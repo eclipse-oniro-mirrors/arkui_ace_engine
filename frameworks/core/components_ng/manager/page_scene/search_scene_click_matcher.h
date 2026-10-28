@@ -88,6 +88,8 @@ struct SearchClickMatchResult {
     int32_t nodeId = -1;
     std::string nodeType;
     RectF rect;
+    int32_t processId = -1;
+    std::string operationId;
 };
 
 // Click matching: Inspector ID case-sensitive full exact match first; only when

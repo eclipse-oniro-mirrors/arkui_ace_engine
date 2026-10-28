@@ -28,6 +28,7 @@
 #include "core/event/crown_event.h"
 #endif
 #include "core/event/mouse_event.h"
+#include "interfaces/inner_api/ace/macros.h"
 #include "interfaces/inner_api/ace/ui_content_config.h"
 
 #define UIEXT_LOGD(fmt, ...)                                                                                      \
@@ -158,9 +159,11 @@ public:
         const std::function<void(const UIExtensionOperationPhase&, int32_t)>&& callback);
     void FireOnAbilityErrorCodeCallback(
         const UIExtensionOperationPhase& operationPhase, int32_t abilityErrorCode);
-    void SetSyncCallbacks(const std::list<std::function<void(const RefPtr<UIExtensionProxy>&)>>&& callbackList);
+    ACE_FORCE_EXPORT void SetSyncCallbacks(
+        const std::list<std::function<void(const RefPtr<UIExtensionProxy>&)>>&& callbackList);
     void FireSyncCallbacks();
-    void SetAsyncCallbacks(const std::list<std::function<void(const RefPtr<UIExtensionProxy>&)>>&& callbackList);
+    ACE_FORCE_EXPORT void SetAsyncCallbacks(
+        const std::list<std::function<void(const RefPtr<UIExtensionProxy>&)>>&& callbackList);
     void FireAsyncCallbacks();
     void SetBindModalCallback(const std::function<void()>&& callback);
     void FireBindModalCallback();
@@ -168,8 +171,12 @@ public:
     bool GetIsTransferringCaller();
     void SetIsTransferringCaller(bool isTransferringCaller);
     /* only for 1.2 end */
-    void SetDpiFollowStrategy(DpiFollowStrategy dpiFollowStrategy);
+    void SetDpiFollowStrategy(DpiFollowStrategy dpiFollowStrategy, bool isDpiFollowStrategySet = true);
     DpiFollowStrategy GetDpiFollowStrategy();
+    bool IsDpiFollowStrategySet()
+    {
+        return isDpiFollowStrategySet_;
+    }
     DpiFollowStrategy GetEffectiveDpiFollowStrategy();
     bool IsCompatibleOldVersion();
 
@@ -266,7 +273,8 @@ public:
     void AddExtraInfoWithParamConfig(
         std::shared_ptr<JsonValue>& json, ParamConfig config = ParamConfig()) override;
     void ExecuteDumpTask(
-        std::shared_ptr<JsonValue>& json, const std::vector<std::string>& params, const RefPtr<FrameNode>& host);
+        std::shared_ptr<JsonValue>& json, const std::vector<std::string>& params, const RefPtr<FrameNode>& host,
+        InspectorTreeRequestContext* request = nullptr);
     int32_t GetInstanceIdFromHost() const;
     void DispatchDisplayArea(bool isForce = false);
     void DispatchDisplayAreaWithDelay(uint32_t delayMs);
@@ -481,6 +489,7 @@ private:
     bool isFoldStatusChanged_ = false;
     bool isRotateStatusChanged_ = false;
     DpiFollowStrategy dpiFollowStrategy_ = DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI;
+    bool isDpiFollowStrategySet_ = false;
     WeakPtr<Pattern> weakSystemWindowScene_;
     SessionViewportConfig sessionViewportConfig_;
     bool viewportConfigChanged_ = false;

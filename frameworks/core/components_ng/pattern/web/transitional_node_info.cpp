@@ -288,4 +288,9 @@ namespace OHOS::Ace::NG {
         return node_->GetRemoveText();
     }
 
+    int32_t TransitionalNodeInfo::GetZIndex()
+    {
+        return node_->GetZIndex();
+    }
+
 } // namespace OHOS::Ace::NG

@@ -38,7 +38,7 @@ struct OrientationAction {
     bool flipVertical = false;
     int rotateAngle = 0;
 };
-class ACE_FORCE_EXPORT ServiceCollaborationMenuAceHelper : public virtual AceType {
+class ACE_FORCE_EXPORT ServiceCollaborationMenuAceHelper : public AceType {
     DECLARE_ACE_TYPE(ServiceCollaborationMenuAceHelper, AceType);
 public:
     explicit ServiceCollaborationMenuAceHelper(std::shared_ptr<SelectOverlayInfo> info)
@@ -109,7 +109,7 @@ private:
     static constexpr char SUN_MENU_TAG[33] = "SelectOverlayMenuByRightClickSub";
 };
 
-class ACE_FORCE_EXPORT ServiceCollaborationAceCallback : public virtual AceType {
+class ACE_FORCE_EXPORT ServiceCollaborationAceCallback : public AceType {
     DECLARE_ACE_TYPE(ServiceCollaborationAceCallback, AceType);
 public:
     RefPtr<FrameNode> CreateCustomPopUpNode(const std::string& value, const std::string& icon);

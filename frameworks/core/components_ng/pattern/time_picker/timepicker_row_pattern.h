@@ -49,6 +49,8 @@ class ACE_FORCE_EXPORT TimePickerRowPattern : public LinearLayoutPattern {
     DECLARE_ACE_TYPE(TimePickerRowPattern, LinearLayoutPattern);
 
 public:
+    void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context) override;
+
     TimePickerRowPattern() : LinearLayoutPattern(false) {};
 
     ~TimePickerRowPattern() override = default;
@@ -337,6 +339,15 @@ public:
     {
         return endTime_;
     }
+
+    bool IsAtStartHour() const;
+    bool IsAtEndHour() const;
+    bool IsAtStartMinute() const;
+    bool IsAtEndMinute() const;
+
+    RefPtr<FrameNode> GetHourColumnNode() const;
+    RefPtr<FrameNode> GetMinuteColumnNode() const;
+    RefPtr<FrameNode> GetSecondColumnNode() const;
 
     void SetDialogTitleDate(const PickerDate& value)
     {
@@ -676,7 +687,7 @@ public:
     void ColumnPatternInitHapticController();
     void ColumnPatternStopHaptic();
     void SetDigitalCrownSensitivity(int32_t crownSensitivity);
-    bool IsStartEndTimeDefined();
+    bool IsStartEndTimeDefined() const;
     bool CheckHourIndexAtStart(uint32_t amPmIndex, uint32_t hourIndex, bool nextStart);
     bool CheckHourIndexAtEnd(uint32_t amPmIndex, uint32_t hourIndex, bool prevEnd);
     bool IsNeedToRebuildColumn(bool isHour, bool isAdd, uint32_t amPmIndex, uint32_t hourIndex, uint32_t minuteIndex);
@@ -749,6 +760,7 @@ private:
     void HandleHour12BuildTimeRange();
     void HandleMinuteBuildTimeRange(uint32_t hourOf24, uint32_t minute);
     void HandleSecondBuildTimeRange();
+    void FlushSecondColumnOptions();
     void SetHourColumnIndexByTime(std::string hour);
     void SetMinuteColumnIndexByTime(uint32_t hourOf24, std::string minute);
     void RecordHourOptions();

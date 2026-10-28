@@ -155,6 +155,7 @@ void JSEmbeddedComponent::Create(const JSCallbackInfo& info)
 
     NG::SessionType sessionType = NG::SessionType::EMBEDDED_UI_EXTENSION;
     NG::DpiFollowStrategy dpiFollowStrategy = NG::DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI;
+    bool isDpiFollowStrategySet = false;
     bool windowModeStrategy = false;
     std::map<NG::PlaceholderType, RefPtr<NG::FrameNode>> placeholderMap;
     if (info.Length() > 1 && info[1]->IsNumber()) {
@@ -165,6 +166,7 @@ void JSEmbeddedComponent::Create(const JSCallbackInfo& info)
         JSRef<JSVal> enableDensityDPI = obj->GetProperty("dpiFollowStrategy");
         if (enableDensityDPI->IsNumber()) {
             dpiFollowStrategy = NG::ParseDpiFollowStrategy(enableDensityDPI->ToNumber<int32_t>());
+            isDpiFollowStrategySet = true;
         }
         JSRef<JSVal> windowModeStrategyValue = obj->GetProperty("windowModeFollowStrategy");
         if (windowModeStrategyValue->IsNumber()) {
@@ -179,6 +181,7 @@ void JSEmbeddedComponent::Create(const JSCallbackInfo& info)
     config.sessionType = sessionType;
     config.placeholderMap = placeholderMap;
     config.dpiFollowStrategy = dpiFollowStrategy;
+    config.isDpiFollowStrategySet = isDpiFollowStrategySet;
     config.isWindowModeFollowHost = windowModeStrategy;
     UIExtensionModel::GetInstance()->Create(config);
     

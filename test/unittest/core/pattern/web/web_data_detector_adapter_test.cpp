@@ -45,6 +45,7 @@ using namespace OHOS::Ace;
 namespace OHOS::Ace::NG {
 namespace {
 RefPtr<WebPattern> g_webPattern = nullptr;
+RefPtr<FrameNode> g_webPatternHost = nullptr;
 const std::string ALL_TEXT_DETECT_TYPES = "phoneNum,url,email,location,datetime";
 }
 
@@ -73,18 +74,26 @@ void WebDataDetectorAdapterTest::SetUpTestCase()
         V2::WEB_ETS_TAG, nodeId, [src, controller]() { return AceType::MakeRefPtr<WebPattern>(src, controller); });
     stack->Push(frameNode);
 
+    g_webPatternHost = frameNode;
     g_webPattern = frameNode->GetPattern<WebPattern>();
     CHECK_NULL_VOID(g_webPattern);
     g_webPattern->OnModifyDone();
+    // Drop the stale ViewStack entry pushed above: a later implicit Finish (e.g. the menu
+    // construction inside AIMenu_001's ShowAIMenu — ViewStackProcessor::Push finishes the
+    // previous stack top) would re-run this pattern's OnModifyDone → InitializeAccessibility
+    // mid-construction; the re-entrant accessibility routing crashed on device
+    // (processdump: InitializeAccessibility+776, fault in the AM-routing refcount claim).
+    ViewStackProcessor::GetInstance()->ClearStack();
 #endif
 }
 
 void WebDataDetectorAdapterTest::TearDownTestCase()
 {
 #ifdef OHOS_STANDARD_SYSTEM
+    g_webPattern = nullptr;
+    g_webPatternHost = nullptr;
     MockPipelineContext::TearDown();
     MockContainer::TearDown();
-    g_webPattern = nullptr;
 #endif
 }
 void WebDataDetectorAdapterTest::SetUp() {}
@@ -616,6 +625,12 @@ HWTEST_F(WebDataDetectorAdapterTest, AIMenu_001, TestSize.Level0)
 {
 #ifdef OHOS_STANDARD_SYSTEM
     auto adapter = AceType::MakeRefPtr<WebDataDetectorAdapter>(AceType::WeakClaim(AceType::RawPtr(g_webPattern)), 0);
+    // The mock pipeline's SetupRootElement creates a REAL OverlayManager; null its
+    // getter so the ShowAIMenu call with menu options present stops at the
+    // overlay-manager gate (returns false) instead of building real menu UI in the
+    // mock env — no theme/render stack, deep MenuManager::ShowAIEntityMenu
+    // construction would crash.
+    MockPipelineContext::SetNullOverlayManagerForTest(true);
     AIMenuInfo info { "phoneNum", "12345678901", R"(<a href="tel:12345678901">12345678901</a>)", RectF(0, 0, 10, 10) };
     bool ret = adapter->ShowAIMenu(info);
     EXPECT_FALSE(ret);
@@ -643,6 +658,7 @@ HWTEST_F(WebDataDetectorAdapterTest, AIMenu_001, TestSize.Level0)
     adapter->OnClickMenuItem("copy", info);
     adapter->OnClickMenuItem("selectText", info);
 
+    MockPipelineContext::SetNullOverlayManagerForTest(false);
     EXPECT_FALSE(ret);
 #endif
 }

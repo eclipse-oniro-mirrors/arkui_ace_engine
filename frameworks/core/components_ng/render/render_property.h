@@ -245,9 +245,16 @@ struct GraphicsProperty {
     ACE_DEFINE_PROPERTY_GROUP_ITEM(BgDynamicBrightnessOption, BrightnessOption);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(FgDynamicBrightnessOption, BrightnessOption);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(DynamicDimDegree, float);
-    ACE_DEFINE_PROPERTY_GROUP_ITEM(BackShadow, Shadow);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(BackBlendMode, BlendMode);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(BackBlendApplyType, BlendApplyType);
+
+    void ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const;
+};
+
+struct VisualProperty {
+    ACE_DEFINE_PROPERTY_GROUP_ITEM(BackShadow, Shadow);
+    ACE_DEFINE_PROPERTY_GROUP_ITEM(ShadowShape, RefPtr<BasicShape>);
+    ACE_DEFINE_PROPERTY_GROUP_ITEM(ShadowClipMode, ShadowClipMode);
 
     void ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const;
 };

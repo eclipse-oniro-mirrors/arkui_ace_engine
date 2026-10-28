@@ -17,8 +17,22 @@
 
 #include "core/components_ng/pattern/common_text/counter_decorator.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_pattern.h"
+#include "core/common/ime/text_input_type.h"
 
 namespace OHOS::Ace::NG {
+
+std::string RichEditorAccessibilityProperty::GetText() const
+{
+    auto frameNode = host_.Upgrade();
+    CHECK_NULL_RETURN(frameNode, "");
+    auto richEditorPattern = frameNode->GetPattern<RichEditorPattern>();
+    CHECK_NULL_RETURN(richEditorPattern, "");
+    if (richEditorPattern->IsPasswordObscured()) {
+        auto content = richEditorPattern->GetObscureContent();
+        return std::string(content.size(), '*');
+    }
+    return TextAccessibilityProperty::GetText();
+}
 
 bool RichEditorAccessibilityProperty::IsEditable() const
 {
@@ -45,12 +59,57 @@ std::string RichEditorAccessibilityProperty::GetHintText() const
     return richEditorPattern->GetPlaceHolder();
 }
 
+bool RichEditorAccessibilityProperty::IsPassword() const
+{
+    auto frameNode = host_.Upgrade();
+    CHECK_NULL_RETURN(frameNode, false);
+    auto richEditorPattern = frameNode->GetPattern<RichEditorPattern>();
+    CHECK_NULL_RETURN(richEditorPattern, false);
+    return richEditorPattern->IsPasswordObscured();
+}
+
+AceTextCategory RichEditorAccessibilityProperty::GetTextInputType() const
+{
+    auto frameNode = host_.Upgrade();
+    CHECK_NULL_RETURN(frameNode, AceTextCategory::INPUT_TYPE_DEFAULT);
+    auto richEditorPattern = frameNode->GetPattern<RichEditorPattern>();
+    CHECK_NULL_RETURN(richEditorPattern, AceTextCategory::INPUT_TYPE_DEFAULT);
+    auto textInputType = richEditorPattern->GetTextInputType();
+
+    switch (textInputType) {
+        case TextInputType::TEXT:
+            return AceTextCategory::INPUT_TYPE_TEXT;
+        case TextInputType::NUMBER:
+        case TextInputType::NUMBER_DECIMAL:
+        case TextInputType::ONE_TIME_CODE:
+        case TextInputType::ONE_TIME_CODE_NUMBER:
+            return AceTextCategory::INPUT_TYPE_NUMBER;
+        case TextInputType::PHONE:
+            return AceTextCategory::INPUT_TYPE_PHONENUMBER;
+        case TextInputType::DATETIME:
+            return AceTextCategory::INPUT_TYPE_DATE;
+        case TextInputType::EMAIL_ADDRESS:
+            return AceTextCategory::INPUT_TYPE_EMAIL;
+        case TextInputType::VISIBLE_PASSWORD:
+        case TextInputType::NUMBER_PASSWORD:
+        case TextInputType::SCREEN_LOCK_PASSWORD:
+            return AceTextCategory::INPUT_TYPE_PASSWORD;
+        case TextInputType::USER_NAME:
+            return AceTextCategory::INPUT_TYPE_USER_NAME;
+        case TextInputType::NEW_PASSWORD:
+            return AceTextCategory::INPUT_TYPE_NEW_PASSWORD;
+        default:
+            return AceTextCategory::INPUT_TYPE_DEFAULT;
+    }
+}
+
 bool RichEditorAccessibilityProperty::IsShowCount() const
 {
     auto frameNode = host_.Upgrade();
     CHECK_NULL_RETURN(frameNode, false);
     auto richEditorPattern = frameNode->GetPattern<RichEditorPattern>();
     CHECK_NULL_RETURN(richEditorPattern, false);
+    CHECK_NULL_RETURN(!richEditorPattern->IsInPasswordMode(), false);
     CHECK_NULL_RETURN(richEditorPattern->IsShowCounterEnabled(), false);
     auto counterDecorator = DynamicCast<CounterDecorator>(richEditorPattern->GetCounterDecorator());
     CHECK_NULL_RETURN(counterDecorator, false);

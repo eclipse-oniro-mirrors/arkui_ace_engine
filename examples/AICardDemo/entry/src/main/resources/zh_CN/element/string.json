@@ -1,0 +1,100 @@
+{
+  "string": [
+    {
+      "name": "titlebar_thinking",
+      "value": "思考中..."
+    },
+    {
+      "name": "titlebar_generating",
+      "value": "生成中..."
+    },
+    {
+      "name": "titlebar_found",
+      "value": "为你找到"
+    },
+    {
+      "name": "titlebar_error",
+      "value": "连接异常"
+    },
+    {
+      "name": "titlebar_stopped",
+      "value": "已停止生成"
+    },
+    {
+      "name": "content_error_hint",
+      "value": "无法获取内容，请稍后重试"
+    },
+    {
+      "name": "compliance_text",
+      "value": "内容由 AI 生成"
+    },
+    {
+      "name": "markdown_copied",
+      "value": "已复制"
+    },
+    {
+      "name": "compliance_dialog_confirm",
+      "value": "确定"
+    },
+    {
+      "name": "compliance_dialog_cancel",
+      "value": "取消"
+    },
+    {
+      "name": "compliance_dislike_reason_1",
+      "value": "答复慢"
+    },
+    {
+      "name": "compliance_dislike_reason_2",
+      "value": "答非所问"
+    },
+    {
+      "name": "compliance_dislike_reason_3",
+      "value": "答复质量差"
+    },
+    {
+      "name": "compliance_dislike_reason_4",
+      "value": "没找到想要的内容"
+    },
+    {
+      "name": "compliance_dislike_reason_5",
+      "value": "搜索结果不相关"
+    },
+    {
+      "name": "compliance_dislike_reason_6",
+      "value": "内容排版乱"
+    },
+    {
+      "name": "compliance_dislike_reason_7",
+      "value": "其他"
+    },
+    {
+      "name": "compliance_dialog_feedback_title",
+      "value": "问题反馈"
+    },
+    {
+      "name": "compliance_dialog_description_title",
+      "value": "问题描述或建议"
+    },
+    {
+      "name": "compliance_dialog_select_reason_tip",
+      "value": "请选择至少一个问题原因"
+    },
+    {
+      "name": "compliance_dialog_description_placeholder",
+      "value": "反馈将帮助我们持续进步，谢谢"
+    },
+    {
+      "name": "recommend_title",
+      "value": "你还可以这样问我："
+    },
+    {
+      "name": "card_expand",
+      "value": "查看全部"
+    },
+    {
+      "name": "card_collapse",
+      "value": "收起"
+    }
+  ]
+}

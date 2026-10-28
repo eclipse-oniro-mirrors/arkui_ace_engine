@@ -40,6 +40,9 @@
 #include "core/components_ng/event/input_event_hub.h"
 #include "core/components_ng/event/gesture_event_hub.h"
 #include "core/components_ng/event/pan_event.h"
+#ifndef CROSS_PLATFORM
+#include "core/components_ng/manager/content_change_manager/content_change_manager.h"
+#endif
 #include "core/components_ng/manager/navigation/navigation_manager.h"
 #include "core/components_ng/pattern/divider/divider_layout_property.h"
 #include "core/components_ng/pattern/divider/divider_pattern.h"
@@ -129,7 +132,10 @@ void TabsPattern::OnAttachToFrameNode()
     auto tabTheme = host->GetTheme<TabTheme>(true);
     CHECK_NULL_VOID(tabTheme);
     host->GetRenderContext()->SetClipToFrame(!tabTheme->GetIsChangeFocusTextStyle());
-    // expand to navigation bar by default
+    // Expand to navigation bar by default (bottom-only, for bottom tab bar mode).
+    // SetCurrentBarDisplayMode() upgrades this to TOP + BOTTOM
+    // when the actual display mode resolves to SIDEBAR, and restores these
+    // bottom-only defaults when it resolves back to BOTTOMTABBAR.
     host->GetLayoutProperty()->UpdateSafeAreaExpandOpts(
         { .type = SAFE_AREA_TYPE_SYSTEM, .edges = SAFE_AREA_EDGE_BOTTOM });
 }
@@ -602,6 +608,9 @@ TabBarDisplayMode TabsPattern::CalculateTabBarDisplayMode(float width)
     if (barLayoutStyle == TabBarLayoutStyle::BOTTOM) {
         return TabBarDisplayMode::BOTTOMTABBAR;
     }
+    if (barLayoutStyle == TabBarLayoutStyle::TOP) {
+        return TabBarDisplayMode::TOP_TABBAR;
+    }
     // minSidebarWidth and minContentWidth constraints only apply when a visible
     // divider exists (i.e., the sidebar is draggable). Without a divider, these
     // range properties should have no effect on display mode determination.
@@ -654,10 +663,32 @@ void TabsPattern::SetCurrentBarDisplayMode(TabBarDisplayMode mode)
     currentBarDisplayMode_ = mode;
     auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
     CHECK_NULL_VOID(tabsNode);
+    // Adjust safe-area expansion on the host based on the actual
+    // display mode. Only SIDEBAR mode needs expansion into
+    // both top (status bar) and bottom (navigation bar) safe areas so that
+    // sidebar children (divider, header/bottom bar, mask nodes) can render
+    // into the safe areas — consistent with Navigation.
+    // BOTTOMTABBAR restores the bottom-only defaults from OnAttachToFrameNode.
+    auto property = tabsNode->GetLayoutProperty();
+    if (property) {
+        if (mode == TabBarDisplayMode::SIDEBAR) {
+            property->UpdateSafeAreaExpandOpts(
+                { .type = SAFE_AREA_TYPE_SYSTEM, .edges = SAFE_AREA_EDGE_TOP + SAFE_AREA_EDGE_BOTTOM });
+        } else {
+            property->UpdateSafeAreaExpandOpts(
+                { .type = SAFE_AREA_TYPE_SYSTEM, .edges = SAFE_AREA_EDGE_BOTTOM });
+        }
+    }
     auto swiperNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabs());
     CHECK_NULL_VOID(swiperNode);
     auto swiperPattern = swiperNode->GetPattern<SwiperPattern>();
     CHECK_NULL_VOID(swiperPattern);
+    // In sidebar mode the sidebar occupies the swiper's main axis (width). When sidebar width
+    // >= container width, contentMainSize_ becomes 0 and itemPosition_ is empty, which would
+    // cause SwipeTo/SwipeToWithoutAnimation to early-return and BeforeCreateLayoutWrapper to
+    // discard a pending targetIndex_. This flag bypasses those checks so tab switch requests
+    // are preserved. Only enabled for SIDEBAR mode to avoid affecting other swiper scenarios.
+    swiperPattern->SetIsTabsSidebarDisplayMode(mode == TabBarDisplayMode::SIDEBAR);
     auto controller = AceType::DynamicCast<TabsControllerNG>(swiperPattern->GetSwiperController());
     if (controller) {
         controller->SetBarDisplayMode(mode);
@@ -1040,6 +1071,13 @@ void TabsPattern::UpdateIndex(const RefPtr<FrameNode>& tabsNode, const RefPtr<Fr
                 return;
             }
         }
+#ifndef CROSS_PLATFORM
+        auto pipeline = swiperNode->GetContext();
+        auto manager = pipeline ? pipeline->GetContentChangeManager() : nullptr;
+        if (manager) {
+            manager->OnSwiperChangeStart(swiperNode, true);
+        }
+#endif
         AceAsyncTraceBeginCommercial(0, APP_TABS_NO_ANIMATION_SWITCH);
         tabBarPattern->SetMaskAnimationByCreate(true);
         UpdateSelectedState(swiperNode, tabBarPattern, tabsLayoutProperty, index);
@@ -1260,6 +1298,9 @@ void TabsPattern::OnColorModeChange(uint32_t colorMode)
     }
     UpdateBackBlurStyle(tabBarNode);
     UpdateBgMaskNode();
+    if (isFloatingTopBar_) {
+        UpdateTopBgMaskNode();
+    }
     tabBarNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
     // Sync divider color and background blur style to the sidebar on color mode change.
     UpdateSideBarAttributes();
@@ -1289,6 +1330,9 @@ bool TabsPattern::OnThemeScopeUpdate(int32_t themeScopeId)
         dividerRenderProperty->UpdateDividerColor(currentDivider.color);
     }
     UpdateBgMaskNode();
+    if (isFloatingTopBar_) {
+        UpdateTopBgMaskNode();
+    }
     // Sync divider/background to the sidebar on theme scope update.
     UpdateSideBarAttributes();
     return false;
@@ -1369,6 +1413,8 @@ RefPtr<LayoutAlgorithm> TabsPattern::CreateLayoutAlgorithm()
     algo->SetItemIndex(tabsNode->GetItemIndex());
     algo->SetIsFloatingBar(isFloatingBar_);
     algo->SetLastFloatingBar(lastFloatingBar_);
+    algo->SetIsFloatingTopBar(isFloatingTopBar_);
+    algo->SetLastFloatingTopBar(lastFloatingTopBar_);
     algo->SetBarDisplayMode(currentBarDisplayMode_);
     return algo;
 }
@@ -1381,13 +1427,26 @@ void TabsPattern::InitFloatingBar()
     bool isHorizontal = property->GetAxis().value_or(Axis::HORIZONTAL) == Axis::HORIZONTAL;
     bool isBarPositionEnd = property->GetTabBarPosition().value_or(BarPosition::START) == BarPosition::END;
     bool isFloatingStyle = property->HasBarFloatingStyle();
+    auto barLayoutStyle = property->GetBarLayoutStyleValue(TabBarLayoutStyle::BOTTOM);
 
     auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
     CHECK_NULL_VOID(tabsNode);
+
     lastFloatingBar_ = isFloatingBar_;
-    if (isBarOverlap && isHorizontal && isBarPositionEnd && isFloatingStyle) {
+    lastFloatingTopBar_ = isFloatingTopBar_;
+
+    bool shouldBottomFloating = isBarOverlap && isHorizontal && isBarPositionEnd && isFloatingStyle &&
+        barLayoutStyle != TabBarLayoutStyle::TOP;
+    bool shouldTopFloating = isHorizontal && barLayoutStyle == TabBarLayoutStyle::TOP;
+
+    auto tabBar = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
+    auto renderContext = tabBar ? tabBar->GetRenderContext() : nullptr;
+
+    if (shouldBottomFloating) {
         isFloatingBar_ = true;
+        isFloatingTopBar_ = false;
         SetTabBarIsFloating(true);
+        SetTabBarIsFloatingTopBar(false);
         if (!tabsNode->HasBackgroundMaskNode()) {
             auto backgroundMaskNode = FrameNode::GetOrCreateFrameNode(TABS_BACKGROUND_MASK_ETS_TAG,
                 tabsNode->GetBackgroundMaskId(), []() { return AceType::MakeRefPtr<StackPattern>(); });
@@ -1397,25 +1456,107 @@ void TabsPattern::InitFloatingBar()
             tabsNode->SetItemIndex(itemIndex);
         }
         UpdateBgMaskNode();
-
         InitTouchEvent();
+        if (renderContext && lastFloatingTopBar_) {
+            renderContext->UpdateBackgroundColor(Color::TRANSPARENT);
+            renderContext->UpdateBackBlurStyle(std::nullopt);
+            renderContext->ResetBorder();
+        }
         ApplySystemMaterial();
+        if (renderContext) {
+            auto style = property->GetBarFloatingStyle();
+            float offsetX = 0.0f;
+            float offsetY = 0.0f;
+            if (style.has_value()) {
+                if (style->offsetX.has_value()) {
+                    offsetX = style->offsetX.value().ConvertToPx();
+                }
+                if (style->offsetY.has_value()) {
+                    offsetY = style->offsetY.value().ConvertToPx();
+                }
+            }
+            renderContext->UpdateTransformTranslate({offsetX, offsetY, 0.0f});
+            renderContext->UpdateTransformScale({baseFloatingScale_, baseFloatingScale_});
+        }
+    } else if (shouldTopFloating) {
+        isFloatingBar_ = false;
+        isFloatingTopBar_ = true;
+        SetTabBarIsFloating(false);
+        SetTabBarIsFloatingTopBar(true);
+        auto topStyle = property->GetBarTopFloatingStyle();
+        bool hasMask = topStyle.has_value() && topStyle->maskHeight.has_value() &&
+            topStyle->maskHeight->IsNonNegative();
+        if (hasMask) {
+            if (!tabsNode->HasBackgroundMaskNode()) {
+                auto backgroundMaskNode = FrameNode::GetOrCreateFrameNode(TABS_BACKGROUND_MASK_ETS_TAG,
+                    tabsNode->GetBackgroundMaskId(), []() { return AceType::MakeRefPtr<StackPattern>(); });
+                backgroundMaskNode->MountToParent(tabsNode, BG_MASK_INDEX);
+                backgroundMaskNode->SetHitTestMode(HitTestMode::HTMNONE);
+                ItemIndex itemIndex = { 0, 1, 2, 3, 4 };
+                tabsNode->SetItemIndex(itemIndex);
+            }
+            UpdateTopBgMaskNode();
+        } else if (tabsNode->HasBackgroundMaskNode() && lastFloatingBar_) {
+            auto backgroundMaskNode = AceType::DynamicCast<FrameNode>(tabsNode->GetBackgroundMask());
+            CHECK_NULL_VOID(backgroundMaskNode);
+            backgroundMaskNode->SetActive(false);
+        }
+        if (renderContext) {
+            auto tabTheme = tabBar->GetTheme<TabTheme>(true);
+            if (tabTheme) {
+                renderContext->UpdateBackgroundColor(tabTheme->GetTopTabBarBackgroundColor());
+                BlurStyleOption blurOption;
+                blurOption.blurStyle = BlurStyle::COMPONENT_THIN;
+                renderContext->UpdateBackBlurStyle(blurOption);
+                NG::BorderWidthProperty borderWidthProperty;
+                borderWidthProperty.SetBorderWidth(Dimension(1, DimensionUnit::VP));
+                renderContext->UpdateBorderWidth(borderWidthProperty);
+                NG::BorderStyleProperty borderStyle;
+                borderStyle.SetBorderStyle(BorderStyle::SOLID);
+                renderContext->UpdateBorderStyle(borderStyle);
+                NG::BorderColorProperty borderColor;
+                borderColor.SetColor(tabTheme->GetTopTabBarBackgroundColor());
+                renderContext->UpdateBorderColor(borderColor);
+            }
+            float offsetX = 0.0f;
+            float offsetY = 0.0f;
+            if (topStyle.has_value()) {
+                if (topStyle->offsetX.has_value()) {
+                    offsetX = topStyle->offsetX.value().ConvertToPx();
+                }
+                if (topStyle->offsetY.has_value()) {
+                    offsetY = topStyle->offsetY.value().ConvertToPx();
+                }
+            }
+            renderContext->UpdateTransformTranslate({offsetX, offsetY, 0.0f});
+            renderContext->UpdateTransformScale({1.0f, 1.0f});
+        }
     } else {
+        isFloatingBar_ = false;
+        isFloatingTopBar_ = false;
+        SetTabBarIsFloating(false);
+        SetTabBarIsFloatingTopBar(false);
         if (tabsNode->HasBackgroundMaskNode()) {
             auto backgroundMaskNode = AceType::DynamicCast<FrameNode>(tabsNode->GetBackgroundMask());
             CHECK_NULL_VOID(backgroundMaskNode);
             backgroundMaskNode->SetActive(false);
         }
-        isFloatingBar_ = false;
-        SetTabBarIsFloating(false);
         if (floatingBarPosition_ != FloatingBarPosition::CENTER) {
             ResetTabBarFollowHandPosition();
         }
         if (lastFloatingBar_) {
             ResetSystemMaterial();
         }
+        if (renderContext && (lastFloatingBar_ || lastFloatingTopBar_)) {
+            renderContext->UpdateTransformTranslate({0.0f, 0.0f, 0.0f});
+            renderContext->UpdateTransformScale({1.0f, 1.0f});
+            if (lastFloatingTopBar_) {
+                renderContext->UpdateBackBlurStyle(std::nullopt);
+                renderContext->ResetBorder();
+            }
+        }
     }
-    if (isFloatingBar_ != lastFloatingBar_) {
+    if (isFloatingBar_ != lastFloatingBar_ || isFloatingTopBar_ != lastFloatingTopBar_) {
         tabsNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
     }
 }
@@ -1454,6 +1595,51 @@ void TabsPattern::UpdateBgMaskNode()
     Gradient gradient;
     gradient.CreateGradientWithType(GradientType::LINEAR);
     gradient.SetDirection(GradientDirection::TOP);
+
+    for (uint32_t index = 0; index < DEFAULT_GRADIENT_COLOR_NUM; ++index) {
+        double ratio = DEFAULT_GRADIENT_COLOR_RATIO[index];
+        Color stepColor = Color(
+            static_cast<uint32_t>(baseColor.GetAlpha() * ratio) << LEFT_SHIFT_24 | (baseColor.GetValue() & RGB_MASK));
+        gradient.AddColor(CreatePercentGradientColor(DEFAULT_GRADIENT_COLOR_DIMENSION[index], stepColor));
+    }
+
+    stackRenderContext->UpdateLinearGradient(gradient);
+}
+
+void TabsPattern::UpdateTopBgMaskNode()
+{
+    auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
+    CHECK_NULL_VOID(tabsNode);
+    if (!tabsNode->HasBackgroundMaskNode()) {
+        return;
+    }
+    auto backgroundMaskNode = AceType::DynamicCast<FrameNode>(tabsNode->GetBackgroundMask());
+    CHECK_NULL_VOID(backgroundMaskNode);
+    auto stackRenderContext = backgroundMaskNode->GetRenderContext();
+    CHECK_NULL_VOID(stackRenderContext);
+    auto property = GetLayoutProperty<TabsLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    auto style = property->GetBarTopFloatingStyle();
+    Color baseColor(MASK_COLOR_LIGHT);
+    ColorMode colorInvertColorMode = GetColorInvertColorMode();
+    if (style.has_value() && style->maskColor.has_value()) {
+        baseColor = style->maskColor.value();
+    } else if (colorInvertColorMode != ColorMode::COLOR_MODE_UNDEFINED) {
+        if (colorInvertColorMode == ColorMode::DARK) {
+            baseColor = Color(MASK_COLOR_DARK);
+        }
+    } else {
+        auto context = GetContext();
+        if (context && context->GetColorMode() == ColorMode::DARK) {
+            baseColor = Color(MASK_COLOR_DARK);
+        } else if (tabsNode->GetLocalColorMode() == ColorMode::DARK) {
+            baseColor = Color(MASK_COLOR_DARK);
+        }
+    }
+
+    Gradient gradient;
+    gradient.CreateGradientWithType(GradientType::LINEAR);
+    gradient.SetDirection(GradientDirection::BOTTOM);
 
     for (uint32_t index = 0; index < DEFAULT_GRADIENT_COLOR_NUM; ++index) {
         double ratio = DEFAULT_GRADIENT_COLOR_RATIO[index];
@@ -1592,7 +1778,21 @@ void TabsPattern::ResetTabBarFollowHandPosition()
         return;
     }
     renderContext->UpdateTransformScale({ baseFloatingScale_, baseFloatingScale_ });
-    renderContext->UpdateTransformTranslate({ 0.0f, 0.0f, 0.0f });
+    float offsetX = 0.0f;
+    float offsetY = 0.0f;
+    auto property = GetLayoutProperty<TabsLayoutProperty>();
+    if (property) {
+        auto style = property->GetBarFloatingStyle();
+        if (style.has_value()) {
+            if (style->offsetX.has_value()) {
+                offsetX = style->offsetX.value().ConvertToPx();
+            }
+            if (style->offsetY.has_value()) {
+                offsetY = style->offsetY.value().ConvertToPx();
+            }
+        }
+    }
+    renderContext->UpdateTransformTranslate({offsetX, offsetY, 0.0f});
 }
 
 void TabsPattern::OnWindowSizeChanged(int32_t /*width*/, int32_t /*height*/, WindowSizeChangeReason type)
@@ -1784,6 +1984,73 @@ void TabsPattern::ResetSystemMaterial()
     UnregisterColorPicker();
 }
 
+void TabsPattern::ClampTabBarTransformOffset()
+{
+    if (!isFloatingBar_ && !isFloatingTopBar_) {
+        return;
+    }
+    auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
+    CHECK_NULL_VOID(tabsNode);
+    auto tabBar = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
+    CHECK_NULL_VOID(tabBar);
+    auto renderContext = tabBar->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    if (!renderContext->HasTransformTranslate()) {
+        return;
+    }
+    auto translate = renderContext->GetTransformTranslate().value();
+    float offsetX = translate.x.ConvertToPx();
+    float offsetY = translate.y.ConvertToPx();
+    auto tabBarGeo = tabBar->GetGeometryNode();
+    auto tabsGeo = tabsNode->GetGeometryNode();
+    if (!tabBarGeo || !tabsGeo) {
+        return;
+    }
+    float barLeft = tabBarGeo->GetFrameOffset().GetX();
+    float barTop = tabBarGeo->GetFrameOffset().GetY();
+    float barWidth = tabBarGeo->GetFrameSize().Width();
+    float barHeight = tabBarGeo->GetFrameSize().Height();
+    float tabsWidth = tabsGeo->GetFrameSize().Width();
+    float tabsHeight = tabsGeo->GetFrameSize().Height();
+    float tabsOffsetX = tabsGeo->GetFrameOffset().GetX();
+    float tabsOffsetY = tabsGeo->GetFrameOffset().GetY();
+
+    float minOffsetX = -barLeft;
+    float maxOffsetX = tabsWidth - barLeft - barWidth;
+    float minOffsetY = -barTop;
+    float maxOffsetY = tabsHeight - barTop - barHeight;
+
+    auto context = tabsNode->GetContext();
+    if (context) {
+        auto safeArea = context->GetSafeArea();
+        auto titleHeight = context->GetContainerModalTitleHeight();
+        float titleAvoidance = titleHeight > 0 ? static_cast<float>(titleHeight) : 0.0f;
+        float safeLeftPx = static_cast<float>(safeArea.left_.Length());
+        float safeRightPx = static_cast<float>(safeArea.right_.Length());
+        float safeTopPx = static_cast<float>(safeArea.top_.Length()) + titleAvoidance;
+        float safeBottomPx = static_cast<float>(safeArea.bottom_.Length());
+
+        if (LessNotEqual(tabsOffsetX, safeLeftPx)) {
+            minOffsetX = std::max(minOffsetX, safeLeftPx - tabsOffsetX - barLeft);
+        }
+        if (GreatNotEqual(tabsOffsetX + tabsWidth, safeRightPx)) {
+            maxOffsetX = std::min(maxOffsetX, tabsOffsetX + tabsWidth - safeRightPx - barLeft - barWidth);
+        }
+        if (LessNotEqual(tabsOffsetY, safeTopPx)) {
+            minOffsetY = std::max(minOffsetY, safeTopPx - tabsOffsetY - barTop);
+        }
+        if (GreatNotEqual(tabsOffsetY + tabsHeight, safeBottomPx)) {
+            maxOffsetY = std::min(maxOffsetY, tabsOffsetY + tabsHeight - safeBottomPx - barTop - barHeight);
+        }
+    }
+
+    float clampedX = std::clamp(offsetX, minOffsetX, std::max(minOffsetX, maxOffsetX));
+    float clampedY = std::clamp(offsetY, minOffsetY, std::max(minOffsetY, maxOffsetY));
+    if (!NearEqual(clampedX, offsetX) || !NearEqual(clampedY, offsetY)) {
+        renderContext->UpdateTransformTranslate({clampedX, clampedY, 0.0f});
+    }
+}
+
 void TabsPattern::SetFloatingScaleEnabled(bool isFloatingScaleEnabled)
 {
     baseFloatingScale_ = isFloatingScaleEnabled ? FLOATING_BAR_SCALE_ENLARGED : FLOATING_BAR_SCALE;
@@ -1929,6 +2196,9 @@ void TabsPattern::HandleColorInvert()
     tabBarPattern->SetColorInvertColorMode(colorMode);
 
     UpdateBgMaskNode();
+    if (isFloatingTopBar_) {
+        UpdateTopBgMaskNode();
+    }
 }
 
 RefPtr<FrameNode> TabsPattern::CreateSideBarNode()
@@ -1944,6 +2214,12 @@ RefPtr<FrameNode> TabsPattern::CreateSideBarNode()
     auto renderContext = sideBarNode->GetRenderContext();
     CHECK_NULL_RETURN(renderContext, nullptr);
     renderContext->UpdateClipEdge(true);
+    // Expand sidebar background/blur into status bar (top) and navigation bar (bottom).
+    auto sideBarLayoutProperty = sideBarNode->GetLayoutProperty();
+    if (sideBarLayoutProperty) {
+        sideBarLayoutProperty->UpdateSafeAreaExpandOpts(
+            { .type = SAFE_AREA_TYPE_SYSTEM, .edges = SAFE_AREA_EDGE_TOP + SAFE_AREA_EDGE_BOTTOM });
+    }
     return sideBarNode;
 }
 
@@ -1959,7 +2235,14 @@ RefPtr<FrameNode> TabsPattern::CreateSideBarDividerNode()
         static_cast<int32_t>(DEFAULT_DIVIDER_STROKE_WIDTH.Unit()));
     CHECK_NULL_RETURN(nodeModifiers->setDividerVertical, nullptr);
     nodeModifiers->setDividerVertical(arkUINodeHandle, true);
-    return Referenced::Claim<FrameNode>(reinterpret_cast<FrameNode*>(arkUINodeHandle));
+    auto dividerNode = Referenced::Claim<FrameNode>(reinterpret_cast<FrameNode*>(arkUINodeHandle));
+    CHECK_NULL_RETURN(dividerNode, nullptr);
+    auto dividerLayoutProperty = dividerNode->GetLayoutProperty();
+    CHECK_NULL_RETURN(dividerLayoutProperty, nullptr);
+    // Expand divider background/blur into status bar (top) and navigation bar (bottom).
+    dividerLayoutProperty->UpdateSafeAreaExpandOpts(
+        { .type = SAFE_AREA_TYPE_SYSTEM, .edges = SAFE_AREA_EDGE_TOP + SAFE_AREA_EDGE_BOTTOM });
+    return dividerNode;
 }
 
 void TabsPattern::UpdateSideBarIfNeeded()
@@ -1971,7 +2254,9 @@ void TabsPattern::UpdateSideBarIfNeeded()
     auto preStyle = layoutStyle_.value_or(TabBarLayoutStyle::BOTTOM);
     layoutStyle_ = property->GetBarLayoutStyle();
     auto newStyle = layoutStyle_.value_or(TabBarLayoutStyle::BOTTOM);
-    if (preStyle == TabBarLayoutStyle::BOTTOM && newStyle == TabBarLayoutStyle::BOTTOM) {
+    bool preIsNonSidebar = preStyle == TabBarLayoutStyle::BOTTOM || preStyle == TabBarLayoutStyle::TOP;
+    bool newIsNonSidebar = newStyle == TabBarLayoutStyle::BOTTOM || newStyle == TabBarLayoutStyle::TOP;
+    if (preIsNonSidebar && newIsNonSidebar) {
         return;
     }
     if ((preStyle == TabBarLayoutStyle::SIDEBAR_ADAPTABLE || preStyle == TabBarLayoutStyle::SIDEBAR) &&
@@ -1982,9 +2267,17 @@ void TabsPattern::UpdateSideBarIfNeeded()
         }
         return;
     }
-    // adaptable/sidebar -> bottom
-    if (newStyle == TabBarLayoutStyle::BOTTOM) {
+    // adaptable/sidebar -> bottom/top
+    if (newIsNonSidebar) {
         ClearDividerDragEvent();
+        // Remove CollapseButton (direct child of tabsNode) when leaving sidebar mode.
+        // sideBarNode_ and sideBarDividerNode_ are kept for reuse on the next switch;
+        // their visibility is managed by the layout algorithm's Measure().
+        if (collapseButtonNode_) {
+            host->RemoveChild(collapseButtonNode_);
+            host->MarkNeedSyncRenderTree();
+            collapseButtonNode_ = nullptr;
+        }
         // Keep sideBarTabBarItemId on each TabContentNode so that GetOrCreateTabItemNode
         // can reuse existing tab item nodes on the next bottom->sidebar switch.
         // Resetting the ids here would cause fresh ids to be generated, leading to
@@ -2009,21 +2302,15 @@ void TabsPattern::UpdateSideBarIfNeeded()
         host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
     } else {
         // Nodes already exist (kept from a previous sidebar→bottom switch).
-        // Make them visible again and sync any property changes.
-        if (sideBarNode_) {
-            auto property = sideBarNode_->GetLayoutProperty();
-            CHECK_NULL_VOID(property);
-            property->UpdateVisibility(VisibleType::VISIBLE);
-        }
-        if (sideBarDividerNode_) {
-            auto property = sideBarDividerNode_->GetLayoutProperty();
-            CHECK_NULL_VOID(property);
-            property->UpdateVisibility(VisibleType::VISIBLE);
-        }
+        // Don't set visibility here — the layout algorithm's Measure() will
+        // call UpdateSideBarAndSideBarDividerVisibility based on the resolved
+        // display mode (which depends on width for SIDEBAR_ADAPTABLE).
         host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
     }
     // Sync properties to SideBarPattern, then trigger its OnModifyDone
     SyncPropertiesToSideBar();
+    // Create or remove collapse button based on showSidebarControlButton_
+    UpdateCollapseButtonIfNeeded();
     // Register all existing TabContent tab items.
     // First time: update=false to create items and bind click events.
     // Subsequent switches: update=true to update existing items in place
@@ -2084,8 +2371,8 @@ TabsItemDivider TabsPattern::GetEffectiveSidebarDividerConfig() const
         auto divider = property->GetSidebarDividerValue();
         return divider;
     }
-    if (property->HasDivider()) {
-        auto divider = property->GetDividerValue();
+    if (property->HasDividerForSideBar()) {
+        auto divider = property->GetDividerForSideBarValue();
         return divider;
     }
     return TabsItemDivider();
@@ -2121,17 +2408,27 @@ void TabsPattern::UpdateSidebarDividerColor()
             color = currentDivider.color;
             hasColor = true;
         }
-    } else if (tabsProperty->HasDivider()) {
+    } else if (tabsProperty->HasDividerForSideBar()) {
         if (tabsProperty->HasDividerColorSetByUser() && tabsProperty->GetDividerColorSetByUserValue()) {
-            auto currentDivider = tabsProperty->GetDividerValue();
+            auto currentDivider = tabsProperty->GetDividerForSideBarValue();
             color = currentDivider.color;
             hasColor = true;
         }
     }
     if (hasColor) {
+        // The sidebar divider expands into the status bar and navigation bar via
+        // SafeAreaExpandOpts, which enlarges the RSNode Bounds but NOT the Line drawn
+        // by DividerPaintMethod (dividerLength_ stays at FrameRect height).
+        // To make the divider visually span the full expanded height, we follow the
+        // same approach as Navigation (navigation_model_ng.cpp:457-459): set the
+        // DividerColor (Line) to transparent and use BackgroundColor instead, since
+        // BackgroundColor fills the entire RSNode Bounds including the safe area.
         auto renderProp = sideBarDividerNode_->GetPaintProperty<DividerRenderProperty>();
         CHECK_NULL_VOID(renderProp);
-        renderProp->UpdateDividerColor(color);
+        renderProp->UpdateDividerColor(Color::TRANSPARENT);
+        auto renderContext = sideBarDividerNode_->GetRenderContext();
+        CHECK_NULL_VOID(renderContext);
+        renderContext->UpdateBackgroundColor(color);
     }
 }
 
@@ -2140,9 +2437,11 @@ void TabsPattern::UpdateSideBarDivider()
     CHECK_NULL_VOID(sideBarDividerNode_);
     auto divider = GetEffectiveSidebarDividerConfig();
     if (!divider.isNull) {
-        // Use DividerPattern's own properties for both line width and color,
-        // so DividerPaintMethod renders the full divider without needing RenderContext background.
-        // strokeWidth defaults to 0; only use the developer's value when it is positive and non-percent.
+        // strokeWidth controls the divider width. When strokeWidth is 0 the default
+        // DEFAULT_DIVIDER_STROKE_WIDTH set in CreateSideBarDividerNode is used.
+        // Color is handled by UpdateSidebarDividerColor() via RenderContext BackgroundColor
+        // (not DividerColor) so that it fills the entire safe-area-expanded Bounds.
+        // Only use the developer's value when it is positive and non-percent.
         auto dividerLayoutProp = sideBarDividerNode_->GetLayoutProperty<DividerLayoutProperty>();
         if (dividerLayoutProp) {
             Dimension effectiveStrokeWidth(0.0f);
@@ -2268,14 +2567,17 @@ void TabsPattern::SyncPropertiesToSideBar()
     // 5. Sync searchable
     sideBarPattern->SetSideBarSearchableOptions(searchableOptions_);
 
-    // 4. Replay bar modifier on the sidebar node first (matches tabBar execution order
+    // 4. Sync showSidebarControlButton
+    sideBarPattern->SetShowSidebarControlButton(showSidebarControlButton_);
+
+    // 5. Replay bar modifier on the sidebar node first (matches tabBar execution order
     // where barModifier is applied before bar* properties, so bar* can override modifier)
     if (barModifierApply_) {
         auto apply = barModifierApply_;
         apply(sideBarNode_);
     }
 
-    // 5. Sync bar* attributes (divider, background color, background blur style) to the sidebar.
+    // 6. Sync bar* attributes (divider, background color, background blur style) to the sidebar.
     // Applied after modifier so that bar* properties take precedence, consistent with tabBar.
     UpdateSideBarAttributes();
 
@@ -2298,6 +2600,31 @@ void TabsPattern::SyncPropertiesToSideBar()
     // After all properties are synced, explicitly trigger SideBar Pattern's OnModifyDone
     sideBarNode_->MarkModifyDone();
     sideBarNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+}
+
+void TabsPattern::UpdateCollapseButtonIfNeeded()
+{
+    auto host = AceType::DynamicCast<TabsNode>(GetHost());
+    CHECK_NULL_VOID(host);
+    CHECK_NULL_VOID(sideBarNode_);
+    auto sideBarPattern = sideBarNode_->GetPattern<TabsSideBarPattern>();
+    CHECK_NULL_VOID(sideBarPattern);
+
+    if (showSidebarControlButton_ && !collapseButtonNode_) {
+        collapseButtonNode_ = sideBarPattern->CreateCollapseButton(host);
+        if (collapseButtonNode_) {
+            sideBarPattern->UpdateCollapseButtonIcon();
+            collapseButtonNode_->MarkModifyDone();
+            host->MarkNeedSyncRenderTree();
+            host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+        }
+    } else if (!showSidebarControlButton_ && collapseButtonNode_) {
+        host->RemoveChild(collapseButtonNode_);
+        host->MarkNeedSyncRenderTree();
+        host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+        collapseButtonNode_ = nullptr;
+        sideBarPattern->ClearCollapseButtonState();
+    }
 }
 
 void TabsPattern::RegisterSideBarTabItems(bool update)
@@ -2374,6 +2701,9 @@ TabBarDisplayMode TabsPattern::GetActiveBarDisplayMode() const
     auto barStyle = property->GetBarLayoutStyleValue(TabBarLayoutStyle::BOTTOM);
     if (barStyle == TabBarLayoutStyle::SIDEBAR) {
         return TabBarDisplayMode::SIDEBAR;
+    }
+    if (barStyle == TabBarLayoutStyle::TOP) {
+        return TabBarDisplayMode::TOP_TABBAR;
     }
     return TabBarDisplayMode::BOTTOMTABBAR;
 }
@@ -2486,8 +2816,8 @@ std::optional<Dimension> TabsPattern::GetEffectiveSidebarWidth() const
         return std::nullopt;
     }
     // sidebarWidth API was never called: fall back to barWidth
-    if (property->HasBarWidth()) {
-        auto width = property->GetBarWidthValue();
+    if (property->HasBarWidthForSideBar()) {
+        auto width = property->GetBarWidthForSideBarValue();
         if (width.IsNonNegative()) {
             return width;
         }
@@ -2861,7 +3191,11 @@ void TabsPattern::ApplyEnteringElementInitialTransform(TabBarDisplayMode toMode)
     CHECK_NULL_VOID(host);
     auto tabBar = AceType::DynamicCast<FrameNode>(host->GetTabBar());
     auto tabBarDivider = AceType::DynamicCast<FrameNode>(host->GetDivider());
-    ApplyEnteringBottomTabBarInitialTransform(tabBar, tabBarDivider);
+    auto layoutProperty = host->GetLayoutProperty<TabsLayoutProperty>();
+    bool keepNode = layoutProperty && layoutProperty->GetKeepTabBarInSideBarValue(false);
+    if (!keepNode) {
+        ApplyEnteringBottomTabBarInitialTransform(tabBar, tabBarDivider);
+    }
 }
 
 void TabsPattern::ApplyEnteringSidebarInitialTransform(float outsideX)
@@ -2934,12 +3268,16 @@ void TabsPattern::ResetDisplayModeSwitchTransforms()
     auto tabBarDivider = AceType::DynamicCast<FrameNode>(host->GetDivider());
     auto bgMaskNode = host->HasBackgroundMaskNode() ?
         AceType::DynamicCast<FrameNode>(host->GetBackgroundMask()) : nullptr;
+    auto layoutProperty = host->GetLayoutProperty<TabsLayoutProperty>();
+    bool keepMode = layoutProperty && layoutProperty->GetKeepTabBarInSideBarValue(false);
 
-    if (tabBar) {
+    if (tabBar && !keepMode) {
         auto renderContext = tabBar->GetRenderContext();
         CHECK_NULL_VOID(renderContext);
         renderContext->UpdateTransformScale({ baseFloatingScale_, baseFloatingScale_ });
-        renderContext->UpdateTransformTranslate({ 0.0f, 0.0f, 0.0f });
+        if (!isFloatingTopBar_) {
+            renderContext->UpdateTransformTranslate({ 0.0f, 0.0f, 0.0f });
+        }
         renderContext->UpdateOpacity(1.0);
     }
     if (sideBar) {
@@ -2947,7 +3285,7 @@ void TabsPattern::ResetDisplayModeSwitchTransforms()
         CHECK_NULL_VOID(renderContext);
         renderContext->UpdateTransformTranslate({ 0.0f, 0.0f, 0.0f });
     }
-    if (sideBarDivider) {
+    if (sideBarDivider && !keepMode) {
         auto renderContext = sideBarDivider->GetRenderContext();
         CHECK_NULL_VOID(renderContext);
         renderContext->UpdateTransformTranslate({ 0.0f, 0.0f, 0.0f });
@@ -3044,6 +3382,8 @@ void TabsPattern::ApplyNonFloatingTabBarAnimClosure(bool toSidebar, float outsid
     auto tabBarDivider = AceType::DynamicCast<FrameNode>(tabsNode->GetDivider());
     auto bgMaskNode = tabsNode->HasBackgroundMaskNode() ?
         AceType::DynamicCast<FrameNode>(tabsNode->GetBackgroundMask()) : nullptr;
+    auto layoutProperty = tabsNode->GetLayoutProperty<TabsLayoutProperty>();
+    bool keepMode = layoutProperty && layoutProperty->GetKeepTabBarInSideBarValue(false);
 
     float sideTranslateX = toSidebar ? 0.0f : outsideX;
     if (sideBar) {
@@ -3056,18 +3396,18 @@ void TabsPattern::ApplyNonFloatingTabBarAnimClosure(bool toSidebar, float outsid
         CHECK_NULL_VOID(renderContext);
         renderContext->UpdateTransformTranslate({ sideTranslateX, 0.0f, 0.0f });
     }
-    if (tabBar) {
+    if (tabBar && !keepMode) {
         auto renderContext = tabBar->GetRenderContext();
         CHECK_NULL_VOID(renderContext);
         if (toSidebar) {
             renderContext->UpdateTransformTranslate({ 0.0f, tabHeight, 0.0f });
             renderContext->UpdateOpacity(0.0);
-        } else {
+        } else if (!isFloatingTopBar_) {
             renderContext->UpdateTransformTranslate({ 0.0f, 0.0f, 0.0f });
             renderContext->UpdateOpacity(1.0);
         }
     }
-    if (tabBarDivider) {
+    if (tabBarDivider && !keepMode) {
         auto renderContext = tabBarDivider->GetRenderContext();
         CHECK_NULL_VOID(renderContext);
         if (toSidebar) {

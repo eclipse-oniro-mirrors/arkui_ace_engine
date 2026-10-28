@@ -35,7 +35,7 @@ extern const char RICHTEXT_METHOD[];
 extern const char RICHTEXT_EVENT[];
 extern const char RICHTEXT_RESULT_FAIL[];
 
-class RichTextResource : public virtual AceType {
+class RichTextResource : public AceType {
     DECLARE_ACE_TYPE(RichTextResource, AceType);
 
 public:

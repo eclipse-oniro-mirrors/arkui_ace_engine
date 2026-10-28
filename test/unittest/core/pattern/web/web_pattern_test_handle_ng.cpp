@@ -113,7 +113,9 @@ public:
     void Unlock() override {}
 }; // namespace OHOS::Ace::NG
 
-class MockLayoutWrapper : public LayoutWrapper {
+class MockLayoutWrapper : public LayoutWrapper, public AceType {
+    DECLARE_ACE_TYPE(MockLayoutWrapper, LayoutWrapper, AceType);
+
 public:
     MockLayoutWrapper(WeakPtr<FrameNode> hostNode) : LayoutWrapper(std::move(hostNode)), lock_() {}
 
@@ -145,8 +147,8 @@ public:
         return layoutProperty;
     }
 
-    RefPtr<LayoutWrapper> GetOrCreateChildByIndex(
-        uint32_t index, bool addToRenderTree = true, bool isCache = false) override
+    RefPtr<LayoutWrapper> GetOrCreateChildByIndex(uint32_t index, bool addToRenderTree = true,
+        bool isCache = false, bool allowPlaceholderSubstitution = false) override
     {
         return nullptr;
     }
@@ -226,6 +228,11 @@ public:
     void SetLongPredictTask() override {}
 
 private:
+    AceType* GetLayoutOwner() const override
+    {
+        return const_cast<MockLayoutWrapper*>(this);
+    }
+
     MockRecursiveLock lock_;
 };
 } // namespace OHOS::Ace::NG

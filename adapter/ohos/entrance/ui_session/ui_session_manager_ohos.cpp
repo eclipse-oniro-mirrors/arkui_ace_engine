@@ -1043,6 +1043,19 @@ int32_t UiSessionManagerOhos::ExtractRuleJsonAndWebEnabled(int32_t processId,
             ruleJson = ruleJsons.front();
         }
     } else {
+        // Look up search rule sets by ruleSetId (searchPageSceneRuleSets_:
+        // pid -> ruleSetId -> SearchPageSceneRuleSetInfo)
+        auto searchIter = searchPageSceneRuleSets_.find(processId);
+        if (searchIter != searchPageSceneRuleSets_.end()) {
+            auto setIter = searchIter->second.find(ruleJsonOrRuleSetId);
+            if (setIter != searchIter->second.end()) {
+                // Search rules use ArkUI detection and do not use the legacy Web rule schema.
+                webEnabled = false;
+                ruleJson = setIter->second.ruleJson;
+                pendingPageSceneGets_.insert(processId);
+                return NO_ERROR;
+            }
+        }
         auto ruleSetInfo = ExtractPageSceneRuleSetInfo(ruleJsonOrRuleSetId);
         webEnabled = ruleSetInfo.webEnabled;
         auto ruleJsons = GetPageSceneRuleJsons(ruleSetInfo, PAGE_SCENE_TEXT_EDITOR_SCENE, false, "");
@@ -1203,6 +1216,11 @@ void UiSessionManagerOhos::FlushPageSceneNodeChanged()
     for (const auto& [pid, ruleJson] : ruleJsons) {
         TriggerPageSceneDetect(pid, ruleJson, false);
     }
+}
+
+void UiSessionManagerOhos::FlushPendingSearchClicksIfStable()
+{
+    UiSessionManager::FlushPendingSearchClicksIfStable();
 }
 
 void UiSessionManagerOhos::SavePageSceneDetectFunction(PageSceneDetectFunction&& function)
@@ -1674,6 +1692,23 @@ void UiSessionManagerOhos::NotifySendCommandPattern(int32_t id, const std::strin
     }
 }
 
+void UiSessionManagerOhos::NotifySendCommandPatternWithResult(
+    int32_t id, const std::string& command, const CommandResultCallback& finishCallback)
+{
+    NotifySendCommandWithResultFunction notifyFunction;
+    {
+        std::lock_guard<std::mutex> lock(notifySendCommandWithResultFunctionMutex_);
+        notifyFunction = notifySendCommandWithResultFunction_;
+    }
+    if (notifyFunction) {
+        notifyFunction(id, command, finishCallback);
+        return;
+    }
+    if (finishCallback) {
+        finishCallback(R"({"result":"FAILED","errorType":"EXECUTE_FAIL","errorMessage":""})");
+    }
+}
+
 int32_t UiSessionManagerOhos::NotifySendCommandSyncPattern(int32_t id, const std::string& command)
 {
     NotifySendCommandSyncFunction notifySendCommandSyncFunction;
@@ -1744,6 +1779,12 @@ void UiSessionManagerOhos::SaveForSendCommandSyncFunction(NotifySendCommandSyncF
 {
     std::lock_guard<std::mutex> lock(notifySendCommandSyncFunctionMutex_);
     notifySendCommandSyncFunction_ = std::move(function);
+}
+
+void UiSessionManagerOhos::SaveForSendCommandWithResultFunction(NotifySendCommandWithResultFunction&& function)
+{
+    std::lock_guard<std::mutex> lock(notifySendCommandWithResultFunctionMutex_);
+    notifySendCommandWithResultFunction_ = std::move(function);
 }
 
 bool UiSessionManagerOhos::GetWebFocusRegistered()
@@ -2415,6 +2456,23 @@ void UiSessionManagerOhos::SendCommand(const std::string& command)
     }
 }
 
+void UiSessionManagerOhos::SendCommandWithResult(
+    const std::string& command, const CommandResultCallback& finishCallback)
+{
+    SendCommandWithResultFunction sendFunction;
+    {
+        std::lock_guard<std::mutex> lock(sendCommandWithResultFunctionMutex_);
+        sendFunction = sendCommandWithResultFunction_;
+    }
+    if (sendFunction) {
+        sendFunction(command, finishCallback);
+        return;
+    }
+    if (finishCallback) {
+        finishCallback(R"({"result":"FAILED","errorType":"EXECUTE_FAIL","errorMessage":""})");
+    }
+}
+
 void UiSessionManagerOhos::SaveSendCommandFunction(SendCommandFunction&& function)
 {
     std::lock_guard<std::mutex> lock(sendCommandFunctionMutex_);
@@ -2425,6 +2483,43 @@ void UiSessionManagerOhos::SaveRelaxedCommandFunction(RelaxedCommandFunction&& f
 {
     std::lock_guard<std::mutex> lock(relaxedCommandFunctionMutex_);
     relaxedCommandFunction_ = std::move(function);
+}
+
+void UiSessionManagerOhos::SaveSendCommandWithResultFunction(SendCommandWithResultFunction&& function)
+{
+    std::lock_guard<std::mutex> lock(sendCommandWithResultFunctionMutex_);
+    sendCommandWithResultFunction_ = std::move(function);
+}
+
+UiSessionManager::CommandResultCallback UiSessionManagerOhos::MakeCommandResultCallback(
+    int32_t processId, uint64_t requestId)
+{
+    wptr<IRemoteObject> connection;
+    {
+        std::shared_lock<std::shared_mutex> lock(reportObjectMutex_);
+        auto iter = reportObjectMap_.find(processId);
+        if (iter == reportObjectMap_.end()) {
+            return {};
+        }
+        connection = iter->second;
+    }
+    return [this, connection, processId, requestId](const std::string& resultJson) {
+        auto remote = connection.promote();
+        if (!remote) {
+            return;
+        }
+        {
+            std::shared_lock<std::shared_mutex> lock(reportObjectMutex_);
+            auto iter = reportObjectMap_.find(processId);
+            if (iter == reportObjectMap_.end() || iter->second != remote) {
+                return;
+            }
+        }
+        auto service = iface_cast<ReportService>(remote);
+        if (service) {
+            service->ReportCommandResult(requestId, resultJson);
+        }
+    };
 }
 
 void UiSessionManagerOhos::RegisterPipeLineExeAppAIFunction(
@@ -2635,13 +2730,13 @@ void UiSessionManagerOhos::ComponentTreeQuery(const ComponentTreeQueryRequest& r
     }
 }
 
-void UiSessionManagerOhos::ReportComponentTreeQueryResult(const std::string& data)
+void UiSessionManagerOhos::ReportNavigationQueryResult(const std::string& data)
 {
     std::shared_lock<std::shared_mutex> reportLock(reportObjectMutex_);
     std::unique_lock<std::shared_mutex> processMapLock(processMapMutex_);
     auto processIter = processMap_.find("componentTreeQuery");
     if (processIter == processMap_.end() || processIter->second.empty()) {
-        LOGW("ReportComponentTreeQueryResult no report proxy");
+        LOGW("ReportNavigationQueryResult no report proxy");
         return;
     }
     for (const auto& pid : processIter->second) {
@@ -2649,10 +2744,54 @@ void UiSessionManagerOhos::ReportComponentTreeQueryResult(const std::string& dat
         auto reportService =
             (reportIter != reportObjectMap_.end()) ? iface_cast<ReportService>(reportIter->second) : nullptr;
         if (reportService == nullptr) {
-            LOGW("Report ComponentTreeQueryResult failed, process id:%{public}d", pid);
+            LOGW("Report NavigationQueryResult failed, process id:%{public}d", pid);
             continue;
         }
-        reportService->ReportComponentTreeQueryResult(data);
+        reportService->ReportNavigationQueryResult(data);
+    }
+    processIter->second.clear();
+}
+
+void UiSessionManagerOhos::ReportLazyForEachQueryResult(const std::string& data)
+{
+    std::shared_lock<std::shared_mutex> reportLock(reportObjectMutex_);
+    std::unique_lock<std::shared_mutex> processMapLock(processMapMutex_);
+    auto processIter = processMap_.find("lazyForEachQuery");
+    if (processIter == processMap_.end() || processIter->second.empty()) {
+        LOGW("ReportLazyForEachQueryResult no report proxy");
+        return;
+    }
+    for (const auto& pid : processIter->second) {
+        auto reportIter = reportObjectMap_.find(pid);
+        auto reportService =
+            (reportIter != reportObjectMap_.end()) ? iface_cast<ReportService>(reportIter->second) : nullptr;
+        if (reportService == nullptr) {
+            LOGW("Report LazyForEachQueryResult failed, process id:%{public}d", pid);
+            continue;
+        }
+        reportService->ReportLazyForEachQueryResult(data);
+    }
+    processIter->second.clear();
+}
+
+void UiSessionManagerOhos::ReportNodesInRectQueryResult(const std::string& data)
+{
+    std::shared_lock<std::shared_mutex> reportLock(reportObjectMutex_);
+    std::unique_lock<std::shared_mutex> processMapLock(processMapMutex_);
+    auto processIter = processMap_.find("nodesInRectQuery");
+    if (processIter == processMap_.end() || processIter->second.empty()) {
+        LOGW("ReportNodesInRectQueryResult no report proxy");
+        return;
+    }
+    for (const auto& pid : processIter->second) {
+        auto reportIter = reportObjectMap_.find(pid);
+        auto reportService =
+            (reportIter != reportObjectMap_.end()) ? iface_cast<ReportService>(reportIter->second) : nullptr;
+        if (reportService == nullptr) {
+            LOGW("Report NodesInRectQueryResult failed, process id:%{public}d", pid);
+            continue;
+        }
+        reportService->ReportNodesInRectQueryResult(data);
     }
     processIter->second.clear();
 }

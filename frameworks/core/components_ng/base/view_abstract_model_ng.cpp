@@ -280,6 +280,8 @@ void ViewAbstractModelNG::BindMenu(
     CHECK_NULL_VOID(targetNode);
     auto targetId = targetNode->GetId();
     ACE_UPDATE_LAYOUT_PROPERTY(LayoutProperty, IsBindOverlay, true);
+    targetNode->SetInspectorMenuBinding((!params.empty() || buildFunc) ?
+        std::make_optional(menuParam.isShowInSubWindow) : std::nullopt);
     if (CheckMenuIsShow(menuParam, targetId, targetNode)) {
         TAG_LOGI(AceLogTag::ACE_MENU, "hide menu done %{public}d %{public}d.", menuParam.isShowInSubWindow, targetId);
     } else if (menuParam.isShow) {
@@ -1223,6 +1225,18 @@ RefPtr<PipelineContext> ViewAbstractModelNG::GetSheetContext(NG::SheetStyle& she
     return context;
 }
 
+void ViewAbstractModelNG::ApplySheetImmersiveStrategyDefaults(
+    const RefPtr<PipelineContext>& context, NG::SheetStyle& sheetStyle)
+{
+    CHECK_NULL_VOID(context);
+    if (!context->IsImmersiveStrategySet(ImmersiveStrategy::BIND_SHEET_EXPAND_SAFE_AREA)) {
+        return;
+    }
+    if (!sheetStyle.titleBarHoverMode.has_value()) {
+        sheetStyle.titleBarHoverMode = SheetTitleBarHoverMode::SAFE_AREA_PADDING;
+    }
+}
+
 void ViewAbstractModelNG::BindSheet(bool isShow, std::function<void(const std::string&)>&& callback,
     std::function<void()>&& buildFunc, std::function<void()>&& titleBuildFunc, NG::SheetStyle& sheetStyle,
     std::function<void()>&& onAppear, std::function<void()>&& onDisappear, std::function<void()>&& shouldDismiss,
@@ -1250,6 +1264,7 @@ void ViewAbstractModelNG::BindSheet(bool isShow, std::function<void(const std::s
     };
     auto context = GetSheetContext(sheetStyle);
     CHECK_NULL_VOID(context);
+    ApplySheetImmersiveStrategyDefaults(context, sheetStyle);
     auto overlayManager = context->GetOverlayManager();
     auto* sheetModifier = NodeModifier::GetSheetManagerInnerModifier();
     CHECK_NULL_VOID(sheetModifier);
@@ -2237,6 +2252,49 @@ void ViewAbstractModelNG::SetSafeAreaPaddings(const std::optional<CalcDimension>
     ViewAbstract::SetSafeAreaPadding(paddings);
 }
 
+void ViewAbstractModelNG::SetSafeAreaInset(
+    const SafeAreaInsetOptions& options, SafeAreaInsetBuilderArray&& builders)
+{
+    if (!ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess()) {
+        return;
+    }
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    auto effectiveOptions = options;
+    SafeAreaInsetContentArray contents;
+    for (size_t index = 0; index < SAFE_AREA_INSET_EDGE_COUNT; ++index) {
+        if (!effectiveOptions.edges[index].has_value()) {
+            continue;
+        }
+        auto& builder = builders[index];
+        if (!builder) {
+            effectiveOptions.edges[index].reset();
+            continue;
+        }
+        ScopedViewStackProcessor builderViewStackProcessor;
+        builder();
+        contents[index] = ViewStackProcessor::GetInstance()->Finish();
+        if (!contents[index]) {
+            effectiveOptions.edges[index].reset();
+        }
+    }
+    if (effectiveOptions.Empty()) {
+        ViewAbstract::ResetSafeAreaInset(frameNode);
+        return;
+    }
+    ViewAbstract::SetSafeAreaInset(frameNode, effectiveOptions, contents);
+}
+
+void ViewAbstractModelNG::ResetSafeAreaInset()
+{
+    if (!ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess()) {
+        return;
+    }
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    ViewAbstract::ResetSafeAreaInset(frameNode);
+}
+
 void ViewAbstractModelNG::SetAccessibilityCustomActions(
     FrameNode* frameNode, const std::vector<AccessibilityCustomAction>& actions)
 {
@@ -2266,5 +2324,15 @@ void ViewAbstractModelNG::ResetAccessibilityCustomActions()
     auto frameNode = NG::ViewStackProcessor::GetInstance()->GetMainFrameNode();
     CHECK_NULL_VOID(frameNode);
     ResetAccessibilityCustomActions(frameNode);
+}
+
+void ViewAbstractModelNG::SetShadowShape(const RefPtr<BasicShape>& basicShape)
+{
+    ViewAbstract::SetShadowShape(basicShape);
+}
+
+void ViewAbstractModelNG::SetShadowClipMode(ShadowClipMode clipMode)
+{
+    ViewAbstract::SetShadowClipMode(clipMode);
 }
 } // namespace OHOS::Ace::NG

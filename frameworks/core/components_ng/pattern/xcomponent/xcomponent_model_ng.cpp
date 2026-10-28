@@ -333,6 +333,16 @@ void XComponentModelNG::HdrBrightness(float hdrBrightness, HdrType hdrType)
     xcPattern->HdrBrightness(hdrBrightness, hdrType);
 }
 
+void XComponentModelNG::SetExtraFlag(uint32_t flag)
+{
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent SetExtraFlag (model instance) entry, flag: %{public}u", flag);
+    auto frameNode = AceType::Claim(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    CHECK_NULL_VOID(frameNode);
+    auto xcPattern = AceType::DynamicCast<XComponentPattern>(frameNode->GetPattern());
+    CHECK_NULL_VOID(xcPattern);
+    xcPattern->SetExtraFlag(flag);
+}
+
 void XComponentModelNG::EnableTransparentLayer(bool isTransparentLayer)
 {
     auto frameNode = AceType::Claim(ViewStackProcessor::GetInstance()->GetMainFrameNode());
@@ -626,6 +636,15 @@ void XComponentModelNG::HdrBrightness(FrameNode* frameNode, float hdrBrightness,
     auto xcPattern = AceType::DynamicCast<XComponentPattern>(frameNode->GetPattern());
     CHECK_NULL_VOID(xcPattern);
     xcPattern->HdrBrightness(hdrBrightness, hdrType);
+}
+
+void XComponentModelNG::SetExtraFlag(FrameNode* frameNode, uint32_t flag)
+{
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent SetExtraFlag (model static) entry, flag: %{public}u", flag);
+    CHECK_NULL_VOID(frameNode);
+    auto xcPattern = AceType::DynamicCast<XComponentPattern>(frameNode->GetPattern());
+    CHECK_NULL_VOID(xcPattern);
+    xcPattern->SetExtraFlag(flag);
 }
 
 void XComponentModelNG::EnableTransparentLayer(FrameNode* frameNode, bool enable)

@@ -14,12 +14,15 @@
  * limitations under the License.
  */
 
+#include <cstdio>
+#include <fstream>
 #include <gmock/gmock.h>
 #include <memory>
 
 #include "gtest/gtest.h"
 
 #include "base/memory/ace_type.h"
+#include "base/base64/base64_util.h"
 
 #define private public
 #define protected public
@@ -309,6 +312,8 @@ public:
 
 class NWebDragDataTrueDummy : public NWeb::NWebDragData {
 public:
+    explicit NWebDragDataTrueDummy(const std::string& html = "<p>This is some fragment html</p>")
+        : fragmentHtml_(html) {}
     std::string GetLinkURL() override
     {
         return "https://example.com";
@@ -319,7 +324,7 @@ public:
     }
     std::string GetFragmentHtml() override
     {
-        return "<p>This is some fragment html</p>";
+        return fragmentHtml_;
     }
     bool GetPixelMapSetting(const void** data, size_t& len, int& width, int& height) override
     {
@@ -372,6 +377,8 @@ public:
         return DragOperationsMask::DRAG_ALLOW_EVERY;
     }
     void SetAllowedDragOperation(DragOperationsMask allowed_op) override {}
+
+    std::string fragmentHtml_;
 };
 
 class WebPatternAddTestNg : public testing::Test {
@@ -1385,6 +1392,524 @@ HWTEST_F(WebPatternAddTestNg, ClearDragData_001, TestSize.Level1)
     EXPECT_FALSE(mockNWebDragData->isDataCleared_);
     webPattern->ClearDragData();
     EXPECT_TRUE(mockNWebDragData->isDataCleared_);
+#endif
+}
+
+/**
+ * @tc.name: RewriteHtmlImgSrc_001
+ * @tc.desc: RewriteHtmlImgSrc — normal case: <img src="old"> is replaced with fileUri.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternAddTestNg, RewriteHtmlImgSrc_001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    std::string html = R"(<img src="file:///old/path/image.jpg" style="width:100px;">)";
+    std::string fileUri = "file:///data/storage/el2/base/haps/entry/temp/dragdrop/test.jpg";
+    webPattern->RewriteHtmlImgSrc(html, fileUri);
+    EXPECT_NE(html.find(fileUri), std::string::npos);
+    EXPECT_EQ(html.find("file:///old/path/image.jpg"), std::string::npos);
+#endif
+}
+
+/**
+ * @tc.name: RewriteHtmlImgSrc_002
+ * @tc.desc: RewriteHtmlImgSrc — no <img tag in HTML, htmlContent unchanged.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternAddTestNg, RewriteHtmlImgSrc_002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    std::string html = "<p>This is some fragment html</p>";
+    std::string original = html;
+    std::string fileUri = "file:///data/storage/el2/base/haps/entry/temp/dragdrop/test.jpg";
+    webPattern->RewriteHtmlImgSrc(html, fileUri);
+    EXPECT_EQ(html, original);
+#endif
+}
+
+/**
+ * @tc.name: RewriteHtmlImgSrc_003
+ * @tc.desc: RewriteHtmlImgSrc — <img tag exists but no  src=" attribute, htmlContent unchanged.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternAddTestNg, RewriteHtmlImgSrc_003, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    std::string html = R"(<img data-src="something.jpg">)";
+    std::string original = html;
+    std::string fileUri = "file:///data/storage/el2/base/haps/entry/temp/dragdrop/test.jpg";
+    webPattern->RewriteHtmlImgSrc(html, fileUri);
+    EXPECT_EQ(html, original);
+#endif
+}
+
+/**
+ * @tc.name: RewriteHtmlImgSrc_004
+ * @tc.desc: RewriteHtmlImgSrc — <img src=" present but no closing quote, htmlContent unchanged.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternAddTestNg, RewriteHtmlImgSrc_004, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    std::string html = R"(<img src="no_closing_quote)";
+    std::string original = html;
+    std::string fileUri = "file:///data/storage/el2/base/haps/entry/temp/dragdrop/test.jpg";
+    webPattern->RewriteHtmlImgSrc(html, fileUri);
+    EXPECT_EQ(html, original);
+#endif
+}
+
+/**
+ * @tc.name: RewriteHtmlImgSrc_005
+ * @tc.desc: RewriteHtmlImgSrc — does not match data-src attribute, only matches  src=".
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternAddTestNg, RewriteHtmlImgSrc_005, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    std::string html = R"(<img data-src="data_value.jpg" src="real_src.jpg">)";
+    std::string fileUri = "file:///new/path/test.jpg";
+    webPattern->RewriteHtmlImgSrc(html, fileUri);
+    EXPECT_NE(html.find(fileUri), std::string::npos);
+    EXPECT_EQ(html.find("real_src.jpg"), std::string::npos);
+    // data-src should still be intact
+    EXPECT_NE(html.find("data-src=\"data_value.jpg\""), std::string::npos);
+#endif
+}
+
+/**
+ * @tc.name: HandleOnDragStart_003
+ * @tc.desc: HandleOnDragStart with image file and HTML containing <img src>, verifies RewriteHtmlImgSrc is called.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternAddTestNg, HandleOnDragStart_003, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    webPattern->delegate_->pixelMap_ = AccessibilityManager::MakeRefPtr<PixelMapImpl>();
+    webPattern->delegate_->tempDir_ = "/data/storage/el2/base/haps/entry/temp";
+    std::string originalHtml = R"(<img src="file:///old/path/image.jpg" alt="test">)";
+    auto mockNWebDragData = std::make_shared<NWebDragDataTrueDummy>(originalHtml);
+    webPattern->delegate_->dragData_ = mockNWebDragData;
+    RefPtr<UnifiedDataImpl> aceUnifiedData = AceType::MakeRefPtr<UnifiedDataImpl>();
+    ASSERT_NE(aceUnifiedData, nullptr);
+    auto mockUdmfClient = AceType::DynamicCast<MockUdmfClient>(UdmfClient::GetInstance());
+    ASSERT_NE(mockUdmfClient, nullptr);
+    EXPECT_CALL(*mockUdmfClient, CreateUnifiedData()).WillOnce(Return(aceUnifiedData));
+    EXPECT_CALL(*mockUdmfClient,
+        AddFileUriRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData),
+            ElementsAreArray({ "file:///data/storage/el2/base/haps/entry/temp/dragdrop/example_image.jpg" })))
+        .WillOnce(Return(true));
+    EXPECT_CALL(*mockUdmfClient,
+        AddPlainTextRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData), "This is some fragment text"))
+        .Times(1);
+    // After RewriteHtmlImgSrc, the html should contain the rewritten fileUri instead of the original src.
+    std::string expectedHtml =
+        R"(<img src="file:///data/storage/el2/base/haps/entry/temp/dragdrop/example_image.jpg" alt="test">)";
+    EXPECT_CALL(*mockUdmfClient,
+        AddHtmlRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData), expectedHtml, ""))
+        .Times(1);
+    EXPECT_CALL(*mockUdmfClient,
+        AddLinkRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData), "https://example.com", "Example Link Title"))
+        .Times(1);
+    RefPtr<OHOS::Ace::DragEvent> info = AceType::MakeRefPtr<OHOS::Ace::DragEvent>();
+    webPattern->HandleOnDragStart(info);
+    EXPECT_FALSE(webPattern->isDragEndMenuShow_);
+#endif
+}
+
+/**
+ * @tc.name: HandleOnDragStart_004
+ * @tc.desc: HandleOnDragStart with no image file name, RewriteHtmlImgSrc not called.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternAddTestNg, HandleOnDragStart_004, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    webPattern->delegate_->pixelMap_ = AccessibilityManager::MakeRefPtr<PixelMapImpl>();
+    auto mockNWebDragData = std::make_shared<NWebDragDataDummy>();
+    webPattern->delegate_->dragData_ = mockNWebDragData;
+    RefPtr<UnifiedDataImpl> aceUnifiedData = AceType::MakeRefPtr<UnifiedDataImpl>();
+    ASSERT_NE(aceUnifiedData, nullptr);
+    auto mockUdmfClient = AceType::DynamicCast<MockUdmfClient>(UdmfClient::GetInstance());
+    ASSERT_NE(mockUdmfClient, nullptr);
+    EXPECT_CALL(*mockUdmfClient, CreateUnifiedData()).WillOnce(Return(aceUnifiedData));
+    // No AddFileUriRecord expected because fileName is empty
+    // No AddHtmlRecord expected because htmlContent is empty (NWebDragDataDummy returns "")
+    // No AddPlainTextRecord expected because plainContent is empty
+    // No AddLinkRecord expected because linkUrl is empty
+    RefPtr<OHOS::Ace::DragEvent> info = AceType::MakeRefPtr<OHOS::Ace::DragEvent>();
+    webPattern->HandleOnDragStart(info);
+    EXPECT_FALSE(webPattern->isDragEndMenuShow_);
+#endif
+}
+
+/**
+ * @tc.name: OnDragFileNameStart_002
+ * @tc.desc: OnDragFileNameStart returns the udmfUri string, verifies return value.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternAddTestNg, OnDragFileNameStart_002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    webPattern->delegate_->tempDir_ = "/data/storage/el2/base/haps/entry/temp";
+    RefPtr<UnifiedDataImpl> aceUnifiedData = AceType::MakeRefPtr<UnifiedDataImpl>();
+    ASSERT_NE(aceUnifiedData, nullptr);
+    auto mockUdmfClient = AceType::DynamicCast<MockUdmfClient>(UdmfClient::GetInstance());
+    ASSERT_NE(mockUdmfClient, nullptr);
+    std::string expectedUri = "file:///data/storage/el2/base/haps/entry/temp/dragdrop/test.jpg";
+    EXPECT_CALL(*mockUdmfClient, AddFileUriRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData),
+                                     ElementsAreArray({ expectedUri })))
+        .WillOnce(Return(false));
+    std::string result = webPattern->OnDragFileNameStart(aceUnifiedData, "test.jpg");
+    // OnDragFileNameStart returns "" when AddFileUriRecord fails, so the caller falls back
+    // to not rewriting the HTML <img src>.
+    EXPECT_TRUE(result.empty());
+#endif
+}
+
+/**
+ * @tc.name: BuildImageDataUri_001
+ * @tc.desc: BuildImageDataUri reads a bmp temp file and returns a data: URI with image/bmp mime.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternAddTestNg, BuildImageDataUri_001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    // Write a temp file with known content, mimicking what Blink writes to tempDir_/dragdrop/<fileName>.
+    std::string fullName = "/data/local/tmp/test_drag_image_build_data_uri_001.bmp";
+    std::string fileContent = "BMPFakeImageContent001";
+    {
+        std::ofstream ofs(fullName, std::ofstream::binary);
+        if (!ofs.is_open()) {
+            GTEST_SKIP() << "Cannot write temp file, skip: " << fullName;
+        }
+        ofs.write(fileContent.data(), static_cast<std::streamsize>(fileContent.size()));
+        ofs.close();
+    }
+    std::string dataUri = webPattern->BuildImageDataUri(fullName, "jpg1.bmp");
+    EXPECT_FALSE(dataUri.empty());
+    EXPECT_EQ(dataUri.substr(0, sizeof("data:image/bmp;base64,") - 1), std::string("data:image/bmp;base64,"));
+    // Base64Util is mocked in unit tests; verify the data: URI carries the encoded payload.
+    std::string payload = dataUri.substr(sizeof("data:image/bmp;base64,") - 1);
+    EXPECT_FALSE(payload.empty());
+    std::string decoded;
+    EXPECT_TRUE(Base64Util::Decode(payload, decoded));
+    std::remove(fullName.c_str());
+#endif
+}
+
+/**
+ * @tc.name: BuildImageDataUri_002
+ * @tc.desc: BuildImageDataUri maps webp extension to image/webp mime.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternAddTestNg, BuildImageDataUri_002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    std::string fullName = "/data/local/tmp/test_drag_image_build_data_uri_002.webp";
+    std::string fileContent = "WebPFakeContent002";
+    {
+        std::ofstream ofs(fullName, std::ofstream::binary);
+        if (!ofs.is_open()) {
+            GTEST_SKIP() << "Cannot write temp file, skip: " << fullName;
+        }
+        ofs.write(fileContent.data(), static_cast<std::streamsize>(fileContent.size()));
+        ofs.close();
+    }
+    std::string dataUri = webPattern->BuildImageDataUri(fullName, "1000.webp");
+    EXPECT_FALSE(dataUri.empty());
+    EXPECT_EQ(dataUri.substr(0, sizeof("data:image/webp;base64,") - 1), std::string("data:image/webp;base64,"));
+    std::string payload = dataUri.substr(sizeof("data:image/webp;base64,") - 1);
+    EXPECT_FALSE(payload.empty());
+    std::remove(fullName.c_str());
+#endif
+}
+
+/**
+ * @tc.name: BuildImageDataUri_003
+ * @tc.desc: BuildImageDataUri returns empty string when the temp file does not exist (fallback path).
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternAddTestNg, BuildImageDataUri_003, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    // Non-existent path: BuildImageDataUri should return "" so HandleOnDragStart falls back to file://.
+    std::string dataUri = webPattern->BuildImageDataUri("/data/local/tmp/nonexistent_drag_image_003.bmp", "jpg1.bmp");
+    EXPECT_TRUE(dataUri.empty());
+#endif
+}
+
+/**
+ * @tc.name: BuildImageDataUri_004
+ * @tc.desc: BuildImageDataUri maps jpg extension to image/jpeg mime and png to image/png mime.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternAddTestNg, BuildImageDataUri_004, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    std::string fileContent = "JpgPngContent004";
+    // jpg -> image/jpeg
+    std::string jpgPath = "/data/local/tmp/test_drag_image_build_data_uri_004.jpg";
+    {
+        std::ofstream ofs(jpgPath, std::ofstream::binary);
+        if (!ofs.is_open()) {
+            GTEST_SKIP() << "Cannot write temp file, skip: " << jpgPath;
+        }
+        ofs.write(fileContent.data(), static_cast<std::streamsize>(fileContent.size()));
+        ofs.close();
+    }
+    std::string jpgUri = webPattern->BuildImageDataUri(jpgPath, "img.jpg");
+    EXPECT_EQ(jpgUri.substr(0, sizeof("data:image/jpeg;base64,") - 1), std::string("data:image/jpeg;base64,"));
+    std::remove(jpgPath.c_str());
+    // png -> image/png
+    std::string pngPath = "/data/local/tmp/test_drag_image_build_data_uri_004.png";
+    {
+        std::ofstream ofs(pngPath, std::ofstream::binary);
+        if (!ofs.is_open()) {
+            GTEST_SKIP() << "Cannot write temp file, skip: " << pngPath;
+        }
+        ofs.write(fileContent.data(), static_cast<std::streamsize>(fileContent.size()));
+        ofs.close();
+    }
+    std::string pngUri = webPattern->BuildImageDataUri(pngPath, "img.png");
+    EXPECT_EQ(pngUri.substr(0, sizeof("data:image/png;base64,") - 1), std::string("data:image/png;base64,"));
+    std::remove(pngPath.c_str());
+#endif
+}
+
+/**
+ * @tc.name: BuildImageDataUri_005
+ * @tc.desc: BuildImageDataUri returns empty string when the file exceeds the size cap (fallback to file://).
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternAddTestNg, BuildImageDataUri_005, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    // Write a file larger than the 10MB cap. BuildImageDataUri must skip it and return "" so the
+    // caller falls back to the file:// path (avoids OOM from inlining huge images into HTML).
+    std::string fullName = "/data/local/tmp/test_drag_image_build_data_uri_005.bmp";
+    constexpr size_t overSize = 10 * 1024 * 1024 + 1; // 10MB + 1 byte
+    {
+        std::ofstream ofs(fullName, std::ofstream::binary);
+        if (!ofs.is_open()) {
+            GTEST_SKIP() << "Cannot write temp file, skip: " << fullName;
+        }
+        std::vector<char> chunk(1024 * 1024, 'x'); // 1MB chunks
+        for (size_t i = 0; i + chunk.size() <= overSize; i += chunk.size()) {
+            ofs.write(chunk.data(), static_cast<std::streamsize>(chunk.size()));
+        }
+        ofs.write(chunk.data(), static_cast<std::streamsize>(overSize % chunk.size()));
+        ofs.flush();
+        if (!ofs.good()) {
+            std::remove(fullName.c_str());
+            GTEST_SKIP() << "Cannot write full temp file, skip: " << fullName;
+        }
+        ofs.close();
+    }
+    std::string dataUri = webPattern->BuildImageDataUri(fullName, "big.bmp");
+    EXPECT_TRUE(dataUri.empty());
+    std::remove(fullName.c_str());
+#endif
+}
+
+/**
+ * @tc.name: RewriteHtmlImgSrc_DataUri_001
+ * @tc.desc: RewriteHtmlImgSrc replaces <img src> with a data: URI (the new cross-device execution branch).
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternAddTestNg, RewriteHtmlImgSrc_DataUri_001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    // HTML from Blink CreateMarkup is lowercase double-quoted: <img src="..." style="...">
+    std::string html = R"(<img src="dragdrop://sandbox-link" style="width:100px;height:100px;">)";
+    std::string dataUri = "data:image/bmp;base64,Qk1QRmFrZUltYWdlQ29udGVudDAwMQ==";
+    webPattern->RewriteHtmlImgSrc(html, dataUri);
+    auto srcPos = html.find("src=\"");
+    ASSERT_NE(srcPos, std::string::npos);
+    auto srcEnd = html.find("\"", srcPos + sizeof("src=\"") - 1);
+    ASSERT_NE(srcEnd, std::string::npos);
+    std::string extracted = html.substr(srcPos + sizeof("src=\"") - 1, srcEnd - (srcPos + sizeof("src=\"") - 1));
+    EXPECT_EQ(extracted, dataUri);
+#endif
+}
+
+/**
+ * @tc.name: RewriteHtmlImgSrc_DataUri_002
+ * @tc.desc: RewriteHtmlImgSrc leaves HTML unchanged when there is no <img tag (data: URI variant).
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternAddTestNg, RewriteHtmlImgSrc_DataUri_002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    std::string html = R"(<p>no image here</p>)";
+    std::string original = html;
+    webPattern->RewriteHtmlImgSrc(html, "data:image/png;base64,AAAA");
+    EXPECT_EQ(html, original);
 #endif
 }
 } // namespace OHOS::Ace::NG

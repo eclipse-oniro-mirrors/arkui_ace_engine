@@ -145,6 +145,10 @@ declare enum ShadowStyle {
   OUTLINE_MD = 8,
   COSINE = 9,
 }
+declare enum ShadowClipMode {
+  DEFAULT_SHAPE = 0,
+  BOUNDS_SHAPE,
+}
 declare interface BlurOptions {
   low?: number;
   high?: number;
@@ -1391,6 +1395,11 @@ declare interface ItemDragInfo {
   y: number;
 }
 declare interface EditModeOptions {}
+declare interface PlaceholderOptions {
+  id?: string;
+  size?: SizeOptions;
+}
+declare type PlaceholderProvider = (index: number) => PlaceholderOptions | undefined;
 declare interface Scroller {}
 declare enum FocusWrapMode {
   DEFAULT = 0,
@@ -1581,6 +1590,7 @@ declare enum TabBarStyle {
   BOTTOM = 0,
   SIDEBAR = 1,
   SIDEBAR_ADAPTABLE = 2,
+  TOP = 3,
 }
 declare enum TabsSidebarDisplayStyle {
   EMBED = 0,
@@ -1596,6 +1606,7 @@ declare interface TabsSidebarSearchableOptions {
 declare enum TabBarDisplayMode {
   BOTTOM_TABBAR = 0,
   SIDEBAR = 1,
+  TOP_TABBAR = 2,
 }
 declare enum TabVisibility {
   VISIBLE = 0,
@@ -1643,6 +1654,10 @@ declare enum ScrollSnapAlign {
   START = 1,
   CENTER = 2,
   END = 3,
+}
+declare interface ScrollSnapOffsetProvider {
+  calculateSnapOffset: (velocity: number) => number;
+  calculateApproachOffset?: (velocity: number, decayOffset: number) => number;
 }
 declare class SymbolEffect {}
 declare enum TextDataDetectorType {
@@ -2027,8 +2042,10 @@ declare interface NestedScrollOptionsExt {
 }
 declare type OnCameraCaptureStateChangeCallback = (event: any) => void;
 declare type OnContextMenuHideCallback = () => void;
+declare type OnContextMenuUpdateCallback = () => void;
 declare type OnDetectBlankScreenCallback = (event: any) => void;
 declare type OnFirstScreenPaintCallback = (firstScreenPaint: any) => void;
+declare type OnMonitorBlankScreenCallback = (event: any) => void;
 declare type OnMicrophoneCaptureStateChangeCallback = (event: any) => void;
 declare type OnNavigationEntryCommittedCallback = (loadCommittedDetails: any) => void;
 declare type OnOverrideUrlLoadingCallback = (webResourceRequest: WebResourceRequest) => boolean;

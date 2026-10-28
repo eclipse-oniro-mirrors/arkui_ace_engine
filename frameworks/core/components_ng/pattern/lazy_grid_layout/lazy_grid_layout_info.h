@@ -27,6 +27,10 @@
 
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_offset.h"
 
+namespace OHOS::Ace {
+struct ParamConfig;
+}
+
 namespace OHOS::Ace::NG {
 
 class LazyGridLayoutAlgorithm;
@@ -42,12 +46,15 @@ class ACE_EXPORT LazyGridLayoutInfo : public AceType {
     DECLARE_ACE_TYPE(LazyGridLayoutInfo, AceType);
 public:
     void EstimateItemSize();
-    void UpdatePosMap(float prevBodyMainSize);
+    // False rejects an inconsistent known extent; the normal posMap update still runs.
+    bool UpdatePosMap(float prevBodyMainSize, std::optional<float> knownBodyMainSize = std::nullopt);
     void SetPosMap(int32_t index, const GridItemMainPos& pos);
     void SetCachedPosMap(int32_t index, const GridItemMainPos& pos);
     void SetSpace(float space);
     void SetLanes(int32_t lanes);
     void SetTotalItemCount(int32_t count);
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
     void DumpAdvanceInfo();
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json);
 
@@ -57,6 +64,10 @@ public:
 
     bool NeedPredict() const;
 private:
+    void EstimateBoundaryItemSize();
+    bool ApplyKnownBodySize(float prevBodyMainSize, float knownBodyMainSize);
+    std::optional<std::pair<int32_t, double>> CollectMeasuredRows() const;
+    void RebaseKnownRows(double estimateSize, float knownBodyMainSize);
     float UpdatePosMapStart(int32_t updateStart, int32_t updateEnd);
     void UpdatePosMapEnd(int32_t updateEnd);
     void UpdateTotalMainSize();
@@ -95,6 +106,8 @@ private:
     int32_t cachedUpdatedStart_ = INT_MAX;
     int32_t cachedUpdatedEnd_ = -1;
     std::optional<int64_t> deadline_;
+    // Committed content extent whose container geometry has not been published by normal Measure yet.
+    std::optional<float> premeasuredMainSize_;
 
     friend class LazyGridLayoutAlgorithm;
     friend class LazyGridLayoutPattern;

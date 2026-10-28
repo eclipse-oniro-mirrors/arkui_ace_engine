@@ -166,6 +166,11 @@ public:
     void StartExitingTransitionEffects(const RefPtr<FrameNode>& popupNode, const std::function<void()>& finish);
     void StartEnteringAnimation(std::function<void()> finish);
     void StartExitingAnimation(std::function<void()> finish);
+    int32_t GetPopupTargetId() const
+    {
+        return targetNodeId_;
+    }
+
     bool IsOnShow();
     bool IsExiting();
     void OnColorConfigurationUpdate() override;
@@ -437,12 +442,28 @@ public:
 protected:
     void OnDetachFromFrameNode(FrameNode* frameNode) override;
 
+    // Safe area avoidance is handled entirely by OverlaySafeAreaHelper via DeriveInsetsFromHelper
+    // in BubbleLayoutAlgorithm (Func-04-02-01-Feat-07): avoidSafeArea carries the own-window
+    // safe area and avoidPopupFreeNav carries the bindPopup free-navigation path, both
+    // data-driven (zero when the global switch is off, equal to the legacy behavior).
+    // The Avoid* flags stay false so the framework's ContentRootPattern::CreateSafeAreaInsets
+    // does not record separate insets that could double-stack with the helper-derived ones.
     bool AvoidKeyboard() const override
     {
         return false;
     }
 
     bool AvoidBottom() const override
+    {
+        return false;
+    }
+
+    bool AvoidTop() const override
+    {
+        return false;
+    }
+
+    bool AvoidCutout() const override
     {
         return false;
     }

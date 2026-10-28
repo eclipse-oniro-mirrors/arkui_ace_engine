@@ -27,7 +27,7 @@ namespace OHOS::Ace {
  * HyperlinkTheme defines styles of Hyperlink. HyperlinkTheme should be built
  * using HyperlinkTheme::Builder.
  */
-class HyperlinkTheme : public virtual Theme {
+class HyperlinkTheme : public Theme {
     DECLARE_ACE_TYPE(HyperlinkTheme, Theme);
 
 public:

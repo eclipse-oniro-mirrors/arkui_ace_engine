@@ -59,6 +59,7 @@
 #include "core/components_ng/pattern/menu/wrapper/menu_wrapper_pattern.h"
 #include "core/components_ng/pattern/overlay/modal_presentation_pattern.h"
 #include "core/components_ng/pattern/overlay/overlay_manager.h"
+#include "core/components/common/properties/ui_material.h"
 #include "core/components_ng/pattern/toast/toast_view.h"
 #include "core/components_ng/pattern/sheet/sheet_drag_bar_paint_method.h"
 #include "core/components_ng/pattern/sheet/sheet_drag_bar_pattern.h"
@@ -122,7 +123,8 @@ RefPtr<Theme> GetTheme(ThemeType type)
     } else if (type == MenuTheme::TypeId()) {
         return AceType::MakeRefPtr<MenuTheme>();
     } else if (type == ToastTheme::TypeId()) {
-        return AceType::MakeRefPtr<ToastTheme>();
+        static auto toastTheme = AceType::MakeRefPtr<ToastTheme>();
+        return toastTheme;
     } else if (type == SheetTheme::TypeId()) {
         return AceType::MakeRefPtr<SheetTheme>();
     } else if (type == TextTheme::TypeId()) {
@@ -2023,5 +2025,187 @@ HWTEST_F(OverlayTestUpdate, ToastTest034, TestSize.Level1)
         pattern->GetOffsetY(toastNode->CreateLayoutWrapper())});
     EXPECT_EQ(toastContext->GetOffset()->GetX().ConvertToPx(), 360.0);
     EXPECT_EQ(toastContext->GetOffset()->GetY().ConvertToPx(), 1280.0);
+}
+
+/**
+ * @tc.name: ToastTest035
+ * @tc.desc: Test UpdateToastContext with DoubleBorder enabled and isUserSetMaterial false.
+ *           Branch: toastTheme->GetToastDoubleBorderEnable() && !pattern->IsUserSetMaterial()
+ *           Condition: GetToastDoubleBorderEnable()=true, IsUserSetMaterial()=false -> enter block
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayTestUpdate, ToastTest035, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create toastInfo with backgroundColor (prevents ApplyDefaultMaterial).
+     */
+    auto offset = DimensionOffset(MENU_OFFSET);
+    ToastInfo toastInfo = { MESSAGE, 0, BOTTOMSTRING, true, ToastShowMode::DEFAULT, 0, offset };
+    toastInfo.backgroundColor = Color::BLUE;
+    auto toastNode = ToastView::CreateToastNode(toastInfo);
+    ASSERT_NE(toastNode, nullptr);
+    auto toastPattern = toastNode->GetPattern<ToastPattern>();
+    ASSERT_NE(toastPattern, nullptr);
+
+    /**
+     * @tc.steps: step2. Enable double border in toastTheme.
+     */
+    auto pipelineContext = PipelineBase::GetCurrentContext();
+    ASSERT_NE(pipelineContext, nullptr);
+    auto toastTheme = pipelineContext->GetTheme<ToastTheme>();
+    ASSERT_NE(toastTheme, nullptr);
+    auto backupEnable = toastTheme->toastDoubleBorderEnable_;
+    auto backupOuterWidth = toastTheme->toastOuterBorderWidth_;
+    auto backupInnerWidth = toastTheme->toastInnerBorderWidth_;
+    toastTheme->toastDoubleBorderEnable_ = 1;
+    toastTheme->toastOuterBorderWidth_ = 2.0;
+    toastTheme->toastInnerBorderWidth_ = 1.0;
+
+    /**
+     * @tc.steps: step3. Set API version and call UpdateToastContext.
+     * @tc.expected: isUserSetMaterial is false, double border IS applied.
+     */
+    int32_t backupApiVersion = MockContainer::Current()->GetApiTargetVersion();
+    MockContainer::Current()->SetApiTargetVersion(VERSION_TWELVE);
+    ToastView::UpdateToastContext(toastNode);
+    MockContainer::Current()->SetApiTargetVersion(backupApiVersion);
+
+    /**
+     * @tc.steps: step4. Verify double border properties are set.
+     */
+    EXPECT_FALSE(toastPattern->IsUserSetMaterial());
+    auto toastContext = toastNode->GetRenderContext();
+    ASSERT_NE(toastContext, nullptr);
+    EXPECT_TRUE(toastContext->GetBorderWidth().has_value());
+    EXPECT_TRUE(toastContext->GetBorderColor().has_value());
+    EXPECT_TRUE(toastContext->GetOuterBorderWidth().has_value());
+    EXPECT_TRUE(toastContext->GetOuterBorderColor().has_value());
+
+    /**
+     * @tc.steps: step5. Restore theme values.
+     */
+    toastTheme->toastDoubleBorderEnable_ = backupEnable;
+    toastTheme->toastOuterBorderWidth_ = backupOuterWidth;
+    toastTheme->toastInnerBorderWidth_ = backupInnerWidth;
+}
+
+/**
+ * @tc.name: ToastTest036
+ * @tc.desc: Test UpdateToastContext with DoubleBorder enabled and isUserSetMaterial true.
+ *           Branch: toastTheme->GetToastDoubleBorderEnable() && !pattern->IsUserSetMaterial()
+ *           Condition: GetToastDoubleBorderEnable()=true, IsUserSetMaterial()=true -> skip block (NEW)
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayTestUpdate, ToastTest036, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create toastInfo with systemMaterial (isUserSetMaterial will be true).
+     */
+    auto offset = DimensionOffset(MENU_OFFSET);
+    ToastInfo toastInfo = { MESSAGE, 0, BOTTOMSTRING, true, ToastShowMode::DEFAULT, 0, offset };
+    auto material = AceType::MakeRefPtr<UiMaterial>();
+    material->SetType(static_cast<int32_t>(MaterialType::SEMI_TRANSPARENT));
+    toastInfo.systemMaterial = material;
+    auto toastNode = ToastView::CreateToastNode(toastInfo);
+    ASSERT_NE(toastNode, nullptr);
+    auto toastPattern = toastNode->GetPattern<ToastPattern>();
+    ASSERT_NE(toastPattern, nullptr);
+
+    /**
+     * @tc.steps: step2. Enable double border in toastTheme.
+     */
+    auto pipelineContext = PipelineBase::GetCurrentContext();
+    ASSERT_NE(pipelineContext, nullptr);
+    auto toastTheme = pipelineContext->GetTheme<ToastTheme>();
+    ASSERT_NE(toastTheme, nullptr);
+    auto backupEnable = toastTheme->toastDoubleBorderEnable_;
+    auto backupOuterWidth = toastTheme->toastOuterBorderWidth_;
+    auto backupInnerWidth = toastTheme->toastInnerBorderWidth_;
+    toastTheme->toastDoubleBorderEnable_ = 1;
+    toastTheme->toastOuterBorderWidth_ = 2.0;
+    toastTheme->toastInnerBorderWidth_ = 1.0;
+
+    /**
+     * @tc.steps: step3. Set API version and call UpdateToastContext.
+     * @tc.expected: isUserSetMaterial is true, double border NOT applied (NEW branch).
+     */
+    int32_t backupApiVersion = MockContainer::Current()->GetApiTargetVersion();
+    MockContainer::Current()->SetApiTargetVersion(VERSION_TWELVE);
+    ToastView::UpdateToastContext(toastNode);
+    MockContainer::Current()->SetApiTargetVersion(backupApiVersion);
+
+    /**
+     * @tc.steps: step4. Verify double border properties are NOT set.
+     */
+    EXPECT_TRUE(toastPattern->IsUserSetMaterial());
+    auto toastContext = toastNode->GetRenderContext();
+    ASSERT_NE(toastContext, nullptr);
+    EXPECT_FALSE(toastContext->GetBorderWidth().has_value());
+    EXPECT_FALSE(toastContext->GetBorderColor().has_value());
+    EXPECT_FALSE(toastContext->GetOuterBorderWidth().has_value());
+    EXPECT_FALSE(toastContext->GetOuterBorderColor().has_value());
+
+    /**
+     * @tc.steps: step5. Restore theme values.
+     */
+    toastTheme->toastDoubleBorderEnable_ = backupEnable;
+    toastTheme->toastOuterBorderWidth_ = backupOuterWidth;
+    toastTheme->toastInnerBorderWidth_ = backupInnerWidth;
+}
+
+/**
+ * @tc.name: ToastTest037
+ * @tc.desc: Test UpdateToastContext with DoubleBorder disabled.
+ *           Branch: toastTheme->GetToastDoubleBorderEnable() && !pattern->IsUserSetMaterial()
+ *           Condition: GetToastDoubleBorderEnable()=false -> skip block
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayTestUpdate, ToastTest037, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create toastInfo with backgroundColor (prevents ApplyDefaultMaterial).
+     */
+    auto offset = DimensionOffset(MENU_OFFSET);
+    ToastInfo toastInfo = { MESSAGE, 0, BOTTOMSTRING, true, ToastShowMode::DEFAULT, 0, offset };
+    toastInfo.backgroundColor = Color::BLUE;
+    auto toastNode = ToastView::CreateToastNode(toastInfo);
+    ASSERT_NE(toastNode, nullptr);
+    auto toastPattern = toastNode->GetPattern<ToastPattern>();
+    ASSERT_NE(toastPattern, nullptr);
+
+    /**
+     * @tc.steps: step2. Ensure double border is disabled in toastTheme.
+     */
+    auto pipelineContext = PipelineBase::GetCurrentContext();
+    ASSERT_NE(pipelineContext, nullptr);
+    auto toastTheme = pipelineContext->GetTheme<ToastTheme>();
+    ASSERT_NE(toastTheme, nullptr);
+    auto backupEnable = toastTheme->toastDoubleBorderEnable_;
+    toastTheme->toastDoubleBorderEnable_ = 0;
+
+    /**
+     * @tc.steps: step3. Set API version and call UpdateToastContext.
+     * @tc.expected: DoubleBorder disabled, double border NOT applied.
+     */
+    int32_t backupApiVersion = MockContainer::Current()->GetApiTargetVersion();
+    MockContainer::Current()->SetApiTargetVersion(VERSION_TWELVE);
+    ToastView::UpdateToastContext(toastNode);
+    MockContainer::Current()->SetApiTargetVersion(backupApiVersion);
+
+    /**
+     * @tc.steps: step4. Verify double border properties are NOT set.
+     */
+    EXPECT_FALSE(toastPattern->IsUserSetMaterial());
+    auto toastContext = toastNode->GetRenderContext();
+    ASSERT_NE(toastContext, nullptr);
+    EXPECT_FALSE(toastContext->GetBorderWidth().has_value());
+    EXPECT_FALSE(toastContext->GetBorderColor().has_value());
+    EXPECT_FALSE(toastContext->GetOuterBorderWidth().has_value());
+    EXPECT_FALSE(toastContext->GetOuterBorderColor().has_value());
+
+    /**
+     * @tc.steps: step5. Restore theme values.
+     */
+    toastTheme->toastDoubleBorderEnable_ = backupEnable;
 }
 }

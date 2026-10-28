@@ -49,7 +49,7 @@ const auto TabBarPhysicalCurve = AceType::MakeRefPtr<InterpolatingSpring>(-1.0f,
 
 using TabBarBuilderFunc = std::function<void()>;
 using OnTabBarItemsChangeEvent = std::function<void()>;
-class TabBarParam : public virtual Referenced {
+class TabBarParam : public Referenced {
 public:
     TabBarParam(const std::string& textParam, const std::string& iconParam, TabBarBuilderFunc&& builderParam)
         : text_(textParam), icon_(iconParam), builder_(std::move(builderParam)) {};
@@ -193,6 +193,7 @@ public:
         layoutAlgorithm->SetVisibleItemPosition(visibleItemPosition_);
         layoutAlgorithm->SetCanOverScroll(canOverScroll_);
         layoutAlgorithm->SetIsFloatingBar(isFloatingBar_);
+        layoutAlgorithm->SetIsFloatingTopBar(isFloatingTopBar_);
         return layoutAlgorithm;
     }
 
@@ -557,9 +558,12 @@ public:
         return iter->second;
     }
     void ChangeIndex(int32_t index);
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
     void SetRegionInfo(std::unique_ptr<JsonValue>& json);
+    void SetRegionInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
 
     std::optional<int32_t> GetAnimationDuration()
     {
@@ -692,6 +696,26 @@ public:
     {
         isFloatingBar_ = isFloatingBar;
     }
+    bool IsFloatingBar() const
+    {
+        return isFloatingBar_;
+    }
+    void SetIsFloatingTopBar(bool isFloatingTopBar)
+    {
+        isFloatingTopBar_ = isFloatingTopBar;
+    }
+    void SetTopFloatingContentWidth(float width)
+    {
+        topFloatingContentWidth_ = width;
+    }
+    float GetTopFloatingContentWidth() const
+    {
+        return topFloatingContentWidth_;
+    }
+    bool IsFloatingTopBar() const
+    {
+        return isFloatingTopBar_;
+    }
 
     void SetColorInvertColorMode(ColorMode colorMode)
     {
@@ -746,6 +770,8 @@ private:
     void CloseDialog();
     void InitLongPressAndDragEvent();
     void HandleClick(SourceType type, int32_t index);
+    void DoHandleClick(const RefPtr<FrameNode>& host, int32_t index);
+    bool IsTabBarClickIntercepted(const RefPtr<FrameNode>& host) const;
     void ClickTo(const RefPtr<FrameNode>& host, int32_t index);
     void HandleTouchEvent(TouchType touchType, int32_t index);
     void HandleTouchUpAndClickTo(const TouchLocationInfo& info);
@@ -839,6 +865,7 @@ private:
     const Color& GetSubTabBarHoverColor(int32_t index) const;
     void UpdateFocusToSelectedNode(bool isFocusActive);
     void UpdateFocusTabBarPageState();
+    void UpdateTopFloatingFocusBorder(bool isFocused, int32_t index);
     void UpdateSubTabBarItemStyles(const RefPtr<FrameNode>& columnNode, int32_t focusedColumnId,
         int32_t selectedColumnId, OHOS::Ace::Axis axis, int32_t index);
     void UpdateSelectedTextColor(const RefPtr<TabTheme>& tabTheme, OHOS::Ace::Axis axis,
@@ -940,6 +967,7 @@ private:
     float currentDelta_ = 0.0f;
     float currentOffset_ = 0.0f;
     float barGridMargin_ = 0.0f;
+    float topFloatingContentWidth_ = 0.0f;
     std::map<int32_t, ItemInfo> visibleItemPosition_;
     bool canOverScroll_ = false;
     bool isTabBarFocusActive_ = false;
@@ -951,6 +979,7 @@ private:
     bool shouldPlayMaskAnimation_ = true;
     bool useNewMaterial_ = false;
     bool isFloatingBar_ = false;
+    bool isFloatingTopBar_ = false;
     ColorMode colorInvertColorMode_ = ColorMode::COLOR_MODE_UNDEFINED;
 
     ACE_DISALLOW_COPY_AND_MOVE(TabBarPattern);
@@ -958,6 +987,7 @@ private:
 public:
     static RefPtr<FrameNode> GetIconNodeFromColumn(const RefPtr<UINode>& columnNode);
     static RefPtr<FrameNode> GetTextNodeFromColumn(const RefPtr<UINode>& columnNode);
+    void TapToHandle(int32_t index, bool skipInterceptGuard = false);
 };
 } // namespace OHOS::Ace::NG
 

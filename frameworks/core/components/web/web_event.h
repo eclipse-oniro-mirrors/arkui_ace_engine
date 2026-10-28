@@ -1007,6 +1007,28 @@ private:
     int32_t detectedContentfulNodesCount_;
 };
 
+class ACE_EXPORT MonitoredBlankScreenEvent : public BaseEventInfo {
+    DECLARE_RELATIONSHIP_OF_CLASSES(MonitoredBlankScreenEvent, BaseEventInfo);
+ 
+public:
+    MonitoredBlankScreenEvent(
+        const std::string& url, int32_t reason,
+        const std::string& extraMsg)
+        : BaseEventInfo("MonitoredBlankScreenEvent"), url_(url), reason_(reason),
+          extraMsg_(extraMsg)
+    {}
+    ~MonitoredBlankScreenEvent() = default;
+ 
+    const std::string& GetUrl() const { return url_; }
+    int32_t GetReason() const { return reason_; }
+    const std::string& GetExtraMsg() const { return extraMsg_; }
+ 
+private:
+    std::string url_;
+    int32_t reason_;
+    std::string extraMsg_;
+};
+
 class ACE_EXPORT FirstScreenPaintEvent : public BaseEventInfo {
     DECLARE_RELATIONSHIP_OF_CLASSES(FirstScreenPaintEvent, BaseEventInfo);
 
@@ -1077,6 +1099,10 @@ public:
 
 private:
     std::string info_;
+};
+
+struct WebContextMenuOptions {
+    bool enable = false;
 };
 
 class ACE_EXPORT LoadWebProgressChangeEvent : public BaseEventInfo {
@@ -1818,6 +1844,9 @@ public:
     virtual std::string GetSelectionText() const = 0;
     virtual void GetImageRect(int32_t& x, int32_t& y, int32_t& width, int32_t& height) const {}
     virtual bool IsAILink() const { return false; }
+    virtual bool ShouldOfferLinkToText() const { return false; }
+    virtual bool IsOverTextFragment() const { return false; }
+    virtual std::string GetTextFragmentGeneratedLink() const { return ""; }
     virtual int GetSourceTypeV2() const { return 0; }
     virtual int GetMediaTypeV2() const { return 0; }
     virtual int GetContextMenuMediaType() const { return 0; }
@@ -1841,6 +1870,8 @@ public:
     virtual void Redo() const = 0;
     virtual void PasteAndMatchStyle() const = 0;
     virtual void RequestPasswordAutoFill() const = 0;
+    virtual void CopyLinkToTextMenu() const {}
+    virtual void RemoveFragments() const {}
 };
 
 class ACE_EXPORT ContextMenuEvent : public BaseEventInfo {

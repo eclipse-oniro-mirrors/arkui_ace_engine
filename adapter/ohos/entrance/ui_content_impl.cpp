@@ -17,10 +17,14 @@
 #include "adapter/ohos/entrance/ui_session/ui_session_manager_ohos.h"
 #include "core/accessibility/accessibility_manager.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
+#include "base/resource/shared_image_manager.h"
+
+#include <map>
 
 #include <atomic>
 #include <cinttypes>
 #include <optional>
+#include <tuple>
 
 #include "ability_context.h"
 #include "ability_info.h"
@@ -70,6 +74,7 @@
 #include "core/components_ng/manager/uisession_query/component_tree_query.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_manager.h"
+#include "core/components_ng/pattern/ui_extension/ui_extension_utils.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_resolution_config.h"
 #include "core/components_ng/render/animation_utils.h"
 #include "core/components_ng/render/detached_rs_node_manager.h"
@@ -94,6 +99,7 @@
 #ifdef WEB_SUPPORTED
 #include "core/components/web/resource/web_page_scene_manager.h"
 #endif
+#include "interfaces/inner_api/ui_session/component_tree_query_type.h"
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
 #include "interfaces/napi/kits/observer/ui_observer.h"
 
@@ -148,6 +154,7 @@
 #include "core/components/theme/shadow_theme.h"
 #include "core/components/popup/popup_theme.h"
 #include "core/components_ng/base/inspector.h"
+#include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/components_ng/base/view_abstract.h"
 #include "core/components_ng/manager/content_change_manager/content_change_manager.h"
 #include "core/components_ng/pattern/app_bar/app_bar_view.h"
@@ -209,6 +216,8 @@ static bool g_isDragging = false;
 constexpr char SCENE_COMMON_CHAR = '0';
 constexpr char SCENE_START_CHAR = '1';
 constexpr uint32_t VSYNC_FIRST_WITHOUT_DEFAULT_BARRIER = 2;
+// Delay search click flushing to batch rapid clicks.
+constexpr uint32_t SEARCH_CLICK_FLUSH_DELAY_MS = 250;
 static const uint64_t VSYNC_FIRST_FORCE_ENABLE_TIME_NS =
     system::GetIntParameter("const.sys.param_vsync_first_force_enable_time_ms", 5000) * 1000000ULL;
 
@@ -435,16 +444,17 @@ static ContainerScopeHilogRegistrar g_hilogRegistrar;
 
 // Presence event JSON per spec.md: true carries full evidence
 //; false carries exits; subwindow evidence applies
-// `<mainPageName>+Dialog`.
+// `<mainPageName>+Dialog` or `<mainPageName>+Sheet`.
 std::string BuildSearchPresenceEventJson(
-    const NG::SearchPresenceStateMachine::PresenceEvent& event, const std::string& pageName)
+    const NG::SearchPresenceStateMachine::PresenceEvent& event)
 {
     auto root = JsonUtil::Create(true);
     root->Put("eventType", "presence");
     root->Put("hasSearch", event.isTrue);
-    std::string eventPageName = pageName.empty() ? event.pageName : pageName;
-    if (event.anySubwindow && !eventPageName.empty()) {
-        eventPageName += "+Dialog";
+    std::string eventPageName = event.pageName;
+    if (event.anySubwindow) {
+        const auto suffix = event.subwindowSuffix.empty() ? NG::SUBWINDOW_DIALOG_SUFFIX : event.subwindowSuffix;
+        eventPageName = NG::BuildSearchSubwindowPageName(eventPageName, suffix);
     }
     if (!eventPageName.empty()) {
         root->Put("pageName", eventPageName.c_str());
@@ -519,6 +529,86 @@ std::string BuildSearchClickEventJson(
     hitsJson->Put(item);
     root->Put("hits", hitsJson);
     return root->ToString();
+}
+
+// Aggregate multi-rule click hits: a single click matching multiple rules
+// (including cross-ruleSet) produces one JSON with all hits, sent in a single
+// IPC. Group globally by response control (inspectorId+nodeId): cross-ruleSet
+// hits on the same control merge into one event; different controls stay separate.
+std::vector<std::string> BuildSearchClickEventsJson(
+    const std::vector<NG::SearchClickMatchResult>& results, const std::string& pageName)
+{
+    std::vector<std::string> eventJsons;
+    if (results.empty()) {
+        return eventJsons;
+    }
+    // Group by response control (inspectorId+nodeId); cross-ruleSet hits merge into one JSON.
+    std::map<std::tuple<int32_t, std::string, std::string, int32_t>,
+        std::vector<const NG::SearchClickMatchResult*>> groups;
+    for (const auto& r : results) {
+        auto gk = std::make_tuple(r.processId, r.operationId, r.inspectorId, r.nodeId);
+        groups[gk].push_back(&r);
+    }
+    // Each group produces one click event (one IPC) with all matched ruleSet/rule hits.
+    for (auto& [gk, vec] : groups) {
+        auto root = JsonUtil::Create(true);
+        root->Put("eventType", "click");
+        if (!pageName.empty()) {
+            root->Put("pageName", pageName.c_str());
+        }
+        auto hitsJson = JsonUtil::CreateArray(true);
+        for (const auto* result : vec) {
+            auto item = JsonUtil::Create(true);
+            item->Put("ruleSetId", result->ruleSetId.c_str());
+            item->Put("ruleId", result->ruleId.c_str());
+            item->Put("matchType", result->matchType.c_str());
+            if (!result->matchedKeyword.empty()) {
+                item->Put("matchedKeyword", result->matchedKeyword.c_str());
+            }
+            auto responseNode = JsonUtil::Create(true);
+            responseNode->Put("inspectorId", result->inspectorId.c_str());
+            responseNode->Put("nodeId", result->nodeId);
+            responseNode->Put("type", result->nodeType.c_str());
+            auto rectJson = JsonUtil::Create(true);
+            rectJson->Put("x", static_cast<double>(result->rect.GetX()));
+            rectJson->Put("y", static_cast<double>(result->rect.GetY()));
+            rectJson->Put("width", static_cast<double>(result->rect.Width()));
+            rectJson->Put("height", static_cast<double>(result->rect.Height()));
+            responseNode->Put("rect", rectJson);
+            item->Put("responseNode", responseNode);
+            hitsJson->Put(item);
+        }
+        root->Put("hits", hitsJson);
+        eventJsons.emplace_back(root->ToString());
+    }
+    return eventJsons;
+}
+
+void PostSearchClickEvent(int32_t processId, const std::string& json, const RefPtr<TaskExecutor>& executor)
+{
+    executor->PostTask(
+        [processId, json] {
+            auto session = UiSessionManager::GetInstance();
+            if (session) {
+                session->ReportPageSceneEvent(processId, json, false);
+            }
+        },
+        TaskExecutor::TaskType::BACKGROUND, "UiSessionSearchClickReport");
+}
+
+void ReportSearchClickEvents(const std::vector<NG::SearchClickMatchResult>& results,
+    const std::string& pageName, const RefPtr<TaskExecutor>& executor)
+{
+    CHECK_NULL_VOID(executor);
+    std::map<int32_t, std::vector<NG::SearchClickMatchResult>> byProcess;
+    for (const auto& result : results) {
+        byProcess[result.processId].emplace_back(result);
+    }
+    for (const auto& [processId, processResults] : byProcess) {
+        for (const auto& json : BuildSearchClickEventsJson(processResults, pageName)) {
+            PostSearchClickEvent(processId, json, executor);
+        }
+    }
 }
 
 bool HandlePageSceneRuleRemoval(int32_t processId, const std::unique_ptr<JsonValue>& ruleRoot,
@@ -684,6 +774,9 @@ bool ParseAvoidAreasUpdate(const RefPtr<NG::PipelineContext>& context,
         } else if (avoidArea.first == OHOS::Rosen::AvoidAreaType::TYPE_CUTOUT) {
             safeAreaUpdated |= safeAreaManager->UpdateCutoutSafeArea(ConvertAvoidArea(avoidArea.second),
                 NG::OptionalSize<uint32_t>(config.Width(), config.Height()));
+        } else if (avoidArea.first == OHOS::Rosen::AvoidAreaType::TYPE_TITLE_BUTTON) {
+            safeAreaUpdated |= safeAreaManager->UpdateTitleButtonSafeArea(ConvertAvoidArea(avoidArea.second),
+                NG::OptionalSize<uint32_t>(config.Width(), config.Height()));
         }
     }
     if (safeAreaUpdated) {
@@ -706,6 +799,8 @@ std::map<NG::SafeAreaAvoidType, NG::SafeAreaInsets> ParseAvoidAreasToMap(
             safeAvoidAreas[NG::SafeAreaAvoidType::TYPE_FLOAT_NAVIGATION] = ConvertAvoidArea(avoidArea.second);
         } else if (avoidArea.first == OHOS::Rosen::AvoidAreaType::TYPE_CUTOUT) {
             safeAvoidAreas[NG::SafeAreaAvoidType::TYPE_CUTOUT] = ConvertAvoidArea(avoidArea.second);
+        } else if (avoidArea.first == OHOS::Rosen::AvoidAreaType::TYPE_TITLE_BUTTON) {
+            safeAvoidAreas[NG::SafeAreaAvoidType::TYPE_TITLE_BUTTON] = ConvertAvoidArea(avoidArea.second);
         }
     }
     return safeAvoidAreas;
@@ -813,11 +908,19 @@ public:
         CHECK_NULL_VOID(pipeline);
         auto taskExecutor = container->GetTaskExecutor();
         CHECK_NULL_VOID(taskExecutor);
-        auto context = AceType::DynamicCast<NG::PipelineContext>(pipeline);
-        if (context) {
+        taskExecutor->PostTask(
+            [instanceId = instanceId_, avoidArea, type] {
+            ContainerScope scope(instanceId);
+            auto container = Platform::AceContainer::GetContainer(instanceId);
+            CHECK_NULL_VOID(container);
+            auto pipeline = container->GetPipelineContext();
+            CHECK_NULL_VOID(pipeline);
+            auto context = AceType::DynamicCast<NG::PipelineContext>(pipeline);
+            CHECK_NULL_VOID(context);
             auto dynamicComponentManager = context->GetDynamicComponentSafeManager();
-            dynamicComponentManager->UpdateAllDCAvoidArea(instanceId_, avoidArea, type);
-        }
+            dynamicComponentManager->UpdateAllDCAvoidArea(instanceId, avoidArea, type);
+            },
+            TaskExecutor::TaskType::UI, "ArkUIUpdateAllDCAvoidArea");
         if (type == Rosen::AvoidAreaType::TYPE_SYSTEM) {
             systemSafeArea_ = ConvertAvoidArea(avoidArea);
         } else if (type == Rosen::AvoidAreaType::TYPE_NAVIGATION_INDICATOR) {
@@ -2845,6 +2948,9 @@ UIContentErrorCode UIContentImpl::CommonInitialize(
     errorCode = Platform::AceContainer::SetViewNew(aceView, density, 0, 0, window_);
     CHECK_ERROR_CODE_RETURN(errorCode);
 #endif
+    // SetView has created the pipeline (AttachView) synchronously; apply the strategy cached
+    // from a pre-initialization window call here, before RunPage builds the page content.
+    ApplyPendingDpiFollowStrategy();
     // set focus window id for ui extension after pipeline context created.
     if (focusWindowId != 0) {
         container->SetFocusWindowId(focusWindowId);
@@ -2871,6 +2977,12 @@ UIContentErrorCode UIContentImpl::CommonInitialize(
     bool halfLeading = std::any_of(metaData.begin(), metaData.end(),
         [](const auto& metaDataItem) { return metaDataItem.name == "half_leading" && metaDataItem.value == "true"; });
     pipeline->SetHalfLeading(halfLeading);
+    // Use metadata to control text style optimization flag for fallbackLineSpacing/includeFontPadding.
+    bool configTextStyleOptimizeFlag = std::any_of(metaData.begin(), metaData.end(),
+        [](const auto& metaDataItem) {
+            return metaDataItem.name == "configTextStyleOptimizeFlagInArkUI" && metaDataItem.value == "true";
+        });
+    pipeline->SetConfigTextStyleOptimizeFlag(configTextStyleOptimizeFlag);
     bool hasPreviewTextOption = std::any_of(metaData.begin(), metaData.end(),
         [pipelineWeak = AceType::WeakClaim(AceType::RawPtr(pipeline))](const auto& metaDataItem) {
                 if (metaDataItem.name == "can_preview_text") {
@@ -3037,15 +3149,17 @@ void UIContentImpl::InitializeSafeArea(const RefPtr<Platform::AceContainer>& con
             auto cutoutInsets = container->GetViewSafeAreaByType(Rosen::AvoidAreaType::TYPE_CUTOUT);
             auto navInsets = container->GetViewSafeAreaByType(Rosen::AvoidAreaType::TYPE_NAVIGATION_INDICATOR);
             auto floatNavInsets = container->GetViewSafeAreaByType(Rosen::AvoidAreaType::TYPE_FLOAT_NAVIGATION);
+            auto titleButtonInsets = container->GetViewSafeAreaByType(Rosen::AvoidAreaType::TYPE_TITLE_BUTTON);
             pipeline->UpdateSystemSafeAreaWithoutAnimation(systemInsets);
             pipeline->UpdateCutoutSafeAreaWithoutAnimation(cutoutInsets);
             pipeline->UpdateNavSafeAreaWithoutAnimation(navInsets);
             pipeline->UpdateFloatNavSafeAreaWithoutAnimation(floatNavInsets);
+            pipeline->UpdateTitleButtonSafeAreaWithoutAnimation(titleButtonInsets);
             TAG_LOGI(ACE_SAFE_AREA,
                 "InitializeSafeArea systemInsets:%{public}s, cutoutInsets:%{public}s, navInsets:%{public}s, "
-                "floatNavInsets:%{public}s",
+                "floatNavInsets:%{public}s, titleButtonInsets:%{public}s",
                 systemInsets.ToString().c_str(), cutoutInsets.ToString().c_str(), navInsets.ToString().c_str(),
-                floatNavInsets.ToString().c_str());
+                floatNavInsets.ToString().c_str(), titleButtonInsets.ToString().c_str());
         }
     }
     InitWindowMode(container);
@@ -3159,7 +3273,7 @@ void UIContentImpl::Background()
         auto exitEvents = pageSceneMatcher_->ExitAllSearchPresence();
         for (const auto& [pid, event] : exitEvents) {
             UiSessionManager::GetInstance()->ReportPageSceneEvent(
-                pid, BuildSearchPresenceEventJson(event, ""), false);
+                pid, BuildSearchPresenceEventJson(event), false);
         }
     }
 
@@ -4664,29 +4778,58 @@ void UIContentImpl::SetHostParams(const OHOS::AAFwk::WantParams& params)
     uIExtensionContainerHandler->SetHostParams(hostWindowInfo_.hostWantParams);
 }
 
-void UIContentImpl::MarkUIExtensionDensityFollowHost()
+void UIContentImpl::SetUIExtensionDensityFollowHost(OHOS::Rosen::DpiFollowStrategy dpiFollowStrategy)
 {
+    // The call may arrive before Initialize assigns instanceId_ (the container is not
+    // resolvable yet), so cache the latest strategy and re-apply it in ApplyPendingDpiFollowStrategy.
+    isDpiFollowStrategyReceived_ = true;
+    pendingDpiFollowStrategy_ = dpiFollowStrategy;
+    NG::DpiFollowStrategy strategy = NG::ConvertFromRosenDpiFollowStrategy(dpiFollowStrategy);
     TAG_LOGI(AceLogTag::ACE_UIEXTENSIONCOMPONENT,
-        "[%{public}s][%{public}s][%{public}d]: MarkUIExtensionDensityFollowHost", bundleName_.c_str(),
-        moduleName_.c_str(), instanceId_);
+        "[%{public}s][%{public}s][%{public}d]: SetUIExtensionDensityFollowHost, rosenStrategy=%{public}u, "
+        "strategy=%{public}d",
+        bundleName_.c_str(), moduleName_.c_str(), instanceId_, static_cast<uint32_t>(dpiFollowStrategy),
+        static_cast<int32_t>(strategy));
+    ApplyUIExtensionDensityFollowHost(strategy);
+}
+
+void UIContentImpl::ApplyUIExtensionDensityFollowHost(NG::DpiFollowStrategy strategy)
+{
     auto container = Platform::AceContainer::GetContainer(instanceId_);
-    CHECK_NULL_VOID(container);
-    ContainerScope scope(instanceId_);
-    auto taskExecutor = container->GetTaskExecutor();
-    CHECK_NULL_VOID(taskExecutor);
-    auto task = [instanceId = instanceId_]() {
-        auto container = Platform::AceContainer::GetContainer(instanceId);
-        CHECK_NULL_VOID(container);
-        auto pipelineContext = container->GetPipelineContext();
-        CHECK_NULL_VOID(pipelineContext);
-        pipelineContext->SetUIExtensionDensityFollowHost(true);
-    };
-    auto uiTaskRunner = SingleTaskExecutor::Make(taskExecutor, TaskExecutor::TaskType::UI);
-    if (uiTaskRunner.IsRunOnCurrentThread()) {
-        task();
-    } else {
-        taskExecutor->PostTask(std::move(task), TaskExecutor::TaskType::UI, "ArkUIMarkUIExtensionDensityFollowHost");
+    if (!container) {
+        TAG_LOGW(AceLogTag::ACE_UIEXTENSIONCOMPONENT,
+            "[%{public}s][%{public}s][%{public}d]: ApplyUIExtensionDensityFollowHost container is not ready, "
+            "strategy=%{public}d is kept pending",
+            bundleName_.c_str(), moduleName_.c_str(), instanceId_, static_cast<int32_t>(strategy));
+        return;
     }
+    ContainerScope scope(instanceId_);
+    // The pipeline is created synchronously in SetView (AttachView) during CommonInitialize,
+    // so it is expected to exist here for both the post-initialization direct calls and the
+    // pending-strategy application.
+    auto pipelineContext = container->GetPipelineContext();
+    if (!pipelineContext) {
+        TAG_LOGW(AceLogTag::ACE_UIEXTENSIONCOMPONENT,
+            "[%{public}s][%{public}s][%{public}d]: pipeline is not ready, strategy=%{public}d is dropped",
+            bundleName_.c_str(), moduleName_.c_str(), instanceId_, static_cast<int32_t>(strategy));
+        return;
+    }
+    pipelineContext->SetUIExtensionDensityFollowHost(strategy);
+    TAG_LOGI(AceLogTag::ACE_UIEXTENSIONCOMPONENT,
+        "[%{public}s][%{public}s][%{public}d]: strategy=%{public}d applied to pipeline",
+        bundleName_.c_str(), moduleName_.c_str(), instanceId_, static_cast<int32_t>(strategy));
+}
+
+void UIContentImpl::ApplyPendingDpiFollowStrategy()
+{
+    if (!isDpiFollowStrategyReceived_) {
+        return;
+    }
+    NG::DpiFollowStrategy strategy = NG::ConvertFromRosenDpiFollowStrategy(pendingDpiFollowStrategy_);
+    TAG_LOGI(AceLogTag::ACE_UIEXTENSIONCOMPONENT,
+        "[%{public}s][%{public}s][%{public}d]: ApplyPendingDpiFollowStrategy, strategy=%{public}d",
+        bundleName_.c_str(), moduleName_.c_str(), instanceId_, static_cast<int32_t>(strategy));
+    ApplyUIExtensionDensityFollowHost(strategy);
 }
 
 void UIContentImpl::UpdateMaximizeMode(OHOS::Rosen::MaximizeMode mode)
@@ -5088,6 +5231,17 @@ void UIContentImpl::UpdateFormData(const std::string& data)
     } else {
         formData_ = data;
     }
+}
+
+void UIContentImpl::SetFormImageCacheThreshold(int32_t threshold)
+{
+    auto container = Platform::AceContainer::GetContainer(instanceId_);
+    CHECK_NULL_VOID(container);
+    auto context = container->GetPipelineContext();
+    CHECK_NULL_VOID(context);
+    auto sharedImageManager = context->GetOrCreateSharedImageManager();
+    CHECK_NULL_VOID(sharedImageManager);
+    sharedImageManager->SetImageCacheThreshold(threshold);
 }
 
 void UIContentImpl::UpdateFormSharedImage(const std::map<std::string, sptr<OHOS::AppExecFwk::FormAshmem>>& imageDataMap)
@@ -5909,27 +6063,38 @@ void UIContentImpl::SetContainerModalTitleHeight(int32_t height)
     ContainerScope scope(instanceId_);
     auto taskExecutor = Container::CurrentTaskExecutor();
     CHECK_NULL_VOID(taskExecutor);
-    auto task = [height, instanceId = instanceId_]() {
-        ContainerScope scope(instanceId);
-        auto container = Platform::AceContainer::GetContainer(instanceId);
-        CHECK_NULL_VOID(container);
-        auto pipeline = AceType::DynamicCast<NG::PipelineContext>(container->GetPipelineContext());
+    auto task = [height]() {
+        auto pipeline = NG::PipelineContext::GetCurrentContext();
         CHECK_NULL_VOID(pipeline);
-        auto display = Rosen::DisplayManager::GetInstance().GetDisplayById(container->GetDisplayId());
-        float vpr = display ? display->GetVirtualPixelRatio() : 0.0f;
-        if (NearZero(static_cast<double>(vpr))) {
-            // Fallback when the display or its vpr is unavailable, so no DM-side scale can be used here.
-            pipeline->SetContainerModalTitleHeight(height);
-        } else {
-            double heightVp = height / static_cast<double>(vpr);
-            pipeline->SetContainerModalTitleHeightWithVp(heightVp);
-        }
+        pipeline->SetContainerModalTitleHeight(height);
     };
     auto uiTaskRunner = SingleTaskExecutor::Make(taskExecutor, TaskExecutor::TaskType::UI);
     if (uiTaskRunner.IsRunOnCurrentThread()) {
         task();
     } else {
         taskExecutor->PostTask(std::move(task), TaskExecutor::TaskType::UI, "ArkUISetContainerModalTitleHeight");
+    }
+}
+
+void UIContentImpl::SetContainerModalTitleHeightWithVp(double heightVp)
+{
+    ContainerScope scope(instanceId_);
+    auto taskExecutor = Container::CurrentTaskExecutor();
+    CHECK_NULL_VOID(taskExecutor);
+    auto task = [heightVp, instanceId = instanceId_]() {
+        ContainerScope scope(instanceId);
+        auto container = Platform::AceContainer::GetContainer(instanceId);
+        CHECK_NULL_VOID(container);
+        auto pipeline = AceType::DynamicCast<NG::PipelineContext>(container->GetPipelineContext());
+        CHECK_NULL_VOID(pipeline);
+        pipeline->SetContainerModalTitleHeightWithVp(heightVp);
+    };
+    auto uiTaskRunner = SingleTaskExecutor::Make(taskExecutor, TaskExecutor::TaskType::UI);
+    if (uiTaskRunner.IsRunOnCurrentThread()) {
+        task();
+    } else {
+        taskExecutor->PostTask(
+            std::move(task), TaskExecutor::TaskType::UI, "ArkUISetContainerModalTitleHeightWithVp");
     }
 }
 
@@ -6391,7 +6556,7 @@ void UIContentImpl::SetTopWindowBoundaryByID(const std::string& stringId)
         TaskExecutor::TaskType::UI, "ArkUISetTopWindowBoundaryByID");
 }
 
-void sendCommandCallbackInner(const WeakPtr<TaskExecutor>& taskExecutor)
+void SendCommandCallbackInner(const WeakPtr<TaskExecutor>& taskExecutor)
 {
     auto sendCommandCallback = [weakTaskExecutor = taskExecutor](int32_t value) {
         KeyEvent keyEvent;
@@ -6496,8 +6661,39 @@ void UIContentImpl::RelaxedCommandCallbackInner(const WeakPtr<TaskExecutor>& tas
     UiSessionManager::GetInstance()->SaveRelaxedCommandFunction(relaxedCommandCallback);
 }
 
+void UIContentImpl::InitInspectorWindowSnapshotCallback()
+{
+    auto container = Platform::AceContainer::GetContainer(instanceId_);
+    auto pipeline = container ? AceType::DynamicCast<NG::PipelineContext>(container->GetPipelineContext()) : nullptr;
+    WeakPtr<NG::PipelineContext> weakPipeline = pipeline;
+    wptr<OHOS::Rosen::Window> weakWindow = Platform::AceContainer::GetUIWindow(instanceId_);
+    auto snapshot = [weakPipeline, weakWindow]() -> std::optional<InspectorWindowSnapshot> {
+        auto window = weakWindow.promote();
+        auto pipeline = weakPipeline.Upgrade();
+        CHECK_NULL_RETURN(window, std::nullopt);
+        CHECK_NULL_RETURN(pipeline, std::nullopt);
+        if (pipeline->IsDestroyed()) {
+            return std::nullopt;
+        }
+        std::string title = pipeline->GetInspectorAppTitle();
+        if (title.empty()) {
+            auto themes = pipeline->GetThemeManager();
+            auto constants = themes ? themes->GetThemeConstants() : nullptr;
+            auto manager = pipeline->GetWindowManager();
+            if (constants && manager) {
+                title = constants->GetString(manager->GetAppLabelId());
+            }
+        }
+        return InspectorWindowSnapshot { window->IsPrivacyMode(), std::move(title), getpid() };
+    };
+    if (pipeline) {
+        pipeline->SetInspectorWindowSnapshotCallback(std::move(snapshot));
+    }
+}
+
 void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& taskExecutor)
 {
+    InitInspectorWindowSnapshotCallback();
     const int32_t GET_INSPECTOR_TREE_TIMEOUT_TIME = 1500;
     // set get inspector tree function for ui session manager
     auto callback = [weakTaskExecutor = taskExecutor](bool onlyNeedVisible, ParamConfig config) {
@@ -6533,7 +6729,7 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
     SetupGetImagesByIdCallback(taskExecutor);
     RegisterGetCurrentPageName(taskExecutor);
     InitSendCommandFunctionsCallbacks(taskExecutor);
-    sendCommandCallbackInner(taskExecutor);
+    SendCommandCallbackInner(taskExecutor);
     RelaxedCommandCallbackInner(taskExecutor);
     SaveGetCurrentInstanceId();
     RegisterExeAppAIFunction(taskExecutor);
@@ -6550,6 +6746,50 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
     SaveTraverseWebForPageSceneCallback(taskExecutor);
     auto pageSceneMatcher = std::make_shared<NG::PageSceneRuleManager>();
     pageSceneMatcher_ = pageSceneMatcher;
+    const auto instanceId = instanceId_;
+    pageSceneMatcher->SetIsContentStableFunction([instanceId]() -> bool {
+        ContainerScope scope(instanceId);
+        auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
+        if (!pipeline) {
+            return false;
+        }
+        auto& manager = pipeline->GetContentChangeManager();
+        return !manager || (!manager->IsScrolling() && !manager->IsTransitioning() && !manager->IsSwiperScrolling());
+    });
+    // One delayed flush per UIContent batches rapid clicks. It never queues a
+    // presence scan, and content-change consumption can safely drain it first.
+    auto flushScheduled = std::make_shared<std::atomic<bool>>(false);
+    UiSessionManager::GetInstance()->SaveSearchClickFlushFunction(
+        [weakExecutor = taskExecutor, weakManager = std::weak_ptr<NG::PageSceneRuleManager>(pageSceneMatcher),
+            flushScheduled, instanceId] {
+            auto executor = weakExecutor.Upgrade();
+            if (!executor || weakManager.expired() || flushScheduled->exchange(true)) {
+                return;
+            }
+            auto posted = executor->PostDelayedTask([weakExecutor, weakManager, flushScheduled, instanceId] {
+                flushScheduled->store(false);
+                auto manager = weakManager.lock();
+                auto executor = weakExecutor.Upgrade();
+                if (!manager || !executor) {
+                    return;
+                }
+                ContainerScope scope(instanceId);
+                auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
+                if (!pipeline) {
+                    return;
+                }
+                NG::SearchClickPageContext page {
+                    pipeline->GetCurrentNavDestinationName(), pipeline->GetCurrentPageUrl()
+                };
+                auto results = manager->FlushPendingSearchClicksIfStable(page);
+                const auto pageName = !page.navDestinationName.empty() ? page.navDestinationName
+                    : (!page.pageUrl.empty() ? page.pageUrl : pipeline->GetCurrentPageName());
+                ReportSearchClickEvents(results, pageName, executor);
+            }, TaskExecutor::TaskType::UI, SEARCH_CLICK_FLUSH_DELAY_MS, "ArkUISearchClickFlushIfStable");
+            if (!posted) {
+                flushScheduled->store(false);
+            }
+        });
     auto pageSceneDetectCallback = [weakTaskExecutor = taskExecutor,
                                       weakPageSceneMatcher = std::weak_ptr<NG::PageSceneRuleManager>(pageSceneMatcher)](
         int32_t processId, const std::string& ruleJson, bool isGetResult) {
@@ -6633,26 +6873,39 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
                             UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
                         }
                     };
+                    // Derive eventPageName by pageType instead of the concatenated
+                    // snapshot.pageName ("route,navName"). Navigation → navDestinationName;
+                    // Router → pageUrl; fallback → pageName.
+                    std::string eventPageName = !snapshot.navDestinationName.empty()
+                        ? snapshot.navDestinationName
+                        : (!snapshot.pageUrl.empty() ? snapshot.pageUrl : snapshot.pageName);
                     // Route transition: exit PRESENT pages of this process other
                     // than the current one first (A false before B true, AC-6.4).
-                    auto exitEvents = pageSceneMatcher->ExitOtherSearchPresence(processId, snapshot.pageName);
-                    for (const auto& event : exitEvents) {
-                        reportSearchEvent(BuildSearchPresenceEventJson(event, snapshot.pageName));
+                    // Skip exit when eventPageName is empty (subwindow UIContent) to
+                    // avoid clearing the main-window presence (AC-5.1).
+                    if (!eventPageName.empty()) {
+                        auto exitEvents = pageSceneMatcher->ExitOtherSearchPresence(processId, eventPageName);
+                        for (const auto& event : exitEvents) {
+                            reportSearchEvent(BuildSearchPresenceEventJson(event));
+                        }
                     }
                     auto hits = pageSceneMatcher->MatchSearchScene(processId, snapshot);
                     auto events = pageSceneMatcher->UpdateSearchPresence(processId, snapshot, hits);
+                    LOGD("SearchDetect: pageName=%{public}s nav=%{public}s url=%{public}s "
+                         "hits=%{public}zu events=%{public}zu",
+                        snapshot.pageName.c_str(), snapshot.navDestinationName.c_str(),
+                        snapshot.pageUrl.c_str(), hits.size(), events.size());
                     for (const auto& event : events) {
-                        reportSearchEvent(BuildSearchPresenceEventJson(event, snapshot.pageName));
+                        reportSearchEvent(BuildSearchPresenceEventJson(event));
                     }
                     // Consume click candidates buffered since the last stable point
-                    // and report search click events.
+                    // and report search click events. Use FlushPendingSearchClicksIfStable
+                    // to reuse the stability gate.
                     NG::SearchClickPageContext clickPage;
                     clickPage.navDestinationName = snapshot.navDestinationName;
                     clickPage.pageUrl = snapshot.pageUrl;
-                    auto clickResults = pageSceneMatcher->ConsumeSearchClickCandidates(clickPage);
-                    for (const auto& clickResult : clickResults) {
-                        reportSearchEvent(BuildSearchClickEventJson(clickResult, snapshot.pageName));
-                    }
+                    auto clickResults = pageSceneMatcher->FlushPendingSearchClicksIfStable(clickPage);
+                    ReportSearchClickEvents(clickResults, eventPageName, taskExecutor);
                     if (isGetResult) {
                         UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
                     }
@@ -6905,7 +7158,13 @@ void UIContentImpl::SaveComponentTreeQueryFunction(const WeakPtr<TaskExecutor>& 
             [request]() {
                 std::string resultJson;
                 NG::ComponentTreeQuery::Execute(request, resultJson);
-                UiSessionManager::GetInstance()->ReportComponentTreeQueryResult(resultJson);
+                if (request.type == ComponentTreeQueryType::LAZY_FOREACH_DATA_BY_POINT) {
+                    UiSessionManager::GetInstance()->ReportLazyForEachQueryResult(resultJson);
+                } else if (request.type == ComponentTreeQueryType::NODES_IN_RECT) {
+                    UiSessionManager::GetInstance()->ReportNodesInRectQueryResult(resultJson);
+                } else {
+                    UiSessionManager::GetInstance()->ReportNavigationQueryResult(resultJson);
+                }
             },
             TaskExecutor::TaskType::UI, "UiSessionComponentTreeQuery");
     };
@@ -7017,6 +7276,8 @@ void UIContentImpl::InitSendCommandFunctionsCallbacks(const WeakPtr<TaskExecutor
             TaskExecutor::TaskType::UI, "UiSessionSendCommandPattern");
     };
     UiSessionManager::GetInstance()->SaveForSendCommandFunction(sendCommand);
+    UiSessionManager::GetInstance()->RegisterNodeCommandWithResultCallback(taskExecutor);
+    UiSessionManager::GetInstance()->RegisterSendCommandWithResultCallback(taskExecutor);
 }
 
 bool UIContentImpl::SendUIExtProprty(uint32_t code, const AAFwk::Want& data,

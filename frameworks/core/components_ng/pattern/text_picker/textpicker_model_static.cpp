@@ -37,7 +37,6 @@ namespace OHOS::Ace::NG {
 namespace {
 constexpr float PICKER_MAXFONTSCALE = 1.0f;
 constexpr bool DEFAULT_ENABLE_HAPTIC_FEEDBACK = true;
-const int32_t BUFFER_NODE_NUMBER = 2;
 const char TEXT_PICKER_ETS_TAG[] = "TextPicker";
 const char BUTTON_ETS_TAG[] = "Button";
 
@@ -64,7 +63,7 @@ void TextPickerModelStatic::InitialSetupSinglePicker(FrameNode* frameNode, uint3
     textPickerPattern->SetColumnsKind(columnKind);
 
     if (frameNode->GetChildren().empty()) {
-        auto columnNode = CreateColumnNode(columnKind, showCount_);
+        auto columnNode = CreateColumnNode(columnKind, textPickerPattern->GetShowCount());
         auto stackNode = CreateStackNode();
         auto buttonNode = CreateButtonNode();
         auto columnBlendNode = CreateColumnNode();
@@ -155,9 +154,7 @@ RefPtr<FrameNode> TextPickerModelStatic::CreateButtonNode()
     return FrameNode::GetOrCreateFrameNode(BUTTON_ETS_TAG, buttonId, []() -> RefPtr<Pattern> {
         auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
         CHECK_NULL_RETURN(buttonModifier, nullptr);
-        auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-        CHECK_NULL_RETURN(rawPattern, nullptr);
-        return AceType::Claim(rawPattern);
+        return buttonModifier->createButtonPattern();
     });
 }
 
@@ -169,8 +166,6 @@ RefPtr<FrameNode> TextPickerModelStatic::CreateFrameNode(int32_t nodeId)
     CHECK_NULL_RETURN(pipeline, textPickerNode);
     auto pickerTheme = pipeline->GetTheme<PickerTheme>(textPickerNode->GetThemeScopeId());
     CHECK_NULL_RETURN(pickerTheme, textPickerNode);
-    std::lock_guard<std::shared_mutex> lock(showCountMutex_);
-    showCount_ = BUFFER_NODE_NUMBER + pickerTheme->GetShowOptionCount();
     SetDefaultAttributes(textPickerNode, pickerTheme);
     return textPickerNode;
 }
@@ -389,7 +384,6 @@ void TextPickerModelStatic::SetColumnKind(FrameNode* frameNode, uint32_t columnK
     CHECK_NULL_VOID(frameNode);
     auto textPickerPattern = frameNode->GetPattern<TextPickerPattern>();
     CHECK_NULL_VOID(textPickerPattern);
-    columnKind_ = columnKind;
     textPickerPattern->SetColumnsKind(columnKind);
 }
 
@@ -558,14 +552,18 @@ void TextPickerModelStatic::SetBackgroundColor(FrameNode* frameNode, const Color
 void TextPickerModelStatic::SetRange(FrameNode* frameNode, const std::vector<NG::RangeContent>& value)
 {
     CHECK_NULL_VOID(frameNode);
+    auto textPickerPattern = frameNode->GetPattern<TextPickerPattern>();
+    CHECK_NULL_VOID(textPickerPattern);
     if (frameNode->GetChildren().empty()) {
-        std::lock_guard<std::shared_mutex> lock(showCountMutex_);
+        auto showCount = textPickerPattern->GetShowCount();
+        auto columnKind = textPickerPattern->GetColumnsKind();
         RefPtr<FrameNode> columnNode = nullptr;
-        if (columnKind_ == TEXT) {
-            columnNode = CreateColumnNode(TEXT, showCount_);
-        } else if (columnKind_ == MIXTURE) {
-            columnNode = CreateColumnNode(MIXTURE, showCount_);
+        if (columnKind == TEXT) {
+            columnNode = CreateColumnNode(TEXT, showCount);
+        } else if (columnKind == MIXTURE) {
+            columnNode = CreateColumnNode(MIXTURE, showCount);
         }
+        CHECK_NULL_VOID(columnNode);
         auto stackNode = CreateStackNode();
         auto buttonNode = CreateButtonNode();
         auto columnBlendNode = CreateColumnNode();
@@ -578,7 +576,6 @@ void TextPickerModelStatic::SetRange(FrameNode* frameNode, const std::vector<NG:
         layoutProperty->UpdateAlignment(Alignment::CENTER);
         stackNode->MountToParent(AceType::Claim(frameNode));
     }
-    auto textPickerPattern = frameNode->GetPattern<TextPickerPattern>();
     textPickerPattern->SetRange(value);
 }
 
@@ -595,10 +592,12 @@ void TextPickerModelStatic::SetUnCascadeColumnsNode(FrameNode* frameNode,
     const std::vector<NG::TextCascadePickerOptions>& options)
 {
     CHECK_NULL_VOID(frameNode);
+    auto textPickerPattern = frameNode->GetPattern<TextPickerPattern>();
+    CHECK_NULL_VOID(textPickerPattern);
     if (frameNode->GetChildren().empty()) {
-        std::lock_guard<std::shared_mutex> lock(showCountMutex_);
+        auto showCount = textPickerPattern->GetShowCount();
         for (uint32_t i = 0; i < options.size(); i++) {
-            auto columnNode = CreateColumnNode(TEXT, showCount_);
+            auto columnNode = CreateColumnNode(TEXT, showCount);
             auto stackNode = CreateStackNode();
             auto buttonNode = CreateButtonNode();
             auto columnBlendNode = CreateColumnNode();
@@ -613,8 +612,6 @@ void TextPickerModelStatic::SetUnCascadeColumnsNode(FrameNode* frameNode,
         }
     }
 
-    auto textPickerPattern = frameNode->GetPattern<TextPickerPattern>();
-    CHECK_NULL_VOID(textPickerPattern);
     textPickerPattern->SetCascadeOptions(options, options);
 }
 
@@ -636,9 +633,9 @@ void TextPickerModelStatic::SetCascadeColumnsNode(FrameNode* frameNode,
 
     // Create Node
     if (frameNode->GetChildren().empty()) {
-        std::lock_guard<std::shared_mutex> lock(showCountMutex_);
+        auto showCount = textPickerPattern->GetShowCount();
         for (size_t i = 0; i < columnCount; i++) {
-            auto columnNode = CreateColumnNode(NG::TEXT, showCount_);
+            auto columnNode = CreateColumnNode(NG::TEXT, showCount);
             auto stackNode = CreateStackNode();
             auto buttonNode = CreateButtonNode();
             auto columnBlendNode = CreateColumnNode();
@@ -981,5 +978,21 @@ bool TextPickerModelStatic::GetEnableHapticFeedback(FrameNode* frameNode)
     auto textPickerPattern = frameNode->GetPattern<TextPickerPattern>();
     CHECK_NULL_RETURN(textPickerPattern, DEFAULT_ENABLE_HAPTIC_FEEDBACK);
     return textPickerPattern->GetIsEnableHaptic();
+}
+
+void TextPickerModelStatic::SetTextPickerSingeRange(FrameNode* frameNode, bool isSingleRange)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto textPickerPattern = frameNode->GetPattern<TextPickerPattern>();
+    CHECK_NULL_VOID(textPickerPattern);
+    textPickerPattern->SetSingleRange(isSingleRange);
+}
+
+bool TextPickerModelStatic::GetTextPickerSingeRange(FrameNode* frameNode)
+{
+    CHECK_NULL_RETURN(frameNode, true);
+    auto textPickerPattern = frameNode->GetPattern<TextPickerPattern>();
+    CHECK_NULL_RETURN(textPickerPattern, true);
+    return textPickerPattern->GetIsSingleRange();
 }
 } // namespace OHOS::Ace::NG

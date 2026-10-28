@@ -14,6 +14,7 @@
 import("//foundation/arkui/ace_engine/test/unittest/ace_unittest.gni")
 
 test_sources = [
+  "menu_inspector_tree_test.cpp",
   "custommenuitem_pattern_test_ng.cpp",
   "menu_accessibility_property_test_ng.cpp",
   "menu_animation_test_ng.cpp",
@@ -41,8 +42,11 @@ test_sources = [
   "menu_patternMore_test_three_ng.cpp",
   "menu_pattern_test_ng.cpp",
   "menu_pattern_test_two_ng.cpp",
+  "menu_pattern_test_three_ng.cpp",
   "menu_view_test_ng.cpp",
   "menu_view_test_two_ng.cpp",
+  "menu_view_grid_test_ng.cpp",
+  "menu_view_test_three_ng.cpp",
   "menuitem_layout_property_test_ng.cpp",
   "menuitem_pattern_basic_test_ng.cpp",
   "menuitem_pattern_option_test_ng.cpp",

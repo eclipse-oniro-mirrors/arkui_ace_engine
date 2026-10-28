@@ -31,7 +31,7 @@ namespace OHOS::Ace {
  * ToolBarTheme defines color and styles of ToolBar. ToolBarTheme should be built
  * using ToolBarTheme::Builder.
  */
-class ToolBarTheme : public virtual Theme {
+class ToolBarTheme : public Theme {
     DECLARE_ACE_TYPE(ToolBarTheme, Theme);
 
 public:

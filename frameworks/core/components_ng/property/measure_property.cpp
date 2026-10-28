@@ -29,6 +29,46 @@
 
 namespace OHOS::Ace::NG {
 
+bool SafeAreaInsetEdgeOptions::operator==(const SafeAreaInsetEdgeOptions& other) const
+{
+    return spacing == other.spacing && alignment == other.alignment;
+}
+
+bool SafeAreaInsetEdgeOptions::operator!=(const SafeAreaInsetEdgeOptions& other) const
+{
+    return !(*this == other);
+}
+
+const std::optional<SafeAreaInsetEdgeOptions>& SafeAreaInsetOptions::GetEdge(SafeAreaInsetEdge edge) const
+{
+    return edges[ToIndex(edge)];
+}
+
+std::optional<SafeAreaInsetEdgeOptions>& SafeAreaInsetOptions::GetEdge(SafeAreaInsetEdge edge)
+{
+    return edges[ToIndex(edge)];
+}
+
+bool SafeAreaInsetOptions::Empty() const
+{
+    for (const auto& edge : edges) {
+        if (edge.has_value()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool SafeAreaInsetOptions::operator==(const SafeAreaInsetOptions& other) const
+{
+    return edges == other.edges;
+}
+
+bool SafeAreaInsetOptions::operator!=(const SafeAreaInsetOptions& other) const
+{
+    return !(*this == other);
+}
+
 void CalcSize::Reset()
 {
     width_.reset();

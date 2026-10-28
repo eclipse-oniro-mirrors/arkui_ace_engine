@@ -1225,7 +1225,11 @@ void CalendarDialogPattern::HandleTitleArrowsClickEvent(int32_t nodeIndex)
 void CalendarDialogPattern::ResolveFirstDayOfWeek()
 {
     int32_t raw = currentSettingData_.firstDayOfWeek;
-    if (raw == 0) {
+    if (raw < CalendarPickerConstants::FIRST_DAY_OF_WEEK_LOCAL ||
+        raw > CalendarPickerConstants::MAX_FIRST_DAY_OF_WEEK) {
+        raw = CalendarPickerConstants::FIRST_DAY_OF_WEEK_LOCAL;
+    }
+    if (raw == CalendarPickerConstants::FIRST_DAY_OF_WEEK_LOCAL) {
         auto locale = Localization::GetInstance()->GetLanguage();
         resolvedFirstDay_ = CalendarPickerI18n::GetFirstDayOfWeek(locale);
     } else {
@@ -1723,6 +1727,21 @@ void CalendarDialogPattern::ToJsonValue(std::unique_ptr<JsonValue>& json, const 
     if (currentSettingData_.endDate.ToDays() != PickerDate().ToDays()) {
         json->PutExtAttr("end", currentSettingData_.endDate.ToString(false).c_str(), filter);
     }
+    auto GetFirstDayOfWeekString = [](int32_t firstDayOfWeek) {
+        std::string ret;
+        switch (firstDayOfWeek) {
+            case 1: ret = "CalendarFirstDayOfWeek.MON"; break;
+            case 2: ret = "CalendarFirstDayOfWeek.TUE"; break;
+            case 3: ret = "CalendarFirstDayOfWeek.WED"; break;
+            case 4: ret = "CalendarFirstDayOfWeek.THU"; break;
+            case 5: ret = "CalendarFirstDayOfWeek.FRI"; break;
+            case 6: ret = "CalendarFirstDayOfWeek.SAT"; break;
+            case 7: ret = "CalendarFirstDayOfWeek.SUN"; break;
+            default: ret = "CalendarFirstDayOfWeek.LOCAL"; break;
+        }
+        return ret;
+    };
+    json->PutExtAttr("firstDayOfWeek", GetFirstDayOfWeekString(currentSettingData_.firstDayOfWeek).c_str(), filter);
 }
 
 void CalendarDialogPattern::MarkMonthNodeDirty()

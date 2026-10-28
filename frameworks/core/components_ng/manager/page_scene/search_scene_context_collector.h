@@ -30,7 +30,7 @@ namespace OHOS::Ace::NG {
 class ACE_FORCE_EXPORT SearchSceneContextCollector final {
 public:
     struct SearchPageContext {
-        // Event PageName (main top page name; subwindow hits use `<main>+Dialog`).
+        // Event PageName (main top page name; subwindow hits use `<main>+Dialog` or `<main>+Sheet`).
         std::string pageName;
         // Rule page matching values, fetched independently by pageType.
         std::string navDestinationName;

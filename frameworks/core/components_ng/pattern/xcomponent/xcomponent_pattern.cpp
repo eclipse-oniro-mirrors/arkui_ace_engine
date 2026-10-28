@@ -14,7 +14,11 @@
  */
 
 #include "core/components_ng/pattern/xcomponent/xcomponent_pattern.h"
+
+#include "base/log/log_wrapper.h"
 #include "core/accessibility/accessibility_manager.h"
+#include "core/accessibility/third_provider_tree_exporter.h"
+#include "core/components_ng/base/inspector_tree_request_context.h"
 
 #include <cmath>
 #include <string_view>
@@ -31,7 +35,6 @@
 #include "base/geometry/ng/size_t.h"
 #include "base/log/dump_log.h"
 #include "base/log/frame_report.h"
-#include "base/log/log_wrapper.h"
 #include "base/memory/ace_type.h"
 #include "base/perfmonitor/perf_monitor.h"
 #include "base/ressched/ressched_report.h"
@@ -88,6 +91,7 @@ std::mutex XComponentPattern::angleMtx_;
 std::string XComponentPattern::compensationAngleFromFeatureManager_ = "";
 namespace {
 
+constexpr uint32_t XCOMPONENT_EXTRA_FLAG_ENABLE_SOLID_COLOR = 0x01;
 constexpr std::string_view BUFFER_USAGE_XCOMPONENT = "xcomponent";
 #ifdef ENABLE_ROSEN_BACKEND
 constexpr char X_COMPONENT_COMPENSATION_ANGLE[] = "xcomponentCompensationAngle";
@@ -730,7 +734,7 @@ void XComponentPattern::applyBackGroundColor()
     CHECK_NULL_VOID(handlingSurfaceRenderContext_);
     auto bkColor = renderContext->GetBackgroundColor().value_or(Color::BLACK);
     handlingSurfaceRenderContext_->UpdateBackgroundColor(
-        (bkColor.GetAlpha() < UINT8_MAX) ? Color::TRANSPARENT : bkColor);
+        (!IsSolidColorEnabled() && bkColor.GetAlpha() < UINT8_MAX) ? Color::TRANSPARENT : bkColor);
 }
 
 void XComponentPattern::OnAreaChangedInner()
@@ -932,6 +936,7 @@ void XComponentPattern::ToJsonValue(std::unique_ptr<JsonValue>& json, const Insp
     json->PutExtAttr("enableAnalyzer", isEnableAnalyzer_ ? "true" : "false", filter);
     json->PutExtAttr("enableSecure", isEnableSecure_ ? "true" : "false", filter);
     json->PutExtAttr("hdrBrightness", std::to_string(hdrBrightness_).c_str(), filter);
+    json->PutExtAttr("extraFlag", IsSolidColorEnabled() ? "ENABLE_SOLID_COLOR" : "", filter);
     json->PutExtAttr("enableTransparentLayer", isTransparentLayer_ ? "true" : "false", filter);
     json->PutExtAttr("bufferQueueCount", std::to_string(bufferQueueCount_).c_str(), filter);
     json->PutExtAttr("screenId", screenId_.has_value() ? std::to_string(screenId_.value()).c_str() : "", filter);
@@ -1080,7 +1085,7 @@ void XComponentPattern::NativeXComponentDispatchTouchEvent(
     const auto* callback = nativeXComponentImpl_->GetCallback();
     CHECK_NULL_VOID(callback);
     CHECK_NULL_VOID(callback->DispatchTouchEvent);
-    LOG_CALLBACK(callback->DispatchTouchEvent);
+    LOG_CALLBACK(__FUNCTION__, callback->DispatchTouchEvent);
     callback->DispatchTouchEvent(nativeXComponent_.get(), surface);
 }
 
@@ -1187,7 +1192,9 @@ void XComponentPattern::InitializeAccessibility()
         "InitializeAccessibility accessibilityId: %{public}" PRId64 "", accessibilityId);
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
     accessibilityChildTreeCallback_ = std::make_shared<XComponentAccessibilityChildTreeCallback>(
         WeakClaim(this), host->GetAccessibilityId());
@@ -1206,7 +1213,10 @@ void XComponentPattern::UninitializeAccessibility(FrameNode* frameNode)
     int64_t accessibilityId = frameNode->GetAccessibilityId();
     auto pipeline = frameNode->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto host = GetHost();
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
     if (accessibilityManager->IsRegister() && accessibilityChildTreeCallback_) {
         OnAccessibilityChildTreeDeregister(frameNode);
@@ -1232,7 +1242,9 @@ bool XComponentPattern::OnAccessibilityChildTreeRegister(uint32_t windowId, int3
     CHECK_NULL_RETURN(host, false);
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_RETURN(pipeline, false);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_RETURN(mainAccessibilityManager, false);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_RETURN(accessibilityManager, false);
     if (accessibilityProvider_ == nullptr) {
         accessibilityProvider_ =
@@ -1269,15 +1281,19 @@ bool XComponentPattern::OnAccessibilityChildTreeDeregister(FrameNode* frameNode)
     TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "OnAccessibilityChildTreeDeregister, "
         "windowId: %{public}u, treeId: %{public}d.", windowId_, treeId_);
     RefPtr<PipelineContext> pipeline;
+    RefPtr<FrameNode> nodeForAM;
     if (!frameNode) {
-        auto host = GetHost();
-        CHECK_NULL_RETURN(host, false);
-        pipeline = host->GetContextRefPtr();
+        nodeForAM = GetHost();
+        CHECK_NULL_RETURN(nodeForAM, false);
+        pipeline = nodeForAM->GetContextRefPtr();
     } else {
+        nodeForAM = frameNode;
         pipeline = frameNode->GetContextRefPtr();
     }
     CHECK_NULL_RETURN(pipeline, false);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_RETURN(mainAccessibilityManager, false);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(nodeForAM);
     CHECK_NULL_RETURN(accessibilityManager, false);
     auto nativeProvider = GetNativeProvider();
     CHECK_NULL_RETURN(nativeProvider, false);
@@ -1325,7 +1341,9 @@ void XComponentPattern::HandleRegisterAccessibilityEvent(bool isRegister)
     CHECK_NULL_VOID(host);
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
     if (!isRegister) {
         accessibilityChildTreeCallback_->OnDeregister();
@@ -1430,6 +1448,7 @@ void XComponentPattern::HandleFocusEvent()
     auto* surface = const_cast<void*>(nativeXComponentImpl_->GetSurface());
     const auto focusEventCallback = nativeXComponentImpl_->GetFocusEventCallback();
     CHECK_NULL_VOID(focusEventCallback);
+    LOG_CALLBACK("OH_NativeXComponent_RegisterFocusEventCallback", focusEventCallback);
     focusEventCallback(nativeXComponent_.get(), surface);
 }
 
@@ -1444,11 +1463,15 @@ bool XComponentPattern::HandleKeyEvent(const KeyEvent& event)
     auto* surface = const_cast<void*>(nativeXComponentImpl_->GetSurface());
     const auto keyEventCallbackWithResult = nativeXComponentImpl_->GetKeyEventCallbackWithResult();
     if (keyEventCallbackWithResult) {
+        LOG_CALLBACK("OH_NativeXComponent_RegisterKeyEventCallbackWithResult", keyEventCallbackWithResult);
         return keyEventCallbackWithResult(nativeXComponent_.get(), surface);
     }
     const auto keyEventCallback = nativeXComponentImpl_->GetKeyEventCallback();
     CHECK_NULL_RETURN(keyEventCallback, false);
-    keyEventCallback(nativeXComponent_.get(), surface);
+    {
+        LOG_CALLBACK("OH_NativeXComponent_RegisterKeyEventCallback", keyEventCallback);
+        keyEventCallback(nativeXComponent_.get(), surface);
+    }
     return false;
 }
 
@@ -1459,6 +1482,7 @@ void XComponentPattern::HandleBlurEvent()
     auto* surface = const_cast<void*>(nativeXComponentImpl_->GetSurface());
     const auto blurEventCallback = nativeXComponentImpl_->GetBlurEventCallback();
     CHECK_NULL_VOID(blurEventCallback);
+    LOG_CALLBACK("OH_NativeXComponent_RegisterBlurEventCallback", blurEventCallback);
     blurEventCallback(nativeXComponent_.get(), surface);
 }
 
@@ -1506,6 +1530,7 @@ void XComponentPattern::InitOnTouchIntercept(const RefPtr<GestureEventHub>& gest
         auto event = touchEvent.ConvertToTouchEvent();
         ArkUI_UIInputEvent uiEvent { ARKUI_UIINPUTEVENT_TYPE_TOUCH, TOUCH_EVENT_ID, &event, false,
             Container::GetCurrentApiTargetVersion(), hostNode->GetId(), .usePXUnit = true };
+        LOG_CALLBACK("OH_NativeXComponent_RegisterOnTouchInterceptCallback", onTouchInterceptCallback);
         return static_cast<NG::HitTestMode>(onTouchInterceptCallback(pattern->nativeXComponent_.get(), &uiEvent));
     });
 }
@@ -1639,7 +1664,7 @@ void XComponentPattern::HandleMouseHoverEvent(bool isHover)
     const auto* callback = nativeXComponentImpl_->GetMouseEventCallback();
     CHECK_NULL_VOID(callback);
     CHECK_NULL_VOID(callback->DispatchHoverEvent);
-    LOG_CALLBACK(callback->DispatchHoverEvent);
+    LOG_CALLBACK(__FUNCTION__, callback->DispatchHoverEvent);
     callback->DispatchHoverEvent(nativeXComponent_.get(), isHover);
 }
 
@@ -1655,7 +1680,7 @@ void XComponentPattern::NativeXComponentDispatchMouseEvent(const OH_NativeXCompo
     const auto* callback = nativeXComponentImpl_->GetMouseEventCallback();
     CHECK_NULL_VOID(callback);
     CHECK_NULL_VOID(callback->DispatchMouseEvent);
-    LOG_CALLBACK(callback->DispatchMouseEvent);
+    LOG_CALLBACK(__FUNCTION__, callback->DispatchMouseEvent);
     callback->DispatchMouseEvent(nativeXComponent_.get(), surface);
 }
 
@@ -1668,6 +1693,7 @@ void XComponentPattern::NativeXComponentDispatchAxisEvent(AxisEvent* axisEvent)
     CHECK_NULL_VOID(callback);
     ArkUI_UIInputEvent uiEvent { ARKUI_UIINPUTEVENT_TYPE_AXIS, AXIS_EVENT_ID, axisEvent, false,
         Container::GetCurrentApiTargetVersion(), GetHost()->GetId(), .usePXUnit = true };
+    LOG_CALLBACK("OH_NativeXComponent_RegisterUIInputEventCallback", callback);
     callback(nativeXComponent_.get(), &uiEvent, ArkUI_UIInputEvent_Type::ARKUI_UIINPUTEVENT_TYPE_AXIS);
 }
 
@@ -1899,8 +1925,11 @@ void XComponentPattern::HandleOnFrameEvent()
         auto xComponentPattern = weak.Upgrade();
         CHECK_NULL_VOID(xComponentPattern);
         CHECK_NULL_VOID(xComponentPattern->nativeXComponentImpl_->GetOnFrameCallback());
-        xComponentPattern->nativeXComponentImpl_->GetOnFrameCallback()(xComponentPattern->nativeXComponent_.get(),
-            displaySyncData->GetTimestamp(), displaySyncData->GetTargetTimestamp());
+        const auto onFrameCallback = xComponentPattern->nativeXComponentImpl_->GetOnFrameCallback();
+        LOG_CALLBACK("OH_NativeXComponent_RegisterOnFrameCallback", onFrameCallback);
+        onFrameCallback(
+            xComponentPattern->nativeXComponent_.get(), displaySyncData->GetTimestamp(),
+            displaySyncData->GetTargetTimestamp());
     });
     TAG_LOGD(AceLogTag::ACE_XCOMPONENT, "Id: %{public}" PRIu64 " RegisterOnFrame",
         displaySync_->GetId());
@@ -2167,7 +2196,7 @@ void XComponentPattern::OnSurfaceCreated()
         CHECK_NULL_VOID(callback->OnSurfaceCreated);
         TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent[%{public}s] native OnSurfaceCreated", GetId().c_str());
         ACE_SCOPED_TRACE("XComponent[%s] NativeSurfaceCreated[w:%f,h:%f]", GetId().c_str(), width, height);
-        LOG_CALLBACK(callback->OnSurfaceCreated);
+        LOG_CALLBACK(__FUNCTION__, callback->OnSurfaceCreated);
         callback->OnSurfaceCreated(nativeXComponent_.get(), nativeWindow_);
     } else {
         auto host = GetHost();
@@ -2214,7 +2243,7 @@ void XComponentPattern::OnSurfaceChanged(const RectF& surfaceRect, bool needResi
         CHECK_NULL_VOID(callback->OnSurfaceChanged);
         {
             ACE_SCOPED_TRACE("XComponent[%s] native OnSurfaceChanged[w:%f,h:%f]", GetId().c_str(), width, height);
-            LOG_CALLBACK(callback->OnSurfaceChanged);
+            LOG_CALLBACK(__FUNCTION__, callback->OnSurfaceChanged);
             callback->OnSurfaceChanged(nativeXComponent_.get(), surface);
         }
     } else {
@@ -2236,8 +2265,10 @@ void XComponentPattern::OnSurfaceDestroyed(FrameNode* frameNode)
         CHECK_NULL_VOID(callback->OnSurfaceDestroyed);
         TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent[%{public}s] native OnSurfaceDestroyed", GetId().c_str());
         ACE_SCOPED_TRACE("XComponent[%s] native OnSurfaceDestroyed", GetId().c_str());
-        LOG_CALLBACK(callback->OnSurfaceDestroyed);
-        callback->OnSurfaceDestroyed(nativeXComponent_.get(), surface);
+        {
+            LOG_CALLBACK(__FUNCTION__, callback->OnSurfaceDestroyed);
+            callback->OnSurfaceDestroyed(nativeXComponent_.get(), surface);
+        }
         nativeXComponentImpl_->SetSurface(nullptr);
     } else if (isTypedNode_) {
         RefPtr<FrameNode> host;
@@ -2320,6 +2351,7 @@ void XComponentPattern::NativeSurfaceShow()
     auto* surface = const_cast<void*>(nativeXComponentImpl_->GetSurface());
     const auto surfaceShowCallback = nativeXComponentImpl_->GetSurfaceShowCallback();
     CHECK_NULL_VOID(surfaceShowCallback);
+    LOG_CALLBACK("OH_NativeXComponent_RegisterSurfaceShowCallback", surfaceShowCallback);
     surfaceShowCallback(nativeXComponent_.get(), surface);
 }
 
@@ -2331,7 +2363,10 @@ void XComponentPattern::NativeSurfaceHide()
     auto* surface = const_cast<void*>(nativeXComponentImpl_->GetSurface());
     const auto surfaceHideCallback = nativeXComponentImpl_->GetSurfaceHideCallback();
     CHECK_NULL_VOID(surfaceHideCallback);
-    surfaceHideCallback(nativeXComponent_.get(), surface);
+    {
+        LOG_CALLBACK("OH_NativeXComponent_RegisterSurfaceHideCallback", surfaceHideCallback);
+        surfaceHideCallback(nativeXComponent_.get(), surface);
+    }
     CHECK_NULL_VOID(renderSurface_);
     renderSurface_->ReleaseSurfaceBuffers();
 }
@@ -2652,6 +2687,27 @@ void XComponentPattern::HdrBrightness(float hdrBrightness, HdrType hdrType)
     hdrType_ = hdrType;
 }
 
+void XComponentPattern::SetExtraFlag(uint32_t flag)
+{
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT,
+        "XComponent[%{public}s] SetExtraFlag (pattern) entry, flag: 0x%{public}x, type: %{public}d",
+        GetId().c_str(), flag, static_cast<int32_t>(type_));
+    extraFlag_ = flag;
+    if (type_ == XComponentType::SURFACE) {
+        bool isSolidColorEnabled = IsSolidColorEnabled();
+        CHECK_NULL_VOID(renderContextForSurface_);
+        renderContextForSurface_->SetSolidLayerEnabled(isSolidColorEnabled);
+        if (handlingSurfaceRenderContext_ == renderContextForSurface_) {
+            applyBackGroundColor();
+        }
+    }
+}
+
+bool XComponentPattern::IsSolidColorEnabled() const
+{
+    return (extraFlag_ & XCOMPONENT_EXTRA_FLAG_ENABLE_SOLID_COLOR) == XCOMPONENT_EXTRA_FLAG_ENABLE_SOLID_COLOR;
+}
+
 void XComponentPattern::EnableTransparentLayer(bool isTransparentLayer)
 {
     if (type_ != XComponentType::SURFACE) {
@@ -2762,6 +2818,23 @@ void XComponentPattern::SetSurfaceIsOpaque(bool isOpaque)
     }
 }
 
+void XComponentPattern::AddExtraInfoWithParamConfig(
+    std::shared_ptr<JsonValue>& json, ParamConfig config)
+{
+    if (!config.withCustomContent || config.inspectorContext) {
+        return;
+    }
+    CHECK_NULL_VOID(json);
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* provider = GetNativeProvider();
+    CHECK_NULL_VOID(provider);
+    auto providerTree = ThirdProviderTreeExporter::ExportToInspectorJson(provider, host);
+    if (providerTree) {
+        json->Put(THIRD_PROVIDER_JSON_CHILDREN, providerTree);
+    }
+}
+
 void XComponentPattern::UpdateSdrRatioIfNeed()
 {
     if (xcomponentTouchSdrRatio_ < std::numeric_limits<float>::epsilon() &&
@@ -2782,6 +2855,13 @@ void XComponentPattern::UpdateSdrRatioIfNeed()
         TAG_LOGD(AceLogTag::ACE_XCOMPONENT,
             "XComponentPattern[UpdateSdrRatioIfNeed] touchSdrRatio_:%{public}f, sizeSdrRatio_:%{public}f",
             xcomponentTouchSdrRatio_, xcomponentSizeSdrRatio_);
+    }
+}
+
+void XComponentPattern::AddInspectorTreeInfo(std::shared_ptr<JsonValue>& node, InspectorTreeRequestContext& context)
+{
+    if (context.config.withCustomContent && !context.ShouldStop()) {
+        context.CollectCustomContent(GetNativeProvider(), GetHost(), node);
     }
 }
 

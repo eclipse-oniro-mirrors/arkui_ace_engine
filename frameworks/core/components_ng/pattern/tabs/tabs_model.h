@@ -136,6 +136,9 @@ struct BarFloatingStyleParameters {
     std::optional<Dimension> maskHeight;
     std::optional<bool> adaptToHandedness;
     RefPtr<UiMaterial> systemMaterial;
+    std::optional<Dimension> offsetX;
+    std::optional<Dimension> offsetY;
+    std::optional<Dimension> maxWidth;
 
     RefPtr<ResourceObject> smallBarWidthObject;
     RefPtr<ResourceObject> mediumBarWidthObject;
@@ -144,6 +147,9 @@ struct BarFloatingStyleParameters {
     RefPtr<ResourceObject> barBottomMarginObject;
     RefPtr<ResourceObject> maskColorObject;
     RefPtr<ResourceObject> maskHeightObject;
+    RefPtr<ResourceObject> offsetXObject;
+    RefPtr<ResourceObject> offsetYObject;
+    RefPtr<ResourceObject> maxWidthObject;
 
     bool operator==(const BarFloatingStyleParameters& parameters) const
     {
@@ -151,7 +157,37 @@ struct BarFloatingStyleParameters {
                (largeBarWidth == parameters.largeBarWidth) && (barSideMargin == parameters.barSideMargin) &&
                (barBottomMargin == parameters.barBottomMargin) && (maskColor == parameters.maskColor) &&
                (maskHeight == parameters.maskHeight) && (adaptToHandedness == parameters.adaptToHandedness) &&
-               (systemMaterial == parameters.systemMaterial);
+               (systemMaterial == parameters.systemMaterial) && (offsetX == parameters.offsetX) &&
+               (offsetY == parameters.offsetY) && (maxWidth == parameters.maxWidth);
+    }
+};
+
+struct BarTopFloatingStyleParameters {
+    std::optional<Dimension> barWidth;
+    std::optional<Dimension> barSideMargin;
+    std::optional<Dimension> barTopMargin;
+    std::optional<Color> maskColor;
+    std::optional<Dimension> maskHeight;
+    std::optional<Dimension> offsetX;
+    std::optional<Dimension> offsetY;
+    std::optional<Dimension> maxWidth;
+
+    RefPtr<ResourceObject> barWidthObject;
+    RefPtr<ResourceObject> barSideMarginObject;
+    RefPtr<ResourceObject> barTopMarginObject;
+    RefPtr<ResourceObject> maskColorObject;
+    RefPtr<ResourceObject> maskHeightObject;
+    RefPtr<ResourceObject> offsetXObject;
+    RefPtr<ResourceObject> offsetYObject;
+    RefPtr<ResourceObject> maxWidthObject;
+
+    bool operator==(const BarTopFloatingStyleParameters& parameters) const
+    {
+        return (barWidth == parameters.barWidth) && (barSideMargin == parameters.barSideMargin) &&
+               (barTopMargin == parameters.barTopMargin) && (maskColor == parameters.maskColor) &&
+               (maskHeight == parameters.maskHeight) &&
+               (offsetX == parameters.offsetX) && (offsetY == parameters.offsetY) &&
+               (maxWidth == parameters.maxWidth);
     }
 };
 
@@ -216,6 +252,8 @@ public:
     virtual void SetNestedScroll(const NestedScrollOptions& nestedOpt) {}
     virtual void SetBarFloatingStyle(const BarFloatingStyleParameters& parameters) {}
     virtual void ResetBarFloatingStyle() {}
+    virtual void SetBarTopFloatingStyle(const BarTopFloatingStyleParameters& parameters) {}
+    virtual void ResetBarTopFloatingStyle() {}
     virtual void SetSidebarDisplayStyle(NG::SidebarDisplayStyle sidebarDisplayStyle) {}
     virtual void SetBarLayoutStyle(NG::TabBarLayoutStyle barLayoutStyle) {}
     virtual void SetSidebarPosition(BarPosition position) {}
@@ -223,8 +261,10 @@ public:
     virtual void SetSidebarFooter(const RefPtr<AceType>& footer) {}
     virtual void SetSidebarBottomBar(const RefPtr<AceType>& bottomBar) {}
     virtual void SetSidebarSearchableOptions(const NG::TabsSidebarSearchableOptions& options) {}
+    virtual void SetShowSidebarControlButton(bool showControlButton) {}
     virtual void SetBarDisplayModeBreakpoint(const NG::TabBarDisplayModeBreakpoint& breakpoint) {}
     virtual void SetOnBarDisplayModeChange(std::function<void(NG::TabBarDisplayMode)>&& onBarDisplayModeChange) {}
+    virtual void SetKeepTabBarInSideBar(bool keepTabBarInSideBar) {}
 
 private:
     static std::unique_ptr<TabsModel> instance_;

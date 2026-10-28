@@ -20,10 +20,10 @@
 
 #include "base/memory/ace_type.h"
 #include "core/components/select/select_theme.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
-class SelectThemeWrapper : public SelectTheme, public TokenThemeWrapper {
+class SelectThemeWrapper : public SelectTheme {
     DECLARE_ACE_TYPE(SelectThemeWrapper, SelectTheme);
 
 public:
@@ -32,7 +32,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<SelectThemeWrapper>();
             auto theme = AceType::DynamicCast<SelectTheme>(wrapper);

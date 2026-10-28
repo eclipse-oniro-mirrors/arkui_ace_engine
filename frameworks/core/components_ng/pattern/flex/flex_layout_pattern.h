@@ -49,6 +49,12 @@ public:
         return MakeRefPtr<FlexLayoutAlgorithm>();
     }
 
+    // Restricted scroll-placeholder whitelist clone: plain layout-only container.
+    RefPtr<Pattern> CloneForPlaceholder() override
+    {
+        return MakeRefPtr<FlexLayoutPattern>(isWrap_);
+    }
+
     bool IsAtomicNode() const override
     {
         return false;
@@ -111,6 +117,14 @@ public:
         json->Put("FlexMeasureLayoutPaired", GetMeasureLayoutPaired());
         json->Put("FlexFrontSpace", static_cast<double>(layoutResult_.frontSpace));
         json->Put("FlexBetweenSpace", static_cast<double>(layoutResult_.betweenSpace));
+    }
+
+    void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json, const InspectorDumpOptions& options) override
+    {
+        DumpSimplifyInfo(json);
+        if (!ShouldIncludeDiagnostic(options)) {
+            json->Delete("FlexMeasureLayoutPaired");
+        }
     }
 
     bool GetIsWrap() const

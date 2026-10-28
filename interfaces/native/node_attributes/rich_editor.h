@@ -45,6 +45,36 @@ extern "C" {
 #endif
 
 /**
+ * @brief Enumerates the text editor input types.
+ *
+ * @since 26.2.0
+ */
+typedef enum {
+    /** Normal input mode. */
+    ARKUI_TEXT_EDITOR_TYPE_NORMAL = 0,
+    /** Number input mode. */
+    ARKUI_TEXT_EDITOR_TYPE_NUMBER = 2,
+    /** Phone number input mode. */
+    ARKUI_TEXT_EDITOR_TYPE_PHONE_NUMBER = 3,
+    /** Email address input mode. */
+    ARKUI_TEXT_EDITOR_TYPE_EMAIL = 5,
+    /** Password input mode. */
+    ARKUI_TEXT_EDITOR_TYPE_PASSWORD = 7,
+    /** Numeric password input mode. */
+    ARKUI_TEXT_EDITOR_TYPE_NUMBER_PASSWORD = 8,
+    /** Lock screen password input mode. */
+    ARKUI_TEXT_EDITOR_TYPE_SCREEN_LOCK_PASSWORD = 9,
+    /** Username input mode. */
+    ARKUI_TEXT_EDITOR_TYPE_USER_NAME = 10,
+    /** New password input mode. */
+    ARKUI_TEXT_EDITOR_TYPE_NEW_PASSWORD = 11,
+    /** Number input mode with a decimal point. */
+    ARKUI_TEXT_EDITOR_TYPE_NUMBER_DECIMAL = 12,
+    /** One time code input mode. */
+    ARKUI_TEXT_EDITOR_TYPE_ONE_TIME_CODE = 14,
+} ArkUI_TextEditorType;
+
+/**
  * @brief Defines the text selection menu options of the text editor.
  *
  * @since 24

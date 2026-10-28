@@ -45,7 +45,7 @@ bool ScrollableController::AnimateToMultiThread(
                     position.ConvertToPx(), duration, smooth, canOverScroll,
                     static_cast<int32_t>(host->GetAccessibilityId()), host->GetTag().c_str());
                 pattern->SetAccessibilityScrollSource(AccessibilityScrollSource::API);
-                pattern->AnimateTo(position.ConvertToPx(), duration, curve, smooth, canOverScroll);
+                pattern->AnimateToFromController(position.ConvertToPx(), duration, curve, smooth, canOverScroll);
             });
         } else {
             host->PostAfterAttachMainTreeTask([weak = AceType::WeakClaim(AceType::RawPtr(pattern)),
@@ -127,11 +127,12 @@ void ScrollableController::ScrollByMultiThread(double pixelX, double pixelY, boo
         ACE_SCOPED_TRACE("ScrollBy, offset:%f, id:%d, tag:%s", static_cast<float>(-offset),
             static_cast<int32_t>(host->GetAccessibilityId()), host->GetTag().c_str());
         pattern->SetAccessibilityScrollSource(AccessibilityScrollSource::API);
-        if (pattern->GetAxis() == Axis::FREE) {
+    if (pattern->GetAxis() == Axis::FREE) {
             pattern->FreeScrollBy(OffsetF { -pixelX, -pixelY });
             return;
         }
         pattern->SetIsOverScroll(false);
+        pattern->ScheduleCapiScrollCommand(false, true);
         pattern->UpdateCurrentOffset(static_cast<float>(-offset), SCROLL_FROM_JUMP);
     });
 }
@@ -171,6 +172,26 @@ void ScrollableController::ScrollToIndexMultiThread(
     });
 }
 
+void ScrollableController::ScrollToIndexWithOptionsMultiThread(int32_t index, bool smooth, ScrollAlign align,
+    std::optional<float> extraOffset, FastScrollMode mode)
+{
+    auto pattern = scroll_.Upgrade();
+    CHECK_NULL_VOID(pattern);
+    auto host = pattern->GetHost();
+    CHECK_NULL_VOID(host);
+    host->PostAfterAttachMainTreeTask([weak = WeakPtr<ScrollablePattern>(pattern),
+        index, smooth, align, extraOffset, mode]() {
+        auto pattern = weak.Upgrade();
+        CHECK_NULL_VOID(pattern);
+        pattern->SetAccessibilityScrollSource(AccessibilityScrollSource::API);
+        if (IsFastScrollEnabled(mode) && smooth) {
+            pattern->ScrollToIndexFastScroll(index, smooth, align, extraOffset, mode);
+        } else {
+            pattern->ScrollToIndex(index, smooth, align, extraOffset);
+        }
+    });
+}
+
 void ScrollableController::ScrollPageMultiThread(bool reverse, bool smooth)
 {
     auto pattern = scroll_.Upgrade();
@@ -202,6 +223,7 @@ void ScrollableController::ScrollPageMultiThread(bool reverse, bool smooth)
             pattern->StopAnimate();
             ACE_SCOPED_TRACE("ScrollPage without animation, offset:%f, id:%d, tag:%s", offset,
                 static_cast<int32_t>(host->GetAccessibilityId()), host->GetTag().c_str());
+            pattern->ScheduleCapiScrollCommand(false);
             pattern->UpdateCurrentOffset(offset, SCROLL_FROM_JUMP);
         }
     });

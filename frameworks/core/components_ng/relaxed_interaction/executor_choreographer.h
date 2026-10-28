@@ -35,6 +35,8 @@ public:
 
     void Clear();
 
+    void DiscardFront(size_t count);
+
     bool HasCurrent() const
     {
         return currentExecutor_ != nullptr;

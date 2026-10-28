@@ -14,6 +14,7 @@
 import("//foundation/arkui/ace_engine/test/unittest/ace_unittest.gni")
 
 test_sources = [
+  "$ace_root/test/unittest/core/pattern/scrollable/scrollable_test_utils.cpp",
   "free_scroll_test.cpp",
   "scroll_accessibility_test_ng.cpp",
   "scroll_bar_overlay_test_ng.cpp",
@@ -41,7 +42,7 @@ if (is_host_product) {
     type = "host_components"
     module_name = "ScrollingSet-Scroll"
     sources = test_sources
-      cflags = [ "-fno-access-control" ]
+    cflags = [ "-fno-access-control" ]
   }
 } else {
   ace_unittest("scroll_test_ng") {

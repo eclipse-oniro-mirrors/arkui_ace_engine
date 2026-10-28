@@ -17,11 +17,11 @@
 #define FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_TOGGLE_TOGGLE_THEME_WRAPPER_H
 
 #include "core/components/toggle/toggle_theme.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
-class ToggleThemeWrapper : public ToggleTheme, public TokenThemeWrapper {
+class ToggleThemeWrapper : public ToggleTheme {
     DECLARE_ACE_TYPE(ToggleThemeWrapper, ToggleTheme);
 
 public:
@@ -30,7 +30,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto themeWrapper = AceType::MakeRefPtr<ToggleThemeWrapper>();
             auto theme = AceType::DynamicCast<ToggleTheme>(themeWrapper);

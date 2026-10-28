@@ -20,11 +20,13 @@
 #include "core/components_ng/manager/event/json_child_report.h"
 #include "core/components_ng/manager/event/json_report.h"
 #include "core/components_ng/manager/page_scene/search_scene_click_matcher.h"
+#include "core/components_ng/manager/interaction_observer/ui_info_collection_manager.h"
 #include "core/accessibility/accessibility_utils.h"
 #include "core/common/container.h"
 #include "core/common/event_manager.h"
 #include "core/common/reporter/reporter.h"
 #include "core/components_ng/event/event_constants.h"
+#include "interfaces/inner_api/ui_session/ui_session_manager.h"
 #include "core/components_ng/property/accessibility_property.h"
 
 #ifndef CROSS_PLATFORM
@@ -234,6 +236,10 @@ void ClickRecognizer::PublishSearchClickCandidate(const TouchEvent& touchPoint)
         effectivePoint.deviceId, effectivePoint.id, pressedTime > 0 ? pressedTime : now, candidate.nodeId);
     candidate.responseNode = WeakPtr<FrameNode>(responseNode);
     SearchClickObserver::GetInstance().Publish(candidate);
+    auto session = UiSessionManager::GetInstance();
+    if (session) {
+        session->FlushPendingSearchClicksIfStable();
+    }
 }
 
 void ClickRecognizer::OnAccepted()
@@ -680,8 +686,8 @@ void ClickRecognizer::SendCallbackMsg(const std::unique_ptr<GestureEventFunc>& o
     if (gestureInfo_ && gestureInfo_->GetDisposeTag()) {
         return;
     }
+    GestureEvent info = GetGestureEventInfo();
     if (onAction && *onAction) {
-        GestureEvent info = GetGestureEventInfo();
         info.SetGestureTypeName(GestureTypeName::TAP_GESTURE);
         // onAction may be overwritten in its invoke so we copy it first
         auto onActionFunction = *onAction;
@@ -703,6 +709,10 @@ void ClickRecognizer::SendCallbackMsg(const std::unique_ptr<GestureEventFunc>& o
         RecordClickEventIfNeed(info);
 #endif
     }
+    // Always-on delivery for NDK interaction observers; the manager drops the
+    // notification when no observer is registered.
+    UIInfoCollectionManager::GetInstance().NotifyTapOrClick(
+        GetAttachedNode().Upgrade(), GetRecognizerType() == GestureTypeName::CLICK, count_, info);
 #ifdef GESTURE_DEBUG_BOUNDARY_SUPPORTED
     ReportToGestureDebugManager(type, GestureListenerType::TAP);
 #endif

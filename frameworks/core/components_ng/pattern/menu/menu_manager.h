@@ -48,7 +48,7 @@ template<typename T>
 class RectT;
 using RectF = RectT<float>;
 
-class ACE_EXPORT MenuManager : public virtual AceType {
+class ACE_EXPORT MenuManager : public AceType {
     DECLARE_ACE_TYPE(MenuManager, AceType);
 
 public:

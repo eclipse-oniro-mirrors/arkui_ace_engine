@@ -66,6 +66,10 @@ constexpr int32_t ERROR_CODE_UIEXTENSION_TRANSPARENT = 100021;
 constexpr int32_t ERROR_CODE_PARAM_ERROR = 100023;
 // The inspector parameter depth must bu greater than zero.
 constexpr int32_t ERROR_CODE_INSPECTOR_PARAM_DEPTH_INVALID  = 100024;
+// Scroll placeholder template registration rejected: the builder was not marked with
+// @Builder({ isPlaceholder: true }) at compile time (proposed value, pending error code
+// governance confirmation).
+constexpr int32_t ERROR_CODE_SCROLL_PLACEHOLDER_REGISTER_REJECTED = 100031;
 
 // C-API errors
 constexpr int32_t ERROR_CODE_NATIVE_IMPL_LIBRARY_NOT_FOUND = 106101;

@@ -25,6 +25,7 @@
 #include "core/components_ng/render/adapter/rosen_render_context.h"
 
 #include "base/error/error_code.h"
+#include "base/log/log_wrapper.h"
 #include "base/memory/ace_type.h"
 #include "core/common/container.h"
 #include "core/components_ng/base/mixed_mount_registry.h"
@@ -1731,6 +1732,7 @@ ArkUI_Int32 SetModifierOnDraw(ArkUIRenderModifierHandle modifier, void* userData
         drawContext.canvas = reinterpret_cast<ArkUICanvasHandle>(&context.canvas);
         drawContext.width = context.width;
         drawContext.height = context.height;
+        LOG_CALLBACK("OH_ArkUI_RenderNodeUtils_SetContentModifierOnDraw", customRenderDrawFunc);
         customRenderDrawFunc(&drawContext, userData);
     };
     renderContentModifier->setDrawFunction(std::move(onContentDraw));
@@ -2273,7 +2275,7 @@ ArkUI_Int32 SetNodeMountPolicy(ArkUINodeHandle node, ArkUINodeMountPolicy policy
     return ERROR_CODE_NO_ERROR;
 }
 
-ArkUI_Int32 AdoptChild(ArkUINodeHandle node, ArkUINodeHandle child)
+ArkUI_Int32 AdoptChildInner(ArkUINodeHandle node, ArkUINodeHandle child, bool useAdoptedCompensation)
 {
     ViewAbstract::CheckMainThread();
     auto parentNode = reinterpret_cast<FrameNode*>(node);
@@ -2294,6 +2296,42 @@ ArkUI_Int32 AdoptChild(ArkUINodeHandle node, ArkUINodeHandle child)
     }
     auto childRef = Referenced::Claim<FrameNode>(childNode);
     parentNode->AdoptChild(childRef);
+    childNode->SetUseAdoptedCompensation(useAdoptedCompensation);
+    return ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_Int32 AdoptChild(ArkUINodeHandle node, ArkUINodeHandle child)
+{
+    return AdoptChildInner(node, child, false);
+}
+
+ArkUI_Int32 AdoptChildWithPolicy(ArkUINodeHandle node, ArkUINodeHandle child, ArkUI_Int32 policy)
+{
+    // Public OH_ArkUI_AdoptPolicy::
+    // OH_ARKUI_NATIVE_MODULE_ADOPT_POLICY_OVERLAY_POSITION_FOLLOWS_ADOPT_PARENT_CHAIN.
+    constexpr ArkUI_Int32 overlayPositionFollowsAdoptParentChain = 0;
+    if (policy != overlayPositionFollowsAdoptParentChain) {
+        SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(ERROR_CODE_PARAM_INVALID, "Adopt policy is invalid");
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    return AdoptChildInner(node, child, true);
+}
+
+ArkUI_Int32 SetAdoptedChildOverlayPositionCompensation(ArkUINodeHandle adoptedChild,
+    ArkUI_Float32 offsetX, ArkUI_Float32 offsetY, ArkUIMatrix4Handle transform)
+{
+    ViewAbstract::CheckMainThread();
+    auto childNode = reinterpret_cast<FrameNode*>(adoptedChild);
+    auto matrix = reinterpret_cast<Matrix4*>(transform);
+    CHECK_NULL_RETURN(childNode && matrix, ERROR_CODE_PARAM_INVALID);
+    auto adoptParent = AceType::DynamicCast<FrameNode>(childNode->GetAdoptParent());
+    if (!childNode->IsAdopted() || !adoptParent || !childNode->UseAdoptedCompensation()) {
+        SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(
+            ERROR_CODE_NODE_IS_NOT_IN_ADOPTED_CHILDREN,
+            "Child is not adopted with overlay position policy");
+        return ERROR_CODE_NODE_IS_NOT_IN_ADOPTED_CHILDREN;
+    }
+    childNode->SetAdoptedCompensation(OffsetF(offsetX, offsetY), *matrix);
     return ERROR_CODE_NO_ERROR;
 }
 
@@ -2691,6 +2729,8 @@ const ArkUINDKRenderNodeModifier* GetNDKRenderNodeModifier()
         .setContentBlurOption = SetContentBlurOption,
         .resetContentBlurOption = ResetContentBlurOption,
         .getRSNode = GetRSNode,
+        .adoptChildWithPolicy = AdoptChildWithPolicy,
+        .setAdoptedChildOverlayPositionCompensation = SetAdoptedChildOverlayPositionCompensation,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
 

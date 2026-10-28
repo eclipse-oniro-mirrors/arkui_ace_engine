@@ -20,7 +20,7 @@
 
 namespace OHOS::Ace {
 
-class RenderFactory : public virtual AceType {
+class RenderFactory : public AceType {
     DECLARE_ACE_TYPE(RenderFactory, AceType);
 
 public:

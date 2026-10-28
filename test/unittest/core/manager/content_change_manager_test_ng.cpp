@@ -14,6 +14,9 @@
  */
 
 #include <optional>
+#include <vector>
+
+#include "interfaces/native/ui_info_collection.h"
 
 #include "gtest/gtest.h"
 #define private public
@@ -24,8 +27,17 @@
 
 #include "base/memory/ace_type.h"
 #include "base/memory/referenced.h"
-#include "core/components_ng/manager/content_change_manager/content_change_manager.h"
+#include "core/components_ng/manager/content_change_manager/content_change_manager_impl.h"
+#include "core/pipeline/base/element_register.h"
 #include "core/components_ng/pattern/swiper/swiper_pattern.h"
+#include "core/components_ng/pattern/swiper/swiper_model_ng.h"
+#include "core/components_ng/pattern/list/list_pattern.h"
+#include "core/components_ng/pattern/grid/grid_pattern.h"
+#include "core/components_ng/pattern/scroll/scroll_pattern.h"
+#include "core/components_ng/pattern/scroll/effect/scroll_fade_effect.h"
+#include "core/components_ng/pattern/scrollable/scrollable_controller.h"
+#include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
+#include "core/components_ng/pattern/waterflow/layout/sliding_window/water_flow_layout_info_sw.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -39,6 +51,26 @@ constexpr int32_t TEST_SCROLLING_NODE_ID = 100;
 constexpr int32_t TEST_TRANSITIONING_NODE_ID = 200;
 constexpr int32_t NEVER_ONCE = 0;
 constexpr int32_t AT_LEAST_ONCE = 1;
+
+class CapiTreeReadProbe : public UINode {
+    DECLARE_ACE_TYPE(CapiTreeReadProbe, UINode);
+
+public:
+    explicit CapiTreeReadProbe(int32_t id) : UINode("CapiTreeReadProbe", id) {}
+
+    bool IsAtomicNode() const override
+    {
+        return false;
+    }
+
+    const std::list<RefPtr<UINode>>& GetChildren(bool notDetach = false) const override
+    {
+        ++reads;
+        return UINode::GetChildren(notDetach);
+    }
+
+    mutable size_t reads = 0;
+};
 
 RefPtr<ContentChangeManager> GetContentChangeManager()
 {
@@ -143,6 +175,22 @@ void ResetTransitioningNodes()
     }
 }
 } // namespace
+
+class ScopedDeferredCapiLayout {
+public:
+    ScopedDeferredCapiLayout() : pipeline_(MockPipelineContext::GetCurrent()), previous_(pipeline_->UseFlushUITasks())
+    {
+        pipeline_->SetUseFlushUITasks(true);
+    }
+    ~ScopedDeferredCapiLayout()
+    {
+        pipeline_->taskScheduler_->FlushAfterLayoutTask();
+        pipeline_->SetUseFlushUITasks(previous_);
+    }
+private:
+    RefPtr<MockPipelineContext> pipeline_;
+    bool previous_;
+};
 
 class ContentChangeManagerTestNg : public testing::Test {
 public:
@@ -2629,11 +2677,11 @@ HWTEST_F(ContentChangeManagerTestNg, ConcurrentScrollInterruptionWaitsForLastNod
 }
 
 /**
- * @tc.name: DetachedSwiperWithoutStartClearsDeferredEnd
- * @tc.desc: Detach clears the deferred Swiper END even when no START created a pending entry.
+ * @tc.name: DetachedSwiperWithoutPairClearsPending
+ * @tc.desc: With IPC START enabled, detach clears pending END without fabricating a missing START pair.
  * @tc.type: FUNC
  */
-HWTEST_F(ContentChangeManagerTestNg, DetachedSwiperWithoutStartClearsDeferredEnd, TestSize.Level1)
+HWTEST_F(ContentChangeManagerTestNg, DetachedSwiperWithoutPairClearsPending, TestSize.Level1)
 {
     auto pipeline = MockPipelineContext::GetCurrent();
     auto contentChangeMgr = GetContentChangeManager();
@@ -2649,7 +2697,7 @@ HWTEST_F(ContentChangeManagerTestNg, DetachedSwiperWithoutStartClearsDeferredEnd
     EXPECT_CALL(*mockUiSessionManager, ReportContentChangeEvent(_, _)).Times(NEVER_ONCE);
     contentChangeMgr->OnSwiperChangeEnd(swiper, false);
     ASSERT_EQ(contentChangeMgr->changedSwiperNodes_.size(), 1u);
-    ASSERT_TRUE(contentChangeMgr->pendingSwiperChanges_.empty());
+    ASSERT_EQ(contentChangeMgr->pendingSwiperChanges_.size(), 1U);
     swiper->OnDetachFromMainTree(false, AceType::RawPtr(pipeline));
     EXPECT_TRUE(contentChangeMgr->changedSwiperNodes_.empty());
     contentChangeMgr->OnVsyncEnd(RectF(0.0f, 0.0f, 100.0f, 100.0f));
@@ -2728,4 +2776,2938 @@ HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerTest031, TestSize.Level
 
     EXPECT_FALSE(contentChangeMgr->IsContentChanging());
 }
+
+namespace {
+constexpr uint32_t PAGE_CATEGORY = OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_PAGE;
+constexpr uint32_t SCROLL_CATEGORY = OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_SCROLL;
+constexpr uint32_t OVERLAY_CATEGORY = OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_OVERLAY;
+constexpr uint32_t IGNORE_SCROLL_BY = OH_ARKUI_NATIVEMODULE_CONTENTCHANGE_IGNORE_SCROLLBY;
+constexpr uint32_t IGNORE_SCROLL_TO = OH_ARKUI_NATIVEMODULE_CONTENTCHANGE_IGNORE_SCROLLTO;
+constexpr uint32_t IGNORE_TOAST = OH_ARKUI_NATIVEMODULE_CONTENTCHANGE_IGNORE_TOAST;
+constexpr uint32_t PAGE_START = OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_START;
+constexpr uint32_t PAGE_END = OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_END;
+constexpr uint32_t SCROLL_START = OH_ARKUI_NATIVEMODULE_EVENT_SCROLL_START;
+constexpr uint32_t SCROLL_END = OH_ARKUI_NATIVEMODULE_EVENT_SCROLL_END;
+constexpr uint32_t OVERLAY_SHOW = OH_ARKUI_NATIVEMODULE_EVENT_OVERLAY_SHOW;
+constexpr uint32_t OVERLAY_HIDE = OH_ARKUI_NATIVEMODULE_EVENT_OVERLAY_HIDE;
+constexpr uint32_t SWIPER_START = OH_ARKUI_NATIVEMODULE_EVENT_SWIPER_START;
+constexpr uint32_t SWIPER_END = OH_ARKUI_NATIVEMODULE_EVENT_SWIPER_END;
+constexpr uint32_t SWIPER_CANCEL = OH_ARKUI_NATIVEMODULE_EVENT_SWIPER_CANCEL;
+constexpr uint32_t TABS_START = OH_ARKUI_NATIVEMODULE_EVENT_TABS_START;
+constexpr uint32_t TABS_CANCEL = OH_ARKUI_NATIVEMODULE_EVENT_TABS_CANCEL;
+constexpr uint32_t TABS_END = OH_ARKUI_NATIVEMODULE_EVENT_TABS_END;
+constexpr uint32_t NO_IGNORED_EVENTS = 0;
+constexpr uint32_t NO_SCROLL_EVENT_SOURCE = 0;
+constexpr int32_t CONTENT_CHANGE_SCHEMA_VERSION = 1;
+
+struct CapiTestState {
+    RefPtr<ContentChangeManager> manager;
+    uint64_t removeId = 0;
+    int32_t calls = 0;
+    int32_t releases = 0;
+    std::string json;
+    std::vector<uint32_t> types;
+    std::function<void(uint32_t)> onEvent;
+};
+
+struct CapiTestCookie {
+    CapiTestState* state;
+};
+
+void CapiContentChangeTestSink(uint32_t type, uint64_t timestamp, const char* json, uint32_t size, void* cookie)
+{
+    auto* state = static_cast<CapiTestCookie*>(cookie)->state;
+    EXPECT_GT(timestamp, 0U);
+    ++state->calls;
+    state->types.emplace_back(type);
+    state->json.assign(json, size);
+    auto onEvent = state->onEvent;
+    if (onEvent) {
+        onEvent(type);
+    }
+    if (state->removeId) {
+        EXPECT_TRUE(state->manager->UnregisterCapiContentChangeEvent(state->removeId));
+        state->removeId = 0;
+    }
+}
+
+void ReleaseCapiContentChangeTestCookie(void* cookie)
+{
+    auto* record = static_cast<CapiTestCookie*>(cookie);
+    ++record->state->releases;
+    delete record;
+}
+} // namespace
+
+/**
+ * @tc.name: CapiUnregisterSkipsUnenteredCallback
+ * @tc.desc: Unregister during a callback skips unentered callbacks in this batch and subsequent events.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiUnregisterSkipsUnenteredCallback, TestSize.Level1)
+{
+    constexpr int32_t EXPECTED_CALLBACK_COUNT = 2;
+    constexpr int32_t PAGE_NODE_ID = 410;
+    auto manager = GetContentChangeManager();
+    ASSERT_NE(manager, nullptr);
+    CapiTestState first { manager };
+    CapiTestState second { manager };
+    auto firstId = manager->RegisterCapiContentChangeEvent(
+        false, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &first },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto secondId = manager->RegisterCapiContentChangeEvent(
+        false, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &second },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    ASSERT_NE(firstId, 0U);
+    ASSERT_NE(secondId, 0U);
+    first.removeId = secondId;
+    auto page = FrameNode::CreateFrameNode("page", PAGE_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
+
+    manager->capiImpl_->DispatchCapiContentChangeEvent(PAGE_END, page);
+    EXPECT_EQ(first.calls, 1);
+    EXPECT_EQ(second.calls, 0);
+    EXPECT_EQ(second.releases, 1);
+    manager->capiImpl_->DispatchCapiContentChangeEvent(PAGE_END, page);
+    EXPECT_EQ(first.calls, EXPECTED_CALLBACK_COUNT);
+    EXPECT_EQ(second.calls, 0);
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(firstId));
+    EXPECT_EQ(first.releases, 1);
+}
+
+/**
+ * @tc.name: CapiStateSurvivesInnerStop
+ * @tc.desc: Stopping the IPC channel preserves independent CAPI subscriptions and state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiStateSurvivesInnerStop, TestSize.Level1)
+{
+    constexpr int32_t EXPECTED_CHILD_COUNT = 2;
+    constexpr int32_t EXPECTED_CALLBACK_COUNT = 2;
+    constexpr int32_t PAGE_NODE_ID = 411;
+    constexpr int32_t FIRST_CHILD_NODE_ID = 417;
+    constexpr int32_t SECOND_CHILD_NODE_ID = 418;
+    auto manager = GetContentChangeManager();
+    ASSERT_NE(manager, nullptr);
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(
+        true, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    ASSERT_NE(id, 0U);
+    manager->StopContentChangeReport();
+    auto page = FrameNode::CreateFrameNode("page", PAGE_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
+    auto firstChild = FrameNode::CreateFrameNode("Text", FIRST_CHILD_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
+    auto secondChild = FrameNode::CreateFrameNode("Button", SECOND_CHILD_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
+    page->AddChild(firstChild);
+    page->AddChild(secondChild);
+    manager->OnContentChangeStart(page, ChangeType::PAGE);
+    manager->OnPageTransitionEnd(page);
+    EXPECT_EQ(state.calls, EXPECTED_CALLBACK_COUNT);
+    auto json = JsonUtil::ParseJsonString(state.json);
+    ASSERT_TRUE(json);
+    EXPECT_EQ(json->GetInt("schemaVersion"), CONTENT_CHANGE_SCHEMA_VERSION);
+    EXPECT_EQ(json->GetInt("eventType"), PAGE_END);
+    EXPECT_EQ(json->GetString("category"), "page");
+    auto target = json->GetValue("targetNode");
+    ASSERT_TRUE(target);
+    EXPECT_EQ(target->GetString("id"), std::to_string(PAGE_NODE_ID));
+    EXPECT_EQ(target->GetString("type"), "page");
+    auto trigger = json->GetValue("triggerNode");
+    ASSERT_TRUE(trigger);
+    EXPECT_TRUE(trigger->IsNull());
+    auto overlayType = json->GetValue("overlayType");
+    ASSERT_TRUE(overlayType);
+    EXPECT_TRUE(overlayType->IsNull());
+    auto subtree = json->GetValue("subtree");
+    ASSERT_TRUE(subtree);
+    EXPECT_EQ(subtree->GetString("id"), std::to_string(PAGE_NODE_ID));
+    auto children = subtree->GetValue("children");
+    ASSERT_TRUE(children);
+    ASSERT_EQ(children->GetArraySize(), EXPECTED_CHILD_COUNT);
+    EXPECT_EQ(children->GetArrayItem(0)->GetString("id"), std::to_string(FIRST_CHILD_NODE_ID));
+    EXPECT_EQ(children->GetArrayItem(1)->GetString("id"), std::to_string(SECOND_CHILD_NODE_ID));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+    EXPECT_EQ(state.releases, 1);
+}
+
+/**
+ * @tc.name: CapiInterruptedEventsRequireActiveCycle
+ * @tc.desc: Abnormal END notifications require an actual matching START.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiInterruptedEventsRequireActiveCycle, TestSize.Level1)
+{
+    constexpr int32_t PAGE_NODE_ID = 421;
+    constexpr int32_t SCROLL_NODE_ID = 422;
+    auto manager = GetContentChangeManager();
+    ASSERT_NE(manager, nullptr);
+    manager->InvalidateCapiContentChangeSubscriptions();
+    manager->StopContentChangeReport();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(true, PAGE_CATEGORY | SCROLL_CATEGORY, NO_IGNORED_EVENTS,
+        new CapiTestCookie { &state }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    ASSERT_NE(id, 0U);
+    auto page = FrameNode::CreateFrameNode("page", PAGE_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
+    auto scroll = FrameNode::CreateFrameNode("scroll", SCROLL_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
+
+    manager->OnContentChangeInterrupted(page, ChangeType::PAGE);
+    manager->OnContentChangeInterrupted(scroll, ChangeType::SCROLL);
+    EXPECT_TRUE(state.types.empty());
+
+    manager->OnContentChangeStart(page, ChangeType::PAGE);
+    manager->OnScrollChangeStart(scroll);
+    manager->OnContentChangeStart(scroll, ChangeType::SCROLL);
+    manager->OnContentChangeInterrupted(page, ChangeType::PAGE);
+    manager->OnContentChangeInterrupted(scroll, ChangeType::SCROLL);
+    manager->OnContentChangeInterrupted(page, ChangeType::PAGE);
+    manager->OnContentChangeInterrupted(scroll, ChangeType::SCROLL);
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { PAGE_START, SCROLL_START, PAGE_END, SCROLL_END }));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+    EXPECT_EQ(state.releases, 1);
+}
+
+/**
+ * @tc.name: CapiFiltersAndEmptyTarget
+ * @tc.desc: Event masks and ignore masks filter notifications without inventing target nodes.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiFiltersAndEmptyTarget, TestSize.Level1)
+{
+    constexpr int32_t NODE_NODE_ID = 412;
+    auto manager = GetContentChangeManager();
+    ASSERT_NE(manager, nullptr);
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(
+        false, PAGE_CATEGORY | SCROLL_CATEGORY | OVERLAY_CATEGORY, IGNORE_SCROLL_BY | IGNORE_TOAST,
+        new CapiTestCookie { &state }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    ASSERT_NE(id, 0U);
+    auto node = FrameNode::CreateFrameNode("page", NODE_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
+    manager->capiImpl_->DispatchCapiContentChangeEvent(PAGE_START, node);
+    manager->capiImpl_->DispatchCapiContentChangeEvent(SCROLL_START, node);
+    manager->capiImpl_->DispatchCapiContentChangeEvent(SCROLL_END, node, IGNORE_SCROLL_BY);
+    manager->capiImpl_->DispatchCapiContentChangeEvent(OVERLAY_SHOW, node, NO_SCROLL_EVENT_SOURCE, "toast");
+    EXPECT_EQ(state.calls, 0);
+    manager->capiImpl_->DispatchCapiContentChangeEvent(PAGE_END, nullptr);
+    EXPECT_EQ(state.calls, 1);
+    EXPECT_EQ(state.json, "");
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+    EXPECT_EQ(state.releases, 1);
+}
+
+/**
+ * @tc.name: CapiScrollEndUsesLastNodeSource
+ * @tc.desc: The last scrolling node determines the normal END source and ignore filtering.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiScrollEndUsesLastNodeSource, TestSize.Level1)
+{
+    constexpr int32_t FIRST_NODE_ID = 413;
+    constexpr int32_t LAST_NODE_ID = 414;
+    auto manager = GetContentChangeManager();
+    ASSERT_NE(manager, nullptr);
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(false, SCROLL_CATEGORY, IGNORE_SCROLL_TO,
+        new CapiTestCookie { &state }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    ASSERT_NE(id, 0U);
+    auto first = FrameNode::CreateFrameNode("scroll", FIRST_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
+    auto last = FrameNode::CreateFrameNode("scroll", LAST_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
+    manager->OnScrollChangeStart(first);
+    manager->OnScrollChangeStart(last);
+    manager->MarkCapiScrollToEventSource(first->GetId());
+    manager->OnScrollChangeEnd(first, ContentChangeManager::SCROLL_TO);
+    EXPECT_EQ(state.calls, 0);
+    manager->MarkCapiScrollByEventSource(last->GetId());
+    manager->OnScrollChangeEnd(last, 0);
+    ASSERT_EQ(state.calls, 1);
+    EXPECT_EQ(state.types.front(), SCROLL_END);
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+}
+
+/**
+ * @tc.name: CapiOverlayReportsEveryCallAcrossRegistration
+ * @tc.desc: Every Overlay notification is delivered independently of prior SHOW and registration changes.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiOverlayReportsEveryCallAcrossRegistration, TestSize.Level1)
+{
+    constexpr int32_t POPUP_NODE_ID = 415;
+    auto manager = GetContentChangeManager();
+    ASSERT_NE(manager, nullptr);
+    manager->InvalidateCapiContentChangeSubscriptions();
+    auto popup = FrameNode::CreateFrameNode("popup", POPUP_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
+    manager->ReportCapiOverlayEvent(popup, true, "popup");
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(false, OVERLAY_CATEGORY, NO_IGNORED_EVENTS,
+        new CapiTestCookie { &state }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    ASSERT_NE(id, 0U);
+    manager->ReportCapiOverlayEvent(popup, false, "popup");
+    manager->ReportCapiOverlayEvent(popup, true, "popup");
+    manager->OnContentChangeNodeDestroyed(popup->GetId());
+    manager->ReportCapiOverlayEvent(popup, false, "popup");
+    manager->ReportCapiOverlayEvent(popup, false, "popup");
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { OVERLAY_HIDE, OVERLAY_SHOW, OVERLAY_HIDE, OVERLAY_HIDE }));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+}
+
+/**
+ * @tc.name: CapiSwiperEndAndCancelKeepDistinctEdges
+ * @tc.desc: Normal completion and cancellation keep distinct Swiper event semantics.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiSwiperEndAndCancelKeepDistinctEdges, TestSize.Level1)
+{
+    constexpr int32_t SWIPER_NODE_ID = 416;
+    auto manager = GetContentChangeManager();
+    ASSERT_NE(manager, nullptr);
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(true, PAGE_CATEGORY, NO_IGNORED_EVENTS,
+        new CapiTestCookie { &state }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    ASSERT_NE(id, 0U);
+    auto swiper = FrameNode::CreateFrameNode("Swiper", SWIPER_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
+    manager->OnSwiperChangeStart(swiper, false);
+    manager->OnSwiperChangeEnd(swiper, false);
+    manager->capiImpl_->FlushCapiSwiperEndEvents();
+    manager->OnSwiperChangeStart(swiper, false);
+    manager->OnSwiperChangeCancel(swiper, false);
+    manager->capiImpl_->FlushCapiSwiperEndEvents();
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { SWIPER_START, SWIPER_END, SWIPER_START, SWIPER_CANCEL }));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+}
+
+/**
+ * @tc.name: CapiDestroyedActiveNodesReportEndOnce
+ * @tc.desc: Destroyed active nodes complete cached START pairs only once.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiDestroyedActiveNodesReportEndOnce, TestSize.Level1)
+{
+    constexpr int32_t PAGE_NODE_ID = 419;
+    constexpr int32_t SCROLL_NODE_ID = 420;
+    auto manager = GetContentChangeManager();
+    ASSERT_NE(manager, nullptr);
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(true, PAGE_CATEGORY | SCROLL_CATEGORY, NO_IGNORED_EVENTS,
+        new CapiTestCookie { &state }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    ASSERT_NE(id, 0U);
+    auto page = FrameNode::CreateFrameNode("page", PAGE_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
+    auto scroll = FrameNode::CreateFrameNode("scroll", SCROLL_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
+    manager->OnContentChangeStart(page, ChangeType::PAGE);
+    manager->OnScrollChangeStart(scroll);
+    manager->OnContentChangeStart(scroll, ChangeType::SCROLL);
+    manager->OnContentChangeNodeDestroyed(page->GetId());
+    manager->OnContentChangeNodeDestroyed(scroll->GetId());
+    manager->OnContentChangeNodeDestroyed(page->GetId());
+    manager->OnContentChangeNodeDestroyed(scroll->GetId());
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { PAGE_START, SCROLL_START, PAGE_END, SCROLL_END }));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+}
+
+/**
+ * @tc.name: CapiDetachWithoutStartPreservesNormalPending
+ * @tc.desc: Detach preserves a live node normal pending END for listeners without START.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiDetachWithoutStartPreservesNormalPending, TestSize.Level1)
+{
+    constexpr int32_t SCROLL_NODE_ID = 423;
+    constexpr int32_t SWIPER_NODE_ID = 424;
+    auto manager = GetContentChangeManager();
+    ASSERT_NE(manager, nullptr);
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(false, PAGE_CATEGORY | SCROLL_CATEGORY, NO_IGNORED_EVENTS,
+        new CapiTestCookie { &state }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    ASSERT_NE(id, 0U);
+    auto scroll = FrameNode::CreateFrameNode("scroll", SCROLL_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
+    auto swiper = FrameNode::CreateFrameNode("Swiper", SWIPER_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
+    manager->OnScrollChangeStart(scroll);
+    manager->OnSwiperChangeEnd(swiper, false);
+    manager->OnContentChangeNodeDestroyed(scroll->GetId());
+    manager->OnContentChangeNodeDestroyed(swiper->GetId());
+    manager->capiImpl_->FlushCapiSwiperEndEvents();
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { SWIPER_END }));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+}
+
+/**
+ * @tc.name: CapiSwiperFlushCanRevokeLaterEvent
+ * @tc.desc: A callback can cancel a later pending Swiper END in the same frame.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiSwiperFlushCanRevokeLaterEvent, TestSize.Level1)
+{
+    constexpr int32_t FIRST_NODE_ID = 430;
+    constexpr int32_t SECOND_NODE_ID = 431;
+    auto manager = GetContentChangeManager();
+    ASSERT_NE(manager, nullptr);
+    manager->StopContentChangeReport();
+    for (bool destroy : { false, true }) {
+        manager->InvalidateCapiContentChangeSubscriptions();
+        CapiTestState state { manager };
+        auto id = manager->RegisterCapiContentChangeEvent(
+            true, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+            CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto first = FrameNode::CreateFrameNode("Swiper", FIRST_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
+        auto second = FrameNode::CreateFrameNode("Swiper", SECOND_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
+        manager->OnSwiperChangeStart(first, false);
+        manager->OnSwiperChangeStart(second, false);
+        manager->OnSwiperChangeEnd(first, false);
+        manager->OnSwiperChangeEnd(second, false);
+        state.onEvent = [&](uint32_t type) {
+            if (type != SWIPER_END) {
+                return;
+            }
+            state.onEvent = nullptr;
+            if (destroy) {
+                manager->OnContentChangeNodeDestroyed(second->GetId());
+            } else {
+                manager->OnSwiperChangeCancel(second, false);
+            }
+        };
+        manager->capiImpl_->FlushCapiSwiperEndEvents();
+        EXPECT_EQ(state.types,
+            (std::vector<uint32_t> { SWIPER_START, SWIPER_START, SWIPER_END, destroy ? SWIPER_END : SWIPER_CANCEL }));
+        EXPECT_TRUE(manager->capiImpl_->capiPendingSwipers_.empty());
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+    }
+}
+
+/**
+ * @tc.name: CapiSwiperFlushKeepsNewTransactionForNextFrame
+ * @tc.desc: Reentrant completion keeps a new pending transaction for the next frame.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiSwiperFlushKeepsNewTransactionForNextFrame, TestSize.Level1)
+{
+    constexpr int32_t FIRST_NODE_ID = 432;
+    constexpr int32_t SECOND_NODE_ID = 433;
+    auto manager = GetContentChangeManager();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(
+        true, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto first = FrameNode::CreateFrameNode("Swiper", FIRST_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
+    auto second = FrameNode::CreateFrameNode("Swiper", SECOND_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
+    manager->OnSwiperChangeStart(first, false);
+    manager->OnSwiperChangeStart(second, false);
+    manager->OnSwiperChangeEnd(first, false);
+    manager->OnSwiperChangeEnd(second, false);
+    state.onEvent = [&](uint32_t type) {
+        if (type != SWIPER_END) {
+            return;
+        }
+        state.onEvent = nullptr;
+        manager->OnSwiperChangeCancel(second, false);
+        manager->OnSwiperChangeStart(second, false);
+        manager->OnSwiperChangeEnd(second, false);
+    };
+    manager->capiImpl_->FlushCapiSwiperEndEvents();
+    EXPECT_EQ(state.types,
+        (std::vector<uint32_t> { SWIPER_START, SWIPER_START, SWIPER_END, SWIPER_CANCEL, SWIPER_START }));
+    EXPECT_EQ(manager->capiImpl_->capiPendingSwipers_.size(), 1U);
+    manager->capiImpl_->FlushCapiSwiperEndEvents();
+    EXPECT_EQ(state.types,
+        (std::vector<uint32_t> { SWIPER_START, SWIPER_START, SWIPER_END, SWIPER_CANCEL, SWIPER_START, SWIPER_END }));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+}
+
+/**
+ * @tc.name: CapiSwiperFlushInvalidationDropsOldBatch
+ * @tc.desc: Context invalidation discards remaining transactions from an old frame snapshot.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiSwiperFlushInvalidationDropsOldBatch, TestSize.Level1)
+{
+    constexpr int32_t FIRST_NODE_ID = 434;
+    constexpr int32_t SECOND_NODE_ID = 435;
+    auto manager = GetContentChangeManager();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    manager->RegisterCapiContentChangeEvent(
+        true, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state }, CapiContentChangeTestSink,
+        ReleaseCapiContentChangeTestCookie);
+    auto first = FrameNode::CreateFrameNode("Swiper", FIRST_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
+    auto second = FrameNode::CreateFrameNode("Swiper", SECOND_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
+    manager->OnSwiperChangeStart(first, false);
+    manager->OnSwiperChangeStart(second, false);
+    manager->OnSwiperChangeEnd(first, false);
+    manager->OnSwiperChangeEnd(second, false);
+    uint64_t replacement = 0;
+    state.onEvent = [&](uint32_t type) {
+        if (type != SWIPER_END) {
+            return;
+        }
+        state.onEvent = nullptr;
+        manager->InvalidateCapiContentChangeSubscriptions();
+        replacement = manager->RegisterCapiContentChangeEvent(
+            true, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+            CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    };
+    manager->capiImpl_->FlushCapiSwiperEndEvents();
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { SWIPER_START, SWIPER_START, SWIPER_END }));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(replacement));
+}
+
+/**
+ * @tc.name: CapiOverlayPagesPreserveSubscriptionRules
+ * @tc.desc: Overlay page notifications honor each subscription event and ignore masks.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiOverlayPagesPreserveSubscriptionRules, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    auto ipc = GetMockUiSessionManager();
+    EXPECT_CALL(*ipc, ReportContentChangeEvent(_, _)).Times(0);
+    CapiTestState overlay { manager };
+    CapiTestState filtered { manager };
+    auto observer = manager->RegisterCapiContentChangeEvent(
+        false, OVERLAY_CATEGORY, IGNORE_TOAST, new CapiTestCookie { &overlay },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto other = manager->RegisterCapiContentChangeEvent(
+        true, PAGE_CATEGORY | SCROLL_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &filtered },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    int32_t nodeId = 554;
+    for (auto tag : { V2::SHEET_PAGE_TAG, V2::MODAL_PAGE_TAG }) {
+        auto node = FrameNode::CreateFrameNode(tag, nodeId++, AceType::MakeRefPtr<Pattern>());
+        manager->OnDialogChangeEnd(node, true);
+        manager->OnDialogChangeEnd(node, true);
+        CapiTestState late { manager };
+        auto lateId = manager->RegisterCapiContentChangeEvent(
+            false, OVERLAY_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &late },
+            CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        manager->OnDialogChangeEnd(node, false);
+        manager->OnDialogChangeEnd(node, false);
+        EXPECT_EQ(late.types, (std::vector<uint32_t> { OVERLAY_HIDE, OVERLAY_HIDE }));
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(lateId));
+    }
+    EXPECT_EQ(overlay.types, (std::vector<uint32_t> {
+        OVERLAY_SHOW, OVERLAY_SHOW, OVERLAY_HIDE, OVERLAY_HIDE,
+        OVERLAY_SHOW, OVERLAY_SHOW, OVERLAY_HIDE, OVERLAY_HIDE }));
+    EXPECT_TRUE(filtered.types.empty());
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(observer));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(other));
+    Mock::VerifyAndClearExpectations(ipc);
+}
+
+/**
+ * @tc.name: CapiControllerAnimatedScrollToAndGestureSources
+ * @tc.desc: Controller animations and gestures retain the correct operation source for filtering.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiControllerAnimatedScrollToAndGestureSources, TestSize.Level1)
+{
+    constexpr float SCROLLABLE_DISTANCE = 1000.f;
+    constexpr int32_t TARGET_OFFSET = 100;
+    constexpr int32_t ANIMATION_DURATION_MS = 300;
+    constexpr int32_t NODE_NODE_ID = 439;
+    auto manager = GetContentChangeManager();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState ignored { manager };
+    CapiTestState all { manager };
+    auto filteredId = manager->RegisterCapiContentChangeEvent(
+        true, SCROLL_CATEGORY, IGNORE_SCROLL_TO, new CapiTestCookie { &ignored },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto allId = manager->RegisterCapiContentChangeEvent(
+        true, SCROLL_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &all },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto pattern = AceType::MakeRefPtr<ScrollPattern>();
+    auto node = FrameNode::CreateFrameNode(V2::SCROLL_ETS_TAG, NODE_NODE_ID, pattern);
+    pattern->SetAxis(Axis::VERTICAL);
+    pattern->scrollableDistance_ = SCROLLABLE_DISTANCE;
+    auto controller = AceType::MakeRefPtr<ScrollableController>();
+    controller->SetScrollPattern(pattern);
+    EXPECT_TRUE(controller->AnimateTo(Dimension(TARGET_OFFSET), ANIMATION_DURATION_MS, Curves::LINEAR, false));
+    EXPECT_TRUE(all.types.empty());
+    pattern->FireObserverOnDidScroll(100.0f);
+    EXPECT_EQ(all.types, (std::vector<uint32_t> { SCROLL_START }));
+    pattern->scrollStop_ = true;
+    pattern->OnScrollStop({}, {});
+    EXPECT_EQ(all.types, (std::vector<uint32_t> { SCROLL_START, SCROLL_END }));
+    EXPECT_TRUE(ignored.types.empty());
+    EXPECT_TRUE(controller->AnimateTo(
+        Dimension(pattern->GetTotalOffset()), ANIMATION_DURATION_MS, Curves::LINEAR, false));
+    EXPECT_EQ(manager->capiImpl_->capiScrollSources_.count(node->GetId()), 0U);
+    // A subsequent ordinary start must not inherit an interrupted API animation's source.
+    manager->MarkCapiScrollToEventSource(node->GetId());
+    pattern->SetScrollAbort(false);
+    pattern->scrollStop_ = false;
+    pattern->FireOnScrollStart();
+    pattern->FireObserverOnDidScroll(100.0f);
+    manager->OnScrollChangeEnd(node);
+    EXPECT_EQ(ignored.types, (std::vector<uint32_t> { SCROLL_START, SCROLL_END }));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(filteredId));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(allId));
+}
+
+/**
+ * @tc.name: CapiControllerScrollByNoOpAndInternalAnimation
+ * @tc.desc: ScrollBy, no-op requests and internal animations preserve operation-source classification.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiControllerScrollByNoOpAndInternalAnimation, TestSize.Level1)
+{
+    constexpr float SCROLLABLE_DISTANCE = 1000.f;
+    constexpr int32_t SCROLL_DELTA = 80;
+    constexpr int32_t NODE_NODE_ID = 440;
+    auto manager = GetContentChangeManager();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(
+        false, SCROLL_CATEGORY, IGNORE_SCROLL_BY, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto pattern = AceType::MakeRefPtr<ScrollPattern>();
+    auto node = FrameNode::CreateFrameNode(V2::SCROLL_ETS_TAG, NODE_NODE_ID, pattern);
+    pattern->SetAxis(Axis::VERTICAL);
+    pattern->scrollableDistance_ = SCROLLABLE_DISTANCE;
+    auto controller = AceType::MakeRefPtr<ScrollableController>();
+    controller->SetScrollPattern(pattern);
+    controller->ScrollBy(0, SCROLL_DELTA, false);
+    EXPECT_NE(pattern->GetTotalOffset(), 0);
+    MockPipelineContext::GetCurrent()->taskScheduler_->FlushAfterLayoutTask();
+    EXPECT_TRUE(state.types.empty());
+    controller->ScrollBy(0, 0, false);
+    MockPipelineContext::GetCurrent()->taskScheduler_->FlushAfterLayoutTask();
+    EXPECT_EQ(manager->capiImpl_->capiScrollSources_.count(node->GetId()), 0U);
+    // This helper is used by ScrollPage/ScrollToEdge; it is not the public ScrollBy entry.
+    pattern->ScrollBy(0, -SCROLL_DELTA, true);
+    manager->OnScrollChangeEnd(node);
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { SCROLL_END }));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+}
+
+
+/**
+ * @tc.name: CapiExplicitScrollToSourceOverridesPreviousScrollBy
+ * @tc.desc: Explicit ScrollTo END uses its own source instead of an earlier ScrollBy marker.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiExplicitScrollToSourceOverridesPreviousScrollBy, TestSize.Level1)
+{
+    constexpr int32_t NODE_NODE_ID = 443;
+    auto manager = GetContentChangeManager();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(
+        false, SCROLL_CATEGORY, IGNORE_SCROLL_TO, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto node = FrameNode::CreateFrameNode("Scroll", NODE_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
+    manager->MarkCapiScrollByEventSource(node->GetId());
+    manager->OnScrollChangeEnd(node, ContentChangeManager::SCROLL_TO);
+    EXPECT_TRUE(state.types.empty());
+    EXPECT_EQ(manager->capiImpl_->capiScrollSources_.count(node->GetId()), 0U);
+    manager->OnScrollChangeEnd(node);
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { SCROLL_END }));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+}
+
+
+/**
+ * @tc.name: CapiScrollSourceSurvivesSubscriptionGap
+ * @tc.desc: Operation provenance survives late registration and is cleared on completion without listeners.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiScrollSourceSurvivesSubscriptionGap, TestSize.Level1)
+{
+    constexpr int32_t NODE_NODE_ID = 444;
+    auto manager = GetContentChangeManager();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto node = FrameNode::CreateFrameNode("Scroll", NODE_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
+    // An operation can start before the first subscription.
+    manager->MarkCapiScrollToEventSource(node->GetId());
+    auto id = manager->RegisterCapiContentChangeEvent(
+        false, SCROLL_CATEGORY, IGNORE_SCROLL_TO, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    manager->OnScrollChangeEnd(node);
+    EXPECT_TRUE(state.types.empty());
+    manager->MarkCapiScrollToEventSource(node->GetId());
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+    id = manager->RegisterCapiContentChangeEvent(
+        false, SCROLL_CATEGORY, IGNORE_SCROLL_TO, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    manager->OnScrollChangeEnd(node);
+    EXPECT_TRUE(state.types.empty());
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+    // With no subscribers, completion and detach must still release provenance.
+    manager->MarkCapiScrollByEventSource(node->GetId());
+    manager->OnScrollChangeEnd(node);
+    EXPECT_TRUE(manager->capiImpl_->capiScrollSources_.empty());
+    manager->MarkCapiScrollToEventSource(node->GetId());
+    manager->OnContentChangeNodeDestroyed(node->GetId());
+    EXPECT_TRUE(manager->capiImpl_->capiScrollSources_.empty());
+}
+
+/**
+ * @tc.name: DetachedSwiperWithoutStartClearsPending
+ * @tc.desc: IPC detach clears pending END whether the reporting node remains alive or is released.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, DetachedSwiperWithoutStartClearsPending, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    auto ipc = GetMockUiSessionManager();
+    ContentChangeConfig config;
+    config.reportStartEvent = false;
+    manager->StartContentChangeReport(config);
+    auto released = FrameNode::CreateFrameNode(
+        V2::SWIPER_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<SwiperPattern>());
+    auto retained = FrameNode::CreateFrameNode(
+        V2::SWIPER_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<SwiperPattern>());
+    manager->OnSwiperChangeEnd(released, false);
+    manager->OnSwiperChangeEnd(retained, false);
+    manager->OnContentChangeNodeDestroyed(released->GetId());
+    manager->OnContentChangeNodeDestroyed(retained->GetId());
+    WeakPtr<FrameNode> weak = released;
+    released.Reset();
+    ASSERT_TRUE(weak.Invalid());
+    EXPECT_CALL(*ipc, ReportContentChangeEvent(_, _)).Times(NEVER_ONCE);
+    manager->OnVsyncEnd(RectF());
+    EXPECT_TRUE(manager->pendingSwiperChanges_.empty());
+    EXPECT_TRUE(manager->changedSwiperNodes_.empty());
+    Mock::VerifyAndClearExpectations(ipc);
+    manager->StopContentChangeReport();
+}
+
+/**
+ * @tc.name: CapiWaterFlowScrollToReportsAcceptedMovement
+ * @tc.desc: Both layout modes suppress stationary or blocked jumps while preserving real IPC and CAPI ENDs.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiWaterFlowScrollToReportsAcceptedMovement, TestSize.Level1)
+{
+    ScopedDeferredCapiLayout deferredLayout;
+    constexpr float INITIAL_OFFSET = 100.0f;
+    constexpr float TARGET_OFFSET = 200.0f;
+    auto manager = GetContentChangeManager();
+    auto ipc = GetMockUiSessionManager();
+    for (auto mode : { WaterFlowLayoutMode::TOP_DOWN, WaterFlowLayoutMode::SLIDING_WINDOW }) {
+        manager->InvalidateCapiContentChangeSubscriptions();
+        manager->StartContentChangeReport(ContentChangeConfig {});
+        CapiTestState state { manager };
+        auto id = manager->RegisterCapiContentChangeEvent(false, SCROLL_CATEGORY, NO_IGNORED_EVENTS,
+            new CapiTestCookie { &state }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto pattern = AceType::MakeRefPtr<WaterFlowPattern>();
+        auto node = FrameNode::CreateFrameNode(
+            V2::WATERFLOW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), pattern);
+        pattern->SetAxis(Axis::VERTICAL);
+        pattern->SetLayoutMode(mode);
+        auto sliding = AceType::DynamicCast<WaterFlowLayoutInfoSW>(pattern->layoutInfo_);
+        if (sliding) {
+            sliding->totalOffset_ = -INITIAL_OFFSET;
+        } else {
+            pattern->layoutInfo_->UpdateOffset(-INITIAL_OFFSET);
+        }
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::SCROLL, _)).Times(1);
+        pattern->ScrollTo(INITIAL_OFFSET);
+        MockPipelineContext::GetCurrent()->taskScheduler_->FlushAfterLayoutTask();
+        EXPECT_TRUE(state.types.empty());
+        EXPECT_TRUE(manager->capiImpl_->capiScrollSources_.empty());
+        Mock::VerifyAndClearExpectations(ipc);
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::SCROLL, _)).Times(1);
+        pattern->ScrollTo(TARGET_OFFSET);
+        EXPECT_TRUE(state.types.empty());
+        if (sliding) {
+            EXPECT_EQ(sliding->totalOffset_, -INITIAL_OFFSET);
+            EXPECT_EQ(sliding->delta_, INITIAL_OFFSET - TARGET_OFFSET);
+        } else {
+            EXPECT_EQ(pattern->GetTotalOffset(), TARGET_OFFSET);
+        }
+        if (sliding) {
+            sliding->totalOffset_ += sliding->delta_;
+            sliding->delta_ = 0.0f;
+        }
+        MockPipelineContext::GetCurrent()->taskScheduler_->FlushAfterLayoutTask();
+        EXPECT_EQ(state.types, (std::vector<uint32_t> { SCROLL_END }));
+        Mock::VerifyAndClearExpectations(ipc);
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::SCROLL, _)).Times(2);
+        int willScrollCalls = 0;
+        auto hub = node->GetEventHub<ScrollableEventHub>();
+        hub->SetOnWillScroll([&willScrollCalls](Dimension, ScrollState, ScrollSource) {
+            ++willScrollCalls;
+            return ScrollFrameResult { .offset = Dimension(0) };
+        });
+        pattern->ScrollTo(TARGET_OFFSET + INITIAL_OFFSET);
+        EXPECT_EQ(willScrollCalls, 1);
+        MockPipelineContext::GetCurrent()->taskScheduler_->FlushAfterLayoutTask();
+        EXPECT_EQ(state.types.size(), 1U);
+        EXPECT_TRUE(manager->capiImpl_->capiScrollSources_.empty());
+        hub->SetOnWillScroll(nullptr);
+        pattern->layoutInfo_->offsetEnd_ = true;
+        pattern->ScrollTo(TARGET_OFFSET + INITIAL_OFFSET);
+        MockPipelineContext::GetCurrent()->taskScheduler_->FlushAfterLayoutTask();
+        EXPECT_EQ(state.types.size(), 1U);
+        EXPECT_TRUE(manager->capiImpl_->capiScrollSources_.empty());
+        Mock::VerifyAndClearExpectations(ipc);
+        // Retain the original base ScrollTo host lifetime when the application releases its last reference.
+        pattern->layoutInfo_->offsetEnd_ = false;
+        WeakPtr<FrameNode> weak = node;
+        hub->SetOnWillScroll([&node](Dimension offset, ScrollState, ScrollSource) {
+            node.Reset();
+            return ScrollFrameResult { .offset = offset };
+        });
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::SCROLL, _)).Times(1);
+        pattern->ScrollTo(TARGET_OFFSET + INITIAL_OFFSET);
+        // Release the layout queue's host reference before testing the pending callback's weak ownership.
+        MockPipelineContext::GetCurrent()->taskScheduler_->CleanUp();
+        EXPECT_TRUE(weak.Invalid());
+        MockPipelineContext::GetCurrent()->taskScheduler_->FlushAfterLayoutTask();
+        EXPECT_EQ(state.types, (std::vector<uint32_t> { SCROLL_END }));
+        EXPECT_TRUE(weak.Invalid());
+        Mock::VerifyAndClearExpectations(ipc);
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+        manager->StopContentChangeReport();
+    }
+}
+
+/**
+ * @tc.name: CapiNoOpScrollToUsesActualOffset
+ * @tc.desc: Stationary or edge-blocked ScrollTo does not report END; accepted movement still reports.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiNoOpScrollToUsesActualOffset, TestSize.Level1)
+{
+    ScopedDeferredCapiLayout deferredLayout;
+    constexpr float SCROLLABLE_DISTANCE = 1000.f;
+    constexpr float INITIAL_OFFSET = 800.f;
+    constexpr int32_t REPEATED_NO_OP_COUNT = 3;
+    constexpr int32_t OUT_OF_RANGE_OFFSET = 2000;
+    constexpr int32_t IMMEDIATE_DURATION_MS = 0;
+    constexpr int32_t NODE_NODE_ID = 501;
+    auto manager = GetContentChangeManager();
+    auto ipc = GetMockUiSessionManager();
+    for (bool start : { false, true }) {
+        manager->InvalidateCapiContentChangeSubscriptions();
+        ContentChangeConfig config;
+        config.reportStartEvent = start;
+        manager->StartContentChangeReport(config);
+        CapiTestState state { manager };
+        auto id = manager->RegisterCapiContentChangeEvent(
+            start, SCROLL_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+            CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto pattern = AceType::MakeRefPtr<ScrollPattern>();
+        auto node = FrameNode::CreateFrameNode(V2::SCROLL_ETS_TAG, NODE_NODE_ID, pattern);
+        pattern->SetAxis(Axis::VERTICAL);
+        pattern->scrollableDistance_ = SCROLLABLE_DISTANCE;
+        pattern->currentOffset_ = -INITIAL_OFFSET;
+        auto controller = AceType::MakeRefPtr<ScrollableController>();
+        controller->SetScrollPattern(pattern);
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::SCROLL, _)).Times(REPEATED_NO_OP_COUNT);
+        for (int i = 0; i < REPEATED_NO_OP_COUNT; ++i) {
+            EXPECT_TRUE(controller->AnimateTo(
+                Dimension(INITIAL_OFFSET, DimensionUnit::PX), IMMEDIATE_DURATION_MS, Curves::LINEAR, false));
+        }
+        MockPipelineContext::GetCurrent()->taskScheduler_->FlushAfterLayoutTask();
+        EXPECT_TRUE(state.types.empty());
+        EXPECT_TRUE(manager->capiImpl_->capiScrollSources_.empty());
+        Mock::VerifyAndClearExpectations(ipc);
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::SCROLL, _)).Times(1);
+        EXPECT_TRUE(controller->AnimateTo(
+            Dimension(SCROLLABLE_DISTANCE, DimensionUnit::PX), IMMEDIATE_DURATION_MS, Curves::LINEAR, false));
+        MockPipelineContext::GetCurrent()->taskScheduler_->FlushAfterLayoutTask();
+        EXPECT_EQ(state.types, start ? (std::vector<uint32_t> { SCROLL_START, SCROLL_END })
+                                     : (std::vector<uint32_t> { SCROLL_END }));
+        Mock::VerifyAndClearExpectations(ipc);
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::SCROLL, _)).Times(1);
+        EXPECT_TRUE(controller->AnimateTo(
+            Dimension(OUT_OF_RANGE_OFFSET, DimensionUnit::PX), IMMEDIATE_DURATION_MS, Curves::LINEAR, false));
+        // Commit the layout clamp before evaluating the no-displacement CAPI command.
+        pattern->currentOffset_ = -SCROLLABLE_DISTANCE;
+        MockPipelineContext::GetCurrent()->taskScheduler_->FlushAfterLayoutTask();
+        EXPECT_EQ(state.types.size(), start ? 2U : 1U);
+        Mock::VerifyAndClearExpectations(ipc);
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+        manager->StopContentChangeReport();
+    }
+}
+
+/**
+ * @tc.name: CapiCancelTerminatesAllSubscriptions
+ * @tc.desc: Cancellation revokes the same pending END for both START and END-only listeners.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiCancelTerminatesAllSubscriptions, TestSize.Level1)
+{
+    constexpr int32_t SWIPER_NODE_ID = 502;
+    auto manager = GetContentChangeManager();
+    auto ipc = GetMockUiSessionManager();
+    for (bool start : { false, true }) {
+        manager->InvalidateCapiContentChangeSubscriptions();
+        ContentChangeConfig config;
+        config.reportStartEvent = start;
+        manager->StartContentChangeReport(config);
+        CapiTestState a { manager };
+        CapiTestState b { manager };
+        auto aid = manager->RegisterCapiContentChangeEvent(
+            start, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &a },
+            CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto bid = manager->RegisterCapiContentChangeEvent(
+            false, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &b },
+            CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto swiper = FrameNode::CreateFrameNode(
+            V2::SWIPER_ETS_TAG, SWIPER_NODE_ID, AceType::MakeRefPtr<SwiperPattern>());
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::SWIPER_START, _)).Times(start ? 1 : 0);
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::SWIPER_START_CANCEL, _)).Times(start ? 1 : 0);
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::SWIPER, _)).Times(0);
+        manager->OnSwiperChangeStart(swiper, false);
+        manager->OnSwiperChangeEnd(swiper, false);
+        manager->OnSwiperChangeCancel(swiper, false);
+        manager->OnContentChangeNodeDestroyed(swiper->GetId());
+        manager->OnVsyncEnd(RectF());
+        EXPECT_EQ(a.types, start ? (std::vector<uint32_t> { SWIPER_START, SWIPER_CANCEL }) : std::vector<uint32_t>());
+        EXPECT_TRUE(b.types.empty());
+        Mock::VerifyAndClearExpectations(ipc);
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::SWIPER_START, _)).Times(start ? 1 : 0);
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::SWIPER, _)).Times(1);
+        manager->OnSwiperChangeStart(swiper, false);
+        manager->OnSwiperChangeEnd(swiper, false);
+        manager->OnVsyncEnd(RectF());
+        EXPECT_EQ(b.types, (std::vector<uint32_t> { SWIPER_END }));
+        Mock::VerifyAndClearExpectations(ipc);
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(aid));
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(bid));
+        manager->StopContentChangeReport();
+    }
+}
+
+/**
+ * @tc.name: CapiScrollDetachKeepsSubscriptionPairing
+ * @tc.desc: Detach completes accepted activity for both listener modes; normal END also reaches late subscribers.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiScrollDetachKeepsSubscriptionPairing, TestSize.Level1)
+{
+    constexpr int32_t FIRST_NODE_ID = 503;
+    constexpr int32_t SECOND_NODE_ID = 504;
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState a { manager };
+    CapiTestState b { manager };
+    CapiTestState late { manager };
+    auto aid = manager->RegisterCapiContentChangeEvent(
+        true, SCROLL_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &a },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto bid = manager->RegisterCapiContentChangeEvent(
+        false, SCROLL_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &b },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto first = FrameNode::CreateFrameNode("Scroll", FIRST_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    auto second = FrameNode::CreateFrameNode("Scroll", SECOND_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    for (const auto& node : { first, second }) {
+        manager->OnScrollChangeStart(node);
+        manager->OnContentChangeStart(node, ChangeType::SCROLL);
+    }
+    auto lateId = manager->RegisterCapiContentChangeEvent(
+        true, SCROLL_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &late },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    manager->OnContentChangeNodeDestroyed(first->GetId());
+    manager->OnContentChangeNodeDestroyed(first->GetId());
+    EXPECT_EQ(a.types, (std::vector<uint32_t> { SCROLL_START, SCROLL_START, SCROLL_END }));
+    EXPECT_EQ(b.types, (std::vector<uint32_t> { SCROLL_END }));
+    EXPECT_TRUE(late.types.empty());
+    manager->OnScrollChangeEnd(second);
+    EXPECT_EQ(b.types, (std::vector<uint32_t> { SCROLL_END, SCROLL_END }));
+    EXPECT_EQ(late.types, (std::vector<uint32_t> { SCROLL_END }));
+    EXPECT_TRUE(manager->capiImpl_->capiScrollingNodes_.empty());
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(aid));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(bid));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(lateId));
+}
+
+/**
+ * @tc.name: CapiTabsDetachPreservesNormalPendingForFalse
+ * @tc.desc: Tabs detach preserves normal pending END for END-only listeners without double completion.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiTabsDetachPreservesNormalPendingForFalse, TestSize.Level1)
+{
+    constexpr size_t PAIRED_EVENT_COUNT = 2U;
+    constexpr int32_t TABS_NODE_ID = 505;
+    constexpr int32_t SWIPER_NODE_ID = 506;
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState a { manager };
+    CapiTestState b { manager };
+    auto aid = manager->RegisterCapiContentChangeEvent(
+        true, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &a },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto bid = manager->RegisterCapiContentChangeEvent(
+        false, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &b },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto tabs = FrameNode::CreateFrameNode("Tabs", TABS_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    auto swiper = FrameNode::CreateFrameNode("Swiper", SWIPER_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    swiper->MountToParent(tabs);
+    manager->OnSwiperChangeStart(swiper, true);
+    manager->OnSwiperChangeEnd(swiper, true);
+    manager->OnContentChangeNodeDestroyed(tabs->GetId());
+    manager->OnContentChangeNodeDestroyed(swiper->GetId());
+    EXPECT_EQ(a.types, (std::vector<uint32_t> { TABS_START, TABS_END }));
+    EXPECT_EQ(b.types, (std::vector<uint32_t> { TABS_END }));
+    manager->capiImpl_->FlushCapiSwiperEndEvents();
+    EXPECT_EQ(a.types.size(), PAIRED_EVENT_COUNT);
+    EXPECT_EQ(b.types, (std::vector<uint32_t> { TABS_END }));
+    EXPECT_NE(b.json.find(std::to_string(TABS_NODE_ID)), std::string::npos);
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(aid));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(bid));
+}
+
+/**
+ * @tc.name: CapiTabsMissingAncestorFallsBackToSwiper
+ * @tc.desc: Tabs notifications fall back to the Swiper target when its Tabs ancestor is unavailable.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiTabsMissingAncestorFallsBackToSwiper, TestSize.Level1)
+{
+    constexpr int32_t SWIPER_NODE_ID = 507;
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(
+        true, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto swiper = FrameNode::CreateFrameNode("Swiper", SWIPER_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    manager->OnSwiperChangeStart(swiper, true);
+    manager->OnSwiperChangeEnd(swiper, true);
+    manager->capiImpl_->FlushCapiSwiperEndEvents();
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { TABS_START, TABS_END }));
+    EXPECT_NE(state.json.find(std::to_string(SWIPER_NODE_ID)), std::string::npos);
+    EXPECT_NE(state.json.find("Swiper"), std::string::npos);
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+}
+
+/**
+ * @tc.name: CapiPendingEndMatchesSubscribersAtDispatch
+ * @tc.desc: Deferred normal END matches listeners at dispatch, including late registrations.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiPendingEndMatchesSubscribersAtDispatch, TestSize.Level1)
+{
+    constexpr int32_t SWIPER_NODE_ID = 508;
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState a { manager };
+    CapiTestState b { manager };
+    auto aid = manager->RegisterCapiContentChangeEvent(
+        false, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &a },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto swiper = FrameNode::CreateFrameNode("Swiper", SWIPER_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    manager->OnSwiperChangeEnd(swiper, false);
+    auto bid = manager->RegisterCapiContentChangeEvent(
+        true, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &b },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(aid));
+    manager->capiImpl_->FlushCapiSwiperEndEvents();
+    EXPECT_TRUE(a.types.empty());
+    EXPECT_EQ(b.types, (std::vector<uint32_t> { SWIPER_END }));
+    manager->OnSwiperChangeEnd(swiper, false);
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(bid));
+    auto next = manager->RegisterCapiContentChangeEvent(
+        true, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &b },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    manager->capiImpl_->FlushCapiSwiperEndEvents();
+    EXPECT_EQ(b.types.size(), 1U);
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(next));
+}
+
+/**
+ * @tc.name: CapiFailedRegistrationRetainsCookieOwnership
+ * @tc.desc: Failed registration leaves callback-cookie ownership with the caller.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiFailedRegistrationRetainsCookieOwnership, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto* cookie = new CapiTestCookie { &state };
+    auto previous = ContentChangeManager::CapiImpl::nextCapiSubscriptionId_.exchange(0);
+    auto id = manager->RegisterCapiContentChangeEvent(
+        false, PAGE_CATEGORY, NO_IGNORED_EVENTS, cookie, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    ContentChangeManager::CapiImpl::nextCapiSubscriptionId_.store(previous);
+    EXPECT_EQ(id, 0U);
+    EXPECT_EQ(state.releases, 0);
+    EXPECT_FALSE(manager->HasCapiContentChangeSubscriptions());
+    ReleaseCapiContentChangeTestCookie(cookie);
+    EXPECT_EQ(state.releases, 1);
+}
+
+/**
+ * @tc.name: CapiSubtreeIncludesDisappearingChildren
+ * @tc.desc: Normal event snapshots include disappearing children in the existing tree traversal.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiSubtreeIncludesDisappearingChildren, TestSize.Level1)
+{
+    constexpr int32_t PAGE_NODE_ID = 509;
+    constexpr int32_t CHILD_NODE_ID = 510;
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(
+        false, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto page = FrameNode::CreateFrameNode("page", PAGE_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    auto child = FrameNode::CreateFrameNode("Text", CHILD_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    page->AddDisappearingChild(child, 0);
+    manager->OnPageTransitionEnd(page);
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { PAGE_END }));
+    EXPECT_NE(state.json.find(std::to_string(CHILD_NODE_ID)), std::string::npos);
+    EXPECT_TRUE(page->RemoveDisappearingChild(child));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+}
+
+/**
+ * @tc.name: CapiScrollInterruptUsesIndependentSubscriptions
+ * @tc.desc: Scroll interruption pairs CAPI END independently of the IPC START configuration.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiScrollInterruptUsesIndependentSubscriptions, TestSize.Level1)
+{
+    constexpr int32_t NODE_NODE_ID = 511;
+    auto manager = GetContentChangeManager();
+    auto ipc = GetMockUiSessionManager();
+    for (const auto& start : { std::optional<bool>(), std::optional<bool>(false), std::optional<bool>(true) }) {
+        manager->InvalidateCapiContentChangeSubscriptions();
+        manager->StopContentChangeReport();
+        if (start.has_value()) {
+            ContentChangeConfig config;
+            config.reportStartEvent = start.value();
+            manager->StartContentChangeReport(config);
+        }
+        CapiTestState a { manager };
+        CapiTestState b { manager };
+        auto aid = manager->RegisterCapiContentChangeEvent(
+            true, SCROLL_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &a },
+            CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto bid = manager->RegisterCapiContentChangeEvent(
+            false, SCROLL_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &b },
+            CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto pattern = AceType::MakeRefPtr<ScrollPattern>();
+        auto node = FrameNode::CreateFrameNode("Scroll", NODE_NODE_ID, pattern);
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::SCROLL_START, _)).Times(start.value_or(false) ? 1 : 0);
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::SCROLL, _)).Times(start.value_or(false) ? 1 : 0);
+        manager->OnScrollChangeStart(node);
+        manager->OnContentChangeStart(node, ChangeType::SCROLL);
+        pattern->scrollStop_ = true;
+        pattern->SetScrollAbort(true);
+        pattern->OnScrollStop({}, {});
+        EXPECT_EQ(a.types, (std::vector<uint32_t> { SCROLL_START, SCROLL_END }));
+        EXPECT_EQ(b.types, (std::vector<uint32_t> { SCROLL_END }));
+        EXPECT_TRUE(manager->capiImpl_->capiScrollingNodes_.empty());
+        EXPECT_TRUE(manager->capiImpl_->capiSubscriptions_.at(bid)->starts.empty());
+        EXPECT_FALSE(manager->capiImpl_->HasCapiContentChangeStart(node->GetId(), SCROLL_START));
+        Mock::VerifyAndClearExpectations(ipc);
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(aid));
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(bid));
+        manager->StopContentChangeReport();
+    }
+}
+
+/**
+ * @tc.name: CapiSwiperInterruptUsesIndependentSubscriptions
+ * @tc.desc: Swiper interruption pairs CAPI END independently of the IPC START configuration.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiSwiperInterruptUsesIndependentSubscriptions, TestSize.Level1)
+{
+    constexpr int32_t NODE_NODE_ID = 512;
+    auto manager = GetContentChangeManager();
+    auto ipc = GetMockUiSessionManager();
+    for (const auto& start : { std::optional<bool>(), std::optional<bool>(false), std::optional<bool>(true) }) {
+        manager->InvalidateCapiContentChangeSubscriptions();
+        manager->StopContentChangeReport();
+        if (start.has_value()) {
+            ContentChangeConfig config;
+            config.reportStartEvent = start.value();
+            manager->StartContentChangeReport(config);
+        }
+        CapiTestState a { manager };
+        CapiTestState b { manager };
+        auto aid = manager->RegisterCapiContentChangeEvent(
+            true, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &a },
+            CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto bid = manager->RegisterCapiContentChangeEvent(
+            false, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &b },
+            CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto pattern = AceType::MakeRefPtr<SwiperPattern>();
+        auto node = FrameNode::CreateFrameNode("Swiper", NODE_NODE_ID, pattern);
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::SWIPER_START, _)).Times(start.value_or(false) ? 1 : 0);
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::SWIPER, _)).Times(start.value_or(false) ? 1 : 0);
+        manager->OnSwiperChangeStart(node, false);
+        pattern->ContentChangeOnTransitionEnd(node, true);
+        manager->OnVsyncEnd(RectF());
+        EXPECT_EQ(a.types, (std::vector<uint32_t> { SWIPER_START, SWIPER_END }));
+        EXPECT_EQ(b.types, (std::vector<uint32_t> { SWIPER_END }));
+        EXPECT_TRUE(manager->capiImpl_->capiActiveSwipers_.empty());
+        Mock::VerifyAndClearExpectations(ipc);
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(aid));
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(bid));
+        manager->StopContentChangeReport();
+    }
+}
+
+/**
+ * @tc.name: CapiListGridScrollToHonorsConsumedOffset
+ * @tc.desc: List and Grid suppress ScrollTo END when callbacks consume all requested movement.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiListGridScrollToHonorsConsumedOffset, TestSize.Level1)
+{
+    constexpr float INITIAL_OFFSET = 800.f;
+    constexpr int32_t VISIBLE_START_INDEX = 1;
+    constexpr int32_t VISIBLE_END_INDEX = 9;
+    constexpr int32_t LAST_ITEM_INDEX = 20;
+    constexpr float START_MAIN_POSITION = -20.f;
+    constexpr float END_MAIN_POSITION = 1000.f;
+    constexpr float VIEWPORT_MAIN_SIZE = 200.f;
+    constexpr float SCROLL_DELTA = 80.f;
+    constexpr int32_t LIST_NODE_ID = 513;
+    constexpr int32_t GRID_NODE_ID = 514;
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(
+        true, SCROLL_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto list = AceType::MakeRefPtr<ListPattern>();
+    auto listNode = FrameNode::CreateFrameNode("List", LIST_NODE_ID, list);
+    list->currentOffset_ = INITIAL_OFFSET;
+    list->startIndex_ = VISIBLE_START_INDEX;
+    list->endIndex_ = VISIBLE_END_INDEX;
+    list->maxListItemIndex_ = LAST_ITEM_INDEX;
+    list->startMainPos_ = START_MAIN_POSITION;
+    list->endMainPos_ = END_MAIN_POSITION;
+    list->contentMainSize_ = VIEWPORT_MAIN_SIZE;
+    auto grid = AceType::MakeRefPtr<GridPattern>();
+    auto gridNode = FrameNode::CreateFrameNode("Grid", GRID_NODE_ID, grid);
+    grid->isConfigScrollable_ = true;
+    grid->info_.reachStart_ = false;
+    grid->info_.offsetEnd_ = false;
+    grid->info_.currentOffset_ = -INITIAL_OFFSET;
+    for (const auto& node : { listNode, gridNode }) {
+        auto pattern = node->GetPattern<ScrollablePattern>();
+        pattern->SetAxis(Axis::VERTICAL);
+        pattern->ScrollTo(pattern->GetTotalOffset());
+        EXPECT_TRUE(state.types.empty());
+        int calls = 0;
+        auto hub = node->GetEventHub<ScrollableEventHub>();
+        hub->SetOnWillScroll([&calls](Dimension, ScrollState, ScrollSource) {
+            ++calls;
+            return ScrollFrameResult { .offset = Dimension(0) };
+        });
+        pattern->ScrollTo(pattern->GetTotalOffset() + SCROLL_DELTA);
+        EXPECT_EQ(calls, 1);
+        EXPECT_TRUE(state.types.empty());
+        hub->SetOnWillScroll(nullptr);
+    }
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+}
+
+/**
+ * @tc.name: CapiTabsPendingEndFallsBackAfterAncestorReleased
+ * @tc.desc: Pending Tabs END resolves a fallback target after its ancestor is released.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiTabsPendingEndFallsBackAfterAncestorReleased, TestSize.Level1)
+{
+    constexpr int32_t TABS_NODE_ID = 515;
+    constexpr int32_t SWIPER_NODE_ID = 516;
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(
+        false, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto tabs = FrameNode::CreateFrameNode("Tabs", TABS_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    auto swiper = FrameNode::CreateFrameNode("Swiper", SWIPER_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    swiper->MountToParent(tabs);
+    manager->OnSwiperChangeEnd(swiper, true);
+    tabs->RemoveChild(swiper);
+    tabs.Reset();
+    manager->capiImpl_->FlushCapiSwiperEndEvents();
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { TABS_END }));
+    EXPECT_NE(state.json.find(std::to_string(SWIPER_NODE_ID)), std::string::npos);
+    EXPECT_NE(state.json.find("Swiper"), std::string::npos);
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+}
+
+/**
+ * @tc.name: CapiDestroyedPageUsesCachedMetadataWithoutRetainingNodes
+ * @tc.desc: Destroyed page END uses cached metadata without retaining the node.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiDestroyedPageUsesCachedMetadataWithoutRetainingNodes, TestSize.Level1)
+{
+    constexpr size_t PAIRED_EVENT_COUNT = 2U;
+    constexpr int32_t PAGE_NODE_ID = 520;
+    constexpr int32_t CHILD_NODE_ID = 521;
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(
+        true, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto page = FrameNode::CreateFrameNode("page", PAGE_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    auto child = FrameNode::CreateFrameNode("Text", CHILD_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    page->AddChild(child);
+    WeakPtr<FrameNode> weakPage = page;
+    WeakPtr<FrameNode> weakChild = child;
+    const auto refs = page->RefCount();
+    manager->OnContentChangeStart(page, ChangeType::PAGE);
+    EXPECT_EQ(page->RefCount(), refs);
+    // Release both nodes before delivering the ID-only notification.
+    child.Reset();
+    page.Reset();
+    EXPECT_EQ(weakPage.Upgrade(), nullptr);
+    EXPECT_EQ(weakChild.Upgrade(), nullptr);
+    manager->OnContentChangeNodeDestroyed(PAGE_NODE_ID);
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { PAGE_START, PAGE_END }));
+    auto json = JsonUtil::ParseJsonString(state.json);
+    EXPECT_EQ(json->GetInt("eventType"), PAGE_END);
+    EXPECT_EQ(json->GetValue("targetNode")->GetString("id"), std::to_string(PAGE_NODE_ID));
+    EXPECT_TRUE(json->GetValue("subtree")->IsNull());
+    manager->OnContentChangeNodeDestroyed(PAGE_NODE_ID);
+    EXPECT_EQ(state.types.size(), PAIRED_EVENT_COUNT);
+    EXPECT_TRUE(manager->capiImpl_->capiSubscriptions_.at(id)->starts.empty());
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+}
+
+/**
+ * @tc.name: CapiStartAndDestroyedEndDoNotTraverseChildren
+ * @tc.desc: START and destroyed-node paired END do not traverse the component subtree.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiStartAndDestroyedEndDoNotTraverseChildren, TestSize.Level1)
+{
+    constexpr int32_t CHILD_NODE_ID = 532;
+    constexpr int32_t PAGE_NODE_ID = 530;
+    constexpr int32_t PROBE_NODE_ID = 531;
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(
+        true, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto page = FrameNode::CreateFrameNode("page", PAGE_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    auto probe = AceType::MakeRefPtr<CapiTreeReadProbe>(PROBE_NODE_ID);
+    probe->AddChild(FrameNode::CreateFrameNode("Text", CHILD_NODE_ID, AceType::MakeRefPtr<Pattern>()));
+    page->AddChild(probe);
+    probe->reads = 0;
+    manager->OnContentChangeStart(page, ChangeType::PAGE);
+    EXPECT_EQ(probe->reads, 0U);
+    EXPECT_TRUE(JsonUtil::ParseJsonString(state.json)->GetValue("subtree")->IsNull());
+    manager->OnContentChangeNodeDestroyed(page->GetId());
+    EXPECT_EQ(probe->reads, 0U);
+    EXPECT_TRUE(JsonUtil::ParseJsonString(state.json)->GetValue("subtree")->IsNull());
+    manager->OnContentChangeStart(page, ChangeType::PAGE);
+    manager->OnPageTransitionEnd(page);
+    EXPECT_GT(probe->reads, 0U);
+    auto json = JsonUtil::ParseJsonString(state.json);
+    auto children = json->GetValue("subtree")->GetValue("children");
+    ASSERT_EQ(children->GetArraySize(), 1);
+    EXPECT_EQ(children->GetArrayItem(0)->GetString("id"), std::to_string(CHILD_NODE_ID));
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { PAGE_START, PAGE_END, PAGE_START, PAGE_END }));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+}
+
+/**
+ * @tc.name: CapiPageInterruptUsesMetadataLikeIpc
+ * @tc.desc: Page interruption reports paired metadata without a normal-completion subtree.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiPageInterruptUsesMetadataLikeIpc, TestSize.Level1)
+{
+    constexpr int32_t PAGE_NODE_ID = 542;
+    constexpr int32_t PROBE_NODE_ID = 543;
+    auto manager = GetContentChangeManager();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    ContentChangeConfig config;
+    config.reportStartEvent = true;
+    manager->StartContentChangeReport(config);
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(
+        true, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto page = FrameNode::CreateFrameNode("page", PAGE_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    auto probe = AceType::MakeRefPtr<CapiTreeReadProbe>(PROBE_NODE_ID);
+    page->AddChild(probe);
+    EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(ChangeType::PAGE_START, _)).Times(1);
+    EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(ChangeType::PAGE, _))
+        .WillOnce([=](ChangeType, const std::string& data) {
+            auto json = JsonUtil::ParseJsonString(data);
+            EXPECT_EQ(json->GetInt("$ID"), PAGE_NODE_ID);
+            EXPECT_FALSE(json->Contains("$children"));
+        });
+    probe->reads = 0;
+    manager->OnContentChangeStart(page, ChangeType::PAGE);
+    manager->OnContentChangeInterrupted(page, ChangeType::PAGE);
+    EXPECT_EQ(probe->reads, 0U);
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { PAGE_START, PAGE_END }));
+    auto json = JsonUtil::ParseJsonString(state.json);
+    EXPECT_EQ(json->GetValue("targetNode")->GetString("id"), std::to_string(PAGE_NODE_ID));
+    EXPECT_TRUE(json->GetValue("subtree")->IsNull());
+    Mock::VerifyAndClearExpectations(GetMockUiSessionManager());
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+    manager->StopContentChangeReport();
+}
+
+/**
+ * @tc.name: CapiScrollInterruptKeepsIpcStateWithoutBlockingNextNode
+ * @tc.desc: CAPI interruption cleanup leaves IPC state unchanged and permits later normal scroll END.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiScrollInterruptKeepsIpcStateWithoutBlockingNextNode, TestSize.Level1)
+{
+    constexpr int32_t NODE_NODE_ID = 533;
+    auto manager = GetContentChangeManager();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    ContentChangeConfig config;
+    config.reportStartEvent = false;
+    manager->StartContentChangeReport(config);
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(
+        true, SCROLL_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto pattern = AceType::MakeRefPtr<ScrollPattern>();
+    auto node = FrameNode::CreateFrameNode(V2::SCROLL_ETS_TAG, NODE_NODE_ID, pattern);
+    EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(_, _)).Times(0);
+    manager->OnScrollChangeStart(node);
+    manager->OnContentChangeStart(node, ChangeType::SCROLL);
+    ASSERT_TRUE(manager->IsScrolling());
+    manager->MarkCapiScrollToEventSource(node->GetId());
+    pattern->scrollStop_ = true;
+    pattern->scrollAbort_ = true;
+    pattern->OnScrollStop(nullptr, nullptr);
+    EXPECT_TRUE(manager->IsScrolling());
+    EXPECT_TRUE(manager->capiImpl_->capiScrollingNodes_.empty());
+    EXPECT_TRUE(manager->capiImpl_->capiScrollSources_.empty());
+    EXPECT_FALSE(manager->capiImpl_->HasCapiContentChangeStart(node->GetId(), SCROLL_START));
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { SCROLL_START, SCROLL_END }));
+    auto next = FrameNode::CreateFrameNode(V2::SCROLL_ETS_TAG, node->GetId() + 1, AceType::MakeRefPtr<ScrollPattern>());
+    manager->OnScrollChangeStart(next);
+    manager->OnContentChangeStart(next, ChangeType::SCROLL);
+    manager->OnScrollChangeEnd(next);
+    EXPECT_TRUE(manager->IsScrolling());
+    EXPECT_TRUE(manager->capiImpl_->capiScrollingNodes_.empty());
+    EXPECT_TRUE(manager->capiImpl_->capiScrollSources_.empty());
+    EXPECT_FALSE(manager->capiImpl_->HasCapiContentChangeStart(node->GetId(), SCROLL_START));
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { SCROLL_START, SCROLL_END, SCROLL_START, SCROLL_END }));
+    Mock::VerifyAndClearExpectations(GetMockUiSessionManager());
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+    manager->StopContentChangeReport();
+}
+
+/**
+ * @tc.name: CapiSwiperInterruptKeepsIpcStateAndAutoPlayExclusion
+ * @tc.desc: AutoPlay suppresses CAPI interruption while IPC retains its original state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiSwiperInterruptKeepsIpcStateAndAutoPlayExclusion, TestSize.Level1)
+{
+    constexpr int32_t NODE_NODE_ID = 534;
+    auto manager = GetContentChangeManager();
+    for (bool autoPlay : { false, true }) {
+        manager->InvalidateCapiContentChangeSubscriptions();
+        ContentChangeConfig config;
+        config.reportStartEvent = autoPlay;
+        manager->StartContentChangeReport(config);
+        CapiTestState state { manager };
+        auto id = manager->RegisterCapiContentChangeEvent(
+            true, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+            CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto pattern = AceType::MakeRefPtr<SwiperPattern>();
+        auto node = FrameNode::CreateFrameNode(V2::SWIPER_ETS_TAG, NODE_NODE_ID, pattern);
+        node->GetPaintProperty<SwiperPaintProperty>()->UpdateAutoPlay(autoPlay);
+        EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(_, _)).Times(0);
+        pattern->ContentChangeOnTransitionStart(node);
+        manager->OnSwiperChangeStart(node, false);
+        ASSERT_TRUE(manager->IsTransitioning());
+        pattern->ContentChangeOnTransitionEnd(node, true);
+        EXPECT_TRUE(manager->IsTransitioning());
+        EXPECT_EQ(manager->capiImpl_->HasCapiContentChangeStart(node->GetId(), SWIPER_START), !autoPlay);
+        EXPECT_EQ(manager->capiImpl_->capiActiveSwipers_.empty(), autoPlay);
+        EXPECT_EQ(manager->capiImpl_->capiPendingSwipers_.empty(), autoPlay);
+        manager->OnVsyncEnd(RectF());
+        EXPECT_TRUE(manager->IsTransitioning());
+        EXPECT_TRUE(manager->capiImpl_->capiPendingSwipers_.empty());
+        EXPECT_TRUE(manager->capiImpl_->capiActiveSwipers_.empty());
+        EXPECT_FALSE(manager->capiImpl_->HasCapiContentChangeStart(node->GetId(), SWIPER_START));
+        EXPECT_EQ(state.types,
+            autoPlay ? std::vector<uint32_t>() : (std::vector<uint32_t> { SWIPER_START, SWIPER_END }));
+        Mock::VerifyAndClearExpectations(GetMockUiSessionManager());
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+        manager->StopContentChangeReport();
+    }
+}
+
+/**
+ * @tc.name: CapiScrollInterruptCompletesEachStartedNode
+ * @tc.desc: Interrupted scroll completes accepted activity for both listener modes.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiScrollInterruptCompletesEachStartedNode, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    for (bool withStart : { false, true }) {
+        manager->InvalidateCapiContentChangeSubscriptions();
+        CapiTestState state { manager };
+        auto id = manager->RegisterCapiContentChangeEvent(
+            withStart, SCROLL_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+            CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto first = FrameNode::CreateFrameNode(
+            V2::SCROLL_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<ScrollPattern>());
+        auto second = FrameNode::CreateFrameNode(
+            V2::SCROLL_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<ScrollPattern>());
+        EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(_, _)).Times(0);
+        manager->OnScrollChangeStart(first);
+        manager->OnContentChangeStart(first, ChangeType::SCROLL);
+        manager->OnScrollChangeStart(second);
+        manager->OnContentChangeStart(second, ChangeType::SCROLL);
+        manager->MarkCapiScrollToEventSource(first->GetId());
+        manager->OnScrollInterrupted(first, false);
+        EXPECT_EQ(manager->capiImpl_->capiScrollingNodes_.count(second->GetId()), 1U);
+        EXPECT_EQ(manager->capiImpl_->capiScrollingNodes_.count(first->GetId()), 0U);
+        EXPECT_TRUE(manager->capiImpl_->capiScrollSources_.empty());
+        EXPECT_FALSE(manager->capiImpl_->HasCapiContentChangeStart(first->GetId(), SCROLL_START));
+        EXPECT_EQ(state.types,
+            withStart ? (std::vector<uint32_t> { SCROLL_START, SCROLL_START, SCROLL_END }) :
+                        (std::vector<uint32_t> { SCROLL_END }));
+        manager->OnScrollInterrupted(second, false);
+        manager->OnScrollInterrupted(second, false);
+        EXPECT_TRUE(manager->capiImpl_->capiScrollingNodes_.empty());
+        EXPECT_FALSE(manager->capiImpl_->HasCapiContentChangeStart(second->GetId(), SCROLL_START));
+        EXPECT_EQ(state.types,
+            withStart ? (std::vector<uint32_t> { SCROLL_START, SCROLL_START, SCROLL_END, SCROLL_END }) :
+                (std::vector<uint32_t> { SCROLL_END, SCROLL_END }));
+        Mock::VerifyAndClearExpectations(GetMockUiSessionManager());
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+    }
+}
+
+/**
+ * @tc.name: CapiTabsInterruptDropsManualStartAfterAutoPlay
+ * @tc.desc: Enabling autoPlay drops an unfinished Tabs cycle without END or CANCEL.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiTabsInterruptDropsManualStartAfterAutoPlay, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    for (bool autoPlay : { false, true }) {
+        manager->InvalidateCapiContentChangeSubscriptions();
+        CapiTestState withStart { manager };
+        CapiTestState withoutStart { manager };
+        auto first = manager->RegisterCapiContentChangeEvent(
+            true, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &withStart },
+            CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto second = manager->RegisterCapiContentChangeEvent(
+            false, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &withoutStart },
+            CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto tabs = FrameNode::CreateFrameNode(
+            V2::TABS_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+        auto pattern = AceType::MakeRefPtr<SwiperPattern>();
+        auto swiper = FrameNode::CreateFrameNode(
+            V2::SWIPER_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), pattern);
+        swiper->MountToParent(tabs);
+        EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(_, _)).Times(0);
+        manager->OnSwiperChangeStart(swiper, true);
+        swiper->GetPaintProperty<SwiperPaintProperty>()->UpdateAutoPlay(autoPlay);
+        manager->OnSwiperChangeInterrupted(swiper, true);
+        EXPECT_EQ(withStart.types, (std::vector<uint32_t> { TABS_START }));
+        manager->OnVsyncEnd(RectF());
+        manager->OnSwiperChangeInterrupted(swiper, true);
+        manager->OnVsyncEnd(RectF());
+        EXPECT_EQ(withStart.types, autoPlay ? (std::vector<uint32_t> { TABS_START }) :
+            (std::vector<uint32_t> { TABS_START, TABS_END }));
+        EXPECT_EQ(withoutStart.types, autoPlay ? std::vector<uint32_t>() :
+            (std::vector<uint32_t> { TABS_END }));
+        EXPECT_FALSE(manager->capiImpl_->HasCapiContentChangeStart(tabs->GetId(), TABS_START));
+        EXPECT_TRUE(manager->capiImpl_->capiActiveSwipers_.empty());
+        EXPECT_TRUE(manager->capiImpl_->capiPendingSwipers_.empty());
+        Mock::VerifyAndClearExpectations(GetMockUiSessionManager());
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(first));
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(second));
+    }
+}
+
+/**
+ * @tc.name: CapiSwiperInterruptPreservesNormalEndLikeIpc
+ * @tc.desc: Interruption does not narrow or discard an already pending normal Swiper END.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiSwiperInterruptPreservesNormalEndLikeIpc, TestSize.Level1)
+{
+    constexpr int32_t NODE_NODE_ID = 541;
+    auto manager = GetContentChangeManager();
+    auto ipc = GetMockUiSessionManager();
+    for (const auto& [reportStart, autoPlay] :
+        { std::make_pair(false, false), std::make_pair(true, true), std::make_pair(true, false) }) {
+        manager->InvalidateCapiContentChangeSubscriptions();
+        ContentChangeConfig config;
+        config.reportStartEvent = reportStart;
+        manager->StartContentChangeReport(config);
+        CapiTestState withStart { manager };
+        CapiTestState withoutStart { manager };
+        auto first = manager->RegisterCapiContentChangeEvent(
+            true, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &withStart },
+            CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto second = manager->RegisterCapiContentChangeEvent(
+            false, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &withoutStart },
+            CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto pattern = AceType::MakeRefPtr<SwiperPattern>();
+        auto node = FrameNode::CreateFrameNode(V2::SWIPER_ETS_TAG, NODE_NODE_ID, pattern);
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::SWIPER_START, _)).Times(reportStart ? 1 : 0);
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::SWIPER, _)).Times(1);
+        manager->OnSwiperChangeStart(node, false);
+        pattern->ContentChangeReport(node, true);
+        ASSERT_FALSE(manager->capiImpl_->capiPendingSwipers_.empty());
+        node->GetPaintProperty<SwiperPaintProperty>()->UpdateAutoPlay(autoPlay);
+        pattern->ContentChangeOnTransitionEnd(node, true);
+        EXPECT_EQ(withStart.types, (std::vector<uint32_t> { SWIPER_START }));
+        EXPECT_TRUE(withoutStart.types.empty());
+        manager->OnVsyncEnd(RectF());
+        EXPECT_EQ(withStart.types, autoPlay ? (std::vector<uint32_t> { SWIPER_START }) :
+            (std::vector<uint32_t> { SWIPER_START, SWIPER_END }));
+        EXPECT_EQ(withoutStart.types, autoPlay ? std::vector<uint32_t>() :
+            (std::vector<uint32_t> { SWIPER_END }));
+        EXPECT_TRUE(manager->capiImpl_->capiPendingSwipers_.empty());
+        EXPECT_FALSE(manager->capiImpl_->HasCapiContentChangeStart(node->GetId(), SWIPER_START));
+        Mock::VerifyAndClearExpectations(ipc);
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(first));
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(second));
+        manager->StopContentChangeReport();
+    }
+}
+
+/**
+ * @tc.name: CapiFrameNodeDestructorReportsCachedEndAtZeroReferences
+ * @tc.desc: Final node destruction reports cached END without claiming the dying node.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiFrameNodeDestructorReportsCachedEndAtZeroReferences, TestSize.Level1)
+{
+    constexpr int32_t NODE_NODE_ID = 522;
+    auto pipeline = MockPipelineContext::GetCurrent();
+    auto manager = pipeline->GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(
+        true, PAGE_CATEGORY | SCROLL_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    for (auto type : { ChangeType::PAGE, ChangeType::SCROLL }) {
+        auto node = FrameNode::CreateFrameNode("node", NODE_NODE_ID, AceType::MakeRefPtr<Pattern>());
+        node->RegisterReleaseFunc(false);
+        node->AttachToMainTree(false, AceType::RawPtr(pipeline));
+        manager->OnContentChangeStart(node, type);
+        auto* rawNode = AceType::RawPtr(node);
+        state.onEvent = [rawNode](uint32_t eventType) {
+            EXPECT_TRUE(eventType == PAGE_END || eventType == SCROLL_END);
+            EXPECT_EQ(rawNode->RefCount(), 0);
+        };
+        WeakPtr<FrameNode> weak = node;
+        node.Reset();
+        EXPECT_EQ(weak.Upgrade(), nullptr);
+        state.onEvent = nullptr;
+    }
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { PAGE_START, PAGE_END, SCROLL_START, SCROLL_END }));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+}
+
+/**
+ * @tc.name: CapiNormalPageEndUsesFreshTreeAndReleasesCache
+ * @tc.desc: Normal page END uses a fresh subtree and releases its START metadata cache.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiNormalPageEndUsesFreshTreeAndReleasesCache, TestSize.Level1)
+{
+    constexpr int32_t PAGE_NODE_ID = 523;
+    constexpr int32_t CHILD_NODE_ID = 524;
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(
+        true, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto page = FrameNode::CreateFrameNode("page", PAGE_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    manager->OnContentChangeStart(page, ChangeType::PAGE);
+    std::weak_ptr<const std::string> cache =
+        manager->capiImpl_->capiSubscriptions_.at(id)->starts.at({ PAGE_NODE_ID, PAGE_START });
+    auto child = FrameNode::CreateFrameNode("Button", CHILD_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    page->AddChild(child);
+    manager->OnPageTransitionEnd(page);
+    auto json = JsonUtil::ParseJsonString(state.json);
+    EXPECT_EQ(json->GetValue("subtree")->GetValue("children")->GetArraySize(), 1);
+    EXPECT_TRUE(cache.expired());
+    manager->OnContentChangeNodeDestroyed(PAGE_NODE_ID);
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { PAGE_START, PAGE_END }));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+}
+
+/**
+ * @tc.name: CapiDestroyedTabsUsesCachedLogicalTarget
+ * @tc.desc: Destroyed Tabs END retains the cached logical target identity.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiDestroyedTabsUsesCachedLogicalTarget, TestSize.Level1)
+{
+    constexpr size_t PAIRED_EVENT_COUNT = 2U;
+    constexpr int32_t TABS_NODE_ID = 525;
+    constexpr int32_t SWIPER_NODE_ID = 526;
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(
+        true, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto tabs = FrameNode::CreateFrameNode("Tabs", TABS_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    auto swiper = FrameNode::CreateFrameNode("Swiper", SWIPER_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    swiper->MountToParent(tabs);
+    manager->OnSwiperChangeStart(swiper, true);
+    manager->OnSwiperChangeEnd(swiper, true);
+    WeakPtr<FrameNode> weakTabs = tabs;
+    tabs.Reset();
+    EXPECT_EQ(weakTabs.Upgrade(), nullptr);
+    manager->OnContentChangeNodeDestroyed(TABS_NODE_ID);
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { TABS_START, TABS_END }));
+    auto json = JsonUtil::ParseJsonString(state.json);
+    EXPECT_EQ(json->GetValue("targetNode")->GetString("id"), std::to_string(TABS_NODE_ID));
+    EXPECT_EQ(json->GetValue("targetNode")->GetString("type"), "Tabs");
+    manager->OnContentChangeNodeDestroyed(SWIPER_NODE_ID);
+    manager->capiImpl_->FlushCapiSwiperEndEvents();
+    EXPECT_EQ(state.types.size(), PAIRED_EVENT_COUNT);
+    EXPECT_TRUE(manager->capiImpl_->capiSubscriptions_.at(id)->starts.empty());
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+}
+
+/**
+ * @tc.name: CapiCachedDestroyEndPreservesReentrantStart
+ * @tc.desc: A new START created by a destroyed-node callback survives old transaction cleanup.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiCachedDestroyEndPreservesReentrantStart, TestSize.Level1)
+{
+    constexpr size_t TOTAL_EVENT_COUNT = 6U;
+    constexpr int32_t NODE_NODE_ID = 527;
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(
+        true, PAGE_CATEGORY | SCROLL_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto node = FrameNode::CreateFrameNode("node", NODE_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    manager->OnContentChangeStart(node, ChangeType::PAGE);
+    manager->OnContentChangeStart(node, ChangeType::SCROLL);
+    state.onEvent = [&](uint32_t type) {
+        if (type == PAGE_END) {
+            state.onEvent = nullptr;
+            manager->OnContentChangeNodeDestroyed(NODE_NODE_ID);
+            manager->OnContentChangeStart(node, ChangeType::SCROLL);
+        }
+    };
+    manager->OnContentChangeNodeDestroyed(NODE_NODE_ID);
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { PAGE_START, SCROLL_START, PAGE_END, SCROLL_END, SCROLL_START }));
+    EXPECT_TRUE(manager->capiImpl_->HasCapiContentChangeStart(NODE_NODE_ID, SCROLL_START));
+    manager->OnContentChangeNodeDestroyed(NODE_NODE_ID);
+    EXPECT_EQ(state.types.back(), SCROLL_END);
+    EXPECT_EQ(state.types.size(), TOTAL_EVENT_COUNT);
+    EXPECT_TRUE(manager->capiImpl_->capiSubscriptions_.at(id)->starts.empty());
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+}
+
+/**
+ * @tc.name: CapiCachedDestroyEndSkipsUnregisteredReceiver
+ * @tc.desc: Unregister skips both the current cached END and later queued END callbacks.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiCachedDestroyEndSkipsUnregisteredReceiver, TestSize.Level1)
+{
+    constexpr int32_t NODE_NODE_ID = 528;
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState first { manager };
+    CapiTestState second { manager };
+    auto firstId = manager->RegisterCapiContentChangeEvent(
+        true, PAGE_CATEGORY | SCROLL_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &first },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto secondId = manager->RegisterCapiContentChangeEvent(
+        true, PAGE_CATEGORY | SCROLL_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &second },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto node = FrameNode::CreateFrameNode("node", NODE_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    manager->OnContentChangeStart(node, ChangeType::PAGE);
+    manager->OnContentChangeStart(node, ChangeType::SCROLL);
+    first.removeId = secondId;
+    manager->OnContentChangeNodeDestroyed(NODE_NODE_ID);
+    EXPECT_EQ(first.types, (std::vector<uint32_t> { PAGE_START, SCROLL_START, PAGE_END, SCROLL_END }));
+    EXPECT_EQ(second.types, (std::vector<uint32_t> { PAGE_START, SCROLL_START }));
+    EXPECT_EQ(second.releases, 1);
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(firstId));
+}
+
+/**
+ * @tc.name: CapiCachedEndReleasedOnCancelUnregisterAndInvalidation
+ * @tc.desc: Cancel, unregister and context invalidation release cached paired-event metadata.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiCachedEndReleasedOnCancelUnregisterAndInvalidation, TestSize.Level1)
+{
+    constexpr int32_t RELEASED_SUBSCRIPTION_COUNT = 3;
+    constexpr int32_t SWIPER_NODE_ID = 529;
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto first = manager->RegisterCapiContentChangeEvent(
+        true, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto second = manager->RegisterCapiContentChangeEvent(
+        true, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto swiper = FrameNode::CreateFrameNode("Swiper", SWIPER_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    manager->OnSwiperChangeStart(swiper, false);
+    std::weak_ptr<const std::string> cache =
+        manager->capiImpl_->capiSubscriptions_.at(first)->starts.at({ SWIPER_NODE_ID, SWIPER_START });
+    EXPECT_EQ(cache.lock(),
+        manager->capiImpl_->capiSubscriptions_.at(second)->starts.at({ SWIPER_NODE_ID, SWIPER_START }));
+    manager->OnSwiperChangeCancel(swiper, false);
+    EXPECT_TRUE(cache.expired());
+    manager->OnSwiperChangeStart(swiper, false);
+    cache = manager->capiImpl_->capiSubscriptions_.at(first)->starts.at({ SWIPER_NODE_ID, SWIPER_START });
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(first));
+    EXPECT_FALSE(cache.expired());
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(second));
+    EXPECT_TRUE(cache.expired());
+    auto third = manager->RegisterCapiContentChangeEvent(
+        true, PAGE_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    manager->OnSwiperChangeStart(swiper, false);
+    cache = manager->capiImpl_->capiSubscriptions_.at(third)->starts.at({ SWIPER_NODE_ID, SWIPER_START });
+    manager->InvalidateCapiContentChangeSubscriptions();
+    EXPECT_TRUE(cache.expired());
+    manager->OnContentChangeNodeDestroyed(SWIPER_NODE_ID);
+    EXPECT_EQ(state.types,
+        (std::vector<uint32_t> { SWIPER_START, SWIPER_START, SWIPER_CANCEL, SWIPER_CANCEL, SWIPER_START,
+        SWIPER_START, SWIPER_START }));
+    EXPECT_EQ(state.releases, RELEASED_SUBSCRIPTION_COUNT);
+}
+
+
+/**
+ * @tc.name: CapiScrollNormalEndIsIndependentPerNode
+ * @tc.desc: Both subscription modes receive each node normal END; IPC retains its last-node behavior.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiScrollNormalEndIsIndependentPerNode, TestSize.Level1)
+{
+    constexpr int32_t SCROLLING_NODE_COUNT = 2;
+    constexpr size_t COMPLETED_EVENT_COUNT = 4;
+    auto manager = GetContentChangeManager();
+    ContentChangeConfig config;
+    config.reportStartEvent = true;
+    manager->StartContentChangeReport(config);
+    CapiTestState paired { manager };
+    CapiTestState unpaired { manager };
+    auto firstId = manager->RegisterCapiContentChangeEvent(true, SCROLL_CATEGORY, NO_IGNORED_EVENTS,
+        new CapiTestCookie { &paired }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto secondId = manager->RegisterCapiContentChangeEvent(false, SCROLL_CATEGORY, NO_IGNORED_EVENTS,
+        new CapiTestCookie { &unpaired }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto first = FrameNode::CreateFrameNode(
+        "Scroll", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    auto second = FrameNode::CreateFrameNode(
+        "List", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(ChangeType::SCROLL_START, _))
+        .Times(SCROLLING_NODE_COUNT);
+    for (const auto& node : { first, second }) {
+        manager->OnScrollChangeStart(node);
+        manager->OnContentChangeStart(node, ChangeType::SCROLL);
+    }
+    Mock::VerifyAndClearExpectations(GetMockUiSessionManager());
+    EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(ChangeType::SCROLL, _)).Times(0);
+    manager->OnScrollChangeEnd(first);
+    EXPECT_EQ(paired.types, (std::vector<uint32_t> { SCROLL_START, SCROLL_START, SCROLL_END }));
+    EXPECT_EQ(unpaired.types, (std::vector<uint32_t> { SCROLL_END }));
+    Mock::VerifyAndClearExpectations(GetMockUiSessionManager());
+    EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(ChangeType::SCROLL, _)).Times(1);
+    manager->OnScrollChangeEnd(second);
+    EXPECT_EQ(paired.types.size(), COMPLETED_EVENT_COUNT);
+    EXPECT_EQ(unpaired.types, (std::vector<uint32_t> { SCROLL_END, SCROLL_END }));
+    Mock::VerifyAndClearExpectations(GetMockUiSessionManager());
+    EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(_, _)).Times(0);
+    manager->OnScrollInterrupted(first, true);
+    EXPECT_EQ(paired.types.size(), COMPLETED_EVENT_COUNT);
+    manager->UnregisterCapiContentChangeEvent(firstId);
+    manager->UnregisterCapiContentChangeEvent(secondId);
+    manager->StopContentChangeReport();
+    Mock::VerifyAndClearExpectations(GetMockUiSessionManager());
+}
+
+/**
+ * @tc.name: CapiNormalEndDoesNotRequireStart
+ * @tc.desc: Both START-enabled and END-only receivers accept normal END without a previous START.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiNormalEndDoesNotRequireStart, TestSize.Level1)
+{
+    constexpr int32_t IPC_NORMAL_END_COUNT = 3;
+    auto manager = GetContentChangeManager();
+    ContentChangeConfig config;
+    config.reportStartEvent = true;
+    manager->StartContentChangeReport(config);
+    CapiTestState paired { manager };
+    CapiTestState unpaired { manager };
+    auto aid = manager->RegisterCapiContentChangeEvent(true, PAGE_CATEGORY | SCROLL_CATEGORY, NO_IGNORED_EVENTS,
+        new CapiTestCookie { &paired }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto bid = manager->RegisterCapiContentChangeEvent(false, PAGE_CATEGORY | SCROLL_CATEGORY, NO_IGNORED_EVENTS,
+        new CapiTestCookie { &unpaired }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto node = FrameNode::CreateFrameNode(
+        "Swiper", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<SwiperPattern>());
+    EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(_, _)).Times(IPC_NORMAL_END_COUNT);
+    manager->OnPageTransitionEnd(node);
+    manager->OnScrollChangeEnd(node);
+    manager->OnSwiperChangeEnd(node, false);
+    manager->capiImpl_->FlushCapiSwiperEndEvents();
+    manager->ProcessSwiperNodes();
+    EXPECT_EQ(paired.types, (std::vector<uint32_t> { PAGE_END, SCROLL_END, SWIPER_END }));
+    EXPECT_EQ(unpaired.types, (std::vector<uint32_t> { PAGE_END, SCROLL_END, SWIPER_END }));
+    manager->UnregisterCapiContentChangeEvent(aid);
+    manager->UnregisterCapiContentChangeEvent(bid);
+    manager->StopContentChangeReport();
+    Mock::VerifyAndClearExpectations(GetMockUiSessionManager());
+}
+
+/**
+ * @tc.name: StrictPairingKeepsAcceptedStartAcrossFilters
+ * @tc.desc: Changing the scroll source cannot suppress the terminal event of an already accepted START.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, StrictPairingKeepsAcceptedStartAcrossFilters, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    ContentChangeConfig config;
+    config.reportStartEvent = true;
+    config.ignoreEventType = R"({"SCROLL":["scrollTo"]})";
+    manager->StartContentChangeReport(config);
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(true, SCROLL_CATEGORY, IGNORE_SCROLL_TO,
+        new CapiTestCookie { &state }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto node = FrameNode::CreateFrameNode(
+        "Scroll", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(ChangeType::SCROLL_START, _)).Times(1);
+    manager->OnScrollChangeStart(node);
+    manager->OnContentChangeStart(node, ChangeType::SCROLL);
+    EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(ChangeType::SCROLL, _)).Times(0);
+    manager->MarkCapiScrollToEventSource(node->GetId());
+    manager->OnScrollChangeEnd(node, ContentChangeManager::SCROLL_TO);
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { SCROLL_START, SCROLL_END }));
+    manager->UnregisterCapiContentChangeEvent(id);
+    manager->StopContentChangeReport();
+    Mock::VerifyAndClearExpectations(GetMockUiSessionManager());
+}
+
+/**
+ * @tc.name: CapiDropsManualStartAfterAutoPlayEnabled
+ * @tc.desc: AutoPlay suppresses terminal events and discards the unfinished manual START.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiDropsManualStartAfterAutoPlayEnabled, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    ContentChangeConfig config;
+    config.reportStartEvent = true;
+    manager->StartContentChangeReport(config);
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(true, PAGE_CATEGORY, NO_IGNORED_EVENTS,
+        new CapiTestCookie { &state }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto node = FrameNode::CreateFrameNode(
+        "Swiper", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<SwiperPattern>());
+    EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(ChangeType::SWIPER_START, _)).Times(1);
+    manager->OnSwiperChangeStart(node, false);
+    node->GetPaintProperty<SwiperPaintProperty>()->UpdateAutoPlay(true);
+    EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(ChangeType::SWIPER, _)).Times(0);
+    manager->OnSwiperChangeInterrupted(node, false);
+    manager->OnVsyncEnd(RectF());
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { SWIPER_START }));
+    EXPECT_FALSE(manager->capiImpl_->HasCapiContentChangeStart(node->GetId(), SWIPER_START));
+    manager->UnregisterCapiContentChangeEvent(id);
+    manager->StopContentChangeReport();
+    Mock::VerifyAndClearExpectations(GetMockUiSessionManager());
+}
+
+/**
+ * @tc.name: StrictPairingOrdersReentrantStartAndEndForEveryReceiver
+ * @tc.desc: A nested completion from the first START callback must not overtake START for the second receiver.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, StrictPairingOrdersReentrantStartAndEndForEveryReceiver, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    CapiTestState first { manager };
+    CapiTestState second { manager };
+    auto node = FrameNode::CreateFrameNode(
+        "Page", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    first.onEvent = [manager, node](uint32_t type) {
+        if (type == PAGE_START) {
+            manager->OnPageTransitionEnd(node);
+        }
+    };
+    auto aid = manager->RegisterCapiContentChangeEvent(true, PAGE_CATEGORY, NO_IGNORED_EVENTS,
+        new CapiTestCookie { &first }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto bid = manager->RegisterCapiContentChangeEvent(true, PAGE_CATEGORY, NO_IGNORED_EVENTS,
+        new CapiTestCookie { &second }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    manager->OnContentChangeStart(node, ChangeType::PAGE);
+    EXPECT_EQ(first.types, (std::vector<uint32_t> { PAGE_START, PAGE_END }));
+    EXPECT_EQ(second.types, first.types);
+    manager->UnregisterCapiContentChangeEvent(aid);
+    manager->UnregisterCapiContentChangeEvent(bid);
+}
+
+/**
+ * @tc.name: StrictPairingScrollRemovalCompletesBeforeDestroy
+ * @tc.desc: Either removal order closes a CAPI scroll pair once; IPC removal keeps its original behavior.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, StrictPairingScrollRemovalCompletesBeforeDestroy, TestSize.Level1)
+{
+    auto pipeline = MockPipelineContext::GetCurrent();
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(true, SCROLL_CATEGORY, NO_IGNORED_EVENTS,
+        new CapiTestCookie { &state }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto pattern = AceType::MakeRefPtr<ScrollPattern>();
+    auto node = FrameNode::CreateFrameNode(
+        "Scroll", ElementRegister::GetInstance()->MakeUniqueId(), pattern);
+    for (bool destroyFirst : { false, true }) {
+        state.types.clear();
+        pattern->OnAttachToMainTree();
+        manager->OnScrollChangeStart(node);
+        manager->OnContentChangeStart(node, ChangeType::SCROLL);
+        if (destroyFirst) {
+            manager->OnContentChangeNodeDestroyed(node->GetId());
+        }
+        pattern->ContentChangeByDetaching(AceType::RawPtr(pipeline));
+        manager->OnContentChangeNodeDestroyed(node->GetId());
+        pattern->ContentChangeReport(node);
+        EXPECT_EQ(state.types, (std::vector<uint32_t> { SCROLL_START, SCROLL_END }));
+    }
+    manager->UnregisterCapiContentChangeEvent(id);
+}
+
+/**
+ * @tc.name: StrictPairingAutoPlayCompletionDoesNotEnterIpc
+ * @tc.desc: Normal completion and cancellation after enabling autoPlay produce no CAPI or IPC event.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, StrictPairingAutoPlayCompletionDoesNotEnterIpc, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    for (bool canceled : { false, true }) {
+        ContentChangeConfig config;
+        config.reportStartEvent = true;
+        manager->StartContentChangeReport(config);
+        CapiTestState paired { manager };
+        CapiTestState unpaired { manager };
+        auto aid = manager->RegisterCapiContentChangeEvent(true, PAGE_CATEGORY, NO_IGNORED_EVENTS,
+            new CapiTestCookie { &paired }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto bid = manager->RegisterCapiContentChangeEvent(false, PAGE_CATEGORY, NO_IGNORED_EVENTS,
+            new CapiTestCookie { &unpaired }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto pattern = AceType::MakeRefPtr<SwiperPattern>();
+        auto node = FrameNode::CreateFrameNode(
+            V2::SWIPER_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), pattern);
+        EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(ChangeType::SWIPER_START, _)).Times(1);
+        manager->OnSwiperChangeStart(node, false);
+        Mock::VerifyAndClearExpectations(GetMockUiSessionManager());
+        node->GetPaintProperty<SwiperPaintProperty>()->UpdateAutoPlay(true);
+        if (canceled) {
+            pattern->targetIndex_ = pattern->currentIndex_;
+        }
+        EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(_, _)).Times(0);
+        pattern->ContentChangeReport(node, true);
+        manager->OnVsyncEnd(RectF());
+        EXPECT_EQ(paired.types, (std::vector<uint32_t> { SWIPER_START }));
+        EXPECT_TRUE(unpaired.types.empty());
+        EXPECT_FALSE(manager->capiImpl_->HasCapiContentChangeStart(node->GetId(), SWIPER_START));
+        EXPECT_EQ(manager->activeContentChanges_.count(node->GetId()), 1U);
+        manager->UnregisterCapiContentChangeEvent(aid);
+        manager->UnregisterCapiContentChangeEvent(bid);
+        manager->StopContentChangeReport();
+        Mock::VerifyAndClearExpectations(GetMockUiSessionManager());
+    }
+}
+
+/**
+ * @tc.name: StrictPairingPendingDestroyCannotConsumeNewCycle
+ * @tc.desc: A queued old END skips completed receivers without erasing a later START on the same node.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, StrictPairingPendingDestroyCannotConsumeNewCycle, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(true, PAGE_CATEGORY, NO_IGNORED_EVENTS,
+        new CapiTestCookie { &state }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto swiper = FrameNode::CreateFrameNode(
+        V2::SWIPER_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<SwiperPattern>());
+    manager->OnSwiperChangeStart(swiper, false);
+    manager->OnSwiperChangeEnd(swiper, false);
+    manager->OnContentChangeNodeDestroyed(swiper->GetId());
+    manager->OnSwiperChangeStart(swiper, false);
+    manager->capiImpl_->FlushCapiSwiperEndEvents();
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { SWIPER_START, SWIPER_END, SWIPER_START }));
+    EXPECT_TRUE(manager->capiImpl_->HasCapiContentChangeStart(swiper->GetId(), SWIPER_START));
+    EXPECT_FALSE(manager->capiImpl_->capiActiveSwipers_.empty());
+    manager->OnSwiperChangeEnd(swiper, false);
+    manager->capiImpl_->FlushCapiSwiperEndEvents();
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { SWIPER_START, SWIPER_END, SWIPER_START, SWIPER_END }));
+    EXPECT_FALSE(manager->capiImpl_->HasCapiContentChangeStart(swiper->GetId(), SWIPER_START));
+    manager->UnregisterCapiContentChangeEvent(id);
+}
+
+/**
+ * @tc.name: ContentChangeManagerPageLogicalIdTest001
+ * @tc.desc: An explicit logical ID closes only its START while END dumps a different node.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerPageLogicalIdTest001, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    auto mock = GetMockUiSessionManager();
+    ContentChangeConfig config;
+    config.reportStartEvent = true;
+    manager->StartContentChangeReport(config);
+    auto navigation = FrameNode::CreateFrameNode("Navigation", 450, AceType::MakeRefPtr<Pattern>(), true);
+    auto target = FrameNode::CreateFrameNode("NavDestination", 451, AceType::MakeRefPtr<Pattern>(), true);
+    EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::PAGE_START, _)).Times(2);
+    EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::PAGE, GetSimpleTree(target))).Times(2);
+    manager->OnTransitionAdded(navigation->GetId());
+    manager->OnContentChangeStart(navigation, ChangeType::PAGE);
+    manager->OnTransitionAdded(target->GetId());
+    manager->OnContentChangeStart(target, ChangeType::PAGE);
+    manager->OnPageTransitionEnd(target, navigation->GetId());
+    EXPECT_EQ(manager->transitioningNodes_.count(navigation->GetId()), 0);
+    EXPECT_EQ(manager->activeContentChanges_.count(navigation->GetId()), 0);
+    EXPECT_EQ(manager->transitioningNodes_.count(target->GetId()), 1);
+    EXPECT_EQ(manager->activeContentChanges_.count(target->GetId()), 1);
+    manager->OnPageTransitionEnd(target);
+    EXPECT_FALSE(manager->IsTransitioning());
+    EXPECT_TRUE(manager->activeContentChanges_.empty());
+    Mock::VerifyAndClearExpectations(mock);
+    manager->StopContentChangeReport();
+}
+
+/**
+ * @tc.name: ContentChangeManagerPageLogicalIdTest002
+ * @tc.desc: Interruption clears Navigation identity and allows a subsequent START without PAGE CANCEL.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerPageLogicalIdTest002, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    auto mock = GetMockUiSessionManager();
+    ContentChangeConfig config;
+    config.reportStartEvent = true;
+    manager->StartContentChangeReport(config);
+    auto navigation = FrameNode::CreateFrameNode("Navigation", 452, AceType::MakeRefPtr<Pattern>(), true);
+    EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::PAGE_START, HasSubstr("\"$ID\":452"))).Times(2);
+    EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::PAGE, HasSubstr("\"$ID\":452"))).Times(2);
+    for (int32_t i = 0; i < 2; ++i) {
+        manager->OnTransitionAdded(navigation->GetId());
+        manager->OnContentChangeStart(navigation, ChangeType::PAGE);
+        manager->OnContentChangeInterrupted(navigation, ChangeType::PAGE);
+        EXPECT_FALSE(manager->IsTransitioning());
+        EXPECT_TRUE(manager->activeContentChanges_.empty());
+    }
+    Mock::VerifyAndClearExpectations(mock);
+    manager->StopContentChangeReport();
+}
+
+/**
+ * @tc.name: ContentChangeManagerPageLogicalIdTest003
+ * @tc.desc: A missing dump node does not prevent cleanup of the explicit logical ID.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerPageLogicalIdTest003, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    auto mock = GetMockUiSessionManager();
+    ContentChangeConfig config;
+    config.reportStartEvent = true;
+    manager->StartContentChangeReport(config);
+    auto navigation = FrameNode::CreateFrameNode("Navigation", 453, AceType::MakeRefPtr<Pattern>(), true);
+    EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::PAGE_START, _)).Times(1);
+    EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::PAGE, _)).Times(0);
+    manager->OnTransitionAdded(navigation->GetId());
+    manager->OnContentChangeStart(navigation, ChangeType::PAGE);
+    manager->OnPageTransitionEnd(nullptr, navigation->GetId());
+    EXPECT_FALSE(manager->IsTransitioning());
+    EXPECT_TRUE(manager->activeContentChanges_.empty());
+    Mock::VerifyAndClearExpectations(mock);
+    manager->StopContentChangeReport();
+}
+
+/**
+ * @tc.name: CapiPageLogicalIdPreservesBothChannels
+ * @tc.desc: Logical START identity and END snapshot target remain distinct with each IPC START configuration.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiPageLogicalIdPreservesBothChannels, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    auto ipc = GetMockUiSessionManager();
+    for (int32_t ipcMode = -1; ipcMode <= 1; ++ipcMode) {
+        SCOPED_TRACE(ipcMode);
+        manager->StopContentChangeReport();
+        if (ipcMode >= 0) {
+            ContentChangeConfig config;
+            config.reportStartEvent = ipcMode == 1;
+            manager->StartContentChangeReport(config);
+        }
+        CapiTestState state { manager };
+        auto id = manager->RegisterCapiContentChangeEvent(true, PAGE_CATEGORY, NO_IGNORED_EVENTS,
+            new CapiTestCookie { &state }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto navigation = FrameNode::CreateFrameNode(V2::NAVIGATION_VIEW_ETS_TAG,
+            ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+        auto target = FrameNode::CreateFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG,
+            ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::PAGE_START, _)).Times(ipcMode == 1 ? 2 : 0);
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::PAGE, _)).Times(ipcMode >= 0 ? 2 : 0);
+        manager->OnContentChangeStart(navigation, ChangeType::PAGE);
+        manager->OnContentChangeStart(target, ChangeType::PAGE);
+        manager->OnPageTransitionEnd(target, navigation->GetId());
+        EXPECT_EQ(state.types, (std::vector<uint32_t> { PAGE_START, PAGE_START, PAGE_END }));
+        EXPECT_FALSE(manager->capiImpl_->HasCapiContentChangeStart(navigation->GetId(), PAGE_START));
+        EXPECT_TRUE(manager->capiImpl_->HasCapiContentChangeStart(target->GetId(), PAGE_START));
+        auto json = JsonUtil::ParseJsonString(state.json);
+        ASSERT_TRUE(json && json->IsValid());
+        EXPECT_EQ(json->GetObject("targetNode")->GetString("id"), std::to_string(target->GetId()));
+        manager->OnPageTransitionEnd(target);
+        EXPECT_EQ(state.types, (std::vector<uint32_t> { PAGE_START, PAGE_START, PAGE_END, PAGE_END }));
+        EXPECT_FALSE(manager->capiImpl_->HasCapiContentChangeStart(target->GetId(), PAGE_START));
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+        Mock::VerifyAndClearExpectations(ipc);
+        manager->StopContentChangeReport();
+    }
+}
+
+/**
+ * @tc.name: CapiRegistrationInsideStartReceivesNormalEndOnly
+ * @tc.desc: A listener added in START receives normal END but no replayed START or abnormal completion.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiRegistrationInsideStartReceivesNormalEndOnly, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    for (auto start : { PAGE_START, SCROLL_START, SWIPER_START, TABS_START }) {
+        for (bool normal : { true, false }) {
+            manager->InvalidateCapiContentChangeSubscriptions();
+            CapiTestState first { manager };
+            CapiTestState late { manager };
+            uint64_t lateId = 0;
+            auto node = FrameNode::CreateFrameNode(
+                "node", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+            first.onEvent = [&](uint32_t type) {
+                if (type == start) {
+                    lateId = manager->RegisterCapiContentChangeEvent(true, PAGE_CATEGORY | SCROLL_CATEGORY,
+                        NO_IGNORED_EVENTS, new CapiTestCookie { &late },
+                        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+                }
+            };
+            auto firstId = manager->RegisterCapiContentChangeEvent(true, PAGE_CATEGORY | SCROLL_CATEGORY,
+                NO_IGNORED_EVENTS, new CapiTestCookie { &first },
+                CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+            manager->capiImpl_->DispatchCapiContentChangeEvent(start, node);
+            ASSERT_NE(lateId, 0U);
+            EXPECT_TRUE(late.types.empty());
+            const auto end = start + (PAGE_END - PAGE_START);
+            manager->capiImpl_->DispatchCapiContentChangeEvent(
+                end, node, NO_SCROLL_EVENT_SOURCE, nullptr, nullptr, !normal);
+            EXPECT_EQ(first.types, (std::vector<uint32_t> { start, end }));
+            EXPECT_EQ(late.types, normal ? (std::vector<uint32_t> { end }) : std::vector<uint32_t>());
+            EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(firstId));
+            EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(lateId));
+        }
+    }
+}
+
+/**
+ * @tc.name: CapiOverlayUnregisterSkipsCurrentReceiver
+ * @tc.desc: Unregistering B in A's SHOW skips B immediately and preserves A's current event.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiOverlayUnregisterSkipsCurrentReceiver, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState first { manager };
+    CapiTestState second { manager };
+    auto aid = manager->RegisterCapiContentChangeEvent(false, OVERLAY_CATEGORY, NO_IGNORED_EVENTS,
+        new CapiTestCookie { &first }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    first.removeId = manager->RegisterCapiContentChangeEvent(false, OVERLAY_CATEGORY, NO_IGNORED_EVENTS,
+        new CapiTestCookie { &second }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto node = FrameNode::CreateFrameNode(
+        "Popup", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    manager->capiImpl_->DispatchCapiContentChangeEvent(OVERLAY_SHOW, node, NO_SCROLL_EVENT_SOURCE, "popup");
+    EXPECT_EQ(first.types, (std::vector<uint32_t> { OVERLAY_SHOW }));
+    EXPECT_TRUE(second.types.empty());
+    EXPECT_EQ(second.releases, 1);
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(aid));
+}
+
+/**
+ * @tc.name: CapiSwiperIndexPropertyStartsWithoutChangingIpc
+ * @tc.desc: Index changes start CAPI only; initialization and repeated layouts do not duplicate START.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiSwiperIndexPropertyStartsWithoutChangingIpc, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    ContentChangeConfig config;
+    config.reportStartEvent = true;
+    manager->StartContentChangeReport(config);
+    CapiTestState withStart { manager };
+    CapiTestState withoutStart { manager };
+    auto aid = manager->RegisterCapiContentChangeEvent(true, PAGE_CATEGORY, NO_IGNORED_EVENTS,
+        new CapiTestCookie { &withStart }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto bid = manager->RegisterCapiContentChangeEvent(false, PAGE_CATEGORY, NO_IGNORED_EVENTS,
+        new CapiTestCookie { &withoutStart }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto pattern = AceType::MakeRefPtr<SwiperPattern>();
+    auto node = FrameNode::CreateFrameNode(V2::SWIPER_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), pattern);
+    for (int32_t index = 0; index < 3; ++index) {
+        auto child = FrameNode::CreateFrameNode(
+            "Text", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+        node->AddChild(child);
+    }
+    auto ipc = GetMockUiSessionManager();
+    EXPECT_CALL(*ipc, ReportContentChangeEvent(_, _)).Times(0);
+    pattern->BeforeCreateLayoutWrapper();
+    EXPECT_TRUE(withStart.types.empty());
+    pattern->isInit_ = false;
+    SwiperModelNG::SetIndex(AceType::RawPtr(node), 1);
+    pattern->BeforeCreateLayoutWrapper();
+    EXPECT_EQ(pattern->currentIndex_, 1);
+    EXPECT_EQ(withStart.types, (std::vector<uint32_t> { SWIPER_START }));
+    EXPECT_TRUE(withoutStart.types.empty());
+    pattern->BeforeCreateLayoutWrapper();
+    EXPECT_EQ(withStart.types, (std::vector<uint32_t> { SWIPER_START }));
+    Mock::VerifyAndClearExpectations(ipc);
+    pattern->ContentChangeReport(node, true);
+    manager->capiImpl_->FlushCapiSwiperEndEvents();
+    EXPECT_EQ(withStart.types, (std::vector<uint32_t> { SWIPER_START, SWIPER_END }));
+    EXPECT_EQ(withoutStart.types, (std::vector<uint32_t> { SWIPER_END }));
+    // The controller has already sent START; subsequent attribute layout must not duplicate it.
+    EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::SWIPER_START, _)).Times(1);
+    pattern->SwipeToWithoutAnimation(2);
+    SwiperModelNG::SetIndex(AceType::RawPtr(node), 2);
+    pattern->BeforeCreateLayoutWrapper();
+    EXPECT_EQ(withStart.types, (std::vector<uint32_t> { SWIPER_START, SWIPER_END, SWIPER_START }));
+    Mock::VerifyAndClearExpectations(ipc);
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(aid));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(bid));
+    manager->StopContentChangeReport();
+}
+
+/**
+ * @tc.name: CapiRouterStageCleanupAllowsNextStart
+ * @tc.desc: Router null-target cleanup sends no END and allows the next Stage START in every IPC mode.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiRouterStageCleanupAllowsNextStart, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    auto ipc = GetMockUiSessionManager();
+    for (const auto& enabled : { std::optional<bool>(), std::optional<bool>(false), std::optional<bool>(true) }) {
+        manager->InvalidateCapiContentChangeSubscriptions();
+        manager->StopContentChangeReport();
+        if (enabled.has_value()) {
+            ContentChangeConfig config;
+            config.reportStartEvent = enabled.value();
+            manager->StartContentChangeReport(config);
+        }
+        CapiTestState state { manager };
+        auto id = manager->RegisterCapiContentChangeEvent(true, PAGE_CATEGORY, NO_IGNORED_EVENTS,
+            new CapiTestCookie { &state }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto stage = FrameNode::CreateFrameNode(
+            "Stage", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+        auto page = FrameNode::CreateFrameNode(
+            "Page", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::PAGE_START, _)).Times(enabled.value_or(false) ? 2 : 0);
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::PAGE, _)).Times(enabled.has_value() ? 1 : 0);
+        manager->OnContentChangeStart(stage, ChangeType::PAGE);
+        manager->OnPageTransitionEnd(nullptr, stage->GetId());
+        EXPECT_FALSE(manager->capiImpl_->HasCapiContentChangeStart(stage->GetId(), PAGE_START));
+        EXPECT_EQ(state.types, (std::vector<uint32_t> { PAGE_START }));
+        manager->OnContentChangeStart(stage, ChangeType::PAGE);
+        manager->OnPageTransitionEnd(nullptr, stage->GetId());
+        manager->OnPageTransitionEnd(page);
+        EXPECT_EQ(state.types, (std::vector<uint32_t> { PAGE_START, PAGE_START, PAGE_END }));
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+        Mock::VerifyAndClearExpectations(ipc);
+        manager->StopContentChangeReport();
+    }
+}
+
+
+/**
+ * @tc.name: CapiAutoPlaySuppressesEveryCycleForBothListeners
+ * @tc.desc: AutoPlay suppresses CAPI with IPC start detection both on and off.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiAutoPlaySuppressesEveryCycleForBothListeners, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    for (bool ipcStart : { false, true }) {
+        manager->InvalidateCapiContentChangeSubscriptions();
+        ContentChangeConfig config;
+        config.reportStartEvent = ipcStart;
+        manager->StartContentChangeReport(config);
+        CapiTestState a { manager };
+        CapiTestState b { manager };
+        auto aid = manager->RegisterCapiContentChangeEvent(true, PAGE_CATEGORY, 0,
+            new CapiTestCookie { &a }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto bid = manager->RegisterCapiContentChangeEvent(false, PAGE_CATEGORY, 0,
+            new CapiTestCookie { &b }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto pattern = AceType::MakeRefPtr<SwiperPattern>();
+        auto node = FrameNode::CreateFrameNode("Swiper", ElementRegister::GetInstance()->MakeUniqueId(), pattern);
+        node->GetPaintProperty<SwiperPaintProperty>()->UpdateAutoPlay(true);
+        EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(_, _)).Times(0);
+        for (int cycle = 0; cycle < 2; ++cycle) {
+            manager->OnSwiperChangeStart(node, false);
+            pattern->ContentChangeReport(node, true);
+            manager->OnVsyncEnd(RectF());
+        }
+        EXPECT_TRUE(a.types.empty());
+        EXPECT_TRUE(b.types.empty());
+        manager->UnregisterCapiContentChangeEvent(aid);
+        manager->UnregisterCapiContentChangeEvent(bid);
+        manager->StopContentChangeReport();
+        Mock::VerifyAndClearExpectations(GetMockUiSessionManager());
+    }
+}
+
+/**
+ * @tc.name: CapiSameIndexCancelsOnlyStartedListeners
+ * @tc.desc: No visible change cancels a started Swiper/Tabs cycle, without END for late or END-only listeners.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiSameIndexCancelsOnlyStartedListeners, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    for (bool isTabs : { false, true }) {
+        manager->InvalidateCapiContentChangeSubscriptions();
+        CapiTestState a { manager };
+        CapiTestState b { manager };
+        CapiTestState late { manager };
+        auto aid = manager->RegisterCapiContentChangeEvent(true, PAGE_CATEGORY, 0,
+            new CapiTestCookie { &a }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto bid = manager->RegisterCapiContentChangeEvent(false, PAGE_CATEGORY, 0,
+            new CapiTestCookie { &b }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto tabs = FrameNode::CreateFrameNode(
+            V2::TABS_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+        auto node = FrameNode::CreateFrameNode(
+            V2::SWIPER_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<SwiperPattern>());
+        if (isTabs) {
+            node->MountToParent(tabs);
+        }
+        manager->CompleteCapiSwiperChangeWithoutMove(node, isTabs);
+        manager->OnVsyncEnd(RectF());
+        EXPECT_TRUE(a.types.empty());
+        EXPECT_TRUE(b.types.empty());
+        manager->ReportCapiSwiperStartEvent(node, isTabs);
+        auto lid = manager->RegisterCapiContentChangeEvent(true, PAGE_CATEGORY, 0,
+            new CapiTestCookie { &late }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        manager->CompleteCapiSwiperChangeWithoutMove(node, isTabs);
+        manager->CompleteCapiSwiperChangeWithoutMove(node, isTabs);
+        manager->OnVsyncEnd(RectF());
+        EXPECT_EQ(a.types, (std::vector<uint32_t> {
+            isTabs ? TABS_START : SWIPER_START, isTabs ? TABS_CANCEL : SWIPER_CANCEL }));
+        EXPECT_TRUE(b.types.empty());
+        EXPECT_TRUE(late.types.empty());
+        EXPECT_TRUE(manager->capiImpl_->capiPendingSwipers_.empty());
+        manager->UnregisterCapiContentChangeEvent(aid);
+        manager->UnregisterCapiContentChangeEvent(bid);
+        manager->UnregisterCapiContentChangeEvent(lid);
+    }
+}
+
+/**
+ * @tc.name: CapiAutoPlayDropsPendingEndAndRecoversWhenDisabled
+ * @tc.desc: AutoPlay filters queued completion, manual starts and cancellation; disabling restores normal reporting.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiAutoPlayDropsPendingEndAndRecoversWhenDisabled, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState a { manager };
+    CapiTestState b { manager };
+    auto aid = manager->RegisterCapiContentChangeEvent(true, PAGE_CATEGORY, 0,
+        new CapiTestCookie { &a }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto bid = manager->RegisterCapiContentChangeEvent(false, PAGE_CATEGORY, 0,
+        new CapiTestCookie { &b }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto node = FrameNode::CreateFrameNode(
+        V2::SWIPER_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<SwiperPattern>());
+    auto paint = node->GetPaintProperty<SwiperPaintProperty>();
+    manager->ReportCapiSwiperStartEvent(node, false);
+    manager->OnSwiperChangeEnd(node, false);
+    ASSERT_FALSE(manager->capiImpl_->capiPendingSwipers_.empty());
+    paint->UpdateAutoPlay(true);
+    manager->OnVsyncEnd(RectF());
+    manager->ReportCapiSwiperStartEvent(node, false);
+    manager->OnSwiperChangeCancel(node, false);
+    manager->CompleteCapiSwiperChangeWithoutMove(node, false);
+    manager->OnSwiperChangeInterrupted(node, false);
+    manager->OnContentChangeNodeDestroyed(node->GetId());
+    manager->OnVsyncEnd(RectF());
+    EXPECT_EQ(a.types, (std::vector<uint32_t> { SWIPER_START }));
+    EXPECT_TRUE(b.types.empty());
+    EXPECT_TRUE(manager->capiImpl_->capiActiveSwipers_.empty());
+    EXPECT_TRUE(manager->capiImpl_->capiPendingSwipers_.empty());
+    paint->UpdateAutoPlay(false);
+    manager->ReportCapiSwiperStartEvent(node, false);
+    manager->OnSwiperChangeEnd(node, false);
+    manager->OnVsyncEnd(RectF());
+    EXPECT_EQ(a.types, (std::vector<uint32_t> { SWIPER_START, SWIPER_START, SWIPER_END }));
+    EXPECT_EQ(b.types, (std::vector<uint32_t> { SWIPER_END }));
+    manager->UnregisterCapiContentChangeEvent(aid);
+    manager->UnregisterCapiContentChangeEvent(bid);
+}
+
+/**
+ * @tc.name: CapiScrollByCommandReportsAndFiltersWithoutIpc
+ * @tc.desc: An actual command reports both phases; zero displacement and ignored sources report none.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiScrollByCommandReportsAndFiltersWithoutIpc, TestSize.Level1)
+{
+    ScopedDeferredCapiLayout deferredLayout;
+    auto manager = GetContentChangeManager();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    manager->StartContentChangeReport(ContentChangeConfig {});
+    CapiTestState a { manager };
+    CapiTestState b { manager };
+    auto aid = manager->RegisterCapiContentChangeEvent(true, SCROLL_CATEGORY, 0,
+        new CapiTestCookie { &a }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto bid = manager->RegisterCapiContentChangeEvent(false, SCROLL_CATEGORY, IGNORE_SCROLL_BY,
+        new CapiTestCookie { &b }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto pattern = AceType::MakeRefPtr<ScrollPattern>();
+    auto node = FrameNode::CreateFrameNode("Scroll", ElementRegister::GetInstance()->MakeUniqueId(), pattern);
+    pattern->SetAxis(Axis::VERTICAL);
+    pattern->scrollableDistance_ = 1000.0f;
+    auto controller = AceType::MakeRefPtr<ScrollableController>();
+    controller->SetScrollPattern(pattern);
+    EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(_, _)).Times(0);
+    controller->ScrollBy(0, 300, false);
+    MockPipelineContext::GetCurrent()->taskScheduler_->FlushAfterLayoutTask();
+    EXPECT_EQ(a.types, (std::vector<uint32_t> { SCROLL_START, SCROLL_END }));
+    EXPECT_TRUE(b.types.empty());
+    controller->ScrollBy(0, 0, false);
+    MockPipelineContext::GetCurrent()->taskScheduler_->FlushAfterLayoutTask();
+    EXPECT_EQ(a.types.size(), 2U);
+    EXPECT_TRUE(b.types.empty());
+    manager->UnregisterCapiContentChangeEvent(aid);
+    manager->UnregisterCapiContentChangeEvent(bid);
+    manager->StopContentChangeReport();
+    Mock::VerifyAndClearExpectations(GetMockUiSessionManager());
+}
+
+/**
+ * @tc.name: CapiSpeculativePageStartDoesNotEscapeToCapi
+ * @tc.desc: Failed speculative loads preserve IPC reporting without publishing a CAPI page change.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiSpeculativePageStartDoesNotEscapeToCapi, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    ContentChangeConfig config;
+    config.reportStartEvent = true;
+    manager->StartContentChangeReport(config);
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(true, PAGE_CATEGORY, 0,
+        new CapiTestCookie { &state }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto node = FrameNode::CreateFrameNode("Page", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>());
+    EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(ChangeType::PAGE_START, _)).Times(1);
+    manager->OnContentChangeStart(node, ChangeType::PAGE, false);
+    EXPECT_TRUE(state.types.empty());
+    manager->OnPageTransitionEnd(nullptr, node->GetId());
+    EXPECT_TRUE(state.types.empty());
+    manager->ReportCapiPageStartEvent(node);
+    manager->ReportCapiPageEndEvent(node, node->GetId());
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { PAGE_START, PAGE_END }));
+    manager->UnregisterCapiContentChangeEvent(id);
+    manager->StopContentChangeReport();
+    Mock::VerifyAndClearExpectations(GetMockUiSessionManager());
+}
+
+/**
+ * @tc.name: CapiPendingCommandDoesNotEndNewGestureOrDetachedNode
+ * @tc.desc: Layout completion of a superseded command cannot terminate a new interaction or revive a removed node.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiPendingCommandDoesNotEndNewGestureOrDetachedNode, TestSize.Level1)
+{
+    ScopedDeferredCapiLayout deferredLayout;
+    auto pipeline = MockPipelineContext::GetCurrent();
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(true, SCROLL_CATEGORY, 0,
+        new CapiTestCookie { &state }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto pattern = AceType::MakeRefPtr<ScrollPattern>();
+    auto node = FrameNode::CreateFrameNode("Scroll", ElementRegister::GetInstance()->MakeUniqueId(), pattern);
+    pattern->ScheduleCapiScrollCommand(false, true);
+    pattern->currentOffset_ = -100.0f;
+    pattern->ContentChangeOnScrollStart(node);
+    pattern->FireObserverOnDidScroll(100.0f);
+    pipeline->taskScheduler_->FlushAfterLayoutTask();
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { SCROLL_START }));
+    pattern->ContentChangeReport(node);
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { SCROLL_START, SCROLL_END }));
+    state.types.clear();
+    pattern->ScheduleCapiScrollCommand(true);
+    pattern->currentOffset_ = -200.0f;
+    pattern->ContentChangeByDetaching(AceType::RawPtr(pipeline));
+    pipeline->taskScheduler_->FlushAfterLayoutTask();
+    EXPECT_TRUE(state.types.empty());
+    manager->UnregisterCapiContentChangeEvent(id);
+}
+
+/**
+ * @tc.name: EndOnlyDetachCompletesActivityOnce
+ * @tc.desc: Removal and destruction complete active END-only subscriptions without reporting idle nodes.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, EndOnlyDetachCompletesActivityOnce, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    for (bool isTabs : { false, true }) {
+        manager->InvalidateCapiContentChangeSubscriptions();
+        CapiTestState state { manager };
+        auto id = manager->RegisterCapiContentChangeEvent(false, PAGE_CATEGORY | SCROLL_CATEGORY, 0,
+            new CapiTestCookie { &state }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto scroll = FrameNode::CreateFrameNode(
+            "Scroll", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<ScrollPattern>());
+        auto tabs = FrameNode::CreateFrameNode(
+            "Tabs", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+        auto swiper = FrameNode::CreateFrameNode(
+            "Swiper", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<SwiperPattern>());
+        if (isTabs) {
+            swiper->MountToParent(tabs);
+        }
+        manager->OnScrollRemoved(scroll->GetId());
+        manager->OnContentChangeNodeDestroyed(swiper->GetId());
+        EXPECT_TRUE(state.types.empty());
+        manager->OnContentChangeStart(scroll, ChangeType::SCROLL);
+        manager->OnSwiperChangeStart(swiper, isTabs);
+        EXPECT_TRUE(state.types.empty());
+        manager->OnSwiperChangeInterrupted(swiper, isTabs);
+        manager->OnScrollRemoved(scroll->GetId());
+        manager->OnContentChangeNodeDestroyed(isTabs ? tabs->GetId() : swiper->GetId());
+        manager->OnContentChangeNodeDestroyed(scroll->GetId());
+        manager->OnContentChangeNodeDestroyed(swiper->GetId());
+        manager->OnVsyncEnd(RectF());
+        EXPECT_EQ(state.types, (std::vector<uint32_t> { SCROLL_END, isTabs ? TABS_END : SWIPER_END }));
+        EXPECT_TRUE(manager->capiImpl_->capiSubscriptions_.at(id)->starts.empty());
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+    }
+}
+
+/**
+ * @tc.name: CanceledPageDoesNotCompleteOnDestroy
+ * @tc.desc: Interactive cancellation clears activity without END and allows a later real transition.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CanceledPageDoesNotCompleteOnDestroy, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    for (bool withStart : { false, true }) {
+        manager->InvalidateCapiContentChangeSubscriptions();
+        CapiTestState state { manager };
+        auto id = manager->RegisterCapiContentChangeEvent(withStart, PAGE_CATEGORY, 0,
+            new CapiTestCookie { &state }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto page = FrameNode::CreateFrameNode(
+            "Navigation", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+        manager->OnContentChangeStart(page, ChangeType::PAGE);
+        manager->OnContentChangeInterrupted(page, ChangeType::PAGE, false);
+        manager->OnContentChangeNodeDestroyed(page->GetId());
+        EXPECT_EQ(state.types, withStart ? (std::vector<uint32_t> { PAGE_START }) : std::vector<uint32_t>());
+        state.types.clear();
+        manager->OnContentChangeStart(page, ChangeType::PAGE);
+        manager->OnPageTransitionEnd(page);
+        EXPECT_EQ(state.types, withStart ? (std::vector<uint32_t> { PAGE_START, PAGE_END }) :
+            (std::vector<uint32_t> { PAGE_END }));
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+    }
+}
+
+/**
+ * @tc.name: CapiScrollRequiresActualMovement
+ * @tc.desc: Zero-range and unconsumed nested starts stay silent for all four scrollable components.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiScrollRequiresActualMovement, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState a { manager };
+    CapiTestState b { manager };
+    auto aid = manager->RegisterCapiContentChangeEvent(true, SCROLL_CATEGORY, 0,
+        new CapiTestCookie { &a }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto bid = manager->RegisterCapiContentChangeEvent(false, SCROLL_CATEGORY, 0,
+        new CapiTestCookie { &b }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    std::vector<RefPtr<ScrollablePattern>> patterns { AceType::MakeRefPtr<ScrollPattern>(),
+        AceType::MakeRefPtr<ListPattern>(), AceType::MakeRefPtr<GridPattern>(),
+        AceType::MakeRefPtr<WaterFlowPattern>() };
+    for (auto pattern : patterns) {
+        auto node = FrameNode::CreateFrameNode("Scroll", ElementRegister::GetInstance()->MakeUniqueId(), pattern);
+        pattern->ContentChangeOnScrollStart(node);
+        pattern->FireObserverOnDidScroll(0.0f);
+        pattern->ContentChangeReport(node);
+        EXPECT_TRUE(a.types.empty());
+        EXPECT_TRUE(b.types.empty());
+        EXPECT_TRUE(manager->capiImpl_->capiScrollingNodes_.empty());
+        auto parentPattern = AceType::MakeRefPtr<ScrollPattern>();
+        auto parent = FrameNode::CreateFrameNode(
+            "Scroll", ElementRegister::GetInstance()->MakeUniqueId(), parentPattern);
+        for (bool childMoves : { false, true }) {
+            pattern->ContentChangeOnScrollStart(node);
+            parentPattern->ContentChangeOnScrollStart(parent);
+            pattern->FireObserverOnDidScroll(childMoves ? 100.0f : 0.0f);
+            parentPattern->FireObserverOnDidScroll(childMoves ? 0.0f : 100.0f);
+            pattern->ContentChangeReport(node);
+            parentPattern->ContentChangeReport(parent);
+            EXPECT_EQ(a.types, (std::vector<uint32_t> { SCROLL_START, SCROLL_END }));
+            EXPECT_EQ(b.types, (std::vector<uint32_t> { SCROLL_END }));
+            EXPECT_TRUE(manager->capiImpl_->capiScrollingNodes_.empty());
+            a.types.clear();
+            b.types.clear();
+        }
+        pattern->ContentChangeOnScrollStart(node);
+        pattern->FireObserverOnDidScroll(5.0f);
+        pattern->FireObserverOnDidScroll(-5.0f);
+        auto pipeline = MockPipelineContext::GetCurrent();
+        pattern->ContentChangeByDetaching(AceType::RawPtr(pipeline));
+        pattern->ContentChangeReport(node);
+        EXPECT_EQ(a.types, (std::vector<uint32_t> { SCROLL_START, SCROLL_END }));
+        EXPECT_EQ(b.types, (std::vector<uint32_t> { SCROLL_END }));
+        a.types.clear();
+        b.types.clear();
+    }
+    manager->UnregisterCapiContentChangeEvent(aid);
+    manager->UnregisterCapiContentChangeEvent(bid);
+}
+
+/**
+ * @tc.name: CapiVisibleScrollFadeStillReports
+ * @tc.desc: Actual edge opacity remains a visible change even when the content offset does not move.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiVisibleScrollFadeStillReports, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(true, SCROLL_CATEGORY, 0,
+        new CapiTestCookie { &state }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto pattern = AceType::MakeRefPtr<ScrollPattern>();
+    auto node = FrameNode::CreateFrameNode("Scroll", ElementRegister::GetInstance()->MakeUniqueId(), pattern);
+    pattern->SetEdgeEffect(EdgeEffect::FADE);
+    auto fade = AceType::DynamicCast<ScrollFadeEffect>(pattern->scrollEffect_);
+    ASSERT_NE(fade, nullptr);
+    pattern->ContentChangeOnScrollStart(node);
+    fade->SetOpacityAndScale(0.0f, 0.0f);
+    EXPECT_TRUE(state.types.empty());
+    fade->SetOpacityAndScale(0.5f, 0.5f);
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { SCROLL_START }));
+    pattern->ContentChangeReport(node);
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { SCROLL_START, SCROLL_END }));
+    manager->UnregisterCapiContentChangeEvent(id);
+}
+
+/**
+ * @tc.name: CapiSnapTakeoverPreservesBusinessEnd
+ * @tc.desc: Snap takeover keeps only the NDK cycle open; business and IPC end notifications still run.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CapiSnapTakeoverPreservesBusinessEnd, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState a { manager };
+    CapiTestState b { manager };
+    auto aid = manager->RegisterCapiContentChangeEvent(true, SCROLL_CATEGORY, 0,
+        new CapiTestCookie { &a }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto bid = manager->RegisterCapiContentChangeEvent(false, SCROLL_CATEGORY, 0,
+        new CapiTestCookie { &b }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    for (int mode = 0; mode < 3; ++mode) {
+        auto pattern = AceType::MakeRefPtr<ScrollPattern>();
+        auto node = FrameNode::CreateFrameNode("Scroll", ElementRegister::GetInstance()->MakeUniqueId(), pattern);
+        auto scrollable = AceType::MakeRefPtr<Scrollable>();
+        pattern->scrollableEvent_ = AceType::MakeRefPtr<ScrollableEvent>(Axis::VERTICAL);
+        pattern->scrollableEvent_->SetScrollable(scrollable);
+        pattern->InitTouchEvent(node->GetOrCreateGestureEventHub());
+        pattern->SetScrollEndCallback(scrollable);
+        auto touch = [&](TouchType type) {
+            TouchLocationInfo location(1);
+            location.SetTouchType(type);
+            TouchEventInfo info("touch");
+            info.AddChangedTouchLocationInfo(std::move(location));
+            pattern->touchEvent_->GetTouchEventCallback()(info);
+        };
+        manager->StartContentChangeReport(ContentChangeConfig());
+        pattern->ContentChangeOnScrollStart(node);
+        pattern->FireObserverOnDidScroll(20.0f);
+        scrollable->state_ = Scrollable::AnimationState::SNAP;
+        touch(TouchType::DOWN);
+        // Deliver the interrupted snap's finish exactly as the animation callback does.
+        int businessEnds = 0;
+        node->GetEventHub<ScrollEventHub>()->SetOnScrollEnd([&businessEnds]() { ++businessEnds; });
+        scrollable->ProcessScrollSnapStop();
+        EXPECT_EQ(businessEnds, 1);
+        int businessStops = 0;
+        pattern->OnScrollStop([&businessStops]() { ++businessStops; }, {});
+        EXPECT_EQ(businessStops, 1);
+        EXPECT_FALSE(manager->IsScrolling());
+        EXPECT_EQ(a.types, (std::vector<uint32_t> { SCROLL_START }));
+        EXPECT_TRUE(b.types.empty());
+        if (mode == 2) {
+            scrollable->isDragging_ = true;
+            pattern->FireOnScrollStart(false);
+            pattern->FireObserverOnDidScroll(10.0f);
+            touch(TouchType::UP);
+            scrollable->isDragging_ = false;
+            scrollable->isTouching_ = false;
+            scrollable->state_ = Scrollable::AnimationState::SNAP;
+            pattern->ContentChangeOnTouchEnd();
+            EXPECT_EQ(a.types, (std::vector<uint32_t> { SCROLL_START }));
+            scrollable->state_ = Scrollable::AnimationState::IDLE;
+            scrollable->ProcessScrollSnapStop();
+            pattern->OnScrollStop([&businessStops]() { ++businessStops; }, {});
+            EXPECT_EQ(businessEnds, 2);
+            EXPECT_EQ(businessStops, 2);
+        } else {
+            touch(mode == 0 ? TouchType::UP : TouchType::CANCEL);
+            EXPECT_EQ(businessEnds, 1);
+            EXPECT_EQ(businessStops, 1);
+        }
+        EXPECT_EQ(a.types, (std::vector<uint32_t> { SCROLL_START, SCROLL_END }));
+        EXPECT_EQ(b.types, (std::vector<uint32_t> { SCROLL_END }));
+        pattern->ContentChangeReport(node);
+        pattern->ContentChangeOnTouchEnd();
+        EXPECT_EQ(a.types.size(), 2U);
+        EXPECT_EQ(b.types.size(), 1U);
+        EXPECT_TRUE(manager->capiImpl_->capiScrollingNodes_.empty());
+        manager->StopContentChangeReport();
+        a.types.clear();
+        b.types.clear();
+    }
+    manager->UnregisterCapiContentChangeEvent(aid);
+    manager->UnregisterCapiContentChangeEvent(bid);
+}
+
+/**
+ * @tc.name: CachedPageEndConsumesOnlyOutstandingActivity
+ * @tc.desc: A weak target fallback closes END-only and START+END cycles once, and ignores canceled cycles.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, CachedPageEndConsumesOnlyOutstandingActivity, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    for (bool withStart : { false, true }) {
+        manager->InvalidateCapiContentChangeSubscriptions();
+        CapiTestState state { manager };
+        auto id = manager->RegisterCapiContentChangeEvent(withStart, PAGE_CATEGORY, 0,
+            new CapiTestCookie { &state }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto page = FrameNode::CreateFrameNode("Navigation", ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<Pattern>());
+        const auto nodeId = page->GetId();
+        manager->OnContentChangeStart(page, ChangeType::PAGE);
+        manager->ReportCapiPageEndEventFromCache(nodeId);
+        manager->ReportCapiPageEndEventFromCache(nodeId);
+        manager->OnContentChangeNodeDestroyed(nodeId);
+        EXPECT_EQ(state.types, withStart ? (std::vector<uint32_t> { PAGE_START, PAGE_END }) :
+            (std::vector<uint32_t> { PAGE_END }));
+        auto json = JsonUtil::ParseJsonString(state.json);
+        EXPECT_EQ(json->GetValue("targetNode")->GetString("id"), std::to_string(nodeId));
+        state.types.clear();
+        manager->OnContentChangeStart(page, ChangeType::PAGE);
+        manager->OnContentChangeInterrupted(page, ChangeType::PAGE, false);
+        manager->ReportCapiPageEndEventFromCache(nodeId);
+        EXPECT_EQ(state.types, withStart ? std::vector<uint32_t> { PAGE_START } : std::vector<uint32_t> {});
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+    }
+}
+
+/**
+ * @tc.name: OverlayHideSnapshotUsesCurrentSubscriptions
+ * @tc.desc: Snapshot holds no node and respects unsubscribed, late, and unrelated-category receivers.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, OverlayHideSnapshotUsesCurrentSubscriptions, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState removed { manager };
+    CapiTestState late { manager };
+    CapiTestState pageOnly { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(false, OVERLAY_CATEGORY, 0,
+        new CapiTestCookie { &removed }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto node = FrameNode::CreateFrameNode("Text", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>());
+    auto reportHide = manager->BuildCapiOverlayContentHideCallback(node);
+    auto nodeId = node->GetId();
+    WeakPtr<FrameNode> weakNode(node);
+    node.Reset();
+    EXPECT_EQ(weakNode.Upgrade(), nullptr);
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+    auto lateId = manager->RegisterCapiContentChangeEvent(false, OVERLAY_CATEGORY, 0,
+        new CapiTestCookie { &late }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto pageId = manager->RegisterCapiContentChangeEvent(true, PAGE_CATEGORY, 0,
+        new CapiTestCookie { &pageOnly }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    reportHide();
+    EXPECT_TRUE(removed.types.empty());
+    EXPECT_TRUE(pageOnly.types.empty());
+    EXPECT_EQ(late.types, (std::vector<uint32_t> { OVERLAY_HIDE }));
+    auto json = JsonUtil::ParseJsonString(late.json);
+    EXPECT_EQ(json->GetValue("targetNode")->GetString("id"), std::to_string(nodeId));
+    EXPECT_EQ(json->GetString("overlayType"), "overlay");
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(lateId));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(pageId));
+}
+
 } // namespace OHOS::Ace::NG

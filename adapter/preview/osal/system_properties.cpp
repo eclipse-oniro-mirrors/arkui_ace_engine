@@ -31,7 +31,6 @@ constexpr char PROPERTY_DEVICE_TYPE_TABLET[] = "tablet";
 constexpr char PROPERTY_DEVICE_TYPE_TWO_IN_ONE[] = "2in1";
 constexpr char PROPERTY_DEVICE_TYPE_WEARABLE[] = "wearable";
 constexpr char PROPERTY_DEVICE_TYPE_CAR[] = "car";
-constexpr int32_t DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD = 30;
 
 constexpr int32_t DEFAULT_VELOCITY_TRACKER_POINTNUMBER_VALUE = 20;
 constexpr int32_t DEFAULT_FORM_TASK_PRIORITY = 2;
@@ -143,7 +142,6 @@ bool SystemProperties::pageTransitionFrzEnabled_ = false;
 bool SystemProperties::forcibleLandscapeEnabled_ = false;
 bool SystemProperties::softPagetransition_ = false;
 bool SystemProperties::formSkeletonBlurEnabled_ = true;
-int32_t SystemProperties::formSharedImageCacheThreshold_ = DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD;
 WidthLayoutBreakPoint SystemProperties::widthLayoutBreakpoints_ = WidthLayoutBreakPoint();
 HeightLayoutBreakPoint SystemProperties::heightLayoutBreakpoints_ = HeightLayoutBreakPoint();
 bool SystemProperties::syncLoadEnabled_ = true;
@@ -515,11 +513,6 @@ bool SystemProperties::IsFormSkeletonBlurEnabled()
 bool SystemProperties::GetMultiInstanceEnabled()
 {
     return true;
-}
-
-int32_t SystemProperties::getFormSharedImageCacheThreshold()
-{
-    return formSharedImageCacheThreshold_;
 }
 
 bool SystemProperties::IsFormSkeletonRSTransactionEnabled()

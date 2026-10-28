@@ -314,10 +314,11 @@ type TabBarSymbol = object;
 type LayoutMode = object;
 type TabBarIconStyle = object;
 type barFloatingStyleOptions = object;
-type TabBarStyle = 'bottom' | 'sidebar' | 'sidebarAdaptable';
+type topBarFloatingStyleOptions = object;
+type TabBarStyle = 'bottom' | 'sidebar' | 'sidebarAdaptable' | 'top';
 type TabsSidebarDisplayStyle = 'embed' | 'displace';
 type TabsSidebarSearchableOptions = object;
-type TabBarDisplayMode = 'bottomTabbar' | 'sidebar';
+type TabBarDisplayMode = 'bottomTabbar' | 'sidebar' | 'topTabbar';
 type TabsBreakpointType<T> = object;
 type TabVisibility = 'visible' | 'hidden';
 
@@ -738,6 +739,13 @@ type TextDecorationOptions = object;
 type SliderConfiguration = object;
 type DateTimeOptions = object;
 type NestedScrollOptions = object;
+declare enum ScrollSnapAlign {
+    NONE = 0,
+    START = 1,
+    CENTER = 2,
+    END = 3,
+}
+type ScrollSnapOffsetProvider = object;
 
 declare class ArkLogConsole {
     public static log(...args: unknown[]): void;

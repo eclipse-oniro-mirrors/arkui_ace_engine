@@ -154,6 +154,7 @@ void RenderContext::ToJsonValue(std::unique_ptr<JsonValue>& json, const Inspecto
     ACE_PROPERTY_TO_JSON_VALUE(propBackground_, BackgroundProperty);
     ACE_PROPERTY_TO_JSON_VALUE(propForeground_, ForegroundProperty);
     ACE_PROPERTY_TO_JSON_VALUE(propGraphics_, GraphicsProperty);
+    ACE_PROPERTY_TO_JSON_VALUE(propVisual_, VisualProperty);
     ACE_PROPERTY_TO_JSON_VALUE(propGradient_, GradientProperty);
     ACE_PROPERTY_TO_JSON_VALUE(propTransform_, TransformProperty);
     ACE_PROPERTY_TO_JSON_VALUE(propClip_, ClipProperty);

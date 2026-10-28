@@ -162,7 +162,7 @@ HWTEST_F(RenderPropertyTestNg, GraphicsPropertyTest001, TestSize.Level0)
     auto json = JsonUtil::Create(true);
 
     /**
-     * @tc.steps: step2. call ToJsonValue.The propBackShadow is null, propFrontColorBlend = WHITE;
+     * @tc.steps: step2. call ToJsonValue. propFrontColorBlend = WHITE;
      */
     MakeGraphicsProperty(graphicsProperty);
     graphicsProperty.ToJsonValue(json, filter);
@@ -171,11 +171,6 @@ HWTEST_F(RenderPropertyTestNg, GraphicsPropertyTest001, TestSize.Level0)
      * @tc.expected: Return expected results.
      */
     EXPECT_EQ(json->GetString("colorBlend"), "#FFFFFFFF");
-    EXPECT_EQ(json->GetValue(SHADOW_TEST)->GetString("radius"),
-        Container::GreatOrEqualAPIVersion(PlatformVersion::VERSION_TWENTY_SIX) ? "-1.000000" : "0.000000");
-    EXPECT_EQ(json->GetValue(SHADOW_TEST)->GetString("color"), "#FF000000");
-    EXPECT_EQ(json->GetValue(SHADOW_TEST)->GetString("offsetX"), "0.000000");
-    EXPECT_EQ(json->GetValue(SHADOW_TEST)->GetString("offsetY"), "0.000000");
     EXPECT_EQ(json->GetDouble("dynamicDimming"), 0.5);
 }
 
@@ -189,7 +184,7 @@ HWTEST_F(RenderPropertyTestNg, GraphicsPropertyTest002, TestSize.Level0)
     /**
      * @tc.steps: step1. Build a object graphicsProperty.
      */
-    NG::GraphicsProperty graphicsProperty;
+    NG::VisualProperty graphicsProperty;
     auto json = JsonUtil::Create(true);
     Shadow shadow(VALUE_TEST, OFFSETS, WHITE, ShadowStyle::None);
 
@@ -263,7 +258,7 @@ HWTEST_F(RenderPropertyTestNg, GraphicsPropertyTest003, TestSize.Level0)
     /**
      * @tc.steps: step1. Build a object graphicsProperty.
      */
-    NG::GraphicsProperty graphicsProperty;
+    NG::VisualProperty graphicsProperty;
     auto json = JsonUtil::Create(true);
     Shadow shadow(VALUE_TEST, OFFSETS, WHITE, ShadowStyle::None);
 
@@ -586,33 +581,19 @@ HWTEST_F(RenderPropertyTestNg, RenderPropertyTest002, TestSize.Level1)
     /**
      * @tc.steps: step1. Build a object graphicsProperty.
      */
-    NG::GraphicsProperty graphicsProperty;
+    NG::VisualProperty graphicsProperty;
     NG::InspectorFilter testFilter;
     auto jsonValue = JsonUtil::Create(true);
     Shadow shadow(VALUE_TEST, OFFSETS, WHITE, ShadowStyle::None);
     shadow.colorStrategy_ = ShadowColorStrategy::AVERAGE;
     graphicsProperty.propBackShadow = shadow;
-    InvertOption option;
-    option.low_ = 1.0f;
-    option.high_ = 1.0f;
-    InvertVariant testInvert = option;
-    graphicsProperty.propFrontInvert = testInvert;
-    std::vector<std::pair<float, float>> fractionStops;
-    fractionStops.push_back(std::pair<float, float>(0.0f, 1.0f));
-    CalcDimension dimensionRadius(0.0);
-    NG::LinearGradientBlurPara blurPara(dimensionRadius, fractionStops, NG::GradientDirection::LEFT);
-    graphicsProperty.propLinearGradientBlur = blurPara;
 
     /**
-     * @tc.steps: step2. call ToJsonValue.
+     * @tc.steps: step2. call ToJsonValue
      */
     graphicsProperty.ToJsonValue(jsonValue, testFilter);
     EXPECT_EQ(jsonValue->GetValue(SHADOW_TEST)->GetString("color"),
         "ColoringStrategy.AVERAGE");
-    blurPara.direction_ = static_cast<NG::GradientDirection>(11); // 11 is not a valid GradientDirection.
-    graphicsProperty.propLinearGradientBlur = blurPara;
-    graphicsProperty.ToJsonValue(jsonValue, testFilter);
-    EXPECT_EQ(jsonValue->GetValue(SHADOW_TEST)->GetString("color"), "ColoringStrategy.AVERAGE");
     testFilter.AddFilterAttr("focusable");
     graphicsProperty.ToJsonValue(jsonValue, testFilter);
     EXPECT_EQ(jsonValue->GetValue(SHADOW_TEST)->GetString("color"), "ColoringStrategy.AVERAGE");
@@ -878,5 +859,129 @@ HWTEST_F(RenderPropertyTestNg, RenderPropertyTest011, TestSize.Level1)
     auto obj = jsonValue->GetValue("backgroundSysOptions");
     ASSERT_NE(obj, nullptr);
     EXPECT_EQ(obj->GetBool("disableSystemAdaptation"), true);
+}
+
+/**
+ * @tc.name: VisualPropertyTest001
+ * @tc.desc: Test VisualProperty::ToJsonValue shadowShape not output branches
+ * @tc.type: FUNC
+ */
+HWTEST_F(RenderPropertyTestNg, VisualPropertyTest001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. propShadowShape is nullopt.
+     * @tc.expected: shadowShape is not output.
+     */
+    NG::VisualProperty visualProperty;
+    auto json = JsonUtil::Create(true);
+    visualProperty.ToJsonValue(json, filter);
+    EXPECT_FALSE(json->Contains("shadowShape"));
+
+    /**
+     * @tc.steps: step2. propShadowShape has value but null pointer.
+     * @tc.expected: shadowShape is not output.
+     */
+    json = JsonUtil::Create(true);
+    visualProperty.propShadowShape = RefPtr<BasicShape>(nullptr);
+    visualProperty.ToJsonValue(json, filter);
+    EXPECT_FALSE(json->Contains("shadowShape"));
+}
+
+/**
+ * @tc.name: VisualPropertyTest002
+ * @tc.desc: Test VisualProperty::ToJsonValue shadowShape output branches
+ * @tc.type: FUNC
+ */
+HWTEST_F(RenderPropertyTestNg, VisualPropertyTest002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. propShadowShape has value and Circle shape.
+     * @tc.expected: shadowShape.shape is "Circle".
+     */
+    NG::VisualProperty visualProperty;
+    auto json = JsonUtil::Create(true);
+    visualProperty.propShadowShape = AceType::MakeRefPtr<Circle>();
+    visualProperty.ToJsonValue(json, filter);
+    EXPECT_EQ(json->GetValue("shadowShape")->GetString("shape"), "Circle");
+
+    /**
+     * @tc.steps: step2. propShadowShape has value and Ellipse shape.
+     * @tc.expected: shadowShape.shape is "Ellipse".
+     */
+    json = JsonUtil::Create(true);
+    visualProperty.propShadowShape = AceType::MakeRefPtr<Ellipse>();
+    visualProperty.ToJsonValue(json, filter);
+    EXPECT_EQ(json->GetValue("shadowShape")->GetString("shape"), "Ellipse");
+
+    /**
+     * @tc.steps: step3. propShadowShape has value and Path shape.
+     * @tc.expected: shadowShape.shape is "Path".
+     */
+    json = JsonUtil::Create(true);
+    visualProperty.propShadowShape = AceType::MakeRefPtr<Path>();
+    visualProperty.ToJsonValue(json, filter);
+    EXPECT_EQ(json->GetValue("shadowShape")->GetString("shape"), "Path");
+
+    /**
+     * @tc.steps: step4. propShadowShape has value and ShapeRect shape.
+     * @tc.expected: shadowShape.shape is "Rect".
+     */
+    json = JsonUtil::Create(true);
+    visualProperty.propShadowShape = AceType::MakeRefPtr<ShapeRect>();
+    visualProperty.ToJsonValue(json, filter);
+    EXPECT_EQ(json->GetValue("shadowShape")->GetString("shape"), "Rect");
+
+    /**
+     * @tc.steps: step5. propShadowShape has value and NONE basic shape.
+     * @tc.expected: shadowShape is output but shape field is empty.
+     */
+    json = JsonUtil::Create(true);
+    visualProperty.propShadowShape = AceType::MakeRefPtr<BasicShape>();
+    visualProperty.ToJsonValue(json, filter);
+    EXPECT_TRUE(json->Contains("shadowShape"));
+}
+
+/**
+ * @tc.name: VisualPropertyTest003
+ * @tc.desc: Test VisualProperty::ToJsonValue shadowClipMode branches
+ * @tc.type: FUNC
+ */
+HWTEST_F(RenderPropertyTestNg, VisualPropertyTest003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. propShadowClipMode is nullopt.
+     * @tc.expected: shadowClipMode is not output.
+     */
+    NG::VisualProperty visualProperty;
+    auto json = JsonUtil::Create(true);
+    visualProperty.ToJsonValue(json, filter);
+    EXPECT_FALSE(json->Contains("shadowClipMode"));
+
+    /**
+     * @tc.steps: step2. propShadowClipMode = DEFAULT_SHAPE.
+     * @tc.expected: shadowClipMode is "ShadowClipMode.DEFAULT_SHAPE".
+     */
+    json = JsonUtil::Create(true);
+    visualProperty.propShadowClipMode = ShadowClipMode::DEFAULT_SHAPE;
+    visualProperty.ToJsonValue(json, filter);
+    EXPECT_EQ(json->GetString("shadowClipMode"), "ShadowClipMode.DEFAULT_SHAPE");
+
+    /**
+     * @tc.steps: step3. propShadowClipMode = BOUNDS_SHAPE.
+     * @tc.expected: shadowClipMode is "ShadowClipMode.BOUNDS_SHAPE".
+     */
+    json = JsonUtil::Create(true);
+    visualProperty.propShadowClipMode = ShadowClipMode::BOUNDS_SHAPE;
+    visualProperty.ToJsonValue(json, filter);
+    EXPECT_EQ(json->GetString("shadowClipMode"), "ShadowClipMode.BOUNDS_SHAPE");
+
+    /**
+     * @tc.steps: step4. propShadowClipMode is an invalid value (-1).
+     * @tc.expected: shadowClipMode falls back to "ShadowClipMode.DEFAULT_SHAPE".
+     */
+    json = JsonUtil::Create(true);
+    visualProperty.propShadowClipMode = static_cast<ShadowClipMode>(-1);
+    visualProperty.ToJsonValue(json, filter);
+    EXPECT_EQ(json->GetString("shadowClipMode"), "ShadowClipMode.DEFAULT_SHAPE");
 }
 } // namespace OHOS::Ace

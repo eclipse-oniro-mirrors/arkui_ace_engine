@@ -303,7 +303,7 @@ void* Create()
 {
     auto controller = IndicatorModelNG().Create();
     CHECK_NULL_RETURN(controller, nullptr);
-    return AceType::RawPtr(controller);
+    return static_cast<AceType*>(AceType::RawPtr(controller));
 }
 
 void SetCount(ArkUINodeHandle node, ArkUI_Int32 count)

@@ -19,8 +19,10 @@
 #include "core/components_ng/pattern/custom_frame_node/custom_accessibility_session_adapter.h"
 #include "core/components_ng/property/accessibility_property.h"
 #include "core/accessibility/accessibility_manager.h"
+#include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/accessibility/accessibility_session_adapter.h"
 #include "core/accessibility/native_interface_accessibility_provider.h"
+#include "core/accessibility/third_provider_tree_exporter.h"
 #include "core/common/ace_application_info.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
@@ -71,7 +73,9 @@ void CustomPattern::InitializeAccessibility(PipelineContext* context)
     CHECK_NULL_VOID(host);
     int64_t accessibilityId = host->GetAccessibilityId();
     CHECK_NULL_VOID(context);
-    auto accessibilityManager = context->GetAccessibilityManager();
+    auto mainAccessibilityManager = context->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
 
     accessibilityChildTreeCallback_ =
@@ -88,7 +92,12 @@ void CustomPattern::InitializeAccessibility(PipelineContext* context)
 void CustomPattern::UninitializeAccessibility(FrameNode* frameNode, PipelineContext* context)
 {
     CHECK_NULL_VOID(frameNode);
-    auto accessibilityManager = context->GetAccessibilityManager();
+    // Route via GetHost() (XComponent idiom): the callback was registered under the host's AM.
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto mainAccessibilityManager = context->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
     int64_t accessibilityId = frameNode->GetAccessibilityId();
 
@@ -105,7 +114,9 @@ bool CustomPattern::OnAccessibilityChildTreeRegister(uint32_t windowId, int32_t 
     CHECK_NULL_RETURN(host, false);
     auto pipeline = host->GetContext();
     CHECK_NULL_RETURN(pipeline, false);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_RETURN(mainAccessibilityManager, false);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_RETURN(accessibilityManager, false);
     if (pipeline->IsSubPipeline()) {
         windowId = pipeline->GetRealHostWindowId();
@@ -148,7 +159,17 @@ bool CustomPattern::OnAccessibilityChildTreeDeregister(FrameNode* frameNode)
         pipeline = host->GetContext();
     }
     CHECK_NULL_RETURN(pipeline, false);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    // XComponent idiom: RefPtr nodeForAM (raw FrameNode* converts via RefPtr::operator=).
+    RefPtr<FrameNode> nodeForAM;
+    if (frameNode) {
+        nodeForAM = frameNode;
+    } else {
+        nodeForAM = GetHost();
+        CHECK_NULL_RETURN(nodeForAM, false);
+    }
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_RETURN(mainAccessibilityManager, false);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(nodeForAM);
     CHECK_NULL_RETURN(accessibilityManager, false);
 
     auto nativeProvider = GetNativeAccessibilityProvider();
@@ -224,6 +245,30 @@ void CustomPattern::DumpInfo()
 {
     if (vOverflowHandler_) {
         DumpLog::GetInstance().AddDesc(std::string("OverflowInfo: ").append(vOverflowHandler_->ToString().c_str()));
+    }
+}
+
+void CustomPattern::AddInspectorTreeInfo(std::shared_ptr<JsonValue>& node, InspectorTreeRequestContext& context)
+{
+    if (context.config.withCustomContent && !context.ShouldStop()) {
+        context.CollectCustomContent(GetNativeAccessibilityProvider(), GetHost(), node);
+    }
+}
+
+void CustomPattern::AddExtraInfoWithParamConfig(
+    std::shared_ptr<JsonValue>& json, ParamConfig config)
+{
+    if (!config.withCustomContent || config.inspectorContext) {
+        return;
+    }
+    CHECK_NULL_VOID(json);
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* provider = GetNativeAccessibilityProvider();
+    CHECK_NULL_VOID(provider);
+    auto providerTree = ThirdProviderTreeExporter::ExportToInspectorJson(provider, host);
+    if (providerTree) {
+        json->Put(THIRD_PROVIDER_JSON_CHILDREN, providerTree);
     }
 }
 } // namespace OHOS::Ace::NG

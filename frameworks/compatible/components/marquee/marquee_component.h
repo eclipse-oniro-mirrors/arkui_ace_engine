@@ -31,7 +31,7 @@ inline constexpr int32_t DEFAULT_MARQUEE_LOOP = -1;
 using MarqueeStartFunc = std::function<void()>;
 using MarqueeStopFunc = std::function<void()>;
 
-class ACE_EXPORT MarqueeController : public virtual AceType {
+class ACE_EXPORT MarqueeController : public AceType {
     DECLARE_ACE_TYPE(MarqueeController, AceType);
 
 public:

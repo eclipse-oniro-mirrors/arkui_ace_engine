@@ -25,7 +25,7 @@
 #include "frameworks/base/memory/ace_type.h"
 
 namespace OHOS::Ace {
-class VideoController : public virtual AceType {
+class VideoController : public AceType {
     DECLARE_ACE_TYPE(VideoController, AceType);
 
 public:
@@ -131,7 +131,7 @@ private:
     ResetImpl resetImpl_;
 };
 
-class VideoControllerV2 : public virtual AceType {
+class VideoControllerV2 : public AceType {
     DECLARE_ACE_TYPE(VideoControllerV2, AceType);
 
 public:

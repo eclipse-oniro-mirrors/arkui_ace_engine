@@ -17,7 +17,6 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_TEXT_PICKER_TEXT_PICKER_MODEL_STATIC_H
 
 #include "base/geometry/dimension.h"
-#include <shared_mutex>
 
 #include "core/components/common/layout/constants.h"
 #include "core/components_ng/pattern/text_picker/textpicker_model.h"
@@ -30,17 +29,8 @@ class TextTheme;
 namespace OHOS::Ace::NG {
 class ACE_FORCE_EXPORT TextPickerModelStatic {
 public:
-    static void SetTextPickerSingeRange(bool isSingleRange)
-    {
-        std::lock_guard<std::shared_mutex> lock(isSingleMutex_);
-        isSingleRange_ = isSingleRange;
-    }
-
-    static bool GetTextPickerSingeRange()
-    {
-        std::lock_guard<std::shared_mutex> lock(isSingleMutex_);
-        return isSingleRange_;
-    }
+    static void SetTextPickerSingeRange(FrameNode* frameNode, bool isSingleRange);
+    static bool GetTextPickerSingeRange(FrameNode* frameNode);
 
     static void InitialSetupSinglePicker(FrameNode* frameNode, uint32_t columnKind);
     static void SetCanLoop(FrameNode* frameNode, const bool value);
@@ -111,12 +101,6 @@ private:
     static void ValidateData(
         NG::TextCascadePickerOptions& options, const std::vector<std::string>& values, uint32_t index,
         std::vector<std::string>& selectedValues, std::vector<uint32_t>& valuesIndex);
-
-    static inline bool isSingleRange_ = true;
-    static inline uint32_t showCount_ = 0;
-    static inline std::shared_mutex showCountMutex_;
-    static inline std::shared_mutex isSingleMutex_;
-    static inline uint32_t columnKind_ = TEXT;
 };
 } // namespace OHOS::Ace::NG
 

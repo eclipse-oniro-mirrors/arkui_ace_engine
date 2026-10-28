@@ -223,21 +223,21 @@ public:
     /**
      * @description: report component tree query result
      */
-    void ReportComponentTreeQueryResult(const std::string& data) override;
+    void ReportNavigationQueryResult(const std::string& data) override;
+    void ReportLazyForEachQueryResult(const std::string& data) override;
+    void ReportNodesInRectQueryResult(const std::string& data) override;
 
-    /**
-     * @description: register a callback for component tree query results.
-     * Returns false if a previous callback is still pending (concurrent query rejection).
-     */
-    bool RegisterComponentTreeQueryCallback(
-        const std::function<void(const std::string&)>& eventCallback);
+    bool RegisterNavigationQueryCallback(const std::function<void(const std::string&)>& eventCallback);
+    void UnregisterNavigationQueryCallback();
+    bool PostNavigationQueryCallbackRemoveTask(int32_t timeout);
 
-    /**
-     * @description: unregister component tree query callback (cleanup on IPC failure).
-     */
-    void UnregisterComponentTreeQueryCallback();
+    bool RegisterLazyForEachQueryCallback(const std::function<void(const std::string&)>& eventCallback);
+    void UnregisterLazyForEachQueryCallback();
+    bool PostLazyForEachQueryCallbackRemoveTask(int32_t timeout);
 
-    bool PostComponentTreeQueryCallbackRemoveTask(int32_t timeout);
+    bool RegisterNodesInRectQueryCallback(const std::function<void(const std::string&)>& eventCallback);
+    void UnregisterNodesInRectQueryCallback();
+    bool PostNodesInRectQueryCallbackRemoveTask(int32_t timeout);
 
     /**
      * @description: report web unfocus value for SA
@@ -299,6 +299,13 @@ public:
     bool RegisterGetPageSceneCallback(const PageSceneEventCallback& eventCallback);
     void UnregisterGetPageSceneCallback();
     void ReportPageSceneEvent(const std::string& sceneJson, bool isGetResult = false) override;
+    void ReportCommandResult(uint64_t requestId, const std::string& resultJson) override;
+
+    bool RegisterSendCommandFinishCallback(
+        const SendCommandFinishCallback& finishCallback, uint64_t& requestId);
+    bool PostSendCommandCallbackRemoveTask(
+        uint64_t requestId, int32_t timeout = DEFAULT_SEND_COMMAND_CALLBACK_TIMEOUT_MS);
+    void UnregisterSendCommandFinishCallback(uint64_t requestId);
 
     void SetEventHandler(std::shared_ptr<AppExecFwk::EventHandler> eventHandler);
 
@@ -311,14 +318,21 @@ public:
 private:
     void HandleInspectorTreeCallbackTimeout();
     void CancelGetInspectorTreeCallbackTimeoutTaskLocked();
-    void HandleComponentTreeQueryCallbackTimeout();
-    void CancelComponentTreeQueryCallbackTimeoutTaskLocked();
+    void HandleNavigationQueryCallbackTimeout();
+    void CancelNavigationQueryCallbackTimeoutTaskLocked();
+    void HandleLazyForEachQueryCallbackTimeout();
+    void CancelLazyForEachQueryCallbackTimeoutTaskLocked();
+    void HandleNodesInRectQueryCallbackTimeout();
+    void CancelNodesInRectQueryCallbackTimeoutTaskLocked();
     void OnGetWebInfoByRequestInner(MessageParcel& data);
     void OnSendPageTextInner(MessageParcel& data);
     void HandlePageTranslateCallbackTimeout(int64_t requestId);
     void HandlePageTranslateResultWatchdogTimeout(int32_t nodeId, int64_t version);
     void ClearPageTranslateCallbackLocked();
     void CancelPageTranslateCallbackTimeoutTaskLocked();
+    void HandleSendCommandCallbackTimeout(uint64_t requestId);
+    void CancelSendCommandCallbackTimeoutTaskLocked(uint64_t requestId);
+    void ClearSendCommandFinishCallbackLocked();
 
     EventCallback clickEventCallback_;
     EventCallback searchEventCallback_;
@@ -341,8 +355,12 @@ private:
     std::mutex inspectorTreeCallbackMutex_;
     std::function<void(std::string, int32_t, bool)> inspectorTreeCallback_;
     std::function<void(std::string, int32_t, bool)> getHitTestNodeInfoCallback_;
-    std::mutex componentTreeQueryCallbackMutex_;
-    std::function<void(const std::string&)> componentTreeQueryCallback_;
+    std::mutex navigationQueryCallbackMutex_;
+    std::function<void(const std::string&)> navigationQueryCallback_;
+    std::mutex lazyForEachQueryCallbackMutex_;
+    std::function<void(const std::string&)> lazyForEachQueryCallback_;
+    std::mutex nodesInRectQueryCallbackMutex_;
+    std::function<void(const std::string&)> nodesInRectQueryCallback_;
     std::function<void(int64_t accessibilityId, const std::string& data)> unfocusEvent_;
     std::function<void(std::vector<std::pair<int32_t, std::shared_ptr<Media::PixelMap>>>)> getShowingImageCallback_;
     std::function<void(int32_t, const std::unordered_map<int32_t, std::shared_ptr<Media::PixelMap>>&,
@@ -359,6 +377,9 @@ private:
     GetWebInfoByRequestCallback getWebInfoByRequestCallback_;
 
     std::weak_ptr<AppExecFwk::EventHandler> eventHandler_;
+    std::mutex sendCommandCallbackMutex_;
+    SendCommandFinishCallback sendCommandFinishCallback_;
+    uint64_t sendCommandRequestId_ = 0;
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_INTERFACE_UI_REPORT_STUB_H

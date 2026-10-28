@@ -14,6 +14,7 @@
  */
 
 #include "core/components_ng/pattern/list/list_layout_property.h"
+#include "interfaces/inner_api/ui_session/param_config.h"
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -66,24 +67,45 @@ void ListLayoutProperty::DumpInfo()
 
 void ListLayoutProperty::DumpInfo(std::unique_ptr<JsonValue>& json)
 {
-    auto listItemAlign = propListItemAlign_.value_or(V2::ListItemAlign::START);
-    json->Put("alignListItem", std::to_string(static_cast<int32_t>(listItemAlign)).c_str());
-    if (propDivider_.has_value()) {
-        auto& div = propDivider_.value();
-        std::unique_ptr<JsonValue> dividerJson = JsonUtil::Create(true);
-        dividerJson->Put("strokeWidth", div.strokeWidth.ToString().c_str());
-        dividerJson->Put("startMargin", div.startMargin.ToString().c_str());
-        dividerJson->Put("endMargin", div.endMargin.ToString().c_str());
-        dividerJson->Put("color", div.color.ColorToString().c_str());
-        json->Put("divider", dividerJson);
-    } else {
-        json->Put("divider", "None");
+    DumpInfo(json, ParamConfig());
+}
+
+void ListLayoutProperty::DumpInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree() || config.visualProperties) {
+        auto listItemAlign = propListItemAlign_.value_or(V2::ListItemAlign::START);
+        if (config.IsPublicTree()) {
+            json->Put("alignListItem", static_cast<int32_t>(listItemAlign));
+        } else {
+            json->Put("alignListItem", std::to_string(static_cast<int32_t>(listItemAlign)).c_str());
+        }
+        if (propDivider_.has_value()) {
+            auto& div = propDivider_.value();
+            std::unique_ptr<JsonValue> dividerJson = JsonUtil::Create(true);
+            dividerJson->Put("strokeWidth", div.strokeWidth.ToString().c_str());
+            dividerJson->Put("startMargin", div.startMargin.ToString().c_str());
+            dividerJson->Put("endMargin", div.endMargin.ToString().c_str());
+            dividerJson->Put("color", div.color.ColorToString().c_str());
+            json->Put("divider", dividerJson);
+        } else if (!config.IsPublicTree()) {
+            json->Put("divider", "None");
+        }
     }
-    auto stickyStyle = propStickyStyle_.value_or(V2::StickyStyle::NONE);
-    json->Put("sticky", std::to_string(static_cast<uint32_t>(stickyStyle)).c_str());
-    auto scrollSnapAlign = propScrollSnapAlign_.value_or(ScrollSnapAlign::NONE);
-    json->Put("scrollSnapAlign", std::to_string(static_cast<int32_t>(scrollSnapAlign)).c_str());
-    json->Put("syncLoad", propSyncLoad_.value_or(false));
+    if (!config.IsPublicTree() || config.functionalProperties) {
+        auto stickyStyle = propStickyStyle_.value_or(V2::StickyStyle::NONE);
+        if (config.IsPublicTree()) {
+            json->Put("sticky", static_cast<int64_t>(static_cast<uint32_t>(stickyStyle)));
+        } else {
+            json->Put("sticky", std::to_string(static_cast<uint32_t>(stickyStyle)).c_str());
+        }
+        auto scrollSnapAlign = propScrollSnapAlign_.value_or(ScrollSnapAlign::NONE);
+        if (config.IsPublicTree()) {
+            json->Put("scrollSnapAlign", static_cast<int32_t>(scrollSnapAlign));
+        } else {
+            json->Put("scrollSnapAlign", std::to_string(static_cast<int32_t>(scrollSnapAlign)).c_str());
+        }
+        json->Put("syncLoad", propSyncLoad_.value_or(false));
+    }
 }
 
 void ListLayoutProperty::ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const

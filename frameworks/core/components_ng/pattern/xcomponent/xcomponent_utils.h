@@ -30,7 +30,7 @@ struct KeyEvent;
 
 namespace OHOS::Ace::NG {
 
-class ACE_FORCE_EXPORT XComponentUtils : public virtual AceType {
+class ACE_FORCE_EXPORT XComponentUtils : public AceType {
     DECLARE_ACE_TYPE(XComponentUtils, AceType);
 public:
     static RectF AdjustPaintRect(float positionX, float positionY, float width, float height, bool isRound);

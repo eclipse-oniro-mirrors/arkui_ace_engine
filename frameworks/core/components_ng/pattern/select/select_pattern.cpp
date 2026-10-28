@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/components_ng/pattern/select/select_pattern.h"
 #include "core/accessibility/accessibility_manager.h"
 
@@ -801,15 +802,12 @@ void SelectPattern::SetFocusStyle()
     CHECK_NULL_VOID(pipeline);
     auto selectTheme = pipeline->GetTheme<SelectTheme>(host->GetThemeScopeId());
     CHECK_NULL_VOID(selectTheme);
-    auto&& graphics = selectRenderContext->GetOrCreateGraphics();
-    CHECK_NULL_VOID(graphics);
     auto&& transform = selectRenderContext->GetOrCreateTransform();
     CHECK_NULL_VOID(transform);
-
     ShadowStyle shadowStyle = selectTheme->GetSelectNormalShadow();
     Shadow shadow;
     GetShadowFromTheme(shadowStyle, shadow);
-    if (!graphics->HasBackShadow() || graphics->GetBackShadowValue() == shadow) {
+    if (!selectRenderContext->HasBackShadow() || selectRenderContext->GetBackShadowValue(Shadow()) == shadow) {
         shadowModify_ = true;
         shadowStyle = selectTheme->GetSelectFocusedShadow();
         GetShadowFromTheme(shadowStyle, shadow);
@@ -2165,8 +2163,31 @@ void SelectPattern::RegisterScrollToSelectedTask()
         auto pattern = weak.Upgrade();
         CHECK_NULL_VOID(pattern);
         pattern->ScrollToSelectedOption();
+        pattern->RegisterScrollAreaChangeCallback();
     };
     pipeline->AddBuildFinishCallBack(std::move(callback));
+}
+
+void SelectPattern::RegisterScrollAreaChangeCallback()
+{
+    auto menu = GetMenuNode();
+    CHECK_NULL_VOID(menu);
+    auto scroll = DynamicCast<FrameNode>(menu->GetFirstChild());
+    CHECK_NULL_VOID(scroll);
+    if (!scroll->IsOnMainTree()) {
+        return;
+    }
+    auto eventHub = scroll->GetEventHub<EventHub>();
+    CHECK_NULL_VOID(eventHub);
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    OnAreaChangedFunc onAreaChanged = [weak = WeakClaim(this)](const RectF& /* oldRect */,
+        const OffsetF& /* oldOrigin */, const RectF& /* rect */, const OffsetF& /* origin */) {
+        auto pattern = weak.Upgrade();
+        CHECK_NULL_VOID(pattern);
+        pattern->ScrollToSelectedOption();
+    };
+    eventHub->AddInnerOnAreaChangedCallback(host->GetId(), std::move(onAreaChanged));
 }
 
 void SelectPattern::ScrollToSelectedOption()
@@ -2177,6 +2198,9 @@ void SelectPattern::ScrollToSelectedOption()
     CHECK_NULL_VOID(scroll);
     auto scrollPattern = scroll->GetPattern<ScrollPattern>();
     CHECK_NULL_VOID(scrollPattern);
+    if (!NearEqual(static_cast<float>(scrollPattern->GetTotalOffset()), lastAutoScrollOffset_)) {
+        return;
+    }
     auto column = DynamicCast<FrameNode>(scroll->GetFirstChild());
     CHECK_NULL_VOID(column);
     if (selected_ >= static_cast<int32_t>(column->GetChildren().size())) {
@@ -2186,34 +2210,20 @@ void SelectPattern::ScrollToSelectedOption()
     CHECK_NULL_VOID(option);
     auto optionGeometry = option->GetGeometryNode();
     CHECK_NULL_VOID(optionGeometry);
-    auto optionTop = optionGeometry->GetFrameOffset().GetY();
-    bool reachedScroll = false;
-    for (auto parent = option->GetParent(); parent != nullptr; parent = parent->GetParent()) {
-        auto parentFrame = DynamicCast<FrameNode>(parent);
-        if (!parentFrame) {
-            continue;
-        }
-        if (parentFrame == scroll) {
-            reachedScroll = true;
-            break;
-        }
-        auto parentGeometry = parentFrame->GetGeometryNode();
-        CHECK_NULL_VOID(parentGeometry);
-        optionTop += parentGeometry->GetFrameOffset().GetY();
-    }
-    if (!reachedScroll) {
-        return;
-    }
+    auto columnGeometry = column->GetGeometryNode();
+    CHECK_NULL_VOID(columnGeometry);
     auto scrollGeometry = scroll->GetGeometryNode();
     CHECK_NULL_VOID(scrollGeometry);
-    auto scrollLayoutProps = scroll->GetLayoutProperty<ScrollLayoutProperty>();
-    CHECK_NULL_VOID(scrollLayoutProps);
+    auto optionTop = optionGeometry->GetFrameOffset().GetY() + columnGeometry->GetFrameOffset().GetY();
     auto optionHeight = optionGeometry->GetFrameSize().Height();
     auto scrollHeight = scrollGeometry->GetFrameSize().Height();
     auto viewport = scrollPattern->GetMainContentSize();
-    if (optionTop >= 0 && optionTop + optionHeight <= scrollHeight) {
+    if (GreatOrEqual(optionTop, 0.0f) && LessOrEqual(optionTop + optionHeight, scrollHeight)) {
+        lastAutoScrollOffset_ = static_cast<float>(scrollPattern->GetTotalOffset());
         return;
     }
+    auto scrollLayoutProps = scroll->GetLayoutProperty<ScrollLayoutProperty>();
+    CHECK_NULL_VOID(scrollLayoutProps);
     auto contentOffsetY = scrollLayoutProps->CreatePaddingAndBorder().Offset().GetY();
     auto targetOffset = static_cast<float>(scrollPattern->GetTotalOffset()) + optionTop - contentOffsetY
         - (viewport - optionHeight) / 2.0f;
@@ -2224,6 +2234,7 @@ void SelectPattern::ScrollToSelectedOption()
         targetOffset = maxScrollOffset;
     }
     scrollPattern->ScrollTo(targetOffset);
+    lastAutoScrollOffset_ = targetOffset;
 }
 
 void SelectPattern::SetSpace(const Dimension& value)
@@ -2393,9 +2404,6 @@ void SelectPattern::SetOptionBgColorByUser(const Color& color, const RefPtr<Sele
 
 void SelectPattern::SetColorByUser(const RefPtr<FrameNode>& host, const RefPtr<SelectTheme>& theme)
 {
-    if (!SystemProperties::ConfigChangePerform()) {
-        return;
-    }
     CHECK_NULL_VOID(host);
     CHECK_NULL_VOID(theme);
     auto props = host->GetPaintProperty<SelectPaintProperty>();
@@ -2466,7 +2474,9 @@ bool SelectPattern::OnThemeScopeUpdate(int32_t themeScopeId)
 
     if (!fontColor_.has_value()) {
         ResetFontColor();
-        text_->MarkDirtyNode();
+        if (text_) {
+            text_->MarkDirtyNode();
+        }
         result = true;
     }
 
@@ -2939,9 +2949,7 @@ bool SelectPattern::GetShadowFromTheme(ShadowStyle shadowStyle, Shadow& shadow)
 
 void SelectPattern::SetDivider(const SelectDivider& divider)
 {
-    if (SystemProperties::ConfigChangePerform()) {
-        divider_ = divider;
-    }
+    divider_ = divider;
     const auto* menuItemModifier = NG::NodeModifier::GetMenuItemInnerModifier();
     CHECK_NULL_VOID(menuItemModifier);
     for (auto&& option : options_) {
@@ -3338,4 +3346,29 @@ std::optional<DividerMode> SelectPattern::GetDividerMode() const
 {
     return dividerMode_;
 }
+void SelectPattern::DumpInspectorTreeInfo(
+    std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context)
+{
+    Pattern::DumpInspectorTreeInfo(attrs, context);
+    const auto menu = GetMenuNode();
+    const auto layout = menu ? menu->GetLayoutProperty<MenuLayoutProperty>() : nullptr;
+    if (layout && layout->GetShowInSubWindowValue(false)) {
+        return;
+    }
+    auto wrapper = menuWrapper_ ? menuWrapper_->GetPattern<MenuWrapperPattern>() : nullptr;
+    attrs->Put("expanded", wrapper && wrapper->IsShow());
+}
+
+void SelectPattern::AddInspectorTreeInfo(
+    std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context)
+{
+    if (context.config.interactionInfo) {
+        if (attrs->Contains("selected")) {
+            attrs->Replace("selected", selected_ >= 0);
+        } else {
+            attrs->Put("selected", selected_ >= 0);
+        }
+    }
+}
+
 } // namespace OHOS::Ace::NG

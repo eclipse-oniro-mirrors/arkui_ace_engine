@@ -226,7 +226,12 @@ RefPtr<ThemeStyle> ResourceAdapterImpl::GetTheme(int32_t themeId)
         for (size_t i = 0; i < sizeof(PATTERN_MAP) / sizeof(PATTERN_MAP[0]); i++) {
             ResourceThemeStyle::RawAttrMap attrMap;
             std::string patternTag = PATTERN_MAP[i];
-            std::string patternName = std::string(OHFlag) + PATTERN_MAP[i];
+            std::string patternName = "";
+            if (patternTag == THEME_PATTERN_SHADOW) {
+                patternName = patternTag;
+            } else {
+                patternName = std::string(OHFlag) + patternTag;
+            }
             ret = resourceManager_->GetPatternByName(patternName.c_str(), attrMap);
             if (attrMap.empty()) {
                 continue;

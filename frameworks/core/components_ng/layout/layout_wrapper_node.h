@@ -47,8 +47,8 @@ class LayoutWrapperNode;
 
 using LazyBuildFunction = std::function<void(RefPtr<LayoutWrapperNode>)>;
 
-class ACE_EXPORT LayoutWrapperNode : public LayoutWrapper {
-    DECLARE_ACE_TYPE(LayoutWrapperNode, LayoutWrapper);
+class ACE_EXPORT LayoutWrapperNode : public LayoutWrapper, public AceType {
+    DECLARE_ACE_TYPE(LayoutWrapperNode, LayoutWrapper, AceType);
 public:
     LayoutWrapperNode(
         WeakPtr<FrameNode> hostNode, RefPtr<GeometryNode> geometryNode, RefPtr<LayoutProperty> layoutProperty);
@@ -100,8 +100,8 @@ public:
     // Calling these two method will mark the node as in use by default, nodes marked as use state will be added to the
     // render area, and nodes in the render area will be mounted on the render tree after the layout is complete. You
     // can call the RemoveChildInRenderTree method to explicitly remove the node from the area to be rendered.
-    RefPtr<LayoutWrapper> GetOrCreateChildByIndex(
-        uint32_t index, bool addToRenderTree = true, bool isCache = false) override;
+    RefPtr<LayoutWrapper> GetOrCreateChildByIndex(uint32_t index, bool addToRenderTree = true,
+        bool isCache = false, bool allowPlaceholderSubstitution = false) override;
     ChildrenListWithGuard GetAllChildrenWithBuild(bool addToRenderTree = true) override;
     RefPtr<LayoutWrapper> GetChildByIndex(uint32_t index, bool isCache = false) override
     {
@@ -225,6 +225,11 @@ public:
     void SetLongPredictTask() override;
 
 private:
+    AceType* GetLayoutOwner() const override
+    {
+        return const_cast<LayoutWrapperNode*>(this);
+    }
+
     void Build(bool addToRenderTree);
     void LayoutOverlay();
     // Used to save a persist wrapper created by child, ifElse, ForEach, the map stores [index, Wrapper].

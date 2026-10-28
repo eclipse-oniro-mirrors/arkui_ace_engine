@@ -18,6 +18,7 @@
 
 #include <optional>
 #include <string_view>
+#include "ui/base/utils/utils.h"
 
 #include "base/geometry/axis.h"
 #include "base/geometry/dimension.h"
@@ -1532,7 +1533,7 @@ bool TabBarPattern::CustomizeExpandSafeArea()
     CHECK_NULL_RETURN(tabsNode, false);
     auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
     CHECK_NULL_RETURN(tabsPattern, false);
-    if (tabsPattern->IsFloatingBar()) {
+    if (IsFloatingBar() || IsFloatingTopBar()) {
         return true;
     }
 
@@ -1634,9 +1635,8 @@ void TabBarPattern::CloseDialog()
     dialogNode_.Reset();
 }
 
-void TabBarPattern::HandleClick(SourceType type, int32_t index)
+void TabBarPattern::DoHandleClick(const RefPtr<FrameNode>& host, int32_t index)
 {
-    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto layoutProperty = host->GetLayoutProperty<TabBarLayoutProperty>();
     CHECK_NULL_VOID(layoutProperty);
@@ -1674,6 +1674,36 @@ void TabBarPattern::HandleClick(SourceType type, int32_t index)
         return;
     }
     ClickTo(host, index);
+}
+
+bool TabBarPattern::IsTabBarClickIntercepted(const RefPtr<FrameNode>& host) const
+{
+    CHECK_NULL_RETURN(host, false);
+    auto tabsNode = AceType::DynamicCast<TabsNode>(host->GetParent());
+    CHECK_NULL_RETURN(tabsNode, false);
+    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+    CHECK_NULL_RETURN(tabsPattern, false);
+    return tabsPattern->GetTabBarClickIntercept();
+}
+
+void TabBarPattern::HandleClick(SourceType type, int32_t index)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    if (IsTabBarClickIntercepted(host)) {
+        return;
+    }
+    DoHandleClick(host, index);
+}
+
+void TabBarPattern::TapToHandle(int32_t index, bool skipInterceptGuard)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    if (!skipInterceptGuard && IsTabBarClickIntercepted(host)) {
+        return;
+    }
+    DoHandleClick(host, index);
 }
 
 void TabBarPattern::ClickTo(const RefPtr<FrameNode>& host, int32_t index)
@@ -2238,7 +2268,7 @@ void TabBarPattern::PlayPressAnimation(int32_t index, const Color& pressColor, A
         CHECK_NULL_VOID(tabsPattern);
         bool needSetRadius = selectedIndex < static_cast<int32_t>(tabBar->tabBarStyles_.size()) &&
                              tabBar->tabBarStyles_[selectedIndex] != TabBarStyle::SUBTABBATSTYLE &&
-                             !tabsPattern->IsFloatingBar();
+                             !(tabBar->IsFloatingBar() || tabBar->IsFloatingTopBar());
         if (needSetRadius) {
             BorderRadiusProperty borderRadiusProperty;
             auto tabTheme = host->GetTheme<TabTheme>(true);
@@ -2414,6 +2444,9 @@ void TabBarPattern::UpdateTextColorAndFontWeight(int32_t indicator)
             UpdateSelectedTextColor(tabTheme, axis, textLayoutProperty, index, columnId);
         } else {
             auto defaultColor = useNewMaterial_ ? tabTheme->GetFontPrimary() : tabTheme->GetSubTabTextOffColor();
+            if (isFloatingTopBar_) {
+                defaultColor = tabTheme->GetSubTabTextOffColor();
+            }
             textLayoutProperty->UpdateTextColor(
                 labelStyles_[columnId].unselectedColor.value_or(defaultColor));
         }
@@ -2436,6 +2469,9 @@ void TabBarPattern::UpdateSelectedTextColor(const RefPtr<TabTheme>& tabTheme, OH
                              ? tabTheme->GetSubTabBoardTextOnColor()
                              : tabTheme->GetSubTabTextOnColor();
     auto defaultColor = useNewMaterial_ ? tabTheme->GetFontEmphasize() : selectedColor;
+    if (isFloatingTopBar_) {
+        defaultColor = tabTheme->GetFontPrimary();
+    }
     textLayoutProperty->UpdateTextColor(labelStyles_[columnId].selectedColor.value_or(defaultColor));
 }
 
@@ -2879,6 +2915,9 @@ RefPtr<NodePaintMethod> TabBarPattern::CreateNodePaintMethod()
     RectF tabBarItemRect;
     auto layoutProperty = GetLayoutProperty<TabBarLayoutProperty>();
     auto paintProperty = GetPaintProperty<TabBarPaintProperty>();
+    auto tabsNode = AceType::DynamicCast<TabsNode>(host->GetParent());
+    auto tabsPattern = tabsNode ? tabsNode->GetPattern<TabsPattern>() : nullptr;
+    bool isTopFloating = IsFloatingTopBar();
     if (layoutProperty && paintProperty && paintProperty->GetIndicator().has_value()) {
         tabBarItemRect = layoutProperty->GetIndicatorRect(paintProperty->GetIndicator().value());
     }
@@ -2891,7 +2930,7 @@ RefPtr<NodePaintMethod> TabBarPattern::CreateNodePaintMethod()
         static_cast<int32_t>(selectedModes_.size()) && !NearZero(tabBarItemRect.Height()) : 0;
     hasIndicator = GetDrawableIndicatorFlagByIndex(indicator_) ? 0 : hasIndicator;
     return MakeRefPtr<TabBarPaintMethod>(tabBarModifier_, tabBarRect, gradientRegions_, bgColor, indicatorStyle,
-        indicatorOffset, hasIndicator);
+        indicatorOffset, hasIndicator, isTopFloating);
 }
 
 Color TabBarPattern::GetTabBarBackgroundColor() const
@@ -3549,6 +3588,45 @@ void TabBarPattern::ChangeIndex(int32_t index)
     HandleClick(SourceType::NONE, index);
 }
 
+void TabBarPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("isRTL", isRTL_);
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("touching", touching_);
+        json->Put("isMaskAnimationByCreate", isMaskAnimationByCreate_);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        if (!config.IsPublicTree() || animationCurve_) {
+            json->Put("animationCurve", animationCurve_ ? animationCurve_->ToString().c_str() : "null");
+        }
+        if (!config.IsPublicTree() || animationDuration_.has_value()) {
+            if (config.IsPublicTree()) {
+                json->Put("animationDuration", animationDuration_.value());
+            } else {
+                json->Put("animationDuration",
+                    animationDuration_.has_value() ? std::to_string(animationDuration_.value()).c_str() : "null");
+            }
+        }
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("isTouchingSwiper", isTouchingSwiper_);
+        json->Put("isAnimating", isAnimating_);
+        json->Put("changeByClick", changeByClick_);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("indicator", indicator_);
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("swiperStartIndex", swiperStartIndex_);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("scrollMargin", scrollMargin_);
+        SetRegionInfo(json, config);
+    }
+}
+
 void TabBarPattern::DumpAdvanceInfo()
 {
     isRTL_ ? DumpLog::GetInstance().AddDesc("isRTL:true") : DumpLog::GetInstance().AddDesc("isRTL:false");
@@ -3643,11 +3721,24 @@ int32_t TabBarPattern::GetLoopIndex(int32_t originalIndex) const
 
 void TabBarPattern::SetRegionInfo(std::unique_ptr<JsonValue>& json)
 {
-    std::string regionString = "";
-    for (auto item : gradientRegions_) {
-        item ? regionString.append("true ") : regionString.append("false ");
+    SetRegionInfo(json, ParamConfig());
+}
+
+void TabBarPattern::SetRegionInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (config.IsPublicTree()) {
+        auto regions = JsonUtil::CreateArray();
+        for (size_t index = 0; index < gradientRegions_.size(); ++index) {
+            regions->Put(std::to_string(index).c_str(), static_cast<bool>(gradientRegions_[index]));
+        }
+        json->PutRef("region", std::move(regions));
+    } else {
+        std::string regionString;
+        for (auto item : gradientRegions_) {
+            item ? regionString.append("true ") : regionString.append("false ");
+        }
+        json->Put("region", regionString.c_str());
     }
-    json->Put("region", regionString.c_str());
     switch (axis_) {
         case Axis::NONE: {
             json->Put("Axis", "NONE");
@@ -3683,19 +3774,7 @@ const RefPtr<Curve> TabBarPattern::GetAnimationCurve(const RefPtr<Curve>& defaul
 
 void TabBarPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    json->Put("isRTL", isRTL_);
-    json->Put("touching", touching_);
-    json->Put("isMaskAnimationByCreate", isMaskAnimationByCreate_);
-    json->Put("animationCurve", animationCurve_ ? animationCurve_->ToString().c_str() : "null");
-    json->Put("animationDuration",
-        animationDuration_.has_value() ? std::to_string(animationDuration_.value()).c_str() : "null");
-    json->Put("isTouchingSwiper", isTouchingSwiper_);
-    json->Put("isAnimating", isAnimating_);
-    json->Put("changeByClick", changeByClick_);
-    json->Put("indicator", indicator_);
-    json->Put("swiperStartIndex", swiperStartIndex_);
-    json->Put("scrollMargin", scrollMargin_);
-    SetRegionInfo(json);
+    TabBarPattern::DumpAdvanceInfo(json, ParamConfig());
 }
 
 TabBarParamType TabBarPattern::GetTabBarItemType(int32_t tabBarItemId)
@@ -3820,6 +3899,38 @@ void TabBarPattern::UpdateFocusTabBarPageState()
         UpdateSubTabBoard(indicator_);
         UpdateTextColorAndFontWeight(indicator_);
     }
+    auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost() ? GetHost()->GetParent() : nullptr);
+    auto tabsPattern = tabsNode ? tabsNode->GetPattern<TabsPattern>() : nullptr;
+    if (IsFloatingTopBar()) {
+        UpdateTopFloatingFocusBorder(isTabBarFocusActive_, focusIndicator_);
+    }
+}
+
+void TabBarPattern::UpdateTopFloatingFocusBorder(bool isFocused, int32_t index)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto tabTheme = host->GetTheme<TabTheme>(true);
+    CHECK_NULL_VOID(tabTheme);
+    auto columnNode = AceType::DynamicCast<FrameNode>(host->GetChildAtIndex(index));
+    CHECK_NULL_VOID(columnNode);
+    auto renderContext = columnNode->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    if (!isFocused) {
+        renderContext->ResetBorder();
+        return;
+    }
+    bool isSelected = index == indicator_;
+    Dimension borderWidth = isSelected ? tabTheme->GetBorderExtraLarger() : tabTheme->GetOutlineExtraLarger();
+    NG::BorderWidthProperty borderWidthProperty;
+    borderWidthProperty.SetBorderWidth(borderWidth);
+    renderContext->UpdateBorderWidth(borderWidthProperty);
+    NG::BorderStyleProperty borderStyle;
+    borderStyle.SetBorderStyle(BorderStyle::SOLID);
+    renderContext->UpdateBorderStyle(borderStyle);
+    NG::BorderColorProperty borderColor;
+    borderColor.SetColor(Color::WHITE);
+    renderContext->UpdateBorderColor(borderColor);
 }
 
 void TabBarPattern::HandleFocusEvent()
@@ -4072,8 +4183,8 @@ void TabBarPattern::CheckFloatingStyle(int32_t index)
     CHECK_NULL_VOID(tabsNode);
     auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
     CHECK_NULL_VOID(tabsPattern);
-    if (!tabsPattern->IsFloatingBar()) {
-        if (tabsPattern->LastFloatingBar()) {
+    if (!(IsFloatingBar() || IsFloatingTopBar())) {
+        if (tabsPattern->LastFloatingBar() || tabsPattern->LastFloatingTopBar()) {
             BorderRadiusProperty borderRadius;
             renderContext->UpdateBorderRadius(borderRadius);
         }
@@ -4105,13 +4216,16 @@ void TabBarPattern::ApplyDefaultVisibility()
     }
 
     auto tabContentNum = swiperNode->TotalChildCount();
-    auto isHiddenByDefaultVisibility = [](
+    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+    auto activeDisplayMode = tabsPattern ? tabsPattern->GetActiveBarDisplayMode()
+                                         : TabBarDisplayMode::BOTTOMTABBAR;
+    auto isHiddenByDefaultVisibility = [activeDisplayMode](
         const RefPtr<FrameNode>& tabContentNode) -> bool {
         CHECK_NULL_RETURN(tabContentNode, false);
         auto tabContentPattern = tabContentNode->GetPattern<TabContentPattern>();
         CHECK_NULL_RETURN(tabContentPattern, false);
         const auto& defaultVisibility = tabContentPattern->GetDefaultVisibility();
-        return defaultVisibility.ShouldHide(TabBarDisplayMode::BOTTOMTABBAR);
+        return defaultVisibility.ShouldHide(activeDisplayMode);
     };
     // tabBarNode children: columnNodes + maskNodes + imageIndicatorNode
     // columnNodes are at the front, count = tabContentNum

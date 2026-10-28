@@ -19,6 +19,9 @@
 #include "animation/animation_ani_impl.h"
 #include "canvas/canvas_module.h"
 #include "common/common_module.h"
+#ifdef MODAL_UI_EXTENSION_SUPPORTED
+#include "modal_ui_extension/modal_ui_extension_module.h"
+#endif
 #include "common_node/common_node_module.h"
 #include "component3d/component3d_module_methods.h"
 #include "componentSnapshot/componentSnapshot_module.h"
@@ -63,6 +66,7 @@
 #include "dynamiclayout/dynamiclayout_module.h"
 #include "lazy_dynamic_layout/lazy_dynamic_layout_module.h"
 #include "with_env/with_env_module.h"
+#include "placeholder_register/placeholder_register_module.h"
 
 ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
 {
@@ -487,6 +491,11 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             "_ConvertUtils_ConvertToPixelMapAni",
             "l:C{@ohos.multimedia.image.image.PixelMap}",
             reinterpret_cast<void*>(OHOS::Ace::Ani::ConvertToPixelMapAni)
+        },
+        ani_native_function {
+            "_Common_SetSafeAreaInset",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::SetSafeAreaInset)
         },
         ani_native_function {
             "_Common_GetHostContext",
@@ -1403,6 +1412,11 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             reinterpret_cast<void*>(OHOS::Ace::Ani::getWindowHeightBreakpoint)
         },
         ani_native_function {
+            "_Common_isWindowInfoInitialized",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::isWindowInfoInitialized)
+        },
+        ani_native_function {
             "_TransferKeyEventPointer",
             nullptr,
             reinterpret_cast<void*>(OHOS::Ace::Ani::TransferKeyEventPointer)
@@ -2075,6 +2089,73 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             "_ArkTSFrameNode_GetId",
             "l:C{std.core.String}",
             reinterpret_cast<void*>(OHOS::Ace::Ani::ArkTSFrameNodeGetId)
+        },
+#ifdef MODAL_UI_EXTENSION_SUPPORTED
+        ani_native_function {
+            "_CreateModalUIExtension",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::CreateModalUIExtension)
+        },
+        ani_native_function {
+            "_CloseModalUIExtension",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::CloseModalUIExtension)
+        },
+        ani_native_function {
+            "_ModalUIExtensionProxySend",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::ModalUIExtensionProxySend)
+        },
+        ani_native_function {
+            "_ModalUIExtensionProxySendSync",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::ModalUIExtensionProxySendSync)
+        },
+        ani_native_function {
+            "_ModalUIExtensionProxyDestroy",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::ModalUIExtensionProxyDestroy)
+        },
+        ani_native_function {
+            "_ModalUIExtensionProxyOnAsyncReceiverRegister",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::ModalUIExtensionProxyOnAsyncReceiverRegister)
+        },
+        ani_native_function {
+            "_ModalUIExtensionProxyOnSyncReceiverRegister",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::ModalUIExtensionProxyOnSyncReceiverRegister)
+        },
+        ani_native_function {
+            "_ModalUIExtensionProxyOffAsyncReceiverRegister",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::ModalUIExtensionProxyOffAsyncReceiverRegister)
+        },
+        ani_native_function {
+            "_ModalUIExtensionProxyOffSyncReceiverRegister",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::ModalUIExtensionProxyOffSyncReceiverRegister)
+        },
+#endif
+        ani_native_function {
+            "_PlaceholderRegisterRegister",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::PlaceholderRegisterRegister)
+        },
+        ani_native_function {
+            "_PlaceholderRegisterUnregister",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::PlaceholderRegisterUnregister)
+        },
+        ani_native_function {
+            "_PlaceholderRegisterIsRegistered",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::PlaceholderRegisterIsRegistered)
+        },
+        ani_native_function {
+            "_PlaceholderRegisterPublishProduct",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::PlaceholderRegisterPublishProduct)
         }
     };
 
@@ -2082,6 +2163,35 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
     if (bindRst != ANI_OK) {
         HILOGE("Bind static native methods failed, bindRst:%{public}d", bindRst);
         return bindRst;
+    }
+    // The restricted-builder scope hooks are declared on their own class in the
+    // handwritten builder source (arkui.component.builder.AcePlaceholderScopeModule),
+    // not on ArkUIAniModule. The binding stays best-effort: apps that do not
+    // link the placeholder instrumentation do not carry that class, and a
+    // missing class must not fail the library load for everybody else.
+    ani_class scopeCls = nullptr;
+    // ani_status names a local above, so the statuses below infer their type.
+    auto scopeFindStatus = env->FindClass("arkui.component.builder.AcePlaceholderScopeModule", &scopeCls);
+    if (scopeFindStatus == ANI_OK && scopeCls != nullptr) {
+        std::array scopeMethods = {
+            ani_native_function {
+                "_AceBeginScrollPlaceholder",
+                nullptr,
+                reinterpret_cast<void*>(OHOS::Ace::Ani::PlaceholderBeginScrollPlaceholder)
+            },
+            ani_native_function {
+                "_AceEndScrollPlaceholder",
+                nullptr,
+                reinterpret_cast<void*>(OHOS::Ace::Ani::PlaceholderEndScrollPlaceholder)
+            },
+        };
+        auto scopeBindStatus = env->Class_BindStaticNativeMethods(scopeCls, scopeMethods.data(), scopeMethods.size());
+        if (scopeBindStatus != ANI_OK) {
+            HILOGW("Bind placeholder scope hooks failed, status:%{public}d", scopeBindStatus);
+            env->ResetError();
+        }
+    } else {
+        env->ResetError();
     }
     *result = ANI_VERSION_1;
     return ANI_OK;

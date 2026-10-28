@@ -39,6 +39,7 @@ public:
     LazyWaterFlowLayoutPattern();
     ~LazyWaterFlowLayoutPattern() override = default;
 
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
     bool IsAtomicNode() const override

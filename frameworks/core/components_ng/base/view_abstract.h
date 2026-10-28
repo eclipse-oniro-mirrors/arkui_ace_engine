@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_BASE_VIEW_ABSTRACT_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_BASE_VIEW_ABSTRACT_H
 
+#include <array>
 #include <cstdint>
 #include <functional>
 
@@ -84,9 +85,12 @@ struct ImmersiveMaterialConfig;
 }
 
 namespace OHOS::Ace::NG {
+class UINode;
+
 struct AttractionEffect;
 using TransitionFinishCallback = std::function<void(bool)>;
 using OnNeedSoftkeyboardFunc = std::function<bool()>;
+using SafeAreaInsetContentArray = std::array<RefPtr<UINode>, SAFE_AREA_INSET_EDGE_COUNT>;
 struct ACE_FORCE_EXPORT OptionParam {
     std::string value;
     std::string icon;
@@ -253,6 +257,9 @@ public:
     static void SetSafeAreaPadding(FrameNode* frameNode, const PaddingProperty& value);
     static void ResetSafeAreaPadding();
     static void ResetSafeAreaPadding(FrameNode* frameNode);
+    static void SetSafeAreaInset(
+        FrameNode* frameNode, const SafeAreaInsetOptions& options, const SafeAreaInsetContentArray& contents);
+    static void ResetSafeAreaInset(FrameNode* frameNode);
     static void CheckSafeAreaPaddingLPX(const PaddingProperty& value);
     static void CheckNodeSafeAreaPaddingLPX(FrameNode* frameNode, const PaddingProperty& value);
     static void CheckNodeSafeAreaPaddingLPX(RefPtr<OHOS::Ace::NG::FrameNode> frameNode, const PaddingProperty& value);
@@ -608,6 +615,10 @@ public:
     static void SetClipShape(const RefPtr<BasicShape> &basicShape);
     static void SetClipEdge(bool isClip);
     static void SetMask(const RefPtr<BasicShape> &basicShape);
+    static void SetShadowShape(const RefPtr<BasicShape>& basicShape);
+    static void SetShadowClipMode(ShadowClipMode clipMode);
+    static void ResetShadowShape();
+    static void ResetShadowClipMode();
     // overlay
     static void SetOverlay(const NG::OverlayOptions &overlay);
     static void SetOverlayBuilder(std::function<void()>&& buildFunc,
@@ -844,6 +855,10 @@ public:
     static void SetRotateAngle(FrameNode* frameNode, const NG::Vector4F& value);
     static void SetClipEdge(FrameNode* frameNode, bool isClip);
     static void SetClipShape(FrameNode* frameNode, const RefPtr<BasicShape>& basicShape);
+    static void SetShadowShape(FrameNode* frameNode, const RefPtr<BasicShape>& basicShape);
+    static void SetShadowClipMode(FrameNode* frameNode, ShadowClipMode clipMode);
+    static void ResetShadowShape(FrameNode* frameNode);
+    static void ResetShadowClipMode(FrameNode* frameNode);
     static void SetPixelStretchEffect(FrameNode* frameNode, PixStretchEffectOption& option);
     static void SetSpatialEffect(FrameNode* frameNode, const std::optional<SpatialEffectParams>& params);
     static void SetLightUpEffect(FrameNode* frameNode, double radio);
@@ -1314,6 +1329,7 @@ private:
         const RefPtr<Pattern>& pattern, const RefPtr<RenderContext>& renderContext);
     static void RegisterTransparencyListener(const RefPtr<FrameNode>& frameNode);
     static void HistogramImmersiveOptions(const ImmersiveMaterialConfig& config);
+    static void SetShadowShapeLpxCallback(FrameNode* frameNode, const RefPtr<BasicShape>& basicShape);
 
     static OEMVisualEffectFunc oemVisualEffectFunc;
     static std::mutex visualEffectMutex_;

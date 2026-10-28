@@ -29,6 +29,7 @@ class WantParams;
 
 namespace OHOS::Ace {
 namespace NG {
+class ChainedTransitionEffect;
 class SecurityUIExtensionProxy;
 class UIExtensionProxy;
 
@@ -39,6 +40,7 @@ struct InnerModalUIExtensionConfig {
     bool isWindowModeFollowHost = false;
     bool isModalRequestFocus = true;
     bool isModalFixFocus = false;
+    RefPtr<ChainedTransitionEffect> transition;
 };
 
 struct EmbeddedUIExtensionConfig {
@@ -46,6 +48,8 @@ struct EmbeddedUIExtensionConfig {
     NG::SessionType sessionType = NG::SessionType::EMBEDDED_UI_EXTENSION;
     std::map<NG::PlaceholderType, RefPtr<NG::FrameNode>> placeholderMap;
     NG::DpiFollowStrategy dpiFollowStrategy = NG::DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI;
+    // True only when the developer explicitly configured dpiFollowStrategy in options.
+    bool isDpiFollowStrategySet = false;
     bool isWindowModeFollowHost = false;
 };
 
@@ -54,6 +58,8 @@ struct UIExtensionConfig {
     RefPtr<NG::FrameNode> placeholderNode = nullptr;
     bool transferringCaller = false;
     NG::DpiFollowStrategy dpiFollowStrategy = NG::DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI;
+    // True only when the developer explicitly configured dpiFollowStrategy in options.
+    bool isDpiFollowStrategySet = false;
     NG::SessionType sessionType = NG::SessionType::UI_EXTENSION_ABILITY;
     bool backgroundTransparent = true;
     bool allowCrossProcessNesting = false;
@@ -69,7 +75,7 @@ public:
     virtual void Create(const RefPtr<OHOS::Ace::WantWrap>& wantWrap,
         const std::map<NG::PlaceholderType, RefPtr<NG::FrameNode>>& placeholderMap, bool transferringCaller = false,
         NG::DpiFollowStrategy dpiFollowStrategy = NG::DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI,
-        bool isWindowModeFollowHost = false);
+        bool isDpiFollowStrategySet = false, bool isWindowModeFollowHost = false);
     // for Embedded Component
     virtual void Create(const NG::EmbeddedUIExtensionConfig& config);
     virtual void Create(const NG::UIExtensionConfig& config) {}

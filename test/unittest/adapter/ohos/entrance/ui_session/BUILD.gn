@@ -45,12 +45,23 @@ config("ui_session_test_config") {
 
 ohos_unittest("ui_content_stub_unittest") {
   module_out_path = adapter_test_output_path
+  cflags = [ "-fno-access-control" ]
   sources = [
+    "$ace_root/frameworks/core/components_ng/pattern/command/command_result.cpp",
+    "$ace_root/frameworks/base/json/json_util.cpp",
+    "$ace_root/frameworks/core/components_ng/base/inspector_filter.cpp",
+    "$ace_root/frameworks/base/utils/string_utils.cpp",
+    "$ace_root/test/mock/adapter/ohos/osal/mock_system_properties.cpp",
+    "$ace_root/adapter/ohos/entrance/ui_session/get_inspector_tree_config_impl.cpp",
+    "$ace_root/adapter/ohos/entrance/ui_session/content_change_config_impl.cpp",
     "$ace_root/adapter/ohos/entrance/ui_session/large_string_ashmem.cpp",
     "$ace_root/adapter/ohos/entrance/ui_session/ui_content_stub.cpp",
+    "$ace_root/adapter/ohos/entrance/ui_session/ui_content_proxy.cpp",
+    "$ace_root/adapter/ohos/entrance/ui_session/ui_report_proxy.cpp",
     "$ace_root/adapter/ohos/entrance/ui_session/ui_content_stub_impl.cpp",
     "$ace_root/adapter/ohos/entrance/ui_session/ui_report_stub.cpp",
     "$ace_root/adapter/ohos/entrance/ui_session/ui_session_batch_command.cpp",
+    "$ace_root/adapter/ohos/entrance/ui_session/ui_session_command_result.cpp",
     "$ace_root/adapter/ohos/entrance/ui_session/ui_session_ipc_util.cpp",
     "$ace_root/adapter/ohos/entrance/ui_session/ui_session_json_util.cpp",
     "$ace_root/adapter/ohos/entrance/ui_session/ui_translate_request_util.cpp",
@@ -58,14 +69,21 @@ ohos_unittest("ui_content_stub_unittest") {
     "$ace_root/test/mock/adapter/ohos/entrance/ui_session/mock_ui_session_manager_ohos.cpp",
 
     # mocker
+    "$ace_root/test/mock/frameworks/base/log/mock_log_wrapper.cpp",
     "accesstoken_kit.cpp",
 
     # test source file
+    "inspector_tree_config_test.cpp",
+    "inspector_tree_request_lifecycle_test.cpp",
     "ui_content_stub_test.cpp",
+    "ui_session_send_command_test.cpp",
     "ui_session_batch_command_test.cpp",
   ]
 
   configs = [ ":ui_session_test_config" ]
+  if (ace_engine_feature_enable_coverage) {
+    ldflags = [ "--coverage" ]
+  }
 
   deps = [
     "$ace_root/test/mock/ohos_mock/c_utils:mock_c_utils",
@@ -75,6 +93,7 @@ ohos_unittest("ui_content_stub_unittest") {
   ]
 
   external_deps = [
+    "bounds_checking_function:libsec_static",
     "cJSON:cjson_static",
     "googletest:gmock",
     "googletest:gtest_main",

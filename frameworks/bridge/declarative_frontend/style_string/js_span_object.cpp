@@ -1173,6 +1173,8 @@ void JSImageAttachment::JSBind(BindingTarget globalObj)
         "supportSvg2", &JSImageAttachment::GetSupportSvg2, &JSImageAttachment::SetSupportSvg2);
     JSClass<JSImageAttachment>::CustomProperty(
         "resizable", &JSImageAttachment::GetResizable, &JSImageAttachment::SetResizable);
+    JSClass<JSImageAttachment>::CustomProperty(
+        "imageTag", &JSImageAttachment::GetImageTag, &JSImageAttachment::SetImageTag);
     JSClass<JSImageAttachment>::Bind(globalObj, JSImageAttachment::Constructor, JSImageAttachment::Destructor);
 }
 
@@ -1224,6 +1226,13 @@ ImageSpanOptions JSImageAttachment::CreateImageOptions(const JSRef<JSObject>& ob
             }
         }
 #endif
+    }
+    auto imageTagVal = obj->GetProperty("imageTag");
+    if (!imageTagVal->IsNull() && !imageTagVal->IsUndefined()) {
+        std::u16string imageTag;
+        if (JSContainerBase::ParseJsString(imageTagVal, imageTag)) {
+            options.imageTag = imageTag;
+        }
     }
     return options;
 }
@@ -1535,6 +1544,16 @@ void JSImageAttachment::GetSupportSvg2(const JSCallbackInfo& info)
         return;
     }
     info.SetReturnValue(JSRef<JSVal>::Make(ToJSValue(imageAttr->supportSvg2)));
+}
+
+void JSImageAttachment::GetImageTag(const JSCallbackInfo& info)
+{
+    CHECK_NULL_VOID(imageSpan_);
+    auto& imageOptions = imageSpan_->GetImageSpanOptions();
+    if (!imageOptions.imageTag.has_value()) {
+        return;
+    }
+    info.SetReturnValue(JSRef<JSVal>::Make(ToJSValue(imageOptions.imageTag.value())));
 }
 
 void JSImageAttachment::GetResizable(const JSCallbackInfo& info)

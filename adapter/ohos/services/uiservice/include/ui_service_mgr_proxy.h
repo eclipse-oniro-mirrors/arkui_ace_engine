@@ -45,7 +45,10 @@ public:
 private:
     static bool WriteInterfaceToken(MessageParcel& data);
 
-    static inline BrokerDelegator<UIServiceMgrProxy> delegator_;
+    // Defined in ui_service_mgr_proxy.cpp. Do NOT make it `static inline`:
+    // an inline definition gets compiled into every .so that includes this
+    // header, causing duplicate BrokerDelegator registrations (ODR risk).
+    static BrokerDelegator<UIServiceMgrProxy> delegator_;
 };
 }  // namespace Ace
 }  // namespace OHOS

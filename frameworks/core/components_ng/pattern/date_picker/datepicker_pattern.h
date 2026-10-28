@@ -53,6 +53,8 @@ class ACE_FORCE_EXPORT DatePickerPattern : public LinearLayoutPattern {
     DECLARE_ACE_TYPE(DatePickerPattern, LinearLayoutPattern);
 
 public:
+    void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context) override;
+
     DatePickerPattern() : LinearLayoutPattern(false) {};
 
     ~DatePickerPattern() override = default;
@@ -208,9 +210,10 @@ public:
 
     int LunarDateCompare(const LunarDate& left, const LunarDate& right) const;
 
-    std::unordered_map<std::string, RefPtr<FrameNode>> GetAllChildNode();
+    std::unordered_map<std::string, RefPtr<FrameNode>> GetAllChildNode() const;
 
-    void OrderAllChildNode(RefPtr<FrameNode>& stackYear, RefPtr<FrameNode>& stackMonth, RefPtr<FrameNode>& stackDay);
+    void OrderAllChildNode(RefPtr<FrameNode>& stackYear, RefPtr<FrameNode>& stackMonth,
+        RefPtr<FrameNode>& stackDay) const;
 
     RefPtr<FrameNode> GetColumn(const int32_t& tag) const;
 
@@ -455,6 +458,11 @@ public:
     {
         return endDateSolar_;
     }
+
+    bool IsAtStartYear() const;
+    bool IsAtEndYear() const;
+    bool IsAtStartMonth() const;
+    bool IsAtEndMonth() const;
 
     void SetMode(const DatePickerMode& value)
     {
@@ -981,7 +989,6 @@ private:
     std::string selectedColumnId_;
     bool lastTimeIsLuanar_ = true;
     bool isFirstTimeSetFocus_ = true;
-    bool isDirectionSetByAr = false;
 };
 } // namespace OHOS::Ace::NG
 

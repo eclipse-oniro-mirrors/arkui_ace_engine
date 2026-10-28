@@ -122,7 +122,9 @@ constexpr Dimension DEFAULT_INDICATOR_HEAD_DISTANCE = 14.0_vp;
 constexpr char SWIPER_SCROLL_DIRECTION_FORWARD[] = "forward";
 constexpr char SWIPER_SCROLL_DIRECTION_BACKWARD[] = "backward";
 constexpr char SWIPER_SCROLL_DIRECTION_BIDIRECTIONAL[] = "bidirectional";
-constexpr int32_t COMPONENT_SWIPER = 1;
+constexpr int32_t COMPONENT_STATE_CHANGE_IDX = 0;
+constexpr int32_t COMPONENT_STATE_SHOW = 1;
+constexpr int32_t COMPONENT_STATE_HIDDEN = 2;
 constexpr int32_t MEMORY_LEVEL_CRITICAL = 2;
 
 MoveStep GetKeyMoveStep(const KeyEvent& event, Axis axis, bool isRtl)
@@ -232,6 +234,7 @@ void SwiperPattern::OnDetachFromFrameNode(FrameNode* node)
 
 void SwiperPattern::OnAttachToMainTree()
 {
+    contentChangeDetached_ = false;
     auto host = GetHost();
     THREAD_SAFE_NODE_CHECK(host, OnAttachToMainTree);
     if (!isInit_) {
@@ -553,6 +556,13 @@ void SwiperPattern::OnModifyDone()
     Pattern::OnModifyDone();
     auto host = GetHost();
     CHECK_NULL_VOID(host);
+    if (IsAutoPlay()) {
+        auto context = GetContext();
+        auto manager = context ? context->GetContentChangeManager() : nullptr;
+        if (manager) {
+            manager->CompleteCapiSwiperChangeAfterAutoPlay(host, hasTabsAncestor_, false);
+        }
+    }
     ACE_UINODE_TRACE(host);
     swiperId_ = host->GetId();
     auto hub = host->GetEventHub<SwiperEventHub>();
@@ -767,7 +777,16 @@ void SwiperPattern::BeforeCreateLayoutWrapper()
         needAdjustIndex_ = false;
     }
 
-    if (lastCurrentIndex != currentIndex_ || (itemPosition_.empty() && !isVoluntarilyClear_)
+    // When contentMainSize_ is zero (e.g. Tabs sidebar occupies the full main axis),
+    // itemPosition_ will be empty because no items can be laid out. In this case, if a
+    // SwipeTo has set targetIndex_, we must NOT reset it via jumpIndex_ — otherwise the
+    // pending tab switch is lost. The isTabsSidebarDisplayMode_ flag is set by Tabs
+    // when operating in sidebar display mode (TabBarDisplayMode::SIDEBAR), so this guard
+    // only affects that mode and leaves all other swiper scenarios unchanged.
+    bool isSidebarContentEmptyWithPendingTarget =
+        isTabsSidebarDisplayMode_ && NearZero(contentMainSize_) && targetIndex_.has_value();
+    if (lastCurrentIndex != currentIndex_ ||
+        (itemPosition_.empty() && !isVoluntarilyClear_ && !isSidebarContentEmptyWithPendingTarget)
         || hadCachedCapture != hasCachedCapture_) {
         jumpIndex_ = (!isInit_ && GetMaintainVisibleContentPosition())
                          ? jumpIndex_.value_or(GetLoopIndex(currentIndex_))
@@ -797,6 +816,13 @@ void SwiperPattern::BeforeCreateLayoutWrapper()
         FireSelectedEvent(-1, currentIndex_);
     }
     if (lastCurrentIndex != currentIndex_ && !isInit_ && !IsUseCustomAnimation()) {
+        if (GetLoopIndex(lastCurrentIndex) != GetLoopIndex(currentIndex_)) {
+            auto pipeline = GetContext();
+            auto manager = pipeline ? pipeline->GetContentChangeManager() : nullptr;
+            if (manager) {
+                manager->ReportCapiSwiperStartEvent(host, hasTabsAncestor_);
+            }
+        }
         FireWillShowEvent(currentIndex_);
         FireWillHideEvent(lastCurrentIndex);
     }
@@ -1334,6 +1360,9 @@ bool SwiperPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty,
     isInit_ = false;
 
     if (!IsAutoPlay() && config.skipMeasure && config.skipLayout) {
+        if (isTabsSidebarDisplayMode_ && NearZero(contentMainSize_) && jumpIndex_) {
+            jumpIndex_.reset();
+        }
         return false;
     }
 
@@ -1346,11 +1375,51 @@ bool SwiperPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty,
 
     // set tabs invisible item freeze state.
     HandleTabsAncestor();
+    if (hasTabsAncestor_) {
+        auto host = GetHost();
+        auto item = TotalCount() > 0 ? GetCurrentFrameNode(props->GetIndexValue(0)) : nullptr;
+        const auto itemId = item ? item->GetId() : -1;
+        const bool replaced = !isInit && lastTabContentId_ != -1 && itemId != -1 &&
+            lastTabContentId_ != itemId && props->GetIndexValue(0) == changeEndOldIndex;
+        lastTabContentId_ = itemId;
+        if (replaced) {
+            auto pipeline = GetContext();
+            auto manager = pipeline ? pipeline->GetContentChangeManager() : nullptr;
+            if (manager) {
+                manager->ReportCapiSwiperStartEvent(host, true);
+                pipeline->AddAfterRenderTask([weak = WeakClaim(this)]() {
+                    auto pattern = weak.Upgrade();
+                    if (pattern && !pattern->contentChangeDetached_) {
+                        auto pipeline = pattern->GetContext();
+                        auto manager = pipeline ? pipeline->GetContentChangeManager() : nullptr;
+                        if (manager) {
+                            manager->OnSwiperChangeEnd(pattern->GetHost(), true);
+                        }
+                    }
+                });
+            }
+        }
+    }
 
     if (props->GetIsCustomAnimation().value_or(false)) {
         needUnmountIndexs_ = algo->GetNeedUnmountIndexs();
         auto currentIndex = props->GetIndexValue(0);
         HandleTabsCachedMaxCount(currentIndex, customAnimationToIndex_.value_or(currentIndex));
+        // Attribute-driven jumps do not create a transition proxy, but still change the visible tab.
+        if (!isInit && currentIndex != changeEndOldIndex && !customAnimationToIndex_ && !currentProxyInAnimation_) {
+            auto pipeline = GetContext();
+            if (pipeline) {
+                pipeline->AddAfterRenderTask([weak = WeakClaim(this), currentIndex]() {
+                    auto swiper = weak.Upgrade();
+                    auto host = swiper ? swiper->GetHost() : nullptr;
+                    if (host && host->IsOnMainTree() && swiper->CurrentIndex() == currentIndex &&
+                        !swiper->customAnimationToIndex_ &&
+                        !swiper->currentProxyInAnimation_) {
+                        swiper->ContentChangeReport(host, true);
+                    }
+                });
+            }
+        }
         return false;
     }
     if (SupportSwiperCustomAnimation()) {
@@ -1402,7 +1471,13 @@ bool SwiperPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty,
         ResetAnimationParam();
         auto pipeline = GetContext();
         if (pipeline) {
-            bool needSwiperChangeEnd = isInit || jumpIndex_.value() != changeEndOldIndex;
+            bool needSwiperChangeEnd = TotalCount() > 0 && (isInit || jumpIndex_.value() != changeEndOldIndex);
+            if (isInit && TotalCount() > 0) {
+                auto manager = pipeline->GetContentChangeManager();
+                if (manager) {
+                    manager->ReportCapiSwiperStartEvent(GetHost(), hasTabsAncestor_);
+                }
+            }
             pipeline->AddAfterRenderTask([weak = WeakClaim(this), needSwiperChangeEnd]() {
                 auto swiper = weak.Upgrade();
                 CHECK_NULL_VOID(swiper);
@@ -1732,6 +1807,7 @@ bool SwiperPattern::AutoLinearAnimationNeedReset(float translate) const
 
 void SwiperPattern::OnAnimationTranslateZero(int32_t nextIndex, bool stopAutoPlay)
 {
+    ContentChangeReport(GetHost(), GetLoopIndex(currentIndex_) != GetLoopIndex(nextIndex));
     ResetAndUpdateIndexOnAnimationEnd(nextIndex);
 
     if (!NeedAutoPlay() || !isUserFinish_) {
@@ -1783,7 +1859,7 @@ void SwiperPattern::FireIndicatorChangeAccessibilityEvent() const
     indicatorPattern->OnIndicatorChangeAccessibilityEvent();
 }
 
-void SwiperPattern::ReportSwiperChangeContent(int32_t currentIndex) const
+void SwiperPattern::ReportSwiperChangeContent(int32_t currentIndex, int32_t componentState) const
 {
     auto host = GetHost();
     CHECK_NULL_VOID(host);
@@ -1805,7 +1881,6 @@ void SwiperPattern::ReportSwiperChangeContent(int32_t currentIndex) const
     if (half * width > swiperWidth || half * height > swiperHeight) {
         return;
     }
-
 #ifndef CROSS_PLATFORM
     CHECK_NULL_VOID(pipeline->GetTaihangOptimizer());
     auto pageInfo = pipeline->GetLastPageInfo();
@@ -1813,14 +1888,17 @@ void SwiperPattern::ReportSwiperChangeContent(int32_t currentIndex) const
     auto fullPath = pageInfo->GetFullPath();
     auto pageName = pipeline->GetNavDestinationPageName(pageInfo);
     auto jsViewName = pipeline->GetNavDestinationJSViewName(pageInfo);
-    if (pipeline->GetTaihangOptimizer()->CheckSwiperPageValid(fullPath, pageName, jsViewName) && !isInAutoPlay_) {
+    // The `isInAutoPlay_` guard only applies to `COMPONENT_STATE_CHANGE_IDX`;
+    // SHOW/HIDDEN reports bypass it.
+    if (pipeline->GetTaihangOptimizer()->CheckSwiperPageValid(fullPath, pageName, jsViewName) &&
+        (componentState != COMPONENT_STATE_CHANGE_IDX || !isInAutoPlay_)) {
         RefPtr<NG::UINode> curUINode = host;
         std::string path = curUINode->GetPath();
         std::unordered_map<std::string, std::string> payload;
         payload["window_id"] = std::to_string(pipeline->GetWindowId());
         payload["path"] = path;
         payload["currentIndex"] = std::to_string(currentIndex);
-        payload["componentType"] = std::to_string(COMPONENT_SWIPER);
+        payload["componentSwiperState"] = std::to_string(componentState);
         ResSchedReport::GetInstance().HandleSwiperChange(payload);
     }
 #endif
@@ -1899,7 +1977,6 @@ void SwiperPattern::FireUnselectedEvent(int32_t currentIndex, int32_t targetInde
 
 void SwiperPattern::NotifyScrollStateEvent(ScrollState scrollState)
 {
-#ifndef CROSS_PLATFORM
     if (scrollState_ == scrollState) {
         return;
     }
@@ -1911,13 +1988,12 @@ void SwiperPattern::NotifyScrollStateEvent(ScrollState scrollState)
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
     auto host = GetHost();
-    if (scrollState_ == ScrollState::IDLE) {
+    if (scrollState_ == ScrollState::IDLE && TotalCount() > 0 && !contentChangeDetached_) {
         mgr->OnSwiperScrollStart(host, hasTabsAncestor_);
     }
     if (scrollState == ScrollState::IDLE) {
         mgr->OnSwiperScrollEnd(host);
     }
-#endif
 }
 
 void SwiperPattern::FireScrollStateEvent(ScrollState scrollState)
@@ -2159,7 +2235,6 @@ void SwiperPattern::OnSwiperCustomAnimationFinish(
 void SwiperPattern::SwipeToWithoutAnimation(int32_t index, std::optional<int32_t> rawIndex)
 {
     if (currentIndex_ != index) {
-#ifndef CROSS_PLATFORM
         auto pipeline = GetContext();
         if (pipeline) {
             auto contentChangeManager = pipeline->GetContentChangeManager();
@@ -2167,11 +2242,16 @@ void SwiperPattern::SwipeToWithoutAnimation(int32_t index, std::optional<int32_t
                 contentChangeManager->OnSwiperChangeStart(GetHost(), hasTabsAncestor_);
             }
         }
-#endif
         FireWillShowEvent(index);
         FireWillHideEvent(currentIndex_);
     }
-    if (IsVisibleChildrenSizeLessThanSwiper()) {
+    // In Tabs sidebar mode, when sidebar width >= container width, contentMainSize_ is 0
+    // and itemPosition_ is empty, causing IsVisibleChildrenSizeLessThanSwiper() to return
+    // true. The bypass condition (isTabsSidebarDisplayMode_ && NearZero(contentMainSize_))
+    // matches the guard in BeforeCreateLayoutWrapper so that the tab switch request can be
+    // recorded via jumpIndex_ consistently across all three sites.
+    if (IsVisibleChildrenSizeLessThanSwiper() &&
+        !(isTabsSidebarDisplayMode_ && NearZero(contentMainSize_))) {
         return;
     }
 
@@ -2237,7 +2317,13 @@ void SwiperPattern::SwipeTo(int32_t index)
         return;
     }
 
-    if (IsVisibleChildrenSizeLessThanSwiper()) {
+    // In Tabs sidebar mode, when sidebar width >= container width, contentMainSize_ is 0
+    // and itemPosition_ is empty, causing IsVisibleChildrenSizeLessThanSwiper() to return
+    // true. The bypass condition (isTabsSidebarDisplayMode_ && NearZero(contentMainSize_))
+    // matches the guard in BeforeCreateLayoutWrapper so that the tab switch request can be
+    // recorded via targetIndex_ consistently across all three sites.
+    if (IsVisibleChildrenSizeLessThanSwiper() &&
+        !(isTabsSidebarDisplayMode_ && NearZero(contentMainSize_))) {
         return;
     }
 
@@ -3461,6 +3547,13 @@ bool SwiperPattern::FadeOverScroll(float offset)
             HandleSwiperCustomAnimation(realOffset);
         }
         fadeOffset_ += offset;
+        if (!NearZero(fadeOffset_) && TotalCount() > 0 && !contentChangeDetached_) {
+            auto pipeline = GetContext();
+            auto manager = pipeline ? pipeline->GetContentChangeManager() : nullptr;
+            if (manager) {
+                manager->ReportCapiSwiperStartEvent(GetHost(), hasTabsAncestor_);
+            }
+        }
         auto host = GetHost();
         CHECK_NULL_RETURN(host, false);
         host->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
@@ -4942,6 +5035,7 @@ float SwiperPattern::EstimateSpringOffset(float realOffset)
 
 void SwiperPattern::OnSpringAndFadeAnimationFinish()
 {
+    const bool contentChanged = GetLoopIndex(currentIndex_) != GetLoopIndex(nextIndex_);
     auto itemInfoInVisibleArea = std::make_pair(0, SwiperItemInfo {});
     if (!itemPosition_.empty()) {
         auto item = itemPosition_.find(nextIndex_);
@@ -4950,7 +5044,8 @@ void SwiperPattern::OnSpringAndFadeAnimationFinish()
                 std::make_pair(item->first, SwiperItemInfo { item->second.startPos, item->second.endPos });
         }
     }
-    if (GetLoopIndex(currentIndex_) != GetLoopIndex(nextIndex_)) {
+    ContentChangeReport(GetHost(), contentChanged);
+    if (contentChanged) {
         UpdateCurrentIndex(nextIndex_);
         UpdateCurrentFocus();
         OnIndexChange();
@@ -5738,6 +5833,10 @@ void SwiperPattern::PostTranslateTask(uint32_t delayTime)
 
 void SwiperPattern::HandleVisibleChange(bool visible)
 {
+    if (isVisibleArea_ != visible) {
+        auto currentIndex = GetLoopIndex(CurrentIndex());
+        ReportSwiperChangeContent(currentIndex, visible ? COMPONENT_STATE_SHOW : COMPONENT_STATE_HIDDEN);
+    }
     isVisibleArea_ = visible;
     if (!visible) {
         translateTask_.Cancel();
@@ -6801,6 +6900,94 @@ int32_t SwiperPattern::GetLoopIndex(int32_t index, int32_t childrenSize) const
     return loopIndex;
 }
 
+void SwiperPattern::DumpAdvanceCurveInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree()) {
+        json->Put("curve", GetCurveIncludeMotion() ? GetCurveIncludeMotion()->ToString().c_str() : "null");
+        return;
+    }
+    // The legacy motion getter changes animation state; public collection reads the saved curve.
+    if (auto curve = GetCurve()) {
+        json->Put("curve", curve->ToString().c_str());
+    }
+}
+
+void SwiperPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    DumpAdvanceDiagnostics(json, config);
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("currentIndex", currentIndex_);
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("oldIndex", oldIndex_);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        BuildOffsetInfo(json, config);
+        BuildIndicatorTypeInfo(json, config);
+    }
+    if (!config.IsPublicTree()) {
+        BuildItemPositionInfo(json);
+        BuildPanDirectionInfo(json);
+        BuildAxisInfo(json);
+        return;
+    }
+    if (config.visualProperties) {
+        auto property = GetLayoutProperty<SwiperLayoutProperty>();
+        if (property) {
+            json->Put("TextDirection", static_cast<int32_t>(property->GetNonAutoLayoutDirection()));
+        }
+    }
+    if (config.functionalProperties) {
+        json->Put("disableSwipe", IsDisableSwipe());
+    }
+}
+
+void SwiperPattern::DumpAdvanceDiagnostics(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree()) {
+        json->Put("isLastIndicatorFocused", isLastIndicatorFocused_);
+        json->Put("moveDirection", moveDirection_);
+        json->Put("indicatorDoingAnimation", indicatorDoingAnimation_);
+        json->Put("hasVisibleChangeRegistered", hasVisibleChangeRegistered_);
+        json->Put("isVisible", isVisible_);
+        json->Put("isVisibleArea", isVisibleArea_);
+        json->Put("isWindowShow", isWindowShow_);
+        json->Put("IsCustomSize", isCustomSize_);
+        json->Put("indicatorIsBoolean", indicatorIsBoolean_);
+        json->Put("isAtHotRegion", isAtHotRegion_);
+        json->Put("isDragging", isDragging_);
+        json->Put("isTouchDown", isTouchDown_);
+        json->Put("preLoop", preLoop_.has_value() ? std::to_string(preLoop_.value()).c_str() : "null");
+        json->Put("indicatorId", indicatorId_.has_value() ? std::to_string(indicatorId_.value()).c_str() : "null");
+        json->Put("leftButtonId", leftButtonId_.has_value() ? std::to_string(leftButtonId_.value()).c_str() : "null");
+        json->Put(
+            "rightButtonId", rightButtonId_.has_value() ? std::to_string(rightButtonId_.value()).c_str() : "null");
+        json->Put("crossMatchChild", crossMatchChild_);
+        json->Put("uiCastJumpIndex",
+            uiCastJumpIndex_.has_value() ? std::to_string(uiCastJumpIndex_.value()).c_str() : "null");
+        json->Put("jumpIndex", jumpIndex_.has_value() ? std::to_string(jumpIndex_.value()).c_str() : "null");
+        json->Put("targetIndex", targetIndex_.has_value() ? std::to_string(targetIndex_.value()).c_str() : "null");
+        json->Put("pauseTargetIndex",
+            pauseTargetIndex_.has_value() ? std::to_string(pauseTargetIndex_.value()).c_str() : "null");
+        json->Put("velocity", velocity_.has_value() ? std::to_string(velocity_.value()).c_str() : "null");
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        DumpAdvanceCurveInfo(json, config);
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("isFinishAnimation", isFinishAnimation_);
+        json->Put("mainSizeIsMeasured", mainSizeIsMeasured_);
+        json->Put("usePropertyAnimation", propertyAnimationIsRunning_);
+        json->Put("isUserFinish", isUserFinish_);
+        json->Put("isVoluntarilyClear", isVoluntarilyClear_);
+        json->Put("isIndicatorLongPress", isIndicatorLongPress_);
+        json->Put("stopIndicatorAnimation", stopIndicatorAnimation_);
+        json->Put("isTouchPad", isTouchPad_);
+        json->Put("surfaceChangedCallbackId",
+            surfaceChangedCallbackId_.has_value() ? std::to_string(surfaceChangedCallbackId_.value()).c_str() : "null");
+    }
+}
+
 void SwiperPattern::DumpAdvanceInfo()
 {
     SwiperHelper::DumpAdvanceInfo(*this);
@@ -6898,14 +7085,12 @@ void SwiperPattern::TriggerCustomContentTransitionEvent(int32_t fromIndex, int32
     }
     CHECK_NULL_VOID(onTabsCustomContentTransition_);
 
-#ifndef CROSS_PLATFORM
     if (auto context = GetContext()) {
         auto contentChangeManager = context->GetContentChangeManager();
         if (contentChangeManager) {
             contentChangeManager->OnSwiperChangeStart(GetHost(), hasTabsAncestor_);
         }
     }
-#endif
     auto tabContentAnimatedTransition = (*onTabsCustomContentTransition_)(fromIndex, toIndex);
     auto transition = tabContentAnimatedTransition.transition;
 
@@ -7994,48 +8179,7 @@ void SwiperPattern::DumpInfo()
 
 void SwiperPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    json->Put("isLastIndicatorFocused", isLastIndicatorFocused_);
-    json->Put("moveDirection", moveDirection_);
-    json->Put("indicatorDoingAnimation", indicatorDoingAnimation_);
-    json->Put("hasVisibleChangeRegistered", hasVisibleChangeRegistered_);
-    json->Put("isVisible", isVisible_);
-    json->Put("isVisibleArea", isVisibleArea_);
-    json->Put("isWindowShow", isWindowShow_);
-    json->Put("IsCustomSize", isCustomSize_);
-    json->Put("indicatorIsBoolean", indicatorIsBoolean_);
-    json->Put("isAtHotRegion", isAtHotRegion_);
-    json->Put("isDragging", isDragging_);
-    json->Put("isTouchDown", isTouchDown_);
-    json->Put("preLoop", preLoop_.has_value() ? std::to_string(preLoop_.value()).c_str() : "null");
-    json->Put("indicatorId", indicatorId_.has_value() ? std::to_string(indicatorId_.value()).c_str() : "null");
-    json->Put("leftButtonId", leftButtonId_.has_value() ? std::to_string(leftButtonId_.value()).c_str() : "null");
-    json->Put("rightButtonId", rightButtonId_.has_value() ? std::to_string(rightButtonId_.value()).c_str() : "null");
-    json->Put("crossMatchChild", crossMatchChild_);
-    json->Put(
-        "uiCastJumpIndex", uiCastJumpIndex_.has_value() ? std::to_string(uiCastJumpIndex_.value()).c_str() : "null");
-    json->Put("jumpIndex", jumpIndex_.has_value() ? std::to_string(jumpIndex_.value()).c_str() : "null");
-    json->Put("targetIndex", targetIndex_.has_value() ? std::to_string(targetIndex_.value()).c_str() : "null");
-    json->Put(
-        "pauseTargetIndex", pauseTargetIndex_.has_value() ? std::to_string(pauseTargetIndex_.value()).c_str() : "null");
-    json->Put("velocity", velocity_.has_value() ? std::to_string(velocity_.value()).c_str() : "null");
-    json->Put("curve", GetCurveIncludeMotion() ? GetCurveIncludeMotion()->ToString().c_str() : "null");
-    json->Put("isFinishAnimation", isFinishAnimation_);
-    json->Put("mainSizeIsMeasured", mainSizeIsMeasured_);
-    json->Put("usePropertyAnimation", propertyAnimationIsRunning_);
-    json->Put("isUserFinish", isUserFinish_);
-    json->Put("isVoluntarilyClear", isVoluntarilyClear_);
-    json->Put("isIndicatorLongPress", isIndicatorLongPress_);
-    json->Put("stopIndicatorAnimation", stopIndicatorAnimation_);
-    json->Put("isTouchPad", isTouchPad_);
-    json->Put("surfaceChangedCallbackId",
-        surfaceChangedCallbackId_.has_value() ? std::to_string(surfaceChangedCallbackId_.value()).c_str() : "null");
-    json->Put("currentIndex", currentIndex_);
-    json->Put("oldIndex", oldIndex_);
-    BuildOffsetInfo(json);
-    BuildIndicatorTypeInfo(json);
-    BuildItemPositionInfo(json);
-    BuildPanDirectionInfo(json);
-    BuildAxisInfo(json);
+    SwiperPattern::DumpAdvanceInfo(json, ParamConfig());
 }
 
 void SwiperPattern::DumpSimplifyInfoOnlyForParamConfig(std::shared_ptr<JsonValue>& json, ParamConfig config)
@@ -8051,20 +8195,40 @@ void SwiperPattern::DumpSimplifyInfoOnlyForParamConfig(std::shared_ptr<JsonValue
     json->Put("isLoop", IsLoop());
 }
 
-void SwiperPattern::BuildOffsetInfo(std::unique_ptr<JsonValue>& json)
+void SwiperPattern::BuildOffsetInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
-    json->Put("currentOffset", std::to_string(currentOffset_).c_str());
-    json->Put("fadeOffset", std::to_string(fadeOffset_).c_str());
-    json->Put("touchBottomRate", std::to_string(touchBottomRate_).c_str());
-    json->Put("currentIndexOffset", std::to_string(currentIndexOffset_).c_str());
-    json->Put("gestureSwipeIndex", gestureSwipeIndex_);
+    if (config.IsPublicTree()) {
+        json->Put("currentOffset", currentOffset_);
+    } else {
+        json->Put("currentOffset", std::to_string(currentOffset_).c_str());
+    }
+    if (config.IsPublicTree()) {
+        json->Put("fadeOffset", fadeOffset_);
+    } else {
+        json->Put("fadeOffset", std::to_string(fadeOffset_).c_str());
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("touchBottomRate", std::to_string(touchBottomRate_).c_str());
+    }
+    if (config.IsPublicTree()) {
+        json->Put("currentIndexOffset", currentIndexOffset_);
+    } else {
+        json->Put("currentIndexOffset", std::to_string(currentIndexOffset_).c_str());
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("gestureSwipeIndex", gestureSwipeIndex_);
+    }
     json->Put("currentFirstIndex", currentFirstIndex_);
     json->Put("startMainPos", startMainPos_);
     json->Put("endMainPos", endMainPos_);
     json->Put("contentMainSize", contentMainSize_);
     json->Put("contentCrossSize", contentCrossSize_);
-    json->Put("propertyAnimationIndex", propertyAnimationIndex_);
-    json->Put("mainDeltaSum", mainDeltaSum_);
+    if (!config.IsPublicTree()) {
+        json->Put("propertyAnimationIndex", propertyAnimationIndex_);
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("mainDeltaSum", mainDeltaSum_);
+    }
 }
 
 void SwiperPattern::BuildAxisInfo(std::unique_ptr<JsonValue>& json)
@@ -8118,10 +8282,14 @@ void SwiperPattern::BuildItemPositionInfo(std::unique_ptr<JsonValue>& json)
     }
 }
 
-void SwiperPattern::BuildIndicatorTypeInfo(std::unique_ptr<JsonValue>& json)
+void SwiperPattern::BuildIndicatorTypeInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
-    if (lastSwiperIndicatorType_.has_value()) {
-        switch (lastSwiperIndicatorType_.value()) {
+    auto indicatorType = lastSwiperIndicatorType_;
+    if (config.IsPublicTree()) {
+        indicatorType = GetIndicatorType();
+    }
+    if (indicatorType.has_value()) {
+        switch (indicatorType.value()) {
             case SwiperIndicatorType::DOT: {
                 json->Put("SwiperIndicatorType", "DOT");
                 break;
@@ -8130,11 +8298,17 @@ void SwiperPattern::BuildIndicatorTypeInfo(std::unique_ptr<JsonValue>& json)
                 json->Put("SwiperIndicatorType", "DIGIT");
                 break;
             }
+            case SwiperIndicatorType::ARC_DOT: {
+                if (config.IsPublicTree()) {
+                    json->Put("SwiperIndicatorType", "ARC_DOT");
+                }
+                break;
+            }
             default: {
                 break;
             }
         }
-    } else {
+    } else if (!config.IsPublicTree()) {
         json->Put("lastSwiperIndicatorType", "null");
     }
 }
@@ -8389,69 +8563,64 @@ std::vector<SwiperItemInfoNG> SwiperPattern::GetShownItemInfoFromIndex(int32_t i
 
 void SwiperPattern::ContentChangeReport(const RefPtr<FrameNode>& keyNode, bool needSwiperChangeEnd)
 {
+    if (contentChangeDetached_) {
+        return;
+    }
     auto pipeline = GetContext();
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
-    if (IsAutoPlay()) {
+    if (!needSwiperChangeEnd) {
+        mgr->CompleteCapiSwiperChangeWithoutMove(keyNode, hasTabsAncestor_);
         return;
     }
-    if (!needSwiperChangeEnd) {
+    if (IsAutoPlay()) {
+        if (needSwiperChangeEnd) {
+            mgr->CompleteCapiSwiperChangeAfterAutoPlay(
+                keyNode, hasTabsAncestor_, targetIndex_.has_value() && targetIndex_.value() == currentIndex_);
+        }
         return;
     }
     if (targetIndex_.has_value() && targetIndex_.value() == currentIndex_) {
-#ifndef CROSS_PLATFORM
-        if (mgr->IsStartEventReportEnabled()) {
-            mgr->OnSwiperChangeCancel(keyNode, hasTabsAncestor_);
-        }
-#endif
+        mgr->OnSwiperChangeCancel(keyNode, hasTabsAncestor_);
         return;
     }
-#ifndef CROSS_PLATFORM
     mgr->OnSwiperChangeEnd(keyNode, hasTabsAncestor_);
-#endif
 }
 
 void SwiperPattern::ContentChangeOnTransitionStart(const RefPtr<FrameNode>& keyNode) const
 {
-#ifndef CROSS_PLATFORM
     auto pipeline = GetContext();
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
     CHECK_NULL_VOID(keyNode);
     mgr->OnTransitionAdded(keyNode->GetId());
-#endif
 }
 
 void SwiperPattern::ContentChangeOnTransitionEnd(const RefPtr<FrameNode>& keyNode, bool isInterrupt) const
 {
-#ifndef CROSS_PLATFORM
     auto pipeline = GetContext();
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
     CHECK_NULL_VOID(keyNode);
-    if (isInterrupt && (IsAutoPlay() || !mgr->IsStartEventReportEnabled())) {
+    if (isInterrupt) {
+        mgr->OnSwiperChangeInterrupted(keyNode, hasTabsAncestor_);
         return;
     }
     mgr->OnTransitionRemoved(keyNode->GetId());
-    if (isInterrupt) {
-        mgr->OnSwiperChangeEnd(keyNode, hasTabsAncestor_);
-    }
-#endif
 }
 
 void SwiperPattern::ContentChangeByDetaching(PipelineContext* pipeline)
 {
-#ifndef CROSS_PLATFORM
+    contentChangeDetached_ = true;
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     mgr->OnTransitionRemoved(host->GetId());
-#endif
 }
 
 bool SwiperPattern::StartFakeDrag()

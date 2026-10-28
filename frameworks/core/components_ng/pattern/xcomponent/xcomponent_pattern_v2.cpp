@@ -14,6 +14,8 @@
  */
 
 #include "core/components_ng/pattern/xcomponent/xcomponent_pattern_v2.h"
+
+#include "base/log/log_wrapper.h"
 #include "core/accessibility/accessibility_manager.h"
 
 #include <string_view>
@@ -255,6 +257,7 @@ void XComponentPatternV2::OnSurfaceChanged(const RectF& surfaceRect)
     for (const auto& iter : callbackList) {
         auto callback = iter->OnSurfaceChanged;
         if (callback) {
+            LOG_CALLBACK("OH_ArkUI_SurfaceCallback_SetSurfaceChangedEvent", callback);
             callback(surfaceHolder_, surfaceRect.Width(), surfaceRect.Height());
         }
     }
@@ -440,6 +443,7 @@ int32_t XComponentPatternV2::HandleSurfaceCreated()
         for (const auto& iter : callbackList) {
             auto callback = iter->OnSurfaceCreated;
             if (callback) {
+                LOG_CALLBACK("OH_ArkUI_SurfaceCallback_SetSurfaceCreatedEvent", callback);
                 callback(surfaceHolder_);
             }
         }
@@ -461,6 +465,7 @@ int32_t XComponentPatternV2::HandleSurfaceDestroyed()
         for (const auto& iter : callbackList) {
             auto callback = iter->OnSurfaceDestroyed;
             if (callback) {
+                LOG_CALLBACK("OH_ArkUI_SurfaceCallback_SetSurfaceDestroyedEvent", callback);
                 callback(surfaceHolder_);
             }
         }
@@ -651,6 +656,7 @@ void XComponentPatternV2::UpdateOnFrameEvent(void(*callback)(void*, uint64_t, ui
         CHECK_NULL_VOID(callback);
         CHECK_NULL_VOID(arkuiNode);
         CHECK_NULL_VOID(displaySyncData);
+        LOG_CALLBACK("OH_ArkUI_XComponent_RegisterOnFrameCallback", callback);
         callback(arkuiNode, displaySyncData->GetTimestamp(), displaySyncData->GetTargetTimestamp());
     });
     TAG_LOGD(AceLogTag::ACE_XCOMPONENT, "Id: %{public}" PRIu64 " RegisterOnFrame",
@@ -689,6 +695,7 @@ void XComponentPatternV2::OnSurfaceShow()
     for (const auto& iter : callbackList) {
         auto callback = iter->onSurfaceShow;
         if (callback) {
+            LOG_CALLBACK("OH_ArkUI_SurfaceCallback_SetSurfaceShowEvent", callback);
             callback(surfaceHolder_);
         }
     }
@@ -703,7 +710,10 @@ void XComponentPatternV2::OnSurfaceHide()
     for (const auto& iter : callbackList) {
         auto callback = iter->onSurfaceHide;
         if (callback) {
-            callback(surfaceHolder_);
+            {
+                LOG_CALLBACK("OH_ArkUI_SurfaceCallback_SetSurfaceHideEvent", callback);
+                callback(surfaceHolder_);
+            }
             hasCallback = true;
         }
     }
@@ -719,7 +729,9 @@ void XComponentPatternV2::ResetAndInitializeNodeHandleAccessibility()
     CHECK_NULL_VOID(host);
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
     if (accessibilityChildTreeCallback_) {
         accessibilityManager->DeregisterAccessibilityChildTreeCallback(

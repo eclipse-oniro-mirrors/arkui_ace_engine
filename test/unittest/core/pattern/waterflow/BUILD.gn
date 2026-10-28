@@ -14,6 +14,7 @@
 import("//foundation/arkui/ace_engine/test/unittest/ace_unittest.gni")
 
 COMMON_SRC = [
+  "water_flow_scroll_snap_test_ng.cpp",
   "water_flow_test_ng.cpp",
   "water_flow_scroller_test_ng.cpp",
   "water_flow_cache_test.cpp",
@@ -21,6 +22,7 @@ COMMON_SRC = [
 
 CONTENT_CLIP_SRC = [
   "water_flow_content_clip_test.cpp",
+  "$ace_root/test/unittest/core/pattern/scrollable/scrollable_test_utils.cpp",
   "$ace_root/frameworks/core/components_ng/pattern/lazy_column_layout/lazy_column_layout_algorithm.cpp",
   "$ace_root/frameworks/core/components_ng/pattern/lazy_column_layout/lazy_column_layout_info.cpp",
   "$ace_root/frameworks/core/components_ng/pattern/lazy_column_layout/lazy_column_layout_model.cpp",
@@ -43,7 +45,7 @@ if (is_host_product) {
     sources += CONTENT_CLIP_SRC
     sources += COMMON_SRC
     sources += [ "water_flow_test_core.cpp" ]
-      cflags = [ "-fno-access-control" ]
+    cflags = [ "-fno-access-control" ]
   }
 } else {
   ace_unittest("water_flow_test_original") {
@@ -85,7 +87,7 @@ if (is_host_product) {
     sources += CONTENT_CLIP_SRC
     sources += COMMON_SRC
     sources += [ "water_flow_test_core.cpp" ]
-      cflags = [ "-fno-access-control" ]
+    cflags = [ "-fno-access-control" ]
   }
 } else {
   ace_unittest("water_flow_test_segmented") {
@@ -118,17 +120,18 @@ if (is_host_product) {
     defines = [ "TEST_WATER_FLOW_SW" ]
     sources = [
       "water_flow_estimation_test.cpp",
+      "water_flow_fast_scroll_test_ng.cpp",
+      "water_flow_layout_utils_test.cpp",
       "water_flow_regular_test.cpp",
       "water_flow_segment_common_test.cpp",
-      "water_flow_sw_lazy_layout_test.cpp",
       "water_flow_sw_layout_test.cpp",
+      "water_flow_sw_lazy_layout_test.cpp",
       "water_flow_sw_test.cpp",
-      "water_flow_layout_utils_test.cpp",
     ]
     sources += CONTENT_CLIP_SRC
     sources += COMMON_SRC
     sources += [ "water_flow_test_core.cpp" ]
-      cflags = [ "-fno-access-control" ]
+    cflags = [ "-fno-access-control" ]
   }
 } else {
   ace_unittest("water_flow_test_sw") {
@@ -137,12 +140,13 @@ if (is_host_product) {
     defines = [ "TEST_WATER_FLOW_SW" ]
     sources = [
       "water_flow_estimation_test.cpp",
+      "water_flow_fast_scroll_test_ng.cpp",
+      "water_flow_layout_utils_test.cpp",
       "water_flow_regular_test.cpp",
       "water_flow_segment_common_test.cpp",
-      "water_flow_sw_lazy_layout_test.cpp",
       "water_flow_sw_layout_test.cpp",
+      "water_flow_sw_lazy_layout_test.cpp",
       "water_flow_sw_test.cpp",
-      "water_flow_layout_utils_test.cpp",
     ]
     sources += CONTENT_CLIP_SRC
     sources += COMMON_SRC
@@ -158,7 +162,7 @@ if (is_host_product) {
 if (is_host_product) {
   ace_unittest("water_flow_test_generated") {
     type = "host_components"
-      cflags = [ "-fno-access-control" ]
+    cflags = [ "-fno-access-control" ]
     module_name = "ScrollingSet-WaterFlowAndFlowItem"
     sources = [
       "water_flow_item_model_test.cpp",
@@ -192,9 +196,9 @@ if (is_host_product) {
 group("water_flow_test_all") {
   testonly = true
   deps = [
+    ":water_flow_test_generated",
     ":water_flow_test_original",
     ":water_flow_test_segmented",
     ":water_flow_test_sw",
-    ":water_flow_test_generated",
   ]
 }

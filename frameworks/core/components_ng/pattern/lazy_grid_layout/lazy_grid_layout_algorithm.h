@@ -38,6 +38,9 @@ public:
     void Measure(LayoutWrapper* layoutWrapper) override;
     void Layout(LayoutWrapper* layoutWrapper) override;
 
+    // Nullopt rejects preflight; an unsupported result still carries committed size/adjustment for the caller.
+    std::optional<LazyPremeasureResult> Premeasure(LayoutWrapper* layoutWrapper);
+
     // Inject the header FrameNode (optional). Pattern calls it once in CreateLayoutAlgorithm.
     void SetHeader(const RefPtr<FrameNode>& header)
     {
@@ -86,6 +89,19 @@ public:
     void SetDynamicLayout(bool isDynamic) { isDynamicLayout_ = isDynamic; }
 
 private:
+    std::optional<LazyPremeasureResult> MeasureBoundaryRange(LayoutWrapper* layoutWrapper);
+    bool PrepareBoundaryMeasure(LayoutWrapper* layoutWrapper, OptionalSizeF& ideal);
+    LazyPremeasureResult MeasureBoundaryLines(
+        LayoutWrapper* layoutWrapper, const ViewPosReference& reference);
+    bool FinishBoundaryMeasure(LazyPremeasureResult& result, float oldTotal, float oldHeader,
+        const std::optional<float>& oldAnchor);
+    void CapturePreparedGeometry(PreparedLayoutGeometry& geometry) const;
+    std::optional<float> GetKnownBodySize() const;
+    AdjustOffset PrepareKnownBodyMeasure();
+    AdjustOffset MeasureInitialEdges(LayoutWrapper* layoutWrapper);
+    void UpdateMeasuredMainSize(LayoutWrapper* layoutWrapper, const AdjustOffset& knownAdjust);
+    void RebasePremeasureWindow(float bodyAnchorAdjust);
+    std::optional<bool> MeasureBoundaryLine(LayoutWrapper* layoutWrapper, int32_t first, int32_t last, float& size);
     // DynamicLayout branch of Measure: measure all items (non-lazy) and finalize the frame size.
     void MeasureDynamicLayout(LayoutWrapper* layoutWrapper, OptionalSizeF& contentIdealSize,
         const PaddingPropertyF& padding);
@@ -126,6 +142,8 @@ private:
     void MeasurePredictItems(LayoutWrapper* layoutWrapper, const PaddingPropertyF& padding);
     void GetStartIndexInfo(int32_t& index, float& pos);
     void GetEndIndexInfo(int32_t& index, float& pos);
+    bool ShouldSeedFromKnownTail() const;
+    bool ShouldSeedFromKnownHead() const;
     void CheckRecycle();
     void CheckCacheRecycle();
     void FixIndexRange(int32_t& startIndex, int32_t& endIndex);
@@ -169,6 +187,8 @@ private:
     float totalMainSize_ = 0.0f;
     // Last frame's body extent (captured before the edges are remeasured); keeps edge resizes out of adjustOffset_.
     float prevBodyMainSize_ = 0.0f;
+    // Refreshed from the current content constraint, never retained by the pattern.
+    std::optional<float> knownMainSize_;
     // False only on the very first layout (previous total == 0); a recycled child re-entering still counts as laid.
     bool hadMeasuredItems_ = true;
     // Set when a prediction without a baseline placed the tail at 0; its result is rebased by the new extent.

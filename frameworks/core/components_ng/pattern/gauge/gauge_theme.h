@@ -67,7 +67,7 @@ inline const std::vector<Color> GAUGE_DEFAULT_COLOR { Color(0xFF64BB5C), Color(0
  * GaugeTheme defines color and styles of GaugePattern. GaugeTheme should be built
  * using GaugeTheme::Builder.
  */
-class GaugeTheme : public virtual Theme {
+class GaugeTheme : public Theme {
     DECLARE_ACE_TYPE(GaugeTheme, Theme);
 
 public:

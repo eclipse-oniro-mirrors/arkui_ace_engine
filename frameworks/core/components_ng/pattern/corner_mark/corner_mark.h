@@ -20,7 +20,7 @@
 
 namespace OHOS::Ace::NG {
 
-class CornerMark : public virtual AceType {
+class CornerMark : public AceType {
     DECLARE_ACE_TYPE(CornerMark, AceType);
 
 public:

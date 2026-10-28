@@ -123,8 +123,12 @@ public:
     virtual void FireAsyncCallbacks();
 
     // Dpi
-    void SetDpiFollowStrategy(DpiFollowStrategy dpiFollowStrategy);
+    void SetDpiFollowStrategy(DpiFollowStrategy dpiFollowStrategy, bool isDpiFollowStrategySet = true);
     DpiFollowStrategy GetDpiFollowStrategy();
+    bool IsDpiFollowStrategySet()
+    {
+        return isDpiFollowStrategySet_;
+    }
     DpiFollowStrategy GetEffectiveDpiFollowStrategy();
     void DispatchFollowHostDensity(DpiFollowStrategy dpiFollowStrategy);
     void OnDpiConfigurationUpdate() override;
@@ -206,6 +210,7 @@ protected:
     bool isVisible_ = true;
     bool isShowPlaceholder_ = false;
     DpiFollowStrategy dpiFollowStrategy_ = DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI;
+    bool isDpiFollowStrategySet_ = false;
 
     // StartUIExtension should after mountToParent
     bool hasMountToParent_ = false;

@@ -1616,6 +1616,7 @@ void ParallelStageManager::ReportPageTransitionEnd(const RefPtr<FrameNode>& page
     CHECK_NULL_VOID(context);
     auto mgr = context->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
+    mgr->ReportCapiPageStartEvent(page);
     context->AddAfterLayoutTask([weakMgr = WeakPtr(mgr), weakNode = WeakPtr(page)]() {
         auto node = weakNode.Upgrade();
         CHECK_NULL_VOID(node);

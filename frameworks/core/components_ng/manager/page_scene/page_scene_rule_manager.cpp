@@ -674,13 +674,35 @@ std::vector<SearchPresenceStateMachine::PresenceEvent> PageSceneRuleManager::Upd
 {
     std::lock_guard<std::mutex> presenceLock(presenceStateMutex_);
     std::vector<SearchPresenceStateMachine::PresenceEvent> events;
-    if (snapshot.pageName.empty()) {
+    // Derive pageName by pageType instead of the concatenated snapshot.pageName.
+    // Navigation → navDestinationName; Router → pageUrl; fallback → pageName.
+    std::string pageName = !snapshot.navDestinationName.empty()
+        ? snapshot.navDestinationName : (!snapshot.pageUrl.empty() ? snapshot.pageUrl : snapshot.pageName);
+    if (pageName.empty()) {
         return events;
     }
-    std::string key = std::to_string(processId) + ":" + snapshot.pageName;
-    auto event = presenceStateMachine_.Update(key, snapshot.pageName, !hits.empty(), hits);
-    if (event.has_value()) {
-        events.emplace_back(event.value());
+    std::map<std::string, std::vector<SearchMatchEvidence>> hitsBySuffix {
+        { "", {} }, { SUBWINDOW_DIALOG_SUFFIX, {} }, { SUBWINDOW_SHEET_SUFFIX, {} }
+    };
+    for (const auto& hit : hits) {
+        const auto suffix = hit.isSubwindow
+            ? (hit.subwindowSuffix.empty() ? std::string(SUBWINDOW_DIALOG_SUFFIX) : hit.subwindowSuffix) : "";
+        hitsBySuffix[suffix].emplace_back(hit);
+    }
+    // Update every supported state even on a miss or after a window closes.
+    // Dialog and Sheet must have independent evidence and exit transitions.
+    std::map<std::string, std::vector<SearchMatchEvidence>> hitsByPage;
+    for (const auto& [suffix, pageHits] : hitsBySuffix) {
+        const auto name = suffix.empty() ? pageName : BuildSearchSubwindowPageName(pageName, suffix);
+        auto& combined = hitsByPage[name];
+        combined.insert(combined.end(), pageHits.begin(), pageHits.end());
+    }
+    for (const auto& [eventPageName, pageHits] : hitsByPage) {
+        const auto key = std::to_string(processId) + ":" + eventPageName;
+        auto event = presenceStateMachine_.Update(key, eventPageName, !pageHits.empty(), pageHits);
+        if (event) {
+            events.emplace_back(std::move(*event));
+        }
     }
     return events;
 }
@@ -699,8 +721,14 @@ std::vector<SearchPresenceStateMachine::PresenceEvent> PageSceneRuleManager::Exi
     int32_t processId, const std::string& currentPageName)
 {
     std::lock_guard<std::mutex> presenceLock(presenceStateMutex_);
+    // Do not exit any PRESENT state when there is no current page identity
+    // (subwindow UIContent / transition), to avoid subwindow focus detection
+    // clearing the main-window presence (AC-5.1).
+    if (currentPageName.empty()) {
+        return {};
+    }
     std::string prefix = std::to_string(processId) + ":";
-    return presenceStateMachine_.ExitAllExcept(prefix, prefix + currentPageName);
+    return presenceStateMachine_.ExitOtherPages(prefix, currentPageName);
 }
 
 std::vector<std::pair<int32_t, SearchPresenceStateMachine::PresenceEvent>> PageSceneRuleManager::ExitAllSearchPresence()
@@ -819,7 +847,7 @@ std::vector<SearchClickMatchResult> PageSceneRuleManager::ConsumeSearchClickCand
     const SearchClickPageContext& page)
 {
     std::vector<SearchClickCandidate> candidates;
-    std::vector<SearchRuleSet> ruleSets;
+    std::vector<std::pair<int32_t, SearchRuleSet>> ruleSets;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         PrunePendingClickCandidatesLocked(GetSysTimestamp() / NANOSECONDS_PER_MILLISECOND);
@@ -829,20 +857,48 @@ std::vector<SearchClickMatchResult> PageSceneRuleManager::ConsumeSearchClickCand
         pendingClickCandidates_.clear();
         for (const auto& [processId, processRuleSets] : searchRuleSets_) {
             for (const auto& [ruleSetId, ruleSet] : processRuleSets) {
-                ruleSets.emplace_back(ruleSet);
+                ruleSets.emplace_back(processId, ruleSet);
             }
         }
     }
     SearchClickMatcher matcher;
     std::vector<SearchClickMatchResult> results;
-    for (const auto& ruleSet : ruleSets) {
+    for (const auto& [processId, ruleSet] : ruleSets) {
         for (const auto& candidate : candidates) {
             auto responseNode = candidate.responseNode.Upgrade();
             auto ruleResults = matcher.Match(candidate, page, ruleSet, responseNode);
+            for (auto& result : ruleResults) {
+                result.processId = processId;
+                result.operationId = candidate.operationId;
+            }
             results.insert(results.end(), ruleResults.begin(), ruleResults.end());
         }
     }
     return results;
+}
+
+void PageSceneRuleManager::SetIsContentStableFunction(IsContentStableFunction&& func)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    isContentStableFunc_ = std::move(func);
+}
+
+std::vector<SearchClickMatchResult> PageSceneRuleManager::FlushPendingSearchClicksIfStable(
+    const SearchClickPageContext& page)
+{
+    // Check the stability gate first (reusing ContentChangeManager's
+    // IsScrolling/IsTransitioning/IsSwiperScrolling); if not stable, skip
+    // consumption and leave candidates for the ContentChange flush path (AC-7.11).
+    IsContentStableFunction isStable;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        isStable = isContentStableFunc_;
+    }
+    if (isStable && !isStable()) {
+        return {};
+    }
+    auto clickResults = ConsumeSearchClickCandidates(page);
+    return clickResults;
 }
 
 int32_t PageSceneRuleManager::BeginGetPageScene(

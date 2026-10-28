@@ -17,7 +17,8 @@
 
 namespace OHOS::Ace {
 GetInspectorTreeConfigImpl::GetInspectorTreeConfigImpl(bool interactionInfo, bool accessibilityInfo, bool cacheNodes,
-    bool withWeb, bool withUIExtension, bool rectCulling, float minOpacity)
+    bool withWeb, bool withUIExtension, bool rectCulling, float minOpacity,
+    bool withResponseRegion, bool withCustomContent)
 {
     config_.interactionInfo = interactionInfo;
     config_.accessibilityInfo = accessibilityInfo;
@@ -26,6 +27,8 @@ GetInspectorTreeConfigImpl::GetInspectorTreeConfigImpl(bool interactionInfo, boo
     config_.withUIExtension = withUIExtension;
     config_.rectCulling = rectCulling;
     config_.minOpacity = minOpacity;
+    config_.withResponseRegion = withResponseRegion;
+    config_.withCustomContent = withCustomContent;
 }
 GetInspectorTreeConfigImpl::GetInspectorTreeConfigImpl(const ParamConfig& config)
 {
@@ -36,6 +39,8 @@ GetInspectorTreeConfigImpl::GetInspectorTreeConfigImpl(const ParamConfig& config
     config_.withUIExtension = config.withUIExtension;
     config_.rectCulling = config.rectCulling;
     config_.minOpacity = config.minOpacity;
+    config_.withResponseRegion = config.withResponseRegion;
+    config_.withCustomContent = config.withCustomContent;
 }
 bool GetInspectorTreeConfigImpl::Marshalling(Parcel& parcel) const
 {
@@ -60,7 +65,7 @@ bool GetInspectorTreeConfigImpl::Marshalling(Parcel& parcel) const
     if (!parcel.WriteFloat(config_.minOpacity)) {
         return false;
     }
-    return true;
+    return parcel.WriteBool(config_.withResponseRegion) && parcel.WriteBool(config_.withCustomContent);
 }
 GetInspectorTreeConfigImpl* GetInspectorTreeConfigImpl::Unmarshalling(Parcel& parcel)
 {
@@ -71,6 +76,8 @@ GetInspectorTreeConfigImpl* GetInspectorTreeConfigImpl::Unmarshalling(Parcel& pa
     bool withUIExtension = false;
     bool rectCulling = false;
     float minOpacity = 0.0f;
+    bool withResponseRegion = false;
+    bool withCustomContent = false;
     if (!parcel.ReadBool(interactionInfo)) {
         return nullptr;
     }
@@ -92,9 +99,13 @@ GetInspectorTreeConfigImpl* GetInspectorTreeConfigImpl::Unmarshalling(Parcel& pa
     if (!parcel.ReadFloat(minOpacity)) {
         return nullptr;
     }
+    if (!parcel.ReadBool(withResponseRegion) || !parcel.ReadBool(withCustomContent)) {
+        return nullptr;
+    }
     GetInspectorTreeConfigImpl* configImpl =
         new GetInspectorTreeConfigImpl(
-            interactionInfo, accessibilityInfo, cacheNodes, withWeb, withUIExtension, rectCulling, minOpacity);
+            interactionInfo, accessibilityInfo, cacheNodes, withWeb, withUIExtension, rectCulling, minOpacity,
+            withResponseRegion, withCustomContent);
     return configImpl;
 }
 ParamConfig GetInspectorTreeConfigImpl::GetConfig() const

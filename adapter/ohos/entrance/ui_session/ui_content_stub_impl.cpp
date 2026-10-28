@@ -101,6 +101,26 @@ int32_t UIContentServiceStubImpl::SendCommand(const std::string command)
     return NO_ERROR;
 }
 
+int32_t UIContentServiceStubImpl::SendCommand(
+    int32_t id, const std::string& command, const SendCommandFinishCallback& finishCallback)
+{
+    if (!finishCallback) {
+        return PARAM_INVALID;
+    }
+    UiSessionManager::GetInstance()->NotifySendCommandPatternWithResult(id, command, finishCallback);
+    return NO_ERROR;
+}
+
+int32_t UIContentServiceStubImpl::SendCommand(
+    const std::string command, const SendCommandFinishCallback& finishCallback)
+{
+    if (!finishCallback) {
+        return PARAM_INVALID;
+    }
+    UiSessionManager::GetInstance()->SendCommandWithResult(command, finishCallback);
+    return NO_ERROR;
+}
+
 int32_t UIContentServiceStubImpl::UnregisterClickEventCallback()
 {
     UiSessionManager::GetInstance()->SetClickEventRegistered(false);
@@ -373,6 +393,32 @@ int32_t UIContentServiceStubImpl::GetNavigationContentByPoint(float x, float y, 
     request.x = x;
     request.y = y;
     request.pattern = pattern;
+    UiSessionManager::GetInstance()->ComponentTreeQuery(request);
+    return NO_ERROR;
+}
+
+int32_t UIContentServiceStubImpl::GetLazyForEachDataByPoint(float x, float y,
+    [[maybe_unused]] const std::function<void(const std::string&)>& eventCallback,
+    [[maybe_unused]] int32_t timeout)
+{
+    ComponentTreeQueryRequest request;
+    request.type = ComponentTreeQueryType::LAZY_FOREACH_DATA_BY_POINT;
+    request.x = x;
+    request.y = y;
+    UiSessionManager::GetInstance()->ComponentTreeQuery(request);
+    return NO_ERROR;
+}
+
+int32_t UIContentServiceStubImpl::GetNodesInRect(float x1, float y1, float x2, float y2,
+    [[maybe_unused]] const std::function<void(const std::string&)>& eventCallback,
+    [[maybe_unused]] int32_t timeout)
+{
+    ComponentTreeQueryRequest request;
+    request.type = ComponentTreeQueryType::NODES_IN_RECT;
+    request.x = x1;
+    request.y = y1;
+    request.extraX = x2;
+    request.extraY = y2;
     UiSessionManager::GetInstance()->ComponentTreeQuery(request);
     return NO_ERROR;
 }

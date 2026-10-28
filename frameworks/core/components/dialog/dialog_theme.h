@@ -51,7 +51,7 @@ constexpr float DIALOG_TITLE_TEXT_FONT_WEIGHT = 9.0;
  * DialogTheme defines color and styles of DialogComponent. DialogTheme should be built
  * using DialogTheme::Builder.
  */
-class DialogTheme : public virtual Theme {
+class DialogTheme : public Theme {
     DECLARE_ACE_TYPE(DialogTheme, Theme);
 
 public:

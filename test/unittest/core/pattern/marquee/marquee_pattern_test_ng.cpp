@@ -60,7 +60,9 @@ public:
     }
 };
 
-class MockLayoutWrapper : public LayoutWrapper {
+class MockLayoutWrapper : public LayoutWrapper, public AceType {
+    DECLARE_ACE_TYPE(MockLayoutWrapper, LayoutWrapper, AceType);
+
 public:
     explicit MockLayoutWrapper(WeakPtr<FrameNode> hostNode) : LayoutWrapper(std::move(hostNode)) {}
     ~MockLayoutWrapper() override = default;
@@ -71,8 +73,8 @@ public:
     MOCK_METHOD(int32_t, GetTotalChildCount, (), (const, override));
     MOCK_METHOD(const RefPtr<GeometryNode>&, GetGeometryNode, (), (const, override));
     MOCK_METHOD(const RefPtr<LayoutProperty>&, GetLayoutProperty, (), (const, override));
-    MOCK_METHOD(RefPtr<LayoutWrapper>, GetOrCreateChildByIndex, (uint32_t index, bool addToRenderTree, bool isCache),
-        (override));
+    MOCK_METHOD(RefPtr<LayoutWrapper>, GetOrCreateChildByIndex,
+        (uint32_t index, bool addToRenderTree, bool isCache, bool allowPlaceholderSubstitution), (override));
     MOCK_METHOD(RefPtr<LayoutWrapper>, GetChildByIndex, (uint32_t index, bool isCache), (override));
     MOCK_METHOD(ChildrenListWithGuard, GetAllChildrenWithBuild, (bool addToRenderTree), (override));
     MOCK_METHOD(void, RemoveChildInRenderTree, (uint32_t index), (override));
@@ -87,6 +89,12 @@ public:
         void, SetCacheCount, (int32_t cacheCount, const std::optional<LayoutConstraintF>& itemConstraint), (override));
     MOCK_METHOD(float, GetBaselineDistance, (), (const, override));
     MOCK_METHOD(bool, CheckNeedForceMeasureAndLayout, (), (override));
+
+private:
+    AceType* GetLayoutOwner() const override
+    {
+        return const_cast<MockLayoutWrapper*>(this);
+    }
 };
 
 /**

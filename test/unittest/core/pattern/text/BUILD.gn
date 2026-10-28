@@ -24,6 +24,7 @@ test_sources = [
   "text_test_core.cpp",
   "text_test_min.cpp",
   "text_test_ng.cpp",
+  "text_style_optimization_test_ng.cpp",
   "text_testeight_ng.cpp",
   "text_testeleven_ng.cpp",
   "text_testfive_ng.cpp",
@@ -65,6 +66,7 @@ if (is_host_product) {
 addition_sources = [
   "paragraph_cache_test_ng.cpp",
   "text_base.cpp",
+  "text_external_paragraph_test_ng.cpp",
   "text_pattern_multi_thread_test_ng.cpp",
   "text_scroll_bar_2d_test.cpp",
   "text_test_min.cpp",

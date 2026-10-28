@@ -25,7 +25,7 @@ namespace OHOS::Ace::NG {
 /**
  * GridItemTheme defines styles of grid item. GridItemTheme should be built using GridItemTheme::Builder.
  */
-class GridItemTheme : public virtual Theme {
+class GridItemTheme : public Theme {
     DECLARE_ACE_TYPE(GridItemTheme, Theme);
 
 public:

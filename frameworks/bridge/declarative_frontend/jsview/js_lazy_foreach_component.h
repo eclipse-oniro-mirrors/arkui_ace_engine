@@ -27,8 +27,8 @@
 
 namespace OHOS::Ace::Framework {
 
-class DefaultDataChangeListener : public V2::DataChangeListener {
-    DECLARE_ACE_TYPE(DefaultDataChangeListener, DataChangeListener);
+class DefaultDataChangeListener : public V2::DataChangeListener, public AceType {
+    DECLARE_ACE_TYPE(DefaultDataChangeListener, DataChangeListener, AceType);
 public:
     explicit DefaultDataChangeListener(JSView* parentView) : parentView_(parentView) {}
     ~DefaultDataChangeListener() override = default;
@@ -83,6 +83,11 @@ public:
     }
 
 private:
+    AceType* GetDataChangeOwner() const override
+    {
+        return const_cast<DefaultDataChangeListener*>(this);
+    }
+
     JSView* parentView_ = nullptr;
 
     ACE_DISALLOW_COPY_AND_MOVE(DefaultDataChangeListener);

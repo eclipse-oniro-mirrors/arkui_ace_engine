@@ -139,6 +139,13 @@ using OnOffsetChangeFunc = std::function<void(int32_t)>;
 using OnStateChangedEvent = std::function<void(SwipeActionState)>;
 
 namespace NG {
+enum ListItemGroupArea {
+    NONE_AREA,
+    IN_LIST_ITEM_AREA,
+    IN_HEADER_AREA,
+    IN_FOOTER_AREA
+};
+
 using ItemState = uint32_t;
 inline constexpr ItemState ITEM_STATE_NORMAL = 0;
 inline constexpr ItemState ITEM_STATE_PRESSED = 1;

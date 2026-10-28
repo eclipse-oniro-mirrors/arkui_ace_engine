@@ -187,10 +187,7 @@ void TextInputLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
 
     auto unitNodeWidth = 0.0f;
     for (const auto& area : pattern->GetAllResponseArea()) {
-        if (area) {
-            int32_t childIndex = frameNode->GetChildIndex(area->GetFrameNode());
-            area->Layout(layoutWrapper, childIndex, unitNodeWidth);
-        }
+        ResponseAreaMeasureHelper::LayoutArea(area, layoutWrapper, unitNodeWidth);
     }
 
     UpdateContentPositionParams params = {
@@ -317,19 +314,9 @@ LayoutConstraintF TextInputLayoutAlgorithm::BuildLayoutConstraintWithoutResponse
     auto pattern = frameNode->GetPattern<TextFieldPattern>();
     CHECK_NULL_RETURN(pattern, contentConstraint);
 
-    float childWidth = 0.0f;
-    for (const auto& area : pattern->GetAllResponseArea()) {
-        if (area) {
-            auto childIndex = frameNode->GetChildIndex(area->GetFrameNode());
-            childWidth += area->Measure(layoutWrapper, childIndex).Width();
-        }
-    }
-
     auto newLayoutConstraint = contentConstraint;
-    newLayoutConstraint.maxSize.SetWidth(std::max(newLayoutConstraint.maxSize.Width() - childWidth, 0.0f));
-    newLayoutConstraint.minSize.SetWidth(std::max(newLayoutConstraint.minSize.Width() - childWidth, 0.0f));
-    if (newLayoutConstraint.selfIdealSize.Width()) {
-        newLayoutConstraint.selfIdealSize.SetWidth(newLayoutConstraint.selfIdealSize.Width().value() - childWidth);
+    for (const auto& area : pattern->GetAllResponseArea()) {
+        ResponseAreaMeasureHelper::MeasureAndDeductConstraint(area, layoutWrapper, newLayoutConstraint);
     }
     return newLayoutConstraint;
 }

@@ -14,11 +14,13 @@
  */
 #include "core/components_ng/pattern/scrollable/scrollable_utils.h"
 
+#include <unordered_map>
+#include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/scrollable/scrollable_accessibility_utils.h"
+#include "core/components_ng/pattern/scrollable/scrollable_paint_property.h"
 #include "core/components_ng/syntax/if_else_node.h"
 #include "core/components_ng/syntax/lazy_for_each_node.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_2_node.h"
-#include "core/components_v2/inspector/inspector_constants.h"
 #include "core/pipeline_ng/pipeline_context.h"
 namespace OHOS::Ace::NG {
 namespace {
@@ -281,5 +283,41 @@ bool ScrollableUtils::IsChildLazy(const RefPtr<FrameNode>& frameNode, int32_t in
         }
     }
     return false;
+}
+
+std::optional<ImmersiveStrategy> ScrollableUtils::StrategyForClipHostTag(const std::string& tag)
+{
+    static const std::unordered_map<std::string, ImmersiveStrategy> tagMap = {
+        { "Grid", ImmersiveStrategy::GRID_EXPAND_SAFE_AREA },
+        { "List", ImmersiveStrategy::LIST_EXPAND_SAFE_AREA },
+        { "Scroll", ImmersiveStrategy::SCROLL_EXPAND_SAFE_AREA },
+        { "WaterFlow", ImmersiveStrategy::WATER_FLOW_EXPAND_SAFE_AREA },
+    };
+    auto it = tagMap.find(tag);
+    if (it != tagMap.end()) {
+        return it->second;
+    }
+    return std::nullopt;
+}
+
+ContentClipMode ScrollableUtils::ResolveEffectiveDefaultContentClip(
+    FrameNode* host, const ScrollablePaintProperty* props)
+{
+    CHECK_NULL_RETURN(props, ContentClipMode::CONTENT_ONLY);
+    const auto builtInDefault = props->GetDefaultContentClip();
+    CHECK_NULL_RETURN(host, builtInDefault);
+    const auto strategy = StrategyForClipHostTag(host->GetTag());
+    if (!strategy.has_value()) {
+        return builtInDefault;
+    }
+    const auto pipeline = host->GetContext();
+    CHECK_NULL_RETURN(pipeline, builtInDefault);
+    return pipeline->IsImmersiveStrategySet(*strategy) ? ContentClipMode::SAFE_AREA : builtInDefault;
+}
+
+ContentClipMode ScrollableUtils::ResolveEffectiveDefaultContentClip(
+    const RefPtr<FrameNode>& host, const ScrollablePaintProperty* props)
+{
+    return ResolveEffectiveDefaultContentClip(AceType::RawPtr(host), props);
 }
 } // namespace OHOS::Ace::NG

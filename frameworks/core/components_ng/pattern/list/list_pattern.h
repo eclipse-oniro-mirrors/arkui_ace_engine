@@ -16,9 +16,12 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_LIST_LIST_PATTERN_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_LIST_LIST_PATTERN_H
 
+#include <list>
+#include <map>
 #include <tuple>
 #include "core/animation/chain_animation.h"
 #include "core/components/common/layout/constants.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_types.h"
 #include "core/components_ng/pattern/list/list_children_main_size.h"
 #include "core/components_ng/pattern/list/list_content_modifier.h"
 #include "core/components_ng/pattern/list/list_layout_algorithm.h"
@@ -30,6 +33,7 @@
 #include "core/components/scroll/scroll_controller_base.h"
 
 namespace OHOS::Ace::NG {
+class ScrollPlaceholderManager;
 class InspectorFilter;
 class ListAccessibilityProperty;
 class ListEventHub;
@@ -46,11 +50,18 @@ struct ListItemGroupPara {
     bool hasFooter = false;
 };
 
-struct ListScrollTarget {
-    int32_t index = -1;
-    float extraOffset = 0.0f;
-    ScrollAlign align = ScrollAlign::START;
-    float targetOffset;
+enum class FastScrollPreparation : uint8_t { NONE, NEED_TARGET, NEED_WINDOW, READY, UNSUPPORTED };
+
+struct ListFastScrollPreparation {
+    float estimatedSpace = 0.0f;
+    FastScrollPreparation preparation = FastScrollPreparation::NONE;
+    bool estimated = false;
+    std::shared_ptr<FastScrollPreparedLayouts> preparedLayouts;
+
+    bool NeedsPreparation() const
+    {
+        return preparation == FastScrollPreparation::NEED_TARGET || preparation == FastScrollPreparation::NEED_WINDOW;
+    }
 };
 
 class ACE_FORCE_EXPORT ListPattern : public SelectableContainerPattern {
@@ -62,6 +73,55 @@ public:
         SetEdgeEffect(EdgeEffect::SPRING, false);
     }
     ~ListPattern() override;
+
+    // FEAT scroll placeholder: the per-item provider, enable flag and host
+    // generation are owned by the pattern (never written into the clonable
+    // layout property); a null provider resets the capability.
+    void SetScrollPlaceholder(ScrollPlaceholderProvider&& provider);
+    bool IsScrollPlaceholderEnabled() const
+    {
+        return scrollPlaceholderProvider_ != nullptr;
+    }
+    const ScrollPlaceholderProvider& GetScrollPlaceholderProvider() const
+    {
+        return scrollPlaceholderProvider_;
+    }
+    void ResetScrollPlaceholder();
+
+    // ---- Component call-site placeholder replacement (ADR-2/ADR-7, 2026-10-12) ----
+    // An item whose real build got deferred shows a placeholder shell mounted as a
+    // direct child of the List host — never inside any LazyForEach/Repeat cache
+    // (syntax layer untouched). All methods run on the UI thread only.
+    struct ScrollPlaceholderItemInfo {
+        RefPtr<FrameNode> shell;
+        std::string templateId;
+        uint64_t templateGen = 0;
+    };
+    // Decision + acquire + mount + framed enqueue at the child build call point.
+    // Returns the mounted shell when this index is deferred to a placeholder,
+    // null when the caller should keep the existing (build-real) acquisition.
+    // A deferred index is also recorded in the manager's deferral table, so the
+    // acquisition itself (FrameProxy::GetFrameNodeByIndex) substitutes the shell.
+    RefPtr<FrameNode> CreateScrollPlaceholderShell(int32_t index);
+    // Decision-side entry invoked from the layout fill loop right before the normal
+    // child acquisition: predicts with the remaining frame budget and, on defer,
+    // mounts the shell and records the deferral. The wrapper substitution itself is
+    // NOT done here — the acquisition below flows through FrameProxy, which resolves
+    // the recorded deferral, so skip-flag inheritance and activation match real items.
+    void PrepareScrollPlaceholderForAcquisition(int32_t index);
+    bool HasScrollPlaceholderItem(int32_t index) const;
+    // Real-build closure executed by the pipeline framed flush: builds the real
+    // item through the existing build-style acquisition (syntax path as-is),
+    // then requests the local remeasure that completes the replacement.
+    bool CommitScrollPlaceholderRealBuild(int32_t index);
+    // Layout-round reconcile: drops placeholders whose index already holds a real
+    // child or fell out of range, and retires shells whose real item was committed
+    // (removed from the host and the template content returned to the pool).
+    void ReconcileScrollPlaceholderItems();
+    // Defensive sweep: retires mounted shells that neither placeholder table tracks
+    // anymore, so a bookkeeping miss can never leave a shell on the tree (index-based
+    // cleanup can not see shells by design — zero frame count).
+    void SweepOrphanPlaceholderShells();
 
     RefPtr<NodePaintMethod> CreateNodePaintMethod() override;
 
@@ -219,6 +279,13 @@ public:
     void ScrollTo(float position) override;
     void ScrollToIndex(int32_t index, bool smooth = false, ScrollAlign align = ScrollAlign::START,
         std::optional<float> extraOffset = std::nullopt) override;
+    void ScrollToIndexFastScroll(int32_t index, bool smooth, ScrollAlign align,
+        std::optional<float> extraOffset, FastScrollMode mode) override;
+
+    bool HasFastScrollRequest() const
+    {
+        return GetFastScrollRequest() != nullptr;
+    }
     void ScrollToItemInGroup(int32_t index, int32_t indexInGroup, bool smooth = false,
         ScrollAlign align = ScrollAlign::START);
     bool CheckTargetValid(int32_t index, int32_t indexInGroup);
@@ -343,6 +410,8 @@ public:
     std::string ProvideRestoreInfo() override;
     void OnRestoreInfo(const std::string& restoreInfo) override;
     void DumpInfo() override;
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
     void GetEventDumpInfo() override;
@@ -541,6 +610,7 @@ protected:
     virtual float GetEndOverScrollOffset(float offset, float endMainPos, float startMainPos) const;
     void SetLayoutAlgorithmParams(
         const RefPtr<ListLayoutAlgorithm>& listLayoutAlgorithm, const RefPtr<ListLayoutProperty>& listLayoutProperty);
+    void SetLayoutAlgorithmFastScrollParams(const RefPtr<ListLayoutAlgorithm>& algorithm);
     bool GetFadingEdge(RefPtr<ScrollablePaintProperty>& paintProperty);
     std::optional<ScrollingConfig> CreateScrollingConfig(
         SmartGestureDirection direction, double distance) const;
@@ -587,6 +657,34 @@ protected:
     bool isStackFromEnd_ = true;
     FocusWrapMode focusWrapMode_ = FocusWrapMode::DEFAULT;
 private:
+    void DumpAdvanceListConfiguration(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    void DumpAdvanceDiagnostics(std::unique_ptr<JsonValue>& json);
+    void DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceFunctionalProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    const ListFastScrollPreparation* GetFastScrollPreparation() const
+    {
+        return fastScrollPreparation_.get();
+    }
+
+    ListFastScrollPreparation& GetOrCreateFastScrollPreparation();
+    void CancelFastScrollForTargetChange();
+    void CancelFastScroll() override;
+    void InitializeFastScrollRequest(int32_t index, ScrollAlign align, float extraOffset,
+        FastScrollMode mode);
+    bool MarkFastScrollVisibleTargetPrepared();
+    void UpdateFastScrollPositionMap();
+    bool FallbackFastScroll();
+    void TryStartFastScroll();
+    void UpdateFastScrollAnimation(float coordinateCorrection = 0.0f);
+    bool HasKnownFastScrollRowMismatch() const;
+    void ApplyFastScrollLayoutResult(const RefPtr<ListLayoutAlgorithm>& algorithm);
+    void ApplyFastScrollPreparationResult(const RefPtr<ListLayoutAlgorithm>& algorithm);
+    bool EstimateFastScrollPositions(int32_t firstMeasured = -1, int32_t lastMeasured = -1);
+    void ResolveFastScrollAlign();
+    bool GetFastScrollTargetPosition(float& position) const;
+    bool HandleFastScrollTargetReached(float position);
     std::optional<int32_t> GetDefaultScrollTargetIndex(
         SmartGestureDirection direction, ScrollAlign align, int32_t anchorIndex) const;
     double GetAverageScrollingDistance() const;
@@ -608,7 +706,6 @@ private:
 
     void InitOnKeyEvent(const RefPtr<FocusHub>& focusHub);
     bool OnKeyEvent(const KeyEvent& event);
-    bool HandleDirectionKey(const KeyEvent& event);
     WeakPtr<FocusHub> GetNextFocusNode(FocusStep step, const WeakPtr<FocusHub>& currentFocusNode);
     WeakPtr<FocusHub> GetChildFocusNodeByIndex(int32_t tarMainIndex, int32_t tarGroupIndex);
     WeakPtr<FocusHub> ScrollAndFindFocusNode(int32_t nextIndex, int32_t curIndex, int32_t& nextIndexInGroup,
@@ -703,6 +800,25 @@ private:
     float prevEndOffset_ = 0.f;
     double currentOffset_ = 0.0f;
     bool maintainVisibleContentPosition_ = false;
+    // Timestamp of the last scroll callback; 0 = no scroll happened yet.
+    int64_t lastScrollCallbackNs_ = 0;
+    ScrollPlaceholderProvider scrollPlaceholderProvider_;
+    std::map<int32_t, ScrollPlaceholderItemInfo> scrollPlaceholderItems_;
+    std::list<std::pair<RefPtr<FrameNode>, std::string>> retiringPlaceholderShells_;
+    // Every shell this pattern mounted on the host (shell -> its template id), the
+    // single source of truth for the orphan sweep: shells are invisible to index-based
+    // cleanup (zero frame count by design), so retirement bookkeeping misses are
+    // caught here rather than leaking a mounted shell onto the tree.
+    std::map<RefPtr<FrameNode>, std::string> mountedPlaceholderShells_;
+    // Two-stage budget gate (aggregate estimate first, provider only under pressure);
+    // returns the provider options when the index should defer to a placeholder.
+    std::optional<ScrollPlaceholderOptions> PredictScrollPlaceholderDefer(
+        const RefPtr<ScrollPlaceholderManager>& manager, const RefPtr<FrameNode>& host, int32_t index);
+    void RetireScrollPlaceholderShell(const RefPtr<FrameNode>& shell, const std::string& templateId);
+    // Submits the deferred real-build closure for a placeholder item into the
+    // framed UI-thread queue (flushed by the pipeline).
+    void EnqueueScrollPlaceholderRealBuild(const RefPtr<ScrollPlaceholderManager>& manager,
+        const ScrollPlaceholderPredictParams& params, uint64_t templateGen);
     std::optional<int32_t> lastSnapTargetIndex_;
 
     bool crossMatchChild_ = false;
@@ -714,7 +830,7 @@ private:
     std::optional<int32_t> jumpIndexInGroup_;
     std::optional<int32_t> targetIndexInGroup_;
     mutable std::optional<bool> isLayoutListForFocus_; // Flag for only do Layout.
-    std::optional<ListScrollTarget> scrollTarget_;
+    std::unique_ptr<ListFastScrollPreparation> fastScrollPreparation_;
     bool paintStateFlag_ = false;
     bool isFramePaintStateValid_ = false;
 

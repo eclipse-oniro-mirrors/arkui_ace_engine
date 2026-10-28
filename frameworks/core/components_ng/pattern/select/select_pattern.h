@@ -50,6 +50,11 @@ class SelectPattern : public Pattern {
     DECLARE_ACE_TYPE(SelectPattern, Pattern);
 
 public:
+    void AddInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context) override;
+
+    void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context) override;
+
+    bool HasInspectorSelection() const override { return true; }
     SelectPattern() = default;
     ~SelectPattern() override = default;
 
@@ -436,6 +441,7 @@ private:
     void ShowScrollBar();
     void RegisterScrollToSelectedTask();
     void ScrollToSelectedOption();
+    void RegisterScrollAreaChangeCallback();
     void UpdateMenuBorderStyle(const RefPtr<FrameNode>& menu);
     std::vector<RefPtr<FrameNode>> options_;
     std::vector<RefPtr<FrameNode>> builderOptions_;
@@ -446,6 +452,7 @@ private:
 
     // index of selected option
     int32_t selected_ = -1;
+    float lastAutoScrollOffset_ = 0.0f;
     // props when selected
     struct OptionFont {
         // text style when selected

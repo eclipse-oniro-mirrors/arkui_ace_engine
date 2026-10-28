@@ -77,14 +77,6 @@ private:
         const RefPtr<FrameNode>& bubbleNode,
         const RefPtr<UiMaterial>& systemMaterial,
         const RefPtr<RenderContext>& renderContext);
-    static void SetLowEndImmersiveBackgroundForBubble(
-        const RefPtr<RenderContext>& renderContext,
-        const RefPtr<ThemeConstants>& themeConstants);
-    static void SetLowEndImmersiveShadowForBubble(
-        const RefPtr<FrameNode>& bubbleNode,
-        const RefPtr<UiMaterial>& systemMaterial,
-        const RefPtr<RenderContext>& renderContext,
-        const RefPtr<PipelineContext>& pipelineContext);
     static bool ApplySystemMaterialForBubble(
         const RefPtr<FrameNode>& bubbleNode,
         const RefPtr<UiMaterial>& systemMaterial,

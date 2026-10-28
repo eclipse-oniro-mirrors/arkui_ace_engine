@@ -27,6 +27,7 @@
 #include <optional>
 #include <set>
 #include <unordered_map>
+#include <vector>
 
 namespace OHOS::Ace::NG {
 class FrameNode;
@@ -46,7 +47,7 @@ public:
     };
 
     explicit ContentChangeManager(const RefPtr<TaskExecutor>& taskExecutor = nullptr);
-    virtual ~ContentChangeManager() = default;
+    ~ContentChangeManager() override;
     void StartContentChangeReport(const ContentChangeConfig& config);
     void StopContentChangeReport();
     void AddOnContentChangeNode(WeakPtr<FrameNode> node);
@@ -69,15 +70,26 @@ public:
     }
 
     void OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode);
+    void OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode, int32_t transitionId, bool reportCapi = true);
+    void ReportCapiPageEndEvent(const RefPtr<FrameNode>& keyNode, int32_t transitionId);
+    void ReportCapiPageEndEventFromCache(int32_t transitionId);
+    std::function<void()> BuildCapiOverlayContentHideCallback(const RefPtr<FrameNode>& target);
     void OnContentChangeStart(const RefPtr<FrameNode>& keyNode, ChangeType type);
-    void OnContentChangeInterrupted(const RefPtr<FrameNode>& keyNode, ChangeType type);
+    void OnContentChangeStart(const RefPtr<FrameNode>& keyNode, ChangeType type, bool reportCapi);
+    void ReportCapiPageStartEvent(const RefPtr<FrameNode>& node);
+    void OnContentChangeInterrupted(const RefPtr<FrameNode>& keyNode, ChangeType type, bool reportCapiEnd = true);
     void OnContentChangeNodeDestroyed(int32_t nodeId);
-    void OnScrollChangeStart(const RefPtr<FrameNode>& keyNode);
+    void OnScrollChangeStart(const RefPtr<FrameNode>& keyNode, bool reportCapi = true);
     void OnScrollChangeEnd(const RefPtr<FrameNode>& keyNode, uint32_t type = NONE);
+    void OnScrollChangeEnd(const RefPtr<FrameNode>& keyNode, uint32_t type, bool reportCapi);
     void OnSwiperChangeStart(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor);
+    void ReportCapiSwiperStartEvent(const RefPtr<FrameNode>& node, bool hasTabsAncestor);
     void OnSwiperChangeCancel(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor);
+    void CompleteCapiSwiperChangeWithoutMove(const RefPtr<FrameNode>& node, bool hasTabsAncestor);
+    void CompleteCapiSwiperChangeAfterAutoPlay(const RefPtr<FrameNode>& node, bool hasTabsAncestor, bool canceled);
     void OnSwiperChangeEnd(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor);
     ACE_FORCE_EXPORT void OnDialogChangeEnd(const RefPtr<FrameNode>& keyNode, bool isShow);
+    void OnDialogChangeEnd(const RefPtr<FrameNode>& keyNode, bool isShow, bool reportCapi);
     void OnScrollRemoved(int32_t nodeId);
     void OnTransitionAdded(int32_t nodeId);
     void OnTransitionRemoved(int32_t nodeId);
@@ -97,6 +109,23 @@ public:
     void OnSwiperScrollStart(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor = false);
     void OnSwiperScrollEnd(const RefPtr<FrameNode>& keyNode);
 
+    using CapiSink = void (*)(uint32_t, uint64_t, const char*, uint32_t, void*);
+    uint64_t RegisterCapiContentChangeEvent(bool withStart, uint32_t eventMask, uint32_t ignoreMask, void* cookie,
+        CapiSink sink, void (*release)(void*));
+    bool UnregisterCapiContentChangeEvent(uint64_t subscriptionId);
+    bool HasCapiContentChangeSubscriptions() const;
+    void InvalidateCapiContentChangeSubscriptions();
+    void OnScrollInterrupted(const RefPtr<FrameNode>& node, bool reportEnd);
+    void OnSwiperChangeInterrupted(const RefPtr<FrameNode>& node, bool hasTabsAncestor);
+    void ReportCapiOverlayEvent(const RefPtr<FrameNode>& target, bool isShow, const char* overlayType,
+        const RefPtr<FrameNode>& trigger = nullptr);
+    void ReportCapiScrollStartEvent(const RefPtr<FrameNode>& node);
+    void ReportCapiScrollEndEvent(const RefPtr<FrameNode>& node);
+    void ReportCapiScrollCommand(const RefPtr<FrameNode>& node, uint32_t source);
+    void MarkCapiScrollByEventSource(int32_t nodeId);
+    void MarkCapiScrollToEventSource(int32_t nodeId);
+    void ClearCapiScrollEventSource(int32_t nodeId);
+
 #ifndef IS_RELEASE_VERSION
     std::string DumpInfo() const;
 #endif
@@ -110,6 +139,24 @@ public:
     void FlushPageSceneNodeChanged();
 
 private:
+    class CapiImpl;
+    std::unique_ptr<CapiImpl> capiImpl_;
+
+    static RefPtr<FrameNode> GetSwiperContentChangeNode(const RefPtr<FrameNode>& node, bool hasTabsAncestor);
+    void OnScrollChangeStartInner(const RefPtr<FrameNode>& node);
+    void OnSwiperScrollStartInner(const RefPtr<FrameNode>& node);
+    void OnContentChangeNodeDestroyedInner(int32_t nodeId);
+    void OnContentChangeStartInner(const RefPtr<FrameNode>& keyNode, ChangeType type);
+    void OnContentChangeInterruptedInner(const RefPtr<FrameNode>& keyNode, ChangeType type);
+    void OnPageTransitionEndInner(const RefPtr<FrameNode>& keyNode, int32_t transitionId);
+    void OnScrollChangeEndInner(const RefPtr<FrameNode>& keyNode, uint32_t type);
+    void OnSwiperChangeStartInner(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor);
+    void OnSwiperChangeEndInner(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor);
+    void OnSwiperChangeCancelInner(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor);
+    void OnDialogChangeEndInner(const RefPtr<FrameNode>& keyNode, bool isShow);
+    void OnVsyncEndInner(const RectF& rootRect);
+    void OnScrollRemovedInner(int32_t nodeId);
+
     struct ActiveContentChange {
         ChangeType endType = ChangeType::PAGE;
         std::string tag;
@@ -122,6 +169,7 @@ private:
     struct PendingSwiperChange {
         int32_t logicalNodeId = -1;
         bool canceled = false;
+        WeakPtr<FrameNode> reportNode;
     };
 
     std::optional<ChangeType> GetStartChangeType(ChangeType type) const;

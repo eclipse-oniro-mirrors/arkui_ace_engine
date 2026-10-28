@@ -34,6 +34,7 @@ text_input_test_sources = [
   "text_free_scroll_controller_test.cpp",
   "text_input_area_model_test.cpp",
   "text_input_base.cpp",
+  "text_field_inspector_tree_test.cpp",
   "text_input_check_test.cpp",
   "text_input_cursor_test.cpp",
   "text_input_decoration_test.cpp",
@@ -86,6 +87,7 @@ text_field_test_ng_sources = [
   "text_field_test_ng_one.cpp",
   "text_field_test_ng_three.cpp",
   "text_field_test_ng_two.cpp",
+  "text_field_text_style_optimization_test_ng.cpp",
   "text_input_base.cpp",
 ]
 

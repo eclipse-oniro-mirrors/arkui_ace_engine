@@ -781,6 +781,39 @@ HWTEST_F(RichEditorChangeCallbackTestNg, ChangeTextCallbackTest012, TestSize.Lev
 }
 
 /**
+ * @tc.name: ChangeTextCallbackTest012ImageTag
+ * @tc.desc: test imageTag in onWillChange replacedImageSpans
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorChangeCallbackTestNg, ChangeTextCallbackTest012ImageTag, TestSize.Level0)
+{
+    RichEditorModelNG richEditorModel;
+    richEditorModel.Create();
+    auto host = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ASSERT_NE(host, nullptr);
+    auto richEditorPattern = host->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+    InitContentChangeCallback(richEditorModel);
+
+    // Branch: imageTag not set
+    richEditorPattern->AddImageSpan(IMAGE_SPAN_OPTIONS_1);
+    ASSERT_EQ(onWillReplacedImageSpans.size(), 1);
+    EXPECT_FALSE(onWillReplacedImageSpans[0].GetImageTag().has_value());
+
+    // Branch: imageTag set
+    ImageSpanOptions optionsWithTag = IMAGE_SPAN_OPTIONS_1;
+    optionsWithTag.imageTag = u"onWillTag";
+    richEditorPattern->AddImageSpan(optionsWithTag);
+    ASSERT_EQ(onWillReplacedImageSpans.size(), 1);
+    EXPECT_TRUE(onWillReplacedImageSpans[0].GetImageTag().has_value());
+    EXPECT_EQ(onWillReplacedImageSpans[0].GetImageTag().value(), u"onWillTag");
+
+    while (!ViewStackProcessor::GetInstance()->elementsStack_.empty()) {
+        ViewStackProcessor::GetInstance()->elementsStack_.pop();
+    }
+}
+
+/**
  * @tc.name: ChangeTextCallbackTest013
  * @tc.desc: test for callback onWillchange/onDidChange, add symbol span
  * @tc.type: FUNC

@@ -37,7 +37,7 @@ constexpr Dimension OVERLAY_MENU_HORIZONTAL_GAP = 16.0_vp;
  * DialogTheme defines color and styles of PopupComponent. PopupTheme should be built
  * using DialogTheme::Builder.
  */
-class TextOverlayTheme : public virtual Theme {
+class TextOverlayTheme : public Theme {
     DECLARE_ACE_TYPE(TextOverlayTheme, Theme);
 
 public:

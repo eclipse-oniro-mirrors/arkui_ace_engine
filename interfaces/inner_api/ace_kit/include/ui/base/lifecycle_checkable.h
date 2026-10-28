@@ -29,12 +29,15 @@ public:
     public:
         PtrHolder(T* ptr) : ptr_(ptr)
         {
-            ptr_->lastStack_ = &ptr;
+#ifdef ACE_DEBUG
             ++ptr_->usingCount_;
+#endif
         }
         ~PtrHolder()
         {
+#ifdef ACE_DEBUG
             --ptr_->usingCount_;
+#endif
         }
         T* operator->() const
         {
@@ -49,16 +52,19 @@ public:
 protected:
     ~LifeCycleCheckable()
     {
+#ifdef ACE_DEBUG
         if (usingCount_) {
             OnDetectedObjDestroyInUse();
         }
+#endif
     }
 
     void OnDetectedObjDestroyInUse();
 
 private:
+#ifdef ACE_DEBUG
     std::atomic_int usingCount_ = 0;
-    std::atomic<void*> lastStack_ = nullptr;
+#endif
 };
 } // namespace OHOS::Ace
 

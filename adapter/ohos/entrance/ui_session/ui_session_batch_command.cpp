@@ -269,22 +269,30 @@ BatchParseResult ParseBatchCommands(const cJSON* commands, const BatchJsonString
             result.batchReason = BatchDiagnosticReason::TOO_MANY_COMMANDS;
             result.items.clear();
             result.diagnostics.clear();
+            result.resultItems.clear();
             break;
         }
         int32_t nodeId = -1;
         const auto keyLength = strings.GetLength(child->string);
         if (!ParseNodeId(child->string, nodeId, strings)) {
             auto item = AnalyzeCommand(child, nodeId, result.commandCount, strings);
+            item.nodeKey = std::string(child->string, keyLength);
+            item.semanticError = BatchDiagnosticReason::INVALID_NODE_ID;
+            result.resultItems.emplace_back(item);
             result.diagnostics.emplace_back(
                 MakePreDispatchDiagnostic(item, BatchDiagnosticReason::INVALID_NODE_ID, keyLength, false));
             continue;
         }
         auto item = AnalyzeCommand(child, nodeId, result.commandCount, strings);
+        item.nodeKey = std::string(child->string, keyLength);
         if (!nodeIds.emplace(nodeId).second) {
+            item.semanticError = BatchDiagnosticReason::DUPLICATE_NODE_ID;
+            result.resultItems.emplace_back(item);
             result.diagnostics.emplace_back(
                 MakePreDispatchDiagnostic(item, BatchDiagnosticReason::DUPLICATE_NODE_ID, keyLength, true));
             continue;
         }
+        result.resultItems.emplace_back(item);
         result.items.emplace_back(std::move(item));
     }
     return result;

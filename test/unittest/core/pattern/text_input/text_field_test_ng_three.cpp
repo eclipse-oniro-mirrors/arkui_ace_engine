@@ -379,7 +379,7 @@ HWTEST_F(TextFieldTestNgThree, ResetObscureTickCountDown001, TestSize.Level1)
     ASSERT_NE(textFieldPattern, nullptr);
     textFieldPattern->textObscured_ = true;
     textFieldPattern->ResetObscureTickCountDown();
-    EXPECT_EQ(textFieldPattern->obscureTickCountDown_, 0);
+    EXPECT_EQ(textFieldPattern->obscureHelper_.tickCountDown_, 0);
 }
 
 /**
@@ -396,7 +396,7 @@ HWTEST_F(TextFieldTestNgThree, ToTreeJson001, TestSize.Level1)
     std::unique_ptr<JsonValue> json = std::make_unique<JsonValue>();
     InspectorConfig config;
     textFieldPattern->ToTreeJson(json, config);
-    EXPECT_EQ(textFieldPattern->obscureTickCountDown_, 0);
+    EXPECT_EQ(textFieldPattern->obscureHelper_.tickCountDown_, 0);
 }
 
 /**

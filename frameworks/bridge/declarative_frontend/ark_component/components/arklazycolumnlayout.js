@@ -20,7 +20,7 @@ class SpaceModifier extends ModifierWithKey {
     super(value);
   }
   applyPeer(node, reset) {
-    if (reset || !isObject(this.value)) {
+    if (reset) {
       getUINativeModule().lazyColumnLayout.resetSpace(node);
     } else {
       getUINativeModule().lazyColumnLayout.setSpace(node, this.value);
@@ -37,7 +37,7 @@ class AlignItemsModifier extends ModifierWithKey {
     super(value);
   }
   applyPeer(node, reset) {
-    if (reset || !isNumber(this.value)) {
+    if (reset) {
       getUINativeModule().lazyColumnLayout.resetAlignItems(node);
     } else {
       getUINativeModule().lazyColumnLayout.setAlignItems(node, this.value);
@@ -51,7 +51,7 @@ class OnVisibleIndexesChangeModifier extends ModifierWithKey {
     super(value);
   }
   applyPeer(node, reset) {
-    if (reset || !isFunction(this.value)) {
+    if (reset) {
       getUINativeModule().lazyColumnLayout.resetOnVisibleIndexesChange(node);
     } else {
       getUINativeModule().lazyColumnLayout.setOnVisibleIndexesChange(node, this.value);

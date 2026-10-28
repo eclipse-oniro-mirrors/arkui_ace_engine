@@ -767,8 +767,6 @@ public:
 
     static bool IsFormSkeletonBlurEnabled();
 
-    static int32_t getFormSharedImageCacheThreshold();
-
     static bool IsFormSkeletonRSTransactionEnabled();
 
     static bool IsWhiteBlockEnabled();
@@ -937,7 +935,6 @@ private:
     static bool forcibleLandscapeEnabled_;
     static bool softPagetransition_;
     static bool formSkeletonBlurEnabled_;
-    static int32_t formSharedImageCacheThreshold_;
     static WidthLayoutBreakPoint widthLayoutBreakpoints_;
     static HeightLayoutBreakPoint heightLayoutBreakpoints_;
     static bool syncLoadEnabled_;

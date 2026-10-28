@@ -16,12 +16,12 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_PATTERNLOCK_PATTERNLOCK_THEME_WRAPPER_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_PATTERNLOCK_PATTERNLOCK_THEME_WRAPPER_H
 
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 #include "core/components_v2/pattern_lock/pattern_lock_theme.h"
 
 namespace OHOS::Ace::NG {
 
-class PatternLockThemeWrapper : public V2::PatternLockTheme, public TokenThemeWrapper {
+class PatternLockThemeWrapper : public V2::PatternLockTheme {
     DECLARE_ACE_TYPE(PatternLockThemeWrapper, V2::PatternLockTheme);
 
 public:
@@ -30,7 +30,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() override = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<PatternLockThemeWrapper>();
             auto theme = AceType::DynamicCast<V2::PatternLockTheme>(wrapper);

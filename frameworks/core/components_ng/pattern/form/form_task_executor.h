@@ -22,7 +22,7 @@ namespace OHOS::Ace::NG {
 
 // Delegate class for form task posting, created by FormPattern and passed to FormManagerDelegate.
 // Main responsibility: Post UI/BACKGROUND tasks with consistent priority and ContainerScope handling.
-class FormTaskExecutor : public virtual Referenced {
+class FormTaskExecutor : public Referenced {
 public:
     explicit FormTaskExecutor(int32_t instanceId);
     ~FormTaskExecutor() = default;

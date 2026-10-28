@@ -25,7 +25,7 @@ namespace OHOS::Ace {
  * AdvancePatternTheme defines color and styles of advancedPatternComponent. AdvancePatternTheme should be built
  * using AdvancePatternTheme::Builder.
  */
-class AdvancedPatternTheme : public virtual Theme {
+class AdvancedPatternTheme : public Theme {
     DECLARE_ACE_TYPE(AdvancedPatternTheme, Theme);
 
 public:

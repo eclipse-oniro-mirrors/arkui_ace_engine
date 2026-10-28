@@ -282,6 +282,11 @@ public:
         return true;
     }
 
+    template<class T> bool WriteParcelable(const sptr<T>& object)
+    {
+        return WriteParcelable(object.GetRefPtr());
+    }
+
     bool WriteParcelable(const Parcelable* object)
     {
         (void)object;

@@ -20,6 +20,17 @@
 
 namespace OHOS::Ace::NG {
 
+bool InputEventHub::HasTreeInteraction() const
+{
+    return userMouseFunc_ || userJSFrameNodeMouseFunc_ || !mouseInputEvents_.empty() || mouseEventActuator_ ||
+           userHoverFunc_ || userJSFrameNodeHoverFunc_ || !hoverInputEvents_.empty() || hoverEventActuator_ ||
+           userHoverMoveFunc_ || userJSFrameNodeHoverMoveFunc_ || !hoverMoveInputEvents_.empty() ||
+           hoverMoveEventActuator_ || hoverEffectActuator_ || userAxisFunc_ || !axisInputEvents_.empty() ||
+           axisEventActuator_ || userCoastingAxisFunc_ || coastingAxisEventActuator_ ||
+           userAccessibilityHoverFunc_ || accessibilityHoverEventActuator_ || showMenu_ ||
+           hoverEffectType_ != HoverEffectType::UNKNOWN || hoverEffectAuto_ != HoverEffectType::UNKNOWN;
+}
+
 InputEventHub::InputEventHub(const WeakPtr<EventHub>& eventHub) : eventHub_(eventHub) {}
 
 RefPtr<FrameNode> InputEventHub::GetFrameNode() const

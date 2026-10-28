@@ -736,7 +736,7 @@ void MenuManager::SetPreviewFirstShow(const RefPtr<FrameNode>& menu, const RefPt
     CHECK_NULL_VOID(previewPattern);
     previewPattern->SetFirstShow();
     CHECK_NULL_VOID(overlayManager);
-    overlayManager->ContentChangeReport(menu, true);
+    overlayManager->ContentChangeReport(menu, true, false);
 }
 
 void MenuManager::ShowMenuAnimation(const RefPtr<FrameNode>& menu,

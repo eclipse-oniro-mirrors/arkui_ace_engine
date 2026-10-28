@@ -21,7 +21,7 @@
 #include "core/components/theme/theme_constants.h"
 
 namespace OHOS::Ace {
-class DragBarTheme : public virtual Theme {
+class DragBarTheme : public Theme {
     DECLARE_ACE_TYPE(DragBarTheme, Theme);
 
 public:

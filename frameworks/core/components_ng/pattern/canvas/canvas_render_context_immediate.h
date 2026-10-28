@@ -18,7 +18,7 @@
 
 #include "core/components_ng/pattern/canvas/canvas_render_context.h"
 namespace OHOS::Ace::NG {
-class ACE_EXPORT CanvasRenderContextImmediate : public virtual CanvasRenderContext {
+class ACE_EXPORT CanvasRenderContextImmediate : public CanvasRenderContext {
     DECLARE_ACE_TYPE(CanvasRenderContextImmediate, CanvasRenderContext);
 
 public:

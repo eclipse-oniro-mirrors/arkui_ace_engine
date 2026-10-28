@@ -38,8 +38,19 @@ public:
     static void TearDown();
     static void SetCurrentWindowRect(Rect rect);
     static RefPtr<MockPipelineContext> GetCurrent();
+    // Test helper: make PipelineContext::GetOverlayManager() return null. Some tests
+    // verify overlay-gated paths (e.g. WebDataDetectorAdapter::ShowAIMenu) bail at the
+    // overlay-manager null check instead of building real overlay/menu UI in the mock
+    // environment (no theme/render stack — deep menu construction would crash).
+    static void SetNullOverlayManagerForTest(bool useNull);
+    static void SetLastPageInfo(const RefPtr<NG::PageInfo>& pageInfo);
     void SetRootSize(double rootWidth, double rootHeight);
     void SetDensity(double density);
+    void SetDipScale(double scale)
+    {
+        dipScale_ = scale;
+        PipelineBase::dipScale_ = scale;
+    }
     void SetInstanceId(int32_t instanceId);
     void SetThisInstanceId(int32_t instanceId)
     {
@@ -50,6 +61,7 @@ public:
     void SetContainerControlButtonVisible(bool visible);
     void SetContainerModalButtonsRect(RectF buttons);
     void SetContainerModalTitleHeight(int32_t height);
+    void SetContainerModalTitleHeightWithVp(double heightVp);
 
     MOCK_CONST_METHOD0(GetSafeAreaWithoutProcess, SafeAreaInsets());
     MOCK_CONST_METHOD0(GetSelectOverlayManager, SafeAreaInsets());
@@ -128,6 +140,7 @@ public:
     }
 
     const RefPtr<NG::PageInfo> GetLastPageInfo();
+
     std::string GetNavDestinationPageName(const RefPtr<NG::PageInfo>& pageInfo)
     {
         return "";

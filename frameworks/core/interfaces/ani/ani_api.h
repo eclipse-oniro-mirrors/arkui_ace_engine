@@ -34,7 +34,7 @@
 extern "C" {
 #endif
 
-#define ARKUI_ANI_API_VERSION 100
+#define ARKUI_ANI_API_VERSION 102
 #define EXTRA_INFO_MAX_LENGTH 1024
 #define ARKUI_ANI_MODIFIER_FUNCTION_NAME "GetArkUIAniModifiers"
 const float DEFAULT_SNAPSHOT_SCALE = 1.f;
@@ -597,6 +597,27 @@ struct ArkUIAniParallelizeUIModifier {
     void (*registerCallback)(
         ArkUINodeHandle, std::function<int32_t()>&&, std::function<ArkUINodeHandle(int32_t, int32_t, int32_t)>&&);
 };
+// Complete snapshot in TOP, END, BOTTOM, START order; content is a detached static builder root.
+struct ArkUIAniSafeAreaInsetEdge {
+    ArkUINodeHandle content = nullptr;
+    double spacing = 0.0;
+    int32_t unit = 1; // DimensionUnit::VP
+    int32_t alignment = 1; // SafeAreaInsetAlignment::CENTER
+};
+namespace OHOS::AAFwk {
+class Want;
+class WantParams;
+} // namespace OHOS::AAFwk
+
+namespace OHOS::Ace {
+struct ModalUIExtensionCallbacks;
+struct ModalUIExtensionConfig;
+class ModalUIExtensionProxy;
+} // namespace OHOS::Ace
+namespace OHOS::Ace::NG {
+struct InnerExtraConfig;
+} // namespace OHOS::Ace::NG
+
 struct ArkUIAniCommonModifier {
     ani_ref* (*getHostContext)(ArkUI_Int32 key);
     void (*setFrameRateRange)(ani_env* env, ani_long peerPtr, ani_object value, ArkUI_Int32 type);
@@ -640,6 +661,7 @@ struct ArkUIAniCommonModifier {
     ani_int (*getWindowId)(ani_int instanceId);
     ani_int (*getWindowWidthBreakpoint)();
     ani_int (*getWindowHeightBreakpoint)();
+    ani_boolean (*isWindowInfoInitialized)(ani_int instanceId);
     void* (*transferKeyEventPointer)(ani_long nativePtr);
     void* (*createKeyEventAccessorWithPointer)(ani_long nativePtr);
     void* (*createEventTargetInfoAccessor)();
@@ -694,7 +716,14 @@ struct ArkUIAniCommonModifier {
     void (*setOnNodeDestroyEvent)(ArkUINodeHandle node, std::function<void(int32_t)>&& event);
     void(*fireArkUIObjectLifecycleCallback)(ani_long nodePtr, const std::string& className, void* data);
     std::string (*GetIdString)(ArkUINodeHandle node);
+    int32_t (*createModalUIExtension)(const OHOS::AAFwk::Want& want,
+        const OHOS::Ace::ModalUIExtensionCallbacks& callbacks, const OHOS::Ace::ModalUIExtensionConfig& config,
+        const OHOS::Ace::NG::InnerExtraConfig& extraConfig, ArkUI_Int32 instanceId);
+    void (*closeModalUIExtension)(int32_t sessionId, ArkUI_Int32 instanceId);
+    void (*modalUIExtensionProxySend)(
+        std::shared_ptr<OHOS::Ace::ModalUIExtensionProxy>& proxy, const OHOS::AAFwk::WantParams& params);
     ani_long (*interopProxyNodeConstruct)(ArkUI_Int32 id);
+    void (*setSafeAreaInset)(ArkUINodeHandle node, const ArkUIAniSafeAreaInsetEdge* edges, int32_t count);
 };
 struct  ArkUICustomNodeInfo {
     std::function<void()> onPageShowFunc;
@@ -1052,6 +1081,28 @@ struct ArkUIAniGestureEventUIObserverModifier {
         ani_int type, ani_int resourceId, bool isRemoveAll);
 };
 
+// Scroll placeholder registry of the static track. The registry lives in the
+// per-pipeline ScrollPlaceholderManager; the ANI library converts the ani
+// arguments (id strings) and reaches these entries through
+// getPlaceholderRegisterAniModifier like every other static ANI API.
+// registerTemplate still receives the ani execution closure because its
+// global reference and the isolated invocation belong to the engine, which
+// may re-execute the template on any later frame. release is the module-side
+// destroy callback of the detached roots the execution products live in: the
+// engine invokes it with the raw product pointer whenever the registry drops
+// a product (source replacement, unregister, pool rejection or LRU demotion),
+// mirroring the destroyFunc/destroyCallback contract of the dialog, snapshot
+// and drag APIs.
+struct ArkUIAniPlaceholderRegisterModifier {
+    ani_int (*registerTemplate)(
+        ani_env* env, const std::string& id, ani_object builder, ani_object execution, ani_object release);
+    void (*unregisterTemplate)(const std::string& id);
+    ani_boolean (*isTemplateRegistered)(const std::string& id);
+    void (*publishProduct)(ani_long productPtr);
+    void (*beginScrollPlaceholder)();
+    void (*endScrollPlaceholder)();
+};
+
 struct ArkUIAniModifiers {
     ArkUI_Int32 version;
     const ArkUIAniImageModifier* (*getImageAniModifier)();
@@ -1098,6 +1149,7 @@ struct ArkUIAniModifiers {
     const ArkUIAniDetachedFreeRootModifier* (*getArkUIAniDetachedFreeRootModifier)();
     const ArkUIAniGestureEventUIObserverModifier* (*getArkUIAniGestureEventUIObserverModifier)();
     const ArkUIAniWithEnvModifier* (*getArkUIAniWithEnvModifier)();
+    const ArkUIAniPlaceholderRegisterModifier* (*getPlaceholderRegisterAniModifier)();
 };
 
 __attribute__((visibility("default"))) const ArkUIAniModifiers* GetArkUIAniModifiers(void);

@@ -39,7 +39,7 @@ constexpr char RICH_EDITOR_THEME_PATTERN_NAME[] = "rich_editor_pattern";
 constexpr char RICH_EDITOR_THEME_BG_COLOR[] = "bg_color";
 } // namespace
 
-class RichEditorTheme : public virtual Theme {
+class RichEditorTheme : public Theme {
     DECLARE_ACE_TYPE(RichEditorTheme, Theme);
 
 public:

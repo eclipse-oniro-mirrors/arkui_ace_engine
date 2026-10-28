@@ -29,7 +29,7 @@ class ThemeConstants;
  * ToggleTheme defines color and styles of ToggleComponent. ToggleTheme should be built
  * using ToggleTheme::Builder.
  */
-class ToggleTheme : public virtual Theme {
+class ToggleTheme : public Theme {
     DECLARE_ACE_TYPE(ToggleTheme, Theme);
 
 public:

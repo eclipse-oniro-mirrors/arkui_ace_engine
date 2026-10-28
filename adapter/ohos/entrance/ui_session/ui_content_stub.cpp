@@ -258,6 +258,20 @@ int32_t UiContentStub::OnRemoteRequest(uint32_t code, MessageParcel& data, Messa
             GetNavigationContentByPointInner(data, reply, option);
             break;
         }
+        case GET_LAZY_FOREACH_DATA_BY_POINT: {
+            GetLazyForEachDataByPointInner(data, reply, option);
+            break;
+        }
+        case GET_NODES_IN_RECT: {
+            GetNodesInRectInner(data, reply, option);
+            break;
+        }
+        case SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK: {
+            return SendCommandWithFinishCallbackInner(data, reply, option);
+        }
+        case SEND_COMMAND_WITH_FINISH_CALLBACK: {
+            return SendCommandKeyCodeWithFinishCallbackInner(data, reply, option);
+        }
         default: {
             LOGI("ui_session unknown transaction code %{public}d", code);
             return IPCObjectStub::OnRemoteRequest(code, data, reply, option);
@@ -324,6 +338,29 @@ int32_t UiContentStub::GetNavigationContentByPointInner(
     int32_t processId = IPCSkeleton::GetCallingRealPid();
     UiSessionManager::GetInstance()->SaveProcessId("componentTreeQuery", processId);
     reply.WriteInt32(GetNavigationContentByPoint(x, y, pattern, nullptr));
+    return NO_ERROR;
+}
+
+int32_t UiContentStub::GetLazyForEachDataByPointInner(
+    MessageParcel& data, MessageParcel& reply, MessageOption& option)
+{
+    float x = data.ReadFloat();
+    float y = data.ReadFloat();
+    int32_t processId = IPCSkeleton::GetCallingRealPid();
+    UiSessionManager::GetInstance()->SaveProcessId("lazyForEachQuery", processId);
+    reply.WriteInt32(GetLazyForEachDataByPoint(x, y, nullptr));
+    return NO_ERROR;
+}
+
+int32_t UiContentStub::GetNodesInRectInner(MessageParcel& data, MessageParcel& reply, MessageOption& option)
+{
+    float x1 = data.ReadFloat();
+    float y1 = data.ReadFloat();
+    float x2 = data.ReadFloat();
+    float y2 = data.ReadFloat();
+    int32_t processId = IPCSkeleton::GetCallingRealPid();
+    UiSessionManager::GetInstance()->SaveProcessId("nodesInRectQuery", processId);
+    reply.WriteInt32(GetNodesInRect(x1, y1, x2, y2, nullptr));
     return NO_ERROR;
 }
 
@@ -417,6 +454,41 @@ int32_t UiContentStub::SendCommandKeyCodeInner(MessageParcel& data, MessageParce
     std::string command = data.ReadString();
     reply.WriteInt32(SendCommand(command));
     return NO_ERROR;
+}
+
+int32_t UiContentStub::SendCommandWithFinishCallbackInner(
+    MessageParcel& data, MessageParcel& reply, MessageOption& option)
+{
+    uint64_t requestId = 0;
+    int32_t id = 0;
+    if (!data.ReadUint64(requestId) || requestId == 0 || !data.ReadInt32(id)) {
+        LOGW("SendCommandWithFinishCallbackInner read parcel failed");
+        return FAILED;
+    }
+    std::string command;
+    if (!data.ReadString(command)) {
+        return FAILED;
+    }
+    int32_t processId = IPCSkeleton::GetCallingRealPid();
+    auto callback = UiSessionManager::GetInstance()->MakeCommandResultCallback(processId, requestId);
+    return callback ? SendCommand(id, command, callback) : FAILED;
+}
+
+int32_t UiContentStub::SendCommandKeyCodeWithFinishCallbackInner(
+    MessageParcel& data, MessageParcel& reply, MessageOption& option)
+{
+    uint64_t requestId = 0;
+    if (!data.ReadUint64(requestId) || requestId == 0) {
+        LOGW("SendCommandKeyCodeWithFinishCallbackInner read parcel failed");
+        return FAILED;
+    }
+    std::string command;
+    if (!data.ReadString(command)) {
+        return FAILED;
+    }
+    int32_t processId = IPCSkeleton::GetCallingRealPid();
+    auto callback = UiSessionManager::GetInstance()->MakeCommandResultCallback(processId, requestId);
+    return callback ? SendCommand(command, callback) : FAILED;
 }
 
 int32_t UiContentStub::UnregisterClickEventCallbackInner(

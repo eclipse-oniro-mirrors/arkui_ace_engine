@@ -98,7 +98,7 @@ RefPtr<FrameNode> FindSameParentComponent(const RefPtr<FrameNode>& nodeA, const 
         if (current->CheckTopWindowBoundary()) {
             break;
         }
-        current = current->GetAncestorNodeOfFrame(false);
+        current = current->GetCoordinateAncestorNodeOfFrame(false);
     }
     current = nodeB;
     while (current) {
@@ -110,7 +110,7 @@ RefPtr<FrameNode> FindSameParentComponent(const RefPtr<FrameNode>& nodeA, const 
         if (current->CheckTopWindowBoundary()) {
             break;
         }
-        current = current->GetAncestorNodeOfFrame(false);
+        current = current->GetCoordinateAncestorNodeOfFrame(false);
     }
     return nullptr;
 }

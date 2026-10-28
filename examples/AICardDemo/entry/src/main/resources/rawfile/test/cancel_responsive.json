@@ -1,0 +1,44 @@
+{
+  "actions": [
+    {
+      "result": {
+        "index": 0,
+        "status": 17,
+        "isFinal": false,
+        "streamingText": "人工智能卡片组件用于展示智能搜索"
+      }
+    },
+    {
+      "result": {
+        "index": 1,
+        "status": 17,
+        "isFinal": false,
+        "streamingText": "结果，支持流式打字机渲染、乱序重"
+      }
+    },
+    {
+      "result": {
+        "index": 2,
+        "status": 17,
+        "isFinal": false,
+        "streamingText": "组、grounding替换与折叠"
+      }
+    },
+    {
+      "result": {
+        "index": 3,
+        "status": 17,
+        "isFinal": false,
+        "streamingText": "展开序重组，**开发者可经配置快"
+      }
+    },
+    {
+      "result": {
+        "index": 4,
+        "status": 17,
+        "isFinal": false,
+        "streamingText": "速集成1**"
+      }
+    }
+  ]
+}

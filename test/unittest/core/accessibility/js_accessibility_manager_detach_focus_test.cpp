@@ -389,12 +389,14 @@ HWTEST_F(JsAccessibilityManagerDetachFocusTest, HandleDetachFocusFallbackCallbac
 {
     auto context = NG::PipelineContext::GetCurrentContext();
     ASSERT_NE(context, nullptr);
-    context->SetTaskExecutor(AceType::MakeRefPtr<MockTaskExecutor>(true));
+    auto previousExecutor = context->GetTaskExecutor();
+    context->taskExecutor_ = AceType::MakeRefPtr<MockTaskExecutor>(true);
 
     int32_t instanceId = 500;
     manager_->HandleDetachFocusFallbackCallback(instanceId);
     auto result = manager_->GetAndClearDetachFocusFallbackCandidates(instanceId);
     EXPECT_TRUE(result.candidateIds.empty());
+    context->taskExecutor_ = previousExecutor;
 }
 
 /**

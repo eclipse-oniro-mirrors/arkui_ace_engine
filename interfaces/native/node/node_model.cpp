@@ -14,7 +14,10 @@
  */
 
 #include "node_model.h"
+#include "core/interfaces/native/node/content_change_api.h"
 #include "core/interfaces/native/node/page_text_api.h"
+#include "core/interfaces/native/node/ui_tree_api.h"
+#include "core/interfaces/native/node/interaction_observer_api.h"
 #include "node/config_manager.h"
 
 #include <cstring>
@@ -202,6 +205,39 @@ const ArkUIPageTextAPI* GetPageTextAPI()
     }
     auto entry = reinterpret_cast<Entry>(FindFunction(module, "GetArkUIPageTextAPI"));
     return entry ? entry(1) : nullptr;
+}
+
+const ArkUITreeAPI* GetTreeAPI()
+{
+    using Entry = const ArkUITreeAPI* (*)(int32_t);
+    auto* module = FindModule();
+    if (!module) {
+        return nullptr;
+    }
+    auto entry = reinterpret_cast<Entry>(FindFunction(module, "GetArkUITreeAPI"));
+    return entry ? entry(1) : nullptr;
+}
+
+const ArkUIInteractionObserverAPI* GetInteractionObserverAPI()
+{
+    using Entry = const ArkUIInteractionObserverAPI* (*)(int32_t);
+    auto* module = FindModule();
+    if (!module) {
+        return nullptr;
+    }
+    auto entry = reinterpret_cast<Entry>(FindFunction(module, "GetArkUIInteractionObserverAPI"));
+    return entry ? entry(1) : nullptr;
+}
+
+const ArkUIContentChangeAPI* GetContentChangeAPI()
+{
+    using Entry = const ArkUIContentChangeAPI* (*)(int32_t);
+    auto* module = FindModule();
+    if (!module) {
+        return nullptr;
+    }
+    auto entry = reinterpret_cast<Entry>(FindFunction(module, "GetArkUIContentChangeAPI"));
+    return entry ? entry(ARKUI_CONTENT_CHANGE_API_VERSION) : nullptr;
 }
 
 ArkUIFullNodeAPI* GetFullImpl()
@@ -942,6 +978,7 @@ void HandleNodeEvent(ArkUI_NodeEvent* event)
         TriggerNodeEvent(event, eventListenersSet);
     }
     if (g_eventReceiver) {
+        LOG_CALLBACK("ArkUI_NativeNodeAPI_1.registerNodeEventReceiver", g_eventReceiver);
         g_eventReceiver(event);
     }
 }
@@ -960,7 +997,10 @@ void TriggerNodeEvent(ArkUI_NodeEvent* event, std::set<void (*)(ArkUI_NodeEvent*
 
     // Use the copy for iteration and callbacks
     for (const auto& eventListener : listenersCopy) {
-        eventListener(event);
+        {
+            LOG_CALLBACK("ArkUI_NativeNodeAPI_1.addNodeEventReceiver", eventListener);
+            eventListener(event);
+        }
         if (!IsValidArkUINode(event->node)) {
             break;
         }
@@ -1049,6 +1089,13 @@ void TriggerNodeCommonEvent(ArkUI_NodeEvent* event, int32_t eventType,
     auto it = commonEventListenersMap->find(eventType);
     if (it != commonEventListenersMap->end()) {
         const auto& eventListener = it->second;
+        const char* source = "OH_ArkUI_NativeModule_RegisterCommonEvent";
+        if (eventType == NODE_VISIBLE_AREA_APPROXIMATE_CHANGE_EVENT) {
+            source = "OH_ArkUI_NativeModule_RegisterCommonVisibleAreaApproximateChangeEvent";
+        } else if (eventType == NODE_EVENT_ON_AREA_CHANGE) {
+            source = "OH_ArkUI_NativeModule_RegisterCommonAreaApproximateChangeEvent";
+        }
+        LOG_CALLBACK(source, eventListener);
         (*eventListener)(event);
     }
 }
@@ -1779,7 +1826,9 @@ int32_t GetNodeTypeByTag(ArkUI_NodeHandle node)
         { OHOS::Ace::V2::CUSTOM_ETS_TAG, ArkUI_NodeType::ARKUI_NODE_CUSTOM },
     };
 
-    const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
+    // GetOrCreateFullImpl (NOT GetFullImpl): this resolution may be the caller's FIRST access to the NDK-side NodeModel bundle (e.g.
+    const auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
+    CHECK_NULL_RETURN(impl, -1);
     auto value = impl->getNodeModifiers()->getFrameNodeModifier()->getNodeType(node->uiNodeHandle);
     auto iter = nodeTypeMap.find(value);
     if (iter != nodeTypeMap.end()) {

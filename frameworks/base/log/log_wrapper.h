@@ -93,7 +93,7 @@ constexpr uint32_t APP_DOMAIN = 0xC0D0;
 #define TAG_LOGF(tag, fmt, ...) PRINT_LOG(FATAL, tag, fmt, ##__VA_ARGS__)
 
 #define LOG_FUNCTION() LOGD("function track: %{public}s", __FUNCTION__)
-#define LOG_CALLBACK(callback) CallbackLogger _(__FUNCTION__, reinterpret_cast<uintptr_t>(callback))
+#define LOG_CALLBACK(funcName, callback) CallbackLogger _(funcName, reinterpret_cast<uintptr_t>(callback))
 
 #define LOGF_ABORT(fmt, ...)      \
     do {                          \
@@ -289,6 +289,7 @@ private:
     ~LogWrapper() = delete;
 
     static LogLevel level_;
+    static LogLevel& GetLogLevelStorage();
 };
 
 ACE_FORCE_EXPORT bool LogBacktrace(size_t maxFrameNums = 256);

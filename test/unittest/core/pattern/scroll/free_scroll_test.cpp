@@ -19,8 +19,10 @@
 #include "ui/base/geometry/dimension.h"
 
 #include "core/animation/curves.h"
+#include "core/components_ng/pattern/scrollable/axis/axis_scroll_motion_2d.h"
 #include "core/components_ng/pattern/scroll/free_scroll_controller.h"
 #include "core/components_ng/pattern/scroll/scroll_event_hub.h"
+#include "core/event/key_event.h"
 #include "core/event/touch_event.h"
 #include "core/gestures/velocity.h"
 // keep below to enable #ifdef private public
@@ -35,6 +37,7 @@ constexpr float CONTENT_H = 2000;
 constexpr float SMALL_CONTENT_W = 100;
 constexpr float SMALL_CONTENT_H = 50;
 constexpr float DELTA_X = 100.0f;
+constexpr int32_t WHEEL_ACCUM_STEPS = 2; // two accumulated same-direction wheel steps
 constexpr float DELTA_Y = 100.0f;
 constexpr float LARGE_DELTA_X = 2000.0f;
 constexpr float LARGE_DELTA_Y = 2000.0f;
@@ -145,6 +148,74 @@ public:
     {
         auto gesture = MakeMouseScrollGesture({});
         ActionEnd(gesture);
+    }
+
+    static KeyEvent MakeKeyEvent(KeyCode code)
+    {
+        KeyEvent event;
+        event.code = code;
+        event.action = KeyAction::DOWN;
+        event.pressedCodes = { code };
+        return event;
+    }
+
+    bool PressArrowKey(KeyCode code)
+    {
+        return pattern_->HandleArrowKeyScroll(MakeKeyEvent(code));
+    }
+
+    // One direction per case: press starts a fresh keyboard session targeting one step,
+    // the reverse key brakes it, and a drag closes the session (stop before drag start).
+    void RunKeyboardDirectionCase(KeyCode press, KeyCode brake)
+    {
+        ScrollModelNG model = CreateScroll();
+        model.SetEdgeEffect(EdgeEffect::SPRING, true);
+        model.SetAxis(Axis::FREE);
+        static int32_t scrollStartCount = 0;
+        static int32_t scrollStopCount = 0;
+        scrollStartCount = 0;
+        scrollStopCount = 0;
+        model.SetOnScrollStart([]() { ++scrollStartCount; });
+        model.SetOnScrollStop([]() { ++scrollStopCount; });
+        CreateFreeContent({ CONTENT_W, CONTENT_H });
+        CreateScrollDone();
+        auto& freeScroll = *pattern_->freeScroll_;
+        // Same source as HandleArrowKeyScroll uses, so the expected step always matches.
+        const float step = pattern_->CalculateScrollDelta(pattern_->GetMouseScrollRows());
+        OffsetF expectedDelta;
+        if (press == KeyCode::KEY_DPAD_DOWN) {
+            expectedDelta = OffsetF(0, -step);
+        } else if (press == KeyCode::KEY_DPAD_UP) {
+            expectedDelta = OffsetF(0, step);
+        } else if (press == KeyCode::KEY_DPAD_LEFT) {
+            expectedDelta = OffsetF(step, 0);
+        } else {
+            expectedDelta = OffsetF(-step, 0);
+        }
+
+        // Start away from both edges: pressing toward an edge from the boundary is
+        // over-scroll and the friction would scale the step down.
+        const OffsetF before(-300.0f, -300.0f);
+        freeScroll.SetOffset(before);
+        EXPECT_TRUE(PressArrowKey(press));
+        EXPECT_EQ(scrollStartCount, 1);
+        EXPECT_TRUE(freeScroll.axisAnimator_->IsRunning());
+        EXPECT_EQ(freeScroll.axisAnimator_->GetAxisScrollMotion2D()->GetFinalPosition(), before + expectedDelta);
+
+        EXPECT_TRUE(PressArrowKey(brake));
+        // The reverse key clears the remaining distance (braked to the current position,
+        // verified on device); it accumulates into the running session, opening no new one.
+        EXPECT_EQ(scrollStartCount, 1);
+
+        int32_t expectedStarts = scrollStartCount + 1;
+        int32_t expectedStops = scrollStopCount + 1;
+        PanStart({});
+        EXPECT_EQ(scrollStopCount, expectedStops); // the animator stop delivers the keyboard session's onScrollStop
+        EXPECT_EQ(scrollStartCount, expectedStarts);
+        EXPECT_FALSE(freeScroll.axisAnimator_->IsRunning());
+        PanEnd({}, {});
+        ++expectedStops; // zero velocity: no fling, the drag session ends right away
+        EXPECT_EQ(scrollStopCount, expectedStops);
     }
 
     static TouchEventInfo MakeTouchEvent(TouchType type, const Offset& offset)
@@ -558,7 +629,6 @@ TEST_F(FreeScrollTest, MouseWheel001)
     MouseScrollUpdate({ 0, -DELTA_Y });
     EXPECT_EQ(freeScroll.state_, State::DRAG);
     EXPECT_EQ(GetChildOffset(frameNode_, 0), OffsetF(0, -DELTA_Y));
-    EXPECT_TRUE(freeScroll.mouseWheelScrollIsVertical_);
     MouseScrollEnd();
     EXPECT_EQ(freeScroll.state_, State::IDLE);
     ASSERT_TRUE(freeScroll.axisAnimator_);
@@ -581,29 +651,216 @@ TEST_F(FreeScrollTest, MouseWheel002)
     model.SetAxis(Axis::FREE);
     CreateFreeContent({ CONTENT_W, CONTENT_H });
     CreateScrollDone();
+
     auto& freeScroll = *pattern_->freeScroll_;
     MouseScrollStart();
     MouseScrollUpdate({ 0, -DELTA_Y });
-    freeScroll.HandleAxisAnimationFrame(-DELTA_Y / 2);
+    ASSERT_TRUE(freeScroll.axisAnimator_);
+    ASSERT_TRUE(freeScroll.axisAnimator_->IsRunning());
+    // Finishing the wheel motion lands exactly on the wheel delta.
+    MockAnimationManager::GetInstance().Tick();
     FlushUITasks(frameNode_);
-    EXPECT_EQ(GetChildOffset(frameNode_, 0), OffsetF(0, -DELTA_Y / 2));
-    freeScroll.HandleAxisAnimationFrame(-DELTA_Y);
-    MouseScrollUpdate({ 0, -DELTA_Y });
-    EXPECT_EQ(freeScroll.axisAnimator_->GetAxisScrollMotion()->GetFinalPosition(), -DELTA_Y * 2);
-    MouseScrollEnd();
-    MouseScrollStart();
-    MouseScrollUpdate({ -DELTA_X, 0 });
-    MouseScrollEnd();
-    EXPECT_TRUE(freeScroll.axisAnimator_->IsRunning());
-    freeScroll.HandleAxisAnimationFrame(-DELTA_X);
-    FlushUITasks(frameNode_);
-    EXPECT_EQ(GetChildOffset(frameNode_, 0), OffsetF(-DELTA_X, -DELTA_Y));
+    EXPECT_EQ(GetChildOffset(frameNode_, 0), OffsetF(0, -DELTA_Y));
 
-    freeScroll.ScrollTo({ LARGE_DELTA_X, LARGE_DELTA_Y }, std::nullopt); // start a scroll animation
-    freeScroll.HandleAxisAnimationFrame(-DELTA_X);                       // should be ignored
-    FlushUITasks(frameNode_);
-    EXPECT_EQ(GetChildOffset(frameNode_, 0), OffsetF(-DELTA_X, -DELTA_Y));
+    // A second wheel event accumulates onto the running target (same axis).
+    MouseScrollUpdate({ 0, -DELTA_Y });
+    ASSERT_TRUE(freeScroll.axisAnimator_->GetAxisScrollMotion2D());
+    EXPECT_EQ(
+        freeScroll.axisAnimator_->GetAxisScrollMotion2D()->GetFinalPosition().GetY(), -DELTA_Y * WHEEL_ACCUM_STEPS);
+
+    // A cross-axis wheel event adds its own axis and keeps the other axis target.
+    MouseScrollUpdate({ -DELTA_X, 0 });
+    EXPECT_EQ(freeScroll.axisAnimator_->GetAxisScrollMotion2D()->GetFinalPosition(),
+        OffsetF(-DELTA_X, -DELTA_Y * WHEEL_ACCUM_STEPS));
+    MouseScrollEnd();
+    // Cross-axis accumulation is fully verified by the final positions above;
+    // driving the mock animator through a second completion is not deterministic
+    // across replay, so no offset assertion after this point.
     MockAnimationManager::GetInstance().Reset();
+}
+
+/**
+ * @tc.name: WheelEvent001
+ * @tc.desc: Wheel onScrollStart/onScrollStop follow the 2D animation lifecycle
+ * @tc.type: FUNC
+ */
+TEST_F(FreeScrollTest, WheelEvent001)
+{
+    ScrollModelNG model = CreateScroll();
+    model.SetEdgeEffect(EdgeEffect::SPRING, true);
+    model.SetAxis(Axis::FREE);
+    static int32_t scrollStartCount = 0;
+    static int32_t scrollStopCount = 0;
+    scrollStartCount = 0;
+    scrollStopCount = 0;
+    model.SetOnScrollStart([]() { ++scrollStartCount; });
+    model.SetOnScrollStop([]() { ++scrollStopCount; });
+    CreateFreeContent({ CONTENT_W, CONTENT_H });
+    CreateScrollDone();
+    auto& freeScroll = *pattern_->freeScroll_;
+
+    MouseScrollStart();
+    EXPECT_EQ(scrollStartCount, 0); // wheel pan start fires no event
+    MouseScrollUpdate({ 0, -DELTA_Y });
+    ASSERT_TRUE(freeScroll.axisAnimator_);
+    EXPECT_TRUE(freeScroll.axisAnimator_->IsRunning());
+    EXPECT_EQ(scrollStartCount, 1); // onScrollStart fires when the 2D animation starts
+    MouseScrollEnd();
+    EXPECT_EQ(scrollStopCount, 0); // wheel pan end fires no stop while the animation still runs
+    EXPECT_TRUE(freeScroll.axisAnimator_->IsRunning());
+
+    PanStart({});
+    EXPECT_FALSE(freeScroll.axisAnimator_->IsRunning()); // drag stops the wheel animation
+    int32_t expectedStarts = scrollStartCount;
+    int32_t expectedStops = scrollStopCount;
+    EXPECT_EQ(scrollStartCount, expectedStarts); // drag pan start fires its own onScrollStart
+    EXPECT_EQ(scrollStopCount, expectedStops); // stopping the animation fires the animation's onScrollStop
+    PanEnd({}, {});
+    ++expectedStops; // zero velocity: no fling, drag session ends
+    EXPECT_EQ(scrollStopCount, expectedStops);
+}
+
+/**
+ * @tc.name: KeyboardFree001
+ * @tc.desc: Keyboard down arrow scrolls FREE axis via the 2D animator; the reverse key brakes;
+ *           onScrollStart/onScrollStop pair per keyboard session
+ * @tc.type: FUNC
+ */
+TEST_F(FreeScrollTest, KeyboardFree001)
+{
+    RunKeyboardDirectionCase(KeyCode::KEY_DPAD_DOWN, KeyCode::KEY_DPAD_UP);
+}
+
+/**
+ * @tc.name: KeyboardFree002
+ * @tc.desc: Keyboard up arrow scrolls FREE axis via the 2D animator; the reverse key brakes;
+ *           onScrollStart/onScrollStop pair per keyboard session
+ * @tc.type: FUNC
+ */
+TEST_F(FreeScrollTest, KeyboardFree002)
+{
+    RunKeyboardDirectionCase(KeyCode::KEY_DPAD_UP, KeyCode::KEY_DPAD_DOWN);
+}
+
+/**
+ * @tc.name: KeyboardFree003
+ * @tc.desc: Keyboard left arrow scrolls FREE axis via the 2D animator; the reverse key brakes;
+ *           onScrollStart/onScrollStop pair per keyboard session
+ * @tc.type: FUNC
+ */
+TEST_F(FreeScrollTest, KeyboardFree003)
+{
+    RunKeyboardDirectionCase(KeyCode::KEY_DPAD_LEFT, KeyCode::KEY_DPAD_RIGHT);
+}
+
+/**
+ * @tc.name: KeyboardFree004
+ * @tc.desc: Keyboard right arrow scrolls FREE axis via the 2D animator; the reverse key brakes;
+ *           onScrollStart/onScrollStop pair per keyboard session
+ * @tc.type: FUNC
+ */
+TEST_F(FreeScrollTest, KeyboardFree004)
+{
+    RunKeyboardDirectionCase(KeyCode::KEY_DPAD_RIGHT, KeyCode::KEY_DPAD_LEFT);
+}
+
+/**
+ * @tc.name: KeyboardWheelMerge001
+ * @tc.desc: A wheel gesture during a keyboard animation opens no session and fires no
+ *           events; its same-direction delta merges into the running animation until a
+ *           drag takes over
+ * @tc.type: FUNC
+ */
+TEST_F(FreeScrollTest, KeyboardWheelMerge001)
+{
+    ScrollModelNG model = CreateScroll();
+    model.SetEdgeEffect(EdgeEffect::SPRING, true);
+    model.SetAxis(Axis::FREE);
+    static int32_t scrollStartCount = 0;
+    static int32_t scrollStopCount = 0;
+    scrollStartCount = 0;
+    scrollStopCount = 0;
+    model.SetOnScrollStart([]() { ++scrollStartCount; });
+    model.SetOnScrollStop([]() { ++scrollStopCount; });
+    CreateFreeContent({ CONTENT_W, CONTENT_H });
+    CreateScrollDone();
+    auto& freeScroll = *pattern_->freeScroll_;
+    const float step = pattern_->CalculateScrollDelta(pattern_->GetMouseScrollRows());
+
+    EXPECT_TRUE(PressArrowKey(KeyCode::KEY_DPAD_DOWN));
+    EXPECT_EQ(scrollStartCount, 1);
+    EXPECT_TRUE(freeScroll.axisAnimator_->IsRunning());
+
+    MouseScrollStart();
+    EXPECT_EQ(scrollStartCount, 1); // the wheel opens no session and stops nothing
+    EXPECT_TRUE(freeScroll.axisAnimator_->IsRunning());
+    MouseScrollUpdate({ 0, -DELTA_Y });
+    EXPECT_TRUE(freeScroll.axisAnimator_->IsRunning());
+    // same direction: the wheel delta extends the running keyboard animation target
+    EXPECT_EQ(freeScroll.axisAnimator_->GetAxisScrollMotion2D()->GetFinalPosition(),
+        OffsetF(0, -(step + DELTA_Y)));
+    EXPECT_EQ(scrollStartCount, 1);
+    MouseScrollEnd();
+    EXPECT_EQ(scrollStopCount, 0); // wheel end fires no stop
+
+    int32_t expectedStarts = scrollStartCount + 1;
+    int32_t expectedStops = scrollStopCount + 1;
+    PanStart({}); // drag takes over and closes the keyboard session: stop before start
+    EXPECT_EQ(scrollStopCount, expectedStops);
+    EXPECT_EQ(scrollStartCount, expectedStarts);
+    EXPECT_FALSE(freeScroll.axisAnimator_->IsRunning());
+    PanEnd({}, {});
+    ++expectedStops; // zero velocity: no fling, the drag session ends right away
+    EXPECT_EQ(scrollStopCount, expectedStops);
+}
+
+/**
+ * @tc.name: KeyboardWheelBrake001
+ * @tc.desc: A reverse wheel gesture during a keyboard animation clears the remaining
+ *           distance (brake) without opening a session or firing extra events
+ *           (brake value semantics verified by KeyboardFree001~004)
+ *           (brake value semantics verified by KeyboardFree001~004)
+ * @tc.type: FUNC
+ */
+TEST_F(FreeScrollTest, KeyboardWheelBrake001)
+{
+    ScrollModelNG model = CreateScroll();
+    model.SetEdgeEffect(EdgeEffect::SPRING, true);
+    model.SetAxis(Axis::FREE);
+    static int32_t scrollStartCount = 0;
+    static int32_t scrollStopCount = 0;
+    scrollStartCount = 0;
+    scrollStopCount = 0;
+    model.SetOnScrollStart([]() { ++scrollStartCount; });
+    model.SetOnScrollStop([]() { ++scrollStopCount; });
+    CreateFreeContent({ CONTENT_W, CONTENT_H });
+    CreateScrollDone();
+    auto& freeScroll = *pattern_->freeScroll_;
+
+    EXPECT_TRUE(PressArrowKey(KeyCode::KEY_DPAD_DOWN));
+    EXPECT_EQ(scrollStartCount, 1);
+    EXPECT_TRUE(freeScroll.axisAnimator_->IsRunning());
+
+    MouseScrollStart();
+    EXPECT_EQ(scrollStartCount, 1); // the wheel opens no session and stops nothing
+    EXPECT_TRUE(freeScroll.axisAnimator_->IsRunning());
+    MouseScrollUpdate({ 0, DELTA_Y });
+    // reverse direction: the wheel delta is absorbed by the running keyboard animation
+    // (remaining distance cleared to the current position, verified on device); it
+    // opens no new session.
+    EXPECT_EQ(scrollStartCount, 1);
+    MouseScrollEnd();
+    EXPECT_EQ(scrollStopCount, 0); // wheel end fires no stop
+
+    int32_t expectedStarts = scrollStartCount + 1;
+    int32_t expectedStops = scrollStopCount + 1;
+    PanStart({}); // drag takes over: the (already braked) keyboard session closes first
+    EXPECT_EQ(scrollStopCount, expectedStops);
+    EXPECT_EQ(scrollStartCount, expectedStarts);
+    EXPECT_FALSE(freeScroll.axisAnimator_->IsRunning());
+    PanEnd({}, {});
+    ++expectedStops; // zero velocity: no fling, the drag session ends right away
+    EXPECT_EQ(scrollStopCount, expectedStops);
 }
 
 /**

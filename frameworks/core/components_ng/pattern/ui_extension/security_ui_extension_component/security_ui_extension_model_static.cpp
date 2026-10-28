@@ -33,8 +33,8 @@ RefPtr<FrameNode> SecurityUIExtensionStatic::CreateSecurityUIExtensionComponent(
 }
 
 void SecurityUIExtensionStatic::UpdateSecurityUecConfig(
-    FrameNode* frameNode, bool isTransferringCaller, DpiFollowStrategy dpiFollowStrategy, bool isWindowModeFollowHost,
-    const std::map<PlaceholderType, RefPtr<NG::FrameNode>>& placeholderMap)
+    FrameNode* frameNode, bool isTransferringCaller, DpiFollowStrategy dpiFollowStrategy, bool isDpiFollowStrategySet,
+    bool isWindowModeFollowHost, const std::map<PlaceholderType, RefPtr<NG::FrameNode>>& placeholderMap)
 {
     CHECK_NULL_VOID(frameNode);
     CHECK_NULL_VOID(frameNode->GetPattern());
@@ -43,7 +43,7 @@ void SecurityUIExtensionStatic::UpdateSecurityUecConfig(
     if (pattern->GetIsTransferringCaller() != isTransferringCaller) {
         pattern->SetIsTransferringCaller(isTransferringCaller);
     }
-    pattern->SetDpiFollowStrategy(dpiFollowStrategy);
+    pattern->SetDpiFollowStrategy(dpiFollowStrategy, isDpiFollowStrategySet);
     pattern->SetIsWindowModeFollowHost(isWindowModeFollowHost);
 }
 

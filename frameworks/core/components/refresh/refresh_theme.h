@@ -27,7 +27,7 @@ constexpr int TEXT_FIELD_FONT_WEIGHT = 3;
 /**
  * RefreshTheme should be built using RefreshTheme::Builder.
  */
-class RefreshTheme : public virtual Theme {
+class RefreshTheme : public Theme {
     DECLARE_ACE_TYPE(RefreshTheme, Theme);
 
 public:

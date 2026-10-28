@@ -16,8 +16,10 @@
 #include "list_test_ng.h"
 #include "test/mock/frameworks/core/animation/mock_animation_manager.h"
 #include "test/mock/frameworks/core/common/mock_container.h"
+#include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 #include "test/mock/frameworks/core/rosen/mock_canvas.h"
 #include "test/mock/frameworks/core/components_ng/render/mock_render_context.h"
+#include "test/unittest/core/pattern/scrollable/scrollable_test_utils.h"
 
 #include <utility>
 #include <vector>
@@ -32,6 +34,7 @@
 #include "core/components_ng/pattern/list/list_model_ng.h"
 #include "core/components_ng/pattern/list/list_pattern.h"
 #include "core/components_ng/pattern/scrollable/scrollable_model_ng.h"
+#include "core/components_ng/pattern/scrollable/scrollable_paint_property.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_node.h"
 #include "core/components_ng/pattern/lazy_grid_layout/lazy_grid_layout_model.h"
 #include "core/components_ng/pattern/lazy_grid_layout/lazy_grid_layout_pattern.h"
@@ -1897,5 +1900,161 @@ HWTEST_F(ListContentClipTestNg, ContentClipSafeAreaWithMultipleLazyVWaterFlowLay
     EXPECT_EQ(lazyWaterFlowPattern1->GetVisibleIndexesRangeForCallback(), (std::make_pair<int32_t, int32_t>(-1, -1)));
     EXPECT_EQ(layoutInfo1->startIndex_, -1);
     EXPECT_EQ(layoutInfo1->endIndex_, -1);
+}
+
+// ===================== Unified immersive strategy: promoted default =====================
+// AC-1.1/AC-1.2 (VM-1/VM-4): with LIST_EXPAND_SAFE_AREA applied and clipContent
+// never set explicitly, the List resolves its effective default to SAFE_AREA and
+// reuses the whole explicit-SAFE_AREA extension chain. The assertions mirror
+// ContentClipSafeAreaWithSafeAreaPadding001 field by field (INV-4).
+
+/**
+ * @tc.name: ContentClipImmersiveStrategyDefaultSafeArea001
+ * @tc.desc: Enabled LIST_EXPAND_SAFE_AREA promotes the unset clipContent default to SAFE_AREA.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListContentClipTestNg, ContentClipImmersiveStrategyDefaultSafeArea001, TestSize.Level1)
+{
+    ImmersiveStrategyScope scope({ ImmersiveStrategy::LIST_EXPAND_SAFE_AREA });
+    int32_t startIndex = -1;
+    int32_t endIndex = -1;
+    ListModelNG model = CreateList();
+    // clipContent is deliberately never set: the strategy promotes the default.
+    model.SetSpace(Dimension(5));
+    PaddingProperty paddingProperty;
+    paddingProperty.bottom = std::make_optional<CalcLength>(150);
+    layoutProperty_->UpdateSafeAreaPadding(paddingProperty);
+    model.SetOnScrollIndex([&startIndex, &endIndex](int32_t start, int32_t end, int32_t center) {
+        startIndex = start;
+        endIndex = end;
+    });
+    CreateListItems(TOTAL_ITEM_NUMBER);
+    CreateDone();
+    FlushUITasks(frameNode_);
+
+    // AC-1.1 query surface.
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::SAFE_AREA);
+    // Same item layout and report range as the explicit SAFE_AREA case.
+    auto item3 = GetChildFrameNode(frameNode_, 3);
+    EXPECT_TRUE(item3->IsActive());
+    EXPECT_EQ(GetChildHeight(frameNode_, 3), ITEM_MAIN_SIZE);
+    auto item4 = GetChildFrameNode(frameNode_, 4);
+    EXPECT_FALSE(item4->IsActive());
+    EXPECT_EQ(GetChildHeight(frameNode_, 4), 0);
+    EXPECT_EQ(startIndex, 0);
+    EXPECT_EQ(endIndex, 2);
+}
+
+/**
+ * @tc.name: ContentClipImmersiveStrategyExplicitContentOnlyWins001
+ * @tc.desc: AC-2.1 - an explicit clipContent is never overridden by the enabled strategy.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListContentClipTestNg, ContentClipImmersiveStrategyExplicitContentOnlyWins001, TestSize.Level1)
+{
+    ImmersiveStrategyScope scope({ ImmersiveStrategy::LIST_EXPAND_SAFE_AREA });
+    ListModelNG model = CreateList();
+    ScrollableModelNG::SetContentClip(AceType::RawPtr(frameNode_), ContentClipMode::CONTENT_ONLY, nullptr);
+    model.SetSpace(Dimension(5));
+    PaddingProperty paddingProperty;
+    paddingProperty.bottom = std::make_optional<CalcLength>(150);
+    layoutProperty_->UpdateSafeAreaPadding(paddingProperty);
+    CreateListItems(TOTAL_ITEM_NUMBER);
+    CreateDone();
+    FlushUITasks(frameNode_);
+
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::CONTENT_ONLY);
+}
+
+/**
+ * @tc.name: ContentClipImmersiveStrategyExplicitDefaultPromotes001
+ * @tc.desc: AC-2.1/R-3 - an explicit "restore default" resolves to the promoted default.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListContentClipTestNg, ContentClipImmersiveStrategyExplicitDefaultPromotes001, TestSize.Level1)
+{
+    ImmersiveStrategyScope scope({ ImmersiveStrategy::LIST_EXPAND_SAFE_AREA });
+    ListModelNG model = CreateList();
+    ScrollableModelNG::SetContentClip(AceType::RawPtr(frameNode_), ContentClipMode::DEFAULT, nullptr);
+    model.SetSpace(Dimension(5));
+    CreateListItems(TOTAL_ITEM_NUMBER);
+    CreateDone();
+    FlushUITasks(frameNode_);
+
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::SAFE_AREA);
+}
+
+/**
+ * @tc.name: ContentClipImmersiveStrategyDisabledKeepsBuiltInDefault001
+ * @tc.desc: AC-3.1 - with no strategy applied the List keeps its built-in CONTENT_ONLY default.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListContentClipTestNg, ContentClipImmersiveStrategyDisabledKeepsBuiltInDefault001, TestSize.Level1)
+{
+    ListModelNG model = CreateList();
+    model.SetSpace(Dimension(5));
+    CreateListItems(TOTAL_ITEM_NUMBER);
+    CreateDone();
+    FlushUITasks(frameNode_);
+
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::CONTENT_ONLY);
+}
+
+/**
+ * @tc.name: ContentClipImmersiveStrategyOtherComponentIsolated001
+ * @tc.desc: AC-1.3 - a strategy for another component type never touches the List.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListContentClipTestNg, ContentClipImmersiveStrategyOtherComponentIsolated001, TestSize.Level1)
+{
+    ImmersiveStrategyScope scope({ ImmersiveStrategy::GRID_EXPAND_SAFE_AREA });
+    ListModelNG model = CreateList();
+    model.SetSpace(Dimension(5));
+    CreateListItems(TOTAL_ITEM_NUMBER);
+    CreateDone();
+    FlushUITasks(frameNode_);
+
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::CONTENT_ONLY);
+}
+
+/**
+ * @tc.name: ContentClipImmersiveStrategyResetNotFrozen001
+ * @tc.desc: A reset clipContent stores DEFAULT and keeps resolving the effective default, so clearing
+ *           the strategy stops the extension instead of leaving the promoted SAFE_AREA frozen.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListContentClipTestNg, ContentClipImmersiveStrategyResetNotFrozen001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Enable the strategy, set clipContent explicitly and reset it again
+     * @tc.expected: The reset stores DEFAULT and still resolves to the promoted SAFE_AREA
+     */
+    ImmersiveStrategyScope scope({ ImmersiveStrategy::LIST_EXPAND_SAFE_AREA });
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    ListModelNG model = CreateList();
+    ScrollableModelNG::SetContentClip(AceType::RawPtr(frameNode_), ContentClipMode::SAFE_AREA, nullptr);
+    model.SetSpace(Dimension(5));
+    CreateListItems(TOTAL_ITEM_NUMBER);
+    CreateDone();
+    FlushUITasks(frameNode_);
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::SAFE_AREA);
+
+    ScrollableModelNG::ResetContentClip(AceType::RawPtr(frameNode_));
+    FlushUITasks(frameNode_);
+    auto paintProperty = frameNode_->GetPaintProperty<ScrollablePaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    ASSERT_TRUE(paintProperty->GetContentClip().has_value());
+    EXPECT_EQ(paintProperty->GetContentClip()->first, ContentClipMode::DEFAULT);
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::SAFE_AREA);
+
+    /**
+     * @tc.steps: step2. Clear the strategy set on the same node
+     * @tc.expected: The effective default falls back to the built-in CONTENT_ONLY, nothing is frozen
+     */
+    pipeline->ApplyDefaultImmersiveStrategy({});
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::CONTENT_ONLY);
+    FlushUITasks(frameNode_);
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::CONTENT_ONLY);
 }
 } // namespace OHOS::Ace::NG

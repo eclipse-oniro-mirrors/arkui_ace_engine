@@ -995,4 +995,336 @@ HWTEST_F(ViewAbstractTestNg, GetImmersiveMaterialConfigWithScale006, TestSize.Le
     // dipScale should be adjusted (baseDipScale / 2.0 = baseDipScale * 0.5)
     EXPECT_GT(config->dipScale, 0.0f);
 }
+
+/**
+ * @tc.name: SetShadowShapeForVisualEffect001
+ * @tc.desc: Test SetShadowShape with valid BasicShape then nullptr reset
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, SetShadowShapeForVisualEffect001, TestSize.Level1)
+{
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    auto& rc = node->GetRenderContext();
+
+    /**
+     * @tc.steps: step1. Set a valid Circle shape.
+     * @tc.expected: HasShadowShape is true and type is CIRCLE.
+     */
+    auto basicShape = AceType::MakeRefPtr<Circle>();
+    ViewAbstract::SetShadowShape(AceType::RawPtr(node), basicShape);
+    ASSERT_TRUE(rc->HasShadowShape());
+    auto shadowShape = rc->GetShadowShapeValue(nullptr);
+    ASSERT_NE(shadowShape, nullptr);
+    EXPECT_EQ(shadowShape->GetBasicShapeType(), BasicShapeType::CIRCLE);
+
+    /**
+     * @tc.steps: step2. Set nullptr to reset.
+     * @tc.expected: HasShadowShape is false.
+     */
+    ViewAbstract::SetShadowShape(AceType::RawPtr(node), nullptr);
+    EXPECT_FALSE(rc->HasShadowShape());
+}
+
+/**
+ * @tc.name: SetShadowShapeForVisualEffect002
+ * @tc.desc: Test SetShadowShape then replace with different shape type
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, SetShadowShapeForVisualEffect002, TestSize.Level1)
+{
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    auto& rc = node->GetRenderContext();
+    auto circle = AceType::MakeRefPtr<Circle>();
+    ViewAbstract::SetShadowShape(AceType::RawPtr(node), circle);
+    auto shadowShape = rc->GetShadowShapeValue(nullptr);
+    ASSERT_NE(shadowShape, nullptr);
+    EXPECT_EQ(shadowShape->GetBasicShapeType(), BasicShapeType::CIRCLE);
+    auto rect = AceType::MakeRefPtr<ShapeRect>();
+    ViewAbstract::SetShadowShape(AceType::RawPtr(node), rect);
+    auto shadowShapeRect = rc->GetShadowShapeValue(nullptr);
+    ASSERT_NE(shadowShapeRect, nullptr);
+    EXPECT_EQ(shadowShapeRect->GetBasicShapeType(), BasicShapeType::RECT);
+}
+
+/**
+ * @tc.name: SetShadowShapeForVisualEffect003
+ * @tc.desc: Test SetShadowShape without FrameNode overload (via ViewStackProcessor)
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, SetShadowShapeForVisualEffect003, TestSize.Level1)
+{
+    auto stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    stack->ClearVisualState();
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    stack->Push(node);
+    auto basicShape = AceType::MakeRefPtr<Circle>();
+    ViewAbstract::SetShadowShape(basicShape);
+    stack->Finish();
+    auto& rc = node->GetRenderContext();
+    ASSERT_TRUE(rc->HasShadowShape());
+    auto shadowShape = rc->GetShadowShapeValue(nullptr);
+    ASSERT_NE(shadowShape, nullptr);
+    EXPECT_EQ(shadowShape->GetBasicShapeType(), BasicShapeType::CIRCLE);
+}
+
+/**
+ * @tc.name: SetShadowShapeForVisualEffect004
+ * @tc.desc: Test SetShadowShape and ResetShadowShape return early when IsCurrentVisualStateProcess is false
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, SetShadowShapeForVisualEffect004, TestSize.Level1)
+{
+    auto stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    stack->Push(node);
+    stack->SetVisualState(VisualState::DISABLED);
+    auto basicShape = AceType::MakeRefPtr<Circle>();
+    ViewAbstract::SetShadowShape(basicShape);
+    EXPECT_FALSE(node->GetRenderContext()->HasShadowShape());
+    ViewAbstract::ResetShadowShape();
+    stack->ClearVisualState();
+    stack->Finish();
+    EXPECT_FALSE(node->GetRenderContext()->HasShadowShape());
+}
+
+/**
+ * @tc.name: SetShadowShapeForVisualEffect005
+ * @tc.desc: Test SetShadowShape ConfigChangePerform branch
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, SetShadowShapeForVisualEffect005, TestSize.Level1)
+{
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    auto& rc = node->GetRenderContext();
+
+    /**
+     * @tc.steps: step1. ConfigChangePerform is true.
+     * @tc.expected: SetShadowShape works and property is set.
+     */
+    g_isConfigChangePerform = true;
+    auto basicShape = AceType::MakeRefPtr<Circle>();
+    ViewAbstract::SetShadowShape(AceType::RawPtr(node), basicShape);
+    EXPECT_TRUE(rc->HasShadowShape());
+    g_isConfigChangePerform = false;
+}
+
+/**
+ * @tc.name: SetShadowShapeForVisualEffect006
+ * @tc.desc: Test SetShadowShape nullptr frameNode and LPX callback
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, SetShadowShapeForVisualEffect006, TestSize.Level1)
+{
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    auto& rc = node->GetRenderContext();
+    auto basicShape = AceType::MakeRefPtr<Circle>();
+
+    /**
+     * @tc.steps: step1. nullptr frameNode, should not crash.
+     */
+    ViewAbstract::SetShadowShape(nullptr, basicShape);
+
+    /**
+     * @tc.steps: step2. basicShape with LPX width, register LPX callback.
+     * @tc.expected: FireLpxUpdateCallbacks re-applies the shape.
+     */
+    auto lpxShape = AceType::MakeRefPtr<Circle>();
+    lpxShape->SetWidth(Dimension(1.0, DimensionUnit::LPX));
+    ViewAbstract::SetShadowShape(AceType::RawPtr(node), lpxShape);
+    ASSERT_TRUE(rc->HasShadowShape());
+    rc->ResetShadowShape();
+    EXPECT_FALSE(rc->HasShadowShape());
+    node->FireLpxUpdateCallbacks();
+    EXPECT_TRUE(rc->HasShadowShape());
+}
+
+/**
+ * @tc.name: SetShadowShapeForVisualEffect007
+ * @tc.desc: Test SetShadowShape ConfigChangePerform AddResObj and nullptr branches
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, SetShadowShapeForVisualEffect007, TestSize.Level1)
+{
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    auto& rc = node->GetRenderContext();
+
+    /**
+     * @tc.steps: step1. ConfigChangePerform true + basicShape with ResourceObj.
+     * @tc.expected: AddResObj branch executed, shadowShape is set.
+     */
+    g_isConfigChangePerform = true;
+    auto basicShape = AceType::MakeRefPtr<Circle>();
+    EXPECT_FALSE(basicShape->HasResourceObj());
+    auto resObj = AceType::MakeRefPtr<ResourceObject>("", "", -1);
+    auto updateFunc = [](const RefPtr<ResourceObject>&, BasicShape&) {};
+    basicShape->AddResource("test", resObj, updateFunc);
+    EXPECT_TRUE(basicShape->HasResourceObj());
+    ViewAbstract::SetShadowShape(AceType::RawPtr(node), basicShape);
+    EXPECT_TRUE(rc->HasShadowShape());
+
+    /**
+     * @tc.steps: step2. ConfigChangePerform true + nullptr basicShape.
+     * @tc.expected: RemoveResObj branch executed, shadowShape is not set.
+     */
+    ViewAbstract::SetShadowShape(AceType::RawPtr(node), nullptr);
+    EXPECT_FALSE(rc->HasShadowShape());
+    g_isConfigChangePerform = false;
+}
+
+/**
+ * @tc.name: SetShadowClipModeForVisualEffect001
+ * @tc.desc: Test SetShadowClipMode with BOUNDS_SHAPE
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, SetShadowClipModeForVisualEffect001, TestSize.Level1)
+{
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    ViewAbstract::SetShadowClipMode(AceType::RawPtr(node), ShadowClipMode::BOUNDS_SHAPE);
+    auto& rc = node->GetRenderContext();
+    ASSERT_TRUE(rc->HasShadowClipMode());
+    EXPECT_EQ(rc->GetShadowClipModeValue(ShadowClipMode::DEFAULT_SHAPE), ShadowClipMode::BOUNDS_SHAPE);
+}
+
+/**
+ * @tc.name: SetShadowClipModeForVisualEffect002
+ * @tc.desc: Test SetShadowClipMode with DEFAULT_SHAPE
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, SetShadowClipModeForVisualEffect002, TestSize.Level1)
+{
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    ViewAbstract::SetShadowClipMode(AceType::RawPtr(node), ShadowClipMode::DEFAULT_SHAPE);
+    auto& rc = node->GetRenderContext();
+    ASSERT_TRUE(rc->HasShadowClipMode());
+    EXPECT_EQ(rc->GetShadowClipModeValue(ShadowClipMode::BOUNDS_SHAPE), ShadowClipMode::DEFAULT_SHAPE);
+}
+
+/**
+ * @tc.name: SetShadowClipModeForVisualEffect003
+ * @tc.desc: Test SetShadowClipMode without FrameNode overload (via ViewStackProcessor)
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, SetShadowClipModeForVisualEffect003, TestSize.Level1)
+{
+    auto stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    stack->ClearVisualState();
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    stack->Push(node);
+    ViewAbstract::SetShadowClipMode(ShadowClipMode::BOUNDS_SHAPE);
+    stack->Finish();
+    auto& rc = node->GetRenderContext();
+    ASSERT_TRUE(rc->HasShadowClipMode());
+    EXPECT_EQ(rc->GetShadowClipModeValue(ShadowClipMode::DEFAULT_SHAPE), ShadowClipMode::BOUNDS_SHAPE);
+}
+
+/**
+ * @tc.name: SetShadowClipModeForVisualEffect004
+ * @tc.desc: Test SetShadowClipMode and ResetShadowClipMode return early when IsCurrentVisualStateProcess is false
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, SetShadowClipModeForVisualEffect004, TestSize.Level1)
+{
+    auto stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    stack->Push(node);
+    stack->SetVisualState(VisualState::DISABLED);
+    ViewAbstract::SetShadowClipMode(ShadowClipMode::BOUNDS_SHAPE);
+    EXPECT_FALSE(node->GetRenderContext()->HasShadowClipMode());
+    ViewAbstract::ResetShadowClipMode();
+    stack->ClearVisualState();
+    stack->Finish();
+    EXPECT_FALSE(node->GetRenderContext()->HasShadowClipMode());
+}
+
+/**
+ * @tc.name: ResetShadowShapeForVisualEffect001
+ * @tc.desc: Test ResetShadowShape clears the property
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, ResetShadowShapeForVisualEffect001, TestSize.Level1)
+{
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    auto& rc = node->GetRenderContext();
+    auto basicShape = AceType::MakeRefPtr<Circle>();
+    ViewAbstract::SetShadowShape(AceType::RawPtr(node), basicShape);
+    ASSERT_TRUE(rc->HasShadowShape());
+    ViewAbstract::ResetShadowShape(AceType::RawPtr(node));
+    EXPECT_FALSE(rc->HasShadowShape());
+}
+
+/**
+ * @tc.name: ResetShadowShapeForVisualEffect002
+ * @tc.desc: Test ResetShadowShape without FrameNode overload (via ViewStackProcessor)
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, ResetShadowShapeForVisualEffect002, TestSize.Level1)
+{
+    auto stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    stack->ClearVisualState();
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    stack->Push(node);
+    auto basicShape = AceType::MakeRefPtr<Circle>();
+    ViewAbstract::SetShadowShape(basicShape);
+    auto& rc = node->GetRenderContext();
+    EXPECT_TRUE(rc->HasShadowShape());
+    ViewAbstract::ResetShadowShape();
+    stack->Finish();
+    EXPECT_FALSE(rc->HasShadowShape());
+}
+
+/**
+ * @tc.name: ResetShadowClipModeForVisualEffect001
+ * @tc.desc: Test ResetShadowClipMode clears the property
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, ResetShadowClipModeForVisualEffect001, TestSize.Level1)
+{
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    auto& rc = node->GetRenderContext();
+    ViewAbstract::SetShadowClipMode(AceType::RawPtr(node), ShadowClipMode::BOUNDS_SHAPE);
+    EXPECT_TRUE(rc->GetShadowClipMode().has_value() && rc->GetShadowClipMode().value() == ShadowClipMode::BOUNDS_SHAPE);
+    ViewAbstract::ResetShadowClipMode(AceType::RawPtr(node));
+    EXPECT_TRUE(rc->GetShadowClipModeValue(ShadowClipMode::DEFAULT_SHAPE) == ShadowClipMode::DEFAULT_SHAPE);
+}
+
+/**
+ * @tc.name: ResetShadowClipModeForVisualEffect002
+ * @tc.desc: Test ResetShadowClipMode without FrameNode overload (via ViewStackProcessor)
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, ResetShadowClipModeForVisualEffect002, TestSize.Level1)
+{
+    auto stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    stack->ClearVisualState();
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    stack->Push(node);
+    ViewAbstract::SetShadowClipMode(ShadowClipMode::BOUNDS_SHAPE);
+    auto& rc = node->GetRenderContext();
+    EXPECT_TRUE(rc->HasShadowClipMode());
+    ViewAbstract::ResetShadowClipMode();
+    stack->Finish();
+    EXPECT_TRUE(rc->HasShadowClipMode());
+}
+
 } // namespace OHOS::Ace::NG

@@ -26,6 +26,7 @@
 #include "interfaces/native/node/config_manager.h"
 #include "interfaces/native/node/node_model.h"
 #include "interfaces/native/native_error_message_macros.h"
+#include "native_node.h"
 #include "native_type.h"
 
 namespace {
@@ -829,6 +830,78 @@ int32_t OH_ArkUI_NativeModule_GetNativeAccessibilityProvider(
     }
     *provider = arkuiProvider;
     return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+// ============================================================================
+// CMP mixed-rendering: BindExportTree / UnbindExportTree CAPI implementation.
+// ============================================================================
+
+namespace {
+using namespace OHOS::Ace;
+
+// The owner must be a node type capable of hosting CMP mixed-rendered content.
+bool IsSupportedOwnerNodeType(const ArkUI_NodeHandle node)
+{
+    if (node == nullptr) {
+        return false;
+    }
+    int32_t nodeType = node->type;
+    return nodeType == -1 || nodeType == ARKUI_NODE_CUSTOM || nodeType == ARKUI_NODE_XCOMPONENT ||
+        nodeType == ARKUI_NODE_XCOMPONENT_TEXTURE;
+}
+} // namespace
+
+int32_t OH_ArkUI_Accessibility_BindExportTree(
+    ArkUI_NodeHandle owner, int64_t bindId, ArkUI_NodeHandle exportedRoot)
+{
+    // Null check first: CheckIsCNode dereferences the handle (no internal null guard), so a nullptr must be rejected.
+    if (owner == nullptr || exportedRoot == nullptr) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__,
+            "owner or exportedRoot is null");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    if (!OHOS::Ace::NodeModel::CheckIsCNode(owner) ||
+        !OHOS::Ace::NodeModel::CheckIsCNode(exportedRoot)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__,
+            "owner or exportedRoot is invalid");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    if (!IsSupportedOwnerNodeType(owner)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__,
+            "owner type must be ARKUI_NODE_CUSTOM, ARKUI_NODE_XCOMPONENT or ARKUI_NODE_XCOMPONENT_TEXTURE");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    const auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
+    CHECK_NULL_RETURN_WITH_MESSAGE(
+        impl, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "impl is null");
+    // Frame node modifier route (validation and dispatch live behind the modifier).
+    return impl->getNodeModifiers()->getFrameNodeModifier()->bindAccessibilityExportTree(
+        owner->uiNodeHandle, bindId, exportedRoot->uiNodeHandle);
+}
+
+int32_t OH_ArkUI_Accessibility_UnbindExportTree(
+    ArkUI_NodeHandle owner, int64_t bindId)
+{
+    // Null check first (same rationale as BindExportTree): reject nullptr with 401 before CheckIsCNode dereferences the handle.
+    if (owner == nullptr) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "owner is null");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    if (!OHOS::Ace::NodeModel::CheckIsCNode(owner)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "owner is invalid");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    if (!IsSupportedOwnerNodeType(owner)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__,
+            "owner type must be ARKUI_NODE_CUSTOM, ARKUI_NODE_XCOMPONENT or ARKUI_NODE_XCOMPONENT_TEXTURE");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    const auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
+    CHECK_NULL_RETURN_WITH_MESSAGE(
+        impl, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "impl is null");
+    // Frame node modifier route.
+    return impl->getNodeModifiers()->getFrameNodeModifier()->unbindAccessibilityExportTree(
+        owner->uiNodeHandle, bindId);
 }
 
 #ifdef __cplusplus

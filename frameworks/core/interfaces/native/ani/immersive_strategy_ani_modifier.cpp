@@ -25,6 +25,13 @@ namespace {
 const std::unordered_set<int32_t> VALID_IMMERSIVE_STRATEGY_VALUES = {
     static_cast<int32_t>(ImmersiveStrategy::AVOID_CUTOUT),
     static_cast<int32_t>(ImmersiveStrategy::AVOID_FLOAT_NAV),
+    static_cast<int32_t>(ImmersiveStrategy::GRID_EXPAND_SAFE_AREA),
+    static_cast<int32_t>(ImmersiveStrategy::LIST_EXPAND_SAFE_AREA),
+    static_cast<int32_t>(ImmersiveStrategy::SCROLL_EXPAND_SAFE_AREA),
+    static_cast<int32_t>(ImmersiveStrategy::WATER_FLOW_EXPAND_SAFE_AREA),
+    static_cast<int32_t>(ImmersiveStrategy::AVOID_WINDOW_CONTROLS),
+    static_cast<int32_t>(ImmersiveStrategy::BIND_SHEET_EXPAND_SAFE_AREA),
+    static_cast<int32_t>(ImmersiveStrategy::NAVIGATION_EXPAND_SAFE_AREA),
 };
 } // namespace
 
@@ -34,7 +41,8 @@ void ApplyDefaultImmersiveStrategy(const int32_t* types, int32_t count)
     CHECK_NULL_VOID(pipeline);
     auto ngPipeline = AceType::DynamicCast<NG::PipelineContext>(pipeline);
     // C8 gate: only effective before the first layout flow is entered.
-    if (!ngPipeline || !ngPipeline->IsFirstRootLayout()) {
+    if (!ngPipeline || !ngPipeline->IsFirstFlushMessages()) {
+        LOGW("applyDefaultImmersiveStrategy is only effective before the first layout flow is entered.");
         return;
     }
     std::unordered_set<ImmersiveStrategy> strategies;

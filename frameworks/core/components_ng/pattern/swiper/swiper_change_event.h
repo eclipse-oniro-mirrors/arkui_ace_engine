@@ -23,11 +23,11 @@
 #include "core/pipeline/base/component_group.h"
 
 namespace OHOS::Ace {
-class ACE_EXPORT SwiperChangeEvent : public BaseEventInfo, public EventToJSONStringAdapter {
-    DECLARE_RELATIONSHIP_OF_CLASSES(SwiperChangeEvent, BaseEventInfo, EventToJSONStringAdapter);
+class ACE_EXPORT SwiperChangeEvent : public JSONStringifiableEventInfo {
+    DECLARE_RELATIONSHIP_OF_CLASSES(SwiperChangeEvent, JSONStringifiableEventInfo);
 
 public:
-    explicit SwiperChangeEvent(int32_t index) : BaseEventInfo("SwiperChangeEvent"), index_(index) {}
+    explicit SwiperChangeEvent(int32_t index) : JSONStringifiableEventInfo("SwiperChangeEvent"), index_(index) {}
     ~SwiperChangeEvent() = default;
 
     int32_t GetIndex() const

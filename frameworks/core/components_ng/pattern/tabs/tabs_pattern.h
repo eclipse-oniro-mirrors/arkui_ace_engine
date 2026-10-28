@@ -63,6 +63,8 @@ public:
         return true;
     }
 
+    void ClampTabBarTransformOffset();
+
     RefPtr<LayoutProperty> CreateLayoutProperty() override
     {
         ACE_UINODE_TRACE(GetHost());
@@ -214,6 +216,10 @@ public:
     {
         floatingBarMargin_ = floatingBarMargin;
     }
+    void SetFloatingTopBarMargin(std::optional<float> floatingTopBarMargin)
+    {
+        floatingTopBarMargin_ = floatingTopBarMargin;
+    }
     bool IsFloatingBar() const
     {
         return isFloatingBar_;
@@ -221,6 +227,14 @@ public:
     bool LastFloatingBar() const
     {
         return lastFloatingBar_;
+    }
+    bool IsFloatingTopBar() const
+    {
+        return isFloatingTopBar_;
+    }
+    bool LastFloatingTopBar() const
+    {
+        return lastFloatingTopBar_;
     }
     void SetFloatingScaleEnabled(bool isFloatingScaleEnabled);
 
@@ -263,10 +277,34 @@ public:
         return sideBarDividerNode_;
     }
 
+    RefPtr<FrameNode> GetCollapseButtonNode() const
+    {
+        return collapseButtonNode_;
+    }
+
     void SetTabsSidebarSearchableOptions(const TabsSidebarSearchableOptions& options)
     {
         searchableOptions_ = options;
     }
+
+    void SetShowSidebarControlButton(bool showControlButton)
+    {
+        if (showSidebarControlButton_ == showControlButton) {
+            return;
+        }
+        showSidebarControlButton_ = showControlButton;
+        if (sideBarNode_) {
+            SyncPropertiesToSideBar();
+            UpdateCollapseButtonIfNeeded();
+        }
+    }
+
+    bool GetShowSidebarControlButton() const
+    {
+        return showSidebarControlButton_;
+    }
+
+    void UpdateCollapseButtonIfNeeded();
 
     const TabsSidebarSearchableOptions& GetTabsSidebarSearchableOptions() const
     {
@@ -331,6 +369,26 @@ public:
         return realSideBarWidthPx_;
     }
 
+    void SetRealSideBarWidthPx(float width)
+    {
+        realSideBarWidthPx_ = width;
+    }
+
+    void ClearRealSideBarWidthPx()
+    {
+        realSideBarWidthPx_.reset();
+    }
+
+    float GetPreSideBarWidthPx() const
+    {
+        return preSideBarWidthPx_;
+    }
+
+    void SetPreSideBarWidthPx(float width)
+    {
+        preSideBarWidthPx_ = width;
+    }
+
     std::optional<Dimension> GetEffectiveSidebarWidth() const;
 
     void SetSidebarWidthCalled()
@@ -356,6 +414,16 @@ public:
     bool IsOnDisplayModeSwitchAnimation() const
     {
         return isOnDisplayModeSwitchAnimation_;
+    }
+
+    void SetTabBarClickIntercept(bool active)
+    {
+        tabBarClickIntercept_ = active;
+    }
+
+    bool GetTabBarClickIntercept() const
+    {
+        return tabBarClickIntercept_;
     }
 
 private:
@@ -392,6 +460,7 @@ private:
 
     void InitFloatingBar();
     void UpdateBgMaskNode();
+    void UpdateTopBgMaskNode();
     GradientColor CreatePercentGradientColor(float percent, Color color);
     void InitTouchEvent();
     void OnTouchEvent(const TouchEventInfo& info);
@@ -416,6 +485,18 @@ private:
             auto tabBarPattern = tabBar->GetPattern<TabBarPattern>();
             if (tabBarPattern) {
                 tabBarPattern->SetIsFloatingBar(isFloating);
+            }
+        }
+    }
+    void SetTabBarIsFloatingTopBar(bool isFloating)
+    {
+        auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
+        CHECK_NULL_VOID(tabsNode);
+        auto tabBar = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
+        if (tabBar) {
+            auto tabBarPattern = tabBar->GetPattern<TabBarPattern>();
+            if (tabBarPattern) {
+                tabBarPattern->SetIsFloatingTopBar(isFloating);
             }
         }
     }
@@ -500,14 +581,20 @@ private:
     std::optional<float> floatingBarMargin_ = 0.0f;
     float baseFloatingScale_ = FLOATING_BAR_SCALE;
 
+    bool isFloatingTopBar_ = false;
+    bool lastFloatingTopBar_ = false;
+    std::optional<float> floatingTopBarMargin_ = 0.0f;
+
     std::optional<TabBarDisplayMode> currentBarDisplayMode_;
     std::optional<TabBarLayoutStyle> layoutStyle_;
     RefPtr<FrameNode> sideBarNode_ = nullptr;
     RefPtr<FrameNode> sideBarDividerNode_ = nullptr;
+    RefPtr<FrameNode> collapseButtonNode_ = nullptr;
     RefPtr<NG::UINode> sidebarHeaderNode_;
     RefPtr<NG::UINode> sidebarFooterNode_;
     RefPtr<NG::UINode> sidebarBottomBarNode_;
     TabsSidebarSearchableOptions searchableOptions_;
+    bool showSidebarControlButton_ = false;
     std::function<void(WeakPtr<NG::FrameNode>)> barModifierApply_;
     bool hasBarBlurStyle_ = false;
     BlurStyleOption barBlurStyleOption_;
@@ -541,6 +628,7 @@ private:
     std::optional<TabBarDisplayMode> displayModeAnimTarget_;
     std::shared_ptr<AnimationUtils::Animation> sidebarTranslateAnim_;
     std::shared_ptr<AnimationUtils::Animation> tabBarEnterExitAnim_;
+    bool tabBarClickIntercept_ = false;
 };
 
 } // namespace OHOS::Ace::NG

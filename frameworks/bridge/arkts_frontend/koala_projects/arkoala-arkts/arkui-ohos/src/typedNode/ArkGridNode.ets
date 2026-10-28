@@ -17,6 +17,8 @@ import { RuntimeType, runtimeType } from '@koalaui/interop';
 import { ArkScrollableNode } from './ArkScrollableNode';
 import { ItemFillPolicy, Length } from '../component/units';
 import { Color, BarState, FocusWrapMode, EdgeEffect } from '../component/enums';
+import { ScrollSnapAlign } from '../component/list';
+import { ScrollSnapOffsetProvider } from '../component/scrollCommon';
 import { CustomBuilder } from '../component/builder';
 import { int32 } from '@koalaui/common';
 import {
@@ -223,6 +225,11 @@ export class ArkGridNode extends ArkScrollableNode implements GridAttribute {
     nestedScroll(value: NestedScrollOptions | undefined): this {
         const value_casted = value as (NestedScrollOptions | undefined)
         this.getPeer()?.setNestedScrollAttribute(value_casted)
+        this.markDirty()
+        return this
+    }
+    scrollSnapStrategy(value: ScrollSnapAlign | ScrollSnapOffsetProvider | undefined): this {
+        this.getPeer()?.setScrollSnapStrategyAttribute(value)
         this.markDirty()
         return this
     }

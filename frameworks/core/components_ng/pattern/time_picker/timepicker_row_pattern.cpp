@@ -665,9 +665,7 @@ void TimePickerRowPattern::CreateAmPmNode()
             ElementRegister::GetInstance()->MakeUniqueId(), []() -> RefPtr<Pattern> {
                 auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
                 CHECK_NULL_RETURN(buttonModifier, nullptr);
-                auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-                CHECK_NULL_RETURN(rawPattern, nullptr);
-                return AceType::Claim(rawPattern);
+                return buttonModifier->createButtonPattern();
             });
         auto blendNodeId = ElementRegister::GetInstance()->MakeUniqueId();
         auto columnBlendNode = FrameNode::GetOrCreateFrameNode(TimePickerUtil::COLUMN_ETS_TAG, blendNodeId,
@@ -724,9 +722,7 @@ void TimePickerRowPattern::CreateOrDeleteSecondNode()
                 ElementRegister::GetInstance()->MakeUniqueId(), []() -> RefPtr<Pattern> {
                     auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
                     CHECK_NULL_RETURN(buttonModifier, nullptr);
-                    auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-                    CHECK_NULL_RETURN(rawPattern, nullptr);
-                    return AceType::Claim(rawPattern);
+                    return buttonModifier->createButtonPattern();
                 });
             auto blendNodeId = ElementRegister::GetInstance()->MakeUniqueId();
             auto columnBlendNode = FrameNode::GetOrCreateFrameNode(TimePickerUtil::COLUMN_ETS_TAG, blendNodeId,
@@ -1005,11 +1001,53 @@ void TimePickerRowPattern::HandleColumnChange(const RefPtr<FrameNode>& tag, bool
     HandleColumnsChangeTimeRange(tag, isAdd);
 }
 
-bool TimePickerRowPattern::IsStartEndTimeDefined()
+bool TimePickerRowPattern::IsStartEndTimeDefined() const
 {
     auto isStartEndTimeDefined = startTime_.ToMinutes() != START_DEFAULT_TIME.ToMinutes() ||
                                  endTime_.ToMinutes() != END_DEFAULT_TIME.ToMinutes();
     return isStartEndTimeDefined;
+}
+
+bool TimePickerRowPattern::IsAtStartHour() const
+{
+    auto currentTime = const_cast<TimePickerRowPattern*>(this)->GetCurrentTime();
+    return currentTime.GetHour() == startTime_.GetHour();
+}
+
+bool TimePickerRowPattern::IsAtEndHour() const
+{
+    auto currentTime = const_cast<TimePickerRowPattern*>(this)->GetCurrentTime();
+    return currentTime.GetHour() == endTime_.GetHour();
+}
+
+bool TimePickerRowPattern::IsAtStartMinute() const
+{
+    auto currentTime = const_cast<TimePickerRowPattern*>(this)->GetCurrentTime();
+    return IsAtStartHour() && currentTime.GetMinute() == startTime_.GetMinute();
+}
+
+bool TimePickerRowPattern::IsAtEndMinute() const
+{
+    auto currentTime = const_cast<TimePickerRowPattern*>(this)->GetCurrentTime();
+    return IsAtEndHour() && currentTime.GetMinute() == endTime_.GetMinute();
+}
+
+RefPtr<FrameNode> TimePickerRowPattern::GetHourColumnNode() const
+{
+    auto it = allChildNode_.find("hour");
+    return (it != allChildNode_.end()) ? it->second.Upgrade() : nullptr;
+}
+
+RefPtr<FrameNode> TimePickerRowPattern::GetMinuteColumnNode() const
+{
+    auto it = allChildNode_.find("minute");
+    return (it != allChildNode_.end()) ? it->second.Upgrade() : nullptr;
+}
+
+RefPtr<FrameNode> TimePickerRowPattern::GetSecondColumnNode() const
+{
+    auto it = allChildNode_.find("second");
+    return (it != allChildNode_.end()) ? it->second.Upgrade() : nullptr;
 }
 
 bool TimePickerRowPattern::CheckHourIndexAtStart(uint32_t amPmIndex, uint32_t hourIndex, bool nextStart)
@@ -1069,6 +1107,14 @@ bool TimePickerRowPattern::IsNeedToRebuildColumn(bool isHour, bool isAdd,
             // atStartHour or atEndHour or from startHour to startHour + 1 or from endHour to endHour - 1
             return true;
         }
+    } else if (IsStartEndTimeDefined()) {
+        bool atStartMinute = IsAtStartMinute();
+        bool atEndMinute = IsAtEndMinute();
+        if (atStartMinute || atEndMinute ||
+            (atStartHour && minuteIndex == startTime_.GetMinute() + 1 && isAdd) ||
+            (atEndHour && minuteIndex + 1 == endTime_.GetMinute() && !isAdd)) {
+            return true;
+        }
     }
     return false;
 }
@@ -1094,6 +1140,7 @@ void TimePickerRowPattern::HandleColumnsChangeTimeRange(const RefPtr<FrameNode>&
             auto amPmColumnPattern = amPmColumn->GetPattern<TimePickerColumnPattern>();
             CHECK_NULL_VOID(amPmColumnPattern);
             amPmColumnPattern->FlushCurrentOptions();
+            FlushSecondColumnOptions();
         } else if (tag == hourColumn || tag == minuteColumn) {
             uint32_t amPmIndex = 0;
             if (!GetHour24()) {
@@ -1109,6 +1156,7 @@ void TimePickerRowPattern::HandleColumnsChangeTimeRange(const RefPtr<FrameNode>&
             UpdateHourAndMinuteTimeRange(tag);
             hourColumnPattern->FlushCurrentOptions();
             minuteColumnPattern->FlushCurrentOptions();
+            FlushSecondColumnOptions();
         }
     }
 }
@@ -1157,6 +1205,18 @@ void TimePickerRowPattern::HandleSecondBuildTimeRange()
         optionsTotalCount_[secondColumn]++;
     }
     secondColumnPattern->SetOptions(GetOptionsCount());
+}
+
+void TimePickerRowPattern::FlushSecondColumnOptions()
+{
+    if (!hasSecond_) {
+        return;
+    }
+    auto secondColumn = allChildNode_["second"].Upgrade();
+    CHECK_NULL_VOID(secondColumn);
+    auto secondColumnPattern = secondColumn->GetPattern<TimePickerColumnPattern>();
+    CHECK_NULL_VOID(secondColumnPattern);
+    secondColumnPattern->FlushCurrentOptions();
 }
 
 void TimePickerRowPattern::HandleHourBuildTimeRange(uint32_t hour)
@@ -2724,4 +2784,13 @@ bool TimePickerRowPattern::ReportCommandResult(int32_t nodeId, const std::string
 #endif
     return true;
 }
+void TimePickerRowPattern::DumpInspectorTreeInfo(
+    std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context)
+{
+    Pattern::DumpInspectorTreeInfo(attrs, context);
+    if (!GetIsShowInDialog()) {
+        attrs->Put("expanded", true);
+    }
+}
+
 } // namespace OHOS::Ace::NG

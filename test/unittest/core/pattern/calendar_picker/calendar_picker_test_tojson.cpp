@@ -392,4 +392,163 @@ HWTEST_F(CalendarPickerTestToJson, CalendarPickerTestToJsonEdgeAlign, TestSize.L
     EXPECT_EQ(offsetData->GetString("dx"),"2.00px");
     EXPECT_EQ(offsetData->GetString("dy"),"2.20px");
 }
+
+/**
+ * @tc.name: CalendarPickerTestToJsonFirstDayOfWeekLocal
+ * @tc.desc: Test CalendarPickerPattern ToJsonValue firstDayOfWeek default LOCAL.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerTestToJson, CalendarPickerTestToJsonFirstDayOfWeekLocal, TestSize.Level1)
+{
+    CreateCalendarPicker();
+    RefPtr<UINode> element = ViewStackProcessor::GetInstance()->Finish();
+    ASSERT_NE(element, nullptr);
+    auto frameNode = AceType::DynamicCast<FrameNode>(element);
+    ASSERT_NE(frameNode, nullptr);
+    auto pickerPattern = frameNode->GetPattern<CalendarPickerPattern>();
+    ASSERT_NE(pickerPattern, nullptr);
+
+    InspectorFilter filter;
+    auto json = JsonUtil::Create(true);
+    pickerPattern->ToJsonValue(json, filter);
+
+    EXPECT_EQ(json->GetString("firstDayOfWeek"), "CalendarFirstDayOfWeek.LOCAL");
+}
+
+/**
+ * @tc.name: CalendarPickerTestToJsonFirstDayOfWeekMon
+ * @tc.desc: Test CalendarPickerPattern ToJsonValue firstDayOfWeek MON.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerTestToJson, CalendarPickerTestToJsonFirstDayOfWeekMon, TestSize.Level1)
+{
+    CreateCalendarPicker();
+    RefPtr<UINode> element = ViewStackProcessor::GetInstance()->Finish();
+    ASSERT_NE(element, nullptr);
+    auto frameNode = AceType::DynamicCast<FrameNode>(element);
+    ASSERT_NE(frameNode, nullptr);
+    auto pickerPattern = frameNode->GetPattern<CalendarPickerPattern>();
+    ASSERT_NE(pickerPattern, nullptr);
+
+    pickerPattern->SetFirstDayOfWeek(1);
+
+    InspectorFilter filter;
+    auto json = JsonUtil::Create(true);
+    pickerPattern->ToJsonValue(json, filter);
+
+    EXPECT_EQ(json->GetString("firstDayOfWeek"), "CalendarFirstDayOfWeek.MON");
+}
+
+/**
+ * @tc.name: CalendarPickerTestToJsonFirstDayOfWeekSun
+ * @tc.desc: Test CalendarPickerPattern ToJsonValue firstDayOfWeek SUN.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerTestToJson, CalendarPickerTestToJsonFirstDayOfWeekSun, TestSize.Level1)
+{
+    CreateCalendarPicker();
+    RefPtr<UINode> element = ViewStackProcessor::GetInstance()->Finish();
+    ASSERT_NE(element, nullptr);
+    auto frameNode = AceType::DynamicCast<FrameNode>(element);
+    ASSERT_NE(frameNode, nullptr);
+    auto pickerPattern = frameNode->GetPattern<CalendarPickerPattern>();
+    ASSERT_NE(pickerPattern, nullptr);
+
+    pickerPattern->SetFirstDayOfWeek(7);
+
+    InspectorFilter filter;
+    auto json = JsonUtil::Create(true);
+    pickerPattern->ToJsonValue(json, filter);
+
+    EXPECT_EQ(json->GetString("firstDayOfWeek"), "CalendarFirstDayOfWeek.SUN");
+}
+
+/**
+ * @tc.name: CalendarPickerTestToJsonFirstDayOfWeekInvalid
+ * @tc.desc: Test CalendarPickerPattern ToJsonValue firstDayOfWeek with out-of-range value clamps to LOCAL.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerTestToJson, CalendarPickerTestToJsonFirstDayOfWeekInvalid, TestSize.Level1)
+{
+    CreateCalendarPicker();
+    RefPtr<UINode> element = ViewStackProcessor::GetInstance()->Finish();
+    ASSERT_NE(element, nullptr);
+    auto frameNode = AceType::DynamicCast<FrameNode>(element);
+    ASSERT_NE(frameNode, nullptr);
+    auto pickerPattern = frameNode->GetPattern<CalendarPickerPattern>();
+    ASSERT_NE(pickerPattern, nullptr);
+
+    pickerPattern->SetFirstDayOfWeek(99);
+
+    InspectorFilter filter;
+    auto json = JsonUtil::Create(true);
+    pickerPattern->ToJsonValue(json, filter);
+
+    EXPECT_EQ(json->GetString("firstDayOfWeek"), "CalendarFirstDayOfWeek.LOCAL");
+}
+
+/**
+ * @tc.name: CalendarPickerTestToJsonFirstDayOfWeekFastFilter
+ * @tc.desc: Test CalendarPickerPattern ToJsonValue firstDayOfWeek is skipped under FastFilter.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerTestToJson, CalendarPickerTestToJsonFirstDayOfWeekFastFilter, TestSize.Level1)
+{
+    CreateCalendarPicker();
+    RefPtr<UINode> element = ViewStackProcessor::GetInstance()->Finish();
+    ASSERT_NE(element, nullptr);
+    auto frameNode = AceType::DynamicCast<FrameNode>(element);
+    ASSERT_NE(frameNode, nullptr);
+    auto pickerPattern = frameNode->GetPattern<CalendarPickerPattern>();
+    ASSERT_NE(pickerPattern, nullptr);
+
+    pickerPattern->SetFirstDayOfWeek(1);
+
+    InspectorFilter fastFilter;
+    fastFilter.AddFilterAttr("id");
+    auto json = JsonUtil::Create(true);
+    pickerPattern->ToJsonValue(json, fastFilter);
+
+    EXPECT_EQ(json->GetString("firstDayOfWeek"), "");
+}
+
+/**
+ * @tc.name: CalendarPickerTestToJsonDialogFirstDayOfWeekEndToEnd
+ * @tc.desc: Test CalendarDialogPattern ToJsonValue firstDayOfWeek via CalendarDialogView::Show end-to-end.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerTestToJson, CalendarPickerTestToJsonDialogFirstDayOfWeekEndToEnd, TestSize.Level1)
+{
+    auto entryNode = FrameNode::CreateFrameNode(V2::CALENDAR_PICKER_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<CalendarPickerPattern>());
+    ASSERT_NE(entryNode, nullptr);
+
+    CalendarSettingData settingData;
+    DialogProperties properties;
+    properties.alignment = DialogAlignment::BOTTOM;
+    properties.customStyle = false;
+    properties.offset = DimensionOffset(Offset(0, -1.0f));
+    settingData.selectedDate = PickerDate(2000, 1, 1);
+    settingData.dayRadius = TEST_SETTING_RADIUS;
+    settingData.firstDayOfWeek = 7;
+    settingData.entryNode = entryNode;
+    std::map<std::string, NG::DialogEvent> dialogEvent;
+    std::map<std::string, NG::DialogGestureEvent> dialogCancelEvent;
+    std::vector<ButtonInfo> buttonInfos;
+    auto dialogNode = CalendarDialogView::Show(properties, settingData, buttonInfos, dialogEvent, dialogCancelEvent);
+    ASSERT_NE(dialogNode, nullptr);
+
+    auto contentWrapper = dialogNode->GetChildAtIndex(0);
+    ASSERT_NE(contentWrapper, nullptr);
+    auto contentColumn = AceType::DynamicCast<FrameNode>(contentWrapper->GetChildAtIndex(0));
+    ASSERT_NE(contentColumn, nullptr);
+    auto dialogPattern = contentColumn->GetPattern<CalendarDialogPattern>();
+    ASSERT_NE(dialogPattern, nullptr);
+
+    InspectorFilter filter;
+    auto json = JsonUtil::Create(true);
+    dialogPattern->ToJsonValue(json, filter);
+
+    EXPECT_EQ(json->GetString("firstDayOfWeek"), "CalendarFirstDayOfWeek.SUN");
+}
 } // namespace OHOS::Ace::NG

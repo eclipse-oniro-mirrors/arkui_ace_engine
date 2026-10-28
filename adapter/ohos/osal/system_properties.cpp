@@ -74,7 +74,6 @@ constexpr float DEFAULT_ANIMATION_SCALE = 1.0f;
 float animationScale_ = DEFAULT_ANIMATION_SCALE;
 constexpr int32_t DEFAULT_DRAG_START_DAMPING_RATIO = 20;
 constexpr int32_t DEFAULT_DRAG_START_PAN_DISTANCE_THRESHOLD_IN_VP = 10;
-constexpr int32_t DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD = 30;
 constexpr int32_t DEFAULT_VELOCITY_TRACKER_POINT_NUMBER = 20;
 constexpr bool DEFAULT_IS_VELOCITY_WITHIN_TIME_WINDOW = true;
 constexpr bool DEFAULT_IS_VELOCITY_WITHOUT_UP_POINT = true;
@@ -857,7 +856,6 @@ bool SystemProperties::pageTransitionFrzEnabled_ = false;
 bool SystemProperties::forcibleLandscapeEnabled_ = false;
 bool SystemProperties::softPagetransition_ = false;
 bool SystemProperties::formSkeletonBlurEnabled_ = true;
-int32_t SystemProperties::formSharedImageCacheThreshold_ = DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD;
 WidthLayoutBreakPoint SystemProperties::widthLayoutBreakpoints_ = WidthLayoutBreakPoint();
 HeightLayoutBreakPoint SystemProperties::heightLayoutBreakpoints_ = HeightLayoutBreakPoint();
 bool SystemProperties::syncLoadEnabled_ = true;
@@ -1077,8 +1075,6 @@ void SystemProperties::ReadSystemParametersCallOnce()
 
         // init form sys params
         formSkeletonBlurEnabled_ = system::GetBoolParameter("const.form.skeleton_view.blur_style_enable", true);
-        formSharedImageCacheThreshold_ = system::GetIntParameter(
-            "const.form.shared_image.cache_threshold", DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD);
 
         InitDeviceTypeBySystemProperty();
 
@@ -1560,11 +1556,6 @@ bool SystemProperties::IsSoftPageTransition()
 bool SystemProperties::IsFormSkeletonBlurEnabled()
 {
     return formSkeletonBlurEnabled_;
-}
-
-int32_t SystemProperties::getFormSharedImageCacheThreshold()
-{
-    return formSharedImageCacheThreshold_;
 }
 
 bool SystemProperties::IsFormSkeletonRSTransactionEnabled()

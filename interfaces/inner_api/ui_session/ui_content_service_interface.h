@@ -16,11 +16,14 @@
 #ifndef FOUNDATION_ACE_INTERFACE_UI_CONTENT_SERVICE_INTERFACE_H
 #define FOUNDATION_ACE_INTERFACE_UI_CONTENT_SERVICE_INTERFACE_H
 
-#include "iremote_broker.h"
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <string>
 #include <vector>
+
+#include "iremote_broker.h"
+
 #include "ui/base/macros.h"
 #include "param_config.h"
 #include "ui_content_errors.h"
@@ -39,9 +42,11 @@ using GetWebInfoByRequestCallback =
     std::function<void(int32_t, int32_t, const std::string&, const std::string&, WebRequestErrorCode)>;
 using PageTranslateTextCallback = std::function<void(int32_t, const std::string&, int64_t)>;
 using PageSceneEventCallback = std::function<void(const std::string&)>;
+using SendCommandFinishCallback = std::function<void(const std::string&)>;
 
 constexpr int32_t DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS = 1500;
 constexpr int32_t DEFAULT_PAGE_TRANSLATE_CALLBACK_TIMEOUT_MS = 5000;
+constexpr int32_t DEFAULT_SEND_COMMAND_CALLBACK_TIMEOUT_MS = 5000;
 
 class ACE_FORCE_EXPORT IUiContentService : public OHOS::IRemoteBroker {
 public:
@@ -103,6 +108,10 @@ public:
         UNREGISTER_PAGE_SCENE_RULES,
         GET_PAGE_SCENE,
         GET_NAVIGATION_CONTENT_BY_POINT,
+        GET_LAZY_FOREACH_DATA_BY_POINT,
+        GET_NODES_IN_RECT,
+        SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK,
+        SEND_COMMAND_WITH_FINISH_CALLBACK,
     };
 
     /**
@@ -445,7 +454,45 @@ public:
      */
     virtual int32_t GetNavigationContentByPoint(float x, float y, const std::string& pattern,
         const std::function<void(const std::string&)>& eventCallback,
+        int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS) = 0;
+
+    /**
+     * @description: extract LazyForEach current data of the
+     * item hit by the window point (x, y). Result JSON is reported through
+     * eventCallback. Only dynamic ArkTS frontend is supported; static/CJ
+     * reports UNSUPPORTED_FRONTEND.
+     * @return result number of the IPC request itself.
+     */
+    virtual int32_t GetLazyForEachDataByPoint(float x, float y,
+        const std::function<void(const std::string&)>& eventCallback,
         int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS)
+    {
+        return FAILED;
+    }
+    /**
+     * @description: collect visible nodes whose transform rect intersects the
+     * normalized rect (x1, y1)-(x2, y2) with positive area. Tangent /
+     * edge-touching does not count as a hit. Result JSON is reported through
+     * eventCallback.
+     * @return result number of the IPC request itself.
+     */
+    virtual int32_t GetNodesInRect(float x1, float y1, float x2, float y2,
+        const std::function<void(const std::string&)>& eventCallback,
+        int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS) = 0;
+    /**
+     * @description: send a command with one asynchronous completion on this connection.
+     * @return: NO_ERROR for accepted, PARAM_INVALID for an empty callback,
+     * LAST_UNFINISH when a callback command is pending, FAILED or REPLY_ERROR for send failure.
+     * Waiting expires after 5000ms without calling back or cancelling UI execution.
+     * Death/disconnect and duplicate/late results do not call back.
+     */
+    virtual int32_t SendCommand(
+        int32_t id, const std::string& command, const SendCommandFinishCallback& finishCallback)
+    {
+        return FAILED;
+    }
+    virtual int32_t SendCommand(
+        const std::string command, const SendCommandFinishCallback& finishCallback)
     {
         return FAILED;
     }
@@ -482,7 +529,10 @@ public:
         SEND_WEB_INFO_BY_REQUEST,
         SEND_PAGE_TEXT,
         REPORT_PAGE_SCENE_EVENT,
-        REPORT_COMPONENT_TREE_QUERY_RESULT,
+        REPORT_NAVIGATION_QUERY_RESULT,
+        REPORT_LAZY_FOREACH_QUERY_RESULT,
+        REPORT_NODES_IN_RECT_QUERY_RESULT,
+        REPORT_COMMAND_RESULT,
     };
 
     /**
@@ -609,7 +659,10 @@ public:
     /**
      * @description: reports component tree query result to the requesting SA process.
      */
-    virtual void ReportComponentTreeQueryResult(const std::string& data) {}
+    virtual void ReportNavigationQueryResult(const std::string& data) = 0;
+    virtual void ReportLazyForEachQueryResult(const std::string& data) = 0;
+    virtual void ReportNodesInRectQueryResult(const std::string& data) = 0;
+    virtual void ReportCommandResult(uint64_t requestId, const std::string& resultJson) {}
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_INTERFACE_UI_CONTENT_SERVICE_INTERFACE_H

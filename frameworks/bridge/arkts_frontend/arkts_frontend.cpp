@@ -16,12 +16,14 @@
 
 #include <ani.h>
 #include <ani_signature_builder.h>
+#include <regex>
 #include "ets_ani_expo.h"
 #include "interfaces/inner_api/ace/constants.h"
 #include "ui/base/utils/utils.h"
 #include "base/utils/system_properties.h"
 #include "bridge/arkts_frontend/ani_local_scope.h"
 #include "bridge/arkts_frontend/entry/arkts_entry_loader.h"
+#include "core/common/container.h"
 #include "core/components_ng/pattern/stage/page_pattern.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "frameworks/base/subwindow/subwindow_manager.h"
@@ -31,7 +33,29 @@
 namespace OHOS::Ace {
 namespace {
 using namespace arkts::ani_signature;
-const std::string ENTRY_SUFFIX = "/__EntryWrapper";
+static const std::string ENTRY_SUFFIX = "/__EntryWrapper";
+static const std::string ENTRY_PREFIX = "/src/main/ets";
+static const std::string ENTRY_PREFIX_REGEX = R"(\w+/src/\w+/\w+/)";
+
+std::string GetModuleSourcePath(const RefPtr<Container>& container)
+{
+    if (!container) {
+        return std::string();
+    }
+    const auto srcEntrance = container->GetSrcEntrance();
+    if (!srcEntrance.empty()) {
+        std::regex regex(ENTRY_PREFIX_REGEX);
+        std::smatch prefixMatch;
+        if (std::regex_search(srcEntrance, prefixMatch, regex)) {
+            auto prefix = prefixMatch[0].str();
+            if (!prefix.empty() && prefix.back() == '/') {
+                prefix.pop_back();
+            }
+            return prefix;
+        }
+    }
+    return container->GetModuleName() + ENTRY_PREFIX;
+}
 /* copied from arkcompiler_ets_frontend vmloader.cc*/
 struct AppInfo {
     const char* className;
@@ -522,9 +546,9 @@ UIContentErrorCode ArktsFrontend::RunPage(
     auto entryPointObj = entryLoader.GetPageEntryObj(entryPath);
     auto currentContainer = Container::Current();
     CHECK_NULL_RETURN(currentContainer, UIContentErrorCode::NULL_POINTER);
-    std::string moduleName = currentContainer->GetModuleName();
+    std::string moduleSourcePath = GetModuleSourcePath(currentContainer);
     ani_string module;
-    env->String_NewUTF8(moduleName.c_str(), moduleName.size(), &module);
+    env->String_NewUTF8(moduleSourcePath.c_str(), moduleSourcePath.size(), &module);
     ani_boolean enableDebug = ani_boolean(SystemProperties::GetDebugEnabled());
     ani_class appConstructorParamClass;
     if (env->FindClass(KOALA_APP_INFO.constructorParamClassName, &appConstructorParamClass) != ANI_OK) {
@@ -645,9 +669,9 @@ UIContentErrorCode ArktsFrontend::RunPage(const std::string& url, const std::str
     auto legacyEntryPointObj = url == "__INTEROP__" ? nullptr : LegacyLoadPage(env);
     auto currentContainer = Container::Current();
     CHECK_NULL_RETURN(currentContainer, UIContentErrorCode::NULL_POINTER);
-    std::string moduleName = currentContainer->GetModuleName();
+    std::string moduleSourcePath = GetModuleSourcePath(currentContainer);
     ani_string module = nullptr;
-    if (env->String_NewUTF8(moduleName.c_str(), moduleName.size(), &module) != ANI_OK) {
+    if (env->String_NewUTF8(moduleSourcePath.c_str(), moduleSourcePath.size(), &module) != ANI_OK) {
         LOGE("Failed to create module string");
         return UIContentErrorCode::INVALID_URL;
     }
@@ -756,9 +780,9 @@ UIContentErrorCode ArktsFrontend::RunPageByNamedRouter(const std::string& name, 
     env->GetUndefined(&optionalEntry);
     auto currentContainer = Container::Current();
     CHECK_NULL_RETURN(currentContainer, UIContentErrorCode::NULL_POINTER);
-    std::string moduleName = currentContainer->GetModuleName();
+    std::string moduleSourcePath = GetModuleSourcePath(currentContainer);
     ani_string module;
-    env->String_NewUTF8(moduleName.c_str(), moduleName.size(), &module);
+    env->String_NewUTF8(moduleSourcePath.c_str(), moduleSourcePath.size(), &module);
     ani_boolean enableDebug = ani_boolean(SystemProperties::GetDebugEnabled());
     ani_class appConstructorParamClass;
     if (env->FindClass(KOALA_APP_INFO.constructorParamClassName, &appConstructorParamClass) != ANI_OK) {

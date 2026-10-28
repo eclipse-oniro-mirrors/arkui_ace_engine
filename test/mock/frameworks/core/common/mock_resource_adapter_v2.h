@@ -19,6 +19,7 @@
 #include "core/components/theme/resource_adapter.h"
 
 namespace OHOS::Ace {
+constexpr float MOCK_DIMENSION_DEFAULT = 10.0f;
 class MockResourceAdapterV2 : public ResourceAdapter {
     DECLARE_ACE_TYPE(MockResourceAdapterV2, ResourceAdapter);
 
@@ -30,6 +31,11 @@ public:
     {
         Color data;
         return GetMockResourceData(resId, data) ? data : Color();
+    }
+
+    Color GetColor(uint32_t resId, ColorMode /*colorMode*/) override
+    {
+        return GetColor(resId);
     }
 
     Dimension GetDimension(uint32_t resId) override
@@ -62,6 +68,42 @@ public:
         return GetMockResourceData(resId, data) ? data : 0;
     }
 
+    Color GetColorByName(const std::string& resName) override
+    {
+        Color data;
+        return GetMockResourceDataByName(resName, data) ? data : Color();
+    }
+
+    Dimension GetDimensionByName(const std::string& resName) override
+    {
+        Dimension data;
+        return GetMockResourceDataByName(resName, data) ? data : Dimension();
+    }
+
+    std::string GetStringByName(const std::string& resName) override
+    {
+        std::string data;
+        return GetMockResourceDataByName(resName, data) ? data : "";
+    }
+
+    std::vector<std::string> GetStringArrayByName(const std::string& resName) const override
+    {
+        std::vector<std::string> data;
+        return GetMockResourceDataByName(resName, data) ? data : std::vector<std::string>();
+    }
+
+    double GetDoubleByName(const std::string& resName) override
+    {
+        double data = 0.0;
+        return GetMockResourceDataByName(resName, data) ? data : 0.0;
+    }
+
+    int32_t GetIntByName(const std::string& resName) override
+    {
+        int32_t data = 0;
+        return GetMockResourceDataByName(resName, data) ? data : 0;
+    }
+
 private:
     static bool GetMockResourceData(uint32_t id, Color& data);
     static bool GetMockResourceData(uint32_t id, Dimension& data);
@@ -69,6 +111,12 @@ private:
     static bool GetMockResourceData(uint32_t id, std::vector<std::string>& data);
     static bool GetMockResourceData(uint32_t id, double& data);
     static bool GetMockResourceData(uint32_t id, int32_t& data);
+    static bool GetMockResourceDataByName(const std::string& name, Color& data);
+    static bool GetMockResourceDataByName(const std::string& name, Dimension& data);
+    static bool GetMockResourceDataByName(const std::string& name, std::string& data);
+    static bool GetMockResourceDataByName(const std::string& name, std::vector<std::string>& data);
+    static bool GetMockResourceDataByName(const std::string& name, double& data);
+    static bool GetMockResourceDataByName(const std::string& name, int32_t& data);
 };
 
 void ResetMockResourceData();
@@ -78,6 +126,12 @@ void AddMockResourceData(uint32_t id, const std::string& data);
 void AddMockResourceData(uint32_t id, const std::vector<std::string>& data);
 void AddMockResourceData(uint32_t id, const double& data);
 void AddMockResourceData(uint32_t id, const int32_t& data);
+void AddMockResourceDataByName(const std::string& name, const Color& data);
+void AddMockResourceDataByName(const std::string& name, const Dimension& data);
+void AddMockResourceDataByName(const std::string& name, const std::string& data);
+void AddMockResourceDataByName(const std::string& name, const std::vector<std::string>& data);
+void AddMockResourceDataByName(const std::string& name, const double& data);
+void AddMockResourceDataByName(const std::string& name, const int32_t& data);
 void SetMockResourceAdapterInstanceId(int32_t instanceId);
 
 } // namespace OHOS::Ace

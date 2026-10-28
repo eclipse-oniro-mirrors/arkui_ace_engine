@@ -42,6 +42,9 @@ private:
     int32_t SendCommandInner(MessageParcel& data, MessageParcel& reply, MessageOption& option);
     int32_t SendCommandInnerSync(MessageParcel& data, MessageParcel& reply, MessageOption& option);
     int32_t SendCommandKeyCodeInner(MessageParcel& data, MessageParcel& reply, MessageOption& option);
+    int32_t SendCommandWithFinishCallbackInner(MessageParcel& data, MessageParcel& reply, MessageOption& option);
+    int32_t SendCommandKeyCodeWithFinishCallbackInner(
+        MessageParcel& data, MessageParcel& reply, MessageOption& option);
     int32_t UnregisterClickEventCallbackInner(MessageParcel& data, MessageParcel& reply, MessageOption& option);
     int32_t UnregisterSearchEventCallbackInner(MessageParcel& data, MessageParcel& reply, MessageOption& option);
     int32_t UnregisterTextChangeEventCallbackInner(MessageParcel& data, MessageParcel& reply, MessageOption& option);
@@ -82,6 +85,8 @@ private:
     int32_t UnregisterPageSceneRulesInner(MessageParcel& data, MessageParcel& reply, MessageOption& option);
     int32_t GetPageSceneInner(MessageParcel& data, MessageParcel& reply, MessageOption& option);
     int32_t GetNavigationContentByPointInner(MessageParcel& data, MessageParcel& reply, MessageOption& option);
+    int32_t GetLazyForEachDataByPointInner(MessageParcel& data, MessageParcel& reply, MessageOption& option);
+    int32_t GetNodesInRectInner(MessageParcel& data, MessageParcel& reply, MessageOption& option);
 
     bool IsSACalling() const;
 };

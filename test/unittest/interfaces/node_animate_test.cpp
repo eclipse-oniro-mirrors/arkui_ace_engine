@@ -1957,55 +1957,6 @@ HWTEST_F(NodeAnimateTest, KeyframeAnimation_GetCurve_OutParamName_001, TestSize.
 // =============================================================================
 
 /**
- * @tc.name: PathAnimation_SetCurve_RejectsSpring_001
- * @tc.desc: Test SetCurve rejects duration-independent curves on path animation.
- * @tc.type: FUNC
- */
-HWTEST_F(NodeAnimateTest, PathAnimation_SetCurve_RejectsSpring_001, TestSize.Level1)
-{
-    ASSERT_TRUE(OHOS::Ace::NodeModel::InitialFullImpl());
-    auto* path = OH_ArkUI_NativeModule_PathAnimation_Create("M0,0 L100,100");
-    ASSERT_NE(path, nullptr);
-
-    auto* spring = OH_ArkUI_Curve_CreateInterpolatingSpring(0.0f, 1.0f, 100.0f, 10.0f);
-    ASSERT_NE(spring, nullptr);
-    EXPECT_EQ(OH_ArkUI_NativeModule_PathAnimation_SetCurve(path, spring),
-        ARKUI_ERROR_CODE_PARAM_INVALID);
-
-    OH_ArkUI_Curve_DisposeCurve(spring);
-    OH_ArkUI_NativeModule_PathAnimation_Destroy(path);
-}
-
-/**
- * @tc.name: PathAnimation_GetCurve_OutParamName_001
- * @tc.desc: Test GetCurve outputs into outBorrowedCurve parameter.
- * @tc.type: FUNC
- */
-HWTEST_F(NodeAnimateTest, PathAnimation_GetCurve_OutParamName_001, TestSize.Level1)
-{
-    ASSERT_TRUE(OHOS::Ace::NodeModel::InitialFullImpl());
-    auto* path = OH_ArkUI_NativeModule_PathAnimation_Create("M0,0 L100,100");
-    ASSERT_NE(path, nullptr);
-
-    ArkUI_CurveHandle outBorrowedCurve = nullptr;
-    EXPECT_EQ(OH_ArkUI_NativeModule_PathAnimation_GetCurve(path, &outBorrowedCurve),
-        ARKUI_ERROR_CODE_NO_ERROR);
-    EXPECT_EQ(outBorrowedCurve, nullptr);
-
-    auto* linear = OH_ArkUI_Curve_CreateCurveByType(ARKUI_CURVE_LINEAR);
-    ASSERT_NE(linear, nullptr);
-    EXPECT_EQ(OH_ArkUI_NativeModule_PathAnimation_SetCurve(path, linear), ARKUI_ERROR_CODE_NO_ERROR);
-
-    outBorrowedCurve = nullptr;
-    EXPECT_EQ(OH_ArkUI_NativeModule_PathAnimation_GetCurve(path, &outBorrowedCurve),
-        ARKUI_ERROR_CODE_NO_ERROR);
-    EXPECT_NE(outBorrowedCurve, nullptr);
-
-    OH_ArkUI_Curve_DisposeCurve(linear);
-    OH_ArkUI_NativeModule_PathAnimation_Destroy(path);
-}
-
-/**
  * @tc.name: PropertyAnimation_SetCurve_NullAllowed_001
  * @tc.desc: Test SetCurve accepts NULL (inherit group curve) on property animation.
  * @tc.type: FUNC
@@ -2045,27 +1996,6 @@ HWTEST_F(NodeAnimateTest, KeyframeAnimation_SetCurve_NullAllowed_001, TestSize.L
     EXPECT_EQ(outBorrowedCurve, nullptr);
 
     OH_ArkUI_NativeModule_KeyframeAnimation_Destroy(kf);
-}
-
-/**
- * @tc.name: PathAnimation_SetCurve_NullAllowed_001
- * @tc.desc: Test SetCurve accepts NULL (inherit group curve) on path animation.
- * @tc.type: FUNC
- */
-HWTEST_F(NodeAnimateTest, PathAnimation_SetCurve_NullAllowed_001, TestSize.Level1)
-{
-    ASSERT_TRUE(OHOS::Ace::NodeModel::InitialFullImpl());
-    auto* path = OH_ArkUI_NativeModule_PathAnimation_Create("M0,0 L100,100");
-    ASSERT_NE(path, nullptr);
-
-    EXPECT_EQ(OH_ArkUI_NativeModule_PathAnimation_SetCurve(path, nullptr), ARKUI_ERROR_CODE_NO_ERROR);
-
-    ArkUI_CurveHandle outBorrowedCurve = reinterpret_cast<ArkUI_CurveHandle>(0x1);
-    EXPECT_EQ(OH_ArkUI_NativeModule_PathAnimation_GetCurve(path, &outBorrowedCurve),
-        ARKUI_ERROR_CODE_NO_ERROR);
-    EXPECT_EQ(outBorrowedCurve, nullptr);
-
-    OH_ArkUI_NativeModule_PathAnimation_Destroy(path);
 }
 
 /**
@@ -2260,31 +2190,6 @@ HWTEST_F(NodeAnimateTest, AnimationGroup_AddKeyframeAnimation_RejectsDuplicate_0
     EXPECT_EQ(OH_ArkUI_NativeModule_AnimationGroup_AddKeyframeAnimation(group, kf), ARKUI_ERROR_CODE_PARAM_INVALID);
 
     OH_ArkUI_NativeModule_KeyframeAnimation_Destroy(kf);
-    OH_ArkUI_NativeModule_AnimationGroup_Destroy(group);
-}
-
-/**
- * @tc.name: AnimationGroup_AddPathAnimation_RejectsSpring_001
- * @tc.desc: Test AddPathAnimation rejects spring curve.
- * @tc.type: FUNC
- */
-HWTEST_F(NodeAnimateTest, AnimationGroup_AddPathAnimation_RejectsSpring_001, TestSize.Level1)
-{
-    ASSERT_TRUE(OHOS::Ace::NodeModel::InitialFullImpl());
-    auto* group = OH_ArkUI_NativeModule_AnimationGroup_Create();
-    ASSERT_NE(group, nullptr);
-
-    auto* path = OH_ArkUI_NativeModule_PathAnimation_Create("M0,0 L100,100");
-    ASSERT_NE(path, nullptr);
-
-    auto* spring = OH_ArkUI_Curve_CreateResponsiveSpringMotion(0.3f, 0.5f, 0.0f);
-    ASSERT_NE(spring, nullptr);
-    EXPECT_EQ(OH_ArkUI_NativeModule_PathAnimation_SetCurve(path, spring), ARKUI_ERROR_CODE_PARAM_INVALID);
-
-    EXPECT_EQ(OH_ArkUI_NativeModule_AnimationGroup_AddPathAnimation(group, path), ARKUI_ERROR_CODE_NO_ERROR);
-
-    OH_ArkUI_Curve_DisposeCurve(spring);
-    OH_ArkUI_NativeModule_PathAnimation_Destroy(path);
     OH_ArkUI_NativeModule_AnimationGroup_Destroy(group);
 }
 

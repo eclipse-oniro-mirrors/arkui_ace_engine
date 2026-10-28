@@ -17,7 +17,7 @@
 #include "compatible/components/picker/picker_text_component.h"
 
 #include "core/components_ng/base/frame_node.h"
-#include "core/components_ng/pattern/text_picker/bridge/textpicker_parser.h"
+#include "core/components_ng/pattern/text_picker/bridge/textpicker_options.h"
 #include "core/components_ng/pattern/text_picker/textpicker_event_hub.h"
 #include "core/components_ng/pattern/text_picker/textpicker_model_ng.h"
 #include "core/components_ng/pattern/text_picker/textpicker_model_static.h"
@@ -437,7 +437,7 @@ void SetTextPickerOptionsImpl(Ark_NativePointer node, const Opt_TextPickerOption
     if (!textPickerOptions.range.empty()) {
         ValidateSingleTextPickerOptions(textPickerOptions);
         // do not change the order of calls
-        TextPickerModelStatic::SetTextPickerSingeRange(true);
+        TextPickerModelStatic::SetTextPickerSingeRange(frameNode, true);
         TextPickerModelStatic::InitialSetupSinglePicker(frameNode, textPickerOptions.kind);
         TextPickerModelStatic::SetRange(frameNode, textPickerOptions.range);
         TextPickerModelStatic::SetValue(frameNode, textPickerOptions.value);
@@ -446,7 +446,7 @@ void SetTextPickerOptionsImpl(Ark_NativePointer node, const Opt_TextPickerOption
     } else if (!textPickerOptions.options.empty()) {
         ValidateMultiTextPickerOptions(textPickerOptions);
         // do not change the order of calls
-        TextPickerModelStatic::SetTextPickerSingeRange(false);
+        TextPickerModelStatic::SetTextPickerSingeRange(frameNode, false);
         TextPickerModelStatic::SetIsCascade(frameNode, textPickerOptions.isCascade);
         TextPickerModelStatic::SetHasSelectAttr(frameNode, textPickerOptions.hasSelected);
         TextPickerModelStatic::SetColumns(frameNode, textPickerOptions.options);

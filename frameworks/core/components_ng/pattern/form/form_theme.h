@@ -26,7 +26,7 @@ namespace OHOS::Ace::NG {
  * FormTheme defines color and styles of FormPattern. FormTheme should be built
  * using FormTheme::Builder.
  */
-class FormTheme : public virtual Theme {
+class FormTheme : public Theme {
     DECLARE_ACE_TYPE(FormTheme, Theme);
 
 public:

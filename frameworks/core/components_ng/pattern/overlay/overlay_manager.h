@@ -51,6 +51,11 @@ class FrameNode;
 class UINode;
 class PipelineContext;
 class OverlayManager;
+class ChainedTransitionEffect;
+class ModalPresentationPattern;
+struct InnerExtraConfig {
+    RefPtr<ChainedTransitionEffect> transition;
+};
 struct CalendarSettingData;
 struct ContentCoverParam;
 struct DatePickerSettingData;
@@ -182,6 +187,10 @@ public:
 
     PopupInfo GetPopupInfo(int32_t targetId) const;
 
+    // Read pattern state without exposing concrete Menu/Bubble pattern headers to callers.
+    static bool GetMenuWrapperState(const RefPtr<FrameNode>& node, int32_t& targetId, bool& isShown);
+    static bool GetPopupTargetId(const RefPtr<FrameNode>& node, int32_t& targetId);
+
     bool HasPopupInfo(int32_t targetId) const;
 
     void ErasePopupInfo(int32_t targetId);
@@ -203,6 +212,7 @@ public:
     void HideMenuInSubWindow(const RefPtr<FrameNode>& menu, int32_t targetId);
     RefPtr<FrameNode> GetMenuNodeWithExistContent(const RefPtr<UINode>& node);
     RefPtr<FrameNode> GetMenuNode(int32_t targetId);
+    bool IsMenuShowForTarget(int32_t targetId);
     void HideMenuInSubWindow(bool showPreviewAnimation = true, bool startDrag = false);
     void CleanMenuInSubWindow(int32_t targetId);
     void CleanPreviewInSubWindow();
@@ -489,9 +499,9 @@ public:
     bool HandleUIExtNodeTransform(const AAFwk::Want& want, RefPtr<FrameNode> uiExtNode);
     bool UIExtNodeAngleValid(int32_t uiExtNodeAngle);
     int32_t CreateModalUIExtension(const RefPtr<WantWrap>& want, const ModalUIExtensionCallbacks& callbacks,
-        const ModalUIExtensionConfig& config);
+        const ModalUIExtensionConfig& config, const InnerExtraConfig& extraConfig = {});
     int32_t CreateModalUIExtension(const AAFwk::Want& want, const ModalUIExtensionCallbacks& callbacks,
-        const ModalUIExtensionConfig& config);
+        const ModalUIExtensionConfig& config, const InnerExtraConfig& extraConfig = {});
     void CloseModalUIExtension(int32_t sessionId);
     void UpdateModalUIExtensionConfig(
         int32_t sessionId, const ModalUIExtensionAllowedUpdateConfig& config);
@@ -600,7 +610,11 @@ public:
     // 4. end hide animation: overlay node lost focus, lower level node get focus.
     void FocusOverlayNode(const RefPtr<FrameNode>& overlayNode, bool isInSubWindow = false);
     void ContentChangeReport(const RefPtr<FrameNode>& keyNode, bool isShow);
+    void ContentChangeReport(const RefPtr<FrameNode>& keyNode, bool isShow, bool reportCapi);
+    void ReportCapiOverlayEvent(const RefPtr<FrameNode>& keyNode, bool isShow, const char* overlayType,
+        const RefPtr<FrameNode>& trigger = nullptr);
     void RemoveChildWithService(const RefPtr<UINode>& rootNode, const RefPtr<FrameNode>& node);
+    void ReportSubMenuEvent(const RefPtr<FrameNode>& node, bool isShow);
     const std::set<WeakPtr<UINode>>& GetwindowScenes();
     CancelableCallback<void()>& GetPreviewFilterTask();
 
@@ -742,6 +756,13 @@ private:
         const NG::ContentCoverParam& contentCoverParam, int32_t targetId,
         std::optional<ModalTransition> modalTransition);
     void HandleModalPop(std::function<void()>&& onWillDisappear, const RefPtr<UINode> rootNode, int32_t targetId);
+    void ExecuteModalTransitionOut(const RefPtr<FrameNode>& topModalNode,
+        const RefPtr<ModalPresentationPattern>& pattern, ModalTransition modalTransition,
+        const RefPtr<FrameNode>& builder, const RefPtr<UINode>& rootNode);
+    void BindModalUIExtensionContentCover(const ModalUIExtensionConfig& config,
+        int32_t sessionId, std::function<RefPtr<UINode>()>&& buildNodeFunc,
+        const RefPtr<NG::ChainedTransitionEffect>& transitionEffect,
+        const RefPtr<FrameNode>& uiExtNode);
 
     int32_t ExceptComponent(const RefPtr<NG::UINode>& rootNode, RefPtr<NG::FrameNode>& overlay,
         bool isBackPressed, bool isPageRouter);
@@ -845,6 +866,9 @@ private:
     // No thread safety issue due to they are all run in UI thread
     bool isAllowedBeCovered_ = true;
     // Only hasValue when isAllowedBeCovered is false
+    std::set<int32_t> capiVisibleSubMenus_;
+    std::set<int32_t> capiVisibleOverlayContents_;
+    void ScheduleOverlayContentVisibilityReport(const RefPtr<FrameNode>& node);
     std::set<int32_t> curSessionIds_;
     std::optional<OverlayManagerInfo> overlayInfo_;
     WeakPtr<FrameNode> customKeyboardNode_;

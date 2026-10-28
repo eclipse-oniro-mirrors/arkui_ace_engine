@@ -40,7 +40,7 @@
 #include "core/components/web/web_property.h" // Unscoped enum types
 #include "core/common/ime/text_range.h"
 #include "core/components/common/properties/text_style.h"
-#include "core/components_ng/pattern/list/list_item_group_pattern.h" // Unscoped enum types
+#include "core/components_ng/pattern/list/list_properties.h" // Unscoped enum types
 #include "core/components_ng/pattern/slider/slider_model.h" // Inner types
 #include "core/components_ng/pattern/tabs/tab_content_model.h"
 #include "core/components_ng/pattern/text/text_styles.h"
@@ -85,6 +85,7 @@ enum class LineJoinStyle;
 enum class MenuPolicy;
 enum class NavigationType;
 enum class ParticleDisturbanceShapeType : uint32_t;
+enum class ScrollAlign;
 enum class TabBarDisplayMode;
 enum class SidebarDisplayStyle;
 enum class TabsCacheMode;
@@ -98,6 +99,7 @@ class PickerDate;
 class PickerTime;
 struct DateTimeType;
 struct Font;
+struct ListItemGroupIndex;
 struct PickerIndicatorStyle;
 struct PreviewText;
 struct SelectionOptions;
@@ -1162,6 +1164,15 @@ namespace Converter {
     template<> void AssignCast(std::optional<ImmersiveOptions>& dst, const Ark_ImmersiveOptionsInner& src);
     template<> void AssignCast(std::optional<BlurSnapshotOptions>& dst, const Ark_BlurSnapshotOptions& src);
     template<> void AssignCast(std::optional<LightEffectOptions>& dst, const Ark_LightEffectOptionsInner& src);
+    template<> void AssignCast(std::optional<SheetTitleBarHoverMode>& dst, const Ark_SheetTitleBarHoverMode& src);
+    template<> void AssignCast(std::optional<ShadowClipMode>& dst, const Ark_ShadowClipMode& src);
+#ifndef WINDOWS_PLATFORM
+#if defined(ARKUI_CAPI_UNITTEST) || defined(LINUX_PLATFORM) || defined(MAC_PLATFORM) || defined(CROSS_PLATFORM)
+    template<> void AssignCast(std::optional<WebContextMenuItemId>& dst, const WebContextMenuItemId& src);
+#else
+    template<> void AssignCast(std::optional<WebContextMenuItemId>& dst, const Ark_WebContextMenuItemId& src);
+#endif
+#endif
     // DO NOT ADD NEW DECLARATIONS HERE!!! Add in alphabetic order above!
 
     template<typename From>
@@ -1182,11 +1193,10 @@ namespace Converter {
         return std::nullopt;
     }
 
-    class ConverterState {
-    public:
-        inline static DimensionUnit defDimensionUnit = DimensionUnit::VP;
-        inline static double defShadowBlurRadius = -1.0;
-    };
+    namespace ConverterState {
+        extern ACE_FORCE_EXPORT DimensionUnit defDimensionUnit;
+        extern ACE_FORCE_EXPORT double defShadowBlurRadius;
+    } // namespace OHOS::Ace::NG::Converter::ConverterState
 
     template<> inline Dimension Convert(const Ark_LengthMetricsProxy& src)
     {

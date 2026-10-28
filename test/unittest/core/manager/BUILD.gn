@@ -204,6 +204,17 @@ if (!is_host_product) {
   }
 }
 
+if (!is_host_product) {
+  ace_unittest("handedness_manager_test_ng") {
+    module_name = "Component-Layout"
+    type = "new"
+    sources = [
+      "$ace_root/test/mock/frameworks/core/common/mock_window.cpp",
+      "handedness_manager_test_ng.cpp",
+    ]
+  }
+}
+
 ace_unittest("frame_rate_manager_test_ng") {
   module_name = "StateManagement-InComponent"
   type = "new"
@@ -255,6 +266,7 @@ ace_unittest("safe_area_manager_test_ng") {
     "safe_area_immersive_strategy_test_ng.cpp",
     "safe_area_manager_test_ng.cpp",
     "safe_area_manager_test_ng_part_two.cpp",
+    "safe_area_title_button_test_ng.cpp",
   ]
 }
 
@@ -363,6 +375,7 @@ ace_unittest("component_tree_query_test_ng") {
   if (is_host_product) {
     type = "host_components"
   }
+  cflags = [ "-fno-access-control" ]
   sources = [ "component_tree_query_test_ng.cpp" ]
 }
 
@@ -403,6 +416,7 @@ ohos_unittest("content_change_manager_translate_test_ng") {
   sources = [
     "$ace_root/frameworks/base/log/log_wrapper.cpp",
     "$ace_root/frameworks/core/components_ng/manager/content_change_manager/content_change_manager.cpp",
+    "$ace_root/frameworks/core/components_ng/manager/content_change_manager/content_change_manager_capi.cpp",
     "$ace_root/test/mock/adapter/ohos/osal/mock_system_properties.cpp",
     "$ace_root/test/mock/frameworks/base/geometry/mock_matrix4.cpp",
     "$ace_root/test/mock/frameworks/base/utils/mock_lifecycle_checkable.cpp",
@@ -476,6 +490,9 @@ group("core_manager_unittest") {
     ":theme_manager_test_ng",
   ]
   if (!is_host_product) {
-    deps += [ ":force_split_manager_test_ng" ]
+    deps += [
+      ":force_split_manager_test_ng",
+      ":handedness_manager_test_ng",
+    ]
   }
 }

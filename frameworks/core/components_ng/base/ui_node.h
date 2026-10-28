@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_BASE_UI_NODE_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_BASE_UI_NODE_H
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <list>
@@ -131,7 +132,7 @@ enum class UINodeType {
 };
 
 // UINode is the base class of FrameNode and SyntaxNode.
-class ACE_FORCE_EXPORT UINode : public virtual AceType {
+class ACE_FORCE_EXPORT UINode : public AceType {
     DECLARE_ACE_TYPE(UINode, AceType);
 
 public:
@@ -272,6 +273,21 @@ public:
         return children_;
     }
 
+    // Read-only snapshot for the Native API detector; does not invoke virtual GetChildren().
+    // Only called when multi-thread tree operation check is enabled (inside GetTreeMutex()).
+    std::vector<RefPtr<UINode>> GetChildrenForNativeTreeCheck() const;
+
+    // Native operation occupancy, not the node's UI-thread affinity.
+    uint64_t GetNativeTreeOperationThreadId() const
+    {
+        return nativeTreeOperationThreadId_.load(std::memory_order_acquire);
+    }
+
+    void SetNativeTreeOperationThreadId(uint64_t threadId)
+    {
+        nativeTreeOperationThreadId_.store(threadId, std::memory_order_release);
+    }
+
     RefPtr<UINode> GetLastChild() const;
 
     RefPtr<UINode> GetFirstChild() const;
@@ -353,6 +369,7 @@ public:
     // DFX info.
     virtual void DumpTree(int32_t depth, bool hasJson = false, const std::string& desc = "");
     void DumpTreeJsonForDiff(std::unique_ptr<JsonValue>& json);
+    virtual void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& current, ParamConfig config);
     void DumpSimplifyTreeBase(std::shared_ptr<JsonValue>& current);
     void DumpSimplifyTree(int32_t depth, std::shared_ptr<JsonValue>& current);
     void DumpSimplifyTreeNode(std::shared_ptr<JsonValue>& current, ParamConfig config);
@@ -584,6 +601,11 @@ public:
             return AceType::DynamicCast<T>(uiNode);
         }
         return nullptr;
+    }
+
+    const std::list<std::tuple<RefPtr<UINode>, uint32_t, int32_t>>& GetDisappearingChildren() const
+    {
+        return disappearingChildren_;
     }
 
     // utility function for adding child to disappearingChildren_
@@ -1425,6 +1447,7 @@ private:
     // Used for IsolatedThread consistency validation: node should operate on pipeline
     // with matching IsolatedThread identity to avoid cross-domain routing issues.
     bool isIsolatedThread_ = false;
+    std::atomic<uint64_t> nativeTreeOperationThreadId_ { 0 };
     bool isFree_ = false; // the thread safe node in free state can be operated by non UI threads
     bool isRunningPendingUnsafeTask_ = false;
     std::vector<std::function<void()>> afterAttachMainTreeTasks_;

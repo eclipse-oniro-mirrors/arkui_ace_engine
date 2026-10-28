@@ -659,6 +659,11 @@ export enum ScrollAlign {
     END = 2,
     AUTO = 3
 }
+export enum FastScrollMode {
+    NONE = 0,
+    SKIP_MEASURE = 1,
+    SKIP_CREATE_AND_MEASURE = 2
+}
 export interface OffsetResult {
     xOffset: double;
     yOffset: double;
@@ -668,6 +673,7 @@ export interface ScrollEdgeOptions {
 }
 export interface ScrollToIndexOptions {
     extraOffset?: arkui_component_units_LengthMetrics;
+    fastScroll?: FastScrollMode;
 }
 export interface ScrollAnimationOptions {
     duration?: int32;
@@ -1226,6 +1232,14 @@ export class ScrollToIndexOptions_serializer {
         } else {
             valueSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
+        const valueHolderForFastScroll = value.fastScroll
+        if (valueHolderForFastScroll !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForFastScrollTmpValue = (valueHolderForFastScroll as FastScrollMode)
+            valueSerializer.writeInt32(valueHolderForFastScrollTmpValue.valueOf())
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
     }
     public static read(buffer: DeserializerBase): ScrollToIndexOptions {
         let valueDeserializer: DeserializerBase = buffer
@@ -1236,7 +1250,13 @@ export class ScrollToIndexOptions_serializer {
             extraOffsetTmpBuf = extractors.transform_Ark_LengthMetricsProxy_to_Ark_LengthMetrics(extraOffsetTmpBufOptDeserialized)
         }
         const extraOffsetTmpResult: arkui_component_units_LengthMetrics | undefined = extraOffsetTmpBuf
-        let value: ScrollToIndexOptions = ({extraOffset: extraOffsetTmpResult} as ScrollToIndexOptions)
+        const fastScrollTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let fastScrollTmpBuf: FastScrollMode | undefined = undefined
+        if ((fastScrollTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            fastScrollTmpBuf = FastScrollMode.fromValue(valueDeserializer.readInt32())
+        }
+        const fastScrollTmpResult: FastScrollMode | undefined = fastScrollTmpBuf
+        let value: ScrollToIndexOptions = ({extraOffset: extraOffsetTmpResult, fastScroll: fastScrollTmpResult} as ScrollToIndexOptions)
         return value
     }
 }

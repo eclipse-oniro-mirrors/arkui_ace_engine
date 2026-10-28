@@ -37,6 +37,10 @@ ace_unittest("interfaces_test") {
       "core_interfaces_test_min.cpp",
     ]
   }
+  sources += [
+    "$ace_root/frameworks/core/interfaces/native/ani/safe_area_inset_ani_modifier.cpp",
+    "native/ani/safe_area_inset_ani_modifier_test.cpp",
+  ]
 }
 
 ace_unittest("visual_effect_ani_modifier_test") {
@@ -76,12 +80,36 @@ ace_unittest("ui_event_command_test") {
   ]
 }
 
+ace_unittest("ui_tree_api_test") {
+  module_name = "UIEngine-Mainprocess"
+  type = "new"
+  if (defined(is_host_product) && is_host_product) {
+    type = "host_components"
+  }
+  sources = [ "native/node/ui_tree_api_test.cpp" ]
+}
+
+ace_unittest("capi_handle_conversion_test") {
+  module_name = "UIEngine-Mainprocess"
+  type = "new"
+  if (is_host_product) {
+    type = "host_components"
+  }
+  sources = [
+    "$ace_root/frameworks/core/components_ng/pattern/canvas/bridge/canvas_dynamic_modifier.cpp",
+    "$ace_root/frameworks/core/components_ng/pattern/swiper_indicator/bridge/swiper_indicator_dynamic_modifier.cpp",
+    "native/node/capi_handle_conversion_test.cpp",
+  ]
+}
+
 group("core_interfaces_unittest") {
   testonly = true
   deps = [
+    ":capi_handle_conversion_test",
     ":immersive_strategy_ani_modifier_test",
     ":interfaces_test",
     ":ui_event_command_test",
+    ":ui_tree_api_test",
     ":visual_effect_ani_modifier_test",
   ]
 }

@@ -29,7 +29,7 @@ namespace {
 constexpr double BUTTON_ALPHA_DISABLED = 0.4;
 constexpr double COUNTER_ALPHA = 0.9;
 } // namespace
-class CounterTheme : public virtual Theme {
+class CounterTheme : public Theme {
     DECLARE_ACE_TYPE(CounterTheme, Theme);
 
 public:

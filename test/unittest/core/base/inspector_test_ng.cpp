@@ -30,6 +30,8 @@
 #include "base/utils/utils.h"
 #include "core/common/ace_application_info.h"
 #include "core/components_ng/base/inspector.h"
+#include "core/components_ng/base/view_abstract.h"
+#include "core/components_ng/pattern/safe_area_inset/safe_area_inset_pattern.h"
 #include "core/components_ng/base/inspector_filter.h"
 #include "core/components_ng/base/simplified_inspector.h"
 #include "core/components_ng/base/ui_node.h"
@@ -2917,4 +2919,193 @@ HWTEST_F(InspectorTestNg, RecordOnePageNodes_002, TestSize.Level1)
     it = treesInfos.find(4021);
     EXPECT_TRUE(it != treesInfos.end());
 }
+
+namespace {
+class InsetInspectorFlagNode : public FrameNode {
+    DECLARE_ACE_TYPE(InsetInspectorFlagNode, FrameNode);
+public:
+    InsetInspectorFlagNode() : FrameNode("insetInspectorHost", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>()) {}
+
+    const std::list<RefPtr<UINode>>& GetChildren(bool notDetach = false) const override
+    {
+        queries.push_back(notDetach);
+        return UINode::GetChildren(notDetach);
+    }
+
+    mutable std::vector<bool> queries;
+};
+}
+
+/**
+ * @tc.name: SafeAreaInsetInspectorLookup001
+ * @tc.desc: Inspector reaches content by key, preserves notDetach, and drops replaced/reset roots.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InspectorTestNg, SafeAreaInsetInspectorLookup001, TestSize.Level0)
+{
+    auto host = AceType::MakeRefPtr<InsetInspectorFlagNode>();
+    host->InitializePatternAndContext();
+    auto content = FrameNode::CreateFrameNode("insetInspectorContent",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    content->UpdateInspectorId("inset-observed");
+    SafeAreaInsetOptions options;
+    options.edges[0] = SafeAreaInsetEdgeOptions {};
+    SafeAreaInsetContentArray contents;
+    contents[0] = content;
+    ViewAbstract::SetSafeAreaInset(AceType::RawPtr(host), options, contents);
+    for (bool notDetach : { false, true }) {
+        host->queries.clear();
+        EXPECT_EQ(Inspector::GetInspectorByKey(host, "inset-observed", notDetach), content);
+        ASSERT_FALSE(host->queries.empty());
+        for (bool flag : host->queries) {
+            EXPECT_EQ(flag, notDetach);
+        }
+    }
+    auto replacement = FrameNode::CreateFrameNode("replacementInspectorContent",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    replacement->UpdateInspectorId("inset-replacement");
+    contents[0] = replacement;
+    ViewAbstract::SetSafeAreaInset(AceType::RawPtr(host), options, contents);
+    EXPECT_EQ(Inspector::GetInspectorByKey(host, "inset-observed"), nullptr);
+    EXPECT_EQ(Inspector::GetInspectorByKey(host, "inset-replacement"), replacement);
+    ViewAbstract::ResetSafeAreaInset(AceType::RawPtr(host));
+    EXPECT_EQ(Inspector::GetInspectorByKey(host, "inset-replacement"), nullptr);
+}
+
+/**
+ * @tc.name: SafeAreaInsetInspectorTree001
+ * @tc.desc: Inspector tree maps include actual content once, keep the carrier hidden, and respect depth.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InspectorTestNg, SafeAreaInsetInspectorTree001, TestSize.Level0)
+{
+    auto makeNode = [](const char* tag) {
+        return FrameNode::CreateFrameNode(tag, ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<Pattern>());
+    };
+    auto host = makeNode("insetInspectorHost");
+    auto business = makeNode("ordinaryInspectorChild");
+    business->MountToParent(host);
+    auto content = makeNode("insetInspectorContent");
+    content->SetDebugLine("inset-content-debug-line");
+    business->SetDebugLine("business-debug-line");
+    SafeAreaInsetOptions options;
+    options.edges[2] = SafeAreaInsetEdgeOptions {};
+    SafeAreaInsetContentArray contents;
+    contents[2] = content;
+    ViewAbstract::SetSafeAreaInset(AceType::RawPtr(host), options, contents);
+    auto carrier = host->GetSafeAreaInsetNode();
+    ASSERT_NE(carrier, nullptr);
+    InspectorTreeMap nodes;
+    Inspector::GetInspectorChildrenInfo(host, nodes, 0, 0);
+    EXPECT_TRUE(nodes.empty());
+    Inspector::GetInspectorChildrenInfo(host, nodes, 0, 1);
+    EXPECT_EQ(nodes.count(content->GetId()), 1);
+    ASSERT_NE(nodes.find(content->GetId()), nodes.end());
+    EXPECT_EQ(nodes.at(content->GetId())->GetParentId(), host->GetId());
+    EXPECT_EQ(nodes.count(business->GetId()), 1);
+    EXPECT_EQ(nodes.count(carrier->GetId()), 0);
+    EXPECT_EQ(nodes.size(), 2);
+    ViewAbstract::ResetSafeAreaInset(AceType::RawPtr(host));
+    nodes.clear();
+    Inspector::GetInspectorChildrenInfo(host, nodes, 0, 1);
+    EXPECT_EQ(nodes.count(content->GetId()), 0);
+    EXPECT_EQ(nodes.count(business->GetId()), 1);
+}
+
+/**
+ * @tc.name: SafeAreaInsetInspectorJson001
+ * @tc.desc: Normal and layout Inspector JSON retain inset content while hiding the internal carrier.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InspectorTestNg, SafeAreaInsetInspectorJson001, TestSize.Level0)
+{
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto stage = FrameNode::CreateFrameNode("stage", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<StagePattern>());
+    auto page = FrameNode::CreateFrameNode("page", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<PagePattern>(AceType::MakeRefPtr<PageInfo>()));
+    page->MountToParent(stage);
+    auto host = FrameNode::CreateFrameNode("insetJsonHost", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>());
+    host->SetDebugLine("inset-host-line");
+    host->SetActive(true);
+    host->MountToParent(page);
+    auto content = FrameNode::CreateFrameNode("insetJsonContent", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>());
+    content->SetDebugLine("inset-content-line");
+    content->SetActive(true);
+    SafeAreaInsetOptions options;
+    options.edges[1] = SafeAreaInsetEdgeOptions {};
+    SafeAreaInsetContentArray contents;
+    contents[1] = content;
+    ViewAbstract::SetSafeAreaInset(AceType::RawPtr(host), options, contents);
+    auto previousStage = context->stageManager_;
+    context->stageManager_ = AceType::MakeRefPtr<StageManager>(stage);
+    const auto normal = Inspector::GetInspector(false);
+    const auto layout = Inspector::GetInspector(true);
+    ViewAbstract::ResetSafeAreaInset(AceType::RawPtr(host));
+    const auto cleared = Inspector::GetInspector(false);
+    context->stageManager_ = previousStage;
+    for (const auto& text : { normal, layout }) {
+        EXPECT_NE(text.find("insetJsonContent"), std::string::npos);
+        EXPECT_EQ(text.find("SafeAreaInsetContainer"), std::string::npos);
+    }
+    EXPECT_EQ(cleared.find("insetJsonContent"), std::string::npos);
+}
+
+/**
+ * @tc.name: SafeAreaInsetInspectorFourEdges001
+ * @tc.desc: All four roots and a nested custom component are observable without changing business children.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InspectorTestNg, SafeAreaInsetInspectorFourEdges001, TestSize.Level0)
+{
+    auto makeNode = [](const char* tag) {
+        auto node = FrameNode::CreateFrameNode(tag, ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<Pattern>());
+        node->SetDebugLine(tag);
+        return node;
+    };
+    auto host = makeNode("inspectorFourHost");
+    auto business = makeNode("inspectorFourBusiness");
+    business->MountToParent(host);
+    SafeAreaInsetOptions options;
+    SafeAreaInsetContentArray contents;
+    for (size_t edge = 0; edge < SAFE_AREA_INSET_EDGE_COUNT; ++edge) {
+        options.edges[edge] = SafeAreaInsetEdgeOptions {};
+        auto content = makeNode("inspectorFourContent");
+        content->UpdateInspectorId("inspector-edge-" + std::to_string(edge));
+        contents[edge] = content;
+    }
+    auto custom = CustomNode::CreateCustomNode(ElementRegister::GetInstance()->MakeUniqueId(), "inspector-custom");
+    auto nested = makeNode("inspectorFourNested");
+    nested->UpdateInspectorId("inspector-nested");
+    nested->MountToParent(custom);
+    custom->MountToParent(contents[3]);
+    ViewAbstract::SetSafeAreaInset(AceType::RawPtr(host), options, contents);
+    auto carrier = host->GetSafeAreaInsetNode();
+    ASSERT_NE(carrier, nullptr);
+    InspectorTreeMap nodes;
+    Inspector::GetInspectorChildrenInfo(host, nodes, 0, 1);
+    EXPECT_EQ(nodes.size(), 5);
+    EXPECT_EQ(nodes.count(carrier->GetId()), 0);
+    EXPECT_EQ(nodes.count(nested->GetId()), 0);
+    for (size_t edge = 0; edge < SAFE_AREA_INSET_EDGE_COUNT; ++edge) {
+        EXPECT_EQ(Inspector::GetInspectorByKey(host, "inspector-edge-" + std::to_string(edge)), contents[edge]);
+        ASSERT_EQ(nodes.count(contents[edge]->GetId()), 1);
+        EXPECT_EQ(nodes.at(contents[edge]->GetId())->GetParentId(), host->GetId());
+    }
+    EXPECT_EQ(Inspector::GetInspectorByKey(host, "inspector-nested", true), nested);
+    EXPECT_EQ(host->GetChildren().size(), 1);
+    ViewAbstract::ResetSafeAreaInset(AceType::RawPtr(host));
+    EXPECT_EQ(Inspector::GetInspectorByKey(host, "inspector-nested"), nullptr);
+    nodes.clear();
+    Inspector::GetInspectorChildrenInfo(host, nodes, 0, 1);
+    ASSERT_EQ(nodes.size(), 1);
+    EXPECT_EQ(nodes.count(business->GetId()), 1);
+}
+
 } // namespace OHOS::Ace::NG

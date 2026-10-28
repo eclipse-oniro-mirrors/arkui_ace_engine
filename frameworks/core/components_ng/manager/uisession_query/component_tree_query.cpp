@@ -15,6 +15,7 @@
 
 #include "frameworks/core/components_ng/manager/uisession_query/component_tree_query.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -30,6 +31,9 @@
 #include "core/components_ng/base/inspector.h"
 #include "core/components_ng/base/ui_node.h"
 #include "core/components_ng/pattern/navigation/navigation_group_node.h"
+#include "core/components_ng/syntax/arkoala_lazy_node.h"
+#include "core/components_ng/syntax/lazy_for_each_node.h"
+#include "core/common/container_scope.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "frameworks/base/json/json_util.h"
 
@@ -38,12 +42,15 @@ namespace {
 constexpr int32_t ERR_OK = static_cast<int32_t>(ComponentTreeQueryError::OK);
 constexpr int32_t ERR_INVALID_PARAMETER = static_cast<int32_t>(ComponentTreeQueryError::INVALID_PARAMETER);
 constexpr int32_t ERR_TARGET_NOT_FOUND = static_cast<int32_t>(ComponentTreeQueryError::TARGET_NOT_FOUND);
+constexpr int32_t ERR_UNSUPPORTED_FRONTEND = static_cast<int32_t>(ComponentTreeQueryError::UNSUPPORTED_FRONTEND);
+constexpr int32_t ERR_DATA_SOURCE_ERROR = static_cast<int32_t>(ComponentTreeQueryError::DATA_SOURCE_ERROR);
 constexpr int32_t ERR_RESOURCE_LIMIT = static_cast<int32_t>(ComponentTreeQueryError::RESOURCE_LIMIT);
 constexpr int32_t ERR_INTERNAL_ERROR = static_cast<int32_t>(ComponentTreeQueryError::INTERNAL_ERROR);
 constexpr int32_t ERR_TIMEOUT = static_cast<int32_t>(ComponentTreeQueryError::TIMEOUT);
 
 const char QUERY_KEY_CONTENT[] = "content";
 const char QUERY_KEY_NAV_BAR_MATCHES[] = "navBarMatches";
+const char QUERY_KEY_RESULTS[] = "results";
 
 // Traversal state shared by all preorder walks of this query.
 struct ScanState {
@@ -153,6 +160,43 @@ void VisitForPointHit(const RefPtr<UINode>& node, int32_t depth,
     }
 }
 
+// Region (rect) collection with tree order and node id dedup. Same preorder +
+// visibility + quota contract as VisitForPointHit.
+void VisitForRegion(const RefPtr<UINode>& node, ScanState& state,
+    std::unordered_set<int32_t>& visitedIds,
+    const std::function<bool(const RectF&)>& hitTest,
+    std::vector<RefPtr<FrameNode>>& matched)
+{
+    if (!node || !ConsumeScanQuota(state)) {
+        return;
+    }
+    // Dedup all UINodes (not just FrameNode): a second visit must skip the
+    // entire subtree, not just the hit-test. Without this early return, a
+    // re-encountered node would fall through to the child loop and waste the
+    // scan budget re-traversing an already-walked subtree.
+    if (visitedIds.find(node->GetId()) != visitedIds.end()) {
+        return;
+    }
+    // Skip invisible/inactive nodes entirely; descendants inherit invisibility.
+    if (!node->IsVisibleAndActive()) {
+        return;
+    }
+    visitedIds.emplace(node->GetId());
+    auto frameNode = AceType::DynamicCast<FrameNode>(node);
+    if (frameNode) {
+        auto rect = GetVisibleRectRelativeToWindow(frameNode);
+        if (GreatNotEqual(rect.Width(), 0.0f) && GreatNotEqual(rect.Height(), 0.0f) && hitTest(rect)) {
+            matched.emplace_back(frameNode);
+        }
+    }
+    for (const auto& child : GetTraversalChildren(node)) {
+        VisitForRegion(child, state, visitedIds, hitTest, matched);
+        if (state.limitExceeded) {
+            return;
+        }
+    }
+}
+
 // Walks up from the hit node; returns the first ancestor matching pred together
 // with the child on the path directly below it.
 RefPtr<UINode> FindAncestorWithDirectChild(const RefPtr<UINode>& hitNode,
@@ -230,6 +274,48 @@ RefPtr<NavigationGroupNode> FindNavigationByPoint(float x, float y, ScanState& s
     return navGroupNode;
 }
 
+RefPtr<LazyForEachNode> FindLazyForEachByPoint(float x, float y, ScanState& state, int32_t& errorCode)
+{
+    auto context = PipelineContext::GetCurrentContextSafely();
+    auto root = context ? context->GetRootElement() : nullptr;
+    if (!root) {
+        errorCode = ERR_INTERNAL_ERROR;
+        return nullptr;
+    }
+    PointHitQuery query;
+    query.x = x;
+    query.y = y;
+    VisitForPointHit(root, 0, query, state);
+    if (state.limitExceeded) {
+        errorCode = ERR_RESOURCE_LIMIT;
+        return nullptr;
+    }
+    if (!query.best.node) {
+        errorCode = ERR_TARGET_NOT_FOUND;
+        return nullptr;
+    }
+    RefPtr<UINode> ignored;
+    auto staticLazy = FindAncestorWithDirectChild(query.best.node,
+        [](const RefPtr<UINode>& n) { return AceType::InstanceOf<ArkoalaLazyNode>(n); }, ignored);
+    if (staticLazy) {
+        errorCode = ERR_UNSUPPORTED_FRONTEND;
+        return nullptr;
+    }
+    auto lazyForEach = FindAncestorWithDirectChild(query.best.node,
+        [](const RefPtr<UINode>& n) { return AceType::InstanceOf<LazyForEachNode>(n); }, ignored);
+    if (!lazyForEach) {
+        errorCode = ERR_TARGET_NOT_FOUND;
+        return nullptr;
+    }
+    auto node = AceType::DynamicCast<LazyForEachNode>(lazyForEach);
+    if (!node) {
+        errorCode = ERR_INTERNAL_ERROR;
+        return nullptr;
+    }
+    errorCode = ERR_OK;
+    return node;
+}
+
 void ProcessMatchedNode(const RefPtr<UINode>& node, const std::string& nodeJsonStr,
     ScanState& state, MatchResult& result)
 {
@@ -286,6 +372,98 @@ void WalkNavBarAndMatch(const RefPtr<UINode>& navBarNode, const std::regex& rege
     };
     walk(navBarNode);
 }
+
+std::string BuildQueryErrorJson(int32_t code)
+{
+    auto json = JsonUtil::CreateSharedPtrJson(true);
+    json->Put("errorCode", code);
+    auto ctx = PipelineContext::GetCurrentContextSafely();
+    if (ctx) {
+        ctx->GetAppInfo(json);
+    }
+    return json->ToString();
+}
+
+int32_t BuildNodesInRectResult(const std::vector<RefPtr<FrameNode>>& matched, std::string& resultJson)
+{
+    auto json = JsonUtil::CreateSharedPtrJson(true);
+    json->Put("errorCode", ERR_OK);
+    auto ctx = PipelineContext::GetCurrentContextSafely();
+    if (ctx) {
+        ctx->GetAppInfo(json);
+    }
+    auto results = JsonUtil::CreateArray(true);
+    size_t serializedSize = 0;
+    for (const auto& node : matched) {
+        auto jsonValue = JsonUtil::CreateSharedPtrJson(true);
+        node->DumpSimplifyTreeNode(jsonValue, ParamConfig());
+        auto nodeJsonStr = jsonValue->ToString();
+        if (nodeJsonStr.empty()) {
+            continue;
+        }
+        serializedSize += nodeJsonStr.size();
+        if (!CheckSerializedSize(serializedSize)) {
+            resultJson = BuildQueryErrorJson(ERR_RESOURCE_LIMIT);
+            return ERR_RESOURCE_LIMIT;
+        }
+        results->PutRef(ParseJsonOrEmpty(nodeJsonStr));
+    }
+    json->PutRef(QUERY_KEY_RESULTS, std::move(results));
+    resultJson = json->ToString();
+    if (!CheckSerializedSize(resultJson.size())) {
+        resultJson = BuildQueryErrorJson(ERR_RESOURCE_LIMIT);
+        return ERR_RESOURCE_LIMIT;
+    }
+    return ERR_OK;
+}
+
+int32_t ExtractAndBuildLazyForEachData(const RefPtr<LazyForEachBuilder>& builder,
+    int32_t instanceId, const ScanState& state, std::string& resultJson)
+{
+    auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - state.startTime).count();
+    if (elapsedMs >= COMPONENT_TREE_QUERY_MAX_EXECUTION_MS) {
+        resultJson = BuildQueryErrorJson(ERR_TIMEOUT);
+        return ERR_TIMEOUT;
+    }
+    ContainerScope containerScope(instanceId);
+    auto results = JsonUtil::CreateArray(true);
+    int32_t extractedCount = 0;
+    int32_t totalCount = builder->GetTotalCount();
+    auto allChildren = builder->GetAllChildren();
+    for (const auto& item : allChildren) {
+        if (item.first < 0 || item.first >= totalCount) {
+            continue;
+        }
+        int32_t dataError = ERR_OK;
+        auto dataJson = builder->GetDataByIndexAsJson(item.first, dataError);
+        if (dataError != ERR_OK || dataJson.empty()) {
+            continue;
+        }
+        auto entry = JsonUtil::CreateSharedPtrJson(true);
+        entry->Put("index", item.first);
+        entry->PutRef("data", ParseJsonOrEmpty(dataJson));
+        results->PutRef(std::move(entry));
+        extractedCount++;
+    }
+    if (extractedCount == 0) {
+        resultJson = BuildQueryErrorJson(ERR_DATA_SOURCE_ERROR);
+        return ERR_DATA_SOURCE_ERROR;
+    }
+    auto json = JsonUtil::CreateSharedPtrJson(true);
+    json->Put("errorCode", ERR_OK);
+    auto context = PipelineContext::GetCurrentContextSafely();
+    if (context) {
+        context->GetAppInfo(json);
+    }
+    json->PutRef(QUERY_KEY_RESULTS, std::move(results));
+    resultJson = json->ToString();
+    if (!CheckSerializedSize(resultJson.size())) {
+        resultJson = BuildQueryErrorJson(ERR_RESOURCE_LIMIT);
+        return ERR_RESOURCE_LIMIT;
+    }
+    return ERR_OK;
+}
 } // namespace
 
 // static
@@ -299,6 +477,27 @@ bool ComponentTreeQuery::IsPointInRectBoundaryInclusive(float x, float y, const 
 {
     return GreatOrEqual(x, rect.Left()) && LessOrEqual(x, rect.Right()) && GreatOrEqual(y, rect.Top()) &&
            LessOrEqual(y, rect.Bottom());
+}
+
+// static
+RectF ComponentTreeQuery::NormalizeRect(float x1, float y1, float x2, float y2)
+{
+    auto left = std::min(x1, x2);
+    auto right = std::max(x1, x2);
+    auto top = std::min(y1, y2);
+    auto bottom = std::max(y1, y2);
+    return RectF(left, top, right - left, bottom - top);
+}
+
+// static
+bool ComponentTreeQuery::IsPositiveAreaRectIntersection(const RectF& lhs, const RectF& rhs)
+{
+    auto left = std::max(lhs.Left(), rhs.Left());
+    auto right = std::min(lhs.Right(), rhs.Right());
+    auto top = std::max(lhs.Top(), rhs.Top());
+    auto bottom = std::min(lhs.Bottom(), rhs.Bottom());
+    // Tangent / edge-touching (zero-width or zero-height overlap) does not count.
+    return GreatNotEqual(right - left, 0.0f) && GreatNotEqual(bottom - top, 0.0f);
 }
 
 // static
@@ -330,16 +529,10 @@ int32_t ComponentTreeQuery::QueryNavigationContentByPoint(
         return json->ToString();
     };
 
-    // Convert physical pixel coordinates (from SA) to vp used by component tree rects.
     auto pipeline = PipelineContext::GetCurrentContextSafely();
     if (!pipeline) {
         resultJson = buildResult(ERR_INTERNAL_ERROR);
         return ERR_INTERNAL_ERROR;
-    }
-    float viewScale = pipeline->GetViewScale();
-    if (viewScale > 0.0f) {
-        x /= viewScale;
-        y /= viewScale;
     }
 
     auto regexCheck = CheckRegex(pattern);
@@ -421,11 +614,96 @@ int32_t ComponentTreeQuery::QueryNavigationContentByPoint(
 }
 
 // static
+int32_t ComponentTreeQuery::QueryLazyForEachDataByPoint(float x, float y, std::string& resultJson)
+{
+    ACE_SCOPED_TRACE("QueryLazyForEachDataByPoint[x:%f][y:%f]", x, y);
+
+    auto pipeline = PipelineContext::GetCurrentContextSafely();
+    if (!pipeline) {
+        resultJson = BuildQueryErrorJson(ERR_INTERNAL_ERROR);
+        return ERR_INTERNAL_ERROR;
+    }
+    if (!IsFinitePoint(x, y)) {
+        resultJson = BuildQueryErrorJson(ERR_INVALID_PARAMETER);
+        return ERR_INVALID_PARAMETER;
+    }
+
+    ScanState state;
+    int32_t errorCode = ERR_OK;
+    auto lazyForEachNode = FindLazyForEachByPoint(x, y, state, errorCode);
+    if (!lazyForEachNode) {
+        resultJson = BuildQueryErrorJson(errorCode);
+        return errorCode;
+    }
+
+    auto builder = lazyForEachNode->GetBuilder();
+    if (!builder) {
+        resultJson = BuildQueryErrorJson(ERR_OK);
+        return ERR_OK;
+    }
+    if (!builder->IsDataExtractionSupported()) {
+        resultJson = BuildQueryErrorJson(ERR_UNSUPPORTED_FRONTEND);
+        return ERR_UNSUPPORTED_FRONTEND;
+    }
+    if (builder->GetAllChildren().empty()) {
+        resultJson = BuildQueryErrorJson(ERR_OK);
+        return ERR_OK;
+    }
+    return ExtractAndBuildLazyForEachData(builder, lazyForEachNode->GetInstanceId(), state, resultJson);
+}
+
+// static
+int32_t ComponentTreeQuery::QueryNodesInRect(float x1, float y1, float x2, float y2, std::string& resultJson)
+{
+    ACE_SCOPED_TRACE("QueryNodesInRect[x1:%f][y1:%f][x2:%f][y2:%f]", x1, y1, x2, y2);
+
+    auto pipeline = PipelineContext::GetCurrentContextSafely();
+    if (!pipeline) {
+        resultJson = BuildQueryErrorJson(ERR_INTERNAL_ERROR);
+        return ERR_INTERNAL_ERROR;
+    }
+    if (!IsFinitePoint(x1, y1) || !IsFinitePoint(x2, y2)) {
+        resultJson = BuildQueryErrorJson(ERR_INVALID_PARAMETER);
+        return ERR_INVALID_PARAMETER;
+    }
+    auto queryRect = NormalizeRect(x1, y1, x2, y2);
+    if (LessOrEqual(queryRect.Width(), 0.0f) || LessOrEqual(queryRect.Height(), 0.0f)) {
+        resultJson = BuildQueryErrorJson(ERR_INVALID_PARAMETER);
+        return ERR_INVALID_PARAMETER;
+    }
+
+    auto root = pipeline->GetRootElement();
+    if (!root) {
+        resultJson = BuildQueryErrorJson(ERR_INTERNAL_ERROR);
+        return ERR_INTERNAL_ERROR;
+    }
+    ScanState state;
+    std::unordered_set<int32_t> visitedIds;
+    std::vector<RefPtr<FrameNode>> matched;
+    VisitForRegion(root, state, visitedIds,
+        [queryRect](const RectF& rect) { return IsPositiveAreaRectIntersection(queryRect, rect); },
+        matched);
+    if (state.timedOut) {
+        resultJson = BuildQueryErrorJson(ERR_TIMEOUT);
+        return ERR_TIMEOUT;
+    }
+    if (state.limitExceeded) {
+        resultJson = BuildQueryErrorJson(ERR_RESOURCE_LIMIT);
+        return ERR_RESOURCE_LIMIT;
+    }
+    return BuildNodesInRectResult(matched, resultJson);
+}
+
+// static
 int32_t ComponentTreeQuery::Execute(const ComponentTreeQueryRequest& request, std::string& resultJson)
 {
     switch (request.type) {
         case ComponentTreeQueryType::NAVIGATION_CONTENT_BY_POINT:
             return QueryNavigationContentByPoint(request.x, request.y, request.pattern, resultJson);
+        case ComponentTreeQueryType::LAZY_FOREACH_DATA_BY_POINT:
+            return QueryLazyForEachDataByPoint(request.x, request.y, resultJson);
+        case ComponentTreeQueryType::NODES_IN_RECT:
+            return QueryNodesInRect(request.x, request.y, request.extraX, request.extraY, resultJson);
         default:
             return ERR_INVALID_PARAMETER;
     }

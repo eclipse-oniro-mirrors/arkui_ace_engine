@@ -1795,6 +1795,42 @@ typedef enum {
      * @since 26.2.0
      */
     ARKUI_ERROR_CODE_NODE_NOT_FOUND = 106410,
+    /**
+     * @brief Result too large.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_RESULT_TOO_LARGE = 106411,
+    /**
+     * @brief Resource exhausted.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_RESOURCE_EXHAUSTED = 106412,
+    /**
+     * @brief The node ID is duplicated.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_DUPLICATE_NODE_ID = 106413,
+    /**
+     * @brief Some collection items failed.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_COLLECTION_PARTIAL_FAILED = 106414,
+    /**
+     * @brief The collection item is not found.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_COLLECTION_ITEM_NOT_FOUND = 106415,
+    /**
+     * @brief The collection item has already been taken.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_COLLECTION_ITEM_ALREADY_TAKEN = 106416,
 } ArkUI_ErrorCode;
 
 /**
@@ -7099,6 +7135,21 @@ typedef enum {
      */
     OH_ARKUI_NODE_MOUNT_POLICY_MIXED = 1,
 } OH_ArkUI_NodeMountPolicy;
+
+/**
+ * @brief Enumerates the policy for adopting a child node.
+ *
+ * @since 26.2.0
+ */
+typedef enum {
+    /**
+     * The window position of the adopted node's overlays follows the FrameNode adopt-parent chain and applies the
+     * developer-provided compensation at each adoption boundary.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVE_MODULE_ADOPT_POLICY_OVERLAY_POSITION_FOLLOWS_ADOPT_PARENT_CHAIN = 0,
+} OH_ArkUI_AdoptPolicy;
 
 /**
  * @brief Enumerates the ArcDirection.

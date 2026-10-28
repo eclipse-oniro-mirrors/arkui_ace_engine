@@ -14,6 +14,8 @@
  */
 
 #include "core/components_ng/pattern/ui_extension/ui_extension_component/ui_extension_pattern.h"
+
+#include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/accessibility/accessibility_manager.h"
 
 #include <atomic>
@@ -166,13 +168,17 @@ UIExtensionPattern::~UIExtensionPattern()
         return;
     }
 
-    auto instanceId = GetInstanceIdFromHost();
+    auto host = GetHost();
+    auto instanceId = host ? host->GetInstanceId() : instanceId_;
     ContainerScope scope(instanceId);
     auto ngPipeline = NG::PipelineContext::GetCurrentContext();
     CHECK_NULL_VOID(ngPipeline);
     auto frontend = ngPipeline->GetFrontend();
     CHECK_NULL_VOID(frontend);
-    auto accessibilityManager = frontend->GetAccessibilityManager();
+    auto mainAccessibilityManager = frontend->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = host ? mainAccessibilityManager->GetAccessibilityManagerForNode(host)
+                                     : mainAccessibilityManager;
     CHECK_NULL_VOID(accessibilityManager);
     accessibilityManager->DeregisterAccessibilityChildTreeCallback(
         accessibilityChildTreeCallback_->GetAccessibilityId());
@@ -1559,7 +1565,8 @@ void UIExtensionPattern::FireOnRemoteReadyCallback()
         onRemoteReadyCallback_(MakeRefPtr<UIExtensionProxy>(sessionWrapper_, Claim(this)));
     }
     if (onModalRemoteReadyCallback_) {
-        onModalRemoteReadyCallback_(std::make_shared<ModalUIExtensionProxyImpl>(sessionWrapper_));
+        auto innerProxy = MakeRefPtr<UIExtensionProxy>(sessionWrapper_, Claim(this));
+        onModalRemoteReadyCallback_(std::make_shared<ModalUIExtensionProxyImpl>(innerProxy));
     }
 }
 
@@ -1758,9 +1765,10 @@ void UIExtensionPattern::FireBindModalCallback()
     }
 }
 
-void UIExtensionPattern::SetDpiFollowStrategy(DpiFollowStrategy dpiFollowStrategy)
+void UIExtensionPattern::SetDpiFollowStrategy(DpiFollowStrategy dpiFollowStrategy, bool isDpiFollowStrategySet)
 {
     dpiFollowStrategy_ = dpiFollowStrategy;
+    isDpiFollowStrategySet_ = isDpiFollowStrategySet;
 }
 
 DpiFollowStrategy UIExtensionPattern::GetDpiFollowStrategy()
@@ -1772,13 +1780,16 @@ DpiFollowStrategy UIExtensionPattern::GetEffectiveDpiFollowStrategy()
 {
     ContainerScope scope(instanceId_);
     auto context = PipelineBase::GetCurrentContext();
-    bool densityFollowHostMarked = context && context->IsUIExtensionDensityFollowHost();
-    DpiFollowStrategy effectiveStrategy =
-        densityFollowHostMarked ? DpiFollowStrategy::FOLLOW_HOST_DPI_ALL : dpiFollowStrategy_;
-    UIEXT_LOGI("GetEffectiveDpiFollowStrategy: dpiFollowStrategy=%{public}d, densityFollowHostMarked=%{public}d, "
-               "effective=%{public}d, instanceId=%{public}d.",
-        static_cast<int32_t>(dpiFollowStrategy_), densityFollowHostMarked, static_cast<int32_t>(effectiveStrategy),
-        instanceId_);
+    DpiFollowStrategy hostDpiFollowStrategy =
+        context ? context->GetUIExtensionDensityFollowHost() : DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI;
+    // Developer-configured strategy takes precedence (even when it is the default value,
+    // i.e. an explicit opt-out); when not configured at all, fall back to the strategy
+    // saved from UIContent::SetUIExtensionDensityFollowHost.
+    DpiFollowStrategy effectiveStrategy = isDpiFollowStrategySet_ ? dpiFollowStrategy_ : hostDpiFollowStrategy;
+    UIEXT_LOGI("GetEffectiveDpiFollowStrategy: dpiFollowStrategy=%{public}d, isDpiFollowStrategySet=%{public}d, "
+               "hostDpiFollowStrategy=%{public}d, effective=%{public}d, instanceId=%{public}d.",
+        static_cast<int32_t>(dpiFollowStrategy_), isDpiFollowStrategySet_, static_cast<int32_t>(hostDpiFollowStrategy),
+        static_cast<int32_t>(effectiveStrategy), instanceId_);
     return effectiveStrategy;
 }
 
@@ -1809,10 +1820,12 @@ void UIExtensionPattern::InitializeAccessibility()
     CHECK_NULL_VOID(ngPipeline);
     auto frontend = ngPipeline->GetFrontend();
     CHECK_NULL_VOID(frontend);
-    auto accessibilityManager = frontend->GetAccessibilityManager();
-    CHECK_NULL_VOID(accessibilityManager);
     auto frameNode = frameNode_.Upgrade();
     CHECK_NULL_VOID(frameNode);
+    auto mainAccessibilityManager = frontend->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(frameNode);
+    CHECK_NULL_VOID(accessibilityManager);
     int64_t accessibilityId = frameNode->GetAccessibilityId();
     accessibilityChildTreeCallback_ = std::make_shared<UIExtensionAccessibilityChildTreeCallback>(
         WeakClaim(this), accessibilityId);
@@ -2056,8 +2069,10 @@ void UIExtensionPattern::DumpDpiFollowInfo()
     auto dpiContext = PipelineBase::GetCurrentContext();
     DumpLog::GetInstance().AddDesc(std::string("dpiFollowStrategy: ")
         .append(std::to_string(static_cast<int32_t>(dpiFollowStrategy_))));
-    DumpLog::GetInstance().AddDesc(std::string("densityFollowHostMarked: ")
-        .append(std::to_string(dpiContext && dpiContext->IsUIExtensionDensityFollowHost())));
+    DumpLog::GetInstance().AddDesc(std::string("isDpiFollowStrategySet: ")
+        .append(std::to_string(isDpiFollowStrategySet_)));
+    DumpLog::GetInstance().AddDesc(std::string("uiExtensionDpiFollowHost: ")
+        .append(std::to_string(dpiContext ? static_cast<int32_t>(dpiContext->GetUIExtensionDensityFollowHost()) : -1)));
     DumpLog::GetInstance().AddDesc(std::string("dpiFollowStrategyEffective: ")
         .append(std::to_string(static_cast<int32_t>(GetEffectiveDpiFollowStrategy()))));
 }
@@ -2124,8 +2139,9 @@ void UIExtensionPattern::DumpInfo(std::unique_ptr<JsonValue>& json)
     ContainerScope dpiScope(instanceId_);
     auto dpiContext = PipelineBase::GetCurrentContext();
     json->Put("dpiFollowStrategy: ", std::to_string(static_cast<int32_t>(dpiFollowStrategy_)).c_str());
-    json->Put("densityFollowHostMarked: ",
-        std::to_string(dpiContext && dpiContext->IsUIExtensionDensityFollowHost()).c_str());
+    json->Put("isDpiFollowStrategySet: ", std::to_string(isDpiFollowStrategySet_).c_str());
+    json->Put("uiExtensionDpiFollowHost: ",
+        std::to_string(dpiContext ? static_cast<int32_t>(dpiContext->GetUIExtensionDensityFollowHost()) : -1).c_str());
     json->Put("dpiFollowStrategyEffective: ",
         std::to_string(static_cast<int32_t>(GetEffectiveDpiFollowStrategy())).c_str());
     std::string eventProxyStr = "[]";
@@ -2202,7 +2218,12 @@ void UIExtensionPattern::AddExtraInfoWithParamConfig(std::shared_ptr<JsonValue>&
     CHECK_EQUAL_VOID(config.withUIExtension, false);
     CHECK_NULL_VOID(sessionWrapper_);
     auto container = Platform::AceContainer::GetContainer(instanceId_);
-    CHECK_NULL_VOID(container);
+    if (!container) {
+        if (config.inspectorContext) {
+            config.inspectorContext->ReportError(InspectorTreeError::COLLECTION_FAILED);
+        }
+        return;
+    }
     std::vector<std::string> params;
     params.push_back("-allInfoWithParamConfigTotal");
     params.push_back("1");
@@ -2213,6 +2234,8 @@ void UIExtensionPattern::AddExtraInfoWithParamConfig(std::shared_ptr<JsonValue>&
     params.push_back(config.withUIExtension ? "1" : "0");
     params.push_back(config.rectCulling ? "1" : "0");
     params.push_back(std::to_string(config.minOpacity));
+    params.push_back(config.withResponseRegion ? "1" : "0");
+    params.push_back(config.withCustomContent ? "1" : "0");
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     if (!container->IsUIExtensionWindow()) {
@@ -2220,18 +2243,26 @@ void UIExtensionPattern::AddExtraInfoWithParamConfig(std::shared_ptr<JsonValue>&
     }
     params.push_back(std::to_string(getpid()));
 
-    ExecuteDumpTask(json, params, host);
+    ExecuteDumpTask(json, params, host, config.inspectorContext);
 }
 
 void UIExtensionPattern::ExecuteDumpTask(
-    std::shared_ptr<JsonValue>& json, const std::vector<std::string>& params, const RefPtr<FrameNode>& host)
+    std::shared_ptr<JsonValue>& json, const std::vector<std::string>& params, const RefPtr<FrameNode>& host,
+    InspectorTreeRequestContext* request)
 {
     ACE_SCOPED_TRACE("UIExtensionPattern::ExecuteDumpTask");
     const int32_t GET_INSPECTOR_TREE_TIMEOUT_TIME = 900;
-    auto context = host->GetContext();
-    CHECK_NULL_VOID(context);
-    auto taskExecutor = context->GetTaskExecutor();
-    CHECK_NULL_VOID(taskExecutor);
+    const auto fail = [request]() {
+        if (request) {
+            request->ReportError(InspectorTreeError::COLLECTION_FAILED);
+        }
+    };
+    auto context = host ? host->GetContext() : nullptr;
+    auto taskExecutor = context ? context->GetTaskExecutor() : nullptr;
+    if (!taskExecutor) {
+        fail();
+        return;
+    }
 
     // Capture sessionWrapper_ on the calling thread to avoid cross-thread data race
     // when the lambda runs on the background thread.
@@ -2241,6 +2272,7 @@ void UIExtensionPattern::ExecuteDumpTask(
     // with a promise/future pair to run the IPC call (NotifyUieDump) on the background
     // thread and wait for the result with a timeout on the calling thread.
     if (!sessionWrapper) {
+        fail();
         return;
     }
 
@@ -2254,12 +2286,22 @@ void UIExtensionPattern::ExecuteDumpTask(
     }, TaskExecutor::TaskType::BACKGROUND, "UiSessionGetInspectorTree");
     if (!postResult) {
         taskValid->store(false, std::memory_order_release);
+        fail();
         return;
     }
 
     auto result = future.wait_for(std::chrono::milliseconds(GET_INSPECTOR_TREE_TIMEOUT_TIME));
     if (result == std::future_status::timeout) {
         taskValid->store(false, std::memory_order_release);
+        return;
+    }
+    if (request) {
+        auto child = json ? json->GetValue("$child-uec") : nullptr;
+        if (!child) {
+            fail();
+            return;
+        }
+        request->AcceptExtensionTree(*child);
     }
 }
 

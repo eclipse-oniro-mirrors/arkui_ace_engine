@@ -17,6 +17,7 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_MANAGER_PAGE_SCENE_PAGE_SCENE_RULE_MANAGER_H
 
 #include <chrono>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -205,6 +206,12 @@ public:
     void UnregisterSearchClickObserver(uint32_t handlerId);
     void AddPendingClickCandidate(const SearchClickCandidate& candidate);
     std::vector<SearchClickMatchResult> ConsumeSearchClickCandidates(const SearchClickPageContext& page);
+    // Trigger independent consumption on stable-page pure clicks. Checks the
+    // stability gate (via IsContentStableFunction) first; only calls
+    // ConsumeSearchClickCandidates when stable.
+    using IsContentStableFunction = std::function<bool()>;
+    void SetIsContentStableFunction(IsContentStableFunction&& func);
+    std::vector<SearchClickMatchResult> FlushPendingSearchClicksIfStable(const SearchClickPageContext& page);
 
 private:
     void StopSearchClickObservationIfIdleLocked();
@@ -229,6 +236,9 @@ private:
     std::unordered_map<std::string, int64_t> recentClickOperations_;
     std::set<int32_t> pendingGetProcesses_;
     std::unordered_map<std::string, PageSceneReportState> reportStates_;
+    // Stability gate callback (injected by UIContentImpl, reusing
+    // ContentChangeManager's IsScrolling/IsTransitioning/IsSwiperScrolling).
+    IsContentStableFunction isContentStableFunc_;
 };
 } // namespace OHOS::Ace::NG
 

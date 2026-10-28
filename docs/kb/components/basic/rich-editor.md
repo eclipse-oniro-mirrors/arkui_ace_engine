@@ -144,6 +144,7 @@ RichEditor 长期规格位于 `specs/05-ui-components/09-text-components/02-rich
 | copyOption 默认值不一致 | `text_pattern.h` 基类默认 None；`rich_editor_pattern.cpp` `OnModifyDone` 缺省值 Local |
 | getSelection 返回类型不同 | 旧框架模式返回 `RichEditorSelection`（含 spans）；属性字符串模式返回 `RichEditorRange`（仅 start/end） |
 | 模式切换不生效 | 动态路径不支持创建后切换；静态路径通过 `RichEditorModelStatic::SetStyledStringMode` 切换 |
+| 密码显示后被 Inspector 导出 | `RichEditorPattern::DumpInspectorTreeInfo` 使用 `IsInPasswordMode()` 判定正文保护及 password 属性；`IsPasswordObscured()` 仅表示当前隐藏状态。RichEditor 已支持单行密码模式，不能据旧文档将 password 固定为 false |
 
 ## 调试入口
 

@@ -36,6 +36,7 @@
 #include "base/log/ace_trace.h"
 #include "base/log/log.h"
 #include "base/memory/referenced.h"
+#include "core/components_ng/base/cmp_accessibility_registry.h"
 #include "base/ressched/ressched_click_optimizer.h"
 #include "base/ressched/ressched_report.h"
 #include "base/utils/utils.h"
@@ -82,6 +83,21 @@
 namespace OHOS::Ace {
 
 namespace {
+
+template<typename T>
+auto PutCaretColorIfSupported(T& preference, uint32_t colorValue, int32_t)
+    -> decltype(preference.PutCaretColor(colorValue), void())
+{
+    preference.PutCaretColor(colorValue);
+}
+
+template<typename T>
+void PutCaretColorIfSupported(T& preference, uint32_t colorValue, int64_t)
+{
+    // The web_webview interface can be updated after ArkUI in a staged rollout.
+    (void)preference;
+    (void)colorValue;
+}
 
 constexpr char WEB_METHOD_ROUTER_BACK[] = "routerBack";
 constexpr char WEB_METHOD_UPDATEURL[] = "updateUrl";
@@ -834,6 +850,29 @@ bool ContextMenuParamOhos::IsAILink() const
     return false;
 }
 
+bool ContextMenuParamOhos::ShouldOfferLinkToText() const
+{
+    if (param_) {
+        return param_->ShouldOfferLinkToText();
+    }
+    return false;
+}
+
+bool ContextMenuParamOhos::IsOverTextFragment() const
+{
+    if (param_) {
+        return param_->IsOverTextFragment();
+    }
+    return false;
+}
+
+std::string ContextMenuParamOhos::GetTextFragmentGeneratedLink() const
+{
+    if (param_) {
+        return param_->GetTextFragmentGeneratedLink();
+    }
+    return "";
+}
 void ContextMenuResultOhos::Cancel() const
 {
     if (callback_) {
@@ -916,6 +955,21 @@ void ContextMenuResultOhos::RequestPasswordAutoFill() const
     auto delegate = delegate_.Upgrade();
     if (delegate) {
         delegate->OnRequestAutofill(static_cast<int32_t>(NG::WebMenuType::TYPE_CONTEXTMENU));
+    }
+}
+
+void ContextMenuResultOhos::CopyLinkToTextMenu() const
+{
+    TAG_LOGI(AceLogTag::ACE_WEB, "ContextMenuResultOhos::CopyLinkToTextMenu");
+    if (callback_) {
+        callback_->Continue(CI_COPY_LINK_TO_HIGHLIGHT, EF_NONE);
+    }
+}
+
+void ContextMenuResultOhos::RemoveFragments() const
+{
+    if (callback_) {
+        callback_->Continue(CI_CLEAR_HIGHLIGHT, EF_NONE);
     }
 }
 
@@ -3902,6 +3956,23 @@ void WebDelegate::InitWebViewWithSurface()
             pattern->InitDataDetector();
             pattern->InitSelectDataDetector();
             pattern->InitAIDetectResult();
+            if (!Container::IsCurrentUseNewPipeline()) {
+                auto webCom = delegate->webComponent_.Upgrade();
+                if (!webCom) {
+                    return;
+                }
+                // 0.0f is the default sentinel meaning "not set"; skip to avoid
+                // sending an ineffective call to NWeb during initialization.
+                float speedLimit = webCom->GetFlingSpeedLimit();
+                if (speedLimit > 0.0f) {
+                    delegate->SetFlingSpeedLimit(speedLimit);
+                }
+            } else {
+                auto flingSpeedLimit = pattern->GetFlingSpeedLimit();
+                if (flingSpeedLimit.has_value()) {
+                    delegate->SetFlingSpeedLimit(flingSpeedLimit.value());
+                }
+            }
         },
         TaskExecutor::TaskType::PLATFORM, "ArkUIWebInitWebViewWithSurface");
 }
@@ -5078,6 +5149,28 @@ void WebDelegate::UpdateScrollBarColor(const std::string& colorValue)
             }
         },
         TaskExecutor::TaskType::PLATFORM, "ArkUIWebPutScrollBarColor");
+}
+
+void WebDelegate::UpdateCaretColor(const Color& caretColor)
+{
+    auto context = context_.Upgrade();
+    if (!context) {
+        return;
+    }
+    auto executor = context->GetTaskExecutor();
+    CHECK_NULL_VOID(executor);
+    uint32_t colorValue = caretColor.GetValue();
+    executor->PostTask(
+        [weak = WeakClaim(this), colorValue]() {
+            auto delegate = weak.Upgrade();
+            if (delegate && delegate->nweb_) {
+                std::shared_ptr<OHOS::NWeb::NWebPreference> setting = delegate->nweb_->GetPreference();
+                if (setting) {
+                    PutCaretColorIfSupported(*setting, colorValue, 0);
+                }
+            }
+        },
+        TaskExecutor::TaskType::PLATFORM, "ArkUIWebPutCaretColor");
 }
 
 void WebDelegate::UpdateEnableFollowSystemFontWeight(bool enableFollowSystemFontWeight)
@@ -6389,6 +6482,20 @@ void WebDelegate::OnAccessibilityEvent(
     if (!accessibilityState_) {
         return;
     }
+    // Page-event suppression for webs inside CMP exported subtrees: the SR's page-change policy re-focuses the first node of the page-event source.
+    if (eventType == AccessibilityEventType::PAGE_CHANGE ||
+        eventType == AccessibilityEventType::PAGE_OPEN ||
+        eventType == AccessibilityEventType::PAGE_CLOSE) {
+        auto webPatternForGate = webPattern_.Upgrade();
+        auto webHost = webPatternForGate ? webPatternForGate->GetHost() : nullptr;
+        if (OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::HasAnySubAM() && webHost &&
+            OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::HasSubAM(webHost.GetRawPtr())) {
+            TAG_LOGI(AceLogTag::ACE_WEB,
+                "WebPageEvent suppressed (web in exported subtree): type=%{public}d, hostId=%{public}d",
+                static_cast<int32_t>(eventType), webHost->GetId());
+            return;
+        }
+    }
     auto context = context_.Upgrade();
     CHECK_NULL_VOID(context);
     AccessibilityEvent event;
@@ -6603,6 +6710,15 @@ void WebDelegate::SendAccessibilityPageChangeEvent(const RefPtr<NG::FrameNode>& 
     TAG_LOGI(AceLogTag::ACE_WEB,
         "WebDelegate::AccessibilitySendPageChange accessibilityId = %{public}" PRId64,
         webNode->GetAccessibilityId());
+    // Page-event suppression for webs inside CMP exported subtrees: this send path bypasses OnAccessibilityEvent's suppression gate ().
+    if (OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::HasAnySubAM() && webNode &&
+        OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::HasSubAM(webNode.GetRawPtr())) {
+        TAG_LOGI(AceLogTag::ACE_WEB,
+            "WebPageEvent suppressed (web in exported subtree): pageChange, hostId=%{public}d",
+            webNode->GetId());
+        accessibilityManager->ReleasePageEvent(webNode, true, true);
+        return;
+    }
     accessibilityManager->ReleasePageEvent(webNode, true, true);
     AccessibilityEvent event;
     event.nodeId = webNode->GetAccessibilityId();
@@ -6933,6 +7049,43 @@ void WebDelegate::OnContextMenuDismissed()
     auto webPattern = webPattern_.Upgrade();
     CHECK_NULL_VOID(webPattern);
     webPattern->OnCloseContextMenu();
+}
+
+void WebDelegate::OnContextMenuUpdate(WebContextMenuItemId menuItemId, WebContextMenuOptions options)
+{
+    CHECK_NULL_VOID(taskExecutor_);
+    auto jsTaskExecutor = SingleTaskExecutor::Make(taskExecutor_, TaskExecutor::TaskType::JS);
+    jsTaskExecutor.PostSyncTask([weak = WeakClaim(this), itemId_ = menuItemId, options_ = options]() {
+        auto delegate = weak.Upgrade();
+        CHECK_NULL_VOID(delegate);
+#ifdef NG_BUILD
+        auto webPattern = delegate->webPattern_.Upgrade();
+        CHECK_NULL_VOID(webPattern);
+        auto menuUpdateCallback = webPattern->GetOnContextMenuUpdateCallback();
+        if (menuUpdateCallback) {
+            TAG_LOGI(AceLogTag::ACE_WEB, "OnContextMenuUpdate menuItemId:%{public}d, enable:%{public}d",
+                itemId_, options_.enable);
+            menuUpdateCallback(itemId_, options_);
+        }
+#else
+        if (Container::IsCurrentUseNewPipeline()) {
+            auto webPattern = delegate->webPattern_.Upgrade();
+            CHECK_NULL_VOID(webPattern);
+            auto menuUpdateCallback = webPattern->GetOnContextMenuUpdateCallback();
+            if (menuUpdateCallback) {
+                TAG_LOGI(AceLogTag::ACE_WEB, "OnContextMenuUpdate new itemId:%{public}d, enable:%{public}d",
+                    itemId_, options_.enable);
+                menuUpdateCallback(itemId_, options_);
+            }
+            return;
+        }
+        auto webCom = delegate->webComponent_.Upgrade();
+        CHECK_NULL_VOID(webCom);
+        TAG_LOGI(AceLogTag::ACE_WEB, "OnContextMenuUpdate itemId:%{public}d, enable:%{public}d",
+            itemId_, options_.enable);
+        webCom->OnContextMenuUpdate(itemId_, options_);
+#endif
+    }, "ArkUIWebContextMenuUpdate");
 }
 
 bool WebDelegate::OnContextMenuShow(const std::shared_ptr<BaseEventInfo>& info)
@@ -10549,6 +10702,26 @@ void WebDelegate::OnDetectedBlankScreen(
         TaskExecutor::TaskType::JS, "ArkUIWebDetectedBlankScreen");
 }
 
+void WebDelegate::OnMonitoredBlankScreen(
+    const std::string& url, int32_t reason,
+    const std::string& extraMsg)
+{
+    CHECK_NULL_VOID(taskExecutor_);
+    taskExecutor_->PostTask(
+        [weak = WeakClaim(this), url, reason, extraMsg]() {
+            TAG_LOGI(AceLogTag::ACE_WEB, "WebDelegate::OnMonitoredBlankScreen, fire event task");
+            auto delegate = weak.Upgrade();
+            CHECK_NULL_VOID(delegate);
+            auto webPattern = delegate->webPattern_.Upgrade();
+            CHECK_NULL_VOID(webPattern);
+            auto webEventHub = webPattern->GetWebEventHub();
+            CHECK_NULL_VOID(webEventHub);
+            webEventHub->FireOnMonitoredBlankScreenEvent(
+                std::make_shared<MonitoredBlankScreenEvent>(url, reason, extraMsg));
+        },
+        TaskExecutor::TaskType::JS, "ArkUIWebMonitoredBlankScreen");
+}
+
 void WebDelegate::OnFirstScreenPaint(
     const std::string& url, int64_t navigationStartTime, int64_t firstScreenPaintTime)
 {
@@ -10591,6 +10764,25 @@ void WebDelegate::UpdateBlankScreenDetectionConfig(bool enable, const std::vecto
             }
         },
         TaskExecutor::TaskType::PLATFORM, "ArkUIWebUpdateBlankScreenDetectionConfig");
+}
+
+void WebDelegate::UpdateWebBlankScreenMonitorEnabled(bool isEnabled)
+{
+    auto context = context_.Upgrade();
+    if (!context) {
+        return;
+    }
+    context->GetTaskExecutor()->PostTask(
+        [weak = WeakClaim(this), isEnabled]() {
+            auto delegate = weak.Upgrade();
+            if (delegate && delegate->nweb_) {
+                std::shared_ptr<OHOS::NWeb::NWebPreference> setting = delegate->nweb_->GetPreference();
+                if (setting) {
+                    setting->PutWebBlankScreenMonitorEnabled(isEnabled);
+                }
+            }
+        },
+        TaskExecutor::TaskType::PLATFORM, "ArkUIWebUpdateWebBlankScreenMonitorEnabled");
 }
 
 void WebDelegate::UpdateEnableImageAnalyzer(bool enable)
@@ -10699,6 +10891,12 @@ void WebDelegate::SetForceEnableZoom(bool isEnabled)
 {
     CHECK_NULL_VOID(nweb_);
     nweb_->SetForceEnableZoomPublic(isEnabled);
+}
+
+void WebDelegate::SetFlingSpeedLimit(float speedLimit)
+{
+    CHECK_NULL_VOID(nweb_);
+    nweb_->SetFlingSpeedLimit(speedLimit);
 }
 
 void WebDelegate::OnExtensionDisconnect(int32_t connectId)

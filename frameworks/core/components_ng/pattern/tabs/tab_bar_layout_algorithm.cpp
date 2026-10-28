@@ -158,6 +158,21 @@ void TabBarLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     } else {
         MeasureScrollableMode(layoutWrapper, contentSize);
     }
+    if (isFloatingTopBar_ && axis_ == Axis::HORIZONTAL && !visibleItemPosition_.empty()) {
+        float contentStart = visibleItemPosition_.begin()->second.startPos;
+        float contentEnd = visibleItemPosition_.rbegin()->second.endPos;
+        float contentWidth = contentEnd - contentStart + padding.Width();
+        if (contentWidth > 0.0f && contentWidth < frameSize.Width()) {
+            frameSize.SetWidth(contentWidth);
+            float offset = 0.0f;
+            for (auto& [index, pos] : visibleItemPosition_) {
+                float itemWidth = pos.endPos - pos.startPos;
+                pos.startPos = offset;
+                pos.endPos = offset + itemWidth;
+                offset += itemWidth;
+            }
+        }
+    }
     if (visibleItemPosition_.empty()) {
         layoutWrapper->SetActiveChildRange(-1, -1);
     } else {
@@ -229,13 +244,15 @@ void TabBarLayoutAlgorithm::MeasureFixedMode(LayoutWrapper* layoutWrapper, SizeF
                 break;
             }
         }
-        if (!isApplySymmetricExtensible) {
+        if (!isApplySymmetricExtensible && !isFloatingTopBar_) {
             childLayoutConstraint.selfIdealSize.SetWidth(allocatedWidth);
         }
         for (int32_t index = 0; index < effectiveChildCount; index++) {
             auto childIndex = effectiveChildIndices_[index];
             MeasureItem(layoutWrapper, childLayoutConstraint, childIndex);
-            visibleItemPosition_[childIndex] = { allocatedWidth * index, allocatedWidth * (index + 1) };
+            if (!isFloatingTopBar_) {
+                visibleItemPosition_[childIndex] = { allocatedWidth * index, allocatedWidth * (index + 1) };
+            }
         }
         if (isApplySymmetricExtensible) {
             ApplySymmetricExtensible(layoutWrapper, allocatedWidth);

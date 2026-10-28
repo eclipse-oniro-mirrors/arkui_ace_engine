@@ -114,6 +114,9 @@ template("build_component_ng") {
       if (ace_engine_feature_enable_material_customized) {
         defines += [ "ACE_ENGINE_IMMERSIVE_MATERIAL_CUSTOMIZED" ]
       }
+      if (ace_engine_feature_enable_material_tv) {
+        defines += [ "ACE_ENGINE_IMMERSIVE_MATERIAL_TV" ]
+      }
       if (is_arkui_x) {
         include_dirs += [
           "//foundation/appframework/arkui",

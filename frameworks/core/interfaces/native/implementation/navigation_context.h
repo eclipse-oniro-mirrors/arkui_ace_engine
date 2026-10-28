@@ -26,7 +26,7 @@
 
 namespace OHOS::Ace::NG::GeneratedModifier::NavigationContext {
 
-class ExternalDataKeeper : public virtual Referenced {
+class ExternalDataKeeper : public Referenced {
 public:
     ExternalDataKeeper() = default;
     ~ExternalDataKeeper() override
@@ -176,7 +176,7 @@ constexpr LaunchMode DEFAULT_LAUNCH_MODE = LaunchMode::STANDARD;
 
 // this duplicates the functionality of JS NavPathStack class
 // (frameworks/bridge/declarative_frontend/engine/jsEnumStyle.js)
-class PathStack : public virtual Referenced {
+class PathStack : public virtual AceType {
 public:
     enum IsReplace {
         NO_ANIM_NO_REPLACE = 0, // replace value 0: don't do anything;

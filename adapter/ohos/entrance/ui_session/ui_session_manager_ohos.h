@@ -167,17 +167,27 @@ public:
         const std::string& nodeTag, PageSceneNodeStateChange stateChange) override;
     void NotifyPageSceneContentChanged() override;
     void FlushPageSceneNodeChanged() override;
+    void FlushPendingSearchClicksIfStable() override;
     void SavePageSceneDetectFunction(PageSceneDetectFunction&& function) override;
     void SaveWebPageSceneFunction(WebPageSceneFunction&& function) override;
     bool IsWebSourceEnabled(const std::string& ruleJson);
     void SaveComponentTreeQueryFunction(ComponentTreeQueryFunction&& function) override;
     void ComponentTreeQuery(const ComponentTreeQueryRequest& request) override;
-    void ReportComponentTreeQueryResult(const std::string& data) override;
+    void ReportNavigationQueryResult(const std::string& data) override;
+    void ReportLazyForEachQueryResult(const std::string& data) override;
+    void ReportNodesInRectQueryResult(const std::string& data) override;
 
     void SaveReportProxy(sptr<IRemoteObject> reportProxy, int32_t processId);
     // UI-thread validation of an internal detection request; does not change IPC.
     ACE_FORCE_EXPORT bool IsSearchPageSceneRuleCurrent(
         int32_t processId, const std::string& ruleSetId, const std::string& generation) override;
+    void SaveForSendCommandWithResultFunction(NotifySendCommandWithResultFunction&& function) override;
+    void NotifySendCommandPatternWithResult(
+        int32_t id, const std::string& command, const CommandResultCallback& finishCallback) override;
+    void SaveSendCommandWithResultFunction(SendCommandWithResultFunction&& function) override;
+    void SendCommandWithResult(
+        const std::string& command, const CommandResultCallback& finishCallback) override;
+    CommandResultCallback MakeCommandResultCallback(int32_t processId, uint64_t requestId) override;
 
 private:
     bool PostToCurrentTranslateManager(const char* caller,

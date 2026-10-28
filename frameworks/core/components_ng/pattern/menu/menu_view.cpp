@@ -31,6 +31,8 @@
 #include "core/components_ng/pattern/image/image_layout_property.h"
 #include "core/components_ng/pattern/image/image_pattern.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
+#include "core/components_ng/pattern/menu/menu_item/menu_item_layout_property.h"
+#include "core/components_ng/pattern/menu/menu_item/menu_item_paint_property.h"
 #include "core/components_ng/pattern/menu/menu_item/menu_item_row_pattern.h"
 #include "core/components_ng/pattern/menu/menu_layout_property.h"
 #include "core/components_ng/pattern/menu/menu_pattern.h"
@@ -54,6 +56,7 @@
 #include "core/components/common/properties/placement.h"
 #include "core/components/theme/shadow_theme.h"
 #include "interfaces/inner_api/ace_kit/include/ui/view/theme/token_colors.h"
+#include "core/components_ng/token_theme/token_theme_storage.h"
 
 namespace OHOS::Ace::NG {
 /**
@@ -1222,38 +1225,37 @@ bool MenuView::ShouldHandleLowEndImmersiveMaterial(const RefPtr<UiMaterial>& sys
 bool MenuView::HandleLowEndImmersiveMaterialForMenu(const RefPtr<FrameNode>& menuNode,
     const RefPtr<UiMaterial>& systemMaterial, const RefPtr<RenderContext>& renderContext)
 {
-    auto pipelineContext = menuNode->GetContextRefPtr();
-    CHECK_NULL_RETURN(pipelineContext, false);
-    auto themeManager = pipelineContext->GetThemeManager();
-    CHECK_NULL_RETURN(themeManager, false);
-    auto themeConstants = themeManager->GetThemeConstants();
-    CHECK_NULL_RETURN(themeConstants, false);
-
-    SetLowEndImmersiveBackgroundForMenu(renderContext, themeConstants);
-    SetLowEndImmersiveShadowForMenu(menuNode, systemMaterial, renderContext, pipelineContext);
-    return true;
-}
-
-void MenuView::SetLowEndImmersiveBackgroundForMenu(
-    const RefPtr<RenderContext>& renderContext, const RefPtr<ThemeConstants>& themeConstants)
-{
-    auto resId = Ace::TokenColors::GetSystemColorResIdByIndex(Ace::TokenColors::COMP_BACKGROUND_PRIMARY);
-    auto backgroundColor = themeConstants->GetColor(resId);
-    renderContext->UpdateBackgroundColor(backgroundColor);
-}
-
-void MenuView::SetLowEndImmersiveShadowForMenu(const RefPtr<FrameNode>& menuNode,
-    const RefPtr<UiMaterial>& systemMaterial, const RefPtr<RenderContext>& renderContext,
-    const RefPtr<PipelineContext>& pipelineContext)
-{
-    auto immersiveOptions = systemMaterial->GetImmersiveOptions();
-    if (!immersiveOptions || !immersiveOptions->applyShadow) {
-        return;
+    CHECK_NULL_RETURN(systemMaterial, false);
+    auto options = systemMaterial->GetImmersiveOptions();
+    if (options && !options->materialColor.has_value() && !options->colorResObj) {
+        // Resolve COMP_BACKGROUND_PRIMARY honoring WithTheme scope on the menu node first,
+        // because ThemeConstants::GetColor only reads global resources and ignores themeScopeId.
+        auto backgroundColor = Color::TRANSPARENT;
+        auto themeScopeId = menuNode->GetThemeScopeId();
+        auto tokenTheme = TokenThemeStorage::GetInstance()->GetTheme(themeScopeId);
+        if (tokenTheme && tokenTheme->Colors()) {
+            backgroundColor = tokenTheme->Colors()->CompBackgroundPrimary();
+        } else {
+            auto pipelineContext = menuNode->GetContext();
+            CHECK_NULL_RETURN(pipelineContext, false);
+            auto themeManager = pipelineContext->GetThemeManager();
+            CHECK_NULL_RETURN(themeManager, false);
+            auto themeConstants = themeManager->GetThemeConstants();
+            CHECK_NULL_RETURN(themeConstants, false);
+            auto resId = Ace::TokenColors::GetSystemColorResIdByIndex(Ace::TokenColors::COMP_BACKGROUND_PRIMARY);
+            backgroundColor = themeConstants->GetColor(resId);
+        }
+        auto copiedMaterial = systemMaterial->Copy();
+        CHECK_NULL_RETURN(copiedMaterial, false);
+        auto copiedOptions = copiedMaterial->GetImmersiveOptions();
+        CHECK_NULL_RETURN(copiedOptions, false);
+        copiedOptions->materialColor = backgroundColor;
+        renderContext->UpdateBackgroundColor(Color::TRANSPARENT);
+        ViewAbstract::SetSystemMaterial(AceType::RawPtr(menuNode), AceType::RawPtr(copiedMaterial));
+    } else {
+        ViewAbstract::SetSystemMaterial(AceType::RawPtr(menuNode), AceType::RawPtr(systemMaterial));
     }
-
-    auto dipScale = pipelineContext->GetDipScale();
-    auto shadow = Ace::MaterialUtils::GetImmersiveShadow(dipScale);
-    renderContext->UpdateBackShadow(shadow);
+    return true;
 }
 
 bool MenuView::ApplySystemMaterialForMenu(const RefPtr<FrameNode>& menuNode, const RefPtr<UiMaterial>& systemMaterial,
@@ -2610,6 +2612,31 @@ RefPtr<FrameNode> CreateGridItemContent(const OptionParam& param, int32_t themeS
     return columnNode;
 }
 
+// Apply disabled visual style to grid item, mirroring MenuItemPattern::UpdateDisabledStyle().
+// When enabled is false, set opacity to disabledFontColorAlpha on every child (icon / text) so
+// the grid item shows the same greyed-out appearance as a normal disabled MenuItem.
+void UpdateGridItemDisabledStyle(const RefPtr<FrameNode>& itemNode, const RefPtr<SelectTheme>& theme,
+    bool enabled)
+{
+    CHECK_NULL_VOID(itemNode);
+    CHECK_NULL_VOID(theme);
+    if (enabled) {
+        return;
+    }
+    auto alpha = theme->GetDisabledFontColorAlpha();
+    for (const auto& child : itemNode->GetChildren()) {
+        auto childFrame = AceType::DynamicCast<FrameNode>(child);
+        if (!childFrame) {
+            continue;
+        }
+        auto renderContext = childFrame->GetRenderContext();
+        CHECK_NULL_VOID(renderContext);
+        auto originalOpacity = renderContext->GetOpacityValue(1.0);
+        renderContext->OnOpacityUpdate(alpha * originalOpacity);
+        childFrame->MarkModifyDone();
+    }
+}
+
 void InitGridItemFeedback(const RefPtr<FrameNode>& itemNode, const RefPtr<SelectTheme>& theme)
 {
     CHECK_NULL_VOID(itemNode);
@@ -2739,6 +2766,7 @@ RefPtr<FrameNode> MenuView::CreateGridItem(const OptionParam& param, int32_t ind
     auto eventHub = contentColumn->GetEventHub<EventHub>();
     CHECK_NULL_RETURN(eventHub, nullptr);
     eventHub->SetEnabled(param.enabled);
+    UpdateGridItemDisabledStyle(contentColumn, theme, param.enabled);
     // Transfer events first, then set feedback and click. CopyEvent overwrites touch/click
     // actuators, so it must run before InitGridItemFeedback (which appends touch/hover via
     // AddTouchEvent/AddOnHoverEvent) and InitGridItemClick (which appends via AddClickEvent).
@@ -3518,6 +3546,64 @@ static OptionParam ExtractOneMenuItemParam(const RefPtr<FrameNode>& customChildN
     return param;
 }
 
+// Whether the previous list item carries a start icon/symbol. The divider is drawn at the top
+// of the current item, so its start margin follows the *previous* item: align after the icon
+// when present, otherwise use the default start margin.
+static bool PrevItemHasStartIconOrSymbol(const RefPtr<FrameNode>& prevItemFrame)
+{
+    if (!prevItemFrame) {
+        return false;
+    }
+    auto prevLayoutProp = prevItemFrame->GetLayoutProperty<MenuItemLayoutProperty>();
+    if (!prevLayoutProp) {
+        return false;
+    }
+    const auto& startIconOpt = prevLayoutProp->GetStartIcon();
+    bool hasStartIcon = startIconOpt.has_value() && !startIconOpt->GetSrc().empty();
+    bool hasStartSymbol = static_cast<bool>(prevLayoutProp->GetStartSymbol());
+    return hasStartIcon || hasStartSymbol;
+}
+
+// Set dividers on remaining MenuItems in the column. The divider is drawn at the top of each
+// item, so its alignment follows the *previous* item: if the previous item has a start
+// icon/symbol the divider starts after the icon; otherwise it aligns to the content.
+static void SetRemainingItemDividers(const RefPtr<FrameNode>& customMenuNode, const RefPtr<SelectTheme>& theme)
+{
+    CHECK_NULL_VOID(customMenuNode);
+    CHECK_NULL_VOID(theme);
+    if (theme->GetExpandDisplay() || SystemProperties::IsPCMode()) {
+        return;
+    }
+    int listIndex = 0;
+    RefPtr<FrameNode> prevItemFrame;
+    for (const auto& child : customMenuNode->GetChildren()) {
+        auto childFrame = AceType::DynamicCast<FrameNode>(child);
+        if (!childFrame || childFrame->GetTag() != MENU_ITEM_ETS_TAG) {
+            continue;
+        }
+        if (listIndex > 0) {
+            auto paintProperty = childFrame->GetPaintProperty<MenuItemPaintProperty>();
+            CHECK_NULL_VOID(paintProperty);
+            auto strokeWidth = theme->GetDefaultDividerWidth();
+            auto startMargin = theme->GetDefaultDividerStartMargin();
+            auto endMargin = theme->GetDefaultDividerEndMargin();
+            auto color = theme->GetLineColor();
+            if (PrevItemHasStartIconOrSymbol(prevItemFrame)) {
+                auto horInterval = theme->GetMenuItemHorIntervalPadding();
+                startMargin = horInterval + theme->GetIconSideLength() + theme->GetIconContentPadding();
+            }
+            paintProperty->UpdateStrokeWidth(strokeWidth);
+            paintProperty->UpdateStartMargin(startMargin);
+            paintProperty->UpdateEndMargin(endMargin);
+            paintProperty->UpdateDividerColor(color);
+            childFrame->MarkModifyDone();
+            childFrame->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
+        }
+        prevItemFrame = childFrame;
+        listIndex++;
+    }
+}
+
 RefPtr<FrameNode> MenuView::BuildGridListColumn(const RefPtr<FrameNode>& customMenuNode,
     const RefPtr<FrameNode>& menuNode, const MenuParam& menuParam, int32_t themeScopeId)
 {
@@ -3581,38 +3667,9 @@ RefPtr<FrameNode> MenuView::BuildGridListColumn(const RefPtr<FrameNode>& customM
         gridContainer->MountToParent(customMenuNode);
     }
 
-    // Set dividers on remaining MenuItems
-    int listIndex = 0;
     auto theme = menuNode->GetTheme<SelectTheme>(true);
     CHECK_NULL_RETURN(theme, nullptr);
-    for (const auto& child : customMenuNode->GetChildren()) {
-        if (theme->GetExpandDisplay() || SystemProperties::IsPCMode()) {
-            break;
-        }
-        auto childFrame = AceType::DynamicCast<FrameNode>(child);
-        if (!childFrame || childFrame->GetTag() != MENU_ITEM_ETS_TAG) {
-            continue;
-        }
-        if (listIndex > 0) {
-            auto paintProperty = childFrame->GetPaintProperty<MenuItemPaintProperty>();
-            CHECK_NULL_RETURN(paintProperty, nullptr);
-            auto strokeWidth = theme->GetDefaultDividerWidth();
-            auto startMargin = theme->GetDefaultDividerStartMargin();
-            auto endMargin = theme->GetDefaultDividerEndMargin();
-            auto color = theme->GetLineColor();
-            auto iconContentPadding = theme->GetIconContentPadding();
-            auto endIconWidth = theme->GetEndIconWidth();
-            auto menuIconPadding = theme->GetMenuIconPadding();
-            auto finalStartMargin = startMargin + iconContentPadding + endIconWidth + menuIconPadding;
-            paintProperty->UpdateStrokeWidth(strokeWidth);
-            paintProperty->UpdateStartMargin(finalStartMargin);
-            paintProperty->UpdateEndMargin(endMargin);
-            paintProperty->UpdateDividerColor(color);
-            childFrame->MarkModifyDone();
-            childFrame->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
-        }
-        listIndex++;
-    }
+    SetRemainingItemDividers(customMenuNode, theme);
 
     customMenuNode->MarkModifyDone();
     return customMenuNode;

@@ -14,6 +14,9 @@
  */
 #include "core/components_ng/pattern/waterflow/bridge/waterflow/arkts_native_water_flow_bridge.h"
 
+#include <cmath>
+#include <limits>
+
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
 
 #include "base/utils/string_utils.h"
@@ -21,8 +24,10 @@
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_utils.h"
 #include "bridge/declarative_frontend/jsview/js_scroller.h"
 #include "bridge/declarative_frontend/jsview/js_water_flow_sections.h"
+#include "core/common/container.h"
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/pattern/scrollable/scrollable_controller.h"
+#include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "core/components_ng/pattern/waterflow/water_flow_model_ng.h"
 #include "core/components_ng/pattern/waterflow/water_flow_sections.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -71,8 +76,107 @@ bool ParseItemConstraintDimensionVp(const EcmaVM* vm, const Local<JSValueRef>& v
     if (!ArkTSUtils::ParseJsDimensionVp(vm, value, result, resourceObject, false)) {
         return false;
     }
-    // Match JSViewAbstract: reject resource types that remain unknown after completion.
+    // Parsing has already succeeded. Numeric/string dimensions have no ResourceObject.
+    // Allow those dimensions; reject Resource types that remain unknown after completion,
+    // matching the legacy JSViewAbstract behavior.
     return !resourceObject || resourceObject->GetType() != UNKNOWN_RESOURCE_TYPE;
+}
+
+// Feat-20260806915269: the public provider uses vp and vp/s while the shared scroll pipeline uses px.
+// A finite target that overflows on scaling stays finite so that the shared resolver clamps it.
+double ConvertSnapOffsetVpToPx(double offsetVp)
+{
+    if (!std::isfinite(offsetVp)) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+    const double offsetPx = Dimension(offsetVp, DimensionUnit::VP).ConvertToPx();
+    return std::isfinite(offsetPx) ? offsetPx : std::copysign(std::numeric_limits<double>::max(), offsetPx);
+}
+
+struct SnapProviderContext {
+    EcmaVM* vm;
+    Local<ObjectRef> receiver;
+    FrameNode* frameNode;
+    bool isJSView;
+};
+
+// Wraps a provider method. It runs with the provider object as receiver (arrow functions keep their
+// lexical this); exceptions, non-number results and a destroyed node resolve to NaN so that the shared
+// snap falls back to its natural behavior.
+SnapApproachOffsetFunc MakeSnapProviderCallback(
+    const SnapProviderContext& context, const Local<JSValueRef>& callback, bool isApproach)
+{
+    auto vm = context.vm;
+    auto weakNode = AceType::WeakClaim(context.frameNode);
+    Local<panda::FunctionRef> function = callback->ToObject(vm);
+    return [func = panda::CopyableGlobal(vm, function), receiver = panda::CopyableGlobal(vm, context.receiver),
+               weakNode, isJSView = context.isJSView, isApproach, id = Container::CurrentId()](
+               double velocity, double decayOffset) -> double {
+        constexpr auto invalid = std::numeric_limits<double>::quiet_NaN();
+        auto vm = func.GetEcmaVM();
+        if (!ArkTSUtils::CheckJavaScriptScope(vm) || !weakNode.Upgrade()) {
+            return invalid;
+        }
+        ContainerScope containerScope(id);
+        panda::LocalScope scope(vm);
+        panda::TryCatch trycatch(vm);
+        PipelineContext::SetCallBackNode(weakNode);
+        Local<JSValueRef> params[] = { panda::NumberRef::New(vm, Dimension(velocity).ConvertToVp()),
+            panda::NumberRef::New(vm, Dimension(decayOffset).ConvertToVp()) };
+        auto result = func->Call(vm, receiver.ToLocal(), params, isApproach ? NUM_2 : NUM_1);
+        if (trycatch.HasCaught()) {
+            // Provider failures are part of the snap fallback contract, not uncaught application errors.
+            trycatch.ClearException();
+            return invalid;
+        }
+        if (result.IsEmpty() || (isJSView && !ArkTSUtils::HandleCallbackJobs(vm, trycatch, result))) {
+            return invalid;
+        }
+        if (!result->IsNumber() || !weakNode.Upgrade()) {
+            return invalid;
+        }
+        return ConvertSnapOffsetVpToPx(result->ToNumber(vm)->Value());
+    };
+}
+
+// Parses a ScrollSnapAlign number or a provider object; false for anything else (cleared by the caller).
+bool ParseScrollSnapStrategy(EcmaVM* vm, const Local<JSValueRef>& value, const Local<JSValueRef>& nodeArg,
+    FrameNode* frameNode, ScrollSnapStrategy& strategy)
+{
+    if (value->IsNumber()) {
+        const double align = value->ToNumber(vm)->Value();
+        if (align != static_cast<int32_t>(ScrollSnapAlign::START) &&
+            align != static_cast<int32_t>(ScrollSnapAlign::CENTER) &&
+            align != static_cast<int32_t>(ScrollSnapAlign::END)) {
+            return false;
+        }
+        strategy.align = static_cast<ScrollSnapAlign>(static_cast<int32_t>(align));
+        return true;
+    }
+    if (!value->IsObject(vm)) {
+        return false;
+    }
+    panda::TryCatch trycatch(vm);
+    auto object = value->ToObject(vm);
+    auto snap = object->Get(vm, panda::StringRef::NewFromUtf8(vm, "calculateSnapOffset"));
+    auto approach = object->Get(vm, panda::StringRef::NewFromUtf8(vm, "calculateApproachOffset"));
+    if (trycatch.HasCaught()) {
+        trycatch.ClearException();
+        return false;
+    }
+    if (snap.IsEmpty() || !snap->IsFunction(vm) || approach.IsEmpty()) {
+        return false;
+    }
+    const SnapProviderContext context { vm, object, frameNode, ArkTSUtils::IsJsView(nodeArg, vm) };
+    auto snapCallback = MakeSnapProviderCallback(context, snap, false);
+    strategy.hasProvider = true;
+    strategy.calculateSnapOffset = [snapCallback = std::move(snapCallback)](double velocity) {
+        return snapCallback(velocity, 0.0);
+    };
+    if (approach->IsFunction(vm)) {
+        strategy.calculateApproachOffset = MakeSnapProviderCallback(context, approach, true);
+    }
+    return true;
 }
 
 void SetItemConstraintSizeSendParams(CalcDimension& doubleValue, std::string& calcStrValue)
@@ -574,6 +678,41 @@ void SetWaterFlowParams(EcmaVM* vm, const Local<ObjectRef>& obj)
 }
 } // namespace
 
+ArkUINativeModuleValue WaterFlowBridge::SetScrollSnapStrategy(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    auto vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
+    auto nodeArg = runtimeCallInfo->GetCallArgRef(NUM_0);
+    auto value = runtimeCallInfo->GetCallArgRef(NUM_1);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_EQUAL_RETURN(GetNativeNode(nativeNode, nodeArg, vm), false, panda::JSValueRef::Undefined(vm));
+    auto frameNode = nativeNode ? reinterpret_cast<FrameNode*>(nativeNode)
+                                : ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
+    ScrollSnapStrategy strategy;
+    if (ParseScrollSnapStrategy(vm, value, nodeArg, frameNode, strategy)) {
+        WaterFlowModelNG::SetScrollSnapStrategy(frameNode, strategy);
+    } else {
+        // undefined / null / NONE / invalid values clear the strategy (last write wins).
+        WaterFlowModelNG::ResetScrollSnapStrategy(frameNode);
+    }
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue WaterFlowBridge::ResetScrollSnapStrategy(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    auto vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
+    auto nodeArg = runtimeCallInfo->GetCallArgRef(NUM_0);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_EQUAL_RETURN(GetNativeNode(nativeNode, nodeArg, vm), false, panda::JSValueRef::Undefined(vm));
+    auto frameNode = nativeNode ? reinterpret_cast<FrameNode*>(nativeNode)
+                                : ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
+    WaterFlowModelNG::ResetScrollSnapStrategy(frameNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
 void WaterFlowBridge::RegisterWaterFlowAttributes(Local<panda::ObjectRef> object, EcmaVM* vm)
 {
     const char* functionNames[] = {
@@ -626,6 +765,8 @@ void WaterFlowBridge::RegisterWaterFlowAttributes(Local<panda::ObjectRef> object
         "setJSScrollBarWidth",
         "setJSScrollBarColor",
         "setSupportLazyLoadingEmptyBranch",
+        "setScrollSnapStrategy",
+        "resetScrollSnapStrategy",
     };
     Local<JSValueRef> funcValues[] = {
         panda::FunctionRef::New(vm, WaterFlowBridge::CreateWaterFlow),
@@ -677,6 +818,8 @@ void WaterFlowBridge::RegisterWaterFlowAttributes(Local<panda::ObjectRef> object
         panda::FunctionRef::New(vm, WaterFlowBridge::SetJSScrollBarWidth),
         panda::FunctionRef::New(vm, WaterFlowBridge::SetJSScrollBarColor),
         panda::FunctionRef::New(vm, WaterFlowBridge::SetSupportLazyLoadingEmptyBranch),
+        panda::FunctionRef::New(vm, WaterFlowBridge::SetScrollSnapStrategy),
+        panda::FunctionRef::New(vm, WaterFlowBridge::ResetScrollSnapStrategy),
     };
     auto waterflow = panda::ObjectRef::NewWithNamedProperties(vm, ArraySize(functionNames), functionNames, funcValues);
     object->Set(vm, panda::StringRef::NewFromUtf8(vm, "waterFlow"), waterflow);

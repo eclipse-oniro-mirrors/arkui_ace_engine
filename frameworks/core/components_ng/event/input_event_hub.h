@@ -35,7 +35,7 @@ struct TouchpadInteractionListener {
 };
 
 // The gesture event hub is mainly used to handle common gesture events.
-class ACE_FORCE_EXPORT InputEventHub : public virtual AceType {
+class ACE_FORCE_EXPORT InputEventHub : public AceType {
     DECLARE_ACE_TYPE(InputEventHub, AceType);
 public:
     explicit InputEventHub(const WeakPtr<EventHub>& eventHub);
@@ -343,6 +343,8 @@ public:
     // Copy all user-registered input event callbacks (hover/mouse/axis/etc.) from source hub.
     // Used when transferring events from a builder-created MenuItem to a rebuilt grid item.
     ACE_FORCE_EXPORT void CopyEvent(const RefPtr<InputEventHub>& source);
+
+    bool HasTreeInteraction() const;
 
 private:
     WeakPtr<EventHub> eventHub_;

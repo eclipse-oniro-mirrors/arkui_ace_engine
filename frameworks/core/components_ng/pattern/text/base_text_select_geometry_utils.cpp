@@ -103,8 +103,13 @@ bool BaseTextSelectGeometryUtils::CheckUnsupportedTransformMatrix(
     if (!transformMatrix) {
         return false;
     }
+    return CheckUnsupportedTransformMatrix(transformMatrix.value(), checkScale);
+}
+
+bool BaseTextSelectGeometryUtils::CheckUnsupportedTransformMatrix(const Matrix4& matrix, bool checkScale)
+{
     DecomposedTransform transform;
-    TransformUtil::DecomposeTransform(transform, transformMatrix.value());
+    TransformUtil::DecomposeTransform(transform, matrix);
     const int32_t zIndex = 2;
     Quaternion identity(0.0f, 0.0f, 0.0f, 1.0f);
     if (transform.quaternion != identity || !NearZero(transform.translate[zIndex])) {
@@ -185,7 +190,11 @@ bool BaseTextSelectGeometryUtils::HasUnsupportedTransform(
                 return true;
             }
         }
-        node = node->GetAncestorNodeOfFrame(true);
+        if (node->IsAdopted() && node->UseAdoptedCompensation() &&
+            CheckUnsupportedTransformMatrix(node->GetAdoptedCompensationTransform(), checkScale)) {
+            return true;
+        }
+        node = node->GetCoordinateAncestorNodeOfFrame(true);
     }
     return false;
 }
@@ -226,7 +235,12 @@ bool BaseTextSelectGeometryUtils::HasTransformAttr(const RefPtr<FrameNode>& host
             hasTransform = true;
             break;
         }
-        node = node->GetAncestorNodeOfFrame(true);
+        if (node->IsAdopted() && node->UseAdoptedCompensation() &&
+            !node->GetAdoptedCompensationTransform().IsIdentityMatrix()) {
+            hasTransform = true;
+            break;
+        }
+        node = node->GetCoordinateAncestorNodeOfFrame(true);
     }
     return hasTransform;
 }
@@ -242,7 +256,7 @@ bool BaseTextSelectGeometryUtils::GetRenderClipValue(const RefPtr<FrameNode>& ho
 RectF BaseTextSelectGeometryUtils::GetVisibleRect(const RefPtr<FrameNode>& node, const RectF& visibleRect)
 {
     CHECK_NULL_RETURN(node, visibleRect);
-    auto parentNode = node->GetAncestorNodeOfFrame(true);
+    auto parentNode = node->GetCoordinateAncestorNodeOfFrame(true);
     CHECK_NULL_RETURN(parentNode, visibleRect);
     if (parentNode->GetTag() == V2::PAGE_ETS_TAG) {
         return visibleRect;
@@ -314,7 +328,11 @@ void BaseTextSelectGeometryUtils::GetGlobalPointsWithTransform(
             pointElement = pointElement + paintOffset;
             renderContext->GetPointTransform(pointElement);
         }
-        parent = parent->GetAncestorNodeOfFrame(true);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor) {
+            parent->ApplyAdoptedCompensationToPoints(convertPoints);
+        }
+        parent = ancestor;
     }
     points.clear();
     auto offsetConverter = [](const PointF& point) { return OffsetF(point.GetX(), point.GetY()); };
@@ -355,7 +373,10 @@ std::vector<OffsetF> BaseTextSelectGeometryUtils::GetGlobalRectVertexWithTransfo
 bool BaseTextSelectGeometryUtils::CalculateClippedRect(const RefPtr<FrameNode>& host, RectF& contentRect)
 {
     CHECK_NULL_RETURN(host, false);
-    auto parent = host->GetAncestorNodeOfFrame(true);
+    auto parent = host->GetCoordinateAncestorNodeOfFrame(true);
+    if (parent) {
+        contentRect.SetOffset(contentRect.GetOffset() + host->GetTransformedAdoptedCompensationOffset());
+    }
     while (parent) {
         RectF parentContentRect;
         if (!GetFrameNodeContentRect(parent, parentContentRect)) {
@@ -367,7 +388,11 @@ bool BaseTextSelectGeometryUtils::CalculateClippedRect(const RefPtr<FrameNode>& 
             contentRect = contentRect.Constrain(parentContentRect);
         }
         contentRect.SetOffset(contentRect.GetOffset() + parent->GetPaintRectWithTransform().GetOffset());
-        parent = parent->GetAncestorNodeOfFrame(true);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor) {
+            contentRect.SetOffset(contentRect.GetOffset() + parent->GetTransformedAdoptedCompensationOffset());
+        }
+        parent = ancestor;
     }
     return true;
 }
@@ -381,7 +406,7 @@ void BaseTextSelectGeometryUtils::UpdateClipHandleViewPort(
     if (renderClipValue) {
         return;
     }
-    auto clipNode = host->GetAncestorNodeOfFrame(true);
+    auto clipNode = host->GetCoordinateAncestorNodeOfFrame(true);
     RefPtr<FrameNode> prevNode;
     while (clipNode) {
         renderContext = clipNode->GetRenderContext();
@@ -390,7 +415,7 @@ void BaseTextSelectGeometryUtils::UpdateClipHandleViewPort(
             break;
         }
         prevNode = clipNode;
-        clipNode = clipNode->GetAncestorNodeOfFrame(true);
+        clipNode = clipNode->GetCoordinateAncestorNodeOfFrame(true);
     }
     if (clipNode) {
         RectF visibleRect;

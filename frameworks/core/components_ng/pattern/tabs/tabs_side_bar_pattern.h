@@ -122,11 +122,42 @@ public:
         incommingOptions_ = options;
     }
 
+    void SetShowSidebarControlButton(bool show)
+    {
+        showControlButton_ = show;
+    }
+
     void CreateChildNodeIfNeeded(const RefPtr<FrameNode>& tabsNode);
 
     bool IsScrollEffectEnabled() const
     {
         return isScrollEffectEnabled_;
+    }
+
+    RefPtr<FrameNode> GetCollapseButtonNode() const
+    {
+        return collapseButtonNode_;
+    }
+
+    RefPtr<FrameNode> CreateCollapseButton(const RefPtr<FrameNode>& tabsNode);
+
+    void ClearCollapseButtonState();
+
+    void UpdateCollapseButtonIcon();
+
+    bool IsCollapsed() const
+    {
+        return isCollapsed_;
+    }
+
+    bool IsCollapseAnimating() const
+    {
+        return isCollapseAnimating_;
+    }
+
+    void SetCollapseAnimating(bool animating)
+    {
+        isCollapseAnimating_ = animating;
     }
 
     bool IsBottomBarScrollEffectEnabled() const
@@ -147,6 +178,12 @@ private:
     void CreateBottomBarContainerIfNeeded();
     RefPtr<FrameNode> CreateSearchContainer();
     void CreateMaskNodeIfNeeded();
+    RefPtr<FrameNode> CreateCollapseButtonNode();
+    RefPtr<FrameNode> CreateCollapseButtonIcon();
+    void InitCollapseButtonClickEvent(const RefPtr<GestureEventHub>& gestureHub);
+    void OnCollapseButtonClick();
+    void CollapseSideBarContent();
+    void ExpandSideBarContent();
     void CreateBottomBarMaskNodeIfNeeded();
     void OnTabListScroll(float totalOffset, float scrollableDistance);
 
@@ -189,6 +226,13 @@ private:
     RefPtr<FrameNode> headerContainerMaskNode_ = nullptr;
     bool isScrollEffectEnabled_ = false;
     float scrollScale_ = -1.0f;
+
+    RefPtr<FrameNode> collapseButtonNode_ = nullptr;
+    RefPtr<FrameNode> collapseButtonIconNode_ = nullptr;
+    RefPtr<FrameNode> buttonPlaceholderNode_ = nullptr;
+    bool isCollapsed_ = false;
+    bool isCollapseAnimating_ = false;
+    bool showControlButton_ = false;
 
     // BottomBar gradual blur effect nodes & state
     RefPtr<FrameNode> bottomBarMaskBlurNode_ = nullptr;

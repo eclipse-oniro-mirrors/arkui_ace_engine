@@ -907,6 +907,24 @@ void ResetTabsBarFloatingStyleImpl(ArkUINodeHandle node)
     tabsModelImpl->ResetBarFloatingStyle();
 }
 
+void SetTabsBarTopFloatingStyleImpl(ArkUINodeHandle node, void* paramRawPtr)
+{
+    (void)node;
+    auto tabsModelImpl = GetTabsModelImpl();
+    CHECK_NULL_VOID(tabsModelImpl);
+    auto param = reinterpret_cast<BarTopFloatingStyleParameters*>(paramRawPtr);
+    CHECK_NULL_VOID(param);
+    tabsModelImpl->SetBarTopFloatingStyle(*param);
+}
+
+void ResetTabsBarTopFloatingStyleImpl(ArkUINodeHandle node)
+{
+    (void)node;
+    auto tabsModelImpl = GetTabsModelImpl();
+    CHECK_NULL_VOID(tabsModelImpl);
+    tabsModelImpl->ResetBarTopFloatingStyle();
+}
+
 void CreateWithResourceObjImpl(ArkUINodeHandle node, void* paramRawPtr)
 {
     (void)node;
@@ -944,6 +962,10 @@ void ResetSidebarBottomBarImpl(ArkUINodeHandle node) {}
 void SetSidebarSearchableImpl(ArkUINodeHandle node, struct ArkUITabsSidebarSearchableOptions* options) {}
 
 void ResetSidebarSearchableImpl(ArkUINodeHandle node) {}
+
+void SetShowSidebarControlButtonImpl(ArkUINodeHandle node, ArkUI_Bool showControlButton) {}
+
+void ResetShowSidebarControlButtonImpl(ArkUINodeHandle node) {}
 
 void SetBarDisplayModeBreakpointImpl(ArkUINodeHandle node, struct ArkUITabBarDisplayModeBreakpoint* breakpoint) {}
 
@@ -2010,6 +2032,21 @@ void ResetTabsBarFloatingStyle(ArkUINodeHandle node)
     TabsModelNG::ResetBarFloatingStyle(frameNode);
 }
 
+void SetTabsBarTopFloatingStyle(ArkUINodeHandle node, void* paramRawPtr)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto param = reinterpret_cast<BarTopFloatingStyleParameters*>(paramRawPtr);
+    TabsModelNG::SetBarTopFloatingStyle(frameNode, *param);
+}
+
+void ResetTabsBarTopFloatingStyle(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabsModelNG::ResetBarTopFloatingStyle(frameNode);
+}
+
 void CreateWithResourceObj(ArkUINodeHandle node, void* paramRawPtr)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -2157,13 +2194,27 @@ void ResetSidebarSearchable(ArkUINodeHandle node)
     TabsModelNG::SetSidebarSearchableOptions(frameNode, options);
 }
 
+void SetShowSidebarControlButton(ArkUINodeHandle node, ArkUI_Bool showControlButton)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabsModelNG::SetShowSidebarControlButton(frameNode, showControlButton);
+}
+
+void ResetShowSidebarControlButton(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabsModelNG::SetShowSidebarControlButton(frameNode, false);
+}
+
 void SetBarDisplayModeBreakpoint(ArkUINodeHandle node, struct ArkUITabBarDisplayModeBreakpoint* breakpoint)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
     CHECK_NULL_VOID(breakpoint);
     static const std::vector<TabBarDisplayMode> BAR_DISPLAY_MODES =
-        { TabBarDisplayMode::BOTTOMTABBAR, TabBarDisplayMode::SIDEBAR };
+        { TabBarDisplayMode::BOTTOMTABBAR, TabBarDisplayMode::SIDEBAR, TabBarDisplayMode::TOP_TABBAR };
     TabBarDisplayModeBreakpoint bp;
     bp.isNull = breakpoint->isNull;
     if (!breakpoint->isNull) {
@@ -2496,6 +2547,8 @@ const ArkUITabsModifier* GetTabsModifier()
             .createBarBackgroundEffectWithResourceObj = CreateBarBackgroundEffectWithResourceObj,
             .setTabsBarFloatingStyle = SetTabsBarFloatingStyle,
             .resetTabsBarFloatingStyle = ResetTabsBarFloatingStyle,
+            .setTabsBarTopFloatingStyle = SetTabsBarTopFloatingStyle,
+            .resetTabsBarTopFloatingStyle = ResetTabsBarTopFloatingStyle,
             .createWithResourceObj = CreateWithResourceObj,
             .setSidebarDisplayStyle = SetSidebarDisplayStyle,
             .resetSidebarDisplayStyle = ResetSidebarDisplayStyle,
@@ -2511,6 +2564,8 @@ const ArkUITabsModifier* GetTabsModifier()
             .resetSidebarBottomBar = ResetSidebarBottomBar,
             .setSidebarSearchable = SetSidebarSearchable,
             .resetSidebarSearchable = ResetSidebarSearchable,
+            .setShowSidebarControlButton = SetShowSidebarControlButton,
+            .resetShowSidebarControlButton = ResetShowSidebarControlButton,
             .setBarDisplayModeBreakpoint = SetBarDisplayModeBreakpoint,
             .resetBarDisplayModeBreakpoint = ResetBarDisplayModeBreakpoint,
             .setOnBarDisplayModeChange = SetOnBarDisplayModeChange,
@@ -2646,6 +2701,8 @@ const ArkUITabsModifier* GetTabsModifier()
         .createBarBackgroundEffectWithResourceObj = CreateBarBackgroundEffectWithResourceObjImpl,
         .setTabsBarFloatingStyle = SetTabsBarFloatingStyleImpl,
         .resetTabsBarFloatingStyle = ResetTabsBarFloatingStyleImpl,
+        .setTabsBarTopFloatingStyle = SetTabsBarTopFloatingStyleImpl,
+        .resetTabsBarTopFloatingStyle = ResetTabsBarTopFloatingStyleImpl,
         .createWithResourceObj = CreateWithResourceObjImpl,
         .setSidebarDisplayStyle = SetSidebarDisplayStyleImpl,
         .resetSidebarDisplayStyle = ResetSidebarDisplayStyleImpl,
@@ -2661,6 +2718,8 @@ const ArkUITabsModifier* GetTabsModifier()
         .resetSidebarBottomBar = ResetSidebarBottomBarImpl,
         .setSidebarSearchable = SetSidebarSearchableImpl,
         .resetSidebarSearchable = ResetSidebarSearchableImpl,
+        .setShowSidebarControlButton = SetShowSidebarControlButtonImpl,
+        .resetShowSidebarControlButton = ResetShowSidebarControlButtonImpl,
         .setBarDisplayModeBreakpoint = SetBarDisplayModeBreakpointImpl,
         .resetBarDisplayModeBreakpoint = ResetBarDisplayModeBreakpointImpl,
         .setOnBarDisplayModeChange = SetOnBarDisplayModeChangeImpl,

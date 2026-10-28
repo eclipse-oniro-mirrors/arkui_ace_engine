@@ -34,6 +34,7 @@ constexpr uint32_t RES_TYPE_AXIS_EVENT      = 123;
 constexpr uint32_t RES_TYPE_PAGE_TRANSITION = 140;
 constexpr uint32_t RES_TYPE_ABILITY_OR_PAGE_SWITCH = 156;
 constexpr uint32_t RES_TYPE_FLOAT_START_FROM_SIDEBAR = 216;
+constexpr uint32_t RES_TYPE_LV_INTO_APP_ANIM = 226;
 constexpr uint32_t RES_TYPE_CHECK_APP_IS_IN_SCHEDULE_LIST = 504;
 constexpr uint32_t SYNC_RES_TYPE_APP_IS_IN_TAIHANG_LIST = 511;
 #ifdef FFRT_EXISTS
@@ -43,6 +44,7 @@ constexpr uint32_t RES_TYPE_OVERLAY        = 151;
 constexpr uint32_t RES_TYPE_BACKPRESSED_EVENT = 184;
 constexpr uint32_t RES_TYPE_COMPONENT_STATE_CHANGE = 212;
 constexpr uint32_t RES_TYPE_DIALOG_EVENT = 225;
+constexpr int32_t COMPONENT_TYPE_SWIPER = 1;
 constexpr int32_t TOUCH_DOWN_EVENT          = 1;
 constexpr int32_t CLICK_EVENT               = 2;
 constexpr int32_t TOUCH_UP_EVENT            = 3;
@@ -109,6 +111,8 @@ constexpr char ABILITY_OR_PAGE_SWITCH_START[] = "ability_or_page_switch_start";
 constexpr char ABILITY_OR_PAGE_SWITCH_END[] = "ability_or_page_switch_end";
 constexpr char FLOAT_START_FROM_SIDEBAR_START[] = "float_start_from_sidebar_start";
 constexpr char FLOAT_START_FROM_SIDEBAR_END[] = "float_start_from_sidebar_end";
+constexpr char LV_INTO_APP_ANIM_START[] = "lv_into_app_anim_start";
+constexpr char LV_INTO_APP_ANIM_END[] = "lv_into_app_anim_end";
 #ifdef FFRT_EXISTS
 constexpr char LONG_FRAME_START[] = "long_frame_start";
 constexpr char LONG_FRAME_END[] = "long_frame_end";
@@ -314,6 +318,22 @@ void ResSchedReport::ResSchedDataReport(const char* name, const std::unordered_m
                 [this](std::unordered_map<std::string, std::string>& payload) {
                     LoadAceApplicationContext(payload);
                     reportDataFunc_(RES_TYPE_FLOAT_START_FROM_SIDEBAR, 1, payload);
+                }
+            },
+            { LV_INTO_APP_ANIM_START,
+                [this](std::unordered_map<std::string, std::string>& payload) {
+                    std::string targetBundle = payload[BUNDLE_NAME];
+                    LoadAceApplicationContext(payload);
+                    if (!targetBundle.empty()) {
+                        payload[BUNDLE_NAME] = targetBundle;
+                    }
+                    reportDataFunc_(RES_TYPE_LV_INTO_APP_ANIM, 0, payload);
+                }
+            },
+            { LV_INTO_APP_ANIM_END,
+                [this](std::unordered_map<std::string, std::string>& payload) {
+                    LoadAceApplicationContext(payload);
+                    reportDataFunc_(RES_TYPE_LV_INTO_APP_ANIM, 1, payload);
                 }
             },
         };
@@ -724,7 +744,7 @@ void ResSchedReport::HandlePageTransition(const PageTransitionInfo& pageTransiti
 void ResSchedReport::HandleSwiperChange(std::unordered_map<std::string, std::string>& payload)
 {
     LoadAceApplicationContext(payload);
-    ResSchedDataReport(RES_TYPE_COMPONENT_STATE_CHANGE, 0, payload);
+    ResSchedDataReport(RES_TYPE_COMPONENT_STATE_CHANGE, COMPONENT_TYPE_SWIPER, payload);
 }
 
 void ResSchedReport::ReportDialogShow()
