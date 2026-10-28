@@ -811,6 +811,10 @@ public:
     void OnScrollEndCallback() override;
     bool IsScrollable() const override;
     void SetScrollable(bool scrollable);
+    bool IsReverse() const override
+    {
+        return false;
+    }
     bool IsAtomicNode() const override;
     RefPtr<FrameNode> GetClientHost() const override;
     bool IsSelectAreaVisible();
