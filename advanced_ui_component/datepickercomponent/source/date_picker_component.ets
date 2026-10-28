@@ -159,6 +159,7 @@ export struct DatePickerComponent {
   private initFlag: boolean = true;
   private lunarCalendar: i18n.Calendar | null = null;
   private subscriber: commonEventManager.CommonEventSubscriber | null = null;
+  private isComponentActive: boolean = false;
   private formatter: intl.NumberFormat | null = null;
   private yearFormatter: intl.NumberFormat | null = null;
   private userLunar: boolean = false;  // Save user-set lunar value
@@ -209,10 +210,12 @@ export struct DatePickerComponent {
       this.initArrays();
     }
     
+    this.isComponentActive = true;
     this.createLocaleChangeSubscriber();
   }
   
   aboutToDisappear(): void {
+    this.isComponentActive = false;
     this.lunarCalendar = null;
     
     // Unsubscribe from locale change events
@@ -233,6 +236,14 @@ export struct DatePickerComponent {
     
     commonEventManager.createSubscriber(subscribeInfo)
       .then((commonEventSubscriber: commonEventManager.CommonEventSubscriber) => {
+        if (!this.isComponentActive) {
+          commonEventManager.unsubscribe(commonEventSubscriber, (err) => {
+            if (err) {
+              console.error(`Component destroyed, unsubscribe failed. code: ${err.code}, message: ${err.message}.`);
+            }
+          });
+          return;
+        }
         this.subscriber = commonEventSubscriber;
         commonEventManager.subscribe(this.subscriber, (err, data) => {
           if (err) {
