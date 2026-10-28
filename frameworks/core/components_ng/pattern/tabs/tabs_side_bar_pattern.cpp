@@ -47,14 +47,25 @@
 #include "core/components_ng/pattern/tabs/tab_content_layout_property.h"
 #include "core/components_ng/pattern/tabs/tab_content_pattern.h"
 #include "core/components_ng/pattern/tabs/tabs_layout_property.h"
+#include "core/components_ng/pattern/tabs/tabs_pattern.h"
 #include "core/components_ng/pattern/tabs/tabs_declaration.h"
 #include "core/components_ng/pattern/tabs/tabs_controller.h"
 #include "core/components_ng/pattern/tabs/tabs_node.h"
 #include "core/components_ng/pattern/tabs/tabs_side_bar_tab_list_pattern.h"
+#include "core/components_ng/pattern/button/button_pattern.h"
+#include "core/components_ng/pattern/text/text_layout_property.h"
+#include "core/components_ng/pattern/text/text_pattern.h"
+#include "core/components_ng/pattern/symbol/symbol_source_info.h"
+#include "core/common/resource/resource_manager.h"
+#include "core/interfaces/native/node/node_button_modifier.h"
+#include "core/components/tab_bar/tab_theme.h"
 #include "core/components_ng/property/gradient_property.h"
 #include "core/components_ng/property/property.h"
 #include "core/components_ng/render/animation_utils.h"
 #include "core/components_v2/inspector/inspector_constants.h"
+#include "core/components/common/properties/animation_option.h"
+#include "core/components/common/properties/shadow_config.h"
+#include "core/animation/spring_curve.h"
 #include "core/gestures/gesture_info.h"
 #include "core/interfaces/native/node/search_modifier.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -75,6 +86,9 @@ const Dimension GRADUAL_BLUR_MAX_RADIUS = 12.0_vp;
 constexpr double GRADUAL_BLUR_MAX_OPACITY = 0.8;
 
 const Color DEFAULT_GRADIENT_MASK_BLEND_COLOR = Color(0xFFF1F3F5);
+const Dimension COLLAPSE_BUTTON_SIZE = 40.0_vp;
+const Dimension COLLAPSE_BUTTON_ICON_SIZE = 24.0_vp;
+constexpr int32_t COLLAPSE_BUTTON_ZINDEX = 4;
 
 const std::vector<std::pair<float, float>> MASK_BLUR_STOPS = {
     { 1.0f, 0.0f }, { 0.6f, 0.6f }, { 0.0f, 1.0f }
@@ -382,9 +396,10 @@ void TabsSideBarPattern::UpdateHeaderNodeIfNeeded()
         curHeaderNode_ = nullptr;
     }
 
-    // Mount new header to index 0
+    // Mount new header after placeholder (placeholder stays at index 0)
     if (headerNode_) {
-        headerNode_->MountToParent(headerContainerNode_, 0);
+        int32_t insertIndex = buttonPlaceholderNode_ ? 1 : 0;
+        headerNode_->MountToParent(headerContainerNode_, insertIndex);
         curHeaderNode_ = headerNode_;
     }
     headerContainerNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
@@ -541,7 +556,7 @@ void TabsSideBarPattern::OnModifyDone()
     UpdateBottomBarNodeIfNeeded();
     bool isHeaderContainerVisible;
     bool isScrollEffectEnabled;
-    if (!curHeaderNode_ && !searchContainerNode_) {
+    if (!curHeaderNode_ && !searchContainerNode_ && !collapseButtonNode_) {
         isScrollEffectEnabled = false;
         isHeaderContainerVisible = false;
     } else {
@@ -567,6 +582,14 @@ void TabsSideBarPattern::OnModifyDone()
 
     bool isBottomBarScrollEffect = curBottomBarNode_ != nullptr;
     InitBottomBarScrollEffect(isBottomBarScrollEffect);
+
+    // Refresh collapse button icon in case sidebarPosition or layout direction
+    // changed without a collapse/expand action (e.g., developer updates
+    // sidebarPosition at runtime). Without this, the icon stays stale until
+    // the next collapse/expand click.
+    if (collapseButtonIconNode_) {
+        UpdateCollapseButtonIcon();
+    }
 }
 
 RefPtr<FrameNode> TabsSideBarPattern::CreateEffectNode(const std::string& tag)
@@ -727,4 +750,454 @@ void TabsSideBarPattern::OnColorConfigurationUpdate()
             bottomBarMaskBlurNode_, bottomBarMaskNode_, GradientDirection::TOP);
     }
 }
+
+RefPtr<FrameNode> TabsSideBarPattern::CreateCollapseButton(const RefPtr<FrameNode>& tabsNode)
+{
+    CHECK_NULL_RETURN(tabsNode, nullptr);
+    auto buttonNode = CreateCollapseButtonNode();
+    CHECK_NULL_RETURN(buttonNode, nullptr);
+    auto iconNode = CreateCollapseButtonIcon();
+    CHECK_NULL_RETURN(iconNode, nullptr);
+
+    auto buttonHub = buttonNode->GetEventHub<EventHub>();
+    CHECK_NULL_RETURN(buttonHub, nullptr);
+    auto gestureHub = buttonHub->GetOrCreateGestureEventHub();
+    CHECK_NULL_RETURN(gestureHub, nullptr);
+    InitCollapseButtonClickEvent(gestureHub);
+
+    iconNode->MountToParent(buttonNode);
+    iconNode->MarkModifyDone();
+
+    // Mount button as direct child of tabsNode (stays visible when sidebar is collapsed)
+    buttonNode->MountToParent(tabsNode);
+    buttonNode->MarkModifyDone();
+
+    // Create placeholder in headerContainer to reserve space for button (56vp = 8+40+8)
+    if (headerContainerNode_ && !buttonPlaceholderNode_) {
+        auto placeholder = FrameNode::CreateFrameNode(
+            "CollapseButtonPlaceholder", ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<Pattern>());
+        CHECK_NULL_RETURN(placeholder, buttonNode);
+        auto placeholderProp = placeholder->GetLayoutProperty();
+        if (placeholderProp) {
+            placeholderProp->UpdateUserDefinedIdealSize(
+                CalcSize(std::nullopt, CalcLength(COLLAPSE_BUTTON_SIZE + 16.0_vp)));
+            placeholderProp->UpdateVisibility(showControlButton_ ? VisibleType::VISIBLE : VisibleType::GONE);
+        }
+        placeholder->MountToParent(headerContainerNode_, 0);
+        placeholder->MarkModifyDone();
+        headerContainerNode_->MarkNeedSyncRenderTree();
+        headerContainerNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+        buttonPlaceholderNode_ = placeholder;
+    }
+
+    collapseButtonNode_ = buttonNode;
+    collapseButtonIconNode_ = iconNode;
+    return buttonNode;
+}
+
+RefPtr<FrameNode> TabsSideBarPattern::CreateCollapseButtonNode()
+{
+    int32_t buttonId = ElementRegister::GetInstance()->MakeUniqueId();
+    auto buttonNode = FrameNode::GetOrCreateFrameNode(V2::BUTTON_ETS_TAG, buttonId, []() -> RefPtr<Pattern> {
+        auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
+        CHECK_NULL_RETURN(buttonModifier, nullptr);
+        return buttonModifier->createButtonPattern();
+    });
+    CHECK_NULL_RETURN(buttonNode, nullptr);
+
+    auto* btnCustomModifier = NodeModifier::GetButtonCustomModifier();
+    CHECK_NULL_RETURN(btnCustomModifier, nullptr);
+    ArkUINodeHandle buttonHandle = reinterpret_cast<ArkUINodeHandle>(AceType::RawPtr(buttonNode));
+    btnCustomModifier->updateTypeToLayoutProp(buttonHandle, ButtonType::NORMAL);
+    btnCustomModifier->updateBorderRadiusToLayoutProp(buttonHandle, BorderRadiusProperty(COLLAPSE_BUTTON_SIZE / 2));
+    btnCustomModifier->updateCreateWithLabelToLayoutProp(buttonHandle, false);
+
+    auto renderContext = buttonNode->GetRenderContext();
+    CHECK_NULL_RETURN(renderContext, nullptr);
+    renderContext->UpdateBackgroundColor(Color::TRANSPARENT);
+    btnCustomModifier->updateBackgroundColorFlagByUserToLayoutProp(buttonHandle, true);
+    renderContext->UpdateZIndex(COLLAPSE_BUTTON_ZINDEX);
+    BlurStyleOption blurStyleOption;
+    blurStyleOption.blurStyle = BlurStyle::COMPONENT_ULTRA_THIN;
+    renderContext->UpdateBackBlurStyle(blurStyleOption);
+    renderContext->UpdateBackShadow(ShadowConfig::DefaultShadowXS);
+
+    auto layoutProperty = buttonNode->GetLayoutProperty();
+    CHECK_NULL_RETURN(layoutProperty, nullptr);
+    layoutProperty->UpdateUserDefinedIdealSize(
+        CalcSize(CalcLength(COLLAPSE_BUTTON_SIZE), CalcLength(COLLAPSE_BUTTON_SIZE)));
+
+    auto focusHub = buttonNode->GetOrCreateFocusHub();
+    CHECK_NULL_RETURN(focusHub, nullptr);
+    focusHub->SetFocusDependence(FocusDependence::SELF);
+
+    return buttonNode;
+}
+
+RefPtr<FrameNode> TabsSideBarPattern::CreateCollapseButtonIcon()
+{
+    auto iconNode = FrameNode::CreateFrameNode(
+        V2::SYMBOL_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<TextPattern>());
+    CHECK_NULL_RETURN(iconNode, nullptr);
+
+    auto symbolLayoutProperty = iconNode->GetLayoutProperty<TextLayoutProperty>();
+    CHECK_NULL_RETURN(symbolLayoutProperty, nullptr);
+
+    // Resolve symbol icon based on sidebar position and collapsed state
+    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    CHECK_NULL_RETURN(host, iconNode);
+    auto context = host->GetContextRefPtr();
+    CHECK_NULL_RETURN(context, iconNode);
+    auto resourceAdapter = ResourceManager::GetInstance().GetResourceAdapter(context->GetInstanceId());
+    CHECK_NULL_RETURN(resourceAdapter, iconNode);
+    auto tabsNode = tabsNode_.Upgrade();
+    CHECK_NULL_RETURN(tabsNode, iconNode);
+    auto tabsLayoutProp = tabsNode->GetLayoutProperty<TabsLayoutProperty>();
+    CHECK_NULL_RETURN(tabsLayoutProp, iconNode);
+    auto sideBarPosition = tabsLayoutProp->GetSidebarPositionValue(BarPosition::START);
+    bool isRTL = tabsLayoutProp->GetNonAutoLayoutDirection() == TextDirection::RTL;
+    bool isEnd = (isRTL && sideBarPosition == BarPosition::START) ||
+                 (!isRTL && sideBarPosition == BarPosition::END);
+    const char* symbolName = isEnd ? "sys.symbol.close_sidebar" : "sys.symbol.open_sidebar";
+    uint32_t symbolId = resourceAdapter->GetSymbolByName(symbolName);
+    symbolLayoutProperty->UpdateSymbolSourceInfo(SymbolSourceInfo{symbolId});
+
+    symbolLayoutProperty->UpdateFontSize(COLLAPSE_BUTTON_ICON_SIZE);
+    auto tabTheme = host->GetTheme<TabTheme>();
+    Color iconColor = tabTheme ? tabTheme->GetIconPrimary() : Color::BLACK;
+    symbolLayoutProperty->UpdateSymbolColorList({iconColor});
+    symbolLayoutProperty->UpdateAlignment(Alignment::CENTER);
+    symbolLayoutProperty->UpdateUserDefinedIdealSize(
+        CalcSize(CalcLength(COLLAPSE_BUTTON_ICON_SIZE), CalcLength(COLLAPSE_BUTTON_ICON_SIZE)));
+    return iconNode;
+}
+
+void TabsSideBarPattern::InitCollapseButtonClickEvent(const RefPtr<GestureEventHub>& gestureHub)
+{
+    auto clickTask = [weakPattern = WeakClaim(this)](const GestureEvent& info) {
+        auto pattern = weakPattern.Upgrade();
+        CHECK_NULL_VOID(pattern);
+        pattern->OnCollapseButtonClick();
+    };
+    auto clickEvent = MakeRefPtr<ClickEvent>(std::move(clickTask));
+    gestureHub->AddClickEvent(clickEvent);
+}
+
+void TabsSideBarPattern::OnCollapseButtonClick()
+{
+    if (isCollapseAnimating_) {
+        return;
+    }
+    if (isCollapsed_) {
+        ExpandSideBarContent();
+    } else {
+        CollapseSideBarContent();
+    }
+}
+
+namespace {
+constexpr int32_t SIDEBAR_COLLAPSE_ANIM_DURATION = 300; // ms
+const RefPtr<InterpolatingSpring> SIDEBAR_COLLAPSE_CURVE =
+    AceType::MakeRefPtr<InterpolatingSpring>(0.0f, 1.0f, 228.0f, 24.0f);
+const Dimension SIDEBAR_FALLBACK_WIDTH = 240.0_vp;
+} // namespace
+
+void TabsSideBarPattern::CollapseSideBarContent()
+{
+    isCollapsed_ = true;
+    isCollapseAnimating_ = true;
+    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    CHECK_NULL_VOID(host);
+    auto tabsNode = tabsNode_.Upgrade();
+    CHECK_NULL_VOID(tabsNode);
+    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(tabsPattern);
+    auto divider = tabsPattern->GetSideBarDividerNode();
+
+    // Calculate the outside translate offset (sidebar + divider fully off-screen)
+    auto sideBarGeo = host->GetGeometryNode();
+    float sideBarWidth = sideBarGeo ? sideBarGeo->GetFrameSize().Width() : 0.0f;
+    float dividerWidth = 0.0f;
+    if (divider) {
+        auto dividerGeo = divider->GetGeometryNode();
+        dividerWidth = dividerGeo ? dividerGeo->GetFrameSize().Width() : 0.0f;
+    }
+    auto tabsLayoutProp = tabsNode->GetLayoutProperty<TabsLayoutProperty>();
+    auto sideBarPos = tabsLayoutProp ? tabsLayoutProp->GetSidebarPositionValue(BarPosition::START) : BarPosition::START;
+    bool isRTL = tabsLayoutProp ? tabsLayoutProp->GetNonAutoLayoutDirection() == TextDirection::RTL : false;
+    bool sideBarOnLeft = (!isRTL && sideBarPos == BarPosition::START) ||
+                         (isRTL && sideBarPos == BarPosition::END);
+    float outsideX = sideBarOnLeft ? -(sideBarWidth + dividerWidth) : (sideBarWidth + dividerWidth);
+
+    UpdateCollapseButtonIcon();
+
+    auto context = host->GetContextRefPtr();
+    CHECK_NULL_VOID(context);
+
+    // Save current sidebar width so we can restore it on expand.
+    float currentWidth = sideBarWidth;
+    if (currentWidth <= 0.0f && tabsPattern->GetRealSideBarWidthPx().has_value()) {
+        currentWidth = tabsPattern->GetRealSideBarWidthPx().value();
+    }
+    tabsPattern->SetPreSideBarWidthPx(currentWidth);
+
+    // Key insight: keep sidebar + divider VISIBLE during animation so RSNode can
+    // capture and animate the transform translate. Use realSideBarWidthPx_ = 0 to
+    // make MeasureSideBar return 0 width, causing the swiper to expand to full width.
+    // GONE is set only in the finish callback (after animation completes), matching
+    // the display mode switch animation pattern.
+    auto weakHost = WeakPtr<FrameNode>(host);
+    auto weakDivider = WeakPtr<FrameNode>(divider);
+    auto weakTabsNode = WeakPtr<FrameNode>(tabsNode);
+    auto weakTabsPattern = WeakPtr<TabsPattern>(tabsPattern);
+    auto weakThis = WeakClaim(this);
+    AnimationOption option;
+    option.SetDuration(SIDEBAR_COLLAPSE_ANIM_DURATION);
+    option.SetCurve(SIDEBAR_COLLAPSE_CURVE);
+    AnimationUtils::StartAnimation(option,
+        [weakHost, weakDivider, weakTabsNode, weakTabsPattern, outsideX]() {
+            auto host = weakHost.Upgrade();
+            CHECK_NULL_VOID(host);
+            auto divider = weakDivider.Upgrade();
+            auto tabsNode = weakTabsNode.Upgrade();
+            auto tabsPattern = weakTabsPattern.Upgrade();
+
+            // Set realSideBarWidthPx_ = 0 so MeasureSideBar measures sidebar as 0 width,
+            // causing swiper to expand to full width. Keep visibility VISIBLE so the
+            // node stays in the render tree and RSNode can animate the translate.
+            if (tabsPattern) {
+                tabsPattern->SetRealSideBarWidthPx(0.0f);
+            }
+            if (tabsNode) {
+                tabsNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+                auto ctx = tabsNode->GetContext();
+                if (ctx) {
+                    ctx->FlushUITasks();
+                }
+            }
+
+            // Set translate target: slide sidebar + divider outside.
+            // RSNode animates the translate from {0,0,0} to {outsideX,0,0}.
+            auto renderContext = host->GetRenderContext();
+            if (renderContext) {
+                renderContext->UpdateTransformTranslate({ outsideX, 0.0f, 0.0f });
+            }
+            if (divider) {
+                auto dividerRender = divider->GetRenderContext();
+                if (dividerRender) {
+                    dividerRender->UpdateTransformTranslate({ outsideX, 0.0f, 0.0f });
+                }
+            }
+        },
+        [weakHost, weakDivider, weakTabsNode, weakTabsPattern, weakThis]() {
+            // After animation: set GONE (node no longer needs to render),
+            // reset transform translate, and clear realSideBarWidthPx_.
+            auto host = weakHost.Upgrade();
+            CHECK_NULL_VOID(host);
+            auto divider = weakDivider.Upgrade();
+            auto tabsNode = weakTabsNode.Upgrade();
+            auto tabsPattern = weakTabsPattern.Upgrade();
+            auto self = weakThis.Upgrade();
+
+            if (host) {
+                host->GetLayoutProperty()->UpdateVisibility(VisibleType::GONE);
+                auto renderContext = host->GetRenderContext();
+                if (renderContext) {
+                    renderContext->UpdateTransformTranslate({ 0.0f, 0.0f, 0.0f });
+                }
+            }
+            if (divider) {
+                divider->GetLayoutProperty()->UpdateVisibility(VisibleType::GONE);
+                auto renderContext = divider->GetRenderContext();
+                if (renderContext) {
+                    renderContext->UpdateTransformTranslate({ 0.0f, 0.0f, 0.0f });
+                }
+            }
+            if (tabsPattern) {
+                tabsPattern->ClearRealSideBarWidthPx();
+            }
+            if (tabsNode) {
+                tabsNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+            }
+            if (self) {
+                self->isCollapseAnimating_ = false;
+            }
+        }, nullptr, context);
+}
+
+void TabsSideBarPattern::ExpandSideBarContent()
+{
+    isCollapsed_ = false;
+    isCollapseAnimating_ = true;
+    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    CHECK_NULL_VOID(host);
+    auto tabsNode = tabsNode_.Upgrade();
+    CHECK_NULL_VOID(tabsNode);
+    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(tabsPattern);
+    auto divider = tabsPattern->GetSideBarDividerNode();
+
+    // Restore sidebar width from saved value
+    float restoreWidth = tabsPattern->GetPreSideBarWidthPx();
+    if (restoreWidth <= 0.0f) {
+        // Fallback: use current sidebar width from property or default
+        auto sideBarGeo = host->GetGeometryNode();
+        restoreWidth = sideBarGeo ? sideBarGeo->GetFrameSize().Width() : 0.0f;
+        if (restoreWidth <= 0.0f) {
+            restoreWidth = SIDEBAR_FALLBACK_WIDTH.ConvertToPx();
+        }
+    }
+
+    // Calculate the outside translate offset using the restore width
+    float dividerWidth = 0.0f;
+    if (divider) {
+        auto dividerGeo = divider->GetGeometryNode();
+        dividerWidth = dividerGeo ? dividerGeo->GetFrameSize().Width() : 0.0f;
+    }
+    auto tabsLayoutProp = tabsNode->GetLayoutProperty<TabsLayoutProperty>();
+    auto sideBarPos = tabsLayoutProp ? tabsLayoutProp->GetSidebarPositionValue(BarPosition::START) : BarPosition::START;
+    bool isRTL = tabsLayoutProp ? tabsLayoutProp->GetNonAutoLayoutDirection() == TextDirection::RTL : false;
+    bool sideBarOnLeft = (!isRTL && sideBarPos == BarPosition::START) ||
+                         (isRTL && sideBarPos == BarPosition::END);
+    float outsideX = sideBarOnLeft ? -(restoreWidth + dividerWidth) : (restoreWidth + dividerWidth);
+
+    UpdateCollapseButtonIcon();
+
+    auto context = host->GetContextRefPtr();
+    CHECK_NULL_VOID(context);
+
+    // Set sidebar + divider VISIBLE and realSideBarWidthPx_ = 0 so layout gives
+    // sidebar 0 width (swiper stays full width). Then set initial off-screen
+    // translate BEFORE animation so sidebar starts from outside.
+    host->GetLayoutProperty()->UpdateVisibility(VisibleType::VISIBLE);
+    if (divider) {
+        divider->GetLayoutProperty()->UpdateVisibility(VisibleType::VISIBLE);
+    }
+    tabsPattern->SetRealSideBarWidthPx(0.0f);
+    tabsNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    context->FlushUITasks();
+
+    // Set initial off-screen translate (after layout, sidebar has 0 width but is VISIBLE)
+    auto renderContext = host->GetRenderContext();
+    if (renderContext) {
+        renderContext->UpdateTransformTranslate({ outsideX, 0.0f, 0.0f });
+    }
+    if (divider) {
+        auto dividerRender = divider->GetRenderContext();
+        if (dividerRender) {
+            dividerRender->UpdateTransformTranslate({ outsideX, 0.0f, 0.0f });
+        }
+    }
+
+    auto weakHost = WeakPtr<FrameNode>(host);
+    auto weakDivider = WeakPtr<FrameNode>(divider);
+    auto weakTabsNode = WeakPtr<FrameNode>(tabsNode);
+    auto weakTabsPattern = WeakPtr<TabsPattern>(tabsPattern);
+    auto weakThis = WeakClaim(this);
+
+    // Animate: restore sidebar width (swiper shrinks) + slide sidebar in from outsideX to {0,0,0}.
+    // Inside the closure: set realSideBarWidthPx_ to restoreWidth + MarkDirtyNode + FlushUITasks
+    // triggers re-layout where MeasureSideBar returns the full sidebar width, so swiper narrows.
+    // RSNode captures both the geometry change and the translate change and animates them.
+    AnimationOption option;
+    option.SetDuration(SIDEBAR_COLLAPSE_ANIM_DURATION);
+    option.SetCurve(SIDEBAR_COLLAPSE_CURVE);
+    AnimationUtils::StartAnimation(option,
+        [weakHost, weakDivider, weakTabsNode, weakTabsPattern, restoreWidth]() {
+            auto host = weakHost.Upgrade();
+            CHECK_NULL_VOID(host);
+            auto divider = weakDivider.Upgrade();
+            auto tabsNode = weakTabsNode.Upgrade();
+            auto tabsPattern = weakTabsPattern.Upgrade();
+
+            // Restore sidebar width so MeasureSideBar measures it at full width,
+            // causing swiper to shrink. Keep VISIBLE so RSNode animates the change.
+            if (tabsPattern) {
+                tabsPattern->SetRealSideBarWidthPx(restoreWidth);
+            }
+            if (tabsNode) {
+                tabsNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+                auto ctx = tabsNode->GetContext();
+                if (ctx) {
+                    ctx->FlushUITasks();
+                }
+            }
+
+            // Set translate target: slide sidebar + divider to final position {0,0,0}
+            auto renderContext = host->GetRenderContext();
+            if (renderContext) {
+                renderContext->UpdateTransformTranslate({ 0.0f, 0.0f, 0.0f });
+            }
+            if (divider) {
+                auto dividerRender = divider->GetRenderContext();
+                if (dividerRender) {
+                    dividerRender->UpdateTransformTranslate({ 0.0f, 0.0f, 0.0f });
+                }
+            }
+        },
+        [weakTabsPattern, weakTabsNode, weakThis]() {
+            // After animation: clear realSideBarWidthPx_ so future layout uses property-based width.
+            auto tabsPattern = weakTabsPattern.Upgrade();
+            if (tabsPattern) {
+                tabsPattern->ClearRealSideBarWidthPx();
+            }
+            auto tabsNode = weakTabsNode.Upgrade();
+            if (tabsNode) {
+                tabsNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+            }
+            auto self = weakThis.Upgrade();
+            if (self) {
+                self->isCollapseAnimating_ = false;
+            }
+        }, nullptr, context);
+}
+
+void TabsSideBarPattern::UpdateCollapseButtonIcon()
+{
+    CHECK_NULL_VOID(collapseButtonIconNode_);
+    auto symbolLayoutProperty = collapseButtonIconNode_->GetLayoutProperty<TextLayoutProperty>();
+    CHECK_NULL_VOID(symbolLayoutProperty);
+
+    // Resolve symbol icon based on sidebar position and collapsed state
+    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    CHECK_NULL_VOID(host);
+    auto context = host->GetContextRefPtr();
+    CHECK_NULL_VOID(context);
+    auto resourceAdapter = ResourceManager::GetInstance().GetResourceAdapter(context->GetInstanceId());
+    CHECK_NULL_VOID(resourceAdapter);
+    auto tabsNode = tabsNode_.Upgrade();
+    CHECK_NULL_VOID(tabsNode);
+    auto tabsLayoutProp = tabsNode->GetLayoutProperty<TabsLayoutProperty>();
+    CHECK_NULL_VOID(tabsLayoutProp);
+    auto sideBarPosition = tabsLayoutProp->GetSidebarPositionValue(BarPosition::START);
+    bool isRTL = tabsLayoutProp->GetNonAutoLayoutDirection() == TextDirection::RTL;
+    bool isEnd = (isRTL && sideBarPosition == BarPosition::START) ||
+                 (!isRTL && sideBarPosition == BarPosition::END);
+    const char* symbolName = nullptr;
+    if (isCollapsed_) {
+        symbolName = isEnd ? "sys.symbol.open_sidebar" : "sys.symbol.close_sidebar";
+    } else {
+        symbolName = isEnd ? "sys.symbol.close_sidebar" : "sys.symbol.open_sidebar";
+    }
+    uint32_t symbolId = resourceAdapter->GetSymbolByName(symbolName);
+    symbolLayoutProperty->UpdateSymbolSourceInfo(SymbolSourceInfo{symbolId});
+
+    collapseButtonIconNode_->MarkModifyDone();
+    collapseButtonIconNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+}
+
+void TabsSideBarPattern::ClearCollapseButtonState()
+{
+    collapseButtonNode_ = nullptr;
+    collapseButtonIconNode_ = nullptr;
+    if (buttonPlaceholderNode_ && headerContainerNode_) {
+        headerContainerNode_->RemoveChild(buttonPlaceholderNode_);
+        headerContainerNode_->MarkNeedSyncRenderTree();
+        headerContainerNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+        buttonPlaceholderNode_ = nullptr;
+    }
+}
+
 } // namespace OHOS::Ace::NG

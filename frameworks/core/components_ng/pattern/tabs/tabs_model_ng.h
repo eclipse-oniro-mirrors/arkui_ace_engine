@@ -94,6 +94,7 @@ public:
     void SetSidebarPosition(BarPosition position) override;
     void SetSidebarHeader(const RefPtr<AceType>& header) override;
     void SetSidebarSearchableOptions(const TabsSidebarSearchableOptions& options) override;
+    void SetShowSidebarControlButton(bool showControlButton) override;
     void SetBarDisplayModeBreakpoint(const TabBarDisplayModeBreakpoint& breakpoint) override;
     void SetOnBarDisplayModeChange(std::function<void(NG::TabBarDisplayMode)>&& onBarDisplayModeChange) override;
     void SetKeepTabBarInSideBar(bool keepTabBarInSideBar) override;
@@ -215,6 +216,7 @@ public:
     static void SetSidebarFooter(FrameNode* frameNode, const RefPtr<AceType>& footer);
     static void SetSidebarBottomBar(FrameNode* frameNode, const RefPtr<AceType>& bottomBar);
     static void SetSidebarSearchableOptions(FrameNode* frameNode, const TabsSidebarSearchableOptions& options);
+    static void SetShowSidebarControlButton(FrameNode* frameNode, bool showControlButton);
     static void SetBarDisplayModeBreakpoint(FrameNode* frameNode, const TabBarDisplayModeBreakpoint& breakpoint);
     static void SetOnBarDisplayModeChange(FrameNode* frameNode,
         std::function<void(NG::TabBarDisplayMode)>&& onBarDisplayModeChange);

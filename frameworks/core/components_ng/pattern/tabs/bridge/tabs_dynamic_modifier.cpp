@@ -963,6 +963,10 @@ void SetSidebarSearchableImpl(ArkUINodeHandle node, struct ArkUITabsSidebarSearc
 
 void ResetSidebarSearchableImpl(ArkUINodeHandle node) {}
 
+void SetShowSidebarControlButtonImpl(ArkUINodeHandle node, ArkUI_Bool showControlButton) {}
+
+void ResetShowSidebarControlButtonImpl(ArkUINodeHandle node) {}
+
 void SetBarDisplayModeBreakpointImpl(ArkUINodeHandle node, struct ArkUITabBarDisplayModeBreakpoint* breakpoint) {}
 
 void ResetBarDisplayModeBreakpointImpl(ArkUINodeHandle node) {}
@@ -2190,6 +2194,20 @@ void ResetSidebarSearchable(ArkUINodeHandle node)
     TabsModelNG::SetSidebarSearchableOptions(frameNode, options);
 }
 
+void SetShowSidebarControlButton(ArkUINodeHandle node, ArkUI_Bool showControlButton)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabsModelNG::SetShowSidebarControlButton(frameNode, showControlButton);
+}
+
+void ResetShowSidebarControlButton(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabsModelNG::SetShowSidebarControlButton(frameNode, false);
+}
+
 void SetBarDisplayModeBreakpoint(ArkUINodeHandle node, struct ArkUITabBarDisplayModeBreakpoint* breakpoint)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -2546,6 +2564,8 @@ const ArkUITabsModifier* GetTabsModifier()
             .resetSidebarBottomBar = ResetSidebarBottomBar,
             .setSidebarSearchable = SetSidebarSearchable,
             .resetSidebarSearchable = ResetSidebarSearchable,
+            .setShowSidebarControlButton = SetShowSidebarControlButton,
+            .resetShowSidebarControlButton = ResetShowSidebarControlButton,
             .setBarDisplayModeBreakpoint = SetBarDisplayModeBreakpoint,
             .resetBarDisplayModeBreakpoint = ResetBarDisplayModeBreakpoint,
             .setOnBarDisplayModeChange = SetOnBarDisplayModeChange,
@@ -2698,6 +2718,8 @@ const ArkUITabsModifier* GetTabsModifier()
         .resetSidebarBottomBar = ResetSidebarBottomBarImpl,
         .setSidebarSearchable = SetSidebarSearchableImpl,
         .resetSidebarSearchable = ResetSidebarSearchableImpl,
+        .setShowSidebarControlButton = SetShowSidebarControlButtonImpl,
+        .resetShowSidebarControlButton = ResetShowSidebarControlButtonImpl,
         .setBarDisplayModeBreakpoint = SetBarDisplayModeBreakpointImpl,
         .resetBarDisplayModeBreakpoint = ResetBarDisplayModeBreakpointImpl,
         .setOnBarDisplayModeChange = SetOnBarDisplayModeChangeImpl,

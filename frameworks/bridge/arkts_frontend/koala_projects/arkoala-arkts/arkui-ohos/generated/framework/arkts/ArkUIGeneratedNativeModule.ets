@@ -2584,6 +2584,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _TabsAttribute_setSidebarBottomBar(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
+    native static _TabsAttribute_setShowSidebarControlButton(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
     native static _TabsAttribute_setBarMode(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _TabsAttribute_setBarHeight1(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void

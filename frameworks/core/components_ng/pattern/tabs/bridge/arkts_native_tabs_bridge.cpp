@@ -286,7 +286,8 @@ void TabsBridge::RegisterTabsAttributes(panda::Local<panda::ObjectRef> object, p
         "resetTabsBarFloatingStyle", "setTabsBarTopFloatingStyle", "resetTabsBarTopFloatingStyle",
         "setBarStyle", "resetBarStyle", "setSidebarPosition",
         "resetSidebarPosition", "setSidebarHeader", "resetSidebarHeader", "setSidebarSearchable",
-        "resetSidebarSearchable", "setBarDisplayModeBreakpoint", "resetBarDisplayModeBreakpoint",
+        "resetSidebarSearchable", "setShowSidebarControlButton", "resetShowSidebarControlButton",
+        "setBarDisplayModeBreakpoint", "resetBarDisplayModeBreakpoint",
         "setOnBarDisplayModeChange", "resetOnBarDisplayModeChange", "setSidebarDisplayStyle",
         "resetSidebarDisplayStyle", "setTabSidebarWidth", "resetTabSidebarWidth", "setTabMinSidebarWidth",
         "resetTabMinSidebarWidth", "setTabMaxSidebarWidth", "resetTabMaxSidebarWidth", "setTabMinContentWidth",
@@ -400,6 +401,8 @@ void TabsBridge::RegisterTabsAttributes(panda::Local<panda::ObjectRef> object, p
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::ResetSidebarHeader),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::SetSidebarSearchable),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::ResetSidebarSearchable),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::SetShowSidebarControlButton),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::ResetShowSidebarControlButton),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::SetBarDisplayModeBreakpoint),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::ResetBarDisplayModeBreakpoint),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::SetOnBarDisplayModeChange),
@@ -3464,6 +3467,33 @@ ArkUINativeModuleValue TabsBridge::ResetSidebarSearchable(ArkUIRuntimeCallInfo* 
     CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
     auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
     GetArkUINodeModifiers()->getTabsModifier()->resetSidebarSearchable(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue TabsBridge::SetShowSidebarControlButton(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(TABS_ARG_INDEX_0);
+    Local<JSValueRef> showArg = runtimeCallInfo->GetCallArgRef(TABS_ARG_INDEX_1);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    bool showControlButton = false;
+    if (!showArg.IsNull() && !showArg->IsUndefined() && showArg->IsBoolean()) {
+        showControlButton = showArg->ToBoolean(vm)->Value();
+    }
+    GetArkUINodeModifiers()->getTabsModifier()->setShowSidebarControlButton(nativeNode, showControlButton);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue TabsBridge::ResetShowSidebarControlButton(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(TABS_ARG_INDEX_0);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    GetArkUINodeModifiers()->getTabsModifier()->resetShowSidebarControlButton(nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }
 

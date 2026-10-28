@@ -277,10 +277,34 @@ public:
         return sideBarDividerNode_;
     }
 
+    RefPtr<FrameNode> GetCollapseButtonNode() const
+    {
+        return collapseButtonNode_;
+    }
+
     void SetTabsSidebarSearchableOptions(const TabsSidebarSearchableOptions& options)
     {
         searchableOptions_ = options;
     }
+
+    void SetShowSidebarControlButton(bool showControlButton)
+    {
+        if (showSidebarControlButton_ == showControlButton) {
+            return;
+        }
+        showSidebarControlButton_ = showControlButton;
+        if (sideBarNode_) {
+            SyncPropertiesToSideBar();
+            UpdateCollapseButtonIfNeeded();
+        }
+    }
+
+    bool GetShowSidebarControlButton() const
+    {
+        return showSidebarControlButton_;
+    }
+
+    void UpdateCollapseButtonIfNeeded();
 
     const TabsSidebarSearchableOptions& GetTabsSidebarSearchableOptions() const
     {
@@ -343,6 +367,26 @@ public:
     const std::optional<float>& GetRealSideBarWidthPx() const
     {
         return realSideBarWidthPx_;
+    }
+
+    void SetRealSideBarWidthPx(float width)
+    {
+        realSideBarWidthPx_ = width;
+    }
+
+    void ClearRealSideBarWidthPx()
+    {
+        realSideBarWidthPx_.reset();
+    }
+
+    float GetPreSideBarWidthPx() const
+    {
+        return preSideBarWidthPx_;
+    }
+
+    void SetPreSideBarWidthPx(float width)
+    {
+        preSideBarWidthPx_ = width;
     }
 
     std::optional<Dimension> GetEffectiveSidebarWidth() const;
@@ -545,10 +589,12 @@ private:
     std::optional<TabBarLayoutStyle> layoutStyle_;
     RefPtr<FrameNode> sideBarNode_ = nullptr;
     RefPtr<FrameNode> sideBarDividerNode_ = nullptr;
+    RefPtr<FrameNode> collapseButtonNode_ = nullptr;
     RefPtr<NG::UINode> sidebarHeaderNode_;
     RefPtr<NG::UINode> sidebarFooterNode_;
     RefPtr<NG::UINode> sidebarBottomBarNode_;
     TabsSidebarSearchableOptions searchableOptions_;
+    bool showSidebarControlButton_ = false;
     std::function<void(WeakPtr<NG::FrameNode>)> barModifierApply_;
     bool hasBarBlurStyle_ = false;
     BlurStyleOption barBlurStyleOption_;

@@ -1031,6 +1031,18 @@ export class ArkTabsPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._TabsAttribute_setSidebarBottomBar(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setShowSidebarControlButtonAttribute(value: boolean | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            thisSerializer.writeBoolean(valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._TabsAttribute_setShowSidebarControlButton(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setBarModeAttribute(value: BarMode | undefined, options?: ScrollableBarModeOptions): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (value !== undefined) {
@@ -1385,6 +1397,9 @@ export interface TabsAttribute extends CommonMethod {
     sidebarBottomBar(value: ComponentContentBase | undefined): this {
         throw new Error('Unimplemented method sidebarBottomBar')
     }
+    showSidebarControlButton(value: boolean | undefined): this {
+        throw new Error('Unimplemented method showSidebarControlButton')
+    }
     barMode(value: BarMode | undefined, options?: ScrollableBarModeOptions): this {
         throw new Error('Unimplemented method barMode')
     }
@@ -1669,6 +1684,11 @@ export class ArkTabsComponent extends ArkCommonMethodComponent implements TabsAt
     public sidebarBottomBar(value: ComponentContentBase | undefined): this {
         const value_casted = value as (ComponentContentBase | undefined)
         this.getPeer()?.setSidebarBottomBarAttribute(value_casted)
+        return this
+    }
+    public showSidebarControlButton(value: boolean | undefined): this {
+        const value_casted = value as (boolean | undefined)
+        this.getPeer()?.setShowSidebarControlButtonAttribute(value_casted)
         return this
     }
     public barMode(value: BarMode | undefined, options?: ScrollableBarModeOptions): this {
