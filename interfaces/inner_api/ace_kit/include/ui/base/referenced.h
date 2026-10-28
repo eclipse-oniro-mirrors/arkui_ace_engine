@@ -164,11 +164,12 @@ protected:
         return RefPtr<T>(p, false);
     }
 
-    // ATTENTION: Use this only in performance-sensitive contexts
+    // Requires a valid static pointer conversion and the correct dynamic type.
+    // Virtual-base downcasts and cross-casts must use Transfer instead.
     template<class T, class O>
     static RefPtr<T> ForceTransfer(RefPtr<O>& ptr)
     {
-        auto p = reinterpret_cast<T*>(ptr.rawPtr_);
+        auto p = static_cast<T*>(ptr.rawPtr_);
         ptr.rawPtr_ = nullptr;
         return RefPtr<T>(p, false);
     }

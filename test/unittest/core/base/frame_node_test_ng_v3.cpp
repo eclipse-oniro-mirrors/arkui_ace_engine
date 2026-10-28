@@ -2494,4 +2494,128 @@ HWTEST_F(FrameNodeTestNg, DumpVisibleAreaInfo001, TestSize.Level1)
     EXPECT_TRUE(eventHub->HasVisibleAreaCallback(true));
     EXPECT_TRUE(eventHub->HasThrottledVisibleAreaCallback());
 }
+namespace {
+class PointerOffsetPrefix {
+public:
+    virtual ~PointerOffsetPrefix() = default;
+    uintptr_t padding = 1;
+};
+
+class OffsetPattern : public PointerOffsetPrefix, public Pattern {
+    DECLARE_ACE_TYPE(OffsetPattern, Pattern);
+};
+
+class VirtualBasePattern : public virtual Pattern {
+    DECLARE_ACE_TYPE(VirtualBasePattern, Pattern);
+public:
+    uintptr_t padding = 1;
+};
+
+class PatternCapability : public virtual AceType {
+    DECLARE_ACE_TYPE(PatternCapability, AceType);
+};
+
+class CrossCastPattern : public Pattern, public PatternCapability {
+    DECLARE_ACE_TYPE(CrossCastPattern, Pattern, PatternCapability);
+};
+
+class OffsetLayoutProperty : public PointerOffsetPrefix, public LayoutProperty {
+    DECLARE_ACE_TYPE(OffsetLayoutProperty, LayoutProperty);
+};
+
+class OffsetPaintProperty : public PointerOffsetPrefix, public PaintProperty {
+    DECLARE_ACE_TYPE(OffsetPaintProperty, PaintProperty);
+};
+
+class TransferOwner : public PointerOffsetPrefix, public AceType {
+    DECLARE_ACE_TYPE(TransferOwner, AceType);
+public:
+    explicit TransferOwner(int& destroyed) : destroyed_(destroyed) {}
+    ~TransferOwner() override { ++destroyed_; }
+    using Referenced::ForceTransfer;
+private:
+    int& destroyed_;
+};
+} // namespace
+
+/**
+ * @tc.name: TypedComponentPointerOffset001
+ * @tc.desc: Static downcasts adjust non-primary component bases without changing ownership.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeTestNg, TypedComponentPointerOffset001, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<OffsetPattern>();
+    auto node = FrameNode::CreateFrameNode("offset", ElementRegister::GetInstance()->MakeUniqueId(), pattern);
+    auto* raw = AceType::RawPtr(pattern);
+    ASSERT_NE(static_cast<void*>(raw), static_cast<void*>(static_cast<Pattern*>(raw)));
+    auto count = pattern->RefCount();
+    EXPECT_EQ(node->GetPatternPtr<OffsetPattern>(), raw);
+    EXPECT_EQ(node->GetPatternPtr<Pattern>(), static_cast<Pattern*>(raw));
+    EXPECT_EQ(node->GetPatternPtr<AceType>(), static_cast<AceType*>(raw));
+    EXPECT_EQ(pattern->RefCount(), count);
+
+    auto layout = AceType::MakeRefPtr<OffsetLayoutProperty>();
+    node->layoutProperty_ = layout;
+    ASSERT_NE(static_cast<void*>(AceType::RawPtr(layout)),
+        static_cast<void*>(static_cast<LayoutProperty*>(AceType::RawPtr(layout))));
+    EXPECT_EQ(node->GetLayoutPropertyPtr<OffsetLayoutProperty>(), AceType::RawPtr(layout));
+    auto paint = AceType::MakeRefPtr<OffsetPaintProperty>();
+    node->paintProperty_ = paint;
+    ASSERT_NE(static_cast<void*>(AceType::RawPtr(paint)),
+        static_cast<void*>(static_cast<PaintProperty*>(AceType::RawPtr(paint))));
+    EXPECT_EQ(node->GetPaintPropertyPtr<OffsetPaintProperty>(), AceType::RawPtr(paint));
+}
+
+/**
+ * @tc.name: TypedComponentVirtualBase001
+ * @tc.desc: Virtual-base downcasts use runtime type information; null components stay null.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeTestNg, TypedComponentVirtualBase001, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<VirtualBasePattern>();
+    auto node = FrameNode::CreateFrameNode("virtual", ElementRegister::GetInstance()->MakeUniqueId(), pattern);
+    auto* raw = AceType::RawPtr(pattern);
+    ASSERT_NE(static_cast<void*>(raw), static_cast<void*>(static_cast<Pattern*>(raw)));
+    EXPECT_EQ(node->GetPatternPtr<VirtualBasePattern>(), raw);
+    auto cross = AceType::MakeRefPtr<CrossCastPattern>();
+    node->pattern_ = cross;
+    EXPECT_EQ(node->GetPatternPtr<PatternCapability>(), static_cast<PatternCapability*>(AceType::RawPtr(cross)));
+    auto layout = node->layoutProperty_;
+    auto paint = node->paintProperty_;
+    node->pattern_.Reset();
+    node->layoutProperty_.Reset();
+    node->paintProperty_.Reset();
+    EXPECT_EQ(node->GetPatternPtr<VirtualBasePattern>(), nullptr);
+    EXPECT_EQ(node->GetLayoutPropertyPtr<OffsetLayoutProperty>(), nullptr);
+    EXPECT_EQ(node->GetPaintPropertyPtr<OffsetPaintProperty>(), nullptr);
+    // Restore the live node's invariants before destruction.
+    node->pattern_ = pattern;
+    node->layoutProperty_ = layout;
+    node->paintProperty_ = paint;
+}
+
+/**
+ * @tc.name: ForceTransferPointerOffset001
+ * @tc.desc: Transfer adjusts a secondary owner address and retains exactly one strong reference.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeTestNg, ForceTransferPointerOffset001, TestSize.Level1)
+{
+    int destroyed = 0;
+    auto* raw = new TransferOwner(destroyed);
+    ASSERT_NE(static_cast<void*>(raw), static_cast<void*>(static_cast<AceType*>(raw)));
+    auto source = Referenced::Claim<AceType, true>(raw);
+    ASSERT_EQ(source->RefCount(), 1);
+    auto target = TransferOwner::ForceTransfer<TransferOwner>(source);
+    EXPECT_EQ(source, nullptr);
+    EXPECT_EQ(AceType::RawPtr(target), raw);
+    EXPECT_EQ(target->RefCount(), 1);
+    EXPECT_EQ(destroyed, 0);
+    target.Reset();
+    EXPECT_EQ(destroyed, 1);
+    auto empty = TransferOwner::ForceTransfer<TransferOwner>(source);
+    EXPECT_EQ(empty, nullptr);
+}
 } // namespace OHOS::Ace::NG
