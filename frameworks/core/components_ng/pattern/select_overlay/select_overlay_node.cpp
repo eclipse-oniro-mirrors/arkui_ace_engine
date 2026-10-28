@@ -3180,12 +3180,6 @@ void SelectOverlayNode::PlaySelectMenuToExtensionAnimation(
     CHECK_NULL_VOID(selectMenu_);
     CHECK_NULL_VOID(selectMenuInner_);
     CHECK_NULL_VOID(extensionMenu_);
-    auto selectProperty = selectMenu_->GetLayoutProperty();
-    CHECK_NULL_VOID(selectProperty);
-    auto selectMenuInnerProperty = selectMenuInner_->GetLayoutProperty();
-    CHECK_NULL_VOID(selectMenuInnerProperty);
-    auto extensionProperty = extensionMenu_->GetLayoutProperty();
-    CHECK_NULL_VOID(extensionProperty);
     auto selectContext = selectMenu_->GetRenderContext();
     CHECK_NULL_VOID(selectContext);
     auto selectMenuInnerContext = selectMenuInner_->GetRenderContext();
@@ -3193,27 +3187,8 @@ void SelectOverlayNode::PlaySelectMenuToExtensionAnimation(
     auto pipeline = GetContext();
     CHECK_NULL_VOID(pipeline);
 
-    auto containerId = pipeline->GetInstanceId();
-    FinishCallback callback = [selectProperty, selectMenuInnerProperty, extensionProperty, id = containerId,
-        weak = WeakClaim(this), weakExtensionMenu = WeakClaim(RawPtr(extensionMenu_)), onFinish]() {
-        ContainerScope scope(id);
-        selectProperty->UpdateVisibility(VisibleType::GONE);
-        selectMenuInnerProperty->UpdateVisibility(VisibleType::GONE);
-        extensionProperty->UpdateVisibility(VisibleType::VISIBLE);
-        auto selectOverlay = weak.Upgrade();
-        CHECK_NULL_VOID(selectOverlay);
-        selectOverlay->SetAnimationStatus(false);
-        auto extensionMenu = weakExtensionMenu.Upgrade();
-        CHECK_NULL_VOID(extensionMenu);
-        auto child = FindAccessibleFocusNodeInExtMenu(extensionMenu);
-        auto target = AceType::DynamicCast<FrameNode>(child);
-        if (target) {
-            target->OnAccessibilityEvent(AccessibilityEventType::REQUEST_FOCUS);
-        }
-        if (onFinish) {
-            onFinish();
-        }
-    };
+    auto callback = CreateSelectMenuToExtensionFinishCallback(onFinish);
+    CHECK_NULL_VOID(callback);
     AnimationOption selectOption;
     selectOption.SetDuration(ANIMATION_DURATION3);
     const RefPtr<CubicCurve> cubicCurve = AceType::MakeRefPtr<CubicCurve>(0.26, 0.00, 0.60, 0.00);
@@ -3226,6 +3201,72 @@ void SelectOverlayNode::PlaySelectMenuToExtensionAnimation(
     selectMenu_->MarkDirtyNode(PROPERTY_UPDATE_LAYOUT);
     pipeline->FlushUITasks();
     AnimationUtils::CloseImplicitAnimation(GetContextRefPtr());
+}
+
+std::function<void()> SelectOverlayNode::CreateSelectMenuToExtensionFinishCallback(
+    const std::function<void()>& onFinish)
+{
+    CHECK_NULL_RETURN(selectMenu_, nullptr);
+    CHECK_NULL_RETURN(selectMenuInner_, nullptr);
+    CHECK_NULL_RETURN(extensionMenu_, nullptr);
+    auto selectProperty = selectMenu_->GetLayoutProperty();
+    CHECK_NULL_RETURN(selectProperty, nullptr);
+    auto selectMenuInnerProperty = selectMenuInner_->GetLayoutProperty();
+    CHECK_NULL_RETURN(selectMenuInnerProperty, nullptr);
+    auto extensionProperty = extensionMenu_->GetLayoutProperty();
+    CHECK_NULL_RETURN(extensionProperty, nullptr);
+    auto pipeline = GetContext();
+    CHECK_NULL_RETURN(pipeline, nullptr);
+    return [selectProperty, selectMenuInnerProperty, extensionProperty, id = pipeline->GetInstanceId(),
+        weak = WeakClaim(this), weakExtensionMenu = WeakClaim(RawPtr(extensionMenu_)), onFinish]() {
+        ContainerScope scope(id);
+        auto selectOverlay = weak.Upgrade();
+        CHECK_NULL_VOID(selectOverlay);
+        auto extensionMenu = weakExtensionMenu.Upgrade();
+        CHECK_NULL_VOID(extensionMenu);
+        if (!selectOverlay->isExtensionMenu_ || selectOverlay->extensionMenu_ != extensionMenu) {
+            return;
+        }
+        // Make the extension menu available before hiding the currently focused more button.
+        extensionProperty->UpdateVisibility(VisibleType::VISIBLE);
+        if (onFinish) {
+            onFinish();
+        }
+        selectProperty->UpdateVisibility(VisibleType::GONE);
+        selectMenuInnerProperty->UpdateVisibility(VisibleType::GONE);
+        selectOverlay->SetAnimationStatus(false);
+        selectOverlay->RequestExtensionMenuAccessibilityFocusAfterLayout(extensionMenu);
+    };
+}
+
+void SelectOverlayNode::RequestExtensionMenuAccessibilityFocusAfterLayout(const RefPtr<FrameNode>& extensionMenu)
+{
+    CHECK_NULL_VOID(extensionMenu);
+    auto pipeline = GetContext();
+    CHECK_NULL_VOID(pipeline);
+    pipeline->AddAfterLayoutTask([weak = WeakClaim(this), weakExtensionMenu = WeakClaim(RawPtr(extensionMenu)),
+        id = pipeline->GetInstanceId()]() {
+        ContainerScope scope(id);
+        auto selectOverlay = weak.Upgrade();
+        CHECK_NULL_VOID(selectOverlay);
+        auto extensionMenu = weakExtensionMenu.Upgrade();
+        CHECK_NULL_VOID(extensionMenu);
+        if (!selectOverlay->IsOnMainTree() || !selectOverlay->isExtensionMenu_ ||
+            selectOverlay->extensionMenu_ != extensionMenu || !extensionMenu->IsVisible()) {
+            return;
+        }
+        auto pattern = selectOverlay->GetPattern<SelectOverlayPattern>();
+        CHECK_NULL_VOID(pattern);
+        auto info = pattern->GetSelectOverlayInfo();
+        CHECK_NULL_VOID(info);
+        if (!info->menuInfo.menuIsShow) {
+            return;
+        }
+        auto target = AceType::DynamicCast<FrameNode>(FindAccessibleFocusNodeInExtMenu(extensionMenu));
+        CHECK_NULL_VOID(target);
+        target->OnAccessibilityEvent(AccessibilityEventType::REQUEST_FOCUS);
+    });
+    pipeline->RequestFrame();
 }
 
 void SelectOverlayNode::PlayExtensionMenuLightAnimation(
