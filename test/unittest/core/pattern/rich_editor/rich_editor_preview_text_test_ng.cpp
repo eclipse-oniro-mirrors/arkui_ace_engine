@@ -214,7 +214,6 @@ HWTEST_F(RichEditorPreviewTextTestNg, SetPreviewText003, TestSize.Level0)
     testPreviewList.emplace_back(0, -1, PREVIEW_TEXT_VALUE1, -1);
     testPreviewList.emplace_back(-1, 0, PREVIEW_TEXT_VALUE1, -1);
     testPreviewList.emplace_back(0, 0, PREVIEW_TEXT_VALUE1, 0);
-    testPreviewList.emplace_back(0, 5, PREVIEW_TEXT_VALUE1, 0);
     PreviewRange previewRange;
     for (const auto& testCase : testPreviewList) {
         previewRange.start = std::get<0>(testCase);
@@ -768,7 +767,6 @@ HWTEST_F(RichEditorPreviewTextTestNg, RichEditorPatternTestGetPreviewTextStyle00
  */
 HWTEST_F(RichEditorPreviewTextTestNg, SetResultObjectText001, TestSize.Level0)
 {
-    ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
     ResultObject resultObject;

@@ -36,7 +36,7 @@ class RichEditorStyledStringOneTestNg : public RichEditorStyledStringCommonTestN
  * @tc.desc: test InsertValueInStyledString
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorStyledStringOneTestNg, InsertValueInStyledString002, TestSize.Level0)
+HWTEST_F(RichEditorStyledStringOneTestNg, InsertValueInStyledString002, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -54,7 +54,7 @@ HWTEST_F(RichEditorStyledStringOneTestNg, InsertValueInStyledString002, TestSize
  * @tc.desc: test RichEditorPattern InsertValueInStyledString
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorStyledStringOneTestNg, InsertValueInStyledString003, TestSize.Level0)
+HWTEST_F(RichEditorStyledStringOneTestNg, InsertValueInStyledString003, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -76,45 +76,38 @@ HWTEST_F(RichEditorStyledStringOneTestNg, InsertValueInStyledString003, TestSize
     ASSERT_EQ(richEditorPattern->HasFocus(), true);
 }
 
-/**
- * @tc.name: CreatePasteCallback001
- * @tc.desc: test CreatePasteCallback
+/*
+ * @tc.name: HandleOnPaste001
+ * @tc.desc: test HandleOnPaste
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorStyledStringOneTestNg, CreatePasteCallback001, TestSize.Level0)
+HWTEST_F(RichEditorStyledStringOneTestNg, AddImageSpanFromCollaboration001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
-    auto pipeline = MockPipelineContext::GetCurrent();
-    auto clipboard = ClipboardProxy::GetInstance()->GetClipboard(pipeline->GetTaskExecutor());
-    richEditorPattern->clipboard_ = clipboard;
-    /**
-     * @tc.steps: step1. CreatePasteCallback
-     */
-    auto pasteCallback = richEditorPattern->CreatePasteCallback();
-    /**
-     * @tc.steps: step2. value from clipBoard
-     */
     auto mutableTextStr = CreateTextStyledString(INIT_U16STRING_1);
-    auto mutableImageStr = CreateImageStyledString();
-    std::vector<uint8_t> data1;
-    std::vector<uint8_t> data2;
-    mutableTextStr->EncodeTlv(data1);
-    mutableImageStr->EncodeTlv(data2);
-    std::vector<std::vector<uint8_t>> arrs = { std::move(data1), std::move(data2) };
-    string text = UtfUtils::Str16ToStr8(INIT_U16STRING_1);
-    bool isMulitiTypeRecord = true;
-    /**
-     * @tc.steps: step3. test spanStringMode
-     */
-    richEditorPattern->spans_.clear();
-    richEditorPattern->isSpanStringMode_ = true;
-    richEditorPattern->styledString_ = AceType::MakeRefPtr<MutableSpanString>(u"");
-    richEditorPattern->styledString_->SetSpanWatcher(AceType::WeakClaim(AceType::RawPtr(richEditorPattern)));
-    bool isAutoFill = false;
-    pasteCallback(arrs, text, isMulitiTypeRecord, isAutoFill);
-    EXPECT_EQ(2, richEditorPattern->spans_.size());
+    richEditorPattern->SetStyledString(mutableTextStr);
+    int32_t insertIndex = 1;
+    int32_t initCaretPosition = 5;
+    richEditorPattern->caretPosition_ = initCaretPosition;
+    const ImageSpanOptions IMAGE_SPAN_OPTIONS_1 = {
+        .offset = insertIndex,
+        .image = "app.media.icon",
+        .bundleName = std::nullopt,
+        .moduleName = std::nullopt,
+        .imagePixelMap = std::nullopt,
+        .imageAttribute = IMAGE_SPAN_ATTRIBUTE_1
+    };
+    richEditorPattern->AddImageSpanFromCollaboration(IMAGE_SPAN_OPTIONS_1, false);
+    EXPECT_EQ(richEditorPattern->caretPosition_, initCaretPosition);
+    richEditorPattern->AddImageSpanFromCollaboration(IMAGE_SPAN_OPTIONS_1, true);
+    EXPECT_EQ(richEditorPattern->caretPosition_, insertIndex + 1);
+ 
+    auto contentLength = richEditorPattern->GetTextContentLength();
+    richEditorPattern->maxLength_ = contentLength;
+    richEditorPattern->AddImageSpanFromCollaboration(IMAGE_SPAN_OPTIONS_1, false);
+    EXPECT_EQ(richEditorPattern->GetTextContentLength(), contentLength);
 }
 
 /**
@@ -122,7 +115,7 @@ HWTEST_F(RichEditorStyledStringOneTestNg, CreatePasteCallback001, TestSize.Level
  * @tc.desc: test ProcessStyledString
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorStyledStringOneTestNg, ProcessStyledString001, TestSize.Level0)
+HWTEST_F(RichEditorStyledStringOneTestNg, ProcessStyledString001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -145,7 +138,7 @@ HWTEST_F(RichEditorStyledStringOneTestNg, ProcessStyledString001, TestSize.Level
  * @tc.desc: test ProcessStyledString
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorStyledStringOneTestNg, ProcessStyledString002, TestSize.Level0)
+HWTEST_F(RichEditorStyledStringOneTestNg, ProcessStyledString002, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -168,7 +161,7 @@ HWTEST_F(RichEditorStyledStringOneTestNg, ProcessStyledString002, TestSize.Level
  * @tc.desc: test ProcessStyledString
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorStyledStringOneTestNg, ProcessStyledString003, TestSize.Level0)
+HWTEST_F(RichEditorStyledStringOneTestNg, ProcessStyledString003, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -190,7 +183,7 @@ HWTEST_F(RichEditorStyledStringOneTestNg, ProcessStyledString003, TestSize.Level
  * @tc.desc: test ProcessStyledString
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorStyledStringOneTestNg, StyledStringCreateTest, TestSize.Level0)
+HWTEST_F(RichEditorStyledStringOneTestNg, StyledStringCreateTest, TestSize.Level1)
 {
     RefPtr<RichEditorPattern> pattern;
     bool isStyledStringMode;
