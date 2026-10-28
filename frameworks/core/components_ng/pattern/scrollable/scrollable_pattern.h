@@ -688,6 +688,13 @@ public:
 
     static ScrollSource ConvertScrollSource(int32_t source);
 
+    struct ItemLazySyntax {
+        bool arkoala = false;
+        bool repeatV2 = false;
+    };
+    // Lazy syntax kinds that directly provide items of host.
+    ACE_FORCE_EXPORT static ItemLazySyntax FindItemLazySyntax(const RefPtr<UINode>& host);
+
     static int32_t ScrollToTarget(
         RefPtr<FrameNode>& scrollable, RefPtr<FrameNode>& target, float targetOffset, ScrollAlign targetAlign);
 
@@ -1198,6 +1205,7 @@ protected:
     std::optional<ScrollToIndexTarget> scrollTarget_;
     bool fastScrollSkip_ = false;
     bool startingFastScroll_ = false;
+    uint64_t animationGeneration_ = 0;
     ACE_FORCE_EXPORT void SuggestOpIncGroup(bool flag);
     void OnAttachToFrameNode() override;
     void OnAttachToFrameNodeMultiThread();
