@@ -26,6 +26,8 @@ test_sources = [
   "dialog_test_ng.cpp",
   "dialog_test_two_ng.cpp",
   "dialog_test_core.cpp",
+  "dialog_theme_wrapper_test_ng.cpp",
+  "$ace_root/frameworks/core/components/dialog/dialog_theme.cpp",
 ]
 
 if (is_host_product) {
