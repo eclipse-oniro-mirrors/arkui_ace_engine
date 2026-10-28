@@ -266,6 +266,12 @@ int32_t UiContentStub::OnRemoteRequest(uint32_t code, MessageParcel& data, Messa
             GetNodesInRectInner(data, reply, option);
             break;
         }
+        case SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK: {
+            return SendCommandWithFinishCallbackInner(data, reply, option);
+        }
+        case SEND_COMMAND_WITH_FINISH_CALLBACK: {
+            return SendCommandKeyCodeWithFinishCallbackInner(data, reply, option);
+        }
         default: {
             LOGI("ui_session unknown transaction code %{public}d", code);
             return IPCObjectStub::OnRemoteRequest(code, data, reply, option);
@@ -448,6 +454,41 @@ int32_t UiContentStub::SendCommandKeyCodeInner(MessageParcel& data, MessageParce
     std::string command = data.ReadString();
     reply.WriteInt32(SendCommand(command));
     return NO_ERROR;
+}
+
+int32_t UiContentStub::SendCommandWithFinishCallbackInner(
+    MessageParcel& data, MessageParcel& reply, MessageOption& option)
+{
+    uint64_t requestId = 0;
+    int32_t id = 0;
+    if (!data.ReadUint64(requestId) || requestId == 0 || !data.ReadInt32(id)) {
+        LOGW("SendCommandWithFinishCallbackInner read parcel failed");
+        return FAILED;
+    }
+    std::string command;
+    if (!data.ReadString(command)) {
+        return FAILED;
+    }
+    int32_t processId = IPCSkeleton::GetCallingRealPid();
+    auto callback = UiSessionManager::GetInstance()->MakeCommandResultCallback(processId, requestId);
+    return callback ? SendCommand(id, command, callback) : FAILED;
+}
+
+int32_t UiContentStub::SendCommandKeyCodeWithFinishCallbackInner(
+    MessageParcel& data, MessageParcel& reply, MessageOption& option)
+{
+    uint64_t requestId = 0;
+    if (!data.ReadUint64(requestId) || requestId == 0) {
+        LOGW("SendCommandKeyCodeWithFinishCallbackInner read parcel failed");
+        return FAILED;
+    }
+    std::string command;
+    if (!data.ReadString(command)) {
+        return FAILED;
+    }
+    int32_t processId = IPCSkeleton::GetCallingRealPid();
+    auto callback = UiSessionManager::GetInstance()->MakeCommandResultCallback(processId, requestId);
+    return callback ? SendCommand(command, callback) : FAILED;
 }
 
 int32_t UiContentStub::UnregisterClickEventCallbackInner(

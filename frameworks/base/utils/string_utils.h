@@ -87,6 +87,9 @@ void ReplaceTabAndNewLine(std::string& data);
 ACE_FORCE_EXPORT std::string RestoreEscape(const std::string& src);
 ACE_FORCE_EXPORT std::string RestoreBackslash(const std::string& src);
 
+// Returns a JSON string literal including surrounding quotes; non-ASCII bytes are preserved.
+std::string EscapeJsonString(const std::string& value);
+
 ACE_FORCE_EXPORT int32_t StringToInt(const std::string& value, int64_t defaultErr = 0);
 ACE_FORCE_EXPORT int64_t StringToLongInt(const std::string& value, int64_t defaultErr = 0);
 ACE_FORCE_EXPORT uint64_t StringToLongUint(const std::string& value, uint64_t defaultErr = 0);

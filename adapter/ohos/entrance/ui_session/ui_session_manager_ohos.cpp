@@ -1692,6 +1692,23 @@ void UiSessionManagerOhos::NotifySendCommandPattern(int32_t id, const std::strin
     }
 }
 
+void UiSessionManagerOhos::NotifySendCommandPatternWithResult(
+    int32_t id, const std::string& command, const CommandResultCallback& finishCallback)
+{
+    NotifySendCommandWithResultFunction notifyFunction;
+    {
+        std::lock_guard<std::mutex> lock(notifySendCommandWithResultFunctionMutex_);
+        notifyFunction = notifySendCommandWithResultFunction_;
+    }
+    if (notifyFunction) {
+        notifyFunction(id, command, finishCallback);
+        return;
+    }
+    if (finishCallback) {
+        finishCallback(R"({"result":"FAILED","errorType":"EXECUTE_FAIL","errorMessage":""})");
+    }
+}
+
 int32_t UiSessionManagerOhos::NotifySendCommandSyncPattern(int32_t id, const std::string& command)
 {
     NotifySendCommandSyncFunction notifySendCommandSyncFunction;
@@ -1762,6 +1779,12 @@ void UiSessionManagerOhos::SaveForSendCommandSyncFunction(NotifySendCommandSyncF
 {
     std::lock_guard<std::mutex> lock(notifySendCommandSyncFunctionMutex_);
     notifySendCommandSyncFunction_ = std::move(function);
+}
+
+void UiSessionManagerOhos::SaveForSendCommandWithResultFunction(NotifySendCommandWithResultFunction&& function)
+{
+    std::lock_guard<std::mutex> lock(notifySendCommandWithResultFunctionMutex_);
+    notifySendCommandWithResultFunction_ = std::move(function);
 }
 
 bool UiSessionManagerOhos::GetWebFocusRegistered()
@@ -2433,6 +2456,23 @@ void UiSessionManagerOhos::SendCommand(const std::string& command)
     }
 }
 
+void UiSessionManagerOhos::SendCommandWithResult(
+    const std::string& command, const CommandResultCallback& finishCallback)
+{
+    SendCommandWithResultFunction sendFunction;
+    {
+        std::lock_guard<std::mutex> lock(sendCommandWithResultFunctionMutex_);
+        sendFunction = sendCommandWithResultFunction_;
+    }
+    if (sendFunction) {
+        sendFunction(command, finishCallback);
+        return;
+    }
+    if (finishCallback) {
+        finishCallback(R"({"result":"FAILED","errorType":"EXECUTE_FAIL","errorMessage":""})");
+    }
+}
+
 void UiSessionManagerOhos::SaveSendCommandFunction(SendCommandFunction&& function)
 {
     std::lock_guard<std::mutex> lock(sendCommandFunctionMutex_);
@@ -2443,6 +2483,43 @@ void UiSessionManagerOhos::SaveRelaxedCommandFunction(RelaxedCommandFunction&& f
 {
     std::lock_guard<std::mutex> lock(relaxedCommandFunctionMutex_);
     relaxedCommandFunction_ = std::move(function);
+}
+
+void UiSessionManagerOhos::SaveSendCommandWithResultFunction(SendCommandWithResultFunction&& function)
+{
+    std::lock_guard<std::mutex> lock(sendCommandWithResultFunctionMutex_);
+    sendCommandWithResultFunction_ = std::move(function);
+}
+
+UiSessionManager::CommandResultCallback UiSessionManagerOhos::MakeCommandResultCallback(
+    int32_t processId, uint64_t requestId)
+{
+    wptr<IRemoteObject> connection;
+    {
+        std::shared_lock<std::shared_mutex> lock(reportObjectMutex_);
+        auto iter = reportObjectMap_.find(processId);
+        if (iter == reportObjectMap_.end()) {
+            return {};
+        }
+        connection = iter->second;
+    }
+    return [this, connection, processId, requestId](const std::string& resultJson) {
+        auto remote = connection.promote();
+        if (!remote) {
+            return;
+        }
+        {
+            std::shared_lock<std::shared_mutex> lock(reportObjectMutex_);
+            auto iter = reportObjectMap_.find(processId);
+            if (iter == reportObjectMap_.end() || iter->second != remote) {
+                return;
+            }
+        }
+        auto service = iface_cast<ReportService>(remote);
+        if (service) {
+            service->ReportCommandResult(requestId, resultJson);
+        }
+    };
 }
 
 void UiSessionManagerOhos::RegisterPipeLineExeAppAIFunction(

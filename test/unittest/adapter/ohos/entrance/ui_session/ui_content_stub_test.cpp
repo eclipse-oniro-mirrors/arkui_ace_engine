@@ -2183,6 +2183,49 @@ HWTEST_F(UIContentStubTest, UIContentStubTestQueryReport004, TestSize.Level1)
     EXPECT_FALSE(report->lazyForEachQueryCallback_);
 }
 
+HWTEST_F(UIContentStubTest, SendCommandWithFinishCallback_002, TestSize.Level1)
+{
+    sptr<UIContentServiceStubImpl> stub = std::make_shared<UIContentServiceStubImpl>();
+    auto manager = static_cast<OHOS::Ace::MockUiSessionManager*>(UiSessionManager::GetInstance());
+    ASSERT_NE(manager, nullptr);
+    constexpr uint64_t requestId = 0x123456789ABCULL;
+    constexpr int32_t nodeId = 42;
+    const std::string command = R"({"cmd":"setText","params":{"value":"test"}})";
+    const std::string resultJson = R"({"result":"SUCCESS"})";
+
+    EXPECT_CALL(*manager, NotifySendCommandPatternWithResult(nodeId, command, _))
+        .WillOnce(Invoke([&](int32_t, const std::string&, const UiSessionManager::CommandResultCallback& callback) {
+            callback(resultJson);
+        }));
+    int reportCount = 0;
+    EXPECT_CALL(*manager, MakeCommandResultCallback(_, requestId))
+        .Times(2).WillRepeatedly(Return([&](const std::string& json) { EXPECT_EQ(json, resultJson); ++reportCount; }));
+    MessageParcel data;
+    MessageParcel reply;
+    MessageOption option;
+    data.EnablePayloadStorage();
+    PrepareValidUiSessionParcel(data);
+    ASSERT_TRUE(data.WriteUint64(requestId));
+    ASSERT_TRUE(data.WriteInt32(nodeId));
+    ASSERT_TRUE(data.WriteString(command));
+    EXPECT_EQ(stub->OnRemoteRequest(IUiContentService::SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK, data, reply, option),
+        NO_ERROR);
+
+    EXPECT_CALL(*manager, SendCommandWithResult(command, _))
+        .WillOnce(Invoke([&](const std::string&, const UiSessionManager::CommandResultCallback& callback) {
+            callback(resultJson);
+        }));
+    MessageParcel keyData;
+    keyData.EnablePayloadStorage();
+    PrepareValidUiSessionParcel(keyData);
+    ASSERT_TRUE(keyData.WriteUint64(requestId));
+    ASSERT_TRUE(keyData.WriteString(command));
+    EXPECT_EQ(stub->OnRemoteRequest(IUiContentService::SEND_COMMAND_WITH_FINISH_CALLBACK, keyData, reply, option),
+        NO_ERROR);
+    Mock::VerifyAndClearExpectations(manager);
+    EXPECT_EQ(reportCount, 2);
+}
+
 HWTEST_F(UIContentStubTest, SearchReview_ClickFlushDoesNotDetectPages, TestSize.Level1)
 {
     class SearchClickSession : public UiSessionManager {

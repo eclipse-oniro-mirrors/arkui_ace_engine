@@ -9372,6 +9372,14 @@ int32_t FrameNode::OnRecvCommand(const std::string& command)
     return pattern->OnRecvCommand(command);
 }
 
+CommandResult FrameNode::OnRecvCommandWithResult(const std::string& command)
+{
+    ContainerScope scope(GetInstanceId());
+    auto pattern = GetPattern();
+    CHECK_NULL_RETURN(pattern, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+    return pattern->OnRecvCommandWithResult(command);
+}
+
 void FrameNode::HandleAreaChangeDestruct()
 {
     if (eventHub_) {

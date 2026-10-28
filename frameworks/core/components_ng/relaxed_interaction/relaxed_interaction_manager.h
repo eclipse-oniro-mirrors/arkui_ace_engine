@@ -16,6 +16,8 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_RELAXED_INTERACTION_RELAXED_INTERACTION_MANAGER_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_RELAXED_INTERACTION_RELAXED_INTERACTION_MANAGER_H
 
+#include <deque>
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -38,19 +40,32 @@ public:
     ~RelaxedInteractionManager() = default;
 
     ProcessResult ProcessCommand(const std::string& jsonStr);
+    ProcessResult ProcessCommand(
+        const std::string& jsonStr, const std::function<void(ExecutionState)>& finishCallback);
 
     ExecutionState ExecuteNextStep();
+
+    bool HasPendingWorkflow() const;
 
     void Clear();
 
 private:
-    ExecutionState DoExecuteNextStep();
+    ProcessResult ProcessCommandInternal(const std::string& jsonStr,
+        const std::function<void(ExecutionState)>& finishCallback, bool preserveLegacySemantics);
+    ExecutionState DoExecuteNextStep(std::function<void(ExecutionState)>& finishCallback);
+    ExecutionState ExecuteLegacyWorkflow(ExecutorResult result);
     std::string ExecutionStateToString(ExecutionState state);
     std::string ExecutorsToString(const std::vector<std::unique_ptr<BaseExecutor>>& executors);
 
     WeakPtr<PipelineContext> context_;
     std::unique_ptr<ExecutorGenerator> executorGenerator_;
     std::unique_ptr<ExecutorChoreographer> choreographer_;
+    struct WorkflowState {
+        size_t remainingExecutors = 0;
+        std::function<void(ExecutionState)> finishCallback;
+        bool preserveLegacySemantics = false;
+    };
+    std::deque<WorkflowState> workflowStates_;
 };
 
 } // namespace OHOS::Ace::NG

@@ -273,6 +273,7 @@ public:
     bool OnNonPointerEvent(const NonPointerEvent& event) override;
 
     void ProcessCommand(const std::string& command);
+    void ProcessCommandWithResult(const std::string& command, const std::function<void(const CommandResult&)>& finish);
 
     // ReDispatch KeyEvent from Web process.
     void ReDispatch(KeyEvent& keyEvent);

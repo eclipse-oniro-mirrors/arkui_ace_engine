@@ -94,6 +94,7 @@ class ExposureProcessor;
 }
 
 namespace OHOS::Ace::NG {
+struct CommandResult;
 class InspectorFilter;
 class PipelineContext;
 class Pattern;
@@ -1659,6 +1660,7 @@ public:
     }
 
     int32_t OnRecvCommand(const std::string& command) override;
+    CommandResult OnRecvCommandWithResult(const std::string& command);
 
     std::vector<std::pair<float, float>> GetSpecifiedContentOffsets(const std::string& content);
     void HighlightSpecifiedContent(

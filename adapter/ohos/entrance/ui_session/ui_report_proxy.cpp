@@ -18,6 +18,7 @@
 #include "pixel_map.h"
 
 #include "adapter/ohos/entrance/ui_session/include/large_string_ashmem.h"
+#include "adapter/ohos/entrance/ui_session/include/ui_session_trace.h"
 #include "adapter/ohos/entrance/ui_session/include/ui_session_log.h"
 #include "interfaces/inner_api/ui_session/ui_session_json_util.h"
 #include "interfaces/inner_api/ui_session/ui_session_ipc_util.h"
@@ -57,6 +58,23 @@ void WriteWebImagesStruct(const std::map<int32_t, std::map<int32_t,
 } // namespace
 
 namespace OHOS::Ace {
+void UiReportProxy::ReportCommandResult(uint64_t requestId, const std::string& resultJson)
+{
+    UI_SESSION_SCOPED_TRACE("SendCommand.ResultIPC.%llu", static_cast<unsigned long long>(requestId));
+    MessageParcel messageData;
+    MessageParcel reply;
+    MessageOption option(MessageOption::TF_ASYNC);
+    if (Remote() == nullptr || !messageData.WriteInterfaceToken(GetDescriptor()) ||
+        !messageData.WriteUint64(requestId) || !messageData.WriteString(resultJson)) {
+        LOGW("ReportCommandResult remote unavailable or write parcel failed");
+        return;
+    }
+    int32_t sendRequestErrorCode = Remote()->SendRequest(REPORT_COMMAND_RESULT, messageData, reply, option);
+    if (sendRequestErrorCode != ERR_NONE) {
+        LOGW("ReportCommandResult send request failed, errorCode is %{public}d", sendRequestErrorCode);
+    }
+}
+
 void UiReportProxy::ReportClickEvent(const std::string& data)
 {
     MessageParcel messageData;

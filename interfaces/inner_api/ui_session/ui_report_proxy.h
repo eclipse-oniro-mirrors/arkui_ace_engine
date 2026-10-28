@@ -114,6 +114,7 @@ public:
     void ReportNavigationQueryResult(const std::string& data) override;
     void ReportLazyForEachQueryResult(const std::string& data) override;
     void ReportNodesInRectQueryResult(const std::string& data) override;
+    void ReportCommandResult(uint64_t requestId, const std::string& resultJson) override;
 
 private:
     void SendQueryResultReport(uint32_t code, const char* caller, const std::string& data);

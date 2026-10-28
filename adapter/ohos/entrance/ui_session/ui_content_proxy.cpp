@@ -19,6 +19,7 @@
 
 #include "adapter/ohos/entrance/ui_session/content_change_config_impl.h"
 #include "adapter/ohos/entrance/ui_session/get_inspector_tree_config_impl.h"
+#include "adapter/ohos/entrance/ui_session/include/ui_session_trace.h"
 #include "adapter/ohos/entrance/ui_session/include/ui_session_log.h"
 #include "adapter/ohos/entrance/ui_session/ui_translate_request_util.h"
 #include "interfaces/inner_api/ui_session/ui_session_json_util.h"
@@ -713,6 +714,68 @@ int32_t UIContentServiceProxy::SendCommand(const std::string command)
     int32_t sendRequestErrorCode = Remote()->SendRequest(SEND_COMMAND, data, reply, option);
     if (sendRequestErrorCode != ERR_NONE) {
         LOGW("SendCommand send request failed, errorCode is %{public}d", sendRequestErrorCode);
+        return REPLY_ERROR;
+    }
+    return NO_ERROR;
+}
+
+int32_t UIContentServiceProxy::SendCommand(
+    int32_t id, const std::string& command, const SendCommandFinishCallback& finishCallback)
+{
+    return SendCommandWithFinishCallback(
+        SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK, &id, command, finishCallback);
+}
+
+int32_t UIContentServiceProxy::SendCommand(
+    const std::string command, const SendCommandFinishCallback& finishCallback)
+{
+    return SendCommandWithFinishCallback(
+        SEND_COMMAND_WITH_FINISH_CALLBACK, nullptr, command, finishCallback);
+}
+
+int32_t UIContentServiceProxy::SendCommandWithFinishCallback(
+    uint32_t code, const int32_t* id, const std::string& command, const SendCommandFinishCallback& finishCallback)
+{
+    if (finishCallback == nullptr) {
+        LOGW("SendCommandWithFinishCallback callback is nullptr");
+        return PARAM_INVALID;
+    }
+    if (report_ == nullptr) {
+        LOGW("SendCommandWithFinishCallback reportStub is nullptr");
+        return FAILED;
+    }
+    auto remote = Remote();
+    if (remote == nullptr) {
+        LOGW("SendCommandWithFinishCallback remote is nullptr");
+        return FAILED;
+    }
+    uint64_t requestId = 0;
+    if (!report_->RegisterSendCommandFinishCallback(finishCallback, requestId)) {
+        return LAST_UNFINISH;
+    }
+    UI_SESSION_SCOPED_TRACE("SendCommand.Send.%llu", static_cast<unsigned long long>(requestId));
+    MessageParcel data;
+    MessageParcel reply;
+    MessageOption option;
+    bool writeSuccess = data.WriteInterfaceToken(GetDescriptor()) && data.WriteUint64(requestId);
+    if (writeSuccess && id != nullptr) {
+        writeSuccess = data.WriteInt32(*id);
+    }
+    writeSuccess = writeSuccess && data.WriteString(command);
+    if (!writeSuccess) {
+        LOGW("SendCommandWithFinishCallback write parcel failed");
+        report_->UnregisterSendCommandFinishCallback(requestId);
+        return FAILED;
+    }
+    if (!report_->PostSendCommandCallbackRemoveTask(requestId)) {
+        LOGW("SendCommandWithFinishCallback post timeout task failed");
+        report_->UnregisterSendCommandFinishCallback(requestId);
+        return FAILED;
+    }
+    int32_t sendRequestErrorCode = remote->SendRequest(code, data, reply, option);
+    if (sendRequestErrorCode != ERR_NONE) {
+        LOGW("SendCommandWithFinishCallback send request failed, errorCode is %{public}d", sendRequestErrorCode);
+        report_->UnregisterSendCommandFinishCallback(requestId);
         return REPLY_ERROR;
     }
     return NO_ERROR;
