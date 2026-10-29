@@ -118,15 +118,15 @@ bool RelaxedInteractionManager::HasPendingWorkflow() const
 ExecutionState RelaxedInteractionManager::DoExecuteNextStep(
     std::function<void(ExecutionState)>& finishCallback)
 {
-    executing_ = true;
+    executionPhase_ = ExecutionPhase::EXECUTING;
     ExecutorResult result = choreographer_->ExecuteNext();
-    executing_ = false;
-    if (clearRequested_) {
+    if (executionPhase_ == ExecutionPhase::CLEAR_PENDING) {
         auto reason = clearReason_;
-        clearRequested_ = false;
+        executionPhase_ = ExecutionPhase::IDLE;
         Clear(reason);
         return HasPendingWorkflow() ? ExecutionState::RUNNING : reason;
     }
+    executionPhase_ = ExecutionPhase::IDLE;
 
     if (workflowStates_.empty()) {
         switch (result) {
@@ -211,8 +211,8 @@ void RelaxedInteractionManager::Clear()
 
 void RelaxedInteractionManager::Clear(ExecutionState reason)
 {
-    if (executing_) {
-        clearRequested_ = true;
+    if (executionPhase_ != ExecutionPhase::IDLE) {
+        executionPhase_ = ExecutionPhase::CLEAR_PENDING;
         clearReason_ = reason;
         return;
     }

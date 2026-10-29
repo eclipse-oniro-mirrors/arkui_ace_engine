@@ -67,11 +67,14 @@ const std::string VALID_SLIDE_JSON = R"({
 // Mock executor that returns configurable results
 class MockExecutor : public BaseExecutor {
 public:
-    explicit MockExecutor(ExecutorResult result, bool isSingleStep = true)
-        : BaseExecutor(nullptr), result_(result), isSingleStep_(isSingleStep)
+    explicit MockExecutor(ExecutorResult result, bool isSingleStep = true, std::function<void()> onExecute = nullptr)
+        : BaseExecutor(nullptr), result_(result), isSingleStep_(isSingleStep), onExecute_(std::move(onExecute))
     {}
     ExecutorResult ExecuteStep() override
     {
+        if (onExecute_) {
+            onExecute_();
+        }
         return result_;
     }
     std::string GetType() const override
@@ -90,6 +93,7 @@ public:
 private:
     ExecutorResult result_;
     bool isSingleStep_;
+    std::function<void()> onExecute_;
 };
 
 class MockExecutorUnknownResult : public BaseExecutor {
@@ -641,6 +645,27 @@ HWTEST_F(RelaxedInteractionManagerCallbackTest, PendingFallbackAndFinalCallback,
     EXPECT_EQ(manager_->ExecuteNextStep(), ExecutionState::SUCCESS);
     EXPECT_EQ(count, 1);
     EXPECT_EQ(manager_->ExecuteNextStep(), ExecutionState::FAILED);
+    EXPECT_EQ(count, 1);
+}
+
+HWTEST_F(RelaxedInteractionManagerCallbackTest, ClearDuringExecutionIsDeferred, TestSize.Level1)
+{
+    int count = 0;
+    auto parser = Prepare({});
+    parser->executors.emplace_back(std::make_unique<MockExecutor>(ExecutorResult::PENDING, false, [this, &count]() {
+        manager_->Clear(ExecutionState::INTERRUPTED_BY_USER);
+        EXPECT_EQ(count, 0);
+        EXPECT_TRUE(manager_->choreographer_->HasCurrent());
+    }));
+    ASSERT_EQ(manager_->ProcessCommand(VALID_BACKPRESS_JSON, [&count](ExecutionState state) {
+        EXPECT_EQ(state, ExecutionState::INTERRUPTED_BY_USER);
+        ++count;
+    }), ProcessResult::SUCCESS);
+
+    EXPECT_EQ(manager_->ExecuteNextStep(), ExecutionState::INTERRUPTED_BY_USER);
+    EXPECT_EQ(count, 1);
+    EXPECT_FALSE(manager_->HasPendingWorkflow());
+    manager_->Clear(ExecutionState::INTERRUPTED_BY_USER);
     EXPECT_EQ(count, 1);
 }
 

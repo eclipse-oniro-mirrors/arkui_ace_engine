@@ -66,9 +66,13 @@ private:
         std::function<void(ExecutionState)> finishCallback;
         bool preserveLegacySemantics = false;
     };
+    enum class ExecutionPhase {
+        IDLE,
+        EXECUTING,
+        CLEAR_PENDING,
+    };
     std::deque<WorkflowState> workflowStates_;
-    bool executing_ = false;
-    bool clearRequested_ = false;
+    ExecutionPhase executionPhase_ = ExecutionPhase::IDLE;
     ExecutionState clearReason_ = ExecutionState::FAILED;
 };
 
