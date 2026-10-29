@@ -160,7 +160,7 @@ private:
     int32_t subWindowId_ = -1;
     DimensionOffset dialogOffset_;
     DialogAlignment alignment_ = DialogAlignment::DEFAULT;
-    HandednessFollowMode handednessMode_ = HandednessFollowMode::NONE;
+    HandednessFollowMode handednessMode_;
     TouchingBoundaryType touchingBoundaryFlag_ = TouchingBoundaryType::NotTouchBoundary;
 
     RefPtr<DialogTheme> dialogTheme_ = nullptr;

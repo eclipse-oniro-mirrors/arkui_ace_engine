@@ -48,7 +48,6 @@
 #include "core/components_ng/render/paragraph.h"
 #include "core/components_ng/property/accessibility_property.h"
 #include "core/components_ng/property/particle_enum.h"
-#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/interfaces/native/utility/ace_engine_types.h"
 
 #include "converter_union.h"

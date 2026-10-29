@@ -28,7 +28,6 @@
 #include "core/components_ng/property/border_property.h"
 #include "core/components_ng/pattern/overlay/level_mode.h"
 #include "core/components_ng/property/transition_property.h"
-#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/event/ace_event_handler.h"
 #include "core/gestures/gesture_event.h"
 

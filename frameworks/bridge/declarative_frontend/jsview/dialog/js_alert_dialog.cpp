@@ -27,6 +27,7 @@
 #include "core/components/common/layout/common_text_constants.h"
 #include "core/components/common/properties/ui_material.h"
 #include "core/components_ng/base/view_stack_processor.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/pattern/overlay/level_order.h"
 #include "core/interfaces/native/node/dialog_modifier.h"
 #include "frameworks/bridge/common/utils/engine_helper.h"

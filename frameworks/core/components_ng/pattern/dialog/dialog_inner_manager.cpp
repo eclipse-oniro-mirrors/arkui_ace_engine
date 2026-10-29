@@ -24,6 +24,7 @@
 #include "base/subwindow/subwindow_manager.h"
 #include "core/common/ace_engine.h"
 #include "core/components_ng/base/view_stack_processor.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/manager/navigation/navigation_manager.h"
 #include "core/components_ng/pattern/dialog/dialog_pattern.h"
 #include "core/components_ng/pattern/dialog/dialog_view.h"

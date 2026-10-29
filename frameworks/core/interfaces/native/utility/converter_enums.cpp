@@ -25,6 +25,7 @@
 #include "core/components/common/properties/shadow.h"
 #include "core/components/dialog/dialog_properties.h"
 #include "core/components/web/web_property.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/pattern/checkbox/checkbox_model.h"
 #include "core/components_ng/pattern/container_picker/container_picker_layout_property.h"
 #include "core/components_ng/pattern/date_picker/picker_types.h"

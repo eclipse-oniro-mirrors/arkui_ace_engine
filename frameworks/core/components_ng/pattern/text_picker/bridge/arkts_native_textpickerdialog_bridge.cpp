@@ -30,6 +30,7 @@
 #include "core/common/dynamic_module_helper.h"
 #include "core/components/common/properties/text_enums.h"
 #include "core/components_ng/base/view_stack_processor.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/pattern/text_picker/bridge/textpicker_parser.h"
 #include "core/components_ng/pattern/text_picker/textpicker_model.h"
 #include "core/pipeline_ng/pipeline_context.h"

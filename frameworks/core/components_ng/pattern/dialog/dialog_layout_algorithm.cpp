@@ -22,6 +22,7 @@
 #include "core/components/container_modal/container_modal_constants.h"
 #include "core/components_ng/manager/force_split/force_split_manager.h"
 #include "core/components_ng/manager/handedness/handedness_manager.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/manager/navigation/navigation_manager.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 #include "core/components_ng/layout/overlay_safe_area_helper.h"

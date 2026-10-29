@@ -18,6 +18,7 @@
 #include "core/interfaces/native/utility/callback_helper.h"
 #include "core/interfaces/native/utility/converter.h"
 #include "core/components/common/properties/ui_material.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/pattern/sheet/sheet_style.h"
 
 #include "dismiss_dialog_action_peer.h"

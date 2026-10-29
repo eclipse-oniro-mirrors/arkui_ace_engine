@@ -28,7 +28,6 @@
 #include "core/components/dialog/dialog_theme.h"
 #include "core/components/common/properties/text_style.h"
 #include "core/components_ng/manager/focus/focus_view.h"
-#include "core/components_ng/manager/handedness/handedness_manager.h"
 #include "core/components_ng/pattern/dialog/dialog_event_hub.h"
 #include "core/components_ng/manager/avoid_info/avoid_info_manager.h"
 #include "core/components_ng/pattern/dialog/dialog_accessibility_property.h"
@@ -39,6 +38,7 @@ namespace OHOS::Ace::NG {
 class InspectorFilter;
 class TextLayoutProperty;
 class OverlayManager;
+enum class PopupSide;
 
 enum class DialogContentNode {
     TITLE = 0,
@@ -631,7 +631,7 @@ private:
     // first layout pass and reused on subsequent re-layouts so the dialog stays stable.
     bool handednessLayoutCaptured_ = false;
     bool needRefreshAnchorPos_ = false;
-    PopupSide cachedPopupSide_ = PopupSide::CENTER;
+    int32_t cachedPopupSideValue_ = 1; // PopupSide::CENTER
     std::optional<OffsetF> cachedAnchorPos_;
     int32_t cachedAnchorNodeId_ = -1;
 
@@ -640,20 +640,13 @@ public:
     void MarkHandednessLayoutCaptured() { handednessLayoutCaptured_ = true; }
     bool NeedRefreshAnchorPos() const { return needRefreshAnchorPos_; }
     void SetNeedRefreshAnchorPos(bool need) { needRefreshAnchorPos_ = need; }
-    PopupSide GetCachedPopupSide() const { return cachedPopupSide_; }
-    void SetCachedPopupSide(PopupSide side) { cachedPopupSide_ = side; }
+    PopupSide GetCachedPopupSide() const;
+    void SetCachedPopupSide(PopupSide side);
     const std::optional<OffsetF>& GetCachedAnchorPos() const { return cachedAnchorPos_; }
     void SetCachedAnchorPos(const OffsetF& pos) { cachedAnchorPos_ = pos; }
     int32_t GetCachedAnchorNodeId() const { return cachedAnchorNodeId_; }
     void SetCachedAnchorNodeId(int32_t nodeId) { cachedAnchorNodeId_ = nodeId; }
-    void ResetHandednessCache()
-    {
-        handednessLayoutCaptured_ = false;
-        needRefreshAnchorPos_ = false;
-        cachedPopupSide_ = PopupSide::CENTER;
-        cachedAnchorPos_.reset();
-        cachedAnchorNodeId_ = -1;
-    }
+    void ResetHandednessCache();
 };
 } // namespace OHOS::Ace::NG
 

@@ -20,10 +20,10 @@
 
 #include "base/geometry/ng/offset_t.h"
 #include "base/memory/ace_type.h"
-#include "core/components_ng/manager/handedness/handedness_types.h"
 
 namespace OHOS::Ace::NG {
 class PipelineContext;
+enum class PopupSide;
 
 /**
  * @brief 智感握姿公共服务 Manager。

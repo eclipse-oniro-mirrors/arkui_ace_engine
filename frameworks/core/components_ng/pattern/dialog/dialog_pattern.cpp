@@ -52,7 +52,7 @@
 #include "core/components_ng/event/gesture_event_hub.h"
 #include "core/components_ng/layout/layout_property.h"
 #include "core/components_ng/manager/force_split/force_split_manager.h"
-#include "core/components_ng/manager/handedness/handedness_manager.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/pattern/dialog/dialog_layout_algorithm.h"
 #include "core/components_ng/pattern/dialog/dialog_view.h"
 #include "core/components_ng/pattern/distortion_component/distortion_component_options.h"
@@ -3847,5 +3847,24 @@ void DialogPattern::PlayDistortion()
         }
     }, onFinishEvent_);
     TAG_LOGI(AceLogTag::ACE_DIALOG, "Distortion animation applied successfully");
+}
+
+PopupSide DialogPattern::GetCachedPopupSide() const
+{
+    return static_cast<PopupSide>(cachedPopupSideValue_);
+}
+
+void DialogPattern::SetCachedPopupSide(PopupSide side)
+{
+    cachedPopupSideValue_ = static_cast<int32_t>(side);
+}
+
+void DialogPattern::ResetHandednessCache()
+{
+    handednessLayoutCaptured_ = false;
+    needRefreshAnchorPos_ = false;
+    cachedPopupSideValue_ = static_cast<int32_t>(PopupSide::CENTER);
+    cachedAnchorPos_.reset();
+    cachedAnchorNodeId_ = -1;
 }
 } // namespace OHOS::Ace::NG

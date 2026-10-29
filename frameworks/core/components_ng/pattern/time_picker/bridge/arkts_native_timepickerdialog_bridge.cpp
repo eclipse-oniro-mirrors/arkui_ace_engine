@@ -28,6 +28,7 @@
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_utils.h"
 #include "bridge/declarative_frontend/view_stack_processor.h"
 #include "core/components/common/properties/text_enums.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/pattern/date_picker/picker_model.h"
 #include "core/components_ng/pattern/date_picker/picker_theme.h"
 #include "core/components_ng/pattern/time_picker/timepicker_model.h"

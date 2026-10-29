@@ -119,14 +119,8 @@ public:
         json->PutExtAttr("DisplayModeInSubWindow",
             GetDisplayModeInSubWindowValue(DialogDisplayModeInSubWindow::SCREEN_BASED)
                 == DialogDisplayModeInSubWindow::SCREEN_BASED ? "SCREEN_BASED" : "WINDOW_BASED", filter);
-        auto handednessMode = propAdaptToHandedness_.value_or(HandednessFollowMode::NONE);
-        const char* handednessStr = "NONE";
-        if (handednessMode == HandednessFollowMode::FOLLOW_ANCHOR) {
-            handednessStr = "FOLLOW_ANCHOR";
-        } else if (handednessMode == HandednessFollowMode::FOLLOW_GRIP_HAND) {
-            handednessStr = "FOLLOW_GRIP_HAND";
-        }
-        json->PutExtAttr("adaptToHandedness", handednessStr, filter);
+        json->PutExtAttr("adaptToHandedness",
+            propAdaptToHandedness_.has_value() ? static_cast<int32_t>(*propAdaptToHandedness_) : 0, filter);
     }
 
 private:
