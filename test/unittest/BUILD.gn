@@ -1091,6 +1091,7 @@ ohos_static_library("ace_components_pattern") {
     "$ace_root/frameworks/core/components_ng/pattern/checkboxgroup/checkboxgroup_pattern_multi_thread.cpp",
     "$ace_root/frameworks/core/components_ng/pattern/common_text/counter_decorator.cpp",
     "$ace_root/frameworks/core/components_ng/pattern/common_text/counter_foreground_modifier.cpp",
+    "$ace_root/frameworks/core/components_ng/pattern/common_text/preview_text_decoration_utils.cpp",
     "$ace_root/frameworks/core/components_ng/pattern/common_text/text_border_utils.cpp",
     "$ace_root/frameworks/core/components_ng/pattern/common_text/text_margin_utils.cpp",
     "$ace_root/frameworks/core/components_ng/pattern/common_view/common_view_model_ng.cpp",

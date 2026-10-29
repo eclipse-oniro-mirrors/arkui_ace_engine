@@ -1703,8 +1703,6 @@ public:
 
     void ReceivePreviewTextStyle(const std::string& style) override;
 
-    PreviewTextStyle GetPreviewTextStyle() const;
-
     RefPtr<UINode> GetCustomKeyboard()
     {
         return customKeyboard_;

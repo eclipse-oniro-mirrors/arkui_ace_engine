@@ -126,7 +126,6 @@ constexpr std::string_view FIELD_TEXT_CHANGE_EVENT = "textChange";
 constexpr std::string_view FIELD_BLUR_EVENT = "blur";
 constexpr std::string_view FIELD_FOCUS_EVENT = "focus";
 constexpr int32_t PREVIEW_TEXT_RANGE_DEFAULT = -1;
-constexpr std::string_view PREVIEW_STYLE_NORMAL = "normal";
 constexpr std::string_view PREVIEW_STYLE_UNDERLINE = "underline";
 
 constexpr int32_t PREVIEW_NO_ERROR = 0;
@@ -11714,29 +11713,24 @@ int32_t TextFieldPattern::CheckPreviewTextValidate(const std::string& previewVal
     return CheckPreviewTextValidate(UtfUtils::Str8DebugToStr16(previewValue), range);
 }
 
-PreviewTextStyle TextFieldPattern::GetPreviewTextStyle() const
-{
-    auto defaultStyle = PreviewTextStyle::NORMAL;
-    auto paintProperty = GetPaintProperty<TextFieldPaintProperty>();
-    CHECK_NULL_RETURN(paintProperty, defaultStyle);
-    if (paintProperty->HasPreviewTextStyle()) {
-        auto style = paintProperty->GetPreviewTextStyle();
-        CHECK_NULL_RETURN(style, defaultStyle);
-        if (style.value() == PREVIEW_STYLE_NORMAL) {
-            return PreviewTextStyle::NORMAL;
-        } else if (style.value() == PREVIEW_STYLE_UNDERLINE) {
-            return PreviewTextStyle::UNDERLINE;
-        }
-    }
-    return defaultStyle;
-}
-
 void TextFieldPattern::ReceivePreviewTextStyle(const std::string& style)
 {
     auto paintProperty = GetPaintProperty<TextFieldPaintProperty>();
     CHECK_NULL_VOID(paintProperty);
+    auto frameNode = GetHost();
+    CHECK_NULL_VOID(frameNode);
+    auto previewDecorationColor = paintProperty->GetCursorColorValue(GetPreviewDecorationColor());
+    if (frameNode->GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY_SIX) &&
+        !paintProperty->HasCaretColorFlagByUser()) {
+        previewDecorationColor = GetPreviewDecorationColor();
+    }
     if (!style.empty()) {
-        paintProperty->UpdatePreviewTextStyle(style);
+        PreviewTextStyling previewTextStyling;
+        previewTextStyling.underlineColor = previewDecorationColor.GetValue();
+        if (style == PREVIEW_STYLE_UNDERLINE) {
+            previewTextStyling.underlineShape = PreviewTextStyle::UNDERLINE;
+        }
+        SetPreviewTextStyling(previewTextStyling);
     }
 }
 

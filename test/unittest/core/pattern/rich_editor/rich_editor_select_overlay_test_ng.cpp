@@ -1204,7 +1204,7 @@ HWTEST_F(RichEditorSelectOverlayTestNg, RichEditorOverlayTestNg001, TestSize.Lev
     EXPECT_CALL(rsCanvas, DetachPen()).WillRepeatedly(ReturnRef(rsCanvas));
     DrawingContext context { rsCanvas, CONTEXT_WIDTH_VALUE, CONTEXT_HEIGHT_VALUE };
 
-    richEditorOverlayModifier->previewTextStyle_ = PreviewTextStyle::NORMAL;
+    richEditorPattern->SetPreviewTextStyling(PreviewTextStyling{});
     richEditorPattern->contentRect_ = RectF(0, 0, 10.0f, 10.0f);
     richEditorOverlayModifier->showPreviewTextDecoration_ = AceType::MakeRefPtr<PropertyBool>(1);
     richEditorOverlayModifier->caretVisible_ = AceType::MakeRefPtr<PropertyBool>(1);

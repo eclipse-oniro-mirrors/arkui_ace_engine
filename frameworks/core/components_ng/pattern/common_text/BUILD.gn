@@ -20,6 +20,7 @@ build_component_ng("common_text_pattern_ng") {
   sources = [
     "counter_decorator.cpp",
     "counter_foreground_modifier.cpp",
+    "preview_text_decoration_utils.cpp",
     "text_border_utils.cpp",
     "text_margin_utils.cpp",
   ]

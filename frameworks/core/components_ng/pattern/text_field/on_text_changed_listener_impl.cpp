@@ -487,6 +487,7 @@ void OnTextChangedListenerImpl::FinishTextPreview()
         auto client = textFieldPattern.Upgrade();
         CHECK_NULL_VOID(client);
         ContainerScope scope(client->GetInstanceId());
+        client->OnFinishTextPreview();
         client->FinishTextPreview();
     };
     PostTaskToUI(task, "ArkUITextFieldFinishTextPreview");

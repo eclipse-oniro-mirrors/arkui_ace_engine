@@ -44,12 +44,10 @@ public:
     void SetScrollBarOpacityType(int32_t type);
     void SetTextHeight(float value);
     void SetFrameSize(const SizeF& value);
-    void SetPreviewTextDecorationColor(const Color& value);
     void SetPreviewTextUnderlineWidth(float value);
     void SetShowPreviewTextDecoration(bool value);
     void SetUnderlineColor(const Color& value);
     void SetUnderlineWidth(float value);
-    void SetPreviewTextStyle(const PreviewTextStyle& value);
     float GetCaretHeight() const;
     float GetCaretWidth() const;
     OffsetF GetCaretOffset() const;
@@ -98,13 +96,11 @@ private:
     WeakPtr<ScrollEdgeEffect> edgeEffect_;
     WeakPtr<ScrollBarOverlayModifier> scrollBarOverlayModifier_;
     RefPtr<PropertySizeF> frameSize_;
-    RefPtr<PropertyColor> previewTextDecorationColor_;
     RefPtr<PropertyFloat> previewTextUnderlineWidth_;
     RefPtr<PropertyBool> showPreviewTextDecoration_;
     RefPtr<PropertyColor> underlineColor_;
     RefPtr<PropertyFloat> underlineWidth_;
     RefPtr<PropertyBool> changeOverlay_;
-    PreviewTextStyle previewTextStyle_;
     bool caretLanding_ = false;
     bool isContentNode_ = false;
     std::vector<RoundRect> hoverRects_;

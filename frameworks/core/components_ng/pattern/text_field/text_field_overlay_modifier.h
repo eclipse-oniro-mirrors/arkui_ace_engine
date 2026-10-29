@@ -69,8 +69,6 @@ public:
 
     void SetShowPreviewTextDecoration(bool value);
     void SetPreviewTextRects(bool value);
-    void SetPreviewTextDecorationColor(const Color& value);
-    void SetPreviewTextStyle(PreviewTextStyle style);
     void ContentChange();
 
     void StartFloatingCaretLand(const OffsetF& originCaretOffset);
@@ -106,7 +104,6 @@ private:
     bool caretLanding_ = false;
     bool needPaintSelect_ = false;
     bool needPaintPreviewText = false;
-    PreviewTextStyle previewTextStyle_ = PreviewTextStyle::NORMAL;
     WeakPtr<Pattern> pattern_;
     WeakPtr<ScrollBar> scrollBar_;
     WeakPtr<ScrollEdgeEffect> edgeEffect_;
@@ -130,7 +127,6 @@ private:
     RefPtr<PropertyBool> showPreviewText_;
     RefPtr<PropertyBool> changePreviewTextRects_;
     RefPtr<PropertyBool> contentChange_;
-    RefPtr<PropertyColor> previewTextDecorationColor_;
     RectF textRect_;
     RefPtr<AnimatablePropertyOffsetF> floatingCursorOffset_;
     RefPtr<PropertyBool> floatingCursorVisible_;

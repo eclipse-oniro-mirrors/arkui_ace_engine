@@ -354,7 +354,6 @@ public:
     bool IsPreviewTextInputting();
     std::vector<RectF> GetPreviewTextRects();
     float GetPreviewTextUnderlineWidth() const;
-    PreviewTextStyle GetPreviewTextStyle() const;
     void SetSupportPreviewText(bool isTextPreviewSupported);
     bool IsSupportPreviewText();
 
