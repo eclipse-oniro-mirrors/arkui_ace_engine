@@ -144,6 +144,9 @@ action("runner_gen_code") {
 
 if (!build_ohos_sdk && !(defined(is_arkui_x) && is_arkui_x)) {
   config("idlize_gen_config") {
+    # Normal compilation input, rather than an order-only dependency. A real
+    # deployed native header change must rebuild consumers in this invocation.
+    inputs = [ "$target_out_dir/idlize_native_signature" ]
     include_dirs = [
       "$idlize_gen_bridges_output_path",
     ]
@@ -159,6 +162,8 @@ if (!build_ohos_sdk && !(defined(is_arkui_x) && is_arkui_x)) {
       rebase_path("./generation_config/instructive-config.json"),
       "--stamp",
       rebase_path("$target_out_dir/idlize_install_stamp"),
+      "--native-stamp",
+      rebase_path("$target_out_dir/idlize_native_signature"),
     ]
     deps = [
       ":runner_gen_code",
@@ -168,6 +173,7 @@ if (!build_ohos_sdk && !(defined(is_arkui_x) && is_arkui_x)) {
     ]
     outputs = [
       "$target_out_dir/idlize_install_stamp",
+      "$target_out_dir/idlize_native_signature",
     ]
   }
 } else {
