@@ -19,6 +19,12 @@ ace_unittest("os_content_test") {
   sources = [ "./common/properties/os_content_test.cpp" ]
 }
 
+ace_unittest("grid_system_manager_test") {
+  module_name = "CommonProperties-LayoutAndBorder"
+  type = "new"
+  sources = [ "./common/layout/grid_system_manager_test.cpp" ]
+}
+
 ace_unittest("ui_material_theme_test_ng") {
   module_name = "CommonVisualEffects"
   type = "new"
@@ -28,6 +34,7 @@ ace_unittest("ui_material_theme_test_ng") {
 group("core_components_unittest") {
   testonly = true
   deps = [
+    ":grid_system_manager_test",
     ":os_content_test",
     ":ui_material_theme_test_ng",
   ]
