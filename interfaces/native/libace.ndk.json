@@ -7569,6 +7569,14 @@
         "name": "OH_ArkUI_KeyEvent_SetScrollLockOn"
     },
     {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_NativeModule_RegisterInspectorTreeGetter"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_NativeModule_UnregisterInspectorTreeGetter"
+    },
+    {
         "first_introduced": "26.2.0",
         "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestCreate"
     },
