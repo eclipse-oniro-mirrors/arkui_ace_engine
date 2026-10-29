@@ -381,67 +381,68 @@ struct DialogTableScopeEntry {
     void (*invoke)(ArkUI_NativeDialogAPI_3*);
 };
 
-#define DIALOG_TABLE_ENTRY_1(member)                                                                \
-    {                                                                                               \
-        "ArkUI_NativeDialogAPI_1." #member,                                                         \
-            [](ArkUI_NativeDialogAPI_3* api) { CallWithDefaultArgs(api->nativeDialogAPI1.member); } \
-    }
-#define DIALOG_TABLE_ENTRY_2(member)                                                                \
-    {                                                                                               \
-        "ArkUI_NativeDialogAPI_2." #member,                                                         \
-            [](ArkUI_NativeDialogAPI_3* api) { CallWithDefaultArgs(api->nativeDialogAPI2.member); } \
-    }
-#define DIALOG_TABLE_ENTRY_3(member)                                                                \
-    {                                                                                               \
-        "ArkUI_NativeDialogAPI_3." #member,                                                         \
-            [](ArkUI_NativeDialogAPI_3* api) { CallWithDefaultArgs(api->member); }                  \
-    }
+// 函数式宏已替换为模板函数以满足 G.PRE.02-CPP（使用函数代替函数式宏）；
+// Member 为指向各 API 版本函数指针字段的指针到成员，名称字符串显式传入。
+template <auto Member>
+DialogTableScopeEntry MakeDialogTableEntry1(const char* name)
+{
+    return { name, [](ArkUI_NativeDialogAPI_3* api) { CallWithDefaultArgs(api->nativeDialogAPI1.*Member); } };
+}
+template <auto Member>
+DialogTableScopeEntry MakeDialogTableEntry2(const char* name)
+{
+    return { name, [](ArkUI_NativeDialogAPI_3* api) { CallWithDefaultArgs(api->nativeDialogAPI2.*Member); } };
+}
+template <auto Member>
+DialogTableScopeEntry MakeDialogTableEntry3(const char* name)
+{
+    return { name, [](ArkUI_NativeDialogAPI_3* api) { CallWithDefaultArgs(api->*Member); } };
+}
 const DialogTableScopeEntry DIALOG_TABLE_SCOPE_ENTRIES[] = {
-    DIALOG_TABLE_ENTRY_1(create),
-    DIALOG_TABLE_ENTRY_1(dispose),
-    DIALOG_TABLE_ENTRY_1(setContent),
-    DIALOG_TABLE_ENTRY_1(removeContent),
-    DIALOG_TABLE_ENTRY_1(setContentAlignment),
-    DIALOG_TABLE_ENTRY_1(resetContentAlignment),
-    DIALOG_TABLE_ENTRY_1(setModalMode),
-    DIALOG_TABLE_ENTRY_1(setAutoCancel),
-    DIALOG_TABLE_ENTRY_1(setMask),
-    DIALOG_TABLE_ENTRY_1(setBackgroundColor),
-    DIALOG_TABLE_ENTRY_1(setCornerRadius),
-    DIALOG_TABLE_ENTRY_1(setGridColumnCount),
-    DIALOG_TABLE_ENTRY_1(enableCustomStyle),
-    DIALOG_TABLE_ENTRY_1(enableCustomAnimation),
-    DIALOG_TABLE_ENTRY_1(registerOnWillDismiss),
-    DIALOG_TABLE_ENTRY_1(show),
-    DIALOG_TABLE_ENTRY_1(close),
-    DIALOG_TABLE_ENTRY_1(registerOnWillDismissWithUserData),
-    DIALOG_TABLE_ENTRY_2(setKeyboardAvoidDistance),
-    DIALOG_TABLE_ENTRY_2(setLevelMode),
-    DIALOG_TABLE_ENTRY_2(setLevelUniqueId),
-    DIALOG_TABLE_ENTRY_2(setImmersiveMode),
-    DIALOG_TABLE_ENTRY_3(setLevelOrder),
-    DIALOG_TABLE_ENTRY_3(registerOnWillAppear),
-    DIALOG_TABLE_ENTRY_3(registerOnDidAppear),
-    DIALOG_TABLE_ENTRY_3(registerOnWillDisappear),
-    DIALOG_TABLE_ENTRY_3(registerOnDidDisappear),
-    DIALOG_TABLE_ENTRY_3(setBorderWidth),
-    DIALOG_TABLE_ENTRY_3(setBorderColor),
-    DIALOG_TABLE_ENTRY_3(setBorderStyle),
-    DIALOG_TABLE_ENTRY_3(setWidth),
-    DIALOG_TABLE_ENTRY_3(setHeight),
-    DIALOG_TABLE_ENTRY_3(setShadow),
-    DIALOG_TABLE_ENTRY_3(setCustomShadow),
-    DIALOG_TABLE_ENTRY_3(setBackgroundBlurStyle),
-    DIALOG_TABLE_ENTRY_3(setKeyboardAvoidMode),
-    DIALOG_TABLE_ENTRY_3(enableHoverMode),
-    DIALOG_TABLE_ENTRY_3(setHoverModeArea),
-    DIALOG_TABLE_ENTRY_3(setFocusable),
-    DIALOG_TABLE_ENTRY_3(setBackgroundBlurStyleOptions),
-    DIALOG_TABLE_ENTRY_3(setBackgroundEffect),
+    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::create>("ArkUI_NativeDialogAPI_1.create"),
+    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::dispose>("ArkUI_NativeDialogAPI_1.dispose"),
+    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::setContent>("ArkUI_NativeDialogAPI_1.setContent"),
+    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::removeContent>("ArkUI_NativeDialogAPI_1.removeContent"),
+    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::setContentAlignment>("ArkUI_NativeDialogAPI_1.setContentAlignment"),
+    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::resetContentAlignment>("ArkUI_NativeDialogAPI_1.resetContentAlignment"),
+    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::setModalMode>("ArkUI_NativeDialogAPI_1.setModalMode"),
+    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::setAutoCancel>("ArkUI_NativeDialogAPI_1.setAutoCancel"),
+    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::setMask>("ArkUI_NativeDialogAPI_1.setMask"),
+    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::setBackgroundColor>("ArkUI_NativeDialogAPI_1.setBackgroundColor"),
+    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::setCornerRadius>("ArkUI_NativeDialogAPI_1.setCornerRadius"),
+    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::setGridColumnCount>("ArkUI_NativeDialogAPI_1.setGridColumnCount"),
+    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::enableCustomStyle>("ArkUI_NativeDialogAPI_1.enableCustomStyle"),
+    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::enableCustomAnimation>("ArkUI_NativeDialogAPI_1.enableCustomAnimation"),
+    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::registerOnWillDismiss>("ArkUI_NativeDialogAPI_1.registerOnWillDismiss"),
+    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::show>("ArkUI_NativeDialogAPI_1.show"),
+    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::close>("ArkUI_NativeDialogAPI_1.close"),
+    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::registerOnWillDismissWithUserData>(
+        "ArkUI_NativeDialogAPI_1.registerOnWillDismissWithUserData"),
+    MakeDialogTableEntry2<&ArkUI_NativeDialogAPI_2::setKeyboardAvoidDistance>("ArkUI_NativeDialogAPI_2.setKeyboardAvoidDistance"),
+    MakeDialogTableEntry2<&ArkUI_NativeDialogAPI_2::setLevelMode>("ArkUI_NativeDialogAPI_2.setLevelMode"),
+    MakeDialogTableEntry2<&ArkUI_NativeDialogAPI_2::setLevelUniqueId>("ArkUI_NativeDialogAPI_2.setLevelUniqueId"),
+    MakeDialogTableEntry2<&ArkUI_NativeDialogAPI_2::setImmersiveMode>("ArkUI_NativeDialogAPI_2.setImmersiveMode"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setLevelOrder>("ArkUI_NativeDialogAPI_3.setLevelOrder"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::registerOnWillAppear>("ArkUI_NativeDialogAPI_3.registerOnWillAppear"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::registerOnDidAppear>("ArkUI_NativeDialogAPI_3.registerOnDidAppear"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::registerOnWillDisappear>("ArkUI_NativeDialogAPI_3.registerOnWillDisappear"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::registerOnDidDisappear>("ArkUI_NativeDialogAPI_3.registerOnDidDisappear"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setBorderWidth>("ArkUI_NativeDialogAPI_3.setBorderWidth"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setBorderColor>("ArkUI_NativeDialogAPI_3.setBorderColor"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setBorderStyle>("ArkUI_NativeDialogAPI_3.setBorderStyle"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setWidth>("ArkUI_NativeDialogAPI_3.setWidth"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setHeight>("ArkUI_NativeDialogAPI_3.setHeight"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setShadow>("ArkUI_NativeDialogAPI_3.setShadow"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setCustomShadow>("ArkUI_NativeDialogAPI_3.setCustomShadow"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setBackgroundBlurStyle>("ArkUI_NativeDialogAPI_3.setBackgroundBlurStyle"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setKeyboardAvoidMode>("ArkUI_NativeDialogAPI_3.setKeyboardAvoidMode"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::enableHoverMode>("ArkUI_NativeDialogAPI_3.enableHoverMode"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setHoverModeArea>("ArkUI_NativeDialogAPI_3.setHoverModeArea"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setFocusable>("ArkUI_NativeDialogAPI_3.setFocusable"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setBackgroundBlurStyleOptions>(
+        "ArkUI_NativeDialogAPI_3.setBackgroundBlurStyleOptions"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setBackgroundEffect>("ArkUI_NativeDialogAPI_3.setBackgroundEffect"),
 };
-#undef DIALOG_TABLE_ENTRY_1
-#undef DIALOG_TABLE_ENTRY_2
-#undef DIALOG_TABLE_ENTRY_3
 
 class UiThreadDialogTableLogTest : public UiThreadDetectionTest, public WithParamInterface<DialogTableScopeEntry> {};
 
