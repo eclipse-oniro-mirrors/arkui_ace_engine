@@ -978,6 +978,16 @@ int32_t OH_ArkUI_NativeModule_CustomDialog_SetSystemMaterial(
     return impl->getDialogAPI()->setSystemMaterial(handle->controller, material);
 }
 
+int32_t OH_ArkUI_NativeModule_CustomDialog_SetAdaptToHandedness(
+    ArkUI_NativeDialogHandle handle, OH_ArkUI_NativeModule_HandednessMode mode)
+{
+    const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
+    if (!impl || !handle) {
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    return impl->getDialogAPI()->setAdaptToHandedness(handle->controller, static_cast<int32_t>(mode));
+}
+
 #ifdef __cplusplus
 };
 #endif

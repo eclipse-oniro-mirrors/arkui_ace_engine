@@ -10761,6 +10761,7 @@ struct ArkUIDialogAPI {
         ArkUI_Int32 (*intArray)[2], ArkUI_Uint32 (*uintArray)[4], ArkUI_Bool (*boolArray)[2]);
     ArkUI_Int32 (*openCustomDialogWithErrorCallback)(ArkUIDialogHandle handle, void* userData,
         void (*callback)(int32_t errorCode, int32_t dialogId, void* userData));
+    ArkUI_Int32 (*setAdaptToHandedness)(ArkUIDialogHandle handle, ArkUI_Int32 mode);
 };
 
 struct ArkUIBasicNodeAPI {

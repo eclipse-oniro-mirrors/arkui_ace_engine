@@ -633,6 +633,14 @@ void CustomDialogControllerPeerImpl::SetEdgeLightMode(Opt_EdgeLightMode edgeLigh
     }
 }
 
+void CustomDialogControllerPeerImpl::SetAdaptToHandedness(Opt_HandednessFollowMode adaptToHandedness)
+{
+    auto result = Converter::OptConvert<HandednessFollowMode>(adaptToHandedness);
+    if (result.has_value()) {
+        dialogProperties_.adaptToHandedness = result.value();
+    }
+}
+
 DialogProperties CustomDialogControllerPeerImpl::GetDialogProperties() const
 {
     return dialogProperties_;

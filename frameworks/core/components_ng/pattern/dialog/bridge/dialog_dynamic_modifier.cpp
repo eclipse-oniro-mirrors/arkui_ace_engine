@@ -144,6 +144,11 @@ ArkUI_Int32 SetDialogImmersiveMode(ArkUIDialogHandle handle, ArkUI_Int32 mode)
     return CustomDialog::SetImmersiveMode(handle, mode);
 }
 
+ArkUI_Int32 SetDialogAdaptToHandedness(ArkUIDialogHandle handle, ArkUI_Int32 mode)
+{
+    return CustomDialog::SetAdaptToHandedness(handle, mode);
+}
+
 ArkUI_Int32 SetLevelOrder(ArkUIDialogHandle handle, ArkUI_Float64 levelOrder)
 {
     return CustomDialog::SetLevelOrder(handle, levelOrder);
@@ -307,6 +312,7 @@ const ArkUIDialogAPI* GetDialogAPI()
         .setLevelMode = SetDialogLevelMode,
         .setLevelUniqueId = SetDialogLevelUniqueId,
         .setImmersiveMode = SetDialogImmersiveMode,
+        .setAdaptToHandedness = SetDialogAdaptToHandedness,
         .setLevelOrder = SetLevelOrder,
         .registerOnWillAppear = RegisterOnWillAppear,
         .registerOnDidAppear = RegisterOnDidAppear,

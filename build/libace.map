@@ -461,6 +461,7 @@
       "OHOS::Ace::DimensionOffset OHOS::Ace::NG::Converter::Convert<OHOS::Ace::DimensionOffset, Ark_Offset>(Ark_Offset const&)";
       "OHOS::Ace::DimensionRect OHOS::Ace::NG::Converter::Convert<OHOS::Ace::DimensionRect, Ark_Rectangle>(Ark_Rectangle const&)";
       "OHOS::Ace::DistortionMode OHOS::Ace::NG::Converter::Convert<OHOS::Ace::DistortionMode, Ark_DistortionMode>(Ark_DistortionMode const&)";
+      "OHOS::Ace::NG::HandednessFollowMode OHOS::Ace::NG::Converter::Convert<OHOS::Ace::NG::HandednessFollowMode, Ark_HandednessFollowMode>(Ark_HandednessFollowMode const&)";
       "OHOS::Ace::DOM_ANIMATION_FINISH";
       "OHOS::Ace::DOM_CATCH_BUBBLE_CLICK";
       "OHOS::Ace::DOM_CLICK";
@@ -2927,6 +2928,8 @@
       "OHOS::Ace::NG::VibratorUtils::StartViratorDirectly(std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
       "OHOS::Ace::NG::ViewAbstract::CancelPropertyAnimations(OHOS::Ace::NG::FrameNode*, std::__h::vector<OHOS::Ace::AnimationPropertyType, std::__h::allocator<OHOS::Ace::AnimationPropertyType>> const&)";
       "OHOS::Ace::NG::ViewAbstract::ClearWidthOrHeight(OHOS::Ace::NG::FrameNode*, bool)";
+      "OHOS::Ace::NG::ViewAbstract::GetWindowWidthBreakpoint()";
+      "OHOS::Ace::NG::ViewAbstract::GetWindowHeightBreakpoint()";
       "OHOS::Ace::NG::ViewAbstract::SetBackgroundColor(OHOS::Ace::Color const&)";
       "OHOS::Ace::NG::ViewAbstract::SetBorderColor(OHOS::Ace::NG::FrameNode*, OHOS::Ace::Color const&)";
       "OHOS::Ace::NG::ViewAbstract::SetBorderColor(OHOS::Ace::NG::FrameNode*, OHOS::Ace::NG::BorderColorProperty const&)";
@@ -3362,6 +3365,7 @@
       "void OHOS::Ace::NG::Converter::AssignCast<OHOS::Ace::PickerTime, long>(std::__h::optional<OHOS::Ace::PickerTime>&, long const&)";
       "void OHOS::Ace::NG::Converter::AssignCast<OHOS::Ace::DistortionMode, Ark_DistortionMode>(std::__h::optional<OHOS::Ace::DistortionMode>&, Ark_DistortionMode const&)";
       "void OHOS::Ace::NG::Converter::AssignCast<OHOS::Ace::EdgeLightMode, Ark_EdgeLightMode>(std::__h::optional<OHOS::Ace::EdgeLightMode>&, Ark_EdgeLightMode const&)";
+      "void OHOS::Ace::NG::Converter::AssignCast<OHOS::Ace::NG::HandednessFollowMode, Ark_HandednessFollowMode>(std::__h::optional<OHOS::Ace::NG::HandednessFollowMode>&, Ark_HandednessFollowMode const&)";
       "void OHOS::Ace::NG::Converter::AssignCast<OHOS::Ace::UiMaterial*, uiMaterial_MaterialPeer*>(std::__h::optional<OHOS::Ace::UiMaterial*>&, uiMaterial_MaterialPeer* const&)";
       "OHOS::Ace::V2::InspectorComposedElement::GetInspectorNode(unsigned long, bool) const";
       "OHOS::Ace::V2::ElementProxyHost::GetComponentByIndex(unsigned long)";
@@ -4910,6 +4914,7 @@
       "OHOS::Ace::NG::PipelineContext::GetFocusManager() const";
       "OHOS::Ace::NG::PipelineContext::GetFontScaleFromEnv(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&)";
       "OHOS::Ace::NG::PipelineContext::GetForceSplitManager() const";
+      "OHOS::Ace::NG::PipelineContext::GetHandednessManager() const";
       "OHOS::Ace::NG::PipelineContext::GetFormVisibleManager() const";
       "OHOS::Ace::NG::PipelineContext::GetIsFocusActive() const";
       "OHOS::Ace::NG::PipelineContext::GetNavigationManager() const";

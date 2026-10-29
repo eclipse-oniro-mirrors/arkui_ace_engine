@@ -48,6 +48,7 @@
 #include "core/components_ng/render/paragraph.h"
 #include "core/components_ng/property/accessibility_property.h"
 #include "core/components_ng/property/particle_enum.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/interfaces/native/utility/ace_engine_types.h"
 
 #include "converter_union.h"
@@ -129,6 +130,7 @@ enum class TextContentType;
 enum class TextResponseType;
 enum class TextSpanType;
 enum class ToggleType;
+enum class HandednessFollowMode;
 struct BarItem;
 struct KeyboardOptions;
 struct NavDestinationTransition;
@@ -693,6 +695,7 @@ namespace Converter {
     template<> ACE_FORCE_EXPORT DimensionRect Convert(const Ark_Rectangle &src);
     template<> ACE_FORCE_EXPORT DistortionMode Convert(const Ark_DistortionMode& options);
     template<> ACE_FORCE_EXPORT EdgeLightMode Convert(const Ark_EdgeLightMode& options);
+    template<> ACE_FORCE_EXPORT HandednessFollowMode Convert(const Ark_HandednessFollowMode& options);
     template<> EdgesParam Convert(const Ark_Edges& src);
     template<> EdgesParam Convert(const Ark_LocalizedEdges& src);
     template<> ACE_FORCE_EXPORT EffectOption Convert(const Ark_BackgroundEffectOptions& src);
@@ -926,6 +929,8 @@ namespace Converter {
     template<> void AssignCast(std::optional<DynamicRangeMode>& dst, const Ark_DynamicRangeMode& src);
     template<> ACE_FORCE_EXPORT void AssignCast(std::optional<EdgeEffect>& dst, const Ark_EdgeEffect& src);
     template<> ACE_FORCE_EXPORT void AssignCast(std::optional<EdgeLightMode>& dst, const Ark_EdgeLightMode& src);
+    template<> ACE_FORCE_EXPORT void AssignCast(std::optional<HandednessFollowMode>& dst,
+        const Ark_HandednessFollowMode& src);
     template<> void AssignCast(std::optional<EdgeLightPosition>& dst, const Ark_EdgeLightPosition& src);
     template<> void AssignCast(std::optional<EffectLayer>& dst, const Ark_EffectLayer& src);
     template<> void AssignCast(std::optional<UnionMode>& dst, const Ark_UnionMode& src);

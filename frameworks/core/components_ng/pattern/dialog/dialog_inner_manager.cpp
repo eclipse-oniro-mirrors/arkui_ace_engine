@@ -1060,6 +1060,7 @@ RefPtr<FrameNode> DialogInnerManager::UpdateCustomDialogInner(
     CHECK_NULL_RETURN(dialogLayoutProp, nullptr);
     dialogLayoutProp->UpdateDialogAlignment(dialogProps.alignment);
     dialogLayoutProp->UpdateDialogOffset(dialogProps.offset);
+    dialogLayoutProp->UpdateAdaptToHandedness(dialogProps.adaptToHandedness.value_or(HandednessFollowMode::NONE));
     dialogLayoutProp->UpdateAutoCancel(dialogProps.autoCancel);
     auto dialogPattern = dialogNode->GetPattern<DialogPattern>();
     CHECK_NULL_RETURN(dialogPattern, nullptr);

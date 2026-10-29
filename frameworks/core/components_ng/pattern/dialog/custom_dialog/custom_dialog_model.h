@@ -47,6 +47,7 @@ struct _ArkUIDialog {
     ArkUI_Int32 levelMode;
     ArkUI_Int32 levelUniqueId;
     ArkUI_Int32 immersiveMode;
+    std::optional<ArkUI_Int32> adaptToHandedness;
     ArkUI_Float64 levelOrder;
     void* onWillAppearData;
     void* onDidAppearData;
@@ -110,6 +111,7 @@ ArkUI_Int32 SetKeyboardAvoidDistance(ArkUIDialogHandle handle, float distance, A
 ArkUI_Int32 SetLevelMode(ArkUIDialogHandle handle, ArkUI_Int32 mode);
 ArkUI_Int32 SetLevelUniqueId(ArkUIDialogHandle handle, ArkUI_Int32 uniqueId);
 ArkUI_Int32 SetImmersiveMode(ArkUIDialogHandle handle, ArkUI_Int32 mode);
+ArkUI_Int32 SetAdaptToHandedness(ArkUIDialogHandle handle, ArkUI_Int32 mode);
 ArkUI_Int32 SetLevelOrder(ArkUIDialogHandle handle, ArkUI_Float64 levelOrder);
 ArkUI_Int32 RegisterOnWillAppearDialog(ArkUIDialogHandle handle, void* userData, void (*callback)(void* userData));
 ArkUI_Int32 RegisterOnDidAppearDialog(ArkUIDialogHandle handle, void* userData, void (*callback)(void* userData));

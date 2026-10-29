@@ -28,6 +28,7 @@
 #include "core/components_ng/property/border_property.h"
 #include "core/components_ng/pattern/overlay/level_mode.h"
 #include "core/components_ng/property/transition_property.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/event/ace_event_handler.h"
 #include "core/gestures/gesture_event.h"
 
@@ -35,6 +36,7 @@ namespace OHOS::Ace {
 class UiMaterial;
 enum class DistortionMode;
 enum class EdgeLightMode;
+
 class Component;
 class Gesture;
 
@@ -42,6 +44,7 @@ namespace NG {
     class UINode;
     class FrameNode;
     class ChainedTransitionEffect;
+    enum class HandednessFollowMode;
 }
 
 enum class DialogType {
@@ -239,6 +242,7 @@ struct DialogProperties {
     std::optional<int32_t> controllerId;
     std::optional<DistortionMode> distortionMode;
     std::optional<EdgeLightMode> edgeLightMode;
+    std::optional<NG::HandednessFollowMode> adaptToHandedness;
     HasInvertColor hasInvertColor;
 
 #ifndef NG_BUILD
@@ -336,6 +340,7 @@ struct PromptDialogAttr {
     std::optional<double> levelOrder;
     std::optional<DistortionMode> distortionMode;
     std::optional<EdgeLightMode> edgeLightMode;
+    std::optional<NG::HandednessFollowMode> adaptToHandedness;
     bool focusable = true;
     LevelMode dialogLevelMode = LevelMode::OVERLAY;
     int32_t dialogLevelUniqueId = -1;

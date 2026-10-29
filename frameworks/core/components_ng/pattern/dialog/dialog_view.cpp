@@ -631,6 +631,7 @@ RefPtr<FrameNode> DialogView::CreateDialogNode(const int32_t nodeId, const Dialo
     dialogLayoutProp->UpdateIsModal(param.isModal);
     dialogLayoutProp->UpdateIsSceneBoardDialog(param.isSceneBoardDialog);
     dialogLayoutProp->UpdateDisplayModeInSubWindow(param.displayModeInSubWindow);
+    dialogLayoutProp->UpdateAdaptToHandedness(param.adaptToHandedness.value_or(HandednessFollowMode::NONE));
     if (param.width.has_value() && NonNegative(param.width.value().Value())) {
         dialogLayoutProp->UpdateWidth(param.width.value());
     } else {

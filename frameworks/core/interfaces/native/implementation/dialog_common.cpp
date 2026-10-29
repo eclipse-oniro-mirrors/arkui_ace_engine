@@ -137,5 +137,16 @@ ACE_FORCE_EXPORT EdgeLightMode Convert(const Ark_EdgeLightMode& options)
     }
     return EdgeLightMode::EDGELIGHT_DISABLED;
 }
+
+template<>
+ACE_FORCE_EXPORT HandednessFollowMode Convert(const Ark_HandednessFollowMode& options)
+{
+    if (options == Ark_HandednessFollowMode::ARK_HANDEDNESS_FOLLOW_MODE_FOLLOW_ANCHOR) {
+        return HandednessFollowMode::FOLLOW_ANCHOR;
+    } else if (options == Ark_HandednessFollowMode::ARK_HANDEDNESS_FOLLOW_MODE_FOLLOW_GRIP_HAND) {
+        return HandednessFollowMode::FOLLOW_GRIP_HAND;
+    }
+    return HandednessFollowMode::NONE;
+}
 } // namespace Converter
 } // namespace OHOS::Ace::NG

@@ -614,6 +614,16 @@ int32_t OH_ArkUI_NativeModule_CustomDialog_SetSystemMaterialInOptions(
     return impl->getDialogAPI()->setSystemMaterial(options->handle, material);
 }
 
+int32_t OH_ArkUI_NativeModule_CustomDialog_SetAdaptToHandednessInOptions(
+    ArkUI_CustomDialogOptions* options, OH_ArkUI_NativeModule_HandednessMode mode)
+{
+    const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
+    if (!impl || !options) {
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    return impl->getDialogAPI()->setAdaptToHandedness(options->handle, static_cast<int32_t>(mode));
+}
+
 int32_t OH_ArkUI_CustomDialog_SetMask(
     ArkUI_CustomDialogOptions* options, uint32_t maskColor, const ArkUI_Rect* maskRect)
 {

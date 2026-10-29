@@ -434,6 +434,10 @@ void ParseDialogProperties(DialogProperties& dialogProperties, ArkUIDialogHandle
     dialogProperties.dialogLevelMode = static_cast<LevelMode>(controllerHandler->levelMode);
     dialogProperties.dialogLevelUniqueId = controllerHandler->levelUniqueId;
     dialogProperties.dialogImmersiveMode = static_cast<ImmersiveMode>(controllerHandler->immersiveMode);
+    if (controllerHandler->adaptToHandedness.has_value()) {
+        dialogProperties.adaptToHandedness =
+            static_cast<HandednessFollowMode>(*controllerHandler->adaptToHandedness);
+    }
     dialogProperties.backgroundBlurStyle = controllerHandler->blurStyle;
     dialogProperties.blurStyleOption = controllerHandler->blurStyleOption;
     dialogProperties.hasInvertColor.hasBlurStyleOptionInactiveColor =
@@ -891,6 +895,13 @@ ArkUI_Int32 SetImmersiveMode(ArkUIDialogHandle controllerHandler, ArkUI_Int32 mo
 {
     CHECK_NULL_RETURN_WITH_BACKEND_MESSAGE(controllerHandler, ERROR_CODE_PARAM_INVALID, "controllerHandler is null");
     controllerHandler->immersiveMode = mode;
+    return ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_Int32 SetAdaptToHandedness(ArkUIDialogHandle controllerHandler, ArkUI_Int32 mode)
+{
+    CHECK_NULL_RETURN_WITH_BACKEND_MESSAGE(controllerHandler, ERROR_CODE_PARAM_INVALID, "controllerHandler is null");
+    controllerHandler->adaptToHandedness = mode;
     return ERROR_CODE_NO_ERROR;
 }
 

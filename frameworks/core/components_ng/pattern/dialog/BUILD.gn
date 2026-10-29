@@ -50,7 +50,12 @@ build_component_ng("dialog_pattern_ng") {
 
   if (!build_ohos_sdk) {
     if (!is_arkui_x) {
-      deps = [ "${ace_root}/interfaces/inner_api/ui_session:ui_session" ]
+      deps = [
+        "${ace_root}/interfaces/inner_api/ui_session:ui_session",
+      ]
+      platform_deps = [
+        "$ace_root/frameworks/core/components_ng/manager/handedness:ace_core_components_handedness_manager_ng",
+      ]
     }
     if (is_ohos_standard_system) {
       external_deps = [

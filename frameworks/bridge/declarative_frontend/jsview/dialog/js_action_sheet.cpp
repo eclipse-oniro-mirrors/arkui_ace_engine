@@ -62,6 +62,8 @@ const std::vector<DistortionMode> DIALOG_DISTORTION_MODE = { DistortionMode::DIS
     DistortionMode::DISTORTION_ENABLED, DistortionMode::DISTORTION_DISABLED };
 const std::vector<EdgeLightMode> DIALOG_EDGELIGHT_MODE = { EdgeLightMode::EDGELIGHT_AUTO,
     EdgeLightMode::EDGELIGHT_ENABLED, EdgeLightMode::EDGELIGHT_DISABLED };
+const std::vector<NG::HandednessFollowMode> DIALOG_HANDEDNESS_FOLLOW_MODE = { NG::HandednessFollowMode::NONE,
+    NG::HandednessFollowMode::FOLLOW_ANCHOR, NG::HandednessFollowMode::FOLLOW_GRIP_HAND };
 } // namespace
 
 static void SetParseStyle(ButtonInfo& buttonInfo, const int32_t styleValue)
@@ -394,6 +396,18 @@ void ParseEdgeLightMode(DialogProperties& properties, JSRef<JSObject> obj)
     }
 }
 
+void ParseAdaptToHandedness(DialogProperties& properties, JSRef<JSObject> obj)
+{
+    auto adaptToHandedness = obj->GetProperty("adaptToHandedness");
+    if (adaptToHandedness->IsNumber()) {
+        auto adaptToHandednessVal = adaptToHandedness->ToNumber<int32_t>();
+        if (adaptToHandednessVal >= 0 &&
+            adaptToHandednessVal < static_cast<int32_t>(DIALOG_HANDEDNESS_FOLLOW_MODE.size())) {
+            properties.adaptToHandedness = DIALOG_HANDEDNESS_FOLLOW_MODE[adaptToHandednessVal];
+        }
+    }
+}
+
 void JSActionSheet::Show(const JSCallbackInfo& args)
 {
     auto scopedDelegate = EngineHelper::GetCurrentDelegateSafely();
@@ -546,6 +560,7 @@ void JSActionSheet::Show(const JSCallbackInfo& args)
     ParseSystemMaterial(properties, obj);
     ParseDistortionMode(properties, obj);
     ParseEdgeLightMode(properties, obj);
+    ParseAdaptToHandedness(properties, obj);
     JSViewAbstract::SetDialogProperties(obj, properties);
     JSViewAbstract::SetDialogHoverModeProperties(obj, properties);
     JSViewAbstract::SetDialogBlurStyleOption(obj, properties);

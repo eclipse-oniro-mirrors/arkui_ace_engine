@@ -817,7 +817,17 @@ DialogProperties CalendarPickerDialogBridge::BuildDialogProperties(EcmaVM* vm,
             properties.edgeLightMode = static_cast<EdgeLightMode>(edgeLightMode);
         }
     }
-    
+
+    auto adaptToHandednessValue =
+        paramObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "adaptToHandedness"));
+    if (adaptToHandednessValue->IsNumber()) {
+        auto adaptToHandedness = adaptToHandednessValue->ToNumber(vm)->Int32Value(vm);
+        if (adaptToHandedness >= static_cast<int32_t>(HandednessFollowMode::NONE) &&
+            adaptToHandedness <= static_cast<int32_t>(HandednessFollowMode::FOLLOW_GRIP_HAND)) {
+            properties.adaptToHandedness = static_cast<HandednessFollowMode>(adaptToHandedness);
+        }
+    }
+
     return properties;
 }
 

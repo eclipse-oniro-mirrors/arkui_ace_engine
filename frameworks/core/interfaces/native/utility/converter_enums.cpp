@@ -2692,4 +2692,15 @@ ACE_FORCE_EXPORT void AssignCast(std::optional<EdgeLightMode>& dst, const Ark_Ed
         default: LOGE("Unexpected enum value in Ark_EdgeLightMode: %{public}d", src);
     }
 }
+
+template<>
+ACE_FORCE_EXPORT void AssignCast(std::optional<HandednessFollowMode>& dst, const Ark_HandednessFollowMode& src)
+{
+    switch (src) {
+        case ARK_HANDEDNESS_FOLLOW_MODE_NONE: dst = HandednessFollowMode::NONE; break;
+        case ARK_HANDEDNESS_FOLLOW_MODE_FOLLOW_ANCHOR: dst = HandednessFollowMode::FOLLOW_ANCHOR; break;
+        case ARK_HANDEDNESS_FOLLOW_MODE_FOLLOW_GRIP_HAND: dst = HandednessFollowMode::FOLLOW_GRIP_HAND; break;
+        default: LOGE("Unexpected enum value in Ark_HandednessFollowMode: %{public}d", src);
+    }
+}
 } // namespace OHOS::Ace::NG::Converter

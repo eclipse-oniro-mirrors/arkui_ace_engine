@@ -48,6 +48,7 @@ public:
         props->propEnableHoverMode_ = CloneEnableHoverMode();
         props->propHoverModeArea_ = CloneHoverModeArea();
         props->propDisplayModeInSubWindow_ = CloneDisplayModeInSubWindow();
+        props->propAdaptToHandedness_ = CloneAdaptToHandedness();
         return props;
     }
 
@@ -66,6 +67,7 @@ public:
         ResetEnableHoverMode();
         ResetHoverModeArea();
         ResetDisplayModeInSubWindow();
+        ResetAdaptToHandedness();
     }
 
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(DialogAlignment, DialogAlignment, PROPERTY_UPDATE_MEASURE);
@@ -83,6 +85,7 @@ public:
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(EnableHoverMode, bool, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(HoverModeArea, HoverModeAreaType, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(DisplayModeInSubWindow, DialogDisplayModeInSubWindow, PROPERTY_UPDATE_MEASURE);
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(AdaptToHandedness, HandednessFollowMode, PROPERTY_UPDATE_MEASURE);
     void ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const override
     {
         LayoutProperty::ToJsonValue(json, filter);
@@ -116,6 +119,14 @@ public:
         json->PutExtAttr("DisplayModeInSubWindow",
             GetDisplayModeInSubWindowValue(DialogDisplayModeInSubWindow::SCREEN_BASED)
                 == DialogDisplayModeInSubWindow::SCREEN_BASED ? "SCREEN_BASED" : "WINDOW_BASED", filter);
+        auto handednessMode = propAdaptToHandedness_.value_or(HandednessFollowMode::NONE);
+        const char* handednessStr = "NONE";
+        if (handednessMode == HandednessFollowMode::FOLLOW_ANCHOR) {
+            handednessStr = "FOLLOW_ANCHOR";
+        } else if (handednessMode == HandednessFollowMode::FOLLOW_GRIP_HAND) {
+            handednessStr = "FOLLOW_GRIP_HAND";
+        }
+        json->PutExtAttr("adaptToHandedness", handednessStr, filter);
     }
 
 private:

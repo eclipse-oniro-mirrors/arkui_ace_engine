@@ -52,6 +52,7 @@
 #include "core/components_ng/event/gesture_event_hub.h"
 #include "core/components_ng/layout/layout_property.h"
 #include "core/components_ng/manager/force_split/force_split_manager.h"
+#include "core/components_ng/manager/handedness/handedness_manager.h"
 #include "core/components_ng/pattern/dialog/dialog_layout_algorithm.h"
 #include "core/components_ng/pattern/dialog/dialog_view.h"
 #include "core/components_ng/pattern/distortion_component/distortion_component_options.h"
@@ -1759,6 +1760,10 @@ void DialogPattern::ToJsonValue(std::unique_ptr<JsonValue>& json, const Inspecto
     json->PutExtAttr("edgeLightMode",
         EdgeLightModeToString(dialogProperties_.edgeLightMode.value_or(EdgeLightMode::EDGELIGHT_AUTO)).c_str(),
         filter);
+    json->PutExtAttr("adaptToHandedness",
+        HandednessFollowModeToString(
+            dialogProperties_.adaptToHandedness.value_or(HandednessFollowMode::NONE)).c_str(),
+        filter);
     json->PutExtAttr("distortionEnabled", needDistortion_.value_or(false) ? "true" : "false", filter);
     json->PutExtAttr("edgeLightEnabled", needFlowLight_.value_or(false) ? "true" : "false", filter);
     json->PutExtAttr("hasSystemMaterial", dialogProperties_.systemMaterial ? "true" : "false", filter);
@@ -1907,6 +1912,7 @@ void DialogPattern::UpdateAlignmentAndOffset()
     auto dialogProp = GetDialogProperties();
     props->UpdateDialogAlignment(dialogProp.alignment);
     props->UpdateDialogOffset(dialogProp.offset);
+    props->UpdateAdaptToHandedness(dialogProp.adaptToHandedness.value_or(HandednessFollowMode::NONE));
 }
 
 void DialogPattern::OnLanguageConfigurationUpdate()
@@ -2471,6 +2477,10 @@ void DialogPattern::DumpInfo()
         "EdgeLightMode: " +
         EdgeLightModeToString(dialogProperties_.edgeLightMode.value_or(EdgeLightMode::EDGELIGHT_AUTO)));
     DumpLog::GetInstance().AddDesc(
+        "AdaptToHandedness: " +
+        HandednessFollowModeToString(
+            dialogProperties_.adaptToHandedness.value_or(HandednessFollowMode::NONE)));
+    DumpLog::GetInstance().AddDesc(
         "DistortionEnabled: " + std::string(needDistortion_.value_or(false) ? "true" : "false"));
     DumpLog::GetInstance().AddDesc(
         "EdgeLightEnabled: " + std::string(needFlowLight_.value_or(false) ? "true" : "false"));
@@ -2596,6 +2606,12 @@ void DialogPattern::OnWindowSizeChanged(int32_t width, int32_t height, WindowSiz
         InitParentWindowRect();
         host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
         isFoldStatusChanged_ = false;
+        // Window size changed: the cached anchor position (window-relative coordinates)
+        // may be stale. Set a flag so the next layout pass re-queries the anchor from
+        // HandednessManager instead of using the stale cached value.
+        if (handednessLayoutCaptured_) {
+            needRefreshAnchorPos_ = true;
+        }
     }
 }
 
@@ -2723,6 +2739,9 @@ void DialogPattern::DumpInfo(std::unique_ptr<JsonValue>& json)
         DistortionModeToString(dialogProperties_.distortionMode.value_or(DistortionMode::DISTORTION_AUTO)).c_str());
     json->Put("EdgeLightMode",
         EdgeLightModeToString(dialogProperties_.edgeLightMode.value_or(EdgeLightMode::EDGELIGHT_AUTO)).c_str());
+    json->Put("AdaptToHandedness",
+        HandednessFollowModeToString(
+            dialogProperties_.adaptToHandedness.value_or(HandednessFollowMode::NONE)).c_str());
     json->Put("DistortionEnabled", needDistortion_.value_or(false) ? "true" : "false");
     json->Put("EdgeLightEnabled", needFlowLight_.value_or(false) ? "true" : "false");
 }

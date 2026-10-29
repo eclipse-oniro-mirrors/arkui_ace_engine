@@ -7611,5 +7611,13 @@
     {
         "first_introduced": "26.2.0",
         "name": "OH_ArkUI_NativeModule_UIInfoCollectionUnregisterInteractionObserver"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_NativeModule_CustomDialog_SetAdaptToHandednessInOptions"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_NativeModule_CustomDialog_SetAdaptToHandedness"
     }
 ]
