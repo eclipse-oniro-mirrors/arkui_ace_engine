@@ -919,9 +919,26 @@ void SwitchPattern::ResetHostMaterialEffects()
     auto material = renderContext->GetSystemMaterial();
     CHECK_NULL_VOID(material);
 
-    // Clear SO-level material effects
-    MaterialUtils::CallSetMaterial(AceType::RawPtr(host), nullptr);
+    AnimationUtils::ExecuteWithoutAnimation(
+        [weak = WeakClaim(this)]() {
+            auto pattern = weak.Upgrade();
+            CHECK_NULL_VOID(pattern);
+            pattern->ResetHostMaterialEffectsInner();
+        },
+        host->GetContextRefPtr());
+}
 
+void SwitchPattern::ResetHostMaterialEffectsInner()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto renderContext = host->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+
+    // Clear SO-level material effects
+    if (!MaterialUtils::CallSetMaterial(AceType::RawPtr(host), nullptr)) {
+        ViewAbstract::SetSystemMaterialImmediate(AceType::RawPtr(host), nullptr);
+    }
     // Clear RS material filter
     renderContext->UpdateUiMaterialFilter(nullptr);
 
