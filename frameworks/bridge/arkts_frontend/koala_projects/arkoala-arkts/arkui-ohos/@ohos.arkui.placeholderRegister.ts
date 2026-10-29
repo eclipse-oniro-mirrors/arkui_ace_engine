@@ -110,7 +110,7 @@ export class PlaceholderRegister {
         }
         let cause: string;
         if (result === REGISTER_RESULT_NOT_INSTRUMENTED) {
-            cause = 'Registration rejected: the builder is not marked with @Builder({ isPlaceholder: true }).';
+            cause = 'Registration rejected: the builder is not marked with @Builder({ isPlaceholder: true }). The ID is not registered.';
             prLog(`register: rejected, builder without isPlaceholder instrumentation, id='${id}' ` +
                 `(the __aceBegin/EndScrollPlaceholder__ signal never fired during the isolated execution)`);
         } else if (result === REGISTER_RESULT_UNSUPPORTED_COMPONENT) {
