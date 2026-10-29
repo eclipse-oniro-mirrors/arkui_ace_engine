@@ -164,7 +164,8 @@ private:
     void OnModeChange();
     void OnWindowStateChange(bool show);
     RefPtr<FrameNode> GetHomePage() const;
-
+    void ResetPageLevelDisplaceHomeTypes(const RefPtr<FrameNode>& homePage);
+    void ResetPageLevelNavigationHomes(const RefPtr<FrameNode>& homePage);
     void FirePageHideOnPushPage(RouterPageType newPageType, const RefPtr<FrameNode>& lastPage,
         const RefPtr<FrameNode>& topRelatedOrPhPage, const RefPtr<FrameNode>& preHomePage,
         PageTransitionType hideTransitionType, bool newPageIsFullScreenPage);
