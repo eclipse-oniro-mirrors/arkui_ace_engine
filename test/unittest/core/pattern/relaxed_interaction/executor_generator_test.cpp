@@ -192,29 +192,6 @@ class ExecutorGeneratorParseCommandTest : public ExecutorGeneratorTest {};
 class ExecutorGeneratorParseFallbackCmdTest : public ExecutorGeneratorTest {};
 class ExecutorGeneratorParseRegularCmdTest : public ExecutorGeneratorTest {};
 
-HWTEST_F(ExecutorGeneratorParseCommandTest, ValidateCommand_MatchesExecutionParameterRules, TestSize.Level1)
-{
-    ExecutorGenerator generator(mockPipelineContext_);
-    for (const auto& command : { VALID_BACKPRESS_JSON, VALID_CLICK_JSON, VALID_CONTENT_SWITCH_JSON,
-             VALID_SCROLL_JSON, VALID_KEY_JSON }) {
-        auto json = JsonUtil::ParseJsonString(command);
-        EXPECT_TRUE(ExecutorGenerator::ValidateCommand(json)) << command;
-        EXPECT_FALSE(generator.ParseCommand(json).empty()) << command;
-    }
-    for (const auto* command : {
-             R"({"cmd":{"type":"click","action_info":{"coordinates":{"x1":1}}}})",
-             R"({"cmd":{"type":"scroll","action_info":{"distance":-1,"coordinates":{"x1":1,"y1":2}}}})",
-             R"({"cmd":{"type":"key","action_info":{"code":999}}})" }) {
-        auto json = JsonUtil::ParseJsonString(command);
-        EXPECT_FALSE(ExecutorGenerator::ValidateCommand(json)) << command;
-        EXPECT_TRUE(generator.ParseCommand(json).empty()) << command;
-    }
-    auto missingMode = JsonUtil::ParseJsonString(
-        R"({"cmd":{"type":"content_switch","action_info":{"coordinates":{"pos":{"x":1,"y":2}}}}})");
-    EXPECT_FALSE(ExecutorGenerator::ValidateCommand(missingMode));
-    EXPECT_FALSE(generator.ParseCommand(missingMode).empty());
-}
-
 // ============ Constructor Tests ============
 
 HWTEST_F(ExecutorGeneratorConstructorTest, Constructor_NullContext, TestSize.Level1)

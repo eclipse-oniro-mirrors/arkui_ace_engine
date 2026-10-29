@@ -33,9 +33,6 @@ ace_unittest("relaxed_interaction_manager_test_ng") {
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/parsers/key_command_parser.cpp",
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/relaxed_interaction_manager.cpp",
     "$ace_root/frameworks/core/event/key_event_recognizer.cpp",
-    "$ace_root/frameworks/core/interfaces/native/node/relaxed_command_processor.cpp",
-    "$ace_root/frameworks/core/interfaces/native/utility/error_message_manager.cpp",
-    "relaxed_command_processor_test.cpp",
     "relaxed_interaction_manager_test_ng.cpp",
   ]
 

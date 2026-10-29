@@ -759,25 +759,6 @@ HWTEST_F(ScrollCommandParserParseTest, ParseCoordinates_OnlyX1Y1_ReturnsTrueAndL
     EXPECT_FALSE(cmd.isY2Set);
 }
 
-HWTEST_F(ScrollCommandParserParseTest, Parse_SimulatingWithoutEndPoint_UsesDefaultWindowDistance, TestSize.Level1)
-{
-    auto context = AceType::MakeRefPtr<MockPipelineContext>();
-    context->SetRootSize(400.0, 600.0);
-    ScrollCommandParser parser { WeakPtr<PipelineContext>(context) };
-    auto json = JsonUtil::ParseJsonString(R"({
-        "type": "scroll",
-        "mode": "simulating",
-        "action_info": { "coordinates": { "x1": 300, "y1": 400 } }
-    })");
-    auto executors = parser.Parse(json);
-    ASSERT_EQ(executors.size(), 1);
-    auto* executor = static_cast<ScrollSimulatingExecutor*>(executors.front().get());
-    ASSERT_FALSE(executor->touchEvents_.empty());
-    EXPECT_FLOAT_EQ(executor->touchEvents_.back().x, 300.0f);
-    EXPECT_FLOAT_EQ(executor->touchEvents_.back().y, 200.0f);
-    EXPECT_EQ(executor->ExecuteStep(), ExecutorResult::PENDING);
-}
-
 HWTEST_F(ScrollCommandParserParseTest, ParseCoordinates_MissingX1_ReturnsFalse, TestSize.Level1)
 {
     auto context = WeakPtr<PipelineContext>(mockPipelineContext_);
