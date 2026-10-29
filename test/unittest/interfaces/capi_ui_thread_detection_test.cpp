@@ -373,8 +373,7 @@ TEST_P(UiThreadTableLogTest, LogModeProducesDiagnostic)
 }
 
 // === 表单弹窗类绑定表参数化测试（41 × 5 模式）===
-// 覆盖 ArkUI_NativeDialogAPI_1/2/3 经 dialogImpl_1/2/3 绑定 DialogModel::* 的全部入口，
-// 权威清单见 .codespec/changes/issue-20260831442009-thread-check-dialog-api/evidence/inputs/onebox-interface-list.txt。
+// 覆盖 ArkUI_NativeDialogAPI_1/2/3 经 dialogImpl_1/2/3 绑定 DialogModel::* 的全部 41 个入口。
 
 struct DialogTableScopeEntry {
     const char* name;
