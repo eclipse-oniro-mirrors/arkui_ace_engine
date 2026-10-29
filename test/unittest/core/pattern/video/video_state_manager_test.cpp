@@ -1677,6 +1677,11 @@ HWTEST_F(VideoStateManagerTestNg, VideoStateManagerClearPendingCommandWithReason
     EXPECT_EQ(callbackReason, "Media player Play() failed");
 }
 
+/**
+ * @tc.name: VideoStateManagerDrainNextSerialBgTaskEmpty001
+ * @tc.desc: Test DrainNextSerialBgTaskOnBg stops draining when the queue is empty.
+ * @tc.type: FUNC
+ */
 HWTEST_F(VideoStateManagerTestNg, VideoStateManagerDrainNextSerialBgTaskEmpty001, TestSize.Level1)
 {
     auto manager = AceType::MakeRefPtr<VideoStateManager>(WeakPtr<VideoStateMachinePattern>());
@@ -1689,6 +1694,11 @@ HWTEST_F(VideoStateManagerTestNg, VideoStateManagerDrainNextSerialBgTaskEmpty001
     EXPECT_TRUE(manager->serialBgTaskQueue_.empty());
 }
 
+/**
+ * @tc.name: VideoStateManagerDrainNextSerialBgTaskNullTask001
+ * @tc.desc: Test DrainNextSerialBgTaskOnBg skips a null task and runs the next valid task.
+ * @tc.type: FUNC
+ */
 HWTEST_F(VideoStateManagerTestNg, VideoStateManagerDrainNextSerialBgTaskNullTask001, TestSize.Level1)
 {
     auto manager = AceType::MakeRefPtr<VideoStateManager>(WeakPtr<VideoStateMachinePattern>());

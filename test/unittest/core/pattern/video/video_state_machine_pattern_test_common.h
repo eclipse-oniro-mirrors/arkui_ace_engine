@@ -32,10 +32,11 @@
 #define protected public
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
-#include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 #include "test/mock/frameworks/core/components_ng/render/mock_media_player.h"
 #include "test/mock/frameworks/core/components_ng/render/mock_render_context.h"
 #include "test/mock/frameworks/core/components_ng/render/mock_render_surface.h"
+#include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
+#include "video_test_property_common.h"
 
 #include "base/geometry/ng/size_t.h"
 #include "base/json/json_util.h"
@@ -43,8 +44,6 @@
 #include "base/resource/internal_resource.h"
 #include "core/common/ai/image_analyzer_mgr.h"
 #include "core/components/common/layout/constants.h"
-#include "core/components_ng/pattern/video/video_theme.h"
-#include "core/components_ng/pattern/video/video_utils.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/layout/layout_algorithm.h"
@@ -66,14 +65,16 @@
 #include "core/components_ng/pattern/video/video_state_machine_pattern.h"
 #include "core/components_ng/pattern/video/video_state_manager.h"
 #include "core/components_ng/pattern/video/video_styles.h"
+#include "core/components_ng/pattern/video/video_theme.h"
+#include "core/components_ng/pattern/video/video_utils.h"
 #include "core/components_v2/inspector/inspector_constants.h"
 #include "core/image/image_source_info.h"
-#include "video_test_property_common.h"
 
 namespace OHOS::Ace::NG {
 
 class TestableMockMediaPlayer : public MockMediaPlayer {
     DECLARE_ACE_TYPE(TestableMockMediaPlayer, MockMediaPlayer);
+
 public:
     int32_t videoWidth_ = DEFAULT_WIDTH;
     int32_t videoHeight_ = DEFAULT_HEIGHT;
@@ -90,6 +91,7 @@ public:
 
 class TestCallbackMediaPlayer : public TestableMockMediaPlayer {
     DECLARE_ACE_TYPE(TestCallbackMediaPlayer, TestableMockMediaPlayer);
+
 public:
     void CreateMediaPlayer() override
     {
@@ -101,10 +103,9 @@ public:
         resetCount_++;
     }
 
-    void RegisterMediaPlayerEvent(PositionUpdatedEvent&& positionUpdatedEvent,
-        StateChangedEvent&& stateChangedEvent, CommonEvent&& errorEvent, CommonEvent&& resolutionChangeEvent,
-        CommonEvent&& startRenderFrameEvent, VideoErrorEvent&& videoErrorEvent = {},
-        SeekDoneEvent&& seekDoneEvent = {}) override
+    void RegisterMediaPlayerEvent(PositionUpdatedEvent&& positionUpdatedEvent, StateChangedEvent&& stateChangedEvent,
+        CommonEvent&& errorEvent, CommonEvent&& resolutionChangeEvent, CommonEvent&& startRenderFrameEvent,
+        VideoErrorEvent&& videoErrorEvent, SeekDoneEvent&& seekDoneEvent) override
     {
         positionUpdatedEvent_ = std::move(positionUpdatedEvent);
         stateChangedEvent_ = std::move(stateChangedEvent);
@@ -128,6 +129,7 @@ public:
 
 class RecordingTaskExecutor : public MockTaskExecutor {
     DECLARE_ACE_TYPE(RecordingTaskExecutor, MockTaskExecutor);
+
 public:
     struct RecordedTask {
         TaskExecutor::Task task;
@@ -135,9 +137,8 @@ public:
         std::string name;
     };
 
-    bool OnPostTask(Task&& task, TaskType type, uint32_t delayTime, const std::string& name,
-        PriorityType priorityType = PriorityType::LOW,
-        VsyncBarrierOption barrierOption = VsyncBarrierOption::NO_BARRIER) const override
+    bool OnPostTask(Task&& task, TaskType type, uint32_t delayTime, const std::string& name, PriorityType priorityType,
+        VsyncBarrierOption barrierOption) const override
     {
         if (!task) {
             return false;
@@ -147,16 +148,15 @@ public:
     }
 
     bool OnPostTaskWithoutTraceId(Task&& task, TaskType type, uint32_t delayTime, const std::string& name,
-        PriorityType priorityType = PriorityType::LOW) const override
+        PriorityType priorityType) const override
     {
-        return OnPostTask(std::move(task), type, delayTime, name, priorityType);
+        return OnPostTask(std::move(task), type, delayTime, name, priorityType, VsyncBarrierOption::NO_BARRIER);
     }
 
     bool RunNext(TaskType type)
     {
-        auto it = std::find_if(tasks_.begin(), tasks_.end(), [type](const RecordedTask& recorded) {
-            return recorded.type == type;
-        });
+        auto it = std::find_if(
+            tasks_.begin(), tasks_.end(), [type](const RecordedTask& recorded) { return recorded.type == type; });
         if (it == tasks_.end()) {
             return false;
         }
