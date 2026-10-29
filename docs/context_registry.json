@@ -12957,6 +12957,72 @@
       ],
       "status": "active",
       "last_verified": "2026-08-08"
+    },
+    {
+      "id": "KeyboardEventFocusChain",
+      "name": "Keyboard Event Focus Chain",
+      "name_cn": "键盘事件目标与焦点链",
+      "kind": "issue",
+      "category": "interaction",
+      "keywords": [
+        "KeyboardEventFocusChain",
+        "键盘事件目标与焦点链",
+        "焦点",
+        "焦点链",
+        "获焦",
+        "失焦",
+        "走焦",
+        "焦点激活态",
+        "激活态",
+        "键盘事件",
+        "按键事件",
+        "方向键",
+        "DPAD",
+        "KEY_DPAD",
+        "Tab走焦",
+        "按键冒泡",
+        "事件冒泡",
+        "onKeyEvent",
+        "onKeyPreIme",
+        "onKeyEventDispatch",
+        "dispatchKeyEvent",
+        "requestFocus",
+        "defaultFocus",
+        "focusable",
+        "FocusHub",
+        "HandleFocusTravel",
+        "OnFocusEventScope",
+        "KeyEventManager",
+        "SCROLL_FROM_FOCUS_JUMP",
+        "TriggerFocusScroll",
+        "ScrollByOffset",
+        "FlushFocusScroll",
+        "方向键滚动",
+        "键盘滚动",
+        "嵌套滚动 键盘",
+        "enableScrollWithKeyboard"
+      ],
+      "aliases": [
+        "键盘事件焦点链误判",
+        "按键只触发父组件",
+        "子组件收不到按键事件",
+        "方向键只滚动父组件",
+        "键盘事件优先下发给父组件"
+      ],
+      "kb": "docs/kb/issues/interaction/keyboard-event-focus-chain.md",
+      "func_ids": [
+        "05-03-07",
+        "04-14-02"
+      ],
+      "status": "active",
+      "last_verified": "2026-10-29",
+      "source_paths": {
+        "focus_hub": "frameworks/core/components_ng/event/focus_hub.cpp",
+        "focus_event_handler": "frameworks/core/components_ng/event/focus_event_handler.cpp",
+        "key_event_manager": "frameworks/core/common/key_event_manager.cpp",
+        "focus_manager": "frameworks/core/components_ng/manager/focus/focus_manager.cpp",
+        "scroll_pattern": "frameworks/core/components_ng/pattern/scroll/scroll_pattern.cpp"
+      }
     }
   ]
 }
