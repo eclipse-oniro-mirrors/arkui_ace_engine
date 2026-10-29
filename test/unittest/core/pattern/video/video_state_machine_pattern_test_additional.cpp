@@ -31,6 +31,8 @@ constexpr int32_t RET_SUCCESS_VAL = 10;
 constexpr int32_t RET_FAILED_VAL = 11;
 constexpr int32_t ERROR_CODE_INVALID_VAL = 401;
 constexpr int32_t RESET_DURATION_MS = 65000;
+constexpr double FULLSCREEN_EXPECTED_PROGRESS_RATE = 1.5;
+constexpr double FULLSCREEN_INITIAL_PROGRESS_RATE = 0.5;
 const std::string VIDEO_SRC_TEST = "common/video.mp4";
 const std::string VIDEO_POSTER_TEST = "common/img2.png";
 
@@ -62,7 +64,7 @@ void PrepareFullScreenUpdateState(const RefPtr<FrameNode>& frameNode, FullScreen
 
     context.pattern->UpdateLoop(true);
     context.pattern->UpdateMuted(true);
-    context.pattern->UpdateProgressRate(1.5);
+    context.pattern->UpdateProgressRate(FULLSCREEN_EXPECTED_PROGRESS_RATE);
     context.pattern->SetShortcutKeyEnabled(true);
     context.pattern->SetCurrentVolume(0.35f);
     auto imageAnalyzerManager =
@@ -75,7 +77,7 @@ void PrepareFullScreenUpdateState(const RefPtr<FrameNode>& frameNode, FullScreen
     context.fullScreenPattern->UpdateLoop(false);
     context.fullScreenPattern->UpdateMuted(false);
     context.fullScreenPattern->UpdateAutoPlay(true);
-    context.fullScreenPattern->UpdateProgressRate(0.5);
+    context.fullScreenPattern->UpdateProgressRate(FULLSCREEN_INITIAL_PROGRESS_RATE);
     context.fullScreenPattern->UpdateAnalyzerState(false);
     context.fullScreenPattern->SetShortcutKeyEnabled(false);
     context.fullScreenPattern->SetCurrentVolume(0.9f);
