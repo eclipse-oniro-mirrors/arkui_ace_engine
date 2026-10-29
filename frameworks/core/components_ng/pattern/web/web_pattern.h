@@ -86,6 +86,7 @@ namespace OHOS::NWeb {
     class NWebSelectPopupMenuParam;
     class NWebDateTimeChooser;
     class NWebDateTimeSuggestion;
+    struct NWebRect;
     class NWebSelectPopupMenuCallback;
     class NWebDateTimeChooserCallback;
     class NWebAccessibilityNodeInfo;
@@ -1477,7 +1478,8 @@ private:
     void InitEnhanceSurfaceFlag();
     void UpdateBackgroundColorRightNow(int32_t color);
     void UpdateContentOffset(const RefPtr<LayoutWrapper>& dirty);
-    DialogProperties GetDialogProperties(const RefPtr<DialogTheme>& theme);
+    DialogProperties GetDialogProperties(const RefPtr<DialogTheme>& theme,
+                                         const OHOS::NWeb::NWebRect& elementRect);
     bool ShowDateTimeDialog(std::shared_ptr<OHOS::NWeb::NWebDateTimeChooser> chooser,
         const std::vector<std::shared_ptr<OHOS::NWeb::NWebDateTimeSuggestion>>& suggestions,
         std::shared_ptr<NWeb::NWebDateTimeChooserCallback> callback);
