@@ -19951,8 +19951,20 @@ int32_t SetWaterFlowScrollToIndex(ArkUI_NodeHandle node, const ArkUI_AttributeIt
         extraOffset = item->value[NUM_3].f32;
     }
     auto* fullImpl = GetFullImpl();
-    fullImpl->getNodeModifiers()->getWaterFlowModifier()->setScrollToIndex(
-        node->uiNodeHandle, values[NUM_0], values[NUM_1], values[NUM_2], extraOffset);
+    auto* modifier = fullImpl->getNodeModifiers()->getWaterFlowModifier();
+    ArkUIScrollToIndexOptions options { values[NUM_1], values[NUM_2], extraOffset, 0 };
+    const bool fastScroll = item->size > NUM_4 && InRegion(NUM_1, NUM_2, item->value[NUM_4].i32) &&
+        values[NUM_1] != DEFAULT_FALSE && modifier->getWaterFlowLayoutMode &&
+        modifier->getWaterFlowLayoutMode(node->uiNodeHandle) == ARKUI_WATER_FLOW_LAYOUT_MODE_SLIDING_WINDOW;
+    if (fastScroll) {
+        // Only the fast path converts the offset; the original path keeps its raw value.
+        options.fastScrollMode = item->value[NUM_4].i32;
+        const int32_t unit = GetDefaultUnit(node, UNIT_VP);
+        if (unit != UNIT_PX) {
+            options.extraOffset = fullImpl->getBasicAPI()->convertLengthMetricsUnit(extraOffset, unit, UNIT_PX);
+        }
+    }
+    modifier->setScrollToIndex(node->uiNodeHandle, values[NUM_0], &options);
     return ERROR_CODE_NO_ERROR;
 }
 

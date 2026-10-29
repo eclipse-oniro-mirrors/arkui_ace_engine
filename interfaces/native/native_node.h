@@ -9494,6 +9494,11 @@ typedef enum {
      * If value[3] is negative, it will offset further towards the top.
      * This parameter is supported since API version 23. \n
      *
+     * .value[4]?.i32: fast scroll mode for WaterFlow. The value <b>0</b> disables optimization, <b>1</b> skips
+     * intermediate item measurement, and <b>2</b> skips intermediate item creation and measurement.
+     * Other values disable optimization. The default value is <b>0</b>. This option takes effect only when
+     * .value[1] is <b>1</b> and the layout mode is SLIDING_WINDOW, and then .value[3] is converted from vp once.
+     * This parameter is supported since API version 26.1.0. \n
      */
     NODE_WATER_FLOW_SCROLL_TO_INDEX,
 

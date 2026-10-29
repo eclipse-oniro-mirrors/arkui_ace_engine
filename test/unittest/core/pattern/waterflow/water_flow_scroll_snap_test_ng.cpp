@@ -204,9 +204,120 @@ protected:
         EXPECT_TRUE(scrollable->IsStopped());
     }
 
+#ifdef TEST_WATER_FLOW_SW
+    static constexpr int32_t FAST_SCROLL_ITEM_COUNT = 1000;
+    static constexpr int32_t FAST_SCROLL_TARGET = 800;
+    static constexpr int32_t FAST_SCROLL_TICKS = 4;
+    static constexpr int32_t SKIPPED_INDEX_GAP = 100;
+    static constexpr size_t MAX_VISIBLE_RANGES = 50;
+
+    void CheckCommandsAfterFastScroll()
+    {
+        const float beforeScroll = pattern_->GetTotalOffset();
+        pattern_->positionController_->ScrollBy(0.0f, 100.0f, false);
+        FlushUITasks();
+        EXPECT_GT(pattern_->GetTotalOffset(), beforeScroll);
+
+        const float beforeAccessibility = pattern_->GetTotalOffset();
+        accessibilityProperty_->ActActionScrollForward();
+        FlushUITasks();
+        FinishSnapAnimation();
+        EXPECT_GT(pattern_->GetTotalOffset(), beforeAccessibility);
+        EXPECT_FALSE(pattern_->GetFastScrollRequest());
+        MockAnimationManager::GetInstance().Reset();
+
+        ScrollToIndex(FAST_SCROLL_TARGET, false, ScrollAlign::START);
+        SetStrategy(MakeAlign(ScrollSnapAlign::START));
+        UpdateCurrentOffset(-25.0f);
+        ASSERT_TRUE(pattern_->StartSnapAnimation({ .snapDelta = -0.1f }));
+        FlushUITasks();
+        FinishSnapAnimation();
+        EXPECT_NEAR(GetItem(FAST_SCROLL_TARGET)->GetGeometryNode()->GetFrameRect().Top(), 0.0f, 0.5f);
+        MockAnimationManager::GetInstance().Reset();
+
+        pattern_->SetBackToTop(true);
+        pattern_->StartBackToTopAnimation();
+        FlushUITasks();
+        FinishSnapAnimation();
+        EXPECT_TRUE(pattern_->IsAtTop());
+        EXPECT_EQ(pattern_->GetBeginIndex(), 0);
+        EXPECT_FALSE(pattern_->GetFastScrollRequest());
+        EXPECT_FALSE(pattern_->fastScrollState_);
+        MockAnimationManager::GetInstance().Reset();
+    }
+
+    void CheckFastScrollFollowingOperations(FastScrollMode mode)
+    {
+        auto lifecycle = std::make_shared<std::vector<int32_t>>();
+        auto visibleRanges = std::make_shared<std::vector<std::pair<int32_t, int32_t>>>();
+        auto model = CreateWaterFlow();
+        model.SetOnScrollStart([lifecycle]() { lifecycle->push_back(0); });
+        model.SetOnScrollStop([lifecycle]() { lifecycle->push_back(1); });
+        model.SetOnScrollIndex([this, visibleRanges](int32_t first, int32_t last) {
+            visibleRanges->emplace_back(first, last);
+            EXPECT_EQ(first, pattern_->GetBeginIndex());
+            EXPECT_EQ(last, pattern_->GetEndIndex());
+            auto item = GetItem(first);
+            ASSERT_NE(item, nullptr);
+            const auto rect = item->GetGeometryNode()->GetFrameRect();
+            EXPECT_LT(rect.Top(), WATER_FLOW_HEIGHT);
+            EXPECT_GT(rect.Bottom(), 0.0f);
+        });
+        CreateItemsInLazyForEach(FAST_SCROLL_ITEM_COUNT, [](int32_t) { return 100.0f; });
+        CreateDone();
+        lifecycle->clear();
+        visibleRanges->clear();
+
+        MockAnimationManager::GetInstance().SetTicks(FAST_SCROLL_TICKS);
+        pattern_->ScrollToIndexFastScroll(FAST_SCROLL_TARGET, true, ScrollAlign::START, 0.0f, mode);
+        FlushUITasks();
+        EXPECT_TRUE(visibleRanges->empty()); // Offscreen preparation must not publish a visible-index event.
+        FinishSnapAnimation();
+        ASSERT_FALSE(lifecycle->empty());
+        EXPECT_EQ(lifecycle->front(), 0);
+        EXPECT_EQ(lifecycle->back(), 1);
+        ASSERT_FALSE(visibleRanges->empty());
+        EXPECT_LT(visibleRanges->size(), MAX_VISIBLE_RANGES);
+        bool skippedIndices = false;
+        int32_t previous = 0;
+        for (const auto& range : *visibleRanges) {
+            skippedIndices = skippedIndices || range.first - previous > SKIPPED_INDEX_GAP;
+            previous = range.first;
+        }
+        EXPECT_TRUE(skippedIndices); // Events describe displayed windows, not every skipped intermediate item.
+        EXPECT_FALSE(pattern_->GetFastScrollRequest());
+        EXPECT_NEAR(GetItem(FAST_SCROLL_TARGET)->GetGeometryNode()->GetFrameRect().Top(), 0.0f, 0.2f);
+        MockAnimationManager::GetInstance().Reset();
+
+        ASSERT_NO_FATAL_FAILURE(CheckCommandsAfterFastScroll());
+    }
+#endif
+
     RefPtr<TaskExecutor> previousExecutor_;
     RefPtr<WaterFlowSnapTaskExecutor> snapExecutor_;
 };
+
+#ifdef TEST_WATER_FLOW_SW
+/**
+ * @tc.name: WFFastScrollFollowingOperationsMode1
+ * @tc.desc: Visible-index events skip undisplayed items; page actions, snap and back-to-top remain usable.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, WFFastScrollFollowingOperationsMode1, TestSize.Level1)
+{
+    CheckFastScrollFollowingOperations(FastScrollMode::SKIP_MEASURE);
+}
+
+/**
+ * @tc.name: WFFastScrollFollowingOperationsMode2
+ * @tc.desc: Skip-create fast scrolling preserves event and subsequent interaction behavior.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, WFFastScrollFollowingOperationsMode2, TestSize.Level1)
+{
+    CheckFastScrollFollowingOperations(FastScrollMode::SKIP_CREATE_AND_MEASURE);
+}
+#endif
 
 /**
  * @tc.name: SnapTypeFollowsStrategy
