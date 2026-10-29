@@ -273,7 +273,7 @@ public:
 
     virtual int32_t SetPreviewTextWithStyle(const PreviewTextStyling& styling)
     {
-        isNeedPreviewTextStyling = true;
+        isNeedPreviewTextStyling_ = true;
         SetPreviewTextStyling(styling);
         return 0;
     }

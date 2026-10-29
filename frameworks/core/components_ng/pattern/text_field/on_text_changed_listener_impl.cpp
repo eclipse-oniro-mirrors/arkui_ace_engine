@@ -486,7 +486,7 @@ int32_t OnTextChangedListenerImpl::SetPreviewTextWithStyle(const std::u16string 
         static_cast<int32_t>(text.length()), range.start, range.end);
     int32_t ret = CheckPreviewTextParams(text, {range.start, range.end});
     if (ret != MiscServices::ErrorCode::NO_ERROR) {
-        TAG_LOGI(AceLogTag::ACE_TEXT_FIELD, "SetPreviewTextWithStyle result is %{public}d}", ret);
+        TAG_LOGI(AceLogTag::ACE_TEXT_FIELD, "SetPreviewTextWithStyle result is %{public}d", ret);
         return ret;
     }
     auto task = [textFieldPattern = pattern_, text, range, style] {
@@ -494,10 +494,10 @@ int32_t OnTextChangedListenerImpl::SetPreviewTextWithStyle(const std::u16string 
         auto client = textFieldPattern.Upgrade();
         CHECK_NULL_VOID(client);
         ContainerScope scope(client->GetInstanceId());
-        TAG_LOGD(AceLogTag::ACE_TEXT_FIELD, "SetPreviewTextWithStyle  hasUnderlineColor:%{public}d"
+        TAG_LOGD(AceLogTag::ACE_TEXT_FIELD, "SetPreviewTextWithStyle  hasUnderlineColor:%{public}d "
             "underlineColor:0x%{public}X underlineStyle:%{public}d", style.hasUnderlineColor,
             style.underlineColor, style.underlineStyle);
-        if (style.underlineStyle >= 0  && style.underlineStyle <= 3) {
+        if (style.underlineStyle >= 0 && style.underlineStyle <= static_cast<int32_t>(PreviewTextStyle::DASH_LINE)) {
             if (style.hasUnderlineColor) {
                 client->SetPreviewTextWithStyle({ style.underlineColor,
                     static_cast<PreviewTextStyle>(style.underlineStyle) });

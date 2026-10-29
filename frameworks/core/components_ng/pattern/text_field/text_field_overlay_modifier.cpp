@@ -498,10 +498,10 @@ void TextFieldOverlayModifier::PaintPreviewTextDecoration(DrawingContext& contex
     canvas.AttachBrush(brush);
     float startOffset = 0.0f;
     for (const auto& rect : previewTextRect) {
-        PreviewDecorationParams p { rect.Left() + offsetX, rect.Right() + offsetX,
-            rect.Bottom() + offsetY, underlineWidth, PreviewTextStyle::WAVY,
+        PreviewDecorationParams params { rect.Left() + offsetX, rect.Right() + offsetX,
+            rect.Bottom() + offsetY, underlineWidth, styling.underlineShape,
             &rect == &previewTextRect.back(), color, startOffset };
-        DrawPreviewTextUnderline(canvas, p);
+        DrawPreviewTextUnderline(canvas, params);
         // Accumulate this segment's width so the next segment continues the dash/wavy
         // phase continuously instead of restarting the pattern at the new left edge.
         startOffset += rect.Right() - rect.Left();

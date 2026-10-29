@@ -207,10 +207,10 @@ void RichEditorOverlayModifier::PaintPreviewTextDecoration(DrawingContext& drawi
     drawingContext.canvas.AttachBrush(brush);
     float startOffset = 0.0f;
     for (const auto& rect : previewTextRects) {
-        PreviewDecorationParams p { rect.Left(), rect.Right(), rect.Bottom(),
+        PreviewDecorationParams params { rect.Left(), rect.Right(), rect.Bottom(),
             underlineWidth, styling.underlineShape,
             &rect == &previewTextRects.back(), RSColor(color), startOffset };
-        DrawPreviewTextUnderline(drawingContext.canvas, p);
+        DrawPreviewTextUnderline(drawingContext.canvas, params);
         // Accumulate this segment's width so the next segment continues the dash/wavy
         // phase continuously instead of restarting the pattern at the new left edge.
         startOffset += rect.Right() - rect.Left();
