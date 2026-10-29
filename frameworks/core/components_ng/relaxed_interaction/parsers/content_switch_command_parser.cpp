@@ -33,7 +33,7 @@ std::vector<std::unique_ptr<BaseExecutor>> ContentSwitchCommandParser::Parse(con
         return {};
     }
     auto executor = std::make_unique<StrictContentSwitchExecutor>(
-        context_, json->GetString("mode"), actionInfo.direction, actionInfo.count, point);
+        context_, "target", actionInfo.direction, actionInfo.count, point);
     std::vector<std::unique_ptr<BaseExecutor>> executors;
     executors.push_back(std::move(executor));
     return executors;
@@ -43,7 +43,7 @@ bool ContentSwitchCommandParser::Validate(const std::unique_ptr<JsonValue>& json
 {
     ActionInfo actionInfo;
     PointF point;
-    return ParseParameters(json, actionInfo, point);
+    return ParseParameters(json, actionInfo, point) && json->Contains("mode");
 }
 
 bool ContentSwitchCommandParser::ParseParameters(
@@ -53,7 +53,7 @@ bool ContentSwitchCommandParser::ParseParameters(
         return false;
     }
 
-    std::string mode = json->GetString("mode");
+    std::string mode = json->Contains("mode") ? json->GetString("mode") : "target";
     if (mode != "target") {
         TAG_LOGW(AceLogTag::ACE_UIEVENT, "Parsed mode is not target");
         return false;

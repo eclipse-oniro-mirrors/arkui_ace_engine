@@ -203,13 +203,16 @@ HWTEST_F(ExecutorGeneratorParseCommandTest, ValidateCommand_MatchesExecutionPara
     }
     for (const auto* command : {
              R"({"cmd":{"type":"click","action_info":{"coordinates":{"x1":1}}}})",
-             R"({"cmd":{"type":"content_switch","action_info":{"coordinates":{"pos":{"x":1,"y":2}}}}})",
              R"({"cmd":{"type":"scroll","action_info":{"distance":-1,"coordinates":{"x1":1,"y1":2}}}})",
              R"({"cmd":{"type":"key","action_info":{"code":999}}})" }) {
         auto json = JsonUtil::ParseJsonString(command);
         EXPECT_FALSE(ExecutorGenerator::ValidateCommand(json)) << command;
         EXPECT_TRUE(generator.ParseCommand(json).empty()) << command;
     }
+    auto missingMode = JsonUtil::ParseJsonString(
+        R"({"cmd":{"type":"content_switch","action_info":{"coordinates":{"pos":{"x":1,"y":2}}}}})");
+    EXPECT_FALSE(ExecutorGenerator::ValidateCommand(missingMode));
+    EXPECT_FALSE(generator.ParseCommand(missingMode).empty());
 }
 
 // ============ Constructor Tests ============

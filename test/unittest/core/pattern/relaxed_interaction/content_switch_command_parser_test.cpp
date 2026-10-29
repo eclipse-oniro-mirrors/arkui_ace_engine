@@ -402,7 +402,7 @@ HWTEST_F(ContentSwitchCommandParserParseTest, Parse_ValidTargetMode_ReturnsOneEx
     EXPECT_TRUE(executors[0]->IsSingleStep());
 }
 
-HWTEST_F(ContentSwitchCommandParserParseTest, Parse_MissingMode_ReturnsEmpty, TestSize.Level1)
+HWTEST_F(ContentSwitchCommandParserParseTest, Parse_MissingModeDefaultsToTargetButNDKRejects, TestSize.Level1)
 {
     auto context = WeakPtr<PipelineContext>(mockPipelineContext_);
     ContentSwitchCommandParser parser(context);
@@ -410,7 +410,10 @@ HWTEST_F(ContentSwitchCommandParserParseTest, Parse_MissingMode_ReturnsEmpty, Te
     ASSERT_NE(json, nullptr);
 
     auto executors = parser.Parse(json);
-    EXPECT_TRUE(executors.empty());
+    ASSERT_EQ(executors.size(), 1u);
+    EXPECT_EQ(executors[0]->GetType(), "strict_content_switch");
+    EXPECT_FALSE(ContentSwitchCommandParser::Validate(json));
+    EXPECT_TRUE(ContentSwitchCommandParser::Validate(JsonUtil::ParseJsonString(VALID_CONTENT_SWITCH_TARGET_JSON)));
 }
 
 HWTEST_F(ContentSwitchCommandParserParseTest, Parse_NullJson_ReturnsEmpty, TestSize.Level1)
