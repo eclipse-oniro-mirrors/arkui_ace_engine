@@ -32,6 +32,8 @@
 #include "unified_types.h"
 #include "utd_client.h"
 #include "video.h"
+
+#include "adapter/ohos/osal/pixel_map_ohos.h"
 #include "frameworks/bridge/common/utils/engine_helper.h"
 #include "frameworks/bridge/common/utils/utils.h"
 
@@ -374,6 +376,8 @@ void UdmfClientImpl::GetHtmlRecord(
     }
 }
 
+// this function is used to add pixelmap record to unifiedData, and the pixelmap data is stored in data vector.
+// only used by text, richeditor and Image components for drag and drop.
 void UdmfClientImpl::AddPixelMapRecord(const RefPtr<UnifiedData>& unifiedData, std::vector<uint8_t>& data,
     PixelMapRecordDetails& details)
 {
@@ -381,7 +385,7 @@ void UdmfClientImpl::AddPixelMapRecord(const RefPtr<UnifiedData>& unifiedData, s
     UDMF::UDDetails uDetails = {
         { "width", details.width },
         { "height", details.height },
-        { "pixel-format", static_cast<int32_t>(details.pixelFormat) },
+        { "pixel-format", static_cast<int32_t>(PixelMapOhos::ConvertToMediaPixelFormat(details.pixelFormat)) },
         { "alpha-type", static_cast<int32_t>(details.alphaType) } };
     record->SetDetails(uDetails);
     auto udData = AceType::DynamicCast<UnifiedDataImpl>(unifiedData);
