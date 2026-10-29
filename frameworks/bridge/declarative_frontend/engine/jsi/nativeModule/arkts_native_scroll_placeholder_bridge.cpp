@@ -33,7 +33,8 @@ namespace {
 // Northbound-facing message text of the registration rejection (SDK documents
 // error 100031 for exactly this condition).
 constexpr char REGISTER_REJECTED_MESSAGE[] =
-    "Registration rejected: the builder is not marked with @Builder({ isPlaceholder: true }).";
+    "Registration rejected: the builder is not marked with @Builder({ isPlaceholder: true })."
+    " The ID is not registered.";
 constexpr char UNSUPPORTED_COMPONENT_MESSAGE_PREFIX[] =
     "Registration rejected: the placeholder template contains an unsupported component";
 
