@@ -14,6 +14,8 @@
  */
 
 #include "gtest/gtest.h"
+#include <algorithm>
+#include <vector>
 #define private public
 #define protected public
 #include "base/ressched/ressched_report.h"
@@ -22,6 +24,8 @@
 #include "core/pipeline_ng/pipeline_context.h"
 #undef private
 #undef protected
+#include "test/mock/frameworks/base/thread/mock_task_executor.h"
+#include "test/mock/frameworks/core/common/mock_container.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -349,5 +353,174 @@ HWTEST_F(ResSchedReportTest, ResSchedReportSwiperChange001, TestSize.Level1)
     EXPECT_EQ(g_swiperChangeRecorder.lastResType, 212u);
     EXPECT_EQ(g_swiperChangeRecorder.lastValue, 1);
     EXPECT_EQ(g_swiperChangeRecorder.reportCount, 1);
+}
+
+namespace {
+// resType / event value / payload keys are internal to ressched_report.cpp, mirrored here
+constexpr uint32_t RES_TYPE_CLICK_RECOGNIZE_VALUE = 9;
+constexpr uint32_t RES_TYPE_SLIDE_VALUE = 11;
+constexpr int64_t TOUCH_DOWN_EVENT_VALUE = 1;
+constexpr int64_t TOUCH_UP_EVENT_VALUE = 3;
+constexpr int64_t TOUCH_PULL_UP_EVENT_VALUE = 4;
+constexpr int64_t SLIDE_DETECTING_VALUE = 2;
+constexpr uint64_t CONTAINER_DISPLAY_ID = 9; // must match SetMockDisplayId in SetUp
+constexpr int32_t FIRST_DISPLAY_ID = 1;
+constexpr int32_t SECOND_DISPLAY_ID = 4;
+constexpr int32_t INVALID_DISPLAY_ID = -1;
+
+struct TouchReportRecord {
+    uint32_t resType = 0;
+    int64_t value = 0;
+    std::unordered_map<std::string, std::string> payload;
+};
+
+std::vector<TouchReportRecord> g_touchReportRecords;
+
+void TouchReportCapture(uint32_t resType, int64_t value,
+    const std::unordered_map<std::string, std::string>& payload)
+{
+    g_touchReportRecords.push_back({ resType, value, payload });
+}
+
+TouchEvent MakeTouchEvent(TouchType type, int32_t targetDisplayId, float x = 0.0f, float y = 0.0f)
+{
+    TouchEvent event;
+    event.type = type;
+    event.targetDisplayId = targetDisplayId;
+    event.x = x;
+    event.y = y;
+    return event;
+}
+
+const TouchReportRecord* FindReport(uint32_t resType, int64_t value)
+{
+    auto iter = std::find_if(g_touchReportRecords.begin(), g_touchReportRecords.end(),
+        [resType, value](const TouchReportRecord& record) {
+            return record.resType == resType && record.value == value;
+        });
+    return iter == g_touchReportRecords.end() ? nullptr : &(*iter);
+}
+
+size_t CountReports(uint32_t resType, int64_t value)
+{
+    return static_cast<size_t>(std::count_if(g_touchReportRecords.begin(), g_touchReportRecords.end(),
+        [resType, value](const TouchReportRecord& record) {
+            return record.resType == resType && record.value == value;
+        }));
+}
+
+bool HasPayloadKey(const TouchReportRecord* record, const char* key)
+{
+    return record != nullptr && record->payload.find(key) != record->payload.end();
+}
+
+std::string GetPayloadValue(const TouchReportRecord* record, const char* key)
+{
+    if (!HasPayloadKey(record, key)) {
+        return std::string();
+    }
+    return record->payload.at(key);
+}
+} // namespace
+
+class ResSchedReportDisplayIdTest : public testing::Test {
+public:
+    static void SetUpTestSuite() {}
+    static void TearDownTestSuite() {}
+
+    void SetUp() override
+    {
+        savedTriggerExecuted_ = ResSchedReport::triggerExecuted;
+        ResSchedReport::triggerExecuted = true;
+        ResSchedReport::isInTouch_ = false;
+        ResSchedReport::isInSlide_ = false;
+        ResSchedReport::averageDistance_.Reset();
+        MockContainer::SetUp();
+        MockContainer::Current()->SetTaskExecutor(AceType::MakeRefPtr<MockTaskExecutor>(true));
+        MockContainer::Current()->SetMockDisplayId(CONTAINER_DISPLAY_ID);
+        g_touchReportRecords.clear();
+        ResSchedReport::GetInstance().reportDataFunc_ = &TouchReportCapture;
+    }
+
+    void TearDown() override
+    {
+        ResSchedReport::GetInstance().reportDataFunc_ = nullptr;
+        MockContainer::TearDown();
+        ResSchedReport::triggerExecuted = savedTriggerExecuted_;
+        g_touchReportRecords.clear();
+    }
+
+private:
+    bool savedTriggerExecuted_ = false;
+};
+
+/**
+ * @tc.name: ResSchedReportDisplayId001
+ * @tc.desc: test LoadEventDisplayId branches: event displayId overrides container
+ *           displayId, zero is a valid display, invalid (< 0) falls back to
+ *           container value, and no displayId key exists without container
+ * @tc.type: FUNC
+ */
+HWTEST_F(ResSchedReportDisplayIdTest, ResSchedReportDisplayId001, TestSize.Level1)
+{
+    ReportConfig config;
+    ResSchedReport::GetInstance().HandleTouchDown(
+        MakeTouchEvent(TouchType::DOWN, FIRST_DISPLAY_ID), config);
+    ResSchedReport::GetInstance().HandleTouchDown(MakeTouchEvent(TouchType::DOWN, 0), config);
+    ResSchedReport::GetInstance().HandleTouchDown(
+        MakeTouchEvent(TouchType::DOWN, INVALID_DISPLAY_ID), config);
+    MockContainer::TearDown();
+    ResSchedReport::GetInstance().HandleTouchDown(
+        MakeTouchEvent(TouchType::DOWN, INVALID_DISPLAY_ID), config);
+
+    EXPECT_EQ(g_touchReportRecords.size(), 4u);
+    EXPECT_EQ(GetPayloadValue(&g_touchReportRecords[0], "displayId"), std::to_string(FIRST_DISPLAY_ID));
+    EXPECT_EQ(GetPayloadValue(&g_touchReportRecords[1], "displayId"), "0");
+    EXPECT_EQ(GetPayloadValue(&g_touchReportRecords[2], "displayId"), std::to_string(CONTAINER_DISPLAY_ID));
+    EXPECT_FALSE(HasPayloadKey(&g_touchReportRecords[3], "displayId"));
+    EXPECT_EQ(GetPayloadValue(&g_touchReportRecords[0], "name"), "touch");
+}
+
+/**
+ * @tc.name: ResSchedReportDisplayId002
+ * @tc.desc: test touch gesture through OnTouchEvent wires displayId on all four
+ *           touch handlers, each event keeps its own displayId when display
+ *           changes within one gesture
+ * @tc.type: FUNC
+ */
+HWTEST_F(ResSchedReportDisplayIdTest, ResSchedReportDisplayId002, TestSize.Level1)
+{
+    ReportConfig config;
+    ResSchedReport::GetInstance().OnTouchEvent(
+        MakeTouchEvent(TouchType::DOWN, FIRST_DISPLAY_ID), config);
+    ResSchedReport::GetInstance().OnTouchEvent(
+        MakeTouchEvent(TouchType::MOVE, SECOND_DISPLAY_ID, 100.0f), config);
+    ResSchedReport::GetInstance().OnTouchEvent(
+        MakeTouchEvent(TouchType::PULL_UP, SECOND_DISPLAY_ID), config);
+    ResSchedReport::GetInstance().OnTouchEvent(
+        MakeTouchEvent(TouchType::UP, SECOND_DISPLAY_ID), config);
+    EXPECT_EQ(CountReports(RES_TYPE_CLICK_RECOGNIZE_VALUE, TOUCH_DOWN_EVENT_VALUE), 1u);
+    EXPECT_EQ(CountReports(RES_TYPE_SLIDE_VALUE, SLIDE_DETECTING_VALUE), 1u);
+    EXPECT_EQ(CountReports(RES_TYPE_CLICK_RECOGNIZE_VALUE, TOUCH_PULL_UP_EVENT_VALUE), 1u);
+    EXPECT_EQ(CountReports(RES_TYPE_CLICK_RECOGNIZE_VALUE, TOUCH_UP_EVENT_VALUE), 1u);
+    const TouchReportRecord* downRecord =
+        FindReport(RES_TYPE_CLICK_RECOGNIZE_VALUE, TOUCH_DOWN_EVENT_VALUE);
+    const TouchReportRecord* slideRecord = FindReport(RES_TYPE_SLIDE_VALUE, SLIDE_DETECTING_VALUE);
+    const TouchReportRecord* pullUpRecord =
+        FindReport(RES_TYPE_CLICK_RECOGNIZE_VALUE, TOUCH_PULL_UP_EVENT_VALUE);
+    const TouchReportRecord* upRecord = FindReport(RES_TYPE_CLICK_RECOGNIZE_VALUE, TOUCH_UP_EVENT_VALUE);
+    ASSERT_NE(downRecord, nullptr);
+    ASSERT_NE(slideRecord, nullptr);
+    ASSERT_NE(pullUpRecord, nullptr);
+    ASSERT_NE(upRecord, nullptr);
+    EXPECT_EQ(GetPayloadValue(downRecord, "displayId"), std::to_string(FIRST_DISPLAY_ID));
+    EXPECT_EQ(GetPayloadValue(slideRecord, "displayId"), std::to_string(SECOND_DISPLAY_ID));
+    EXPECT_EQ(GetPayloadValue(pullUpRecord, "displayId"), std::to_string(SECOND_DISPLAY_ID));
+    EXPECT_EQ(GetPayloadValue(upRecord, "displayId"), std::to_string(SECOND_DISPLAY_ID));
+    EXPECT_TRUE(HasPayloadKey(upRecord, "up_speed"));
+    EXPECT_TRUE(HasPayloadKey(upRecord, "pid"));
+    EXPECT_TRUE(HasPayloadKey(upRecord, "uid"));
+    EXPECT_TRUE(HasPayloadKey(upRecord, "bundleName"));
+    EXPECT_TRUE(HasPayloadKey(upRecord, "abilityName"));
 }
 } // namespace OHOS::Ace

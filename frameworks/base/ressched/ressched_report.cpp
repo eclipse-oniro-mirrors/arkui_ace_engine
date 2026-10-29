@@ -81,6 +81,7 @@ constexpr char UID[] = "uid";
 constexpr char SCRTID[] = "scrTid";
 constexpr char BUNDLE_NAME[] = "bundleName";
 constexpr char ABILITY_NAME[] = "abilityName";
+constexpr char DISPLAY_ID[] = "displayId";
 constexpr char CLICK[] = "click";
 constexpr char RSS_KEY_EVENT[] = "key_event";
 constexpr char PUSH_PAGE[] = "push_page";
@@ -133,6 +134,21 @@ void LoadReportConfig(
 {
     if (config.isReportTid) {
         payload[SCRTID] = std::to_string(config.tid);
+    }
+}
+
+// Fill the displayId for event reporting: prefer targetDisplayId (the MMI-assigned
+// display where the touch landed); fall back to the container displayId when the
+// event display is invalid (< 0, e.g. injected events).
+void LoadEventDisplayId(std::unordered_map<std::string, std::string>& payload, int32_t targetDisplayId)
+{
+    auto container = Container::Current();
+    if (container) {
+        auto displayId = container->GetDisplayId();
+        payload[DISPLAY_ID] = std::to_string(displayId);
+    }
+    if (targetDisplayId >= 0) {
+        payload[DISPLAY_ID] = std::to_string(targetDisplayId);
     }
 }
 }
@@ -517,6 +533,7 @@ void ResSchedReport::HandleTouchDown(const TouchEvent& touchEvent, const ReportC
     std::unordered_map<std::string, std::string> payload;
     payload[Ressched::NAME] = TOUCH;
     LoadReportConfig(config, payload);
+    LoadEventDisplayId(payload, touchEvent.targetDisplayId);
     ResSchedDataReport(RES_TYPE_CLICK_RECOGNIZE, TOUCH_DOWN_EVENT, payload);
     RecordTouchEvent(touchEvent, true);
     isInTouch_ = true;
@@ -538,6 +555,7 @@ void ResSchedReport::HandleTouchUp(const TouchEvent& touchEvent, const ReportCon
     payload[Ressched::NAME] = TOUCH;
     payload[UP_SPEED_KEY] = std::to_string(GetUpVelocity(lastTouchEvent_, curTouchEvent_));
     LoadAceApplicationContext(payload);
+    LoadEventDisplayId(payload, touchEvent.targetDisplayId);
     ResSchedDataReport(RES_TYPE_CLICK_RECOGNIZE, TOUCH_UP_EVENT, payload);
     isInSlide_ = false;
     isInTouch_ = false;
@@ -562,6 +580,7 @@ void ResSchedReport::HandleTouchMove(const TouchEvent& touchEvent, const ReportC
         std::unordered_map<std::string, std::string> payload;
         LoadReportConfig(config, payload);
         LoadAceApplicationContext(payload);
+        LoadEventDisplayId(payload, touchEvent.targetDisplayId);
         ResSchedDataReport(RES_TYPE_SLIDE, SLIDE_DETECTING, payload);
         isInSlide_ = true;
     }
@@ -594,6 +613,7 @@ void ResSchedReport::HandleTouchPullUp(const TouchEvent& touchEvent, const Repor
 {
     std::unordered_map<std::string, std::string> payload;
     LoadReportConfig(config, payload);
+    LoadEventDisplayId(payload, touchEvent.targetDisplayId);
     payload[Ressched::NAME] = TOUCH;
     ResSchedDataReport(RES_TYPE_CLICK_RECOGNIZE, TOUCH_PULL_UP_EVENT, payload);
     averageDistance_.Reset();
