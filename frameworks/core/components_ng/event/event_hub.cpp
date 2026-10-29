@@ -1277,8 +1277,7 @@ const std::vector<KeyboardShortcut>& EventHub::GetKeyboardShortcut() const
 
 void EventHub::SetDefaultOnDragStart(OnDragStartFunc&& defaultOnDragStart)
 {
-    auto host = GetHost();
-    CHECK_NULL_VOID(host);
+    CHECK_NULL_VOID(GetHost());
     GetOrCreateDragDropCallbackSet()->GetOrCreateInnerDragDropCallback()->defaultOnDragStart =
         std::move(defaultOnDragStart);
 }
