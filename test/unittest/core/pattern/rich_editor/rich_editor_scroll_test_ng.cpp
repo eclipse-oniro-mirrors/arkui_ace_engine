@@ -679,4 +679,31 @@ HWTEST_F(RichEditorScrollTestOneNg, MoveTextRectOnLayoutSwap001, TestSize.Level0
     richEditorPattern->MoveTextRectOnLayoutSwap();
     EXPECT_EQ(richEditorPattern->richTextRect_.GetX(), -100.0f);
 }
+
+/**
+ * @tc.name: IsReverse001
+ * @tc.desc: Verify IsReverse() returns false in single-line RTL mode to prevent scroll direction reversal.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorScrollTestOneNg, IsReverse001, TestSize.Level0)
+{
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+
+    // Set single-line mode via layout property so InitScrollablePattern picks it up
+    auto* frameNode = AceType::RawPtr(richEditorNode_);
+    RichEditorModelNG::SetSingleLine(frameNode, true);
+    richEditorPattern->isHorizontalScrolling_ = false;
+    richEditorPattern->InitScrollablePattern();
+    EXPECT_EQ(richEditorPattern->GetAxis(), Axis::HORIZONTAL);
+
+    auto layoutProperty = richEditorPattern->GetLayoutProperty<RichEditorLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->UpdateLayoutDirection(TextDirection::RTL);
+
+    // IsReverse() must return false to prevent scroll direction reversal
+    // Base class would return true, but RichEditorPattern overrides to return false
+    EXPECT_FALSE(richEditorPattern->IsReverse());
+}
 }
