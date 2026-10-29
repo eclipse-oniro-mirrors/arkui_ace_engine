@@ -2667,6 +2667,9 @@ void PipelineContext::StartWindowSizeChangeAnimate(int32_t width, int32_t height
             safeAreaManager_->UpdateKeyboardOffset(0.0);
             FlushSafeArea(width, height, safeAvoidArea);
             SetRootRect(width, height, 0.0);
+            if (textFieldManager_) {
+                DynamicCast<TextFieldManagerNG>(textFieldManager_)->AvoidKeyBoardInNavigation();
+            }
             FlushUITasks();
             if (textFieldManager_) {
                 DynamicCast<TextFieldManagerNG>(textFieldManager_)->ScrollTextFieldToSafeArea();
