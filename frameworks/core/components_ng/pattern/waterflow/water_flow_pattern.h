@@ -86,6 +86,15 @@ public:
     // the recorded deferral, so skip-flag inheritance and activation match real items.
     void PrepareScrollPlaceholderForAcquisition(int32_t index);
     bool HasScrollPlaceholderItem(int32_t index) const;
+    // Live shell of a deferred index for the layout-time item lookup: the plain
+    // host index walk resolves through the lazy syntax nodes only and cannot
+    // see a mounted shell (zero frame count), so the layout positioning phase
+    // asks the pattern's own table. Null when no shell is live at the index.
+    RefPtr<FrameNode> GetScrollPlaceholderShell(int32_t index) const
+    {
+        auto iter = scrollPlaceholderItems_.find(index);
+        return iter != scrollPlaceholderItems_.end() ? iter->second.shell : nullptr;
+    }
     // Real-build closure executed by the pipeline framed flush: builds the real
     // item through the existing build-style acquisition (syntax path as-is),
     // then requests the local remeasure that completes the replacement.

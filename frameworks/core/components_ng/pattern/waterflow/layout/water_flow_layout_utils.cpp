@@ -305,13 +305,30 @@ RefPtr<LayoutWrapper> WaterFlowLayoutUtils::GetWaterFlowItemByIndex(
     CHECK_NULL_RETURN(layoutWrapper, nullptr);
     const auto& layoutProperty = AceType::DynamicCast<WaterFlowLayoutProperty>(layoutWrapper->GetLayoutProperty());
     CHECK_NULL_RETURN(layoutProperty, nullptr);
+    auto wrapper = GetWaterFlowItemForLayout(layoutWrapper, index, isCache);
     if (layoutProperty->GetSupportLazyLoadingEmptyBranch().value_or(false)) {
-        auto wrapper = layoutWrapper->GetChildByIndex(index, isCache);
         if (!wrapper) {
             wrapper = CreateDummyFlowItem();
         }
         return wrapper;
     }
-    return layoutWrapper->GetChildByIndex(index, isCache);
+    return wrapper;
+}
+
+RefPtr<LayoutWrapper> WaterFlowLayoutUtils::GetWaterFlowItemForLayout(
+    LayoutWrapper* layoutWrapper, int32_t index, bool isCache)
+{
+    CHECK_NULL_RETURN(layoutWrapper, nullptr);
+    auto wrapper = layoutWrapper->GetChildByIndex(static_cast<uint32_t>(index), isCache);
+    if (wrapper) {
+        return wrapper;
+    }
+    const auto& host = layoutWrapper->GetHostNode();
+    const auto& pattern = host ? host->GetPattern<WaterFlowPattern>() : nullptr;
+    CHECK_NULL_RETURN(pattern, nullptr);
+    // Node-as-wrapper: a mounted shell doubles as its own layout wrapper, so
+    // the positioning call site drives it exactly like a built real item
+    // (SetMarginFrameOffset + Layout / ForceSyncGeometryNode).
+    return pattern->GetScrollPlaceholderShell(index);
 }
 } // namespace OHOS::Ace::NG

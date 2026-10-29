@@ -1142,7 +1142,12 @@ void WaterFlowLayoutSW::LayoutSection(
         float mainPos = lane.startPos;
         for (const auto& item : lane.items_) {
             const bool isCache = IsCache(info_, item.idx);
-            auto child = wrapper_->GetChildByIndex(nodeIdx(item.idx), isCache);
+            // Shell-aware lookup: a live placeholder shell of this index is
+            // invisible to the plain lazy index walk, and skipping it here
+            // would leave the measured shell at the stale origin offset (its
+            // reserved slot renders blank while scrolling).
+            auto child = WaterFlowLayoutUtils::GetWaterFlowItemForLayout(
+                wrapper_, nodeIdx(item.idx), isCache);
             if (!child) {
                 mainPos += item.mainSize + mainGaps_[idx];
                 continue;

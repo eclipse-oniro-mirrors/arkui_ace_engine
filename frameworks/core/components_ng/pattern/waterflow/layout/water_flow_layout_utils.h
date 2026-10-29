@@ -74,6 +74,18 @@ public:
     static bool IsScrollPlaceholderEnabled(const LayoutWrapper* layoutWrapper);
     static RefPtr<LayoutWrapper> GetWaterFlowItemByIndex(
         LayoutWrapper* layoutWrapper, int32_t index, bool isCache = false);
+    // Layout-time item lookup for the three WaterFlow algorithms: the plain
+    // index walk (GetChildByIndex) resolves through the lazy syntax nodes only,
+    // so an index whose real item is not built yet returns null — including an
+    // index a live placeholder shell occupies (the shell sits outside the lazy
+    // index space by design, zero frame count). Grid positions its items
+    // through the acquisition funnel (GridLayoutBaseAlgorithm::GetGridItem), so
+    // its recorded deferral resolves at layout time; the WaterFlow algorithms
+    // position through this raw walk, which would leave the measured shell at
+    // the stale origin offset (the reserved slot renders blank during scroll).
+    // Resolve a live shell from the host pattern's table on the raw miss.
+    static RefPtr<LayoutWrapper> GetWaterFlowItemForLayout(
+        LayoutWrapper* layoutWrapper, int32_t index, bool isCache = false);
 };
 } // namespace OHOS::Ace::NG
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_WATERFLOW_WATER_FLOW_LAYOUT_UTILS_H
