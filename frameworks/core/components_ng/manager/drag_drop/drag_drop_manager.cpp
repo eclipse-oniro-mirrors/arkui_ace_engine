@@ -2146,8 +2146,8 @@ bool DragDropManager::FireOnItemDropEvent(const RefPtr<FrameNode>& frameNode, Dr
         CHECK_NULL_RETURN(eventHub, false);
 #ifndef CROSS_PLATFORM
         ReportOnItemDropEvent(dragType, frameNode, dropPositionX, dropPositionY);
-        return eventHub->FireOnItemDrop(itemDragInfo, draggedIndex, insertIndex, isSuccess);
 #endif
+        return eventHub->FireOnItemDrop(itemDragInfo, draggedIndex, insertIndex, isSuccess);
     } else if (dragType == DragType::LIST) {
         auto eventHub = frameNode->GetEventHub<ListEventHub>();
         CHECK_NULL_RETURN(eventHub, false);
