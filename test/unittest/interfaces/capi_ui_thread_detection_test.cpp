@@ -403,7 +403,8 @@ const DialogTableScopeEntry DIALOG_TABLE_SCOPE_ENTRIES[] = {
     MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::setContent>("ArkUI_NativeDialogAPI_1.setContent"),
     MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::removeContent>("ArkUI_NativeDialogAPI_1.removeContent"),
     MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::setContentAlignment>("ArkUI_NativeDialogAPI_1.setContentAlignment"),
-    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::resetContentAlignment>("ArkUI_NativeDialogAPI_1.resetContentAlignment"),
+    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::resetContentAlignment>(
+        "ArkUI_NativeDialogAPI_1.resetContentAlignment"),
     MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::setModalMode>("ArkUI_NativeDialogAPI_1.setModalMode"),
     MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::setAutoCancel>("ArkUI_NativeDialogAPI_1.setAutoCancel"),
     MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::setMask>("ArkUI_NativeDialogAPI_1.setMask"),
@@ -411,21 +412,27 @@ const DialogTableScopeEntry DIALOG_TABLE_SCOPE_ENTRIES[] = {
     MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::setCornerRadius>("ArkUI_NativeDialogAPI_1.setCornerRadius"),
     MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::setGridColumnCount>("ArkUI_NativeDialogAPI_1.setGridColumnCount"),
     MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::enableCustomStyle>("ArkUI_NativeDialogAPI_1.enableCustomStyle"),
-    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::enableCustomAnimation>("ArkUI_NativeDialogAPI_1.enableCustomAnimation"),
-    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::registerOnWillDismiss>("ArkUI_NativeDialogAPI_1.registerOnWillDismiss"),
+    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::enableCustomAnimation>(
+        "ArkUI_NativeDialogAPI_1.enableCustomAnimation"),
+    MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::registerOnWillDismiss>(
+        "ArkUI_NativeDialogAPI_1.registerOnWillDismiss"),
     MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::show>("ArkUI_NativeDialogAPI_1.show"),
     MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::close>("ArkUI_NativeDialogAPI_1.close"),
     MakeDialogTableEntry1<&ArkUI_NativeDialogAPI_1::registerOnWillDismissWithUserData>(
         "ArkUI_NativeDialogAPI_1.registerOnWillDismissWithUserData"),
-    MakeDialogTableEntry2<&ArkUI_NativeDialogAPI_2::setKeyboardAvoidDistance>("ArkUI_NativeDialogAPI_2.setKeyboardAvoidDistance"),
+    MakeDialogTableEntry2<&ArkUI_NativeDialogAPI_2::setKeyboardAvoidDistance>(
+        "ArkUI_NativeDialogAPI_2.setKeyboardAvoidDistance"),
     MakeDialogTableEntry2<&ArkUI_NativeDialogAPI_2::setLevelMode>("ArkUI_NativeDialogAPI_2.setLevelMode"),
     MakeDialogTableEntry2<&ArkUI_NativeDialogAPI_2::setLevelUniqueId>("ArkUI_NativeDialogAPI_2.setLevelUniqueId"),
     MakeDialogTableEntry2<&ArkUI_NativeDialogAPI_2::setImmersiveMode>("ArkUI_NativeDialogAPI_2.setImmersiveMode"),
     MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setLevelOrder>("ArkUI_NativeDialogAPI_3.setLevelOrder"),
-    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::registerOnWillAppear>("ArkUI_NativeDialogAPI_3.registerOnWillAppear"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::registerOnWillAppear>(
+        "ArkUI_NativeDialogAPI_3.registerOnWillAppear"),
     MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::registerOnDidAppear>("ArkUI_NativeDialogAPI_3.registerOnDidAppear"),
-    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::registerOnWillDisappear>("ArkUI_NativeDialogAPI_3.registerOnWillDisappear"),
-    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::registerOnDidDisappear>("ArkUI_NativeDialogAPI_3.registerOnDidDisappear"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::registerOnWillDisappear>(
+        "ArkUI_NativeDialogAPI_3.registerOnWillDisappear"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::registerOnDidDisappear>(
+        "ArkUI_NativeDialogAPI_3.registerOnDidDisappear"),
     MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setBorderWidth>("ArkUI_NativeDialogAPI_3.setBorderWidth"),
     MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setBorderColor>("ArkUI_NativeDialogAPI_3.setBorderColor"),
     MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setBorderStyle>("ArkUI_NativeDialogAPI_3.setBorderStyle"),
@@ -433,8 +440,10 @@ const DialogTableScopeEntry DIALOG_TABLE_SCOPE_ENTRIES[] = {
     MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setHeight>("ArkUI_NativeDialogAPI_3.setHeight"),
     MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setShadow>("ArkUI_NativeDialogAPI_3.setShadow"),
     MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setCustomShadow>("ArkUI_NativeDialogAPI_3.setCustomShadow"),
-    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setBackgroundBlurStyle>("ArkUI_NativeDialogAPI_3.setBackgroundBlurStyle"),
-    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setKeyboardAvoidMode>("ArkUI_NativeDialogAPI_3.setKeyboardAvoidMode"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setBackgroundBlurStyle>(
+        "ArkUI_NativeDialogAPI_3.setBackgroundBlurStyle"),
+    MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setKeyboardAvoidMode>(
+        "ArkUI_NativeDialogAPI_3.setKeyboardAvoidMode"),
     MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::enableHoverMode>("ArkUI_NativeDialogAPI_3.enableHoverMode"),
     MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setHoverModeArea>("ArkUI_NativeDialogAPI_3.setHoverModeArea"),
     MakeDialogTableEntry3<&ArkUI_NativeDialogAPI_3::setFocusable>("ArkUI_NativeDialogAPI_3.setFocusable"),
