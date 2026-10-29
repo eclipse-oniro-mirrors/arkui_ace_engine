@@ -582,7 +582,8 @@ void WaterFlowSegmentedLayout::Fill(int32_t startIdx)
             Fill(i);
             break;
         }
-        if (!syncLoad_ && wrapper_->ReachResponseDeadline()) {
+        if (!syncLoad_ && wrapper_->ReachResponseDeadline() &&
+            !WaterFlowLayoutUtils::IsScrollPlaceholderEnabled(wrapper_)) {
             info_->measureInNextFrame_ = true;
             break;
         }

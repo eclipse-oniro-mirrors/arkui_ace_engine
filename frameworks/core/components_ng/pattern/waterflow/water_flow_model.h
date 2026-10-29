@@ -24,6 +24,7 @@
 
 #include "core/common/resource/resource_object.h"
 #include "core/components/common/layout/constants.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_types.h"
 #include "core/components_ng/pattern/scrollable/scrollable_properties.h"
 #include "core/components_ng/pattern/waterflow/layout/water_flow_layout_mode.h"
 
@@ -115,6 +116,8 @@ public:
     virtual void ParseResObjItemMaxHeight(const RefPtr<ResourceObject>& resObj) {};
 
     virtual void SetSyncLoad(bool syncLoad) {}
+    // FEAT scroll placeholder: a null provider resets the capability (see WaterFlowPattern).
+    virtual void SetScrollPlaceholder(NG::ScrollPlaceholderProvider&& provider) {}
     virtual void ParseResObjScrollBarColor(const RefPtr<ResourceObject>& resObj) {};
     virtual void SetSupportLazyLoadingEmptyBranch(bool enable) {};
 private:

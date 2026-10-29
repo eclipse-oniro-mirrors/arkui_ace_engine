@@ -723,7 +723,8 @@ bool WaterFlowLayoutSW::FillBackSection(float viewportBound, int32_t& idx, int32
         if (LessNotEqual(endPos, viewportBound)) {
             q.push({ endPos, laneIdx });
         }
-        if (!cacheDeadline_ && !syncLoad_ && wrapper_->ReachResponseDeadline()) {
+        if (!cacheDeadline_ && !syncLoad_ && wrapper_->ReachResponseDeadline() &&
+            !WaterFlowLayoutUtils::IsScrollPlaceholderEnabled(wrapper_)) {
             info_->measureInNextFrame_ = true;
             return true;
         }

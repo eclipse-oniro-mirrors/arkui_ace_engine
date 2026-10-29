@@ -67,6 +67,11 @@ public:
     static AdjustOffset GetAdjustOffset(const RefPtr<LayoutWrapper>& item);
     static RefPtr<LayoutWrapper> GetWaterFlowItem(LayoutWrapper* layoutWrapper, int32_t index,
         bool addToRenderTree = true, bool isCache = false);
+    // Fast flag check on the WaterFlow host pattern: with the scroll placeholder
+    // provider set, the fill loops keep filling the viewport past the response
+    // deadline with cheap placeholder items (deferred real builds) instead of
+    // stopping early. Shared by all three layout algorithms.
+    static bool IsScrollPlaceholderEnabled(const LayoutWrapper* layoutWrapper);
     static RefPtr<LayoutWrapper> GetWaterFlowItemByIndex(
         LayoutWrapper* layoutWrapper, int32_t index, bool isCache = false);
 };
