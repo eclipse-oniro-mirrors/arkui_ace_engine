@@ -2157,7 +2157,7 @@ bool TextFieldPattern::HandleOnKeyBack()
 
 bool TextFieldPattern::HandleOnTab(bool backward)
 {
-    return backward ? UpdateFocusBackward() : UpdateFocusForward();
+    return CleanNodeHostBase::HandleOnTabImpl(backward);
 }
 
 void TextFieldPattern::HandleOnUndoAction()
@@ -10755,36 +10755,22 @@ void TextFieldPattern::FocusForwardStopTwinkling()
 
 bool TextFieldPattern::UpdateFocusForward()
 {
-    return HandleFocusForward(focusIndex_);
-}
-
-bool TextFieldPattern::HandleFocusForward(FocuseIndex index)
-{
-    if (!HasFocus()) {
-        return false;
-    }
-    auto next = focusForwardMap_.find(index);
-    if (next == focusForwardMap_.end()) {
-        return false;
-    }
-    return HandleSwithFocus(next->second) || HandleFocusForward(next->second);
+    return CleanNodeHostBase::HandleFocusForwardImpl(focusIndex_);
 }
 
 bool TextFieldPattern::UpdateFocusBackward()
 {
-    return HandleFocusBackward(focusIndex_);
+    return CleanNodeHostBase::HandleFocusBackwardImpl(focusIndex_);
 }
 
-bool TextFieldPattern::HandleFocusBackward(FocuseIndex index)
+const std::unordered_map<FocuseIndex, FocuseIndex>& TextFieldPattern::GetFocusForwardMap() const
 {
-    if (!HasFocus()) {
-        return false;
-    }
-    auto next = focusBackwardMap_.find(index);
-    if (next == focusBackwardMap_.end()) {
-        return false;
-    }
-    return HandleSwithFocus(next->second) || HandleFocusBackward(next->second);
+    return focusForwardMap_;
+}
+
+const std::unordered_map<FocuseIndex, FocuseIndex>& TextFieldPattern::GetFocusBackwardMap() const
+{
+    return focusBackwardMap_;
 }
 
 bool TextFieldPattern::HandleSwithFocus(FocuseIndex index)

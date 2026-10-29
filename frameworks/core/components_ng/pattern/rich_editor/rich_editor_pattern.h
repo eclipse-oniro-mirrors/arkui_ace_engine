@@ -1169,6 +1169,24 @@ public:
     bool RequestKeyboard(bool isFocusViewChanged, bool needStartTwinkling, bool needShowSoftKeyboard,
         SourceType sourceType = SourceType::NONE);
 
+    // Tab focus navigation (shared logic via CleanNodeHostBase CRTP)
+    bool HandleOnTab(bool backward) override;
+    bool HandleSwithFocus(FocuseIndex index);
+    void FocusForwardStopTwinkling();
+    void PaintCancelRect();
+    void PaintTextRect();
+    void GetInnerFocusPaintRect(RoundRect& paintRect);
+    bool CancelNodeIsShow() const;
+    bool ProcessFocusIndexAction();
+    bool HandleSpaceKeyClickEvent();
+    void CleanNodeResponseKeyEvent();
+    FocuseIndex GetFocusIndex() const
+    {
+        return focusIndex_;
+    }
+    const std::unordered_map<FocuseIndex, FocuseIndex>& GetFocusForwardMap() const;
+    const std::unordered_map<FocuseIndex, FocuseIndex>& GetFocusBackwardMap() const;
+
     Color GetUnderlineColor() const;
     Dimension GetUnderlineWidth() const;
     void UpdateUnderlineStyle();
@@ -1177,6 +1195,7 @@ public:
     {
         return frameRect_;
     }
+
 protected:
     RefPtr<TextSelectOverlay> GetOrCreateSelectOverlay() override;
     RefPtr<TextSelectOverlay> GetSelectOverlay() const override;
@@ -1769,6 +1788,7 @@ private:
     bool lastContentEmptyForCancel_ = true;
     bool cancelButtonDirty_ = true;
     bool cancelButtonTouched_ = false;
+    FocuseIndex focusIndex_ = FocuseIndex::TEXT;
     std::string lastReportSelectionText_ = "";
 
     // ===== counter members =====

@@ -109,8 +109,6 @@ inline constexpr Dimension AUTO_SCROLL_HOT_ZONE_HEIGHT = 58.0_vp;
 inline constexpr Dimension AUTO_SCROLL_HOT_ZONE_WIDTH = 26.0_vp;
 inline constexpr Dimension MOUSE_SCROLL_BAR_REGION_WIDTH = 8.0_vp;
 
-enum class FocuseIndex { TEXT = 0, CANCEL, UNIT, VOICE };
-
 enum class SelectionMode { SELECT, SELECT_ALL, NONE };
 
 enum class DragStatus { DRAGGING, ON_DROP, NONE };
@@ -1488,9 +1486,13 @@ public:
     void FocusForwardStopTwinkling();
     bool HandleSwithFocus(FocuseIndex index);
     bool UpdateFocusForward();
-    bool HandleFocusForward(FocuseIndex index);
     bool UpdateFocusBackward();
-    bool HandleFocusBackward(FocuseIndex index);
+    FocuseIndex GetFocusIndex() const
+    {
+        return focusIndex_;
+    }
+    const std::unordered_map<FocuseIndex, FocuseIndex>& GetFocusForwardMap() const;
+    const std::unordered_map<FocuseIndex, FocuseIndex>& GetFocusBackwardMap() const;
 
     bool HandleSpaceEvent();
     bool HandleSpaceKeyClickEvent();
