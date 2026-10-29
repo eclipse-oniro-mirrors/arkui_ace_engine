@@ -118,16 +118,13 @@ int32_t ArkUI_AccessibilityProvider::AccessibilityProviderRegisterCallback(
 {
     if (!CheckProviderCallback(callbacks)) {
         TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY, "CheckProviderCallback failed.");
-        if (registerCallback_) {
-            registerCallback_(false);
-        }
+        NotifyRegisterCallback(false);
         return ARKUI_ACCESSIBILITY_NATIVE_RESULT_BAD_PARAMETER;
     }
 
     accessibilityProviderCallbacks_ = *callbacks;
-    if (registerCallback_) {
-        registerCallback_(true);
-    }
+    callbacksRegistered_.store(true, std::memory_order_release);
+    NotifyRegisterCallback(true);
     TAG_LOGI(AceLogTag::ACE_ACCESSIBILITY, "AccessibilityProviderRegisterCallback success");
     return ARKUI_ACCESSIBILITY_NATIVE_RESULT_SUCCESSFUL;
 }
@@ -137,16 +134,13 @@ int32_t ArkUI_AccessibilityProvider::AccessibilityProviderRegisterCallbackWithIn
 {
     if (!CheckProviderCallbackWithInstance(callbacks)) {
         TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY, "CheckProviderCallbackWithInstance failed.");
-        if (registerCallback_) {
-            registerCallback_(false);
-        }
+        NotifyRegisterCallback(false);
         return ARKUI_ACCESSIBILITY_NATIVE_RESULT_BAD_PARAMETER;
     }
     accessibilityProviderCallbacksWithInstance_ = *callbacks;
-    if (registerCallback_) {
-        registerCallback_(true);
-    }
     instanceId_ = instanceId;
+    callbacksRegistered_.store(true, std::memory_order_release);
+    NotifyRegisterCallback(true);
     TAG_LOGI(AceLogTag::ACE_ACCESSIBILITY, "AccessibilityProviderRegisterCallbackWithInstance success");
     return ARKUI_ACCESSIBILITY_NATIVE_RESULT_SUCCESSFUL;
 }
@@ -333,7 +327,11 @@ int32_t ArkUI_AccessibilityProvider::SendAccessibilityAsyncEvent(
         return SEND_EVENT_FAILED;
     }
 
-    auto accessibilityProvider = accessibilityProvider_.Upgrade();
+    OHOS::Ace::RefPtr<OHOS::Ace::AccessibilityProvider> accessibilityProvider;
+    {
+        std::lock_guard<std::mutex> lock(accessibilityProviderMutex_);
+        accessibilityProvider = accessibilityProvider_.Upgrade();
+    }
     if (accessibilityProvider == nullptr) {
         TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY, "accessibilityProvider is null");
         if (callback) {
@@ -350,16 +348,29 @@ int32_t ArkUI_AccessibilityProvider::SendAccessibilityAsyncEvent(
 void ArkUI_AccessibilityProvider::SetInnerAccessibilityProvider(
     const OHOS::Ace::WeakPtr<OHOS::Ace::AccessibilityProvider>& accessibilityProvider)
 {
+    std::lock_guard<std::mutex> lock(accessibilityProviderMutex_);
     accessibilityProvider_ = accessibilityProvider;
 }
 
 bool ArkUI_AccessibilityProvider::IsRegister()
 {
-    return accessibilityProviderCallbacks_.findAccessibilityNodeInfosById != nullptr ||
-        accessibilityProviderCallbacksWithInstance_.findAccessibilityNodeInfosById != nullptr;
+    return callbacksRegistered_.load(std::memory_order_acquire);
 }
 
 void ArkUI_AccessibilityProvider::SetRegisterCallback(RegisterCallback callback)
 {
-    registerCallback_ = callback;
+    std::lock_guard<std::mutex> lock(registerCallbackMutex_);
+    registerCallback_.swap(callback);
+}
+
+void ArkUI_AccessibilityProvider::NotifyRegisterCallback(bool isRegister)
+{
+    RegisterCallback callback;
+    {
+        std::lock_guard<std::mutex> lock(registerCallbackMutex_);
+        callback = registerCallback_;
+    }
+    if (callback) {
+        callback(isRegister);
+    }
 }

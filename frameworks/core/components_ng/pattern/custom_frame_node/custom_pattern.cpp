@@ -14,16 +14,18 @@
  */
 
 #include "core/components_ng/pattern/custom_frame_node/custom_pattern.h"
-#include "core/components_ng/pattern/custom_frame_node/custom_accessibility_child_tree_callback.h"
-#include "core/components_ng/pattern/custom_frame_node/custom_accessibility_provider.h"
-#include "core/components_ng/pattern/custom_frame_node/custom_accessibility_session_adapter.h"
-#include "core/components_ng/property/accessibility_property.h"
+
 #include "core/accessibility/accessibility_manager.h"
-#include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/accessibility/accessibility_session_adapter.h"
 #include "core/accessibility/native_interface_accessibility_provider.h"
 #include "core/accessibility/third_provider_tree_exporter.h"
 #include "core/common/ace_application_info.h"
+#include "core/common/container_scope.h"
+#include "core/components_ng/base/inspector_tree_request_context.h"
+#include "core/components_ng/pattern/custom_frame_node/custom_accessibility_child_tree_callback.h"
+#include "core/components_ng/pattern/custom_frame_node/custom_accessibility_provider.h"
+#include "core/components_ng/pattern/custom_frame_node/custom_accessibility_session_adapter.h"
+#include "core/components_ng/property/accessibility_property.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
@@ -68,7 +70,6 @@ void CustomPattern::InitializeAccessibility(PipelineContext* context)
     if (accessibilityChildTreeCallback_) {
         return;
     }
-    InitializeAccessibilityCallback();
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     int64_t accessibilityId = host->GetAccessibilityId();
@@ -80,6 +81,7 @@ void CustomPattern::InitializeAccessibility(PipelineContext* context)
 
     accessibilityChildTreeCallback_ =
         std::make_shared<CustomAccessibilityChildTreeCallback>(WeakClaim(this), accessibilityId);
+    InitializeAccessibilityCallback();
     accessibilityManager->RegisterAccessibilityChildTreeCallback(
         accessibilityId, accessibilityChildTreeCallback_);
 
@@ -197,13 +199,34 @@ void CustomPattern::OnSetAccessibilityChildTree(int32_t childWindowId, int32_t c
 
 void CustomPattern::InitializeAccessibilityCallback()
 {
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto pipeline = host->GetContext();
+    CHECK_NULL_VOID(pipeline);
+    auto taskExecutor = pipeline->GetTaskExecutor();
+    CHECK_NULL_VOID(taskExecutor);
     auto nativeProvider = GetNativeAccessibilityProvider();
     CHECK_NULL_VOID(nativeProvider);
     nativeProvider->SetRegisterCallback(
-        [weak = WeakClaim(this)](bool isRegister) {
-            auto pattern = weak.Upgrade();
-            CHECK_NULL_VOID(pattern);
-            pattern->HandleRegisterAccessibilityEvent(isRegister);
+        [weak = WeakClaim(this),
+            callback = std::weak_ptr<AccessibilityChildTreeCallback>(accessibilityChildTreeCallback_), taskExecutor,
+            instanceId = pipeline->GetInstanceId()](bool isRegister) {
+            auto task = [weak, callback, instanceId, isRegister] {
+                ContainerScope scope(instanceId);
+                auto pattern = weak.Upgrade();
+                CHECK_NULL_VOID(pattern);
+                auto childTreeCallback = callback.lock();
+                // A notification queued before detach must not affect a later attachment.
+                if (!childTreeCallback || pattern->accessibilityChildTreeCallback_ != childTreeCallback) {
+                    return;
+                }
+                pattern->HandleRegisterAccessibilityEvent(isRegister);
+            };
+            if (taskExecutor->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
+                task();
+            } else {
+                taskExecutor->PostTask(std::move(task), TaskExecutor::TaskType::UI, "ArkUICustomAccessibilityRegister");
+            }
         });
 }
 
