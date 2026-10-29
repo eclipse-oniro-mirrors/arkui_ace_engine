@@ -247,6 +247,7 @@ int32_t OH_ArkUI_RegisterSystemFontStyleChangeEvent(
     if (node == nullptr) {
         return OHOS::Ace::ERROR_CODE_PARAM_INVALID;
     }
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     impl->getNodeModifiers()->getFrameNodeModifier()->setSystemFontStyleChangeEvent(
         node->uiNodeHandle, userData, reinterpret_cast<void*>(onFontStyleChange));
@@ -259,6 +260,7 @@ void OH_ArkUI_UnregisterSystemFontStyleChangeEvent(ArkUI_NodeHandle node)
     if (node == nullptr) {
         return;
     }
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     impl->getNodeModifiers()->getFrameNodeModifier()->resetSystemFontStyleChangeEvent(node->uiNodeHandle);
 }
