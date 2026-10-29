@@ -261,6 +261,21 @@ class WaterFlowSyncLoadModifier extends ModifierWithKey {
 }
 WaterFlowSyncLoadModifier.identity = Symbol('waterFlowSyncLoad');
 
+class WaterFlowScrollPlaceholderModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().waterFlow.resetScrollPlaceholder(node);
+    }
+    else {
+      getUINativeModule().waterFlow.setScrollPlaceholder(node, this.value);
+    }
+  }
+}
+WaterFlowScrollPlaceholderModifier.identity = Symbol('waterFlowScrollPlaceholder');
+
 class WaterFlowOnScrollFrameBeginModifier extends ModifierWithKey {
   constructor(value) {
     super(value);
@@ -474,6 +489,11 @@ class ArkWaterFlowComponent extends ArkScrollable {
     modifierWithKey(this._modifiersWithKeys, WaterFlowSyncLoadModifier.identity, WaterFlowSyncLoadModifier, value);
     return this;
   }
+  scrollPlaceholder(provider) {
+    modifierWithKey(this._modifiersWithKeys, WaterFlowScrollPlaceholderModifier.identity,
+      WaterFlowScrollPlaceholderModifier, provider);
+    return this;
+  }
   onReachStart(event) {
     modifierWithKey(this._modifiersWithKeys, WaterFlowOnReachStartModifier.identity, WaterFlowOnReachStartModifier, event);
     return this;
@@ -591,6 +611,9 @@ class JSWaterFlow extends JSContainerBase {
   }
   static syncLoad(value) {
     getUINativeModule().waterFlow.setSyncLoad(true, value);
+  }
+  static scrollPlaceholder(provider) {
+    getUINativeModule().waterFlow.setScrollPlaceholder(true, provider);
   }
   static scrollBar(value) {
     getUINativeModule().waterFlow.setJSScrollBar(true, value);
