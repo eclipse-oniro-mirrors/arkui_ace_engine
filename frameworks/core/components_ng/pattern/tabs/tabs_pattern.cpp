@@ -636,6 +636,7 @@ TabBarDisplayMode TabsPattern::CalculateTabBarDisplayMode(float width)
         auto customBreakpoint = property->GetBarDisplayModeBreakpointValue();
         if (!customBreakpoint.isNull) {
             switch (currentBreakpoint) {
+                case WidthBreakpoint::WIDTH_XS:
                 case WidthBreakpoint::WIDTH_SM:
                     return customBreakpoint.sm;
                 case WidthBreakpoint::WIDTH_MD:
