@@ -3636,6 +3636,7 @@ test/unittest/core/common/transform/ @ArkUI_Event
 test/unittest/core/common/ui_observer_store_test.cpp @arkui_framework_xnode
 test/unittest/core/common/vibrator/ @arkui_framework_xnode
 test/unittest/core/components/BUILD.gn @arkuiscroll
+test/unittest/core/components/common/layout/grid_system_manager_test.cpp @arkuilayout1
 test/unittest/core/components/common/properties/os_content_test.cpp @arkuiscroll
 test/unittest/core/components/common/properties/os_content_test.h @arkuiscroll
 test/unittest/core/event/ @ArkUI_Event
