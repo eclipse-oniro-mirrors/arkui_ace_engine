@@ -255,6 +255,10 @@ void RelaxedInteractionManager::Clear(ExecutionState reason)
         if (!hasInterrupted) {
             return;
         }
+        if (executionPhase_ != ExecutionPhase::IDLE &&
+            workflowStates_.front().interruptionPolicy == InterruptionPolicy::INTERRUPTED) {
+            choreographer_->RequestCancelCurrent();
+        }
     }
     if (executionPhase_ != ExecutionPhase::IDLE) {
         if (executionPhase_ == ExecutionPhase::EXECUTING ||

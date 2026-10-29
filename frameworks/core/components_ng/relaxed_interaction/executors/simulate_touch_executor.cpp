@@ -32,6 +32,9 @@ SimulateTouchExecutor::SimulateTouchExecutor(WeakPtr<PipelineContext> context, c
 
 ExecutorResult SimulateTouchExecutor::ExecuteStep()
 {
+    if (cancelRequested_) {
+        return SetFailureState(ExecutionState::INTERRUPTED_BY_USER);
+    }
     auto context = context_.Upgrade();
     if (!context) {
         TAG_LOGE(AceLogTag::ACE_UIEVENT, "Pipeline context is null");
@@ -43,13 +46,33 @@ ExecutorResult SimulateTouchExecutor::ExecuteStep()
     TouchEvent upEvent = RelaxedEventFactory::CreateTouchEvent(coordinates_, TouchType::UP);
 
     // Dispatch touch events
+    touchActive_ = true;
     context->OnTouchEvent(downEvent);
     if (context->IsDestroyed()) {
+        touchActive_ = false;
         return SetFailureState(ExecutionState::TARGET_NOT_FOUND);
     }
+    if (cancelRequested_) {
+        Cancel();
+        return SetFailureState(ExecutionState::INTERRUPTED_BY_USER);
+    }
+    touchActive_ = false;
     context->OnTouchEvent(upEvent);
 
     return ExecutorResult::SUCCESS;
+}
+
+void SimulateTouchExecutor::Cancel()
+{
+    RequestCancel();
+    if (!touchActive_) {
+        return;
+    }
+    touchActive_ = false;
+    auto context = context_.Upgrade();
+    if (context && !context->IsDestroyed()) {
+        context->OnTouchEvent(RelaxedEventFactory::CreateTouchEvent(coordinates_, TouchType::CANCEL));
+    }
 }
 
 } // namespace OHOS::Ace::NG

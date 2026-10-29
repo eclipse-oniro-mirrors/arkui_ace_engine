@@ -34,6 +34,7 @@ public:
     ExecutorResult ExecuteNext();
 
     void Clear();
+    void RequestCancelCurrent();
     std::vector<std::unique_ptr<BaseExecutor>> ExtractExecutors(const std::vector<bool>& removeExecutors);
 
     ExecutionState GetFailureState() const

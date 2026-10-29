@@ -36,6 +36,11 @@ public:
 
     virtual void Cancel() {}
 
+    void RequestCancel()
+    {
+        cancelRequested_ = true;
+    }
+
     virtual std::string GetType() const = 0;
 
     virtual bool IsSingleStep() const = 0;
@@ -59,6 +64,7 @@ protected:
 
     FrameNodeMatch FindFrameNode(double x, double y, GestureRecognizerPred pred);
     WeakPtr<PipelineContext> context_;
+    bool cancelRequested_ = false;
     ExecutionState failureState_ = ExecutionState::FAILED;
 };
 
