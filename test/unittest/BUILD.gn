@@ -17,6 +17,10 @@ import("//foundation/arkui/ace_engine/build/ace_ext.gni")
 import("//foundation/arkui/ace_engine/test/unittest/ace_unittest.gni")
 import("capi/capi_common.gni")
 
+if (enable_ace_host_product) {
+  is_host_product = true
+}
+
 group("unittest") {
   testonly = true
   deps = []
