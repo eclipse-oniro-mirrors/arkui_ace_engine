@@ -99,8 +99,8 @@ void ParallelPageRouterManager::NotifyForceFullScreenChangeIfNeeded(
     auto stageManager = AceType::DynamicCast<ParallelStageManager>(context->GetStageManager());
     CHECK_NULL_VOID(stageManager);
     // when page-level split control is on, fullScreenPages takes no effect
-    bool isCurFullScreen = forceSplitMgr->IsFullScreenPage(curTopPageName) &&
-        !forceSplitMgr->IsPageLevelSplitEnabled();
+    bool isCurFullScreen = forceSplitMgr->IsPageLevelSplitEnabled() ? 
+        forceSplitMgr->IsTopPageSplitDisabled() : forceSplitMgr->IsFullScreenPage(curTopPageName)
     if (stageManager->IsTopFullScreenPage() != isCurFullScreen) {
         stageManager->UpdateIsTopFullScreenPage(isCurFullScreen);
         forceSplitMgr->NotifyForceFullScreenChange(stageManager->IsTopFullScreenPage());
@@ -127,14 +127,14 @@ void ParallelPageRouterManager::TryEstablishPageLevelSplitHome(
         return;
     }
     CHECK_NULL_VOID(pageNode);
-
+ 
     // Collect the effective stack by target page instance, preserving distinct instances of pages that share the
     // same name. LoadPage collects the newly pushed page; StartPop collects the pop target page.
     std::vector<std::string> pageNames;
     std::vector<RefPtr<FrameNode>> effectivePages;
     RefPtr<FrameNode> belowTopPage;
     bool foundTarget = false;
-
+ 
     for (const auto& weakNode : pageRouterStack_) {
         auto node = weakNode.Upgrade();
         if (!node) {
@@ -151,23 +151,99 @@ void ParallelPageRouterManager::TryEstablishPageLevelSplitHome(
             foundTarget = true;
             break;
         }
+        pageNames.emplace_back(pattern->GetPageUrl());
+        if (node == pageNode) {
+            belowTopPage = effectivePages.empty() ? nullptr : effectivePages.back();
+            effectivePages.emplace_back(node);
+            foundTarget = true;
+            break;
+        }
         effectivePages.emplace_back(node);
     }
-
     if (!foundTarget) {
-        TAG_LOGW(AceLogTag::ACE_ROUTER,
-            "pageLevelSplit home skip:targetNotInStack, page:%{public}s, node:%{public}d",
-            pageUrl.c_str(), pageNode->GetId());
         return;
     }
-
     // The policy stack must be updated before querying the split policies of the current page and its upstream pages.
     forceSplitMgr->SetPageStack(std::move(pageNames));
     if (forceSplitMgr->IsPageSplitDisabled(pageUrl)) {
         return;
     }
-
+    if (forceSplitMgr->GetBehaviorMode() == ForceSplitBehaviorMode::NAVIGATION) {
+        UpdatePageLevelNavigationHome(effectivePages, forceSplitMgr, context);
+        return;
+    }
+ 
     UpdatePageLevelSplitHome(pageNode, belowTopPage, effectivePages, forceSplitMgr, context);
+}
+
+RefPtr<FrameNode> ParallelPageRouterManager::SelectPageLevelNavigationHome(
+    const std::vector<RefPtr<FrameNode>>& effectivePages,
+    const RefPtr<ForceSplitManager>& forceSplitMgr)
+{
+    CHECK_NULL_RETURN(forceSplitMgr, nullptr);
+    if (effectivePages.empty()) {
+        return nullptr;
+    }
+ 
+    pageLevelNavigationHomes_.erase(
+        std::remove_if(pageLevelNavigationHomes_.begin(), pageLevelNavigationHomes_.end(),
+            [&effectivePages](const auto& item) {
+                auto node = item.Upgrade();
+                return !node ||
+                    std::find(effectivePages.begin(), effectivePages.end(), node) == effectivePages.end();
+            }),
+        pageLevelNavigationHomes_.end());
+    auto home = pageLevelNavigationHomes_.empty() ? nullptr : pageLevelNavigationHomes_.back().Upgrade();
+    bool reachedHome = false;
+    bool separatedByNonSplit = false;
+    std::vector<std::string> names;
+    for (const auto& page : effectivePages) {
+        auto pattern = page->GetPattern<PagePattern>();
+        CHECK_NULL_CONTINUE(pattern);
+        names.emplace_back(pattern->GetPageUrl());
+        // Resolve inheritance using this instance's stack prefix.
+        forceSplitMgr->SetPageStack(std::vector<std::string>(names));
+        if (page == home) {
+            reachedHome = true;
+        }
+        if (reachedHome && forceSplitMgr->IsPageSplitDisabled(pattern->GetPageUrl())) {
+            separatedByNonSplit = true;
+        }
+    }
+    return reachedHome && !separatedByNonSplit ? home : effectivePages.back();
+}
+ 
+void ParallelPageRouterManager::UpdatePageLevelNavigationHome(const std::vector<RefPtr<FrameNode>>& effectivePages,
+    const RefPtr<ForceSplitManager>& forceSplitMgr, const RefPtr<PipelineContext>& context)
+{
+    CHECK_NULL_VOID(context);
+    auto stageManager = AceType::DynamicCast<ParallelStageManager>(context->GetStageManager());
+    CHECK_NULL_VOID(stageManager);
+    auto stageNode = stageManager->GetStageNode();
+    CHECK_NULL_VOID(stageNode);
+    auto stagePattern = stageNode->GetPattern<ParallelStagePattern>();
+    CHECK_NULL_VOID(stagePattern);
+ 
+    auto home = SelectPageLevelNavigationHome(effectivePages, forceSplitMgr);
+    CHECK_NULL_VOID(home);
+    auto homePattern = home->GetPattern<ParallelPagePattern>();
+    CHECK_NULL_VOID(homePattern);
+    auto previousHome = stagePattern->GetHomePage();
+ 
+    forceSplitMgr->SetHomePageName(homePattern->GetPageUrl());
+    if (previousHome != home || homePattern->GetPageType() != RouterPageType::HOME_PAGE) {
+        if (!stageManager->OnHomePageDetected(home, pageRouterStack_)) {
+            return;
+        }
+        stageNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    }
+ 
+    if (pageLevelNavigationHomes_.empty() || pageLevelNavigationHomes_.back().Upgrade() != home) {
+        pageLevelNavigationHomes_.push_back(home);
+    }
+    TAG_LOGI(AceLogTag::ACE_ROUTER,
+        "pageLevelSplit navigation home, previous:%{public}d, home:%{public}d, top:%{public}d",
+        previousHome ? previousHome->GetId() : -1, home->GetId(), effectivePages.back()->GetId());
 }
 
 void ParallelPageRouterManager::UpdatePageLevelSplitHome(const RefPtr<FrameNode>& pageNode,
