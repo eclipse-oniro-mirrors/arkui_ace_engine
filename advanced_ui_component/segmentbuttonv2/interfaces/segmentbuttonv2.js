@@ -3379,19 +3379,17 @@ class SegmentButtonV2ItemContent extends ViewV2 {
     }
   }
   aboutToAppear() {
-    if (deviceInfo.sdkApiVersion >= 26) {
-      this.updateLanguageLineHeight();
-      let abilityContext = this.getUIContext().getHostContext();
-      if (abilityContext) {
-        this.environmentCallbackID = abilityContext.getApplicationContext().on('environment', this.environmentCallback);
-      }
+    this.updateLanguageLineHeight();
+    let abilityContext = this.getUIContext().getHostContext();
+    if (abilityContext) {
+      this.environmentCallbackID = abilityContext.getApplicationContext().on('environment', this.environmentCallback);
     }
   }
   aboutToDisappear() {
-    if (deviceInfo.sdkApiVersion >= 26 && this.environmentCallbackID) {
-      let abilityContext = this.getUIContext().getHostContext();
+    if (this.environmentCallbackID !== undefined) {
+      let abilityContext = this.getUIContext()?.getHostContext();
       if (abilityContext) {
-        abilityContext.getApplicationContext().off('environment', this.environmentCallbackID);
+        abilityContext.getApplicationContext()?.off('environment', this.environmentCallbackID);
       }
       this.environmentCallbackID = void 0;
     }

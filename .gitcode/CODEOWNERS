@@ -227,10 +227,10 @@ advanced_ui_component/atomicservicenavigation/ @giteewzp
 advanced_ui_component/atomicservicetabs/ @giteewzp
 advanced_ui_component/atomicserviceweb/ @giteewzp
 advanced_ui_component/BUILD.gn @arkuitoolchain
-advanced_ui_component/chip/ @arkuitoolchain
+advanced_ui_component/chip/ @arkuilayout1
 advanced_ui_component/chipgroup/ @arkuitoolchain
 advanced_ui_component/chipgroupv2/ @arkuitoolchain
-advanced_ui_component/chipv2/ @arkuitoolchain
+advanced_ui_component/chipv2/ @arkuilayout1
 advanced_ui_component/composelistitem/ @arkuiadvancedcomponent
 advanced_ui_component/composelistitemv2/ @arkuiadvancedcomponent
 advanced_ui_component/composetitlebar/ @arkuiadvancedcomponent
@@ -255,7 +255,7 @@ advanced_ui_component/popup/ @arkuipopupwindow_all
 advanced_ui_component/progressbutton/ @arkuiadvancedcomponent
 advanced_ui_component/progressbuttonv2/ @arkuiadvancedcomponent
 advanced_ui_component/segmentbutton/ @arkuitoolchain
-advanced_ui_component/segmentbuttonv2/ @arkuitoolchain
+advanced_ui_component/segmentbuttonv2/ @arkuilayout1
 advanced_ui_component/selectionmenu/ @huawei_g_five
 advanced_ui_component/selecttitlebar/ @arkuiadvancedcomponent
 advanced_ui_component/splitlayout/ @arkuiadvancedcomponent
