@@ -938,7 +938,7 @@ HWTEST_F(VideoStateMachinePatternTestNg, OnDirtyLayoutWrapperSwap_Api12PixelRoun
     layoutWrapper->skipMeasureContent_ = false;
     layoutWrapper->layoutAlgorithm_ =
         AceType::MakeRefPtr<LayoutAlgorithmWrapper>(AceType::MakeRefPtr<LayoutAlgorithm>());
-    layoutWrapper->layoutAlgorithm_->skipMeasure_ = false;
+    layoutWrapper->layoutAlgorithm_->SetNeedMeasure();
     auto renderContext = AceType::MakeRefPtr<MockRenderContext>();
     pattern->renderContextForMediaPlayer_ = renderContext;
     DirtySwapConfig config;
@@ -995,7 +995,7 @@ HWTEST_F(VideoStateMachinePatternTestNg, OnDirtyLayoutWrapperSwap_InvalidFitUses
     layoutWrapper->skipMeasureContent_ = false;
     layoutWrapper->layoutAlgorithm_ =
         AceType::MakeRefPtr<LayoutAlgorithmWrapper>(AceType::MakeRefPtr<LayoutAlgorithm>());
-    layoutWrapper->layoutAlgorithm_->skipMeasure_ = false;
+    layoutWrapper->layoutAlgorithm_->SetNeedMeasure();
     auto renderContext = AceType::MakeRefPtr<MockRenderContext>();
     pattern->renderContextForMediaPlayer_ = renderContext;
     DirtySwapConfig config;

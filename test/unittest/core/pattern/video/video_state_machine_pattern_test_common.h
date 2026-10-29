@@ -171,16 +171,16 @@ public:
 
 class ScopedRecordingTaskExecutor {
 public:
-    explicit ScopedRecordingTaskExecutor(const RefPtr<PipelineContext>& context)
+    explicit ScopedRecordingTaskExecutor(const RefPtr<MockPipelineContext>& context)
         : context_(context), originalExecutor_(context->GetTaskExecutor()),
           executor_(AceType::MakeRefPtr<RecordingTaskExecutor>())
     {
-        context_->taskExecutor_ = executor_;
+        context_->SetTaskExecutor(executor_);
     }
 
     ~ScopedRecordingTaskExecutor()
     {
-        context_->taskExecutor_ = originalExecutor_;
+        context_->SetTaskExecutor(originalExecutor_);
     }
 
     const RefPtr<RecordingTaskExecutor>& Get() const
@@ -189,7 +189,7 @@ public:
     }
 
 private:
-    RefPtr<PipelineContext> context_;
+    RefPtr<MockPipelineContext> context_;
     RefPtr<TaskExecutor> originalExecutor_;
     RefPtr<RecordingTaskExecutor> executor_;
 };
