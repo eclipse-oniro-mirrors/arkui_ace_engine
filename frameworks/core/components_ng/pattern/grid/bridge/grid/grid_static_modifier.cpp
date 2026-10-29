@@ -33,6 +33,34 @@
 
 namespace OHOS::Ace::NG::Converter {
 
+// The provider size follows the ArkTS Length convention; the unit must survive
+// the conversion into the layout-side option (same contract as List's
+// SetScrollPlaceholderImpl).
+template<>
+ScrollPlaceholderOptions Convert(const Ark_PlaceholderOptions& src)
+{
+    ScrollPlaceholderOptions options;
+    options.id = Converter::OptConvert<std::string>(src.id).value_or("");
+    if (src.size.tag != INTEROP_TAG_UNDEFINED) {
+        ScrollPlaceholderSizeOption sizeOption;
+        // Keep the converted Dimension with its unit: "100%" maps to
+        // Dimension(1.0, PERCENT), and Value() would collapse it to 1.0.
+        sizeOption.width = Converter::OptConvert<Dimension>(src.size.value.width);
+        sizeOption.height = Converter::OptConvert<Dimension>(src.size.value.height);
+        options.size = sizeOption;
+    }
+    return options;
+}
+
+template<>
+std::optional<ScrollPlaceholderOptions> OptConvert(const Opt_PlaceholderOptions& src)
+{
+    if (src.tag == INTEROP_TAG_UNDEFINED) {
+        return std::nullopt;
+    }
+    return Convert<ScrollPlaceholderOptions>(src.value);
+}
+
 template<>
 inline void AssignCast(std::optional<GridItemSize>& dst, const Ark_GridLayoutOptions& src)
 {
@@ -766,8 +794,28 @@ void SetScrollPlaceholderImpl(Ark_NativePointer node,
 {
     auto frameNode = reinterpret_cast<FrameNode *>(node);
     CHECK_NULL_VOID(frameNode);
-    //auto convValue = value ? Converter::OptConvert<type>(*value) : std::nullopt;
-    // GridModelNG::SetSetScrollPlaceholder(frameNode, convValue);
+    auto optValue = Converter::GetOptPtr(value);
+    if (!optValue) {
+        TAG_LOGI(AceLogTag::ACE_SCROLL,
+            "Grid scrollPlaceholder: provider cleared, node=%{public}s, id=%{public}d",
+            frameNode->GetTag().c_str(), frameNode->GetId());
+        GridModelNG::SetScrollPlaceholder(frameNode, nullptr);
+        return;
+    }
+    TAG_LOGI(AceLogTag::ACE_SCROLL,
+        "Grid scrollPlaceholder: provider set, node=%{public}s, id=%{public}d "
+        "(placeholders appear only while this Grid scrolls under load)",
+        frameNode->GetTag().c_str(), frameNode->GetId());
+    // The provider is a synchronous northbound callback: the continuation is
+    // invoked on the spot, so the invoke converts into a plain optional result.
+    auto provider = [arkCallback = CallbackHelper(*optValue)](
+        int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+        Ark_Int32 arkIndex = Converter::ArkValue<Ark_Int32>(index);
+        auto result = arkCallback.InvokeWithOptConvertResult<ScrollPlaceholderOptions, Opt_PlaceholderOptions,
+            Callback_Opt_PlaceholderOptions_Void>(arkIndex);
+        return result;
+    };
+    GridModelNG::SetScrollPlaceholder(frameNode, std::move(provider));
 }
 void SetCachedCount1Impl(Ark_NativePointer node,
                          const Opt_Int32* count,

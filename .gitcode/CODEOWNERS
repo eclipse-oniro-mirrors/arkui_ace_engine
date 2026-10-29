@@ -3699,6 +3699,7 @@ test/unittest/core/pattern/form/mock/ @form_framework
 test/unittest/core/pattern/form_link/ @form_framework
 test/unittest/core/pattern/gauge/ @huawei_g_five
 test/unittest/core/pattern/grid/ @arkuiscroll
+test/unittest/core/pattern/grid/grid_scroll_placeholder_test_ng.cpp @arkuiscroll
 test/unittest/core/pattern/grid/irregular/ @arkuiscroll
 test/unittest/core/pattern/grid_col/ @arkuilayout1
 test/unittest/core/pattern/grid_container/ @arkuilayout1

@@ -31,6 +31,19 @@
 
 namespace OHOS::Ace::NG {
 namespace {
+// Fast flag check on the Grid host pattern: with the scroll placeholder provider
+// set, the fill loops keep filling the viewport past the response deadline with
+// cheap placeholder items (deferred real builds) instead of stopping early.
+bool IsScrollPlaceholderEnabled(const LayoutWrapper* layoutWrapper)
+{
+    CHECK_NULL_RETURN(layoutWrapper, false);
+    const auto& host = layoutWrapper->GetHostNode();
+    CHECK_NULL_RETURN(host, false);
+    const auto& pattern = host->GetPattern<GridPattern>();
+    CHECK_NULL_RETURN(pattern, false);
+    return pattern->IsScrollPlaceholderEnabled();
+}
+
 void AddCacheItemsInFront(
     int32_t startIdx, LayoutWrapper* host, int32_t cacheCnt, std::list<GridPreloadItem>& buildList)
 {
@@ -833,7 +846,7 @@ void GridScrollLayoutAlgorithm::FillBlankAtEnd(
         float lineHeight = FillNewLineBackward(crossSize, mainSize, layoutWrapper, false);
         if (GreatOrEqual(lineHeight, 0.0)) {
             mainLength += (lineHeight + mainGap_);
-            if (!syncLoad_ && layoutWrapper->ReachResponseDeadline()) {
+            if (!syncLoad_ && layoutWrapper->ReachResponseDeadline() && !IsScrollPlaceholderEnabled(layoutWrapper)) {
                 measureInNextFrame_ = true;
                 break;
             }
@@ -881,7 +894,7 @@ void GridScrollLayoutAlgorithm::FillCurrentLine(float mainSize, float crossSize,
             info_.endIndex_ = currentIndex;
             currentIndex++;
             doneFillCurrentLine = true;
-            if (!syncLoad_ && layoutWrapper->ReachResponseDeadline()) {
+            if (!syncLoad_ && layoutWrapper->ReachResponseDeadline() && !IsScrollPlaceholderEnabled(layoutWrapper)) {
                 measureInNextFrame_ = true;
                 break;
             }
@@ -2792,6 +2805,9 @@ float GridScrollLayoutAlgorithm::GetContentHeight(LayoutWrapper* layoutWrapper)
 
 bool GridScrollLayoutAlgorithm::HaveToMeasureInNextFrame(bool reverse, LayoutWrapper* layoutWrapper) const
 {
-    return !reverse && !syncLoad_ && layoutWrapper->ReachResponseDeadline() && info_.endIndex_ >= moveToEndLineIndex_;
+    // With scroll placeholder enabled the fill keeps going past the deadline with
+    // cheap placeholder items instead of deferring the tail to the next frame.
+    return !reverse && !syncLoad_ && layoutWrapper->ReachResponseDeadline() && !IsScrollPlaceholderEnabled(layoutWrapper)
+        && info_.endIndex_ >= moveToEndLineIndex_;
 }
 } // namespace OHOS::Ace::NG

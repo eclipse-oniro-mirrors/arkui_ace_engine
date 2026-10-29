@@ -324,6 +324,22 @@ RefPtr<LayoutWrapper> GridLayoutBaseAlgorithm::GetGridItem(
     LayoutWrapper* layoutWrapper, int32_t index, bool addToRenderTree, bool isCache)
 {
     const auto& layoutProperty = DynamicCast<GridLayoutProperty>(layoutWrapper->GetLayoutProperty());
+    // Scroll placeholder acquisition pre-check (ADR-2/ADR-7, 2026-10-12): the
+    // budget decision and shell mounting stay with the pattern (it owns the frame
+    // context); the index->wrapper substitution itself executes in
+    // FrameProxy::GetFrameNodeByIndex, gated by an explicit per-acquisition
+    // declaration. Only a fill loop of an enabled host passes the declaration
+    // down, so every other caller of the host acquisition keeps the unmodified
+    // semantics. Cache/preload paths never substitute.
+    bool allowPlaceholderSubstitution = false;
+    if (!isCache && layoutWrapper) {
+        const auto& host = layoutWrapper->GetHostNode();
+        const auto& pattern = host ? host->GetPattern<GridPattern>() : nullptr;
+        if (pattern && pattern->IsScrollPlaceholderEnabled()) {
+            pattern->PrepareScrollPlaceholderForAcquisition(index);
+            allowPlaceholderSubstitution = true;
+        }
+    }
     // Scroll placeholder load observation at the Grid child build call point: predict before
     // the real builder runs on an unbuilt index and sample its duration afterwards. Observation
     // only; the dummy empty-branch fallback is reported after the acquisition so it never feeds
@@ -331,14 +347,16 @@ RefPtr<LayoutWrapper> GridLayoutBaseAlgorithm::GetGridItem(
     ScrollPlaceholderItemBuildScope buildScope(
         ScrollPlaceholderComponentType::GRID, layoutWrapper, index, isCache);
     if (layoutProperty->GetSupportLazyLoadingEmptyBranch().value_or(false)) {
-        auto wrapper = layoutWrapper->GetOrCreateChildByIndex(index, addToRenderTree, isCache);
+        auto wrapper = layoutWrapper->GetOrCreateChildByIndex(
+            index, addToRenderTree, isCache, allowPlaceholderSubstitution);
         buildScope.SetAcquiredWrapper(wrapper);
         if (!wrapper) {
             wrapper = CreateDummyGridItemChild();
         }
         return wrapper;
     }
-    auto wrapper = layoutWrapper->GetOrCreateChildByIndex(index, addToRenderTree, isCache);
+    auto wrapper = layoutWrapper->GetOrCreateChildByIndex(
+        index, addToRenderTree, isCache, allowPlaceholderSubstitution);
     buildScope.SetAcquiredWrapper(wrapper);
     return wrapper;
 }
