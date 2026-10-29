@@ -48,9 +48,13 @@ ExecutorResult ExecutorChoreographer::ExecuteNext()
 void ExecutorChoreographer::Clear()
 {
     auto current = std::move(currentExecutor_);
-    executorQueue_.clear();
+    std::deque<std::unique_ptr<BaseExecutor>> cancelledExecutors;
+    cancelledExecutors.swap(executorQueue_);
     if (current) {
         current->Cancel();
+    }
+    for (auto& executor : cancelledExecutors) {
+        executor->Cancel();
     }
 }
 
