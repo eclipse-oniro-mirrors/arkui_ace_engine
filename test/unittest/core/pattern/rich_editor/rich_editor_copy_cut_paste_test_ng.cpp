@@ -592,47 +592,6 @@ HWTEST_F(RichEditorCopyCutPasteTestNg, OnModifyDone001, TestSize.Level0)
 }
 
 /**
- * @tc.name: AddUdmfData001
- * @tc.desc: test AddUdmfData
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorCopyCutPasteTestNg, AddUdmfData001, TestSize.Level0)
-{
-    ASSERT_NE(richEditorNode_, nullptr);
-    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-
-    ResultObject resultObject;
-    richEditorPattern->dragResultObjects_.emplace_back(resultObject);
-
-    resultObject.type = SelectSpanType::TYPESYMBOLSPAN;
-    richEditorPattern->dragResultObjects_.emplace_back(resultObject);
-
-    resultObject.type = SelectSpanType::TYPEIMAGE;
-    resultObject.valueString = INIT_VALUE_1;
-    richEditorPattern->dragResultObjects_.emplace_back(resultObject);
-
-    resultObject.type = SelectSpanType::TYPEIMAGE;
-    resultObject.valueString.clear();
-    richEditorPattern->dragResultObjects_.emplace_back(resultObject);
-
-    resultObject.type = SelectSpanType::TYPEIMAGE;
-    resultObject.valuePixelMap = PixelMap::CreatePixelMap(nullptr);
-    ASSERT_NE(resultObject.valuePixelMap, nullptr);
-    richEditorPattern->dragResultObjects_.emplace_back(resultObject);
-
-    richEditorPattern->AddImageSpan(IMAGE_SPAN_OPTIONS_1);
-
-    auto event = AceType::MakeRefPtr<Ace::DragEvent>();
-    richEditorPattern->AddUdmfData(event);
-    if (UdmfClient::GetInstance()->CreateUnifiedData()) {
-        EXPECT_NE(event->GetData(), 0);
-    } else {
-        EXPECT_EQ(event->GetData(), 0);
-    }
-}
-
-/**
  * @tc.name: AsyncHandleOnCopyStyledStringHtml
  * @tc.desc: Test AsyncHandleOnCopyStyledStringHtml.
  * @tc.type: FUNC
@@ -826,5 +785,46 @@ HWTEST_F(RichEditorCopyCutPasteTestNg, HandleOnCut002, TestSize.Level0)
     EXPECT_EQ(changeReason, TextChangeReason::CUT); // not preventDefault
     EXPECT_EQ(richEditorPattern->caretUpdateType_, CaretUpdateType::NONE);
     EXPECT_EQ(isEventCalled, true);
+}
+
+/**
+ * @tc.name: AddUdmfData001
+ * @tc.desc: test AddUdmfData
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCopyCutPasteTestNg, AddUdmfData001, TestSize.Level0)
+{
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+
+    ResultObject resultObject;
+    richEditorPattern->dragResultObjects_.emplace_back(resultObject);
+
+    resultObject.type = SelectSpanType::TYPESYMBOLSPAN;
+    richEditorPattern->dragResultObjects_.emplace_back(resultObject);
+
+    resultObject.type = SelectSpanType::TYPEIMAGE;
+    resultObject.valueString = INIT_VALUE_1;
+    richEditorPattern->dragResultObjects_.emplace_back(resultObject);
+
+    resultObject.type = SelectSpanType::TYPEIMAGE;
+    resultObject.valueString.clear();
+    richEditorPattern->dragResultObjects_.emplace_back(resultObject);
+
+    resultObject.type = SelectSpanType::TYPEIMAGE;
+    resultObject.valuePixelMap = PixelMap::CreatePixelMap(nullptr);
+    ASSERT_NE(resultObject.valuePixelMap, nullptr);
+    richEditorPattern->dragResultObjects_.emplace_back(resultObject);
+
+    richEditorPattern->AddImageSpan(IMAGE_SPAN_OPTIONS_1);
+
+    auto event = AceType::MakeRefPtr<Ace::DragEvent>();
+    richEditorPattern->AddUdmfData(event);
+    if (UdmfClient::GetInstance()->CreateUnifiedData()) {
+        EXPECT_NE(event->GetData(), 0);
+    } else {
+        EXPECT_EQ(event->GetData(), 0);
+    }
 }
 }

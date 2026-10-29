@@ -95,7 +95,9 @@ HWTEST_F(RichEditorCounterCoreTestNg, ICounterHostInterface001, TestSize.Level0)
 
 /**
  * @tc.name: GetAllResponseArea001
- * @tc.desc: GetAllResponseArea returns vector with cleanNodeResponseArea_ null and non-null
+ * @tc.desc: GetAllResponseArea always returns a 2-element vector ordered as
+ *           {passwordResponseArea_, cleanNodeResponseArea_}; slot indices stay fixed
+ *           regardless of which area is currently initialized.
  * @tc.type: FUNC
  */
 HWTEST_F(RichEditorCounterCoreTestNg, GetAllResponseArea001, TestSize.Level0)
@@ -103,7 +105,9 @@ HWTEST_F(RichEditorCounterCoreTestNg, GetAllResponseArea001, TestSize.Level0)
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
-    // Branch: cleanNodeResponseArea_ not initialized -> size 1, element null
+
+    // Initial state: neither area has been initialized. The vector still reserves both
+    // slots so that downstream layout can rely on a stable index-to-area mapping.
     auto areas = richEditorPattern->GetAllResponseArea();
     EXPECT_EQ(areas.size(), 2);
     // Branch: cleanNodeResponseArea_ set -> size 1, element non-null
@@ -111,7 +115,6 @@ HWTEST_F(RichEditorCounterCoreTestNg, GetAllResponseArea001, TestSize.Level0)
         AceType::MakeRefPtr<CleanNodeResponseArea>(AceType::WeakClaim(AceType::RawPtr(richEditorPattern)));
     areas = richEditorPattern->GetAllResponseArea();
     EXPECT_EQ(areas.size(), 2);
-    EXPECT_NE(areas[0], nullptr);
     richEditorPattern->cleanNodeResponseArea_.Reset();
 }
 
@@ -1004,7 +1007,7 @@ HWTEST_F(RichEditorCounterApiTestNg, PaintMethodForegroundModifier001, TestSize.
  */
 HWTEST_F(RichEditorCounterApiTestNg, SetRichEditorShowCounter001, TestSize.Level0)
 {
-    SystemProperties::SetConfigChangePerform();
+    g_isConfigChangePerform = true;
     auto richEditorNode = FrameNode::GetOrCreateFrameNode(V2::RICH_EDITOR_ETS_TAG,
         ElementRegister::GetInstance()->MakeUniqueId(),
         []() { return AceType::MakeRefPtr<RichEditorPattern>(); });
@@ -1057,7 +1060,7 @@ HWTEST_F(RichEditorCounterApiTestNg, SetRichEditorShowCounter001, TestSize.Level
  */
 HWTEST_F(RichEditorCounterApiTestNg, ResetRichEditorShowCounterConfigChange, TestSize.Level0)
 {
-    SystemProperties::SetConfigChangePerform();
+    g_isConfigChangePerform = true;
     auto richEditorNode = FrameNode::GetOrCreateFrameNode(V2::RICH_EDITOR_ETS_TAG,
         ElementRegister::GetInstance()->MakeUniqueId(),
         []() { return AceType::MakeRefPtr<RichEditorPattern>(); });

@@ -131,5 +131,4 @@ void RichEditorCommonTestNg::ClearSpan()
     richEditorPattern->spans_.clear();
     richEditorPattern->caretPosition_ = 0;
 }
-
 } // namespace OHOS::Ace::NG

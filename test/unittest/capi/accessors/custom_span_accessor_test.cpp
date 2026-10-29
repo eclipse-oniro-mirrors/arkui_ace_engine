@@ -29,11 +29,6 @@ using namespace testing;
 using namespace testing::ext;
 using namespace Converter;
 
-namespace Converter {
-// Defined in custom_span_accessor.cpp
-template<> CustomSpanMetrics Convert(const Ark_CustomSpanMetrics& src);
-} // namespace Converter
-
 namespace {
 class MockFrameNode : public FrameNode {
 public:

@@ -231,7 +231,6 @@ HWTEST_F(RichEditorLayoutTestNg, OnDirtyLayoutWrapper004, TestSize.Level2)
     EXPECT_FALSE(ret);
 }
 
-
 /**
  * @tc.name: RichEditorLayoutAlgorithm001
  * @tc.desc: test MeasureContent
@@ -684,6 +683,9 @@ HWTEST_F(RichEditorLayoutTestNg, HandleAISpanTest001, TestSize.Level2)
     auto layoutAlgorithm = AceType::DynamicCast<RichEditorLayoutAlgorithm>(richEditorPattern->CreateLayoutAlgorithm());
     ASSERT_NE(layoutAlgorithm, nullptr);
     std::list<RefPtr<SpanItem>> spans;
+    /**
+     * @tc.steps: step1. Init spanItem
+     */
     auto spanItem1 = AceType::MakeRefPtr<SpanItem>();
     spanItem1->rangeStart = 0;
     spanItem1->position = 5;
@@ -700,6 +702,9 @@ HWTEST_F(RichEditorLayoutTestNg, HandleAISpanTest001, TestSize.Level2)
     spans.push_back(spanItem2);
     spans.push_back(spanItem3);
 
+    /**
+     * @tc.steps: step2. test HandleAISpan
+     */
     std::map<int32_t, AISpan> aiSpanMap = { { 8, { 8, 12 } } };
     AISpanLayoutInfo aiSpanLayoutInfo{ aiSpanMap, true };
     // span:[0-5][5-10][10-15]
@@ -911,9 +916,11 @@ HWTEST_F(RichEditorLayoutTestNg, ReMeasureContentTest001, TestSize.Level2)
     SizeF textSize(100.0f, 50.0f);
     LayoutConstraintF contentConstraint;
     contentConstraint.maxSize = CONTAINER_SIZE;
+    
     auto layoutWrapper = AceType::MakeRefPtr<LayoutWrapperNode>(
         richEditorNode_, AceType::MakeRefPtr<GeometryNode>(), richEditorNode_->GetLayoutProperty());
     ASSERT_NE(layoutWrapper, nullptr);
+    
     auto layoutProperty = richEditorNode_->GetLayoutProperty<RichEditorLayoutProperty>();
     ASSERT_NE(layoutProperty, nullptr);
 
@@ -931,7 +938,7 @@ HWTEST_F(RichEditorLayoutTestNg, ReMeasureContentTest001, TestSize.Level2)
      */
     auto result = layoutAlgorithm->ReMeasureContent(textSize,
         contentConstraint, layoutWrapper.GetRawPtr());
-
+    
     /**
      * @tc.expected: The result.maxSize.Height() should equal to pattern's MaxLinesHeight
      */
@@ -1094,7 +1101,7 @@ HWTEST_F(RichEditorLayoutTestNg, AddImageToParagraphTest001, TestSize.Level2)
     auto layoutAlgorithm =
         AceType::DynamicCast<RichEditorLayoutAlgorithm>(pattern->CreateLayoutAlgorithm());
     ASSERT_NE(layoutAlgorithm, nullptr);
-
+    
     // Set useParagraphCache_ to true
     layoutAlgorithm->useParagraphCache_ = true;
     layoutAlgorithm->preParagraphsPlaceholderCount_ = 10;
@@ -1115,7 +1122,7 @@ HWTEST_F(RichEditorLayoutTestNg, AddImageToParagraphTest001, TestSize.Level2)
      *               placeholderIndex should be set correctly
      */
     layoutAlgorithm->AddImageToParagraph(imageSpanItem, layoutWrapper, paragraph, spanTextLength);
-
+    
     /**
      * @tc.expected: spanTextLength should be increased by the content length (18 characters)
      * @tc.expected: imageSpanItem->placeholderIndex should be set to 10 (preParagraphsPlaceholderCount_)
@@ -1144,7 +1151,7 @@ HWTEST_F(RichEditorLayoutTestNg, AddPlaceHolderToParagraphTest001, TestSize.Leve
     auto layoutAlgorithm =
         AceType::DynamicCast<RichEditorLayoutAlgorithm>(pattern->CreateLayoutAlgorithm());
     ASSERT_NE(layoutAlgorithm, nullptr);
-
+    
     // Set useParagraphCache_ to true
     layoutAlgorithm->useParagraphCache_ = true;
     layoutAlgorithm->preParagraphsPlaceholderCount_ = 10;
@@ -1165,7 +1172,7 @@ HWTEST_F(RichEditorLayoutTestNg, AddPlaceHolderToParagraphTest001, TestSize.Leve
      *               placeholderIndex should be set correctly
      */
     layoutAlgorithm->AddPlaceHolderToParagraph(placeholderSpanItem, layoutWrapper, paragraph, spanTextLength);
-
+    
     /**
      * @tc.expected: spanTextLength should be increased by the content length (19 characters)
      * @tc.expected: placeholderSpanItem->placeholderIndex should be set to 10
@@ -1193,7 +1200,7 @@ HWTEST_F(RichEditorLayoutTestNg, UpdateParagraphByCustomSpanTest001, TestSize.Le
     auto layoutAlgorithm =
         AceType::DynamicCast<RichEditorLayoutAlgorithm>(pattern->CreateLayoutAlgorithm());
     ASSERT_NE(layoutAlgorithm, nullptr);
-
+    
     // Set useParagraphCache_ to false
     layoutAlgorithm->useParagraphCache_ = false;
 
@@ -1212,7 +1219,7 @@ HWTEST_F(RichEditorLayoutTestNg, UpdateParagraphByCustomSpanTest001, TestSize.Le
      */
     layoutAlgorithm->UpdateParagraphByCustomSpan(customSpanItem,
         paragraph, spanTextLength, customSpanPlaceholder);
-
+    
     /**
      * @tc.expected: spanTextLength should remain unchanged as we're calling base class method
      */
@@ -1238,7 +1245,7 @@ HWTEST_F(RichEditorLayoutTestNg, UpdateParagraphByCustomSpanTest002, TestSize.Le
     auto layoutAlgorithm =
         AceType::DynamicCast<RichEditorLayoutAlgorithm>(pattern->CreateLayoutAlgorithm());
     ASSERT_NE(layoutAlgorithm, nullptr);
-
+    
     // Set useParagraphCache_ to true
     layoutAlgorithm->useParagraphCache_ = true;
     layoutAlgorithm->preParagraphsPlaceholderCount_ = 10;
@@ -1261,7 +1268,7 @@ HWTEST_F(RichEditorLayoutTestNg, UpdateParagraphByCustomSpanTest002, TestSize.Le
      */
     layoutAlgorithm->UpdateParagraphByCustomSpan(customSpanItem, paragraph,
         spanTextLength, customSpanPlaceholder);
-
+    
     /**
      * @tc.expected: spanTextLength should be increased by the content length (18 characters)
      * @tc.expected: customSpanItem->placeholderIndex should be set to 10

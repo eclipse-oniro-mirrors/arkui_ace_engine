@@ -79,11 +79,17 @@ void RichEditorAddSpanTestNg::TearDownTestSuite()
  */
 HWTEST_F(RichEditorAddSpanTestNg, AddImageSpan001, TestSize.Level0)
 {
+    /**
+     * @tc.steps: step1. get richEditor pattern and controller
+     */
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
     auto richEditorController = richEditorPattern->GetRichEditorController();
     ASSERT_NE(richEditorController, nullptr);
+    /**
+     * @tc.steps: step2. add image span with various options
+     */
     ImageSpanAttribute imageStyle;
     AddSpan("test");
     ImageSpanOptions options;

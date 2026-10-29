@@ -91,7 +91,7 @@ HWTEST_F(RichEditorTextStyleTestNg, AddTextSpan001, TestSize.Level0)
     ASSERT_NE(richEditorController, nullptr);
 
     /**
-     * @tc.steps: step2. set text style
+     * @tc.steps: step2. set text style.
      */
     TextStyle style;
     style.SetTextColor(TEXT_COLOR_VALUE);
@@ -290,9 +290,6 @@ HWTEST_F(RichEditorTextStyleTestNg, CreateTextSpanNode001, TestSize.Level0)
     auto typingStyle = richEditorPattern->GetTypingStyle();
     auto typingTextStyle = richEditorPattern->styleManager_->GetTypingTextStyle();
 
-    /**
-     * @tc.steps: step2. Parameter declaration
-     */
     RefPtr<SpanNode> spanNode;
     TextInsertValueInfo info;
     std::u16string insertValue;
@@ -300,15 +297,15 @@ HWTEST_F(RichEditorTextStyleTestNg, CreateTextSpanNode001, TestSize.Level0)
     TextStyle textStyle;
 
     /**
-     * @tc.steps: step3. test CreateTextSpanNode
+     * @tc.steps: step2. test CreateTextSpanNode
      */
     richEditorPattern->SetTypingStyle(updateSpanStyle, textStyle);
     updateSpanStyle.useThemeFontColor = false;
     richEditorPattern->CreateTextSpanNode(spanNode, info, insertValue);
     EXPECT_EQ(spanNode->GetSpanItem()->useThemeDecorationColor, true);
 
-    updateSpanStyle.updateTextColor = Color::RED;
-    richEditorPattern->SetTypingStyle(updateSpanStyle, richEditorPattern->styleManager_->GetTypingTextStyle());
+    updateSpanStyle.updateTextColor = Color::RED,
+    richEditorPattern->styleManager_->typingFontStyle_ = updateSpanStyle;
     richEditorPattern->CreateTextSpanNode(spanNode, info, insertValue);
     EXPECT_FALSE(richEditorPattern->GetTypingStyle()->updateStrokeColor.has_value());
 
@@ -324,7 +321,7 @@ HWTEST_F(RichEditorTextStyleTestNg, CreateTextSpanNode001, TestSize.Level0)
     EXPECT_FALSE(richEditorPattern->GetTypingStyle()->updateStrokeColor.has_value());
 
     /**
-     * @tc.steps: step4. reset typingStyle and typingTextStyle
+     * @tc.steps: step3. reset typingStyle and typingTextStyle
      */
     richEditorPattern->SetTypingStyle(typingStyle, typingTextStyle);
 }

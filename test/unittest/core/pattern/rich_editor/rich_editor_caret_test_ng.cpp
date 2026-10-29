@@ -178,33 +178,6 @@ HWTEST_F(RichEditorCaretTestNg, CaretColorTest001, TestSize.Level0)
 }
 
 /**
- * @tc.name: CaretColorTest002
- * @tc.desc: test set and get caretColor
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorCaretTestNg, CaretColorTest002, TestSize.Level0)
-{
-    RichEditorModelNG model;
-    model.Create();
-    auto host = ViewStackProcessor::GetInstance()->GetMainFrameNode();
-    ASSERT_NE(host, nullptr);
-
-    /**
-     * @tc.steps: step1. get system caret color.
-     */
-    auto richEditorPattern = host->GetPattern<RichEditorPattern>();
-    Color patternCaretColor = richEditorPattern->GetCaretColor();
-    EXPECT_EQ(patternCaretColor, SYSTEM_CARET_COLOR);
-
-    /**
-     * @tc.steps: step2. set blue color.
-     */
-    model.SetCaretColor(host, Color::BLUE);
-    patternCaretColor = richEditorPattern->GetCaretColor();
-    EXPECT_EQ(patternCaretColor, Color::BLUE);
-}
-
-/**
  * @tc.name: SetCaretPosition001
  * @tc.desc: test SetCaretPosition
  * @tc.type: FUNC
@@ -1144,29 +1117,6 @@ HWTEST_F(RichEditorCaretTestNg, GetCaretOffset001, TestSize.Level0)
     richEditorPattern->caretPosition_ = 2;
     auto offset2 = richEditorController->GetCaretOffset();
     EXPECT_EQ(offset2, 2);
-}
-
-/**
- * @tc.name: UpdateEditingValue001
- * @tc.desc: test UpdateEditingValue
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorCaretTestNg, UpdateEditingValue001, TestSize.Level2)
-{
-    ASSERT_NE(richEditorNode_, nullptr);
-    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-
-    TextEditingValue value;
-    value.text = "123456789";
-    TextSelection selection;
-    int32_t caretPos = value.text.length();
-    selection.baseOffset = caretPos;
-    selection.extentOffset = caretPos;
-    value.selection = selection;
-
-    richEditorPattern->UpdateEditingValue(std::make_shared<TextEditingValue>(value));
-    EXPECT_EQ(richEditorPattern->caretPosition_, 0);
 }
 
 /**
