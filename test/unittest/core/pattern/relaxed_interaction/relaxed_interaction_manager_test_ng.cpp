@@ -660,13 +660,137 @@ HWTEST_F(RelaxedInteractionManagerCallbackTest, ClearDuringExecutionIsDeferred, 
     ASSERT_EQ(manager_->ProcessCommand(VALID_BACKPRESS_JSON, [&count](ExecutionState state) {
         EXPECT_EQ(state, ExecutionState::INTERRUPTED_BY_USER);
         ++count;
-    }), ProcessResult::SUCCESS);
+    }, true), ProcessResult::SUCCESS);
 
-    EXPECT_EQ(manager_->ExecuteNextStep(), ExecutionState::INTERRUPTED_BY_USER);
+    EXPECT_EQ(manager_->ExecuteNextStep(), ExecutionState::RUNNING);
+    EXPECT_EQ(count, 0);
+    EXPECT_TRUE(manager_->HasPendingWorkflow());
+    EXPECT_EQ(manager_->ExecuteNextStep(), ExecutionState::FAILED);
     EXPECT_EQ(count, 1);
     EXPECT_FALSE(manager_->HasPendingWorkflow());
     manager_->Clear(ExecutionState::INTERRUPTED_BY_USER);
     EXPECT_EQ(count, 1);
+}
+
+HWTEST_F(RelaxedInteractionManagerCallbackTest, UserInputPreservesLegacyCurrentAndQueuedRequests, TestSize.Level1)
+{
+    int legacyCount = 0;
+    int interruptedCount = 0;
+    auto parser = Prepare({ ExecutorResult::PENDING });
+    auto legacy = static_cast<MockExecutor*>(parser->executors.front().get());
+    auto legacyCallback = [&legacyCount](ExecutionState state) {
+        EXPECT_EQ(state, ExecutionState::SUCCESS);
+        ++legacyCount;
+    };
+    ASSERT_EQ(manager_->ProcessCommand(VALID_BACKPRESS_JSON, legacyCallback), ProcessResult::SUCCESS);
+    Prepare({ ExecutorResult::FAILED, ExecutorResult::PENDING });
+    ASSERT_EQ(manager_->ProcessCommand(VALID_BACKPRESS_JSON, [&interruptedCount](ExecutionState state) {
+        EXPECT_EQ(state, ExecutionState::INTERRUPTED_BY_USER);
+        ++interruptedCount;
+    }, true), ProcessResult::SUCCESS);
+    Prepare({ ExecutorResult::SUCCESS });
+    ASSERT_EQ(manager_->ProcessCommand(VALID_BACKPRESS_JSON, legacyCallback), ProcessResult::SUCCESS);
+    ASSERT_EQ(manager_->ExecuteNextStep(), ExecutionState::RUNNING);
+    manager_->Clear(ExecutionState::INTERRUPTED_BY_USER);
+    EXPECT_EQ(interruptedCount, 0);
+    EXPECT_EQ(manager_->choreographer_->GetQueueSize(), 1u);
+    EXPECT_EQ(manager_->ExecuteNextStep(), ExecutionState::RUNNING);
+    EXPECT_EQ(interruptedCount, 1);
+    EXPECT_EQ(legacyCount, 0);
+    legacy->SetResult(ExecutorResult::SUCCESS);
+    EXPECT_EQ(manager_->ExecuteNextStep(), ExecutionState::SUCCESS);
+    EXPECT_EQ(manager_->ExecuteNextStep(), ExecutionState::SUCCESS);
+    EXPECT_EQ(legacyCount, 2);
+    EXPECT_FALSE(manager_->HasPendingWorkflow());
+}
+
+HWTEST_F(RelaxedInteractionManagerCallbackTest, UserInputPreservesLegacyStepResults, TestSize.Level1)
+{
+    for (auto result : { ExecutorResult::SUCCESS, ExecutorResult::FAILED, ExecutorResult::PENDING }) {
+        int legacyCount = 0;
+        int interruptedCount = 0;
+        auto parser = Prepare({});
+        parser->executors.emplace_back(std::make_unique<MockExecutor>(result, false, [this]() {
+            manager_->Clear(ExecutionState::INTERRUPTED_BY_USER);
+        }));
+        ASSERT_EQ(manager_->ProcessCommand(VALID_BACKPRESS_JSON, [&legacyCount](ExecutionState) {
+            ++legacyCount;
+        }), ProcessResult::SUCCESS);
+        Prepare({ ExecutorResult::FAILED, ExecutorResult::SUCCESS });
+        ASSERT_EQ(manager_->ProcessCommand(VALID_BACKPRESS_JSON, [&interruptedCount](ExecutionState state) {
+            EXPECT_EQ(state, ExecutionState::INTERRUPTED_BY_USER);
+            ++interruptedCount;
+        }, true), ProcessResult::SUCCESS);
+        manager_->ExecuteNextStep();
+        EXPECT_EQ(legacyCount, result == ExecutorResult::PENDING ? 0 : 1);
+        EXPECT_EQ(interruptedCount, 0);
+        EXPECT_EQ(manager_->choreographer_->GetQueueSize(), 0u);
+        manager_->ExecuteNextStep();
+        EXPECT_EQ(interruptedCount, 1);
+        EXPECT_EQ(legacyCount, result == ExecutorResult::PENDING ? 0 : 1);
+        manager_->Clear();
+    }
+}
+
+HWTEST_F(RelaxedInteractionManagerCallbackTest, UserInputDoesNotCancelRequestsSubmittedAfterInterruption,
+    TestSize.Level1)
+{
+    int firstCount = 0;
+    int nextCount = 0;
+    auto parser = Prepare({});
+    parser->executors.emplace_back(std::make_unique<MockExecutor>(ExecutorResult::PENDING, false, [this, &nextCount]() {
+        manager_->Clear(ExecutionState::INTERRUPTED_BY_USER);
+        Prepare({ ExecutorResult::SUCCESS });
+        EXPECT_EQ(manager_->ProcessCommand(VALID_BACKPRESS_JSON, [&nextCount](ExecutionState state) {
+            EXPECT_EQ(state, ExecutionState::SUCCESS);
+            ++nextCount;
+        }, true), ProcessResult::SUCCESS);
+    }));
+    ASSERT_EQ(manager_->ProcessCommand(VALID_BACKPRESS_JSON, [&firstCount](ExecutionState state) {
+        EXPECT_EQ(state, ExecutionState::INTERRUPTED_BY_USER);
+        ++firstCount;
+    }, true), ProcessResult::SUCCESS);
+    EXPECT_EQ(manager_->ExecuteNextStep(), ExecutionState::RUNNING);
+    EXPECT_EQ(firstCount, 0);
+    EXPECT_EQ(manager_->ExecuteNextStep(), ExecutionState::SUCCESS);
+    EXPECT_EQ(firstCount, 1);
+    EXPECT_EQ(nextCount, 1);
+}
+
+HWTEST_F(RelaxedInteractionManagerCallbackTest, DestroyClearsLegacyAndDeferredNDKCallbacksOnce, TestSize.Level1)
+{
+    int legacyCount = 0;
+    int interruptedCount = 0;
+    Prepare({ ExecutorResult::PENDING });
+    ASSERT_EQ(manager_->ProcessCommand(VALID_BACKPRESS_JSON, [&legacyCount](ExecutionState state) {
+        EXPECT_EQ(state, ExecutionState::TARGET_NOT_FOUND);
+        ++legacyCount;
+    }), ProcessResult::SUCCESS);
+    Prepare({ ExecutorResult::PENDING });
+    ASSERT_EQ(manager_->ProcessCommand(VALID_BACKPRESS_JSON, [&interruptedCount](ExecutionState state) {
+        EXPECT_EQ(state, ExecutionState::INTERRUPTED_BY_USER);
+        ++interruptedCount;
+    }, true), ProcessResult::SUCCESS);
+    manager_->Clear(ExecutionState::INTERRUPTED_BY_USER);
+    EXPECT_EQ(interruptedCount, 0);
+    manager_->Clear(ExecutionState::TARGET_NOT_FOUND);
+    manager_->Clear(ExecutionState::TARGET_NOT_FOUND);
+    EXPECT_EQ(legacyCount, 1);
+    EXPECT_EQ(interruptedCount, 1);
+    EXPECT_FALSE(manager_->HasPendingWorkflow());
+}
+
+HWTEST_F(RelaxedInteractionManagerCallbackTest, NullCallbackNDKIsCancelledButLegacyWithoutCallbackContinues,
+    TestSize.Level1)
+{
+    Prepare({ ExecutorResult::PENDING });
+    ASSERT_EQ(manager_->ProcessCommand(VALID_BACKPRESS_JSON), ProcessResult::SUCCESS);
+    Prepare({ ExecutorResult::PENDING });
+    ASSERT_EQ(manager_->ProcessCommand(VALID_BACKPRESS_JSON, nullptr, true), ProcessResult::SUCCESS);
+    manager_->Clear(ExecutionState::INTERRUPTED_BY_USER);
+    EXPECT_EQ(manager_->choreographer_->GetQueueSize(), 1u);
+    EXPECT_EQ(manager_->ExecuteNextStep(), ExecutionState::RUNNING);
+    EXPECT_EQ(manager_->workflowStates_.size(), 1u);
 }
 
 HWTEST_F(RelaxedInteractionManagerCallbackTest, QueuedCommandsAreIsolatedAndReentrant, TestSize.Level1)

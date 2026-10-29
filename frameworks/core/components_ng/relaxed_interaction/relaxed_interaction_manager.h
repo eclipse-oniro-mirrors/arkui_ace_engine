@@ -42,6 +42,8 @@ public:
     ProcessResult ProcessCommand(const std::string& jsonStr);
     ProcessResult ProcessCommand(
         const std::string& jsonStr, const std::function<void(ExecutionState)>& finishCallback);
+    ProcessResult ProcessCommand(const std::string& jsonStr,
+        const std::function<void(ExecutionState)>& finishCallback, bool interruptibleByUser);
 
     ExecutionState ExecuteNextStep();
 
@@ -52,7 +54,10 @@ public:
 
 private:
     ProcessResult ProcessCommandInternal(const std::string& jsonStr,
-        const std::function<void(ExecutionState)>& finishCallback, bool preserveLegacySemantics);
+        const std::function<void(ExecutionState)>& finishCallback, bool preserveLegacySemantics,
+        bool interruptibleByUser = false);
+    void ClearInterruptedWorkflows(bool currentStepFinished = false);
+    bool HandleDeferredClear(ExecutorResult result, ExecutionState& state);
     ExecutionState DoExecuteNextStep(std::function<void(ExecutionState)>& finishCallback);
     ExecutionState ExecuteLegacyWorkflow(ExecutorResult result);
     std::string ExecutionStateToString(ExecutionState state);
@@ -61,10 +66,16 @@ private:
     WeakPtr<PipelineContext> context_;
     std::unique_ptr<ExecutorGenerator> executorGenerator_;
     std::unique_ptr<ExecutorChoreographer> choreographer_;
+    enum class InterruptionPolicy {
+        IGNORE_USER_INPUT,
+        INTERRUPTIBLE,
+        INTERRUPTED,
+    };
     struct WorkflowState {
         size_t remainingExecutors = 0;
         std::function<void(ExecutionState)> finishCallback;
         bool preserveLegacySemantics = false;
+        InterruptionPolicy interruptionPolicy = InterruptionPolicy::IGNORE_USER_INPUT;
     };
     enum class ExecutionPhase {
         IDLE,
@@ -72,6 +83,7 @@ private:
         CLEAR_PENDING,
     };
     std::deque<WorkflowState> workflowStates_;
+    std::deque<std::function<void(ExecutionState)>> pendingUserCompletions_;
     ExecutionPhase executionPhase_ = ExecutionPhase::IDLE;
     ExecutionState clearReason_ = ExecutionState::FAILED;
 };

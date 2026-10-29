@@ -3689,7 +3689,7 @@ NG::ProcessResult EventManager::ProcessCommand(const std::string& command, std::
         TAG_LOGW(AceLogTag::ACE_UIEVENT, "RelaxedInteractionManager is null.");
         return NG::ProcessResult::NO_VALID_CMD;
     }
-    auto result = relaxedInteractionManager->ProcessCommand(command, completion);
+    auto result = relaxedInteractionManager->ProcessCommand(command, completion, true);
     TAG_LOGD(AceLogTag::ACE_UIEVENT, "ProcessCommand result: %{public}d.", static_cast<int>(result));
     if (result == NG::ProcessResult::SUCCESS) {
         requestFrameCallback();
