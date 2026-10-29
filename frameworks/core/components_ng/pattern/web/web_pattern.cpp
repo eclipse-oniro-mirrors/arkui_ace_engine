@@ -7736,16 +7736,30 @@ void WebPattern::OnDateTimeChooserPopup(std::shared_ptr<OHOS::NWeb::NWebDateTime
     }
 }
 
-DialogProperties WebPattern::GetDialogProperties(const RefPtr<DialogTheme>& theme)
+DialogProperties WebPattern::GetDialogProperties(const RefPtr<DialogTheme>& theme,
+                                                 const OHOS::NWeb::NWebRect& elementRect)
 {
     DialogProperties properties;
-    if (GetWebInfoType() == WebInfoType::TYPE_MOBILE) {
-        properties.alignment = DialogAlignment::BOTTOM;
-    } else {
-        properties.alignment = DialogAlignment::CENTER;
-    }
     properties.customStyle = false;
-    properties.offset = DimensionOffset(Offset(0, -theme->GetMarginBottom().ConvertToPx()));
+    // 非 PC 宽屏 + 有焦点元素 rect → 跟手定位（alignment+offset 精确定位到 input 元素）
+    // rect 为空（全 0）表示程序触发（JS input.click()/showPicker()），回退默认对齐
+    bool hasRect = (elementRect.width > 0 && elementRect.height > 0);
+    bool isMobile = (GetWebInfoType() == WebInfoType::TYPE_MOBILE);
+    bool isPcMode = (GetWebInfoType() == WebInfoType::TYPE_2IN1) && delegate_ && delegate_->IsPcMode();
+    bool isWideScreenNonPc = !isMobile && !isPcMode;
+    if (isWideScreenNonPc && hasRect) {
+        // 跟手：弹框定位到元素位置（viewport 坐标作为组件内 offset，PoC 验证精度 OP-2）
+        properties.alignment = DialogAlignment::TOP;
+        properties.offset = DimensionOffset(Offset(elementRect.x, elementRect.y));
+    } else {
+        // 现有逻辑：mobile→BOTTOM, 其他（PC/空 rect）→CENTER
+        if (isMobile) {
+            properties.alignment = DialogAlignment::BOTTOM;
+        } else {
+            properties.alignment = DialogAlignment::CENTER;
+        }
+        properties.offset = DimensionOffset(Offset(0, -theme->GetMarginBottom().ConvertToPx()));
+    }
     return properties;
 }
 
@@ -7768,7 +7782,7 @@ bool WebPattern::ShowDateTimeDialog(std::shared_ptr<OHOS::NWeb::NWebDateTimeChoo
     settingData.isLunar = false;
     settingData.showTime = chooser->GetType() == NWeb::DTC_DATETIME_LOCAL;
     settingData.useMilitary = true;
-    DialogProperties properties = GetDialogProperties(theme);
+    DialogProperties properties = GetDialogProperties(theme, chooser->GetFocusedElementRect());
     std::map<std::string, PickerDate> datePickerProperty;
     std::map<std::string, PickerTime> timePickerProperty;
     OHOS::NWeb::DateTime minimum = chooser->GetMinimum();
@@ -7818,7 +7832,7 @@ bool WebPattern::ShowTimeDialog(std::shared_ptr<OHOS::NWeb::NWebDateTimeChooser>
     NG::TimePickerSettingData settingData;
     settingData.isUseMilitaryTime = true;
     settingData.dialogTitleDate = PickerDate::Current();
-    DialogProperties properties = GetDialogProperties(theme);
+    DialogProperties properties = GetDialogProperties(theme, chooser->GetFocusedElementRect());
     std::map<std::string, PickerTime> timePickerProperty;
     OHOS::NWeb::DateTime minimum = chooser->GetMinimum();
     OHOS::NWeb::DateTime maximum = chooser->GetMaximum();
@@ -7880,7 +7894,7 @@ bool WebPattern::ShowDateTimeSuggestionDialog(std::shared_ptr<OHOS::NWeb::NWebDa
     }
     settingData.columnKind = NG::TEXT;
     settingData.selected = chooser->GetSuggestionIndex();
-    DialogProperties properties = GetDialogProperties(theme);
+    DialogProperties properties = GetDialogProperties(theme, chooser->GetFocusedElementRect());
     std::map<std::string, NG::DialogTextEvent> dialogEvent;
     std::map<std::string, NG::DialogGestureEvent> dialogCancelEvent;
     dialogEvent["acceptId"] = [suggestionMap, callback](const std::string& info) {
