@@ -479,6 +479,40 @@ int32_t OnTextChangedListenerImpl::SetPreviewText(const std::u16string &text, co
     return ret;
 }
 
+int32_t OnTextChangedListenerImpl::SetPreviewTextWithStyle(const std::u16string &text, const MiscServices::Range &range,
+    const MiscServices::PreviewTextStyleInner &style)
+{
+    TAG_LOGI(AceLogTag::ACE_TEXT_FIELD, "SetPreviewTextWithStyle length :%{public}d in range (%{public}d, %{public}d)",
+        static_cast<int32_t>(text.length()), range.start, range.end);
+    int32_t ret = CheckPreviewTextParams(text, {range.start, range.end});
+    if (ret != MiscServices::ErrorCode::NO_ERROR) {
+        TAG_LOGI(AceLogTag::ACE_TEXT_FIELD, "SetPreviewTextWithStyle result is %{public}d}", ret);
+        return ret;
+    }
+    auto task = [textFieldPattern = pattern_, text, range, style] {
+        ACE_SCOPED_TRACE("SetPreviewTextWithStyle");
+        auto client = textFieldPattern.Upgrade();
+        CHECK_NULL_VOID(client);
+        ContainerScope scope(client->GetInstanceId());
+        TAG_LOGD(AceLogTag::ACE_TEXT_FIELD, "SetPreviewTextWithStyle  hasUnderlineColor:%{public}d"
+            "underlineColor:0x%{public}X underlineStyle:%{public}d", style.hasUnderlineColor,
+            style.underlineColor, style.underlineStyle);
+        if (style.underlineStyle >= 0  && style.underlineStyle <= 3) {
+            if (style.hasUnderlineColor) {
+                client->SetPreviewTextWithStyle({ style.underlineColor,
+                    static_cast<PreviewTextStyle>(style.underlineStyle) });
+            } else {
+                client->SetPreviewTextWithStyle({ std::nullopt, static_cast<PreviewTextStyle>(style.underlineStyle) });
+            }
+        } else {
+            client->SetPreviewTextWithStyle({ std::nullopt, PreviewTextStyle::UNDERLINE });
+        }
+        client->SetPreviewText(text, { range.start, range.end });
+    };
+    PostTaskToUI(task, "SetPreviewTextWithStyle");
+    return ret;
+}
+
 void OnTextChangedListenerImpl::FinishTextPreview()
 {
     TAG_LOGI(AceLogTag::ACE_TEXT_FIELD, "FinishTextPreview");

@@ -54,6 +54,9 @@ public:
         const std::unordered_map<std::string, MiscServices::PrivateDataValue>& privateCommand,
         const WeakPtr<TextInputClient>& pattern);
     int32_t SetPreviewText(const std::u16string &text, const MiscServices::Range &range) override;
+    int32_t SetPreviewTextWithStyle(const std::u16string &text, const MiscServices::Range &range,
+        const MiscServices::PreviewTextStyleInner &style) override;
+    bool IsSupportPreviewTextWithStyle() override { return true; }
     void FinishTextPreview() override;
     int32_t ReceivePrivateCommand(
         const std::unordered_map<std::string, MiscServices::PrivateDataValue> &privateCommand) override;

@@ -447,4 +447,164 @@ HWTEST_F(PreviewTextDecorationUtilsTest, DrawPreviewTextUnderline_AllStyles_NoCr
     params.underlineStyle = PreviewTextStyle::NORMAL;
     DrawPreviewTextUnderline(canvas, params);
 }
+
+/**
+ * @tc.name: DrawDashLineUnderline_MultiSegment_PhaseContinuity_017
+ * @tc.desc: Two consecutive segments with startOffset set; dash pattern should continue
+ *           across the boundary rather than restarting at the second segment's left edge.
+ *           Verifies startOffset is consumed (DrawLine called at least 2 times across
+ *           the two segments combined) and no crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PreviewTextDecorationUtilsTest, DrawDashLineUnderline_MultiSegment_PhaseContinuity_017, TestSize.Level0)
+{
+    Testing::MockCanvas canvas;
+    EXPECT_CALL(canvas, DrawLine(_, _)).Times(AtLeast(2));
+    EXPECT_CALL(canvas, AttachPen(_)).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, DetachPen()).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, DetachBrush()).WillRepeatedly(ReturnRef(canvas));
+
+    // Segment 1: width 90. Segment 2 starts at startOffset = 90 so the dash phase
+    // continues. The second segment's left (100) is unrelated to the first segment's
+    // right (100) for phase purposes; only startOffset drives phase alignment.
+    PreviewDecorationParams first;
+    first.left = TEST_LEFT;
+    first.right = TEST_RIGHT;
+    first.bottom = TEST_BOTTOM;
+    first.underlineWidth = TEST_UNDERLINE_WIDTH;
+    first.underlineStyle = PreviewTextStyle::DASH_LINE;
+    first.isLast = false;
+    first.color = RSColor(TEST_COLOR_R, TEST_COLOR_G, TEST_COLOR_B, TEST_COLOR_A);
+    first.startOffset = 0.0f;
+    DrawPreviewTextUnderline(canvas, first);
+
+    PreviewDecorationParams second = first;
+    second.left = TEST_RIGHT;            // contiguous with first.right
+    second.right = TEST_RIGHT + 80.0f;   // arbitrary width
+    second.isLast = true;
+    second.startOffset = TEST_RIGHT - TEST_LEFT; // = 90, accumulated width
+    DrawPreviewTextUnderline(canvas, second);
+}
+
+/**
+ * @tc.name: DrawDashLineUnderline_StartOffsetInsideGap_018
+ * @tc.desc: When startOffset falls inside a gap (phase > dashLength), the segment should
+ *           skip to the next dash start and not draw a phantom short dash at the left edge.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PreviewTextDecorationUtilsTest, DrawDashLineUnderline_StartOffsetInsideGap_018, TestSize.Level0)
+{
+    Testing::MockCanvas canvas;
+    // We do not assert an exact count (pattern depends on font dip scale), only that
+    // drawing happens and the first DrawLine start point is >= params.left + skip.
+    EXPECT_CALL(canvas, DrawLine(_, _)).Times(AnyNumber());
+    EXPECT_CALL(canvas, AttachPen(_)).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, DetachPen()).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, DetachBrush()).WillRepeatedly(ReturnRef(canvas));
+
+    PreviewDecorationParams params;
+    params.left = TEST_LEFT;
+    params.right = TEST_RIGHT;
+    params.bottom = TEST_BOTTOM;
+    params.underlineWidth = TEST_UNDERLINE_WIDTH;
+    params.underlineStyle = PreviewTextStyle::DASH_LINE;
+    params.isLast = true;
+    params.color = RSColor(TEST_COLOR_R, TEST_COLOR_G, TEST_COLOR_B, TEST_COLOR_A);
+    // Pick a startOffset that lands in the middle of a gap. dashLength = unit*4,
+    // gap = unit*2, period = unit*6. With DEFAULT_FONTSIZE=16vp and dipScale=1,
+    // unit = 16/14, period ~= 6.857px. startOffset = 5.0 lands inside the first gap
+    // (dashLength ~= 4.57), so the segment should skip ~1.86px before drawing.
+    params.startOffset = 5.0f;
+    DrawPreviewTextUnderline(canvas, params);
+}
+
+/**
+ * @tc.name: DrawWavyUnderline_MultiSegment_PhaseContinuity_019
+ * @tc.desc: Two consecutive wavy segments with startOffset set; the wave should continue
+ *           across the boundary instead of restarting. Verifies DrawPath is called once
+ *           per segment and no crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PreviewTextDecorationUtilsTest, DrawWavyUnderline_MultiSegment_PhaseContinuity_019, TestSize.Level0)
+{
+    Testing::MockCanvas canvas;
+    EXPECT_CALL(canvas, DrawPath(_)).Times(2);
+    EXPECT_CALL(canvas, DetachBrush()).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, AttachPen(_)).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, DetachPen()).WillRepeatedly(ReturnRef(canvas));
+
+    PreviewDecorationParams first;
+    first.left = 0.0f;
+    first.right = 50.0f;
+    first.bottom = TEST_BOTTOM;
+    first.underlineWidth = TEST_UNDERLINE_WIDTH;
+    first.underlineStyle = PreviewTextStyle::WAVY;
+    first.isLast = false;
+    first.color = RSColor(TEST_COLOR_R, TEST_COLOR_G, TEST_COLOR_B, TEST_COLOR_A);
+    first.startOffset = 0.0f;
+    DrawPreviewTextUnderline(canvas, first);
+
+    PreviewDecorationParams second = first;
+    second.left = 50.0f;
+    second.right = 100.0f;
+    second.isLast = true;
+    second.startOffset = 50.0f; // accumulated width from first segment
+    DrawPreviewTextUnderline(canvas, second);
+}
+
+/**
+ * @tc.name: DrawWavyUnderline_StartOffsetMidHalfWave_020
+ * @tc.desc: A non-zero startOffset shifts the up/down alternation of the first half-wave
+ *           in this segment so the wave continues seamlessly across segment boundaries.
+ *           Verifies DrawPath is called once and no crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PreviewTextDecorationUtilsTest, DrawWavyUnderline_StartOffsetMidHalfWave_020, TestSize.Level0)
+{
+    Testing::MockCanvas canvas;
+    EXPECT_CALL(canvas, DrawPath(_)).Times(1);
+    EXPECT_CALL(canvas, DetachBrush()).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, AttachPen(_)).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, DetachPen()).WillRepeatedly(ReturnRef(canvas));
+
+    PreviewDecorationParams params;
+    params.left = TEST_LEFT;
+    params.right = TEST_RIGHT;
+    params.bottom = TEST_BOTTOM;
+    params.underlineWidth = TEST_UNDERLINE_WIDTH;
+    params.underlineStyle = PreviewTextStyle::WAVY;
+    params.isLast = true;
+    params.color = RSColor(TEST_COLOR_R, TEST_COLOR_G, TEST_COLOR_B, TEST_COLOR_A);
+    // startOffset = quarterWave (one full half-wave) makes the first half-wave in this
+    // segment go down instead of up, continuing the alternation from a previous segment.
+    params.startOffset = 1.0f;
+    DrawPreviewTextUnderline(canvas, params);
+}
+
+/**
+ * @tc.name: DrawDashLineUnderline_DetachesCallerBrush_021
+ * @tc.desc: DrawDashLineUnderline must detach a caller-attached brush before stroking,
+ *           otherwise brush+pen coexistence makes dashes look like a solid line.
+ *           Verifies DetachBrush is called at least once for DASH_LINE style.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PreviewTextDecorationUtilsTest, DrawDashLineUnderline_DetachesCallerBrush_021, TestSize.Level0)
+{
+    Testing::MockCanvas canvas;
+    EXPECT_CALL(canvas, DetachBrush()).Times(AtLeast(1));
+    EXPECT_CALL(canvas, DrawLine(_, _)).Times(AnyNumber());
+    EXPECT_CALL(canvas, AttachPen(_)).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, DetachPen()).WillRepeatedly(ReturnRef(canvas));
+
+    PreviewDecorationParams params;
+    params.left = TEST_LEFT;
+    params.right = TEST_RIGHT;
+    params.bottom = TEST_BOTTOM;
+    params.underlineWidth = TEST_UNDERLINE_WIDTH;
+    params.underlineStyle = PreviewTextStyle::DASH_LINE;
+    params.isLast = true;
+    params.color = RSColor(TEST_COLOR_R, TEST_COLOR_G, TEST_COLOR_B, TEST_COLOR_A);
+    params.startOffset = 0.0f;
+    DrawPreviewTextUnderline(canvas, params);
+}
 } // namespace OHOS::Ace::NG

@@ -17,8 +17,10 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_TEXT_FIELD_TEXT_FIELD_OVERLAY_MODIFIER_H
 
 #include <cstdint>
+#include <optional>
 
 #include "base/memory/ace_type.h"
+#include "core/common/ime/text_input_client.h"
 #include "core/components/common/properties/color.h"
 #include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/pattern/scroll/inner/scroll_bar.h"
@@ -100,6 +102,7 @@ private:
     void PaintShadow(const RSPath& path, const Shadow& shadow, RSCanvas& canvas);
     void GetFrameRectClip(RSRect& clipRect, std::vector<RSPoint>& clipRadius);
     void PaintPreviewTextDecoration(DrawingContext& context) const;
+    std::optional<Color> GetPreviewDecorationColor(const PreviewTextStyling& styling) const;
 
     bool caretLanding_ = false;
     bool needPaintSelect_ = false;
