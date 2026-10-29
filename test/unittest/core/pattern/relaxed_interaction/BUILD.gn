@@ -87,7 +87,7 @@ ace_unittest("relaxed_interaction_manager_test_ng") {
     sources = []
     sources = [ "relaxed_interaction_manager_test_core.cpp" ]
   } else {
-    extra_deps = [ ":relaxed_interaction_destruction_mock" ]
+    deps = [ ":relaxed_interaction_destruction_mock" ]
     sources += [ "relaxed_interaction_manager_test_core.cpp" ]
   }
 
