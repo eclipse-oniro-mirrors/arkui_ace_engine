@@ -16,6 +16,7 @@
 #include "material_statistic_event.h"
 
 #include <algorithm>
+#include <set>
 #include <string>
 
 #include "hisysevent.h"
@@ -24,8 +25,24 @@
 namespace OHOS::Ace {
 namespace {
 constexpr char EVENT_NAME_MATERIAL_NODE_STAT[] = "MATERIAL_NODE_STAT";
-constexpr char EVENT_NAME_MATERIAL_STAT_JSON[] = "MATERIAL_PAGE_INFO";
+constexpr char KEY_BUNDLE_NAME[] = "BUNDLE_NAME";
+constexpr char KEY_PAGE_INFO[] = "PAGE_INFO";
+constexpr char KEY_NAV_INFO[] = "NAV_INFO";
+constexpr char KEY_TABS_INFO[] = "TABS_INFO";
 static constexpr size_t MAX_SUMMARY_COUNT = 500;
+static constexpr size_t MAX_BUNDLE_COUNT = 100;
+
+std::string JoinStringList(const std::vector<std::string>& parts, char sep)
+{
+    std::string result;
+    for (size_t i = 0; i < parts.size(); ++i) {
+        if (i > 0) {
+            result += sep;
+        }
+        result += parts[i];
+    }
+    return result;
+}
 } // namespace
 
 void MaterialStatisticEvent::Append(const MaterialStatisticEventInfo& info)
@@ -38,6 +55,9 @@ void MaterialStatisticEvent::Append(const MaterialStatisticEventInfo& info)
         }
     }
     if (!bundle) {
+        if (summaries_.size() >= MAX_BUNDLE_COUNT || GetTotalSummaryCount() >= MAX_SUMMARY_COUNT) {
+            return;
+        }
         summaries_.push_back({});
         bundle = &summaries_.back();
         bundle->bundleName = info.bundleName;
@@ -80,10 +100,6 @@ void MaterialStatisticEvent::Append(const MaterialStatisticEventInfo& info)
         overlaySummary->maxArea = std::max(overlaySummary->maxArea, overlayData.areaPercent);
         overlaySummary->count++;
     }
-
-    if (GetTotalSummaryCount() >= MAX_SUMMARY_COUNT) {
-        ReportEvent();
-    }
 }
 
 size_t MaterialStatisticEvent::GetTotalSummaryCount() const
@@ -97,53 +113,67 @@ size_t MaterialStatisticEvent::GetTotalSummaryCount() const
 
 void MaterialStatisticEvent::ReportEvent()
 {
-    auto json = BuildStatisticsJson();
+    if (summaries_.empty()) {
+        return;
+    }
+    auto fields = BuildFieldsFromStatistics(summaries_);
     HiSysEventWrite(OHOS::HiviewDFX::HiSysEvent::Domain::ACE, EVENT_NAME_MATERIAL_NODE_STAT,
-        OHOS::HiviewDFX::HiSysEvent::EventType::STATISTIC, EVENT_NAME_MATERIAL_STAT_JSON, json);
+        OHOS::HiviewDFX::HiSysEvent::EventType::STATISTIC, KEY_BUNDLE_NAME, fields.bundleNames, KEY_PAGE_INFO,
+        fields.pageInfos, KEY_NAV_INFO, fields.navInfos, KEY_TABS_INFO, fields.tabsInfos);
     summaries_.clear();
 }
 
-std::string MaterialStatisticEvent::BuildJsonFromStatistics(const std::vector<BundleStatSummary>& summaries)
+MaterialStatisticsFields MaterialStatisticEvent::BuildFieldsFromStatistics(
+    const std::vector<BundleStatSummary>& summaries)
 {
-    std::ostringstream oss;
-    oss << "[";
-    bool firstBundle = true;
+    MaterialStatisticsFields fields;
     for (const auto& bundle : summaries) {
-        if (!firstBundle) {
-            oss << ",";
-        }
-        firstBundle = false;
-        oss << "{\"bundleName\":\"" << bundle.bundleName << "\",\"pageInfo\":[";
-        bool firstInfo = true;
-        for (const auto& matStat : bundle.materialStats) {
-            if (!firstInfo) {
-                oss << ",";
-            }
-            firstInfo = false;
-            oss << "{\"type\":\"materialNodeStat\","
-                << "\"url\":\"" << matStat.navName << "|" << matStat.tabIndex << "|" << matStat.pageName << "\","
-                << "\"area\":{\"min\":" << matStat.minArea << ",\"max\":" << matStat.maxArea << "},"
-                << "\"count\":" << matStat.count << "}";
-        }
-        for (const auto& overlayStat : bundle.overlayStats) {
-            if (!firstInfo) {
-                oss << ",";
-            }
-            firstInfo = false;
-            oss << "{\"type\":\"overlay\","
-                << "\"tag\":\"" << overlayStat.tag << "\","
-                << "\"area\":{\"min\":" << overlayStat.minArea << ",\"max\":" << overlayStat.maxArea << "},"
-                << "\"count\":" << overlayStat.count << "}";
-        }
-        oss << "]}";
-    }
-    oss << "]";
-    return oss.str();
-}
+        fields.bundleNames.push_back(bundle.bundleName);
 
-std::string MaterialStatisticEvent::BuildStatisticsJson() const
-{
-    return BuildJsonFromStatistics(summaries_);
+        std::vector<std::string> pageParts;
+        std::set<std::string> seenPages;
+        for (const auto& matStat : bundle.materialStats) {
+            if (matStat.pageName.empty() || !seenPages.insert(matStat.pageName).second) {
+                continue;
+            }
+            pageParts.push_back(matStat.pageName);
+        }
+        std::set<std::string> seenTags;
+        for (const auto& overlayStat : bundle.overlayStats) {
+            if (overlayStat.tag.empty() || !seenTags.insert(overlayStat.tag).second) {
+                continue;
+            }
+            pageParts.push_back(overlayStat.tag);
+        }
+        fields.pageInfos.push_back(JoinStringList(pageParts, ';'));
+
+        std::vector<std::string> navParts;
+        std::set<std::string> seenNav;
+        for (const auto& matStat : bundle.materialStats) {
+            if (matStat.navName.empty()) {
+                continue;
+            }
+            std::string entry = matStat.pageName + ':' + matStat.navName;
+            if (seenNav.insert(entry).second) {
+                navParts.push_back(entry);
+            }
+        }
+        fields.navInfos.push_back(JoinStringList(navParts, ';'));
+
+        std::vector<std::string> tabsParts;
+        std::set<std::string> seenTabs;
+        for (const auto& matStat : bundle.materialStats) {
+            if (matStat.tabIndex < 0) {
+                continue;
+            }
+            std::string entry = matStat.pageName + ':' + std::to_string(matStat.tabIndex);
+            if (seenTabs.insert(entry).second) {
+                tabsParts.push_back(entry);
+            }
+        }
+        fields.tabsInfos.push_back(JoinStringList(tabsParts, ';'));
+    }
+    return fields;
 }
 
 } // namespace OHOS::Ace

@@ -268,6 +268,9 @@ UI_STATISTIC_EVENT:
   BUNDLE_NAME: {type: STRING, arrsize: 100, desc: bundle name}
 
 MATERIAL_NODE_STAT:
-  __BASE: {type: STATISTIC, level: MINOR, desc: per-page immersive material node statistic batched by container}
-  MATERIAL_PAGE_INFO: {type: STRING, desc: material node stat info in JSON format}
+  __BASE: {type: STATISTIC, level: CRITICAL, desc: Statistics of Material Node Information}
+  BUNDLE_NAME: {type: STRING, arrsize: 100, desc: app name}
+  PAGE_INFO: {type: STRING, arrsize: 100, desc: page information}
+  NAV_INFO: {type: STRING, arrsize: 100, desc: navigation information}
+  TABS_INFO: {type: STRING, arrsize: 100, desc: tabs information}
 

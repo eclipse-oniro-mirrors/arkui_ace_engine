@@ -57,6 +57,13 @@ struct BundleStatSummary {
     std::vector<OverlayStatSummary> overlayStats;
 };
 
+struct MaterialStatisticsFields {
+    std::vector<std::string> bundleNames;
+    std::vector<std::string> pageInfos;
+    std::vector<std::string> navInfos;
+    std::vector<std::string> tabsInfos;
+};
+
 class MaterialStatisticEvent {
 public:
     MaterialStatisticEvent() = default;
@@ -69,10 +76,9 @@ public:
         return summaries_.size();
     }
     size_t GetTotalSummaryCount() const;
-    std::string BuildStatisticsJson() const;
 
 private:
-    static std::string BuildJsonFromStatistics(const std::vector<BundleStatSummary>& summaries);
+    static MaterialStatisticsFields BuildFieldsFromStatistics(const std::vector<BundleStatSummary>& summaries);
 
     std::vector<BundleStatSummary> summaries_;
 };

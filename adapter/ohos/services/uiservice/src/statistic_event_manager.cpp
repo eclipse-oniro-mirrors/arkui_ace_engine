@@ -107,6 +107,9 @@ void StatisticEventManager::ReportTimedStatisticEvent(int32_t interval)
             ++it;
         }
     }
+    if (interval == defaultReportInterval_ && richEvent_ && richEvent_->GetPendingCount() > 0) {
+        richEvent_->ReportEvent();
+    }
 }
 
 void StatisticEventManager::PostTimedEvent(int32_t interval)

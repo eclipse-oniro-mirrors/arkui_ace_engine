@@ -40,6 +40,7 @@ const std::string TARGET_SUB_MENU = "MenuItem ShowSubMenuHelper";
 const std::string TARGET_POPUP_TIPS = "overlay ShowPopupAnimationNG";
 const std::string TARGET_SELECT = "Select ShowSelectMenu";
 constexpr float MATERIAL_AREA_REPORT_THRESHOLD = 0.2f;
+const std::string NAVBAR_DEFAULT_NAME = "navbar";
 
 struct PageContextStatBatch {
     int32_t navContainerId = -1;
@@ -389,8 +390,7 @@ void MaterialProcessor::ApplyScopeGate(const RefPtr<PipelineContext>& pipeline)
     }
 }
 
-void MaterialProcessor::ReportPageContextStats(
-    int32_t targetContainerId, PageLogContainerType type, int32_t tabIndex)
+void MaterialProcessor::ReportPageContextStats(int32_t targetContainerId, PageLogContainerType type, int32_t tabIndex)
 {
     std::vector<MaterialNodeInfo> navNodes;
     std::vector<MaterialNodeInfo> tabsNodes;
@@ -508,6 +508,8 @@ void MaterialProcessor::ReportPageContextStats(
             if (navDestPattern) {
                 navName = navDestPattern->GetName();
             }
+        } else if (type == PageLogContainerType::NavContainer && targetNode->GetTag() == V2::NAVBAR_ETS_TAG) {
+            navName = NAVBAR_DEFAULT_NAME;
         }
         pageName = GetPageUrlByContainerId(targetContainerId);
     }
