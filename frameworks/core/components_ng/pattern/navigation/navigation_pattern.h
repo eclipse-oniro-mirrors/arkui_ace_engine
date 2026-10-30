@@ -1111,6 +1111,9 @@ private:
         const RefPtr<ForceSplitManager>& forceSplitMgr, bool isDisplace, int32_t navigationId);
     void ReanchorPageLevelSplitHome(const std::vector<RefPtr<NavDestinationGroupNode>>& allDestNodes,
         const RefPtr<ForceSplitManager>& forceSplitMgr, bool isDisplace);
+    void SetPageLevelSplitDestinationHome(const RefPtr<NavDestinationGroupNode>& homeDest,
+        const std::string& homeName, const RefPtr<ForceSplitManager>& forceSplitMgr);
+    void SetPageLevelSplitNavBarHome();
     void UpdatePageLevelDisplaceColumns(
         const std::optional<std::pair<std::string, RefPtr<UINode>>>& preTop,
         const std::optional<std::pair<std::string, RefPtr<UINode>>>& curTop);

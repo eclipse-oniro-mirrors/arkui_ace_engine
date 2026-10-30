@@ -151,13 +151,6 @@ void ParallelPageRouterManager::TryEstablishPageLevelSplitHome(
             foundTarget = true;
             break;
         }
-        pageNames.emplace_back(pattern->GetPageUrl());
-        if (node == pageNode) {
-            belowTopPage = effectivePages.empty() ? nullptr : effectivePages.back();
-            effectivePages.emplace_back(node);
-            foundTarget = true;
-            break;
-        }
         effectivePages.emplace_back(node);
     }
     if (!foundTarget) {
