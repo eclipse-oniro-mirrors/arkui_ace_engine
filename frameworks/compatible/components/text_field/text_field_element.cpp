@@ -192,7 +192,9 @@ void TextFieldElement::OnFocus()
     LOGI("On focus, request keyboard");
     RequestKeyboard(true, false);
     FocusNode::OnFocus();
-    textField->SetCanPaintSelection(true);
+    if (textField) {
+        textField->SetCanPaintSelection(true);
+    }
     auto context = context_.Upgrade();
     if (context && context->GetIsTabKeyPressed() && renderNode_) {
         renderNode_->ChangeStatus(RenderStatus::FOCUS);

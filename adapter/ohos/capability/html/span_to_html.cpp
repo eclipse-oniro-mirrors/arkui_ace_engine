@@ -467,15 +467,17 @@ std::string SpanToHtml::ImageToHtml(RefPtr<NG::SpanItem> item)
     std::string urlName;
     auto pixelMap = options.imagePixelMap.value_or(nullptr);
     if (pixelMap) {
-        int ret = WriteLocalFile(pixelMap, *options.image, urlName);
+        std::string filepath = options.image.value_or("");
+        int ret = WriteLocalFile(pixelMap, filepath, urlName);
         LOGI("img write ret: %{public}d height: %{public}d, width: %{public}d, size:%{public}d", ret,
             pixelMap->GetHeight(), pixelMap->GetWidth(), pixelMap->GetByteCount());
     } else if (options.image.has_value()) {
         urlName = options.image.value();
     }
     std::string imgHtml = "<img src=\"" + urlName + "\" ";
-    imgHtml += ToHtml(options.imageAttribute->size);
+
     if (options.imageAttribute) {
+        imgHtml += ToHtml(options.imageAttribute->size);
         imgHtml += " style=\"";
         imgHtml += ToHtml(options.imageAttribute->verticalAlign);
         imgHtml += ToHtml(options.imageAttribute->objectFit);
