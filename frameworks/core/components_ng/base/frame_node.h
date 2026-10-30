@@ -1503,6 +1503,12 @@ public:
     }
 
     void SetAICallerHelper(const std::shared_ptr<AICallerHelper>& aiCallerHelper);
+
+    bool HasAICallerHelper() const
+    {
+        return aiCallerHelper_ != nullptr;
+    }
+
     /**
      * @description: this callback triggered by ai assistant by ui_session proxy.
      * @param funcName function name of the target function.

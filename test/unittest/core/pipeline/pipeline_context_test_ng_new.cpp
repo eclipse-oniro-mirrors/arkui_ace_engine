@@ -3163,36 +3163,200 @@ HWTEST_F(PipelineContextTestNg, PipelineContextTestNg258, TestSize.Level1)
     ASSERT_NE(context_->rootNode_, nullptr);
 
     /**
-     * @tc.steps3: make navigationGroupNode.
+     * @tc.steps3: make navigationGroupNode and mount some NavDestinationNode into its subtree.
      */
     auto navigationGroupNode = NavigationGroupNode::GetOrCreateGroupNode(
         V2::NAVIGATION_VIEW_ETS_TAG, 11, []() { return AceType::MakeRefPtr<NavigationPattern>(); });
+    navigationGroupNode->GetPattern<NavigationPattern>()->SetNavigationStack(AceType::MakeRefPtr<NavigationStack>());
     navigationGroupNode->SetActive(true);
-    RefPtr<NavigationPattern> navigationPattern = navigationGroupNode->GetPattern<NavigationPattern>();
-    navigationPattern->navigationStack_ = AceType::MakeRefPtr<NavigationStack>();
     rootNode->AddChild(navigationGroupNode);
 
     /**
-     * @tc.steps4: make some NavDestinationNode.
+     * @tc.steps4: make some NavDestinationNode on the tree.
+     * @tc.expected: all the visible destinations are collected as candidates.
      */
-    auto navDestinationNode1 =
-        FrameNode::CreateFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, 21, AceType::MakeRefPtr<Pattern>(), true);
-    auto navDestinationNode2 =
-        FrameNode::CreateFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, 22, AceType::MakeRefPtr<Pattern>(), true);
-    auto navDestinationNode3 =
-        FrameNode::CreateFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, 23, AceType::MakeRefPtr<Pattern>(), true);
-    auto navDestinationNode4 =
-        FrameNode::CreateFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, 24, AceType::MakeRefPtr<Pattern>(), true);
-    NavPathList navPathList;
-    navPathList.emplace_back(std::make_pair("pageOne", navDestinationNode1));
-    navPathList.emplace_back(std::make_pair("pageTwo", navDestinationNode2));
-    navPathList.emplace_back(std::make_pair("pageThree", navDestinationNode3));
-    navPathList.emplace_back(std::make_pair("pageFour", navDestinationNode4));
-    navigationPattern->navigationStack_->SetNavPathList(navPathList);
+    for (int32_t nodeId = 21; nodeId <= 24; ++nodeId) {
+        auto navDestinationNode =
+            FrameNode::CreateFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, nodeId, AceType::MakeRefPtr<Pattern>(), true);
+        navDestinationNode->SetActive(true);
+        navigationGroupNode->AddChild(navDestinationNode);
+    }
 
+    /**
+     * @tc.steps5: call ExeAppAIFunctionCallback without a specified nodeId.
+     * @tc.expected: ambiguous, and every candidate is reported with its id, rect, title and helper state.
+     */
     auto result = context_->ExeAppAIFunctionCallback("Success", "", nullptr);
     EXPECT_EQ(result.first, AI_CALL_NODE_AMBIGUOUS);
     EXPECT_FALSE(result.second.empty());
+    EXPECT_NE(result.second.find("candidateNodeIds"), std::string::npos);
+    EXPECT_NE(result.second.find("candidateNodes"), std::string::npos);
+    EXPECT_NE(result.second.find("aiCallerBound"), std::string::npos);
+    EXPECT_NE(result.second.find("title"), std::string::npos);
+}
+
+/**
+ * @tc.name: ExeAppAIFunctionCallback
+ * @tc.desc: Test ExeAppAIFunctionCallback with a standalone NavDestination used as an ordinary container
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, PipelineContextTestNg260, TestSize.Level1)
+{
+    /**
+     * @tc.steps1: initialize parameters.
+     */
+    ASSERT_NE(context_, nullptr);
+    auto rootNode = FrameNode::CreateFrameNode("root", 1, AceType::MakeRefPtr<Pattern>(), true);
+    rootNode->SetActive(true);
+    context_->rootNode_ = rootNode;
+    ASSERT_NE(context_->rootNode_, nullptr);
+
+    /**
+     * @tc.steps2: a NavDestination without a Navigation ancestor, nested in an ordinary container.
+     */
+    auto containerNode = FrameNode::CreateFrameNode("column", 12, AceType::MakeRefPtr<Pattern>(), true);
+    containerNode->SetActive(true);
+    rootNode->AddChild(containerNode);
+    auto navDestinationNode =
+        FrameNode::CreateFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, 21, AceType::MakeRefPtr<Pattern>(), true);
+    navDestinationNode->SetActive(true);
+    containerNode->AddChild(navDestinationNode);
+
+    /**
+     * @tc.steps3: call ExeAppAIFunctionCallback.
+     * @tc.expected: the node is found, so the call reaches it and reports AI_CALLER_INVALID (no helper bound).
+     */
+    auto result = context_->ExeAppAIFunctionCallback("Success", "", nullptr);
+    EXPECT_EQ(result.first, AI_CALLER_INVALID);
+    EXPECT_TRUE(result.second.empty());
+}
+
+/**
+ * @tc.name: ExeAppAIFunctionCallback
+ * @tc.desc: Test ExeAppAIFunctionCallback with a NavDestination mounted under the NavBar subtree
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, PipelineContextTestNg261, TestSize.Level1)
+{
+    /**
+     * @tc.steps1: initialize parameters.
+     */
+    ASSERT_NE(context_, nullptr);
+    auto rootNode = FrameNode::CreateFrameNode("root", 1, AceType::MakeRefPtr<Pattern>(), true);
+    rootNode->SetActive(true);
+    context_->rootNode_ = rootNode;
+    ASSERT_NE(context_->rootNode_, nullptr);
+
+    /**
+     * @tc.steps2: a NavDestination inside the Navigation/NavBar subtree instead of the navigation stack.
+     */
+    auto navigationGroupNode = NavigationGroupNode::GetOrCreateGroupNode(
+        V2::NAVIGATION_VIEW_ETS_TAG, 31, []() { return AceType::MakeRefPtr<NavigationPattern>(); });
+    navigationGroupNode->GetPattern<NavigationPattern>()->SetNavigationStack(AceType::MakeRefPtr<NavigationStack>());
+    navigationGroupNode->SetActive(true);
+    rootNode->AddChild(navigationGroupNode);
+    auto navBarNode = FrameNode::CreateFrameNode(V2::NAVBAR_ETS_TAG, 32, AceType::MakeRefPtr<Pattern>(), true);
+    navBarNode->SetActive(true);
+    navigationGroupNode->AddChild(navBarNode);
+    auto contentNode =
+        FrameNode::CreateFrameNode(V2::NAVBAR_CONTENT_ETS_TAG, 33, AceType::MakeRefPtr<Pattern>(), true);
+    contentNode->SetActive(true);
+    navBarNode->AddChild(contentNode);
+    auto navDestinationNode =
+        FrameNode::CreateFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, 34, AceType::MakeRefPtr<Pattern>(), true);
+    navDestinationNode->SetActive(true);
+    contentNode->AddChild(navDestinationNode);
+
+    /**
+     * @tc.steps3: call ExeAppAIFunctionCallback.
+     * @tc.expected: the node under the NavBar subtree is found.
+     */
+    auto result = context_->ExeAppAIFunctionCallback("Success", "", nullptr);
+    EXPECT_EQ(result.first, AI_CALLER_INVALID);
+    EXPECT_TRUE(result.second.empty());
+}
+
+/**
+ * @tc.name: ExeAppAIFunctionCallback
+ * @tc.desc: Test ExeAppAIFunctionCallback does not collect a destination nested in a hidden destination
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, PipelineContextTestNg262, TestSize.Level1)
+{
+    /**
+     * @tc.steps1: initialize parameters.
+     */
+    ASSERT_NE(context_, nullptr);
+    auto rootNode = FrameNode::CreateFrameNode("root", 1, AceType::MakeRefPtr<Pattern>(), true);
+    rootNode->SetActive(true);
+    context_->rootNode_ = rootNode;
+    ASSERT_NE(context_->rootNode_, nullptr);
+
+    /**
+     * @tc.steps2: an inner NavDestination nested in an outer NavDestination which is covered by the top page.
+     */
+    auto outerNode =
+        FrameNode::CreateFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, 21, AceType::MakeRefPtr<Pattern>(), true);
+    outerNode->SetActive(true);
+    rootNode->AddChild(outerNode);
+    auto innerNode =
+        FrameNode::CreateFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, 22, AceType::MakeRefPtr<Pattern>(), true);
+    innerNode->SetActive(true);
+    outerNode->AddChild(innerNode);
+    outerNode->GetLayoutProperty()->UpdateVisibility(VisibleType::INVISIBLE);
+
+    /**
+     * @tc.steps3: call ExeAppAIFunctionCallback.
+     * @tc.expected: the ancestor hides the subtree, so the inner node is not a candidate.
+     */
+    auto result = context_->ExeAppAIFunctionCallback("Success", "", nullptr);
+    EXPECT_EQ(result.first, AI_CALL_NODE_INVALID);
+    EXPECT_TRUE(result.second.empty());
+}
+
+/**
+ * @tc.name: ExeAppAIFunctionCallback
+ * @tc.desc: Test ExeAppAIFunctionCallback with the nodeId of a destination nested in another destination
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, PipelineContextTestNg263, TestSize.Level1)
+{
+    /**
+     * @tc.steps1: initialize parameters.
+     */
+    ASSERT_NE(context_, nullptr);
+    auto rootNode = FrameNode::CreateFrameNode("root", 1, AceType::MakeRefPtr<Pattern>(), true);
+    rootNode->SetActive(true);
+    context_->rootNode_ = rootNode;
+    ASSERT_NE(context_->rootNode_, nullptr);
+
+    /**
+     * @tc.steps2: an inner NavDestination nested in a visible outer NavDestination.
+     */
+    auto outerNode =
+        FrameNode::CreateFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, 21, AceType::MakeRefPtr<Pattern>(), true);
+    outerNode->SetActive(true);
+    rootNode->AddChild(outerNode);
+    auto innerNode =
+        FrameNode::CreateFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, 22, AceType::MakeRefPtr<Pattern>(), true);
+    innerNode->SetActive(true);
+    outerNode->AddChild(innerNode);
+
+    /**
+     * @tc.steps3: call ExeAppAIFunctionCallback with the inner node id.
+     * @tc.expected: the call reaches the inner node instead of the outer one.
+     */
+    auto result = context_->ExeAppAIFunctionCallback("Success", "", nullptr, 22);
+    EXPECT_EQ(result.first, AI_CALLER_INVALID);
+    EXPECT_TRUE(result.second.empty());
+
+    /**
+     * @tc.steps4: call ExeAppAIFunctionCallback with an id which is not a candidate.
+     * @tc.expected: report AI_CALL_NODE_INVALID.
+     */
+    result = context_->ExeAppAIFunctionCallback("Success", "", nullptr, 99);
+    EXPECT_EQ(result.first, AI_CALL_NODE_INVALID);
+    EXPECT_TRUE(result.second.empty());
 }
 
 /**
@@ -3213,70 +3377,92 @@ HWTEST_F(PipelineContextTestNg, PipelineContextTestNg259, TestSize.Level1)
     ASSERT_NE(context_->rootNode_, nullptr);
 
     /**
-     * @tc.steps2: make navigationGroupNode.
+     * @tc.steps2: make navigationGroupNode and mount some NavDestinationNode into its subtree.
      */
-    auto navigationGroupNode = NavigationGroupNode::GetOrCreateGroupNode(
-        V2::NAVIGATION_VIEW_ETS_TAG, 11, []() { return AceType::MakeRefPtr<NavigationPattern>(); });
+    auto navigationGroupNode = NavigationGroupNode::GetOrCreateGroupNode(V2::NAVIGATION_VIEW_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<NavigationPattern>(); });
+    navigationGroupNode->GetPattern<NavigationPattern>()->SetNavigationStack(AceType::MakeRefPtr<NavigationStack>());
     navigationGroupNode->SetActive(true);
-
-    RefPtr<NavigationPattern> navigationPattern = navigationGroupNode->GetPattern<NavigationPattern>();
-    navigationPattern->navigationStack_ = AceType::MakeRefPtr<NavigationStack>();
     rootNode->AddChild(navigationGroupNode);
+    auto nonCandidateNode = FrameNode::CreateFrameNode(
+        "column", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>(), true);
+    nonCandidateNode->SetActive(true);
+    rootNode->AddChild(nonCandidateNode);
+    std::vector<int32_t> destinationIds;
+    for (int32_t index = 0; index < 4; ++index) {
+        auto navDestinationNode = FrameNode::CreateFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG,
+            ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>(), true);
+        navDestinationNode->SetActive(true);
+        navigationGroupNode->AddChild(navDestinationNode);
+        destinationIds.emplace_back(navDestinationNode->GetId());
+    }
+    ASSERT_EQ(destinationIds.size(), 4);
+    auto lastNodeId = destinationIds.back();
+    auto secondNodeId = destinationIds[1];
 
     /**
-     * @tc.steps3: make some NavDestinationNode.
-     */
-    auto navDestinationNode1 =
-        FrameNode::CreateFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, 21, AceType::MakeRefPtr<Pattern>(), true);
-    auto navDestinationNode2 =
-        FrameNode::CreateFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, 22, AceType::MakeRefPtr<Pattern>(), true);
-    auto navDestinationNode3 =
-        FrameNode::CreateFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, 23, AceType::MakeRefPtr<Pattern>(), true);
-    auto navDestinationNode4 =
-        FrameNode::CreateFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, 24, AceType::MakeRefPtr<Pattern>(), true);
-    NavPathList navPathList;
-    navPathList.emplace_back(std::make_pair("pageOne", navDestinationNode1));
-    navPathList.emplace_back(std::make_pair("pageTwo", navDestinationNode2));
-    navPathList.emplace_back(std::make_pair("pageThree", navDestinationNode3));
-    navPathList.emplace_back(std::make_pair("pageFour", navDestinationNode4));
-    navigationPattern->navigationStack_->SetNavPathList(navPathList);
-
-    /**
-     * @tc.steps4: find topNavNode.
-     * @tc.expected: topNavNode found, navDesNodes is not empty.
+     * @tc.steps3: the navigation stack based API cannot see the destinations living under the navBar.
+     * @tc.expected: navDesNodes is empty.
      */
     std::list<RefPtr<FrameNode>> navDesNodes;
     rootNode->FindTopNavDestination(navDesNodes);
-    ASSERT_EQ(navDesNodes.size(), 4);
-    auto topNavNode = navDesNodes.empty() ? nullptr : navDesNodes.back();
-    EXPECT_NE(topNavNode, nullptr);
+    EXPECT_TRUE(navDesNodes.empty());
 
     /**
-     * @tc.steps5: Call the function OnDumpBindAICaller.
-     * @tc.expected: topNavNode->CallAIFunction result is AI_CALL_SUCCESS.
+     * @tc.steps4: Call the function OnDumpBindAICaller without a node id.
+     * @tc.expected: the last candidate is bound, so its CallAIFunction result is AI_CALL_SUCCESS.
      */
-    std::vector<std::string> params;
-    params.push_back("-bindaihelper");
-    params.push_back("-bind");
-    EXPECT_EQ(params.size(), 2);
+    std::vector<std::string> params = { "-bindaicaller", "-bind" };
     context_->OnDumpBindAICaller(params);
+    auto result = context_->ExeAppAIFunctionCallback("Success", "", nullptr, lastNodeId);
+    EXPECT_EQ(result.first, AI_CALL_SUCCESS);
+    EXPECT_FALSE(result.second.empty());
 
     /**
-     * @tc.steps6: Call the function OnDumpBindAICaller.
-     * @tc.expected: topNavNode->CallAIFunction result is AI_CALLER_INVALID.
+     * @tc.steps5: Call the function OnDumpBindAICaller without a node id to unbind it.
+     * @tc.expected: the last candidate is unbound, so its CallAIFunction result is AI_CALLER_INVALID.
+     */
+    params = { "-bindaicaller", "-unbind" };
+    context_->OnDumpBindAICaller(params);
+    result = context_->ExeAppAIFunctionCallback("Success", "", nullptr, lastNodeId);
+    EXPECT_EQ(result.first, AI_CALLER_INVALID);
+
+    /**
+     * @tc.steps6: Call the function OnDumpBindAICaller with the id of another candidate.
+     * @tc.expected: only the specified candidate is bound.
+     */
+    params = { "-bindaicaller", "-bind", std::to_string(secondNodeId) };
+    context_->OnDumpBindAICaller(params);
+    result = context_->ExeAppAIFunctionCallback("Success", "", nullptr, secondNodeId);
+    EXPECT_EQ(result.first, AI_CALL_SUCCESS);
+    result = context_->ExeAppAIFunctionCallback("Success", "", nullptr, lastNodeId);
+    EXPECT_EQ(result.first, AI_CALLER_INVALID);
+
+    /**
+     * @tc.steps7: Call the function OnDumpBindAICaller with an id which is not a candidate.
+     * @tc.expected: nothing is bound.
+     */
+    params = { "-bindaicaller", "-unbind", std::to_string(secondNodeId) };
+    context_->OnDumpBindAICaller(params);
+    result = context_->ExeAppAIFunctionCallback("Success", "", nullptr, secondNodeId);
+    EXPECT_EQ(result.first, AI_CALLER_INVALID);
+
+    params = { "-bindaicaller", "-bind", std::to_string(nonCandidateNode->GetId()) };
+    context_->OnDumpBindAICaller(params);
+    result = context_->ExeAppAIFunctionCallback("Success", "", nullptr, secondNodeId);
+    EXPECT_EQ(result.first, AI_CALLER_INVALID);
+    result = context_->ExeAppAIFunctionCallback("Success", "", nullptr, lastNodeId);
+    EXPECT_EQ(result.first, AI_CALLER_INVALID);
+
+    /**
+     * @tc.steps8: Call the function OnDumpBindAICaller with invalid parameters.
+     * @tc.expected: nothing happens.
      */
     params.clear();
-    params.push_back("-bindaihelper");
-    params.push_back("-unbind");
-    EXPECT_EQ(params.size(), 2);
     context_->OnDumpBindAICaller(params);
-
-    /**
-     * @tc.steps7: Call the function OnDumpBindAICaller.
-     * @tc.expected: topNavNode->CallAIFunction result is AI_CALLER_INVALID.
-     */
-    params.clear();
-    EXPECT_EQ(params.size(), 0);
+    params = { "-bindaicaller" };
+    context_->OnDumpBindAICaller(params);
+    params = { "-bindaicaller", "-bindsomething" };
     context_->OnDumpBindAICaller(params);
 }
 
