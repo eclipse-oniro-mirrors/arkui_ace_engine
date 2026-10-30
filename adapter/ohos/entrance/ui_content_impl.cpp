@@ -918,19 +918,6 @@ public:
         CHECK_NULL_VOID(pipeline);
         auto taskExecutor = container->GetTaskExecutor();
         CHECK_NULL_VOID(taskExecutor);
-        taskExecutor->PostTask(
-            [instanceId = instanceId_, avoidArea, type] {
-            ContainerScope scope(instanceId);
-            auto container = Platform::AceContainer::GetContainer(instanceId);
-            CHECK_NULL_VOID(container);
-            auto pipeline = container->GetPipelineContext();
-            CHECK_NULL_VOID(pipeline);
-            auto context = AceType::DynamicCast<NG::PipelineContext>(pipeline);
-            CHECK_NULL_VOID(context);
-            auto dynamicComponentManager = context->GetDynamicComponentSafeManager();
-            dynamicComponentManager->UpdateAllDCAvoidArea(instanceId, avoidArea, type);
-            },
-            TaskExecutor::TaskType::UI, "ArkUIUpdateAllDCAvoidArea");
         if (type == Rosen::AvoidAreaType::TYPE_SYSTEM) {
             systemSafeArea_ = ConvertAvoidArea(avoidArea);
         } else if (type == Rosen::AvoidAreaType::TYPE_NAVIGATION_INDICATOR) {
