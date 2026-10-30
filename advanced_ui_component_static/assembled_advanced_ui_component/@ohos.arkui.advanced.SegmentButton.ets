@@ -508,7 +508,10 @@ export class SegmentButtonItemOptionsArray extends Array<SegmentButtonItemOption
     return this._wrappedArray.unshift(option1, option2, option3).toInt();
   }
 
-  splice(start: int, deleteCount: int, ...items: SegmentButtonItemOptions[]): SegmentButtonItemOptions[] {
+  splice(start: int, deleteCount: int | undefined, ...items: SegmentButtonItemOptions[]): SegmentButtonItemOptions[] {
+    if (deleteCount === undefined) {
+      deleteCount = 0;
+    }
     let length: int = (this.length - deleteCount) < 0 ? 0 : (this.length - deleteCount);
     length += items.length;
     if (length < MIN_ITEM_COUNT) {
