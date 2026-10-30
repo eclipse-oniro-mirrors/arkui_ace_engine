@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2026 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,10 +46,6 @@ public:
         FunctionCallback classNativeCallback, JsiFunctionMap& staticFns, JsiFunctionMap& customFns,
         JsiFunctionMap& customGetFns, JsiFunctionMap& customSetFns,
         panda::Global<panda::FunctionRef>& classFn);
-
-    static void BindImpl(EcmaVM* vm, BindingTarget t, const char* jsName, const std::string& classDisplayName,
-        FunctionCallback classNativeCallback, JsiFunctionMap& staticFns, JsiFunctionMap& customFns,
-        JsiFunctionMap& customGetFns, JsiFunctionMap& customSetFns, panda::Global<panda::FunctionRef>& classFn);
 
     using UnDeclareFunc = void (*)();
     static void RegisterUnDeclare(UnDeclareFunc func);

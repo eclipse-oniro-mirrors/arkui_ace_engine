@@ -20,7 +20,6 @@ jsi_class_base_sources = [
 
 jsi_constructor_binding_sources = [
   "$ace_root/frameworks/bridge/declarative_frontend/engine/jsi/jsi_class_base.cpp",
-  "$ace_root/frameworks/bridge/declarative_frontend/engine/jsi/jsi_types.cpp",
   "jsi_constructor_binding_test.cpp",
 ]
 

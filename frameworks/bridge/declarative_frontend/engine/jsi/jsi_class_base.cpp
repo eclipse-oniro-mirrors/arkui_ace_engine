@@ -1,5 +1,5 @@
-/**
- * Copyright (c) 2025-2026 Huawei Device Co., Ltd.
+/*
+ * Copyright (c) 2025 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -106,14 +106,6 @@ void JsiClassBase::BindImpl(BindingTarget t, const char* jsName, const std::stri
 {
     auto runtime = std::static_pointer_cast<ArkJSRuntime>(JsiDeclarativeEngineInstance::GetCurrentRuntime());
     auto vm = const_cast<EcmaVM*>(runtime->GetEcmaVm());
-    BindImpl(vm, t, jsName, classDisplayName, classNativeCallback, staticFns, customFns, customGetFns, customSetFns,
-        classFn);
-}
-
-void JsiClassBase::BindImpl(EcmaVM* vm, BindingTarget t, const char* jsName, const std::string& classDisplayName,
-    FunctionCallback classNativeCallback, JsiFunctionMap& staticFns, JsiFunctionMap& customFns,
-    JsiFunctionMap& customGetFns, JsiFunctionMap& customSetFns, panda::Global<panda::FunctionRef>& classFn)
-{
     panda::LocalScope scope(vm);
     classFn = panda::Global<panda::FunctionRef>(
         vm, panda::FunctionRef::NewClassFunction(vm, classNativeCallback, nullptr, nullptr));

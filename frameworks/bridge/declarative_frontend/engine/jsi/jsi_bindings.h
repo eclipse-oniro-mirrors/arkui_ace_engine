@@ -1,5 +1,5 @@
-/**
- * Copyright (c) 2021-2026 Huawei Device Co., Ltd.
+/*
+ * Copyright (c) 2021-2022 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -15,9 +15,6 @@
 
 #ifndef FRAMEWORKS_BRIDGE_DECLARATIVE_FRONTEND_ENGINE_JSI_JSI_BINDINGS_H
 #define FRAMEWORKS_BRIDGE_DECLARATIVE_FRONTEND_ENGINE_JSI_JSI_BINDINGS_H
-
-#include <functional>
-#include <memory>
 
 #include "frameworks/bridge/declarative_frontend/engine/bindings_implementation.h"
 #include "frameworks/bridge/declarative_frontend/engine/jsi/jsi_class_base.h"
@@ -38,31 +35,38 @@ std::tuple<Types...> ToTuple(panda::JsiRuntimeCallInfo* runtimeCallInfo)
 
 namespace OHOS::Ace::Framework {
 
-// Each JS constructor and its native instances share an immutable callback snapshot.
-// No VM callback may retain the address of thread_local registration state.
 struct JsiClassConstructorBinding {
     JSFunctionCallback jsConstructor = nullptr;
-    std::function<void(void*)> jsDestructorErased;
-    std::function<void(void*, const JSGCMarkCallbackInfo&)> jsGcMarkErased;
+    JSDestructorCallbackErased jsDestructorErased = nullptr;
+    JSGCMarkCallbackErased jsGcMarkErased = nullptr;
 };
 
-using JsiClassConstructorBindingRef = std::shared_ptr<const JsiClassConstructorBinding>;
+// Per-type storage for the original typed callbacks. Kept thread_local to match
+// JsiClass<C> state semantics. Only written by JsiClass<C>::Bind/InheritAndBind.
+template<typename C>
+inline thread_local JSDestructorCallback<C> jsiTypedDestructor = nullptr;
+template<typename C>
+inline thread_local JSGCMarkCallback<C> jsiTypedGcMark = nullptr;
+
+// Type-erased adapters with exactly the erased signature. Calling a function
+// through an incompatible function pointer type is undefined behavior, so the
+// adapters restore the typed pointer and invoke it with its original signature.
+template<typename C>
+void JsiDestroyCallbackAdapter(void* instance)
+{
+    auto dtor = jsiTypedDestructor<C>;
+    if (dtor != nullptr) {
+        dtor(static_cast<C*>(instance));
+    }
+}
 
 template<typename C>
-JsiClassConstructorBindingRef MakeJsiClassConstructorBinding(
-    JSFunctionCallback ctor, JSDestructorCallback<C> dtor, JSGCMarkCallback<C> gcMark)
+void JsiGcMarkCallbackAdapter(void* instance, const JSGCMarkCallbackInfo& info)
 {
-    auto binding = std::make_shared<JsiClassConstructorBinding>();
-    binding->jsConstructor = ctor;
-    if (dtor != nullptr) {
-        binding->jsDestructorErased = [dtor](void* instance) { dtor(static_cast<C*>(instance)); };
-    }
+    auto gcMark = jsiTypedGcMark<C>;
     if (gcMark != nullptr) {
-        binding->jsGcMarkErased = [gcMark](void* instance, const JSGCMarkCallbackInfo& info) {
-            gcMark(static_cast<C*>(instance), info);
-        };
+        gcMark(static_cast<C*>(instance), info);
     }
-    return binding;
 }
 
 inline panda::Local<panda::JSValueRef> JsiJSConstructorInterceptor(panda::JsiRuntimeCallInfo* runtimeCallInfo);
@@ -117,18 +121,11 @@ public:
     static void Bind(BindingTarget t, JSFunctionCallback ctor, JSDestructorCallback<C> dtor = nullptr,
         JSGCMarkCallback<C> gcMark = nullptr);
 
-    static void Bind(EcmaVM* vm, BindingTarget t, JSFunctionCallback ctor, JSDestructorCallback<C> dtor = nullptr,
-        JSGCMarkCallback<C> gcMark = nullptr);
-
     template<typename... Args>
     static void Bind(BindingTarget t, JSDestructorCallback<C> dtor = nullptr, JSGCMarkCallback<C> gcMark = nullptr);
 
     template<typename Base>
     static void InheritAndBind(BindingTarget t, JSFunctionCallback ctor = nullptr,
-        JSDestructorCallback<C> dtor = nullptr, JSGCMarkCallback<C> gcMark = nullptr);
-
-    template<typename Base>
-    static void InheritAndBind(EcmaVM* vm, BindingTarget t, JSFunctionCallback ctor = nullptr,
         JSDestructorCallback<C> dtor = nullptr, JSGCMarkCallback<C> gcMark = nullptr);
 
     template<typename Base>
@@ -167,6 +164,7 @@ private:
     static thread_local std::unordered_map<std::string, panda::Global<panda::FunctionRef>> customGetFunctions_;
     static thread_local std::unordered_map<std::string, panda::Global<panda::FunctionRef>> customSetFunctions_;
     static thread_local FunctionCallback constructor_;
+    static thread_local JsiClassConstructorBinding jsConstructorBinding_;
     static thread_local std::string className_;
     static thread_local panda::Global<panda::FunctionRef> classFunction_;
 };

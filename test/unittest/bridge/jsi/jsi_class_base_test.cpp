@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2026 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -177,63 +177,3 @@ HWTEST_F(JsiClassBaseTest, JsiClassBaseDeclareImpl002, TestSize.Level1)
     EXPECT_TRUE(staticFns.empty());
 }
 
-/**
- * @tc.name: BindImplMethods_001
- * @tc.desc: A real VM observes static methods, prototype methods and paired accessors after BindImpl.
- * @tc.type: FUNC
- */
-HWTEST_F(JsiClassBaseTest, BindImplMethods_001, TestSize.Level1)
-{
-    panda::RuntimeOption option;
-    auto* vm = panda::JSNApi::CreateJSVM(option);
-    ASSERT_NE(vm, nullptr);
-    {
-        panda::LocalScope scope(vm);
-        auto global = panda::JSNApi::GetGlobalObject(vm);
-        auto callback = [](panda::JsiRuntimeCallInfo* info) -> panda::Local<panda::JSValueRef> {
-            return panda::NumberRef::New(info->GetVM(), 42);
-        };
-        auto getter = [](panda::JsiRuntimeCallInfo* info) -> panda::Local<panda::JSValueRef> {
-            auto object = panda::Local<panda::ObjectRef>(info->GetThisRef());
-            return object->Get(info->GetVM(), panda::StringRef::NewFromUtf8(info->GetVM(), "stored"));
-        };
-        auto setter = [](panda::JsiRuntimeCallInfo* info) -> panda::Local<panda::JSValueRef> {
-            auto vm = info->GetVM();
-            auto object = panda::Local<panda::ObjectRef>(info->GetThisRef());
-            object->Set(vm, panda::StringRef::NewFromUtf8(vm, "stored"), info->GetCallArgRef(0));
-            return panda::JSValueRef::Undefined(vm);
-        };
-        JsiFunctionMap staticFns;
-        JsiFunctionMap customFns;
-        JsiFunctionMap getters;
-        JsiFunctionMap setters;
-        staticFns.emplace("staticMethod", panda::Global<panda::FunctionRef>(vm, panda::FunctionRef::New(vm, callback)));
-        customFns.emplace("method", panda::Global<panda::FunctionRef>(vm, panda::FunctionRef::New(vm, callback)));
-        getters.emplace("value", panda::Global<panda::FunctionRef>(vm, panda::FunctionRef::New(vm, getter)));
-        setters.emplace("value", panda::Global<panda::FunctionRef>(vm, panda::FunctionRef::New(vm, setter)));
-        panda::Global<panda::FunctionRef> classFn;
-        std::string name = "BoundClass";
-        JsiClassBase::BindImpl(
-            vm, global, name.c_str(), name, [](panda::JsiRuntimeCallInfo* info) { return info->GetThisRef(); },
-            staticFns, customFns, getters, setters, classFn);
-        auto exported = global->Get(vm, panda::StringRef::NewFromUtf8(vm, name.c_str()));
-        EXPECT_TRUE(exported->IsFunction(vm));
-        auto staticMethod =
-            panda::Local<panda::FunctionRef>(classFn->Get(vm, panda::StringRef::NewFromUtf8(vm, "staticMethod")));
-        EXPECT_EQ(staticMethod->Call(vm, exported, nullptr, 0)->Int32Value(vm), 42);
-        auto instance = panda::Local<panda::ObjectRef>(classFn->Constructor(vm, nullptr, 0));
-        auto method = panda::Local<panda::FunctionRef>(instance->Get(vm, panda::StringRef::NewFromUtf8(vm, "method")));
-        EXPECT_EQ(method->Call(vm, instance, nullptr, 0)->Int32Value(vm), 42);
-        instance->Set(vm, panda::StringRef::NewFromUtf8(vm, "value"), panda::NumberRef::New(vm, 7));
-        EXPECT_EQ(instance->Get(vm, panda::StringRef::NewFromUtf8(vm, "value"))->Int32Value(vm), 7);
-        EXPECT_FALSE(panda::JSNApi::HasPendingException(vm));
-        // Clear live Global handles before VM destruction (the earlier cases only used empty handles).
-        JsiClassBase::DeclareImpl("reset", name, staticFns, customFns, getters, setters, classFn);
-        EXPECT_TRUE(staticFns.empty());
-        EXPECT_TRUE(customFns.empty());
-        EXPECT_TRUE(getters.empty());
-        EXPECT_TRUE(setters.empty());
-        EXPECT_TRUE(classFn.IsEmpty());
-    }
-    panda::JSNApi::DestroyJSVM(vm);
-}
