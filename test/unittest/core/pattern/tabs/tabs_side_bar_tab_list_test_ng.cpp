@@ -449,4 +449,120 @@ HWTEST_F(TabsSideBarTabListTestNg, IsHiddenByDefaultVisibility004, TestSize.Leve
 
     EXPECT_FALSE(tree.tabListPattern->IsHiddenByDefaultVisibility(5));
 }
+
+/**
+ * @tc.name: SetCurrentIndexWithoutAnimation001
+ * @tc.desc: When isCustomAnimation is false (default), SetCurrentIndex routes to
+ *           SwipeToWithoutAnimation and does NOT call SwipeTo
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSideBarTabListTestNg, SetCurrentIndexWithoutAnimation001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Build a sidebar tabs tree with one tab content
+     */
+    SideBarVisibilityTestTree tree;
+    tree.Build(1, { TabContentDefaultVisibility() });
+    ASSERT_NE(tree.tabListPattern, nullptr);
+    ASSERT_NE(tree.tabsNode, nullptr);
+
+    /**
+     * @tc.steps: step2. Inject a SwiperController with recording impls
+     */
+    auto controller = AceType::MakeRefPtr<SwiperController>();
+    ASSERT_NE(controller, nullptr);
+    int32_t swipeToIndex = -1;
+    int32_t swipeToWithoutAnimIndex = -1;
+    int32_t swipeToCallCount = 0;
+    int32_t swipeToWithoutAnimCallCount = 0;
+    controller->SetSwipeToImpl([&swipeToIndex, &swipeToCallCount](int32_t index, bool reverse) {
+        swipeToIndex = index;
+        ++swipeToCallCount;
+    });
+    controller->SetSwipeToWithoutAnimationImpl(
+        [&swipeToWithoutAnimIndex, &swipeToWithoutAnimCallCount](int32_t index) {
+            swipeToWithoutAnimIndex = index;
+            ++swipeToWithoutAnimCallCount;
+        });
+    tree.tabListPattern->SetSwiperController(controller);
+
+    /**
+     * @tc.steps: step3. Ensure isCustomAnimation is false (the default)
+     */
+    auto tabsPattern = tree.tabsNode->GetPattern<TabsPattern>();
+    ASSERT_NE(tabsPattern, nullptr);
+    tabsPattern->SetIsCustomAnimation(false);
+    EXPECT_FALSE(tabsPattern->GetIsCustomAnimation());
+
+    /**
+     * @tc.steps: step4. Init to 0 then SetCurrentIndex to 2
+     * @tc.expected: SwipeToWithoutAnimation called with 2; SwipeTo NOT called
+     */
+    tree.tabListPattern->InitCurrentIndex(0);
+    EXPECT_EQ(tree.tabListPattern->GetCurrentIndex(), 0);
+    tree.tabListPattern->SetCurrentIndex(2);
+    EXPECT_EQ(tree.tabListPattern->GetCurrentIndex(), 2);
+
+    EXPECT_EQ(swipeToWithoutAnimCallCount, 1);
+    EXPECT_EQ(swipeToWithoutAnimIndex, 2);
+    EXPECT_EQ(swipeToCallCount, 0);
+}
+
+/**
+ * @tc.name: SetCurrentIndexWithCustomAnimation001
+ * @tc.desc: When isCustomAnimation is true, SetCurrentIndex routes to SwipeTo
+ *           and does NOT call SwipeToWithoutAnimation
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSideBarTabListTestNg, SetCurrentIndexWithCustomAnimation001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Build a sidebar tabs tree with one tab content
+     */
+    SideBarVisibilityTestTree tree;
+    tree.Build(1, { TabContentDefaultVisibility() });
+    ASSERT_NE(tree.tabListPattern, nullptr);
+    ASSERT_NE(tree.tabsNode, nullptr);
+
+    /**
+     * @tc.steps: step2. Inject a SwiperController with recording impls
+     */
+    auto controller = AceType::MakeRefPtr<SwiperController>();
+    ASSERT_NE(controller, nullptr);
+    int32_t swipeToIndex = -1;
+    int32_t swipeToWithoutAnimIndex = -1;
+    int32_t swipeToCallCount = 0;
+    int32_t swipeToWithoutAnimCallCount = 0;
+    controller->SetSwipeToImpl([&swipeToIndex, &swipeToCallCount](int32_t index, bool reverse) {
+        swipeToIndex = index;
+        ++swipeToCallCount;
+    });
+    controller->SetSwipeToWithoutAnimationImpl(
+        [&swipeToWithoutAnimIndex, &swipeToWithoutAnimCallCount](int32_t index) {
+            swipeToWithoutAnimIndex = index;
+            ++swipeToWithoutAnimCallCount;
+        });
+    tree.tabListPattern->SetSwiperController(controller);
+
+    /**
+     * @tc.steps: step3. Enable custom animation on TabsPattern
+     */
+    auto tabsPattern = tree.tabsNode->GetPattern<TabsPattern>();
+    ASSERT_NE(tabsPattern, nullptr);
+    tabsPattern->SetIsCustomAnimation(true);
+    EXPECT_TRUE(tabsPattern->GetIsCustomAnimation());
+
+    /**
+     * @tc.steps: step4. Init to 0 then SetCurrentIndex to 2
+     * @tc.expected: SwipeTo called with 2; SwipeToWithoutAnimation NOT called
+     */
+    tree.tabListPattern->InitCurrentIndex(0);
+    EXPECT_EQ(tree.tabListPattern->GetCurrentIndex(), 0);
+    tree.tabListPattern->SetCurrentIndex(2);
+    EXPECT_EQ(tree.tabListPattern->GetCurrentIndex(), 2);
+
+    EXPECT_EQ(swipeToCallCount, 1);
+    EXPECT_EQ(swipeToIndex, 2);
+    EXPECT_EQ(swipeToWithoutAnimCallCount, 0);
+}
 } // namespace OHOS::Ace::NG
