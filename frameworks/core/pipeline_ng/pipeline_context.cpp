@@ -16,12 +16,14 @@
 #include "core/components_ng/pattern/ui_extension/ui_extension_config.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "core/components_ng/base/ui_tree_collector.h"
+#include "core/components_ng/base/inspector_occlusion_collector.h"
 #include "core/accessibility/accessibility_manager.h"
 #include "core/accessibility/accessibility_manager_ng.h"
 
 #include <cmath>
 #include <cstdlib>
 #include <unistd.h>
+#include <unordered_set>
 #include "base/resource/data_provider_manager.h"
 #include "core/components_ng/base/inspector_tree_request_context.h"
 #include "base/json/json_util_internal.h"
@@ -7940,6 +7942,31 @@ UITreeRequestState& PipelineContext::GetUITreeRequestState()
     return *uiTreeRequestState_;
 }
 
+#ifndef CROSS_PLATFORM
+namespace {
+// Keeps an occluded node whose subtree still holds a retained node, so no descendant is lost.
+bool MarkOcclusionKeepIds(const RefPtr<FrameNode>& node, const InspectorOcclusionCollector::Decisions& decisions,
+    std::unordered_set<int32_t>& keepIds)
+{
+    if (!node) {
+        return false;
+    }
+    auto found = decisions.find(node->GetId());
+    bool keep = found == decisions.end() || found->second != OcclusionDecision::OCCLUDED;
+    for (const auto& weakChild : node->GetFrameChildren()) {
+        auto child = weakChild.Upgrade();
+        if (MarkOcclusionKeepIds(child, decisions, keepIds)) {
+            keep = true;
+        }
+    }
+    if (keep) {
+        keepIds.insert(node->GetId());
+    }
+    return keep;
+}
+} // namespace
+#endif
+
 void PipelineContext::CollectInspectorTreeInto(
     std::shared_ptr<JsonValue>& root, bool onlyNeedVisible, ParamConfig config)
 {
@@ -7947,6 +7974,17 @@ void PipelineContext::CollectInspectorTreeInto(
         return;
     }
     if (onlyNeedVisible) {
+#ifndef CROSS_PLATFORM
+        if (config.filterOccludedNodes && config.collectionState && !config.collectionState->occlusionEnabled) {
+            auto& state = *config.collectionState;
+            state.occlusionDecisions = InspectorOcclusionCollector::Collect(
+                rootNode_, static_cast<double>(config.occlusionOpacityThreshold), GetInstanceId());
+            if (!state.occlusionDecisions.empty()) {
+                MarkOcclusionKeepIds(rootNode_, state.occlusionDecisions, state.occlusionKeepIds);
+            }
+            state.occlusionEnabled = true;
+        }
+#endif
         DumpVisibleInspectorTree(root, config);
     } else {
 #ifndef CROSS_PLATFORM

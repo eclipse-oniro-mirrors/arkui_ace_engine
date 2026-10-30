@@ -48,8 +48,10 @@ struct ParamConfig {
     bool withCustomContent = false;
     // Borrowed request state; never serialized into the configuration parcel.
     NG::InspectorTreeRequestContext* inspectorContext = nullptr;
-
     bool withResponseRegion = false;
+    // Occluder threshold; must not reuse minOpacity, which filters a node by its own final opacity.
+    bool filterOccludedNodes = false;
+    float occlusionOpacityThreshold = 1.0f;
 
     bool IsPublicTree() const
     {
