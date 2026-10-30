@@ -84,7 +84,12 @@ ace_unittest("simplified_inspector_test_ng") {
   if (is_host_product) {
     type = "host_components"
   }
-  sources = [ "simplified_inspector_test_ng.cpp" ]
+  sources = [
+    "$ace_root/frameworks/core/components_ng/base/inspector_occlusion_collector.cpp",
+    "$ace_root/frameworks/core/components_ng/base/inspector_occlusion_region.cpp",
+    "simplified_inspector_test_ng.cpp",
+    "ui_node_occlusion_test.cpp",
+  ]
 }
 
 ace_unittest("ui_node_gc_test_ng") {

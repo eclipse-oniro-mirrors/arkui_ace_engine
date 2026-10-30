@@ -2371,6 +2371,10 @@ frameworks/core/components_ng/base/inspector.cpp @ArkUI_ability_group
 frameworks/core/components_ng/base/inspector.h @ArkUI_ability_group
 frameworks/core/components_ng/base/inspector_filter.cpp @ArkUI_ability_group
 frameworks/core/components_ng/base/inspector_filter.h @ArkUI_ability_group
+frameworks/core/components_ng/base/inspector_occlusion_collector.cpp @arkui_framework_xnode
+frameworks/core/components_ng/base/inspector_occlusion_collector.h @arkui_framework_xnode
+frameworks/core/components_ng/base/inspector_occlusion_region.cpp @arkui_framework_xnode
+frameworks/core/components_ng/base/inspector_occlusion_region.h @arkui_framework_xnode
 frameworks/core/components_ng/base/linear_vector.h @arkui_framework_xnode
 frameworks/core/components_ng/base/mixed_mount_registry.cpp @arkui_framework_xnode
 frameworks/core/components_ng/base/mixed_mount_registry.h @arkui_framework_xnode
@@ -3614,6 +3618,7 @@ test/unittest/core/base/inspector_test_ng.cpp @ArkUI_ability_group
 test/unittest/core/base/observer_draw_callback_test.cpp @arkui_framework_xnode
 test/unittest/core/base/observer_test_ng.cpp @arkui_framework_resource
 test/unittest/core/base/simplified_inspector_test_ng.cpp @arkui_framework_xnode
+test/unittest/core/base/ui_node_occlusion_test.cpp @arkui_framework_xnode
 test/unittest/core/base/view_abstract_model_test_ng.cpp @ArkUI_Event
 test/unittest/core/common/ace_engine/ @arkui_framework_xnode
 test/unittest/core/common/asset/ @arkui_framework_xnode

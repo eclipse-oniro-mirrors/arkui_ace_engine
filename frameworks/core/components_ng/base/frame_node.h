@@ -440,6 +440,11 @@ public:
         return frameChildren_;
     }
 
+    bool IsRenderTreeSyncPending() const
+    {
+        return needSyncRenderTree_;
+    }
+
     virtual void InitializePatternAndContext();
 
     virtual void MarkModifyDone();
