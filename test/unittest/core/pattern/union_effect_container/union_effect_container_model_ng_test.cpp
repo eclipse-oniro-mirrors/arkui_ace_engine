@@ -24,6 +24,7 @@
 #include "core/components_ng/pattern/union_effect_container/union_effect_container_model_ng.h"
 #include "core/components_ng/pattern/union_effect_container/union_effect_container_pattern.h"
 #include "core/components_ng/property/union_effect_container_options.h"
+#include "core/components/common/properties/state_attributes.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -125,5 +126,66 @@ HWTEST_F(UnionEffectContainerModelNgTest, Create003, TestSize.Level1)
     auto pattern = node->GetPattern<UnionEffectContainerPattern>();
     ASSERT_NE(pattern, nullptr);
     EXPECT_TRUE(NearEqual(pattern->GetSpacing(), 0.0));
+}
+
+/**
+ * @tc.name: SetUnionMode001
+ * @tc.desc: SetUnionMode without visual state updates render context.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UnionEffectContainerModelNgTest, SetUnionMode001, TestSize.Level1)
+{
+    UnionEffectContainerModelNG model;
+    UnionEffectContainerOptions options;
+    model.Create(options);
+    model.SetUnionMode(UnionMode::GRAVITY_UNION);
+    auto node = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ASSERT_NE(node, nullptr);
+    auto renderContext = node->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+    auto unionMode = renderContext->GetUnionMode();
+    ASSERT_TRUE(unionMode.has_value());
+    EXPECT_EQ(unionMode.value(), UnionMode::GRAVITY_UNION);
+}
+
+/**
+ * @tc.name: SetUnionMode002
+ * @tc.desc: SetUnionMode without pushed frame node, frameNode null branch.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UnionEffectContainerModelNgTest, SetUnionMode002, TestSize.Level1)
+{
+    UnionEffectContainerModelNG model;
+    ViewStackProcessor::GetInstance()->ClearStack();
+    model.SetUnionMode(UnionMode::SMOOTH_UNION);
+    EXPECT_EQ(ViewStackProcessor::GetInstance()->GetMainFrameNode(), nullptr);
+}
+
+/**
+ * @tc.name: SetUnionMode003
+ * @tc.desc: SetUnionMode early return when current visual state is not on.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UnionEffectContainerModelNgTest, SetUnionMode003, TestSize.Level1)
+{
+    UnionEffectContainerModelNG model;
+    UnionEffectContainerOptions options;
+    model.Create(options);
+    ViewStackProcessor::GetInstance()->SetVisualState(VisualState::PRESSED);
+    model.SetUnionMode(UnionMode::GRAVITY_UNION);
+    ViewStackProcessor::GetInstance()->ClearVisualState();
+    auto node = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ASSERT_NE(node, nullptr);
+    auto renderContext = node->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+    // state is off, union mode should not be updated
+    EXPECT_FALSE(renderContext->GetUnionMode().has_value());
+
+    // visual state set with empty stack: eventHub is null, early return
+    ViewStackProcessor::GetInstance()->SetVisualState(VisualState::PRESSED);
+    ViewStackProcessor::GetInstance()->ClearStack();
+    model.SetUnionMode(UnionMode::SMOOTH_UNION);
+    EXPECT_EQ(ViewStackProcessor::GetInstance()->GetMainFrameNode(), nullptr);
+    ViewStackProcessor::GetInstance()->ClearVisualState();
 }
 } // namespace OHOS::Ace::NG
