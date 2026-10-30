@@ -15,6 +15,8 @@
 
 #include "core/components_ng/pattern/tabs/bridge/arkts_native_tabs_bridge.h"
 
+#include <cmath>
+
 #include "base/log/ace_scoring_log.h"
 #include "base/utils/utils.h"
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_utils_bridge.h"
@@ -2992,13 +2994,93 @@ std::optional<Dimension> TabsBridge::ParseBarFloatingDimension(
     EcmaVM* vm, Local<JSValueRef> value, RefPtr<ResourceObject>& resObj)
 {
     CalcDimension dimension;
-    auto parseOk = ArkTSUtils::ParseJsDimensionVp(vm, value, dimension, resObj, false);
-    if (parseOk) {
+    // LengthMetrics object form ({ value, unit }) — used by LocalizedEdges fields.
+    if (value->IsObject(vm) && ArkTSUtils::ParseJsLengthMetrics(vm, value, dimension, resObj)) {
+        double v = dimension.Value();
+        if (std::isnan(v) || std::isinf(v) || std::fpclassify(v) == FP_SUBNORMAL) {
+            return std::nullopt;
+        }
         return dimension;
-    } else {
+    }
+    // number / string / Resource form.
+    auto parseOk = ArkTSUtils::ParseJsDimensionVp(vm, value, dimension, resObj, false);
+    if (!parseOk) {
+        return std::nullopt;
+    }
+    double v = dimension.Value();
+    if (std::isnan(v) || std::isinf(v) || std::fpclassify(v) == FP_SUBNORMAL) {
         return std::nullopt;
     }
     return dimension;
+}
+
+template <typename ParametersType>
+void TabsBridge::ParseBarFloatingOffset(EcmaVM* vm, Local<JSValueRef> offsetVal,
+    ParametersType& parameters,
+    RefPtr<ResourceObject>& offsetXObj, RefPtr<ResourceObject>& offsetYObj)
+{
+    if (!offsetVal->IsObject(vm)) {
+        return;
+    }
+    auto offsetObject = offsetVal->ToObject(vm);
+    // 1) Position shape: { x, y }
+    auto xVal = ArkTSUtils::GetProperty(vm, offsetObject, "x");
+    auto yVal = ArkTSUtils::GetProperty(vm, offsetObject, "y");
+    bool hasX = !xVal->IsNull() && !xVal->IsUndefined();
+    bool hasY = !yVal->IsNull() && !yVal->IsUndefined();
+    if (hasX || hasY) {
+        if (hasX) {
+            parameters.offsetX = ParseBarFloatingDimension(vm, xVal, offsetXObj);
+        }
+        if (hasY) {
+            parameters.offsetY = ParseBarFloatingDimension(vm, yVal, offsetYObj);
+        }
+        return;
+    }
+    // 2) LocalizedEdges shape: { top, start, bottom, end }
+    // LocalizedEdges fields are LengthMetrics objects ({ value, unit }); ParseBarFloatingDimension
+    // handles the LengthMetrics object form in addition to number/string/Resource.
+    auto startVal = ArkTSUtils::GetProperty(vm, offsetObject, "start");
+    auto endVal = ArkTSUtils::GetProperty(vm, offsetObject, "end");
+    bool hasStart = !startVal->IsNull() && !startVal->IsUndefined();
+    bool hasEnd = !endVal->IsNull() && !endVal->IsUndefined();
+    if (hasStart || hasEnd) {
+        auto topVal = ArkTSUtils::GetProperty(vm, offsetObject, "top");
+        auto bottomVal = ArkTSUtils::GetProperty(vm, offsetObject, "bottom");
+        // start/end → X, top/bottom → Y
+        if (hasStart) {
+            parameters.offsetX = ParseBarFloatingDimension(vm, startVal, offsetXObj);
+        } else if (hasEnd) {
+            parameters.offsetX = ParseBarFloatingDimension(vm, endVal, offsetXObj);
+        }
+        if (!topVal->IsNull() && !topVal->IsUndefined()) {
+            parameters.offsetY = ParseBarFloatingDimension(vm, topVal, offsetYObj);
+        } else if (!bottomVal->IsNull() && !bottomVal->IsUndefined()) {
+            parameters.offsetY = ParseBarFloatingDimension(vm, bottomVal, offsetYObj);
+        }
+        return;
+    }
+    // 3) Edges shape: { top, bottom, left, right }
+    auto topVal = ArkTSUtils::GetProperty(vm, offsetObject, "top");
+    auto bottomVal = ArkTSUtils::GetProperty(vm, offsetObject, "bottom");
+    auto leftVal = ArkTSUtils::GetProperty(vm, offsetObject, "left");
+    auto rightVal = ArkTSUtils::GetProperty(vm, offsetObject, "right");
+    bool hasTop = !topVal->IsNull() && !topVal->IsUndefined();
+    bool hasBottom = !bottomVal->IsNull() && !bottomVal->IsUndefined();
+    bool hasLeft = !leftVal->IsNull() && !leftVal->IsUndefined();
+    bool hasRight = !rightVal->IsNull() && !rightVal->IsUndefined();
+    if (hasTop || hasBottom || hasLeft || hasRight) {
+        if (hasLeft) {
+            parameters.offsetX = ParseBarFloatingDimension(vm, leftVal, offsetXObj);
+        } else if (hasRight) {
+            parameters.offsetX = ParseBarFloatingDimension(vm, rightVal, offsetXObj);
+        }
+        if (hasTop) {
+            parameters.offsetY = ParseBarFloatingDimension(vm, topVal, offsetYObj);
+        } else if (hasBottom) {
+            parameters.offsetY = ParseBarFloatingDimension(vm, bottomVal, offsetYObj);
+        }
+    }
 }
 
 ArkUINativeModuleValue TabsBridge::SetTabsBarFloatingStyle(ArkUIRuntimeCallInfo* runtimeCallInfo)
@@ -3071,13 +3153,7 @@ ArkUINativeModuleValue TabsBridge::SetTabsBarFloatingStyle(ArkUIRuntimeCallInfo*
     }
 
     auto offsetVal = ArkTSUtils::GetProperty(vm, paramObject, "offset");
-    if (offsetVal->IsObject(vm)) {
-        auto offsetObject = offsetVal->ToObject(vm);
-        parameters.offsetX = ParseBarFloatingDimension(
-            vm, ArkTSUtils::GetProperty(vm, offsetObject, "x"), offsetXObj);
-        parameters.offsetY = ParseBarFloatingDimension(
-            vm, ArkTSUtils::GetProperty(vm, offsetObject, "y"), offsetYObj);
-    }
+    ParseBarFloatingOffset(vm, offsetVal, parameters, offsetXObj, offsetYObj);
     parameters.maxWidth =
         ParseBarFloatingDimension(vm, ArkTSUtils::GetProperty(vm, paramObject, "maxWidth"), maxWidthObj);
 
@@ -3155,13 +3231,7 @@ ArkUINativeModuleValue TabsBridge::SetTabsBarTopFloatingStyle(ArkUIRuntimeCallIn
         ParseBarFloatingDimension(vm, ArkTSUtils::GetProperty(vm, paramObject, "maskHeight"), maskHeightObj);
 
     auto offsetVal = ArkTSUtils::GetProperty(vm, paramObject, "offset");
-    if (offsetVal->IsObject(vm)) {
-        auto offsetObject = offsetVal->ToObject(vm);
-        parameters.offsetX = ParseBarFloatingDimension(
-            vm, ArkTSUtils::GetProperty(vm, offsetObject, "x"), offsetXObj);
-        parameters.offsetY = ParseBarFloatingDimension(
-            vm, ArkTSUtils::GetProperty(vm, offsetObject, "y"), offsetYObj);
-    }
+    ParseBarFloatingOffset(vm, offsetVal, parameters, offsetXObj, offsetYObj);
     parameters.maxWidth =
         ParseBarFloatingDimension(vm, ArkTSUtils::GetProperty(vm, paramObject, "maxWidth"), maxWidthObj);
 

@@ -18,6 +18,7 @@
 
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_api_bridge.h"
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_common_bridge.h"
+#include "core/components_ng/pattern/tabs/tabs_model.h"
 
 namespace OHOS::Ace::NG {
 class TabsBridge : public CommonBridge {
@@ -157,6 +158,10 @@ private:
         EcmaVM* vm, ArkUINodeHandle nativeNode, const Local<JSValueRef>& transitionFunc, bool isJsView);
     static std::optional<Dimension> ParseBarFloatingDimension(
         EcmaVM* vm, Local<JSValueRef> value, RefPtr<ResourceObject>& resObj);
+    template <typename ParametersType>
+    static void ParseBarFloatingOffset(EcmaVM* vm, Local<JSValueRef> offsetVal,
+        ParametersType& parameters,
+        RefPtr<ResourceObject>& offsetXObj, RefPtr<ResourceObject>& offsetYObj);
 };
 } // namespace OHOS::Ace::NG
 
