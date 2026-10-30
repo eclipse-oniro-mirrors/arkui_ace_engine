@@ -33,12 +33,13 @@ inline panda::Local<panda::FunctionRef> JsiNewClassFunction(EcmaVM* vm, const Js
     auto owner = std::make_unique<JsiClassConstructorBindingRef>(binding);
     auto function = panda::FunctionRef::NewClassFunction(
         vm, JsiJSConstructorInterceptor, JsiReleaseConstructorBinding, owner.get());
-    if (function.IsEmpty() || !function->IsFunction(vm)) {
-        // No constructor was created; the VM has not taken ownership of data.
-        // Keep RAII cleanup, including the non-empty undefined failure result.
+    if (function.IsEmpty()) {
+        // No handle was produced; the VM has not taken ownership of data.
+        // Keep RAII cleanup.
         return function;
     }
-    // The constructor owns data; its finalizer releases this holder exactly once.
+    // For any non-empty result (function or non-empty undefined), the VM already
+    // holds data and releases it via JsiReleaseConstructorBinding during GC.
     owner.release();
     return function;
 }
