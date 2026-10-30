@@ -219,7 +219,7 @@ void GetInspectorChildren(const RefPtr<NG::UINode>& parent, std::unique_ptr<OHOS
         for (auto uiNode : children) {
             GetInspectorChildren(uiNode, jsonChildrenArray, inspectorParameters, filter, depth - 1);
         }
-        AppendExternalSubtreeToChildren(parent, jsonChildrenArray);
+        AppendExternalSubtreeToChildren(parent, jsonChildrenArray, filter);
         if (jsonChildrenArray->GetArraySize()) {
             jsonNode->PutRef(INSPECTOR_CHILDREN, std::move(jsonChildrenArray));
         }
@@ -493,7 +493,7 @@ void GetInspectorChildren(const RefPtr<NG::UINode>& parent, std::unique_ptr<OHOS
             GetInspectorChildren(uiNode, jsonChildrenArray, inspectorParameters, filter, depth - 1);
         }
     }
-    AppendExternalSubtreeToChildren(parent, jsonChildrenArray);
+    AppendExternalSubtreeToChildren(parent, jsonChildrenArray, filter);
     if (jsonChildrenArray->GetArraySize() > 0) {
         jsonNodeNew->PutRef(INSPECTOR_CHILDREN, std::move(jsonChildrenArray));
     }
@@ -605,7 +605,7 @@ std::set<RefPtr<UINode>, RootComp> GetAllRoots()
     return roots;
 }
 void GetFreeNodeContent(const std::unique_ptr<JsonValue>& jsonTree, const RefPtr<UINode>& currentRoot,
-    InspectorChildrenParameters inspectorParameters)
+    InspectorChildrenParameters inspectorParameters, const InspectorFilter& filter)
 {
     auto jsonNodeArray = JsonUtil::CreateArray(true);
     for (auto& uiNode : GetAllRoots()) {
@@ -615,7 +615,7 @@ void GetFreeNodeContent(const std::unique_ptr<JsonValue>& jsonTree, const RefPtr
         if (uiNode->GetId() == currentRoot->GetId()) {
             continue;
         }
-        GetInspectorChildren(uiNode, jsonNodeArray, inspectorParameters);
+        GetInspectorChildren(uiNode, jsonNodeArray, inspectorParameters, filter);
     }
     jsonTree->PutRef("other_contents", std::move(jsonNodeArray));
 }
@@ -645,7 +645,7 @@ std::string GetInspectorInfo(std::vector<RefPtr<NG::UINode>> children, int32_t p
             jsonTree->Put("ProcessID", getpid());
             jsonTree->Put("WindowID", (int32_t)pipeline->GetWindowId());
             if (filter.IsFreeNodesEnabled()) {
-                GetFreeNodeContent(jsonTree, pipeline->GetRootElement(), inspectorParameters);
+                GetFreeNodeContent(jsonTree, pipeline->GetRootElement(), inspectorParameters, filter);
             }
         }
         return jsonTree->ToString();
@@ -796,12 +796,16 @@ std::string Inspector::GetFreeNodesInspector()
 {
     InspectorFilter filter;
     filter.EnableFreeNodes();
+    filter.SetWebEnable(true);
     bool needThrow = false;
     return GetInspector(true, filter, needThrow);
 }
 std::string Inspector::GetInspector(bool isLayoutInspector)
 {
     InspectorFilter filter;
+    if (isLayoutInspector) {
+        filter.SetWebEnable(true);
+    }
     bool needThrow = false;
     return GetInspector(isLayoutInspector, filter, needThrow);
 }
