@@ -1452,8 +1452,8 @@ export struct ComposeListItem {
       let compareSize = paddingNum > LISTITEM_PADDING;
       let horizontalPadding: number = compareSize ? paddingNum - LISTITEM_PADDING : 0;
       return {
-        top: this.isWrapText ? paddingNum : 0,
-        bottom: this.isWrapText ? paddingNum : 0,
+        top: this.isWrapText ? paddingNum : 0.0,
+        bottom: this.isWrapText ? paddingNum : 0.0,
         left: horizontalPadding,
         right: horizontalPadding
       } as Padding;
@@ -1617,8 +1617,8 @@ export struct ComposeListItem {
       right: !IS_SUPPORT_SUBCOMPONENT_EVENT ? STACK_PADDING : undefined
     } as Margin)
     .padding({
-      left: IS_SUPPORT_SUBCOMPONENT_EVENT ? STACK_PADDING : 0,
-      right: IS_SUPPORT_SUBCOMPONENT_EVENT ? STACK_PADDING : 0
+      left: IS_SUPPORT_SUBCOMPONENT_EVENT ? STACK_PADDING : 0.0,
+      right: IS_SUPPORT_SUBCOMPONENT_EVENT ? STACK_PADDING : 0.0
     } as Padding)
   }
 

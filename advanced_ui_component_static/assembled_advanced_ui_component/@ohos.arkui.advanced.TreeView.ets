@@ -2992,7 +2992,7 @@ export class ListNodeDataSource extends BasicDataSource {
   }
 
   public getListItemOpacity(item: NodeInfo): number {
-    return item.getNodeCurrentNodeId() === this.getDraggingCurrentNodeId() ? this.listItemOpacity : 1;
+    return item.getNodeCurrentNodeId() === this.getDraggingCurrentNodeId() ? this.listItemOpacity : 1.0;
   }
 
   public getDragPopupPara(): DragPopup {

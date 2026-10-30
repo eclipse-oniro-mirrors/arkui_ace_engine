@@ -276,7 +276,7 @@ export struct TabTitleBar {
             const offset = this.tabOffsets[index] + TabTitleBar.correctionOffset;
             this.currentIndex = index;
             this.scroller.scrollTo({
-              xOffset: offset > 0 ? offset : 0,
+              xOffset: offset > 0 ? offset : 0.0,
               yOffset: 0,
               animation: {
                 duration: 300,
@@ -577,7 +577,7 @@ struct TabContentItem {
   }
 
   getImageScaleFactor(): number {
-    return this.index === this.currentIndex ? TabContentItem.imageMagnificationFactor : 1;
+    return this.index === this.currentIndex ? TabContentItem.imageMagnificationFactor : 1.0;
   }
 
   getImageLayoutWidth(): number {
@@ -800,7 +800,7 @@ struct TabContentItem {
       }
     }
     .margin({
-      start: LengthMetrics.vp(this.index === 0 ? TabContentItem.marginFirst : 0),
+      start: LengthMetrics.vp(this.index === 0 ? TabContentItem.marginFirst : 0.0),
       end: LengthMetrics.vp(this.index === this.maxIndex ? 12 : 0)
     } as LocalizedPadding)
   }
