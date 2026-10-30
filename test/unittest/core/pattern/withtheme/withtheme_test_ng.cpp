@@ -495,6 +495,66 @@ HWTEST_F(WithThemeTestNg, WithThemeTest012, TestSize.Level0)
 }
 
 /**
+ * @tc.name: CacheRemoveClearsUserFlags
+ * @tc.desc: Removing a theme releases its color flags and preserves other themes.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WithThemeTestNg, CacheRemoveClearsUserFlags, TestSize.Level1)
+{
+    TokenThemeStorage storage;
+    constexpr int32_t removedThemeId = 20001;
+    constexpr int32_t retainedThemeId = 20002;
+    storage.CacheSet(AceType::MakeRefPtr<TokenTheme>(removedThemeId));
+    storage.CacheSet(AceType::MakeRefPtr<TokenTheme>(retainedThemeId));
+    storage.SetIsThemeColorSetByUser(removedThemeId, false, 0, true);
+    storage.InitDarkThemeMapWithoutUserSet(removedThemeId, true);
+    storage.SetIsThemeColorSetByUser(retainedThemeId, false, 0, true);
+
+    storage.CacheRemove(removedThemeId);
+
+    EXPECT_EQ(storage.CacheGet(removedThemeId), nullptr);
+    EXPECT_EQ(storage.themeColorSetByUser_.count(removedThemeId), 0);
+    EXPECT_NE(storage.CacheGet(retainedThemeId), nullptr);
+    EXPECT_TRUE(storage.GetIsThemeColorSetByUser(retainedThemeId, false, 0));
+}
+
+/**
+ * @tc.name: CacheRemoveUncachedThemeClearsUserFlags
+ * @tc.desc: Flags are released even if theme creation did not populate the cache.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WithThemeTestNg, CacheRemoveUncachedThemeClearsUserFlags, TestSize.Level1)
+{
+    TokenThemeStorage storage;
+    for (int32_t themeId = 1; themeId <= 1000; ++themeId) {
+        storage.SetIsThemeColorSetByUser(themeId, false, 0, true);
+        storage.InitDarkThemeMapWithoutUserSet(themeId, true);
+        storage.CacheRemove(themeId);
+    }
+    EXPECT_TRUE(storage.themeColorSetByUser_.empty());
+}
+
+/**
+ * @tc.name: CacheClearClearsUserFlags
+ * @tc.desc: Clearing cached themes also clears their color flags.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WithThemeTestNg, CacheClearClearsUserFlags, TestSize.Level1)
+{
+    TokenThemeStorage storage;
+    for (int32_t themeId = 1; themeId <= 10; ++themeId) {
+        storage.CacheSet(AceType::MakeRefPtr<TokenTheme>(themeId));
+        storage.SetIsThemeColorSetByUser(themeId, false, 0, true);
+        storage.SetIsThemeColorSetByUser(themeId, true, 0, true);
+    }
+
+    storage.CacheClear();
+
+    EXPECT_TRUE(storage.themeCache_.empty());
+    EXPECT_TRUE(storage.themeColorSetByUser_.empty());
+}
+
+/**
  * @tc.name: WithThemeTestNg013
  * @tc.desc: reset cache color test
  * @tc.type: FUNC
