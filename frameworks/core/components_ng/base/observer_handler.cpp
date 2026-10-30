@@ -28,7 +28,7 @@
 namespace OHOS::Ace::NG {
 namespace {
 constexpr int32_t ABOUT_TO_API_MAJOR = 26;
-constexpr int32_t ABOUT_TO_API_MINOR = 2;
+constexpr int32_t ABOUT_TO_API_MINOR = 1;
 constexpr int32_t ABOUT_TO_API_PATCH = 0;
 std::string GetNavigationId(const RefPtr<NavDestinationPattern>& pattern)
 {
