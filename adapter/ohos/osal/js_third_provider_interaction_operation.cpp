@@ -14,6 +14,11 @@
  */
 
 #include "js_third_provider_interaction_operation.h"
+
+#include <algorithm>
+#include <cmath>
+#include <cstring>
+#include <limits>
 #include "core/accessibility/accessibility_manager.h"
 #include "core/accessibility/native_interface_accessibility_impl.h"
 
@@ -21,12 +26,89 @@
 
 #include "adapter/ohos/osal/accessibility/focus_move/accessibility_focus_move_osal_third.h"
 #include "base/log/log_wrapper.h"
+#include "adapter/ohos/osal/accessibility/third_accessibility_traversal.h"
 #include "core/components_ng/property/accessibility_property.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "js_third_provider_interaction_operation_utils.h"
 
 namespace OHOS::Ace::Framework {
 namespace {
+int32_t TransformThirdCoordinate(int32_t value, float scale, float offset)
+{
+    // Keep normal float arithmetic, but never cast a non-finite/out-of-range value to int.
+    if (!std::isfinite(scale) || !std::isfinite(offset)) {
+        return 0;
+    }
+    const double transformed = static_cast<double>(value * scale + std::trunc(offset));
+    if (std::isnan(transformed)) {
+        return 0;
+    }
+    return static_cast<int32_t>(std::clamp(transformed,
+        static_cast<double>(std::numeric_limits<int32_t>::min()),
+        static_cast<double>(std::numeric_limits<int32_t>::max())));
+}
+
+bool ValidateThirdNodePayload(const ArkUI_AccessibilityElementInfo& node, ThirdAccessibilityTraversal& traversal)
+{
+    const auto id = node.GetElementId();
+    if (!traversal.ConsumeBytes(sizeof(node), id) ||
+        !traversal.ConsumeBytes(node.GetChildNodeIds().size() * sizeof(int64_t), id) ||
+        node.GetOperationActions().size() > ThirdAccessibilityTraversal::MAX_BYTES / sizeof(ArkUI_AccessibleAction)) {
+        traversal.Record(ThirdAccessibilityTraversal::LIMIT_EXCEEDED, id);
+        return false;
+    }
+    if (!traversal.ConsumeBytes(node.GetOperationActions().size() * sizeof(ArkUI_AccessibleAction), id)) {
+        return false;
+    }
+    const auto strings = { &ArkUI_AccessibilityElementInfo::GetComponentType,
+        &ArkUI_AccessibilityElementInfo::GetContents, &ArkUI_AccessibilityElementInfo::GetHintText,
+        &ArkUI_AccessibilityElementInfo::GetAccessibilityText, &ArkUI_AccessibilityElementInfo::GetAccessibilityDescription,
+        &ArkUI_AccessibilityElementInfo::GetAccessibilityLevel, &ArkUI_AccessibilityElementInfo::GetBackgroundColor,
+        &ArkUI_AccessibilityElementInfo::GetBackgroundImage, &ArkUI_AccessibilityElementInfo::GetBlur,
+        &ArkUI_AccessibilityElementInfo::GetHitTestBehavior, &ArkUI_AccessibilityElementInfo::GetComponentIdentifier };
+    for (auto getter : strings) {
+        if (!traversal.ConsumeBytes((node.*getter)().size(), id)) {
+            return false;
+        }
+    }
+    for (const auto& action : node.GetOperationActions()) {
+        if (action.description && !traversal.ConsumeBytes(
+            strnlen(action.description, ThirdAccessibilityTraversal::MAX_BYTES + 1), id)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool ValidateThirdNodeResponse(int64_t queryId, const std::vector<ArkUI_AccessibilityElementInfo>& infos,
+    ThirdAccessibilityTraversal& traversal)
+{
+    if (infos.empty()) {
+        traversal.Record(ThirdAccessibilityTraversal::QUERY_FAILED, queryId);
+        return false;
+    }
+    const auto id = infos.front().GetElementId();
+    if (id < 0 || (queryId != -1 && id != queryId)) {
+        traversal.Record(ThirdAccessibilityTraversal::ID_MISMATCH, queryId);
+        return false;
+    }
+    if (infos.size() > ThirdAccessibilityTraversal::MAX_NODES ||
+        infos.front().GetChildNodeIds().size() > ThirdAccessibilityTraversal::MAX_EDGES) {
+        traversal.Record(ThirdAccessibilityTraversal::LIMIT_EXCEEDED, id);
+        return false;
+    }
+    if (queryId == -1) {
+        for (size_t i = 1; i < infos.size(); ++i) {
+            traversal.Record(infos[i].GetElementId() != id ? ThirdAccessibilityTraversal::MULTIPLE_ROOTS :
+                ThirdAccessibilityTraversal::REPEATED_ID, infos[i].GetElementId());
+        }
+    } else if (infos.size() != 1) {
+        traversal.Record(ThirdAccessibilityTraversal::EXTRA_RESULTS, queryId);
+        return false; // A mode=0 lookup must not choose arbitrarily between conflicting payloads.
+    }
+    return ValidateThirdNodePayload(infos.front(), traversal);
+}
+
 void LogAccessibilityElementInfo(
     const std::string& tag, const Accessibility::AccessibilityElementInfo& info)
 {
@@ -312,10 +394,10 @@ void JsThirdProviderInteractionOperation::FillNodeConfig(
 {
     OHOS::Accessibility::Rect oldRect = info.GetRectInScreen();
     OHOS::Accessibility::Rect newRect = OHOS::Accessibility::Rect(
-        oldRect.GetLeftTopXScreenPostion() * config.scaleX + static_cast<int32_t>(config.offset.GetX()),
-        oldRect.GetLeftTopYScreenPostion() * config.scaleY + static_cast<int32_t>(config.offset.GetY()),
-        oldRect.GetRightBottomXScreenPostion() * config.scaleX + static_cast<int32_t>(config.offset.GetX()),
-        oldRect.GetRightBottomYScreenPostion() * config.scaleY + static_cast<int32_t>(config.offset.GetY()));
+        TransformThirdCoordinate(oldRect.GetLeftTopXScreenPostion(), config.scaleX, config.offset.GetX()),
+        TransformThirdCoordinate(oldRect.GetLeftTopYScreenPostion(), config.scaleY, config.offset.GetY()),
+        TransformThirdCoordinate(oldRect.GetRightBottomXScreenPostion(), config.scaleX, config.offset.GetX()),
+        TransformThirdCoordinate(oldRect.GetRightBottomYScreenPostion(), config.scaleY, config.offset.GetY()));
     info.SetRectInScreen(newRect);
     info.SetPageId(config.pageId);
     info.SetWindowId(config.windowId);
@@ -367,7 +449,7 @@ RetError JsThirdProviderInteractionOperation::SearchElementInfoByAccessibilityId
 bool JsThirdProviderInteractionOperation::FindNativeInfoById(
     const WeakPtr<AccessibilityProvider>& accessibilityProvider,
     int64_t splitElementId,
-    std::shared_ptr<ArkUI_AccessibilityElementInfo>& nativeInfo)
+    std::shared_ptr<ArkUI_AccessibilityElementInfo>& nativeInfo, ThirdAccessibilityTraversal* traversal)
 {
     CHECK_NULL_RETURN(nativeInfo, false);
     auto provider = accessibilityProvider.Upgrade();
@@ -375,6 +457,17 @@ bool JsThirdProviderInteractionOperation::FindNativeInfoById(
     std::vector<ArkUI_AccessibilityElementInfo> nativeInfos;
     int32_t code = provider->FindAccessibilityNodeInfosById(
         splitElementId, 0, 0, nativeInfos);
+    if (traversal) {
+        if (code != 0) {
+            traversal->Record(ThirdAccessibilityTraversal::QUERY_FAILED, splitElementId);
+            return false;
+        }
+        if (!ValidateThirdNodeResponse(splitElementId, nativeInfos, *traversal)) {
+            return false;
+        }
+        *nativeInfo = nativeInfos.front();
+        return true;
+    }
     if (code != 0) {
         TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
             "FindNativeInfoById failed: %{public}d", code);
@@ -383,20 +476,43 @@ bool JsThirdProviderInteractionOperation::FindNativeInfoById(
     if (nativeInfos.empty()) {
         return false;
     }
+    if (splitElementId == -1) {
+        const auto rootId = nativeInfos.front().GetElementId();
+        for (const auto& candidate : nativeInfos) {
+            if (candidate.GetElementId() != rootId) {
+                TAG_LOGE(AceLogTag::ACE_ACCESSIBILITY,
+                    "Third provider multi-root response: queryId=-1, nodeCount=%{public}zu, "
+                    "selectedRootId=%{public}d, extraRootId=%{public}d"
+                    ". Only the first root is used.",
+                    nativeInfos.size(), rootId, candidate.GetElementId());
+                break;
+            }
+        }
+    }
     *nativeInfo = nativeInfos.front();
     return true;
 }
 
 bool JsThirdProviderInteractionOperation::FindAccessibilityNodeInfosByIdFromProvider(
     const int64_t splitElementId, const int32_t mode, const int32_t requestId,
-    std::list<Accessibility::AccessibilityElementInfo>& infos, bool ignoreHostOffset)
+    std::list<Accessibility::AccessibilityElementInfo>& infos, bool ignoreHostOffset,
+    ThirdAccessibilityTraversal* traversal)
 {
     auto provider = accessibilityProvider_.Upgrade();
     CHECK_NULL_RETURN(provider, false);
     std::vector<ArkUI_AccessibilityElementInfo> nativeInfos;
     int32_t code = provider->FindAccessibilityNodeInfosById(
         splitElementId, mode, requestId, nativeInfos);
-    if (code != 0) {
+    if (traversal) {
+        if (code != 0) {
+            traversal->Record(ThirdAccessibilityTraversal::QUERY_FAILED, splitElementId);
+            return false;
+        }
+        if (!ValidateThirdNodeResponse(splitElementId, nativeInfos, *traversal)) {
+            return false;
+        }
+        nativeInfos.resize(1);
+    } else if (code != 0) {
         TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
             "FindAccessibilityNodeInfosByIdFromProvider failed: %{public}d", code);
         return false;
@@ -405,7 +521,10 @@ bool JsThirdProviderInteractionOperation::FindAccessibilityNodeInfosByIdFromProv
     NodeConfig config;
     config.ignoreHostOffset = ignoreHostOffset;
     GetNodeConfig(config);
-    CopyNativeInfosToAccessibilityElementInfos(nativeInfos, config, infos, &thirdCustomProperties_);
+    {
+        std::lock_guard<std::mutex> lock(thirdCustomPropertiesMutex_);
+        CopyNativeInfosToAccessibilityElementInfos(nativeInfos, config, infos, &thirdCustomProperties_);
+    }
     ApplyChildTreeIdAndWinId(infos);
     return !infos.empty();
 }
@@ -510,7 +629,10 @@ bool JsThirdProviderInteractionOperation::FindAccessibilityNodeInfosByTextFromPr
 
     NodeConfig config;
     GetNodeConfig(config);
-    CopyNativeInfosToAccessibilityElementInfos(nativeInfos, config, infos, &thirdCustomProperties_);
+    {
+        std::lock_guard<std::mutex> lock(thirdCustomPropertiesMutex_);
+        CopyNativeInfosToAccessibilityElementInfos(nativeInfos, config, infos, &thirdCustomProperties_);
+    }
     ApplyChildTreeIdAndWinId(infos);
     return true;
 }
@@ -579,7 +701,10 @@ bool JsThirdProviderInteractionOperation::FindFocusedElementInfoFromProvider(
 
     NodeConfig config;
     GetNodeConfig(config);
-    CopyNativeInfoToAccessibilityElementInfo(nativeInfo, config, info, &thirdCustomProperties_);
+    {
+        std::lock_guard<std::mutex> lock(thirdCustomPropertiesMutex_);
+        CopyNativeInfoToAccessibilityElementInfo(nativeInfo, config, info, &thirdCustomProperties_);
+    }
     ApplyChildTreeIdAndWinId(info);
     return true;
 }
@@ -649,7 +774,10 @@ bool JsThirdProviderInteractionOperation::FocusMoveSearchProvider(
 
     NodeConfig config;
     GetNodeConfig(config);
-    CopyNativeInfoToAccessibilityElementInfo(nativeInfo, config, info, &thirdCustomProperties_);
+    {
+        std::lock_guard<std::mutex> lock(thirdCustomPropertiesMutex_);
+        CopyNativeInfoToAccessibilityElementInfo(nativeInfo, config, info, &thirdCustomProperties_);
+    }
     ApplyChildTreeIdAndWinId(info);
     return true;
 }
@@ -1040,11 +1168,21 @@ void JsThirdProviderInteractionOperation::FocusMoveSearchWithCondition(
     int32_t splitTreeId = AccessibilityElementInfo::UNDEFINED_TREE_ID;
     AccessibilitySystemAbilityClient::GetTreeIdAndElementIdBySplitElementId(
         elementId, splitElementId, splitTreeId);
+    if (splitTreeId > 0 && splitTreeId != GetBelongTreeId()) {
+        TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+            "Third accessibility focus: tree mismatch, requested=%{public}d registered=%{public}d",
+            splitTreeId, GetBelongTreeId());
+        ReplyFocusMoveNotSupport(callback, requestId);
+        return;
+    }
     Accessibility::AccessibilityElementInfo nodeInfo;
     std::list<Accessibility::AccessibilityElementInfo> infos;
     auto jsAccessibilityManager = jsAccessibilityManager_.Upgrade();
-    CHECK_NULL_VOID(jsAccessibilityManager);
     auto accessibilityProvider = accessibilityProvider_.Upgrade();
+    if (!jsAccessibilityManager || !accessibilityProvider) {
+        ReplyFocusMoveNotSupport(callback, requestId);
+        return;
+    }
     NodeConfig config;
     GetNodeConfig(config);
     FocusStrategyOsalThird strategy(jsAccessibilityManager, accessibilityProvider, config);
@@ -1054,7 +1192,7 @@ void JsThirdProviderInteractionOperation::FocusMoveSearchWithCondition(
         result.parentWindowId = GetParentWindowId();
         HILOG_INFO_FOCUS("focus move search third scroll result id %{public}" PRId64 ", "
             "ret %{public}d treeId %{public}d parentWindowId %{public}d requestID %{public}d",
-            nodeInfo.GetAccessibilityId(), result.resultType, result.nowLevelBelongTreeId,
+            splitElementId, result.resultType, result.nowLevelBelongTreeId,
             result.parentWindowId, requestId);
         jsAccessibilityManager->UpdateElementInfosTreeId(infos);
         callback.SetFocusMoveSearchWithConditionResult(infos, result, requestId);
@@ -1107,6 +1245,7 @@ Accessibility::FocusMoveResult JsThirdProviderInteractionOperation::SearchFocusM
     auto jsAccessibilityManager = jsAccessibilityManager_.Upgrade();
     CHECK_NULL_RETURN(jsAccessibilityManager, failResult);
     auto accessibilityProvider = accessibilityProvider_.Upgrade();
+    CHECK_NULL_RETURN(accessibilityProvider, failResult);
     NodeConfig config;
     GetNodeConfig(config);
     FocusStrategyOsalThird strategy(jsAccessibilityManager, accessibilityProvider, config);
@@ -1125,7 +1264,7 @@ Accessibility::FocusMoveResult JsThirdProviderInteractionOperation::SearchFocusM
             ", belongTreeId=%{public}d, componentType=%{public}s",
             nodeInfo.GetAccessibilityId(), nodeInfo.GetBelongTreeId(),
             nodeInfo.GetComponentType().c_str());
-        return result;
+        return failResult;
     }
     // Same outbound wiring as the operator-level main path: child-tree pointers on mount nodes, T_cmp splicing for.
     std::list<Accessibility::AccessibilityElementInfo> infos = { nodeInfo };
@@ -1422,6 +1561,7 @@ void JsThirdProviderInteractionOperation::SetThirdCustomProperty(
 
 RefPtr<NG::CustomAccessibilityProperty> JsThirdProviderInteractionOperation::GetThirdCustomProperty(int64_t elementId)
 {
+    std::lock_guard<std::mutex> lock(thirdCustomPropertiesMutex_);
     auto it = thirdCustomProperties_.find(elementId);
     if (it != thirdCustomProperties_.end()) {
         return it->second;

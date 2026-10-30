@@ -14,11 +14,44 @@
  */
 
 
+#include <charconv>
+
 #include "base/log/dump_log.h"
 #include "core/accessibility/hidumper/accessibility_hidumper.h"
 #include "core/components_ng/base/frame_node.h"
 
 namespace OHOS::Ace {
+
+bool AccessibilityHidumper::ParseThirdFocusSearch(
+    const std::vector<std::string>& params, DumpInfoArgument& argument)
+{
+    constexpr size_t parameterCount = 6;
+    if (params.size() != parameterCount || params[1] != "--third-focus-search") {
+        DumpLog::GetInstance().Print(
+            "Usage: -accessibility --third-focus-search <splicedId> <direction:16|32|64|128|256|512> "
+            "<rule:1|2|3> <condition:1|2|4|8>");
+        return false;
+    }
+    int64_t values[4] = {};
+    for (size_t i = 0; i < 4; ++i) {
+        const auto& text = params[i + 2];
+        auto result = std::from_chars(text.data(), text.data() + text.size(), values[i]);
+        if (result.ec != std::errc() || result.ptr != text.data() + text.size()) {
+            return false;
+        }
+    }
+    if (values[0] < 0 || (values[1] != 16 && values[1] != 32 && values[1] != 64 &&
+        values[1] != 128 && values[1] != 256 && values[1] != 512) || values[2] < 1 || values[2] > 3 ||
+        (values[3] != 1 && values[3] != 2 && values[3] != 4 && values[3] != 8)) {
+        return false;
+    }
+    argument.mode = DumpMode::THIRD_FOCUS_SEARCH;
+    argument.nodeId = values[0];
+    argument.focusDirection = static_cast<int32_t>(values[1]);
+    argument.focusMoveRule = static_cast<int32_t>(values[2]);
+    argument.focusCondition = static_cast<int32_t>(values[3]);
+    return true;
+}
 
 bool AccessibilityHidumper::DumpProcessInjectActionParameters(
     const std::vector<std::string>& params,
