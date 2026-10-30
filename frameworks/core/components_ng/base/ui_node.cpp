@@ -14,6 +14,7 @@
  */
 #include "core/components_ng/base/ui_tree_collector.h"
 #include "core/components_ng/base/ui_node.h"
+#include "core/components_ng/base/inspector_tree_provider_registry.h"
 
 #include <optional>
 #include <queue>
@@ -149,6 +150,9 @@ UINode::UINode(std::string_view tag, int32_t nodeId, bool isRoot)
 
 UINode::~UINode()
 {
+    // Release the external inspector-tree getter entry bound to this node
+    // (registration lifetime follows the node by construction).
+    InspectorTreeProviderRegistry::ReleaseNodeEntry(this);
     --count_;
 #ifdef UICAST_COMPONENT_SUPPORTED
     do {

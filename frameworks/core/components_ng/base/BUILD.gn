@@ -23,6 +23,8 @@ build_component_ng("base_ng") {
     "frame_node_multi_thread.cpp",
     "geometry_node.cpp",
     "inspector.cpp",
+    "inspector_external_subtree.cpp",
+    "inspector_tree_provider_registry.cpp",
     "page_text_collector.cpp",
     "inspector_filter.cpp",
     "inspector_tree_request_context.cpp",

@@ -67,6 +67,7 @@ class FocusHub;
 class LayoutWrapperNode;
 class FrameNode;
 class CustomNode;
+struct InspectorGetterEntry;
 
 struct ExtraInfo {
     std::string page;
@@ -241,6 +242,14 @@ public:
     // Determine if the node is a SyntaxNode, default returns false.
     // SyntaxNode classes need to override the method and return true.
     virtual bool IsSyntaxNode() const
+    {
+        return false;
+    }
+
+    // Determine if the node can host an external inspector subtree getter
+    // (registration-time host-type policy). CustomNode overrides this to
+    // return true; XComponent hosts are identified by tag instead.
+    virtual bool IsInspectorSubtreeHost() const
     {
         return false;
     }
@@ -871,6 +880,17 @@ public:
         return instanceId_;
     }
 
+    // External inspector-tree getter entry bound to this node (managed by
+    // InspectorTreeProviderRegistry; lifecycle follows the node).
+    InspectorGetterEntry* GetInspectorGetterEntry() const
+    {
+        return inspectorGetterEntry_;
+    }
+    void SetInspectorGetterEntry(InspectorGetterEntry* entry)
+    {
+        inspectorGetterEntry_ = entry;
+    }
+
     static std::set<std::string> GetLayoutTags()
     {
         return layoutTags_;
@@ -1471,6 +1491,7 @@ private:
     bool isNodeAdapter_ = false;
 
     int32_t restoreId_ = -1;
+    InspectorGetterEntry* inspectorGetterEntry_ = nullptr;
 
     bool useOffscreenProcess_ = false;
 
