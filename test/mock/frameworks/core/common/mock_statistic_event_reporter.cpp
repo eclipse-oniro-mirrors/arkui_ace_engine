@@ -15,6 +15,8 @@
 
 #include "core/common/statistic_event_reporter.h"
 
+#include "base/log/material_statistic_event_info.h"
+
 namespace OHOS::Ace {
 namespace {
 }
@@ -22,6 +24,8 @@ namespace {
 StatisticEventReporter::StatisticEventReporter() {}
 
 StatisticEventReporter::StatisticEventReporter(int32_t instanceId) {}
+
+StatisticEventReporter::~StatisticEventReporter() = default;
 
 void StatisticEventReporter::SendEvent(StatisticEventType eventName) {}
 

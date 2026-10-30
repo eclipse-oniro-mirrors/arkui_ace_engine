@@ -18,6 +18,7 @@
 #include <mutex>
 
 #include "base/log/log.h"
+#include "base/log/material_statistic_event_info.h"
 #include "base/thread/task_executor.h"
 #include "base/utils/time_util.h"
 #include "core/common/ace_application_info.h"
@@ -45,6 +46,8 @@ StatisticEventReporter::StatisticEventReporter(int32_t instanceId)
     auto bundleName = container->GetBundleName();
     appInfo_.bundleName = bundleName != "" ? bundleName : AceApplicationInfo::GetInstance().GetPackageName();
 }
+
+StatisticEventReporter::~StatisticEventReporter() = default;
 
 StatisticEventInfo StatisticEventReporter::ConvertToEvent(StatisticEventType eventType)
 {

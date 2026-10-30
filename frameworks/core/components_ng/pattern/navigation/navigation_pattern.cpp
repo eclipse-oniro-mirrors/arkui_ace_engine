@@ -5097,6 +5097,16 @@ void NavigationPattern::HandlePreTransition(const RefPtr<NavigationGroupNode>& h
     ACE_SCOPED_TRACE_COMMERCIAL("NavDestination Page from %s to %s", fromPathInfo.c_str(), toPathInfo.c_str());
 }
 
+void NavigationPattern::ReportNavPageContextStats(const RefPtr<FrameNode>& topNode)
+{
+    if (!topNode) {
+        return;
+    }
+    auto ctx = GetContext();
+    CHECK_NULL_VOID(ctx);
+    ctx->ReportPageContextStats(topNode->GetId(), PageLogContainerType::NavContainer);
+}
+
 void NavigationPattern::StartTransition(const RefPtr<NavDestinationGroupNode>& preDestination,
     const RefPtr<NavDestinationGroupNode>& topDestination,
     bool isAnimated, bool isPopPage, bool isNeedVisible)
@@ -5256,11 +5266,7 @@ void NavigationPattern::StartTransition(const RefPtr<NavDestinationGroupNode>& p
                     topNode = AceType::DynamicCast<FrameNode>(navigationNode->GetNavBarOrHomeDestinationNode());
                 }
                 navigationPattern->ContentChangeReport(topNode, isPopTransition);
-                if (topNode) {
-                    if (auto ctx = navigationPattern->GetContext()) {
-                        ctx->ReportPageContextStats(topNode->GetId(), PageLogContainerType::NavContainer);
-                    }
-                }
+                navigationPattern->ReportNavPageContextStats(topNode);
             });
         return;
     }
@@ -5278,7 +5284,6 @@ void NavigationPattern::StartTransition(const RefPtr<NavDestinationGroupNode>& p
         auto forceSplitUseNavBar = navigationPattern->IsForceSplitUseNavBar();
 
         RefPtr<FrameNode> topNode = topDestination;
-        auto ctx = navigationPattern->GetContext();
         if (!topNode) {
             auto navNode = AceType::DynamicCast<NavigationGroupNode>(navigationPattern->GetHost());
             CHECK_NULL_VOID(navNode);
@@ -5295,9 +5300,7 @@ void NavigationPattern::StartTransition(const RefPtr<NavDestinationGroupNode>& p
             navigationPattern->primaryNodesToBeRemoved_.clear();
             navigationPattern->RemoveRedundantPrimaryNavDestination();
             navigationPattern->ContentChangeReport(topDestination, isPopTransition);
-            if (topNode && ctx) {
-                ctx->ReportPageContextStats(topNode->GetId(), PageLogContainerType::NavContainer);
-            }
+            navigationPattern->ReportNavPageContextStats(topNode);
             return;
         }
 
@@ -5307,9 +5310,7 @@ void NavigationPattern::StartTransition(const RefPtr<NavDestinationGroupNode>& p
         navigationPattern->prePrimaryNodes_.clear();
         navigationPattern->primaryNodesToBeRemoved_.clear();
         navigationPattern->RemoveRedundantPrimaryNavDestination();
-        if (topNode && ctx) {
-            ctx->ReportPageContextStats(topNode->GetId(), PageLogContainerType::NavContainer);
-        }
+        navigationPattern->ReportNavPageContextStats(topNode);
     });
 }
 

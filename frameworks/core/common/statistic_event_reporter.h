@@ -24,10 +24,12 @@
 #include <string>
 
 #include "base/utils/macros.h"
-#include "base/log/material_statistic_event_info.h"
 
 namespace OHOS::Ace {
 class PipelineBase;
+struct RichMaterialNodeStatData;
+struct RichOverlayMaterialAreaData;
+struct MaterialStatisticEventInfo;
 // Each component type occupies 100 enum positions for easy extension
 enum class StatisticEventType {
     // General framework events (0-10099)
@@ -113,7 +115,7 @@ class ACE_FORCE_EXPORT StatisticEventReporter : public std::enable_shared_from_t
 public:
     StatisticEventReporter();
     explicit StatisticEventReporter(int32_t instanceId);
-    virtual ~StatisticEventReporter() = default;
+    virtual ~StatisticEventReporter();
 
     /**
      * Send statistic event. This method should ONLY be called from the main thread.

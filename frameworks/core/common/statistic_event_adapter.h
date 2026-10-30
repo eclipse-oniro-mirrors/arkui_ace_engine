@@ -19,12 +19,11 @@
 #include <map>
 #include <vector>
 
-#include "base/log/material_statistic_event_info.h"
-
 namespace OHOS::Ace {
 struct StatisticAppInfo;
 enum class StatisticEventType;
 struct StatisticEventInfo;
+struct MaterialStatisticEventInfo;
 class StatisticEventAdapter final {
 public:
     StatisticEventAdapter() = default;

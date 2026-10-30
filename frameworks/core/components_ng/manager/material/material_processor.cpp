@@ -148,6 +148,45 @@ void FlushOverlayMaterialArea(int32_t nodeId, std::string tag, double width, dou
     pipeline->GetStatisticEventReporter()->SendOverlayMaterialArea(data);
 }
 
+void SendPageContextStats(const std::vector<MaterialNodeInfo>& totalNodes, int32_t navCount, int32_t tabsCount,
+    int32_t pageCount, const PageContextStatBatch& batch, const RefPtr<PipelineContext>& pipeline)
+{
+    RichMaterialNodeStatData data;
+    data.containerId = batch.navContainerId;
+    data.containerType = "navigation-tabs-page";
+    data.entries.reserve(totalNodes.size());
+    for (const auto& node : totalNodes) {
+        RichMaterialNodeEntry entry;
+        entry.nodeId = node.nodeId;
+        entry.tag = node.tag;
+        entry.containerId = node.containerId;
+        entry.width = node.width;
+        entry.height = node.height;
+        entry.area = node.area;
+        entry.inTitleBar = node.inTitleBar;
+        entry.inBottomTabBar = node.inBottomTabBar;
+        data.entries.emplace_back(std::move(entry));
+    }
+    data.navCount = navCount;
+    data.tabsCount = tabsCount;
+    data.pageCount = pageCount;
+    data.screenWidth = batch.screenWidth;
+    data.screenHeight = batch.screenHeight;
+    double screenArea = std::max(1e-6, batch.screenWidth * batch.screenHeight);
+    double materialArea = 0.0;
+    for (const auto& node : totalNodes) {
+        materialArea += node.area;
+    }
+    data.areaPercent = materialArea / screenArea;
+    if (data.areaPercent < MATERIAL_AREA_REPORT_THRESHOLD) {
+        return;
+    }
+    data.navName = batch.navName;
+    data.pageName = batch.pageName;
+    data.tabIndex = batch.tabIndex;
+    pipeline->GetStatisticEventReporter()->SendMaterialNodeStat(data);
+}
+
 void FlushPageContextStats(PageContextStatBatch batch, int64_t deadline, const WeakPtr<PipelineContext>& pipelineWk)
 {
     if (GetSysTimestamp() > deadline) {
@@ -166,44 +205,12 @@ void FlushPageContextStats(PageContextStatBatch batch, int64_t deadline, const W
     totalNodes.insert(totalNodes.end(), batch.navNodes.begin(), batch.navNodes.end());
     totalNodes.insert(totalNodes.end(), batch.tabsNodes.begin(), batch.tabsNodes.end());
     totalNodes.insert(totalNodes.end(), batch.pageNodes.begin(), batch.pageNodes.end());
-    if (!totalNodes.empty()) {
-        auto pipeline = pipelineWk.Upgrade();
-        CHECK_NULL_VOID(pipeline);
-        RichMaterialNodeStatData data;
-        data.containerId = batch.navContainerId;
-        data.containerType = "navigation-tabs-page";
-        data.entries.reserve(totalNodes.size());
-        for (const auto& node : totalNodes) {
-            RichMaterialNodeEntry entry;
-            entry.nodeId = node.nodeId;
-            entry.tag = node.tag;
-            entry.containerId = node.containerId;
-            entry.width = node.width;
-            entry.height = node.height;
-            entry.area = node.area;
-            entry.inTitleBar = node.inTitleBar;
-            entry.inBottomTabBar = node.inBottomTabBar;
-            data.entries.emplace_back(std::move(entry));
-        }
-        data.navCount = navCount;
-        data.tabsCount = tabsCount;
-        data.pageCount = pageCount;
-        data.screenWidth = batch.screenWidth;
-        data.screenHeight = batch.screenHeight;
-        double screenArea = std::max(1e-6, batch.screenWidth * batch.screenHeight);
-        double materialArea = 0.0;
-        for (const auto& node : totalNodes) {
-            materialArea += node.area;
-        }
-        data.areaPercent = materialArea / screenArea;
-        if (data.areaPercent < MATERIAL_AREA_REPORT_THRESHOLD) {
-            return;
-        }
-        data.navName = batch.navName;
-        data.pageName = batch.pageName;
-        data.tabIndex = batch.tabIndex;
-        pipeline->GetStatisticEventReporter()->SendMaterialNodeStat(data);
+    if (totalNodes.empty()) {
+        return;
     }
+    auto pipeline = pipelineWk.Upgrade();
+    CHECK_NULL_VOID(pipeline);
+    SendPageContextStats(totalNodes, navCount, tabsCount, pageCount, batch, pipeline);
 }
 
 std::string GetTargetTag(const std::string& tag, const std::string& parentTag, const std::string& source)
@@ -235,6 +242,186 @@ std::string GetTargetTag(const std::string& tag, const std::string& parentTag, c
         targetTag = "Sub Menu";
     }
     return targetTag;
+}
+
+bool IsPageContextNodeVisible(const RefPtr<FrameNode>& node, const ContainerInfo& ci)
+{
+    auto tabContainerNode =
+        AceType::DynamicCast<FrameNode>(ElementRegister::GetInstance()->GetUINodeById(ci.tabContentId));
+    if (tabContainerNode && !tabContainerNode->IsVisible()) {
+        return false;
+    }
+    auto navContainerNode = AceType::DynamicCast<FrameNode>(ElementRegister::GetInstance()->GetUINodeById(
+        (ci.navDestinationId != -1) ? ci.navDestinationId : ci.navBarId));
+    if (navContainerNode && !navContainerNode->IsVisible()) {
+        return false;
+    }
+    if (!node->IsVisibleAndActive()) {
+        return false;
+    }
+    return true;
+}
+
+bool MatchesPageScope(const ContainerInfo& ci, int32_t targetContainerId)
+{
+    if (ci.tabsId == -1 && ci.navigationId == -1 && ci.pageId == -1) {
+        return false;
+    }
+    if (ci.pageId != -1 && ci.pageId != targetContainerId) {
+        return false;
+    }
+    return true;
+}
+
+bool MatchesNavContainerScope(const ContainerInfo& ci, int32_t targetContainerId)
+{
+    if (ci.navigationId == -1 || (ci.navBarId == -1 && ci.navDestinationId == -1)) {
+        return false;
+    }
+    if ((ci.navBarId != -1 && ci.navBarId != targetContainerId) ||
+        (ci.navDestinationId != -1 && ci.navDestinationId != targetContainerId)) {
+        return false;
+    }
+    return true;
+}
+
+bool MatchesTabContainerScope(const ContainerInfo& ci, int32_t targetContainerId)
+{
+    if (ci.tabsId == -1) {
+        return false;
+    }
+    if (ci.tabContentId != -1 && ci.tabContentId != targetContainerId) {
+        return false;
+    }
+    return true;
+}
+
+bool MatchesContainerScope(const ContainerInfo& ci, PageLogContainerType type, int32_t targetContainerId)
+{
+    switch (type) {
+        case PageLogContainerType::Page:
+            return MatchesPageScope(ci, targetContainerId);
+        case PageLogContainerType::NavContainer:
+            return MatchesNavContainerScope(ci, targetContainerId);
+        case PageLogContainerType::TabContainer:
+            return MatchesTabContainerScope(ci, targetContainerId);
+        default:
+            return false;
+    }
+}
+
+bool ShouldSkipPageContextNode(const RefPtr<FrameNode>& node, const ContainerInfo& ci,
+    PageLogContainerType type, int32_t targetContainerId)
+{
+    if (!node) {
+        return true;
+    }
+    if (!IsPageContextNodeVisible(node, ci)) {
+        return true;
+    }
+    if (!MatchesContainerScope(ci, type, targetContainerId)) {
+        return true;
+    }
+    if (!node->GetGeometryNode()) {
+        return true;
+    }
+    return false;
+}
+
+void ClassifyPageContextNode(const RefPtr<FrameNode>& node, const ContainerInfo& ci,
+    std::vector<MaterialNodeInfo>& navNodes, std::vector<MaterialNodeInfo>& tabsNodes,
+    std::vector<MaterialNodeInfo>& pageNodes)
+{
+    if (!node) {
+        return;
+    }
+    auto geometryNode = node->GetGeometryNode();
+    if (!geometryNode) {
+        return;
+    }
+    auto size = geometryNode->GetFrameSize();
+    MaterialNodeInfo info;
+    info.nodeId = node->GetId();
+    info.tag = node->GetTag();
+    info.width = size.Width();
+    info.height = size.Height();
+    info.area = info.width * info.height;
+    info.inTitleBar = node->IsInTitleBar();
+    info.inBottomTabBar = node->IsInBottomTabBar();
+    if (ci.navigationId != -1 && ci.navigationId == ci.containerId) {
+        info.containerId = ci.navigationId;
+        navNodes.push_back(info);
+    } else if (ci.tabsId != -1 && ci.tabsId == ci.containerId) {
+        info.containerId = ci.tabsId;
+        tabsNodes.push_back(info);
+    } else {
+        info.containerId = ci.pageId;
+        pageNodes.push_back(info);
+    }
+}
+
+void ResolveTargetNames(int32_t targetContainerId, PageLogContainerType type,
+    std::string& navName, std::string& pageName)
+{
+    auto targetNode =
+        AceType::DynamicCast<FrameNode>(ElementRegister::GetInstance()->GetUINodeById(targetContainerId));
+    if (!targetNode) {
+        return;
+    }
+    if (targetNode->GetTag() == V2::NAVDESTINATION_VIEW_ETS_TAG) {
+        auto navDestPattern = targetNode->GetPattern<NavDestinationPattern>();
+        if (navDestPattern) {
+            navName = navDestPattern->GetName();
+        }
+    } else if (type == PageLogContainerType::NavContainer && targetNode->GetTag() == V2::NAVBAR_ETS_TAG) {
+        navName = NAVBAR_DEFAULT_NAME;
+    }
+    pageName = GetPageUrlByContainerId(targetContainerId);
+}
+
+bool GetOverlayDimensions(const RefPtr<FrameNode>& host, double& width, double& height, double& area)
+{
+    auto geometryNode = host->GetGeometryNode();
+    if (!geometryNode) {
+        return false;
+    }
+    auto size = geometryNode->GetFrameSize();
+    width = size.Width();
+    height = size.Height();
+    if (host->GetTag() == V2::SHEET_PAGE_TAG) {
+        auto pattern = host->GetPattern<SheetPresentationPattern>();
+        if (!pattern) {
+            return false;
+        }
+        if (!pattern->IsSheetBottomStyle()) {
+            height = pattern->GetCenterHeight();
+        } else {
+            height = pattern->GetHeight();
+        }
+    }
+    area = width * height;
+    return !NearZero(area);
+}
+
+void PostOverlayAreaTask(const RefPtr<FrameNode>& host, const std::string& parentTag,
+    const std::string& source, double width, double height, double area)
+{
+    auto pipeline = PipelineContext::GetCurrentContextSafelyWithCheck();
+    CHECK_NULL_VOID(pipeline);
+    double screenWidth = pipeline->GetRootWidth();
+    double screenHeight = pipeline->GetRootHeight();
+    if (NearZero(screenHeight * screenWidth)) {
+        return;
+    }
+    auto nodeId = host->GetId();
+    auto tag = host->GetTag();
+    auto pipelineWk = WeakPtr<PipelineContext>(pipeline);
+    std::string targetTag = GetTargetTag(tag, parentTag, source);
+    pipeline->AddPredictTask([nodeId, tag = std::move(targetTag), width, height, area, screenWidth, screenHeight,
+                                 pipelineWk](int64_t deadline, bool /*canUseLongPredictTask*/) {
+        FlushOverlayMaterialArea(
+            nodeId, std::move(tag), width, height, area, screenWidth, screenHeight, deadline, pipelineWk);
+    });
 }
 } // namespace
 
@@ -285,43 +472,13 @@ void MaterialProcessor::ReportOverlayNodeMaterialArea(const RefPtr<FrameNode>& h
         }
     }
 
-    auto geometryNode = host->GetGeometryNode();
-    CHECK_NULL_VOID(geometryNode);
-    auto size = geometryNode->GetFrameSize();
-    double width = size.Width();
-    double height = size.Height();
-    if (host->GetTag() == V2::SHEET_PAGE_TAG) {
-        auto pattern = host->GetPattern<SheetPresentationPattern>();
-        CHECK_NULL_VOID(pattern);
-        if (!pattern->IsSheetBottomStyle()) {
-            height = pattern->GetCenterHeight();
-        } else {
-            height = pattern->GetHeight();
-        }
-    }
-    double area = width * height;
-    if (NearZero(area)) {
+    double width = 0.0;
+    double height = 0.0;
+    double area = 0.0;
+    if (!GetOverlayDimensions(host, width, height, area)) {
         return;
     }
-
-    auto pipeline = NG::PipelineContext::GetCurrentContextSafelyWithCheck();
-    CHECK_NULL_VOID(pipeline);
-    double screenWidth = pipeline->GetRootWidth();
-    double screenHeight = pipeline->GetRootHeight();
-    if (NearZero(screenHeight * screenWidth)) {
-        return;
-    }
-    auto nodeId = host->GetId();
-    auto tag = host->GetTag();
-    auto pipelineWk = WeakPtr<PipelineContext>(pipeline);
-
-    std::string targetTag = GetTargetTag(tag, parentTag, source);
-
-    pipeline->AddPredictTask([nodeId, tag = std::move(targetTag), width, height, area, screenWidth, screenHeight,
-                                 pipelineWk](int64_t deadline, bool /*canUseLongPredictTask*/) {
-        FlushOverlayMaterialArea(
-            nodeId, std::move(tag), width, height, area, screenWidth, screenHeight, deadline, pipelineWk);
-    });
+    PostOverlayAreaTask(host, parentTag, source, width, height, area);
 }
 
 void MaterialProcessor::ApplyScopeGate(const RefPtr<PipelineContext>& pipeline)
@@ -403,93 +560,12 @@ void MaterialProcessor::ReportPageContextStats(int32_t targetContainerId, PageLo
             it = pageContextStats_.erase(it);
             continue;
         }
-
         auto ci = CollectContainerInfo(node);
-        int32_t navId = ci.navigationId;
-        int32_t tabsId = ci.tabsId;
-        int32_t pageId = ci.pageId;
-        int32_t nearestComponentId = ci.containerId;
-        int32_t navDesContainerId = ci.navDestinationId;
-        int32_t navBarContainerId = ci.navBarId;
-        int32_t tabContainerId = ci.tabContentId;
-
-        bool needContinue = false;
-        {
-            auto tabContainerNode =
-                AceType::DynamicCast<NG::FrameNode>(ElementRegister::GetInstance()->GetUINodeById(tabContainerId));
-            auto navContainerNode = AceType::DynamicCast<NG::FrameNode>(ElementRegister::GetInstance()->GetUINodeById(
-                (navDesContainerId != -1) ? navDesContainerId : navBarContainerId));
-            if (tabContainerNode) {
-                bool tabContainerVisible = tabContainerNode->IsVisible();
-                if (!tabContainerVisible) {
-                    needContinue = true;
-                }
-            }
-            if (navContainerNode) {
-                bool navContainerVisible = navContainerNode->IsVisible();
-                if (!navContainerVisible) {
-                    needContinue = true;
-                }
-            }
-
-            if (!node->IsVisibleAndActive()) {
-                needContinue = true;
-            }
-        }
-
-        if (type == PageLogContainerType::Page) {
-            if (tabsId == -1 && navId == -1 && pageId == -1) {
-                needContinue = true;
-            }
-            if (pageId != -1 && pageId != targetContainerId) {
-                needContinue = true;
-            }
-        } else if (type == PageLogContainerType::NavContainer) {
-            if (navId == -1 || (navBarContainerId == -1 && navDesContainerId == -1)) {
-                needContinue = true;
-            }
-            if ((navBarContainerId != -1 && navBarContainerId != targetContainerId) ||
-                (navDesContainerId != -1 && navDesContainerId != targetContainerId)) {
-                needContinue = true;
-            }
-        } else if (type == PageLogContainerType::TabContainer) {
-            if (tabsId == -1) {
-                needContinue = true;
-            } else if (tabContainerId != -1 && tabContainerId != targetContainerId) {
-                needContinue = true;
-            }
-        }
-        auto geometryNode = node->GetGeometryNode();
-        if (!geometryNode) {
-            needContinue = true;
-        }
-        if (needContinue) {
+        if (ShouldSkipPageContextNode(node, ci, type, targetContainerId)) {
             ++it;
             continue;
         }
-        bool inTitleBar = node->IsInTitleBar();
-        bool inBottomTabBar = node->IsInBottomTabBar();
-        auto size = geometryNode->GetFrameSize();
-        double width = size.Width();
-        double height = size.Height();
-        MaterialNodeInfo info;
-        info.nodeId = node->GetId();
-        info.tag = node->GetTag();
-        info.width = width;
-        info.height = height;
-        info.area = width * height;
-        info.inTitleBar = inTitleBar;
-        info.inBottomTabBar = inBottomTabBar;
-        if (navId != -1 && navId == nearestComponentId) {
-            info.containerId = navId;
-            navNodes.push_back(info);
-        } else if (tabsId != -1 && tabsId == nearestComponentId) {
-            info.containerId = tabsId;
-            tabsNodes.push_back(info);
-        } else {
-            info.containerId = pageId;
-            pageNodes.push_back(info);
-        }
+        ClassifyPageContextNode(node, ci, navNodes, tabsNodes, pageNodes);
         ++it;
     }
     lock.unlock();
@@ -500,19 +576,7 @@ void MaterialProcessor::ReportPageContextStats(int32_t targetContainerId, PageLo
 
     std::string navName;
     std::string pageName;
-    auto targetNode =
-        AceType::DynamicCast<NG::FrameNode>(ElementRegister::GetInstance()->GetUINodeById(targetContainerId));
-    if (targetNode) {
-        if (targetNode->GetTag() == V2::NAVDESTINATION_VIEW_ETS_TAG) {
-            auto navDestPattern = targetNode->GetPattern<NavDestinationPattern>();
-            if (navDestPattern) {
-                navName = navDestPattern->GetName();
-            }
-        } else if (type == PageLogContainerType::NavContainer && targetNode->GetTag() == V2::NAVBAR_ETS_TAG) {
-            navName = NAVBAR_DEFAULT_NAME;
-        }
-        pageName = GetPageUrlByContainerId(targetContainerId);
-    }
+    ResolveTargetNames(targetContainerId, type, navName, pageName);
 
     auto pipeline = NG::PipelineContext::GetCurrentContextSafelyWithCheck();
     CHECK_NULL_VOID(pipeline);

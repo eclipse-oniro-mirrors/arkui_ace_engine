@@ -16,6 +16,7 @@
 #include "core/common/statistic_event_adapter.h"
 
 #include "base/log/log.h"
+#include "base/log/material_statistic_event_info.h"
 #include "core/common/statistic_event_reporter.h"
 #ifdef UI_SERVICE_WITH_IDL
 #include "ui_service_mgr_client_idl.h"

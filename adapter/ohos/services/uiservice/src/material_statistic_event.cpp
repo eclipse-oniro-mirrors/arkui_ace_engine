@@ -43,6 +43,46 @@ std::string JoinStringList(const std::vector<std::string>& parts, char sep)
     }
     return result;
 }
+
+void AppendNodeStat(BundleStatSummary& bundle, const RichMaterialNodeStatData& data)
+{
+    MaterialStatSummary* summary = nullptr;
+    for (auto& matStat : bundle.materialStats) {
+        if (matStat.Matches(data)) {
+            summary = &matStat;
+            break;
+        }
+    }
+    if (!summary) {
+        bundle.materialStats.push_back({});
+        summary = &bundle.materialStats.back();
+        summary->navName = data.navName;
+        summary->tabIndex = data.tabIndex;
+        summary->pageName = data.pageName;
+    }
+    summary->minArea = std::min(summary->minArea, data.areaPercent);
+    summary->maxArea = std::max(summary->maxArea, data.areaPercent);
+    summary->count++;
+}
+
+void AppendOverlayArea(BundleStatSummary& bundle, const RichOverlayMaterialAreaData& data)
+{
+    OverlayStatSummary* summary = nullptr;
+    for (auto& overlayStat : bundle.overlayStats) {
+        if (overlayStat.Matches(data)) {
+            summary = &overlayStat;
+            break;
+        }
+    }
+    if (!summary) {
+        bundle.overlayStats.push_back({});
+        summary = &bundle.overlayStats.back();
+        summary->tag = data.tag;
+    }
+    summary->minArea = std::min(summary->minArea, data.areaPercent);
+    summary->maxArea = std::max(summary->maxArea, data.areaPercent);
+    summary->count++;
+}
 } // namespace
 
 void MaterialStatisticEvent::Append(const MaterialStatisticEventInfo& info)
@@ -64,41 +104,9 @@ void MaterialStatisticEvent::Append(const MaterialStatisticEventInfo& info)
     }
 
     if (info.type == MaterialStatisticEventType::MATERIAL_NODE_STAT) {
-        const auto& materialData = info.materialNodeStat;
-        MaterialStatSummary* materialSummary = nullptr;
-        for (auto& matStat : bundle->materialStats) {
-            if (matStat.Matches(materialData)) {
-                materialSummary = &matStat;
-                break;
-            }
-        }
-        if (!materialSummary) {
-            bundle->materialStats.push_back({});
-            materialSummary = &bundle->materialStats.back();
-            materialSummary->navName = materialData.navName;
-            materialSummary->tabIndex = materialData.tabIndex;
-            materialSummary->pageName = materialData.pageName;
-        }
-        materialSummary->minArea = std::min(materialSummary->minArea, materialData.areaPercent);
-        materialSummary->maxArea = std::max(materialSummary->maxArea, materialData.areaPercent);
-        materialSummary->count++;
+        AppendNodeStat(*bundle, info.materialNodeStat);
     } else if (info.type == MaterialStatisticEventType::MATERIAL_OVERLAY_AREA) {
-        const auto& overlayData = info.overlayMaterialArea;
-        OverlayStatSummary* overlaySummary = nullptr;
-        for (auto& overlayStat : bundle->overlayStats) {
-            if (overlayStat.Matches(overlayData)) {
-                overlaySummary = &overlayStat;
-                break;
-            }
-        }
-        if (!overlaySummary) {
-            bundle->overlayStats.push_back({});
-            overlaySummary = &bundle->overlayStats.back();
-            overlaySummary->tag = overlayData.tag;
-        }
-        overlaySummary->minArea = std::min(overlaySummary->minArea, overlayData.areaPercent);
-        overlaySummary->maxArea = std::max(overlaySummary->maxArea, overlayData.areaPercent);
-        overlaySummary->count++;
+        AppendOverlayArea(*bundle, info.overlayMaterialArea);
     }
 }
 
