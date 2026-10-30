@@ -282,6 +282,8 @@ ArkUIBackgroundColorStyle ConvertToOriginBackgroundColorStyle(const OH_ArkUI_Bac
     backgroundColorStyle.topRightRadius = style.topRightRadius;
     backgroundColorStyle.bottomLeftRadius = style.bottomLeftRadius;
     backgroundColorStyle.bottomRightRadius = style.bottomRightRadius;
+    backgroundColorStyle.borderWidth = style.borderWidth;
+    backgroundColorStyle.borderColor = style.borderColor;
     return backgroundColorStyle;
 }
 
@@ -578,6 +580,8 @@ OH_ArkUI_BackgroundColorStyle ConvertToCBackgroundColorStyle(const ArkUIBackgrou
     backgroundColorStyle.topRightRadius = style.topRightRadius;
     backgroundColorStyle.bottomLeftRadius = style.bottomLeftRadius;
     backgroundColorStyle.bottomRightRadius = style.bottomRightRadius;
+    backgroundColorStyle.borderWidth = style.borderWidth;
+    backgroundColorStyle.borderColor = style.borderColor;
     return backgroundColorStyle;
 }
 
@@ -1143,6 +1147,8 @@ ArkUI_ErrorCode OH_ArkUI_SpanStyle_SetBackgroundColorStyle(
     spanStyle->backgroundColorStyle.topRightRadius = backgroundColorStyle->topRightRadius;
     spanStyle->backgroundColorStyle.bottomLeftRadius = backgroundColorStyle->bottomLeftRadius;
     spanStyle->backgroundColorStyle.bottomRightRadius = backgroundColorStyle->bottomRightRadius;
+    spanStyle->backgroundColorStyle.borderWidth = backgroundColorStyle->borderWidth;
+    spanStyle->backgroundColorStyle.borderColor = backgroundColorStyle->borderColor;
     return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
 }
 
@@ -1157,6 +1163,8 @@ ArkUI_ErrorCode OH_ArkUI_SpanStyle_GetBackgroundColorStyle(
     backgroundColorStyle->topRightRadius = spanStyle->backgroundColorStyle.topRightRadius;
     backgroundColorStyle->bottomLeftRadius = spanStyle->backgroundColorStyle.bottomLeftRadius;
     backgroundColorStyle->bottomRightRadius = spanStyle->backgroundColorStyle.bottomRightRadius;
+    backgroundColorStyle->borderWidth = spanStyle->backgroundColorStyle.borderWidth;
+    backgroundColorStyle->borderColor = spanStyle->backgroundColorStyle.borderColor;
     return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
 }
 
@@ -2113,6 +2121,39 @@ ArkUI_ErrorCode OH_ArkUI_BackgroundColorStyle_GetRadius(const OH_ArkUI_Backgroun
     *topRight = style->topRightRadius;
     *bottomLeft = style->bottomLeftRadius;
     *bottomRight = style->bottomRightRadius;
+    return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_BackgroundColorStyle_SetBorderWidth(OH_ArkUI_BackgroundColorStyle* style, float borderWidth)
+{
+    CHECK_NULL_RETURN(style, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    style->borderWidth = borderWidth;
+    return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_BackgroundColorStyle_GetBorderWidth(
+    const OH_ArkUI_BackgroundColorStyle* style, float* borderWidth)
+{
+    CHECK_NULL_RETURN(style, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    CHECK_NULL_RETURN(borderWidth, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    *borderWidth = style->borderWidth;
+    return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_BackgroundColorStyle_SetBorderColor(
+    OH_ArkUI_BackgroundColorStyle* style, uint32_t borderColor)
+{
+    CHECK_NULL_RETURN(style, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    style->borderColor = borderColor;
+    return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_BackgroundColorStyle_GetBorderColor(
+    const OH_ArkUI_BackgroundColorStyle* style, uint32_t* borderColor)
+{
+    CHECK_NULL_RETURN(style, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    CHECK_NULL_RETURN(borderColor, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    *borderColor = style->borderColor;
     return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
 }
 

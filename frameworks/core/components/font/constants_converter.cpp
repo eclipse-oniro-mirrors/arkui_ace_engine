@@ -446,16 +446,23 @@ void ConvertTxtStyle(const TextStyle& textStyle, Rosen::TextStyle& txtStyle)
     if (textBackgroundStyle->backgroundColor.has_value()) {
         txtStyle.backgroundRect.color = textBackgroundStyle->backgroundColor.value().GetValue();
     }
-    auto radius = textBackgroundStyle->backgroundRadius;
-    CHECK_NULL_VOID(radius.has_value());
-    auto radiusConverter = [](const std::optional<Dimension>& radius) -> double {
-        CHECK_NULL_RETURN(radius.has_value(), 0);
-        return NormalizeToPx(radius.value());
+    auto dimensionConverter = [](const std::optional<Dimension>& dimension) -> double {
+        CHECK_NULL_RETURN(dimension.has_value(), 0);
+        return NormalizeToPx(dimension.value());
     };
-    txtStyle.backgroundRect.leftTopRadius = radiusConverter(radius->radiusTopLeft);
-    txtStyle.backgroundRect.rightTopRadius = radiusConverter(radius->radiusTopRight);
-    txtStyle.backgroundRect.leftBottomRadius = radiusConverter(radius->radiusBottomLeft);
-    txtStyle.backgroundRect.rightBottomRadius = radiusConverter(radius->radiusBottomRight);
+    auto radius = textBackgroundStyle->backgroundRadius;
+    if (radius.has_value()) {
+        txtStyle.backgroundRect.leftTopRadius = dimensionConverter(radius->radiusTopLeft);
+        txtStyle.backgroundRect.rightTopRadius = dimensionConverter(radius->radiusTopRight);
+        txtStyle.backgroundRect.leftBottomRadius = dimensionConverter(radius->radiusBottomLeft);
+        txtStyle.backgroundRect.rightBottomRadius = dimensionConverter(radius->radiusBottomRight);
+    }
+    if (textBackgroundStyle->borderWidth.has_value()) {
+        txtStyle.backgroundRect.borderWidth = dimensionConverter(textBackgroundStyle->borderWidth);
+    }
+    if (textBackgroundStyle->borderColor.has_value()) {
+        txtStyle.backgroundRect.borderColor = textBackgroundStyle->borderColor.value().GetValue();
+    }
 }
 
 // ConvertTxtStyle helper for LineSpacing and LineHeight etc
@@ -734,19 +741,27 @@ void ConvertTxtStyle(const TextStyle& textStyle, const WeakPtr<PipelineBase>& co
     if (textBackgroundStyle->backgroundColor.has_value()) {
         txtStyle.backgroundRect.color = textBackgroundStyle->backgroundColor.value().GetValue();
     }
-    auto radius = textBackgroundStyle->backgroundRadius;
-    CHECK_NULL_VOID(radius.has_value());
-    auto radiusConverter = [context = pipelineContext, textStyle](const std::optional<Dimension>& radius) -> double {
-        CHECK_NULL_RETURN(radius.has_value(), 0);
-        CHECK_NULL_RETURN(context, radius->Value());
-        return radius.value().ConvertToPxDistributeWithEnv(
+    auto dimensionConverter = [context = pipelineContext, textStyle](
+        const std::optional<Dimension>& dimension) -> double {
+        CHECK_NULL_RETURN(dimension.has_value(), 0);
+        CHECK_NULL_RETURN(context, dimension->Value());
+        return dimension.value().ConvertToPxDistributeWithEnv(
             textStyle.GetMinFontScale(), textStyle.GetMaxFontScale(),
             textStyle.IsAllowScale(), textStyle.GetEnvFontScale());
     };
-    txtStyle.backgroundRect.leftTopRadius = radiusConverter(radius->radiusTopLeft);
-    txtStyle.backgroundRect.rightTopRadius = radiusConverter(radius->radiusTopRight);
-    txtStyle.backgroundRect.leftBottomRadius = radiusConverter(radius->radiusBottomLeft);
-    txtStyle.backgroundRect.rightBottomRadius = radiusConverter(radius->radiusBottomRight);
+    auto radius = textBackgroundStyle->backgroundRadius;
+    if (radius.has_value()) {
+        txtStyle.backgroundRect.leftTopRadius = dimensionConverter(radius->radiusTopLeft);
+        txtStyle.backgroundRect.rightTopRadius = dimensionConverter(radius->radiusTopRight);
+        txtStyle.backgroundRect.leftBottomRadius = dimensionConverter(radius->radiusBottomLeft);
+        txtStyle.backgroundRect.rightBottomRadius = dimensionConverter(radius->radiusBottomRight);
+    }
+    if (textBackgroundStyle->borderWidth.has_value()) {
+        txtStyle.backgroundRect.borderWidth = dimensionConverter(textBackgroundStyle->borderWidth);
+    }
+    if (textBackgroundStyle->borderColor.has_value()) {
+        txtStyle.backgroundRect.borderColor = textBackgroundStyle->borderColor.value().GetValue();
+    }
 }
 
 NG::Gradient ToGradient(const Gradient& gradient)

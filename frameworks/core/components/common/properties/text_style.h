@@ -118,6 +118,8 @@ struct PlaceholderRun {
 struct TextBackgroundStyle {
     std::optional<Color> backgroundColor;
     std::optional<NG::BorderRadiusProperty> backgroundRadius;
+    std::optional<Dimension> borderWidth;
+    std::optional<Color> borderColor;
     int32_t groupId = 0;
     bool needCompareGroupId = true;
 
@@ -129,6 +131,7 @@ struct TextBackgroundStyle {
         // Only compare groupId if both styles require it.
         bool bothNeedCompareGroupId = needCompareGroupId && value.needCompareGroupId;
         return backgroundColor == value.backgroundColor && backgroundRadius == value.backgroundRadius &&
+               borderWidth == value.borderWidth && borderColor == value.borderColor &&
                (!bothNeedCompareGroupId || groupId == value.groupId);
     }
 

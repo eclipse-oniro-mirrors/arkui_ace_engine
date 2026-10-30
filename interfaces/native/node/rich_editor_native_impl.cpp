@@ -592,6 +592,8 @@ OH_ArkUI_TextEditorTextStyle* OH_ArkUI_TextEditorTextStyle_Create()
     style->textBackgroundTopRightRadius = 0;
     style->textBackgroundBottomLeftRadius = 0;
     style->textBackgroundBottomRightRadius = 0;
+    style->textBackgroundBorderWidth = 0.0f;
+    style->textBackgroundBorderColor = 0x00000000;
     style->strokeWidth = 0;
     style->strokeColor = style->fontColor;
     return style;
@@ -884,6 +886,38 @@ ArkUI_ErrorCode OH_ArkUI_TextEditorTextStyle_GetStrokeColor(OH_ArkUI_TextEditorT
     return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
 }
 
+ArkUI_ErrorCode OH_ArkUI_TextEditorTextStyle_SetTextBackgroundBorderWidth(
+    OH_ArkUI_TextEditorTextStyle* style, float borderWidth)
+{
+    CHECK_NULL_RETURN(style, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    style->textBackgroundBorderWidth = borderWidth;
+    return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_TextEditorTextStyle_GetTextBackgroundBorderWidth(
+    OH_ArkUI_TextEditorTextStyle* style, float* borderWidth)
+{
+    CHECK_NULL_RETURN(style && borderWidth, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    *borderWidth = style->textBackgroundBorderWidth;
+    return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_TextEditorTextStyle_SetTextBackgroundBorderColor(
+    OH_ArkUI_TextEditorTextStyle* style, uint32_t borderColor)
+{
+    CHECK_NULL_RETURN(style, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    style->textBackgroundBorderColor = borderColor;
+    return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_TextEditorTextStyle_GetTextBackgroundBorderColor(
+    OH_ArkUI_TextEditorTextStyle* style, uint32_t* borderColor)
+{
+    CHECK_NULL_RETURN(style && borderColor, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    *borderColor = style->textBackgroundBorderColor;
+    return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
+}
+
 ArkUI_ErrorCode OH_ArkUI_TextEditorStyledStringController_SetTypingStyle(
     OH_ArkUI_TextEditorStyledStringController* controller, OH_ArkUI_TextEditorTextStyle* style)
 {
@@ -917,6 +951,8 @@ ArkUI_ErrorCode OH_ArkUI_TextEditorStyledStringController_SetTypingStyle(
     textStyle.textBackgroundTopRightRadius = style->textBackgroundTopRightRadius;
     textStyle.textBackgroundBottomRightRadius = style->textBackgroundBottomRightRadius;
     textStyle.textBackgroundBottomLeftRadius = style->textBackgroundBottomLeftRadius;
+    textStyle.textBackgroundBorderWidth = style->textBackgroundBorderWidth;
+    textStyle.textBackgroundBorderColor = style->textBackgroundBorderColor;
     textStyle.strokeWidth = style->strokeWidth;
     textStyle.strokeColor = style->strokeColor;
     OHOS::Ace::NodeModel::GetFullImpl()->getNodeModifiers()->getRichEditorModifier()->
@@ -961,6 +997,8 @@ ArkUI_ErrorCode OH_ArkUI_TextEditorStyledStringController_GetTypingStyle(
     textStyle.textBackgroundTopRightRadius = result.textBackgroundTopRightRadius;
     textStyle.textBackgroundBottomRightRadius = result.textBackgroundBottomRightRadius;
     textStyle.textBackgroundBottomLeftRadius = result.textBackgroundBottomLeftRadius;
+    textStyle.textBackgroundBorderWidth = result.textBackgroundBorderWidth;
+    textStyle.textBackgroundBorderColor = result.textBackgroundBorderColor;
     textStyle.strokeWidth = result.strokeWidth;
     textStyle.strokeColor = result.strokeColor;
     *style = textStyle;

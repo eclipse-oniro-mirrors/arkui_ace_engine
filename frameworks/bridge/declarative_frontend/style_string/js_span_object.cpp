@@ -2791,6 +2791,14 @@ void JSBackgroundColorSpan::GetBackgroundColor(const JSCallbackInfo& info)
     backgroundColorObj->SetProperty<std::string>("color", backgroundColorStyle.backgroundColor->ColorToString());
     backgroundColorObj->SetProperty<std::string>(
         "BorderRadiusProperty", backgroundColorStyle.backgroundRadius->ToString());
+    if (backgroundColorStyle.borderWidth.has_value()) {
+        backgroundColorObj->SetProperty<std::string>(
+            "borderWidth", backgroundColorStyle.borderWidth->ToString());
+    }
+    if (backgroundColorStyle.borderColor.has_value()) {
+        backgroundColorObj->SetProperty<std::string>(
+            "borderColor", backgroundColorStyle.borderColor->ColorToString());
+    }
     info.SetReturnValue(backgroundColorObj);
 }
 

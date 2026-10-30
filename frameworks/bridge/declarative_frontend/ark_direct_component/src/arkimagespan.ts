@@ -69,8 +69,9 @@ function loadComponent(): ComponentObj | undefined {
 					}
 					else {
 						getUINativeModule().imageSpan.setTextBackgroundStyle(node, textBackgroundStyle.color,
-							textBackgroundStyle.radius.topLeft, textBackgroundStyle.radius.topRight,
-							textBackgroundStyle.radius.bottomLeft, textBackgroundStyle.radius.bottomRight);
+						textBackgroundStyle.radius.topLeft, textBackgroundStyle.radius.topRight,
+						textBackgroundStyle.radius.bottomLeft, textBackgroundStyle.radius.bottomRight,
+						textBackgroundStyle.borderColor, textBackgroundStyle.borderWidth);
 					}
 				}
 			}

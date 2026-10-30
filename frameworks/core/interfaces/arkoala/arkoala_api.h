@@ -800,6 +800,8 @@ struct ArkUIRichEditorTextStyle {
     int32_t strokeWidth;
     uint32_t strokeColor;
     std::vector<ArkUIShadowOptions> textShadow;
+    float textBackgroundBorderWidth = 0.0f;
+    uint32_t textBackgroundBorderColor = 0x00000000;
 };
 
 struct ArkUIImagePropertiesStruct {
@@ -1154,6 +1156,8 @@ struct ArkUITextBackgroundStyleOptions {
     ArkUI_Float32 topRight;
     ArkUI_Float32 bottomLeft;
     ArkUI_Float32 bottomRight;
+    ArkUI_Float32 borderWidth = 0.0f;
+    ArkUI_Uint32 borderColor = 0x00000000;
 };
 
 struct ArkUIWaterFlowNestedScrollOptions {
@@ -3061,6 +3065,8 @@ struct ArkUIBackgroundColorStyle {
     float topRightRadius;
     float bottomLeftRadius;
     float bottomRightRadius;
+    float borderWidth = 0.0f;
+    ArkUI_Uint32 borderColor = 0x00000000;
 };
 
 struct ArkUIUrlStyle {

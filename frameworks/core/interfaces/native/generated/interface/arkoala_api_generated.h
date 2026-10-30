@@ -24172,6 +24172,8 @@ typedef struct Ark_TextBackgroundStyle {
     /* kind: Interface */
     Opt_ResourceColor color;
     Opt_Union_Dimension_BorderRadiuses radius;
+    Opt_Dimension borderWidth;
+    Opt_ResourceColor borderColor;
 } Ark_TextBackgroundStyle;
 typedef struct Opt_TextBackgroundStyle {
     Ark_Tag tag;

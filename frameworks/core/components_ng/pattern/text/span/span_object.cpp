@@ -1580,7 +1580,10 @@ void BackgroundColorSpan::AddSpanStyle(const RefPtr<NG::SpanItem>& spanItem) con
     }
     TextBackgroundStyle tempVal = GetBackgroundColor();
     spanItem->SetBackgroundStyle(tempVal);
-    if (!tempVal.HasKey("textBackgroundStyle.color")) {
+    bool hasColorRes = tempVal.HasKey("textBackgroundStyle.color");
+    bool hasBorderWidthRes = tempVal.HasKey("textBackgroundStyle.borderWidth");
+    bool hasBorderColorRes = tempVal.HasKey("textBackgroundStyle.borderColor");
+    if (!hasColorRes && !hasBorderWidthRes && !hasBorderColorRes) {
         return;
     }
     NG::SpanItem::SpanResourceUpdater resourceUpdater;
@@ -1594,16 +1597,25 @@ void BackgroundColorSpan::AddSpanStyle(const RefPtr<NG::SpanItem>& spanItem) con
         if (frameNode->GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY_SIX) &&
             colorMode != ColorMode::COLOR_MODE_UNDEFINED) {
             auto it = styleValue.textBackgroundStyleResMap_.find("textBackgroundStyle.color");
-            CHECK_NULL_VOID(it != styleValue.textBackgroundStyleResMap_.end());
-            Color color;
-            bool parseState = false;
-            parseState =
-                ResourceParseUtils::ParseResColorWithColorMode(it->second.obj, color, colorMode);
-            if (parseState) {
-                styleValue.backgroundColor = color;
+            if (it != styleValue.textBackgroundStyleResMap_.end()) {
+                Color color;
+                if (ResourceParseUtils::ParseResColorWithColorMode(it->second.obj, color, colorMode)) {
+                    styleValue.backgroundColor = color;
+                }
             }
+            auto borderColorIt = styleValue.textBackgroundStyleResMap_.find("textBackgroundStyle.borderColor");
+            if (borderColorIt != styleValue.textBackgroundStyleResMap_.end()) {
+                Color borderColor;
+                if (ResourceParseUtils::ParseResColorWithColorMode(
+                    borderColorIt->second.obj, borderColor, colorMode)) {
+                    styleValue.borderColor = borderColor;
+                }
+            }
+            styleValue.ReloadResourcesByKey("textBackgroundStyle.borderWidth");
         } else {
             styleValue.ReloadResourcesByKey("textBackgroundStyle.color");
+            styleValue.ReloadResourcesByKey("textBackgroundStyle.borderColor");
+            styleValue.ReloadResourcesByKey("textBackgroundStyle.borderWidth");
         }
         spanItem->SetBackgroundStyle(styleValue);
     };
@@ -1614,7 +1626,10 @@ void BackgroundColorSpan::AddSpanStyle(const RefPtr<NG::SpanItem>& spanItem) con
 void BackgroundColorSpan::RemoveSpanStyle(const RefPtr<NG::SpanItem>& spanItem)
 {
     if (spanItem->backgroundStyle.has_value()) {
-        if (spanItem->backgroundStyle.value().HasKey("textBackgroundStyle.color")) {
+        auto& style = spanItem->backgroundStyle.value();
+        if (style.HasKey("textBackgroundStyle.color") ||
+            style.HasKey("textBackgroundStyle.borderWidth") ||
+            style.HasKey("textBackgroundStyle.borderColor")) {
             spanItem->RemoveResourceObj("textbackgroundStyle");
         }
         spanItem->ResetBackgroundStyle();

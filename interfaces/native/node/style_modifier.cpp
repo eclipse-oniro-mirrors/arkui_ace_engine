@@ -15554,31 +15554,39 @@ int32_t SetSpanTextBackgroundStyle(ArkUI_NodeHandle node, const ArkUI_AttributeI
     if (actualSize < 0) {
         return ERROR_CODE_PARAM_INVALID;
     }
-    float radiusVals[ALLOW_SIZE_4] = { 0, 0, 0, 0 };
+    float bgStyleVals[NUM_6] = { 0, 0, 0, 0, 0, 0 };
     int32_t unit = GetDefaultUnit(node, UNIT_VP);
-    int radiusUnits[ALLOW_SIZE_4] = { unit, unit, unit, unit };
+    int bgStyleUnits[NUM_6] = { unit, unit, unit, unit, unit, unit };
 
     if (item->size == ALLOW_SIZE_2) {
         if (LessNotEqual(item->value[NUM_1].f32, 0.0f)) {
             return ERROR_CODE_PARAM_INVALID;
         }
         for (int i = 0; i < ALLOW_SIZE_4; ++i) {
-            radiusVals[i] = item->value[1].f32;
+            bgStyleVals[i] = item->value[1].f32;
         }
-    } else if (item->size == ALLOW_SIZE_5) {
+    } else if (item->size == ALLOW_SIZE_5 || item->size == NUM_6 || item->size == ALLOW_SIZE_7) {
         for (int i = 0; i < ALLOW_SIZE_4; ++i) {
             if (LessNotEqual(item->value[i + NUM_1].f32, 0.0f)) {
                 return ERROR_CODE_PARAM_INVALID;
             } else {
-                radiusVals[i] = item->value[i + NUM_1].f32;
+                bgStyleVals[i] = item->value[i + NUM_1].f32;
             }
+        }
+        if (item->size >= NUM_6) {
+            bgStyleVals[NUM_4] = item->value[NUM_5].f32;
+        }
+        if (item->size >= ALLOW_SIZE_7) {
+            ArkUIInt32orFloat32 borderVal;
+            borderVal.u32 = item->value[NUM_6].u32;
+            bgStyleVals[NUM_5] = borderVal.f32;
         }
     } else {
         return ERROR_CODE_PARAM_INVALID;
     }
 
     fullImpl->getNodeModifiers()->getSpanModifier()->setSpanTextBackgroundStyle(
-        node->uiNodeHandle, item->value[NUM_0].u32, radiusVals, radiusUnits, NUM_4, nullptr);
+        node->uiNodeHandle, item->value[NUM_0].u32, bgStyleVals, bgStyleUnits, NUM_6, nullptr);
     return ERROR_CODE_NO_ERROR;
 }
 
@@ -18005,6 +18013,9 @@ const ArkUI_AttributeItem* GetSpanTextBackgroundStyle(ArkUI_NodeHandle node)
     g_numberValues[NUM_2].f32 = options.topRight;
     g_numberValues[NUM_3].f32 = options.bottomLeft;
     g_numberValues[NUM_4].f32 = options.bottomRight;
+    g_numberValues[NUM_5].f32 = options.borderWidth;
+    g_numberValues[NUM_6].u32 = options.borderColor;
+    g_attributeItem.size = ALLOW_SIZE_7;
     return &g_attributeItem;
 }
 

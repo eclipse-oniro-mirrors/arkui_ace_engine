@@ -781,7 +781,8 @@ public:
         RefPtr<ResourceObject>& resObj);
     static void RegisterTextBackgroundStyleResource(TextBackgroundStyle& textBackgroundStyle,
         RefPtr<ResourceObject>& resObjTopLeft, RefPtr<ResourceObject>& resObjTopRight,
-        RefPtr<ResourceObject>& resObjBottomLeft, RefPtr<ResourceObject>& resObjBottomRight);
+        RefPtr<ResourceObject>& resObjBottomLeft, RefPtr<ResourceObject>& resObjBottomRight,
+        RefPtr<ResourceObject>& borderColorResObj, RefPtr<ResourceObject>& borderWidthResObj);
     static bool ParseAllBorderRadiuses(JSRef<JSObject>& object, CalcDimension& topLeft, CalcDimension& topRight,
         CalcDimension& bottomLeft, CalcDimension& bottomRight);
     static bool ParseAllBorderRadiuses(JSRef<JSObject>& object, CalcDimension& topLeft, CalcDimension& topRight,

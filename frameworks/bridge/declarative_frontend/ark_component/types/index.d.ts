@@ -1447,6 +1447,8 @@ declare enum ImageContent {
 declare interface TextBackgroundStyle {
   color?: ResourceColor;
   radius?: BorderRadiuses;
+  borderColor?: ResourceColor;
+  borderWidth?: Dimension;
 }
 declare type LinearIndicatorStyle = any;
 declare type OnLinearIndicatorChangeCallback = any;

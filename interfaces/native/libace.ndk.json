@@ -5724,6 +5724,22 @@
         "name": "OH_ArkUI_TextEditorTextStyle_GetTextBackgroundRadius"
     },
     {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_TextEditorTextStyle_SetTextBackgroundBorderWidth"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_TextEditorTextStyle_GetTextBackgroundBorderWidth"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_TextEditorTextStyle_SetTextBackgroundBorderColor"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_TextEditorTextStyle_GetTextBackgroundBorderColor"
+    },
+    {
         "first_introduced": "24",
         "name": "OH_ArkUI_TextEditorStyledStringController_SetTypingStyle"
     },
@@ -6370,6 +6386,22 @@
     {
         "first_introduced": "24",
         "name": "OH_ArkUI_BackgroundColorStyle_GetRadius"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_BackgroundColorStyle_SetBorderWidth"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_BackgroundColorStyle_GetBorderWidth"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_BackgroundColorStyle_SetBorderColor"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_BackgroundColorStyle_GetBorderColor"
     },
     {
         "first_introduced": "24",
