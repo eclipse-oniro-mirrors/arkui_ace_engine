@@ -6597,6 +6597,11 @@ void ListPattern::ReportOnItemListScrollEvent(const std::string& event, int32_t 
 #endif
 }
 
+CommandResult ListPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return OnInjectionEventByRatioWithResult(command);
+}
+
 int32_t ListPattern::OnInjectionEvent(const std::string& command)
 {
     return OnInjectionEventByRatio(command);

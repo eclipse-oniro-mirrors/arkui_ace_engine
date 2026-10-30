@@ -3567,6 +3567,20 @@ bool DatePickerPattern::IsNotSetStartEndDate()
     return startDate == startDefaultDateSolar_ && endDate == endDefaultDateSolar_;
 }
 
+CommandResult DatePickerPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "setDatePickerTime", "setDatePickerDialogTime" },
+        CommandErrorType::INVALID_PARAM, [this](const std::unique_ptr<JsonValue>& json) {
+        if ((json->GetString("cmd") == "setDatePickerDialogTime") != GetIsShowInDialog()) {
+            return CommandResult::Error(CommandErrorType::INVALID_COMMAND);
+        }
+        if (!GetHost()->GetLayoutProperty<DataPickerRowLayoutProperty>()) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        }
+        return CommandResult::Success();
+    });
+}
+
 int32_t DatePickerPattern::OnInjectionEvent(const std::string& command)
 {
     if (GetIsShowInDialog()) {

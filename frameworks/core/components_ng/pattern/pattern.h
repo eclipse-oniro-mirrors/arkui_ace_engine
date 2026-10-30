@@ -638,6 +638,9 @@ public:
     };
     virtual CommandResult OnInjectionEventWithResult(const std::string& command);
 
+    CommandResult ConvertLegacyInjectionEventResult(const std::string& command,
+        std::initializer_list<std::string_view> commands, CommandErrorType failure = CommandErrorType::INVALID_PARAM,
+        const std::function<CommandResult(const std::unique_ptr<JsonValue>&)>& preflight = nullptr);
     bool HandleTextBoxComponentCommand(const std::string& command, std::string& cmd, std::unique_ptr<JsonValue>& json,
         std::unique_ptr<JsonValue>& params);
 

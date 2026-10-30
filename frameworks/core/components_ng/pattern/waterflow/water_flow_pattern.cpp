@@ -1835,6 +1835,11 @@ void WaterFlowPattern::ReportOnItemWaterFlowScrollEvent(const std::string& event
 #endif
 }
 
+CommandResult WaterFlowPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return OnInjectionEventByRatioWithResult(command);
+}
+
 int32_t WaterFlowPattern::OnInjectionEvent(const std::string& command)
 {
     return OnInjectionEventByRatio(command);

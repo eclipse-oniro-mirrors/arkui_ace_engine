@@ -16,6 +16,7 @@
 #include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "core/components_ng/pattern/refresh/refresh_pattern.h"
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
+#include "core/components_ng/pattern/command/command_validation.h"
 #include "core/components_ng/pattern/scrollable/item_snap_prediction.h"
 #include "core/components_ng/base/modifier.h"
 
@@ -6234,6 +6235,82 @@ void ScrollablePattern::FillReportOnItemStopParams(std::unique_ptr<JsonValue>& p
     auto index = GetFirstIndex();
     params->Put("topIndex", index);
     return;
+}
+
+namespace {
+bool ValidateScrollCommandParameters(const std::unique_ptr<JsonValue>& json, const std::string& name)
+{
+    return !((json->Contains("eventId") && !IsCommandNumber(json, "eventId", true)) ||
+        (json->Contains("ratio") && (!IsCommandNumber(json, "ratio") ||
+            json->GetDouble("ratio") <= 0 || json->GetDouble("ratio") > 1)) ||
+        (name == "scrollByOffset" && !IsCommandNumber(json, "offset")) ||
+        (name == "scrollByTargetId" && !IsCommandNumber(json, "targetId", true)));
+}
+} // namespace
+
+CommandResult ScrollablePattern::OnInjectionEventByRatioWithResult(const std::string& command)
+{
+    auto json = JsonUtil::ParseJsonString(command);
+    if (!json || !json->IsObject()) {
+        return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+    }
+    auto cmd = json->GetValue("cmd");
+    if (!cmd || !cmd->IsString()) {
+        return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+    }
+    auto name = cmd->GetString();
+    if (name != "scrollForward" && name != "scrollBackward" && name != "scrollByOffset" &&
+        name != "scrollByTargetId") {
+        return CommandResult::Error(CommandErrorType::INVALID_COMMAND);
+    }
+    if (!ValidateScrollCommandParameters(json, name)) {
+        return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+    }
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+    auto eventHub = host->GetEventHub<EventHub>();
+    if (!eventHub || !eventHub->IsEnabled() || !IsScrollable()) {
+        return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+    }
+    auto reportId = json->GetInt("eventId", host->GetId());
+    lastScrollFromInjection_ = true;
+    SetAccessibilityScrollSource(AccessibilityScrollSource::ACCESSIBILITY);
+    return ExecuteScrollCommandWithResult(json, name, reportId);
+}
+
+CommandResult ScrollablePattern::ExecuteScrollCommandWithResult(
+    const std::unique_ptr<JsonValue>& json, const std::string& name, int32_t reportId)
+{
+    if (name == "scrollByOffset") {
+        auto offset = json->GetDouble("offset");
+        if ((IsAtBottom() && offset > 0) || (IsAtTop() && offset < 0)) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        }
+        HandleScrollByOffset(offset, reportId);
+    } else if (name == "scrollByTargetId") {
+        SetIsOverScroll(false);
+        StopAnimate();
+        auto success = UpdateCurrentOffsetByTargetId(json->GetInt("targetId"));
+        ReportScroll(success, success ? ScrollError::SCROLL_NO_ERROR : ScrollError::SCROLL_ERROR_OTHER, reportId);
+        if (!success) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        }
+    } else {
+        const bool reverse = name == "scrollForward";
+        if (json->Contains("ratio")) {
+            auto error = ScrollByRatio(reverse, json->GetDouble("ratio"));
+            ReportScroll(error == ScrollError::SCROLL_NO_ERROR, error, reportId);
+            if (error != ScrollError::SCROLL_NO_ERROR) {
+                return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+            }
+        } else {
+            if ((reverse && IsAtTop()) || (!reverse && IsAtBottom())) {
+                return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+            }
+            ScrollPage(reverse);
+        }
+    }
+    return CommandResult::Success();
 }
 
 int32_t ScrollablePattern::OnInjectionEventByRatio(const std::string& command)

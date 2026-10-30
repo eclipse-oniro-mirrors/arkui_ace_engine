@@ -480,6 +480,7 @@ public:
     void DeleteBackward(int32_t length = 1) override;
     void DeleteBackward(int32_t length, TextChangeReason reason, bool isByIME = false);
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
     void DeleteBackwardFunction();
     void ReportSelectionChangeEvent(int32_t nodeId, const std::string& str, int32_t start, int32_t end);
     void ReportCommandExecution(int32_t nodeId, const std::string& command);

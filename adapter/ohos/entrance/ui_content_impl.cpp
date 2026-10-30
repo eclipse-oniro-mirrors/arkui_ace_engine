@@ -23,6 +23,8 @@
 
 #include <atomic>
 #include <cinttypes>
+#include <cmath>
+#include <limits>
 #include <optional>
 #include <tuple>
 
@@ -121,6 +123,7 @@
 #include "adapter/ohos/entrance/hap_asset_provider_impl.h"
 #include "adapter/ohos/entrance/plugin_utils_impl.h"
 #include "adapter/ohos/entrance/ui_session/ui_session_batch_command.h"
+#include "adapter/ohos/entrance/ui_session/ui_session_command_result.h"
 #include "adapter/ohos/entrance/ui_event_impl.h"
 #include "adapter/ohos/entrance/utils.h"
 #include "adapter/ohos/osal/navigation_route_ohos.h"
@@ -6628,6 +6631,121 @@ BatchResolvedTarget ResolveBatchTextTarget(int32_t nodeId)
             } };
 }
 
+namespace {
+BatchResolvedTarget ResolveBatchTextTargetWithResult(int32_t nodeId)
+{
+    auto target = ResolveBatchTextTarget(nodeId);
+    if (target.status == BatchTargetStatus::READY) {
+        auto node = AceType::DynamicCast<NG::FrameNode>(ElementRegister::GetInstance()->GetUINodeById(nodeId));
+        if (!node) {
+            return {
+                .status = BatchTargetStatus::NOT_FOUND
+            };
+        }
+        target.execute = [node](const std::string& command) {
+            return node->OnRecvCommandWithResult(command).success;
+        };
+    }
+    return target;
+}
+
+bool IsKeyCodeNumber(const std::unique_ptr<JsonValue>& json)
+{
+    auto value = json->GetValue("cmd");
+    if (!value || !value->IsNumber() || !std::isfinite(value->GetDouble())) {
+        return false;
+    }
+    auto number = value->GetDouble();
+    return number == std::trunc(number) && number >= std::numeric_limits<int32_t>::min() &&
+        number <= std::numeric_limits<int32_t>::max();
+}
+
+NG::CommandResult ExecuteKeyCodeWithResult(
+    const std::unique_ptr<JsonValue>& json, const RefPtr<NG::PipelineContext>& pipeline)
+{
+    if (!IsKeyCodeNumber(json)) {
+        return NG::CommandResult::Error(NG::CommandErrorType::INVALID_PARAM);
+    }
+    KeyEvent keyEvent;
+    keyEvent.action = KeyAction::DOWN;
+    keyEvent.code = static_cast<KeyCode>(json->GetInt("cmd"));
+    keyEvent.pressedCodes = { keyEvent.code };
+    return pipeline->OnNonPointerEvent(keyEvent)
+        ? NG::CommandResult::Success() : NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL);
+}
+
+void ExecuteGlobalCommandWithResult(
+    const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback)
+{
+    auto json = JsonUtil::ParseJsonString(command);
+    if (!json || !json->IsValid() || !json->IsObject()) {
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::INVALID_PARAM)));
+        return;
+    }
+    auto batch = UiSessionBatchCommand::Parse(command);
+    if (batch.status != BatchParseStatus::NOT_BATCH) {
+        finishCallback(UiSessionBatchCommand::ExecuteWithResult(batch, ResolveBatchTextTargetWithResult));
+        return;
+    }
+    auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
+    if (!pipeline) {
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
+        return;
+    }
+    auto value = json->GetValue("cmd");
+    if (value && value->IsNumber()) {
+        finishCallback(SerializeCommandResult(ExecuteKeyCodeWithResult(json, pipeline)));
+        return;
+    }
+    pipeline->ProcessCommandWithResult(command, [finishCallback](const NG::CommandResult& result) {
+        finishCallback(SerializeCommandResult(result));
+    });
+}
+
+void ExecuteNodeCommandWithResult(
+    int32_t id, const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback)
+{
+    auto node = AceType::DynamicCast<NG::FrameNode>(ElementRegister::GetInstance()->GetUINodeById(id));
+    if (!node) {
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::NODE_NOT_FOUND)));
+        return;
+    }
+    finishCallback(SerializeCommandResult(node->OnRecvCommandWithResult(command)));
+}
+
+void PostNodeCommandWithResult(const WeakPtr<TaskExecutor>& weakTaskExecutor, int32_t id,
+    const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback)
+{
+    auto taskExecutor = weakTaskExecutor.Upgrade();
+    if (!taskExecutor) {
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
+        return;
+    }
+    bool posted = taskExecutor->PostTask(
+        [id, command, finishCallback]() { ExecuteNodeCommandWithResult(id, command, finishCallback); },
+        TaskExecutor::TaskType::UI, "UiSessionSendCommandPatternWithResult");
+    if (!posted) {
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
+    }
+}
+
+void PostGlobalCommandWithResult(const WeakPtr<TaskExecutor>& weakTaskExecutor,
+    const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback)
+{
+    auto taskExecutor = weakTaskExecutor.Upgrade();
+    if (!taskExecutor) {
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
+        return;
+    }
+    bool posted = taskExecutor->PostTask(
+        [command, finishCallback]() { ExecuteGlobalCommandWithResult(command, finishCallback); },
+        TaskExecutor::TaskType::UI, "UiSessionSendCommandWithResult");
+    if (!posted) {
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
+    }
+}
+} // namespace
+
 BatchDispatchCallbacks CreateBatchDispatchCallbacks(const RefPtr<TaskExecutor>& taskExecutor)
 {
     BatchDispatchCallbacks callbacks;
@@ -7284,8 +7402,16 @@ void UIContentImpl::InitSendCommandFunctionsCallbacks(const WeakPtr<TaskExecutor
             TaskExecutor::TaskType::UI, "UiSessionSendCommandPattern");
     };
     UiSessionManager::GetInstance()->SaveForSendCommandFunction(sendCommand);
-    UiSessionManager::GetInstance()->RegisterNodeCommandWithResultCallback(taskExecutor);
-    UiSessionManager::GetInstance()->RegisterSendCommandWithResultCallback(taskExecutor);
+    auto nodeCommandWithResult = [weakTaskExecutor = taskExecutor](int32_t id, const std::string& command,
+        const UiSessionManager::CommandResultCallback& finishCallback) {
+        PostNodeCommandWithResult(weakTaskExecutor, id, command, finishCallback);
+    };
+    UiSessionManager::GetInstance()->SaveForSendCommandWithResultFunction(std::move(nodeCommandWithResult));
+    auto globalCommandWithResult = [weakTaskExecutor = taskExecutor](const std::string& command,
+        const UiSessionManager::CommandResultCallback& finishCallback) {
+        PostGlobalCommandWithResult(weakTaskExecutor, command, finishCallback);
+    };
+    UiSessionManager::GetInstance()->SaveSendCommandWithResultFunction(std::move(globalCommandWithResult));
 }
 
 bool UIContentImpl::SendUIExtProprty(uint32_t code, const AAFwk::Want& data,

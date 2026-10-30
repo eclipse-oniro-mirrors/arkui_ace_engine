@@ -325,4 +325,21 @@ HWTEST_F(WebPatternTestNgPartOne, OnStatusBarClick, TestSize.Level1)
     EXPECT_TRUE(!webPattern->isBackToTopRunning_);
 #endif
 }
+
+HWTEST_F(WebPatternTestNgPartOne, SendCommandStructuredResultBranches, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<WebPattern>();
+    EXPECT_EQ(pattern->OnInjectionEventWithResult("{").errorType, CommandErrorType::INVALID_PARAM);
+    EXPECT_EQ(pattern->OnInjectionEventWithResult(R"({"event_type":"unsupported"})").errorType,
+        CommandErrorType::INVALID_COMMAND);
+    EXPECT_EQ(pattern->OnInjectionEventWithResult(R"({"event_type":12})").errorType,
+        CommandErrorType::INVALID_PARAM);
+    pattern->delegate_ = nullptr;
+    EXPECT_EQ(pattern->OnInjectionEventWithResult(R"({"event_type":"click","xpath":"/html/body"})").errorType,
+        CommandErrorType::EXECUTE_FAIL);
+    EXPECT_EQ(pattern->OnInjectionEventWithResult("[]").errorType, CommandErrorType::INVALID_PARAM);
+    EXPECT_EQ(pattern->OnInjectionEventWithResult(R"([{"event_type":"unsupported"}])").errorType,
+        CommandErrorType::INVALID_COMMAND);
+}
+
 }

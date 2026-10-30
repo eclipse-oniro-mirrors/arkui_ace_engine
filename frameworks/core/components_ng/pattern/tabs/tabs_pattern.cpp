@@ -1374,6 +1374,11 @@ bool TabsPattern::GetTargetIndex(const std::string& command, int32_t& targetInde
     return true;
 }
 
+CommandResult TabsPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "changeIndex" }, CommandErrorType::EXECUTE_FAIL);
+}
+
 int32_t TabsPattern::OnInjectionEvent(const std::string& command)
 {
     int32_t targetIndex = 0;

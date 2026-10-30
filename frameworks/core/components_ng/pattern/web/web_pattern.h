@@ -321,6 +321,7 @@ public:
         RefPtr<PageNodeInfoWrap> nodeWrap, AceAutoFillType autoFillType,
         AceAutoFillTriggerType triggerType = AceAutoFillTriggerType::AUTO_REQUEST) override;
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
     void NotifyFillRequestFailed(int32_t errCode, const std::string& fillContent = "", bool isPopup = false) override;
 
     Color GetDefaultBackgroundColor();

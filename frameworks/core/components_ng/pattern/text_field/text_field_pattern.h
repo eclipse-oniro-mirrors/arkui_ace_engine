@@ -809,6 +809,7 @@ public:
     void HandleExtendAction(int32_t action) override;
     void HandleSelect(CaretMoveIntent direction) override;
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
 
     void HandleSelectExtend(CaretMoveIntent direction) override
     {

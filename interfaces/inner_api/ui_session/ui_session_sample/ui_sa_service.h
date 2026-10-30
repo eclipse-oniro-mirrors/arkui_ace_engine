@@ -45,6 +45,8 @@ public:
     void HandleGetCurrentPageName(sptr<IUiContentService> service, std::vector<std::string> params);
     void HandleSendCommand(sptr<IUiContentService> service, std::vector<std::string> params);
     void HandleSendBatchSetText(sptr<IUiContentService> service, std::vector<std::string> params);
+    void HandleSendBatchSetTextWithFinishCallback(sptr<IUiContentService> service, std::vector<std::string> params);
+    void HandleSendCommandWithFinishCallback(sptr<IUiContentService> service, std::vector<std::string> params);
     void HandleSendCommandSync(sptr<IUiContentService> service, std::vector<std::string> params);
     void HandleRegisterContentChangeCallback(sptr<IUiContentService> service, std::vector<std::string> params);
     void HandleUnregisterContentChangeCallback(sptr<IUiContentService> service, std::vector<std::string> params);

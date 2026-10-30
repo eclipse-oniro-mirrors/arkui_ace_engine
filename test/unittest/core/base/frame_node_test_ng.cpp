@@ -3987,6 +3987,65 @@ HWTEST_F(FrameNodeTestNg, FrameNodeIsPreMakeAndScroll001, TestSize.Level1)
 }
 
 /**
+ * @tc.name: OnRecvCommandWithResult_001
+ * @tc.desc: Verify malformed and unknown commands have distinct structured errors without changing legacy behavior.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeTestNg, OnRecvCommandWithResult_001, TestSize.Level1)
+{
+    auto frameNode = FrameNode::CreateFrameNode(
+        "commandNode", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(frameNode, nullptr);
+
+    auto malformedResult = frameNode->OnRecvCommandWithResult("invalid-json");
+    EXPECT_FALSE(malformedResult.success);
+    EXPECT_EQ(malformedResult.errorType, CommandErrorType::INVALID_PARAM);
+
+    const std::string unknownCommand = R"({"cmd":"unknown"})";
+    EXPECT_EQ(frameNode->OnRecvCommand(unknownCommand), RET_SUCCESS);
+    auto unknownResult = frameNode->OnRecvCommandWithResult(unknownCommand);
+    EXPECT_FALSE(unknownResult.success);
+    EXPECT_EQ(unknownResult.errorType, CommandErrorType::INVALID_COMMAND);
+}
+
+/**
+ * @tc.name: ConvertLegacyInjectionEventResult_001
+ * @tc.desc: Verify the compatibility adapter distinguishes syntax, command, environment, and success results.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeTestNg, ConvertLegacyInjectionEventResult_001, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<Pattern>();
+    auto frameNode = FrameNode::CreateFrameNode(
+        "commandNode", ElementRegister::GetInstance()->MakeUniqueId(), pattern);
+    ASSERT_NE(frameNode, nullptr);
+
+    auto malformedResult = pattern->ConvertLegacyInjectionEventResult("invalid-json", { "supported" });
+    EXPECT_FALSE(malformedResult.success);
+    EXPECT_EQ(malformedResult.errorType, CommandErrorType::INVALID_PARAM);
+
+    auto missingCommandResult = pattern->ConvertLegacyInjectionEventResult(R"({"value":1})", { "supported" });
+    EXPECT_FALSE(missingCommandResult.success);
+    EXPECT_EQ(missingCommandResult.errorType, CommandErrorType::INVALID_PARAM);
+
+    auto unsupportedResult = pattern->ConvertLegacyInjectionEventResult(R"({"cmd":"unknown"})", { "supported" });
+    EXPECT_FALSE(unsupportedResult.success);
+    EXPECT_EQ(unsupportedResult.errorType, CommandErrorType::INVALID_COMMAND);
+
+    auto eventHub = frameNode->GetEventHub<EventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    eventHub->SetEnabled(false);
+    auto disabledResult = pattern->ConvertLegacyInjectionEventResult(R"({"cmd":"supported"})", { "supported" });
+    EXPECT_FALSE(disabledResult.success);
+    EXPECT_EQ(disabledResult.errorType, CommandErrorType::EXECUTE_FAIL);
+
+    eventHub->SetEnabled(true);
+    auto successResult = pattern->ConvertLegacyInjectionEventResult(R"({"cmd":"supported"})", { "supported" });
+    EXPECT_TRUE(successResult.success);
+    EXPECT_EQ(successResult.errorType, CommandErrorType::NONE);
+}
+
+/**
  * @tc.name: FrameNodeAdoptedCompensation001
  * @tc.desc: Test adopted compensation transforms geometry and can be reverted.
  * @tc.type: FUNC

@@ -2746,6 +2746,11 @@ void SelectPattern::ShowOptions(int32_t index)
     ShowSelectMenu();
 }
 
+CommandResult SelectPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "onSelect" });
+}
+
 int32_t SelectPattern::OnInjectionEvent(const std::string& command)
 {
     int32_t targetIndex = -1;

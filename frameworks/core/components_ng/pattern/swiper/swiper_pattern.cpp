@@ -8080,6 +8080,11 @@ void SwiperPattern::FromJson(const std::unique_ptr<JsonValue>& json)
     Pattern::FromJson(json);
 }
 
+CommandResult SwiperPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "change" }, CommandErrorType::EXECUTE_FAIL);
+}
+
 int32_t SwiperPattern::OnInjectionEvent(const std::string& command)
 {
     auto host = GetHost();
