@@ -638,6 +638,8 @@ protected:
     void LayoutItem(RefPtr<LayoutWrapper>& layoutWrapper, int32_t index, const ListItemInfo& pos,
         int32_t& startIndex, float crossSize);
     static void SyncGeometry(RefPtr<LayoutWrapper>& wrapper, bool isDirty = false);
+    void LayoutDeferredCacheItem(const RefPtr<LayoutWrapper>& wrapper, int32_t index, const ListItemInfo& pos,
+        float crossSize, bool isDirty, bool show);
     ListItemInfo GetListItemGroupPosition(const RefPtr<LayoutWrapper>& layoutWrapper, int32_t index);
     bool CheckNeedMeasure(const RefPtr<LayoutWrapper>& layoutWrapper) const;
     bool CheckLayoutConstraintChanged(const RefPtr<LayoutWrapper>& layoutWrapper) const;

@@ -3287,6 +3287,273 @@ HWTEST_F(ListLayoutTestNg, ListRepeatCacheCount002, TestSize.Level1)
 }
 
 /**
+ * @tc.name: ListRepeatPrebuiltCacheItemKeptInRange001
+ * @tc.desc: A prebuilt cache item waiting for parent layout keeps its cache slot
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListLayoutTestNg, ListRepeatPrebuiltCacheItemKeptInRange001, TestSize.Level1)
+{
+    ListModelNG model = CreateList();
+    ViewStackProcessor::GetInstance()->StartGetAccessRecordingFor(GetElmtId());
+    CreateRepeatVirtualScrollNode(10, [this](int32_t idx) {
+        CreateListItem();
+        ViewStackProcessor::GetInstance()->Pop();
+        ViewStackProcessor::GetInstance()->StopGetAccessRecording();
+    });
+    auto repeat = AceType::DynamicCast<RepeatVirtualScrollNode>(frameNode_->GetChildAtIndex(0));
+    ASSERT_NE(repeat, nullptr);
+
+    /**
+     * @tc.steps: step1. Prebuild the first cache item before the first layout pass
+     * @tc.expected: the item exists and its layout is not complete
+     */
+    auto prebuilt = AceType::DynamicCast<FrameNode>(repeat->GetFrameChildByIndex(4, true, true, false));
+    ASSERT_NE(prebuilt, nullptr);
+    EXPECT_FALSE(prebuilt->IsLayoutComplete());
+    constexpr float prevCrossOffset = 37.0f;
+    prebuilt->GetGeometryNode()->SetFrameOffset(OffsetF(prevCrossOffset, 0.0f));
+    CreateDone();
+
+    /**
+     * @tc.steps: step2. Check the item is deferred to the parent layout
+     * @tc.expected: the queued predict item requires a parent layout
+     */
+    auto listPattern = frameNode_->GetPattern<ListPattern>();
+    ASSERT_NE(listPattern, nullptr);
+    auto predictParam = listPattern->GetPredictLayoutParamV2();
+    ASSERT_TRUE(predictParam.has_value());
+    ASSERT_FALSE(predictParam->items.empty());
+    EXPECT_TRUE(predictParam->items.front().needParentLayout);
+
+    /**
+     * @tc.steps: step3. Check the deferred item is not dropped from the cache range
+     * @tc.expected: index 4 stays in the L1 cache as the same inactive node
+     */
+    EXPECT_TRUE(repeat->caches_.IsInL1Cache("4"));
+    EXPECT_EQ(repeat->GetChildren().size(), 5);
+    auto cachedItem = frameNode_->GetChildByIndex(4)->GetHostNode();
+    EXPECT_EQ(cachedItem, prebuilt);
+    EXPECT_FALSE(cachedItem->IsActive());
+    const auto deferredOffset = cachedItem->GetGeometryNode()->GetFrameOffset();
+    EXPECT_FLOAT_EQ(deferredOffset.GetX(), prevCrossOffset);
+    EXPECT_NE(deferredOffset.GetY(), 0.0f);
+
+    /**
+     * @tc.steps: step4. Run the idle predict pass and one more layout pass
+     * @tc.expected: the item is kept and converges, so it is neither destroyed nor rebuilt
+     */
+    FlushIdleTask(listPattern);
+    frameNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    FlushUITasks();
+    EXPECT_TRUE(repeat->caches_.IsInL1Cache("4"));
+    EXPECT_EQ(frameNode_->GetChildByIndex(4)->GetHostNode(), cachedItem);
+    EXPECT_TRUE(cachedItem->IsLayoutComplete());
+    EXPECT_FALSE(cachedItem->CheckNeedForceMeasureAndLayout());
+}
+
+/**
+ * @tc.name: ListRepeatPrebuiltCacheItemKeptInRange002
+ * @tc.desc: A prebuilt cache item of a multi-lane List keeps its cache slot
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListLayoutTestNg, ListRepeatPrebuiltCacheItemKeptInRange002, TestSize.Level1)
+{
+    ListModelNG model = CreateList();
+    model.SetLanes(2);
+    ViewStackProcessor::GetInstance()->StartGetAccessRecordingFor(GetElmtId());
+    CreateRepeatVirtualScrollNode(20, [this](int32_t idx) {
+        CreateListItem();
+        ViewStackProcessor::GetInstance()->Pop();
+        ViewStackProcessor::GetInstance()->StopGetAccessRecording();
+    });
+    auto repeat = AceType::DynamicCast<RepeatVirtualScrollNode>(frameNode_->GetChildAtIndex(0));
+    ASSERT_NE(repeat, nullptr);
+
+    /**
+     * @tc.steps: step1. Prebuild the first cache item of the second lane row
+     * @tc.expected: the item exists and its layout is not complete
+     */
+    auto prebuilt = AceType::DynamicCast<FrameNode>(repeat->GetFrameChildByIndex(8, true, true, false));
+    ASSERT_NE(prebuilt, nullptr);
+    EXPECT_FALSE(prebuilt->IsLayoutComplete());
+    constexpr float prevCrossOffset = 37.0f;
+    prebuilt->GetGeometryNode()->SetFrameOffset(OffsetF(prevCrossOffset, 0.0f));
+    CreateDone();
+
+    /**
+     * @tc.steps: step2. Check the deferred item is not dropped from the cache range
+     * @tc.expected: index 8 stays in the L1 cache as the same inactive node
+     */
+    auto listPattern = frameNode_->GetPattern<ListPattern>();
+    ASSERT_NE(listPattern, nullptr);
+    auto predictParam = listPattern->GetPredictLayoutParamV2();
+    ASSERT_TRUE(predictParam.has_value());
+    ASSERT_FALSE(predictParam->items.empty());
+    EXPECT_TRUE(predictParam->items.front().needParentLayout);
+    EXPECT_TRUE(repeat->caches_.IsInL1Cache("8"));
+    EXPECT_EQ(repeat->GetChildren().size(), 9);
+    auto cachedItem = frameNode_->GetChildByIndex(8)->GetHostNode();
+    EXPECT_EQ(cachedItem, prebuilt);
+    const auto deferredOffset = cachedItem->GetGeometryNode()->GetFrameOffset();
+    EXPECT_FLOAT_EQ(deferredOffset.GetX(), prevCrossOffset);
+    EXPECT_NE(deferredOffset.GetY(), 0.0f);
+}
+
+/**
+ * @tc.name: ListRepeatPrebuiltCacheItemKeptInRange003
+ * @tc.desc: A prebuilt cache item before the visible range keeps its cache slot
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListLayoutTestNg, ListRepeatPrebuiltCacheItemKeptInRange003, TestSize.Level1)
+{
+    ListModelNG model = CreateList();
+    ViewStackProcessor::GetInstance()->StartGetAccessRecordingFor(GetElmtId());
+    CreateRepeatVirtualScrollNode(10, [this](int32_t idx) {
+        CreateListItem();
+        ViewStackProcessor::GetInstance()->Pop();
+        ViewStackProcessor::GetInstance()->StopGetAccessRecording();
+    });
+    auto repeat = AceType::DynamicCast<RepeatVirtualScrollNode>(frameNode_->GetChildAtIndex(0));
+    ASSERT_NE(repeat, nullptr);
+    CreateDone();
+    auto listPattern = frameNode_->GetPattern<ListPattern>();
+    ASSERT_NE(listPattern, nullptr);
+    FlushIdleTask(listPattern);
+
+    /**
+     * @tc.steps: step1. Jump to the tail so that the leading items leave the cache range
+     * @tc.expected: index 1 is no longer kept in the L1 cache
+     */
+    UpdateCurrentOffset(-600, SCROLL_FROM_JUMP);
+    FlushIdleTask(listPattern);
+    EXPECT_FALSE(repeat->caches_.IsInL1Cache("1"));
+
+    /**
+     * @tc.steps: step2. Prebuild index 1, record a cross axis offset and scroll back
+     * @tc.expected: the item exists, its layout is not complete and it keeps the recorded offset
+     */
+    auto prebuilt = AceType::DynamicCast<FrameNode>(repeat->GetFrameChildByIndex(1, true, true, false));
+    ASSERT_NE(prebuilt, nullptr);
+    EXPECT_FALSE(prebuilt->IsLayoutComplete());
+    constexpr float prevCrossOffset = 37.0f;
+    prebuilt->GetGeometryNode()->SetFrameOffset(OffsetF(prevCrossOffset, 0.0f));
+    UpdateCurrentOffset(350, SCROLL_FROM_JUMP);
+
+    /**
+     * @tc.steps: step3. Check the backward cache walk defers the prebuilt item
+     * @tc.expected: the queued predict item is index 1 and requires a parent layout
+     */
+    auto predictParam = listPattern->GetPredictLayoutParamV2();
+    ASSERT_TRUE(predictParam.has_value());
+    ASSERT_FALSE(predictParam->items.empty());
+    EXPECT_EQ(predictParam->items.front().index, 1);
+    EXPECT_TRUE(predictParam->items.front().needParentLayout);
+
+    /**
+     * @tc.steps: step4. Check the backward deferred item is not dropped from the cache range
+     * @tc.expected: index 1 stays in the L1 cache as the same node
+     */
+    EXPECT_TRUE(repeat->caches_.IsInL1Cache("1"));
+    EXPECT_EQ(frameNode_->GetChildByIndex(1)->GetHostNode(), prebuilt);
+
+    /**
+     * @tc.steps: step5. Check the deferred item is positioned within the same pass
+     * @tc.expected: the main axis offset comes from the cache walk and the cross axis keeps its previous value
+     */
+    const auto deferredOffset = prebuilt->GetGeometryNode()->GetFrameOffset();
+    EXPECT_FLOAT_EQ(deferredOffset.GetX(), prevCrossOffset);
+    EXPECT_NE(deferredOffset.GetY(), 0.0f);
+}
+
+/**
+ * @tc.name: ListRepeatDeferredCacheItemCrossAxisStable004
+ * @tc.desc: A deferred cache item keeps its cross axis offset across repeated deferred passes
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListLayoutTestNg, ListRepeatDeferredCacheItemCrossAxisStable004, TestSize.Level1)
+{
+    ListModelNG model = CreateList();
+    ViewStackProcessor::GetInstance()->StartGetAccessRecordingFor(GetElmtId());
+    CreateRepeatVirtualScrollNode(10, [this](int32_t idx) {
+        CreateListItem();
+        ViewStackProcessor::GetInstance()->Pop();
+        ViewStackProcessor::GetInstance()->StopGetAccessRecording();
+    });
+    auto repeat = AceType::DynamicCast<RepeatVirtualScrollNode>(frameNode_->GetChildAtIndex(0));
+    ASSERT_NE(repeat, nullptr);
+
+    /**
+     * @tc.steps: step1. Prebuild the cache item with a cross axis offset and a safe area adjust
+     * @tc.expected: the item waits for the parent layout with both values on its geometry node
+     */
+    auto prebuilt = AceType::DynamicCast<FrameNode>(repeat->GetFrameChildByIndex(4, true, true, false));
+    ASSERT_NE(prebuilt, nullptr);
+    const OffsetF prevOffset(37.0f, 0.0f);
+    prebuilt->GetGeometryNode()->SetFrameOffset(prevOffset);
+    const OffsetF ignoreAdjust(10.0f, 5.0f);
+    prebuilt->GetGeometryNode()->SetIgnoreAdjust(ignoreAdjust);
+    CreateDone();
+    auto listPattern = frameNode_->GetPattern<ListPattern>();
+    ASSERT_NE(listPattern, nullptr);
+    auto predictParam = listPattern->GetPredictLayoutParamV2();
+    ASSERT_TRUE(predictParam.has_value());
+    ASSERT_FALSE(predictParam->items.empty());
+    EXPECT_TRUE(predictParam->items.front().needParentLayout);
+
+    /**
+     * @tc.steps: step2. Run two more layout passes without flushing the idle predict task
+     * @tc.expected: the item stays deferred and its cross axis offset does not drift
+     */
+    constexpr int32_t extraPasses = 2;
+    for (int32_t pass = 0; pass < extraPasses; ++pass) {
+        frameNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+        FlushUITasks();
+        ASSERT_TRUE(repeat->caches_.IsInL1Cache("4"));
+        EXPECT_FLOAT_EQ(prebuilt->GetGeometryNode()->GetFrameOffset().GetX(), prevOffset.GetX());
+    }
+    EXPECT_FALSE(prebuilt->IsLayoutComplete());
+}
+
+/**
+ * @tc.name: ListRepeatDeferredCacheItemShownInLanes005
+ * @tc.desc: A deferred cache item of a multi-lane List showing cache items is kept and activated
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListLayoutTestNg, ListRepeatDeferredCacheItemShownInLanes005, TestSize.Level1)
+{
+    ListModelNG model = CreateList();
+    model.SetLanes(2);
+    model.SetCachedCount(1, true);
+    ViewStackProcessor::GetInstance()->StartGetAccessRecordingFor(GetElmtId());
+    CreateRepeatVirtualScrollNode(20, [this](int32_t idx) {
+        CreateListItem();
+        ViewStackProcessor::GetInstance()->Pop();
+        ViewStackProcessor::GetInstance()->StopGetAccessRecording();
+    });
+    auto repeat = AceType::DynamicCast<RepeatVirtualScrollNode>(frameNode_->GetChildAtIndex(0));
+    ASSERT_NE(repeat, nullptr);
+
+    /**
+     * @tc.steps: step1. Prebuild the first cache item of the second lane row
+     * @tc.expected: the item exists and its layout is not complete
+     */
+    auto prebuilt = AceType::DynamicCast<FrameNode>(repeat->GetFrameChildByIndex(8, true, true, false));
+    ASSERT_NE(prebuilt, nullptr);
+    EXPECT_FALSE(prebuilt->IsLayoutComplete());
+    CreateDone();
+
+    /**
+     * @tc.steps: step2. Check the deferred item is kept and activated while cache items are shown
+     * @tc.expected: index 8 stays in the L1 cache as the same active node with its index assigned
+     */
+    EXPECT_TRUE(repeat->caches_.IsInL1Cache("8"));
+    auto cachedItem = frameNode_->GetChildByIndex(8)->GetHostNode();
+    EXPECT_EQ(cachedItem, prebuilt);
+    EXPECT_TRUE(cachedItem->IsActive());
+    EXPECT_EQ(cachedItem->GetPattern<ListItemPattern>()->GetIndexInList(), 8);
+}
+
+/**
  * @tc.name: ListRepeatCacheCount003
  * @tc.desc: List update size, cacheCount item update size
  * @tc.type: FUNC
@@ -3582,7 +3849,9 @@ HWTEST_P(ListPredictCacheTestNg, WaitsForParentLayout, TestSize.Level1)
     if (prebuilt_) {
         EXPECT_EQ(item, prebuiltItem_);
     }
-    EXPECT_FALSE(item->IsActive());
+    // A prebuilt item is positioned and activated by List in the same pass; a newly built one is
+    // rebuilt offscreen on idle, where ProcessOffscreenNode restores its pre-task inactive state.
+    EXPECT_EQ(item->IsActive(), show_ && prebuilt_);
     // Repeat attaches newly created cache nodes; LazyForEach defers attachment until display.
     EXPECT_EQ(item->IsOnMainTree(), repeat_ || wasOnMainTree);
     EXPECT_FLOAT_EQ(item->GetGeometryNode()->GetFrameSize().Height(), ITEM_MAIN_SIZE);
@@ -3608,7 +3877,7 @@ HWTEST_P(ListPredictCacheTestNg, DeadlinePreservesParentLayoutIntent, TestSize.L
     PipelineContext::GetCurrentContext()->OnIdle(INT64_MAX);
     item = GetCachedItem();
     ASSERT_NE(item, nullptr);
-    EXPECT_FALSE(item->IsActive());
+    EXPECT_EQ(item->IsActive(), show_ && prebuilt_);
     FlushUITasks();
     EXPECT_EQ(GetCachedItem(), item);
     ASSERT_NO_FATAL_FAILURE(CheckPosition());
