@@ -1145,8 +1145,7 @@ HWTEST_F(DialogPatternTestNg, DialogPatternTest011, TestSize.Level0)
         auto dialog = overlayManager->ShowDialog(props, nullptr);
         ASSERT_NE(dialog, nullptr);
         auto dialogProp = AceType::DynamicCast<DialogLayoutProperty>(dialog->GetLayoutProperty());
-        auto dialogPattern = dialog->GetPattern<DialogPattern>();
-        dialogLayoutAlgorithm.MultipleDialog(dialogProp, childSize, selfSize, overlayManager, dialogPattern);
+        dialogLayoutAlgorithm.MultipleDialog(dialogProp, childSize, selfSize, overlayManager);
     }
     /**
      * @tc.steps: step5. test DialogLayoutAlgorithm's MultipleDialog function.
@@ -1158,8 +1157,7 @@ HWTEST_F(DialogPatternTestNg, DialogPatternTest011, TestSize.Level0)
     auto dialog = overlayManager->ShowDialog(props, nullptr);
     ASSERT_NE(dialog, nullptr);
     auto dialogProp = AceType::DynamicCast<DialogLayoutProperty>(dialog->GetLayoutProperty());
-    auto dialogPattern = dialog->GetPattern<DialogPattern>();
-    dialogLayoutAlgorithm.MultipleDialog(dialogProp, newChildSize, newSelfSize, overlayManager, dialogPattern);
+    dialogLayoutAlgorithm.MultipleDialog(dialogProp, newChildSize, newSelfSize, overlayManager);
     EXPECT_EQ(dialogLayoutAlgorithm.touchingBoundaryFlag_, TouchingBoundaryType::NotTouchBoundary);
 }
 

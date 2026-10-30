@@ -21,8 +21,6 @@
 #include "core/components/common/layout/grid_column_info.h"
 #include "core/components/container_modal/container_modal_constants.h"
 #include "core/components_ng/manager/force_split/force_split_manager.h"
-#include "core/components_ng/manager/handedness/handedness_manager.h"
-#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/manager/navigation/navigation_manager.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 #include "core/components_ng/layout/overlay_safe_area_helper.h"
@@ -54,9 +52,6 @@ constexpr Dimension INNER_SCROLL_MIN_HEIGHT = 100.0_vp;
 constexpr Dimension MULTIPLE_DIALOG_OFFSET_Y = 48.0_vp;
 constexpr Dimension SUBWINDOW_DIALOG_DEFAULT_WIDTH = 400.0_vp;
 constexpr Dimension AVOID_LIMIT_PADDING = 8.0_vp;
-// Handedness layout safe-area clearances.
-constexpr Dimension HANDEDNESS_TOP_SAFE_PADDING = 8.0_vp;
-constexpr Dimension HANDEDNESS_BOTTOM_SAFE_PADDING = 16.0_vp;
 constexpr double EXPAND_DISPLAY_WINDOW_HEIGHT_RATIO = 0.67;
 constexpr double EXPAND_DISPLAY_DIALOG_HEIGHT_RATIO = 0.9;
 constexpr double HALF = 2.0;
@@ -109,10 +104,8 @@ void DialogLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
         isModal_ && !isShowInSubWindow_;
     auto enableHoverMode = dialogProp->GetEnableHoverMode().value_or(false);
     hoverModeArea_ = dialogProp->GetHoverModeArea().value_or(HoverModeAreaType::BOTTOM_SCREEN);
-    auto handednessMode = dialogProp->GetAdaptToHandedness().value_or(HandednessFollowMode::NONE);
     needAdaptForceSplitMode_ = pipeline->IsDisplayInForceSplitMode() && !IsEmbeddedDialog(hostNode) &&
-                                (forceSplitMgr->GetDialogSupportSplit()) &&
-                                (handednessMode == HandednessFollowMode::NONE);
+                                (forceSplitMgr->GetDialogSupportSplit());
     forceSplitRatio_ = forceSplitMgr->GetSplitRatio();
     auto safeAreaManager = pipeline->GetSafeAreaManager();
     auto keyboardInsert = safeAreaManager->GetKeyboardInset();
@@ -236,155 +229,6 @@ bool DialogLayoutAlgorithm::IsDefaultPosition(const RefPtr<DialogLayoutProperty>
     auto alignment = dialogProp->GetDialogAlignment().value_or(DialogAlignment::DEFAULT);
     auto offset = dialogProp->GetDialogOffset().value_or(DimensionOffset());
     return alignment == DialogAlignment::DEFAULT && NearZero(offset.GetX().Value()) && NearZero(offset.GetY().Value());
-}
-
-bool DialogLayoutAlgorithm::IsHandednessActive(const RefPtr<DialogLayoutProperty>& dialogProp)
-{
-    CHECK_NULL_RETURN(dialogProp, false);
-    if (handednessMode_ == HandednessFollowMode::NONE) {
-        return false;
-    }
-    bool hasCustomPlacement = !IsDefaultPosition(dialogProp);
-    bool hasCustomStyle = dialogProp->GetUseCustomStyle().value_or(false);
-    return !hasCustomPlacement && !hasCustomStyle;
-}
-
-std::pair<bool, OffsetF> DialogLayoutAlgorithm::ComputeHandednessOffset(
-    const SizeF& childSize, const SizeF& selfSize, const RefPtr<DialogLayoutProperty>& dialogProp,
-    const RefPtr<DialogPattern>& dialogPattern)
-{
-    if (!dialogProp) {
-        return std::make_pair(false, OffsetF());
-    }
-    auto pipeline = GetPipelineContext();
-    CHECK_NULL_RETURN(pipeline, std::make_pair(false, OffsetF()));
-    CHECK_NULL_RETURN(dialogTheme_, std::make_pair(false, OffsetF()));
-    CHECK_NULL_RETURN(dialogPattern, std::make_pair(false, OffsetF()));
-
-    // Horizontal margin follows dialogTheme_->GetMarginLeft() on both sides.
-    float horizontalMarginPx = static_cast<float>(pipeline->NormalizeToPx(dialogTheme_->GetMarginLeft()));
-    // Top: 8vp clearance from the top safe-area edge.
-    float topPaddingPx = static_cast<float>(pipeline->NormalizeToPx(HANDEDNESS_TOP_SAFE_PADDING));
-    // Bottom: 0 if a bottom safe area exists, otherwise 16vp clearance.
-    float bottomPaddingPx = GreatNotEqual(safeAreaInsets_.bottom_.Length(), 0)
-        ? safeAreaInsets_.bottom_.Length()
-        : static_cast<float>(pipeline->NormalizeToPx(HANDEDNESS_BOTTOM_SAFE_PADDING));
-
-    float topBound = static_cast<float>(safeAreaInsets_.top_.end) + topPaddingPx;
-    float bottomBound = static_cast<float>(selfSize.Height()) - bottomPaddingPx;
-    float leftBound = horizontalMarginPx;
-    float rightBound = static_cast<float>(selfSize.Width()) - horizontalMarginPx;
-    bool cacheValid = dialogPattern->IsHandednessLayoutCaptured();
-    // If the dialog is too large to honor the safe-area bounds, handedness degrades to default layout.
-    if (GreatNotEqual(childSize.Width(), rightBound - leftBound) ||
-        GreatNotEqual(childSize.Height(), bottomBound - topBound)) {
-        return std::make_pair(false, OffsetF());
-    }
-
-    auto clampToBounds = [&leftBound, &rightBound, &topBound, &bottomBound](
-                             float x, float y, const SizeF& size) -> OffsetF {
-        float clampedX = std::max(leftBound, std::min(x, rightBound - size.Width()));
-        float clampedY = std::max(topBound, std::min(y, bottomBound - size.Height()));
-        return OffsetF(clampedX, clampedY);
-    };
-
-    // HandednessManager always lives on the main window's pipeline, even when the dialog
-    // is displayed in a sub-window. Fetch the main pipeline context to obtain it.
-    auto mainPipeline = DialogManager::GetMainPipelineContext(dialogProp->GetHost());
-
-    if (handednessMode_ == HandednessFollowMode::FOLLOW_ANCHOR) {
-        // On first layout, query HandednessManager for the anchor position and cache the
-        // returned nodeId on the pattern. On subsequent re-layouts, reuse the cached anchor
-        // so the dialog position stays stable. If the window size changed since the last
-        // layout (needRefreshAnchorPos_), re-query using the saved nodeId so the dialog
-        // follows the same anchor component instead of whatever lastFocusNodeId_ points to now.
-        std::optional<OffsetF> anchor;
-        bool needRefresh = dialogPattern->NeedRefreshAnchorPos();
-        if (cacheValid && !needRefresh) {
-            anchor = dialogPattern->GetCachedAnchorPos();
-        } else {
-            CHECK_NULL_RETURN(mainPipeline, std::make_pair(false, OffsetF()));
-            auto handednessManager = mainPipeline->GetHandednessManager();
-            if (!handednessManager) {
-                return std::make_pair(false, OffsetF());
-            }
-            int32_t queryNodeId = dialogPattern->GetCachedAnchorNodeId();
-            auto [nodeId, anchorOffset] = handednessManager->QueryAnchorPosition(queryNodeId);
-            TAG_LOGI(AceLogTag::ACE_DIALOG,
-                "FOLLOW_ANCHOR query anchor, nodeId: %{public}d, anchorOffset: %{public}s, cacheValid: %{public}d, "
-                "needRefresh: %{public}d",
-                nodeId, anchorOffset.ToString().c_str(), cacheValid, needRefresh);
-            if (nodeId < 0) {
-                return std::make_pair(false, OffsetF());
-            }
-            anchor = anchorOffset;
-            dialogPattern->SetCachedAnchorNodeId(nodeId);
-            dialogPattern->SetCachedAnchorPos(anchor.value());
-            dialogPattern->SetNeedRefreshAnchorPos(false);
-        }
-        float anchorX = anchor->GetX();
-        float anchorY = anchor->GetY();
-        // When the dialog is displayed in a sub-window, the anchor position returned by
-        // HandednessManager is in the main window's coordinate system. Add the offset
-        // delta (mainWindow top-left - subWindow top-left) to convert it into the
-        // sub-window's coordinate system.
-        if (isShowInSubWindow_ && mainPipeline) {
-            auto host = dialogProp->GetHost();
-            if (host) {
-                auto subPipeline = host->GetContext();
-                if (subPipeline) {
-                    auto mainWindowOffset = mainPipeline->GetCurrentWindowRect().GetOffset();
-                    auto subWindowOffset = subPipeline->GetCurrentWindowRect().GetOffset();
-                    anchorX += (mainWindowOffset.GetX() - subWindowOffset.GetX());
-                    anchorY += (mainWindowOffset.GetY() - subWindowOffset.GetY());
-                }
-            }
-        }
-        float targetX = anchorX - childSize.Width() / HALF;
-        float targetY = anchorY - childSize.Height() / HALF;
-        auto finalOffset = clampToBounds(targetX, targetY, childSize);
-        TAG_LOGI(AceLogTag::ACE_DIALOG,
-            "FOLLOW_ANCHOR layout, anchor: (%{public}f, %{public}f), childSize: (%{public}f, %{public}f), "
-            "isShowInSubWindow: %{public}d, target: (%{public}f, %{public}f), finalOffset: %{public}s",
-            anchorX, anchorY, childSize.Width(), childSize.Height(), isShowInSubWindow_,
-            targetX, targetY, finalOffset.ToString().c_str());
-        return std::make_pair(true, finalOffset);
-    }
-    if (handednessMode_ == HandednessFollowMode::FOLLOW_GRIP_HAND) {
-        // On first layout, query HandednessManager for the grip-hand side and cache it on the pattern.
-        // On subsequent re-layouts, reuse the cached side so the dialog position stays stable.
-        PopupSide side;
-        if (cacheValid) {
-            side = dialogPattern->GetCachedPopupSide();
-        } else {
-            CHECK_NULL_RETURN(mainPipeline, std::make_pair(false, OffsetF()));
-            auto handednessManager = mainPipeline->GetHandednessManager();
-            if (!handednessManager) {
-                return std::make_pair(false, OffsetF());
-            }
-            side = handednessManager->QueryPopupSideByHoldingHand();
-            TAG_LOGI(AceLogTag::ACE_DIALOG,
-                "FOLLOW_GRIP_HAND query popup side: %{public}s, cacheValid: %{public}d",
-                PopupSideToString(side).c_str(), cacheValid);
-            dialogPattern->SetCachedPopupSide(side);
-        }
-        float centerY = (topBound + bottomBound - childSize.Height()) / HALF;
-        float centerX = (leftBound + rightBound - childSize.Width()) / HALF;
-        float offsetX = centerX;
-        if (side == PopupSide::LEFT) {
-            offsetX = leftBound;
-        } else if (side == PopupSide::RIGHT) {
-            offsetX = rightBound - childSize.Width();
-        }
-        auto finalOffset = clampToBounds(offsetX, centerY, childSize);
-        TAG_LOGI(AceLogTag::ACE_DIALOG,
-            "FOLLOW_GRIP_HAND layout, side: %{public}s, childSize: (%{public}f, %{public}f), "
-            "offset: (%{public}f, %{public}f), finalOffset: %{public}s",
-            PopupSideToString(side).c_str(), childSize.Width(), childSize.Height(),
-            offsetX, centerY, finalOffset.ToString().c_str());
-        return std::make_pair(true, finalOffset);
-    }
-    return std::make_pair(false, OffsetF());
 }
 
 void DialogLayoutAlgorithm::ResizeDialogSubwindow(
@@ -954,12 +798,11 @@ void DialogLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
         CHECK_NULL_VOID(subWindow);
         auto subOverlayManager = subWindow->GetOverlayManager();
         CHECK_NULL_VOID(subOverlayManager);
-        MultipleDialog(dialogProp, childSize, selfSize, subOverlayManager, dialogPattern);
+        MultipleDialog(dialogProp, childSize, selfSize, subOverlayManager);
     }
     dialogOffset_ = dialogProp->GetDialogOffset().value_or(DimensionOffset());
     alignment_ = dialogProp->GetDialogAlignment().value_or(DialogAlignment::DEFAULT);
-    handednessMode_ = dialogProp->GetAdaptToHandedness().value_or(HandednessFollowMode::NONE);
-    topLeftPoint_ = ComputeChildPosition(childSize, dialogProp, selfSize, dialogPattern);
+    topLeftPoint_ = ComputeChildPosition(childSize, dialogProp, selfSize);
     auto isNonUIExtensionSubwindow = isShowInSubWindow_ && !isUIExtensionSubWindow_;
     if ((!isModal_ || isNonUIExtensionSubwindow) && !dialogProp->GetIsSceneBoardDialog().value_or(false)) {
         ProcessMaskRect(
@@ -1107,8 +950,7 @@ bool DialogLayoutAlgorithm::IsDialogTouchingBoundary(OffsetF topLeftPoint, SizeF
 }
 
 void DialogLayoutAlgorithm::MultipleDialog(const RefPtr<DialogLayoutProperty>& dialogProp, const SizeF& childSize,
-    const SizeF& selfSize, const RefPtr<OverlayManager> subOverlayManager,
-    const RefPtr<DialogPattern>& dialogPattern)
+    const SizeF& selfSize, const RefPtr<OverlayManager> subOverlayManager)
 {
     std::map<int32_t, RefPtr<FrameNode>> DialogMap(
         subOverlayManager->GetDialogMap().begin(), subOverlayManager->GetDialogMap().end());
@@ -1124,8 +966,7 @@ void DialogLayoutAlgorithm::MultipleDialog(const RefPtr<DialogLayoutProperty>& d
                                        DimensionOffset(MULTIPLE_DIALOG_OFFSET_X, MULTIPLE_DIALOG_OFFSET_Y));
         dialogOffset_ = dialogProp->GetDialogOffset().value_or(DimensionOffset());
         alignment_ = dialogProp->GetDialogAlignment().value_or(DialogAlignment::DEFAULT);
-        handednessMode_ = dialogProp->GetAdaptToHandedness().value_or(HandednessFollowMode::NONE);
-        topLeftPoint_ = ComputeChildPosition(childSize, dialogProp, selfSize, dialogPattern);
+        topLeftPoint_ = ComputeChildPosition(childSize, dialogProp, selfSize);
         if (IsDialogTouchingBoundary(topLeftPoint_, childSize, selfSize)) {
             if (touchingBoundaryFlag_ == TouchingBoundaryType::TouchBottomBoundary) {
                 dialogProp->UpdateDialogOffset(
@@ -1139,8 +980,7 @@ void DialogLayoutAlgorithm::MultipleDialog(const RefPtr<DialogLayoutProperty>& d
 }
 
 OffsetF DialogLayoutAlgorithm::ComputeChildPosition(
-    const SizeF& childSize, const RefPtr<DialogLayoutProperty>& prop, const SizeF& selfSize,
-    const RefPtr<DialogPattern>& dialogPattern)
+    const SizeF& childSize, const RefPtr<DialogLayoutProperty>& prop, const SizeF& selfSize)
 {
     OffsetF topLeftPoint;
     auto pipelineContext = GetPipelineContext();
@@ -1160,20 +1000,7 @@ OffsetF DialogLayoutAlgorithm::ComputeChildPosition(
     auto maxSize = isHostWindowAlign ? hostWindowRect_.GetSize() : layoutConstraint->maxSize;
     maxSize = isWindowBased_ ? parentWindowRect_.GetSize() : maxSize;
     wrapperSize_ = layoutConstraint->maxSize;
-    if (IsHandednessActive(prop)) {
-        auto handednessOffset = ComputeHandednessOffset(childSize, maxSize, prop, dialogPattern);
-        if (handednessOffset.first) {
-            topLeftPoint = handednessOffset.second;
-            if (dialogPattern && !dialogPattern->IsHandednessLayoutCaptured()) {
-                dialogPattern->MarkHandednessLayoutCaptured();
-            }
-        } else {
-            if (!SetAlignmentSwitch(maxSize, childSize, topLeftPoint)) {
-                topLeftPoint =
-                    OffsetF(maxSize.Width() - childSize.Width(), maxSize.Height() - childSize.Height()) / HALF;
-            }
-        }
-    } else if (!SetAlignmentSwitch(maxSize, childSize, topLeftPoint)) {
+    if (!SetAlignmentSwitch(maxSize, childSize, topLeftPoint)) {
         topLeftPoint = OffsetF(maxSize.Width() - childSize.Width(), maxSize.Height() - childSize.Height()) / HALF;
     }
     if (isHostWindowAlign && !isModal_) {
