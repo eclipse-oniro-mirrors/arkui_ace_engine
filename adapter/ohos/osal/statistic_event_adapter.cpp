@@ -16,6 +16,7 @@
 #include "core/common/statistic_event_adapter.h"
 
 #include "base/log/log.h"
+#include "base/log/material_statistic_event_info.h"
 #include "core/common/statistic_event_reporter.h"
 #ifdef UI_SERVICE_WITH_IDL
 #include "ui_service_mgr_client_idl.h"
@@ -32,6 +33,22 @@ void StatisticEventAdapter::ReportStatisticEvents(
         eventParcelList.emplace_back(eventInfo.eventName, eventInfo.subEventName, eventInfo.eventCount);
     }
     Ace::UIServiceMgrClientIdl::GetInstance()->ReportStatisticEvents(appInfoParcel, eventParcelList);
+#else
+    TAG_LOGE(AceLogTag::ACE_UI_SERVICE, "ui service not implement");
+#endif
+}
+
+void StatisticEventAdapter::ReportMaterialStatisticEvents(
+    const StatisticAppInfo& appInfo, const std::vector<MaterialStatisticEventInfo>& events)
+{
+#ifdef UI_SERVICE_WITH_IDL
+    AppInfoParcel appInfoParcel(appInfo.bundleName);
+    std::vector<MaterialStatisticEventInfoParcel> eventParcelList;
+    eventParcelList.reserve(events.size());
+    for (const auto& eventInfo : events) {
+        eventParcelList.emplace_back(eventInfo);
+    }
+    Ace::UIServiceMgrClientIdl::GetInstance()->ReportMaterialStatisticEvents(appInfoParcel, eventParcelList);
 #else
     TAG_LOGE(AceLogTag::ACE_UI_SERVICE, "ui service not implement");
 #endif

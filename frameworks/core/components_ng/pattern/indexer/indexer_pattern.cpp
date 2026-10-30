@@ -1900,13 +1900,22 @@ void IndexerPattern::ItemSelectedInAnimation(RefPtr<FrameNode>& itemNode)
     AnimationOption option;
     option.SetDuration(INDEXER_SELECT_DURATION);
     option.SetCurve(Curves::LINEAR);
+    auto onFinish = [weak = AceType::WeakClaim(this)]() {
+        auto pattern = weak.Upgrade();
+        CHECK_NULL_VOID(pattern);
+        auto popupNode = pattern->popupNode_;
+        CHECK_NULL_VOID(popupNode);
+        if (auto ctx = popupNode->GetContext()) {
+            ctx->ReportOverlayNodeMaterialArea(popupNode, "Indexer ItemSelectedInAnimation");
+        }
+    };
     AnimationUtils::Animate(
         option,
         [renderContext, id = Container::CurrentId(), selectedBackgroundColor]() {
             ContainerScope scope(id);
             renderContext->UpdateBackgroundColor(selectedBackgroundColor);
         },
-        nullptr, nullptr, Claim(pipelineContext));
+        onFinish, nullptr, Claim(pipelineContext));
 }
 
 void IndexerPattern::ItemSelectedOutAnimation(RefPtr<FrameNode>& itemNode)

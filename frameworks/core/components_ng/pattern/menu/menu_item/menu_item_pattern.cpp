@@ -946,6 +946,9 @@ void MenuItemPattern::ShowSubMenuHelper(const RefPtr<FrameNode>& subMenu)
         menuWrapper->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF_AND_CHILD);
         RegisterWrapperMouseEvent();
     }
+    if (auto ctx = subMenu->GetContext()) {
+        ctx->AddTaskOverlayNodeMaterialArea(subMenu, "MenuItem ShowSubMenuHelper");
+    }
     // select overlay menu no need focus
     if (!isSelectOverlayMenu) {
         menuPattern->FocusViewShow();

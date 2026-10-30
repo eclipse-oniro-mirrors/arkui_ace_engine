@@ -982,6 +982,7 @@ protected:
 
     bool isPureSwiper_ = false;
     bool hasTabsAncestor_ = false;
+    bool hasReportedInitialTabs_ = false;
     bool usePropertyAnimation_ = false;
     bool stopIndicatorAnimation_ = true;
     bool isFinishAnimation_ = false;

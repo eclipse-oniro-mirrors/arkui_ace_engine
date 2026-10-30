@@ -15,13 +15,308 @@
 
 #include "core/components_ng/manager/material/material_processor.h"
 
+#include "base/log/event_report.h"
+#include "base/log/log.h"
+#include "base/log/material_statistic_event_info.h"
+#include "core/common/statistic_event_reporter.h"
 #include "core/components/common/properties/ui_material.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/base/geometry_node.h"
 #include "core/components_ng/base/view_abstract.h"
 #include "core/components_ng/render/render_context.h"
 #include "core/pipeline_ng/pipeline_context.h"
+#include "core/components_ng/manager/material/material_processor_helper.h"
 
 namespace OHOS::Ace::NG {
+namespace {
+const std::vector<std::string> TARGET_TAG = { "ActionSheet", "AlertDialog", "AlphabetIndexer", "SheetPage", "Dialog",
+    "Slider", "Toast", "Toggle" };
+const std::string TARGET_TEXT_COPY = "SelectOverlayNode ShowSelectOverlay";
+const std::string TARGET_TEXT_COPY_EXT = "extensionMenu";
+const std::string TARGET_MENU_SELECT_MENU = "MenuManager OnShowMenuAnimationFinished";
+const std::string TARGET_SUB_MENU = "MenuItem ShowSubMenuHelper";
+const std::string TARGET_POPUP_TIPS = "overlay ShowPopupAnimationNG";
+const std::string TARGET_SELECT = "Select ShowSelectMenu";
+constexpr float MATERIAL_AREA_REPORT_THRESHOLD = 0.2f;
+
+struct PageContextStatBatch {
+    int32_t navContainerId = -1;
+    std::vector<MaterialNodeInfo> navNodes;
+    int32_t tabsContainerId = -1;
+    std::vector<MaterialNodeInfo> tabsNodes;
+    int32_t pageContainerId = -1;
+    std::vector<MaterialNodeInfo> pageNodes;
+    double screenWidth = 0.0;
+    double screenHeight = 0.0;
+    std::string navName;
+    std::string pageName;
+    int32_t tabIndex = -1;
+};
+
+void FlushOverlayMaterialArea(int32_t nodeId, std::string tag, double width, double height, double area,
+    double screenWidth, double screenHeight, int64_t deadline, const WeakPtr<PipelineContext>& pipelineWk)
+{
+    if (GetSysTimestamp() > deadline) {
+        auto pipeline = pipelineWk.Upgrade();
+        CHECK_NULL_VOID(pipeline);
+        pipeline->AddPredictTask([nodeId, tag = std::move(tag), width, height, area, screenWidth, screenHeight,
+                                     pipelineWk](int64_t deadline, bool /*canUseLongPredictTask*/) {
+            FlushOverlayMaterialArea(
+                nodeId, std::move(tag), width, height, area, screenWidth, screenHeight, deadline, pipelineWk);
+        });
+        return;
+    }
+    auto pipeline = pipelineWk.Upgrade();
+    CHECK_NULL_VOID(pipeline);
+    RichOverlayMaterialAreaData data;
+    data.nodeId = nodeId;
+    data.tag = std::move(tag);
+    data.width = width;
+    data.height = height;
+    data.area = area;
+    data.screenWidth = screenWidth;
+    data.screenHeight = screenHeight;
+    double screenArea = std::max(1e-6, screenWidth * screenHeight);
+    data.areaPercent = area / screenArea;
+    if (data.areaPercent < MATERIAL_AREA_REPORT_THRESHOLD) {
+        return;
+    }
+    pipeline->GetStatisticEventReporter()->SendOverlayMaterialArea(data);
+}
+
+void SendPageContextStats(const std::vector<MaterialNodeInfo>& totalNodes, int32_t navCount, int32_t tabsCount,
+    int32_t pageCount, const PageContextStatBatch& batch, const RefPtr<PipelineContext>& pipeline)
+{
+    RichMaterialNodeStatData data;
+    data.containerId = batch.navContainerId;
+    data.containerType = "navigation-tabs-page";
+    data.entries.reserve(totalNodes.size());
+    for (const auto& node : totalNodes) {
+        RichMaterialNodeEntry entry;
+        entry.nodeId = node.nodeId;
+        entry.tag = node.tag;
+        entry.containerId = node.containerId;
+        entry.width = node.width;
+        entry.height = node.height;
+        entry.area = node.area;
+        entry.inTitleBar = node.inTitleBar;
+        entry.inBottomTabBar = node.inBottomTabBar;
+        data.entries.emplace_back(std::move(entry));
+    }
+    data.navCount = navCount;
+    data.tabsCount = tabsCount;
+    data.pageCount = pageCount;
+    data.screenWidth = batch.screenWidth;
+    data.screenHeight = batch.screenHeight;
+    double screenArea = std::max(1e-6, batch.screenWidth * batch.screenHeight);
+    double materialArea = 0.0;
+    for (const auto& node : totalNodes) {
+        materialArea += node.area;
+    }
+    data.areaPercent = materialArea / screenArea;
+    if (data.areaPercent < MATERIAL_AREA_REPORT_THRESHOLD) {
+        return;
+    }
+    data.navName = batch.navName;
+    data.pageName = batch.pageName;
+    data.tabIndex = batch.tabIndex;
+    pipeline->GetStatisticEventReporter()->SendMaterialNodeStat(data);
+}
+
+void FlushPageContextStats(PageContextStatBatch batch, int64_t deadline, const WeakPtr<PipelineContext>& pipelineWk)
+{
+    if (GetSysTimestamp() > deadline) {
+        auto pipeline = pipelineWk.Upgrade();
+        CHECK_NULL_VOID(pipeline);
+        pipeline->AddPredictTask(
+            [batch = std::move(batch), pipelineWk](int64_t deadline, bool /*canUseLongPredictTask*/) {
+                FlushPageContextStats(std::move(batch), deadline, pipelineWk);
+            });
+        return;
+    }
+    int32_t navCount = batch.navNodes.size();
+    int32_t tabsCount = batch.tabsNodes.size();
+    int32_t pageCount = batch.pageNodes.size();
+    std::vector<MaterialNodeInfo> totalNodes;
+    totalNodes.insert(totalNodes.end(), batch.navNodes.begin(), batch.navNodes.end());
+    totalNodes.insert(totalNodes.end(), batch.tabsNodes.begin(), batch.tabsNodes.end());
+    totalNodes.insert(totalNodes.end(), batch.pageNodes.begin(), batch.pageNodes.end());
+    if (totalNodes.empty()) {
+        return;
+    }
+    auto pipeline = pipelineWk.Upgrade();
+    CHECK_NULL_VOID(pipeline);
+    SendPageContextStats(totalNodes, navCount, tabsCount, pageCount, batch, pipeline);
+}
+
+std::string GetTargetTag(const std::string& tag, const std::string& parentTag, const std::string& source)
+{
+    std::string targetTag = "";
+    for (auto str : TARGET_TAG) {
+        if (parentTag == str) {
+            targetTag = str;
+            break;
+        }
+        if (tag == str) {
+            targetTag = str;
+            break;
+        }
+    }
+    if (source == TARGET_TEXT_COPY) {
+        targetTag = "Text Copy";
+    }
+    if (source == TARGET_TEXT_COPY_EXT) {
+        targetTag = "Text Copy ExtMenu";
+    }
+    if (source == TARGET_MENU_SELECT_MENU) {
+        targetTag = "Menu or Select Menu";
+    }
+    if (source == TARGET_POPUP_TIPS) {
+        targetTag = "Popup or Tips";
+    }
+    if (source == TARGET_SUB_MENU) {
+        targetTag = "Sub Menu";
+    }
+    return targetTag;
+}
+
+bool IsPageContextNodeVisible(const RefPtr<FrameNode>& node, const ContainerInfo& ci)
+{
+    auto tabContainerNode =
+        AceType::DynamicCast<FrameNode>(ElementRegister::GetInstance()->GetUINodeById(ci.tabContentId));
+    if (tabContainerNode && !tabContainerNode->IsVisible()) {
+        return false;
+    }
+    auto navContainerNode = AceType::DynamicCast<FrameNode>(ElementRegister::GetInstance()->GetUINodeById(
+        (ci.navDestinationId != -1) ? ci.navDestinationId : ci.navBarId));
+    if (navContainerNode && !navContainerNode->IsVisible()) {
+        return false;
+    }
+    if (!node->IsVisibleAndActive()) {
+        return false;
+    }
+    return true;
+}
+
+bool MatchesPageScope(const ContainerInfo& ci, int32_t targetContainerId)
+{
+    if (ci.tabsId == -1 && ci.navigationId == -1 && ci.pageId == -1) {
+        return false;
+    }
+    if (ci.pageId != -1 && ci.pageId != targetContainerId) {
+        return false;
+    }
+    return true;
+}
+
+bool MatchesNavContainerScope(const ContainerInfo& ci, int32_t targetContainerId)
+{
+    if (ci.navigationId == -1 || (ci.navBarId == -1 && ci.navDestinationId == -1)) {
+        return false;
+    }
+    if ((ci.navBarId != -1 && ci.navBarId != targetContainerId) ||
+        (ci.navDestinationId != -1 && ci.navDestinationId != targetContainerId)) {
+        return false;
+    }
+    return true;
+}
+
+bool MatchesTabContainerScope(const ContainerInfo& ci, int32_t targetContainerId)
+{
+    if (ci.tabsId == -1) {
+        return false;
+    }
+    if (ci.tabContentId != -1 && ci.tabContentId != targetContainerId) {
+        return false;
+    }
+    return true;
+}
+
+bool MatchesContainerScope(const ContainerInfo& ci, PageLogContainerType type, int32_t targetContainerId)
+{
+    switch (type) {
+        case PageLogContainerType::Page:
+            return MatchesPageScope(ci, targetContainerId);
+        case PageLogContainerType::NavContainer:
+            return MatchesNavContainerScope(ci, targetContainerId);
+        case PageLogContainerType::TabContainer:
+            return MatchesTabContainerScope(ci, targetContainerId);
+        default:
+            return false;
+    }
+}
+
+bool ShouldSkipPageContextNode(const RefPtr<FrameNode>& node, const ContainerInfo& ci,
+    PageLogContainerType type, int32_t targetContainerId)
+{
+    if (!node) {
+        return true;
+    }
+    if (!IsPageContextNodeVisible(node, ci)) {
+        return true;
+    }
+    if (!MatchesContainerScope(ci, type, targetContainerId)) {
+        return true;
+    }
+    if (!node->GetGeometryNode()) {
+        return true;
+    }
+    return false;
+}
+
+void ClassifyPageContextNode(const RefPtr<FrameNode>& node, const ContainerInfo& ci,
+    std::vector<MaterialNodeInfo>& navNodes, std::vector<MaterialNodeInfo>& tabsNodes,
+    std::vector<MaterialNodeInfo>& pageNodes)
+{
+    if (!node) {
+        return;
+    }
+    auto geometryNode = node->GetGeometryNode();
+    if (!geometryNode) {
+        return;
+    }
+    auto size = geometryNode->GetFrameSize();
+    MaterialNodeInfo info;
+    info.nodeId = node->GetId();
+    info.tag = node->GetTag();
+    info.width = size.Width();
+    info.height = size.Height();
+    info.area = info.width * info.height;
+    info.inTitleBar = node->IsInTitleBar();
+    info.inBottomTabBar = node->IsInBottomTabBar();
+    if (ci.navigationId != -1 && ci.navigationId == ci.containerId) {
+        info.containerId = ci.navigationId;
+        navNodes.push_back(info);
+    } else if (ci.tabsId != -1 && ci.tabsId == ci.containerId) {
+        info.containerId = ci.tabsId;
+        tabsNodes.push_back(info);
+    } else {
+        info.containerId = ci.pageId;
+        pageNodes.push_back(info);
+    }
+}
+
+void PostOverlayAreaTask(const RefPtr<FrameNode>& host, const std::string& parentTag,
+    const std::string& source, double width, double height, double area)
+{
+    auto pipeline = PipelineContext::GetCurrentContextSafelyWithCheck();
+    CHECK_NULL_VOID(pipeline);
+    double screenWidth = pipeline->GetRootWidth();
+    double screenHeight = pipeline->GetRootHeight();
+    if (NearZero(screenHeight * screenWidth)) {
+        return;
+    }
+    auto nodeId = host->GetId();
+    auto tag = host->GetTag();
+    auto pipelineWk = WeakPtr<PipelineContext>(pipeline);
+    std::string targetTag = GetTargetTag(tag, parentTag, source);
+    pipeline->AddPredictTask([nodeId, tag = std::move(targetTag), width, height, area, screenWidth, screenHeight,
+                                 pipelineWk](int64_t deadline, bool /*canUseLongPredictTask*/) {
+        FlushOverlayMaterialArea(
+            nodeId, std::move(tag), width, height, area, screenWidth, screenHeight, deadline, pipelineWk);
+    });
+}
+} // namespace
 
 void MaterialProcessor::Register(const RefPtr<FrameNode>& node)
 {
@@ -29,9 +324,54 @@ void MaterialProcessor::Register(const RefPtr<FrameNode>& node)
     materialNodes_[node->GetId()] = WeakPtr<FrameNode>(node);
 }
 
+void MaterialProcessor::RegisterPageContextNode(const RefPtr<FrameNode>& node)
+{
+    CHECK_NULL_VOID(node);
+    std::lock_guard<std::mutex> lock(pageContextMutex_);
+    pageContextStats_[node->GetId()] = WeakPtr<FrameNode>(node);
+}
+
 void MaterialProcessor::Unregister(int32_t nodeId)
 {
     materialNodes_.erase(nodeId);
+}
+
+void MaterialProcessor::UnregisterPageContextNode(int32_t nodeId)
+{
+    std::lock_guard<std::mutex> lock(pageContextMutex_);
+    pageContextStats_.erase(nodeId);
+}
+
+void MaterialProcessor::ReportOverlayNodeMaterialArea(const RefPtr<FrameNode>& host, const std::string& source)
+{
+    if (source == TARGET_SELECT) {
+        return;
+    }
+    CHECK_NULL_VOID(host);
+
+    auto parentNode = host->GetParent();
+    std::string parentTag = "";
+    if (parentNode) {
+        parentTag = parentNode->GetTag();
+    }
+
+    auto rc = host->GetRenderContext();
+    CHECK_NULL_VOID(rc);
+    auto material = rc->GetSystemMaterial();
+    bool notImmersive = (!material || material->GetType() != static_cast<int32_t>(MaterialType::IMMERSIVE));
+    if (parentTag != V2::TOGGLE_ETS_TAG && parentTag != V2::SLIDER_ETS_TAG) {
+        if (notImmersive) {
+            return;
+        }
+    }
+
+    double width = 0.0;
+    double height = 0.0;
+    double area = 0.0;
+    if (!GetOverlayDimensions(host, width, height, area)) {
+        return;
+    }
+    PostOverlayAreaTask(host, parentTag, source, width, height, area);
 }
 
 void MaterialProcessor::ApplyScopeGate(const RefPtr<PipelineContext>& pipeline)
@@ -98,6 +438,60 @@ void MaterialProcessor::ApplyScopeGate(const RefPtr<PipelineContext>& pipeline)
         }
         ++it;
     }
+}
+
+void MaterialProcessor::ReportPageContextStats(int32_t targetContainerId, PageLogContainerType type, int32_t tabIndex)
+{
+    std::vector<MaterialNodeInfo> navNodes;
+    std::vector<MaterialNodeInfo> tabsNodes;
+    std::vector<MaterialNodeInfo> pageNodes;
+
+    std::unique_lock<std::mutex> lock(pageContextMutex_);
+    for (auto it = pageContextStats_.begin(); it != pageContextStats_.end();) {
+        auto node = it->second.Upgrade();
+        if (!node) {
+            it = pageContextStats_.erase(it);
+            continue;
+        }
+        auto ci = CollectContainerInfo(node);
+        if (ShouldSkipPageContextNode(node, ci, type, targetContainerId)) {
+            ++it;
+            continue;
+        }
+        ClassifyPageContextNode(node, ci, navNodes, tabsNodes, pageNodes);
+        ++it;
+    }
+    lock.unlock();
+
+    int32_t navContainerId = navNodes.empty() ? -1 : navNodes[0].containerId;
+    int32_t tabsContainerId = tabsNodes.empty() ? -1 : tabsNodes[0].containerId;
+    int32_t pageContainerId = pageNodes.empty() ? -1 : pageNodes[0].containerId;
+
+    std::string navName;
+    std::string pageName;
+    ResolveTargetNames(targetContainerId, type, navName, pageName);
+
+    auto pipeline = NG::PipelineContext::GetCurrentContextSafelyWithCheck();
+    CHECK_NULL_VOID(pipeline);
+    PageContextStatBatch batch;
+    batch.navContainerId = navContainerId;
+    batch.navNodes = std::move(navNodes);
+    batch.tabsContainerId = tabsContainerId;
+    batch.tabsNodes = std::move(tabsNodes);
+    batch.pageContainerId = pageContainerId;
+    batch.pageNodes = std::move(pageNodes);
+    batch.screenWidth = pipeline->GetRootWidth();
+    batch.screenHeight = pipeline->GetRootHeight();
+    batch.navName = std::move(navName);
+    batch.pageName = std::move(pageName);
+    batch.tabIndex = tabIndex;
+    if (NearZero(batch.screenHeight * batch.screenWidth)) {
+        return;
+    }
+    auto pipelineWk = WeakPtr<PipelineContext>(pipeline);
+    pipeline->AddPredictTask([batch = std::move(batch), pipelineWk](int64_t deadline, bool /*canUseLongPredictTask*/) {
+        FlushPageContextStats(std::move(batch), deadline, pipelineWk);
+    });
 }
 
 } // namespace OHOS::Ace::NG

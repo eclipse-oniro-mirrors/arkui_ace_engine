@@ -2246,7 +2246,19 @@ void PipelineContext::UnRegisterListenerForTranslate(int32_t nodeId)
 
 void PipelineContext::RegisterMaterialNode(const RefPtr<FrameNode>& node) {}
 
+void PipelineContext::RegisterPageContextNode(const RefPtr<FrameNode>& node) {}
+
 void PipelineContext::UnregisterMaterialNode(int32_t nodeId) {}
+
+void PipelineContext::UnregisterPageContextNode(int32_t nodeId) {}
+
+void PipelineContext::ReportPageContextStats(
+    int32_t targetContainerId, PageLogContainerType type, int32_t tabIndex)
+{}
+
+void PipelineContext::AddTaskOverlayNodeMaterialArea(const RefPtr<FrameNode>& targetNode, const std::string& source) {}
+
+void PipelineContext::ReportOverlayNodeMaterialArea(const RefPtr<FrameNode>& host, const std::string& source) {}
 } // namespace OHOS::Ace::NG
 
 namespace OHOS::Ace {

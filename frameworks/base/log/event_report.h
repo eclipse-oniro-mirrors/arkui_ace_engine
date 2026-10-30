@@ -229,6 +229,17 @@ struct FRCSceneFpsInfo {
     int64_t duration_60 = 0;
 };
 
+struct MaterialNodeInfo {
+    int32_t nodeId = 0;
+    std::string tag;
+    int32_t containerId = -1;
+    double width = 0.0;
+    double height = 0.0;
+    double area = 0.0;
+    bool inTitleBar = false;
+    bool inBottomTabBar = false;
+};
+
 class ACE_FORCE_EXPORT EventReport {
 public:
     static void SendEvent(const EventInfo& eventInfo);

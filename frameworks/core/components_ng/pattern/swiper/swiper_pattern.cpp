@@ -68,6 +68,7 @@
 #include "core/components_ng/syntax/repeat_virtual_scroll_node.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_2_node.h"
 #include "core/components_ng/syntax/arkoala_lazy_node.h"
+#include "core/components_ng/manager/material/material_processor.h"
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -346,6 +347,16 @@ void SwiperPattern::OnIndexChange(bool isInLayout)
         FireUnselectedEvent(oldIndex, targetIndex);
         // lazyBuild feature.
         SetLazyLoadFeature(true);
+    } else if (!hasReportedInitialTabs_) {
+        hasReportedInitialTabs_ = true;
+        auto host = GetHost();
+        CHECK_NULL_VOID(host);
+        if (auto ctx = host->GetContext()) {
+            auto currentFrameNode = GetCurrentFrameNode(targetIndex);
+            if (currentFrameNode) {
+                ctx->ReportPageContextStats(currentFrameNode->GetId(), PageLogContainerType::TabContainer, targetIndex);
+            }
+        }
     }
     // interrupt FAST_ANIMATION and end in JUMP_NEAR_VALUE Page
     if (oldIndex == targetIndex && fastAnimationRunning_) {
@@ -1840,10 +1851,17 @@ void SwiperPattern::FireChangeEvent(int32_t preIndex, int32_t currentIndex, bool
         swiperController_->FireOnChangeEvent(currentIndex);
     }
 
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
     if (jumpIndex_) {
-        auto host = GetHost();
-        CHECK_NULL_VOID(host);
         host->OnAccessibilityEvent(AccessibilityEventType::SCROLL_END);
+    }
+    if (auto ctx = host->GetContext()) {
+        auto currentFrameNode = GetCurrentFrameNode(currentIndex);
+        if (currentFrameNode) {
+            ctx->ReportPageContextStats(
+                currentFrameNode->GetId(), PageLogContainerType::TabContainer, currentIndex);
+        }
     }
 }
 

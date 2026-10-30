@@ -4363,6 +4363,7 @@ void SheetPresentationPattern::OnAppear()
     }
     auto pipeline = GetContext();
     CHECK_NULL_VOID(pipeline);
+    pipeline->ReportOverlayNodeMaterialArea(GetHost());
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
     mgr->OnDialogChangeEnd(GetHost(), true);

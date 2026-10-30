@@ -412,6 +412,7 @@ bool ToastPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, 
     ACE_UINODE_TRACE(host);
     auto context = IsDefaultToast() ? host->GetContextRefPtr() : DialogManager::GetMainPipelineContext(host);
     CHECK_NULL_RETURN(context, false);
+    context->ReportOverlayNodeMaterialArea(host, "Toast OnDirtyLayoutWrapperSwap");
     auto toastNode = dirty->GetHostNode();
     CHECK_NULL_RETURN(toastNode, false);
     ACE_UINODE_TRACE(toastNode);

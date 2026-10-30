@@ -3152,6 +3152,7 @@ void SelectOverlayNode::NewMaterialMoreAnimation(bool noAnimation)
 
     extensionProperty->UpdateVisibility(VisibleType::VISIBLE);
     extensionMenuStatus_ = FrameNodeStatus::VISIBLE;
+    pipeline->AddTaskOverlayNodeMaterialArea(extensionMenu_, "extensionMenu");
     UpdateMoreOrBackSymbolOptions(false, true);
     AnimationOption extensionOption;
     extensionOption.SetDuration(ANIMATION_DURATION2);
@@ -5163,6 +5164,11 @@ void SelectOverlayNode::ShowSelectOverlay(bool animation)
 {
     auto pattern = GetPattern<SelectOverlayPattern>();
     CHECK_NULL_VOID(pattern);
+
+    auto ctx = GetContext();
+    if (ctx) {
+        ctx->AddTaskOverlayNodeMaterialArea(selectMenu_, "SelectOverlayNode ShowSelectOverlay");
+    }
 
     // In SelectOverlayMode::MENU_ONLY mode, SelectOverlay controls the animation by self.
     if (pattern->GetMode() == SelectOverlayMode::MENU_ONLY) {

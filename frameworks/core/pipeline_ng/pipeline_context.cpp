@@ -40,6 +40,7 @@
 #include "core/components_ng/manager/frame_rate/frame_rate_manager.h"
 #include "core/components_ng/manager/handedness/handedness_manager.h"
 #include "core/components_ng/manager/full_screen/full_screen_manager.h"
+#include "core/components_ng/manager/material/material_processor.h"
 #include "core/components_ng/manager/memory/memory_manager.h"
 #include "core/components_ng/manager/post_event/post_event_manager.h"
 #include "core/components_ng/manager/privacy_sensitive/privacy_sensitive_manager.h"
@@ -105,7 +106,6 @@
 #include "core/components_ng/manager/select_overlay/select_overlay_manager.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_manager.h"
-#include "core/components_ng/manager/material/material_processor.h"
 #ifdef SMART_GESTURE_SUPPORTED
 #include "core/components_ng/manager/smart_gesture/smart_gesture_manager.h"
 #endif
@@ -6732,10 +6732,47 @@ void PipelineContext::RegisterMaterialNode(const RefPtr<FrameNode>& node)
     materialProcessor_->Register(node);
 }
 
+void PipelineContext::RegisterPageContextNode(const RefPtr<FrameNode>& node)
+{
+    CHECK_NULL_VOID(materialProcessor_);
+    materialProcessor_->RegisterPageContextNode(node);
+}
+
 void PipelineContext::UnregisterMaterialNode(int32_t nodeId)
 {
     CHECK_NULL_VOID(materialProcessor_);
     materialProcessor_->Unregister(nodeId);
+}
+
+void PipelineContext::UnregisterPageContextNode(int32_t nodeId)
+{
+    CHECK_NULL_VOID(materialProcessor_);
+    materialProcessor_->UnregisterPageContextNode(nodeId);
+}
+
+void PipelineContext::ReportPageContextStats(int32_t targetContainerId, PageLogContainerType type, int32_t tabIndex)
+{
+    CHECK_NULL_VOID(materialProcessor_);
+    materialProcessor_->ReportPageContextStats(targetContainerId, type, tabIndex);
+}
+
+void PipelineContext::AddTaskOverlayNodeMaterialArea(const RefPtr<FrameNode>& targetNode, const std::string& source)
+{
+    CHECK_NULL_VOID(targetNode);
+    auto wk = WeakPtr<FrameNode>(targetNode);
+    AddAfterLayoutTask([wk, source]() {
+        auto node = wk.Upgrade();
+        CHECK_NULL_VOID(node);
+        auto pipeline = node->GetContext();
+        CHECK_NULL_VOID(pipeline);
+        pipeline->ReportOverlayNodeMaterialArea(node, source);
+    });
+}
+
+void PipelineContext::ReportOverlayNodeMaterialArea(const RefPtr<FrameNode>& host, const std::string& source)
+{
+    CHECK_NULL_VOID(materialProcessor_);
+    materialProcessor_->ReportOverlayNodeMaterialArea(host, source);
 }
 
 void PipelineContext::AddAfterRenderTask(std::function<void()>&& task)

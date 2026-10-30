@@ -211,6 +211,8 @@ adapter/ohos/osal/window_utils.cpp @arkui_framework_xnode
 adapter/ohos/osal/window_utils.h @arkui_framework_xnode
 adapter/ohos/sa_profile/ @arkui_framework_xnode
 adapter/ohos/services/ @arkui_framework_xnode
+adapter/ohos/services/uiservice/include/material_statistic_event.h @arkuicodepulse
+adapter/ohos/services/uiservice/src/material_statistic_event.cpp @arkuicodepulse
 adapter/ohos/tools/raw_input_injector/ @ArkUI_Event
 
 [Preview adapter]
@@ -371,6 +373,7 @@ frameworks/base/image/ @arkui001
 frameworks/base/input_manager/input_manager.h @ArkUI_Event
 frameworks/base/json/ @arkui_framework_xnode
 frameworks/base/log/ @arkui_framework_xnode
+frameworks/base/log/material_statistic_event_info.h @arkuicodepulse
 frameworks/base/longframe/long_frame_report.h @arkui_framework_xnode
 frameworks/base/memory/ @arkui_framework_xnode
 frameworks/base/mousestyle/mouse_style.h @ArkUI_Event

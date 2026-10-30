@@ -27,6 +27,9 @@
 
 namespace OHOS::Ace {
 class PipelineBase;
+struct RichMaterialNodeStatData;
+struct RichOverlayMaterialAreaData;
+struct MaterialStatisticEventInfo;
 // Each component type occupies 100 enum positions for easy extension
 enum class StatisticEventType {
     // General framework events (0-10099)
@@ -112,7 +115,7 @@ class ACE_FORCE_EXPORT StatisticEventReporter : public std::enable_shared_from_t
 public:
     StatisticEventReporter();
     explicit StatisticEventReporter(int32_t instanceId);
-    virtual ~StatisticEventReporter() = default;
+    virtual ~StatisticEventReporter();
 
     /**
      * Send statistic event. This method should ONLY be called from the main thread.
@@ -133,8 +136,14 @@ public:
     void SendEventSafe(StatisticEventType eventType);
     void TryReportStatisticEvents(PipelineBase* pipeline);
     void ForceReportStatisticEvents();
+
+    void SendMaterialNodeStat(const RichMaterialNodeStatData& data);
+    void SendOverlayMaterialArea(const RichOverlayMaterialAreaData& data);
 private:
     void ReportStatisticEvents(const std::map<StatisticEventType, StatisticEventInfo>& events);
+    void ReportMaterialStatisticEvents(const std::vector<MaterialStatisticEventInfo>& events);
+    std::vector<MaterialStatisticEventInfo> TryReportMaterialEvents();
+    void ForceReportMaterialEvents();
     StatisticEventInfo ConvertToEvent(StatisticEventType eventType);
     void MergeEvents(std::map<StatisticEventType, StatisticEventInfo>& target,
                      const std::map<StatisticEventType, StatisticEventInfo>& source);
@@ -143,7 +152,9 @@ private:
     StatisticAppInfo appInfo_;
     std::map<StatisticEventType, StatisticEventInfo> statisitcEventMap_;
     std::map<StatisticEventType, StatisticEventInfo> concurrentEventMap_;
+    std::vector<MaterialStatisticEventInfo> pendingMaterialEvents_;
     std::mutex concurrentMutex_;
+    std::mutex materialMutex_;
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMMON_STATISTIC_EVENT_REPORTRE_H

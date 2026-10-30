@@ -256,7 +256,9 @@ int32_t UIMgrServiceIdl::OnRemoteRequest(uint32_t code, MessageParcel& data, Mes
 {
     UIServiceMgrXCollie uiServiceMgrXCollie(IpcCodeToString(code), UI_MGR_SERVICE_TIMEOUT);
     if (!IsSystemApp() &&
-        static_cast<IUIServiceMgrNewIpcCode>(code) != IUIServiceMgrNewIpcCode::COMMAND_REPORT_STATISTIC_EVENTS) {
+        static_cast<IUIServiceMgrNewIpcCode>(code) != IUIServiceMgrNewIpcCode::COMMAND_REPORT_STATISTIC_EVENTS &&
+        static_cast<IUIServiceMgrNewIpcCode>(code) !=
+            IUIServiceMgrNewIpcCode::COMMAND_REPORT_MATERIAL_STATISTIC_EVENTS) {
         return ERR_PERMISSION_DENIED;
     }
     auto result = UIServiceMgrNewStub::OnRemoteRequest(code, data, reply, option);
@@ -279,6 +281,8 @@ const char* UIMgrServiceIdl::IpcCodeToString(uint32_t code)
             return "UISERVICE_RETURN_REQUEST";
         case IUIServiceMgrNewIpcCode::COMMAND_REPORT_STATISTIC_EVENTS:
             return "UISERVICE_REPORT_STATISTIC_EVENTS";
+        case IUIServiceMgrNewIpcCode::COMMAND_REPORT_MATERIAL_STATISTIC_EVENTS:
+            return "UISERVICE_REPORT_MATERIAL_STATISTIC_EVENTS";
         default:
             return "UISERVICE_UNKNOWN";
     }
@@ -325,6 +329,21 @@ int32_t UIMgrServiceIdl::ReportStatisticEvents(const AppInfoParcel& appInfo,
     }
     bool ret = handler_->PostTask([appInfo, events]() {
         DelayedSingleton<StatisticEventManager>::GetInstance()->SendStatisticEvents(appInfo, events);
+    });
+    if (!ret) {
+        return UI_SERVICE_POST_TASK_FAILED;
+    }
+    return NO_ERROR;
+}
+
+int32_t UIMgrServiceIdl::ReportMaterialStatisticEvents(
+    const AppInfoParcel& appInfo, const std::vector<MaterialStatisticEventInfoParcel>& events)
+{
+    if (handler_ == nullptr) {
+        return UI_SERVICE_HANDLER_IS_NULL;
+    }
+    bool ret = handler_->PostTask([appInfo, events]() {
+        DelayedSingleton<StatisticEventManager>::GetInstance()->SendRichStatisticEvents(appInfo, events);
     });
     if (!ret) {
         return UI_SERVICE_POST_TASK_FAILED;

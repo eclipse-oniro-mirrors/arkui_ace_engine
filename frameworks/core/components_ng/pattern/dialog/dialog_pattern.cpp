@@ -3306,9 +3306,15 @@ void DialogPattern::ReportShow()
         UiSessionManager::GetInstance()->ReportComponentChangeEvent("onVisibleChange", "ActionSheet.show",
             ComponentEventType::COMPONENT_EVENT_DIALOG);
     } else if (dialogProperties_.isMenu) {
-        UiSessionManager::GetInstance()->ReportComponentChangeEvent("onVisibleChange", "ActionMenu.show",
-            ComponentEventType::COMPONENT_EVENT_DIALOG);
+        UiSessionManager::GetInstance()->ReportComponentChangeEvent(
+            "onVisibleChange", "ActionMenu.show", ComponentEventType::COMPONENT_EVENT_DIALOG);
     }
+    CHECK_NULL_VOID(contentRenderContext_);
+    auto materialNode = contentRenderContext_->GetHost();
+    CHECK_NULL_VOID(materialNode);
+    auto ctx = materialNode->GetContext();
+    CHECK_NULL_VOID(ctx);
+    ctx->AddTaskOverlayNodeMaterialArea(materialNode, "Dialog ReportShow");
 #endif
 }
 
