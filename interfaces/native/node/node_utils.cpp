@@ -167,6 +167,7 @@ int32_t OH_ArkUI_NodeUtils_GetPositionWithTranslateInScreen(ArkUI_NodeHandle nod
 int32_t OH_ArkUI_RegisterSystemColorModeChangeEvent(
     ArkUI_NodeHandle node, void* userData, void (*onColorModeChange)(ArkUI_SystemColorMode colorMode, void* userData))
 {
+    CHECK_UI_THREAD("OH_ArkUI_RegisterSystemColorModeChangeEvent");
     if (node == nullptr) {
         return OHOS::Ace::ERROR_CODE_PARAM_INVALID;
     }
@@ -179,6 +180,7 @@ int32_t OH_ArkUI_RegisterSystemColorModeChangeEvent(
 
 void OH_ArkUI_UnregisterSystemColorModeChangeEvent(ArkUI_NodeHandle node)
 {
+    CHECK_UI_THREAD("OH_ArkUI_UnregisterSystemColorModeChangeEvent");
     if (node == nullptr) {
         return;
     }
@@ -955,6 +957,7 @@ int32_t OH_ArkUI_RunTaskInScope(ArkUI_ContextHandle uiContext, void* userData, v
 int32_t OH_ArkUI_SetForceDarkConfig(
     ArkUI_ContextHandle uiContext, bool forceDark, ArkUI_NodeType nodeType, uint32_t (*colorInvertFunc)(uint32_t color))
 {
+    CHECK_UI_THREAD("OH_ArkUI_SetForceDarkConfig");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN(impl, OHOS::Ace::ERROR_CODE_CAPI_INIT_ERROR);
     int32_t instanceId = OHOS::Ace::INSTANCE_ID_UNDEFINED;
