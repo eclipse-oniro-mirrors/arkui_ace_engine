@@ -77,6 +77,7 @@
 namespace OHOS::Ace::NG {
 namespace {
 
+constexpr int32_t NUM_1 = 1;
 constexpr int32_t NUM_2 = 2;
 
 enum class RawInputEventType : int32_t {
@@ -435,6 +436,29 @@ ArkUINativeModuleValue ArkUINativeModule::EnableEventPassthrough(ArkUIRuntimeCal
                 "enableEventPassthrough: unknown eventType=%{public}d", static_cast<int32_t>(eventType));
             break;
     }
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue ArkUINativeModule::SetTransPageEnabled(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+
+    if (runtimeCallInfo->GetArgsNumber() < NUM_1) {
+        return panda::JSValueRef::Undefined(vm);
+    }
+
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(0);
+    if (firstArg.IsEmpty()) {
+        return panda::JSValueRef::Undefined(vm);
+    }
+    if (!firstArg->IsBoolean() && !firstArg->IsUndefined()) {
+        return panda::JSValueRef::Undefined(vm);
+    }
+    bool enabled = firstArg->IsBoolean() ? firstArg->ToBoolean(vm)->Value() : true;
+    auto context = PipelineContext::GetCurrentContext();
+    CHECK_NULL_RETURN(context, panda::JSValueRef::Undefined(vm));
+    context->SetTransPageEnabled(enabled);
     return panda::JSValueRef::Undefined(vm);
 }
 
@@ -2829,6 +2853,8 @@ void ArkUINativeModule::RegisterGlobalMethods(Local<panda::ObjectRef> object, Ec
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), RequireDynamicSyncScene));
     object->Set(vm, panda::StringRef::NewFromUtf8(vm, "enableEventPassthrough"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), EnableEventPassthrough));
+    object->Set(vm, panda::StringRef::NewFromUtf8(vm, "setTransPageEnabled"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), SetTransPageEnabled));
     object->Set(vm, panda::StringRef::NewFromUtf8(vm, "setFrameRateRange"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), SetFrameRateRange));
     object->Set(vm, panda::StringRef::NewFromUtf8(vm, "setMarqueeFrameRateRange"),

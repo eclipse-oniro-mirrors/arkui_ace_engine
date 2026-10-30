@@ -31120,6 +31120,7 @@ typedef struct GENERATED_ArkUIIUIContextAccessor {
                                                    const InputEventListener* listener);
     void (*removeLocalInputEventMonitor)(Ark_NativePointer monitor);
     void (*setTextSelectionClearPolicy)(Ark_TextSelectionClearPolicy policy);
+    void (*setTransPageEnabled)(const Opt_Boolean* enabled);
 } GENERATED_ArkUIIUIContextAccessor;
 
 typedef struct GENERATED_ArkUIJsGeolocationAccessor {

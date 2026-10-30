@@ -3931,6 +3931,11 @@ export class IUIContext {
         IUIContext.setTextSelectionClearPolicy_serialize(policy_casted)
         return
     }
+    public static setTransPageEnabled(enabled: boolean | undefined): void {
+        const enabled_casted = enabled as (boolean | undefined)
+        IUIContext.setTransPageEnabled_serialize(enabled_casted)
+        return
+    }
     private static freezeUINode0_serialize(id: string, isFrozen: boolean): void {
         ArkUIGeneratedNativeModule._IUIContext_freezeUINode0(id, isFrozen ? true : false)
     }
@@ -4054,6 +4059,18 @@ export class IUIContext {
     }
     private static setTextSelectionClearPolicy_serialize(policy: TextSelectionClearPolicy): void {
         ArkUIGeneratedNativeModule._IUIContext_setTextSelectionClearPolicy(policy.valueOf())
+    }
+    private static setTransPageEnabled_serialize(enabled: boolean | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (enabled !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const enabledTmpValue = enabled!
+            thisSerializer.writeBoolean(enabledTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._IUIContext_setTransPageEnabled(thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
     }
 }
 export class LazyBuild {

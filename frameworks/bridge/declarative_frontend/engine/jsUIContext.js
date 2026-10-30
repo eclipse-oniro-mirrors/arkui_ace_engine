@@ -1262,6 +1262,18 @@ class UIContext {
         });
     }
 
+    isTransPageEnabled() {
+        return withInstanceId(this.instanceId_, () => {
+            return Context.isTransPageEnabled();
+        });
+    }
+
+    setTransPageEnabled(enabled) {
+        return withInstanceId(this.instanceId_, () => {
+            return getUINativeModule().setTransPageEnabled(enabled);
+        });
+    }
+
     createModalUIExtension(want, options, callback) {
         return withInstanceId(this.instanceId_, () => {
             return getUINativeModule().createModalUIExtension(this.instanceId_, want, options, callback);

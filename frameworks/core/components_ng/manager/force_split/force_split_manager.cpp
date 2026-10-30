@@ -436,7 +436,12 @@ bool ForceSplitManager::IsTransitionShouldMovePageToPrimary(const std::string& f
     }
     if (behaviorMode_ == ForceSplitBehaviorMode::DISPLACE) {
         // In displace mode, except for the fromPage or toPage that belong to transPages,
-        // all transitions will trigger secondary push to primary by default
+        // all transitions will trigger secondary push to primary by default.
+        // When transPage is disabled at runtime, skip the transPages check so that
+        // transition pages also participate in the secondary push to primary.
+        if (!transPageEnabled_) {
+            return true;
+        }
         return !IsTransPage(from) && !IsTransPage(to);
     }
     return IsPagePair(from, to);

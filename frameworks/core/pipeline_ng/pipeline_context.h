@@ -899,6 +899,11 @@ public:
 
     const RefPtr<HandednessManager>& GetHandednessManager() const;
 
+    // Runtime control of the force split transPages behavior. Non-virtual forwarding
+    // helpers keep bridges free of direct force_split_manager.h includes.
+    void SetTransPageEnabled(bool enabled);
+    bool IsTransPageEnabled() const;
+
     const RefPtr<RecoverableManager>& GetRecoverableManager() const;
 
     double CalcPageWidth(double rootWidth) const override;

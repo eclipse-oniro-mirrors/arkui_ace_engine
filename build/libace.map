@@ -4924,6 +4924,7 @@
       "OHOS::Ace::NG::PipelineContext::GetRootRect()";
       "OHOS::Ace::NG::PipelineContext::GetTaihangOptimizer() const";
       "OHOS::Ace::NG::PipelineContext::HasOnAreaChangeNode(int)";
+      "OHOS::Ace::NG::PipelineContext::IsTransPageEnabled() const";
       "OHOS::Ace::NG::PipelineContext::RegisterFoldDisplayModeChangedCallback(std::__h::function<void (OHOS::Ace::FoldDisplayMode)>&&)";
       "OHOS::Ace::NG::PipelineContext::RegisterFoldStatusChangedCallback(std::__h::function<void (OHOS::Ace::FoldStatus)>&&)";
       "OHOS::Ace::NG::PipelineContext::RegisterHalfFoldHoverChangedCallback(std::__h::function<void (bool)>&&)";
@@ -4935,6 +4936,7 @@
       "OHOS::Ace::NG::PipelineContext::SetCloseButtonStatus(bool)";
       "OHOS::Ace::NG::PipelineContext::SetIsFocusActive(bool, OHOS::Ace::NG::FocusActiveReason, bool)";
       "OHOS::Ace::NG::PipelineContext::SetMouseStyleHoldNode(int)";
+      "OHOS::Ace::NG::PipelineContext::SetTransPageEnabled(bool)";
       "OHOS::Ace::NG::PipelineContext::SetVsyncListener(std::__h::function<void ()>)";
       "OHOS::Ace::NG::PipelineContext::UnRegisterFoldDisplayModeChangedCallback(int)";
       "OHOS::Ace::NG::PipelineContext::UnRegisterFoldStatusChangedCallback(int)";

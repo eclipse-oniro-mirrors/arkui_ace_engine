@@ -134,6 +134,16 @@ ani_boolean IsEasySplit(ArkUI_Int32 instanceId)
     return context->IsDisplayInForceSplitMode();
 }
 
+ani_boolean IsTransPageEnabled(ArkUI_Int32 instanceId)
+{
+    auto context = NG::PipelineContext::GetContextByContainerId(instanceId);
+    if (context == nullptr) {
+        TAG_LOGE(AceLogTag::ACE_NAVIGATION, "IsTransPageEnabled-ani can not get current context.");
+        return true;
+    }
+    return context->IsTransPageEnabled();
+}
+
 ani_ref* GetHostContext(ArkUI_Int32 key)
 {
     auto context = NG::PipelineContext::GetCurrentContextSafely();
@@ -1419,6 +1429,7 @@ const ArkUIAniCommonModifier* GetCommonAniModifier()
         .resolveUIContext = OHOS::Ace::NG::ResolveUIContext,
         .getPageRootNode = OHOS::Ace::NG::GetPageRootNodeInStatic,
         .isEasySplit = OHOS::Ace::NG::IsEasySplit,
+        .isTransPageEnabled = OHOS::Ace::NG::IsTransPageEnabled,
         .dumpLogPrint = OHOS::Ace::NG::DumpLogPrintImpl,
         .getBuilderNodeParentViewId = OHOS::Ace::NG::GetBuilderNodeParentViewId,
         .setOnNodeDestroyEvent = OHOS::Ace::NG::SetOnNodeDestroyEvent,
