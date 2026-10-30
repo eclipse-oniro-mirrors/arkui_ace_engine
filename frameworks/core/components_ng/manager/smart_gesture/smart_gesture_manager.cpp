@@ -384,6 +384,7 @@ void SmartGestureManager::RefreshProductGestureEnabled()
 
 void SmartGestureManager::SetMonitor(SmartGestureMonitor&& callback)
 {
+    std::lock_guard<std::mutex> lock(monitorMutex_);
     monitorCallback_ = std::move(callback);
 }
 
@@ -573,6 +574,7 @@ RefPtr<PipelineContext> SmartGestureManager::GetPipelineContext() const
 
 SmartGestureManager::SmartGestureMonitor SmartGestureManager::GetMonitorHandle() const
 {
+    std::lock_guard<std::mutex> lock(monitorMutex_);
     return monitorCallback_;
 }
 
