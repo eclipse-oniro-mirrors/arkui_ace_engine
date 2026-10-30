@@ -867,6 +867,7 @@ void DatePickerDialogModelNG::SetDatePickerDialogShow(PickerDialogInfo& pickerDi
     properties.systemMaterial = pickerDialog.systemMaterial;
     properties.distortionMode = pickerDialog.distortionMode;
     properties.edgeLightMode = pickerDialog.edgeLightMode;
+    properties.adaptToHandedness = pickerDialog.adaptToHandedness;
     properties.customStyle = false;
     if (lessThanApi11) {
         properties.offset = DimensionOffset(Offset(0, -theme->GetMarginBottom().ConvertToPx()));

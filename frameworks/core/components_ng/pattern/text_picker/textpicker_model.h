@@ -48,6 +48,7 @@ struct TextPickerDialog {
     RefPtr<UiMaterial> systemMaterial;
     std::optional<DistortionMode> distortionMode;
     std::optional<EdgeLightMode> edgeLightMode;
+    std::optional<NG::HandednessFollowMode> adaptToHandedness;
 };
 struct TextPickerDialogEvent {
     std::function<void()> onDidAppear;

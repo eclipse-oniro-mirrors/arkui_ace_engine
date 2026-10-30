@@ -49,6 +49,9 @@
             "@ohos/arkui/dragController": [
                 "../@ohos.arkui.dragController.ts"
             ],
+            "@ohos/arkui/dialog": [
+                "../@ohos.arkui.dialog.ts"
+            ],
             "@ohos/arkui/inspector": [
                 "../@ohos.arkui.inspector.ts"
             ],
@@ -129,6 +132,7 @@
         "build/unmemoized/@ohos.promptAction.ts",
         "build/unmemoized/@ohos.arkui.componentSnapshot.ts",
         "build/unmemoized/@ohos.arkui.dragController.ts",
+        "build/unmemoized/@ohos.arkui.dialog.ts",
         "build/unmemoized/@ohos.arkui.Parallelize.ts"
     ],
     "exclude": [

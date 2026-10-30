@@ -67,6 +67,7 @@ struct DialogPropsForUpdate {
     Opt_uiMaterial_Material systemMaterial;
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
+    Opt_HandednessFollowMode adaptToHandedness;
 };
 } // namespace OHOS::Ace::NG
 
@@ -255,6 +256,10 @@ void UpdateDynamicDialogProperties(DialogProperties& dialogProps, const DialogPr
     if (edgeLightMode) {
         dialogProps.edgeLightMode = edgeLightMode.value();
     }
+    auto adaptToHandedness = Converter::OptConvert<HandednessFollowMode>(props.adaptToHandedness);
+    if (adaptToHandedness) {
+        dialogProps.adaptToHandedness = adaptToHandedness.value();
+    }
     auto transitionEffect = Converter::OptConvert<RefPtr<NG::ChainedTransitionEffect>>(props.transition);
     if (transitionEffect) {
         dialogProps.transitionEffect = transitionEffect.value();
@@ -388,6 +393,7 @@ DialogPropsForUpdate GetPropsWithConfirm(const Ark_AlertDialogParamWithConfirm p
         .systemMaterial = params.systemMaterial,
         .distortionMode = params.distortionMode,
         .edgeLightMode = params.edgeLightMode,
+        .adaptToHandedness = params.adaptToHandedness,
     };
 }
 void UpdateConfirmButton(DialogProperties& dialogProps, const Ark_AlertDialogParamWithConfirm params)
@@ -467,6 +473,7 @@ DialogPropsForUpdate GetPropsWithButtons(const Ark_AlertDialogParamWithButtons p
         .systemMaterial = params.systemMaterial,
         .distortionMode = params.distortionMode,
         .edgeLightMode = params.edgeLightMode,
+        .adaptToHandedness = params.adaptToHandedness,
     };
 }
 void ShowWithButtons(const Ark_AlertDialogParamWithButtons params)
@@ -547,6 +554,7 @@ DialogPropsForUpdate GetPropsWithOptions(const Ark_AlertDialogParamWithOptions p
         .systemMaterial = params.systemMaterial,
         .distortionMode = params.distortionMode,
         .edgeLightMode = params.edgeLightMode,
+        .adaptToHandedness = params.adaptToHandedness,
     };
 }
 void ShowWithOptions(const Ark_AlertDialogParamWithOptions params)

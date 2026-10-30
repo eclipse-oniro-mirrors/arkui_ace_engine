@@ -56,6 +56,7 @@ struct PickerDialogInfo {
     RefPtr<UiMaterial> systemMaterial;
     std::optional<DistortionMode> distortionMode;
     std::optional<EdgeLightMode> edgeLightMode;
+    std::optional<NG::HandednessFollowMode> adaptToHandedness;
 };
 struct PickerDialogEvent {
     std::function<void()> onDidAppear;

@@ -24,6 +24,7 @@
 #include "base/subwindow/subwindow_manager.h"
 #include "core/common/ace_engine.h"
 #include "core/components_ng/base/view_stack_processor.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/manager/navigation/navigation_manager.h"
 #include "core/components_ng/pattern/dialog/dialog_pattern.h"
 #include "core/components_ng/pattern/dialog/dialog_view.h"
@@ -1060,6 +1061,7 @@ RefPtr<FrameNode> DialogInnerManager::UpdateCustomDialogInner(
     CHECK_NULL_RETURN(dialogLayoutProp, nullptr);
     dialogLayoutProp->UpdateDialogAlignment(dialogProps.alignment);
     dialogLayoutProp->UpdateDialogOffset(dialogProps.offset);
+    dialogLayoutProp->UpdateAdaptToHandedness(dialogProps.adaptToHandedness.value_or(HandednessFollowMode::NONE));
     dialogLayoutProp->UpdateAutoCancel(dialogProps.autoCancel);
     auto dialogPattern = dialogNode->GetPattern<DialogPattern>();
     CHECK_NULL_RETURN(dialogPattern, nullptr);

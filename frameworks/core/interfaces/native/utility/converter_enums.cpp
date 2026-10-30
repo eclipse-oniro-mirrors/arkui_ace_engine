@@ -25,6 +25,7 @@
 #include "core/components/common/properties/shadow.h"
 #include "core/components/dialog/dialog_properties.h"
 #include "core/components/web/web_property.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/pattern/checkbox/checkbox_model.h"
 #include "core/components_ng/pattern/container_picker/container_picker_layout_property.h"
 #include "core/components_ng/pattern/date_picker/picker_types.h"
@@ -2690,6 +2691,17 @@ ACE_FORCE_EXPORT void AssignCast(std::optional<EdgeLightMode>& dst, const Ark_Ed
         case ARK_EDGE_LIGHT_MODE_EDGELIGHT_ENABLED: dst = EdgeLightMode::EDGELIGHT_ENABLED; break;
         case ARK_EDGE_LIGHT_MODE_EDGELIGHT_DISABLED: dst = EdgeLightMode::EDGELIGHT_DISABLED; break;
         default: LOGE("Unexpected enum value in Ark_EdgeLightMode: %{public}d", src);
+    }
+}
+
+template<>
+ACE_FORCE_EXPORT void AssignCast(std::optional<HandednessFollowMode>& dst, const Ark_HandednessFollowMode& src)
+{
+    switch (src) {
+        case ARK_HANDEDNESS_FOLLOW_MODE_NONE: dst = HandednessFollowMode::NONE; break;
+        case ARK_HANDEDNESS_FOLLOW_MODE_FOLLOW_ANCHOR: dst = HandednessFollowMode::FOLLOW_ANCHOR; break;
+        case ARK_HANDEDNESS_FOLLOW_MODE_FOLLOW_GRIP_HAND: dst = HandednessFollowMode::FOLLOW_GRIP_HAND; break;
+        default: LOGE("Unexpected enum value in Ark_HandednessFollowMode: %{public}d", src);
     }
 }
 } // namespace OHOS::Ace::NG::Converter

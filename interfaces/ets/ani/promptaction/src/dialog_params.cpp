@@ -363,6 +363,18 @@ bool GetEdgeLightMode(ani_env* env, ani_object object, std::optional<OHOS::Ace::
     return true;
 }
 
+bool GetHandednessFollowMode(ani_env* env, ani_object object,
+    std::optional<OHOS::Ace::NG::HandednessFollowMode>& result)
+{
+    ani_int resultInt;
+    if (!GetEnumInt(env, object, "adaptToHandedness", "@ohos.arkui.dialog.HandednessFollowMode",
+        resultInt)) {
+        return false;
+    }
+    result = static_cast<OHOS::Ace::NG::HandednessFollowMode>(resultInt);
+    return true;
+}
+
 void UpdateDialogAlignment(OHOS::Ace::DialogAlignment& alignment)
 {
     bool isRtl = OHOS::Ace::AceApplicationInfo::GetInstance().IsRightToLeft();
@@ -467,6 +479,7 @@ bool GetShowDialogOptions(ani_env* env, ani_object object, OHOS::Ace::DialogProp
     GetImmersiveMode(env, object, dialogProps.dialogImmersiveMode);
     GetDistortionMode(env, object, dialogProps.distortionMode);
     GetEdgeLightMode(env, object, dialogProps.edgeLightMode);
+    GetHandednessFollowMode(env, object, dialogProps.adaptToHandedness);
     GetOnLanguageChange(dialogProps);
     return true;
 }
@@ -732,6 +745,7 @@ bool GetActionMenuOptions(ani_env* env, ani_object object, OHOS::Ace::DialogProp
     GetFunctionParam(env, object, "onWillDisappear", dialogProps.onWillDisappear);
     GetDistortionMode(env, object, dialogProps.distortionMode);
     GetEdgeLightMode(env, object, dialogProps.edgeLightMode);
+    GetHandednessFollowMode(env, object, dialogProps.adaptToHandedness);
     return true;
 }
 
@@ -1055,6 +1069,7 @@ bool GetBaseDialogOptions(ani_env* env, ani_object object, OHOS::Ace::DialogProp
     GetBoolParam(env, object, "focusable", dialogProps.focusable);
     GetDistortionMode(env, object, dialogProps.distortionMode);
     GetEdgeLightMode(env, object, dialogProps.edgeLightMode);
+    GetHandednessFollowMode(env, object, dialogProps.adaptToHandedness);
     return true;
 }
 

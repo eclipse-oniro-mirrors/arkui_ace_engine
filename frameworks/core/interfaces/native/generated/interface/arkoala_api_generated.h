@@ -5530,6 +5530,15 @@ typedef struct Opt_GridRowDirection {
     Ark_Tag tag;
     Ark_GridRowDirection value;
 } Opt_GridRowDirection;
+typedef enum Ark_HandednessFollowMode {
+    ARK_HANDEDNESS_FOLLOW_MODE_NONE = 0,
+    ARK_HANDEDNESS_FOLLOW_MODE_FOLLOW_ANCHOR = 1,
+    ARK_HANDEDNESS_FOLLOW_MODE_FOLLOW_GRIP_HAND = 2,
+} Ark_HandednessFollowMode;
+typedef struct Opt_HandednessFollowMode {
+    Ark_Tag tag;
+    Ark_HandednessFollowMode value;
+} Opt_HandednessFollowMode;
 typedef enum Ark_HapticFeedbackMode {
     ARK_HAPTIC_FEEDBACK_MODE_DISABLED = 0,
     ARK_HAPTIC_FEEDBACK_MODE_ENABLED = 1,
@@ -23474,6 +23483,7 @@ typedef struct Ark_ActionSheetOptions {
     Opt_uiMaterial_Material systemMaterial;
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
+    Opt_HandednessFollowMode adaptToHandedness;
 } Ark_ActionSheetOptions;
 typedef struct Opt_ActionSheetOptions {
     Ark_Tag tag;
@@ -23519,6 +23529,7 @@ typedef struct Ark_AlertDialogParamWithButtons {
     Opt_uiMaterial_Material systemMaterial;
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
+    Opt_HandednessFollowMode adaptToHandedness;
     Ark_AlertDialogButtonBaseOptions primaryButton;
     Ark_AlertDialogButtonBaseOptions secondaryButton;
 } Ark_AlertDialogParamWithButtons;
@@ -23566,6 +23577,7 @@ typedef struct Ark_AlertDialogParamWithConfirm {
     Opt_uiMaterial_Material systemMaterial;
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
+    Opt_HandednessFollowMode adaptToHandedness;
     Opt_AlertDialogButtonBaseOptions confirm;
 } Ark_AlertDialogParamWithConfirm;
 typedef struct Opt_AlertDialogParamWithConfirm {
@@ -23612,6 +23624,7 @@ typedef struct Ark_AlertDialogParamWithOptions {
     Opt_uiMaterial_Material systemMaterial;
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
+    Opt_HandednessFollowMode adaptToHandedness;
     Array_AlertDialogButtonOptions buttons;
     Opt_DialogButtonDirection buttonDirection;
 } Ark_AlertDialogParamWithOptions;
@@ -23809,6 +23822,7 @@ typedef struct Ark_CustomDialogControllerOptions {
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
     Opt_ExtendableComponent baseComponent;
+    Opt_HandednessFollowMode adaptToHandedness;
 } Ark_CustomDialogControllerOptions;
 typedef struct Opt_CustomDialogControllerOptions {
     Ark_Tag tag;
@@ -23858,6 +23872,7 @@ typedef struct Ark_CustomDialogControllerOptionsExtender {
     Opt_uiMaterial_Material systemMaterial;
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
+    Opt_HandednessFollowMode adaptToHandedness;
 } Ark_CustomDialogControllerOptionsExtender;
 typedef struct Opt_CustomDialogControllerOptionsExtender {
     Ark_Tag tag;
@@ -24495,6 +24510,7 @@ typedef struct Ark_CalendarDialogOptions {
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
     Opt_CalendarFirstDayOfWeek firstDayOfWeek;
+    Opt_HandednessFollowMode adaptToHandedness;
 } Ark_CalendarDialogOptions;
 typedef struct Opt_CalendarDialogOptions {
     Ark_Tag tag;
@@ -24539,6 +24555,7 @@ typedef struct Ark_DatePickerDialogOptions {
     Opt_uiMaterial_Material systemMaterial;
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
+    Opt_HandednessFollowMode adaptToHandedness;
 } Ark_DatePickerDialogOptions;
 typedef struct Opt_DatePickerDialogOptions {
     Ark_Tag tag;
@@ -24903,6 +24920,7 @@ typedef struct Ark_TextPickerDialogOptionsExt {
     Opt_uiMaterial_Material systemMaterial;
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
+    Opt_HandednessFollowMode adaptToHandedness;
 } Ark_TextPickerDialogOptionsExt;
 typedef struct Opt_TextPickerDialogOptionsExt {
     Ark_Tag tag;
@@ -24944,6 +24962,7 @@ typedef struct Ark_TimePickerDialogOptions {
     Opt_uiMaterial_Material systemMaterial;
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
+    Opt_HandednessFollowMode adaptToHandedness;
 } Ark_TimePickerDialogOptions;
 typedef struct Opt_TimePickerDialogOptions {
     Ark_Tag tag;

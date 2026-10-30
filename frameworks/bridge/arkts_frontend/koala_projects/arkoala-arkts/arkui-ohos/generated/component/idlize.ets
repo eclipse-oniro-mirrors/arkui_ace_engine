@@ -98,6 +98,7 @@ import { memo, memo_stable, memo_skip } from 'arkui.stateManagement.runtime'
 import { ComponentBuilder, Builder } from '@koalaui/builderLambda'
 import { default as curves } from '@ohos.curves'
 import { default as uiMaterial } from '@ohos.arkui.uiMaterial'
+import { HandednessFollowMode } from '@ohos.arkui.dialog'
 import { ParticleUpdater, ParticleColorOptions, VelocityOptions, EmitterParticleOptions, ParticleEmitterShape, DistributionType, DisturbanceFieldShape, ParticleColorOptions_serializer, EmitterParticleOptions_serializer, VelocityOptions_serializer } from './particle'
 import { default as router } from '@ohos.router'
 import { RootModifier } from './../RootModifier'
@@ -7803,6 +7804,7 @@ export interface CustomDialogControllerOptionsExtender {
     systemMaterial?: SystemUiMaterial;
     distortionMode?: DistortionMode;
     edgeLightMode?: EdgeLightMode;
+    adaptToHandedness?: HandednessFollowMode;
 }
 export interface CustomDialogControllerExternalOptionsExtender {
     customStyle?: boolean;
@@ -11414,6 +11416,14 @@ export class CustomDialogControllerOptionsExtender_serializer {
         } else {
             valueSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
+        const valueHolderForAdaptToHandedness = value.adaptToHandedness
+        if (valueHolderForAdaptToHandedness !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForAdaptToHandednessTmpValue = (valueHolderForAdaptToHandedness as HandednessFollowMode)
+            valueSerializer.writeInt32(valueHolderForAdaptToHandednessTmpValue.valueOf())
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
     }
     public static read(buffer: DeserializerBase): CustomDialogControllerOptionsExtender {
         let valueDeserializer: DeserializerBase = buffer
@@ -11885,7 +11895,13 @@ export class CustomDialogControllerOptionsExtender_serializer {
             edgeLightModeTmpBuf = EdgeLightMode.fromValue(valueDeserializer.readInt32())
         }
         const edgeLightModeTmpResult: EdgeLightMode | undefined = edgeLightModeTmpBuf
-        let value: CustomDialogControllerOptionsExtender = ({builder: builderTmpResult, cancel: cancelTmpResult, autoCancel: autoCancelTmpResult, alignment: alignmentTmpResult, offset: offsetTmpResult, customStyle: customStyleTmpResult, gridCount: gridCountTmpResult, maskColor: maskColorTmpResult, maskRect: maskRectTmpResult, openAnimation: openAnimationTmpResult, closeAnimation: closeAnimationTmpResult, showInSubWindow: showInSubWindowTmpResult, displayModeInSubWindow: displayModeInSubWindowTmpResult, backgroundColor: backgroundColorTmpResult, cornerRadius: cornerRadiusTmpResult, isModal: isModalTmpResult, onWillDismiss: onWillDismissTmpResult, width: widthTmpResult, height: heightTmpResult, borderWidth: borderWidthTmpResult, borderColor: borderColorTmpResult, borderStyle: borderStyleTmpResult, shadow: shadowTmpResult, backgroundBlurStyle: backgroundBlurStyleTmpResult, backgroundBlurStyleOptions: backgroundBlurStyleOptionsTmpResult, backgroundEffect: backgroundEffectTmpResult, keyboardAvoidMode: keyboardAvoidModeTmpResult, enableHoverMode: enableHoverModeTmpResult, hoverModeArea: hoverModeAreaTmpResult, onDidAppear: onDidAppearTmpResult, onDidDisappear: onDidDisappearTmpResult, onWillAppear: onWillAppearTmpResult, onWillDisappear: onWillDisappearTmpResult, keyboardAvoidDistance: keyboardAvoidDistanceTmpResult, levelMode: levelModeTmpResult, levelUniqueId: levelUniqueIdTmpResult, immersiveMode: immersiveModeTmpResult, levelOrderExtender: levelOrderExtenderTmpResult, focusable: focusableTmpResult, systemMaterial: systemMaterialTmpResult, distortionMode: distortionModeTmpResult, edgeLightMode: edgeLightModeTmpResult} as CustomDialogControllerOptionsExtender)
+        const adaptToHandednessTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let adaptToHandednessTmpBuf: HandednessFollowMode | undefined = undefined
+        if ((adaptToHandednessTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            adaptToHandednessTmpBuf = HandednessFollowMode.fromValue(valueDeserializer.readInt32())
+        }
+        const adaptToHandednessTmpResult: HandednessFollowMode | undefined = adaptToHandednessTmpBuf
+        let value: CustomDialogControllerOptionsExtender = ({builder: builderTmpResult, cancel: cancelTmpResult, autoCancel: autoCancelTmpResult, alignment: alignmentTmpResult, offset: offsetTmpResult, customStyle: customStyleTmpResult, gridCount: gridCountTmpResult, maskColor: maskColorTmpResult, maskRect: maskRectTmpResult, openAnimation: openAnimationTmpResult, closeAnimation: closeAnimationTmpResult, showInSubWindow: showInSubWindowTmpResult, displayModeInSubWindow: displayModeInSubWindowTmpResult, backgroundColor: backgroundColorTmpResult, cornerRadius: cornerRadiusTmpResult, isModal: isModalTmpResult, onWillDismiss: onWillDismissTmpResult, width: widthTmpResult, height: heightTmpResult, borderWidth: borderWidthTmpResult, borderColor: borderColorTmpResult, borderStyle: borderStyleTmpResult, shadow: shadowTmpResult, backgroundBlurStyle: backgroundBlurStyleTmpResult, backgroundBlurStyleOptions: backgroundBlurStyleOptionsTmpResult, backgroundEffect: backgroundEffectTmpResult, keyboardAvoidMode: keyboardAvoidModeTmpResult, enableHoverMode: enableHoverModeTmpResult, hoverModeArea: hoverModeAreaTmpResult, onDidAppear: onDidAppearTmpResult, onDidDisappear: onDidDisappearTmpResult, onWillAppear: onWillAppearTmpResult, onWillDisappear: onWillDisappearTmpResult, keyboardAvoidDistance: keyboardAvoidDistanceTmpResult, levelMode: levelModeTmpResult, levelUniqueId: levelUniqueIdTmpResult, immersiveMode: immersiveModeTmpResult, levelOrderExtender: levelOrderExtenderTmpResult, focusable: focusableTmpResult, systemMaterial: systemMaterialTmpResult, distortionMode: distortionModeTmpResult, edgeLightMode: edgeLightModeTmpResult, adaptToHandedness: adaptToHandednessTmpResult} as CustomDialogControllerOptionsExtender)
         return value
     }
 }

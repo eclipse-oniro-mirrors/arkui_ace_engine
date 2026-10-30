@@ -1276,6 +1276,19 @@ bool GetDialogBaseOptions(napi_env env, napi_value options, DialogProperties& di
         }
     }
 
+    // Adapt to handedness
+    {
+        napi_value adaptToHandednessApi = nullptr;
+        napi_valuetype athType = napi_undefined;
+        napi_get_named_property(env, options, "adaptToHandedness", &adaptToHandednessApi);
+        napi_typeof(env, adaptToHandednessApi, &athType);
+        if (athType == napi_number) {
+            int32_t adaptToHandedness = 0;
+            napi_get_value_int32(env, adaptToHandednessApi, &adaptToHandedness);
+            dialogProps.adaptToHandedness = static_cast<NG::HandednessFollowMode>(adaptToHandedness);
+        }
+    }
+
     // Life cycle callbacks
     Napi::GetVoidCallbackProperty(env, options, "onWillAppear", dialogProps.onWillAppear);
     Napi::GetVoidCallbackProperty(env, options, "onDidAppear", dialogProps.onDidAppear);

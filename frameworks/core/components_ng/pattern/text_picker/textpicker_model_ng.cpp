@@ -85,6 +85,7 @@ void SetDialogProperties(DialogProperties& properties, TextPickerDialog& textPic
     properties.systemMaterial = textPickerDialog.systemMaterial;
     properties.distortionMode = textPickerDialog.distortionMode;
     properties.edgeLightMode = textPickerDialog.edgeLightMode;
+    properties.adaptToHandedness = textPickerDialog.adaptToHandedness;
 }
 
 using TextPickerGetTextStyleFunc = const std::unique_ptr<FontStyle>& (TextPickerLayoutProperty::*)() const;

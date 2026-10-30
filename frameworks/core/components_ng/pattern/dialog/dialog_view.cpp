@@ -16,6 +16,7 @@
 
 #include "core/common/resource/resource_parse_utils.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/pattern/dialog/dialog_pattern.h"
 #include "core/components_ng/pattern/overlay/dialog_manager.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -631,6 +632,7 @@ RefPtr<FrameNode> DialogView::CreateDialogNode(const int32_t nodeId, const Dialo
     dialogLayoutProp->UpdateIsModal(param.isModal);
     dialogLayoutProp->UpdateIsSceneBoardDialog(param.isSceneBoardDialog);
     dialogLayoutProp->UpdateDisplayModeInSubWindow(param.displayModeInSubWindow);
+    dialogLayoutProp->UpdateAdaptToHandedness(param.adaptToHandedness.value_or(HandednessFollowMode::NONE));
     if (param.width.has_value() && NonNegative(param.width.value().Value())) {
         dialogLayoutProp->UpdateWidth(param.width.value());
     } else {

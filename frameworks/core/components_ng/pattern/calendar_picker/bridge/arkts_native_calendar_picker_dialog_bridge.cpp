@@ -31,6 +31,7 @@
 #include "core/components/common/properties/text_enums.h"
 #include "core/components/dialog/dialog_theme.h"
 #include "core/components/theme/shadow_theme.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/pattern/calendar_picker/calendar_picker_model_ng.h"
 #include "core/components_ng/pattern/calendar_picker/calendar_type_define.h"
 #include "core/components_ng/pattern/overlay/overlay_manager.h"
@@ -817,7 +818,17 @@ DialogProperties CalendarPickerDialogBridge::BuildDialogProperties(EcmaVM* vm,
             properties.edgeLightMode = static_cast<EdgeLightMode>(edgeLightMode);
         }
     }
-    
+
+    auto adaptToHandednessValue =
+        paramObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "adaptToHandedness"));
+    if (adaptToHandednessValue->IsNumber()) {
+        auto adaptToHandedness = adaptToHandednessValue->ToNumber(vm)->Int32Value(vm);
+        if (adaptToHandedness >= static_cast<int32_t>(HandednessFollowMode::NONE) &&
+            adaptToHandedness <= static_cast<int32_t>(HandednessFollowMode::FOLLOW_GRIP_HAND)) {
+            properties.adaptToHandedness = static_cast<HandednessFollowMode>(adaptToHandedness);
+        }
+    }
+
     return properties;
 }
 

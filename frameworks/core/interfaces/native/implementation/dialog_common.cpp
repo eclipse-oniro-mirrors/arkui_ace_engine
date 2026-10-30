@@ -18,6 +18,7 @@
 #include "core/interfaces/native/utility/callback_helper.h"
 #include "core/interfaces/native/utility/converter.h"
 #include "core/components/common/properties/ui_material.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/pattern/sheet/sheet_style.h"
 
 #include "dismiss_dialog_action_peer.h"
@@ -136,6 +137,17 @@ ACE_FORCE_EXPORT EdgeLightMode Convert(const Ark_EdgeLightMode& options)
         return EdgeLightMode::EDGELIGHT_ENABLED;
     }
     return EdgeLightMode::EDGELIGHT_DISABLED;
+}
+
+template<>
+ACE_FORCE_EXPORT HandednessFollowMode Convert(const Ark_HandednessFollowMode& options)
+{
+    if (options == Ark_HandednessFollowMode::ARK_HANDEDNESS_FOLLOW_MODE_FOLLOW_ANCHOR) {
+        return HandednessFollowMode::FOLLOW_ANCHOR;
+    } else if (options == Ark_HandednessFollowMode::ARK_HANDEDNESS_FOLLOW_MODE_FOLLOW_GRIP_HAND) {
+        return HandednessFollowMode::FOLLOW_GRIP_HAND;
+    }
+    return HandednessFollowMode::NONE;
 }
 } // namespace Converter
 } // namespace OHOS::Ace::NG

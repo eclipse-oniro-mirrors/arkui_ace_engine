@@ -171,6 +171,10 @@ void UpdateDynamicDialogProperties(DialogProperties& dialogProps, const Ark_Acti
     if (edgeLightMode) {
         dialogProps.edgeLightMode = edgeLightMode.value();
     }
+    auto adaptToHandedness = Converter::OptConvert<HandednessFollowMode>(options.adaptToHandedness);
+    if (adaptToHandedness) {
+        dialogProps.adaptToHandedness = adaptToHandedness.value();
+    }
     dialogProps.maskRect = Converter::OptConvert<DimensionRect>(options.maskRect);
     dialogProps.sheetsInfo = Converter::Convert<std::vector<ActionSheetInfo>>(options.sheets);
     auto transitionEffect = Converter::OptConvert<RefPtr<NG::ChainedTransitionEffect>>(options.transition);
