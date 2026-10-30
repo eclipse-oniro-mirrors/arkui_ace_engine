@@ -725,11 +725,11 @@ void XComponentModelNG::InnerSetSurfaceRectV2(
     xcPattern->SetIdealSurfaceHeight(surfaceHeight);
 
     const auto& [offsetChanged, sizeChanged] = xcPattern->UpdateSurfaceRect();
-    xcPattern->HandleSurfaceChangeEvent(true, offsetChanged, sizeChanged, true);
+    xcPattern->HandleSurfaceChangeEvent(true, offsetChanged, sizeChanged, false);
 }
 
-void XComponentModelNG::GetXComponentSurfaceRect(
-    FrameNode* frameNode, float& offsetX, float& offsetY, float& surfaceWidth, float& surfaceHeight)
+void XComponentModelNG::GetXComponentSurfaceRect(FrameNode* frameNode, float& offsetX, float& offsetY,
+    float& surfaceWidth, float& surfaceHeight)
 {
     CHECK_NULL_VOID(frameNode);
     auto xcPattern = AceType::DynamicCast<XComponentPattern>(frameNode->GetPattern());

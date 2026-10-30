@@ -16,7 +16,6 @@
 #include "core/components_ng/pattern/xcomponent/xcomponent_inner_surface_controller.h"
 
 #include "core/components_ng/pattern/xcomponent/xcomponent_pattern.h"
-#include "base/thread/task_executor.h"
 #ifdef ENABLE_ROSEN_BACKEND
 #include "feature/anco_manager/rs_ext_node_operation.h"
 
