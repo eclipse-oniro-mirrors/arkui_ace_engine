@@ -27,10 +27,8 @@ constexpr int32_t MAX_ENTRIES = 1024;
 
 #define READ_OR_RET(parcel, method, ...)     \
     do {                                     \
-        if (!(parcel.method(__VA_ARGS__))) { \
-            delete result;                   \
-            return nullptr;                  \
-        }                                    \
+        if (!(parcel.method(__VA_ARGS__)))   \
+            return false;                    \
     } while (0)
 
 bool WriteNodeStat(Parcel& parcel, const RichMaterialNodeStatData& d)
@@ -85,9 +83,8 @@ bool WriteOverlayArea(Parcel& parcel, const RichOverlayMaterialAreaData& d)
     return true;
 }
 
-MaterialStatisticEventInfoParcel* ReadNodeStat(Parcel& parcel, MaterialStatisticEventInfoParcel* result)
+bool ReadNodeStat(Parcel& parcel, RichMaterialNodeStatData& d)
 {
-    auto& d = result->info_.materialNodeStat;
     READ_OR_RET(parcel, ReadInt32, d.containerId);
     READ_OR_RET(parcel, ReadString, d.containerType);
     std::vector<int32_t> inTitleBarArr;
@@ -115,7 +112,7 @@ MaterialStatisticEventInfoParcel* ReadNodeStat(Parcel& parcel, MaterialStatistic
     READ_OR_RET(parcel, ReadInt32, d.tabIndex);
     size_t n = nodeIds.size();
     if (n > MAX_ENTRIES) {
-        return nullptr;
+        return false;
     }
     d.entries.reserve(n);
     for (size_t i = 0; i < n; ++i) {
@@ -129,12 +126,11 @@ MaterialStatisticEventInfoParcel* ReadNodeStat(Parcel& parcel, MaterialStatistic
         entry.inBottomTabBar = i < inBottomTabBarArr.size() ? (inBottomTabBarArr[i] != 0) : false;
         d.entries.emplace_back(std::move(entry));
     }
-    return result;
+    return true;
 }
 
-MaterialStatisticEventInfoParcel* ReadOverlayArea(Parcel& parcel, MaterialStatisticEventInfoParcel* result)
+bool ReadOverlayArea(Parcel& parcel, RichOverlayMaterialAreaData& d)
 {
-    auto& d = result->info_.overlayMaterialArea;
     READ_OR_RET(parcel, ReadInt32, d.nodeId);
     READ_OR_RET(parcel, ReadString, d.tag);
     READ_OR_RET(parcel, ReadDouble, d.width);
@@ -143,7 +139,7 @@ MaterialStatisticEventInfoParcel* ReadOverlayArea(Parcel& parcel, MaterialStatis
     READ_OR_RET(parcel, ReadDouble, d.screenWidth);
     READ_OR_RET(parcel, ReadDouble, d.screenHeight);
     READ_OR_RET(parcel, ReadDouble, d.areaPercent);
-    return result;
+    return true;
 }
 } // namespace
 
@@ -251,10 +247,18 @@ MaterialStatisticEventInfoParcel* MaterialStatisticEventInfoParcel::Unmarshallin
     auto* result = new MaterialStatisticEventInfoParcel();
     result->info_.type = static_cast<MaterialStatisticEventType>(type);
     if (type == static_cast<int32_t>(MaterialStatisticEventType::MATERIAL_NODE_STAT)) {
-        return ReadNodeStat(parcel, result);
+        if (!ReadNodeStat(parcel, result->info_.materialNodeStat)) {
+            delete result;
+            return nullptr;
+        }
+        return result;
     }
     if (type == static_cast<int32_t>(MaterialStatisticEventType::MATERIAL_OVERLAY_AREA)) {
-        return ReadOverlayArea(parcel, result);
+        if (!ReadOverlayArea(parcel, result->info_.overlayMaterialArea)) {
+            delete result;
+            return nullptr;
+        }
+        return result;
     }
     delete result;
     return nullptr;

@@ -56,6 +56,7 @@ build_component_ng("manager_ng") {
     "memory/memory_manager.cpp",
     "navigation/navigation_manager.cpp",
     "material/material_processor.cpp",
+    "material/material_processor_helper.cpp",
     "page_scene/page_scene_rule_manager.cpp",
     "page_scene/search_scene_click_matcher.cpp",
     "page_scene/search_scene_context_collector.cpp",

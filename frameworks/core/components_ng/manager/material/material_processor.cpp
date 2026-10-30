@@ -25,9 +25,7 @@
 #include "core/components_ng/base/view_abstract.h"
 #include "core/components_ng/render/render_context.h"
 #include "core/pipeline_ng/pipeline_context.h"
-#include "core/components_ng/pattern/sheet/sheet_presentation_pattern.h"
-#include "core/components_ng/pattern/navrouter/navdestination_pattern.h"
-#include "core/components_ng/pattern/stage/page_pattern.h"
+#include "core/components_ng/manager/material/material_processor_helper.h"
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -40,7 +38,6 @@ const std::string TARGET_SUB_MENU = "MenuItem ShowSubMenuHelper";
 const std::string TARGET_POPUP_TIPS = "overlay ShowPopupAnimationNG";
 const std::string TARGET_SELECT = "Select ShowSelectMenu";
 constexpr float MATERIAL_AREA_REPORT_THRESHOLD = 0.2f;
-const std::string NAVBAR_DEFAULT_NAME = "navbar";
 
 struct PageContextStatBatch {
     int32_t navContainerId = -1;
@@ -55,67 +52,6 @@ struct PageContextStatBatch {
     std::string pageName;
     int32_t tabIndex = -1;
 };
-
-struct ContainerInfo {
-    int32_t navigationId = -1;
-    int32_t tabsId = -1;
-    int32_t pageId = -1;
-    int32_t navDestinationId = -1;
-    int32_t navBarId = -1;
-    int32_t tabContentId = -1;
-    int32_t containerId = -1;
-};
-
-ContainerInfo CollectContainerInfo(const RefPtr<FrameNode>& node)
-{
-    ContainerInfo info;
-    for (auto parent = node->GetParent(); parent; parent = parent->GetParent()) {
-        const auto& tag = parent->GetTag();
-        if (info.navigationId == -1 && tag == V2::NAVIGATION_VIEW_ETS_TAG) {
-            info.navigationId = parent->GetId();
-        }
-        if (info.tabsId == -1 && tag == V2::TABS_ETS_TAG) {
-            info.tabsId = parent->GetId();
-        }
-        if (info.pageId == -1 && tag == V2::PAGE_ETS_TAG) {
-            info.pageId = parent->GetId();
-        }
-        if (info.navDestinationId == -1 && tag == V2::NAVDESTINATION_VIEW_ETS_TAG) {
-            info.navDestinationId = parent->GetId();
-        }
-        if (info.navBarId == -1 && tag == V2::NAVBAR_ETS_TAG) {
-            info.navBarId = parent->GetId();
-        }
-        if (info.tabContentId == -1 && tag == V2::TAB_CONTENT_ITEM_ETS_TAG) {
-            info.tabContentId = parent->GetId();
-        }
-        if (info.containerId == -1 &&
-            (tag == V2::PAGE_ETS_TAG || tag == V2::NAVIGATION_VIEW_ETS_TAG || tag == V2::TABS_ETS_TAG)) {
-            info.containerId = parent->GetId();
-        }
-    }
-    return info;
-}
-
-std::string GetPageUrlByContainerId(int32_t containerId)
-{
-    auto node = AceType::DynamicCast<FrameNode>(ElementRegister::GetInstance()->GetUINodeById(containerId));
-    CHECK_NULL_RETURN(node, "");
-    if (node->GetTag() == V2::PAGE_ETS_TAG) {
-        auto pagePattern = node->GetPattern<PagePattern>();
-        CHECK_NULL_RETURN(pagePattern, "");
-        return pagePattern->GetPageUrl();
-    }
-    auto ci = CollectContainerInfo(node);
-    if (ci.pageId == -1) {
-        return "";
-    }
-    auto pageFrameNode = AceType::DynamicCast<FrameNode>(ElementRegister::GetInstance()->GetUINodeById(ci.pageId));
-    CHECK_NULL_RETURN(pageFrameNode, "");
-    auto pagePattern = pageFrameNode->GetPattern<PagePattern>();
-    CHECK_NULL_RETURN(pagePattern, "");
-    return pagePattern->GetPageUrl();
-}
 
 void FlushOverlayMaterialArea(int32_t nodeId, std::string tag, double width, double height, double area,
     double screenWidth, double screenHeight, int64_t deadline, const WeakPtr<PipelineContext>& pipelineWk)
@@ -358,49 +294,6 @@ void ClassifyPageContextNode(const RefPtr<FrameNode>& node, const ContainerInfo&
         info.containerId = ci.pageId;
         pageNodes.push_back(info);
     }
-}
-
-void ResolveTargetNames(int32_t targetContainerId, PageLogContainerType type,
-    std::string& navName, std::string& pageName)
-{
-    auto targetNode =
-        AceType::DynamicCast<FrameNode>(ElementRegister::GetInstance()->GetUINodeById(targetContainerId));
-    if (!targetNode) {
-        return;
-    }
-    if (targetNode->GetTag() == V2::NAVDESTINATION_VIEW_ETS_TAG) {
-        auto navDestPattern = targetNode->GetPattern<NavDestinationPattern>();
-        if (navDestPattern) {
-            navName = navDestPattern->GetName();
-        }
-    } else if (type == PageLogContainerType::NavContainer && targetNode->GetTag() == V2::NAVBAR_ETS_TAG) {
-        navName = NAVBAR_DEFAULT_NAME;
-    }
-    pageName = GetPageUrlByContainerId(targetContainerId);
-}
-
-bool GetOverlayDimensions(const RefPtr<FrameNode>& host, double& width, double& height, double& area)
-{
-    auto geometryNode = host->GetGeometryNode();
-    if (!geometryNode) {
-        return false;
-    }
-    auto size = geometryNode->GetFrameSize();
-    width = size.Width();
-    height = size.Height();
-    if (host->GetTag() == V2::SHEET_PAGE_TAG) {
-        auto pattern = host->GetPattern<SheetPresentationPattern>();
-        if (!pattern) {
-            return false;
-        }
-        if (!pattern->IsSheetBottomStyle()) {
-            height = pattern->GetCenterHeight();
-        } else {
-            height = pattern->GetHeight();
-        }
-    }
-    area = width * height;
-    return !NearZero(area);
 }
 
 void PostOverlayAreaTask(const RefPtr<FrameNode>& host, const std::string& parentTag,
