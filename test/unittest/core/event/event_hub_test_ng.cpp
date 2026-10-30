@@ -1992,7 +1992,7 @@ HWTEST_F(EventHubTestNg, SetDefaultOnDragStartWithoutHost, TestSize.Level1)
     auto frameNode = FrameNode::CreateFrameNode(V2::IMAGE_ETS_TAG, -1, AceType::MakeRefPtr<Pattern>());
     eventHub->AttachHost(frameNode);
     frameNode.Reset();
-    ASSERT_EQ(eventHub->GetHost(), nullptr);
+    ASSERT_EQ(eventHub->GetFrameNode(), nullptr);
     eventHub->SetDefaultOnDragStart(onDragStart);
     EXPECT_EQ(eventHub->dragDropCallbackSet_, nullptr);
     EXPECT_FALSE(eventHub->HasDefaultOnDragStart());
