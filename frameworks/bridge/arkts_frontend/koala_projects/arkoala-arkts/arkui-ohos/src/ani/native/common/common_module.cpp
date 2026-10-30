@@ -709,6 +709,7 @@ void SetCustomCallbackWithCheck(ani_env* env, ani_object obj, ani_long ptr, ani_
         ani_env* env = nullptr;
         vm->GetEnv(ANI_VERSION_1, &env);
         env->WeakReference_Delete(*wref);
+        delete wref;
     });
     env->WeakReference_Create(frameNode, frameNodeWeakRef.get());
     if ((status = env->Object_GetType(frameNode, &frameNodeType)) != ANI_OK) {
