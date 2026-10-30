@@ -39,6 +39,7 @@
 #include "base/utils/utf_helper.h"
 #include "base/utils/utils.h"
 #include "core/common/ace_engine_ext.h"
+#include "core/common/ai/text_ai_utils.h"
 #include "core/common/container.h"
 #include "core/common/container_scope.h"
 #include "core/common/clipboard/clipboard_proxy.h"
@@ -1799,11 +1800,43 @@ bool TextPattern::PrepareAIMenuOptions(
         selectedAiEntityNum++;
         if (selectedAiEntityNum > MAX_SELECTED_AI_ENTITY) {
             break;
-        } else {
-            aiMenuOptions[spanIter->second.type] = spanIter->second;
         }
+        // Skip phone number entity if no phone call app exists (e.g. wifi-only device)
+        if (!CheckPhoneCallAppExist(spanIter->second)) {
+            continue;
+        }
+        aiMenuOptions[spanIter->second.type] = spanIter->second;
     }
     return selectedAiEntityNum == MAX_SELECTED_AI_ENTITY;
+}
+
+bool TextPattern::CheckPhoneCallAppExist(const AISpan& aiSpan)
+{
+    if (aiSpan.type != TextDataDetectType::PHONE_NUMBER) {
+        return true;
+    }
+    auto callPhoneFuncName = TextAiUtils::GetCallPhoneFuncName();
+    if (callPhoneFuncName.empty()) {
+        return false;
+    }
+    auto typeIter = TEXT_DETECT_MAP.find(aiSpan.type);
+    if (typeIter == TEXT_DETECT_MAP.end()) {
+        return true;
+    }
+    if (!selectDetectorAdapter_) {
+        return true;
+    }
+    const auto& menuActions = selectDetectorAdapter_->textDetectResult_.menuOptionAndAction;
+    auto actionIter = menuActions.find(typeIter->second);
+    if (actionIter == menuActions.end() || actionIter->second.empty()) {
+        return false;
+    }
+    for (const auto& [actionName, func] : actionIter->second) {
+        if (actionName == callPhoneFuncName) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void TextPattern::UpdateAIMenuOptions()

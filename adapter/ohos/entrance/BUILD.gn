@@ -85,6 +85,9 @@ template("ace_ohos_standard_source_set") {
       #Miscdevice Vibrator
       "$ace_root/adapter/ohos/entrance/vibrator/vibrator_utils.cpp",
 
+      # Text AI utils
+      "$ace_root/adapter/ohos/entrance/text/text_ai_utils.cpp",
+
       # CJUtils
       "$ace_root/adapter/ohos/entrance/cj_utils/cj_utils.cpp",
 

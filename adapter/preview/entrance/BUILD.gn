@@ -61,6 +61,7 @@ ohos_source_set("preview_entrance_source") {
       "picker/picker_haptic_factory.cpp",
       "setting_data_manager_impl.cpp",
       "subwindow_preview.cpp",
+      "text/text_ai_utils.cpp",
       "touch_event_convertor.cpp",
       "udmf/udmf_impl.cpp",
       "ui_content_impl.cpp",

@@ -931,6 +931,7 @@ ohos_static_library("ace_components_mock") {
     "$ace_root/test/mock/frameworks/core/common/mock_setting_data_manager.cpp",
     "$ace_root/test/mock/frameworks/core/common/mock_stylus_detector_default.cpp",
     "$ace_root/test/mock/frameworks/core/common/mock_stylus_detector_mgr.cpp",
+    "$ace_root/test/mock/frameworks/core/common/mock_text_ai_utils.cpp",
     "$ace_root/test/mock/frameworks/core/common/mock_text_share_adapter.cpp",
     "$ace_root/test/mock/frameworks/core/common/mock_text_translation_adapter.cpp",
     "$ace_root/test/mock/frameworks/core/common/mock_text_translation_mgr.cpp",
