@@ -20945,6 +20945,22 @@ bool IsNodeAttributeSupported(int32_t nodeType, int32_t attribute, int32_t attri
         case NODE_SCROLL_BAR_DISPLAY_MODE:
         case NODE_SCROLL_BAR_COLOR:
         case NODE_SCROLL_BAR_WIDTH:
+        case NODE_SCROLL_OFFSET:
+        case NODE_SCROLL_EDGE:
+        case NODE_SCROLL_FADING_EDGE:
+        case NODE_SCROLL_SIZE:
+        case NODE_SCROLL_CONTENT_START_OFFSET:
+        case NODE_SCROLL_CONTENT_END_OFFSET:
+        case NODE_SCROLL_FLING_SPEED_LIMIT:
+        case NODE_SCROLL_CLIP_CONTENT:
+        case NODE_SCROLL_BACK_TO_TOP:
+        case NODE_SCROLL_BAR_MARGIN:
+        case NODE_SCROLL_ENABLE_BOUNCES_ZOOM:
+        case NODE_SCROLL_ENABLE_SCROLL_WITH_MOUSE:
+        case NODE_SCROLL_AUTO_ADJUST_MARGIN:
+        case NODE_SCROLL_BAR_HEIGHT:
+        case NODE_SCROLL_STATE:
+        case NODE_SCROLL_ENABLE_SCROLL_WITH_KEYBOARD:
         case NODE_TEXT_ALIGN:
         case NODE_TEXT_CASE:
         case NODE_TEXT_COPY_OPTION:

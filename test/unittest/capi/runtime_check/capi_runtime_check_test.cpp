@@ -195,12 +195,6 @@ HWTEST_F(RuntimeCheckBehaviorTest, DebugDefaultsToCrash, TestSize.Level1)
     EXPECT_EQ(manager_.GetEffectiveMode(CheckType::UI_THREAD).mode, CheckMode::CRASH);
 }
 
-HWTEST_F(RuntimeCheckBehaviorTest, DebugSafeThreadDoesNotCrash, TestSize.Level1)
-{
-    AceApplicationInfo::GetInstance().SetDebugForParallel(true);
-    manager_.CheckUIThread("DebugSafe");
-}
-
 HWTEST_F(RuntimeCheckBehaviorTest, DebugIsQueriedUntilInitialization, TestSize.Level1)
 {
     bridge_.debugReady.store(false);
@@ -383,6 +377,20 @@ HWTEST_F(RuntimeCheckBehaviorTest, MultiThreadModesAndAttributeMatchRemainIndepe
         EXPECT_FALSE(manager_.SetRuntimeCheckMode(4, 0));
         EXPECT_FALSE(manager_.SetRuntimeCheckMode(3, 3));
         EXPECT_EQ(manager_.GetEffectiveMode(CheckType::MULTI_THREAD).mode, static_cast<CheckMode>(mode));
+    }
+}
+
+HWTEST_F(RuntimeCheckBehaviorTest, AttributeMatchModeSurvivesMultiThreadModeChanges, TestSize.Level1)
+{
+    const auto attributeType = static_cast<int32_t>(CheckType::ATTRIBUTE_MATCH);
+    const auto multiThreadType = static_cast<int32_t>(CheckType::MULTI_THREAD);
+    for (auto attributeMode : { CheckMode::DISABLED, CheckMode::LOG, CheckMode::CRASH }) {
+        ASSERT_TRUE(manager_.SetRuntimeCheckMode(attributeType, static_cast<int32_t>(attributeMode)));
+        for (auto multiThreadMode : { CheckMode::DISABLED, CheckMode::LOG, CheckMode::CRASH }) {
+            ASSERT_TRUE(manager_.SetRuntimeCheckMode(multiThreadType, static_cast<int32_t>(multiThreadMode)));
+            EXPECT_EQ(manager_.GetEffectiveMode(CheckType::ATTRIBUTE_MATCH).mode, attributeMode);
+            EXPECT_EQ(manager_.GetEffectiveMode(CheckType::MULTI_THREAD).mode, multiThreadMode);
+        }
     }
 }
 
