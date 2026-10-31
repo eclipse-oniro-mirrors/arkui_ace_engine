@@ -486,6 +486,9 @@ private:
     std::optional<ScrollPlaceholderOptions> PredictScrollPlaceholderDefer(
         const RefPtr<ScrollPlaceholderManager>& manager, const RefPtr<FrameNode>& host, int32_t index);
     void RetireScrollPlaceholderShell(const RefPtr<FrameNode>& shell, const std::string& templateId);
+    // Drops queued real-build tasks (and their mounted shells) for indices outside the
+    // visible window; reports the window to the manager for flush-time banding.
+    void SweepScrollPlaceholderOutOfRange(int32_t start, int32_t end);
     // Submits the deferred real-build closure for a placeholder item into the
     // framed UI-thread queue (flushed by the pipeline).
     void EnqueueScrollPlaceholderRealBuild(const RefPtr<ScrollPlaceholderManager>& manager,

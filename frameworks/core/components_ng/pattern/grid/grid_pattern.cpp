@@ -267,6 +267,22 @@ bool GridPattern::HasScrollPlaceholderItem(int32_t index) const
     return scrollPlaceholderItems_.find(index) != scrollPlaceholderItems_.end();
 }
 
+namespace {
+// Placeholder commit/sweep visibility margin: covers typical cachedCount prefetch
+// bands without consulting each component's cached-count plumbing. A deferred build
+// whose index fell outside the window is dropped — the index falls back to the normal
+// acquisition and re-defers on demand if the user scrolls back.
+constexpr int32_t SCROLL_PH_RANGE_MARGIN = 10;
+
+bool InScrollPhVisibleRange(int32_t start, int32_t end, int32_t index)
+{
+    if (start < 0 || end < 0 || index < 0) {
+        return true; // range unknown (pre-first-layout): fail open
+    }
+    return index >= start - SCROLL_PH_RANGE_MARGIN && index <= end + SCROLL_PH_RANGE_MARGIN;
+}
+} // namespace
+
 bool GridPattern::CommitScrollPlaceholderRealBuild(int32_t index)
 {
     // Framed real-build closure (UI thread, pipeline OnIdle flush). The real item
@@ -289,6 +305,19 @@ bool GridPattern::CommitScrollPlaceholderRealBuild(int32_t index)
     }
     if (index < 0 || index >= host->GetTotalChildCount()) {
         // Data shrank below this index: drop the placeholder, never mount.
+        RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
+        scrollPlaceholderItems_.erase(iter);
+        return false;
+    }
+
+    // Visibility guard: a storm can leave a task queued for an index the viewport has
+    // long left behind (the queue itself has no scroll-position cleanup). Committing
+    // it would mount a full off-screen item and force a host re-measure for content
+    // the user may never revisit; retire the shell — the index re-defers through the
+    // normal path if the user scrolls back.
+    const int32_t visStart = startIndex_;
+    const int32_t visEnd = endIndex_;
+    if (!InScrollPhVisibleRange(visStart, visEnd, index)) {
         RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
         scrollPlaceholderItems_.erase(iter);
         return false;
@@ -359,6 +388,30 @@ void GridPattern::RetireScrollPlaceholderShell(const RefPtr<FrameNode>& shell, c
     shell->DetachFromMainTree();
 }
 
+void GridPattern::SweepScrollPlaceholderOutOfRange(int32_t start, int32_t end)
+{
+    // Scroll-driven hygiene for the framed real-build queue: a fast fling can defer
+    // more items than the viewport will ever revisit. Queued tasks whose index left
+    // the window (plus margin) can no longer render near the user — drop the task and
+    // retire the shell so the index falls back to the normal acquisition. Without
+    // this the backlog drains for minutes, building items the user has long passed.
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* context = host->GetContext();
+    const auto& manager = context ? context->GetOrCreateScrollPlaceholderManager() : nullptr;
+    CHECK_NULL_VOID(manager);
+    manager->SetHostVisibleRange(host->GetId(), start, end);
+    for (auto iter = scrollPlaceholderItems_.begin(); iter != scrollPlaceholderItems_.end();) {
+        const int32_t index = iter->first;
+        if (InScrollPhVisibleRange(start, end, index)) {
+            ++iter;
+            continue;
+        }
+        manager->CancelRealBuildTask(host->GetId(), index, ScrollPlaceholderCancelReason::OUT_OF_RANGE);
+        RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
+        iter = scrollPlaceholderItems_.erase(iter);
+    }
+}
 void GridPattern::ReconcileScrollPlaceholderItems()
 {
     // Layout-round reconcile: placeholders whose index already holds a real
@@ -1188,6 +1241,7 @@ void GridPattern::SyncIndexesAndProcessEvents(
         info_.prevHeight_ = info_.currentHeight_;
         startIndex_ = info_.ReportStartIndex();
         endIndex_ = info_.ReportEndIndex();
+        SweepScrollPlaceholderOutOfRange(startIndex_, endIndex_);
         if (isConfigScrollable_) {
             focusHandler_.ProcessFocusEvent(keyEvent_, indexChanged);
         }

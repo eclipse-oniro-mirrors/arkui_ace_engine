@@ -126,6 +126,14 @@ public:
     bool HasPendingRealBuild() const;
     size_t GetPendingRealBuildCount() const;
     void CancelHostRealBuilds(int32_t hostNodeId, ScrollPlaceholderCancelReason reason);
+    // Drops the single queued real-build task of (hostNodeId, index); true when a task was
+    // removed. The CALLER owns the shell lifecycle: the adapter retires the mounted shell
+    // for the index (content pooling + deferral cleanup) alongside this call.
+    bool CancelRealBuildTask(int32_t hostNodeId, int32_t index, ScrollPlaceholderCancelReason reason);
+    // Scroll-position hygiene: adapters report the visible window (their layout's reported
+    // start/end indices) on scroll-index changes. Used to re-band the queue at flush time
+    // (visible-first) so a storm backlog drains viewport-first instead of in enqueue order.
+    void SetHostVisibleRange(int32_t hostNodeId, int32_t start, int32_t end);
 
     // Lifecycle.
     void Destroy();
@@ -244,6 +252,9 @@ private:
 
     void RequestFrameIfAlive();
     void PurgeTemplateRealBuilds(const std::string& templateId, ScrollPlaceholderCancelReason reason);
+    // Current-viewport membership for flush-time banding; fail-open (in-range) when the
+    // adapter has not reported a window yet, so pre-first-layout commits keep working.
+    bool InHostVisibleRange(int32_t hostNodeId, int32_t index) const;
 
     // Deferral table key: host id and item index packed into one 64-bit key. Host ids
     // and lazy-container indexes are generated positive int32s, so the packing is
@@ -262,6 +273,15 @@ private:
     ScrollPlaceholderCostModel costModel_;
     ScrollPlaceholderTemplateRegistry registry_;
     std::deque<RealBuildTask> pendingRealBuilds_;
+    // Max forced (starvation-escape) commits inside ONE FlushRealBuild invocation. Without
+    // this bound a storm backlog ages past the escape threshold wholesale and one flush
+    // turns into an unbounded UI-thread drain: minutes pinned, no frame in between.
+    static constexpr size_t MAX_FORCED_COMMITS_PER_FLUSH = 8;
+    struct HostVisibleRange {
+        int32_t start = -1;
+        int32_t end = -1;
+    };
+    std::unordered_map<int32_t, HostVisibleRange> hostVisibleRanges_;
     uint64_t nextTaskSequence_ = 0;
     int64_t lastVsyncTimestampNs_ = 0;
     int64_t vsyncPeriodNs_ = 0;

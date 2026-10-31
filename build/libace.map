@@ -1921,6 +1921,8 @@
       "OHOS::Ace::NG::ScrollPlaceholderManager::EnqueueRealBuild(OHOS::Ace::NG::ScrollPlaceholderPredictParams const&, unsigned long long, std::__h::function<bool ()>&&, OHOS::Ace::NG::ScrollPlaceholderRealBuildPriority)";
       "OHOS::Ace::NG::ScrollPlaceholderManager::EnqueueRealBuild(OHOS::Ace::NG::ScrollPlaceholderPredictParams const&, unsigned long, std::__h::function<bool ()>&&, OHOS::Ace::NG::ScrollPlaceholderRealBuildPriority)";
       "OHOS::Ace::NG::ScrollPlaceholderManager::CancelHostRealBuilds(int, OHOS::Ace::NG::ScrollPlaceholderCancelReason)";
+      "OHOS::Ace::NG::ScrollPlaceholderManager::CancelRealBuildTask(int, int, OHOS::Ace::NG::ScrollPlaceholderCancelReason)";
+      "OHOS::Ace::NG::ScrollPlaceholderManager::SetHostVisibleRange(int, int, int)";
       "OHOS::Ace::NG::ScrollPlaceholderManager::RecordDeferral(int, int, OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&)";
       "OHOS::Ace::NG::ScrollPlaceholderManager::ClearDeferral(int, int)";
       "OHOS::Ace::NG::ScrollPlaceholderManager::RemoveDeferralsByShell(int, OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&)";

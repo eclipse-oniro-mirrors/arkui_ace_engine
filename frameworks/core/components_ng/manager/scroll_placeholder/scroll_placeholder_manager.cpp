@@ -517,8 +517,19 @@ void ScrollPlaceholderManager::FlushRealBuild(int64_t deadlineNs)
     // Visible items first, FIFO inside the same priority band.
     std::stable_sort(pendingRealBuilds_.begin(), pendingRealBuilds_.end(),
         [](const RealBuildTask& lhs, const RealBuildTask& rhs) { return lhs.priority < rhs.priority; });
+    // Re-band against the CURRENT viewport before draining: adapters enqueue with a
+    // static priority constant, so the sort above carries no visibility signal — a
+    // storm backlog would drain in enqueue order, committing items the viewport has
+    // long left behind while the on-screen shells wait behind them. Stable sort keeps
+    // the priority/FIFO order inside each band.
+    std::stable_sort(pendingRealBuilds_.begin(), pendingRealBuilds_.end(),
+        [this](const RealBuildTask& lhs, const RealBuildTask& rhs) {
+            return InHostVisibleRange(lhs.params.hostNodeId, lhs.params.index) &&
+                   !InHostVisibleRange(rhs.params.hostNodeId, rhs.params.index);
+        });
     std::deque<RealBuildTask> requeued;
     bool budgetExhausted = false;
+    size_t forcedCommits = 0;
     while (!pendingRealBuilds_.empty()) {
         RealBuildTask pendingTask = std::move(pendingRealBuilds_.front());
         pendingRealBuilds_.pop_front();
@@ -555,6 +566,20 @@ void ScrollPlaceholderManager::FlushRealBuild(int64_t deadlineNs)
             break;
         }
         if (forced) {
+            if (forcedCommits >= MAX_FORCED_COMMITS_PER_FLUSH) {
+                // Bound the synchronous drain: once a storm backlog ages past the escape
+                // threshold wholesale, the forced path would otherwise run to queue
+                // exhaustion in this single invocation — minutes of UI-thread pinning
+                // with no frame in between. Carve the remainder back into the next
+                // frame; progress stays guaranteed (bounded per frame).
+                TAG_LOGI(AceLogTag::ACE_SCROLL,
+                    "ScrollPH flush: forced-commit cap (%{public}zu) reached, defer rest to next frame",
+                    MAX_FORCED_COMMITS_PER_FLUSH);
+                requeued.push_back(std::move(pendingTask));
+                budgetExhausted = true;
+                break;
+            }
+            ++forcedCommits;
             TAG_LOGI(AceLogTag::ACE_SCROLL,
                 "ScrollPH flush: forced commit after requeues, idx=%{public}d",
                 pendingTask.params.index);
@@ -610,6 +635,38 @@ void ScrollPlaceholderManager::CancelHostRealBuilds(int32_t hostNodeId, ScrollPl
     if (cancelled > 0 && reasonIndex < CANCEL_REASON_COUNT) {
         cancelledByReason_[reasonIndex].fetch_add(cancelled, std::memory_order_relaxed);
     }
+}
+
+bool ScrollPlaceholderManager::CancelRealBuildTask(int32_t hostNodeId, int32_t index,
+    ScrollPlaceholderCancelReason reason)
+{
+    for (auto iter = pendingRealBuilds_.begin(); iter != pendingRealBuilds_.end(); ++iter) {
+        if (iter->params.hostNodeId == hostNodeId && iter->params.index == index) {
+            pendingRealBuilds_.erase(iter);
+            auto reasonIndex = static_cast<size_t>(reason);
+            if (reasonIndex < CANCEL_REASON_COUNT) {
+                cancelledByReason_[reasonIndex].fetch_add(1, std::memory_order_relaxed);
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+void ScrollPlaceholderManager::SetHostVisibleRange(int32_t hostNodeId, int32_t start, int32_t end)
+{
+    hostVisibleRanges_[hostNodeId] = { start, end };
+}
+
+bool ScrollPlaceholderManager::InHostVisibleRange(int32_t hostNodeId, int32_t index) const
+{
+    auto iter = hostVisibleRanges_.find(hostNodeId);
+    if (iter == hostVisibleRanges_.end()) {
+        // No window reported yet (pre-first-layout or a host that never scrolled):
+        // fail open so legacy commit behavior is unchanged.
+        return true;
+    }
+    return index >= iter->second.start && index <= iter->second.end;
 }
 
 void ScrollPlaceholderManager::Destroy()
