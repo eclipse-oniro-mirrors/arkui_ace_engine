@@ -48,11 +48,11 @@ bool ForceSplitManager::IsForceSplitEnable(bool isRouter) const
 
 void ForceSplitManager::SetForceSplitEnable(bool isForceSplit, ForceSplitMode mode)
 {
-    TAG_LOGI(AceLogTag::ACE_NAVIGATION, "%{public}s forceSplit, mode:%{public}d",
-        (isForceSplit ? "enable" : "disable"), static_cast<int32_t>(mode));
     if (isForceSplitEnable_ == isForceSplit && mode_ == mode) {
         return;
     }
+    TAG_LOGI(AceLogTag::ACE_NAVIGATION, "%{public}s forceSplit, mode:%{public}d",
+        (isForceSplit ? "enable" : "disable"), static_cast<int32_t>(mode));
     /**
      * There are following scenarios:
      * 1. isForceSplit -> false
