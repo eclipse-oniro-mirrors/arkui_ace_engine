@@ -69,8 +69,8 @@ bool AccessibilityHoverManagerForThirdNG::GetElementInfoForThird(
         return false;
     }
     std::list<Accessibility::AccessibilityElementInfo> infos;
-    bool ret = jsThirdProviderOperator->FindAccessibilityNodeInfosByIdFromProvider(
-        elementId, 0, 0, infos, true, traversal); // hover coordinates exclude the host offset
+    // Hover coordinates exclude the host offset.
+    bool ret = traversal->FindNodeInfos(*jsThirdProviderOperator, elementId, infos, true);
     if (!ret || infos.empty()) {
         traversal->Record(ThirdAccessibilityTraversal::QUERY_FAILED, elementId);
         return false;
@@ -163,12 +163,30 @@ std::pair<bool, bool> AccessibilityHoverManagerForThirdNG::GetSearchStrategyForT
     return std::make_pair(shouldSearchSelf, shouldSearchChildren);
 }
 
+bool AccessibilityHoverManagerForThirdNG::HoverChildrenForThird(
+    const AccessibilityElementInfo& nodeInfo, ThirdHoverContext& context, size_t depth)
+{
+    const auto childrenIds = nodeInfo.GetChildIds();
+    for (auto childId = childrenIds.rbegin(); childId != childrenIds.rend(); ++childId) {
+        if (context.traversal.Exhausted()) {
+            break;
+        }
+        if (!context.traversal.Visit(*childId, depth + 1)) {
+            continue;
+        }
+        AccessibilityElementInfo childInfo;
+        if (!GetElementInfoForThird(*childId, childInfo, context.hostElementId, &context.traversal)) {
+            continue;
+        }
+        if (HoverPathForThirdRecursive(childInfo, context, depth + 1)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool AccessibilityHoverManagerForThirdNG::HoverPathForThirdRecursive(
-    const int64_t hostElementId,
-    const NG::PointF& hoverPoint,
-    const AccessibilityElementInfo& nodeInfo,
-    AccessibilityHoverTestPathForThird& path,
-    const std::vector<int64_t>& mountBindIds, ThirdAccessibilityTraversal& traversal, size_t depth)
+    const AccessibilityElementInfo& nodeInfo, ThirdHoverContext& context, size_t depth)
 {
     bool hitTarget = false;
     auto [shouldSearchSelf, shouldSearchChildren]
@@ -181,36 +199,20 @@ bool AccessibilityHoverManagerForThirdNG::HoverPathForThirdRecursive(
     auto height = static_cast<float>(
         rectInScreen.GetRightBottomYScreenPostion()) - static_cast<float>(rectInScreen.GetLeftTopYScreenPostion());
     NG::RectF rect { left, right, width, height };
-    bool hitSelf = rect.IsInnerRegion(hoverPoint);
+    bool hitSelf = rect.IsInnerRegion(context.point);
     // REGISTERED exported-subtree mounts are hover anchors regardless of their own accessibility level: the mount.
     int64_t splitNodeId = AccessibilityElementInfo::UNDEFINED_ACCESSIBILITY_ID;
     int32_t splitNodeTreeId = AccessibilityElementInfo::UNDEFINED_TREE_ID;
     AccessibilitySystemAbilityClient::GetTreeIdAndElementIdBySplitElementId(
         nodeInfo.GetAccessibilityId(), splitNodeId, splitNodeTreeId);
     bool isRegisteredMount =
-        std::find(mountBindIds.begin(), mountBindIds.end(), splitNodeId) != mountBindIds.end();
+        std::find(context.mountBindIds.begin(), context.mountBindIds.end(), splitNodeId) != context.mountBindIds.end();
     if (hitSelf && (shouldSearchSelf || isRegisteredMount)) {
         hitTarget = true;
-        path.push_back(nodeInfo.GetAccessibilityId());
+        context.path.push_back(nodeInfo.GetAccessibilityId());
     }
-    if (shouldSearchChildren) {
-        auto childrenIds = nodeInfo.GetChildIds();
-        for (auto childId = childrenIds.rbegin(); childId != childrenIds.rend(); ++childId) {
-            if (!traversal.Visit(*childId, depth + 1)) {
-                if (traversal.Exhausted()) {
-                    break;
-                }
-                continue;
-            }
-            AccessibilityElementInfo childInfo;
-            if (!GetElementInfoForThird(*childId, childInfo, hostElementId, &traversal)) {
-                continue;
-            }
-            if (HoverPathForThirdRecursive(
-                hostElementId, hoverPoint, childInfo, path, mountBindIds, traversal, depth + 1)) {
-                return true;
-            }
-        }
+    if (shouldSearchChildren && HoverChildrenForThird(nodeInfo, context, depth)) {
+        return true;
     }
     return hitTarget;
 }
@@ -235,7 +237,8 @@ AccessibilityHoverTestPathForThird AccessibilityHoverManagerForThirdNG::HoverPat
     AccessibilitySystemAbilityClient::GetTreeIdAndElementIdBySplitElementId(
         rootInfo.GetAccessibilityId(), rootId, treeId);
     if (traversal.Visit(rootId, 0)) {
-        HoverPathForThirdRecursive(hostElementId, point, rootInfo, path, mountBindIds, traversal, 0);
+        ThirdHoverContext context { hostElementId, point, mountBindIds, path, traversal };
+        HoverPathForThirdRecursive(rootInfo, context, 0);
     }
     if (traversal.Exhausted()) {
         path.clear();
@@ -876,8 +879,7 @@ void DumpTreeForThird(
     if (splitElementId != -1 && !traversal.Visit(splitElementId, depth)) {
         return;
     }
-    bool ret = jsThirdProviderOperator->FindAccessibilityNodeInfosByIdFromProvider(
-        splitElementId, 0, 0, infos, false, &traversal);
+    bool ret = traversal.FindNodeInfos(*jsThirdProviderOperator, splitElementId, infos);
     if (!ret || infos.empty()) {
         traversal.Record(ThirdAccessibilityTraversal::QUERY_FAILED, splitElementId);
         return;
@@ -1021,6 +1023,35 @@ void DumpHandleAction(
     MockDumpOperatorCallBack operatorCallback;
     jsThirdProviderOperator->ExecuteAction(nodeId, op, paramsMap, 0, operatorCallback);
 }
+
+void DumpFocusSearchForThird(const DumpInfoArgument& argument,
+    const std::shared_ptr<JsThirdProviderInteractionOperation>& jsThirdProviderOperator)
+{
+    AccessibilityElementInfo source;
+    source.SetAccessibilityId(argument.nodeId);
+    AccessibilityFocusMoveParam param {};
+    param.direction = static_cast<FocusMoveDirection>(argument.focusDirection);
+    param.type = static_cast<FocusRuleType>(argument.focusMoveRule);
+    param.condition = static_cast<DetailCondition>(argument.focusCondition);
+    param.parentId = -1;
+    // These search directions reply synchronously; detect-focusable is deliberately excluded.
+    MockDumpOperatorCallBack callback;
+    jsThirdProviderOperator->FocusMoveSearchWithCondition(source, param, 0, callback);
+}
+
+void DumpTreeWithDiagnosticsForThird(int64_t rootId,
+    const std::shared_ptr<JsThirdProviderInteractionOperation>& jsThirdProviderOperator)
+{
+    if (!IsDumpTreeForThird(rootId, jsThirdProviderOperator)) {
+        return;
+    }
+    ThirdAccessibilityTraversal traversal("dump");
+    DumpTreeForThird(rootId, jsThirdProviderOperator, 0, traversal);
+    if (traversal.HasIssues()) {
+        DumpLog::GetInstance().Print(
+            "Warning: malformed third-party tree; dump is incomplete. See accessibility log.");
+    }
+}
 } // namespace
 
 void AccessibilityHoverManagerForThirdNG::DumpPropertyForThird(
@@ -1064,34 +1095,15 @@ bool AccessibilityHoverManagerForThirdNG::OnDumpChildInfoForThirdRecursive(
         return true;
     }
     switch (argument.mode) {
-        case DumpMode::THIRD_FOCUS_SEARCH: {
-            AccessibilityElementInfo source;
-            source.SetAccessibilityId(argument.nodeId);
-            AccessibilityFocusMoveParam param {};
-            param.direction = static_cast<FocusMoveDirection>(argument.focusDirection);
-            param.type = static_cast<FocusRuleType>(argument.focusMoveRule);
-            param.condition = static_cast<DetailCondition>(argument.focusCondition);
-            param.parentId = -1;
-            // These search directions reply synchronously; detect-focusable is deliberately excluded.
-            MockDumpOperatorCallBack callback;
-            jsThirdProviderOperator->FocusMoveSearchWithCondition(source, param, 0, callback);
+        case DumpMode::THIRD_FOCUS_SEARCH:
+            DumpFocusSearchForThird(argument, jsThirdProviderOperator);
             break;
-        }
         case DumpMode::NODE:
             DumpPropertyForThird(argument.nodeId, jsAccessibilityManager, jsThirdProviderOperator);
             break;
-        case DumpMode::TREE: {
-            if (!IsDumpTreeForThird(argument.rootId, jsThirdProviderOperator)) {
-                break;
-            }
-            ThirdAccessibilityTraversal traversal("dump");
-            DumpTreeForThird(argument.rootId, jsThirdProviderOperator, 0, traversal);
-            if (traversal.HasIssues()) {
-                DumpLog::GetInstance().Print(
-                    "Warning: malformed third-party tree; dump is incomplete. See accessibility log.");
-            }
+        case DumpMode::TREE:
+            DumpTreeWithDiagnosticsForThird(argument.rootId, jsThirdProviderOperator);
             break;
-        }
         case DumpMode::HANDLE_EVENT:
             DumpHandleAction(params, jsAccessibilityManager, jsThirdProviderOperator);
             break;

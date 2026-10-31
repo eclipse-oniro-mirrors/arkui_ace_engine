@@ -143,12 +143,17 @@ private:
         const NG::PointF& point,
         AccessibilityElementInfo& rootInfo,
         const std::vector<int64_t>& mountBindIds);
+    struct ThirdHoverContext {
+        int64_t hostElementId;
+        const NG::PointF& point;
+        const std::vector<int64_t>& mountBindIds;
+        AccessibilityHoverTestPathForThird& path;
+        ThirdAccessibilityTraversal& traversal;
+    };
     bool HoverPathForThirdRecursive(
-        const int64_t hostElementId,
-        const NG::PointF& hoverPoint,
-        const AccessibilityElementInfo& nodeInfo,
-        AccessibilityHoverTestPathForThird& path,
-        const std::vector<int64_t>& mountBindIds, ThirdAccessibilityTraversal& traversal, size_t depth);
+        const AccessibilityElementInfo& nodeInfo, ThirdHoverContext& context, size_t depth);
+    bool HoverChildrenForThird(
+        const AccessibilityElementInfo& nodeInfo, ThirdHoverContext& context, size_t depth);
     std::pair<bool, bool> GetSearchStrategyForThird(
         const AccessibilityElementInfo& nodeInfo);
     bool IsAccessibilityFocusable(const AccessibilityElementInfo& nodeInfo);

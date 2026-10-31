@@ -480,7 +480,11 @@ AceFocusMoveResult AccessibilityFocusStrategy::FindNextReadableNodeBySelfAndSame
             auto result = TryJumpToNextFocusTarget(current, targetNode, *visitedNextFocusNodes, "same-level");
             CHECK_NE_RETURN(result, AceFocusMoveResult::FIND_FAIL, result);
         }
-        if (brother == sameLevelNodes.end() || ++brother == sameLevelNodes.end()) {
+        if (brother == sameLevelNodes.end()) {
+            break;
+        }
+        ++brother;
+        if (brother == sameLevelNodes.end()) {
             break;
         }
         CHECK_NULL_RETURN(*brother, AceFocusMoveResult::FIND_FAIL);

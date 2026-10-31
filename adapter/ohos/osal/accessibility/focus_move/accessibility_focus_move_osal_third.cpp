@@ -45,6 +45,57 @@ struct ThirdNodeSnapshot : ArkUI_AccessibilityElementInfo {
     }
     std::vector<std::string> descriptions;
 };
+
+struct ThirdTreeBuildContext {
+    const WeakPtr<AccessibilityProvider>& provider;
+    ThirdRulesCheckNode::ParentMap& parents;
+    ThirdRulesCheckNode::NodeMap& nodes;
+    ThirdAccessibilityTraversal& traversal;
+    std::vector<std::pair<std::shared_ptr<ArkUI_AccessibilityElementInfo>, size_t>> pending;
+};
+
+void CollectThirdChildren(const std::shared_ptr<ArkUI_AccessibilityElementInfo>& parent,
+    size_t depth, ThirdTreeBuildContext& context)
+{
+    for (auto childId : parent->GetChildNodeIds()) {
+        if (context.traversal.Exhausted()) {
+            break;
+        }
+        if (!context.traversal.Visit(childId, depth + 1)) {
+            continue;
+        }
+        auto child = std::make_shared<ArkUI_AccessibilityElementInfo>();
+        if (!JsThirdProviderInteractionOperation::FindNativeInfoById(
+            context.provider, childId, child, &context.traversal)) {
+            continue;
+        }
+        child = std::make_shared<ThirdNodeSnapshot>(*child);
+        auto reportedParent = child->GetParentId();
+        // Missing parent IDs are a supported provider convention, not a warning.
+        if (reportedParent >= 0 && reportedParent != parent->GetElementId()) {
+            context.traversal.Record(ThirdAccessibilityTraversal::WRONG_PARENT, childId);
+        }
+        context.parents.emplace(childId, parent->GetElementId());
+        context.nodes.emplace(childId, child);
+        context.pending.emplace_back(child, depth + 1);
+    }
+}
+
+void SanitizeThirdNode(const std::shared_ptr<ArkUI_AccessibilityElementInfo>& node,
+    const ThirdRulesCheckNode::ParentMap& parents)
+{
+    const auto id = node->GetElementId();
+    const auto children = node->GetChildNodeIds();
+    node->ClearChildNodeIds();
+    std::unordered_set<int64_t> emitted;
+    for (auto childId : children) {
+        auto parent = parents.find(childId);
+        if (parent != parents.end() && parent->second == id && emitted.insert(childId).second) {
+            node->AddChildNodeId(childId);
+        }
+    }
+    node->SetParentId(parents.at(id));
+}
 } // namespace
 
 void FocusStrategyOsalThird::InvailidElementInfo(Accessibility::AccessibilityElementInfo& info)
@@ -142,32 +193,11 @@ bool FocusStrategyOsalThird::BuildParentMap()
     root = std::make_shared<ThirdNodeSnapshot>(*root);
     parentMap_->emplace(root->GetElementId(), AccessibilityElementInfo::ROOT_PARENT_ID);
     nodeMap_->emplace(root->GetElementId(), root);
-    std::vector<std::pair<std::shared_ptr<ArkUI_AccessibilityElementInfo>, size_t>> pending { { root, 0 } };
-    while (!pending.empty() && !traversal.Exhausted()) {
-        auto [parent, depth] = pending.back();
-        pending.pop_back();
-        for (auto childId : parent->GetChildNodeIds()) {
-            if (!traversal.Visit(childId, depth + 1)) {
-                if (traversal.Exhausted()) {
-                    break;
-                }
-                continue;
-            }
-            auto child = std::make_shared<ArkUI_AccessibilityElementInfo>();
-            if (!JsThirdProviderInteractionOperation::FindNativeInfoById(
-                accessibilityProvider_, childId, child, &traversal)) {
-                continue;
-            }
-            child = std::make_shared<ThirdNodeSnapshot>(*child);
-            auto reportedParent = child->GetParentId();
-            // Missing parent IDs are a supported provider convention, not a warning.
-            if (reportedParent >= 0 && reportedParent != parent->GetElementId()) {
-                traversal.Record(ThirdAccessibilityTraversal::WRONG_PARENT, childId);
-            }
-            parentMap_->emplace(childId, parent->GetElementId());
-            nodeMap_->emplace(childId, child);
-            pending.emplace_back(child, depth + 1);
-        }
+    ThirdTreeBuildContext context { accessibilityProvider_, *parentMap_, *nodeMap_, traversal, { { root, 0 } } };
+    while (!context.pending.empty() && !traversal.Exhausted()) {
+        auto [parent, depth] = context.pending.back();
+        context.pending.pop_back();
+        CollectThirdChildren(parent, depth, context);
     }
     if (traversal.Exhausted()) {
         parentMap_->clear();
@@ -176,16 +206,7 @@ bool FocusStrategyOsalThird::BuildParentMap()
     }
     // Publish only the accepted edges, including in element info returned to the service.
     for (const auto& [id, node] : *nodeMap_) {
-        const auto children = node->GetChildNodeIds();
-        node->ClearChildNodeIds();
-        std::unordered_set<int64_t> emitted;
-        for (auto childId : children) {
-            auto parent = parentMap_->find(childId);
-            if (parent != parentMap_->end() && parent->second == id && emitted.insert(childId).second) {
-                node->AddChildNodeId(childId);
-            }
-        }
-        node->SetParentId(parentMap_->at(id));
+        SanitizeThirdNode(node, *parentMap_);
     }
     rootInfo_ = root;
     return true;

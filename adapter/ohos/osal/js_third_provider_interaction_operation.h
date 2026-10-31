@@ -102,8 +102,7 @@ public:
         Accessibility::EventType eventType);
     bool FindAccessibilityNodeInfosByIdFromProvider(
         const int64_t splitElementId, const int32_t mode, const int32_t requestId,
-        std::list<Accessibility::AccessibilityElementInfo>& infos, bool ignoreHostOffset = false,
-        ThirdAccessibilityTraversal* traversal = nullptr);
+        std::list<Accessibility::AccessibilityElementInfo>& infos, bool ignoreHostOffset = false);
     const WeakPtr<JsAccessibilityManager>& GetHandler() const
     {
         return jsAccessibilityManager_;
@@ -141,6 +140,15 @@ public:
         Accessibility::AccessibilityElementInfo& info);
 
 private:
+    friend class ThirdAccessibilityTraversal;
+    struct NodeQueryOptions {
+        int32_t mode = 0;
+        int32_t requestId = 0;
+        bool ignoreHostOffset = false;
+        ThirdAccessibilityTraversal* traversal = nullptr;
+    };
+    bool FindNodeInfosFromProvider(int64_t elementId, const NodeQueryOptions& options,
+        std::list<Accessibility::AccessibilityElementInfo>& infos);
     bool BuildNativeHoverEvent(const ArkUI_AccessibilityElementInfo& info,
         NG::AccessibilityHoverEventType eventType, Accessibility::AccessibilityEventInfo& event);
     void GetHostRectTranslateInfo(NodeConfig& config);

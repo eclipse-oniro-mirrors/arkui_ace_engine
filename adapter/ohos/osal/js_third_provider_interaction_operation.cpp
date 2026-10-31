@@ -62,7 +62,8 @@ bool ValidateThirdNodePayload(const ArkUI_AccessibilityElementInfo& node, ThirdA
     }
     const auto strings = { &ArkUI_AccessibilityElementInfo::GetComponentType,
         &ArkUI_AccessibilityElementInfo::GetContents, &ArkUI_AccessibilityElementInfo::GetHintText,
-        &ArkUI_AccessibilityElementInfo::GetAccessibilityText, &ArkUI_AccessibilityElementInfo::GetAccessibilityDescription,
+        &ArkUI_AccessibilityElementInfo::GetAccessibilityText,
+        &ArkUI_AccessibilityElementInfo::GetAccessibilityDescription,
         &ArkUI_AccessibilityElementInfo::GetAccessibilityLevel, &ArkUI_AccessibilityElementInfo::GetBackgroundColor,
         &ArkUI_AccessibilityElementInfo::GetBackgroundImage, &ArkUI_AccessibilityElementInfo::GetBlur,
         &ArkUI_AccessibilityElementInfo::GetHitTestBehavior, &ArkUI_AccessibilityElementInfo::GetComponentIdentifier };
@@ -493,16 +494,36 @@ bool JsThirdProviderInteractionOperation::FindNativeInfoById(
     return true;
 }
 
+bool ThirdAccessibilityTraversal::FindNodeInfos(JsThirdProviderInteractionOperation& operation,
+    int64_t elementId, std::list<Accessibility::AccessibilityElementInfo>& infos, bool ignoreHostOffset)
+{
+    JsThirdProviderInteractionOperation::NodeQueryOptions options;
+    options.ignoreHostOffset = ignoreHostOffset;
+    options.traversal = this;
+    return operation.FindNodeInfosFromProvider(elementId, options, infos);
+}
+
 bool JsThirdProviderInteractionOperation::FindAccessibilityNodeInfosByIdFromProvider(
     const int64_t splitElementId, const int32_t mode, const int32_t requestId,
-    std::list<Accessibility::AccessibilityElementInfo>& infos, bool ignoreHostOffset,
-    ThirdAccessibilityTraversal* traversal)
+    std::list<Accessibility::AccessibilityElementInfo>& infos, bool ignoreHostOffset)
+{
+    NodeQueryOptions options;
+    options.mode = mode;
+    options.requestId = requestId;
+    options.ignoreHostOffset = ignoreHostOffset;
+    return FindNodeInfosFromProvider(splitElementId, options, infos);
+}
+
+bool JsThirdProviderInteractionOperation::FindNodeInfosFromProvider(
+    int64_t splitElementId, const NodeQueryOptions& options,
+    std::list<Accessibility::AccessibilityElementInfo>& infos)
 {
     auto provider = accessibilityProvider_.Upgrade();
     CHECK_NULL_RETURN(provider, false);
     std::vector<ArkUI_AccessibilityElementInfo> nativeInfos;
     int32_t code = provider->FindAccessibilityNodeInfosById(
-        splitElementId, mode, requestId, nativeInfos);
+        splitElementId, options.mode, options.requestId, nativeInfos);
+    auto* traversal = options.traversal;
     if (traversal) {
         if (code != 0) {
             traversal->Record(ThirdAccessibilityTraversal::QUERY_FAILED, splitElementId);
@@ -519,7 +540,7 @@ bool JsThirdProviderInteractionOperation::FindAccessibilityNodeInfosByIdFromProv
     }
 
     NodeConfig config;
-    config.ignoreHostOffset = ignoreHostOffset;
+    config.ignoreHostOffset = options.ignoreHostOffset;
     GetNodeConfig(config);
     {
         std::lock_guard<std::mutex> lock(thirdCustomPropertiesMutex_);

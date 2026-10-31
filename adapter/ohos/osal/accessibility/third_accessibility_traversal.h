@@ -17,13 +17,19 @@
 
 #include <cstdint>
 #include <limits>
+#include <list>
 #include <utility>
 #include <string>
 #include <unordered_set>
 
 #include "base/log/log_wrapper.h"
 
+namespace OHOS::Accessibility {
+class AccessibilityElementInfo;
+}
+
 namespace OHOS::Ace::Framework {
+class JsThirdProviderInteractionOperation;
 // Request-local limits; a repeated edge also consumes work. No normal-path logging.
 class ThirdAccessibilityTraversal {
 public:
@@ -115,6 +121,9 @@ public:
         bytes_ += bytes;
         return true;
     }
+
+    bool FindNodeInfos(JsThirdProviderInteractionOperation& operation, int64_t elementId,
+        std::list<Accessibility::AccessibilityElementInfo>& infos, bool ignoreHostOffset = false);
 
     bool Exhausted() const { return (issues_ & LIMIT_EXCEEDED) != 0; }
     bool HasIssues() const { return issues_ != 0; }

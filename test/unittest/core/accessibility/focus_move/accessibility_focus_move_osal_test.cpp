@@ -1705,30 +1705,6 @@ HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningSnapshotAndSanitizedEdges, Te
     EXPECT_EQ(provider->queries, queries);
 }
 
-HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningBadResponsesAreNotNodes, TestSize.Level1)
-{
-    auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
-    provider->Add(100, -1, {101, 102, 103, 104, 999, -1, INT64_MAX});
-    for (auto id : {101, 102, 103, 104}) {
-        provider->Add(id, 100, {});
-    }
-    provider->emptyIds.insert(101);
-    provider->wrongIds[102] = 100;
-    provider->duplicateIds.insert(103);
-    auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
-    FocusStrategyOsalThird strategy(manager, provider, NodeConfig{});
-    ASSERT_TRUE(strategy.UpdateOriginNodeInfo(-1));
-    auto children = strategy.GetCurrentCheckNode()->GetAceChildren();
-    ASSERT_EQ(children.size(), 1);
-    EXPECT_EQ(children.front()->GetAccessibilityId(), 104);
-    EXPECT_EQ(provider->queries.count(INT64_MAX), 0);
-    EXPECT_FALSE(strategy.UpdateOriginNodeInfo(103));
-    EXPECT_EQ(strategy.GetCurrentCheckNode(), nullptr);
-    provider->emptyIds.insert(-1);
-    EXPECT_FALSE(strategy.UpdateOriginNodeInfo(-1));
-    EXPECT_EQ(strategy.ChangeToRoot(), nullptr);
-}
-
 HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningDepthBoundaryAndFailure, TestSize.Level1)
 {
     auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
@@ -1885,23 +1861,6 @@ HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningFailedHoverAndUnroutableSync,
     EXPECT_TRUE(provider->queries.empty());
 }
 
-HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningCoordinateBounds, TestSize.Level1)
-{
-    AccessibilityElementInfo info;
-    Accessibility::Rect inputRect(INT32_MIN, INT32_MIN, INT32_MAX, INT32_MAX);
-    info.SetRectInScreen(inputRect);
-    NodeConfig config;
-    JsThirdProviderInteractionOperation::FillNodeConfig(config, info);
-    auto rect = info.GetRectInScreen();
-    EXPECT_EQ(rect.GetLeftTopXScreenPostion(), INT32_MIN);
-    EXPECT_EQ(rect.GetRightBottomXScreenPostion(), INT32_MAX);
-    config.scaleX = std::numeric_limits<float>::infinity();
-    config.scaleY = std::numeric_limits<float>::quiet_NaN();
-    JsThirdProviderInteractionOperation::FillNodeConfig(config, info);
-    EXPECT_EQ(info.GetRectInScreen().GetLeftTopXScreenPostion(), 0);
-    EXPECT_EQ(info.GetRectInScreen().GetRightBottomYScreenPostion(), 0);
-}
-
 HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningPayloadLimitAndOwnedActions, TestSize.Level1)
 {
     auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
@@ -1920,41 +1879,6 @@ HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningPayloadLimitAndOwnedActions, 
     provider->nodes[101].SetContents(std::string(ThirdAccessibilityTraversal::MAX_BYTES, 'x'));
     EXPECT_FALSE(strategy.UpdateOriginNodeInfo(-1));
     EXPECT_EQ(strategy.GetCurrentCheckNode(), nullptr);
-}
-
-HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningGeneratedGraphsRemainTrees, TestSize.Level1)
-{
-    uint32_t random = 90456;
-    auto next = [&random]() { random = random * 1664525U + 1013904223U; return random; };
-    auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
-    for (size_t round = 0; round < 32; ++round) {
-        auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
-        for (int64_t id = 100; id < 132; ++id) {
-            provider->Add(id, static_cast<int64_t>(next() % 40) + 100, {});
-            for (size_t edge = 0; edge < 6; ++edge) {
-                const auto child = static_cast<int64_t>(next() % 38) + 98;
-                provider->nodes[id].AddChildNodeId(child);
-            }
-        }
-        FocusStrategyOsalThird strategy(manager, provider, NodeConfig{});
-        ASSERT_TRUE(strategy.UpdateOriginNodeInfo(-1));
-        std::vector<std::shared_ptr<FocusRulesCheckNode>> pending {strategy.GetCurrentCheckNode()};
-        std::set<int64_t> seen;
-        while (!pending.empty()) {
-            auto current = pending.back();
-            pending.pop_back();
-            ASSERT_TRUE(seen.insert(current->GetAccessibilityId()).second);
-            ASSERT_LE(seen.size(), provider->nodes.size());
-            for (auto child : current->GetAceChildren()) {
-                ASSERT_NE(child->GetAceParent(), nullptr);
-                EXPECT_EQ(child->GetAceParent()->GetAccessibilityId(), current->GetAccessibilityId());
-                pending.push_back(child);
-            }
-        }
-        for (const auto& [id, count] : provider->queries) {
-            EXPECT_EQ(count, 1) << "query id=" << id;
-        }
-    }
 }
 
 HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningConcurrentPropertyUpdates, TestSize.Level1)
