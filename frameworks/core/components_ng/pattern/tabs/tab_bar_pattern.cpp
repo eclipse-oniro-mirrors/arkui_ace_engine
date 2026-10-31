@@ -4009,6 +4009,21 @@ bool TabBarPattern::OnThemeScopeUpdate(int32_t themeScopeId)
 
     auto tabTheme = host->GetTheme<TabTheme>(true);
     InitTabBarProperties(tabTheme);
+    auto layoutProperty = host->GetLayoutProperty<TabBarLayoutProperty>();
+    auto indicator = layoutProperty ? layoutProperty->GetIndicatorValue(0) : 0;
+    // Clear cached label/icon colors so that UpdateTextColorAndFontWeight and
+    // UpdateImageColor fall back to reading the latest theme colors.
+    for (auto& [id, style] : labelStyles_) {
+        style.selectedColor.reset();
+        style.unselectedColor.reset();
+    }
+    for (auto& style : iconStyles_) {
+        style.selectedColor.reset();
+        style.unselectedColor.reset();
+    }
+    UpdateTextColorAndFontWeight(indicator);
+    UpdateImageColor(indicator);
+    host->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
     return false;
 }
 

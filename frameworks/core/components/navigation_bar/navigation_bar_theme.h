@@ -501,6 +501,10 @@ public:
     {
         return backgroundFocusOutlineColor_;
     }
+    void SetBackgroundFocusOutlineColor(const Color& color)
+    {
+        backgroundFocusOutlineColor_ = color;
+    }
     const Dimension& GetBackgroundFocusOutlineWeight() const
     {
         return backgroundFocusOutlineWeight_;
