@@ -28,6 +28,9 @@ struct ArkUITreeOptions {
     bool accessibility = false;
     bool visual = false;
     bool functional = false;
+    // Occlusion filtering applies to VISIBLE collections only and is off by default.
+    bool filterOccludedNodes = false;
+    float occlusionOpacityThreshold = 1.0f;
 };
 
 struct ArkUITreeCompletion {

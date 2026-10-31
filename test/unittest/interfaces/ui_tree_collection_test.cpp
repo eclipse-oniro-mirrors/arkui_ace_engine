@@ -15,6 +15,7 @@
 #include <array>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <string>
 
 #include "gtest/gtest.h"
@@ -168,6 +169,18 @@ void CheckConfiguration(ArkUI_Context& context, size_t index)
     CheckCapturedOptions(snapshot, mask);
 }
 
+// Runs production collection so the options reaching the shared-library boundary are observable.
+ArkUITreeOptions CaptureOptions(OH_ArkUI_NativeModule_UIAgentTreeRequest* request)
+{
+    ArkUI_Context context { TEST_CONTEXT_ID };
+    OH_ArkUI_NativeModule_UIJsonWrapper* result = nullptr;
+    EXPECT_EQ(
+        OH_ArkUI_NativeModule_UIAgentGetTreeJson(&context, request, OH_ARKUI_NATIVE_MODULE_UI_JSON_COMPACT, &result),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    OH_ArkUI_NativeModule_UIJsonWrapperDestroy(result);
+    return captured;
+}
+
 } // namespace
 namespace OHOS::Ace::NodeModel {
 const ArkUITreeAPI* GetTreeAPI()
@@ -267,4 +280,114 @@ HWTEST_F(UITreeCollectionTest, DefaultsAndFailuresDoNotReturnPartialWrapper, Tes
         EXPECT_TRUE(callbackPayload.empty());
     }
     OH_ArkUI_NativeModule_UIAgentTreeRequestDestroy(request);
+}
+
+HWTEST_F(UITreeCollectionTest, OcclusionSettersValidateRequestAndTreeType, TestSize.Level1)
+{
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIAgentTreeRequestSetFilterOccludedNodes(nullptr, true),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIAgentTreeRequestSetOcclusionOpacityThreshold(nullptr, 0.5f),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+
+    OH_ArkUI_NativeModule_UIAgentTreeRequest* request = nullptr;
+    ASSERT_EQ(OH_ArkUI_NativeModule_UIAgentTreeRequestCreate(OH_ARKUI_NATIVE_MODULE_UI_AGENT_TREE_FULL, &request),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIAgentTreeRequestSetFilterOccludedNodes(request, true),
+        ARKUI_ERROR_CODE_ATTRIBUTE_OR_EVENT_NOT_SUPPORTED);
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIAgentTreeRequestSetOcclusionOpacityThreshold(request, 0.5f),
+        ARKUI_ERROR_CODE_ATTRIBUTE_OR_EVENT_NOT_SUPPORTED);
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIAgentTreeRequestSetFilterOccludedNodes(request, false),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    auto options = CaptureOptions(request);
+    EXPECT_FALSE(options.filterOccludedNodes);
+    EXPECT_FLOAT_EQ(options.occlusionOpacityThreshold, 1.0f);
+    OH_ArkUI_NativeModule_UIAgentTreeRequestDestroy(request);
+
+    ASSERT_EQ(OH_ArkUI_NativeModule_UIAgentTreeRequestCreate(OH_ARKUI_NATIVE_MODULE_UI_AGENT_TREE_VISIBLE, &request),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    options = CaptureOptions(request);
+    EXPECT_FALSE(options.filterOccludedNodes);
+    EXPECT_FLOAT_EQ(options.occlusionOpacityThreshold, 1.0f);
+    OH_ArkUI_NativeModule_UIAgentTreeRequestDestroy(request);
+}
+
+HWTEST_F(UITreeCollectionTest, OcclusionThresholdRangeAndRejectionAtomicity, TestSize.Level1)
+{
+    OH_ArkUI_NativeModule_UIAgentTreeRequest* request = nullptr;
+    ASSERT_EQ(OH_ArkUI_NativeModule_UIAgentTreeRequestCreate(OH_ARKUI_NATIVE_MODULE_UI_AGENT_TREE_VISIBLE, &request),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    for (auto threshold : { 0.0f, 0.25f, 0.5f, 1.0f }) {
+        SCOPED_TRACE(threshold);
+        EXPECT_EQ(OH_ArkUI_NativeModule_UIAgentTreeRequestSetOcclusionOpacityThreshold(request, threshold),
+            ARKUI_ERROR_CODE_NO_ERROR);
+        EXPECT_FLOAT_EQ(CaptureOptions(request).occlusionOpacityThreshold, threshold);
+    }
+    ASSERT_EQ(OH_ArkUI_NativeModule_UIAgentTreeRequestSetOcclusionOpacityThreshold(request, 0.25f),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    for (auto invalid : { -1.0f, -0.5f, 1.5f, 2.0f, std::numeric_limits<float>::quiet_NaN(),
+        std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity() }) {
+        SCOPED_TRACE(invalid);
+        EXPECT_EQ(OH_ArkUI_NativeModule_UIAgentTreeRequestSetOcclusionOpacityThreshold(request, invalid),
+            ARKUI_ERROR_CODE_PARAM_OUT_OF_RANGE);
+        EXPECT_FLOAT_EQ(CaptureOptions(request).occlusionOpacityThreshold, 0.25f);
+    }
+    OH_ArkUI_NativeModule_UIAgentTreeRequestDestroy(request);
+}
+
+HWTEST_F(UITreeCollectionTest, OcclusionErrorPrecedence, TestSize.Level1)
+{
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIAgentTreeRequestSetOcclusionOpacityThreshold(nullptr, 2.0f),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    OH_ArkUI_NativeModule_UIAgentTreeRequest* request = nullptr;
+    ASSERT_EQ(OH_ArkUI_NativeModule_UIAgentTreeRequestCreate(OH_ARKUI_NATIVE_MODULE_UI_AGENT_TREE_FULL, &request),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIAgentTreeRequestSetOcclusionOpacityThreshold(request, 2.0f),
+        ARKUI_ERROR_CODE_PARAM_OUT_OF_RANGE);
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIAgentTreeRequestSetOcclusionOpacityThreshold(request, 0.5f),
+        ARKUI_ERROR_CODE_ATTRIBUTE_OR_EVENT_NOT_SUPPORTED);
+    EXPECT_FLOAT_EQ(CaptureOptions(request).occlusionOpacityThreshold, 1.0f);
+    OH_ArkUI_NativeModule_UIAgentTreeRequestDestroy(request);
+}
+
+HWTEST_F(UITreeCollectionTest, OcclusionSettingsReachSyncAndAsyncCollection, TestSize.Level1)
+{
+    ArkUI_Context context { TEST_CONTEXT_ID };
+    OH_ArkUI_NativeModule_UIAgentTreeRequest* request = nullptr;
+    ASSERT_EQ(OH_ArkUI_NativeModule_UIAgentTreeRequestCreate(OH_ARKUI_NATIVE_MODULE_UI_AGENT_TREE_VISIBLE, &request),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIAgentTreeRequestSetOcclusionOpacityThreshold(request, 0.6f),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    auto options = CaptureOptions(request);
+    EXPECT_FALSE(options.filterOccludedNodes);
+    EXPECT_FLOAT_EQ(options.occlusionOpacityThreshold, 0.6f);
+
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIAgentTreeRequestSetFilterOccludedNodes(request, true),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    options = CaptureOptions(request);
+    EXPECT_TRUE(options.filterOccludedNodes);
+    EXPECT_FLOAT_EQ(options.occlusionOpacityThreshold, 0.6f);
+
+    uint64_t id = 0;
+    ASSERT_EQ(OH_ArkUI_NativeModule_UIAgentGetTreeJsonAsync(
+                  &context, request, OH_ARKUI_NATIVE_MODULE_UI_JSON_COMPACT, Callback, &context, &id),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    const auto snapshot = captured;
+    EXPECT_TRUE(snapshot.filterOccludedNodes);
+    EXPECT_FLOAT_EQ(snapshot.occlusionOpacityThreshold, 0.6f);
+
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIAgentTreeRequestSetFilterOccludedNodes(request, false),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_FALSE(CaptureOptions(request).filterOccludedNodes);
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIAgentTreeRequestSetFilterOccludedNodes(request, true),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    options = CaptureOptions(request);
+    EXPECT_TRUE(options.filterOccludedNodes);
+    EXPECT_FLOAT_EQ(options.occlusionOpacityThreshold, 0.6f);
+
+    OH_ArkUI_NativeModule_UIAgentTreeRequestDestroy(request);
+    accepted.deliver(accepted, id, ARKUI_ERROR_CODE_NO_ERROR, PAYLOAD, std::strlen(PAYLOAD));
+    EXPECT_EQ(callbacks, 1);
+    EXPECT_EQ(callbackId, id);
+    EXPECT_TRUE(snapshot.filterOccludedNodes);
+    EXPECT_FLOAT_EQ(snapshot.occlusionOpacityThreshold, 0.6f);
 }

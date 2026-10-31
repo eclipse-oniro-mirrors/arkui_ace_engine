@@ -3546,6 +3546,8 @@ void InitializeTreeRequest(
     state.accessibility = options.accessibility;
     state.visual = options.visual;
     state.functional = options.functional;
+    state.filterOccludedNodes = options.filterOccludedNodes;
+    state.occlusionOpacityThreshold = options.occlusionOpacityThreshold;
     state.deliver = [completion](uint64_t requestId, int32_t result, const char* data, uint32_t size) {
         ArkUITreeCompletion copy = completion;
         copy.deliver(copy, requestId, result, data, size);
@@ -3565,6 +3567,8 @@ ArkUITreeOptions GetPendingTreeOptions(const UITreeRequestState& pending)
     options.accessibility = pending.accessibility;
     options.visual = pending.visual;
     options.functional = pending.functional;
+    options.filterOccludedNodes = pending.filterOccludedNodes;
+    options.occlusionOpacityThreshold = pending.occlusionOpacityThreshold;
     return options;
 }
 
@@ -3607,6 +3611,9 @@ ParamConfig CreateTreeConfig(const ArkUITreeOptions& options, TreeCollectionStat
     config.filterPureLayout = options.filterPureLayout;
     config.visualProperties = options.visual;
     config.functionalProperties = options.functional;
+    // Only a VISIBLE request can enable occlusion; the setters reject it for FULL requests.
+    config.filterOccludedNodes = !config.cacheNodes && options.filterOccludedNodes;
+    config.occlusionOpacityThreshold = options.occlusionOpacityThreshold;
     config.collectionState = &state;
     config.dumpMode = TreeDumpMode::PUBLIC_TREE;
     return config;
@@ -3626,6 +3633,15 @@ bool ShouldPruneNode(
 {
     if (!config.collectionState || !visible || !node) {
         return false;
+    }
+    if (config.collectionState->occlusionEnabled) {
+        const auto& decisions = config.collectionState->occlusionDecisions;
+        const auto& keepIds = config.collectionState->occlusionKeepIds;
+        auto occluded = decisions.find(node->GetId());
+        if (occluded != decisions.end() && occluded->second == OcclusionDecision::OCCLUDED &&
+            keepIds.find(node->GetId()) == keepIds.end()) {
+            return true;
+        }
     }
     auto& snapshots = config.collectionState->visibility;
     if (auto found = snapshots.find(AceType::RawPtr(node)); found != snapshots.end()) {

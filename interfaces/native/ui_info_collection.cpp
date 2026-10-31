@@ -14,6 +14,7 @@
  */
 #include "ui_info_collection.h"
 
+#include <cmath>
 #include <new>
 
 #include "core/interfaces/native/node/content_change_api.h"
@@ -163,6 +164,36 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_UIAgentTreeRequestSetFilterPureLayoutNodes
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
     request->options.filterPureLayout = enabled;
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIAgentTreeRequestSetFilterOccludedNodes(
+    OH_ArkUI_NativeModule_UIAgentTreeRequest* request, bool enabled)
+{
+    if (!request) {
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    if (request->options.treeType == OH_ARKUI_NATIVE_MODULE_UI_AGENT_TREE_FULL) {
+        return enabled ? ARKUI_ERROR_CODE_ATTRIBUTE_OR_EVENT_NOT_SUPPORTED : ARKUI_ERROR_CODE_NO_ERROR;
+    }
+    request->options.filterOccludedNodes = enabled;
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIAgentTreeRequestSetOcclusionOpacityThreshold(
+    OH_ArkUI_NativeModule_UIAgentTreeRequest* request, float threshold)
+{
+    if (!request) {
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    // Validate the value before the tree type so that an out-of-range threshold is always reported as such.
+    if (!std::isfinite(threshold) || threshold < 0.0f || threshold > 1.0f) {
+        return ARKUI_ERROR_CODE_PARAM_OUT_OF_RANGE;
+    }
+    if (request->options.treeType == OH_ARKUI_NATIVE_MODULE_UI_AGENT_TREE_FULL) {
+        return ARKUI_ERROR_CODE_ATTRIBUTE_OR_EVENT_NOT_SUPPORTED;
+    }
+    request->options.occlusionOpacityThreshold = threshold;
     return ARKUI_ERROR_CODE_NO_ERROR;
 }
 
