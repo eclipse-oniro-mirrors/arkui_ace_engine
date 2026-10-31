@@ -123,6 +123,7 @@ HWTEST_F(PreviewTextDecorationUtilsTest, DrawPreviewTextUnderline_DashLineStyle_
     EXPECT_CALL(canvas, DrawLine(_, _)).Times(AtLeast(1));
     EXPECT_CALL(canvas, AttachPen(_)).WillRepeatedly(ReturnRef(canvas));
     EXPECT_CALL(canvas, DetachPen()).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, DetachBrush()).WillRepeatedly(ReturnRef(canvas));
 
     PreviewDecorationParams params;
     params.left = TEST_LEFT;
@@ -272,6 +273,7 @@ HWTEST_F(PreviewTextDecorationUtilsTest, DrawDashLineUnderline_ShortWidth_010, T
     EXPECT_CALL(canvas, DrawLine(_, _)).Times(1);
     EXPECT_CALL(canvas, AttachPen(_)).WillRepeatedly(ReturnRef(canvas));
     EXPECT_CALL(canvas, DetachPen()).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, DetachBrush()).WillRepeatedly(ReturnRef(canvas));
 
     PreviewDecorationParams params;
     params.left = 10.0f;
@@ -296,6 +298,7 @@ HWTEST_F(PreviewTextDecorationUtilsTest, DrawDashLineUnderline_LongWidth_Multipl
     EXPECT_CALL(canvas, DrawLine(_, _)).Times(AtLeast(2));
     EXPECT_CALL(canvas, AttachPen(_)).WillRepeatedly(ReturnRef(canvas));
     EXPECT_CALL(canvas, DetachPen()).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, DetachBrush()).WillRepeatedly(ReturnRef(canvas));
 
     PreviewDecorationParams params;
     params.left = 0.0f;
@@ -398,6 +401,7 @@ HWTEST_F(PreviewTextDecorationUtilsTest, DrawDashLineUnderline_LeftGeRight_015, 
     EXPECT_CALL(canvas, DrawLine(_, _)).Times(0);
     EXPECT_CALL(canvas, AttachPen(_)).WillRepeatedly(ReturnRef(canvas));
     EXPECT_CALL(canvas, DetachPen()).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, DetachBrush()).WillRepeatedly(ReturnRef(canvas));
 
     PreviewDecorationParams params;
     params.left = TEST_RIGHT;
@@ -591,7 +595,7 @@ HWTEST_F(PreviewTextDecorationUtilsTest, DrawWavyUnderline_StartOffsetMidHalfWav
 HWTEST_F(PreviewTextDecorationUtilsTest, DrawDashLineUnderline_DetachesCallerBrush_021, TestSize.Level0)
 {
     Testing::MockCanvas canvas;
-    EXPECT_CALL(canvas, DetachBrush()).Times(AtLeast(1));
+    EXPECT_CALL(canvas, DetachBrush()).Times(AtLeast(1)).WillRepeatedly(ReturnRef(canvas));
     EXPECT_CALL(canvas, DrawLine(_, _)).Times(AnyNumber());
     EXPECT_CALL(canvas, AttachPen(_)).WillRepeatedly(ReturnRef(canvas));
     EXPECT_CALL(canvas, DetachPen()).WillRepeatedly(ReturnRef(canvas));
