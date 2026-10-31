@@ -1399,9 +1399,11 @@ HWTEST_F(AccessibilityFocusMoveTest, FocusStrategyOsalNGCheckReadableToRoot001, 
 }
 
 namespace {
+constexpr int64_t FOCUS_DUMP_HOST_ID = 100;
+
 class FocusDumpChildCallback : public AccessibilityChildTreeCallback {
 public:
-    FocusDumpChildCallback() : AccessibilityChildTreeCallback(100) {}
+    FocusDumpChildCallback() : AccessibilityChildTreeCallback(FOCUS_DUMP_HOST_ID) {}
     bool OnRegister(uint32_t, int32_t) override { return true; }
     bool OnDeregister() override { return true; }
     bool OnSetChildTree(int32_t, int32_t) override { return true; }
@@ -1662,7 +1664,7 @@ HWTEST_F(AccessibilityFocusMoveTest, FocusDumpChildTreeDispatchAndUnknownTree, T
     manager->treeId_ = 7;
     auto childCallback = std::make_shared<FocusDumpChildCallback>();
     childCallback->SetChildTreeId(8);
-    manager->childTreeCallbackMap_[100] = childCallback;
+    manager->childTreeCallbackMap_[FOCUS_DUMP_HOST_ID] = childCallback;
     int64_t childId = 101;
     AccessibilitySystemAbilityClient::SetSplicElementIdTreeId(8, childId);
     std::vector<std::string> params {
@@ -1894,7 +1896,7 @@ HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningConcurrentPropertyUpdates, Te
     auto property = AceType::MakeRefPtr<NG::CustomAccessibilityProperty>();
     property->SetAccessibilityText("override");
     std::atomic<bool> start { false };
-    std::thread writer([&] {
+    std::thread writer([&start, operation, property] {
         while (!start.load()) {
             std::this_thread::yield();
         }
@@ -1928,7 +1930,7 @@ HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningConcurrentProviderRegistratio
     auto host = NG::FrameNode::CreateFrameNode("XComponent", 200, AceType::MakeRefPtr<NG::Pattern>());
     auto operation = std::make_shared<JsThirdProviderInteractionOperation>(provider, manager, host);
     std::atomic<bool> start { false };
-    std::thread writer([&] {
+    std::thread writer([&start, manager, operation] {
         while (!start.load()) {
             std::this_thread::yield();
         }

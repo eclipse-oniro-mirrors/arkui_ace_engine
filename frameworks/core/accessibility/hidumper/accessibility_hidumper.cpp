@@ -14,7 +14,10 @@
  */
 
 
+#include <algorithm>
 #include <charconv>
+#include <initializer_list>
+#include <iterator>
 
 #include "base/log/dump_log.h"
 #include "core/accessibility/hidumper/accessibility_hidumper.h"
@@ -22,34 +25,89 @@
 
 namespace OHOS::Ace {
 
-bool AccessibilityHidumper::ParseThirdFocusSearch(
-    const std::vector<std::string>& params, DumpInfoArgument& argument)
+namespace {
+constexpr size_t FOCUS_SEARCH_COMMAND_INDEX = 1;
+constexpr size_t FOCUS_SEARCH_VALUES_BEGIN = FOCUS_SEARCH_COMMAND_INDEX + 1;
+
+// Dump protocol values mirror accessibility_def.h without an OHOS dependency in cross-platform core code.
+enum class DumpFocusDirection : int64_t {
+    FORWARD = 16,
+    BACKWARD = 32,
+    FIND_LAST = 64,
+    GET_FORWARD_SCROLL_ANCESTOR = 128,
+    GET_BACKWARD_SCROLL_ANCESTOR = 256,
+    GET_SCROLLABLE_ANCESTOR = 512,
+};
+enum class DumpFocusRule : int64_t {
+    DEFAULT = 1,
+    FOCUS_BY_LINK = 2,
+    FOCUS_BY_TITLE = 3,
+};
+enum class DumpFocusCondition : int64_t {
+    BYPASS_SELF = 1,
+    BYPASS_SELF_DESCENDANTS = 2,
+    CHECK_SELF = 4,
+    CHECK_SELF_BYPASS_DESCENDANTS = 8,
+};
+
+struct FocusSearchValues {
+    int64_t nodeId = -1;
+    int64_t direction = 0;
+    int64_t rule = 0;
+    int64_t condition = 0;
+};
+
+template<typename Enum>
+bool IsSupportedFocusValue(int64_t value, std::initializer_list<Enum> supported)
 {
-    constexpr size_t parameterCount = 6;
-    if (params.size() != parameterCount || params[1] != "--third-focus-search") {
+    return std::any_of(supported.begin(), supported.end(), [value](Enum candidate) {
+        return value == static_cast<int64_t>(candidate);
+    });
+}
+
+bool ParseFocusSearchValues(const std::vector<std::string>& params, FocusSearchValues& values)
+{
+    int64_t* fields[] = { &values.nodeId, &values.direction, &values.rule, &values.condition };
+    if (params.size() != FOCUS_SEARCH_VALUES_BEGIN + std::size(fields) ||
+        params[FOCUS_SEARCH_COMMAND_INDEX] != "--third-focus-search") {
         DumpLog::GetInstance().Print(
             "Usage: -accessibility --third-focus-search <splicedId> <direction:16|32|64|128|256|512> "
             "<rule:1|2|3> <condition:1|2|4|8>");
         return false;
     }
-    int64_t values[4] = {};
-    for (size_t i = 0; i < 4; ++i) {
-        const auto& text = params[i + 2];
-        auto result = std::from_chars(text.data(), text.data() + text.size(), values[i]);
+    auto arg = params.begin() + FOCUS_SEARCH_VALUES_BEGIN;
+    for (auto* field : fields) {
+        const auto& text = *arg;
+        auto result = std::from_chars(text.data(), text.data() + text.size(), *field);
         if (result.ec != std::errc() || result.ptr != text.data() + text.size()) {
             return false;
         }
+        ++arg;
     }
-    if (values[0] < 0 || (values[1] != 16 && values[1] != 32 && values[1] != 64 &&
-        values[1] != 128 && values[1] != 256 && values[1] != 512) || values[2] < 1 || values[2] > 3 ||
-        (values[3] != 1 && values[3] != 2 && values[3] != 4 && values[3] != 8)) {
+    return true;
+}
+} // namespace
+
+bool AccessibilityHidumper::ParseThirdFocusSearch(
+    const std::vector<std::string>& params, DumpInfoArgument& argument)
+{
+    FocusSearchValues values;
+    if (!ParseFocusSearchValues(params, values) || values.nodeId < 0 ||
+        !IsSupportedFocusValue(values.direction, { DumpFocusDirection::FORWARD, DumpFocusDirection::BACKWARD,
+            DumpFocusDirection::FIND_LAST, DumpFocusDirection::GET_FORWARD_SCROLL_ANCESTOR,
+            DumpFocusDirection::GET_BACKWARD_SCROLL_ANCESTOR, DumpFocusDirection::GET_SCROLLABLE_ANCESTOR }) ||
+        !IsSupportedFocusValue(values.rule,
+            { DumpFocusRule::DEFAULT, DumpFocusRule::FOCUS_BY_LINK, DumpFocusRule::FOCUS_BY_TITLE }) ||
+        !IsSupportedFocusValue(values.condition, { DumpFocusCondition::BYPASS_SELF,
+            DumpFocusCondition::BYPASS_SELF_DESCENDANTS, DumpFocusCondition::CHECK_SELF,
+            DumpFocusCondition::CHECK_SELF_BYPASS_DESCENDANTS })) {
         return false;
     }
     argument.mode = DumpMode::THIRD_FOCUS_SEARCH;
-    argument.nodeId = values[0];
-    argument.focusDirection = static_cast<int32_t>(values[1]);
-    argument.focusMoveRule = static_cast<int32_t>(values[2]);
-    argument.focusCondition = static_cast<int32_t>(values[3]);
+    argument.nodeId = values.nodeId;
+    argument.focusDirection = static_cast<int32_t>(values.direction);
+    argument.focusMoveRule = static_cast<int32_t>(values.rule);
+    argument.focusCondition = static_cast<int32_t>(values.condition);
     return true;
 }
 

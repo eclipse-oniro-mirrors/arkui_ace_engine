@@ -774,6 +774,35 @@ bool ParseGetCustomPropertyParamsTest(std::vector<std::string>::const_iterator& 
     return true;
 }
 
+bool ParseDumpRootArgument(std::vector<std::string>::const_iterator& arg,
+    const std::vector<std::string>& params, DumpInfoArgument& argument)
+{
+    ++arg;
+    if (arg == params.end()) {
+        DumpLog::GetInstance().Print(std::string("Error: --root is used to set the root node, ") +
+            "e.g. '--root ${AccessibilityId}'!");
+        return false;
+    }
+    argument.rootId = StringUtils::StringToLongInt(*arg);
+    return true;
+}
+
+bool ParseDumpHoverArgument(std::vector<std::string>::const_iterator& arg,
+    const std::vector<std::string>& params, DumpInfoArgument& argument)
+{
+    argument.mode = DumpMode::HOVER_TEST;
+    if (std::distance(arg, params.end()) <= NUM_POINT_DIMENSION) {
+        DumpLog::GetInstance().Print(std::string("Error: --hover-test is used to get nodes at a point ") +
+            "relative to the root node, e.g. '--hover-test ${x} ${y}'!");
+        return false;
+    }
+    ++arg;
+    argument.pointX = StringUtils::StringToInt(*arg);
+    ++arg;
+    argument.pointY = StringUtils::StringToInt(*arg);
+    return true;
+}
+
 bool GetDumpInfoArgument(const std::vector<std::string>& params, DumpInfoArgument& argument)
 {
     if (params.empty()) {
@@ -787,24 +816,13 @@ bool GetDumpInfoArgument(const std::vector<std::string>& params, DumpInfoArgumen
         if (*arg == "-w") {
             argument.useWindowId = true;
         } else if (*arg == "--root") {
-            ++arg;
-            if (arg == params.end()) {
-                DumpLog::GetInstance().Print(std::string("Error: --root is used to set the root node, ") +
-                    "e.g. '--root ${AccessibilityId}'!");
+            if (!ParseDumpRootArgument(arg, params, argument)) {
                 return false;
             }
-            argument.rootId = StringUtils::StringToLongInt(*arg);
         } else if (*arg == "--hover-test") {
-            argument.mode = DumpMode::HOVER_TEST;
-            if (std::distance(arg, params.end()) <= NUM_POINT_DIMENSION) {
-                DumpLog::GetInstance().Print(std::string("Error: --hover-test is used to get nodes at a point ") +
-                    "relative to the root node, e.g. '--hover-test ${x} ${y}'!");
+            if (!ParseDumpHoverArgument(arg, params, argument)) {
                 return false;
             }
-            ++arg;
-            argument.pointX = StringUtils::StringToInt(*arg);
-            ++arg;
-            argument.pointY = StringUtils::StringToInt(*arg);
         } else if (*arg == "-v") {
             argument.verbose = true;
         } else if (*arg == "-json") {
