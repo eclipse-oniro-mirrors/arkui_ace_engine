@@ -193,6 +193,7 @@ uint32_t ParseColor(const ArkUI_AttributeItem* item, int32_t index, bool& isColo
 
 ArkUI_NativeDialogHandle Create()
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_1.create");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return nullptr;
@@ -203,6 +204,7 @@ ArkUI_NativeDialogHandle Create()
 
 void Dispose(ArkUI_NativeDialogHandle handle)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_1.dispose");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return;
@@ -218,6 +220,7 @@ void Dispose(ArkUI_NativeDialogHandle handle)
 
 int32_t SetContent(ArkUI_NativeDialogHandle handle, ArkUI_NodeHandle content)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_1.setContent");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ERROR_CODE_PARAM_INVALID;
@@ -234,6 +237,7 @@ int32_t SetContent(ArkUI_NativeDialogHandle handle, ArkUI_NodeHandle content)
 
 int32_t RemoveContent(ArkUI_NativeDialogHandle handle)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_1.removeContent");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ERROR_CODE_PARAM_INVALID;
@@ -248,6 +252,7 @@ int32_t RemoveContent(ArkUI_NativeDialogHandle handle)
 
 int32_t SetContentAlignment(ArkUI_NativeDialogHandle handle, int32_t alignment, float offsetX, float offsetY)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_1.setContentAlignment");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ERROR_CODE_PARAM_INVALID;
@@ -263,6 +268,7 @@ int32_t SetContentAlignment(ArkUI_NativeDialogHandle handle, int32_t alignment, 
 
 int32_t ResetContentAlignment(ArkUI_NativeDialogHandle handle)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_1.resetContentAlignment");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ERROR_CODE_PARAM_INVALID;
@@ -277,6 +283,7 @@ int32_t ResetContentAlignment(ArkUI_NativeDialogHandle handle)
 
 int32_t SetModalMode(ArkUI_NativeDialogHandle handle, bool isModal)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_1.setModalMode");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ERROR_CODE_PARAM_INVALID;
@@ -291,6 +298,7 @@ int32_t SetModalMode(ArkUI_NativeDialogHandle handle, bool isModal)
 
 int32_t SetAutoCancel(ArkUI_NativeDialogHandle handle, bool autoCancel)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_1.setAutoCancel");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ERROR_CODE_PARAM_INVALID;
@@ -305,6 +313,7 @@ int32_t SetAutoCancel(ArkUI_NativeDialogHandle handle, bool autoCancel)
 
 int32_t SetMask(ArkUI_NativeDialogHandle handle, uint32_t maskColor, const ArkUI_Rect* maskRect)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_1.setMask");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ERROR_CODE_PARAM_INVALID;
@@ -328,6 +337,7 @@ int32_t SetMask(ArkUI_NativeDialogHandle handle, uint32_t maskColor, const ArkUI
 
 int32_t SetBackgroundColor(ArkUI_NativeDialogHandle handle, uint32_t backgroundColor)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_1.setBackgroundColor");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ERROR_CODE_PARAM_INVALID;
@@ -343,6 +353,7 @@ int32_t SetBackgroundColor(ArkUI_NativeDialogHandle handle, uint32_t backgroundC
 int32_t SetCornerRadius(ArkUI_NativeDialogHandle handle, float topLeft, float topRight,
     float bottomLeft, float bottomRight)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_1.setCornerRadius");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ERROR_CODE_PARAM_INVALID;
@@ -358,6 +369,7 @@ int32_t SetCornerRadius(ArkUI_NativeDialogHandle handle, float topLeft, float to
 
 int32_t SetGridColumnCount(ArkUI_NativeDialogHandle handle, int32_t gridCount)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_1.setGridColumnCount");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ERROR_CODE_PARAM_INVALID;
@@ -372,6 +384,7 @@ int32_t SetGridColumnCount(ArkUI_NativeDialogHandle handle, int32_t gridCount)
 
 int32_t EnableCustomStyle(ArkUI_NativeDialogHandle handle, bool enableCustomStyle)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_1.enableCustomStyle");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ERROR_CODE_PARAM_INVALID;
@@ -386,6 +399,7 @@ int32_t EnableCustomStyle(ArkUI_NativeDialogHandle handle, bool enableCustomStyl
 
 int32_t EnableCustomAnimation(ArkUI_NativeDialogHandle handle, bool enableCustomAnimation)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_1.enableCustomAnimation");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ERROR_CODE_PARAM_INVALID;
@@ -400,6 +414,7 @@ int32_t EnableCustomAnimation(ArkUI_NativeDialogHandle handle, bool enableCustom
 
 int32_t Show(ArkUI_NativeDialogHandle handle, bool showInSubWindow)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_1.show");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ERROR_CODE_PARAM_INVALID;
@@ -414,6 +429,7 @@ int32_t Show(ArkUI_NativeDialogHandle handle, bool showInSubWindow)
 
 int32_t Close(ArkUI_NativeDialogHandle handle)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_1.close");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ERROR_CODE_PARAM_INVALID;
@@ -428,6 +444,7 @@ int32_t Close(ArkUI_NativeDialogHandle handle)
 
 int32_t RegisterOnWillDismiss(ArkUI_NativeDialogHandle handle, ArkUI_OnWillDismissEvent eventHandler)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_1.registerOnWillDismiss");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ERROR_CODE_PARAM_INVALID;
@@ -443,6 +460,7 @@ int32_t RegisterOnWillDismiss(ArkUI_NativeDialogHandle handle, ArkUI_OnWillDismi
 int32_t RegisterOnWillDismissWithUserData(
     ArkUI_NativeDialogHandle handle, void* userData, void (*callback)(ArkUI_DialogDismissEvent* event))
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_1.registerOnWillDismissWithUserData");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ERROR_CODE_PARAM_INVALID;
@@ -458,6 +476,7 @@ int32_t RegisterOnWillDismissWithUserData(
 int32_t SetKeyboardAvoidDistance(
     ArkUI_NativeDialogHandle handle, float distance, ArkUI_LengthMetricUnit unit)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_2.setKeyboardAvoidDistance");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ARKUI_ERROR_CODE_CAPI_INIT_ERROR;
@@ -476,6 +495,7 @@ int32_t SetKeyboardAvoidDistance(
 
 int32_t SetLevelMode(ArkUI_NativeDialogHandle handle, ArkUI_LevelMode levelMode)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_2.setLevelMode");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ARKUI_ERROR_CODE_CAPI_INIT_ERROR;
@@ -495,6 +515,7 @@ int32_t SetLevelMode(ArkUI_NativeDialogHandle handle, ArkUI_LevelMode levelMode)
 
 int32_t SetLevelUniqueId(ArkUI_NativeDialogHandle handle, int32_t uniqueId)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_2.setLevelUniqueId");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ARKUI_ERROR_CODE_CAPI_INIT_ERROR;
@@ -512,6 +533,7 @@ int32_t SetLevelUniqueId(ArkUI_NativeDialogHandle handle, int32_t uniqueId)
 
 int32_t SetImmersiveMode(ArkUI_NativeDialogHandle handle, ArkUI_ImmersiveMode immersiveMode)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_2.setImmersiveMode");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ARKUI_ERROR_CODE_CAPI_INIT_ERROR;
@@ -531,6 +553,7 @@ int32_t SetImmersiveMode(ArkUI_NativeDialogHandle handle, ArkUI_ImmersiveMode im
 
 int32_t SetLevelOrder(ArkUI_NativeDialogHandle handle, double levelOrder)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_3.setLevelOrder");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ARKUI_ERROR_CODE_CAPI_INIT_ERROR;
@@ -549,6 +572,7 @@ int32_t SetLevelOrder(ArkUI_NativeDialogHandle handle, double levelOrder)
 
 int32_t RegisterOnWillAppear(ArkUI_NativeDialogHandle handle, void* userData, void (*callback)(void* userData))
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_3.registerOnWillAppear");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ERROR_CODE_PARAM_INVALID;
@@ -563,6 +587,7 @@ int32_t RegisterOnWillAppear(ArkUI_NativeDialogHandle handle, void* userData, vo
 
 int32_t RegisterOnDidAppear(ArkUI_NativeDialogHandle handle, void* userData, void (*callback)(void* userData))
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_3.registerOnDidAppear");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ERROR_CODE_PARAM_INVALID;
@@ -577,6 +602,7 @@ int32_t RegisterOnDidAppear(ArkUI_NativeDialogHandle handle, void* userData, voi
 
 int32_t RegisterOnWillDisappear(ArkUI_NativeDialogHandle handle, void* userData, void (*callback)(void* userData))
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_3.registerOnWillDisappear");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ERROR_CODE_PARAM_INVALID;
@@ -591,6 +617,7 @@ int32_t RegisterOnWillDisappear(ArkUI_NativeDialogHandle handle, void* userData,
 
 int32_t RegisterOnDidDisappear(ArkUI_NativeDialogHandle handle, void* userData, void (*callback)(void* userData))
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_3.registerOnDidDisappear");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ERROR_CODE_PARAM_INVALID;
@@ -606,6 +633,7 @@ int32_t RegisterOnDidDisappear(ArkUI_NativeDialogHandle handle, void* userData, 
 int32_t SetBorderWidth(
     ArkUI_NativeDialogHandle handle, float top, float right, float bottom, float left, ArkUI_LengthMetricUnit unit)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_3.setBorderWidth");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -624,6 +652,7 @@ int32_t SetBorderWidth(
 
 int32_t SetBorderColor(ArkUI_NativeDialogHandle handle, uint32_t top, uint32_t right, uint32_t bottom, uint32_t left)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_3.setBorderColor");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -638,6 +667,7 @@ int32_t SetBorderColor(ArkUI_NativeDialogHandle handle, uint32_t top, uint32_t r
 
 int32_t SetBorderStyle(ArkUI_NativeDialogHandle handle, int32_t top, int32_t right, int32_t bottom, int32_t left)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_3.setBorderStyle");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -652,6 +682,7 @@ int32_t SetBorderStyle(ArkUI_NativeDialogHandle handle, int32_t top, int32_t rig
 
 int32_t SetWidth(ArkUI_NativeDialogHandle handle, float width, ArkUI_LengthMetricUnit unit)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_3.setWidth");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -670,6 +701,7 @@ int32_t SetWidth(ArkUI_NativeDialogHandle handle, float width, ArkUI_LengthMetri
 
 int32_t SetHeight(ArkUI_NativeDialogHandle handle, float height, ArkUI_LengthMetricUnit unit)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_3.setHeight");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -688,6 +720,7 @@ int32_t SetHeight(ArkUI_NativeDialogHandle handle, float height, ArkUI_LengthMet
 
 int32_t SetShadow(ArkUI_NativeDialogHandle handle, ArkUI_ShadowStyle shadow)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_3.setShadow");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -702,6 +735,7 @@ int32_t SetShadow(ArkUI_NativeDialogHandle handle, ArkUI_ShadowStyle shadow)
 
 int32_t SetCustomShadow(ArkUI_NativeDialogHandle handle, const ArkUI_AttributeItem* customShadow)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_3.setCustomShadow");
     CHECK_NULL_RETURN_WITH_MESSAGE(customShadow, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__,
         "customShadow is null");
     if (customShadow->size == 0) {
@@ -760,6 +794,7 @@ int32_t SetCustomShadow(ArkUI_NativeDialogHandle handle, const ArkUI_AttributeIt
 
 int32_t SetBackgroundBlurStyle(ArkUI_NativeDialogHandle handle, ArkUI_BlurStyle blurStyle)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_3.setBackgroundBlurStyle");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -774,6 +809,7 @@ int32_t SetBackgroundBlurStyle(ArkUI_NativeDialogHandle handle, ArkUI_BlurStyle 
 
 int32_t SetKeyboardAvoidMode(ArkUI_NativeDialogHandle handle, ArkUI_KeyboardAvoidMode keyboardAvoidMode)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_3.setKeyboardAvoidMode");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -788,6 +824,7 @@ int32_t SetKeyboardAvoidMode(ArkUI_NativeDialogHandle handle, ArkUI_KeyboardAvoi
 
 int32_t EnableHoverMode(ArkUI_NativeDialogHandle handle, bool enableHoverMode)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_3.enableHoverMode");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -802,6 +839,7 @@ int32_t EnableHoverMode(ArkUI_NativeDialogHandle handle, bool enableHoverMode)
 
 int32_t SetHoverModeArea(ArkUI_NativeDialogHandle handle, ArkUI_HoverModeAreaType hoverModeAreaType)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_3.setHoverModeArea");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -816,6 +854,7 @@ int32_t SetHoverModeArea(ArkUI_NativeDialogHandle handle, ArkUI_HoverModeAreaTyp
 
 int32_t SetFocusable(ArkUI_NativeDialogHandle handle, bool focusable)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_3.setFocusable");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ARKUI_ERROR_CODE_CAPI_INIT_ERROR;
@@ -831,6 +870,7 @@ int32_t SetFocusable(ArkUI_NativeDialogHandle handle, bool focusable)
 int32_t SetBackgroundBlurStyleOptions(
     ArkUI_NativeDialogHandle handle, const ArkUI_AttributeItem* backgroundBlurStyleOptions)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_3.setBackgroundBlurStyleOptions");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ERROR_CODE_PARAM_INVALID;
@@ -873,6 +913,7 @@ int32_t SetBackgroundBlurStyleOptions(
 
 int32_t SetBackgroundEffect(ArkUI_NativeDialogHandle handle, const ArkUI_AttributeItem* backgroundEffect)
 {
+    CHECK_UI_THREAD("ArkUI_NativeDialogAPI_3.setBackgroundEffect");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ERROR_CODE_PARAM_INVALID;
@@ -953,6 +994,7 @@ int32_t OH_ArkUI_DialogDismissEvent_GetDismissReason(ArkUI_DialogDismissEvent* e
 
 int32_t OH_ArkUI_CustomDialog_GetState(ArkUI_NativeDialogHandle handle, ArkUI_DialogState* dialogState)
 {
+    CHECK_UI_THREAD("OH_ArkUI_CustomDialog_GetState");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     int32_t tem = 1;
     if (!impl) {
@@ -971,6 +1013,7 @@ int32_t OH_ArkUI_CustomDialog_GetState(ArkUI_NativeDialogHandle handle, ArkUI_Di
 int32_t OH_ArkUI_NativeModule_CustomDialog_SetSystemMaterial(
     ArkUI_NativeDialogHandle handle, ArkUI_ImmersiveMaterialHandle material)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NativeModule_CustomDialog_SetSystemMaterial");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl || !handle) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
