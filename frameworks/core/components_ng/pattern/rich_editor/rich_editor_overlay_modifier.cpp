@@ -196,20 +196,26 @@ void RichEditorOverlayModifier::PaintPreviewTextDecoration(DrawingContext& drawi
     CHECK_NULL_VOID(pattern);
     auto styling = pattern->GetPreviewStyling();
     CHECK_EQUAL_VOID(styling.underlineShape, PreviewTextStyle::NORMAL);
-    auto color = styling.underlineColor.has_value()
-        ? static_cast<int32_t>(styling.underlineColor.value()) : caretColor_->Get();
     auto underlineWidth = previewTextUnderlineWidth_->Get();
     auto previewTextRects = pattern->GetPreviewTextRects();
     drawingContext.canvas.Save();
     RSBrush brush;
     brush.SetAntiAlias(true);
-    brush.SetColor(color);
+    if (styling.underlineColor.has_value()) {
+        brush.SetColor(styling.underlineColor.value());
+    } else {
+        brush.SetColor(pattern->GetCaretColor().GetValue());
+    }
     drawingContext.canvas.AttachBrush(brush);
     float startOffset = 0.0f;
     for (const auto& rect : previewTextRects) {
         PreviewDecorationParams params { rect.Left(), rect.Right(), rect.Bottom(),
             underlineWidth, styling.underlineShape,
-            &rect == &previewTextRects.back(), RSColor(color), startOffset };
+            &rect == &previewTextRects.back(),
+            styling.underlineColor.has_value()
+                ? RSColor(styling.underlineColor.value())
+                : RSColor(pattern->GetCaretColor().GetValue()),
+            startOffset };
         DrawPreviewTextUnderline(drawingContext.canvas, params);
         // Accumulate this segment's width so the next segment continues the dash/wavy
         // phase continuously instead of restarting the pattern at the new left edge.
