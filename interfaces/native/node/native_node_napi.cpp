@@ -357,6 +357,7 @@ void OH_ArkUI_NotifyArkTSEnvDestroy(napi_env env)
 int32_t OH_ArkUI_GetDrawableDescriptorFromNapiValue(
     napi_env env, napi_value value, ArkUI_DrawableDescriptor** drawableDescriptor)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetDrawableDescriptorFromNapiValue");
     void* objectNapi = nullptr;
     napi_unwrap(env, value, &objectNapi);
     if (!objectNapi) {
@@ -390,6 +391,7 @@ int32_t OH_ArkUI_GetDrawableDescriptorFromNapiValue(
 int32_t OH_ArkUI_GetDrawableDescriptorFromResourceNapiValue(
     napi_env env, napi_value value, ArkUI_DrawableDescriptor** drawableDescriptor)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetDrawableDescriptorFromResourceNapiValue");
     auto parseApi = reinterpret_cast<void (*)(void*, void*)>(OHOS::Ace::NodeModel::GetParseJsMedia());
     if (!parseApi) {
         return OHOS::Ace::ERROR_CODE_PARAM_INVALID;
