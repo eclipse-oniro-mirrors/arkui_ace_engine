@@ -854,6 +854,7 @@ private:
     {
         return userDefinedTranslateY_;
     }
+    bool GetFloatingBaseOffset() const;
 
     void AddIsFocusActiveUpdateEvent();
     void RemoveIsFocusActiveUpdateEvent();
