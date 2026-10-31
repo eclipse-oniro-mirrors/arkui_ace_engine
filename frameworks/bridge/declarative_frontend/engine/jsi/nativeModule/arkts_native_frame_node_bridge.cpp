@@ -3694,6 +3694,13 @@ void InitTouchEventFromObj(EcmaVM* vm, const Local<panda::ObjectRef>& eventObj, 
     touchEvent.tiltY = GetFloatProperty(vm, eventObj, "tiltY");
     touchEvent.rollAngle = GetFloatProperty(vm, eventObj, "rollAngle");
 
+    if (eventObj->GetNativePointerFieldCount(vm) > 0) {
+        auto* eventInfo = static_cast<BaseEventInfo*>(eventObj->GetNativePointerField(vm, 0));
+        if (eventInfo) {
+            touchEvent.SetPressedKeyCodes(eventInfo->GetPressedKeyCodes());
+        }
+    }
+
     auto touchesVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "touches"));
     if (!touchesVal->IsArray(vm)) {
         return;
@@ -3736,6 +3743,13 @@ void InitTouchEventFromObj(EcmaVM* vm, const Local<panda::ObjectRef>& eventObj, 
             touchEvent.globalDisplayY = GetDoubleProperty(vm, changedObj, "globalDisplayY");
             touchEvent.operatingHand = GetIntProperty(vm, changedObj, "hand");
             touchEvent.originalId = touchEvent.id;
+            touchEvent.width = static_cast<int32_t>(GetFloatProperty(vm, changedObj, "width"));
+            touchEvent.height = static_cast<int32_t>(GetFloatProperty(vm, changedObj, "height"));
+            auto pressedTimeVal = changedObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "pressedTime"));
+            if (pressedTimeVal->IsNumber()) {
+                touchEvent.pressedTime =
+                    TimeStamp(std::chrono::nanoseconds(static_cast<int64_t>(pressedTimeVal->ToNumber(vm)->Value())));
+            }
         }
     }
 }
@@ -3772,6 +3786,12 @@ void InitAxisEventFromObj(EcmaVM* vm, const Local<panda::ObjectRef>& eventObj, A
     if (rotateVal->IsNumber()) {
         axisEvent.rotateAxisAngle = static_cast<float>(rotateVal->ToNumber(vm)->Value());
     }
+    if (eventObj->GetNativePointerFieldCount(vm) > 0) {
+        auto* eventInfo = static_cast<BaseEventInfo*>(eventObj->GetNativePointerField(vm, 0));
+        if (eventInfo) {
+            axisEvent.pressedCodes = eventInfo->GetPressedKeyCodes();
+        }
+    }
 }
 
 void InitMouseEventFromObj(EcmaVM* vm, const Local<panda::ObjectRef>& eventObj, MouseEvent& mouseEvent)
@@ -3801,6 +3821,12 @@ void InitMouseEventFromObj(EcmaVM* vm, const Local<panda::ObjectRef>& eventObj, 
     mouseEvent.eventHandleId = GetIntProperty(vm, eventObj, "eventHandleId");
     mouseEvent.rawDeltaX = GetFloatProperty(vm, eventObj, "rawDeltaX");
     mouseEvent.rawDeltaY = GetFloatProperty(vm, eventObj, "rawDeltaY");
+    if (eventObj->GetNativePointerFieldCount(vm) > 0) {
+        auto* eventInfo = static_cast<BaseEventInfo*>(eventObj->GetNativePointerField(vm, 0));
+        if (eventInfo) {
+            mouseEvent.pressedKeyCodes_ = eventInfo->GetPressedKeyCodes();
+        }
+    }
     auto pressedButtonsVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "pressedButtons"));
     if (!pressedButtonsVal->IsArray(vm)) {
         return;
@@ -3863,28 +3889,29 @@ void InitKeyEventFromObj(EcmaVM* vm, const Local<panda::ObjectRef>& eventObj, Ke
 ArkUINativeModuleValue FrameNodeBridge::DispatchInputEvent(ArkUIRuntimeCallInfo* runtimeCallInfo)
 {
     EcmaVM* vm = runtimeCallInfo->GetVM();
-    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    CHECK_NULL_RETURN(vm, panda::BooleanRef::New(vm, false));
     auto* nativeNode = GetFrameNode(runtimeCallInfo);
-    CHECK_NULL_RETURN(nativeNode, panda::JSValueRef::Undefined(vm));
+    CHECK_NULL_RETURN(nativeNode, panda::BooleanRef::New(vm, false));
     auto* frameNode = reinterpret_cast<NG::FrameNode*>(nativeNode);
-    CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
+    CHECK_NULL_RETURN(frameNode, panda::BooleanRef::New(vm, false));
 
     Local<JSValueRef> eventArg = runtimeCallInfo->GetCallArgRef(1);
+    CHECK_NULL_RETURN(!eventArg.IsNull(), panda::BooleanRef::New(vm, false));
     if (!eventArg->IsObject(vm)) {
-        return panda::JSValueRef::Undefined(vm);
+        return panda::BooleanRef::New(vm, false);
     }
     auto eventObj = eventArg->ToObject(vm);
 
     int32_t competitionStrategy = ARKUI_COMPETITION_STRATEGY_DEFAULT;
     Local<JSValueRef> strategyArg = runtimeCallInfo->GetCallArgRef(2); // 2: index of the competition strategy argument
-    if (strategyArg->IsNumber()) {
+    if (!strategyArg.IsNull() && strategyArg->IsNumber()) {
         competitionStrategy = static_cast<int32_t>(strategyArg->ToNumber(vm)->Value());
     }
 
     auto pipelineContext = frameNode->GetContext();
-    CHECK_NULL_RETURN(pipelineContext, panda::JSValueRef::Undefined(vm));
+    CHECK_NULL_RETURN(pipelineContext, panda::BooleanRef::New(vm, false));
     auto postEventManager = pipelineContext->GetPostEventManager();
-    CHECK_NULL_RETURN(postEventManager, panda::JSValueRef::Undefined(vm));
+    CHECK_NULL_RETURN(postEventManager, panda::BooleanRef::New(vm, false));
 
     auto node = AceType::Claim(frameNode);
     bool result = false;
@@ -3918,15 +3945,16 @@ ArkUINativeModuleValue FrameNodeBridge::DispatchInputEvent(ArkUIRuntimeCallInfo*
 ArkUINativeModuleValue FrameNodeBridge::DispatchKeyEvent(ArkUIRuntimeCallInfo* runtimeCallInfo)
 {
     EcmaVM* vm = runtimeCallInfo->GetVM();
-    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    CHECK_NULL_RETURN(vm, panda::BooleanRef::New(vm, false));
     auto* nativeNode = GetFrameNode(runtimeCallInfo);
-    CHECK_NULL_RETURN(nativeNode, panda::JSValueRef::Undefined(vm));
+    CHECK_NULL_RETURN(nativeNode, panda::BooleanRef::New(vm, false));
     auto* frameNode = reinterpret_cast<NG::FrameNode*>(nativeNode);
-    CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
+    CHECK_NULL_RETURN(frameNode, panda::BooleanRef::New(vm, false));
 
     Local<JSValueRef> eventArg = runtimeCallInfo->GetCallArgRef(1);
+    CHECK_NULL_RETURN(!eventArg.IsNull(), panda::BooleanRef::New(vm, false));
     if (!eventArg->IsObject(vm)) {
-        return panda::JSValueRef::Undefined(vm);
+        return panda::BooleanRef::New(vm, false);
     }
     auto eventObj = eventArg->ToObject(vm);
 
@@ -3934,7 +3962,7 @@ ArkUINativeModuleValue FrameNodeBridge::DispatchKeyEvent(ArkUIRuntimeCallInfo* r
     InitKeyEventFromObj(vm, eventObj, keyEvent);
 
     auto pipelineContext = frameNode->GetContext();
-    CHECK_NULL_RETURN(pipelineContext, panda::JSValueRef::Undefined(vm));
+    CHECK_NULL_RETURN(pipelineContext, panda::BooleanRef::New(vm, false));
 
     auto focusHub = frameNode->GetOrCreateFocusHub();
     CHECK_NULL_RETURN(focusHub, panda::BooleanRef::New(vm, false));
