@@ -35,6 +35,7 @@ public:
     ~ScrollCommandParser() override = default;
 
     std::vector<std::unique_ptr<BaseExecutor>> Parse(const std::unique_ptr<JsonValue>& json) override;
+    std::vector<std::unique_ptr<BaseExecutor>> ParseInjectionCommand(const std::unique_ptr<JsonValue>& json);
     static bool Validate(const std::unique_ptr<JsonValue>& json);
     std::vector<std::unique_ptr<BaseExecutor>> CreateExecutor(const Command& cmd);
 private:
@@ -43,6 +44,7 @@ private:
     float GetDefaultScrollDistance();
     static bool ParseCoordinates(const JsonValue* cmdJson, Command& cmd);
     static bool ParseCmd(const JsonValue* cmdJson, Command& cmd);
+    static void CompleteEndPoint(Command& cmd);
 };
  
 } // namespace OHOS::Ace::NG

@@ -14,7 +14,6 @@
  */
 
 #include "gtest/gtest.h"
-#include <vector>
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 #include "base/geometry/ng/point_t.h"
@@ -60,7 +59,7 @@ HWTEST_F(
     ScrollSimulatingExecutorConstructorTest, ScrollSimulatingExecutor_Constructor_LargeCoordinates, TestSize.Level1)
 {
     auto context = WeakPtr<PipelineContext>(mockPipelineContext_);
-    Command tmpCmd = {};
+    Command tmpCmd;
     tmpCmd.type = "scroll";
     tmpCmd.mode = ExecuteMode::SIMULATING;
     tmpCmd.actionInfo.distance = 1200.0;
@@ -79,7 +78,7 @@ HWTEST_F(
 HWTEST_F(ScrollSimulatingExecutorStepTest, ExecuteStep_NullContext_ReturnsFailed, TestSize.Level1)
 {
     WeakPtr<PipelineContext> nullContext;
-    Command tmpCmd = {};
+    Command tmpCmd;
     tmpCmd.type = "scroll";
     tmpCmd.mode = ExecuteMode::SIMULATING;
     tmpCmd.actionInfo.distance = 1200.0;
@@ -169,10 +168,10 @@ HWTEST_F(ScrollSimulatingExecutorStepTest, ExecuteStep_ReturnsPENDING, TestSize.
     EXPECT_EQ(result, ExecutorResult::PENDING);
 }
 
-HWTEST_F(ScrollSimulatingExecutorStepTest, ExecuteStep_MissingEndPoint_ReturnsPending, TestSize.Level1)
+HWTEST_F(ScrollSimulatingExecutorStepTest, ExecuteStep_ReturnsFAILED, TestSize.Level1)
 {
     auto context = WeakPtr<PipelineContext>(mockPipelineContext_);
-    Command tmpCmd = {};
+    Command tmpCmd;
     tmpCmd.type = "scroll";
     tmpCmd.mode = ExecuteMode::SIMULATING;
     tmpCmd.actionInfo.distance = 1200.0;
@@ -187,13 +186,13 @@ HWTEST_F(ScrollSimulatingExecutorStepTest, ExecuteStep_MissingEndPoint_ReturnsPe
         tmpCmd.actionInfo.coordinates.x2, tmpCmd.actionInfo.coordinates.y2);
     ScrollSimulatingExecutor executor(context, tmpCmd);
     auto result = executor.ExecuteStep();
-    EXPECT_EQ(result, ExecutorResult::PENDING);
+    EXPECT_EQ(result, ExecutorResult::FAILED);
 }
 
-HWTEST_F(ScrollSimulatingExecutorStepTest, ExecuteStep_AutoMissingEndPoint_ReturnsPending, TestSize.Level1)
+HWTEST_F(ScrollSimulatingExecutorStepTest, ExecuteStep_ReturnFAILED, TestSize.Level1)
 {
     auto context = WeakPtr<PipelineContext>(mockPipelineContext_);
-    Command tmpCmd = {};
+    Command tmpCmd;
     tmpCmd.type = "scroll";
     tmpCmd.mode = ExecuteMode::AUTO;
     tmpCmd.actionInfo.distance = 1200.0;
@@ -204,7 +203,7 @@ HWTEST_F(ScrollSimulatingExecutorStepTest, ExecuteStep_AutoMissingEndPoint_Retur
     tmpCmd.isY2Set = false;
     ScrollSimulatingExecutor executor(context, tmpCmd);
     auto result = executor.ExecuteStep();
-    EXPECT_EQ(result, ExecutorResult::PENDING);
+    EXPECT_EQ(result, ExecutorResult::FAILED);
 }
 
 HWTEST_F(ScrollSimulatingExecutorGetTypeTest, GetType_ReturnsType, TestSize.Level1)
@@ -471,7 +470,7 @@ HWTEST_F(TouchEventBuilderSumStepsTest, SumSteps_ZeroDistance_ReturnsZero1, Test
 HWTEST_F(ScrollSimulatingExecutorStepTest, ExecuteStep_ReturnPENDING, TestSize.Level1)
 {
     auto context = WeakPtr<PipelineContext>(mockPipelineContext_);
-    Command tmpCmd = {};
+    Command tmpCmd;
     tmpCmd.type = "scroll";
     tmpCmd.mode = ExecuteMode::TARGET;
     tmpCmd.actionInfo.distance = 1200.0;

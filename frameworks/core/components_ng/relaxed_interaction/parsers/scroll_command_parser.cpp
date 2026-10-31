@@ -54,7 +54,53 @@ std::vector<std::unique_ptr<BaseExecutor>> ScrollCommandParser::Parse(const std:
 bool ScrollCommandParser::Validate(const std::unique_ptr<JsonValue>& json)
 {
     Command cmd = {};
-    return json && json->IsObject() && ParseCmd(json.get(), cmd);
+    if (!json || !json->IsObject() || !ParseCmd(json.get(), cmd)) {
+        return false;
+    }
+    auto coordinates = json->GetValue("action_info")->GetValue("coordinates");
+    return (!coordinates->Contains("x2") || coordinates->GetValue("x2")->IsNumber()) &&
+        (!coordinates->Contains("y2") || coordinates->GetValue("y2")->IsNumber());
+}
+
+std::vector<std::unique_ptr<BaseExecutor>> ScrollCommandParser::ParseInjectionCommand(
+    const std::unique_ptr<JsonValue>& json)
+{
+    Command cmd = {};
+    if (!json || !json->IsObject() || !ParseCmd(json.get(), cmd)) {
+        return {};
+    }
+    if (!json->GetValue("action_info")->Contains("distance")) {
+        auto context = context_.Upgrade();
+        cmd.actionInfo.distance = context && context->GetRootHeight() > 0.0
+            ? static_cast<float>(context->GetRootHeight() / 3.0f) : GetDefaultScrollDistance();
+    }
+    if (!cmd.isY2Set) {
+        CompleteEndPoint(cmd);
+    }
+    return CreateExecutor(cmd);
+}
+
+void ScrollCommandParser::CompleteEndPoint(Command& cmd)
+{
+    auto& coordinates = cmd.actionInfo.coordinates;
+    coordinates.x2 = coordinates.x1;
+    coordinates.y2 = coordinates.y1;
+    switch (cmd.actionInfo.direction) {
+        case RelaxedScrollDirection::LEFT:
+            coordinates.x2 += cmd.actionInfo.distance;
+            break;
+        case RelaxedScrollDirection::RIGHT:
+            coordinates.x2 -= cmd.actionInfo.distance;
+            break;
+        case RelaxedScrollDirection::BACKWARD:
+        case RelaxedScrollDirection::UP:
+            coordinates.y2 += cmd.actionInfo.distance;
+            break;
+        default:
+            coordinates.y2 -= cmd.actionInfo.distance;
+            break;
+    }
+    cmd.isY2Set = true;
 }
 
 bool ScrollCommandParser::ParseMode(const JsonValue* cmdJson, ExecuteMode& mode)
@@ -132,16 +178,11 @@ bool ScrollCommandParser::ParseCoordinates(const JsonValue* cmdJson, Command& cm
         TAG_LOGE(AceLogTag::ACE_UIEVENT, "coordinates x1 or y1 is not number.");
         return false;
     }
-    if ((coordinatesJson->Contains("x2") &&
-            !coordinatesJson->GetValue("x2")->IsNumber()) ||
-        (coordinatesJson->Contains("y2") &&
-            !coordinatesJson->GetValue("y2")->IsNumber())) {
-        return false;
-    }
     cmd.actionInfo.coordinates = { 0.0f, 0.0f, 0.0f, 0.0f };
     cmd.actionInfo.coordinates.x1 = coordinatesJson->GetDouble("x1");
     cmd.actionInfo.coordinates.y1 = coordinatesJson->GetDouble("y1");
-    if (coordinatesJson->Contains("x2") && coordinatesJson->Contains("y2")) {
+    if (coordinatesJson->Contains("x2") && coordinatesJson->Contains("y2") &&
+        coordinatesJson->GetValue("x2")->IsNumber() && coordinatesJson->GetValue("y2")->IsNumber()) {
         cmd.actionInfo.coordinates.x2 = coordinatesJson->GetDouble("x2");
         cmd.actionInfo.coordinates.y2 = coordinatesJson->GetDouble("y2");
         cmd.isY2Set = true;
@@ -195,11 +236,6 @@ bool ScrollCommandParser::ParseCmd(const JsonValue* cmdJson, Command& cmd)
 
 float ScrollCommandParser::GetDefaultScrollDistance()
 {
-    auto context = context_.Upgrade();
-    if (context && context->GetRootHeight() > 0.0) {
-        return static_cast<float>(context->GetRootHeight() / 3.0f);
-    }
-
     auto container = Container::CurrentSafely();
     if (container && container->GetDisplayInfo()) {
         // window height

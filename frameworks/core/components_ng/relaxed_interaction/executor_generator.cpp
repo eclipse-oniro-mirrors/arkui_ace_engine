@@ -44,7 +44,6 @@ void ExecutorGenerator::RegisterDefaultParsers()
     parserRegistry_[SCROLL] = std::make_unique<ScrollCommandParser>(context_);
     parserRegistry_[TAP] = std::make_unique<TapCommandParser>(context_);
     parserRegistry_[SLIDE] = std::make_unique<SlideCommandParser>(context_);
-    parserRegistry_[KEY] = std::make_unique<KeyCommandParser>(context_);
 }
 
 bool ExecutorGenerator::ValidateCommand(const std::unique_ptr<JsonValue>& json)
@@ -70,6 +69,23 @@ bool ExecutorGenerator::ValidateCommand(const std::unique_ptr<JsonValue>& json)
         return KeyCommandParser::Validate(cmd);
     }
     return type == BACKPRESS;
+}
+
+std::vector<std::unique_ptr<BaseExecutor>> ExecutorGenerator::ParseInjectionCommand(
+    const std::unique_ptr<JsonValue>& json)
+{
+    if (!ValidateCommand(json)) {
+        return {};
+    }
+    auto cmd = json->GetValue(CMD_KEY);
+    const auto type = cmd->GetString(TYPE_KEY);
+    if (type == SCROLL) {
+        return ScrollCommandParser(context_).ParseInjectionCommand(cmd);
+    }
+    if (type == KEY) {
+        return KeyCommandParser(context_).Parse(cmd);
+    }
+    return ParseRegularCmd(json);
 }
 
 std::vector<std::unique_ptr<BaseExecutor>> ExecutorGenerator::ParseCommand(const std::unique_ptr<JsonValue>& json)

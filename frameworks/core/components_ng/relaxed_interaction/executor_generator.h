@@ -36,6 +36,7 @@ public:
     ~ExecutorGenerator();
 
     std::vector<std::unique_ptr<BaseExecutor>> ParseCommand(const std::unique_ptr<JsonValue>& json);
+    std::vector<std::unique_ptr<BaseExecutor>> ParseInjectionCommand(const std::unique_ptr<JsonValue>& json);
     static bool ValidateCommand(const std::unique_ptr<JsonValue>& json);
 
 private:

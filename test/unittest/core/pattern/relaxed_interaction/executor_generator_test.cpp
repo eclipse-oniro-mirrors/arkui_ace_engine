@@ -286,12 +286,13 @@ HWTEST_F(ExecutorGeneratorParseRegularCmdTest, ParseRegularCmd_TapType, TestSize
     EXPECT_EQ(result[0]->GetType(), "smart_gesture");
 }
 
-HWTEST_F(ExecutorGeneratorParseRegularCmdTest, ParseRegularCmd_KeyType, TestSize.Level1)
+HWTEST_F(ExecutorGeneratorParseRegularCmdTest, ParseInjectionCommand_KeyDoesNotChangeLegacyParser, TestSize.Level1)
 {
     ExecutorGenerator generator(mockPipelineContext_);
     auto json = JsonUtil::ParseJsonString(VALID_KEY_JSON);
-    auto result = generator.ParseCommand(json);
-    EXPECT_EQ(result.size(), EXPECTED_SINGLE_EXECUTOR_COUNT);
+    EXPECT_TRUE(generator.ParseCommand(json).empty());
+    auto result = generator.ParseInjectionCommand(json);
+    ASSERT_EQ(result.size(), EXPECTED_SINGLE_EXECUTOR_COUNT);
     EXPECT_EQ(result[0]->GetType(), KEY);
 }
 
@@ -472,7 +473,7 @@ HWTEST_F(ExecutorGeneratorParseRegularCmdTest, ParseRegularCmd_TypeNotString_Ret
 HWTEST_F(ExecutorGeneratorConstructorTest, Constructor_RegisterDefaultParsers_AllRegistered, TestSize.Level1)
 {
     ExecutorGenerator generator(mockPipelineContext_);
-    EXPECT_EQ(generator.parserRegistry_.size(), 8u);
+    EXPECT_EQ(generator.parserRegistry_.size(), 7u);
     EXPECT_NE(generator.parserRegistry_.find(BACKPRESS), generator.parserRegistry_.end());
     EXPECT_NE(generator.parserRegistry_.find(FALLBACK), generator.parserRegistry_.end());
     EXPECT_NE(generator.parserRegistry_.find(CLICK), generator.parserRegistry_.end());
@@ -480,7 +481,6 @@ HWTEST_F(ExecutorGeneratorConstructorTest, Constructor_RegisterDefaultParsers_Al
     EXPECT_NE(generator.parserRegistry_.find(SCROLL), generator.parserRegistry_.end());
     EXPECT_NE(generator.parserRegistry_.find(TAP), generator.parserRegistry_.end());
     EXPECT_NE(generator.parserRegistry_.find(SLIDE), generator.parserRegistry_.end());
-    EXPECT_NE(generator.parserRegistry_.find(KEY), generator.parserRegistry_.end());
 }
 
 HWTEST_F(ExecutorGeneratorConstructorTest, Destructor_Cleanup_Success, TestSize.Level1)

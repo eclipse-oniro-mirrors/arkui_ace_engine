@@ -14,41 +14,19 @@
  */
 
 #include "gtest/gtest.h"
-#include <vector>
 
-#include "mock_pipeline_destruction.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 #include "base/geometry/ng/point_t.h"
 #include "base/memory/ace_type.h"
 #include "base/memory/referenced.h"
 #include "core/components_ng/relaxed_interaction/executors/simulate_touch_executor.h"
-#include "core/components_ng/relaxed_interaction/relaxed_interaction_manager.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
 using namespace testing;
 using namespace testing::ext;
 
 namespace OHOS::Ace::NG {
-
-namespace {
-PipelineBase* g_destroyedContext = nullptr;
-}
-
-void SetDestroyedContextForTest(PipelineBase* context)
-{
-    g_destroyedContext = context;
-}
-
-extern "C" bool RealPipelineIsDestroyed(PipelineBase* context)
-    asm("__real__ZN4OHOS3Ace12PipelineBase11IsDestroyedEv");
-extern "C" bool WrapPipelineIsDestroyed(PipelineBase* context)
-    asm("__wrap__ZN4OHOS3Ace12PipelineBase11IsDestroyedEv");
-
-extern "C" bool WrapPipelineIsDestroyed(PipelineBase* context)
-{
-    return context == g_destroyedContext || RealPipelineIsDestroyed(context);
-}
 
 class SimulateTouchExecutorTest : public testing::Test {
 public:

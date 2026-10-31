@@ -69,9 +69,6 @@ public:
     MOCK_METHOD(SafeAreaInsets, GetSafeArea, (), (const));
     MOCK_METHOD(bool, RequestFocus, (const std::string&, bool), (override));
     MOCK_METHOD(void, SendEventToAccessibility, (const AccessibilityEvent&), (override));
-    MOCK_METHOD(bool, OnNonPointerEvent, (const NonPointerEvent&), (override));
-    using PipelineContext::OnTouchEvent;
-    MOCK_METHOD(void, OnTouchEvent, (const TouchEvent&, bool), (override));
 
     bool GetIsDeclarative() const override
     {

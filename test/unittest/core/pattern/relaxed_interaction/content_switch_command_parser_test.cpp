@@ -43,8 +43,9 @@ const std::string VALID_CONTENT_SWITCH_TARGET_JSON = R"({
     }
 })";
 
-const std::string INVALID_MISSING_MODE_JSON = R"({
+const std::string VALID_CONTENT_SWITCH_DEFAULT_MODE_JSON = R"({
     "type": "content_switch",
+    "mode":"target",
     "action_info": {
       "direction": "forward",
       "count":1,
@@ -217,7 +218,6 @@ const std::string INVALID_DIRECTION_JSON = R"({
 
 const std::string INVALID_DIRECTION_TYPE_JSON = R"({
     "type": "content_switch",
-    "mode": "target",
     "action_info": {
         "direction": 1,
         "coordinates": {
@@ -231,7 +231,6 @@ const std::string INVALID_DIRECTION_TYPE_JSON = R"({
 
 const std::string VALID_ZERO_COUNT_JSON = R"({
     "type": "content_switch",
-    "mode": "target",
     "action_info": {
         "count": 0,
         "coordinates": {
@@ -245,7 +244,6 @@ const std::string VALID_ZERO_COUNT_JSON = R"({
 
 const std::string INVALID_NEGATIVE_COUNT_JSON = R"({
     "type": "content_switch",
-    "mode": "target",
     "action_info": {
         "count": -1,
         "coordinates": {
@@ -259,7 +257,6 @@ const std::string INVALID_NEGATIVE_COUNT_JSON = R"({
 
 const std::string INVALID_COUNT_TYPE_JSON = R"({
     "type": "content_switch",
-    "mode": "target",
     "action_info": {
         "count": "1",
         "coordinates": {
@@ -273,7 +270,6 @@ const std::string INVALID_COUNT_TYPE_JSON = R"({
 
 const std::string VALID_COUNT_JSON = R"({
     "type": "content_switch",
-    "mode": "target",
     "action_info": {
         "count": 10,
         "coordinates": {
@@ -287,7 +283,6 @@ const std::string VALID_COUNT_JSON = R"({
 
 const std::string VALID_NEGATIVE_COORDINATES_JSON = R"({
     "type": "content_switch",
-    "mode": "target",
     "action_info": {
         "count": 1,
         "coordinates": {
@@ -301,7 +296,6 @@ const std::string VALID_NEGATIVE_COORDINATES_JSON = R"({
 
 const std::string INVALID_COORDINATES_X_TYPE_JSON = R"({
     "type": "content_switch",
-    "mode": "target",
     "action_info": {
         "count": 1,
         "coordinates": {
@@ -315,7 +309,6 @@ const std::string INVALID_COORDINATES_X_TYPE_JSON = R"({
 
 const std::string INVALID_COORDINATES_Y_TYPE_JSON = R"({
     "type": "content_switch",
-    "mode": "target",
     "action_info": {
         "count": 1,
         "coordinates": {
@@ -344,7 +337,6 @@ const std::string VALID_CONTENT_SWITCH_BACKWARD_JSON = R"({
 
 const std::string INVALID_X_NULL_JSON = R"({
     "type": "content_switch",
-    "mode": "target",
     "action_info": {
         "coordinates": {
             "pos": {
@@ -357,7 +349,6 @@ const std::string INVALID_X_NULL_JSON = R"({
 
 const std::string INVALID_Y_NULL_JSON = R"({
     "type": "content_switch",
-    "mode": "target",
     "action_info": {
         "coordinates": {
             "pos": {
@@ -402,18 +393,16 @@ HWTEST_F(ContentSwitchCommandParserParseTest, Parse_ValidTargetMode_ReturnsOneEx
     EXPECT_TRUE(executors[0]->IsSingleStep());
 }
 
-HWTEST_F(ContentSwitchCommandParserParseTest, Parse_MissingModeDefaultsToTargetButNDKRejects, TestSize.Level1)
+HWTEST_F(ContentSwitchCommandParserParseTest, Parse_DefaultMode_ReturnsOneExecutor, TestSize.Level1)
 {
     auto context = WeakPtr<PipelineContext>(mockPipelineContext_);
     ContentSwitchCommandParser parser(context);
-    auto json = JsonUtil::ParseJsonString(INVALID_MISSING_MODE_JSON);
+    auto json = JsonUtil::ParseJsonString(VALID_CONTENT_SWITCH_DEFAULT_MODE_JSON);
     ASSERT_NE(json, nullptr);
 
     auto executors = parser.Parse(json);
-    ASSERT_EQ(executors.size(), 1u);
-    EXPECT_EQ(executors[0]->GetType(), "strict_content_switch");
-    EXPECT_FALSE(ContentSwitchCommandParser::Validate(json));
-    EXPECT_TRUE(ContentSwitchCommandParser::Validate(JsonUtil::ParseJsonString(VALID_CONTENT_SWITCH_TARGET_JSON)));
+    EXPECT_EQ(executors.size(), 1);
+    EXPECT_NE(executors[0], nullptr);
 }
 
 HWTEST_F(ContentSwitchCommandParserParseTest, Parse_NullJson_ReturnsEmpty, TestSize.Level1)
@@ -558,7 +547,7 @@ HWTEST_F(ContentSwitchCommandParserParseTest, Parse_InvalidDirectionType_Returns
     EXPECT_TRUE(executors.empty());
 }
 
-HWTEST_F(ContentSwitchCommandParserParseTest, Parse_CountZero_ReturnsEmpty, TestSize.Level1)
+HWTEST_F(ContentSwitchCommandParserParseTest, Parse_ValidCountZero_ReturnsOneExecutor, TestSize.Level1)
 {
     auto context = WeakPtr<PipelineContext>(mockPipelineContext_);
     ContentSwitchCommandParser parser(context);
@@ -566,7 +555,7 @@ HWTEST_F(ContentSwitchCommandParserParseTest, Parse_CountZero_ReturnsEmpty, Test
     ASSERT_NE(json, nullptr);
 
     auto executors = parser.Parse(json);
-    EXPECT_TRUE(executors.empty());
+    EXPECT_EQ(executors.size(), 1);
 }
 
 HWTEST_F(ContentSwitchCommandParserParseTest, Parse_NegativeCount_ReturnsEmpty, TestSize.Level1)

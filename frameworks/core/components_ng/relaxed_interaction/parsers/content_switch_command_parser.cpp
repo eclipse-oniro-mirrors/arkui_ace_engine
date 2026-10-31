@@ -43,7 +43,7 @@ bool ContentSwitchCommandParser::Validate(const std::unique_ptr<JsonValue>& json
 {
     ActionInfo actionInfo;
     PointF point;
-    return ParseParameters(json, actionInfo, point) && json->Contains("mode");
+    return ParseParameters(json, actionInfo, point) && json->Contains("mode") && actionInfo.count > 0;
 }
 
 bool ContentSwitchCommandParser::ParseParameters(
@@ -137,7 +137,7 @@ ContentSwitchCommandParser::ActionInfo ContentSwitchCommandParser::ParseActionIn
     int32_t count = 1;
     if (actionJson->Contains("count")) {
         auto value = actionJson->GetValue("count");
-        if (!JsonUtils::IsUint(value) || value->GetDouble() < 1) {
+        if (!JsonUtils::IsUint(value)) {
             TAG_LOGW(AceLogTag::ACE_UIEVENT, "Invalid count type");
             return {"", 0};
         }

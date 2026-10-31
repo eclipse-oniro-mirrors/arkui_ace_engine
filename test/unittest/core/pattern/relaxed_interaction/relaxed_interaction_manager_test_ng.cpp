@@ -704,13 +704,13 @@ HWTEST_F(RelaxedInteractionManagerCallbackTest, UserInputPreservesLegacyCurrentA
     EXPECT_FALSE(manager_->HasPendingWorkflow());
 }
 
-HWTEST_F(RelaxedInteractionManagerCallbackTest, DestroyClearsLegacyAndDeferredNDKCallbacksOnce, TestSize.Level1)
+HWTEST_F(RelaxedInteractionManagerCallbackTest, DestroyPreservesLegacyCallbackAndCompletesNDKOnce, TestSize.Level1)
 {
     int legacyCount = 0;
     int interruptedCount = 0;
+    int destroyedCount = 0;
     Prepare({ ExecutorResult::PENDING });
-    ASSERT_EQ(manager_->ProcessCommand(VALID_BACKPRESS_JSON, [&legacyCount](ExecutionState state) {
-        EXPECT_EQ(state, ExecutionState::TARGET_NOT_FOUND);
+    ASSERT_EQ(manager_->ProcessCommand(VALID_BACKPRESS_JSON, [&legacyCount](ExecutionState) {
         ++legacyCount;
     }), ProcessResult::SUCCESS);
     Prepare({ ExecutorResult::PENDING });
@@ -720,10 +720,16 @@ HWTEST_F(RelaxedInteractionManagerCallbackTest, DestroyClearsLegacyAndDeferredND
     }, true), ProcessResult::SUCCESS);
     manager_->Clear(ExecutionState::INTERRUPTED_BY_USER);
     EXPECT_EQ(interruptedCount, 0);
+    Prepare({ ExecutorResult::PENDING });
+    ASSERT_EQ(manager_->ProcessCommand(VALID_BACKPRESS_JSON, [&destroyedCount](ExecutionState state) {
+        EXPECT_EQ(state, ExecutionState::TARGET_NOT_FOUND);
+        ++destroyedCount;
+    }, true), ProcessResult::SUCCESS);
     manager_->Clear(ExecutionState::TARGET_NOT_FOUND);
     manager_->Clear(ExecutionState::TARGET_NOT_FOUND);
-    EXPECT_EQ(legacyCount, 1);
+    EXPECT_EQ(legacyCount, 0);
     EXPECT_EQ(interruptedCount, 1);
+    EXPECT_EQ(destroyedCount, 1);
     EXPECT_FALSE(manager_->HasPendingWorkflow());
 }
 

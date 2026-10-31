@@ -29,7 +29,7 @@ namespace {
 bool IsSupportedCommandType(const std::string& type)
 {
     return type == BACKPRESS || type == CLICK || type == CONTENT_SWITCH || type == SCROLL ||
-        type == TAP || type == SLIDE || type == KEY;
+        type == TAP || type == SLIDE;
 }
 }
 
@@ -71,12 +71,13 @@ ProcessResult RelaxedInteractionManager::ProcessCommandInternal(const std::strin
             return ProcessResult::VALIDATION_ERROR;
         }
         auto name = type->GetString();
-        if (!IsSupportedCommandType(name)) {
+        if (!IsSupportedCommandType(name) && !(interruptibleByUser && name == KEY)) {
             return ProcessResult::NO_VALID_CMD;
         }
     }
 
-    std::vector<std::unique_ptr<BaseExecutor>> executors = executorGenerator_->ParseCommand(json);
+    auto executors = interruptibleByUser ? executorGenerator_->ParseInjectionCommand(json)
+                                       : executorGenerator_->ParseCommand(json);
     if (executors.empty()) {
         WorkflowDumper::GetInstance().AddLog("No valid executor parsed from command");
         TAG_LOGE(AceLogTag::ACE_UIEVENT, "No valid executor parsed from command");
@@ -284,7 +285,7 @@ void RelaxedInteractionManager::Clear(ExecutionState reason)
         completion(ExecutionState::INTERRUPTED_BY_USER);
     }
     for (auto& workflow : cancelledWorkflows) {
-        if (workflow.finishCallback) {
+        if (workflow.finishCallback && workflow.interruptionPolicy != InterruptionPolicy::IGNORE_USER_INPUT) {
             workflow.finishCallback(reason);
         }
     }

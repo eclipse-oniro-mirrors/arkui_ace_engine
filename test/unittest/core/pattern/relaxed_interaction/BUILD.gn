@@ -13,15 +13,6 @@
 
 import("//foundation/arkui/ace_engine/test/unittest/ace_unittest.gni")
 
-config("relaxed_interaction_destruction_config") {
-  ldflags = [ "-Wl,--wrap=_ZN4OHOS3Ace12PipelineBase11IsDestroyedEv" ]
-}
-
-source_set("relaxed_interaction_destruction_mock") {
-  testonly = true
-  public_configs = [ ":relaxed_interaction_destruction_config" ]
-}
-
 ace_unittest("relaxed_interaction_manager_test_ng") {
   module_name = "Gesture-BasicAndCombinationGesture"
   type = "new"
@@ -84,7 +75,6 @@ ace_unittest("relaxed_interaction_manager_test_ng") {
     sources = []
     sources = [ "relaxed_interaction_manager_test_core.cpp" ]
   } else {
-    deps = [ ":relaxed_interaction_destruction_mock" ]
     sources += [ "relaxed_interaction_manager_test_core.cpp" ]
   }
 
