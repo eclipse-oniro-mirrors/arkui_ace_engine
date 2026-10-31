@@ -84,7 +84,13 @@ void FocusManager::FocusViewShow(const RefPtr<FocusView>& focusView, bool isTrig
     focusView->SetIsViewHasShow(true);
     auto lastFocusView = lastFocusView_.Upgrade();
     if (lastFocusView) {
-        if (lastFocusView == focusView || lastFocusView->IsChildFocusViewOf(focusView)) {
+        if (lastFocusView == focusView) {
+            auto focusViewWeak = AceType::WeakClaim(AceType::RawPtr(focusView));
+            focusViewStack_.remove(focusViewWeak);
+            focusViewStack_.emplace_back(focusViewWeak);
+            return;
+        }
+        if (lastFocusView->IsChildFocusViewOf(focusView)) {
             return;
         }
         if (IsModalFocusViewStackValid()) {
