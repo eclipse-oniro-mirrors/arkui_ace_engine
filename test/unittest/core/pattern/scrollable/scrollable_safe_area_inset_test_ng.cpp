@@ -13,11 +13,10 @@
  * limitations under the License.
  */
 
-#include "gtest/gtest.h"
-
 #include <array>
 #include <vector>
 
+#include "gtest/gtest.h"
 #include "test/unittest/core/pattern/test_ng.h"
 
 #include "core/components_ng/base/frame_node.h"
@@ -64,8 +63,8 @@ RefPtr<FrameNode> MakeContent(const char* tag, float width, float height)
     auto node = FrameNode::CreateFrameNode(
         tag, ViewStackProcessor::GetInstance()->ClaimNodeId(), AceType::MakeRefPtr<Pattern>());
     CHECK_NULL_RETURN(node, nullptr);
-    node->GetLayoutProperty()->UpdateUserDefinedIdealSize(CalcSize(
-        CalcLength(width, DimensionUnit::PX), CalcLength(height, DimensionUnit::PX)));
+    node->GetLayoutProperty()->UpdateUserDefinedIdealSize(
+        CalcSize(CalcLength(width, DimensionUnit::PX), CalcLength(height, DimensionUnit::PX)));
     return node;
 }
 
@@ -164,8 +163,7 @@ HWTEST_F(ScrollableSafeAreaInsetTestNg, ScrollableSafeAreaInsetAvoid002, TestSiz
 {
     auto host = CreateScrollHost([](ScrollModelNG&) {
         SetHostSize();
-        ApplyInset({ { SafeAreaInsetEdge::TOP, 20.0f, 100.0f },
-            { SafeAreaInsetEdge::BOTTOM, 30.0f, 100.0f } });
+        ApplyInset({ { SafeAreaInsetEdge::TOP, 20.0f, 100.0f }, { SafeAreaInsetEdge::BOTTOM, 30.0f, 100.0f } });
     });
     ASSERT_NE(host, nullptr);
     FlushUITasks(host);
@@ -275,8 +273,7 @@ HWTEST_F(ScrollableSafeAreaInsetTestNg, ScrollableSafeAreaInsetAvoid007, TestSiz
     auto host = CreateScrollHost([](ScrollModelNG& model) {
         SetHostSize();
         model.SetAxis(Axis::HORIZONTAL);
-        ApplyInset({ { SafeAreaInsetEdge::START, 20.0f, 60.0f },
-            { SafeAreaInsetEdge::END, 60.0f, 60.0f } });
+        ApplyInset({ { SafeAreaInsetEdge::START, 20.0f, 60.0f }, { SafeAreaInsetEdge::END, 60.0f, 60.0f } });
     });
     ASSERT_NE(host, nullptr);
     FlushUITasks(host);
@@ -302,8 +299,7 @@ HWTEST_F(ScrollableSafeAreaInsetTestNg, ScrollableSafeAreaInsetAvoid008, TestSiz
         SetHostSize();
         model.SetAxis(Axis::HORIZONTAL);
         ViewAbstract::SetLayoutDirection(TextDirection::RTL);
-        ApplyInset({ { SafeAreaInsetEdge::START, 20.0f, 60.0f },
-            { SafeAreaInsetEdge::END, 60.0f, 60.0f } });
+        ApplyInset({ { SafeAreaInsetEdge::START, 20.0f, 60.0f }, { SafeAreaInsetEdge::END, 60.0f, 60.0f } });
     });
     ASSERT_NE(host, nullptr);
     FlushUITasks(host);
@@ -338,4 +334,3 @@ HWTEST_F(ScrollableSafeAreaInsetTestNg, ScrollableSafeAreaInsetAvoid009, TestSiz
     EXPECT_FLOAT_EQ(avoid.second, 0.0f);
 }
 } // namespace OHOS::Ace::NG
- 
