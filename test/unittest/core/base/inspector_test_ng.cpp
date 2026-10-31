@@ -3901,4 +3901,99 @@ HWTEST_F(InspectorTestNg, InspectorExternalSubtreeScreenToWindowDensity014, Test
     context->SetDisplayWindowRectInfo(Rect(0, 0, 0, 0));
     context->stageManager_ = nullptr;
 }
+
+/**
+ * @tc.name: InspectorFilterWebEnable015
+ * @tc.desc: InspectorFilter web flag: a freshly constructed filter has the
+ *           web subtree disabled (external filtered-tree entries rely on this
+ *           default), SetWebEnable toggles the flag, and the flag stays
+ *           independent of the free-nodes flag.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InspectorTestNg, InspectorFilterWebEnable015, TestSize.Level1)
+{
+    InspectorFilter filter;
+    EXPECT_FALSE(filter.IsWebEnable());
+
+    filter.SetWebEnable(true);
+    EXPECT_TRUE(filter.IsWebEnable());
+
+    filter.SetWebEnable(false);
+    EXPECT_FALSE(filter.IsWebEnable());
+
+    filter.EnableFreeNodes();
+    EXPECT_TRUE(filter.IsFreeNodesEnabled());
+    EXPECT_FALSE(filter.IsWebEnable());
+
+    filter.SetWebEnable(true);
+    EXPECT_TRUE(filter.IsWebEnable());
+    EXPECT_TRUE(filter.IsFreeNodesEnabled());
+}
+
+/**
+ * @tc.name: InspectorWebSubtreeFlagGate016
+ * @tc.desc: Web-flag gate regression on a tree containing a Web-tag node:
+ *           GetInspector(bool) enables the web flag only for the layout
+ *           inspector (isLayoutInspector == true) while the non-layout call
+ *           and the shared 3-arg entry with a default filter (what the
+ *           external getFilteredInspectorTree* entries build) keep it
+ *           disabled; GetFreeNodesInspector enables it as well. In the
+ *           unit-test build the gated web splice is a no-op stub, so both
+ *           flag states must be observationally equal and the Web host node
+ *           itself is never dropped by the gate. (The real web splice is
+ *           exercised by the product build via WEB_SUPPORTED.)
+ * @tc.type: FUNC
+ */
+HWTEST_F(InspectorTestNg, InspectorWebSubtreeFlagGate016, TestSize.Level1)
+{
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto rootId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> root = FrameNode::CreateFrameNode("one", rootId, AceType::MakeRefPtr<Pattern>(), true);
+    context->stageManager_ = AceType::MakeRefPtr<StageManager>(root);
+    auto pageId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> page = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, pageId, AceType::MakeRefPtr<Pattern>());
+    root->AddChild(page);
+    auto hostId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> host = FrameNode::CreateFrameNode(V2::WEB_ETS_TAG, hostId, AceType::MakeRefPtr<Pattern>());
+    page->AddChild(host);
+
+    // Non-layout GetInspector(bool) keeps the web flag disabled and matches
+    // the shared 3-arg entry with a default (web-disabled) filter.
+    std::string nonLayoutTree = Inspector::GetInspector(false);
+    InspectorFilter externalFilter;
+    bool needThrow = false;
+    std::string externalTree = Inspector::GetInspector(false, externalFilter, needThrow);
+    EXPECT_FALSE(needThrow);
+    EXPECT_EQ(nonLayoutTree, externalTree);
+
+    // Same shared entry with the web flag explicitly enabled: identical
+    // output (unit-test web splice is a no-op stub).
+    InspectorFilter webEnabledFilter;
+    webEnabledFilter.SetWebEnable(true);
+    std::string webEnabledTree = Inspector::GetInspector(false, webEnabledFilter, needThrow);
+    EXPECT_EQ(webEnabledTree, externalTree);
+
+    // Layout entry GetInspector(true) enables the web flag: valid layout
+    // tree containing the Web host node, which is never dropped by the gate.
+    std::string layoutTree = Inspector::GetInspector(true);
+    auto layoutJson = JsonUtil::ParseJsonString(layoutTree);
+    ASSERT_NE(layoutJson, nullptr);
+    EXPECT_EQ(layoutJson->GetString("type"), "root");
+    auto hostNode = FindNodeInTree(layoutTree, hostId);
+    ASSERT_NE(hostNode, nullptr);
+    EXPECT_EQ(hostNode->GetString("$type"), std::string(V2::WEB_ETS_TAG));
+
+    // The Web host node is present in the non-layout trees as well.
+    ASSERT_NE(FindNodeInTree(nonLayoutTree, hostId), nullptr);
+    ASSERT_NE(FindNodeInTree(externalTree, hostId), nullptr);
+
+    // Free-nodes entry (web enabled): valid layout tree containing the host.
+    std::string freeNodesTree = Inspector::GetFreeNodesInspector();
+    auto freeNodesJson = JsonUtil::ParseJsonString(freeNodesTree);
+    ASSERT_NE(freeNodesJson, nullptr);
+    EXPECT_EQ(freeNodesJson->GetString("type"), "root");
+    ASSERT_NE(FindNodeInTree(freeNodesTree, hostId), nullptr);
+    context->stageManager_ = nullptr;
+}
 } // namespace OHOS::Ace::NG

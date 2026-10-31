@@ -60,6 +60,8 @@ public:
     size_t GetFilterDepth() const;
     void EnableFreeNodes();
     bool IsFreeNodesEnabled() const;
+    void SetWebEnable(bool enable);
+    bool IsWebEnable() const;
 
 private:
     bool FilterEmpty() const;
@@ -68,6 +70,7 @@ private:
     uint64_t filterFixed = 0;
     std::vector<std::string> filterExt;
     bool isFreeNodesEnable = false;
+    bool isWebEnable = false;
 };
 
 struct InspectorConfig {

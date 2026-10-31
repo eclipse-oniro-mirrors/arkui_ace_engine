@@ -30,6 +30,7 @@
 #include "base/log/log_wrapper.h"
 #include "core/components_ng/base/distributed_ui.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/base/inspector_filter.h"
 #include "core/components_ng/base/inspector_tree_provider_registry.h"
 #include "core/components_ng/base/ui_node.h"
 #include "core/components_v2/inspector/inspector_constants.h"
@@ -431,12 +432,14 @@ void AppendWebSubtreeToChildren(
 #endif
 } // namespace
 
-void AppendExternalSubtreeToChildren(
-    const RefPtr<NG::UINode>& parent, std::unique_ptr<OHOS::Ace::JsonValue>& jsonChildrenArray)
+void AppendExternalSubtreeToChildren(const RefPtr<NG::UINode>& parent,
+    std::unique_ptr<OHOS::Ace::JsonValue>& jsonChildrenArray, const InspectorFilter& filter)
 {
     CHECK_NULL_VOID(parent);
     if (parent->GetTag() == V2::WEB_ETS_TAG) {
-        AppendWebSubtreeToChildren(parent, jsonChildrenArray);
+        if (filter.IsWebEnable()) {
+            AppendWebSubtreeToChildren(parent, jsonChildrenArray);
+        }
         return;
     }
     std::vector<InspectorTreeProviderRegistry::GetterEntry> getters;

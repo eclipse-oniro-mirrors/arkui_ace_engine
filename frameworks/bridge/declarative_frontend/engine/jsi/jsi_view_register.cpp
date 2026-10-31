@@ -773,6 +773,10 @@ panda::Local<panda::JSValueRef> JsGetFilteredInspectorTree(panda::JsiRuntimeCall
                 isLayoutInspector = true;
                 continue;
             }
+            if (itemVal->ToString(vm) == "isWebEnable") {
+                filter.SetWebEnable(true);
+                continue;
+            }
             filter.AddFilterAttr(itemVal->ToString(vm));
         }
     }
@@ -841,6 +845,10 @@ panda::Local<panda::JSValueRef> JsGetFilteredInspectorTreeById(panda::JsiRuntime
                 return panda::StringRef::NewFromUtf8(vm, "");
             }
             auto itemVal = panda::Local<panda::StringRef>(subItemVal);
+            if (itemVal->ToString(vm) == "isWebEnable") {
+                filter.SetWebEnable(true);
+                continue;
+            }
             filter.AddFilterAttr(itemVal->ToString(vm));
         }
     }

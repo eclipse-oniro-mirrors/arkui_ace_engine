@@ -24,9 +24,10 @@ namespace OHOS::Ace {
 class JsonValue;
 namespace NG {
 class UINode;
+class InspectorFilter;
 
-void AppendExternalSubtreeToChildren(
-    const RefPtr<NG::UINode>& parent, std::unique_ptr<OHOS::Ace::JsonValue>& jsonChildrenArray);
+void AppendExternalSubtreeToChildren(const RefPtr<NG::UINode>& parent,
+    std::unique_ptr<OHOS::Ace::JsonValue>& jsonChildrenArray, const InspectorFilter& filter);
 } // namespace NG
 } // namespace OHOS::Ace
 
