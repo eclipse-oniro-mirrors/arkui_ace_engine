@@ -28,6 +28,7 @@
 #include "interfaces/native/native_interface_accessibility.h"
 #include "interfaces/native/native_interface_xcomponent.h"
 #include "interfaces/native/native_key_event.h"
+#include "interfaces/native/native_material.h"
 #include "interfaces/native/native_node.h"
 #include "interfaces/native/native_dialog.h"
 #include "interfaces/native/native_node_napi.h"
@@ -575,6 +576,80 @@ HWTEST_F(UiThreadDetectionTest, DialogApisOnUiThreadNeverTriggerThreadCheck, Tes
     RunAndExpectNoDiagnostic([api] { CallWithDefaultArgs(api->setWidth); });
 }
 
+// === ArkUI_NativeAnimateAPI_1 表成员（4 个函数 × 4 模式）===
+
+struct AnimateTableScopeEntry {
+    const char* name;
+    void (*invoke)(ArkUI_NativeAnimateAPI_1*);
+};
+
+// Member 为指向 ArkUI_NativeAnimateAPI_1 函数指针字段的指针到成员，名称字符串显式传入。
+template<auto Member>
+AnimateTableScopeEntry MakeAnimateTableEntry(const char* name)
+{
+    return { name, [](ArkUI_NativeAnimateAPI_1* api) { CallWithDefaultArgs(api->*Member); } };
+}
+const AnimateTableScopeEntry ANIMATE_TABLE_ENTRIES[] = {
+    MakeAnimateTableEntry<&ArkUI_NativeAnimateAPI_1::animateTo>("ArkUI_NativeAnimateAPI_1_animateTo"),
+    MakeAnimateTableEntry<&ArkUI_NativeAnimateAPI_1::keyframeAnimateTo>("ArkUI_NativeAnimateAPI_1_keyframeAnimateTo"),
+    MakeAnimateTableEntry<&ArkUI_NativeAnimateAPI_1::createAnimator>("ArkUI_NativeAnimateAPI_1_createAnimator"),
+    MakeAnimateTableEntry<&ArkUI_NativeAnimateAPI_1::disposeAnimator>("ArkUI_NativeAnimateAPI_1_disposeAnimator"),
+};
+
+class UiThreadAnimateTableLogTest : public UiThreadDetectionTest, public WithParamInterface<AnimateTableScopeEntry> {};
+
+static ArkUI_NativeAnimateAPI_1* GetAnimateApi()
+{
+    return static_cast<ArkUI_NativeAnimateAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_ANIMATE, "ArkUI_NativeAnimateAPI_1"));
+}
+
+// 模式 1：默认-debug + 安全线程 → 无诊断
+TEST_P(UiThreadAnimateTableLogTest, DebugDefaultSafeThreadNoDiagnostic)
+{
+    auto* api = GetAnimateApi();
+    ASSERT_NE(api, nullptr);
+    AceApplicationInfo::GetInstance().SetDebugForParallel(true);
+    ResetToUnresolved();
+    SetupDiagnosticMatch(GetParam().name);
+    SetMockIsCurrentThreadSafe(SafeThread);
+    RunAndExpectNoDiagnostic([api, this] { GetParam().invoke(api); });
+}
+
+// 模式 2：默认-非debug + 不安全线程 → 无诊断
+TEST_P(UiThreadAnimateTableLogTest, ReleaseDefaultUnsafeThreadNoDiagnostic)
+{
+    auto* api = GetAnimateApi();
+    ASSERT_NE(api, nullptr);
+    AceApplicationInfo::GetInstance().SetDebugForParallel(false);
+    ResetToUnresolved();
+    SetupDiagnosticMatch(GetParam().name);
+    SetMockIsCurrentThreadSafe(UnsafeThread);
+    RunAndExpectNoDiagnostic([api, this] { GetParam().invoke(api); });
+}
+
+// 模式 3：DISABLED + 不安全线程 → 无诊断
+TEST_P(UiThreadAnimateTableLogTest, DisabledModeNoDiagnostic)
+{
+    auto* api = GetAnimateApi();
+    ASSERT_NE(api, nullptr);
+    EnableMode(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED);
+    SetupDiagnosticMatch(GetParam().name);
+    SetMockIsCurrentThreadSafe(UnsafeThread);
+    RunAndExpectNoDiagnostic([api, this] { GetParam().invoke(api); });
+}
+
+// 模式 4：LOG + 不安全线程 → 有诊断
+TEST_P(UiThreadAnimateTableLogTest, LogModeProducesDiagnostic)
+{
+    auto* api = GetAnimateApi();
+    ASSERT_NE(api, nullptr);
+    EnableMode(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG);
+    SetupDiagnosticMatch(GetParam().name);
+    SetMockIsCurrentThreadSafe(UnsafeThread);
+    RunAndExpectDiagnostic([api, this] { GetParam().invoke(api); });
+}
+
 // === Scope entries（271 导出函数：原 215 + 表单弹窗类 38 + TextEditorStyledStringController 18，排除范围外与 ANI）===
 
 namespace {
@@ -861,6 +936,22 @@ const ScopeEntry SCOPE_ENTRIES[] = {
     SCOPE_ENTRY(OH_ArkUI_XComponent_StopImageAnalyzer),
     SCOPE_ENTRY(OH_ArkUI_XComponent_UnregisterOnFrameCallback),
     SCOPE_ENTRY(OH_NativeXComponent_GetNativeXComponent),
+    // === Animator & AnimationGroup & Material Api ===
+    SCOPE_ENTRY(OH_ArkUI_Animator_Cancel),
+    SCOPE_ENTRY(OH_ArkUI_Animator_Finish),
+    SCOPE_ENTRY(OH_ArkUI_Animator_Pause),
+    SCOPE_ENTRY(OH_ArkUI_Animator_Play),
+    SCOPE_ENTRY(OH_ArkUI_Animator_ResetAnimatorOption),
+    SCOPE_ENTRY(OH_ArkUI_Animator_Reverse),
+    SCOPE_ENTRY(OH_ArkUI_NativeModule_AddAnimationGroup),
+    SCOPE_ENTRY(OH_ArkUI_NativeModule_FinishAnimationGroup),
+    SCOPE_ENTRY(OH_ArkUI_NativeModule_GetAnimationGroupState),
+    SCOPE_ENTRY(OH_ArkUI_NativeModule_GetGlobalMaterialLevel),
+    SCOPE_ENTRY(OH_ArkUI_NativeModule_GetSystemMaterialSupported),
+    SCOPE_ENTRY(OH_ArkUI_NativeModule_HasAnimationGroup),
+    SCOPE_ENTRY(OH_ArkUI_NativeModule_PauseAnimationGroup),
+    SCOPE_ENTRY(OH_ArkUI_NativeModule_RemoveAnimationGroup),
+    SCOPE_ENTRY(OH_ArkUI_NativeModule_ResumeAnimationGroup),
 };
 #undef SCOPE_ENTRY
 } // namespace
@@ -870,5 +961,8 @@ INSTANTIATE_TEST_SUITE_P(AllExports, UiThreadExportLogTest, ValuesIn(SCOPE_ENTRI
 
 INSTANTIATE_TEST_SUITE_P(AllTableMembers, UiThreadTableLogTest, ValuesIn(TABLE_SCOPE_ENTRIES),
     [](const TestParamInfo<TableScopeEntry>& info) { return std::string(info.param.name); });
+
+INSTANTIATE_TEST_SUITE_P(AllAnimateTableMembers, UiThreadAnimateTableLogTest, ValuesIn(ANIMATE_TABLE_ENTRIES),
+    [](const TestParamInfo<AnimateTableScopeEntry>& info) { return std::string(info.param.name); });
 
 } // namespace OHOS::Ace::NodeModel
