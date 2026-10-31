@@ -41,34 +41,6 @@ struct JsiClassConstructorBinding {
     JSGCMarkCallbackErased jsGcMarkErased = nullptr;
 };
 
-// Per-type storage for the original typed callbacks. Kept thread_local to match
-// JsiClass<C> state semantics. Only written by JsiClass<C>::Bind/InheritAndBind.
-template<typename C>
-inline thread_local JSDestructorCallback<C> jsiTypedDestructor = nullptr;
-template<typename C>
-inline thread_local JSGCMarkCallback<C> jsiTypedGcMark = nullptr;
-
-// Type-erased adapters with exactly the erased signature. Calling a function
-// through an incompatible function pointer type is undefined behavior, so the
-// adapters restore the typed pointer and invoke it with its original signature.
-template<typename C>
-void JsiDestroyCallbackAdapter(void* instance)
-{
-    auto dtor = jsiTypedDestructor<C>;
-    if (dtor != nullptr) {
-        dtor(static_cast<C*>(instance));
-    }
-}
-
-template<typename C>
-void JsiGcMarkCallbackAdapter(void* instance, const JSGCMarkCallbackInfo& info)
-{
-    auto gcMark = jsiTypedGcMark<C>;
-    if (gcMark != nullptr) {
-        gcMark(static_cast<C*>(instance), info);
-    }
-}
-
 inline panda::Local<panda::JSValueRef> JsiJSConstructorInterceptor(panda::JsiRuntimeCallInfo* runtimeCallInfo);
 inline void JsiJSNativePointerDestructorInterceptor(void* env, void* nativePtr, void* data);
 

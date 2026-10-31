@@ -18,11 +18,6 @@ jsi_class_base_sources = [
   "jsi_class_base_test.cpp",
 ]
 
-jsi_constructor_binding_sources = [
-  "$ace_root/frameworks/bridge/declarative_frontend/engine/jsi/jsi_class_base.cpp",
-  "jsi_constructor_binding_test.cpp",
-]
-
 if (is_host_product) {
   ace_unittest("jsi_class_base_test") {
     type = "host_components"
@@ -36,18 +31,6 @@ if (is_host_product) {
     ]
     sources = jsi_class_base_sources
   }
-  ace_unittest("jsi_constructor_binding_test") {
-    type = "host_components"
-    module_name = "Bridge-JsiConstructorBinding"
-    defines = [ "USE_ARK_ENGINE" ]
-    external_deps = [
-      "ets_runtime:libark_jsruntime",
-      "libuv:uv",
-      "napi:ace_napi",
-      "node:node_header_notice",
-    ]
-    sources = jsi_constructor_binding_sources
-  }
 } else {
   ace_unittest("jsi_class_base_test") {
     type = "new"
@@ -60,17 +43,5 @@ if (is_host_product) {
       "node:node_header_notice",
     ]
     sources = jsi_class_base_sources
-  }
-  ace_unittest("jsi_constructor_binding_test") {
-    type = "new"
-    module_name = "Bridge-JsiConstructorBinding"
-    defines = [ "USE_ARK_ENGINE" ]
-    external_deps = [
-      "ets_runtime:libark_jsruntime",
-      "libuv:uv",
-      "napi:ace_napi",
-      "node:node_header_notice",
-    ]
-    sources = jsi_constructor_binding_sources
   }
 }

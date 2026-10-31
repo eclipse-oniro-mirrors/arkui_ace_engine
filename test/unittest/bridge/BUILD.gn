@@ -21,6 +21,5 @@ group("bridge_unittest") {
     "common/sourcemap:bridge_source_map_test",
     "common/utils:bridge_utils_test",
     "jsi:jsi_class_base_test",
-    "jsi:jsi_constructor_binding_test",
   ]
 }

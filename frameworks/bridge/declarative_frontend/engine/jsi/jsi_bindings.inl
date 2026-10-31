@@ -213,12 +213,10 @@ void JsiClass<C>::Bind(
     BindingTarget t, JSFunctionCallback ctor, JSDestructorCallback<C> dtor, JSGCMarkCallback<C> gcMark)
 {
     jsConstructorBinding_.jsConstructor = ctor;
-    jsiTypedDestructor<C> = dtor;
-    jsiTypedGcMark<C> = gcMark;
     jsConstructorBinding_.jsDestructorErased =
-        dtor == nullptr ? nullptr : &JsiDestroyCallbackAdapter<C>;
+        dtor == nullptr ? nullptr : reinterpret_cast<JSDestructorCallbackErased>(dtor);
     jsConstructorBinding_.jsGcMarkErased =
-        gcMark == nullptr ? nullptr : &JsiGcMarkCallbackAdapter<C>;
+        gcMark == nullptr ? nullptr : reinterpret_cast<JSGCMarkCallbackErased>(gcMark);
     auto runtime = std::static_pointer_cast<ArkJSRuntime>(JsiDeclarativeEngineInstance::GetCurrentRuntime());
     auto vm = const_cast<EcmaVM*>(runtime->GetEcmaVm());
     LocalScope scope(vm);
@@ -253,12 +251,10 @@ template<typename C>
 template<typename... Args>
 void JsiClass<C>::Bind(BindingTarget t, JSDestructorCallback<C> dtor, JSGCMarkCallback<C> gcMark)
 {
-    jsiTypedDestructor<C> = dtor;
-    jsiTypedGcMark<C> = gcMark;
     jsConstructorBinding_.jsDestructorErased =
-        dtor == nullptr ? nullptr : &JsiDestroyCallbackAdapter<C>;
+        dtor == nullptr ? nullptr : reinterpret_cast<JSDestructorCallbackErased>(dtor);
     jsConstructorBinding_.jsGcMarkErased =
-        gcMark == nullptr ? nullptr : &JsiGcMarkCallbackAdapter<C>;
+        gcMark == nullptr ? nullptr : reinterpret_cast<JSGCMarkCallbackErased>(gcMark);
     auto runtime = std::static_pointer_cast<ArkJSRuntime>(JsiDeclarativeEngineInstance::GetCurrentRuntime());
     auto vm = const_cast<EcmaVM*>(runtime->GetEcmaVm());
     LocalScope scope(vm);
@@ -323,12 +319,10 @@ void JsiClass<C>::InheritAndBind(
     }
 
     jsConstructorBinding_.jsConstructor = ctor;
-    jsiTypedDestructor<C> = dtor;
-    jsiTypedGcMark<C> = gcMark;
     jsConstructorBinding_.jsDestructorErased =
-        dtor == nullptr ? nullptr : &JsiDestroyCallbackAdapter<C>;
+        dtor == nullptr ? nullptr : reinterpret_cast<JSDestructorCallbackErased>(dtor);
     jsConstructorBinding_.jsGcMarkErased =
-        gcMark == nullptr ? nullptr : &JsiGcMarkCallbackAdapter<C>;
+        gcMark == nullptr ? nullptr : reinterpret_cast<JSGCMarkCallbackErased>(gcMark);
     classFunction_ = panda::Global<panda::FunctionRef>(
         vm, panda::FunctionRef::NewClassFunction(vm, JsiJSConstructorInterceptor, nullptr,
             reinterpret_cast<void*>(&JsiClass<C>::jsConstructorBinding_)));
