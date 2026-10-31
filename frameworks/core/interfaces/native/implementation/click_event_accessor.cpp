@@ -64,7 +64,7 @@ void SetDisplayXImpl(Ark_ClickEvent peer, Ark_Float64 displayX)
     CHECK_NULL_VOID(info);
     Offset offset = info->GetScreenLocation();
     const auto animation = offset.GetXAnimationOption();
-    offset.SetX(displayX, animation);
+    offset.SetX(PipelineBase::Vp2PxWithCurrentDensity(displayX), animation);
     info->SetScreenLocation(offset);
 }
 Ark_Float64 GetDisplayYImpl(Ark_ClickEvent peer)
@@ -84,7 +84,7 @@ void SetDisplayYImpl(Ark_ClickEvent peer, Ark_Float64 displayY)
     CHECK_NULL_VOID(info);
     Offset offset = info->GetScreenLocation();
     const auto animation = offset.GetYAnimationOption();
-    offset.SetY(displayY, animation);
+    offset.SetY(PipelineBase::Vp2PxWithCurrentDensity(displayY), animation);
     info->SetScreenLocation(offset);
 }
 Ark_Float64 GetWindowXImpl(Ark_ClickEvent peer)
@@ -104,7 +104,7 @@ void SetWindowXImpl(Ark_ClickEvent peer, Ark_Float64 windowX)
     CHECK_NULL_VOID(info);
     Offset offset = info->GetGlobalLocation();
     const auto animation = offset.GetXAnimationOption();
-    offset.SetX(windowX, animation);
+    offset.SetX(PipelineBase::Vp2PxWithCurrentDensity(windowX), animation);
     info->SetGlobalLocation(offset);
 }
 Ark_Float64 GetWindowYImpl(Ark_ClickEvent peer)
@@ -124,7 +124,7 @@ void SetWindowYImpl(Ark_ClickEvent peer, Ark_Float64 windowY)
     CHECK_NULL_VOID(info);
     Offset offset = info->GetGlobalLocation();
     const auto animation = offset.GetYAnimationOption();
-    offset.SetY(windowY, animation);
+    offset.SetY(PipelineBase::Vp2PxWithCurrentDensity(windowY), animation);
     info->SetGlobalLocation(offset);
 }
 Ark_Float64 GetXImpl(Ark_ClickEvent peer)
@@ -144,7 +144,7 @@ void SetXImpl(Ark_ClickEvent peer, Ark_Float64 x)
     CHECK_NULL_VOID(info);
     Offset offset = info->GetLocalLocation();
     const auto animation = offset.GetXAnimationOption();
-    offset.SetX(x, animation);
+    offset.SetX(PipelineBase::Vp2PxWithCurrentDensity(x), animation);
     info->SetLocalLocation(offset);
 }
 Ark_Float64 GetYImpl(Ark_ClickEvent peer)
@@ -164,7 +164,7 @@ void SetYImpl(Ark_ClickEvent peer, Ark_Float64 y)
     CHECK_NULL_VOID(info);
     Offset offset = info->GetLocalLocation();
     const auto animation = offset.GetYAnimationOption();
-    offset.SetY(y, animation);
+    offset.SetY(PipelineBase::Vp2PxWithCurrentDensity(y), animation);
     info->SetLocalLocation(offset);
 }
 Opt_InteractionHand GetHandImpl(Ark_ClickEvent peer)
@@ -232,7 +232,7 @@ void SetGlobalDisplayXImpl(Ark_ClickEvent peer,
     Offset globalDisplayLocation = info->GetGlobalDisplayLocation();
     const auto animation = globalDisplayLocation.GetXAnimationOption();
     const auto globalDisplayXValue = Converter::OptConvertPtr<double>(globalDisplayX).value_or(DEFAULT_VALUE);
-    globalDisplayLocation.SetX(globalDisplayXValue, animation);
+    globalDisplayLocation.SetX(PipelineBase::Vp2PxWithCurrentDensity(globalDisplayXValue), animation);
     info->SetGlobalDisplayLocation(globalDisplayLocation);
 }
 Opt_Float64 GetGlobalDisplayYImpl(Ark_ClickEvent peer)
@@ -253,7 +253,7 @@ void SetGlobalDisplayYImpl(Ark_ClickEvent peer,
     Offset globalDisplayLocation = info->GetGlobalDisplayLocation();
     const auto animation = globalDisplayLocation.GetYAnimationOption();
     const auto globalDisplayYValue = Converter::OptConvertPtr<double>(globalDisplayY).value_or(DEFAULT_VALUE);
-    globalDisplayLocation.SetY(globalDisplayYValue, animation);
+    globalDisplayLocation.SetY(PipelineBase::Vp2PxWithCurrentDensity(globalDisplayYValue), animation);
     info->SetGlobalDisplayLocation(globalDisplayLocation);
 }
 } // ClickEventAccessor
