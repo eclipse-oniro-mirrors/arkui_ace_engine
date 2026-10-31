@@ -327,7 +327,6 @@ void MaterialProcessor::Register(const RefPtr<FrameNode>& node)
 void MaterialProcessor::RegisterPageContextNode(const RefPtr<FrameNode>& node)
 {
     CHECK_NULL_VOID(node);
-    std::lock_guard<std::mutex> lock(pageContextMutex_);
     pageContextStats_[node->GetId()] = WeakPtr<FrameNode>(node);
 }
 
@@ -338,7 +337,6 @@ void MaterialProcessor::Unregister(int32_t nodeId)
 
 void MaterialProcessor::UnregisterPageContextNode(int32_t nodeId)
 {
-    std::lock_guard<std::mutex> lock(pageContextMutex_);
     pageContextStats_.erase(nodeId);
 }
 
@@ -446,7 +444,6 @@ void MaterialProcessor::ReportPageContextStats(int32_t targetContainerId, PageLo
     std::vector<MaterialNodeInfo> tabsNodes;
     std::vector<MaterialNodeInfo> pageNodes;
 
-    std::unique_lock<std::mutex> lock(pageContextMutex_);
     for (auto it = pageContextStats_.begin(); it != pageContextStats_.end();) {
         auto node = it->second.Upgrade();
         if (!node) {
@@ -461,7 +458,6 @@ void MaterialProcessor::ReportPageContextStats(int32_t targetContainerId, PageLo
         ClassifyPageContextNode(node, ci, navNodes, tabsNodes, pageNodes);
         ++it;
     }
-    lock.unlock();
 
     int32_t navContainerId = navNodes.empty() ? -1 : navNodes[0].containerId;
     int32_t tabsContainerId = tabsNodes.empty() ? -1 : tabsNodes[0].containerId;
