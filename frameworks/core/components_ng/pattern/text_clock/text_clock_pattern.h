@@ -159,7 +159,7 @@ private:
     void RequestUpdateForNextSecond();
     void FireChangeEvent() const;
     std::string GetCurrentFormatDateTime();
-    std::string GetFormattedDateTime();
+    void LogCurrentTime(const std::string& currentTime, bool isTimeChange);
     std::string ParseDateTime(const std::string& dateTimeValue, int32_t week, int32_t month, int32_t hour);
     void RegistVisibleAreaChangeCallback();
     void OnVisibleAreaChange(bool visible);

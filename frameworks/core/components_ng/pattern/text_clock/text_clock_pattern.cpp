@@ -257,8 +257,6 @@ void TextClockPattern::InitTextClockController()
 
 void TextClockPattern::OnVisibleAreaChange(bool visible)
 {
-    TAG_LOGI(AceLogTag::ACE_TEXT_CLOCK, "Clock:%{public}s PT:%{public}s",
-        visible ? "visible" : "invisible", prevTime_.c_str());
     if (visible && !isInVisibleArea_) {
         isInVisibleArea_ = visible;
         UpdateTimeText();
@@ -266,6 +264,8 @@ void TextClockPattern::OnVisibleAreaChange(bool visible)
         isInVisibleArea_ = visible;
         delayTask_.Cancel();
     }
+    TAG_LOGI(AceLogTag::ACE_TEXT_CLOCK, "Clock:%{public}s PT:%{public}s",
+        visible ? "visible" : "invisible", prevTime_.c_str());
 }
 
 void TextClockPattern::RegistVisibleAreaChangeCallback()
@@ -312,16 +312,29 @@ void TextClockPattern::UpdateTimeText(bool isTimeChange)
         TAG_LOGE(AceLogTag::ACE_TEXT_CLOCK, "currentTime empty");
         return;
     }
+    LogCurrentTime(currentTime, isTimeChange);
     if (currentTime != prevTime_ || isTimeChange) {
         auto host = GetHost();
-        CHECK_NULL_VOID(host);
+        if (!host) {
+            TAG_LOGE(AceLogTag::ACE_TEXT_CLOCK, "textClockNode is nullptr");
+            return;
+        }
         auto textNode = GetTextNode();
-        CHECK_NULL_VOID(textNode);
+        if (!textNode) {
+            TAG_LOGE(AceLogTag::ACE_TEXT_CLOCK, "textNode is nullptr");
+            return;
+        }
         auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
-        CHECK_NULL_VOID(textLayoutProperty);
+        if (!textLayoutProperty) {
+            TAG_LOGE(AceLogTag::ACE_TEXT_CLOCK, "textLayoutProperty is nullptr");
+            return;
+        }
         textLayoutProperty->UpdateContent(currentTime); // update time text.
         auto textContext = textNode->GetRenderContext();
-        CHECK_NULL_VOID(textContext);
+        if (!textContext) {
+            TAG_LOGE(AceLogTag::ACE_TEXT_CLOCK, "textContext is nullptr");
+            return;
+        }
         textContext->SetClipToFrame(false);
         textContext->UpdateClipEdge(false);
         host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF_AND_PARENT);
@@ -329,6 +342,19 @@ void TextClockPattern::UpdateTimeText(bool isTimeChange)
         textNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
         prevTime_ = currentTime;
         FireChangeEvent();
+    }
+}
+
+void TextClockPattern::LogCurrentTime(const std::string& currentTime, bool isTimeChange)
+{
+    auto now = std::chrono::system_clock::now();
+    auto duration_cast_to_millis = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());
+    auto timeValue = duration_cast_to_millis.count();
+    if (timeValue - timeValue_ > LOG_INTERVAL_TIME) {
+        timeValue_ = timeValue;
+        auto textNode = GetTextNode();
+        TAG_LOGI(AceLogTag::ACE_TEXT_CLOCK, "PT:%{public}s CT:%{public}s TC:%{public}d ID:%{public}d",
+            prevTime_.c_str(), currentTime.c_str(), isTimeChange, textNode ? textNode->GetId() : -1);
     }
 }
 
@@ -374,7 +400,7 @@ void TextClockPattern::RequestUpdateForNextSecond()
         delayTask_, TaskExecutor::TaskType::UI, delayTime, "ArkUITextClockUpdateTimeText");
 }
 
-std::string TextClockPattern::GetFormattedDateTime()
+std::string TextClockPattern::GetCurrentFormatDateTime()
 {
     auto now = std::chrono::system_clock::now();
     time_t current = std::chrono::system_clock::to_time_t(now);
@@ -419,22 +445,6 @@ std::string TextClockPattern::GetFormattedDateTime()
     }
     std::string outputDateTime = ParseDateTime(dateTimeValue, timeZoneTime->tm_wday, timeZoneTime->tm_mon,
         timeZoneTime->tm_hour);
-    return outputDateTime;
-}
-
-std::string TextClockPattern::GetCurrentFormatDateTime()
-{
-    auto now = std::chrono::system_clock::now();
-    auto duration_cast_to_millis = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());
-    auto timeValue = duration_cast_to_millis.count();
-    std::string outputDateTime = GetFormattedDateTime();
-    if (timeValue - timeValue_ > LOG_INTERVAL_TIME) {
-        timeValue_ = timeValue;
-        auto textNode = GetTextNode();
-        CHECK_NULL_RETURN(textNode, outputDateTime);
-        TAG_LOGI(AceLogTag::ACE_TEXT_CLOCK, "PT:%{public}s CT:%{public}s ID:%{public}d",
-            prevTime_.c_str(), outputDateTime.c_str(), textNode->GetId());
-    }
     return outputDateTime;
 }
 
@@ -860,6 +870,7 @@ RefPtr<FrameNode> TextClockPattern::GetTextNode()
     auto textNode = AceType::DynamicCast<FrameNode>(host->GetLastChild());
     CHECK_NULL_RETURN(textNode, nullptr);
     if (textNode->GetTag() != TEXT_ETS_TAG) {
+        TAG_LOGE(AceLogTag::ACE_TEXT_CLOCK, "last child is not text");
         return nullptr;
     }
     return textNode;
@@ -867,9 +878,9 @@ RefPtr<FrameNode> TextClockPattern::GetTextNode()
 
 void TextClockPattern::OnTimeChange()
 {
-    TAG_LOGI(AceLogTag::ACE_TEXT_CLOCK, "Time updated");
     is24H_ = SystemProperties::Is24HourClock();
     UpdateTimeText(ON_TIME_CHANGE);
+    TAG_LOGI(AceLogTag::ACE_TEXT_CLOCK, "Time updated. PT:%{public}s", prevTime_.c_str());
 }
 
 void TextClockPattern::FireBuilder()
@@ -917,8 +928,8 @@ RefPtr<FrameNode> TextClockPattern::BuildContentModifierNode()
 
 void TextClockPattern::OnLanguageConfigurationUpdate()
 {
-    TAG_LOGI(AceLogTag::ACE_TEXT_CLOCK, "Language changed, update");
     UpdateTimeText(true);
+    TAG_LOGI(AceLogTag::ACE_TEXT_CLOCK, "Language changed. PT:%{public}s", prevTime_.c_str());
 }
 
 void TextClockPattern::DumpInfo()
@@ -929,8 +940,15 @@ void TextClockPattern::DumpInfo()
     DumpLog::GetInstance().AddDesc("isInVisibleArea: ", isInVisibleArea_ ? "true" : "false");
     DumpLog::GetInstance().AddDesc("isStart: ", isStart_ ? "true" : "false");
     DumpLog::GetInstance().AddDesc("prevTime: ", prevTime_);
-    DumpLog::GetInstance().AddDesc("currentTime: ", GetFormattedDateTime());
+    DumpLog::GetInstance().AddDesc("currentTime: ", GetCurrentFormatDateTime());
     DumpLog::GetInstance().AddDesc("logTime: ", timeValue_);
+    auto textNode = GetTextNode();
+    CHECK_NULL_VOID(textNode);
+    DumpLog::GetInstance().AddDesc("textId: ", textNode->GetId());
+    auto textLayoutProp = textNode->GetLayoutProperty<TextLayoutProperty>();
+    CHECK_NULL_VOID(textLayoutProp);
+    DumpLog::GetInstance().AddDesc("textContent: ",
+        UtfUtils::Str16DebugToStr8(textLayoutProp->GetContent().value_or(u" ")));
 }
 
 void TextClockPattern::OnColorConfigurationUpdate()
