@@ -19932,7 +19932,7 @@ void ResetRelativeContainerBarrier(ArkUI_NodeHandle node)
 int32_t SetWaterFlowScrollToIndex(ArkUI_NodeHandle node, const ArkUI_AttributeItem* item)
 {
     auto actualSize = CheckAttributeItemArray(item, REQUIRED_ONE_PARAM);
-    if (actualSize < NUM_0) {
+    if (actualSize < NUM_0 || item->value == nullptr) {
         return ERROR_CODE_PARAM_INVALID;
     }
     ArkUI_Int32 values[ALLOW_SIZE_3] = { NUM_0, DEFAULT_FALSE, ArkUI_ScrollAlignment::ARKUI_SCROLL_ALIGNMENT_NONE };

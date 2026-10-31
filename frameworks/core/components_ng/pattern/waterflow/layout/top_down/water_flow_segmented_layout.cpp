@@ -123,6 +123,9 @@ void WaterFlowSegmentedLayout::Measure(LayoutWrapper* wrapper)
 
 void WaterFlowSegmentedLayout::Layout(LayoutWrapper* wrapper)
 {
+    if (info_->targetPreparation_ && info_->measureInNextFrame_) {
+        return;
+    }
     if (!info_->isDataValid_) {
         return;
     }
@@ -243,6 +246,10 @@ int32_t WaterFlowSegmentedLayout::CheckDirtyItem(bool forceMeasure) const
 
 void WaterFlowSegmentedLayout::Init(const SizeF& frameSize, double originalWidth)
 {
+    const bool childDirty = props_->GetPropertyChangeFlag() & PROPERTY_UPDATE_BY_CHILD_REQUEST;
+    if (GetUpdateIdx(wrapper_, info_->footerIndex_) >= 0 || wrapper_->ConstraintChanged() || childDirty) {
+        info_->targetPreparation_.reset();
+    }
     if (sections_) {
         const auto& sections = sections_->GetSectionInfo();
         if (info_->margins_.empty()) {
@@ -268,7 +275,6 @@ void WaterFlowSegmentedLayout::Init(const SizeF& frameSize, double originalWidth
         info_->ClearCacheAfterIndex(updateIdx - 1);
     }
 
-    const bool childDirty = props_->GetPropertyChangeFlag() & PROPERTY_UPDATE_BY_CHILD_REQUEST;
     const int32_t dirtyItem = CheckDirtyItem(childDirty);
     if (dirtyItem != -1) {
         PrepareJump(info_, postJumpOffset_);
@@ -536,6 +542,10 @@ void WaterFlowSegmentedLayout::MeasureToTarget(int32_t targetIdx, std::optional<
             }
         }
         info_->RecordItem(i, position, itemHeight);
+        if (!cacheDeadline && info_->targetPreparation_ && i < targetIdx &&
+            YieldTargetPreparation(wrapper_)) {
+            break;
+        }
         if (cacheDeadline && GetSysTimestamp() > *cacheDeadline) {
             break;
         }
@@ -729,9 +739,13 @@ void WaterFlowSegmentedLayout::PerformMeasurement()
         MeasureOnJump(info_->jumpIndex_);
         info_->jumpIndex_ = WaterFlowLayoutInfoBase::EMPTY_JUMP_INDEX;
     } else if (info_->targetIndex_) {
+        BeginTargetPreparation();
         MeasureToTarget(*info_->targetIndex_, std::nullopt);
-        info_->targetIndex_.reset();
-        info_->duringPositionCalc_ = false;
+        ReleaseTargetPreparationItems(wrapper_);
+        if (!info_->measureInNextFrame_) {
+            info_->targetIndex_.reset();
+            info_->duringPositionCalc_ = false;
+        }
     } else {
         MeasureOnOffset();
     }

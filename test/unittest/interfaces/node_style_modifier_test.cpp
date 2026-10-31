@@ -30,11 +30,78 @@
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 #include "frameworks/base/error/error_code.h"
+#include "core/components_ng/pattern/waterflow/layout/sliding_window/water_flow_layout_sw.h"
+#include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
+#include "core/interfaces/arkoala/arkoala_api.h"
 
 using namespace testing;
 using namespace testing::ext;
 
 namespace OHOS::Ace {
+namespace {
+constexpr float WATER_FLOW_TEST_EXTRA_OFFSET = 40.5f;
+constexpr int32_t WATER_FLOW_OFFSET_PARAM_COUNT = 4;
+constexpr int32_t WATER_FLOW_FAST_SCROLL_PARAM_COUNT = 5;
+ArkUIBasicAPI g_waterFlowUnitBasicApi;
+int32_t g_waterFlowConversionCalls = 0;
+double g_waterFlowTestDipScale = 1.0;
+
+class WaterFlowUnitConversionScope {
+public:
+    WaterFlowUnitConversionScope() : fullImpl_(NodeModel::GetFullImpl()), previous_(fullImpl_->getBasicAPI)
+    {
+        // InitialFullImpl loads the device backend. Its pipeline is independent
+        // of MockPipelineContext, so inject only this external conversion dependency.
+        g_waterFlowUnitBasicApi = *previous_();
+        g_waterFlowUnitBasicApi.convertLengthMetricsUnit = [](double value, int32_t origin, int32_t target) {
+            ++g_waterFlowConversionCalls;
+            EXPECT_EQ(origin, static_cast<int32_t>(DimensionUnit::VP));
+            EXPECT_EQ(target, static_cast<int32_t>(DimensionUnit::PX));
+            EXPECT_DOUBLE_EQ(value, WATER_FLOW_TEST_EXTRA_OFFSET);
+            return value * g_waterFlowTestDipScale;
+        };
+        fullImpl_->getBasicAPI = []() -> const ArkUIBasicAPI* { return &g_waterFlowUnitBasicApi; };
+    }
+    ~WaterFlowUnitConversionScope()
+    {
+        fullImpl_->getBasicAPI = previous_;
+    }
+private:
+    ArkUIFullNodeAPI* fullImpl_;
+    const ArkUIBasicAPI* (*previous_)();
+};
+
+void CheckWaterFlowOffsetParameters(ArkUI_NativeNodeAPI_1* nodeAPI, ArkUI_NodeHandle node,
+    const RefPtr<NG::WaterFlowPattern>& pattern, bool fastLayout, float convertedOffset)
+{
+    ArkUI_NumberValue values[] = { { .i32 = 0 }, { .i32 = 1 }, { .i32 = ARKUI_SCROLL_ALIGNMENT_START },
+        { .f32 = WATER_FLOW_TEST_EXTRA_OFFSET }, { .i32 = 0 } };
+    ArkUI_AttributeItem item { values, WATER_FLOW_FAST_SCROLL_PARAM_COUNT };
+    for (int32_t size : { WATER_FLOW_OFFSET_PARAM_COUNT, WATER_FLOW_FAST_SCROLL_PARAM_COUNT }) {
+        item.size = size;
+        for (int32_t mode : { -1, 0, 1, 2, 3 }) {
+            values[WATER_FLOW_FAST_SCROLL_PARAM_COUNT - 1].i32 = mode;
+            for (int32_t smooth : { 0, 1 }) {
+                values[1].i32 = smooth;
+                SCOPED_TRACE(testing::Message() << size << "/" << mode << "/" << smooth);
+                const bool converted = fastLayout && smooth && size == WATER_FLOW_FAST_SCROLL_PARAM_COUNT &&
+                    (mode == 1 || mode == 2) && node->lengthMetricUnit != ARKUI_LENGTH_METRIC_UNIT_PX;
+                const float expected = converted ? convertedOffset : WATER_FLOW_TEST_EXTRA_OFFSET;
+                g_waterFlowConversionCalls = 0;
+                EXPECT_EQ(nodeAPI->setAttribute(node, NODE_WATER_FLOW_SCROLL_TO_INDEX, &item), ERROR_CODE_NO_ERROR);
+                EXPECT_EQ(g_waterFlowConversionCalls, static_cast<int32_t>(converted));
+                if (!smooth) {
+                    EXPECT_FLOAT_EQ(pattern->layoutInfo_->extraOffset_.value_or(0.0f), -expected);
+                } else if (pattern->fastScrollState_) {
+                    EXPECT_FLOAT_EQ(pattern->fastScrollState_->extraOffset, expected);
+                } else {
+                    EXPECT_FLOAT_EQ(pattern->GetExtraOffset().value_or(0.0f), expected);
+                }
+            }
+        }
+    }
+}
+} // namespace
 
 class NodeStyleModifierTest : public testing::Test {
 public:
@@ -557,6 +624,74 @@ HWTEST_F(NodeStyleModifierTest, WFFastScrollCapiParameters, TestSize.Level1)
     }
     item.size = legacyValueCount;
     EXPECT_EQ(nodeAPI->setAttribute(node, NODE_WATER_FLOW_SCROLL_TO_INDEX, &item), ERROR_CODE_NO_ERROR);
+    nodeAPI->removeChild(node, child);
+    nodeAPI->disposeNode(child);
+    nodeAPI->disposeNode(node);
+}
+
+/**
+ * @tc.name: WFFastScrollCapiNullValues
+ * @tc.desc: Invalid numeric arrays return 401 without accessing a null value pointer.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeStyleModifierTest, WFFastScrollCapiNullValues, TestSize.Level1)
+{
+    ASSERT_TRUE(NodeModel::InitialFullImpl());
+    auto* nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
+    ASSERT_NE(nodeAPI, nullptr);
+    auto node = nodeAPI->createNode(ARKUI_NODE_WATER_FLOW);
+    ASSERT_NE(node, nullptr);
+    EXPECT_EQ(nodeAPI->setAttribute(node, NODE_WATER_FLOW_SCROLL_TO_INDEX, nullptr), ERROR_CODE_PARAM_INVALID);
+    for (int32_t size : { -1, 0, 1, 4, 5 }) {
+        ArkUI_AttributeItem item { nullptr, size };
+        EXPECT_EQ(nodeAPI->setAttribute(node, NODE_WATER_FLOW_SCROLL_TO_INDEX, &item), ERROR_CODE_PARAM_INVALID);
+    }
+    ArkUI_NumberValue values[] = { { .i32 = 0 } };
+    ArkUI_AttributeItem valid { values, 1 };
+    EXPECT_EQ(nodeAPI->setAttribute(node, NODE_WATER_FLOW_SCROLL_TO_INDEX, &valid), ERROR_CODE_NO_ERROR);
+    nodeAPI->disposeNode(node);
+}
+
+/**
+ * @tc.name: WFFastScrollCapiOffsetUnits
+ * @tc.desc: Only effective fast scrolling converts VP offsets; legacy and fallback paths keep their original units.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeStyleModifierTest, WFFastScrollCapiOffsetUnits, TestSize.Level1)
+{
+    ASSERT_TRUE(NodeModel::InitialFullImpl());
+    ASSERT_NE(NodeModel::GetFullImpl(), nullptr);
+    ASSERT_NE(NodeModel::GetFullImpl()->getBasicAPI(), nullptr);
+    WaterFlowUnitConversionScope conversionScope;
+    auto* nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
+    ASSERT_NE(nodeAPI, nullptr);
+    auto node = nodeAPI->createNode(ARKUI_NODE_WATER_FLOW);
+    auto child = nodeAPI->createNode(ARKUI_NODE_FLOW_ITEM);
+    ASSERT_NE(node, nullptr);
+    ASSERT_NE(child, nullptr);
+    ASSERT_EQ(nodeAPI->addChild(node, child), ERROR_CODE_NO_ERROR);
+    auto* frameNode = reinterpret_cast<NG::FrameNode*>(node->uiNodeHandle);
+    auto pattern = frameNode->GetPattern<NG::WaterFlowPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ArkUI_NumberValue layoutValue[] = { { .i32 = ARKUI_WATER_FLOW_LAYOUT_MODE_SLIDING_WINDOW } };
+    ArkUI_AttributeItem layoutItem { layoutValue, 1 };
+    for (auto layout : { ARKUI_WATER_FLOW_LAYOUT_MODE_SLIDING_WINDOW,
+             ARKUI_WATER_FLOW_LAYOUT_MODE_ALWAYS_TOP_DOWN }) {
+        layoutValue[0].i32 = layout;
+        EXPECT_EQ(nodeAPI->setAttribute(node, NODE_WATER_FLOW_LAYOUT_MODE, &layoutItem), ERROR_CODE_NO_ERROR);
+        for (double density : { 1.0, 1.5, 2.0, 3.0 }) {
+            g_waterFlowTestDipScale = density;
+            for (auto unit : { ARKUI_LENGTH_METRIC_UNIT_DEFAULT, ARKUI_LENGTH_METRIC_UNIT_VP,
+                     ARKUI_LENGTH_METRIC_UNIT_PX }) {
+                node->lengthMetricUnit = unit;
+                SCOPED_TRACE(testing::Message() << layout << "/" << density << "/" << unit);
+                CheckWaterFlowOffsetParameters(nodeAPI, node, pattern,
+                    layout == ARKUI_WATER_FLOW_LAYOUT_MODE_SLIDING_WINDOW, WATER_FLOW_TEST_EXTRA_OFFSET * density);
+            }
+        }
+    }
     nodeAPI->removeChild(node, child);
     nodeAPI->disposeNode(child);
     nodeAPI->disposeNode(node);

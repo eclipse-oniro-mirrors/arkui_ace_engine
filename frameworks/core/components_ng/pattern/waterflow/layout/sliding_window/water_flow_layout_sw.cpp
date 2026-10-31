@@ -56,7 +56,10 @@ void WaterFlowLayoutSW::Measure(LayoutWrapper* wrapper)
         return;
     }
     InvalidateFastScrollIfNeeded();
+    CleanupTargetPreparation();
     if (int32_t change = CheckReset(); change > -1) {
+        info_->targetPreparation_.reset();
+        info_->targetPreparationCleanup_.reset();
         FillBack(info_->GetViewEndBound(mainLen_), change, itemCnt_ - 1);
     }
 
@@ -88,6 +91,22 @@ void WaterFlowLayoutSW::Measure(LayoutWrapper* wrapper)
     measuredStartIndex_ = info_->StartIndex();
     measuredEndIndex_ = info_->EndIndex();
     isLayouted_ = false;
+}
+
+void WaterFlowLayoutSW::CleanupTargetPreparation()
+{
+    if (const auto& cleanup = info_->targetPreparationCleanup_; cleanup) {
+        // The target position has been consumed or cancelled. Size checks and
+        // stale-layout cleanup must only visit the retained viewport, otherwise
+        // an implicit animation can recreate the entire released route at once.
+        prevStartIndex_ = cleanup->startIndex;
+        prevEndIndex_ = cleanup->endIndex;
+        ClearFront();
+        ClearBack(info_->GetViewEndBound(mainLen_));
+        info_->startIndex_ = info_->StartIndex();
+        info_->endIndex_ = info_->EndIndex();
+        info_->targetPreparationCleanup_.reset();
+    }
 }
 
 void WaterFlowLayoutSW::InvalidateFastScrollIfNeeded()
@@ -445,7 +464,20 @@ bool WaterFlowLayoutSW::CheckItemSizeChanged(bool forceMeasure) const
 bool WaterFlowLayoutSW::LaneItemSizeChanged(
     const WaterFlowLayoutInfoSW::Lane& lane, size_t laneIdx, bool forceMeasure) const
 {
-    for (const auto& item : lane.items_) {
+    auto first = lane.items_.begin();
+    auto last = lane.items_.end();
+    if (info_->targetPreparation_ && !forceMeasure) {
+        // Preparation retains route geometry across frames, but releases its
+        // offscreen nodes. Only the original viewport can change independently.
+        // Data reloads and forced child measurement still take the full path.
+        const auto& state = *info_->targetPreparation_;
+        first = std::lower_bound(first, last, state.startIndex,
+            [](const auto& item, int32_t index) { return item.idx < index; });
+        last = std::upper_bound(first, last, state.endIndex,
+            [](int32_t index, const auto& item) { return index < item.idx; });
+    }
+    for (auto it = first; it != last; ++it) {
+        const auto& item = *it;
         // stable-state lanes_ only hold in-viewport items; pass isCache defensively
         auto child = wrapper_->GetChildByIndex(nodeIdx(item.idx), IsCache(info_, item.idx));
         // Measure lazy items later with a viewport reference.
@@ -567,13 +599,15 @@ void WaterFlowLayoutSW::ApplyDelta(float delta)
 
 void WaterFlowLayoutSW::MeasureBeforeAnimation(int32_t targetIdx)
 {
-    const std::pair prevRange { info_->startIndex_, info_->endIndex_ };
+    BeginTargetPreparation();
+    measuringTarget_ = true;
     MeasureToTarget(targetIdx);
-
-    // skip Layout, only measure to calculate target position
-    const int32_t cacheCount = props_->GetCachedCountValue(1);
-    wrapper_->SetActiveChildRange(nodeIdx(prevRange.first), nodeIdx(prevRange.second), cacheCount, cacheCount,
-        props_->GetShowCachedItemsValue(false));
+    measuringTarget_ = false;
+    if (targetIdx >= info_->StartIndex() && targetIdx <= info_->EndIndex()) {
+        info_->measureInNextFrame_ = false;
+    }
+    // Release each bounded batch while keeping the pre-animation viewport.
+    ReleaseTargetPreparationItems(wrapper_);
 }
 
 void WaterFlowLayoutSW::MeasureToTarget(int32_t targetIdx)
@@ -581,10 +615,13 @@ void WaterFlowLayoutSW::MeasureToTarget(int32_t targetIdx)
     if (itemCnt_ == 0) {
         return;
     }
-    if (targetIdx < info_->startIndex_) {
-        FillFront(-FLT_MAX, info_->startIndex_ - 1, targetIdx);
-    } else if (targetIdx > info_->endIndex_) {
-        FillBack(FLT_MAX, info_->endIndex_ + 1, targetIdx);
+    if (targetIdx == LAST_ITEM) {
+        targetIdx = itemCnt_ - 1;
+    }
+    if (targetIdx < info_->StartIndex()) {
+        FillFront(-FLT_MAX, info_->StartIndex() - 1, targetIdx);
+    } else if (targetIdx > info_->EndIndex()) {
+        FillBack(FLT_MAX, info_->EndIndex() + 1, targetIdx);
     }
 }
 
@@ -664,6 +701,9 @@ bool WaterFlowLayoutSW::FillBackSection(float viewportBound, int32_t& idx, int32
     maxChildIdx = std::min(maxChildIdx, info_->segmentTails_[section]);
     if (info_->idxToLane_.count(idx)) {
         RecoverBack(viewportBound, idx, maxChildIdx);
+        if (info_->measureInNextFrame_) {
+            return true;
+        }
     }
     EndPosQ q;
     PrepareEndPosQueue(q, info_->lanes_[section], mainGaps_[section], viewportBound);
@@ -677,6 +717,9 @@ bool WaterFlowLayoutSW::FillBackSection(float viewportBound, int32_t& idx, int32
         info_->idxToLane_[idx] = laneIdx;
         const float mainLen = MeasureChild(idx, laneIdx);
         float endPos = FillBackHelper(mainLen, idx++, laneIdx);
+        if (measuringTarget_ && YieldTargetPreparation(wrapper_)) {
+            return true;
+        }
         if (LessNotEqual(endPos, viewportBound)) {
             q.push({ endPos, laneIdx });
         }
@@ -708,6 +751,9 @@ bool WaterFlowLayoutSW::FillFrontSection(float viewportBound, int32_t& idx, int3
     minChildIdx = std::max(minChildIdx, secIdx > 0 ? info_->segmentTails_[secIdx - 1] + 1 : 0);
     if (info_->idxToLane_.count(idx)) {
         RecoverFront(viewportBound, idx, minChildIdx);
+        if (info_->measureInNextFrame_) {
+            return true;
+        }
     }
     StartPosQ q;
     PrepareStartPosQueue(q, info_->lanes_[secIdx], mainGaps_[secIdx], viewportBound);
@@ -721,6 +767,9 @@ bool WaterFlowLayoutSW::FillFrontSection(float viewportBound, int32_t& idx, int3
         info_->idxToLane_[idx] = laneIdx;
         const float mainLen = MeasureChild(idx, laneIdx, false);
         float startPos = FillFrontHelper(mainLen, idx--, laneIdx);
+        if (measuringTarget_ && YieldTargetPreparation(wrapper_)) {
+            return true;
+        }
         if (GreatNotEqual(startPos, viewportBound)) {
             q.push({ startPos, laneIdx });
         }
@@ -772,14 +821,21 @@ void WaterFlowLayoutSW::RecoverBack(float viewportBound, int32_t& idx, int32_t m
         }
     }
 
+    const auto syntax = ScrollablePattern::FindItemLazySyntax(wrapper_->GetHostNode());
+    const bool lazyReuse = syntax.arkoala || syntax.repeatV2;
     while (!lanes.empty() && idx <= maxChildIdx && info_->idxToLane_.count(idx)) {
         size_t laneIdx = info_->idxToLane_.at(idx);
-        const float mainLen = MeasureChild(idx, laneIdx);
+        const auto& lane = info_->lanes_[secIdx][laneIdx];
+        const auto cached = info_->GetCachedHeight(idx);
+        const float itemStart = lane.endPos + (lane.items_.empty() ? 0.0f : mainGaps_[secIdx]);
+        const bool crossed = lazyReuse && !measuringTarget_ && !cacheDeadline_ && cached &&
+            LessOrEqual(itemStart + *cached, info_->GetViewStartBound());
+        const float mainLen = crossed ? *cached : MeasureChild(idx, laneIdx);
         float endPos = FillBackHelper(mainLen, idx++, laneIdx);
         if (GreatOrEqual(endPos, viewportBound)) {
             lanes.erase(laneIdx);
         }
-        if (OverDue(cacheDeadline_)) {
+        if ((measuringTarget_ && YieldTargetPreparation(wrapper_)) || OverDue(cacheDeadline_)) {
             return;
         }
     }
@@ -796,14 +852,21 @@ void WaterFlowLayoutSW::RecoverFront(float viewportBound, int32_t& idx, int32_t 
             lanes.insert(i);
         }
     }
+    const auto syntax = ScrollablePattern::FindItemLazySyntax(wrapper_->GetHostNode());
+    const bool lazyReuse = syntax.arkoala || syntax.repeatV2;
     while (!lanes.empty() && idx >= minChildIdx && info_->idxToLane_.count(idx)) {
         size_t laneIdx = info_->idxToLane_.at(idx);
-        const float mainLen = MeasureChild(idx, laneIdx, false);
+        const auto& lane = info_->lanes_[secIdx][laneIdx];
+        const auto cached = info_->GetCachedHeight(idx);
+        const float itemEnd = lane.startPos - (lane.items_.empty() ? 0.0f : mainGaps_[secIdx]);
+        const bool crossed = lazyReuse && !measuringTarget_ && !cacheDeadline_ && cached &&
+            GreatOrEqual(itemEnd - *cached, info_->GetViewEndBound(mainLen_));
+        const float mainLen = crossed ? *cached : MeasureChild(idx, laneIdx, false);
         float startPos = FillFrontHelper(mainLen, idx--, laneIdx);
         if (LessOrEqual(startPos, viewportBound)) {
             lanes.erase(laneIdx);
         }
-        if (OverDue(cacheDeadline_)) {
+        if ((measuringTarget_ && YieldTargetPreparation(wrapper_)) || OverDue(cacheDeadline_)) {
             return;
         }
     }

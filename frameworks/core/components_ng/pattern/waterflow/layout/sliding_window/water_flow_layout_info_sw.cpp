@@ -40,7 +40,11 @@ void WaterFlowLayoutInfoSW::Sync(int32_t itemCnt, float mainSize, const std::vec
     mainGap_ = mainGap;
     startPos_ = StartPos();
     endPos_ = EndPos();
-    SyncReportRange(mainSize);
+    // No visible geometry changes while a legacy route is prepared. Avoid
+    // scanning its growing prefix again on every yielded frame.
+    if (!targetPreparation_ || !measureInNextFrame_) {
+        SyncReportRange(mainSize);
+    }
 
     prevItemStart_ = itemStart_;
     itemStart_ = startIndex_ == 0 && NonNegative(startPos_ - TopMargin() - contentStartOffset_);
@@ -417,6 +421,7 @@ void WaterFlowLayoutInfoSW::Reset()
     for (auto& section : lanes_) {
         for (auto& lane : section) {
             lane.items_.clear();
+            lane.endPos = lane.startPos;
         }
     }
     idxToLane_.clear();
