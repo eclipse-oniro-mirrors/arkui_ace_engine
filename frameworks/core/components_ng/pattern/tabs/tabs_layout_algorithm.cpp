@@ -23,6 +23,7 @@
 #include "core/components_ng/pattern/tabs/tabs_pattern.h"
 #include "core/components_ng/pattern/tabs/tabs_side_bar_pattern.h"
 #include "core/components_ng/pattern/tabs/tabs_side_bar_tab_list_pattern.h"
+#include "core/components_ng/property/calc_length.h"
 #include "core/components_ng/property/measure_utils.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "ui/base/geometry/ng/offset_t.h"
@@ -823,12 +824,70 @@ void TabsLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
 
     LayoutBackgroundMask(layoutWrapper);
 
-    tabsPattern->ClampTabBarTransformOffset();
-
     if (measuringForAnimStart_ || tabsPattern->IsOnDisplayModeSwitchAnimation()) {
         LayoutSidebarForAnimation(layoutWrapper, layoutProperty, geometryNode);
         measuringForAnimStart_ = false;
     }
+
+    UpdateFloatingBarTransform(layoutWrapper);
+    tabsPattern->ClampTabBarTransformOffset();
+}
+
+void TabsLayoutAlgorithm::UpdateFloatingBarTransform(LayoutWrapper* layoutWrapper) const
+{
+    if (!isFloatingBar_ && !isFloatingTopBar_) {
+        return;
+    }
+    auto host = layoutWrapper->GetHostNode();
+    CHECK_NULL_VOID(host);
+    auto tabsPattern = host->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(tabsPattern);
+    if (tabsPattern->IsOnDisplayModeSwitchAnimation() ||
+        (isFloatingBar_ && tabsPattern->IsTabBarFollowingHand())) {
+        return;
+    }
+    auto layoutProperty = AceType::DynamicCast<TabsLayoutProperty>(layoutWrapper->GetLayoutProperty());
+    CHECK_NULL_VOID(layoutProperty);
+    auto geometryNode = layoutWrapper->GetGeometryNode();
+    CHECK_NULL_VOID(geometryNode);
+    auto tabBarWrapper = layoutWrapper->GetChildByIndex(itemIndex_.tabBarIndex);
+    CHECK_NULL_VOID(tabBarWrapper);
+    auto tabBar = tabBarWrapper->GetHostNode();
+    CHECK_NULL_VOID(tabBar);
+    auto renderContext = tabBar->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+
+    std::optional<Dimension> offsetX;
+    std::optional<Dimension> offsetY;
+    if (isFloatingTopBar_) {
+        auto style = layoutProperty->GetBarTopFloatingStyle();
+        if (style.has_value()) {
+            offsetX = style->offsetX;
+            offsetY = style->offsetY;
+        }
+    } else {
+        auto style = layoutProperty->GetBarFloatingStyle();
+        if (style.has_value()) {
+            offsetX = style->offsetX;
+            offsetY = style->offsetY;
+        }
+    }
+    auto tabsFrameSize = geometryNode->GetFrameSize();
+    auto scaleProperty = ScaleProperty::CreateScaleProperty();
+    double result = 0.0;
+    float translateX = 0.0f;
+    float translateY = 0.0f;
+    if (offsetX.has_value() && offsetX->NormalizeToPx(scaleProperty.vpScale, scaleProperty.fpScale,
+        scaleProperty.lpxScale, tabsFrameSize.Width(), result)) {
+        translateX = static_cast<float>(result);
+    }
+    if (offsetY.has_value() && offsetY->NormalizeToPx(scaleProperty.vpScale, scaleProperty.fpScale,
+        scaleProperty.lpxScale, tabsFrameSize.Height(), result)) {
+        translateY = static_cast<float>(result);
+    }
+    renderContext->UpdateTransformTranslate({translateX, translateY, 0.0f});
+    float scale = isFloatingTopBar_ ? 1.0f : tabsPattern->GetBaseFloatingScale();
+    renderContext->UpdateTransformScale({scale, scale});
 }
 
 void TabsLayoutAlgorithm::LayoutSidebarForAnimation(LayoutWrapper* layoutWrapper,
@@ -972,7 +1031,7 @@ void TabsLayoutAlgorithm::UpdateTopBarMargin(LayoutWrapper* layoutWrapper, Offse
     }
     if (GreatNotEqual(barOffset.GetY(), maxY)) {
         barOffset.SetY(maxY);
-     }
+    }
 }
 
 void TabsLayoutAlgorithm::LayoutBackgroundMask(LayoutWrapper* layoutWrapper)

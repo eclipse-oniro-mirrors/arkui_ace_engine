@@ -63,7 +63,6 @@
 #include "core/components_ng/pattern/tabs/tabs_side_bar_pattern.h"
 #include "core/components_ng/pattern/tabs/tabs_side_bar_tab_list_pattern.h"
 #include "core/components_ng/pattern/window_scene/helper/window_scene_helper.h"
-#include "core/components_ng/property/calc_length.h"
 #include "core/components_ng/property/property.h"
 #include "core/components_ng/render/animation_utils.h"
 #include "core/components_v2/inspector/inspector_constants.h"
@@ -1470,33 +1469,6 @@ void TabsPattern::InitFloatingBar()
             renderContext->ResetBorder();
         }
         ApplySystemMaterial();
-        if (renderContext) {
-            auto style = property->GetBarFloatingStyle();
-            float offsetX = 0.0f;
-            float offsetY = 0.0f;
-            if (style.has_value()) {
-                auto tabsGeometry = tabsNode->GetGeometryNode();
-                auto tabsFrameSize = tabsGeometry ? tabsGeometry->GetFrameSize() : SizeF();
-                auto scaleProperty = ScaleProperty::CreateScaleProperty();
-                double result = 0.0;
-                if (style->offsetX.has_value()) {
-                    if (style->offsetX.value().NormalizeToPx(
-                            scaleProperty.vpScale, scaleProperty.fpScale, scaleProperty.lpxScale,
-                            tabsFrameSize.Width(), result)) {
-                        offsetX = static_cast<float>(result);
-                    }
-                }
-                if (style->offsetY.has_value()) {
-                    if (style->offsetY.value().NormalizeToPx(
-                            scaleProperty.vpScale, scaleProperty.fpScale, scaleProperty.lpxScale,
-                            tabsFrameSize.Height(), result)) {
-                        offsetY = static_cast<float>(result);
-                    }
-                }
-            }
-            renderContext->UpdateTransformTranslate({offsetX, offsetY, 0.0f});
-            renderContext->UpdateTransformScale({baseFloatingScale_, baseFloatingScale_});
-        }
     } else if (shouldTopFloating) {
         isFloatingBar_ = false;
         isFloatingTopBar_ = true;
@@ -1537,30 +1509,6 @@ void TabsPattern::InitFloatingBar()
                 borderColor.SetColor(tabTheme->GetTopTabBarBackgroundColor());
                 renderContext->UpdateBorderColor(borderColor);
             }
-            float offsetX = 0.0f;
-            float offsetY = 0.0f;
-            if (topStyle.has_value()) {
-                auto tabsGeometry = tabsNode->GetGeometryNode();
-                auto tabsFrameSize = tabsGeometry ? tabsGeometry->GetFrameSize() : SizeF();
-                auto scaleProperty = ScaleProperty::CreateScaleProperty();
-                double result = 0.0;
-                if (topStyle->offsetX.has_value()) {
-                    if (topStyle->offsetX.value().NormalizeToPx(
-                            scaleProperty.vpScale, scaleProperty.fpScale, scaleProperty.lpxScale,
-                            tabsFrameSize.Width(), result)) {
-                        offsetX = static_cast<float>(result);
-                    }
-                }
-                if (topStyle->offsetY.has_value()) {
-                    if (topStyle->offsetY.value().NormalizeToPx(
-                            scaleProperty.vpScale, scaleProperty.fpScale, scaleProperty.lpxScale,
-                            tabsFrameSize.Height(), result)) {
-                        offsetY = static_cast<float>(result);
-                    }
-                }
-            }
-            renderContext->UpdateTransformTranslate({offsetX, offsetY, 0.0f});
-            renderContext->UpdateTransformScale({1.0f, 1.0f});
         }
     } else {
         isFloatingBar_ = false;
