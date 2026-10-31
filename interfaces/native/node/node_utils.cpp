@@ -172,6 +172,7 @@ int32_t OH_ArkUI_RegisterSystemColorModeChangeEvent(
         return OHOS::Ace::ERROR_CODE_PARAM_INVALID;
     }
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     impl->getNodeModifiers()->getFrameNodeModifier()->setSystemColorModeChangeEvent(
         node->uiNodeHandle, userData, reinterpret_cast<void*>(onColorModeChange));
 
@@ -185,6 +186,7 @@ void OH_ArkUI_UnregisterSystemColorModeChangeEvent(ArkUI_NodeHandle node)
         return;
     }
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     impl->getNodeModifiers()->getFrameNodeModifier()->resetSystemColorModeChangeEvent(node->uiNodeHandle);
 }
 
