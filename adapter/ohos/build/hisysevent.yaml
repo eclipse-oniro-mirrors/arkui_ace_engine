@@ -267,3 +267,10 @@ UI_STATISTIC_EVENT:
   EVENT_COUNT: {type: INT32, arrsize: 100, desc: event count}
   BUNDLE_NAME: {type: STRING, arrsize: 100, desc: bundle name}
 
+MATERIAL_NODE_STAT:
+  __BASE: {type: STATISTIC, level: CRITICAL, desc: Statistics of Material Node Information}
+  BUNDLE_NAME: {type: STRING, arrsize: 100, desc: app name}
+  PAGE_INFO: {type: STRING, arrsize: 100, desc: page information}
+  NAV_INFO: {type: STRING, arrsize: 100, desc: navigation information}
+  TABS_INFO: {type: STRING, arrsize: 100, desc: tabs information}
+

@@ -95,7 +95,7 @@ void RichEditorStyleChangeTestNg::TearDownTestSuite()
  * @tc.desc: test update span style
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorStyleChangeTestNg, TextStyle001, TestSize.Level0)
+HWTEST_F(RichEditorStyleChangeTestNg, TextStyle001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -149,7 +149,7 @@ HWTEST_F(RichEditorStyleChangeTestNg, TextStyle001, TestSize.Level0)
  * @tc.desc: test update span style
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorStyleChangeTestNg, UpdateSpanStyle001, TestSize.Level0)
+HWTEST_F(RichEditorStyleChangeTestNg, UpdateSpanStyle001, TestSize.Level1)
 {
     /**
      * @tc.steps: step1. get richEditor controller
@@ -226,7 +226,7 @@ HWTEST_F(RichEditorStyleChangeTestNg, UpdateSpanStyle001, TestSize.Level0)
  * @tc.desc: test UpdateImageStyle
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorStyleChangeTestNg, UpdateSpanStyle002, TestSize.Level0)
+HWTEST_F(RichEditorStyleChangeTestNg, UpdateSpanStyle002, TestSize.Level1)
 {
     /**
      * @tc.steps: step1. get richEditor controller
@@ -298,11 +298,8 @@ HWTEST_F(RichEditorStyleChangeTestNg, UpdateSpanStyle002, TestSize.Level0)
  * @tc.desc: test update span style
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorStyleChangeTestNg, UpdateSpanStyle003, TestSize.Level0)
+HWTEST_F(RichEditorStyleChangeTestNg, UpdateSpanStyle003, TestSize.Level1)
 {
-    /**
-     * @tc.steps: step1. get richEditor controller
-     */
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
@@ -310,10 +307,6 @@ HWTEST_F(RichEditorStyleChangeTestNg, UpdateSpanStyle003, TestSize.Level0)
     ASSERT_NE(richEditorController, nullptr);
     auto contentNode = richEditorNode_->GetChildAtIndex(0);
     ASSERT_NE(contentNode, nullptr);
-
-    /**
-     * @tc.steps: step2. initalize style
-     */
     AddSpan(INIT_VALUE_1);
     AddImageSpan();
     AddSpan(INIT_VALUE_2);
@@ -338,10 +331,6 @@ HWTEST_F(RichEditorStyleChangeTestNg, UpdateSpanStyle003, TestSize.Level0)
     updateSpanStyle.updateTextDecoration = TEXT_DECORATION_VALUE;
     updateSpanStyle.updateTextDecorationColor = TEXT_DECORATION_COLOR_VALUE;
     updateSpanStyle.updateLineThicknessScale = TEXT_DECORATION_THICKNESS_SCALE;
-
-    /**
-     * @tc.steps: step2. updateSpanStyle and check
-     */
     richEditorController->SetUpdateSpanStyle(updateSpanStyle);
     richEditorController->UpdateSpanStyle(5, 10, textStyle, imageStyle);
     EXPECT_EQ(contentNode->GetChildren().size(), 5);
@@ -363,7 +352,7 @@ HWTEST_F(RichEditorStyleChangeTestNg, UpdateSpanStyle003, TestSize.Level0)
  * @tc.desc: test AddTextSpan with UpdateParagraphStyle
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorStyleChangeTestNg, UpdateParagraphStyle001, TestSize.Level0)
+HWTEST_F(RichEditorStyleChangeTestNg, UpdateParagraphStyle001, TestSize.Level1)
 {
     /**
      * @tc.steps: step1. get richEditor controller

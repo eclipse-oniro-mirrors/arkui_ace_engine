@@ -198,9 +198,10 @@ void TextInputResponseArea::SetHoverRectForTV(RefPtr<FrameNode>& stackNode, Rect
         hoverRectHeight + DOUBLE_PADDING * iconOffsetPadding, hoverRectHeight + DOUBLE_PADDING * iconOffsetPadding);
 }
 
-void TextInputResponseArea::SetHotZoneRect(DimensionRect& hotZoneRegion, float iconSize, float hotZoneHeight)
+void TextInputResponseArea::SetHotZoneRect(DimensionRect& hotZoneRegion, float iconSize, float hotZoneHeight,
+    float imageOffsetX)
 {
-    auto hotZoneX = - (hotZoneHeight - iconSize) / HALF_SPACE;
+    auto hotZoneX = - (hotZoneHeight - iconSize) / HALF_SPACE + imageOffsetX;
     auto hotZoneY = - (hotZoneHeight - iconSize) / HALF_SPACE;
 
     OffsetF hotZoneOffset;
@@ -981,15 +982,28 @@ void CleanNodeResponseArea::AddIconHotZoneRect()
     CHECK_NULL_VOID(imageGeometryNode);
     auto imageRect = imageGeometryNode->GetFrameRect();
     auto iconSize = imageRect.Height();
+    // Calculate image offset within stack for RTL alignment compensation.
+    // SetHotZoneRect assumes icon at x=0 (CENTER_LEFT), but in RTL the icon
+    // is at x=rightOffset (CENTER_RIGHT), so the response region must shift.
+    float imageOffsetX = 0.0f;
+    auto layoutProperty = pattern->GetLayoutProperty<LayoutProperty>();
+    if (layoutProperty) {
+        auto alignment = GetStackAlignment(layoutProperty->GetLayoutDirection());
+        if (alignment == Alignment::CENTER_RIGHT) {
+            auto stackGeometryNode = cleanNode_->GetGeometryNode();
+            CHECK_NULL_VOID(stackGeometryNode);
+            imageOffsetX = stackGeometryNode->GetFrameRect().Width() - imageRect.Width();
+        }
+    }
     auto hotZoneHeight = static_cast<float>(DEFAULT_ICON_HOT_ZONE.ConvertToPx());
     hotZoneHeight = cancelHoverSize_ > hotZoneHeight ? cancelHoverSize_ : hotZoneHeight;
     DimensionRect hotZoneRegion;
-    SetHotZoneRect(hotZoneRegion, iconSize, hotZoneHeight);
+    SetHotZoneRect(hotZoneRegion, iconSize, hotZoneHeight, imageOffsetX);
 
     auto defaultHoverSize = static_cast<float>(DEFAULT_HOVER_SIZE.ConvertToPx());
     auto mouseHotZoneHeight = NearZero(cancelHoverSize_) ? defaultHoverSize : cancelHoverSize_;
     DimensionRect mouseHotZoneRegion;
-    SetHotZoneRect(mouseHotZoneRegion, iconSize, mouseHotZoneHeight);
+    SetHotZoneRect(mouseHotZoneRegion, iconSize, mouseHotZoneHeight, imageOffsetX);
 
     std::vector<DimensionRect> mouseRegion;
     mouseRegion.emplace_back(mouseHotZoneRegion);

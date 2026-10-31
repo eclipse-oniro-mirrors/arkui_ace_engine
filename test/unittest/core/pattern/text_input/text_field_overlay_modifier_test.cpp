@@ -298,10 +298,12 @@ static RefPtr<TextFieldOverlayModifier> CreatePreviewModifier(const RefPtr<TextF
     EdgeEffect edgeEffect;
     auto scrollEdgeEffect = AceType::MakeRefPtr<ScrollEdgeEffect>(edgeEffect);
     auto modifier = AceType::MakeRefPtr<TextFieldOverlayModifier>(pattern, scrollEdgeEffect);
-    modifier->SetPreviewTextStyle(PreviewTextStyle::UNDERLINE);
+    PreviewTextStyling styling;
+    styling.underlineShape = PreviewTextStyle::UNDERLINE;
+    styling.underlineColor = Color::RED.GetValue();
+    pattern->SetPreviewTextStyling(styling);
     modifier->SetShowPreviewTextDecoration(true);
     modifier->SetPreviewTextRects(true);
-    modifier->SetPreviewTextDecorationColor(Color::RED);
     OffsetF contentOffset(PREVIEW_CONTENT_OFFSET_X, PREVIEW_CONTENT_OFFSET_Y);
     SizeF contentSize(PREVIEW_CONTENT_WIDTH, PREVIEW_CONTENT_HEIGHT);
     modifier->SetContentOffset(contentOffset);
@@ -378,5 +380,172 @@ HWTEST_F(TextFieldOverlayModifierTest, TextFieldOverlayModifierTest006, TestSize
     auto capturedRect = capturedRoundRect.GetRect();
     EXPECT_FLOAT_EQ(capturedRect.GetLeft(), PREVIEW_DRAW_LEFT + PREVIEW_TEXT_RECT_X);
     EXPECT_FLOAT_EQ(capturedRect.GetRight(), PREVIEW_DRAW_LEFT + PREVIEW_DRAW_WIDTH + PREVIEW_TEXT_RECT_X);
+}
+
+/**
+ * @tc.name: TextFieldOverlayModifierTest007
+ * @tc.desc: Test PaintPreviewTextDecoration early return when style is NORMAL
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldOverlayModifierTest, TextFieldOverlayModifierTest007, TestSize.Level1)
+{
+    CreateTextField();
+    GetFocus();
+    SetupPreviewTextPattern(pattern_);
+
+    auto modifier = CreatePreviewModifier(pattern_);
+    PreviewTextStyling styling;
+    styling.underlineShape = PreviewTextStyle::NORMAL;
+    pattern_->SetPreviewTextStyling(styling);
+
+    Testing::MockCanvas rsCanvas;
+    EXPECT_CALL(rsCanvas, DrawRoundRect(_)).Times(0);
+    EXPECT_CALL(rsCanvas, DrawPath(_)).Times(0);
+    EXPECT_CALL(rsCanvas, DrawLine(_, _)).Times(0);
+    DrawingContext context { rsCanvas, CONTEXT_WIDTH_VALUE, CONTEXT_HEIGHT_VALUE };
+    modifier->PaintPreviewTextDecoration(context);
+}
+
+/**
+ * @tc.name: TextFieldOverlayModifierTest008
+ * @tc.desc: Test PaintPreviewTextDecoration early return when showPreviewText is false
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldOverlayModifierTest, TextFieldOverlayModifierTest008, TestSize.Level1)
+{
+    CreateTextField();
+    GetFocus();
+    SetupPreviewTextPattern(pattern_);
+
+    auto modifier = CreatePreviewModifier(pattern_);
+    modifier->SetShowPreviewTextDecoration(false);
+    modifier->SetPreviewTextRects(false);
+
+    Testing::MockCanvas rsCanvas;
+    EXPECT_CALL(rsCanvas, DrawRoundRect(_)).Times(0);
+    EXPECT_CALL(rsCanvas, DrawPath(_)).Times(0);
+    EXPECT_CALL(rsCanvas, DrawLine(_, _)).Times(0);
+    DrawingContext context { rsCanvas, CONTEXT_WIDTH_VALUE, CONTEXT_HEIGHT_VALUE };
+    modifier->PaintPreviewTextDecoration(context);
+}
+
+/**
+ * @tc.name: TextFieldOverlayModifierTest009
+ * @tc.desc: Test PaintPreviewTextDecoration early return when underlineColor is nullopt
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldOverlayModifierTest, TextFieldOverlayModifierTest009, TestSize.Level1)
+{
+    CreateTextField();
+    GetFocus();
+    SetupPreviewTextPattern(pattern_);
+
+    auto modifier = CreatePreviewModifier(pattern_);
+    PreviewTextStyling styling;
+    styling.underlineShape = PreviewTextStyle::UNDERLINE;
+    styling.underlineColor = std::nullopt;
+    pattern_->SetPreviewTextStyling(styling);
+
+    Testing::MockCanvas rsCanvas;
+    EXPECT_CALL(rsCanvas, DrawRoundRect(_)).Times(0);
+    EXPECT_CALL(rsCanvas, DrawPath(_)).Times(0);
+    EXPECT_CALL(rsCanvas, DrawLine(_, _)).Times(0);
+    DrawingContext context { rsCanvas, CONTEXT_WIDTH_VALUE, CONTEXT_HEIGHT_VALUE };
+    modifier->PaintPreviewTextDecoration(context);
+}
+
+/**
+ * @tc.name: TextFieldOverlayModifierTest010
+ * @tc.desc: Test PaintPreviewTextDecoration with WAVY style
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldOverlayModifierTest, TextFieldOverlayModifierTest010, TestSize.Level1)
+{
+    CreateTextField();
+    GetFocus();
+    layoutProperty_->UpdateMaxLines(2);
+    EXPECT_TRUE(pattern_->IsTextArea());
+
+    SetupPreviewTextPattern(pattern_);
+    auto modifier = CreatePreviewModifier(pattern_);
+    PreviewTextStyling styling;
+    styling.underlineShape = PreviewTextStyle::WAVY;
+    styling.underlineColor = Color::RED.GetValue();
+    pattern_->SetPreviewTextStyling(styling);
+
+    Testing::MockCanvas rsCanvas;
+    EXPECT_CALL(rsCanvas, Save()).Times(AnyNumber());
+    EXPECT_CALL(rsCanvas, Restore()).Times(AnyNumber());
+    EXPECT_CALL(rsCanvas, ClipRect(_, _, _)).Times(AnyNumber());
+    EXPECT_CALL(rsCanvas, AttachBrush(_)).WillRepeatedly(ReturnRef(rsCanvas));
+    EXPECT_CALL(rsCanvas, DetachBrush()).WillRepeatedly(ReturnRef(rsCanvas));
+    EXPECT_CALL(rsCanvas, AttachPen(_)).WillRepeatedly(ReturnRef(rsCanvas));
+    EXPECT_CALL(rsCanvas, DrawPath(_)).Times(1);
+    EXPECT_CALL(rsCanvas, DetachPen()).WillRepeatedly(ReturnRef(rsCanvas));
+    DrawingContext context { rsCanvas, CONTEXT_WIDTH_VALUE, CONTEXT_HEIGHT_VALUE };
+    modifier->PaintPreviewTextDecoration(context);
+}
+
+/**
+ * @tc.name: TextFieldOverlayModifierTest011
+ * @tc.desc: Test PaintPreviewTextDecoration for non-TextArea (single-line TextField)
+ *           covering the else branch for clipInnerRect
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldOverlayModifierTest, TextFieldOverlayModifierTest011, TestSize.Level1)
+{
+    CreateTextField();
+    GetFocus();
+    EXPECT_FALSE(pattern_->IsTextArea());
+
+    SetupPreviewTextPattern(pattern_);
+    auto modifier = CreatePreviewModifier(pattern_);
+
+    Testing::MockCanvas rsCanvas;
+    EXPECT_CALL(rsCanvas, Save()).Times(AnyNumber());
+    EXPECT_CALL(rsCanvas, Restore()).Times(AnyNumber());
+    EXPECT_CALL(rsCanvas, ClipRect(_, _, _)).Times(AnyNumber());
+    EXPECT_CALL(rsCanvas, AttachBrush(_)).WillRepeatedly(ReturnRef(rsCanvas));
+    EXPECT_CALL(rsCanvas, DetachBrush()).WillRepeatedly(ReturnRef(rsCanvas));
+    EXPECT_CALL(rsCanvas, DrawRoundRect(_)).Times(1);
+    DrawingContext context { rsCanvas, CONTEXT_WIDTH_VALUE, CONTEXT_HEIGHT_VALUE };
+    modifier->PaintPreviewTextDecoration(context);
+}
+
+/**
+ * @tc.name: TextFieldOverlayModifierTest012
+ * @tc.desc: Test PaintPreviewTextDecoration early return when previewTextRect is empty
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldOverlayModifierTest, TextFieldOverlayModifierTest012, TestSize.Level1)
+{
+    CreateTextField();
+    GetFocus();
+
+    EdgeEffect edgeEffect;
+    auto scrollEdgeEffect = AceType::MakeRefPtr<ScrollEdgeEffect>(edgeEffect);
+    auto modifier = AceType::MakeRefPtr<TextFieldOverlayModifier>(pattern_, scrollEdgeEffect);
+    PreviewTextStyling styling;
+    styling.underlineShape = PreviewTextStyle::UNDERLINE;
+    styling.underlineColor = Color::RED.GetValue();
+    pattern_->SetPreviewTextStyling(styling);
+    modifier->SetShowPreviewTextDecoration(true);
+    modifier->SetPreviewTextRects(true);
+    OffsetF contentOffset(PREVIEW_CONTENT_OFFSET_X, PREVIEW_CONTENT_OFFSET_Y);
+    SizeF contentSize(PREVIEW_CONTENT_WIDTH, PREVIEW_CONTENT_HEIGHT);
+    modifier->SetContentOffset(contentOffset);
+    modifier->SetContentSize(contentSize);
+
+    pattern_->hasPreviewText_ = false;
+
+    Testing::MockCanvas rsCanvas;
+    EXPECT_CALL(rsCanvas, Save()).Times(AnyNumber());
+    EXPECT_CALL(rsCanvas, Restore()).Times(AnyNumber());
+    EXPECT_CALL(rsCanvas, ClipRect(_, _, _)).Times(0);
+    EXPECT_CALL(rsCanvas, DrawRoundRect(_)).Times(0);
+    EXPECT_CALL(rsCanvas, DrawPath(_)).Times(0);
+    EXPECT_CALL(rsCanvas, DrawLine(_, _)).Times(0);
+    DrawingContext context { rsCanvas, CONTEXT_WIDTH_VALUE, CONTEXT_HEIGHT_VALUE };
+    modifier->PaintPreviewTextDecoration(context);
 }
 } // namespace OHOS::Ace::NG

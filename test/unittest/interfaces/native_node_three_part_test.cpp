@@ -14,15 +14,18 @@
  */
 
 #include <cstdint>
+#include <cstring>
 
 #include "gtest/gtest.h"
 #define private public
 #define protected public
+#include "interfaces/native/node/config_manager.h"
 #include "interfaces/native/node/node_extened.h"
 #include "interfaces/native/node/node_model.h"
 #include "native_interface.h"
 #include "native_node.h"
 #include "native_type.h"
+#include "test/mock/frameworks/base/log/mock_log_wrapper.h"
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "test/mock/frameworks/core/common/mock_container.h"
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
@@ -35,6 +38,19 @@
 using namespace testing;
 using namespace testing::ext;
 namespace OHOS::Ace::NG {
+namespace {
+struct RuntimeCheckModeGuard {
+    ~RuntimeCheckModeGuard()
+    {
+        NodeModel::ConfigManager::SetRuntimeCheckMode(
+            static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_TYPE_NODE_DISPOSED),
+            static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED));
+        ResetDiagnosticLog();
+    }
+};
+
+void TestColorModeChangeCallback(ArkUI_SystemColorMode colorMode, void* userData) {}
+} // namespace
 
 class NativeNodeThreePartTest : public testing::Test {
 public:
@@ -489,6 +505,111 @@ HWTEST_F(NativeNodeThreePartTest, LinearGradientBlur_GetAttributeAfterReset, Tes
     EXPECT_EQ(
         OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetDirection(opts, &direction), ARKUI_ERROR_CODE_NO_ERROR);
     EXPECT_EQ(direction, OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_BOTTOM);
+
+    nodeAPI->disposeNode(rootNode);
+}
+
+/**
+ * @tc.name: CheckColorModeChangeEventDisposedLog
+ * @tc.desc: LOG mode diagnoses disposed node and continues without aborting.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeThreePartTest, CheckColorModeChangeEventDisposedLog, TestSize.Level1)
+{
+    ASSERT_TRUE(NodeModel::InitialFullImpl());
+    RuntimeCheckModeGuard modeGuard;
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_TYPE_NODE_DISPOSED),
+        static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG)));
+
+    ArkUI_Node node;
+    node.type = ARKUI_NODE_STACK;
+    node.cNode = true;
+    node.uiNodeHandle = nullptr;
+    node.magic = ARKUI_NODE_MAGIC_INVALID;
+    node.userData = nullptr;
+
+    ResetDiagnosticLog();
+    OH_ArkUI_RegisterSystemColorModeChangeEvent(&node, nullptr, TestColorModeChangeCallback);
+    EXPECT_GT(GetDiagnosticLogCount(), 0);
+    const auto* diag = GetLastDiagnosticLog();
+    ASSERT_NE(diag, nullptr);
+    ASSERT_TRUE(diag->reason != nullptr);
+    EXPECT_TRUE(strstr(diag->reason, "has been disposed") != nullptr);
+
+    ResetDiagnosticLog();
+    OH_ArkUI_UnregisterSystemColorModeChangeEvent(&node);
+    EXPECT_GT(GetDiagnosticLogCount(), 0);
+}
+
+/**
+ * @tc.name: CheckColorModeChangeEventDisposedDisabled
+ * @tc.desc: DISABLED mode does not diagnose disposed node.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeThreePartTest, CheckColorModeChangeEventDisposedDisabled, TestSize.Level1)
+{
+    ASSERT_TRUE(NodeModel::InitialFullImpl());
+    RuntimeCheckModeGuard modeGuard;
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_TYPE_NODE_DISPOSED),
+        static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED)));
+
+    ArkUI_Node node;
+    node.type = ARKUI_NODE_STACK;
+    node.cNode = true;
+    node.uiNodeHandle = nullptr;
+    node.magic = ARKUI_NODE_MAGIC_INVALID;
+    node.userData = nullptr;
+
+    ResetDiagnosticLog();
+    OH_ArkUI_RegisterSystemColorModeChangeEvent(&node, nullptr, TestColorModeChangeCallback);
+    EXPECT_EQ(GetDiagnosticLogCount(), 0);
+    OH_ArkUI_UnregisterSystemColorModeChangeEvent(&node);
+    EXPECT_EQ(GetDiagnosticLogCount(), 0);
+}
+
+/**
+ * @tc.name: CheckColorModeChangeEventValidHandle
+ * @tc.desc: Valid handle in all three modes produces no diagnosis and normal behavior.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeThreePartTest, CheckColorModeChangeEventValidHandle, TestSize.Level1)
+{
+    ASSERT_TRUE(NodeModel::InitialFullImpl());
+    auto* nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
+    ASSERT_NE(nodeAPI, nullptr);
+    auto rootNode = nodeAPI->createNode(ARKUI_NODE_STACK);
+    ASSERT_NE(rootNode, nullptr);
+    RuntimeCheckModeGuard modeGuard;
+
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_TYPE_NODE_DISPOSED),
+        static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED)));
+    ResetDiagnosticLog();
+    EXPECT_EQ(OH_ArkUI_RegisterSystemColorModeChangeEvent(rootNode, nullptr, TestColorModeChangeCallback),
+        ERROR_CODE_NO_ERROR);
+    OH_ArkUI_UnregisterSystemColorModeChangeEvent(rootNode);
+    EXPECT_EQ(GetDiagnosticLogCount(), 0);
+
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_TYPE_NODE_DISPOSED),
+        static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG)));
+    ResetDiagnosticLog();
+    EXPECT_EQ(OH_ArkUI_RegisterSystemColorModeChangeEvent(rootNode, nullptr, TestColorModeChangeCallback),
+        ERROR_CODE_NO_ERROR);
+    OH_ArkUI_UnregisterSystemColorModeChangeEvent(rootNode);
+    EXPECT_EQ(GetDiagnosticLogCount(), 0);
+
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_TYPE_NODE_DISPOSED),
+        static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_CRASH)));
+    ResetDiagnosticLog();
+    EXPECT_EQ(OH_ArkUI_RegisterSystemColorModeChangeEvent(rootNode, nullptr, TestColorModeChangeCallback),
+        ERROR_CODE_NO_ERROR);
+    OH_ArkUI_UnregisterSystemColorModeChangeEvent(rootNode);
+    EXPECT_EQ(GetDiagnosticLogCount(), 0);
 
     nodeAPI->disposeNode(rootNode);
 }

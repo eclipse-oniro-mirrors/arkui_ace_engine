@@ -9494,6 +9494,11 @@ typedef enum {
      * If value[3] is negative, it will offset further towards the top.
      * This parameter is supported since API version 23. \n
      *
+     * .value[4]?.i32: fast scroll mode for WaterFlow. The value <b>0</b> disables optimization, <b>1</b> skips
+     * intermediate item measurement, and <b>2</b> skips intermediate item creation and measurement.
+     * Other values disable optimization. The default value is <b>0</b>. This option takes effect only when
+     * .value[1] is <b>1</b> and the layout mode is SLIDING_WINDOW, and then .value[3] is converted from vp once.
+     * This parameter is supported since API version 26.1.0. \n
      */
     NODE_WATER_FLOW_SCROLL_TO_INDEX,
 
@@ -15290,6 +15295,70 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_GetChildMountPolicy(ArkUI_NodeHandle node,
  * @since 26.1.0
  */
 ArkUI_ErrorCode OH_ArkUI_NodeUtils_SetUiDvsyncSwitch(ArkUI_ContextHandle context, bool enable);
+
+/**
+ * @brief Registers an inspector tree getter callback on the specified node.
+ *
+ * component tree information to the ArkUI inspector. When the inspector traverses the
+ * component tree and encounters a node with a registered callback, it invokes
+ * <b>getInspectorTree</b> to obtain the external component subtree and merges the result
+ * into the complete inspector tree output.
+ *
+ * one more inspector tree getter callback can be registered for the same node.
+ * @see {@link OH_ArkUI_NativeModule_UnregisterInspectorTreeGetter} for unregister inspector tree getter.
+ *
+ * @param node [in] Indicates the host node of the third-party framework.
+ *              Only <b>ARKUI_NODE_XCOMPONENT</b> and <b>ARKUI_NODE_CUSTOM</b>
+ *              and <b>ARKUI_NODE_XCOMPONENT_TEXTURE</b> nodes are supported.
+ * @param userData [in] Indicates the custom data to be saved. This value is passed back
+ *                  as the <b>userData</b> parameter when the <b>getInspectorTree</b> 
+ *                  callback is invoked.
+ * @param getInspectorTree [in] Indicates the callback function invoked by the inspector
+ *                          to obtain the component subtree of the third-party framework.
+ *                          The <b>inspectorTree</b> output should be a JSON string
+ *                          in a format consistent with the ArkUI inspector output.
+ *                          The memory for the string is allocated by the callback
+ *                          implementation and should be freed by the caller using
+ *                          <b>free()</b>.
+ * @return Error code.
+ *         <ul><li>{@link ARKUI_ERROR_CODE_NO_ERROR} Success.
+ *         </li><li>{@link ARKUI_ERROR_CODE_CAPI_INIT_ERROR} Failed to initialize the CAPI.
+ *         </li><li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} Function parameter exception,
+ *         or the node type is not <b>ARKUI_NODE_XCOMPONENT</b> or <b>ARKUI_NODE_CUSTOM</b>
+ *         or <b>ARKUI_NODE_XCOMPONENT_TEXTURE</b>
+ *         or getInspectorTree is null.</li></ul>
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_NativeModule_RegisterInspectorTreeGetter(ArkUI_NodeHandle node,
+    void* userData, void (*getInspectorTree)(void* userData, char** inspectorTree));
+
+/**
+ * @brief Unregister the inspector tree getter callback on the specified node.
+ *
+ * After unregistration, the inspector will no longer invoke the callback
+ * when traversing this node. The <b>userData</b> previously passed to
+ * {@link OH_ArkUI_NativeModule_RegisterInspectorTreeGetter} is not released
+ * by this function; the caller is responsible for freeing it.
+ *
+ * @param node [in] Indicates the target node. Only <b>ARKUI_NODE_XCOMPONENT</b> and
+ *              <b>ARKUI_NODE_CUSTOM</b> and <b>ARKUI_NODE_XCOMPONENT_TEXTURE</b> nodes are supported.
+ * @param getInspectorTree [in] Indicates the callback function pointer to unregister. This must be
+ *                          the same function pointer that was passed to
+ *                          {@link OH_ArkUI_NativeModule_RegisterInspectorTreeGetter} during
+ *                          registration. If the pointer does not match any registered callback
+ *                          on the node, the operation has no effect. If the pointer is null, all callbacks
+ *                          of the node will be unregistered.
+ * @return Error code.
+ *         <ul><li>{@link ARKUI_ERROR_CODE_NO_ERROR} Success.
+ *         </li><li>{@link ARKUI_ERROR_CODE_CAPI_INIT_ERROR} Failed to initialize the CAPI.
+ *         </li><li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} Function parameter exception,
+ *         or the node type is not <b>ARKUI_NODE_XCOMPONENT</b> or <b>ARKUI_NODE_CUSTOM</b>
+ *         or <b>ARKUI_NODE_XCOMPONENT_TEXTURE</b>
+ *         or getInspectorTree is not registered.</li></ul>
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UnregisterInspectorTreeGetter(ArkUI_NodeHandle node,
+    void (*getInspectorTree)(void* userData, char** inspectorTree));
 
 #ifdef __cplusplus
 }

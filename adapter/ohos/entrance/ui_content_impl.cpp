@@ -23,6 +23,8 @@
 
 #include <atomic>
 #include <cinttypes>
+#include <cmath>
+#include <limits>
 #include <optional>
 #include <tuple>
 
@@ -121,6 +123,7 @@
 #include "adapter/ohos/entrance/hap_asset_provider_impl.h"
 #include "adapter/ohos/entrance/plugin_utils_impl.h"
 #include "adapter/ohos/entrance/ui_session/ui_session_batch_command.h"
+#include "adapter/ohos/entrance/ui_session/ui_session_command_result.h"
 #include "adapter/ohos/entrance/ui_event_impl.h"
 #include "adapter/ohos/entrance/utils.h"
 #include "adapter/ohos/osal/navigation_route_ohos.h"
@@ -167,6 +170,8 @@
 #include "core/components_ng/pattern/ui_extension/ui_extension_component/ui_extension_pattern.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_config.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_container_handler.h"
+#include "core/components_ng/token_theme/brand_color_info.h"
+#include "core/components_ng/token_theme/token_theme_storage.h"
 #include "core/components_ng/render/adapter/rosen_render_context.h"
 #include "core/image/image_file_cache.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -720,6 +725,14 @@ extern "C" ACE_FORCE_EXPORT int32_t OHOS_ACE_GetUIContentWindowID(int32_t instan
     return UIContentImpl::GetUIContentWindowID(instanceId);
 }
 
+extern "C" ACE_FORCE_EXPORT bool OHOS_ACE_IsBrandColorValid(const char* brandColorStr)
+{
+    if (brandColorStr == nullptr) {
+        return false;
+    }
+    return UIContentImpl::IsBrandColorValid(brandColorStr);
+}
+
 extern "C" ACE_FORCE_EXPORT void OHOS_ACE_ScopeErrorHivewReport()
 {
     auto context = OHOS::Ace::PipelineBase::GetCurrentContextSafely();
@@ -908,19 +921,6 @@ public:
         CHECK_NULL_VOID(pipeline);
         auto taskExecutor = container->GetTaskExecutor();
         CHECK_NULL_VOID(taskExecutor);
-        taskExecutor->PostTask(
-            [instanceId = instanceId_, avoidArea, type] {
-            ContainerScope scope(instanceId);
-            auto container = Platform::AceContainer::GetContainer(instanceId);
-            CHECK_NULL_VOID(container);
-            auto pipeline = container->GetPipelineContext();
-            CHECK_NULL_VOID(pipeline);
-            auto context = AceType::DynamicCast<NG::PipelineContext>(pipeline);
-            CHECK_NULL_VOID(context);
-            auto dynamicComponentManager = context->GetDynamicComponentSafeManager();
-            dynamicComponentManager->UpdateAllDCAvoidArea(instanceId, avoidArea, type);
-            },
-            TaskExecutor::TaskType::UI, "ArkUIUpdateAllDCAvoidArea");
         if (type == Rosen::AvoidAreaType::TYPE_SYSTEM) {
             systemSafeArea_ = ConvertAvoidArea(avoidArea);
         } else if (type == Rosen::AvoidAreaType::TYPE_NAVIGATION_INDICATOR) {
@@ -3105,6 +3105,7 @@ UIContentErrorCode UIContentImpl::CommonInitialize(
             fontManager->UpdateStyleOptimizeFlagInCurrentLanguage();
         }
     }
+    InitBrandColor();
     return errorCode;
 }
 
@@ -3815,12 +3816,17 @@ void UIContentImpl::UpdateConfiguration(const std::shared_ptr<OHOS::AppExecFwk::
     bool formFontUseDefault = isFormRender_ && !fontScaleFollowSystem_;
     taskExecutor->PostTask(
         [weakContainer = WeakPtr<Platform::AceContainer>(container), config, instanceId = instanceId_,
-            bundleName = bundleName_, moduleName = moduleName_, formFontUseDefault]() {
+            bundleName = bundleName_, moduleName = moduleName_, formFontUseDefault, weakContext = context_]() {
             auto container = weakContainer.Upgrade();
             CHECK_NULL_VOID(container);
             Platform::ParsedConfig parsedConfig;
             BuildParsedConfig(parsedConfig, config, formFontUseDefault);
             container->UpdateConfiguration(parsedConfig, config->GetName());
+            auto brandColorChanged =
+                !config->GetItem(OHOS::AAFwk::GlobalConfigurationKey::BRAND_COLOR_CHANGED).empty();
+            if (brandColorChanged) {
+                HandleBrandColorChanged(weakContext, instanceId);
+            }
             LOGI("[%{public}d][%{public}s][%{public}s] UpdateConfiguration, name:%{public}s",
                 instanceId, bundleName.c_str(), moduleName.c_str(), config->GetName().c_str());
         },
@@ -3850,12 +3856,17 @@ void UIContentImpl::UpdateConfiguration(const std::shared_ptr<OHOS::AppExecFwk::
     bool formFontUseDefault = isFormRender_ && !fontScaleFollowSystem_;
     taskExecutor->PostTask(
         [weakContainer = WeakPtr<Platform::AceContainer>(container), config, instanceId = instanceId_,
-            bundleName = bundleName_, moduleName = moduleName_, formFontUseDefault]() {
+            bundleName = bundleName_, moduleName = moduleName_, formFontUseDefault, weakContext = context_]() {
             auto container = weakContainer.Upgrade();
             CHECK_NULL_VOID(container);
             Platform::ParsedConfig parsedConfig;
             BuildParsedConfig(parsedConfig, config, formFontUseDefault);
             container->UpdateConfiguration(parsedConfig, config->GetName(), true);
+            auto brandColorChanged =
+                !config->GetItem(OHOS::AAFwk::GlobalConfigurationKey::BRAND_COLOR_CHANGED).empty();
+            if (brandColorChanged) {
+                HandleBrandColorChanged(weakContext, instanceId);
+            }
             LOGI("[%{public}d][%{public}s][%{public}s] UpdateConfiguration, name:%{public}s", instanceId,
                 bundleName.c_str(), moduleName.c_str(), config->GetName().c_str());
         },
@@ -6620,6 +6631,122 @@ BatchResolvedTarget ResolveBatchTextTarget(int32_t nodeId)
             } };
 }
 
+namespace {
+BatchResolvedTarget ResolveBatchTextTargetWithResult(int32_t nodeId)
+{
+    auto target = ResolveBatchTextTarget(nodeId);
+    if (target.status == BatchTargetStatus::READY) {
+        auto node = AceType::DynamicCast<NG::FrameNode>(ElementRegister::GetInstance()->GetUINodeById(nodeId));
+        if (!node) {
+            return {
+                .status = BatchTargetStatus::NOT_FOUND
+            };
+        }
+        target.execute = [node](const std::string& command) {
+            return node->OnRecvCommandWithResult(command).success;
+        };
+    }
+    return target;
+}
+
+bool IsKeyCodeNumber(const std::unique_ptr<JsonValue>& json)
+{
+    auto value = json->GetValue("cmd");
+    if (!value || !value->IsNumber() || !std::isfinite(value->GetDouble())) {
+        return false;
+    }
+    auto number = value->GetDouble();
+    return number == std::trunc(number) && number >= std::numeric_limits<int32_t>::min() &&
+        number <= std::numeric_limits<int32_t>::max();
+}
+
+NG::CommandResult ExecuteKeyCodeWithResult(
+    const std::unique_ptr<JsonValue>& json, const RefPtr<NG::PipelineContext>& pipeline)
+{
+    if (!IsKeyCodeNumber(json)) {
+        return NG::CommandResult::Error(NG::CommandErrorType::INVALID_PARAM);
+    }
+    KeyEvent keyEvent;
+    keyEvent.isInjected = true;
+    keyEvent.action = KeyAction::DOWN;
+    keyEvent.code = static_cast<KeyCode>(json->GetInt("cmd"));
+    keyEvent.pressedCodes = { keyEvent.code };
+    return pipeline->OnNonPointerEvent(keyEvent)
+        ? NG::CommandResult::Success() : NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL);
+}
+
+void ExecuteGlobalCommandWithResult(
+    const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback)
+{
+    auto json = JsonUtil::ParseJsonString(command);
+    if (!json || !json->IsValid() || !json->IsObject()) {
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::INVALID_PARAM)));
+        return;
+    }
+    auto batch = UiSessionBatchCommand::Parse(command);
+    if (batch.status != BatchParseStatus::NOT_BATCH) {
+        finishCallback(UiSessionBatchCommand::ExecuteWithResult(batch, ResolveBatchTextTargetWithResult));
+        return;
+    }
+    auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
+    if (!pipeline) {
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
+        return;
+    }
+    auto value = json->GetValue("cmd");
+    if (value && value->IsNumber()) {
+        finishCallback(SerializeCommandResult(ExecuteKeyCodeWithResult(json, pipeline)));
+        return;
+    }
+    pipeline->ProcessCommandWithResult(command, [finishCallback](const NG::CommandResult& result) {
+        finishCallback(SerializeCommandResult(result));
+    });
+}
+
+void ExecuteNodeCommandWithResult(
+    int32_t id, const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback)
+{
+    auto node = AceType::DynamicCast<NG::FrameNode>(ElementRegister::GetInstance()->GetUINodeById(id));
+    if (!node) {
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::NODE_NOT_FOUND)));
+        return;
+    }
+    finishCallback(SerializeCommandResult(node->OnRecvCommandWithResult(command)));
+}
+
+void PostNodeCommandWithResult(const WeakPtr<TaskExecutor>& weakTaskExecutor, int32_t id,
+    const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback)
+{
+    auto taskExecutor = weakTaskExecutor.Upgrade();
+    if (!taskExecutor) {
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
+        return;
+    }
+    bool posted = taskExecutor->PostTask(
+        [id, command, finishCallback]() { ExecuteNodeCommandWithResult(id, command, finishCallback); },
+        TaskExecutor::TaskType::UI, "UiSessionSendCommandPatternWithResult");
+    if (!posted) {
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
+    }
+}
+
+void PostGlobalCommandWithResult(const WeakPtr<TaskExecutor>& weakTaskExecutor,
+    const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback)
+{
+    auto taskExecutor = weakTaskExecutor.Upgrade();
+    if (!taskExecutor) {
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
+        return;
+    }
+    bool posted = taskExecutor->PostTask(
+        [command, finishCallback]() { ExecuteGlobalCommandWithResult(command, finishCallback); },
+        TaskExecutor::TaskType::UI, "UiSessionSendCommandWithResult");
+    if (!posted) {
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
+    }
+}
+} // namespace
+
 BatchDispatchCallbacks CreateBatchDispatchCallbacks(const RefPtr<TaskExecutor>& taskExecutor)
 {
     BatchDispatchCallbacks callbacks;
@@ -7276,8 +7403,16 @@ void UIContentImpl::InitSendCommandFunctionsCallbacks(const WeakPtr<TaskExecutor
             TaskExecutor::TaskType::UI, "UiSessionSendCommandPattern");
     };
     UiSessionManager::GetInstance()->SaveForSendCommandFunction(sendCommand);
-    UiSessionManager::GetInstance()->RegisterNodeCommandWithResultCallback(taskExecutor);
-    UiSessionManager::GetInstance()->RegisterSendCommandWithResultCallback(taskExecutor);
+    auto nodeCommandWithResult = [weakTaskExecutor = taskExecutor](int32_t id, const std::string& command,
+        const UiSessionManager::CommandResultCallback& finishCallback) {
+        PostNodeCommandWithResult(weakTaskExecutor, id, command, finishCallback);
+    };
+    UiSessionManager::GetInstance()->SaveForSendCommandWithResultFunction(std::move(nodeCommandWithResult));
+    auto globalCommandWithResult = [weakTaskExecutor = taskExecutor](const std::string& command,
+        const UiSessionManager::CommandResultCallback& finishCallback) {
+        PostGlobalCommandWithResult(weakTaskExecutor, command, finishCallback);
+    };
+    UiSessionManager::GetInstance()->SaveSendCommandWithResultFunction(std::move(globalCommandWithResult));
 }
 
 bool UIContentImpl::SendUIExtProprty(uint32_t code, const AAFwk::Want& data,
@@ -7806,5 +7941,104 @@ const std::shared_ptr<const OHOS::MMI::PointerEvent> UIContentImpl::GetPointerEv
         return touchEventInfo->GetPointerEvent();
     }
     return nullptr;
+}
+
+void UIContentImpl::InitBrandColor()
+{
+    auto context = context_.lock();
+    CHECK_NULL_VOID(context);
+    auto brandColorStr = context->GetBrandColorValue();
+    auto abilityStrategy = context->GetBrandColorStrategy();
+    if (brandColorStr.empty() ||
+        static_cast<NG::BrandColorStrategy>(abilityStrategy) == NG::BrandColorStrategy::BRAND_COLOR_FOLLOW_SYSTEM) {
+        return;
+    }
+    NG::BrandColorInfo info;
+    info.brandColor = Color::FromString(brandColorStr);
+    info.colorStrategy = static_cast<NG::BrandColorStrategy>(abilityStrategy);
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    CHECK_NULL_VOID(storage);
+    storage->StoreInstanceBrandColor(instanceId_, info);
+    NotifyBrandColorChangeToUEC(instanceId_, info.brandColor, info.colorStrategy);
+}
+
+void UIContentImpl::HandleBrandColorChanged(
+    const std::weak_ptr<OHOS::AbilityRuntime::Context>& weakContext, int32_t instanceId)
+{
+    TAG_LOGI(AceLogTag::ACE_THEME, "HandleBrandColorChanged instanceId: %{public}d", instanceId);
+    UpdateBrandColor(weakContext, instanceId);
+}
+
+void UIContentImpl::UpdateBrandColor(
+    const std::weak_ptr<OHOS::AbilityRuntime::Context>& weakContext, int32_t instanceId)
+{
+    auto context = weakContext.lock();
+    CHECK_NULL_VOID(context);
+    auto brandColorStr = context->GetBrandColorValue();
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    CHECK_NULL_VOID(storage);
+    if (brandColorStr.empty()) {
+        storage->RemoveInstanceBrandColor(instanceId);
+        NotifyBrandColorChangeToUEC(instanceId, std::nullopt, std::nullopt);
+        return;
+    }
+    NG::BrandColorInfo info;
+    info.brandColor = Color::FromString(brandColorStr);
+    info.colorStrategy = static_cast<NG::BrandColorStrategy>(context->GetBrandColorStrategy());
+    storage->StoreInstanceBrandColor(instanceId, info);
+    auto pipelineContext = NG::PipelineContext::GetContextByContainerId(instanceId);
+    CHECK_NULL_VOID(pipelineContext);
+    auto rootNode = pipelineContext->GetRootElement();
+    CHECK_NULL_VOID(rootNode);
+    ContainerScope scope(instanceId);
+    rootNode->UpdateThemeScopeUpdate(0); // 0 means default theme scope id
+}
+
+void UIContentImpl::NotifyBrandColorChangeToUEC(
+    int32_t instanceId, const std::optional<Color>& brandColor,
+    const std::optional<NG::BrandColorStrategy>& colorStrategy)
+{
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    CHECK_NULL_VOID(storage);
+    storage->NotifyBrandColorChange(instanceId, brandColor, colorStrategy);
+}
+
+void UIContentImpl::RegisterBrandColorChangeListener(const BrandColorChangeCallback& callback)
+{
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    CHECK_NULL_VOID(storage);
+    NG::BrandColorChangeCallback internalCallback =
+        [callback](int32_t instanceId, const std::optional<Color>& brandColor,
+            const std::optional<NG::BrandColorStrategy>& colorStrategy) {
+            if (!callback) {
+                return;
+            }
+            std::optional<uint32_t> rawColor;
+            if (brandColor.has_value()) {
+                rawColor = brandColor.value().GetValue();
+            }
+            std::optional<int32_t> rawStrategy;
+            if (colorStrategy.has_value()) {
+                rawStrategy = static_cast<int32_t>(colorStrategy.value());
+            }
+            callback(instanceId, rawColor, rawStrategy);
+        };
+    storage->RegisterBrandColorChangeListener(instanceId_, internalCallback);
+}
+
+void UIContentImpl::UnregisterBrandColorChangeListener()
+{
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    CHECK_NULL_VOID(storage);
+    storage->UnregisterBrandColorChangeListener(instanceId_);
+}
+
+bool UIContentImpl::IsBrandColorValid(const std::string& brandColorStr)
+{
+    if (brandColorStr.empty()) {
+        return false;
+    }
+    auto color = Color::FromString(brandColorStr);
+    return color.GetAlpha() != 0;
 }
 } // namespace OHOS::Ace

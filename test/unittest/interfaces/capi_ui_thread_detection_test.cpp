@@ -475,6 +475,7 @@ const ScopeEntry SCOPE_ENTRIES[] = {
     SCOPE_ENTRY(OH_ArkUI_PostIdleCallback),
     SCOPE_ENTRY(OH_ArkUI_RegisterDrawCallbackOnNodeHandle),
     SCOPE_ENTRY(OH_ArkUI_RegisterLayoutCallbackOnNodeHandle),
+    SCOPE_ENTRY(OH_ArkUI_RegisterSystemColorModeChangeEvent),
     SCOPE_ENTRY(OH_ArkUI_RenderNodeUtils_AddChild),
     SCOPE_ENTRY(OH_ArkUI_RenderNodeUtils_AddRenderNode),
     SCOPE_ENTRY(OH_ArkUI_RenderNodeUtils_AttachColorAnimatableProperty),
@@ -582,6 +583,7 @@ const ScopeEntry SCOPE_ENTRIES[] = {
     SCOPE_ENTRY(OH_ArkUI_RenderNodeUtils_SetVector2AnimatablePropertyValue),
     SCOPE_ENTRY(OH_ArkUI_RenderNodeUtils_SetVector2PropertyValue),
     SCOPE_ENTRY(OH_ArkUI_RunTaskInScope),
+    SCOPE_ENTRY(OH_ArkUI_SetForceDarkConfig),
     // === TextEditorStyledStringController (17 APIs with CHECK_UI_THREAD guard) ===
     SCOPE_ENTRY(OH_ArkUI_TextEditorStyledStringController_CloseSelectionMenu),
     SCOPE_ENTRY(OH_ArkUI_TextEditorStyledStringController_DeleteBackward),
@@ -604,6 +606,7 @@ const ScopeEntry SCOPE_ENTRIES[] = {
     SCOPE_ENTRY(OH_ArkUI_SurfaceHolder_Dispose),
     SCOPE_ENTRY(OH_ArkUI_UnregisterDrawCallbackOnNodeHandle),
     SCOPE_ENTRY(OH_ArkUI_UnregisterLayoutCallbackOnNodeHandle),
+    SCOPE_ENTRY(OH_ArkUI_UnregisterSystemColorModeChangeEvent),
     SCOPE_ENTRY(OH_ArkUI_XComponent_Finalize),
     SCOPE_ENTRY(OH_ArkUI_XComponent_Initialize),
     SCOPE_ENTRY(OH_ArkUI_XComponent_IsInitialized),

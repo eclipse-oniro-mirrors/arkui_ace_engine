@@ -94,6 +94,10 @@ DialogProperties BuildDialogProperties(const Ark_CalendarDialogOptions options)
     if (edgeLightMode) {
         dialogProps.edgeLightMode = edgeLightMode.value();
     }
+    auto adaptToHandedness = Converter::OptConvert<HandednessFollowMode>(options.adaptToHandedness);
+    if (adaptToHandedness) {
+        dialogProps.adaptToHandedness = adaptToHandedness.value();
+    }
     BuildDialogPropertiesCallbacks(options, dialogProps);
     return dialogProps;
 }

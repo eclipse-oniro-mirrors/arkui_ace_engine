@@ -3416,6 +3416,11 @@ bool SliderPattern::ParseCommand(const std::string& command, float& value)
     return true;
 }
 
+CommandResult SliderPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "onSliderChange" }, CommandErrorType::EXECUTE_FAIL);
+}
+
 int32_t SliderPattern::OnInjectionEvent(const std::string& command)
 {
     float value = 0.0f;
@@ -4306,6 +4311,8 @@ void SliderPattern::ApplyDragFrameNodeSystemMaterial()
         auto shadow = MaterialUtils::GetImmersiveShadow(dipScale * 0.8);
         shadow.SetColor(Color(0x1F050505));
         renderContext->UpdateBackShadow(shadow);
+
+        pipeline->AddTaskOverlayNodeMaterialArea(dragFrameNode_, "Slider HandleHighGradeLongPress");
     }
     ResetHostMaterialEffects();
 }
@@ -4496,7 +4503,7 @@ void SliderPattern::HandleHighGradeLongPress()
 
     auto blockRadius = GetBlockRadius();
     UpdateMaterialNodePosition(circleCenter_.GetX(), circleCenter_.GetY(), blockRadius, false);
-    
+
     auto frameRC = dragFrameNode_->GetRenderContext();
     CHECK_NULL_VOID(frameRC);
 

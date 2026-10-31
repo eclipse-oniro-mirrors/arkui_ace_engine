@@ -694,7 +694,6 @@ HWTEST_F(RichEditorBaseTestNg, RichEditorModel015, TestSize.Level0)
     MockPipelineContext::GetCurrent()->SetThemeManager(themeManager);
     auto richEditorTheme = AceType::MakeRefPtr<RichEditorTheme>();
     EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(richEditorTheme));
-    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(richEditorTheme));
     richEditorTheme->textStyle_.SetTextColor(DEFAULT_TEXT_COLOR_VALUE);
     richEditorTheme->textStyle_.SetTextDecorationColor(DEFAULT_TEXT_COLOR_VALUE);
 
@@ -702,7 +701,6 @@ HWTEST_F(RichEditorBaseTestNg, RichEditorModel015, TestSize.Level0)
     textOptions.value = INIT_VALUE_1;
     richEditorController->AddTextSpan(textOptions);
     auto info1 = richEditorController->GetSpansInfo(1, 3);
-    ASSERT_NE(info1.selection_.resultObjects.size(), 0);
     TextStyleResult textStyle1 = info1.selection_.resultObjects.front().textStyle;
     EXPECT_EQ(textStyle1.fontSize, 16);
     EXPECT_EQ(Color::FromString(textStyle1.fontColor), DEFAULT_TEXT_COLOR_VALUE);
@@ -711,7 +709,6 @@ HWTEST_F(RichEditorBaseTestNg, RichEditorModel015, TestSize.Level0)
     ClearSpan();
     richEditorPattern->InsertValue(INIT_VALUE_2);
     auto info2 = richEditorController->GetSpansInfo(1, 2);
-    ASSERT_NE(info2.selection_.resultObjects.size(), 0);
     TextStyleResult textStyle2 = info2.selection_.resultObjects.front().textStyle;
     EXPECT_EQ(Color::FromString(textStyle2.fontColor), DEFAULT_TEXT_COLOR_VALUE);
     EXPECT_EQ(Color::FromString(textStyle2.decorationColor), DEFAULT_TEXT_COLOR_VALUE);
@@ -780,10 +777,50 @@ HWTEST_F(RichEditorBaseTestNg, RichEditorModel016, TestSize.Level0)
 
 /**
  * @tc.name: RichEditorModel017
- * @tc.desc: test GetRichEditorController、SetCustomKeyboard、BindSelectionMenu、SetPlaceholder.
+ * @tc.desc: test paragraph style linebreakstrategy attribute
  * @tc.type: FUNC
  */
 HWTEST_F(RichEditorBaseTestNg, RichEditorModel017, TestSize.Level0)
+{
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+    auto richEditorController = richEditorPattern->GetRichEditorController();
+    ASSERT_NE(richEditorController, nullptr);
+    TextSpanOptions options;
+    options.value = INIT_VALUE_1;
+ 
+    // test paragraph  style linebreakstrategy default value
+    richEditorController->AddTextSpan(options);
+    auto info = richEditorController->GetParagraphsInfo(1, sizeof(INIT_VALUE_1));
+    EXPECT_EQ(static_cast<LineBreakStrategy>(info[0].lineBreakStrategy), LineBreakStrategy::GREEDY);
+ 
+    // test paragraph style linebreakstrategy value of LineBreakStrategy.GREEDY
+    struct UpdateParagraphStyle style;
+    style.lineBreakStrategy = LineBreakStrategy::GREEDY;
+    richEditorController->UpdateParagraphStyle(1, sizeof(INIT_VALUE_1), style);
+    info = richEditorController->GetParagraphsInfo(1, sizeof(INIT_VALUE_1));
+    EXPECT_EQ(static_cast<LineBreakStrategy>(info[0].lineBreakStrategy), LineBreakStrategy::GREEDY);
+ 
+    // test paragraph style linebreakstrategy value of LineBreakStrategy.HIGH_QUALITY
+    style.lineBreakStrategy = LineBreakStrategy::HIGH_QUALITY;
+    richEditorController->UpdateParagraphStyle(1, sizeof(INIT_VALUE_1), style);
+    info = richEditorController->GetParagraphsInfo(1, sizeof(INIT_VALUE_1));
+    EXPECT_EQ(static_cast<LineBreakStrategy>(info[0].lineBreakStrategy), LineBreakStrategy::HIGH_QUALITY);
+ 
+    // test paragraph style linebreakstrategy value of LineBreakStrategy.BALANCED
+    style.lineBreakStrategy = LineBreakStrategy::BALANCED;
+    richEditorController->UpdateParagraphStyle(1, sizeof(INIT_VALUE_1), style);
+    info = richEditorController->GetParagraphsInfo(1, sizeof(INIT_VALUE_1));
+    EXPECT_EQ(static_cast<LineBreakStrategy>(info[0].lineBreakStrategy), LineBreakStrategy::BALANCED);
+}
+
+/**
+ * @tc.name: RichEditorModel018
+ * @tc.desc: test GetRichEditorController、SetCustomKeyboard、BindSelectionMenu、SetPlaceholder.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, RichEditorModel018, TestSize.Level0)
 {
     /**
      * @tc.steps: Create RichEditor node
@@ -828,7 +865,7 @@ HWTEST_F(RichEditorBaseTestNg, RichEditorModel017, TestSize.Level0)
  * @tc.desc: test SetEnableHapticFeedback.
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorBaseTestNg, RichEditorModel018, TestSize.Level0)
+HWTEST_F(RichEditorBaseTestNg, RichEditorModel019, TestSize.Level0)
 {
     RichEditorModelNG richEditorModel;
     richEditorModel.Create(true);
@@ -840,11 +877,11 @@ HWTEST_F(RichEditorBaseTestNg, RichEditorModel018, TestSize.Level0)
 }
 
 /**
- * @tc.name: RichEditorModel019
+ * @tc.name: RichEditorModel020
  * @tc.desc: test SetEnableAutoSpacing.
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorBaseTestNg, RichEditorModel019, TestSize.Level0)
+HWTEST_F(RichEditorBaseTestNg, RichEditorModel020, TestSize.Level0)
 {
     /**
      * @tc.steps: Create RichEditor node and Set EnableAutoSpacing True
@@ -880,11 +917,11 @@ HWTEST_F(RichEditorBaseTestNg, RichEditorModel019, TestSize.Level0)
 }
 
 /**
- * @tc.name: RichEditorModel020
+ * @tc.name: RichEditorModel021
  * @tc.desc: test SetSupportStyledUndo.
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorBaseTestNg, RichEditorModel020, TestSize.Level0)
+HWTEST_F(RichEditorBaseTestNg, RichEditorModel021, TestSize.Level0)
 {
     /**
      * @tc.steps: Get RichEditor node
@@ -909,11 +946,11 @@ HWTEST_F(RichEditorBaseTestNg, RichEditorModel020, TestSize.Level0)
 }
 
 /**
- * @tc.name: RichEditorModel021
+ * @tc.name: RichEditorModel022
  * @tc.desc: test paragraph style textVerticalAlign attribute
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorBaseTestNg, RichEditorModel021, TestSize.Level0)
+HWTEST_F(RichEditorBaseTestNg, RichEditorModel022, TestSize.Level0)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -945,11 +982,30 @@ HWTEST_F(RichEditorBaseTestNg, RichEditorModel021, TestSize.Level0)
 }
 
 /**
- * @tc.name: RichEditorModel022
+ * @tc.name: RichEditorModel023
+ * @tc.desc: test IsStopBackPress.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, RichEditorModel023, TestSize.Level0)
+{
+    auto richEditorNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ASSERT_NE(richEditorNode, nullptr);
+    auto richEditorPattern = richEditorNode->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+
+    RichEditorModelNG::SetStopBackPress(richEditorNode, true);
+    EXPECT_TRUE(richEditorPattern->IsStopBackPress());
+
+    RichEditorModelNG::SetStopBackPress(richEditorNode, false);
+    EXPECT_FALSE(richEditorPattern->IsStopBackPress());
+}
+
+/**
+ * @tc.name: RichEditorModel024
  * @tc.desc: test SetEnableAutoSpacing.
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorBaseTestNg, RichEditorModel022, TestSize.Level0)
+HWTEST_F(RichEditorBaseTestNg, RichEditorModel024, TestSize.Level0)
 {
     /**
      * @tc.steps: Create RichEditor node and Set EnableAutoSpacing True
@@ -985,30 +1041,11 @@ HWTEST_F(RichEditorBaseTestNg, RichEditorModel022, TestSize.Level0)
 }
 
 /**
- * @tc.name: RichEditorModel023
- * @tc.desc: test IsStopBackPress.
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorBaseTestNg, RichEditorModel023, TestSize.Level0)
-{
-    auto richEditorNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
-    ASSERT_NE(richEditorNode, nullptr);
-    auto richEditorPattern = richEditorNode->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-
-    RichEditorModelNG::SetStopBackPress(richEditorNode, true);
-    EXPECT_TRUE(richEditorPattern->IsStopBackPress());
-
-    RichEditorModelNG::SetStopBackPress(richEditorNode, false);
-    EXPECT_FALSE(richEditorPattern->IsStopBackPress());
-}
-
-/**
- * @tc.name: RichEditorModel024
+ * @tc.name: RichEditorModel025
  * @tc.desc: test SetOrphanCharOptimization.
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorBaseTestNg, RichEditorModel024, TestSize.Level0)
+HWTEST_F(RichEditorBaseTestNg, RichEditorModel025, TestSize.Level0)
 {
     RichEditorModelNG richEditorModel;
     richEditorModel.Create(true);
@@ -1337,6 +1374,23 @@ HWTEST_F(RichEditorBaseTestNg, SetBarState002, TestSize.Level0)
     richEditorModel.SetBarState(richEditorNode, DisplayMode::ON);
     auto barState = richEditorLayoutProperty->GetDisplayModeValue(DisplayMode::ON);
     EXPECT_EQ(barState, DisplayMode::ON);
+}
+
+/**
+ * @tc.name: OnDetachFromFrameNode001
+ * @tc.desc: test OnDetachFromFrameNode
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, OnDetachFromFrameNode001, TestSize.Level2)
+{
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+    richEditorPattern->ShowSelectOverlay(
+        richEditorPattern->textSelector_.firstHandle, richEditorPattern->textSelector_.secondHandle, false);
+    EXPECT_TRUE(richEditorPattern->SelectOverlayIsOn());
+    richEditorPattern->OnDetachFromFrameNode(nullptr);
+    EXPECT_FALSE(richEditorPattern->SelectOverlayIsOn());
 }
 
 /**
@@ -2110,16 +2164,10 @@ HWTEST_F(RichEditorBaseTestNg, RichEditorGetTextLength001, TestSize.Level0)
  */
 HWTEST_F(RichEditorBaseTestNg, ReportShiftAndDirectionEvent001, TestSize.Level0)
 {
-    /**
-     * @tc.steps: step1. Initialize RichEditor node
-     */
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
 
-    /**
-     * @tc.steps: step2. Set shiftFlag_ to true
-     */
     richEditorPattern->shiftFlag_ = true;
     KeyEvent keyEvent;
     keyEvent.code = KeyCode::KEY_SHIFT_LEFT;

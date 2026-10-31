@@ -423,9 +423,12 @@ HWTEST_F(RichEditorMouseTest, RichEditorPatternTestInitMouseEvent001, TestSize.L
     auto hoverEventActuator = inputHub->hoverEventActuator_;
     ASSERT_NE(hoverEventActuator, nullptr);
     auto hoverInputEvents = hoverEventActuator->inputEvents_;
+    HoverInfo hoverInfo;
     for (auto input : hoverInputEvents) {
-        CHECK_NULL_CONTINUE(input);
-        (*input)(true);
+        auto onHoverFunc = input->GetOnHoverFunc();
+        if (onHoverFunc) {
+            onHoverFunc(true, hoverInfo);
+        }
     }
 
     ASSERT_EQ(richEditorPattern->mouseEventInitialized_, true);

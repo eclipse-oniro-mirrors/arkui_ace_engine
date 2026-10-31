@@ -20,6 +20,7 @@
 #define private public
 #define protected public
 #include "core/components_ng/manager/handedness/handedness_manager.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/common/event_manager.h"
 
 #include "base/utils/system_properties.h"

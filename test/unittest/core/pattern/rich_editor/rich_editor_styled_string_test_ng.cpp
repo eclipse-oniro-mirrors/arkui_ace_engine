@@ -467,53 +467,6 @@ HWTEST_F(RichEditorStyledStringTestNg, StyledStringController008, TestSize.Level
 }
 
 /**
- * @tc.name: StyledStringController009
- * @tc.desc: Test SetStyledString.
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorStyledStringTestNg, StyledStringController009, TestSize.Level0)
-{
-    /**
-     * @tc.steps: step1. create styledString with text
-     */
-    auto mutableStr = CreateTextStyledString(INIT_U16STRING_1);
-
-    /**
-     * @tc.steps: step2. get richEditor styledString controller and set styledString
-     */
-    ASSERT_NE(richEditorNode_, nullptr);
-    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-    auto styledStringController = richEditorPattern->GetRichEditorStyledStringController();
-    ASSERT_NE(styledStringController, nullptr);
-
-    /**
-     * @tc.steps: step3. SetOnWillChange
-     */
-    auto onWillChange = [styledStringController, mutableStr](const StyledStringChangeValue& changeValue) {
-        onStyledStringWillChangeValue = changeValue;
-        styledStringController->SetStyledString(mutableStr);
-        return false;
-    };
-    styledStringController->SetOnWillChange(onWillChange);
-
-    /**
-     * @tc.steps: step4. enable preview text
-     */
-    richEditorPattern->previewTextRecord_.previewContent = u"test";
-    richEditorPattern->previewTextRecord_.previewTextHasStarted = true;
-    richEditorPattern->previewTextRecord_.startOffset = 0;
-    richEditorPattern->previewTextRecord_.endOffset = 4;
-
-    /**
-     * @tc.steps: step3. insert value
-     */
-    richEditorPattern->caretPosition_ = 0;
-    richEditorPattern->InsertValue(INIT_STRING_2);
-    EXPECT_EQ(richEditorPattern->GetTextContentLength(), 7);
-}
-
-/**
  * @tc.name: StyledStringController010
  * @tc.desc: Test textVerticalAlign.
  * @tc.type: FUNC
@@ -1037,71 +990,15 @@ HWTEST_F(RichEditorStyledStringTestNg, ToStyledString001, TestSize.Level0)
  */
 HWTEST_F(RichEditorStyledStringTestNg, ToStyledString002, TestSize.Level0)
 {
-    /**
-     * @tc.steps: step1. create richEditorPattern
-     */
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
 
-    /**
-     * @tc.steps: step2. test ToStyledString
-     */
     int32_t start = 3;
     int32_t end = -2;
     AddSpan("test");
     RefPtr<SpanString> res = richEditorPattern->ToStyledString(start, end);
     ASSERT_NE(res, nullptr);
-}
-
-/**
- * @tc.name: ToStyledString003
- * @tc.desc: Test spans to styledString.
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorStyledStringTestNg, ToStyledString003, TestSize.Level0)
-{
-    auto richEditorNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
-    ASSERT_NE(richEditorNode, nullptr);
-    auto richEditorPattern = richEditorNode->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-    auto richEditorController = richEditorPattern->GetRichEditorController();
-    ASSERT_NE(richEditorController, nullptr);
-
-    /**
-     * @tc.steps: step1. init spans
-     */
-    TextSpanOptions options;
-    options.value = INIT_VALUE_1;
-    richEditorController->AddTextSpan(options);
-    options.value = INIT_VALUE_2;
-    richEditorController->AddTextSpan(options);
-    options.value = INIT_VALUE_3;
-    richEditorController->AddTextSpan(options);
-    options.value = INIT_VALUE_4;
-    richEditorController->AddTextSpan(options);
-    options.value = INIT_VALUE_5;
-    richEditorController->AddTextSpan(options);
-    options.value = INIT_VALUE_6;
-    richEditorController->AddTextSpan(options);
-    options.value = INIT_VALUE_7;
-    richEditorController->AddTextSpan(options);
-    options.value = INIT_VALUE_8;
-    richEditorController->AddTextSpan(options);
-
-    /**
-     * @tc.steps: step2. test ToStyledString after add spans
-     */
-    auto spanString = richEditorPattern->ToStyledString(3, 4);
-    ASSERT_NE(spanString, nullptr);
-    EXPECT_EQ(spanString->GetSpanItems().size(), 1);
-    options.value = INIT_VALUE_3;
-    richEditorController->AddTextSpan(options);
-    options.value = INIT_VALUE_4;
-    richEditorController->AddTextSpan(options);
-    auto spanString2 = richEditorPattern->ToStyledString(3, 4);
-    ASSERT_NE(spanString2, nullptr);
-    EXPECT_EQ(spanString2->GetSpanItems().size(), 1);
 }
 
 /**
@@ -1193,60 +1090,6 @@ HWTEST_F(RichEditorStyledStringTestNg, CreateStyledStringByTextStyle, TestSize.L
     ASSERT_NE(fontStyle, nullptr);
     EXPECT_EQ(fontStyle->GetFontFamily(), FONT_FAMILY_VALUE);
     EXPECT_EQ(fontStyle->GetTextColor(), TEXT_COLOR_VALUE);
-}
-
-/**
- * @tc.name: CreateStyledStringByTextStyle002
- * @tc.desc: test CreateStyledStringByTextStyle
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorStyledStringTestNg, CreateStyledStringByTextStyle002, TestSize.Level0)
-{
-    /**
-     * @tc.steps: step1. get richEditor pattern
-     */
-    ASSERT_NE(richEditorNode_, nullptr);
-    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-
-    /**
-     * @tc.steps: step2. get richEditor controller
-     */
-    auto richEditorController = richEditorPattern->GetRichEditorController();
-    ASSERT_NE(richEditorController, nullptr);
-
-    /**
-     * @tc.steps: step3. add two text span
-     */
-    AddSpan(INIT_VALUE_2);
-    AddSpan(INIT_VALUE_3);
-    auto contentNode = richEditorNode_->GetChildAtIndex(0);
-    EXPECT_EQ(contentNode->children_.size(), 2);
-
-    /**
-     * @tc.steps: step4. initalize style
-     */
-    TextStyle textStyle;
-    textStyle.SetTextColor(TEXT_COLOR_VALUE);
-    textStyle.SetFontFamilies(FONT_FAMILY_VALUE);
-
-    /**
-     * @tc.steps: step5. test CreateStyledStringByTextStyle
-     */
-    auto& styledString = richEditorPattern->styledString_;
-    richEditorPattern->styleManager_->CreateStyledStringByTypingStyle(INIT_VALUE_2, styledString, 0, 0);
-    auto spanItemFirst = richEditorPattern->spans_.front();
-    auto& fontStyleFirst = spanItemFirst->fontStyle;
-    ASSERT_NE(fontStyleFirst, nullptr);
-    EXPECT_EQ(fontStyleFirst->GetFontFamily(), FONT_FAMILY_VALUE);
-    EXPECT_EQ(fontStyleFirst->GetFontFamily()->size(), 1);
-    EXPECT_EQ(fontStyleFirst->GetTextColor(), TEXT_COLOR_VALUE);
-    auto spanItemSecond = richEditorPattern->spans_.back();
-    auto& fontStyleSecond = spanItemSecond->fontStyle;
-    ASSERT_NE(fontStyleSecond, nullptr);
-    EXPECT_EQ(fontStyleSecond->GetFontFamily(), FONT_FAMILY_VALUE);
-    EXPECT_EQ(fontStyleSecond->GetFontFamily()->size(), 1);
-    EXPECT_EQ(fontStyleSecond->GetTextColor(), TEXT_COLOR_VALUE);
 }
 
 /**

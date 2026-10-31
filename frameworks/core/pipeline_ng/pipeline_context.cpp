@@ -40,6 +40,7 @@
 #include "core/components_ng/manager/frame_rate/frame_rate_manager.h"
 #include "core/components_ng/manager/handedness/handedness_manager.h"
 #include "core/components_ng/manager/full_screen/full_screen_manager.h"
+#include "core/components_ng/manager/material/material_processor.h"
 #include "core/components_ng/manager/memory/memory_manager.h"
 #include "core/components_ng/manager/post_event/post_event_manager.h"
 #include "core/components_ng/manager/privacy_sensitive/privacy_sensitive_manager.h"
@@ -106,7 +107,6 @@
 #include "core/components_ng/manager/select_overlay/select_overlay_manager.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_manager.h"
-#include "core/components_ng/manager/material/material_processor.h"
 #ifdef SMART_GESTURE_SUPPORTED
 #include "core/components_ng/manager/smart_gesture/smart_gesture_manager.h"
 #endif
@@ -115,7 +115,10 @@
 #include "core/components_ng/pattern/container_modal/container_modal_view_factory.h"
 #include "core/components_ng/pattern/container_modal/enhance/container_modal_pattern_enhance.h"
 #include "core/components_ng/pattern/navigation/nav_bar_node.h"
+#include "core/components_ng/pattern/navigation/navdestination_node_base.h"
 #include "core/components_ng/pattern/navigation/navigation_pattern.h"
+#include "core/components_ng/pattern/navigation/navigation_title_util.h"
+#include "core/components_ng/pattern/navigation/title_bar_node.h"
 #include "core/components_ng/pattern/overlay/overlay_manager.h"
 #include "core/components_ng/pattern/root/root_pattern.h"
 #include "core/components_ng/pattern/select_overlay/magnifier_controller.h"
@@ -358,16 +361,51 @@ void AddJsonChild(
 constexpr uint32_t AI_CALL_NODE_INVALID = 3;
 constexpr uint32_t AI_CALL_NODE_AMBIGUOUS = 5;
 
-std::vector<RefPtr<NG::FrameNode>> CollectCandidateNavDestinationNodes(const std::list<RefPtr<NG::FrameNode>>& navNodes)
+bool IsNavDestinationCandidate(const RefPtr<NG::FrameNode>& node)
 {
-    std::vector<RefPtr<NG::FrameNode>> result;
-    for (const auto& node : navNodes) {
-        CHECK_NULL_CONTINUE(node);
-        if (node->GetTag() == V2::NAVDESTINATION_VIEW_ETS_TAG) {
-            result.emplace_back(node);
+    return node && node->GetTag() == V2::NAVDESTINATION_VIEW_ETS_TAG;
+}
+
+void CollectVisibleNavDestinations(const RefPtr<NG::UINode>& node, std::vector<RefPtr<NG::FrameNode>>& result)
+{
+    CHECK_NULL_VOID(node);
+    auto frameNode = AceType::DynamicCast<NG::FrameNode>(node);
+    if (frameNode) {
+        if (!frameNode->IsVisibleAndActive()) {
+            return;
+        }
+        if (IsNavDestinationCandidate(frameNode)) {
+            result.emplace_back(frameNode);
         }
     }
-    return result;
+    for (const auto& child : node->GetChildren()) {
+        CHECK_NULL_CONTINUE(child);
+        CollectVisibleNavDestinations(child, result);
+    }
+}
+
+std::unique_ptr<JsonValue> BuildCandidateNodeData(const RefPtr<NG::FrameNode>& node)
+{
+    auto nodeJson = JsonUtil::Create(true);
+    CHECK_NULL_RETURN(nodeJson, nullptr);
+    nodeJson->Put("nodeId", node->GetId());
+    auto rect = node->GetTransformRectRelativeToWindow();
+    auto rectJson = JsonUtil::Create(true);
+    CHECK_NULL_RETURN(rectJson, nullptr);
+    rectJson->Put("left", static_cast<double>(rect.Left()));
+    rectJson->Put("top", static_cast<double>(rect.Top()));
+    rectJson->Put("width", static_cast<double>(rect.Width()));
+    rectJson->Put("height", static_cast<double>(rect.Height()));
+    nodeJson->PutRef("rect", std::move(rectJson));
+    std::string title;
+    auto navDestination = AceType::DynamicCast<NG::NavDestinationNodeBase>(node);
+    if (navDestination) {
+        auto titleBarNode = AceType::DynamicCast<NG::TitleBarNode>(navDestination->GetTitleBarNode());
+        title = NG::NavigationTitleUtil::GetTitleString(titleBarNode, navDestination->GetPrevTitleIsCustomValue(false));
+    }
+    nodeJson->Put("title", title.c_str());
+    nodeJson->Put("aiCallerBound", node->HasAICallerHelper());
+    return nodeJson;
 }
 
 std::string BuildExeAppAIFunctionAmbiguousData(
@@ -378,13 +416,19 @@ std::string BuildExeAppAIFunctionAmbiguousData(
     root->Put("funcName", funcName.c_str());
     auto candidateNodeIds = JsonUtil::CreateArray();
     CHECK_NULL_RETURN(candidateNodeIds, root->ToString());
+    auto candidateNodesJson = JsonUtil::CreateArray();
+    CHECK_NULL_RETURN(candidateNodesJson, root->ToString());
     for (const auto& node : candidateNodes) {
         CHECK_NULL_CONTINUE(node);
         auto nodeId = JsonUtil::ParseJsonString(std::to_string(node->GetId()));
         CHECK_NULL_CONTINUE(nodeId);
         candidateNodeIds->PutRef(std::move(nodeId));
+        auto nodeJson = BuildCandidateNodeData(node);
+        CHECK_NULL_CONTINUE(nodeJson);
+        candidateNodesJson->PutRef(std::move(nodeJson));
     }
     root->PutRef("candidateNodeIds", std::move(candidateNodeIds));
+    root->PutRef("candidateNodes", std::move(candidateNodesJson));
     return root->ToString();
 }
 
@@ -2678,6 +2722,9 @@ void PipelineContext::StartWindowSizeChangeAnimate(int32_t width, int32_t height
             safeAreaManager_->UpdateKeyboardOffset(0.0);
             FlushSafeArea(width, height, safeAvoidArea);
             SetRootRect(width, height, 0.0);
+            if (textFieldManager_) {
+                DynamicCast<TextFieldManagerNG>(textFieldManager_)->AvoidKeyBoardInNavigation();
+            }
             FlushUITasks();
             if (textFieldManager_) {
                 DynamicCast<TextFieldManagerNG>(textFieldManager_)->ScrollTextFieldToSafeArea();
@@ -6720,10 +6767,47 @@ void PipelineContext::RegisterMaterialNode(const RefPtr<FrameNode>& node)
     materialProcessor_->Register(node);
 }
 
+void PipelineContext::RegisterPageContextNode(const RefPtr<FrameNode>& node)
+{
+    CHECK_NULL_VOID(materialProcessor_);
+    materialProcessor_->RegisterPageContextNode(node);
+}
+
 void PipelineContext::UnregisterMaterialNode(int32_t nodeId)
 {
     CHECK_NULL_VOID(materialProcessor_);
     materialProcessor_->Unregister(nodeId);
+}
+
+void PipelineContext::UnregisterPageContextNode(int32_t nodeId)
+{
+    CHECK_NULL_VOID(materialProcessor_);
+    materialProcessor_->UnregisterPageContextNode(nodeId);
+}
+
+void PipelineContext::ReportPageContextStats(int32_t targetContainerId, PageLogContainerType type, int32_t tabIndex)
+{
+    CHECK_NULL_VOID(materialProcessor_);
+    materialProcessor_->ReportPageContextStats(targetContainerId, type, tabIndex);
+}
+
+void PipelineContext::AddTaskOverlayNodeMaterialArea(const RefPtr<FrameNode>& targetNode, const std::string& source)
+{
+    CHECK_NULL_VOID(targetNode);
+    auto wk = WeakPtr<FrameNode>(targetNode);
+    AddAfterLayoutTask([wk, source]() {
+        auto node = wk.Upgrade();
+        CHECK_NULL_VOID(node);
+        auto pipeline = node->GetContext();
+        CHECK_NULL_VOID(pipeline);
+        pipeline->ReportOverlayNodeMaterialArea(node, source);
+    });
+}
+
+void PipelineContext::ReportOverlayNodeMaterialArea(const RefPtr<FrameNode>& host, const std::string& source)
+{
+    CHECK_NULL_VOID(materialProcessor_);
+    materialProcessor_->ReportOverlayNodeMaterialArea(host, source);
 }
 
 void PipelineContext::AddAfterRenderTask(std::function<void()>&& task)
@@ -8589,10 +8673,9 @@ bool PipelineContext::CheckSourceTypeChange(SourceType currentSourceType)
 std::pair<uint32_t, std::string> PipelineContext::ExeAppAIFunctionCallback(const std::string& funcName,
     const std::string& params, const sptr<IRemoteObject>& remoteObj, int32_t nodeId)
 {
-    std::list<RefPtr<NG::FrameNode>> navNodes;
     CHECK_NULL_RETURN(rootNode_, std::make_pair(AI_CALL_NODE_INVALID, ""));
-    rootNode_->FindTopNavDestination(navNodes);
-    auto candidateNodes = CollectCandidateNavDestinationNodes(navNodes);
+    std::vector<RefPtr<NG::FrameNode>> candidateNodes;
+    CollectVisibleNavDestinations(rootNode_, candidateNodes);
     CHECK_NULL_RETURN(!candidateNodes.empty(), std::make_pair(AI_CALL_NODE_INVALID, ""));
     if (nodeId != -1) {
         for (const auto& node : candidateNodes) {
@@ -8611,19 +8694,31 @@ std::pair<uint32_t, std::string> PipelineContext::ExeAppAIFunctionCallback(const
 
 void PipelineContext::OnDumpBindAICaller(const std::vector<std::string>& params) const
 {
-    std::list<RefPtr<NG::FrameNode>> navNodes;
+    if (params.size() < PARAM_NUM) {
+        return;
+    }
     CHECK_NULL_VOID(rootNode_);
-    rootNode_->FindTopNavDestination(navNodes);
-    CHECK_NULL_VOID(!navNodes.empty());
-    auto topNavNode = navNodes.back();
-    CHECK_NULL_VOID(topNavNode);
-    if (params.size() > 1) {
-        if (params[1] == "-bind") {
-            auto myAICaller = std::make_shared<TestAICaller>();
-            topNavNode->SetAICallerHelper(myAICaller);
-        } else if (params[1] == "-unbind") {
-            topNavNode->SetAICallerHelper(nullptr);
+    std::vector<RefPtr<NG::FrameNode>> candidateNodes;
+    CollectVisibleNavDestinations(rootNode_, candidateNodes);
+    CHECK_NULL_VOID(!candidateNodes.empty());
+    auto targetNode = candidateNodes.back();
+    if (params.size() > PARAM_NUM) {
+        auto nodeId = StringUtils::StringToInt(params[PARAM_NUM], -1);
+        targetNode = nullptr;
+        for (const auto& node : candidateNodes) {
+            CHECK_NULL_CONTINUE(node);
+            if (node->GetId() == nodeId) {
+                targetNode = node;
+                break;
+            }
         }
+    }
+    CHECK_NULL_VOID(targetNode);
+    if (params[1] == "-bind") {
+        auto myAICaller = std::make_shared<TestAICaller>();
+        targetNode->SetAICallerHelper(myAICaller);
+    } else if (params[1] == "-unbind") {
+        targetNode->SetAICallerHelper(nullptr);
     }
 }
 
@@ -8890,6 +8985,17 @@ const RefPtr<ScrollPlaceholderManager>& PipelineContext::GetOrCreateScrollPlaceh
 const RefPtr<ForceSplitManager>& PipelineContext::GetForceSplitManager() const
 {
     return forceSplitMgr_;
+}
+
+void PipelineContext::SetTransPageEnabled(bool enabled)
+{
+    CHECK_NULL_VOID(forceSplitMgr_);
+    forceSplitMgr_->SetTransPageEnabled(enabled);
+}
+
+bool PipelineContext::IsTransPageEnabled() const
+{
+    return forceSplitMgr_ ? forceSplitMgr_->IsTransPageEnabled() : true;
 }
 
 const RefPtr<RecoverableManager>& PipelineContext::GetRecoverableManager() const

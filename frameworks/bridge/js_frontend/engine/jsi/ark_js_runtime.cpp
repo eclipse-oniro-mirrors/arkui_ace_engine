@@ -411,6 +411,7 @@ shared_ptr<JsValue> ArkJSRuntime::NewNativePointer(void* ptr)
 
 void ArkJSRuntime::ThrowError(const std::string& msg, int32_t code)
 {
+    LocalScope scope(vm_);
     auto errorVal = panda::Exception::Error(vm_, panda::StringRef::NewFromUtf8(vm_, msg.c_str()));
     auto codeVal = panda::Exception::Error(vm_, panda::StringRef::NewFromUtf8(vm_, std::to_string(code).c_str()));
     Local<StringRef> codeKey = StringRef::NewFromUtf8(vm_, "code");

@@ -129,6 +129,15 @@ ani_boolean IsEasySplit([[maybe_unused]] ani_env* env, ani_object obj, ani_int i
     return modifier->getCommonAniModifier()->isEasySplit(instanceId);
 }
 
+ani_boolean IsTransPageEnabled([[maybe_unused]] ani_env* env, ani_object obj, ani_int instanceId)
+{
+    const auto* modifier = GetNodeAniModifier();
+    if (!modifier || !modifier->getCommonAniModifier() || !env) {
+        return ANI_TRUE;
+    }
+    return modifier->getCommonAniModifier()->isTransPageEnabled(instanceId);
+}
+
 ani_object GetHostContext([[maybe_unused]] ani_env* env, ani_object obj, ani_int key)
 {
     const auto* modifier = GetNodeAniModifier();

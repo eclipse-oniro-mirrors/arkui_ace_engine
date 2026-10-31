@@ -162,7 +162,7 @@ HWTEST_F(RichEditorSpanNodeTestNg, RemoveEmptySpanNodes001, TestSize.Level0)
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
 
-    auto host = richEditorPattern->GetContentHost();
+    auto host = richEditorPattern->GetHost();
     EXPECT_NE(host, nullptr);
 
     richEditorPattern->spans_.clear();
@@ -209,17 +209,19 @@ HWTEST_F(RichEditorSpanNodeTestNg, RemoveEmptySpanNodes003, TestSize.Level0)
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
+    auto contentNode = richEditorNode_->GetChildAtIndex(0);
+    ASSERT_NE(contentNode, nullptr);
     auto* stack = ViewStackProcessor::GetInstance();
     auto nodeId = stack->ClaimNodeId();
     auto newFrameNode = ImageSpanNode::GetOrCreateSpanNode(
         V2::IMAGE_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<RichEditorPattern>(); });
     auto newAddFrameNode = ImageSpanNode::GetOrCreateSpanNode(
         V2::IMAGE_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<RichEditorPattern>(); });
-    richEditorNode_->children_.push_back(newFrameNode);
-    richEditorNode_->children_.push_back(newAddFrameNode);
+    contentNode->children_.push_back(newFrameNode);
+    contentNode->children_.push_back(newAddFrameNode);
     richEditorPattern->RemoveEmptySpanNodes();
     bool nonSpanNodeStillExists = false;
-    for (const auto& child : richEditorNode_->children_) {
+    for (const auto& child : contentNode->children_) {
         if (child == newFrameNode) {
             nonSpanNodeStillExists = true;
             break;

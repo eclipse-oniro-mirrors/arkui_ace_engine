@@ -25,6 +25,39 @@
 #include "interfaces/inner_api/ui_session/param_config.h"
 
 namespace OHOS::Ace::NG {
+/**
+ * @tc.name: WFFastScrollScopeAndPreparation
+ * @tc.desc: Only sliding-window mode prepares a bounded target window without moving visible items.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollScopeAndPreparation, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    model.SetColumnsTemplate("1fr 1fr");
+    auto created = std::make_shared<int32_t>(0);
+    CreateItemsInLazyForEach(1000, [created](int32_t index) {
+        ++*created;
+        return 100.0f + static_cast<float>(index % 3) * 20.0f;
+    });
+    CreateDone();
+    if (TOP_TO_DOWN) {
+        pattern_->ScrollToIndexFastScroll(10, true, ScrollAlign::CENTER, 0.0f, FastScrollMode::SKIP_MEASURE);
+        EXPECT_FALSE(pattern_->GetFastScrollRequest());
+        return;
+    }
+    const float before = pattern_->GetTotalOffset();
+    const auto firstRect = FastScrollItemRect(0);
+    const int32_t createdBefore = *created;
+    pattern_->ScrollToIndexFastScroll(800, true, ScrollAlign::CENTER, 0.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    ASSERT_NE(pattern_->GetFastScrollRequest(), nullptr);
+    FlushUITasks();
+    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), before);
+    EXPECT_EQ(FastScrollItemRect(0), firstRect);
+    EXPECT_LT(*created - createdBefore, 100);
+    EXPECT_FALSE(pattern_->targetIndex_);
+    EXPECT_TRUE(pattern_->AnimateRunning());
+}
 
 /**
  * @tc.name: UpdateCurrentOffset001

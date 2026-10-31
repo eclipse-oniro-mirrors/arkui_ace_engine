@@ -1543,6 +1543,16 @@ void JSViewContext::JSIsEasySplit(const JSCallbackInfo& info)
     info.SetReturnValue(JSRef<JSVal>::Make(ToJSValue(result)));
 }
 
+void JSViewContext::JSIsTransPageEnabled(const JSCallbackInfo& info)
+{
+    auto context = NG::PipelineContext::GetCurrentContext();
+    if (!context) {
+        info.SetReturnValue(JSRef<JSVal>::Make(JSVal(ToJSValue(true))));
+        return;
+    }
+    info.SetReturnValue(JSRef<JSVal>::Make(ToJSValue(context->IsTransPageEnabled())));
+}
+
 void JSViewContext::JSSetTextSelectionClearPolicy(const JSCallbackInfo& info)
 {
     if (info.Length() < 1 || !info[0]->IsNumber()) {
@@ -1595,6 +1605,7 @@ void JSViewContext::JSBind(BindingTarget globalObj)
     JSClass<JSViewContext>::StaticMethod(
         "setCustomKeyboardContinueFeature",  JSViewContext::JSSetCustomKeyboardContinueFeature);
     JSClass<JSViewContext>::StaticMethod("isEasySplit", JSViewContext::JSIsEasySplit);
+    JSClass<JSViewContext>::StaticMethod("isTransPageEnabled", JSViewContext::JSIsTransPageEnabled);
     JSClass<JSViewContext>::StaticMethod("setTextSelectionClearPolicy", JSViewContext::JSSetTextSelectionClearPolicy);
     JSClass<JSViewContext>::Bind<>(globalObj);
 }

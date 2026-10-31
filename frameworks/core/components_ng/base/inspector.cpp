@@ -21,6 +21,7 @@
 #include "base/log/log_wrapper.h"
 #include "core/common/container.h"
 #include "core/components_ng/base/distributed_ui.h"
+#include "core/components_ng/base/inspector_external_subtree.h"
 #include "core/components_ng/pattern/navrouter/navdestination_group_node.h"
 #include "core/components_ng/pattern/navrouter/navdestination_pattern.h"
 #include "core/components_ng/pattern/stage/page_pattern.h"
@@ -218,6 +219,7 @@ void GetInspectorChildren(const RefPtr<NG::UINode>& parent, std::unique_ptr<OHOS
         for (auto uiNode : children) {
             GetInspectorChildren(uiNode, jsonChildrenArray, inspectorParameters, filter, depth - 1);
         }
+        AppendExternalSubtreeToChildren(parent, jsonChildrenArray);
         if (jsonChildrenArray->GetArraySize()) {
             jsonNode->PutRef(INSPECTOR_CHILDREN, std::move(jsonChildrenArray));
         }
@@ -491,6 +493,7 @@ void GetInspectorChildren(const RefPtr<NG::UINode>& parent, std::unique_ptr<OHOS
             GetInspectorChildren(uiNode, jsonChildrenArray, inspectorParameters, filter, depth - 1);
         }
     }
+    AppendExternalSubtreeToChildren(parent, jsonChildrenArray);
     if (jsonChildrenArray->GetArraySize() > 0) {
         jsonNodeNew->PutRef(INSPECTOR_CHILDREN, std::move(jsonChildrenArray));
     }

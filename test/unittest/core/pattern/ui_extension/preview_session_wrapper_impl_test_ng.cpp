@@ -744,4 +744,38 @@ HWTEST_F(PreviewSessionWrapperImplTestNg, PreviewSessionWrapperImplTestNg014, Te
     EXPECT_EQ(foregroundErrorCode, ERROR_CODE_UIEXTENSION_FOREGROUND_FAILED);
 #endif
 }
+
+/**
+ * @tc.name: PreviewSessionWrapperBrandColorTest001
+ * @tc.desc: Test pattern GetBrandColorStr returns DEFAULT_BRAND_COLOR_STR by default
+ * @tc.type: FUNC
+ */
+HWTEST_F(PreviewSessionWrapperImplTestNg, PreviewSessionWrapperBrandColorTest001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto sessionWrapper = GeneratePreviewSessionWrapperImpl();
+    ASSERT_NE(sessionWrapper, nullptr);
+    auto pattern = sessionWrapper->hostPattern_.Upgrade();
+    ASSERT_EQ(pattern, nullptr);
+    auto result = pattern->GetBrandColorStr();
+    EXPECT_EQ(result, "");
+#endif
+}
+
+/**
+ * @tc.name: PreviewSessionWrapperBrandColorTest002
+ * @tc.desc: Test pattern ResolveBrandColor returns DEFAULT_BRAND_COLOR_STR with invalid themeScopeId
+ * @tc.type: FUNC
+ */
+HWTEST_F(PreviewSessionWrapperImplTestNg, PreviewSessionWrapperBrandColorTest002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto sessionWrapper = GeneratePreviewSessionWrapperImpl();
+    ASSERT_NE(sessionWrapper, nullptr);
+    auto pattern = sessionWrapper->hostPattern_.Upgrade();
+    ASSERT_EQ(pattern, nullptr);
+    auto result = pattern->ResolveBrandColor(999);
+    EXPECT_EQ(result, "");
+#endif
+}
 } // namespace OHOS::Ace::NG

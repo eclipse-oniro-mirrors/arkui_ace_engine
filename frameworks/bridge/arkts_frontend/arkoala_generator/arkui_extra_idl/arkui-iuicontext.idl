@@ -45,4 +45,5 @@ interface IUIContext {
     static pointer addLocalInputEventMonitor(i32 eventMask, InputEventListener listener);
     static void removeLocalInputEventMonitor(pointer monitor);
     static void setTextSelectionClearPolicy(TextSelectionClearPolicy policy);
+    static void setTransPageEnabled((boolean or undefined) enabled);
 };

@@ -211,6 +211,8 @@ adapter/ohos/osal/window_utils.cpp @arkui_framework_xnode
 adapter/ohos/osal/window_utils.h @arkui_framework_xnode
 adapter/ohos/sa_profile/ @arkui_framework_xnode
 adapter/ohos/services/ @arkui_framework_xnode
+adapter/ohos/services/uiservice/include/material_statistic_event.h @arkuicodepulse
+adapter/ohos/services/uiservice/src/material_statistic_event.cpp @arkuicodepulse
 adapter/ohos/tools/raw_input_injector/ @ArkUI_Event
 
 [Preview adapter]
@@ -371,6 +373,7 @@ frameworks/base/image/ @arkui001
 frameworks/base/input_manager/input_manager.h @ArkUI_Event
 frameworks/base/json/ @arkui_framework_xnode
 frameworks/base/log/ @arkui_framework_xnode
+frameworks/base/log/material_statistic_event_info.h @arkuicodepulse
 frameworks/base/longframe/long_frame_report.h @arkui_framework_xnode
 frameworks/base/memory/ @arkui_framework_xnode
 frameworks/base/mousestyle/mouse_style.h @ArkUI_Event
@@ -2371,6 +2374,10 @@ frameworks/core/components_ng/base/inspector.cpp @ArkUI_ability_group
 frameworks/core/components_ng/base/inspector.h @ArkUI_ability_group
 frameworks/core/components_ng/base/inspector_filter.cpp @ArkUI_ability_group
 frameworks/core/components_ng/base/inspector_filter.h @ArkUI_ability_group
+frameworks/core/components_ng/base/inspector_occlusion_collector.cpp @arkui_framework_xnode
+frameworks/core/components_ng/base/inspector_occlusion_collector.h @arkui_framework_xnode
+frameworks/core/components_ng/base/inspector_occlusion_region.cpp @arkui_framework_xnode
+frameworks/core/components_ng/base/inspector_occlusion_region.h @arkui_framework_xnode
 frameworks/core/components_ng/base/linear_vector.h @arkui_framework_xnode
 frameworks/core/components_ng/base/mixed_mount_registry.cpp @arkui_framework_xnode
 frameworks/core/components_ng/base/mixed_mount_registry.h @arkui_framework_xnode
@@ -3614,6 +3621,7 @@ test/unittest/core/base/inspector_test_ng.cpp @ArkUI_ability_group
 test/unittest/core/base/observer_draw_callback_test.cpp @arkui_framework_xnode
 test/unittest/core/base/observer_test_ng.cpp @arkui_framework_resource
 test/unittest/core/base/simplified_inspector_test_ng.cpp @arkui_framework_xnode
+test/unittest/core/base/ui_node_occlusion_test.cpp @arkui_framework_xnode
 test/unittest/core/base/view_abstract_model_test_ng.cpp @ArkUI_Event
 test/unittest/core/common/ace_engine/ @arkui_framework_xnode
 test/unittest/core/common/asset/ @arkui_framework_xnode
@@ -3636,6 +3644,7 @@ test/unittest/core/common/transform/ @ArkUI_Event
 test/unittest/core/common/ui_observer_store_test.cpp @arkui_framework_xnode
 test/unittest/core/common/vibrator/ @arkui_framework_xnode
 test/unittest/core/components/BUILD.gn @arkuiscroll
+test/unittest/core/components/common/layout/grid_system_manager_test.cpp @arkuilayout1
 test/unittest/core/components/common/properties/os_content_test.cpp @arkuiscroll
 test/unittest/core/components/common/properties/os_content_test.h @arkuiscroll
 test/unittest/core/event/ @ArkUI_Event
@@ -3666,6 +3675,7 @@ test/unittest/core/pattern/calendar_picker/ @arkui001
 test/unittest/core/pattern/canvas/ @arkuilayout1
 test/unittest/core/pattern/checkbox/ @arkuipopupwindow_all
 test/unittest/core/pattern/checkboxgroup/ @arkuipopupwindow_all
+test/unittest/core/pattern/common_text/ @huawei_g_five
 test/unittest/core/pattern/common_view/ @arkui_statemgmt
 test/unittest/core/pattern/container_modal/ @ArkUI_ability_group
 test/unittest/core/pattern/container_picker/ @arkui001

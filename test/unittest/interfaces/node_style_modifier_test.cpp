@@ -512,4 +512,54 @@ HWTEST_F(NodeStyleModifierTest, GetNextFocusTest003, TestSize.Level1)
     nodeAPI->disposeNode(rootNode);
 }
 
+/**
+ * @tc.name: WFFastScrollCapiParameters
+ * @tc.desc: The optional fifth value of NODE_WATER_FLOW_SCROLL_TO_INDEX is accepted in every unit and layout mode.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeStyleModifierTest, WFFastScrollCapiParameters, TestSize.Level1)
+{
+    ASSERT_TRUE(NodeModel::InitialFullImpl());
+    auto* nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
+    ASSERT_NE(nodeAPI, nullptr);
+    auto node = nodeAPI->createNode(ARKUI_NODE_WATER_FLOW);
+    auto child = nodeAPI->createNode(ARKUI_NODE_FLOW_ITEM);
+    ASSERT_NE(node, nullptr);
+    ASSERT_NE(child, nullptr);
+    ASSERT_EQ(nodeAPI->addChild(node, child), ERROR_CODE_NO_ERROR);
+
+    constexpr size_t fastScrollModeSlot = 4;
+    constexpr int32_t legacyValueCount = 4;
+    constexpr int32_t fastScrollValueCount = 5;
+    ArkUI_NumberValue layoutValue[] = { { .i32 = ARKUI_WATER_FLOW_LAYOUT_MODE_SLIDING_WINDOW } };
+    ArkUI_AttributeItem layoutItem { layoutValue, 1 };
+    ArkUI_NumberValue values[] = { { .i32 = 0 }, { .i32 = 1 }, { .i32 = ARKUI_SCROLL_ALIGNMENT_START },
+        { .f32 = 10.0f }, { .i32 = 1 } };
+    ArkUI_AttributeItem item { values, fastScrollValueCount };
+    for (auto layoutMode :
+        { ARKUI_WATER_FLOW_LAYOUT_MODE_SLIDING_WINDOW, ARKUI_WATER_FLOW_LAYOUT_MODE_ALWAYS_TOP_DOWN }) {
+        layoutValue[0].i32 = layoutMode;
+        ASSERT_EQ(nodeAPI->setAttribute(node, NODE_WATER_FLOW_LAYOUT_MODE, &layoutItem), ERROR_CODE_NO_ERROR);
+        for (auto unit : { ARKUI_LENGTH_METRIC_UNIT_DEFAULT, ARKUI_LENGTH_METRIC_UNIT_VP,
+                 ARKUI_LENGTH_METRIC_UNIT_PX }) {
+            node->lengthMetricUnit = unit;
+            // Enabled modes, the disabled mode and out-of-range modes, with and without animation.
+            for (int32_t mode : { 1, 2, 0, -1, 3 }) {
+                values[fastScrollModeSlot].i32 = mode;
+                for (int32_t smooth : { 1, 0 }) {
+                    values[1].i32 = smooth;
+                    EXPECT_EQ(nodeAPI->setAttribute(node, NODE_WATER_FLOW_SCROLL_TO_INDEX, &item),
+                        ERROR_CODE_NO_ERROR) << layoutMode << " " << unit << " " << mode << " " << smooth;
+                }
+            }
+        }
+    }
+    item.size = legacyValueCount;
+    EXPECT_EQ(nodeAPI->setAttribute(node, NODE_WATER_FLOW_SCROLL_TO_INDEX, &item), ERROR_CODE_NO_ERROR);
+    nodeAPI->removeChild(node, child);
+    nodeAPI->disposeNode(child);
+    nodeAPI->disposeNode(node);
+}
+
 } // namespace OHOS::Ace

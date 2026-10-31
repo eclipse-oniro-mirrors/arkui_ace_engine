@@ -913,5 +913,727 @@ HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollDetachAfterFinish, TestSize.Level1
     CheckFastScrollDetach(DetachPhase::AFTER_FINISH);
 }
 
+/**
+ * @tc.name: WFFastScrollRecycledTargetMode1
+ * @tc.desc: Skip-measure restores a recycled target even when the next frame reaches the endpoint.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollRecycledTargetMode1, TestSize.Level1)
+{
+    CheckFastScrollRecycledTarget(FastScrollMode::SKIP_MEASURE);
+}
+
+/**
+ * @tc.name: WFFastScrollRecycledTargetMode2
+ * @tc.desc: Skip-create-and-measure restores real target geometry after idle recycling.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollRecycledTargetMode2, TestSize.Level1)
+{
+    CheckFastScrollRecycledTarget(FastScrollMode::SKIP_CREATE_AND_MEASURE);
+}
+
+/**
+ * @tc.name: WFFastScrollAlignments
+ * @tc.desc: Both fast modes settle at measured target geometry in both directions.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollAlignments, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    model.SetColumnsTemplate("1fr 1fr");
+    CreateItemsInLazyForEach(1000, [](int32_t index) { return 100.0f + (index % 3) * 20.0f; });
+    CreateDone();
+    ASSERT_FALSE(TOP_TO_DOWN) << "This test must execute in water_flow_test_sw";
+    for (auto mode : { FastScrollMode::SKIP_MEASURE, FastScrollMode::SKIP_CREATE_AND_MEASURE }) {
+        for (auto align : { ScrollAlign::START, ScrollAlign::CENTER, ScrollAlign::END, ScrollAlign::AUTO }) {
+            for (int32_t index : { 800, 100 }) {
+                for (float extra : { 0.0f, 20.0f, -20.0f }) {
+                    SCOPED_TRACE(std::to_string(static_cast<int>(mode)) + ":" +
+                        std::to_string(static_cast<int>(align)) + ":" + std::to_string(index) + ":" +
+                        std::to_string(extra));
+                    // Begin away from the destination for each alignment/offset combination.
+                    ScrollToIndex(index == 800 ? 50 : 900, false, ScrollAlign::START);
+                    MockAnimationManager::GetInstance().SetTicks(4);
+                    pattern_->ScrollToIndexFastScroll(index, true, align, extra, mode);
+                    FlushUITasks();
+                    FinishFastScroll();
+                    ASSERT_TRUE(AceType::DynamicCast<WaterFlowLayoutInfoSW>(pattern_->layoutInfo_)->ItemInView(index));
+                    const auto rect = FastScrollItemRect(index);
+                    auto resolved = align == ScrollAlign::AUTO ?
+                        (index == 800 ? ScrollAlign::END : ScrollAlign::START) : align;
+                    const float expected = resolved == ScrollAlign::START ? -extra :
+                        (resolved == ScrollAlign::CENTER ? (WATER_FLOW_HEIGHT - rect.Height()) / 2.0f - extra :
+                            WATER_FLOW_HEIGHT - rect.Height() - extra);
+                    EXPECT_NEAR(rect.Top(), expected, 0.2f);
+                    EXPECT_TRUE(std::isfinite(pattern_->GetTotalOffset()));
+                    EXPECT_FALSE(pattern_->targetIndex_);
+                }
+            }
+        }
+    }
+}
+
+/**
+ * @tc.name: WFFastScrollInterruptAndReplace
+ * @tc.desc: Touch, data changes and same-target replacement invalidate previous preparation.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollInterruptAndReplace, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateItemsInLazyForEach(1000, [](int32_t) { return 100.0f; });
+    CreateDone();
+    ASSERT_FALSE(TOP_TO_DOWN) << "This test must execute in water_flow_test_sw";
+    pattern_->ScrollToIndexFastScroll(800, true, ScrollAlign::CENTER, 0.0f, FastScrollMode::SKIP_MEASURE);
+    auto old = pattern_->fastScrollState_;
+    pattern_->ScrollToIndexFastScroll(800, true, ScrollAlign::CENTER, 0.0f, FastScrollMode::SKIP_MEASURE);
+    ASSERT_NE(old, pattern_->fastScrollState_);
+    EXPECT_TRUE(old->cancelled);
+    TouchEventInfo touch("touch");
+    pattern_->OnTouchDown(touch);
+    FlushUITasks();
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    EXPECT_FALSE(pattern_->fastScrollState_);
+    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), 0.0f);
+
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(800, true, ScrollAlign::CENTER, 0.0f, FastScrollMode::SKIP_MEASURE);
+    FlushUITasks();
+    MockAnimationManager::GetInstance().Tick();
+    FlushUITasks();
+    const float stopped = pattern_->GetTotalOffset();
+    pattern_->OnTouchDown(touch);
+    FlushUITasks();
+    FinishFastScroll();
+    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), stopped);
+
+    pattern_->ScrollToIndexFastScroll(800, true, ScrollAlign::CENTER, 0.0f, FastScrollMode::SKIP_MEASURE);
+    pattern_->NotifyDataChange(0, 1);
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    EXPECT_FALSE(pattern_->fastScrollState_);
+    EXPECT_FALSE(pattern_->layoutInfo_->targetIndex_);
+    EXPECT_FALSE(pattern_->layoutInfo_->duringPositionCalc_);
+}
+
+/**
+ * @tc.name: WFFastScrollReentrantCallback
+ * @tc.desc: An old spring frame cannot apply its delta or stop a replacement request from onWillScroll.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollReentrantCallback, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateItemsInLazyForEach(1000, [](int32_t) { return 100.0f; });
+    CreateDone();
+    ASSERT_FALSE(TOP_TO_DOWN) << "This test must execute in water_flow_test_sw";
+    auto replace = std::make_shared<bool>(true);
+    eventHub_->SetOnWillScroll([this, replace](Dimension offset, ScrollState, ScrollSource) {
+        if (*replace) {
+            *replace = false;
+            pattern_->ScrollToIndexFastScroll(100, true, ScrollAlign::START, 0.0f, FastScrollMode::SKIP_MEASURE);
+        }
+        return ScrollFrameResult { .offset = offset };
+    });
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(800, true, ScrollAlign::CENTER, 0.0f, FastScrollMode::SKIP_MEASURE);
+    FlushUITasks();
+    MockAnimationManager::GetInstance().Tick();
+    ASSERT_NE(pattern_->GetFastScrollRequest(), nullptr);
+    EXPECT_EQ(pattern_->GetFastScrollRequest()->index, 100);
+    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), 0.0f);
+    EXPECT_FALSE(pattern_->fastScrollSkip_);
+    FlushUITasks();
+    FinishFastScroll();
+    EXPECT_NEAR(FastScrollItemRect(100).Top(), 0.0f, 0.2f);
+}
+
+/**
+ * @tc.name: WFFastScrollSingleFrameAndLargeOffset
+ * @tc.desc: A final callback before layout preserves alignment; extraOffset measures only its required region.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollSingleFrameAndLargeOffset, TestSize.Level1)
+{
+    CreateWaterFlow();
+    auto created = std::make_shared<std::set<int32_t>>();
+    CreateItemsInLazyForEach(1000, [created](int32_t index) { created->insert(index); return 100.0f; });
+    CreateDone();
+    ASSERT_FALSE(TOP_TO_DOWN) << "This test must execute in water_flow_test_sw";
+    MockAnimationManager::GetInstance().SetTicks(1);
+    pattern_->ScrollToIndexFastScroll(800, true, ScrollAlign::CENTER, 0.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    FinishFastScroll();
+    EXPECT_NEAR(FastScrollItemRect(800).Top(), 350.0f, 0.2f);
+    const int32_t before = created->size();
+    pattern_->ScrollToIndexFastScroll(500, true, ScrollAlign::START, -40000.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    FinishFastScroll();
+    const int32_t offsetRegionCreated = created->size() - before;
+    RecordProperty("offset_region_created", offsetRegionCreated);
+    EXPECT_GE(offsetRegionCreated, 400);
+    EXPECT_LE(offsetRegionCreated, 450);
+    for (int32_t index = 532; index < 768; ++index) {
+        EXPECT_EQ(created->count(index), 0u) << index;
+    }
+    EXPECT_NEAR(FastScrollItemRect(100).Top(), 0.0f, 0.2f);
+}
+
+/**
+ * @tc.name: WFFastScrollModeAndNegativeTarget
+ * @tc.desc: Mode 1 preserves intermediate creation; an absolute target of -1 is a valid coordinate.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollModeAndNegativeTarget, TestSize.Level1)
+{
+    CreateWaterFlow();
+    ScrollableModelNG::SetContentStartOffset(40.0f);
+    ScrollableModelNG::SetContentEndOffset(60.0f);
+    auto created = std::make_shared<int32_t>(0);
+    CreateItemsInLazyForEach(1000, [created](int32_t) { ++*created; return 100.0f; });
+    CreateDone();
+    ASSERT_FALSE(TOP_TO_DOWN) << "This test must execute in water_flow_test_sw";
+    MockAnimationManager::GetInstance().SetTicks(1);
+    pattern_->ScrollToIndexFastScroll(0, true, ScrollAlign::START, 39.0f, FastScrollMode::SKIP_MEASURE);
+    FlushUITasks();
+    FinishFastScroll();
+    EXPECT_NEAR(pattern_->GetTotalOffset(), -1.0f, 0.1f);
+    EXPECT_NEAR(FastScrollItemRect(0).Top(), 1.0f, 0.1f);
+    pattern_->ScrollToIndexFastScroll(800, true, ScrollAlign::START, 0.0f, FastScrollMode::SKIP_MEASURE);
+    FlushUITasks();
+    EXPECT_GE(*created, 801);
+    FinishFastScroll();
+    EXPECT_NEAR(FastScrollItemRect(800).Top(), 40.0f, 0.1f);
+}
+
+/**
+ * @tc.name: WFFastScrollBoundedWork
+ * @tc.desc: A ten-thousand-item data source does not create or measure the skipped interval in mode 2.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollBoundedWork, TestSize.Level1)
+{
+    CreateWaterFlow();
+    auto created = std::make_shared<int32_t>(0);
+    CreateItemsInLazyForEach(10000, [created](int32_t) { ++*created; return 100.0f; });
+    CreateDone();
+    ASSERT_FALSE(TOP_TO_DOWN) << "This test must execute in water_flow_test_sw";
+    const int32_t before = *created;
+    auto context = MockPipelineContext::GetCurrent();
+    context->SetResponseTime(200);
+    MockAnimationManager::GetInstance().SetTicks(8);
+    positionController_->ScrollToIndexWithOptions(8000, true, ScrollAlign::CENTER, 0.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), 0.0f);
+    FinishFastScroll();
+    EXPECT_LT(*created - before, 100);
+    EXPECT_FALSE(context->ReachResponseDeadline());
+    EXPECT_NEAR(FastScrollItemRect(8000).Top(), 350.0f, 0.2f);
+}
+
+/**
+ * @tc.name: WFFastScrollHorizontal
+ * @tc.desc: Fast scrolling uses horizontal main-axis geometry in both directions.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollHorizontal, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    model.SetLayoutDirection(FlexDirection::ROW);
+    model.SetRowsTemplate("1fr 1fr");
+    CreateWaterFlowItems(1000);
+    CreateDone();
+    ASSERT_FALSE(TOP_TO_DOWN) << "This test must execute in water_flow_test_sw";
+    for (auto direction : { TextDirection::LTR, TextDirection::RTL }) {
+        layoutProperty_->UpdateLayoutDirection(direction);
+        frameNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+        FlushUITasks();
+        for (int32_t index : { 800, 100 }) {
+            MockAnimationManager::GetInstance().SetTicks(4);
+            pattern_->ScrollToIndexFastScroll(index, true, ScrollAlign::CENTER, 20.0f,
+                FastScrollMode::SKIP_CREATE_AND_MEASURE);
+            FlushUITasks();
+            FinishFastScroll();
+            const auto rect = FastScrollItemRect(index);
+            EXPECT_NEAR(rect.Left(), (WATER_FLOW_WIDTH - rect.Width()) / 2.0f +
+                (direction == TextDirection::RTL ? 20.0f : -20.0f), 0.2f);
+        }
+    }
+}
+
+
+/**
+ * @tc.name: WFFastScrollSections
+ * @tc.desc: Sliding-window section changes in lane count, gaps and margins preserve measured target alignment.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollSections, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateItemsInLazyForEach(1000, [](int32_t index) { return 100.0f + (index % 3) * 20.0f; });
+    auto sections = pattern_->GetOrCreateWaterFlowSections();
+    MarginProperty margin;
+    margin.top = CalcLength(30.0f);
+    margin.bottom = CalcLength(20.0f);
+    std::vector<WaterFlowSections::Section> data(3);
+    data[0].itemsCount = 200;
+    data[0].crossCount = 1;
+    data[1].itemsCount = 300;
+    data[1].crossCount = 3;
+    data[2].itemsCount = 500;
+    data[2].crossCount = 2;
+    for (auto& section : data) {
+        section.rowsGap = 10.0_vp;
+        section.margin = margin;
+    }
+    sections->ChangeData(0, 0, data);
+    MockPipelineContext::GetCurrent()->FlushBuildFinishCallbacks();
+    CreateDone();
+    ASSERT_FALSE(TOP_TO_DOWN) << "This test must execute in water_flow_test_sw";
+    for (int32_t index : { 750, 100, 350 }) {
+        MockAnimationManager::GetInstance().SetTicks(4);
+        pattern_->ScrollToIndexFastScroll(index, true, ScrollAlign::CENTER, -20.0f,
+            FastScrollMode::SKIP_CREATE_AND_MEASURE);
+        FlushUITasks();
+        FinishFastScroll();
+        const auto rect = FastScrollItemRect(index);
+        EXPECT_NEAR(rect.Top(), (WATER_FLOW_HEIGHT - rect.Height()) / 2.0f + 20.0f, 0.2f);
+    }
+}
+
+/**
+ * @tc.name: WFFastScrollFirstLayoutAndFollowingCommand
+ * @tc.desc: Preparation obtains first-layout samples and leaves ordinary commands usable after a fast jump.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollFirstLayoutAndFollowingCommand, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateItemsInLazyForEach(1000, [](int32_t) { return 100.0f; });
+    if (!(TOP_TO_DOWN)) {
+        pattern_->ScrollToIndexFastScroll(800, true, ScrollAlign::CENTER, 0.0f,
+            FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    }
+    CreateDone();
+    ASSERT_FALSE(TOP_TO_DOWN) << "This test must execute in water_flow_test_sw";
+    FinishFastScroll();
+    EXPECT_NEAR(FastScrollItemRect(800).Top(), 350.0f, 0.2f);
+    ScrollToIndex(20, false, ScrollAlign::START);
+    EXPECT_NEAR(FastScrollItemRect(20).Top(), 0.0f, 0.2f);
+    pattern_->ScrollToIndexFastScroll(LAST_ITEM, true, ScrollAlign::END, 0.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    ASSERT_NE(pattern_->GetFastScrollRequest(), nullptr);
+    EXPECT_EQ(pattern_->GetFastScrollRequest()->index, 999);
+    FlushUITasks();
+    auto lastState = pattern_->fastScrollState_;
+    ASSERT_NE(lastState, nullptr);
+    ASSERT_TRUE(lastState->targetOffset);
+    const float initialTarget = *lastState->targetOffset;
+    const int32_t preparedEnd = lastState->preparedWindow ? lastState->preparedWindow->endIndex_ : -1;
+    FinishFastScroll();
+    SCOPED_TRACE(testing::Message() << "initialTarget=" << initialTarget << " preparedEnd=" << preparedEnd
+        << " finalTarget=" << lastState->targetOffset.value_or(0.0f) << " offset=" << pattern_->GetTotalOffset());
+    EXPECT_NEAR(FastScrollItemRect(999).Bottom(), WATER_FLOW_HEIGHT, 0.2f);
+    ScrollToIndex(0, false, ScrollAlign::START);
+    EXPECT_NEAR(FastScrollItemRect(0).Top(), 0.0f, 0.2f);
+}
+
+/**
+ * @tc.name: WFFastScrollThresholdAndVisibleAuto
+ * @tc.desc: Exactly four viewports do not skip, and AUTO applies extraOffset once to a visible item.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollThresholdAndVisibleAuto, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateItemsInLazyForEach(1000, [](int32_t) { return 100.0f; });
+    CreateDone();
+    ASSERT_FALSE(TOP_TO_DOWN) << "This test must execute in water_flow_test_sw";
+    for (int32_t index : { 32, 33 }) {
+        ScrollToIndex(0, false, ScrollAlign::START);
+        MockAnimationManager::GetInstance().SetTicks(4);
+        pattern_->ScrollToIndexFastScroll(index, true, ScrollAlign::START, 0.0f,
+            FastScrollMode::SKIP_CREATE_AND_MEASURE);
+        FlushUITasks();
+        ASSERT_NE(pattern_->GetFastScrollRequest(), nullptr);
+        EXPECT_EQ(!NearZero(pattern_->GetFastScrollRequest()->skipDistance), index == 33);
+        FinishFastScroll();
+        EXPECT_NEAR(FastScrollItemRect(index).Top(), 0.0f, 0.2f);
+    }
+    ScrollToIndex(0, false, ScrollAlign::START);
+    pattern_->ScrollToIndexFastScroll(2, true, ScrollAlign::AUTO, 20.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    FinishFastScroll();
+    EXPECT_NEAR(FastScrollItemRect(2).Top(), 180.0f, 0.2f);
+}
+
+/**
+ * @tc.name: WFFastScrollOversizedItem
+ * @tc.desc: Measured alignment remains correct when the destination is larger than the viewport.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollOversizedItem, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateItemsInLazyForEach(1000, [](int32_t index) { return index == 500 ? 2000.0f : 100.0f; });
+    CreateDone();
+    ASSERT_FALSE(TOP_TO_DOWN) << "This test must execute in water_flow_test_sw";
+    for (auto align : { ScrollAlign::START, ScrollAlign::CENTER, ScrollAlign::END }) {
+        ScrollToIndex(10, false, ScrollAlign::START);
+        MockAnimationManager::GetInstance().SetTicks(4);
+        pattern_->ScrollToIndexFastScroll(500, true, align, 20.0f,
+            FastScrollMode::SKIP_CREATE_AND_MEASURE);
+        FlushUITasks();
+        FinishFastScroll();
+        const float expected = align == ScrollAlign::START ? -20.0f :
+            (align == ScrollAlign::CENTER ? -620.0f : -1220.0f);
+        EXPECT_NEAR(FastScrollItemRect(500).Top(), expected, 0.2f);
+    }
+}
+
+/**
+ * @tc.name: WFFastScrollReverse
+ * @tc.desc: Reversed layout transforms the final main-axis geometry and extra offset consistently.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollReverse, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    model.SetLayoutDirection(FlexDirection::COLUMN_REVERSE);
+    CreateItemsInLazyForEach(1000, [](int32_t) { return 100.0f; });
+    CreateDone();
+    ASSERT_FALSE(TOP_TO_DOWN) << "This test must execute in water_flow_test_sw";
+    for (int32_t index : { 800, 100 }) {
+        MockAnimationManager::GetInstance().SetTicks(4);
+        pattern_->ScrollToIndexFastScroll(index, true, ScrollAlign::CENTER, 20.0f,
+            FastScrollMode::SKIP_CREATE_AND_MEASURE);
+        FlushUITasks();
+        FinishFastScroll();
+        EXPECT_NEAR(FastScrollItemRect(index).Top(), 370.0f, 0.2f);
+    }
+}
+
+/**
+ * @tc.name: WFFastScrollReentrantPreparation
+ * @tc.desc: A request replaced during item creation survives the old layout and starts in the next layout.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollReentrantPreparation, TestSize.Level1)
+{
+    CreateWaterFlow();
+    auto replace = std::make_shared<bool>(false);
+    CreateItemsInLazyForEach(1000, [this, replace](int32_t index) {
+        if (*replace && index >= 790) {
+            *replace = false;
+            pattern_->ScrollToIndexFastScroll(100, true, ScrollAlign::START, 0.0f,
+                FastScrollMode::SKIP_CREATE_AND_MEASURE);
+        }
+        return 100.0f;
+    });
+    CreateDone();
+    ASSERT_FALSE(TOP_TO_DOWN) << "This test must execute in water_flow_test_sw";
+    *replace = true;
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(800, true, ScrollAlign::CENTER, 0.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    auto old = pattern_->fastScrollState_;
+    FlushUITasks();
+    EXPECT_TRUE(old->cancelled);
+    ASSERT_NE(pattern_->GetFastScrollRequest(), nullptr);
+    EXPECT_EQ(pattern_->GetFastScrollRequest()->index, 100);
+    FlushUITasks();
+    FinishFastScroll();
+    EXPECT_NEAR(FastScrollItemRect(100).Top(), 0.0f, 0.2f);
+}
+
+
+/**
+ * @tc.name: WFFastScrollFooterAndFollowingScroll
+ * @tc.desc: A fast jump preserves footer geometry and ordinary scrolling across the target window.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollFooterAndFollowingScroll, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    model.SetFooter(GetDefaultHeaderBuilder());
+    CreateItemsInLazyForEach(1000, [](int32_t) { return 100.0f; });
+    CreateDone();
+    pattern_->ScrollToIndexFastScroll(800, true, ScrollAlign::CENTER, 0.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    FinishFastScroll();
+    for (float delta : { -300.0f, -300.0f, 300.0f, 300.0f }) {
+        UpdateCurrentOffset(delta);
+        const int32_t start = pattern_->layoutInfo_->startIndex_;
+        const int32_t end = pattern_->layoutInfo_->endIndex_;
+        EXPECT_LT(start, end);
+        EXPECT_LE(FastScrollItemRect(start).Top(), 0.0f);
+        EXPECT_GE(FastScrollItemRect(end).Bottom(), WATER_FLOW_HEIGHT);
+        for (int32_t index = start; index < end; ++index) {
+            EXPECT_NEAR(FastScrollItemRect(index).Bottom(), FastScrollItemRect(index + 1).Top(), 0.1f);
+        }
+    }
+    pattern_->ScrollToIndexFastScroll(LAST_ITEM, true, ScrollAlign::END, 0.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    FinishFastScroll();
+    EXPECT_NEAR(FastScrollItemRect(999).Bottom(), WATER_FLOW_HEIGHT, 0.2f);
+    const auto footerRect = GetChildRect(frameNode_, pattern_->layoutInfo_->footerIndex_);
+    EXPECT_NEAR(footerRect.Top(), FastScrollItemRect(999).Bottom(), 0.2f);
+    ScrollToIndex(0, false, ScrollAlign::START);
+    EXPECT_NEAR(FastScrollItemRect(0).Top(), 0.0f, 0.2f);
+}
+
+void WaterFlowScrollerTestNg::CheckFastScrollInvalidIndex(FastScrollMode mode, int32_t index, bool running)
+{
+    constexpr int32_t CANCEL_SETTLE_TICKS = 2;
+    MockAnimationManager::GetInstance().SetTicks(FAST_SCROLL_ANIMATION_TICKS);
+    pattern_->ScrollToIndexFastScroll(FAST_SCROLL_TARGET, true, ScrollAlign::START, 0.0f, mode);
+    const auto previous = pattern_->fastScrollState_;
+    ASSERT_NE(previous, nullptr);
+    if (running) {
+        FlushUITasks();
+        MockAnimationManager::GetInstance().Tick();
+        FlushUITasks();
+    }
+    const float before = pattern_->GetTotalOffset();
+    pattern_->ScrollToIndexFastScroll(index, true, ScrollAlign::START, 0.0f, mode);
+    EXPECT_TRUE(previous->cancelled);
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    for (int32_t tick = 0; tick < CANCEL_SETTLE_TICKS; ++tick) {
+        MockAnimationManager::GetInstance().Tick();
+        FlushUITasks();
+        EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), before);
+    }
+    FinishFastScroll();
+    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), before);
+}
+
+/**
+ * @tc.name: WFFastScrollInvalidInputAndZeroViewport
+ * @tc.desc: Invalid indices stop prior work like the legacy entry, and zero-height layout cancels safely.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollInvalidInputAndZeroViewport, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateItemsInLazyForEach(1000, [](int32_t) { return 100.0f; });
+    CreateDone();
+    for (auto mode : { FastScrollMode::NONE, static_cast<FastScrollMode>(-1), static_cast<FastScrollMode>(3) }) {
+        pattern_->ScrollToIndexFastScroll(2, true, ScrollAlign::START, 0.0f, mode);
+        EXPECT_FALSE(pattern_->GetFastScrollRequest());
+        pattern_->StopAnimate();
+    }
+    for (int32_t index : { -2, 1000 }) {
+        pattern_->ScrollToIndexFastScroll(index, true, ScrollAlign::START, 0.0f,
+            FastScrollMode::SKIP_CREATE_AND_MEASURE);
+        EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    }
+    // Invalid indices retain the old entry's stop behavior in both preparation and animation.
+    for (auto mode : { FastScrollMode::SKIP_MEASURE, FastScrollMode::SKIP_CREATE_AND_MEASURE }) {
+        for (int32_t index : { -2, 1000 }) {
+            for (bool running : { false, true }) {
+                ASSERT_NO_FATAL_FAILURE(CheckFastScrollInvalidIndex(mode, index, running));
+            }
+        }
+    }
+    pattern_->ScrollToIndexFastScroll(800, true, ScrollAlign::START,
+        std::numeric_limits<float>::infinity(), FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    pattern_->ScrollToIndexFastScroll(800, true, ScrollAlign::START, 0.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    layoutProperty_->UpdateUserDefinedIdealSize(CalcSize(CalcLength(WATER_FLOW_WIDTH), CalcLength(0.0f)));
+    frameNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    FlushUITasks();
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    EXPECT_TRUE(std::isfinite(pattern_->GetTotalOffset()));
+    layoutProperty_->UpdateUserDefinedIdealSize(
+        CalcSize(CalcLength(WATER_FLOW_WIDTH), CalcLength(WATER_FLOW_HEIGHT)));
+    frameNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    FlushUITasks();
+    pattern_->ScrollToIndexFastScroll(100, true, ScrollAlign::START, 0.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    FinishFastScroll();
+    EXPECT_NEAR(FastScrollItemRect(100).Top(), 0.0f, 0.2f);
+}
+
+/**
+ * @tc.name: WFFastScrollSignedThreshold
+ * @tc.desc: Both directions distinguish 4V-1, 4V, and 4V+1 without an initial opposite delta.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollSignedThreshold, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateItemsInLazyForEach(1000, [](int32_t) { return 100.0f; });
+    CreateDone();
+    for (int32_t direction : { -1, 1 }) {
+        for (float extra : { -1.0f, 0.0f, 1.0f }) {
+            ScrollToIndex(100, false, ScrollAlign::START);
+            const float before = pattern_->GetTotalOffset();
+            MockAnimationManager::GetInstance().SetTicks(8);
+            pattern_->ScrollToIndexFastScroll(100 + direction * 32, true, ScrollAlign::START, extra,
+                FastScrollMode::SKIP_CREATE_AND_MEASURE);
+            FlushUITasks();
+            ASSERT_NE(pattern_->GetFastScrollRequest(), nullptr);
+            EXPECT_EQ(!NearZero(pattern_->GetFastScrollRequest()->skipDistance), direction * extra > 0.0f);
+            MockAnimationManager::GetInstance().Tick();
+            FlushUITasks();
+            EXPECT_GE(direction * (pattern_->GetTotalOffset() - before), 0.0f);
+            FinishFastScroll();
+            EXPECT_NEAR(FastScrollItemRect(100 + direction * 32).Top(), -extra, 0.2f);
+        }
+    }
+}
+/**
+ * @tc.name: WFFastScrollOrdinaryTakeover
+ * @tc.desc: Ordinary scrollTo, scrollBy and scrollEdge own the viewport after replacing pending or active fast work.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollOrdinaryTakeover, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateItemsInLazyForEach(1000, [](int32_t) { return 100.0f; });
+    CreateDone();
+    for (bool animating : { false, true }) {
+        for (int32_t operation = 0; operation < 3; ++operation) {
+            SCOPED_TRACE(std::to_string(animating) + ":" + std::to_string(operation));
+            ScrollToIndex(50, false, ScrollAlign::START);
+            MockAnimationManager::GetInstance().SetTicks(8);
+            pattern_->ScrollToIndexFastScroll(800, true, ScrollAlign::CENTER, 0.0f,
+                FastScrollMode::SKIP_CREATE_AND_MEASURE);
+            auto old = pattern_->fastScrollState_;
+            if (animating) {
+                FlushUITasks();
+                MockAnimationManager::GetInstance().Tick();
+                FlushUITasks();
+            }
+            float expected = 0.0f;
+            if (operation == 0) {
+                expected = 200.0f;
+                pattern_->ScrollTo(expected);
+                FlushUITasks();
+            } else if (operation == 1) {
+                expected = pattern_->GetTotalOffset() + 120.0f;
+                ScrollBy(0.0f, 120.0f);
+            } else {
+                ScrollToEdge(ScrollEdgeType::SCROLL_TOP, false);
+            }
+            EXPECT_TRUE(old->cancelled);
+            EXPECT_FALSE(pattern_->fastScrollState_);
+            EXPECT_FALSE(pattern_->GetFastScrollRequest());
+            FinishFastScroll();
+            EXPECT_NEAR(pattern_->GetTotalOffset(), expected, 0.2f);
+        }
+    }
+}
+
+/**
+ * @tc.name: WFFastScrollSectionAndDeletionRecovery
+ * @tc.desc: Section changes and deletion of an animated target invalidate its window and allow a new request.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollSectionAndDeletionRecovery, TestSize.Level1)
+{
+    CreateWaterFlow();
+    auto lazy = CreateItemsInLazyForEach(1000, [](int32_t) { return 100.0f; });
+    auto sections = pattern_->GetOrCreateWaterFlowSections();
+    std::vector<WaterFlowSections::Section> data(2);
+    data[0].itemsCount = 500;
+    data[1].itemsCount = 500;
+    data[0].crossCount = 1;
+    data[1].crossCount = 1;
+    sections->ChangeData(0, 0, data);
+    MockPipelineContext::GetCurrent()->FlushBuildFinishCallbacks();
+    CreateDone();
+    MockAnimationManager::GetInstance().SetTicks(8);
+    pattern_->ScrollToIndexFastScroll(800, true, ScrollAlign::CENTER, 0.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    MockAnimationManager::GetInstance().Tick();
+    FlushUITasks();
+    auto old = pattern_->fastScrollState_;
+    ASSERT_NE(old, nullptr);
+    data[0].crossCount = 2;
+    sections->ChangeData(0, 1, { data[0] });
+    MockPipelineContext::GetCurrent()->FlushBuildFinishCallbacks();
+    FlushUITasks();
+    EXPECT_TRUE(old->cancelled);
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    FinishFastScroll();
+
+    pattern_->ScrollToIndexFastScroll(900, true, ScrollAlign::CENTER, 0.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    old = pattern_->fastScrollState_;
+    ASSERT_NE(old, nullptr);
+    lazy->SetTotalCount(999);
+    DeleteItemInLazyForEach(900);
+    data[1].itemsCount = 499;
+    sections->ChangeData(1, 1, { data[1] });
+    MockPipelineContext::GetCurrent()->FlushBuildFinishCallbacks();
+    FlushUITasks();
+    EXPECT_TRUE(old->cancelled);
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    FinishFastScroll();
+    pattern_->ScrollToIndexFastScroll(100, true, ScrollAlign::CENTER, 0.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    FinishFastScroll();
+    EXPECT_NEAR(FastScrollItemRect(100).Top(), 350.0f, 0.2f);
+}
+
+/**
+ * @tc.name: WFFastScrollRepeatAndAccessibility
+ * @tc.desc: Virtual Repeat settles in both directions and the forward page action remains usable afterward.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollRepeatAndAccessibility, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateItemsInRepeat(1000, [](uint32_t index) { return 100.0f + (index % 3) * 20.0f; });
+    CreateDone();
+    for (int32_t index : { 800, 100 }) {
+        MockAnimationManager::GetInstance().SetTicks(4);
+        pattern_->ScrollToIndexFastScroll(index, true, ScrollAlign::CENTER, 20.0f,
+            FastScrollMode::SKIP_CREATE_AND_MEASURE);
+        FlushUITasks();
+        FinishFastScroll();
+        const auto rect = FastScrollItemRect(index);
+        EXPECT_NEAR(rect.Top(), (WATER_FLOW_HEIGHT - rect.Height()) / 2.0f - 20.0f, 0.2f);
+    }
+    const auto before = pattern_->GetTotalOffset();
+    accessibilityProperty_->ActActionScrollForward();
+    FlushUITasks();
+    FinishFastScroll();
+    EXPECT_GT(pattern_->GetTotalOffset(), before);
+    EXPECT_FALSE(pattern_->fastScrollState_);
+}
+
+/**
+ * @tc.name: WFFastScrollEmptyData
+ * @tc.desc: An empty WaterFlow rejects content and last-item indices without retaining animation state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollEmptyData, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateDone();
+    for (int32_t index : { 0, LAST_ITEM }) {
+        pattern_->ScrollToIndexFastScroll(index, true, ScrollAlign::START, 0.0f,
+            FastScrollMode::SKIP_CREATE_AND_MEASURE);
+        FlushUITasks();
+        EXPECT_FALSE(pattern_->GetFastScrollRequest());
+        EXPECT_FALSE(pattern_->fastScrollState_);
+        EXPECT_FALSE(pattern_->AnimateRunning());
+        EXPECT_TRUE(std::isfinite(pattern_->GetTotalOffset()));
+    }
+}
 #endif
 } // namespace OHOS::Ace::NG

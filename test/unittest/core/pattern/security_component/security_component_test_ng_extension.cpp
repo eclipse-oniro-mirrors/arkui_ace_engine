@@ -1905,7 +1905,7 @@ HWTEST_F(SecurityComponentModelTestNg, SecurityComponentLayoutAlgorithmUpdateHor
         0, V2::LOCATION_BUTTON_ETS_TAG);
     ASSERT_NE(frameNode, nullptr);
     auto layoutWrapperNode = CreateLayoutWrapper(frameNode);
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
 
     auto buttonAlgorithm = AceType::MakeRefPtr<SecurityComponentLayoutAlgorithm>();
     ASSERT_NE(buttonAlgorithm, nullptr);
@@ -1946,7 +1946,7 @@ HWTEST_F(SecurityComponentModelTestNg, SecurityComponentLayoutAlgorithmGetTextDi
     auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
     ASSERT_NE(textLayoutProperty, nullptr);
     auto layoutWrapperNode = CreateLayoutWrapper(frameNode);
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
 
     auto buttonAlgorithm = AceType::MakeRefPtr<SecurityComponentLayoutAlgorithm>();
     ASSERT_NE(buttonAlgorithm, nullptr);

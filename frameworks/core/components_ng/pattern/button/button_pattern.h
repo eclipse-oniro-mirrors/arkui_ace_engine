@@ -248,6 +248,7 @@ public:
     }
 
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
 
     void ReportButtonClickResult();
 

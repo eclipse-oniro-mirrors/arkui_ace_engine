@@ -417,6 +417,11 @@ void HyperlinkPattern::UpdatePropertyImpl(const std::string& key, RefPtr<Propert
     }
 }
 
+CommandResult HyperlinkPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "click" }, CommandErrorType::EXECUTE_FAIL);
+}
+
 int32_t HyperlinkPattern::OnInjectionEvent(const std::string& command)
 {
     auto json = JsonUtil::ParseJsonString(command);

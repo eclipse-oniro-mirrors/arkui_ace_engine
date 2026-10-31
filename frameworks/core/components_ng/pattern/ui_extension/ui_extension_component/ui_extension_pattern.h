@@ -24,6 +24,8 @@
 #include "core/components_ng/pattern/ui_extension/accessibility_session_adapter_ui_extension.h"
 #include "core/components_ng/pattern/ui_extension/platform_event_proxy.h"
 #include "core/components_ng/pattern/ui_extension/session_wrapper.h"
+#include "core/components_ng/token_theme/brand_color_info.h"
+#include "core/components_ng/token_theme/token_theme_storage.h"
 #ifdef SUPPORT_DIGITAL_CROWN
 #include "core/event/crown_event.h"
 #endif
@@ -335,6 +337,18 @@ public:
         isUpdateDisplayArea_ = isUpdate;
     }
     void AddWindowStateChangedCallback();
+
+    void NotifyBrandColorChangeToUEA(
+        int32_t instanceId, const std::string& brandColorStr);
+    void NotifyBrandColorChange(int32_t instanceId);
+    std::string GetBrandColorStr() const;
+    bool OnThemeScopeUpdate(int32_t themeScopeId) override;
+    std::string ResolveBrandColor(int32_t themeScopeId) const;
+    void SetLastSentBrandColorStr(const std::string& brandColorStr)
+    {
+        lastSentBrandColorStr_ = brandColorStr;
+    }
+
 protected:
     virtual void DispatchPointerEvent(const std::shared_ptr<MMI::PointerEvent>& pointerEvent);
     virtual void DispatchKeyEvent(const KeyEvent& event);
@@ -532,7 +546,9 @@ private:
     ContainerModalAvoidInfo avoidInfo_;
     RefPtr<UIExtensionAvoidListener> avoidListener_;
     bool isUpdateDisplayArea_ = true;
-
+    std::string brandColorStr_ = DEFAULT_BRAND_COLOR_STR;
+    std::string lastSentBrandColorStr_;
+    bool isUeaConnecting_ = false;
     ACE_DISALLOW_COPY_AND_MOVE(UIExtensionPattern);
 };
 } // namespace OHOS::Ace::NG

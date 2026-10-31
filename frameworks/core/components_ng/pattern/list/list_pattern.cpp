@@ -15,6 +15,7 @@
 
 #include "core/components_ng/pattern/list/list_pattern.h"
 
+#include <cmath>
 #include <limits>
 #include <set>
 #include <vector>
@@ -398,11 +399,18 @@ RefPtr<FrameNode> CreatePlaceholderShellNode(
         // Options carry unit-preserving Dimensions (bridges map plain numbers to vp;
         // strings keep PERCENT/PX/...). Pass through untranslated so PERCENT resolves
         // against the List cross-axis constraint at measure.
+        // The scroll_placeholder_types.h contract — invalid dimensions are ignored in
+        // favor of the component's own estimate — is enforced here: the layout chain
+        // clamps a negative ideal size to 0 and passes a NaN through untouched, so a
+        // non-finite or non-positive value never reaches the ideal size at all.
+        auto isValidDimension = [](const Dimension& dim) {
+            return std::isfinite(dim.Value()) && !LessNotEqual(dim.Value(), 0.0);
+        };
         CalcSize idealSize;
-        if (options.size->width.has_value()) {
+        if (options.size->width.has_value() && isValidDimension(options.size->width.value())) {
             idealSize.SetWidth(CalcLength(options.size->width.value()));
         }
-        if (options.size->height.has_value()) {
+        if (options.size->height.has_value() && isValidDimension(options.size->height.value())) {
             idealSize.SetHeight(CalcLength(options.size->height.value()));
         }
         shell->GetLayoutProperty()->UpdateUserDefinedIdealSize(idealSize);
@@ -6587,6 +6595,11 @@ void ListPattern::ReportOnItemListScrollEvent(const std::string& event, int32_t 
     UiSessionManager::GetInstance()->ReportComponentChangeEvent("result", result->ToString(),
         ComponentEventType::COMPONENT_EVENT_SCROLL);
 #endif
+}
+
+CommandResult ListPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return OnInjectionEventByRatioWithResult(command);
 }
 
 int32_t ListPattern::OnInjectionEvent(const std::string& command)

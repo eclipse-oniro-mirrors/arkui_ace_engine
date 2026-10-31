@@ -636,6 +636,7 @@ TabBarDisplayMode TabsPattern::CalculateTabBarDisplayMode(float width)
         auto customBreakpoint = property->GetBarDisplayModeBreakpointValue();
         if (!customBreakpoint.isNull) {
             switch (currentBreakpoint) {
+                case WidthBreakpoint::WIDTH_XS:
                 case WidthBreakpoint::WIDTH_SM:
                     return customBreakpoint.sm;
                 case WidthBreakpoint::WIDTH_MD:
@@ -1371,6 +1372,11 @@ bool TabsPattern::GetTargetIndex(const std::string& command, int32_t& targetInde
     auto originIndex = paramJson->GetString("index");
     targetIndex = StringUtils::StringToInt(originIndex);
     return true;
+}
+
+CommandResult TabsPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "changeIndex" }, CommandErrorType::EXECUTE_FAIL);
 }
 
 int32_t TabsPattern::OnInjectionEvent(const std::string& command)
@@ -2484,32 +2490,43 @@ void TabsPattern::UpdateSideBarBackgroundColor()
     auto theme = host->GetTheme<TabTheme>(true);
     auto renderContext = sideBarNode_->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
-    bool hasColor = false;
+    // Priority: explicit bar*/sidebar* API color > barModifier color > theme default
+    bool hasExplicitColor = false;
+    bool needSetDefaultColor = false;
     Color color;
-    if (theme) {
-        color = theme->GetSideBarBackgroundColor();
-        hasColor = true;
-    }
     if (tabsProperty->HasSidebarBackgroundColor()) {
+        needSetDefaultColor = true;
         if (tabsProperty->HasSidebarBackgroundColorSetByUser() &&
             tabsProperty->GetSidebarBackgroundColorSetByUserValue()) {
             color = tabsProperty->GetSidebarBackgroundColorValue();
-            hasColor = true;
+            hasExplicitColor = true;
         }
     } else if (tabsProperty->HasBarBackgroundColorForSideBar()) {
+        needSetDefaultColor = true;
         if (tabsProperty->HasBarBackgroundColorSetByUser() && tabsProperty->GetBarBackgroundColorSetByUserValue()) {
             color = tabsProperty->GetBarBackgroundColorForSideBarValue();
-            hasColor = true;
+            hasExplicitColor = true;
         }
     } else if (tabsProperty->HasBarBackgroundColor()) {
+        needSetDefaultColor = true;
         if (tabsProperty->HasBarBackgroundColorSetByUser() && tabsProperty->GetBarBackgroundColorSetByUserValue()) {
             color = tabsProperty->GetBarBackgroundColorValue();
-            hasColor = true;
+            hasExplicitColor = true;
         }
     }
-    if (hasColor) {
+    if (hasExplicitColor) {
         renderContext->UpdateBackgroundColor(color);
+        return;
     }
+    // Check if barModifier set a background color on the sidebar node via
+    // ViewAbstract::SetBackgroundColor (which sets IsUserSetBackgroundColor=true).
+    // If so, keep the modifier's color instead of overwriting with theme default.
+    auto sideBarLayoutProperty = sideBarNode_->GetLayoutProperty();
+    if (sideBarLayoutProperty && sideBarLayoutProperty->GetIsUserSetBackgroundColor() && !needSetDefaultColor) {
+        return;
+    }
+    CHECK_NULL_VOID(theme);
+    renderContext->UpdateBackgroundColor(theme->GetSideBarBackgroundColor());
 }
 
 void TabsPattern::UpdateSideBarBackgroundBlurStyle()
@@ -2815,13 +2832,37 @@ std::optional<Dimension> TabsPattern::GetEffectiveSidebarWidth() const
         }
         return std::nullopt;
     }
-    // sidebarWidth API was never called: fall back to barWidth
+    // sidebarWidth API was never called: fall back to barWidth.
+    // If barWidth was called (even with undefined), use it exclusively —
+    // don't fall through to barModifier. undefined means "use default".
     if (property->HasBarWidthForSideBar()) {
         auto width = property->GetBarWidthForSideBarValue();
         if (width.IsNonNegative()) {
             return width;
         }
+        return std::nullopt;
     }
+    // Fall back to barModifier-set width on the sidebar node's own layout property.
+    // The barModifier (CommonModifier) sets width via UpdateUserDefinedIdealSize
+    // during SyncPropertiesToSideBar(), which runs before layout.
+    do {
+        CHECK_NULL_BREAK(sideBarNode_);
+        auto sideBarLayoutProperty = sideBarNode_->GetLayoutProperty();
+        CHECK_NULL_BREAK(sideBarLayoutProperty);
+        const auto& calcLayout = sideBarLayoutProperty->GetCalcLayoutConstraint();
+        CHECK_NULL_BREAK(calcLayout);
+        if (!calcLayout->selfIdealSize.has_value()) {
+            break;
+        }
+        const auto& idealWidth = calcLayout->selfIdealSize->Width();
+        if (!idealWidth.has_value()) {
+            break;
+        }
+        auto dim = idealWidth->GetDimension();
+        if (dim.IsNonNegative() && dim.Unit() != DimensionUnit::AUTO) {
+            return dim;
+        }
+    } while (false);
     TAG_LOGD(AceLogTag::ACE_TABS, "No valid sidebarWidth/barWidth, use default width");
     return std::nullopt;
 }

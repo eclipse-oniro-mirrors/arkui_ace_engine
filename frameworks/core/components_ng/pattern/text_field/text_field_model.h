@@ -211,11 +211,6 @@ struct SelectionOptions {
     bool forceShowHandle = false; // Used to force show the selection menu when stylus selects text on PC.
 };
 
-enum class PreviewTextStyle {
-    NORMAL,
-    UNDERLINE,
-};
-
 class SpanStringBase;
 
 struct TextScrollOptions {

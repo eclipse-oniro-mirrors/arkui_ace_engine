@@ -10618,6 +10618,64 @@ int32_t WebPattern::OnInjectionEvent(const std::string &command)
     return static_cast<int>(WebCommandResult::FAILED);
 }
 
+namespace {
+CommandResult ConvertWebCommandResult(int32_t result)
+{
+    if (result == static_cast<int32_t>(WebCommandResult::SUCCESS)) {
+        return CommandResult::Success();
+    }
+    if (result == static_cast<int32_t>(WebCommandResult::JSON_INVALID_EVENT_TYPE) ||
+        result == static_cast<int32_t>(WebCommandResult::JSON_VALUE_ERROR_EVENT_TYPE)) {
+        return CommandResult::Error(CommandErrorType::INVALID_COMMAND);
+    }
+    if (result == static_cast<int32_t>(WebCommandResult::INPUT_TYPE_INVALID) ||
+        result == static_cast<int32_t>(WebCommandResult::INPUT_EVENT_TYPE_MISMATCH) ||
+        result == static_cast<int32_t>(WebCommandResult::SELECT_NOT_MULTIPLE) ||
+        result == static_cast<int32_t>(WebCommandResult::SELECT_OPTION_DISABLED)) {
+        return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+    }
+    if ((result >= static_cast<int32_t>(WebCommandResult::JSON_IS_INVALID) &&
+        result <= static_cast<int32_t>(WebCommandResult::JSON_INVALID_PARAM)) ||
+        result >= static_cast<int32_t>(WebCommandResult::JSON_INVALID_INPUT_XPATH)) {
+        return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+    }
+    return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+}
+} // namespace
+
+CommandResult WebPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    auto json = JsonUtil::ParseJsonString(command);
+    if (!json || !json->IsValid() || (!json->IsObject() && !json->IsArray())) {
+        return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+    }
+    if (json->IsArray()) {
+        if (json->GetArraySize() == 0) {
+            return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+        }
+        for (int32_t index = 0; index < json->GetArraySize(); ++index) {
+            auto item = json->GetArrayItem(index);
+            if (!item || !item->IsObject()) {
+                return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+            }
+            auto result = OnInjectionEventWithResult(item->ToString());
+            if (!result.success) {
+                return result;
+            }
+        }
+        return CommandResult::Success();
+    }
+    auto batchCommand = json->GetValue("command");
+    if (!batchCommand || !batchCommand->IsString() || batchCommand->GetString() != "inputAutoFill") {
+        auto type = json->GetValue("event_type");
+        if (!type || !type->IsString()) {
+            return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+        }
+    }
+    const int32_t result = OnInjectionEvent(command);
+    return ConvertWebCommandResult(result);
+}
+
 int WebPattern::SendCommandToNWeb(std::unique_ptr<JsonValue> comJson)
 {
     if (WebUtil::HasJSONDuplicateKeys(comJson->ToString())) {

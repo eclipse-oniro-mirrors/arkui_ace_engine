@@ -164,7 +164,6 @@ const auto MAGNIFIER_ANIMATION_CURVE = AceType::MakeRefPtr<InterpolatingSpring>(
 constexpr int32_t MAGNIFIER_ANIMATION_DURATION = 100;
 
 constexpr int32_t ERROR_BAD_PARAMETERS = -1;
-constexpr char PREVIEW_STYLE_NORMAL[] = "normal";
 constexpr char PREVIEW_STYLE_UNDERLINE[] = "underline";
 static constexpr char16_t LINE_SEPARATOR[] = u"\n";
 // hen do ai anaylsis, we should limit the left an right limit of the string
@@ -202,6 +201,16 @@ std::list<RefPtr<FrameNode>> GetDragImageChildren(const RefPtr<FrameNode>& conte
     }
     return imageChildren;
 }
+
+// Tab focus navigation maps (TEXT -> CANCEL -> UNIT, pre-defined for future password icon).
+static std::unordered_map<FocuseIndex, FocuseIndex> focusForwardMap_ = {
+    { FocuseIndex::TEXT, FocuseIndex::CANCEL },
+    { FocuseIndex::CANCEL, FocuseIndex::UNIT }
+};
+static std::unordered_map<FocuseIndex, FocuseIndex> focusBackwardMap_ = {
+    { FocuseIndex::UNIT, FocuseIndex::CANCEL },
+    { FocuseIndex::CANCEL, FocuseIndex::TEXT }
+};
 } // namespace
 
 RichEditorPattern::RichEditorPattern(bool isStyledStringMode) :
@@ -1091,6 +1100,146 @@ void RichEditorPattern::HandleCleanNodeClicked()
     }
     IF_TRUE(isEditing_, StartTwinkling());
     ClearTextForDisplayIfEmpty();
+}
+
+bool RichEditorPattern::HandleOnTab(bool backward)
+{
+    return CleanNodeHostBase::HandleOnTabImpl(backward);
+}
+
+const std::unordered_map<FocuseIndex, FocuseIndex>& RichEditorPattern::GetFocusForwardMap() const
+{
+    return focusForwardMap_;
+}
+
+const std::unordered_map<FocuseIndex, FocuseIndex>& RichEditorPattern::GetFocusBackwardMap() const
+{
+    return focusBackwardMap_;
+}
+
+bool RichEditorPattern::HandleSwithFocus(FocuseIndex index)
+{
+    if (index == FocuseIndex::TEXT) {
+        focusIndex_ = FocuseIndex::TEXT;
+        PaintTextRect();
+        StartTwinkling();
+        return true;
+    }
+    if (index == FocuseIndex::CANCEL) {
+        if (!CancelNodeIsShow()) {
+            TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "HandleSwithFocus skip CANCEL, cancel node not shown");
+            return false;
+        }
+        FocusForwardStopTwinkling();
+        focusIndex_ = FocuseIndex::CANCEL;
+        PaintCancelRect();
+        TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "HandleSwithFocus switched to CANCEL");
+        return true;
+    }
+    // UNIT branch reserved for future password icon support.
+    return false;
+}
+
+void RichEditorPattern::FocusForwardStopTwinkling()
+{
+    StopTwinkling();
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    host->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
+}
+
+void RichEditorPattern::PaintTextRect()
+{
+    RoundRect focusRect;
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto focusHub = host->GetFocusHub();
+    CHECK_NULL_VOID(focusHub);
+    focusHub->PaintInnerFocusState(focusRect);
+}
+
+void RichEditorPattern::PaintCancelRect()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto focusHub = host->GetFocusHub();
+    CHECK_NULL_VOID(focusHub);
+    RoundRect focusRect;
+    GetInnerFocusPaintRect(focusRect);
+    focusHub->PaintInnerFocusState(focusRect);
+}
+
+void RichEditorPattern::GetInnerFocusPaintRect(RoundRect& paintRect)
+{
+    if (focusIndex_ != FocuseIndex::CANCEL) {
+        return;
+    }
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    CHECK_NULL_VOID(cleanNodeResponseArea_);
+    auto stackNode = cleanNodeResponseArea_->GetFrameNode();
+    CHECK_NULL_VOID(stackNode);
+    auto stackGeometryNode = stackNode->GetGeometryNode();
+    CHECK_NULL_VOID(stackGeometryNode);
+    auto stackRect = stackGeometryNode->GetFrameRect();
+    auto imageNode = stackNode->GetFirstChild();
+    CHECK_NULL_VOID(imageNode);
+    auto imageFrameNode = AceType::DynamicCast<FrameNode>(imageNode);
+    CHECK_NULL_VOID(imageFrameNode);
+    auto imageGeometryNode = imageFrameNode->GetGeometryNode();
+    CHECK_NULL_VOID(imageGeometryNode);
+    auto imageRect = imageGeometryNode->GetFrameRect();
+    auto layoutProperty = GetLayoutProperty<RichEditorLayoutProperty>();
+    CHECK_NULL_VOID(layoutProperty);
+    auto isRTL = layoutProperty->GetNonAutoLayoutDirection() == TextDirection::RTL;
+    RectF rect;
+    if (isRTL) {
+        rect = RectF(stackRect.GetX() + stackRect.Width() - imageRect.Width(),
+            stackRect.GetY(), imageRect.Width(), imageRect.Height());
+    } else {
+        rect = RectF(stackRect.GetX(), stackRect.GetY(), imageRect.Width(), imageRect.Height());
+    }
+    paintRect.SetRect(rect);
+    if (host->GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_EIGHTEEN)) {
+        cleanNodeResponseArea_->CreateIconRect(paintRect, true);
+        float cornerRadius = paintRect.GetRect().Width() / 2;
+        paintRect.SetCornerRadius(cornerRadius);
+    }
+}
+
+bool RichEditorPattern::CancelNodeIsShow() const
+{
+    CHECK_NULL_RETURN(cleanNodeResponseArea_, false);
+    return cleanNodeResponseArea_->IsShow();
+}
+
+bool RichEditorPattern::ProcessFocusIndexAction()
+{
+    if (focusIndex_ == FocuseIndex::CANCEL) {
+        CleanNodeResponseKeyEvent();
+        return false;
+    }
+    return true;
+}
+
+bool RichEditorPattern::HandleSpaceKeyClickEvent()
+{
+    if (focusIndex_ == FocuseIndex::CANCEL) {
+        CHECK_NULL_RETURN(cleanNodeResponseArea_, false);
+        auto frameNode = cleanNodeResponseArea_->GetFrameNode();
+        CHECK_NULL_RETURN(frameNode, false);
+        auto gestureHub = frameNode->GetOrCreateGestureEventHub();
+        CHECK_NULL_RETURN(gestureHub, false);
+        gestureHub->ActClick();
+        return true;
+    }
+    return false;
+}
+
+void RichEditorPattern::CleanNodeResponseKeyEvent()
+{
+    CHECK_NULL_VOID(!IsDragging());
+    HandleCleanNodeClicked();
 }
 
 bool RichEditorPattern::IsContentEmpty() const
@@ -2217,6 +2366,35 @@ void RichEditorPattern::RequestKeyboardForStylus()
 {
     // just for stylus scene: viewFocused but need Show stylus Keyboard
     RequestKeyboard(false, true, true);
+}
+
+CommandResult RichEditorPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    auto json = JsonUtil::ParseJsonString(command);
+    if (json && json->IsObject() && json->GetString("cmd") == "requestKeyboard") {
+        auto host = GetHost();
+        CHECK_NULL_RETURN(host, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+        auto hub = host->GetEventHub<EventHub>();
+        if (!hub || !hub->IsEnabled()) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        }
+        RequestFocusImpl();
+        if (!RequestKeyboard(true, true, true, SourceType::MOUSE)) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        }
+        ReportRichEditorRequestKeyboardEvent(host->GetId());
+        return CommandResult::Success();
+    }
+    return ConvertLegacyInjectionEventResult(command,
+        { "addText", "deleteText", "setText", "clear", "selectText", "copy", "cut",
+            "setCaretPosition", "requestKeyboard" }, CommandErrorType::INVALID_PARAM,
+        [this](const std::unique_ptr<JsonValue>& json) {
+            const auto name = json->GetString("cmd");
+            if ((name == "copy" || name == "cut") && copyOption_ == CopyOptions::None) {
+                return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+            }
+            return CommandResult::Success();
+        });
 }
 
 bool RichEditorPattern::ParseCommand(const std::string& command)
@@ -4298,6 +4476,11 @@ void RichEditorPattern::ScheduleCaretTwinkling()
 
 void RichEditorPattern::StartTwinkling()
 {
+    if (focusIndex_ == FocuseIndex::CANCEL) {
+        focusIndex_ = FocuseIndex::TEXT;
+        PaintTextRect();
+        IF_TRUE(auto focusHub = GetFocusHub(), focusHub->PaintFocusState(false));
+    }
     caretTwinklingTask_.Cancel();
     caretVisible_ = true;
     MarkContentNodeForRender();
@@ -4845,6 +5028,7 @@ void RichEditorPattern::HandleBlurEventReset()
     needSelectAll_ = false;
     StopTwinkling();
     cancelButtonTouched_ = false;
+    focusIndex_ = FocuseIndex::TEXT;
 }
 
 bool RichEditorPattern::IsCloseKeyboard()
@@ -4911,6 +5095,7 @@ void RichEditorPattern::HandleBlurEvent()
 void RichEditorPattern::HandleFocusEvent(FocusReason focusReason)
 {
     TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "HandleFocusEvent frameId:%{public}d reason:%{public}d", frameId_, focusReason);
+    focusIndex_ = FocuseIndex::TEXT;
 
     auto textFieldManager = GetTextFieldManager();
     bool continueFeature = textFieldManager && textFieldManager->GetCustomKeyboardContinueFeature();
@@ -6866,6 +7051,10 @@ void RichEditorPattern::OnColorModeChange(uint32_t colorMode)
 {
     TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "OnColorModeChange, mode=%{public}u", colorMode);
     Pattern::OnColorModeChange(colorMode);
+    if (cancelButtonDirty_) {
+        cancelButtonDirty_ = false;
+        IF_PRESENT(cleanNodeResponseArea_, Refresh());
+    }
 }
 
 void RichEditorPattern::UpdatePlaceholderFontColor(const Color& color)
@@ -7486,32 +7675,13 @@ std::vector<RectF> RichEditorPattern::GetPreviewTextRects()
     return rects;
 }
 
-PreviewTextStyle RichEditorPattern::GetPreviewTextStyle() const
-{
-    auto previewTextStyle = PreviewTextStyle::NORMAL;
-    auto property = GetLayoutProperty<RichEditorLayoutProperty>();
-    if (property && property->HasPreviewTextStyle()) {
-        auto style = property->GetPreviewTextStyle();
-        CHECK_NULL_RETURN(style.has_value(), previewTextStyle);
-        if (style.value() == PREVIEW_STYLE_NORMAL) {
-            previewTextStyle = PreviewTextStyle::NORMAL;
-        } else if (style.value() == PREVIEW_STYLE_UNDERLINE) {
-            previewTextStyle = PreviewTextStyle::UNDERLINE;
-        } else {
-            TAG_LOGW(
-                AceLogTag::ACE_RICH_TEXT, "invalid previewTextStyle of RichEditorLayoutProperty");
-        }
-    }
-    return previewTextStyle;
-}
-
 const Color& RichEditorPattern::GetPreviewTextDecorationColor() const
 {
     auto pipeline = PipelineBase::GetCurrentContextSafelyWithCheck();
     CHECK_NULL_RETURN(pipeline, Color::TRANSPARENT);
     auto theme = pipeline->GetTheme<RichEditorTheme>();
     CHECK_NULL_RETURN(theme, Color::TRANSPARENT);
-    if (GetPreviewTextStyle() == PreviewTextStyle::UNDERLINE) {
+    if (GetPreviewStyling().underlineShape == PreviewTextStyle::UNDERLINE) {
         return theme->GetPreviewUnderLineColor();
     }
     return Color::TRANSPARENT;
@@ -7789,6 +7959,11 @@ void RichEditorPattern::ProcessInsertValue(const std::u16string& insertValue, Op
     bool shouldCommitInput)
 {
     CONTENT_MODIFY_LOCK(this);
+    if (focusIndex_ == FocuseIndex::CANCEL && insertValue == u" ") {
+        TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "ProcessInsertValue intercepted space for cancel button click");
+        HandleSpaceKeyClickEvent();
+        return;
+    }
     auto text = insertValue;
     auto wasNonEmpty = !text.empty();
     auto insertValueLength = static_cast<int32_t>(text.length());
@@ -9400,6 +9575,11 @@ RefPtr<GestureEventHub> RichEditorPattern::GetGestureEventHub() {
 bool RichEditorPattern::OnKeyEvent(const KeyEvent& keyEvent)
 {
     ReportShiftAndDirectionEvent(keyEvent);
+    if (keyEvent.action == KeyAction::DOWN && keyEvent.code == KeyCode::KEY_SPACE &&
+        focusIndex_ != FocuseIndex::TEXT) {
+        TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "OnKeyEvent intercepted space for cancel button click");
+        return HandleSpaceKeyClickEvent();
+    }
     return TextInputClient::HandleKeyEvent(keyEvent);
 }
 
@@ -10249,7 +10429,7 @@ void RichEditorPattern::HandleMouseEvent(const MouseInfo& info)
 
     if (currentMouseStyle_ == MouseFormat::DEFAULT && !IsDragging()) {
         auto localLoc = info.GetLocalLocation();
-        if (GetTextRect().IsInRegion({ localLoc.GetX(), localLoc.GetY() })) {
+        if (!(cleanNodeResponseArea_ && IsOnCancelButtonHoverArea(localLoc))) {
             ChangeMouseStyle(MouseFormat::TEXT_CURSOR);
         }
     }
@@ -13229,6 +13409,10 @@ void RichEditorPattern::PerformAction(TextInputAction action, bool forceCloseKey
     TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "PerformAction, action=%{public}d", action);
     auto host = GetHost();
     CHECK_NULL_VOID(host);
+    if (!ProcessFocusIndexAction()) {
+        TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "PerformAction skipped, focusIndex not on text");
+        return;
+    }
     // When the Enter key is triggered, perform a line feed operation.
     // When inputType is configured (via NODE_TEXT_EDITOR_TYPE), align with TextInput: do not insert newline.
     bool inputTypeConfigured = IsInPlainTextInputMode();
@@ -15465,7 +15649,11 @@ void RichEditorPattern::ReceivePreviewTextStyle(const std::string& style)
     TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "previewTextStyle: [%{public}s]", style.c_str());
     auto property = GetLayoutProperty<RichEditorLayoutProperty>();
     CHECK_NULL_VOID(property && !style.empty());
-    property->UpdatePreviewTextStyle(style);
+    PreviewTextStyling previewTextStyling;
+    if (style == PREVIEW_STYLE_UNDERLINE) {
+        previewTextStyling.underlineShape = PreviewTextStyle::UNDERLINE;
+    }
+    SetPreviewTextStyling(previewTextStyling);
 }
 
 bool RichEditorPattern::IsPreviewTextInputting()

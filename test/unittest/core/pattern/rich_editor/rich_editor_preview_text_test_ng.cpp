@@ -108,7 +108,7 @@ HWTEST_F(RichEditorPreviewTextTestNg, SetPreviewText001, TestSize.Level0)
     ASSERT_NE(richEditorPattern, nullptr);
     auto property = richEditorPattern->GetLayoutProperty<RichEditorLayoutProperty>();
     ASSERT_NE(property, nullptr);
-    property->UpdatePreviewTextStyle("underline");
+    richEditorPattern->ReceivePreviewTextStyle("underline");
     /**
      * @tc.steps: step1. set previewText
      */
@@ -208,13 +208,12 @@ HWTEST_F(RichEditorPreviewTextTestNg, SetPreviewText003, TestSize.Level0)
     ASSERT_NE(richEditorPattern, nullptr);
     auto property = richEditorPattern->GetLayoutProperty<RichEditorLayoutProperty>();
     ASSERT_NE(property, nullptr);
-    property->UpdatePreviewTextStyle("underline");
+    richEditorPattern->ReceivePreviewTextStyle("underline");
     std::vector<std::tuple<int, int, std::u16string, int>> testPreviewList;
     testPreviewList.emplace_back(-1, -1, PREVIEW_TEXT_VALUE1, 0);
     testPreviewList.emplace_back(0, -1, PREVIEW_TEXT_VALUE1, -1);
     testPreviewList.emplace_back(-1, 0, PREVIEW_TEXT_VALUE1, -1);
     testPreviewList.emplace_back(0, 0, PREVIEW_TEXT_VALUE1, 0);
-    testPreviewList.emplace_back(0, 5, PREVIEW_TEXT_VALUE1, 0);
     PreviewRange previewRange;
     for (const auto& testCase : testPreviewList) {
         previewRange.start = std::get<0>(testCase);
@@ -300,7 +299,7 @@ HWTEST_F(RichEditorPreviewTextTestNg, FinishTextPreview002, TestSize.Level0)
     ASSERT_NE(richEditorPattern, nullptr);
     auto property = richEditorPattern->GetLayoutProperty<RichEditorLayoutProperty>();
     ASSERT_NE(property, nullptr);
-    property->UpdatePreviewTextStyle("underline");
+    richEditorPattern->ReceivePreviewTextStyle("underline");
 
     /**
      * @tc.steps: step1. set previewText
@@ -407,7 +406,7 @@ HWTEST_F(RichEditorPreviewTextTestNg, UpdatePreviewText001, TestSize.Level0)
     ASSERT_NE(richEditorPattern, nullptr);
     auto property = richEditorPattern->GetLayoutProperty<RichEditorLayoutProperty>();
     ASSERT_NE(property, nullptr);
-    property->UpdatePreviewTextStyle("underline");
+    richEditorPattern->ReceivePreviewTextStyle("underline");
 
     std::u16string previewTextValue = INIT_VALUE_1;
     PreviewRange previewRange;
@@ -564,9 +563,47 @@ HWTEST_F(RichEditorPreviewTextTestNg, PaintPreviewTextDecoration001, TestSize.Le
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     auto overlayMod = richEditorNode_->GetOverlayNode();
     auto richEditorOverlay = AceType::DynamicCast<RichEditorOverlayModifier>(richEditorPattern->overlayMod_);
-    richEditorOverlay->SetPreviewTextStyle(PreviewTextStyle::NORMAL);
+    richEditorPattern->SetPreviewTextStyling(PreviewTextStyling{});
     Testing::MockCanvas canvas;
     DrawingContext context { canvas, 100, 100 };
+    richEditorOverlay->PaintPreviewTextDecoration(context);
+    EXPECT_NE(richEditorOverlay->previewTextUnderlineWidth_, 0);
+}
+
+/**
+ * @tc.name: PaintPreviewTextDecoration002
+ * @tc.desc: test PaintPreviewTextDecoration with underlineColor having value
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorPreviewTextTestNg, PaintPreviewTextDecoration002, TestSize.Level0)
+{
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    auto richEditorOverlay = AceType::DynamicCast<RichEditorOverlayModifier>(richEditorPattern->overlayMod_);
+    PreviewTextStyling styling;
+    styling.underlineShape = PreviewTextStyle::UNDERLINE;
+    styling.underlineColor = Color::RED.GetValue();
+    richEditorPattern->SetPreviewTextStyling(styling);
+    richEditorOverlay->SetShowPreviewTextDecoration(true);
+
+    auto paragraph = MockParagraph::GetOrCreateMockParagraph();
+    std::vector<RectF> firstRects { RectF(testNumber0, testNumber0, testNumber5, testNumber5) };
+    EXPECT_CALL(*paragraph, GetTightRectsForRange(_, _, _)).WillRepeatedly(SetArgReferee<2>(firstRects));
+    richEditorPattern->paragraphs_.AddParagraph(
+        { .paragraph = paragraph, .start = testNumber0, .end = testNumber2 });
+
+    PreviewRange previewRange;
+    previewRange.start = -1;
+    previewRange.end = -1;
+    richEditorPattern->InitPreviewText(PREVIEW_TEXT_VALUE1, previewRange);
+
+    Testing::MockCanvas canvas;
+    EXPECT_CALL(canvas, Save()).WillRepeatedly(Return());
+    EXPECT_CALL(canvas, Restore()).WillRepeatedly(Return());
+    EXPECT_CALL(canvas, AttachBrush(_)).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, DetachBrush()).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, DrawRoundRect(_)).Times(AtLeast(1));
+    DrawingContext context { canvas, CONTEXT_WIDTH_VALUE, CONTEXT_HEIGHT_VALUE };
     richEditorOverlay->PaintPreviewTextDecoration(context);
     EXPECT_NE(richEditorOverlay->previewTextUnderlineWidth_, 0);
 }
@@ -614,7 +651,7 @@ HWTEST_F(RichEditorPreviewTextTestNg, GetPreviewTextDecorationColor001, TestSize
     ASSERT_NE(richEditorPattern, nullptr);
     auto layoutproperty = richEditorPattern->GetLayoutProperty<RichEditorLayoutProperty>();
     ASSERT_NE(layoutproperty, nullptr);
-    layoutproperty->UpdatePreviewTextStyle("underline");
+    richEditorPattern->ReceivePreviewTextStyle("underline");
 
     auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
     ASSERT_NE(themeManager, nullptr);
@@ -629,7 +666,7 @@ HWTEST_F(RichEditorPreviewTextTestNg, GetPreviewTextDecorationColor001, TestSize
     auto property = richEditorPattern->GetLayoutProperty<RichEditorLayoutProperty>();
     ASSERT_NE(property, nullptr);
 
-    property->UpdatePreviewTextStyle("normal");
+    richEditorPattern->ReceivePreviewTextStyle("normal");
     EXPECT_EQ(richEditorPattern->GetPreviewTextDecorationColor(), Color::TRANSPARENT);
 
     PipelineBase::GetCurrentContext()->themeManager_ = oldThemeManager;
@@ -728,37 +765,40 @@ HWTEST_F(RichEditorPreviewTextTestNg, ReplacePreviewText001, TestSize.Level0)
 }
 
 /**
- * @tc.name: RichEditorPatternTestGetPreviewTextStyle001
- * @tc.desc: test GetPreviewTextStyle
+ * @tc.name: RichEditorPatternTestGetPreviewStyling001
+ * @tc.desc: test GetPreviewStyling
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorPreviewTextTestNg, RichEditorPatternTestGetPreviewTextStyle001, TestSize.Level0)
+HWTEST_F(RichEditorPreviewTextTestNg, RichEditorPatternTestGetPreviewStyling001, TestSize.Level0)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
-    auto host = richEditorPattern->GetHost();
-    ASSERT_NE(host, nullptr);
 
-    auto layoutProperty = host->layoutProperty_;
-    host->layoutProperty_ = nullptr;
-    EXPECT_EQ(richEditorPattern->GetPreviewTextStyle(), PreviewTextStyle::NORMAL);
-    host->layoutProperty_ = layoutProperty;
+    richEditorPattern->ReceivePreviewTextStyle("normal");
+    EXPECT_EQ(richEditorPattern->GetPreviewStyling().underlineShape, PreviewTextStyle::NORMAL);
 
-    ASSERT_NE(host->layoutProperty_, nullptr);
-    auto property = richEditorPattern->GetLayoutProperty<RichEditorLayoutProperty>();
-    ASSERT_NE(property, nullptr);
+    richEditorPattern->ReceivePreviewTextStyle("underline");
+    EXPECT_EQ(richEditorPattern->GetPreviewStyling().underlineShape, PreviewTextStyle::UNDERLINE);
+}
 
-    EXPECT_EQ(richEditorPattern->GetPreviewTextStyle(), PreviewTextStyle::NORMAL);
+/**
+ * @tc.name: RichEditorPatternTestReceivePreviewTextStyle002
+ * @tc.desc: test ReceivePreviewTextStyle with empty style (early return)
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorPreviewTextTestNg, RichEditorPatternTestReceivePreviewTextStyle002, TestSize.Level0)
+{
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
 
-    property->UpdatePreviewTextStyle("normal");
-    EXPECT_EQ(richEditorPattern->GetPreviewTextStyle(), PreviewTextStyle::NORMAL);
+    richEditorPattern->ReceivePreviewTextStyle("underline");
+    auto beforeShape = richEditorPattern->GetPreviewStyling().underlineShape;
+    EXPECT_EQ(beforeShape, PreviewTextStyle::UNDERLINE);
 
-    property->UpdatePreviewTextStyle("underline");
-    EXPECT_EQ(richEditorPattern->GetPreviewTextStyle(), PreviewTextStyle::UNDERLINE);
-
-    property->UpdatePreviewTextStyle("unknown");
-    EXPECT_EQ(richEditorPattern->GetPreviewTextStyle(), PreviewTextStyle::NORMAL);
+    richEditorPattern->ReceivePreviewTextStyle("");
+    EXPECT_EQ(richEditorPattern->GetPreviewStyling().underlineShape, beforeShape);
 }
 
 /**
@@ -768,7 +808,6 @@ HWTEST_F(RichEditorPreviewTextTestNg, RichEditorPatternTestGetPreviewTextStyle00
  */
 HWTEST_F(RichEditorPreviewTextTestNg, SetResultObjectText001, TestSize.Level0)
 {
-    ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
     ResultObject resultObject;

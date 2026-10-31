@@ -3924,4 +3924,229 @@ HWTEST_F(TextFieldPatternTestNine, PasswordResponseAreaRefreshHotZoneSize001, Te
     float actualHotZoneSize = calcLayoutConstraint->selfIdealSize->Width()->GetDimension().ConvertToPx();
     EXPECT_FLOAT_EQ(actualHotZoneSize, expectedHotZoneSize);
 }
+
+// ============ TextField CRTP focus navigation getter coverage ============
+
+/**
+ * @tc.name: TextFieldGetFocusForwardMap001
+ * @tc.desc: Verify GetFocusForwardMap returns TEXT→CANCEL, CANCEL→VOICE, VOICE→UNIT.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestNine, TextFieldGetFocusForwardMap001, TestSize.Level1)
+{
+    CreateTextField(DEFAULT_TEXT);
+    const auto& fwdMap = pattern_->GetFocusForwardMap();
+    ASSERT_EQ(fwdMap.size(), 3u);
+    EXPECT_EQ(fwdMap.at(FocuseIndex::TEXT), FocuseIndex::CANCEL);
+    EXPECT_EQ(fwdMap.at(FocuseIndex::CANCEL), FocuseIndex::VOICE);
+    EXPECT_EQ(fwdMap.at(FocuseIndex::VOICE), FocuseIndex::UNIT);
+}
+
+/**
+ * @tc.name: TextFieldGetFocusBackwardMap001
+ * @tc.desc: Verify GetFocusBackwardMap returns UNIT→VOICE, VOICE→CANCEL, CANCEL→TEXT.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestNine, TextFieldGetFocusBackwardMap001, TestSize.Level1)
+{
+    CreateTextField(DEFAULT_TEXT);
+    const auto& bwdMap = pattern_->GetFocusBackwardMap();
+    ASSERT_EQ(bwdMap.size(), 3u);
+    EXPECT_EQ(bwdMap.at(FocuseIndex::UNIT), FocuseIndex::VOICE);
+    EXPECT_EQ(bwdMap.at(FocuseIndex::VOICE), FocuseIndex::CANCEL);
+    EXPECT_EQ(bwdMap.at(FocuseIndex::CANCEL), FocuseIndex::TEXT);
+}
+
+/**
+ * @tc.name: TextFieldGetFocusIndex001
+ * @tc.desc: Verify GetFocusIndex returns TEXT by default.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestNine, TextFieldGetFocusIndex001, TestSize.Level1)
+{
+    CreateTextField(DEFAULT_TEXT);
+    EXPECT_EQ(pattern_->GetFocusIndex(), FocuseIndex::TEXT);
+}
+
+/**
+ * @tc.name: TextFieldHandleOnTabRefactored001
+ * @tc.desc: Verify refactored HandleOnTab delegates to CRTP base (backward path).
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestNine, TextFieldHandleOnTabRefactored001, TestSize.Level1)
+{
+    CreateTextField(DEFAULT_TEXT);
+    // Without focus, HandleOnTab should return false
+    EXPECT_FALSE(pattern_->HandleOnTab(true));
+    EXPECT_FALSE(pattern_->HandleOnTab(false));
+}
+
+/**
+ * @tc.name: TextFieldUpdateFocusForwardRefactored001
+ * @tc.desc: Verify refactored UpdateFocusForward delegates to CRTP HandleFocusForwardImpl.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestNine, TextFieldUpdateFocusForwardRefactored001, TestSize.Level1)
+{
+    CreateTextField(DEFAULT_TEXT);
+    // Without focus, UpdateFocusForward should return false
+    EXPECT_FALSE(pattern_->UpdateFocusForward());
+}
+
+/**
+ * @tc.name: TextFieldUpdateFocusBackwardRefactored001
+ * @tc.desc: Verify refactored UpdateFocusBackward delegates to CRTP HandleFocusBackwardImpl.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestNine, TextFieldUpdateFocusBackwardRefactored001, TestSize.Level1)
+{
+    CreateTextField(DEFAULT_TEXT);
+    // Without focus, UpdateFocusBackward should return false
+    EXPECT_FALSE(pattern_->UpdateFocusBackward());
+}
+
+// ============ SetHotZoneRect with imageOffsetX coverage ============
+
+/**
+ * @tc.name: SetHotZoneRectWithImageOffsetX001
+ * @tc.desc: Verify SetHotZoneRect applies imageOffsetX to hot zone X coordinate.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestNine, SetHotZoneRectWithImageOffsetX001, TestSize.Level1)
+{
+    CreateTextField(DEFAULT_TEXT);
+    auto cleanNodeResponseArea = AceType::MakeRefPtr<CleanNodeResponseArea>(pattern_);
+    ASSERT_NE(cleanNodeResponseArea, nullptr);
+
+    float iconSize = 24.0f;
+    float hotZoneHeight = 40.0f;
+    float imageOffsetX = 16.0f; // RTL compensation offset
+    DimensionRect hotZoneRegion;
+    cleanNodeResponseArea->SetHotZoneRect(hotZoneRegion, iconSize, hotZoneHeight, imageOffsetX);
+
+    // Verify offset was set
+    const auto& offset = hotZoneRegion.GetOffset();
+    float expectedX = -(hotZoneHeight - iconSize) / 2.0f + imageOffsetX;
+    float expectedY = -(hotZoneHeight - iconSize) / 2.0f;
+    EXPECT_FLOAT_EQ(offset.GetX().ConvertToPx(), expectedX);
+    EXPECT_FLOAT_EQ(offset.GetY().ConvertToPx(), expectedY);
+
+    // Verify size was set
+    EXPECT_FLOAT_EQ(hotZoneRegion.GetWidth().ConvertToPx(), hotZoneHeight);
+    EXPECT_FLOAT_EQ(hotZoneRegion.GetHeight().ConvertToPx(), hotZoneHeight);
+}
+
+/**
+ * @tc.name: SetHotZoneRectDefaultImageOffsetX001
+ * @tc.desc: Verify SetHotZoneRect with default imageOffsetX (0.0f) produces correct LTR offset.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestNine, SetHotZoneRectDefaultImageOffsetX001, TestSize.Level1)
+{
+    CreateTextField(DEFAULT_TEXT);
+    auto cleanNodeResponseArea = AceType::MakeRefPtr<CleanNodeResponseArea>(pattern_);
+    ASSERT_NE(cleanNodeResponseArea, nullptr);
+
+    float iconSize = 24.0f;
+    float hotZoneHeight = 40.0f;
+    // Use default imageOffsetX = 0.0f (LTR case)
+    DimensionRect hotZoneRegion;
+    cleanNodeResponseArea->SetHotZoneRect(hotZoneRegion, iconSize, hotZoneHeight);
+
+    const auto& offset = hotZoneRegion.GetOffset();
+    float expectedX = -(hotZoneHeight - iconSize) / 2.0f; // Without imageOffsetX
+    EXPECT_FLOAT_EQ(offset.GetX().ConvertToPx(), expectedX);
+}
+
+/**
+ * @tc.name: SetHotZoneRectEqualSizes001
+ * @tc.desc: Verify SetHotZoneRect when iconSize equals hotZoneHeight (no padding).
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestNine, SetHotZoneRectEqualSizes001, TestSize.Level1)
+{
+    CreateTextField(DEFAULT_TEXT);
+    auto cleanNodeResponseArea = AceType::MakeRefPtr<CleanNodeResponseArea>(pattern_);
+    ASSERT_NE(cleanNodeResponseArea, nullptr);
+
+    float iconSize = 40.0f;
+    float hotZoneHeight = 40.0f;
+    DimensionRect hotZoneRegion;
+    cleanNodeResponseArea->SetHotZoneRect(hotZoneRegion, iconSize, hotZoneHeight, 0.0f);
+
+    const auto& offset = hotZoneRegion.GetOffset();
+    // When sizes are equal, offset should be 0 (no padding)
+    EXPECT_FLOAT_EQ(offset.GetX().ConvertToPx(), 0.0f);
+    EXPECT_FLOAT_EQ(offset.GetY().ConvertToPx(), 0.0f);
+}
+
+// ============ CleanNodeResponseArea::AddIconHotZoneRect branch coverage ============
+
+/**
+ * @tc.name: CleanNodeAddIconHotZoneRect_NullPattern001
+ * @tc.desc: When hostPattern_ upgrade returns null, AddIconHotZoneRect returns without crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestNine, CleanNodeAddIconHotZoneRect_NullPattern001, TestSize.Level1)
+{
+    // Create CleanNodeResponseArea with null pattern
+    auto cleanNodeResponseArea = AceType::MakeRefPtr<CleanNodeResponseArea>(nullptr);
+    ASSERT_NE(cleanNodeResponseArea, nullptr);
+    // Should not crash when pattern is null
+    cleanNodeResponseArea->AddIconHotZoneRect();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: CleanNodeAddIconHotZoneRect_NullCleanNode001
+ * @tc.desc: When cleanNode_ is null, AddIconHotZoneRect returns without crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestNine, CleanNodeAddIconHotZoneRect_NullCleanNode001, TestSize.Level1)
+{
+    CreateTextField(DEFAULT_TEXT);
+    auto cleanNodeResponseArea = AceType::MakeRefPtr<CleanNodeResponseArea>(pattern_);
+    ASSERT_NE(cleanNodeResponseArea, nullptr);
+    // cleanNode_ is null by default
+    ASSERT_EQ(cleanNodeResponseArea->cleanNode_, nullptr);
+    cleanNodeResponseArea->AddIconHotZoneRect();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: CleanNodeAddIconHotZoneRect_NullImageNode001
+ * @tc.desc: When cleanNode_ has no child, AddIconHotZoneRect returns without crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestNine, CleanNodeAddIconHotZoneRect_NullImageNode001, TestSize.Level1)
+{
+    CreateTextField(DEFAULT_TEXT);
+    auto cleanNodeResponseArea = AceType::MakeRefPtr<CleanNodeResponseArea>(pattern_);
+    ASSERT_NE(cleanNodeResponseArea, nullptr);
+    // Create a cleanNode_ with no children
+    cleanNodeResponseArea->cleanNode_ = AceType::MakeRefPtr<FrameNode>("stack", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(cleanNodeResponseArea->cleanNode_, nullptr);
+    ASSERT_EQ(cleanNodeResponseArea->cleanNode_->GetFirstChild(), nullptr);
+    cleanNodeResponseArea->AddIconHotZoneRect();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: CleanNodeAddIconHotZoneRect_LTR_001
+ * @tc.desc: AddIconHotZoneRect with LTR layout (imageOffsetX stays 0.0f).
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestNine, CleanNodeAddIconHotZoneRect_LTR_001, TestSize.Level1)
+{
+    CreateTextField(DEFAULT_TEXT);
+    auto cleanNodeResponseArea = AceType::MakeRefPtr<CleanNodeResponseArea>(pattern_);
+    ASSERT_NE(cleanNodeResponseArea, nullptr);
+    // Set up cleanNode_ with a child image node
+    cleanNodeResponseArea->cleanNode_ = AceType::MakeRefPtr<FrameNode>("stack", -1, AceType::MakeRefPtr<Pattern>());
+    auto imageNode = AceType::MakeRefPtr<FrameNode>("image", -1, AceType::MakeRefPtr<Pattern>());
+    cleanNodeResponseArea->cleanNode_->AddChild(imageNode);
+    // Call AddIconHotZoneRect - should not crash with LTR layout
+    cleanNodeResponseArea->AddIconHotZoneRect();
+    SUCCEED();
+}
 } // namespace OHOS::Ace::NG

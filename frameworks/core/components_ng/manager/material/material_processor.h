@@ -18,12 +18,19 @@
 
 #include <map>
 
+#include <mutex>
 #include "base/memory/ace_type.h"
 
 namespace OHOS::Ace::NG {
 
 class PipelineContext;
 class FrameNode;
+
+enum class PageLogContainerType: int32_t {
+    NavContainer = 0,
+    TabContainer = 1,
+    Page = 2,
+};
 
 // Post-layout processor that enforces the scope gate for a component's
 // SystemMaterial to take effect: system apps keep material effective everywhere;
@@ -43,6 +50,13 @@ public:
     void Register(const RefPtr<FrameNode>& node);
     void Unregister(int32_t nodeId);
 
+    void RegisterPageContextNode(const RefPtr<FrameNode>& node);
+    void UnregisterPageContextNode(int32_t nodeId);
+
+    void ReportPageContextStats(int32_t targetContainerId, PageLogContainerType type, int32_t tabIndex = -1);
+
+    void ReportOverlayNodeMaterialArea(const RefPtr<FrameNode>& host, const std::string& source = "");
+
     // Scope gate (condition 1). For every registered material node, suppress
     // (remove) the material when the node is not in scope (not a system app,
     // not inside a titleBar / bottom TabBar subtree, not an overlay-exempt or
@@ -53,6 +67,9 @@ private:
     // nodeId -> weak ref to the material node. Entries auto-expire when the node
     // is destroyed (Upgrade() fails) and are pruned during the post-layout pass.
     std::map<int32_t, WeakPtr<FrameNode>> materialNodes_;
+
+    std::map<int32_t, WeakPtr<FrameNode>> pageContextStats_;
+    std::mutex pageContextMutex_;
 };
 
 } // namespace OHOS::Ace::NG

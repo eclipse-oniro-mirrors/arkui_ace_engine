@@ -1697,4 +1697,63 @@ HWTEST_F(BubbleTestTwoNg, BubbleViewBackgroundEffectTest002, TestSize.Level1)
     EXPECT_EQ(result->blurType, BlurType::BEHIND_WINDOW);
     EXPECT_EQ(result->policy, BlurStyleActivePolicy::ALWAYS_INACTIVE);
 }
+
+/**
+ * @tc.name: BubbleViewHandleLowEndImmersiveMaterialForBubble001
+ * @tc.desc: Test if-branch (materialColor empty) marks node scope-exempt via SetSystemMaterialForOverlay
+ * @tc.type: FUNC
+ */
+HWTEST_F(BubbleTestTwoNg, BubbleViewHandleLowEndImmersiveMaterialForBubble001, TestSize.Level1)
+{
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    MockPipelineContext::GetCurrent()->SetThemeManager(themeManager);
+    auto themeConstants = AceType::MakeRefPtr<ThemeConstants>(nullptr);
+    EXPECT_CALL(*themeManager, GetThemeConstants()).WillRepeatedly(Return(themeConstants));
+
+    auto popupId = ElementRegister::GetInstance()->MakeUniqueId();
+    auto bubbleNode =
+        FrameNode::CreateFrameNode(V2::POPUP_ETS_TAG, popupId, AceType::MakeRefPtr<BubblePattern>(-1, "target"));
+    ASSERT_NE(bubbleNode, nullptr);
+    auto renderContext = bubbleNode->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+    auto material = AceType::MakeRefPtr<UiMaterial>();
+    material->SetType(static_cast<int32_t>(MaterialType::IMMERSIVE));
+    ImmersiveOptions options;
+    options.applyShadow = false;
+    // materialColor and colorResObj are not set -> enters the if-branch (copiedMaterial path).
+    material->SetImmersiveOptions(options);
+
+    EXPECT_FALSE(renderContext->IsMaterialScopeExempt());
+    auto result = BubbleView::HandleLowEndImmersiveMaterialForBubble(bubbleNode, material, renderContext);
+    EXPECT_TRUE(result);
+    // The low-end path must go through SetSystemMaterialForOverlay so the overlay node is
+    // exempt from the material scope gate, keeping material effective for non-system apps.
+    EXPECT_TRUE(renderContext->IsMaterialScopeExempt());
+}
+
+/**
+ * @tc.name: BubbleViewHandleLowEndImmersiveMaterialForBubble002
+ * @tc.desc: Test else-branch (materialColor preset) marks node scope-exempt via SetSystemMaterialForOverlay
+ * @tc.type: FUNC
+ */
+HWTEST_F(BubbleTestTwoNg, BubbleViewHandleLowEndImmersiveMaterialForBubble002, TestSize.Level1)
+{
+    auto popupId = ElementRegister::GetInstance()->MakeUniqueId();
+    auto bubbleNode =
+        FrameNode::CreateFrameNode(V2::POPUP_ETS_TAG, popupId, AceType::MakeRefPtr<BubblePattern>(-1, "target"));
+    ASSERT_NE(bubbleNode, nullptr);
+    auto renderContext = bubbleNode->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+    auto material = AceType::MakeRefPtr<UiMaterial>();
+    material->SetType(static_cast<int32_t>(MaterialType::IMMERSIVE));
+    ImmersiveOptions options;
+    options.applyShadow = false;
+    options.materialColor = Color(0xFF000000); // preset -> skips if-branch, goes to else path.
+    material->SetImmersiveOptions(options);
+
+    EXPECT_FALSE(renderContext->IsMaterialScopeExempt());
+    auto result = BubbleView::HandleLowEndImmersiveMaterialForBubble(bubbleNode, material, renderContext);
+    EXPECT_TRUE(result);
+    EXPECT_TRUE(renderContext->IsMaterialScopeExempt());
+}
 } // namespace OHOS::Ace::NG

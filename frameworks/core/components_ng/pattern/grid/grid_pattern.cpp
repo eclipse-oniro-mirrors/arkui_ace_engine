@@ -2890,6 +2890,11 @@ std::string GridPattern::GetLayoutMode() const
     return hasOptions ? "scrollWithOptions" : "scroll";
 }
 
+CommandResult GridPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return OnInjectionEventByRatioWithResult(command);
+}
+
 int32_t GridPattern::OnInjectionEvent(const std::string& command)
 {
     return OnInjectionEventByRatio(command);

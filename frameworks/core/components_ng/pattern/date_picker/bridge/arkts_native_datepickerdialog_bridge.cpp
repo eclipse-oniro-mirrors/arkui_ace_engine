@@ -26,6 +26,7 @@
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_utils.h"
 #include "bridge/declarative_frontend/view_stack_processor.h"
 #include "core/components/common/properties/text_enums.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/pattern/date_picker/picker_model.h"
 #include "core/components_ng/pattern/time_picker/timepicker_model.h"
 #include "core/components_ng/base/view_stack_processor.h"
@@ -43,6 +44,8 @@ const std::vector<DistortionMode> DIALOG_DISTORTION_MODE = { DistortionMode::DIS
     DistortionMode::DISTORTION_ENABLED, DistortionMode::DISTORTION_DISABLED };
 const std::vector<EdgeLightMode> DIALOG_EDGELIGHT_MODE = { EdgeLightMode::EDGELIGHT_AUTO,
     EdgeLightMode::EDGELIGHT_ENABLED, EdgeLightMode::EDGELIGHT_DISABLED };
+const std::vector<HandednessFollowMode> DIALOG_HANDEDNESS_FOLLOW_MODE = { HandednessFollowMode::NONE,
+    HandednessFollowMode::FOLLOW_ANCHOR, HandednessFollowMode::FOLLOW_GRIP_HAND };
 const char TIMEPICKER_OPTIONS_HOUR[] = "hour";
 const char TIMEPICKER_OPTIONS_MINUTE[] = "minute";
 const std::string TIMEPICKER_OPTIONS_NUMERIC_VAL = "numeric";
@@ -786,6 +789,15 @@ void ParsePickerDialogMaterial(const EcmaVM* vm, PickerDialogInfo& pickerDialog,
         auto edgeLightModeVal = edgeLightModeValue->ToNumber(vm)->Int32Value(vm);
         if (edgeLightModeVal >= 0 && edgeLightModeVal < static_cast<int32_t>(DIALOG_EDGELIGHT_MODE.size())) {
             pickerDialog.edgeLightMode = DIALOG_EDGELIGHT_MODE[edgeLightModeVal];
+        }
+    }
+
+    auto adaptToHandednessValue = ArkTSUtils::GetProperty(vm, paramObject, "adaptToHandedness");
+    if (adaptToHandednessValue->IsNumber()) {
+        auto adaptToHandednessVal = adaptToHandednessValue->ToNumber(vm)->Int32Value(vm);
+        if (adaptToHandednessVal >= 0 &&
+            adaptToHandednessVal < static_cast<int32_t>(DIALOG_HANDEDNESS_FOLLOW_MODE.size())) {
+            pickerDialog.adaptToHandedness = DIALOG_HANDEDNESS_FOLLOW_MODE[adaptToHandednessVal];
         }
     }
 }

@@ -30,6 +30,7 @@
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
 #include "core/components_ng/pattern/list/list_item_pattern.h"
 #include "core/components_ng/pattern/list/list_layout_algorithm.h"
+#include "core/components_ng/pattern/scrollable/scrollable_properties.h"
 #include "core/pipeline/base/element_register.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
@@ -128,6 +129,10 @@ public:
     {
         ListModelNG model = CreateList();
         AnchorFrame(expiredAnchor);
+        // The deferral gate requires an active scroll: without a callback tick inside
+        // the 200ms scroll-active window every prediction stays on the synchronous
+        // path and no shell is ever mounted. Simulate one drag-start tick.
+        pattern_->OnScrollCallback(0.0f, SCROLL_FROM_START);
         model.SetScrollPlaceholder(std::move(provider));
         return model;
     }
@@ -421,6 +426,9 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderStageTwoTemplateFlip001, 
 {
     ListModelNG model = CreateList();
     AnchorFrame(false);
+    // Same deferral gate as the scaffold: the provider only runs while a scroll
+    // callback ticked inside the 200ms active window.
+    pattern_->OnScrollCallback(0.0f, SCROLL_FROM_START);
     auto manager = MockPipelineContext::GetCurrent()->GetOrCreateScrollPlaceholderManager();
     ASSERT_TRUE(manager);
     ScrollPlaceholderPredictParams mineParams;
@@ -613,6 +621,159 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderShellMeasureNoProviderSiz
     EXPECT_FLOAT_EQ(contentSize.Height(), sourceHeight);
     EXPECT_FLOAT_EQ(shellSize.Width(), sourceWidth);
     EXPECT_FLOAT_EQ(shellSize.Height(), sourceHeight);
+}
+
+/**
+ * @tc.name: ScrollPlaceholderShellMeasureNegativeSize001
+ * @tc.desc: Consumption-side defense for abnormal provider sizes: a negative width is
+ *           dropped by the layout ideal-size guard, the dimension falls back to the
+ *           measured content extent, while the valid height still applies.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderShellMeasureNegativeSize001, TestSize.Level1)
+{
+    constexpr float sourceWidth = 100.0f;
+    constexpr float sourceHeight = 50.0f;
+    auto manager = MockPipelineContext::GetCurrent()->GetOrCreateScrollPlaceholderManager();
+    ASSERT_TRUE(manager);
+    manager->RegisterTemplate("tpl-sized-negative", []() -> RefPtr<UINode> {
+        auto root = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG,
+            ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<LinearLayoutPattern>(false));
+        root->GetLayoutProperty()->UpdateUserDefinedIdealSize(
+            CalcSize(CalcLength(sourceWidth), CalcLength(sourceHeight)));
+        return root;
+    });
+    CreatePlaceholderList(
+        [](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            ScrollPlaceholderOptions options;
+            options.id = "tpl-sized-negative";
+            ScrollPlaceholderSizeOption sizeOption;
+            sizeOption.width = Dimension(-ITEM_MAIN_SIZE, DimensionUnit::VP);
+            sizeOption.height = Dimension(ITEM_MAIN_SIZE, DimensionUnit::VP);
+            options.size = sizeOption;
+            return options;
+        },
+        true);
+    CreateItemsAndDone();
+
+    int32_t index = FindUnbuiltSlot();
+    ASSERT_GE(index, 0);
+    auto shell = pattern_->CreateScrollPlaceholderShell(index);
+    ASSERT_TRUE(shell);
+    ASSERT_EQ(shell->GetChildren().size(), 1u);
+
+    LayoutConstraintF constraint;
+    constraint.maxSize = { 1080.0f, 5000.0f };
+    constraint.percentReference = { 1080.0f, 5000.0f };
+    shell->Measure(constraint);
+    auto shellSize = shell->GetGeometryNode()->GetFrameSize();
+    GTEST_LOG_(INFO) << "ShellMeasureNegativeSize shellNode=" << shellSize.Width() << "x" << shellSize.Height();
+
+    // Negative width is ignored (width/height invalid-size semantics); the width
+    // falls back to the measured content extent and the valid height still applies.
+    EXPECT_FLOAT_EQ(shellSize.Width(), sourceWidth);
+    EXPECT_FLOAT_EQ(shellSize.Height(), ITEM_MAIN_SIZE);
+}
+
+/**
+ * @tc.name: ScrollPlaceholderShellMeasureNaNSize001
+ * @tc.desc: Consumption-side defense for abnormal provider sizes: a NaN width passes
+ *           the JS layer like the width attribute does and must be rejected by the
+ *           layout ideal-size guard, falling back to the measured content extent.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderShellMeasureNaNSize001, TestSize.Level1)
+{
+    constexpr float sourceWidth = 100.0f;
+    constexpr float sourceHeight = 50.0f;
+    auto manager = MockPipelineContext::GetCurrent()->GetOrCreateScrollPlaceholderManager();
+    ASSERT_TRUE(manager);
+    manager->RegisterTemplate("tpl-sized-nan", []() -> RefPtr<UINode> {
+        auto root = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG,
+            ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<LinearLayoutPattern>(false));
+        root->GetLayoutProperty()->UpdateUserDefinedIdealSize(
+            CalcSize(CalcLength(sourceWidth), CalcLength(sourceHeight)));
+        return root;
+    });
+    CreatePlaceholderList(
+        [](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            ScrollPlaceholderOptions options;
+            options.id = "tpl-sized-nan";
+            ScrollPlaceholderSizeOption sizeOption;
+            sizeOption.width =
+                Dimension(std::numeric_limits<float>::quiet_NaN(), DimensionUnit::VP);
+            sizeOption.height = Dimension(ITEM_MAIN_SIZE, DimensionUnit::VP);
+            options.size = sizeOption;
+            return options;
+        },
+        true);
+    CreateItemsAndDone();
+
+    int32_t index = FindUnbuiltSlot();
+    ASSERT_GE(index, 0);
+    auto shell = pattern_->CreateScrollPlaceholderShell(index);
+    ASSERT_TRUE(shell);
+    ASSERT_EQ(shell->GetChildren().size(), 1u);
+
+    LayoutConstraintF constraint;
+    constraint.maxSize = { 1080.0f, 5000.0f };
+    constraint.percentReference = { 1080.0f, 5000.0f };
+    shell->Measure(constraint);
+    auto shellSize = shell->GetGeometryNode()->GetFrameSize();
+    GTEST_LOG_(INFO) << "ShellMeasureNaNSize shellNode=" << shellSize.Width() << "x" << shellSize.Height();
+
+    EXPECT_FLOAT_EQ(shellSize.Width(), sourceWidth);
+    EXPECT_FLOAT_EQ(shellSize.Height(), ITEM_MAIN_SIZE);
+}
+
+/**
+ * @tc.name: ScrollPlaceholderShellMeasurePartialSize001
+ * @tc.desc: A provider size with only one dimension set applies it and leaves the
+ *           other dimension to the measured content extent through the ListItem
+ *           constraint chain.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderShellMeasurePartialSize001, TestSize.Level1)
+{
+    constexpr float sourceWidth = 100.0f;
+    constexpr float sourceHeight = 50.0f;
+    auto manager = MockPipelineContext::GetCurrent()->GetOrCreateScrollPlaceholderManager();
+    ASSERT_TRUE(manager);
+    manager->RegisterTemplate("tpl-sized-partial", []() -> RefPtr<UINode> {
+        auto root = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG,
+            ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<LinearLayoutPattern>(false));
+        root->GetLayoutProperty()->UpdateUserDefinedIdealSize(
+            CalcSize(CalcLength(sourceWidth), CalcLength(sourceHeight)));
+        return root;
+    });
+    CreatePlaceholderList(
+        [](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            ScrollPlaceholderOptions options;
+            options.id = "tpl-sized-partial";
+            ScrollPlaceholderSizeOption sizeOption;
+            sizeOption.height = Dimension(ITEM_MAIN_SIZE, DimensionUnit::VP);
+            options.size = sizeOption;
+            return options;
+        },
+        true);
+    CreateItemsAndDone();
+
+    int32_t index = FindUnbuiltSlot();
+    ASSERT_GE(index, 0);
+    auto shell = pattern_->CreateScrollPlaceholderShell(index);
+    ASSERT_TRUE(shell);
+    ASSERT_EQ(shell->GetChildren().size(), 1u);
+
+    LayoutConstraintF constraint;
+    constraint.maxSize = { 1080.0f, 5000.0f };
+    constraint.percentReference = { 1080.0f, 5000.0f };
+    shell->Measure(constraint);
+    auto shellSize = shell->GetGeometryNode()->GetFrameSize();
+    GTEST_LOG_(INFO) << "ShellMeasurePartialSize shellNode=" << shellSize.Width() << "x" << shellSize.Height();
+
+    // Height-only size: the unset width comes from the measured content extent.
+    EXPECT_FLOAT_EQ(shellSize.Width(), sourceWidth);
+    EXPECT_FLOAT_EQ(shellSize.Height(), ITEM_MAIN_SIZE);
 }
 
 

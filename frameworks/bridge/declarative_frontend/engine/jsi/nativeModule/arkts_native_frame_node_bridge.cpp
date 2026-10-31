@@ -3734,6 +3734,7 @@ void InitTouchEventFromObj(EcmaVM* vm, const Local<panda::ObjectRef>& eventObj, 
             touchEvent.screenY = GetFloatProperty(vm, changedObj, "displayY");
             touchEvent.globalDisplayX = GetDoubleProperty(vm, changedObj, "globalDisplayX");
             touchEvent.globalDisplayY = GetDoubleProperty(vm, changedObj, "globalDisplayY");
+            touchEvent.operatingHand = GetIntProperty(vm, changedObj, "hand");
             touchEvent.originalId = touchEvent.id;
         }
     }

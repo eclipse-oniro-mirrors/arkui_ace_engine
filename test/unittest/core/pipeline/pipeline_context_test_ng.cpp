@@ -1326,7 +1326,9 @@ HWTEST_F(PipelineContextTestNg, PipelineContextTestNg025, TestSize.Level1)
         { "-rotation" }, { "-animationscale" }, { "-velocityscale" }, { "-scrollfriction" }, { "-threadstuck" },
         { "test" }, { "-navigation" }, { "-focuswindowscene" }, { "-focusmanager" }, { "-jsdump" }, { "-event" },
         { "-imagecache" }, { "-imagefilecache" }, { "-allelements" }, { "-default" }, { "-overlay" }, { "--stylus" },
-        { "-bindaicaller" }, { "-allInfoWithParamConfigTotal" }, { "-featuremanager", "testKey" } };
+        { "-bindaicaller" }, { "-bindaicaller", "-bind" }, { "-bindaicaller", "-unbind" },
+        { "-bindaicaller", "-bind", "1" }, { "-bindaicaller", "-unbind", "1" },
+        { "-allInfoWithParamConfigTotal" }, { "-featuremanager", "testKey" } };
     int turn = 0;
     for (; turn < params.size(); turn++) {
         EXPECT_TRUE(context_->OnDumpInfo(params[turn]));

@@ -20,6 +20,7 @@
 #include "base/utils/utils.h"
 #include "base/utils/system_properties.h"
 #include "core/common/container.h"
+#include "core/common/container_scope.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "core/common/resource/resource_parse_utils.h"
 #include "core/components/theme/theme_constants.h"
@@ -72,7 +73,7 @@ void TokenThemeStorage::RemoveThemeScope(TokenThemeScopeId themeScopeId, bool re
 const RefPtr<TokenTheme>& TokenThemeStorage::GetTheme(TokenThemeScopeId themeScopeId)
 {
     if (themeScopeId == 0) {
-        return GetDefaultTheme();
+        return GetDefaultThemeWithInstance(Container::CurrentIdSafelyWithCheck());
     }
     int32_t themeId = 0;
     {
@@ -120,6 +121,15 @@ const RefPtr<TokenTheme>& TokenThemeStorage::GetDefaultTheme()
 
     UpdateDefaultThemeBySystemTheme(colorMode);
     return colorMode == ColorMode::DARK ? defaultDarkTheme_ : defaultLightTheme_;
+}
+
+const RefPtr<TokenTheme>& TokenThemeStorage::GetDefaultThemeWithInstance(int32_t instanceId)
+{
+    std::lock_guard<std::mutex> lock(instanceBrandColorMutex_);
+    if (instanceDefaultThemerMap_.find(instanceId) != instanceDefaultThemerMap_.end()) {
+        return instanceDefaultThemerMap_[instanceId];
+    }
+    return GetDefaultTheme();
 }
 
 ColorMode TokenThemeStorage::CheckLocalAndSystemColorMode()
@@ -265,9 +275,16 @@ RefPtr<TokenTheme> TokenThemeStorage::CreateSystemTokenTheme(
     std::vector<Color> darkColors;
     colors.reserve(TokenColors::TOTAL_NUMBER);
     darkColors.reserve(TokenColors::TOTAL_NUMBER);
-    for (size_t resId = 0; resId < TokenColors::TOTAL_NUMBER; ++resId) {
-        colors.push_back(themeConstants->GetColor(TokenColors::GetSystemColorResIdByIndex(resId), colorMode));
-        darkColors.push_back(themeConstants->GetColor(TokenColors::GetSystemColorResIdByIndex(resId), colorMode));
+    if (specifiedThemeId.has_value()) {
+        for (size_t resId = 0; resId < TokenColors::TOTAL_NUMBER; ++resId) {
+            colors.push_back(themeConstants->GetColor(TokenColors::GetSystemColorResIdByIndex(resId), colorMode));
+            darkColors.push_back(themeConstants->GetColor(TokenColors::GetSystemColorResIdByIndex(resId), colorMode));
+        }
+    } else {
+        for (size_t resId = 0; resId < TokenColors::TOTAL_NUMBER; ++resId) {
+            colors.push_back(themeConstants->GetColor(TokenColors::GetSystemColorResIdByIndex(resId)));
+            darkColors.push_back(themeConstants->GetColor(TokenColors::GetSystemColorResIdByIndex(resId)));
+        }
     }
     tokenColors->SetColors(std::move(colors));
     tokenDarkColors->SetColors(std::move(darkColors));
@@ -294,6 +311,22 @@ void TokenThemeStorage::SetIsThemeColorSetByUser(int32_t themeId, bool isDark, i
     themeIdMap[isDark][index] = isColorSetByUser;
 }
 
+bool TokenThemeStorage::GetIsThemeColorSetByUser(int32_t themeId, bool isDark, int32_t index) const
+{
+    if (index < 0 || index >= TokenColors::TOTAL_NUMBER) {
+        return false;
+    }
+    auto it = themeColorSetByUser_.find(themeId);
+    if (it == themeColorSetByUser_.end()) {
+        return false;
+    }
+    auto modeIt = it->second.find(isDark);
+    if (modeIt == it->second.end() || modeIt->second.size() <= static_cast<size_t>(index)) {
+        return false;
+    }
+    return modeIt->second[index];
+}
+
 void TokenThemeStorage::InitDarkThemeMapWithoutUserSet(int32_t themeId, bool isDark)
 {
     if (themeColorSetByUser_.find(themeId) == themeColorSetByUser_.end()) {
@@ -302,4 +335,93 @@ void TokenThemeStorage::InitDarkThemeMapWithoutUserSet(int32_t themeId, bool isD
     auto& themeIdMap = themeColorSetByUser_[themeId];
     themeIdMap[isDark] = themeIdMap[!isDark];
 }
+
+void TokenThemeStorage::StoreInstanceBrandColor(int32_t instanceId, const BrandColorInfo& info)
+{
+    std::lock_guard<std::mutex> lock(instanceBrandColorMutex_);
+    instanceBrandColorMap_[instanceId] = info;
+    TAG_LOGD(AceLogTag::ACE_THEME,
+        "StoreInstanceBrandColor instanceId: %{public}d, hasBrandColor: %{public}d, hasStrategy: %{public}d",
+        instanceId, info.brandColor.has_value(), info.colorStrategy.has_value());
+    if (instanceDefaultThemerMap_.find(instanceId) == instanceDefaultThemerMap_.end()) {
+        ContainerScope scope(instanceId);
+        instanceDefaultThemerMap_[instanceId] = CreateSystemTokenTheme(CheckLocalAndSystemColorMode());
+    }
+}
+
+BrandColorInfo TokenThemeStorage::GetInstanceBrandColor(int32_t instanceId)
+{
+    std::lock_guard<std::mutex> lock(instanceBrandColorMutex_);
+    auto it = instanceBrandColorMap_.find(instanceId);
+    if (it != instanceBrandColorMap_.end()) {
+        return it->second;
+    }
+    return BrandColorInfo {};
+}
+
+std::optional<Color> TokenThemeStorage::GetThemeScopeBrandColor(int32_t themeScopeId)
+{
+    auto tokenTheme = GetTheme(themeScopeId);
+    auto themeColors = tokenTheme ? tokenTheme->Colors() : nullptr;
+    if (themeColors) {
+        Color brandColor = themeColors->Brand();
+        return brandColor;
+    }
+    return std::nullopt;
+}
+
+void TokenThemeStorage::RemoveInstanceBrandColor(int32_t instanceId)
+{
+    std::lock_guard<std::mutex> lock(instanceBrandColorMutex_);
+    instanceBrandColorMap_.erase(instanceId);
+    instanceDefaultThemerMap_.erase(instanceId);
+    TAG_LOGI(AceLogTag::ACE_THEME, "RemoveInstanceBrandColor instanceId: %{public}d", instanceId);
+}
+
+void TokenThemeStorage::ClearAllInstanceBrandColors()
+{
+    std::lock_guard<std::mutex> lock(instanceBrandColorMutex_);
+    instanceBrandColorMap_.clear();
+    instanceDefaultThemerMap_.clear();
+}
+
+void TokenThemeStorage::RegisterBrandColorChangeListener(int32_t instanceId, const BrandColorChangeCallback& callback)
+{
+    std::lock_guard<std::mutex> lock(brandColorListenerMutex_);
+    brandColorChangeListeners_[instanceId].push_back(callback);
+}
+
+void TokenThemeStorage::UnregisterBrandColorChangeListener(int32_t instanceId)
+{
+    std::lock_guard<std::mutex> lock(brandColorListenerMutex_);
+    brandColorChangeListeners_.erase(instanceId);
+}
+
+void TokenThemeStorage::NotifyBrandColorChange(
+    int32_t instanceId, const std::optional<Color>& brandColor,
+    const std::optional<BrandColorStrategy>& colorStrategy)
+{
+    std::vector<BrandColorChangeCallback> callbacks;
+    {
+        std::lock_guard<std::mutex> lock(brandColorListenerMutex_);
+        auto it = brandColorChangeListeners_.find(instanceId);
+        if (it != brandColorChangeListeners_.end()) {
+            callbacks = it->second;
+        }
+    }
+    if (callbacks.empty()) {
+        TAG_LOGW(AceLogTag::ACE_THEME, "NotifyBrandColorChange no listener for instanceId: %{public}d", instanceId);
+        return;
+    }
+    TAG_LOGD(AceLogTag::ACE_THEME,
+        "NotifyBrandColorChange instanceId: %{public}d, hasBrandColor: %{public}d, hasStrategy: %{public}d, "
+        "callbackCount: %{public}zu",
+        instanceId, brandColor.has_value(), colorStrategy.has_value(), callbacks.size());
+    for (const auto& callback : callbacks) {
+        if (callback) {
+            callback(instanceId, brandColor, colorStrategy);
+        }
+    }
+}
+
 } // namespace OHOS::Ace::NG

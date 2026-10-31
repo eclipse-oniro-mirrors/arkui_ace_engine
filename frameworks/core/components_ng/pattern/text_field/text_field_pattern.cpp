@@ -126,7 +126,6 @@ constexpr std::string_view FIELD_TEXT_CHANGE_EVENT = "textChange";
 constexpr std::string_view FIELD_BLUR_EVENT = "blur";
 constexpr std::string_view FIELD_FOCUS_EVENT = "focus";
 constexpr int32_t PREVIEW_TEXT_RANGE_DEFAULT = -1;
-constexpr std::string_view PREVIEW_STYLE_NORMAL = "normal";
 constexpr std::string_view PREVIEW_STYLE_UNDERLINE = "underline";
 
 constexpr int32_t PREVIEW_NO_ERROR = 0;
@@ -553,6 +552,28 @@ void TextFieldPattern::ReportRequestKeyboardEvent(const RefPtr<FrameNode>& frame
             "event", value->ToString(), ComponentEventType::COMPONENT_EVENT_TEXT_INPUT);
     }
 #endif
+}
+
+CommandResult TextFieldPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    auto json = JsonUtil::ParseJsonString(command);
+    if (json && json->IsObject() && json->GetString("cmd") == "requestKeyboard") {
+        auto host = GetHost();
+        CHECK_NULL_RETURN(host, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+        auto hub = host->GetEventHub<EventHub>();
+        if (!hub || !hub->IsEnabled() || HasFocus()) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        }
+        auto focusHub = GetFocusHub();
+        if (!focusHub || !focusHub->RequestFocusImmediately()) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        }
+        ReportRequestKeyboardEvent(host);
+        return CommandResult::Success();
+    }
+    return ConvertLegacyInjectionEventResult(command,
+        { "MSDP_AutoFill", "addText", "setText", "deleteText", "selectText", "copy", "cut",
+            "clear", "requestKeyboard", "setCaretPosition" });
 }
 
 int32_t TextFieldPattern::OnInjectionEvent(const std::string& command)
@@ -2158,7 +2179,7 @@ bool TextFieldPattern::HandleOnKeyBack()
 
 bool TextFieldPattern::HandleOnTab(bool backward)
 {
-    return backward ? UpdateFocusBackward() : UpdateFocusForward();
+    return CleanNodeHostBase::HandleOnTabImpl(backward);
 }
 
 void TextFieldPattern::HandleOnUndoAction()
@@ -10756,36 +10777,22 @@ void TextFieldPattern::FocusForwardStopTwinkling()
 
 bool TextFieldPattern::UpdateFocusForward()
 {
-    return HandleFocusForward(focusIndex_);
-}
-
-bool TextFieldPattern::HandleFocusForward(FocuseIndex index)
-{
-    if (!HasFocus()) {
-        return false;
-    }
-    auto next = focusForwardMap_.find(index);
-    if (next == focusForwardMap_.end()) {
-        return false;
-    }
-    return HandleSwithFocus(next->second) || HandleFocusForward(next->second);
+    return CleanNodeHostBase::HandleFocusForwardImpl(focusIndex_);
 }
 
 bool TextFieldPattern::UpdateFocusBackward()
 {
-    return HandleFocusBackward(focusIndex_);
+    return CleanNodeHostBase::HandleFocusBackwardImpl(focusIndex_);
 }
 
-bool TextFieldPattern::HandleFocusBackward(FocuseIndex index)
+const std::unordered_map<FocuseIndex, FocuseIndex>& TextFieldPattern::GetFocusForwardMap() const
 {
-    if (!HasFocus()) {
-        return false;
-    }
-    auto next = focusBackwardMap_.find(index);
-    if (next == focusBackwardMap_.end()) {
-        return false;
-    }
-    return HandleSwithFocus(next->second) || HandleFocusBackward(next->second);
+    return focusForwardMap_;
+}
+
+const std::unordered_map<FocuseIndex, FocuseIndex>& TextFieldPattern::GetFocusBackwardMap() const
+{
+    return focusBackwardMap_;
 }
 
 bool TextFieldPattern::HandleSwithFocus(FocuseIndex index)
@@ -11714,29 +11721,24 @@ int32_t TextFieldPattern::CheckPreviewTextValidate(const std::string& previewVal
     return CheckPreviewTextValidate(UtfUtils::Str8DebugToStr16(previewValue), range);
 }
 
-PreviewTextStyle TextFieldPattern::GetPreviewTextStyle() const
-{
-    auto defaultStyle = PreviewTextStyle::NORMAL;
-    auto paintProperty = GetPaintProperty<TextFieldPaintProperty>();
-    CHECK_NULL_RETURN(paintProperty, defaultStyle);
-    if (paintProperty->HasPreviewTextStyle()) {
-        auto style = paintProperty->GetPreviewTextStyle();
-        CHECK_NULL_RETURN(style, defaultStyle);
-        if (style.value() == PREVIEW_STYLE_NORMAL) {
-            return PreviewTextStyle::NORMAL;
-        } else if (style.value() == PREVIEW_STYLE_UNDERLINE) {
-            return PreviewTextStyle::UNDERLINE;
-        }
-    }
-    return defaultStyle;
-}
-
 void TextFieldPattern::ReceivePreviewTextStyle(const std::string& style)
 {
     auto paintProperty = GetPaintProperty<TextFieldPaintProperty>();
     CHECK_NULL_VOID(paintProperty);
+    auto frameNode = GetHost();
+    CHECK_NULL_VOID(frameNode);
+    auto previewDecorationColor = paintProperty->GetCursorColorValue(GetPreviewDecorationColor());
+    if (frameNode->GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY_SIX) &&
+        !paintProperty->HasCaretColorFlagByUser()) {
+        previewDecorationColor = GetPreviewDecorationColor();
+    }
     if (!style.empty()) {
-        paintProperty->UpdatePreviewTextStyle(style);
+        PreviewTextStyling previewTextStyling;
+        previewTextStyling.underlineColor = previewDecorationColor.GetValue();
+        if (style == PREVIEW_STYLE_UNDERLINE) {
+            previewTextStyling.underlineShape = PreviewTextStyle::UNDERLINE;
+        }
+        SetPreviewTextStyling(previewTextStyling);
     }
 }
 

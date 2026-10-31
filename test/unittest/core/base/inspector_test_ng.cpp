@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 #include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <fcntl.h>
 #include <functional>
 #include <memory>
@@ -22,17 +24,21 @@
 
 #include "gtest/gtest.h"
 
+#include "securec.h"
+
 #define protected public
 #define private public
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
+#include "base/geometry/rect.h"
 #include "base/utils/utils.h"
 #include "core/common/ace_application_info.h"
 #include "core/components_ng/base/inspector.h"
 #include "core/components_ng/base/view_abstract.h"
 #include "core/components_ng/pattern/safe_area_inset/safe_area_inset_pattern.h"
 #include "core/components_ng/base/inspector_filter.h"
+#include "core/components_ng/base/inspector_tree_provider_registry.h"
 #include "core/components_ng/base/simplified_inspector.h"
 #include "core/components_ng/base/ui_node.h"
 #include "core/components_ng/pattern/stage/stage_manager.h"
@@ -3108,4 +3114,791 @@ HWTEST_F(InspectorTestNg, SafeAreaInsetInspectorFourEdges001, TestSize.Level0)
     EXPECT_EQ(nodes.count(business->GetId()), 1);
 }
 
+namespace {
+// Getter helpers follow the API memory contract: the callback allocates the
+// payload buffer with malloc() and the engine releases it with free() after
+// deep-copying, so every invocation returns a fresh malloc'd buffer.
+void ExternalPayloadFromUserData(void* userData, char** inspectorTree)
+{
+    const auto* payload = static_cast<const std::string*>(userData);
+    if (payload == nullptr || payload->empty()) {
+        *inspectorTree = nullptr;
+        return;
+    }
+    size_t length = payload->size() + 1; // including the terminating NUL
+    char* buffer = static_cast<char*>(malloc(length));
+    if (buffer == nullptr) {
+        *inspectorTree = nullptr;
+        return;
+    }
+    errno_t result = memcpy_s(buffer, length, payload->c_str(), length);
+    if (result != 0) {
+        free(buffer);
+        *inspectorTree = nullptr;
+        return;
+    }
+    *inspectorTree = buffer;
+}
+
+void ExternalPayloadNull(void* /*userData*/, char** inspectorTree)
+{
+    *inspectorTree = nullptr;
+}
+
+// Returns a fixed JSON payload each call (fresh malloc'd buffer); used to
+// demonstrate multiple getter callbacks coexisting on one node.
+void ExternalPayloadConstant(void* /*userData*/, char** inspectorTree)
+{
+    static const char payload[] = R"([{"$type":"MultiTwo","$ID":90022}])";
+    size_t length = sizeof(payload); // including the terminating NUL
+    char* buffer = static_cast<char*>(malloc(length));
+    if (buffer == nullptr) {
+        *inspectorTree = nullptr;
+        return;
+    }
+    errno_t result = memcpy_s(buffer, length, payload, length);
+    if (result != 0) {
+        free(buffer);
+        *inspectorTree = nullptr;
+        return;
+    }
+    *inspectorTree = buffer;
+}
+
+std::unique_ptr<JsonValue> FindInspectorNodeById(JsonValue* node, int32_t nodeId)
+{
+    CHECK_NULL_RETURN(node, nullptr);
+    if (node->GetInt("$ID", -1) == nodeId) {
+        return JsonUtil::ParseJsonString(node->ToString());
+    }
+    auto children = node->GetValue("$children");
+    CHECK_NULL_RETURN(children, nullptr);
+    int32_t size = children->GetArraySize();
+    for (int32_t index = 0; index < size; ++index) {
+        auto child = children->GetArrayItem(index);
+        auto result = FindInspectorNodeById(child.get(), nodeId);
+        if (result) {
+            return result;
+        }
+    }
+    return nullptr;
+}
+
+// Finds the node with the given id in an inspector tree (layout format has the
+// page nodes under "content"; non-layout format has them at the root level).
+std::unique_ptr<JsonValue> FindNodeInTree(const std::string& tree, int32_t nodeId)
+{
+    auto root = JsonUtil::ParseJsonString(tree);
+    CHECK_NULL_RETURN(root, nullptr);
+    auto content = root->GetValue("content");
+    if (content) {
+        auto result = FindInspectorNodeById(content.get(), nodeId);
+        if (result) {
+            return result;
+        }
+    }
+    return FindInspectorNodeById(root.get(), nodeId);
+}
+
+bool NodeChildrenContainType(JsonValue* node, const std::string& type)
+{
+    CHECK_NULL_RETURN(node, false);
+    auto children = node->GetValue("$children");
+    CHECK_NULL_RETURN(children, false);
+    int32_t size = children->GetArraySize();
+    for (int32_t index = 0; index < size; ++index) {
+        auto child = children->GetArrayItem(index);
+        if (child && child->GetString("$type") == type) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Returns the index of the first direct child with the given "$type" in the
+// node's "$children" array, or -1 when absent (used for order assertions).
+int32_t FindChildIndexByType(JsonValue* node, const std::string& type)
+{
+    CHECK_NULL_RETURN(node, -1);
+    auto children = node->GetValue("$children");
+    CHECK_NULL_RETURN(children, -1);
+    int32_t size = children->GetArraySize();
+    for (int32_t index = 0; index < size; ++index) {
+        auto child = children->GetArrayItem(index);
+        if (child && child->GetString("$type") == type) {
+            return index;
+        }
+    }
+    return -1;
+}
+
+// External host format sample (CustomNode/XComponent provider output) used by
+// the format-conversion tests. Delimited raw string: the payload contains ')"'
+// inside "Offset(...)" attribute values, which would terminate a plain R"(...)"
+// literal early. Non-const: Register takes the userData as void*, and a
+// const std::string* cannot implicitly convert to void*.
+std::string g_externalHostFormatPayload = R"json([
+  {
+    "elementId": 1,
+    "parentId": -1,
+    "componentType": "CustomFrameNode",
+    "screenRect": {"x": 0.0, "y": 0.0, "width": 1316.0, "height": 2598.0},
+    "attributes": {"visible": true, "enabled": true, "clickable": false,
+    "focused": false, "scrollable": false, "selected": false,
+    "isPlaced": "true", "width": "1316", "height": "2598",
+    "positionInParent": "Offset(0.0, 0.0)"},
+    "children": [
+      {
+        "elementId": 11,
+        "parentId": 1,
+        "componentType": "Text",
+        "screenRect": {"x": 392.0, "y": 63.0, "width": 533.0, "height": 98.0},
+        "attributes": {"visible": true, "enabled": true, "clickable": false,
+        "focused": false, "scrollable": false, "selected": false,
+        "isPlaced": "true", "width": "533", "height": "98",
+        "positionInParent": "Offset(0.0, 0.0)", "text": "属性示例 - Skia",
+        "fontSize": "22.0.sp", "actualFontSize": "22.0.sp"},
+        "children": []
+      }
+    ]
+  },
+  {
+    "elementId": 200,
+    "parentId": -1,
+    "componentType": "CustomFrameNode",
+    "screenRect": {"x": 168.0, "y": 350.0, "width": 980.0, "height": 504.0},
+    "attributes": {"visible": true, "enabled": true, "clickable": false,
+    "focused": false, "scrollable": false, "selected": false,
+    "isPlaced": "true", "width": "980", "height": "504",
+    "positionInParent": "Offset(0.0, 0.0)"},
+    "children": [
+      {
+        "elementId": 201,
+        "parentId": 200,
+        "componentType": "Button",
+        "screenRect": {"x": 364.0, "y": 630.0, "width": 588.0, "height": 112.0},
+        "attributes": {"visible": true, "enabled": true, "clickable": true,
+        "focused": false, "scrollable": false, "selected": false,
+        "isPlaced": "true", "width": "588", "height": "112",
+        "positionInParent": "Offset(0.0, 742.0)",
+        "text": "确定"},
+        "children": []
+      }
+    ]
+  }
+])json";
+
+// Verifies the first converted root (elementId 1 with Text child 11) of the
+// external host-format sample payload.
+void AssertExternalHostFormatRoot1(JsonValue* hostNode)
+{
+    auto root1 = FindInspectorNodeById(hostNode, 1);
+    ASSERT_NE(root1, nullptr);
+    EXPECT_EQ(root1->GetString("$type"), "CustomFrameNode");
+    EXPECT_EQ(root1->GetString("$rect"), "[0.00, 0.00],[1316.00,2598.00]");
+    EXPECT_FALSE(root1->Contains("parentId"));
+    EXPECT_FALSE(root1->Contains("elementId"));
+    auto attrs1 = root1->GetValue("$attrs");
+    ASSERT_NE(attrs1, nullptr);
+    EXPECT_TRUE(attrs1->GetBool("visible", false));
+    EXPECT_EQ(attrs1->GetString("width"), "1316");
+    auto textNode = FindInspectorNodeById(root1.get(), 11);
+    ASSERT_NE(textNode, nullptr);
+    EXPECT_EQ(textNode->GetString("$type"), "Text");
+    EXPECT_EQ(textNode->GetString("$rect"), "[392.00, 63.00],[925.00,161.00]");
+    auto textAttrs = textNode->GetValue("$attrs");
+    ASSERT_NE(textAttrs, nullptr);
+    EXPECT_EQ(textAttrs->GetString("text"), "属性示例 - Skia");
+    EXPECT_EQ(textAttrs->GetString("fontSize"), "22.0.sp");
+}
+
+// Verifies the second converted root (elementId 200 with Button child 201).
+void AssertExternalHostFormatRoot200(JsonValue* hostNode)
+{
+    auto root200 = FindInspectorNodeById(hostNode, 200);
+    ASSERT_NE(root200, nullptr);
+    EXPECT_EQ(root200->GetString("$type"), "CustomFrameNode");
+    EXPECT_EQ(root200->GetString("$rect"), "[168.00, 350.00],[1148.00,854.00]");
+    EXPECT_FALSE(root200->Contains("parentId"));
+    auto buttonNode = FindInspectorNodeById(root200.get(), 201);
+    ASSERT_NE(buttonNode, nullptr);
+    EXPECT_EQ(buttonNode->GetString("$type"), "Button");
+    EXPECT_EQ(buttonNode->GetString("$rect"), "[364.00, 630.00],[952.00,742.00]");
+    auto buttonAttrs = buttonNode->GetValue("$attrs");
+    ASSERT_NE(buttonAttrs, nullptr);
+    EXPECT_EQ(buttonAttrs->GetString("text"), "确定");
+    EXPECT_TRUE(buttonAttrs->GetBool("clickable", false));
+}
+} // namespace
+
+/**
+ * @tc.name: InspectorExternalSubtreeSpliced001
+ * @tc.desc: AC-1.1/R-1: registered provider subtree is spliced verbatim under
+ *           the host node's $children during collection.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InspectorTestNg, InspectorExternalSubtreeSpliced001, TestSize.Level1)
+{
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto rootId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> root = FrameNode::CreateFrameNode("one", rootId, AceType::MakeRefPtr<Pattern>(), true);
+    context->stageManager_ = AceType::MakeRefPtr<StageManager>(root);
+    auto pageId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> page = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, pageId, AceType::MakeRefPtr<Pattern>());
+    root->AddChild(page);
+    auto hostId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> host = FrameNode::CreateFrameNode(V2::XCOMPONENT_ETS_TAG, hostId, AceType::MakeRefPtr<Pattern>());
+    page->AddChild(host);
+    std::string payload = R"([{"$type":"FlutterView","$ID":90001}])";
+    ASSERT_EQ(InspectorTreeProviderRegistry::Register(AceType::RawPtr(host), ExternalPayloadFromUserData, &payload),
+        InspectorTreeProviderRegistry::RESULT_OK);
+
+    auto tree = Inspector::GetInspector(true);
+    EXPECT_NE(tree, "");
+    auto hostNode = FindNodeInTree(tree, hostId);
+    ASSERT_NE(hostNode, nullptr);
+    EXPECT_TRUE(NodeChildrenContainType(hostNode.get(), "FlutterView"));
+
+    InspectorTreeProviderRegistry::Unregister(AceType::RawPtr(host), nullptr);
+    context->stageManager_ = nullptr;
+}
+
+/**
+ * @tc.name: InspectorExternalSubtreeNoRegistrationUnchanged002
+ * @tc.desc: AC-1.2/R-3/INV-4: no registration or empty payload keeps the tree
+ *           output identical to the baseline.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InspectorTestNg, InspectorExternalSubtreeNoRegistrationUnchanged002, TestSize.Level1)
+{
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto rootId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> root = FrameNode::CreateFrameNode("one", rootId, AceType::MakeRefPtr<Pattern>(), true);
+    context->stageManager_ = AceType::MakeRefPtr<StageManager>(root);
+    auto pageId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> page = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, pageId, AceType::MakeRefPtr<Pattern>());
+    root->AddChild(page);
+    auto hostId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> host = FrameNode::CreateFrameNode(V2::XCOMPONENT_ETS_TAG, hostId, AceType::MakeRefPtr<Pattern>());
+    page->AddChild(host);
+    std::string baseline = Inspector::GetInspector(true);
+
+    // Provider returns nullptr => no data this time, output identical.
+    ASSERT_EQ(InspectorTreeProviderRegistry::Register(AceType::RawPtr(host), ExternalPayloadNull, nullptr),
+        InspectorTreeProviderRegistry::RESULT_OK);
+    EXPECT_EQ(Inspector::GetInspector(true), baseline);
+
+    std::string payload = R"([{"$type":"FlutterView","$ID":90002}])";
+    ASSERT_EQ(InspectorTreeProviderRegistry::Register(AceType::RawPtr(host), ExternalPayloadFromUserData, &payload),
+        InspectorTreeProviderRegistry::RESULT_OK);
+    EXPECT_NE(Inspector::GetInspector(true), baseline);
+
+    InspectorTreeProviderRegistry::Unregister(AceType::RawPtr(host), nullptr);
+    EXPECT_EQ(Inspector::GetInspector(true), baseline);
+    context->stageManager_ = nullptr;
+}
+
+/**
+ * @tc.name: InspectorExternalSubtreeReplace003
+ * @tc.desc: AC-1.4/R-2: re-registering on the same anchor replaces the
+ *           previous provider as a whole.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InspectorTestNg, InspectorExternalSubtreeReplace003, TestSize.Level1)
+{
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto rootId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> root = FrameNode::CreateFrameNode("one", rootId, AceType::MakeRefPtr<Pattern>(), true);
+    context->stageManager_ = AceType::MakeRefPtr<StageManager>(root);
+    auto pageId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> page = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, pageId, AceType::MakeRefPtr<Pattern>());
+    root->AddChild(page);
+    auto hostId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> host = FrameNode::CreateFrameNode(V2::XCOMPONENT_ETS_TAG, hostId, AceType::MakeRefPtr<Pattern>());
+    page->AddChild(host);
+    std::string payloadA = R"([{"$type":"FlutterA","$ID":90003}])";
+    std::string payloadB = R"([{"$type":"FlutterB","$ID":90004}])";
+    ASSERT_EQ(InspectorTreeProviderRegistry::Register(AceType::RawPtr(host), ExternalPayloadFromUserData, &payloadA),
+        InspectorTreeProviderRegistry::RESULT_OK);
+    auto treeA = Inspector::GetInspector(true);
+    auto hostNodeA = FindNodeInTree(treeA, hostId);
+    ASSERT_NE(hostNodeA, nullptr);
+    EXPECT_TRUE(NodeChildrenContainType(hostNodeA.get(), "FlutterA"));
+    EXPECT_FALSE(NodeChildrenContainType(hostNodeA.get(), "FlutterB"));
+
+    ASSERT_EQ(InspectorTreeProviderRegistry::Register(AceType::RawPtr(host), ExternalPayloadFromUserData, &payloadB),
+        InspectorTreeProviderRegistry::RESULT_OK);
+    auto treeB = Inspector::GetInspector(true);
+    auto hostNodeB = FindNodeInTree(treeB, hostId);
+    ASSERT_NE(hostNodeB, nullptr);
+    EXPECT_TRUE(NodeChildrenContainType(hostNodeB.get(), "FlutterB"));
+    EXPECT_FALSE(NodeChildrenContainType(hostNodeB.get(), "FlutterA"));
+
+    InspectorTreeProviderRegistry::Unregister(AceType::RawPtr(host), nullptr);
+    context->stageManager_ = nullptr;
+}
+
+/**
+ * @tc.name: InspectorExternalSubtreeHostInvalid004
+ * @tc.desc: AC-1.3/INV-2: after the host node is destroyed, a re-created node
+ *           reusing the same node id must not splice the stale registration.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InspectorTestNg, InspectorExternalSubtreeHostInvalid004, TestSize.Level1)
+{
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto rootId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> root = FrameNode::CreateFrameNode("one", rootId, AceType::MakeRefPtr<Pattern>(), true);
+    context->stageManager_ = AceType::MakeRefPtr<StageManager>(root);
+    auto pageId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> page = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, pageId, AceType::MakeRefPtr<Pattern>());
+    root->AddChild(page);
+    auto reusedId = ElementRegister::GetInstance()->MakeUniqueId();
+    {
+        RefPtr<FrameNode> host =
+            FrameNode::CreateFrameNode(V2::XCOMPONENT_ETS_TAG, reusedId, AceType::MakeRefPtr<Pattern>());
+        std::string payload = R"([{"$type":"FlutterView","$ID":90005}])";
+        ASSERT_EQ(InspectorTreeProviderRegistry::Register(AceType::RawPtr(host), ExternalPayloadFromUserData, &payload),
+            InspectorTreeProviderRegistry::RESULT_OK);
+        // host destroyed at scope end while still registered.
+    }
+    // A new node reusing the same id (same instance) must not match the dead anchor.
+    RefPtr<FrameNode> host2 = FrameNode::CreateFrameNode("host2", reusedId, AceType::MakeRefPtr<Pattern>());
+    page->AddChild(host2);
+    auto tree = Inspector::GetInspector(true);
+    auto hostNode = FindNodeInTree(tree, reusedId);
+    ASSERT_NE(hostNode, nullptr);
+    EXPECT_FALSE(NodeChildrenContainType(hostNode.get(), "FlutterView"));
+    context->stageManager_ = nullptr;
+}
+
+/**
+ * @tc.name: InspectorExternalSubtreeDegradeAndRecover005
+ * @tc.desc: AC-3.1/AC-3.2/R-11/INV-6: malformed payload degrades in isolation;
+ *           the next valid payload recovers without re-registration.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InspectorTestNg, InspectorExternalSubtreeDegradeAndRecover005, TestSize.Level1)
+{
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto rootId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> root = FrameNode::CreateFrameNode("one", rootId, AceType::MakeRefPtr<Pattern>(), true);
+    context->stageManager_ = AceType::MakeRefPtr<StageManager>(root);
+    auto pageId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> page = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, pageId, AceType::MakeRefPtr<Pattern>());
+    root->AddChild(page);
+    auto hostId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> host = FrameNode::CreateFrameNode(V2::XCOMPONENT_ETS_TAG, hostId, AceType::MakeRefPtr<Pattern>());
+    page->AddChild(host);
+    std::string baseline = Inspector::GetInspector(true);
+
+    std::string payload = R"([{"$type":"FlutterView","$ID":90006}])";
+    ASSERT_EQ(InspectorTreeProviderRegistry::Register(AceType::RawPtr(host), ExternalPayloadFromUserData, &payload),
+        InspectorTreeProviderRegistry::RESULT_OK);
+    // Malformed JSON: skipped, main tree intact.
+    payload = "{\"$type\":\"FlutterView\",\"$ID\":90006"; // broken JSON
+    EXPECT_EQ(Inspector::GetInspector(true), baseline);
+    // Oversized payload (valid JSON, > 4 MiB content): skipped by the size
+    // limit, main tree intact.
+    payload = "{\"$type\":\"Big\",\"$ID\":90006,\"$attrs\":{\"pad\":\"" + std::string(4194305, 'a') + "\"}}";
+    EXPECT_EQ(Inspector::GetInspector(true), baseline);
+    // Recovery: valid payload splices again without re-registration.
+    payload = R"([{"$type":"FlutterView","$ID":90006}])";
+    auto tree = Inspector::GetInspector(true);
+    auto hostNode = FindNodeInTree(tree, hostId);
+    ASSERT_NE(hostNode, nullptr);
+    EXPECT_TRUE(NodeChildrenContainType(hostNode.get(), "FlutterView"));
+
+    InspectorTreeProviderRegistry::Unregister(AceType::RawPtr(host), nullptr);
+    context->stageManager_ = nullptr;
+}
+
+/**
+ * @tc.name: InspectorExternalSubtreeInstanceIsolation006
+ * @tc.desc: AC-1.5/R-5: registrations are keyed by (instanceId, nodeId); a
+ *           node with a different instance id never matches another
+ *           instance's registration.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InspectorTestNg, InspectorExternalSubtreeInstanceIsolation006, TestSize.Level1)
+{
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto rootId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> root = FrameNode::CreateFrameNode("one", rootId, AceType::MakeRefPtr<Pattern>(), true);
+    context->stageManager_ = AceType::MakeRefPtr<StageManager>(root);
+    auto pageId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> page = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, pageId, AceType::MakeRefPtr<Pattern>());
+    root->AddChild(page);
+    auto reusedId = ElementRegister::GetInstance()->MakeUniqueId();
+    {
+        // Registered in the default instance (instanceId -1).
+        RefPtr<FrameNode> host =
+            FrameNode::CreateFrameNode(V2::XCOMPONENT_ETS_TAG, reusedId, AceType::MakeRefPtr<Pattern>());
+        std::string payload = R"([{"$type":"FlutterView","$ID":90007}])";
+        ASSERT_EQ(InspectorTreeProviderRegistry::Register(AceType::RawPtr(host), ExternalPayloadFromUserData, &payload),
+            InspectorTreeProviderRegistry::RESULT_OK);
+    }
+    // Re-created node with the same id but a different instance id must not match.
+    RefPtr<FrameNode> otherInstanceHost =
+        FrameNode::CreateFrameNode(V2::XCOMPONENT_ETS_TAG, reusedId, AceType::MakeRefPtr<Pattern>());
+    otherInstanceHost->instanceId_ = 42; // private member access via test macro
+    page->AddChild(otherInstanceHost);
+    auto tree = Inspector::GetInspector(true);
+    auto hostNode = FindNodeInTree(tree, reusedId);
+    ASSERT_NE(hostNode, nullptr);
+    EXPECT_FALSE(NodeChildrenContainType(hostNode.get(), "FlutterView"));
+
+    // Registering under the node's own instance key works normally.
+    std::string payload = R"([{"$type":"FlutterView","$ID":90008}])";
+    ASSERT_EQ(InspectorTreeProviderRegistry::Register(
+                  AceType::RawPtr(otherInstanceHost), ExternalPayloadFromUserData, &payload),
+        InspectorTreeProviderRegistry::RESULT_OK);
+    tree = Inspector::GetInspector(true);
+    hostNode = FindNodeInTree(tree, reusedId);
+    ASSERT_NE(hostNode, nullptr);
+    EXPECT_TRUE(NodeChildrenContainType(hostNode.get(), "FlutterView"));
+
+    InspectorTreeProviderRegistry::Unregister(AceType::RawPtr(otherInstanceHost), nullptr);
+    context->stageManager_ = nullptr;
+}
+
+/**
+ * @tc.name: InspectorExternalSubtreeCustomHost007
+ * @tc.desc: AC-1.1/R-1: CustomNode hosts also participate in external-subtree
+ *           splicing (layout inspector mode).
+ * @tc.type: FUNC
+ */
+HWTEST_F(InspectorTestNg, InspectorExternalSubtreeCustomHost007, TestSize.Level1)
+{
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto rootId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> root = FrameNode::CreateFrameNode("one", rootId, AceType::MakeRefPtr<Pattern>(), true);
+    context->stageManager_ = AceType::MakeRefPtr<StageManager>(root);
+    auto pageId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> page = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, pageId, AceType::MakeRefPtr<Pattern>());
+    root->AddChild(page);
+    auto hostId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<CustomNode> host = CustomNode::CreateCustomNode(hostId, "inspector_custom_host");
+    ASSERT_NE(host, nullptr);
+    page->AddChild(host);
+    std::string payload = R"([{"$type":"CmpMockRoot","$ID":90009}])";
+    ASSERT_EQ(InspectorTreeProviderRegistry::Register(AceType::RawPtr(host), ExternalPayloadFromUserData, &payload),
+        InspectorTreeProviderRegistry::RESULT_OK);
+
+    auto tree = Inspector::GetInspector(true);
+    EXPECT_NE(tree, "");
+    auto hostNode = FindNodeInTree(tree, hostId);
+    ASSERT_NE(hostNode, nullptr);
+    EXPECT_TRUE(NodeChildrenContainType(hostNode.get(), "CmpMockRoot"));
+
+    InspectorTreeProviderRegistry::Unregister(AceType::RawPtr(host), nullptr);
+    context->stageManager_ = nullptr;
+}
+
+/**
+ * @tc.name: InspectorExternalSubtreeNonHostRejected008
+ * @tc.desc: AC-1.7/R-1: a getter registered on a node that is neither a
+ *           CustomNode nor an XComponent is rejected at registration time
+ *           (RESULT_UNSUPPORTED_HOST; no entry is stored and the tree output
+ *           stays identical to the baseline).
+ * @tc.type: FUNC
+ */
+HWTEST_F(InspectorTestNg, InspectorExternalSubtreeNonHostRejected008, TestSize.Level1)
+{
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto rootId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> root = FrameNode::CreateFrameNode("one", rootId, AceType::MakeRefPtr<Pattern>(), true);
+    context->stageManager_ = AceType::MakeRefPtr<StageManager>(root);
+    auto hostId = ElementRegister::GetInstance()->MakeUniqueId();
+    // Plain column host: not CustomNode / XComponent.
+    RefPtr<FrameNode> host = FrameNode::CreateFrameNode("column", hostId, AceType::MakeRefPtr<Pattern>());
+    root->AddChild(host);
+    std::string baseline = Inspector::GetInspector(true);
+
+    std::string payload = R"([{"$type":"FlutterView","$ID":90010}])";
+    // Rejected at registration: unsupported host type, no entry stored.
+    ASSERT_EQ(InspectorTreeProviderRegistry::Register(AceType::RawPtr(host), ExternalPayloadFromUserData, &payload),
+        InspectorTreeProviderRegistry::RESULT_UNSUPPORTED_HOST);
+    std::vector<InspectorTreeProviderRegistry::GetterEntry> registeredGetters;
+    InspectorTreeProviderRegistry::GetInspectorGettersForNode(host, registeredGetters);
+    EXPECT_TRUE(registeredGetters.empty());
+    // Tree output unchanged.
+    EXPECT_EQ(Inspector::GetInspector(true), baseline);
+
+    InspectorTreeProviderRegistry::Unregister(AceType::RawPtr(host), nullptr);
+    EXPECT_EQ(Inspector::GetInspector(true), baseline);
+    context->stageManager_ = nullptr;
+}
+
+/**
+ * @tc.name: InspectorWebSubtreeUnitTestStub009
+ * @tc.desc: Web-tag node in the unit-test build: the Web subtree branch is
+ *           compiled as a no-op (the WebPattern header chain is not part of
+ *           the unit-test source set), so collection stays stable and the
+ *           tree output is identical to the baseline. The public C API
+ *           registration on the Web host keeps being rejected by the
+ *           host-type whitelist. (The real Web branch is exercised by the
+ *           product build via WEB_SUPPORTED.)
+ * @tc.type: FUNC
+ */
+HWTEST_F(InspectorTestNg, InspectorWebSubtreeUnitTestStub009, TestSize.Level1)
+{
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto rootId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> root = FrameNode::CreateFrameNode("one", rootId, AceType::MakeRefPtr<Pattern>(), true);
+    context->stageManager_ = AceType::MakeRefPtr<StageManager>(root);
+    auto hostId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> host = FrameNode::CreateFrameNode(V2::WEB_ETS_TAG, hostId, AceType::MakeRefPtr<Pattern>());
+    root->AddChild(host);
+    std::string baseline = Inspector::GetInspector(true);
+
+    // Web-tag node present: collection stays stable, output unchanged.
+    EXPECT_EQ(Inspector::GetInspector(true), baseline);
+
+    // Public registration on the Web host keeps being rejected by the
+    // host-type whitelist.
+    std::string payload = R"([{"$type":"rootWebArea","$ID":90020}])";
+    EXPECT_EQ(InspectorTreeProviderRegistry::Register(AceType::RawPtr(host), ExternalPayloadFromUserData, &payload),
+        InspectorTreeProviderRegistry::RESULT_UNSUPPORTED_HOST);
+    EXPECT_EQ(Inspector::GetInspector(true), baseline);
+    context->stageManager_ = nullptr;
+}
+
+/**
+ * @tc.name: InspectorExternalSubtreeHostFormatConverted010
+ * @tc.desc: AC-1.1: a payload in the external host format
+ *           (elementId/componentType/screenRect/attributes/children) is
+ *           converted to the inspector node schema before splicing:
+ *           elementId -> "$ID", componentType -> "$type", screenRect ->
+ *           "$rect" ("[left, top],[right, bottom]"), attributes -> "$attrs",
+ *           children -> "$children" (recursively); "parentId" and unknown
+ *           fields are dropped. Native-schema payloads keep being spliced
+ *           verbatim (covered by 001).
+ * @tc.type: FUNC
+ */
+HWTEST_F(InspectorTestNg, InspectorExternalSubtreeHostFormatConverted010, TestSize.Level1)
+{
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto rootId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> root = FrameNode::CreateFrameNode("one", rootId, AceType::MakeRefPtr<Pattern>(), true);
+    context->stageManager_ = AceType::MakeRefPtr<StageManager>(root);
+    auto pageId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> page = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, pageId, AceType::MakeRefPtr<Pattern>());
+    root->AddChild(page);
+    auto hostId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> host = FrameNode::CreateFrameNode(V2::XCOMPONENT_ETS_TAG, hostId, AceType::MakeRefPtr<Pattern>());
+    page->AddChild(host);
+    ASSERT_EQ(InspectorTreeProviderRegistry::Register(
+                  AceType::RawPtr(host), ExternalPayloadFromUserData, &g_externalHostFormatPayload),
+        InspectorTreeProviderRegistry::RESULT_OK);
+
+    auto tree = Inspector::GetInspector(true);
+    auto hostNode = FindNodeInTree(tree, hostId);
+    ASSERT_NE(hostNode, nullptr);
+    EXPECT_TRUE(NodeChildrenContainType(hostNode.get(), "CustomFrameNode"));
+    AssertExternalHostFormatRoot1(hostNode.get());
+    AssertExternalHostFormatRoot200(hostNode.get());
+
+    InspectorTreeProviderRegistry::Unregister(AceType::RawPtr(host), nullptr);
+    context->stageManager_ = nullptr;
+}
+
+/**
+ * @tc.name: InspectorExternalSubtreeScreenToWindow011
+ * @tc.desc: External "screenRect" values are screen-space while the
+ *           inspector "$rect" is window-relative: the window origin
+ *           (GetDisplayWindowRectInfo) is subtracted during conversion,
+ *           so with the window placed at screen (100, 200) a screen rect
+ *           {150, 263, 533, 98} is spliced as "[50.00, 63.00],[583.00,161.00]"
+ *           (full-screen windows at screen origin keep the values as-is,
+ *           covered by 010).
+ * @tc.type: FUNC
+ */
+HWTEST_F(InspectorTestNg, InspectorExternalSubtreeScreenToWindow011, TestSize.Level1)
+{
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto rootId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> root = FrameNode::CreateFrameNode("one", rootId, AceType::MakeRefPtr<Pattern>(), true);
+    context->stageManager_ = AceType::MakeRefPtr<StageManager>(root);
+    auto pageId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> page = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, pageId, AceType::MakeRefPtr<Pattern>());
+    root->AddChild(page);
+    auto hostId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> host = FrameNode::CreateFrameNode(V2::XCOMPONENT_ETS_TAG, hostId, AceType::MakeRefPtr<Pattern>());
+    page->AddChild(host);
+    // Window placed at screen (100, 200): a floating/free window.
+    context->SetDisplayWindowRectInfo(Rect(100, 200, 1116, 2398));
+    std::string payload = R"([{"elementId":300,"parentId":-1,"componentType":"CustomFrameNode",
+        "screenRect":{"x":150.0,"y":263.0,"width":533.0,"height":98.0},
+        "attributes":{"text":"screen"},"children":[]}])";
+    ASSERT_EQ(InspectorTreeProviderRegistry::Register(AceType::RawPtr(host), ExternalPayloadFromUserData, &payload),
+        InspectorTreeProviderRegistry::RESULT_OK);
+
+    auto tree = Inspector::GetInspector(true);
+    auto hostNode = FindNodeInTree(tree, hostId);
+    ASSERT_NE(hostNode, nullptr);
+    auto node300 = FindInspectorNodeById(hostNode.get(), 300);
+    ASSERT_NE(node300, nullptr);
+    EXPECT_EQ(node300->GetString("$type"), "CustomFrameNode");
+    // screen {150, 263} - window origin {100, 200} = window {50, 63}.
+    EXPECT_EQ(node300->GetString("$rect"), "[50.00, 63.00],[583.00,161.00]");
+
+    InspectorTreeProviderRegistry::Unregister(AceType::RawPtr(host), nullptr);
+    context->SetDisplayWindowRectInfo(Rect(0, 0, 0, 0));
+    context->stageManager_ = nullptr;
+}
+
+/**
+ * @tc.name: InspectorExternalSubtreeMultiGetter012
+ * @tc.desc: API definition semantics: multiple getter callbacks can be
+ *           registered on the same node and are invoked in registration
+ *           order (both subtrees appear); Unregister matches by function
+ *           pointer (no effect when absent, success), and re-registering
+ *           the same callback replaces its userData.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InspectorTestNg, InspectorExternalSubtreeMultiGetter012, TestSize.Level1)
+{
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto rootId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> root = FrameNode::CreateFrameNode("one", rootId, AceType::MakeRefPtr<Pattern>(), true);
+    context->stageManager_ = AceType::MakeRefPtr<StageManager>(root);
+    auto pageId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> page = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, pageId, AceType::MakeRefPtr<Pattern>());
+    root->AddChild(page);
+    auto hostId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> host = FrameNode::CreateFrameNode(V2::XCOMPONENT_ETS_TAG, hostId, AceType::MakeRefPtr<Pattern>());
+    page->AddChild(host);
+    std::string payloadOne = R"([{"$type":"MultiOne","$ID":90021}])";
+    ASSERT_EQ(InspectorTreeProviderRegistry::Register(AceType::RawPtr(host), ExternalPayloadFromUserData, &payloadOne),
+        InspectorTreeProviderRegistry::RESULT_OK);
+    // A different getter function coexists on the same node.
+    ASSERT_EQ(InspectorTreeProviderRegistry::Register(AceType::RawPtr(host), ExternalPayloadConstant, nullptr),
+        InspectorTreeProviderRegistry::RESULT_OK);
+
+    auto tree = Inspector::GetInspector(true);
+    auto hostNode = FindNodeInTree(tree, hostId);
+    ASSERT_NE(hostNode, nullptr);
+    EXPECT_TRUE(NodeChildrenContainType(hostNode.get(), "MultiOne"));
+    EXPECT_TRUE(NodeChildrenContainType(hostNode.get(), "MultiTwo"));
+    // Registration order equals splice order: MultiOne precedes MultiTwo.
+    EXPECT_GT(FindChildIndexByType(hostNode.get(), "MultiTwo"), FindChildIndexByType(hostNode.get(), "MultiOne"));
+
+    // Unregister by function pointer: only the matching getter is removed.
+    ASSERT_EQ(InspectorTreeProviderRegistry::Unregister(AceType::RawPtr(host), ExternalPayloadConstant),
+        InspectorTreeProviderRegistry::RESULT_OK);
+    tree = Inspector::GetInspector(true);
+    hostNode = FindNodeInTree(tree, hostId);
+    ASSERT_NE(hostNode, nullptr);
+    EXPECT_TRUE(NodeChildrenContainType(hostNode.get(), "MultiOne"));
+    EXPECT_FALSE(NodeChildrenContainType(hostNode.get(), "MultiTwo"));
+
+    // A non-matching pointer has no effect and still returns success.
+    ASSERT_EQ(InspectorTreeProviderRegistry::Unregister(AceType::RawPtr(host), ExternalPayloadNull),
+        InspectorTreeProviderRegistry::RESULT_NOT_FOUND);
+    tree = Inspector::GetInspector(true);
+    hostNode = FindNodeInTree(tree, hostId);
+    ASSERT_NE(hostNode, nullptr);
+    EXPECT_TRUE(NodeChildrenContainType(hostNode.get(), "MultiOne"));
+
+    InspectorTreeProviderRegistry::Unregister(AceType::RawPtr(host), nullptr);
+    context->stageManager_ = nullptr;
+}
+
+/**
+ * @tc.name: InspectorExternalSubtreeNativeCustomHost013
+ * @tc.desc: API definition: natively created ARKUI_NODE_CUSTOM hosts (FrameNode
+ *           with the "Custom" tag, see the node_model.cpp type mapping) are
+ *           supported registration targets, same as ARKUI_NODE_XCOMPONENT.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InspectorTestNg, InspectorExternalSubtreeNativeCustomHost013, TestSize.Level1)
+{
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto rootId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> root = FrameNode::CreateFrameNode("one", rootId, AceType::MakeRefPtr<Pattern>(), true);
+    context->stageManager_ = AceType::MakeRefPtr<StageManager>(root);
+    auto pageId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> page = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, pageId, AceType::MakeRefPtr<Pattern>());
+    root->AddChild(page);
+    auto hostId = ElementRegister::GetInstance()->MakeUniqueId();
+    // Native ARKUI_NODE_CUSTOM host: a FrameNode with the "Custom" tag.
+    RefPtr<FrameNode> host = FrameNode::CreateFrameNode(V2::CUSTOM_ETS_TAG, hostId, AceType::MakeRefPtr<Pattern>());
+    page->AddChild(host);
+    std::string payload = R"([{"$type":"NativeCustomRoot","$ID":90023}])";
+    ASSERT_EQ(InspectorTreeProviderRegistry::Register(AceType::RawPtr(host), ExternalPayloadFromUserData, &payload),
+        InspectorTreeProviderRegistry::RESULT_OK);
+
+    auto tree = Inspector::GetInspector(true);
+    auto hostNode = FindNodeInTree(tree, hostId);
+    ASSERT_NE(hostNode, nullptr);
+    EXPECT_TRUE(NodeChildrenContainType(hostNode.get(), "NativeCustomRoot"));
+
+    InspectorTreeProviderRegistry::Unregister(AceType::RawPtr(host), nullptr);
+    context->stageManager_ = nullptr;
+}
+
+/**
+ * @tc.name: InspectorExternalSubtreeScreenToWindowDensity014
+ * @tc.desc: GetDisplayWindowRectInfo returns the window origin in physical
+ *           px while payload screenRect values and the inspector "$rect" are
+ *           in vp: with density 2.0 and the window placed at screen px
+ *           (200, 400) (= vp (100, 200)), a screen rect {150, 263, 533, 98}
+ *           in vp is spliced as "[50.00, 63.00],[583.00,161.00]" — the px
+ *           origin is divided by the pipeline density before subtraction.
+ *           Regression for the unit-mismatch defect found by the on-device
+ *           floating-window case (without the division the engine subtracted
+ *           200/400 from vp coordinates and produced a shifted rect).
+ * @tc.type: FUNC
+ */
+HWTEST_F(InspectorTestNg, InspectorExternalSubtreeScreenToWindowDensity014, TestSize.Level1)
+{
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto rootId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> root = FrameNode::CreateFrameNode("one", rootId, AceType::MakeRefPtr<Pattern>(), true);
+    context->stageManager_ = AceType::MakeRefPtr<StageManager>(root);
+    auto pageId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> page = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, pageId, AceType::MakeRefPtr<Pattern>());
+    root->AddChild(page);
+    auto hostId = ElementRegister::GetInstance()->MakeUniqueId();
+    RefPtr<FrameNode> host = FrameNode::CreateFrameNode(V2::XCOMPONENT_ETS_TAG, hostId, AceType::MakeRefPtr<Pattern>());
+    page->AddChild(host);
+    // Window at screen px (200, 400) with density 2.0 -> window origin vp (100, 200).
+    MockPipelineContext::GetCurrent()->SetDensity(2.0);
+    context->SetDisplayWindowRectInfo(Rect(200, 400, 2232, 3196));
+    std::string payload = R"([{"elementId":400,"parentId":-1,"componentType":"CustomFrameNode",
+        "screenRect":{"x":150.0,"y":263.0,"width":533.0,"height":98.0},
+        "attributes":{"text":"screen"},"children":[]}])";
+    ASSERT_EQ(InspectorTreeProviderRegistry::Register(AceType::RawPtr(host), ExternalPayloadFromUserData, &payload),
+        InspectorTreeProviderRegistry::RESULT_OK);
+
+    auto tree = Inspector::GetInspector(true);
+    auto hostNode = FindNodeInTree(tree, hostId);
+    ASSERT_NE(hostNode, nullptr);
+    auto node400 = FindInspectorNodeById(hostNode.get(), 400);
+    ASSERT_NE(node400, nullptr);
+    EXPECT_EQ(node400->GetString("$type"), "CustomFrameNode");
+    // screen vp {150, 263} - window vp origin {200/2, 400/2} = window vp {50, 63}.
+    EXPECT_EQ(node400->GetString("$rect"), "[50.00, 63.00],[583.00,161.00]");
+
+    InspectorTreeProviderRegistry::Unregister(AceType::RawPtr(host), nullptr);
+    // Restore the mock defaults so other tests are unaffected.
+    MockPipelineContext::GetCurrent()->SetDensity(1.0);
+    context->SetDisplayWindowRectInfo(Rect(0, 0, 0, 0));
+    context->stageManager_ = nullptr;
+}
 } // namespace OHOS::Ace::NG

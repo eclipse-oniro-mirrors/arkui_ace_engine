@@ -132,6 +132,7 @@ public:
     void ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const override;
     void FromJson(const std::unique_ptr<JsonValue>& json) override;
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
 
     virtual std::string GetArcDotIndicatorStyle() const { return ""; }
     // ArcSwiper will implement this interface in order to set transitionAnimation disable
@@ -981,6 +982,7 @@ protected:
 
     bool isPureSwiper_ = false;
     bool hasTabsAncestor_ = false;
+    bool hasReportedInitialTabs_ = false;
     bool usePropertyAnimation_ = false;
     bool stopIndicatorAnimation_ = true;
     bool isFinishAnimation_ = false;

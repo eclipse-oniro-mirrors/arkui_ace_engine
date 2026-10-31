@@ -298,17 +298,28 @@ void RenderContext::FromJson(const std::unique_ptr<JsonValue>& json)
 
 void RenderContext::SetSystemMaterial(const RefPtr<UiMaterial>& material)
 {
+    auto host = GetHost();
+    auto* pipeline = host ? host->GetContext() : nullptr;
     if (!uiMaterial_) {
         uiMaterial_ = std::make_shared<UiMaterialInfo>(UiMaterialInfo{.material = material});
     } else {
         uiMaterial_->material = material;
     }
+    if (pipeline && !IsMaterialLimiterUpdating()) {
+        // not update by Limiter
+        if (!IsMaterialScopeExempt() || host->GetTag() == V2::SELECT_ETS_TAG) {
+            // not overlay
+            if (material != nullptr && material->GetType() == static_cast<int32_t>(MaterialType::IMMERSIVE)) {
+                pipeline->RegisterPageContextNode(host);
+            } else {
+                pipeline->UnregisterPageContextNode(host->GetId());
+            }
+        }
+    }
     // Track the node with its pipeline's MaterialProcessor so the limiter only
     // iterates material nodes after layout. The IsMaterialSuppressed flag keeps the
     // node registered while the limiter temporarily clears its material (suppress);
     // a real clear (developer passing nullptr while not suppressed) unregisters.
-    auto host = GetHost();
-    auto* pipeline = host ? host->GetContext() : nullptr;
     if (pipeline) {
         bool intended = (material != nullptr && material->GetType() == static_cast<int32_t>(MaterialType::IMMERSIVE)) ||
                         IsMaterialSuppressed();

@@ -1286,6 +1286,7 @@ protected:
     std::string ParseCommand(const std::string& command, ScrollOnInjectionEventInfo& scrollOnInjectionEventInfo);
     void ReportScroll(bool isJump, ScrollError error, int32_t reportEventId);
     int32_t OnInjectionEventByRatio(const std::string& command);
+    CommandResult OnInjectionEventByRatioWithResult(const std::string& command);
     ScrollError ScrollByRatio(bool reverse, float ratio);
     void HandleScrollByRatio(bool isScrollByRatio, bool reverse, float ratio, int reportEventId);
     void HandleScrollByOffset(double scrollOffset, int reportEventId);
@@ -1341,6 +1342,8 @@ private:
     void DumpAdvanceFunctionalProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
 
 
+    CommandResult ExecuteScrollCommandWithResult(
+        const std::unique_ptr<JsonValue>& json, const std::string& name, int32_t reportId);
     // Pattern owns target selection; Scrollable owns the animation and queued-task generation.
     std::optional<float> predictedItemSnapTarget_;
     float itemSnapReleaseMotionVelocity_ = 0.0f;

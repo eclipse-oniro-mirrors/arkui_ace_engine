@@ -372,6 +372,7 @@ void SelectPattern::ShowSelectMenu()
     CHECK_NULL_VOID(host);
     auto context = host->GetContext();
     CHECK_NULL_VOID(context);
+    context->AddTaskOverlayNodeMaterialArea(host, "Select ShowSelectMenu");
     auto overlayManager = context->GetOverlayManager();
     CHECK_NULL_VOID(overlayManager);
     UpdateTargetSize();
@@ -2744,6 +2745,11 @@ void SelectPattern::ShowOptions(int32_t index)
         return;
     }
     ShowSelectMenu();
+}
+
+CommandResult SelectPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "onSelect" });
 }
 
 int32_t SelectPattern::OnInjectionEvent(const std::string& command)

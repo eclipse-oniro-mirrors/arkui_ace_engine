@@ -7538,7 +7538,7 @@ struct ArkUIWaterFlowModifier {
     ArkUI_Int32 (*getWaterFlowEnableScrollInteraction)(ArkUINodeHandle node);
     ArkUI_Float32 (*getWaterFlowFriction)(ArkUINodeHandle node);
     void (*setScrollToIndex)(
-        ArkUINodeHandle node, ArkUI_Int32 index, ArkUI_Int32 animation, ArkUI_Int32 alignment, ArkUI_Float32 options);
+        ArkUINodeHandle node, ArkUI_Int32 index, const ArkUIScrollToIndexOptions* options);
     void (*setWaterflowFooter)(ArkUINodeHandle node, ArkUINodeHandle footer);
     void (*resetWaterflowFooter)(ArkUINodeHandle node);
     ArkUINodeHandle (*getScrollController)(ArkUINodeHandle node);
@@ -10764,6 +10764,7 @@ struct ArkUIDialogAPI {
         ArkUI_Int32 (*intArray)[2], ArkUI_Uint32 (*uintArray)[4], ArkUI_Bool (*boolArray)[2]);
     ArkUI_Int32 (*openCustomDialogWithErrorCallback)(ArkUIDialogHandle handle, void* userData,
         void (*callback)(int32_t errorCode, int32_t dialogId, void* userData));
+    ArkUI_Int32 (*setAdaptToHandedness)(ArkUIDialogHandle handle, ArkUI_Int32 mode);
 };
 
 struct ArkUIBasicNodeAPI {

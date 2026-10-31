@@ -2469,6 +2469,63 @@ HWTEST_F(MenuViewTestNg, HandleLowEndImmersiveMaterialForMenu007, TestSize.Level
     TokenThemeStorage::GetInstance()->CacheClear();
 }
 
+/**
+ * @tc.name: HandleLowEndImmersiveMaterialForMenu008
+ * @tc.desc: Test if-branch (materialColor empty) marks node scope-exempt via SetSystemMaterialForOverlay
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuViewTestNg, HandleLowEndImmersiveMaterialForMenu008, TestSize.Level1)
+{
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    MockPipelineContext::GetCurrent()->SetThemeManager(themeManager);
+    auto themeConstants = AceType::MakeRefPtr<ThemeConstants>(nullptr);
+    EXPECT_CALL(*themeManager, GetThemeConstants()).WillRepeatedly(Return(themeConstants));
+
+    auto menuNode = FrameNode::CreateFrameNode(
+        V2::MENU_ETS_TAG, GetNodeId(), AceType::MakeRefPtr<MenuPattern>(TARGET_ID, TEXT_TAG, MenuType::MENU));
+    ASSERT_NE(menuNode, nullptr);
+    auto renderContext = menuNode->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+    auto material = AceType::MakeRefPtr<UiMaterial>();
+    material->SetType(static_cast<int32_t>(MaterialType::IMMERSIVE));
+    ImmersiveOptions options;
+    options.applyShadow = false;
+    // materialColor and colorResObj are not set -> enters the if-branch (copiedMaterial path).
+    material->SetImmersiveOptions(options);
+
+    EXPECT_FALSE(renderContext->IsMaterialScopeExempt());
+    auto result = MenuView::HandleLowEndImmersiveMaterialForMenu(menuNode, material, renderContext);
+    EXPECT_TRUE(result);
+    // The low-end path must go through SetSystemMaterialForOverlay so the overlay node is
+    // exempt from the material scope gate, keeping material effective for non-system apps.
+    EXPECT_TRUE(renderContext->IsMaterialScopeExempt());
+}
+
+/**
+ * @tc.name: HandleLowEndImmersiveMaterialForMenu009
+ * @tc.desc: Test else-branch (materialColor preset) marks node scope-exempt via SetSystemMaterialForOverlay
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuViewTestNg, HandleLowEndImmersiveMaterialForMenu009, TestSize.Level1)
+{
+    auto menuNode = FrameNode::CreateFrameNode(
+        V2::MENU_ETS_TAG, GetNodeId(), AceType::MakeRefPtr<MenuPattern>(TARGET_ID, TEXT_TAG, MenuType::MENU));
+    ASSERT_NE(menuNode, nullptr);
+    auto renderContext = menuNode->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+    auto material = AceType::MakeRefPtr<UiMaterial>();
+    material->SetType(static_cast<int32_t>(MaterialType::IMMERSIVE));
+    ImmersiveOptions options;
+    options.applyShadow = false;
+    options.materialColor = Color(0xFF000000); // preset -> skips if-branch, goes to else path.
+    material->SetImmersiveOptions(options);
+
+    EXPECT_FALSE(renderContext->IsMaterialScopeExempt());
+    auto result = MenuView::HandleLowEndImmersiveMaterialForMenu(menuNode, material, renderContext);
+    EXPECT_TRUE(result);
+    EXPECT_TRUE(renderContext->IsMaterialScopeExempt());
+}
+
 // --- ApplySystemMaterialForMenu ---
 
 /**

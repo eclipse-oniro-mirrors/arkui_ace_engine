@@ -1005,6 +1005,7 @@ private:
     void TriggerPerformanceCheck(const RefPtr<NavDestinationGroupNode>& topDestination, std::string fromPath);
     NavigateChangeInfo ConvertNavDestinationContext(const RefPtr<NavDestinationContext>& context);
     void ContentChangeOnTransitionStart(const RefPtr<FrameNode>& keyNode, bool isPopPage = false);
+    void ReportNavPageContextStats(const RefPtr<FrameNode>& topNode);
     void UpdatePlaceholderVisibilityIfNeeded();
     bool CheckIfLastDestWillBeFullScreenOverlay(const std::vector<RefPtr<NavDestinationGroupNode>>& destList);
 

@@ -783,7 +783,8 @@ void FrontendDelegateDeclarativeNG::ShowDialog(const PromptDialogAttr& dialogAtt
         .onDidDisappear = dialogAttr.onDidDisappear,
         .onWillAppear = dialogAttr.onWillAppear,
         .onWillDisappear = dialogAttr.onWillDisappear, .systemMaterial = dialogAttr.systemMaterial,
-        .distortionMode = dialogAttr.distortionMode, .edgeLightMode = dialogAttr.edgeLightMode
+        .distortionMode = dialogAttr.distortionMode, .edgeLightMode = dialogAttr.edgeLightMode,
+        .adaptToHandedness = dialogAttr.adaptToHandedness
     };
     if (dialogAttr.alignment.has_value()) {
         dialogProperties.alignment = dialogAttr.alignment.value();
@@ -903,6 +904,7 @@ DialogProperties FrontendDelegateDeclarativeNG::ParsePropertiesFromAttr(const Pr
         .dialogImmersiveMode = dialogAttr.dialogImmersiveMode,
         .systemMaterial = dialogAttr.systemMaterial,
         .distortionMode = dialogAttr.distortionMode, .edgeLightMode = dialogAttr.edgeLightMode,
+        .adaptToHandedness = dialogAttr.adaptToHandedness,
     };
     ParsePartialPropertiesFromAttr(dialogProperties, dialogAttr);
     return dialogProperties;
@@ -1097,6 +1099,7 @@ void FrontendDelegateDeclarativeNG::ShowActionMenu(const PromptDialogAttr& dialo
         .systemMaterial = dialogAttr.systemMaterial,
         .distortionMode = dialogAttr.distortionMode,
         .edgeLightMode = dialogAttr.edgeLightMode,
+        .adaptToHandedness = dialogAttr.adaptToHandedness,
     };
 #if defined(PREVIEW)
     if (dialogProperties.isShowInSubWindow) {

@@ -129,15 +129,32 @@ void TabsSideBarTabListPattern::SetCurrentIndex(int32_t index)
     UpdateTabItemStyle(index, true);
 
     // Notify Swiper to switch page.
-    // Update the animation curve before SwipeTo, same as TabsController.changeIndex
-    // (see tabs_controller_modifier.cpp ChangeIndex), so that sidebar tab switching
-    // uses the same TabBar animation curve as the JS changeIndex API.
+    // In sidebar display mode the system default is to switch pages without animation.
+    // Only when the developer has configured a custom content transition
+    // (customContentTransition, reflected as TabsPattern::isCustomAnimation_,
+    // kept in sync with SwiperLayoutProperty::IsCustomAnimation by TabsModelNG::
+    // SetIsCustomAnimation) do we honor the animated path — updating the TabBar
+    // cubic curve and calling SwipeTo so that the developer's custom animation is
+    // invoked. Otherwise we jump directly via SwipeToWithoutAnimation to avoid the
+    // default sliding animation.
     if (swiperController_) {
-        const auto& updateCubicCurveCallback = swiperController_->GetUpdateCubicCurveCallback();
-        if (updateCubicCurveCallback) {
-            updateCubicCurveCallback();
+        bool useCustomAnimation = false;
+        auto tabsNode = AceType::DynamicCast<TabsNode>(tabsNode_.Upgrade());
+        if (tabsNode) {
+            auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+            if (tabsPattern) {
+                useCustomAnimation = tabsPattern->GetIsCustomAnimation();
+            }
         }
-        swiperController_->SwipeTo(index);
+        if (useCustomAnimation) {
+            const auto& updateCubicCurveCallback = swiperController_->GetUpdateCubicCurveCallback();
+            if (updateCubicCurveCallback) {
+                updateCubicCurveCallback();
+            }
+            swiperController_->SwipeTo(index);
+        } else {
+            swiperController_->SwipeToWithoutAnimation(index);
+        }
     }
 
     UpdateTabItemTextAndIconColor(index);
@@ -516,6 +533,10 @@ void TabsSideBarTabListPattern::UpdateTabBarItemTextProperties(
         textLayoutProperty->UpdateTextAlign(TextAlign::START); // Left-aligned (Row layout)
         textLayoutProperty->UpdateMaxFontScale(SIDEBAR_TAB_MAX_FONT_SCALE);
         textLayoutProperty->UpdateFontWeight(FontWeight::MEDIUM);
+        // Default to single-line with ellipsis for long tab labels.
+        // UpdateLabelStyle below can override these if the user set them.
+        textLayoutProperty->UpdateMaxLines(1);
+        textLayoutProperty->UpdateTextOverflow(TextOverflow::ELLIPSIS);
     }
     if (!isFrameNode) {
         TabContentModelNG::UpdateLabelStyle(labelStyle, textLayoutProperty);

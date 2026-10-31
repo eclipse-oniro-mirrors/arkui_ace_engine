@@ -354,7 +354,6 @@ public:
     bool IsPreviewTextInputting();
     std::vector<RectF> GetPreviewTextRects();
     float GetPreviewTextUnderlineWidth() const;
-    PreviewTextStyle GetPreviewTextStyle() const;
     void SetSupportPreviewText(bool isTextPreviewSupported);
     bool IsSupportPreviewText();
 
@@ -481,6 +480,7 @@ public:
     void DeleteBackward(int32_t length = 1) override;
     void DeleteBackward(int32_t length, TextChangeReason reason, bool isByIME = false);
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
     void DeleteBackwardFunction();
     void ReportSelectionChangeEvent(int32_t nodeId, const std::string& str, int32_t start, int32_t end);
     void ReportCommandExecution(int32_t nodeId, const std::string& command);
@@ -813,6 +813,10 @@ public:
     void OnScrollEndCallback() override;
     bool IsScrollable() const override;
     void SetScrollable(bool scrollable);
+    bool IsReverse() const override
+    {
+        return false;
+    }
     bool IsAtomicNode() const override;
     RefPtr<FrameNode> GetClientHost() const override;
     bool IsSelectAreaVisible();
@@ -1170,6 +1174,24 @@ public:
     bool RequestKeyboard(bool isFocusViewChanged, bool needStartTwinkling, bool needShowSoftKeyboard,
         SourceType sourceType = SourceType::NONE);
 
+    // Tab focus navigation (shared logic via CleanNodeHostBase CRTP)
+    bool HandleOnTab(bool backward) override;
+    bool HandleSwithFocus(FocuseIndex index);
+    void FocusForwardStopTwinkling();
+    void PaintCancelRect();
+    void PaintTextRect();
+    void GetInnerFocusPaintRect(RoundRect& paintRect);
+    bool CancelNodeIsShow() const;
+    bool ProcessFocusIndexAction();
+    bool HandleSpaceKeyClickEvent();
+    void CleanNodeResponseKeyEvent();
+    FocuseIndex GetFocusIndex() const
+    {
+        return focusIndex_;
+    }
+    const std::unordered_map<FocuseIndex, FocuseIndex>& GetFocusForwardMap() const;
+    const std::unordered_map<FocuseIndex, FocuseIndex>& GetFocusBackwardMap() const;
+
     Color GetUnderlineColor() const;
     Dimension GetUnderlineWidth() const;
     void UpdateUnderlineStyle();
@@ -1178,6 +1200,7 @@ public:
     {
         return frameRect_;
     }
+
 protected:
     RefPtr<TextSelectOverlay> GetOrCreateSelectOverlay() override;
     RefPtr<TextSelectOverlay> GetSelectOverlay() const override;
@@ -1770,6 +1793,7 @@ private:
     bool lastContentEmptyForCancel_ = true;
     bool cancelButtonDirty_ = true;
     bool cancelButtonTouched_ = false;
+    FocuseIndex focusIndex_ = FocuseIndex::TEXT;
     std::string lastReportSelectionText_ = "";
 
     // ===== counter members =====

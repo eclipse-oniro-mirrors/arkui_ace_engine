@@ -14,6 +14,9 @@
  */
 
 #include "core/components_ng/pattern/pattern.h"
+#include "core/components_ng/pattern/command/command_validation.h"
+
+#include <algorithm>
 
 #include "core/common/resource/resource_parse_utils.h"
 #include "core/components_ng/base/inspector_dump_options.h"
@@ -26,6 +29,16 @@
 #include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
+CommandResult CommandResult::Success()
+{
+    return { true, CommandErrorType::NONE, "" };
+}
+
+CommandResult CommandResult::Error(CommandErrorType type, std::string message)
+{
+    return { false, type, std::move(message) };
+}
+
 bool Pattern::ShouldIncludeDiagnostic(const InspectorDumpOptions& options)
 {
     return options.includeDiagnostic;
@@ -103,6 +116,46 @@ CommandResult Pattern::OnRecvCommandWithResult(const std::string& command)
             : CommandResult::Error(CommandErrorType::INVALID_PARAM);
     }
     return OnInjectionEventWithResult(command);
+}
+
+CommandResult Pattern::ConvertLegacyInjectionEventResult(const std::string& command,
+    std::initializer_list<std::string_view> commands, CommandErrorType failure,
+    const std::function<CommandResult(const std::unique_ptr<JsonValue>&)>& preflight)
+{
+    auto json = JsonUtil::ParseJsonString(command);
+    if (!json || !json->IsValid() || !json->IsObject()) {
+        return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+    }
+    auto commandValue = json->GetValue("cmd");
+    if (!commandValue || !commandValue->IsValid() || !commandValue->IsString()) {
+        return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+    }
+    const auto commandName = commandValue->GetString();
+    const auto supported = std::find(commands.begin(), commands.end(), commandName) != commands.end();
+    if (!supported) {
+        return CommandResult::Error(CommandErrorType::INVALID_COMMAND);
+    }
+    if (!ValidateCommandParameters(json, commandName)) {
+        return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+    }
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+    auto eventHub = host->GetEventHub<EventHub>();
+    if (!eventHub || !eventHub->IsEnabled()) {
+        return CommandResult::Error(CommandErrorType::EXECUTE_FAIL, "Component is disabled.");
+    }
+    if (preflight) {
+        auto result = preflight(json);
+        if (!result.success) {
+            return result;
+        }
+    }
+    if (commandName == "copy" || commandName == "cut" || commandName == "requestKeyboard") {
+        failure = CommandErrorType::EXECUTE_FAIL;
+    }
+    return OnInjectionEvent(command) == RET_SUCCESS
+        ? CommandResult::Success()
+        : CommandResult::Error(failure);
 }
 
 void Pattern::OnColorModeChange(uint32_t colorMode)

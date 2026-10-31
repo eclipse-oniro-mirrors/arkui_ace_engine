@@ -29,6 +29,7 @@ import { LengthMetrics } from 'arkui/Graphics';
 import { AsyncCallback } from 'arkui/base';
 import { int32 } from "@koalaui/compat";
 import { default as uiMaterial } from '@ohos.arkui.uiMaterial';
+import { HandednessFollowMode } from '@ohos.arkui.dialog';
 
 export enum LevelMode {
     OVERLAY = 0,
@@ -126,6 +127,7 @@ declare namespace promptAction {
         systemMaterial?: uiMaterial.Material;
         distortionMode?: DistortionMode;
         edgeLightMode?: EdgeLightMode;
+        adaptToHandedness?: HandednessFollowMode;
     }
 
     export interface ShowDialogOptionsInternal {
@@ -162,6 +164,7 @@ declare namespace promptAction {
         systemMaterial?: uiMaterial.Material;
         distortionMode?: DistortionMode;
         edgeLightMode?: EdgeLightMode;
+        adaptToHandedness?: HandednessFollowMode;
     }
 
     export interface ActionMenuOptionsInternal {
@@ -203,6 +206,7 @@ declare namespace promptAction {
         systemMaterial?: uiMaterial.Material;
         distortionMode?: DistortionMode;
         edgeLightMode?: EdgeLightMode;
+        adaptToHandedness?: HandednessFollowMode;
     }
 
     export interface DialogOptionsInternal {

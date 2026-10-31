@@ -947,6 +947,11 @@ std::optional<bool> CheckBoxGroupPattern::ParseSelectStatus(const std::string& c
     return json->GetBool("selectStatus");
 }
 
+CommandResult CheckBoxGroupPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "selectCheckBoxGroup" }, CommandErrorType::EXECUTE_FAIL);
+}
+
 int32_t CheckBoxGroupPattern::OnInjectionEvent(const std::string& command)
 {
     auto host = GetHost();

@@ -937,6 +937,13 @@ void OverlayManager::ShowPopupAnimationNG(const RefPtr<FrameNode>& popupNode)
             popupPattern->GetTransitionStatus() == TransitionStatus::NORMAL) {
             overlay->ReportCapiOverlayEvent(popupNode, true, "popup");
         }
+        auto bubbleChild = AceType::DynamicCast<FrameNode>(popupNode->GetFirstChild());
+        if (bubbleChild) {
+            auto ctx = bubbleChild->GetContext();
+            if (ctx) {
+                ctx->AddTaskOverlayNodeMaterialArea(bubbleChild, "overlay ShowPopupAnimationNG");
+            }
+        }
     };
 
     if (modifier) {

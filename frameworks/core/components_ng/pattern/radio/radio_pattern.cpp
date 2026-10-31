@@ -1234,6 +1234,11 @@ void RadioPattern::OnColorModeChange(uint32_t colorMode)
     InitDefaultMargin();
 }
 
+CommandResult RadioPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "checked" });
+}
+
 int32_t RadioPattern::OnInjectionEvent(const std::string& command)
 {
     TAG_LOGD(AceLogTag::ACE_SELECT_COMPONENT,

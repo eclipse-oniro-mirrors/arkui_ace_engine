@@ -18,6 +18,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 
 #include "base/geometry/ng/offset_t.h"
 #include "base/memory/ace_type.h"
@@ -37,6 +38,7 @@ namespace OHOS::Ace::NG {
 class InspectorFilter;
 class TextLayoutProperty;
 class OverlayManager;
+enum class PopupSide;
 
 enum class DialogContentNode {
     TITLE = 0,
@@ -551,6 +553,9 @@ private:
     void ReportActionSheetOnInjectionEvent(bool result,
         std::string reason, int32_t sheetIndex = -1, int32_t buttonIndex = -1);
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
+    CommandResult ResolveMenuCommandTarget(const std::unique_ptr<JsonValue>& params, RefPtr<FrameNode>& target);
+    CommandResult ResolveDialogCommandTarget(const std::unique_ptr<JsonValue>& json, RefPtr<FrameNode>& target);
     std::vector<RefPtr<FrameNode>> GetButtons();
     bool HandleAlertDialogButtonClickCmd(const std::unique_ptr<JsonValue>& json);
     void ReportAlertDialogOnInjectionEvent(bool result, std::string reason,
@@ -623,6 +628,28 @@ private:
     bool hasExtraNodeForDistortion_ = false;
     bool isVertical_ = false;
     std::function<void()> onFinishEvent_ = nullptr;
+
+    // ========== Handedness layout cache ==========
+    // Handedness-dependent inputs (grip-hand side, anchor position) are captured on the
+    // first layout pass and reused on subsequent re-layouts so the dialog stays stable.
+    bool handednessLayoutCaptured_ = false;
+    bool needRefreshAnchorPos_ = false;
+    int32_t cachedPopupSideValue_ = 1; // PopupSide::CENTER
+    std::optional<OffsetF> cachedAnchorPos_;
+    int32_t cachedAnchorNodeId_ = -1;
+
+public:
+    bool IsHandednessLayoutCaptured() const { return handednessLayoutCaptured_; }
+    void MarkHandednessLayoutCaptured() { handednessLayoutCaptured_ = true; }
+    bool NeedRefreshAnchorPos() const { return needRefreshAnchorPos_; }
+    void SetNeedRefreshAnchorPos(bool need) { needRefreshAnchorPos_ = need; }
+    PopupSide GetCachedPopupSide() const;
+    void SetCachedPopupSide(PopupSide side);
+    const std::optional<OffsetF>& GetCachedAnchorPos() const { return cachedAnchorPos_; }
+    void SetCachedAnchorPos(const OffsetF& pos) { cachedAnchorPos_ = pos; }
+    int32_t GetCachedAnchorNodeId() const { return cachedAnchorNodeId_; }
+    void SetCachedAnchorNodeId(int32_t nodeId) { cachedAnchorNodeId_ = nodeId; }
+    void ResetHandednessCache();
 };
 } // namespace OHOS::Ace::NG
 

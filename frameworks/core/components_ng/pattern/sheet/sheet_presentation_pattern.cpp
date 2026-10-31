@@ -4363,6 +4363,7 @@ void SheetPresentationPattern::OnAppear()
     }
     auto pipeline = GetContext();
     CHECK_NULL_VOID(pipeline);
+    pipeline->ReportOverlayNodeMaterialArea(GetHost());
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
     mgr->OnDialogChangeEnd(GetHost(), true);
@@ -5352,6 +5353,18 @@ int32_t SheetPresentationPattern::ParseCommand(const std::string& command, Sheet
     }
     cmdType = SheetCmdType::CMD_CLOSE;
     return RET_SUCCESS;
+}
+
+CommandResult SheetPresentationPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "CloseSheet" },
+        CommandErrorType::EXECUTE_FAIL, [this](const std::unique_ptr<JsonValue>& /* json */) {
+        auto context = GetHost()->GetContext();
+        if (!context || !context->GetOverlayManager()) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        }
+        return CommandResult::Success();
+    });
 }
 
 int32_t SheetPresentationPattern::OnInjectionEvent(const std::string& command)

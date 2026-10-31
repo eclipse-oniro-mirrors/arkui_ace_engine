@@ -475,8 +475,7 @@ HWTEST_F(RichEditorDragTestNg, HandleDraggableFlag001, TestSize.Level2)
     ASSERT_NE(richEditorPattern, nullptr);
     auto eventHubRefPtr = AceType::MakeRefPtr<EventHub>();
     auto eventHubWeakPtr = AceType::WeakClaim(AceType::RawPtr(eventHubRefPtr));
-    richEditorNode_->GetEventHub<EventHub>()->gestureEventHub_ =
-        AceType::MakeRefPtr<GestureEventHub>(eventHubWeakPtr);
+    richEditorNode_->GetEventHub<EventHub>()->gestureEventHub_ = AceType::MakeRefPtr<GestureEventHub>(eventHubWeakPtr);
     richEditorPattern->copyOption_ = CopyOptions::InApp;
     richEditorNode_->GetEventHub<EventHub>()->gestureEventHub_->isTextDraggable_ = true;
     richEditorPattern->HandleDraggableFlag(true);
@@ -1252,48 +1251,6 @@ HWTEST_F(RichEditorDragTestNg, BeforeDrag001, TestSize.Level2)
     richEditorPattern->isDragSponsor_ = true;
     richEditorPattern->BeforeDrag(changeValue, innerPosition, record);
     EXPECT_NE(innerPosition, 0);
-}
-
-/**
- * @tc.name: SetSelfAndChildDraggableFalse001
- * @tc.desc: test SetSelfAndChildDraggableFalse
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorDragTestNg, SetSelfAndChildDraggableFalse001, TestSize.Level2)
-{
-    ASSERT_NE(richEditorNode_, nullptr);
-    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-    int32_t nodeId = 2;
-    RefPtr<Pattern> pattern = AceType::MakeRefPtr<Pattern>();
-    RefPtr<FrameNode> customNode = AceType::MakeRefPtr<FrameNode>(V2::IMAGE_ETS_TAG, nodeId, pattern, false, false);
-    auto eventHub = customNode->GetEventHub<EventHub>();
-    RefPtr<EventHub> sharedEventHub = RefPtr<EventHub>(new EventHub());
-    WeakPtr<EventHub> weakEventHub(sharedEventHub);
-    eventHub->gestureEventHub_ = AceType::MakeRefPtr<GestureEventHub>(weakEventHub);
-    eventHub->gestureEventHub_->isDragForbiddenForWholeSubTree_ = false;
-    richEditorPattern->SetSelfAndChildDraggableFalse(customNode);
-    EXPECT_TRUE(eventHub->gestureEventHub_->isDragForbiddenForWholeSubTree_);
-}
-
-/**
- * @tc.name: HandleDraggableFlag004
- * @tc.desc: test HandleDraggableFlag
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorDragTestNg, HandleDraggableFlag004, TestSize.Level2)
-{
-    ASSERT_NE(richEditorNode_, nullptr);
-    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-    auto eventHubRefPtr = AceType::MakeRefPtr<EventHub>();
-    auto eventHubWeakPtr = AceType::WeakClaim(AceType::RawPtr(eventHubRefPtr));
-    richEditorNode_->GetEventHub<EventHub>()->gestureEventHub_ =
-        AceType::MakeRefPtr<GestureEventHub>(eventHubWeakPtr);
-    richEditorPattern->copyOption_ = CopyOptions::InApp;
-    richEditorNode_->GetEventHub<EventHub>()->gestureEventHub_->isTextDraggable_ = true;
-    richEditorPattern->HandleDraggableFlag(true);
-    EXPECT_FALSE(richEditorNode_->GetEventHub<EventHub>()->gestureEventHub_->isTextDraggable_);
 }
 
 /**

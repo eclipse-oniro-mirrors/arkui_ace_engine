@@ -112,7 +112,7 @@ config("lto_link_config") {
       "-Wl,-mllvm,-force-sched-model=${ace_engine_feature_sched_model}",
       "-Wl,-Bsymbolic",
     ]
-    if (ace_engine_feature_enable_codemerge && !is_asan && !ace_engine_feature_enable_coverage) {
+    if (ace_engine_feature_enable_codemerge && !is_asan && !ace_engine_feature_enable_coverage && !use_clang_coverage) {
       ldflags += [
         "-Wl,-plugin-opt=-split-machine-functions",
         "-Wl,-mllvm",
@@ -156,10 +156,10 @@ ohos_shared_library("libace_compatible") {
       debug = ace_sanitize_debug
     }
     if (is_clang && target_cpu == "arm64") {
-      ldflags = [ 
+      ldflags = [
         "-Wl,--emit-relocs",
-        "-Wl,--no-relax", 
-        "-mno-fix-cortex-a53-843419" 
+        "-Wl,--no-relax",
+        "-mno-fix-cortex-a53-843419"
       ]
     }
     deps += [ "$ace_root/build:libace_static_ohos" ]

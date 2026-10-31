@@ -51,12 +51,12 @@ export class ConsumerDecoratedVariable<T> extends DecoratedV2VariableBase<T> imp
         return value;
     }
 
-    set(newValue: T): void {
+    set(newValue: Any): void {
         if (this.sourceProvider_) {
             const value = this.sourceProvider_!.get();
             StateMgmtDFX.enableDebug && StateMgmtDFX.functionTrace(`Consumer ${value === newValue} ${this.setTraceInfo()}`);
             if (value !== newValue) {
-                this.sourceProvider_!.set(newValue);
+                this.sourceProvider_!.set(newValue as T);
             }
             return;
         }

@@ -110,6 +110,7 @@ class RecycleManager;
 class BackPressHandlerManager;
 class DragDropManager;
 class MaterialProcessor;
+enum class PageLogContainerType : int32_t;
 class DynamicComponentSafeManager;
 class EnvironmentManager;
 enum class FocusActiveReason : int32_t;
@@ -903,6 +904,11 @@ public:
 
     const RefPtr<HandednessManager>& GetHandednessManager() const;
 
+    // Runtime control of the force split transPages behavior. Non-virtual forwarding
+    // helpers keep bridges free of direct force_split_manager.h includes.
+    void SetTransPageEnabled(bool enabled);
+    bool IsTransPageEnabled() const;
+
     const RefPtr<RecoverableManager>& GetRecoverableManager() const;
 
     double CalcPageWidth(double rootWidth) const override;
@@ -1350,6 +1356,13 @@ public:
     // these are non-virtual, so they do not shift any existing vtable slot.
     void RegisterMaterialNode(const RefPtr<FrameNode>& node);
     void UnregisterMaterialNode(int32_t nodeId);
+
+    void RegisterPageContextNode(const RefPtr<FrameNode>& node);
+    void UnregisterPageContextNode(int32_t nodeId);
+    void ReportPageContextStats(int32_t targetContainerId, PageLogContainerType type, int32_t tabIndex = -1);
+
+    void AddTaskOverlayNodeMaterialArea(const RefPtr<FrameNode>& targetNode, const std::string& source);
+    void ReportOverlayNodeMaterialArea(const RefPtr<FrameNode>& host, const std::string& source = "");
 
 protected:
     void StartWindowSizeChangeAnimate(int32_t width, int32_t height, WindowSizeChangeReason type,

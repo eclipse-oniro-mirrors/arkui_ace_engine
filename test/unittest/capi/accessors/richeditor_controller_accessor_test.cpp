@@ -160,7 +160,6 @@ void AssignArkValue(Ark_RichEditorTextStyle& dst, const OHOS::Ace::TextStyle& st
     dst.strokeWidth =
         Converter::ArkUnion<Opt_Union_LengthMetricsProxy_F64, Ark_LengthMetricsProxy>(style.GetStrokeWidth(), ctx);
     dst.strokeColor = Converter::ArkUnion<Opt_ResourceColor, Ark_String>(style.GetStrokeColor(), ctx);
-    dst.strokeJoinStyle = Converter::ArkValue<Opt_StrokeJoinStyle>(style.GetStrokeJoinStyle());
 }
 
 void AssignArkValue(Ark_RichEditorParagraphStyle& dst, const UpdateParagraphStyle& style)

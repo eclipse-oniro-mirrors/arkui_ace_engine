@@ -118,6 +118,10 @@ PickerDialogInfo BuildTimePickerDialogInfo(const Ark_TimePickerDialogOptions& op
     if (edgeLightMode) {
         dialogInfo.edgeLightMode = edgeLightMode.value();
     }
+    auto adaptToHandedness = Converter::OptConvert<HandednessFollowMode>(options.adaptToHandedness);
+    if (adaptToHandedness) {
+        dialogInfo.adaptToHandedness = adaptToHandedness.value();
+    }
     return dialogInfo;
 }
 

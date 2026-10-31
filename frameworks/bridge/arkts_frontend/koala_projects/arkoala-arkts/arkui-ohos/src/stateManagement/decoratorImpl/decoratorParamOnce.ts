@@ -46,7 +46,7 @@ export class ParamOnceDecoratedVariable<T> extends DecoratedV2VariableBase<T> im
         return value;
     }
 
-    set(newValue: T): void {
+    set(newValue: Any): void {
         const value = this.backing_.get(false);
         StateMgmtDFX.enableDebug && StateMgmtDFX.functionTrace(`ParamOnce ${value === newValue} ${this.setTraceInfo()}`);
         if (value === newValue) {
@@ -59,7 +59,7 @@ export class ParamOnceDecoratedVariable<T> extends DecoratedV2VariableBase<T> im
         // Update ObservedObjectRegistry registration before setting the new value
         this.updateObservedObjectRegistration(value, processedNewValue);
 
-        this.backing_.setNoCheck(processedNewValue);
+        this.backing_.setNoCheck(processedNewValue as T);
     }
 
     resetOnReuse(newValue: T): void {

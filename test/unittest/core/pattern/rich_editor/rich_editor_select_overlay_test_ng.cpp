@@ -89,17 +89,10 @@ void RichEditorSelectOverlayTestNg::TearDownTestSuite()
  */
 HWTEST_F(RichEditorSelectOverlayTestNg, GetSelectArea, TestSize.Level0)
 {
-    /**
-     * @tc.steps: step1. get RichEditorPattern and set hasTransform_ true
-     */
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
     richEditorPattern->selectOverlay_->hasTransform_ = true;
-
-    /**
-     * @tc.steps: step2. get select area
-     */
     RectF rect(10, 10, 100, 100);
     auto selectArea = richEditorPattern->selectOverlay_->GetSelectArea();
     EXPECT_NE(selectArea.GetX(), rect.GetX());
@@ -1204,7 +1197,7 @@ HWTEST_F(RichEditorSelectOverlayTestNg, RichEditorOverlayTestNg001, TestSize.Lev
     EXPECT_CALL(rsCanvas, DetachPen()).WillRepeatedly(ReturnRef(rsCanvas));
     DrawingContext context { rsCanvas, CONTEXT_WIDTH_VALUE, CONTEXT_HEIGHT_VALUE };
 
-    richEditorOverlayModifier->previewTextStyle_ = PreviewTextStyle::NORMAL;
+    richEditorPattern->SetPreviewTextStyling(PreviewTextStyling{});
     richEditorPattern->contentRect_ = RectF(0, 0, 10.0f, 10.0f);
     richEditorOverlayModifier->showPreviewTextDecoration_ = AceType::MakeRefPtr<PropertyBool>(1);
     richEditorOverlayModifier->caretVisible_ = AceType::MakeRefPtr<PropertyBool>(1);

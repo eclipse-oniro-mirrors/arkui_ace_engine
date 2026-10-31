@@ -20,7 +20,6 @@
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
 
 #include "base/geometry/axis.h"
-#include "base/utils/string_utils.h"
 #include "base/hiviewdfx/histogram_wrapper.h"
 #include "base/log/ace_scoring_log.h"
 #include "bridge/declarative_frontend/engine/functions/js_drag_function.h"
@@ -694,18 +693,23 @@ void JSList::SetScrollPlaceholder(const JSCallbackInfo& args)
         if (size->IsObject()) {
             auto sizeObj = JSRef<JSObject>::Cast(size);
             NG::ScrollPlaceholderSizeOption sizeOption;
+            // Same parse-and-validate contract as the size attribute
+            // (JSViewAbstract::JsSize -> JsWidth/JsHeight): bare numbers mean vp,
+            // suffixed strings and resources keep their unit through
+            // ParseJsDimensionVpNG, a value that does not parse leaves the
+            // dimension unset, and a non-positive value is dropped instead of
+            // applied (the width/height invalid-size semantics since API 12).
             auto width = sizeObj->GetProperty("width");
-            if (width->IsNumber()) {
-                sizeOption.width = Dimension(width->ToNumber<float>(), DimensionUnit::VP);
-            } else if (width->IsString()) {
-                // Bare numbers mean vp; suffixed strings ("100%", "10px") keep their unit.
-                sizeOption.width = StringUtils::StringToDimension(width->ToString(), true);
+            CalcDimension widthDim;
+            if (JSViewAbstract::ParseJsDimensionVpNG(width, widthDim) &&
+                !LessNotEqual(widthDim.Value(), 0.0)) {
+                sizeOption.width = widthDim;
             }
             auto height = sizeObj->GetProperty("height");
-            if (height->IsNumber()) {
-                sizeOption.height = Dimension(height->ToNumber<float>(), DimensionUnit::VP);
-            } else if (height->IsString()) {
-                sizeOption.height = StringUtils::StringToDimension(height->ToString(), true);
+            CalcDimension heightDim;
+            if (JSViewAbstract::ParseJsDimensionVpNG(height, heightDim) &&
+                !LessNotEqual(heightDim.Value(), 0.0)) {
+                sizeOption.height = heightDim;
             }
             options.size = sizeOption;
         }
