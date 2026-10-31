@@ -918,10 +918,8 @@ HWTEST_F(SecuritySessionWrapperImplTestNg, SecuritySessionWrapperImplTestNg020, 
 HWTEST_F(SecuritySessionWrapperImplTestNg, SecuritySessionWrapperBrandColorTest001, TestSize.Level1)
 {
 #ifdef OHOS_STANDARD_SYSTEM
-    auto sessionWrapper = GenerateSecuritySessionWrapperImpl();
-    ASSERT_NE(sessionWrapper, nullptr);
-    auto pattern = sessionWrapper->hostPattern_.Upgrade();
-    ASSERT_EQ(pattern, nullptr);
+    auto pattern = AceType::MakeRefPtr<SecurityUIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
     auto result = pattern->GetBrandColorStr();
     EXPECT_EQ(result, "");
 #endif
@@ -935,12 +933,41 @@ HWTEST_F(SecuritySessionWrapperImplTestNg, SecuritySessionWrapperBrandColorTest0
 HWTEST_F(SecuritySessionWrapperImplTestNg, SecuritySessionWrapperBrandColorTest002, TestSize.Level1)
 {
 #ifdef OHOS_STANDARD_SYSTEM
-    auto sessionWrapper = GenerateSecuritySessionWrapperImpl();
-    ASSERT_NE(sessionWrapper, nullptr);
-    auto pattern = sessionWrapper->hostPattern_.Upgrade();
-    ASSERT_EQ(pattern, nullptr);
+    auto pattern = AceType::MakeRefPtr<SecurityUIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
     auto result = pattern->ResolveBrandColor(999);
     EXPECT_EQ(result, "");
+#endif
+}
+
+/**
+ * @tc.name: SecuritySessionWrapperBrandColorTest003
+ * @tc.desc: Test NotifyBrandColorChangeToUEA with transparent brand color is skipped
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecuritySessionWrapperImplTestNg, SecuritySessionWrapperBrandColorTest003, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<SecurityUIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->NotifyBrandColorChangeToUEA(200, "#00EEEEEE");
+    EXPECT_TRUE(pattern->lastSentBrandColorStr_.empty());
+#endif
+}
+
+/**
+ * @tc.name: SecuritySessionWrapperBrandColorTest004
+ * @tc.desc: Test NotifyBrandColorChangeToUEA with unchanged brand color is skipped
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecuritySessionWrapperImplTestNg, SecuritySessionWrapperBrandColorTest004, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<SecurityUIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->lastSentBrandColorStr_ = "#FF00FF00";
+    pattern->NotifyBrandColorChangeToUEA(200, "#FF00FF00");
+    EXPECT_EQ(pattern->lastSentBrandColorStr_, "#FF00FF00");
 #endif
 }
 } // namespace OHOS::Ace::NG
