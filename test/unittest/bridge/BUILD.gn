@@ -20,5 +20,6 @@ group("bridge_unittest") {
     "common/media_query:media_query_test_ng",
     "common/sourcemap:bridge_source_map_test",
     "common/utils:bridge_utils_test",
+    "jsi:jsi_class_base_test",
   ]
 }
