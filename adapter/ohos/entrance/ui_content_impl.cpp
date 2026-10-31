@@ -6667,6 +6667,7 @@ NG::CommandResult ExecuteKeyCodeWithResult(
         return NG::CommandResult::Error(NG::CommandErrorType::INVALID_PARAM);
     }
     KeyEvent keyEvent;
+    keyEvent.isInjected = true;
     keyEvent.action = KeyAction::DOWN;
     keyEvent.code = static_cast<KeyCode>(json->GetInt("cmd"));
     keyEvent.pressedCodes = { keyEvent.code };

@@ -35,6 +35,7 @@
 #include "core/interfaces/arkoala/arkoala_api.h"
 #include "core/interfaces/native/node/frame_node_modifier_multi_thread.h"
 #include "core/interfaces/native/node/ui_event_command_processor.h"
+#include "core/interfaces/native/node/relaxed_command_processor.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "core/interfaces/native/utility/error_message_macros.h"
 #include "interfaces/native/native_type.h"
@@ -1531,6 +1532,7 @@ const ArkUIFrameNodeModifier* GetFrameNodeModifier()
         .injectCompositeCommand = InjectCompositeCommandImpl,
         .registerAccessibilityHoverEventHandler = RegisterAccessibilityHoverEventHandler,
         .unregisterAccessibilityHoverEventHandler = UnregisterAccessibilityHoverEventHandler,
+        .injectRelaxedCommand = InjectRelaxedCommandImpl,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;

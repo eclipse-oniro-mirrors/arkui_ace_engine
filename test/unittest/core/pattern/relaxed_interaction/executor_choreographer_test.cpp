@@ -60,6 +60,28 @@ private:
     bool singleStep_;
     int stepCount_;
 };
+
+class CancellationTrackingExecutor : public MockExecutor {
+public:
+    explicit CancellationTrackingExecutor(int& cancelCount, ExecutorChoreographer* choreographer = nullptr)
+        : MockExecutor(ExecutorResult::PENDING), cancelCount_(cancelCount), choreographer_(choreographer)
+    {}
+
+    void Cancel() override
+    {
+        ++cancelCount_;
+        if (choreographer_) {
+            choreographer_->Clear();
+            std::vector<std::unique_ptr<BaseExecutor>> executors;
+            executors.emplace_back(std::make_unique<MockExecutor>(ExecutorResult::SUCCESS));
+            choreographer_->Enqueue(std::move(executors));
+        }
+    }
+
+private:
+    int& cancelCount_;
+    ExecutorChoreographer* choreographer_;
+};
 } // namespace
 
 class ExecutorChoreographerTest : public testing::Test {
@@ -260,6 +282,41 @@ HWTEST_F(ExecutorChoreographerClearTest, Clear_ThenEnqueue, TestSize.Level1)
     choreographer_->Enqueue(std::move(executors2));
     EXPECT_EQ(choreographer_->GetQueueSize(), 1u);
     EXPECT_EQ(choreographer_->ExecuteNext(), ExecutorResult::FAILED);
+}
+
+HWTEST_F(ExecutorChoreographerClearTest, Clear_CancelsCurrentAndQueuedExecutorsOnce, TestSize.Level1)
+{
+    int currentCancelled = 0;
+    int queuedCancelled = 0;
+    std::vector<std::unique_ptr<BaseExecutor>> executors;
+    executors.emplace_back(std::make_unique<CancellationTrackingExecutor>(currentCancelled));
+    executors.emplace_back(std::make_unique<CancellationTrackingExecutor>(queuedCancelled));
+    choreographer_->Enqueue(std::move(executors));
+    ASSERT_EQ(choreographer_->ExecuteNext(), ExecutorResult::PENDING);
+
+    choreographer_->Clear();
+    choreographer_->Clear();
+    EXPECT_EQ(currentCancelled, 1);
+    EXPECT_EQ(queuedCancelled, 1);
+    EXPECT_FALSE(choreographer_->HasCurrent());
+    EXPECT_FALSE(choreographer_->HasNext());
+}
+
+HWTEST_F(ExecutorChoreographerClearTest, Clear_PreservesExecutorsEnqueuedDuringCancel, TestSize.Level1)
+{
+    int currentCancelled = 0;
+    int queuedCancelled = 0;
+    std::vector<std::unique_ptr<BaseExecutor>> executors;
+    executors.emplace_back(std::make_unique<CancellationTrackingExecutor>(currentCancelled, choreographer_.get()));
+    executors.emplace_back(std::make_unique<CancellationTrackingExecutor>(queuedCancelled));
+    choreographer_->Enqueue(std::move(executors));
+    ASSERT_EQ(choreographer_->ExecuteNext(), ExecutorResult::PENDING);
+
+    choreographer_->Clear();
+    EXPECT_EQ(currentCancelled, 1);
+    EXPECT_EQ(queuedCancelled, 1);
+    EXPECT_EQ(choreographer_->GetQueueSize(), 1u);
+    EXPECT_EQ(choreographer_->ExecuteNext(), ExecutorResult::SUCCESS);
 }
 
 // ============ ExecutorResultToString Tests ============

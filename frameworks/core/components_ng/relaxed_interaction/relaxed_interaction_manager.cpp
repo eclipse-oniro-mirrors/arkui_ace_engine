@@ -25,6 +25,13 @@
 #include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
+namespace {
+bool IsSupportedCommandType(const std::string& type)
+{
+    return type == BACKPRESS || type == CLICK || type == CONTENT_SWITCH || type == SCROLL ||
+        type == TAP || type == SLIDE;
+}
+}
 
 RelaxedInteractionManager::RelaxedInteractionManager(WeakPtr<PipelineContext> context) : context_(context)
 {
@@ -44,7 +51,7 @@ ProcessResult RelaxedInteractionManager::ProcessCommand(
 }
 
 ProcessResult RelaxedInteractionManager::ProcessCommandInternal(const std::string& jsonStr,
-    const std::function<void(ExecutionState)>& finishCallback, bool preserveLegacySemantics)
+    const std::function<void(ExecutionState)>& finishCallback, bool preserveLegacySemantics, bool interruptibleByUser)
 {
     WorkflowDumper::GetInstance().AddLog("Processing command: " + jsonStr);
     auto json = JsonUtil::ParseJsonString(jsonStr);
@@ -64,13 +71,13 @@ ProcessResult RelaxedInteractionManager::ProcessCommandInternal(const std::strin
             return ProcessResult::VALIDATION_ERROR;
         }
         auto name = type->GetString();
-        if (name != BACKPRESS && name != CLICK && name != CONTENT_SWITCH && name != SCROLL &&
-            name != TAP && name != SLIDE) {
+        if (!IsSupportedCommandType(name) && !(interruptibleByUser && name == KEY)) {
             return ProcessResult::NO_VALID_CMD;
         }
     }
 
-    std::vector<std::unique_ptr<BaseExecutor>> executors = executorGenerator_->ParseCommand(json);
+    auto executors = interruptibleByUser ? executorGenerator_->ParseInjectionCommand(json)
+                                       : executorGenerator_->ParseCommand(json);
     if (executors.empty()) {
         WorkflowDumper::GetInstance().AddLog("No valid executor parsed from command");
         TAG_LOGE(AceLogTag::ACE_UIEVENT, "No valid executor parsed from command");
@@ -85,12 +92,24 @@ ProcessResult RelaxedInteractionManager::ProcessCommandInternal(const std::strin
     WorkflowDumper::GetInstance().AddLog("Parsed executors: " + ExecutorsToString(executors));
     size_t executorCount = executors.size();
     choreographer_->Enqueue(std::move(executors));
-    workflowStates_.push_back({ executorCount, finishCallback, preserveLegacySemantics });
+    workflowStates_.push_back({ executorCount, finishCallback, preserveLegacySemantics,
+        interruptibleByUser ? InterruptionPolicy::INTERRUPTIBLE : InterruptionPolicy::IGNORE_USER_INPUT });
     return ProcessResult::SUCCESS;
+}
+
+ProcessResult RelaxedInteractionManager::ProcessCommand(const std::string& jsonStr,
+    const std::function<void(ExecutionState)>& finishCallback, bool interruptibleByUser)
+{
+    return ProcessCommandInternal(jsonStr, finishCallback, false, interruptibleByUser);
 }
 
 ExecutionState RelaxedInteractionManager::ExecuteNextStep()
 {
+    std::deque<std::function<void(ExecutionState)>> completions;
+    completions.swap(pendingUserCompletions_);
+    for (auto& completion : completions) {
+        completion(ExecutionState::INTERRUPTED_BY_USER);
+    }
     if (!choreographer_->HasCurrent() && !choreographer_->HasNext()) {
         return ExecutionState::FAILED;
     }
@@ -106,13 +125,20 @@ ExecutionState RelaxedInteractionManager::ExecuteNextStep()
 
 bool RelaxedInteractionManager::HasPendingWorkflow() const
 {
-    return choreographer_ && (choreographer_->HasCurrent() || choreographer_->HasNext());
+    return !pendingUserCompletions_.empty() ||
+        (choreographer_ && (choreographer_->HasCurrent() || choreographer_->HasNext()));
 }
 
 ExecutionState RelaxedInteractionManager::DoExecuteNextStep(
     std::function<void(ExecutionState)>& finishCallback)
 {
+    executionPhase_ = ExecutionPhase::EXECUTING;
     ExecutorResult result = choreographer_->ExecuteNext();
+    ExecutionState clearedState;
+    if (HandleDeferredClear(result, clearedState)) {
+        return clearedState;
+    }
+    executionPhase_ = ExecutionPhase::IDLE;
 
     if (workflowStates_.empty()) {
         switch (result) {
@@ -154,11 +180,32 @@ ExecutionState RelaxedInteractionManager::DoExecuteNextStep(
             } else {
                 finishCallback = std::move(workflow.finishCallback);
                 workflowStates_.pop_front();
-                return ExecutionState::FAILED;
+                return choreographer_->GetFailureState();
             }
     }
 
     return ExecutionState::FAILED;
+}
+
+bool RelaxedInteractionManager::HandleDeferredClear(ExecutorResult result, ExecutionState& state)
+{
+    if (executionPhase_ != ExecutionPhase::CLEAR_PENDING) {
+        return false;
+    }
+    auto reason = clearReason_;
+    executionPhase_ = ExecutionPhase::IDLE;
+    if (reason == ExecutionState::INTERRUPTED_BY_USER) {
+        bool currentInterrupted = !workflowStates_.empty() &&
+            workflowStates_.front().interruptionPolicy == InterruptionPolicy::INTERRUPTED;
+        ClearInterruptedWorkflows(result != ExecutorResult::PENDING);
+        if (!currentInterrupted && !workflowStates_.empty()) {
+            return false;
+        }
+    } else {
+        Clear(reason);
+    }
+    state = HasPendingWorkflow() ? ExecutionState::RUNNING : reason;
+    return true;
 }
 
 ExecutionState RelaxedInteractionManager::ExecuteLegacyWorkflow(ExecutorResult result)
@@ -189,10 +236,84 @@ ExecutionState RelaxedInteractionManager::ExecuteLegacyWorkflow(ExecutorResult r
 
 void RelaxedInteractionManager::Clear()
 {
+    pendingUserCompletions_.clear();
+    for (auto& workflow : workflowStates_) {
+        workflow.finishCallback = nullptr;
+    }
+    Clear(ExecutionState::FAILED);
+}
+
+void RelaxedInteractionManager::Clear(ExecutionState reason)
+{
+    if (reason == ExecutionState::INTERRUPTED_BY_USER) {
+        bool hasInterrupted = false;
+        for (auto& workflow : workflowStates_) {
+            if (workflow.interruptionPolicy != InterruptionPolicy::IGNORE_USER_INPUT) {
+                workflow.interruptionPolicy = InterruptionPolicy::INTERRUPTED;
+                hasInterrupted = true;
+            }
+        }
+        if (!hasInterrupted) {
+            return;
+        }
+    }
+    if (executionPhase_ != ExecutionPhase::IDLE) {
+        if (executionPhase_ == ExecutionPhase::EXECUTING ||
+            (clearReason_ != ExecutionState::TARGET_NOT_FOUND &&
+                (reason != ExecutionState::INTERRUPTED_BY_USER || clearReason_ == reason))) {
+            clearReason_ = reason;
+        }
+        executionPhase_ = ExecutionPhase::CLEAR_PENDING;
+        return;
+    }
+    if (reason == ExecutionState::INTERRUPTED_BY_USER) {
+        ClearInterruptedWorkflows();
+        return;
+    }
+    std::deque<WorkflowState> cancelledWorkflows;
+    cancelledWorkflows.swap(workflowStates_);
+    std::deque<std::function<void(ExecutionState)>> completions;
+    completions.swap(pendingUserCompletions_);
     if (choreographer_) {
         choreographer_->Clear();
     }
-    workflowStates_.clear();
+    for (auto& completion : completions) {
+        completion(ExecutionState::INTERRUPTED_BY_USER);
+    }
+    for (auto& workflow : cancelledWorkflows) {
+        if (workflow.finishCallback && workflow.interruptionPolicy != InterruptionPolicy::IGNORE_USER_INPUT) {
+            workflow.finishCallback(reason);
+        }
+    }
+}
+
+void RelaxedInteractionManager::ClearInterruptedWorkflows(bool currentStepFinished)
+{
+    std::vector<bool> removeExecutors;
+    std::deque<WorkflowState> retainedWorkflows;
+    for (auto& workflow : workflowStates_) {
+        size_t count = workflow.remainingExecutors;
+        if (currentStepFinished && count > 0) {
+            --count;
+        }
+        currentStepFinished = false;
+        bool interrupted = workflow.interruptionPolicy == InterruptionPolicy::INTERRUPTED;
+        removeExecutors.insert(removeExecutors.end(), count, interrupted);
+        if (!interrupted) {
+            retainedWorkflows.push_back(std::move(workflow));
+        } else if (workflow.finishCallback) {
+            pendingUserCompletions_.push_back(std::move(workflow.finishCallback));
+        }
+    }
+    workflowStates_.swap(retainedWorkflows);
+    auto cancelledExecutors = choreographer_->ExtractExecutors(removeExecutors);
+    for (auto& executor : cancelledExecutors) {
+        executor->Cancel();
+    }
+    auto context = context_.Upgrade();
+    if (!pendingUserCompletions_.empty() && context && !context->IsDestroyed()) {
+        context->RequestFrame();
+    }
 }
 
 std::string RelaxedInteractionManager::ExecutorsToString(
@@ -219,6 +340,10 @@ std::string RelaxedInteractionManager::ExecutionStateToString(ExecutionState sta
             return "SUCCESS";
         case ExecutionState::FAILED:
             return "FAILED";
+        case ExecutionState::TARGET_NOT_FOUND:
+            return "TARGET_NOT_FOUND";
+        case ExecutionState::INTERRUPTED_BY_USER:
+            return "INTERRUPTED_BY_USER";
         default:
             return "UNKNOWN";
     }

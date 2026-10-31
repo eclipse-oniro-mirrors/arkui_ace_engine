@@ -923,6 +923,45 @@ HWTEST_F(ScrollCommandParserTest, GetDefaultScrollDistance_CoverIfBranch, TestSi
     EXPECT_FLOAT_EQ(distance, 400.0f);
 }
 
+HWTEST_F(ScrollCommandParserTest, ParseInjectionCommand_PreservesLegacyScrollDefaults, TestSize.Level1)
+{
+    auto firstContext = AceType::MakeRefPtr<MockPipelineContext>();
+    firstContext->SetRootSize(400.0, 600.0);
+    auto secondContext = AceType::MakeRefPtr<MockPipelineContext>();
+    secondContext->SetRootSize(400.0, 1200.0);
+    ScrollCommandParser firstParser(firstContext);
+    ScrollCommandParser secondParser(secondContext);
+
+    const auto previousDisplay = mockContainer_->GetDisplayInfo();
+    auto displayInfo = AceType::MakeRefPtr<DisplayInfo>();
+    displayInfo->SetHeight(2400);
+    mockContainer_->SetDisplayInfo(displayInfo);
+    auto json = JsonUtil::ParseJsonString(R"({
+        "type": "scroll", "mode": "simulating",
+        "action_info": {"coordinates": {"x1": 100, "y1": 200}}
+    })");
+    auto legacy = firstParser.Parse(json);
+    auto first = firstParser.ParseInjectionCommand(json);
+    auto second = secondParser.ParseInjectionCommand(json);
+    mockContainer_->SetDisplayInfo(previousDisplay);
+
+    ASSERT_EQ(legacy.size(), 1u);
+    ASSERT_EQ(first.size(), 1u);
+    ASSERT_EQ(second.size(), 1u);
+    auto legacyExecutor = static_cast<ScrollSimulatingExecutor*>(legacy[0].get());
+    auto firstExecutor = static_cast<ScrollSimulatingExecutor*>(first[0].get());
+    auto secondExecutor = static_cast<ScrollSimulatingExecutor*>(second[0].get());
+    EXPECT_FLOAT_EQ(legacyExecutor->cmd_.actionInfo.distance, 800.0f);
+    EXPECT_FALSE(legacyExecutor->cmd_.isY2Set);
+    EXPECT_EQ(legacyExecutor->ExecuteStep(), ExecutorResult::FAILED);
+    EXPECT_FLOAT_EQ(firstExecutor->cmd_.actionInfo.distance, 200.0f);
+    EXPECT_FLOAT_EQ(secondExecutor->cmd_.actionInfo.distance, 400.0f);
+    EXPECT_TRUE(firstExecutor->cmd_.isY2Set);
+    EXPECT_FLOAT_EQ(firstExecutor->cmd_.actionInfo.coordinates.y2, 0.0f);
+    EXPECT_FLOAT_EQ(secondExecutor->cmd_.actionInfo.coordinates.y2, -200.0f);
+    EXPECT_EQ(firstExecutor->ExecuteStep(), ExecutorResult::PENDING);
+}
+
 HWTEST_F(ScrollCommandParserTest, GetDefaultScrollDistance_NoDisplayInfo, TestSize.Level1)
 {
     ASSERT_NE(mockContainer_, nullptr);

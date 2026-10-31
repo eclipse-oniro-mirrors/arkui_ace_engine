@@ -44,6 +44,8 @@
 
 namespace OHOS::Ace {
 namespace NG {
+enum class ExecutionState;
+enum class ProcessResult;
 struct CommandResult;
 class FrameNode;
 class GestureDebugBoundaryManager;
@@ -496,10 +498,13 @@ public:
     }
     
     RefPtr<NG::ActiveRecognizerManager> GetOrCreateActiveRecognizerManager();
+    NG::ProcessResult ProcessCommand(const std::string& command, std::function<void()> requestFrameCallback,
+        const std::function<void(NG::ExecutionState)>& completion);
     void ProcessCommand(const std::string& command, std::function<void()> requestFrameCallback);
     void ProcessCommandWithResult(const std::string& command, std::function<void()> requestFrameCallback,
         const std::function<void(const NG::CommandResult&)>& finishCallback);
     void FlushRelaxedInteraction(std::function<void()> requestFrameCallback);
+    void ClearRelaxedInteraction(NG::ExecutionState reason);
 
 private:
     RefPtr<NG::ActiveRecognizerManager> activeRecognizerManager_;

@@ -27,51 +27,70 @@ ContentSwitchCommandParser::ContentSwitchCommandParser(WeakPtr<PipelineContext> 
 
 std::vector<std::unique_ptr<BaseExecutor>> ContentSwitchCommandParser::Parse(const std::unique_ptr<JsonValue>& json)
 {
-    if (!ValidateBasicJson(json) || !ValidateType(json)) {
+    ActionInfo actionInfo;
+    PointF point;
+    if (!ParseParameters(json, actionInfo, point)) {
         return {};
+    }
+    auto executor = std::make_unique<StrictContentSwitchExecutor>(
+        context_, "target", actionInfo.direction, actionInfo.count, point);
+    std::vector<std::unique_ptr<BaseExecutor>> executors;
+    executors.push_back(std::move(executor));
+    return executors;
+}
+
+bool ContentSwitchCommandParser::Validate(const std::unique_ptr<JsonValue>& json)
+{
+    ActionInfo actionInfo;
+    PointF point;
+    return ParseParameters(json, actionInfo, point) && json->Contains("mode") && actionInfo.count > 0;
+}
+
+bool ContentSwitchCommandParser::ParseParameters(
+    const std::unique_ptr<JsonValue>& json, ActionInfo& actionInfo, PointF& point)
+{
+    if (!ValidateBasicJson(json) || !ValidateType(json)) {
+        return false;
     }
 
     std::string mode = json->Contains("mode") ? json->GetString("mode") : "target";
     if (mode != "target") {
         TAG_LOGW(AceLogTag::ACE_UIEVENT, "Parsed mode is not target");
-        return {};
+        return false;
     }
 
     auto actionJson = json->GetValue("action_info");
     if (!actionJson || !actionJson->IsObject()) {
         TAG_LOGW(AceLogTag::ACE_UIEVENT, "No valid action_info value parsed");
-        return {};
+        return false;
     }
 
-    auto [direction, count] = ParseActionInfo(actionJson);
-    if (direction.empty()) {
-        return {};
+    actionInfo = ParseActionInfo(actionJson);
+    if (actionInfo.direction.empty()) {
+        return false;
     }
 
     auto coordinates = actionJson->GetValue("coordinates");
     if (!coordinates || !coordinates->IsObject() || !coordinates->Contains("pos")) {
         TAG_LOGW(AceLogTag::ACE_UIEVENT, "No valid coordinates parsed");
-        return {};
+        return false;
     }
 
     auto pos = coordinates->GetValue("pos");
     if (!pos || !pos->IsObject() || !pos->Contains("x") || !pos->Contains("y")) {
         TAG_LOGW(AceLogTag::ACE_UIEVENT, "No valid pos or x,y parsed");
-        return {};
+        return false;
     }
 
     auto x = pos->GetValue("x");
     auto y = pos->GetValue("y");
     if (!x || !x->IsNumber() || !y || !y->IsNumber()) {
         TAG_LOGW(AceLogTag::ACE_UIEVENT, "No valid x or y value parsed");
-        return {};
+        return false;
     }
 
-    auto point = PointF(static_cast<float>(x->GetDouble()), static_cast<float>(y->GetDouble()));
-    auto executor = std::make_unique<StrictContentSwitchExecutor>(context_, mode, direction, count, point);
-    std::vector<std::unique_ptr<BaseExecutor>> executors;
-    executors.push_back(std::move(executor));
-    return executors;
+    point = PointF(static_cast<float>(x->GetDouble()), static_cast<float>(y->GetDouble()));
+    return true;
 }
 
 bool ContentSwitchCommandParser::ValidateBasicJson(const std::unique_ptr<JsonValue>& json)

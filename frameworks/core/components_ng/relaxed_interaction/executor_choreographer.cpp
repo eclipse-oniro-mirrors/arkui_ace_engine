@@ -37,6 +37,7 @@ ExecutorResult ExecutorChoreographer::ExecuteNext()
     ExecutorResult result = currentExecutor_->ExecuteStep();
     WorkflowDumper::GetInstance().AddLog("Executor '" + currentExecutor_->GetDescription() + "' execution result: " +
         ExecutorResultToString(result));
+    failureState_ = currentExecutor_->GetFailureState();
     if (result != ExecutorResult::PENDING) {
         currentExecutor_.reset();
     }
@@ -46,8 +47,15 @@ ExecutorResult ExecutorChoreographer::ExecuteNext()
 
 void ExecutorChoreographer::Clear()
 {
-    executorQueue_.clear();
-    currentExecutor_.reset();
+    auto current = std::move(currentExecutor_);
+    std::deque<std::unique_ptr<BaseExecutor>> cancelledExecutors;
+    cancelledExecutors.swap(executorQueue_);
+    if (current) {
+        current->Cancel();
+    }
+    for (auto& executor : cancelledExecutors) {
+        executor->Cancel();
+    }
 }
 
 void ExecutorChoreographer::DiscardFront(size_t count)
@@ -56,6 +64,30 @@ void ExecutorChoreographer::DiscardFront(size_t count)
         executorQueue_.pop_front();
         --count;
     }
+}
+
+std::vector<std::unique_ptr<BaseExecutor>> ExecutorChoreographer::ExtractExecutors(
+    const std::vector<bool>& removeExecutors)
+{
+    std::vector<std::unique_ptr<BaseExecutor>> removed;
+    size_t index = 0;
+    if (currentExecutor_) {
+        if (index < removeExecutors.size() && removeExecutors[index]) {
+            removed.push_back(std::move(currentExecutor_));
+        }
+        ++index;
+    }
+    std::deque<std::unique_ptr<BaseExecutor>> retained;
+    for (auto& executor : executorQueue_) {
+        if (index < removeExecutors.size() && removeExecutors[index]) {
+            removed.push_back(std::move(executor));
+        } else {
+            retained.push_back(std::move(executor));
+        }
+        ++index;
+    }
+    executorQueue_.swap(retained);
+    return removed;
 }
 
 bool ExecutorChoreographer::MoveToNext()

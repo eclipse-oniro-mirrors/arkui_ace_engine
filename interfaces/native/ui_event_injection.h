@@ -171,6 +171,61 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_UIEventInjectCompositeCommand(
     OH_ArkUI_NativeModule_UIEventInjectionCallback callback,
     void *userData);
 
+/**
+ * @brief Injects a relaxed interaction command into the UI asynchronously.
+ *
+ * The JSON command has the following structure:
+ * { "schemaVersion": 1, "cmd": { "type": "<command type>", "mode": "<execution mode>", "action_info": { ... } } }
+ *
+ * schemaVersion must be the number 1. Only the five command types below are accepted.
+ * The command-specific parameters are as follows; unless marked required, the action_info fields
+ * are optional.
+ * - click: mode (optional, default "auto"); action_info.coordinates with x1 and y1 (both required).
+ * - content_switch: mode must be "target"; action_info.count must be a positive integer (optional,
+ * default 1); action_info.direction ("forward" | "backward", optional, default "forward");
+ * action_info.coordinates.pos with x and y (required).
+ * - scroll: mode (optional, default "auto"); action_info.direction ("forward" | "backward" | "left"
+ * | "right" | "up" | "down", optional, default "forward"); action_info.distance, a non-negative
+ * physical-pixel value (optional, default one third of the window height); action_info.coordinates
+ * with x1 and y1 required, and x2 and y2 optional. Supplied endpoint values must be valid;
+ * an incomplete endpoint uses the default trajectory derived from direction and distance.
+ * - backpress: no parameters.
+ * - key: action_info.code, the virtual key code of the key, which must be a valid key code
+ * (required).
+ *
+ * All positional coordinates are relative to the window, in physical pixels (px). If a required
+ * field is missing or a value is outside its valid range,
+ * {@link ARKUI_ERROR_CODE_PARAM_INVALID} is returned.
+ *
+ * This function is thread-safe and can be called from any thread. JSON validation and copying
+ * finish before return; execution and callback run on the target UI thread. It does not wait for
+ * execution, rendering, or animation. Rejected requests are not executed and do not invoke callback.
+ * If the instance becomes unavailable after acceptance, callback reports TARGET_NOT_FOUND.
+ * Multiple commands may be queued; their execution order is not guaranteed.
+ *
+ * @param uiContext [in] Pointer to a UI instance. It must not be NULL and must remain valid for
+ *     the duration of this call. The caller must synchronize destruction of the handle itself.
+ * @param command [in] Configured JSON command. It must not be NULL and must remain valid for the
+ *     duration of the call. The callee does not retain it.
+ * @param callback [in] Optional callback, invoked once when the injected command finishes executing.
+ *     It can be NULL.
+ * @param userData [in] Custom user data passed to the callback. It can be NULL. The framework does
+ *     not take ownership of it. When callback is non-NULL, data must be ready before the call
+ *     and remain valid until the callback completes.
+ * @return <ul>
+ *     <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the command is queued successfully.</li>
+ *     <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter is invalid, a required field is missing,
+ *     or command submission fails.</li>
+ *     <li>{@link ARKUI_ERROR_CODE_UI_CONTEXT_INVALID} if the UI context or its task executor is unavailable.</li>
+ *     </ul>
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIEventInjectRelaxedInteraction(
+    ArkUI_ContextHandle uiContext,
+    const OH_ArkUI_NativeModule_UIJsonWrapper *command,
+    OH_ArkUI_NativeModule_UIEventInjectionCallback callback,
+    void *userData);
+
 #ifdef __cplusplus
 };
 #endif

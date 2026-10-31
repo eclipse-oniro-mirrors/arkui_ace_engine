@@ -85,7 +85,7 @@ ExecutorResult ScrollSimulatingExecutor::ExecuteStep()
     auto context = context_.Upgrade();
     if (!context) {
         TAG_LOGD(AceLogTag::ACE_UIEVENT, "ScrollSimulatingExecutor failed.");
-        return ExecutorResult::FAILED;
+        return SetFailureState(ExecutionState::TARGET_NOT_FOUND);
     }
 
     if (!cmd_.isY2Set && cmd_.mode != ExecuteMode::TARGET) {
@@ -97,12 +97,26 @@ ExecutorResult ScrollSimulatingExecutor::ExecuteStep()
         return ExecutorResult::FAILED;
     }
     auto event = touchEvents_.front();
+    touchActive_ = event.type == TouchType::DOWN || event.type == TouchType::MOVE;
+    lastPosition_ = PointF(event.x, event.y);
     context->OnTouchEvent(event);
     touchEvents_.pop();
     if (touchEvents_.empty()) {
         return ExecutorResult::SUCCESS;
     }
     return ExecutorResult::PENDING;
+}
+
+void ScrollSimulatingExecutor::Cancel()
+{
+    if (!touchActive_) {
+        return;
+    }
+    touchActive_ = false;
+    auto context = context_.Upgrade();
+    if (context && !context->IsDestroyed()) {
+        context->OnTouchEvent(RelaxedEventFactory::CreateTouchEvent(lastPosition_, TouchType::CANCEL));
+    }
 }
 
 } // namespace OHOS::Ace::NG

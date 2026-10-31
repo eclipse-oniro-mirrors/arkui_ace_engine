@@ -114,6 +114,8 @@ enum class PageLogContainerType : int32_t;
 class DynamicComponentSafeManager;
 class EnvironmentManager;
 enum class FocusActiveReason : int32_t;
+enum class ExecutionState;
+enum class ProcessResult;
 
 enum class MockFlushEventType : int32_t {
     REJECT = -1,
@@ -273,6 +275,8 @@ public:
     // if return false, then this event needs platform to handle it.
     bool OnNonPointerEvent(const NonPointerEvent& event) override;
 
+    ProcessResult ProcessCommand(const std::string& command,
+        const std::function<void(ExecutionState)>& completion);
     void ProcessCommand(const std::string& command);
     void ProcessCommandWithResult(const std::string& command, const std::function<void(const CommandResult&)>& finish);
 

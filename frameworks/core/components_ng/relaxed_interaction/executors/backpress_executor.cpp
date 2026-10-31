@@ -28,12 +28,12 @@ ExecutorResult BackpressExecutor::ExecuteStep()
 {
     auto context = context_.Upgrade();
     if (!context) {
-        return ExecutorResult::FAILED;
+        return SetFailureState(ExecutionState::TARGET_NOT_FOUND);
     }
 
     UIContent* uiContent = UIContent::GetUIContent(context->GetInstanceId());
     if (!uiContent) {
-        return ExecutorResult::FAILED;
+        return SetFailureState(ExecutionState::TARGET_NOT_FOUND);
     }
     bool result = uiContent->ProcessBackPressed();
     return result ? ExecutorResult::SUCCESS : ExecutorResult::FAILED;

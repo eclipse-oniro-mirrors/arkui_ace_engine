@@ -40,6 +40,7 @@
 #include "core/components_ng/manager/handedness/handedness_manager.h"
 #include "core/pipeline/base/render_node.h"
 #include "core/pipeline_ng/pipeline_context.h"
+#include "core/components_ng/relaxed_interaction/relaxed_interaction_types.h"
 #ifdef RELAXED_INTERACTION_SUPPORT
 #include "core/pipeline_ng/pipeline_context.h"
 #include "core/components_ng/relaxed_interaction/relaxed_interaction_manager.h"
@@ -3675,6 +3676,35 @@ void EventManager::ProcessCommand(const std::string& command, std::function<void
     TAG_LOGD(AceLogTag::ACE_UIEVENT, "ProcessCommand result: %{public}d.", static_cast<int>(result));
     if (result == NG::ProcessResult::SUCCESS) {
         requestFrameCallback();
+    }
+#endif
+}
+
+NG::ProcessResult EventManager::ProcessCommand(const std::string& command, std::function<void()> requestFrameCallback,
+    const std::function<void(NG::ExecutionState)>& completion)
+{
+#ifdef RELAXED_INTERACTION_SUPPORT
+    auto relaxedInteractionManager = GetOrCreateRelaxedInteractionManager();
+    if (!relaxedInteractionManager) {
+        TAG_LOGW(AceLogTag::ACE_UIEVENT, "RelaxedInteractionManager is null.");
+        return NG::ProcessResult::NO_VALID_CMD;
+    }
+    auto result = relaxedInteractionManager->ProcessCommand(command, completion, true);
+    TAG_LOGD(AceLogTag::ACE_UIEVENT, "ProcessCommand result: %{public}d.", static_cast<int>(result));
+    if (result == NG::ProcessResult::SUCCESS) {
+        requestFrameCallback();
+    }
+    return result;
+#else
+    return NG::ProcessResult::NO_VALID_CMD;
+#endif
+}
+
+void EventManager::ClearRelaxedInteraction(NG::ExecutionState reason)
+{
+#ifdef RELAXED_INTERACTION_SUPPORT
+    if (relaxedInteractionManager_) {
+        relaxedInteractionManager_->Clear(reason);
     }
 #endif
 }

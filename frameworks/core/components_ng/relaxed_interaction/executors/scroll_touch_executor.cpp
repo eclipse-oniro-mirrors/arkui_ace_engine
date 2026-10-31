@@ -72,10 +72,12 @@ RefPtr<Pattern> ScrollTouchExecutor::FindScrollPattern(float x, float y)
 {
     auto context = context_.Upgrade();
     if (!context) {
+        failureState_ = ExecutionState::TARGET_NOT_FOUND;
         return nullptr;
     }
     auto result = FindFrameNode(x, y, ScrollRecognizerPred(cmd_.actionInfo.direction));
     if (!result.GetNode()) {
+        failureState_ = ExecutionState::TARGET_NOT_FOUND;
         TAG_LOGD(AceLogTag::ACE_UIEVENT, "No FrameNode found at coordinates.");
         return nullptr;
     }

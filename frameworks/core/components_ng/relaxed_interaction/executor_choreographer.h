@@ -34,6 +34,12 @@ public:
     ExecutorResult ExecuteNext();
 
     void Clear();
+    std::vector<std::unique_ptr<BaseExecutor>> ExtractExecutors(const std::vector<bool>& removeExecutors);
+
+    ExecutionState GetFailureState() const
+    {
+        return failureState_;
+    }
 
     void DiscardFront(size_t count);
 
@@ -60,6 +66,7 @@ private:
     std::deque<std::unique_ptr<BaseExecutor>> executorQueue_;
 
     std::unique_ptr<BaseExecutor> currentExecutor_;
+    ExecutionState failureState_ = ExecutionState::FAILED;
 };
 
 } // namespace OHOS::Ace::NG

@@ -9970,6 +9970,8 @@ struct ArkUIInjectCommandParams {
     void* userData;
 };
 
+struct ArkUIInjectRelaxedCommandParams;
+
 struct ArkUIFrameNodeModifier {
     ArkUI_Bool (*isModifiable)(ArkUINodeHandle node);
     ArkUINodeHandle (*createFrameNode)();
@@ -10083,6 +10085,7 @@ struct ArkUIFrameNodeModifier {
     ArkUI_Int32 (*registerAccessibilityHoverEventHandler)(ArkUINodeHandle node, void* userData,
         void (*handler)(void*, int32_t, int32_t, int32_t, ArkUI_AccessibilityElementInfo*));
     ArkUI_Int32 (*unregisterAccessibilityHoverEventHandler)(ArkUINodeHandle node);
+    ArkUI_Int32 (*injectRelaxedCommand)(const ArkUIInjectRelaxedCommandParams* params);
 };
 
 struct ArkUINodeContentEvent {

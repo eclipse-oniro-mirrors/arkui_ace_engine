@@ -35,15 +35,18 @@ ExecutorResult SimulateTouchExecutor::ExecuteStep()
     auto context = context_.Upgrade();
     if (!context) {
         TAG_LOGE(AceLogTag::ACE_UIEVENT, "Pipeline context is null");
-        return ExecutorResult::FAILED;
+        return SetFailureState(ExecutionState::TARGET_NOT_FOUND);
     }
 
     // Create touch event
     TouchEvent downEvent = RelaxedEventFactory::CreateTouchEvent(coordinates_, TouchType::DOWN);
     TouchEvent upEvent = RelaxedEventFactory::CreateTouchEvent(coordinates_, TouchType::UP);
 
-    // Dispatch touch events
+    // DOWN and UP are dispatched synchronously in this step; normal user input cannot interrupt between them.
     context->OnTouchEvent(downEvent);
+    if (context->IsDestroyed()) {
+        return SetFailureState(ExecutionState::TARGET_NOT_FOUND);
+    }
     context->OnTouchEvent(upEvent);
 
     return ExecutorResult::SUCCESS;

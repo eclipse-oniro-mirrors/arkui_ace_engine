@@ -36,10 +36,12 @@ public:
     ~ClickCommandParser() override = default;
 
     std::vector<std::unique_ptr<BaseExecutor>> Parse(const std::unique_ptr<JsonValue>& json) override;
+    static bool Validate(const std::unique_ptr<JsonValue>& json);
 
 private:
-    bool ParseMode(const JsonValue* cmdJson, ExecuteMode& mode);
-    bool ParseCoordinates(const JsonValue* cmdJson, PointF& coordinates);
+    static bool ParseParameters(const std::unique_ptr<JsonValue>& json, ExecuteMode& mode, PointF& coordinates);
+    static bool ParseMode(const JsonValue* cmdJson, ExecuteMode& mode);
+    static bool ParseCoordinates(const JsonValue* cmdJson, PointF& coordinates);
     std::vector<std::unique_ptr<BaseExecutor>> CreateExecutor(ExecuteMode mode, const PointF& coordinates);
 };
 

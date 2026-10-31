@@ -31,6 +31,7 @@ inline constexpr char CLICK[] = "click";
 inline constexpr char SCROLL[] = "scroll";
 inline constexpr char TAP[] = "tap";
 inline constexpr char SLIDE[] = "slide";
+inline constexpr char KEY[] = "key";
 
 // Return status of ExecuteNextStep.
 enum class ExecutionState {
@@ -38,6 +39,8 @@ enum class ExecutionState {
     RUNNING,
     SUCCESS,
     FAILED,
+    TARGET_NOT_FOUND,
+    INTERRUPTED_BY_USER,
 };
 
 // Executor execution result

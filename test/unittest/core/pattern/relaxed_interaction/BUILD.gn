@@ -21,13 +21,16 @@ ace_unittest("relaxed_interaction_manager_test_ng") {
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/executor_choreographer.cpp",
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/executor_generator.cpp",
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/parsers/backpress_command_parser.cpp",
+    "$ace_root/frameworks/core/components_ng/relaxed_interaction/parsers/key_command_parser.cpp",
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/relaxed_interaction_manager.cpp",
+    "$ace_root/frameworks/core/event/key_event_recognizer.cpp",
     "relaxed_interaction_manager_test_ng.cpp",
   ]
 
   sources += [
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/base_executor.cpp",
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/executors/fallback_executor.cpp",
+    "$ace_root/frameworks/core/components_ng/relaxed_interaction/executors/key_executor.cpp",
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/executors/scroll_simulating_executor.cpp",
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/executors/scroll_touch_executor.cpp",
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/executors/simulate_touch_executor.cpp",

@@ -143,6 +143,7 @@ inline bool UsePXUnit(ArkUI_NodeHandle nodePtr)
 bool InitialFullImpl();
 ArkUIFullNodeAPI* GetFullImpl();
 ArkUIFullNodeAPI* GetOrCreateFullImpl();
+ArkUIFullNodeAPI* GetFullImplForAnyThread();
 ArkUIFullNodeAPI* GetFullImplForErrorMessage();
 const ArkUIBasicAPI* GetBasicAPI();
 ArkUI_NodeHandle CreateNode(ArkUI_NodeType type);
