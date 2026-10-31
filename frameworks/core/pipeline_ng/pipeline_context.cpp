@@ -8780,7 +8780,7 @@ void PipelineContext::GetStateMgmtInfo(const std::string& componentName, const s
     std::vector<int32_t> matchNodeIds;
     rootNode_->GetNodeListByComponentName(0, matchNodeIds, componentName, onlyVisible);
     if (matchNodeIds.empty()) {
-        LOGE("GetStateMgmtInfo can't find componentName: %s", componentName.c_str());
+        LOGD("GetStateMgmtInfo can't find componentName: %s", componentName.c_str());
         return;
     }
     auto frontend = weakFrontend_.Upgrade();
