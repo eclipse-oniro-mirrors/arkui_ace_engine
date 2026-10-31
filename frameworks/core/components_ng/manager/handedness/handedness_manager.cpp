@@ -24,7 +24,6 @@
 #include "base/log/log.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/view_abstract.h"
-#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/pipeline/base/element_register.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
