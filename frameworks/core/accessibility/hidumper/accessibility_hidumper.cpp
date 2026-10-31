@@ -15,19 +15,28 @@
 
 
 #include <algorithm>
-#include <charconv>
 #include <initializer_list>
 #include <iterator>
 
 #include "base/log/dump_log.h"
+#include "base/utils/string_utils.h"
 #include "core/accessibility/hidumper/accessibility_hidumper.h"
 #include "core/components_ng/base/frame_node.h"
 
 namespace OHOS::Ace {
 
 namespace {
-constexpr size_t FOCUS_SEARCH_COMMAND_INDEX = 1;
-constexpr size_t FOCUS_SEARCH_VALUES_BEGIN = FOCUS_SEARCH_COMMAND_INDEX + 1;
+constexpr int64_t INVALID_FOCUS_SEARCH_VALUE = -1;
+constexpr int64_t MIN_FOCUS_SEARCH_VALUE = 0;
+enum FocusSearchArgumentIndex : size_t {
+    FOCUS_SEARCH_PREFIX_INDEX,
+    FOCUS_SEARCH_COMMAND_INDEX,
+    FOCUS_SEARCH_NODE_ID_INDEX,
+    FOCUS_SEARCH_DIRECTION_INDEX,
+    FOCUS_SEARCH_RULE_INDEX,
+    FOCUS_SEARCH_CONDITION_INDEX,
+    FOCUS_SEARCH_ARGUMENT_COUNT,
+};
 
 // Dump protocol values mirror accessibility_def.h without an OHOS dependency in cross-platform core code.
 enum class DumpFocusDirection : int64_t {
@@ -65,26 +74,38 @@ bool IsSupportedFocusValue(int64_t value, std::initializer_list<Enum> supported)
     });
 }
 
+bool ParseFocusSearchNumber(const std::string& text, int64_t& value)
+{
+    auto firstDigit = text.begin();
+    if (firstDigit != text.end() && *firstDigit == '-') {
+        ++firstDigit;
+    }
+    if (firstDigit == text.end() ||
+        !std::all_of(firstDigit, text.end(), [](char digit) { return digit >= '0' && digit <= '9'; })) {
+        return false;
+    }
+    // Keep -0 valid; StringToLongInt reports overflow with the negative error sentinel.
+    const auto parsed = StringUtils::StringToLongInt(text, INVALID_FOCUS_SEARCH_VALUE);
+    if (parsed < MIN_FOCUS_SEARCH_VALUE) {
+        return false;
+    }
+    value = parsed;
+    return true;
+}
+
 bool ParseFocusSearchValues(const std::vector<std::string>& params, FocusSearchValues& values)
 {
-    int64_t* fields[] = { &values.nodeId, &values.direction, &values.rule, &values.condition };
-    if (params.size() != FOCUS_SEARCH_VALUES_BEGIN + std::size(fields) ||
+    if (params.size() != FOCUS_SEARCH_ARGUMENT_COUNT ||
         params[FOCUS_SEARCH_COMMAND_INDEX] != "--third-focus-search") {
         DumpLog::GetInstance().Print(
             "Usage: -accessibility --third-focus-search <splicedId> <direction:16|32|64|128|256|512> "
             "<rule:1|2|3> <condition:1|2|4|8>");
         return false;
     }
-    auto arg = params.begin() + FOCUS_SEARCH_VALUES_BEGIN;
-    for (auto* field : fields) {
-        const auto& text = *arg;
-        auto result = std::from_chars(text.data(), text.data() + text.size(), *field);
-        if (result.ec != std::errc() || result.ptr != text.data() + text.size()) {
-            return false;
-        }
-        ++arg;
-    }
-    return true;
+    return ParseFocusSearchNumber(params[FOCUS_SEARCH_NODE_ID_INDEX], values.nodeId) &&
+        ParseFocusSearchNumber(params[FOCUS_SEARCH_DIRECTION_INDEX], values.direction) &&
+        ParseFocusSearchNumber(params[FOCUS_SEARCH_RULE_INDEX], values.rule) &&
+        ParseFocusSearchNumber(params[FOCUS_SEARCH_CONDITION_INDEX], values.condition);
 }
 } // namespace
 
@@ -92,7 +113,7 @@ bool AccessibilityHidumper::ParseThirdFocusSearch(
     const std::vector<std::string>& params, DumpInfoArgument& argument)
 {
     FocusSearchValues values;
-    if (!ParseFocusSearchValues(params, values) || values.nodeId < 0 ||
+    if (!ParseFocusSearchValues(params, values) ||
         !IsSupportedFocusValue(values.direction, { DumpFocusDirection::FORWARD, DumpFocusDirection::BACKWARD,
             DumpFocusDirection::FIND_LAST, DumpFocusDirection::GET_FORWARD_SCROLL_ANCESTOR,
             DumpFocusDirection::GET_BACKWARD_SCROLL_ANCESTOR, DumpFocusDirection::GET_SCROLLABLE_ANCESTOR }) ||
