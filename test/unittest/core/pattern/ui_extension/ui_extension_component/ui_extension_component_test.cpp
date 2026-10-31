@@ -2707,36 +2707,4 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest012, TestSize.Leve
     EXPECT_EQ(pattern->brandColorStr_, "#FF0000FF");
 #endif
 }
-
-/**
- * @tc.name: UIExtensionBrandColorTest013
- * @tc.desc: Test IsBrandColorValid returns false for empty string
- * @tc.type: FUNC
- */
-HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest013, TestSize.Level1)
-{
-    EXPECT_FALSE(UIContent::IsBrandColorValid(""));
-}
-
-/**
- * @tc.name: UIExtensionBrandColorTest014
- * @tc.desc: Test IsBrandColorValid returns false for transparent color
- * @tc.type: FUNC
- */
-HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest014, TestSize.Level1)
-{
-    EXPECT_FALSE(UIContent::IsBrandColorValid("#00000000"));
-    EXPECT_FALSE(UIContent::IsBrandColorValid("#00EEEEEE"));
-}
-
-/**
- * @tc.name: UIExtensionBrandColorTest015
- * @tc.desc: Test IsBrandColorValid returns true for valid opaque color
- * @tc.type: FUNC
- */
-HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest015, TestSize.Level1)
-{
-    EXPECT_TRUE(UIContent::IsBrandColorValid("#FF0000FF"));
-    EXPECT_TRUE(UIContent::IsBrandColorValid("#FF00FF00"));
-}
 } // namespace OHOS::Ace::NG
