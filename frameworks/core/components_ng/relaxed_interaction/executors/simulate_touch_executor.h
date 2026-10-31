@@ -30,8 +30,6 @@ public:
 
     ExecutorResult ExecuteStep() override;
 
-    void Cancel() override;
-
     virtual std::string GetType() const override
     {
         return "simulate_touch";
@@ -49,7 +47,6 @@ public:
 
 private:
     PointF coordinates_;
-    bool touchActive_ = false;
 };
 
 } // namespace OHOS::Ace::NG

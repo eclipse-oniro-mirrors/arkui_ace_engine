@@ -45,13 +45,6 @@ ExecutorResult ExecutorChoreographer::ExecuteNext()
     return result;
 }
 
-void ExecutorChoreographer::RequestCancelCurrent()
-{
-    if (currentExecutor_) {
-        currentExecutor_->RequestCancel();
-    }
-}
-
 void ExecutorChoreographer::Clear()
 {
     auto current = std::move(currentExecutor_);
