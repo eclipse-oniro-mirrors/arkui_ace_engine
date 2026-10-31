@@ -17,15 +17,22 @@
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "core/components_ng/manager/content_change_manager/content_change_manager.h"
+#include "core/components_ng/pattern/tabs/tab_content_pattern.h"
 
 namespace OHOS::Ace::NG {
 namespace {
 constexpr int32_t CUSTOM_TRANSITION_TIMEOUT_MS = 3000;
+constexpr int32_t POST_CHANGE_LAYOUT_FRAME_COUNT = 2;
+constexpr uint32_t TABS_START_EVENT = 9;
+constexpr uint32_t TABS_END_EVENT = 10;
+constexpr uint64_t INVALID_SUBSCRIPTION_ID = 0;
+enum class TabsSwitchTrigger { CONTROLLER, TAB_BAR, SWIPE, ALLOWED_CONTROLLER, ZERO_DURATION_CONTROLLER };
 } // namespace
 
 class TabsLayoutTestNg : public TabsTestNg {
 public:
     void CheckCustomTabsAttributeEnd(bool validTransition);
+    void CheckTabsIndexWriteback(TabsSwitchTrigger trigger);
 };
 
 /**
@@ -635,6 +642,184 @@ HWTEST_F(TabsLayoutTestNg, CustomTabsControllerEndIsNotDuplicatedByLayout, TestS
     manager->UnregisterCapiContentChangeEvent(aid);
     manager->UnregisterCapiContentChangeEvent(bid);
     pipeline->SetTaskExecutor(oldExecutor);
+}
+
+void TabsLayoutTestNg::CheckTabsIndexWriteback(TabsSwitchTrigger trigger)
+{
+    auto pipeline = MockPipelineContext::GetCurrent();
+    auto manager = pipeline->GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    MockAnimationManager::Enable(true);
+    MockAnimationManager::GetInstance().Reset();
+    MockAnimationManager::GetInstance().SetTicks(1);
+    auto model = CreateTabs();
+    model.SetAnimationDuration(trigger == TabsSwitchTrigger::ZERO_DURATION_CONTROLLER ? 0.0f : 800.0f);
+    int32_t changedIndex = -1;
+    model.SetOnChange([&changedIndex](const BaseEventInfo* info) {
+        changedIndex = TypeInfoHelper::DynamicCast<TabContentChangeEvent>(info)->GetIndex();
+    });
+    if (trigger == TabsSwitchTrigger::ALLOWED_CONTROLLER) {
+        model.SetOnContentWillChange([](int32_t, int32_t) { return true; });
+    }
+    CreateTabContents();
+    CreateTabsDone(model);
+    manager->OnVsyncEnd(RectF());
+    using Events = std::vector<std::pair<uint32_t, std::string>>;
+    Events a;
+    Events b;
+    Events lateTrue;
+    Events lateFalse;
+    auto sink = [](uint32_t type, uint64_t, const char* json, uint32_t, void* data) {
+        auto event = JsonUtil::ParseJsonString(json);
+        static_cast<Events*>(data)->emplace_back(type, event->GetObject("targetNode")->GetString("id"));
+    };
+    uint64_t lateTrueId = INVALID_SUBSCRIPTION_ID;
+    uint64_t lateFalseId = INVALID_SUBSCRIPTION_ID;
+    std::function<void(uint32_t, std::string)> onEvent = [&](uint32_t type, std::string id) {
+        a.emplace_back(type, id);
+        if (type == TABS_START_EVENT && lateTrueId == INVALID_SUBSCRIPTION_ID) {
+            lateTrueId = manager->RegisterCapiContentChangeEvent(true, 1, 0, &lateTrue, sink, nullptr);
+            lateFalseId = manager->RegisterCapiContentChangeEvent(false, 1, 0, &lateFalse, sink, nullptr);
+        }
+    };
+    auto aid = manager->RegisterCapiContentChangeEvent(true, 1, 0, &onEvent,
+        [](uint32_t type, uint64_t, const char* json, uint32_t, void* data) {
+            auto event = JsonUtil::ParseJsonString(json);
+            (*static_cast<std::function<void(uint32_t, std::string)>*>(data))(
+                type, event->GetObject("targetNode")->GetString("id"));
+        }, nullptr);
+    auto bid = manager->RegisterCapiContentChangeEvent(false, 1, 0, &b, sink, nullptr);
+
+    // Start at index 0; use the real controller, tab bar or drag entry point to switch to index 1.
+    if (trigger == TabsSwitchTrigger::SWIPE) {
+        auto info = CreateDragInfo(true);
+        swiperPattern_->HandleDragStart(info);
+        swiperPattern_->HandleDragUpdate(info);
+        FlushUITasks();
+        swiperPattern_->HandleDragEnd(info.GetMainVelocity());
+        FlushUITasks();
+    } else if (trigger == TabsSwitchTrigger::TAB_BAR) {
+        HandleClick(1);
+    } else {
+        ChangeIndex(1);
+    }
+    MockAnimationManager::GetInstance().Tick();
+    // MockRenderContext does not animate TranslateXY; deliver its normal completion callback explicitly.
+    if (swiperPattern_->propertyAnimationIsRunning_) {
+        swiperPattern_->PropertyPrefMonitor(false);
+        swiperPattern_->OnPropertyTranslateAnimationFinish(OffsetF(-TABS_WIDTH, 0.0f));
+        swiperPattern_->FireScrollStateEvent(ScrollState::IDLE);
+    }
+    pipeline->taskScheduler_->FlushAfterLayoutCallbackInImplicitAnimationTask();
+    manager->OnVsyncEnd(RectF());
+    EXPECT_EQ(changedIndex, 1);
+
+    // Apply the one-way index binding after onChange, then allow two more layout/vsync cycles.
+    layoutProperty_->UpdateIndexSetByUser(changedIndex);
+    for (int frame = 0; frame < POST_CHANGE_LAYOUT_FRAME_COUNT; ++frame) {
+        FlushUITasks();
+        FlushUITasks(swiperNode_);
+        manager->OnVsyncEnd(RectF());
+    }
+    EXPECT_TRUE(CurrentIndex(1));
+    const auto nodeId = std::to_string(frameNode_->GetId());
+    EXPECT_EQ(a, (Events { { TABS_START_EVENT, nodeId }, { TABS_END_EVENT, nodeId } }));
+    EXPECT_EQ(b, (Events { { TABS_END_EVENT, nodeId } }));
+    EXPECT_EQ(lateTrue, (Events { { TABS_END_EVENT, nodeId } }));
+    EXPECT_EQ(lateFalse, (Events { { TABS_END_EVENT, nodeId } }));
+    for (auto id : { aid, bid, lateTrueId, lateFalseId }) {
+        manager->UnregisterCapiContentChangeEvent(id);
+    }
+    MockAnimationManager::Enable(false);
+}
+
+/**
+ * @tc.name: TabsControllerIndexWritebackReportsOnce
+ * @tc.desc: Controller completion and onChange writeback produce one cycle, including late and END-only listeners.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsLayoutTestNg, TabsControllerIndexWritebackReportsOnce, TestSize.Level1)
+{
+    CheckTabsIndexWriteback(TabsSwitchTrigger::CONTROLLER);
+}
+
+/**
+ * @tc.name: TabsTabBarIndexWritebackReportsOnce
+ * @tc.desc: Clicking tab 1 and writing back its index must not report a content replacement.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsLayoutTestNg, TabsTabBarIndexWritebackReportsOnce, TestSize.Level1)
+{
+    CheckTabsIndexWriteback(TabsSwitchTrigger::TAB_BAR);
+}
+
+/**
+ * @tc.name: TabsSwipeIndexWritebackReportsOnce
+ * @tc.desc: A completed content swipe and its index writeback must produce only one Tabs cycle.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsLayoutTestNg, TabsSwipeIndexWritebackReportsOnce, TestSize.Level1)
+{
+    CheckTabsIndexWriteback(TabsSwitchTrigger::SWIPE);
+}
+
+/**
+ * @tc.name: TabsAllowedControllerIndexWritebackReportsOnce
+ * @tc.desc: Allowing a controller switch must preserve single-cycle reporting after index writeback.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsLayoutTestNg, TabsAllowedControllerIndexWritebackReportsOnce, TestSize.Level1)
+{
+    CheckTabsIndexWriteback(TabsSwitchTrigger::ALLOWED_CONTROLLER);
+}
+
+/**
+ * @tc.name: TabsZeroDurationControllerIndexWritebackReportsOnce
+ * @tc.desc: A zero-duration controller jump and its index writeback produce only one cycle, as in W06.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsLayoutTestNg, TabsZeroDurationControllerIndexWritebackReportsOnce, TestSize.Level1)
+{
+    CheckTabsIndexWriteback(TabsSwitchTrigger::ZERO_DURATION_CONTROLLER);
+}
+
+/**
+ * @tc.name: TabsSameIndexReplacementReportsOnce
+ * @tc.desc: Replacing the selected TabContent without changing index still reports one cycle.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsLayoutTestNg, TabsSameIndexReplacementReportsOnce, TestSize.Level1)
+{
+    auto pipeline = MockPipelineContext::GetCurrent();
+    auto manager = pipeline->GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    auto model = CreateTabs();
+    CreateTabContents();
+    CreateTabsDone(model);
+    manager->OnVsyncEnd(RectF());
+    std::vector<uint32_t> a;
+    std::vector<uint32_t> b;
+    auto sink = [](uint32_t type, uint64_t, const char*, uint32_t, void* data) {
+        static_cast<std::vector<uint32_t>*>(data)->push_back(type);
+    };
+    auto aid = manager->RegisterCapiContentChangeEvent(true, 1, 0, &a, sink, nullptr);
+    auto bid = manager->RegisterCapiContentChangeEvent(false, 1, 0, &b, sink, nullptr);
+    auto original = swiperNode_->GetChildAtIndex(0);
+    auto replacement = FrameNode::CreateFrameNode(V2::TAB_CONTENT_ITEM_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<TabContentPattern>(nullptr));
+    swiperNode_->ReplaceChild(original, replacement);
+    swiperNode_->MarkNeedSyncRenderTree();
+    for (int frame = 0; frame < POST_CHANGE_LAYOUT_FRAME_COUNT; ++frame) {
+        FlushUITasks(swiperNode_);
+        manager->OnVsyncEnd(RectF());
+    }
+    EXPECT_EQ(swiperPattern_->GetCurrentIndex(), 0);
+    EXPECT_EQ(a, (std::vector<uint32_t> { TABS_START_EVENT, TABS_END_EVENT }));
+    EXPECT_EQ(b, (std::vector<uint32_t> { TABS_END_EVENT }));
+    manager->UnregisterCapiContentChangeEvent(aid);
+    manager->UnregisterCapiContentChangeEvent(bid);
 }
 
 } // namespace OHOS::Ace::NG

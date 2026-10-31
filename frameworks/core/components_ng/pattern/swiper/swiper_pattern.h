@@ -1504,6 +1504,7 @@ private:
     bool isInit_ = true;
     bool contentChangeDetached_ = false;
     int32_t lastTabContentId_ = -1;
+    int32_t lastTabContentIndex_ = -1;
     bool hasVisibleChangeRegistered_ = false;
     bool isVisible_ = true;
     bool isVisibleArea_ = false;

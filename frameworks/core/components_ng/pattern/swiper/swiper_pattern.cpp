@@ -1388,11 +1388,14 @@ bool SwiperPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty,
     HandleTabsAncestor();
     if (hasTabsAncestor_) {
         auto host = GetHost();
-        auto item = TotalCount() > 0 ? GetCurrentFrameNode(props->GetIndexValue(0)) : nullptr;
+        const auto itemIndex = props->GetIndexValue(0);
+        auto item = TotalCount() > 0 ? GetCurrentFrameNode(itemIndex) : nullptr;
         const auto itemId = item ? item->GetId() : -1;
+        // Compare one layout snapshot: oldIndex_ may already advance when an animation finishes.
         const bool replaced = !isInit && lastTabContentId_ != -1 && itemId != -1 &&
-            lastTabContentId_ != itemId && props->GetIndexValue(0) == changeEndOldIndex;
+            lastTabContentId_ != itemId && itemIndex == lastTabContentIndex_;
         lastTabContentId_ = itemId;
+        lastTabContentIndex_ = itemIndex;
         if (replaced) {
             auto pipeline = GetContext();
             auto manager = pipeline ? pipeline->GetContentChangeManager() : nullptr;
