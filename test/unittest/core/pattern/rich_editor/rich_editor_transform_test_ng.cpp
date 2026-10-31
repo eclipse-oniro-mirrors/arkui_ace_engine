@@ -752,4 +752,30 @@ HWTEST_F(RichEditorTransformTestNg, ChangeHandleHeightWithTransform001, TestSize
     richEditorPattern->selectOverlay_->ChangeHandleHeight(event, false);
     EXPECT_FLOAT_EQ(textSelector.secondHandle.GetY(), touchY - 25.0f);
 }
+
+/**
+ * @tc.name: ChangeLastRichTextRect001
+ * @tc.desc: Test ChangeLastRichTextRect / GetLastTextRect.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorTransformTestNg, ChangeLastRichTextRect001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->richTextRect_ = RectF(1, 2, 3, 4);
+    pattern->ChangeLastRichTextRect();
+    EXPECT_EQ(pattern->GetLastTextRect(), RectF(1, 2, 3, 4));
+}
+
+/**
+ * @tc.name: GetPageTranslateNodeId001
+ * @tc.desc: Test GetPageTranslateNodeId returns host id.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorTransformTestNg, GetPageTranslateNodeId001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_EQ(pattern->GetPageTranslateNodeId(), richEditorNode_->GetId());
+}
 }

@@ -929,4 +929,30 @@ HWTEST_F(RichEditorAITestOneNg, HandleAIWriteResult002, TestSize.Level2)
     ASSERT_NE(styled, nullptr);
     EXPECT_EQ(styled->GetString(), "abclo1");
 }
+
+/**
+ * @tc.name: UpdateAIMenuOptions001
+ * @tc.desc: Test UpdateAIMenuOptions exercises capability check.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorAITestOneNg, UpdateAIMenuOptions001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->UpdateAIMenuOptions();
+    EXPECT_FALSE(pattern->isShowAIMenuOption_);
+}
+
+/**
+ * @tc.name: SelectAIDetect001
+ * @tc.desc: Test SelectAIDetect capability-disabled early return.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorAITestOneNg, SelectAIDetect001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SelectAIDetect();
+    EXPECT_FALSE(pattern->isShowAIMenuOption_);
+}
 }

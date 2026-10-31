@@ -22,6 +22,7 @@
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_theme.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_model_ng.h"
+#include "core/components_ng/pattern/text_field/text_keyboard_common_type.h"
 #include "core/common/text_field_manager_ng.h"
 #include "core/common/ime/input_method_manager.h"
 
@@ -820,5 +821,38 @@ HWTEST_F(RichEditorKeyboardTestNg, SetRequestKeyboardOnFocus002, TestSize.Level0
 
     richEditorModel.SetRequestKeyboardOnFocus(richEditorNode, false);
     EXPECT_FALSE(richEditorPattern->needToRequestKeyboardOnFocus_);
+}
+
+/**
+ * @tc.name: KeyboardAppearance002
+ * @tc.desc: Test SetKeyboardAppearance / GetKeyboardAppearance.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorKeyboardTestNg, KeyboardAppearance002, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetKeyboardAppearance(KeyboardAppearance::LIGHT_IMMERSIVE);
+    EXPECT_EQ(pattern->GetKeyboardAppearance(), KeyboardAppearance::LIGHT_IMMERSIVE);
+    KeyboardAppearanceConfig config;
+    config.gradientMode = KeyboardGradientMode::LINEAR_GRADIENT;
+    config.fluidLightMode = KeyboardFluidLightMode::BACKGROUND_FLUID_LIGHT;
+    pattern->SetKeyboardAppearanceConfig(config);
+    EXPECT_EQ(pattern->imeGradientMode_, KeyboardGradientMode::LINEAR_GRADIENT);
+}
+
+/**
+ * @tc.name: StopBackPress001
+ * @tc.desc: Test SetStopBackPress / IsStopBackPress.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorKeyboardTestNg, StopBackPress001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetStopBackPress(true);
+    EXPECT_TRUE(pattern->IsStopBackPress());
+    pattern->SetStopBackPress(false);
+    EXPECT_FALSE(pattern->IsStopBackPress());
 }
 }

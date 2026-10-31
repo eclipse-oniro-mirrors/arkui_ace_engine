@@ -827,4 +827,38 @@ HWTEST_F(RichEditorCopyCutPasteTestNg, AddUdmfData001, TestSize.Level0)
         EXPECT_EQ(event->GetData(), 0);
     }
 }
+
+/**
+ * @tc.name: HandleCopyOrCutCommand001
+ * @tc.desc: Test HandleCopyOrCutCommand early return when copyOption_ is None.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCopyCutPasteTestNg, HandleCopyOrCutCommand001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->copyOption_ = CopyOptions::None;
+    pattern->HandleCopyOrCutCommand("copy", richEditorNode_->GetId());
+    pattern->HandleCopyOrCutCommand("cut", richEditorNode_->GetId());
+    pattern->copyOption_ = CopyOptions::Distributed;
+    pattern->HandleCopyOrCutCommand("unknown", richEditorNode_->GetId());
+    EXPECT_NE(pattern->copyOption_, CopyOptions::None);
+}
+
+/**
+ * @tc.name: PasteStr003
+ * @tc.desc: Test AddPasteStr / GetPasteStr / ClearPasteStr.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCopyCutPasteTestNg, PasteStr003, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->ClearPasteStr();
+    EXPECT_TRUE(pattern->GetPasteStr().empty());
+    pattern->AddPasteStr("hello");
+    EXPECT_EQ(pattern->GetPasteStr(), u"hello");
+    pattern->ClearPasteStr();
+    EXPECT_TRUE(pattern->GetPasteStr().empty());
+}
 }

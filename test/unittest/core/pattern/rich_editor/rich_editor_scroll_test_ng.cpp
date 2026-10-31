@@ -706,4 +706,35 @@ HWTEST_F(RichEditorScrollTestOneNg, IsReverse001, TestSize.Level0)
     // Base class would return true, but RichEditorPattern overrides to return false
     EXPECT_FALSE(richEditorPattern->IsReverse());
 }
+
+/**
+ * @tc.name: ScrollState001
+ * @tc.desc: Test IsAtBottom / IsAtTop / UpdateCurrentOffset / IsScrollable.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorScrollTestOneNg, ScrollState001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_TRUE(pattern->IsAtBottom());
+    EXPECT_TRUE(pattern->IsAtTop());
+    EXPECT_TRUE(pattern->UpdateCurrentOffset(0, 0));
+    pattern->SetScrollable(false);
+    EXPECT_FALSE(pattern->IsScrollable());
+    pattern->SetScrollable(true);
+    EXPECT_TRUE(pattern->IsScrollable());
+}
+
+/**
+ * @tc.name: GetScrollControllerBar001
+ * @tc.desc: Test GetScrollControllerBar.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorScrollTestOneNg, GetScrollControllerBar001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto bar = pattern->GetScrollControllerBar();
+    EXPECT_NE(bar, nullptr);
+}
 }

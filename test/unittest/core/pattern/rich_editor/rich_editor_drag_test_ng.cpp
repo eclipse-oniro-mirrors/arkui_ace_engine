@@ -1443,4 +1443,22 @@ HWTEST_F(RichEditorDragTestNg, HandleOnDragDropStyledString007, TestSize.Level2)
     richEditorPattern->HandleOnDragDropStyledString(event);
     EXPECT_NE(event->GetData(), nullptr);
 }
+
+/**
+ * @tc.name: IsDragging001
+ * @tc.desc: Test IsDragging for various status values.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorDragTestNg, IsDragging001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->status_ = Status::DRAGGING;
+    EXPECT_TRUE(pattern->IsDragging());
+    pattern->status_ = Status::FLOATING;
+    EXPECT_TRUE(pattern->IsDragging());
+    pattern->status_ = Status::NONE;
+    EXPECT_FALSE(pattern->IsDragging());
+    EXPECT_FALSE(pattern->IsShortCutBlocked());
+}
 } // namespace OHOS::Ace::NG

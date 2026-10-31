@@ -20,6 +20,7 @@
 #include "test/mock/frameworks/core/common/mock_container.h"
 #include "test/mock/frameworks/core/common/mock_udmf.h"
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
+#include "base/json/json_util.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_theme.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_model_ng.h"
 #include "core/common/text_field_manager_ng.h"
@@ -1484,6 +1485,236 @@ HWTEST_F(RichEditorEditTestNg, UpdateChildrenOffset005, TestSize.Level0)
 
     richEditorPattern->UpdateChildrenOffset();
     EXPECT_FALSE(childNode2->GetSpanItem());
+}
+
+/**
+ * @tc.name: ProcessCommand001
+ * @tc.desc: Test ProcessCommand addText branch.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEditTestNg, ProcessCommand001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto json = JsonUtil::ParseJsonString(R"({"params":{"value":"hi","offset":0}})");
+    ASSERT_TRUE(json && json->IsObject());
+    EXPECT_TRUE(pattern->ProcessCommand("addText", json, richEditorNode_->GetId()));
+}
+
+/**
+ * @tc.name: ProcessCommand002
+ * @tc.desc: Test ProcessCommand deleteText branch with start/end.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEditTestNg, ProcessCommand002, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    AddSpan(u"abc");
+    auto json = JsonUtil::ParseJsonString(R"({"params":{"start":0,"end":1}})");
+    ASSERT_TRUE(json && json->IsObject());
+    EXPECT_TRUE(pattern->ProcessCommand("deleteText", json, richEditorNode_->GetId()));
+}
+
+/**
+ * @tc.name: ProcessCommand003
+ * @tc.desc: Test ProcessCommand setText branch.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEditTestNg, ProcessCommand003, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto json = JsonUtil::ParseJsonString(R"({"params":{"value":"new"}})");
+    ASSERT_TRUE(json && json->IsObject());
+    EXPECT_TRUE(pattern->ProcessCommand("setText", json, richEditorNode_->GetId()));
+}
+
+/**
+ * @tc.name: ProcessCommand004
+ * @tc.desc: Test ProcessCommand clear branch.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEditTestNg, ProcessCommand004, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    AddSpan(u"clearme");
+    auto json = JsonUtil::ParseJsonString(R"({})");
+    EXPECT_TRUE(pattern->ProcessCommand("clear", json, richEditorNode_->GetId()));
+}
+
+/**
+ * @tc.name: ProcessCommand005
+ * @tc.desc: Test ProcessCommand selectText with missing keys returns false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEditTestNg, ProcessCommand005, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto json = JsonUtil::ParseJsonString(R"({})");
+    EXPECT_FALSE(pattern->ProcessCommand("selectText", json, richEditorNode_->GetId()));
+}
+
+/**
+ * @tc.name: ProcessCommand006
+ * @tc.desc: Test ProcessCommand selectText with valid keys.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEditTestNg, ProcessCommand006, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    AddSpan(u"hello");
+    auto json = JsonUtil::ParseJsonString(R"({"selectionStart":0,"selectionEnd":2})");
+    EXPECT_TRUE(pattern->ProcessCommand("selectText", json, richEditorNode_->GetId()));
+}
+
+/**
+ * @tc.name: ProcessCommand007
+ * @tc.desc: Test ProcessCommand copy/cut branches.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEditTestNg, ProcessCommand007, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->copyOption_ = CopyOptions::Distributed;
+    auto json = JsonUtil::ParseJsonString(R"({})");
+    EXPECT_TRUE(pattern->ProcessCommand("copy", json, richEditorNode_->GetId()));
+    EXPECT_TRUE(pattern->ProcessCommand("cut", json, richEditorNode_->GetId()));
+}
+
+/**
+ * @tc.name: ProcessCommand008
+ * @tc.desc: Test ProcessCommand setCaretPosition missing position returns false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEditTestNg, ProcessCommand008, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto json = JsonUtil::ParseJsonString(R"({})");
+    EXPECT_FALSE(pattern->ProcessCommand("setCaretPosition", json, richEditorNode_->GetId()));
+}
+
+/**
+ * @tc.name: ProcessCommand009
+ * @tc.desc: Test ProcessCommand setCaretPosition with valid position.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEditTestNg, ProcessCommand009, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    AddSpan(u"abc");
+    auto json = JsonUtil::ParseJsonString(R"({"position":1})");
+    EXPECT_TRUE(pattern->ProcessCommand("setCaretPosition", json, richEditorNode_->GetId()));
+}
+
+/**
+ * @tc.name: ProcessCommand010
+ * @tc.desc: Test ProcessCommand requestKeyboard branch.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEditTestNg, ProcessCommand010, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto json = JsonUtil::ParseJsonString(R"({})");
+    EXPECT_TRUE(pattern->ProcessCommand("requestKeyboard", json, richEditorNode_->GetId()));
+}
+
+/**
+ * @tc.name: ProcessCommand011
+ * @tc.desc: Test ProcessCommand unknown command returns false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEditTestNg, ProcessCommand011, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto json = JsonUtil::ParseJsonString(R"({})");
+    EXPECT_FALSE(pattern->ProcessCommand("unknownCmd", json, richEditorNode_->GetId()));
+}
+
+/**
+ * @tc.name: ProcessCommand012
+ * @tc.desc: Test ProcessCommand addText with null params returns false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEditTestNg, ProcessCommand012, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto json = JsonUtil::ParseJsonString(R"({})");
+    EXPECT_FALSE(pattern->ProcessCommand("addText", json, richEditorNode_->GetId()));
+}
+
+/**
+ * @tc.name: ParseCommand001
+ * @tc.desc: Test ParseCommand with empty command string returns false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEditTestNg, ParseCommand001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_FALSE(pattern->ParseCommand(""));
+    EXPECT_FALSE(pattern->ParseCommand("not a json"));
+}
+
+/**
+ * @tc.name: ParseCommand002
+ * @tc.desc: Test ParseCommand with valid addText command.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEditTestNg, ParseCommand002, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_TRUE(pattern->ParseCommand(R"({"cmd":"clear"})"));
+}
+
+/**
+ * @tc.name: OnInjectionEvent001
+ * @tc.desc: Test OnInjectionEvent returns RET_FAILED for unparseable command.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEditTestNg, OnInjectionEvent001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_EQ(pattern->OnInjectionEvent(""), RET_FAILED);
+    EXPECT_EQ(pattern->OnInjectionEvent("garbage"), RET_FAILED);
+}
+
+/**
+ * @tc.name: HandleExtendAction001
+ * @tc.desc: Test HandleExtendAction default branch does nothing.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEditTestNg, HandleExtendAction001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->HandleExtendAction(-1);
+    EXPECT_FALSE(pattern->textSelector_.IsValid());
+}
+
+/**
+ * @tc.name: HandleExtendAction002
+ * @tc.desc: Test HandleExtendAction ACTION_SELECT_ALL.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEditTestNg, HandleExtendAction002, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    AddSpan(u"sel");
+    pattern->HandleExtendAction(ACTION_SELECT_ALL);
+    EXPECT_EQ(pattern->textSelector_.GetTextStart(), 0);
 }
 
 } // namespace OHOS::Ace::NG

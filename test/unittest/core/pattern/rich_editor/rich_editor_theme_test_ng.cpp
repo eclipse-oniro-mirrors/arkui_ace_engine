@@ -90,4 +90,35 @@ HWTEST_F(RichEditorThemeTestNg, RichEditorThemePadding, TestSize.Level2)
     EXPECT_EQ(padding.Top(), Dimension(8.0f, DimensionUnit::VP));
     EXPECT_EQ(padding.Bottom(), Dimension(8.0f, DimensionUnit::VP));
 }
+
+/**
+ * @tc.name: OnThemeScopeUpdate001
+ * @tc.desc: Test OnThemeScopeUpdate returns true when isAPI26Plus is false (early return).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorThemeTestNg, OnThemeScopeUpdate001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_TRUE(pattern->OnThemeScopeUpdate(0));
+}
+
+/**
+ * @tc.name: IsShowHandle001
+ * @tc.desc: Test IsShowHandle with theme present.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorThemeTestNg, IsShowHandle001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto pipeline = richEditorNode_->GetContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    ASSERT_NE(themeManager, nullptr);
+    pipeline->SetThemeManager(themeManager);
+    EXPECT_CALL(*themeManager, GetTheme(_))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<RichEditorTheme>()));
+    EXPECT_TRUE(pattern->IsShowHandle());
+}
 } // namespace OHOS::Ace::NG
