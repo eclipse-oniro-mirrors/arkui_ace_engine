@@ -334,8 +334,10 @@ ohos_unittest("native_node_napi_test") {
     "$ace_root/interfaces/native/node/grid_layout_option.cpp",
     "$ace_root/interfaces/native/node/native_impl.cpp",
     "$ace_root/interfaces/native/node/native_interface_focus.cpp",
+    "$ace_root/interfaces/native/node/native_material_impl.cpp",
     "$ace_root/interfaces/native/node/native_node_extented.cpp",
     "$ace_root/interfaces/native/node/native_node_napi.cpp",
+    "$ace_root/interfaces/native/node/node_animate.cpp",
     "$ace_root/interfaces/native/node/node_component_snapshot.cpp",
     "$ace_root/interfaces/native/node/node_extened.cpp",
     "$ace_root/interfaces/native/node/node_model.cpp",
@@ -1614,7 +1616,12 @@ ohos_unittest("native_material_test") {
   module_out_path = interface_test_output_path
 
   sources = [
+    "$ace_root/adapter/ohos/osal/log_wrapper.cpp",
+    "$ace_root/frameworks/base/log/log_wrapper.cpp",
+    "$ace_root/interfaces/native/node/config_manager.cpp",
     "$ace_root/interfaces/native/node/native_material_impl.cpp",
+    "$ace_root/test/mock/adapter/ohos/osal/mock_log_wrapper.cpp",
+    "$ace_root/test/mock/adapter/ohos/osal/mock_system_properties.cpp",
     "$ace_root/test/mock/interfaces/native/mock_node_model.cpp",
     "native_material_test.cpp",
   ]

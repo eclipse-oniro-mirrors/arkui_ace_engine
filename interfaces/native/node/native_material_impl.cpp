@@ -15,11 +15,13 @@
 
 #include "native_material_impl.h"
 
-#include "node_model.h"
+#include "node/config_manager.h"
+#include "node/node_model.h"
 #include "ui/base/utils/utils.h"
 
 bool OH_ArkUI_NativeModule_GetSystemMaterialSupported()
 {
+    CHECK_UI_THREAD("OH_ArkUI_NativeModule_GetSystemMaterialSupported");
     auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
     CHECK_NULL_RETURN(impl, false);
     return impl->getNodeModifiers()->getMaterialModifier()->getDeviceSystemMaterialSupported();
@@ -27,6 +29,7 @@ bool OH_ArkUI_NativeModule_GetSystemMaterialSupported()
 
 ArkUI_MaterialLevel OH_ArkUI_NativeModule_GetGlobalMaterialLevel()
 {
+    CHECK_UI_THREAD("OH_ArkUI_NativeModule_GetGlobalMaterialLevel");
     auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
     CHECK_NULL_RETURN(impl, ArkUI_MaterialLevel::ARKUI_MATERIAL_LEVEL_SMOOTH);
     auto level = impl->getNodeModifiers()->getMaterialModifier()->getGlobalMaterialLevel();

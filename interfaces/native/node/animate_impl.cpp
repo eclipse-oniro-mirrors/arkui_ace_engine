@@ -15,6 +15,7 @@
 
 #include "node/animate_impl.h"
 
+#include "node/config_manager.h"
 #include "node/node_model.h"
 
 #include "base/error/error_code.h"
@@ -25,6 +26,7 @@ namespace OHOS::Ace::AnimateModel {
 int32_t AnimateTo(ArkUI_ContextHandle context, ArkUI_AnimateOption* option, ArkUI_ContextCallback* update,
     ArkUI_AnimateCompleteCallback* complete)
 {
+    CHECK_UI_THREAD("ArkUI_NativeAnimateAPI_1.animateTo");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl || !context || !option || !update || !update->callback) {
         return ERROR_CODE_PARAM_INVALID;
@@ -66,6 +68,7 @@ int32_t AnimateTo(ArkUI_ContextHandle context, ArkUI_AnimateOption* option, ArkU
 
 int32_t KeyframeAnimateTo(ArkUI_ContextHandle context, ArkUI_KeyframeAnimateOption* option)
 {
+    CHECK_UI_THREAD("ArkUI_NativeAnimateAPI_1.keyframeAnimateTo");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl || !context || !option || option->keyframes.size() == 0) {
         return ERROR_CODE_PARAM_INVALID;
@@ -163,6 +166,7 @@ ArkUIAnimatorOption* ConvertAnimatorOption(ArkUI_AnimatorOption* option)
 
 ArkUI_AnimatorHandle CreateAnimator(ArkUI_ContextHandle context, ArkUI_AnimatorOption* option)
 {
+    CHECK_UI_THREAD("ArkUI_NativeAnimateAPI_1.createAnimator");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl || !context || !option) {
         return nullptr;
@@ -176,6 +180,7 @@ ArkUI_AnimatorHandle CreateAnimator(ArkUI_ContextHandle context, ArkUI_AnimatorO
 
 void DisposeAnimator(ArkUI_AnimatorHandle animatorHandle)
 {
+    CHECK_UI_THREAD("ArkUI_NativeAnimateAPI_1.disposeAnimator");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!animatorHandle || !animatorHandle->animator) {
         return;
