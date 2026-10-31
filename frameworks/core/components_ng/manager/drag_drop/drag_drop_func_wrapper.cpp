@@ -26,6 +26,7 @@
 #include "core/components/theme/blur_style_theme.h"
 #include "core/components/theme/shadow_theme.h"
 #include "core/components_ng/base/inspector.h"
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include "core/components_ng/event/drag_event.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_behavior_reporter/drag_drop_behavior_reporter.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_global_controller.h"
@@ -834,7 +835,7 @@ OffsetF DragDropFuncWrapper::GetPaintRectCenter(const RefPtr<FrameNode>& frameNo
     context->GetPointTransformRotate(pointNode);
     auto parent = frameNode->GetCoordinateAncestorNodeOfFrame(false);
     if (parent) {
-        frameNode->ApplyAdoptedCompensationToPoint(pointNode);
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(frameNode.GetRawPtr(), pointNode);
     }
     while (parent) {
         if (checkWindowBoundary && parent->IsWindowBoundary()) {
@@ -848,7 +849,7 @@ OffsetF DragDropFuncWrapper::GetPaintRectCenter(const RefPtr<FrameNode>& frameNo
         renderContext->GetPointTransformRotate(pointNode);
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(false);
         if (ancestor) {
-            parent->ApplyAdoptedCompensationToPoint(pointNode);
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(parent.GetRawPtr(), pointNode);
         }
         parent = ancestor;
     }
@@ -923,7 +924,8 @@ RectF DragDropFuncWrapper::GetPaintRectToWindowWithoutRotate(const RefPtr<FrameN
     context->GetPointTransformRotate(pointNode);
     auto parent = frameNode->GetCoordinateAncestorNodeOfFrame(true);
     if (parent) {
-        frameNode->ApplyAdoptedCompensationToCenterAndSize(pointNode, width, height);
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToCenterAndSize(
+            frameNode.GetRawPtr(), pointNode, width, height);
     }
     while (parent) {
         auto scale = parent->GetTransformScale();
@@ -937,7 +939,8 @@ RectF DragDropFuncWrapper::GetPaintRectToWindowWithoutRotate(const RefPtr<FrameN
         renderContext->GetPointTransformRotate(pointNode);
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
         if (ancestor) {
-            parent->ApplyAdoptedCompensationToCenterAndSize(pointNode, width, height);
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToCenterAndSize(
+                parent.GetRawPtr(), pointNode, width, height);
         }
         parent = ancestor;
     }

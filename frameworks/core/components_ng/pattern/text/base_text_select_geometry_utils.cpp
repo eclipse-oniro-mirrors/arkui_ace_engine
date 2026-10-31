@@ -20,6 +20,7 @@
 
 #include "core/common/container.h"
 #include "base/geometry/transform_util.h"
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include "core/components_ng/pattern/scrollable/nestable_scroll_container.h"
 #include "core/components_ng/pattern/scrollable/scrollable_paint_property.h"
 #include "core/components_ng/render/render_context.h"
@@ -190,8 +191,8 @@ bool BaseTextSelectGeometryUtils::HasUnsupportedTransform(
                 return true;
             }
         }
-        if (node->IsAdopted() && node->UseAdoptedCompensation() &&
-            CheckUnsupportedTransformMatrix(node->GetAdoptedCompensationTransform(), checkScale)) {
+        if (FrameNodeAdoptedCompensation::HasAdoptedCompensationUnsupportedTransform(
+            node.GetRawPtr(), checkScale)) {
             return true;
         }
         node = node->GetCoordinateAncestorNodeOfFrame(true);
@@ -235,8 +236,8 @@ bool BaseTextSelectGeometryUtils::HasTransformAttr(const RefPtr<FrameNode>& host
             hasTransform = true;
             break;
         }
-        if (node->IsAdopted() && node->UseAdoptedCompensation() &&
-            !node->GetAdoptedCompensationTransform().IsIdentityMatrix()) {
+        if (node->IsAdopted() && FrameNodeAdoptedCompensation::UseAdoptedCompensation(node.GetRawPtr()) &&
+            FrameNodeAdoptedCompensation::HasAdoptedCompensationNonTranslationTransform(node.GetRawPtr())) {
             hasTransform = true;
             break;
         }
@@ -330,7 +331,7 @@ void BaseTextSelectGeometryUtils::GetGlobalPointsWithTransform(
         }
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
         if (ancestor) {
-            parent->ApplyAdoptedCompensationToPoints(convertPoints);
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoints(parent.GetRawPtr(), convertPoints);
         }
         parent = ancestor;
     }
@@ -375,7 +376,8 @@ bool BaseTextSelectGeometryUtils::CalculateClippedRect(const RefPtr<FrameNode>& 
     CHECK_NULL_RETURN(host, false);
     auto parent = host->GetCoordinateAncestorNodeOfFrame(true);
     if (parent) {
-        contentRect.SetOffset(contentRect.GetOffset() + host->GetTransformedAdoptedCompensationOffset());
+        contentRect.SetOffset(contentRect.GetOffset() +
+            FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(host.GetRawPtr()));
     }
     while (parent) {
         RectF parentContentRect;
@@ -390,7 +392,8 @@ bool BaseTextSelectGeometryUtils::CalculateClippedRect(const RefPtr<FrameNode>& 
         contentRect.SetOffset(contentRect.GetOffset() + parent->GetPaintRectWithTransform().GetOffset());
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
         if (ancestor) {
-            contentRect.SetOffset(contentRect.GetOffset() + parent->GetTransformedAdoptedCompensationOffset());
+            contentRect.SetOffset(contentRect.GetOffset() +
+                FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(parent.GetRawPtr()));
         }
         parent = ancestor;
     }

@@ -390,6 +390,12 @@ public:
 
     RectF GetPaintRectWithTransform() override;
 
+    static RectF GetPaintRectWithTransform(
+        const std::shared_ptr<Rosen::RSNode>& rsNode, const RectF& paintRect);
+
+    static Matrix4 GetMatrixWithTransformRotate(
+        const std::shared_ptr<Rosen::RSNode>& rsNode, const RectF& paintRect);
+
     std::pair<RectF, bool> GetPaintRectWithTranslate() override;
 
     RectF GetPaintRectWithoutTransform() override;
@@ -416,7 +422,9 @@ public:
     void GetPointTransformRotate(PointF& point) override;
 
     Matrix4 GetMatrixWithTransformRotate() override;
-    Matrix4 GetMatrixWithTransformRotateInner();
+    static Matrix4 GetMatrixWithTransformRotateInner(
+        const std::shared_ptr<Rosen::RSNode>& rsNode, const RectF& paintRect,
+        const std::shared_ptr<Rosen::ModifierNG::RSTransformModifier>& transformModifier);
 
     void GetPointWithTransform(PointF& point) override;
     void GetPointWithTransformInner(PointF& point);
@@ -1074,7 +1082,7 @@ private:
         const ImageSourceInfo& source, const ParamConfig& config);
 
     void ModifyCustomBackground();
-    bool ShouldSkipAffineTransformation(std::shared_ptr<RSNode>& rsNode);
+    static bool ShouldSkipAffineTransformation(const std::shared_ptr<RSNode>& rsNode);
     void InsertFrameChildBefore(const RefPtr<UINode>& child, const RefPtr<UINode>& nextSibling);
     void RemoveMixedFrameChild(const RefPtr<UINode>& child);
     void NotifyMixedListChanged();

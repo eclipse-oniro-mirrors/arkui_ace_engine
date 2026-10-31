@@ -30,6 +30,7 @@
 #include "core/common/premake_scope.h"
 #include "core/common/resource/resource_parse_utils.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/components_ng/base/ui_node_gc.h"
 #include "core/components_ng/export_texture_info/export_texture_info.h"
@@ -511,7 +512,7 @@ bool UINode::RemoveAdoptedChild(const RefPtr<FrameNode>& child)
         return false;
     }
     adoptedChildren_.erase(iter);
-    child->SetUseAdoptedCompensation(false);
+    FrameNodeAdoptedCompensation::SetUseAdoptedCompensation(child.GetRawPtr(), false);
     child->SetIsAdopted(false);
     child->SetAdoptParent(nullptr);
     return true;

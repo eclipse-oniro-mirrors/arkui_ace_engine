@@ -19,6 +19,7 @@
 #include <cmath>
 #include <limits>
 #include <tuple>
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include "core/components_ng/base/modifier.h"
 #include "core/pipeline/container_window_manager.h"
 #include "core/accessibility/accessibility_manager.h"
@@ -781,7 +782,7 @@ void FrameNode::DetachRsNodeInAdoptedChildren()
 {
     for (auto& adoptedChild : adoptedChildren_) {
         CHECK_NULL_CONTINUE(adoptedChild);
-        adoptedChild->SetUseAdoptedCompensation(false);
+        FrameNodeAdoptedCompensation::SetUseAdoptedCompensation(adoptedChild.GetRawPtr(), false);
         adoptedChild->SetIsAdopted(false);
         adoptedChild->SetAdoptParent(nullptr);
         auto rsContext = adoptedChild->GetRenderContext();
@@ -4019,7 +4020,8 @@ RefPtr<FrameNode> FrameNode::GetAncestorNodeOfFrame(bool checkBoundary) const
 RefPtr<FrameNode> FrameNode::GetCoordinateAncestorNodeOfFrame(bool checkBoundary) const
 {
     auto parent = GetAncestorNodeOfFrame(checkBoundary);
-    if (parent || (checkBoundary && IsWindowBoundary()) || !IsAdopted() || !UseAdoptedCompensation()) {
+    if (parent || (checkBoundary && IsWindowBoundary()) || !IsAdopted() ||
+        !FrameNodeAdoptedCompensation::UseAdoptedCompensation(this)) {
         return parent;
     }
     return AceType::DynamicCast<FrameNode>(GetAdoptParent());
@@ -5312,8 +5314,8 @@ OffsetF FrameNode::GetOffsetRelativeToWindow() const
             offset.SetY(static_cast<float>(renderPosition.second));
         }
     }
-    if (parent && HasAdoptedCompensation()) {
-        offset += GetAdoptedCompensationOffset();
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        offset += FrameNodeAdoptedCompensation::GetAdoptedCompensationOffset(this);
     }
     while (parent) {
         auto parentRenderContext = parent->GetRenderContext();
@@ -5326,8 +5328,8 @@ OffsetF FrameNode::GetOffsetRelativeToWindow() const
                 offset.AddX(static_cast<float>(parentRenderContextPosition.first));
                 offset.AddY(static_cast<float>(parentRenderContextPosition.second));
                 auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
-                if (ancestor && parent->HasAdoptedCompensation()) {
-                    offset += parent->GetAdoptedCompensationOffset();
+                if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+                    offset += FrameNodeAdoptedCompensation::GetAdoptedCompensationOffset(parent.GetRawPtr());
                 }
                 parent = ancestor;
                 continue;
@@ -5337,8 +5339,8 @@ OffsetF FrameNode::GetOffsetRelativeToWindow() const
             offset += parentRenderContext->GetPaintRectWithoutTransform().GetOffset();
         }
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
-        if (ancestor && parent->HasAdoptedCompensation()) {
-            offset += parent->GetAdoptedCompensationOffset();
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            offset += FrameNodeAdoptedCompensation::GetAdoptedCompensationOffset(parent.GetRawPtr());
         }
         parent = ancestor;
     }
@@ -5435,8 +5437,8 @@ OffsetF FrameNode::GetPositionToWindowWithTransform(bool fromBottom) const
     PointF pointNode(offset.GetX(), offset.GetY());
     context->GetPointTransformRotate(pointNode);
     auto parent = GetCoordinateAncestorNodeOfFrame(true);
-    if (parent && HasAdoptedCompensation()) {
-        ApplyAdoptedCompensationToPoint(pointNode);
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(this, pointNode);
     }
     while (parent) {
         auto parentRenderContext = parent->GetRenderContext();
@@ -5446,8 +5448,8 @@ OffsetF FrameNode::GetPositionToWindowWithTransform(bool fromBottom) const
         pointNode.SetX(pointTmp.GetX());
         pointNode.SetY(pointTmp.GetY());
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
-        if (ancestor && parent->HasAdoptedCompensation()) {
-            parent->ApplyAdoptedCompensationToPoint(pointNode);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(parent.GetRawPtr(), pointNode);
         }
         parent = ancestor;
     }
@@ -5508,8 +5510,8 @@ OffsetF FrameNode::GetPositionToWindowWithTransform(OffsetF offset) const
     PointF pointNode(offset.GetX(), offset.GetY());
     context->GetPointTransformRotate(pointNode);
     auto parent = GetCoordinateAncestorNodeOfFrame(true);
-    if (parent && HasAdoptedCompensation()) {
-        ApplyAdoptedCompensationToPoint(pointNode);
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(this, pointNode);
     }
     while (parent) {
         auto parentRenderContext = parent->GetRenderContext();
@@ -5519,8 +5521,8 @@ OffsetF FrameNode::GetPositionToWindowWithTransform(OffsetF offset) const
         pointNode.SetX(pointTmp.GetX());
         pointNode.SetY(pointTmp.GetY());
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
-        if (ancestor && parent->HasAdoptedCompensation()) {
-            parent->ApplyAdoptedCompensationToPoint(pointNode);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(parent.GetRawPtr(), pointNode);
         }
         parent = ancestor;
     }
@@ -5540,8 +5542,8 @@ VectorF FrameNode::GetTransformScaleRelativeToWindow() const
     }
 
     auto parent = GetCoordinateAncestorNodeOfFrame(true);
-    if (parent && HasAdoptedCompensation()) {
-        auto scale = GetAdoptedCompensationScale();
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        auto scale = FrameNodeAdoptedCompensation::GetAdoptedCompensationScale(this);
         finalScale.x *= scale.x;
         finalScale.y *= scale.y;
     }
@@ -5553,8 +5555,8 @@ VectorF FrameNode::GetTransformScaleRelativeToWindow() const
             finalScale.y *= scale.y;
         }
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
-        if (ancestor && parent->HasAdoptedCompensation()) {
-            auto scale = parent->GetAdoptedCompensationScale();
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            auto scale = FrameNodeAdoptedCompensation::GetAdoptedCompensationScale(parent.GetRawPtr());
             finalScale.x *= scale.x;
             finalScale.y *= scale.y;
         }
@@ -5573,8 +5575,8 @@ RectF FrameNode::GetTransformRectRelativeToWindow(bool checkBoundary) const
     CHECK_NULL_RETURN(context, RectF());
     RectF rect = context->GetPaintRectWithTransform();
     auto parent = GetCoordinateAncestorNodeOfFrame(true);
-    if (parent && HasAdoptedCompensation()) {
-        ApplyAdoptedCompensationToRect(rect);
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(this, rect);
     }
     while (parent) {
         if (checkBoundary && parent->IsWindowBoundary()) {
@@ -5582,8 +5584,8 @@ RectF FrameNode::GetTransformRectRelativeToWindow(bool checkBoundary) const
         }
         rect = ApplyFrameNodeTranformToRect(rect, parent);
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
-        if (ancestor && parent->HasAdoptedCompensation()) {
-            parent->ApplyAdoptedCompensationToRect(rect);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(parent.GetRawPtr(), rect);
         }
         parent = ancestor;
     }
@@ -5602,8 +5604,8 @@ RectF FrameNode::GetTransformRectRelativeToWindowOnlyVisible(bool checkBoundary)
     CHECK_NULL_RETURN(context, invalidRect);
     RectF rect = context->GetPaintRectWithTransform();
     auto parent = GetCoordinateAncestorNodeOfFrame(true);
-    if (parent && HasAdoptedCompensation()) {
-        ApplyAdoptedCompensationToRect(rect);
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(this, rect);
     }
     while (parent) {
         if (!parent->IsVisibleAndActive()) {
@@ -5614,8 +5616,8 @@ RectF FrameNode::GetTransformRectRelativeToWindowOnlyVisible(bool checkBoundary)
         }
         rect = ApplyFrameNodeTranformToRect(rect, parent);
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
-        if (ancestor && parent->HasAdoptedCompensation()) {
-            parent->ApplyAdoptedCompensationToRect(rect);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(parent.GetRawPtr(), rect);
         }
         parent = ancestor;
     }
@@ -5632,16 +5634,16 @@ OffsetF FrameNode::GetTransformRelativeOffset() const
     CHECK_NULL_RETURN(context, OffsetF());
     auto offset = context->GetPaintRectWithTransform().GetOffset();
     auto parent = GetCoordinateAncestorNodeOfFrame(true);
-    if (parent && HasAdoptedCompensation()) {
-        offset += GetTransformedAdoptedCompensationOffset();
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        offset += FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(this);
     }
 
     while (parent) {
         auto parentRenderContext = parent->GetRenderContext();
         offset += parentRenderContext->GetPaintRectWithTransform().GetOffset();
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
-        if (ancestor && parent->HasAdoptedCompensation()) {
-            offset += parent->GetTransformedAdoptedCompensationOffset();
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            offset += FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(parent.GetRawPtr());
         }
         parent = ancestor;
     }
@@ -5655,8 +5657,8 @@ OffsetF FrameNode::GetPaintRectOffset(bool excludeSelf, bool checkBoundary, bool
     CHECK_NULL_RETURN(context, OffsetF());
     OffsetF offset = excludeSelf ? OffsetF() : context->GetPaintRectWithTransform().GetOffset();
     auto parent = GetCoordinateAncestorNodeOfFrame(checkBoundary);
-    if (parent && HasAdoptedCompensation()) {
-        offset += GetTransformedAdoptedCompensationOffset();
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        offset += FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(this);
     }
     while (parent) {
         if ((!checkBoundary && parent->CheckTopWindowBoundary()) || (checkScreen && parent->CheckTopScreen())) {
@@ -5666,8 +5668,8 @@ OffsetF FrameNode::GetPaintRectOffset(bool excludeSelf, bool checkBoundary, bool
         CHECK_NULL_RETURN(renderContext, OffsetF());
         offset += renderContext->GetPaintRectWithTransform().GetOffset();
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(checkBoundary);
-        if (ancestor && parent->HasAdoptedCompensation()) {
-            offset += parent->GetTransformedAdoptedCompensationOffset();
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            offset += FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(parent.GetRawPtr());
         }
         parent = ancestor;
     }
@@ -5682,7 +5684,7 @@ OffsetF FrameNode::GetPaintRectOffsetNG(bool excludeSelf, bool checkBoundary) co
     Point point = Matrix4::Invert(context->GetRevertMatrix()) * Point(offset.GetX(), offset.GetY());
     auto parent = GetCoordinateAncestorNodeOfFrame(checkBoundary);
     if (parent) {
-        ApplyAdoptedCompensationToPoint(point);
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(this, point);
     }
     while (parent) {
         if (!checkBoundary && parent->CheckTopWindowBoundary()) {
@@ -5696,7 +5698,7 @@ OffsetF FrameNode::GetPaintRectOffsetNG(bool excludeSelf, bool checkBoundary) co
         point = parentMatrix * point;
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(checkBoundary);
         if (ancestor) {
-            parent->ApplyAdoptedCompensationToPoint(point);
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(parent.GetRawPtr(), point);
         }
         parent = ancestor;
     }
@@ -5739,8 +5741,8 @@ OffsetF FrameNode::ConvertPoint(OffsetF position, const RefPtr<FrameNode>& targe
             break;
         }
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(false);
-        if (ancestor && parent->HasAdoptedCompensation()) {
-            parent->ApplyAdoptedCompensationToPoint(point);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(parent.GetRawPtr(), point);
         }
         parent = ancestor;
     }
@@ -5754,11 +5756,11 @@ OffsetF FrameNode::ConvertPoint(OffsetF position, const RefPtr<FrameNode>& targe
         targetNodePoint = revertMatrix * targetNodePoint;
         targetNodePoint = targetNodePoint - Offset(parentOffset.GetX(), parentOffset.GetY());
         historyNodes.pop_back();
-        if (!historyNodes.empty() && historyNodes.back()->HasAdoptedCompensation()) {
+        if (!historyNodes.empty() &&
+            FrameNodeAdoptedCompensation::HasAdoptedCompensation(historyNodes.back().GetRawPtr())) {
             auto child = historyNodes.back();
-            targetNodePoint = Matrix4::Invert(child->GetAdoptedCompensationTransform()) * targetNodePoint;
-            auto offset = child->GetAdoptedCompensationOffset();
-            targetNodePoint = targetNodePoint - Offset(offset.GetX(), offset.GetY());
+            FrameNodeAdoptedCompensation::RevertAdoptedCompensationFromPoint(
+                child.GetRawPtr(), targetNodePoint);
         }
     }
     return OffsetF(targetNodePoint.GetX(), targetNodePoint.GetY());
@@ -5788,13 +5790,12 @@ OffsetF FrameNode::ConvertPositionToWindow(OffsetF position, bool fromWindow)
             break;
         }
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(false);
-        if (ancestor && parent->HasAdoptedCompensation()) {
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
             if (fromWindow) {
-                point = Matrix4::Invert(parent->GetAdoptedCompensationTransform()) * point;
-                auto offset = parent->GetAdoptedCompensationOffset();
-                point = point - Offset(offset.GetX(), offset.GetY());
+                FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPointFromWindow(
+                    parent.GetRawPtr(), point);
             } else {
-                parent->ApplyAdoptedCompensationToPoint(point);
+                FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(parent.GetRawPtr(), point);
             }
         }
         parent = ancestor;
@@ -5861,13 +5862,13 @@ RectF FrameNode::GetPaintRectToWindowWithTransform()
     GetRectPointToParentWithTransform(pointList, Claim(this));
     auto parent = GetCoordinateAncestorNodeOfFrame(true);
     if (parent) {
-        ApplyAdoptedCompensationToPoints(pointList);
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoints(this, pointList);
     }
     while (parent) {
         if (GetRectPointToParentWithTransform(pointList, parent)) {
             auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
             if (ancestor) {
-                parent->ApplyAdoptedCompensationToPoints(pointList);
+                FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoints(parent.GetRawPtr(), pointList);
             }
             parent = ancestor;
         } else {
@@ -5887,8 +5888,8 @@ OffsetF FrameNode::GetParentGlobalOffsetDuringLayout() const
     while (parent) {
         offset += parent->geometryNode_->GetFrameOffset();
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
-        if (ancestor && parent->HasAdoptedCompensation()) {
-            offset += parent->GetAdoptedCompensationOffset();
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            offset += FrameNodeAdoptedCompensation::GetAdoptedCompensationOffset(parent.GetRawPtr());
         }
         parent = ancestor;
     }
@@ -5905,9 +5906,11 @@ std::pair<OffsetF, bool> FrameNode::GetPaintRectGlobalOffsetWithTranslate(bool e
     CHECK_NULL_RETURN(context, std::make_pair(OffsetF(), error));
     OffsetF offset = excludeSelf ? OffsetF() : context->GetPaintRectWithTranslate().first.GetOffset();
     auto parent = GetCoordinateAncestorNodeOfFrame(checkBoundary);
-    if (parent && HasAdoptedCompensation()) {
-        offset += GetAdoptedCompensationOffset();
-        error = error || !GetAdoptedCompensationTransform().IsIdentityMatrix();
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        auto [compensationOffset, compensationError] =
+            FrameNodeAdoptedCompensation::GetAdoptedCompensationOffsetWithTranslate(this);
+        offset += compensationOffset;
+        error = error || compensationError;
     }
     while (parent) {
         auto renderContext = parent->GetRenderContext();
@@ -5917,9 +5920,11 @@ std::pair<OffsetF, bool> FrameNode::GetPaintRectGlobalOffsetWithTranslate(bool e
         CHECK_NULL_RETURN(rect.IsValid(), std::make_pair(offset + parent->GetPaintRectOffset(), error));
         offset += rect.GetOffset();
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(checkBoundary);
-        if (ancestor && parent->HasAdoptedCompensation()) {
-            offset += parent->GetAdoptedCompensationOffset();
-            error = error || !parent->GetAdoptedCompensationTransform().IsIdentityMatrix();
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            auto [compensationOffset, compensationError] =
+                FrameNodeAdoptedCompensation::GetAdoptedCompensationOffsetWithTranslate(parent.GetRawPtr());
+            offset += compensationOffset;
+            error = error || compensationError;
         }
         parent = ancestor;
     }
@@ -5935,8 +5940,8 @@ OffsetF FrameNode::GetPaintRectOffsetToPage() const
     CHECK_NULL_RETURN(context, OffsetF());
     OffsetF offset = context->GetPaintRectWithTransform().GetOffset();
     auto parent = GetCoordinateAncestorNodeOfFrame(true);
-    if (parent && HasAdoptedCompensation()) {
-        offset += GetTransformedAdoptedCompensationOffset();
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        offset += FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(this);
     }
     while (parent && parent->GetTag() != V2::PAGE_ETS_TAG) {
         auto renderContext = parent->GetRenderContext();
@@ -5944,8 +5949,8 @@ OffsetF FrameNode::GetPaintRectOffsetToPage() const
         // Eliminate the impact of default page transition
         offset += renderContext->GetPaintRectWithTransform().GetOffset();
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
-        if (ancestor && parent->HasAdoptedCompensation()) {
-            offset += parent->GetTransformedAdoptedCompensationOffset();
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            offset += FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(parent.GetRawPtr());
         }
         parent = ancestor;
     }
@@ -7868,8 +7873,8 @@ OffsetF FrameNode::CalculateCachedTransformRelativeOffset(uint64_t nanoTimestamp
     auto offset = context->GetPaintRectWithTransform().GetOffset();
 
     auto parent = GetCoordinateAncestorNodeOfFrame(true);
-    if (parent && HasAdoptedCompensation()) {
-        offset += GetTransformedAdoptedCompensationOffset();
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        offset += FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(this);
     }
     if (parent) {
         auto parentTimestampOffset = parent->GetCachedTransformRelativeOffset();
@@ -7901,8 +7906,8 @@ OffsetF FrameNode::CalculateOffsetRelativeToWindow(uint64_t nanoTimestamp, bool 
     // if this node have not calculate once, then it will calculate to root
     areaChangeMinDepth = cachedGlobalOffset_.first > 0 ? areaChangeMinDepth : -1;
     auto parent = GetCoordinateAncestorNodeOfFrame(true);
-    if (parent && HasAdoptedCompensation()) {
-        currOffset += GetAdoptedCompensationOffset();
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        currOffset += FrameNodeAdoptedCompensation::GetAdoptedCompensationOffset(this);
     }
     if (parent) {
         auto parentTimestampOffset = parent->GetCachedGlobalOffset();
@@ -8259,9 +8264,9 @@ void FrameNode::GetVisibleRect(RectF& visibleRect, RectF& frameRect) const
         visibleRect.SetHeight(0.0f);
         return;
     }
-    if (HasAdoptedCompensation()) {
-        ApplyAdoptedCompensationToRect(visibleRect);
-        ApplyAdoptedCompensationToRect(frameRect);
+    if (FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(this, visibleRect);
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(this, frameRect);
     }
     while (parentUi) {
         visibleRect = ApplyFrameNodeTranformToRect(visibleRect, parentUi);
@@ -8272,9 +8277,9 @@ void FrameNode::GetVisibleRect(RectF& visibleRect, RectF& frameRect) const
         }
         frameRect = ApplyFrameNodeTranformToRect(frameRect, parentUi);
         auto ancestor = parentUi->GetCoordinateAncestorNodeOfFrame(true);
-        if (ancestor && parentUi->HasAdoptedCompensation()) {
-            parentUi->ApplyAdoptedCompensationToRect(visibleRect);
-            parentUi->ApplyAdoptedCompensationToRect(frameRect);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parentUi.GetRawPtr())) {
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(parentUi.GetRawPtr(), visibleRect);
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(parentUi.GetRawPtr(), frameRect);
         }
         parentUi = ancestor;
     }
@@ -8299,10 +8304,10 @@ void FrameNode::GetVisibleRectWithClip(
         visibleInnerRect.SetHeight(0.0f);
         return;
     }
-    if (HasAdoptedCompensation()) {
-        ApplyAdoptedCompensationToRect(visibleRect);
-        ApplyAdoptedCompensationToRect(visibleInnerRect);
-        ApplyAdoptedCompensationToRect(frameRect);
+    if (FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(this, visibleRect);
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(this, visibleInnerRect);
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(this, frameRect);
     }
 
     while (parentUi) {
@@ -8328,10 +8333,10 @@ void FrameNode::GetVisibleRectWithClip(
         }
         frameRect = ApplyFrameNodeTranformToRect(frameRect, parentUi);
         auto ancestor = parentUi->GetCoordinateAncestorNodeOfFrame(true);
-        if (ancestor && parentUi->HasAdoptedCompensation()) {
-            parentUi->ApplyAdoptedCompensationToRect(visibleRect);
-            parentUi->ApplyAdoptedCompensationToRect(visibleInnerRect);
-            parentUi->ApplyAdoptedCompensationToRect(frameRect);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parentUi.GetRawPtr())) {
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(parentUi.GetRawPtr(), visibleRect);
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(parentUi.GetRawPtr(), visibleInnerRect);
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(parentUi.GetRawPtr(), frameRect);
         }
         parentUi = ancestor;
     }
@@ -8370,9 +8375,9 @@ const CacheVisibleRectResult& FrameNode::GetCacheVisibleRect(uint64_t timestamp,
         innerScale = { innerScale.x * static_cast<float>(matrix4.GetScaleX()),
             innerScale.y * static_cast<float>(matrix4.GetScaleY()) };
     }
-    if (parentUi && HasAdoptedCompensation()) {
-        ApplyAdoptedCompensationToRect(rectToParent);
-        auto compensationScale = GetAdoptedCompensationScale();
+    if (parentUi && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(this, rectToParent);
+        auto compensationScale = FrameNodeAdoptedCompensation::GetAdoptedCompensationScale(this);
         scale = { scale.x * compensationScale.x, scale.y * compensationScale.y };
         innerScale = { innerScale.x * compensationScale.x, innerScale.y * compensationScale.y };
     }
@@ -9695,6 +9700,16 @@ MountPolicy FrameNode::GetMountPolicy()
 void FrameNode::SetMountPolicy(MountPolicy mountPolicy)
 {
     mountPolicy_ = mountPolicy;
+}
+
+std::unique_ptr<FrameNode::AdoptedCompensationInfo>& FrameNode::GetAdoptedCompensationInfo()
+{
+    return adoptedCompensationInfo_;
+}
+
+const std::unique_ptr<FrameNode::AdoptedCompensationInfo>& FrameNode::GetAdoptedCompensationInfo() const
+{
+    return adoptedCompensationInfo_;
 }
 
 void FrameNode::OnMixedMountChildAdded(const RefPtr<UINode>& child)

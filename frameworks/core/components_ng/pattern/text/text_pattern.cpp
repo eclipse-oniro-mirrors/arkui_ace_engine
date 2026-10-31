@@ -52,6 +52,7 @@
 #include "core/components/common/properties/text_style_parser.h"
 #include "core/components/common/properties/text_style_gradient.h"
 #include "core/components_ng/base/geometry_node.h"
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include "core/components_ng/gestures/recognizers/gesture_recognizer.h"
 #include "core/components_ng/manager/select_content_overlay/selection_container.h"
 #include "core/components_ng/manager/select_overlay/select_overlay_manager.h"
@@ -8351,8 +8352,8 @@ const RefPtr<ScrollablePattern> TextPattern::FindScrollableParentWithRelativeOff
     auto renderContext = host->GetRenderContext();
     CHECK_NULL_RETURN(renderContext, nullptr);
     offset = renderContext->GetPaintRectWithTransform().GetOffset();
-    if (parent && host->HasAdoptedCompensation()) {
-        offset += host->GetTransformedAdoptedCompensationOffset();
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(host.GetRawPtr())) {
+        offset += FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(host.GetRawPtr());
     }
     while (parent) {
         auto scrollablePattern = parent->GetPattern<ScrollablePattern>();
@@ -8363,8 +8364,8 @@ const RefPtr<ScrollablePattern> TextPattern::FindScrollableParentWithRelativeOff
         CHECK_NULL_RETURN(parentRenderContext, nullptr);
         offset += parentRenderContext->GetPaintRectWithTransform().GetOffset();
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
-        if (ancestor && parent->HasAdoptedCompensation()) {
-            offset += parent->GetTransformedAdoptedCompensationOffset();
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            offset += FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(parent.GetRawPtr());
         }
         parent = ancestor;
     }

@@ -288,6 +288,7 @@ ohos_static_library("ace_components_base") {
     "$ace_root/frameworks/core/components_ng/base/extension_handler.cpp",
     "$ace_root/frameworks/core/components_ng/base/frame_node.cpp",
     "$ace_root/frameworks/core/components_ng/base/frame_node_adopted_compensation.cpp",
+    "$ace_root/test/mock/frameworks/core/components_ng/render/mock_frame_node_adopted_render_adapter.cpp",
     "$ace_root/frameworks/core/components_ng/base/frame_node_multi_thread.cpp",
     "$ace_root/frameworks/core/components_ng/base/geometry_node.cpp",
     "$ace_root/frameworks/core/components_ng/base/inspector.cpp",

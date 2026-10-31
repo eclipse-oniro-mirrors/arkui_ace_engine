@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-#include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 
 #include <algorithm>
 #include <cmath>
@@ -22,9 +22,15 @@
 
 #include "base/geometry/transform_util.h"
 #include "base/utils/utils.h"
+#include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/base/frame_node_adopted_render_adapter.h"
 
 namespace OHOS::Ace::NG {
 namespace {
+constexpr int32_t TRANSLATION_X_ROW = 0;
+constexpr int32_t TRANSLATION_Y_ROW = 1;
+constexpr int32_t TRANSLATION_COLUMN = 3;
+
 RectF GetBoundingRect(const std::vector<Point>& points)
 {
     CHECK_NULL_RETURN(!points.empty(), RectF());
@@ -50,136 +56,302 @@ std::vector<Point> GetRectPoints(const RectF& rect)
         Point(rect.Left(), rect.Bottom()),
     };
 }
+
+bool IsUnsupportedTransform(const Matrix4& matrix, bool checkScale)
+{
+    DecomposedTransform transform;
+    if (!TransformUtil::DecomposeTransform(transform, matrix)) {
+        return true;
+    }
+    constexpr int32_t zIndex = 2;
+    Quaternion identity(0.0f, 0.0f, 0.0f, 1.0f);
+    if (transform.quaternion != identity || !NearZero(transform.translate[zIndex])) {
+        return true;
+    }
+    if (!checkScale) {
+        return false;
+    }
+    for (const auto& scale : transform.scale) {
+        if (!NearEqual(scale, 1.0)) {
+            return true;
+        }
+    }
+    return false;
+}
 } // namespace
 
-void FrameNode::SetUseAdoptedCompensation(bool useAdoptedCompensation)
+bool FrameNodeAdoptedCompensation::UseAdoptedCompensation(const FrameNode* frameNode)
 {
-    if (!useAdoptedCompensation && !UseAdoptedCompensation()) {
+    CHECK_NULL_RETURN(frameNode, false);
+    const auto& compensationInfo = frameNode->GetAdoptedCompensationInfo();
+    return compensationInfo && compensationInfo->useAdoptedCompensation;
+}
+
+void FrameNodeAdoptedCompensation::SetUseAdoptedCompensation(
+    FrameNode* frameNode, bool useAdoptedCompensation)
+{
+    CHECK_NULL_VOID(frameNode);
+    if (!useAdoptedCompensation && !UseAdoptedCompensation(frameNode)) {
         return;
     }
+    auto& compensationInfo = frameNode->GetAdoptedCompensationInfo();
     if (!useAdoptedCompensation) {
-        adoptedCompensationInfo_.reset();
+        compensationInfo.reset();
         return;
     }
-    if (!adoptedCompensationInfo_) {
-        adoptedCompensationInfo_ = std::make_unique<AdoptedCompensationInfo>();
+    if (!compensationInfo) {
+        compensationInfo = std::make_unique<FrameNode::AdoptedCompensationInfo>();
     }
-    adoptedCompensationInfo_->useAdoptedCompensation = true;
+    compensationInfo->useAdoptedCompensation = true;
 }
 
-bool FrameNode::HasAdoptedCompensation() const
+bool FrameNodeAdoptedCompensation::HasAdoptedCompensation(const FrameNode* frameNode)
 {
-    return IsAdopted() && UseAdoptedCompensation();
+    return frameNode && frameNode->IsAdopted() && UseAdoptedCompensation(frameNode);
 }
 
-void FrameNode::SetAdoptedCompensation(const OffsetF& offset, const Matrix4& transform)
+void FrameNodeAdoptedCompensation::SetAdoptedCompensation(
+    FrameNode* frameNode, const OffsetF& offset, const Matrix4& transform)
 {
-    if (!adoptedCompensationInfo_) {
-        adoptedCompensationInfo_ = std::make_unique<AdoptedCompensationInfo>();
+    CHECK_NULL_VOID(frameNode);
+    auto& compensationInfo = frameNode->GetAdoptedCompensationInfo();
+    if (!compensationInfo) {
+        compensationInfo = std::make_unique<FrameNode::AdoptedCompensationInfo>();
     }
-    adoptedCompensationInfo_->offset = offset;
-    adoptedCompensationInfo_->transform = transform;
+    compensationInfo->offset = offset;
+    compensationInfo->transform = transform;
 }
 
-OffsetF FrameNode::GetAdoptedCompensationOffset() const
+OffsetF FrameNodeAdoptedCompensation::GetAdoptedCompensationOffset(const FrameNode* frameNode)
 {
-    return adoptedCompensationInfo_ ? adoptedCompensationInfo_->offset : OffsetF();
+    CHECK_NULL_RETURN(frameNode, OffsetF());
+    const auto& compensationInfo = frameNode->GetAdoptedCompensationInfo();
+    return compensationInfo ? compensationInfo->offset : OffsetF();
 }
 
-Matrix4 FrameNode::GetAdoptedCompensationTransform() const
+Matrix4 FrameNodeAdoptedCompensation::GetAdoptedCompensationTransform(const FrameNode* frameNode)
 {
-    return adoptedCompensationInfo_ ? adoptedCompensationInfo_->transform : Matrix4();
+    CHECK_NULL_RETURN(frameNode, Matrix4());
+    const auto& compensationInfo = frameNode->GetAdoptedCompensationInfo();
+    return compensationInfo ? compensationInfo->transform : Matrix4();
 }
 
-void FrameNode::ApplyAdoptedCompensationToPoints(std::vector<Point>& points) const
+bool FrameNodeAdoptedCompensation::HasAdoptedCompensationNonTranslationTransform(const FrameNode* frameNode)
 {
-    if (!HasAdoptedCompensation()) {
+    std::vector<FrameNodeAdoptedRenderAdapter::RSNodePtr> layers;
+    if (FrameNodeAdoptedRenderAdapter::CollectLayers(frameNode, layers) && !layers.empty()) {
+        return std::any_of(layers.begin(), layers.end(), [](const auto& layer) {
+            auto transform = FrameNodeAdoptedRenderAdapter::GetTransform(layer);
+            transform.SetEntry(TRANSLATION_X_ROW, TRANSLATION_COLUMN, 0.0);
+            transform.SetEntry(TRANSLATION_Y_ROW, TRANSLATION_COLUMN, 0.0);
+            return !transform.IsIdentityMatrix();
+        });
+    }
+    auto transform = GetAdoptedCompensationTransform(frameNode);
+    transform.SetEntry(TRANSLATION_X_ROW, TRANSLATION_COLUMN, 0.0);
+    transform.SetEntry(TRANSLATION_Y_ROW, TRANSLATION_COLUMN, 0.0);
+    return !transform.IsIdentityMatrix();
+}
+
+bool FrameNodeAdoptedCompensation::HasAdoptedCompensationUnsupportedTransform(
+    const FrameNode* frameNode, bool checkScale)
+{
+    std::vector<FrameNodeAdoptedRenderAdapter::RSNodePtr> layers;
+    if (FrameNodeAdoptedRenderAdapter::CollectLayers(frameNode, layers) && !layers.empty()) {
+        return std::any_of(layers.begin(), layers.end(), [checkScale](const auto& layer) {
+            return IsUnsupportedTransform(FrameNodeAdoptedRenderAdapter::GetTransform(layer), checkScale);
+        });
+    }
+    return HasAdoptedCompensation(frameNode) &&
+        IsUnsupportedTransform(GetAdoptedCompensationTransform(frameNode), checkScale);
+}
+
+bool FrameNodeAdoptedCompensation::HasAdoptedCompensationPaintRectTransform(const FrameNode* frameNode)
+{
+    std::vector<FrameNodeAdoptedRenderAdapter::RSNodePtr> layers;
+    if (FrameNodeAdoptedRenderAdapter::CollectLayers(frameNode, layers) && !layers.empty()) {
+        return std::any_of(layers.begin(), layers.end(), [](const auto& layer) {
+            auto bounds = FrameNodeAdoptedRenderAdapter::GetBounds(layer);
+            return FrameNodeAdoptedRenderAdapter::GetPaintRect(layer) != bounds;
+        });
+    }
+    if (!HasAdoptedCompensation(frameNode)) {
+        return false;
+    }
+    auto transformedOrigin = GetAdoptedCompensationTransform(frameNode) * Point();
+    auto offset = GetAdoptedCompensationOffset(frameNode);
+    return !NearEqual(transformedOrigin.GetX(), offset.GetX()) ||
+        !NearEqual(transformedOrigin.GetY(), offset.GetY()) ||
+        HasAdoptedCompensationNonTranslationTransform(frameNode);
+}
+
+void FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoints(
+    const FrameNode* frameNode, std::vector<Point>& points)
+{
+    if (!HasAdoptedCompensation(frameNode)) {
         return;
     }
-    auto offset = GetAdoptedCompensationOffset();
-    auto transform = GetAdoptedCompensationTransform();
+    auto transform = GetAdoptedCompensationTransform(frameNode);
     for (auto& point : points) {
-        point = transform * (point + Offset(offset.GetX(), offset.GetY()));
+        point = transform * point;
     }
 }
 
-void FrameNode::ApplyAdoptedCompensationToPoints(std::vector<PointF>& points) const
+void FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoints(
+    const FrameNode* frameNode, std::vector<PointF>& points)
 {
-    if (!HasAdoptedCompensation()) {
+    if (!HasAdoptedCompensation(frameNode)) {
         return;
     }
-    auto offset = GetAdoptedCompensationOffset();
-    auto transform = GetAdoptedCompensationTransform();
+    auto transform = GetAdoptedCompensationTransform(frameNode);
     for (auto& point : points) {
-        auto result = transform * (Point(point.GetX(), point.GetY()) + Offset(offset.GetX(), offset.GetY()));
+        auto result = transform * Point(point.GetX(), point.GetY());
         point.SetX(result.GetX());
         point.SetY(result.GetY());
     }
 }
 
-void FrameNode::ApplyAdoptedCompensationToRect(RectF& rect) const
+void FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(const FrameNode* frameNode, RectF& rect)
 {
-    auto points = GetRectPoints(rect);
-    ApplyAdoptedCompensationToPoints(points);
-    rect = GetBoundingRect(points);
-}
-
-void FrameNode::ApplyAdoptedCompensationToPoint(Point& point) const
-{
-    if (!HasAdoptedCompensation()) {
+    std::vector<FrameNodeAdoptedRenderAdapter::RSNodePtr> layers;
+    if (!FrameNodeAdoptedRenderAdapter::CollectLayers(frameNode, layers) || layers.empty()) {
+        auto points = GetRectPoints(rect);
+        ApplyAdoptedCompensationToPoints(frameNode, points);
+        rect = GetBoundingRect(points);
         return;
     }
-    auto offset = GetAdoptedCompensationOffset();
-    point = GetAdoptedCompensationTransform() * (point + Offset(offset.GetX(), offset.GetY()));
+    for (const auto& layer : layers) {
+        auto scale = FrameNodeAdoptedRenderAdapter::GetScale(layer);
+        auto offset = rect.GetOffset();
+        rect.SetWidth(rect.Width() * scale.x);
+        rect.SetHeight(rect.Height() * scale.y);
+        offset = OffsetF(offset.GetX() * scale.x, offset.GetY() * scale.y);
+        offset += FrameNodeAdoptedRenderAdapter::GetPaintRect(layer).GetOffset();
+        rect.SetOffset(offset);
+    }
 }
 
-void FrameNode::ApplyAdoptedCompensationToPoint(PointF& point) const
+void FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(const FrameNode* frameNode, Point& point)
+{
+    if (!HasAdoptedCompensation(frameNode)) {
+        return;
+    }
+    point = GetAdoptedCompensationTransform(frameNode) * point;
+}
+
+void FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(const FrameNode* frameNode, PointF& point)
 {
     Point transformedPoint(point.GetX(), point.GetY());
-    ApplyAdoptedCompensationToPoint(transformedPoint);
+    ApplyAdoptedCompensationToPoint(frameNode, transformedPoint);
     point.SetX(transformedPoint.GetX());
     point.SetY(transformedPoint.GetY());
 }
 
-void FrameNode::RevertAdoptedCompensationFromPoint(PointF& point) const
+void FrameNodeAdoptedCompensation::RevertAdoptedCompensationFromPoint(const FrameNode* frameNode, Point& point)
 {
-    if (!HasAdoptedCompensation()) {
+    if (!HasAdoptedCompensation(frameNode)) {
         return;
     }
-    auto transformedPoint =
-        Matrix4::Invert(GetAdoptedCompensationTransform()) * Point(point.GetX(), point.GetY());
-    auto offset = GetAdoptedCompensationOffset();
-    point.SetX(transformedPoint.GetX() - offset.GetX());
-    point.SetY(transformedPoint.GetY() - offset.GetY());
+    point = Matrix4::Invert(GetAdoptedCompensationTransform(frameNode)) * point;
 }
 
-void FrameNode::ApplyAdoptedCompensationToCenterAndSize(PointF& center, float& width, float& height) const
+void FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPointFromWindow(
+    const FrameNode* frameNode, Point& point)
 {
-    if (!HasAdoptedCompensation()) {
+    std::vector<FrameNodeAdoptedRenderAdapter::RSNodePtr> layers;
+    if (!FrameNodeAdoptedRenderAdapter::CollectLayers(frameNode, layers) || layers.empty()) {
+        RevertAdoptedCompensationFromPoint(frameNode, point);
         return;
     }
-    ApplyAdoptedCompensationToPoint(center);
-    auto offset = GetAdoptedCompensationOffset();
-    auto transform = GetAdoptedCompensationTransform();
-    auto origin = transform * Point(offset.GetX(), offset.GetY());
-    auto right = transform * Point(offset.GetX() + width, offset.GetY());
-    auto bottom = transform * Point(offset.GetX(), offset.GetY() + height);
+    for (const auto& layer : layers) {
+        auto offset = FrameNodeAdoptedRenderAdapter::GetBounds(layer).GetOffset();
+        point = point - Offset(offset.GetX(), offset.GetY());
+        point = FrameNodeAdoptedRenderAdapter::GetTransform(layer) * point;
+    }
+}
+
+void FrameNodeAdoptedCompensation::RevertAdoptedCompensationFromPoint(const FrameNode* frameNode, PointF& point)
+{
+    Point transformedPoint(point.GetX(), point.GetY());
+    RevertAdoptedCompensationFromPoint(frameNode, transformedPoint);
+    point.SetX(transformedPoint.GetX());
+    point.SetY(transformedPoint.GetY());
+}
+
+void FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToCenterAndSize(
+    const FrameNode* frameNode, PointF& center, float& width, float& height)
+{
+    if (!HasAdoptedCompensation(frameNode)) {
+        return;
+    }
+    ApplyAdoptedCompensationToPoint(frameNode, center);
+    std::vector<FrameNodeAdoptedRenderAdapter::RSNodePtr> layers;
+    if (FrameNodeAdoptedRenderAdapter::CollectLayers(frameNode, layers) && !layers.empty()) {
+        for (const auto& layer : layers) {
+            auto scale = FrameNodeAdoptedRenderAdapter::GetScale(layer);
+            width *= scale.x;
+            height *= scale.y;
+        }
+        return;
+    }
+    auto transform = GetAdoptedCompensationTransform(frameNode);
+    auto origin = transform * Point();
+    auto right = transform * Point(width, 0.0);
+    auto bottom = transform * Point(0.0, height);
     width = std::hypot(right.GetX() - origin.GetX(), right.GetY() - origin.GetY());
     height = std::hypot(bottom.GetX() - origin.GetX(), bottom.GetY() - origin.GetY());
 }
 
-OffsetF FrameNode::GetTransformedAdoptedCompensationOffset() const
+OffsetF FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(const FrameNode* frameNode)
 {
-    CHECK_NULL_RETURN(HasAdoptedCompensation(), OffsetF());
-    auto offset = GetAdoptedCompensationOffset();
-    auto point = GetAdoptedCompensationTransform() * Point(offset.GetX(), offset.GetY());
+    std::vector<FrameNodeAdoptedRenderAdapter::RSNodePtr> layers;
+    if (FrameNodeAdoptedRenderAdapter::CollectLayers(frameNode, layers) && !layers.empty()) {
+        OffsetF result;
+        for (const auto& layer : layers) {
+            result += FrameNodeAdoptedRenderAdapter::GetPaintRect(layer).GetOffset();
+        }
+        return result;
+    }
+    auto point = GetAdoptedCompensationTransform(frameNode) * Point();
     return OffsetF(point.GetX(), point.GetY());
 }
 
-VectorF FrameNode::GetAdoptedCompensationScale() const
+std::pair<OffsetF, bool> FrameNodeAdoptedCompensation::GetAdoptedCompensationOffsetWithTranslate(
+    const FrameNode* frameNode)
 {
+    std::vector<FrameNodeAdoptedRenderAdapter::RSNodePtr> layers;
+    if (!FrameNodeAdoptedRenderAdapter::CollectLayers(frameNode, layers) || layers.empty()) {
+        return { GetAdoptedCompensationOffset(frameNode),
+            HasAdoptedCompensationNonTranslationTransform(frameNode) };
+    }
+    OffsetF result;
+    bool hasNonTranslationTransform = false;
+    for (const auto& layer : layers) {
+        auto bounds = FrameNodeAdoptedRenderAdapter::GetBounds(layer);
+        auto translate = FrameNodeAdoptedRenderAdapter::GetTranslate(layer);
+        result += bounds.GetOffset() + translate;
+        auto matrix = FrameNodeAdoptedRenderAdapter::GetTransform(layer);
+        matrix.SetEntry(TRANSLATION_X_ROW, TRANSLATION_COLUMN, 0.0);
+        matrix.SetEntry(TRANSLATION_Y_ROW, TRANSLATION_COLUMN, 0.0);
+        hasNonTranslationTransform = hasNonTranslationTransform || !matrix.IsIdentityMatrix();
+    }
+    return { result, hasNonTranslationTransform };
+}
+
+VectorF FrameNodeAdoptedCompensation::GetAdoptedCompensationScale(const FrameNode* frameNode)
+{
+    std::vector<FrameNodeAdoptedRenderAdapter::RSNodePtr> layers;
+    if (FrameNodeAdoptedRenderAdapter::CollectLayers(frameNode, layers) && !layers.empty()) {
+        VectorF result(1.0f, 1.0f);
+        for (const auto& layer : layers) {
+            auto scale = FrameNodeAdoptedRenderAdapter::GetScale(layer);
+            result.x *= scale.x;
+            result.y *= scale.y;
+        }
+        return result;
+    }
     DecomposedTransform transform;
-    if (!TransformUtil::DecomposeTransform(transform, GetAdoptedCompensationTransform())) {
+    if (!TransformUtil::DecomposeTransform(transform, GetAdoptedCompensationTransform(frameNode))) {
         return VectorF(1.0f, 1.0f);
     }
     return VectorF(static_cast<float>(transform.scale[0]), static_cast<float>(transform.scale[1]));

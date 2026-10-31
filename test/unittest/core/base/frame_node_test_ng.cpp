@@ -22,6 +22,7 @@
 #include "core/accessibility/accessibility_manager.h"
 #include "core/components/common/properties/border_image.h"
 #include "core/components_ng/animation/geometry_transition.h"
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include "core/components_ng/layout/layout_wrapper_node.h"
 #include "core/components_ng/pattern/custom/custom_measure_layout_node.h"
 #include "core/components_ng/pattern/custom/custom_node.h"
@@ -4000,26 +4001,46 @@ HWTEST_F(FrameNodeTestNg, FrameNodeAdoptedCompensation001, TestSize.Level1)
     ASSERT_NE(parent, nullptr);
     ASSERT_NE(child, nullptr);
     parent->AdoptChild(child);
-    child->SetUseAdoptedCompensation(true);
-    child->SetAdoptedCompensation(OffsetF(10.0f, 20.0f), Matrix4::CreateScale(2.0, 3.0, 1.0));
+    FrameNodeAdoptedCompensation::SetUseAdoptedCompensation(child.GetRawPtr(), true);
+    auto transform = Matrix4::CreateTranslate(10.0, 20.0, 0.0) * Matrix4::CreateScale(2.0, 3.0, 1.0);
+    FrameNodeAdoptedCompensation::SetAdoptedCompensation(
+        child.GetRawPtr(), OffsetF(10.0f, 20.0f), transform);
 
-    EXPECT_TRUE(child->HasAdoptedCompensation());
+    EXPECT_TRUE(FrameNodeAdoptedCompensation::HasAdoptedCompensation(child.GetRawPtr()));
     EXPECT_EQ(child->GetCoordinateAncestorNodeOfFrame(), parent);
-    EXPECT_EQ(child->GetTransformedAdoptedCompensationOffset(), OffsetF(20.0f, 60.0f));
-    EXPECT_FLOAT_EQ(child->GetAdoptedCompensationScale().x, 2.0f);
-    EXPECT_FLOAT_EQ(child->GetAdoptedCompensationScale().y, 3.0f);
+    EXPECT_EQ(FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(child.GetRawPtr()),
+        OffsetF(10.0f, 20.0f));
+    EXPECT_FLOAT_EQ(FrameNodeAdoptedCompensation::GetAdoptedCompensationScale(child.GetRawPtr()).x, 2.0f);
+    EXPECT_FLOAT_EQ(FrameNodeAdoptedCompensation::GetAdoptedCompensationScale(child.GetRawPtr()).y, 3.0f);
+    EXPECT_TRUE(FrameNodeAdoptedCompensation::HasAdoptedCompensationNonTranslationTransform(child.GetRawPtr()));
+    EXPECT_TRUE(FrameNodeAdoptedCompensation::HasAdoptedCompensationPaintRectTransform(child.GetRawPtr()));
+    auto [translateOffset, translateError] =
+        FrameNodeAdoptedCompensation::GetAdoptedCompensationOffsetWithTranslate(child.GetRawPtr());
+    EXPECT_EQ(translateOffset, OffsetF(10.0f, 20.0f));
+    EXPECT_TRUE(translateError);
 
     PointF point(1.0f, 2.0f);
-    child->ApplyAdoptedCompensationToPoint(point);
-    EXPECT_FLOAT_EQ(point.GetX(), 22.0f);
-    EXPECT_FLOAT_EQ(point.GetY(), 66.0f);
-    child->RevertAdoptedCompensationFromPoint(point);
+    FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(child.GetRawPtr(), point);
+    EXPECT_FLOAT_EQ(point.GetX(), 12.0f);
+    EXPECT_FLOAT_EQ(point.GetY(), 26.0f);
+    FrameNodeAdoptedCompensation::RevertAdoptedCompensationFromPoint(child.GetRawPtr(), point);
     EXPECT_FLOAT_EQ(point.GetX(), 1.0f);
     EXPECT_FLOAT_EQ(point.GetY(), 2.0f);
+    Point fromWindowPoint(12.0, 26.0);
+    FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPointFromWindow(
+        child.GetRawPtr(), fromWindowPoint);
+    EXPECT_DOUBLE_EQ(fromWindowPoint.GetX(), 1.0);
+    EXPECT_DOUBLE_EQ(fromWindowPoint.GetY(), 2.0);
 
     RectF rect(1.0f, 2.0f, 3.0f, 4.0f);
-    child->ApplyAdoptedCompensationToRect(rect);
-    EXPECT_EQ(rect, RectF(22.0f, 66.0f, 6.0f, 12.0f));
+    FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(child.GetRawPtr(), rect);
+    EXPECT_EQ(rect, RectF(12.0f, 26.0f, 6.0f, 12.0f));
+
+    FrameNodeAdoptedCompensation::SetAdoptedCompensation(
+        child.GetRawPtr(), OffsetF(10.0f, 20.0f), Matrix4::CreateTranslate(10.0, 20.0, 0.0));
+    EXPECT_EQ(FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(child.GetRawPtr()),
+        OffsetF(10.0f, 20.0f));
+    EXPECT_FALSE(FrameNodeAdoptedCompensation::HasAdoptedCompensationNonTranslationTransform(child.GetRawPtr()));
 }
 
 /**
@@ -4036,23 +4057,24 @@ HWTEST_F(FrameNodeTestNg, FrameNodeAdoptedCompensation002, TestSize.Level1)
     ASSERT_NE(parent, nullptr);
     ASSERT_NE(child, nullptr);
     parent->AdoptChild(child);
-    child->SetAdoptedCompensation(OffsetF(10.0f, 20.0f), Matrix4::CreateScale(2.0, 3.0, 1.0));
+    FrameNodeAdoptedCompensation::SetAdoptedCompensation(
+        child.GetRawPtr(), OffsetF(10.0f, 20.0f), Matrix4::CreateScale(2.0, 3.0, 1.0));
 
-    EXPECT_FALSE(child->UseAdoptedCompensation());
-    EXPECT_FALSE(child->HasAdoptedCompensation());
+    EXPECT_FALSE(FrameNodeAdoptedCompensation::UseAdoptedCompensation(child.GetRawPtr()));
+    EXPECT_FALSE(FrameNodeAdoptedCompensation::HasAdoptedCompensation(child.GetRawPtr()));
     EXPECT_EQ(child->GetCoordinateAncestorNodeOfFrame(), nullptr);
     PointF point(1.0f, 2.0f);
-    child->ApplyAdoptedCompensationToPoint(point);
+    FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(child.GetRawPtr(), point);
     EXPECT_EQ(point, PointF(1.0f, 2.0f));
 
-    child->SetUseAdoptedCompensation(true);
-    ASSERT_TRUE(child->HasAdoptedCompensation());
+    FrameNodeAdoptedCompensation::SetUseAdoptedCompensation(child.GetRawPtr(), true);
+    ASSERT_TRUE(FrameNodeAdoptedCompensation::HasAdoptedCompensation(child.GetRawPtr()));
     ASSERT_TRUE(parent->RemoveAdoptedChild(child));
     EXPECT_FALSE(child->IsAdopted());
-    EXPECT_FALSE(child->UseAdoptedCompensation());
-    EXPECT_FALSE(child->HasAdoptedCompensation());
-    EXPECT_EQ(child->GetAdoptedCompensationOffset(), OffsetF());
-    EXPECT_TRUE(child->GetAdoptedCompensationTransform().IsIdentityMatrix());
+    EXPECT_FALSE(FrameNodeAdoptedCompensation::UseAdoptedCompensation(child.GetRawPtr()));
+    EXPECT_FALSE(FrameNodeAdoptedCompensation::HasAdoptedCompensation(child.GetRawPtr()));
+    EXPECT_EQ(FrameNodeAdoptedCompensation::GetAdoptedCompensationOffset(child.GetRawPtr()), OffsetF());
+    EXPECT_TRUE(FrameNodeAdoptedCompensation::GetAdoptedCompensationTransform(child.GetRawPtr()).IsIdentityMatrix());
 }
 
 /**
@@ -4066,34 +4088,36 @@ HWTEST_F(FrameNodeTestNg, FrameNodeAdoptedCompensation003, TestSize.Level1)
         "adoptedChild", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
     ASSERT_NE(child, nullptr);
 
-    EXPECT_FALSE(child->UseAdoptedCompensation());
-    EXPECT_FALSE(child->HasAdoptedCompensation());
-    EXPECT_EQ(child->GetAdoptedCompensationOffset(), OffsetF());
-    EXPECT_TRUE(child->GetAdoptedCompensationTransform().IsIdentityMatrix());
-    EXPECT_EQ(child->GetTransformedAdoptedCompensationOffset(), OffsetF());
-    child->SetUseAdoptedCompensation(false);
-    EXPECT_EQ(child->adoptedCompensationInfo_, nullptr);
+    EXPECT_FALSE(FrameNodeAdoptedCompensation::UseAdoptedCompensation(child.GetRawPtr()));
+    EXPECT_FALSE(FrameNodeAdoptedCompensation::HasAdoptedCompensation(child.GetRawPtr()));
+    EXPECT_EQ(FrameNodeAdoptedCompensation::GetAdoptedCompensationOffset(child.GetRawPtr()), OffsetF());
+    EXPECT_TRUE(FrameNodeAdoptedCompensation::GetAdoptedCompensationTransform(child.GetRawPtr()).IsIdentityMatrix());
+    EXPECT_EQ(FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(child.GetRawPtr()), OffsetF());
+    FrameNodeAdoptedCompensation::SetUseAdoptedCompensation(child.GetRawPtr(), false);
+    EXPECT_EQ(child->GetAdoptedCompensationInfo(), nullptr);
 
     auto transform = Matrix4::CreateTranslate(3.0, 4.0, 0.0) * Matrix4::CreateScale(2.0, 3.0, 1.0);
-    child->SetAdoptedCompensation(OffsetF(10.0f, 20.0f), transform);
-    ASSERT_NE(child->adoptedCompensationInfo_, nullptr);
-    EXPECT_FALSE(child->UseAdoptedCompensation());
-    EXPECT_EQ(child->GetAdoptedCompensationOffset(), OffsetF(10.0f, 20.0f));
-    EXPECT_EQ(child->GetAdoptedCompensationTransform(), transform);
+    FrameNodeAdoptedCompensation::SetAdoptedCompensation(
+        child.GetRawPtr(), OffsetF(10.0f, 20.0f), transform);
+    ASSERT_NE(child->GetAdoptedCompensationInfo(), nullptr);
+    EXPECT_FALSE(FrameNodeAdoptedCompensation::UseAdoptedCompensation(child.GetRawPtr()));
+    EXPECT_EQ(FrameNodeAdoptedCompensation::GetAdoptedCompensationOffset(child.GetRawPtr()),
+        OffsetF(10.0f, 20.0f));
+    EXPECT_EQ(FrameNodeAdoptedCompensation::GetAdoptedCompensationTransform(child.GetRawPtr()), transform);
 
-    child->SetUseAdoptedCompensation(true);
-    EXPECT_TRUE(child->UseAdoptedCompensation());
-    EXPECT_FALSE(child->HasAdoptedCompensation());
-    child->SetUseAdoptedCompensation(false);
-    EXPECT_FALSE(child->UseAdoptedCompensation());
-    EXPECT_EQ(child->adoptedCompensationInfo_, nullptr);
-    child->SetUseAdoptedCompensation(false);
-    EXPECT_EQ(child->adoptedCompensationInfo_, nullptr);
+    FrameNodeAdoptedCompensation::SetUseAdoptedCompensation(child.GetRawPtr(), true);
+    EXPECT_TRUE(FrameNodeAdoptedCompensation::UseAdoptedCompensation(child.GetRawPtr()));
+    EXPECT_FALSE(FrameNodeAdoptedCompensation::HasAdoptedCompensation(child.GetRawPtr()));
+    FrameNodeAdoptedCompensation::SetUseAdoptedCompensation(child.GetRawPtr(), false);
+    EXPECT_FALSE(FrameNodeAdoptedCompensation::UseAdoptedCompensation(child.GetRawPtr()));
+    EXPECT_EQ(child->GetAdoptedCompensationInfo(), nullptr);
+    FrameNodeAdoptedCompensation::SetUseAdoptedCompensation(child.GetRawPtr(), false);
+    EXPECT_EQ(child->GetAdoptedCompensationInfo(), nullptr);
 }
 
 /**
  * @tc.name: FrameNodeAdoptedCompensation004
- * @tc.desc: Test Point and PointF collection overloads apply offset before transform.
+ * @tc.desc: Test Point and PointF collection overloads apply the complete transform without adding layout offset.
  * @tc.type: FUNC
  */
 HWTEST_F(FrameNodeTestNg, FrameNodeAdoptedCompensation004, TestSize.Level1)
@@ -4105,34 +4129,39 @@ HWTEST_F(FrameNodeTestNg, FrameNodeAdoptedCompensation004, TestSize.Level1)
     ASSERT_NE(parent, nullptr);
     ASSERT_NE(child, nullptr);
     parent->AdoptChild(child);
-    child->SetUseAdoptedCompensation(true);
-    child->SetAdoptedCompensation(OffsetF(10.0f, 20.0f), Matrix4::CreateScale(2.0, 3.0, 1.0));
+    FrameNodeAdoptedCompensation::SetUseAdoptedCompensation(child.GetRawPtr(), true);
+    auto transform = Matrix4::CreateTranslate(10.0, 20.0, 0.0) * Matrix4::CreateScale(2.0, 3.0, 1.0);
+    FrameNodeAdoptedCompensation::SetAdoptedCompensation(
+        child.GetRawPtr(), OffsetF(10.0f, 20.0f), transform);
 
     std::vector<Point> points = { Point(1.0, 2.0), Point(-1.0, -2.0) };
-    child->ApplyAdoptedCompensationToPoints(points);
+    FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoints(child.GetRawPtr(), points);
     ASSERT_EQ(points.size(), 2);
-    EXPECT_DOUBLE_EQ(points[0].GetX(), 22.0);
-    EXPECT_DOUBLE_EQ(points[0].GetY(), 66.0);
-    EXPECT_DOUBLE_EQ(points[1].GetX(), 18.0);
-    EXPECT_DOUBLE_EQ(points[1].GetY(), 54.0);
+    EXPECT_DOUBLE_EQ(points[0].GetX(), 12.0);
+    EXPECT_DOUBLE_EQ(points[0].GetY(), 26.0);
+    EXPECT_DOUBLE_EQ(points[1].GetX(), 8.0);
+    EXPECT_DOUBLE_EQ(points[1].GetY(), 14.0);
 
     std::vector<PointF> floatPoints = { PointF(1.0f, 2.0f), PointF(-1.0f, -2.0f) };
-    child->ApplyAdoptedCompensationToPoints(floatPoints);
+    FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoints(child.GetRawPtr(), floatPoints);
     ASSERT_EQ(floatPoints.size(), 2);
-    EXPECT_FLOAT_EQ(floatPoints[0].GetX(), 22.0f);
-    EXPECT_FLOAT_EQ(floatPoints[0].GetY(), 66.0f);
-    EXPECT_FLOAT_EQ(floatPoints[1].GetX(), 18.0f);
-    EXPECT_FLOAT_EQ(floatPoints[1].GetY(), 54.0f);
+    EXPECT_FLOAT_EQ(floatPoints[0].GetX(), 12.0f);
+    EXPECT_FLOAT_EQ(floatPoints[0].GetY(), 26.0f);
+    EXPECT_FLOAT_EQ(floatPoints[1].GetX(), 8.0f);
+    EXPECT_FLOAT_EQ(floatPoints[1].GetY(), 14.0f);
 
     Point point(1.0, 2.0);
-    child->ApplyAdoptedCompensationToPoint(point);
-    EXPECT_DOUBLE_EQ(point.GetX(), 22.0);
-    EXPECT_DOUBLE_EQ(point.GetY(), 66.0);
+    FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(child.GetRawPtr(), point);
+    EXPECT_DOUBLE_EQ(point.GetX(), 12.0);
+    EXPECT_DOUBLE_EQ(point.GetY(), 26.0);
+    FrameNodeAdoptedCompensation::RevertAdoptedCompensationFromPoint(child.GetRawPtr(), point);
+    EXPECT_DOUBLE_EQ(point.GetX(), 1.0);
+    EXPECT_DOUBLE_EQ(point.GetY(), 2.0);
 
     std::vector<Point> emptyPoints;
     std::vector<PointF> emptyFloatPoints;
-    child->ApplyAdoptedCompensationToPoints(emptyPoints);
-    child->ApplyAdoptedCompensationToPoints(emptyFloatPoints);
+    FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoints(child.GetRawPtr(), emptyPoints);
+    FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoints(child.GetRawPtr(), emptyFloatPoints);
     EXPECT_TRUE(emptyPoints.empty());
     EXPECT_TRUE(emptyFloatPoints.empty());
 }
@@ -4151,19 +4180,22 @@ HWTEST_F(FrameNodeTestNg, FrameNodeAdoptedCompensation005, TestSize.Level1)
     ASSERT_NE(parent, nullptr);
     ASSERT_NE(child, nullptr);
     parent->AdoptChild(child);
-    child->SetUseAdoptedCompensation(true);
-    child->SetAdoptedCompensation(OffsetF(10.0f, 20.0f), Matrix4::CreateScale(-2.0, 3.0, 1.0));
+    FrameNodeAdoptedCompensation::SetUseAdoptedCompensation(child.GetRawPtr(), true);
+    auto transform = Matrix4::CreateTranslate(10.0, 20.0, 0.0) * Matrix4::CreateScale(-2.0, 3.0, 1.0);
+    FrameNodeAdoptedCompensation::SetAdoptedCompensation(
+        child.GetRawPtr(), OffsetF(10.0f, 20.0f), transform);
 
     RectF rect(1.0f, 2.0f, 3.0f, 4.0f);
-    child->ApplyAdoptedCompensationToRect(rect);
-    EXPECT_EQ(rect, RectF(-28.0f, 66.0f, 6.0f, 12.0f));
+    FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(child.GetRawPtr(), rect);
+    EXPECT_EQ(rect, RectF(2.0f, 26.0f, 6.0f, 12.0f));
 
     PointF center(1.0f, 2.0f);
     float width = 3.0f;
     float height = 4.0f;
-    child->ApplyAdoptedCompensationToCenterAndSize(center, width, height);
-    EXPECT_FLOAT_EQ(center.GetX(), -22.0f);
-    EXPECT_FLOAT_EQ(center.GetY(), 66.0f);
+    FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToCenterAndSize(
+        child.GetRawPtr(), center, width, height);
+    EXPECT_FLOAT_EQ(center.GetX(), 8.0f);
+    EXPECT_FLOAT_EQ(center.GetY(), 26.0f);
     EXPECT_FLOAT_EQ(width, 6.0f);
     EXPECT_FLOAT_EQ(height, 12.0f);
 }
@@ -4178,7 +4210,8 @@ HWTEST_F(FrameNodeTestNg, FrameNodeAdoptedCompensation006, TestSize.Level1)
     auto child = FrameNode::CreateFrameNode(
         "adoptedChild", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
     ASSERT_NE(child, nullptr);
-    child->SetAdoptedCompensation(OffsetF(10.0f, 20.0f), Matrix4::CreateScale(2.0, 3.0, 1.0));
+    FrameNodeAdoptedCompensation::SetAdoptedCompensation(
+        child.GetRawPtr(), OffsetF(10.0f, 20.0f), Matrix4::CreateScale(2.0, 3.0, 1.0));
 
     std::vector<Point> points = { Point(1.0, 2.0) };
     std::vector<PointF> floatPoints = { PointF(1.0f, 2.0f) };
@@ -4188,13 +4221,14 @@ HWTEST_F(FrameNodeTestNg, FrameNodeAdoptedCompensation006, TestSize.Level1)
     PointF center(1.0f, 2.0f);
     float width = 3.0f;
     float height = 4.0f;
-    child->ApplyAdoptedCompensationToPoints(points);
-    child->ApplyAdoptedCompensationToPoints(floatPoints);
-    child->ApplyAdoptedCompensationToPoint(point);
-    child->ApplyAdoptedCompensationToPoint(floatPoint);
-    child->RevertAdoptedCompensationFromPoint(floatPoint);
-    child->ApplyAdoptedCompensationToRect(rect);
-    child->ApplyAdoptedCompensationToCenterAndSize(center, width, height);
+    FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoints(child.GetRawPtr(), points);
+    FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoints(child.GetRawPtr(), floatPoints);
+    FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(child.GetRawPtr(), point);
+    FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(child.GetRawPtr(), floatPoint);
+    FrameNodeAdoptedCompensation::RevertAdoptedCompensationFromPoint(child.GetRawPtr(), floatPoint);
+    FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(child.GetRawPtr(), rect);
+    FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToCenterAndSize(
+        child.GetRawPtr(), center, width, height);
 
     EXPECT_EQ(points[0], Point(1.0, 2.0));
     EXPECT_EQ(floatPoints[0], PointF(1.0f, 2.0f));
@@ -4204,12 +4238,12 @@ HWTEST_F(FrameNodeTestNg, FrameNodeAdoptedCompensation006, TestSize.Level1)
     EXPECT_EQ(center, PointF(1.0f, 2.0f));
     EXPECT_FLOAT_EQ(width, 3.0f);
     EXPECT_FLOAT_EQ(height, 4.0f);
-    EXPECT_EQ(child->GetTransformedAdoptedCompensationOffset(), OffsetF());
+    EXPECT_EQ(FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(child.GetRawPtr()), OffsetF());
 
     auto invalidTransform = Matrix4::CreateIdentity();
     invalidTransform.Set(3, 3, 0.0);
-    child->SetAdoptedCompensation(OffsetF(), invalidTransform);
-    auto scale = child->GetAdoptedCompensationScale();
+    FrameNodeAdoptedCompensation::SetAdoptedCompensation(child.GetRawPtr(), OffsetF(), invalidTransform);
+    auto scale = FrameNodeAdoptedCompensation::GetAdoptedCompensationScale(child.GetRawPtr());
     EXPECT_FLOAT_EQ(scale.x, 1.0f);
     EXPECT_FLOAT_EQ(scale.y, 1.0f);
 }

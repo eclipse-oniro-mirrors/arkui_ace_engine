@@ -16,6 +16,7 @@
 #include "core/components_ng/pattern/select_overlay/magnifier_controller.h"
 #include "core/common/container.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include <chrono>
 #include <cmath>
 #include <cinttypes>
@@ -149,9 +150,9 @@ void MagnifierController::SetLocalOffset(const OffsetF& localOffset, const TimeS
         patternOffset = patternOffset + paintOffset;
         renderContext->GetPointTransform(point);
         auto ancestor = node->GetCoordinateAncestorNodeOfFrame(true);
-        if (ancestor && node->HasAdoptedCompensation()) {
-            node->ApplyAdoptedCompensationToPoint(point);
-            patternOffset += node->GetAdoptedCompensationOffset();
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(node.GetRawPtr())) {
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(node.GetRawPtr(), point);
+            patternOffset += FrameNodeAdoptedCompensation::GetAdoptedCompensationOffset(node.GetRawPtr());
         }
         node = ancestor;
     }

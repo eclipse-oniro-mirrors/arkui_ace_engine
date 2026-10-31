@@ -20,6 +20,7 @@
 #include "base/utils/utils.h"
 #include "base/subwindow/subwindow_manager.h"
 #include "core/common/container.h"
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include "core/components_ng/manager/post_event/post_event_manager.h"
 #include "core/components_ng/manager/select_overlay/select_overlay_manager.h"
 #include "core/components_ng/pattern/container_modal/container_modal_pattern.h"
@@ -1282,12 +1283,8 @@ void SelectContentOverlayManager::ConvertPointRelativeToNode(
         temp = temp - rectOffset;
         if (!nodeStack.empty()) {
             auto child = nodeStack.top();
-            if (child->IsAdopted() && child->UseAdoptedCompensation()) {
-                auto pointWithRevert = Matrix4::Invert(child->GetAdoptedCompensationTransform()) *
-                    Point(temp.GetX(), temp.GetY());
-                auto offset = child->GetAdoptedCompensationOffset();
-                temp.SetX(pointWithRevert.GetX() - offset.GetX());
-                temp.SetY(pointWithRevert.GetY() - offset.GetY());
+            if (child->IsAdopted() && FrameNodeAdoptedCompensation::UseAdoptedCompensation(child.GetRawPtr())) {
+                FrameNodeAdoptedCompensation::RevertAdoptedCompensationFromPoint(child.GetRawPtr(), temp);
             }
         }
     }
