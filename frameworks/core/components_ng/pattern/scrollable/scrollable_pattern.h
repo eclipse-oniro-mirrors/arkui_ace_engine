@@ -1368,6 +1368,8 @@ private:
     std::pair<double, double> GetAutoAdjustAvoidOffset();
     void CalcPaddingAvoidDistByMainAxis(
         const std::unique_ptr<PaddingProperty>& property, std::pair<double, double>& offset, bool isRtl);
+    void CalcEffectiveSafeAreaAvoidDistByMainAxis(
+        const PaddingPropertyF& effectiveSafeAreaPadding, std::pair<double, double>& offset);
     void CalcBorderWidthAvoidDistByMainAxis(
         const std::unique_ptr<BorderWidthProperty>& property, std::pair<double, double>& offset, bool isRtl);
     bool OnScrollPosition(double& offset, int32_t source);
