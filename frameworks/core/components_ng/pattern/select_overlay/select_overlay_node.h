@@ -209,6 +209,8 @@ private:
     void BackAnimation(bool noAnimation);
     void PlaySelectMenuToExtensionAnimation(
         const RectF& selectMenuTargetRect, const std::function<void()>& onFinish);
+    std::function<void()> CreateSelectMenuToExtensionFinishCallback(const std::function<void()>& onFinish);
+    void RequestExtensionMenuAccessibilityFocusAfterLayout(const RefPtr<FrameNode>& extensionMenu);
     void PlayExtensionMenuDistortAnimation(const RefPtr<FrameNode>& extensionMenu, const OffsetF& menuPosition);
     void ContinuePlayExtensionMenuDistortAnimation(
         const RefPtr<FrameNode>& extensionMenu, const OffsetF& adjustedMenuPosition, Placement finalPlacement,
