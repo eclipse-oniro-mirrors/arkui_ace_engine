@@ -15,6 +15,8 @@
 
 #include "test/mock/frameworks/core/animation/mock_animation_manager.h"
 
+#include <type_traits>
+
 #include "core/components_ng/base/modifier.h"
 #include "core/components_ng/render/modifier_adapter.h"
 
@@ -29,6 +31,9 @@ void NodeAnimatableProperty<T, S>::AnimateWithVelocity(
         return;
     }
     MockAnimationManager::GetInstance().SetParams(option, { finishCallback, nullptr });
+    if constexpr (std::is_same_v<T, float>) {
+        MockAnimationManager::GetInstance().SetVelocity(velocity);
+    }
     MockAnimationManager::GetInstance().OpenAnimation();
     Set(value);
     MockAnimationManager::GetInstance().CloseAnimation();

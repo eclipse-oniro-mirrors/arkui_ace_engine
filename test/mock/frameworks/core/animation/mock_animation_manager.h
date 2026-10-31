@@ -64,16 +64,25 @@ public:
     struct AnimationParams {
         AnimationCallbacks callbacks;
         AnimationOperation type = AnimationOperation::PLAY;
+        RefPtr<Curve> curve;
+        float velocity = 0.0f;
 
         void Reset()
         {
             callbacks.finishCb = nullptr;
             callbacks.repeatCb = nullptr;
             type = AnimationOperation::PLAY;
+            curve.Reset();
+            velocity = 0.0f;
         }
     };
 
     void SetParams(const AnimationOption& option, AnimationCallbacks&& cbs);
+
+    void SetVelocity(float velocity)
+    {
+        params_.velocity = velocity;
+    }
 
     void AddActiveProp(const WeakPtr<PropertyBase>& prop)
     {

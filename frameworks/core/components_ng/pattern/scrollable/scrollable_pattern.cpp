@@ -1091,6 +1091,11 @@ bool ScrollablePattern::StartItemSnapAnimation(const SnapAnimationOptions& snapA
     if (!strategy.IsEnabled() || !IsScrollable()) {
         return false;
     }
+    // The container can receive touch-up before the thumb's drag-end. Let the scrollbar
+    // release own the snap decision instead of starting a competing zero-velocity snap.
+    if (scrollBar_ && scrollBar_->IsDriving() && snapAnimationOptions.source == SCROLL_FROM_NONE) {
+        return false;
+    }
     // Scrollbar fling already moving toward the reached boundary: let the default over-scroll
     // motion finish instead of seizing the animation channel — snapping here would block a
     // scrollToIndex issued from onReachEnd (same lesson as the List scrollbar fix 007561232a4).
@@ -1117,11 +1122,24 @@ bool ScrollablePattern::StartItemSnapAnimation(const SnapAnimationOptions& snapA
     auto motionVelocity = -snapAnimationOptions.animationVelocity;
     auto motionDelta = -snapAnimationOptions.snapDelta;
     auto maxOffset = GetItemSnapMaxOffset();
+    const bool innerScrollBarRelease =
+        snapAnimationOptions.source == SCROLL_FROM_BAR && scrollBar_ && scrollBar_->IsDriving();
+    if (innerScrollBarRelease && !snapAnimationOptions.fromItemSnapFlingStop && !NearZero(motionVelocity)) {
+        scrollable->SetPendingItemSnapKickoff([weak = WeakClaim(this), snapAnimationOptions]() {
+            auto pattern = weak.Upgrade();
+            CHECK_NULL_VOID(pattern);
+            auto scroll = pattern->GetScrollable();
+            CHECK_NULL_VOID(scroll);
+            scroll->StartScrollBarSnapFling(-pattern->GetItemSnapCurrentOffset(), snapAnimationOptions);
+        });
+        return true;
+    }
     // Built-in alignment starts with normal friction. Components with measured anchors
     // refine the handoff each frame; other components settle at the natural stop.
     // Axis input remains an immediate discrete step, and a settle must never defer again.
     if (!strategy.hasProvider && !snapAnimationOptions.fromItemSnapFlingStop && !NearZero(motionVelocity) &&
-        snapAnimationOptions.snapDirection == SnapDirection::NONE) {
+        snapAnimationOptions.snapDirection == SnapDirection::NONE &&
+        (!innerScrollBarRelease || !NearZero(motionDelta))) {
         PrepareItemSnapFling(motionVelocity, motionDelta);
         return false;
     }
@@ -1262,7 +1280,7 @@ bool ScrollablePattern::StartItemSnapWithProvider(const ScrollSnapStrategy& stra
     };
     scrollable->StartItemSnapTwoStageAnimation(-(approachOffset * direction),
         snapAnimationOptions.animationVelocity, snapAnimationOptions.fromScrollBar, std::move(targetGetter),
-        snapAnimationOptions.source);
+        snapAnimationOptions.source, -(decayOffset * direction));
     return true;
 }
 
@@ -1929,6 +1947,12 @@ void ScrollablePattern::RegisterScrollBarEventTask()
     auto startSnapAnimationCallback = [weak = WeakClaim(this)](SnapAnimationOptions snapAnimationOptions) -> bool {
         auto pattern = weak.Upgrade();
         CHECK_NULL_RETURN(pattern, false);
+        // Item snap uses content coordinates for both its fling budget and release velocity.
+        // Keep the legacy List/Scroll scrollbar contract unchanged.
+        if (pattern->GetScrollSnapStrategy().IsEnabled() && pattern->GetScrollBar()) {
+            snapAnimationOptions.animationVelocity =
+                pattern->GetScrollBar()->CalcPatternOffset(-snapAnimationOptions.animationVelocity);
+        }
         return pattern->StartSnapAnimation(snapAnimationOptions);
     };
     scrollBar_->SetStartSnapAnimationCallback(std::move(startSnapAnimationCallback));
@@ -1952,12 +1976,13 @@ void ScrollablePattern::RegisterScrollBarEventTask()
         auto scrollable = pattern->GetScrollable();
         CHECK_NULL_VOID(scrollable);
         bool userFlingBeforeDrag = scrollable->GetIsUserFling();
-        if (scrollable->GetOnDidStopDraggingCallback()) {
+        if (scrollable->GetOnDidStopDraggingCallback() || pattern->GetScrollSnapStrategy().IsEnabled()) {
             scrollable->HandleScrollBarOnDidStopDragging(isWillFling);
         }
         if (!userFlingBeforeDrag && isWillFling && scrollable->GetOnWillStartFlingCallback()) {
             scrollable->HandleScrollBarOnWillStartFling();
         }
+        scrollable->FlushPendingItemSnapKickoff();
     };
     scrollBar_->SetScrollBarOnDidStopDraggingCallback(std::move(scrollBarOnDidStopDraggingCallback));
 

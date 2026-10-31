@@ -540,17 +540,25 @@ public:
         float scrollSnapDelta, float scrollSnapVelocity, bool fromScrollBar, int32_t source = SCROLL_FROM_NONE,
         bool useSlowSpring = false);
 
-    // Feat-20260806915268: two-stage item snap for a custom ScrollSnapOffsetProvider — approach spring by
-    // [approachDelta], then a [targetGetter]-resolved final spring (stage contract in
-    // scrollable_item_snap.cpp; approach is skipped when [approachDelta] is near zero).
+    // Provider approach follows the original fling budget, extended only if approachDelta is farther.
+    // It hands off at approachDelta inside budget, or after completion at/beyond budget.
+    // Zero approachDelta skips directly to the targetGetter-resolved final spring.
     void StartItemSnapTwoStageAnimation(float approachDelta, float scrollSnapVelocity, bool fromScrollBar,
-        std::function<float(float handoffVelocity)>&& targetGetter, int32_t source = SCROLL_FROM_NONE);
+        std::function<float(float handoffVelocity)>&& targetGetter, int32_t source = SCROLL_FROM_NONE,
+        float flingDelta = 0.0f);
 
     // Runs one spring stage of the two-stage item snap; invoked with finalStage=true by the handoff of
     // the approach stage. Not intended for external use.
     void RunItemSnapStage(float endPos, float velocity, bool finalStage, std::function<void(float, float)>&& onHandoff);
 
 private:
+    void RunItemSnapApproach(
+        float approachDelta, float flingDelta, float velocity, std::function<void(float, float)>&& onHandoff);
+    bool ProcessItemSnapApproach(float position);
+    bool UpdateSnapVelocity(float position);
+    float GetFlingFriction() const;
+    void CompleteItemSnapApproach(uint32_t generation, float position);
+    void FlushItemSnapAnimationStart();
     bool TryItemSnapTakeover();
     void ProcessItemSnapFrictionFrame(float position);
     void CompleteItemSnapTakeover(uint32_t generation, float remaining, float velocity);
@@ -612,6 +620,7 @@ public:
     void SetItemSnapLookaheadDistance(float distance);
     void MarkItemSnapChainActive();
     void SetPendingItemSnapKickoff(std::function<void()>&& kickoff);
+    void StartScrollBarSnapFling(float mainPosition, SnapAnimationOptions options);
     void FlushPendingItemSnapKickoff();
     void SetDeferItemSnapKickoff(bool defer);
     // Returns whether the snap callback took over the motion (a settle spring is now in
@@ -936,6 +945,14 @@ private:
     bool snapAnimationFromScrollBar_ = false;
     int32_t snapAnimationSource_ = 0;
     float snapVelocity_ = 0.0f;
+    struct ItemSnapApproach {
+        uint32_t generation;
+        float endPos;
+        float startVelocity;
+        bool earlyHandoff;
+        std::function<void(float, float)> onHandoff;
+    };
+    std::optional<ItemSnapApproach> itemSnapApproach_;
     // Generation token of the two-stage item snap chain: bumped on every stage start and on
     // interruption so completion callbacks of superseded/interrupted stages are ignored.
     uint32_t itemSnapGeneration_ = 0;

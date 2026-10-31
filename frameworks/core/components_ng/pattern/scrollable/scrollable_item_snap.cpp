@@ -15,7 +15,9 @@
 
 #include "core/components_ng/pattern/scrollable/scrollable.h"
 
+#include <cmath>
 #include <functional>
+#include <limits>
 
 #include "base/log/log.h"
 #include "base/thread/task_executor.h"
@@ -31,11 +33,12 @@
 namespace OHOS::Ace::NG {
 namespace {
 // Spring curve for one item snap stage; long stages reduce the minimum amplitude ratio so the
-// spring settles without visible oscillation around the target. Shape constants are shared
-// with the legacy snap animation via scrollable_animation_consts.h.
+// spring settles without visible oscillation around the target. Final provider stages use
+// the same slow spring as built-in item alignment.
 RefPtr<ResponsiveSpringMotion> CreateItemSnapSpringCurve(float endPos, float currentPos)
 {
-    auto curve = AceType::MakeRefPtr<ResponsiveSpringMotion>(SNAP_SPRING_RESPONSE, SNAP_SPRING_DAMP, 0.0f);
+    auto curve = AceType::MakeRefPtr<ResponsiveSpringMotion>(
+        ITEM_SNAP_FIXED_RESPONSE, ITEM_SNAP_FIXED_DAMPING, 0.0f);
     if (NearZero(endPos - currentPos)) {
         return curve;
     }
@@ -106,6 +109,11 @@ void Scrollable::RunItemSnapStage(
     float endPos, float velocity, bool finalStage, std::function<void(float, float)>&& onHandoff)
 {
     endPos_ = endPos;
+    itemSnapMonotonicSpring_ = finalStage;
+    if (finalStage && (endPos - currentPos_) * velocity < 0.0f) {
+        velocity = 0.0f;
+    }
+    snapVelocity_ = velocity;
     // finalPosition_ carries the FINAL snap target only; during the approach stage it keeps its
     // previous value so interrupt logic never mistakes the approach waypoint for the target.
     if (finalStage) {
@@ -139,14 +147,127 @@ void Scrollable::RunItemSnapStage(
     CHECK_NULL_VOID(context);
     lastVsyncTime_ = context->GetVsyncTime();
     MarkNeedFlushAnimationStartTime();
+    FlushItemSnapAnimationStart();
+}
+
+void Scrollable::RunItemSnapApproach(
+    float approachDelta, float flingDelta, float velocity, std::function<void(float, float)>&& onHandoff)
+{
+    auto context = context_.Upgrade();
+    CHECK_NULL_VOID(context);
+    if (!snapOffsetProperty_) {
+        GetSnapProperty();
+    }
+    const double limit = std::numeric_limits<float>::max();
+    endPos_ = static_cast<float>(
+        std::clamp(currentPos_ + static_cast<double>(approachDelta), -limit, limit));
+    const bool earlyHandoff = std::isfinite(flingDelta) && std::abs(flingDelta) > std::abs(approachDelta);
+    // For |approachDelta| < |flingDelta|, preserve the fling destination and hand off at approach.
+    // For |approachDelta| >= |flingDelta|, animate to approach and wait for completion before snap.
+    const double motionEnd = earlyHandoff ? currentPos_ + static_cast<double>(flingDelta) : endPos_;
+    const auto generation = ++itemSnapGeneration_;
+    // Initializing a custom property can synchronously invoke its update callback. Keep it
+    // outside SNAP and abandon this startup if that callback cancels or replaces the chain.
+    snapOffsetProperty_->Set(currentPos_);
+    if (itemSnapGeneration_ != generation) {
+        return;
+    }
+    itemSnapApproach_ = ItemSnapApproach { generation, endPos_, velocity, earlyHandoff, std::move(onHandoff) };
+    itemSnapChainActive_ = true;
+    itemSnapMonotonicSpring_ = false;
+    state_ = AnimationState::SNAP;
+    lastVsyncTime_ = context->GetVsyncTime();
+    snapOffsetProperty_->SetPropertyUnit(PropertyUnit::PIXEL_POSITION);
+    snapOffsetProperty_->SetThresholdType(ThresholdType::LAYOUT);
+    const auto friction = GetFlingFriction();
+    float response = std::isfinite(friction) && friction > 0.0 ?
+        static_cast<float>(std::abs(2.0 * ACE_PI / (FRICTION_SCALE * friction))) : SNAP_SPRING_RESPONSE;
+    if (!std::isfinite(response) || response <= 0.0f) {
+        response = SNAP_SPRING_RESPONSE;
+    }
+    AnimationOption option;
+    option.SetDuration(CUSTOM_SPRING_ANIMATION_DURATION);
+    option.SetFinishCallbackType(FinishCallbackType::LOGICALLY);
+    option.SetCurve(AceType::MakeRefPtr<ResponsiveSpringMotion>(response, 1.0f, 0.0f));
+    snapOffsetProperty_->AnimateWithVelocity(option, static_cast<float>(std::clamp(motionEnd, -limit, limit)), velocity,
+        [weak = WeakClaim(this), id = Container::CurrentId(), generation]() {
+            ContainerScope scope(id);
+            auto scroll = weak.Upgrade();
+            CHECK_NULL_VOID(scroll);
+            // A boundary can finish the motion before its requested distance is available.
+            scroll->CompleteItemSnapApproach(generation, scroll->GetCurrentPos());
+        });
+    MarkNeedFlushAnimationStartTime();
+    FlushItemSnapAnimationStart();
+}
+
+bool Scrollable::ProcessItemSnapApproach(float position)
+{
+    if (!itemSnapApproach_) {
+        return false;
+    }
+    if (!std::isfinite(position)) {
+        return true;
+    }
+    const auto generation = itemSnapApproach_->generation;
+    const float target = itemSnapApproach_->endPos;
+    const float current = currentPos_;
+    if ((position - current) * (target - current) < 0.0f) {
+        return true;
+    }
+    // Measure the uncut motion: clipping the last frame's distance must not erase its speed.
+    if (!UpdateSnapVelocity(position)) {
+        return true;
+    }
+    const auto bounded = std::clamp(position, std::min(current, target), std::max(current, target));
+    if (itemSnapApproach_->earlyHandoff && NearEqual(bounded, target)) {
+        CompleteItemSnapApproach(generation, target);
+    } else {
+        ProcessListSnapMotion(bounded);
+    }
+    return true;
+}
+
+void Scrollable::CompleteItemSnapApproach(uint32_t generation, float position)
+{
+    if (!itemSnapApproach_ || itemSnapGeneration_ != generation) {
+        return;
+    }
+    auto approach = std::move(itemSnapApproach_.value());
+    itemSnapApproach_.reset();
+    const float motionVelocity = snapVelocity_;
+    // Logical spring completion can precede the exact final property sample. Normalize a
+    // normally completed endpoint, but preserve the actual position when a boundary stopped it.
+    if (!approach.earlyHandoff && state_ == AnimationState::SNAP &&
+        NearEqual(position, approach.endPos, SNAP_SPRING_MINIMUM_AMPLITUDE_PX)) {
+        position = approach.endPos;
+    }
+    // Invalidate the old backend completion before cancelling its animation property.
+    const auto handoffGeneration = ++itemSnapGeneration_;
+    ProcessListSnapMotion(position);
+    if (itemSnapGeneration_ != handoffGeneration) {
+        return;
+    }
+    StopSnapAnimation();
+    PostItemSnapHandoff(handoffGeneration, approach.startVelocity, motionVelocity, std::move(approach.onHandoff));
+}
+
+void Scrollable::FlushItemSnapAnimationStart()
+{
+    auto pipeline = context_.Upgrade();
+    if (pipeline && pipeline->GetWindow()) {
+        const auto startTime = ResolveItemSnapStartTime(
+            pipeline->GetVsyncTime(), static_cast<uint64_t>(GetSysTimestamp()));
+        pipeline->GetWindow()->FlushAnimationStartTime(startTime);
+        pipeline->GetWindow()->RequestFrame();
+    }
 }
 
 // Feat-20260806915268 item snap stage helpers (definitions live in scrollable_item_snap.cpp).
 // Dispatches a finished stage by generation; posts the handoff as a UI task and re-checks
 // the generation before running it. The handoff carries TWO velocities: providerVelocity
-// feeds calculateSnapOffset's decision (the release fling speed — the spring is at rest
-// when a stage completes, so the per-frame residual there is noise, not signal), while
-// motionVelocity keeps the stage-2 spring's physical continuity (the actual residual).
+// retains the stage-start decision velocity, while motionVelocity is the actual residual.
+// The provider's distance-limited first stage hands off through CompleteItemSnapApproach.
 void Scrollable::OnItemSnapStageFinished(uint32_t generation, bool finalStage, int32_t source, float startVelocity,
     std::function<void(float, float)>&& onHandoff)
 {
@@ -154,6 +275,9 @@ void Scrollable::OnItemSnapStageFinished(uint32_t generation, bool finalStage, i
         // Superseded by a newer stage or interrupted: this stage is fully invalidated.
         return;
     }
+    // Completion may also arrive from a backend cancellation. Consume this generation
+    // before publishing a continuation so a repeated completion cannot finish the chain twice.
+    const auto continuationGeneration = ++itemSnapGeneration_;
     if (finalStage && !onHandoff) {
         state_ = AnimationState::IDLE;
         nextStep_.reset();
@@ -166,13 +290,9 @@ void Scrollable::OnItemSnapStageFinished(uint32_t generation, bool finalStage, i
         return;
     }
     if (onHandoff) {
-        // Hand off while the snap chain is still current. A completed spring is at rest, so
-        // the per-frame snapVelocity_ at this point is a small residual (1~10 px/s on a real
-        // backend), NOT the fling speed the provider is documented to approximate — the
-        // NearZero fallback below could never trigger there. Always report the stage start
-        // (release) velocity to the provider; keep the residual only as the stage-2 spring's
-        // physical initial velocity so the takeover stays visually continuous.
-        PostItemSnapHandoff(generation, startVelocity, snapVelocity_, std::move(onHandoff));
+        // Layout-dependent final targets can require another stabilization stage. Preserve
+        // decision and physical velocities separately, just as in the initial handoff.
+        PostItemSnapHandoff(continuationGeneration, startVelocity, snapVelocity_, std::move(onHandoff));
     }
 }
 
@@ -180,8 +300,8 @@ void Scrollable::PostItemSnapHandoff(
     uint32_t generation, float providerVelocity, float motionVelocity,
     std::function<void(float, float)>&& onHandoff)
 {
-    // Defer the handoff out of the animation completion callback: starting the stage-2 spring
-    // reentrantly from inside the backend finish callback risks replace/reentrancy issues and
+    // Defer the handoff out of property updates and animation completion callbacks: starting
+    // a replacement spring reentrantly risks backend replacement/reentrancy issues and
     // breaks animation scheduling. The handoff runs on the next UI task (frame boundary) and is
     // cancelled by a newer generation.
     auto context = context_.Upgrade();
@@ -189,7 +309,9 @@ void Scrollable::PostItemSnapHandoff(
     auto weak = WeakClaim(this);
     auto id = Container::CurrentId();
     auto taskExecutor = SingleTaskExecutor::Make(context->GetTaskExecutor(), TaskExecutor::TaskType::UI);
-    taskExecutor.PostTask(
+    state_ = AnimationState::TRANSITION;
+    itemSnapTakeoverPending_ = true;
+    auto posted = taskExecutor.PostTask(
         [weak, id, generation, providerVelocity, motionVelocity, onHandoff = std::move(onHandoff)]() mutable {
             ContainerScope scope(id);
             auto scroll = weak.Upgrade();
@@ -197,9 +319,16 @@ void Scrollable::PostItemSnapHandoff(
             if (scroll->itemSnapGeneration_ != generation) {
                 return;
             }
+            scroll->itemSnapTakeoverPending_ = false;
+            scroll->state_ = AnimationState::IDLE;
             onHandoff(providerVelocity, motionVelocity);
         },
         "ArkUIScrollItemSnapHandoff");
+    if (!posted) {
+        CancelItemSnapChain();
+        state_ = AnimationState::IDLE;
+        ProcessScrollMotionStop(snapAnimationSource_);
+    }
 }
 
 // Feat-20260806915268 cmetrics helper: the snap branch of ProcessAxisUpdateEvent, extracted
@@ -258,16 +387,20 @@ bool Scrollable::HandleAxisSnapUpdate(float mainDelta, bool fromScrollBar)
 }
 
 // Feat-20260806915268: two-stage item snap for a custom ScrollSnapOffsetProvider. Stage 1 (approach)
-// springs from the current position by [approachDelta]; on completion the [targetGetter] is
-// invoked with the handoff velocity to resolve the absolute final target, and stage 2 springs
+// follows the original [flingDelta] destination, extended to [approachDelta] only when needed.
+// For 0 < |approachDelta| < |flingDelta| it hands off at approach; for
+// |approachDelta| >= |flingDelta| it waits for completion, including the equal-budget case.
+// [targetGetter] is invoked with the handoff velocity to resolve the absolute final target, and stage 2 springs
 // to that target. The provider receives the stage start (release fling) velocity; the stage-2
 // spring receives the physical residual so the motion stays continuous (see
 // OnItemSnapStageFinished). Both stages are interruptible by a new gesture through the
 // existing snap-animation stop paths. When [approachDelta] is near zero the approach stage
 // is skipped.
 void Scrollable::StartItemSnapTwoStageAnimation(float approachDelta, float scrollSnapVelocity, bool fromScrollBar,
-    std::function<float(float handoffVelocity)>&& targetGetter, int32_t source)
+    std::function<float(float handoffVelocity)>&& targetGetter, int32_t source, float flingDelta)
 {
+    CancelItemSnapChain();
+    StopSnapController();
     snapAnimationFromScrollBar_ = fromScrollBar;
     snapAnimationSource_ = source;
     if (!snapOffsetProperty_) {
@@ -309,7 +442,7 @@ void Scrollable::StartItemSnapTwoStageAnimation(float approachDelta, float scrol
         handoff(scrollSnapVelocity, scrollSnapVelocity);
         return;
     }
-    RunItemSnapStage(currentPos_ + approachDelta, scrollSnapVelocity, false, std::move(handoff));
+    RunItemSnapApproach(approachDelta, flingDelta, scrollSnapVelocity, std::move(handoff));
 }
 
 bool Scrollable::TryItemSnapTakeover()
@@ -362,6 +495,8 @@ void Scrollable::CompleteItemSnapTakeover(uint32_t generation, float remaining, 
     SnapAnimationOptions options {
         .snapDelta = remaining,
         .animationVelocity = velocity,
+        .source = snapAnimationSource_,
+        .fromScrollBar = snapAnimationFromScrollBar_,
         .fromItemSnapFlingStop = true,
         .fromItemSnapTakeover = true,
     };
@@ -370,14 +505,7 @@ void Scrollable::CompleteItemSnapTakeover(uint32_t generation, float remaining, 
     if (startSnapAnimationCallback_ && startSnapAnimationCallback_(options)) {
         FlushPendingItemSnapKickoff();
         // An idle frame must not backdate the replacement spring.
-        auto pipeline = context_.Upgrade();
-        if (pipeline && pipeline->GetWindow()) {
-            const auto startTime = ResolveItemSnapStartTime(
-                pipeline->GetVsyncTime(), static_cast<uint64_t>(GetSysTimestamp()));
-            pipeline->GetWindow()->FlushAnimationStartTime(startTime);
-            // The old friction may have delivered its last frame before this queued task.
-            pipeline->GetWindow()->RequestFrame();
-        }
+        FlushItemSnapAnimationStart();
         return;
     }
     ProcessScrollMotionStop(SCROLL_FROM_ANIMATION);

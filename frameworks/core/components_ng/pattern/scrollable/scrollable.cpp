@@ -568,6 +568,14 @@ void Scrollable::HandleTouchUp()
         return;
     }
     isTouching_ = false;
+    // A touch-up delivered after scrollbar drag-end must not replace its running fling.
+    // A new touch cancels that animation first, so its subsequent release can still settle.
+    if (isScrollBarDragging_ &&
+        (snapAnimationSource_ == SCROLL_FROM_BAR || snapAnimationSource_ == SCROLL_FROM_BAR_FLING) &&
+        !IsAllAnimationStopped()) {
+        isTouchStopAnimation_ = false;
+        return;
+    }
     if (nestedScrolling_) {
         CheckStopFlingInTouchUp();
         return;
@@ -672,6 +680,7 @@ void Scrollable::CancelItemSnapChain()
     itemSnapTrackingCallback_ = nullptr;
     itemSnapTargetReady_ = false;
     itemSnapLookaheadDistance_ = 0.0f;
+    itemSnapApproach_.reset();
     pendingItemSnapKickoff_ = nullptr;
     if (itemSnapChainActive_) {
         itemSnapChainActive_ = false;
@@ -1128,7 +1137,7 @@ void Scrollable::CalcOverScrollVelocity()
 
 // Feat-20260806915268 cmetrics helper: the friction-parameter preamble of
 // StartScrollAnimation, extracted verbatim (zero behavior change).
-float Scrollable::PrepareFlingParams(float mainPosition, float& correctVelocity, bool isScrollFromTouchPad)
+float Scrollable::GetFlingFriction() const
 {
     double frictionTmp = friction_;
     if (NearEqual(friction_, -1.0)) {
@@ -1136,7 +1145,12 @@ float Scrollable::PrepareFlingParams(float mainPosition, float& correctVelocity,
         double ret = SystemProperties::GetSrollableFriction();
         frictionTmp = !NearZero(ret) ? ret : defaultFriction;
     }
-    float friction = frictionTmp;
+    return static_cast<float>(frictionTmp);
+}
+
+float Scrollable::PrepareFlingParams(float mainPosition, float& correctVelocity, bool isScrollFromTouchPad)
+{
+    const float friction = GetFlingFriction();
     slidInfo_.friction = friction;
     EventReport::ReportPageSlidInfo(slidInfo_);
     initVelocity_ = correctVelocity;
@@ -1167,11 +1181,17 @@ bool Scrollable::HandleSlowReleaseOrFling(float mainPosition, float friction, fl
             SnapAnimationOptions settleOptions = {
                 .snapDelta = GetFinalPosition() - currentPos_,
                 .animationVelocity = correctVelocity,
+                .source = snapAnimationSource_,
+                .fromScrollBar = snapAnimationFromScrollBar_,
                 .fromItemSnapFlingStop = true,
             };
             if (startSnapAnimationCallback_(settleOptions)) {
                 return true;
             }
+        }
+        if (snapAnimationSource_ == SCROLL_FROM_BAR) {
+            ProcessScrollMotionStop(SCROLL_FROM_BAR);
+            return false;
         }
         HandleScrollEnd(correctVelocity);
         currentVelocity_ = 0.0;
@@ -1190,6 +1210,33 @@ bool Scrollable::HandleSlowReleaseOrFling(float mainPosition, float friction, fl
     return true;
 }
 
+void Scrollable::StartScrollBarSnapFling(float mainPosition, SnapAnimationOptions options)
+{
+    CancelItemSnapChain();
+    StopSnapController();
+    if (!frictionOffsetProperty_) {
+        GetFrictionProperty();
+    }
+    // The thumb velocity has already been mapped to content coordinates. Apply the page
+    // speed limit without gesture gain, and recompute the slow/fast state for this release.
+    isSlow_ = LessNotEqual(std::abs(options.animationVelocity), SLOW_FRICTION_THRESHOLD);
+    options.animationVelocity = std::clamp(options.animationVelocity,
+        static_cast<float>(-maxFlingVelocity_ + slipFactor_), static_cast<float>(maxFlingVelocity_ - slipFactor_));
+    currentVelocity_ = options.animationVelocity;
+    const float friction = PrepareFlingParams(mainPosition, options.animationVelocity, false);
+    snapAnimationSource_ = SCROLL_FROM_BAR;
+    snapAnimationFromScrollBar_ = options.fromScrollBar;
+    // Both built-in alignment and providers use the page's natural endpoint, independent
+    // of the legacy scrollbar's 45px/s cutoff. BAR_FLING avoids queuing this release twice.
+    options.snapDelta = GetFinalPosition() - mainPosition;
+    options.source = SCROLL_FROM_BAR_FLING;
+    if (startSnapAnimationCallback_ && startSnapAnimationCallback_(options)) {
+        FlushPendingItemSnapKickoff();
+        return;
+    }
+    HandleSlowReleaseOrFling(mainPosition, friction, options.animationVelocity);
+}
+
 bool Scrollable::StartScrollAnimation(float mainPosition, float correctVelocity, bool isScrollFromTouchPad)
 {
     if (state_ == AnimationState::SPRING) {
@@ -1202,6 +1249,8 @@ bool Scrollable::StartScrollAnimation(float mainPosition, float correctVelocity,
     // snap handoff must not survive into the new fling.
     CancelItemSnapChain();
     StopSnapController();
+    snapAnimationSource_ = SCROLL_FROM_NONE;
+    snapAnimationFromScrollBar_ = false;
     TAG_LOGD(AceLogTag::ACE_SCROLLABLE, "The position of scroll motion is %{public}f, velocity is %{public}f",
         mainPosition, correctVelocity);
     float friction = PrepareFlingParams(mainPosition, correctVelocity, isScrollFromTouchPad);
@@ -1505,7 +1554,9 @@ void Scrollable::ProcessListSnapMotion(double position)
 {
     TAG_LOGD(AceLogTag::ACE_SCROLLABLE, "Current Pos is %{public}f, position is %{public}f", currentPos_, position);
     currentVelocity_ = snapVelocity_;
-    auto source = snapAnimationFromScrollBar_ ? SCROLL_FROM_BAR_FLING : SCROLL_FROM_ANIMATION;
+    const bool itemSnapFromBar = itemSnapChainActive_ &&
+        (snapAnimationSource_ == SCROLL_FROM_BAR || snapAnimationSource_ == SCROLL_FROM_BAR_FLING);
+    auto source = snapAnimationFromScrollBar_ || itemSnapFromBar ? SCROLL_FROM_BAR_FLING : SCROLL_FROM_ANIMATION;
     if (NearEqual(currentPos_, position)) {
         UpdateScrollPosition(0.0, source);
     } else {
@@ -1748,6 +1799,8 @@ bool Scrollable::SettleSnapOnFrictionStop(bool itemSnapSettle)
     SnapAnimationOptions snapAnimationOptions = {
         .snapDelta = GetFinalPosition() - currentPos_,
         .animationVelocity = currentVelocity_,
+        .source = itemSnapSettle ? snapAnimationSource_ : SCROLL_FROM_NONE,
+        .fromScrollBar = itemSnapSettle && snapAnimationFromScrollBar_,
         .fromItemSnapFlingStop = itemSnapSettle,
     };
     return startSnapAnimationCallback_(snapAnimationOptions);
@@ -1798,6 +1851,9 @@ void Scrollable::ProcessScrollMotionStop(int32_t source)
         return;
     }
 
+    if (snapAnimationSource_ == SCROLL_FROM_BAR || snapAnimationSource_ == SCROLL_FROM_BAR_FLING) {
+        isScrollBarDragging_ = false;
+    }
     if (!isTouchStopAnimation_ && !isDragOuterScrollBarStopAnimation_ && source != SCROLL_FROM_AXIS &&
             source != SCROLL_FROM_LAYOUT) {
         if (onDidStopFlingCallback_) {
@@ -1911,7 +1967,11 @@ void Scrollable::ProcessScrollMotion(double position, int32_t source)
             nodeId_, (TRAILING_ANIMATION + std::to_string(nodeId_) + std::string(" ") + nodeTag_).c_str());
     }
     // UpdateScrollPosition return false, means reach to scroll limit.
-    source = snapAnimationSource_ == SCROLL_FROM_BAR && state_ == AnimationState::SNAP ? SCROLL_FROM_BAR_FLING : source;
+    const bool barMotion = snapAnimationSource_ == SCROLL_FROM_BAR || snapAnimationSource_ == SCROLL_FROM_BAR_FLING;
+    if (barMotion && (state_ == AnimationState::SNAP ||
+        (state_ == AnimationState::FRICTION && needItemSnapSettle_))) {
+        source = SCROLL_FROM_BAR_FLING;
+    }
     HandleScroll(mainDelta, source, NestedState::GESTURE);
     if (!moved_) {
         ResetContinueDragCount();
@@ -2159,6 +2219,21 @@ RefPtr<NodeAnimatablePropertyFloat> Scrollable::GetSpringProperty()
     return springOffsetProperty_;
 }
 
+// Provider stages reset lastVsyncTime_ at startup; velocity samples use intervals within each stage.
+// An invalid or same-vsync interval retains the current velocity until a valid sample arrives.
+bool Scrollable::UpdateSnapVelocity(float position)
+{
+    auto context = context_.Upgrade();
+    CHECK_NULL_RETURN(context, false);
+    const auto vsync = context->GetVsyncTime();
+    const auto interval = vsync - lastVsyncTime_;
+    if (interval < MAX_VSYNC_DIFF_TIME && interval > MIN_DIFF_VSYNC) {
+        snapVelocity_ = (position - currentPos_) / interval * MILLOS_PER_NANO_SECONDS;
+    }
+    lastVsyncTime_ = vsync;
+    return true;
+}
+
 RefPtr<NodeAnimatablePropertyFloat> Scrollable::GetSnapProperty()
 {
     auto propertyCallback = [weak = AceType::WeakClaim(this)](float position) {
@@ -2167,8 +2242,9 @@ RefPtr<NodeAnimatablePropertyFloat> Scrollable::GetSnapProperty()
         if (scroll->state_ != AnimationState::SNAP) {
             return;
         }
-        auto context = scroll->context_.Upgrade();
-        CHECK_NULL_VOID(context);
+        if (scroll->ProcessItemSnapApproach(position)) {
+            return;
+        }
         if (scroll->itemSnapMonotonicSpring_) {
             // Roundoff or an obsolete sample must neither cross the target nor reverse the motion.
             const float current = static_cast<float>(scroll->currentPos_);
@@ -2178,12 +2254,9 @@ RefPtr<NodeAnimatablePropertyFloat> Scrollable::GetSnapProperty()
             }
             position = std::clamp(position, std::min(current, scroll->endPos_), std::max(current, scroll->endPos_));
         }
-        uint64_t currentVsync = context->GetVsyncTime();
-        uint64_t diff = currentVsync - scroll->lastVsyncTime_;
-        if (diff < MAX_VSYNC_DIFF_TIME && diff > MIN_DIFF_VSYNC) {
-            scroll->snapVelocity_ = (position - scroll->currentPos_) / diff * MILLOS_PER_NANO_SECONDS;
+        if (!scroll->UpdateSnapVelocity(position)) {
+            return;
         }
-        scroll->lastVsyncTime_ = currentVsync;
 
         if (NearEqual(scroll->endPos_, position, SPRING_ACCURACY)) {
             if (scroll->GetSnapType() == SnapType::LIST_SNAP) {
