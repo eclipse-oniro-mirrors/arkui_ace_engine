@@ -613,7 +613,6 @@ std::vector<int32_t> NavigationManager::FindNavigationInTargetParent(int32_t tar
 {
     auto it = navigationMap_.find(targetId);
     if (it == navigationMap_.end()) {
-        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "can't find inner navigation");
         return {};
     }
     std::vector<int32_t> navigationIds = {};
