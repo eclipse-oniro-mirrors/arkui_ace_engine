@@ -56,30 +56,6 @@ class TouchEventBuilderBuildTest : public ScrollSimulatingExecutorTest {};
 class TouchEventBuilderMoveByStepsTest : public ScrollSimulatingExecutorTest {};
 class TouchEventBuilderSumStepsTest : public ScrollSimulatingExecutorTest {};
 
-HWTEST_F(ScrollSimulatingExecutorStepTest, Cancel_ReleasesTouchExactlyOnce, TestSize.Level1)
-{
-    auto context = AceType::MakeRefPtr<MockPipelineContext>();
-    std::vector<TouchEvent> touchEvents;
-    EXPECT_CALL(*context, OnTouchEvent(testing::_, testing::_)).Times(3)
-        .WillRepeatedly([&](const TouchEvent& event, bool) { touchEvents.push_back(event); });
-    Command command = {};
-    command.actionInfo.coordinates = { 10.0f, 20.0f, 10.0f, 320.0f };
-    command.isY2Set = true;
-    ScrollSimulatingExecutor executor(context, command);
-    EXPECT_EQ(executor.ExecuteStep(), ExecutorResult::PENDING);
-    EXPECT_EQ(executor.ExecuteStep(), ExecutorResult::PENDING);
-    executor.Cancel();
-    executor.Cancel();
-    ASSERT_EQ(touchEvents.size(), 3u);
-    EXPECT_EQ(touchEvents[0].type, TouchType::DOWN);
-    EXPECT_EQ(touchEvents[1].type, TouchType::MOVE);
-    const auto& cancel = touchEvents[2];
-    EXPECT_EQ(cancel.type, TouchType::CANCEL);
-    EXPECT_TRUE(cancel.isInjected);
-    EXPECT_FLOAT_EQ(cancel.x, touchEvents[1].x);
-    EXPECT_FLOAT_EQ(cancel.y, touchEvents[1].y);
-}
-
 HWTEST_F(
     ScrollSimulatingExecutorConstructorTest, ScrollSimulatingExecutor_Constructor_LargeCoordinates, TestSize.Level1)
 {

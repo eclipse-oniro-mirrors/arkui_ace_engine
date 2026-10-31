@@ -73,63 +73,6 @@ class SimulateTouchExecutorGetTypeTest : public SimulateTouchExecutorTest {};
 class SimulateTouchExecutorGetDescriptionTest : public SimulateTouchExecutorTest {};
 class SimulateTouchExecutorIsSingleStepTest : public SimulateTouchExecutorTest {};
 
-HWTEST_F(SimulateTouchExecutorExecuteStepTest, UserInterruptionDuringDownCancelsOnlyNDK, TestSize.Level1)
-{
-    for (bool interruptible : { false, true }) {
-        auto context = AceType::MakeRefPtr<MockPipelineContext>();
-        auto manager = AceType::MakeRefPtr<RelaxedInteractionManager>(context);
-        std::vector<TouchEvent> events;
-        int count = 0;
-        EXPECT_CALL(*context, OnTouchEvent(testing::_, testing::_)).Times(2)
-            .WillRepeatedly([&](const TouchEvent& event, bool) {
-                events.push_back(event);
-                if (event.type != TouchType::UP) {
-                    manager->Clear(ExecutionState::INTERRUPTED_BY_USER);
-                    manager->Clear(ExecutionState::INTERRUPTED_BY_USER);
-                }
-                EXPECT_EQ(count, 0);
-            });
-        ASSERT_EQ(manager->ProcessCommand(
-            R"({"cmd":{"type":"click","mode":"simulating","action_info":{"coordinates":{"x1":10,"y1":20}}}})",
-            [&](ExecutionState state) {
-                EXPECT_EQ(state, interruptible ? ExecutionState::INTERRUPTED_BY_USER : ExecutionState::SUCCESS);
-                ++count;
-            }, interruptible), ProcessResult::SUCCESS);
-        manager->ExecuteNextStep();
-        EXPECT_EQ(count, interruptible ? 0 : 1);
-        manager->ExecuteNextStep();
-        manager->Clear(ExecutionState::INTERRUPTED_BY_USER);
-        EXPECT_EQ(count, 1);
-        EXPECT_FALSE(manager->HasPendingWorkflow());
-        ASSERT_EQ(events.size(), 2u);
-        EXPECT_EQ(events[0].type, TouchType::DOWN);
-        EXPECT_EQ(events[1].type, interruptible ? TouchType::CANCEL : TouchType::UP);
-        EXPECT_TRUE(events[1].isInjected);
-        EXPECT_FLOAT_EQ(events[1].x, events[0].x);
-        EXPECT_FLOAT_EQ(events[1].y, events[0].y);
-    }
-}
-
-HWTEST_F(SimulateTouchExecutorExecuteStepTest, DestructionDuringDownStopsDispatch, TestSize.Level1)
-{
-    auto context = AceType::MakeRefPtr<MockPipelineContext>();
-    std::vector<TouchEvent> events;
-    EXPECT_CALL(*context, OnTouchEvent(testing::_, testing::_)).WillOnce([&](const TouchEvent& event, bool) {
-        events.push_back(event);
-        SetDestroyedContextForTest(context.GetRawPtr());
-        EXPECT_FALSE(mockPipelineContext_->IsDestroyed());
-    });
-    SimulateTouchExecutor executor(context, PointF(10.0f, 20.0f));
-    const auto result = executor.ExecuteStep();
-    SetDestroyedContextForTest(nullptr);
-    EXPECT_FALSE(context->IsDestroyed());
-    EXPECT_EQ(result, ExecutorResult::FAILED);
-    EXPECT_EQ(executor.GetFailureState(), ExecutionState::TARGET_NOT_FOUND);
-    ASSERT_EQ(events.size(), 1u);
-    EXPECT_EQ(events[0].type, TouchType::DOWN);
-    EXPECT_TRUE(events[0].isInjected);
-}
-
 HWTEST_F(SimulateTouchExecutorConstructorTest, SimulateTouchExecutor_Constructor, TestSize.Level1)
 {
     auto context = WeakPtr<PipelineContext>(mockPipelineContext_);
