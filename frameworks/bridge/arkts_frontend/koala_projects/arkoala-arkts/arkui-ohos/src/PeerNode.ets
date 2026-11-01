@@ -238,6 +238,36 @@ export class PeerNode extends IncrementalNode {
         return { classKey: this.stripClassPrefix(beforeHash), reuseId: afterHash };
     }
 
+    /**
+    * ReuseId portion of a reuseKey, or undefined when there is none. Only
+    * custom-component keys carry a user reuseId — they are the keys ending
+    * with the '@Component' marker ("fullClassName#userReuseId@Component");
+    * anything else (e.g. a Repeat item key that happens to contain '#')
+    * returns undefined. Strip the marker first, then the '#' and everything
+    * before it; a marker-stripped key without '#' (the class's default
+    * bucket) returns the marker-stripped key itself.
+    */
+    static __reuseIdOfKey__Internal(reuseKey: string): string | undefined {
+        if (!reuseKey.endsWith('@Component')) {
+            return undefined;
+        }
+        const withoutMarker = reuseKey.substring(0, reuseKey.length - 10);
+        const hashAt = withoutMarker.indexOf('#');
+        if (hashAt < 0) {
+            return withoutMarker;
+        }
+        return withoutMarker.substring(hashAt + 1);
+    }
+
+    /**
+    * Default (legacy) reuse pool of this scope: buckets of recycled child
+    * components keyed by reuseKey. Returns undefined until the first child has
+    * actually been recycled into this scope — never created on demand.
+    */
+    __getDefaultReusePool__Internal(): Map<string, ReusablePool> | undefined {
+        return this._reusePool;
+    }
+
     override recycle(reuseKey: string, child: Disposable, id: KoalaCallsiteKey): boolean {
         if (!this.isKind(RootPeerType)) {
             const upward = this.getParentNodeWhenRecycle()

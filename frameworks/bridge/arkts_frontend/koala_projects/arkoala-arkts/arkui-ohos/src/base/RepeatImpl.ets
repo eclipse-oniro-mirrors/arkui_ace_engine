@@ -19,7 +19,7 @@
 import { int32, hashCodeFromString, KoalaCallsiteKey } from '@koalaui/common'
 import { KPointer } from '@koalaui/interop'
 import { __context, __id, memoEntry2, remember, NodeAttach, contextNode, scheduleCallback } from '@koalaui/runtime'
-import { RepeatItem, RepeatAttribute, RepeatArray, RepeatItemBuilder, TemplateTypedFunc, VirtualScrollOptions, TemplateOptions, RepeatMemOptStrategy } from '../component/repeat'
+import { RepeatItem, RepeatAttribute, RepeatArray, RepeatItemBuilder, TemplateTypedFunc, VirtualScrollOptions, TemplateOptions, RepeatMemOptStrategy, RepeatController, RepeatOptions } from '../component/repeat'
 import { IDataSource, DataChangeListener } from '../component/lazyForEach'
 import { OnMoveHandler, ItemDragEventHandler, ForEachOps } from '#generated'
 import { LazyForEachImplForOptions } from './LazyForEachImpl'
@@ -35,12 +35,19 @@ import { FactoryInternal } from '../stateManagement/base/iFactoryInternal'
 export function RepeatImplForOptions<T>(
     /** @memo */
     style: ((attributes: RepeatAttribute<T>) => void) | undefined,
-    arr: RepeatArray<T>
+    arr: RepeatArray<T>,
+    controller?: RepeatController
 ): void {
     const repeat = remember(() => {
         return new RepeatAttributeImpl<T>();
     });
     style?.(repeat);
+    // Immutable controller binding (@since 26.1.0): the controller arrives at creation
+    // through RepeatOptions.controller; the attribute impl is remembered per callsite,
+    // so later re-renders with a different controller keep the first binding.
+    if (controller !== undefined && repeat.controller_ === undefined) {
+        repeat.controller_ = controller;
+    }
     if (!repeat.itemGenFuncs_.get(REPEAT_EACH_FUNC_TYPE)) {
         throw new Error('Repeat item builder function unspecified. Usage error!');
     }
@@ -179,9 +186,15 @@ export class RepeatAttributeImpl<T> implements RepeatAttribute<T> {
     disableVirtualScroll_: boolean = false;
     memoryOptimizationStrategy_: int32 = 0;
 
+    // controller bound through RepeatOptions.controller, set once (first-bind-wins)
+    controller_?: RepeatController = undefined;
+
     useTemplate_: boolean = false; // whether use template function
 
     setRepeatOptions(arr: RepeatArray<T>): this {
+        return this;
+    }
+    setRepeatOptions(arr: RepeatArray<T>, options?: RepeatOptions): this {
         return this;
     }
 
@@ -327,6 +340,17 @@ function virtualRender<T>(
             node.setRepeatTemplatePoolSize(size, getRepeatTemplateKey(template, repeatId));
         });
     };
+    // Register the Repeat node in its bound controller (RepeatOptions.controller,
+    // @since 26.1.0): the controller records the node weakly (one-to-one,
+    // last-bind-wins) and cleans its cache on clearCache(). Only the virtualScroll
+    // branch binds: nonVirtualRender keeps no prebuilt cache, so there is nothing
+    // for the controller to clean.
+    const onNodeCreated = attributes.controller_ !== undefined
+        ? (node: LazyNodePeer): void => {
+            initRepeatReusePool(node);
+            attributes.controller_!.__bindNode__Internal(node);
+        }
+        : initRepeatReusePool;
     const updateRepeatActiveRange = (
         node: LazyNodePeer,
         activeIndices: int32[],
@@ -381,7 +405,7 @@ function virtualRender<T>(
         }
     };
     LazyForEachImplForOptions<T>(dataSource, itemGen, attributes.keyGenFunc_, attributes.onMove_,
-        attributes.itemDragEvent_, undefined, true, attributes.memoryOptimizationStrategy_, initRepeatReusePool,
+        attributes.itemDragEvent_, undefined, true, attributes.memoryOptimizationStrategy_, onNodeCreated,
         updateRepeatActiveRange, arr, attributes.itemGenFuncs_, attributes.ttypeGenFunc_, repeatId);
 }
 

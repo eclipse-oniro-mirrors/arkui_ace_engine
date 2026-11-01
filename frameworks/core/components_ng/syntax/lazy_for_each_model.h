@@ -43,6 +43,17 @@ public:
     virtual void SetItemDragHandler(std::function<void(int32_t)>&& onLongPress,
         std::function<void(int32_t)>&& onDragStart, std::function<void(int32_t, int32_t)>&& onMoveThrough,
         std::function<void(int32_t)>&& onDrop) = 0;
+    // Controller binding on the current stack-top LazyForEach node (creation-time,
+    // immutable on the node side, one-to-one on the controller side):
+    // bindController(node) is invoked only when the node accepts its first binding;
+    // the controller records the node weakly, replacing any previous binding
+    // (last-bind-wins). Called right after LazyForEach creation when
+    // options.controller is set; later calls on an already bound node are ignored.
+    // Non LazyForEach chain-top: safe no-op.
+    virtual void SetController(const std::function<void(const RefPtr<NG::LazyForEachNode>&)>& bindController)
+    {
+        (void)bindController;
+    }
 };
 
 } // namespace OHOS::Ace

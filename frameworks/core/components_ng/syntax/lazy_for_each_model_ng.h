@@ -50,6 +50,18 @@ public:
             std::move(onLongPress), std::move(onDragStart), std::move(onMoveThrough), std::move(onDrop));
     }
 
+    void SetController(const std::function<void(const RefPtr<LazyForEachNode>&)>& bindController) override
+    {
+        auto* stack = ViewStackProcessor::GetInstance();
+        auto node = AceType::DynamicCast<LazyForEachNode>(stack->GetMainElementNode());
+        CHECK_NULL_VOID(node);
+        // First bind wins: on an already bound node the controller is not replaced
+        // (creation-time immutable binding on the component side).
+        if (node->TryBindController()) {
+            bindController(node);
+        }
+    }
+
 private:
     void Create(const RefPtr<LazyForEachBuilder>& forEachBuilder)
     {

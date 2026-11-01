@@ -854,6 +854,7 @@ namespace OHOS::Ace::NG {
         }
         if (result) {
             reduceCache_ = false;
+            clearAllCache_ = false;
             recyclableNodeSet_.clear();
         }
         return result;
@@ -1374,7 +1375,9 @@ namespace OHOS::Ace::NG {
                         .append("],");
                 }
             }
-            cachedNodes.pop_back();
+            if (!cachedNodes.empty()) {
+                cachedNodes.pop_back();
+            }
             DumpLog::GetInstance().AddDesc(
                 std::string("CachedItems: ").append("[").append(cachedNodes).append("]"));
         }
@@ -1480,9 +1483,10 @@ namespace OHOS::Ace::NG {
         }
     }
 
-    void LazyForEachBuilder::CleanCache(bool syncClean)
+    void LazyForEachBuilder::CleanCache(bool syncClean, bool clearAll)
     {
         reduceCache_ = true;
+        clearAllCache_ = clearAll;
         if (!syncClean) {
             return;
         }
@@ -1498,15 +1502,22 @@ namespace OHOS::Ace::NG {
         ProcessNodesForCleanCache(cache);
         removingNodeList_.clear();
         reduceCache_ = false;
+        clearAllCache_ = false;
     }
 
     void LazyForEachBuilder::RestoreCache()
     {
         reduceCache_ = false;
+        clearAllCache_ = false;
     }
 
     int32_t LazyForEachBuilder::ReduceCacheCount(int32_t count)
     {
+        // Cleanup requested by LazyForEachController.clearCache releases the whole
+        // prebuilt cache: no idle cache count is retained in this round.
+        if (clearAllCache_) {
+            return 0;
+        }
         CHECK_EQUAL_RETURN(!reduceCache_ || startShowCached_ > 0 || endShowCached_ > 0, true, count);
         // maxCacheCount defaults to 2; 0 when deviceMemory <= 6G
         int32_t maxCacheCount = SystemProperties::GetBootVendorDdrSize() <= LOW_MEMORY_DDR_THRESHOLD_GB ?

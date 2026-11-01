@@ -1633,21 +1633,23 @@ abstract class ViewPU extends PUV2ViewBase
    * on first render create a new Instance of Repeat
    * on re-render connect to existing instance
    * @param arr
+   * @param options RepeatOptions, only read when the instance is first created
    * @returns
    */
-  public __mkRepeatAPI: <I>(arr: Array<I>) => RepeatAPI<I> = <I>(arr: Array<I>): RepeatAPI<I> => {
+  public __mkRepeatAPI: <I>(arr: Array<I>, options?: RepeatOptions) => RepeatAPI<I> =
+    <I>(arr: Array<I>, options?: RepeatOptions): RepeatAPI<I> => {
     // factory is for future extensions, currently always return the same
     const elmtId = this.getCurrentlyRenderedElmtId();
     let repeat = this.elmtId2Repeat_.get(elmtId) as __Repeat<I>;
     if (!repeat) {
-        repeat = new __Repeat<I>(this, arr);
+        repeat = new __Repeat<I>(this, arr, options);
         this.elmtId2Repeat_.set(elmtId, repeat);
     } else {
         repeat.updateArr(arr);
     }
 
     return repeat;
-  }
+  };
 
   public reuseOrCreateNewComponent(params: { componentClass: any, getParams: () => Object,
     getReuseId?: () => string, extraInfo?: ExtraInfo }): void {

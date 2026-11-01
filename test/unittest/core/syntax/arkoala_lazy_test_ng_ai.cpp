@@ -1744,6 +1744,9 @@ HWTEST_F(ArkoalaLazyTestNgAI, PurgeNode_RemovesOutsideCacheTest, TestSize.Level1
     ASSERT_NE(node, nullptr);
 
     node->SetTotalCount(TOTAL_COUNT);
+    // Scroll-parent scenario: PurgeNode only prunes for a scrollable parent
+    // (needBuildAll_ == false); a non-scroll parent keeps every child.
+    node->SetNeedBuildAll(false);
     auto child0 = CreateFrameNode(V2::TEXT_ETS_TAG);
     auto child1 = CreateFrameNode(V2::TEXT_ETS_TAG);
     node->node4Index_.Put(INDEX_0, child0);

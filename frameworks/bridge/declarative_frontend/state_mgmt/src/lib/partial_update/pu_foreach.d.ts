@@ -110,9 +110,19 @@ declare class RepeatVirtualScroll2Native {
 
   // drag and drop
   static onMove(repeatElmtId: number, handler: (from: number, to: number) => void, eventHandler?: ItemDragEventHandler);
+  // controller binding (RepeatOptions.controller API): binds the controller
+  // to the Repeat node with given elmtId, at Repeat creation time (immutable afterwards
+  // on the node side; one-to-one, last-bind-wins on the controller side)
+  static controller(repeatElmtId: number, controller: RepeatController): void;
   static setCreateByTemplate(isCreatedByTemplate: boolean): void;
   static isAllowAnimation(repeatElmtId: number): boolean;
   static isImplicitAnimationOpen(): boolean;
   static isChildInAnimation(repeatElmtId: number, rid: number): boolean;
   static isChildOnMainTree(repeatElmtId: number, rid: number): boolean;
+}
+
+// framework internal typing of the native "RepeatController" global class instance
+// (registered from C++ side); only used to pass the handle through to native code
+declare class RepeatController {
+  clearCache(): void;
 }

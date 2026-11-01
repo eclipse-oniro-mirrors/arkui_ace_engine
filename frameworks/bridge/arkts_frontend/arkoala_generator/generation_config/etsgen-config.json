@@ -41,6 +41,7 @@
         "ForEachAttribute",
         "LazyForEachAttribute",
         "LazyForEachInterface",
+        "LazyForEachController",
         "IDataSource",
         "DisturbanceFieldOptions",
         "RepeatItem",

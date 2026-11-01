@@ -317,6 +317,10 @@ class __RepeatVirtualScroll2Impl<T> {
     // register drag drop Handler Class, only used for List onMove
     private itemDragEventHandler_?: ItemDragEventHandler;
 
+    // controller (RepeatOptions.controller API), bound to the native node
+    // once at Repeat creation (immutable afterwards on the node side)
+    private controller_?: RepeatController;
+
     // update from C++ when MoveData happens
     // reset from C++ when FireOnMove happens
     private moveFromTo_?: [number, number] = undefined;
@@ -468,6 +472,7 @@ class __RepeatVirtualScroll2Impl<T> {
 
         this.onMoveHandler_ = config.onMoveHandler;
         this.itemDragEventHandler_ = config.itemDragEventHandler;
+        this.controller_ = config.controller;
 
         this.owningViewV2_ = config.owningView_;
         if ((this.owningViewV2_ instanceof ViewV2) && ('onLazyLoading' in config)) {
@@ -542,8 +547,20 @@ class __RepeatVirtualScroll2Impl<T> {
         // init onMove
         RepeatVirtualScroll2Native.onMove(this.repeatElmtId_, this.onMoveHandler_, this.itemDragEventHandler_);
 
+        // init controller (RepeatOptions.controller API): bind once at
+        // creation, the native side keeps the first binding (immutable, spec R-8)
+        this.updateController();
+
         stateMgmtConsole.debug(`${this.constructor.name}(${this.repeatElmtId_}) initialRender() data array length: `,
             `${this.arr_.length}, totalCount: ${this.totalCount()} - done`);
+    }
+
+    // bind the controller to the native node if configured;
+    // called from initialRender only: binding is creation-time and immutable
+    private updateController(): void {
+        if (this.controller_) {
+            RepeatVirtualScroll2Native.controller(this.repeatElmtId_, this.controller_);
+        }
     }
 
     // given data item and the ttype it needs to be rendered with from updated array:
@@ -586,7 +603,7 @@ class __RepeatVirtualScroll2Impl<T> {
         this.allowAnimation_ = RepeatVirtualScroll2Native.isAllowAnimation(this.repeatElmtId_);
 
         // update onMove
-        // scenario: developers control whether onMove exists or not dynamically. 
+        // scenario: developers control whether onMove exists or not dynamically.
         RepeatVirtualScroll2Native.onMove(this.repeatElmtId_, this.onMoveHandler_, this.itemDragEventHandler_);
 
         const activeRangeFrom = this.activeRange_[0];

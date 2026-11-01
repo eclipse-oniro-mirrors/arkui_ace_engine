@@ -4267,6 +4267,11 @@ export class LazyForEachOps {
         LazyForEachOps.SetOptions_serialize(node_casted, options_casted)
         return
     }
+    public static ClearCache(node: KPointer): void {
+        const node_casted = node as (KPointer)
+        LazyForEachOps.ClearCache_serialize(node_casted)
+        return
+    }
     private static NotifyChange_serialize(node: KPointer, startIndex: int32, endIndex: int32, count: int32): void {
         ArkUIGeneratedNativeModule._LazyForEachOps_NotifyChange(node, startIndex, endIndex, count)
     }
@@ -4304,6 +4309,9 @@ export class LazyForEachOps {
         LazyForEachOptions_serializer.write(thisSerializer, options)
         ArkUIGeneratedNativeModule._LazyForEachOps_SetOptions(node, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
+    }
+    private static ClearCache_serialize(node: KPointer): void {
+        ArkUIGeneratedNativeModule._LazyForEachOps_ClearCache(node)
     }
 }
 export class LazyWaterFlowLayoutExtender {

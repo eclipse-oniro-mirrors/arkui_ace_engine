@@ -159,6 +159,9 @@ interface __RepeatConfig<T> {
     mkRepeatItem?: (item: T, index?: number) => __RepeatItemFactoryReturn<T>;
     onMoveHandler?: OnMoveHandler;
     itemDragEventHandler?: ItemDragEventHandler;
+    // controller from RepeatOptions (creation-time binding, immutable on the component
+    // side; one controller controls one Repeat, last-bind-wins on the controller side)
+    controller?: RepeatController;
     reusable?: boolean;
     memOptStrategy?: RepeatMemOptStrategy;
 };
@@ -180,13 +183,18 @@ class __Repeat<T> implements RepeatAPI<T> {
     private impl: __RepeatImpl<T> | __RepeatVirtualScrollImpl<T> | __RepeatVirtualScroll2Impl<T>;
     private isVirtualScroll = false;
 
-    constructor(owningView: ViewV2 | ViewPU, arr: Array<T>) {
+    constructor(owningView: ViewV2 | ViewPU, arr: Array<T>, options?: RepeatOptions) {
         this.config.owningView_ = owningView instanceof ViewV2 ? owningView : undefined;
         this.config.arr = arr ?? [];
         this.config.itemGenFuncs = {};
         this.config.keyGenFunc = __RepeatDefaultKeyGen.funcWithIndex;
         this.config.keyGenFuncSpecified = false;
         this.config.ttypeGenFunc = undefined;
+
+        // RepeatOptions.controller is read here only: binding happens at Repeat creation
+        // and is immutable afterwards (spec R-8). Re-render only calls updateArr(), so a
+        // changed options.controller in the re-render call is ignored.
+        this.config.controller = options?.controller;
 
         this.config.totalCountSpecified = false;
         this.config.totalCount = this.config.arr.length;

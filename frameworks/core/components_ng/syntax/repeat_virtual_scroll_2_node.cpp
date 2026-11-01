@@ -91,6 +91,8 @@ RepeatVirtualScroll2Node::~RepeatVirtualScroll2Node()
         UnregisterWindowStateChangedCallback();
         UnregisterMemoryLevelChangedCallback();
     }
+    // The controller holds only a weak reference to this node: a node destroyed in
+    // the meantime expires the weak reference automatically, no notify-back needed.
 }
 
 void RepeatVirtualScroll2Node::UpdateTotalCount(uint32_t totalCount)
@@ -1142,6 +1144,18 @@ void RepeatVirtualScroll2Node::TryExecuteScheduledCacheTask()
         }
         StartRestoreCache();
     }
+}
+
+bool RepeatVirtualScroll2Node::TryBindController()
+{
+    // Creation-time immutable binding: keep the first controller, ignore later binds
+    // (a re-render passing a different options.controller must not re-bind; the
+    // controller side is one-to-one, last-bind-wins).
+    if (controllerBound_) {
+        return false;
+    }
+    controllerBound_ = true;
+    return true;
 }
 
 void RepeatVirtualScroll2Node::CleanCache(bool syncClean)

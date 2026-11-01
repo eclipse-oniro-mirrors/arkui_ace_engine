@@ -1041,6 +1041,39 @@ abstract class PUV2ViewBase extends ViewBuildNodeBase {
   }
 
   /**
+   * @function __getDefaultReusePool__Internal
+   * @description
+   * Returns the default reuse pool of this component (getDefaultReusePool API):
+   * the per-instance pool this component's recycled child components are cached in —
+   * a RecyclePoolV2 for a ViewV2 owner, a RecycleManager for a ViewPU owner.
+   * Returns undefined when no default reuse pool exists yet.
+   * The returned handle holds only a weak reference to the pool, so calling
+   * clearCache() after the owning component was destroyed is a safe no-op.
+   * @returns {IDefaultReusePool | undefined} The default reuse pool handle.
+   */
+  __getDefaultReusePool__Internal(): IDefaultReusePool | undefined {
+    let pool: RecycleManager | RecyclePoolV2 | undefined = undefined;
+    if (this instanceof ViewV2) {
+      pool = this.getRecyclePool();
+    } else if (this instanceof ViewPU) {
+      pool = this.getRecycleManager();
+    }
+    if (!pool) {
+      return undefined;
+    }
+    const weakPool = new WeakRef<RecycleManager | RecyclePoolV2>(pool);
+    return {
+      clearCache(reuseId?: string): void {
+        const currentPool = weakPool.deref();
+        if (!currentPool) {
+          return;
+        }
+        currentPool.clearCache(reuseId);
+      }
+    };
+  }
+
+  /**
    * @function __getCustomComponentContext__Internal
    * @description
    * Returns a per-instance ICustomComponentContext that captures `this` in a
@@ -1056,6 +1089,9 @@ abstract class PUV2ViewBase extends ViewBuildNodeBase {
       this.__customComponentContext__Internal = ((thizz: PUV2ViewBase): CustomComponentContext => ({
         getReusePool(): IReusePool | undefined {
           return PUV2ViewBase.prototype.getReusePool.call(thizz);
+        },
+        getDefaultReusePool(): IDefaultReusePool | undefined {
+          return PUV2ViewBase.prototype.__getDefaultReusePool__Internal.call(thizz);
         }
       }))(this);
     }
@@ -1294,9 +1330,10 @@ abstract class PUV2ViewBase extends ViewBuildNodeBase {
    * on first render create a new Instance of Repeat
    * on re-render connect to existing instance
    * @param arr
+   * @param options RepeatOptions, only read when the instance is first created
    * @returns
    */
-  abstract __mkRepeatAPI<I>(arr: Array<I>): RepeatAPI<I>;
+  abstract __mkRepeatAPI<I>(arr: Array<I>, options?: RepeatOptions): RepeatAPI<I>;
 
   public findViewInHierarchy(id: number): ViewPU | ViewV2 {
     let weakChild = this.childrenWeakrefMap_.get(id);
