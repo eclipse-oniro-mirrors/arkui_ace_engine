@@ -1806,7 +1806,7 @@ bool Scrollable::SettleSnapOnFrictionStop(bool itemSnapSettle)
     return startSnapAnimationCallback_(snapAnimationOptions);
 }
 
-void Scrollable::ProcessScrollMotionStop(int32_t source)
+bool Scrollable::TrySnapOnScrollMotionStop()
 {
     if (needScrollSnapChange_ && startSnapAnimationCallback_ && frictionOffsetProperty_) {
         needScrollSnapChange_ = false;
@@ -1815,7 +1815,7 @@ void Scrollable::ProcessScrollMotionStop(int32_t source)
         // settle takes over, the stop events are delivered by ITS spring completion —
         // dispatching them here as well would double-fire.
         if (SettleSnapOnFrictionStop(false)) {
-            return;
+            return true;
         }
     }
     // Feat-20260806915268 item snap (built-in align): the release deferred to the friction fling; now that
@@ -1832,8 +1832,16 @@ void Scrollable::ProcessScrollMotionStop(int32_t source)
             // (the release path has already flushed); run it so the two-stage chain — and its
             // completion-driven stop events — actually start.
             FlushPendingItemSnapKickoff();
-            return;
+            return true;
         }
+    }
+    return false;
+}
+
+void Scrollable::ProcessScrollMotionStop(int32_t source)
+{
+    if (TrySnapOnScrollMotionStop()) {
+        return;
     }
     // spring effect special process
     if (scrollPause_) {
@@ -1945,6 +1953,16 @@ double Scrollable::CalcNextStep(double position, double mainDelta)
     return mainDelta;
 }
 
+int32_t Scrollable::GetScrollMotionSource(int32_t source) const
+{
+    const bool barMotion = snapAnimationSource_ == SCROLL_FROM_BAR || snapAnimationSource_ == SCROLL_FROM_BAR_FLING;
+    if (barMotion && (state_ == AnimationState::SNAP ||
+        (state_ == AnimationState::FRICTION && needItemSnapSettle_))) {
+        return SCROLL_FROM_BAR_FLING;
+    }
+    return source;
+}
+
 void Scrollable::ProcessScrollMotion(double position, int32_t source)
 {
     currentVelocity_ = state_ == AnimationState::SNAP ? snapVelocity_ : frictionVelocity_;
@@ -1967,11 +1985,7 @@ void Scrollable::ProcessScrollMotion(double position, int32_t source)
             nodeId_, (TRAILING_ANIMATION + std::to_string(nodeId_) + std::string(" ") + nodeTag_).c_str());
     }
     // UpdateScrollPosition return false, means reach to scroll limit.
-    const bool barMotion = snapAnimationSource_ == SCROLL_FROM_BAR || snapAnimationSource_ == SCROLL_FROM_BAR_FLING;
-    if (barMotion && (state_ == AnimationState::SNAP ||
-        (state_ == AnimationState::FRICTION && needItemSnapSettle_))) {
-        source = SCROLL_FROM_BAR_FLING;
-    }
+    source = GetScrollMotionSource(source);
     HandleScroll(mainDelta, source, NestedState::GESTURE);
     if (!moved_) {
         ResetContinueDragCount();

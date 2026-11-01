@@ -58,6 +58,14 @@ constexpr int32_t TAKEOVER_COLUMN_COUNT = 2;
 constexpr int32_t TAKEOVER_ANIMATION_TICKS = 40;
 constexpr int32_t TAKEOVER_MAX_FLING_FRAMES = 400;
 constexpr int32_t TAKEOVER_MAX_SNAP_TICKS = 200;
+constexpr int32_t SCROLL_BAR_ITEM_COUNT = 200;
+constexpr double SCROLL_BAR_TEST_VELOCITY_LIMIT = 100000.0;
+
+enum class ScrollBarEvent {
+    DRAG_STOP,
+    DRAG_STOP_WITH_FLING,
+    FLING_START,
+};
 
 struct ItemSnapFlingOptions {
     ScrollSnapAlign align = ScrollSnapAlign::CENTER;
@@ -1426,14 +1434,16 @@ public:
         model.SetScrollBarMode(DisplayMode::ON);
         model.SetScrollSnapStrategy(strategy);
         model.SetOnScrollStop([this]() { ++scrollStops_; });
-        CreateGridItems(200, ITEM_MAIN_SIZE, ITEM_MAIN_SIZE);
+        CreateGridItems(SCROLL_BAR_ITEM_COUNT, ITEM_MAIN_SIZE, ITEM_MAIN_SIZE);
         CreateDone();
         UpdateCurrentOffset(-3000.0f);
         auto scroll = pattern_->GetScrollable();
-        scroll->onDidStopDraggingCallback_ = [this](bool fling) { events_.push_back(fling ? 1 : 0); };
-        scroll->onWillStartFlingCallback_ = [this]() { events_.push_back(2); };
+        scroll->onDidStopDraggingCallback_ = [this](bool fling) {
+            events_.push_back(fling ? ScrollBarEvent::DRAG_STOP_WITH_FLING : ScrollBarEvent::DRAG_STOP);
+        };
+        scroll->onWillStartFlingCallback_ = [this]() { events_.push_back(ScrollBarEvent::FLING_START); };
         scroll->onDidStopFlingCallback_ = [this]() { ++flingStops_; };
-        scroll->maxFlingVelocity_ = 100000.0;
+        scroll->maxFlingVelocity_ = SCROLL_BAR_TEST_VELOCITY_LIMIT;
         scrollStops_ = 0;
         MockAnimationManager::GetInstance().SetTicks(TAKEOVER_ANIMATION_TICKS);
     }
@@ -1472,7 +1482,7 @@ public:
 protected:
     bool physicalTouch_ = false;
     bool competingSnap_ = false;
-    std::vector<int32_t> events_;
+    std::vector<ScrollBarEvent> events_;
     std::vector<ScrollSource> motionSources_;
     float releaseOffset_ = 0.0f;
     float contentVelocity_ = 0.0f;
@@ -1502,7 +1512,8 @@ HWTEST_P(GridScrollBarSnapTest, InnerScrollBarBuiltInFling, TestSize.Level1)
     EXPECT_FLOAT_EQ(curve->GetDampingRatio(), 1.0f);
     EXPECT_NEAR(scroll->GetFinalPosition(), -releaseOffset_ + budget, 0.01f);
     EXPECT_FALSE(bar->frictionController_ && bar->frictionController_->IsRunning());
-    EXPECT_EQ(events_, (std::vector<int32_t> { 1, 2 }));
+    EXPECT_EQ(events_,
+        (std::vector<ScrollBarEvent> { ScrollBarEvent::DRAG_STOP_WITH_FLING, ScrollBarEvent::FLING_START }));
     frictionRate_ = std::abs(contentVelocity_ / budget);
     const float direction = velocity > 0.0f ? 1.0f : -1.0f;
     for (int32_t i = 0; i < TAKEOVER_MAX_FLING_FRAMES &&
@@ -1539,7 +1550,8 @@ HWTEST_P(GridScrollBarSnapTest, InnerScrollBarProviderFling, TestSize.Level1)
     });
     strategy.calculateApproachOffset = [this, snapAlign = align](double speed, double decay) {
         ++approachCalls_;
-        EXPECT_EQ(events_, (std::vector<int32_t> { 1, 2 }));
+        EXPECT_EQ(events_,
+            (std::vector<ScrollBarEvent> { ScrollBarEvent::DRAG_STOP_WITH_FLING, ScrollBarEvent::FLING_START }));
         EXPECT_NEAR(speed, -contentVelocity_, 0.01f);
         EXPECT_NEAR(decay, std::abs(contentVelocity_) /
             (-FRICTION_SCALE * pattern_->GetScrollable()->GetFlingFriction()), 0.01f);
@@ -1850,7 +1862,8 @@ HWTEST_P(GridScrollBarSnapTest, InnerScrollBarPhysicalProviderRelease, TestSize.
     });
     strategy.calculateApproachOffset = [this](double, double decay) {
         ++approachCalls_;
-        EXPECT_EQ(events_, (std::vector<int32_t> { 1, 2 }));
+        EXPECT_EQ(events_,
+            (std::vector<ScrollBarEvent> { ScrollBarEvent::DRAG_STOP_WITH_FLING, ScrollBarEvent::FLING_START }));
         return decay * 0.5;
     };
     CreateBarGrid(strategy);

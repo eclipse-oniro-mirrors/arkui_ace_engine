@@ -1085,16 +1085,12 @@ void ScrollablePattern::PrepareItemSnapFling(float motionVelocity, float motionD
     });
 }
 
-bool ScrollablePattern::StartItemSnapAnimation(const SnapAnimationOptions& snapAnimationOptions)
+bool ScrollablePattern::IsItemSnapBlockedByScrollBar(const SnapAnimationOptions& snapAnimationOptions)
 {
-    auto strategy = GetScrollSnapStrategy();
-    if (!strategy.IsEnabled() || !IsScrollable()) {
-        return false;
-    }
     // The container can receive touch-up before the thumb's drag-end. Let the scrollbar
     // release own the snap decision instead of starting a competing zero-velocity snap.
     if (scrollBar_ && scrollBar_->IsDriving() && snapAnimationOptions.source == SCROLL_FROM_NONE) {
-        return false;
+        return true;
     }
     // Scrollbar fling already moving toward the reached boundary: let the default over-scroll
     // motion finish instead of seizing the animation channel — snapping here would block a
@@ -1102,19 +1098,41 @@ bool ScrollablePattern::StartItemSnapAnimation(const SnapAnimationOptions& snapA
     if (snapAnimationOptions.fromScrollBar &&
         ((GreatNotEqual(snapAnimationOptions.animationVelocity, 0.0f) && IsAtTop()) ||
             (LessNotEqual(snapAnimationOptions.animationVelocity, 0.0f) && IsAtBottom()))) {
-        return false;
+        return true;
     }
-    auto scrollable = GetScrollable();
-    CHECK_NULL_RETURN(scrollable, false);
     // A scrollbar drag in progress (finger still holding the thumb) must not snap: the
     // ScrollBarProxy marks the trigger state, and Scroll's gate learned this the hard way
     // (!20677). Same gate as the List/Scroll snap entries.
     if (snapAnimationOptions.fromScrollBar) {
         auto scrollBarProxy = GetScrollBarProxy();
         if (scrollBarProxy && scrollBarProxy->IsScrollSnapTrigger()) {
-            return false;
+            return true;
         }
     }
+    return false;
+}
+
+void ScrollablePattern::QueueScrollBarSnapFling(const SnapAnimationOptions& snapAnimationOptions)
+{
+    auto scrollable = GetScrollable();
+    CHECK_NULL_VOID(scrollable);
+    scrollable->SetPendingItemSnapKickoff([weak = WeakClaim(this), snapAnimationOptions]() {
+        auto pattern = weak.Upgrade();
+        CHECK_NULL_VOID(pattern);
+        auto scroll = pattern->GetScrollable();
+        CHECK_NULL_VOID(scroll);
+        scroll->StartScrollBarSnapFling(-pattern->GetItemSnapCurrentOffset(), snapAnimationOptions);
+    });
+}
+
+bool ScrollablePattern::StartItemSnapAnimation(const SnapAnimationOptions& snapAnimationOptions)
+{
+    auto strategy = GetScrollSnapStrategy();
+    if (!strategy.IsEnabled() || !IsScrollable() || IsItemSnapBlockedByScrollBar(snapAnimationOptions)) {
+        return false;
+    }
+    auto scrollable = GetScrollable();
+    CHECK_NULL_RETURN(scrollable, false);
     // SnapAnimationOptions carries drag-frame motion (snapDelta = finalPos - currentPos, negative
     // when scrolling forward) while the candidates and GetTotalOffset() use positive scroll
     // distances. Convert at the boundary: selection runs in the positive frame, the scrollable
@@ -1125,13 +1143,7 @@ bool ScrollablePattern::StartItemSnapAnimation(const SnapAnimationOptions& snapA
     const bool innerScrollBarRelease =
         snapAnimationOptions.source == SCROLL_FROM_BAR && scrollBar_ && scrollBar_->IsDriving();
     if (innerScrollBarRelease && !snapAnimationOptions.fromItemSnapFlingStop && !NearZero(motionVelocity)) {
-        scrollable->SetPendingItemSnapKickoff([weak = WeakClaim(this), snapAnimationOptions]() {
-            auto pattern = weak.Upgrade();
-            CHECK_NULL_VOID(pattern);
-            auto scroll = pattern->GetScrollable();
-            CHECK_NULL_VOID(scroll);
-            scroll->StartScrollBarSnapFling(-pattern->GetItemSnapCurrentOffset(), snapAnimationOptions);
-        });
+        QueueScrollBarSnapFling(snapAnimationOptions);
         return true;
     }
     // Built-in alignment starts with normal friction. Components with measured anchors

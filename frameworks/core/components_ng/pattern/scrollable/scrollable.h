@@ -801,6 +801,8 @@ private:
     void ProcessPanActionEndEvents(const GestureEvent& info);
     bool UpdateScrollPosition(double offset, int32_t source) const;
     void ProcessSpringMotion(double position);
+    bool TrySnapOnScrollMotionStop();
+    int32_t GetScrollMotionSource(int32_t source) const;
     void ProcessScrollMotion(double position, int32_t source = SCROLL_FROM_ANIMATION);
     void ProcessListSnapMotion(double position);
     void TriggerFrictionAnimation(float mainPosition, float friction, float correctVelocity);
