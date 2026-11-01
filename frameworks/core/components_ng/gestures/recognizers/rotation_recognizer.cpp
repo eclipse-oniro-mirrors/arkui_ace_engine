@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "base/log/log_wrapper_without_instance.h"
 #include "core/components_ng/base/observer_handler.h"
 #include "core/components_ng/gestures/recognizers/rotation_recognizer.h"
 #include "core/components_ng/event/event_constants.h"
@@ -58,7 +59,7 @@ void RotationRecognizer::OnAccepted()
     }
     
     auto node = GetAttachedNode().Upgrade();
-    TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW, "ROTATE RACC, T: %{public}s",
+    TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW, "ROTATE RACC, T: %{public}s",
         node ? node->GetTag().c_str() : "null");
     LogStateChange(refereeState_, RefereeState::SUCCEED, StateChangeReason::ROTATION_ANGLE_REACHED);
     lastRefereeState_ = refereeState_;
@@ -319,7 +320,7 @@ void RotationRecognizer::HandleTouchCancelEvent(const TouchEvent& event)
         lastRefereeState_ = RefereeState::READY;
         refereeState_ = RefereeState::READY;
     } else if (refereeState_ == RefereeState::SUCCEED) {
-        TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW,
+        TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW,
             "RotationRecognizer touchPoints size not equal fingers_, not send cancel callback.");
     }
 }

@@ -15,6 +15,7 @@
 
 #include "core/components_ng/gestures/recognizers/long_press_recognizer.h"
 
+#include "base/log/log_wrapper_without_instance.h"
 #include "core/components_ng/base/observer_handler.h"
 #include "core/components_ng/gestures/recognizers/gestures_extra_handler.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -60,7 +61,7 @@ void LongPressRecognizer::OnAccepted()
     }
 
     auto node = GetAttachedNode().Upgrade();
-    TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW, "LONG RACC, T: %{public}s",
+    TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW, "LONG RACC, T: %{public}s",
         node ? node->GetTag().c_str() : "null");
     if (onAccessibilityEventFunc_) {
         auto onAccessibilityEventFunc = onAccessibilityEventFunc_;
@@ -275,7 +276,7 @@ void LongPressRecognizer::HandleTouchCancelEvent(const TouchEvent& event)
         lastRefereeState_ = RefereeState::READY;
         refereeState_ = RefereeState::READY;
     } else if (refereeState_ == RefereeState::SUCCEED) {
-        TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW,
+        TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW,
             "LongPressRecognizer touchPoints size not equal 0, not send cancel callback.");
         extraInfo_ += "Reject: received cancel and succeed.";
         LogStateChange(refereeState_, RefereeState::FAIL, StateChangeReason::SYSTEM_CANCEL);

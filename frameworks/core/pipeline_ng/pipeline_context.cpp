@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <unistd.h>
 #include <unordered_set>
+#include "base/log/log_wrapper_without_instance.h"
 #include "base/resource/data_provider_manager.h"
 #include "core/components_ng/base/inspector_tree_request_context.h"
 #include "base/json/json_util_internal.h"
@@ -3973,7 +3974,7 @@ void PipelineContext::OnTouchEvent(const TouchEvent& point, const RefPtr<FrameNo
     }
     ACE_BENCH_MARK_TRACE("OnTouchEvent_start type:%d", static_cast<int32_t>(point.type));
 
-    TAG_LOGD(AceLogTag::ACE_INPUTKEYFLOW, "OnTouchEvent type:%{public}d, isGenerate:%{public}d",
+    TAG_LOGD_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW, "OnTouchEvent type:%{public}d, isGenerate:%{public}d",
         static_cast<int32_t>(point.type), point.isGenerate);
     if (ConvertFromMouseAxis(point) && !point.isGenerate && compatibleManager_.NotifyNewEvent(point)) {
         if (!eventManager_->touchDelegatesMap_.empty()) {
@@ -4041,13 +4042,13 @@ void PipelineContext::OnTouchEvent(const TouchEvent& point, const RefPtr<FrameNo
         scalePoint.type != TouchType::HOVER_MOVE) {
         eventManager_->GetEventTreeRecord(EventTreeType::TOUCH).AddTouchPoint(scalePoint);
 #ifdef IS_RELEASE_VERSION
-        TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW,
+        TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW,
             "ITK Id:%{public}d, fId:%{public}d, T:%{public}d, I=%{public}d, "
             "M=%{public}d",
             scalePoint.touchEventId, scalePoint.id, (int)scalePoint.type, scalePoint.isInjected,
             scalePoint.isPrivacyMode);
 #else
-        TAG_LOGD(AceLogTag::ACE_INPUTKEYFLOW,
+        TAG_LOGD_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW,
             "ITK Id:%{public}d, fId:%{public}d, x=%{public}.3f, y=%{public}.3f T=%{public}d, "
             "I=%{public}d",
             scalePoint.touchEventId, scalePoint.id, scalePoint.x, scalePoint.y, (int)scalePoint.type,
@@ -5312,11 +5313,11 @@ void PipelineContext::OnMouseEvent(const MouseEvent& event, const RefPtr<FrameNo
     lastMouseEvent_->node = node;
     if (event.action == MouseAction::PRESS || event.action == MouseAction::RELEASE) {
 #ifdef IS_RELEASE_VERSION
-        TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW,
+        TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW,
             "InputTracking id:%{public}d, mouseId:%{public}d, type=%{public}d, button=%{public}d, inject=%{public}d",
             event.touchEventId, event.id, (int)event.action, (int)event.button, event.isInjected);
 #else
-        TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW,
+        TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW,
             "InputTracking id:%{public}d, mouseId:%{public}d, x=%{public}.3f, y=%{public}.3f, z=%{public}.3f, "
             "type=%{public}d, button=%{public}d"
             "inject=%{public}d",
@@ -5720,7 +5721,7 @@ void PipelineContext::OnAxisEvent(const AxisEvent& event, const RefPtr<FrameNode
     ACE_BENCH_MARK_TRACE("OnAxisEvent_start type:%d", event.action);
     eventManager_->NotifyAxisEvent(event);
     if (!axisEventChecker_.IsAxisEventSequenceCorrect(event)) {
-        TAG_LOGW(AceLogTag::ACE_INPUTKEYFLOW,
+        TAG_LOGW_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW,
             "AxisEvent error occurred, the currentAction is %{public}d, the preAction is %{public}d", event.action,
             axisEventChecker_.GetPreAction());
     }

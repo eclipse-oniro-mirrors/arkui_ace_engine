@@ -17,6 +17,7 @@
 #include "core/common/event_manager.h"
 
 #include "core/components_ng/gestures/recognizers/click_recognizer.h"
+#include "core/components_ng/gestures/recognizers/exclusive_recognizer.h"
 #include "core/components_ng/gestures/recognizers/pan_recognizer.h"
 #include "core/common/event_dump.h"
 
@@ -125,7 +126,7 @@ HWTEST_F(EventManagerTestNg, EventManagerTest063, TestSize.Level1)
 
 /**
  * @tc.name: EventManagerTest064
- * @tc.desc: Test LogTouchTestResultRecognizers
+ * @tc.desc: Test GetTouchTestResultRecognizers
  * @tc.type: FUNC
  */
 HWTEST_F(EventManagerTestNg, EventManagerTest064, TestSize.Level1)
@@ -138,8 +139,8 @@ HWTEST_F(EventManagerTestNg, EventManagerTest064, TestSize.Level1)
     ASSERT_NE(eventManager, nullptr);
 
     /**
-     * @tc.steps: step2. Call LogTouchTestResultRecognizers.
-     * @tc.expected: ret is false.
+     * @tc.steps: step2. Collect information for a recognizer attached to a frame node.
+     * @tc.expected: The returned information contains the recognizer type and node tag.
      */
     TouchEvent event;
     event.type = TouchType::DOWN;
@@ -152,8 +153,27 @@ HWTEST_F(EventManagerTestNg, EventManagerTest064, TestSize.Level1)
     auto pageNode = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, 1, pagePattern);
     panHorizontal->AttachFrameNode(pageNode);
     resultList.emplace_back(panHorizontal);
-    eventManager->LogTouchTestResultRecognizers(resultList, 1);
+    auto recognizerInfo = eventManager->GetTouchTestResultRecognizers(resultList);
+    EXPECT_EQ(recognizerInfo, "TTHRTI:3:P;");
     EXPECT_FALSE(panHorizontal->isFlushTouchEventsEnd_);
+
+    auto stackNode = FrameNode::CreateFrameNode(V2::STACK_ETS_TAG, 2, AceType::MakeRefPtr<Pattern>());
+    auto columnNode = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, 3, AceType::MakeRefPtr<Pattern>());
+    panHorizontal->AttachFrameNode(stackNode);
+    auto columnPan = AceType::MakeRefPtr<PanRecognizer>(
+        DEFAULT_PAN_FINGER, PanDirection { PanDirection::HORIZONTAL }, DEFAULT_PAN_DISTANCE.ConvertToPx());
+    columnPan->AttachFrameNode(columnNode);
+    std::list<RefPtr<NGGestureRecognizer>> groupedRecognizers = { columnPan };
+    resultList.emplace_back(AceType::MakeRefPtr<ExclusiveRecognizer>(std::move(groupedRecognizers)));
+    EXPECT_EQ(eventManager->GetTouchTestResultRecognizers(resultList), "TTHRTI:3:S,C;");
+
+    EXPECT_TRUE(eventManager->GetTouchTestResultInfo(event, pageNode).empty());
+    eventManager->touchTestResults_[event.id] = { panHorizontal, columnPan };
+    auto nodeInfo = eventManager->GetTouchTestResultInfo(event, pageNode);
+    EXPECT_NE(nodeInfo.find("T: S"), std::string::npos);
+    EXPECT_NE(nodeInfo.find("T: C"), std::string::npos);
+    EXPECT_EQ(nodeInfo.find("Stack"), std::string::npos);
+    EXPECT_EQ(nodeInfo.find("Column"), std::string::npos);
 }
 
 /**

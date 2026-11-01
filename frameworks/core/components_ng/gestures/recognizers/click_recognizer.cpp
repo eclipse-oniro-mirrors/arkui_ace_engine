@@ -15,6 +15,7 @@
 
 #include <chrono>
 
+#include "base/log/log_wrapper_without_instance.h"
 #include "core/components_ng/base/observer_handler.h"
 #include "core/components_ng/gestures/recognizers/click_recognizer.h"
 #include "core/components_ng/manager/event/json_child_report.h"
@@ -256,7 +257,7 @@ void ClickRecognizer::OnAccepted()
     firstInputTime_.reset();
 
     auto node = GetAttachedNode().Upgrade();
-    TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW, "CLK RACC, T: %{public}s",
+    TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW, "CLK RACC, T: %{public}s",
         node ? node->GetTag().c_str() : "null");
     
     auto lastRefereeState = refereeState_;

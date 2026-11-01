@@ -21,6 +21,7 @@
 #include "core/components_ng/event/event_constants.h"
 #include "core/components_ng/manager/event/json_report.h"
 
+#include "base/log/log_wrapper_without_instance.h"
 #include "base/ressched/ressched_report.h"
 
 namespace OHOS::Ace::NG {
@@ -58,7 +59,7 @@ void PinchRecognizer::OnAccepted()
     }
     
     auto node = GetAttachedNode().Upgrade();
-    TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW, "PINCH RACC, T: %{public}s",
+    TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW, "PINCH RACC, T: %{public}s",
         node ? node->GetTag().c_str() : "null");
 #ifndef CROSS_PLATFORM
     ResSchedReport::GetInstance().ResSchedDataReport("click");
@@ -361,7 +362,7 @@ void PinchRecognizer::HandleTouchCancelEvent(const TouchEvent& event)
         lastRefereeState_ = RefereeState::READY;
         refereeState_ = RefereeState::READY;
     } else if (refereeState_ == RefereeState::SUCCEED) {
-        TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW,
+        TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW,
             "PinchRecognizer activeFingers size not equal fingers_, not send cancel callback.");
     }
 }
