@@ -26,7 +26,7 @@ void FocusView::FocusViewShow(bool isTriggerByStep)
         GetFrameName() == V2::NAVDESTINATION_VIEW_ETS_TAG ||
         GetFrameName() == V2::MENU_ETS_TAG) {
         if (!GetFocusViewFocusable()) {
-            TAG_LOGI(AceLogTag::ACE_FOCUS, "view: %{public}s/%{public}d is not focusable, cannot be shown",
+            TAG_LOGI(AceLogTag::ACE_FOCUS, "view: %{public}s/%{public}d not focusable, cannot show",
                 GetFrameName().c_str(), GetFrameId());
             return;
         }
@@ -290,7 +290,7 @@ std::pair<bool, bool> FocusView::HandleDefaultFocusNode(
         if (!defaultFocusNode) {
             TAG_LOGD(AceLogTag::ACE_FOCUS, "Focus view has no default focus.");
         } else if (!defaultFocusNode->IsFocusableWholePath()) {
-            TAG_LOGI(AceLogTag::ACE_FOCUS, "Default focus node: %{public}s/%{public}d is not focusable",
+            TAG_LOGI(AceLogTag::ACE_FOCUS, "Default focus node: %{public}s/%{public}d not focusable",
                 defaultFocusNode->GetFrameName().c_str(), defaultFocusNode->GetFrameId());
         } else {
             SetIsViewRootScopeFocused(false);
@@ -366,13 +366,13 @@ bool FocusView::TriggerFocusMove()
     CHECK_NULL_RETURN(viewRootScope, false);
     if (!viewRootScope->IsCurrentFocus()) {
         TAG_LOGI(AceLogTag::ACE_FOCUS,
-            "Current view root: %{public}s/%{public}d is not on focusing. Cannot trigger focus move.",
+            "View root: %{public}s/%{public}d not focusing, cannot trigger focus move.",
             viewRootScope->GetFrameName().c_str(), viewRootScope->GetFrameId());
         return false;
     }
     if (viewRootScope->GetFocusDependence() != FocusDependence::SELF) {
         TAG_LOGI(AceLogTag::ACE_FOCUS,
-            "Current view root: %{public}s/%{public}d is not focus depend self. Do not trigger focus move.",
+            "View root: %{public}s/%{public}d not focus depend self, skip focus move.",
             viewRootScope->GetFrameName().c_str(), viewRootScope->GetFrameId());
         return false;
     }
