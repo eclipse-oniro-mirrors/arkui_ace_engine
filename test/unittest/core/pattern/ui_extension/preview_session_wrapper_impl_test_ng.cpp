@@ -753,10 +753,8 @@ HWTEST_F(PreviewSessionWrapperImplTestNg, PreviewSessionWrapperImplTestNg014, Te
 HWTEST_F(PreviewSessionWrapperImplTestNg, PreviewSessionWrapperBrandColorTest001, TestSize.Level1)
 {
 #ifdef OHOS_STANDARD_SYSTEM
-    auto sessionWrapper = GeneratePreviewSessionWrapperImpl();
-    ASSERT_NE(sessionWrapper, nullptr);
-    auto pattern = sessionWrapper->hostPattern_.Upgrade();
-    ASSERT_EQ(pattern, nullptr);
+    auto pattern = AceType::MakeRefPtr<PreviewUIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
     auto result = pattern->GetBrandColorStr();
     EXPECT_EQ(result, "");
 #endif
@@ -770,12 +768,39 @@ HWTEST_F(PreviewSessionWrapperImplTestNg, PreviewSessionWrapperBrandColorTest001
 HWTEST_F(PreviewSessionWrapperImplTestNg, PreviewSessionWrapperBrandColorTest002, TestSize.Level1)
 {
 #ifdef OHOS_STANDARD_SYSTEM
-    auto sessionWrapper = GeneratePreviewSessionWrapperImpl();
-    ASSERT_NE(sessionWrapper, nullptr);
-    auto pattern = sessionWrapper->hostPattern_.Upgrade();
-    ASSERT_EQ(pattern, nullptr);
+    auto pattern = AceType::MakeRefPtr<PreviewUIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
     auto result = pattern->ResolveBrandColor(999);
     EXPECT_EQ(result, "");
+#endif
+}
+
+/**
+ * @tc.name: PreviewSessionWrapperBrandColorTest003
+ * @tc.desc: Test NotifyBrandColorChangeToUEA with transparent brand color is skipped
+ * @tc.type: FUNC
+ */
+HWTEST_F(PreviewSessionWrapperImplTestNg, PreviewSessionWrapperBrandColorTest003, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<PreviewUIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->NotifyBrandColorChangeToUEA(300, "#00EEEEEE");
+    EXPECT_TRUE(pattern->lastSentBrandColorStr_.empty());
+#endif
+}
+
+/**
+ * @tc.name: PreviewSessionWrapperBrandColorTest004
+ * @tc.desc: Test isUeaConnecting_ defaults to false
+ * @tc.type: FUNC
+ */
+HWTEST_F(PreviewSessionWrapperImplTestNg, PreviewSessionWrapperBrandColorTest004, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<PreviewUIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_FALSE(pattern->isUeaConnecting_);
 #endif
 }
 } // namespace OHOS::Ace::NG
