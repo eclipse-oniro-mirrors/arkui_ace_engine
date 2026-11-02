@@ -6110,7 +6110,7 @@ void ScrollablePattern::ContentChangeByDetaching(PipelineContext* pipeline)
 
 void ScrollablePattern::ContentChangeOnScrollStart(const RefPtr<FrameNode>& keyNode)
 {
-    CHECK_NULL_VOID(keyNode);
+    CHECK_NULL_VOID(keyNode && keyNode->IsOnMainTree());
     // A new continuous interaction supersedes any command that has not reached layout yet.
     capiCommandOffset_.reset();
     auto pipeline = GetContext();
