@@ -759,7 +759,7 @@ DialogProperties CalendarPickerDialogBridge::BuildDialogProperties(EcmaVM* vm,
 
     properties.alignment = theme->GetAlignment();
     if (Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWELVE)) {
-        properties.alignment = DialogAlignment::CENTER;
+        properties.alignment = DialogAlignment::DEFAULT;
     }
     
     auto backgroundColorValue = paramObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "backgroundColor"));
