@@ -705,8 +705,12 @@ public:
     RefPtr<SpanString> ToStyledString(int32_t start, int32_t end);
     SelectionInfo FromStyledString(const RefPtr<SpanString>& spanString);
     bool BeforeAddSymbol(RichEditorChangeValue& changeValue, const SymbolSpanOptions& options);
-    void AfterContentChange(RichEditorChangeValue& changeValue);
-    void ReportAfterContentChangeEvent();
+    void AfterContentChange(RichEditorChangeValue& changeValue,
+        const std::optional<std::u16string>& addText = std::nullopt,
+        const std::optional<std::u16string>& deleteText = std::nullopt);
+    void ReportAfterContentChangeEvent(
+        const std::optional<std::u16string>& addText = std::nullopt,
+        const std::optional<std::u16string>& deleteText = std::nullopt);
     void ReportTextChange();
     void ReportEditorEvent(const std::string& eventType);
     void DeleteToMaxLength(std::optional<int32_t> length);

@@ -2668,7 +2668,9 @@ bool RichEditorPattern::BeforeAddSymbol(RichEditorChangeValue& changeValue, cons
     return ret;
 }
 
-void RichEditorPattern::AfterContentChange(RichEditorChangeValue& changeValue)
+void RichEditorPattern::AfterContentChange(RichEditorChangeValue& changeValue,
+    const std::optional<std::u16string>& addText,
+    const std::optional<std::u16string>& deleteText)
 {
     auto eventHub = GetEventHub<RichEditorEventHub>();
     ReportTextChange();
@@ -2676,10 +2678,12 @@ void RichEditorPattern::AfterContentChange(RichEditorChangeValue& changeValue)
         eventHub->FireOnDidChange(changeValue);
     }
     ForceTriggerAvoidOnCaretChange();
-    ReportAfterContentChangeEvent();
+    ReportAfterContentChangeEvent(addText, deleteText);
 }
 
-void RichEditorPattern::ReportAfterContentChangeEvent()
+void RichEditorPattern::ReportAfterContentChangeEvent(
+    const std::optional<std::u16string>& addText,
+    const std::optional<std::u16string>& deleteText)
 {
     std::string currentContent;
     if (isSpanStringMode_) {
@@ -2688,6 +2692,22 @@ void RichEditorPattern::ReportAfterContentChangeEvent()
         std::u16string u16Str;
         GetContentBySpans(u16Str);
         currentContent = UtfUtils::Str16DebugToStr8(u16Str);
+    }
+
+    if ((addText.has_value() || deleteText.has_value()) && suppressAccessibilityEvent_) {
+        if (currentContent != textCache_) {
+            auto removedStr = deleteText.has_value() ? UtfUtils::Str16DebugToStr8(deleteText.value()) : "";
+            auto addedStr = addText.has_value() ? UtfUtils::Str16DebugToStr8(addText.value()) : "";
+            TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "incremental addLen=%{public}zu, removedLen=%{public}zu",
+                addedStr.length(), removedStr.length());
+            IF_TRUE(!removedStr.empty(),
+                OnAccessibilityEventTextChange(TextChangeType::REMOVE, removedStr));
+            IF_TRUE(!addedStr.empty(),
+                OnAccessibilityEventTextChange(TextChangeType::ADD, addedStr));
+        }
+        textCache_ = currentContent;
+        suppressAccessibilityEvent_ = true;
+        return;
     }
 
     auto weakThis = AceType::WeakClaim(this);
@@ -7950,7 +7970,8 @@ void RichEditorPattern::ProcessInsertValueMore(const std::u16string& text, Opera
         record.deleteCaretPosition = dragRange_.first;
     }
     IF_TRUE(shouldCommitInput, AddInsertOperationRecord(record));
-    AfterContentChange(changeValue);
+    // record.addText is set in ProcessInsertValue; record.deleteText is set by DeleteSelectionOrPreviewText
+    AfterContentChange(changeValue, record.addText, record.deleteText);
 }
 
 // operationType: when type is IME, it controls whether to perform ime callbacks

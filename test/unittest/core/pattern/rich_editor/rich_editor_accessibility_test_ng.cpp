@@ -574,4 +574,176 @@ HWTEST_F(RichEditorAccessibilityTestNg, AccessibilityProperty002, TestSize.Level
     richEditorPattern->SetAccessibilityAction();
 }
 
+/**
+ * @tc.name: ReportAfterContentChangeEvent001
+ * @tc.desc: Test ReportAfterContentChangeEvent with addText, verify textCache_ is updated.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorAccessibilityTestNg, ReportAfterContentChangeEvent001, TestSize.Level2)
+{
+    SetSpanStringMode(false);
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+
+    richEditorPattern->AddTextSpan(TEXT_SPAN_OPTIONS_1);
+    richEditorPattern->PreCreateLayoutWrapper();
+
+    EXPECT_EQ(richEditorPattern->textCache_, "hello1");
+    EXPECT_TRUE(richEditorPattern->suppressAccessibilityEvent_);
+
+    richEditorPattern->textCache_ = "";
+    richEditorPattern->ReportAfterContentChangeEvent(u"hello1", std::nullopt);
+
+    EXPECT_EQ(richEditorPattern->textCache_, "hello1");
+    EXPECT_TRUE(richEditorPattern->suppressAccessibilityEvent_);
+}
+
+/**
+ * @tc.name: ReportAfterContentChangeEvent002
+ * @tc.desc: Test no event when content unchanged (FinishTextPreview scenario).
+ *           Verifies currentContent == textCache_ prevents spurious events.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorAccessibilityTestNg, ReportAfterContentChangeEvent002, TestSize.Level2)
+{
+    SetSpanStringMode(false);
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+
+    richEditorPattern->AddTextSpan(TEXT_SPAN_OPTIONS_1);
+    richEditorPattern->PreCreateLayoutWrapper();
+
+    EXPECT_EQ(richEditorPattern->textCache_, "hello1");
+
+    richEditorPattern->ReportAfterContentChangeEvent(u"hello1", std::nullopt);
+
+    EXPECT_EQ(richEditorPattern->textCache_, "hello1");
+    EXPECT_TRUE(richEditorPattern->suppressAccessibilityEvent_);
+}
+
+/**
+ * @tc.name: ReportAfterContentChangeEvent003
+ * @tc.desc: Test suppress=false falls through to ProcessAccessibilityTextChange diff path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorAccessibilityTestNg, ReportAfterContentChangeEvent003, TestSize.Level2)
+{
+    SetSpanStringMode(false);
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+
+    richEditorPattern->AddTextSpan(TEXT_SPAN_OPTIONS_1);
+    richEditorPattern->PreCreateLayoutWrapper();
+
+    richEditorPattern->suppressAccessibilityEvent_ = false;
+    richEditorPattern->textCache_ = "";
+    richEditorPattern->ReportAfterContentChangeEvent(u"hello1", std::nullopt);
+
+    EXPECT_EQ(richEditorPattern->textCache_, "hello1");
+    EXPECT_TRUE(richEditorPattern->suppressAccessibilityEvent_);
+}
+
+/**
+ * @tc.name: ReportAfterContentChangeEvent004
+ * @tc.desc: Test no incremental data (default nullopt) falls through to diff path.
+ *           Verifies backward compatibility with callers that don't pass addText/deleteText.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorAccessibilityTestNg, ReportAfterContentChangeEvent004, TestSize.Level2)
+{
+    SetSpanStringMode(false);
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+
+    richEditorPattern->AddTextSpan(TEXT_SPAN_OPTIONS_1);
+    richEditorPattern->PreCreateLayoutWrapper();
+
+    richEditorPattern->textCache_ = "";
+    richEditorPattern->ReportAfterContentChangeEvent();
+
+    EXPECT_EQ(richEditorPattern->textCache_, "hello1");
+    EXPECT_TRUE(richEditorPattern->suppressAccessibilityEvent_);
+}
+
+/**
+ * @tc.name: ReportAfterContentChangeEvent005
+ * @tc.desc: Test incremental path with both addText and deleteText (selection replace).
+ *           Verifies textCache_ is updated to full content, not just addText.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorAccessibilityTestNg, ReportAfterContentChangeEvent005, TestSize.Level2)
+{
+    SetSpanStringMode(false);
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+
+    richEditorPattern->AddTextSpan(TEXT_SPAN_OPTIONS_1);
+    richEditorPattern->AddTextSpan(TEXT_SPAN_OPTIONS_1);
+    richEditorPattern->PreCreateLayoutWrapper();
+
+    richEditorPattern->textCache_ = "hello1";
+    richEditorPattern->ReportAfterContentChangeEvent(u"hello1", u"old");
+
+    EXPECT_EQ(richEditorPattern->textCache_, "hello1hello1");
+    EXPECT_TRUE(richEditorPattern->suppressAccessibilityEvent_);
+}
+
+/**
+ * @tc.name: ReportAfterContentChangeEvent006
+ * @tc.desc: Test incremental path with Chinese text (voice input scenario).
+ *           Verifies Str16DebugToStr8 encoding works for non-ASCII characters.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorAccessibilityTestNg, ReportAfterContentChangeEvent006, TestSize.Level2)
+{
+    SetSpanStringMode(false);
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+
+    TextSpanOptions options;
+    options.value = u"窗前明月光";
+    richEditorPattern->AddTextSpan(options);
+    richEditorPattern->PreCreateLayoutWrapper();
+
+    EXPECT_FALSE(richEditorPattern->textCache_.empty());
+
+    richEditorPattern->textCache_ = "";
+    richEditorPattern->ReportAfterContentChangeEvent(u"床前明月光，疑是地上霜", std::nullopt);
+
+    EXPECT_FALSE(richEditorPattern->textCache_.empty());
+    EXPECT_TRUE(richEditorPattern->suppressAccessibilityEvent_);
+}
+
+/**
+ * @tc.name: InsertValueAccessibility001
+ * @tc.desc: Test full InsertValue flow updates textCache_ via incremental path.
+ *           Uses ActActionSetText to trigger ProcessInsertValueMore → AfterContentChange.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorAccessibilityTestNg, InsertValueAccessibility001, TestSize.Level2)
+{
+    SetSpanStringMode(false);
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+    auto accProp = richEditorNode_->GetAccessibilityProperty<RichEditorAccessibilityProperty>();
+    ASSERT_NE(accProp, nullptr);
+
+    richEditorPattern->AddTextSpan(TEXT_SPAN_OPTIONS_1);
+    richEditorPattern->PreCreateLayoutWrapper();
+    EXPECT_EQ(richEditorPattern->textCache_, "hello1");
+
+    accProp->ActActionSetText("test123");
+    richEditorPattern->PreCreateLayoutWrapper();
+
+    EXPECT_FALSE(richEditorPattern->textCache_.empty());
+    EXPECT_TRUE(richEditorPattern->suppressAccessibilityEvent_);
+}
+
 } // namespace OHOS::Ace::NG
