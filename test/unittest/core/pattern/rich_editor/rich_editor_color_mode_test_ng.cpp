@@ -20,6 +20,7 @@
 #include "test/mock/frameworks/core/common/mock_container.h"
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_model_ng.h"
+#include "core/components_ng/pattern/rich_editor/rich_editor_theme.h"
 #include "core/components_ng/pattern/rich_editor/color_mode_processor.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_base_controller.h"
 
@@ -336,5 +337,121 @@ HWTEST_F(RichEditorColorModeTestNg, InitFloatingCaretColorMode002, TestSize.Leve
     auto pattern = AceType::MakeRefPtr<RichEditorPattern>();
     // With LIGHT container mode, caret color should be semi-transparent black
     EXPECT_EQ(pattern->floatingCaretState_.originCaretColor, Color(0x4D000000));
+}
+
+/**
+ * @tc.name: OnColorModeChange001
+ * @tc.desc: Test OnColorModeChange with cancelButtonDirty_ true and null cleanNodeResponseArea_.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorColorModeTestNg, OnColorModeChange001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->cancelButtonDirty_ = true;
+    pattern->cleanNodeResponseArea_ = nullptr;
+    pattern->OnColorModeChange(1);
+    EXPECT_FALSE(pattern->cancelButtonDirty_);
+}
+
+/**
+ * @tc.name: OnColorModeChange002
+ * @tc.desc: Test OnColorModeChange with cancelButtonDirty_ false skips refresh branch.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorColorModeTestNg, OnColorModeChange002, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->cancelButtonDirty_ = false;
+    pattern->OnColorModeChange(0);
+    EXPECT_FALSE(pattern->cancelButtonDirty_);
+}
+
+/**
+ * @tc.name: UpdateLayoutPropertyColor001
+ * @tc.desc: Test UpdateLayoutPropertyColor with theme present updates text color.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorColorModeTestNg, UpdateLayoutPropertyColor001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto pipeline = richEditorNode_->GetContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    ASSERT_NE(themeManager, nullptr);
+    pipeline->SetThemeManager(themeManager);
+    EXPECT_CALL(*themeManager, GetTheme(_))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<RichEditorTheme>()));
+    pattern->UpdateLayoutPropertyColor();
+    auto layoutProperty = richEditorNode_->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    EXPECT_TRUE(layoutProperty->HasTextColor());
+}
+
+/**
+ * @tc.name: UpdateSpanNodeByColorMode001
+ * @tc.desc: Test UpdateSpanNodeByColorMode early return when isSpanStringMode_ is true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorColorModeTestNg, UpdateSpanNodeByColorMode001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSpanStringMode_ = true;
+    pattern->UpdateSpanNodeByColorMode();
+    EXPECT_TRUE(pattern->isSpanStringMode_);
+}
+
+/**
+ * @tc.name: UpdateSpanNodeByColorMode002
+ * @tc.desc: Test UpdateSpanNodeByColorMode with null content host returns early.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorColorModeTestNg, UpdateSpanNodeByColorMode002, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSpanStringMode_ = false;
+    pattern->contentPattern_ = nullptr;
+    pattern->UpdateSpanNodeByColorMode();
+    EXPECT_FALSE(pattern->isSpanStringMode_);
+}
+
+/**
+ * @tc.name: UpdateSpanNodeByColorMode003
+ * @tc.desc: Test UpdateSpanNodeByColorMode iterates span nodes and updates colors.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorColorModeTestNg, UpdateSpanNodeByColorMode003, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto pipeline = richEditorNode_->GetContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    ASSERT_NE(themeManager, nullptr);
+    pipeline->SetThemeManager(themeManager);
+    EXPECT_CALL(*themeManager, GetTheme(_))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<RichEditorTheme>()));
+    AddSpan(u"abc");
+    pattern->isSpanStringMode_ = false;
+    pattern->UpdateSpanNodeByColorMode();
+    EXPECT_FALSE(pattern->isSpanStringMode_);
+}
+
+/**
+ * @tc.name: UpdateStyledStringByColorMode001
+ * @tc.desc: Test UpdateStyledStringByColorMode early return when not in span string mode.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorColorModeTestNg, UpdateStyledStringByColorMode001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSpanStringMode_ = false;
+    pattern->UpdateStyledStringByColorMode();
+    EXPECT_FALSE(pattern->isSpanStringMode_);
 }
 } // namespace OHOS::Ace::NG

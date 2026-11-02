@@ -1437,4 +1437,249 @@ HWTEST_F(RichEditorSelectionTestNg, JudgeSelectType001, TestSize.Level0)
     EXPECT_NE(selectType, SelectType::SELECT_FORWARD);
 }
 
+/**
+ * @tc.name: AdjustSelectorForEmoji001
+ * @tc.desc: Test AdjustSelectorForEmoji returns false when index out of span range.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSelectionTestNg, AdjustSelectorForEmoji001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ClearSpan();
+    AddSpan(u"abc");
+    int32_t index = 100;
+    EXPECT_FALSE(pattern->AdjustSelectorForEmoji(index, HandleType::FIRST, SelectorAdjustPolicy::INCLUDE));
+    EXPECT_FALSE(pattern->AdjustSelectorForEmoji(index, HandleType::SECOND, SelectorAdjustPolicy::EXCLUDE));
+}
+
+/**
+ * @tc.name: AdjustSelectorForEmoji002
+ * @tc.desc: Test AdjustSelectorForEmoji returns false when content has no emoji.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSelectionTestNg, AdjustSelectorForEmoji002, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ClearSpan();
+    AddSpan(u"plain");
+    int32_t index = 2;
+    EXPECT_FALSE(pattern->AdjustSelectorForEmoji(index, HandleType::FIRST, SelectorAdjustPolicy::INCLUDE));
+}
+
+/**
+ * @tc.name: GetSpanType001
+ * @tc.desc: Test GetSpanType returns NORMAL when index is out of range.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSelectionTestNg, GetSpanType001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ClearSpan();
+    AddSpan(u"text");
+    EXPECT_EQ(pattern->GetSpanType(1000), SpanItemType::NORMAL);
+    EXPECT_EQ(pattern->GetSpanType(0), SpanItemType::NORMAL);
+}
+
+/**
+ * @tc.name: ShouldSelectAllOnInit001
+ * @tc.desc: Test ShouldSelectAllOnInit various && combinations.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSelectionTestNg, ShouldSelectAllOnInit001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ClearSpan();
+    pattern->selectAllOnInit_ = false;
+    EXPECT_FALSE(pattern->ShouldSelectAllOnInit(FocusReason::DEFAULT));
+    pattern->selectAllOnInit_ = true;
+    EXPECT_FALSE(pattern->ShouldSelectAllOnInit(FocusReason::DEFAULT));
+    AddSpan(u"x");
+    pattern->editingLongPress_ = true;
+    EXPECT_FALSE(pattern->ShouldSelectAllOnInit(FocusReason::DEFAULT));
+    pattern->editingLongPress_ = false;
+    EXPECT_FALSE(pattern->ShouldSelectAllOnInit(FocusReason::WINDOW_FOCUS));
+    EXPECT_TRUE(pattern->ShouldSelectAllOnInit(FocusReason::DEFAULT));
+}
+
+/**
+ * @tc.name: SetSelectAll001
+ * @tc.desc: Test SetSelectAll IF_TRUE branch (value=false clears needSelectAll_).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSelectionTestNg, SetSelectAll001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->needSelectAll_ = true;
+    pattern->SetSelectAll(false);
+    EXPECT_FALSE(pattern->GetSelectAll());
+    EXPECT_FALSE(pattern->needSelectAll_);
+    pattern->SetSelectAll(true);
+    EXPECT_TRUE(pattern->GetSelectAll());
+}
+
+/**
+ * @tc.name: TryExecuteSelectAll001
+ * @tc.desc: Test TryExecuteSelectAll early return when needSelectAll_ false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSelectionTestNg, TryExecuteSelectAll001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->needSelectAll_ = false;
+    pattern->TryExecuteSelectAll();
+    EXPECT_FALSE(pattern->needSelectAll_);
+}
+
+/**
+ * @tc.name: ResetOnInvalidSelection001
+ * @tc.desc: Test ResetOnInvalidSelection both branches.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSelectionTestNg, ResetOnInvalidSelection001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_FALSE(pattern->ResetOnInvalidSelection(0, 5));
+    EXPECT_TRUE(pattern->ResetOnInvalidSelection(5, 5));
+}
+
+/**
+ * @tc.name: IsSelectEmpty001
+ * @tc.desc: Test IsSelectEmpty returns true for empty paragraphs.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSelectionTestNg, IsSelectEmpty001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_TRUE(pattern->IsSelectEmpty(0, 0));
+}
+
+/**
+ * @tc.name: AdjustSelectorForSymbol001
+ * @tc.desc: Test AdjustSelectorForSymbol returns false when span iter is end.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSelectionTestNg, AdjustSelectorForSymbol001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ClearSpan();
+    AddSpan(u"abc");
+    int32_t index = 1000;
+    EXPECT_FALSE(pattern->AdjustSelectorForSymbol(index, HandleType::FIRST, SelectorAdjustPolicy::INCLUDE));
+    index = 0;
+    EXPECT_FALSE(pattern->AdjustSelectorForSymbol(index, HandleType::FIRST, SelectorAdjustPolicy::INCLUDE));
+}
+
+/**
+ * @tc.name: GetEmojiRelation001
+ * @tc.desc: Test GetEmojiRelation returns NO_EMOJI when index out of range.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSelectionTestNg, GetEmojiRelation001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ClearSpan();
+    AddSpan(u"text");
+    EXPECT_EQ(pattern->GetEmojiRelation(1000), EmojiRelation::NO_EMOJI);
+    EXPECT_EQ(pattern->GetEmojiRelation(0), EmojiRelation::NO_EMOJI);
+}
+
+/**
+ * @tc.name: GetSpanIter001
+ * @tc.desc: Test GetSpanIter returns end iterator for out-of-range index.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSelectionTestNg, GetSpanIter001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ClearSpan();
+    AddSpan(u"abc");
+    auto it = pattern->GetSpanIter(1000);
+    EXPECT_TRUE(it == pattern->spans_.end());
+    auto it2 = pattern->GetSpanIter(0);
+    EXPECT_FALSE(it2 == pattern->spans_.end());
+}
+
+/**
+ * @tc.name: AdjustSelector001
+ * @tc.desc: Test AdjustSelector(start,end) delegates to per-handle variants.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSelectionTestNg, AdjustSelector001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ClearSpan();
+    AddSpan(u"hello");
+    int32_t start = 0;
+    int32_t end = 3;
+    pattern->AdjustSelector(start, end, SelectorAdjustPolicy::INCLUDE);
+    EXPECT_GE(start, 0);
+}
+
+/**
+ * @tc.name: HandleSelectExtend001
+ * @tc.desc: Test HandleSelectExtend delegates to HandleSelect.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSelectionTestNg, HandleSelectExtend001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->HandleSelectExtend(CaretMoveIntent::Left);
+    EXPECT_FALSE(pattern->textSelector_.IsValid());
+}
+
+/**
+ * @tc.name: SelectedBackgroundColor001
+ * @tc.desc: Test SetSelectedBackgroundColor.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSelectionTestNg, SelectedBackgroundColor001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    Color semiTransparentBlue(0x800000ff); // alpha != 255, no opacity change in getter
+    pattern->SetSelectedBackgroundColor(semiTransparentBlue);
+    EXPECT_EQ(pattern->GetSelectedBackgroundColor(), semiTransparentBlue);
+}
+
+/**
+ * @tc.name: GetFirstHandleOffset001
+ * @tc.desc: Test GetFirstHandleOffset / GetSecondHandleOffset return selector offsets.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSelectionTestNg, GetFirstHandleOffset001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto first = pattern->GetFirstHandleOffset();
+    auto second = pattern->GetSecondHandleOffset();
+    EXPECT_EQ(first.GetX(), 0.0f);
+    EXPECT_EQ(second.GetX(), 0.0f);
+}
+
+/**
+ * @tc.name: GetSelectionMenuOffset001
+ * @tc.desc: Test GetSelectionMenuOffset.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSelectionTestNg, GetSelectionMenuOffset001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->selectionMenuOffsetByMouse_ = OffsetF(1, 2);
+    EXPECT_EQ(pattern->GetSelectionMenuOffset(), OffsetF(1, 2));
+}
+
 } // namespace OHOS::Ace::NG

@@ -389,4 +389,158 @@ HWTEST_F(RichEditorTextStyleTestNg, CreateFontSpanByTextStyle002, TestSize.Level
     EXPECT_TRUE(font.strokeColor.has_value());
     EXPECT_EQ(font.strokeColor.value().GetValue(), STROKE_COLOR_VALUE.GetValue());
 }
+
+/**
+ * @tc.name: SetEnableAutoSpacing001
+ * @tc.desc: Test SetEnableAutoSpacing CHECK_NULL_VOID early return when same value.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorTextStyleTestNg, SetEnableAutoSpacing001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    bool cur = pattern->isEnableAutoSpacing_;
+    pattern->SetEnableAutoSpacing(cur);
+    EXPECT_EQ(pattern->isEnableAutoSpacing_, cur);
+    pattern->SetEnableAutoSpacing(!cur);
+    EXPECT_EQ(pattern->isEnableAutoSpacing_, !cur);
+    EXPECT_EQ(pattern->IsEnableAutoSpacing(), !cur);
+}
+
+/**
+ * @tc.name: SetOrphanCharOptimization001
+ * @tc.desc: Test SetOrphanCharOptimization both branches.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorTextStyleTestNg, SetOrphanCharOptimization001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    bool cur = pattern->isOrphanCharOptimization_;
+    pattern->SetOrphanCharOptimization(cur);
+    EXPECT_EQ(pattern->isOrphanCharOptimization_, cur);
+    pattern->SetOrphanCharOptimization(!cur);
+    EXPECT_EQ(pattern->IsOrphanCharOptimization(), !cur);
+}
+
+/**
+ * @tc.name: SetCompressLeadingPunctuation001
+ * @tc.desc: Test SetCompressLeadingPunctuation both branches.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorTextStyleTestNg, SetCompressLeadingPunctuation001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    bool cur = pattern->isCompressLeadingPunctuation_;
+    pattern->SetCompressLeadingPunctuation(cur);
+    EXPECT_EQ(pattern->isCompressLeadingPunctuation_, cur);
+    pattern->SetCompressLeadingPunctuation(!cur);
+    EXPECT_EQ(pattern->IsCompressLeadingPunctuation(), !cur);
+}
+
+/**
+ * @tc.name: SetPunctuationOverflow001
+ * @tc.desc: Test SetPunctuationOverflow both branches.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorTextStyleTestNg, SetPunctuationOverflow001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    bool cur = pattern->isPunctuationOverflow_;
+    pattern->SetPunctuationOverflow(cur);
+    EXPECT_EQ(pattern->isPunctuationOverflow_, cur);
+    pattern->SetPunctuationOverflow(!cur);
+    EXPECT_EQ(pattern->IsPunctuationOverflow(), !cur);
+}
+
+/**
+ * @tc.name: SetIncludeFontPadding001
+ * @tc.desc: Test SetIncludeFontPadding both branches (same early-return + change).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorTextStyleTestNg, SetIncludeFontPadding001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    bool cur = pattern->isIncludeFontPadding_;
+    pattern->SetIncludeFontPadding(cur);
+    EXPECT_EQ(pattern->IsIncludeFontPadding(), cur);
+}
+
+/**
+ * @tc.name: SetFallbackLineSpacing001
+ * @tc.desc: Test SetFallbackLineSpacing early return when same.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorTextStyleTestNg, SetFallbackLineSpacing001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    bool cur = pattern->isFallbackLineSpacing_;
+    pattern->SetFallbackLineSpacing(cur);
+    EXPECT_EQ(pattern->IsFallbackLineSpacing(), cur);
+}
+
+/**
+ * @tc.name: IsInPasswordMode001
+ * @tc.desc: Test IsInPasswordMode / IsSingleLineForPassword.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorTextStyleTestNg, IsInPasswordMode001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSingleLineMode_ = false;
+    EXPECT_FALSE(pattern->IsInPasswordMode());
+    EXPECT_FALSE(pattern->IsSingleLineForPassword());
+    pattern->isSingleLineMode_ = true;
+    EXPECT_TRUE(pattern->IsSingleLineForPassword());
+}
+
+/**
+ * @tc.name: IsInPlainTextInputMode001
+ * @tc.desc: Test IsInPlainTextInputMode.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorTextStyleTestNg, IsInPlainTextInputMode001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSingleLineMode_ = false;
+    EXPECT_FALSE(pattern->IsInPlainTextInputMode());
+}
+
+/**
+ * @tc.name: FilterTextStyleForPasswordMode001
+ * @tc.desc: Test FilterTextStyleForPasswordMode early return when not in password mode.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorTextStyleTestNg, FilterTextStyleForPasswordMode001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSingleLineMode_ = false;
+    TextStyle textStyle;
+    TextStyle inherited;
+    pattern->FilterTextStyleForPasswordMode(textStyle, inherited);
+    EXPECT_FALSE(pattern->IsInPasswordMode());
+}
+
+/**
+ * @tc.name: GetObscureContent001
+ * @tc.desc: Test GetObscureContent / GetObscureCaretPosition.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorTextStyleTestNg, GetObscureContent001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ClearSpan();
+    AddSpan(u"secret");
+    auto content = pattern->GetObscureContent();
+    EXPECT_EQ(content, u"secret");
+    EXPECT_EQ(pattern->GetObscureCaretPosition(), pattern->caretPosition_);
+}
 }

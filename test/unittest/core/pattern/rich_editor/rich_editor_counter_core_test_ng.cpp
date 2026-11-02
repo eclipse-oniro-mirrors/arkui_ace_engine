@@ -24,6 +24,7 @@
 #include "core/components_ng/pattern/rich_editor/rich_editor_foreground_modifier.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_event_hub.h"
 #include "core/components_ng/pattern/rich_editor/style_manager.h"
+#include "core/components_ng/pattern/common_text/counter_constants.h"
 #include "core/components_ng/pattern/common_text/counter_foreground_modifier.h"
 #include "core/components_ng/pattern/common_text/counter_decorator.h"
 #include "core/components_ng/layout/layout_wrapper_node.h"
@@ -1134,5 +1135,203 @@ HWTEST_F(RichEditorCounterApiTestNg, RichEditorAccessibilityIsShowCount, TestSiz
     } else {
         EXPECT_FALSE(result);
     }
+}
+
+/**
+ * @tc.name: IsShowCounterEnabled001
+ * @tc.desc: Test IsShowCounterEnabled false when not in span string mode.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, IsShowCounterEnabled001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSpanStringMode_ = false;
+    EXPECT_FALSE(pattern->IsShowCounterEnabled());
+}
+
+/**
+ * @tc.name: UpdateShowCountBorderStyle001
+ * @tc.desc: Test UpdateShowCountBorderStyle early return when no maxLength.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, UpdateShowCountBorderStyle001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->maxLength_ = std::nullopt;
+    pattern->UpdateShowCountBorderStyle();
+    EXPECT_FALSE(pattern->showCountBorderStyle_);
+}
+
+/**
+ * @tc.name: HandleDeleteOnCounterScene001
+ * @tc.desc: Test HandleDeleteOnCounterScene early return when no maxLength.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, HandleDeleteOnCounterScene001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->maxLength_ = std::nullopt;
+    pattern->HandleDeleteOnCounterScene();
+    EXPECT_FALSE(pattern->showCountBorderStyle_);
+}
+
+/**
+ * @tc.name: HandleCounterWithLength002
+ * @tc.desc: Test HandleCounterWithLength early return when counter not enabled.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, HandleCounterWithLength002, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSpanStringMode_ = false;
+    pattern->HandleCounterWithLength(1, 10);
+    EXPECT_FALSE(pattern->showCountBorderStyle_);
+}
+
+/**
+ * @tc.name: ProcBorderInBlurEvent001
+ * @tc.desc: Test ProcBorderInBlurEvent early return when counter not enabled.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, ProcBorderInBlurEvent001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSpanStringMode_ = false;
+    pattern->ProcBorderInBlurEvent();
+    EXPECT_FALSE(pattern->showCountBorderStyle_);
+}
+
+/**
+ * @tc.name: HandleCounterBorder001
+ * @tc.desc: Test HandleCounterBorder showCountBorderStyle_ false branch.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, HandleCounterBorder001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->showCountBorderStyle_ = false;
+    pattern->HandleCounterBorder();
+    EXPECT_FALSE(pattern->showCountBorderStyle_);
+}
+
+/**
+ * @tc.name: HandleCounterBorder002
+ * @tc.desc: Test HandleCounterBorder showCountBorderStyle_ true branch.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, HandleCounterBorder002, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->showCountBorderStyle_ = true;
+    pattern->HandleCounterBorder();
+    EXPECT_TRUE(pattern->showCountBorderStyle_);
+}
+
+/**
+ * @tc.name: ProcessCounter001
+ * @tc.desc: Test ProcessCounter when counter not enabled (CleanCounterNode branch).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, ProcessCounter001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSpanStringMode_ = false;
+    pattern->ProcessCounter();
+    EXPECT_FALSE(pattern->showCountBorderStyle_);
+}
+
+/**
+ * @tc.name: CounterAccessors001
+ * @tc.desc: Test counter accessor getters with default layout property.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, CounterAccessors001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetShowCounterStyleValue(true);
+    EXPECT_TRUE(pattern->GetShowCounterStyleValue());
+    pattern->SetShowCounterStyleValue(false);
+    EXPECT_FALSE(pattern->GetShowCounterStyleValue());
+    EXPECT_TRUE(pattern->NeedRestoreMeasureConstraint());
+    EXPECT_EQ(pattern->GetCounterDecorator(), nullptr);
+}
+
+/**
+ * @tc.name: CounterColorAccessors001
+ * @tc.desc: Test HasCounterTextColor / GetCounterTextColor default branches.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, CounterColorAccessors001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_FALSE(pattern->HasCounterTextColor());
+    EXPECT_EQ(pattern->GetCounterTextColor(), Color::BLACK);
+    EXPECT_FALSE(pattern->HasCounterTextOverflowColor());
+    EXPECT_EQ(pattern->GetCounterTextOverflowColor(), Color::RED);
+}
+
+/**
+ * @tc.name: BorderFlagAccessors001
+ * @tc.desc: Test border flag accessors return false by default.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, BorderFlagAccessors001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_FALSE(pattern->HasBorderWidthFlagByUser());
+    EXPECT_FALSE(pattern->HasBorderColorFlagByUser());
+    EXPECT_FALSE(pattern->HasBorderRadiusFlagByUser());
+    EXPECT_FALSE(pattern->HasMarginByUser());
+    EXPECT_FALSE(pattern->HasInnerBorderColor());
+}
+
+/**
+ * @tc.name: CounterTypeAccessors001
+ * @tc.desc: Test GetCounterType / GetShowHighlightBorder defaults.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, CounterTypeAccessors001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_EQ(pattern->GetCounterType(), COUNTER_DEFAULT_MODE);
+    EXPECT_TRUE(pattern->GetShowHighlightBorder());
+}
+
+/**
+ * @tc.name: GetShowCounterValue001
+ * @tc.desc: Test GetShowCounterValue default false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, GetShowCounterValue001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_FALSE(pattern->GetShowCounterValue());
+}
+
+/**
+ * @tc.name: CalcCounterAfterFilterInsertValue001
+ * @tc.desc: Test CalcCounterAfterFilterInsertValue exercises showCountBorderStyle_.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, CalcCounterAfterFilterInsertValue001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSpanStringMode_ = false;
+    pattern->CalcCounterAfterFilterInsertValue(0, 0, 10);
+    EXPECT_FALSE(pattern->showCountBorderStyle_);
 }
 } // namespace OHOS::Ace::NG

@@ -860,4 +860,21 @@ HWTEST_F(RichEditorPreviewTextTestNg, SetSupportPreviewText001, TestSize.Level0)
     richEditorModel.SetSupportPreviewText(false);
     EXPECT_FALSE(richEditorPattern->isTextPreviewSupported_);
 }
+
+/**
+ * @tc.name: PreviewText001
+ * @tc.desc: Test IsPreviewTextInputting / IsSupportPreviewText / SetSupportPreviewText.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorPreviewTextTestNg, PreviewText001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->previewTextRecord_.Reset();
+    EXPECT_FALSE(pattern->IsPreviewTextInputting());
+    pattern->SetSupportPreviewText(true);
+    EXPECT_TRUE(pattern->IsSupportPreviewText());
+    pattern->SetSupportPreviewText(false);
+    EXPECT_FALSE(pattern->IsSupportPreviewText());
+}
 } // namespace OHOS::Ace::NG

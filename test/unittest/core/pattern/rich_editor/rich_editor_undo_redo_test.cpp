@@ -712,4 +712,35 @@ HWTEST_F(RichEditorUndoRedoTest, AddInsertOperationRecord, TestSize.Level0)
     EXPECT_EQ(firstRecord.beforeCaretPosition, 0);
 }
 
+/**
+ * @tc.name: UndoRedo001
+ * @tc.desc: Test HandleOnExtendUndoAction delegates to HandleOnUndoAction.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorUndoRedoTest, UndoRedo001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->HandleOnExtendUndoAction();
+    EXPECT_NE(pattern->GetHost(), nullptr);
+}
+
+/**
+ * @tc.name: IsSupportStyledUndo001
+ * @tc.desc: Test IsSupportStyledUndo both || branches.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorUndoRedoTest, IsSupportStyledUndo001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSpanStringMode_ = false;
+    pattern->isStyledUndoSupported_ = false;
+    EXPECT_FALSE(pattern->IsSupportStyledUndo());
+    pattern->isStyledUndoSupported_ = true;
+    EXPECT_TRUE(pattern->IsSupportStyledUndo());
+    pattern->isSpanStringMode_ = true;
+    EXPECT_TRUE(pattern->IsSupportStyledUndo());
+}
+
 } // namespace OHOS::Ace::NG

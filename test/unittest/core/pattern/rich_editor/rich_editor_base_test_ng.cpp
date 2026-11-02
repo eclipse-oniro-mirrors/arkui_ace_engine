@@ -19,6 +19,7 @@
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
 #include "test/mock/frameworks/core/common/mock_container.h"
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
+#include "base/json/json_util.h"
 #include "core/components_ng/layout/layout_wrapper_node.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_theme.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_model_ng.h"
@@ -2301,5 +2302,514 @@ HWTEST_F(RichEditorBaseTestNg, ReportShiftAndDirectionEvent007, TestSize.Level0)
 
     richEditorPattern->ReportShiftAndDirectionEvent(keyEvent);
     EXPECT_TRUE(true);
+}
+
+/**
+ * @tc.name: HasMaxLength001
+ * @tc.desc: Test HasMaxLength true/false branches.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, HasMaxLength001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->maxLength_ = std::nullopt;
+    EXPECT_FALSE(pattern->HasMaxLength());
+    pattern->maxLength_ = 10;
+    EXPECT_TRUE(pattern->HasMaxLength());
+}
+
+/**
+ * @tc.name: GetRealMaxLength001
+ * @tc.desc: Test GetRealMaxLength with and without value.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, GetRealMaxLength001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->maxLength_ = std::nullopt;
+    EXPECT_EQ(pattern->GetRealMaxLength(), static_cast<uint32_t>(INT_MAX));
+    pattern->maxLength_ = 5;
+    EXPECT_EQ(pattern->GetRealMaxLength(), 5u);
+}
+
+/**
+ * @tc.name: GetTextValue001
+ * @tc.desc: Test GetTextValue non-spanString mode (GetContentBySpans branch).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, GetTextValue001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSpanStringMode_ = false;
+    AddSpan(u"value");
+    EXPECT_EQ(pattern->GetTextValue(), "value");
+}
+
+/**
+ * @tc.name: IsStyledStringModeEnabled001
+ * @tc.desc: Test IsStyledStringModeEnabled false when not in span string mode.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, IsStyledStringModeEnabled001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSpanStringMode_ = false;
+    EXPECT_FALSE(pattern->IsStyledStringModeEnabled());
+    pattern->isSpanStringMode_ = true;
+    pattern->styledString_ = nullptr;
+    EXPECT_FALSE(pattern->IsStyledStringModeEnabled());
+}
+
+/**
+ * @tc.name: GetSpanItemByPosition001
+ * @tc.desc: Test GetSpanItemByPosition negative and out-of-range returns null.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, GetSpanItemByPosition001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ClearSpan();
+    AddSpan(u"abc");
+    EXPECT_EQ(pattern->GetSpanItemByPosition(-1), nullptr);
+    EXPECT_EQ(pattern->GetSpanItemByPosition(1000), nullptr);
+    auto span = pattern->GetSpanItemByPosition(0);
+    ASSERT_NE(span, nullptr);
+}
+
+/**
+ * @tc.name: GetEditorType001
+ * @tc.desc: Test GetEditorType with and without selectedType_.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, GetEditorType001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->selectedType_ = std::nullopt;
+    EXPECT_EQ(pattern->GetEditorType(), TextSpanType::NONE);
+    pattern->selectedType_ = TextSpanType::TEXT;
+    EXPECT_EQ(pattern->GetEditorType(), TextSpanType::TEXT);
+}
+
+/**
+ * @tc.name: SetLongPressFlags001
+ * @tc.desc: Test SetLongPressFlags both branches.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, SetLongPressFlags001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isLongPress_ = true;
+    pattern->enableSkipPreviewLongPress_ = true;
+    pattern->isEditing_ = false;
+    pattern->SetLongPressFlags();
+    EXPECT_FALSE(pattern->isLongPress_);
+    EXPECT_TRUE(pattern->editingLongPress_);
+    pattern->enableSkipPreviewLongPress_ = false;
+    pattern->isEditing_ = true;
+    pattern->SetLongPressFlags();
+    EXPECT_TRUE(pattern->editingLongPress_);
+    EXPECT_FALSE(pattern->previewLongPress_);
+}
+
+/**
+ * @tc.name: StateAccessors001
+ * @tc.desc: Test simple state getter/setter pairs.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, StateAccessors001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetBlurOnSubmit(true);
+    EXPECT_TRUE(pattern->GetBlurOnSubmit());
+    pattern->SetBlurOnSubmit(false);
+    EXPECT_FALSE(pattern->GetBlurOnSubmit());
+    pattern->SetSelectionMenuHidden(true);
+    EXPECT_TRUE(pattern->GetSelectionMenuHidden());
+    pattern->SetEnableSkipPreviewLongPress(true);
+    EXPECT_TRUE(pattern->GetEnableSkipPreviewLongPress());
+}
+
+/**
+ * @tc.name: LastClickOffset001
+ * @tc.desc: Test SetLastClickOffset / ResetLastClickOffset.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, LastClickOffset001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetLastClickOffset(OffsetF(10.0f, 20.0f));
+    pattern->ResetLastClickOffset();
+    EXPECT_EQ(pattern->lastClickOffset_.GetX(), -1);
+}
+
+/**
+ * @tc.name: SimpleGetters001
+ * @tc.desc: Test assorted simple getters that have no branches but exercise code paths.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, SimpleGetters001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_EQ(pattern->GetCaretSpanIndex(), pattern->caretSpanIndex_);
+    EXPECT_EQ(pattern->GetCaretIndex(), pattern->caretPosition_);
+    EXPECT_EQ(pattern->GetContentWideTextLength(), pattern->GetTextContentLength());
+    EXPECT_TRUE(pattern->IsEnableMatchParent());
+    EXPECT_TRUE(pattern->GetDefaultClipValue());
+    EXPECT_TRUE(pattern->IsAtomicNode());
+    EXPECT_TRUE(pattern->ConsumeChildrenAdjustment(OffsetF(0, 0)));
+}
+
+/**
+ * @tc.name: ContentChange001
+ * @tc.desc: Test SetContentChange / GetClipboard.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, ContentChange001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetContentChange(true);
+    EXPECT_TRUE(pattern->contentChange_);
+    pattern->SetContentChange(false);
+    EXPECT_FALSE(pattern->contentChange_);
+}
+
+/**
+ * @tc.name: ClearSelectionMenu001
+ * @tc.desc: Test ClearSelectionMenu clears the map.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, ClearSelectionMenu001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->ClearSelectionMenu();
+    EXPECT_TRUE(pattern->selectionMenuMap_.empty());
+}
+
+/**
+ * @tc.name: HandleSysScaleChanged001
+ * @tc.desc: Test HandleSysScaleChanged with valid context.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, HandleSysScaleChanged001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->HandleSysScaleChanged();
+    EXPECT_EQ(pattern->paragraphCache_.Size(), 0u);
+}
+
+/**
+ * @tc.name: GetFocusPattern001
+ * @tc.desc: Test GetFocusPattern returns expected pattern.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, GetFocusPattern001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto fp = pattern->GetFocusPattern();
+    EXPECT_EQ(fp.GetFocusType(), FocusType::NODE);
+}
+
+/**
+ * @tc.name: GetClientHost001
+ * @tc.desc: Test GetClientHost returns host.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, GetClientHost001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto host = pattern->GetClientHost();
+    EXPECT_NE(host, nullptr);
+}
+
+/**
+ * @tc.name: OnFrameNodeChanged001
+ * @tc.desc: Test OnFrameNodeChanged calls overlay.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, OnFrameNodeChanged001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->OnFrameNodeChanged(0);
+    EXPECT_NE(pattern->selectOverlay_, nullptr);
+}
+
+/**
+ * @tc.name: AvoidFlagOnCaret001
+ * @tc.desc: Test SetAvoidFlagOnCaretAvoidMode / IsTriggerAvoidOnCaretAvoidMode.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, AvoidFlagOnCaret001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isTriggerAvoidOnCaretAvoidMode_ = false;
+    pattern->SetAvoidFlagOnCaretAvoidMode(true);
+    EXPECT_FALSE(pattern->IsTriggerAvoidOnCaretAvoidMode());
+}
+
+/**
+ * @tc.name: HorizontalScrolling001
+ * @tc.desc: Test SetHorizontalScrolling / GetHorizontalScrolling.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, HorizontalScrolling001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetHorizontalScrolling(true);
+    EXPECT_TRUE(pattern->GetHorizontalScrolling());
+    pattern->SetHorizontalScrolling(false);
+    EXPECT_FALSE(pattern->GetHorizontalScrolling());
+}
+
+/**
+ * @tc.name: ClearParagraphCache001
+ * @tc.desc: Test ClearParagraphCache.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, ClearParagraphCache001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->ClearParagraphCache();
+    EXPECT_EQ(pattern->paragraphCache_.Size(), 0u);
+}
+
+/**
+ * @tc.name: RemoveEmptySpans001
+ * @tc.desc: Test RemoveEmptySpans with empty spans list.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, RemoveEmptySpans001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ClearSpan();
+    pattern->RemoveEmptySpans();
+    EXPECT_TRUE(pattern->spans_.empty());
+}
+
+/**
+ * @tc.name: RemoveEmptySpans002
+ * @tc.desc: Test RemoveEmptySpans with non-empty content span (no removal).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, RemoveEmptySpans002, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ClearSpan();
+    AddSpan(u"keep");
+    auto countBefore = pattern->spans_.size();
+    pattern->RemoveEmptySpans();
+    EXPECT_EQ(pattern->spans_.size(), countBefore);
+}
+
+/**
+ * @tc.name: RemoveEmptySpanItems001
+ * @tc.desc: Test RemoveEmptySpanItems with content.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, RemoveEmptySpanItems001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ClearSpan();
+    AddSpan(u"abc");
+    pattern->RemoveEmptySpanItems();
+    EXPECT_EQ(pattern->spans_.size(), 1u);
+}
+
+/**
+ * @tc.name: HandleTasksOnLayoutSwap001
+ * @tc.desc: Test HandleTasksOnLayoutSwap with empty task queue.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, HandleTasksOnLayoutSwap001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    while (!pattern->tasks_.empty()) {
+        pattern->tasks_.pop();
+    }
+    pattern->HandleTasksOnLayoutSwap();
+    EXPECT_TRUE(pattern->tasks_.empty());
+}
+
+/**
+ * @tc.name: PostTaskToLayoutSwap001
+ * @tc.desc: Test PostTaskToLayutSwap adds a task then HandleTasksOnLayoutSwap runs it.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, PostTaskToLayoutSwap001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    while (!pattern->tasks_.empty()) {
+        pattern->tasks_.pop();
+    }
+    bool called = false;
+    pattern->PostTaskToLayutSwap([&called]() { called = true; });
+    pattern->HandleTasksOnLayoutSwap();
+    EXPECT_TRUE(called);
+}
+
+/**
+ * @tc.name: DumpInfo001
+ * @tc.desc: Test DumpInfo exercises json construction branches.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, DumpInfo001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto pipeline = richEditorNode_->GetContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    ASSERT_NE(themeManager, nullptr);
+    pipeline->SetThemeManager(themeManager);
+    EXPECT_CALL(*themeManager, GetTheme(_))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<RichEditorTheme>()));
+    auto json = JsonUtil::ParseJsonString("{}");
+    ASSERT_TRUE(json != nullptr);
+    pattern->DumpInfo(json);
+    EXPECT_TRUE(json->Contains("cursorInfo"));
+}
+
+/**
+ * @tc.name: SetShowSelect001
+ * @tc.desc: Test SetShowSelect.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, SetShowSelect001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetShowSelect(true);
+    EXPECT_TRUE(pattern->showSelect_);
+    pattern->SetShowSelect(false);
+    EXPECT_FALSE(pattern->showSelect_);
+}
+
+/**
+ * @tc.name: MaxLines001
+ * @tc.desc: Test SetMaxLines / GetMaxLines / SetMaxLinesHeight / GetMaxLinesHeight.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, MaxLines001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetMaxLines(5);
+    EXPECT_EQ(pattern->GetMaxLines(), 5);
+    pattern->SetMaxLinesHeight(100.0f);
+    EXPECT_EQ(pattern->GetMaxLinesHeight(), 100.0f);
+}
+
+/**
+ * @tc.name: SetMaxLength001
+ * @tc.desc: Test SetMaxLength with INT_MAX (counter update path).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, SetMaxLength001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSpanStringMode_ = false;
+    pattern->SetMaxLength(INT_MAX);
+    EXPECT_TRUE(pattern->maxLength_.has_value());
+    EXPECT_EQ(pattern->GetMaxLength(), INT_MAX);
+    pattern->SetMaxLength(10);
+    EXPECT_TRUE(pattern->maxLength_.has_value());
+    EXPECT_EQ(pattern->GetMaxLength(), 10);
+}
+
+/**
+ * @tc.name: UpdateShowCountBorderStyle002
+ * @tc.desc: Test UpdateShowCountBorderStyle sets true when textLength > maxLength.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, UpdateShowCountBorderStyle002, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ClearSpan();
+    AddSpan(u"hello");
+    pattern->maxLength_ = 3;
+    pattern->showCountBorderStyle_ = false;
+    pattern->UpdateShowCountBorderStyle();
+    EXPECT_TRUE(pattern->showCountBorderStyle_);
+}
+
+/**
+ * @tc.name: UpdateShowCountBorderStyle003
+ * @tc.desc: Test UpdateShowCountBorderStyle no change when textLength == maxLength.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, UpdateShowCountBorderStyle003, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ClearSpan();
+    AddSpan(u"abc");
+    pattern->maxLength_ = 3;
+    pattern->showCountBorderStyle_ = false;
+    pattern->UpdateShowCountBorderStyle();
+    EXPECT_FALSE(pattern->showCountBorderStyle_);
+}
+
+/**
+ * @tc.name: GetParentGlobalOffset001
+ * @tc.desc: Test GetParentGlobalOffset.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, GetParentGlobalOffset001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto offset = pattern->GetParentGlobalOffset();
+    EXPECT_EQ(offset, pattern->parentGlobalOffset_);
+}
+
+/**
+ * @tc.name: GetTextContentRect001
+ * @tc.desc: Test GetTextContentRect returns contentRect_.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, GetTextContentRect001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->contentRect_ = RectF(5, 6, 7, 8);
+    EXPECT_EQ(pattern->GetTextContentRect(), RectF(5, 6, 7, 8));
+}
+
+/**
+ * @tc.name: GetTimestamp001
+ * @tc.desc: Test GetTimestamp.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorBaseTestNg, GetTimestamp001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->timestamp_ = 12345LL;
+    EXPECT_EQ(pattern->GetTimestamp(), 12345LL);
 }
 } // namespace OHOS::Ace::NG
