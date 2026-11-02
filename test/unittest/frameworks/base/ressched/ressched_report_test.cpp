@@ -356,7 +356,7 @@ HWTEST_F(ResSchedReportTest, ResSchedReportSwiperChange001, TestSize.Level1)
 }
 
 namespace {
-// resType / event value / payload keys are internal to ressched_report.cpp, mirrored here
+// resType / event values are internal to ressched_report.cpp, mirrored here
 constexpr uint32_t RES_TYPE_CLICK_RECOGNIZE_VALUE = 9;
 constexpr uint32_t RES_TYPE_SLIDE_VALUE = 11;
 constexpr int64_t TOUCH_DOWN_EVENT_VALUE = 1;
@@ -469,9 +469,11 @@ HWTEST_F(ResSchedReportDisplayIdTest, ResSchedReportDisplayId001, TestSize.Level
     ResSchedReport::GetInstance().HandleTouchDown(MakeTouchEvent(TouchType::DOWN, 0), config);
     ResSchedReport::GetInstance().HandleTouchDown(
         MakeTouchEvent(TouchType::DOWN, INVALID_DISPLAY_ID), config);
-    MockContainer::TearDown();
+    auto saveContainer = MockContainer::container_;
+    MockContainer::container_ = nullptr;
     ResSchedReport::GetInstance().HandleTouchDown(
         MakeTouchEvent(TouchType::DOWN, INVALID_DISPLAY_ID), config);
+    MockContainer::container_ = saveContainer;
 
     EXPECT_EQ(g_touchReportRecords.size(), 4u);
     EXPECT_EQ(GetPayloadValue(&g_touchReportRecords[0], "displayId"), std::to_string(FIRST_DISPLAY_ID));
