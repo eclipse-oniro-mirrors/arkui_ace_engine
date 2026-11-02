@@ -17,10 +17,12 @@ import { eq, neq, gt, lt, ITestFile } from '../lib/testRunner';
 
 // Declare JSONCoder to avoid 'Cannot find name JSONCoder' errors
 declare class JSONCoder {
-  static stringify<T>(value: T, replacer?: (this: any, key: string, value: any) => any, space?: string | number): string;
+  static stringify<T>(value: T, replacer?: (this: JSONAny, key: string, value: JSONAny) => JSONAny, space?: string | number): string;
+  static stringifyCircular<T>(value: T, replacer?: (this: JSONAny, key: string, value: JSONAny) => JSONAny, space?: string | number): string;
   static parse<T extends object>(type: any, source: object | string): T | T[];
   static parseTo<T extends object>(target: T | T[], source: object | string, type?: any): T | T[];
   static getOptions<T>(type?: any): any;
+  static cloneWithoutVisited(value: any, visited: Set<object>): any;
 }
 
 // Declare Meta to avoid 'Cannot find name Meta' errors

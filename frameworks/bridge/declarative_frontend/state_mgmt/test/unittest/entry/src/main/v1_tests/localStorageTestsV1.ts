@@ -55,7 +55,7 @@ declare class SubscribedAbstractProperty<T> extends AbstractProperty<T> {
 }
 
 declare interface IPropertySubscriber {
-  id__?: number;
+  id__(): number;
 }
 
 /**

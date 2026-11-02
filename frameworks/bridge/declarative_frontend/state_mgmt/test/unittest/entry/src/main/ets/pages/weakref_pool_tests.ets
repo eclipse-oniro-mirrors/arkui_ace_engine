@@ -16,7 +16,7 @@
 import { TestRunner } from '../../lib/testRunner'
 import { PageController } from '../../lib/pageController'
 import { WeakRefPoolTests } from '../../common_tests/weakRefPoolTests'
-import router from '@system.router'
+import { router } from '@kit.ArkUI'
 
 @Entry
 @ComponentV2

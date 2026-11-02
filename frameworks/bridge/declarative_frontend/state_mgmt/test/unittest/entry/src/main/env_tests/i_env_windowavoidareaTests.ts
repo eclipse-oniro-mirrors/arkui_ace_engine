@@ -41,6 +41,8 @@ interface UIEnvAvoidArea {
 // 声明源文件中的类
 declare class IEnvironmentValue<T> {
   value: T;
+  update(newValue: T): void;
+  destroy(): void;
 }
 
 //  UIContext 类型

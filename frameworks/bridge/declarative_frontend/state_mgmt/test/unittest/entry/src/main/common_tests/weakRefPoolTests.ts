@@ -29,6 +29,7 @@ declare interface ObservedV2ClassInfo {
 declare class WeakRefPool {
   static wmap_: WeakMap<object, ObservedV2ClassInfo>;
   static getWeakRef<T extends object>(obj: T): WeakRef<T>;
+  static asyncRegisterToFinalizationRegistry<T extends object>(obj: T): void;
   static addMonitorComputedId<T extends object>(obj: T): void;
   static addTagCallback<T extends object>(obj: T, tag: unknown, callback: () => void): void;
   static addMonitorId<T extends object>(obj: T, id: number): void;
