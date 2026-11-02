@@ -127,14 +127,12 @@ void ParallelPageRouterManager::TryEstablishPageLevelSplitHome(
         return;
     }
     CHECK_NULL_VOID(pageNode);
-
     // Collect the effective stack by target page instance, preserving distinct instances of pages that share the
     // same name. LoadPage collects the newly pushed page; StartPop collects the pop target page.
     std::vector<std::string> pageNames;
     std::vector<RefPtr<FrameNode>> effectivePages;
     RefPtr<FrameNode> belowTopPage;
     bool foundTarget = false;
-
     for (const auto& weakNode : pageRouterStack_) {
         auto node = weakNode.Upgrade();
         if (!node) {
@@ -165,7 +163,6 @@ void ParallelPageRouterManager::TryEstablishPageLevelSplitHome(
         UpdatePageLevelNavigationHome(effectivePages, forceSplitMgr, context);
         return;
     }
-
     UpdatePageLevelSplitHome(pageNode, belowTopPage, effectivePages, forceSplitMgr, context);
 }
 
@@ -177,7 +174,6 @@ RefPtr<FrameNode> ParallelPageRouterManager::SelectPageLevelNavigationHome(
     if (effectivePages.empty()) {
         return nullptr;
     }
-
     pageLevelNavigationHomes_.erase(
         std::remove_if(pageLevelNavigationHomes_.begin(), pageLevelNavigationHomes_.end(),
             [&effectivePages](const auto& item) {
@@ -222,7 +218,6 @@ void ParallelPageRouterManager::UpdatePageLevelNavigationHome(const std::vector<
     auto homePattern = home->GetPattern<ParallelPagePattern>();
     CHECK_NULL_VOID(homePattern);
     auto previousHome = stagePattern->GetHomePage();
-
     forceSplitMgr->SetHomePageName(homePattern->GetPageUrl());
     if (previousHome != home || homePattern->GetPageType() != RouterPageType::HOME_PAGE) {
         if (!stageManager->OnHomePageDetected(home, pageRouterStack_)) {
@@ -264,13 +259,11 @@ void ParallelPageRouterManager::UpdatePageLevelSplitHome(const RefPtr<FrameNode>
             belowTopIsSplit =
                 !forceSplitMgr->IsPageSplitDisabled(belowTopPattern->GetPageUrl());
         }
-
         TAG_LOGI(AceLogTag::ACE_ROUTER,
             "pageLevelSplit home continuity, home:%{public}d, homeInStack:%{public}d, "
             "below:%{public}d, belowSplit:%{public}d",
             existingHome ? existingHome->GetId() : -1, homeInStack,
             belowTopPage ? belowTopPage->GetId() : -1, belowTopIsSplit);
-
         if (homeInStack && belowTopIsSplit) {
             return;
         }
