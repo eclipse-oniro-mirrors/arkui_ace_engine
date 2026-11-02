@@ -3712,6 +3712,7 @@ void EventManager::ClearRelaxedInteraction(NG::ExecutionState reason)
 void EventManager::ProcessCommandWithResult(const std::string& command, std::function<void()> requestFrameCallback,
     const std::function<void(const NG::CommandResult&)>& finishCallback)
 {
+    ContainerScope scope(instanceId_);
 #ifdef RELAXED_INTERACTION_SUPPORT
     auto relaxedInteractionManager = GetOrCreateRelaxedInteractionManager();
     if (!relaxedInteractionManager) {

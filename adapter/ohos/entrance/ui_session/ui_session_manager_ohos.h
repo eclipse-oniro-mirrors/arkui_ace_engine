@@ -185,6 +185,7 @@ public:
     void NotifySendCommandPatternWithResult(
         int32_t id, const std::string& command, const CommandResultCallback& finishCallback) override;
     void SaveSendCommandWithResultFunction(SendCommandWithResultFunction&& function) override;
+    void SaveRelaxedCommandWithResultFunction(SendCommandWithResultFunction&& function) override;
     void SendCommandWithResult(
         const std::string& command, const CommandResultCallback& finishCallback) override;
     CommandResultCallback MakeCommandResultCallback(int32_t processId, uint64_t requestId) override;
@@ -269,6 +270,7 @@ private:
     std::set<int32_t> pendingPageSceneGets_;
     std::set<std::pair<int32_t, std::string>> pendingPageSceneDetectRules_;
     std::set<std::pair<int32_t, std::string>> pendingSearchPageSceneDetectRules_;
+    SendCommandWithResultFunction relaxedCommandWithResultFunction_;
 };
 
 } // namespace OHOS::Ace

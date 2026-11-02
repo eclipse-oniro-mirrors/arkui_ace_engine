@@ -2459,18 +2459,29 @@ void UiSessionManagerOhos::SendCommand(const std::string& command)
 void UiSessionManagerOhos::SendCommandWithResult(
     const std::string& command, const CommandResultCallback& finishCallback)
 {
+    if (!finishCallback) {
+        return;
+    }
+    auto json = InspectorJsonUtil::ParseJsonString(command);
+    if (!json || !json->IsObject()) {
+        finishCallback(R"({"result":"FAILED","errorType":"INVALID_PARAM","errorMessage":""})");
+        return;
+    }
+    auto value = json->GetValue("cmd");
     SendCommandWithResultFunction sendFunction;
     {
         std::lock_guard<std::mutex> lock(sendCommandWithResultFunctionMutex_);
-        sendFunction = sendCommandWithResultFunction_;
+        if (value && value->IsNumber()) {
+            sendFunction = sendCommandWithResultFunction_;
+        } else {
+            sendFunction = relaxedCommandWithResultFunction_;
+        }
     }
     if (sendFunction) {
         sendFunction(command, finishCallback);
         return;
     }
-    if (finishCallback) {
-        finishCallback(R"({"result":"FAILED","errorType":"EXECUTE_FAIL","errorMessage":""})");
-    }
+    finishCallback(R"({"result":"FAILED","errorType":"EXECUTE_FAIL","errorMessage":""})");
 }
 
 void UiSessionManagerOhos::SaveSendCommandFunction(SendCommandFunction&& function)
@@ -2489,6 +2500,12 @@ void UiSessionManagerOhos::SaveSendCommandWithResultFunction(SendCommandWithResu
 {
     std::lock_guard<std::mutex> lock(sendCommandWithResultFunctionMutex_);
     sendCommandWithResultFunction_ = std::move(function);
+}
+
+void UiSessionManagerOhos::SaveRelaxedCommandWithResultFunction(SendCommandWithResultFunction&& function)
+{
+    std::lock_guard<std::mutex> lock(sendCommandWithResultFunctionMutex_);
+    relaxedCommandWithResultFunction_ = std::move(function);
 }
 
 UiSessionManager::CommandResultCallback UiSessionManagerOhos::MakeCommandResultCallback(
