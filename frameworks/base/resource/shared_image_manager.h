@@ -50,7 +50,7 @@ public:
     explicit SharedImageManager(const RefPtr<TaskExecutor>& taskExecutor)
         : sharedImageTotalSize_(0), sharedImageCacheThreshold_(DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD),
           taskExecutor_(taskExecutor) {
-        LOGI("SharedImageManager threshold %{public}d", sharedImageCacheThreshold_.load());
+        TAG_LOGI(AceLogTag::ACE_FORM, "SharedImageManager threshold %{public}d", sharedImageCacheThreshold_.load());
     }
     ~SharedImageManager() override = default;
     void AddSharedImage(const std::string& name, SharedImage&& sharedImage);
@@ -60,7 +60,7 @@ public:
     void SetImageCacheThreshold(int32_t threshold)
     {
         sharedImageCacheThreshold_.store(threshold);
-        LOGI("SetImageCacheThreshold %{public}d", threshold);
+        TAG_LOGD(AceLogTag::ACE_FORM, "SetImageCacheThreshold %{public}d", threshold);
     }
 
     int32_t GetImageCacheThreshold() const

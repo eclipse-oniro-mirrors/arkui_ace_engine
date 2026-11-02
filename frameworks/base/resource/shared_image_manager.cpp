@@ -37,7 +37,7 @@ std::function<void()> SharedImageManager::GenerateClearImageDataCallback(const s
         {
             std::lock_guard<std::mutex> lockImageMap(sharedImageManager->sharedImageMapMutex_);
             sharedImageManager->sharedImageMap_.erase(picName);
-            LOGI("clear image cache name: %{public}s", picName.c_str());
+            TAG_LOGI(AceLogTag::ACE_FORM, "clear image cache name: %{public}s", picName.c_str());
             if (sharedImageManager->sharedImageTotalSize_ > dataSize) {
                 sharedImageManager->sharedImageTotalSize_ -= dataSize;
             } else {
@@ -100,7 +100,7 @@ void SharedImageManager::AddSharedImage(const std::string& name, SharedImage&& s
                     auto sharedImageMap = sharedImageManager->GetSharedImageMap();
                     auto imageDataIter = sharedImageMap.find(name);
                     if (imageDataIter == sharedImageMap.end()) {
-                        LOGW("fail to find data of %{public}s in sharedImageMap, stop UpdateData", name.c_str());
+                        TAG_LOGW(AceLogTag::ACE_FORM, "fail to find data of %{public}s in sharedImageMap, stop UpdateData", name.c_str());
                         return;
                     }
                     dataSize = imageDataIter->second.size();
@@ -135,13 +135,13 @@ bool SharedImageManager::UpdateImageMap(const std::string& name, const SharedIma
         sharedImageTotalSize_ += sharedImage.size();
         sharedImageMap_.emplace(name, sharedImage);
         if (static_cast<int>(sharedImageMap_.size()) > sharedImageCacheThreshold_.load()) {
-            LOGW("will clear %{public}s cache, sharedImageMap_ size %{public}d max cache: %{public}d",
+            TAG_LOGW(AceLogTag::ACE_FORM, "will clear %{public}s cache, sharedImageMap_ size %{public}d max cache: %{public}d",
                 name.c_str(), static_cast<int>(sharedImageMap_.size()), sharedImageCacheThreshold_.load());
             isClear = true;
         }
     }
     if (sharedImageTotalSize_ > MAX_SIZE_FOR_TOTAL_IMAGE) {
-        LOGW("will clear %{public}s cache, sharedImageTotalSize_ size %{public}d",
+        TAG_LOGW(AceLogTag::ACE_FORM, "will clear %{public}s cache, sharedImageTotalSize_ size %{public}d",
             name.c_str(), static_cast<int32_t>(sharedImageTotalSize_));
         isClear = true;
     }
@@ -158,16 +158,16 @@ void SharedImageManager::AddPictureNamesToReloadMap(std::string&& name)
 bool SharedImageManager::FindImageInSharedImageMap(
     const std::string& name, const WeakPtr<ImageProviderLoader>& providerWp)
 {
-    LOGD("find image %{public}s in SharedImageMap", name.c_str());
+    TAG_LOGD(AceLogTag::ACE_FORM, "find image %{public}s in SharedImageMap", name.c_str());
     auto loader = providerWp.Upgrade();
     if (!loader) {
-        LOGW("image %{public}s loader nullptr", name.c_str());
+        TAG_LOGW(AceLogTag::ACE_FORM, "image %{public}s loader nullptr", name.c_str());
         return false;
     }
     std::lock_guard<std::mutex> lockImageMap(sharedImageMapMutex_);
     auto iter = sharedImageMap_.find(name);
     if (iter == sharedImageMap_.end()) {
-        LOGW("image data of %{private}s does not found in SharedImageMap", name.c_str());
+        TAG_LOGW(AceLogTag::ACE_FORM, "image data of %{private}s does not found in SharedImageMap", name.c_str());
         return false;
     }
     loader->UpdateData(std::string(MEMORY_IMAGE_HEAD).append(name), iter->second);
@@ -187,7 +187,7 @@ bool SharedImageManager::Remove(const std::string& name)
     std::lock_guard<std::mutex> lockImageMap(sharedImageMapMutex_);
     auto iter = sharedImageMap_.find(name);
     if (iter == sharedImageMap_.end()) {
-        LOGW("Remove failed: image data of %{private}s does not found in SharedImageMap", name.c_str());
+        TAG_LOGW(AceLogTag::ACE_FORM, "Remove failed: image data of %{private}s does not found in SharedImageMap", name.c_str());
         return false;
     }
     if (sharedImageTotalSize_ > iter->second.size()) {
@@ -195,7 +195,7 @@ bool SharedImageManager::Remove(const std::string& name)
     } else {
         sharedImageTotalSize_ = 0;
     }
-    LOGW("clear image cache name: %{public}s", name.c_str());
+    TAG_LOGW(AceLogTag::ACE_FORM, "clear image cache name: %{public}s", name.c_str());
     int res = static_cast<int>(sharedImageMap_.erase(name));
     return (res != 0);
 }
