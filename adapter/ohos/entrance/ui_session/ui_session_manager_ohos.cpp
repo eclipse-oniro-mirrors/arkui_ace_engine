@@ -671,12 +671,12 @@ void UiSessionManagerOhos::SaveReportProxy(sptr<IRemoteObject> reportProxy, int3
             for (auto& [_, processSet] : processMap_) {
                 processSet.erase(processId);
             }
-        }
-        if (shouldResetWebTranslate) {
-            ResetTranslate(-1);
-        }
-        if (shouldResetPageTranslate) {
-            ResetPageTranslate(-1);
+            if (shouldResetWebTranslate) {
+                ResetTranslate(-1);
+            }
+            if (shouldResetPageTranslate) {
+                ResetPageTranslate(-1);
+            }
         }
         std::vector<std::string> searchRemovals;
         {
