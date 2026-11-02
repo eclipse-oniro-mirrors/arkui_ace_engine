@@ -1701,7 +1701,6 @@ bool UINode::IsCulledByRect(const RectCullingState& rectCullingState, bool hasIn
     return !hasInspectableChildren;
 }
 
-#ifndef CROSS_PLATFORM
 void UINode::DumpSimplifyTreeWithParamConfigInner(int32_t depth, std::shared_ptr<JsonValue>& current,
     bool onlyNeedVisible, ParamConfig config, std::function<std::pair<bool, bool>(const RefPtr<UINode>&)> dumpChecker,
     double parentFinalOpacity, const RectCullingState& rectCullingState)
@@ -1874,8 +1873,6 @@ void UINode::DumpSimplifyTreeWithParamConfig(int32_t depth, std::shared_ptr<Json
         config.collectionState->traversalRoot = previousRoot;
     }
 }
-
-#endif
 
 void UINode::DumpSimplifyTree(int32_t depth, std::shared_ptr<JsonValue>& current)
 {
@@ -3877,11 +3874,7 @@ int32_t CollectUITree(int32_t instanceId, const ArkUITreeOptions* options, char*
     if (!tree || !tree->IsValid()) {
         return ARKUI_ERROR_CODE_RESOURCE_EXHAUSTED;
     }
-#ifdef CROSS_PLATFORM
-    return ARKUI_ERROR_CODE_INTERNAL_ERROR;
-#else
     pipeline->CollectInspectorTreeInto(tree, !config.cacheNodes, config);
-#endif
     if (state.GetError()) {
         return state.GetError();
     }
