@@ -18,6 +18,7 @@
 
 #include "adapter/ohos/osal/accessibility/focus_move/accessibility_focus_move_osal.h"
 #include "adapter/ohos/osal/js_third_provider_interaction_operation.h"
+#include "adapter/ohos/osal/accessibility/focus_move/accessibility_focus_third_node_utils.h"
 #include "frameworks/core/accessibility/accessibility_provider.h"
 
 namespace OHOS::Ace::Framework {
@@ -45,6 +46,10 @@ public:
     bool CanSendHoverWithTargetIdByReadableRules(
         int64_t currentId, int64_t& targetId);
 private:
+    bool BuildParentMap();
+    std::shared_ptr<ThirdRulesCheckNode::ParentMap> parentMap_;
+    std::shared_ptr<ThirdRulesCheckNode::NodeMap> nodeMap_;
+    std::shared_ptr<ArkUI_AccessibilityElementInfo> rootInfo_;
     WeakPtr<JsAccessibilityManager> jsAccessibilityManager_;
     WeakPtr<AccessibilityProvider> accessibilityProvider_;
     std::shared_ptr<ArkUI_AccessibilityElementInfo> nodeInfo_ = std::make_shared<ArkUI_AccessibilityElementInfo>();

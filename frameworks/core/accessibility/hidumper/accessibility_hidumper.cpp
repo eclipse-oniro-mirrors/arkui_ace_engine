@@ -14,11 +14,123 @@
  */
 
 
+#include <algorithm>
+#include <initializer_list>
+#include <iterator>
+
 #include "base/log/dump_log.h"
+#include "base/utils/string_utils.h"
 #include "core/accessibility/hidumper/accessibility_hidumper.h"
 #include "core/components_ng/base/frame_node.h"
 
 namespace OHOS::Ace {
+
+namespace {
+constexpr int64_t INVALID_FOCUS_SEARCH_VALUE = -1;
+constexpr int64_t MIN_FOCUS_SEARCH_VALUE = 0;
+enum FocusSearchArgumentIndex : size_t {
+    FOCUS_SEARCH_PREFIX_INDEX,
+    FOCUS_SEARCH_COMMAND_INDEX,
+    FOCUS_SEARCH_NODE_ID_INDEX,
+    FOCUS_SEARCH_DIRECTION_INDEX,
+    FOCUS_SEARCH_RULE_INDEX,
+    FOCUS_SEARCH_CONDITION_INDEX,
+    FOCUS_SEARCH_ARGUMENT_COUNT,
+};
+
+// Dump protocol values mirror accessibility_def.h without an OHOS dependency in cross-platform core code.
+enum class DumpFocusDirection : int64_t {
+    FORWARD = 16,
+    BACKWARD = 32,
+    FIND_LAST = 64,
+    GET_FORWARD_SCROLL_ANCESTOR = 128,
+    GET_BACKWARD_SCROLL_ANCESTOR = 256,
+    GET_SCROLLABLE_ANCESTOR = 512,
+};
+enum class DumpFocusRule : int64_t {
+    DEFAULT = 1,
+    FOCUS_BY_LINK = 2,
+    FOCUS_BY_TITLE = 3,
+};
+enum class DumpFocusCondition : int64_t {
+    BYPASS_SELF = 1,
+    BYPASS_SELF_DESCENDANTS = 2,
+    CHECK_SELF = 4,
+    CHECK_SELF_BYPASS_DESCENDANTS = 8,
+};
+
+struct FocusSearchValues {
+    int64_t nodeId = -1;
+    int64_t direction = 0;
+    int64_t rule = 0;
+    int64_t condition = 0;
+};
+
+template<typename Enum>
+bool IsSupportedFocusValue(int64_t value, std::initializer_list<Enum> supported)
+{
+    return std::any_of(supported.begin(), supported.end(), [value](Enum candidate) {
+        return value == static_cast<int64_t>(candidate);
+    });
+}
+
+bool ParseFocusSearchNumber(const std::string& text, int64_t& value)
+{
+    auto firstDigit = text.begin();
+    if (firstDigit != text.end() && *firstDigit == '-') {
+        ++firstDigit;
+    }
+    if (firstDigit == text.end() ||
+        !std::all_of(firstDigit, text.end(), [](char digit) { return digit >= '0' && digit <= '9'; })) {
+        return false;
+    }
+    // Keep -0 valid; StringToLongInt reports overflow with the negative error sentinel.
+    const auto parsed = StringUtils::StringToLongInt(text, INVALID_FOCUS_SEARCH_VALUE);
+    if (parsed < MIN_FOCUS_SEARCH_VALUE) {
+        return false;
+    }
+    value = parsed;
+    return true;
+}
+
+bool ParseFocusSearchValues(const std::vector<std::string>& params, FocusSearchValues& values)
+{
+    if (params.size() != FOCUS_SEARCH_ARGUMENT_COUNT ||
+        params[FOCUS_SEARCH_COMMAND_INDEX] != "--third-focus-search") {
+        DumpLog::GetInstance().Print(
+            "Usage: -accessibility --third-focus-search <splicedId> <direction:16|32|64|128|256|512> "
+            "<rule:1|2|3> <condition:1|2|4|8>");
+        return false;
+    }
+    return ParseFocusSearchNumber(params[FOCUS_SEARCH_NODE_ID_INDEX], values.nodeId) &&
+        ParseFocusSearchNumber(params[FOCUS_SEARCH_DIRECTION_INDEX], values.direction) &&
+        ParseFocusSearchNumber(params[FOCUS_SEARCH_RULE_INDEX], values.rule) &&
+        ParseFocusSearchNumber(params[FOCUS_SEARCH_CONDITION_INDEX], values.condition);
+}
+} // namespace
+
+bool AccessibilityHidumper::ParseThirdFocusSearch(
+    const std::vector<std::string>& params, DumpInfoArgument& argument)
+{
+    FocusSearchValues values;
+    if (!ParseFocusSearchValues(params, values) ||
+        !IsSupportedFocusValue(values.direction, { DumpFocusDirection::FORWARD, DumpFocusDirection::BACKWARD,
+            DumpFocusDirection::FIND_LAST, DumpFocusDirection::GET_FORWARD_SCROLL_ANCESTOR,
+            DumpFocusDirection::GET_BACKWARD_SCROLL_ANCESTOR, DumpFocusDirection::GET_SCROLLABLE_ANCESTOR }) ||
+        !IsSupportedFocusValue(values.rule,
+            { DumpFocusRule::DEFAULT, DumpFocusRule::FOCUS_BY_LINK, DumpFocusRule::FOCUS_BY_TITLE }) ||
+        !IsSupportedFocusValue(values.condition, { DumpFocusCondition::BYPASS_SELF,
+            DumpFocusCondition::BYPASS_SELF_DESCENDANTS, DumpFocusCondition::CHECK_SELF,
+            DumpFocusCondition::CHECK_SELF_BYPASS_DESCENDANTS })) {
+        return false;
+    }
+    argument.mode = DumpMode::THIRD_FOCUS_SEARCH;
+    argument.nodeId = values.nodeId;
+    argument.focusDirection = static_cast<int32_t>(values.direction);
+    argument.focusMoveRule = static_cast<int32_t>(values.rule);
+    argument.focusCondition = static_cast<int32_t>(values.condition);
+    return true;
+}
 
 bool AccessibilityHidumper::DumpProcessInjectActionParameters(
     const std::vector<std::string>& params,

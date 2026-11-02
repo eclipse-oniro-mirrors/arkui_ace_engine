@@ -453,61 +453,46 @@ AceFocusMoveResult AccessibilityFocusStrategy::FindNextReadableNodeBySelfAndSame
     std::unordered_set<int64_t>* visitedNextFocusNodes)
 {
     CHECK_NULL_RETURN(currentNode, AceFocusMoveResult::FIND_FAIL);
-    // 1. check self's focusable when not bypass self
-    if (!condition.bypassSelf && CanAccessibilityFocus(currentNode)) {
-        targetNode = currentNode;
-        HILOG_INFO_FOCUS("== result: check self Id %{public}" PRId64 " focusable", currentNode->GetAccessibilityId());
-        return AceFocusMoveResult::FIND_SUCCESS;
-    }
-
-    // 1.1 hit childtree container and return it only when bypassDescendants not set
-    auto needFindChildTree = NeedFindChildTreeWithBypassUnset(condition, currentNode, targetNode);
-    CHECK_EQUAL_RETURN(needFindChildTree, AceFocusMoveResult::FIND_CHILDTREE, AceFocusMoveResult::FIND_CHILDTREE);
-
-    std::vector<std::shared_ptr<FocusRulesCheckNode>> children = currentNode->GetAceChildren();
-    HILOG_INFO_FOCUS("== %{public}" PRId64 " not focusable or bypass %{public}d",
-        currentNode->GetAccessibilityId(), condition.bypassSelf);
-    // 2. need firstly search children of currentNode when currentNode is visible and bypassDescendants not set
-    if (!condition.bypassDescendants && !children.empty() && !NoNeedSearchChild(currentNode)) {
-        AceFocusMoveDetailCondition nextLevelCondition = {.bypassSelf = false, .bypassDescendants = false};
-        auto result = FindNextReadableNodeBySelfAndSameLevel(nextLevelCondition,
-            children.front(), children, targetNode, visitedNextFocusNodes);
-        CHECK_NE_RETURN(result, AceFocusMoveResult::FIND_FAIL, result);
-    } else {
-        HILOG_INFO_FOCUS("result: %{public}" PRId64
-            " SearchSelfAndSameLevel not search child by mode %{public}d or child size %{public}zu",
-            currentNode->GetAccessibilityId(), condition.bypassDescendants, children.size());
-    }
-
-    // 2.5 Jump to nextFocus target with descendantMode before searching siblings.
-    if (visitedNextFocusNodes) {
-        auto jumpResult = TryJumpToNextFocusTarget(currentNode, targetNode, *visitedNextFocusNodes, "same-level");
-        CHECK_NE_RETURN(jumpResult, AceFocusMoveResult::FIND_FAIL, jumpResult);
-    }
-
-    HILOG_INFO_FOCUS("== %{public}" PRId64 " start search same level brother", currentNode->GetAccessibilityId());
-    HILOG_INFO_FOCUS("same level brothers %{public}s", GetChildrenIdsStr(sameLevelNodes).c_str());
-
-    // 3. need search right subtree at the same level when currenNode and it's descendants are unfocusable
-    auto brotherIt = std::find_if(sameLevelNodes.begin(), sameLevelNodes.end(),
-        [accessibilityId = currentNode->GetAccessibilityId()](const std::shared_ptr<FocusRulesCheckNode>& node) {
-            return node->GetAccessibilityId() == accessibilityId;
+    auto current = currentNode;
+    auto brother = std::find_if(sameLevelNodes.begin(), sameLevelNodes.end(),
+        [id = current->GetAccessibilityId()](const auto& node) {
+            return node && node->GetAccessibilityId() == id;
         });
-    if (brotherIt != sameLevelNodes.end()) {
-        auto currentIt = brotherIt;
-        if ((++brotherIt) != sameLevelNodes.end() &&
-            !((*brotherIt)->IsHeaderFooterInScroll() && !(*currentIt)->IsAccessibiltyVisible())) {
-            CHECK_NULL_RETURN(*brotherIt, AceFocusMoveResult::FIND_FAIL);
-            HILOG_INFO_FOCUS("=== search same level brother %{public}" PRId64, (*brotherIt)->GetAccessibilityId());
-            AceFocusMoveDetailCondition sameLevelCondition = {.bypassSelf = false, .bypassDescendants = false};
-            auto result = FindNextReadableNodeBySelfAndSameLevel(sameLevelCondition,
-                *brotherIt, sameLevelNodes, targetNode, visitedNextFocusNodes);
-            CHECK_NE_RETURN(result, AceFocusMoveResult::FIND_FAIL, result);
-        } else {
-            HILOG_INFO_FOCUS("there is no right node at the same level");
+    // Siblings are tail traversal, not another stack frame per node. Child recursion
+    // retains the original self -> children -> nextFocus -> sibling ordering.
+    while (current) {
+        if (!condition.bypassSelf && CanAccessibilityFocus(current)) {
+            targetNode = current;
+            return AceFocusMoveResult::FIND_SUCCESS;
         }
-    } else {
-        HILOG_INFO_FOCUS("same level cannot find checked ID %{public}" PRId64, currentNode->GetAccessibilityId());
+        auto childTreeResult = NeedFindChildTreeWithBypassUnset(condition, current, targetNode);
+        CHECK_NE_RETURN(childTreeResult, AceFocusMoveResult::FIND_FAIL, childTreeResult);
+        if (!condition.bypassDescendants && !NoNeedSearchChild(current)) {
+            auto children = current->GetAceChildren();
+            if (!children.empty()) {
+                AceFocusMoveDetailCondition childCondition = { .bypassSelf = false, .bypassDescendants = false };
+                auto result = FindNextReadableNodeBySelfAndSameLevel(
+                    childCondition, children.front(), children, targetNode, visitedNextFocusNodes);
+                CHECK_NE_RETURN(result, AceFocusMoveResult::FIND_FAIL, result);
+            }
+        }
+        if (visitedNextFocusNodes) {
+            auto result = TryJumpToNextFocusTarget(current, targetNode, *visitedNextFocusNodes, "same-level");
+            CHECK_NE_RETURN(result, AceFocusMoveResult::FIND_FAIL, result);
+        }
+        if (brother == sameLevelNodes.end()) {
+            break;
+        }
+        ++brother;
+        if (brother == sameLevelNodes.end()) {
+            break;
+        }
+        CHECK_NULL_RETURN(*brother, AceFocusMoveResult::FIND_FAIL);
+        if ((*brother)->IsHeaderFooterInScroll() && !current->IsAccessibiltyVisible()) {
+            break;
+        }
+        current = *brother;
+        condition = { .bypassSelf = false, .bypassDescendants = false };
     }
     return AceFocusMoveResult::FIND_FAIL;
 }

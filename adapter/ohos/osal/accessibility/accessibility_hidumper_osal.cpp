@@ -158,7 +158,10 @@ public:
         const std::list<Accessibility::AccessibilityElementInfo>& treeInfos, const int32_t requestId) override {}
 
     void SetFocusMoveSearchWithConditionResult(const std::list<Accessibility::AccessibilityElementInfo>& info,
-        const Accessibility::FocusMoveResult& result, const int32_t requestId) override {}
+        const Accessibility::FocusMoveResult& result, const int32_t requestId) override
+    {
+        AccessibilityManagerHidumper::DumpFocusSearchResult(info, result);
+    }
 
     void SetUpdateCustomAccessibilityPropertyResult(
         const OperateVirtualNodeResult result, const int32_t requestId) override {}
@@ -171,6 +174,34 @@ public:
 };
 
 } // namespace
+
+void AccessibilityManagerHidumper::DumpFocusSearch(
+    JsAccessibilityManager& manager, const DumpInfoArgument& argument, int32_t windowId)
+{
+    AccessibilityElementInfo source;
+    source.SetAccessibilityId(argument.nodeId);
+    AccessibilityFocusMoveParam param {};
+    param.direction = static_cast<FocusMoveDirection>(argument.focusDirection);
+    param.type = static_cast<FocusRuleType>(argument.focusMoveRule);
+    param.condition = static_cast<DetailCondition>(argument.focusCondition);
+    param.parentId = -1;
+    // The command parser admits only synchronous search / scroll-ancestor directions.
+    MockDumpExecuteActionCallBack callback;
+    manager.FocusMoveSearchWithCondition(source, param, 0, callback, windowId);
+}
+
+void AccessibilityManagerHidumper::DumpFocusSearchResult(
+    const std::list<AccessibilityElementInfo>& infos, const FocusMoveResult& result)
+{
+    DumpLog::GetInstance().Print("FocusMove result=" + std::to_string(result.resultType) +
+        " tree=" + std::to_string(result.nowLevelBelongTreeId) +
+        " terminate=" + std::to_string(result.needTerminate));
+    for (const auto& node : infos) {
+        DumpLog::GetInstance().Print("id=" + std::to_string(node.GetAccessibilityId()) +
+            " valid=" + std::to_string(node.IsValidElement()) +
+            " type=" + node.GetComponentType() + " text=" + node.GetContent());
+    }
+}
 
 void JsAccessibilityManager::DumpExecuteActionTest(const std::vector<std::string>& params)
 {

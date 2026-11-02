@@ -13,6 +13,9 @@
  * limitations under the License.
  */
 
+#include <atomic>
+#include <thread>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -35,6 +38,7 @@
 #include "adapter/ohos/osal/accessibility/focus_move/accessibility_focus_strategy.h"
 #include "adapter/ohos/osal/accessibility/focus_move/accessibility_focus_third_node_utils.h"
 #include "adapter/ohos/osal/js_third_provider_interaction_operation.h"
+#include "adapter/ohos/osal/accessibility/third_accessibility_traversal.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "frameworks/core/components_ng/property/accessibility_property.h"
 
@@ -482,6 +486,8 @@ HWTEST_F(AccessibilityFocusMoveTest, FocusStrategyOsalThirdTest001, TestSize.Lev
     ASSERT_NE(ohAccessibilityProvider, nullptr);
     NodeConfig config;
     FocusStrategyOsalThird strategy(jsAccessibilityManager, ohAccessibilityProvider, config);
+    EXPECT_EQ(strategy.ChangeToRoot(), nullptr);
+    ASSERT_TRUE(strategy.UpdateOriginNodeInfo(-1));
     auto rootNode = strategy.ChangeToRoot();
     EXPECT_NE(rootNode, nullptr);
 }
@@ -501,6 +507,7 @@ HWTEST_F(AccessibilityFocusMoveTest, FocusStrategyOsalThirdTest002, TestSize.Lev
     ohAccessibilityProvider->SetInjectResult(-1);
     NodeConfig config;
     FocusStrategyOsalThird strategy(jsAccessibilityManager, ohAccessibilityProvider, config);
+    EXPECT_FALSE(strategy.UpdateOriginNodeInfo(-1));
     auto rootNode = strategy.ChangeToRoot();
     EXPECT_EQ(rootNode, nullptr);
 }
@@ -1390,4 +1397,600 @@ HWTEST_F(AccessibilityFocusMoveTest, FocusStrategyOsalNGCheckReadableToRoot001, 
     EXPECT_EQ(result.resultType, FocusMoveResultType::SEARCH_FAIL);
     EXPECT_TRUE(targetInfos.empty());
 }
+
+namespace {
+constexpr int64_t FOCUS_DUMP_HOST_ID = 100;
+
+class FocusDumpChildCallback : public AccessibilityChildTreeCallback {
+public:
+    FocusDumpChildCallback() : AccessibilityChildTreeCallback(FOCUS_DUMP_HOST_ID) {}
+    bool OnRegister(uint32_t, int32_t) override { return true; }
+    bool OnDeregister() override { return true; }
+    bool OnSetChildTree(int32_t, int32_t) override { return true; }
+    void OnClearRegisterFlag() override {}
+    bool OnDumpChildInfo(const std::vector<std::string>& params, std::vector<std::string>& info) override
+    {
+        received = params;
+        info.emplace_back("third focus dispatch");
+        return true;
+    }
+    std::vector<std::string> received;
+};
+
+class FocusTreeProvider : public MockOhAccessibilityProvider {
+    DECLARE_ACE_TYPE(FocusTreeProvider, MockOhAccessibilityProvider);
+public:
+    std::map<int64_t, ArkUI_AccessibilityElementInfo> nodes;
+    std::vector<int64_t> extraRoots;
+    std::map<int64_t, size_t> queries;
+    std::set<int64_t> emptyIds;
+    std::set<int64_t> duplicateIds;
+    std::map<int64_t, int64_t> wrongIds;
+    int32_t FindAccessibilityNodeInfosById(int64_t id, int32_t mode, int32_t requestId,
+        std::vector<ArkUI_AccessibilityElementInfo>& infos) override
+    {
+        ++queries[id];
+        if (emptyIds.count(id)) {
+            return 0;
+        }
+        auto it = nodes.find(id == -1 ? 100 : id);
+        if (it == nodes.end()) {
+            return -1;
+        }
+        infos.push_back(it->second);
+        if (wrongIds.count(id)) {
+            infos.back().SetElementId(wrongIds.at(id));
+        }
+        if (duplicateIds.count(id)) {
+            infos.push_back(it->second);
+            infos.back().SetContents("conflicting payload");
+        }
+        if (id == -1) {
+            for (auto rootId : extraRoots) {
+                infos.push_back(nodes.at(rootId));
+            }
+        }
+        return 0;
+    }
+    void Add(int64_t id, int64_t parent, std::initializer_list<int64_t> children)
+    {
+        auto& node = nodes[id];
+        node.SetElementId(id);
+        node.SetParentId(parent);
+        node.SetVisible(true);
+        for (auto child : children) {
+            node.AddChildNodeId(child);
+        }
+    }
+};
+}
+
+HWTEST_F(AccessibilityFocusMoveTest, ThirdParentMapRepairsIds, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
+    provider->Add(100, -2100000, {101, 102});
+    provider->Add(101, -1, {});
+    provider->Add(102, 999, {103});
+    provider->Add(103, 103, {});
+    auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
+    FocusStrategyOsalThird strategy(manager, provider, NodeConfig{});
+    ASSERT_TRUE(strategy.UpdateOriginNodeInfo(103));
+    auto node = strategy.GetCurrentCheckNode();
+    AccessibilityElementInfo output;
+    output.SetValidElement(false);
+    ASSERT_TRUE(strategy.UpdateElementInfo(node, output));
+    EXPECT_TRUE(output.IsValidElement());
+    EXPECT_EQ(output.GetParentNodeId(), 102);
+    auto parent = node->GetAceParent();
+    ASSERT_NE(parent, nullptr);
+    EXPECT_EQ(parent->GetAccessibilityId(), 102);
+    auto root = parent->GetAceParent();
+    ASSERT_NE(root, nullptr);
+    EXPECT_EQ(root->GetAccessibilityId(), 100);
+    EXPECT_EQ(root->GetAceParent(), nullptr);
+    auto children = root->GetAceChildren();
+    ASSERT_EQ(children.size(), 2);
+    EXPECT_EQ(children[0]->GetAceParent()->GetAccessibilityId(), 100);
+    EXPECT_EQ(children[1]->GetAccessibilityId(), 102);
+}
+
+HWTEST_F(AccessibilityFocusMoveTest, ThirdParentMapPrunesCyclesAndDuplicates, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
+    provider->Add(100, 101, {100, 101, 101, 999});
+    provider->Add(101, 100, {100, 101});
+    auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
+    FocusStrategyOsalThird strategy(manager, provider, NodeConfig{});
+    ASSERT_TRUE(strategy.UpdateOriginNodeInfo(-1));
+    auto root = strategy.GetCurrentCheckNode();
+    EXPECT_EQ(root->GetAceParent(), nullptr);
+    auto children = root->GetAceChildren();
+    ASSERT_EQ(children.size(), 1);
+    EXPECT_TRUE(children.front()->GetAceChildren().empty());
+    AccessibilityFocusStrategy search;
+    std::shared_ptr<FocusRulesCheckNode> target;
+    EXPECT_EQ(search.FindLastNodeWithoutCheck({}, root, target), AceFocusMoveResult::FIND_SUCCESS);
+    ASSERT_NE(target, nullptr);
+    EXPECT_EQ(target->GetAccessibilityId(), 101);
+}
+
+HWTEST_F(AccessibilityFocusMoveTest, ThirdFailedLookupClearsOrigin, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
+    provider->Add(100, -2100000, {101});
+    provider->Add(101, 100, {});
+    auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
+    FocusStrategyOsalThird strategy(manager, provider, NodeConfig{});
+    ASSERT_TRUE(strategy.UpdateOriginNodeInfo(101));
+    EXPECT_FALSE(strategy.UpdateOriginNodeInfo(999));
+    EXPECT_EQ(strategy.GetCurrentCheckNode(), nullptr);
+    AccessibilityFocusMoveParam param {};
+    param.direction = FocusMoveDirection::FORWARD;
+    param.condition = DetailCondition::BYPASS_SELF;
+    param.type = FocusRuleType::FOCUS_BY_LINK;
+    AccessibilityElementInfo output;
+    auto result = strategy.ExecuteFocusMoveSearch(999, param, output);
+    EXPECT_EQ(result.resultType, FocusMoveResultType::SEARCH_FAIL_LOST_NODE);
+    EXPECT_TRUE(result.needTerminate);
+    EXPECT_FALSE(output.IsValidElement());
+    ASSERT_TRUE(strategy.UpdateOriginNodeInfo(101));
+    provider->nodes.erase(100);
+    EXPECT_FALSE(strategy.UpdateOriginNodeInfo(101));
+    EXPECT_EQ(strategy.GetCurrentCheckNode(), nullptr);
+}
+
+HWTEST_F(AccessibilityFocusMoveTest, ThirdParentMapRefreshesAfterMutation, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
+    provider->Add(100, -2100000, {101});
+    provider->Add(101, 100, {});
+    auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
+    FocusStrategyOsalThird strategy(manager, provider, NodeConfig{});
+    ASSERT_TRUE(strategy.UpdateOriginNodeInfo(101));
+    provider->nodes.clear();
+    provider->Add(100, -2100000, {102});
+    provider->Add(102, -1, {});
+    EXPECT_FALSE(strategy.UpdateOriginNodeInfo(101));
+    ASSERT_TRUE(strategy.UpdateOriginNodeInfo(102));
+    EXPECT_EQ(strategy.GetCurrentCheckNode()->GetAceParent()->GetAccessibilityId(), 100);
+}
+
+HWTEST_F(AccessibilityFocusMoveTest, ThirdVisibilityAndRootHandoff, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
+    provider->Add(100, -2100000, {101});
+    provider->Add(101, 100, {});
+    provider->nodes[101].SetVisible(false);
+    auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
+    NodeConfig config;
+    config.belongTreeId = 7;
+    FocusStrategyOsalThird strategy(manager, provider, config);
+    ASSERT_TRUE(strategy.UpdateOriginNodeInfo(101));
+    EXPECT_FALSE(strategy.GetCurrentCheckNode()->IsAccessibiltyVisible());
+    AccessibilityFocusStrategy search(FocusRuleType::FOCUS_BY_TITLE);
+    EXPECT_FALSE(search.CanAccessibilityFocus(strategy.GetCurrentCheckNode()));
+    AccessibilityFocusMoveParam param {};
+    param.direction = FocusMoveDirection::FORWARD;
+    param.type = FocusRuleType::FOCUS_BY_TITLE;
+    AccessibilityElementInfo output;
+    EXPECT_EQ(strategy.HandleFocusMoveSearchResult(param, nullptr,
+        AceFocusMoveResult::FIND_FAIL_IN_CHILDTREE, output), FocusMoveResultType::SEARCH_FAIL_IN_CHILDTREE);
+    EXPECT_EQ(output.GetBelongTreeId(), 7);
+    int64_t id = -1;
+    int32_t tree = -1;
+    AccessibilitySystemAbilityClient::GetTreeIdAndElementIdBySplitElementId(output.GetAccessibilityId(), id, tree);
+    EXPECT_EQ(id, 100);
+    EXPECT_EQ(tree, 7);
+}
+
+HWTEST_F(AccessibilityFocusMoveTest, ThirdMultipleRootsKeepFirstAndRejectDetachedOrigin, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
+    provider->Add(100, AccessibilityElementInfo::ROOT_PARENT_ID, {101});
+    provider->Add(101, 100, {});
+    provider->Add(200, AccessibilityElementInfo::ROOT_PARENT_ID, {201});
+    provider->Add(201, 200, {});
+    provider->extraRoots = {200};
+    auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
+    FocusStrategyOsalThird strategy(manager, provider, NodeConfig{});
+    ASSERT_TRUE(strategy.UpdateOriginNodeInfo(-1));
+    auto root = strategy.GetCurrentCheckNode();
+    ASSERT_NE(root, nullptr);
+    EXPECT_EQ(root->GetAccessibilityId(), 100);
+    auto children = root->GetAceChildren();
+    ASSERT_EQ(children.size(), 1);
+    EXPECT_EQ(children.front()->GetAccessibilityId(), 101);
+
+    AccessibilityFocusMoveParam param {};
+    param.direction = FocusMoveDirection::FORWARD;
+    param.condition = DetailCondition::BYPASS_SELF;
+    param.type = FocusRuleType::FOCUS_BY_TITLE;
+    for (auto id : {200, 201}) {
+        AccessibilityElementInfo output;
+        auto result = strategy.ExecuteFocusMoveSearch(id, param, output);
+        EXPECT_EQ(result.resultType, FocusMoveResultType::SEARCH_FAIL_LOST_NODE);
+        EXPECT_TRUE(result.needTerminate);
+        EXPECT_FALSE(output.IsValidElement());
+    }
+}
+
+HWTEST_F(AccessibilityFocusMoveTest, ThirdFocusDumpParameters, TestSize.Level1)
+{
+    DumpInfoArgument argument;
+    EXPECT_TRUE(AccessibilityHidumper::ParseThirdFocusSearch(
+        {"-accessibility", "--third-focus-search", "123", "16", "3", "1"}, argument));
+    EXPECT_EQ(argument.nodeId, 123);
+    EXPECT_EQ(argument.focusMoveRule, 3);
+    EXPECT_FALSE(AccessibilityHidumper::ParseThirdFocusSearch(
+        {"-accessibility", "--third-focus-search", "123", "1024", "3", "1"}, argument));
+    EXPECT_FALSE(AccessibilityHidumper::ParseThirdFocusSearch(
+        {"-accessibility", "--third-focus-search", "123x", "16", "3", "1"}, argument));
+}
+
+HWTEST_F(AccessibilityFocusMoveTest, FocusDumpNativeAndMainTreeIds, TestSize.Level1)
+{
+    auto context = NG::PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
+    manager->SetPipelineContext(context);
+    manager->SetWindowId(context->GetWindowId());
+    manager->treeId_ = 7;
+    auto root = CreatFrameNode();
+    auto child = CreatFrameNode();
+    root->AddChild(child);
+    auto previousRoot = context->rootNode_;
+    context->rootNode_ = root;
+    int64_t splicedId = root->GetAccessibilityId();
+    AccessibilitySystemAbilityClient::SetSplicElementIdTreeId(7, splicedId);
+    int64_t expectedId = child->GetAccessibilityId();
+    AccessibilitySystemAbilityClient::SetSplicElementIdTreeId(7, expectedId);
+    for (auto sourceId : {root->GetAccessibilityId(), splicedId}) {
+        auto stream = std::make_unique<std::ostringstream>();
+        auto* output = stream.get();
+        DumpLog::GetInstance().SetDumpFile(std::move(stream));
+        // FIND_LAST exercises native traversal without requiring screen-reader rule installation.
+        manager->OnDumpInfoNG({"-accessibility", "--third-focus-search", std::to_string(sourceId), "64", "3", "1"},
+            context->GetWindowId());
+        EXPECT_NE(output->str().find("FocusMove result=0"), std::string::npos);
+        EXPECT_NE(output->str().find("id=" + std::to_string(expectedId)), std::string::npos);
+        EXPECT_EQ(output->str().find("Error:"), std::string::npos);
+    }
+    context->rootNode_ = previousRoot;
+}
+
+HWTEST_F(AccessibilityFocusMoveTest, FocusDumpChildTreeDispatchAndUnknownTree, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
+    manager->treeId_ = 7;
+    auto childCallback = std::make_shared<FocusDumpChildCallback>();
+    childCallback->SetChildTreeId(8);
+    manager->childTreeCallbackMap_[FOCUS_DUMP_HOST_ID] = childCallback;
+    int64_t childId = 101;
+    AccessibilitySystemAbilityClient::SetSplicElementIdTreeId(8, childId);
+    std::vector<std::string> params {
+        "-accessibility", "--third-focus-search", std::to_string(childId), "16", "2", "1"};
+    auto stream = std::make_unique<std::ostringstream>();
+    auto* output = stream.get();
+    DumpLog::GetInstance().SetDumpFile(std::move(stream));
+    manager->OnDumpInfoNG(params, 0);
+    EXPECT_EQ(childCallback->received, params);
+    EXPECT_NE(output->str().find("third focus dispatch"), std::string::npos);
+    manager->childTreeCallbackMap_.clear();
+    output->str("");
+    manager->OnDumpInfoNG(params, 0);
+    EXPECT_NE(output->str().find("child tree is not registered: 8"), std::string::npos);
+    EXPECT_EQ(output->str().find("FocusMove result="), std::string::npos);
+}
+
+HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningSnapshotAndSanitizedEdges, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
+    provider->Add(100, 101, {100, 101, 101, 102});
+    provider->Add(101, -1, {100, 102});
+    provider->Add(102, 999, {});
+    auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
+    FocusStrategyOsalThird strategy(manager, provider, NodeConfig{});
+    ASSERT_TRUE(strategy.UpdateOriginNodeInfo(101));
+    const auto queries = provider->queries;
+    EXPECT_EQ(queries.at(-1), 1);
+    EXPECT_EQ(queries.at(101), 1);
+    EXPECT_EQ(queries.at(102), 1);
+    provider->nodes.clear(); // No callbacks are allowed to replace the in-flight snapshot.
+    auto root = strategy.ChangeToRoot();
+    ASSERT_NE(root, nullptr);
+    EXPECT_EQ(root->GetAccessibilityId(), 100);
+    EXPECT_EQ(root->GetAceChildren().size(), 2);
+    EXPECT_TRUE(strategy.GetCurrentCheckNode()->GetAceChildren().empty());
+    AccessibilityElementInfo output;
+    ASSERT_TRUE(strategy.UpdateElementInfo(root, output));
+    EXPECT_EQ(output.GetChildIds(), (std::vector<int64_t> {101, 102}));
+    EXPECT_EQ(provider->queries, queries);
+}
+
+HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningDepthBoundaryAndFailure, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
+    const int64_t end = 100 + ThirdAccessibilityTraversal::MAX_DEPTH;
+    for (int64_t id = 100; id <= end; ++id) {
+        provider->Add(id, id - 1, {});
+        if (id < end) {
+            provider->nodes[id].AddChildNodeId(id + 1);
+        }
+    }
+    auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
+    FocusStrategyOsalThird strategy(manager, provider, NodeConfig{});
+    ASSERT_TRUE(strategy.UpdateOriginNodeInfo(end));
+    provider->nodes[end].AddChildNodeId(end + 1);
+    provider->Add(end + 1, end, {});
+    AccessibilityFocusMoveParam param {};
+    param.direction = FocusMoveDirection::FIND_LAST;
+    AccessibilityElementInfo output;
+    auto result = strategy.ExecuteFocusMoveSearch(-1, param, output);
+    EXPECT_EQ(result.resultType, FocusMoveResultType::SEARCH_FAIL_LOST_NODE);
+    EXPECT_TRUE(result.needTerminate);
+    EXPECT_FALSE(output.IsValidElement());
+    EXPECT_EQ(strategy.ChangeToRoot(), nullptr);
+    EXPECT_EQ(provider->queries.count(end + 1), 0);
+}
+
+HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningWideTreeAndNodeLimit, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
+    provider->Add(100, -1, {});
+    for (size_t i = 1; i < ThirdAccessibilityTraversal::MAX_NODES; ++i) {
+        const auto id = static_cast<int64_t>(100 + i);
+        provider->nodes[100].AddChildNodeId(id);
+        provider->Add(id, 100, {});
+        provider->nodes[id].SetVisible(false);
+    }
+    auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
+    FocusStrategyOsalThird strategy(manager, provider, NodeConfig{});
+    ASSERT_TRUE(strategy.UpdateOriginNodeInfo(-1));
+    auto children = strategy.GetCurrentCheckNode()->GetAceChildren();
+    ASSERT_EQ(children.size(), ThirdAccessibilityTraversal::MAX_NODES - 1);
+    AccessibilityFocusStrategy search;
+    std::shared_ptr<FocusRulesCheckNode> target;
+    AceFocusMoveDetailCondition condition { .bypassSelf = false, .bypassDescendants = false };
+    EXPECT_EQ(search.FindNextReadableNodeBySelfAndSameLevel(
+        condition, children.front(), children, target, nullptr), AceFocusMoveResult::FIND_FAIL);
+    EXPECT_EQ(target, nullptr);
+    provider->nodes[100].AddChildNodeId(20000);
+    provider->Add(20000, 100, {});
+    EXPECT_FALSE(strategy.UpdateOriginNodeInfo(-1));
+    EXPECT_EQ(strategy.GetCurrentCheckNode(), nullptr);
+}
+
+HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningRepeatedEdgesConsumeBudget, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
+    provider->Add(100, -1, {101, 102});
+    provider->Add(101, 100, {});
+    provider->Add(102, 100, {});
+    for (size_t i = 0; i < ThirdAccessibilityTraversal::MAX_EDGES / 2; ++i) {
+        provider->nodes[101].AddChildNodeId(100);
+        provider->nodes[102].AddChildNodeId(100);
+    }
+    auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
+    FocusStrategyOsalThird strategy(manager, provider, NodeConfig{});
+    EXPECT_FALSE(strategy.UpdateOriginNodeInfo(-1));
+    EXPECT_EQ(provider->queries.size(), 3);
+    EXPECT_EQ(strategy.GetCurrentCheckNode(), nullptr);
+}
+
+HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningHoverSkipsCycleAndMissingSibling, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
+    provider->Add(100, -1, {101, 999, 100});
+    provider->Add(101, 100, {});
+    for (auto& [id, node] : provider->nodes) {
+        node.SetRect({0, 0, 100, 100});
+        node.SetContents("readable");
+        node.SetAccessibilityLevel("yes");
+    }
+    auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
+    manager->SetPipelineContext(NG::PipelineContext::GetCurrentContext());
+    auto host = NG::FrameNode::CreateFrameNode("XComponent", 200, AceType::MakeRefPtr<NG::Pattern>());
+    auto operation = std::make_shared<JsThirdProviderInteractionOperation>(provider, manager, host);
+    operation->SetBelongTreeId(7);
+    manager->RegisterJsThirdProviderInteractionOperation(200, operation);
+    AccessibilityElementInfo root;
+    ASSERT_TRUE(manager->GetElementInfoForThird(-1, root, 200));
+    auto path = manager->HoverPathForThird(200, NG::PointF(1, 1), root, {});
+    ASSERT_FALSE(path.empty());
+    int64_t expected = 101;
+    AccessibilitySystemAbilityClient::SetSplicElementIdTreeId(7, expected);
+    EXPECT_EQ(path.back(), expected);
+    EXPECT_EQ(provider->queries[999], 1);
+    EXPECT_EQ(provider->queries.count(100), 0);
+}
+
+HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningDumpTerminatesAndReportsMalformedTree, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
+    provider->Add(100, -1, {101, 101, 100, 999});
+    provider->Add(101, 100, {100});
+    auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
+    manager->SetPipelineContext(NG::PipelineContext::GetCurrentContext());
+    auto host = NG::FrameNode::CreateFrameNode("XComponent", 200, AceType::MakeRefPtr<NG::Pattern>());
+    auto operation = std::make_shared<JsThirdProviderInteractionOperation>(provider, manager, host);
+    operation->SetBelongTreeId(7);
+    manager->RegisterJsThirdProviderInteractionOperation(200, operation);
+    int64_t rootId = 100;
+    AccessibilitySystemAbilityClient::SetSplicElementIdTreeId(7, rootId);
+    auto stream = std::make_unique<std::ostringstream>();
+    auto* output = stream.get();
+    DumpLog::GetInstance().SetDumpFile(std::move(stream));
+    std::vector<std::string> info;
+    EXPECT_TRUE(manager->OnDumpChildInfoForThirdRecursive(200,
+        {"-accessibility", "--root", std::to_string(rootId)}, info, manager));
+    EXPECT_NE(output->str().find("dump is incomplete"), std::string::npos);
+    EXPECT_EQ(provider->queries[100], 1);
+    EXPECT_EQ(provider->queries[101], 1);
+    EXPECT_EQ(provider->queries[999], 1);
+}
+
+HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningFailedHoverAndUnroutableSync, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
+    provider->Add(100, -1, {101});
+    provider->Add(101, 100, {});
+    auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
+    manager->SetPipelineContext(NG::PipelineContext::GetCurrentContext());
+    FocusStrategyOsalThird strategy(manager, provider, NodeConfig{});
+    int64_t target = -1;
+    EXPECT_FALSE(strategy.CanSendHoverWithTargetIdByReadableRules(999, target));
+    auto host = NG::FrameNode::CreateFrameNode("XComponent", 200, AceType::MakeRefPtr<NG::Pattern>());
+    auto operation = std::make_shared<JsThirdProviderInteractionOperation>(provider, manager, host);
+    operation->SetBelongTreeId(0);
+    AccessibilityFocusMoveParam param {};
+    param.direction = FocusMoveDirection::FIND_LAST;
+    AccessibilityElementInfo output;
+    auto result = operation->SearchFocusMoveWithConditionSync(-1, param, output);
+    EXPECT_EQ(result.resultType, FocusMoveResultType::NOT_SUPPORT);
+    EXPECT_TRUE(result.needTerminate);
+    EXPECT_FALSE(output.IsValidElement());
+    operation->SetBelongTreeId(7);
+    AccessibilityElementInfo source;
+    int64_t foreignId = 101;
+    AccessibilitySystemAbilityClient::SetSplicElementIdTreeId(8, foreignId);
+    source.SetAccessibilityId(foreignId);
+    MockAccessibilityElementOperatorCallback callback;
+    provider->queries.clear();
+    operation->FocusMoveSearchWithCondition(source, param, 42, callback);
+    EXPECT_EQ(callback.mockResult_.resultType, FocusMoveResultType::NOT_SUPPORT);
+    EXPECT_TRUE(callback.mockResult_.needTerminate);
+    EXPECT_EQ(callback.mockRequestId, 42);
+    EXPECT_TRUE(provider->queries.empty());
+}
+
+HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningPayloadLimitAndOwnedActions, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
+    provider->Add(100, -1, {101});
+    provider->Add(101, 100, {});
+    std::string description = "original action";
+    provider->nodes[101].AddOperationAction({
+        ARKUI_ACCESSIBILITY_NATIVE_ACTION_TYPE_CLICK, description.c_str()});
+    auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
+    FocusStrategyOsalThird strategy(manager, provider, NodeConfig{});
+    ASSERT_TRUE(strategy.UpdateOriginNodeInfo(101));
+    auto node = std::static_pointer_cast<ThirdRulesCheckNode>(strategy.GetCurrentCheckNode());
+    description[0] = 'X';
+    ASSERT_EQ(node->GetNodeInfo()->GetOperationActions().size(), 1);
+    EXPECT_STREQ(node->GetNodeInfo()->GetOperationActions()[0].description, "original action");
+    provider->nodes[101].SetContents(std::string(ThirdAccessibilityTraversal::MAX_BYTES, 'x'));
+    EXPECT_FALSE(strategy.UpdateOriginNodeInfo(-1));
+    EXPECT_EQ(strategy.GetCurrentCheckNode(), nullptr);
+}
+
+HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningConcurrentPropertyUpdates, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
+    provider->Add(100, -1, {101});
+    provider->Add(101, 100, {});
+    auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
+    manager->SetPipelineContext(NG::PipelineContext::GetCurrentContext());
+    auto host = NG::FrameNode::CreateFrameNode("XComponent", 200, AceType::MakeRefPtr<NG::Pattern>());
+    auto operation = std::make_shared<JsThirdProviderInteractionOperation>(provider, manager, host);
+    operation->SetBelongTreeId(7);
+    auto property = AceType::MakeRefPtr<NG::CustomAccessibilityProperty>();
+    property->SetAccessibilityText("override");
+    std::atomic<bool> start { false };
+    std::thread writer([&start, operation, property] {
+        while (!start.load()) {
+            std::this_thread::yield();
+        }
+        for (size_t i = 0; i < 2000; ++i) {
+            operation->SetThirdCustomProperty(101, property);
+            operation->RemoveThirdCustomProperty(101);
+            operation->SetThirdCustomProperty(101, property);
+            operation->ClearAllThirdCustomProperties();
+        }
+    });
+    start.store(true);
+    for (size_t i = 0; i < 2000; ++i) {
+        auto current = operation->GetThirdCustomProperty(101);
+        if (current) {
+            EXPECT_EQ(current->GetAccessibilityText(), "override");
+        }
+        std::list<AccessibilityElementInfo> infos;
+        EXPECT_TRUE(operation->FindAccessibilityNodeInfosByIdFromProvider(101, 0, 0, infos));
+        if (!infos.empty()) {
+            auto text = infos.front().GetAccessibilityText();
+            EXPECT_TRUE(text.empty() || text == "override");
+        }
+    }
+    writer.join();
+}
+
+HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningConcurrentProviderRegistration, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
+    auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
+    auto host = NG::FrameNode::CreateFrameNode("XComponent", 200, AceType::MakeRefPtr<NG::Pattern>());
+    auto operation = std::make_shared<JsThirdProviderInteractionOperation>(provider, manager, host);
+    std::atomic<bool> start { false };
+    std::thread writer([&start, manager, operation] {
+        while (!start.load()) {
+            std::this_thread::yield();
+        }
+        for (size_t i = 0; i < 2000; ++i) {
+            manager->RegisterJsThirdProviderInteractionOperation(200, operation);
+            manager->DeregisterJsThirdProviderInteractionOperation(200);
+        }
+    });
+    start.store(true);
+    for (size_t i = 0; i < 2000; ++i) {
+        auto current = manager->GetJsThirdProviderInteractionOperation(200).lock();
+        EXPECT_TRUE(!current || current == operation);
+        EXPECT_TRUE(manager->GetJsThirdProviderInteractionOperation(1000 + i).expired());
+    }
+    writer.join();
+    EXPECT_TRUE(manager->jsThirdProviderOperator_.empty());
+}
+
+namespace {
+class QueuedThirdHoverExecutor : public MockTaskExecutor {
+public:
+    mutable std::vector<Task> queued;
+    bool accept = true;
+    bool OnPostTask(Task&& task, TaskType type, uint32_t delayTime, const std::string& name,
+        PriorityType priorityType = PriorityType::LOW,
+        VsyncBarrierOption barrierOption = VsyncBarrierOption::NO_BARRIER) const override
+    {
+        if (!accept) {
+            return false;
+        }
+        queued.emplace_back(std::move(task));
+        return true;
+    }
+};
+}
+
+HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningHoverWorkerReservation, TestSize.Level1)
+{
+    auto context = NG::MockPipelineContext::GetCurrentContext();
+    auto previousExecutor = context->taskExecutor_;
+    auto executor = AceType::MakeRefPtr<QueuedThirdHoverExecutor>();
+    context->taskExecutor_ = executor;
+    auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
+    AccessibilityHoverForThirdConfig config;
+    config.context = context;
+    config.hostElementId = 200;
+    manager->HandleAccessibilityHoverForThird(config);
+    EXPECT_FALSE(manager->hoverForThirdState_.thirdOperationIdle.load());
+    manager->HandleAccessibilityHoverForThird(config);
+    EXPECT_EQ(executor->queued.size(), 1);
+    if (!executor->queued.empty()) {
+        auto task = std::move(executor->queued.front());
+        executor->queued.clear();
+        task(); // Missing provider exercises the early failure path.
+    }
+    EXPECT_TRUE(manager->hoverForThirdState_.thirdOperationIdle.load());
+    executor->accept = false;
+    manager->HandleAccessibilityHoverForThird(config);
+    EXPECT_TRUE(manager->hoverForThirdState_.thirdOperationIdle.load());
+    context->taskExecutor_ = previousExecutor;
+}
+
 } // namespace OHOS::Ace::NG

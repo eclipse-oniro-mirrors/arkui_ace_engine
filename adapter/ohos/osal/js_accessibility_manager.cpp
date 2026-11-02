@@ -5183,6 +5183,9 @@ bool JsAccessibilityManager::GetDumpInfoArgument(const std::vector<std::string>&
     if (params.size() < 1) {
         return false;
     }
+    if (params.size() > 1 && params[1] == "--third-focus-search") {
+        return AccessibilityHidumper::ParseThirdFocusSearch(params, argument);
+    }
     argument.isDumpSimplify = params[0].compare("-simplify") == 0;
     bool isArgument = DumpInfoParams(params, argument);
     return isArgument;
@@ -5315,6 +5318,10 @@ void JsAccessibilityManager::ChooseDumpEvent(const std::vector<std::string>& par
     DumpInfoArgument& argument, uint32_t windowId, bool hasJson)
 {
     switch (argument.mode) {
+        case DumpMode::THIRD_FOCUS_SEARCH:
+            // Keep the historical command name for both native and third-party nodes.
+            AccessibilityManagerHidumper::DumpFocusSearch(*this, argument, windowId);
+            break;
         case DumpMode::TREE:
             isUseJson_ = hasJson;
             DumpTreeNG(argument.useWindowId, windowId, argument.rootId, argument.isDumpSimplify);
@@ -9163,6 +9170,11 @@ bool JsAccessibilityManager::CheckIsChildElement(
         }
         return true;
     }
+    if (mode == DumpMode::THIRD_FOCUS_SEARCH) {
+        DumpLog::GetInstance().Print("Error: accessibility child tree is not registered: " +
+            std::to_string(splitTreeId));
+        return true;
+    }
     return false;
 }
 
@@ -12312,7 +12324,7 @@ void JsAccessibilityManager::OnCmpTreeDeregistered(NG::FrameNode* owner, int32_t
 int32_t JsAccessibilityManager::GetThirdProviderTreeIdForHost(NG::FrameNode* owner)
 {
     CHECK_NULL_RETURN(owner, AccessibilityElementInfo::UNDEFINED_TREE_ID);
-    auto& weakOp = GetJsThirdProviderInteractionOperation(owner->GetAccessibilityId());
+    auto weakOp = GetJsThirdProviderInteractionOperation(owner->GetAccessibilityId());
     auto op = weakOp.lock();
     if (op) {
         return op->GetBelongTreeId();
