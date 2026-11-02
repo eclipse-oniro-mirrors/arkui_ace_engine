@@ -738,6 +738,7 @@ protected:
 private:
     void DumpAdvanceParagraphInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
     void DumpAdvanceFontInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    bool CheckPhoneCallAppExist(const AISpan& aiSpan);
 
     void ReportSelectionChangeEvent(int32_t nodeId, const std::string& dataStr,
         const std::string& value, int32_t start, int32_t end);
