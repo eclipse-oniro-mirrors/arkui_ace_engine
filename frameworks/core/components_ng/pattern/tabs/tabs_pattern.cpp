@@ -3647,10 +3647,12 @@ void TabsPattern::SetElementVisibilityForMode(TabBarDisplayMode targetMode)
         AceType::DynamicCast<FrameNode>(host->GetBackgroundMask()) : nullptr;
 
     if (targetMode == TabBarDisplayMode::SIDEBAR) {
-        if (tabBar) {
+        auto layoutProperty = host->GetLayoutProperty<TabsLayoutProperty>();
+        bool keepMode = layoutProperty && layoutProperty->GetKeepTabBarInSideBarValue(false);
+        if (tabBar && !keepMode) {
             tabBar->GetLayoutProperty()->UpdateVisibility(VisibleType::GONE);
         }
-        if (tabBarDivider) {
+        if (tabBarDivider && !keepMode) {
             tabBarDivider->GetLayoutProperty()->UpdateVisibility(VisibleType::GONE);
         }
         if (bgMaskNode) {
