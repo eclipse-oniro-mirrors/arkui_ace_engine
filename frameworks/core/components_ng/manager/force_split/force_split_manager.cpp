@@ -499,18 +499,7 @@ bool ForceSplitManager::IsTransitionShouldMovePageToPrimary(const std::string& f
     if (behaviorMode_ == ForceSplitBehaviorMode::DISPLACE) {
         // In displace mode, except for the fromPage or toPage that belong to transPages,
         // all transitions will trigger secondary push to primary by default
-        if (enablePageLevelSplit_) {
-            TAG_LOGI(AceLogTag::ACE_NAVIGATION,
-                "pageLevelSplit movePolicy mode:displace, from:%{public}s, to:%{public}s, "
-                "fromTrans:%{public}d, toTrans:%{public}d",
-                from.c_str(), to.c_str(), IsTransPage(from), IsTransPage(to));
-        }
         return !IsTransPage(from) && !IsTransPage(to);
-    }
-    if (enablePageLevelSplit_) {
-        TAG_LOGI(AceLogTag::ACE_NAVIGATION,
-            "pageLevelSplit movePolicy mode:navigation, from:%{public}s, to:%{public}s, pagePair:%{public}d",
-            from.c_str(), to.c_str(), IsPagePair(from, to));
     }
     return IsPagePair(from, to);
 }
