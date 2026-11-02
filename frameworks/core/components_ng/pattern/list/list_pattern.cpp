@@ -403,17 +403,45 @@ RefPtr<FrameNode> CreatePlaceholderShellNode(
         // favor of the component's own estimate — is enforced here: the layout chain
         // clamps a negative ideal size to 0 and passes a NaN through untouched, so a
         // non-finite or non-positive value never reaches the ideal size at all.
-        auto isValidDimension = [](const Dimension& dim) {
-            return std::isfinite(dim.Value()) && !LessNotEqual(dim.Value(), 0.0);
+        // A finite raw value can still overflow at px normalization (e.g.
+        // Number.MAX_VALUE vp: NormalizeToPx x density then static_cast<float> yields
+        // +Infinity) and poison the List scroll geometry, so those dimensions are
+        // dropped too. percentReference 0 keeps PERCENT finite (it still resolves
+        // against the List cross-axis at measure); a nullopt px (calc without rpnexp)
+        // stays on the existing passthrough path.
+        auto isValidDimension = [&shell](const Dimension& dim) {
+            if (!std::isfinite(dim.Value()) || LessNotEqual(dim.Value(), 0.0)) {
+                return false;
+            }
+            auto px = ConvertToPx(CalcLength(dim), ScaleProperty::CreateScaleProperty(shell->GetContext()),
+                0.0f, {});
+            return !px.has_value() || std::isfinite(px.value());
         };
         CalcSize idealSize;
-        if (options.size->width.has_value() && isValidDimension(options.size->width.value())) {
-            idealSize.SetWidth(CalcLength(options.size->width.value()));
+        bool hasUsableDimension = false;
+        if (options.size->width.has_value()) {
+            const auto& width = options.size->width.value();
+            if (isValidDimension(width)) {
+                idealSize.SetWidth(CalcLength(width));
+                hasUsableDimension = true;
+            } else {
+                TAG_LOGW(AceLogTag::ACE_SCROLL,
+                    "ScrollPlaceholder suggested size dropped as unusable: dim=%{public}s", width.ToString().c_str());
+            }
         }
-        if (options.size->height.has_value() && isValidDimension(options.size->height.value())) {
-            idealSize.SetHeight(CalcLength(options.size->height.value()));
+        if (options.size->height.has_value()) {
+            const auto& height = options.size->height.value();
+            if (isValidDimension(height)) {
+                idealSize.SetHeight(CalcLength(height));
+                hasUsableDimension = true;
+            } else {
+                TAG_LOGW(AceLogTag::ACE_SCROLL,
+                    "ScrollPlaceholder suggested size dropped as unusable: dim=%{public}s", height.ToString().c_str());
+            }
         }
-        shell->GetLayoutProperty()->UpdateUserDefinedIdealSize(idealSize);
+        if (hasUsableDimension) {
+            shell->GetLayoutProperty()->UpdateUserDefinedIdealSize(idealSize);
+        }
     }
     // Node-as-wrapper: the list algorithm will drive this shell through
     // FrameNode::Measure directly. The measure flag is consumed by that first

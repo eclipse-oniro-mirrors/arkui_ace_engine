@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_MANAGER_SCROLL_PLACEHOLDER_SCROLL_PLACEHOLDER_SHELL_MOUNT_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_MANAGER_SCROLL_PLACEHOLDER_SCROLL_PLACEHOLDER_SHELL_MOUNT_H
 
+#include <cmath>
 #include <string>
 #include <string_view>
 
@@ -25,6 +26,7 @@
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_node_clone.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_shell_node.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_types.h"
+#include "core/components_ng/property/measure_utils.h"
 #include "core/pipeline/base/element_register.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #ifndef ACE_UNITTEST
@@ -175,14 +177,47 @@ inline RefPtr<FrameNode> CreatePlaceholderShellNode(const ScrollPlaceholderOptio
         // Options carry unit-preserving Dimensions (bridges map plain numbers to vp;
         // strings keep PERCENT/PX/...). Pass through untranslated so PERCENT resolves
         // against the host cross-axis constraint at measure.
+        // A suggested size that passes the raw-value guard can still overflow at px
+        // normalization (e.g. Number.MAX_VALUE vp: NormalizeToPx x density then
+        // static_cast<float> yields +Infinity). CreateIdealSize takes a valid
+        // selfIdealSize as-is and the host measure path has no finite check, so such a
+        // slot poisons the host scroll geometry - drop the unusable dimension, same
+        // contract as an unset one. percentReference 0 keeps PERCENT finite (it still
+        // resolves against the host cross-axis at measure); a nullopt px (calc without
+        // rpnexp) stays on the existing passthrough path.
+        auto isSuggestedSizeUsable = [&shell](const Dimension& dim) {
+            if (!std::isfinite(dim.Value()) || LessNotEqual(dim.Value(), 0.0)) {
+                return false;
+            }
+            auto px = ConvertToPx(CalcLength(dim), ScaleProperty::CreateScaleProperty(shell->GetContext()),
+                0.0f, {});
+            return !px.has_value() || std::isfinite(px.value());
+        };
         CalcSize idealSize;
+        bool hasUsableDimension = false;
         if (options.size->width.has_value()) {
-            idealSize.SetWidth(CalcLength(options.size->width.value()));
+            const auto& width = options.size->width.value();
+            if (isSuggestedSizeUsable(width)) {
+                idealSize.SetWidth(CalcLength(width));
+                hasUsableDimension = true;
+            } else {
+                TAG_LOGW(AceLogTag::ACE_SCROLL,
+                    "ScrollPlaceholder suggested size dropped as unusable: dim=%{public}s", width.ToString().c_str());
+            }
         }
         if (options.size->height.has_value()) {
-            idealSize.SetHeight(CalcLength(options.size->height.value()));
+            const auto& height = options.size->height.value();
+            if (isSuggestedSizeUsable(height)) {
+                idealSize.SetHeight(CalcLength(height));
+                hasUsableDimension = true;
+            } else {
+                TAG_LOGW(AceLogTag::ACE_SCROLL,
+                    "ScrollPlaceholder suggested size dropped as unusable: dim=%{public}s", height.ToString().c_str());
+            }
         }
-        shell->GetLayoutProperty()->UpdateUserDefinedIdealSize(idealSize);
+        if (hasUsableDimension) {
+            shell->GetLayoutProperty()->UpdateUserDefinedIdealSize(idealSize);
+        }
     }
     // Node-as-wrapper: the host layout algorithm will drive this shell through
     // FrameNode::Measure directly. The measure flag is consumed by that first
