@@ -7501,8 +7501,9 @@ void PipelineContext::GetOverlayInfo(bool hasOverlay, std::shared_ptr<JsonValue>
 
 DumpStartNodeSet PipelineContext::GetDumpStartNodes() const
 {
+    auto lastPage = stageManager_ ? stageManager_->GetLastPage() : nullptr;
     return DumpUtil::CollectInspectorStartNodes(
-        rootNode_, GetContainerModalNode(), stageManager_ ? stageManager_->GetLastPage() : rootNode_, overlayManager_);
+        rootNode_, GetContainerModalNode(), lastPage ? lastPage : rootNode_, overlayManager_);
 }
 
 bool PipelineContext::ProcessOverlayChildrenDumpInfo(const RefPtr<FrameNode>& rootNode,
