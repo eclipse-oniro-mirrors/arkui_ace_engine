@@ -517,7 +517,7 @@ bool FocusHub::ModalCheckBeforeRequestFocus()
         }
         auto modalFocusView = focusManager->GetValidModalFocusView().Upgrade();
         if (modalFocusView && curFocusView != modalFocusView && !curFocusView->IsChildFocusViewOf(modalFocusView)) {
-            TAG_LOGI(AceLogTag::ACE_FOCUS, "ModalFocusViewStack is not empty, intercept focus request.");
+            TAG_LOGI(AceLogTag::ACE_FOCUS, "ModalFocusViewStack not empty, intercept focus request.");
             return false;
         }
     }
@@ -531,7 +531,7 @@ bool FocusHub::RequestFocusImmediately(FocusReason focusReason)
     }
 
     auto frameNode = GetFrameNode();
-    TAG_LOGI(AceLogTag::ACE_FOCUS, "%{public}s/" SEC_PLD(%{public}d)
+    TAG_LOGD(AceLogTag::ACE_FOCUS, "%{public}s/" SEC_PLD(%{public}d)
         " RequestFocusImmediately isOnMainTree:%{public}d",
         GetFrameName().c_str(), SEC_PARAM(GetFrameId()), frameNode ? frameNode->IsOnMainTree() : -1);
     return RequestFocusImmediatelyInner(focusReason);
@@ -599,7 +599,7 @@ void FocusHub::LostFocusToViewRoot()
     auto focusManager = context->GetOrCreateFocusManager();
     CHECK_NULL_VOID(focusManager);
     if (focusManager->IsModalFocusViewStackValid()) {
-        TAG_LOGI(AceLogTag::ACE_FOCUS, "ModalFocusViewStack is not empty, intercept LostFocusToViewRoot.");
+        TAG_LOGI(AceLogTag::ACE_FOCUS, "ModalFocusViewStack not empty, intercept LostFocusToViewRoot.");
         return;
     }
     auto curFocusView = FocusView::GetCurrentFocusView();
@@ -609,7 +609,7 @@ void FocusHub::LostFocusToViewRoot()
     TAG_LOGI(AceLogTag::ACE_FOCUS, "Lost focus to view root: %{public}s",
         viewRootScope->GetFrameName().c_str());
     if (!viewRootScope->IsCurrentFocus()) {
-        TAG_LOGI(AceLogTag::ACE_FOCUS, "View root: %{public}s is not on focusing.",
+        TAG_LOGI(AceLogTag::ACE_FOCUS, "View root: %{public}s not focusing.",
             viewRootScope->GetFrameName().c_str());
         return;
     }
@@ -700,7 +700,7 @@ void FocusHub::RemoveChild(const RefPtr<FocusHub>& focusNode, BlurReason reason)
             auto mainViewRootScope = focusView ? focusView->GetViewRootScope() : nullptr;
             if (mainViewRootScope && mainViewRootScope == AceType::Claim(this)) {
                 TAG_LOGI(AceLogTag::ACE_FOCUS,
-                    "Focus will stop at root scope %{public}s/%{public}d of focus view %{public}s/%{public}d",
+                    "Focus stop at root scope %{public}s/%{public}d of focus view %{public}s/%{public}d",
                     GetFrameName().c_str(), GetFrameId(), focusView->GetFrameName().c_str(), focusView->GetFrameId());
                 focusView->SetIsViewRootScopeFocused(true);
             } else {
@@ -1107,13 +1107,13 @@ void FocusHub::SetIsFocusOnTouch(bool isFocusOnTouch)
 void FocusHub::LostChildFocusToSelf()
 {
     if (!IsCurrentFocus()) {
-        TAG_LOGI(AceLogTag::ACE_FOCUS, "Node need to lost focus: %{public}s/%{public}d is not on focusing.",
+        TAG_LOGI(AceLogTag::ACE_FOCUS, "Node lost focus: %{public}s/%{public}d not focusing.",
             GetFrameName().c_str(), GetFrameId());
         return;
     }
     auto focusedChild = lastWeakFocusNode_.Upgrade();
     CHECK_NULL_VOID(focusedChild);
-    TAG_LOGI(AceLogTag::ACE_FOCUS, "Node: %{public}s/%{public}d need to lost focus of item %{public}s/%{public}d.",
+    TAG_LOGI(AceLogTag::ACE_FOCUS, "Node: %{public}s/%{public}d lost focus of item %{public}s/%{public}d.",
         GetFrameName().c_str(), GetFrameId(), focusedChild->GetFrameName().c_str(), focusedChild->GetFrameId());
     if (focusDepend_ == FocusDependence::AUTO) {
         focusDepend_ = FocusDependence::SELF;
@@ -1358,25 +1358,25 @@ bool FocusHub::RequestNextFocusByDefaultAlgorithm(FocusStep moveStep, const Rect
         }
         if (!nextFocusHub || nextFocusHub == lastFocusNode) {
             TAG_LOGI(
-                AceLogTag::ACE_FOCUS, "Request next focus failed becase cannot find next node by project area.");
+                AceLogTag::ACE_FOCUS, "Request next focus failed: cannot find next node by project area.");
             return false;
         }
         auto ret = TryRequestFocus(nextFocusHub, rect, moveStep);
         TAG_LOGI(AceLogTag::ACE_FOCUS,
-            "Request next focus by project area. Next focus node is %{public}s/" SEC_PLD(%{public}d)
-            ". Return %{public}d",
+            "Request next focus by project area. Next: %{public}s/" SEC_PLD(%{public}d)
+            ". Ret %{public}d",
             nextFocusHub->GetFrameName().c_str(), SEC_PARAM(nextFocusHub->GetFrameId()), ret);
         return ret;
     }
     if (focusAlgorithm_.direction != ScopeFocusDirection::UNIVERSAL && !IsFocusStepTab(moveStep) &&
         focusAlgorithm_.isVertical != IsFocusStepVertical(moveStep)) {
         TAG_LOGI(AceLogTag::ACE_FOCUS,
-            "Request next focus failed because direction of node(%{public}d) is different with step(%{public}d).",
+            "Request next focus failed: direction of node(%{public}d) differs from step(%{public}d).",
             focusAlgorithm_.isVertical, moveStep);
         return IsArrowKeyStepOut(moveStep);
     }
     auto ret = GoToNextFocusLinear(moveStep, rect);
-    TAG_LOGI(AceLogTag::ACE_FOCUS, "Request next focus by default linear algorithm. Return %{public}d.", ret);
+    TAG_LOGI(AceLogTag::ACE_FOCUS, "Request next focus by default linear. Ret %{public}d.", ret);
     return (ret || IsArrowKeyStepOut(moveStep));
 }
 
@@ -1394,7 +1394,7 @@ bool FocusHub::RequestNextFocusByCustomAlgorithm(FocusStep moveStep, const RectF
     }
     auto ret = TryRequestFocus(nextFocusHub, rect, moveStep);
     TAG_LOGI(AceLogTag::ACE_FOCUS,
-        "Request next focus by custom focus algorithm. Next focus node is %{public}s/%{public}d. Return %{public}d",
+        "Request next focus by custom. Next: %{public}s/%{public}d. Ret %{public}d",
         nextFocusHub->GetFrameName().c_str(), nextFocusHub->GetFrameId(), ret);
     return (ret || IsArrowKeyStepOut(moveStep));
 }
@@ -1404,7 +1404,7 @@ bool FocusHub::IsArrowKeyStepOut(FocusStep moveStep)
     if (!IsFocusStepTab(moveStep) && GetIsFocusGroup() && !arrowKeyStepOut_) {
         TAG_LOGI(AceLogTag::ACE_FOCUS,
             "IsArrowKeyStepOut Node(%{public}s/%{public}d), step(%{public}d),"
-            "this node is focus group and set can not step out!",
+            "focus group, can not step out!",
             GetFrameName().c_str(), GetFrameId(), moveStep);
         return true;
     }
@@ -1661,13 +1661,13 @@ void FocusHub::OnBlurNode()
     TAG_LOGD(AceLogTag::ACE_FOCUS, "%{public}s/" SEC_PLD(%{public}d) " blur by %{public}d",
         GetFrameName().c_str(), SEC_PARAM(GetFrameId()), blurReason_);
     if (onBlurInternal_) {
-        TAG_LOGI(AceLogTag::ACE_FOCUS, "%{public}s/" SEC_PLD(%{public}d) "trigger onBlurInternal by %{public}d",
+        TAG_LOGI(AceLogTag::ACE_FOCUS, "%{public}s/" SEC_PLD(%{public}d) "trig onBlurInternal by %{public}d",
             GetFrameName().c_str(), SEC_PARAM(GetFrameId()), blurReason_);
         ACE_EVENT_SCOPED_TRACE("HandleBlurEventInternal Node[%s][%d]", GetFrameName().c_str(), GetFrameId());
         onBlurInternal_();
     }
     if (onBlurReasonInternal_) {
-        TAG_LOGI(AceLogTag::ACE_FOCUS, "%{public}s/" SEC_PLD(%{public}d) "trigger onBlurReasonInternal by %{public}d",
+        TAG_LOGI(AceLogTag::ACE_FOCUS, "%{public}s/" SEC_PLD(%{public}d) "trig onBlurReasonInternal by %{public}d",
             GetFrameName().c_str(), SEC_PARAM(GetFrameId()), blurReason_);
         ACE_EVENT_SCOPED_TRACE("HandleBlurReasonEventInternal Node[%s][%d]", GetFrameName().c_str(), GetFrameId());
         onBlurReasonInternal_(blurReason_);
@@ -1805,7 +1805,7 @@ void FocusHub::OnBlurScope()
     if (lastFocusNode) {
         lastFocusNode->LostFocus(blurReason_);
     } else {
-        TAG_LOGI(AceLogTag::ACE_FOCUS, "Scope(%{public}s/%{public}d) has no last focusNode.",
+        TAG_LOGI(AceLogTag::ACE_FOCUS, "Scope(%{public}s/%{public}d) no last focusNode.",
             GetFrameName().c_str(), GetFrameId());
     }
 }
@@ -2528,7 +2528,7 @@ bool FocusHub::RequestFocusImmediatelyById(const std::string& id, bool isSyncReq
     auto focusNode = GetChildFocusNodeById(id);
     focusNode = focusNode ? focusNode : GetFocusNodeFromSubWindow(id);
     if (!focusNode) {
-        TAG_LOGI(AceLogTag::ACE_FOCUS, "Request focus id can not found.");
+        TAG_LOGI(AceLogTag::ACE_FOCUS, "Req focus id not found.");
         focusManager->TriggerRequestFocusCallback(RequestFocusResult::NON_EXIST);
         return false;
     }
@@ -2537,7 +2537,7 @@ bool FocusHub::RequestFocusImmediatelyById(const std::string& id, bool isSyncReq
         (!isSyncRequest && !focusNode->IsFocusable())) {
         result = false;
     }
-    TAG_LOGI(AceLogTag::ACE_FOCUS, "%{public}s/" SEC_PLD(%{public}d) "Request focus %{public}s by id",
+    TAG_LOGI(AceLogTag::ACE_FOCUS, "%{public}s/" SEC_PLD(%{public}d) "Req focus %{public}s by id",
         focusNode->GetFrameName().c_str(), SEC_PARAM(focusNode->GetFrameId()), isSyncRequest ? "sync" : "async");
     if (result || !isSyncRequest) {
         pipeline->AddDirtyRequestFocus(focusNode->GetFrameNode());
@@ -2622,7 +2622,7 @@ bool FocusHub::HandleFocusByTabIndex(const KeyEvent& event)
     int32_t curTabFocusIndex = GetFocusingTabNodeIdx(tabIndexNodes);
     if ((curTabFocusIndex < 0 || curTabFocusIndex >= static_cast<int32_t>(tabIndexNodes.size())) &&
         curTabFocusIndex != DEFAULT_TAB_FOCUSED_INDEX) {
-        TAG_LOGI(AceLogTag::ACE_FOCUS, "Current focused tabIndex: %{public}d is not valid. Use default focus system.",
+        TAG_LOGI(AceLogTag::ACE_FOCUS, "tabIndex: %{public}d invalid, use default focus system.",
             curTabFocusIndex);
         return false;
     }

@@ -499,7 +499,7 @@ void FocusManager::FocusSwitchingEnd(SwitchingEndReason reason)
         auto lastHub = currentFocus_.Upgrade();
         TAG_LOGI(AceLogTag::ACE_FOCUS, "FocusSwitch end, %{public}s/" SEC_PLD(%{public}d) " onBlur, "
             "%{public}s/" SEC_PLD(%{public}d) " onFocus, "
-            "start: %{public}d, end: %{public}d, update: %{public}d",
+            "s:%{public}d e:%{public}d u:%{public}d",
             lastHub ? lastHub->GetFrameName().c_str() : "NULL",
             SEC_PARAM(lastHub ? lastHub->GetFrameId() : -1),
             switchingFocus_ ? switchingFocus_->GetFrameName().c_str() : "NULL",
@@ -531,7 +531,7 @@ void FocusManager::WindowFocusMoveEnd()
         auto lastHub = currentFocus_.Upgrade();
         TAG_LOGI(AceLogTag::ACE_FOCUS, "WinFocusMove end, %{public}s/" SEC_PLD(%{public}d) " onBlur, "
             "%{public}s/" SEC_PLD(%{public}d) " onFocus, "
-            "start: %{public}d, end: %{public}d, update: %{public}d",
+            "s:%{public}d e:%{public}d u:%{public}d",
             lastHub ? lastHub->GetFrameName().c_str() : "NULL",
             SEC_PARAM(lastHub ? lastHub->GetFrameId() : -1),
             switchingFocus_ ? switchingFocus_->GetFrameName().c_str() : "NULL",
@@ -715,7 +715,7 @@ bool FocusManager::NeedChangeFocusAvtive(bool isFocusActive, FocusActiveReason r
         }
     }
     if (!isFocusActive && reason == FocusActiveReason::POINTER_EVENT && !autoFocusInactive_) {
-        TAG_LOGI(AceLogTag::ACE_FOCUS, "focus cannot be deactived automaticly by pointer event");
+        TAG_LOGI(AceLogTag::ACE_FOCUS, "focus cannot be auto-deactived by pointer event");
         return false;
     }
     return true;

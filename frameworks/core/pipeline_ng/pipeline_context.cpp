@@ -1960,15 +1960,15 @@ void PipelineContext::FlushRequestFocus()
             auto unfocusableParentFocusNode = focusNodeHub->GetUnfocusableParentFocusNode().Upgrade();
             if (unfocusableParentFocusNode) {
                 TAG_LOGI(AceLogTag::ACE_FOCUS,
-                    "Request focus by id on node: %{public}s/%{public}d return false, unfocusable node: "
-                    "%{public}s/%{public}d, focusable = %{public}d, shown = %{public}d, enabled = %{public}d",
+                    "Req focus by id on node: %{public}s/%{public}d return false, unfocusable: "
+                    "%{public}s/%{public}d, focusable=%{public}d, shown=%{public}d, enabled=%{public}d",
                     requestFocusNode->GetTag().c_str(), requestFocusNode->GetId(),
                     unfocusableParentFocusNode->GetFrameName().c_str(), unfocusableParentFocusNode->GetFrameId(),
                     unfocusableParentFocusNode->GetFocusable(), unfocusableParentFocusNode->IsShow(),
                     unfocusableParentFocusNode->IsEnabled());
                 unfocusableParentFocusNode = nullptr;
             } else {
-                TAG_LOGI(AceLogTag::ACE_FOCUS, "Request focus by id on node: %{public}s/%{public}d return false",
+                TAG_LOGI(AceLogTag::ACE_FOCUS, "Req focus by id on node: %{public}s/%{public}d return false",
                     requestFocusNode->GetTag().c_str(), requestFocusNode->GetId());
             }
         }
@@ -5641,7 +5641,7 @@ bool PipelineContext::RequestFocus(const std::string& targetNodeId, bool isSyncR
 
     auto focusManager = focusHub->GetFocusManager();
     if (focusManager && focusManager->IsModalFocusViewStackValid()) {
-        TAG_LOGI(AceLogTag::ACE_FOCUS, "ModalFocusViewStack is not empty, intercept focus request.");
+        TAG_LOGI(AceLogTag::ACE_FOCUS, "ModalFocusViewStack not empty, intercept focus request.");
         return false;
     }
 

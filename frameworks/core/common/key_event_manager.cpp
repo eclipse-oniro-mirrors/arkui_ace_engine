@@ -597,7 +597,7 @@ bool KeyEventManager::DispatchKeyEventNG(const KeyEvent& event, const RefPtr<Fra
     auto focusNodeHub = focusNode->GetFocusHub();
     CHECK_NULL_RETURN(focusNodeHub, false);
     if (focusNodeHub->HandleEvent(event)) {
-        TAG_LOGI(AceLogTag::ACE_FOCUS, "Focus system handled the key event: code:" SEC_PLD(%{private}d)
+        TAG_LOGI(AceLogTag::ACE_FOCUS, "Focus system handled key event: code:" SEC_PLD(%{private}d)
             "/action:%{public}d", SEC_PARAM(event.code), event.action);
         return true;
     }

@@ -108,7 +108,7 @@ bool FocusEventHandler::OnFocusEvent(const FocusEvent& event)
 {
     if (!IsCurrentFocus()) {
         TAG_LOGI(AceLogTag::ACE_FOCUS,
-            "node: %{public}s/%{public}d cannot handle key event because is not current focus",
+            "node: %{public}s/%{public}d not current focus, cannot handle key event",
             GetFrameName().c_str(), GetFrameId());
         return false;
     }
@@ -218,8 +218,8 @@ bool FocusEventHandler::HandleKeyEvent(const KeyEvent& event, FocusIntension int
     if (intension == FocusIntension::SPACE) {
         ret = OnClick(event);
         TAG_LOGI(AceLogTag::ACE_FOCUS,
-            "OnClick: Node %{public}s/%{public}d handle KeyEvent("
-            SEC_PLD(%{private}d) ", %{public}d) return: %{public}d",
+            "OnClick: %{public}s/%{public}d KeyEvent("
+            SEC_PLD(%{private}d) ", %{public}d) ret: %{public}d",
             GetFrameName().c_str(), GetFrameId(), SEC_PARAM(event.code), event.action, ret);
     }
     return ret;
@@ -253,12 +253,12 @@ bool FocusEventHandler::HandleCrownEvent(const CrownEvent& CrownEvent)
         onCrownEventCallback(crownInfo);
         retCallback = crownInfo.IsStopPropagation();
         TAG_LOGI(AceLogTag::ACE_FOCUS,
-            "OnCrownEventUser: Node %{public}s/%{public}d handle CrownAction:%{public}d",
+            "OnCrownEventUser: %{public}s/%{public}d CrownAction:%{public}d",
             GetFrameName().c_str(), GetFrameId(), CrownEvent.action);
     } else {
         retCallback = ProcessOnCrownEventInternal(CrownEvent);
         TAG_LOGI(AceLogTag::ACE_FOCUS,
-            "OnCrownEventInternal: Node %{public}s/%{public}d handle CrownAction:%{public}d",
+            "OnCrownEventInternal: %{public}s/%{public}d CrownAction:%{public}d",
             GetFrameName().c_str(), GetFrameId(), CrownEvent.action);
     }
     return retCallback;
@@ -295,7 +295,7 @@ bool FocusEventHandler::OnKeyPreIme(KeyEventInfo& info, const KeyEvent& keyEvent
     } else if (GetFrameName() == V2::UI_EXTENSION_COMPONENT_ETS_TAG ||
                GetFrameName() == V2::EMBEDDED_COMPONENT_ETS_TAG ||
                GetFrameName() == V2::DYNAMIC_COMPONENT_ETS_TAG) {
-        TAG_LOGI(AceLogTag::ACE_FOCUS, "node: %{public}s/%{public}d try to process OnKeyEventInternal",
+        TAG_LOGI(AceLogTag::ACE_FOCUS, "node: %{public}s/%{public}d try process OnKeyEventInternal",
             GetFrameName().c_str(), GetFrameId());
         return ProcessOnKeyEventInternal(keyEvent);
     } else {
@@ -353,17 +353,17 @@ bool FocusEventHandler::OnKeyEventNodeInternal(const KeyEvent& keyEvent)
     if (isNodeNeedKey_) {
         retInternal =  ProcessOnKeyEventInternal(keyEvent);
         TAG_LOGI(AceLogTag::ACE_FOCUS,
-            "OnKeyEventInteral Node process self: Node %{public}s/%{public}d handle KeyEvent(%{private}d, %{public}d) "
-            "return: %{public}d",
+            "OnKeyEventInternal self: %{public}s/%{public}d KeyEvent(%{private}d, %{public}d) "
+            "ret: %{public}d",
             GetFrameName().c_str(), GetFrameId(), keyEvent.code, keyEvent.action, retInternal);
         return retInternal;
     }
     if (!isBypassInner && !onKeyEventsInternal_.empty()) {
         retInternal = ProcessOnKeyEventInternal(keyEvent);
         TAG_LOGI(AceLogTag::ACE_FOCUS,
-            "OnKeyEventInteral Node process self: Node %{public}s/%{public}d"
-            "handle KeyEvent(" SEC_PLD(%{private}d) ", %{public}d) "
-            "return: %{public}d",
+            "OnKeyEventInternal self: %{public}s/%{public}d "
+            "KeyEvent(" SEC_PLD(%{private}d) ", %{public}d) "
+            "ret: %{public}d",
             GetFrameName().c_str(), GetFrameId(), SEC_PARAM(keyEvent.code), keyEvent.action, retInternal);
     }
     return retInternal;
@@ -396,8 +396,8 @@ bool FocusEventHandler::OnKeyEventNodeUser(KeyEventInfo& info, const KeyEvent& k
 void FocusEventHandler::PrintOnKeyEventUserInfo(const KeyEvent& keyEvent, bool retCallback)
 {
     TAG_LOGI(AceLogTag::ACE_FOCUS,
-        "OnKeyEventUser: Node %{public}s/%{public}d"
-        "handle KeyEvent(" SEC_PLD(%{private}d) ", %{public}d) return: %{public}d",
+        "OnKeyEventUser: %{public}s/%{public}d "
+        "KeyEvent(" SEC_PLD(%{private}d) ", %{public}d) ret: %{public}d",
         GetFrameName().c_str(), GetFrameId(), SEC_PARAM(keyEvent.code), keyEvent.action, retCallback);
 }
 
