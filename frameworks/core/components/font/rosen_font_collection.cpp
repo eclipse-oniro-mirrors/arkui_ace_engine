@@ -46,6 +46,7 @@ void RosenFontCollection::LoadFontFromList(const uint8_t* fontData, size_t lengt
         fontCollection_ = fontCollection->GetRawFontCollection();
     });
 
+    std::lock_guard<std::mutex> lock(fontMutex_);
     if (families_.find(familyName) != families_.end()) {
         return;
     }
