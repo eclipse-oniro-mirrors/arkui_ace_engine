@@ -60,7 +60,7 @@ void WaterFlowPattern::OnDetachFromMainTree()
     // Do not move animation cleanup into the potentially off-thread destructor, and leave
     // thread-safe nodes to the multi-thread detach path of the base class.
     auto host = GetHost();
-    if (fastScrollState_ && !(host && host->IsThreadSafeNode())) {
+    if ((fastScrollState_ || targetIndex_ || legacyScrollTarget_) && !(host && host->IsThreadSafeNode())) {
         StopAnimate();
     }
     ScrollablePattern::OnDetachFromMainTree();
@@ -324,8 +324,12 @@ bool WaterFlowPattern::AdjustOffsetForEdgeEffect(float& delta, int32_t source)
 
 bool WaterFlowPattern::UpdateCurrentOffset(float delta, int32_t source)
 {
-    if (fastScrollState_ && source != SCROLL_FROM_ANIMATION_CONTROLLER) {
+    if ((fastScrollState_ || targetIndex_) && source != SCROLL_FROM_ANIMATION_CONTROLLER) {
         StopAnimate();
+    } else if (legacyScrollTarget_ && source != SCROLL_FROM_ANIMATION_CONTROLLER) {
+        // Stop pursuing the retained index. Keep the pre-existing direct-offset
+        // animation semantics; touch and API interruption stop it at their entry points.
+        CancelFastScroll();
     }
     const auto serial = fastScrollSerial_;
     auto host = GetHost();
@@ -454,6 +458,16 @@ void WaterFlowPattern::BeforeCreateLayoutWrapper()
 
 RefPtr<LayoutAlgorithm> WaterFlowPattern::CreateLayoutAlgorithm()
 {
+    if (targetIndex_ || legacyScrollTarget_) {
+        const auto footer = footer_.Upgrade();
+        const int32_t count = GetChildrenCount() - (footer ? footer->FrameCount() : 0);
+        const int32_t index = targetIndex_.value_or(legacyScrollTarget_ ? legacyScrollTarget_->index : LAST_ITEM);
+        // Reloads can remove a destination without passing NotifyDataChange.
+        // Do not keep scheduling a request that can no longer be measured.
+        if (count <= 0 || (index != LAST_ITEM && (index < 0 || index >= count))) {
+            StopAnimate();
+        }
+    }
     if (targetIndex_.has_value()) {
         layoutInfo_->targetIndex_ = targetIndex_;
     }
@@ -645,7 +659,9 @@ void WaterFlowPattern::TriggerPostLayoutEvents()
     auto onReachEnd = eventHub->GetOnReachEnd();
     auto onJSFrameNodeReachEnd = eventHub->GetJSFrameNodeOnReachEnd();
     FireOnReachEnd(onReachEnd, onJSFrameNodeReachEnd);
-    OnScrollStop(eventHub->GetOnScrollStop(), eventHub->GetJSFrameNodeOnScrollStop());
+    if (!legacyScrollTarget_ || !legacyScrollFinishing_) {
+        OnScrollStop(eventHub->GetOnScrollStop(), eventHub->GetJSFrameNodeOnScrollStop());
+    }
 }
 
 void WaterFlowPattern::FireOnReachStart(const OnReachEvent& onReachStart, const OnReachEvent& onJSFrameNodeReachStart)
@@ -719,6 +735,9 @@ void WaterFlowPattern::UpdateScrollTargetsAfterLayout(const RefPtr<LayoutWrapper
     const auto serial = sw ? sw->GetFastScrollSerial() : fastScrollSerial_;
     const float calibration = layoutInfo_->CalibrateOffset();
     prevOffset_ += calibration; // public content coordinates change by -calibration
+    if (serial == fastScrollSerial_) {
+        UpdateLegacyScrollTarget(-calibration);
+    }
     if (!layoutInfo_->measureInNextFrame_) {
         TriggerPostLayoutEvents();
     }
@@ -726,18 +745,19 @@ void WaterFlowPattern::UpdateScrollTargetsAfterLayout(const RefPtr<LayoutWrapper
     if (serial == fastScrollSerial_) {
         UpdateFastScroll(-calibration);
     }
-    if (serial == fastScrollSerial_ && targetIndex_.has_value()) {
-        ScrollToTargetIndex(targetIndex_.value());
-        if (serial == fastScrollSerial_) {
+    if (serial == fastScrollSerial_ && targetIndex_ && !layoutInfo_->measureInNextFrame_) {
+        const bool started = ScrollToTargetIndex(*targetIndex_);
+        if (started && serial == fastScrollSerial_) {
             targetIndex_.reset();
         }
     }
     layoutInfo_->UpdateStartIndex();
     prevOffset_ = layoutInfo_->Offset();
-    if (serial == fastScrollSerial_) {
+    if (serial == fastScrollSerial_ && !(targetIndex_ && layoutInfo_->measureInNextFrame_)) {
         layoutInfo_->jumpIndex_ = WaterFlowLayoutInfoBase::EMPTY_JUMP_INDEX;
         layoutInfo_->duringPositionCalc_ = false;
         layoutInfo_->targetIndex_.reset();
+        layoutInfo_->EndTargetPreparation();
         layoutInfo_->extraOffset_.reset();
     }
 }
@@ -776,9 +796,18 @@ bool WaterFlowPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dir
 
     UpdateSnapGeometryAfterLayout(snapLayoutValid);
 
-	// Check if we need to mark node dirty when at section boundary with misalignment
-    if (IsAtSectionBoundary() && CheckMisalignment(layoutInfo_)) {
-        MarkDirtyNodeSelf();
+    // Animation stop callbacks can run synchronously while a new segment is
+    // starting. Rebuild misaligned lanes only after target bookkeeping is done,
+    // otherwise that bookkeeping discards Reset's pending jump.
+    // Prepared route geometry still includes released offscreen nodes. Defer
+    // viewport misalignment checks until the next measure trims that route;
+    // Reset here would discard its heights and rebuild it synchronously.
+    if (!layoutInfo_->measureInNextFrame_ && !layoutInfo_->targetPreparationCleanup_ &&
+        (IsAtSectionBoundary() || pendingMisalignmentCheck_)) {
+        pendingMisalignmentCheck_ = false;
+        if (CheckMisalignment(layoutInfo_)) {
+            MarkDirtyNodeSelf();
+        }
     }
 
     ChangeAnimateOverScroll();
@@ -800,12 +829,33 @@ bool WaterFlowPattern::ScrollToTargetIndex(int32_t index)
         return false;
     }
     float targetPosition = layoutInfo_->CalcTargetPosition(index, crossIndex);
+    if (!std::isfinite(targetPosition) || targetPosition == LayoutInfinity<float>()) {
+        return false;
+    }
     auto extraOffset = GetExtraOffset();
     if (extraOffset.has_value()) {
         targetPosition += extraOffset.value();
         ResetExtraOffset();
     }
-    ScrollablePattern::AnimateTo(targetPosition, -1, nullptr, true);
+    const bool slidingWindow = GetLayoutMode() == LayoutMode::SLIDING_WINDOW;
+    if (slidingWindow && legacyScrollTarget_ && NearEqual(targetPosition, GetTotalOffset(), 0.1f)) {
+        // Remeasuring an intentionally offscreen target can produce the current
+        // offset. No new animation will deliver the retained request's stop.
+        FinishLegacyScroll();
+        return true;
+    }
+    if (slidingWindow && !NearEqual(targetPosition, GetTotalOffset(), 0.1f)) {
+        if (legacyScrollFinishing_) {
+            SetScrollAbort(true);
+        }
+        legacyScrollFinishing_ = false;
+        legacyScrollTarget_ = ScrollToIndexTarget { index, extraOffset.value_or(0.0f),
+            layoutInfo_->align_, targetPosition };
+        // Use the shared segment-start guard: preserve the index request during
+        // a synchronous stop, then clear the guard before user callbacks run.
+        startingFastScroll_ = true;
+    }
+    ScrollablePattern::AnimateTo(targetPosition, -1, nullptr, true, false, !slidingWindow);
     return true;
 }
 
@@ -973,7 +1023,7 @@ RefPtr<WaterFlowSections> WaterFlowPattern::GetOrCreateWaterFlowSections()
 
 void WaterFlowPattern::OnSectionChanged(int32_t start)
 {
-    if (fastScrollState_) {
+    if (fastScrollState_ || targetIndex_ || legacyScrollTarget_) {
         StopAnimate();
     }
     snapItemGeometryCache_.clear();
@@ -996,7 +1046,7 @@ int32_t WaterFlowPattern::GetFirstIndex() const
 
 void WaterFlowPattern::ResetSections()
 {
-    if (fastScrollState_) {
+    if (fastScrollState_ || targetIndex_ || legacyScrollTarget_) {
         StopAnimate();
     }
     snapItemGeometryCache_.clear();
@@ -1085,6 +1135,21 @@ void WaterFlowPattern::ScrollToIndexFastScroll(int32_t index, bool smooth, Scrol
 
 void WaterFlowPattern::CancelFastScroll()
 {
+    if (legacyScrollTarget_) {
+        ++fastScrollSerial_;
+        legacyScrollTarget_.reset();
+        legacyScrollFinishing_ = false;
+        legacyScrollRetried_ = false;
+    }
+    if (targetIndex_ || layoutInfo_->targetPreparation_) {
+        ++fastScrollSerial_;
+        targetIndex_.reset();
+        layoutInfo_->targetIndex_.reset();
+        layoutInfo_->EndTargetPreparation();
+        layoutInfo_->duringPositionCalc_ = false;
+        layoutInfo_->measureInNextFrame_ = false;
+        ResetExtraOffset();
+    }
     if (fastScrollState_ || GetFastScrollRequest()) {
         ++fastScrollSerial_;
     }
@@ -1158,9 +1223,81 @@ void WaterFlowPattern::UpdateFastScroll(float coordinateCorrection)
     ResumeFastScrollAnimation(position, coordinateCorrection);
 }
 
+void WaterFlowPattern::UpdateLegacyScrollTarget(float coordinateCorrection)
+{
+    if (!legacyScrollTarget_ || targetIndex_ || layoutInfo_->measureInNextFrame_) {
+        return;
+    }
+    const auto info = DynamicCast<WaterFlowLayoutInfoSW>(layoutInfo_);
+    CHECK_NULL_VOID(info);
+    auto& target = *legacyScrollTarget_;
+    target.targetOffset += coordinateCorrection;
+    if (info->jumpIndex_ != WaterFlowLayoutInfoBase::EMPTY_JUMP_INDEX) {
+        return;
+    }
+    if (!info->ItemInView(target.index)) {
+        RemeasureLegacyScrollTarget();
+        return;
+    }
+    info->align_ = target.align;
+    float position = info->CalcTargetPosition(target.index, 0) + target.extraOffset;
+    if (!std::isfinite(position) || position == LayoutInfinity<float>()) {
+        return;
+    }
+    if ((info->itemStart_ && position < GetTotalOffset()) ||
+        (info->offsetEnd_ && position > GetTotalOffset())) {
+        position = GetTotalOffset();
+    }
+    if (NearEqual(position, GetTotalOffset(), 0.1f)) {
+        FinishLegacyScroll();
+        return;
+    }
+    if (!AnimateRunning() || !NearEqual(position, target.targetOffset, 0.5f) ||
+        !NearZero(coordinateCorrection)) {
+        target.targetOffset = position;
+        // Keep this as one logical scroll even if its numeric endpoint changes.
+        if (legacyScrollFinishing_) {
+            SetScrollAbort(true);
+        }
+        legacyScrollFinishing_ = false;
+        startingFastScroll_ = true;
+        ScrollablePattern::AnimateTo(position, -1, nullptr, true, false, false);
+    }
+}
+
+void WaterFlowPattern::RemeasureLegacyScrollTarget()
+{
+    if (!legacyScrollFinishing_) {
+        return;
+    }
+    // A large extra offset can keep the requested item outside the final
+    // viewport. Allow one geometry correction, never an endless measurement loop.
+    if (legacyScrollRetried_) {
+        FinishLegacyScroll();
+        return;
+    }
+    legacyScrollRetried_ = true;
+    const auto& target = *legacyScrollTarget_;
+    targetIndex_ = target.index;
+    layoutInfo_->targetIndex_ = target.index;
+    layoutInfo_->duringPositionCalc_ = true;
+    layoutInfo_->align_ = target.align;
+    SetExtraOffset(target.extraOffset);
+    scrollStop_ = false;
+    MarkDirtyNodeSelf();
+}
+
+void WaterFlowPattern::FinishLegacyScroll()
+{
+    SetScrollAbort(false);
+    StopAnimate();
+    scrollStop_ = true;
+    MarkDirtyNodeSelf();
+}
+
 void WaterFlowPattern::OnTouchDown(const TouchEventInfo& info)
 {
-    if (fastScrollState_) {
+    if (fastScrollState_ || targetIndex_ || legacyScrollTarget_) {
         StopAnimate();
     }
     ScrollablePattern::OnTouchDown(info);
@@ -1223,7 +1360,7 @@ void WaterFlowPattern::OnScrollEndCallback()
     if (AnimateStoped()) {
         scrollStop_ = true;
     }
-    CheckMisalignment(layoutInfo_);
+    pendingMisalignmentCheck_ = true;
     MarkDirtyNodeSelf();
 }
 
@@ -1242,6 +1379,9 @@ void WaterFlowPattern::CheckBackToTopFallback()
 
 void WaterFlowPattern::OnAnimateStop()
 {
+    if (!startingFastScroll_ && legacyScrollTarget_) {
+        legacyScrollFinishing_ = true;
+    }
     if (!startingFastScroll_ && fastScrollState_) {
         fastScrollState_->finishing = true;
     }
@@ -1250,7 +1390,7 @@ void WaterFlowPattern::OnAnimateStop()
         scrollStop_ = true;
     }
     CheckBackToTopFallback();
-    CheckMisalignment(layoutInfo_);
+    pendingMisalignmentCheck_ = true;
     MarkDirtyNodeSelf();
 }
 
@@ -1288,7 +1428,7 @@ bool WaterFlowPattern::NeedRender()
 
 void WaterFlowPattern::ResetLayoutInfo()
 {
-    if (fastScrollState_) {
+    if (fastScrollState_ || targetIndex_ || legacyScrollTarget_) {
         StopAnimate();
     }
     snapItemGeometryCache_.clear();
@@ -1327,7 +1467,7 @@ void WaterFlowPattern::SetLayoutMode(LayoutMode mode)
     // Same-mode property replay must keep sampled snap geometry. Data, section and layout resets,
     // as well as actual mode switches, remain responsible for invalidation.
     if (!layoutInfo_ || mode != layoutInfo_->Mode()) {
-        if (fastScrollState_) {
+        if (fastScrollState_ || targetIndex_ || legacyScrollTarget_) {
             StopAnimate();
         }
         snapItemGeometryCache_.clear();
@@ -1349,7 +1489,7 @@ int32_t WaterFlowPattern::GetChildrenCount() const
 
 void WaterFlowPattern::NotifyDataChange(int32_t index, int32_t count)
 {
-    if (fastScrollState_) {
+    if (fastScrollState_ || targetIndex_ || legacyScrollTarget_) {
         StopAnimate();
     }
     snapItemGeometryCache_.clear();
@@ -1851,10 +1991,16 @@ void WaterFlowPattern::PostAsyncLoadTask()
     CHECK_NULL_VOID(host);
     auto context = host->GetContext();
     CHECK_NULL_VOID(context);
-    context->AddAsyncLoadTask([weak = AceType::WeakClaim(this)]() {
+    const auto serial = fastScrollSerial_;
+    context->AddAsyncLoadTask([weak = AceType::WeakClaim(this), serial]() {
         auto pattern = weak.Upgrade();
         CHECK_NULL_VOID(pattern);
-        if (pattern->layoutInfo_->measureInNextFrame_) {
+        // Wrapper creation may clear the frame flag even when Measure is skipped.
+        const auto state = pattern->fastScrollState_;
+        const bool pendingFastScroll = pattern->fastScrollSerial_ == serial && state &&
+            !state->cancelled && !state->targetOffset;
+        const bool pendingTarget = pattern->fastScrollSerial_ == serial && pattern->targetIndex_;
+        if (pattern->layoutInfo_->measureInNextFrame_ || pendingFastScroll || pendingTarget) {
             pattern->MarkDirtyNodeSelf();
         }
     });

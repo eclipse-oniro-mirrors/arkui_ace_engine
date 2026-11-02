@@ -143,6 +143,10 @@ void WaterFlowLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     GetExpandArea(layoutProperty, layoutInfo_);
 
     int32_t updateIdx = GetUpdateIdx(layoutWrapper, layoutInfo_->footerIndex_);
+    const bool childDirty = layoutProperty->GetPropertyChangeFlag() & PROPERTY_UPDATE_BY_CHILD_REQUEST;
+    if (updateIdx >= 0 || layoutWrapper->ConstraintChanged() || childDirty) {
+        layoutInfo_->targetPreparation_.reset();
+    }
     if (updateIdx != -1) {
         layoutInfo_->Reset(updateIdx);
         layoutWrapper->GetHostNode()->ChildrenUpdatedFrom(-1);
@@ -172,10 +176,7 @@ void WaterFlowLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     if (!pattern->IsInitialized()) {
         layoutInfo_->currentOffset_ = layoutInfo_->contentStartOffset_;
     }
-    FillViewport(mainSize_, layoutWrapper);
-    if (layoutInfo_->targetIndex_.has_value()) {
-        MeasureToTarget(layoutWrapper, layoutInfo_->endIndex_, std::nullopt);
-    }
+    MeasureItems(layoutWrapper);
     if (matchChildren) {
         mainSize_ = std::min(mainSize_, layoutInfo_->GetMaxMainHeight() + layoutInfo_->footerHeight_);
         idealSize.SetMainSize(mainSize_, axis_);
@@ -203,10 +204,25 @@ void WaterFlowLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     isLayouted_ = false;
 }
 
+void WaterFlowLayoutAlgorithm::MeasureItems(LayoutWrapper* layoutWrapper)
+{
+    // A yielded route keeps the same viewport. Repeating all visible text
+    // measurements here can consume the next frame's budget before any progress.
+    // Constraints, child dirtiness and data updates invalidate preparation in Measure.
+    if (!layoutInfo_->targetPreparation_) {
+        FillViewport(mainSize_, layoutWrapper);
+    }
+    if (layoutInfo_->targetIndex_) {
+        BeginTargetPreparation();
+        MeasureToTarget(layoutWrapper, layoutInfo_->targetPreparation_->nextIndex, std::nullopt);
+        ReleaseTargetPreparationItems(layoutWrapper);
+    }
+}
+
 bool WaterFlowLayoutAlgorithm::MeasureToTarget(
     LayoutWrapper* layoutWrapper, int32_t startFrom, std::optional<int64_t> cacheDeadline)
 {
-    if (layoutInfo_->targetIndex_.value() > layoutInfo_->GetChildrenCount()) {
+    if (layoutInfo_->targetIndex_.value() >= layoutInfo_->GetChildrenCount()) {
         layoutInfo_->targetIndex_.reset();
         return false;
     }
@@ -216,7 +232,9 @@ bool WaterFlowLayoutAlgorithm::MeasureToTarget(
     if (layoutInfo_->targetIndex_.value() == LAST_ITEM) {
         layoutInfo_->targetIndex_ = layoutInfo_->GetChildrenCount() - 1;
     }
-    while (layoutInfo_->targetIndex_.has_value() && (startFrom < layoutInfo_->targetIndex_.value())) {
+    // The cursor can equal the destination after yielding immediately before
+    // it. That item still needs to be measured before starting the animation.
+    while (layoutInfo_->targetIndex_.has_value() && currentIndex <= layoutInfo_->targetIndex_.value()) {
         auto itemWrapper = WaterFlowLayoutUtils::GetWaterFlowItem(layoutWrapper,
             GetChildIndexWithFooter(currentIndex), !cacheDeadline, cacheDeadline.has_value());
         if (!itemWrapper) {
@@ -260,6 +278,12 @@ bool WaterFlowLayoutAlgorithm::MeasureToTarget(
         }
         currentIndex++;
         position = GetItemPosition(currentIndex);
+        if (!cacheDeadline && layoutInfo_->targetPreparation_) {
+            layoutInfo_->targetPreparation_->nextIndex = currentIndex;
+            if (layoutInfo_->targetIndex_ && YieldTargetPreparation(layoutWrapper)) {
+                break;
+            }
+        }
         if (cacheDeadline && GetSysTimestamp() > *cacheDeadline) {
             break;
         }
@@ -269,6 +293,9 @@ bool WaterFlowLayoutAlgorithm::MeasureToTarget(
 
 void WaterFlowLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
 {
+    if (layoutInfo_->targetPreparation_ && layoutInfo_->measureInNextFrame_) {
+        return;
+    }
     if (skipMeasure_) {
         skipMeasure_ = false;
         return;

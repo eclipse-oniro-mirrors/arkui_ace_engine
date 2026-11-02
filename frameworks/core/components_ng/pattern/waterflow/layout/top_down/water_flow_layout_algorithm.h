@@ -39,6 +39,7 @@ public:
     }
 private:
     FlowItemPosition GetItemPosition(int32_t index);
+    void MeasureItems(LayoutWrapper* layoutWrapper);
     bool MeasureToTarget(LayoutWrapper* layoutWrapper, int32_t startFrom, std::optional<int64_t> cacheDeadline);
     void FillViewport(float mainSize, LayoutWrapper* layoutWrapper);
     void MeasureLazyLayoutItem(const RefPtr<LayoutWrapper>& item, float crossSize, float startMainPos, float mainSize,

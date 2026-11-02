@@ -293,6 +293,36 @@ public:
 
     bool measureInNextFrame_ = false;
 
+    // Smooth legacy requests still measure the complete route. Keep its viewport
+    // and cursor across frames so expensive builders cannot monopolize the UI.
+    struct TargetPreparation {
+        int32_t index = -1;
+        int32_t startIndex = 0;
+        int32_t endIndex = -1;
+        int32_t nextIndex = 0;
+        bool releaseToggle = false;
+        bool needsRouteCleanup = false;
+    };
+    std::optional<TargetPreparation> targetPreparation_;
+
+    struct TargetPreparationCleanup {
+        int32_t startIndex = -1;
+        int32_t endIndex = -1;
+    };
+    std::optional<TargetPreparationCleanup> targetPreparationCleanup_;
+
+    void EndTargetPreparation()
+    {
+        if (targetPreparation_ && targetPreparation_->needsRouteCleanup &&
+            Mode() == WaterFlowLayoutMode::SLIDING_WINDOW) {
+            // Retain the original viewport until the next measure can discard
+            // the route geometry without recreating its released children.
+            targetPreparationCleanup_ = TargetPreparationCleanup {
+                targetPreparation_->startIndex, targetPreparation_->endIndex };
+        }
+        targetPreparation_.reset();
+    }
+
     ACE_DISALLOW_COPY_AND_MOVE(WaterFlowLayoutInfoBase);
 };
 

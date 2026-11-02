@@ -303,6 +303,9 @@ private:
     void UpdateScrollTargetsAfterLayout(const RefPtr<LayoutWrapper>& dirty);
     void ResumeFastScrollAnimation(float position, float coordinateCorrection);
     void UpdateFastScroll(float coordinateCorrection);
+    void UpdateLegacyScrollTarget(float coordinateCorrection);
+    void RemeasureLegacyScrollTarget();
+    void FinishLegacyScroll();
     std::shared_ptr<WaterFlowFastScrollState> fastScrollState_;
     uint64_t fastScrollSerial_ = 0;
     bool NeedRender();
@@ -373,6 +376,11 @@ private:
 
     std::vector<int32_t> sectionChangeStartPos_;
     std::optional<ExpandEdges> safeAreaPad_;
+
+    std::optional<ScrollToIndexTarget> legacyScrollTarget_;
+    bool legacyScrollFinishing_ = false;
+    bool legacyScrollRetried_ = false;
+    bool pendingMisalignmentCheck_ = false;
 };
 } // namespace OHOS::Ace::NG
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_WATERFLOW_WATER_FLOW_PATTERN_H

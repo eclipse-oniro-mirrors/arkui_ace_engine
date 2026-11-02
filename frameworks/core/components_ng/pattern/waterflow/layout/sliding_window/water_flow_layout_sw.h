@@ -81,6 +81,7 @@ public:
     }
 
 private:
+    void CleanupTargetPreparation();
     void InvalidateFastScrollIfNeeded();
     void CancelFastScroll();
     void MeasureItems();
@@ -284,6 +285,7 @@ private:
     float mainLen_ = 0.0f;
     std::optional<int64_t> cacheDeadline_; // cache layout deadline
 
+    bool measuringTarget_ = false;
     bool canSkip_ = false; // try converting large delta to jump if true.
 };
 } // namespace OHOS::Ace::NG

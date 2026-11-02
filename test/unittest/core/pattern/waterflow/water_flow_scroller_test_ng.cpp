@@ -16,6 +16,8 @@
 #include "test/mock/frameworks/core/animation/mock_animation_manager.h"
 #include "water_flow_scroller_test_ng.h"
 
+#include <set>
+
 #include "core/animation/velocity_motion.h"
 #include "core/components/common/layout/constants.h"
 #include "core/common/container.h"
@@ -25,6 +27,217 @@
 #include "interfaces/inner_api/ui_session/param_config.h"
 
 namespace OHOS::Ace::NG {
+/**
+ * @tc.name: WFLegacyTargetPreparationYields
+ * @tc.desc: NONE measures every route index across bounded frames and keeps the old viewport until animation.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFLegacyTargetPreparationYields, TestSize.Level1)
+{
+    AnimationVersionScope animationVersion;
+    auto model = CreateWaterFlow();
+    model.SetCachedCount(0);
+    auto created = std::make_shared<int32_t>(0);
+    auto visited = std::make_shared<std::set<int32_t>>();
+    CreateItemsInLazyForEach(FAST_SCROLL_ITEM_COUNT, [created, visited](int32_t index) {
+        ++*created;
+        visited->insert(index);
+        MockPipelineContext::GetCurrent()->DecResponseTime();
+        return 100.0f;
+    });
+    CreateDone();
+    const auto initialRect = FastScrollItemRect(0);
+    const float initialOffset = pattern_->GetTotalOffset();
+    auto context = MockPipelineContext::GetCurrent();
+    context->SetResponseTime(PREPARATION_FRAME_BUDGET);
+    MockAnimationManager::GetInstance().SetTicks(FAST_SCROLL_ANIMATION_TICKS);
+    pattern_->ScrollToIndex(800, true, ScrollAlign::CENTER, 20.0f);
+    context->FlushUITasks();
+    ASSERT_FALSE(pattern_->AnimateRunning());
+    ASSERT_TRUE(pattern_->targetIndex_);
+    // Exercise the same wrapper-skip condition as the fast preparation path.
+    pattern_->BeforeCreateLayoutWrapper();
+    for (int32_t frame = 0; frame < MAX_PREPARATION_FRAMES && !pattern_->AnimateRunning(); ++frame) {
+        const int32_t before = *created;
+        context->SetResponseTime(PREPARATION_FRAME_BUDGET);
+        context->FlushUITasks();
+        if (!pattern_->AnimateRunning()) {
+            EXPECT_LE(*created - before, PREPARATION_FRAME_BUDGET);
+            EXPECT_EQ(FastScrollItemRect(0), initialRect);
+            EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), initialOffset);
+        }
+    }
+    ASSERT_TRUE(pattern_->AnimateRunning());
+    for (int32_t index = 0; index <= 800; ++index) {
+        EXPECT_TRUE(visited->count(index)) << index;
+    }
+    context->SetResponseTime(INT32_MAX);
+    FinishFastScroll();
+    EXPECT_NEAR(FastScrollItemRect(800).Top(), (WATER_FLOW_HEIGHT - 100.0f) / 2.0f - 20.0f, 0.2f);
+}
+
+/**
+ * @tc.name: WFLegacyPreparationResumesAtDestination
+ * @tc.desc: A single-item frame budget must still measure the destination on its own final frame.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFLegacyPreparationResumesAtDestination, TestSize.Level1)
+{
+    constexpr int32_t target = 25;
+    auto model = CreateWaterFlow();
+    model.SetCachedCount(0);
+    auto visited = std::make_shared<std::set<int32_t>>();
+    CreateItemsInLazyForEach(FAST_SCROLL_ITEM_COUNT, [visited](int32_t index) {
+        visited->insert(index);
+        MockPipelineContext::GetCurrent()->DecResponseTime();
+        return 100.0f;
+    });
+    CreateDone();
+    auto context = MockPipelineContext::GetCurrent();
+    MockAnimationManager::GetInstance().SetTicks(FAST_SCROLL_ANIMATION_TICKS);
+    pattern_->ScrollToIndex(target, true, ScrollAlign::START);
+    for (int32_t frame = 0; frame < MAX_PREPARATION_FRAMES && !pattern_->AnimateRunning(); ++frame) {
+        context->SetResponseTime(1);
+        context->FlushUITasks();
+    }
+    EXPECT_EQ(visited->count(target), 1u);
+    ASSERT_TRUE(pattern_->AnimateRunning());
+    context->SetResponseTime(INT32_MAX);
+    FinishFastScroll();
+    EXPECT_NEAR(FastScrollItemRect(target).Top(), 0.0f, 0.2f);
+}
+
+/**
+ * @tc.name: WFLegacyPreparationChildResize
+ * @tc.desc: Resizing a retained child during preparation recalculates the destination with the new height.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFLegacyPreparationChildResize, TestSize.Level1)
+{
+    AnimationVersionScope animationVersion;
+    constexpr float itemHeight = 100.0f;
+    auto firstHeight = std::make_shared<float>(itemHeight);
+    auto model = CreateWaterFlow();
+    model.SetColumnsTemplate("1fr");
+    model.SetCachedCount(0);
+    CreateItemsInLazyForEach(FAST_SCROLL_ITEM_COUNT, [firstHeight](int32_t index) {
+        MockPipelineContext::GetCurrent()->DecResponseTime();
+        return index == 0 ? *firstHeight : itemHeight;
+    });
+    CreateDone();
+    auto context = MockPipelineContext::GetCurrent();
+    context->SetResponseTime(PREPARATION_FRAME_BUDGET);
+    MockAnimationManager::GetInstance().SetTicks(FAST_SCROLL_ANIMATION_TICKS);
+    pattern_->ScrollToIndex(FAST_SCROLL_TARGET, true, ScrollAlign::START);
+    context->FlushUITasks();
+    ASSERT_TRUE(pattern_->layoutInfo_->targetPreparation_);
+    ASSERT_FALSE(pattern_->AnimateRunning());
+    auto first = GetItem(0);
+    ASSERT_NE(first, nullptr);
+    *firstHeight = itemHeight * 2.0f;
+    first->GetLayoutProperty()->UpdateUserDefinedIdealSize(CalcSize(std::nullopt, CalcLength(*firstHeight)));
+    frameNode_->MarkDirtyNode(PROPERTY_UPDATE_BY_CHILD_REQUEST);
+    context->SetResponseTime(INT32_MAX);
+    FlushUITasks();
+    FinishFastScroll();
+    EXPECT_NEAR(FastScrollItemRect(FAST_SCROLL_TARGET).Top(), 0.0f, 0.2f);
+    EXPECT_NEAR(pattern_->GetTotalOffset(), FAST_SCROLL_TARGET * itemHeight + itemHeight, 0.2f);
+    EXPECT_FALSE(pattern_->layoutInfo_->targetPreparation_);
+}
+
+/**
+ * @tc.name: WFLegacyTargetPreparationCancel
+ * @tc.desc: Cancellation during preparation removes queued work and a following ordinary jump remains usable.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFLegacyTargetPreparationCancel, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    model.SetCachedCount(0);
+    CreateItemsInLazyForEach(FAST_SCROLL_ITEM_COUNT, [](int32_t) {
+        MockPipelineContext::GetCurrent()->DecResponseTime();
+        return 100.0f;
+    });
+    CreateDone();
+    auto context = MockPipelineContext::GetCurrent();
+    context->SetResponseTime(PREPARATION_FRAME_BUDGET);
+    pattern_->ScrollToIndex(800, true, ScrollAlign::START, 0.0f);
+    context->FlushUITasks();
+    ASSERT_TRUE(pattern_->targetIndex_);
+    pattern_->StopAnimate();
+    context->SetResponseTime(INT32_MAX);
+    for (int32_t frame = 0; frame < 3; ++frame) {
+        context->FlushUITasks();
+    }
+    EXPECT_FALSE(pattern_->targetIndex_);
+    EXPECT_FALSE(pattern_->layoutInfo_->targetPreparation_);
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    ScrollToIndex(20, false, ScrollAlign::START);
+    EXPECT_NEAR(FastScrollItemRect(20).Top(), 0.0f, 0.2f);
+}
+
+/**
+ * @tc.name: WFLegacyPreparationReloadRemovesTarget
+ * @tc.desc: A full data reload invalidates a removed destination without reviving queued preparation.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFLegacyPreparationReloadRemovesTarget, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    model.SetCachedCount(0);
+    auto builder = CreateItemsInLazyForEach(FAST_SCROLL_ITEM_COUNT, [](int32_t) {
+        MockPipelineContext::GetCurrent()->DecResponseTime();
+        return 100.0f;
+    });
+    CreateDone();
+    auto context = MockPipelineContext::GetCurrent();
+    context->SetResponseTime(PREPARATION_FRAME_BUDGET);
+    pattern_->ScrollToIndex(800, true, ScrollAlign::START);
+    context->FlushUITasks();
+    ASSERT_TRUE(pattern_->targetIndex_);
+    builder->SetTotalCount(50);
+    auto lazy = AceType::DynamicCast<LazyForEachNode>(frameNode_->GetChildAtIndex(0));
+    ASSERT_NE(lazy, nullptr);
+    lazy->OnDataReloaded();
+    context->SetResponseTime(INT32_MAX);
+    FlushUITasks();
+    EXPECT_FALSE(pattern_->targetIndex_);
+    EXPECT_FALSE(pattern_->layoutInfo_->targetPreparation_);
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    ScrollToIndex(20, false, ScrollAlign::START);
+    EXPECT_NEAR(FastScrollItemRect(20).Top(), 0.0f, 0.2f);
+}
+
+/**
+ * @tc.name: WFLegacyPreparationDetach
+ * @tc.desc: A detached pending legacy request cannot start animation from an already queued frame callback.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFLegacyPreparationDetach, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    model.SetCachedCount(0);
+    CreateItemsInLazyForEach(FAST_SCROLL_ITEM_COUNT, [](int32_t) {
+        MockPipelineContext::GetCurrent()->DecResponseTime();
+        return 100.0f;
+    });
+    CreateDone();
+    auto context = MockPipelineContext::GetCurrent();
+    context->SetResponseTime(PREPARATION_FRAME_BUDGET);
+    pattern_->ScrollToIndex(800, true, ScrollAlign::START);
+    context->FlushUITasks();
+    ASSERT_TRUE(pattern_->targetIndex_);
+    pattern_->OnDetachFromMainTree();
+    context->SetResponseTime(INT32_MAX);
+    for (int32_t frame = 0; frame < 3; ++frame) {
+        context->FlushUITasks();
+    }
+    EXPECT_FALSE(pattern_->targetIndex_);
+    EXPECT_FALSE(pattern_->layoutInfo_->targetPreparation_);
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), 0.0f);
+}
+
 /**
  * @tc.name: WFFastScrollScopeAndPreparation
  * @tc.desc: Only sliding-window mode prepares a bounded target window without moving visible items.

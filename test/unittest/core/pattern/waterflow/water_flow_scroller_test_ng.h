@@ -23,6 +23,20 @@
 namespace OHOS::Ace::NG {
 class WaterFlowScrollerTestNg : public WaterFlowTestNg {
 protected:
+    // V2 retains restarted animation properties after the old queue entry is pruned.
+    class AnimationVersionScope {
+    public:
+        AnimationVersionScope() : previous_(MockAnimationManager::GetVersion())
+        {
+            MockAnimationManager::SetVersion(MockAnimationManager::Version::V2);
+        }
+        ~AnimationVersionScope()
+        {
+            MockAnimationManager::SetVersion(previous_);
+        }
+    private:
+        MockAnimationManager::Version previous_;
+    };
     static constexpr int32_t FAST_SCROLL_ITEM_COUNT = 1000;
     static constexpr int32_t FAST_SCROLL_TARGET = 800;
     static constexpr int32_t FAST_SCROLL_ANIMATION_TICKS = 8;
@@ -98,7 +112,8 @@ protected:
     void FinishFastScroll()
     {
         for (int32_t tick = 0;
-             tick < MAX_FAST_SCROLL_TICKS && !MockAnimationManager::GetInstance().AllFinished(); ++tick) {
+             tick < MAX_FAST_SCROLL_TICKS && (pattern_->legacyScrollTarget_ || pattern_->targetIndex_ ||
+                 !MockAnimationManager::GetInstance().AllFinished()); ++tick) {
             MockAnimationManager::GetInstance().Tick();
             FlushUITasks();
         }
@@ -106,6 +121,8 @@ protected:
         EXPECT_FALSE(pattern_->GetFastScrollRequest());
         EXPECT_FALSE(pattern_->fastScrollState_);
         EXPECT_FALSE(pattern_->AnimateRunning());
+        EXPECT_FALSE(pattern_->legacyScrollTarget_);
+        EXPECT_FALSE(pattern_->targetIndex_);
         // Observe queued layout/finish work before resetting mock bookkeeping. A
         // late production callback must not restart an already completed request.
         const float settledOffset = pattern_->GetTotalOffset();
@@ -116,6 +133,8 @@ protected:
             EXPECT_FALSE(pattern_->GetFastScrollRequest());
             EXPECT_FALSE(pattern_->fastScrollState_);
             EXPECT_FALSE(pattern_->AnimateRunning());
+            EXPECT_FALSE(pattern_->legacyScrollTarget_);
+            EXPECT_FALSE(pattern_->targetIndex_);
             EXPECT_NEAR(pattern_->GetTotalOffset(), settledOffset, 0.2f);
         }
         // AllFinished prunes the mock's animation list but its weak property map can
