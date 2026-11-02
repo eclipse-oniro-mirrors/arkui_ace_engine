@@ -100,7 +100,8 @@ void SharedImageManager::AddSharedImage(const std::string& name, SharedImage&& s
                     auto sharedImageMap = sharedImageManager->GetSharedImageMap();
                     auto imageDataIter = sharedImageMap.find(name);
                     if (imageDataIter == sharedImageMap.end()) {
-                        TAG_LOGW(AceLogTag::ACE_FORM, "fail to find data of %{public}s in sharedImageMap, stop UpdateData", name.c_str());
+                        TAG_LOGW(AceLogTag::ACE_FORM,
+                            "fail to find data of %{public}s in sharedImageMap, stop UpdateData", name.c_str());
                         return;
                     }
                     dataSize = imageDataIter->second.size();
@@ -135,7 +136,8 @@ bool SharedImageManager::UpdateImageMap(const std::string& name, const SharedIma
         sharedImageTotalSize_ += sharedImage.size();
         sharedImageMap_.emplace(name, sharedImage);
         if (static_cast<int>(sharedImageMap_.size()) > sharedImageCacheThreshold_.load()) {
-            TAG_LOGW(AceLogTag::ACE_FORM, "will clear %{public}s cache, sharedImageMap_ size %{public}d max cache: %{public}d",
+            TAG_LOGW(AceLogTag::ACE_FORM,
+                "will clear %{public}s cache, sharedImageMap_ size %{public}d max cache: %{public}d",
                 name.c_str(), static_cast<int>(sharedImageMap_.size()), sharedImageCacheThreshold_.load());
             isClear = true;
         }
@@ -187,7 +189,8 @@ bool SharedImageManager::Remove(const std::string& name)
     std::lock_guard<std::mutex> lockImageMap(sharedImageMapMutex_);
     auto iter = sharedImageMap_.find(name);
     if (iter == sharedImageMap_.end()) {
-        TAG_LOGW(AceLogTag::ACE_FORM, "Remove failed: image data of %{private}s does not found in SharedImageMap", name.c_str());
+        TAG_LOGW(AceLogTag::ACE_FORM,
+            "Remove failed: image data of %{private}s does not found in SharedImageMap", name.c_str());
         return false;
     }
     if (sharedImageTotalSize_ > iter->second.size()) {
