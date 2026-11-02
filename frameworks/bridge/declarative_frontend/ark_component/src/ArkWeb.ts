@@ -1208,6 +1208,20 @@ class WebOnDetectedBlankScreenModifier extends ModifierWithKey<OnDetectBlankScre
   }
 }
 
+class WebOnMonitoredBlankScreenModifier extends ModifierWithKey<OnMonitorBlankScreenCallback> {
+  constructor (value: OnMonitorBlankScreenCallback) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('webOnMonitoredBlankScreenModifier');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().web.resetOnMonitoredBlankScreen(node);
+    } else {
+      getUINativeModule().web.setOnMonitoredBlankScreen(node, this.value);
+    }
+  }
+}
+
 class WebBlankScreenDetectionConfigModifier extends ModifierWithKey<BlankScreenDetectionConfig> {
   constructor(value: BlankScreenDetectionConfig) {
     super(value);
@@ -1224,6 +1238,20 @@ class WebBlankScreenDetectionConfigModifier extends ModifierWithKey<BlankScreenD
                                                             this.value.contentfulNodesCountThreshold);
     }
   }
+}
+
+class WebEnableBlankScreenMonitorModifier extends ModifierWithKey<boolean> {
+  constructor(value: boolean) {
+      super(value);
+  }
+  static identity: Symbol = Symbol('webEnableBlankScreenMonitorModifier');
+  applyPeer(node: KNode, reset: boolean): void {
+      if (reset) {
+          getUINativeModule().web.resetEnableBlankScreenMonitor(node);
+      } else {
+          getUINativeModule().web.setEnableBlankScreenMonitor(node, this.value);
+      }
+    }
 }
 
 class WebOnFirstScreenPaintModifier extends ModifierWithKey<OnFirstScreenPaintCallback> {
@@ -1997,9 +2025,17 @@ class ArkWebComponent extends ArkComponent implements WebAttribute {
     modifierWithKey(this._modifiersWithKeys, WebOnDetectedBlankScreenModifier.identity, WebOnDetectedBlankScreenModifier, callback);
     return this;
   }
+  onMonitoredBlankScreen(callback: OnMonitorBlankScreenCallback): this {
+    modifierWithKey(this._modifiersWithKeys, WebOnMonitoredBlankScreenModifier.identity, WebOnMonitoredBlankScreenModifier, callback);
+    return this;
+  }
   blankScreenDetectionConfig(config: BlankScreenDetectionConfig): this {
     modifierWithKey(this._modifiersWithKeys, WebBlankScreenDetectionConfigModifier.identity, WebBlankScreenDetectionConfigModifier, config);
     return this;
+  }
+  enableBlankScreenMonitor(enabled: boolean): this {
+      modifierWithKey(this._modifiersWithKeys, WebEnableBlankScreenMonitorModifier.identity, WebEnableBlankScreenMonitorModifier, enabled);
+      return this;
   }
   onFirstScreenPaint(callback: OnFirstScreenPaintCallback): this {
     modifierWithKey(this._modifiersWithKeys, WebOnFirstScreenPaintModifier.identity, WebOnFirstScreenPaintModifier, callback);

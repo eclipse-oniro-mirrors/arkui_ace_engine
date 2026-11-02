@@ -989,6 +989,20 @@ void WebModelStatic::SetOnDetectedBlankScreen(
     webEventHub->SetOnDetectedBlankScreenEvent(std::move(uiCallback));
 }
 
+void WebModelStatic::SetOnMonitoredBlankScreen(
+    FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto func = callback;
+    auto uiCallback = [func](const std::shared_ptr<BaseEventInfo> &info) {
+        CHECK_NULL_VOID(info);
+        func(info.get());
+    };
+    auto webEventHub = frameNode->GetEventHub<WebEventHub>();
+    CHECK_NULL_VOID(webEventHub);
+    webEventHub->SetOnMonitoredBlankScreenEvent(std::move(uiCallback));
+}
+
 void WebModelStatic::SetOnFirstScreenPaint(
     FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback)
 {
@@ -1010,6 +1024,14 @@ void WebModelStatic::SetBlankScreenDetectionConfig(
     auto webPatternStatic = AceType::DynamicCast<WebPatternStatic>(frameNode->GetPattern());
     CHECK_NULL_VOID(webPatternStatic);
     webPatternStatic->UpdateBlankScreenDetectionConfig(detectConfig);
+}
+
+void WebModelStatic::SetWebBlankScreenMonitorEnabled(FrameNode *frameNode, const std::optional<bool>& enable)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPatternStatic = AceType::DynamicCast<WebPatternStatic>(frameNode->GetPattern());
+    CHECK_NULL_VOID(webPatternStatic);
+    webPatternStatic->UpdateWebBlankScreenMonitorEnabled(enable.value_or(false));
 }
 
 void WebModelStatic::SetResourceLoadId(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback)

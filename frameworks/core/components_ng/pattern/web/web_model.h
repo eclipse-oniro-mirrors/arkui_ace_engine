@@ -243,8 +243,10 @@ public:
     virtual void SetGestureFocusMode(GestureFocusMode mode) {}
     virtual void SetRotateRenderEffect(WebRotateEffect effect) {}
     virtual void SetOnDetectedBlankScreen(std::function<void(const BaseEventInfo* info)>&& jsCallback) {}
+    virtual void SetOnMonitoredBlankScreen(std::function<void(const BaseEventInfo* info)>&& jsCallback) {}
     virtual void SetBlankScreenDetectionConfig(bool enable, const std::vector<double>& detectionTiming,
         const std::vector<int32_t>& detectionMethods, int32_t contentfulNodesCountThreshold) {}
+    virtual void SetWebBlankScreenMonitorEnabled(bool isEnabled) {};
     virtual void SetOnFirstScreenPaint(std::function<void(const BaseEventInfo* info)>&& jsCallback) {}
     virtual void SetEnableImageAnalyzer(bool isEnabled) {}
     virtual void SetEnableAutoFill(bool isEnabled) {}

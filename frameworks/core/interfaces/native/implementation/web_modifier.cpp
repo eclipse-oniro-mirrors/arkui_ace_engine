@@ -2989,6 +2989,27 @@ void SetOnDetectedBlankScreenImpl(Ark_NativePointer node,
 #endif // WEB_SUPPORTED
 }
 
+void SetOnMonitoredBlankScreenImpl(Ark_NativePointer node,
+                                   const Opt_OnMonitorBlankScreenCallback* value)
+{
+#ifdef WEB_SUPPORTED
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto optValue = Converter::GetOptPtr(value);
+    if (!optValue) {
+        // Implement Reset value
+        return;
+    }
+    auto instanceId = Container::CurrentId();
+    WeakPtr<FrameNode> weakNode = AceType::WeakClaim(frameNode);
+    auto onMonitoredBlankScreen = [callback = CallbackHelper(*optValue), weakNode, instanceId](
+        const BaseEventInfo* info) -> void {
+        OnMonitoredBlankScreen(callback, weakNode, instanceId, info);
+    };
+    WebModelStatic::SetOnMonitoredBlankScreen(frameNode, onMonitoredBlankScreen);
+#endif // WEB_SUPPORTED
+}
+
 void SetBlankScreenDetectionConfigImpl(Ark_NativePointer node,
                                        const Opt_BlankScreenDetectionConfig* value)
 {
@@ -3033,6 +3054,16 @@ void SetBlankScreenDetectionConfigImpl(Ark_NativePointer node,
 
     BlankScreenDetectionConfig config{enable, detectionTiming, detectionMethods, contentfulNodesCountThreshold};
     WebModelStatic::SetBlankScreenDetectionConfig(frameNode, config);
+#endif // WEB_SUPPORTED
+}
+void SetEnableBlankScreenMonitorImpl(Ark_NativePointer node,
+                                     const Opt_Boolean* value)
+{
+#ifdef WEB_SUPPORTED
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto convValue = Converter::OptConvert<bool>(*value);
+    WebModelStatic::SetWebBlankScreenMonitorEnabled(frameNode, convValue);
 #endif // WEB_SUPPORTED
 }
 
@@ -3331,7 +3362,9 @@ const GENERATED_ArkUIWebModifier* GetWebModifier()
         WebAttributeModifier::SetRotateRenderEffectImpl,
         WebAttributeModifier::SetZoomControlAccessImpl,
         WebAttributeModifier::SetOnDetectedBlankScreenImpl,
+        WebAttributeModifier::SetOnMonitoredBlankScreenImpl,
         WebAttributeModifier::SetBlankScreenDetectionConfigImpl,
+        WebAttributeModifier::SetEnableBlankScreenMonitorImpl,
         WebAttributeModifier::SetBackToTopImpl,
         WebAttributeModifier::SetEnableSelectedDataDetectorImpl,
         WebAttributeModifier::SetOnFirstScreenPaintImpl,
