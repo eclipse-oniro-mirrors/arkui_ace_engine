@@ -239,6 +239,16 @@ public:
     }
     void SetFloatingScaleEnabled(bool isFloatingScaleEnabled);
 
+    float GetBaseFloatingScale() const
+    {
+        return baseFloatingScale_;
+    }
+
+    bool IsTabBarFollowingHand() const
+    {
+        return floatingBarPosition_ != FloatingBarPosition::CENTER || floatTabBarFollowHandAnimationCount_ > 0;
+    }
+
     void SetSidebarHeaderNode(const RefPtr<NG::UINode>& header)
     {
         sidebarHeaderNode_ = header;

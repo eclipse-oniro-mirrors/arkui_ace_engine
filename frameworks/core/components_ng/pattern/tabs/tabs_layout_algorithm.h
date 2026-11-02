@@ -130,6 +130,7 @@ private:
     std::optional<float> ParseBarWidthAndMargin(LayoutWrapper* layoutWrapper, float tabsWidth, float tabsHeight);
     void UpdateBarMargin(LayoutWrapper* layoutWrapper, OffsetF& barOffset) const;
     void UpdateTopBarMargin(LayoutWrapper* layoutWrapper, OffsetF& barOffset) const;
+    void UpdateFloatingBarTransform(LayoutWrapper* layoutWrapper) const;
     void LayoutBackgroundMask(LayoutWrapper* layoutWrapper);
 
     void UpdateSideBarAndSideBarDividerVisibility(LayoutWrapper* layoutWrapper, bool isVisible);

@@ -204,6 +204,10 @@ void TabBarPattern::StartShowTabBar(int32_t delay)
     if (NearZero(translate) || NearZero(size)) {
         return;
     }
+    bool isFloating = GetFloatingBaseOffset();
+    if (isFloating && !isTabBarHiding_ && !isTabBarShowing_ && tabBarState_ == TabBarState::SHOW) {
+        return;
+    }
 
     CancelShowTabBar();
     if (delay == 0 && isTabBarHiding_) {
@@ -431,6 +435,14 @@ void TabBarPattern::SetTabBarTranslate(const TranslateOptions& options, bool isU
     auto dividerRenderContext = divider->GetRenderContext();
     CHECK_NULL_VOID(dividerRenderContext);
     dividerRenderContext->UpdateTransformTranslate(options);
+}
+
+bool TabBarPattern::GetFloatingBaseOffset() const
+{
+    if (!isFloatingBar_ && !isFloatingTopBar_) {
+        return false;
+    }
+    return true;
 }
 
 void TabBarPattern::SetTabBarOpacity(float opacity)

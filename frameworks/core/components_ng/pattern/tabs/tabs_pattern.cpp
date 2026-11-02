@@ -1469,21 +1469,6 @@ void TabsPattern::InitFloatingBar()
             renderContext->ResetBorder();
         }
         ApplySystemMaterial();
-        if (renderContext) {
-            auto style = property->GetBarFloatingStyle();
-            float offsetX = 0.0f;
-            float offsetY = 0.0f;
-            if (style.has_value()) {
-                if (style->offsetX.has_value()) {
-                    offsetX = style->offsetX.value().ConvertToPx();
-                }
-                if (style->offsetY.has_value()) {
-                    offsetY = style->offsetY.value().ConvertToPx();
-                }
-            }
-            renderContext->UpdateTransformTranslate({offsetX, offsetY, 0.0f});
-            renderContext->UpdateTransformScale({baseFloatingScale_, baseFloatingScale_});
-        }
     } else if (shouldTopFloating) {
         isFloatingBar_ = false;
         isFloatingTopBar_ = true;
@@ -1524,18 +1509,6 @@ void TabsPattern::InitFloatingBar()
                 borderColor.SetColor(tabTheme->GetTopTabBarBackgroundColor());
                 renderContext->UpdateBorderColor(borderColor);
             }
-            float offsetX = 0.0f;
-            float offsetY = 0.0f;
-            if (topStyle.has_value()) {
-                if (topStyle->offsetX.has_value()) {
-                    offsetX = topStyle->offsetX.value().ConvertToPx();
-                }
-                if (topStyle->offsetY.has_value()) {
-                    offsetY = topStyle->offsetY.value().ConvertToPx();
-                }
-            }
-            renderContext->UpdateTransformTranslate({offsetX, offsetY, 0.0f});
-            renderContext->UpdateTransformScale({1.0f, 1.0f});
         }
     } else {
         isFloatingBar_ = false;
@@ -2018,36 +1991,26 @@ void TabsPattern::ClampTabBarTransformOffset()
     float barHeight = tabBarGeo->GetFrameSize().Height();
     float tabsWidth = tabsGeo->GetFrameSize().Width();
     float tabsHeight = tabsGeo->GetFrameSize().Height();
-    float tabsOffsetX = tabsGeo->GetFrameOffset().GetX();
-    float tabsOffsetY = tabsGeo->GetFrameOffset().GetY();
 
+    // Keep the floating bar inside the Tabs container, further constrained by the
+    // component-level safe area (safeAreaPadding + safeAreaInset). The system safe
+    // area is already handled by the Tabs host via SafeAreaExpandOpts.
     float minOffsetX = -barLeft;
     float maxOffsetX = tabsWidth - barLeft - barWidth;
     float minOffsetY = -barTop;
     float maxOffsetY = tabsHeight - barTop - barHeight;
 
-    auto context = tabsNode->GetContext();
-    if (context) {
-        auto safeArea = context->GetSafeArea();
-        auto titleHeight = context->GetContainerModalTitleHeight();
-        float titleAvoidance = titleHeight > 0 ? static_cast<float>(titleHeight) : 0.0f;
-        float safeLeftPx = static_cast<float>(safeArea.left_.Length());
-        float safeRightPx = static_cast<float>(safeArea.right_.Length());
-        float safeTopPx = static_cast<float>(safeArea.top_.Length()) + titleAvoidance;
-        float safeBottomPx = static_cast<float>(safeArea.bottom_.Length());
-
-        if (LessNotEqual(tabsOffsetX, safeLeftPx)) {
-            minOffsetX = std::max(minOffsetX, safeLeftPx - tabsOffsetX - barLeft);
-        }
-        if (GreatNotEqual(tabsOffsetX + tabsWidth, safeRightPx)) {
-            maxOffsetX = std::min(maxOffsetX, tabsOffsetX + tabsWidth - safeRightPx - barLeft - barWidth);
-        }
-        if (LessNotEqual(tabsOffsetY, safeTopPx)) {
-            minOffsetY = std::max(minOffsetY, safeTopPx - tabsOffsetY - barTop);
-        }
-        if (GreatNotEqual(tabsOffsetY + tabsHeight, safeBottomPx)) {
-            maxOffsetY = std::min(maxOffsetY, tabsOffsetY + tabsHeight - safeBottomPx - barTop - barHeight);
-        }
+    auto layoutProperty = tabsNode->GetLayoutProperty();
+    if (layoutProperty) {
+        auto innerSafePadding = layoutProperty->GetOrCreateSafeAreaPadding();
+        float safeLeft = innerSafePadding.left.value_or(0.0f);
+        float safeRight = innerSafePadding.right.value_or(0.0f);
+        float safeTop = innerSafePadding.top.value_or(0.0f);
+        float safeBottom = innerSafePadding.bottom.value_or(0.0f);
+        minOffsetX = std::max(minOffsetX, safeLeft - barLeft);
+        maxOffsetX = std::min(maxOffsetX, tabsWidth - safeRight - barLeft - barWidth);
+        minOffsetY = std::max(minOffsetY, safeTop - barTop);
+        maxOffsetY = std::min(maxOffsetY, tabsHeight - safeBottom - barTop - barHeight);
     }
 
     float clampedX = std::clamp(offsetX, minOffsetX, std::max(minOffsetX, maxOffsetX));
