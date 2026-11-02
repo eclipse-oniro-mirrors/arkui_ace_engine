@@ -15,6 +15,8 @@
 
 #include "bridge/cj_frontend/interfaces/cj_ffi/cj_gesture_ffi.h"
 
+#include <memory>
+
 #include "cj_gesture_native.h"
 #include "cj_gesture_recognizer_ffi.h"
 #include "cj_lambda.h"
@@ -253,8 +255,13 @@ std::function<void(const GestureEvent& event)> FormatGestureEvenFunctionV2(void 
 
         auto& fingerList = event.GetFingerList();
         ffiGestureEvent.fingerListSize = static_cast<int32_t>(fingerList.size());
-        ffiGestureEvent.fingerList = new CJFingerInfo[fingerList.size()];
+        std::unique_ptr<CJFingerInfo[]> fingerListGuard = std::make_unique<CJFingerInfo[]>(fingerList.size());
+        ffiGestureEvent.fingerList = fingerListGuard.get();
         TransformNativeCJFingerInfo(ffiGestureEvent.fingerList, fingerList);
+        std::unique_ptr<CJFingerInfoExtra[]> fingerExtraListGuard =
+            std::make_unique<CJFingerInfoExtra[]>(fingerList.size());
+        ffiGestureEvent.fingerExtraList = fingerExtraListGuard.get();
+        TransformNativeCJFingerInfoExtra(ffiGestureEvent.fingerExtraList, fingerList);
 
         ffiGestureEvent.target = &ffiEventTarget;
         ffiGestureEvent.timestamp = event.GetTimeStamp().time_since_epoch().count();
@@ -279,9 +286,6 @@ std::function<void(const GestureEvent& event)> FormatGestureEvenFunctionV2(void 
         ffiGestureEvent.deviceId = event.GetDeviceId();
         ffiGestureEvent.baseEventInfoPtr = dynamic_cast<const BaseEventInfo*>(&event);
         ffiOnAction(ffiGestureEvent);
-        if (ffiGestureEvent.fingerList != nullptr) {
-            delete[] ffiGestureEvent.fingerList;
-        }
     };
     return result;
 }
