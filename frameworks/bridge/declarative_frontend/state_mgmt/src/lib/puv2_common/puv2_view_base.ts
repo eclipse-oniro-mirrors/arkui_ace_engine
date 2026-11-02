@@ -587,13 +587,17 @@ abstract class PUV2ViewBase extends ViewBuildNodeBase {
     stateMgmtConsole.debug(`${this.debugInfo__()}: start processing WithEnv tree state ${treeState}`);
     let needUpdated: boolean = false;
     this.__getEnvPropertyNameToKey__Internal().forEach(([varName, key]) => {
-      const storeProp = ObserveV2.ENV_PREFIX + varName;
-      if (!EnvV2.isDirectQuerySystemEnvKey(key) || !Object.prototype.hasOwnProperty.call(this, storeProp)) {
+      if (!EnvV2.isDirectQuerySystemEnvKey(key)) {
         return;
       }
+      const storeProp = ObserveV2.ENV_PREFIX + varName;
       const defaultValue = EnvV2.getDirectQuerySystemEnvDefaultValue(key);
       const effectiveValue = isAttached ? this.findEnvValueByKey(key) ?? defaultValue : defaultValue;
-      if (this[storeProp] !== effectiveValue) {
+      // An uninitialized backing store means the property has not been read yet. Compare against the default
+      // value, mirroring the @CustomEnv local-value seeding below, so the first attach reports a change and
+      // notifies @Watch when the backend value differs from the default.
+      const hasStore = Object.prototype.hasOwnProperty.call(this, storeProp);
+      if ((hasStore ? this[storeProp] : defaultValue) !== effectiveValue) {
         this[storeProp] = effectiveValue;
         ObserveV2.getObserve().fireChange(this, varName);
         this.__notifyDecoratedWatch__Internal(varName);
