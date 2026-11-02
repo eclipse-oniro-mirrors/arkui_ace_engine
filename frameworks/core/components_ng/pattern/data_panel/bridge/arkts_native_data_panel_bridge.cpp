@@ -35,7 +35,6 @@ namespace {
 const char* DATA_PANEL_NODEPTR_OF_UINODE = "nodePtr_";
 } // namespace
 namespace OHOS::Ace::NG {
-uint32_t DataPanelBridge::dataPanelType_ = 0;
 namespace {
 constexpr int32_t NUM_0 = 0;
 constexpr int32_t NUM_1 = 1;
@@ -376,7 +375,6 @@ ArkUINativeModuleValue DataPanelBridge::CreateDataPanel(ArkUIRuntimeCallInfo* ru
     if (type == static_cast<int32_t>(ChartType::LINE)) {
         dataPanelType = 1;
     }
-    dataPanelType_ = dataPanelType;
     auto nodeModifiers = GetArkUINodeModifiers();
     CHECK_NULL_RETURN(nodeModifiers, panda::JSValueRef::Undefined(vm));
     nodeModifiers->getDataPanelModifier()->createModel(dataValues, max, dataPanelType);
@@ -684,7 +682,10 @@ ArkUINativeModuleValue DataPanelBridge::SetDataPanelBorderRadius(ArkUIRuntimeCal
     std::vector<JSCallbackInfoType> checkList { JSCallbackInfoType::STRING, JSCallbackInfoType::NUMBER,
         JSCallbackInfoType::OBJECT };
     if (!CheckJSCallbackInfo(vm, "JsBorderRadius", firstArg, checkList)) {
-        if (dataPanelType_ != TYPE_CYCLE) {
+        ArkTSUtils::GetNativeNode(vm, firstArg, nativeNode);
+        auto* frameNode = reinterpret_cast<FrameNode*>(nativeNode);
+        uint32_t currentType = frameNode ? DataPanelModelNG::GetDataPanelType(frameNode) : TYPE_CYCLE;
+        if (currentType != TYPE_CYCLE) {
             RefPtr<DataPanelTheme> theme = GetTheme<DataPanelTheme>();
             CHECK_NULL_RETURN(theme, panda::JSValueRef::Undefined(vm));
             ViewAbstractModel::GetInstance()->SetBorderRadius(theme->GetDefaultBorderRadius());
