@@ -19,6 +19,10 @@
 #include "adapter/ohos/capability/html/html_to_span.h"
 #include "base/log/event_report.h"
 
+#ifdef SYSTEM_CLIPBOARD_SUPPORTED
+#include "pasteboard_client.h"
+#endif
+
 namespace OHOS::Ace {
 namespace {
 #ifndef SYSTEM_CLIPBOARD_SUPPORTED
@@ -52,6 +56,8 @@ MiscServices::ShareOption TransitionCopyOption(CopyOptions copyOption)
 }
 
 const std::string SPAN_STRING_TAG = "openharmony.styled-string";
+static std::string GetMimeType(
+    const std::map<std::string, std::shared_ptr<MiscServices::EntryValue>>& multiTypeDataMap);
 #endif
 
 void ClipboardImpl::HasData(const std::function<void(bool hasData, bool isAutoFill)>& callback)
@@ -242,8 +248,8 @@ void ClipboardImpl::AddMultiTypeRecord(
 }
 
 #ifdef SYSTEM_CLIPBOARD_SUPPORTED
-const std::string ClipboardImpl::GetMimeType(
-    std::map<std::string, std::shared_ptr<OHOS::MiscServices::EntryValue>> multiTypeDataMap)
+std::string GetMimeType(
+    const std::map<std::string, std::shared_ptr<OHOS::MiscServices::EntryValue>>& multiTypeDataMap)
 {
     std::string mimeType;
     if (multiTypeDataMap.find(OHOS::MiscServices::MIMETYPE_TEXT_HTML) != multiTypeDataMap.end()) {
