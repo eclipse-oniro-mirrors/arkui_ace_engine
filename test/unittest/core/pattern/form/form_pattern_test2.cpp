@@ -758,7 +758,7 @@ HWTEST_F(FormPatternTest2, FormPatternTest_OnRebuildFrame_002, TestSize.Level1)
 
 /**
  * @tc.name: FormPatternTest_HandleStaticFormEvent_002
- * @tc.desc: HandleStaticFormEvent with isDynamic_=false and shouldResponseClick_=true and linkRect in region
+ * @tc.desc: HandleStaticFormEvent with isDynamic_=false and shouldResponseClick_=RESPONSIBLE and linkRect in region
  * @tc.type: FUNC
  */
 HWTEST_F(FormPatternTest2, FormPatternTest_HandleStaticFormEvent_002, TestSize.Level1)
@@ -767,9 +767,9 @@ HWTEST_F(FormPatternTest2, FormPatternTest_HandleStaticFormEvent_002, TestSize.L
     auto pattern = formNode->GetPattern<FormPattern>();
     EXPECT_NE(pattern, nullptr);
 
-    // isDynamic_ = false, shouldResponseClick_ = true, valid formLinkInfos with action
+    // isDynamic_ = false, shouldResponseClick_ = RESPONSIBLE, valid formLinkInfos with action
     pattern->isDynamic_ = false;
-    pattern->shouldResponseClick_ = true;
+    pattern->shouldResponseClick_ = ClickResponseState::RESPONSIBLE;
     std::string linkInfo = "{\"action\":\"router\",\"formLinkRect\":\"0 0 100 100\"}";
     std::vector<std::string> infos;
     infos.emplace_back(linkInfo);
@@ -781,8 +781,8 @@ HWTEST_F(FormPatternTest2, FormPatternTest_HandleStaticFormEvent_002, TestSize.L
     touchPoint.SetY(50.0f);
     pattern->HandleStaticFormEvent(touchPoint);
 
-    // shouldResponseClick_ = false, IsAccessibilityState = true
-    pattern->shouldResponseClick_ = false;
+    // shouldResponseClick_ = REJECT_TIMEOUT, IsAccessibilityState = true
+    pattern->shouldResponseClick_ = ClickResponseState::REJECT_TIMEOUT;
     pattern->SetAccessibilityState(true);
     pattern->HandleStaticFormEvent(touchPoint);
     pattern->SetAccessibilityState(false);

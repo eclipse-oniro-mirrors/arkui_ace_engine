@@ -210,6 +210,7 @@ void FormPattern::InitClickEvent()
         CHECK_NULL_VOID(formPattern);
         formPattern->HandleStaticFormEvent(
             { static_cast<float>(info.GetLocalLocation().GetX()), static_cast<float>(info.GetLocalLocation().GetY()) });
+        formPattern->shouldResponseClick_ = ClickResponseState::DEFAULT;
     };
     auto clickEvent = AceType::MakeRefPtr<ClickEvent>(std::move(clickCallback));
     gestureEventHub->AddClickEvent(clickEvent);
@@ -236,7 +237,7 @@ void FormPattern::HandleTouchDownEvent(const TouchEventInfo& event)
 {
     TAG_LOGI(AceLogTag::ACE_FORM, "handle touch down.");
     touchDownTime_ = event.GetTimeStamp();
-    shouldResponseClick_ = true;
+    shouldResponseClick_ = ClickResponseState::RESPONSIBLE;
     if (!event.GetTouches().empty()) {
         lastTouchLocation_ = event.GetTouches().front().GetScreenLocation();
     }
@@ -247,7 +248,7 @@ void FormPattern::HandleTouchUpEvent(const TouchEventInfo& event)
     auto duration = event.GetTimeStamp().time_since_epoch().count() - touchDownTime_.time_since_epoch().count();
     if (duration > MAX_CLICK_DURATION) {
         TAG_LOGI(AceLogTag::ACE_FORM, "reject click. duration is %{public}lld.", duration);
-        shouldResponseClick_ = false;
+        shouldResponseClick_ = ClickResponseState::REJECT_TIMEOUT;
         return;
     }
     if (event.GetTouches().empty()) {
@@ -256,7 +257,7 @@ void FormPattern::HandleTouchUpEvent(const TouchEventInfo& event)
     auto distance = event.GetTouches().front().GetScreenLocation() - lastTouchLocation_;
     if (distance.GetDistance() > FORM_CLICK_OPEN_LIMIT_DISTANCE) {
         TAG_LOGI(AceLogTag::ACE_FORM, "reject click. distance exceeded the limit.");
-        shouldResponseClick_ = false;
+        shouldResponseClick_ = ClickResponseState::REJECT_SLIDE;
     }
 }
 
@@ -346,8 +347,9 @@ void FormPattern::HandleStaticFormEvent(const PointF& touchPoint)
         TAG_LOGE(AceLogTag::ACE_FORM, "dynamic form.");
         return;
     }
-    if (!shouldResponseClick_ && !IsAccessibilityState()) {
-        TAG_LOGE(AceLogTag::ACE_FORM, "shouldResponseClick_ is false.");
+    if (shouldResponseClick_ == ClickResponseState::REJECT_TIMEOUT  ||
+        shouldResponseClick_ == ClickResponseState::REJECT_SLIDE) {
+        TAG_LOGE(AceLogTag::ACE_FORM, "shouldResponseClick_ is not RESPONSIBLE.");
         return;
     }
     TAG_LOGI(AceLogTag::ACE_FORM, "StaticFrom click.");

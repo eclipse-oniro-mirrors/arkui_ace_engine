@@ -110,6 +110,17 @@ enum class FormChildNodeType : int32_t {
     DUE_CONTROL_IMAGE_NODE,
 };
 
+enum class ClickResponseState : int32_t {
+    // Initial/default state: no touch down has occurred yet.
+    DEFAULT = 0,
+    // Touch down occurred and no reject condition has been met; click may proceed.
+    RESPONSIBLE = 1,
+    // Touch up rejected because duration exceeded MAX_CLICK_DURATION.
+    REJECT_TIMEOUT = 2,
+    // Touch up rejected because movement distance exceeded FORM_CLICK_OPEN_LIMIT_DISTANCE.
+    REJECT_SLIDE = 3,
+};
+
 class FormPattern : public Pattern, public FormLayoutWrapper {
     DECLARE_ACE_TYPE(FormPattern, Pattern);
 
@@ -362,7 +373,7 @@ private:
     std::string localeTag_ = AceApplicationInfo::GetInstance().GetLocaleTag();
     std::vector<std::string> formLinkInfos_;
     TimeStamp touchDownTime_;
-    bool shouldResponseClick_ = false;
+    ClickResponseState shouldResponseClick_ = ClickResponseState::DEFAULT;
     Offset lastTouchLocation_;
     ColorMode colorMode = ColorMode::LIGHT;
 
