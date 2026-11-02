@@ -75,6 +75,8 @@ LazyForEachNode::~LazyForEachNode()
         UnregisterWindowStateChangedCallback();
         UnregisterMemoryLevelChangedCallback();
     }
+    // The controller holds only a weak reference to this node: a node destroyed in
+    // the meantime expires the weak reference automatically, no notify-back needed.
     CHECK_NULL_VOID(builder_);
     if (isRegisterListener_) {
         builder_->UnregisterDataChangeListener(this);
@@ -963,13 +965,25 @@ void LazyForEachNode::TryExecuteScheduledCacheTask()
     }
 }
 
-void LazyForEachNode::CleanCache(bool syncClean)
+bool LazyForEachNode::TryBindController()
+{
+    // Creation-time immutable binding: keep the first controller, ignore later binds
+    // (a re-executed LazyForEach create with a different options.controller must not
+    // re-bind; the controller side is one-to-one, last-bind-wins).
+    if (controllerBound_) {
+        return false;
+    }
+    controllerBound_ = true;
+    return true;
+}
+
+void LazyForEachNode::CleanCache(bool syncClean, bool clearAll)
 {
     TAG_LOGI(AceLogTag::ACE_LAZY_FOREACH,
         "LazyForEach.CleanCache id[%{public}d] syncClean[%{public}d]", GetId(), syncClean);
     ACE_SCOPED_TRACE("LazyForEach.CleanCache id[%d] syncClean[%d]", GetId(), syncClean);
     if (builder_) {
-        builder_->CleanCache(syncClean);
+        builder_->CleanCache(syncClean, clearAll);
     }
     pendingCleanCache_ = false;
     pendingRestoreCache_ = false;

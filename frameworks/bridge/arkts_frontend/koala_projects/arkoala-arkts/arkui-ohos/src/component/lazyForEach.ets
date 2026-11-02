@@ -18,9 +18,10 @@
 
 import { __context, __id, remember } from '@koalaui/runtime'
 import { int32 } from "@koalaui/common"
-import { DynamicNode, OnMoveHandler, ItemDragEventHandler, LazyForEachOptions, DataOperation } from '#generated'
+import { DynamicNode, OnMoveHandler, ItemDragEventHandler, LazyForEachOptions, DataOperation, LazyForEachOps } from '#generated'
 import { LazyForEachImplForOptions } from '../base/LazyForEachImpl'
 import { InteropNativeModule } from '@koalaui/interop'
+import { LazyNodePeer } from '../base/SyntaxNodeBase'
 
 export interface DataChangeListener {
     onDataReloaded(): void;
@@ -56,6 +57,41 @@ export interface IDataSource<T> {
      * @since 7
      */
     unregisterDataChangeListener(listener: DataChangeListener): void;
+}
+
+/**
+ * Controller actively releasing the prebuilt cache of the LazyForEach component it is
+ * bound to (@since 26.1.0). One controller controls exactly one LazyForEach; the binding
+ * is established once at creation through LazyForEachOptions.controller and is immutable
+ * afterwards on the component side, while binding the controller to another LazyForEach
+ * replaces the previous binding (last-bind-wins). Pure TS implementation: the node is
+ * tracked weakly, so a destroyed LazyForEach results in a safe no-op clearCache().
+ */
+export class LazyForEachController {
+    private node?: WeakRef<LazyNodePeer> = undefined;
+
+    constructor() {
+    }
+
+    /**
+     * Actively releases the prebuilt cache of the bound (still-alive) LazyForEach.
+     * @since 26.1.0
+     */
+    clearCache(): void {
+        const node = this.node?.deref();
+        if (node === undefined) {
+            return;
+        }
+        LazyForEachOps.ClearCache(node.getPeerPtr());
+    }
+
+    // Records the lazy node of a LazyForEach that received this controller through
+    // LazyForEachOptions.controller. Called when the node is created; one-to-one,
+    // last-bind-wins: binding this controller to another LazyForEach replaces the
+    // previous binding
+    __bindNode__Internal(node: LazyNodePeer): void {
+        this.node = new WeakRef<LazyNodePeer>(node);
+    }
 }
 
 export interface LazyForEachAttribute<T> extends DynamicNode {

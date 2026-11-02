@@ -68,7 +68,8 @@ class ViewInterop extends PUV2ViewBase implements IView {
     public UpdateElement(elmtId: number): void {
         throw new BusinessError(NOT_IMPLEMENT, `UpdateElement method does not implement in ViewInterop`);
     }
-    public __mkRepeatAPI: <I>(arr: Array<I>) => RepeatAPI<I> = <I>(arr: Array<I>): RepeatAPI<I> => {
+    public __mkRepeatAPI: <I>(arr: Array<I>, options?: RepeatOptions) => RepeatAPI<I> =
+        <I>(arr: Array<I>, options?: RepeatOptions): RepeatAPI<I> => {
         throw new BusinessError(NOT_IMPLEMENT, `__mkRepeatAPI method does not implement in ViewInterop`);
     };
     public get localStorage_(): LocalStorage {

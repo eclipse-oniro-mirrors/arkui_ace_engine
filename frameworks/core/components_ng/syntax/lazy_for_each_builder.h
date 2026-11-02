@@ -273,7 +273,7 @@ public:
         enablePreBuild_ = enable;
     }
 
-    void CleanCache(bool syncClean);
+    void CleanCache(bool syncClean, bool clearAll = false);
     void RestoreCache();
     int32_t ReduceCacheCount(int32_t count);
     void ProcessNodesForCleanCache(const std::unordered_map<std::string, LazyForEachCacheChild>& cache);
@@ -404,6 +404,7 @@ private:
     bool useNewInterface_ = false;
     bool enablePreBuild_ = true;
     bool reduceCache_ = false;
+    bool clearAllCache_ = false;
 
     std::unordered_map<int32_t, WeakPtr<UINode>> syncLoadCache_;
     bool enableSyncLoad_ = true;

@@ -16,6 +16,7 @@
 #include "core/components_ng/syntax/arkoala_lazy_node.h"
 
 #include "base/log/dump_log.h"
+#include "base/utils/system_properties.h"
 #include "core/components_ng/pattern/list/list_item_pattern.h"
 #include "core/components_ng/render/animation_utils.h"
 #ifdef ENABLE_ROSEN_BACKEND
@@ -169,6 +170,12 @@ void ArkoalaLazyNode::ProcessRepeatNodeCleanup(bool isRepeat)
 
 void ArkoalaLazyNode::PurgeNode()
 {
+    // Non-scroll parent (see CleanCache): every child is on screen and IsInCacheRange is false
+    // for all indexes under the never-set {-1,-1,-1,-1} range — skip, or this idle-task
+    // backstop would drop the whole node4Index_ map.
+    if (needBuildAll_) {
+        return;
+    }
     std::vector<int32_t> removingIndex;
     for (const auto& [index, node] : node4Index_) {
         const auto indexMapped = ConvertFromToIndexRevert(index);
@@ -947,32 +954,65 @@ void ArkoalaLazyNode::TryExecuteScheduledCacheTask()
     }
 }
 
-void ArkoalaLazyNode::CleanCache(bool syncClean)
+int32_t ArkoalaLazyNode::GetMaxCacheCountForMemOpt(bool clearAll)
+{
+    if (clearAll) {
+        return 0;
+    }
+    return SystemProperties::GetBootVendorDdrSize() <= LOW_MEMORY_DDR_THRESHOLD_GB ? 0
+        : MAX_CACHED_COUNT_FOR_MEMORY_OPTIMIZATION;
+}
+
+ActiveRangeParam ArkoalaLazyNode::GetReducedCacheRangeParam(bool clearAll) const
+{
+    if (activeRangeParam_.start < 0 || activeRangeParam_.end < 0) {
+        // Never laid out: parity with dynamic startIndex_/endIndex_ == -1 -> retain nothing.
+        return { activeRangeParam_.start, activeRangeParam_.end, 0, 0 };
+    }
+    const auto maxCacheCount = GetMaxCacheCountForMemOpt(clearAll);
+    return { activeRangeParam_.start, activeRangeParam_.end,
+        std::min(std::max(activeRangeParam_.cacheStart, 0), maxCacheCount),
+        std::min(std::max(activeRangeParam_.cacheEnd, 0), maxCacheCount) };
+}
+
+void ArkoalaLazyNode::CleanCache(bool syncClean, bool clearAll)
 {
     if (isRepeat_ &&
-        repeatMemoryOptimizationStrategy_ == RepeatMemoryOptimizationStrategy::ENABLE_AUTO_CACHE_OPTIMIZATION) {
+        (repeatMemoryOptimizationStrategy_ == RepeatMemoryOptimizationStrategy::ENABLE_AUTO_CACHE_OPTIMIZATION ||
+        clearAll)) {
         clearCache_();
         return;
     }
-    if (!isRepeat_ && options_.memOptStrategy == LazyForEachMemOptStrategy::ENABLE_AUTO_CACHE_OPTIMIZATION) {
+    // Non-scroll parent (e.g. Column): needBuildAll_ keeps every child active on screen and no
+    // range is ever received (activeRangeParam_ stays {-1,-1,-1,-1}), so there is no idle cache
+    // to release — parity with dynamic LazyForEachBuilder::CleanCache, which only touches L2
+    // expiringItem_ and releases 0 nodes in this case, even for clearAll.
+    if (!isRepeat_ && !needBuildAll_ &&
+        (options_.memOptStrategy == LazyForEachMemOptStrategy::ENABLE_AUTO_CACHE_OPTIMIZATION || clearAll)) {
         auto weak = AceType::WeakClaim(this);
         const auto activeRange = activeRangeParam_;
-        // delete nodes in preload area
-        node4Index_.RemoveIf([weak, activeRange](const uint32_t& k, const auto& _) {
+        // Release-count parity with LazyForEachBuilder::CleanCache: nodes in the active range are
+        // never released, idle cache beyond the reduced band is released.
+        const auto keptRange = GetReducedCacheRangeParam(clearAll);
+        const bool retainNothing = activeRange.start < 0 || activeRange.end < 0;
+        node4Index_.RemoveIf([weak, activeRange, keptRange, retainNothing](const uint32_t& k, const auto& _) {
             auto node = weak.Upgrade();
             CHECK_NULL_RETURN(node, false);
-            auto willRelease = !node->IsInActiveRange(static_cast<int32_t>(k), activeRange);
-            if (willRelease) {
-                node->releaseItemByIndex_(k);
+            const auto indexMapped = node->ConvertFromToIndexRevert(static_cast<int32_t>(k));
+            auto willRelease = !node->IsInActiveRange(indexMapped, activeRange) &&
+                (retainNothing || !node->IsInCacheRange(indexMapped, keptRange));
+            if (willRelease && node->releaseItemByIndex_) {
+                node->releaseItemByIndex_(indexMapped);
             }
             return willRelease;
         });
         if (updateRange_) {
-            // trigger TS-side
-            updateRange_(activeRangeParam_.start, activeRangeParam_.end, 0, 0, isLoop_);
+            // trigger TS-side with the same reduced band, so TS keeps the retained items.
+            updateRange_(activeRangeParam_.start, activeRangeParam_.end,
+                keptRange.cacheStart, keptRange.cacheEnd, isLoop_);
         }
     }
-    
+
     pendingCleanCache_ = false;
     pendingRestoreCache_ = false;
     if (!syncClean) {
@@ -982,7 +1022,10 @@ void ArkoalaLazyNode::CleanCache(bool syncClean)
 
 void ArkoalaLazyNode::RestoreCache()
 {
-    if (!isRepeat_ &&
+    // Non-scroll parent (see CleanCache): nothing was released on hide, so there is no cache
+    // band to restore; also skip updateRange_, which would prune every TS-side item when
+    // driven with the never-set {-1,-1,-1,-1} range.
+    if (!isRepeat_ && !needBuildAll_ &&
         options_.memOptStrategy == LazyForEachMemOptStrategy::ENABLE_AUTO_CACHE_OPTIMIZATION) {
         for (auto i = 0;i < totalCount_; i++) {
             if (IsInCacheRange(i, activeRangeParam_) && !IsInActiveRange(i, activeRangeParam_)) {

@@ -42,6 +42,7 @@ import { StateMgmtDFX, StateUpdateLoop } from './stateManagement'
 import { AceTrace } from 'arkui/base/AceTrace'
 import { flushBuilderRootNode } from './BuilderNode'
 import { EnvDecoratedVariable } from './stateManagement/decoratorImpl/decoratorEnv';
+import { isNeedDestroyImmediately } from './base/SyntaxNodeBase'
 
 setCustomEventsChecker(checkArkoalaCallbacks)
 
@@ -345,9 +346,13 @@ export class Application {
         switch (MessageType.fromValue(type)) {
             case MessageType.DELETE_DETACHED_ROOT: {
                 result = true
-                scheduleCallback(() => {
+                if (isNeedDestroyImmediately(ptr)) {
                     destroyUiDetachedRoot(ptr, this.instanceId)
-                })
+                } else {
+                    scheduleCallback(() => {
+                        destroyUiDetachedRoot(ptr, this.instanceId)
+                    })
+                }
                 break
             }
             default: {

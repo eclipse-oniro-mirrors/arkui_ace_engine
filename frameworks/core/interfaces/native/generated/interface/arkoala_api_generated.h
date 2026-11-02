@@ -17069,6 +17069,7 @@ typedef struct Ark_LazyForEachOptions {
     Opt_LazyForEachCustomComponentFreezeMode customComponentFreezeMode;
     Opt_LazyForEachReleaseStrategy releaseStrategy;
     Opt_LazyForEachMemOptStrategy memoryOptimizationStrategy;
+    Opt_CustomObject controller;
 } Ark_LazyForEachOptions;
 typedef struct Opt_LazyForEachOptions {
     Ark_Tag tag;
@@ -31291,6 +31292,7 @@ typedef struct GENERATED_ArkUILazyForEachOpsAccessor {
                           const Opt_ItemDragEventHandler* onMoveDragEventOps);
     void (*SetOptions)(Ark_NativePointer node,
                        const Ark_LazyForEachOptions* options);
+    void (*ClearCache)(Ark_NativePointer node);
 } GENERATED_ArkUILazyForEachOpsAccessor;
 
 typedef struct GENERATED_ArkUILazyWaterFlowLayoutExtenderAccessor {

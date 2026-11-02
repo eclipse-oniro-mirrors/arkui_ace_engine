@@ -46,6 +46,7 @@ interface LazyForEachOps {
     static void SyncOnMoveOps(pointer node, Callback_OnMoveFromTo onMoveFromToOps,
         (OnMoveHandler or undefined) onMoveOps, (ItemDragEventHandler or undefined) onMoveDragEventOps);
     static void SetOptions(pointer node, LazyForEachOptions options);
+    static void ClearCache(pointer node);
 };
 
 [Entity=Class]

@@ -121,6 +121,26 @@ class RecycleManager {
     return nodesToRemove;
   }
 
+  // Actively release cached nodes (getDefaultReusePool API): move all cached nodes
+  // (or only the given reuseId group's) to the pending progressive release list with
+  // target size 0. The actual release is done progressively by
+  // releaseCachedNodesProgressive via the request callback.
+  // A non-existent or empty-string reuseId has no side effect; undefined clears all groups.
+  // Nodes already popped for reuse are not affected.
+  public clearCache(reuseId?: string): void {
+    let pendingCount = 0;
+    if (reuseId === undefined) {
+      this.cachedRecycleNodes_.forEach((_, name) => {
+        pendingCount += this.prepareCleanCacheToTargetProgressive(name, 0);
+      });
+    } else {
+      pendingCount = this.prepareCleanCacheToTargetProgressive(reuseId, 0);
+    }
+    if (pendingCount > 0 && this.requestProgressiveReleaseCallback_) {
+      this.requestProgressiveReleaseCallback_();
+    }
+  }
+
   private scheduleCacheCleanTask(name: string): void {
     const existingTimer = this.pendingCacheCleanTimers_.get(name);
     if (existingTimer !== undefined) {
