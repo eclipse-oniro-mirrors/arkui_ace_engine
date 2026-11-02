@@ -142,14 +142,14 @@ bool FrameNodeAdoptedCompensation::HasAdoptedCompensationNonTranslationTransform
     if (FrameNodeAdoptedRenderAdapter::CollectLayers(frameNode, layers) && !layers.empty()) {
         return std::any_of(layers.begin(), layers.end(), [](const auto& layer) {
             auto transform = FrameNodeAdoptedRenderAdapter::GetTransform(layer);
-            transform.SetEntry(TRANSLATION_X_ROW, TRANSLATION_COLUMN, 0.0);
-            transform.SetEntry(TRANSLATION_Y_ROW, TRANSLATION_COLUMN, 0.0);
+            transform.Set(TRANSLATION_X_ROW, TRANSLATION_COLUMN, 0.0);
+            transform.Set(TRANSLATION_Y_ROW, TRANSLATION_COLUMN, 0.0);
             return !transform.IsIdentityMatrix();
         });
     }
     auto transform = GetAdoptedCompensationTransform(frameNode);
-    transform.SetEntry(TRANSLATION_X_ROW, TRANSLATION_COLUMN, 0.0);
-    transform.SetEntry(TRANSLATION_Y_ROW, TRANSLATION_COLUMN, 0.0);
+    transform.Set(TRANSLATION_X_ROW, TRANSLATION_COLUMN, 0.0);
+    transform.Set(TRANSLATION_Y_ROW, TRANSLATION_COLUMN, 0.0);
     return !transform.IsIdentityMatrix();
 }
 
@@ -331,8 +331,8 @@ std::pair<OffsetF, bool> FrameNodeAdoptedCompensation::GetAdoptedCompensationOff
         auto translate = FrameNodeAdoptedRenderAdapter::GetTranslate(layer);
         result += bounds.GetOffset() + translate;
         auto matrix = FrameNodeAdoptedRenderAdapter::GetTransform(layer);
-        matrix.SetEntry(TRANSLATION_X_ROW, TRANSLATION_COLUMN, 0.0);
-        matrix.SetEntry(TRANSLATION_Y_ROW, TRANSLATION_COLUMN, 0.0);
+        matrix.Set(TRANSLATION_X_ROW, TRANSLATION_COLUMN, 0.0);
+        matrix.Set(TRANSLATION_Y_ROW, TRANSLATION_COLUMN, 0.0);
         hasNonTranslationTransform = hasNonTranslationTransform || !matrix.IsIdentityMatrix();
     }
     return { result, hasNonTranslationTransform };

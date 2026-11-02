@@ -4041,6 +4041,10 @@ HWTEST_F(FrameNodeTestNg, FrameNodeAdoptedCompensation001, TestSize.Level1)
     EXPECT_EQ(FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(child.GetRawPtr()),
         OffsetF(10.0f, 20.0f));
     EXPECT_FALSE(FrameNodeAdoptedCompensation::HasAdoptedCompensationNonTranslationTransform(child.GetRawPtr()));
+    auto [translationOnlyOffset, translationOnlyError] =
+        FrameNodeAdoptedCompensation::GetAdoptedCompensationOffsetWithTranslate(child.GetRawPtr());
+    EXPECT_EQ(translationOnlyOffset, OffsetF(10.0f, 20.0f));
+    EXPECT_FALSE(translationOnlyError);
 }
 
 /**

@@ -13,18 +13,17 @@
  * limitations under the License.
  */
 
-#include "gtest/gtest.h"
+#include <vector>
 
-#include "native_interface.h"
-#include "native_node.h"
-#include "native_render.h"
-#include "native_type.h"
+#include "gtest/gtest.h"
 
 #include "frameworks/core/components_ng/base/frame_node.h"
 #include "frameworks/core/components_ng/base/frame_node_adopted_compensation.h"
+#include "frameworks/core/components_ng/base/frame_node_adopted_render_adapter.h"
+#include "frameworks/core/components_ng/base/mount_policy.h"
 #include "frameworks/core/components_ng/pattern/text/text_base.h"
-#include "frameworks/core/components_ng/render/render_context.h"
-#include "interfaces/native/node/node_model.h"
+#include "frameworks/core/components_ng/render/adapter/rosen_render_context.h"
+#include "ui/rs_canvas_node.h"
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "test/mock/frameworks/core/common/mock_container.h"
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
@@ -43,6 +42,7 @@ constexpr int32_t INNER_POSITION_X = 30;
 constexpr int32_t INNER_POSITION_Y = 40;
 constexpr int32_t UPDATED_OUTER_POSITION_X = 20;
 constexpr int32_t UPDATED_OUTER_POSITION_Y = 30;
+constexpr int32_t TWO_LAYERS = 2;
 constexpr float HALF_PIVOT = 0.5f;
 constexpr float TWO_LAYER_SCALE = 2.0f;
 constexpr float INNER_ROTATION = 90.0f;
@@ -100,82 +100,64 @@ public:
 
     void TearDown() override
     {
-        if (identityMatrix_) {
-            OH_ArkUI_Matrix4_Dispose(identityMatrix_);
+        if (parentNode_ && childNode_) {
+            parentNode_->RemoveAdoptedChild(childNode_);
         }
-        if (matrix_) {
-            OH_ArkUI_Matrix4_Dispose(matrix_);
-        }
-        DisposeRenderNode(adoptedRenderNode_);
-        DisposeRenderNode(innerRenderNode_);
-        DisposeRenderNode(outerRenderNode_);
+        adoptedRenderNode_.reset();
+        innerRenderNode_.reset();
+        outerRenderNode_.reset();
+        childNode_.Reset();
+        parentNode_.Reset();
     }
 
 protected:
     void CreateAdoptedNodes()
     {
-        nodeAPI_ = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
-            OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
-        ASSERT_NE(nodeAPI_, nullptr);
-        parentNode_ = nodeAPI_->createNode(ARKUI_NODE_CUSTOM);
-        childNode_ = nodeAPI_->createNode(ARKUI_NODE_CUSTOM);
+        parentNode_ = NG::FrameNode::CreateFrameNode("adoptParent",
+            ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>());
+        childNode_ = NG::FrameNode::CreateFrameNode("adoptedChild",
+            ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>());
         ASSERT_NE(parentNode_, nullptr);
         ASSERT_NE(childNode_, nullptr);
-        ASSERT_EQ(OH_ArkUI_NativeModule_AdoptChildWithPolicy(parentNode_, childNode_,
-            OH_ARKUI_NATIVE_MODULE_ADOPT_POLICY_OVERLAY_POSITION_FOLLOWS_ADOPT_PARENT_CHAIN),
-            ARKUI_ERROR_CODE_NO_ERROR);
-        ASSERT_EQ(OH_ArkUI_NativeModule_SetChildMountPolicy(
-            parentNode_, OH_ARKUI_NODE_MOUNT_POLICY_MIXED), ARKUI_ERROR_CODE_NO_ERROR);
-        ASSERT_EQ(OH_ArkUI_RenderNodeUtils_GetRenderNode(childNode_, &adoptedRenderNode_),
-            ARKUI_ERROR_CODE_NO_ERROR);
+        parentNode_->AdoptChild(childNode_);
+        childFrameNode_ = childNode_.GetRawPtr();
+        NG::FrameNodeAdoptedCompensation::SetUseAdoptedCompensation(childFrameNode_, true);
+        parentNode_->SetMountPolicy(NG::MountPolicy::MIXED);
+        auto childContext = AceType::DynamicCast<NG::RosenRenderContext>(childNode_->GetRenderContext());
+        ASSERT_NE(childContext, nullptr);
+        adoptedRenderNode_ = childContext->GetRSNode();
         ASSERT_NE(adoptedRenderNode_, nullptr);
-        childFrameNode_ = reinterpret_cast<NG::FrameNode*>(childNode_->uiNodeHandle);
-        ASSERT_NE(childFrameNode_, nullptr);
     }
 
     void MountTwoLayerTree()
     {
-        outerRenderNode_ = OH_ArkUI_RenderNodeUtils_CreateNode();
-        innerRenderNode_ = OH_ArkUI_RenderNodeUtils_CreateNode();
+        outerRenderNode_ = Rosen::RSCanvasNode::Create();
+        innerRenderNode_ = Rosen::RSCanvasNode::Create();
         ASSERT_NE(outerRenderNode_, nullptr);
         ASSERT_NE(innerRenderNode_, nullptr);
-        ASSERT_EQ(OH_ArkUI_RenderNodeUtils_SetSize(outerRenderNode_, NODE_SIZE, NODE_SIZE),
-            ARKUI_ERROR_CODE_NO_ERROR);
-        ASSERT_EQ(OH_ArkUI_RenderNodeUtils_SetPosition(
-            outerRenderNode_, OUTER_POSITION_X, OUTER_POSITION_Y), ARKUI_ERROR_CODE_NO_ERROR);
-        ASSERT_EQ(OH_ArkUI_RenderNodeUtils_SetPivot(outerRenderNode_, HALF_PIVOT, HALF_PIVOT),
-            ARKUI_ERROR_CODE_NO_ERROR);
-        ASSERT_EQ(OH_ArkUI_RenderNodeUtils_SetScale(outerRenderNode_, TWO_LAYER_SCALE, TWO_LAYER_SCALE),
-            ARKUI_ERROR_CODE_NO_ERROR);
-        ASSERT_EQ(OH_ArkUI_RenderNodeUtils_SetSize(innerRenderNode_, NODE_SIZE, INNER_NODE_HEIGHT),
-            ARKUI_ERROR_CODE_NO_ERROR);
-        ASSERT_EQ(OH_ArkUI_RenderNodeUtils_SetPosition(
-            innerRenderNode_, INNER_POSITION_X, INNER_POSITION_Y), ARKUI_ERROR_CODE_NO_ERROR);
-        ASSERT_EQ(OH_ArkUI_RenderNodeUtils_SetPivot(innerRenderNode_, 0.0f, 0.0f),
-            ARKUI_ERROR_CODE_NO_ERROR);
-        ASSERT_EQ(OH_ArkUI_RenderNodeUtils_SetRotation(innerRenderNode_, 0.0f, 0.0f, INNER_ROTATION),
-            ARKUI_ERROR_CODE_NO_ERROR);
-        ASSERT_EQ(OH_ArkUI_RenderNodeUtils_AddRenderNode(parentNode_, outerRenderNode_),
-            ARKUI_ERROR_CODE_NO_ERROR);
-        ASSERT_EQ(OH_ArkUI_RenderNodeUtils_AddChild(outerRenderNode_, innerRenderNode_),
-            ARKUI_ERROR_CODE_NO_ERROR);
-        ASSERT_EQ(OH_ArkUI_RenderNodeUtils_AddChild(innerRenderNode_, adoptedRenderNode_),
-            ARKUI_ERROR_CODE_NO_ERROR);
+        outerRenderNode_->SetBounds(OUTER_POSITION_X, OUTER_POSITION_Y, NODE_SIZE, NODE_SIZE);
+        outerRenderNode_->SetPivot(HALF_PIVOT, HALF_PIVOT);
+        outerRenderNode_->SetScale(TWO_LAYER_SCALE, TWO_LAYER_SCALE);
+        innerRenderNode_->SetBounds(INNER_POSITION_X, INNER_POSITION_Y, NODE_SIZE, INNER_NODE_HEIGHT);
+        innerRenderNode_->SetPivot(0.0f, 0.0f);
+        innerRenderNode_->SetRotation(INNER_ROTATION);
+        auto parentContext = AceType::DynamicCast<NG::RosenRenderContext>(parentNode_->GetRenderContext());
+        ASSERT_NE(parentContext, nullptr);
+        parentContext->InsertPureRenderChildAt(outerRenderNode_, -1);
+        outerRenderNode_->AddChild(innerRenderNode_, -1);
+        innerRenderNode_->AddChild(adoptedRenderNode_, -1);
     }
 
     void SetTwoLayerCompensation()
     {
-        const float compensationElements[] = {
-            0.0f, TWO_LAYER_SCALE, 0.0f, 0.0f,
-            -TWO_LAYER_SCALE, 0.0f, 0.0f, 0.0f,
-            0.0f, 0.0f, 1.0f, 0.0f,
-            MATRIX_OFFSET_X, MATRIX_OFFSET_Y, 0.0f, 1.0f,
-        };
-        matrix_ = OH_ArkUI_Matrix4_CreateByElements(compensationElements);
-        ASSERT_NE(matrix_, nullptr);
-        ArkUI_PointF offset = { DEVELOPER_OFFSET_X, DEVELOPER_OFFSET_Y };
-        ASSERT_EQ(OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation(
-            childNode_, &offset, matrix_), ARKUI_ERROR_CODE_NO_ERROR);
+        // Matrix4's constructor takes row-major elements; preserve the original C API matrix.
+        Matrix4 transform(
+            0.0, -TWO_LAYER_SCALE, 0.0, MATRIX_OFFSET_X,
+            TWO_LAYER_SCALE, 0.0, 0.0, MATRIX_OFFSET_Y,
+            0.0, 0.0, 1.0, 0.0,
+            0.0, 0.0, 0.0, 1.0);
+        NG::FrameNodeAdoptedCompensation::SetAdoptedCompensation(childFrameNode_,
+            NG::OffsetF(DEVELOPER_OFFSET_X, DEVELOPER_OFFSET_Y), transform);
     }
 
     void SetUpTwoLayerScenario()
@@ -183,6 +165,17 @@ protected:
         ASSERT_NO_FATAL_FAILURE(CreateAdoptedNodes());
         ASSERT_NO_FATAL_FAILURE(MountTwoLayerTree());
         ASSERT_NO_FATAL_FAILURE(SetTwoLayerCompensation());
+        ASSERT_NO_FATAL_FAILURE(RebuildAndVerifyLayers(TWO_LAYERS));
+    }
+
+    void RebuildAndVerifyLayers(size_t expectedLayerCount)
+    {
+        // MIXED children are attached to the parent's RS node during render-tree sync.
+        parentNode_->MarkNeedSyncRenderTree();
+        parentNode_->RebuildRenderContextTree();
+        std::vector<NG::FrameNodeAdoptedRenderAdapter::RSNodePtr> layers;
+        ASSERT_TRUE(NG::FrameNodeAdoptedRenderAdapter::CollectLayers(childFrameNode_, layers));
+        ASSERT_EQ(layers.size(), expectedLayerCount);
     }
 
     void VerifyTwoLayerPointGeometry()
@@ -235,17 +228,14 @@ protected:
 
     void VerifyLiveLayerAndDeveloperSeparation()
     {
-        ASSERT_EQ(OH_ArkUI_RenderNodeUtils_SetPosition(
-            outerRenderNode_, UPDATED_OUTER_POSITION_X, UPDATED_OUTER_POSITION_Y), ARKUI_ERROR_CODE_NO_ERROR);
+        outerRenderNode_->SetBounds(
+            UPDATED_OUTER_POSITION_X, UPDATED_OUTER_POSITION_Y, NODE_SIZE, NODE_SIZE);
         auto transformedOffset = NG::FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(
             childFrameNode_);
         EXPECT_NEAR(transformedOffset.GetX(), EXPECTED_UPDATED_OFFSET_X, TEST_TOLERANCE);
         EXPECT_NEAR(transformedOffset.GetY(), EXPECTED_UPDATED_OFFSET_Y, TEST_TOLERANCE);
-        identityMatrix_ = OH_ArkUI_Matrix4_CreateIdentity();
-        ASSERT_NE(identityMatrix_, nullptr);
-        ArkUI_PointF changedOffset = { UPDATED_DEVELOPER_OFFSET_X, UPDATED_DEVELOPER_OFFSET_Y };
-        ASSERT_EQ(OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation(
-            childNode_, &changedOffset, identityMatrix_), ARKUI_ERROR_CODE_NO_ERROR);
+        NG::FrameNodeAdoptedCompensation::SetAdoptedCompensation(childFrameNode_,
+            NG::OffsetF(UPDATED_DEVELOPER_OFFSET_X, UPDATED_DEVELOPER_OFFSET_Y), Matrix4());
         EXPECT_EQ(NG::FrameNodeAdoptedCompensation::GetAdoptedCompensationOffset(childFrameNode_),
             NG::OffsetF(UPDATED_DEVELOPER_OFFSET_X, UPDATED_DEVELOPER_OFFSET_Y));
         EXPECT_TRUE(NG::FrameNodeAdoptedCompensation::GetAdoptedCompensationTransform(
@@ -267,31 +257,17 @@ protected:
 
     void MountTranslationLayerAndSetCompensation()
     {
-        outerRenderNode_ = OH_ArkUI_RenderNodeUtils_CreateNode();
+        outerRenderNode_ = Rosen::RSCanvasNode::Create();
         ASSERT_NE(outerRenderNode_, nullptr);
-        ASSERT_EQ(OH_ArkUI_RenderNodeUtils_SetSize(outerRenderNode_, NODE_SIZE, INNER_NODE_HEIGHT),
-            ARKUI_ERROR_CODE_NO_ERROR);
-        ASSERT_EQ(OH_ArkUI_RenderNodeUtils_SetPosition(
-            outerRenderNode_, OUTER_POSITION_X, OUTER_POSITION_Y), ARKUI_ERROR_CODE_NO_ERROR);
-        ASSERT_EQ(OH_ArkUI_RenderNodeUtils_SetTranslation(
-            outerRenderNode_, LAYER_TRANSLATION_X, LAYER_TRANSLATION_Y),
-            ARKUI_ERROR_CODE_NO_ERROR);
-        ASSERT_EQ(OH_ArkUI_RenderNodeUtils_AddRenderNode(parentNode_, outerRenderNode_),
-            ARKUI_ERROR_CODE_NO_ERROR);
-        ASSERT_EQ(OH_ArkUI_RenderNodeUtils_AddChild(outerRenderNode_, adoptedRenderNode_),
-            ARKUI_ERROR_CODE_NO_ERROR);
-        const float compensationElements[] = {
-            1.0f, 0.0f, 0.0f, 0.0f,
-            0.0f, 1.0f, 0.0f, 0.0f,
-            0.0f, 0.0f, 1.0f, 0.0f,
-            COMBINED_TRANSLATION_X, COMBINED_TRANSLATION_Y, 0.0f, 1.0f,
-        };
-        matrix_ = OH_ArkUI_Matrix4_CreateByElements(compensationElements);
-        ASSERT_NE(matrix_, nullptr);
-        ArkUI_PointF offset = {
-            static_cast<float>(OUTER_POSITION_X), static_cast<float>(OUTER_POSITION_Y) };
-        ASSERT_EQ(OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation(
-            childNode_, &offset, matrix_), ARKUI_ERROR_CODE_NO_ERROR);
+        outerRenderNode_->SetBounds(OUTER_POSITION_X, OUTER_POSITION_Y, NODE_SIZE, INNER_NODE_HEIGHT);
+        outerRenderNode_->SetTranslate(LAYER_TRANSLATION_X, LAYER_TRANSLATION_Y, 0.0f);
+        auto parentContext = AceType::DynamicCast<NG::RosenRenderContext>(parentNode_->GetRenderContext());
+        ASSERT_NE(parentContext, nullptr);
+        parentContext->InsertPureRenderChildAt(outerRenderNode_, -1);
+        outerRenderNode_->AddChild(adoptedRenderNode_, -1);
+        NG::FrameNodeAdoptedCompensation::SetAdoptedCompensation(childFrameNode_,
+            NG::OffsetF(OUTER_POSITION_X, OUTER_POSITION_Y),
+            Matrix4::CreateTranslate(COMBINED_TRANSLATION_X, COMBINED_TRANSLATION_Y, 0.0));
     }
 
     void VerifyTranslationSemantics()
@@ -314,24 +290,12 @@ protected:
     }
 
 private:
-    static void DisposeRenderNode(ArkUI_RenderNodeHandle& renderNode)
-    {
-        if (!renderNode) {
-            return;
-        }
-        EXPECT_EQ(OH_ArkUI_RenderNodeUtils_DisposeNode(renderNode), ARKUI_ERROR_CODE_NO_ERROR);
-        renderNode = nullptr;
-    }
-
-    ArkUI_NativeNodeAPI_1* nodeAPI_ = nullptr;
-    ArkUI_NodeHandle parentNode_ = nullptr;
-    ArkUI_NodeHandle childNode_ = nullptr;
+    RefPtr<NG::FrameNode> parentNode_;
+    RefPtr<NG::FrameNode> childNode_;
     NG::FrameNode* childFrameNode_ = nullptr;
-    ArkUI_RenderNodeHandle outerRenderNode_ = nullptr;
-    ArkUI_RenderNodeHandle innerRenderNode_ = nullptr;
-    ArkUI_RenderNodeHandle adoptedRenderNode_ = nullptr;
-    ArkUI_Matrix4* matrix_ = nullptr;
-    ArkUI_Matrix4* identityMatrix_ = nullptr;
+    std::shared_ptr<Rosen::RSNode> outerRenderNode_;
+    std::shared_ptr<Rosen::RSNode> innerRenderNode_;
+    std::shared_ptr<Rosen::RSNode> adoptedRenderNode_;
 };
 
 /**
@@ -356,6 +320,7 @@ HWTEST_F(NativeRenderNodeAdoptedCompensationTest, NativeRenderNodeAdopterTest017
 {
     ASSERT_NO_FATAL_FAILURE(CreateAdoptedNodes());
     ASSERT_NO_FATAL_FAILURE(MountTranslationLayerAndSetCompensation());
+    ASSERT_NO_FATAL_FAILURE(RebuildAndVerifyLayers(1));
     VerifyTranslationSemantics();
 }
 
