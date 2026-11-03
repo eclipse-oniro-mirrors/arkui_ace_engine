@@ -3036,6 +3036,16 @@ UIContentErrorCode UIContentImpl::CommonInitialize(
     });
     LOGI("ArkUIInvisibleFreeze: %{public}d", isOpenInvisibleFreeze);
     pipeline->SetOpenInvisibleFreeze(isOpenInvisibleFreeze);
+    // Use metadata to control the default recoverable value of NavDestination when Navigation is recoverable.
+    // Default is true; only "false" explicitly disables it.
+    bool navDestinationRecoverableDefault = !std::any_of(metaData.begin(), metaData.end(),
+        [](const auto& metaDataItem) {
+            return metaDataItem.name == "navDestinationRecoverableDefault" && metaDataItem.value == "false";
+        });
+    LOGD("navDestinationRecoverableDefault: %{public}d", navDestinationRecoverableDefault);
+    if (pipelineContext) {
+        pipelineContext->SetNavDestinationRecoverableDefault(navDestinationRecoverableDefault);
+    }
     // Set sdk version in module json mode
     if (isModelJson) {
         if (pipeline && appInfo) {

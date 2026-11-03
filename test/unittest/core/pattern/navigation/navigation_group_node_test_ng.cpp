@@ -407,6 +407,24 @@ HWTEST_F(NavigationGroupNodeTestNg, RemoveJsChildImmediately006, TestSize.Level1
     NavigationGroupNodeTestNg::TearDownTestCase();
 }
 
+/**
+ * @tc.name: NavDestinationRecoverableDefaultPropertyTest001
+ * @tc.desc: PipelineContext navDestinationRecoverableDefault default is true; set/get round-trip works
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationGroupNodeTestNg, NavDestinationRecoverableDefaultPropertyTest001, TestSize.Level1)
+{
+    NavigationGroupNodeTestNg::SetUpTestCase();
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    EXPECT_EQ(pipeline->GetNavDestinationRecoverableDefault(), true);
+    pipeline->SetNavDestinationRecoverableDefault(false);
+    EXPECT_EQ(pipeline->GetNavDestinationRecoverableDefault(), false);
+    pipeline->SetNavDestinationRecoverableDefault(true);
+    EXPECT_EQ(pipeline->GetNavDestinationRecoverableDefault(), true);
+    NavigationGroupNodeTestNg::TearDownTestCase();
+}
+
 /*
  * @tc.name: HandleBackForHomeOrRelatedDestination001
  * @tc.type: FUNC

@@ -365,6 +365,7 @@ void NavDestinationGroupNode::ToJsonValue(std::unique_ptr<JsonValue>& json, cons
         : "NavDestinationMode::STANDARD", filter);
     json->PutExtAttr("systemTransition", TransitionTypeToString(systemTransitionType_), filter);
     json->PutExtAttr("fullScreenOverlay", isFullScreenOverlay_, filter);
+    json->PutExtAttr("recoverable", recoverable_, filter);
 }
 
 void NavDestinationGroupNode::SystemTransitionPushStart(bool transitionIn)
