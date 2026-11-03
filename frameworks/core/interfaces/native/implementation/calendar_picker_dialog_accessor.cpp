@@ -70,7 +70,7 @@ void BuildDialogPropertiesCallbacks(const Ark_CalendarDialogOptions options, Dia
 DialogProperties BuildDialogProperties(const Ark_CalendarDialogOptions options)
 {
     DialogProperties dialogProps;
-    dialogProps.alignment = DialogAlignment::CENTER;
+    dialogProps.alignment = DialogAlignment::DEFAULT;
     auto blurStyle = Converter::OptConvert<BlurStyle>(options.backgroundBlurStyle);
     if (blurStyle.has_value()) {
         dialogProps.backgroundBlurStyle = static_cast<int32_t>(blurStyle.value());
