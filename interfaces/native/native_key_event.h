@@ -1161,7 +1161,8 @@ typedef struct OH_ArkUI_ApplicationShortcutCallbackInfo OH_ArkUI_ApplicationShor
  *     must remain valid until the shortcut is unregistered.
  * @since 26.2.0
  */
-typedef void (*OH_ArkUI_ApplicationShortcutCallback)(const OH_ArkUI_ApplicationShortcutCallbackInfo* info, void* userData);
+typedef void (*OH_ArkUI_ApplicationShortcutCallback)(
+    const OH_ArkUI_ApplicationShortcutCallbackInfo* info, void* userData);
 
 /**
  * @brief Obtains the UI context of the UI instance where an application-level keyboard shortcut is triggered.
@@ -1185,9 +1186,9 @@ ArkUI_ContextHandle OH_ArkUI_ApplicationShortcutCallbackInfo_GetUIContext(
  * A matching component-level shortcut is triggered before the application-level shortcut.
  *
  * Each registration generates a positive integer registration ID unique within the application, even when the
- * shortcut and callback are identical. Multiple registrations of the same shortcut are retained. All matching registrations
- * are invoked in increasing registration ID order using a snapshot collected for the event. Registration IDs are not reused during the
- * application lifetime.
+ * shortcut and callback are identical. Multiple registrations of the same shortcut are retained.
+ * All matching registrations are invoked in increasing registration ID order using a snapshot collected for the event.
+ * Registration IDs are not reused during the application lifetime.
  *
  * @param key [in] Pointer to a keyboard shortcut key object created by {@link OH_ArkUI_KeyboardShortcutKey_Create}.
  *     The value must not be <b>nullptr</b>. For a character key, the character set through

@@ -53,15 +53,15 @@ static uint8_t GetEventModifierKeys(const KeyEvent& event)
         switch (code) {
             case KeyCode::KEY_CTRL_LEFT:
             case KeyCode::KEY_CTRL_RIGHT:
-                modifiers |= 1;   // CTRL bit
+                modifiers |= static_cast<uint8_t>(ModifierKeyName::ModifierKeyCtrl);
                 break;
             case KeyCode::KEY_SHIFT_LEFT:
             case KeyCode::KEY_SHIFT_RIGHT:
-                modifiers |= 2;   // SHIFT bit
+                modifiers |= static_cast<uint8_t>(ModifierKeyName::ModifierKeyShift);
                 break;
             case KeyCode::KEY_ALT_LEFT:
             case KeyCode::KEY_ALT_RIGHT:
-                modifiers |= 4;   // ALT bit
+                modifiers |= static_cast<uint8_t>(ModifierKeyName::ModifierKeyAlt);
                 break;
             default:
                 break;

@@ -148,6 +148,33 @@ static bool ParseShortcutValue(napi_env env, napi_value arg, std::string& outVal
     return true;
 }
 
+static bool ParseModifierKey(napi_env env, napi_value element, uint8_t& bit)
+{
+    napi_valuetype elementType = napi_undefined;
+    napi_typeof(env, element, &elementType);
+    if (elementType != napi_number) {
+        return false;
+    }
+    double value = 0;
+    if (napi_get_value_double(env, element, &value) != napi_ok || !std::isfinite(value) ||
+        std::trunc(value) != value || value < static_cast<int32_t>(ModifierKey::CTRL) ||
+        value > static_cast<int32_t>(ModifierKey::ALT)) {
+        return false;
+    }
+    switch (static_cast<ModifierKey>(static_cast<int32_t>(value))) {
+        case ModifierKey::CTRL:
+            bit = static_cast<uint8_t>(ModifierKeyName::ModifierKeyCtrl);
+            break;
+        case ModifierKey::SHIFT:
+            bit = static_cast<uint8_t>(ModifierKeyName::ModifierKeyShift);
+            break;
+        case ModifierKey::ALT:
+            bit = static_cast<uint8_t>(ModifierKeyName::ModifierKeyAlt);
+            break;
+    }
+    return true;
+}
+
 // Convert ArkTS ModifierKey enum values to the same bits used by component shortcuts.
 static bool ParseModifierKeys(napi_env env, napi_value arg, uint8_t& outKeys)
 {
@@ -172,28 +199,9 @@ static bool ParseModifierKeys(napi_env env, napi_value arg, uint8_t& outKeys)
         napi_value element = nullptr;
         napi_get_element(env, arg, i, &element);
         CHECK_NULL_RETURN(element, false);
-        napi_valuetype elementType = napi_undefined;
-        napi_typeof(env, element, &elementType);
-        if (elementType != napi_number) {
-            return false;
-        }
-        double value = 0;
-        if (napi_get_value_double(env, element, &value) != napi_ok || !std::isfinite(value) ||
-            std::trunc(value) != value || value < static_cast<int32_t>(ModifierKey::CTRL) ||
-            value > static_cast<int32_t>(ModifierKey::ALT)) {
-            return false;
-        }
         uint8_t bit = 0;
-        switch (static_cast<ModifierKey>(static_cast<int32_t>(value))) {
-            case ModifierKey::CTRL:
-                bit = static_cast<uint8_t>(ModifierKeyName::ModifierKeyCtrl);
-                break;
-            case ModifierKey::SHIFT:
-                bit = static_cast<uint8_t>(ModifierKeyName::ModifierKeyShift);
-                break;
-            case ModifierKey::ALT:
-                bit = static_cast<uint8_t>(ModifierKeyName::ModifierKeyAlt);
-                break;
+        if (!ParseModifierKey(env, element, bit)) {
+            return false;
         }
         if ((keys & bit) != 0) {
             return false;
@@ -238,7 +246,6 @@ static napi_value JSRegisterApplicationShortcut(napi_env env, napi_callback_info
     auto callback = std::make_shared<ApplicationShortcutCallback>(env, argv[ARG_INDEX_TWO]);
     const auto registrationId = AceApplicationInfo::GetInstance().RegisterApplicationShortcut(
         value, keys, [callback](int32_t triggerInstanceId) { callback->Execute(triggerInstanceId); });
-
     if (registrationId == 0) {
         napi_throw_error(env, nullptr, "Application shortcut registration IDs exhausted.");
         return nullptr;

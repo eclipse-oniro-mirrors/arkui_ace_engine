@@ -756,7 +756,8 @@ OH_ArkUI_KeyboardShortcutFunctionKey OH_ArkUI_KeyboardShortcutKey_GetFunctionKey
     const OH_ArkUI_KeyboardShortcutKey* key)
 {
     return key && static_cast<uint32_t>(key->functionKey) <= OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_SPACE ?
-        static_cast<OH_ArkUI_KeyboardShortcutFunctionKey>(key->functionKey) : OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_ESC;
+        static_cast<OH_ArkUI_KeyboardShortcutFunctionKey>(key->functionKey) :
+        OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_ESC;
 }
 
 ArkUI_ContextHandle OH_ArkUI_ApplicationShortcutCallbackInfo_GetUIContext(
@@ -811,7 +812,8 @@ ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Register(const OH_ArkUI_KeyboardSho
             callback(&info, userData);
         });
     if (id == 0) {
-        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_INTERNAL_ERROR, __FUNCTION__, "Application shortcut registration IDs exhausted");
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_INTERNAL_ERROR, __FUNCTION__,
+            "Application shortcut registration IDs exhausted");
         return ARKUI_ERROR_CODE_INTERNAL_ERROR;
     }
     *registrationId = id;
