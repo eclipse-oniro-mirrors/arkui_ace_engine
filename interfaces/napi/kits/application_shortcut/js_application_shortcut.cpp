@@ -23,10 +23,13 @@
 #include "core/common/container.h"
 #include "core/common/container_scope.h"
 #include "core/common/frontend.h"
+#include "core/components/common/layout/constants.h"
+#include "core/event/key_code.h"
 
 namespace OHOS::Ace::Napi {
 namespace {
 constexpr size_t ARGC_REGISTER = 3;
+constexpr uint32_t MAX_MODIFIER_KEYS = 3;
 constexpr size_t ARGC_UNREGISTER = 1;
 constexpr size_t ARG_INDEX_ZERO = 0;
 constexpr size_t ARG_INDEX_ONE = 1;
@@ -145,8 +148,7 @@ static bool ParseShortcutValue(napi_env env, napi_value arg, std::string& outVal
     return true;
 }
 
-// ModifierKey values are defined as a bitmask directly: CTRL=1, SHIFT=2, ALT=4.
-// The JS-side array is OR-combined to form the final modifier bitmask.
+// Convert ArkTS ModifierKey enum values to the same bits used by component shortcuts.
 static bool ParseModifierKeys(napi_env env, napi_value arg, uint8_t& outKeys)
 {
     CHECK_NULL_RETURN(arg, false);
@@ -162,6 +164,9 @@ static bool ParseModifierKeys(napi_env env, napi_value arg, uint8_t& outKeys)
     }
     uint32_t length = 0;
     napi_get_array_length(env, arg, &length);
+    if (length > MAX_MODIFIER_KEYS) {
+        return false;
+    }
     uint8_t keys = 0;
     for (uint32_t i = 0; i < length; ++i) {
         napi_value element = nullptr;
@@ -172,9 +177,28 @@ static bool ParseModifierKeys(napi_env env, napi_value arg, uint8_t& outKeys)
         if (elementType != napi_number) {
             return false;
         }
-        int32_t value = 0;
-        napi_get_value_int32(env, element, &value);
-        keys |= static_cast<uint8_t>(value);
+        double value = 0;
+        if (napi_get_value_double(env, element, &value) != napi_ok || !std::isfinite(value) ||
+            std::trunc(value) != value || value < static_cast<int32_t>(ModifierKey::CTRL) ||
+            value > static_cast<int32_t>(ModifierKey::ALT)) {
+            return false;
+        }
+        uint8_t bit = 0;
+        switch (static_cast<ModifierKey>(static_cast<int32_t>(value))) {
+            case ModifierKey::CTRL:
+                bit = static_cast<uint8_t>(ModifierKeyName::ModifierKeyCtrl);
+                break;
+            case ModifierKey::SHIFT:
+                bit = static_cast<uint8_t>(ModifierKeyName::ModifierKeyShift);
+                break;
+            case ModifierKey::ALT:
+                bit = static_cast<uint8_t>(ModifierKeyName::ModifierKeyAlt);
+                break;
+        }
+        if ((keys & bit) != 0) {
+            return false;
+        }
+        keys |= bit;
     }
     outKeys = keys;
     return true;
