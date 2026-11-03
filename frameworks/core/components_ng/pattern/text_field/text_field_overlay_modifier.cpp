@@ -452,6 +452,24 @@ std::optional<Color> TextFieldOverlayModifier::GetPreviewDecorationColor(const P
     return decorationColor;
 }
 
+RSRect TextFieldOverlayModifier::GetPreviewTextClipRect(const TextFieldPattern& textFieldPattern,
+    PreviewTextStyle underlineShape, bool isTextArea) const
+{
+    float adjustClipHeight = underlineShape == PreviewTextStyle::WAVY
+        ? DEFAULT_FONTSIZE.ConvertToPx() / WAVY_WIDTH_DIVISOR : 0.0f;
+    auto paintOffset = contentOffset_->Get();
+    float clipRectHeight = paintOffset.GetY() + contentSize_->Get().Height();
+    auto contentWidth = contentSize_->Get().Width();
+    if (!textFieldPattern.IsNormalInlineState() || isTextArea) {
+        return RSRect(paintOffset.GetX(), paintOffset.GetY(),
+            paintOffset.GetX() + contentWidth + textFieldPattern.GetInlinePadding(),
+            clipRectHeight + adjustClipHeight);
+    }
+    return RSRect(paintOffset.GetX(), 0.0f,
+        paintOffset.GetX() + contentWidth,
+        textFieldPattern.GetFrameRect().Height() + adjustClipHeight);
+}
+
 void TextFieldOverlayModifier::PaintPreviewTextDecoration(DrawingContext& context) const
 {
     auto textFieldPattern = DynamicCast<TextFieldPattern>(pattern_.Upgrade());
@@ -473,21 +491,7 @@ void TextFieldOverlayModifier::PaintPreviewTextDecoration(DrawingContext& contex
         canvas.Restore();
         return;
     }
-    float adjustClipHeight = styling.underlineShape == PreviewTextStyle::WAVY
-        ? DEFAULT_FONTSIZE.ConvertToPx() / WAVY_WIDTH_DIVISOR : 0.0f;
-    auto paintOffset = contentOffset_->Get();
-    float clipRectHeight = paintOffset.GetY() + contentSize_->Get().Height();
-    auto contentWidth = contentSize_->Get().Width();
-    RSRect clipInnerRect;
-    if (!textFieldPattern->IsNormalInlineState() || isTextArea) {
-        clipInnerRect = RSRect(paintOffset.GetX(), paintOffset.GetY(),
-            paintOffset.GetX() + contentWidth + textFieldPattern->GetInlinePadding(),
-            clipRectHeight + adjustClipHeight);
-    } else {
-        clipInnerRect = RSRect(paintOffset.GetX(), 0.0f,
-            paintOffset.GetX() + contentWidth,
-            textFieldPattern->GetFrameRect().Height() + adjustClipHeight);
-    }
+    auto clipInnerRect = GetPreviewTextClipRect(*textFieldPattern, styling.underlineShape, isTextArea);
     canvas.ClipRect(clipInnerRect, RSClipOp::INTERSECT);
 
     auto underlineWidth = textFieldPattern->GetPreviewUnderlineWidth();

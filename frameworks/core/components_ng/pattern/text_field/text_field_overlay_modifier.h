@@ -30,6 +30,7 @@
 #include "core/components_ng/pattern/text_field/text_field_paint_property.h"
 
 namespace OHOS::Ace::NG {
+class TextFieldPattern;
 class TextFieldOverlayModifier : public ScrollBarOverlayModifier {
     DECLARE_ACE_TYPE(TextFieldOverlayModifier, ScrollBarOverlayModifier);
 
@@ -103,6 +104,8 @@ private:
     void GetFrameRectClip(RSRect& clipRect, std::vector<RSPoint>& clipRadius);
     void PaintPreviewTextDecoration(DrawingContext& context) const;
     std::optional<Color> GetPreviewDecorationColor(const PreviewTextStyling& styling) const;
+    RSRect GetPreviewTextClipRect(const TextFieldPattern& textFieldPattern,
+        PreviewTextStyle underlineShape, bool isTextArea) const;
 
     bool caretLanding_ = false;
     bool needPaintSelect_ = false;
