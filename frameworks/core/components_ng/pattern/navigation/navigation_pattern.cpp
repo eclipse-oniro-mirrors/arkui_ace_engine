@@ -1619,7 +1619,7 @@ void NavigationPattern::UpdateNavPathList()
             continue;
         }
         // Check preload item: match by name and paramString
-        auto paramString = navigationStack_->GetStringifyParamByIndex(arrayIndex);
+        auto paramString = navigationStack_->GetSerializedParamSafely(arrayIndex);
         uiNode = navigationStack_->GetFromPreloadItem(pathName, paramString);
         if (uiNode) {
             TAG_LOGI(AceLogTag::ACE_NAVIGATION, "find in preload item, navigation stack use preloaded node, "
