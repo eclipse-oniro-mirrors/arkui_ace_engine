@@ -770,6 +770,25 @@ void ListPattern::SweepStaleScrollPlaceholderShells()
 void ListPattern::RetireScrollPlaceholderShell(const RefPtr<FrameNode>& shell, const std::string& templateId)
 {
     CHECK_NULL_VOID(shell);
+    // The structural removal below only reaches the RS render tree through a later
+    // host RebuildRenderContextTree — RemoveChild/DetachFromMainTree raise the sync
+    // flag, and no consumer is guaranteed to pick it up for the shell within the
+    // same frame (the mirror note in scroll_placeholder_shell_mount.h
+    // MountPlaceholderShellOnHost documents the same gap from the mount side).
+    // Until that rebuild runs, the retired shell's RS node keeps painting at its
+    // last-synced geometry, surfacing as one-frame placeholder-over-real overlap
+    // ghosts while the decay replacement phase retires shells at frame cadence.
+    // Hide the render output at the context level instead: the opacity update rides
+    // the modifier path straight onto the RS node and takes effect in the next
+    // submitted transaction no matter when the structural sync lands (same pattern
+    // as menu_wrapper_pattern's instant hide). Shells are one-shot nodes — the
+    // instance pool only ever recycles content subtrees — so the hide never needs
+    // revoking.
+    auto renderContext = shell->GetRenderContext();
+    if (renderContext) {
+        renderContext->UpdateOpacity(0.0);
+        shell->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
+    }
     mountedPlaceholderShells_.erase(shell);
     auto host = GetHost();
     CHECK_NULL_VOID(host);

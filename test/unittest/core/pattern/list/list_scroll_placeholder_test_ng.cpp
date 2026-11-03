@@ -945,6 +945,60 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderRetirePoolMiss001, TestSi
 }
 
 /**
+ * @tc.name: ScrollPlaceholderRetireHidesShellRender001
+ * @tc.desc: Retirement suppresses the shell's render output at the context level:
+ *           the structural removal only reaches the RS render tree through a
+ *           later host rebuild (the sync flag has no guaranteed same-frame
+ *           consumer), so a retired shell would keep painting at its last-synced
+ *           geometry until that rebuild runs — the one-frame placeholder-over-real
+ *           ghost of the decay replacement phase. Every retire path must hide the
+ *           shell (opacity 0) while a still-live shell keeps the default state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderRetireHidesShellRender001, TestSize.Level1)
+{
+    CreatePlaceholderList(
+        [](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            return MakeDefaultPlaceholderOptions();
+        },
+        true);
+    CreateItemsAndDone();
+    pattern_->ReconcileScrollPlaceholderItems(-1, -1);
+
+    // One shell stays live in the table; the second one takes the committed-shell
+    // path (entry gone, shell awaiting the layout-round retire).
+    int32_t liveIndex = FindUnbuiltSlot();
+    ASSERT_GE(liveIndex, 0);
+    auto liveShell = pattern_->CreateScrollPlaceholderShell(liveIndex);
+    ASSERT_TRUE(liveShell);
+    int32_t goneIndex = FindUnbuiltSlot();
+    ASSERT_GE(goneIndex, 0);
+    auto goneShell = pattern_->CreateScrollPlaceholderShell(goneIndex);
+    ASSERT_TRUE(goneShell);
+    ASSERT_NE(liveIndex, goneIndex);
+    EXPECT_FALSE(liveShell->GetRenderContext()->HasOpacity());
+    EXPECT_FALSE(goneShell->GetRenderContext()->HasOpacity());
+
+    pattern_->scrollPlaceholderItems_.erase(goneIndex);
+    pattern_->retiringPlaceholderShells_.emplace_back(goneShell, std::string());
+    // Unknown window (-1/-1) is fail-open: the live shell keeps its slot while the
+    // retiring list drains through the retire funnel.
+    pattern_->ReconcileScrollPlaceholderItems(-1, -1);
+    EXPECT_FALSE(pattern_->HasScrollPlaceholderItem(goneIndex));
+    EXPECT_FALSE(IsChildOfHost(goneShell));
+    EXPECT_TRUE(pattern_->retiringPlaceholderShells_.empty());
+
+    // The retired shell's render output is suppressed at the context level, ahead
+    // of the structural render-tree sync.
+    ASSERT_TRUE(goneShell->GetRenderContext()->HasOpacity());
+    EXPECT_EQ(goneShell->GetRenderContext()->GetOpacityValue(), 0.0);
+    // The still-live shell keeps the default render state.
+    EXPECT_FALSE(liveShell->GetRenderContext()->HasOpacity());
+    EXPECT_TRUE(pattern_->HasScrollPlaceholderItem(liveIndex));
+    EXPECT_TRUE(IsChildOfHost(liveShell));
+}
+
+/**
  * @tc.name: ScrollPlaceholderAcquisitionParity001
  * @tc.desc: A shell returned by the acquisition intercept carries the same
  *           post-acquisition state as a child of the standard path: the host's
