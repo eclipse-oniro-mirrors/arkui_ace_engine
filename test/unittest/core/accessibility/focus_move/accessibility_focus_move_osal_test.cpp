@@ -14,13 +14,14 @@
  */
 
 #include <atomic>
-#include <cstdio>
+#include <cstdarg>
 #include <cstring>
 #include <limits>
 #include <thread>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "securec.h"
 
 #define private public
 #define protected public
@@ -53,16 +54,16 @@ struct ThirdAccessibilityLog {
     std::string operation;
     std::string reasons;
 };
-thread_local ThirdAccessibilityLog lastThirdAccessibilityLog;
+thread_local ThirdAccessibilityLog g_lastThirdAccessibilityLog;
 
 void ResetThirdAccessibilityLog()
 {
-    lastThirdAccessibilityLog = {};
+    g_lastThirdAccessibilityLog = {};
 }
 
 ThirdAccessibilityLog GetLastThirdAccessibilityLog()
 {
-    return lastThirdAccessibilityLog;
+    return g_lastThirdAccessibilityLog;
 }
 } // namespace
 
@@ -80,7 +81,7 @@ extern "C" int HiLogPrint(::LogType type, ::LogLevel level, unsigned int domain,
     char buffer[2048] {};
     va_list args;
     va_start(args, fmt);
-    int length = vsnprintf(buffer, sizeof(buffer), format.c_str(), args);
+    int length = vsnprintf_s(buffer, sizeof(buffer), sizeof(buffer) - 1, format.c_str(), args);
     va_end(args);
     if (length <= 0) {
         return 0;
@@ -90,8 +91,8 @@ extern "C" int HiLogPrint(::LogType type, ::LogLevel level, unsigned int domain,
     auto start = message.find(marker);
     auto end = message.find(':', start);
     if (start != std::string::npos && end != std::string::npos) {
-        lastThirdAccessibilityLog.operation = message.substr(start + marker.size(), end - start - marker.size());
-        lastThirdAccessibilityLog.reasons = message.substr(end + 1);
+        g_lastThirdAccessibilityLog.operation = message.substr(start + marker.size(), end - start - marker.size());
+        g_lastThirdAccessibilityLog.reasons = message.substr(end + 1);
     }
     return length;
 }
@@ -2073,6 +2074,34 @@ HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningPayloadLimitAndOwnedActions, 
     EXPECT_EQ(strategy.GetCurrentCheckNode(), nullptr);
 }
 
+namespace {
+void ConfigureMalformedThirdGraph(FocusTreeProvider& provider, size_t scenario)
+{
+    switch (scenario) {
+        case 0:
+            provider.nodes[101].AddChildNodeId(100);
+            break;
+        case 1:
+            provider.nodes[100].AddChildNodeId(101);
+            break;
+        case 2:
+            provider.Add(103, 101, {});
+            provider.nodes[101].AddChildNodeId(103);
+            provider.nodes[102].AddChildNodeId(103);
+            break;
+        case 3:
+            provider.duplicateIds.insert(101);
+            break;
+        case 4:
+            provider.Add(200, -1, {});
+            provider.extraRoots = {200, 200};
+            break;
+        default:
+            break;
+    }
+}
+} // namespace
+
 HWTEST_F(AccessibilityFocusMoveTest, ThirdGraphDiagnosticsIdentifyMalformedEdges, TestSize.Level1)
 {
 #ifndef USE_HILOG
@@ -2086,28 +2115,7 @@ HWTEST_F(AccessibilityFocusMoveTest, ThirdGraphDiagnosticsIdentifyMalformedEdges
         provider->Add(100, -1, {101, 102});
         provider->Add(101, 100, {});
         provider->Add(102, 100, {});
-        switch (scenario) {
-            case 0:
-                provider->nodes[101].AddChildNodeId(100);
-                break;
-            case 1:
-                provider->nodes[100].AddChildNodeId(101);
-                break;
-            case 2:
-                provider->Add(103, 101, {});
-                provider->nodes[101].AddChildNodeId(103);
-                provider->nodes[102].AddChildNodeId(103);
-                break;
-            case 3:
-                provider->duplicateIds.insert(101);
-                break;
-            case 4:
-                provider->Add(200, -1, {});
-                provider->extraRoots = {200, 200};
-                break;
-            default:
-                break;
-        }
+        ConfigureMalformedThirdGraph(*provider, scenario);
         auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
         FocusStrategyOsalThird strategy(manager, provider, NodeConfig{});
         ResetThirdAccessibilityLog();

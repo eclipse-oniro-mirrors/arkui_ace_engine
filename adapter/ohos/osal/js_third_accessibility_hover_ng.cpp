@@ -587,28 +587,46 @@ void AccessibilityHoverManagerForThirdNG::HandleAccessibilityHoverForThirdInner(
     hoverForThirdState_.idle = config.eventType == NG::AccessibilityHoverEventType::EXIT;
 }
 
+namespace {
+constexpr size_t MAX_HOVER_EVENTS_PER_TASK = 32;
+
+bool EnsureThirdHoverOnUI(const WeakPtr<AccessibilityHoverManagerForThirdNG>& weak,
+    const AccessibilityHoverForThirdConfig& config, const RefPtr<TaskExecutor>& executor)
+{
+    if (executor->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
+        return true;
+    }
+    executor->PostTask([weak, config] {
+        auto manager = weak.Upgrade();
+        CHECK_NULL_VOID(manager);
+        manager->HandleAccessibilityHoverForThird(config);
+    }, TaskExecutor::TaskType::UI, "ArkUIPrepareAccessibilityHoverForThird");
+    return false;
+}
+
+void PrepareThirdHoverMountBindings(AccessibilityHoverForThirdConfig& config,
+    const std::shared_ptr<JsThirdProviderInteractionOperation>& provider)
+{
+    auto owner = provider ? provider->GetHost() : nullptr;
+    auto mainAM = provider ? provider->GetHandler().Upgrade() : nullptr;
+    if (mainAM && owner) {
+        config.ownerNodeId = owner->GetId();
+        config.mountBindIds = mainAM->GetCmpBindingBindIdsForHover(config.ownerNodeId);
+    }
+}
+} // namespace
+
 void AccessibilityHoverManagerForThirdNG::HandleAccessibilityHoverForThird(
     const AccessibilityHoverForThirdConfig& config)
 {
     CHECK_NULL_VOID(config.context);
     auto executor = config.context->GetTaskExecutor();
     CHECK_NULL_VOID(executor);
-    if (!executor->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
-        executor->PostTask([weak = WeakClaim(this), config] {
-            auto manager = weak.Upgrade();
-            CHECK_NULL_VOID(manager);
-            manager->HandleAccessibilityHoverForThird(config);
-        }, TaskExecutor::TaskType::UI, "ArkUIPrepareAccessibilityHoverForThird");
+    if (!EnsureThirdHoverOnUI(WeakClaim(this), config, executor)) {
         return;
     }
     AccessibilityHoverForThirdConfig asyncConfig = config;
-    auto provider = GetJsThirdProviderInteractionOperation(config.hostElementId).lock();
-    auto owner = provider ? provider->GetHost() : nullptr;
-    auto mainAM = provider ? provider->GetHandler().Upgrade() : nullptr;
-    if (mainAM && owner) {
-        asyncConfig.ownerNodeId = owner->GetId();
-        asyncConfig.mountBindIds = mainAM->GetCmpBindingBindIdsForHover(asyncConfig.ownerNodeId);
-    }
+    PrepareThirdHoverMountBindings(asyncConfig, GetJsThirdProviderInteractionOperation(config.hostElementId).lock());
     {
         std::lock_guard<std::mutex> lock(hoverTaskMutex_);
         if (!hoverForThirdState_.thirdOperationIdle.load()) {
@@ -648,7 +666,7 @@ void AccessibilityHoverManagerForThirdNG::HandleAccessibilityHoverForThird(
 
 void AccessibilityHoverManagerForThirdNG::DrainPendingHoverForThird(AccessibilityHoverForThirdConfig config)
 {
-    for (;;) {
+    for (size_t processed = 0; processed < MAX_HOVER_EVENTS_PER_TASK; ++processed) {
         if (config.context) {
             HandleAccessibilityHoverForThirdInner(config);
         } else {
@@ -669,6 +687,17 @@ void AccessibilityHoverManagerForThirdNG::DrainPendingHoverForThird(Accessibilit
         }
         config = std::move(next);
     }
+    // A continuously replenished queue must not monopolize the worker. End the session safely.
+    SendHoverExitForThird();
+    ResetHoverForThirdState();
+    TransferHoverToExportedSubtreeIfNeeded(INVALID_NODE_ID, config);
+    {
+        std::lock_guard<std::mutex> lock(hoverTaskMutex_);
+        pendingHover_.reset();
+        pendingHoverContext_.Reset();
+        hoverForThirdState_.thirdOperationIdle.store(true);
+    }
+    TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY, "Third accessibility: hover task event limit reached");
 }
 
 bool AccessibilityHoverManagerForThirdNG::ClearThirdAccessibilityFocus(
