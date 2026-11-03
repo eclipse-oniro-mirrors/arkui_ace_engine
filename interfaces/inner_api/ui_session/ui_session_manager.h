@@ -445,6 +445,10 @@ protected:
     std::mutex sendCommandWithResultFunctionMutex_;
     std::function<void()> searchClickFlushFunction_;
     std::mutex searchClickFlushMutex_;
+
+public:
+    // Append after existing virtual declarations to preserve their slot order.
+    virtual void SaveRelaxedCommandWithResultFunction(SendCommandWithResultFunction&& function) {};
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_INTERFACE_UI_SESSION_MANAGER_H

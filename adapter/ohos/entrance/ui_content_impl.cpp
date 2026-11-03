@@ -6683,6 +6683,17 @@ void ExecuteGlobalCommandWithResult(
         finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::INVALID_PARAM)));
         return;
     }
+    auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
+    if (!pipeline) {
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
+        return;
+    }
+    finishCallback(SerializeCommandResult(ExecuteKeyCodeWithResult(json, pipeline)));
+}
+
+void ExecuteRelaxedCommandWithResult(
+    const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback)
+{
     auto batch = UiSessionBatchCommand::Parse(command);
     if (batch.status != BatchParseStatus::NOT_BATCH) {
         finishCallback(UiSessionBatchCommand::ExecuteWithResult(batch, ResolveBatchTextTargetWithResult));
@@ -6691,11 +6702,6 @@ void ExecuteGlobalCommandWithResult(
     auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
     if (!pipeline) {
         finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
-        return;
-    }
-    auto value = json->GetValue("cmd");
-    if (value && value->IsNumber()) {
-        finishCallback(SerializeCommandResult(ExecuteKeyCodeWithResult(json, pipeline)));
         return;
     }
     pipeline->ProcessCommandWithResult(command, [finishCallback](const NG::CommandResult& result) {
@@ -6731,7 +6737,7 @@ void PostNodeCommandWithResult(const WeakPtr<TaskExecutor>& weakTaskExecutor, in
 }
 
 void PostGlobalCommandWithResult(const WeakPtr<TaskExecutor>& weakTaskExecutor,
-    const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback)
+    const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback, bool isRelaxed)
 {
     auto taskExecutor = weakTaskExecutor.Upgrade();
     if (!taskExecutor) {
@@ -6739,7 +6745,13 @@ void PostGlobalCommandWithResult(const WeakPtr<TaskExecutor>& weakTaskExecutor,
         return;
     }
     bool posted = taskExecutor->PostTask(
-        [command, finishCallback]() { ExecuteGlobalCommandWithResult(command, finishCallback); },
+        [command, finishCallback, isRelaxed]() {
+            if (isRelaxed) {
+                ExecuteRelaxedCommandWithResult(command, finishCallback);
+            } else {
+                ExecuteGlobalCommandWithResult(command, finishCallback);
+            }
+        },
         TaskExecutor::TaskType::UI, "UiSessionSendCommandWithResult");
     if (!posted) {
         finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
@@ -6786,6 +6798,11 @@ void UIContentImpl::RelaxedCommandCallbackInner(const WeakPtr<TaskExecutor>& tas
 #endif
     };
     UiSessionManager::GetInstance()->SaveRelaxedCommandFunction(relaxedCommandCallback);
+    auto relaxedCommandWithResult = [weakTaskExecutor = taskExecutor](const std::string& command,
+        const UiSessionManager::CommandResultCallback& finishCallback) {
+        PostGlobalCommandWithResult(weakTaskExecutor, command, finishCallback, true);
+    };
+    UiSessionManager::GetInstance()->SaveRelaxedCommandWithResultFunction(std::move(relaxedCommandWithResult));
 }
 
 void UIContentImpl::InitInspectorWindowSnapshotCallback()
@@ -7410,7 +7427,7 @@ void UIContentImpl::InitSendCommandFunctionsCallbacks(const WeakPtr<TaskExecutor
     UiSessionManager::GetInstance()->SaveForSendCommandWithResultFunction(std::move(nodeCommandWithResult));
     auto globalCommandWithResult = [weakTaskExecutor = taskExecutor](const std::string& command,
         const UiSessionManager::CommandResultCallback& finishCallback) {
-        PostGlobalCommandWithResult(weakTaskExecutor, command, finishCallback);
+        PostGlobalCommandWithResult(weakTaskExecutor, command, finishCallback, false);
     };
     UiSessionManager::GetInstance()->SaveSendCommandWithResultFunction(std::move(globalCommandWithResult));
 }
