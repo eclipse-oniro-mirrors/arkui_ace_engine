@@ -1074,6 +1074,7 @@ declare type SystemUiMaterial = any;
 declare type ProgressMask = any;
 declare type TipsMessageType = ResourceStr | any;
 declare type OnScrollVisibleContentChangeCallback = (start: any, end: any) => void;
+declare type OnMonitorBlankScreenCallback = (event: any) => void;
 
 declare class ViewStackProcessor { static GetElmtIdToAccountFor(): void; }
 declare class JsPointerClass { invalid(): boolean; }

@@ -11468,6 +11468,10 @@ class ArkWebComponent extends ArkComponent {
     modifierWithKey(this._modifiersWithKeys, WebOnDetectedBlankScreenModifier.identity, WebOnDetectedBlankScreenModifier, callback);
     return this;
   }
+  onMonitoredBlankScreen(callback) {
+    modifierWithKey(this._modifiersWithKeys, WebOnMonitoredBlankScreenModifier.identity, WebOnMonitoredBlankScreenModifier, callback);
+    return this;
+  }
   blankScreenDetectionConfig(config) {
     if (config === undefined || config === null) {
       return this;
@@ -11478,6 +11482,10 @@ class ArkWebComponent extends ArkComponent {
     detectConfig.detectionMethods = config.detectionMethods;
     detectConfig.contentfulNodesCountThreshold = config.contentfulNodesCountThreshold;
     modifierWithKey(this._modifiersWithKeys, WebBlankScreenDetectionConfigModifier.identity, WebBlankScreenDetectionConfigModifier, detectConfig);
+    return this;
+  }
+  enableBlankScreenMonitor(enabled) {
+    modifierWithKey(this._modifiersWithKeys, WebEnableBlankScreenMonitorModifier.identity, WebEnableBlankScreenMonitorModifier, enabled);
     return this;
   }
   onFirstScreenPaint(callback) {
@@ -13143,6 +13151,21 @@ class WebOnDetectedBlankScreenModifier extends ModifierWithKey {
 }
 WebOnDetectedBlankScreenModifier.identity = Symbol('webOnDetectedBlankScreenModifier');
 
+class WebOnMonitoredBlankScreenModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().web.resetOnMonitoredBlankScreen(node);
+    }
+    else {
+      getUINativeModule().web.setOnMonitoredBlankScreen(node, this.value);
+    }
+  }
+}
+WebOnMonitoredBlankScreenModifier.identity = Symbol('webOnMonitoredBlankScreenModifier');
+
 class WebBlankScreenDetectionConfigModifier extends ModifierWithKey {
   constructor(value) {
     super(value);
@@ -13164,6 +13187,20 @@ class WebBlankScreenDetectionConfigModifier extends ModifierWithKey {
   }
 }
 WebBlankScreenDetectionConfigModifier.identity = Symbol('webBlankScreenDetectionConfigModifier');
+
+class WebEnableBlankScreenMonitorModifier extends ModifierWithKey {
+  constructor(value) {
+      super(value);
+  }
+  applyPeer(node, reset) {
+      if (reset) {
+          getUINativeModule().web.resetEnableBlankScreenMonitor(node);
+      } else {
+          getUINativeModule().web.setEnableBlankScreenMonitor(node, this.value);
+      }
+  }
+}
+WebEnableBlankScreenMonitorModifier.identity = Symbol('webEnableBlankScreenMonitorModifier');
 
 class WebOnFirstScreenPaintModifier extends ModifierWithKey {
   constructor(value) {

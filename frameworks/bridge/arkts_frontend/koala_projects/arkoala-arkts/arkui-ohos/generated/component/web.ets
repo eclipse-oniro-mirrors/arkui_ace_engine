@@ -3168,6 +3168,18 @@ export class ArkWebPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._WebAttribute_setOnDetectedBlankScreen(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setOnMonitoredBlankScreenAttribute(value: OnMonitorBlankScreenCallback | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            thisSerializer.holdAndWriteCallback(valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._WebAttribute_setOnMonitoredBlankScreen(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setBlankScreenDetectionConfigAttribute(value: BlankScreenDetectionConfig | undefined): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (value !== undefined) {
@@ -3178,6 +3190,18 @@ export class ArkWebPeer extends ArkCommonMethodPeer {
             thisSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
         ArkUIGeneratedNativeModule._WebAttribute_setBlankScreenDetectionConfig(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
+    setEnableBlankScreenMonitorAttribute(value: boolean | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            thisSerializer.writeBoolean(valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._WebAttribute_setEnableBlankScreenMonitor(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
     setBackToTopAttribute(value: boolean | undefined): void {
@@ -3990,6 +4014,40 @@ export interface BlankScreenDetectionEventInfo {
     blankScreenDetails?: BlankScreenDetails;
 }
 export type OnDetectBlankScreenCallback = (event: BlankScreenDetectionEventInfo) => void;
+export enum BlankScreenReason {
+    DNS_RESOLVE_FAILED = 101,
+    REQUEST_TIMED_OUT = 102,
+    CONNECTION_REFUSED = 103,
+    CONNECTION_RESET = 104,
+    SSL_ERROR = 105,
+    CERT_ERROR = 106,
+    INTERNET_DISCONNECTED = 107,
+    REDIRECT_LOOP = 108,
+    PROXY_ERROR = 109,
+    OTHER_NETWORK_ERROR = 199,
+    MAIN_DOC_EMPTY = 201,
+    HTTP_4XX_ERROR = 202,
+    HTTP_5XX_ERROR = 203,
+    JS_GLOBAL_BUNDLE_LOAD_FAILED = 210,
+    CSS_LOAD_FAILED = 211,
+    MULTI_RESOURCE_LOAD_FAILED = 212,
+    CORS_BLOCKED = 213,
+    CSP_BLOCKED = 214,
+    MIXED_CONTENT_BLOCKED = 215,
+    JS_RUNTIME_ERROR = 301,
+    NO_FIRST_CONTENTFUL_PAINT = 312,
+    RENDERER_CRASHED = 401,
+    RENDERER_KILLED = 402,
+    GPU_PROCESS_CRASHED = 403,
+    GPU_PROCESS_WATCHDOG_TIMEOUT = 404,
+    WEB_VIEW_ZERO_SIZE = 501,
+}
+export interface MonitoredBlankScreenEventInfo {
+    url: string;
+    reason: BlankScreenReason;
+    extraMsg: string;
+}
+export type OnMonitorBlankScreenCallback = (event: MonitoredBlankScreenEventInfo) => void;
 export type TextSelectionChangeCallback = (selectionText: string) => void;
 export enum BlankScreenDetectionMethod {
     DETECTION_CONTENTFUL_NODES_SEVENTEEN = 0
@@ -4416,8 +4474,14 @@ export interface WebAttribute extends CommonMethod {
     onDetectedBlankScreen(value: OnDetectBlankScreenCallback | undefined): this {
         throw new Error('Unimplemented method onDetectedBlankScreen')
     }
+    onMonitoredBlankScreen(value: OnMonitorBlankScreenCallback | undefined): this {
+        throw new Error('Unimplemented method onMonitoredBlankScreen')
+    }
     blankScreenDetectionConfig(value: BlankScreenDetectionConfig | undefined): this {
         throw new Error('Unimplemented method blankScreenDetectionConfig')
+    }
+    enableBlankScreenMonitor(value: boolean | undefined): this {
+        throw new Error('Unimplemented method enableBlankScreenMonitor')
     }
     backToTop(value: boolean | undefined): this {
         throw new Error('Unimplemented method backToTop')
@@ -5258,9 +5322,19 @@ export class ArkWebComponent extends ArkCommonMethodComponent implements WebAttr
         this.getPeer()?.setOnDetectedBlankScreenAttribute(value_casted)
         return this
     }
+    public onMonitoredBlankScreen(value: OnMonitorBlankScreenCallback | undefined): this {
+        const value_casted = value as (OnMonitorBlankScreenCallback | undefined)
+        this.getPeer()?.setOnMonitoredBlankScreenAttribute(value_casted)
+        return this
+    }
     public blankScreenDetectionConfig(value: BlankScreenDetectionConfig | undefined): this {
         const value_casted = value as (BlankScreenDetectionConfig | undefined)
         this.getPeer()?.setBlankScreenDetectionConfigAttribute(value_casted)
+        return this
+    }
+    public enableBlankScreenMonitor(value: boolean | undefined): this {
+        const value_casted = value as (boolean | undefined)
+        this.getPeer()?.setEnableBlankScreenMonitorAttribute(value_casted)
         return this
     }
     public backToTop(value: boolean | undefined): this {
@@ -6456,6 +6530,25 @@ export class LoadCommittedDetails_serializer {
         const navigationTypeTmpResult: WebNavigationType = WebNavigationType.fromValue(valueDeserializer.readInt32())
         const urlTmpResult: string = (valueDeserializer.readString() as string)
         let value: LoadCommittedDetails = ({isMainFrame: isMainFrameTmpResult, isSameDocument: isSameDocumentTmpResult, didReplaceEntry: didReplaceEntryTmpResult, navigationType: navigationTypeTmpResult, url: urlTmpResult} as LoadCommittedDetails)
+        return value
+    }
+}
+export class MonitoredBlankScreenEventInfo_serializer {
+    public static write(buffer: SerializerBase, value: MonitoredBlankScreenEventInfo): void {
+        let valueSerializer: SerializerBase = buffer
+        const valueHolderForUrl = value.url
+        valueSerializer.writeString(valueHolderForUrl)
+        const valueHolderForReason = value.reason
+        valueSerializer.writeInt32(valueHolderForReason.valueOf())
+        const valueHolderForExtraMsg = value.extraMsg
+        valueSerializer.writeString(valueHolderForExtraMsg)
+    }
+    public static read(buffer: DeserializerBase): MonitoredBlankScreenEventInfo {
+        let valueDeserializer: DeserializerBase = buffer
+        const urlTmpResult: string = (valueDeserializer.readString() as string)
+        const reasonTmpResult: BlankScreenReason = BlankScreenReason.fromValue(valueDeserializer.readInt32())
+        const extraMsgTmpResult: string = (valueDeserializer.readString() as string)
+        let value: MonitoredBlankScreenEventInfo = ({url: urlTmpResult, reason: reasonTmpResult, extraMsg: extraMsgTmpResult} as MonitoredBlankScreenEventInfo)
         return value
     }
 }
