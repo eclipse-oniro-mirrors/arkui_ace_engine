@@ -3026,6 +3026,7 @@ void TabsBridge::ParseBarFloatingOffset(EcmaVM* vm, Local<JSValueRef> offsetVal,
         return;
     }
     auto offsetObject = offsetVal->ToObject(vm);
+    parameters.isLocalizedOffsetX = false;
     // 1) Position shape: { x, y }
     auto xVal = ArkTSUtils::GetProperty(vm, offsetObject, "x");
     auto yVal = ArkTSUtils::GetProperty(vm, offsetObject, "y");
@@ -3050,7 +3051,7 @@ void TabsBridge::ParseBarFloatingOffset(EcmaVM* vm, Local<JSValueRef> offsetVal,
     if (hasStart || hasEnd) {
         auto topVal = ArkTSUtils::GetProperty(vm, offsetObject, "top");
         auto bottomVal = ArkTSUtils::GetProperty(vm, offsetObject, "bottom");
-        // start/end → X, top/bottom → Y
+        parameters.isLocalizedOffsetX = true;
         if (hasStart) {
             parameters.offsetX = ParseBarFloatingDimension(vm, startVal, offsetXObj);
         } else if (hasEnd) {

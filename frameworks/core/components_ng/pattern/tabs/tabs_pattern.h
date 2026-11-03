@@ -63,8 +63,6 @@ public:
         return true;
     }
 
-    void ClampTabBarTransformOffset();
-
     RefPtr<LayoutProperty> CreateLayoutProperty() override
     {
         ACE_UINODE_TRACE(GetHost());
