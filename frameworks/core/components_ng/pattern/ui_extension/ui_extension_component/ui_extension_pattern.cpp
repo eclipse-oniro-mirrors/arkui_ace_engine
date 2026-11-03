@@ -950,6 +950,7 @@ void UIExtensionPattern::NotifyForeground()
             sessionWrapper_->NotifyDisplayArea(displayArea_);
             displayAreaChanged_ = false;
         }
+        NotifyBrandColorChangeToUEA(instanceId_, brandColorStr_);
     }
 }
 

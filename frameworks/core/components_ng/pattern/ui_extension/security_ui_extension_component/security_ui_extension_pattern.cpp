@@ -454,6 +454,7 @@ void SecurityUIExtensionPattern::NotifyForeground()
         PLATFORM_LOGI("The state is changing from '%{public}s' to 'FOREGROUND'.", ToString(state_));
         state_ = AbilityState::FOREGROUND;
         sessionWrapper_->NotifyForeground();
+        NotifyBrandColorChangeToUEA(instanceId_, brandColorStr_);
     }
 }
 
