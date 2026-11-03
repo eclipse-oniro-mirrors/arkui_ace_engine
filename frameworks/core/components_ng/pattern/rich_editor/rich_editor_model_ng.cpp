@@ -1946,6 +1946,87 @@ Color RichEditorModelNG::GetCounterTextOverflowColor(FrameNode* frameNode)
     return value;
 }
 
+// ===== auto fill properties (static methods with FrameNode*) =====
+void RichEditorModelNG::SetEnableAutoFill(FrameNode* frameNode, bool enableAutoFill)
+{
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, EnableAutoFill, enableAutoFill, frameNode);
+}
+
+void RichEditorModelNG::ResetEnableAutoFill(FrameNode* frameNode)
+{
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, EnableAutoFill, false, frameNode);
+}
+
+bool RichEditorModelNG::GetEnableAutoFill(FrameNode* frameNode)
+{
+    bool value = false;
+    ACE_GET_NODE_LAYOUT_PROPERTY_WITH_DEFAULT_VALUE(
+        RichEditorLayoutProperty, EnableAutoFill, value, frameNode, false);
+    return value;
+}
+
+void RichEditorModelNG::SetContentType(FrameNode* frameNode, const TextContentType& value)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto layoutProperty = frameNode->GetLayoutProperty<RichEditorLayoutProperty>();
+    CHECK_NULL_VOID(layoutProperty);
+    // companion: notify contentType changed for downstream re-parse
+    if (layoutProperty->HasTextContentType() && layoutProperty->GetTextContentTypeValue() != value) {
+        layoutProperty->UpdateTextContentTypeChanged(true);
+    }
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, TextContentType, value, frameNode);
+}
+
+void RichEditorModelNG::ResetContentType(FrameNode* frameNode)
+{
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(
+        RichEditorLayoutProperty, TextContentType, TextContentType::UNSPECIFIED, frameNode);
+}
+
+TextContentType RichEditorModelNG::GetContentType(FrameNode* frameNode)
+{
+    TextContentType value = TextContentType::UNSPECIFIED;
+    ACE_GET_NODE_LAYOUT_PROPERTY_WITH_DEFAULT_VALUE(
+        RichEditorLayoutProperty, TextContentType, value, frameNode, TextContentType::UNSPECIFIED);
+    return value;
+}
+
+void RichEditorModelNG::SetPasswordRules(FrameNode* frameNode, const std::string& passwordRules)
+{
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, PasswordRules, passwordRules, frameNode);
+}
+
+void RichEditorModelNG::ResetPasswordRules(FrameNode* frameNode)
+{
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, PasswordRules, "", frameNode);
+}
+
+std::string RichEditorModelNG::GetPasswordRules(FrameNode* frameNode)
+{
+    std::string value;
+    ACE_GET_NODE_LAYOUT_PROPERTY_WITH_DEFAULT_VALUE(
+        RichEditorLayoutProperty, PasswordRules, value, frameNode, "");
+    return value;
+}
+
+void RichEditorModelNG::SetEnableAutoFillAnimation(FrameNode* frameNode, bool enableFillAnimation)
+{
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, EnableAutoFillAnimation, enableFillAnimation, frameNode);
+}
+
+void RichEditorModelNG::ResetEnableAutoFillAnimation(FrameNode* frameNode)
+{
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, EnableAutoFillAnimation, true, frameNode);
+}
+
+bool RichEditorModelNG::GetEnableAutoFillAnimation(FrameNode* frameNode)
+{
+    bool value = true;
+    ACE_GET_NODE_LAYOUT_PROPERTY_WITH_DEFAULT_VALUE(
+        RichEditorLayoutProperty, EnableAutoFillAnimation, value, frameNode, true);
+    return value;
+}
+
 // ===== border methods (static methods with FrameNode*) =====
 void RichEditorModelNG::SetBorderWidth(FrameNode* frameNode, const BorderWidthProperty& borderWidth)
 {

@@ -5322,6 +5322,7 @@ const ArkUI_AttributeItem* GetRichEditorInputType(ArkUI_NodeHandle node)
     auto resultValue = GetFullImpl()->getNodeModifiers()->getRichEditorModifier()->getRichEditorInputType(
         node->uiNodeHandle);
     g_numberValues[0].i32 = resultValue;
+    g_attributeItem.size = NUM_1;
     return &g_attributeItem;
 }
 
@@ -5329,6 +5330,133 @@ void ResetRichEditorInputType(ArkUI_NodeHandle node)
 {
     auto* fullImpl = GetFullImpl();
     fullImpl->getNodeModifiers()->getRichEditorModifier()->resetRichEditorInputType(node->uiNodeHandle);
+}
+
+// —— EnableAutoFill ——
+int32_t SetRichEditorEnableAutoFill(ArkUI_NodeHandle node, const ArkUI_AttributeItem* item)
+{
+    auto actualSize = CheckAttributeItemArray(item, REQUIRED_ONE_PARAM);
+    if (actualSize < 0) {
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    auto* fullImpl = GetFullImpl();
+    CHECK_NULL_RETURN(fullImpl, ERROR_CODE_NATIVE_IMPL_TYPE_NOT_SUPPORTED);
+    fullImpl->getNodeModifiers()->getRichEditorModifier()->setRichEditorEnableAutoFill(
+        node->uiNodeHandle, static_cast<ArkUI_Uint32>(item->value[NUM_0].i32));
+    return ERROR_CODE_NO_ERROR;
+}
+
+const ArkUI_AttributeItem* GetRichEditorEnableAutoFill(ArkUI_NodeHandle node)
+{
+    auto resultValue = GetFullImpl()->getNodeModifiers()->getRichEditorModifier()->
+        getRichEditorEnableAutoFill(node->uiNodeHandle);
+    g_numberValues[0].i32 = resultValue;
+    g_attributeItem.size = NUM_1;
+    return &g_attributeItem;
+}
+
+void ResetRichEditorEnableAutoFill(ArkUI_NodeHandle node)
+{
+    GetFullImpl()->getNodeModifiers()->getRichEditorModifier()->
+        resetRichEditorEnableAutoFill(node->uiNodeHandle);
+}
+
+// ContentType (with CONVERT_CONTENT_TYPE=5 offset, aligned with SetTextInputContentType)
+int32_t SetRichEditorContentType(ArkUI_NodeHandle node, const ArkUI_AttributeItem* item)
+{
+    auto actualSize = CheckAttributeItemArray(item, REQUIRED_ONE_PARAM);
+    if (actualSize < 0) {
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    auto* fullImpl = GetFullImpl();
+    CHECK_NULL_RETURN(fullImpl, ERROR_CODE_NATIVE_IMPL_TYPE_NOT_SUPPORTED);
+    auto value = static_cast<ArkUI_Uint32>(item->value[NUM_0].i32);
+    if (value >= static_cast<ArkUI_Uint32>(ARKUI_TEXTINPUT_CONTENT_TYPE_NICKNAME) &&
+        value <= static_cast<ArkUI_Uint32>(ARKUI_TEXTINPUT_CONTENT_TYPE_LICENSE_CHASSIS_NUMBER)) {
+        value += CONVERT_CONTENT_TYPE;
+    }
+    fullImpl->getNodeModifiers()->getRichEditorModifier()->
+        setRichEditorContentType(node->uiNodeHandle, value);
+    return ERROR_CODE_NO_ERROR;
+}
+
+const ArkUI_AttributeItem* GetRichEditorContentType(ArkUI_NodeHandle node)
+{
+    auto value = GetFullImpl()->getNodeModifiers()->getRichEditorModifier()->
+        getRichEditorContentType(node->uiNodeHandle);
+    if (value >= static_cast<int32_t>(
+            static_cast<ArkUI_Uint32>(ARKUI_TEXTINPUT_CONTENT_TYPE_NICKNAME) + CONVERT_CONTENT_TYPE) &&
+        value <= static_cast<int32_t>(
+            static_cast<ArkUI_Uint32>(ARKUI_TEXTINPUT_CONTENT_TYPE_LICENSE_CHASSIS_NUMBER) + CONVERT_CONTENT_TYPE)) {
+        value -= CONVERT_CONTENT_TYPE; // get path -5
+    }
+    g_numberValues[0].i32 = value;
+    g_attributeItem.size = NUM_1;
+    return &g_attributeItem;
+}
+
+void ResetRichEditorContentType(ArkUI_NodeHandle node)
+{
+    GetFullImpl()->getNodeModifiers()->getRichEditorModifier()->
+        resetRichEditorContentType(node->uiNodeHandle);
+}
+
+// —— PasswordRules ——
+int32_t SetRichEditorPasswordRules(ArkUI_NodeHandle node, const ArkUI_AttributeItem* item)
+{
+    auto* fullImpl = GetFullImpl();
+    CHECK_NULL_RETURN(fullImpl, ERROR_CODE_NATIVE_IMPL_TYPE_NOT_SUPPORTED);
+    ArkUI_CharPtr itemString = item->string;
+    if (!itemString) {
+        itemString = "";
+    }
+    fullImpl->getNodeModifiers()->getRichEditorModifier()->
+        setRichEditorPasswordRules(node->uiNodeHandle, itemString);
+    return ERROR_CODE_NO_ERROR;
+}
+
+const ArkUI_AttributeItem* GetRichEditorPasswordRules(ArkUI_NodeHandle node)
+{
+    auto* value = GetFullImpl()->getNodeModifiers()->getRichEditorModifier()->
+        getRichEditorPasswordRules(node->uiNodeHandle);
+    g_attributeItem.string = value;
+    return &g_attributeItem;
+}
+
+void ResetRichEditorPasswordRules(ArkUI_NodeHandle node)
+{
+    GetFullImpl()->getNodeModifiers()->getRichEditorModifier()->
+        resetRichEditorPasswordRules(node->uiNodeHandle);
+}
+
+// —— EnableFillAnimation ——
+int32_t SetRichEditorEnableFillAnimation(ArkUI_NodeHandle node, const ArkUI_AttributeItem* item)
+{
+    auto actualSize = CheckAttributeItemArray(item, REQUIRED_ONE_PARAM);
+    if (actualSize < 0) {
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    auto* fullImpl = GetFullImpl();
+    CHECK_NULL_RETURN(fullImpl, ERROR_CODE_NATIVE_IMPL_TYPE_NOT_SUPPORTED);
+    fullImpl->getNodeModifiers()->getRichEditorModifier()->
+        setRichEditorEnableFillAnimation(node->uiNodeHandle,
+            static_cast<ArkUI_Uint32>(item->value[NUM_0].i32));
+    return ERROR_CODE_NO_ERROR;
+}
+
+const ArkUI_AttributeItem* GetRichEditorEnableFillAnimation(ArkUI_NodeHandle node)
+{
+    auto resultValue = GetFullImpl()->getNodeModifiers()->getRichEditorModifier()->
+        getRichEditorEnableFillAnimation(node->uiNodeHandle);
+    g_numberValues[0].i32 = resultValue;
+    g_attributeItem.size = NUM_1;
+    return &g_attributeItem;
+}
+
+void ResetRichEditorEnableFillAnimation(ArkUI_NodeHandle node)
+{
+    GetFullImpl()->getNodeModifiers()->getRichEditorModifier()->
+        resetRichEditorEnableFillAnimation(node->uiNodeHandle);
 }
 
 int32_t SetRichEditorShowPasswordIcon(ArkUI_NodeHandle node, const ArkUI_AttributeItem* item)
