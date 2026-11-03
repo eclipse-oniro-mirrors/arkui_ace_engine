@@ -120,6 +120,7 @@ CJ_EXPORT void FfiTextSetResponseRegion(CJResponseRegion value);
 CJ_EXPORT void FfiTextSetResponseRegionArray(VectorStringPtr vecContent);
 CJ_EXPORT void FfiOHOSAceFrameworkTextSetFont(
     double fontSize, int32_t unit, const char* fontWeight, const char* fontFamily, int32_t fontStyle);
+CJ_EXPORT void FfiOHOSAceFrameworkTextResetFont();
 CJ_EXPORT VectorNativeShadowOptionsHandle FFICJCreateVectorNativeShadowOptions(int64_t size);
 CJ_EXPORT void FFICJVectorNativeShadowOptionsDelete(VectorNativeShadowOptionsHandle vec);
 CJ_EXPORT void FFICJVectorNativeShadowOptionsSetElement(

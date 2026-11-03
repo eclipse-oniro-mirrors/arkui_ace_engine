@@ -84,7 +84,15 @@ CJ_EXPORT void FfiOHOSAceFrameworkTextFieldSetMinFontSize(double value, int32_t 
 CJ_EXPORT void FfiOHOSAceFrameworkTextFieldSetSelectedBackgroundColor(uint32_t value);
 CJ_EXPORT void FfiOHOSAceFrameworkTextFieldSetCaretStyle(double value, int32_t unit, uint32_t color);
 CJ_EXPORT void FfiOHOSAceFrameworkTextFieldSetTextIndent(double value, int32_t unit);
+CJ_EXPORT void FfiOHOSAceFrameworkTextFieldSetTextIndentV2(double value, int32_t unit);
+CJ_EXPORT void FfiOHOSAceFrameworkTextFieldResetTextIndent();
+CJ_EXPORT void FfiOHOSAceFrameworkTextFieldSetEllipsisMode(int32_t ellipsisMode);
+CJ_EXPORT void FfiOHOSAceFrameworkTextFieldResetEllipsisMode();
+CJ_EXPORT void FfiOHOSAceFrameworkTextFieldSetHalfLeading(bool value);
+CJ_EXPORT void FfiOHOSAceFrameworkTextFieldResetHalfLeading();
 CJ_EXPORT void FfiOHOSAceFrameworkTextFieldSetTextOverflow(int32_t value);
+CJ_EXPORT void FfiOHOSAceFrameworkTextFieldSetTextOverflowV2(int32_t value);
+CJ_EXPORT void FfiOHOSAceFrameworkTextFieldResetTextOverflow();
 CJ_EXPORT void FfiOHOSAceFrameworkTextFieldSetEnablePreviewText(bool value);
 CJ_EXPORT void FfiOHOSAceFrameworkTextFieldSetStyle(int32_t value);
 CJ_EXPORT void FfiOHOSAceFrameworkTextFieldSetBarState(int32_t value);

@@ -238,6 +238,8 @@ CJ_EXPORT void FfiOHOSAceFrameworkTabsSetAnimationDuration(float duration);
 CJ_EXPORT void FfiOHOSAceFrameworkTabsSetAnimateMode(int32_t animateMode);
 CJ_EXPORT void FfiOHOSAceFrameworkTabsSetBarPosition(int32_t barPosition);
 CJ_EXPORT void FfiOHOSAceFrameworkTabsSetDivider(CJTabsDividerStyle dividerStyle);
+CJ_EXPORT void FfiOHOSAceFrameworkTabsSetDividerV2(CJTabsDividerStyle dividerStyle, bool hasStrokeWidth,
+    bool hasColor, bool hasStartMargin, bool hasEndMargin);
 CJ_EXPORT void FfiOHOSAceFrameworkTabsSetFadingEdge(bool fadingEdge);
 CJ_EXPORT void FfiOHOSAceFrameworkTabsSetBarOverlap(bool barOverlap);
 CJ_EXPORT void FfiOHOSAceFrameworkTabsSetBarBackgroundColor(uint32_t backgroundColor);
