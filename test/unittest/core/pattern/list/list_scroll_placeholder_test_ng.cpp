@@ -999,6 +999,77 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderRetireHidesShellRender001
 }
 
 /**
+ * @tc.name: ScrollPlaceholderCoverageFreezeHide001
+ * @tc.desc: Fast-scroll freeze suppression: a shell whose index left the layout
+ *           round's coverage (itemPosition_) stops being painted even while it
+ *           keeps waiting inside the ±10 retirement band — its geometry froze
+ *           the moment the fill loops stopped re-acquiring it, so painting it
+ *           over the freshly scrolling rows is the overlap frame. Coverage
+ *           coming back restores the render output (the same round re-positions
+ *           it), and unknown coverage (-1/-1, pre-first-layout) never touches it.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderCoverageFreezeHide001, TestSize.Level1)
+{
+    CreatePlaceholderList(
+        [](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            return MakeDefaultPlaceholderOptions();
+        },
+        true);
+    CreateItemsAndDone();
+
+    int32_t index = FindUnbuiltSlot();
+    ASSERT_GE(index, 0);
+    auto shell = pattern_->CreateScrollPlaceholderShell(index);
+    ASSERT_TRUE(shell);
+    EXPECT_FALSE(shell->GetRenderContext()->HasOpacity());
+
+    // Layout round whose fill loops covered the index: nothing to suppress.
+    pattern_->itemPosition_.clear();
+    pattern_->itemPosition_[index] = {};
+    pattern_->ReconcileScrollPlaceholderItems(index, index);
+    EXPECT_FALSE(shell->GetRenderContext()->HasOpacity());
+    EXPECT_FALSE(pattern_->scrollPlaceholderItems_[index].frozenHidden);
+
+    // Fast scroll left the index behind while it stayed inside the ±10
+    // retirement band: the entry survives (commit/queue semantics untouched)
+    // but the frozen shell no longer paints.
+    int32_t nextStart = index + 5;
+    pattern_->itemPosition_.clear();
+    pattern_->itemPosition_[nextStart] = {};
+    pattern_->itemPosition_[nextStart + 1] = {};
+    pattern_->ReconcileScrollPlaceholderItems(nextStart, nextStart + 1);
+    EXPECT_TRUE(pattern_->HasScrollPlaceholderItem(index));
+    EXPECT_TRUE(IsChildOfHost(shell));
+    ASSERT_TRUE(shell->GetRenderContext()->HasOpacity());
+    EXPECT_EQ(shell->GetRenderContext()->GetOpacityValue(), 0.0);
+    EXPECT_TRUE(pattern_->scrollPlaceholderItems_[index].frozenHidden);
+
+    // The user scrolls back and the round covers the index again: the render
+    // output returns together with the re-positioning of the same round.
+    pattern_->itemPosition_.clear();
+    pattern_->itemPosition_[index] = {};
+    pattern_->ReconcileScrollPlaceholderItems(index, index);
+    ASSERT_TRUE(shell->GetRenderContext()->HasOpacity());
+    EXPECT_EQ(shell->GetRenderContext()->GetOpacityValue(), 1.0);
+    EXPECT_FALSE(pattern_->scrollPlaceholderItems_[index].frozenHidden);
+
+    // Unknown coverage (empty itemPosition_, pre-first-layout) fails open and
+    // leaves the render state alone.
+    pattern_->itemPosition_.clear();
+    pattern_->ReconcileScrollPlaceholderItems(-1, -1);
+    EXPECT_TRUE(pattern_->HasScrollPlaceholderItem(index));
+    EXPECT_EQ(shell->GetRenderContext()->GetOpacityValue(), 1.0);
+
+    // The retirement funnel still takes the (hidden or restored) pending shell
+    // once the window really moved beyond the margin.
+    int32_t farStart = index + 11 + 10;
+    pattern_->ReconcileScrollPlaceholderItems(farStart, farStart + 1);
+    EXPECT_FALSE(pattern_->HasScrollPlaceholderItem(index));
+    EXPECT_FALSE(IsChildOfHost(shell));
+}
+
+/**
  * @tc.name: ScrollPlaceholderAcquisitionParity001
  * @tc.desc: A shell returned by the acquisition intercept carries the same
  *           post-acquisition state as a child of the standard path: the host's

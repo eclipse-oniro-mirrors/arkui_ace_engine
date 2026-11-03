@@ -847,6 +847,47 @@ void ListPattern::SweepScrollPlaceholderOutOfRange(int32_t start, int32_t end)
     }
 }
 
+void ListPattern::SyncScrollPlaceholderShellCoverage(int32_t index, ScrollPlaceholderItemInfo& info)
+{
+    // Runs on UI-thread layout rounds only, from ReconcileScrollPlaceholderItems
+    // right after the layout swap: by then itemPosition_ mirrors exactly the
+    // indices the just-finished round's fill loops covered, and List applies a
+    // scroll offset by re-laying exactly those entries
+    // (ListLayoutAlgorithm::Layout: per entry, frame position = content position -
+    // currentOffset_). A shell whose index left that coverage (the fill loops
+    // moved past it during a fast scroll) never gets repositioned - its node keeps
+    // the last-synced host-space position, an on-screen stale position it keeps
+    // painting while the real rows scroll past (the zero-frame-count shell is
+    // invisible to the index-space recycling that reclaims real items), until its
+    // retirement (flush/commit cadence) catches up several layout rounds later.
+    // Suppress the render output for exactly that window - same mechanism as the
+    // retirement hide: the opacity update rides the modifier path onto the RS node
+    // and lands in the same frame's render flush, so the frozen shell paints no
+    // stale-geometry frame at all. Restore as soon as coverage returns: the round
+    // that covers the index again also re-positions it. Idempotent - only
+    // transitions flip the render dirty flag.
+    const auto& shell = info.shell;
+    CHECK_NULL_VOID(shell);
+    auto renderContext = shell->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    const bool covered = itemPosition_.find(index) != itemPosition_.end();
+    if (covered != info.frozenHidden) {
+        return;
+    }
+    if (covered) {
+        info.frozenHidden = false;
+        renderContext->UpdateOpacity(1.0);
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder shell coverage-restored: index=%{public}d", index);
+    } else {
+        info.frozenHidden = true;
+        renderContext->UpdateOpacity(0.0);
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder shell frozen-hidden: index=%{public}d", index);
+    }
+    shell->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
+}
+
 void ListPattern::ReconcileScrollPlaceholderItems(int32_t layoutStart, int32_t layoutEnd)
 {
     // Layout-round reconcile: placeholders whose index already holds a
@@ -859,6 +900,14 @@ void ListPattern::ReconcileScrollPlaceholderItems(int32_t layoutStart, int32_t l
     // coordinates, so a scrollbar jump would otherwise paint the previous
     // window's shells on top of the new content until a later event-path
     // sweep (ProcessEvent) caught up.
+    // The out-of-window drop keeps the ±SCROLL_PH_RANGE_MARGIN band on purpose
+    // (commit visibility guard / cache-band prefetch), so during a fast fling a
+    // frozen shell can stay pending inside that band for several layout rounds
+    // — each round painting it at its frozen on-screen position while the real
+    // rows scroll past (the device overlap frames). The coverage sync below
+    // closes that visual window: a shell the current round's fill loops no
+    // longer cover (its index left itemPosition_) never paints stale geometry
+    // even while it keeps waiting in the band.
     // The orphan sweep at the end also runs with both tables empty: an empty
     // table with a mounted shell is exactly the residual it exists to catch.
     auto host = GetHost();
@@ -866,9 +915,15 @@ void ListPattern::ReconcileScrollPlaceholderItems(int32_t layoutStart, int32_t l
     int32_t totalCount = host->GetTotalChildCount();
     auto* context = host->GetContext();
     const auto& manager = context ? context->GetOrCreateScrollPlaceholderManager() : nullptr;
+    // -1/-1 (empty itemPosition_, pre-first-layout) means unknown coverage:
+    // fail open like the window range below and leave every shell as-is.
+    const bool coverageKnown = layoutStart >= 0 && layoutEnd >= 0;
     for (auto iter = scrollPlaceholderItems_.begin(); iter != scrollPlaceholderItems_.end();) {
         if (iter->second.shell) {
             LogScrollPlaceholderShellState(host, iter->first, iter->second.shell);
+        }
+        if (coverageKnown) {
+            SyncScrollPlaceholderShellCoverage(iter->first, iter->second);
         }
         bool outOfWindow = !InScrollPhVisibleRange(layoutStart, layoutEnd, iter->first);
         bool drop = iter->first >= totalCount ||
