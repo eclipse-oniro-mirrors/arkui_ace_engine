@@ -20,6 +20,7 @@
 #include "core/common/ace_engine.h"
 #include "core/components/common/layout/grid_column_info.h"
 #include "core/components/container_modal/container_modal_constants.h"
+#include "core/components_ng/base/view_abstract.h"
 #include "core/components_ng/manager/force_split/force_split_manager.h"
 #include "core/components_ng/manager/navigation/navigation_manager.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
@@ -55,6 +56,12 @@ constexpr Dimension AVOID_LIMIT_PADDING = 8.0_vp;
 // Handedness layout safe-area clearances.
 constexpr Dimension HANDEDNESS_TOP_SAFE_PADDING = 8.0_vp;
 constexpr Dimension HANDEDNESS_BOTTOM_SAFE_PADDING = 16.0_vp;
+constexpr Dimension HANDEDNESS_HORIZONTAL_MARGIN_SM = 16.0_vp;
+constexpr Dimension HANDEDNESS_HORIZONTAL_MARGIN_MD = 24.0_vp;
+constexpr Dimension HANDEDNESS_HORIZONTAL_MARGIN_LG = 32.0_vp;
+constexpr int32_t WIDTH_BREAKPOINT_SM = 1;
+constexpr int32_t WIDTH_BREAKPOINT_MD = 2;
+constexpr int32_t WIDTH_BREAKPOINT_LG = 3;
 constexpr double EXPAND_DISPLAY_WINDOW_HEIGHT_RATIO = 0.67;
 constexpr double EXPAND_DISPLAY_DIALOG_HEIGHT_RATIO = 0.9;
 constexpr double HALF = 2.0;
@@ -259,8 +266,18 @@ std::pair<bool, OffsetF> DialogLayoutAlgorithm::ComputeHandednessOffset(
     CHECK_NULL_RETURN(dialogTheme_, std::make_pair(false, OffsetF()));
     CHECK_NULL_RETURN(dialogPattern, std::make_pair(false, OffsetF()));
 
-    // Horizontal margin follows dialogTheme_->GetMarginLeft() on both sides.
-    float horizontalMarginPx = static_cast<float>(pipeline->NormalizeToPx(dialogTheme_->GetMarginLeft()));
+    Dimension horizontalMargin = HANDEDNESS_HORIZONTAL_MARGIN_SM;
+    auto widthBp = ViewAbstract::GetWindowWidthBreakpoint();
+    if (widthBp >= 0) {
+        if (widthBp <= WIDTH_BREAKPOINT_SM) {
+            horizontalMargin = HANDEDNESS_HORIZONTAL_MARGIN_SM;
+        } else if (widthBp == WIDTH_BREAKPOINT_MD) {
+            horizontalMargin = HANDEDNESS_HORIZONTAL_MARGIN_MD;
+        } else if (widthBp >= WIDTH_BREAKPOINT_LG) {
+            horizontalMargin = HANDEDNESS_HORIZONTAL_MARGIN_LG;
+        }
+    }
+    float horizontalMarginPx = static_cast<float>(pipeline->NormalizeToPx(horizontalMargin));
     // Top: 8vp clearance from the top safe-area edge.
     float topPaddingPx = static_cast<float>(pipeline->NormalizeToPx(HANDEDNESS_TOP_SAFE_PADDING));
     // Bottom: 0 if a bottom safe area exists, otherwise 16vp clearance.
