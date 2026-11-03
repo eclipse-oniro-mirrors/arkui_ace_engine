@@ -828,7 +828,7 @@ void ButtonPattern::OnMaterialDisable()
         renderContext->ResetBackgroundColor();
         return;
     }
-    if (!renderContext->HasBackgroundColor()) {
+    if (!renderContext->HasBackgroundColor() || !layoutProperty->GetIsUserSetBackgroundColor()) {
         renderContext->UpdateBackgroundColor(buttonTheme->GetBgColor(buttonStyle, buttonRole));
     }
     themeBgColor_ = buttonTheme->GetBgColor(buttonStyle, buttonRole);
@@ -1169,7 +1169,7 @@ void ButtonPattern::HandleBackgroundColor()
         return;
     }
 
-    if (!renderContext->HasBackgroundColor()) {
+    if (!renderContext->HasBackgroundColor() || !layoutProperty->GetIsUserSetBackgroundColor()) {
         renderContext->UpdateBackgroundColor(buttonTheme->GetBgColor(buttonStyle, buttonRole));
     }
     if (renderContext->GetSystemMaterial() && !layoutProperty->GetIsUserSetBackgroundColor()) {
