@@ -24,6 +24,8 @@
 #include "frameworks/core/common/ace_engine.h"
 #include "base/subwindow/subwindow_manager.h"
 #include "core/components/navigator/navigator_type.h"
+#include "base/utils/container.h"
+#include "interfaces/inner_api/ace/constants.h"
 
 namespace OHOS::Ace::Framework {
 
@@ -106,6 +108,12 @@ void FrontendDelegateDeclarativeNG::SetOnCompleteContinuationCallBack(
 void FrontendDelegateDeclarativeNG::SetOnSaveDataCallBack(OnSaveDataCallBack&& onSaveDataCallBack)
 {
     onSaveDataCallBack_ = onSaveDataCallBack;
+}
+
+void FrontendDelegateDeclarativeNG::SetRecoverableSnapshotCallBack(
+    RecoverableSnapshotCallBack&& recoverableSnapshotCallBack)
+{
+    recoverableSnapshotCallBack_ = recoverableSnapshotCallBack;
 }
 
 void FrontendDelegateDeclarativeNG::SetOnRemoteTerminatedCallBack(
@@ -1493,6 +1501,33 @@ void FrontendDelegateDeclarativeNG::CreateSnapshotFromComponent(const RefPtr<NG:
 #endif
 }
 
+
+namespace {
+// ===== RecoverableStorage bridge helpers (local, per-TU — no shared header to avoid fan-out) =====
+
+bool IsRecoverableContentInfoType(ContentInfoType type)
+{
+    return type == ContentInfoType::APP_RECOVERY || type == ContentInfoType::RESOURCESCHEDULE_RECOVERY;
+}
+
+std::string GetRecoverableStorageSection(
+    const RefPtr<TaskExecutor>& taskExecutor, const RecoverableSnapshotCallBack& callback)
+{
+    std::string section;
+    if (!callback) {
+        return section;
+    }
+    int32_t instanceId = Container::CurrentId();
+    if (taskExecutor) {
+        taskExecutor->PostSyncTask([&callback, &section, instanceId] {
+            callback(instanceId, section);
+        }, TaskExecutor::TaskType::JS, "ArkUIRecoverableStorageSnapshot");
+    }
+    return section;
+}
+
+} // anonymous namespace
+
 std::string FrontendDelegateDeclarativeNG::GetContentInfo(ContentInfoType type)
 {
     auto jsonContentInfo = JsonUtil::Create(true);
@@ -1510,6 +1545,15 @@ std::string FrontendDelegateDeclarativeNG::GetContentInfo(ContentInfoType type)
         auto pipelineContext = pipelineContextHolder_.Get();
         CHECK_NULL_RETURN(pipelineContext, jsonContentInfo->ToString());
         jsonContentInfo->Put("nodeInfo", pipelineContext->GetStoredNodeInfo());
+    }
+
+    // RecoverableStorage snapshot section: appended for both recovery contentInfo types
+    // (APP_RECOVERY = 2 / RESOURCESCHEDULE_RECOVERY = 3), never for CONTINUATION.
+    if (IsRecoverableContentInfoType(type)) {
+        auto recoverableSection = GetRecoverableStorageSection(taskExecutor_, recoverableSnapshotCallBack_);
+        if (!recoverableSection.empty()) {
+            jsonContentInfo->Put("recoverableStorage", recoverableSection.c_str());
+        }
     }
 
     return jsonContentInfo->ToString();

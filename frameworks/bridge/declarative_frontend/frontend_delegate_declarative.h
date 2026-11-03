@@ -55,6 +55,11 @@ struct RouterTask {
     std::function<void(const std::string&, int32_t)> errorCallback;
 };
 
+// RecoverableStorage bridge callback types (minimal footprint — implementations in
+// implementations live in the .cpp files).
+using RecoverableSnapshotCallBack = std::function<void(int32_t instanceId, std::string& section)>;
+using RecoverableRestoreCallBack = std::function<void(int32_t instanceId, const std::string& section)>;
+
 class FrontendDelegateDeclarative : public FrontendDelegate {
     DECLARE_ACE_TYPE(FrontendDelegateDeclarative, FrontendDelegate);
 
@@ -136,7 +141,8 @@ public:
     std::pair<RouterRecoverRecord, UIContentErrorCode> RestoreRouterStack(
         const std::string& contentInfo, ContentInfoType type) override;
     std::string GetContentInfo(ContentInfoType type) override;
-
+    void SetRecoverableSnapshotCallBack(RecoverableSnapshotCallBack&& recoverableSnapshotCallBack);
+    void SetRecoverableRestoreCallBack(RecoverableRestoreCallBack&& recoverableRestoreCallBack);
     // Accessibility delegate functions.
     RefPtr<Framework::AccessibilityNodeManager> GetJSAccessibilityManager() const
     {
@@ -558,6 +564,8 @@ private:
     OnCompleteContinuationCallBack onCompleteContinuationCallBack_;
     OnRemoteTerminatedCallBack onRemoteTerminatedCallBack_;
     OnSaveDataCallBack onSaveDataCallBack_;
+    RecoverableSnapshotCallBack recoverableSnapshotCallBack_;
+    RecoverableRestoreCallBack recoverableRestoreCallBack_;
     OnRestoreDataCallBack onRestoreDataCallBack_;
     RefPtr<Framework::ManifestParser> manifestParser_;
     RefPtr<Framework::AccessibilityNodeManager> jsAccessibilityManager_;

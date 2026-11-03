@@ -3609,6 +3609,58 @@ void JsiDeclarativeEngine::OnSaveData(std::string& data)
     }
 }
 
+// Calls globalThis.__RecoverableStorageHook__.extractSnapshot(instanceId) registered by the
+// state_mgmt TS bundle (recoverable_storage.ts). Returns "" when the hook is absent
+// (no RecoverableStorage usage in the app) or the call fails.
+std::string JsiDeclarativeEngine::GetRecoverableStorageSnapshot(int32_t instanceId)
+{
+    shared_ptr<JsRuntime> runtime = engineInstance_->GetJsRuntime();
+    if (!runtime) {
+        return "";
+    }
+    shared_ptr<JsValue> global = runtime->GetGlobal();
+    if (!global || !global->IsObject(runtime)) {
+        return "";
+    }
+    shared_ptr<JsValue> hook = global->GetProperty(runtime, "__RecoverableStorageHook__");
+    if (!hook || !hook->IsObject(runtime)) {
+        return "";
+    }
+    shared_ptr<JsValue> func = hook->GetProperty(runtime, "extractSnapshot");
+    if (!func || !func->IsFunction(runtime)) {
+        return "";
+    }
+    std::vector<shared_ptr<JsValue>> argv = { runtime->NewInt32(instanceId) };
+    shared_ptr<JsValue> result = func->Call(runtime, hook, argv, argv.size());
+    if (!result || result->IsUndefined(runtime) || result->IsException(runtime)) {
+        return "";
+    }
+    return result->ToString(runtime);
+}
+
+// Calls globalThis.__RecoverableStorageHook__.setRestoredData(instanceId, sectionJson).
+void JsiDeclarativeEngine::SetRecoverableStorageData(int32_t instanceId, const std::string& data)
+{
+    shared_ptr<JsRuntime> runtime = engineInstance_->GetJsRuntime();
+    if (!runtime) {
+        return;
+    }
+    shared_ptr<JsValue> global = runtime->GetGlobal();
+    if (!global || !global->IsObject(runtime)) {
+        return;
+    }
+    shared_ptr<JsValue> hook = global->GetProperty(runtime, "__RecoverableStorageHook__");
+    if (!hook || !hook->IsObject(runtime)) {
+        return;
+    }
+    shared_ptr<JsValue> func = hook->GetProperty(runtime, "setRestoredData");
+    if (!func || !func->IsFunction(runtime)) {
+        return;
+    }
+    std::vector<shared_ptr<JsValue>> argv = { runtime->NewInt32(instanceId), runtime->NewString(data) };
+    func->Call(runtime, hook, argv, argv.size());
+}
+
 void JsiDeclarativeEngine::SetErrorEventHandler(
     std::function<void(const std::string&, const std::string&)>&& errorCallback)
 {
@@ -3733,15 +3785,23 @@ void JsiDeclarativeEngine::JsUnregisterInstanceId()
     auto globalObj = JSNApi::GetGlobalObject(vm);
     const auto globalObject = JSRef<JSObject>::Make(globalObj);
     const JSRef<JSVal> unregisterInstanceIdFun = globalObject->GetProperty("unregisterInstanceIdForEnv");
-    if (!unregisterInstanceIdFun->IsFunction()) {
-        return;
+    if (unregisterInstanceIdFun->IsFunction()) {
+        const auto func = JSRef<JSFunc>::Cast(unregisterInstanceIdFun);
+        ContainerScope scope(instanceId_);
+        shared_ptr<JsRuntime> runtime = engineInstance_->GetJsRuntime();
+        std::vector<shared_ptr<JsValue>> argv = { runtime->NewNumber(instanceId_) };
+        JSRef<JSVal> param = JSRef<JSVal>::Make(JsiValueConvertor::toJsiValueWithVM(vm, instanceId_));
+        func->Call(globalObject, 1, &param);
     }
-    const auto func = JSRef<JSFunc>::Cast(unregisterInstanceIdFun);
-    ContainerScope scope(instanceId_);
-    shared_ptr<JsRuntime> runtime = engineInstance_->GetJsRuntime();
-    std::vector<shared_ptr<JsValue>> argv = { runtime->NewNumber(instanceId_) };
-    JSRef<JSVal> param = JSRef<JSVal>::Make(JsiValueConvertor::toJsiValueWithVM(vm, instanceId_));
-    func->Call(globalObject, 1, &param);
+    // RecoverableStorage instance cleanup (design ADR-5): same destroy point as @Env.
+    const JSRef<JSVal> unregisterRecoverableFun =
+        globalObject->GetProperty("unregisterInstanceIdForRecoverable");
+    if (unregisterRecoverableFun->IsFunction()) {
+        const auto recoverableFunc = JSRef<JSFunc>::Cast(unregisterRecoverableFun);
+        JSRef<JSVal> recoverableParam =
+            JSRef<JSVal>::Make(JsiValueConvertor::toJsiValueWithVM(vm, instanceId_));
+        recoverableFunc->Call(globalObject, 1, &recoverableParam);
+    }
 #endif
 }
 

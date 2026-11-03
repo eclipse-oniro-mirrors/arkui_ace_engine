@@ -32,6 +32,8 @@
 #include "jsview/js_view_abstract.h"
 #include "core/components_ng/pattern/app_bar/app_bar_view.h"
 #include "core/components_ng/manager/navigation/navigation_manager.h"
+#include "base/utils/container.h"
+#include "interfaces/inner_api/ace/constants.h"
 
 namespace OHOS::Ace::Framework {
 namespace {
@@ -3720,6 +3722,48 @@ RefPtr<PipelineBase> FrontendDelegateDeclarative::GetPipelineContext()
     return pipelineContextHolder_.Get();
 }
 
+
+namespace {
+// ===== RecoverableStorage bridge helpers (local, per-TU — no shared header to avoid fan-out) =====
+
+bool IsRecoverableContentInfoType(ContentInfoType type)
+{
+    return type == ContentInfoType::APP_RECOVERY || type == ContentInfoType::RESOURCESCHEDULE_RECOVERY;
+}
+
+std::string GetRecoverableStorageSection(
+    const RefPtr<TaskExecutor>& taskExecutor, const RecoverableSnapshotCallBack& callback)
+{
+    std::string section;
+    if (!callback) {
+        return section;
+    }
+    int32_t instanceId = Container::CurrentId();
+    if (taskExecutor) {
+        taskExecutor->PostSyncTask([&callback, &section, instanceId] {
+            callback(instanceId, section);
+        }, TaskExecutor::TaskType::JS, "ArkUIRecoverableStorageSnapshot");
+    }
+    return section;
+}
+
+void DeliverRecoverableStorageSection(
+    const RefPtr<TaskExecutor>& taskExecutor, const RecoverableRestoreCallBack& callback,
+    const std::string& section)
+{
+    if (!callback || section.empty()) {
+        return;
+    }
+    int32_t instanceId = Container::CurrentId();
+    if (taskExecutor) {
+        taskExecutor->PostSyncTask([&callback, &section, instanceId] {
+            callback(instanceId, section);
+        }, TaskExecutor::TaskType::JS, "ArkUIRecoverableStorageRestore");
+    }
+}
+
+} // anonymous namespace
+
 std::pair<RouterRecoverRecord, UIContentErrorCode> FrontendDelegateDeclarative::RestoreRouterStack(
     const std::string& contentInfo, ContentInfoType type)
 {
@@ -3728,6 +3772,16 @@ std::pair<RouterRecoverRecord, UIContentErrorCode> FrontendDelegateDeclarative::
     if (!jsonContentInfo->IsValid() || !jsonContentInfo->IsObject()) {
         LOGW("restore contentInfo is invalid");
         return std::make_pair(RouterRecoverRecord(), UIContentErrorCode::WRONG_PAGE_ROUTER);
+    }
+    // RecoverableStorage restore delivery (design ADR-3): covers BOTH arrival paths — the
+    // default recovery (ShouldDefaultRecoverState) and HandleCreateAsRecovery — because
+    // every recovery restore funnels through RestoreRouterStack.
+    if (IsRecoverableContentInfoType(type)) {
+        auto recoverableSection = jsonContentInfo->GetValue("recoverableStorage");
+        if (recoverableSection && recoverableSection->IsValid() && recoverableSection->IsString()) {
+            DeliverRecoverableStorageSection(taskExecutor_, recoverableRestoreCallBack_,
+                recoverableSection->GetString());
+        }
     }
     if (type == ContentInfoType::CONTINUATION || type == ContentInfoType::APP_RECOVERY) {
         // restore node info
@@ -3795,6 +3849,18 @@ std::pair<RouterRecoverRecord, UIContentErrorCode> FrontendDelegateDeclarative::
     return pageRouterManager_->RestoreRouterStack(std::move(routerStack), type);
 }
 
+void FrontendDelegateDeclarative::SetRecoverableSnapshotCallBack(
+    RecoverableSnapshotCallBack&& recoverableSnapshotCallBack)
+{
+    recoverableSnapshotCallBack_ = recoverableSnapshotCallBack;
+}
+
+void FrontendDelegateDeclarative::SetRecoverableRestoreCallBack(
+    RecoverableRestoreCallBack&& recoverableRestoreCallBack)
+{
+    recoverableRestoreCallBack_ = recoverableRestoreCallBack;
+}
+
 std::string FrontendDelegateDeclarative::GetContentInfo(ContentInfoType type)
 {
     auto jsonContentInfo = JsonUtil::Create(true);
@@ -3830,6 +3896,15 @@ std::string FrontendDelegateDeclarative::GetContentInfo(ContentInfoType type)
         auto pipelineContext = pipelineContextHolder_.Get();
         CHECK_NULL_RETURN(pipelineContext, jsonContentInfo->ToString());
         jsonContentInfo->Put("nodeInfo", pipelineContext->GetStoredNodeInfo());
+    }
+
+    // RecoverableStorage snapshot section: appended for both recovery contentInfo types
+    // (APP_RECOVERY = 2 / RESOURCESCHEDULE_RECOVERY = 3), never for CONTINUATION.
+    if (IsRecoverableContentInfoType(type)) {
+        auto recoverableSection = GetRecoverableStorageSection(taskExecutor_, recoverableSnapshotCallBack_);
+        if (!recoverableSection.empty()) {
+            jsonContentInfo->Put("recoverableStorage", recoverableSection.c_str());
+        }
     }
 
     return jsonContentInfo->ToString();

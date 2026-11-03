@@ -114,6 +114,7 @@
     "src/lib/partial_update/pu_repeat_virtual_scroll_2_impl.ts",
 
     "src/lib/sdk/v2_persistence.ts",
+    "src/lib/sdk/recoverable_storage.ts",
     "src/lib/sdk/ui_utils.ts",
     "src/lib/sdk/observed_util.ts",
     "src/lib/sdk/business_error.ts",

@@ -375,6 +375,10 @@ public:
 
     void OnSaveData(std::string& data) override;
 
+    std::string GetRecoverableStorageSnapshot(int32_t instanceId) override;
+
+    void SetRecoverableStorageData(int32_t instanceId, const std::string& data) override;
+
     bool OnRestoreData(const std::string& data) override;
 
     // Destroy application instance according to packageName
