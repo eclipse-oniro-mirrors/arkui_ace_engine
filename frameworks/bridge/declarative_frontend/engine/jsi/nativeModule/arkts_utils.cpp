@@ -295,6 +295,33 @@ void AddJsViewTextBackgroundColorResource(TextBackgroundStyleParseOption& option
     option.style->AddResource("textBackgroundStyle.color", option.colorResObj, std::move(updateFunc));
 }
 
+void AddJsViewTextBackgroundBorderColorResource(TextBackgroundStyleParseOption& option)
+{
+    if (!SystemProperties::ConfigChangePerform() || !option.borderColorResObj || !option.style) {
+        return;
+    }
+    auto&& updateFunc = [](const RefPtr<ResourceObject>& colorObj, TextBackgroundStyle& textBackgroundStyle) {
+        Color color;
+        if (ResourceParseUtils::ParseResColor(colorObj, color)) {
+            textBackgroundStyle.borderColor = color;
+        }
+    };
+    option.style->AddResource("textBackgroundStyle.borderColor", option.borderColorResObj, std::move(updateFunc));
+}
+
+void AddJsViewTextBackgroundBorderWidthResource(TextBackgroundStyleParseOption& option)
+{
+    if (!SystemProperties::ConfigChangePerform() || !option.borderWidthResObj || !option.style) {
+        return;
+    }
+    auto&& updateFunc = [](const RefPtr<ResourceObject>& widthObj, TextBackgroundStyle& textBackgroundStyle) {
+        CalcDimension width;
+        ResourceParseUtils::ParseResDimensionVp(widthObj, width);
+        textBackgroundStyle.borderWidth = width;
+    };
+    option.style->AddResource("textBackgroundStyle.borderWidth", option.borderWidthResObj, std::move(updateFunc));
+}
+
 void AddJsViewTextBackgroundSingleRadiusResource(
     const RefPtr<ResourceObject>& radiusResObj, TextBackgroundStyleParseOption& option)
 {
@@ -331,7 +358,8 @@ void ParseJsViewTextBackgroundRadiusObject(EcmaVM* vm, const Local<ObjectRef>& r
         corners.bottomLeft.value_or(CalcDimension()) };
     option.style->backgroundRadius->multiValued = true;
     ArkTSUtils::RegisterTextBackgroundStyleResource(
-        option.style, resObjTopLeft, resObjTopRight, resObjBottomLeft, resObjBottomRight);
+        option.style, resObjTopLeft, resObjTopRight, resObjBottomLeft, resObjBottomRight,
+        option.borderColorResObj, option.borderWidthResObj);
 }
 
 bool ParseJsViewTextBackgroundRadius(
@@ -3617,6 +3645,10 @@ void ArkTSUtils::ParseJsViewTextBackgroundStyle(EcmaVM* vm, ArkUINodeHandle nati
     option.radiusUnits.clear();
     option.color = Color::TRANSPARENT;
     option.colorResObj.Reset();
+    option.borderColor = Color::TRANSPARENT;
+    option.borderColorResObj.Reset();
+    option.borderWidth.Reset();
+    option.borderWidthResObj.Reset();
     option.radiusValues.reserve(NUM_4);
     option.radiusUnits.reserve(NUM_4);
     CHECK_NULL_VOID(option.style);
@@ -3641,10 +3673,26 @@ void ArkTSUtils::ParseJsViewTextBackgroundStyle(EcmaVM* vm, ArkUINodeHandle nati
         option.style->backgroundColor = option.color;
         AddJsViewTextBackgroundColorResource(option);
     }
+    auto borderColorValue = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "borderColor"));
+    bool hasBorderColor =
+        ArkTSUtils::ParseJsColorAlpha(vm, borderColorValue, option.borderColor, option.borderColorResObj, nodeInfo);
+    if (hasBorderColor) {
+        option.style->borderColor = option.borderColor;
+        AddJsViewTextBackgroundBorderColorResource(option);
+    }
+    auto borderWidthValue = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "borderWidth"));
+    bool hasBorderWidth = ArkTSUtils::ParseJsDimensionVp(
+        vm, borderWidthValue, option.borderWidth, option.borderWidthResObj);
+    if (hasBorderWidth) {
+        option.style->borderWidth = option.borderWidth;
+        AddJsViewTextBackgroundBorderWidthResource(option);
+    }
 }
 
 void ArkTSUtils::SetTextBackgroundStyle(std::shared_ptr<TextBackgroundStyle> style, Color color,
-    RefPtr<ResourceObject>& colorResObj, const ArkUI_Float32* values, const ArkUI_Int32* units)
+    RefPtr<ResourceObject>& colorResObj, const ArkUI_Float32* values, const ArkUI_Int32* units,
+    Color borderColor, RefPtr<ResourceObject>& borderColorResObj,
+    CalcDimension borderWidth, RefPtr<ResourceObject>& borderWidthResObj)
 {
     CHECK_NULL_VOID(style);
     if (SystemProperties::ConfigChangePerform() && colorResObj) {
@@ -3657,6 +3705,26 @@ void ArkTSUtils::SetTextBackgroundStyle(std::shared_ptr<TextBackgroundStyle> sty
         };
         style->AddResource("textBackgroundStyle.color", colorResObj, std::move(updateFunc));
     }
+    if (SystemProperties::ConfigChangePerform() && borderColorResObj) {
+        auto&& updateFunc = [](const RefPtr<ResourceObject>& borderColorResObj,
+            TextBackgroundStyle& textBackgroundStyle) {
+            Color color;
+            bool parseState = ResourceParseUtils::ParseResColor(borderColorResObj, color);
+            if (parseState) {
+                textBackgroundStyle.borderColor = color;
+            }
+        };
+        style->AddResource("textBackgroundStyle.borderColor", borderColorResObj, std::move(updateFunc));
+    }
+    if (SystemProperties::ConfigChangePerform() && borderWidthResObj) {
+        auto&& updateFunc = [](const RefPtr<ResourceObject>& borderWidthResObj,
+            TextBackgroundStyle& textBackgroundStyle) {
+            CalcDimension width;
+            ResourceParseUtils::ParseResDimensionVp(borderWidthResObj, width);
+            textBackgroundStyle.borderWidth = width;
+        };
+        style->AddResource("textBackgroundStyle.borderWidth", borderWidthResObj, std::move(updateFunc));
+    }
     NG::BorderRadiusProperty borderRadius;
     borderRadius.radiusTopLeft = Dimension(values[NUM_0], static_cast<OHOS::Ace::DimensionUnit>(units[NUM_0]));
     borderRadius.radiusTopRight = Dimension(values[NUM_1], static_cast<OHOS::Ace::DimensionUnit>(units[NUM_1]));
@@ -3665,58 +3733,61 @@ void ArkTSUtils::SetTextBackgroundStyle(std::shared_ptr<TextBackgroundStyle> sty
     style->backgroundColor = Color(color);
     style->backgroundRadius = borderRadius;
     style->backgroundRadius->multiValued = true;
+    style->borderColor = borderColor;
+    style->borderWidth = borderWidth;
 }
 
 void ArkTSUtils::RegisterTextBackgroundStyleResource(std::shared_ptr<TextBackgroundStyle> textBackgroundStyle,
     RefPtr<ResourceObject>& resObjTopLeft, RefPtr<ResourceObject>& resObjTopRight,
-    RefPtr<ResourceObject>& resObjBottomLeft, RefPtr<ResourceObject>& resObjBottomRight)
+    RefPtr<ResourceObject>& resObjBottomLeft, RefPtr<ResourceObject>& resObjBottomRight,
+    RefPtr<ResourceObject>& borderColorResObj, RefPtr<ResourceObject>& borderWidthResObj)
 {
     if (!SystemProperties::ConfigChangePerform()) {
         return;
     }
     CHECK_NULL_VOID(textBackgroundStyle);
-    if (resObjTopLeft) {
-        auto&& updateFunc = [](const RefPtr<ResourceObject>& resObjTopLeft,
-            TextBackgroundStyle& textBackgroundStyle) {
+    auto registerRadius = [&textBackgroundStyle](
+        RefPtr<ResourceObject>& resObj, const std::string& key,
+        std::optional<Dimension> BorderRadiusProperty::* member) {
+        if (!resObj) {
+            return;
+        }
+        auto&& updateFunc = [member](const RefPtr<ResourceObject>& resObj,
+            TextBackgroundStyle& style) {
+            if (!style.backgroundRadius.has_value()) {
+                style.backgroundRadius = NG::BorderRadiusProperty();
+            }
             CalcDimension radius;
-            ResourceParseUtils::ParseResDimensionVp(resObjTopLeft, radius);
-            textBackgroundStyle.backgroundRadius->radiusTopLeft = radius;
-            textBackgroundStyle.backgroundRadius->multiValued = true;
+            ResourceParseUtils::ParseResDimensionVp(resObj, radius);
+            style.backgroundRadius.value().*member = radius;
+            style.backgroundRadius->multiValued = true;
         };
-        textBackgroundStyle->AddResource("textBackgroundStyle.radiusTopLeft", resObjTopLeft,
+        textBackgroundStyle->AddResource(key, resObj, std::move(updateFunc));
+    };
+    registerRadius(resObjTopLeft, "textBackgroundStyle.radiusTopLeft", &BorderRadiusProperty::radiusTopLeft);
+    registerRadius(resObjTopRight, "textBackgroundStyle.radiusTopRight", &BorderRadiusProperty::radiusTopRight);
+    registerRadius(resObjBottomLeft, "textBackgroundStyle.radiusBottomLeft", &BorderRadiusProperty::radiusBottomLeft);
+    registerRadius(resObjBottomRight, "textBackgroundStyle.radiusBottomRight",
+        &BorderRadiusProperty::radiusBottomRight);
+    if (borderColorResObj) {
+        auto&& updateFunc = [](const RefPtr<ResourceObject>& borderColorResObj,
+            TextBackgroundStyle& textBackgroundStyle) {
+            Color color;
+            if (ResourceParseUtils::ParseResColor(borderColorResObj, color)) {
+                textBackgroundStyle.borderColor = color;
+            }
+        };
+        textBackgroundStyle->AddResource("textBackgroundStyle.borderColor", borderColorResObj,
             std::move(updateFunc));
     }
-    if (resObjTopRight) {
-        auto&& updateFunc = [](const RefPtr<ResourceObject>& resObjTopRight,
+    if (borderWidthResObj) {
+        auto&& updateFunc = [](const RefPtr<ResourceObject>& borderWidthResObj,
             TextBackgroundStyle& textBackgroundStyle) {
-            CalcDimension radius;
-            ResourceParseUtils::ParseResDimensionVp(resObjTopRight, radius);
-            textBackgroundStyle.backgroundRadius->radiusTopRight = radius;
-            textBackgroundStyle.backgroundRadius->multiValued = true;
+            CalcDimension width;
+            ResourceParseUtils::ParseResDimensionVp(borderWidthResObj, width);
+            textBackgroundStyle.borderWidth = width;
         };
-        textBackgroundStyle->AddResource("textBackgroundStyle.radiusTopRight", resObjTopRight,
-            std::move(updateFunc));
-    }
-    if (resObjBottomLeft) {
-        auto&& updateFunc = [](const RefPtr<ResourceObject>& resObjBottomLeft,
-            TextBackgroundStyle& textBackgroundStyle) {
-            CalcDimension radius;
-            ResourceParseUtils::ParseResDimensionVp(resObjBottomLeft, radius);
-            textBackgroundStyle.backgroundRadius->radiusBottomLeft = radius;
-            textBackgroundStyle.backgroundRadius->multiValued = true;
-        };
-        textBackgroundStyle->AddResource("textBackgroundStyle.radiusBottomLeft", resObjBottomLeft,
-            std::move(updateFunc));
-    }
-    if (resObjBottomRight) {
-        auto&& updateFunc = [](const RefPtr<ResourceObject>& resObjBottomRight,
-            TextBackgroundStyle& textBackgroundStyle) {
-            CalcDimension radius;
-            ResourceParseUtils::ParseResDimensionVp(resObjBottomRight, radius);
-            textBackgroundStyle.backgroundRadius->radiusBottomRight = radius;
-            textBackgroundStyle.backgroundRadius->multiValued = true;
-        };
-        textBackgroundStyle->AddResource("textBackgroundStyle.radiusBottomRight", resObjBottomRight,
+        textBackgroundStyle->AddResource("textBackgroundStyle.borderWidth", borderWidthResObj,
             std::move(updateFunc));
     }
 }
@@ -3757,8 +3828,10 @@ void ArkTSUtils::ParseOuterBorderRadius(ArkUIRuntimeCallInfo* runtimeCallInfo,
     PushOuterBorderDimensionVector(bottomLeftOptional, values, units);
     PushOuterBorderDimensionVector(bottomRightOptional, values, units);
 
+    RefPtr<ResourceObject> borderColorResObj;
+    RefPtr<ResourceObject> borderWidthResObj;
     RegisterTextBackgroundStyleResource(textBackgroundStyle, resObjTopLeft, resObjTopRight, resObjBottomLeft,
-        resObjBottomRight);
+        resObjBottomRight, borderColorResObj, borderWidthResObj);
 }
 
 void ArkTSUtils::PushOuterBorderStyleVector(const std::optional<BorderStyle>& value, std::vector<uint32_t> &options)
@@ -5567,8 +5640,11 @@ bool ArkTSUtils::ParseAllBorderRadiuses(EcmaVM* vm, panda::Local<panda::ObjectRe
     GetBorderRadiusResObj(vm, "bottomLeft", object, borderRadius.bottomLeft, resObjBottomLeft);
     GetBorderRadiusResObj(vm, "bottomRight", object, borderRadius.bottomRight, resObjBottomRight);
 
+    RefPtr<ResourceObject> borderColorResObj;
+    RefPtr<ResourceObject> borderWidthResObj;
     ArkTSUtils::RegisterTextBackgroundStyleResource(
-        textBackgroundStyle, resObjTopLeft, resObjTopRight, resObjBottomLeft, resObjBottomRight);
+        textBackgroundStyle, resObjTopLeft, resObjTopRight, resObjBottomLeft, resObjBottomRight,
+        borderColorResObj, borderWidthResObj);
     return false;
 }
 

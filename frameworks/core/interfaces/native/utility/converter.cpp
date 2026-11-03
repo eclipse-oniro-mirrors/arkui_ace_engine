@@ -3363,6 +3363,8 @@ TextBackgroundStyle Convert(const Ark_TextBackgroundStyle& src)
         Validator::ValidateNonPercent(dst.backgroundRadius->radiusBottomLeft);
         Validator::ValidateNonPercent(dst.backgroundRadius->radiusBottomRight);
     }
+    dst.borderWidth = Converter::OptConvert<Dimension>(src.borderWidth);
+    dst.borderColor = Converter::OptConvert<Color>(src.borderColor);
     return dst;
 }
 

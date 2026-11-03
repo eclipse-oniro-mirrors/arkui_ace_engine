@@ -5891,53 +5891,55 @@ bool JSViewAbstract::ParseAllBorderRadiuses(JSRef<JSObject>& object, CalcDimensi
 
 void JSViewAbstract::RegisterTextBackgroundStyleResource(TextBackgroundStyle& textBackgroundStyle,
     RefPtr<ResourceObject>& resObjTopLeft, RefPtr<ResourceObject>& resObjTopRight,
-    RefPtr<ResourceObject>& resObjBottomLeft, RefPtr<ResourceObject>& resObjBottomRight)
+    RefPtr<ResourceObject>& resObjBottomLeft, RefPtr<ResourceObject>& resObjBottomRight,
+    RefPtr<ResourceObject>& borderColorResObj, RefPtr<ResourceObject>& borderWidthResObj)
 {
     if (!SystemProperties::ConfigChangePerform()) {
         return;
     }
-    if (resObjTopLeft) {
-        auto&& updateFunc = [](const RefPtr<ResourceObject>& resObjTopLeft,
-            TextBackgroundStyle& textBackgroundStyle) {
+    auto registerRadius = [&textBackgroundStyle](
+        RefPtr<ResourceObject>& resObj, const std::string& key,
+        std::optional<Dimension> NG::BorderRadiusProperty::* member) {
+        if (!resObj) {
+            return;
+        }
+        auto&& updateFunc = [member](const RefPtr<ResourceObject>& resObj,
+            TextBackgroundStyle& style) {
+            if (!style.backgroundRadius.has_value()) {
+                style.backgroundRadius = NG::BorderRadiusProperty();
+            }
             CalcDimension radius;
-            ResourceParseUtils::ParseResDimensionVp(resObjTopLeft, radius);
-            textBackgroundStyle.backgroundRadius->radiusTopLeft = radius;
-            textBackgroundStyle.backgroundRadius->multiValued = true;
+            ResourceParseUtils::ParseResDimensionVp(resObj, radius);
+            style.backgroundRadius.value().*member = radius;
+            style.backgroundRadius->multiValued = true;
         };
-        textBackgroundStyle.AddResource("textBackgroundStyle.radiusTopLeft", resObjTopLeft,
+        textBackgroundStyle.AddResource(key, resObj, std::move(updateFunc));
+    };
+    registerRadius(resObjTopLeft, "textBackgroundStyle.radiusTopLeft", &NG::BorderRadiusProperty::radiusTopLeft);
+    registerRadius(resObjTopRight, "textBackgroundStyle.radiusTopRight", &NG::BorderRadiusProperty::radiusTopRight);
+    registerRadius(resObjBottomLeft, "textBackgroundStyle.radiusBottomLeft",
+        &NG::BorderRadiusProperty::radiusBottomLeft);
+    registerRadius(resObjBottomRight, "textBackgroundStyle.radiusBottomRight",
+        &NG::BorderRadiusProperty::radiusBottomRight);
+    if (borderColorResObj) {
+        auto&& updateFunc = [](const RefPtr<ResourceObject>& borderColorResObj,
+            TextBackgroundStyle& textBackgroundStyle) {
+            Color color;
+            if (ResourceParseUtils::ParseResColor(borderColorResObj, color)) {
+                textBackgroundStyle.borderColor = color;
+            }
+        };
+        textBackgroundStyle.AddResource("textBackgroundStyle.borderColor", borderColorResObj,
             std::move(updateFunc));
     }
-    if (resObjTopRight) {
-        auto&& updateFunc = [](const RefPtr<ResourceObject>& resObjTopRight,
+    if (borderWidthResObj) {
+        auto&& updateFunc = [](const RefPtr<ResourceObject>& borderWidthResObj,
             TextBackgroundStyle& textBackgroundStyle) {
-            CalcDimension radius;
-            ResourceParseUtils::ParseResDimensionVp(resObjTopRight, radius);
-            textBackgroundStyle.backgroundRadius->radiusTopRight = radius;
-            textBackgroundStyle.backgroundRadius->multiValued = true;
+            CalcDimension width;
+            ResourceParseUtils::ParseResDimensionVp(borderWidthResObj, width);
+            textBackgroundStyle.borderWidth = width;
         };
-        textBackgroundStyle.AddResource("textBackgroundStyle.radiusTopRight", resObjTopRight,
-            std::move(updateFunc));
-    }
-    if (resObjBottomLeft) {
-        auto&& updateFunc = [](const RefPtr<ResourceObject>& resObjBottomLeft,
-            TextBackgroundStyle& textBackgroundStyle) {
-            CalcDimension radius;
-            ResourceParseUtils::ParseResDimensionVp(resObjBottomLeft, radius);
-            textBackgroundStyle.backgroundRadius->radiusBottomLeft = radius;
-            textBackgroundStyle.backgroundRadius->multiValued = true;
-        };
-        textBackgroundStyle.AddResource("textBackgroundStyle.radiusBottomLeft", resObjBottomLeft,
-            std::move(updateFunc));
-    }
-    if (resObjBottomRight) {
-        auto&& updateFunc = [](const RefPtr<ResourceObject>& resObjBottomRight,
-            TextBackgroundStyle& textBackgroundStyle) {
-            CalcDimension radius;
-            ResourceParseUtils::ParseResDimensionVp(resObjBottomRight, radius);
-            textBackgroundStyle.backgroundRadius->radiusBottomRight = radius;
-            textBackgroundStyle.backgroundRadius->multiValued = true;
-        };
-        textBackgroundStyle.AddResource("textBackgroundStyle.radiusBottomRight", resObjBottomRight,
+        textBackgroundStyle.AddResource("textBackgroundStyle.borderWidth", borderWidthResObj,
             std::move(updateFunc));
     }
 }
@@ -5970,8 +5972,10 @@ bool JSViewAbstract::ParseAllBorderRadiuses(JSRef<JSObject>& object, CalcDimensi
     GetBorderRadiusResObj("bottomLeft", object, bottomLeft, resObjBottomLeft);
     GetBorderRadiusResObj("bottomRight", object, bottomRight, resObjBottomRight);
 
+    RefPtr<ResourceObject> borderColorResObj;
+    RefPtr<ResourceObject> borderWidthResObj;
     RegisterTextBackgroundStyleResource(textBackgroundStyle, resObjTopLeft, resObjTopRight, resObjBottomLeft,
-        resObjBottomRight);
+        resObjBottomRight, borderColorResObj, borderWidthResObj);
     return false;
 }
 

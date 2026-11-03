@@ -34,6 +34,8 @@ public:
     static TextBackgroundStyle ParseTextBackgroundStyle(const JSRef<JSObject>& obj, bool needResObj = false);
 private:
     static void ParseTextBackgroundStyleRadius(const JSRef<JSObject>& obj, TextBackgroundStyle& textBackgroundStyle);
+    static void ParseTextBackgroundStyleBorder(
+        const JSRef<JSObject>& obj, TextBackgroundStyle& textBackgroundStyle, bool needResObj = false);
 };
 } // namespace OHOS::Ace::Framework
 

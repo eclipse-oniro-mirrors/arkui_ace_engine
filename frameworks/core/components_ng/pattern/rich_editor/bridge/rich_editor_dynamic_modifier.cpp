@@ -2144,6 +2144,8 @@ void ParseTextBackgroundStyle(struct OHOS::Ace::UpdateSpanStyle& updateSpanStyle
         CalcDimension(style.textBackgroundBottomRightRadius, DimensionUnit::VP),
         CalcDimension(style.textBackgroundBottomLeftRadius, DimensionUnit::VP) };
     textBackgroundStyle.backgroundRadius->multiValued = true;
+    textBackgroundStyle.borderWidth = CalcDimension(style.textBackgroundBorderWidth, DimensionUnit::VP);
+    textBackgroundStyle.borderColor = Color(style.textBackgroundBorderColor);
     updateSpanStyle.updateTextBackgroundStyle = textBackgroundStyle;
     textStyle.SetTextBackgroundStyle(textBackgroundStyle);
 }
@@ -2256,6 +2258,8 @@ void ParseTextBackgroundStyle(struct ArkUIRichEditorTextStyle& textStyle,
     textStyle.textBackgroundTopRightRadius = radius->radiusTopRight.value_or(Dimension(0)).ConvertToVp();
     textStyle.textBackgroundBottomLeftRadius = radius->radiusBottomLeft.value_or(Dimension(0)).ConvertToVp();
     textStyle.textBackgroundBottomRightRadius = radius->radiusBottomRight.value_or(Dimension(0)).ConvertToVp();
+    textStyle.textBackgroundBorderWidth = textBackgroundStyle.borderWidth.value_or(Dimension(0)).ConvertToVp();
+    textStyle.textBackgroundBorderColor = textBackgroundStyle.borderColor.value_or(Color(0x00000000)).GetValue();
 }
 
 ArkUIRichEditorTextStyle GetRichEditorTypingStyle(ArkUINodeHandle node)

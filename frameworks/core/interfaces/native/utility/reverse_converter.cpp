@@ -749,6 +749,8 @@ ACE_FORCE_EXPORT void AssignArkValue(Ark_TextBackgroundStyle& dst, const TextBac
 {
     dst.radius = ArkUnion<Opt_Union_Dimension_BorderRadiuses, Ark_BorderRadiuses>(src.backgroundRadius, ctx);
     dst.color = ArkUnion<Opt_ResourceColor, Ark_String>(src.backgroundColor, ctx);
+    dst.borderWidth = ArkValue<Opt_Dimension>(src.borderWidth, ctx);
+    dst.borderColor = ArkUnion<Opt_ResourceColor, Ark_String>(src.borderColor, ctx);
 }
 
 void AssignArkValue(Ark_TextRange& dst, const SelectionInfo& src)

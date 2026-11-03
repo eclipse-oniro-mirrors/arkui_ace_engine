@@ -62,8 +62,59 @@ TextBackgroundStyle JSContainerSpan::ParseTextBackgroundStyle(const JSRef<JSObje
         };
         textBackgroundStyle.AddResource("textBackgroundStyle.color", colorResObj, std::move(updateFunc));
     }
+    ParseTextBackgroundStyleBorder(obj, textBackgroundStyle, needResObj);
     ParseTextBackgroundStyleRadius(obj, textBackgroundStyle);
     return textBackgroundStyle;
+}
+
+void JSContainerSpan::ParseTextBackgroundStyleBorder(
+    const JSRef<JSObject>& obj, TextBackgroundStyle& textBackgroundStyle, bool needResObj)
+{
+    JSRef<JSVal> borderColorValue = obj->GetProperty("borderColor");
+    Color borderColorVal;
+    RefPtr<ResourceObject> borderColorResObj;
+    if (ParseJsColor(borderColorValue, borderColorVal, borderColorResObj)) {
+        textBackgroundStyle.borderColor = borderColorVal;
+    }
+    if (needResObj && borderColorResObj && borderColorValue->IsObject()) {
+        JSRef<JSObject> jsObj = JSRef<JSObject>::Cast(borderColorValue);
+        JSViewAbstract::CompleteResourceObject(jsObj);
+        borderColorResObj = JSViewAbstract::GetResourceObject(jsObj);
+    }
+    if ((SystemProperties::ConfigChangePerform() || needResObj) && borderColorResObj) {
+        auto&& updateFunc = [](const RefPtr<ResourceObject>& borderColorResObj,
+            TextBackgroundStyle& textBackgroundStyle) {
+            Color color;
+            bool parseState = ResourceParseUtils::ParseResColor(borderColorResObj, color);
+            if (parseState) {
+                textBackgroundStyle.borderColor = color;
+            }
+        };
+        textBackgroundStyle.AddResource(
+            "textBackgroundStyle.borderColor", borderColorResObj, std::move(updateFunc));
+    }
+
+    JSRef<JSVal> borderWidthValue = obj->GetProperty("borderWidth");
+    CalcDimension borderWidth;
+    RefPtr<ResourceObject> borderWidthResObj;
+    if (ParseJsDimensionVp(borderWidthValue, borderWidth, borderWidthResObj)) {
+        textBackgroundStyle.borderWidth = borderWidth;
+    }
+    if (needResObj && borderWidthResObj && borderWidthValue->IsObject()) {
+        JSRef<JSObject> jsObj = JSRef<JSObject>::Cast(borderWidthValue);
+        JSViewAbstract::CompleteResourceObject(jsObj);
+        borderWidthResObj = JSViewAbstract::GetResourceObject(jsObj);
+    }
+    if ((SystemProperties::ConfigChangePerform() || needResObj) && borderWidthResObj) {
+        auto&& updateFunc = [](const RefPtr<ResourceObject>& borderWidthResObj,
+            TextBackgroundStyle& textBackgroundStyle) {
+            CalcDimension width;
+            ResourceParseUtils::ParseResDimensionVp(borderWidthResObj, width);
+            textBackgroundStyle.borderWidth = width;
+        };
+        textBackgroundStyle.AddResource(
+            "textBackgroundStyle.borderWidth", borderWidthResObj, std::move(updateFunc));
+    }
 }
 
 void JSContainerSpan::ParseTextBackgroundStyleRadius(

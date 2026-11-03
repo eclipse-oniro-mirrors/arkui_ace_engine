@@ -25,6 +25,7 @@
 #include "core/components_ng/pattern/rich_editor/rich_editor_theme.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_model_ng.h"
 #include "core/components_ng/pattern/rich_editor/style_manager.h"
+#include "base/json/json_util.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -287,6 +288,552 @@ HWTEST_F(RichEditorStyleTestNg, TextbackgroundStyle004, TestSize.Level0)
     auto spanTextBackground = info.selection_.resultObjects.front().textStyle.textBackgroundStyle;
     EXPECT_TRUE(spanTextBackground.has_value());
     EXPECT_EQ(spanTextBackground.value(), textBackgroundStyle);
+}
+
+/**
+ * @tc.name: TextbackgroundStyle005
+ * @tc.desc: Test add span with textBackgroundStyle border fields (borderWidth, borderColor).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorStyleTestNg, TextbackgroundStyle005, TestSize.Level0)
+{
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+    auto richEditorController = richEditorPattern->GetRichEditorController();
+    ASSERT_NE(richEditorController, nullptr);
+
+    /**
+     * @tc.steps: step1. add span with border fields
+     */
+    TextStyle style;
+    TextBackgroundStyle textBackgroundStyle;
+    NG::BorderRadiusProperty borderRadius;
+    borderRadius.radiusTopLeft = Dimension(5, OHOS::Ace::DimensionUnit::VP);
+    borderRadius.radiusTopRight = Dimension(5, OHOS::Ace::DimensionUnit::VP);
+    borderRadius.radiusBottomLeft = Dimension(5, OHOS::Ace::DimensionUnit::VP);
+    borderRadius.radiusBottomRight = Dimension(5, OHOS::Ace::DimensionUnit::VP);
+    textBackgroundStyle.backgroundColor = Color::RED;
+    textBackgroundStyle.backgroundRadius = borderRadius;
+    textBackgroundStyle.borderWidth = Dimension(2, OHOS::Ace::DimensionUnit::VP);
+    textBackgroundStyle.borderColor = Color::BLUE;
+    textBackgroundStyle.needCompareGroupId = false;
+    style.SetTextBackgroundStyle(textBackgroundStyle);
+    TextSpanOptions options;
+    options.value = INIT_VALUE_1;
+    options.style = style;
+    richEditorController->AddTextSpan(options);
+    auto contentNode = richEditorNode_->GetChildAtIndex(0);
+    auto newSpan = AceType::DynamicCast<SpanNode>(contentNode->GetChildAtIndex(0));
+    ASSERT_NE(newSpan, nullptr);
+    EXPECT_TRUE(newSpan->GetTextBackgroundStyle().has_value());
+    auto spanBgStyle = newSpan->GetTextBackgroundStyle().value();
+    EXPECT_TRUE(spanBgStyle.borderWidth.has_value());
+    EXPECT_EQ(spanBgStyle.borderWidth.value(), Dimension(2, OHOS::Ace::DimensionUnit::VP));
+    EXPECT_TRUE(spanBgStyle.borderColor.has_value());
+    EXPECT_EQ(spanBgStyle.borderColor.value(), Color::BLUE);
+
+    /**
+     * @tc.steps: step2. get span and verify border fields
+     */
+    auto info = richEditorController->GetSpansInfo(0, 1);
+    auto spanTextBackground = info.selection_.resultObjects.front().textStyle.textBackgroundStyle;
+    EXPECT_TRUE(spanTextBackground.has_value());
+    EXPECT_TRUE(spanTextBackground.value().borderWidth.has_value());
+    EXPECT_EQ(spanTextBackground.value().borderWidth.value(), Dimension(2, OHOS::Ace::DimensionUnit::VP));
+    EXPECT_TRUE(spanTextBackground.value().borderColor.has_value());
+    EXPECT_EQ(spanTextBackground.value().borderColor.value(), Color::BLUE);
+}
+
+/**
+ * @tc.name: TextbackgroundStyle006
+ * @tc.desc: Test set typing style with textBackgroundStyle border fields.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorStyleTestNg, TextbackgroundStyle006, TestSize.Level0)
+{
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+    auto richEditorController = richEditorPattern->GetRichEditorController();
+    ASSERT_NE(richEditorController, nullptr);
+    auto contentNode = richEditorNode_->GetChildAtIndex(0);
+    ASSERT_NE(contentNode, nullptr);
+
+    /**
+     * @tc.steps: step1. set typing style with border fields
+     */
+    TextStyle style;
+    style.SetTextColor(TEXT_COLOR_VALUE);
+    TextBackgroundStyle textBackgroundStyle;
+    NG::BorderRadiusProperty borderRadius;
+    borderRadius.radiusTopLeft = Dimension(5, OHOS::Ace::DimensionUnit::VP);
+    borderRadius.radiusTopRight = Dimension(5, OHOS::Ace::DimensionUnit::VP);
+    borderRadius.radiusBottomLeft = Dimension(5, OHOS::Ace::DimensionUnit::VP);
+    borderRadius.radiusBottomRight = Dimension(5, OHOS::Ace::DimensionUnit::VP);
+    textBackgroundStyle.backgroundColor = Color::RED;
+    textBackgroundStyle.backgroundRadius = borderRadius;
+    textBackgroundStyle.borderWidth = Dimension(3, OHOS::Ace::DimensionUnit::VP);
+    textBackgroundStyle.borderColor = Color::GREEN;
+    textBackgroundStyle.needCompareGroupId = false;
+    style.SetTextBackgroundStyle(textBackgroundStyle);
+    UpdateSpanStyle typingStyle;
+    typingStyle.updateTextColor = TEXT_COLOR_VALUE;
+    typingStyle.updateTextBackgroundStyle = textBackgroundStyle;
+    richEditorController->SetTypingStyle(typingStyle, style);
+
+    /**
+     * @tc.steps: step2. get typing style and verify border fields
+     */
+    auto typingStyleResult = richEditorController->GetTypingStyle();
+    EXPECT_TRUE(typingStyleResult.has_value());
+    auto backgroundResult = typingStyleResult->updateTextBackgroundStyle;
+    EXPECT_TRUE(backgroundResult.has_value());
+    EXPECT_TRUE(backgroundResult.value().borderWidth.has_value());
+    EXPECT_EQ(backgroundResult.value().borderWidth.value(), Dimension(3, OHOS::Ace::DimensionUnit::VP));
+    EXPECT_TRUE(backgroundResult.value().borderColor.has_value());
+    EXPECT_EQ(backgroundResult.value().borderColor.value(), Color::GREEN);
+
+    /**
+     * @tc.steps: step3. insert value and verify span border fields
+     */
+    richEditorPattern->caretPosition_ = 0;
+    richEditorPattern->InsertValue(INIT_VALUE_1);
+    auto newSpan = AceType::DynamicCast<SpanNode>(contentNode->GetChildAtIndex(0));
+    ASSERT_NE(newSpan, nullptr);
+    EXPECT_TRUE(newSpan->GetTextBackgroundStyle().has_value());
+    auto spanBgStyle = newSpan->GetTextBackgroundStyle().value();
+    EXPECT_TRUE(spanBgStyle.borderWidth.has_value());
+    EXPECT_EQ(spanBgStyle.borderWidth.value(), Dimension(3, OHOS::Ace::DimensionUnit::VP));
+    EXPECT_TRUE(spanBgStyle.borderColor.has_value());
+    EXPECT_EQ(spanBgStyle.borderColor.value(), Color::GREEN);
+}
+
+/**
+ * @tc.name: TextbackgroundStyle007
+ * @tc.desc: Test update span style with textBackgroundStyle border fields.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorStyleTestNg, TextbackgroundStyle007, TestSize.Level0)
+{
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+    auto richEditorController = richEditorPattern->GetRichEditorController();
+    ASSERT_NE(richEditorController, nullptr);
+    auto contentNode = richEditorNode_->GetChildAtIndex(0);
+    ASSERT_NE(contentNode, nullptr);
+
+    /**
+     * @tc.steps: step1. add span without border
+     */
+    TextStyle style;
+    TextSpanOptions options;
+    options.value = INIT_VALUE_1;
+    options.style = style;
+    richEditorController->AddTextSpan(options);
+    EXPECT_EQ(richEditorNode_->GetChildren().size(), 1);
+
+    /**
+     * @tc.steps: step2. update span style with border fields
+     */
+    TextBackgroundStyle textBackgroundStyle;
+    NG::BorderRadiusProperty borderRadius;
+    borderRadius.radiusTopLeft = Dimension(5, OHOS::Ace::DimensionUnit::VP);
+    borderRadius.radiusTopRight = Dimension(5, OHOS::Ace::DimensionUnit::VP);
+    borderRadius.radiusBottomLeft = Dimension(5, OHOS::Ace::DimensionUnit::VP);
+    borderRadius.radiusBottomRight = Dimension(5, OHOS::Ace::DimensionUnit::VP);
+    textBackgroundStyle.backgroundColor = Color::RED;
+    textBackgroundStyle.backgroundRadius = borderRadius;
+    textBackgroundStyle.borderWidth = Dimension(4, OHOS::Ace::DimensionUnit::VP);
+    textBackgroundStyle.borderColor = Color::WHITE;
+    textBackgroundStyle.needCompareGroupId = false;
+    style.SetTextBackgroundStyle(textBackgroundStyle);
+    struct UpdateSpanStyle updateSpanStyle;
+    updateSpanStyle.updateTextBackgroundStyle = textBackgroundStyle;
+    richEditorController->SetUpdateSpanStyle(updateSpanStyle);
+    ImageSpanAttribute imageStyle;
+    richEditorController->UpdateSpanStyle(0, 2, style, imageStyle);
+    EXPECT_EQ(contentNode->GetChildren().size(), 2);
+    auto newSpan = AceType::DynamicCast<SpanNode>(contentNode->GetChildAtIndex(0));
+    ASSERT_NE(newSpan, nullptr);
+    EXPECT_TRUE(newSpan->GetTextBackgroundStyle().has_value());
+    auto spanBgStyle = newSpan->GetTextBackgroundStyle().value();
+    EXPECT_TRUE(spanBgStyle.borderWidth.has_value());
+    EXPECT_EQ(spanBgStyle.borderWidth.value(), Dimension(4, OHOS::Ace::DimensionUnit::VP));
+    EXPECT_TRUE(spanBgStyle.borderColor.has_value());
+    EXPECT_EQ(spanBgStyle.borderColor.value(), Color::WHITE);
+}
+
+/**
+ * @tc.name: TextbackgroundStyle008
+ * @tc.desc: Test toStyledString and fromStyledString with textBackgroundStyle border fields.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorStyleTestNg, TextbackgroundStyle008, TestSize.Level0)
+{
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+    auto richEditorController = richEditorPattern->GetRichEditorController();
+    ASSERT_NE(richEditorController, nullptr);
+
+    /**
+     * @tc.steps: step1. add span with border fields
+     */
+    TextStyle style;
+    TextBackgroundStyle textBackgroundStyle;
+    NG::BorderRadiusProperty borderRadius;
+    borderRadius.radiusTopLeft = Dimension(5, OHOS::Ace::DimensionUnit::VP);
+    borderRadius.radiusTopRight = Dimension(5, OHOS::Ace::DimensionUnit::VP);
+    borderRadius.radiusBottomLeft = Dimension(5, OHOS::Ace::DimensionUnit::VP);
+    borderRadius.radiusBottomRight = Dimension(5, OHOS::Ace::DimensionUnit::VP);
+    textBackgroundStyle.backgroundColor = Color::RED;
+    textBackgroundStyle.backgroundRadius = borderRadius;
+    textBackgroundStyle.borderWidth = Dimension(2, OHOS::Ace::DimensionUnit::VP);
+    textBackgroundStyle.borderColor = Color::BLUE;
+    textBackgroundStyle.needCompareGroupId = false;
+    style.SetTextBackgroundStyle(textBackgroundStyle);
+    TextSpanOptions options;
+    options.value = INIT_VALUE_1;
+    options.style = style;
+    richEditorController->AddTextSpan(options);
+    EXPECT_EQ(richEditorNode_->GetChildren().size(), 1);
+
+    /**
+     * @tc.steps: step2. toStyledString (exercises EncodeTlv with border fields)
+     */
+    auto spanString = richEditorPattern->ToStyledString(0, 6);
+    ASSERT_NE(spanString, nullptr);
+    auto spans = spanString->GetSpans(0, 6, SpanType::BackgroundColor);
+    EXPECT_EQ(spans.size(), 1);
+    auto backgroundSpan = AceType::DynamicCast<BackgroundColorSpan>(spans[0]);
+    EXPECT_NE(backgroundSpan, nullptr);
+    auto bgStyle = backgroundSpan->GetBackgroundColor();
+    EXPECT_TRUE(bgStyle.borderWidth.has_value());
+    EXPECT_EQ(bgStyle.borderWidth.value(), Dimension(2, OHOS::Ace::DimensionUnit::VP));
+    EXPECT_TRUE(bgStyle.borderColor.has_value());
+    EXPECT_EQ(bgStyle.borderColor.value(), Color::BLUE);
+
+    /**
+     * @tc.steps: step3. fromStyledString (exercises DecodeTlv with border fields)
+     */
+    auto info = richEditorPattern->FromStyledString(spanString);
+    EXPECT_EQ(info.selection_.resultObjects.size(), 1);
+    auto spanTextBackground = info.selection_.resultObjects.front().textStyle.textBackgroundStyle;
+    EXPECT_TRUE(spanTextBackground.has_value());
+    EXPECT_TRUE(spanTextBackground.value().borderWidth.has_value());
+    EXPECT_EQ(spanTextBackground.value().borderWidth.value(), Dimension(2, OHOS::Ace::DimensionUnit::VP));
+    EXPECT_TRUE(spanTextBackground.value().borderColor.has_value());
+    EXPECT_EQ(spanTextBackground.value().borderColor.value(), Color::BLUE);
+}
+
+/**
+ * @tc.name: TextBackgroundStyleBorderEqual001
+ * @tc.desc: Test TextBackgroundStyle operator== with border fields.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorStyleTestNg, TextBackgroundStyleBorderEqual001, TestSize.Level0)
+{
+    /**
+     * @tc.steps: step1. same border fields -> equal
+     */
+    TextBackgroundStyle style1;
+    TextBackgroundStyle style2;
+    style1.needCompareGroupId = false;
+    style2.needCompareGroupId = false;
+    style1.borderWidth = Dimension(2, OHOS::Ace::DimensionUnit::VP);
+    style1.borderColor = Color::BLUE;
+    style2.borderWidth = Dimension(2, OHOS::Ace::DimensionUnit::VP);
+    style2.borderColor = Color::BLUE;
+    EXPECT_TRUE(style1 == style2);
+
+    /**
+     * @tc.steps: step2. different borderWidth -> not equal
+     */
+    style2.borderWidth = Dimension(3, OHOS::Ace::DimensionUnit::VP);
+    EXPECT_FALSE(style1 == style2);
+
+    /**
+     * @tc.steps: step3. different borderColor -> not equal
+     */
+    style2.borderWidth = Dimension(2, OHOS::Ace::DimensionUnit::VP);
+    style2.borderColor = Color::RED;
+    EXPECT_FALSE(style1 == style2);
+
+    /**
+     * @tc.steps: step4. one has borderWidth, other does not -> not equal
+     */
+    style2.borderColor = Color::BLUE;
+    style2.borderWidth.reset();
+    EXPECT_FALSE(style1 == style2);
+
+    /**
+     * @tc.steps: step5. one has borderColor, other does not -> not equal
+     */
+    style2.borderWidth = Dimension(2, OHOS::Ace::DimensionUnit::VP);
+    style2.borderColor.reset();
+    EXPECT_FALSE(style1 == style2);
+
+    /**
+     * @tc.steps: step6. both no border fields -> equal
+     */
+    style1.borderWidth.reset();
+    style1.borderColor.reset();
+    style2.borderWidth.reset();
+    style2.borderColor.reset();
+    EXPECT_TRUE(style1 == style2);
+}
+
+/**
+ * @tc.name: TextBackgroundStyleToJsonValue001
+ * @tc.desc: Test TextBackgroundStyle::ToJsonValue with border fields present.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorStyleTestNg, TextBackgroundStyleToJsonValue001, TestSize.Level0)
+{
+    /**
+     * @tc.steps: step1. construct style with border fields
+     */
+    TextBackgroundStyle style;
+    style.backgroundColor = Color::RED;
+    style.borderWidth = Dimension(2, OHOS::Ace::DimensionUnit::VP);
+    style.borderColor = Color::BLUE;
+    style.needCompareGroupId = false;
+    std::optional<TextBackgroundStyle> optStyle = style;
+
+    /**
+     * @tc.steps: step2. call ToJsonValue and verify output
+     */
+    auto json = JsonUtil::Create(true);
+    NG::InspectorFilter filter;
+    TextBackgroundStyle::ToJsonValue(json, optStyle, filter);
+    EXPECT_TRUE(json->Contains("textBackgroundStyle"));
+    auto bgJson = json->GetValue("textBackgroundStyle");
+    ASSERT_NE(bgJson, nullptr);
+    EXPECT_TRUE(bgJson->IsObject());
+    EXPECT_EQ(bgJson->GetString("color"), Color::RED.ColorToString());
+}
+
+/**
+ * @tc.name: TextBackgroundStyleToJsonValue002
+ * @tc.desc: Test TextBackgroundStyle::ToJsonValue with style = nullopt (default export path).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorStyleTestNg, TextBackgroundStyleToJsonValue002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. construct style = nullopt
+     */
+    std::optional<TextBackgroundStyle> optStyle = std::nullopt;
+
+    /**
+     * @tc.steps: step2. call ToJsonValue and verify default values
+     */
+    auto json = JsonUtil::Create(true);
+    NG::InspectorFilter filter;
+    TextBackgroundStyle::ToJsonValue(json, optStyle, filter);
+    EXPECT_TRUE(json->Contains("textBackgroundStyle"));
+    auto bgJson = json->GetValue("textBackgroundStyle");
+    ASSERT_NE(bgJson, nullptr);
+    EXPECT_TRUE(bgJson->IsObject());
+    EXPECT_EQ(bgJson->GetString("color"), Color::TRANSPARENT.ColorToString());
+}
+
+/**
+ * @tc.name: TextBackgroundStyleToJsonValue003
+ * @tc.desc: Test TextBackgroundStyle::ToJsonValue with style value but border fields nullopt.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorStyleTestNg, TextBackgroundStyleToJsonValue003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. construct style with value but no border fields
+     */
+    TextBackgroundStyle style;
+    style.backgroundColor = Color::GREEN;
+    style.needCompareGroupId = false;
+    std::optional<TextBackgroundStyle> optStyle = style;
+
+    /**
+     * @tc.steps: step2. call ToJsonValue and verify border defaults are applied
+     */
+    auto json = JsonUtil::Create(true);
+    NG::InspectorFilter filter;
+    TextBackgroundStyle::ToJsonValue(json, optStyle, filter);
+    EXPECT_TRUE(json->Contains("textBackgroundStyle"));
+    auto bgJson = json->GetValue("textBackgroundStyle");
+    ASSERT_NE(bgJson, nullptr);
+    EXPECT_TRUE(bgJson->IsObject());
+    EXPECT_EQ(bgJson->GetString("color"), Color::GREEN.ColorToString());
+}
+
+/**
+ * @tc.name: BaseSpanSetTextBackgroundStyleBorder001
+ * @tc.desc: Test BaseSpan::SetTextBackgroundStyle sets HasTextBackgroundStyle with border fields.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorStyleTestNg, BaseSpanSetTextBackgroundStyleBorder001, TestSize.Level0)
+{
+    /**
+     * @tc.steps: step1. set style with only border fields (no color/radius)
+     */
+    auto spanNode = SpanNode::GetOrCreateSpanNode(V2::SPAN_ETS_TAG, 0);
+    ASSERT_NE(spanNode, nullptr);
+    TextBackgroundStyle style;
+    style.borderWidth = Dimension(2, OHOS::Ace::DimensionUnit::VP);
+    style.borderColor = Color::BLUE;
+    spanNode->SetTextBackgroundStyle(style);
+    EXPECT_TRUE(spanNode->HasTextBackgroundStyle());
+
+    /**
+     * @tc.steps: step2. set style with only borderWidth
+     */
+    TextBackgroundStyle style2;
+    style2.borderWidth = Dimension(1, OHOS::Ace::DimensionUnit::VP);
+    spanNode->SetTextBackgroundStyle(style2);
+    EXPECT_TRUE(spanNode->HasTextBackgroundStyle());
+
+    /**
+     * @tc.steps: step3. set style with only borderColor
+     */
+    TextBackgroundStyle style3;
+    style3.borderColor = Color::RED;
+    spanNode->SetTextBackgroundStyle(style3);
+    EXPECT_TRUE(spanNode->HasTextBackgroundStyle());
+
+    /**
+     * @tc.steps: step4. set empty style (no fields) -> HasTextBackgroundStyle false
+     */
+    TextBackgroundStyle style4;
+    spanNode->SetTextBackgroundStyle(style4);
+    EXPECT_FALSE(spanNode->HasTextBackgroundStyle());
+}
+
+/**
+ * @tc.name: BackgroundColorSpanBorder001
+ * @tc.desc: Test BackgroundColorSpan construction and accessors with border fields.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorStyleTestNg, BackgroundColorSpanBorder001, TestSize.Level0)
+{
+    /**
+     * @tc.steps: step1. construct BackgroundColorSpan with border fields
+     */
+    TextBackgroundStyle style;
+    style.backgroundColor = Color::RED;
+    style.borderWidth = Dimension(2, OHOS::Ace::DimensionUnit::VP);
+    style.borderColor = Color::BLUE;
+    auto backgroundColorSpan = AceType::MakeRefPtr<BackgroundColorSpan>(style, 0, 5);
+    ASSERT_NE(backgroundColorSpan, nullptr);
+
+    /**
+     * @tc.steps: step2. verify GetBackgroundColor returns border fields
+     */
+    auto bgStyle = backgroundColorSpan->GetBackgroundColor();
+    EXPECT_TRUE(bgStyle.borderWidth.has_value());
+    EXPECT_EQ(bgStyle.borderWidth.value(), Dimension(2, OHOS::Ace::DimensionUnit::VP));
+    EXPECT_TRUE(bgStyle.borderColor.has_value());
+    EXPECT_EQ(bgStyle.borderColor.value(), Color::BLUE);
+    EXPECT_EQ(backgroundColorSpan->GetStartIndex(), 0);
+    EXPECT_EQ(backgroundColorSpan->GetEndIndex(), 5);
+}
+
+/**
+ * @tc.name: BackgroundColorSpanAddSpanStyleBorder001
+ * @tc.desc: Test BackgroundColorSpan::AddSpanStyle with border fields but no resources (early return).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorStyleTestNg, BackgroundColorSpanAddSpanStyleBorder001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. construct BackgroundColorSpan with border fields but no resources
+     */
+    TextBackgroundStyle style;
+    style.backgroundColor = Color::RED;
+    style.borderWidth = Dimension(2, OHOS::Ace::DimensionUnit::VP);
+    style.borderColor = Color::BLUE;
+    std::optional<TextBackgroundStyle> optStyle = style;
+    BackgroundColorSpan backgroundColorSpan = BackgroundColorSpan(optStyle);
+    auto spanItem = AceType::MakeRefPtr<NG::SpanItem>();
+    spanItem->backgroundStyle = optStyle;
+
+    /**
+     * @tc.steps: step2. call AddSpanStyle - no resources so HasKey returns false, early return
+     */
+    backgroundColorSpan.AddSpanStyle(spanItem);
+    EXPECT_TRUE(spanItem->backgroundStyle.has_value());
+    EXPECT_TRUE(spanItem->backgroundStyle.value().borderWidth.has_value());
+    EXPECT_EQ(spanItem->backgroundStyle.value().borderWidth.value(), Dimension(2, OHOS::Ace::DimensionUnit::VP));
+}
+
+/**
+ * @tc.name: BackgroundColorSpanAddSpanStyleBorder002
+ * @tc.desc: Test BackgroundColorSpan::AddSpanStyle with nullopt style (first early return).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorStyleTestNg, BackgroundColorSpanAddSpanStyleBorder002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. construct BackgroundColorSpan with nullopt style
+     */
+    std::optional<TextBackgroundStyle> optStyle = std::nullopt;
+    BackgroundColorSpan backgroundColorSpan = BackgroundColorSpan(optStyle);
+    auto spanItem = AceType::MakeRefPtr<NG::SpanItem>();
+    spanItem->backgroundStyle = optStyle;
+
+    /**
+     * @tc.steps: step2. call AddSpanStyle - nullopt style so early return
+     */
+    backgroundColorSpan.AddSpanStyle(spanItem);
+    EXPECT_FALSE(spanItem->backgroundStyle.has_value());
+}
+
+/**
+ * @tc.name: BackgroundColorSpanRemoveSpanStyleBorder001
+ * @tc.desc: Test BackgroundColorSpan::RemoveSpanStyle with border fields present.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorStyleTestNg, BackgroundColorSpanRemoveSpanStyleBorder001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. construct BackgroundColorSpan with border fields
+     */
+    TextBackgroundStyle style;
+    style.backgroundColor = Color::RED;
+    style.borderWidth = Dimension(2, OHOS::Ace::DimensionUnit::VP);
+    style.borderColor = Color::BLUE;
+    std::optional<TextBackgroundStyle> optStyle = style;
+    BackgroundColorSpan backgroundColorSpan = BackgroundColorSpan(optStyle);
+    auto spanItem = AceType::MakeRefPtr<NG::SpanItem>();
+    spanItem->backgroundStyle = optStyle;
+
+    /**
+     * @tc.steps: step2. call RemoveSpanStyle - no resource keys so no RemoveResourceObj
+     */
+    backgroundColorSpan.RemoveSpanStyle(spanItem);
+    EXPECT_FALSE(spanItem->backgroundStyle.has_value());
+}
+
+/**
+ * @tc.name: BackgroundColorSpanRemoveSpanStyleBorder002
+ * @tc.desc: Test BackgroundColorSpan::RemoveSpanStyle with no backgroundStyle.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorStyleTestNg, BackgroundColorSpanRemoveSpanStyleBorder002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. construct BackgroundColorSpan with nullopt style
+     */
+    std::optional<TextBackgroundStyle> optStyle = std::nullopt;
+    BackgroundColorSpan backgroundColorSpan = BackgroundColorSpan(optStyle);
+    auto spanItem = AceType::MakeRefPtr<NG::SpanItem>();
+
+    /**
+     * @tc.steps: step2. call RemoveSpanStyle - no backgroundStyle so early return
+     */
+    backgroundColorSpan.RemoveSpanStyle(spanItem);
+    EXPECT_FALSE(spanItem->backgroundStyle.has_value());
 }
 
 /**

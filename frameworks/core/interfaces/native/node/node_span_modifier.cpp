@@ -35,6 +35,8 @@ constexpr int NUM_0 = 0;
 constexpr int NUM_1 = 1;
 constexpr int NUM_2 = 2;
 constexpr int NUM_3 = 3;
+constexpr int NUM_4 = 4;
+constexpr int NUM_5 = 5;
 constexpr int NUM_32 = 32;
 constexpr int DEFAULT_LENGTH = 4;
 
@@ -486,7 +488,7 @@ void SetSpanTextBackgroundStyle(ArkUINodeHandle node, ArkUI_Uint32 color, const 
 {
     auto* uiNode = reinterpret_cast<UINode*>(node);
     CHECK_NULL_VOID(uiNode);
-    if (length != DEFAULT_LENGTH) {
+    if (length < DEFAULT_LENGTH) {
         return;
     }
     if (SystemProperties::ConfigChangePerform() && style) {
@@ -503,6 +505,22 @@ void SetSpanTextBackgroundStyle(ArkUINodeHandle node, ArkUI_Uint32 color, const 
     font.backgroundColor = Color(color);
     font.backgroundRadius = borderRadius;
     font.backgroundRadius->multiValued = true;
+    if (style) {
+        // JSI bridge path: border fields are carried in the style pointer, not in values array
+        auto textBackgroundStyle = reinterpret_cast<TextBackgroundStyle*>(style);
+        font.borderWidth = textBackgroundStyle->borderWidth;
+        font.borderColor = textBackgroundStyle->borderColor;
+    } else {
+        // C-API path: border fields are carried in the values array when length > 4
+        if (length > NUM_4) {
+            font.borderWidth = Dimension(values[NUM_4], static_cast<OHOS::Ace::DimensionUnit>(units[NUM_4]));
+        }
+        if (length > NUM_5) {
+            ArkUIInt32orFloat32 borderVal;
+            borderVal.f32 = values[NUM_5];
+            font.borderColor = Color(borderVal.u32);
+        }
+    }
     SpanModelNG::SetTextBackgroundStyle(uiNode, font);
 }
 
@@ -519,6 +537,8 @@ void ResetSpanTextBackgroundStyle(ArkUINodeHandle node)
     font.backgroundColor = Color(0x00000000);
     font.backgroundRadius = borderRadius;
     font.backgroundRadius->multiValued = true;
+    font.borderWidth = Dimension(0, OHOS::Ace::DimensionUnit::VP);
+    font.borderColor = Color(0x00000000);
     SpanModelNG::SetTextBackgroundStyle(uiNode, font);
     SpanModelNG::ResetLetterSpacing(uiNode);
     if (SystemProperties::ConfigChangePerform()) {
@@ -538,6 +558,8 @@ void GetSpanTextBackgroundStyle(ArkUINodeHandle node, ArkUITextBackgroundStyleOp
     options->topRight = styleOptions.backgroundRadius->radiusTopRight->Value();
     options->bottomLeft = styleOptions.backgroundRadius->radiusBottomLeft->Value();
     options->bottomRight= styleOptions.backgroundRadius->radiusBottomRight->Value();
+    options->borderWidth = styleOptions.borderWidth.value_or(Dimension(0, DimensionUnit::VP)).Value();
+    options->borderColor = styleOptions.borderColor.value_or(Color(0x00000000)).GetValue();
 }
 
 void SetTextTextShadow(ArkUINodeHandle node, struct ArkUITextShadowStruct* shadows, ArkUI_Uint32 length,

@@ -1502,6 +1502,14 @@ bool SpanItem::EncodeTlv(std::vector<uint8_t>& buff)
             TLVUtil::WriteUint8(buff, TLV_SPAN_BACKGROUND_BACKGROUNDRADIUS);
             TLVUtil::WriteBorderRadiusProperty(buff, backgroundStyle->backgroundRadius.value());
         }
+        if (backgroundStyle->borderWidth.has_value()) {
+            TLVUtil::WriteUint8(buff, TLV_SPAN_BACKGROUND_BORDERWIDTH);
+            TLVUtil::WriteDimension(buff, backgroundStyle->borderWidth.value());
+        }
+        if (backgroundStyle->borderColor.has_value()) {
+            TLVUtil::WriteUint8(buff, TLV_SPAN_BACKGROUND_BORDERCOLOR);
+            TLVUtil::WriteColor(buff, backgroundStyle->borderColor.value());
+        }
         TLVUtil::WriteUint8(buff, TLV_SPAN_BACKGROUND_GROUPID);
         TLVUtil::WriteInt32(buff, backgroundStyle->groupId);
     }
@@ -1695,6 +1703,20 @@ RefPtr<SpanItem> SpanItem::DecodeTlv(std::vector<uint8_t>& buff, int32_t& cursor
             }
             case TLV_SPAN_BACKGROUND_BACKGROUNDRADIUS: {
                 sameSpan->backgroundStyle->backgroundRadius = TLVUtil::ReadBorderRadiusProperty(buff, cursor);
+                break;
+            }
+            case TLV_SPAN_BACKGROUND_BORDERWIDTH: {
+                if (!sameSpan->backgroundStyle.has_value()) {
+                    sameSpan->backgroundStyle = TextBackgroundStyle();
+                }
+                sameSpan->backgroundStyle->borderWidth = TLVUtil::ReadDimension(buff, cursor);
+                break;
+            }
+            case TLV_SPAN_BACKGROUND_BORDERCOLOR: {
+                if (!sameSpan->backgroundStyle.has_value()) {
+                    sameSpan->backgroundStyle = TextBackgroundStyle();
+                }
+                sameSpan->backgroundStyle->borderColor = TLVUtil::ReadColor(buff, cursor);
                 break;
             }
             case TLV_SPAN_BACKGROUND_GROUPID: {
@@ -2229,7 +2251,8 @@ void BaseSpan::SetTextBackgroundStyle(const TextBackgroundStyle& style)
 {
     textBackgroundStyle_ = style;
     textBackgroundStyle_->groupId = groupId_;
-    SetHasTextBackgroundStyle(style.backgroundColor.has_value() || style.backgroundRadius.has_value());
+    SetHasTextBackgroundStyle(style.backgroundColor.has_value() || style.backgroundRadius.has_value() ||
+        style.borderWidth.has_value() || style.borderColor.has_value());
     MarkTextDirty();
 }
 
