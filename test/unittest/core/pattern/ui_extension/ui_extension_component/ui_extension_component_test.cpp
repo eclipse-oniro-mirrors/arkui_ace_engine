@@ -2707,4 +2707,43 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest012, TestSize.Leve
     EXPECT_EQ(pattern->brandColorStr_, "#FF0000FF");
 #endif
 }
+
+/**
+ * @tc.name: UIExtensionBrandColorTest013
+ * @tc.desc: Test NotifyForeground re-sends brandColorStr_ when entering foreground
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest013, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ValidSessionWrapper(pattern);
+    pattern->isUeaConnecting_ = true;
+    pattern->brandColorStr_ = "#FF0000FF";
+    pattern->NotifyForeground();
+    EXPECT_EQ(pattern->state_, UIExtensionPattern::AbilityState::FOREGROUND);
+    EXPECT_EQ(pattern->lastSentBrandColorStr_, "#FF0000FF");
+#endif
+}
+
+/**
+ * @tc.name: UIExtensionBrandColorTest014
+ * @tc.desc: Test NotifyForeground does not re-send when already FOREGROUND
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest014, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ValidSessionWrapper(pattern);
+    pattern->state_ = UIExtensionPattern::AbilityState::FOREGROUND;
+    pattern->isUeaConnecting_ = true;
+    pattern->brandColorStr_ = "#FF0000FF";
+    pattern->lastSentBrandColorStr_ = "#FF0000FF";
+    pattern->NotifyForeground();
+    EXPECT_EQ(pattern->lastSentBrandColorStr_, "#FF0000FF");
+#endif
+}
 } // namespace OHOS::Ace::NG
