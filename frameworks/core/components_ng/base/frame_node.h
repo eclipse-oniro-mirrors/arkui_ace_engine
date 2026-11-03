@@ -353,6 +353,12 @@ private:
     }
 
 public:
+    struct AdoptedCompensationInfo {
+        bool useAdoptedCompensation = false;
+        OffsetF offset;
+        Matrix4 transform;
+    };
+
     // create a new child element with new element tree.
     static RefPtr<FrameNode> CreateFrameNodeWithTree(
         std::string_view tag, int32_t nodeId, const RefPtr<Pattern>& pattern);
@@ -626,27 +632,9 @@ public:
 
     void SetMountPolicy(MountPolicy mountPolicy);
 
-    bool UseAdoptedCompensation() const
-    {
-        return adoptedCompensationInfo_ && adoptedCompensationInfo_->useAdoptedCompensation;
-    }
-
-    void SetUseAdoptedCompensation(bool useAdoptedCompensation);
-    void SetAdoptedCompensation(const OffsetF& offset, const Matrix4& transform);
-    bool HasAdoptedCompensation() const;
-
-    OffsetF GetAdoptedCompensationOffset() const;
-    Matrix4 GetAdoptedCompensationTransform() const;
-    OffsetF GetTransformedAdoptedCompensationOffset() const;
-    VectorF GetAdoptedCompensationScale() const;
-
-    void ApplyAdoptedCompensationToPoints(std::vector<Point>& points) const;
-    void ApplyAdoptedCompensationToPoints(std::vector<PointF>& points) const;
-    void ApplyAdoptedCompensationToRect(RectF& rect) const;
-    void ApplyAdoptedCompensationToPoint(Point& point) const;
-    void ApplyAdoptedCompensationToPoint(PointF& point) const;
-    void RevertAdoptedCompensationFromPoint(PointF& point) const;
-    void ApplyAdoptedCompensationToCenterAndSize(PointF& center, float& width, float& height) const;
+    // Exposes the FrameNode-owned compensation state to the dedicated helper without transferring ownership.
+    std::unique_ptr<AdoptedCompensationInfo>& GetAdoptedCompensationInfo();
+    const std::unique_ptr<AdoptedCompensationInfo>& GetAdoptedCompensationInfo() const;
 
     RefPtr<FrameNode> GetCoordinateAncestorNodeOfFrame(bool checkBoundary = false) const;
 
@@ -1952,12 +1940,6 @@ private:
     RefPtr<AccessibilityProperty>& GetOrCreateAccessibilityProperty();
     void OnHoverWithHightLight(bool isHover) const;
     bool IsPreMakeAndScroll();
-    struct AdoptedCompensationInfo {
-        bool useAdoptedCompensation = false;
-        OffsetF offset;
-        Matrix4 transform;
-    };
-
     bool isAccessibilityPropertyInitialized_ = false;
     bool isTrimMemRecycle_ = false;
     // sort in ZIndex.

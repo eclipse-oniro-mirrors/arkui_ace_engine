@@ -3017,16 +3017,22 @@ void SkewPoint(float sx, float sy, PointF& point)
 
 RectF RosenRenderContext::GetPaintRectWithTransform()
 {
+    return GetPaintRectWithTransform(rsNode_, GetPaintRectWithoutTransform());
+}
+
+RectF RosenRenderContext::GetPaintRectWithTransform(
+    const std::shared_ptr<RSNode>& rsNode, const RectF& paintRect)
+{
     RectF rect;
 
-    CHECK_NULL_RETURN(rsNode_, rect);
-    rect = GetPaintRectWithoutTransform();
+    CHECK_NULL_RETURN(rsNode, rect);
+    rect = paintRect;
     // when the width and height of rect is -1, the func SkewRect will change to 1
-    if (ShouldSkipAffineTransformation(rsNode_) && rect.Width() != -1 && rect.Height() != -1) {
+    if (ShouldSkipAffineTransformation(rsNode) && rect.Width() != -1 && rect.Height() != -1) {
         gRect = rect;
         return rect;
     }
-    auto transform = rsNode_->GetStagingProperties().GetAllTransformPropertyValues();
+    auto transform = rsNode->GetStagingProperties().GetAllTransformPropertyValues();
     const auto& translate = transform.translate;
     const auto& skew = transform.skew;
     const auto& perspective = transform.persp;
@@ -3049,7 +3055,7 @@ RectF RosenRenderContext::GetPaintRectWithTransform()
     degree = static_cast<int32_t>(degree) % FULL_ROTATION;
     auto radian = Degree2Radian(degree);
     if (degree != 0) {
-        auto newRect = GetPaintRectWithoutTransform();
+        auto newRect = paintRect;
         double leftX = 0.0;
         double leftY = 0.0;
         degree = degree < 0 ? degree + FULL_ROTATION : degree;
@@ -3174,34 +3180,48 @@ Matrix4 RosenRenderContext::GetMatrixWithTransformRotate()
     if (ShouldSkipAffineTransformation(rsNode_)) {
         return Matrix4();
     }
-    return GetMatrixWithTransformRotateInner();
+    return GetMatrixWithTransformRotateInner(rsNode_, GetPaintRectWithoutTransform(), transformModifier_);
 }
 
-__attribute__((noinline)) Matrix4 RosenRenderContext::GetMatrixWithTransformRotateInner()
+Matrix4 RosenRenderContext::GetMatrixWithTransformRotate(
+    const std::shared_ptr<RSNode>& rsNode, const RectF& paintRect)
 {
-    auto center = rsNode_->GetStagingProperties().GetPivot();
+    CHECK_NULL_RETURN(rsNode, Matrix4());
+    if (ShouldSkipAffineTransformation(rsNode)) {
+        return Matrix4();
+    }
+    auto modifier = rsNode->GetModifierByType(Rosen::ModifierNG::RSModifierType::TRANSFORM);
+    auto transformModifier = std::static_pointer_cast<Rosen::ModifierNG::RSTransformModifier>(modifier);
+    return GetMatrixWithTransformRotateInner(rsNode, paintRect, transformModifier);
+}
+
+__attribute__((noinline)) Matrix4 RosenRenderContext::GetMatrixWithTransformRotateInner(
+    const std::shared_ptr<RSNode>& rsNode, const RectF& paintRect,
+    const std::shared_ptr<Rosen::ModifierNG::RSTransformModifier>& transformModifier)
+{
+    auto center = rsNode->GetStagingProperties().GetPivot();
     Matrix4 rotateMat;
 
-    if (transformModifier_ && !transformModifier_->GetQuaternion().IsIdentity()) {
-        auto quaternionValue = transformModifier_->GetQuaternion();
+    if (transformModifier && !transformModifier->GetQuaternion().IsIdentity()) {
+        auto quaternionValue = transformModifier->GetQuaternion();
         // 2: parameter index, 3: parameter index
         rotateMat =
             Matrix4::QuaternionToMatrix(quaternionValue[0], quaternionValue[1], quaternionValue[2], quaternionValue[3]);
     } else {
-        int32_t degree = rsNode_->GetStagingProperties().GetRotation();
-        if (rsNode_->GetType() == RSUINodeType::DISPLAY_NODE && degree != 0) {
+        int32_t degree = rsNode->GetStagingProperties().GetRotation();
+        if (rsNode->GetType() == RSUINodeType::DISPLAY_NODE && degree != 0) {
             degree = 0;
             return Matrix4();
         }
         rotateMat = Matrix4::CreateRotate(degree, 0, 0, 1);
     }
 
-    auto translate = rsNode_->GetStagingProperties().GetTranslate();
-    auto skew = rsNode_->GetStagingProperties().GetSkew();
-    auto scale = rsNode_->GetStagingProperties().GetScale();
-    auto perspective = rsNode_->GetStagingProperties().GetPersp();
+    auto translate = rsNode->GetStagingProperties().GetTranslate();
+    auto skew = rsNode->GetStagingProperties().GetSkew();
+    auto scale = rsNode->GetStagingProperties().GetScale();
+    auto perspective = rsNode->GetStagingProperties().GetPersp();
 
-    RectF rect = GetPaintRectWithoutTransform();
+    RectF rect = paintRect;
     auto centOffset = OffsetF(center[0] * rect.Width(), center[1] * rect.Height());
     auto centerPos = rect.GetOffset() + centOffset;
 
@@ -9379,7 +9399,7 @@ void RosenRenderContext::MarkNeedDrawNode(bool condition)
     }
 }
 
-bool RosenRenderContext::ShouldSkipAffineTransformation(std::shared_ptr<RSNode>& rsNode)
+bool RosenRenderContext::ShouldSkipAffineTransformation(const std::shared_ptr<RSNode>& rsNode)
 {
     if (SystemProperties::GetContainerDeleteFlag() &&
         rsNode->GetDrawNodeType() != Rosen::DrawNodeType::GeometryPropertyType) {

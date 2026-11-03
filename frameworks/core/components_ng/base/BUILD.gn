@@ -20,6 +20,7 @@ build_component_ng("base_ng") {
     "extension_handler.cpp",
     "frame_node.cpp",
     "frame_node_adopted_compensation.cpp",
+    "frame_node_adopted_render_adapter.cpp",
     "frame_node_multi_thread.cpp",
     "geometry_node.cpp",
     "inspector.cpp",

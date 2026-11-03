@@ -853,6 +853,23 @@ HWTEST_F(RosenRenderContextTest, RosenRenderContextTest026, TestSize.Level1)
     rosenRenderContext->GetRSNode()->SetRotation(270.0f);
     RectF ret5 = rosenRenderContext->GetPaintRectWithTransform();
     EXPECT_EQ(ret5.x_, 0.0f);
+
+    rosenRenderContext->paintRect_ = RectF(10.0f, 20.0f, 100.0f, 80.0f);
+    rosenRenderContext->GetRSNode()->SetPivot(0.25f, 0.75f);
+    rosenRenderContext->GetRSNode()->SetScale(1.5f, 2.0f);
+    rosenRenderContext->GetRSNode()->SetRotation(90.0f);
+    auto memberRect = rosenRenderContext->GetPaintRectWithTransform();
+    auto staticRect = RosenRenderContext::GetPaintRectWithTransform(
+        rosenRenderContext->GetRSNode(), rosenRenderContext->GetPaintRectWithoutTransform());
+    EXPECT_EQ(staticRect, memberRect);
+    auto memberMatrix = rosenRenderContext->GetMatrixWithTransformRotate();
+    auto staticMatrix = RosenRenderContext::GetMatrixWithTransformRotate(
+        rosenRenderContext->GetRSNode(), rosenRenderContext->GetPaintRectWithoutTransform());
+    for (int32_t row = 0; row < Matrix4::DIMENSION; ++row) {
+        for (int32_t column = 0; column < Matrix4::DIMENSION; ++column) {
+            EXPECT_NEAR(staticMatrix.Get(row, column), memberMatrix.Get(row, column), 0.001);
+        }
+    }
 }
 
 /**

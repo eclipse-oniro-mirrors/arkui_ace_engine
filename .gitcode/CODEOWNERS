@@ -2365,6 +2365,10 @@ frameworks/core/components_ng/base/extension_handler.cpp @arkui_framework_xnode
 frameworks/core/components_ng/base/extension_handler.h @arkui_framework_xnode
 frameworks/core/components_ng/base/frame_node.cpp @arkui_architecture
 frameworks/core/components_ng/base/frame_node.h @arkui_architecture
+frameworks/core/components_ng/base/frame_node_adopted_compensation.cpp @arkui_framework_xnode
+frameworks/core/components_ng/base/frame_node_adopted_compensation.h @arkui_framework_xnode
+frameworks/core/components_ng/base/frame_node_adopted_render_adapter.cpp @arkui_framework_xnode
+frameworks/core/components_ng/base/frame_node_adopted_render_adapter.h @arkui_framework_xnode
 frameworks/core/components_ng/base/frame_node_multi_thread.cpp @arkui_framework_xnode
 frameworks/core/components_ng/base/frame_scene_status.h @arkui_framework_xnode
 frameworks/core/components_ng/base/geometry_node.cpp @arkui_framework_xnode

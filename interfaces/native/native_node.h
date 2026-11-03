@@ -14507,14 +14507,17 @@ int32_t OH_ArkUI_NativeModule_AdoptChildWithPolicy(
 
 /**
  * @brief Sets the overlay position compensation from an adopted child to its adopt parent. The compensation
- * represents the aggregate effect of the render-only nodes between them. A point is first translated by
- * @p compensationOffset and then transformed by @p compensationTransform. The child must have been adopted with
+ * represents the aggregate effect of the render-only nodes between them. @p compensationOffset is the aggregate
+ * layout offset used by calculations that do not apply transforms. @p compensationTransform is the complete
+ * transform, including that layout offset, used by transform-aware calculations. A calculation uses only the
+ * representation appropriate to its coordinate semantics. The child must have been adopted with
  * {@link OH_ARKUI_NATIVE_MODULE_ADOPT_POLICY_OVERLAY_POSITION_FOLLOWS_ADOPT_PARENT_CHAIN}.
  *
  * @param adoptedChild The adopted child node on which the compensation is stored.
- * @param compensationOffset The aggregate x/y offset, in px, of the intermediate render-only nodes.
- * @param compensationTransform The aggregate transform of the intermediate render-only nodes. The matrix is copied
- * by this call.
+ * @param compensationOffset The aggregate untransformed x/y layout offset, in px, of the intermediate render-only
+ * nodes.
+ * @param compensationTransform The complete aggregate transform of the intermediate render-only nodes, including
+ * their layout offset. The matrix is copied by this call.
  * @return Error code.
  *         {@link ARKUI_ERROR_CODE_NO_ERROR} Success.
  *         {@link ARKUI_ERROR_CODE_PARAM_INVALID} A parameter is invalid.

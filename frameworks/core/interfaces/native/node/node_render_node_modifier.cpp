@@ -28,6 +28,7 @@
 #include "base/log/log_wrapper.h"
 #include "base/memory/ace_type.h"
 #include "core/common/container.h"
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include "core/components_ng/base/mixed_mount_registry.h"
 #include "core/components_ng/base/mount_policy.h"
 #include "core/components_ng/base/view_abstract.h"
@@ -2296,7 +2297,7 @@ ArkUI_Int32 AdoptChildInner(ArkUINodeHandle node, ArkUINodeHandle child, bool us
     }
     auto childRef = Referenced::Claim<FrameNode>(childNode);
     parentNode->AdoptChild(childRef);
-    childNode->SetUseAdoptedCompensation(useAdoptedCompensation);
+    FrameNodeAdoptedCompensation::SetUseAdoptedCompensation(childNode, useAdoptedCompensation);
     return ERROR_CODE_NO_ERROR;
 }
 
@@ -2325,13 +2326,14 @@ ArkUI_Int32 SetAdoptedChildOverlayPositionCompensation(ArkUINodeHandle adoptedCh
     auto matrix = reinterpret_cast<Matrix4*>(transform);
     CHECK_NULL_RETURN(childNode && matrix, ERROR_CODE_PARAM_INVALID);
     auto adoptParent = AceType::DynamicCast<FrameNode>(childNode->GetAdoptParent());
-    if (!childNode->IsAdopted() || !adoptParent || !childNode->UseAdoptedCompensation()) {
+    if (!childNode->IsAdopted() || !adoptParent ||
+        !FrameNodeAdoptedCompensation::UseAdoptedCompensation(childNode)) {
         SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(
             ERROR_CODE_NODE_IS_NOT_IN_ADOPTED_CHILDREN,
             "Child is not adopted with overlay position policy");
         return ERROR_CODE_NODE_IS_NOT_IN_ADOPTED_CHILDREN;
     }
-    childNode->SetAdoptedCompensation(OffsetF(offsetX, offsetY), *matrix);
+    FrameNodeAdoptedCompensation::SetAdoptedCompensation(childNode, OffsetF(offsetX, offsetY), *matrix);
     return ERROR_CODE_NO_ERROR;
 }
 
