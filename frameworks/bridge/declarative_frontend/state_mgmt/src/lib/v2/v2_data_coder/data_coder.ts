@@ -58,10 +58,6 @@ class DataCoder {
   }
 
   static isReadOnlyGetter(target: object, prop: string): boolean {
-    if (Object.getPrototypeOf(target)?.[ObserveV2.V2_DECO_METHOD_META]?.[prop]?.deco === '@Computed') {
-      return true;
-    }
-
     let hasGetter = false;
     let hasSetter = false;
     let current: object | null = target;
@@ -74,11 +70,12 @@ class DataCoder {
         if (typeof desc.set === 'function') {
           hasSetter = true;
         }
-        if (hasGetter || hasSetter) {
-          break;
-        }
+        break;
       }
       current = Object.getPrototypeOf(current);
+    }
+    if (hasGetter && Object.getPrototypeOf(target)?.[ObserveV2.V2_DECO_METHOD_META]?.[prop]?.deco === '@Computed') {
+      return true;
     }
     return hasGetter && !hasSetter;
   }
