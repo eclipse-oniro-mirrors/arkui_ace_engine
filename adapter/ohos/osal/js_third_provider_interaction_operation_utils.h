@@ -16,6 +16,8 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_BRIDGE_COMMON_ACCESSIBILITY_JS_THIRD_PROVIDER_INTERATION_OPERATION_UTILS_H
 #define FOUNDATION_ACE_FRAMEWORKS_BRIDGE_COMMON_ACCESSIBILITY_JS_THIRD_PROVIDER_INTERATION_OPERATION_UTILS_H
 
+#include <memory>
+
 #include "accessibility_element_info.h"
 #include "accessibility_event_info.h"
 #include "base/utils/utils.h"
@@ -26,6 +28,8 @@ class AccessibilityThirdProviderUtils {
 public:
     AccessibilityThirdProviderUtils() = default;
     ~AccessibilityThirdProviderUtils() = default;
+    static std::shared_ptr<ArkUI_AccessibilityElementInfo> MakeNodeSnapshot(
+        const ArkUI_AccessibilityElementInfo& source);
     static void TransformAccessibilityElementInfo(const ArkUI_AccessibilityElementInfo& nativeInfo,
         OHOS::Accessibility::AccessibilityElementInfo& accessibilityElementInfo);
 

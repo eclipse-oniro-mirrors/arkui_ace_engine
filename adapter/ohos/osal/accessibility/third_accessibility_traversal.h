@@ -46,6 +46,12 @@ public:
         WRONG_PARENT = 1 << 5,
         LIMIT_EXCEEDED = 1 << 6,
         EXTRA_RESULTS = 1 << 7,
+        DEPTH_LIMIT = 1 << 8,
+        PAYLOAD_LIMIT = 1 << 9,
+        DUPLICATE_ID = 1 << 10,
+        CYCLE = 1 << 11,
+        DUPLICATE_CHILD = 1 << 12,
+        SHARED_CHILD = 1 << 13,
     };
 
     explicit ThirdAccessibilityTraversal(const char* operation) : operation_(operation) {}
@@ -55,10 +61,13 @@ public:
             return;
         }
         const std::pair<Issue, const char*> names[] = {
-            { REPEATED_ID, "repeated-id/cycle" }, { INVALID_ID, "invalid-id" },
+            { REPEATED_ID, "repeated-id/cycle/duplicate-child/shared-child" }, { INVALID_ID, "invalid-id" },
             { QUERY_FAILED, "query-failed" }, { ID_MISMATCH, "id-mismatch" },
             { MULTIPLE_ROOTS, "multiple-roots" }, { WRONG_PARENT, "wrong-parent" },
             { LIMIT_EXCEEDED, "limit-exceeded" }, { EXTRA_RESULTS, "extra-results" },
+            { DEPTH_LIMIT, "depth-limit" }, { PAYLOAD_LIMIT, "payload-limit" },
+            { DUPLICATE_ID, "duplicate-id" }, { CYCLE, "cycle" },
+            { DUPLICATE_CHILD, "duplicate-child" }, { SHARED_CHILD, "shared-child" },
         };
         std::string reasons;
         for (const auto& [issue, name] : names) {
@@ -92,8 +101,12 @@ public:
         if (Exhausted()) {
             return false;
         }
-        if (++edges_ > MAX_EDGES || depth > MAX_DEPTH) {
+        if (++edges_ > MAX_EDGES) {
             Record(LIMIT_EXCEEDED, id);
+            return false;
+        }
+        if (depth > MAX_DEPTH) {
+            Record(DEPTH_LIMIT, id);
             return false;
         }
         if (id < 0 || id > std::numeric_limits<int32_t>::max()) {
@@ -115,7 +128,7 @@ public:
     bool ConsumeBytes(size_t bytes, int64_t id)
     {
         if (bytes > MAX_BYTES - bytes_) {
-            Record(LIMIT_EXCEEDED, id);
+            Record(PAYLOAD_LIMIT, id);
             return false;
         }
         bytes_ += bytes;
@@ -124,6 +137,8 @@ public:
 
     bool FindNodeInfos(JsThirdProviderInteractionOperation& operation, int64_t elementId,
         std::list<Accessibility::AccessibilityElementInfo>& infos, bool ignoreHostOffset = false);
+
+    size_t RemainingBytes() const { return MAX_BYTES - bytes_; }
 
     bool Exhausted() const { return (issues_ & LIMIT_EXCEEDED) != 0; }
     bool HasIssues() const { return issues_ != 0; }

@@ -24,6 +24,7 @@
 #include "adapter/ohos/osal/accessibility/third_accessibility_traversal.h"
 #include "frameworks/core/accessibility/hidumper/accessibility_hidumper.h"
 #include "js_third_accessibility_hover_ng.h"
+#include "js_third_provider_interaction_operation_utils.h"
 #include "core/components_ng/property/accessibility_property.h"
 
 #include <algorithm>
@@ -305,6 +306,7 @@ bool AccessibilityHoverManagerForThirdNG::ComputeHoverTransferOffsets(
     const AccessibilityHoverForThirdConfig& config, HoverTransferGeometry& geometry)
 {
     // Coordinate-space conversion.
+    CHECK_NULL_RETURN(exportedRoot, false);
     auto renderContext = exportedRoot->GetRenderContext();
     CHECK_NULL_RETURN(renderContext, false);
     auto rootPaintRect = renderContext->GetPaintRectWithoutTransform();
@@ -462,7 +464,7 @@ void AccessibilityHoverManagerForThirdNG::PrepareNativeHoverResult(Accessibility
     if (registry.Invoke(host, static_cast<int32_t>(config.point.GetX()), static_cast<int32_t>(config.point.GetY()),
         info, config.nativeHoverGeneration)) {
         // The callback's borrowed pointer ends here; only an owned copy enters the background task.
-        config.nativeHoverInfo = std::make_shared<const ArkUI_AccessibilityElementInfo>(info);
+        config.nativeHoverInfo = AccessibilityThirdProviderUtils::MakeNodeSnapshot(info);
     }
 }
 
@@ -483,8 +485,10 @@ void AccessibilityHoverManagerForThirdNG::SendHoverExitForThird()
 
 void AccessibilityHoverManagerForThirdNG::HandleNativeHoverForThird(const AccessibilityHoverForThirdConfig& config)
 {
+    CHECK_NULL_VOID(config.nativeHoverInfo);
     bool sameTarget = config.eventType != NG::AccessibilityHoverEventType::ENTER &&
         hoverForThirdState_.nativeHoverInfo && hoverForThirdState_.hostElementId == config.hostElementId &&
+        hoverForThirdState_.source == config.sourceType &&
         hoverForThirdState_.nativeHoverGeneration == config.nativeHoverGeneration &&
         hoverForThirdState_.nativeHoverInfo->GetElementId() == config.nativeHoverInfo->GetElementId();
     if (!sameTarget) {
@@ -508,20 +512,29 @@ void AccessibilityHoverManagerForThirdNG::HandleNativeHoverForThird(const Access
 void AccessibilityHoverManagerForThirdNG::HandleAccessibilityHoverForThirdInner(
     const AccessibilityHoverForThirdConfig& config)
 {
+    if (config.eventType == NG::AccessibilityHoverEventType::EXIT ||
+        config.eventType == NG::AccessibilityHoverEventType::CANCEL) {
+        SendHoverExitForThird();
+        ResetHoverForThirdState();
+        TransferHoverToExportedSubtreeIfNeeded(INVALID_NODE_ID, config);
+        return;
+    }
     if (config.nativeHoverInfo && NG::NativeAccessibilityHoverRegistry::GetInstance().IsCurrent(
         config.nativeHoverHost.Upgrade(), config.nativeHoverGeneration)) {
+        if (!hoverForThirdState_.nativeHoverInfo) {
+            TransferHoverToExportedSubtreeIfNeeded(INVALID_NODE_ID, config);
+        }
         HandleNativeHoverForThird(config);
         return;
     }
     if (hoverForThirdState_.nativeHoverInfo) {
         SendHoverExitForThird();
         ResetHoverForThirdState();
-        if (config.eventType == NG::AccessibilityHoverEventType::EXIT ||
-            config.eventType == NG::AccessibilityHoverEventType::CANCEL) {
-            return;
-        }
     }
-    if (config.eventType == NG::AccessibilityHoverEventType::ENTER) {
+    if (config.eventType == NG::AccessibilityHoverEventType::ENTER ||
+        hoverForThirdState_.hostElementId != config.hostElementId ||
+        hoverForThirdState_.source != config.sourceType) {
+        SendHoverExitForThird();
         ResetHoverForThirdState();
     }
     std::vector<int64_t> currentNodesHovering;
@@ -530,6 +543,7 @@ void AccessibilityHoverManagerForThirdNG::HandleAccessibilityHoverForThirdInner(
         AccessibilityElementInfo rootInfo;
         if (GetElementInfoForThird(-1, rootInfo, config.hostElementId) == false) {
             TransferHoverToExportedSubtreeIfNeeded(INVALID_NODE_ID, config);
+            SendHoverExitForThird();
             ResetHoverForThirdState();
             return;
         }
@@ -576,9 +590,6 @@ void AccessibilityHoverManagerForThirdNG::HandleAccessibilityHoverForThirdInner(
 void AccessibilityHoverManagerForThirdNG::HandleAccessibilityHoverForThird(
     const AccessibilityHoverForThirdConfig& config)
 {
-    if (!hoverForThirdState_.thirdOperationIdle) {
-        return;
-    }
     CHECK_NULL_VOID(config.context);
     auto executor = config.context->GetTaskExecutor();
     CHECK_NULL_VOID(executor);
@@ -598,21 +609,65 @@ void AccessibilityHoverManagerForThirdNG::HandleAccessibilityHoverForThird(
         asyncConfig.ownerNodeId = owner->GetId();
         asyncConfig.mountBindIds = mainAM->GetCmpBindingBindIdsForHover(asyncConfig.ownerNodeId);
     }
-    bool idle = true;
-    if (!hoverForThirdState_.thirdOperationIdle.compare_exchange_strong(idle, false)) {
-        return;
+    {
+        std::lock_guard<std::mutex> lock(hoverTaskMutex_);
+        if (!hoverForThirdState_.thirdOperationIdle.load()) {
+            // Keep at most one pending event. A MOVE must not erase a session boundary.
+            if (pendingHover_ && asyncConfig.eventType == NG::AccessibilityHoverEventType::MOVE &&
+                (pendingHover_->eventType != NG::AccessibilityHoverEventType::MOVE ||
+                    pendingHover_->hostElementId != asyncConfig.hostElementId ||
+                    pendingHover_->sourceType != asyncConfig.sourceType)) {
+                asyncConfig.eventType = NG::AccessibilityHoverEventType::ENTER;
+            }
+            pendingHoverContext_ = asyncConfig.context;
+            asyncConfig.context.Reset();
+            pendingHover_ = std::move(asyncConfig);
+            return;
+        }
+        hoverForThirdState_.thirdOperationIdle.store(false);
     }
-    // Reserve the worker before posting: two UI events must not queue concurrent
-    // walks that mutate nodesHovering. Every completion/failure releases it.
+    // Never hold the queue lock across PostTask or provider callbacks: either may run inline.
     bool posted = executor->PostTask(
         [weak = WeakClaim(this), asyncConfig] {
             auto manager = weak.Upgrade();
             CHECK_NULL_VOID(manager);
-            manager->HandleAccessibilityHoverForThirdInner(asyncConfig);
-            manager->hoverForThirdState_.thirdOperationIdle.store(true);
+            manager->DrainPendingHoverForThird(asyncConfig);
         }, TaskExecutor::TaskType::BACKGROUND, "ArkUIHandleAccessibilityHoverForThird");
     if (!posted) {
+        // No background task owns the state. End the previous session before releasing the reservation.
+        SendHoverExitForThird();
+        ResetHoverForThirdState();
+        TransferHoverToExportedSubtreeIfNeeded(INVALID_NODE_ID, config);
+        std::lock_guard<std::mutex> lock(hoverTaskMutex_);
+        pendingHover_.reset();
+        pendingHoverContext_.Reset();
         hoverForThirdState_.thirdOperationIdle.store(true);
+        TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY, "Third accessibility: failed to post hover worker");
+    }
+}
+
+void AccessibilityHoverManagerForThirdNG::DrainPendingHoverForThird(AccessibilityHoverForThirdConfig config)
+{
+    for (;;) {
+        if (config.context) {
+            HandleAccessibilityHoverForThirdInner(config);
+        } else {
+            SendHoverExitForThird();
+            ResetHoverForThirdState();
+        }
+        AccessibilityHoverForThirdConfig next;
+        {
+            std::lock_guard<std::mutex> lock(hoverTaskMutex_);
+            if (!pendingHover_) {
+                hoverForThirdState_.thirdOperationIdle.store(true);
+                return;
+            }
+            next = std::move(*pendingHover_);
+            next.context = pendingHoverContext_.Upgrade();
+            pendingHover_.reset();
+            pendingHoverContext_.Reset();
+        }
+        config = std::move(next);
     }
 }
 

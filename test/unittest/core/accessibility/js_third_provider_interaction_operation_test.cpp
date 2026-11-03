@@ -43,6 +43,8 @@ namespace OHOS::Ace {
 int32_t g_mockErrorCode = -1;
 std::string TEST_CONTENT_STR = "testForFindByText";
 
+// This callback has a different layout from the shared test callback. Keep its symbols local.
+namespace {
 class MockAccessibilityElementOperatorCallback : public Accessibility::AccessibilityElementOperatorCallback {
 public:
     ~MockAccessibilityElementOperatorCallback() = default;
@@ -132,6 +134,7 @@ public:
     bool mockFocusable_ = false;
     int32_t mockCursorPosition_ = 0;
 };
+} // namespace
 } // namespace OHOS::Ace
 
 namespace OHOS::Ace::NG {

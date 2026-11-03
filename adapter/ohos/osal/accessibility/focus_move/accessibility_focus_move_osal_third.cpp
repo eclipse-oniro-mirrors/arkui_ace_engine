@@ -12,6 +12,8 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
+#include <deque>
+
 #include "adapter/ohos/osal/accessibility/focus_move/accessibility_focus_move_osal_third.h"
 #include "adapter/ohos/osal/accessibility/focus_move/accessibility_focus_third_node_utils.h"
 #include "adapter/ohos/osal/js_third_provider_interaction_operation_utils.h"
@@ -25,34 +27,34 @@ using namespace OHOS::AccessibilityConfig;
 
 namespace OHOS::Ace::Framework {
 namespace {
-// Native action descriptions are borrowed pointers. A request snapshot must own
-// them before another provider callback can replace their backing storage.
-struct ThirdNodeSnapshot : ArkUI_AccessibilityElementInfo {
-    explicit ThirdNodeSnapshot(const ArkUI_AccessibilityElementInfo& source)
-        : ArkUI_AccessibilityElementInfo(source)
-    {
-        const auto& actions = source.GetOperationActions();
-        descriptions.reserve(actions.size());
-        for (const auto& action : actions) {
-            descriptions.emplace_back(action.description ? action.description : "");
-        }
-        ClearOperationActions();
-        for (size_t i = 0; i < actions.size(); ++i) {
-            auto action = actions[i];
-            action.description = descriptions[i].c_str();
-            AddOperationAction(action);
-        }
-    }
-    std::vector<std::string> descriptions;
-};
-
 struct ThirdTreeBuildContext {
     const WeakPtr<AccessibilityProvider>& provider;
     ThirdRulesCheckNode::ParentMap& parents;
     ThirdRulesCheckNode::NodeMap& nodes;
     ThirdAccessibilityTraversal& traversal;
-    std::vector<std::pair<std::shared_ptr<ArkUI_AccessibilityElementInfo>, size_t>> pending;
+    std::deque<std::pair<std::shared_ptr<ArkUI_AccessibilityElementInfo>, size_t>> pending;
 };
+
+void RecordRepeatedThirdEdge(int64_t parentId, int64_t childId, ThirdTreeBuildContext& context)
+{
+    auto child = context.parents.find(childId);
+    if (child == context.parents.end()) {
+        return;
+    }
+    for (auto ancestor = parentId; ancestor >= 0;) {
+        if (ancestor == childId) {
+            context.traversal.Record(ThirdAccessibilityTraversal::CYCLE, childId);
+            return;
+        }
+        auto parent = context.parents.find(ancestor);
+        if (parent == context.parents.end()) {
+            break;
+        }
+        ancestor = parent->second;
+    }
+    context.traversal.Record(child->second == parentId ? ThirdAccessibilityTraversal::DUPLICATE_CHILD :
+        ThirdAccessibilityTraversal::SHARED_CHILD, childId);
+}
 
 void CollectThirdChildren(const std::shared_ptr<ArkUI_AccessibilityElementInfo>& parent,
     size_t depth, ThirdTreeBuildContext& context)
@@ -62,6 +64,7 @@ void CollectThirdChildren(const std::shared_ptr<ArkUI_AccessibilityElementInfo>&
             break;
         }
         if (!context.traversal.Visit(childId, depth + 1)) {
+            RecordRepeatedThirdEdge(parent->GetElementId(), childId, context);
             continue;
         }
         auto child = std::make_shared<ArkUI_AccessibilityElementInfo>();
@@ -69,7 +72,7 @@ void CollectThirdChildren(const std::shared_ptr<ArkUI_AccessibilityElementInfo>&
             context.provider, childId, child, &context.traversal)) {
             continue;
         }
-        child = std::make_shared<ThirdNodeSnapshot>(*child);
+        child = AccessibilityThirdProviderUtils::MakeNodeSnapshot(*child);
         auto reportedParent = child->GetParentId();
         // Missing parent IDs are a supported provider convention, not a warning.
         if (reportedParent >= 0 && reportedParent != parent->GetElementId()) {
@@ -190,20 +193,16 @@ bool FocusStrategyOsalThird::BuildParentMap()
         !traversal.Visit(root->GetElementId(), 0)) {
         return false;
     }
-    root = std::make_shared<ThirdNodeSnapshot>(*root);
+    root = AccessibilityThirdProviderUtils::MakeNodeSnapshot(*root);
     parentMap_->emplace(root->GetElementId(), AccessibilityElementInfo::ROOT_PARENT_ID);
     nodeMap_->emplace(root->GetElementId(), root);
     ThirdTreeBuildContext context { accessibilityProvider_, *parentMap_, *nodeMap_, traversal, { { root, 0 } } };
     while (!context.pending.empty() && !traversal.Exhausted()) {
-        auto [parent, depth] = context.pending.back();
-        context.pending.pop_back();
+        auto [parent, depth] = context.pending.front();
+        context.pending.pop_front();
         CollectThirdChildren(parent, depth, context);
     }
-    if (traversal.Exhausted()) {
-        parentMap_->clear();
-        nodeMap_->clear();
-        return false; // Do not report a match from an incomplete tree.
-    }
+    // Keep the bounded, validated prefix. A pruned branch must not invalidate an accepted origin.
     // Publish only the accepted edges, including in element info returned to the service.
     for (const auto& [id, node] : *nodeMap_) {
         SanitizeThirdNode(node, *parentMap_);

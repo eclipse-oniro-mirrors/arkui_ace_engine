@@ -15,6 +15,8 @@
 
 #include "gtest/gtest.h"
 #include <deque>
+#include <functional>
+#include <future>
 #include <limits>
 #include <thread>
 
@@ -453,9 +455,17 @@ public:
         VsyncBarrierOption = VsyncBarrierOption::NO_BARRIER) const override
     {
         if (name == "ArkUIHandleAccessibilityHoverForThird") {
+            if (!acceptHover) {
+                return false;
+            }
             hoverTasks.emplace_back(std::move(task));
         } else if (name == "SetSearchElementInfoByTextResult") {
             ++eventCount;
+            auto callback = std::move(onEvent);
+            onEvent = nullptr;
+            if (callback) {
+                callback();
+            }
         }
         return true;
     }
@@ -472,12 +482,15 @@ public:
         }
     }
     bool onUiThread = true;
+    bool acceptHover = true;
     mutable size_t eventCount = 0;
+    mutable std::function<void()> onEvent;
     mutable std::deque<Task> hoverTasks;
 };
 
 struct NativeHoverCallbackData {
     int64_t id = 100;
+    std::string actionDescription;
     int32_t calls = 0;
     int32_t x = -1;
     int32_t y = -1;
@@ -489,6 +502,8 @@ struct NativeHoverCallbackData {
 void FillNativeHoverResult(void* userData, int32_t x, int32_t y, int32_t requestId,
     ArkUI_AccessibilityElementInfo* info)
 {
+    ASSERT_NE(userData, nullptr);
+    ASSERT_NE(info, nullptr);
     auto& data = *static_cast<NativeHoverCallbackData*>(userData);
     ++data.calls;
     data.x = x;
@@ -499,6 +514,10 @@ void FillNativeHoverResult(void* userData, int32_t x, int32_t y, int32_t request
         info->SetElementId(data.id);
         info->SetComponentType("Button");
         info->SetContents("native result");
+        if (!data.actionDescription.empty()) {
+            info->AddOperationAction({ ARKUI_ACCESSIBILITY_NATIVE_ACTION_TYPE_CLICK,
+                data.actionDescription.c_str() });
+        }
     }
     if (data.unregisterHost) {
         NativeAccessibilityHoverRegistry::GetInstance().Unregister(data.unregisterHost);
@@ -681,6 +700,156 @@ HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeInvalidCoordinatesAndBackgroundN
     scenario.manager->PrepareNativeHoverResult(config);
     EXPECT_FALSE(config.nativeHoverInfo);
     EXPECT_EQ(scenario.data.calls, 0);
+}
+
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeQueuedEnterThenExitClearsHover, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.Transfer(AccessibilityHoverEventType::EXIT);
+    ASSERT_EQ(scenario.executor->hoverTasks.size(), 1);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_EQ(scenario.executor->eventCount, 2);
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.nodesHovering.empty());
+    EXPECT_FALSE(scenario.manager->hoverForThirdState_.nativeHoverInfo);
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.idle);
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.thirdOperationIdle.load());
+}
+
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeQueuedEnterThenCancelClearsHover, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.Transfer(AccessibilityHoverEventType::CANCEL);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_EQ(scenario.executor->eventCount, 2);
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.nodesHovering.empty());
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.idle);
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.thirdOperationIdle.load());
+}
+
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeQueuedMovesKeepLatestTarget, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    for (int64_t id = 101; id <= 200; ++id) {
+        scenario.data.id = id;
+        scenario.Transfer(AccessibilityHoverEventType::MOVE);
+    }
+    ASSERT_EQ(scenario.executor->hoverTasks.size(), 1);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_EQ(scenario.manager->hoverForThirdState_.nodesHovering, std::vector<int64_t>({200}));
+    EXPECT_EQ(scenario.executor->eventCount, 3);
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.thirdOperationIdle.load());
+}
+
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeQueuedRestartSurvivesMoveCoalescing, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.executor->DrainHoverTasks();
+    scenario.Transfer(AccessibilityHoverEventType::MOVE);
+    scenario.Transfer(AccessibilityHoverEventType::EXIT);
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.Transfer(AccessibilityHoverEventType::MOVE);
+    ASSERT_EQ(scenario.executor->hoverTasks.size(), 1);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_EQ(scenario.executor->eventCount, 3); // Same ID, but a new hover session.
+    EXPECT_EQ(scenario.manager->hoverForThirdState_.nodesHovering, std::vector<int64_t>({100}));
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.thirdOperationIdle.load());
+}
+
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeQueuedSnapshotOwnsActionDescriptions, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    scenario.data.actionDescription = "original action";
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.data.actionDescription[0] = 'X';
+    scenario.executor->DrainHoverTasks();
+    auto snapshot = scenario.manager->hoverForThirdState_.nativeHoverInfo;
+    ASSERT_NE(snapshot, nullptr);
+    ASSERT_EQ(snapshot->GetOperationActions().size(), 1);
+    EXPECT_STREQ(snapshot->GetOperationActions().front().description, "original action");
+}
+
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeExitDuringWorkerExecutionIsDrained, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    scenario.executor->onEvent = [&scenario] { scenario.Transfer(AccessibilityHoverEventType::EXIT); };
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_EQ(scenario.executor->eventCount, 2);
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.nodesHovering.empty());
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.thirdOperationIdle.load());
+}
+
+HWTEST_F(JsThirdAccessibilityHoverNgTest, LegacyCancelClearsSavedHoverWithoutHitTest, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    auto& state = scenario.manager->hoverForThirdState_;
+    state.hostElementId = scenario.host->GetAccessibilityId();
+    state.nodesHovering = {100};
+    state.idle = false;
+    scenario.Transfer(AccessibilityHoverEventType::CANCEL);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_TRUE(state.nodesHovering.empty());
+    EXPECT_TRUE(state.idle);
+    EXPECT_EQ(scenario.provider->providerMockResult_.elementId_, 100); // EXIT queries the saved target only.
+}
+
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeConcurrentExitIsNotLost, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    std::promise<void> entered;
+    std::promise<void> resume;
+    auto enteredFuture = entered.get_future();
+    auto resumeFuture = resume.get_future();
+    scenario.executor->onEvent = [&] {
+        entered.set_value();
+        resumeFuture.wait();
+    };
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    std::thread worker([&] { scenario.executor->DrainHoverTasks(); });
+    auto status = enteredFuture.wait_for(std::chrono::seconds(10));
+    if (status == std::future_status::ready) {
+        scenario.Transfer(AccessibilityHoverEventType::EXIT);
+    }
+    resume.set_value();
+    worker.join();
+    ASSERT_EQ(status, std::future_status::ready);
+    EXPECT_EQ(scenario.executor->eventCount, 2);
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.nodesHovering.empty());
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.thirdOperationIdle.load());
+}
+
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeRejectedWorkerClearsPreviousHover, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.executor->DrainHoverTasks();
+    scenario.executor->acceptHover = false;
+    scenario.Transfer(AccessibilityHoverEventType::EXIT);
+    EXPECT_TRUE(scenario.executor->hoverTasks.empty());
+    EXPECT_EQ(scenario.executor->eventCount, 2);
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.nodesHovering.empty());
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.thirdOperationIdle.load());
+    scenario.executor->acceptHover = true;
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_EQ(scenario.executor->eventCount, 3);
+}
+
+HWTEST_F(JsThirdAccessibilityHoverNgTest, PendingEventsDoNotRetainContext, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    const auto references = scenario.context->RefCount();
+    scenario.Transfer(AccessibilityHoverEventType::EXIT);
+    EXPECT_EQ(scenario.context->RefCount(), references);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_EQ(scenario.executor->eventCount, 2);
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.nodesHovering.empty());
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.thirdOperationIdle.load());
 }
 
 } // namespace OHOS::Ace::NG

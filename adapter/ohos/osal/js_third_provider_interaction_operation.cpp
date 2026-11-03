@@ -33,6 +33,27 @@
 
 namespace OHOS::Ace::Framework {
 namespace {
+// Native action descriptions are borrowed pointers. A request snapshot must own
+// them before another provider callback can replace their backing storage.
+struct ThirdNodeSnapshot : ArkUI_AccessibilityElementInfo {
+    explicit ThirdNodeSnapshot(const ArkUI_AccessibilityElementInfo& source)
+        : ArkUI_AccessibilityElementInfo(source)
+    {
+        const auto& actions = source.GetOperationActions();
+        descriptions.reserve(actions.size());
+        for (const auto& action : actions) {
+            descriptions.emplace_back(action.description ? action.description : "");
+        }
+        ClearOperationActions();
+        for (size_t i = 0; i < actions.size(); ++i) {
+            auto action = actions[i];
+            action.description = descriptions[i].c_str();
+            AddOperationAction(action);
+        }
+    }
+    std::vector<std::string> descriptions;
+};
+
 int32_t TransformThirdCoordinate(int32_t value, float scale, float offset)
 {
     // Keep normal float arithmetic, but never cast a non-finite/out-of-range value to int.
@@ -51,13 +72,22 @@ int32_t TransformThirdCoordinate(int32_t value, float scale, float offset)
 bool ValidateThirdNodePayload(const ArkUI_AccessibilityElementInfo& node, ThirdAccessibilityTraversal& traversal)
 {
     const auto id = node.GetElementId();
-    if (!traversal.ConsumeBytes(sizeof(node), id) ||
-        !traversal.ConsumeBytes(node.GetChildNodeIds().size() * sizeof(int64_t), id) ||
+    size_t payloadBytes = 0;
+    auto addBytes = [&traversal, &payloadBytes, id](size_t bytes) {
+        if (bytes > traversal.RemainingBytes() - payloadBytes) {
+            traversal.Record(ThirdAccessibilityTraversal::PAYLOAD_LIMIT, id);
+            return false;
+        }
+        payloadBytes += bytes;
+        return true;
+    };
+    if (!addBytes(sizeof(node)) ||
+        !addBytes(node.GetChildNodeIds().size() * sizeof(int64_t)) ||
         node.GetOperationActions().size() > ThirdAccessibilityTraversal::MAX_BYTES / sizeof(ArkUI_AccessibleAction)) {
-        traversal.Record(ThirdAccessibilityTraversal::LIMIT_EXCEEDED, id);
+        traversal.Record(ThirdAccessibilityTraversal::PAYLOAD_LIMIT, id);
         return false;
     }
-    if (!traversal.ConsumeBytes(node.GetOperationActions().size() * sizeof(ArkUI_AccessibleAction), id)) {
+    if (!addBytes(node.GetOperationActions().size() * sizeof(ArkUI_AccessibleAction))) {
         return false;
     }
     const auto strings = { &ArkUI_AccessibilityElementInfo::GetComponentType,
@@ -68,17 +98,17 @@ bool ValidateThirdNodePayload(const ArkUI_AccessibilityElementInfo& node, ThirdA
         &ArkUI_AccessibilityElementInfo::GetBackgroundImage, &ArkUI_AccessibilityElementInfo::GetBlur,
         &ArkUI_AccessibilityElementInfo::GetHitTestBehavior, &ArkUI_AccessibilityElementInfo::GetComponentIdentifier };
     for (auto getter : strings) {
-        if (!traversal.ConsumeBytes((node.*getter)().size(), id)) {
+        if (!addBytes((node.*getter)().size())) {
             return false;
         }
     }
     for (const auto& action : node.GetOperationActions()) {
-        if (action.description && !traversal.ConsumeBytes(
-            strnlen(action.description, ThirdAccessibilityTraversal::MAX_BYTES + 1), id)) {
+        if (action.description && !addBytes(
+            strnlen(action.description, ThirdAccessibilityTraversal::MAX_BYTES + 1))) {
             return false;
         }
     }
-    return true;
+    return traversal.ConsumeBytes(payloadBytes, id);
 }
 
 bool ValidateThirdNodeResponse(int64_t queryId, const std::vector<ArkUI_AccessibilityElementInfo>& infos,
@@ -95,16 +125,28 @@ bool ValidateThirdNodeResponse(int64_t queryId, const std::vector<ArkUI_Accessib
     }
     if (infos.size() > ThirdAccessibilityTraversal::MAX_NODES ||
         infos.front().GetChildNodeIds().size() > ThirdAccessibilityTraversal::MAX_EDGES) {
-        traversal.Record(ThirdAccessibilityTraversal::LIMIT_EXCEEDED, id);
+        traversal.Record(ThirdAccessibilityTraversal::PAYLOAD_LIMIT, id);
         return false;
     }
     if (queryId == -1) {
+        std::unordered_set<int32_t> ids { id };
         for (size_t i = 1; i < infos.size(); ++i) {
-            traversal.Record(infos[i].GetElementId() != id ? ThirdAccessibilityTraversal::MULTIPLE_ROOTS :
-                ThirdAccessibilityTraversal::REPEATED_ID, infos[i].GetElementId());
+            auto candidateId = infos[i].GetElementId();
+            if (!ids.insert(candidateId).second) {
+                traversal.Record(ThirdAccessibilityTraversal::DUPLICATE_ID, candidateId);
+            }
+            if (candidateId != id) {
+                traversal.Record(ThirdAccessibilityTraversal::MULTIPLE_ROOTS, candidateId);
+            }
         }
     } else if (infos.size() != 1) {
         traversal.Record(ThirdAccessibilityTraversal::EXTRA_RESULTS, queryId);
+        std::unordered_set<int32_t> ids;
+        for (const auto& info : infos) {
+            if (!ids.insert(info.GetElementId()).second) {
+                traversal.Record(ThirdAccessibilityTraversal::DUPLICATE_ID, info.GetElementId());
+            }
+        }
         return false; // A mode=0 lookup must not choose arbitrarily between conflicting payloads.
     }
     return ValidateThirdNodePayload(infos.front(), traversal);
@@ -263,6 +305,12 @@ void RemoveKeysForClickAction(
     args.erase(ACTION_ARGU_CLICK_TIMESTAMP);
 }
 } // namespace
+
+std::shared_ptr<ArkUI_AccessibilityElementInfo> AccessibilityThirdProviderUtils::MakeNodeSnapshot(
+    const ArkUI_AccessibilityElementInfo& source)
+{
+    return std::make_shared<ThirdNodeSnapshot>(source);
+}
 
 void AccessibilityThirdProviderUtils::TransformAccessibilityElementInfoBasic(
     const ArkUI_AccessibilityElementInfo& nativeInfo,
@@ -454,7 +502,12 @@ bool JsThirdProviderInteractionOperation::FindNativeInfoById(
 {
     CHECK_NULL_RETURN(nativeInfo, false);
     auto provider = accessibilityProvider.Upgrade();
-    CHECK_NULL_RETURN(provider, false);
+    if (!provider) {
+        if (traversal) {
+            traversal->Record(ThirdAccessibilityTraversal::QUERY_FAILED, splitElementId);
+        }
+        return false;
+    }
     std::vector<ArkUI_AccessibilityElementInfo> nativeInfos;
     int32_t code = provider->FindAccessibilityNodeInfosById(
         splitElementId, 0, 0, nativeInfos);
@@ -519,7 +572,12 @@ bool JsThirdProviderInteractionOperation::FindNodeInfosFromProvider(
     std::list<Accessibility::AccessibilityElementInfo>& infos)
 {
     auto provider = accessibilityProvider_.Upgrade();
-    CHECK_NULL_RETURN(provider, false);
+    if (!provider) {
+        if (options.traversal) {
+            options.traversal->Record(ThirdAccessibilityTraversal::QUERY_FAILED, splitElementId);
+        }
+        return false;
+    }
     std::vector<ArkUI_AccessibilityElementInfo> nativeInfos;
     int32_t code = provider->FindAccessibilityNodeInfosById(
         splitElementId, options.mode, options.requestId, nativeInfos);
