@@ -254,7 +254,8 @@ void SheetPresentationLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
             CHECK_NULL_VOID(builder);
             auto builderGeometryNode = builder->GetGeometryNode();
             CHECK_NULL_VOID(builderGeometryNode);
-            sheetHeight_ = sheetPattern->GetTitleBuilderHeight() + builderGeometryNode->GetFrameSize().Height();
+            sheetHeight_ =
+                sheetPattern->GetTitleBuilderHeightStackMode() + builderGeometryNode->GetFrameSize().Height();
             float sheetMaxHeight = sheetMaxHeight_;
             if (SheetInSplitWindow()) {
                 auto pipelineContext = PipelineContext::GetCurrentContext();
