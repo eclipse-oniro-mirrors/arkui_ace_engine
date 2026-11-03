@@ -682,13 +682,13 @@ void ScrollablePattern::SetUiDvsyncSwitch(bool on)
     CHECK_NULL_VOID(context);
     bool WebNestedScrollExisted = GetWebNestedScrollExisted();
     if (on && inScrollingStatus_ && !WebNestedScrollExisted) {
-        TAG_LOGI(AceLogTag::ACE_SCROLLABLE, "ScrollablePattern::SetUiDvsyncSwitch SetUiDvsyncSwitch true");
+        TAG_LOGD(AceLogTag::ACE_SCROLLABLE, "ScrollablePattern::SetUiDvsyncSwitch SetUiDvsyncSwitch true");
         inScrollingStatus_ = false;
         context->SetUiDvsyncSwitch(true);
         switchOnStatus_ = true;
         isNeedCollectOffset_ = true;
     } else if (!on && switchOnStatus_) {
-        TAG_LOGI(AceLogTag::ACE_SCROLLABLE, "ScrollablePattern::SetUiDvsyncSwitch SetUiDvsyncSwitch false");
+        TAG_LOGD(AceLogTag::ACE_SCROLLABLE, "ScrollablePattern::SetUiDvsyncSwitch SetUiDvsyncSwitch false");
         context->SetUiDvsyncSwitch(false);
         switchOnStatus_ = false;
     }
@@ -784,7 +784,7 @@ void ScrollablePattern::OnTouchTestDone(const std::shared_ptr<BaseGestureEvent>&
     if (!isHitTestBlock_) {
         return;
     }
-    TAG_LOGI(AceLogTag::ACE_SCROLLABLE, "Scrollable TouchTestDone: isHitTestBlock %{public}d, clickJudge %{public}d",
+    TAG_LOGD(AceLogTag::ACE_SCROLLABLE, "Scrollable TouchTestDone: isHitTestBlock %{public}d, clickJudge %{public}d",
         isHitTestBlock, clickJudge);
     OnTouchTestDoneHandlePreventRecognizer(activeRecognizers, isHitTestBlock);
 }

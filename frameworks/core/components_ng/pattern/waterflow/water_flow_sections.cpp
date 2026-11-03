@@ -28,7 +28,7 @@ void WaterFlowSections::ChangeData(
     deleteCount = std::min(deleteCount, sections_.size() - start);
     prevSections_ = sections_;
 
-    TAG_LOGI(AceLogTag::ACE_WATERFLOW,
+    TAG_LOGD(AceLogTag::ACE_WATERFLOW,
         "section changed, start:%{public}zu, deleteCount:%{public}zu, newSections:%{public}zu", start, deleteCount,
         newSections.size());
     NotifySectionChange(start, deleteCount, newSections);

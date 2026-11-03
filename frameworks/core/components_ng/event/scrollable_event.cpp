@@ -157,7 +157,7 @@ void ScrollableActuator::InitClickRecognizer(const OffsetF& coordinateOffset,
     clickRecognizer_->SetRecognizerType(GestureTypeName::TAP_GESTURE);
     clickRecognizer_->SetSysGestureJudge([isHitTestBlock, clickJudge](const RefPtr<GestureInfo>& gestureInfo,
                                              const std::shared_ptr<BaseGestureEvent>&) -> GestureJudgeResult {
-        TAG_LOGI(
+        TAG_LOGD(
             AceLogTag::ACE_SCROLLABLE, "Scrollable GestureJudge:%{public}d, %{public}d", isHitTestBlock, clickJudge);
         return isHitTestBlock || clickJudge ? GestureJudgeResult::CONTINUE : GestureJudgeResult::REJECT;
     });
