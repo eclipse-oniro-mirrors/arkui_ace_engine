@@ -27,6 +27,8 @@
 #include "node_model.h"
 #include "ui_input_event.h"
 #include "event/ui_input_event_impl.h"
+#include "core/common/ace_application_info.h"
+#include "core/event/key_event.h"
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "test/mock/frameworks/core/common/mock_container.h"
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
@@ -1052,5 +1054,113 @@ HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0033, TestSize.Level1)
     EXPECT_EQ(OH_ArkUI_UIInputEvent_GetLatestStatus(), ARKUI_ERROR_CODE_NO_ERROR);
     EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&event), ARKUI_ERROR_CODE_NO_ERROR);
     EXPECT_EQ(event, nullptr);
+}
+} // namespace OHOS::Ace
+namespace OHOS::Ace {
+namespace {
+void CountApplicationShortcut(const OH_ArkUI_ApplicationShortcutCallbackInfo* info, void* userData)
+{
+    EXPECT_NE(OH_ArkUI_ApplicationShortcutCallbackInfo_GetUIContext(info), nullptr);
+    if (userData) {
+        ++(*static_cast<int32_t*>(userData));
+    }
+}
+
+KeyEvent MakeApplicationShortcutEvent()
+{
+    KeyEvent event;
+    event.code = KeyCode::KEY_A;
+    event.action = KeyAction::DOWN;
+    event.pressedCodes = { KeyCode::KEY_CTRL_LEFT, KeyCode::KEY_A };
+    return event;
+}
+} // namespace
+
+/**
+ * @tc.name: ApplicationShortcutMultipleBindings
+ * @tc.desc: Repeated callbacks get separate IDs; unregistering one preserves the other.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeKeyEventTest, ApplicationShortcutMultipleBindings, TestSize.Level1)
+{
+    auto* key = OH_ArkUI_KeyboardShortcutKey_Create();
+    ASSERT_NE(key, nullptr);
+    OH_ArkUI_KeyboardShortcutKey_SetCharacter(key, 'A');
+    int32_t count = 0;
+    int32_t firstId = 0;
+    int32_t secondId = 0;
+    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, OH_ARKUI_KEYBOARD_SHORTCUT_MODIFIER_CTRL,
+        &count, CountApplicationShortcut, &firstId), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, OH_ARKUI_KEYBOARD_SHORTCUT_MODIFIER_CTRL,
+        &count, CountApplicationShortcut, &secondId), ARKUI_ERROR_CODE_NO_ERROR);
+    OH_ArkUI_KeyboardShortcutKey_Destroy(&key);
+    EXPECT_EQ(key, nullptr);
+    EXPECT_GT(firstId, 0);
+    EXPECT_GT(secondId, firstId);
+    auto& appInfo = AceApplicationInfo::GetInstance();
+    auto event = MakeApplicationShortcutEvent();
+    EXPECT_TRUE(appInfo.TryTriggerApplicationShortcut(event, 1));
+    EXPECT_EQ(count, 2);
+    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Unregister(firstId), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Unregister(firstId), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_TRUE(appInfo.TryTriggerApplicationShortcut(event, 1));
+    EXPECT_EQ(count, 3);
+    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Unregister(secondId), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_FALSE(appInfo.TryTriggerApplicationShortcut(event, 1));
+}
+
+/**
+ * @tc.name: ApplicationShortcutInvalidParameters
+ * @tc.desc: Invalid registrations preserve the output value as required by the SDK.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeKeyEventTest, ApplicationShortcutInvalidParameters, TestSize.Level1)
+{
+    auto* key = OH_ArkUI_KeyboardShortcutKey_Create();
+    ASSERT_NE(key, nullptr);
+    int32_t id = 123;
+    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(nullptr, 1, nullptr, CountApplicationShortcut, &id),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, 1, nullptr, CountApplicationShortcut, &id),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    OH_ArkUI_KeyboardShortcutKey_SetCharacter(key, 'A');
+    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, 0, nullptr, CountApplicationShortcut, &id),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, 8, nullptr, CountApplicationShortcut, &id),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, 1, nullptr, nullptr, &id),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, 1, nullptr, CountApplicationShortcut, nullptr),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(id, 123);
+    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Unregister(-1), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_ApplicationShortcutCallbackInfo_GetUIContext(nullptr), nullptr);
+    OH_ArkUI_KeyboardShortcutKey_Destroy(&key);
+}
+
+/**
+ * @tc.name: ApplicationShortcutFunctionKeys
+ * @tc.desc: Function keys support no modifiers and distinguish F1 from F10.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeKeyEventTest, ApplicationShortcutFunctionKeys, TestSize.Level1)
+{
+    auto* key = OH_ArkUI_KeyboardShortcutKey_Create();
+    ASSERT_NE(key, nullptr);
+    OH_ArkUI_KeyboardShortcutKey_SetType(key, OH_ARKUI_KEYBOARD_SHORTCUT_KEY_TYPE_FUNCTION_KEY);
+    OH_ArkUI_KeyboardShortcutKey_SetFunctionKey(key, OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_F1);
+    int32_t id = 0;
+    int32_t count = 0;
+    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, 0, &count, CountApplicationShortcut, &id),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    OH_ArkUI_KeyboardShortcutKey_Destroy(&key);
+    auto event = MakeApplicationShortcutEvent();
+    event.pressedCodes.clear();
+    event.code = KeyCode::KEY_F10;
+    EXPECT_FALSE(AceApplicationInfo::GetInstance().TryTriggerApplicationShortcut(event, 1));
+    event.code = KeyCode::KEY_F1;
+    EXPECT_TRUE(AceApplicationInfo::GetInstance().TryTriggerApplicationShortcut(event, 1));
+    EXPECT_EQ(count, 1);
+    OH_ArkUI_ApplicationShortcut_Unregister(id);
 }
 } // namespace OHOS::Ace

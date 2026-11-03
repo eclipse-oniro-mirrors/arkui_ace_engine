@@ -523,7 +523,7 @@ bool KeyEventManager::DispatchKeyboardShortcut(const KeyEvent& event)
     if (event.action != KeyAction::DOWN) {
         return false;
     }
-    if (keyboardShortcutNode_.empty() || IsSystemKeyboardShortcut(event)) {
+    if (IsSystemKeyboardShortcut(event)) {
         return false;
     }
     for (auto& node : keyboardShortcutNode_) {

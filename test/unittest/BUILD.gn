@@ -755,6 +755,7 @@ ohos_static_library("ace_core_extra") {
     "$ace_root/frameworks/core/accessibility/node_utils/cmp_accessibility_registry.cpp",
     "$ace_root/frameworks/core/accessibility/third_provider_tree_exporter.cpp",
     "$ace_root/frameworks/core/common/agingadapation/aging_adapation_dialog_util.cpp",
+    "$ace_root/frameworks/core/common/application_shortcut.cpp",
     "$ace_root/frameworks/core/common/back_press_handler_manager.cpp",
     "$ace_root/frameworks/core/common/container_scope.cpp",
     "$ace_root/frameworks/core/common/event_dump.cpp",

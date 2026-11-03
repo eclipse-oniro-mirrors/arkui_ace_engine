@@ -611,14 +611,14 @@ class UIContext {
     static registerApplicationShortcut(value, keys, callback) {
         let shortcut = globalThis.requireNapi('arkui.applicationShortcut');
         if (shortcut) {
-            shortcut.registerApplicationShortcut(value, keys, callback);
+            return shortcut.registerApplicationShortcut(value, keys, callback);
         }
     }
 
-    static unregisterApplicationShortcut(value, keys) {
+    static unregisterApplicationShortcut(registrationId) {
         let shortcut = globalThis.requireNapi('arkui.applicationShortcut');
         if (shortcut) {
-            shortcut.unregisterApplicationShortcut(value, keys);
+            shortcut.unregisterApplicationShortcut(registrationId);
         }
     }
 

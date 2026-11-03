@@ -88,6 +88,8 @@
       "OHOS::Ace::ACE_PI";
       "OHOS::Ace::AceApplicationInfo::GetAbilityName() const";
       "OHOS::Ace::AceApplicationInfo::GetInstance()";
+      "OHOS::Ace::AceApplicationInfo::RegisterApplicationShortcut(std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&, unsigned char, std::__h::function<void (int)>&&, int)";
+      "OHOS::Ace::AceApplicationInfo::UnregisterApplicationShortcut(int)";
       "OHOS::Ace::AceEngine::Get()";
       "OHOS::Ace::AceEngine::GetContainer(int)";
       "OHOS::Ace::AceScopedTrace::~AceScopedTrace()";

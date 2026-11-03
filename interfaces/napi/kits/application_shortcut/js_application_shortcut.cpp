@@ -15,6 +15,9 @@
 
 #include "interfaces/napi/kits/application_shortcut/js_application_shortcut.h"
 
+#include <cmath>
+#include <limits>
+
 #include "base/log/log_wrapper.h"
 #include "core/common/ace_application_info.h"
 #include "core/common/container.h"
@@ -24,7 +27,7 @@
 namespace OHOS::Ace::Napi {
 namespace {
 constexpr size_t ARGC_REGISTER = 3;
-constexpr size_t ARGC_UNREGISTER = 2;
+constexpr size_t ARGC_UNREGISTER = 1;
 constexpr size_t ARG_INDEX_ZERO = 0;
 constexpr size_t ARG_INDEX_ONE = 1;
 constexpr size_t ARG_INDEX_TWO = 2;
@@ -209,11 +212,15 @@ static napi_value JSRegisterApplicationShortcut(napi_env env, napi_callback_info
     }
 
     auto callback = std::make_shared<ApplicationShortcutCallback>(env, argv[ARG_INDEX_TWO]);
-    AceApplicationInfo::GetInstance().RegisterApplicationShortcut(
+    const auto registrationId = AceApplicationInfo::GetInstance().RegisterApplicationShortcut(
         value, keys, [callback](int32_t triggerInstanceId) { callback->Execute(triggerInstanceId); });
 
+    if (registrationId == 0) {
+        napi_throw_error(env, nullptr, "Application shortcut registration IDs exhausted.");
+        return nullptr;
+    }
     napi_value result = nullptr;
-    napi_get_undefined(env, &result);
+    napi_create_int32(env, registrationId, &result);
     return result;
 }
 
@@ -225,23 +232,19 @@ static napi_value JSUnregisterApplicationShortcut(napi_env env, napi_callback_in
     void* data = nullptr;
     napi_get_cb_info(env, info, &argc, argv, &thisVar, &data);
     if (argc != ARGC_UNREGISTER) {
-        NapiThrow(env, "unregisterApplicationShortcut requires 2 parameters.", ERROR_CODE_PARAM_INVALID);
+        NapiThrow(env, "unregisterApplicationShortcut requires 1 parameter.", ERROR_CODE_PARAM_INVALID);
         return nullptr;
     }
 
-    std::string value;
-    if (!ParseShortcutValue(env, argv[ARG_INDEX_ZERO], value)) {
-        NapiThrow(env, "The first parameter must be a string.", ERROR_CODE_PARAM_INVALID);
+    double registrationId = 0;
+    if (napi_get_value_double(env, argv[ARG_INDEX_ZERO], &registrationId) != napi_ok ||
+        !std::isfinite(registrationId) || std::trunc(registrationId) != registrationId ||
+        registrationId < std::numeric_limits<int32_t>::min() ||
+        registrationId > std::numeric_limits<int32_t>::max()) {
+        NapiThrow(env, "The first parameter must be an integer registration ID.", ERROR_CODE_PARAM_INVALID);
         return nullptr;
     }
-
-    uint8_t keys = 0;
-    if (!ParseModifierKeys(env, argv[ARG_INDEX_ONE], keys)) {
-        NapiThrow(env, "The second parameter must be an array of ModifierKey.", ERROR_CODE_PARAM_INVALID);
-        return nullptr;
-    }
-
-    AceApplicationInfo::GetInstance().UnregisterApplicationShortcut(value, keys);
+    AceApplicationInfo::GetInstance().UnregisterApplicationShortcut(static_cast<int32_t>(registrationId));
 
     napi_value result = nullptr;
     napi_get_undefined(env, &result);

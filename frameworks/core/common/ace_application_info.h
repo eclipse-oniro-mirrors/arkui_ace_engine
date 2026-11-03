@@ -20,6 +20,7 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <mutex>
 #include <set>
 #include <shared_mutex>
@@ -63,6 +64,7 @@ struct ApplicationKeyboardShortcut {
     std::string value;
     uint8_t keys = 0;
     std::function<void(int32_t)> onKeyboardShortcutAction;
+    int32_t keyCode = -1;
 };
 
 class ACE_FORCE_EXPORT AceApplicationInfo : public NonCopyable {
@@ -330,10 +332,10 @@ public:
         return textMenuInfo_;
     }
 
-    void RegisterApplicationShortcut(const std::string& value, uint8_t keys,
-        std::function<void(int32_t)>&& onKeyboardShortcutAction);
+    int32_t RegisterApplicationShortcut(const std::string& value, uint8_t keys,
+        std::function<void(int32_t)>&& onKeyboardShortcutAction, int32_t keyCode = -1);
 
-    void UnregisterApplicationShortcut(const std::string& value, uint8_t keys);
+    void UnregisterApplicationShortcut(int32_t registrationId);
 
     bool TryTriggerApplicationShortcut(const KeyEvent& event, int32_t triggerInstanceId);
 
@@ -431,7 +433,8 @@ protected:
     std::string uiMaterialState_;
     std::string uiMaterialType_;
     TextMenuInfo textMenuInfo_;
-    std::vector<ApplicationKeyboardShortcut> applicationKeyboardShortcuts_;
+    std::map<int32_t, ApplicationKeyboardShortcut> applicationKeyboardShortcuts_;
+    int32_t applicationShortcutId_ = 0;
     std::mutex applicationShortcutMutex_;
     bool isSystemApp_ = false;
 };
