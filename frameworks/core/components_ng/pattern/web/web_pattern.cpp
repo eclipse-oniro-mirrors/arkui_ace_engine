@@ -3801,18 +3801,15 @@ bool WebPattern::IsContextMenuShow()
 
 bool WebPattern::IsShouldTriggerBack(const KeyEvent& event, bool isUsed)
 {
-    bool isEscKey = event.code == KeyCode::KEY_ESCAPE;
     bool isKeyDown = event.action == KeyAction::DOWN;
     bool isKeyUp = event.action == KeyAction::UP;
-    if (isEscKey && isKeyDown) {
+    if (isKeyDown && isUsed) {
         isEscKeyDownConsumed_ = isUsed;
+        return false;
     }
     bool shouldTriggerBack = false;
-    if (isEscKey && isKeyUp) {
-        if (!isEscKeyDownConsumed_ && !isUsed) {
-            shouldTriggerBack = true;
-        }
-        isEscKeyDownConsumed_ = true;
+    if (isKeyUp) {
+        shouldTriggerBack = !isEscKeyDownConsumed_ && !isUsed;
     }
     return shouldTriggerBack;
 }
