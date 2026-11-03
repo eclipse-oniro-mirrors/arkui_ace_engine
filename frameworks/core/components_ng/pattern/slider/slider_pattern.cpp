@@ -3297,6 +3297,27 @@ void SliderPattern::DumpInfo(std::unique_ptr<JsonValue>& json)
     }
 }
 
+void SliderPattern::DumpSimplifyInfoOnlyForParamConfig(std::shared_ptr<JsonValue>& json, ParamConfig config)
+{
+    if (!config.interactionInfo) {
+        return;
+    }
+    auto paintProperty = GetPaintProperty<SliderPaintProperty>();
+    CHECK_NULL_VOID(paintProperty);
+    if (paintProperty->HasValue()) {
+        json->Put("value", std::to_string(paintProperty->GetValue().value()).c_str());
+    }
+    if (paintProperty->HasMin()) {
+        json->Put("min", std::to_string(paintProperty->GetMin().value()).c_str());
+    }
+    if (paintProperty->HasMax()) {
+        json->Put("max", std::to_string(paintProperty->GetMax().value()).c_str());
+    }
+    if (paintProperty->HasStep()) {
+        json->Put("step", std::to_string(paintProperty->GetStep().value()).c_str());
+    }
+}
+
 void SliderPattern::DumpSubInfo(RefPtr<SliderPaintProperty> paintProperty)
 {
     auto layoutProperty = GetLayoutProperty<SliderLayoutProperty>();
