@@ -2577,6 +2577,7 @@ void JSWeb::JSBind(BindingTarget globalObj)
     JSClass<JSWeb>::StaticMethod("onLoadIntercept", &JSWeb::OnLoadIntercept);
     JSClass<JSWeb>::StaticMethod("onlineImageAccess", &JSWeb::OnLineImageAccessEnabled);
     JSClass<JSWeb>::StaticMethod("domStorageAccess", &JSWeb::DomStorageAccessEnabled);
+    JSClass<JSWeb>::StaticMethod("visitedLinkPersistEnabled", &JSWeb::VisitedLinkPersistEnabled);
     JSClass<JSWeb>::StaticMethod("imageAccess", &JSWeb::ImageAccessEnabled);
     JSClass<JSWeb>::StaticMethod("mixedMode", &JSWeb::MixedMode);
     JSClass<JSWeb>::StaticMethod("enableNativeEmbedMode", &JSWeb::EnableNativeEmbedMode);
@@ -5080,6 +5081,11 @@ void JSWeb::OnLineImageAccessEnabled(bool isOnLineImageAccessEnabled)
 void JSWeb::DomStorageAccessEnabled(bool isDomStorageAccessEnabled)
 {
     WebModel::GetInstance()->SetDomStorageAccessEnabled(isDomStorageAccessEnabled);
+}
+
+void JSWeb::VisitedLinkPersistEnabled(bool enabled)
+{
+    WebModel::GetInstance()->SetVisitedLinkPersistEnabled(enabled);
 }
 
 void JSWeb::ImageAccessEnabled(bool isImageAccessEnabled)

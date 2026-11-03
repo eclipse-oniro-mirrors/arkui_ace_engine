@@ -67,6 +67,7 @@ public:
     static void OnFocus(const JSCallbackInfo& args);
     static void OnLineImageAccessEnabled(bool isOnLineImageAccessEnabled);
     static void DomStorageAccessEnabled(bool isDomStorageAccessEnabled);
+    static void VisitedLinkPersistEnabled(bool enabled);
     static void ImageAccessEnabled(bool isImageAccessEnabled);
     static void MixedMode(int32_t MixedModeNum);
     static void ZoomAccessEnabled(bool isZoomAccessEnabled);

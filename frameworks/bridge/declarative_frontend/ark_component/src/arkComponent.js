@@ -768,6 +768,21 @@ class FlingSpeedLimitModifier extends ModifierWithKey {
 }
 FlingSpeedLimitModifier.identity = Symbol('flingSpeedLimit');
 
+class VisitedLinkPersistEnabledModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  static identity = undefined;
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().web.resetVisitedLinkPersistEnabled(node);
+    } else {
+      getUINativeModule().web.setVisitedLinkPersistEnabled(node, this.value);
+    }
+  }
+}
+VisitedLinkPersistEnabledModifier.identity = Symbol('visitedLinkPersistEnabled');
+
 class BackToTopModifier extends ModifierWithKey {
   constructor(value) {
     super(value);
@@ -990,6 +1005,10 @@ class ArkScrollable extends ArkComponent {
 
   flingSpeedLimit(value) {
     modifierWithKey(this._modifiersWithKeys, FlingSpeedLimitModifier.identity, FlingSpeedLimitModifier, value);
+    return this;
+  }
+  visitedLinkPersistEnabled(value) {
+    modifierWithKey(this._modifiersWithKeys, VisitedLinkPersistEnabledModifier.identity, VisitedLinkPersistEnabledModifier, value);
     return this;
   }
   backToTop(value) {

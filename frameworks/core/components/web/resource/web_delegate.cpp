@@ -4304,6 +4304,24 @@ void WebDelegate::UpdateDomStorageEnabled(const bool& isDomStorageAccessEnabled)
             }
         },
         TaskExecutor::TaskType::PLATFORM, "ArkUIWebUpdateDomStorageEnabled");
+
+void WebDelegate::UpdateVisitedLinkPersistEnabled(const bool& enabled)
+{
+    auto context = context_.Upgrade();
+    if (!context) {
+        return;
+    }
+    context->GetTaskExecutor()->PostTask(
+        [weak = WeakClaim(this), enabled]() {
+            auto delegate = weak.Upgrade();
+            if (delegate && delegate->nweb_) {
+                std::shared_ptr<OHOS::NWeb::NWebPreference> setting = delegate->nweb_->GetPreference();
+                CHECK_NULL_VOID(setting);
+                setting->PutVisitedLinkPersistEnabled(enabled);
+            }
+        },
+        TaskExecutor::TaskType::PLATFORM, "ArkUIWebUpdateVisitedLinkPersistEnabled");
+}
 }
 void WebDelegate::UpdateGeolocationEnabled(const bool& isGeolocationAccessEnabled)
 {

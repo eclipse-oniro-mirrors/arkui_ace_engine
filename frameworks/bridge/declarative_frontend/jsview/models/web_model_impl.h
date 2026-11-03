@@ -70,6 +70,7 @@ public:
     void SetFileAccessEnabled(bool isFileAccessEnabled) override;
     void SetOnLineImageAccessEnabled(bool isOnLineImageAccessEnabled) override;
     void SetDomStorageAccessEnabled(bool isDomStorageAccessEnabled) override;
+    void SetVisitedLinkPersistEnabled(bool enabled) override;
     void SetImageAccessEnabled(bool isImageAccessEnabled) override;
     void SetMixedMode(MixedModeContent mixedMode) override;
     void SetZoomAccessEnabled(bool isZoomAccessEnabled) override;

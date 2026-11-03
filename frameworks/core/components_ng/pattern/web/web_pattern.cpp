@@ -4319,6 +4319,13 @@ void WebPattern::OnDomStorageAccessEnabledUpdate(bool value)
     }
 }
 
+void WebPattern::OnVisitedLinkPersistEnabledUpdate(bool value)
+{
+    if (delegate_) {
+        delegate_->UpdateVisitedLinkPersistEnabled(value);
+    }
+}
+
 void WebPattern::OnImageAccessEnabledUpdate(bool value)
 {
     if (delegate_) {
@@ -5031,6 +5038,7 @@ void WebPattern::OnModifyDone()
         }
         delegate_->UpdateZoomControlAccess(GetZoomControlAccessValue(true));
         delegate_->UpdateDomStorageEnabled(GetDomStorageAccessEnabledValue(false));
+        delegate_->UpdateVisitedLinkPersistEnabled(GetVisitedLinkPersistEnabledValue(false));
         delegate_->UpdateGeolocationEnabled(GetGeolocationAccessEnabledValue(true));
         delegate_->UpdateCacheMode(GetCacheModeValue(WebCacheMode::DEFAULT));
         if (webData_) {

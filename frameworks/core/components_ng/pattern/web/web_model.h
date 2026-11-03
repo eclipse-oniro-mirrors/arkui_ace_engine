@@ -90,6 +90,7 @@ public:
     virtual void SetFileAccessEnabled(bool isFileAccessEnabled) = 0;
     virtual void SetOnLineImageAccessEnabled(bool isOnLineImageAccessEnabled) = 0;
     virtual void SetDomStorageAccessEnabled(bool isDomStorageAccessEnabled) = 0;
+    virtual void SetVisitedLinkPersistEnabled(bool enabled) = 0;
     virtual void SetImageAccessEnabled(bool isImageAccessEnabled) = 0;
     virtual void SetMixedMode(MixedModeContent mixedMode) = 0;
     virtual void SetZoomAccessEnabled(bool isZoomAccessEnabled) = 0;

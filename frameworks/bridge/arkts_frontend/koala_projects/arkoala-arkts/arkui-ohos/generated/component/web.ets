@@ -1578,6 +1578,18 @@ export class ArkWebPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._WebAttribute_setDomStorageAccess(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setVisitedLinkPersistEnabledAttribute(value: boolean | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            thisSerializer.writeBoolean(valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._WebAttribute_setVisitedLinkPersistEnabled(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setImageAccessAttribute(value: boolean | undefined): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (value !== undefined) {
@@ -4147,6 +4159,9 @@ export interface WebAttribute extends CommonMethod {
     }
     domStorageAccess(value: boolean | undefined): this {
         throw new Error('Unimplemented method domStorageAccess')
+    visitedLinkPersistEnabled(value: boolean | undefined): this {
+        throw new Error('Unimplemented method visitedLinkPersistEnabled')
+    }
     }
     imageAccess(value: boolean | undefined): this {
         throw new Error('Unimplemented method imageAccess')
@@ -4741,6 +4756,11 @@ export class ArkWebComponent extends ArkCommonMethodComponent implements WebAttr
         const value_casted = value as (boolean | undefined)
         this.getPeer()?.setDomStorageAccessAttribute(value_casted)
         return this
+    public visitedLinkPersistEnabled(value: boolean | undefined): this {
+        const value_casted = value as (boolean | undefined)
+        this.getPeer()?.setVisitedLinkPersistEnabledAttribute(value_casted)
+        return this
+    }
     }
     public imageAccess(value: boolean | undefined): this {
         const value_casted = value as (boolean | undefined)

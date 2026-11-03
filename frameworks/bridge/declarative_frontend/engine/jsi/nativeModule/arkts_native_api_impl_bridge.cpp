@@ -2186,6 +2186,10 @@ void ArkUINativeModule::RegisterWebAttributes(Local<panda::ObjectRef> object, Ec
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetDomStorageAccessEnabled));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetDomStorageAccess"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetDomStorageAccessEnabled));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setVisitedLinkPersistEnabled"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetVisitedLinkPersistEnabled));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetVisitedLinkPersistEnabled"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetVisitedLinkPersistEnabled));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setMixedMode"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetMixedMode));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetMixedMode"),

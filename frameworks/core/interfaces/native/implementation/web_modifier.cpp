@@ -373,6 +373,21 @@ void SetDomStorageAccessImpl(Ark_NativePointer node,
     WebModelStatic::SetDomStorageAccessEnabled(frameNode, *convValue);
 #endif // WEB_SUPPORTED
 }
+
+void SetVisitedLinkPersistEnabledImpl(Ark_NativePointer node,
+                                      const Opt_Boolean* value)
+{
+#ifdef WEB_SUPPORTED
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto convValue = Converter::OptConvert<bool>(*value);
+    if (!convValue) {
+        // Implement Reset value
+        return;
+    }
+    WebModelStatic::SetVisitedLinkPersistEnabled(frameNode, *convValue);
+#endif // WEB_SUPPORTED
+}
 void SetImageAccessImpl(Ark_NativePointer node,
                         const Opt_Boolean* value)
 {

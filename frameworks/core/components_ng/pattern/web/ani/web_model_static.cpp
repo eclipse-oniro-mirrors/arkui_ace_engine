@@ -1699,6 +1699,14 @@ void WebModelStatic::SetDomStorageAccessEnabled(FrameNode* frameNode, bool isDom
     webPatternStatic->UpdateDomStorageAccessEnabled(isDomStorageAccessEnabled);
 }
 
+void WebModelStatic::SetVisitedLinkPersistEnabled(FrameNode* frameNode, bool enabled)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPatternStatic = AceType::DynamicCast<WebPatternStatic>(frameNode->GetPattern());
+    CHECK_NULL_VOID(webPatternStatic);
+    webPatternStatic->UpdateVisitedLinkPersistEnabled(enabled);
+}
+
 void WebModelStatic::SetZoomAccessEnabled(FrameNode* frameNode, bool isZoomAccessEnabled)
 {
     CHECK_NULL_VOID(frameNode);

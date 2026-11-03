@@ -252,6 +252,7 @@ public:
     static void SetJsEnabled(FrameNode* frameNode, bool isJsEnabled);
     static void SetFileAccessEnabled(FrameNode* frameNode, bool isFileAccessEnabled);
     static void SetDomStorageAccessEnabled(FrameNode* frameNode, bool isDomStorageAccessEnabled);
+    static void SetVisitedLinkPersistEnabled(FrameNode* frameNode, bool enabled);
     static void SetZoomAccessEnabled(FrameNode* frameNode, bool isZoomAccessEnabled);
     static void SetZoomControlAccess(FrameNode* frameNode, bool zoomControlAccess);
     static void SetGestureFocusMode(FrameNode* frameNode, const GestureFocusMode& mode);

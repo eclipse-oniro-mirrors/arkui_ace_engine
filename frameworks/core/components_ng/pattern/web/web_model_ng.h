@@ -105,6 +105,7 @@ public:
     void SetFileAccessEnabled(bool isFileAccessEnabled) override;
     void SetOnLineImageAccessEnabled(bool isOnLineImageAccessEnabled) override;
     void SetDomStorageAccessEnabled(bool isDomStorageAccessEnabled) override;
+    void SetVisitedLinkPersistEnabled(bool enabled) override;
     void SetImageAccessEnabled(bool isImageAccessEnabled) override;
     void SetMixedMode(MixedModeContent mixedMode) override;
     void SetZoomAccessEnabled(bool isZoomAccessEnabled) override;
@@ -297,6 +298,7 @@ public:
     static void SetJsEnabled(FrameNode* frameNode, bool isJsEnabled);
     static void SetFileAccessEnabled(FrameNode* frameNode, bool isFileAccessEnabled);
     static void SetDomStorageAccessEnabled(FrameNode* frameNode, bool isDomStorageAccessEnabled);
+    static void SetVisitedLinkPersistEnabled(FrameNode* frameNode, bool enabled);
     static void SetMixedMode(FrameNode* frameNode, MixedModeContent mixedMode);
     static void SetZoomAccessEnabled(FrameNode* frameNode, bool isZoomAccessEnabled);
     static void SetZoomControlAccess(FrameNode* frameNode, bool zoomControlAccess);

@@ -547,6 +547,13 @@ void WebModelNG::SetDomStorageAccessEnabled(bool isDomStorageAccessEnabled)
     webPattern->UpdateDomStorageAccessEnabled(isDomStorageAccessEnabled);
 }
 
+void WebModelNG::SetVisitedLinkPersistEnabled(bool enabled)
+{
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->UpdateVisitedLinkPersistEnabled(enabled);
+}
+
 void WebModelNG::SetImageAccessEnabled(bool isImageAccessEnabled)
 {
     auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
@@ -1663,6 +1670,14 @@ void WebModelNG::SetDomStorageAccessEnabled(FrameNode* frameNode, bool isDomStor
     auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
     CHECK_NULL_VOID(webPattern);
     webPattern->UpdateDomStorageAccessEnabled(isDomStorageAccessEnabled);
+}
+
+void WebModelNG::SetVisitedLinkPersistEnabled(FrameNode* frameNode, bool enabled)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->UpdateVisitedLinkPersistEnabled(enabled);
 }
 
 void WebModelNG::SetMixedMode(FrameNode* frameNode, MixedModeContent mixedContentMode)

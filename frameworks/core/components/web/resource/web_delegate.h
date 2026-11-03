@@ -1259,6 +1259,7 @@ public:
     void UpdateSupportZoom(const bool& isZoomAccessEnabled);
     void UpdateZoomControlAccess(bool zoomControlAccess);
     void UpdateDomStorageEnabled(const bool& isDomStorageAccessEnabled);
+    void UpdateVisitedLinkPersistEnabled(const bool& enabled);
     void UpdateGeolocationEnabled(const bool& isGeolocationAccessEnabled);
     void UpdateCacheMode(const WebCacheMode& mode);
     std::shared_ptr<OHOS::NWeb::NWeb> GetNweb();
