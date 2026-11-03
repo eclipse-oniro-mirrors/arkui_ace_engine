@@ -119,11 +119,13 @@ public:
 
     int32_t GetWidth() const override
     {
+        std::scoped_lock<std::mutex> lock(frameMtx_);
         return currentFrame_ ? currentFrame_->GetWidth() : 0;
     }
 
     int32_t GetHeight() const override
     {
+        std::scoped_lock<std::mutex> lock(frameMtx_);
         return currentFrame_ ? currentFrame_->GetHeight() : 0;
     }
 
