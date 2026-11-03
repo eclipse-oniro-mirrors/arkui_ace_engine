@@ -59,7 +59,13 @@ const ACTIVE_TRACK_THICKNESS_MAX = 36;
 const TRACK_BLUR_DEFAULT = 20;
 const TRACK_COLOR_DEFAULT = '#33FFFFFF';
 const SELECTED_COLOR_DEFAULT = '#FF5EA1FF';
-const BLUR_COLOR_DEFAULT = $r('sys.color.ohos_id_color_subtab_bg');
+const BLUR_COLOR_DEFAULT = {
+  id: -1,
+  type: 10001,
+  params: ['sys.color.ohos_id_color_subtab_bg'],
+  bundleName: '__harDefaultBundleName__',
+  moduleName: '__harDefaultModuleName__',
+};
 const TOUCH_ANIMATION_DURATION = 200;
 const LIMIT_RESTORE_ANIMATION_DURATION = 333;
 const RESTORE_ANIMATION_DURATION = 167;
