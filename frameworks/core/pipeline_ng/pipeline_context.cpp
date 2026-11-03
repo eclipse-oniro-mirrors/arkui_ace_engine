@@ -3336,7 +3336,7 @@ void PipelineContext::AvoidanceLogic(float keyboardHeight, const std::shared_ptr
         auto bottomLen = safeAreaManager_->GetNavSafeArea().bottom_.IsValid()
                              ? safeAreaManager_->GetNavSafeArea().bottom_.Length()
                              : 0;
-        if (manager->IsScrollableChild() && rootHeight_ - positionY - safeHeight - bottomLen < 0) {
+        if (manager && manager->IsScrollableChild() && rootHeight_ - positionY - safeHeight - bottomLen < 0) {
             safeHeight = rootHeight_ - positionY - bottomLen;
         }
         if (NearZero(keyboardHeight) || LessOrEqual(positionY + safeHeight, rootHeight_ - keyboardHeight)) {
