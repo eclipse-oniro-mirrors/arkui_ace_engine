@@ -117,7 +117,11 @@ int32_t CustomAccessibilityProvider::SendAccessibilityAsyncEvent(
     void (*callback)(int32_t errorCode))
 {
     constexpr int32_t SEND_EVENT_FAILED = -1;
-    auto mgr = thirdAccessibilityManager_.lock();
+    std::shared_ptr<ThirdAccessibilityManager> mgr;
+    {
+        std::lock_guard<std::mutex> lock(thirdAccessibilityManagerMutex_);
+        mgr = thirdAccessibilityManager_.lock();
+    }
     if (mgr == nullptr) {
         if (callback) {
             LOG_CALLBACK("OH_ArkUI_SendAccessibilityAsyncEvent", callback);
@@ -132,6 +136,7 @@ int32_t CustomAccessibilityProvider::SendAccessibilityAsyncEvent(
 void CustomAccessibilityProvider::SendThirdAccessibilityProvider(
     const std::weak_ptr<ThirdAccessibilityManager>& thirdAccessibilityManager)
 {
+    std::lock_guard<std::mutex> lock(thirdAccessibilityManagerMutex_);
     thirdAccessibilityManager_ = thirdAccessibilityManager;
 }
 } // namespace OHOS::Ace::NG

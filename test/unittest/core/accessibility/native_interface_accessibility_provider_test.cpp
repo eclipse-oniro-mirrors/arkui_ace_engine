@@ -13,7 +13,12 @@
  * limitations under the License.
  */
 
+#include <atomic>
+#include <functional>
+#include <thread>
+
 #include "gtest/gtest.h"
+#include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 #include "frameworks/core/accessibility/accessibility_node.h"
 #include "frameworks/core/accessibility/accessibility_utils.h"
@@ -21,7 +26,6 @@
 #include "frameworks/core/accessibility/third_provider_tree_exporter.h"
 #include "frameworks/core/components_ng/base/frame_node.h"
 #include "frameworks/core/components_ng/pattern/pattern.h"
-#include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -82,6 +86,21 @@ public:
     void SendThirdAccessibilityProvider(
         const std::weak_ptr<ThirdAccessibilityManager>& thirdAccessibilityManager)
         override {}
+};
+
+class EventAccessibilityProvider : public MockOhAccessibilityProvider {
+    DECLARE_ACE_TYPE(EventAccessibilityProvider, MockOhAccessibilityProvider);
+
+public:
+    std::function<void()> onSend;
+
+    int32_t SendAccessibilityAsyncEvent(const ArkUI_AccessibilityEventInfo& event, void (*callback)(int32_t)) override
+    {
+        if (onSend) {
+            onSend();
+        }
+        return 0;
+    }
 };
 } // namespace OHOS::Ace
 
@@ -487,6 +506,7 @@ HWTEST_F(AccessibilityProviderTestNg, AccessibilityProviderTest002, TestSize.Lev
     ret = accessibilityProvider.AccessibilityProviderRegisterCallback(&callBacks);
     EXPECT_EQ(ret, ARKUI_ACCESSIBILITY_NATIVE_RESULT_BAD_PARAMETER);
     EXPECT_EQ(g_providerMockResult.registerResult_, false);
+    EXPECT_TRUE(accessibilityProvider.IsRegister());
 }
 
 /**
@@ -850,6 +870,152 @@ HWTEST_F(AccessibilityProviderTestNg, AccessibilityProviderTest009, TestSize.Lev
     ret = accessibilityProvider.SendAccessibilityAsyncEvent(
         &accessibilityEvent, MockEventCallBack);
     EXPECT_EQ(ret, SEND_EVENT_SUCCESS);
+}
+
+/**
+ * @tc.name: ConcurrentInnerAccessibilityProvider
+ * @tc.desc: Replace and release the inner provider concurrently with event sending.
+ * @tc.type: FUNC
+ */
+HWTEST_F(AccessibilityProviderTestNg, ConcurrentInnerAccessibilityProvider, TestSize.Level1)
+{
+    ArkUI_AccessibilityProvider provider;
+    std::atomic<bool> start { false };
+    std::atomic<int32_t> calls { 0 };
+    constexpr int32_t ITERATIONS = 2000;
+    std::thread writer([&] {
+        while (!start.load()) {
+            std::this_thread::yield();
+        }
+        for (int32_t i = 0; i < ITERATIONS; ++i) {
+            auto inner = AceType::MakeRefPtr<EventAccessibilityProvider>();
+            inner->onSend = [&] { ++calls; };
+            provider.SetInnerAccessibilityProvider(inner);
+            provider.SetInnerAccessibilityProvider(nullptr);
+        }
+    });
+    ArkUI_AccessibilityEventInfo event;
+    int32_t successful = 0;
+    start.store(true);
+    for (int32_t i = 0; i < ITERATIONS; ++i) {
+        auto result = provider.SendAccessibilityAsyncEvent(&event, nullptr);
+        EXPECT_TRUE(result == SEND_EVENT_SUCCESS || result == SEND_EVENT_FAILED);
+        successful += result == SEND_EVENT_SUCCESS;
+    }
+    writer.join();
+    EXPECT_EQ(calls.load(), successful);
+    EXPECT_EQ(provider.SendAccessibilityAsyncEvent(&event, nullptr), SEND_EVENT_FAILED);
+}
+
+/**
+ * @tc.name: InnerAccessibilityProviderReentrantSend
+ * @tc.desc: Event dispatch retains its provider and allows reentrant deregistration.
+ * @tc.type: FUNC
+ */
+HWTEST_F(AccessibilityProviderTestNg, InnerAccessibilityProviderReentrantSend, TestSize.Level1)
+{
+    ArkUI_AccessibilityProvider provider;
+    auto inner = AceType::MakeRefPtr<EventAccessibilityProvider>();
+    WeakPtr<EventAccessibilityProvider> weakInner = inner;
+    inner->onSend = [&] {
+        provider.SetInnerAccessibilityProvider(nullptr);
+        inner.Reset();
+        EXPECT_FALSE(weakInner.Invalid());
+    };
+    provider.SetInnerAccessibilityProvider(inner);
+    ArkUI_AccessibilityEventInfo event;
+    EXPECT_EQ(provider.SendAccessibilityAsyncEvent(&event, nullptr), SEND_EVENT_SUCCESS);
+    EXPECT_TRUE(weakInner.Invalid());
+    EXPECT_EQ(provider.SendAccessibilityAsyncEvent(&event, nullptr), SEND_EVENT_FAILED);
+
+    inner = AceType::MakeRefPtr<EventAccessibilityProvider>();
+    provider.SetInnerAccessibilityProvider(inner);
+    inner.Reset();
+    EXPECT_EQ(provider.SendAccessibilityAsyncEvent(&event, nullptr), SEND_EVENT_FAILED);
+}
+
+/**
+ * @tc.name: ConcurrentRegistrationNotification
+ * @tc.desc: Registration notifications use a stable callback while UI replaces it.
+ * @tc.type: FUNC
+ */
+HWTEST_F(AccessibilityProviderTestNg, ConcurrentRegistrationNotification, TestSize.Level1)
+{
+    ArkUI_AccessibilityProvider provider;
+    std::atomic<int32_t> calls { 0 };
+    std::atomic<bool> start { false };
+    constexpr int32_t ITERATIONS = 2000;
+    provider.SetRegisterCallback([&](bool) { ++calls; });
+    std::thread writer([&] {
+        while (!start.load()) {
+            std::this_thread::yield();
+        }
+        for (int32_t i = 0; i < ITERATIONS; ++i) {
+            provider.SetRegisterCallback([&](bool) { ++calls; });
+        }
+    });
+    ArkUI_AccessibilityProviderCallbacks callbacks {};
+    start.store(true);
+    for (int32_t i = 0; i < ITERATIONS; ++i) {
+        EXPECT_EQ(provider.AccessibilityProviderRegisterCallback(&callbacks),
+            ARKUI_ACCESSIBILITY_NATIVE_RESULT_BAD_PARAMETER);
+    }
+    writer.join();
+    EXPECT_EQ(calls.load(), ITERATIONS);
+}
+
+/**
+ * @tc.name: ConcurrentRegistrationReadiness
+ * @tc.desc: UI can inspect registration readiness while NDK publishes callbacks.
+ * @tc.type: FUNC
+ */
+HWTEST_F(AccessibilityProviderTestNg, ConcurrentRegistrationReadiness, TestSize.Level1)
+{
+    ArkUI_AccessibilityProvider provider;
+    ArkUI_AccessibilityProviderCallbacks callbacks {};
+    BuildMockCallBack(callbacks);
+    std::atomic<bool> start { false };
+    constexpr int32_t ITERATIONS = 2000;
+    std::thread writer([&] {
+        while (!start.load()) {
+            std::this_thread::yield();
+        }
+        for (int32_t i = 0; i < ITERATIONS; ++i) {
+            provider.AccessibilityProviderRegisterCallback(&callbacks);
+        }
+    });
+    EXPECT_FALSE(provider.IsRegister());
+    start.store(true);
+    bool observedRegistration = false;
+    for (int32_t i = 0; i < ITERATIONS; ++i) {
+        bool registered = provider.IsRegister();
+        EXPECT_FALSE(observedRegistration && !registered);
+        observedRegistration = registered;
+    }
+    writer.join();
+    EXPECT_TRUE(provider.IsRegister());
+}
+
+/**
+ * @tc.name: RegistrationNotificationReentrantCallback
+ * @tc.desc: A notification can replace its own callback without holding the registration mutex.
+ * @tc.type: FUNC
+ */
+HWTEST_F(AccessibilityProviderTestNg, RegistrationNotificationReentrantCallback, TestSize.Level1)
+{
+    ArkUI_AccessibilityProvider provider;
+    int32_t calls = 0;
+    provider.SetRegisterCallback([&](bool isRegister) {
+        EXPECT_FALSE(isRegister);
+        ++calls;
+        provider.SetRegisterCallback(nullptr);
+    });
+    ArkUI_AccessibilityProviderCallbacks callbacks {};
+    EXPECT_EQ(
+        provider.AccessibilityProviderRegisterCallback(&callbacks), ARKUI_ACCESSIBILITY_NATIVE_RESULT_BAD_PARAMETER);
+    EXPECT_EQ(
+        provider.AccessibilityProviderRegisterCallback(&callbacks), ARKUI_ACCESSIBILITY_NATIVE_RESULT_BAD_PARAMETER);
+    EXPECT_EQ(calls, 1);
 }
 
 /**
