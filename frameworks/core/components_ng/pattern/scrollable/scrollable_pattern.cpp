@@ -3089,6 +3089,15 @@ void ScrollablePattern::ProcessSpringOffsetCallback(float offset)
         if (isAnimateOverScroll_ && GetCanStayOverScroll()) {
             isAnimateOverScroll_ = false;
             SetIsOverScroll(true);
+            if (stopAnimation) {
+                // The stay-over-scroll animation has reached its out-of-boundary target: the
+                // scroll session is visually over even though this frame does not stop the
+                // animation (it keeps running to its nominal end). Reset the query state so
+                // Scroller.getScrollState() reports IDLE instead of a stale FLING. The reset is
+                // bound to this animation's own frame callbacks, so a newer animation starting
+                // afterwards (which stops this one first) can never be clobbered by it.
+                SetScrollSourceForQuery(SCROLL_FROM_NONE);
+            }
         } else {
             StopAnimation(springAnimation_);
         }
