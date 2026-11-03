@@ -707,7 +707,15 @@ bool ListPattern::CommitScrollPlaceholderRealBuild(int32_t index)
     // range (anchors follow the existing item-size change rules). The shell stays
     // mounted until that layout completes, then the reconcile retires it (content
     // back to the pool, shell unmounted outside the transaction).
-    retiringPlaceholderShells_.emplace_back(info.shell, info.templateId);
+    // Retire the shell NOW, in the same idle flush. The flush runs outside the
+    // layout transaction, so the structural removal (children list mutation,
+    // content back to the pool) is safe here, and the real item paints correctly
+    // from its first frame — observed on device: during a load-heavy fling decay
+    // the committed rows rendered complete while their shells still overlapped
+    // them, because the deferred retirement waited for a later layout round that
+    // measure breaks stretched out over several frames. Keeping the shell
+    // mounted only ever produced placeholder-over-real frames.
+    RetireScrollPlaceholderShell(info.shell, info.templateId);
     host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
     return true;
 }
