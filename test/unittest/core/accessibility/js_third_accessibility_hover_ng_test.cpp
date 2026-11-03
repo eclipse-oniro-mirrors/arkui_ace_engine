@@ -826,10 +826,10 @@ HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeContinuousPendingEventsEndSafely
 {
     NativeHoverScenario scenario;
     size_t queuedMoves = 0;
-    constexpr size_t MAX_QUEUED_MOVES = 100;
+    constexpr size_t maxQueuedMoves = 100;
     std::function<void()> queueMove;
     queueMove = [&scenario, &queuedMoves, &queueMove] {
-        if (queuedMoves >= MAX_QUEUED_MOVES) {
+        if (queuedMoves >= maxQueuedMoves) {
             return;
         }
         ++queuedMoves;
@@ -841,7 +841,7 @@ HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeContinuousPendingEventsEndSafely
     scenario.Transfer(AccessibilityHoverEventType::ENTER);
     scenario.executor->DrainHoverTasks();
     scenario.executor->onEvent = nullptr;
-    EXPECT_LT(queuedMoves, MAX_QUEUED_MOVES);
+    EXPECT_LT(queuedMoves, maxQueuedMoves);
     EXPECT_FALSE(scenario.manager->pendingHover_.has_value());
     EXPECT_TRUE(scenario.manager->hoverForThirdState_.nodesHovering.empty());
     EXPECT_TRUE(scenario.manager->hoverForThirdState_.thirdOperationIdle.load());

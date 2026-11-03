@@ -596,11 +596,13 @@ bool EnsureThirdHoverOnUI(const WeakPtr<AccessibilityHoverManagerForThirdNG>& we
     if (executor->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
         return true;
     }
-    executor->PostTask([weak, config] {
-        auto manager = weak.Upgrade();
-        CHECK_NULL_VOID(manager);
-        manager->HandleAccessibilityHoverForThird(config);
-    }, TaskExecutor::TaskType::UI, "ArkUIPrepareAccessibilityHoverForThird");
+    executor->PostTask(
+        [weak, config] {
+            auto manager = weak.Upgrade();
+            CHECK_NULL_VOID(manager);
+            manager->HandleAccessibilityHoverForThird(config);
+        },
+        TaskExecutor::TaskType::UI, "ArkUIPrepareAccessibilityHoverForThird");
     return false;
 }
 
