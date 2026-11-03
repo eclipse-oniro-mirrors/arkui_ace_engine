@@ -4342,7 +4342,9 @@ void SliderPattern::ResetHostMaterialEffectsInner()
     auto renderContext = host->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
 
-    MaterialUtils::CallSetMaterial(AceType::RawPtr(host), nullptr);
+    if (!MaterialUtils::CallSetMaterial(AceType::RawPtr(host), nullptr)) {
+        ViewAbstract::SetSystemMaterialImmediate(AceType::RawPtr(host), nullptr);
+    }
     renderContext->UpdateUiMaterialFilter(nullptr);
 
     auto preBackgroundColor = renderContext->GetPreBackgroundColor();

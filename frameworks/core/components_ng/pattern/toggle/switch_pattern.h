@@ -243,6 +243,7 @@ private:
     void ApplyBlendMode();
     std::shared_ptr<Rosen::BrightnessBlender> CreateBrightnessBlender();
     void ResetHostMaterialEffects();
+    void ResetHostMaterialEffectsInner();
 
     // Drag animation helpers
     AnimationOption CreateDragAnimationOption() const;
