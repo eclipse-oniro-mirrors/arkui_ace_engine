@@ -45,9 +45,6 @@ struct SerializedGesture;
 struct AccessibilityParentRectInfo;
 
 namespace NG {
-namespace {
-    constexpr uint32_t STATIC_FORM_DELAY_TIME_FOR_DELETE_IMAGE_NODE = 300;
-}
 enum class FormChildNodeType : int32_t {
     /**
      * Arkts card node type
@@ -154,6 +151,14 @@ public:
     void OnSnapshot(std::shared_ptr<Media::PixelMap> pixelMap);
 
     void HandleOnSnapshot(std::shared_ptr<Media::PixelMap> pixelMap);
+
+    void StartDetachSnapshot();
+
+    void PostRemoveFrsNodeOnDetach(uint32_t delay, const std::string& nodeIdStr);
+
+    void OnDetachSnapshot(std::shared_ptr<Media::PixelMap> pixelMap);
+
+    void HandleDetachSnapshot(std::shared_ptr<Media::PixelMap> pixelMap);
 
     RefPtr<RenderContext> GetExternalRenderContext()
     {
@@ -365,6 +370,8 @@ private:
     bool isUnTrust_ = false;
     bool isDynamic_ = true;
     bool isFrsNodeDetached_ = false;
+    // Parsed from the FormComponent want param FORM_ENABLE_SNAPSHOT_ON_DETACH in the .cpp.
+    bool enableSnapshotOnDetach_ = false;
     bool needSnapshotAgain_ = false;
     bool isSnapshot_ = false;
     RefPtr<PixelMap> pixelMap_ = nullptr;
@@ -395,6 +402,8 @@ private:
         VALUE_TYPE_INT = 5,
         VALUE_TYPE_DOUBLE = 8,
     };
+    static constexpr uint32_t STATIC_FORM_DELAY_TIME_FOR_DELETE_IMAGE_NODE = 300;
+    static constexpr uint32_t DELAY_TIME_FOR_REMOVE_FRS_NODE_ON_DETACH = 100;
 };
 } // namespace NG
 } // namespace Ace

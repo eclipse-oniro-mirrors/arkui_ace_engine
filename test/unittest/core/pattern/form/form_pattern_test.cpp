@@ -2364,4 +2364,54 @@ HWTEST_F(FormPatternTest, FormPatternTest_065, TestSize.Level1)
     pattern->FireFormSurfaceDetachCallback();
     EXPECT_TRUE(pattern->isFrsNodeDetached_);
 }
+
+/**
+ * @tc.name: FormPatternTest_HandleDetachSnapshot_001
+ * @tc.desc: HandleDetachSnapshot mounts the last frame when the surface is detached,
+ *           and discards the snapshot after the surface falls back
+ * @tc.type: FUNC
+ */
+HWTEST_F(FormPatternTest, FormPatternTest_HandleDetachSnapshot_001, TestSize.Level1)
+{
+    RefPtr<FormNode> formNode = CreateFromNode();
+    auto pattern = formNode->GetPattern<FormPattern>();
+    EXPECT_NE(pattern, nullptr);
+    pattern->OnAttachToFrameNode();
+    pattern->formTaskExecutor_ = AceType::MakeRefPtr<FormTaskExecutor>(0);
+
+    // Snapshot on detach is opt-in: without the switch, keep the original behavior.
+    pattern->FireFormSurfaceDetachCallback();
+    EXPECT_TRUE(pattern->isFrsNodeDetached_);
+    EXPECT_FALSE(pattern->isSnapshot_);
+
+    // Opted in: the snapshot flow starts.
+    pattern->enableSnapshotOnDetach_ = true;
+    pattern->isFrsNodeDetached_ = false;
+    pattern->FireFormSurfaceDetachCallback();
+    EXPECT_TRUE(pattern->isFrsNodeDetached_);
+
+    // Null pixelmap while detached: wait for the fallback task, flag unchanged.
+    pattern->HandleDetachSnapshot(nullptr);
+    EXPECT_TRUE(pattern->isFrsNodeDetached_);
+
+    // Snapshot landing mounts the static image node with the last frame.
+    std::shared_ptr<Media::MockPixelMap> mockPixelMap = std::make_shared<Media::MockPixelMap>();
+    EXPECT_CALL(*mockPixelMap, GetWidth()).WillRepeatedly(Return(200));
+    EXPECT_CALL(*mockPixelMap, GetHeight()).WillRepeatedly(Return(200));
+    pattern->pixelMap_ = PixelMap::CreatePixelMap(reinterpret_cast<void*>(&mockPixelMap));
+    EXPECT_NE(pattern->pixelMap_, nullptr);
+    pattern->cardInfo_.width.SetValue(200);
+    pattern->cardInfo_.height.SetValue(200);
+    pattern->cardInfo_.borderWidth = 0;
+    pattern->HandleDetachSnapshot(mockPixelMap);
+    EXPECT_TRUE(pattern->isFrsNodeDetached_);
+    EXPECT_TRUE(pattern->isSnapshot_);
+    auto imageNode = pattern->GetFormChildNode(FormChildNodeType::FORM_STATIC_IMAGE_NODE);
+    EXPECT_NE(imageNode, nullptr);
+
+    // Snapshot landing after the surface fell back to this host is discarded.
+    pattern->isFrsNodeDetached_ = false;
+    pattern->HandleDetachSnapshot(mockPixelMap);
+    EXPECT_FALSE(pattern->isFrsNodeDetached_);
+}
 } // namespace OHOS::Ace::NG

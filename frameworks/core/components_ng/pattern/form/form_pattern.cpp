@@ -60,6 +60,8 @@ constexpr double FORM_CLICK_OPEN_LIMIT_DISTANCE = 20.0;
 constexpr uint32_t DELAY_TIME_FOR_FORM_SUBCONTAINER_CACHE = 30000;
 constexpr uint32_t DELAY_TIME_FOR_FORM_SNAPSHOT_3S = 3000;
 constexpr uint32_t DELAY_TIME_FOR_FORM_SNAPSHOT_EXTRA = 200;
+// FormComponent want param; keep in sync with the key in form_renderer.cpp.
+constexpr char FORM_ENABLE_SNAPSHOT_ON_DETACH[] = "ohos.extra.param.key.form_enable_snapshot_on_detach";
 constexpr uint32_t DELAY_TIME_FOR_DELETE_IMAGE_NODE = 200;
 constexpr uint32_t DELAY_TIME_FOR_RESET_MANUALLY_CLICK_FLAG = 3000;
 constexpr uint32_t DELAY_TIME_FOR_RM_IMG_WHEN_UPDATING_SIZE = 60;
@@ -138,6 +140,30 @@ public:
                 pixelMap->GetHeight(), pixelMap->GetWidth(), pixelMap->GetByteCount(), formId);
         }
         formPattern_->OnSnapshot(pixelMap);
+    }
+    void OnSurfaceCaptureHDR(std::shared_ptr<Media::PixelMap> pixelMap,
+        std::shared_ptr<Media::PixelMap> hdrPixelMap) override {}
+private:
+    WeakPtr<FormPattern> weakFormPattern_ = nullptr;
+};
+
+// Capture callback for the detach snapshot; mirrors FormSnapshotCallback.
+class FormDetachSnapshotCallback : public Rosen::SurfaceCaptureCallback {
+public:
+    explicit FormDetachSnapshotCallback(const WeakPtr<FormPattern>& node) : weakFormPattern_(node) {}
+    ~FormDetachSnapshotCallback() override = default;
+    void OnSurfaceCapture(std::shared_ptr<Media::PixelMap> pixelMap) override
+    {
+        auto formPattern_ = weakFormPattern_.Upgrade();
+        CHECK_NULL_VOID(formPattern_);
+        auto subContainer = formPattern_->GetSubContainer();
+        if (subContainer != nullptr && pixelMap != nullptr) {
+            auto formId = subContainer->GetRunningCardId();
+            TAG_LOGI(AceLogTag::ACE_FORM,
+                "formImage height: %{public}d, width: %{public}d, size:%{public}d, formId: %{public}" PRId64,
+                pixelMap->GetHeight(), pixelMap->GetWidth(), pixelMap->GetByteCount(), formId);
+        }
+        formPattern_->OnDetachSnapshot(pixelMap);
     }
     void OnSurfaceCaptureHDR(std::shared_ptr<Media::PixelMap> pixelMap,
         std::shared_ptr<Media::PixelMap> hdrPixelMap) override {}
@@ -507,6 +533,74 @@ void FormPattern::HandleOnSnapshot(std::shared_ptr<Media::PixelMap> pixelMap)
     needSnapshotAgain_ = false;
 }
 
+void FormPattern::StartDetachSnapshot()
+{
+    CHECK_NULL_VOID(formTaskExecutor_);
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    std::string nodeIdStr = std::to_string(host->GetId());
+    auto externalContext = DynamicCast<NG::RosenRenderContext>(GetExternalRenderContext());
+    if (externalContext == nullptr || externalContext->GetRSNode() == nullptr) {
+        TAG_LOGW(AceLogTag::ACE_FORM, "no live surface to snapshot, remove frsNode directly.");
+        PostRemoveFrsNodeOnDetach(0, nodeIdStr);
+        return;
+    }
+    // Fallback: still remove the stale frsNode if the capture callback is lost.
+    formTaskExecutor_->RemoveUITask("ArkUIFormRemoveFrsNodeOnDetach" + nodeIdStr);
+    PostRemoveFrsNodeOnDetach(DELAY_TIME_FOR_REMOVE_FRS_NODE_ON_DETACH, nodeIdStr);
+    SnapshotSurfaceNode(std::make_shared<FormDetachSnapshotCallback>(WeakClaim(this)));
+}
+
+// Post a guarded frsNode removal: skipped if the surface has already fallen back to this host.
+void FormPattern::PostRemoveFrsNodeOnDetach(uint32_t delay, const std::string& nodeIdStr)
+{
+    CHECK_NULL_VOID(formTaskExecutor_);
+    formTaskExecutor_->PostDelayedUITask(
+        [weak = WeakClaim(this)] {
+            auto formPattern = weak.Upgrade();
+            CHECK_NULL_VOID(formPattern);
+            if (!formPattern->isFrsNodeDetached_) {
+                return;
+            }
+            formPattern->RemoveFrsNode();
+        }, delay, "ArkUIFormRemoveFrsNodeOnDetach" + nodeIdStr);
+}
+
+void FormPattern::OnDetachSnapshot(std::shared_ptr<Media::PixelMap> pixelMap)
+{
+    CHECK_NULL_VOID(formTaskExecutor_);
+    formTaskExecutor_->PostUITask([weak = WeakClaim(this), pixelMap] {
+        auto formPattern = weak.Upgrade();
+        CHECK_NULL_VOID(formPattern);
+        formPattern->HandleDetachSnapshot(pixelMap);
+        }, "ArkUIFormHandleDetachSnapshot");
+}
+
+void FormPattern::HandleDetachSnapshot(std::shared_ptr<Media::PixelMap> pixelMap)
+{
+    TAG_LOGI(AceLogTag::ACE_FORM, "HandleDetachSnapshot.");
+    if (!isFrsNodeDetached_) {
+        TAG_LOGW(AceLogTag::ACE_FORM, "frs node is back, discard the detach snapshot.");
+        return;
+    }
+    if (pixelMap == nullptr) {
+        TAG_LOGW(AceLogTag::ACE_FORM, "detach snapshot pixelmap is null, wait for the fallback task.");
+        return; // the timeout task removes the frsNode
+    }
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    std::string nodeIdStr = std::to_string(host->GetId());
+    formTaskExecutor_->RemoveUITask("ArkUIFormRemoveFrsNodeOnDetach" + nodeIdStr);
+    // Cancel pending image-removal tasks, they would remove the snapshot mounted below.
+    formTaskExecutor_->RemoveUITask(std::string("DelayRemoveFormChildNode").append(nodeIdStr));
+    formTaskExecutor_->RemoveUITask(std::string("ArkUIFormDeleteImageNodeAfterRecover_").append(nodeIdStr));
+    pixelMap_ = PixelMap::CreatePixelMap(reinterpret_cast<void*>(&pixelMap));
+    // Block OnRebuildFrame from re-adding the stale context; OnLoadEvent resets it.
+    isSnapshot_ = true;
+    UpdateImageNode();
+    RemoveFrsNode();
+}
+
 bool FormPattern::OnAccessibilityChildTreeRegister(uint32_t windowId, int32_t treeId, int64_t accessibilityId)
 {
     TAG_LOGD(AceLogTag::ACE_FORM, "OnAccessibilityChildTreeRegister, treeId: %{public}d, id: %{public}" PRId64, treeId,
@@ -692,7 +786,8 @@ void FormPattern::ReleaseRenderer()
 
 void FormPattern::OnRebuildFrame()
 {
-    if (isSnapshot_) {
+    // Skip while snapshotting or detached: re-adding the stale context would steal the surface back.
+    if (isSnapshot_ || isFrsNodeDetached_) {
         return;
     }
 
@@ -847,6 +942,7 @@ void FormPattern::GetWantParam(RequestFormInfo& info)
         return;
     }
     auto want = wantWrap->GetWant();
+    enableSnapshotOnDetach_ = want.GetBoolParam(FORM_ENABLE_SNAPSHOT_ON_DETACH, false);
     float width = static_cast<float>(info.width.Value());
     float height = static_cast<float>(info.height.Value());
     float layoutWidth = GetNumberFromParams(want, OHOS::AppExecFwk::Constants::PARAM_LAYOUT_WIDTH_KEY, width);
@@ -1888,13 +1984,15 @@ void FormPattern::FireFormSurfaceDetachCallback()
 {
     TAG_LOGI(AceLogTag::ACE_FORM, "FireFormSurfaceDetachCallback isFrsNodeDetached:%{public}d", isFrsNodeDetached_);
     isFrsNodeDetached_ = true;
-    // Remove the stale frsNode so the next rebuild re-adds it when rendering falls back to this host.
-    CHECK_NULL_VOID(formTaskExecutor_);
-    formTaskExecutor_->PostUITask([weak = WeakClaim(this)] {
-        auto formPattern = weak.Upgrade();
-        CHECK_NULL_VOID(formPattern);
-        formPattern->RemoveFrsNode();
-        }, "ArkUIFormRemoveFrsNodeOnDetach");
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    if (!enableSnapshotOnDetach_) {
+        // Not opted in: remove the stale frsNode immediately (original behavior).
+        PostRemoveFrsNodeOnDetach(0, std::to_string(host->GetId()));
+        return;
+    }
+    // Snapshot first, then remove the stale frsNode, so this host keeps showing the last frame.
+    StartDetachSnapshot();
 }
 
 void FormPattern::CreateCardContainer()
@@ -2042,6 +2140,8 @@ void FormPattern::OnLoadEvent()
 {
     ACE_FUNCTION_TRACE();
     isSnapshot_ = false;
+    // The surface is back; a later preemption takes a fresh capture.
+    pixelMap_.Reset();
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     formTaskExecutor_->PostUITask([weak = WeakClaim(this)] {
