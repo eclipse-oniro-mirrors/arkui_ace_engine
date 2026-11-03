@@ -1633,7 +1633,7 @@ void WebDelegate::QueryPageControls(const std::string&,
     const std::string&, const std::vector<std::string>&,
     std::function<void(const std::string&)>&&) {}
 
-void WebDelegate::ExecuteGetPageSceneMatch(int32_t, const WebPageSceneRuleSet&, bool) {}
+void WebDelegate::ExecuteGetPageSceneMatch(int32_t, const WebPageSceneRuleSet&) {}
 void WebDelegate::ExecuteAllRuleSetMatch() {}
 void WebDelegate::ProcessPageSceneDomReadyResult(const std::string&, const std::string&) {}
 void WebDelegate::ExecuteReportOnRegisterMatch(int32_t) {}

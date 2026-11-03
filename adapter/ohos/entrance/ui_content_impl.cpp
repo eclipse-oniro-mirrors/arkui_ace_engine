@@ -7810,16 +7810,75 @@ void UIContentImpl::SetContentChangeDetectCallback(const WeakPtr<TaskExecutor>& 
     });
 }
 
-void UIContentImpl::PostTraverseWebTask(const WeakPtr<TaskExecutor>& weakTaskExecutor,
+bool UIContentImpl::PostTraverseWebTask(const WeakPtr<TaskExecutor>& weakTaskExecutor,
     std::function<void()>&& task)
 {
     auto taskExecutor = weakTaskExecutor.Upgrade();
     if (!taskExecutor) {
         auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
-        CHECK_NULL_VOID(pipeline);
+        if (!pipeline) {
+            return false;
+        }
         taskExecutor = pipeline->GetTaskExecutor();
     }
-    taskExecutor->PostTask(std::move(task), TaskExecutor::TaskType::UI, "TraverseWebForPageScene");
+    if (!taskExecutor) {
+        return false;
+    }
+    return taskExecutor->PostTask(std::move(task), TaskExecutor::TaskType::UI, "TraverseWebForPageScene");
+}
+
+namespace {
+// Posted task body for the Web page-scene traversal: reports an empty get result when
+// the pipeline or the translate manager is unavailable so the session-side pending
+// query cannot deadlock.
+void TraverseWebForPageScene(int32_t processId, const std::string& ruleJson, bool isGetResult)
+{
+    auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
+    if (!pipeline) {
+        if (isGetResult) {
+            WebPageSceneManager::GetInstance().ReportEmptyWebRound(processId);
+        }
+        return;
+    }
+    auto uiTranslateManager = pipeline->GetUiTranslateManagerImpl();
+    if (!uiTranslateManager) {
+        if (isGetResult) {
+            WebPageSceneManager::GetInstance().ReportEmptyWebRound(processId);
+        }
+        return;
+    }
+    uiTranslateManager->TraverseAndMatchAllWeb(processId, ruleJson, isGetResult);
+}
+} // namespace
+
+int32_t UIContentImpl::HandleWebPageSceneRegister(const WeakPtr<TaskExecutor>& weakTaskExecutor,
+    int32_t processId, const std::string& ruleJson)
+{
+    int32_t ret = WebPageSceneManager::GetInstance().RegisterPageSceneRules(processId, ruleJson);
+    if (ret != PAGE_SCENE_ERR_OK) {
+        return ret;
+    }
+    PostTraverseWebTask(weakTaskExecutor, [processId]() {
+        TraverseWebForPageScene(processId, "", false);
+    });
+    return PAGE_SCENE_ERR_OK;
+}
+
+int32_t UIContentImpl::HandleWebPageSceneGet(const WeakPtr<TaskExecutor>& weakTaskExecutor,
+    int32_t processId, const std::string& ruleJson, bool isGetResult)
+{
+    bool posted = PostTraverseWebTask(weakTaskExecutor, [processId, ruleJson, isGetResult]() {
+        TraverseWebForPageScene(processId, ruleJson, isGetResult);
+    });
+    if (!posted && isGetResult) {
+        // Task dropped (no usable task executor): the session side has already inserted
+        // the pid into pendingPageSceneGets_ before invoking this callback, so close out
+        // any previous round and report an empty result synchronously to clear it —
+        // otherwise subsequent Gets for the same pid would be rejected with
+        // LAST_UNFINISH forever ("get unavailable afterwards").
+        WebPageSceneManager::GetInstance().ReportEmptyWebRound(processId);
+    }
+    return PAGE_SCENE_ERR_OK;
 }
 
 void UIContentImpl::SaveTraverseWebForPageSceneCallback(const WeakPtr<TaskExecutor>& taskExecutor)
@@ -7829,32 +7888,12 @@ void UIContentImpl::SaveTraverseWebForPageSceneCallback(const WeakPtr<TaskExecut
         UiSessionManager::WebPageSceneOp op, int32_t processId, const std::string& ruleJson,
         bool isGetResult) -> int32_t {
         switch (op) {
-            case UiSessionManager::WebPageSceneOp::RegisterRules: {
-                int32_t ret = WebPageSceneManager::GetInstance().RegisterPageSceneRules(processId, ruleJson);
-                if (ret != PAGE_SCENE_ERR_OK) {
-                    return ret;
-                }
-                PostTraverseWebTask(weakTaskExecutor, [processId]() {
-                    auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
-                    CHECK_NULL_VOID(pipeline);
-                    auto uiTranslateManager = pipeline->GetUiTranslateManagerImpl();
-                    CHECK_NULL_VOID(uiTranslateManager);
-                    uiTranslateManager->TraverseAndMatchAllWeb(processId, "", false);
-                });
-                return PAGE_SCENE_ERR_OK;
-            }
+            case UiSessionManager::WebPageSceneOp::RegisterRules:
+                return HandleWebPageSceneRegister(weakTaskExecutor, processId, ruleJson);
             case UiSessionManager::WebPageSceneOp::UnregisterRules:
                 return WebPageSceneManager::GetInstance().UnregisterPageSceneRules(processId);
-            case UiSessionManager::WebPageSceneOp::GetPageScene: {
-                PostTraverseWebTask(weakTaskExecutor, [processId, ruleJson, isGetResult]() {
-                    auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
-                    CHECK_NULL_VOID(pipeline);
-                    auto uiTranslateManager = pipeline->GetUiTranslateManagerImpl();
-                    CHECK_NULL_VOID(uiTranslateManager);
-                    uiTranslateManager->TraverseAndMatchAllWeb(processId, ruleJson, isGetResult);
-                });
-                return PAGE_SCENE_ERR_OK;
-            }
+            case UiSessionManager::WebPageSceneOp::GetPageScene:
+                return HandleWebPageSceneGet(weakTaskExecutor, processId, ruleJson, isGetResult);
         }
         return PAGE_SCENE_ERR_FAILED;
     };

@@ -148,7 +148,11 @@ public:
     void UpdateTitleInTargetPos(bool isShow, int32_t height) override;
     void NotifyRotationAnimationEnd() override;
     void RegisterExeAppAIFunction(const WeakPtr<TaskExecutor>& taskExecutor);
-    void PostTraverseWebTask(const WeakPtr<TaskExecutor>& weakTaskExecutor, std::function<void()>&& task);
+    bool PostTraverseWebTask(const WeakPtr<TaskExecutor>& weakTaskExecutor, std::function<void()>&& task);
+    int32_t HandleWebPageSceneRegister(const WeakPtr<TaskExecutor>& weakTaskExecutor, int32_t processId,
+        const std::string& ruleJson);
+    int32_t HandleWebPageSceneGet(const WeakPtr<TaskExecutor>& weakTaskExecutor, int32_t processId,
+        const std::string& ruleJson, bool isGetResult);
     void SaveTraverseWebForPageSceneCallback(const WeakPtr<TaskExecutor>& taskExecutor);
     void SaveGetStateMgmtInfoFunction(const WeakPtr<TaskExecutor>& taskExecutor);
     void SaveGetWebInfoByRequestFunction(const WeakPtr<TaskExecutor>& taskExecutor);

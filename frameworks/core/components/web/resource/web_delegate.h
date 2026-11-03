@@ -1839,11 +1839,17 @@ public:
 
     // Page scene match execution
     void ProcessPageSceneDomReadyResult(const std::string& resultJson, const std::string& selectorJson);
-    void ExecuteGetPageSceneMatch(int32_t processId, const WebPageSceneRuleSet& ruleSet, bool isTemporary);
+    void ExecuteGetPageSceneMatch(int32_t processId, const WebPageSceneRuleSet& ruleSet);
     void ExecuteAllRuleSetMatch();
 
 private:
     void ExecuteAllRuleSetMatchInternal();
+    static void ExecutePageSceneQuery(const WeakPtr<WebDelegate>& delegateWeak,
+        const std::string& selectorJson, const std::string& ruleId,
+        const std::vector<std::string>& nodeTypes,
+        std::function<void(const std::string& resultJson)>&& callback);
+    static void ForwardPageSceneQueryResult(const WeakPtr<WebDelegate>& delegateWeak,
+        const std::function<void(const std::string& resultJson)>& func, const std::string& result);
     void ResetPageSceneOnNavigate();
     void InitWebEvent();
     void RegisterWebEvent();

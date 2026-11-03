@@ -11318,7 +11318,14 @@ void WebPattern::ExecuteReportOnRegisterMatch(int32_t processId)
 
 void WebPattern::GetPageSceneForWeb(int32_t processId, const std::string& ruleJson)
 {
-    CHECK_NULL_VOID(delegate_);
+    // The caller (TraverseAndMatchAllWeb) has already accounted for this listener in
+    // InitGetRemaining's count. If the delegate is null we cannot run the query, so we
+    // must decrement here to keep the listener/decrement contract balanced, otherwise
+    // the global remaining counter would never reach zero and the round would leak.
+    if (!delegate_) {
+        WebPageSceneManager::GetInstance().DecrementGetRemaining(processId);
+        return;
+    }
     delegate_->GetPageSceneForWeb(processId, ruleJson);
 }
 
