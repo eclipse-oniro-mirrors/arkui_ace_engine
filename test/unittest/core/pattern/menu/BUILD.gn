@@ -61,6 +61,7 @@ test_sources = [
   "menuwrapper_test_two_ng.cpp",
   "submenu_test_ng.cpp",
   "menu_test_core.cpp",
+  "menu_patternMore_test_four_ng.cpp",
 ]
 
 if (is_host_product) {
