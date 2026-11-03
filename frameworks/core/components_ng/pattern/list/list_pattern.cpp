@@ -240,6 +240,7 @@ void ListPattern::ResetScrollPlaceholder()
         RetireScrollPlaceholderShell(shell, templateId);
     }
     retiringPlaceholderShells_.clear();
+    sweepPosted_ = false;
     SweepOrphanPlaceholderShells();
     auto host = GetHost();
     CHECK_NULL_VOID(host);
@@ -716,8 +717,54 @@ bool ListPattern::CommitScrollPlaceholderRealBuild(int32_t index)
     // measure breaks stretched out over several frames. Keeping the shell
     // mounted only ever produced placeholder-over-real frames.
     RetireScrollPlaceholderShell(info.shell, info.templateId);
+    // Post the stale-shell sweep onto the UI queue (once, deduped by
+    // sweepPosted_): it runs right after this flush iteration ends — outside
+    // both the layout transaction and the flush queue iteration — so it can
+    // also cancel queued tasks safely while draining.
+    if (!sweepPosted_) {
+        auto taskExecutor = context ? context->GetTaskExecutor() : nullptr;
+        if (taskExecutor) {
+            sweepPosted_ = true;
+            taskExecutor->PostTask(
+                [weak = AceType::WeakClaim(this)] {
+                    auto pattern = weak.Upgrade();
+                    if (pattern) {
+                        pattern->SweepStaleScrollPlaceholderShells();
+                    }
+                }, TaskExecutor::TaskType::UI, "ArkUIListSweepStaleScrollPlaceholder");
+        }
+    }
     host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
     return true;
+}
+
+void ListPattern::SweepStaleScrollPlaceholderShells()
+{
+    sweepPosted_ = false;
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* context = host->GetContext();
+    const auto& manager = context ? context->GetOrCreateScrollPlaceholderManager() : nullptr;
+    CHECK_NULL_VOID(manager);
+    const int32_t total = host->GetTotalChildCount();
+    for (auto iter = scrollPlaceholderItems_.begin(); iter != scrollPlaceholderItems_.end();) {
+        const bool realExists =
+            host->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(iter->first)) != nullptr;
+        const bool outOfWindow = !InScrollPhVisibleRange(startIndex_, endIndex_, iter->first);
+        if (!realExists && !outOfWindow) {
+            ++iter;
+            continue;
+        }
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
+            "idle sweep retire idx=%{public}d realExists=%{public}d outOfWindow=%{public}d",
+            iter->first, static_cast<int32_t>(realExists), static_cast<int32_t>(outOfWindow));
+        if (outOfWindow) {
+            manager->CancelRealBuildTask(host->GetId(), iter->first,
+                ScrollPlaceholderCancelReason::OUT_OF_RANGE);
+        }
+        RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
+        iter = scrollPlaceholderItems_.erase(iter);
+    }
 }
 
 void ListPattern::RetireScrollPlaceholderShell(const RefPtr<FrameNode>& shell, const std::string& templateId)
@@ -824,6 +871,7 @@ void ListPattern::ReconcileScrollPlaceholderItems(int32_t layoutStart, int32_t l
         RetireScrollPlaceholderShell(shell, templateId);
     }
     retiringPlaceholderShells_.clear();
+    sweepPosted_ = false;
     SweepOrphanPlaceholderShells();
 }
 

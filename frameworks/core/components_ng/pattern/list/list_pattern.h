@@ -120,6 +120,13 @@ public:
     // the pool). layoutStart/layoutEnd describe the just-finished layout round's
     // itemPosition_ window (-1/-1 when empty: range unknown, fail open).
     void ReconcileScrollPlaceholderItems(int32_t layoutStart, int32_t layoutEnd);
+    // Idle-flush companion of ReconcileScrollPlaceholderItems: retires pending
+    // shells whose index the visible window or a real child already left, so a
+    // load-heavy decay (measure breaks stretching the layout rounds) can not
+    // paint stale shell geometry over freshly committed rows for several
+    // frames. Posted once per commit on the UI task queue; runs outside the
+    // flush iteration, so task cancellation here is safe.
+    void SweepStaleScrollPlaceholderShells();
     // Defensive sweep: retires mounted shells that neither placeholder table tracks
     // anymore, so a bookkeeping miss can never leave a shell on the tree (index-based
     // cleanup can not see shells by design — zero frame count).
@@ -808,6 +815,9 @@ private:
     ScrollPlaceholderProvider scrollPlaceholderProvider_;
     std::map<int32_t, ScrollPlaceholderItemInfo> scrollPlaceholderItems_;
     std::list<std::pair<RefPtr<FrameNode>, std::string>> retiringPlaceholderShells_;
+    // Dedup for the UI-queue posted SweepStaleScrollPlaceholderShells (one in
+    // flight at a time; the run clears it so the next commit re-arms).
+    bool sweepPosted_ = false;
     // Every shell this pattern mounted on the host (shell -> its template id), the
     // single source of truth for the orphan sweep: shells are invisible to index-based
     // cleanup (zero frame count by design), so retirement bookkeeping misses are
