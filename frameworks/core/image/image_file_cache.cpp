@@ -250,21 +250,24 @@ void ImageFileCache::WriteCacheFile(const std::string& url, const void* data, si
     auto writeFilePath = ConstructCacheFilePath(fileCacheKey + suffix);
     {
         std::scoped_lock<std::mutex> lock(cacheFileInfoMutex_);
-        // 1. first check if file has been cached.
         auto iter = fileNameToFileInfoPos_.find(fileCacheKey);
         if (iter != fileNameToFileInfoPos_.end()) {
             auto infoIter = iter->second;
-            // either suffix not specified, or fileName ends with the suffix
             if ((suffix.empty() || EndsWith(infoIter->fileName, suffix)) && IsFileExists(writeFilePath.c_str())) {
                 TAG_LOGI(AceLogTag::ACE_IMAGE, "file has been wrote %{private}s", infoIter->fileName.c_str());
                 return;
             }
         }
+        if (writingKeys_.count(fileCacheKey) > 0) {
+            return;
+        }
+        writingKeys_.insert(fileCacheKey);
     }
 
 #ifndef ACE_UNITTEST
-    // 2. if not in dist, write file into disk.
     if (!WriteFile(url, data, size, fileCacheKey, suffix)) {
+        std::scoped_lock<std::mutex> lock(cacheFileInfoMutex_);
+        writingKeys_.erase(fileCacheKey);
         return;
     }
 #endif
@@ -273,8 +276,8 @@ void ImageFileCache::WriteCacheFile(const std::string& url, const void* data, si
     {
         std::scoped_lock<std::mutex> lock(cacheFileInfoMutex_);
         SaveCacheInner(fileCacheKey, suffix, size, removeVector);
+        writingKeys_.erase(fileCacheKey);
     }
-    // 3. clear files removed from cache list.
     ClearCacheFile(removeVector);
 }
 

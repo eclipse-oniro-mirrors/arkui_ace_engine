@@ -19,6 +19,7 @@
 #include <mutex>
 #include <shared_mutex>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -88,6 +89,7 @@ private:
     // lru
     std::list<FileInfo> cacheFileInfo_;
     std::unordered_map<std::string, std::list<FileInfo>::iterator> fileNameToFileInfoPos_;
+    std::unordered_set<std::string> writingKeys_;
 
     bool hasSetCacheFileInfo_ = false;
 };

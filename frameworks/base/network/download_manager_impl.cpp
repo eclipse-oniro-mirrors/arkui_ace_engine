@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+#include <atomic>
+
 #include "hilog/log.h"
 #include "http_client.h"
 #include "net_conn_client.h"
@@ -576,7 +578,7 @@ private:
     }
 
     std::mutex mutex_;
-    bool initialized_ = false;
+    std::atomic<bool> initialized_ = false;
     bool isCurl_ = false;
 };
 
