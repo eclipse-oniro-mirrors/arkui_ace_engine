@@ -115,9 +115,11 @@ public:
     // then requests the local remeasure that completes the replacement.
     bool CommitScrollPlaceholderRealBuild(int32_t index);
     // Layout-round reconcile: drops placeholders whose index already holds a real
-    // child or fell out of range, and retires shells whose real item was committed
-    // (removed from the host and the template content returned to the pool).
-    void ReconcileScrollPlaceholderItems();
+    // child or fell out of the layout window, and retires shells whose real item
+    // was committed (removed from the host and the template content returned to
+    // the pool). layoutStart/layoutEnd describe the just-finished layout round's
+    // itemPosition_ window (-1/-1 when empty: range unknown, fail open).
+    void ReconcileScrollPlaceholderItems(int32_t layoutStart, int32_t layoutEnd);
     // Defensive sweep: retires mounted shells that neither placeholder table tracks
     // anymore, so a bookkeeping miss can never leave a shell on the tree (index-based
     // cleanup can not see shells by design — zero frame count).

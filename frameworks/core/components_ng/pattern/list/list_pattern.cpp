@@ -773,24 +773,39 @@ void ListPattern::SweepScrollPlaceholderOutOfRange(int32_t start, int32_t end)
     }
 }
 
-void ListPattern::ReconcileScrollPlaceholderItems()
+void ListPattern::ReconcileScrollPlaceholderItems(int32_t layoutStart, int32_t layoutEnd)
 {
     // Layout-round reconcile: placeholders whose index already holds a
-    // real child (normal-path rebuild after data change) or fell out of range are
-    // dropped; shells of committed items are retired after the replacement
-    // layout finished (removed outside the transaction, per the commit ordering).
+    // real child (normal-path rebuild after data change) or fell out of the
+    // just-finished layout round's window are dropped; shells of committed
+    // items are retired after the replacement layout finished (removed
+    // outside the transaction, per the commit ordering). The out-of-window
+    // drop runs before the frame reaches the screen: an index the fill loops
+    // no longer visit keeps its shell geometry frozen at stale viewport
+    // coordinates, so a scrollbar jump would otherwise paint the previous
+    // window's shells on top of the new content until a later event-path
+    // sweep (ProcessEvent) caught up.
     // The orphan sweep at the end also runs with both tables empty: an empty
     // table with a mounted shell is exactly the residual it exists to catch.
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     int32_t totalCount = host->GetTotalChildCount();
+    auto* context = host->GetContext();
+    const auto& manager = context ? context->GetOrCreateScrollPlaceholderManager() : nullptr;
     for (auto iter = scrollPlaceholderItems_.begin(); iter != scrollPlaceholderItems_.end();) {
         if (iter->second.shell) {
             LogScrollPlaceholderShellState(host, iter->first, iter->second.shell);
         }
+        bool outOfWindow = !InScrollPhVisibleRange(layoutStart, layoutEnd, iter->first);
         bool drop = iter->first >= totalCount ||
             (host->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(iter->first)) != nullptr);
-        if (drop) {
+        if (drop || outOfWindow) {
+            if (outOfWindow && manager) {
+                // Mirror the event-path sweep: the queued real-build of an index
+                // the layout window left behind is dropped with the shell.
+                manager->CancelRealBuildTask(host->GetId(), iter->first,
+                    ScrollPlaceholderCancelReason::OUT_OF_RANGE);
+            }
             RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
             iter = scrollPlaceholderItems_.erase(iter);
         } else {
@@ -1009,9 +1024,6 @@ bool ListPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, c
     if (config.skipMeasure && config.skipLayout) {
         return false;
     }
-    // Scroll placeholder layout-round reconcile: retire shells whose replacement
-    // layout finished and drop placeholders overtaken by real children.
-    ReconcileScrollPlaceholderItems();
     auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto listLayoutAlgorithm = DynamicCast<ListLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
@@ -1026,6 +1038,13 @@ bool ListPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, c
         jumpIndex_.reset();
     }
     itemPosition_ = listLayoutAlgorithm->GetItemPosition();
+    // Scroll placeholder layout-round reconcile: retire shells whose replacement
+    // layout finished, drop placeholders overtaken by real children and shells
+    // whose index left this layout round's window (their frame geometry froze at
+    // stale viewport coordinates the moment the fill loops stopped visiting them
+    // — a scrollbar jump leaves such shells painted on screen until retired).
+    ReconcileScrollPlaceholderItems(itemPosition_.empty() ? -1 : itemPosition_.begin()->first,
+        itemPosition_.empty() ? -1 : itemPosition_.rbegin()->first);
     cachedItemPosition_ = listLayoutAlgorithm->GetCachedItemPosition();
     laneIdx4Divider_ = listLayoutAlgorithm->GetLaneIdx4Divider();
     maxListItemIndex_ = listLayoutAlgorithm->GetMaxListItemIndex();

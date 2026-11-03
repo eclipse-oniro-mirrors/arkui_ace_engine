@@ -290,7 +290,7 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderCommitAndRetire001, TestS
     // The layout cache path may have built some slots really; those indexes never
     // get a placeholder anymore (create refuses built slots) and stale entries are
     // dropped by the reconcile: the real child always wins over the shell.
-    pattern_->ReconcileScrollPlaceholderItems();
+    pattern_->ReconcileScrollPlaceholderItems(-1, -1);
     for (const auto& [index, info] : pattern_->scrollPlaceholderItems_) {
         EXPECT_TRUE(frameNode_->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(index)) == nullptr);
     }
@@ -315,7 +315,7 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderCommitAndRetire001, TestS
     EXPECT_FALSE(pattern_->retiringPlaceholderShells_.empty());
 
     // Reconcile retires the shell: unmounted from the host, tables cleared.
-    pattern_->ReconcileScrollPlaceholderItems();
+    pattern_->ReconcileScrollPlaceholderItems(-1, -1);
     EXPECT_FALSE(pattern_->HasScrollPlaceholderItem(index));
     EXPECT_TRUE(pattern_->retiringPlaceholderShells_.empty());
     EXPECT_FALSE(IsChildOfHost(shell));
@@ -338,7 +338,7 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderOrphanShellSweep001, Test
         },
         true);
     CreateItemsAndDone();
-    pattern_->ReconcileScrollPlaceholderItems();
+    pattern_->ReconcileScrollPlaceholderItems(-1, -1);
 
     // Find a genuinely unbuilt slot and mount a shell on it.
     int32_t index = FindUnbuiltSlot();
@@ -353,7 +353,7 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderOrphanShellSweep001, Test
     EXPECT_TRUE(IsChildOfHost(shell));
 
     // The next layout-round reconcile sweeps the orphan off the host.
-    pattern_->ReconcileScrollPlaceholderItems();
+    pattern_->ReconcileScrollPlaceholderItems(-1, -1);
     EXPECT_FALSE(IsChildOfHost(shell));
 
     // A committed shell awaiting the reconcile is retired by the reset as well.
@@ -365,6 +365,49 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderOrphanShellSweep001, Test
     EXPECT_FALSE(IsChildOfHost(retiringShell));
     EXPECT_TRUE(pattern_->scrollPlaceholderItems_.empty());
     EXPECT_TRUE(pattern_->retiringPlaceholderShells_.empty());
+}
+
+/**
+ * @tc.name: ScrollPlaceholderReconcileOutOfWindow001
+ * @tc.desc: The layout-round reconcile retires shells whose index left the
+ *           just-finished layout round's window (a scrollbar jump freezes the
+ *           shell geometry at stale viewport coordinates): the shell leaves the
+ *           host before the frame reaches the screen, while an in-window shell
+ *           and an unknown window (-1/-1, pre-first-layout) keep theirs.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderReconcileOutOfWindow001, TestSize.Level1)
+{
+    CreatePlaceholderList(
+        [](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            return MakeDefaultPlaceholderOptions();
+        },
+        true);
+    CreateItemsAndDone();
+    pattern_->ReconcileScrollPlaceholderItems(-1, -1);
+
+    // Mount a shell on a genuinely unbuilt slot.
+    int32_t index = FindUnbuiltSlot();
+    ASSERT_GE(index, 0);
+    auto shell = pattern_->CreateScrollPlaceholderShell(index);
+    ASSERT_TRUE(shell);
+    EXPECT_TRUE(IsChildOfHost(shell));
+
+    // Unknown window keeps the shell (fail open, same as the pre-fix reconcile).
+    pattern_->ReconcileScrollPlaceholderItems(-1, -1);
+    EXPECT_TRUE(pattern_->HasScrollPlaceholderItem(index));
+    EXPECT_TRUE(IsChildOfHost(shell));
+
+    // In-window shell survives the reconcile.
+    pattern_->ReconcileScrollPlaceholderItems(index, index + 1);
+    EXPECT_TRUE(pattern_->HasScrollPlaceholderItem(index));
+    EXPECT_TRUE(IsChildOfHost(shell));
+
+    // Next layout round landed far beyond the visibility margin (10): retired.
+    int32_t farStart = index + 11 + 10;
+    pattern_->ReconcileScrollPlaceholderItems(farStart, farStart + 1);
+    EXPECT_FALSE(pattern_->HasScrollPlaceholderItem(index));
+    EXPECT_FALSE(IsChildOfHost(shell));
 }
 
 /**
@@ -486,7 +529,7 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderRegisteredTemplateFlow001
     // (real child wins): drop those entries, then defer a genuinely unbuilt slot
     // fresh (the expired anchor still holds) and drive it through the full flow.
     ASSERT_FALSE(pattern_->scrollPlaceholderItems_.empty());
-    pattern_->ReconcileScrollPlaceholderItems();
+    pattern_->ReconcileScrollPlaceholderItems(-1, -1);
     int32_t index = FindUnbuiltSlot();
     ASSERT_GE(index, 0);
     auto shell = pattern_->CreateScrollPlaceholderShell(index);
@@ -506,7 +549,7 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderRegisteredTemplateFlow001
     EXPECT_TRUE(instance->IsActive());
 
     EXPECT_TRUE(pattern_->CommitScrollPlaceholderRealBuild(index));
-    pattern_->ReconcileScrollPlaceholderItems();
+    pattern_->ReconcileScrollPlaceholderItems(-1, -1);
     EXPECT_FALSE(pattern_->HasScrollPlaceholderItem(index));
     EXPECT_TRUE(pattern_->retiringPlaceholderShells_.empty());
     // The template content went back to the per-template instance pool.
@@ -861,7 +904,7 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderCommitEdgeBranches001, Te
     // (c) The reconcile drops entries whose index fell out of the data range.
     int32_t staleIndex = TOTAL_ITEM_NUMBER + 4;
     InjectTableEntry(staleIndex, MakeInjectedShell(), std::string());
-    pattern_->ReconcileScrollPlaceholderItems();
+    pattern_->ReconcileScrollPlaceholderItems(-1, -1);
     EXPECT_FALSE(pattern_->HasScrollPlaceholderItem(staleIndex));
 }
 
@@ -1065,7 +1108,7 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderFrameProxySubstitution001
 
     // Retire funnels clear any deferral still pointing at a retired shell, and the
     // test leaves no process-wide deferral behind (the static fast gate is shared).
-    pattern_->ReconcileScrollPlaceholderItems();
+    pattern_->ReconcileScrollPlaceholderItems(-1, -1);
     EXPECT_FALSE(IsChildOfHost(shell));
     pattern_->ResetScrollPlaceholder();
     EXPECT_TRUE(pattern_->scrollPlaceholderItems_.empty());
