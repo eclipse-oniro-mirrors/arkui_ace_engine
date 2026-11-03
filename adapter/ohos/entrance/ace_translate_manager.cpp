@@ -23,6 +23,7 @@
 #include "core/components_ng/pattern/image/image_pattern.h"
 #include "core/components_ng/pattern/page_translate/page_translate_node.h"
 #include "core/components_ng/pattern/web/web_pattern.h"
+#include "core/components/web/resource/web_page_scene_manager.h"
 #include "core/components_ng/render/adapter/component_snapshot.h"
 
 namespace OHOS::Ace {
@@ -86,14 +87,46 @@ void UiTranslateManagerImpl::ForEachArkUITranslateFrameNode(
 void UiTranslateManagerImpl::TraverseAndMatchAllWeb(int32_t processId, const std::string& ruleJson, bool isGetResult)
 {
 #ifdef WEB_SUPPORTED
-    for (auto listener : listenerMap_) {
-        auto pattern = GetWebPattern(listener.second.translateNode);
-        if (pattern) {
-            if (isGetResult && !ruleJson.empty()) {
-                // Get path: temp register + match + cleanup
+    if (isGetResult && !ruleJson.empty()) {
+        // Only ArkWeb listeners take part in page-scene queries: listenerMap_ also holds
+        // TextField/Text/Slider translate nodes whose GetWebPattern is null. They must
+        // not be counted as Web participants nor reported as destroyed Web patterns.
+        int32_t webCount = 0;
+        for (const auto& listener : listenerMap_) {
+            if (IsArkWebTranslateListener(listener.second)) {
+                webCount++;
+            }
+        }
+        if (webCount == 0) {
+            // Close out any previous in-flight round and answer with a single empty
+            // result: the previous round's instance is replaced here, so its late
+            // callbacks are discarded by the round validation instead of being
+            // reported again as this round's answer.
+            WebPageSceneManager::GetInstance().ReportEmptyWebRound(processId);
+            return;
+        }
+        WebPageSceneManager::GetInstance().InitGetRemaining(processId, webCount);
+        for (auto listener : listenerMap_) {
+            if (!IsArkWebTranslateListener(listener.second)) {
+                continue;
+            }
+            auto pattern = GetWebPattern(listener.second.translateNode);
+            if (pattern) {
                 pattern->GetPageSceneForWeb(processId, ruleJson);
             } else {
-                // Register path: reportOnRegister initial match with merge
+                // Pattern gone (node destroyed). InitGetRemaining already counted this
+                // listener, so decrement to keep the contract balanced. Do NOT report an
+                // empty result here: a synchronous empty report would reach the session
+                // side before the remaining components' async results arrive; the round
+                // reports once via its per-rule results (or the completion fallback in
+                // the manager) if nothing else is reported.
+                WebPageSceneManager::GetInstance().DecrementGetRemaining(processId);
+            }
+        }
+    } else {
+        for (auto listener : listenerMap_) {
+            auto pattern = GetWebPattern(listener.second.translateNode);
+            if (pattern) {
                 pattern->ExecuteReportOnRegisterMatch(processId);
             }
         }

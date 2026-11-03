@@ -11253,45 +11253,126 @@ void WebDelegate::UpdateTouchEventFeatureDetectionEnabled()
 
 // ===== PageScene Rule-Based Perception Methods =====
 
+namespace {
+// Error payload for QueryPageControls exits that cannot deliver a real result: the
+// page-scene round counting relies on the callback firing exactly once.
+std::string BuildQueryErrorPayload(int32_t errorCode)
+{
+    return "{\"errorCode\":" + std::to_string(errorCode) + ",\"controls\":[]}";
+}
+} // namespace
+
 void WebDelegate::QueryPageControls(const std::string& selectorJson,
     const std::string& ruleId, const std::vector<std::string>& nodeTypes,
     std::function<void(const std::string& resultJson)>&& callback)
 {
+    // Every exit must invoke the callback exactly once (with an error payload on
+    // failure): page-scene round counting relies on it, and a lost callback would
+    // leave the round pending forever ("get unavailable afterwards").
     auto context = context_.Upgrade();
-    CHECK_NULL_VOID(context);
-    context->GetTaskExecutor()->PostTask(
-        [weak = WeakClaim(this), selectorJson, ruleId, nodeTypes, callback = std::move(callback)]() {
-            auto delegate = weak.Upgrade();
-            CHECK_NULL_VOID(delegate);
-            auto agentManager = delegate->GetNWebAgentManager();
-            if (!agentManager) {
-                TAG_LOGE(AceLogTag::ACE_WEB,
-                    "WebDelegate::QueryPageControls: GetNWebAgentManager failed, WebId: %{public}d",
-                    delegate->GetWebId());
-                if (callback) {
-                    callback("{\"errorCode\":" + std::to_string(PAGE_SCENE_QUERY_EMPTY_SCRIPT) +
-                        ",\"controls\":[]}");
-                }
-                return;
-            }
-            auto callbackImpl = std::make_shared<WebJavaScriptExecuteCallBack>(weak);
-            if (callbackImpl && callback) {
-                callbackImpl->SetCallBack([weak, func = std::move(callback)](std::string result) {
-                    auto delegate = weak.Upgrade();
-                    CHECK_NULL_VOID(delegate);
-                    TAG_LOGI(AceLogTag::ACE_WEB,
-                        "WebDelegate::QueryPageControls: JS result received, webId=%{public}d result len=%{public}zu",
-                        delegate->GetWebId(), result.size());
-                    auto context = delegate->context_.Upgrade();
-                    CHECK_NULL_VOID(context);
-                    context->GetTaskExecutor()->PostTask(
-                        [callback = std::move(func), result]() { callback(result); },
-                        TaskExecutor::TaskType::PLATFORM, "ArkUIWebPageSceneQueryCallback");
-                });
-            }
-            agentManager->RequestPageSceneQuery(selectorJson, ruleId, nodeTypes, callbackImpl);
+    if (!context) {
+        TAG_LOGE(AceLogTag::ACE_WEB, "WebDelegate::QueryPageControls: context is null");
+        if (callback) {
+            callback(BuildQueryErrorPayload(PAGE_SCENE_QUERY_EXCEPTION));
+        }
+        return;
+    }
+    auto taskExecutor = context->GetTaskExecutor();
+    if (!taskExecutor) {
+        TAG_LOGE(AceLogTag::ACE_WEB, "WebDelegate::QueryPageControls: task executor is null");
+        if (callback) {
+            callback(BuildQueryErrorPayload(PAGE_SCENE_QUERY_EXCEPTION));
+        }
+        return;
+    }
+    // Keep a copy for the post-failure path: if PostTask fails, the queued task (holding
+    // the moved callback) is destroyed without running, so the failure path must still
+    // fire the callback exactly once.
+    std::function<void(const std::string& resultJson)> failureCallback = callback;
+    bool posted = taskExecutor->PostTask(
+        [weak = WeakClaim(this), selectorJson, ruleId, nodeTypes, callback = std::move(callback)]() mutable {
+            ExecutePageSceneQuery(weak, selectorJson, ruleId, nodeTypes, std::move(callback));
         },
         TaskExecutor::TaskType::PLATFORM, "ArkUIWebPageSceneQuery");
+    if (!posted) {
+        TAG_LOGE(AceLogTag::ACE_WEB, "WebDelegate::QueryPageControls: post query task failed");
+        if (failureCallback) {
+            failureCallback(BuildQueryErrorPayload(PAGE_SCENE_QUERY_EXCEPTION));
+        }
+    }
+}
+
+void WebDelegate::ExecutePageSceneQuery(const WeakPtr<WebDelegate>& delegateWeak,
+    const std::string& selectorJson, const std::string& ruleId,
+    const std::vector<std::string>& nodeTypes,
+    std::function<void(const std::string& resultJson)>&& callback)
+{
+    auto delegate = delegateWeak.Upgrade();
+    if (!delegate) {
+        if (callback) {
+            callback(BuildQueryErrorPayload(PAGE_SCENE_QUERY_EXCEPTION));
+        }
+        return;
+    }
+    auto agentManager = delegate->GetNWebAgentManager();
+    if (!agentManager) {
+        TAG_LOGE(AceLogTag::ACE_WEB,
+            "WebDelegate::QueryPageControls: GetNWebAgentManager failed, WebId: %{public}d",
+            delegate->GetWebId());
+        if (callback) {
+            callback(BuildQueryErrorPayload(PAGE_SCENE_QUERY_EMPTY_SCRIPT));
+        }
+        return;
+    }
+    auto callbackImpl = std::make_shared<WebJavaScriptExecuteCallBack>(delegateWeak);
+    if (callbackImpl && callback) {
+        callbackImpl->SetCallBack(
+            [delegateWeak, func = std::move(callback)](std::string result) {
+                ForwardPageSceneQueryResult(delegateWeak, func, result);
+            });
+    }
+    agentManager->RequestPageSceneQuery(selectorJson, ruleId, nodeTypes, callbackImpl);
+}
+
+void WebDelegate::ForwardPageSceneQueryResult(const WeakPtr<WebDelegate>& delegateWeak,
+    const std::function<void(const std::string& resultJson)>& func, const std::string& result)
+{
+    auto delegate = delegateWeak.Upgrade();
+    if (!delegate) {
+        // Delegate destroyed before the JS result arrived: deliver the result directly
+        // so the pending round still completes.
+        if (func) {
+            func(result);
+        }
+        return;
+    }
+    TAG_LOGI(AceLogTag::ACE_WEB,
+        "WebDelegate::QueryPageControls: JS result received, webId=%{public}d result len=%{public}zu",
+        delegate->GetWebId(), result.size());
+    auto context = delegate->context_.Upgrade();
+    if (!context) {
+        // No context to hop threads: deliver directly so the pending round still completes.
+        if (func) {
+            func(result);
+        }
+        return;
+    }
+    auto taskExecutor = context->GetTaskExecutor();
+    if (!taskExecutor) {
+        if (func) {
+            func(result);
+        }
+        return;
+    }
+    // Keep a copy for the post-failure path (see QueryPageControls): if PostTask fails
+    // the queued task is destroyed without running.
+    std::function<void(const std::string& resultJson)> failureCallback = func;
+    bool posted = taskExecutor->PostTask(
+        [callback = std::move(func), result]() { callback(result); },
+        TaskExecutor::TaskType::PLATFORM, "ArkUIWebPageSceneQueryCallback");
+    if (!posted && failureCallback) {
+        failureCallback(result);
+    }
 }
 
 void WebDelegate::ExecuteReportOnRegisterMatch(int32_t processId)
@@ -11324,32 +11405,35 @@ void WebDelegate::ExecuteReportOnRegisterMatch(int32_t processId)
 }
 
 void WebDelegate::ExecuteGetPageSceneMatch(int32_t processId,
-    const WebPageSceneRuleSet& ruleSet, bool isTemporary)
+    const WebPageSceneRuleSet& ruleSet)
 {
     int32_t enabledCount = 0;
     for (const auto& rule : ruleSet.rules) {
         if (rule.enabled) enabledCount++;
     }
     if (enabledCount == 0) {
-        WebPageSceneManager::GetInstance().OnMatchResult(processId, "", true);
-        if (isTemporary) {
-            WebPageSceneManager::GetInstance().CompleteGetPageScene(processId);
-        }
+        WebPageSceneManager::GetInstance().DecrementGetRemaining(processId);
         return;
     }
-    auto remaining = std::make_shared<std::atomic<int32_t>>(enabledCount);
+    // Bind this round's global counter: a late callback from a superseded round must
+    // not consume the current round's budget (DecrementRoundRemaining validates the
+    // round instance instead of looking up by processId).
+    auto roundRemaining = WebPageSceneManager::GetInstance().GetRoundRemaining(processId);
+    auto localRemaining = std::make_shared<std::atomic<int32_t>>(enabledCount);
     for (const auto& rule : ruleSet.rules) {
         if (!rule.enabled) continue;
         std::string selectorJson = WebPageSceneManager::GetInstance().BuildSelectorJson(
             rule, ruleSet.globalConfig);
         QueryPageControls(selectorJson, rule.ruleId, {},
-            [processId, webId = GetWebId(), hostNodeId = GetHostNodeId(), isTemporary, remaining, selectorJson](
+            [processId, webId = GetWebId(), hostNodeId = GetHostNodeId(), selectorJson, localRemaining, roundRemaining](
                 const std::string& resultJson) {
-                WebPageSceneManager::GetInstance().ProcessQueryResult(
-                    processId, webId, hostNodeId, selectorJson, resultJson, true);
-                int32_t rem = remaining->fetch_sub(1, std::memory_order_acq_rel) - 1;
-                if (rem == 0 && isTemporary) {
-                    WebPageSceneManager::GetInstance().CompleteGetPageScene(processId);
+                // Round-scoped reporting: a late callback from a superseded round is
+                // discarded instead of answering the current round with stale data.
+                WebPageSceneManager::GetInstance().ProcessQueryResultForRound(
+                    processId, webId, hostNodeId, selectorJson, resultJson, roundRemaining);
+                int32_t rem = localRemaining->fetch_sub(1, std::memory_order_acq_rel) - 1;
+                if (rem == 0) {
+                    WebPageSceneManager::GetInstance().DecrementRoundRemaining(processId, roundRemaining);
                 }
             });
     }
@@ -11359,22 +11443,18 @@ void WebDelegate::GetPageSceneForWeb(int32_t processId, const std::string& ruleJ
 {
     std::optional<WebPageSceneRuleSet> ruleSet;
     int32_t ret = WebPageSceneManager::GetInstance().BeginGetPageScene(processId, ruleJsonOrRuleSetId, ruleSet);
-    if (ret != PAGE_SCENE_ERR_OK) {
+    if (ret != PAGE_SCENE_ERR_OK || !ruleSet) {
         TAG_LOGW(AceLogTag::ACE_WEB,
             "GetPageSceneForWeb: BeginGetPageScene failed, ret=%{public}d processId=%{public}d",
             ret, processId);
-        WebPageSceneManager::GetInstance().OnMatchResult(processId, "", true);
+        // Do not report empty synchronously: it would reach the session side before the
+        // other components' pending async results (and would fire once per component).
+        // Just balance the round counter; the round emits a single empty result on
+        // completion if nothing else reported.
+        WebPageSceneManager::GetInstance().DecrementGetRemaining(processId);
         return;
     }
-    bool isTemporary = !WebPageSceneManager::GetInstance().GetPageSceneRules(processId).has_value();
-    if (!ruleSet) {
-        WebPageSceneManager::GetInstance().OnMatchResult(processId, "", true);
-        if (isTemporary) {
-            WebPageSceneManager::GetInstance().CompleteGetPageScene(processId);
-        }
-        return;
-    }
-    ExecuteGetPageSceneMatch(processId, ruleSet.value(), isTemporary);
+    ExecuteGetPageSceneMatch(processId, ruleSet.value());
 }
 
 void WebDelegate::ProcessPageSceneDomReadyResult(const std::string& resultJson,
