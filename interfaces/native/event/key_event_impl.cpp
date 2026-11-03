@@ -13,7 +13,6 @@
  * limitations under the License.
  */
 
-#include <array>
 #include <cstring>
 #include <new>
 
@@ -21,7 +20,6 @@
 
 #include "interfaces/native/native_key_event.h"
 #include "interfaces/inner_api/ace/node_module_inner.h"
-#include "core/event/key_code.h"
 #include "interfaces/native/node/event_converter.h"
 #include "interfaces/native/node/node_model.h"
 #include "interfaces/native/node/config_manager.h"
@@ -39,43 +37,6 @@ struct OH_ArkUI_KeyboardShortcutKey {
 struct OH_ArkUI_ApplicationShortcutCallbackInfo {
     mutable ArkUI_Context context;
 };
-
-namespace {
-constexpr std::array<OHOS::Ace::KeyCode, 32> SHORTCUT_FUNCTION_KEYS = {
-    OHOS::Ace::KeyCode::KEY_ESCAPE,
-    OHOS::Ace::KeyCode::KEY_F1,
-    OHOS::Ace::KeyCode::KEY_F2,
-    OHOS::Ace::KeyCode::KEY_F3,
-    OHOS::Ace::KeyCode::KEY_F4,
-    OHOS::Ace::KeyCode::KEY_F5,
-    OHOS::Ace::KeyCode::KEY_F6,
-    OHOS::Ace::KeyCode::KEY_F7,
-    OHOS::Ace::KeyCode::KEY_F8,
-    OHOS::Ace::KeyCode::KEY_F9,
-    OHOS::Ace::KeyCode::KEY_F10,
-    OHOS::Ace::KeyCode::KEY_F11,
-    OHOS::Ace::KeyCode::KEY_F12,
-    OHOS::Ace::KeyCode::KEY_TAB,
-    OHOS::Ace::KeyCode::KEY_DPAD_UP,
-    OHOS::Ace::KeyCode::KEY_DPAD_DOWN,
-    OHOS::Ace::KeyCode::KEY_DPAD_LEFT,
-    OHOS::Ace::KeyCode::KEY_DPAD_RIGHT,
-    OHOS::Ace::KeyCode::KEY_CAPS_LOCK,
-    OHOS::Ace::KeyCode::KEY_SYSRQ,
-    OHOS::Ace::KeyCode::KEY_SCROLL_LOCK,
-    OHOS::Ace::KeyCode::KEY_BREAK,
-    OHOS::Ace::KeyCode::KEY_NUM_LOCK,
-    OHOS::Ace::KeyCode::KEY_INSERT,
-    OHOS::Ace::KeyCode::KEY_FORWARD_DEL,
-    OHOS::Ace::KeyCode::KEY_MOVE_HOME,
-    OHOS::Ace::KeyCode::KEY_MOVE_END,
-    OHOS::Ace::KeyCode::KEY_PAGE_UP,
-    OHOS::Ace::KeyCode::KEY_PAGE_DOWN,
-    OHOS::Ace::KeyCode::KEY_ENTER,
-    OHOS::Ace::KeyCode::KEY_DEL,
-    OHOS::Ace::KeyCode::KEY_SPACE,
-};
-} // namespace
 
 #ifdef __cplusplus
 extern "C" {
@@ -794,7 +755,7 @@ void OH_ArkUI_KeyboardShortcutKey_SetFunctionKey(
 OH_ArkUI_KeyboardShortcutFunctionKey OH_ArkUI_KeyboardShortcutKey_GetFunctionKey(
     const OH_ArkUI_KeyboardShortcutKey* key)
 {
-    return key && static_cast<uint32_t>(key->functionKey) < SHORTCUT_FUNCTION_KEYS.size() ?
+    return key && static_cast<uint32_t>(key->functionKey) <= OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_SPACE ?
         static_cast<OH_ArkUI_KeyboardShortcutFunctionKey>(key->functionKey) : OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_ESC;
 }
 
@@ -815,7 +776,6 @@ ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Register(const OH_ArkUI_KeyboardSho
     constexpr uint32_t supportedKeys = OH_ARKUI_KEYBOARD_SHORTCUT_MODIFIER_CTRL |
         OH_ARKUI_KEYBOARD_SHORTCUT_MODIFIER_SHIFT | OH_ARKUI_KEYBOARD_SHORTCUT_MODIFIER_ALT;
     std::string value;
-    int32_t keyCode = -1;
     if ((modifierKeys & ~supportedKeys) != 0) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Unsupported modifier keys");
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -827,18 +787,29 @@ ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Register(const OH_ArkUI_KeyboardSho
             return ARKUI_ERROR_CODE_PARAM_INVALID;
         }
         value.assign(1, key->character);
-    } else if (key->type == OH_ARKUI_KEYBOARD_SHORTCUT_KEY_TYPE_FUNCTION_KEY &&
-        static_cast<uint32_t>(key->functionKey) < SHORTCUT_FUNCTION_KEYS.size()) {
-        keyCode = static_cast<int32_t>(SHORTCUT_FUNCTION_KEYS[static_cast<uint32_t>(key->functionKey)]);
+    } else if (key->type == OH_ARKUI_KEYBOARD_SHORTCUT_KEY_TYPE_FUNCTION_KEY) {
+        // Adapt only the function-key names already handled by ConvertInputCodeToString.
+        static const char* const existingFunctionKeys[] = {
+            "ESC", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
+            "TAB", "DPAD_UP", "DPAD_DOWN", "DPAD_LEFT", "DPAD_RIGHT"
+        };
+        if (key->functionKey >= 0 && key->functionKey <= OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_DPAD_RIGHT) {
+            value = existingFunctionKeys[key->functionKey];
+        } else if (key->functionKey == OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_SPACE) {
+            value = " ";
+        } else {
+            SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Unsupported function key");
+            return ARKUI_ERROR_CODE_PARAM_INVALID;
+        }
     } else {
-        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Invalid shortcut key type or function key");
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Invalid shortcut key type");
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
     const auto id = OHOS::Ace::AceApplicationInfo::GetInstance().RegisterApplicationShortcut(
         value, static_cast<uint8_t>(modifierKeys), [callback, userData](int32_t instanceId) {
             OH_ArkUI_ApplicationShortcutCallbackInfo info { { instanceId } };
             callback(&info, userData);
-        }, keyCode);
+        });
     if (id == 0) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_INTERNAL_ERROR, __FUNCTION__, "Application shortcut registration IDs exhausted");
         return ARKUI_ERROR_CODE_INTERNAL_ERROR;

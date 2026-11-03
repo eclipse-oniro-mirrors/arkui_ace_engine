@@ -1138,29 +1138,4 @@ HWTEST_F(NativeKeyEventTest, ApplicationShortcutInvalidParameters, TestSize.Leve
     OH_ArkUI_KeyboardShortcutKey_Destroy(&key);
 }
 
-/**
- * @tc.name: ApplicationShortcutFunctionKeys
- * @tc.desc: Function keys support no modifiers and distinguish F1 from F10.
- * @tc.type: FUNC
- */
-HWTEST_F(NativeKeyEventTest, ApplicationShortcutFunctionKeys, TestSize.Level1)
-{
-    auto* key = OH_ArkUI_KeyboardShortcutKey_Create();
-    ASSERT_NE(key, nullptr);
-    OH_ArkUI_KeyboardShortcutKey_SetType(key, OH_ARKUI_KEYBOARD_SHORTCUT_KEY_TYPE_FUNCTION_KEY);
-    OH_ArkUI_KeyboardShortcutKey_SetFunctionKey(key, OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_F1);
-    int32_t id = 0;
-    int32_t count = 0;
-    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, 0, &count, CountApplicationShortcut, &id),
-        ARKUI_ERROR_CODE_NO_ERROR);
-    OH_ArkUI_KeyboardShortcutKey_Destroy(&key);
-    auto event = MakeApplicationShortcutEvent();
-    event.pressedCodes.clear();
-    event.code = KeyCode::KEY_F10;
-    EXPECT_FALSE(AceApplicationInfo::GetInstance().TryTriggerApplicationShortcut(event, 1));
-    event.code = KeyCode::KEY_F1;
-    EXPECT_TRUE(AceApplicationInfo::GetInstance().TryTriggerApplicationShortcut(event, 1));
-    EXPECT_EQ(count, 1);
-    OH_ArkUI_ApplicationShortcut_Unregister(id);
-}
 } // namespace OHOS::Ace

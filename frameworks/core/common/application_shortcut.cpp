@@ -24,7 +24,7 @@
 namespace OHOS::Ace {
 
 int32_t AceApplicationInfo::RegisterApplicationShortcut(const std::string& value, uint8_t keys,
-    std::function<void(int32_t)>&& onKeyboardShortcutAction, int32_t keyCode)
+    std::function<void(int32_t)>&& onKeyboardShortcutAction)
 {
     std::lock_guard<std::mutex> lock(applicationShortcutMutex_);
     if (applicationShortcutId_ == std::numeric_limits<int32_t>::max()) {
@@ -32,7 +32,7 @@ int32_t AceApplicationInfo::RegisterApplicationShortcut(const std::string& value
     }
     const auto registrationId = ++applicationShortcutId_;
     applicationKeyboardShortcuts_.emplace(registrationId,
-        ApplicationKeyboardShortcut { value, keys, std::move(onKeyboardShortcutAction), keyCode });
+        ApplicationKeyboardShortcut { value, keys, std::move(onKeyboardShortcutAction) });
     return registrationId;
 }
 
@@ -75,19 +75,8 @@ static bool MatchShortcutValue(const KeyEvent& event, const std::string& value)
     auto keyStr = event.ConvertInputCodeToString();
     std::string lowerKey = keyStr;
     std::string lowerValue = value;
-    auto toLower = [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); };
-    std::transform(lowerKey.begin(), lowerKey.end(), lowerKey.begin(), toLower);
-    std::transform(lowerValue.begin(), lowerValue.end(), lowerValue.begin(), toLower);
-    if (lowerValue.empty()) {
-        return false;
-    }
-    if (lowerValue.size() > 1 || event.IsLetterKey()) {
-        return lowerKey == lowerValue;
-    }
-    // Function-key names such as F1 and TAB are not character-key candidates.
-    if (std::any_of(lowerKey.begin(), lowerKey.end(), [](unsigned char ch) { return std::isalpha(ch); })) {
-        return false;
-    }
+    std::transform(lowerKey.begin(), lowerKey.end(), lowerKey.begin(), ::tolower);
+    std::transform(lowerValue.begin(), lowerValue.end(), lowerValue.begin(), ::tolower);
     return lowerKey.find(lowerValue) != std::string::npos;
 }
 
@@ -98,9 +87,7 @@ bool AceApplicationInfo::TryTriggerApplicationShortcut(const KeyEvent& event, in
     {
         std::lock_guard<std::mutex> lock(applicationShortcutMutex_);
         for (const auto& [registrationId, shortcut] : applicationKeyboardShortcuts_) {
-            const bool keyMatches = shortcut.keyCode >= 0 ?
-                static_cast<int32_t>(event.code) == shortcut.keyCode : MatchShortcutValue(event, shortcut.value);
-            if (keyMatches && eventModifiers == shortcut.keys &&
+            if (MatchShortcutValue(event, shortcut.value) && eventModifiers == shortcut.keys &&
                 shortcut.onKeyboardShortcutAction) {
                 callbacks.emplace_back(shortcut.onKeyboardShortcutAction);
             }

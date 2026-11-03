@@ -64,7 +64,6 @@ struct ApplicationKeyboardShortcut {
     std::string value;
     uint8_t keys = 0;
     std::function<void(int32_t)> onKeyboardShortcutAction;
-    int32_t keyCode = -1;
 };
 
 class ACE_FORCE_EXPORT AceApplicationInfo : public NonCopyable {
@@ -333,7 +332,7 @@ public:
     }
 
     int32_t RegisterApplicationShortcut(const std::string& value, uint8_t keys,
-        std::function<void(int32_t)>&& onKeyboardShortcutAction, int32_t keyCode = -1);
+        std::function<void(int32_t)>&& onKeyboardShortcutAction);
 
     void UnregisterApplicationShortcut(int32_t registrationId);
 

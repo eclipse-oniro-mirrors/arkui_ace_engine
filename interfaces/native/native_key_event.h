@@ -1180,6 +1180,8 @@ ArkUI_ContextHandle OH_ArkUI_ApplicationShortcutCallbackInfo_GetUIContext(
 
 /**
  * @brief Registers an application-level keyboard shortcut. The shortcut takes effect globally in the application.
+ * Function-key registration follows the existing key matching capability: Esc, F1-F12, Tab, arrow keys and Space.
+ * Other function-key enum values are not supported by this registration implementation.
  * A matching component-level shortcut is triggered before the application-level shortcut.
  *
  * Each registration generates a positive integer registration ID unique within the application, even when the
