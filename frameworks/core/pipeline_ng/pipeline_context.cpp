@@ -7469,9 +7469,7 @@ bool PipelineContext::ProcessOverlayChildrenDumpInfo(const RefPtr<FrameNode>& ro
                 continue;
             }
             auto eachOverlayContent = JsonUtil::CreateSharedPtrJson();
-#ifndef CROSS_PLATFORM
             child->DumpSimplifyTreeWithParamConfig(0, eachOverlayContent, true, config, nullptr, rootNodeFinalOpacity);
-#endif
             if (config.collectionState && config.collectionState->GetError()) {
                 return hasOverlay;
             }
@@ -7560,9 +7558,7 @@ void PipelineContext::GetOverlayInspector(std::shared_ptr<JsonValue>& root, RefP
     for (auto& containerId : subContainerIds) {
         auto container = Container::GetContainer(containerId);
         CHECK_NULL_VOID(container);
-#ifndef CROSS_PLATFORM
         container->DumpSimplifyTreeWithParamConfig(root, config, true);
-#endif
     }
 }
 
@@ -7596,9 +7592,7 @@ void PipelineContext::DumpSimplifyTreeJsonFromTopNavNode(std::shared_ptr<JsonVal
             }
         }
         auto navNodeJson = JsonUtil::CreateSharedPtrJson();
-#ifndef CROSS_PLATFORM
         navNode->DumpSimplifyTreeWithParamConfig(0, navNodeJson, true, config, nullptr, navNodeParentFinalOpacity);
-#endif
         if (!navNodeJson->Contains("$type")) {
             continue;
         }
@@ -7650,10 +7644,8 @@ void PipelineContext::DumpVisibleInspectorTree(std::shared_ptr<JsonValue>& rootJ
                 LessNotEqual(titleRowParentFinalOpacity * GetNodeOpacityValue(titleRow), config.minOpacity);
         }
         if (titleRow && !titleRowBelowMinOpacity) {
-#ifndef CROSS_PLATFORM
             titleRow->DumpSimplifyTreeWithParamConfig(
                 0, containerModalTitleJson, true, config, nullptr, titleRowParentFinalOpacity);
-#endif
         }
         pseudoRootJson = JsonUtil::CreateSharedPtrJson();
         // ContainerModal uses the inner stack as its main dump root. Keep the
@@ -7692,10 +7684,8 @@ void PipelineContext::DumpVisibleInspectorTree(std::shared_ptr<JsonValue>& rootJ
                         config.minOpacity);
             }
             if (atomicServiceMenuBar && !atomicServiceMenuBarBelowMinOpacity) {
-#ifndef CROSS_PLATFORM
                 atomicServiceMenuBar->DumpSimplifyTreeWithParamConfig(
                     0, atomicMenuBarJson, true, config, nullptr, menuBarParentFinalOpacity);
-#endif
                 if (HasDumpedJsonContent(atomicMenuBarJson)) {
                     AddJsonChild(atomicRootJson, atomicMenuBarJson, config);
                 }
@@ -7755,9 +7745,7 @@ void PipelineContext::CollectInspectorTreeInto(
     if (onlyNeedVisible) {
         DumpVisibleInspectorTree(root, config);
     } else {
-#ifndef CROSS_PLATFORM
         rootNode_->DumpSimplifyTreeWithParamConfig(0, root, false, config);
-#endif
     }
 }
 
