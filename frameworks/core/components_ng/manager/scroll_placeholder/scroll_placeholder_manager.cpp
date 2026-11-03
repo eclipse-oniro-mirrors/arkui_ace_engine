@@ -607,6 +607,14 @@ void ScrollPlaceholderManager::FlushRealBuild(int64_t deadlineNs)
         RequestFrameIfAlive();
     }
     pendingRealBuilds_ = std::move(requeued);
+    // Post-flush drain: hosts use this to retire stale placeholder shells at
+    // frame cadence; runs after the iteration above, so cancel/retire paths
+    // touching the (already swapped) task queue are safe.
+    for (auto& [hostNodeId, callback] : postFlushCallbacks_) {
+        if (callback) {
+            callback();
+        }
+    }
 }
 
 bool ScrollPlaceholderManager::HasPendingRealBuild() const
@@ -651,6 +659,18 @@ bool ScrollPlaceholderManager::CancelRealBuildTask(int32_t hostNodeId, int32_t i
         }
     }
     return false;
+}
+
+void ScrollPlaceholderManager::SetPostFlushCallback(int32_t hostNodeId, std::function<void()> callback)
+{
+    if (callback) {
+        postFlushCallbacks_[hostNodeId] = std::move(callback);
+    }
+}
+
+void ScrollPlaceholderManager::ClearPostFlushCallback(int32_t hostNodeId)
+{
+    postFlushCallbacks_.erase(hostNodeId);
 }
 
 void ScrollPlaceholderManager::SetHostVisibleRange(int32_t hostNodeId, int32_t start, int32_t end)

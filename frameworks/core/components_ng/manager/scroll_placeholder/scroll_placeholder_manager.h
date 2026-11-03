@@ -133,7 +133,13 @@ public:
     // Scroll-position hygiene: adapters report the visible window (their layout's reported
     // start/end indices) on scroll-index changes. Used to re-band the queue at flush time
     // (visible-first) so a storm backlog drains viewport-first instead of in enqueue order.
-    void SetHostVisibleRange(int32_t hostNodeId, int32_t start, int32_t end);
+    void SetHostVisibleRange(int32_t hostId, int32_t start, int32_t end);
+    // Post-flush hook: the host pattern registers a callback that runs once
+    // after each FlushRealBuild iteration completes (outside the task loop,
+    // so queue mutations are safe). Used to drain stale placeholder shells
+    // at frame cadence during a load-heavy decay.
+    void SetPostFlushCallback(int32_t hostId, std::function<void()> callback);
+    void ClearPostFlushCallback(int32_t hostId);
 
     // Lifecycle.
     void Destroy();
@@ -273,6 +279,7 @@ private:
     ScrollPlaceholderCostModel costModel_;
     ScrollPlaceholderTemplateRegistry registry_;
     std::deque<RealBuildTask> pendingRealBuilds_;
+    std::unordered_map<int32_t, std::function<void()>> postFlushCallbacks_;
     // Max forced (starvation-escape) commits inside ONE FlushRealBuild invocation. Without
     // this bound a storm backlog ages past the escape threshold wholesale and one flush
     // turns into an unbounded UI-thread drain: minutes pinned, no frame in between.
