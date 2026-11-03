@@ -613,6 +613,7 @@ class UIContext {
         if (shortcut) {
             return shortcut.registerApplicationShortcut(value, keys, callback);
         }
+        return undefined;
     }
 
     static unregisterApplicationShortcut(registrationId) {
