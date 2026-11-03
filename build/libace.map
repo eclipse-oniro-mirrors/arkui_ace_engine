@@ -5771,6 +5771,8 @@
       vtable?for?OHOS::Ace::ScrollPositionController;
       vtable?for?OHOS::Ace::ScrollSpringEffect;
       vtable?for?OHOS::Ace::SequencedRecognizer;
+      vtable?for?OHOS::Ace::SimpleSpringAdapter;
+      vtable?for?OHOS::Ace::SpringAdapter;
       vtable?for?OHOS::Ace::SlidingPanelSizeChangeEvent;
       vtable?for?OHOS::Ace::SoleChildElement;
       vtable?for?OHOS::Ace::StackElement;
