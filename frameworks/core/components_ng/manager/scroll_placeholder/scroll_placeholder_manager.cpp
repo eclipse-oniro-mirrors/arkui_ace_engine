@@ -628,7 +628,7 @@ void ScrollPlaceholderManager::Destroy()
             .fetch_add(dropped, std::memory_order_relaxed);
     }
     registry_.Clear();
-    TAG_LOGI(AceLogTag::ACE_SCROLL,
+    TAG_LOGD(AceLogTag::ACE_SCROLL,
         "ScrollPlaceholderManager destroyed, instanceId=%{public}d, dropped pending tasks=%{public}zu", instanceId_,
         dropped);
 }
@@ -773,7 +773,7 @@ void ScrollPlaceholderManager::CloseObservationFrame(int64_t vsyncTimestampNs)
             static_cast<ScrollPlaceholderComponentType>(i), std::string());
         // One summary per frame and container type: measured average item cost plus what the
         // load prediction would have suggested (build now vs defer to placeholder) this frame.
-        TAG_LOGI(AceLogTag::ACE_SCROLL,
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
             "ScrollPH frame summary: component=%{public}d realBuilt=%{public}u avgCostUs=%{public}" PRId64
             " maxCostUs=%{public}" PRId64 " estimateUs=%{public}" PRId64 " suggestReal=%{public}u "
             "suggestPlaceholder=%{public}u remainingBudgetUs=%{public}" PRId64 " vsync=%{public}" PRId64,
