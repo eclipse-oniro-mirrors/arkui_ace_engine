@@ -15,6 +15,7 @@
 
 #include "core/components_ng/gestures/recognizers/swipe_recognizer.h"
 
+#include "base/log/log_wrapper_without_instance.h"
 #include "core/common/reporter/reporter.h"
 #include "core/components_ng/base/observer_handler.h"
 #include "core/components_ng/event/event_constants.h"
@@ -70,7 +71,7 @@ void SwipeRecognizer::OnAccepted()
     firstInputTime_.reset();
 
     auto node = GetAttachedNode().Upgrade();
-    TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW, "SWIPE RACC, T: %{public}s",
+    TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW, "SWIPE RACC, T: %{public}s",
         node ? node->GetTag().c_str() : "null");
     auto lastRefereeState = refereeState_;
     LogStateChange(refereeState_, RefereeState::SUCCEED, StateChangeReason::SWIPE_SPEED_REACHED);

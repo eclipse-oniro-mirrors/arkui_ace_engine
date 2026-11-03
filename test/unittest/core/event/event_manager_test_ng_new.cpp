@@ -17,6 +17,9 @@
 #include "core/common/event_manager.h"
 
 #include "core/components_ng/gestures/recognizers/click_recognizer.h"
+#include "core/components_ng/gestures/recognizers/long_press_recognizer.h"
+#include "core/components_ng/gestures/recognizers/pinch_recognizer.h"
+#include "core/components_ng/gestures/recognizers/rotation_recognizer.h"
 #include "core/components_ng/gestures/recognizers/sequenced_recognizer.h"
 #include "core/components_ng/manager/gesture/active_recognizer_manager.h"
 
@@ -506,7 +509,7 @@ HWTEST_F(EventManagerTestNg, EventManagerTest045, TestSize.Level1)
 
 /**
  * @tc.name: EventManagerTest046
- * @tc.desc: Test LogTouchTestResultRecognizers function.
+ * @tc.desc: Test GetTouchTestResultRecognizers function.
  * @tc.type: FUNC
  */
 HWTEST_F(EventManagerTestNg, EventManagerTest046, TestSize.Level1)
@@ -519,8 +522,8 @@ HWTEST_F(EventManagerTestNg, EventManagerTest046, TestSize.Level1)
     ASSERT_NE(eventManager, nullptr);
 
     /**
-     * @tc.steps: step2. Call LogTouchTestResultRecognizers.
-     * @tc.expected: ret is false.
+     * @tc.steps: step2. Collect recognizer information from empty and populated results.
+     * @tc.expected: Empty results return no information, populated results include recognizer types.
      */
     TouchEvent event;
     event.type = TouchType::DOWN;
@@ -541,7 +544,14 @@ HWTEST_F(EventManagerTestNg, EventManagerTest046, TestSize.Level1)
     auto clickRecognizer = AceType::MakeRefPtr<ClickRecognizer>();
     hitTestResult.emplace_back(clickRecognizer);
 
-    eventManager->LogTouchTestResultRecognizers(hitTestResult, 1);
+    EXPECT_TRUE(eventManager->GetTouchTestResultRecognizers({}).empty());
+    hitTestResult.emplace_back(AceType::MakeRefPtr<LongPressRecognizer>(500, 1, false));
+    hitTestResult.emplace_back(AceType::MakeRefPtr<PinchRecognizer>(2, 5.0));
+    hitTestResult.emplace_back(AceType::MakeRefPtr<RotationRecognizer>(2, 15.0));
+    hitTestResult.emplace_back(
+        AceType::MakeRefPtr<SwipeRecognizer>(1, SwipeDirection { SwipeDirection::HORIZONTAL }, 100.0));
+    auto recognizerInfo = eventManager->GetTouchTestResultRecognizers(hitTestResult);
+    EXPECT_EQ(recognizerInfo, "TTHRTI:1:;2:;3:;4:;5:;6:;");
     EXPECT_FALSE(panHorizontal1->isFlushTouchEventsEnd_);
 }
 

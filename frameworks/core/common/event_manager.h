@@ -516,10 +516,9 @@ private:
     void CleanRefereeBeforeTouchTest(TouchEvent touchPoint, bool needAppend);
     void CleanRefereeBeforeTouchTestForPost(
         TouchEvent touchPoint, const RefPtr<NG::GestureReferee>& currentReferee);
-    void LogTouchTestResultInfo(const TouchEvent& touchPoint, const RefPtr<NG::FrameNode>& frameNode,
-        TouchRestrict& touchRestrict, const Offset& offset = Offset(),
-        float viewScale = 1.0f, bool needAppend = false);
-    void LogTouchTestResultRecognizers(const TouchTestResult& result, int32_t touchEventId);
+    std::string GetTouchTestResultInfo(const TouchEvent& touchPoint, const RefPtr<NG::FrameNode>& frameNode);
+    std::string GetTouchTestResultRecognizers(const TouchTestResult& result);
+    void LogTouchTestResult(int32_t touchEventId, const std::string& nodeInfo, const std::string& recognizerInfo);
     void LogTouchTestRecognizerStates(int32_t touchEventId);
     void CheckRefereeStateAndReTouchTest(const TouchEvent& touchPoint, const RefPtr<NG::FrameNode>& frameNode,
         TouchRestrict& touchRestrict, const Offset& offset = Offset(),

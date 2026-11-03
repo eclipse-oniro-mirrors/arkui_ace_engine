@@ -15,6 +15,7 @@
 
 #include "core/common/event_manager.h"
 
+#include "base/log/log_wrapper_without_instance.h"
 #include "base/mousestyle/mouse_style.h"
 #include "base/input_manager/input_manager.h"
 #include "base/log/dump_log.h"
@@ -58,6 +59,67 @@ constexpr int32_t MIN_PARAM_SIZE = 1;
 constexpr int32_t COUNT_PARAM_SIZE = 3;
 constexpr int32_t EVENT_HANDLE = 100000;
 constexpr int32_t POST_ONCE = 1;
+
+namespace {
+const std::string& GetInputLogNodeTag(const std::string& tag)
+{
+    static const std::unordered_map<std::string, std::string> TAG_ABBREVIATIONS = {
+        { V2::STACK_ETS_TAG, "S" }, { V2::COLUMN_ETS_TAG, "C" }, { V2::ROW_ETS_TAG, "R" },
+        { V2::FLEX_ETS_TAG, "F" }, { V2::TEXT_ETS_TAG, "T" }, { V2::IMAGE_ETS_TAG, "I" },
+        { V2::BUTTON_ETS_TAG, "B" }, { V2::LIST_ETS_TAG, "L" }, { V2::LIST_ITEM_ETS_TAG, "LI" },
+        { V2::GRID_ETS_TAG, "G" }, { V2::GRID_ITEM_ETS_TAG, "GI" }, { V2::SCROLL_ETS_TAG, "Sc" },
+        { V2::SWIPER_ETS_TAG, "Sw" }, { V2::RELATIVE_CONTAINER_ETS_TAG, "RC" }, { V2::PAGE_ETS_TAG, "P" },
+    };
+    auto iter = TAG_ABBREVIATIONS.find(tag);
+    return iter == TAG_ABBREVIATIONS.end() ? tag : iter->second;
+}
+
+const std::string& GetInputLogRecognizerCode(const std::string& type)
+{
+    static const std::unordered_map<std::string, std::string> RECOGNIZER_CODES = {
+        { "ClickRecognizer", "1" }, { "LongPressRecognizer", "2" }, { "PanRecognizer", "3" },
+        { "PinchRecognizer", "4" }, { "RotationRecognizer", "5" }, { "SwipeRecognizer", "6" },
+    };
+    auto iter = RECOGNIZER_CODES.find(type);
+    return iter == RECOGNIZER_CODES.end() ? type : iter->second;
+}
+
+std::string BuildInputLogRecognizerInfo(
+    const std::map<std::string, std::list<NG::TouchTestResultInfo>>& hittedRecognizerInfo)
+{
+    std::string resultInfo = "TTHRTI:";
+    for (const auto& item : hittedRecognizerInfo) {
+        resultInfo.append(GetInputLogRecognizerCode(item.first)).append(":");
+        bool firstNode = true;
+        for (const auto& nodeInfo : item.second) {
+            if (!firstNode) {
+                resultInfo.append(",");
+            }
+            resultInfo.append(GetInputLogNodeTag(nodeInfo.tag));
+            firstNode = false;
+        }
+        resultInfo.append(";");
+    }
+    return resultInfo;
+}
+
+void AppendInputLogStateHistory(std::string& log, const std::list<StateRecord>& stateHistory)
+{
+    for (const auto& state : stateHistory) {
+        if (state.procedure.find("Down") != std::string::npos) {
+            log += ", prcd: D";
+        } else if (state.procedure.find("Move") != std::string::npos) {
+            log += ", prcd: M";
+        } else {
+            log += ", prcd: U";
+        }
+        log += ", state: " + state.state;
+        if (state.extraInfo != "") {
+            log += ", extraInfo: " + state.extraInfo;
+        }
+    }
+}
+} // namespace
 
 std::function<Offset()> CreateCurrentLocalLocationGetter(const Offset& globalOffset, const Offset& localOffset,
     const WeakPtr<NG::FrameNode>& weakNode, bool needPostEvent, int32_t postEventNodeId)
@@ -198,8 +260,9 @@ void EventManager::ProcessTouchTestWithReferee(const TouchEvent& touchPoint, con
     touchTestResults_[touchPoint.id] = std::move(hitTestResult);
 
     CheckRefereeStateAndReTouchTest(touchPoint, frameNode, touchRestrict, offset, viewScale, needAppend);
-    LogTouchTestResultInfo(touchPoint, frameNode, touchRestrict, offset, viewScale, needAppend);
-    LogTouchTestResultRecognizers(touchTestResults_[touchPoint.id], touchPoint.touchEventId);
+    auto nodeInfo = GetTouchTestResultInfo(touchPoint, frameNode);
+    auto recognizerInfo = GetTouchTestResultRecognizers(touchTestResults_[touchPoint.id]);
+    LogTouchTestResult(touchPoint.touchEventId, nodeInfo, recognizerInfo);
     if (eventHandleId / EVENT_HANDLE > 0) {
         currentReferee->UpdateGestureReferee(touchPoint.id);
     }
@@ -333,11 +396,11 @@ void EventManager::CleanRefereeBeforeTouchTest(TouchEvent touchPoint, bool needA
     }
 }
 
-void EventManager::LogTouchTestResultInfo(const TouchEvent& touchPoint, const RefPtr<NG::FrameNode>& frameNode,
-    TouchRestrict& touchRestrict, const Offset& offset, float viewScale, bool needAppend)
+std::string EventManager::GetTouchTestResultInfo(
+    const TouchEvent& touchPoint, [[maybe_unused]] const RefPtr<NG::FrameNode>& frameNode)
 {
     auto container = Container::Current();
-    CHECK_NULL_VOID(container);
+    CHECK_NULL_RETURN(container, "");
     std::map<int32_t, NG::TouchTestResultInfo> touchTestResultInfo;
     for (const auto& item : touchTestResults_[touchPoint.id]) {
         auto node = item->GetAttachedNode().Upgrade();
@@ -354,7 +417,7 @@ void EventManager::LogTouchTestResultInfo(const TouchEvent& touchPoint, const Re
     }
     std::string resultInfo = std::string("fId: ").append(std::to_string(touchPoint.id));
     for (const auto& item : touchTestResultInfo) {
-        resultInfo.append("{ ").append("T: ").append(item.second.tag);
+        resultInfo.append("{ ").append("T: ").append(GetInputLogNodeTag(item.second.tag));
 #ifndef IS_RELEASE_VERSION
         resultInfo.append(", iId: ")
             .append(item.second.inspectorId)
@@ -363,10 +426,8 @@ void EventManager::LogTouchTestResultInfo(const TouchEvent& touchPoint, const Re
 #endif
         resultInfo.append(", D: ").append(std::to_string(item.second.depth)).append(" };");
     }
-    TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW, "ITK Id:%{public}d, TTHNI:%{public}s",
-        touchPoint.touchEventId, resultInfo.c_str());
     if (touchTestResultInfo.empty()) {
-        TAG_LOGW(AceLogTag::ACE_INPUTKEYFLOW, "Touch test result is empty.");
+        TAG_LOGW_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW, "Touch test result is empty.");
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING
         std::list<std::pair<int32_t, std::string>> dumpList;
         eventTree_.Dump(dumpList, 0, DUMP_START_NUMBER);
@@ -383,7 +444,9 @@ void EventManager::LogTouchTestResultInfo(const TouchEvent& touchPoint, const Re
         }
         RecordHitEmptyMessage(touchPoint, resultInfo, frameNode);
 #endif
+        return "";
     }
+    return std::string("TTHNI:").append(resultInfo);
 }
 
 void EventManager::CheckRefereeStateAndReTouchTest(const TouchEvent& touchPoint, const RefPtr<NG::FrameNode>& frameNode,
@@ -486,7 +549,7 @@ void EventManager::RecordHitEmptyMessage(
 }
 #endif
 
-void EventManager::LogTouchTestResultRecognizers(const TouchTestResult& result, int32_t touchEventId)
+std::string EventManager::GetTouchTestResultRecognizers(const TouchTestResult& result)
 {
     std::map<std::string, std::list<NG::TouchTestResultInfo>> hittedRecognizerInfo;
     for (const auto& item : result) {
@@ -509,20 +572,9 @@ void EventManager::LogTouchTestResultRecognizers(const TouchTestResult& result, 
             group->AddHittedRecognizerType(hittedRecognizerInfo);
         }
     }
-    std::string hittedRecognizerTypeInfo = std::string("ITK Id:");
-    hittedRecognizerTypeInfo.append(std::to_string(touchEventId)).append(", TTHRTI: ");
-    for (const auto& item : hittedRecognizerInfo) {
-        hittedRecognizerTypeInfo.append("T ").append(item.first).append(" info:");
-        for (const auto& nodeInfo : item.second) {
-            hittedRecognizerTypeInfo.append(" { ").append("T: ").append(nodeInfo.tag);
-#ifndef IS_RELEASE_VERSION
-            hittedRecognizerTypeInfo.append(", iId: ").append(nodeInfo.inspectorId);
-#endif
-            hittedRecognizerTypeInfo.append(" };");
-        }
-    }
-    TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW, "%{public}s", hittedRecognizerTypeInfo.c_str());
-    if (hittedRecognizerInfo.empty() && !SystemProperties::GetAceCommercialLogEnabled()) {
+    if (!hittedRecognizerInfo.empty()) {
+        return BuildInputLogRecognizerInfo(hittedRecognizerInfo);
+    } else if (!SystemProperties::GetAceCommercialLogEnabled()) {
         TAG_LOGI(AceLogTag::ACE_INPUTTRACKING, "Hitted recognizer info is empty.");
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING
         std::list<std::pair<int32_t, std::string>> dumpList;
@@ -532,6 +584,24 @@ void EventManager::LogTouchTestResultRecognizers(const TouchTestResult& result, 
         }
 #endif
     }
+    return "";
+}
+
+void EventManager::LogTouchTestResult(
+    int32_t touchEventId, const std::string& nodeInfo, const std::string& recognizerInfo)
+{
+    if (nodeInfo.empty() && recognizerInfo.empty()) {
+        return;
+    }
+    std::string resultInfo = nodeInfo;
+    if (!recognizerInfo.empty()) {
+        if (!resultInfo.empty()) {
+            resultInfo.append(", ");
+        }
+        resultInfo.append(recognizerInfo);
+    }
+    TAG_LOGI_WITHOUT_INSTANCE(
+        AceLogTag::ACE_INPUTKEYFLOW, "ITK ID:%{public}d, %{public}s", touchEventId, resultInfo.c_str());
 }
 
 bool EventManager::PostEventTouchTest(
@@ -550,7 +620,7 @@ bool EventManager::PostEventTouchTest(
             postEventRefereeNG_->CleanAll();
         }
     }
-    TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW, "ITK Post Id:%{public}d, fId:%{public}d, T:%{public}d",
+    TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW, "ITK Post Id:%{public}d, fId:%{public}d, T:%{public}d",
         touchPoint.touchEventId, touchPoint.id, (int)touchPoint.type);
     onTouchTestDoneFrameNodeList_.clear();
     ResponseLinkResult responseLinkResult;
@@ -573,7 +643,8 @@ bool EventManager::PostEventTouchTest(
     }
     ExecuteTouchTestDoneCallback(touchPoint, responseLinkResult);
     auto result = !hitTestResult.empty();
-    LogTouchTestResultRecognizers(hitTestResult, touchPoint.touchEventId);
+    auto recognizerInfo = GetTouchTestResultRecognizers(hitTestResult);
+    LogTouchTestResult(touchPoint.touchEventId, "", recognizerInfo);
     postEventTouchTestResults_[touchPoint.id] = std::move(hitTestResult);
     return result;
 }
@@ -615,7 +686,8 @@ void EventManager::TouchTest(
     SetResponseLinkRecognizers(hitTestResult, responseLinkResult, event.passThrough);
     ExecuteTouchTestDoneCallback(event, responseLinkResult);
     axisTouchTestResults_[event.id] = std::move(hitTestResult);
-    LogTouchTestResultRecognizers(axisTouchTestResults_[event.id], event.touchEventId);
+    auto recognizerInfo = GetTouchTestResultRecognizers(axisTouchTestResults_[event.id]);
+    LogTouchTestResult(event.touchEventId, "", recognizerInfo);
 }
 
 RefPtr<NG::GestureReferee> EventManager::GetCurrentReferee(bool isNewReferee, int32_t eventHandleId)
@@ -1205,7 +1277,7 @@ void EventManager::AddDumpTouchInfo(const TouchEvent& event)
     if (touchTimingCallback_ && !event.isFalsified && event.sourceTool == SourceTool::FINGER) {
         auto callback = touchTimingCallback_;
         auto time = std::chrono::high_resolution_clock::now();
-        TAG_LOGD(AceLogTag::ACE_INPUTKEYFLOW,
+        TAG_LOGD_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW,
             "touchTimingCallback:%{public}d/%{public}d sensorTime:%{public}s receiveTime:%{public}s "
             "dispatchTime:%{public}s", static_cast<int32_t>(event.type), static_cast<int32_t>(event.history.size()),
             std::to_string(event.sensorTime.time_since_epoch().count()).c_str(),
@@ -1455,24 +1527,12 @@ void EventManager::LogTouchTestRecognizerStates(int32_t touchEventId)
         }
 #endif
 
-        auto stateHistorys = gestureSnapshot->stateHistory;
-        for (auto stateHistory : stateHistorys) {
-            if (stateHistory.procedure.find("Down") != std::string::npos) {
-                gestureLog += ", prcd: D";
-            } else if (stateHistory.procedure.find("Move") != std::string::npos) {
-                gestureLog += ", prcd: M";
-            } else {
-                gestureLog += ", prcd: U";
-            }
-            gestureLog += ", state: " + stateHistory.state;
-            if (stateHistory.extraInfo != "") {
-                gestureLog += ", extraInfo: " + stateHistory.extraInfo;
-            }
-        }
+        AppendInputLogStateHistory(gestureLog, gestureSnapshot->stateHistory);
         gestureLog += "}";
         log += gestureLog;
     }
-    TAG_LOGD(AceLogTag::ACE_INPUTKEYFLOW, "id: %{public}d, log: %{public}s", touchEventId, log.c_str());
+    TAG_LOGD_WITHOUT_INSTANCE(
+        AceLogTag::ACE_INPUTKEYFLOW, "id: %{public}d, log: %{public}s", touchEventId, log.c_str());
 }
 
 void EventManager::DispatchTouchEventAndCheck(const TouchEvent& event, bool sendOnTouch)
@@ -2860,7 +2920,7 @@ void EventManager::CheckAndLogLastReceivedEventInfo(int32_t eventId, bool logImm
 {
     if (logImmediately) {
         if (SystemProperties::GetDebugEnabled()) {
-            TAG_LOGD(AceLogTag::ACE_INPUTKEYFLOW,
+            TAG_LOGD_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW,
                 "Received new event id=%{public}d in ace_container, lastEventInfo: id:%{public}d", eventId,
                 lastReceivedEvent_.eventId);
         }
@@ -2871,7 +2931,7 @@ void EventManager::CheckAndLogLastReceivedEventInfo(int32_t eventId, bool logImm
     if (lastReceivedEvent_.lastLogTimeStamp != 0 &&
         (currentTime - lastReceivedEvent_.lastLogTimeStamp) > EVENT_CLEAR_DURATION * TRANSLATE_NS_TO_MS) {
         if (SystemProperties::GetDebugEnabled()) {
-            TAG_LOGD(AceLogTag::ACE_INPUTKEYFLOW,
+            TAG_LOGD_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW,
                 "Received new event id=%{public}d has been more than a second since the last one event "
                 "received "
                 "in ace_container, lastEventInfo: id:%{public}d",
