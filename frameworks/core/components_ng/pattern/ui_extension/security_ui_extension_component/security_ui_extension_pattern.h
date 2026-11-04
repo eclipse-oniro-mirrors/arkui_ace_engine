@@ -180,13 +180,12 @@ public:
     std::string GetBrandColorStr() const;
     bool OnThemeScopeUpdate(int32_t themeScopeId) override;
     std::string ResolveBrandColor(int32_t themeScopeId) const;
+    // Called after brand color is successfully sent to UEA (via Want or BusinessData).
+    // Updates both brandColorStr_ (current cache) and lastSentBrandColorStr_ (dedup record).
     void SetLastSentBrandColorStr(const std::string& brandColorStr)
     {
-        lastSentBrandColorStr_ = brandColorStr;
-    }
-    void SetBrandColorStr(const std::string& brandColorStr)
-    {
         brandColorStr_ = brandColorStr;
+        lastSentBrandColorStr_ = brandColorStr;
     }
 
 protected:

@@ -393,7 +393,6 @@ void SecuritySessionWrapperImpl::CreateSession(const AAFwk::Want& want, const Se
     setConnectToRender();
     session_ = Rosen::ExtensionSessionManager::GetInstance().RequestExtensionSession(extensionSessionInfo);
     CHECK_NULL_VOID(session_);
-    pattern->SetBrandColorStr(brandColorStr);
     pattern->SetLastSentBrandColorStr(brandColorStr);
     lifecycleListener_ = std::make_shared<SecurityUIExtensionLifecycleListener>(
         AceType::WeakClaim(this));

@@ -748,7 +748,6 @@ void SessionWrapperImpl::CreateSession(const AAFwk::Want& want, const SessionCon
     auto session = Rosen::ExtensionSessionManager::GetInstance().RequestExtensionSession(extensionSessionInfo);
     CHECK_NULL_VOID(session);
     SetSession(session);
-    pattern->SetBrandColorStr(brandColorStr);
     pattern->SetLastSentBrandColorStr(brandColorStr);
     UpdateSessionConfig();
     lifecycleListener_ = std::make_shared<UIExtensionLifecycleListener>(AceType::WeakClaim(this));
