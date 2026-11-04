@@ -148,6 +148,9 @@ ohos_shared_library("arkoala_native_ani") {
   }
   configs = [ "$ace_root:ace_config" ]
   defines = []
+  if (enable_drag_framework && !build_ohos_sdk) {
+    defines += [ "ENABLE_DRAG_FRAMEWORK" ]
+  }
   if (pixel_map_support) {
     defines += [ "PIXEL_MAP_SUPPORTED" ]
   }
