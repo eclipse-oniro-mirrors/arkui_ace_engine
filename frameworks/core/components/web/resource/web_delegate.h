@@ -1259,7 +1259,6 @@ public:
     void UpdateSupportZoom(const bool& isZoomAccessEnabled);
     void UpdateZoomControlAccess(bool zoomControlAccess);
     void UpdateDomStorageEnabled(const bool& isDomStorageAccessEnabled);
-    void UpdateVisitedLinkPersistEnabled(const bool& enabled);
     void UpdateGeolocationEnabled(const bool& isGeolocationAccessEnabled);
     void UpdateCacheMode(const WebCacheMode& mode);
     std::shared_ptr<OHOS::NWeb::NWeb> GetNweb();
@@ -1470,6 +1469,7 @@ public:
     void OnResourceLoad(const std::string& url);
     void OnScaleChange(float oldScaleFactor, float newScaleFactor);
     void OnZoomChange(double oldZoomFactor, double newZoomFactor);
+    void UpdateVisitedLinkPersistEnabled(const bool& enabled);
     void OnScroll(double xOffset, double yOffset);
     bool LoadDataWithRichText();
     void OnSearchResultReceive(int activeMatchOrdinal, int numberOfMatches, bool isDoneCounting);

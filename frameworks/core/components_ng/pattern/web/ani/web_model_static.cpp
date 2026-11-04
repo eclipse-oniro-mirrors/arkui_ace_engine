@@ -1092,6 +1092,14 @@ void WebModelStatic::SetZoomChangeId(FrameNode* frameNode, std::function<void(co
     webEventHub->SetOnZoomChangeEvent(std::move(uiCallback));
 }
 
+void WebModelStatic::SetVisitedLinkPersistEnabled(FrameNode* frameNode, bool enabled)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPatternStatic = AceType::DynamicCast<WebPatternStatic>(frameNode->GetPattern());
+    CHECK_NULL_VOID(webPatternStatic);
+    webPatternStatic->UpdateVisitedLinkPersistEnabled(enabled);
+}
+
 void WebModelStatic::SetOnHttpAuthRequest(
     FrameNode* frameNode, std::function<bool(const BaseEventInfo* info)>&& callback)
 {
@@ -1697,14 +1705,6 @@ void WebModelStatic::SetDomStorageAccessEnabled(FrameNode* frameNode, bool isDom
     auto webPatternStatic = AceType::DynamicCast<WebPatternStatic>(frameNode->GetPattern());
     CHECK_NULL_VOID(webPatternStatic);
     webPatternStatic->UpdateDomStorageAccessEnabled(isDomStorageAccessEnabled);
-}
-
-void WebModelStatic::SetVisitedLinkPersistEnabled(FrameNode* frameNode, bool enabled)
-{
-    CHECK_NULL_VOID(frameNode);
-    auto webPatternStatic = AceType::DynamicCast<WebPatternStatic>(frameNode->GetPattern());
-    CHECK_NULL_VOID(webPatternStatic);
-    webPatternStatic->UpdateVisitedLinkPersistEnabled(enabled);
 }
 
 void WebModelStatic::SetZoomAccessEnabled(FrameNode* frameNode, bool isZoomAccessEnabled)

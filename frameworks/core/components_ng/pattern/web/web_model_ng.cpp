@@ -547,13 +547,6 @@ void WebModelNG::SetDomStorageAccessEnabled(bool isDomStorageAccessEnabled)
     webPattern->UpdateDomStorageAccessEnabled(isDomStorageAccessEnabled);
 }
 
-void WebModelNG::SetVisitedLinkPersistEnabled(bool enabled)
-{
-    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
-    CHECK_NULL_VOID(webPattern);
-    webPattern->UpdateVisitedLinkPersistEnabled(enabled);
-}
-
 void WebModelNG::SetImageAccessEnabled(bool isImageAccessEnabled)
 {
     auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
@@ -756,6 +749,13 @@ void WebModelNG::SetZoomChangeId(std::function<void(const BaseEventInfo* info)>&
     auto webEventHub = ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>();
     CHECK_NULL_VOID(webEventHub);
     webEventHub->SetOnZoomChangeEvent(std::move(uiCallback));
+}
+
+void WebModelNG::SetVisitedLinkPersistEnabled(bool enabled)
+{
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->UpdateVisitedLinkPersistEnabled(enabled);
 }
 
 void WebModelNG::SetScrollId(std::function<void(const BaseEventInfo* info)>&& jsCallback)
@@ -1672,14 +1672,6 @@ void WebModelNG::SetDomStorageAccessEnabled(FrameNode* frameNode, bool isDomStor
     webPattern->UpdateDomStorageAccessEnabled(isDomStorageAccessEnabled);
 }
 
-void WebModelNG::SetVisitedLinkPersistEnabled(FrameNode* frameNode, bool enabled)
-{
-    CHECK_NULL_VOID(frameNode);
-    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
-    CHECK_NULL_VOID(webPattern);
-    webPattern->UpdateVisitedLinkPersistEnabled(enabled);
-}
-
 void WebModelNG::SetMixedMode(FrameNode* frameNode, MixedModeContent mixedContentMode)
 {
     CHECK_NULL_VOID(frameNode);
@@ -1807,6 +1799,14 @@ void WebModelNG::SetOnZoomChange(FrameNode* frameNode, std::function<void(const 
         func(info.get());
     };
     webEventHub->SetOnZoomChangeEvent(std::move(uiCallback));
+}
+
+void WebModelNG::SetVisitedLinkPersistEnabled(FrameNode* frameNode, bool enabled)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->UpdateVisitedLinkPersistEnabled(enabled);
 }
 
 void WebModelNG::SetOnRequestFocus(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& jsCallback)

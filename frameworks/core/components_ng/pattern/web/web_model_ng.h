@@ -105,7 +105,6 @@ public:
     void SetFileAccessEnabled(bool isFileAccessEnabled) override;
     void SetOnLineImageAccessEnabled(bool isOnLineImageAccessEnabled) override;
     void SetDomStorageAccessEnabled(bool isDomStorageAccessEnabled) override;
-    void SetVisitedLinkPersistEnabled(bool enabled) override;
     void SetImageAccessEnabled(bool isImageAccessEnabled) override;
     void SetMixedMode(MixedModeContent mixedMode) override;
     void SetZoomAccessEnabled(bool isZoomAccessEnabled) override;
@@ -128,6 +127,7 @@ public:
     void SetResourceLoadId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
     void SetScaleChangeId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
     void SetZoomChangeId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
+    void SetVisitedLinkPersistEnabled(bool enabled) override;
     void SetScrollId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
     void SetPermissionRequestEventId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
     void SetScreenCaptureRequestEventId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
@@ -298,7 +298,6 @@ public:
     static void SetJsEnabled(FrameNode* frameNode, bool isJsEnabled);
     static void SetFileAccessEnabled(FrameNode* frameNode, bool isFileAccessEnabled);
     static void SetDomStorageAccessEnabled(FrameNode* frameNode, bool isDomStorageAccessEnabled);
-    static void SetVisitedLinkPersistEnabled(FrameNode* frameNode, bool enabled);
     static void SetMixedMode(FrameNode* frameNode, MixedModeContent mixedMode);
     static void SetZoomAccessEnabled(FrameNode* frameNode, bool isZoomAccessEnabled);
     static void SetZoomControlAccess(FrameNode* frameNode, bool zoomControlAccess);
@@ -317,6 +316,7 @@ public:
     static void SetOnOverScroll(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& jsCallback);
     static void SetOnScaleChange(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& jsCallback);
     static void SetOnZoomChange(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& jsCallback);
+    static void SetVisitedLinkPersistEnabled(FrameNode* frameNode, bool enabled);
     static void SetOnRequestFocus(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& jsCallback);
     static void SetOnContextMenuHide(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& jsCallback);
     static void SetOnContextMenuUpdate(

@@ -320,13 +320,6 @@ void WebModelImpl::SetDomStorageAccessEnabled(bool isDomStorageAccessEnabled)
     webComponent->SetDomStorageAccessEnabled(isDomStorageAccessEnabled);
 }
 
-void WebModelImpl::SetVisitedLinkPersistEnabled(bool enabled)
-{
-    auto webComponent = AceType::DynamicCast<WebComponent>(ViewStackProcessor::GetInstance()->GetMainComponent());
-    CHECK_NULL_VOID(webComponent);
-    webComponent->SetVisitedLinkPersistEnabled(enabled);
-}
-
 void WebModelImpl::SetImageAccessEnabled(bool isImageAccessEnabled)
 {
     auto webComponent = AceType::DynamicCast<WebComponent>(ViewStackProcessor::GetInstance()->GetMainComponent());
@@ -485,6 +478,13 @@ void WebModelImpl::SetZoomChangeId(std::function<void(const BaseEventInfo* info)
     auto eventMarker = EventMarker(std::move(jsCallback));
 
     webComponent->SetZoomChangeId(eventMarker);
+}
+
+void WebModelImpl::SetVisitedLinkPersistEnabled(bool enabled)
+{
+    auto webComponent = AceType::DynamicCast<WebComponent>(ViewStackProcessor::GetInstance()->GetMainComponent());
+    CHECK_NULL_VOID(webComponent);
+    webComponent->SetVisitedLinkPersistEnabled(enabled);
 }
 
 void WebModelImpl::SetScrollId(std::function<void(const BaseEventInfo* info)>&& jsCallback)

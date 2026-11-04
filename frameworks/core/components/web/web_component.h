@@ -345,6 +345,11 @@ public:
         return declaration_->GetZoomChangeId();
     }
 
+    void SetVisitedLinkPersistEnabled(bool enabled)
+    {
+        visitedLinkPersistEnabled_ = enabled;
+    }
+
     void SetScrollId(const EventMarker& scrollId)
     {
         CHECK_NULL_VOID(declaration_);
@@ -530,11 +535,6 @@ public:
     void SetDomStorageAccessEnabled(bool isEnabled)
     {
         isDomStorageAccessEnabled_ = isEnabled;
-    }
-
-    void SetVisitedLinkPersistEnabled(bool enabled)
-    {
-        visitedLinkPersistEnabled_ = enabled;
     }
 
     bool GetImageAccessEnabled() const

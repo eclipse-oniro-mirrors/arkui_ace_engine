@@ -90,7 +90,6 @@ public:
     virtual void SetFileAccessEnabled(bool isFileAccessEnabled) = 0;
     virtual void SetOnLineImageAccessEnabled(bool isOnLineImageAccessEnabled) = 0;
     virtual void SetDomStorageAccessEnabled(bool isDomStorageAccessEnabled) = 0;
-    virtual void SetVisitedLinkPersistEnabled(bool enabled) = 0;
     virtual void SetImageAccessEnabled(bool isImageAccessEnabled) = 0;
     virtual void SetMixedMode(MixedModeContent mixedMode) = 0;
     virtual void SetZoomAccessEnabled(bool isZoomAccessEnabled) = 0;
@@ -113,6 +112,7 @@ public:
     virtual void SetResourceLoadId(std::function<void(const BaseEventInfo* info)>&& jsCallback) = 0;
     virtual void SetScaleChangeId(std::function<void(const BaseEventInfo* info)>&& jsCallback) = 0;
     virtual void SetZoomChangeId(std::function<void(const BaseEventInfo* info)>&& jsCallback) = 0;
+    virtual void SetVisitedLinkPersistEnabled(bool enabled) = 0;
     virtual void SetScrollId(std::function<void(const BaseEventInfo* info)>&& jsCallback) = 0;
     virtual void SetPermissionRequestEventId(std::function<void(const BaseEventInfo* info)>&& jsCallback) = 0;
     virtual void SetBackgroundColor(Color backgroundColor) = 0;

@@ -373,21 +373,6 @@ void SetDomStorageAccessImpl(Ark_NativePointer node,
     WebModelStatic::SetDomStorageAccessEnabled(frameNode, *convValue);
 #endif // WEB_SUPPORTED
 }
-
-void SetVisitedLinkPersistEnabledImpl(Ark_NativePointer node,
-                                      const Opt_Boolean* value)
-{
-#ifdef WEB_SUPPORTED
-    auto frameNode = reinterpret_cast<FrameNode *>(node);
-    CHECK_NULL_VOID(frameNode);
-    auto convValue = Converter::OptConvert<bool>(*value);
-    if (!convValue) {
-        // Implement Reset value
-        return;
-    }
-    WebModelStatic::SetVisitedLinkPersistEnabled(frameNode, *convValue);
-#endif // WEB_SUPPORTED
-}
 void SetImageAccessImpl(Ark_NativePointer node,
                         const Opt_Boolean* value)
 {
@@ -1112,6 +1097,20 @@ void SetOnZoomChangeImpl(Ark_NativePointer node,
         OnZoomChange(callback, weakNode, instanceId, info);
     };
     WebModelStatic::SetZoomChangeId(frameNode, onZoomChange);
+#endif // WEB_SUPPORTED
+}
+void SetVisitedLinkPersistEnabledImpl(Ark_NativePointer node,
+                                      const Opt_Boolean* value)
+{
+#ifdef WEB_SUPPORTED
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto convValue = Converter::OptConvert<bool>(*value);
+    if (!convValue) {
+        // Implement Reset value
+        return;
+    }
+    WebModelStatic::SetVisitedLinkPersistEnabled(frameNode, *convValue);
 #endif // WEB_SUPPORTED
 }
 void SetOnHttpAuthRequestImpl(Ark_NativePointer node,
@@ -3321,7 +3320,6 @@ const GENERATED_ArkUIWebModifier* GetWebModifier()
         WebAttributeModifier::SetFileAccessImpl,
         WebAttributeModifier::SetOnlineImageAccessImpl,
         WebAttributeModifier::SetDomStorageAccessImpl,
-        WebAttributeModifier::SetVisitedLinkPersistEnabledImpl,
         WebAttributeModifier::SetImageAccessImpl,
         WebAttributeModifier::SetMixedModeImpl,
         WebAttributeModifier::SetZoomAccessImpl,
@@ -3477,6 +3475,7 @@ const GENERATED_ArkUIWebModifier* GetWebModifier()
         WebAttributeModifier::SetEnableMediaNetworkProxyImpl,
         WebAttributeModifier::SetCaretColorImpl,
         WebAttributeModifier::SetOnZoomChangeImpl,
+        WebAttributeModifier::SetVisitedLinkPersistEnabledImpl,
         WebAttributeModifier::SetFlingSpeedLimitImpl,
         WebAttributeModifier::SetRegisterNativeEmbedRuleImpl,
         WebAttributeModifier::SetBindSelectionMenuImpl,

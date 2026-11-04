@@ -2577,7 +2577,6 @@ void JSWeb::JSBind(BindingTarget globalObj)
     JSClass<JSWeb>::StaticMethod("onLoadIntercept", &JSWeb::OnLoadIntercept);
     JSClass<JSWeb>::StaticMethod("onlineImageAccess", &JSWeb::OnLineImageAccessEnabled);
     JSClass<JSWeb>::StaticMethod("domStorageAccess", &JSWeb::DomStorageAccessEnabled);
-    JSClass<JSWeb>::StaticMethod("visitedLinkPersistEnabled", &JSWeb::VisitedLinkPersistEnabled);
     JSClass<JSWeb>::StaticMethod("imageAccess", &JSWeb::ImageAccessEnabled);
     JSClass<JSWeb>::StaticMethod("mixedMode", &JSWeb::MixedMode);
     JSClass<JSWeb>::StaticMethod("enableNativeEmbedMode", &JSWeb::EnableNativeEmbedMode);
@@ -2608,6 +2607,7 @@ void JSWeb::JSBind(BindingTarget globalObj)
     JSClass<JSWeb>::StaticMethod("onResourceLoad", &JSWeb::OnResourceLoad);
     JSClass<JSWeb>::StaticMethod("onScaleChange", &JSWeb::OnScaleChange);
     JSClass<JSWeb>::StaticMethod("onZoomChange", &JSWeb::OnZoomChange);
+    JSClass<JSWeb>::StaticMethod("visitedLinkPersistEnabled", &JSWeb::VisitedLinkPersistEnabled);
     JSClass<JSWeb>::StaticMethod("password", &JSWeb::Password);
     JSClass<JSWeb>::StaticMethod("tableData", &JSWeb::TableData);
     JSClass<JSWeb>::StaticMethod("onFileSelectorShow", &JSWeb::OnFileSelectorShowAbandoned);
@@ -5083,11 +5083,6 @@ void JSWeb::DomStorageAccessEnabled(bool isDomStorageAccessEnabled)
     WebModel::GetInstance()->SetDomStorageAccessEnabled(isDomStorageAccessEnabled);
 }
 
-void JSWeb::VisitedLinkPersistEnabled(bool enabled)
-{
-    WebModel::GetInstance()->SetVisitedLinkPersistEnabled(enabled);
-}
-
 void JSWeb::ImageAccessEnabled(bool isImageAccessEnabled)
 {
     WebModel::GetInstance()->SetImageAccessEnabled(isImageAccessEnabled);
@@ -5471,6 +5466,11 @@ void JSWeb::OnZoomChange(const JSCallbackInfo& args)
     };
     WebModel::GetInstance()->SetZoomChangeId(jsCallback);
 }
+void JSWeb::VisitedLinkPersistEnabled(bool enabled)
+{
+    WebModel::GetInstance()->SetVisitedLinkPersistEnabled(enabled);
+}
+
 
 JSRef<JSVal> ScrollEventToJSValue(const WebOnScrollEvent& eventInfo)
 {

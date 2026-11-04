@@ -133,20 +133,6 @@ void ResetDomStorageAccessEnabled(ArkUINodeHandle node)
     WebModelNG::SetDomStorageAccessEnabled(frameNode, DEFAULT_DOM_STORAGE_ACCESS_ENABLED);
 }
 
-void SetVisitedLinkPersistEnabled(ArkUINodeHandle node, ArkUI_Bool value)
-{
-    auto* frameNode = reinterpret_cast<FrameNode*>(node);
-    CHECK_NULL_VOID(frameNode);
-    WebModelNG::SetVisitedLinkPersistEnabled(frameNode, value);
-}
-
-void ResetVisitedLinkPersistEnabled(ArkUINodeHandle node)
-{
-    auto* frameNode = reinterpret_cast<FrameNode*>(node);
-    CHECK_NULL_VOID(frameNode);
-    WebModelNG::SetVisitedLinkPersistEnabled(frameNode, DEFAULT_VISITED_LINK_PERSIST_ENABLED);
-}
-
 void SetMixedMode(ArkUINodeHandle node, ArkUI_Int32 value)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -467,6 +453,20 @@ void ResetOnZoomChangeCallBack(ArkUINodeHandle node)
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
     WebModelNG::SetOnZoomChange(frameNode, nullptr);
+}
+
+void SetVisitedLinkPersistEnabled(ArkUINodeHandle node, ArkUI_Bool value)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetVisitedLinkPersistEnabled(frameNode, value);
+}
+
+void ResetVisitedLinkPersistEnabled(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetVisitedLinkPersistEnabled(frameNode, DEFAULT_VISITED_LINK_PERSIST_ENABLED);
 }
 
 void SetOnRequestSelectedCallBack(ArkUINodeHandle node, void* extraParam)
@@ -2956,8 +2956,6 @@ const ArkUIWebModifier* GetWebModifier()
         .resetFileAccessEnabled = ResetFileAccessEnabled,
         .setDomStorageAccessEnabled = SetDomStorageAccessEnabled,
         .resetDomStorageAccessEnabled = ResetDomStorageAccessEnabled,
-        .setVisitedLinkPersistEnabled = SetVisitedLinkPersistEnabled,
-        .resetVisitedLinkPersistEnabled = ResetVisitedLinkPersistEnabled,
         .setMixedMode = SetMixedMode,
         .resetMixedMode = ResetMixedMode,
         .setZoomAccessEnabled = SetZoomAccessEnabled,
@@ -3216,6 +3214,8 @@ const ArkUIWebModifier* GetWebModifier()
         .resetEnableFullscreenVideoOverlay = ResetEnableFullscreenVideoOverlay,
         .setOnZoomChangeCallBack = SetOnZoomChangeCallBack,
         .resetOnZoomChangeCallBack = ResetOnZoomChangeCallBack,
+        .setVisitedLinkPersistEnabled = SetVisitedLinkPersistEnabled,
+        .resetVisitedLinkPersistEnabled = ResetVisitedLinkPersistEnabled,
         .setCaretColor = SetWebCaretColor,
         .resetCaretColor = ResetWebCaretColor,
     };
@@ -3237,8 +3237,6 @@ const CJUIWebModifier* GetCJUIWebModifier()
         .resetFileAccessEnabled = ResetFileAccessEnabled,
         .setDomStorageAccessEnabled = SetDomStorageAccessEnabled,
         .resetDomStorageAccessEnabled = ResetDomStorageAccessEnabled,
-        .setVisitedLinkPersistEnabled = SetVisitedLinkPersistEnabled,
-        .resetVisitedLinkPersistEnabled = ResetVisitedLinkPersistEnabled,
         .setMixedMode = SetMixedMode,
         .resetMixedMode = ResetMixedMode,
         .setZoomAccessEnabled = SetZoomAccessEnabled,
@@ -3497,6 +3495,8 @@ const CJUIWebModifier* GetCJUIWebModifier()
         .resetEnableFullscreenVideoOverlay = ResetEnableFullscreenVideoOverlay,
         .setOnZoomChangeCallBack = SetOnZoomChangeCallBack,
         .resetOnZoomChangeCallBack = ResetOnZoomChangeCallBack,
+        .setVisitedLinkPersistEnabled = SetVisitedLinkPersistEnabled,
+        .resetVisitedLinkPersistEnabled = ResetVisitedLinkPersistEnabled,
         .setCaretColor = SetWebCaretColor,
         .resetCaretColor = ResetWebCaretColor,
     };

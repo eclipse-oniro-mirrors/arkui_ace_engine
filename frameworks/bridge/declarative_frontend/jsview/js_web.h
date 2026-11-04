@@ -67,7 +67,6 @@ public:
     static void OnFocus(const JSCallbackInfo& args);
     static void OnLineImageAccessEnabled(bool isOnLineImageAccessEnabled);
     static void DomStorageAccessEnabled(bool isDomStorageAccessEnabled);
-    static void VisitedLinkPersistEnabled(bool enabled);
     static void ImageAccessEnabled(bool isImageAccessEnabled);
     static void MixedMode(int32_t MixedModeNum);
     static void ZoomAccessEnabled(bool isZoomAccessEnabled);
@@ -89,6 +88,7 @@ public:
     static void OnResourceLoad(const JSCallbackInfo& args);
     static void OnScaleChange(const JSCallbackInfo& args);
     static void OnZoomChange(const JSCallbackInfo& args);
+    static void VisitedLinkPersistEnabled(bool enabled);
     static void OnScroll(const JSCallbackInfo& args);
     static void WebRotate(const JSCallbackInfo& args);
     static void BackgroundColor(const JSCallbackInfo& info);

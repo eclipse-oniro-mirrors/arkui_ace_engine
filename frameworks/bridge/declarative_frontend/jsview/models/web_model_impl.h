@@ -70,7 +70,6 @@ public:
     void SetFileAccessEnabled(bool isFileAccessEnabled) override;
     void SetOnLineImageAccessEnabled(bool isOnLineImageAccessEnabled) override;
     void SetDomStorageAccessEnabled(bool isDomStorageAccessEnabled) override;
-    void SetVisitedLinkPersistEnabled(bool enabled) override;
     void SetImageAccessEnabled(bool isImageAccessEnabled) override;
     void SetMixedMode(MixedModeContent mixedMode) override;
     void SetZoomAccessEnabled(bool isZoomAccessEnabled) override;
@@ -91,6 +90,7 @@ public:
     void SetResourceLoadId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
     void SetScaleChangeId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
     void SetZoomChangeId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
+    void SetVisitedLinkPersistEnabled(bool enabled) override;
     void SetScrollId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
     void SetPermissionRequestEventId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
     void SetBackgroundColor(Color backgroundColor) override;

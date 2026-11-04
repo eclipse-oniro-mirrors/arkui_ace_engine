@@ -236,6 +236,20 @@ class WebOnZoomChangeModifier extends ModifierWithKey<(result: { oldZoomFactor: 
   }
 }
 
+class WebVisitedLinkPersistEnabledModifier extends ModifierWithKey<boolean> {
+  constructor(value: boolean) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('webVisitedLinkPersistEnabled');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().web.resetVisitedLinkPersistEnabled(node);
+    } else {
+      getUINativeModule().web.setVisitedLinkPersistEnabled(node, this.value);
+    }
+  }
+}
+
 class WebOverviewModeAccessModifier extends ModifierWithKey<boolean> {
   constructor (value: boolean) {
     super(value);
@@ -1689,20 +1703,6 @@ class WebFlingSpeedLimitModifier extends ModifierWithKey<number> {
   }
 }
 
-class WebVisitedLinkPersistEnabledModifier extends ModifierWithKey<boolean> {
-  constructor(value: boolean) {
-    super(value);
-  }
-  static identity: Symbol = Symbol('webVisitedLinkPersistEnabled');
-  applyPeer(node: KNode, reset: boolean): void {
-    if (reset) {
-      getUINativeModule().web.resetVisitedLinkPersistEnabled(node);
-    } else {
-      getUINativeModule().web.setVisitedLinkPersistEnabled(node, this.value);
-    }
-  }
-}
-
 class WebBackToTopModifier extends ModifierWithKey<boolean> {
   constructor(value: boolean) {
     super(value);
@@ -2135,6 +2135,10 @@ class ArkWebComponent extends ArkComponent implements WebAttribute {
     modifierWithKey(this._modifiersWithKeys, WebOnZoomChangeModifier.identity, WebOnZoomChangeModifier, callback);
     return this;
   }
+  visitedLinkPersistEnabled(value: boolean): this {
+    modifierWithKey(this._modifiersWithKeys, WebVisitedLinkPersistEnabledModifier.identity, WebVisitedLinkPersistEnabledModifier, value);
+    return this;
+  }
   onHttpAuthRequest(callback: (event?: { handler: HttpAuthHandler; host: string; realm: string; } | undefined) => boolean): this {
     modifierWithKey(this._modifiersWithKeys, WebOnHttpAuthRequestModifier.identity, WebOnHttpAuthRequestModifier, callback);
     return this;
@@ -2476,10 +2480,6 @@ class ArkWebComponent extends ArkComponent implements WebAttribute {
   }
   flingSpeedLimit(value: number): this {
     modifierWithKey(this._modifiersWithKeys, WebFlingSpeedLimitModifier.identity, WebFlingSpeedLimitModifier, value);
-    return this;
-  }
-  visitedLinkPersistEnabled(value: boolean): this {
-    modifierWithKey(this._modifiersWithKeys, WebVisitedLinkPersistEnabledModifier.identity, WebVisitedLinkPersistEnabledModifier, value);
     return this;
   }
   rotateRenderEffect(effect: WebRotateEffect): this {

@@ -2029,8 +2029,6 @@ struct CJUIWebModifier {
     void (*resetFileAccessEnabled)(ArkUINodeHandle node);
     void (*setDomStorageAccessEnabled)(ArkUINodeHandle node, ArkUI_Bool value);
     void (*resetDomStorageAccessEnabled)(ArkUINodeHandle node);
-    void (*setVisitedLinkPersistEnabled)(ArkUINodeHandle node, ArkUI_Bool value);
-    void (*resetVisitedLinkPersistEnabled)(ArkUINodeHandle node);
     void (*setMixedMode)(ArkUINodeHandle node, ArkUI_Int32 value);
     void (*resetMixedMode)(ArkUINodeHandle node);
     void (*setZoomAccessEnabled)(ArkUINodeHandle node, ArkUI_Bool value);
@@ -2293,6 +2291,8 @@ struct CJUIWebModifier {
     void (*resetEnableFullscreenVideoOverlay)(ArkUINodeHandle node);
     void (*setOnZoomChangeCallBack)(ArkUINodeHandle node, void* callback);
     void (*resetOnZoomChangeCallBack)(ArkUINodeHandle node);
+    void (*setVisitedLinkPersistEnabled)(ArkUINodeHandle node, ArkUI_Bool value);
+    void (*resetVisitedLinkPersistEnabled)(ArkUINodeHandle node);
     void (*setCaretColor)(ArkUINodeHandle node, ArkUI_Uint32 color, void* colorRawPtr);
     void (*resetCaretColor)(ArkUINodeHandle node);
 };
