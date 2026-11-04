@@ -24,7 +24,6 @@
 #include "interfaces/native/node/node_model.h"
 #include "interfaces/native/node/config_manager.h"
 #include "interfaces/native/event/ui_input_event_impl.h"
-#include "frameworks/core/common/ace_application_info.h"
 #include "frameworks/core/interfaces/arkoala/arkoala_api.h"
 #include "interfaces/native/native_error_message_macros.h"
 
@@ -806,7 +805,12 @@ ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Register(const OH_ArkUI_KeyboardSho
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Invalid shortcut key type");
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
-    const auto id = OHOS::Ace::AceApplicationInfo::GetInstance().RegisterApplicationShortcut(
+    const auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
+    CHECK_NULL_RETURN_WITH_MESSAGE(impl, ARKUI_ERROR_CODE_INTERNAL_ERROR,
+        __FUNCTION__, "Native implementation is unavailable");
+    CHECK_NULL_RETURN_WITH_MESSAGE(impl->registerApplicationShortcut, ARKUI_ERROR_CODE_INTERNAL_ERROR,
+        __FUNCTION__, "Application shortcut registration is unavailable");
+    const auto id = impl->registerApplicationShortcut(
         value, static_cast<uint8_t>(modifierKeys), [callback, userData](int32_t instanceId) {
             OH_ArkUI_ApplicationShortcutCallbackInfo info { { instanceId } };
             callback(&info, userData);
@@ -823,7 +827,12 @@ ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Register(const OH_ArkUI_KeyboardSho
 ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Unregister(int32_t registrationId)
 {
     CHECK_UI_THREAD("OH_ArkUI_ApplicationShortcut_Unregister");
-    OHOS::Ace::AceApplicationInfo::GetInstance().UnregisterApplicationShortcut(registrationId);
+    const auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
+    CHECK_NULL_RETURN_WITH_MESSAGE(impl, ARKUI_ERROR_CODE_INTERNAL_ERROR,
+        __FUNCTION__, "Native implementation is unavailable");
+    CHECK_NULL_RETURN_WITH_MESSAGE(impl->unregisterApplicationShortcut, ARKUI_ERROR_CODE_INTERNAL_ERROR,
+        __FUNCTION__, "Application shortcut unregistration is unavailable");
+    impl->unregisterApplicationShortcut(registrationId);
     return ARKUI_ERROR_CODE_NO_ERROR;
 }
 

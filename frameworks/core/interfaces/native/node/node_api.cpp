@@ -2716,6 +2716,17 @@ const ArkUISnapshotAPI* GetComponentSnapshotAPI()
     return &impl;
 }
 
+ArkUI_Int32 RegisterApplicationShortcut(const std::string& value, uint8_t keys,
+    std::function<void(ArkUI_Int32)>&& callback)
+{
+    return AceApplicationInfo::GetInstance().RegisterApplicationShortcut(value, keys, std::move(callback));
+}
+
+void UnregisterApplicationShortcut(ArkUI_Int32 registrationId)
+{
+    AceApplicationInfo::GetInstance().UnregisterApplicationShortcut(registrationId);
+}
+
 /* clang-format off */
 ArkUIFullNodeAPI impl_full = {
     .version = ARKUI_NODE_API_VERSION,
@@ -2733,6 +2744,8 @@ ArkUIFullNodeAPI impl_full = {
     .getSnapshotAPI = GetComponentSnapshotAPI,     // SyncSnapshot
     .getMultiThreadManagerAPI = GetMultiThreadManagerAPI, // MultiThreadManagerAPI
     .getRuntimeInit = RuntimeInit::GetRuntimeInit, // RuntimeInit
+    .registerApplicationShortcut = RegisterApplicationShortcut,
+    .unregisterApplicationShortcut = UnregisterApplicationShortcut,
 };
 /* clang-format on */
 

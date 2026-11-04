@@ -50,10 +50,10 @@ class SymbolEffectOptions;
 extern "C" {
 #endif
 
-#define ARKUI_FULL_API_VERSION 145
+#define ARKUI_FULL_API_VERSION 146
 // When changing ARKUI_BASIC_API_VERSION, ARKUI_FULL_API_VERSION must be
 // increased as well.
-#define ARKUI_NODE_API_VERSION 145
+#define ARKUI_NODE_API_VERSION 146
 
 #define ARKUI_BASIC_API_VERSION 8
 #define ARKUI_EXTENDED_API_VERSION 8
@@ -11012,6 +11012,9 @@ struct ArkUIFullNodeAPI {
     const ArkUISnapshotAPI* (*getSnapshotAPI)();
     const ArkUIMultiThreadManagerAPI* (*getMultiThreadManagerAPI)();
     const ArkUIRuntimeInit* (*getRuntimeInit)();
+    ArkUI_Int32 (*registerApplicationShortcut)(const std::string& value, uint8_t keys,
+        std::function<void(ArkUI_Int32)>&& callback);
+    void (*unregisterApplicationShortcut)(ArkUI_Int32 registrationId);
 };
 
 struct ArkUIAnyAPI {
