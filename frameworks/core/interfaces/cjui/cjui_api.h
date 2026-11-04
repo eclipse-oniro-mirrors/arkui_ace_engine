@@ -2030,7 +2030,7 @@ struct CJUIWebModifier {
     void (*setDomStorageAccessEnabled)(ArkUINodeHandle node, ArkUI_Bool value);
     void (*resetDomStorageAccessEnabled)(ArkUINodeHandle node);
     void (*setVisitedLinkPersistEnabled)(ArkUINodeHandle node, ArkUI_Bool value);
-    void (*resetVisitedLinkPersistEnabled)(ArkUNodeHandle node);
+    void (*resetVisitedLinkPersistEnabled)(ArkUINodeHandle node);
     void (*setMixedMode)(ArkUINodeHandle node, ArkUI_Int32 value);
     void (*resetMixedMode)(ArkUINodeHandle node);
     void (*setZoomAccessEnabled)(ArkUINodeHandle node, ArkUI_Bool value);

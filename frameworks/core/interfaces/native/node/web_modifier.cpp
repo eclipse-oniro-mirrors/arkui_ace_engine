@@ -133,7 +133,7 @@ void ResetDomStorageAccessEnabled(ArkUINodeHandle node)
     WebModelNG::SetDomStorageAccessEnabled(frameNode, DEFAULT_DOM_STORAGE_ACCESS_ENABLED);
 }
 
-void SetVisitedLinkPersistEnabled(ArkUNodeHandle node, ArkUI_Bool value)
+void SetVisitedLinkPersistEnabled(ArkUINodeHandle node, ArkUI_Bool value)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);

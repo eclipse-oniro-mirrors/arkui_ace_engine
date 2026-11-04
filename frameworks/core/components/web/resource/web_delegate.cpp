@@ -4304,6 +4304,7 @@ void WebDelegate::UpdateDomStorageEnabled(const bool& isDomStorageAccessEnabled)
             }
         },
         TaskExecutor::TaskType::PLATFORM, "ArkUIWebUpdateDomStorageEnabled");
+}
 
 void WebDelegate::UpdateVisitedLinkPersistEnabled(const bool& enabled)
 {
@@ -4322,7 +4323,7 @@ void WebDelegate::UpdateVisitedLinkPersistEnabled(const bool& enabled)
         },
         TaskExecutor::TaskType::PLATFORM, "ArkUIWebUpdateVisitedLinkPersistEnabled");
 }
-}
+
 void WebDelegate::UpdateGeolocationEnabled(const bool& isGeolocationAccessEnabled)
 {
     auto context = context_.Upgrade();
