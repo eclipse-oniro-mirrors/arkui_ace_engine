@@ -5761,6 +5761,7 @@
       vtable?for?OHOS::Ace::Platform::FlutterAceView;
       vtable?for?OHOS::Ace::Player;
       vtable?for?OHOS::Ace::PluginComponentManager::UIServiceListener;
+      vtable?for?OHOS::Ace::PluginFrontend;
       vtable?for?OHOS::Ace::PressRecognizer;
       vtable?for?OHOS::Ace::ProgressDataPanelComponent;
       vtable?for?OHOS::Ace::RawRecognizer;
