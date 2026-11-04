@@ -1055,8 +1055,7 @@ HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0033, TestSize.Level1)
     EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&event), ARKUI_ERROR_CODE_NO_ERROR);
     EXPECT_EQ(event, nullptr);
 }
-} // namespace OHOS::Ace
-namespace OHOS::Ace {
+
 namespace {
 void CountApplicationShortcut(const OH_ArkUI_ApplicationShortcutCallbackInfo* info, void* userData)
 {

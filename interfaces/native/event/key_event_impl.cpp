@@ -765,26 +765,18 @@ ArkUI_ContextHandle OH_ArkUI_ApplicationShortcutCallbackInfo_GetUIContext(
     return info && info->context.id >= 0 ? &info->context : nullptr;
 }
 
-ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Register(const OH_ArkUI_KeyboardShortcutKey* key, uint32_t modifierKeys,
-    void* userData, OH_ArkUI_ApplicationShortcutCallback callback, int32_t* registrationId)
+static const char* ParseApplicationShortcutKey(
+    const OH_ArkUI_KeyboardShortcutKey* key, uint32_t modifierKeys, std::string& value)
 {
-    CHECK_UI_THREAD("OH_ArkUI_ApplicationShortcut_Register");
-    CHECK_NULL_RETURN_WITH_MESSAGE(registrationId, ARKUI_ERROR_CODE_PARAM_INVALID,
-        __FUNCTION__, "Registration ID output is null");
-    CHECK_NULL_RETURN_WITH_MESSAGE(key, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Shortcut key is null");
-    CHECK_NULL_RETURN_WITH_MESSAGE(callback, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Callback is null");
     constexpr uint32_t supportedKeys = OH_ARKUI_KEYBOARD_SHORTCUT_MODIFIER_CTRL |
         OH_ARKUI_KEYBOARD_SHORTCUT_MODIFIER_SHIFT | OH_ARKUI_KEYBOARD_SHORTCUT_MODIFIER_ALT;
-    std::string value;
     if ((modifierKeys & ~supportedKeys) != 0) {
-        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Unsupported modifier keys");
-        return ARKUI_ERROR_CODE_PARAM_INVALID;
+        return "Unsupported modifier keys";
     }
     if (key->type == OH_ARKUI_KEYBOARD_SHORTCUT_KEY_TYPE_CHARACTER) {
         // The public char parameter represents a single printable keyboard character.
         if (key->character < ' ' || key->character > '~' || modifierKeys == 0) {
-            SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Invalid character or missing modifier");
-            return ARKUI_ERROR_CODE_PARAM_INVALID;
+            return "Invalid character or missing modifier";
         }
         value.assign(1, key->character);
     } else if (key->type == OH_ARKUI_KEYBOARD_SHORTCUT_KEY_TYPE_FUNCTION_KEY) {
@@ -798,11 +790,26 @@ ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Register(const OH_ArkUI_KeyboardSho
         } else if (key->functionKey == OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_SPACE) {
             value = " ";
         } else {
-            SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Unsupported function key");
-            return ARKUI_ERROR_CODE_PARAM_INVALID;
+            return "Unsupported function key";
         }
     } else {
-        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Invalid shortcut key type");
+        return "Invalid shortcut key type";
+    }
+    return nullptr;
+}
+
+ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Register(const OH_ArkUI_KeyboardShortcutKey* key, uint32_t modifierKeys,
+    void* userData, OH_ArkUI_ApplicationShortcutCallback callback, int32_t* registrationId)
+{
+    CHECK_UI_THREAD("OH_ArkUI_ApplicationShortcut_Register");
+    CHECK_NULL_RETURN_WITH_MESSAGE(registrationId, ARKUI_ERROR_CODE_PARAM_INVALID,
+        __FUNCTION__, "Registration ID output is null");
+    CHECK_NULL_RETURN_WITH_MESSAGE(key, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Shortcut key is null");
+    CHECK_NULL_RETURN_WITH_MESSAGE(callback, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Callback is null");
+    std::string value;
+    const auto* error = ParseApplicationShortcutKey(key, modifierKeys, value);
+    if (error) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, error);
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
     const auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
