@@ -329,7 +329,12 @@ void ImageFileCache::ConvertToAstcAndWriteToFile(const std::string& fileCacheKey
         std::scoped_lock<std::mutex> lock(cacheFileInfoMutex_);
         removeVector.push_back(filePath);
 
-        auto infoIter = fileNameToFileInfoPos_[fileCacheKey];
+        auto findIter = fileNameToFileInfoPos_.find(fileCacheKey);
+        if (findIter == fileNameToFileInfoPos_.end()) {
+            TAG_LOGW(AceLogTag::ACE_IMAGE, "cache key not found for astc convert. %{private}s", fileCacheKey.c_str());
+            return;
+        }
+        auto infoIter = findIter->second;
         cacheFileSize_ = cacheFileSize_ + static_cast<size_t>(packedSize) - infoIter->fileSize;
         infoIter->fileName = astcFileName;
         infoIter->fileSize = static_cast<uint64_t>(packedSize);
