@@ -447,7 +447,9 @@ HWTEST_F(TextFieldOverlayModifierTest, TextFieldOverlayModifierTest009, TestSize
     pattern_->SetPreviewTextStyling(styling);
 
     Testing::MockCanvas rsCanvas;
-    EXPECT_CALL(rsCanvas, DrawRoundRect(_)).Times(0);
+    EXPECT_CALL(rsCanvas, AttachBrush(_)).WillRepeatedly(ReturnRef(rsCanvas));
+    EXPECT_CALL(rsCanvas, DrawRoundRect(_)).Times(1);
+    EXPECT_CALL(rsCanvas, DetachBrush()).WillRepeatedly(ReturnRef(rsCanvas));
     EXPECT_CALL(rsCanvas, DrawPath(_)).Times(0);
     EXPECT_CALL(rsCanvas, DrawLine(_, _)).Times(0);
     DrawingContext context { rsCanvas, CONTEXT_WIDTH_VALUE, CONTEXT_HEIGHT_VALUE };
