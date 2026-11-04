@@ -1079,14 +1079,15 @@ HWTEST_F(WaterFlowScrollSnapTestNg, NewTouchStopsAlignSnap, TestSize.Level1)
     CreateUnequalItems();
     SetStrategy(MakeAlign(ScrollSnapAlign::START));
     ScrollTo(60.0f);
-    MockAnimationManager::GetInstance().SetTicks(4);
+    ASSERT_TRUE(Position(-60.0f));
     ASSERT_TRUE(pattern_->StartSnapAnimation({ .snapDelta = 10.0f }));
-    ASSERT_FALSE(MockAnimationManager::GetInstance().AllFinished());
-    MockAnimationManager::GetInstance().Tick();
-    FlushUITasks();
-    // The mock advances one quarter of the 60 -> 100 animation before the touch.
-    ASSERT_NEAR(pattern_->GetTotalOffset(), 70.0f, 0.5f);
-    pattern_->GetScrollable()->HandleTouchDown();
+    auto scroll = pattern_->GetScrollable();
+    ASSERT_NEAR(scroll->GetFinalPosition(), -100.0f, 0.5f);
+    // Deliver a 10px frame and interrupt the running snap between the start and its anchor.
+    ASSERT_TRUE(TickPosition(-10.0f, -70.0f));
+    ASSERT_TRUE(scroll->IsSnapAnimationRunning());
+    scroll->HandleTouchDown();
+    EXPECT_FALSE(scroll->IsSnapAnimationRunning());
     FinishSnapAnimation();
     EXPECT_NEAR(pattern_->GetTotalOffset(), 70.0f, 0.5f);
     EXPECT_NEAR(GetChildRect(frameNode_, 2).GetY(), 30.0f, 0.5f);
@@ -1099,24 +1100,28 @@ HWTEST_F(WaterFlowScrollSnapTestNg, NewTouchStopsAlignSnap, TestSize.Level1)
  */
 HWTEST_F(WaterFlowScrollSnapTestNg, NewDragCancelsProviderBeforeHandoff, TestSize.Level1)
 {
+    constexpr float FLING_DISTANCE = 300.0f;
+    constexpr int32_t ANIMATION_TICKS = 4;
     CreateUnequalItems();
     int32_t snapCalls = 0;
     int32_t approachCalls = 0;
     SetStrategy(MakeProvider([&](double) { ++snapCalls; return 500.0; },
         [&](double, double) { ++approachCalls; return 200.0; }));
-    MockAnimationManager::GetInstance().SetTicks(4);
-    ASSERT_TRUE(pattern_->StartSnapAnimation({ .snapDelta = -300.0f }));
+    MockAnimationManager::GetInstance().SetTicks(ANIMATION_TICKS);
+    ASSERT_TRUE(pattern_->StartSnapAnimation({ .snapDelta = -FLING_DISTANCE }));
     pattern_->GetScrollable()->FlushPendingItemSnapKickoff();
     MockAnimationManager::GetInstance().Tick();
     FlushUITasks();
-    ASSERT_NEAR(pattern_->GetTotalOffset(), 50.0f, 0.5f);
+    // The first tick follows the natural fling before reaching the provider's handoff point.
+    const auto offsetBeforeDrag = pattern_->GetTotalOffset();
+    ASSERT_NEAR(offsetBeforeDrag, FLING_DISTANCE / ANIMATION_TICKS, 0.5f);
     ASSERT_EQ(approachCalls, 1);
     ASSERT_EQ(snapCalls, 0);
     DragStart(frameNode_, Offset());
     // Keep the provider configured: only the new gesture may cancel the previous chain.
     FinishSnapAnimation();
     EXPECT_EQ(snapCalls, 0);
-    EXPECT_NEAR(pattern_->GetTotalOffset(), 50.0f, 0.5f);
+    EXPECT_NEAR(pattern_->GetTotalOffset(), offsetBeforeDrag, 0.5f);
     DragUpdate(-10.0f);
     DragEnd(0.0f);
     FinishSnapAnimation();
