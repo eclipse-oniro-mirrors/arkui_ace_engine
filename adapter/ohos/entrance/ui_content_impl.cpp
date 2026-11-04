@@ -6343,7 +6343,21 @@ void UIContentImpl::SetForceSplitConfig(const std::optional<ForceSplitConfig>& s
     forceSplitMgr->SetForceSplitSupported(true);
     NG::ForceSplitUtils::LogForceSplitParam(splitConfig->isRouter, config);
     context->SetIsArkUIHookEnabled(config.isArkUIHookEnabled);
-    forceSplitMgr->SetIsRouter(splitConfig->isRouter);
+    ApplyForceSplitParams(forceSplitMgr, config, splitConfig->isRouter);
+    if (!(splitConfig->isRouter)) {
+        navManager->SetForceSplitNavigationId(config.navigationId);
+        navManager->SetForceSplitNavigationDepth(config.navigationDepth);
+        // page-level split: no placeholder, keep the right column empty
+        navManager->SetPlaceholderDisabled(config.navigationDisablePlaceholder ||
+            config.enablePageLevelSplit);
+        navManager->SetDividerDisabled(config.navigationDisableDivider);
+    }
+}
+
+void UIContentImpl::ApplyForceSplitParams(
+    const RefPtr<NG::ForceSplitManager>& forceSplitMgr, NG::ForceSplitParam& config, bool isRouter)
+{
+    forceSplitMgr->SetIsRouter(isRouter);
     forceSplitMgr->SetDialogSupportSplit(config.dialogSupportSplit);
     forceSplitMgr->SetHomePageName(config.homePage);
     forceSplitMgr->SetRelatedPageName(config.relatedPage);
@@ -6357,12 +6371,9 @@ void UIContentImpl::SetForceSplitConfig(const std::optional<ForceSplitConfig>& s
     forceSplitMgr->SetBehaviorMode(config.behaviorMode);
     forceSplitMgr->SetPagePairs(std::move(config.pagePairs));
     forceSplitMgr->SetTransPages(std::move(config.transPages));
-    if (!(splitConfig->isRouter)) {
-        navManager->SetForceSplitNavigationId(config.navigationId);
-        navManager->SetForceSplitNavigationDepth(config.navigationDepth);
-        navManager->SetPlaceholderDisabled(config.navigationDisablePlaceholder);
-        navManager->SetDividerDisabled(config.navigationDisableDivider);
-    }
+    forceSplitMgr->SetEnablePageLevelSplit(config.enablePageLevelSplit);
+    forceSplitMgr->SetPageSplitOptions(std::move(config.pageSplitOptions));
+    forceSplitMgr->SetEnableInheritSplitStrategy(config.enableInheritSplitStrategy);
 }
 
 void UIContentImpl::ProcessDestructCallbacks()

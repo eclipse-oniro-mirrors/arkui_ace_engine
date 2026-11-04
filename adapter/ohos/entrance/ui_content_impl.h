@@ -55,7 +55,9 @@ class RSSyncTransactionHandler;
 } // namespace OHOS::Rosen
 
 namespace OHOS::Ace::NG {
+class ForceSplitManager;
 class PageSceneRuleManager;
+struct ForceSplitParam;
 } // namespace OHOS::Ace::NG
 
 namespace OHOS::Ace {
@@ -639,6 +641,8 @@ protected:
     VMType vmType_ = VMType::NORMAL;
 
 private:
+    static void ApplyForceSplitParams(
+        const RefPtr<NG::ForceSplitManager>& forceSplitMgr, NG::ForceSplitParam& config, bool isRouter);
     void ProcessWindowSizeLayoutBreakPointChange(double density);
     void ApplyFloatNavigationAvoidArea(bool enable);
     void InitBrandColor();

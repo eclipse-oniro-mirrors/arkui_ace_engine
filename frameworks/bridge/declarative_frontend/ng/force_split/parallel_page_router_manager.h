@@ -22,6 +22,8 @@
 #include "bridge/declarative_frontend/ng/page_router_manager.h"
 
 namespace OHOS::Ace::NG {
+class ForceSplitManager;
+
 class ParallelPageRouterManager : public PageRouterManager {
     DECLARE_ACE_TYPE(ParallelPageRouterManager, PageRouterManager);
 public:
@@ -48,6 +50,16 @@ private:
     bool CheckStackSize(const RouterPageInfo& target, bool needClearSecondaryPage);
     void NotifyForceFullScreenChangeIfNeeded(
         const std::string& curTopPageName, const RefPtr<PipelineContext>& context) override;
+    std::vector<std::string> CollectPageStackNames(const std::string& curTopPageName);
+    void TryEstablishPageLevelSplitHome(const std::string& pageUrl, const RefPtr<FrameNode>& pageNode,
+        const RefPtr<PipelineContext>& context);
+    RefPtr<FrameNode> SelectPageLevelNavigationHome(const std::vector<RefPtr<FrameNode>>& effectivePages,
+        const RefPtr<ForceSplitManager>& forceSplitMgr);
+    void UpdatePageLevelNavigationHome(const std::vector<RefPtr<FrameNode>>& effectivePages,
+        const RefPtr<ForceSplitManager>& forceSplitMgr, const RefPtr<PipelineContext>& context);
+    void UpdatePageLevelSplitHome(const RefPtr<FrameNode>& pageNode, const RefPtr<FrameNode>& belowTopPage,
+        const std::vector<RefPtr<FrameNode>>& effectivePages, const RefPtr<ForceSplitManager>& forceSplitMgr,
+        const RefPtr<PipelineContext>& context);
     void LoadPlaceholderOrRelatedPageIfNeeded(
         const RefPtr<PipelineContext>& context, const RefPtr<ParallelStageManager>& manager);
     bool LoadRelatedPage(const std::string& url, const RefPtr<ParallelStageManager>& manager);
@@ -56,6 +68,8 @@ private:
     ACE_DISALLOW_COPY_AND_MOVE(ParallelPageRouterManager);
 
     bool hasTryLoadPlaceholderOrRelatedPage_ = false;
+    // Preserve home instances across nested page-level NAVIGATION sessions.
+    std::vector<WeakPtr<FrameNode>> pageLevelNavigationHomes_;
 };
 } // namespace OHOS::Ace::NG
 
