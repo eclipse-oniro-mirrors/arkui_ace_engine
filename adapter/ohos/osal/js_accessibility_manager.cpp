@@ -9330,7 +9330,6 @@ void JsAccessibilityManager::JsInteractionOperation::SetBelongTreeId(const int32
 {
     auto jsAccessibilityManager = GetHandler().Upgrade();
     CHECK_NULL_VOID(jsAccessibilityManager);
-    jsAccessibilityManager->treeId_ = treeId;
     auto context = jsAccessibilityManager->GetPipelineContext().Upgrade();
     CHECK_NULL_VOID(context);
     auto instanceId = context->GetInstanceId();
@@ -9340,6 +9339,7 @@ void JsAccessibilityManager::JsInteractionOperation::SetBelongTreeId(const int32
             CHECK_NULL_VOID(jsAccessibilityManager);
             ContainerScope scope(instanceId);
             ACE_SCOPED_TRACE("SetBelongTreeId");
+            jsAccessibilityManager->treeId_ = treeId;
             jsAccessibilityManager->SendCacheAccessibilityEvent(instanceId);
             jsAccessibilityManager->NotifyChildTreeOnRegister(treeId);
             jsAccessibilityManager->ReleaseUIExtCacheEvent();
