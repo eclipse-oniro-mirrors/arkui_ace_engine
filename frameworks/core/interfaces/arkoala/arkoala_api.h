@@ -10428,6 +10428,10 @@ struct ArkUINDKRenderNodeModifier {
     ArkUI_Int32 (*adoptChildWithPolicy)(ArkUINodeHandle node, ArkUINodeHandle child, ArkUI_Int32 policy);
     ArkUI_Int32 (*setAdoptedChildOverlayPositionCompensation)(ArkUINodeHandle adoptedChild,
         ArkUI_Float32 offsetX, ArkUI_Float32 offsetY, ArkUIMatrix4Handle transform);
+    ArkUI_Int32 (*addChildWithPolicy)(ArkUIRenderNodeHandle node, ArkUIRenderNodeHandle child,
+        ArkUI_Int32 policy);
+    ArkUI_Int32 (*insertChildAfterWithPolicy)(ArkUIRenderNodeHandle node, ArkUIRenderNodeHandle child,
+        ArkUIRenderNodeHandle sibling, ArkUI_Int32 policy);
 };
 
 struct ArkUIDynamicLayoutModifier {
