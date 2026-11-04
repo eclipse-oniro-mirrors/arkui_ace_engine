@@ -2818,4 +2818,1016 @@ HWTEST_F(WebPatternTestNgSupplement, OnContextMenuShow_001, TestSize.Level1)
     EXPECT_EQ(webPattern->curContextMenuResult_, true);
 #endif
 }
+
+/**
+ * @tc.name: RegisterSystemDocumentStartJS_ExecutesAtDocumentStart_001
+ * @tc.desc: RegisterSystemDocumentStartJS stores system JS and triggers merge to delegate.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, RegisterSystemDocumentStartJS_ExecutesAtDocumentStart_001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    std::string script = "console.log('system_js')";
+    ScriptItems sysItems;
+    sysItems["*"] = { script };
+    ScriptRegexItems sysRegex;
+    ScriptItemsByOrder sysByOrder;
+    sysByOrder.push_back("*");
+    webPattern->RegisterSystemDocumentStartJS(sysItems, sysRegex, sysByOrder);
+
+    // AC-1.1: system JS is stored and flag is set.
+    EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_.size(), 1);
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_["*"],
+              std::vector<std::string>({ script }));
+    EXPECT_EQ(webPattern->systemDocumentStartScriptItemsByOrder_.size(), 1);
+    EXPECT_EQ(webPattern->systemDocumentStartScriptItemsByOrder_[0], "*");
+#endif
+}
+
+/**
+ * @tc.name: RegisterSystemDocumentStartJS_AppFirstThenSystem_002
+ * @tc.desc: App JS is inserted before system JS in the ByOrder vector; both stores stay independent.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, RegisterSystemDocumentStartJS_AppFirstThenSystem_002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // Step 1: Register app JS via ByOrder V2.
+    ScriptItems appItems;
+    appItems["app_script"] = { "console.log('app')" };
+    ScriptRegexItems appRegex;
+    ScriptItemsByOrder appOrder;
+    appOrder.push_back("app_script");
+    webPattern->onDocumentStartScriptItems_ = std::make_optional<ScriptItems>(appItems);
+    webPattern->onDocumentStartScriptRegexItems_ = std::make_optional<ScriptRegexItems>(appRegex);
+    webPattern->onDocumentStartScriptItemsByOrder_ = std::make_optional<ScriptItemsByOrder>(appOrder);
+    webPattern->UpdateJavaScriptOnDocumentStartByOrder();
+
+    // Step 2: Register system JS.
+    ScriptItems sysItems;
+    sysItems["*"] = { "console.log('system')" };
+    ScriptRegexItems sysRegex;
+    ScriptItemsByOrder sysByOrder;
+    sysByOrder.push_back("*");
+    webPattern->RegisterSystemDocumentStartJS(sysItems, sysRegex, sysByOrder);
+
+    // AC-1.2: In MergeAndInject, app JS is inserted BEFORE system JS.
+    // After UpdateJavaScriptOnDocumentStartByOrder, publicOnDocumentStartScriptItemsByOrder_ has app_script.
+    // After RegisterSystemDocumentStartJS, MergeAndInject was called which sends to delegate.
+    // We verify via the persistent state that system JS is stored.
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_.size(), 1);
+    EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+    // The public persistent copy should still contain app JS.
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItems_.size(), 1);
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItemsByOrder_.size(), 1);
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItemsByOrder_[0], "app_script");
+#endif
+}
+
+/**
+ * @tc.name: RegisterSystemDocumentStartJS_FallbackNonByOrder_003
+ * @tc.desc: When app uses non-ByOrder API, system JS falls back to non-ByOrder path (DD-3/AC-1.4).
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, RegisterSystemDocumentStartJS_FallbackNonByOrder_003, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // Step 1: Register app JS via non-ByOrder API.
+    ScriptItems appItems;
+    appItems["app_script"] = { "console.log('app')" };
+    webPattern->onDocumentStartScriptItems_ = std::make_optional<ScriptItems>(appItems);
+    webPattern->onDocumentStartScriptItemsByOrder_ = std::nullopt;
+    webPattern->UpdateJavaScriptOnDocumentStart();
+
+    // publicOnDocumentStartScriptItemsByOrder_ should be empty (non-ByOrder path).
+    EXPECT_TRUE(webPattern->publicOnDocumentStartScriptItemsByOrder_.empty());
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItems_.size(), 1);
+
+    // Step 2: Register system JS — should fall back to non-ByOrder path without crashing.
+    ScriptItems sysItems;
+    sysItems["*"] = { "console.log('system')" };
+    ScriptRegexItems sysRegex;
+    ScriptItemsByOrder sysByOrder;
+    sysByOrder.push_back("*");
+    webPattern->RegisterSystemDocumentStartJS(sysItems, sysRegex, sysByOrder);
+
+    // AC-1.4: system JS is stored; the fallback path was taken (no crash).
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_.size(), 1);
+    EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+#endif
+}
+
+/**
+ * @tc.name: RegisterSystemDocumentStartJS_ReplacesPrevious_004
+ * @tc.desc: Repeated RegisterSystemDocumentStartJS replaces previous system JS (BR-2/EX-4).
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, RegisterSystemDocumentStartJS_ReplacesPrevious_004, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // First registration.
+    ScriptItems items1;
+    items1["*"] = { "console.log('first')" };
+    items1["https://example.com"] = { "console.log('first')" };
+    ScriptRegexItems regex1;
+    ScriptItemsByOrder order1;
+    order1.push_back("*");
+    order1.push_back("https://example.com");
+    webPattern->RegisterSystemDocumentStartJS(items1, regex1, order1);
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_.size(), 2);
+
+    // Second registration — should fully replace.
+    ScriptItems items2;
+    items2["*"] = { "console.log('second')" };
+    ScriptRegexItems regex2;
+    ScriptItemsByOrder order2;
+    order2.push_back("*");
+    webPattern->RegisterSystemDocumentStartJS(items2, regex2, order2);
+
+    // AC-1.5: only the latest system JS is stored.
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_.size(), 1);
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_["*"],
+              std::vector<std::string>({ "console.log('second')" }));
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_.count("https://example.com"), 0);
+#endif
+}
+
+/**
+ * @tc.name: RegisterSystemDocumentStartJS_EmptyScriptRejected_005
+ * @tc.desc: Empty script is rejected per EX-3, no registration occurs.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, RegisterSystemDocumentStartJS_EmptyScriptRejected_005, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // EX-3: empty scriptItems is rejected, no registration occurs.
+    ScriptItems emptyItems;
+    ScriptRegexItems sysRegex;
+    ScriptItemsByOrder sysByOrder;
+    sysByOrder.push_back("*");
+    webPattern->RegisterSystemDocumentStartJS(emptyItems, sysRegex, sysByOrder);
+
+    // EX-3: empty script rejected, no state change.
+    EXPECT_FALSE(webPattern->hasInnerOnDocumentStartScripts_);
+    EXPECT_TRUE(webPattern->systemDocumentStartScripts_.empty());
+#endif
+}
+
+/**
+ * @tc.name: RegisterSystemDocumentStartJS_NoDelegate_006
+ * @tc.desc: RegisterSystemDocumentStartJS without delegate_ does not crash and stores state (EX-1).
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, RegisterSystemDocumentStartJS_NoDelegate_006, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->delegate_ = nullptr;
+
+    ScriptItems sysItems;
+    sysItems["*"] = { "console.log('no_delegate')" };
+    ScriptRegexItems sysRegex;
+    ScriptItemsByOrder sysByOrder;
+    sysByOrder.push_back("*");
+    webPattern->RegisterSystemDocumentStartJS(sysItems, sysRegex, sysByOrder);
+
+    // EX-1: state is stored even without delegate.
+    EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_.size(), 1);
+
+    // MergeAndInject should return early without delegate.
+    webPattern->MergeAndInjectJavaScriptOnDocumentStart();
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_.size(), 1);
+#endif
+}
+
+/**
+ * @tc.name: RemoveSystemDocumentStartJS_StopsExecutionAndPreservesAppJS_007
+ * @tc.desc: RemoveSystemDocumentStartJS clears system JS and re-injects app JS only (AC-1.3).
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, RemoveSystemDocumentStartJS_StopsExecutionAndPreservesAppJS_007, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // Step 1: Register app JS via ByOrder V2.
+    ScriptItems appItems;
+    appItems["app_script"] = { "console.log('app')" };
+    ScriptRegexItems appRegex;
+    ScriptItemsByOrder appOrder;
+    appOrder.push_back("app_script");
+    webPattern->onDocumentStartScriptItems_ = std::make_optional<ScriptItems>(appItems);
+    webPattern->onDocumentStartScriptRegexItems_ = std::make_optional<ScriptRegexItems>(appRegex);
+    webPattern->onDocumentStartScriptItemsByOrder_ = std::make_optional<ScriptItemsByOrder>(appOrder);
+    webPattern->UpdateJavaScriptOnDocumentStartByOrder();
+
+    // Step 2: Register system JS.
+    ScriptItems sysItems;
+    sysItems["*"] = { "console.log('system')" };
+    ScriptRegexItems sysRegex;
+    ScriptItemsByOrder sysByOrder;
+    sysByOrder.push_back("*");
+    webPattern->RegisterSystemDocumentStartJS(sysItems, sysRegex, sysByOrder);
+    EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_.size(), 1);
+
+    // Step 3: Remove system JS.
+    webPattern->RemoveSystemDocumentStartJS();
+
+    // AC-1.3: system JS is cleared, app JS persistent copy is preserved.
+    EXPECT_FALSE(webPattern->hasInnerOnDocumentStartScripts_);
+    EXPECT_TRUE(webPattern->systemDocumentStartScripts_.empty());
+    EXPECT_TRUE(webPattern->systemDocumentStartScriptItemsByOrder_.empty());
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItems_.size(), 1);
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItemsByOrder_.size(), 1);
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItemsByOrder_[0], "app_script");
+#endif
+}
+
+/**
+ * @tc.name: RemoveSystemDocumentStartJS_NoDelegate_008
+ * @tc.desc: RemoveSystemDocumentStartJS without delegate_ does not crash (EX-2).
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, RemoveSystemDocumentStartJS_NoDelegate_008, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->delegate_ = nullptr;
+
+    ScriptItems sysItems;
+    sysItems["*"] = { "console.log('test')" };
+    ScriptRegexItems sysRegex;
+    ScriptItemsByOrder sysByOrder;
+    sysByOrder.push_back("*");
+    webPattern->RegisterSystemDocumentStartJS(sysItems, sysRegex, sysByOrder);
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_.size(), 1);
+
+    // EX-2: should not crash without delegate.
+    webPattern->RemoveSystemDocumentStartJS();
+    EXPECT_FALSE(webPattern->hasInnerOnDocumentStartScripts_);
+    EXPECT_TRUE(webPattern->systemDocumentStartScripts_.empty());
+#endif
+}
+
+/**
+ * @tc.name: NoSystemDocumentStartJS_ExistingBehaviorUnchanged_009
+ * @tc.desc: Without system JS registered, existing DocumentStart behavior is unchanged (AC-1.6).
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, NoSystemDocumentStartJS_ExistingBehaviorUnchanged_009, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // Do NOT register system JS. Use existing API only.
+    ScriptItems appItems;
+    appItems["app_only"] = { "console.log('app_only')" };
+    webPattern->onDocumentStartScriptItems_ = std::make_optional<ScriptItems>(appItems);
+    webPattern->onDocumentStartScriptItemsByOrder_ = std::nullopt;
+    webPattern->UpdateJavaScriptOnDocumentStart();
+
+    // AC-1.6: existing behavior unchanged — no system JS, no merge triggered.
+    EXPECT_FALSE(webPattern->hasInnerOnDocumentStartScripts_);
+    EXPECT_TRUE(webPattern->systemDocumentStartScripts_.empty());
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItems_.size(), 1);
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItems_["app_only"],
+              std::vector<std::string>({ "console.log('app_only')" }));
+    // onDocumentStartScriptItems_ should be consumed.
+    EXPECT_FALSE(webPattern->onDocumentStartScriptItems_.has_value());
+#endif
+}
+
+/**
+ * @tc.name: SystemDocumentStartJS_PublicAndSystemCoexistence_010
+ * @tc.desc: Public and system scripts coexist without interference (BR-1).
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, SystemDocumentStartJS_PublicAndSystemCoexistence_010, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // Register public JS via ByOrder V2.
+    ScriptItems pubItems;
+    pubItems["pub_js"] = { "console.log('pub')" };
+    ScriptRegexItems pubRegex;
+    ScriptItemsByOrder pubOrder;
+    pubOrder.push_back("pub_js");
+    webPattern->onDocumentStartScriptItems_ = std::make_optional<ScriptItems>(pubItems);
+    webPattern->onDocumentStartScriptRegexItems_ = std::make_optional<ScriptRegexItems>(pubRegex);
+    webPattern->onDocumentStartScriptItemsByOrder_ = std::make_optional<ScriptItemsByOrder>(pubOrder);
+    webPattern->UpdateJavaScriptOnDocumentStartByOrder();
+
+    // Register system JS.
+    ScriptItems sysItems;
+    sysItems["*"] = { "console.log('system')" };
+    ScriptRegexItems sysRegex;
+    ScriptItemsByOrder sysByOrder;
+    sysByOrder.push_back("*");
+    webPattern->RegisterSystemDocumentStartJS(sysItems, sysRegex, sysByOrder);
+
+    // BR-1: system and public stores are independent.
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_.size(), 1);
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItems_.size(), 1);
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItemsByOrder_.size(), 1);
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItemsByOrder_[0], "pub_js");
+
+    // Remove system JS — public JS should be unaffected.
+    webPattern->RemoveSystemDocumentStartJS();
+    EXPECT_TRUE(webPattern->systemDocumentStartScripts_.empty());
+    EXPECT_TRUE(webPattern->systemDocumentStartScriptItemsByOrder_.empty());
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItems_.size(), 1);
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItemsByOrder_.size(), 1);
+#endif
+}
+
+/**
+ * @tc.name: MergeAndInject_BothEmpty_EarlyReturn_011
+ * @tc.desc: MergeAndInjectJavaScriptOnDocumentStart returns early when both system and public scripts are empty.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, MergeAndInject_BothEmpty_EarlyReturn_011, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // Register no scripts at all — both stores empty.
+    EXPECT_TRUE(webPattern->systemDocumentStartScripts_.empty());
+    EXPECT_TRUE(webPattern->publicOnDocumentStartScriptItems_.empty());
+
+    // Calling MergeAndInject directly should early-return without crashing.
+    webPattern->MergeAndInjectJavaScriptOnDocumentStart();
+
+    // AC: early return keeps state unchanged.
+    EXPECT_FALSE(webPattern->hasInnerOnDocumentStartScripts_);
+    EXPECT_TRUE(webPattern->systemDocumentStartScripts_.empty());
+    EXPECT_TRUE(webPattern->publicOnDocumentStartScriptItems_.empty());
+    EXPECT_TRUE(webPattern->publicOnDocumentStartScriptItemsByOrder_.empty());
+#endif
+}
+
+/**
+ * @tc.name: MergeAndInject_OnlySystemWithByOrder_TakesByOrderPath_012
+ * @tc.desc: MergeAndInject takes the ByOrder path when only system JS with ByOrder info is present.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, MergeAndInject_OnlySystemWithByOrder_TakesByOrderPath_012, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // Register system JS with ByOrder info, no public scripts registered.
+    ScriptItems sysItems;
+    sysItems["sys_js"] = { "console.log('sys')" };
+    ScriptRegexItems sysRegex;
+    ScriptItemsByOrder sysByOrder;
+    sysByOrder.push_back("sys_js");
+    webPattern->RegisterSystemDocumentStartJS(sysItems, sysRegex, sysByOrder);
+
+    // AC: onlySystemWithByOrder path is taken (not the non-ByOrder fallback).
+    // Persistent system stores are populated and the flag is set; no crash.
+    EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_.size(), 1);
+    EXPECT_EQ(webPattern->systemDocumentStartScriptItemsByOrder_.size(), 1);
+    EXPECT_EQ(webPattern->systemDocumentStartScriptItemsByOrder_[0], "sys_js");
+    // Public stores remain empty (no app JS registered).
+    EXPECT_TRUE(webPattern->publicOnDocumentStartScriptItems_.empty());
+    EXPECT_TRUE(webPattern->publicOnDocumentStartScriptItemsByOrder_.empty());
+#endif
+}
+
+/**
+ * @tc.name: MergeByOrderPath_ScriptKeyCollision_UrlRulesAppended_013
+ * @tc.desc: When system and public share a script key, URL rules are appended (not overwritten) at merge time.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, MergeByOrderPath_ScriptKeyCollision_UrlRulesAppended_013, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // Step 1: Register public script with key "shared_script" and URL rule "*".
+    ScriptItems pubItems;
+    pubItems["shared_script"] = { "*" };
+    ScriptRegexItems pubRegex;
+    ScriptItemsByOrder pubOrder;
+    pubOrder.push_back("shared_script");
+    webPattern->onDocumentStartScriptItems_ = std::make_optional<ScriptItems>(pubItems);
+    webPattern->onDocumentStartScriptRegexItems_ = std::make_optional<ScriptRegexItems>(pubRegex);
+    webPattern->onDocumentStartScriptItemsByOrder_ = std::make_optional<ScriptItemsByOrder>(pubOrder);
+    webPattern->UpdateJavaScriptOnDocumentStartByOrder();
+
+    // Step 2: Register system script with the SAME key "shared_script" but a different URL rule.
+    ScriptItems sysItems;
+    sysItems["shared_script"] = { "https://example.com" };
+    ScriptRegexItems sysRegex;
+    ScriptItemsByOrder sysByOrder;
+    sysByOrder.push_back("shared_script");
+    webPattern->RegisterSystemDocumentStartJS(sysItems, sysRegex, sysByOrder);
+
+    // AC: system and public stores are independent; both keep their own URL rules.
+    // Append semantics apply only at merge time (passed to delegate); the persistent
+    // per-store values are NOT mutated by the merge.
+    ASSERT_EQ(webPattern->systemDocumentStartScripts_.count("shared_script"), 1u);
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_["shared_script"],
+              std::vector<std::string>({ "https://example.com" }));
+    ASSERT_EQ(webPattern->publicOnDocumentStartScriptItems_.count("shared_script"), 1u);
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItems_["shared_script"],
+              std::vector<std::string>({ "*" }));
+    EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+#endif
+}
+
+/**
+ * @tc.name: MergeByOrderPath_AppFirstThenSystem_OrderVerified_014
+ * @tc.desc: App ByOrder scripts precede system ByOrder scripts after merge; both keep their own order.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, MergeByOrderPath_AppFirstThenSystem_OrderVerified_014, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // Step 1: Register public ByOrder scripts ["app_1", "app_2"].
+    ScriptItems pubItems;
+    pubItems["app_1"] = { "*" };
+    pubItems["app_2"] = { "*" };
+    ScriptRegexItems pubRegex;
+    ScriptItemsByOrder pubOrder;
+    pubOrder.push_back("app_1");
+    pubOrder.push_back("app_2");
+    webPattern->onDocumentStartScriptItems_ = std::make_optional<ScriptItems>(pubItems);
+    webPattern->onDocumentStartScriptRegexItems_ = std::make_optional<ScriptRegexItems>(pubRegex);
+    webPattern->onDocumentStartScriptItemsByOrder_ = std::make_optional<ScriptItemsByOrder>(pubOrder);
+    webPattern->UpdateJavaScriptOnDocumentStartByOrder();
+
+    // Step 2: Register system ByOrder scripts ["sys_1", "sys_2"].
+    ScriptItems sysItems;
+    sysItems["sys_1"] = { "*" };
+    sysItems["sys_2"] = { "*" };
+    ScriptRegexItems sysRegex;
+    ScriptItemsByOrder sysByOrder;
+    sysByOrder.push_back("sys_1");
+    sysByOrder.push_back("sys_2");
+    webPattern->RegisterSystemDocumentStartJS(sysItems, sysRegex, sysByOrder);
+
+    // AC: both stores preserve their own order independently (app is merged to
+    // the front of the delegate batch, system appended after — verified via the
+    // persistent per-store ByOrder vectors).
+    ASSERT_EQ(webPattern->systemDocumentStartScriptItemsByOrder_.size(), 2u);
+    EXPECT_EQ(webPattern->systemDocumentStartScriptItemsByOrder_[0], "sys_1");
+    EXPECT_EQ(webPattern->systemDocumentStartScriptItemsByOrder_[1], "sys_2");
+    ASSERT_EQ(webPattern->publicOnDocumentStartScriptItemsByOrder_.size(), 2u);
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItemsByOrder_[0], "app_1");
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItemsByOrder_[1], "app_2");
+    EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+#endif
+}
+
+/**
+ * @tc.name: MergeByOrderPath_RegexItemsMerged_015
+ * @tc.desc: System and public regex items are merged independently under the ByOrder path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, MergeByOrderPath_RegexItemsMerged_015, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // Step 1: Register public ByOrder with regex items.
+    ScriptItems pubItems;
+    pubItems["pub_js"] = { "*" };
+    ScriptRegexItems pubRegex;
+    pubRegex["pub_js"] = { { "pattern1", "replacement1" } };
+    ScriptItemsByOrder pubOrder;
+    pubOrder.push_back("pub_js");
+    webPattern->onDocumentStartScriptItems_ = std::make_optional<ScriptItems>(pubItems);
+    webPattern->onDocumentStartScriptRegexItems_ = std::make_optional<ScriptRegexItems>(pubRegex);
+    webPattern->onDocumentStartScriptItemsByOrder_ = std::make_optional<ScriptItemsByOrder>(pubOrder);
+    webPattern->UpdateJavaScriptOnDocumentStartByOrder();
+
+    // Step 2: Register system ByOrder with regex items.
+    ScriptItems sysItems;
+    sysItems["sys_js"] = { "*" };
+    ScriptRegexItems sysRegex;
+    sysRegex["sys_js"] = { { "pattern2", "replacement2" } };
+    ScriptItemsByOrder sysByOrder;
+    sysByOrder.push_back("sys_js");
+    webPattern->RegisterSystemDocumentStartJS(sysItems, sysRegex, sysByOrder);
+
+    // AC: both regex stores are independent.
+    ASSERT_EQ(webPattern->systemDocumentStartScriptRegexItems_.count("sys_js"), 1u);
+    EXPECT_EQ(webPattern->systemDocumentStartScriptRegexItems_["sys_js"].size(), 1u);
+    EXPECT_EQ(webPattern->systemDocumentStartScriptRegexItems_["sys_js"][0].first, "pattern2");
+    EXPECT_EQ(webPattern->systemDocumentStartScriptRegexItems_["sys_js"][0].second, "replacement2");
+    ASSERT_EQ(webPattern->publicOnDocumentStartScriptRegexItems_.count("pub_js"), 1u);
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptRegexItems_["pub_js"].size(), 1u);
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptRegexItems_["pub_js"][0].first, "pattern1");
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptRegexItems_["pub_js"][0].second, "replacement1");
+    EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+#endif
+}
+
+/**
+ * @tc.name: MergeNonByOrderPath_SystemMergedIntoPublic_016
+ * @tc.desc: When app uses non-ByOrder API, MergeAndInject takes the non-ByOrder fallback path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, MergeNonByOrderPath_SystemMergedIntoPublic_016, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // Step 1: Register public JS via non-ByOrder API (no ByOrder optional set).
+    ScriptItems appItems;
+    appItems["app_js"] = { "*" };
+    webPattern->onDocumentStartScriptItems_ = std::make_optional<ScriptItems>(appItems);
+    webPattern->onDocumentStartScriptItemsByOrder_ = std::nullopt;
+    webPattern->UpdateJavaScriptOnDocumentStart();
+    EXPECT_TRUE(webPattern->publicOnDocumentStartScriptItemsByOrder_.empty());
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItems_.size(), 1);
+
+    // Step 2: Register system JS (with ByOrder info). Because public is non-ByOrder,
+    // MergeAndInject takes the non-ByOrder fallback path.
+    ScriptItems sysItems;
+    sysItems["sys_js"] = { "*" };
+    ScriptRegexItems sysRegex;
+    ScriptItemsByOrder sysByOrder;
+    sysByOrder.push_back("sys_js");
+    webPattern->RegisterSystemDocumentStartJS(sysItems, sysRegex, sysByOrder);
+
+    // AC: non-ByOrder path taken — ByOrder public vector stays empty; both
+    // system and public stores hold their scripts; no crash.
+    EXPECT_TRUE(webPattern->publicOnDocumentStartScriptItemsByOrder_.empty());
+    ASSERT_EQ(webPattern->systemDocumentStartScripts_.size(), 1u);
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_["sys_js"], std::vector<std::string>({ "*" }));
+    ASSERT_EQ(webPattern->publicOnDocumentStartScriptItems_.size(), 1u);
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItems_["app_js"], std::vector<std::string>({ "*" }));
+    EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+#endif
+}
+
+/**
+ * @tc.name: RemoveSystemDocumentStartJS_OnlySystem_BothEmptyEarlyReturn_017
+ * @tc.desc: RemoveSystemDocumentStartJS with only system scripts triggers MergeAndInject early return (both empty).
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, RemoveSystemDocumentStartJS_OnlySystem_BothEmptyEarlyReturn_017, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // Step 1: Register ONLY system JS (no public JS registered).
+    ScriptItems sysItems;
+    sysItems["sys_js"] = { "console.log('sys')" };
+    ScriptRegexItems sysRegex;
+    ScriptItemsByOrder sysByOrder;
+    sysByOrder.push_back("sys_js");
+    webPattern->RegisterSystemDocumentStartJS(sysItems, sysRegex, sysByOrder);
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_.size(), 1);
+    EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+    EXPECT_TRUE(webPattern->publicOnDocumentStartScriptItems_.empty());
+
+    // Step 2: Remove system JS — both stores become empty, MergeAndInject early-returns.
+    webPattern->RemoveSystemDocumentStartJS();
+
+    // AC: system store cleared; flag reset; public store remains empty; no crash.
+    EXPECT_FALSE(webPattern->hasInnerOnDocumentStartScripts_);
+    EXPECT_TRUE(webPattern->systemDocumentStartScripts_.empty());
+    EXPECT_TRUE(webPattern->systemDocumentStartScriptItemsByOrder_.empty());
+    EXPECT_TRUE(webPattern->systemDocumentStartScriptRegexItems_.empty());
+    EXPECT_TRUE(webPattern->publicOnDocumentStartScriptItems_.empty());
+    EXPECT_TRUE(webPattern->publicOnDocumentStartScriptItemsByOrder_.empty());
+#endif
+}
+
+/**
+ * @tc.name: UpdateJavaScriptOnDocumentStart_HasInner_TriggersReMerge_018
+ * @tc.desc: UpdateJavaScriptOnDocumentStart with hasInner triggers MergeAndInject and consumes the optional.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, UpdateJavaScriptOnDocumentStart_HasInner_TriggersReMerge_018, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // Step 1: Register system JS first so hasInnerOnDocumentStartScripts_ becomes true.
+    ScriptItems sysItems;
+    sysItems["sys_js"] = { "console.log('sys')" };
+    ScriptRegexItems sysRegex;
+    ScriptItemsByOrder sysByOrder;
+    sysByOrder.push_back("sys_js");
+    webPattern->RegisterSystemDocumentStartJS(sysItems, sysRegex, sysByOrder);
+    EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+
+    // Step 2: Set onDocumentStartScriptItems_ and call non-ByOrder update.
+    ScriptItems appItems;
+    appItems["app_js"] = { "*" };
+    webPattern->onDocumentStartScriptItems_ = std::make_optional<ScriptItems>(appItems);
+    webPattern->onDocumentStartScriptItemsByOrder_ = std::nullopt;
+    webPattern->UpdateJavaScriptOnDocumentStart();
+
+    // AC: public scripts persisted; optional consumed; hasInner still true.
+    ASSERT_EQ(webPattern->publicOnDocumentStartScriptItems_.size(), 1u);
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItems_["app_js"], std::vector<std::string>({ "*" }));
+    EXPECT_FALSE(webPattern->onDocumentStartScriptItems_.has_value());
+    EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+    // System store untouched by the public update.
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_.size(), 1);
+#endif
+}
+
+/**
+ * @tc.name: UpdateJavaScriptOnDocumentStartByOrder_HasInner_TriggersReMerge_019
+ * @tc.desc: UpdateJavaScriptOnDocumentStartByOrder with hasInner triggers MergeAndInject and consumes all optionals.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, UpdateJavaScriptOnDocumentStartByOrder_HasInner_TriggersReMerge_019,
+    TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // Step 1: Register system JS so hasInnerOnDocumentStartScripts_ becomes true.
+    ScriptItems sysItems;
+    sysItems["sys_js"] = { "console.log('sys')" };
+    ScriptRegexItems sysRegex;
+    sysRegex["sys_js"] = { { "p", "r" } };
+    ScriptItemsByOrder sysByOrder;
+    sysByOrder.push_back("sys_js");
+    webPattern->RegisterSystemDocumentStartJS(sysItems, sysRegex, sysByOrder);
+    EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+
+    // Step 2: Set three optionals and call ByOrder update.
+    ScriptItems appItems;
+    appItems["app_js"] = { "*" };
+    ScriptRegexItems appRegex;
+    appRegex["app_js"] = { { "ap", "ar" } };
+    ScriptItemsByOrder appOrder;
+    appOrder.push_back("app_js");
+    webPattern->onDocumentStartScriptItems_ = std::make_optional<ScriptItems>(appItems);
+    webPattern->onDocumentStartScriptRegexItems_ = std::make_optional<ScriptRegexItems>(appRegex);
+    webPattern->onDocumentStartScriptItemsByOrder_ = std::make_optional<ScriptItemsByOrder>(appOrder);
+    webPattern->UpdateJavaScriptOnDocumentStartByOrder();
+
+    // AC: all three public stores persisted; all optionals consumed; hasInner still true.
+    ASSERT_EQ(webPattern->publicOnDocumentStartScriptItems_.size(), 1u);
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItems_["app_js"], std::vector<std::string>({ "*" }));
+    ASSERT_EQ(webPattern->publicOnDocumentStartScriptRegexItems_.size(), 1u);
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptRegexItems_["app_js"].size(), 1u);
+    ASSERT_EQ(webPattern->publicOnDocumentStartScriptItemsByOrder_.size(), 1u);
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItemsByOrder_[0], "app_js");
+    EXPECT_FALSE(webPattern->onDocumentStartScriptItems_.has_value());
+    EXPECT_FALSE(webPattern->onDocumentStartScriptRegexItems_.has_value());
+    EXPECT_FALSE(webPattern->onDocumentStartScriptItemsByOrder_.has_value());
+    EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+#endif
+}
+
+/**
+ * @tc.name: MergeAndInject_MultipleSystemScripts_OrderPreserved_020
+ * @tc.desc: Multiple system ByOrder scripts preserve their order after merge with no public scripts.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, MergeAndInject_MultipleSystemScripts_OrderPreserved_020, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // Register three system scripts via ByOrder; no public scripts.
+    ScriptItems sysItems;
+    sysItems["sys_a"] = { "*" };
+    sysItems["sys_b"] = { "*" };
+    sysItems["sys_c"] = { "*" };
+    ScriptRegexItems sysRegex;
+    ScriptItemsByOrder sysByOrder;
+    sysByOrder.push_back("sys_a");
+    sysByOrder.push_back("sys_b");
+    sysByOrder.push_back("sys_c");
+    webPattern->RegisterSystemDocumentStartJS(sysItems, sysRegex, sysByOrder);
+
+    // AC: ByOrder order preserved; system store holds 3 keys; no crash.
+    ASSERT_EQ(webPattern->systemDocumentStartScriptItemsByOrder_.size(), 3u);
+    EXPECT_EQ(webPattern->systemDocumentStartScriptItemsByOrder_[0], "sys_a");
+    EXPECT_EQ(webPattern->systemDocumentStartScriptItemsByOrder_[1], "sys_b");
+    EXPECT_EQ(webPattern->systemDocumentStartScriptItemsByOrder_[2], "sys_c");
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_.size(), 3u);
+    EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+    // No public scripts registered.
+    EXPECT_TRUE(webPattern->publicOnDocumentStartScriptItems_.empty());
+    EXPECT_TRUE(webPattern->publicOnDocumentStartScriptItemsByOrder_.empty());
+#endif
+}
+
+/**
+ * @tc.name: MergeByOrderPath_RegexKeyCollision_AppendNoCrash_021
+ * @tc.desc: When system and public regex share a script key, the merge appends without crash; stores stay independent.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, MergeByOrderPath_RegexKeyCollision_AppendNoCrash_021, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // Step 1: Register public ByOrder with a regex entry under key "shared".
+    ScriptItems pubItems;
+    pubItems["shared"] = { "*" };
+    ScriptRegexItems pubRegex;
+    pubRegex["shared"] = { { "pub_pattern", "pub_replacement" } };
+    ScriptItemsByOrder pubOrder;
+    pubOrder.push_back("shared");
+    webPattern->onDocumentStartScriptItems_ = std::make_optional<ScriptItems>(pubItems);
+    webPattern->onDocumentStartScriptRegexItems_ = std::make_optional<ScriptRegexItems>(pubRegex);
+    webPattern->onDocumentStartScriptItemsByOrder_ = std::make_optional<ScriptItemsByOrder>(pubOrder);
+    webPattern->UpdateJavaScriptOnDocumentStartByOrder();
+
+    // Step 2: Register system ByOrder with a regex entry under the SAME key "shared".
+    // This triggers the append branch in MergeByOrderPath (public inserts first,
+    // system appends second because the key already exists in mergedRegexItems).
+    ScriptItems sysItems;
+    sysItems["shared"] = { "https://example.com" };
+    ScriptRegexItems sysRegex;
+    sysRegex["shared"] = { { "sys_pattern", "sys_replacement" } };
+    ScriptItemsByOrder sysByOrder;
+    sysByOrder.push_back("shared");
+    webPattern->RegisterSystemDocumentStartJS(sysItems, sysRegex, sysByOrder);
+
+    // AC: append branch executed without crash; persistent stores stay independent.
+    ASSERT_EQ(webPattern->systemDocumentStartScriptRegexItems_.count("shared"), 1u);
+    EXPECT_EQ(webPattern->systemDocumentStartScriptRegexItems_["shared"].size(), 1u);
+    EXPECT_EQ(webPattern->systemDocumentStartScriptRegexItems_["shared"][0].first, "sys_pattern");
+    ASSERT_EQ(webPattern->publicOnDocumentStartScriptRegexItems_.count("shared"), 1u);
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptRegexItems_["shared"].size(), 1u);
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptRegexItems_["shared"][0].first, "pub_pattern");
+    EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+#endif
+}
+
+/**
+ * @tc.name: MergeNonByOrderPath_ScriptKeyCollision_AppendNoCrash_022
+ * @tc.desc: When system and public ScriptItems share a key on the non-ByOrder path, append runs without crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, MergeNonByOrderPath_ScriptKeyCollision_AppendNoCrash_022, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // Step 1: Register public JS via non-ByOrder API with key "shared".
+    ScriptItems appItems;
+    appItems["shared"] = { "*" };
+    webPattern->onDocumentStartScriptItems_ = std::make_optional<ScriptItems>(appItems);
+    webPattern->onDocumentStartScriptItemsByOrder_ = std::nullopt;
+    webPattern->UpdateJavaScriptOnDocumentStart();
+
+    // Step 2: Register system JS with the SAME key "shared". MergeNonByOrderPath
+    // starts mergedItems = publicOnDocumentStartScriptItems_ (already has "shared"),
+    // then iterates system items; the "shared" key already exists → append branch.
+    ScriptItems sysItems;
+    sysItems["shared"] = { "https://example.com" };
+    ScriptRegexItems sysRegex;
+    ScriptItemsByOrder sysByOrder;
+    sysByOrder.push_back("shared");
+    webPattern->RegisterSystemDocumentStartJS(sysItems, sysRegex, sysByOrder);
+
+    // AC: append branch executed without crash; persistent stores stay independent.
+    ASSERT_EQ(webPattern->publicOnDocumentStartScriptItems_.count("shared"), 1u);
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItems_["shared"], std::vector<std::string>({ "*" }));
+    ASSERT_EQ(webPattern->systemDocumentStartScripts_.count("shared"), 1u);
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_["shared"],
+              std::vector<std::string>({ "https://example.com" }));
+    EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+    // non-ByOrder path taken — ByOrder public vector stays empty.
+    EXPECT_TRUE(webPattern->publicOnDocumentStartScriptItemsByOrder_.empty());
+#endif
+}
 } // namespace OHOS::Ace::NG

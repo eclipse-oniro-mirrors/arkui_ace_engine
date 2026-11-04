@@ -5826,6 +5826,11 @@ void WebDelegate::OnPageStarted(const std::string& param)
             delegate->RecordWebEvent(Recorder::EventType::WEB_PAGE_BEGIN, param);
             delegate->ResetStateOfDataDetectorJS();
             webPattern->InitDataDetector();
+            auto pageUrl = delegate->GetUrl();
+            if (pageUrl != "about:blank") {
+                TAG_LOGI(AceLogTag::ACE_WEB, "OnPageStarted:Start to RunJsInit.");
+                webPattern->RunJsInit();
+            }
         },
         TaskExecutor::TaskType::JS, "ArkUIWebPageStarted");
     taskExecutor_->PostTask(
@@ -5856,11 +5861,6 @@ void WebDelegate::OnPageFinished(const std::string& param)
             webEventHub->FireOnPageFinishedEvent(std::make_shared<LoadWebPageFinishEvent>(param));
             webPattern->OnScrollEndRecursive(std::nullopt);
             delegate->RecordWebEvent(Recorder::EventType::WEB_PAGE_END, param);
-            auto pageUrl = delegate->GetUrl();
-            if (pageUrl != "about:blank") {
-                TAG_LOGI(AceLogTag::ACE_WEB, "OnPageFinished:Start to RunJsInit.");
-                webPattern->RunJsInit();
-            }
             delegate->RunDataDetectorJS();
         },
         TaskExecutor::TaskType::JS, "ArkUIWebPageFinished");
