@@ -28948,6 +28948,8 @@ typedef struct GENERATED_ArkUIWebModifier {
                                  const Opt_Boolean* value);
     void (*setDomStorageAccess)(Ark_NativePointer node,
                                 const Opt_Boolean* value);
+    void (*setVisitedLinkPersistEnabled)(Ark_NativePointer node,
+                                         const Opt_Boolean* value);
     void (*setImageAccess)(Ark_NativePointer node,
                            const Opt_Boolean* value);
     void (*setMixedMode)(Ark_NativePointer node,

@@ -3321,6 +3321,7 @@ const GENERATED_ArkUIWebModifier* GetWebModifier()
         WebAttributeModifier::SetFileAccessImpl,
         WebAttributeModifier::SetOnlineImageAccessImpl,
         WebAttributeModifier::SetDomStorageAccessImpl,
+        WebAttributeModifier::SetVisitedLinkPersistEnabledImpl,
         WebAttributeModifier::SetImageAccessImpl,
         WebAttributeModifier::SetMixedModeImpl,
         WebAttributeModifier::SetZoomAccessImpl,
