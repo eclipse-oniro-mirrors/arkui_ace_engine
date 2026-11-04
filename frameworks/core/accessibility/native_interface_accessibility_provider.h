@@ -69,13 +69,19 @@ public:
 private:
     void NotifyRegisterCallback(bool isRegister);
 
-    ArkUI_AccessibilityProviderCallbacks accessibilityProviderCallbacks_ {};
-    ArkUI_AccessibilityProviderCallbacksWithInstance accessibilityProviderCallbacksWithInstance_ {};
+    struct CallbackSnapshot {
+        ArkUI_AccessibilityProviderCallbacks callbacks {};
+        ArkUI_AccessibilityProviderCallbacksWithInstance callbacksWithInstance {};
+        std::string instanceId;
+    };
+    CallbackSnapshot GetCallbackSnapshot();
+
+    std::mutex callbacksMutex_;
+    CallbackSnapshot callbacks_;
     OHOS::Ace::WeakPtr<OHOS::Ace::AccessibilityProvider> accessibilityProvider_;
     std::mutex accessibilityProviderMutex_;
     RegisterCallback registerCallback_;
     std::mutex registerCallbackMutex_;
     std::atomic<bool> callbacksRegistered_ { false };
-    std::string instanceId_;
 };
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_ACCESSIBILITY_NATIVE_INTERFACE_ACCESSIBILITY_HANDLE_H
