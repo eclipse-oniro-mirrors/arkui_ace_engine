@@ -5442,6 +5442,8 @@ struct ArkUIGridModifier {
     void (*setDirection)(ArkUINodeHandle node, ArkUI_Int32 direction);
     void (*setHeight)(ArkUINodeHandle node, ArkUI_Float64 value, ArkUI_Int32 unit, ArkUI_CharPtr calcValue);
     void (*setOnScrollToIndex)(ArkUINodeHandle node, void* callback);
+    void (*setScrollToIndexWithOptions)(
+        ArkUINodeHandle node, ArkUI_Int32 index, const ArkUIScrollToIndexOptions* options);
 };
 
 struct ArkUIGridItemModifier {

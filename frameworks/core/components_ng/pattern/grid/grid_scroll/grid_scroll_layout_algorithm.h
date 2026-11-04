@@ -34,6 +34,10 @@ public:
     void Measure(LayoutWrapper* layoutWrapper) override;
     void Layout(LayoutWrapper* layoutWrapper) override;
 
+    // Used only for an actual fast-scroll relocation batch; ordinary frames keep their normal layout path.
+    void SetFastScrollTargetForLayout(const GridFastScrollTarget& target);
+
+
     void SetCanOverScrollStart(bool canOverScroll)
     {
         canOverScrollStart_ = canOverScroll;
@@ -79,6 +83,9 @@ public:
     }
 
 protected:
+    virtual std::unique_ptr<GridScrollLayoutAlgorithm> CreateFastScrollPreparation(LayoutWrapper* layoutWrapper);
+    virtual bool PrepareFastScrollAnchor(LayoutWrapper* layoutWrapper, int32_t targetIndex);
+
     void SkipForwardLines(float mainSize, LayoutWrapper* layoutWrapper);
     void SkipBackwardLines(float mainSize, LayoutWrapper* layoutWrapper);
     void SkipRegularLines(bool forward);
@@ -292,6 +299,20 @@ private:
     bool canOverScrollStart_ = false;
     bool canOverScrollEnd_ = false;
     bool enableSkipping_ = true;               // enables skipping lines on a large offset change.
+    bool BuildFastScrollSpanMatrix(LayoutWrapper* layoutWrapper, int32_t targetIndex, int32_t& firstLine);
+    void FindFastScrollAnchor(int32_t& firstLine, int32_t& firstIndex);
+    bool UpdateFrameSizeForMeasure(const RefPtr<GridLayoutProperty>& gridLayoutProperty, bool& matchChildren);
+    bool ShouldSyncLoad(const RefPtr<GridLayoutProperty>& gridLayoutProperty, bool matchChildren) const;
+    float ClampOffsetOnReachStart();
+    bool PrepareFastScrollViewport(float mainSize, float crossSize, LayoutWrapper* layoutWrapper);
+    void PrepareFastScroll(LayoutWrapper* layoutWrapper);
+    std::optional<RectF> GetFastScrollTargetRect(LayoutWrapper* layoutWrapper, int32_t targetIndex);
+
+    std::optional<GridFastScrollTarget> fastScrollPreparation_;
+    bool fastScrollAnchorPrepared_ = false;
+    bool fastScrollKeepViewport_ = false;
+    bool fastScrollPreparationOnly_ = false;
+    bool fastScrollPreparationFailed_ = false;
     bool isLayouted_ = true;
     std::unique_ptr<GridLayoutInfo> infoCopy_; // legacy impl to save independent data for animation.
 

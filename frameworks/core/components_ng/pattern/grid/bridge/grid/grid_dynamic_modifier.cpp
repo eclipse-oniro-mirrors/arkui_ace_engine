@@ -18,6 +18,7 @@
 
 #include "interfaces/native/native_type.h"
 #include "interfaces/native/node/grid_layout_option.h"
+#include "interfaces/native/node/list_option.h"
 #include "interfaces/native/node/node_model.h"
 
 #include "core/common/container.h"
@@ -872,6 +873,17 @@ void SetScrollToIndex(
     CHECK_NULL_VOID(frameNode);
     std::optional<float> extraOffset = options;
     GridModelNG::SetScrollToIndex(frameNode, index, animation, alignment, extraOffset);
+}
+
+void SetScrollToIndexWithOptions(
+    ArkUINodeHandle node, ArkUI_Int32 index, const ArkUIScrollToIndexOptions* options)
+{
+    auto* frameNode = GetFrameNode(node);
+    CHECK_NULL_VOID(frameNode);
+    CHECK_NULL_VOID(options);
+    GridModelNG::SetScrollToIndexWithOptions(frameNode, index, options->smooth,
+        static_cast<ScrollAlign>(options->align), options->extraOffset,
+        static_cast<FastScrollMode>(options->fastScrollMode));
 }
 
 void SetSupportLazyLoadingEmptyBranch(ArkUINodeHandle node, ArkUI_Bool support)
@@ -1928,6 +1940,7 @@ const ArkUIGridModifier* GetGridDynamicModifier()
             .setDirection = SetDirectionImpl,
             .setHeight = SetHeightImpl,
             .setOnScrollToIndex = SetOnScrollToIndexImpl,
+            .setScrollToIndexWithOptions = nullptr,
         };
         CHECK_INITIALIZED_FIELDS_END(modifierImpl, 0, 0, 0); // don't move this line
         return &modifierImpl;
@@ -2070,6 +2083,7 @@ const ArkUIGridModifier* GetGridDynamicModifier()
         .setDirection = SetDirection,
         .setHeight = SetHeight,
         .setOnScrollToIndex = SetOnScrollToIndex,
+        .setScrollToIndexWithOptions = SetScrollToIndexWithOptions,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;

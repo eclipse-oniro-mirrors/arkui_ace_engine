@@ -46,18 +46,212 @@ void AddCacheItemsInFront(
 }
 } // namespace
 
-void GridScrollLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
+std::unique_ptr<GridScrollLayoutAlgorithm> GridScrollLayoutAlgorithm::CreateFastScrollPreparation(
+    LayoutWrapper* layoutWrapper)
 {
-    wrapper_ = layoutWrapper;
-    auto gridLayoutProperty = AceType::DynamicCast<GridLayoutProperty>(layoutWrapper->GetLayoutProperty());
-    CHECK_NULL_VOID(gridLayoutProperty);
+    if (HasLayoutOptions(layoutWrapper)) {
+        return nullptr;
+    }
+    return std::make_unique<GridScrollLayoutAlgorithm>(info_);
+}
 
-    // Pre-recycle
-    ScrollableUtils::RecycleItemsOutOfBoundary(
-        info_.axis_, info_.currentOffset_ - info_.prevOffset_, info_.startIndex_, info_.endIndex_, layoutWrapper);
+void GridScrollLayoutAlgorithm::SetFastScrollTargetForLayout(const GridFastScrollTarget& target)
+{
+    const int32_t index = target.index == LAST_ITEM ? info_.GetChildrenCount() - 1 : target.index;
+    if (!IsFastScrollEnabled(target.mode) || !std::isfinite(target.extraOffsetPx) ||
+        index < 0 || index >= info_.GetChildrenCount()) {
+        return;
+    }
+    fastScrollPreparation_ = target;
+    info_.targetIndex_.reset();
+    info_.jumpIndex_ = index;
+    info_.scrollAlign_ = target.align;
+    fastScrollKeepViewport_ = target.align == ScrollAlign::AUTO &&
+        index >= info_.startIndex_ && index <= info_.endIndex_;
+    if (target.align == ScrollAlign::AUTO && !fastScrollKeepViewport_) {
+        info_.scrollAlign_ = index < info_.startIndex_ ? ScrollAlign::START : ScrollAlign::END;
+    }
+    info_.extraOffset_ = -target.extraOffsetPx;
+}
 
-    // Step1: Decide size of Grid
-    Axis axis = info_.axis_;
+void GridScrollLayoutAlgorithm::PrepareFastScroll(LayoutWrapper* layoutWrapper)
+{
+    if (!info_.fastScrollTarget_ ||
+        info_.crossCount_ <= 0 || info_.GetChildrenCount() <= 0) {
+        return;
+    }
+    const float viewport = GetMainAxisSize(frameSize_, info_.axis_);
+    if (!std::isfinite(viewport) || NonPositive(viewport)) {
+        return;
+    }
+    const auto request = *info_.fastScrollTarget_;
+    const int32_t index = request.index == LAST_ITEM ? info_.GetChildrenCount() - 1 : request.index;
+    if (index < 0 || index >= info_.GetChildrenCount()) {
+        return;
+    }
+    auto preparationAlgorithm = CreateFastScrollPreparation(layoutWrapper);
+    CHECK_NULL_VOID(preparationAlgorithm);
+    auto& preparation = *preparationAlgorithm;
+    preparation.info_.ResetFastScroll();
+    preparation.SetFastScrollTargetForLayout(request);
+    preparation.fastScrollPreparationOnly_ = true;
+    preparation.contentClipMode_ = contentClipMode_;
+    preparation.clipShapeRect_ = clipShapeRect_;
+    preparation.safeAreaPad_ = safeAreaPad_;
+    preparation.Measure(layoutWrapper);
+    if (preparation.fastScrollPreparationFailed_ || preparation.MeasureInNextFrame()) {
+        return;
+    }
+    auto rect = preparation.GetFastScrollTargetRect(layoutWrapper, index);
+    if (!rect || !std::isfinite(rect->Left()) || !std::isfinite(rect->Top()) ||
+        !std::isfinite(rect->Width()) || !std::isfinite(rect->Height())) {
+        return;
+    }
+    const float offset = preparation.info_.GetFastScrollOffset(mainGap_, info_.lineHeightMap_);
+    if (!std::isfinite(offset)) {
+        return;
+    }
+    // Geometry is expressed in the layout's content coordinates. Unmeasured gaps use its offset estimate;
+    // the measured target size, occupied cells and alignment are never replaced by that estimate.
+    const bool reverse = info_.axis_ == Axis::HORIZONTAL &&
+        layoutWrapper->GetLayoutProperty()->GetNonAutoLayoutDirection() == TextDirection::RTL;
+    rect->SetOffset(rect->GetOffset() + OffsetF(0.0f, reverse ? -offset : offset, info_.axis_));
+    info_.fastScrollGeometry_ = GridFastScrollGeometry { *rect, offset,
+        std::min({ info_.startIndex_, index, preparation.info_.startIndex_ }),
+        std::max({ info_.endIndex_, index, preparation.info_.endIndex_ }), true };
+}
+
+bool GridScrollLayoutAlgorithm::BuildFastScrollSpanMatrix(
+    LayoutWrapper* layoutWrapper, int32_t targetIndex, int32_t& firstLine)
+{
+    // Read real GridItem spans through the existing placement algorithm, without measuring the prefix.
+    info_.gridMatrix_.clear();
+    info_.lineHeightMap_.clear();
+    info_.irregularItemsPosition_.clear();
+    currentMainLineIndex_ = 0;
+    lastCross_ = 0;
+    for (int32_t index = 0; index <= targetIndex; ++index) {
+        // Match the normal viewport's FillCurrentLine hole filling before advancing to the next row.
+        lastCross_ = 0;
+        auto child = GetGridItem(layoutWrapper, index, false);
+        CHECK_NULL_RETURN(child, false);
+        while (MeasureCachedChild(SizeF(), index, layoutWrapper, child) < 0) {
+            ++currentMainLineIndex_;
+            lastCross_ = 0;
+        }
+    }
+    return IsIndexInMatrix(targetIndex, firstLine);
+}
+
+void GridScrollLayoutAlgorithm::FindFastScrollAnchor(int32_t& firstLine, int32_t& firstIndex)
+{
+    // Close over origins of multi-line items which intersect the target row.
+    bool expanded = false;
+    do {
+        for (const auto& [column, item] : info_.gridMatrix_.at(firstLine)) {
+            if (item >= 0) {
+                firstIndex = std::min(firstIndex, item);
+            }
+        }
+        int32_t origin = firstLine;
+        expanded = IsIndexInMatrix(firstIndex, origin) && origin != firstLine;
+        if (expanded) {
+            firstLine = origin;
+        }
+    } while (expanded);
+}
+
+bool GridScrollLayoutAlgorithm::PrepareFastScrollAnchor(LayoutWrapper* layoutWrapper, int32_t targetIndex)
+{
+    int32_t firstLine = 0;
+    int32_t firstIndex = targetIndex;
+    bool known = IsIndexInMatrix(targetIndex, firstLine);
+    if (!known && fastScrollPreparation_->mode == FastScrollMode::SKIP_MEASURE) {
+        known = BuildFastScrollSpanMatrix(layoutWrapper, targetIndex, firstLine);
+        if (!known) {
+            return false;
+        }
+    }
+    if (known) {
+        FindFastScrollAnchor(firstLine, firstIndex);
+    } else {
+        if (info_.hasBigItem_) {
+            // Cold spanning input needs GridLayoutOptions; never switch mode2 to mode1.
+            return false;
+        }
+        firstIndex = targetIndex - targetIndex % info_.crossCount_;
+        firstLine = firstIndex / info_.crossCount_;
+    }
+    info_.startMainLineIndex_ = firstLine;
+    info_.startIndex_ = firstIndex;
+    info_.endIndex_ = firstIndex - 1;
+    info_.currentOffset_ = 0.0f;
+    info_.prevOffset_ = 0.0f;
+    info_.ResetPositionFlags();
+    info_.gridMatrix_.clear();
+    info_.lineHeightMap_.clear();
+    info_.irregularItemsPosition_.clear();
+    itemsCrossPosition_.clear();
+    fastScrollAnchorPrepared_ = true;
+    return true;
+}
+
+std::optional<RectF> GridScrollLayoutAlgorithm::GetFastScrollTargetRect(
+    LayoutWrapper* layoutWrapper, int32_t targetIndex)
+{
+    LargeItemForwardLineHeight(info_.startMainLineIndex_, layoutWrapper);
+    int32_t line = -1;
+    if (!IsIndexInMatrix(targetIndex, line)) {
+        return std::nullopt;
+    }
+    const auto& row = info_.gridMatrix_.at(line);
+    const auto cell = std::find_if(row.begin(), row.end(),
+        [targetIndex](const auto& entry) { return entry.second == targetIndex; });
+    if (cell == row.end() || itemsCrossSize_.find(cell->first) == itemsCrossSize_.end()) {
+        return std::nullopt;
+    }
+    const int32_t cross = cell->first;
+    auto child = layoutWrapper->GetChildByIndex(targetIndex, true);
+    CHECK_NULL_RETURN(child, std::nullopt);
+    auto props = AceType::DynamicCast<GridLayoutProperty>(layoutWrapper->GetLayoutProperty());
+    CHECK_NULL_RETURN(props, std::nullopt);
+    auto padding = props->CreatePaddingAndBorder();
+    const float mainPos = line >= info_.startMainLineIndex_
+        ? info_.GetHeightInRange(info_.startMainLineIndex_, line, mainGap_)
+        : -info_.GetHeightInRange(line, info_.startMainLineIndex_, mainGap_);
+    auto offset = OffsetF(0.0f, padding.top.value_or(0.0f)) +
+        OffsetF(0.0f, info_.currentOffset_ + mainPos, info_.axis_);
+    const auto size = child->GetGeometryNode()->GetMarginFrameSize();
+    if (info_.axis_ == Axis::VERTICAL) {
+        offset.SetX(ComputeItemCrossPosition(cross));
+    } else {
+        offset.SetY(ComputeItemCrossPosition(cross));
+    }
+    Alignment align = info_.axis_ == Axis::VERTICAL ? Alignment::TOP_CENTER : Alignment::CENTER_LEFT;
+    if (props->GetPositionProperty()) {
+        align = props->GetPositionProperty()->GetAlignment().value_or(align);
+    }
+    const SizeF block(itemsCrossSize_.at(cross), info_.lineHeightMap_.at(line), info_.axis_);
+    if (props->GetNonAutoLayoutDirection() == TextDirection::RTL) {
+        offset.SetX(frameSize_.Width() - offset.GetX() - size.Width());
+    }
+    offset += OffsetF(padding.left.value_or(0.0f), 0.0f);
+    const auto& geometry = child->GetGeometryNode();
+    const auto marginOffset = geometry->GetFrameOffset() - geometry->GetMarginFrameOffset();
+    return RectF(offset + Alignment::GetAlignPosition(block, size, align) + marginOffset, geometry->GetFrameSize());
+}
+
+bool GridScrollLayoutAlgorithm::ShouldSyncLoad(
+    const RefPtr<GridLayoutProperty>& gridLayoutProperty, bool matchChildren) const
+{
+    return fastScrollPreparation_.has_value() || gridLayoutProperty->GetSyncLoad().value_or(true) ||
+        matchChildren || info_.targetIndex_.has_value() || !NearEqual(info_.currentOffset_, info_.prevOffset_);
+}
+
+bool GridScrollLayoutAlgorithm::UpdateFrameSizeForMeasure(
+    const RefPtr<GridLayoutProperty>& gridLayoutProperty, bool& matchChildren)
+{
+    const Axis axis = info_.axis_;
     frameSize_ = CreateIdealSize(
         gridLayoutProperty->GetLayoutConstraint().value(), axis, gridLayoutProperty->GetMeasureType(), true);
     auto layoutPolicy = gridLayoutProperty->GetLayoutPolicyProperty();
@@ -75,11 +269,32 @@ void GridScrollLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
         // The early return bypasses CalculateContentClipFixOffset's reset;
         // clear the extension state explicitly (C-4).
         info_.ClearContentClipExtension();
+        return false;
+    }
+    matchChildren = ShouldMatchChildrenByLayoutPolicy(GetMainAxisSize(frameSize_, axis), layoutPolicy, axis);
+    return true;
+}
+
+void GridScrollLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
+{
+    wrapper_ = layoutWrapper;
+    if (!fastScrollPreparation_) {
+        info_.fastScrollGeometry_.reset();
+    }
+    auto gridLayoutProperty = AceType::DynamicCast<GridLayoutProperty>(layoutWrapper->GetLayoutProperty());
+    CHECK_NULL_VOID(gridLayoutProperty);
+
+    // Pre-recycle
+    ScrollableUtils::RecycleItemsOutOfBoundary(
+        info_.axis_, info_.currentOffset_ - info_.prevOffset_, info_.startIndex_, info_.endIndex_, layoutWrapper);
+
+    // Step1: Decide size of Grid
+    Axis axis = info_.axis_;
+    bool matchChildren = false;
+    if (!UpdateFrameSizeForMeasure(gridLayoutProperty, matchChildren)) {
         return;
     }
-    bool matchChildren = ShouldMatchChildrenByLayoutPolicy(GetMainAxisSize(frameSize_, axis), layoutPolicy, axis);
-    syncLoad_ = gridLayoutProperty->GetSyncLoad().value_or(true) || matchChildren ||
-                info_.targetIndex_.has_value() || !NearEqual(info_.currentOffset_, info_.prevOffset_);
+    syncLoad_ = ShouldSyncLoad(gridLayoutProperty, matchChildren);
     layoutWrapper->GetGeometryNode()->SetFrameSize(frameSize_);
     double originalWidth = frameSize_.Width();
     MinusPaddingToSize(gridLayoutProperty->CreatePaddingAndBorder(), frameSize_);
@@ -121,6 +336,9 @@ void GridScrollLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
         info_.ResetPositionFlags();
     }
     FillGridViewportAndMeasureChildren(mainSize, crossSize, layoutWrapper);
+    if (!fastScrollPreparation_) {
+        PrepareFastScroll(layoutWrapper);
+    }
     // keepGapStraddlingLine mirrors this algorithm's anchor advance
     // (UpdateStartIndexForExtralOffset), see SyncReportRange.
     info_.SyncReportRange(mainSize, mainGap_, true);
@@ -142,6 +360,9 @@ void GridScrollLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     // reset offsetEnd after scroll to moveToEndLineIndex_
     info_.offsetEnd_ = moveToEndLineIndex_ > 0 ? (info_.endIndex_ + 1 >= info_.GetChildrenCount()) : info_.offsetEnd_;
 
+    if (fastScrollPreparationOnly_) {
+        return;
+    }
     if (SystemProperties::GetGridCacheEnabled()) {
         if (measureInNextFrame_) {
             UpdateUnlayoutedItems();
@@ -360,6 +581,11 @@ void GridScrollLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
             if (!wrapper) {
                 continue;
             }
+            if (info_.fastScrollGeometry_) {
+                auto& prepared = *info_.fastScrollGeometry_;
+                prepared.firstPreparedIndex = std::min(prepared.firstPreparedIndex, itemIdex);
+                prepared.lastPreparedIndex = std::max(prepared.lastPreparedIndex, itemIdex);
+            }
             if (inRange) {
                 startIndex = startIndex == -1 ? itemIdex : std::min(startIndex, itemIdex);
                 endIndex = std::max(itemIdex, endIndex);
@@ -404,6 +630,11 @@ void GridScrollLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
         mainPos += info_.lineHeightMap_[line->first] + mainGap_;
     }
     info_.totalHeightOfItemsInView_ = info_.GetTotalHeightOfItemsInView(mainGap_);
+    if (!fastScrollPreparationOnly_) {
+        fastScrollPreparation_.reset();
+        fastScrollAnchorPrepared_ = false;
+        fastScrollKeepViewport_ = false;
+    }
 
     // No in-range item was laid out. Decide the fallback active range by the out-of-bounds direction.
     // When endMainLineIndex_ < 0 (top overscroll pushes all content below the viewport, and
@@ -517,6 +748,47 @@ void GridScrollLayoutAlgorithm::InitialItemsCrossSize(const RefPtr<GridLayoutPro
     }
 }
 
+bool GridScrollLayoutAlgorithm::PrepareFastScrollViewport(
+    float mainSize, float crossSize, LayoutWrapper* layoutWrapper)
+{
+    if (fastScrollPreparation_ && fastScrollKeepViewport_) {
+        // Preserve AUTO's existing treatment of a fully or partly visible target.
+        ScrollToIndexAuto(layoutWrapper, mainSize, info_.jumpIndex_);
+    } else if (fastScrollPreparation_) {
+        if (!PrepareFastScrollAnchor(layoutWrapper, info_.jumpIndex_)) {
+            fastScrollPreparationFailed_ = true;
+            return false;
+        }
+        fastScrollAnchorPrepared_ = true;
+        ReloadToStartIndex(mainSize, crossSize, layoutWrapper);
+    } else {
+        UpdateGridLayoutInfo(layoutWrapper, mainSize);
+    }
+    return true;
+}
+
+float GridScrollLayoutAlgorithm::ClampOffsetOnReachStart()
+{
+    // Top clamp: positive over-scroll (content pushed below the content-area
+    // top) is always clamped; negative offset (produced by start-extension
+    // filling, content entering the top extension) is clamped to the
+    // extension boundary only while the extension is active. With
+    // startFixOffset_ == 0 (unset/CONTENT_ONLY) only the Positive branch
+    // takes effect, matching the original behavior.
+    auto offset = info_.currentOffset_ - info_.contentStartOffset_;
+    bool needClamp = Positive(offset) ||
+                     (GreatNotEqual(info_.startFixOffset_, 0.0f) &&
+                         LessNotEqual(info_.currentOffset_, info_.contentStartOffset_ - info_.startFixOffset_));
+    if (needClamp && !canOverScrollStart_) {
+        info_.currentOffset_ = info_.contentStartOffset_;
+        info_.prevOffset_ = info_.contentStartOffset_;
+        if (Negative(offset)) {
+            offset = 0.0f;
+        }
+    }
+    return offset;
+}
+
 void GridScrollLayoutAlgorithm::FillGridViewportAndMeasureChildren(
     float mainSize, float crossSize, LayoutWrapper* layoutWrapper)
 {
@@ -528,7 +800,9 @@ void GridScrollLayoutAlgorithm::FillGridViewportAndMeasureChildren(
         info_.currentOffset_ += info_.contentStartOffset_;
     }
     itemsCrossPosition_.clear();
-    UpdateGridLayoutInfo(layoutWrapper, mainSize);
+    if (!PrepareFastScrollViewport(mainSize, crossSize, layoutWrapper)) {
+        return;
+    }
     if (info_.targetIndex_.has_value()) {
         // Complete the gridLayoutInfo to get a complete set of data from 0 to targetIndex for the GridView. Make sure
         // that the index of the matrix_ and heightMap_ is incremented from 0 to targetIndex and sequentially
@@ -543,7 +817,9 @@ void GridScrollLayoutAlgorithm::FillGridViewportAndMeasureChildren(
         reason_ = GridReloadReason::INIT;
     }
 
-    CheckReset(mainSize, crossSize, layoutWrapper);
+    if (!fastScrollPreparation_) {
+        CheckReset(mainSize, crossSize, layoutWrapper);
+    }
 
     UpdateCurrentOffsetForJumpTo(mainSize);
     info_.jumpIndex_ = EMPTY_JUMP_INDEX;
@@ -561,23 +837,7 @@ void GridScrollLayoutAlgorithm::FillGridViewportAndMeasureChildren(
     // Step3: Check if need to fill blank at start (in situation of grid items moving down)
     auto haveNewLineAtStart = FillBlankAtStart(mainSize, crossSize, layoutWrapper);
     if (info_.reachStart_) {
-        // Top clamp: positive over-scroll (content pushed below the content-area
-        // top) is always clamped; negative offset (produced by start-extension
-        // filling, content entering the top extension) is clamped to the
-        // extension boundary only while the extension is active. With
-        // startFixOffset_ == 0 (unset/CONTENT_ONLY) only the Positive branch
-        // takes effect, matching the original behavior.
-        auto offset = info_.currentOffset_ - info_.contentStartOffset_;
-        bool needClamp = Positive(offset) ||
-                         (GreatNotEqual(info_.startFixOffset_, 0.0f) &&
-                             LessNotEqual(info_.currentOffset_, info_.contentStartOffset_ - info_.startFixOffset_));
-        if (needClamp && !canOverScrollStart_) {
-            info_.currentOffset_ = info_.contentStartOffset_;
-            info_.prevOffset_ = info_.contentStartOffset_;
-            if (Negative(offset)) {
-                offset = 0.0f;
-            }
-        }
+        const auto offset = ClampOffsetOnReachStart();
         if (!haveNewLineAtStart) {
             if (canOverScrollStart_) {
                 info_.UpdateEndIndex(offset, mainSize, mainGap_);
@@ -612,15 +872,18 @@ void GridScrollLayoutAlgorithm::ReloadToStartIndex(float mainSize, float crossSi
 {
     const int32_t currentItemIndex = info_.startIndex_;
     // adjust startMainLine based on the new cross count
-    UpdateMainLineOnReload(currentItemIndex);
-    auto firstItem = GetStartingItem(layoutWrapper, currentItemIndex);
+    if (!fastScrollAnchorPrepared_) {
+        UpdateMainLineOnReload(currentItemIndex);
+    }
+    auto firstItem = fastScrollAnchorPrepared_ ? currentItemIndex : GetStartingItem(layoutWrapper, currentItemIndex);
     info_.startIndex_ = firstItem;
     currentMainLineIndex_ = (firstItem == 0 ? 0 : info_.startMainLineIndex_) - 1;
     info_.endIndex_ = firstItem - 1;
     TAG_LOGI(AceLogTag::ACE_GRID,
         "data reload begin, firstItem:%{public}d, currentItemIndex:%{public}d, reason:%{public}s", firstItem,
         currentItemIndex, GetReloadReasonStr(reason_).c_str());
-    while (info_.endIndex_ < currentItemIndex) {
+    const int32_t reloadEndIndex = fastScrollAnchorPrepared_ ? info_.jumpIndex_ : currentItemIndex;
+    while (info_.endIndex_ < reloadEndIndex) {
         auto lineHeight = FillNewLineBackward(crossSize, mainSize, layoutWrapper, false);
         if (LessNotEqual(lineHeight, 0.0)) {
             info_.reachEnd_ = true;
@@ -633,7 +896,7 @@ void GridScrollLayoutAlgorithm::ReloadToStartIndex(float mainSize, float crossSi
     info_.startMainLineIndex_ = currentMainLineIndex_;
     info_.UpdateStartIndexByStartLine();
     // FillNewLineBackward sometimes make startIndex_ > currentItemIndex
-    while (info_.startIndex_ > currentItemIndex && info_.startMainLineIndex_ > 0 &&
+    while (info_.startIndex_ > reloadEndIndex && info_.startMainLineIndex_ > 0 &&
            info_.gridMatrix_.find(info_.startMainLineIndex_) != info_.gridMatrix_.end()) {
         info_.startMainLineIndex_--;
         info_.UpdateStartIndexByStartLine();
@@ -1252,6 +1515,25 @@ void GridScrollLayoutAlgorithm::UpdateCurrentOffsetForJumpTo(float mainSize)
     if (info_.scrollAlign_ == ScrollAlign::START) {
         info_.currentOffset_ += info_.contentStartOffset_;
         info_.prevOffset_ = info_.currentOffset_;
+    }
+    if (fastScrollPreparation_ && !fastScrollPreparation_->preserveAutoAlignment &&
+        (info_.scrollAlign_ == ScrollAlign::CENTER || info_.scrollAlign_ == ScrollAlign::END)) {
+        auto rect = GetFastScrollTargetRect(wrapper_, info_.jumpIndex_);
+        if (rect) {
+            const auto padding = wrapper_->GetLayoutProperty()->CreatePaddingAndBorder();
+            const bool vertical = info_.axis_ == Axis::VERTICAL;
+            const float itemSize = vertical ? rect->Height() : rect->Width();
+            float start = vertical ? rect->Top() - padding.top.value_or(0.0f) :
+                rect->Left() - padding.left.value_or(0.0f);
+            if (!vertical && wrapper_->GetLayoutProperty()->GetNonAutoLayoutDirection() == TextDirection::RTL) {
+                start = mainSize - start - itemSize;
+            }
+            const float available = mainSize - info_.contentEndPadding_;
+            const float desired = info_.scrollAlign_ == ScrollAlign::CENTER ? (available - itemSize) / 2.0f :
+                available - itemSize - info_.contentEndOffset_;
+            info_.currentOffset_ += desired - start;
+            info_.prevOffset_ = info_.currentOffset_;
+        }
     }
     if (info_.extraOffset_.has_value() && !info_.targetIndex_.has_value()) {
         info_.currentOffset_ += info_.extraOffset_.value();

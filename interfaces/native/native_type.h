@@ -778,6 +778,58 @@ typedef enum {
 } ArkUI_ScrollAlignment;
 
 /**
+ * @brief Enumerates per-call optimizations for animated scrolling to an item index.
+ *
+ * The mode takes effect only during animated scrolling. Omitting it uses
+ * <b>OH_ARKUI_FAST_SCROLL_MODE_NONE</b> and the component's original behavior.
+ * For <b>Grid</b>, set `.value[4].i32` of {@link NODE_GRID_SCROLL_TO_INDEX} to the required mode.
+ * Retained items include those in the viewports at the start and end of the animation,
+ * items needed to determine the target's actual layout, and spanning items that overlap the target viewport.
+ *
+ * For <b>Grid</b>, express special row or column placement through {@link ArkUI_GridLayoutOptions}.
+ * <b>OH_ARKUI_FAST_SCROLL_MODE_SKIP_CREATE_AND_MEASURE</b> does not discover explicit placement specified
+ * only when creating a cold item. This does not change <b>OH_ARKUI_FAST_SCROLL_MODE_SKIP_MEASURE</b>
+ * or <b>OH_ARKUI_FAST_SCROLL_MODE_NONE</b>.
+ *
+ * For <b>OH_ARKUI_FAST_SCROLL_MODE_SKIP_CREATE_AND_MEASURE</b>, configure complete row and column spans
+ * through {@link ArkUI_GridLayoutOptions} before requesting the scroll if any uncreated item's spans are unknown.
+ * The information must be available before the corresponding item is created.
+ * Configure irregular indexes with {@link OH_ArkUI_GridLayoutOptions_SetIrregularIndexes} and their spans with
+ * {@link OH_ArkUI_GridLayoutOptions_RegisterGetIrregularSizeByIndexCallback}, following those APIs' requirements.
+ * For custom positioning, follow the position and span requirements of
+ * {@link OH_ArkUI_GridLayoutOptions_RegisterGetRectByIndexCallback}.
+ * Apply the options through {@link NODE_GRID_LAYOUT_OPTIONS} before setting {@link NODE_GRID_SCROLL_TO_INDEX}.
+ * Include every spanning item whose row or column occupancy affects the target position, even if the item
+ * is outside the target viewport. Providing only the target's spans is insufficient. Every span must match
+ * the actual content. This requirement concerns row and column occupancy, not measured pixel sizes.
+ *
+ * This mode supports only inputs that meet this span requirement. No scrolling result is guaranteed for
+ * missing or inconsistent spans. The mode does not automatically fall back to another mode.
+ * The scroll request does not synchronously report arrival or a missing-span error.
+ * <b>OH_ARKUI_FAST_SCROLL_MODE_NONE</b> and <b>OH_ARKUI_FAST_SCROLL_MODE_SKIP_MEASURE</b> do not add this requirement.
+ *
+ * @since 26.1.0
+ */
+typedef enum {
+    /**
+     * Disables fast scroll optimization for this call and uses the component's original scrolling behavior.
+     * @since 26.1.0
+     */
+    OH_ARKUI_FAST_SCROLL_MODE_NONE = 0,
+    /**
+     * Skips measuring intermediate items that displayed content and the target's actual layout do not require.
+     * @since 26.1.0
+     */
+    OH_ARKUI_FAST_SCROLL_MODE_SKIP_MEASURE = 1,
+    /**
+     * Skips creation and measurement of intermediate items not needed for displayed content
+     * or the target's actual layout.
+     * @since 26.1.0
+     */
+    OH_ARKUI_FAST_SCROLL_MODE_SKIP_CREATE_AND_MEASURE = 2,
+} OH_ArkUI_FastScrollMode;
+
+/**
  * @brief Define the current scrolling state.
  *
  * @since 12

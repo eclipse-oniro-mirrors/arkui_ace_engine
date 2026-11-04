@@ -17,6 +17,7 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_GRID_GRID_MODEL_NG_H
 
 #include "base/utils/macros.h"
+#include "core/components/scroll/scroll_controller_base.h"
 #include "core/components_ng/pattern/grid/grid_model.h"
 
 namespace OHOS::Ace::NG {
@@ -186,6 +187,8 @@ public:
     static void SetOnGridItemDragStart(FrameNode* frameNode, ItemDragStartFunc&& value);
     static void SetScrollToIndex(FrameNode* frameNode, int32_t index, int32_t animation, int32_t alignment,
         std::optional<float> extraOffset = std::nullopt);
+    static void SetScrollToIndexWithOptions(FrameNode* frameNode, int32_t index, bool smooth, ScrollAlign align,
+        std::optional<float> extraOffset, FastScrollMode mode);
     static void SetScrollToIndexMultiThread(FrameNode* frameNode, int32_t index, int32_t animation, int32_t alignment,
         std::optional<float> extraOffset = std::nullopt);
     static void SetSupportLazyLoadingEmptyBranch(FrameNode* frameNode, bool enable);

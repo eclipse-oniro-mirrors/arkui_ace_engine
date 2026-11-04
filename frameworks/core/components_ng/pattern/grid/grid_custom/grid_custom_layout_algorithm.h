@@ -36,12 +36,18 @@ public:
     void Measure(LayoutWrapper* layoutWrapper) override;
     void Layout(LayoutWrapper* layoutWrapper) override;
 
+    // Apply the prepared target during the relocation layout batch.
+    void SetFastScrollTargetForLayout(const GridFastScrollTarget& target);
+
     void SetScrollSource(int32_t scrollSource)
     {
         scrollSource_ = scrollSource;
     }
 
 private:
+    void PrepareFastScroll(float mainSize);
+    std::optional<RectF> GetFastScrollTargetRect(int32_t targetIndex);
+
     /**
      * @brief Measures the size of Grid based on the given GridLayoutProperty.
      * @param props The GridLayoutProperty object containing the layout properties.
@@ -63,6 +69,7 @@ private:
     void MeasureBackward(float mainSize);
     void MeasureForward(float mainSize);
     void MeasureToTarget(float mainSize);
+    float UpdateFastScrollTargetRect(float itemHeight);
     void MeasureOnJump(float mainSize);
     void MeasureOnOffset(float mainSize);
     void FillBackward(float mainSize);
@@ -137,6 +144,11 @@ private:
     std::vector<float> crossLens_; /**< The column widths of the GridItems. */
     float crossGap_ = 0.0f;        /**< The cross-axis gap between GridItems. */
     float mainGap_ = 0.0f;         /**< The main-axis gap between GridItems. */
+
+    bool fastScrollLayout_ = false;
+    bool fastScrollAutoAlign_ = false;
+    bool fastScrollPreparationOnly_ = false;
+    std::optional<RectF> fastScrollTargetRect_;
 
     bool enableSkip_ = true;
     bool canOverScrollStart_ = false;

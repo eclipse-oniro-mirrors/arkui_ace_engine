@@ -290,6 +290,12 @@ public:
 
     void ScrollToIndex(int32_t index, bool smooth = false, ScrollAlign align = ScrollAlign::AUTO,
         std::optional<float> extraOffset = std::nullopt) override;
+    void ScrollToIndexFastScroll(int32_t index, bool smooth, ScrollAlign align,
+        std::optional<float> extraOffset, FastScrollMode mode) override;
+    void CancelFastScroll() override;
+    void OnDetachFromFrameNode(FrameNode* frameNode) override;
+    void OnDetachFromMainTree() override;
+    void OnTouchDown(const TouchEventInfo& info) override;
     void AnimateToTarget(ScrollAlign align, const RefPtr<LayoutAlgorithmWrapper>& algo);
     bool AnimateToTargetImpl(ScrollAlign align, const RefPtr<LayoutAlgorithmWrapper>& algo);
 
@@ -404,6 +410,28 @@ public:
         int32_t endLine) const;
 
 private:
+    std::optional<GridFastScrollTarget> TakeFastScrollLayoutTarget();
+    float LimitFastScrollOffset(float value, int32_t source, float mainGap, float mainContentSize, float itemsHeight);
+    void ConfigureScrollEvents();
+    void UpdateFastScrollAfterLayout(
+        const RefPtr<GridLayoutBaseAlgorithm>& gridLayoutAlgorithm, bool shouldDispatchLayoutEvents);
+    void StopFastScrollIfActive();
+    void UpdateFastScrollLayoutInfo(const GridLayoutInfo& gridLayoutInfo);
+    bool ResolveFastScrollTargetAlignment(
+        GridFastScrollTarget& target, int32_t index, float& startPosition, bool& keepViewport);
+    std::optional<float> GetFastScrollCorrection(const GridFastScrollGeometry& geometry,
+        int32_t index, bool reverse) const;
+    void ResolveFastScrollAutoTarget();
+    void UpdateFastScrollAnimation();
+    void RecordFastScrollDelta(float requested, float accepted);
+    struct FastScrollMovement {
+        float startOffset;
+        float endOffset;
+    };
+    std::optional<float> fastScrollPendingDelta_;
+    std::optional<FastScrollMovement> fastScrollPendingMovement_;
+    bool fastScrollMotionAdjusted_ = false;
+
     void DumpAdvanceGridInteractionInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
 
     void DumpAdvanceGridSizeInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);

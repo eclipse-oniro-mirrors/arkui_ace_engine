@@ -1373,6 +1373,14 @@ void GridModelNG::SetScrollToIndex(
     pattern->ScrollToIndex(index, animation, static_cast<ScrollAlign>(alignment), extraOffset);
 }
 
+void GridModelNG::SetScrollToIndexWithOptions(FrameNode* frameNode, int32_t index, bool smooth,
+    ScrollAlign align, std::optional<float> extraOffset, FastScrollMode mode)
+{
+    auto controller = GetOrCreateController(frameNode);
+    CHECK_NULL_VOID(controller);
+    controller->ScrollToIndexWithOptions(index, smooth, align, extraOffset, mode);
+}
+
 void GridModelNG::SetSupportLazyLoadingEmptyBranch(bool enable)
 {
     ACE_UPDATE_LAYOUT_PROPERTY(GridLayoutProperty, SupportLazyLoadingEmptyBranch, enable);

@@ -265,6 +265,32 @@ float GridLayoutInfo::GetCurrentOffsetOfRegularGrid(float mainGap) const
     return res - currentOffset_;
 }
 
+float GridLayoutInfo::GetFastScrollOffset(float mainGap, const std::map<int32_t, float>& knownHeights) const
+{
+    if (lineHeightMap_.empty()) {
+        return 0.0f;
+    }
+    // Current and destination offsets must estimate their unmeasured prefix in the same coordinate system.
+    const auto& referenceHeights = knownHeights.empty() ? lineHeightMap_ : knownHeights;
+    float referenceHeight = 0.0f;
+    for (const auto& [line, height] : referenceHeights) {
+        referenceHeight += height;
+    }
+    const float average = referenceHeight / static_cast<float>(referenceHeights.size());
+    float offset = startMainLineIndex_ * (average + mainGap) - currentOffset_;
+    for (const auto& [line, height] : knownHeights) {
+        if (line >= 0 && line < startMainLineIndex_ && lineHeightMap_.find(line) == lineHeightMap_.end()) {
+            offset += height - average;
+        }
+    }
+    for (const auto& [line, height] : lineHeightMap_) {
+        if (line >= 0 && line < startMainLineIndex_) {
+            offset += height - average;
+        }
+    }
+    return offset;
+}
+
 float GridLayoutInfo::GetContentOffset(float mainGap) const
 {
     if (lineHeightMap_.empty()) {
