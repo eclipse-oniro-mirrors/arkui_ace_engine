@@ -2818,6 +2818,11 @@ void XComponentPattern::SetSurfaceIsOpaque(bool isOpaque)
     }
 }
 
+void XComponentPattern::DumpSimplifyInfo(std::shared_ptr<JsonValue>& json)
+{
+    json->Put("$SurfaceId", surfaceId_.c_str());
+}
+
 void XComponentPattern::AddExtraInfoWithParamConfig(
     std::shared_ptr<JsonValue>& json, ParamConfig config)
 {

@@ -685,7 +685,6 @@ frameworks/bridge/declarative_frontend/ark_component/src/ArkUIExtensionComponent
 frameworks/bridge/declarative_frontend/ark_component/src/ArkVideo.ts @arkuilayout1
 frameworks/bridge/declarative_frontend/ark_component/src/ArkWaterFlow.ts @arkuiscroll
 frameworks/bridge/declarative_frontend/ark_component/src/ArkWeb.ts @arkweb-committer-group
-frameworks/bridge/declarative_frontend/ark_component/src/ArkXComponent.ts @ArkUI_ability_group
 frameworks/bridge/declarative_frontend/ark_component/src/import.ts @arkuieco3
 frameworks/bridge/declarative_frontend/ark_component/tsconfig.json @arkuieco3
 frameworks/bridge/declarative_frontend/ark_component/types/ @arkuieco3
@@ -1103,10 +1102,6 @@ frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_vide
 frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_video_bridge.h @arkuilayout1
 frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_web_bridge.cpp @arkweb-committer-group
 frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_web_bridge.h @arkweb-committer-group
-frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_xcomponent_bridge.cpp @ArkUI_ability_group
-frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_xcomponent_bridge.h @ArkUI_ability_group
-frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_xcomponent_node_bridge.cpp @ArkUI_ability_group
-frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_xcomponent_node_bridge.h @ArkUI_ability_group
 frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/arkts_utils.cpp @arkui_framework_xnode
 frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/arkts_utils.h @arkui_framework_xnode
 frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/ui_context_helper.cpp @arkui_framework_xnode
@@ -1419,7 +1414,6 @@ frameworks/bridge/declarative_frontend/jsview/js_web_controller.cpp @arkweb-comm
 frameworks/bridge/declarative_frontend/jsview/js_web_controller.h @arkweb-committer-group
 frameworks/bridge/declarative_frontend/jsview/js_xcomponent.cpp @ArkUI_ability_group
 frameworks/bridge/declarative_frontend/jsview/js_xcomponent.h @ArkUI_ability_group
-frameworks/bridge/declarative_frontend/jsview/js_xcomponent_controller.cpp @ArkUI_ability_group
 frameworks/bridge/declarative_frontend/jsview/js_xcomponent_controller.h @ArkUI_ability_group
 frameworks/bridge/declarative_frontend/jsview/menu/ @arkuipopupwindow_all
 frameworks/bridge/declarative_frontend/jsview/models/ability_component_model_impl.cpp @arkuieco3
@@ -1582,8 +1576,6 @@ frameworks/bridge/declarative_frontend/jsview/models/view_partial_update_model_i
 frameworks/bridge/declarative_frontend/jsview/models/view_stack_model_impl.h @arkui_statemgmt
 frameworks/bridge/declarative_frontend/jsview/models/web_model_impl.cpp @arkweb-committer-group
 frameworks/bridge/declarative_frontend/jsview/models/web_model_impl.h @arkweb-committer-group
-frameworks/bridge/declarative_frontend/jsview/models/xcomponent_model_impl.cpp @ArkUI_ability_group
-frameworks/bridge/declarative_frontend/jsview/models/xcomponent_model_impl.h @ArkUI_ability_group
 frameworks/bridge/declarative_frontend/jsview/scroll_bar/ @arkuiscroll
 frameworks/bridge/declarative_frontend/jsview/text_menu/js_text_menu.cpp @huawei_g_five
 frameworks/bridge/declarative_frontend/jsview/text_menu/js_text_menu.h @huawei_g_five
@@ -5100,11 +5092,6 @@ frameworks/core/interfaces/native/implementation/view_model_bridge.cpp @arkui_fr
 frameworks/core/interfaces/native/implementation/view_model_bridge.h @arkui_framework_xnode
 frameworks/core/interfaces/native/implementation/webview_controller_peer_impl.h @arkweb-committer-group
 frameworks/core/interfaces/native/implementation/with_theme_modifier.cpp @arkuicodepulse
-frameworks/core/interfaces/native/implementation/x_component_controller_accessor.cpp @ArkUI_ability_group
-frameworks/core/interfaces/native/implementation/x_component_controller_extender_accessor.cpp @ArkUI_ability_group
-frameworks/core/interfaces/native/implementation/x_component_controller_peer_impl.cpp @ArkUI_ability_group
-frameworks/core/interfaces/native/implementation/x_component_controller_peer_impl.h @ArkUI_ability_group
-frameworks/core/interfaces/native/implementation/x_component_modifier.cpp @ArkUI_ability_group
 frameworks/core/interfaces/native/node/badge_modifier.cpp @huawei_g_five
 frameworks/core/interfaces/native/node/badge_modifier.h @huawei_g_five
 frameworks/core/interfaces/native/node/calendar_picker_dialog_modifier.cpp @arkui001
