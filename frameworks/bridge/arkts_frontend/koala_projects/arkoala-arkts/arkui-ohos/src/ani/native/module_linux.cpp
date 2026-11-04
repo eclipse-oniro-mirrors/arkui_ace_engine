@@ -530,6 +530,16 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             reinterpret_cast<void*>(OHOS::Ace::Ani::SetCustomCallbackWithCheckForFrameNodes)
         },
         ani_native_function {
+            "_RegisterApplicationShortcut",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::RegisterApplicationShortcut)
+        },
+        ani_native_function {
+            "_UnregisterApplicationShortcut",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::UnregisterApplicationShortcut)
+        },
+        ani_native_function {
             "_GetCallingScopeUIContext",
             nullptr,
             reinterpret_cast<void*>(OHOS::Ace::Ani::GetCallingScopeUIContext)

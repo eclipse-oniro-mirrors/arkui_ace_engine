@@ -36,7 +36,7 @@ import { Frame } from 'arkui/Graphics';
 import { KeyEvent, KeyframeAnimateParam, KeyframeState, PopupCommonOptions, MenuOptions, ExpectedFrameRateRange } from 'arkui/framework';
 import { TextMenuOptions, TextMenuItemId } from 'arkui/framework';
 import { Nullable, WidthBreakpoint, HeightBreakpoint } from 'arkui/framework';
-import { KeyProcessingMode } from 'arkui/framework';
+import { KeyProcessingMode, ModifierKey } from 'arkui/framework';
 import { default as uiObserver } from '@ohos/arkui/observer';
 import { PlaceholderRegister, createPlaceholderRegister } from '@ohos.arkui.placeholderRegister';
 import { default as mediaquery } from '@ohos/mediaquery';
@@ -831,6 +831,10 @@ export class ModalUIExtensionProxy implements UIExtensionProxy {
     }
 }
 
+export interface ApplicationShortcutCallbackInfo {
+    uiContext: UIContext;
+}
+
 export class UIContext {
     instanceId_: int32 = -1;
     observer_ :UIObserver |null = null;
@@ -908,6 +912,39 @@ export class UIContext {
     }
 
     callCallbacks(): void {}
+
+    static registerApplicationShortcut(value: string, keys: Array<ModifierKey>,
+        callback: Callback<ApplicationShortcutCallbackInfo>): int32 {
+        let modifiers: int32 = 0;
+        for (const key of keys) {
+            let bit: int32;
+            switch (key) {
+                case ModifierKey.CTRL: bit = 1 << 0; break;
+                case ModifierKey.SHIFT: bit = 1 << 1; break;
+                case ModifierKey.ALT: bit = 1 << 2; break;
+                default: throw new BusinessError(401, 'Unsupported modifier key.');
+            }
+            if ((modifiers & bit) !== 0) {
+                throw new BusinessError(401, 'Duplicate modifier key.');
+            }
+            modifiers |= bit;
+        }
+        const registrationId = ArkUIAniModule._RegisterApplicationShortcut(value, modifiers,
+            (instanceId: int32): void => {
+                const info: ApplicationShortcutCallbackInfo = {
+                    uiContext: UIContextUtil.getOrCreateUIContextById(instanceId)
+                };
+                callback(info);
+            });
+        if (registrationId === 0) {
+            throw new Error('Application shortcut registration failed.');
+        }
+        return registrationId;
+    }
+
+    static unregisterApplicationShortcut(registrationId: int32): void {
+        ArkUIAniModule._UnregisterApplicationShortcut(registrationId);
+    }
 
     static getCallingScopeUIContext(): UIContext | undefined {
         const instanceId = ArkUIAniModule._GetCallingScopeUIContext();
