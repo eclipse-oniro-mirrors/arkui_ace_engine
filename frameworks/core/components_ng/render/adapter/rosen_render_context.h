@@ -389,6 +389,7 @@ public:
     void SetUnionSpacing(float spacing) override;
 
     RectF GetPaintRectWithTransform() override;
+    bool HasRenderNode() const override;
 
     static RectF GetPaintRectWithTransform(
         const std::shared_ptr<Rosen::RSNode>& rsNode, const RectF& paintRect);
