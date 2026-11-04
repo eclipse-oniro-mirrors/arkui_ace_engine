@@ -260,7 +260,9 @@ class RecoverableStorageImpl extends StorageHelper {
     partition.forEach((entry: RecoverableEntry, key: string) => {
       let serialized: string;
       try {
-        serialized = DataCoder.stringify(entry.value);
+        // ADR-14: read-only properties (getter-only / @Computed / non-writable) are
+        // skipped from the snapshot, silently (no callback — skipping is not an error).
+        serialized = DataCoder.stringify(entry.value, false, RecoverableStorageImpl.readOnlyFilter_);
       } catch (err) {
         // INV-5: serialization failure must not crash nor block other entries
         this.notifyErrorFor(partition, key, 'serialization',
@@ -398,7 +400,10 @@ class RecoverableStorageImpl extends StorageHelper {
     try {
       const target: T = defaultCreator();
       const parsed = DataCoder.parse(text) as T;
-      DataCoder.restoreTo<T, S>(target, parsed, defaultSubCreator);
+      // ADR-14 injection defense: read-only properties on the target (getter-only /
+      // @Computed / non-writable) are skipped during restore — including keys present in
+      // archives written by older versions — silently, without failing the whole key.
+      DataCoder.restoreTo<T, S>(target, parsed, defaultSubCreator, RecoverableStorageImpl.readOnlyFilter_);
       if (!(target instanceof type)) {
         throw new Error(`restored value is not an instance of the connected type`);
       }
@@ -492,6 +497,36 @@ class RecoverableStorageImpl extends StorageHelper {
       (typeof SendableMap === 'function' && ctor === SendableMap) ||
       (typeof SendableSet === 'function' && ctor === SendableSet);
   }
+
+  // ADR-14: read-only property filter, applied by default (no option) on BOTH sides:
+  // save-side skip (stringify) and restore-side injection defense (restoreTo skip —
+  // the assignment to a read-only property never happens, hence no throw, no callback).
+  // Beyond DataCoder's getter-only check (getter with no setter anywhere on the chain):
+  //  - @Computed accessors: instance-own get+set pair backed by the ComputedV2 internal
+  //    cached property (the setter always throws 'readonly', see v2_computed.ts InitRun);
+  //    the computed VALUE still round-trips via its writable cached backing property;
+  //  - non-writable own data properties: assignment would throw in strict mode.
+  // Skipping is silent — not an error, never notified (AC-14).
+  private static readonly readOnlyFilter_: (target: object, prop: string) => boolean =
+    function (target: object, prop: string): boolean {
+      if (target === null || target === undefined || typeof target !== 'object') {
+        return false;
+      }
+      if (DataCoder.isReadOnlyGetter(target, prop)) {
+        return true;
+      }
+      const desc = Object.getOwnPropertyDescriptor(target, prop);
+      if (desc !== undefined) {
+        if (typeof desc.get === 'function' && typeof desc.set === 'function' &&
+          Object.prototype.hasOwnProperty.call(target, ComputedV2.COMPUTED_CACHED_PREFIX + prop)) {
+          return true;
+        }
+        if (desc.get === undefined && desc.set === undefined && desc.writable === false) {
+          return true;
+        }
+      }
+      return false;
+    };
 }
 
 // Public facade: static connect entry point per spec.md F-A2 (SDK declaration is delivered

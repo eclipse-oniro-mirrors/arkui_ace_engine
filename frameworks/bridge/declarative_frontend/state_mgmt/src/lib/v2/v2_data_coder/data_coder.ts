@@ -18,6 +18,13 @@ function nullOrUndef(value: unknown): boolean {
   return value === null || value === undefined;
 }
 
+// Read-only skip policy for stringify/restoreTo:
+// - boolean: legacy getter-only semantics (skip props with a getter and no setter anywhere
+//   on the prototype chain) — PersistenceV2 opt-in behavior, unchanged;
+// - predicate: caller-defined read-only detection, e.g. RecoverableStorage also skips
+//   @Computed accessors and non-writable data properties (ADR-14).
+type ReadOnlyPropertyFilter = boolean | ((target: object, prop: string) => boolean);
+
 class DataCoder {
   // Tag to detect payload format
   public static readonly FORMAT_TAG = 'JSON2';
@@ -30,7 +37,7 @@ class DataCoder {
   /**
    * Serialize an object to a JSON2
    */
-  public static stringify<T>(value: T, forceLegacyFormat: boolean = false, ignoreReadOnlyProperties: boolean = false): string {
+  public static stringify<T>(value: T, forceLegacyFormat: boolean = false, ignoreReadOnlyProperties: ReadOnlyPropertyFilter = false): string {
     if (forceLegacyFormat) {
       return JSONCoder.stringify(value);
     }
@@ -79,12 +86,24 @@ class DataCoder {
     return hasGetter && !hasSetter;
   }
 
+  // Resolve the read-only skip decision for one property. A boolean keeps the legacy
+  // getter-only semantics; a predicate delegates read-only detection to the caller.
+  static shouldSkipReadOnlyProperty(filter: ReadOnlyPropertyFilter, target: object, prop: string): boolean {
+    if (filter === false || filter === undefined) {
+      return false;
+    }
+    if (typeof filter === 'function') {
+      return filter(target, prop);
+    }
+    return DataCoder.isReadOnlyGetter(target, prop);
+  }
+
   /**
    * Restore the state of 'source' object into 'target' object(s), restore aliased prop names
    */
   public static restoreTo<T extends object, S extends object>(
     target: T | T[], source: T | T[], defaultSubCreator?: StorageDefaultCreator<S>,
-    ignoreReadOnlyProperties: boolean = false
+    ignoreReadOnlyProperties: ReadOnlyPropertyFilter = false
   ): T | T[] {
     const origTarget = ObserveV2.IsMakeObserved(target)
       ? UIUtilsImpl.instance().getTarget(target)
@@ -156,7 +175,7 @@ class DataCoder {
 
   // Recursively restore object 'source' into 'target' considering TransformOptions
   // opts = { alias?, factory?, disabled? }
-  private static restoreObject(target: any, source: any, opts: TransformOptions<any>, ignoreReadOnlyProperties: boolean = false): void {
+  private static restoreObject(target: any, source: any, opts: TransformOptions<any>, ignoreReadOnlyProperties: ReadOnlyPropertyFilter = false): void {
     // meta = { [prop]: { alias, factory, disabled } }
     const meta = Meta.gets(target) as Record<string, TransformOptions<any>>;
 
@@ -254,7 +273,7 @@ class DataCoder {
     if (source && typeof source === 'object') {
       for (const [key, val] of Object.entries(source)) {
         const targetProp = alias2prop.get(key) ?? key;
-        if (ignoreReadOnlyProperties === true && DataCoder.isReadOnlyGetter(target, targetProp)) {
+        if (DataCoder.shouldSkipReadOnlyProperty(ignoreReadOnlyProperties, target, targetProp)) {
           continue;
         }
         const sourceProp = meta[targetProp]?.alias ?? targetProp;
@@ -268,9 +287,9 @@ class DataCoder {
   // opts = { alias, factory, disabled }
   private static restorePropValue(
     target: any, targetProp: string, source: any, sourceProp: string, opts: TransformOptions<any> = {},
-    ignoreReadOnlyProperties: boolean = false
+    ignoreReadOnlyProperties: ReadOnlyPropertyFilter = false
   ): void {
-    if (ignoreReadOnlyProperties === true && DataCoder.isReadOnlyGetter(target, targetProp)) {
+    if (DataCoder.shouldSkipReadOnlyProperty(ignoreReadOnlyProperties, target, targetProp)) {
       return;
     }
     const srcVal = source[sourceProp];
