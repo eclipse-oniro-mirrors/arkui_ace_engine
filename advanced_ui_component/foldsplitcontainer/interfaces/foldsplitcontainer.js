@@ -301,7 +301,14 @@ export class FoldSplitContainer extends ViewPU {
           return;
         }
         this.windowInstance = f4;
-        this.windowStatusType = f4.getWindowStatus();
+        try {
+          this.windowStatusType = f4.getWindowStatus();
+        } catch (e3) {
+          // The previewer does not support getWindowStatus, fallback to UNDEFINED
+          Logger.error('Failed getWindowStatus. code:%{public}d, message:%{public}s',
+            e3.code, e3.message);
+          this.windowStatusType = window.WindowStatusType.UNDEFINED;
+        }
         this.updatePreferredOrientation();
         this.updateLayout();
         this.dealWindowStatusChange();
@@ -313,7 +320,7 @@ export class FoldSplitContainer extends ViewPU {
   
   dealWindowStatusChange() {
     try {
-      this.windowInstance.on('windowStatusChange', (i4) => {
+      this.windowInstance?.on('windowStatusChange', (i4) => {
         const wasFullScreen = this.windowStatusType === window.WindowStatusType.FULL_SCREEN;
         const isFullScreen = i4 === window.WindowStatusType.FULL_SCREEN;
         this.windowStatusType = i4;
@@ -335,7 +342,12 @@ export class FoldSplitContainer extends ViewPU {
         exception.code, exception.message);
     }
     if (this.windowInstance) {
-      this.windowInstance.off('windowStatusChange');
+      try {
+        this.windowInstance.off('windowStatusChange');
+      } catch (exception) {
+        Logger.error('Failed windowInstance.off windowStatusChange. code:%{public}d, message:%{public}s',
+          exception.code, exception.message);
+      }
     }
   }
   initialRender() {
