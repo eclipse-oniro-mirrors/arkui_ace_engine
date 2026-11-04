@@ -55,6 +55,7 @@
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
 #include "core/components_ng/pattern/scrollable/scrollable_utils.h"
 #include "core/components_ng/pattern/scrollable/scroll_snap_utils.h"
+#include "core/components_ng/render/render_context.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_2_node.h"
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
 
@@ -94,6 +95,16 @@ void GridPattern::SetScrollPlaceholder(ScrollPlaceholderProvider&& provider)
             // Selector replacement invalidates in-flight placeholder work of this
             // host; the new provider's decisions start from a clean queue.
             manager->CancelHostRealBuilds(host->GetId(), ScrollPlaceholderCancelReason::RE_REGISTER);
+            // Stale-shell drain at flush cadence (List fix-chain v5): retire
+            // pending shells the visible window or a real child already left,
+            // between layout rounds.
+            manager->SetPostFlushCallback(host->GetId(),
+                [weak = AceType::WeakClaim(this)] {
+                    auto pattern = weak.Upgrade();
+                    if (pattern) {
+                        pattern->SweepStaleScrollPlaceholderShells();
+                    }
+                });
         }
     }
     host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
@@ -121,6 +132,9 @@ void GridPattern::ResetScrollPlaceholder()
     CHECK_NULL_VOID(context);
     const auto& manager = context->GetOrCreateScrollPlaceholderManager();
     CHECK_NULL_VOID(manager);
+    // Host reset/destroy: the flush-cadence sweep must not call back into the
+    // pattern anymore (the manager holds only a weak reference, clear the hook).
+    manager->ClearPostFlushCallback(host->GetId());
     // Pending placeholder real-builds of this host turn stale immediately; the
     // manager never calls back into a detached pattern.
     manager->CancelHostRealBuilds(host->GetId(), ScrollPlaceholderCancelReason::HOST_RESET);
@@ -164,6 +178,18 @@ std::optional<ScrollPlaceholderOptions> GridPattern::PredictScrollPlaceholderDef
     }
     auto options = scrollPlaceholderProvider_(index);
     if (!options.has_value()) {
+        return std::nullopt;
+    }
+    if (!options->id.empty() && !manager->IsTemplateRegistered(options->id)) {
+        // A provider id without a registered template can never fill the shell:
+        // mounting it anyway renders a content-less cell (a blank white grid
+        // cell that is neither a placeholder nor a real item — the device
+        // evidence of the "third state"). Refuse the deferral instead so this
+        // index keeps the synchronous real-build path.
+        TAG_LOGW(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder defer refused: templateId=%{public}s is not registered "
+            "(check the provider id matches PlaceholderRegister.register), index=%{public}d",
+            options->id.c_str(), index);
         return std::nullopt;
     }
     params.templateId = options->id;
@@ -281,6 +307,23 @@ bool InScrollPhVisibleRange(int32_t start, int32_t end, int32_t index)
     }
     return index >= start - SCROLL_PH_RANGE_MARGIN && index <= end + SCROLL_PH_RANGE_MARGIN;
 }
+
+// Fill-coverage probe: gridMatrix_ holds exactly the indices the just-finished
+// layout round's fill loops placed (row -> column -> index), the Grid
+// counterpart of List's itemPosition_ membership. A deferred index resolves to
+// its shell at acquisition, so a covered shell was re-acquired — and thereby
+// re-positioned — by this round; an uncovered one kept frozen geometry.
+bool IsIndexInGridLayoutMatrix(const GridLayoutInfo& layoutInfo, int32_t index)
+{
+    for (const auto& [mainLine, crossLine] : layoutInfo.gridMatrix_) {
+        for (const auto& [crossIdx, itemIdx] : crossLine) {
+            if (itemIdx == index) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
 } // namespace
 
 bool GridPattern::CommitScrollPlaceholderRealBuild(int32_t index)
@@ -344,10 +387,20 @@ bool GridPattern::CommitScrollPlaceholderRealBuild(int32_t index)
         return false;
     }
     // Transaction: the real node is in the tree; the remeasure re-lays the item
-    // range (anchors follow the existing item-size change rules). The shell stays
-    // mounted until that layout completes, then the reconcile retires it (content
-    // back to the pool, shell unmounted outside the transaction).
-    retiringPlaceholderShells_.emplace_back(info.shell, info.templateId);
+    // range (anchors follow the existing item-size change rules).
+    // Retire the shell NOW, in the same idle flush (List fix-chain v2). The flush
+    // runs outside the layout transaction, so the structural removal (children
+    // list mutation, content back to the pool) is safe here, and the real item
+    // paints correctly from its first frame — the host remeasure below is already
+    // requested, so the real item is laid out before the next render submission.
+    // Keeping the shell mounted until a later layout round only ever produced
+    // placeholder-over-real frames (the replacement-phase overlap observed on
+    // device: the retiring shell kept painting its slot geometry while the real
+    // item rendered at the same slot for one or more frames).
+    RetireScrollPlaceholderShell(info.shell, info.templateId);
+    // The stale-shell drain runs from the manager's post-flush hook (registered
+    // in SetScrollPlaceholder), right after each flush iteration at frame
+    // cadence — see SweepStaleScrollPlaceholderShells.
     host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
     return true;
 }
@@ -355,6 +408,25 @@ bool GridPattern::CommitScrollPlaceholderRealBuild(int32_t index)
 void GridPattern::RetireScrollPlaceholderShell(const RefPtr<FrameNode>& shell, const std::string& templateId)
 {
     CHECK_NULL_VOID(shell);
+    // The structural removal below only reaches the RS render tree through a later
+    // host RebuildRenderContextTree — RemoveChild/DetachFromMainTree raise the sync
+    // flag, and no consumer is guaranteed to pick it up for the shell within the
+    // same frame (the mirror note in scroll_placeholder_shell_mount.h
+    // MountPlaceholderShellOnHost documents the same gap from the mount side).
+    // Until that rebuild runs, the retired shell's RS node keeps painting at its
+    // last-synced geometry, surfacing as placeholder-over-real overlap ghosts
+    // while the decay replacement phase retires shells at frame cadence (List
+    // fix-chain v6). Hide the render output at the context level instead: the
+    // opacity update rides the modifier path straight onto the RS node and takes
+    // effect in the next submitted transaction no matter when the structural sync
+    // lands (same pattern as menu_wrapper_pattern's instant hide). Shells are
+    // one-shot nodes — the instance pool only ever recycles content subtrees —
+    // so the hide never needs revoking.
+    auto renderContext = shell->GetRenderContext();
+    if (renderContext) {
+        renderContext->UpdateOpacity(0.0);
+        shell->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
+    }
     mountedPlaceholderShells_.erase(shell);
     auto host = GetHost();
     CHECK_NULL_VOID(host);
@@ -412,24 +484,94 @@ void GridPattern::SweepScrollPlaceholderOutOfRange(int32_t start, int32_t end)
         iter = scrollPlaceholderItems_.erase(iter);
     }
 }
-void GridPattern::ReconcileScrollPlaceholderItems()
+void GridPattern::SyncScrollPlaceholderShellCoverage(
+    int32_t index, ScrollPlaceholderItemInfo& info, const GridLayoutInfo& layoutInfo)
+{
+    // Runs on UI-thread layout rounds only, from ReconcileScrollPlaceholderItems
+    // right after the layout swap: by then layoutInfo.gridMatrix_ mirrors exactly
+    // the indices the just-finished round's fill loops covered, and the grid
+    // algorithms position an item only while re-acquiring it inside that matrix
+    // (slot position = matrix cell). A shell whose index left that coverage (the
+    // fill loops moved past it during a fast scroll) never gets repositioned —
+    // its node keeps the last-synced host-space position, an on-screen stale
+    // position it keeps painting while the real rows scroll past (the
+    // zero-frame-count shell is invisible to the index-space recycling that
+    // reclaims real items), until its retirement (flush/commit cadence) catches
+    // up several layout rounds later. Suppress the render output for exactly
+    // that window — same mechanism as the retirement hide: the opacity update
+    // rides the modifier path onto the RS node and lands in the same frame's
+    // render flush, so the frozen shell paints no stale-geometry frame at all.
+    // Restore as soon as coverage returns: the round that covers the index again
+    // also re-positions it. Idempotent — only transitions flip the render dirty flag.
+    const auto& shell = info.shell;
+    CHECK_NULL_VOID(shell);
+    auto renderContext = shell->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    const bool covered = IsIndexInGridLayoutMatrix(layoutInfo, index);
+    if (covered != info.frozenHidden) {
+        return;
+    }
+    if (covered) {
+        info.frozenHidden = false;
+        renderContext->UpdateOpacity(1.0);
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder shell coverage-restored: index=%{public}d", index);
+    } else {
+        info.frozenHidden = true;
+        renderContext->UpdateOpacity(0.0);
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder shell frozen-hidden: index=%{public}d", index);
+    }
+    shell->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
+}
+
+void GridPattern::ReconcileScrollPlaceholderItems(const GridLayoutInfo& layoutInfo)
 {
     // Layout-round reconcile: placeholders whose index already holds a real
-    // child (normal-path rebuild after data change) or fell out of range are
-    // dropped; shells of committed items are retired after the replacement
-    // layout finished (removed outside the transaction, per the commit ordering).
+    // child (normal-path rebuild after data change) or fell out of the
+    // just-finished layout round's window are dropped; committed shells were
+    // already retired at commit (the retiring list below stays as the residual
+    // safety net). The out-of-window drop runs before the frame reaches the
+    // screen: an index the fill loops no longer visit keeps its shell geometry
+    // frozen at stale viewport coordinates, so a fast fling would otherwise
+    // paint the previous window's shells on top of the new content until a
+    // later event-path sweep (SyncIndexesAndProcessEvents) caught up.
+    // The out-of-window drop keeps the ±SCROLL_PH_RANGE_MARGIN band on purpose
+    // (commit visibility guard / cache-band prefetch), so during a fast fling a
+    // frozen shell can stay pending inside that band for several layout rounds
+    // — each round painting it at its frozen on-screen position while the real
+    // rows scroll past (the device overlap frames). The coverage sync below
+    // closes that visual window: a shell the current round's fill loops no
+    // longer cover (its index left gridMatrix_) never paints stale geometry
+    // even while it keeps waiting in the band.
     // The orphan sweep at the end also runs with both tables empty: an empty
     // table with a mounted shell is exactly the residual it exists to catch.
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     int32_t totalCount = host->GetTotalChildCount();
+    auto* context = host->GetContext();
+    const auto& manager = context ? context->GetOrCreateScrollPlaceholderManager() : nullptr;
+    // An empty gridMatrix_ means unknown coverage (pre-first-layout, or an
+    // algorithm family that does not maintain it): fail open like the window
+    // range below and leave every shell as-is.
+    const bool coverageKnown = !layoutInfo.gridMatrix_.empty();
     for (auto iter = scrollPlaceholderItems_.begin(); iter != scrollPlaceholderItems_.end();) {
         if (iter->second.shell) {
             scroll_placeholder_mount::LogScrollPlaceholderShellState(host, iter->first, iter->second.shell);
         }
+        if (coverageKnown) {
+            SyncScrollPlaceholderShellCoverage(iter->first, iter->second, layoutInfo);
+        }
+        bool outOfWindow = !InScrollPhVisibleRange(layoutInfo.startIndex_, layoutInfo.endIndex_, iter->first);
         bool drop = iter->first >= totalCount ||
             (host->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(iter->first)) != nullptr);
-        if (drop) {
+        if (drop || outOfWindow) {
+            if (outOfWindow && manager) {
+                // Mirror the event-path sweep: the queued real-build of an index
+                // the layout window left behind is dropped with the shell.
+                manager->CancelRealBuildTask(host->GetId(), iter->first,
+                    ScrollPlaceholderCancelReason::OUT_OF_RANGE);
+            }
             RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
             iter = scrollPlaceholderItems_.erase(iter);
         } else {
@@ -441,6 +583,41 @@ void GridPattern::ReconcileScrollPlaceholderItems()
     }
     retiringPlaceholderShells_.clear();
     SweepOrphanPlaceholderShells();
+}
+
+void GridPattern::SweepStaleScrollPlaceholderShells()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* context = host->GetContext();
+    const auto& manager = context ? context->GetOrCreateScrollPlaceholderManager() : nullptr;
+    CHECK_NULL_VOID(manager);
+    int32_t examined = 0;
+    int32_t retired = 0;
+    for (auto iter = scrollPlaceholderItems_.begin(); iter != scrollPlaceholderItems_.end();) {
+        ++examined;
+        const bool realExists =
+            host->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(iter->first)) != nullptr;
+        const bool outOfWindow = !InScrollPhVisibleRange(startIndex_, endIndex_, iter->first);
+        if (!realExists && !outOfWindow) {
+            ++iter;
+            continue;
+        }
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
+            "idle sweep retire idx=%{public}d realExists=%{public}d outOfWindow=%{public}d",
+            iter->first, static_cast<int32_t>(realExists), static_cast<int32_t>(outOfWindow));
+        ++retired;
+        if (outOfWindow) {
+            manager->CancelRealBuildTask(host->GetId(), iter->first,
+                ScrollPlaceholderCancelReason::OUT_OF_RANGE);
+        }
+        RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
+        iter = scrollPlaceholderItems_.erase(iter);
+    }
+    if (examined > 0) {
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
+            "idle sweep ran: examined=%{public}d retired=%{public}d", examined, retired);
+    }
 }
 
 void GridPattern::SweepOrphanPlaceholderShells()
@@ -1279,13 +1456,18 @@ bool GridPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, c
     if (config.skipMeasure && config.skipLayout) {
         return false;
     }
-    // Scroll placeholder layout-round reconcile: retire shells whose replacement
-    // layout finished and drop placeholders overtaken by real children.
-    ReconcileScrollPlaceholderItems();
     auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto gridLayoutAlgorithm = DynamicCast<GridLayoutBaseAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(gridLayoutAlgorithm, false);
+    // Scroll placeholder layout-round reconcile: retire shells whose replacement
+    // layout finished and drop placeholders overtaken by real children. The
+    // fresh result of the just-finished round is handed in so the reconcile can
+    // also drop shells whose index left that round's window and suppress the
+    // render output of shells its fill loops no longer covered (frozen geometry
+    // would keep painting stale on-screen positions — see
+    // SyncScrollPlaceholderShellCoverage).
+    ReconcileScrollPlaceholderItems(gridLayoutAlgorithm->GetGridLayoutInfo());
     auto scrollable = GetScrollable();
     if (scrollable) {
         scrollable->ResetDragUpdateDelta();

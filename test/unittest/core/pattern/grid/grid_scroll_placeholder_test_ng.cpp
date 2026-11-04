@@ -182,9 +182,10 @@ HWTEST_F(GridScrollPlaceholderTestNg, GridScrollPlaceholderDeferAndDedup001, Tes
 /**
  * @tc.name: GridScrollPlaceholderCommitAndRetire001
  * @tc.desc: The framed real-build commit drives the real child into the slot
- *           through the existing build-style acquisition; the next layout-round
- *           reconcile retires the shell (unmounted, content policy handled) and
- *           clears both tables.
+ *           through the existing build-style acquisition and retires the shell
+ *           in the same idle flush (no retiring-list deferral: unmounted from
+ *           the host right away so the shell cannot paint over the real item);
+ *           the next layout-round reconcile keeps both tables consistent.
  * @tc.type: FUNC
  */
 HWTEST_F(GridScrollPlaceholderTestNg, GridScrollPlaceholderCommitAndRetire001, TestSize.Level1)
@@ -199,7 +200,7 @@ HWTEST_F(GridScrollPlaceholderTestNg, GridScrollPlaceholderCommitAndRetire001, T
     // The layout cache path may have built some slots really; those indexes never
     // get a placeholder anymore (create refuses built slots) and stale entries are
     // dropped by the reconcile: the real child always wins over the shell.
-    pattern_->ReconcileScrollPlaceholderItems();
+    pattern_->ReconcileScrollPlaceholderItems(pattern_->info_);
     for (const auto& [index, info] : pattern_->scrollPlaceholderItems_) {
         EXPECT_TRUE(frameNode_->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(index)) == nullptr);
     }
@@ -217,16 +218,19 @@ HWTEST_F(GridScrollPlaceholderTestNg, GridScrollPlaceholderCommitAndRetire001, T
         EXPECT_TRUE(pattern_->CreateScrollPlaceholderShell(builtSlot) == nullptr);
     }
 
-    // Real build: the real child enters the tree at the same slot index.
+    // Real build: the real child enters the tree at the same slot index, and the
+    // shell is retired in the same commit (List fix-chain v2: the retiring-list
+    // deferral is gone — unmounted from the host right away, so no placeholder
+    // keeps painting over the freshly built real item).
     EXPECT_TRUE(pattern_->CommitScrollPlaceholderRealBuild(index));
     EXPECT_TRUE(frameNode_->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(index)) != nullptr);
-    EXPECT_FALSE(pattern_->retiringPlaceholderShells_.empty());
-
-    // Reconcile retires the shell: unmounted from the host, tables cleared.
-    pattern_->ReconcileScrollPlaceholderItems();
-    EXPECT_FALSE(pattern_->HasScrollPlaceholderItem(index));
     EXPECT_TRUE(pattern_->retiringPlaceholderShells_.empty());
+    EXPECT_FALSE(pattern_->HasScrollPlaceholderItem(index));
     EXPECT_FALSE(IsChildOfHost(shell));
+
+    // The reconcile keeps both tables consistent for the remaining entries.
+    pattern_->ReconcileScrollPlaceholderItems(pattern_->info_);
+    EXPECT_TRUE(pattern_->retiringPlaceholderShells_.empty());
 }
 
 /**
@@ -246,7 +250,7 @@ HWTEST_F(GridScrollPlaceholderTestNg, GridScrollPlaceholderOrphanShellSweep001, 
         },
         true);
     CreateItemsAndDone();
-    pattern_->ReconcileScrollPlaceholderItems();
+    pattern_->ReconcileScrollPlaceholderItems(pattern_->info_);
 
     // Find a genuinely unbuilt slot and mount a shell on it.
     int32_t index = FindUnbuiltSlot();
@@ -261,7 +265,7 @@ HWTEST_F(GridScrollPlaceholderTestNg, GridScrollPlaceholderOrphanShellSweep001, 
     EXPECT_TRUE(IsChildOfHost(shell));
 
     // The next layout-round reconcile sweeps the orphan off the host.
-    pattern_->ReconcileScrollPlaceholderItems();
+    pattern_->ReconcileScrollPlaceholderItems(pattern_->info_);
     EXPECT_FALSE(IsChildOfHost(shell));
 
     // A committed shell awaiting the reconcile is retired by the reset as well.
@@ -391,7 +395,7 @@ HWTEST_F(GridScrollPlaceholderTestNg, GridScrollPlaceholderRegisteredTemplateFlo
     // (real child wins): drop those entries, then defer a genuinely unbuilt slot
     // fresh (the expired anchor still holds) and drive it through the full flow.
     ASSERT_FALSE(pattern_->scrollPlaceholderItems_.empty());
-    pattern_->ReconcileScrollPlaceholderItems();
+    pattern_->ReconcileScrollPlaceholderItems(pattern_->info_);
     int32_t index = FindUnbuiltSlot();
     ASSERT_GE(index, 0);
     auto shell = pattern_->CreateScrollPlaceholderShell(index);
@@ -411,7 +415,7 @@ HWTEST_F(GridScrollPlaceholderTestNg, GridScrollPlaceholderRegisteredTemplateFlo
     EXPECT_TRUE(instance->IsActive());
 
     EXPECT_TRUE(pattern_->CommitScrollPlaceholderRealBuild(index));
-    pattern_->ReconcileScrollPlaceholderItems();
+    pattern_->ReconcileScrollPlaceholderItems(pattern_->info_);
     EXPECT_FALSE(pattern_->HasScrollPlaceholderItem(index));
     EXPECT_TRUE(pattern_->retiringPlaceholderShells_.empty());
     // The template content went back to the per-template instance pool.
@@ -556,7 +560,7 @@ HWTEST_F(GridScrollPlaceholderTestNg, GridScrollPlaceholderCommitEdgeBranches001
         ElementRegister::GetInstance()->MakeUniqueId(),
         AceType::MakeRefPtr<GridItemPattern>(nullptr, GridItemStyle::NONE));
     pattern_->scrollPlaceholderItems_[GRID_ITEM_COUNT + 1] = { staleShell, std::string(), 0 };
-    pattern_->ReconcileScrollPlaceholderItems();
+    pattern_->ReconcileScrollPlaceholderItems(pattern_->info_);
     EXPECT_FALSE(pattern_->HasScrollPlaceholderItem(GRID_ITEM_COUNT + 1));
 }
 
@@ -634,7 +638,7 @@ HWTEST_F(GridScrollPlaceholderTestNg, GridScrollPlaceholderFrameProxySubstitutio
 
     // Retire funnels clear any deferral still pointing at a retired shell, and the
     // test leaves no process-wide deferral behind (the static fast gate is shared).
-    pattern_->ReconcileScrollPlaceholderItems();
+    pattern_->ReconcileScrollPlaceholderItems(pattern_->info_);
     EXPECT_FALSE(IsChildOfHost(shell));
     pattern_->ResetScrollPlaceholder();
     EXPECT_TRUE(pattern_->scrollPlaceholderItems_.empty());
@@ -658,7 +662,7 @@ HWTEST_F(GridScrollPlaceholderTestNg, GridScrollPlaceholderGetGridItemFunnel001,
         },
         true);
     CreateItemsAndDone();
-    pattern_->ReconcileScrollPlaceholderItems();
+    pattern_->ReconcileScrollPlaceholderItems(pattern_->info_);
 
     int32_t index = FindUnbuiltSlot();
     ASSERT_GE(index, 0);
@@ -680,6 +684,98 @@ HWTEST_F(GridScrollPlaceholderTestNg, GridScrollPlaceholderGetGridItemFunnel001,
         auto cacheWrapper = GridLayoutBaseAlgorithm::GetGridItem(AceType::RawPtr(frameNode_), other, false, true);
         EXPECT_NE(AceType::RawPtr(cacheWrapper), AceType::RawPtr(shell));
     }
+
+    pattern_->ResetScrollPlaceholder();
+    EXPECT_TRUE(pattern_->scrollPlaceholderItems_.empty());
+}
+
+/**
+ * @tc.name: GridScrollPlaceholderUnregisteredTemplateRefused001
+ * @tc.desc: A provider id that is not registered never mounts a shell: the
+ *           deferral is refused (a content-less shell would render a blank
+ *           cell that is neither a placeholder nor a real item) and the slot
+ *           keeps the synchronous real-build path, so no third cell state and
+ *           no deferred task is left behind.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollPlaceholderTestNg, GridScrollPlaceholderUnregisteredTemplateRefused001, TestSize.Level1)
+{
+    auto manager = MockPipelineContext::GetCurrent()->GetOrCreateScrollPlaceholderManager();
+    ASSERT_TRUE(manager);
+    int32_t providerCalls = 0;
+    auto model = CreatePlaceholderGrid(
+        [&providerCalls](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            providerCalls++;
+            return MakeSizedGridPlaceholderOptions("grid-tpl-missing");
+        },
+        true);
+    CreateItemsAndDone();
+
+    // Stage-1 pressure consults the provider, but the unregistered id refuses
+    // the deferral: no shell, no deferral, no queued real-build duplication.
+    EXPECT_GE(providerCalls, 1);
+    EXPECT_TRUE(pattern_->scrollPlaceholderItems_.empty());
+    EXPECT_TRUE(pattern_->mountedPlaceholderShells_.empty());
+    EXPECT_EQ(manager->QueryDeferredShell(frameNode_->GetId(), 0), nullptr);
+    // The slots keep the normal real-build path: the visible ones built really.
+    int32_t builtSlot = FindBuiltSlot();
+    EXPECT_GE(builtSlot, 0);
+}
+
+/**
+ * @tc.name: GridScrollPlaceholderCoverageFreezeHide001
+ * @tc.desc: The layout-round reconcile suppresses the render output of a shell
+ *           whose index left the just-finished round's gridMatrix_ fill coverage
+ *           (frozen geometry would keep painting a stale on-screen position)
+ *           while the margin band keeps it mounted; a later round that covers
+ *           the index again restores the output.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollPlaceholderTestNg, GridScrollPlaceholderCoverageFreezeHide001, TestSize.Level1)
+{
+    auto model = CreatePlaceholderGrid(
+        [](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            return MakeGridPlaceholderOptions();
+        },
+        true);
+    CreateItemsAndDone();
+    pattern_->ReconcileScrollPlaceholderItems(pattern_->info_);
+
+    int32_t index = FindUnbuiltSlot();
+    ASSERT_GE(index, 0);
+    auto shell = pattern_->CreateScrollPlaceholderShell(index);
+    ASSERT_TRUE(shell);
+    EXPECT_TRUE(IsChildOfHost(shell));
+    EXPECT_FALSE(pattern_->scrollPlaceholderItems_[index].frozenHidden);
+
+    // A layout round whose fill coverage no longer contains the index but whose
+    // window still keeps it inside the margin band (no drop, hide only).
+    GridLayoutInfo round;
+    round.startIndex_ = 0;
+    round.endIndex_ = GRID_ITEM_COUNT - 1;
+    for (int32_t slot = 0; slot < GRID_ITEM_COUNT; slot++) {
+        if (slot == index) {
+            continue;
+        }
+        round.gridMatrix_[slot / 2][slot % 2] = slot;
+    }
+    pattern_->ReconcileScrollPlaceholderItems(round);
+    EXPECT_TRUE(pattern_->HasScrollPlaceholderItem(index));
+    EXPECT_TRUE(IsChildOfHost(shell));
+    EXPECT_TRUE(pattern_->scrollPlaceholderItems_[index].frozenHidden);
+
+    // Coverage returns: the round that re-acquires the index restores the output.
+    round.gridMatrix_[index / 2][index % 2] = index;
+    pattern_->ReconcileScrollPlaceholderItems(round);
+    EXPECT_TRUE(pattern_->HasScrollPlaceholderItem(index));
+    EXPECT_FALSE(pattern_->scrollPlaceholderItems_[index].frozenHidden);
+
+    // An empty matrix (unknown coverage) fails open: no hide, no drop.
+    round.gridMatrix_.clear();
+    pattern_->ReconcileScrollPlaceholderItems(round);
+    EXPECT_TRUE(pattern_->HasScrollPlaceholderItem(index));
+    EXPECT_FALSE(pattern_->scrollPlaceholderItems_[index].frozenHidden);
+    EXPECT_TRUE(IsChildOfHost(shell));
 
     pattern_->ResetScrollPlaceholder();
     EXPECT_TRUE(pattern_->scrollPlaceholderItems_.empty());

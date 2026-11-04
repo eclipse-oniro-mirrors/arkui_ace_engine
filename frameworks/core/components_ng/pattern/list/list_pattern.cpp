@@ -738,7 +738,6 @@ void ListPattern::SweepStaleScrollPlaceholderShells()
     auto* context = host->GetContext();
     const auto& manager = context ? context->GetOrCreateScrollPlaceholderManager() : nullptr;
     CHECK_NULL_VOID(manager);
-    const int32_t total = host->GetTotalChildCount();
     int32_t examined = 0;
     int32_t retired = 0;
     for (auto iter = scrollPlaceholderItems_.begin(); iter != scrollPlaceholderItems_.end();) {

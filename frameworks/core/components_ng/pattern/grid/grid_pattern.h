@@ -65,6 +65,13 @@ public:
         RefPtr<FrameNode> shell;
         std::string templateId;
         uint64_t templateGen = 0;
+        // Fast-scroll freeze state: true while the last layout round's fill loops no
+        // longer covered this index and the shell's render output is suppressed
+        // (opacity 0) — its frame geometry froze the moment the loops stopped
+        // re-acquiring it (the fill loops position an index only while it stays
+        // inside the round's gridMatrix_ window). Cleared — and the render output
+        // restored — as soon as a later layout round covers the index again.
+        bool frozenHidden = false;
     };
     // Decision + acquire + mount + framed enqueue at the child build call point.
     // Returns the mounted shell when this index is deferred to a placeholder,
@@ -84,9 +91,20 @@ public:
     // then requests the local remeasure that completes the replacement.
     bool CommitScrollPlaceholderRealBuild(int32_t index);
     // Layout-round reconcile: drops placeholders whose index already holds a real
-    // child or fell out of range, and retires shells whose real item was committed
-    // (removed from the host and the template content returned to the pool).
-    void ReconcileScrollPlaceholderItems();
+    // child or fell out of the just-finished layout round's window, and retires
+    // shells whose real item was committed (removed from the host and the template
+    // content returned to the pool). layoutInfo is the fresh result of that round:
+    // its gridMatrix_ mirrors exactly the indices the fill loops covered, so a
+    // shell the round no longer covered is visually suppressed
+    // (SyncScrollPlaceholderShellCoverage) instead of painting its frozen
+    // stale-viewport geometry over the scrolling rows.
+    void ReconcileScrollPlaceholderItems(const GridLayoutInfo& layoutInfo);
+    // Frame-cadence companion of ReconcileScrollPlaceholderItems: runs from the
+    // manager post-flush hook after every FlushRealBuild iteration, retiring
+    // pending shells whose index the visible window or a real child already
+    // left, so a load-heavy decay (commits stretching across frames with no
+    // layout round in between) can not keep stale shells mounted.
+    void SweepStaleScrollPlaceholderShells();
     // Defensive sweep: retires mounted shells that neither placeholder table tracks
     // anymore, so a bookkeeping miss can never leave a shell on the tree (index-based
     // cleanup can not see shells by design — zero frame count).
@@ -486,6 +504,11 @@ private:
     std::optional<ScrollPlaceholderOptions> PredictScrollPlaceholderDefer(
         const RefPtr<ScrollPlaceholderManager>& manager, const RefPtr<FrameNode>& host, int32_t index);
     void RetireScrollPlaceholderShell(const RefPtr<FrameNode>& shell, const std::string& templateId);
+    // Coverage sync for one live shell against the just-finished layout round: hides
+    // (restores) the shell's render output when its index left (re-entered) that
+    // round's gridMatrix_ fill coverage. See the freeze note on ScrollPlaceholderItemInfo.
+    void SyncScrollPlaceholderShellCoverage(int32_t index, ScrollPlaceholderItemInfo& info,
+        const GridLayoutInfo& layoutInfo);
     // Drops queued real-build tasks (and their mounted shells) for indices outside the
     // visible window; reports the window to the manager for flush-time banding.
     void SweepScrollPlaceholderOutOfRange(int32_t start, int32_t end);

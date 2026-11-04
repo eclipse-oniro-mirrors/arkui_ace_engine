@@ -142,36 +142,48 @@ inline void LogScrollPlaceholderShellState(const RefPtr<FrameNode>& host, int32_
 // (index-space integrity, see ScrollPlaceholderShellNode). The content pattern
 // type follows the mounting component (ListItemPattern/GridItemPattern/
 // WaterFlowItemPattern) so the shell measures like a real item of that host.
+// Returns null when the options name a template that cannot fill the shell
+// (unregistered id, or a registered id whose builder produced no product): a
+// mounted content-less shell renders as a blank cell that is neither a
+// placeholder nor a real item (the device "white block" evidence), so the
+// caller falls back to the synchronous real build instead.
 inline RefPtr<FrameNode> CreatePlaceholderShellNode(const ScrollPlaceholderOptions& options,
     const RefPtr<ScrollPlaceholderManager>& manager, const RefPtr<Pattern>& contentPattern)
 {
-    auto shell = ScrollPlaceholderShellNode::CreateScrollPlaceholderShellNode(SHELL_ETS_TAG,
-        ElementRegister::GetInstance()->MakeUniqueId(), contentPattern);
-    CHECK_NULL_RETURN(shell, nullptr);
-    // Distinguish the three content-less shell causes in the mount log: a
-    // size-only default shell is a designed provider choice, the other two are
-    // wiring anomalies (acquire failures log on the manager side).
+    // Resolve the template content BEFORE creating the shell node (the node
+    // registers itself into the element register at creation): a refused mount
+    // must not leave a registered-but-orphaned node behind.
+    RefPtr<UINode> instance;
     if (options.id.empty()) {
+        // Designed provider choice: a size-only default shell.
         TAG_LOGD(AceLogTag::ACE_SCROLL,
             "ScrollPlaceholder size-only default shell mounted: provider returned no template id");
     } else if (!manager->IsTemplateRegistered(options.id)) {
         TAG_LOGW(AceLogTag::ACE_SCROLL,
-            "ScrollPlaceholder shell mounted without template content: templateId=%{public}s "
+            "ScrollPlaceholder shell mount refused: templateId=%{public}s "
             "is not registered (check the provider id matches PlaceholderRegister.register)",
             options.id.c_str());
+        return nullptr;
     } else {
-        auto instance = manager->AcquireTemplateInstance(options.id);
-        if (instance) {
-            shell->AddChild(instance);
-            ActivatePlaceholderSubtree(instance);
-            int32_t nodeCount = 0;
-            int32_t depth = 0;
-            CountScrollPlaceholderSubtree(instance, nodeCount, depth);
-            TAG_LOGD(AceLogTag::ACE_SCROLL,
-                "ScrollPlaceholder shell mounted with template content: templateId=%{public}s, "
-                "rootTag=%{public}s, nodeCount=%{public}d, depth=%{public}d",
-                options.id.c_str(), instance->GetTag().c_str(), nodeCount, depth);
+        instance = manager->AcquireTemplateInstance(options.id);
+        if (!instance) {
+            // Acquire failures log on the manager side.
+            return nullptr;
         }
+    }
+    auto shell = ScrollPlaceholderShellNode::CreateScrollPlaceholderShellNode(SHELL_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), contentPattern);
+    CHECK_NULL_RETURN(shell, nullptr);
+    if (instance) {
+        shell->AddChild(instance);
+        ActivatePlaceholderSubtree(instance);
+        int32_t nodeCount = 0;
+        int32_t depth = 0;
+        CountScrollPlaceholderSubtree(instance, nodeCount, depth);
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder shell mounted with template content: templateId=%{public}s, "
+            "rootTag=%{public}s, nodeCount=%{public}d, depth=%{public}d",
+            options.id.c_str(), instance->GetTag().c_str(), nodeCount, depth);
     }
     if (options.size.has_value()) {
         // Options carry unit-preserving Dimensions (bridges map plain numbers to vp;
