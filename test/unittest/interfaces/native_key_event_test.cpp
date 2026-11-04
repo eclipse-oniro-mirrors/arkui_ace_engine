@@ -42,6 +42,23 @@ constexpr uint32_t ARKUI_UNICODE = 98;
 constexpr int32_t ARKUI_DEVICE_ID = 1;
 constexpr uint64_t ARKUI_TIME = 20;
 const char* ARKUI_KEY_TEXT = "k";
+
+void CountApplicationShortcut(const OH_ArkUI_ApplicationShortcutCallbackInfo* info, void* userData)
+{
+    EXPECT_NE(OH_ArkUI_ApplicationShortcutCallbackInfo_GetUIContext(info), nullptr);
+    if (userData) {
+        ++(*static_cast<int32_t*>(userData));
+    }
+}
+
+KeyEvent MakeApplicationShortcutEvent()
+{
+    KeyEvent event;
+    event.code = KeyCode::KEY_A;
+    event.action = KeyAction::DOWN;
+    event.pressedCodes = { KeyCode::KEY_CTRL_LEFT, KeyCode::KEY_A };
+    return event;
+}
 } // namespace
 class NativeKeyEventTest : public testing::Test {
 public:
@@ -1055,25 +1072,6 @@ HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0033, TestSize.Level1)
     EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&event), ARKUI_ERROR_CODE_NO_ERROR);
     EXPECT_EQ(event, nullptr);
 }
-
-namespace {
-void CountApplicationShortcut(const OH_ArkUI_ApplicationShortcutCallbackInfo* info, void* userData)
-{
-    EXPECT_NE(OH_ArkUI_ApplicationShortcutCallbackInfo_GetUIContext(info), nullptr);
-    if (userData) {
-        ++(*static_cast<int32_t*>(userData));
-    }
-}
-
-KeyEvent MakeApplicationShortcutEvent()
-{
-    KeyEvent event;
-    event.code = KeyCode::KEY_A;
-    event.action = KeyAction::DOWN;
-    event.pressedCodes = { KeyCode::KEY_CTRL_LEFT, KeyCode::KEY_A };
-    return event;
-}
-} // namespace
 
 /**
  * @tc.name: ApplicationShortcutMultipleBindings
