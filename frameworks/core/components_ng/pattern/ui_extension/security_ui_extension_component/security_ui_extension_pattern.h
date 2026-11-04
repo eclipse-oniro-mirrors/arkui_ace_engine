@@ -184,6 +184,10 @@ public:
     {
         lastSentBrandColorStr_ = brandColorStr;
     }
+    void SetBrandColorStr(const std::string& brandColorStr)
+    {
+        brandColorStr_ = brandColorStr;
+    }
 
 protected:
     void UpdateSessionInstanceId(int32_t instanceId);

@@ -367,6 +367,7 @@ void PreviewSessionWrapperImpl::CreateSession(const AAFwk::Want& want, const Ses
     SetConnectToRenderInner(container, extensionSessionInfo);
     session_ = Rosen::ExtensionSessionManager::GetInstance().RequestExtensionSession(extensionSessionInfo);
     CHECK_NULL_VOID(session_);
+    pattern->SetBrandColorStr(brandColorStr);
     pattern->SetLastSentBrandColorStr(brandColorStr);
     lifecycleListener_ = std::make_shared<PreviewUIExtensionLifecycleListener>(
         AceType::WeakClaim(this));

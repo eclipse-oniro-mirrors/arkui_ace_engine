@@ -348,6 +348,10 @@ public:
     {
         lastSentBrandColorStr_ = brandColorStr;
     }
+    void SetBrandColorStr(const std::string& brandColorStr)
+    {
+        brandColorStr_ = brandColorStr;
+    }
 
 protected:
     virtual void DispatchPointerEvent(const std::shared_ptr<MMI::PointerEvent>& pointerEvent);
