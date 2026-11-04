@@ -1211,6 +1211,11 @@ void FrameNode::DumpCommonInfo()
     DumpLog::GetInstance().AddDesc(std::string("FrameRect: ").append(geometryNode_->GetFrameRect().ToString()));
     DumpLog::GetInstance().AddDesc(
         std::string("PaintRect without transform: ").append(renderContext_->GetPaintRectWithoutTransform().ToString()));
+    // DebugLine memory trace: emit when a source line is bound via .debugLine().
+    auto debugLine = GetDebugLine();
+    if (!debugLine.empty()) {
+        DumpLog::GetInstance().AddDesc(std::string("DebugLine: ").append(debugLine));
+    }
     if (renderContext_->GetBackgroundColor()->ColorToString().compare("#00000000") != 0) {
         DumpLog::GetInstance().AddDesc(
             std::string("BackgroundColor: ").append(renderContext_->GetBackgroundColor()->ColorToString()));
@@ -9052,6 +9057,11 @@ void FrameNode::DumpCommonInfo(std::unique_ptr<JsonValue>& json)
 {
     json->Put("FrameRect", geometryNode_->GetFrameRect().ToString().c_str());
     json->Put("PaintRect without transform", renderContext_->GetPaintRectWithoutTransform().ToString().c_str());
+    // DebugLine memory trace: emit when a source line is bound via .debugLine().
+    auto debugLine = GetDebugLine();
+    if (!debugLine.empty()) {
+        json->Put("DebugLine", debugLine.c_str());
+    }
     if (renderContext_->GetBackgroundColor()->ColorToString().compare("#00000000") != 0) {
         json->Put("BackgroundColor", renderContext_->GetBackgroundColor()->ColorToString().c_str());
     }

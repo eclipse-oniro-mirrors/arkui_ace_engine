@@ -17,6 +17,7 @@
 
 #include "core/components_ng/pattern/linear_layout/column_model_ng.h"
 #include "frameworks/core/components_ng/syntax/arkoala_lazy_node.h"
+#include "base/log/dump_log.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -804,5 +805,67 @@ TEST_F(ArkoalaLazyNodeTest, NeedBuildAll001)
     repeatNode->SetTotalCount(totalCount);
     repeatNode->BuildAllChildren();
     EXPECT_EQ(repeatNode->GetChildren().size(), totalCount);
+}
+
+/**
+ * @tc.name: ArkoalaLazyNodeRepeatMemOptDump001
+ * @tc.desc: Test ArkoalaLazyNode(Repeat) DumpInfo shows RepeatMemOpt enablement.
+ *           Covers the mem-opt (auto cache clear) dump display on Repeat nodes.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ArkoalaLazyNodeTest, ArkoalaLazyNodeRepeatMemOptDump001, TestSize.Level1)
+{
+    auto repeatNode = CreateRepeatNode(GetNextId());
+    ASSERT_NE(repeatNode, nullptr);
+
+    auto findMemOpt = [](const std::string& needle) -> bool {
+        for (const auto& desc : DumpLog::GetInstance().description_) {
+            if (desc.find(needle) != std::string::npos) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    /**
+     * @tc.steps: step1. ENABLE_AUTO_CACHE_OPTIMIZATION -> dump shows "enabled".
+     */
+    repeatNode->SetRepeatMemoryOptimizationStrategy(1);
+    DumpLog::GetInstance().description_.clear();
+    repeatNode->DumpInfo();
+    EXPECT_TRUE(findMemOpt("RepeatMemOpt: enabled"));
+
+    /**
+     * @tc.steps: step2. DEFAULT -> dump shows "disabled".
+     */
+    repeatNode->SetRepeatMemoryOptimizationStrategy(0);
+    DumpLog::GetInstance().description_.clear();
+    repeatNode->DumpInfo();
+    EXPECT_TRUE(findMemOpt("RepeatMemOpt: disabled"));
+
+    DumpLog::GetInstance().description_.clear();
+}
+
+/**
+ * @tc.name: ArkoalaLazyNodeRepeatMemOptDump002
+ * @tc.desc: Non-repeat ArkoalaLazyNode must NOT emit RepeatMemOpt (only isRepeat_ nodes do).
+ * @tc.type: FUNC
+ */
+HWTEST_F(ArkoalaLazyNodeTest, ArkoalaLazyNodeRepeatMemOptDump002, TestSize.Level1)
+{
+    auto lazyNode = CreateLazyForEachNode(GetNextId());
+    ASSERT_NE(lazyNode, nullptr);
+    lazyNode->SetRepeatMemoryOptimizationStrategy(1);
+    DumpLog::GetInstance().description_.clear();
+    lazyNode->DumpInfo();
+    bool found = false;
+    for (const auto& desc : DumpLog::GetInstance().description_) {
+        if (desc.find("RepeatMemOpt:") != std::string::npos) {
+            found = true;
+            break;
+        }
+    }
+    EXPECT_FALSE(found);
+    DumpLog::GetInstance().description_.clear();
 }
 } // namespace OHOS::Ace::NG

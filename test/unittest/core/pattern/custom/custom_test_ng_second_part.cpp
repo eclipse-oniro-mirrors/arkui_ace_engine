@@ -1718,4 +1718,42 @@ HWTEST_F(CustomTestNg, CustomNodeBaseTryEnableParentCustomNodeMemOpt001, TestSiz
     EXPECT_EQ(parentCustomNode->runningMemOpt_, true);
 }
 
+/**
+ * @tc.name: CustomNodeReusableMemOptDump001
+ * @tc.desc: Test CustomNode DumpInfo shows ReusableMemOpt enablement (auto cache clear).
+ * @tc.type: FUNC
+ */
+HWTEST_F(CustomTestNg, CustomNodeReusableMemOptDump001, TestSize.Level1)
+{
+    auto customNode = CustomNode::CreateCustomNode(ElementRegister::GetInstance()->MakeUniqueId(), TEST_TAG);
+    ASSERT_NE(customNode, nullptr);
+
+    auto findMemOpt = [](const std::string& needle) -> bool {
+        for (const auto& desc : DumpLog::GetInstance().description_) {
+            if (desc.find(needle) != std::string::npos) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    /**
+     * @tc.steps: step1. ENABLE_AUTO_CACHE_OPTIMIZATION -> dump shows "enabled".
+     */
+    customNode->SetReusableMemOptStrategy(static_cast<int32_t>(ReusableMemOptStrategy::ENABLE_AUTO_CACHE_OPTIMIZATION));
+    DumpLog::GetInstance().description_.clear();
+    customNode->DumpInfo();
+    EXPECT_TRUE(findMemOpt("ReusableMemOpt: enabled"));
+
+    /**
+     * @tc.steps: step2. DEFAULT -> dump shows "disabled".
+     */
+    customNode->SetReusableMemOptStrategy(static_cast<int32_t>(ReusableMemOptStrategy::DEFAULT));
+    DumpLog::GetInstance().description_.clear();
+    customNode->DumpInfo();
+    EXPECT_TRUE(findMemOpt("ReusableMemOpt: disabled"));
+
+    DumpLog::GetInstance().description_.clear();
+}
+
 } // namespace OHOS::Ace::NG

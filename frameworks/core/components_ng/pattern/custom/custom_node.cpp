@@ -349,6 +349,12 @@ void CustomNode::DumpInfo()
         }
     }
     DumpLog::GetInstance().AddDesc(std::string("CreatorId: ").append(GetCreatorId()));
+    // Reusable memory optimization (auto cache clear) enablement — reflects the
+    // effective strategy resolved from node -> app-level (LazyForEachUtils) -> system.
+    DumpLog::GetInstance().AddDesc(std::string("ReusableMemOpt: ").append(
+        GetReusableMemOptStrategy() == ReusableMemOptStrategy::ENABLE_AUTO_CACHE_OPTIMIZATION
+            ? "enabled"
+            : "disabled"));
     FireOnDumpInfoFunc({ "RecyclePool" });
 }
 
