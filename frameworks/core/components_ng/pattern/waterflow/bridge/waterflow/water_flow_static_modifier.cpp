@@ -37,7 +37,7 @@ namespace Converter {
 // the conversion into the layout-side option (same contract as List's
 // SetScrollPlaceholderImpl).
 template<>
-ScrollPlaceholderOptions Convert(const Ark_PlaceholderOptions& src)
+inline ScrollPlaceholderOptions Convert(const Ark_PlaceholderOptions& src)
 {
     ScrollPlaceholderOptions options;
     options.id = Converter::OptConvert<std::string>(src.id).value_or("");
@@ -53,7 +53,7 @@ ScrollPlaceholderOptions Convert(const Ark_PlaceholderOptions& src)
 }
 
 template<>
-std::optional<ScrollPlaceholderOptions> OptConvert(const Opt_PlaceholderOptions& src)
+inline std::optional<ScrollPlaceholderOptions> OptConvert(const Opt_PlaceholderOptions& src)
 {
     if (src.tag == INTEROP_TAG_UNDEFINED) {
         return std::nullopt;
