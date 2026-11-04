@@ -1097,6 +1097,50 @@ HWTEST_F(WebModelTestNg, SetDomStorageAccessEnabled002, TestSize.Level1)
 }
 
 /**
+ * @tc.name: SetVisitedLinkPersistEnabled001
+ * @tc.desc: Test web_model_ng.cpp
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelTestNg, SetVisitedLinkPersistEnabled001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+
+    WebModelNG webModelNG;
+    webModelNG.SetVisitedLinkPersistEnabled(true);
+    EXPECT_EQ(webPattern->GetOrCreateWebProperty()->CheckVisitedLinkPersistEnabled(true), true);
+#endif
+}
+
+/**
+ * @tc.name: SetVisitedLinkPersistEnabled002
+ * @tc.desc: Test web_model_ng.cpp
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelTestNg, SetVisitedLinkPersistEnabled002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+
+    WebModelNG webModelNG;
+    webModelNG.SetVisitedLinkPersistEnabled(AccessibilityManager::RawPtr(frameNode), true);
+    EXPECT_EQ(webPattern->GetOrCreateWebProperty()->CheckVisitedLinkPersistEnabled(true), true);
+#endif
+}
+
+/**
  * @tc.name: SetImageAccessEnabled001
  * @tc.desc: Test web_model_ng.cpp
  * @tc.type: FUNC
