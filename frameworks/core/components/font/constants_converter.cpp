@@ -460,9 +460,8 @@ void ConvertTxtStyle(const TextStyle& textStyle, Rosen::TextStyle& txtStyle)
     if (textBackgroundStyle->borderWidth.has_value()) {
         txtStyle.backgroundRect.borderWidth = dimensionConverter(textBackgroundStyle->borderWidth);
     }
-    if (textBackgroundStyle->borderColor.has_value()) {
-        txtStyle.backgroundRect.borderColor = textBackgroundStyle->borderColor.value().GetValue();
-    }
+    Color borderColor = textBackgroundStyle->borderColor.value_or(textStyle.GetTextColor());
+    txtStyle.backgroundRect.borderColor = borderColor.GetValue();
 }
 
 // ConvertTxtStyle helper for LineSpacing and LineHeight etc
@@ -759,9 +758,8 @@ void ConvertTxtStyle(const TextStyle& textStyle, const WeakPtr<PipelineBase>& co
     if (textBackgroundStyle->borderWidth.has_value()) {
         txtStyle.backgroundRect.borderWidth = dimensionConverter(textBackgroundStyle->borderWidth);
     }
-    if (textBackgroundStyle->borderColor.has_value()) {
-        txtStyle.backgroundRect.borderColor = textBackgroundStyle->borderColor.value().GetValue();
-    }
+    Color borderColor = textBackgroundStyle->borderColor.value_or(textStyle.GetTextColor());
+    txtStyle.backgroundRect.borderColor = borderColor.GetValue();
 }
 
 NG::Gradient ToGradient(const Gradient& gradient)

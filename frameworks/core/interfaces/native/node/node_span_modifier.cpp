@@ -538,7 +538,7 @@ void ResetSpanTextBackgroundStyle(ArkUINodeHandle node)
     font.backgroundRadius = borderRadius;
     font.backgroundRadius->multiValued = true;
     font.borderWidth = Dimension(0, OHOS::Ace::DimensionUnit::VP);
-    font.borderColor = Color(0x00000000);
+    font.borderColor = std::nullopt;
     SpanModelNG::SetTextBackgroundStyle(uiNode, font);
     SpanModelNG::ResetLetterSpacing(uiNode);
     if (SystemProperties::ConfigChangePerform()) {

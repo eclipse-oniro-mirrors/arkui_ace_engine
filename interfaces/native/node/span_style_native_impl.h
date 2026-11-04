@@ -138,6 +138,7 @@ struct OH_ArkUI_BackgroundColorStyle {
     float bottomRightRadius;
     float borderWidth = 0.0f;
     uint32_t borderColor = 0x00000000;
+    bool hasBorderColor = false;
 };
 
 struct OH_ArkUI_UrlStyle {
