@@ -2007,18 +2007,33 @@ ani_long GetPageRootNode(ani_env* env, [[maybe_unused]] ani_object obj)
 }
 
 namespace {
-void ReleaseApplicationShortcutCallback(ani_vm* vm, ani_ref* callback)
-{
-    ani_env* env = nullptr;
-    auto attachStatus = GetAniEnv(vm, &env);
-    if (env) {
-        env->GlobalReference_Delete(*callback);
+class ApplicationShortcutCallbackRef final {
+public:
+    ApplicationShortcutCallbackRef(ani_vm* vm, ani_ref callback) : vm_(vm), callback_(callback) {}
+    ApplicationShortcutCallbackRef(const ApplicationShortcutCallbackRef&) = delete;
+    ApplicationShortcutCallbackRef& operator=(const ApplicationShortcutCallbackRef&) = delete;
+
+    ~ApplicationShortcutCallbackRef()
+    {
+        ani_env* env = nullptr;
+        auto attachStatus = GetAniEnv(vm_, &env);
+        if (env) {
+            env->GlobalReference_Delete(callback_);
+        }
+        if (attachStatus == ANI_OK) {
+            vm_->DetachCurrentThread();
+        }
     }
-    if (attachStatus == ANI_OK) {
-        vm->DetachCurrentThread();
+
+    ani_ref Get() const
+    {
+        return callback_;
     }
-    delete callback;
-}
+
+private:
+    ani_vm* vm_;
+    ani_ref callback_;
+};
 
 void ExecuteApplicationShortcutCallback(ani_vm* vm, ani_ref callback, int32_t instanceId)
 {
@@ -2060,13 +2075,11 @@ ani_int RegisterApplicationShortcut(ani_env* env, [[maybe_unused]] ani_object ob
     if (env->GlobalReference_Create(callback, &ref) != ANI_OK) {
         return 0;
     }
-    auto callbackRef = std::shared_ptr<ani_ref>(new ani_ref(ref), [vm](ani_ref* reference) {
-        ReleaseApplicationShortcutCallback(vm, reference);
-    });
+    auto callbackRef = std::make_shared<ApplicationShortcutCallbackRef>(vm, ref);
     auto shortcut = AniUtils::ANIStringToStdString(env, value);
     return common->registerApplicationShortcut(shortcut, static_cast<uint8_t>(modifiers),
         [vm, callbackRef](int32_t instanceId) {
-            ExecuteApplicationShortcutCallback(vm, *callbackRef, instanceId);
+            ExecuteApplicationShortcutCallback(vm, callbackRef->Get(), instanceId);
         });
 }
 
