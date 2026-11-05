@@ -168,8 +168,8 @@ HWTEST_F(ToggleModelNgTest, ToggleModelNG_AddNewChild_CheckboxAndSwitch_SetsNoSt
     ASSERT_NE(toggleNode, nullptr);
     ASSERT_EQ(FrameNode::GetFrameNode(V2::TOGGLE_ETS_TAG, nodeId), toggleNode);
 
-    auto child =
-        FrameNode::CreateFrameNode("child", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<SwitchPattern>());
+    auto child = FrameNode::CreateFrameNode("child",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<SwitchPattern>());
     ASSERT_NE(child, nullptr);
     ASSERT_NE(child->GetOrCreateAccessibilityProperty(), nullptr);
     toggleNode->AddChild(child);
