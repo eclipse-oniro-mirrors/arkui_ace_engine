@@ -50,7 +50,7 @@ class RadioModifier : public ContentModifier {
     DECLARE_ACE_TYPE(RadioModifier, ContentModifier);
 
 public:
-    RadioModifier();
+    RadioModifier(const RefPtr<FrameNode>& host = nullptr);
     ~RadioModifier() override = default;
 
     void onDraw(DrawingContext& context) override
@@ -73,7 +73,7 @@ public:
     void UpdateIndicatorAnimation(bool isCheck, const RefPtr<FrameNode>& host);
     void SetBoardColor(
         LinearColor color, int32_t duration, const RefPtr<CubicCurve>& curve, const RefPtr<FrameNode>& host);
-    void InitializeParam();
+    void InitializeParam(const RefPtr<FrameNode>& host = nullptr);
     void PaintRadio(RSCanvas& canvas, bool checked, const SizeF& contentSize, const OffsetF& contentOffset) const;
     void DrawFocusBoard(RSCanvas& canvas, const SizeF& contentSize, const OffsetF& contentOffset) const;
     void PaintIndicator(RSCanvas& canvas, bool checked, const SizeF& contentSize, const OffsetF& contentOffset) const;

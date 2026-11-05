@@ -16,6 +16,7 @@
 #include "core/components_ng/pattern/radio/radio_paint_property.h"
 
 #include "core/components/checkable/checkable_theme.h"
+#include "core/components_ng/base/frame_node.h"
 #include "core/pipeline/pipeline_base.h"
 
 namespace OHOS::Ace::NG {
@@ -49,9 +50,10 @@ void RadioPaintProperty::ToJsonValue(std::unique_ptr<JsonValue>& json, const Ins
     if (filter.IsFastFilter()) {
         return;
     }
-    auto pipeline = PipelineBase::GetCurrentContext();
-    CHECK_NULL_VOID(pipeline);
-    auto radioTheme = pipeline->GetTheme<RadioTheme>();
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto radioTheme = host->GetTheme<RadioTheme>(true);
+    CHECK_NULL_VOID(radioTheme);
     json->PutExtAttr("checked", GetRadioCheck().value_or(false) ? "true" : "false", filter);
     auto jsonValue = JsonUtil::Create(true);
     jsonValue->Put("checkedBackgroundColor",
