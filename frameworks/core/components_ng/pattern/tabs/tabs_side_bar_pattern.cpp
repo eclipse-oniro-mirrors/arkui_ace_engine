@@ -936,6 +936,17 @@ void TabsSideBarPattern::CollapseSideBarContent()
     auto context = host->GetContextRefPtr();
     CHECK_NULL_VOID(context);
 
+    auto renderContent = host->GetRenderContext();
+    if (renderContent) {
+        renderContent->UpdateTransformTranslate({0.0f, 0.0f, 0.0f});
+    }
+    if (divider) {
+        auto dividerRender = divider->GetRenderContext();
+        if (dividerRender) {
+            dividerRender->UpdateTransformTranslate({0.0f, 0.0f, 0.0f});
+        }
+    }
+
     // Save current sidebar width so we can restore it on expand.
     float currentWidth = sideBarWidth;
     if (currentWidth <= 0.0f && tabsPattern->GetRealSideBarWidthPx().has_value()) {
