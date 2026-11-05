@@ -3083,6 +3083,11 @@ RectF RosenRenderContext::GetPaintRectWithTransform(
     return rect;
 }
 
+bool RosenRenderContext::HasRenderNode() const
+{
+    return rsNode_ != nullptr;
+}
+
 std::pair<RectF, bool> RosenRenderContext::GetPaintRectWithTranslate()
 {
     RectF rect;

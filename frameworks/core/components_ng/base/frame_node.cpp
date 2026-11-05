@@ -8373,6 +8373,9 @@ const CacheVisibleRectResult& FrameNode::GetCacheVisibleRect(uint64_t timestamp,
 {
     RefPtr<FrameNode> parentUi = GetCoordinateAncestorNodeOfFrame(true);
     auto rectToParent = GetPaintRectWithTransform();
+    if (!renderContext_->HasRenderNode()) {
+        rectToParent = renderContext_->GetPaintRectWithoutTransform();
+    }
     auto scale = GetTransformScale();
     auto innerScale = scale;
     if (renderContext_->HasTransformMatrix()) {

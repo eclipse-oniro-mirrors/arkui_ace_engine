@@ -435,6 +435,7 @@ public:
     virtual void SetLayerMark(bool isLayer) {}
 
     virtual RectF GetPaintRectWithTransform();
+    virtual bool HasRenderNode() const { return false; }
     virtual int32_t GetRotateDegree() { return 0; }
     virtual void SavePaintRect(bool isRound = true, uint16_t flag = 0) {}
     virtual void SyncPartialRsProperties() {}

@@ -22,7 +22,24 @@ using namespace testing;
 using namespace testing::ext;
 
 namespace OHOS::Ace::NG {
-namespace {} // namespace
+namespace {
+// Simulates the rsNode_ null / present states of RosenRenderContext for GetCacheVisibleRect.
+class MockRsNodeStateRenderContext final : public RenderContext {
+public:
+    MockRsNodeStateRenderContext(bool hasRenderNode, const RectF& withTransform, const RectF& withoutTransform)
+        : hasRenderNode_(hasRenderNode), withTransform_(withTransform), withoutTransform_(withoutTransform) {}
+    ~MockRsNodeStateRenderContext() override = default;
+
+    bool HasRenderNode() const override { return hasRenderNode_; }
+    RectF GetPaintRectWithTransform() override { return withTransform_; }
+    RectF GetPaintRectWithoutTransform() override { return withoutTransform_; }
+
+private:
+    bool hasRenderNode_;
+    RectF withTransform_;
+    RectF withoutTransform_;
+};
+} // namespace
 
 /**
  * @tc.name: ResetLayoutAlgorithmTest1
@@ -417,6 +434,58 @@ HWTEST_F(FrameNodeTestNg, GetGlobalPositionOnDisplay001, TestSize.Level1)
     frameNode->isWindowBoundary_ = true;
     result = frameNode->GetCacheVisibleRect(1, true);
     EXPECT_EQ(result.cumulativeScale.x, 1.0);
+}
+
+/**
+ * @tc.name: GetCacheVisibleRectTest002
+ * @tc.desc: Test GetCacheVisibleRect falls back to GetPaintRectWithoutTransform when rsNode_ is null.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeTestNg, GetCacheVisibleRectTest002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. create frameNode whose render context has no render node (rsNode_ null).
+     * @tc.steps:    GetPaintRectWithTransform returns empty as RosenRenderContext does when rsNode_ is null,
+     * @tc.steps:    GetPaintRectWithoutTransform returns the layout paintRect_.
+     */
+    RectF paintRect(10.0f, 20.0f, 100.0f, 50.0f);
+    auto frameNode = FrameNode::CreateFrameNode("test", 1, AceType::MakeRefPtr<Pattern>(), true);
+    frameNode->renderContext_ =
+        AceType::MakeRefPtr<MockRsNodeStateRenderContext>(false, RectF(), paintRect);
+    /**
+     * @tc.steps: step2. call GetCacheVisibleRect.
+     * @tc.expected: visibleRect equals the fallback paintRect_, not empty.
+     */
+    auto result = frameNode->GetCacheVisibleRect(0, false);
+    EXPECT_EQ(result.visibleRect, paintRect);
+    EXPECT_EQ(result.frameRect, paintRect);
+    EXPECT_FALSE(result.visibleRect.IsEmpty());
+}
+
+/**
+ * @tc.name: GetCacheVisibleRectTest003
+ * @tc.desc: Test GetCacheVisibleRect uses GetPaintRectWithTransform when rsNode_ is present.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeTestNg, GetCacheVisibleRectTest003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. create frameNode whose render context has a render node (rsNode_ present).
+     * @tc.steps:    GetPaintRectWithTransform returns a transformed rect,
+     * @tc.steps:    GetPaintRectWithoutTransform returns a different layout rect.
+     */
+    RectF withTransformRect(5.0f, 6.0f, 80.0f, 40.0f);
+    RectF withoutTransformRect(10.0f, 20.0f, 100.0f, 50.0f);
+    auto frameNode = FrameNode::CreateFrameNode("test", 2, AceType::MakeRefPtr<Pattern>(), true);
+    frameNode->renderContext_ =
+        AceType::MakeRefPtr<MockRsNodeStateRenderContext>(true, withTransformRect, withoutTransformRect);
+    /**
+     * @tc.steps: step2. call GetCacheVisibleRect.
+     * @tc.expected: visibleRect equals GetPaintRectWithTransform, fallback not triggered.
+     */
+    auto result = frameNode->GetCacheVisibleRect(0, false);
+    EXPECT_EQ(result.visibleRect, withTransformRect);
+    EXPECT_NE(result.visibleRect, withoutTransformRect);
 }
 
 /**
