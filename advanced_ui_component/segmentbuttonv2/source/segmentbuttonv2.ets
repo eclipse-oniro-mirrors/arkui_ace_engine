@@ -609,11 +609,6 @@ struct SimpleSegmentButtonV2 {
     return normalize(this.selectedIndex, 0, items.length - 1);
   }
 
-  @Computed
-  get selectedItemRect(): SegmentButtonV2ItemRect | undefined {
-    return this.itemRects[this.normalizedSelectedIndex];
-  }
-
   @Monitor('selectedIndex', 'items')
   onSelectedIndexChange(): void {
     const index: number = this.normalizedSelectedIndex;
@@ -2061,6 +2056,10 @@ interface SegmentButtonV2LayoutRect {
 }
 
 class SegmentButtonV2LayoutAlgorithm extends CustomLayoutAlgorithm {
+  static readonly EFFECT_LAYER_CHILD_INDEX: number = 0;
+  static readonly BACKPLATE_LAYER_CHILD_INDEX: number = 1;
+  static readonly CONTENT_LAYER_CHILD_INDEX: number = 2;
+
   selectedIndex: number = 0;
   private itemRects: Map<number, SegmentButtonV2LayoutRect> = new Map<number, SegmentButtonV2LayoutRect>();
 
@@ -2076,7 +2075,7 @@ class SegmentButtonV2LayoutAlgorithm extends CustomLayoutAlgorithm {
   }
 
   onMeasure(self: FrameNode, constraint: LayoutConstraint): void {
-    const content = self.getChild(2);
+    const content = self.getChild(SegmentButtonV2LayoutAlgorithm.CONTENT_LAYER_CHILD_INDEX);
     if (!content) {
       self.setMeasuredSize({ width: 0, height: 0 });
       return;
@@ -2086,11 +2085,11 @@ class SegmentButtonV2LayoutAlgorithm extends CustomLayoutAlgorithm {
     const selectedIndex: number = normalize(this.selectedIndex, 0, content.getChildrenCount() - 1);
     const selected = selectedIndex >= 0 ? content.getChild(selectedIndex) : undefined;
     const selectedSize: Size = selected ? selected.getMeasuredSize() : { width: 0, height: 0 };
-    const effect = self.getChild(0);
+    const effect = self.getChild(SegmentButtonV2LayoutAlgorithm.EFFECT_LAYER_CHILD_INDEX);
     if (effect) {
       effect.measure({ maxSize: size, minSize: size, percentReference: size });
     }
-    const backplate = self.getChild(1);
+    const backplate = self.getChild(SegmentButtonV2LayoutAlgorithm.BACKPLATE_LAYER_CHILD_INDEX);
     if (backplate) {
       backplate.measure({ maxSize: selectedSize, minSize: selectedSize, percentReference: selectedSize });
     }
@@ -2098,11 +2097,10 @@ class SegmentButtonV2LayoutAlgorithm extends CustomLayoutAlgorithm {
   }
 
   onLayout(self: FrameNode, position: LayoutPosition): void {
-    const content = self.getChild(2);
+    const content = self.getChild(SegmentButtonV2LayoutAlgorithm.CONTENT_LAYER_CHILD_INDEX);
     if (!content) {
       return;
     }
-    // Resolve the content first; both layers then use this layout pass's geometry.
     content.layout({ x: 0, y: 0 });
     const itemRects = new Map<number, SegmentButtonV2LayoutRect>();
     for (let index: number = 0; index < content.getChildrenCount(); index++) {
@@ -2112,11 +2110,11 @@ class SegmentButtonV2LayoutAlgorithm extends CustomLayoutAlgorithm {
       }
     }
     this.itemRects = itemRects;
-    const effect = self.getChild(0);
+    const effect = self.getChild(SegmentButtonV2LayoutAlgorithm.EFFECT_LAYER_CHILD_INDEX);
     if (effect) {
       effect.layout({ x: 0, y: 0 });
     }
-    const backplate = self.getChild(1);
+    const backplate = self.getChild(SegmentButtonV2LayoutAlgorithm.BACKPLATE_LAYER_CHILD_INDEX);
     const selectedRect = itemRects.get(normalize(this.selectedIndex, 0, content.getChildrenCount() - 1));
     if (backplate) {
       backplate.layout(selectedRect ? selectedRect.position : { x: 0, y: 0 });
