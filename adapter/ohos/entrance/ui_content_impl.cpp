@@ -936,7 +936,8 @@ public:
         auto floatNavArea = floatNavSafeArea_;
         ContainerScope scope(instanceId_);
         taskExecutor->PostTask(
-            [pipeline, safeArea, navSafeArea, cutoutSafeArea, floatNavArea, type, avoidArea] {
+            [pipeline, safeArea, navSafeArea, cutoutSafeArea, floatNavArea, type, avoidArea, instanceId = instanceId_] {
+                ContainerScope scope(instanceId);
                 if (type == Rosen::AvoidAreaType::TYPE_SYSTEM) {
                     pipeline->UpdateSystemSafeArea(safeArea, true);
                 } else if (type == Rosen::AvoidAreaType::TYPE_NAVIGATION_INDICATOR) {

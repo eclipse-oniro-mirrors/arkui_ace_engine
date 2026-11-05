@@ -3222,7 +3222,7 @@ void PipelineContext::SyncSafeArea(SafeAreaSyncType syncType)
         syncType == SafeAreaSyncType::SYNC_TYPE_KEYBOARD && !safeAreaManager_->KeyboardSafeAreaEnabled();
     CHECK_NULL_VOID(stageManager_);
     stageManager_->SyncPageSafeArea(keyboardSafeArea);
-    SubwindowManager::GetInstance()->MarkDirtyDialogSafeArea();
+    SubwindowManager::GetInstance()->MarkDirtyDialogSafeArea(GetInstanceId());
     if (overlayManager_) {
         overlayManager_->MarkDirty(PROPERTY_UPDATE_MEASURE);
     }
