@@ -27,7 +27,7 @@
 #include "node_model.h"
 #include "ui_input_event.h"
 #include "event/ui_input_event_impl.h"
-#include "core/common/ace_application_info.h"
+#include "core/common/application_shortcut.h"
 #include "core/event/key_event.h"
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "test/mock/frameworks/core/common/mock_container.h"
@@ -1094,16 +1094,16 @@ HWTEST_F(NativeKeyEventTest, ApplicationShortcutMultipleBindings, TestSize.Level
     EXPECT_EQ(key, nullptr);
     EXPECT_GT(firstId, 0);
     EXPECT_GT(secondId, firstId);
-    auto& appInfo = AceApplicationInfo::GetInstance();
+    auto& shortcutManager = ApplicationShortcutManager::GetInstance();
     auto event = MakeApplicationShortcutEvent();
-    EXPECT_TRUE(appInfo.TryTriggerApplicationShortcut(event, 1));
+    EXPECT_TRUE(shortcutManager.TryTriggerApplicationShortcut(event, 1));
     EXPECT_EQ(count, 2);
     EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Unregister(firstId), ARKUI_ERROR_CODE_NO_ERROR);
     EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Unregister(firstId), ARKUI_ERROR_CODE_NO_ERROR);
-    EXPECT_TRUE(appInfo.TryTriggerApplicationShortcut(event, 1));
+    EXPECT_TRUE(shortcutManager.TryTriggerApplicationShortcut(event, 1));
     EXPECT_EQ(count, 3);
     EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Unregister(secondId), ARKUI_ERROR_CODE_NO_ERROR);
-    EXPECT_FALSE(appInfo.TryTriggerApplicationShortcut(event, 1));
+    EXPECT_FALSE(shortcutManager.TryTriggerApplicationShortcut(event, 1));
 }
 
 /**

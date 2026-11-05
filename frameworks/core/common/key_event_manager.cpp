@@ -18,7 +18,7 @@
 
 #include "base/input_manager/input_manager.h"
 #include "base/ressched/ressched_report.h"
-#include "core/common/ace_application_info.h"
+#include "core/common/application_shortcut.h"
 #include "core/common/container.h"
 #include "core/common/event_manager.h"
 #include "core/components_ng/base/frame_node.h"
@@ -544,8 +544,8 @@ bool KeyEventManager::DispatchKeyboardShortcut(const KeyEvent& event)
             return true;
         }
     }
-    auto& appInfo = AceApplicationInfo::GetInstance();
-    if (appInfo.TryTriggerApplicationShortcut(event, GetInstanceId())) {
+    auto& shortcutManager = ApplicationShortcutManager::GetInstance();
+    if (shortcutManager.TryTriggerApplicationShortcut(event, GetInstanceId())) {
         return true;
     }
     return false;

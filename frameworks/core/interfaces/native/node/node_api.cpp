@@ -32,6 +32,7 @@
 #include "interfaces/native/node/config_manager.h"
 
 #include "core/common/ace_application_info.h"
+#include "core/common/application_shortcut.h"
 #include "core/common/ace_engine.h"
 #include "core/common/container.h"
 #include "core/components/common/properties/ui_material.h"
@@ -2719,12 +2720,12 @@ const ArkUISnapshotAPI* GetComponentSnapshotAPI()
 ArkUI_Int32 RegisterApplicationShortcut(const std::string& value, uint8_t keys,
     std::function<void(ArkUI_Int32)>&& callback)
 {
-    return AceApplicationInfo::GetInstance().RegisterApplicationShortcut(value, keys, std::move(callback));
+    return ApplicationShortcutManager::GetInstance().RegisterApplicationShortcut(value, keys, std::move(callback));
 }
 
 void UnregisterApplicationShortcut(ArkUI_Int32 registrationId)
 {
-    AceApplicationInfo::GetInstance().UnregisterApplicationShortcut(registrationId);
+    ApplicationShortcutManager::GetInstance().UnregisterApplicationShortcut(registrationId);
 }
 
 /* clang-format off */

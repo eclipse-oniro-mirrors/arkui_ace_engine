@@ -20,7 +20,6 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
-#include <map>
 #include <mutex>
 #include <set>
 #include <shared_mutex>
@@ -36,8 +35,6 @@
 #include "base/utils/string_utils.h"
 
 namespace OHOS::Ace {
-
-struct KeyEvent;
 
 struct AceBundleInfo {
     uint32_t versionCode = 0;
@@ -58,12 +55,6 @@ enum class MousePassMode: int32_t {
 struct TextMenuInfo {
     uint32_t disableFlags = 0;
     std::function<bool()> menuOnChangeCallback;
-};
-
-struct ApplicationKeyboardShortcut {
-    std::string value;
-    uint8_t keys = 0;
-    std::function<void(int32_t)> onKeyboardShortcutAction;
 };
 
 class ACE_FORCE_EXPORT AceApplicationInfo : public NonCopyable {
@@ -331,13 +322,6 @@ public:
         return textMenuInfo_;
     }
 
-    int32_t RegisterApplicationShortcut(const std::string& value, uint8_t keys,
-        std::function<void(int32_t)>&& onKeyboardShortcutAction);
-
-    void UnregisterApplicationShortcut(int32_t registrationId);
-
-    bool TryTriggerApplicationShortcut(const KeyEvent& event, int32_t triggerInstanceId);
-
     void SetTouchPadIdChanged(bool touchPadIdChanged)
     {
         touchPadIdChanged_ = touchPadIdChanged;
@@ -432,9 +416,6 @@ protected:
     std::string uiMaterialState_;
     std::string uiMaterialType_;
     TextMenuInfo textMenuInfo_;
-    std::map<int32_t, ApplicationKeyboardShortcut> applicationKeyboardShortcuts_;
-    int32_t applicationShortcutId_ = 0;
-    std::mutex applicationShortcutMutex_;
     bool isSystemApp_ = false;
 };
 

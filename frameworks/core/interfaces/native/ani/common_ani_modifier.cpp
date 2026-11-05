@@ -29,6 +29,7 @@
 #include "base/memory/ace_type.h"
 #include "core/common/container.h"
 #include "core/common/ace_application_info.h"
+#include "core/common/application_shortcut.h"
 #include "core/common/multi_thread_build_manager.h"
 #include "core/common/thread_checker.h"
 #include "core/components_ng/base/extension_handler.h"
@@ -1342,7 +1343,7 @@ int32_t GetBuilderNodeParentViewId(ani_long nodePtr)
 int32_t RegisterApplicationShortcutInStatic(const std::string& value, uint8_t modifiers,
     std::function<void(int32_t)>&& callback)
 {
-    return AceApplicationInfo::GetInstance().RegisterApplicationShortcut(value, modifiers,
+    return ApplicationShortcutManager::GetInstance().RegisterApplicationShortcut(value, modifiers,
         [callback = std::move(callback)](int32_t instanceId) {
             ContainerScope scope(instanceId);
             callback(instanceId);
@@ -1351,7 +1352,7 @@ int32_t RegisterApplicationShortcutInStatic(const std::string& value, uint8_t mo
 
 void UnregisterApplicationShortcutInStatic(int32_t registrationId)
 {
-    AceApplicationInfo::GetInstance().UnregisterApplicationShortcut(registrationId);
+    ApplicationShortcutManager::GetInstance().UnregisterApplicationShortcut(registrationId);
 }
 
 const ArkUIAniCommonModifier* GetCommonAniModifier()

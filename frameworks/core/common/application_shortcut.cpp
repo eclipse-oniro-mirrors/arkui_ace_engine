@@ -13,17 +13,24 @@
  * limitations under the License.
  */
 
-#include "core/common/ace_application_info.h"
+#include "core/common/application_shortcut.h"
 
 #include <algorithm>
 #include <cctype>
 #include <limits>
+#include <vector>
 
 #include "core/event/key_event.h"
 
 namespace OHOS::Ace {
 
-int32_t AceApplicationInfo::RegisterApplicationShortcut(const std::string& value, uint8_t keys,
+ApplicationShortcutManager& ApplicationShortcutManager::GetInstance()
+{
+    static ApplicationShortcutManager instance;
+    return instance;
+}
+
+int32_t ApplicationShortcutManager::RegisterApplicationShortcut(const std::string& value, uint8_t keys,
     std::function<void(int32_t)>&& onKeyboardShortcutAction)
 {
     std::lock_guard<std::mutex> lock(applicationShortcutMutex_);
@@ -36,7 +43,7 @@ int32_t AceApplicationInfo::RegisterApplicationShortcut(const std::string& value
     return registrationId;
 }
 
-void AceApplicationInfo::UnregisterApplicationShortcut(int32_t registrationId)
+void ApplicationShortcutManager::UnregisterApplicationShortcut(int32_t registrationId)
 {
     // Release the callback outside the lock: its destructor may release frontend resources.
     std::map<int32_t, ApplicationKeyboardShortcut>::node_type removed;
@@ -80,7 +87,7 @@ static bool MatchShortcutValue(const KeyEvent& event, const std::string& value)
     return lowerKey.find(lowerValue) != std::string::npos;
 }
 
-bool AceApplicationInfo::TryTriggerApplicationShortcut(const KeyEvent& event, int32_t triggerInstanceId)
+bool ApplicationShortcutManager::TryTriggerApplicationShortcut(const KeyEvent& event, int32_t triggerInstanceId)
 {
     std::vector<std::function<void(int32_t)>> callbacks;
     const uint8_t eventModifiers = GetEventModifierKeys(event);

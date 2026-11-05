@@ -19,7 +19,7 @@
 #include <limits>
 
 #include "base/log/log_wrapper.h"
-#include "core/common/ace_application_info.h"
+#include "core/common/application_shortcut.h"
 #include "core/common/container.h"
 #include "core/common/container_scope.h"
 #include "core/common/frontend.h"
@@ -244,7 +244,7 @@ static napi_value JSRegisterApplicationShortcut(napi_env env, napi_callback_info
     }
 
     auto callback = std::make_shared<ApplicationShortcutCallback>(env, argv[ARG_INDEX_TWO]);
-    const auto registrationId = AceApplicationInfo::GetInstance().RegisterApplicationShortcut(
+    const auto registrationId = ApplicationShortcutManager::GetInstance().RegisterApplicationShortcut(
         value, keys, [callback](int32_t triggerInstanceId) { callback->Execute(triggerInstanceId); });
     if (registrationId == 0) {
         napi_throw_error(env, nullptr, "Application shortcut registration IDs exhausted.");
@@ -275,7 +275,7 @@ static napi_value JSUnregisterApplicationShortcut(napi_env env, napi_callback_in
         NapiThrow(env, "The first parameter must be an integer registration ID.", ERROR_CODE_PARAM_INVALID);
         return nullptr;
     }
-    AceApplicationInfo::GetInstance().UnregisterApplicationShortcut(static_cast<int32_t>(registrationId));
+    ApplicationShortcutManager::GetInstance().UnregisterApplicationShortcut(static_cast<int32_t>(registrationId));
 
     napi_value result = nullptr;
     napi_get_undefined(env, &result);
