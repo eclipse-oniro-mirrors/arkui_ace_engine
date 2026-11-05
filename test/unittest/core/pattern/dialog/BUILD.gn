@@ -18,6 +18,7 @@ test_sources = [
   "dialog_layout_test_ng.cpp",
   "dialog_layout_test_two_ng.cpp",
   "dialog_layout_test_three_ng.cpp",
+  "dialog_layout_test_four_ng.cpp",
   "dialog_model_test_ng.cpp",
   "dialog_model_test_two_ng.cpp",
   "dialog_pattern_test_ng.cpp",
