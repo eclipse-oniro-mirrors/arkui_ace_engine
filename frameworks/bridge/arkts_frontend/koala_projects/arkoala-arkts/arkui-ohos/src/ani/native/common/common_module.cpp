@@ -2083,8 +2083,8 @@ ani_int RegisterApplicationShortcut(ani_env* env, [[maybe_unused]] ani_object ob
         });
 }
 
-void UnregisterApplicationShortcut(
-    [[maybe_unused]] ani_env* env, [[maybe_unused]] ani_object obj, ani_int registrationId)
+void UnregisterApplicationShortcut([[maybe_unused]] ani_env* env, [[maybe_unused]] ani_object obj,
+    ani_int registrationId)
 {
     const auto* modifier = GetNodeAniModifier();
     CHECK_NULL_VOID(modifier);
