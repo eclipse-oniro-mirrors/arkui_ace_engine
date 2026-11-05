@@ -218,7 +218,7 @@ const char* DEBUG_LINE_INFO_LINE = "$line";
 const char* DEBUG_LINE_INFO_PACKAGE_NAME = "$packageName";
 
 enum class MenuItemType { COPY, PASTE, CUT, SELECT_ALL, AUTO_FILL, PASSWORD_VAULT, UNKNOWN, CAMERA_INPUT,
-    AI_WRITER, TRANSLATE, SHARE, SEARCH, ASK_CELIA, AI_MENU_OPTION };
+    AI_WRITER, TRANSLATE, SHARE, SEARCH, ASK_CELIA, AI_MENU_OPTION, TRANSLATE_INPUT };
 enum class BackgroundType { CUSTOM_BUILDER, COLOR };
 
 const int32_t NUM_0 = 0;
@@ -1956,6 +1956,7 @@ MenuItemType StringToMenuItemType(std::string_view id)
         { "OH_DEFAULT_AUTO_FILL", MenuItemType::AUTO_FILL },
         { "OH_DEFAULT_PASSWORD_VAULT", MenuItemType::PASSWORD_VAULT },
         { "OH_DEFAULT_CAMERA_INPUT", MenuItemType::CAMERA_INPUT },
+        { "OH_DEFAULT_TRANSLATE_INPUT", MenuItemType::TRANSLATE_INPUT },
         { "OH_DEFAULT_AI_WRITE", MenuItemType::AI_WRITER },
         { "OH_DEFAULT_TRANSLATE", MenuItemType::TRANSLATE },
         { "OH_DEFAULT_SHARE", MenuItemType::SHARE },
@@ -2027,6 +2028,7 @@ void UpdateInfoById(NG::MenuOptionsParam& menuOptionsParam, std::string_view id)
             menuOptionsParam.symbolId = theme->GetAIWriteSymbolId();
             break;
         case MenuItemType::TRANSLATE:
+        case MenuItemType::TRANSLATE_INPUT:
             menuOptionsParam.symbolId = theme->GetTranslateSymbolId();
             break;
         case MenuItemType::SHARE:

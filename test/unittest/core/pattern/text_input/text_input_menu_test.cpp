@@ -17,10 +17,28 @@
 #include "text_input_base.h"
 
 #include "test/unittest/core/pattern/text_input/mock/mock_text_field_select_overlay.h"
+#include "core/common/ace_application_info.h"
+#include "core/common/ime/text_input_keyboard_utils.h"
 
 namespace OHOS::Ace::NG {
 
-namespace {} // namespace
+namespace {
+class TranslateInputMenuFlagsGuard {
+public:
+    TranslateInputMenuFlagsGuard()
+        : flags_(AceApplicationInfo::GetInstance().GetTextMenuInfo().disableFlags)
+    {
+        AceApplicationInfo::GetInstance().SetTextMenuDisableFlags(DISABLE_NORMAL_FLAG);
+    }
+    ~TranslateInputMenuFlagsGuard()
+    {
+        AceApplicationInfo::GetInstance().SetTextMenuDisableFlags(DISABLE_NORMAL_FLAG);
+        AceApplicationInfo::GetInstance().AddTextMenuDisableFlag(flags_);
+    }
+private:
+    SystemServiceMenuDisableFlag flags_;
+};
+} // namespace
 
 class TextInputMenuTestNg : public TextInputBases {
 public:
@@ -855,5 +873,75 @@ HWTEST_F(TextInputMenuTestNg, ForceShowHandle002, TestSize.Level1)
     EXPECT_FALSE(ret);
 
     theme->textfieldShowHandle_ = false;
+}
+
+/**
+ * @tc.name: TranslateInputEmptyInput
+ * @tc.desc: Empty inputs can display quick translation without camera or clipboard support.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextInputMenuTestNg, TranslateInputEmptyInput, TestSize.Level1)
+{
+    TranslateInputMenuFlagsGuard guard;
+    CreateTextField("");
+    auto overlay = pattern_->selectOverlay_;
+    ASSERT_NE(overlay, nullptr);
+    overlay->SetMenuIsShow(true);
+    overlay->isShowPaste_ = false;
+    SelectMenuInfo info;
+    overlay->OnUpdateMenuInfo(info, DIRTY_ALL_MENU_ITEM);
+    auto isDefaultIme = IsCurrentInputMethodDefaultIme();
+    EXPECT_EQ(info.showTranslateInput, isDefaultIme);
+    if (isDefaultIme) {
+        EXPECT_TRUE(info.menuIsShow);
+    }
+
+    pattern_->customKeyboardBuilder_ = []() {};
+    overlay->OnUpdateMenuInfo(info, DIRTY_ALL_MENU_ITEM);
+    EXPECT_FALSE(info.showTranslateInput);
+}
+
+/**
+ * @tc.name: TranslateInputSelectionAndPassword
+ * @tc.desc: Quick translation is hidden for selected text and password inputs.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextInputMenuTestNg, TranslateInputSelectionAndPassword, TestSize.Level1)
+{
+    TranslateInputMenuFlagsGuard guard;
+    CreateTextField(DEFAULT_TEXT);
+    auto overlay = pattern_->selectOverlay_;
+    ASSERT_NE(overlay, nullptr);
+    pattern_->selectController_->UpdateHandleIndex(0, 3);
+    SelectMenuInfo info;
+    overlay->OnUpdateMenuInfo(info, DIRTY_ALL_MENU_ITEM);
+    EXPECT_FALSE(info.showTranslateInput);
+
+    pattern_->selectController_->UpdateHandleIndex(0, 0);
+    overlay->OnUpdateMenuInfo(info, DIRTY_ALL_MENU_ITEM);
+    EXPECT_EQ(info.showTranslateInput, IsCurrentInputMethodDefaultIme());
+
+    layoutProperty_->UpdateTextInputType(TextInputType::VISIBLE_PASSWORD);
+    overlay->OnUpdateMenuInfo(info, DIRTY_ALL_MENU_ITEM);
+    EXPECT_FALSE(info.showTranslateInput);
+}
+
+/**
+ * @tc.name: TranslateInputVisibilityMatrix
+ * @tc.desc: All combinations of selection, content restriction and custom keyboard are filtered.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextInputMenuTestNg, TranslateInputVisibilityMatrix, TestSize.Level1)
+{
+    TranslateInputMenuFlagsGuard guard;
+    CreateTextField("");
+    auto overlay = pattern_->selectOverlay_;
+    ASSERT_NE(overlay, nullptr);
+    SelectMenuInfo info;
+    auto isDefaultIme = IsCurrentInputMethodDefaultIme();
+    for (int32_t flags = 0; flags < 8; ++flags) {
+        overlay->FillMenuShowTranslateInput(info, (flags & 1) != 0, (flags & 2) != 0, (flags & 4) != 0);
+        EXPECT_EQ(info.showTranslateInput, flags == 0 && isDefaultIme) << "flags=" << flags;
+    }
 }
 } // namespace OHOS::Ace::NG

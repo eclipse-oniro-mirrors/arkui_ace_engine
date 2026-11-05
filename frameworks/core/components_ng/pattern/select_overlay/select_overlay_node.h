@@ -178,6 +178,8 @@ private:
         float maxWidth, float& allocatedSize, std::shared_ptr<SelectOverlayInfo>& info, const std::string& label);
     void ShowCamera(
         float maxWidth, float& allocatedSize, std::shared_ptr<SelectOverlayInfo>& info, const std::string& label);
+    void ShowTranslateInput(
+        float maxWidth, float& allocatedSize, std::shared_ptr<SelectOverlayInfo>& info, const std::string& label);
     void ShowAIWrite(
         float maxWidth, float& allocatedSize, std::shared_ptr<SelectOverlayInfo>& info, const std::string& label);
     void ShowAIMenuOptions(
@@ -306,7 +308,7 @@ private:
     bool isExtensionMenu_ = false;
 
     // Label whether the menu default button needs to appear within the extended menu
-    bool isShowInDefaultMenu_[12] = { false }; // OPTION_INDEX_AUTO_FILL + 1
+    bool isShowInDefaultMenu_[13] = { false }; // OPTION_INDEX_TRANSLATE_INPUT + 1
 
     bool isDefaultBtnOverMaxWidth_ = false;
 

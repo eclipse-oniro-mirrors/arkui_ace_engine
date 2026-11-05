@@ -12569,6 +12569,21 @@ std::string RichEditorPattern::GetPositionSpansText(int32_t position, int32_t& s
     return sstream.str();
 }
 
+void RichEditorPattern::HandleOnTranslateInput()
+{
+#if defined(ENABLE_STANDARD_INPUT)
+    auto inputMethod = MiscServices::InputMethodController::GetInstance();
+    if (inputMethod) {
+        TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "HandleOnTranslateInput");
+        inputMethod->RequestSystemInputCapability(MiscServices::InputCapabilityType::TRANSLATION);
+    } else {
+        TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "HandleOnTranslateInput, IMC is null");
+    }
+#endif
+    StartTwinkling();
+    CloseSelectOverlay();
+}
+
 void RichEditorPattern::HandleOnCameraInput()
 {
     TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "HandleOnCameraInput");
