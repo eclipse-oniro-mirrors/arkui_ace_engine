@@ -4149,6 +4149,11 @@ int32_t TabBarPattern::GetSelectChildIndex(const Offset& offset)
     CHECK_NULL_RETURN(host, -1);
     int32_t index = 0;
     auto childSize = GetChildrenSize();
+    // In RTL horizontal mode, children are laid out right-to-left: child 0 is
+    // on the right and the last child is on the left. The clamp boundaries must
+    // be swapped accordingly so that touches beyond the first/last child still
+    // clamp to the correct edge item.
+    bool rtl = isRTL_ && axis_ == Axis::HORIZONTAL;
     for (auto child : host->GetChildren()) {
         auto childNode = DynamicCast<FrameNode>(child);
         CHECK_NULL_RETURN(childNode, -1);
@@ -4159,9 +4164,13 @@ int32_t TabBarPattern::GetSelectChildIndex(const Offset& offset)
         if (GreatOrEqual(offset.GetX(), childOffset.GetX()) &&
             LessNotEqual(offset.GetX(), childOffset.GetX() + childWidth)) {
             return index;
-        } else if (index == 0 && LessNotEqual(offset.GetX(), childOffset.GetX())) {
+        } else if (index == 0 &&
+                   (rtl ? GreatOrEqual(offset.GetX(), childOffset.GetX() + childWidth)
+                        : LessNotEqual(offset.GetX(), childOffset.GetX()))) {
             return index;
-        } else if (index == childSize - 1 && GreatOrEqual(offset.GetX(), childOffset.GetX() + childWidth)) {
+        } else if (index == childSize - 1 &&
+                   (rtl ? LessNotEqual(offset.GetX(), childOffset.GetX())
+                        : GreatOrEqual(offset.GetX(), childOffset.GetX() + childWidth))) {
             return index;
         }
         index++;
@@ -4177,7 +4186,32 @@ void TabBarPattern::HandleTouchUpAndClickTo(const TouchLocationInfo& info)
     if (!useNewMaterial_ || info.GetTouchType() != TouchType::UP) {
         return;
     }
-    auto index = GetSelectChildIndex(info.GetLocalLocation());
+    // Touch events are dispatched per tab-item child, so GetLocalLocation() is
+    // relative to that child rather than the TabBar host. Convert the touch
+    // point from window-global coordinates to the TabBar's layout-local
+    // coordinate system so that GetSelectChildIndex (which compares against
+    // child frame offsets in the same layout-local system) returns the correct
+    // index.
+    // For a floating TabBar with follow-hand animation, a TransformTranslate is
+    // applied to the TabBar render context. GetOffsetRelativeToWindow() does
+    // not include this transform, so the translate must be subtracted
+    // explicitly to obtain the correct layout-local position.
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto hostGlobal = host->GetOffsetRelativeToWindow();
+    float translateX = 0.0f;
+    float translateY = 0.0f;
+    auto renderContext = host->GetRenderContext();
+    if (renderContext) {
+        auto translateOptions =
+            renderContext->GetTransformTranslateValue(TranslateOptions(0.0f, 0.0f, 0.0f));
+        translateX = translateOptions.x.ConvertToPx();
+        translateY = translateOptions.y.ConvertToPx();
+    }
+    auto global = info.GetGlobalLocation();
+    Offset tabBarLocal(global.GetX() - hostGlobal.GetX() - translateX,
+                       global.GetY() - hostGlobal.GetY() - translateY);
+    auto index = GetSelectChildIndex(tabBarLocal);
     HandleClick(SourceType::NONE, index);
 }
 

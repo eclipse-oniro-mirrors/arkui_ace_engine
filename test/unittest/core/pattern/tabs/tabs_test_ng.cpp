@@ -2376,6 +2376,86 @@ HWTEST_F(TabsTestNg, HandleTouchUpAndClickTo003, TestSize.Level1)
     TouchLocationInfo info(0);
     info.SetTouchType(TouchType::UP);
     info.SetLocalLocation(Offset(TABS_WIDTH / 4.0f, 0.0f));
+    // HandleTouchUpAndClickTo converts global location to TabBar-local
+    // coordinates, so set the global location to match the touch point.
+    info.SetGlobalLocation(Offset(TABS_WIDTH / 4.0f, 0.0f));
+    tabBarPattern_->HandleTouchUpAndClickTo(info);
+    EXPECT_NE(clickIndex, -1);
+}
+
+/**
+ * @tc.name: HandleTouchUpAndClickTo004
+ * @tc.desc: test HandleTouchUpAndClickTo uses global location for coordinate conversion,
+ *           child-relative local location must not affect the selected index
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsTestNg, HandleTouchUpAndClickTo004, TestSize.Level1)
+{
+    TabsModelNG model = CreateTabs();
+    CreateTabContents(TABCONTENT_NUMBER);
+    CreateTabsDone(model);
+    ASSERT_NE(tabBarPattern_, nullptr);
+
+    tabBarPattern_->SetUseNewMaterial(true);
+    int32_t clickIndex = -1;
+    auto event = [&clickIndex](const BaseEventInfo* info) {
+        const auto* tabInfo = TypeInfoHelper::DynamicCast<TabContentChangeEvent>(info);
+        if (tabInfo != nullptr) {
+            clickIndex = tabInfo->GetIndex();
+        }
+    };
+    pattern_->SetOnTabBarClickEvent(std::move(event));
+
+    // The touch point is given as a global location inside the TabBar. The
+    // child-relative local location is intentionally set to zero to verify
+    // that HandleTouchUpAndClickTo relies on the global location (converted to
+    // TabBar-local coordinates) rather than the child-relative local location.
+    TouchLocationInfo info(0);
+    info.SetTouchType(TouchType::UP);
+    info.SetLocalLocation(Offset(0.0f, 0.0f));
+    info.SetGlobalLocation(Offset(TABS_WIDTH / 2.0f, 0.0f));
+    tabBarPattern_->HandleTouchUpAndClickTo(info);
+    EXPECT_NE(clickIndex, -1);
+}
+
+/**
+ * @tc.name: HandleTouchUpAndClickTo005
+ * @tc.desc: test HandleTouchUpAndClickTo compensates TransformTranslate applied by
+ *           follow-hand animation so that the touch point is still mapped to a
+ *           valid tab item
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsTestNg, HandleTouchUpAndClickTo005, TestSize.Level1)
+{
+    TabsModelNG model = CreateTabs();
+    CreateTabContents(TABCONTENT_NUMBER);
+    CreateTabsDone(model);
+    ASSERT_NE(tabBarPattern_, nullptr);
+
+    tabBarPattern_->SetUseNewMaterial(true);
+    int32_t clickIndex = -1;
+    auto event = [&clickIndex](const BaseEventInfo* info) {
+        const auto* tabInfo = TypeInfoHelper::DynamicCast<TabContentChangeEvent>(info);
+        if (tabInfo != nullptr) {
+            clickIndex = tabInfo->GetIndex();
+        }
+    };
+    pattern_->SetOnTabBarClickEvent(std::move(event));
+
+    // Simulate follow-hand animation: TabBar shifted left by a negative
+    // translateX.  HandleTouchUpAndClickTo must subtract this translate from
+    // the global-to-local conversion so that the touch point still maps to a
+    // valid tab item (index != -1).  Without the compensation the local
+    // coordinate would be off by translateX and could miss all items.
+    auto renderContext = tabBarNode_->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+    float translateX = -TABS_WIDTH / 2.0f;
+    renderContext->UpdateTransformTranslate(TranslateOptions(translateX, 0.0f, 0.0f));
+
+    TouchLocationInfo info(0);
+    info.SetTouchType(TouchType::UP);
+    info.SetLocalLocation(Offset(0.0f, 0.0f));
+    info.SetGlobalLocation(Offset(TABS_WIDTH / 4.0f, 0.0f));
     tabBarPattern_->HandleTouchUpAndClickTo(info);
     EXPECT_NE(clickIndex, -1);
 }
@@ -2456,6 +2536,31 @@ HWTEST_F(TabsTestNg, GetSelectChildIndex004, TestSize.Level1)
 
     auto result = tabBarPattern_->GetSelectChildIndex(Offset(TABS_WIDTH / 2.0f, 0.0f));
     EXPECT_GE(result, 0);
+}
+
+/**
+ * @tc.name: GetSelectChildIndex005
+ * @tc.desc: test GetSelectChildIndex under RTL layout, offset on the right side
+ *           should map to the first child (index 0)
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsTestNg, GetSelectChildIndex005, TestSize.Level1)
+{
+    bool savedIsRightToLeft = AceApplicationInfo::GetInstance().isRightToLeft_;
+    AceApplicationInfo::GetInstance().isRightToLeft_ = true;
+    TabsModelNG model = CreateTabs();
+    CreateTabContents(TABCONTENT_NUMBER);
+    CreateTabsDone(model);
+    ASSERT_NE(tabBarPattern_, nullptr);
+    tabBarLayoutProperty_->UpdateLayoutDirection(TextDirection::RTL);
+    FlushUITasks();
+
+    // In RTL mode, child 0 is on the right. An offset near the right edge
+    // (TABS_WIDTH - small) should map to index 0 after x-mirroring.
+    auto result = tabBarPattern_->GetSelectChildIndex(Offset(TABS_WIDTH - 1.0f, 0.0f));
+    EXPECT_GE(result, 0);
+
+    AceApplicationInfo::GetInstance().isRightToLeft_ = savedIsRightToLeft;
 }
 
 /**
