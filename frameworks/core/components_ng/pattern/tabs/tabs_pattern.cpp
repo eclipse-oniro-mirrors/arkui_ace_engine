@@ -1963,62 +1963,6 @@ void TabsPattern::ResetSystemMaterial()
     UnregisterColorPicker();
 }
 
-void TabsPattern::ClampTabBarTransformOffset()
-{
-    if (!isFloatingBar_ && !isFloatingTopBar_) {
-        return;
-    }
-    auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
-    CHECK_NULL_VOID(tabsNode);
-    auto tabBar = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
-    CHECK_NULL_VOID(tabBar);
-    auto renderContext = tabBar->GetRenderContext();
-    CHECK_NULL_VOID(renderContext);
-    if (!renderContext->HasTransformTranslate()) {
-        return;
-    }
-    auto translate = renderContext->GetTransformTranslate().value();
-    float offsetX = translate.x.ConvertToPx();
-    float offsetY = translate.y.ConvertToPx();
-    auto tabBarGeo = tabBar->GetGeometryNode();
-    auto tabsGeo = tabsNode->GetGeometryNode();
-    if (!tabBarGeo || !tabsGeo) {
-        return;
-    }
-    float barLeft = tabBarGeo->GetFrameOffset().GetX();
-    float barTop = tabBarGeo->GetFrameOffset().GetY();
-    float barWidth = tabBarGeo->GetFrameSize().Width();
-    float barHeight = tabBarGeo->GetFrameSize().Height();
-    float tabsWidth = tabsGeo->GetFrameSize().Width();
-    float tabsHeight = tabsGeo->GetFrameSize().Height();
-
-    // Keep the floating bar inside the Tabs container, further constrained by the
-    // component-level safe area (safeAreaPadding + safeAreaInset). The system safe
-    // area is already handled by the Tabs host via SafeAreaExpandOpts.
-    float minOffsetX = -barLeft;
-    float maxOffsetX = tabsWidth - barLeft - barWidth;
-    float minOffsetY = -barTop;
-    float maxOffsetY = tabsHeight - barTop - barHeight;
-
-    auto layoutProperty = tabsNode->GetLayoutProperty();
-    if (layoutProperty) {
-        auto innerSafePadding = layoutProperty->GetOrCreateSafeAreaPadding();
-        float safeLeft = innerSafePadding.left.value_or(0.0f);
-        float safeRight = innerSafePadding.right.value_or(0.0f);
-        float safeTop = innerSafePadding.top.value_or(0.0f);
-        float safeBottom = innerSafePadding.bottom.value_or(0.0f);
-        minOffsetX = std::max(minOffsetX, safeLeft - barLeft);
-        maxOffsetX = std::min(maxOffsetX, tabsWidth - safeRight - barLeft - barWidth);
-        minOffsetY = std::max(minOffsetY, safeTop - barTop);
-        maxOffsetY = std::min(maxOffsetY, tabsHeight - safeBottom - barTop - barHeight);
-    }
-
-    float clampedX = std::clamp(offsetX, minOffsetX, std::max(minOffsetX, maxOffsetX));
-    float clampedY = std::clamp(offsetY, minOffsetY, std::max(minOffsetY, maxOffsetY));
-    if (!NearEqual(clampedX, offsetX) || !NearEqual(clampedY, offsetY)) {
-        renderContext->UpdateTransformTranslate({clampedX, clampedY, 0.0f});
-    }
-}
 
 void TabsPattern::SetFloatingScaleEnabled(bool isFloatingScaleEnabled)
 {

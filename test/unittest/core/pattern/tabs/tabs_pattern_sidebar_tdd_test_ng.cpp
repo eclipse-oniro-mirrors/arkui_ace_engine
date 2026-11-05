@@ -317,48 +317,6 @@ HWTEST_F(TabsPatternSidebarTddTestNg, ResetSystemMaterialBasic001, TestSize.Leve
     EXPECT_FALSE(tabBarPattern_->IsNewMaterial());
 }
 
-// ===================== ClampTabBarTransformOffset =====================
-
-/**
- * @tc.name: ClampTabBarTransformOffsetNotFloating001
- * @tc.desc: ClampTabBarTransformOffset with not floating bar/topbar is a no-op
- * @tc.type: FUNC
- */
-HWTEST_F(TabsPatternSidebarTddTestNg, ClampTabBarTransformOffsetNotFloating001, TestSize.Level1)
-{
-    TabsModelNG model = CreateTabs();
-    CreateTabContents(TABCONTENT_NUMBER);
-    CreateTabsDone(model);
-    ASSERT_NE(pattern_, nullptr);
-
-    pattern_->isFloatingBar_ = false;
-    pattern_->isFloatingTopBar_ = false;
-    pattern_->ClampTabBarTransformOffset();
-    EXPECT_FALSE(pattern_->isFloatingBar_);
-    EXPECT_FALSE(pattern_->isFloatingTopBar_);
-}
-
-/**
- * @tc.name: ClampTabBarTransformOffsetNoTransform001
- * @tc.desc: ClampTabBarTransformOffset with floating bar but no transform translate is a no-op
- * @tc.type: FUNC
- */
-HWTEST_F(TabsPatternSidebarTddTestNg, ClampTabBarTransformOffsetNoTransform001, TestSize.Level1)
-{
-    TabsModelNG model = CreateTabs();
-    CreateTabContents(TABCONTENT_NUMBER);
-    CreateTabsDone(model);
-    ASSERT_NE(pattern_, nullptr);
-    ASSERT_NE(tabBarNode_, nullptr);
-
-    pattern_->isFloatingBar_ = true;
-    auto renderContext = tabBarNode_->GetRenderContext();
-    ASSERT_NE(renderContext, nullptr);
-    // No transform translate set
-    pattern_->ClampTabBarTransformOffset();
-    EXPECT_FALSE(renderContext->HasTransformTranslate());
-}
-
 // ===================== UpdateCollapseButtonIfNeeded =====================
 
 /**

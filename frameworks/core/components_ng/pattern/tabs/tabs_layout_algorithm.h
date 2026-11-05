@@ -131,6 +131,21 @@ private:
     void UpdateBarMargin(LayoutWrapper* layoutWrapper, OffsetF& barOffset) const;
     void UpdateTopBarMargin(LayoutWrapper* layoutWrapper, OffsetF& barOffset) const;
     void UpdateFloatingBarTransform(LayoutWrapper* layoutWrapper) const;
+    void ClampFloatingBarOffset(LayoutWrapper* layoutWrapper) const;
+    struct FloatingBarSafeBoundary {
+        float left = 0.0f;
+        float right = 0.0f;
+        float top = 0.0f;
+        float bottom = 0.0f;
+        float expandTop = 0.0f;
+        float expandBottom = 0.0f;
+        float expandLeft = 0.0f;
+        float expandRight = 0.0f;
+    };
+    FloatingBarSafeBoundary GetFloatingBarSafeBoundary(LayoutWrapper* layoutWrapper) const;
+    void ApplyExpandSafeArea(FloatingBarSafeBoundary& boundary, const RefPtr<LayoutProperty>& layoutProperty,
+        PipelineContext* pipeline, float tabsGlobalLeft, float tabsGlobalTop,
+        float tabsGlobalRight, float tabsGlobalBottom) const;
     void LayoutBackgroundMask(LayoutWrapper* layoutWrapper);
 
     void UpdateSideBarAndSideBarDividerVisibility(LayoutWrapper* layoutWrapper, bool isVisible);

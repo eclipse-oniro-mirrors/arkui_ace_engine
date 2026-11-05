@@ -1123,27 +1123,6 @@ HWTEST_F(TabsSidebarCalcTestNg, OnDisplayModeSwitchAnimationsFinishedCountGtZero
     EXPECT_EQ(pattern_->displayModeAnimCount_, 1);
 }
 
-// ===================== ClampTabBarTransformOffset =====================
-
-/**
- * @tc.name: ClampTabBarTransformOffsetNotFloating001
- * @tc.desc: When not floating bar and not floating top bar, early returns
- * @tc.type: FUNC
- */
-HWTEST_F(TabsSidebarCalcTestNg, ClampTabBarTransformOffsetNotFloating001, TestSize.Level1)
-{
-    TabsModelNG model = CreateTabs();
-    CreateTabContents(TABCONTENT_NUMBER);
-    CreateTabsDone(model);
-    ASSERT_NE(pattern_, nullptr);
-    ASSERT_NE(tabBarNode_, nullptr);
-
-    // Neither floating bar nor floating top bar → early return
-    pattern_->ClampTabBarTransformOffset();
-    EXPECT_FALSE(pattern_->isFloatingBar_);
-    EXPECT_FALSE(pattern_->isFloatingTopBar_);
-}
-
 // ===================== SetFloatingScaleEnabled =====================
 
 /**
