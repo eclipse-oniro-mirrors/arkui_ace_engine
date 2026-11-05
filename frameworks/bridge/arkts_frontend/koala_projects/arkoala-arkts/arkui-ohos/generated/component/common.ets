@@ -63,6 +63,7 @@ import { BuildOptions } from 'arkui.BuilderNode'
 import { AvoidanceMode } from './select'
 import { LevelMode, default as promptAction } from '@ohos.promptAction'
 import { SymbolGlyphModifier } from 'arkui.SymbolGlyphModifier'
+import { HandednessFollowMode } from '@ohos.arkui.dialog'
 import { CallbackKind } from './../framework/peers/CallbackKind'
 import { memo, memo_stable, memo_skip } from 'arkui.stateManagement.runtime'
 import { ComponentBuilder, Builder } from '@koalaui/builderLambda'
@@ -8729,6 +8730,7 @@ export interface SheetOptions extends BindOptions {
     edgeLightMode?: EdgeLightMode;
     blurSnapshot?: BlurSnapshotOptions;
     titleBarHoverMode?: SheetTitleBarHoverMode;
+    adaptToHandedness?: HandednessFollowMode;
 }
 export enum SheetTitleBarHoverMode {
     STANDARD = 0,
@@ -26328,6 +26330,14 @@ export class SheetOptions_serializer {
         } else {
             valueSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
+        const valueHolderForAdaptToHandedness = value.adaptToHandedness
+        if (valueHolderForAdaptToHandedness !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForAdaptToHandednessTmpValue = (valueHolderForAdaptToHandedness as HandednessFollowMode)
+            valueSerializer.writeInt32(valueHolderForAdaptToHandednessTmpValue.valueOf())
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
     }
     public static read(buffer: DeserializerBase): SheetOptions {
         let valueDeserializer: DeserializerBase = buffer
@@ -27093,7 +27103,13 @@ export class SheetOptions_serializer {
             titleBarHoverModeTmpBuf = SheetTitleBarHoverMode.fromValue(valueDeserializer.readInt32())
         }
         const titleBarHoverModeTmpResult: SheetTitleBarHoverMode | undefined = titleBarHoverModeTmpBuf
-        let value: SheetOptions = ({backgroundColor: backgroundColorTmpResult, onAppear: onAppearTmpResult, onDisappear: onDisappearTmpResult, onWillAppear: onWillAppearTmpResult, onWillDisappear: onWillDisappearTmpResult, height: heightTmpResult, dragBar: dragBarTmpResult, enableFloatingDragBar: enableFloatingDragBarTmpResult, modalTransition: modalTransitionTmpResult, radiusRenderStrategy: radiusRenderStrategyTmpResult, systemMaterial: systemMaterialTmpResult, maskColor: maskColorTmpResult, detents: detentsTmpResult, blurStyle: blurStyleTmpResult, showClose: showCloseTmpResult, preferType: preferTypeTmpResult, title: titleTmpResult, shouldDismiss: shouldDismissTmpResult, onWillDismiss: onWillDismissTmpResult, onWillSpringBackWhenDismiss: onWillSpringBackWhenDismissTmpResult, enableOutsideInteractive: enableOutsideInteractiveTmpResult, width: widthTmpResult, borderWidth: borderWidthTmpResult, borderColor: borderColorTmpResult, borderStyle: borderStyleTmpResult, shadow: shadowTmpResult, onHeightDidChange: onHeightDidChangeTmpResult, mode: modeTmpResult, scrollSizeMode: scrollSizeModeTmpResult, onDetentsDidChange: onDetentsDidChangeTmpResult, onWidthDidChange: onWidthDidChangeTmpResult, onTypeDidChange: onTypeDidChangeTmpResult, uiContext: uiContextTmpResult, keyboardAvoidMode: keyboardAvoidModeTmpResult, enableHoverMode: enableHoverModeTmpResult, hoverModeArea: hoverModeAreaTmpResult, offset: offsetTmpResult, effectEdge: effectEdgeTmpResult, radius: radiusTmpResult, detentSelection: detentSelectionTmpResult, showInSubWindow: showInSubWindowTmpResult, placement: placementTmpResult, placementOnTarget: placementOnTargetTmpResult, edgeLightMode: edgeLightModeTmpResult, blurSnapshot: blurSnapshotTmpResult, titleBarHoverMode: titleBarHoverModeTmpResult} as SheetOptions)
+        const adaptToHandednessTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let adaptToHandednessTmpBuf: HandednessFollowMode | undefined = undefined
+        if ((adaptToHandednessTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            adaptToHandednessTmpBuf = HandednessFollowMode.fromValue(valueDeserializer.readInt32())
+        }
+        const adaptToHandednessTmpResult: HandednessFollowMode | undefined = adaptToHandednessTmpBuf
+        let value: SheetOptions = ({backgroundColor: backgroundColorTmpResult, onAppear: onAppearTmpResult, onDisappear: onDisappearTmpResult, onWillAppear: onWillAppearTmpResult, onWillDisappear: onWillDisappearTmpResult, height: heightTmpResult, dragBar: dragBarTmpResult, enableFloatingDragBar: enableFloatingDragBarTmpResult, modalTransition: modalTransitionTmpResult, radiusRenderStrategy: radiusRenderStrategyTmpResult, systemMaterial: systemMaterialTmpResult, maskColor: maskColorTmpResult, detents: detentsTmpResult, blurStyle: blurStyleTmpResult, showClose: showCloseTmpResult, preferType: preferTypeTmpResult, title: titleTmpResult, shouldDismiss: shouldDismissTmpResult, onWillDismiss: onWillDismissTmpResult, onWillSpringBackWhenDismiss: onWillSpringBackWhenDismissTmpResult, enableOutsideInteractive: enableOutsideInteractiveTmpResult, width: widthTmpResult, borderWidth: borderWidthTmpResult, borderColor: borderColorTmpResult, borderStyle: borderStyleTmpResult, shadow: shadowTmpResult, onHeightDidChange: onHeightDidChangeTmpResult, mode: modeTmpResult, scrollSizeMode: scrollSizeModeTmpResult, onDetentsDidChange: onDetentsDidChangeTmpResult, onWidthDidChange: onWidthDidChangeTmpResult, onTypeDidChange: onTypeDidChangeTmpResult, uiContext: uiContextTmpResult, keyboardAvoidMode: keyboardAvoidModeTmpResult, enableHoverMode: enableHoverModeTmpResult, hoverModeArea: hoverModeAreaTmpResult, offset: offsetTmpResult, effectEdge: effectEdgeTmpResult, radius: radiusTmpResult, detentSelection: detentSelectionTmpResult, showInSubWindow: showInSubWindowTmpResult, placement: placementTmpResult, placementOnTarget: placementOnTargetTmpResult, edgeLightMode: edgeLightModeTmpResult, blurSnapshot: blurSnapshotTmpResult, titleBarHoverMode: titleBarHoverModeTmpResult, adaptToHandedness: adaptToHandednessTmpResult} as SheetOptions)
         return value
     }
 }
