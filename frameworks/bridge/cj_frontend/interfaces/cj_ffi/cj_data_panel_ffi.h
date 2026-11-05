@@ -52,5 +52,6 @@ CJ_EXPORT void FfiOHOSAceFrameworkDataPanelResetValueColors();
 CJ_EXPORT void FfiOHOSAceFrameworkDataPanelSetTrackBackgroundColor(uint32_t color);
 CJ_EXPORT void FfiOHOSAceFrameworkDataPanelSetStrokeWidth(double strokeWidth, int32_t widthUnit);
 CJ_EXPORT void FfiOHOSAceFrameworkDataPanelSetTrackShadow(NativeDataPanelShadow nativeDataPanelShadow);
+CJ_EXPORT void FfiOHOSAceFrameworkDataPanelResetShadowColors(double radius, double offsetX, double offsetY);
 };
 #endif
