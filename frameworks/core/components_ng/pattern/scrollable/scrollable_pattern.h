@@ -333,6 +333,7 @@ public:
     const RefPtr<ScrollEdgeEffect>& GetScrollEdgeEffect() const;
     bool CanFadeEffect(float offset, bool isAtTop, bool isAtBottom) const;
     bool HandleEdgeEffect(float offset, int32_t source, const SizeF& size);
+    virtual void UpdateAnimateOverScroll(int32_t source, bool isAtTop, bool isAtBottom);
     void HandleFadeEffect(float offset, int32_t source, const SizeF& size, bool isNotPositiveScrollableDistance);
     virtual void SetEdgeEffectCallback(const RefPtr<ScrollEdgeEffect>& scrollEffect) {}
     bool IsRestrictBoundary();

@@ -149,6 +149,7 @@ public:
 
     void OnAnimateStop() override;
     bool UpdateCurrentOffset(float offset, int32_t source) override;
+    void UpdateAnimateOverScroll(int32_t source, bool isAtTop, bool isAtBottom) override;
     void ScrollToEdge(ScrollEdgeType scrollEdgeType, bool smooth) override;
 
     void CheckScrollToEdge();

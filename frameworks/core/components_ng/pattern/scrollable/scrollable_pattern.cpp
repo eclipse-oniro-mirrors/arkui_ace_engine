@@ -1901,11 +1901,18 @@ bool ScrollablePattern::HandleEdgeEffect(float offset, int32_t source, const Siz
             return false;
         }
     }
-    animateOverScrollStart_ = (source == SCROLL_FROM_ANIMATION_CONTROLLER) && isAtTop;
-    animateOverScrollEnd_ = (source == SCROLL_FROM_ANIMATION_CONTROLLER) && isAtBottom;
+    UpdateAnimateOverScroll(source, isAtTop, isAtBottom);
     isAnimateOverScroll_ = (source == SCROLL_FROM_ANIMATION_CONTROLLER) && animateCanOverScroll_ &&
                            ((isAtTop && Positive(offset)) || (isAtBottom && Negative(offset)));
     return true;
+}
+
+void ScrollablePattern::UpdateAnimateOverScroll(int32_t source, bool isAtTop, bool isAtBottom)
+{
+    animateOverScrollStart_ =
+        (source == SCROLL_FROM_ANIMATION_CONTROLLER) && isAtTop;
+    animateOverScrollEnd_ =
+        (source == SCROLL_FROM_ANIMATION_CONTROLLER) && isAtBottom;
 }
 
 void ScrollablePattern::RegisterScrollBarEventTask()
