@@ -191,8 +191,8 @@ HWTEST_F(ToggleModelNgTest, ToggleModelNG_AddNewChild_CheckboxAndSwitch_SetsNoSt
     auto toggleNodeSwitch =
         FrameNode::CreateFrameNode(V2::TOGGLE_ETS_TAG, nodeIdSwitch, AceType::MakeRefPtr<ToggleButtonPattern>());
     ASSERT_NE(toggleNodeSwitch, nullptr);
-    auto childSwitch =
-        FrameNode::CreateFrameNode("child", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<SwitchPattern>());
+    auto childSwitch = FrameNode::CreateFrameNode("child",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<SwitchPattern>());
     ASSERT_NE(childSwitch, nullptr);
     ASSERT_NE(childSwitch->GetOrCreateAccessibilityProperty(), nullptr);
     toggleNodeSwitch->AddChild(childSwitch);
@@ -592,8 +592,8 @@ HWTEST_F(ToggleModelNgTest, ToggleModelNG_CreateWithCheckBoxResourceObj_NullAndV
     /**
      * @tc.steps: step1. Create a checkbox toggle node.
      */
-    auto frameNode = FrameNode::CreateFrameNode(
-        V2::TOGGLE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<ToggleCheckBoxPattern>());
+    auto frameNode = FrameNode::CreateFrameNode(V2::TOGGLE_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<ToggleCheckBoxPattern>());
     ASSERT_NE(frameNode, nullptr);
     frameNode->MarkModifyDone();
     auto pattern = frameNode->GetPattern();
