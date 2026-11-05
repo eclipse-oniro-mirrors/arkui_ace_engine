@@ -137,11 +137,15 @@ void GetShadowInfoArray(
 {
     for (auto& pixelMap : dragAction->pixelMapList) {
         double scale = 1.0;
-        if (Referenced::RawPtr(pixelMap)) {
-            scale = GetPixelMapScale(pixelMap, dragAction->previewOption.isScaleEnabled, false);
-            auto pixelMapScale = dragAction->windowScale * scale;
-            pixelMap->Scale(pixelMapScale, pixelMapScale, AceAntiAliasingOption::HIGH);
+        if (!Referenced::RawPtr(pixelMap)) {
+            TAG_LOGW(AceLogTag::ACE_DRAG, "pixelMap is null, skip this shadow info");
+            continue;
         }
+
+        scale = GetPixelMapScale(pixelMap, dragAction->previewOption.isScaleEnabled, false);
+        auto pixelMapScale = dragAction->windowScale * scale;
+        pixelMap->Scale(pixelMapScale, pixelMapScale, AceAntiAliasingOption::HIGH);
+
         int32_t width = pixelMap->GetWidth();
         int32_t height = pixelMap->GetHeight();
         double x = dragAction->touchPointX;
