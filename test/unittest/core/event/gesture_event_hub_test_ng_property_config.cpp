@@ -343,13 +343,11 @@ HWTEST_F(GestureEventHubTestNg, IsPixelMapNeedScale001, TestSize.Level1)
  */
 HWTEST_F(GestureEventHubTestNg, GetDragDropInfo001, TestSize.Level1)
 {
-    auto hostNode = FrameNode::CreateFrameNode(V2::IMAGE_ETS_TAG, -1, AceType::MakeRefPtr<Pattern>());
     /**
      * @tc.steps: step1. Create GestureEventHub.
      * @tc.expected: gestureEventHub is not null.
      */
     auto eventHub = AceType::MakeRefPtr<EventHub>();
-    eventHub->AttachHost(hostNode);
     EXPECT_TRUE(eventHub);
     auto gestureEventHub = AceType::MakeRefPtr<GestureEventHub>(eventHub);
     EXPECT_TRUE(gestureEventHub);
@@ -483,13 +481,11 @@ HWTEST_F(GestureEventHubTestNg, GetDragDropInfo002, TestSize.Level1)
  */
 HWTEST_F(GestureEventHubTestNg, GetUnifiedData001, TestSize.Level1)
 {
-    auto hostNode = FrameNode::CreateFrameNode(V2::IMAGE_ETS_TAG, -1, AceType::MakeRefPtr<Pattern>());
     /**
      * @tc.steps: step1. Create GestureEventHub.
      * @tc.expected: gestureEventHub is not null.
      */
     auto eventHub = AceType::MakeRefPtr<EventHub>();
-    eventHub->AttachHost(hostNode);
     EXPECT_TRUE(eventHub);
     auto gestureEventHub = AceType::MakeRefPtr<GestureEventHub>(eventHub);
     EXPECT_TRUE(gestureEventHub);
@@ -540,13 +536,11 @@ HWTEST_F(GestureEventHubTestNg, GetUnifiedData001, TestSize.Level1)
  */
 HWTEST_F(GestureEventHubTestNg, GetUnifiedData002, TestSize.Level1)
 {
-    auto hostNode = FrameNode::CreateFrameNode(V2::IMAGE_ETS_TAG, -1, AceType::MakeRefPtr<Pattern>());
     /**
      * @tc.steps: step1. Create GestureEventHub.
      * @tc.expected: gestureEventHub is not null.
      */
     auto eventHub = AceType::MakeRefPtr<EventHub>();
-    eventHub->AttachHost(hostNode);
     EXPECT_TRUE(eventHub);
     auto gestureEventHub = AceType::MakeRefPtr<GestureEventHub>(eventHub);
     EXPECT_TRUE(gestureEventHub);
