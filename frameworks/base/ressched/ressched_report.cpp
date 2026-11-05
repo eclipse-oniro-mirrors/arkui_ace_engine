@@ -142,13 +142,14 @@ void LoadReportConfig(
 // event display is invalid (< 0, e.g. injected events).
 void LoadEventDisplayId(std::unordered_map<std::string, std::string>& payload, int32_t targetDisplayId)
 {
+    if (targetDisplayId >= 0) {
+        payload[DISPLAY_ID] = std::to_string(targetDisplayId);
+        return;
+    }
     auto container = Container::Current();
     if (container) {
         auto displayId = container->GetDisplayId();
         payload[DISPLAY_ID] = std::to_string(displayId);
-    }
-    if (targetDisplayId >= 0) {
-        payload[DISPLAY_ID] = std::to_string(targetDisplayId);
     }
 }
 }
