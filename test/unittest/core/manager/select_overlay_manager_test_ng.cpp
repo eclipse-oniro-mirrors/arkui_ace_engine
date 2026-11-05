@@ -28,11 +28,13 @@
 #include "base/memory/ace_type.h"
 #include "base/memory/referenced.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include "core/components_ng/base/geometry_node.h"
 #include "core/components_ng/manager/select_content_overlay/select_overlay_callback.h"
 #include "core/components_ng/manager/select_content_overlay/select_overlay_holder.h"
 #include "core/components_ng/manager/select_overlay/select_overlay_manager.h"
 #include "core/components_ng/pattern/pattern.h"
+#include "core/components_ng/pattern/scroll/scroll_pattern.h"
 #include "core/components_ng/pattern/select_overlay/select_overlay_pattern.h"
 #include "core/components_ng/pattern/select_overlay/select_overlay_property.h"
 #include "core/components_ng/pattern/text/text_base.h"
@@ -113,6 +115,24 @@ private:
     HandleLevelMode handleLevelMode_ = HandleLevelMode::OVERLAY;
     bool allowSwitchMode_ = false;
     RefPtr<FrameNode> node_;
+};
+
+class ScrollTestSelectOverlayClient final : public SelectOverlayClient {
+public:
+    explicit ScrollTestSelectOverlayClient(const RefPtr<FrameNode>& host) : host_(host) {}
+
+    bool BetweenSelectedPosition(const Offset&) override
+    {
+        return false;
+    }
+
+    RefPtr<FrameNode> GetClientHost() const override
+    {
+        return host_.Upgrade();
+    }
+
+private:
+    WeakPtr<FrameNode> host_;
 };
 
 void SelectOverlayManagerTestNg::SetUpTestSuite()
@@ -526,6 +546,36 @@ HWTEST_F(SelectOverlayManagerTestNg, FindWindowScene001, TestSize.Level1)
      */
     auto rootNode = selectOverlayManager->FindWindowScene(nullptr);
     EXPECT_TRUE(rootNode);
+}
+
+/**
+ * @tc.name: FindWindowSceneWithAdoptedOwner
+ * @tc.desc: Verify that both select overlay managers find WindowScene through an adopted parent chain
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectOverlayManagerTestNg, FindWindowSceneWithAdoptedOwner, TestSize.Level1)
+{
+    auto container = MockContainer::Current();
+    ASSERT_NE(container, nullptr);
+    const auto wasSceneBoardWindow = container->isSceneBoardWindow_;
+    container->isSceneBoardWindow_ = true;
+
+    auto root = FrameNode::CreateFrameNode(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    auto windowScene = FrameNode::CreateFrameNode(
+        V2::WINDOW_SCENE_ETS_TAG, NODE_ID, AceType::MakeRefPtr<Pattern>());
+    auto adoptParent = FrameNode::CreateFrameNode("adoptParent", NODE_ID_2, AceType::MakeRefPtr<Pattern>());
+    auto owner = FrameNode::CreateFrameNode("owner", NODE_ID_3, AceType::MakeRefPtr<Pattern>());
+    root->AddChild(windowScene);
+    windowScene->AddChild(adoptParent);
+    adoptParent->AdoptChild(owner);
+    FrameNodeAdoptedCompensation::SetUseAdoptedCompensation(owner.GetRawPtr(), true);
+
+    auto legacyManager = AceType::MakeRefPtr<SelectOverlayManager>(root);
+    auto contentManager = AceType::MakeRefPtr<SelectContentOverlayManager>(root);
+    EXPECT_EQ(legacyManager->FindWindowScene(owner), windowScene);
+    EXPECT_EQ(contentManager->FindWindowScene(owner), windowScene);
+
+    container->isSceneBoardWindow_ = wasSceneBoardWindow;
 }
 
 /**
@@ -1559,6 +1609,37 @@ HWTEST_F(SelectOverlayManagerTestNg, StartListeningScrollableParent001, TestSize
 }
 
 /**
+ * @tc.name: StartListeningScrollableParentWithAdoptedOwner
+ * @tc.desc: Verify that a scrollable adopted parent is registered
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectOverlayManagerTestNg, StartListeningScrollableParentWithAdoptedOwner, TestSize.Level1)
+{
+    auto scrollNode = FrameNode::CreateFrameNode(
+        V2::SCROLL_ETS_TAG, NODE_ID, AceType::MakeRefPtr<ScrollPattern>());
+    auto owner = FrameNode::CreateFrameNode("owner", NODE_ID_2, AceType::MakeRefPtr<Pattern>());
+    scrollNode->AdoptChild(owner);
+    FrameNodeAdoptedCompensation::SetUseAdoptedCompensation(owner.GetRawPtr(), true);
+    auto client = AceType::MakeRefPtr<ScrollTestSelectOverlayClient>(owner);
+    auto context = owner->GetContext();
+    ASSERT_NE(context, nullptr);
+    auto manager = context->GetSelectOverlayManager();
+    ASSERT_NE(manager, nullptr);
+
+    client->StartListeningScrollableParent(owner);
+
+    EXPECT_EQ(client->scrollableParentInfo_.parentIds.size(), 1);
+    EXPECT_TRUE(client->scrollableParentInfo_.hasParent);
+    auto callbacks = manager->parentScrollCallbacks_.find(scrollNode->GetId());
+    EXPECT_NE(callbacks, manager->parentScrollCallbacks_.end());
+    if (callbacks != manager->parentScrollCallbacks_.end()) {
+        EXPECT_EQ(callbacks->second.count(owner->GetId()), 1);
+    }
+    client->StopListeningScrollableParent(owner);
+    EXPECT_EQ(manager->parentScrollCallbacks_.count(scrollNode->GetId()), 0);
+}
+
+/**
  * @tc.name: StopListeningScrollableParent
  * @tc.desc: test StopListeningScrollableParent
  * @tc.type: FUNC
@@ -1779,6 +1860,96 @@ HWTEST_F(SelectOverlayManagerTestNg, MountNodeToRoot, TestSize.Level1)
     bool animation = true;
     content.MountNodeToRoot(root_, animation, NodeType::HANDLE);
     EXPECT_EQ(content.selectionHoldId_, -1);
+}
+
+/**
+ * @tc.name: MountNodeToRootWithAdoptedOwner
+ * @tc.desc: Verify that handle overlay is mounted before menu overlay for an adopted owner
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectOverlayManagerTestNg, MountNodeToRootWithAdoptedOwner, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create an adopted owner under a normal root child and enable adopted compensation.
+     * @tc.expected: The owner can reach the overlay root through its coordinate ancestor chain.
+     */
+    auto root = FrameNode::CreateFrameNode(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    auto adoptParent = FrameNode::CreateFrameNode("adoptParent", NODE_ID, AceType::MakeRefPtr<Pattern>());
+    auto adoptedRoot = FrameNode::CreateFrameNode("adoptedRoot", NODE_ID_2, AceType::MakeRefPtr<Pattern>());
+    auto owner = FrameNode::CreateFrameNode("owner", NODE_ID_3, AceType::MakeRefPtr<Pattern>());
+    root->AddChild(adoptParent);
+    adoptedRoot->AddChild(owner);
+    adoptParent->AdoptChild(adoptedRoot);
+    FrameNodeAdoptedCompensation::SetUseAdoptedCompensation(adoptedRoot.GetRawPtr(), true);
+
+    auto holder = AceType::MakeRefPtr<MockSelectOverlayHolder>();
+    holder->SetOwner(owner);
+    auto content = SelectContentOverlayManager(root);
+    content.SetHolder(holder);
+    content.shareOverlayInfo_ = std::make_shared<SelectOverlayInfo>();
+
+    auto slot = content.FindSelectOverlaySlot(root, root->GetChildren());
+    EXPECT_EQ(slot, root->GetChildren().end());
+
+    /**
+     * @tc.steps: step2. Mount the menu first and then mount the handle.
+     * @tc.expected: The handle is inserted before the menu and both remain above the owner's root subtree.
+     */
+    auto menuNode = FrameNode::CreateFrameNode(
+        V2::SELECT_OVERLAY_ETS_TAG, NODE_ID_3 + 1, AceType::MakeRefPtr<Pattern>());
+    auto handleNode = FrameNode::CreateFrameNode(
+        V2::SELECT_OVERLAY_ETS_TAG, NODE_ID_3 + 2, AceType::MakeRefPtr<Pattern>());
+    content.MountNodeToRoot(menuNode, false, NodeType::TOUCH_MENU);
+    content.MountNodeToRoot(handleNode, false, NodeType::HANDLE);
+
+    const auto& children = root->GetChildren();
+    ASSERT_EQ(children.size(), 3);
+    auto child = children.begin();
+    EXPECT_EQ(*child++, adoptParent);
+    EXPECT_EQ(*child++, handleNode);
+    EXPECT_EQ(*child, menuNode);
+}
+
+/**
+ * @tc.name: MountNodeToRootWithRootAdoptedOwner
+ * @tc.desc: Preserve the existing normal overlay order when the root directly adopts the owner
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectOverlayManagerTestNg, MountNodeToRootWithRootAdoptedOwner, TestSize.Level1)
+{
+    for (bool adopted : { false, true }) {
+        SCOPED_TRACE(adopted ? "adopted" : "normal");
+        auto root = FrameNode::CreateFrameNode(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>());
+        auto owner = FrameNode::CreateFrameNode("owner", NODE_ID, AceType::MakeRefPtr<Pattern>());
+        if (adopted) {
+            root->AdoptChild(owner);
+            FrameNodeAdoptedCompensation::SetUseAdoptedCompensation(owner.GetRawPtr(), true);
+        } else {
+            root->AddChild(owner);
+        }
+
+        auto holder = AceType::MakeRefPtr<MockSelectOverlayHolder>();
+        holder->SetOwner(owner);
+        auto content = SelectContentOverlayManager(root);
+        content.SetHolder(holder);
+        content.shareOverlayInfo_ = std::make_shared<SelectOverlayInfo>();
+
+        auto menuNode = FrameNode::CreateFrameNode(
+            V2::SELECT_OVERLAY_ETS_TAG, NODE_ID_2, AceType::MakeRefPtr<Pattern>());
+        auto handleNode = FrameNode::CreateFrameNode(
+            V2::SELECT_OVERLAY_ETS_TAG, NODE_ID_3, AceType::MakeRefPtr<Pattern>());
+        content.MountNodeToRoot(menuNode, false, NodeType::TOUCH_MENU);
+        content.MountNodeToRoot(handleNode, false, NodeType::HANDLE);
+
+        const auto& children = root->GetChildren();
+        ASSERT_EQ(children.size(), adopted ? 2 : 3);
+        auto child = children.begin();
+        if (!adopted) {
+            EXPECT_EQ(*child++, owner);
+        }
+        EXPECT_EQ(*child++, menuNode);
+        EXPECT_EQ(*child, handleNode);
+    }
 }
 
 /**

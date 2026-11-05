@@ -723,13 +723,13 @@ std::list<RefPtr<UINode>>::const_iterator SelectContentOverlayManager::FindSelec
     auto callerNode = selectOverlayHolder_->GetOwner();
     CHECK_NULL_RETURN(callerNode, begin);
     RefPtr<UINode> prevNode = nullptr;
-    auto parent = callerNode->GetParent();
+    auto parent = callerNode->GetParent(true);
     while (parent) {
         if (parent == root) {
             break;
         }
         prevNode = parent;
-        parent = parent->GetParent();
+        parent = parent->GetParent(true);
     }
     CHECK_NULL_RETURN(parent, begin);
     CHECK_NULL_RETURN(prevNode, begin);
@@ -809,9 +809,9 @@ RefPtr<UINode> SelectContentOverlayManager::FindWindowScene(RefPtr<FrameNode> ta
         return rootNodeWeak_.Upgrade();
     }
     CHECK_NULL_RETURN(targetNode, nullptr);
-    auto parent = targetNode->GetParent();
+    auto parent = targetNode->GetParent(true);
     while (parent && parent->GetTag() != V2::WINDOW_SCENE_ETS_TAG) {
-        parent = parent->GetParent();
+        parent = parent->GetParent(true);
     }
     CHECK_NULL_RETURN(parent, nullptr);
     return parent;

@@ -34,6 +34,7 @@
 #include "core/components/select/select_theme.h"
 #include "core/components/text_overlay/text_overlay_theme.h"
 #include "core/components/theme/shadow_theme.h"
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include "core/components_ng/manager/select_overlay/select_overlay_manager.h"
 #include "core/components_ng/pattern/menu/menu_pattern.h"
 #include "core/components_ng/pattern/menu/menu_item/menu_item_layout_property.h"
@@ -543,6 +544,26 @@ HWTEST_F(SelectOverlayPatternTestNg, MagnifierController_FindWindowScene004, Tes
     targetNode->tag_ = V2::WINDOW_SCENE_ETS_TAG;
     auto result = controller.FindWindowScene(targetNode);
     EXPECT_EQ(result, nullptr);
+}
+
+/**
+ * @tc.name: MagnifierController_FindWindowScene005
+ * @tc.desc: test FindWindowScene through an adopted parent chain
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectOverlayPatternTestNg, MagnifierController_FindWindowScene005, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<Pattern>();
+    MagnifierController controller { WeakPtr<Pattern>(pattern) };
+    auto windowScene = FrameNode::CreateFrameNode(
+        V2::WINDOW_SCENE_ETS_TAG, 2, AceType::MakeRefPtr<Pattern>());
+    auto adoptParent = FrameNode::CreateFrameNode("adoptParent", 3, AceType::MakeRefPtr<Pattern>());
+    auto targetNode = FrameNode::CreateFrameNode("target", 4, pattern);
+    windowScene->AddChild(adoptParent);
+    adoptParent->AdoptChild(targetNode);
+    FrameNodeAdoptedCompensation::SetUseAdoptedCompensation(targetNode.GetRawPtr(), true);
+
+    EXPECT_EQ(controller.FindWindowScene(targetNode), windowScene);
 }
 
 /**

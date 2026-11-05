@@ -460,9 +460,9 @@ RefPtr<FrameNode> MagnifierController::GetRootNode()
 RefPtr<UINode> MagnifierController::FindWindowScene(const RefPtr<FrameNode>& targetNode)
 {
     CHECK_NULL_RETURN(targetNode, nullptr);
-    auto parent = targetNode->GetParent();
+    auto parent = targetNode->GetParent(true);
     while (parent && parent->GetTag() != V2::WINDOW_SCENE_ETS_TAG) {
-        parent = parent->GetParent();
+        parent = parent->GetParent(true);
     }
     CHECK_NULL_RETURN(parent, nullptr);
     return parent;

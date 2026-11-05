@@ -622,6 +622,36 @@ HWTEST_F(UINodeTestNg, UINodeTestNg015, TestSize.Level1)
 }
 
 /**
+ * @tc.name: GetParentCrossAdoptBoundary
+ * @tc.desc: Parent traversal crosses adoption only when explicitly requested.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UINodeTestNg, GetParentCrossAdoptBoundary, TestSize.Level1)
+{
+    auto parent = FrameNode::CreateFrameNode(
+        "parent", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    auto child = FrameNode::CreateFrameNode(
+        "child", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(parent, nullptr);
+    ASSERT_NE(child, nullptr);
+
+    EXPECT_EQ(child->GetParent(true), nullptr);
+    parent->AddChild(child);
+    EXPECT_EQ(child->GetParent(), parent);
+    EXPECT_EQ(child->GetParent(false), parent);
+    EXPECT_EQ(child->GetParent(true), parent);
+
+    parent->RemoveChild(child);
+    parent->AdoptChild(child);
+    EXPECT_EQ(child->GetParent(), nullptr);
+    EXPECT_EQ(child->GetParent(false), nullptr);
+    EXPECT_EQ(child->GetParent(true), parent);
+
+    parent->RemoveAdoptedChild(child);
+    EXPECT_EQ(child->GetParent(true), nullptr);
+}
+
+/**
  * @tc.name: UINodeTestNg016
  * @tc.desc: Test ui node method
  * @tc.type: FUNC

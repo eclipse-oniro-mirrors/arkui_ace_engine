@@ -531,7 +531,7 @@ void WebSelectOverlay::StartListenSelectOverlayParentScroll(const RefPtr<FrameNo
         }
         return;
     }
-    auto parent = host->GetParent();
+    auto parent = host->GetParent(true);
     while (parent && parent->GetTag() != V2::PAGE_ETS_TAG) {
         auto parentNode = AceType::DynamicCast<FrameNode>(parent);
         if (parentNode) {
@@ -541,7 +541,7 @@ void WebSelectOverlay::StartListenSelectOverlayParentScroll(const RefPtr<FrameNo
                 RegisterSelectOverlayParentScrollCallback(parentNode->GetId(), hostId);
             }
         }
-        parent = parent->GetParent();
+        parent = parent->GetParent(true);
     }
     scrollableParentInfo_.hasParent = !scrollableParentInfo_.parentIds.empty();
     TAG_LOGI(AceLogTag::ACE_WEB, "find scrollable parent %{public}d", scrollableParentInfo_.hasParent);

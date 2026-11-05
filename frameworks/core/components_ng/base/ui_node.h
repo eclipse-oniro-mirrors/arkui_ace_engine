@@ -305,9 +305,11 @@ public:
 
     int32_t GetChildIndexById(int32_t id);
 
-    RefPtr<UINode> GetParent() const
+    // Cross the adopt boundary only when explicitly requested; ordinary parents take precedence.
+    RefPtr<UINode> GetParent(bool crossAdoptBoundary = false) const
     {
-        return parent_.Upgrade();
+        auto parent = parent_.Upgrade();
+        return parent || !crossAdoptBoundary ? parent : adoptParent_.Upgrade();
     }
 
     RefPtr<UINode> GetAdoptParent() const
