@@ -214,43 +214,44 @@ static bool ParseModifierKeys(napi_env env, napi_value arg, uint8_t& outKeys)
 
 static napi_value JSRegisterApplicationShortcut(napi_env env, napi_callback_info info)
 {
+    napi_value result = nullptr;
+    napi_create_int32(env, 0, &result);
     size_t argc = ARGC_REGISTER;
     napi_value argv[ARGC_REGISTER] = { nullptr };
     napi_value thisVar = nullptr;
     void* data = nullptr;
     napi_get_cb_info(env, info, &argc, argv, &thisVar, &data);
     if (argc != ARGC_REGISTER) {
-        NapiThrow(env, "registerApplicationShortcut requires 3 parameters.", ERROR_CODE_PARAM_INVALID);
-        return nullptr;
+        LOGE("registerApplicationShortcut requires 3 parameters.");
+        return result;
     }
 
     std::string value;
     if (!ParseShortcutValue(env, argv[ARG_INDEX_ZERO], value)) {
-        NapiThrow(env, "The first parameter must be a string.", ERROR_CODE_PARAM_INVALID);
-        return nullptr;
+        LOGE("The first parameter must be a string.");
+        return result;
     }
 
     uint8_t keys = 0;
     if (!ParseModifierKeys(env, argv[ARG_INDEX_ONE], keys)) {
-        NapiThrow(env, "The second parameter must be an array of ModifierKey.", ERROR_CODE_PARAM_INVALID);
-        return nullptr;
+        LOGE("The second parameter must be an array of ModifierKey.");
+        return result;
     }
 
     napi_valuetype callbackType = napi_undefined;
     napi_typeof(env, argv[ARG_INDEX_TWO], &callbackType);
     if (callbackType != napi_function) {
-        NapiThrow(env, "The third parameter must be a function.", ERROR_CODE_PARAM_INVALID);
-        return nullptr;
+        LOGE("The third parameter must be a function.");
+        return result;
     }
 
     auto callback = std::make_shared<ApplicationShortcutCallback>(env, argv[ARG_INDEX_TWO]);
     const auto registrationId = ApplicationShortcutManager::GetInstance().RegisterApplicationShortcut(
         value, keys, [callback](int32_t triggerInstanceId) { callback->Execute(triggerInstanceId); });
     if (registrationId == 0) {
-        napi_throw_error(env, nullptr, "Application shortcut registration IDs exhausted.");
-        return nullptr;
+        LOGE("Application shortcut registration failed");
+        return result;
     }
-    napi_value result = nullptr;
     napi_create_int32(env, registrationId, &result);
     return result;
 }

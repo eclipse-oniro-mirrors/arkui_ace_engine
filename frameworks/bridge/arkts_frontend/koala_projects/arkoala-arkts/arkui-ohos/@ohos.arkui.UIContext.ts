@@ -922,10 +922,13 @@ export class UIContext {
                 case ModifierKey.CTRL: bit = 1 << 0; break;
                 case ModifierKey.SHIFT: bit = 1 << 1; break;
                 case ModifierKey.ALT: bit = 1 << 2; break;
-                default: throw new BusinessError(401, 'Unsupported modifier key.');
+                default:
+                    console.error('Application shortcut registration failed: unsupported modifier key.');
+                    return 0;
             }
             if ((modifiers & bit) !== 0) {
-                throw new BusinessError(401, 'Duplicate modifier key.');
+                console.error('Application shortcut registration failed: duplicate modifier key.');
+                return 0;
             }
             modifiers |= bit;
         }
@@ -937,7 +940,7 @@ export class UIContext {
                 callback(info);
             });
         if (registrationId === 0) {
-            throw new Error('Application shortcut registration failed.');
+            console.error('Application shortcut registration failed.');
         }
         return registrationId;
     }

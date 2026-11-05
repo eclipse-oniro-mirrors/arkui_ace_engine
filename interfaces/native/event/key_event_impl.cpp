@@ -18,6 +18,8 @@
 
 #include "securec.h"
 
+#include "base/log/log_wrapper.h"
+
 #include "interfaces/native/native_key_event.h"
 #include "interfaces/inner_api/ace/node_module_inner.h"
 #include "interfaces/native/node/event_converter.h"
@@ -765,6 +767,15 @@ ArkUI_ContextHandle OH_ArkUI_ApplicationShortcutCallbackInfo_GetUIContext(
     return info && info->context.id >= 0 ? &info->context : nullptr;
 }
 
+static void CheckApplicationShortcutUIThread(const char* apiName)
+{
+    const auto* impl = OHOS::Ace::NodeModel::GetFullImplForAnyThread();
+    const auto* manager = impl && impl->getMultiThreadManagerAPI ? impl->getMultiThreadManagerAPI() : nullptr;
+    if (manager && manager->checkOnUIThread && !manager->checkOnUIThread()) {
+        LOGF_ABORT("%{public}s must be called on the UI thread", apiName);
+    }
+}
+
 static const char* ParseApplicationShortcutKey(
     const OH_ArkUI_KeyboardShortcutKey* key, uint32_t modifierKeys, std::string& value)
 {
@@ -801,7 +812,7 @@ static const char* ParseApplicationShortcutKey(
 ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Register(const OH_ArkUI_KeyboardShortcutKey* key, uint32_t modifierKeys,
     void* userData, OH_ArkUI_ApplicationShortcutCallback callback, int32_t* registrationId)
 {
-    CHECK_UI_THREAD("OH_ArkUI_ApplicationShortcut_Register");
+    CheckApplicationShortcutUIThread(__FUNCTION__);
     CHECK_NULL_RETURN_WITH_MESSAGE(registrationId, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Registration ID output is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(key, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Shortcut key is null");
@@ -824,7 +835,7 @@ ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Register(const OH_ArkUI_KeyboardSho
         });
     if (id == 0) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_INTERNAL_ERROR, __FUNCTION__,
-            "Application shortcut registration IDs exhausted");
+            "Application shortcut registration failed");
         return ARKUI_ERROR_CODE_INTERNAL_ERROR;
     }
     *registrationId = id;
@@ -833,7 +844,7 @@ ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Register(const OH_ArkUI_KeyboardSho
 
 ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Unregister(int32_t registrationId)
 {
-    CHECK_UI_THREAD("OH_ArkUI_ApplicationShortcut_Unregister");
+    CheckApplicationShortcutUIThread(__FUNCTION__);
     const auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
     CHECK_NULL_RETURN_WITH_MESSAGE(impl, ARKUI_ERROR_CODE_INTERNAL_ERROR,
         __FUNCTION__, "Native implementation is unavailable");

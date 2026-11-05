@@ -613,7 +613,8 @@ class UIContext {
         if (shortcut) {
             return shortcut.registerApplicationShortcut(value, keys, callback);
         }
-        return undefined;
+        console.error('Application shortcut registration module is unavailable.');
+        return 0;
     }
 
     static unregisterApplicationShortcut(registrationId) {

@@ -20,9 +20,22 @@
 #include <limits>
 #include <vector>
 
+#include "base/log/log_wrapper.h"
+#include "core/common/container.h"
 #include "core/event/key_event.h"
 
 namespace OHOS::Ace {
+
+namespace {
+bool IsUnsupportedShortcutContainer(const RefPtr<Container>& container, const char* operation)
+{
+    if (container && (container->IsFormRender() || container->IsDynamicRender())) {
+        LOGE("Application shortcut %{public}s is not supported for form render or dynamic render", operation);
+        return true;
+    }
+    return false;
+}
+} // namespace
 
 ApplicationShortcutManager& ApplicationShortcutManager::GetInstance()
 {
@@ -33,8 +46,12 @@ ApplicationShortcutManager& ApplicationShortcutManager::GetInstance()
 int32_t ApplicationShortcutManager::RegisterApplicationShortcut(const std::string& value, uint8_t keys,
     std::function<void(int32_t)>&& onKeyboardShortcutAction)
 {
+    if (IsUnsupportedShortcutContainer(Container::CurrentSafely(), "registration")) {
+        return 0;
+    }
     std::lock_guard<std::mutex> lock(applicationShortcutMutex_);
     if (applicationShortcutId_ == std::numeric_limits<int32_t>::max()) {
+        LOGE("Application shortcut registration IDs exhausted");
         return 0;
     }
     const auto registrationId = ++applicationShortcutId_;
@@ -45,6 +62,9 @@ int32_t ApplicationShortcutManager::RegisterApplicationShortcut(const std::strin
 
 void ApplicationShortcutManager::UnregisterApplicationShortcut(int32_t registrationId)
 {
+    if (IsUnsupportedShortcutContainer(Container::CurrentSafely(), "unregistration")) {
+        return;
+    }
     // Release the callback outside the lock: its destructor may release frontend resources.
     std::map<int32_t, ApplicationKeyboardShortcut>::node_type removed;
     {
@@ -89,6 +109,9 @@ static bool MatchShortcutValue(const KeyEvent& event, const std::string& value)
 
 bool ApplicationShortcutManager::TryTriggerApplicationShortcut(const KeyEvent& event, int32_t triggerInstanceId)
 {
+    if (IsUnsupportedShortcutContainer(Container::GetContainer(triggerInstanceId), "dispatch")) {
+        return false;
+    }
     std::vector<std::function<void(int32_t)>> callbacks;
     const uint8_t eventModifiers = GetEventModifierKeys(event);
     {

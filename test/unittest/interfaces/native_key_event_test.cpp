@@ -1135,4 +1135,39 @@ HWTEST_F(NativeKeyEventTest, ApplicationShortcutInvalidParameters, TestSize.Leve
     OH_ArkUI_KeyboardShortcutKey_Destroy(&key);
 }
 
+/**
+ * @tc.name: ApplicationShortcutUnsupportedRender
+ * @tc.desc: Form and dynamic render reject registration, unregistration and dispatch.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeKeyEventTest, ApplicationShortcutUnsupportedRender, TestSize.Level1)
+{
+    auto container = MockContainer::Current();
+    ASSERT_NE(container, nullptr);
+    auto& manager = ApplicationShortcutManager::GetInstance();
+    const bool wasForm = container->IsFormRender();
+    const bool wasDynamic = container->IsDynamicRender();
+    auto event = MakeApplicationShortcutEvent();
+    for (bool formRender : { true, false }) {
+        container->SetIsFormRender(false);
+        container->SetIsDynamicRender(false);
+        int32_t count = 0;
+        const auto id = manager.RegisterApplicationShortcut("A", 1, [&](int32_t) { ++count; });
+        EXPECT_GT(id, 0);
+        container->SetIsFormRender(formRender);
+        container->SetIsDynamicRender(!formRender);
+        EXPECT_EQ(manager.RegisterApplicationShortcut("A", 1, [&](int32_t) { ++count; }), 0);
+        manager.UnregisterApplicationShortcut(id);
+        EXPECT_FALSE(manager.TryTriggerApplicationShortcut(event, container->GetInstanceId()));
+        EXPECT_EQ(count, 0);
+        container->SetIsFormRender(false);
+        container->SetIsDynamicRender(false);
+        EXPECT_TRUE(manager.TryTriggerApplicationShortcut(event, container->GetInstanceId()));
+        EXPECT_EQ(count, 1);
+        manager.UnregisterApplicationShortcut(id);
+    }
+    container->SetIsFormRender(wasForm);
+    container->SetIsDynamicRender(wasDynamic);
+}
+
 } // namespace OHOS::Ace
