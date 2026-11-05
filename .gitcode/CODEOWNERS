@@ -3691,6 +3691,7 @@ test/unittest/core/pattern/form/mock/ @form_framework
 test/unittest/core/pattern/form_link/ @form_framework
 test/unittest/core/pattern/gauge/ @huawei_g_five
 test/unittest/core/pattern/grid/ @arkuiscroll
+test/unittest/core/pattern/grid/grid_scroll_placeholder_test_ng.cpp @arkuiscroll
 test/unittest/core/pattern/grid/irregular/ @arkuiscroll
 test/unittest/core/pattern/grid_col/ @arkuilayout1
 test/unittest/core/pattern/grid_container/ @arkuilayout1
@@ -3803,6 +3804,7 @@ test/unittest/core/pattern/union_effect_container/ @arkuicodepulse
 test/unittest/core/pattern/video/ @arkuilayout1
 test/unittest/core/pattern/view_context/ @arkuicodepulse
 test/unittest/core/pattern/waterflow/ @arkuiscroll
+test/unittest/core/pattern/waterflow/water_flow_scroll_placeholder_test_ng.cpp @arkuiscroll
 test/unittest/core/pattern/web/ @arkweb-committer-group
 test/unittest/core/pattern/withtheme/ @arkui_framework_resource
 test/unittest/core/pattern/xcomponent/ @ArkUI_ability_group

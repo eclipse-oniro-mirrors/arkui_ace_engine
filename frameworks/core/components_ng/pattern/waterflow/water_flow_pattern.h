@@ -16,6 +16,16 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_WATERFLOW_WATER_FLOW_PATTERN_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_WATERFLOW_WATER_FLOW_PATTERN_H
 
+#include <list>
+#include <map>
+#include <optional>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_manager.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_types.h"
 #include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
 #include "core/components_ng/pattern/waterflow/layout/water_flow_layout_algorithm_base.h"
@@ -34,6 +44,70 @@ class ACE_EXPORT WaterFlowPattern : public ScrollablePattern {
 
 public:
     ~WaterFlowPattern() override;
+
+    // FEAT scroll placeholder: the per-item provider, enable flag and host
+    // generation are owned by the pattern (never written into the clonable
+    // layout property); a null provider resets the capability.
+    void SetScrollPlaceholder(ScrollPlaceholderProvider&& provider);
+    bool IsScrollPlaceholderEnabled() const
+    {
+        return scrollPlaceholderProvider_ != nullptr;
+    }
+    const ScrollPlaceholderProvider& GetScrollPlaceholderProvider() const
+    {
+        return scrollPlaceholderProvider_;
+    }
+    void ResetScrollPlaceholder();
+
+    // ---- Component call-site placeholder replacement (ADR-2/ADR-7, 2026-10-12) ----
+    // An item whose real build got deferred shows a placeholder shell mounted as a
+    // direct child of the WaterFlow host — never inside any LazyForEach/Repeat
+    // cache (syntax layer untouched), and never on the footer children (footer
+    // stays outside the placeholder selection by design). All methods run on the
+    // UI thread only. The three layout algorithms (sliding-window / top-down /
+    // segmented) share this single adapter: the substitution funnel is
+    // WaterFlowLayoutUtils::GetWaterFlowItem, so the scheduling logic never
+    // forks per algorithm.
+    struct ScrollPlaceholderItemInfo {
+        RefPtr<FrameNode> shell;
+        std::string templateId;
+        uint64_t templateGen = 0;
+    };
+    // Decision + acquire + mount + framed enqueue at the child build call point.
+    // Returns the mounted shell when this index is deferred to a placeholder,
+    // null when the caller should keep the existing (build-real) acquisition.
+    // A deferred index is also recorded in the manager's deferral table, so the
+    // acquisition itself (FrameProxy::GetFrameNodeByIndex) substitutes the shell.
+    RefPtr<FrameNode> CreateScrollPlaceholderShell(int32_t index);
+    // Decision-side entry invoked from the layout fill loop right before the normal
+    // child acquisition: predicts with the remaining frame budget and, on defer,
+    // mounts the shell and records the deferral. The wrapper substitution itself is
+    // NOT done here — the acquisition below flows through FrameProxy, which resolves
+    // the recorded deferral, so skip-flag inheritance and activation match real items.
+    void PrepareScrollPlaceholderForAcquisition(int32_t index);
+    bool HasScrollPlaceholderItem(int32_t index) const;
+    // Live shell of a deferred index for the layout-time item lookup: the plain
+    // host index walk resolves through the lazy syntax nodes only and cannot
+    // see a mounted shell (zero frame count), so the layout positioning phase
+    // asks the pattern's own table. Null when no shell is live at the index.
+    RefPtr<FrameNode> GetScrollPlaceholderShell(int32_t index) const
+    {
+        auto iter = scrollPlaceholderItems_.find(index);
+        return iter != scrollPlaceholderItems_.end() ? iter->second.shell : nullptr;
+    }
+    // Real-build closure executed by the pipeline framed flush: builds the real
+    // item through the existing build-style acquisition (syntax path as-is),
+    // then requests the local remeasure that completes the replacement.
+    bool CommitScrollPlaceholderRealBuild(int32_t index);
+    // Layout-round reconcile: drops placeholders whose index already holds a real
+    // child or fell out of range, and retires shells whose real item was committed
+    // (removed from the host and the template content returned to the pool).
+    void ReconcileScrollPlaceholderItems();
+    // Defensive sweep: retires mounted shells that neither placeholder table tracks
+    // anymore, so a bookkeeping miss can never leave a shell on the tree (index-based
+    // cleanup can not see shells by design — zero frame count).
+    void SweepOrphanPlaceholderShells();
+
     void OnDetachFromMainTree() override;
 
     bool UpdateCurrentOffset(float delta, int32_t source) override;
@@ -285,6 +359,20 @@ private:
     void InitOnKeyEvent();
     bool OnKeyEvent(const KeyEvent& event);
     bool OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config) override;
+    bool OnScrollCallback(float offset, int32_t source) override;
+
+    // Scroll placeholder per-host state (see the public ADR-2/ADR-7 block): the
+    // scroll-activity window gates prediction to scroll time only.
+    std::optional<ScrollPlaceholderOptions> PredictScrollPlaceholderDefer(
+        const RefPtr<ScrollPlaceholderManager>& manager, const RefPtr<FrameNode>& host, int32_t index);
+    void RetireScrollPlaceholderShell(const RefPtr<FrameNode>& shell, const std::string& templateId);
+    // Drops queued real-build tasks (and their mounted shells) for indices outside the
+    // visible window; reports the window to the manager for flush-time banding.
+    void SweepScrollPlaceholderOutOfRange(int32_t start, int32_t end);
+    // Submits the deferred real-build closure for a placeholder item into the
+    // framed UI-thread queue (flushed by the pipeline).
+    void EnqueueScrollPlaceholderRealBuild(const RefPtr<ScrollPlaceholderManager>& manager,
+        const ScrollPlaceholderPredictParams& params, uint64_t templateGen);
     void CheckScrollable();
     bool IsOutOfBoundary(bool useCurrentDelta = true) override;
 
@@ -360,6 +448,17 @@ private:
     std::optional<int32_t> targetIndex_;
     RefPtr<WaterFlowLayoutInfoBase> layoutInfo_ = WaterFlowLayoutInfoBase::Create(LayoutMode::TOP_DOWN);
     RefPtr<WaterFlowSections> sections_;
+
+    // Timestamp of the last scroll callback; 0 = no scroll happened yet.
+    int64_t lastScrollCallbackNs_ = 0;
+    ScrollPlaceholderProvider scrollPlaceholderProvider_;
+    std::map<int32_t, ScrollPlaceholderItemInfo> scrollPlaceholderItems_;
+    std::list<std::pair<RefPtr<FrameNode>, std::string>> retiringPlaceholderShells_;
+    // Every shell this pattern mounted on the host (shell -> its template id), the
+    // single source of truth for the orphan sweep: shells are invisible to index-based
+    // cleanup (zero frame count by design), so retirement bookkeeping misses are
+    // caught here rather than leaking a mounted shell onto the tree.
+    std::map<RefPtr<FrameNode>, std::string> mountedPlaceholderShells_;
 
     double prevOffset_ = 0.0;
     SizeF lastSize_;
