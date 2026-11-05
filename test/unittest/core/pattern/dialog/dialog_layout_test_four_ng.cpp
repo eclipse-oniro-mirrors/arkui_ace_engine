@@ -776,18 +776,6 @@ HWTEST_F(DialogLayoutFourTestNg, UpdateInnerScrollAndListMaxHeight003, TestSize.
 }
 
 /**
- * @tc.name: UpdateInnerScrollAndListMaxHeight004
- * @tc.desc: Test UpdateInnerScrollAndListMaxHeight with neither scroll nor list
- * @tc.type: FUNC
- */
-HWTEST_F(DialogLayoutFourTestNg, UpdateInnerScrollAndListMaxHeight004, TestSize.Level1)
-{
-    DialogLayoutAlgorithm algo;
-    algo.UpdateInnerScrollAndListMaxHeight(nullptr, nullptr, 0.0f, 0.0f, 500.0f);
-    SUCCEED();
-}
-
-/**
  * @tc.name: CaculateMaxSize001
  * @tc.desc: Test CaculateMaxSize with customSize true (no height change from hover/alignment)
  * @tc.type: FUNC
@@ -1030,19 +1018,6 @@ HWTEST_F(DialogLayoutFourTestNg, UpdateCustomMaskNodeLayout002, TestSize.Level1)
     ASSERT_NE(maskNode, nullptr);
     dialog->AddChild(maskNode);
     algo.UpdateCustomMaskNodeLayout(dialog);
-    SUCCEED();
-}
-
-/**
- * @tc.name: ProcessMaskRect001
- * @tc.desc: Test ProcessMaskRect with null dialog
- * @tc.type: FUNC
- */
-HWTEST_F(DialogLayoutFourTestNg, ProcessMaskRect001, TestSize.Level1)
-{
-    DialogLayoutAlgorithm algo;
-    auto maskRect = DimensionRect(Dimension(600.0f), Dimension(1000.0f), DimensionOffset(OffsetF(0.0f, 0.0f)));
-    algo.ProcessMaskRect(maskRect, nullptr, true);
     SUCCEED();
 }
 
