@@ -28,7 +28,8 @@ import { ComponentContentBase_serializer } from './../framework/ComponentContent
 import { CallbackTransformer } from './../CallbackTransformer'
 export enum EmbeddedDpiFollowStrategy {
     FOLLOW_HOST_DPI = 0,
-    FOLLOW_UI_EXTENSION_ABILITY_DPI = 1
+    FOLLOW_UI_EXTENSION_ABILITY_DPI = 1,
+    FOLLOW_HOST_DPI_ALL = 2
 }
 export enum EmbeddedWindowModeFollowStrategy {
     FOLLOW_HOST_WINDOW_MODE = 0,

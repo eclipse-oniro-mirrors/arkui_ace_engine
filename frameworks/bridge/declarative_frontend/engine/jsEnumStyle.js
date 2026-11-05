@@ -132,18 +132,21 @@ let DpiFollowStrategy;
 (function (DpiFollowStrategy) {
   DpiFollowStrategy[DpiFollowStrategy.FOLLOW_HOST_DPI = 0] = 'follow-host-dpi';
   DpiFollowStrategy[DpiFollowStrategy.FOLLOW_UI_EXTENSION_ABILITY_DPI = 1] = 'follow-ui-extension-ability-dpi';
+  DpiFollowStrategy[DpiFollowStrategy.FOLLOW_HOST_DPI_ALL = 2] = 'follow-host-dpi-all';
 })(DpiFollowStrategy || (DpiFollowStrategy = {}));
 
 let EmbeddedDpiFollowStrategy;
 (function (EmbeddedDpiFollowStrategy) {
   EmbeddedDpiFollowStrategy[EmbeddedDpiFollowStrategy.FOLLOW_HOST_DPI = 0] = 'follow-host-dpi';
   EmbeddedDpiFollowStrategy[EmbeddedDpiFollowStrategy.FOLLOW_UI_EXTENSION_ABILITY_DPI = 1] = 'follow-ui-extension-ability-dpi';
+  EmbeddedDpiFollowStrategy[EmbeddedDpiFollowStrategy.FOLLOW_HOST_DPI_ALL = 2] = 'follow-host-dpi-all';
 })(EmbeddedDpiFollowStrategy || (EmbeddedDpiFollowStrategy = {}));
 
 let SecurityDpiFollowStrategy;
 (function (SecurityDpiFollowStrategy) {
   SecurityDpiFollowStrategy[SecurityDpiFollowStrategy.FOLLOW_HOST_DPI = 0] = 'follow-host-dpi';
   SecurityDpiFollowStrategy[SecurityDpiFollowStrategy.FOLLOW_UI_EXTENSION_ABILITY_DPI = 1] = 'follow-ui-extension-ability-dpi';
+  SecurityDpiFollowStrategy[SecurityDpiFollowStrategy.FOLLOW_HOST_DPI_ALL = 2] = 'follow-host-dpi-all';
 })(SecurityDpiFollowStrategy || (SecurityDpiFollowStrategy = {}));
 
 let PreviewDpiFollowStrategy;

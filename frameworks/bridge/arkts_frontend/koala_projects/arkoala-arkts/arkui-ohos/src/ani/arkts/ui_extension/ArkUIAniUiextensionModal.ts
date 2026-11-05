@@ -38,7 +38,7 @@ export class ArkUIAniUIExtensionOptions {
     constructor() {
         this.isTransferringCaller = false;
         this.isWindowModeFollowHost = false;
-        this.dpiFollowStrategy = 0;
+        this.dpiFollowStrategy = -1; // Unset; inherit the host strategy unless explicitly configured.
         this.initPlaceholder = 0;
         this.undefinedPlaceholder = 0;
         this.rotationPlaceholder = 0;
