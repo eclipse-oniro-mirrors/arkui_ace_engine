@@ -644,6 +644,16 @@ void FocusHub::LostFocus(BlurReason reason)
         " lost focus. Lost reason: %{public}d.",
         GetFrameName().c_str(), SEC_PARAM(GetFrameId()), reason);
     if (IsCurrentFocus()) {
+        auto focusManager = GetFocusManager();
+        if (focusManager && !focusManager->GetIsSwitchingFocus().value_or(false) &&
+            (reason == BlurReason::FOCUS_SWITCH || reason == BlurReason::VIEW_SWITCH ||
+                reason == BlurReason::BACK_TO_TABSTOP)) {
+            auto switching = focusManager->GetIsSwitchingFocus();
+            TAG_LOGW(AceLogTag::ACE_FOCUS, "LostFocus outside FocusSwitch, %{public}s/" SEC_PLD(%{public}d)
+                " blur by %{public}d, switching has_value:%{public}d, no FocusSwitch end will be emitted",
+                GetFrameName().c_str(), SEC_PARAM(GetFrameId()), static_cast<int32_t>(reason),
+                switching.has_value());
+        }
         blurReason_ = reason;
         currentFocus_ = false;
         OnBlur();
