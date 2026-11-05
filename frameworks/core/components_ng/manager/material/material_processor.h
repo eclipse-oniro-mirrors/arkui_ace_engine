@@ -18,7 +18,6 @@
 
 #include <map>
 
-#include <mutex>
 #include "base/memory/ace_type.h"
 
 namespace OHOS::Ace::NG {
@@ -69,7 +68,6 @@ private:
     std::map<int32_t, WeakPtr<FrameNode>> materialNodes_;
 
     std::map<int32_t, WeakPtr<FrameNode>> pageContextStats_;
-    std::mutex pageContextMutex_;
 };
 
 } // namespace OHOS::Ace::NG

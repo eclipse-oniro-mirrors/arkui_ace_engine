@@ -154,7 +154,6 @@ private:
     std::map<StatisticEventType, StatisticEventInfo> concurrentEventMap_;
     std::vector<MaterialStatisticEventInfo> pendingMaterialEvents_;
     std::mutex concurrentMutex_;
-    std::mutex materialMutex_;
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMMON_STATISTIC_EVENT_REPORTRE_H

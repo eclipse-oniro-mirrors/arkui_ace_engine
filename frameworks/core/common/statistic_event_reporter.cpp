@@ -266,7 +266,6 @@ std::vector<MaterialStatisticEventInfo> StatisticEventReporter::TryReportMateria
 {
     std::vector<MaterialStatisticEventInfo> materialEvents;
     {
-        std::lock_guard<std::mutex> lock(materialMutex_);
         if (pendingMaterialEvents_.size() < MAX_PENDING_MATERIAL_EVENT_COUNT) {
             return materialEvents;
         }
@@ -301,7 +300,6 @@ void StatisticEventReporter::ForceReportMaterialEvents()
 {
     std::vector<MaterialStatisticEventInfo> materialEvents;
     {
-        std::lock_guard<std::mutex> lock(materialMutex_);
         if (pendingMaterialEvents_.empty()) {
             return;
         }
@@ -312,7 +310,6 @@ void StatisticEventReporter::ForceReportMaterialEvents()
 
 void StatisticEventReporter::SendMaterialNodeStat(const RichMaterialNodeStatData& data)
 {
-    std::lock_guard<std::mutex> lock(materialMutex_);
     if (pendingMaterialEvents_.size() > MAX_PENDING_MATERIAL_EVENT_COUNT) {
         return;
     }
@@ -324,7 +321,6 @@ void StatisticEventReporter::SendMaterialNodeStat(const RichMaterialNodeStatData
 
 void StatisticEventReporter::SendOverlayMaterialArea(const RichOverlayMaterialAreaData& data)
 {
-    std::lock_guard<std::mutex> lock(materialMutex_);
     if (pendingMaterialEvents_.size() > MAX_PENDING_MATERIAL_EVENT_COUNT) {
         return;
     }
