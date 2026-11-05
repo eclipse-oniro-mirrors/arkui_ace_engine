@@ -455,20 +455,6 @@ void ResetOnZoomChangeCallBack(ArkUINodeHandle node)
     WebModelNG::SetOnZoomChange(frameNode, nullptr);
 }
 
-void SetVisitedLinkPersistEnabled(ArkUINodeHandle node, ArkUI_Bool value)
-{
-    auto* frameNode = reinterpret_cast<FrameNode*>(node);
-    CHECK_NULL_VOID(frameNode);
-    WebModelNG::SetVisitedLinkPersistEnabled(frameNode, value);
-}
-
-void ResetVisitedLinkPersistEnabled(ArkUINodeHandle node)
-{
-    auto* frameNode = reinterpret_cast<FrameNode*>(node);
-    CHECK_NULL_VOID(frameNode);
-    WebModelNG::SetVisitedLinkPersistEnabled(frameNode, DEFAULT_VISITED_LINK_PERSIST_ENABLED);
-}
-
 void SetOnRequestSelectedCallBack(ArkUINodeHandle node, void* extraParam)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -2777,6 +2763,20 @@ void ResetFlingSpeedLimit(ArkUINodeHandle node)
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
     WebModelNG::SetFlingSpeedLimit(frameNode, DEFAULT_FLING_SPEED_LIMIT);
+}
+
+void SetVisitedLinkPersistEnabled(ArkUINodeHandle node, ArkUI_Bool value)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetVisitedLinkPersistEnabled(frameNode, value);
+}
+
+void ResetVisitedLinkPersistEnabled(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetVisitedLinkPersistEnabled(frameNode, DEFAULT_VISITED_LINK_PERSIST_ENABLED);
 }
 
 void SetBackToTop(ArkUINodeHandle node, ArkUI_Bool value)
