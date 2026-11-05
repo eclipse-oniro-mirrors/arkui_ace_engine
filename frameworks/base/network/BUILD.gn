@@ -17,6 +17,9 @@ import("//foundation/arkui/ace_engine/ace_config.gni")
 ohos_shared_library("ace_network") {
   sources = [ "download_manager_impl.cpp" ]
   configs = [ "$ace_root:ace_config" ]
+  if (is_ohos) {
+    version_script = "$ace_root/build/libace_network.map"
+  }
   external_deps = [
     "curl:curl_shared",
     "hilog:libhilog",
