@@ -1401,6 +1401,34 @@ void TabsPattern::DumpInfo()
 {
     DumpLog::GetInstance().AddDesc(std::string("isBindonContentDidScroll: ")
             .append((onContentDidScroll_ && *onContentDidScroll_) ? "true" : "false"));
+    // animationDuration: the user-set tab-switch animation duration (ms). Read-only — do NOT call
+    // UpdateAnimationDuration() here (it mutates animationDuration_ + SwiperPaintProperty and triggers
+    // dirty when unset; DumpInfo must be an observe-only path). value_or(0) shows 0 when not explicitly
+    // set (the effective default 300 is resolved at runtime, not in the dump).
+    auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
+    CHECK_NULL_VOID(tabsNode);
+    auto tabBarNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
+    CHECK_NULL_VOID(tabBarNode);
+    auto tabBarPattern = tabBarNode->GetPattern<TabBarPattern>();
+    CHECK_NULL_VOID(tabBarPattern);
+    DumpLog::GetInstance().AddDesc(
+        std::string("animationDuration: ").append(
+            std::to_string(tabBarPattern->GetAnimationDuration().value_or(0))));
+    // animationMode reflects TabAnimateMode. NO_ANIMATION here means the animateMode disables the
+    // tab-switch animation (distinct from the AnimationCurve.NO_ANIMATION enum, which does not apply
+    // to TabsController::ChangeIndex). Matches the inspector JSON 'animationMode' field.
+    static auto animateModeStr = [](TabAnimateMode mode) -> const char* {
+        switch (mode) {
+            case TabAnimateMode::CONTENT_FIRST: return "AnimationMode.CONTENT_FIRST";
+            case TabAnimateMode::ACTION_FIRST: return "AnimationMode.ACTION_FIRST";
+            case TabAnimateMode::NO_ANIMATION: return "AnimationMode.NO_ANIMATION";
+            case TabAnimateMode::CONTENT_FIRST_WITH_JUMP: return "AnimationMode.CONTENT_FIRST_WITH_JUMP";
+            case TabAnimateMode::ACTION_FIRST_WITH_JUMP: return "AnimationMode.ACTION_FIRST_WITH_JUMP";
+            default: return "AnimationMode.UNKNOWN";
+        }
+    };
+    DumpLog::GetInstance().AddDesc(
+        std::string("animationMode: ").append(animateModeStr(GetAnimateMode())));
 }
 
 RefPtr<LayoutAlgorithm> TabsPattern::CreateLayoutAlgorithm()
