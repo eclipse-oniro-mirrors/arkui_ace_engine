@@ -305,7 +305,7 @@ class RecoverableStorageImpl extends StorageHelper {
         parsed.instances === null || typeof parsed.instances !== 'object') {
         throw new Error('invalid recoverableStorage section structure');
       }
-      const values: any = parsed.instances[String(instanceId)];
+      const values = parsed.instances[String(instanceId)] as Record<string, unknown>;
       if (values === null || typeof values !== 'object') {
         // section valid but nothing for this instance: nothing to inject
         return;
@@ -313,7 +313,7 @@ class RecoverableStorageImpl extends StorageHelper {
       const section: Map<string, string> = new Map<string, string>();
       for (const key of Object.keys(values)) {
         if (typeof values[key] === 'string') {
-          section.set(key, values[key]);
+          section.set(key, values[key] as string);
         }
       }
       if (section.size > 0) {
@@ -385,10 +385,10 @@ class RecoverableStorageImpl extends StorageHelper {
       return undefined;
     }
     if (!section.has(key)) {
-      return undefined;  // key absent from section: normal cold-start path (default creator)
+      return undefined; // key absent from section: normal cold-start path (default creator)
     }
     const text: string = section.get(key);
-    section.delete(key);  // INV-4: read-once, regardless of outcome
+    section.delete(key); // INV-4: read-once, regardless of outcome
     if (section.size === 0) {
       this.restored_.delete(instanceId);
     }

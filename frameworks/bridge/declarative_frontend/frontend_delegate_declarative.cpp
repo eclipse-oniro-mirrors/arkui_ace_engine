@@ -3742,7 +3742,7 @@ std::string GetRecoverableStorageSection(
     if (taskExecutor) {
         taskExecutor->PostSyncTask([&callback, &section, instanceId] {
             callback(instanceId, section);
-        }, TaskExecutor::TaskType::JS, "ArkUIRecoverableStorageSnapshot");
+            }, TaskExecutor::TaskType::JS, "ArkUIRecoverableStorageSnapshot");
     }
     return section;
 }
@@ -3758,7 +3758,7 @@ void DeliverRecoverableStorageSection(
     if (taskExecutor) {
         taskExecutor->PostSyncTask([&callback, &section, instanceId] {
             callback(instanceId, section);
-        }, TaskExecutor::TaskType::JS, "ArkUIRecoverableStorageRestore");
+            }, TaskExecutor::TaskType::JS, "ArkUIRecoverableStorageRestore");
     }
 }
 
