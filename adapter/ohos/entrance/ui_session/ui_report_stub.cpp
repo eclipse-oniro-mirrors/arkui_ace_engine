@@ -355,7 +355,10 @@ int32_t UiReportStub::OnRemoteRequest(uint32_t code, MessageParcel& data, Messag
         }
         case SEND_CONTENT_CHANGE: {
             ChangeType type = static_cast<ChangeType>(data.ReadInt32());
-            std::string simpleTree = data.ReadString();
+            std::string simpleTree;
+            if (!UiSessionIpcUtil::ReadLargeString(data, simpleTree, "SendContentChange")) {
+                break;
+            }
             SendContentChange(type, simpleTree);
             break;
         }
