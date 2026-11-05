@@ -73,6 +73,18 @@ void ApplicationShortcutManager::UnregisterApplicationShortcut(int32_t registrat
     }
 }
 
+void ApplicationShortcutManager::RemoveApplicationShortcutsForCleanup(const std::vector<int32_t>& registrationIds)
+{
+    std::vector<std::map<int32_t, ApplicationKeyboardShortcut>::node_type> removed;
+    {
+        std::lock_guard<std::mutex> lock(applicationShortcutMutex_);
+        for (auto id : registrationIds) {
+            removed.emplace_back(applicationKeyboardShortcuts_.extract(id));
+        }
+    }
+    // Release frontend resources outside the registry lock.
+}
+
 static uint8_t GetEventModifierKeys(const KeyEvent& event)
 {
     uint8_t modifiers = 0;

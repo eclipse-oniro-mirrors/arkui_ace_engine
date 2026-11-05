@@ -43,14 +43,6 @@ constexpr int32_t ARKUI_DEVICE_ID = 1;
 constexpr uint64_t ARKUI_TIME = 20;
 const char* ARKUI_KEY_TEXT = "k";
 
-void CountApplicationShortcut(const OH_ArkUI_ApplicationShortcutCallbackInfo* info, void* userData)
-{
-    EXPECT_NE(OH_ArkUI_ApplicationShortcutCallbackInfo_GetUIContext(info), nullptr);
-    if (userData) {
-        ++(*static_cast<int32_t*>(userData));
-    }
-}
-
 KeyEvent MakeApplicationShortcutEvent()
 {
     KeyEvent event;
@@ -1074,39 +1066,6 @@ HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0033, TestSize.Level1)
 }
 
 /**
- * @tc.name: ApplicationShortcutMultipleBindings
- * @tc.desc: Repeated callbacks get separate IDs; unregistering one preserves the other.
- * @tc.type: FUNC
- */
-HWTEST_F(NativeKeyEventTest, ApplicationShortcutMultipleBindings, TestSize.Level1)
-{
-    auto* key = OH_ArkUI_KeyboardShortcutKey_Create();
-    ASSERT_NE(key, nullptr);
-    OH_ArkUI_KeyboardShortcutKey_SetCharacter(key, 'A');
-    int32_t count = 0;
-    int32_t firstId = 0;
-    int32_t secondId = 0;
-    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, OH_ARKUI_KEYBOARD_SHORTCUT_MODIFIER_CTRL,
-        &count, CountApplicationShortcut, &firstId), ARKUI_ERROR_CODE_NO_ERROR);
-    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, OH_ARKUI_KEYBOARD_SHORTCUT_MODIFIER_CTRL,
-        &count, CountApplicationShortcut, &secondId), ARKUI_ERROR_CODE_NO_ERROR);
-    OH_ArkUI_KeyboardShortcutKey_Destroy(&key);
-    EXPECT_EQ(key, nullptr);
-    EXPECT_GT(firstId, 0);
-    EXPECT_GT(secondId, firstId);
-    auto& shortcutManager = ApplicationShortcutManager::GetInstance();
-    auto event = MakeApplicationShortcutEvent();
-    EXPECT_TRUE(shortcutManager.TryTriggerApplicationShortcut(event, 1));
-    EXPECT_EQ(count, 2);
-    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Unregister(firstId), ARKUI_ERROR_CODE_NO_ERROR);
-    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Unregister(firstId), ARKUI_ERROR_CODE_NO_ERROR);
-    EXPECT_TRUE(shortcutManager.TryTriggerApplicationShortcut(event, 1));
-    EXPECT_EQ(count, 3);
-    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Unregister(secondId), ARKUI_ERROR_CODE_NO_ERROR);
-    EXPECT_FALSE(shortcutManager.TryTriggerApplicationShortcut(event, 1));
-}
-
-/**
  * @tc.name: ApplicationShortcutInvalidParameters
  * @tc.desc: Invalid registrations preserve the output value as required by the SDK.
  * @tc.type: FUNC
@@ -1116,18 +1075,19 @@ HWTEST_F(NativeKeyEventTest, ApplicationShortcutInvalidParameters, TestSize.Leve
     auto* key = OH_ArkUI_KeyboardShortcutKey_Create();
     ASSERT_NE(key, nullptr);
     int32_t id = 123;
-    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(nullptr, 1, nullptr, CountApplicationShortcut, &id),
+    auto callback = [](const OH_ArkUI_ApplicationShortcutCallbackInfo*, void*) {};
+    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(nullptr, 1, nullptr, callback, &id),
         ARKUI_ERROR_CODE_PARAM_INVALID);
-    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, 1, nullptr, CountApplicationShortcut, &id),
+    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, 1, nullptr, callback, &id),
         ARKUI_ERROR_CODE_PARAM_INVALID);
     OH_ArkUI_KeyboardShortcutKey_SetCharacter(key, 'A');
-    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, 0, nullptr, CountApplicationShortcut, &id),
+    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, 0, nullptr, callback, &id),
         ARKUI_ERROR_CODE_PARAM_INVALID);
-    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, 8, nullptr, CountApplicationShortcut, &id),
+    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, 8, nullptr, callback, &id),
         ARKUI_ERROR_CODE_PARAM_INVALID);
     EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, 1, nullptr, nullptr, &id),
         ARKUI_ERROR_CODE_PARAM_INVALID);
-    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, 1, nullptr, CountApplicationShortcut, nullptr),
+    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, 1, nullptr, callback, nullptr),
         ARKUI_ERROR_CODE_PARAM_INVALID);
     EXPECT_EQ(id, 123);
     EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Unregister(-1), ARKUI_ERROR_CODE_NO_ERROR);

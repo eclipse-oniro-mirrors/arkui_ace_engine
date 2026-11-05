@@ -17,6 +17,7 @@
 #define FOUNDATION_ACE_INTERFACES_NAPI_KITS_APPLICATION_SHORTCUT_JS_APPLICATION_SHORTCUT_H
 
 #include <string>
+#include <thread>
 
 #include "interfaces/napi/kits/utils/napi_utils.h"
 
@@ -25,7 +26,10 @@ namespace OHOS::Ace::Napi {
 class ApplicationShortcutCallback {
 public:
     ApplicationShortcutCallback(napi_env env, napi_value callback);
-    ~ApplicationShortcutCallback();
+    ~ApplicationShortcutCallback() = default;
+
+    void Detach();
+    bool IsValid() const;
 
     void Execute(int32_t triggerInstanceId);
     bool NapiEqual(napi_env env, napi_value cb);
@@ -33,6 +37,7 @@ public:
 private:
     void ExecuteInner(int32_t triggerInstanceId);
 
+    const std::thread::id ownerThread_ = std::this_thread::get_id();
     napi_env env_ = nullptr;
     napi_ref callback_ = nullptr;
 };

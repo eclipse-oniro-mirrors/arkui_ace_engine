@@ -17,6 +17,9 @@
 
 #include <cmath>
 #include <limits>
+#include <map>
+#include <memory>
+#include <vector>
 
 #include "base/log/log_wrapper.h"
 #include "core/common/application_shortcut.h"
@@ -37,6 +40,98 @@ constexpr size_t ARG_INDEX_TWO = 2;
 constexpr size_t STR_BUFFER_SIZE = 1024;
 constexpr const char* PROPERTY_UICONTEXT = "uiContext";
 constexpr const char* CALLBACK_TAG = "ArkUIAppShortcut";
+
+// Accessed only by the owning env thread. Keep references here until they can be
+// released on that thread, even if another thread drops the last dispatch snapshot.
+class ApplicationShortcutEnv final {
+public:
+    explicit ApplicationShortcutEnv(napi_env env) : env_(env) {}
+
+    napi_env GetEnv() const
+    {
+        return env_;
+    }
+
+    int32_t Register(napi_env env, napi_value value, const std::string& key, uint8_t keys)
+    {
+        CollectRetiredCallbacks();
+        auto callback = std::make_shared<ApplicationShortcutCallback>(env, value);
+        if (closing_ || !callback->IsValid()) {
+            callback->Detach();
+            return 0;
+        }
+        auto id = ApplicationShortcutManager::GetInstance().RegisterApplicationShortcut(
+            key, keys, [callback](int32_t instanceId) { callback->Execute(instanceId); });
+        if (id == 0) {
+            callback->Detach();
+            return 0;
+        }
+        callbacks_.emplace(id, std::move(callback));
+        return id;
+    }
+
+    void CollectRetiredCallbacks()
+    {
+        for (auto it = callbacks_.begin(); it != callbacks_.end();) {
+            // The registry and any in-flight snapshot have released this callback.
+            if (it->second.use_count() == 1) {
+                it->second->Detach();
+                it = callbacks_.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
+    void Close()
+    {
+        closing_ = true;
+        std::vector<int32_t> ids;
+        for (const auto& [id, callback] : callbacks_) {
+            // Detach before removing registrations: snapshots may still hold them.
+            callback->Detach();
+            ids.emplace_back(id);
+        }
+        ApplicationShortcutManager::GetInstance().RemoveApplicationShortcutsForCleanup(ids);
+        callbacks_.clear();
+    }
+
+private:
+    napi_env env_ = nullptr;
+    bool closing_ = false;
+    std::map<int32_t, std::shared_ptr<ApplicationShortcutCallback>> callbacks_;
+};
+
+// The cleanup hook drains this registry while env is valid. No NAPI calls are
+// made by C++ destructors, including thread-local or process teardown.
+thread_local std::map<napi_env, std::unique_ptr<ApplicationShortcutEnv>> shortcutEnvs;
+
+void CleanupApplicationShortcutEnv(void* data)
+{
+    auto* state = static_cast<ApplicationShortcutEnv*>(data);
+    auto it = shortcutEnvs.find(state->GetEnv());
+    if (it == shortcutEnvs.end()) {
+        return;
+    }
+    it->second->Close();
+    shortcutEnvs.erase(it);
+}
+
+ApplicationShortcutEnv* GetApplicationShortcutEnv(napi_env env)
+{
+    auto it = shortcutEnvs.find(env);
+    if (it != shortcutEnvs.end()) {
+        return it->second.get();
+    }
+    auto state = std::make_unique<ApplicationShortcutEnv>(env);
+    if (napi_add_env_cleanup_hook(env, CleanupApplicationShortcutEnv, state.get()) != napi_ok) {
+        LOGE("Failed to register application shortcut environment cleanup");
+        return nullptr;
+    }
+    auto* result = state.get();
+    shortcutEnvs.emplace(env, std::move(state));
+    return result;
+}
 } // namespace
 
 ApplicationShortcutCallback::ApplicationShortcutCallback(napi_env env, napi_value callback)
@@ -47,17 +142,27 @@ ApplicationShortcutCallback::ApplicationShortcutCallback(napi_env env, napi_valu
     }
 }
 
-ApplicationShortcutCallback::~ApplicationShortcutCallback()
+void ApplicationShortcutCallback::Detach()
 {
+    if (std::this_thread::get_id() != ownerThread_) {
+        LOGE("Application shortcut references must be released on their owning thread");
+        return;
+    }
     if (callback_ != nullptr && env_ != nullptr) {
         napi_delete_reference(env_, callback_);
-        callback_ = nullptr;
     }
+    callback_ = nullptr;
+    env_ = nullptr;
+}
+
+bool ApplicationShortcutCallback::IsValid() const
+{
+    return std::this_thread::get_id() == ownerThread_ && env_ != nullptr && callback_ != nullptr;
 }
 
 bool ApplicationShortcutCallback::NapiEqual(napi_env env, napi_value cb)
 {
-    CHECK_NULL_RETURN(callback_, false);
+    CHECK_NULL_RETURN(IsValid(), false);
     CHECK_NULL_RETURN(cb, false);
     napi_value stored = nullptr;
     napi_get_reference_value(env_, callback_, &stored);
@@ -71,6 +176,9 @@ bool ApplicationShortcutCallback::NapiEqual(napi_env env, napi_value cb)
 
 void ApplicationShortcutCallback::Execute(int32_t triggerInstanceId)
 {
+    if (!IsValid()) {
+        return;
+    }
     // UI thread and JS thread are the same in declarative frontends
     // (ace_container.cpp sets jsRunner_ = uiRunner_ via InitJsThread(false)),
     // so Execute() is already on the trigger instance's JS thread when invoked
@@ -132,6 +240,7 @@ void ApplicationShortcutCallback::ExecuteInner(int32_t triggerInstanceId)
 
     napi_close_handle_scope(env_, scope);
 }
+
 
 static bool ParseShortcutValue(napi_env env, napi_value arg, std::string& outValue)
 {
@@ -245,9 +354,9 @@ static napi_value JSRegisterApplicationShortcut(napi_env env, napi_callback_info
         return result;
     }
 
-    auto callback = std::make_shared<ApplicationShortcutCallback>(env, argv[ARG_INDEX_TWO]);
-    const auto registrationId = ApplicationShortcutManager::GetInstance().RegisterApplicationShortcut(
-        value, keys, [callback](int32_t triggerInstanceId) { callback->Execute(triggerInstanceId); });
+    auto* state = GetApplicationShortcutEnv(env);
+    CHECK_NULL_RETURN(state, result);
+    const auto registrationId = state->Register(env, argv[ARG_INDEX_TWO], value, keys);
     if (registrationId == 0) {
         LOGE("Application shortcut registration failed");
         return result;
@@ -277,6 +386,10 @@ static napi_value JSUnregisterApplicationShortcut(napi_env env, napi_callback_in
         return nullptr;
     }
     ApplicationShortcutManager::GetInstance().UnregisterApplicationShortcut(static_cast<int32_t>(registrationId));
+    // Collect only on the owning thread; snapshots retain their normal event semantics.
+    for (const auto& [ownerEnv, state] : shortcutEnvs) {
+        state->CollectRetiredCallbacks();
+    }
 
     napi_value result = nullptr;
     napi_get_undefined(env, &result);

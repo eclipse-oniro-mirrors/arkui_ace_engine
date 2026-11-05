@@ -21,6 +21,7 @@
 #include <map>
 #include <mutex>
 #include <string>
+#include <vector>
 
 #include "base/utils/macros.h"
 #include "base/utils/noncopyable.h"
@@ -36,6 +37,9 @@ public:
         std::function<void(int32_t)>&& onKeyboardShortcutAction);
 
     void UnregisterApplicationShortcut(int32_t registrationId);
+
+    // Internal lifecycle cleanup must not depend on the current container/render mode.
+    void RemoveApplicationShortcutsForCleanup(const std::vector<int32_t>& registrationIds);
 
     bool TryTriggerApplicationShortcut(const KeyEvent& event, int32_t triggerInstanceId);
 
