@@ -2060,15 +2060,11 @@ class SimpleSegmentButtonV2 extends ViewV2 {
     this.layoutAlgorithm = new SegmentButtonV2LayoutAlgorithm();
     this.selectedItemOffsetX = 0;
     this.resetComputed('normalizedSelectedIndex');
-    this.resetComputed('selectedItemRect');
     this.resetMonitorsOnReuse();
   }
   get normalizedSelectedIndex() {
     const items = this.getItems();
     return normalize(this.selectedIndex, 0, items.length - 1);
-  }
-  get selectedItemRect() {
-    return this.itemRects[this.normalizedSelectedIndex];
   }
   getFocusPriority(repeatItem) {
     return this.normalizedSelectedIndex === repeatItem.index ? FocusPriority.PREVIOUS : FocusPriority.AUTO;
@@ -2619,7 +2615,6 @@ __decorate([
 ], SimpleSegmentButtonV2.prototype, 'onInteractionConfigChange', null);
 __decorate([Local], SimpleSegmentButtonV2.prototype, 'followingDragActive', void 0);
 __decorate([Computed], SimpleSegmentButtonV2.prototype, 'normalizedSelectedIndex', null);
-__decorate([Computed], SimpleSegmentButtonV2.prototype, 'selectedItemRect', null);
 const multiplyCapsuleTheme = {
   itemBorderRadius: {
     id: 125834846,
@@ -3789,7 +3784,7 @@ export default {
 
 class SegmentButtonV2LayoutAlgorithm extends CustomLayoutAlgorithm {
   constructor() {
-    super(...arguments);
+    super();
     this.selectedIndex = 0;
     this.itemRects = new Map();
   }
@@ -3803,7 +3798,7 @@ class SegmentButtonV2LayoutAlgorithm extends CustomLayoutAlgorithm {
     return this.itemRects.get(index);
   }
   onMeasure(self, constraint) {
-    const content = self.getChild(2);
+    const content = self.getChild(SegmentButtonV2LayoutAlgorithm.CONTENT_LAYER_CHILD_INDEX);
     if (!content) {
       self.setMeasuredSize({ width: 0, height: 0 });
       return;
@@ -3813,18 +3808,18 @@ class SegmentButtonV2LayoutAlgorithm extends CustomLayoutAlgorithm {
     const selectedIndex = normalize(this.selectedIndex, 0, content.getChildrenCount() - 1);
     const selected = selectedIndex >= 0 ? content.getChild(selectedIndex) : undefined;
     const selectedSize = selected ? selected.getMeasuredSize() : { width: 0, height: 0 };
-    const effect = self.getChild(0);
+    const effect = self.getChild(SegmentButtonV2LayoutAlgorithm.EFFECT_LAYER_CHILD_INDEX);
     if (effect) {
       effect.measure({ maxSize: size, minSize: size, percentReference: size });
     }
-    const backplate = self.getChild(1);
+    const backplate = self.getChild(SegmentButtonV2LayoutAlgorithm.BACKPLATE_LAYER_CHILD_INDEX);
     if (backplate) {
       backplate.measure({ maxSize: selectedSize, minSize: selectedSize, percentReference: selectedSize });
     }
     self.setMeasuredSize(size);
   }
   onLayout(self, position) {
-    const content = self.getChild(2);
+    const content = self.getChild(SegmentButtonV2LayoutAlgorithm.CONTENT_LAYER_CHILD_INDEX);
     if (!content) {
       return;
     }
@@ -3838,11 +3833,11 @@ class SegmentButtonV2LayoutAlgorithm extends CustomLayoutAlgorithm {
       }
     }
     this.itemRects = itemRects;
-    const effect = self.getChild(0);
+    const effect = self.getChild(SegmentButtonV2LayoutAlgorithm.EFFECT_LAYER_CHILD_INDEX);
     if (effect) {
       effect.layout({ x: 0, y: 0 });
     }
-    const backplate = self.getChild(1);
+    const backplate = self.getChild(SegmentButtonV2LayoutAlgorithm.BACKPLATE_LAYER_CHILD_INDEX);
     const selectedRect = itemRects.get(normalize(this.selectedIndex, 0, content.getChildrenCount() - 1));
     if (backplate) {
       backplate.layout(selectedRect ? selectedRect.position : { x: 0, y: 0 });
@@ -3850,3 +3845,6 @@ class SegmentButtonV2LayoutAlgorithm extends CustomLayoutAlgorithm {
     self.setLayoutPosition({ x: position.x, y: position.y });
   }
 }
+SegmentButtonV2LayoutAlgorithm.EFFECT_LAYER_CHILD_INDEX = 0;
+SegmentButtonV2LayoutAlgorithm.BACKPLATE_LAYER_CHILD_INDEX = 1;
+SegmentButtonV2LayoutAlgorithm.CONTENT_LAYER_CHILD_INDEX = 2;
