@@ -176,6 +176,7 @@ public:
     MOCK_METHOD(bool, GetIsWideColorGamut, (), (const override));
     MOCK_METHOD(uint32_t, GetInnerColorGamut, (), (const override));
     MOCK_METHOD(void, SetMemoryName, (std::string pixelMapName), (const override));
+    MOCK_METHOD(bool, ReadPixel, (int32_t x, int32_t y, uint32_t& pixel), (const override));
     MOCK_METHOD(uint32_t, GetUniqueId, (), (override));
 };
 class MockCanvasRenderingContext2DModel : public NG::CanvasRenderingContext2DModelNG {

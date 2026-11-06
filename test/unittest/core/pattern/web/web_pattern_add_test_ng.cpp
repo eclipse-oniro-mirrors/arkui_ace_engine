@@ -234,6 +234,10 @@ public:
         return 0;
     }
     void SetMemoryName(std::string pixelMapName) const override {}
+    bool ReadPixel(int32_t x, int32_t y, uint32_t& pixel) const override
+    {
+        return false;
+    }
 };
 
 class NWebDragDataDummy : public NWeb::NWebDragData {

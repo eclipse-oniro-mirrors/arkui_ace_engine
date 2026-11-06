@@ -2506,6 +2506,9 @@ void ImagePattern::DumpOtherInfo()
 {
     DumpLog::GetInstance().AddDesc("---- Image Component (Excluding Layout and Drawing) Other Info Dump ----");
     DumpLog::GetInstance().AddDesc(renderedImageInfo_.ToString());
+    if (image_) {
+        DumpLog::GetInstance().AddDesc(std::string("PixelSamplingDump: ").append(image_->PixelSamplingDump()));
+    }
     syncLoad_ ? DumpLog::GetInstance().AddDesc("syncLoad:true") : DumpLog::GetInstance().AddDesc("syncLoad:false");
     DumpLog::GetInstance().AddDesc(std::string("SystemRecycleImageEnabled:")
             .append(SystemProperties::GetRecycleImageEnabled() ? "true" : "false"));
