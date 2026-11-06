@@ -32,6 +32,7 @@
 #include "core/components_ng/base/view_abstract_model_ng.h"
 #include "core/components_ng/base/view_stack_model.h"
 #include "core/components_ng/pattern/text/span/span_string.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "bridge/declarative_frontend/jsview/js_utils.h"
 #include "bridge/declarative_frontend/jsview/js_popups.h"
 #include "bridge/declarative_frontend/style_string/js_span_string.h"
@@ -2693,6 +2694,17 @@ void JSViewPopups::ParseSheetTitleBarHoverMode(const JSRef<JSVal>& value, NG::Sh
     }
 }
 
+void JSViewPopups::ParseAdaptToHandedness(const JSRef<JSVal>& value, NG::SheetStyle& sheetStyle)
+{
+    if (value->IsNumber()) {
+        auto handnessValue = value->ToNumber<int32_t>();
+        if (handnessValue >= static_cast<int32_t>(NG::HandednessFollowMode::NONE) &&
+            handnessValue <= static_cast<int32_t>(NG::HandednessFollowMode::FOLLOW_GRIP_HAND)) {
+            sheetStyle.adaptToHandedness = static_cast<NG::HandednessFollowMode>(handnessValue);
+        }
+    }
+}
+
 void JSViewPopups::ParseSheetScrollBarState(const JSRef<JSVal>& value, NG::SheetStyle& sheetStyle)
 {
     if (value->IsNumber()) {
@@ -2881,6 +2893,8 @@ void JSViewAbstract::ParseSheetStyle(
     if (placementOnTarget->IsBoolean()) {
         sheetStyle.placementOnTarget = placementOnTarget->ToBoolean();
     }
+
+    JSViewPopups::ParseAdaptToHandedness(paramObj->GetProperty("adaptToHandedness"), sheetStyle);
 
     Color color;
     if (SystemProperties::ConfigChangePerform()) {

@@ -1473,16 +1473,23 @@ HWTEST_F(SheetECTestNg, SheetECUpdateSheetBackgroundColor001, TestSize.Level1)
 HWTEST_F(SheetECTestNg, SheetECUpdateSheetBackgroundBlurStyle001, TestSize.Level1)
 {
     auto targetNode = CreateTargetNode();
+
     auto stageNode = FrameNode::CreateFrameNode(
         V2::STAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<StagePattern>());
     auto rootNode = FrameNode::CreateFrameNode(V2::ROOT_ETS_TAG, 1, AceType::MakeRefPtr<RootPattern>());
+
     stageNode->MountToParent(rootNode);
+
     targetNode->MountToParent(stageNode);
+
     rootNode->MarkDirtyNode();
 
     SheetStyle sheetStyle;
+
     sheetStyle.sheetHeight.sheetMode = SheetMode::MEDIUM;
+
     sheetStyle.showDragBar = true;
+
     sheetStyle.backgroundBlurStyle = BlurStyleOption { .blurStyle = BlurStyle::COMPONENT_THICK };
 
     auto overlayManager = AceType::MakeRefPtr<OverlayManager>(rootNode);
@@ -1518,7 +1525,6 @@ HWTEST_F(SheetECTestNg, SheetECSetSheetHeightForTranslate001, TestSize.Level1)
 {
     auto pattern = AceType::MakeRefPtr<SheetPresentationPattern>(100, "Button", nullptr);
     EXPECT_FLOAT_EQ(pattern->GetSheetHeightForTranslate(), 0.0);
-
     pattern->SetSheetHeightForTranslate(500.0f);
     EXPECT_FLOAT_EQ(pattern->GetSheetHeightForTranslate(), 500.0f);
 }
@@ -1532,10 +1538,8 @@ HWTEST_F(SheetECTestNg, SheetECNeedDoubleAvoidAfterLayout001, TestSize.Level1)
 {
     auto pattern = AceType::MakeRefPtr<SheetPresentationPattern>(100, "Button", nullptr);
     EXPECT_FALSE(pattern->GetNeedDoubleAvoidAfterLayout());
-
     pattern->SetNeedDoubleAvoidAfterLayout(true);
     EXPECT_TRUE(pattern->GetNeedDoubleAvoidAfterLayout());
-
     pattern->SetNeedDoubleAvoidAfterLayout(false);
     EXPECT_FALSE(pattern->GetNeedDoubleAvoidAfterLayout());
 }
@@ -1551,7 +1555,6 @@ HWTEST_F(SheetECTestNg, SheetECRenderContextBackBlurStyle001, TestSize.Level1)
         AceType::MakeRefPtr<LinearLayoutPattern>(true));
     auto renderContext = frameNode->GetRenderContext();
     ASSERT_TRUE(renderContext);
-
     BlurStyleOption option { .blurStyle = BlurStyle::COMPONENT_THICK };
     renderContext->UpdateBackBlurStyle(option);
 }
@@ -1567,7 +1570,6 @@ HWTEST_F(SheetECTestNg, SheetECRenderContextBackBlurStyle002, TestSize.Level1)
         V2::EFFECT_COMPONENT_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
     auto renderContext = frameNode->GetRenderContext();
     ASSERT_TRUE(renderContext);
-
     BlurStyleOption option { .blurStyle = BlurStyle::COMPONENT_REGULAR };
     renderContext->UpdateBackBlurStyle(option);
 }
@@ -1611,17 +1613,14 @@ HWTEST_F(SheetECTestNg, SheetECUpdateSheetParamResource001, TestSize.Level1)
     stageNode->MountToParent(rootNode);
     targetNode->MountToParent(stageNode);
     rootNode->MarkDirtyNode();
-
     SheetStyle sheetStyle;
     sheetStyle.sheetHeight.sheetMode = SheetMode::MEDIUM;
     sheetStyle.showDragBar = true;
     sheetStyle.systemMaterial = MaterialUtils::GetInitMaterial(UiMaterialStyle::THIN);
-
     auto overlayManager = AceType::MakeRefPtr<OverlayManager>(rootNode);
     CreateSheetBuilder();
     overlayManager->OnBindSheet(true, nullptr, std::move(builderFunc_), std::move(titleBuilderFunc_), sheetStyle,
         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, targetNode);
-
     auto topModalNode = overlayManager->modalStack_.top().Upgrade();
     ASSERT_TRUE(topModalNode);
     auto sheetPattern = topModalNode->GetPattern<SheetPresentationPattern>();

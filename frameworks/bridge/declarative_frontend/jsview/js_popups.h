@@ -69,6 +69,7 @@ public:
         const JSRef<JSObject>& object, NG::SheetTitleBarBackgroundBlurOptions& options, NG::SheetStyle& sheetStyle);
     static void ParseSheetTitleBarBackgroundBlur(const JSRef<JSVal>& value, NG::SheetStyle& sheetStyle);
     static void ParseSheetTitleBarHoverMode(const JSRef<JSVal>& value, NG::SheetStyle& sheetStyle);
+    static void ParseAdaptToHandedness(const JSRef<JSVal>& value, NG::SheetStyle& sheetStyle);
     static void ParseSheetScrollBarState(const JSRef<JSVal>& value, NG::SheetStyle& sheetStyle);
     static void ParseSheetCloseButtonMaterial(const JSRef<JSVal>& value, NG::SheetStyle& sheetStyle);
 

@@ -24296,6 +24296,7 @@ typedef struct Ark_SheetOptions {
     Opt_EdgeLightMode edgeLightMode;
     Opt_BlurSnapshotOptions blurSnapshot;
     Opt_SheetTitleBarHoverMode titleBarHoverMode;
+    Opt_HandednessFollowMode adaptToHandedness;
 } Ark_SheetOptions;
 typedef struct Opt_SheetOptions {
     Ark_Tag tag;
