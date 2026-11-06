@@ -27,18 +27,18 @@
 #include "core/accessibility/accessibility_session_adapter.h"
 #include "core/common/window.h"
 #include "core/common/statistic_event_reporter.h"
-#include "core/components_ng/pattern/xcomponent/xcomponent_accessibility_child_tree_callback.h"
-#include "core/components_ng/pattern/xcomponent/xcomponent_accessibility_session_adapter.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_ext_surface_callback_client.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_inner_surface_controller.h"
+#include "core/components_ng/pattern/xcomponent/xcomponent_accessibility_child_tree_callback.h"
+#include "core/components_ng/pattern/xcomponent/xcomponent_accessibility_session_adapter.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_surface_config_client.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_utils.h"
 #ifdef ENABLE_ROSEN_BACKEND
+#include "transaction/rs_sync_transaction_controller.h"
+#include "transaction/rs_sync_transaction_handler.h"
 #include "transaction/rs_transaction.h"
 #include "transaction/rs_transaction_handler.h"
 #include "transaction/rs_transaction_proxy.h"
-#include "transaction/rs_sync_transaction_controller.h"
-#include "transaction/rs_sync_transaction_handler.h"
 #include "ui/rs_ui_context.h"
 #include "ui/rs_ui_director.h"
 #endif
@@ -392,10 +392,10 @@ void XComponentPatternV2::DisposeSurface()
 std::shared_ptr<Rosen::RSTransactionHandler> XComponentPatternV2::GetRSTransactionHandler(
     const RefPtr<FrameNode>& frameNode)
 {
-#ifdef ENABLE_ROSEN_BACKEND
     if (!SystemProperties::GetMultiInstanceEnabled()) {
         return nullptr;
     }
+#ifdef ENABLE_ROSEN_BACKEND
     auto rsUIContext = GetRSUIContext(frameNode);
     CHECK_NULL_RETURN(rsUIContext, nullptr);
     return rsUIContext->GetRSTransaction();
@@ -422,10 +422,13 @@ std::shared_ptr<Rosen::RSUIContext> XComponentPatternV2::GetRSUIContext(const Re
 void XComponentPatternV2::FlushImplicitTransaction(const RefPtr<FrameNode>& frameNode)
 {
 #ifdef ENABLE_ROSEN_BACKEND
-    if (auto transactionHandler = GetRSTransactionHandler(frameNode)) {
+    if (!SystemProperties::GetMultiInstanceEnabled()) {
+        auto transactionProxy = Rosen::RSTransactionProxy::GetInstance();
+        if (transactionProxy != nullptr) {
+            transactionProxy->FlushImplicitTransaction();
+        }
+    } else if (auto transactionHandler = GetRSTransactionHandler(frameNode)) {
         transactionHandler->FlushImplicitTransaction();
-    } else {
-        Rosen::RSTransactionProxy::GetInstance()->FlushImplicitTransaction();
     }
 #endif
 }
@@ -729,9 +732,9 @@ void XComponentPatternV2::ResetAndInitializeNodeHandleAccessibility()
     CHECK_NULL_VOID(host);
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
-    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
-    CHECK_NULL_VOID(mainAccessibilityManager);
-    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
+    auto pipelineAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_VOID(pipelineAccessibilityManager);
+    auto accessibilityManager = pipelineAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
     if (accessibilityChildTreeCallback_) {
         accessibilityManager->DeregisterAccessibilityChildTreeCallback(
