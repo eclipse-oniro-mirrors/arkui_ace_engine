@@ -674,7 +674,7 @@ void ScrollableModelNG::ResetEnableScrollWithKeyboard(FrameNode* frameNode)
     CHECK_NULL_VOID(frameNode);
     auto pattern = frameNode->GetPattern<ScrollablePattern>();
     CHECK_NULL_VOID(pattern);
-    pattern->SetIsAllowKeyboard(true);
+    pattern->SetIsAllowKeyboard(false);
 }
 
 bool ScrollableModelNG::GetEnableScrollWithKeyboard(FrameNode* frameNode)

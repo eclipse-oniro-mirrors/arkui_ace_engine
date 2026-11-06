@@ -8308,7 +8308,7 @@ typedef enum {
      *
      * **Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:**
      * <ul>
-     * <li>.value[0].i32 Whether to enable scrolling with keyboard arrow keys, 0: no, 1: yes. The default value is 1.
+     * <li>.value[0].i32 Whether to enable scrolling with keyboard arrow keys, 0: no, 1: yes. The default value is 0.
      * </li>
      * </ul>
      *

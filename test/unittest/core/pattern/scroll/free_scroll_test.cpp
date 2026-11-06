@@ -179,6 +179,7 @@ public:
         model.SetOnScrollStop([]() { ++scrollStopCount; });
         CreateFreeContent({ CONTENT_W, CONTENT_H });
         CreateScrollDone();
+        pattern_->SetIsAllowKeyboard(true); // keyboard scrolling is opt-in (default false)
         auto& freeScroll = *pattern_->freeScroll_;
         // Same source as HandleArrowKeyScroll uses, so the expected step always matches.
         const float step = pattern_->CalculateScrollDelta(pattern_->GetMouseScrollRows());
@@ -784,6 +785,7 @@ TEST_F(FreeScrollTest, KeyboardWheelMerge001)
     model.SetOnScrollStop([]() { ++scrollStopCount; });
     CreateFreeContent({ CONTENT_W, CONTENT_H });
     CreateScrollDone();
+    pattern_->SetIsAllowKeyboard(true); // keyboard scrolling is opt-in (default false)
     auto& freeScroll = *pattern_->freeScroll_;
     const float step = pattern_->CalculateScrollDelta(pattern_->GetMouseScrollRows());
 
@@ -835,6 +837,7 @@ TEST_F(FreeScrollTest, KeyboardWheelBrake001)
     model.SetOnScrollStop([]() { ++scrollStopCount; });
     CreateFreeContent({ CONTENT_W, CONTENT_H });
     CreateScrollDone();
+    pattern_->SetIsAllowKeyboard(true); // keyboard scrolling is opt-in (default false)
     auto& freeScroll = *pattern_->freeScroll_;
 
     EXPECT_TRUE(PressArrowKey(KeyCode::KEY_DPAD_DOWN));
