@@ -1694,46 +1694,6 @@ JSRef<JSObject> JSNavigationStack::CreatePathInfoWithNecessaryProperty(
     return pathInfo;
 }
 
-std::string JSNavigationStack::GetStringifyParamByIndex(int32_t index) const
-{
-    auto env = GetNapiEnv();
-    if (!env) {
-        return JS_STRINGIFIED_UNDEFINED;
-    }
-    ScopeRAII scope(env);
-    if (!scope) {
-        return JS_STRINGIFIED_UNDEFINED;
-    }
-    if (dataSourceObj_->IsEmpty()) {
-        return JS_STRINGIFIED_UNDEFINED;
-    }
-    napi_value navPathStack = JsConverter::ConvertJsValToNapiValue(dataSourceObj_);
-    napi_value getParamByIndex;
-    napi_get_named_property(env, navPathStack, "getParamByIndex", &getParamByIndex);
-    napi_value napiIndex;
-    napi_create_int32(env, index, &napiIndex);
-    napi_value param;
-    napi_call_function(env, navPathStack, getParamByIndex, 1, &napiIndex, &param);
-
-    napi_value globalValue;
-    napi_get_global(env, &globalValue);
-    napi_value jsonClass;
-    napi_get_named_property(env, globalValue, "JSON", &jsonClass);
-    napi_value stringifyFunc;
-    napi_get_named_property(env, jsonClass, "stringify", &stringifyFunc);
-    napi_value stringifyParam;
-    if (napi_call_function(env, jsonClass, stringifyFunc, 1, &param, &stringifyParam) != napi_ok) {
-        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "Can not stringify current param!");
-        napi_get_and_clear_last_exception(env, &stringifyParam);
-        return JS_STRINGIFIED_UNDEFINED;
-    }
-    size_t len = 0;
-    napi_get_value_string_utf8(env, stringifyParam, nullptr, 0, &len);
-    std::unique_ptr<char[]> paramChar = std::make_unique<char[]>(len + 1);
-    napi_get_value_string_utf8(env, stringifyParam, paramChar.get(), len + 1, &len);
-    return paramChar.get();
-}
-
 std::string JSNavigationStack::GetSerializedParamSafely(int32_t index) const
 {
     std::string serializedEmpty = "{}";
