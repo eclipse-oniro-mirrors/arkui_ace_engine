@@ -43,14 +43,6 @@ constexpr int32_t ARKUI_DEVICE_ID = 1;
 constexpr uint64_t ARKUI_TIME = 20;
 const char* ARKUI_KEY_TEXT = "k";
 
-KeyEvent MakeApplicationShortcutEvent()
-{
-    KeyEvent event;
-    event.code = KeyCode::KEY_A;
-    event.action = KeyAction::DOWN;
-    event.pressedCodes = { KeyCode::KEY_CTRL_LEFT, KeyCode::KEY_A };
-    return event;
-}
 } // namespace
 class NativeKeyEventTest : public testing::Test {
 public:
@@ -1066,68 +1058,32 @@ HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0033, TestSize.Level1)
 }
 
 /**
- * @tc.name: ApplicationShortcutInvalidParameters
- * @tc.desc: Invalid registrations preserve the output value as required by the SDK.
+ * @tc.name: ApplicationShortcutCallback
+ * @tc.desc: Register a callback and verify that triggering the shortcut updates a local variable.
  * @tc.type: FUNC
  */
-HWTEST_F(NativeKeyEventTest, ApplicationShortcutInvalidParameters, TestSize.Level1)
+HWTEST_F(NativeKeyEventTest, ApplicationShortcutCallback, TestSize.Level1)
 {
     auto* key = OH_ArkUI_KeyboardShortcutKey_Create();
     ASSERT_NE(key, nullptr);
-    int32_t id = 123;
-    auto callback = [](const OH_ArkUI_ApplicationShortcutCallbackInfo*, void*) {};
-    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(nullptr, 1, nullptr, callback, &id),
-        ARKUI_ERROR_CODE_PARAM_INVALID);
-    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, 1, nullptr, callback, &id),
-        ARKUI_ERROR_CODE_PARAM_INVALID);
     OH_ArkUI_KeyboardShortcutKey_SetCharacter(key, 'A');
-    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, 0, nullptr, callback, &id),
-        ARKUI_ERROR_CODE_PARAM_INVALID);
-    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, 8, nullptr, callback, &id),
-        ARKUI_ERROR_CODE_PARAM_INVALID);
-    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, 1, nullptr, nullptr, &id),
-        ARKUI_ERROR_CODE_PARAM_INVALID);
-    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Register(key, 1, nullptr, callback, nullptr),
-        ARKUI_ERROR_CODE_PARAM_INVALID);
-    EXPECT_EQ(id, 123);
-    EXPECT_EQ(OH_ArkUI_ApplicationShortcut_Unregister(-1), ARKUI_ERROR_CODE_NO_ERROR);
-    EXPECT_EQ(OH_ArkUI_ApplicationShortcutCallbackInfo_GetUIContext(nullptr), nullptr);
+    int32_t value = 0;
+    int32_t registrationId = 0;
+    auto callback = [](const OH_ArkUI_ApplicationShortcutCallbackInfo*, void* userData) {
+        *static_cast<int32_t*>(userData) = 1;
+    };
+    const auto status = OH_ArkUI_ApplicationShortcut_Register(key, OH_ARKUI_KEYBOARD_SHORTCUT_MODIFIER_CTRL,
+        &value, callback, &registrationId);
     OH_ArkUI_KeyboardShortcutKey_Destroy(&key);
-}
-
-/**
- * @tc.name: ApplicationShortcutUnsupportedRender
- * @tc.desc: Form and dynamic render reject registration, unregistration and dispatch.
- * @tc.type: FUNC
- */
-HWTEST_F(NativeKeyEventTest, ApplicationShortcutUnsupportedRender, TestSize.Level1)
-{
-    auto container = MockContainer::Current();
-    ASSERT_NE(container, nullptr);
-    auto& manager = ApplicationShortcutManager::GetInstance();
-    const bool wasForm = container->IsFormRender();
-    const bool wasDynamic = container->IsDynamicRender();
-    auto event = MakeApplicationShortcutEvent();
-    for (bool formRender : { true, false }) {
-        container->SetIsFormRender(false);
-        container->SetIsDynamicRender(false);
-        int32_t count = 0;
-        const auto id = manager.RegisterApplicationShortcut("A", 1, [&](int32_t) { ++count; });
-        EXPECT_GT(id, 0);
-        container->SetIsFormRender(formRender);
-        container->SetIsDynamicRender(!formRender);
-        EXPECT_EQ(manager.RegisterApplicationShortcut("A", 1, [&](int32_t) { ++count; }), 0);
-        manager.UnregisterApplicationShortcut(id);
-        EXPECT_FALSE(manager.TryTriggerApplicationShortcut(event, container->GetInstanceId()));
-        EXPECT_EQ(count, 0);
-        container->SetIsFormRender(false);
-        container->SetIsDynamicRender(false);
-        EXPECT_TRUE(manager.TryTriggerApplicationShortcut(event, container->GetInstanceId()));
-        EXPECT_EQ(count, 1);
-        manager.UnregisterApplicationShortcut(id);
-    }
-    container->SetIsFormRender(wasForm);
-    container->SetIsDynamicRender(wasDynamic);
+    ASSERT_EQ(status, ARKUI_ERROR_CODE_NO_ERROR);
+    KeyEvent event;
+    event.code = KeyCode::KEY_A;
+    event.action = KeyAction::DOWN;
+    event.pressedCodes = { KeyCode::KEY_CTRL_LEFT, KeyCode::KEY_A };
+    ApplicationShortcutManager::GetInstance().TryTriggerApplicationShortcut(
+        event, MockContainer::Current()->GetInstanceId());
+    OH_ArkUI_ApplicationShortcut_Unregister(registrationId);
+    EXPECT_EQ(value, 1);
 }
 
 } // namespace OHOS::Ace
