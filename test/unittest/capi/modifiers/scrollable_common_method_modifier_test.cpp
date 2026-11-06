@@ -25,6 +25,18 @@
 #include "core/interfaces/native/utility/reverse_converter.h"
 #include "core/interfaces/native/utility/callback_helper.h"
 #include "core/interfaces/native/utility/peer_utils.h"
+#include "core/components/scroll/scrollable.h"
+#include "core/pipeline/base/element_register.h"
+#include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/pattern/grid/grid_pattern.h"
+#include "core/components_ng/pattern/list/list_pattern.h"
+#include "core/components_ng/pattern/scroll/scroll_pattern.h"
+#include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
+#include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
+#include "core/interfaces/native/node/scrollable_modifier.h"
+#include "native_node.h"
+#include "test/mock/frameworks/core/common/mock_container.h"
+#include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 namespace OHOS::Ace::NG {
 using namespace testing;
@@ -411,5 +423,141 @@ HWTEST_F(ScrollableCommonMethodModifierTest, DISABLED_setBackToTopTest, TestSize
     modifier_->setBackToTop(node_, &value);
     checkVal = GetAttrValue<std::string>(node_, ATTRIBUTE_BACK_TO_TOP_NAME);
     EXPECT_THAT(checkVal, Eq(EXPECTED_TRUE));
+}
+namespace {
+constexpr ArkUI_Int32 ERROR_INT_CODE = -1;
+
+const ArkUIScrollableModifier* GetScrollableModifier()
+{
+    return NodeModifier::GetScrollableModifier();
+}
+
+ArkUINodeHandle CreateScrollableNode(const char* tag, RefPtr<Pattern> pattern, std::vector<RefPtr<FrameNode>>& keep)
+{
+    auto frameNode = FrameNode::CreateFrameNode(tag, ElementRegister::GetInstance()->MakeUniqueId(), pattern);
+    keep.emplace_back(frameNode);
+    return reinterpret_cast<ArkUINodeHandle>(AceType::RawPtr(frameNode));
+}
+} // namespace
+
+class ScrollableGetScrollStateTest : public testing::Test {
+public:
+    static void SetUpTestCase()
+    {
+        MockPipelineContext::SetUp();
+        MockContainer::SetUp();
+    }
+    static void TearDownTestCase()
+    {
+        MockContainer::TearDown();
+        MockPipelineContext::TearDown();
+    }
+};
+
+/**
+ * @tc.name: GetScrollStateNullNodeReturnsError
+ * @tc.desc: NODE_SCROLL_STATE query on a null node handle returns ERROR_INT_CODE, not a valid state
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollableGetScrollStateTest, GetScrollStateNullNodeReturnsError, TestSize.Level1)
+{
+    auto* modifier = GetScrollableModifier();
+    ASSERT_NE(modifier, nullptr);
+    ASSERT_NE(modifier->getScrollState, nullptr);
+    EXPECT_EQ(modifier->getScrollState(nullptr), ERROR_INT_CODE);
+}
+
+/**
+ * @tc.name: GetScrollStateNonScrollableNodeReturnsError
+ * @tc.desc: node without ScrollablePattern (base pattern only) returns ERROR_INT_CODE, not a valid state
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollableGetScrollStateTest, GetScrollStateNonScrollableNodeReturnsError, TestSize.Level1)
+{
+    auto* modifier = GetScrollableModifier();
+    ASSERT_NE(modifier, nullptr);
+    std::vector<RefPtr<FrameNode>> keep;
+    auto node = CreateScrollableNode("plain", AceType::MakeRefPtr<Pattern>(), keep);
+    EXPECT_EQ(modifier->getScrollState(node), ERROR_INT_CODE);
+}
+
+/**
+ * @tc.name: GetScrollStateScrollIdleByDefault
+ * @tc.desc: NODE_SCROLL_STATE on Scroll component returns IDLE before any scroll session starts
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollableGetScrollStateTest, GetScrollStateScrollIdleByDefault, TestSize.Level1)
+{
+    auto* modifier = GetScrollableModifier();
+    ASSERT_NE(modifier, nullptr);
+    std::vector<RefPtr<FrameNode>> keep;
+    auto node = CreateScrollableNode("scroll", AceType::MakeRefPtr<ScrollPattern>(), keep);
+    EXPECT_EQ(modifier->getScrollState(node), static_cast<ArkUI_Int32>(ARKUI_SCROLL_STATE_IDLE));
+}
+
+/**
+ * @tc.name: GetScrollStateListScrollingReturnsScroll
+ * @tc.desc: NODE_SCROLL_STATE on List component returns SCROLL during an active scroll session (fix: was empty item)
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollableGetScrollStateTest, GetScrollStateListScrollingReturnsScroll, TestSize.Level1)
+{
+    auto* modifier = GetScrollableModifier();
+    ASSERT_NE(modifier, nullptr);
+    std::vector<RefPtr<FrameNode>> keep;
+    auto listPattern = AceType::MakeRefPtr<ListPattern>();
+    auto node = CreateScrollableNode("list", listPattern, keep);
+    listPattern->SetScrollSourceForQuery(SCROLL_FROM_UPDATE);
+    EXPECT_EQ(modifier->getScrollState(node), static_cast<ArkUI_Int32>(ARKUI_SCROLL_STATE_SCROLL));
+}
+
+/**
+ * @tc.name: GetScrollStateGridFlingReturnsFling
+ * @tc.desc: NODE_SCROLL_STATE on Grid component returns FLING while snap/fling animation is running
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollableGetScrollStateTest, GetScrollStateGridFlingReturnsFling, TestSize.Level1)
+{
+    auto* modifier = GetScrollableModifier();
+    ASSERT_NE(modifier, nullptr);
+    std::vector<RefPtr<FrameNode>> keep;
+    auto gridPattern = AceType::MakeRefPtr<GridPattern>();
+    auto node = CreateScrollableNode("grid", gridPattern, keep);
+    gridPattern->SetScrollSourceForQuery(SCROLL_FROM_ANIMATION);
+    EXPECT_EQ(modifier->getScrollState(node), static_cast<ArkUI_Int32>(ARKUI_SCROLL_STATE_FLING));
+}
+
+/**
+ * @tc.name: GetScrollStateWaterFlowScrollingReturnsScroll
+ * @tc.desc: NODE_SCROLL_STATE on WaterFlow component returns SCROLL during an active scroll session
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollableGetScrollStateTest, GetScrollStateWaterFlowScrollingReturnsScroll, TestSize.Level1)
+{
+    auto* modifier = GetScrollableModifier();
+    ASSERT_NE(modifier, nullptr);
+    std::vector<RefPtr<FrameNode>> keep;
+    auto waterFlowPattern = AceType::MakeRefPtr<WaterFlowPattern>();
+    auto node = CreateScrollableNode("waterflow", waterFlowPattern, keep);
+    waterFlowPattern->SetScrollSourceForQuery(SCROLL_FROM_UPDATE);
+    EXPECT_EQ(modifier->getScrollState(node), static_cast<ArkUI_Int32>(ARKUI_SCROLL_STATE_SCROLL));
+}
+
+/**
+ * @tc.name: GetScrollStateListResetToIdle
+ * @tc.desc: session-level query source reset (SCROLL_FROM_NONE) brings NODE_SCROLL_STATE back to IDLE
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollableGetScrollStateTest, GetScrollStateListResetToIdle, TestSize.Level1)
+{
+    auto* modifier = GetScrollableModifier();
+    ASSERT_NE(modifier, nullptr);
+    std::vector<RefPtr<FrameNode>> keep;
+    auto listPattern = AceType::MakeRefPtr<ListPattern>();
+    auto node = CreateScrollableNode("list", listPattern, keep);
+    listPattern->SetScrollSourceForQuery(SCROLL_FROM_UPDATE);
+    EXPECT_EQ(modifier->getScrollState(node), static_cast<ArkUI_Int32>(ARKUI_SCROLL_STATE_SCROLL));
+    listPattern->SetScrollSourceForQuery(SCROLL_FROM_NONE);
+    EXPECT_EQ(modifier->getScrollState(node), static_cast<ArkUI_Int32>(ARKUI_SCROLL_STATE_IDLE));
 }
 } // namespace OHOS::Ace::NG

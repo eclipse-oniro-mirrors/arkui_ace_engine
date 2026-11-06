@@ -8454,11 +8454,8 @@ const ArkUI_AttributeItem* GetScrollContentSize(ArkUI_NodeHandle node)
 
 const ArkUI_AttributeItem* GetScrollStateAttribute(ArkUI_NodeHandle node)
 {
-    auto scrollerHandle = GetFullImpl()->getNodeModifiers()->getScrollerModifier()->
-        getScroller(node->uiNodeHandle, 0);
-    CHECK_NULL_RETURN(scrollerHandle, &g_attributeItem);
-    g_numberValues[NUM_0].i32 = GetFullImpl()->getNodeModifiers()->getScrollerModifier()->
-        getScrollState(scrollerHandle);
+    g_numberValues[NUM_0].i32 = GetFullImpl()->getNodeModifiers()->getScrollableModifier()->
+        getScrollState(node->uiNodeHandle);
     return &g_attributeItem;
 }
 
