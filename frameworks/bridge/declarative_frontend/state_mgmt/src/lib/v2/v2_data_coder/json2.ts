@@ -185,7 +185,7 @@ class JSON2 {
           obj[key] = payload;
         }
 
-      })
+      });
 
       return obj;
     }
@@ -207,7 +207,9 @@ class JSON2 {
         return;
       }
       const options = meta?.[baseKey];
-      if (options?.disabled) { return; }
+      if (options?.disabled) {
+        return;
+      }
       result[options?.alias || baseKey] = (value as Record<string, unknown>)[baseKey];
     });
     return result;
@@ -229,19 +231,45 @@ class JSON2 {
       const { type, refId, payload } = JSON2.parseTRP(value as string);
 
       let result = value;
-      if (type === 'Da') { result = new Date(payload); }
-      if (type === 'Bo') { result = new Boolean(parse(payload)); }
-      if (type === 'Nu') { result = new Number(payload); }
-      if (type === 'St') { result = new String(payload); }
-      if (type === 'Ar') { result = parse(payload); }
-      if (type === 'Ma') { result = parseMap(payload); }
-      if (type === 'Se') { result = new Set(parse(payload)); }
-      if (type === 'SO') { result = parseSendable(payload); }
-      if (type === 'SA') { result = new SendableArray(...parseSendable(payload)); }
-      if (type === 'SM') { result = new SendableMap(parseSendable(payload)); }
-      if (type === 'SS') { result = new SendableSet(parseSendable(payload)); }
-      if (type === 'Ob') { result = parse(payload); }
-      if (type === 'bi') { result = BigInt(payload); }
+      if (type === 'Da') {
+        result = new Date(payload);
+      }
+      if (type === 'Bo') {
+        result = new Boolean(parse(payload));
+      }
+      if (type === 'Nu') {
+        result = new Number(parse(payload));
+      }
+      if (type === 'St') {
+        result = new String(payload);
+      }
+      if (type === 'Ar') {
+        result = parse(payload);
+      }
+      if (type === 'Ma') {
+        result = parseMap(payload);
+      }
+      if (type === 'Se') {
+        result = new Set(parse(payload));
+      }
+      if (type === 'SO') {
+        result = parseSendable(payload);
+      }
+      if (type === 'SA') {
+        result = new SendableArray(...parseSendable(payload));
+      }
+      if (type === 'SM') {
+        result = new SendableMap(parseSendable(payload));
+      }
+      if (type === 'SS') {
+        result = new SendableSet(parseSendable(payload));
+      }
+      if (type === 'Ob') {
+        result = parse(payload);
+      }
+      if (type === 'bi') {
+        result = BigInt(payload);
+      }
 
       // don't process 're' (references) and 'st' (plain strings) here
       // we return them as-is, and process them after parsing the full structure
