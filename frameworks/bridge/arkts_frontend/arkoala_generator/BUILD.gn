@@ -147,6 +147,7 @@ if (!build_ohos_sdk && !(defined(is_arkui_x) && is_arkui_x)) {
   }
   action("idlize_install") {
     script = "gn/command/deploy.py"
+    depfile = "$target_gen_dir/idlize_install.d"
     args = [
       "--source",
       rebase_path(idlize_gen_output_path),
@@ -159,6 +160,8 @@ if (!build_ohos_sdk && !(defined(is_arkui_x) && is_arkui_x)) {
       rebase_path("$target_out_dir/idlize_install_stamp"),
       "--native-stamp",
       rebase_path("$target_out_dir/idlize_native_signature"),
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
     ]
     deps = [ ":runner_gen_code" ]
     public_deps = [ ":runner_gen_code" ]
