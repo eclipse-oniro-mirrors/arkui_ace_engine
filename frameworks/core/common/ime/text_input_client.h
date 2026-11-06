@@ -271,6 +271,13 @@ public:
         return 0;
     }
 
+    virtual int32_t SetPreviewTextWithStyle(const PreviewTextStyling& styling)
+    {
+        isNeedPreviewTextStyling_ = true;
+        SetPreviewTextStyling(styling);
+        return 0;
+    }
+
     virtual void OnFinishTextPreview()
     {
         if (isNeedPreviewTextStyling_) {

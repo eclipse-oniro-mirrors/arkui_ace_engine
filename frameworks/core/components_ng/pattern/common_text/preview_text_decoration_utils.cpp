@@ -13,8 +13,11 @@
  * limitations under the License.
  */
 
-#include "core/components_ng/pattern/common_text/preview_text_decoration_utils.h"
+#include <algorithm>
+#include <cmath>
+
 #include "base/geometry/dimension.h"
+#include "core/components_ng/pattern/common_text/preview_text_decoration_utils.h"
 
 namespace OHOS::Ace::NG {
 
@@ -27,27 +30,27 @@ constexpr float WAVE_PERIOD_FACTOR = 2.0f;
 constexpr float DASH_UNIT_DIVISOR = 14.0f;
 constexpr float DASH_LENGTH_MULT = 4.0f;
 constexpr float DASH_GAP_MULT = 2.0f;
+constexpr float EPSILON = 0.001f;
 
-void BuildWavyPath(RSPath& path, float left, float width, float baseline, float quarterWave)
+void BuildWavyPath(RSPath& path, float width, float quarterWave, float phaseOffset)
 {
-    path.MoveTo(left, baseline);
-    int waveCount = 0;
+    if (quarterWave <= MIN_WIDTH || width <= EPSILON) {
+        return;
+    }
+    float halfWaveWidth = quarterWave * WAVE_PERIOD_FACTOR;
+    int waveCount = static_cast<int>(std::floor(phaseOffset / halfWaveWidth));
     float xStart = 0.0f;
-    while (xStart + quarterWave * WAVE_PERIOD_FACTOR < width) {
+    while (xStart + halfWaveWidth <= width + EPSILON) {
         float dy = (waveCount % ODD_CHECK != 0) ? quarterWave : -quarterWave;
-        path.RQuadTo(quarterWave, dy, quarterWave * WAVE_PERIOD_FACTOR, 0.0f);
-        xStart += quarterWave * WAVE_PERIOD_FACTOR;
+        path.RQuadTo(halfWaveWidth / WAVE_PERIOD_FACTOR, dy, halfWaveWidth, 0.0f);
+        xStart += halfWaveWidth;
         ++waveCount;
     }
     float remaining = width - xStart;
-    if (remaining > 0.0f) {
-        float half = remaining / WAVE_PERIOD_FACTOR;
-        float sign = (waveCount % ODD_CHECK == 0) ? -1.0f : 1.0f;
-        double x1 = half;
-        double y1 = half * sign;
-        double x2 = remaining;
-        double y2 = (remaining - remaining * remaining / (quarterWave * WAVE_PERIOD_FACTOR)) * sign;
-        path.RQuadTo(x1, y1, x2, y2);
+    if (remaining > EPSILON) {
+        float peak = (remaining / halfWaveWidth) * quarterWave;
+        float dy = (waveCount % ODD_CHECK != 0) ? peak : -peak;
+        path.RQuadTo(remaining / WAVE_PERIOD_FACTOR, dy, remaining, 0.0f);
     }
 }
 
@@ -74,7 +77,8 @@ void DrawWavyUnderline(RSCanvas& canvas, const PreviewDecorationParams& params)
     }
     float baseline = params.bottom - underlineWidth / HALF_DIVISOR;
     RSPath path;
-    BuildWavyPath(path, params.left, width, baseline, underlineWidth);
+    path.MoveTo(params.left, baseline);
+    BuildWavyPath(path, width, underlineWidth, params.startOffset);
     StrokeWavyPath(canvas, path, underlineWidth, params.color);
 }
 
@@ -93,17 +97,41 @@ void DrawDashLineUnderline(RSCanvas& canvas, const PreviewDecorationParams& para
     float dashLength = unit * DASH_LENGTH_MULT;
     float gap = unit * DASH_GAP_MULT;
     float baseline = params.bottom - params.underlineWidth / HALF_DIVISOR;
+    if (dashLength <= MIN_WIDTH) {
+        return;
+    }
 
+    canvas.DetachBrush();
     RSPen pen;
     pen.SetAntiAlias(true);
     pen.SetColor(params.color);
     pen.SetWidth(params.underlineWidth);
+    pen.SetCapStyle(RSPen::CapStyle::FLAT_CAP);
     canvas.AttachPen(pen);
 
+    float period = dashLength + gap;
+    float phase = std::fmod(params.startOffset, period);
+    if (phase < 0.0f) {
+        phase += period;
+    }
     float x = params.left;
-    while (x < params.right) {
+    if (phase > dashLength) {
+        float skip = period - phase;
+        x += skip;
+        phase = 0.0f;
+    } else if (phase > 0.0f) {
+        float remain = dashLength - phase;
+        float segEnd = std::min(x + remain, params.right);
+        if (segEnd > x + EPSILON) {
+            canvas.DrawLine(RSPoint(x, baseline), RSPoint(segEnd, baseline));
+        }
+        x = segEnd + gap;
+    }
+    while (x < params.right - EPSILON) {
         float segEnd = std::min(x + dashLength, params.right);
-        canvas.DrawLine(RSPoint(x, baseline), RSPoint(segEnd, baseline));
+        if (segEnd > x + EPSILON) {
+            canvas.DrawLine(RSPoint(x, baseline), RSPoint(segEnd, baseline));
+        }
         x = segEnd + gap;
     }
     canvas.DetachPen();
