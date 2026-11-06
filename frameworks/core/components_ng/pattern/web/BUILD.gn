@@ -15,6 +15,13 @@ import("//foundation/arkui/ace_engine/ace_config.gni")
 import(
     "//foundation/arkui/ace_engine/frameworks/core/components_ng/components.gni")
 
+group("hds_color_picker_wrapper_all") {
+  deps = [
+    "source:hds_color_picker_wrapper",
+    "source:hds_color_picker_wrapper_etc",
+  ]
+}
+
 build_component_ng("web_pattern_ng") {
   if (is_arkui_x) {
     import(
@@ -84,4 +91,8 @@ build_component_ng("web_pattern_ng") {
     }
     standard_input_deps = [ "imf:inputmethod_client" ]
   }
+
+  deps = [
+    ":hds_color_picker_wrapper_all",
+  ]
 }
