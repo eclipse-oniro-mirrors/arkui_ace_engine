@@ -130,18 +130,36 @@ DragEventActuator::DragEventActuator(
     if (LessOrEqual(distance_, PAN_DISTANCE)) {
         distance_ = PAN_DISTANCE;
     }
+}
 
+void DragEventActuator::EnsurePanRecognizer()
+{
+    if (panRecognizer_) {
+        return;
+    }
     panRecognizer_ = MakeRefPtr<PanRecognizer>(fingers_, direction_, distance_);
     panRecognizer_->SetGestureInfo(MakeRefPtr<GestureInfo>(GestureTypeName::DRAG, GestureTypeName::DRAG, true));
-    longPressRecognizer_ = AceType::MakeRefPtr<LongPressRecognizer>(LONG_PRESS_DURATION, fingers_, false, true);
-    longPressRecognizer_->SetGestureInfo(MakeRefPtr<GestureInfo>(GestureTypeName::DRAG, GestureTypeName::DRAG, true));
-    previewLongPressRecognizer_ =
-        AceType::MakeRefPtr<LongPressRecognizer>(PREVIEW_LONG_PRESS_RECONGNIZER, fingers_, false, true);
-    previewLongPressRecognizer_->SetGestureInfo(
-        MakeRefPtr<GestureInfo>(GestureTypeName::DRAG, GestureTypeName::DRAG, true));
+}
+
+void DragEventActuator::EnsureLongPressRecognizers()
+{
+    if (!longPressRecognizer_) {
+        longPressRecognizer_ = AceType::MakeRefPtr<LongPressRecognizer>(LONG_PRESS_DURATION, fingers_, false, true);
+        longPressRecognizer_->SetGestureInfo(
+            MakeRefPtr<GestureInfo>(GestureTypeName::DRAG, GestureTypeName::DRAG, true));
+        if (textDragCallback_) {
+            auto callback = textDragCallback_;
+            longPressRecognizer_->SetThumbnailCallback(std::move(callback));
+        }
+    }
+    if (!previewLongPressRecognizer_) {
+        previewLongPressRecognizer_ =
+            AceType::MakeRefPtr<LongPressRecognizer>(PREVIEW_LONG_PRESS_RECONGNIZER, fingers_, false, true);
+        previewLongPressRecognizer_->SetGestureInfo(
+            MakeRefPtr<GestureInfo>(GestureTypeName::DRAG, GestureTypeName::DRAG, true));
+    }
     previewLongPressRecognizer_->SetThumbnailDeadline(PRE_DRAG_TIMER_DEADLINE);
-    isNotInPreviewState_ = false;
-    isNewFwk_ = false;
+    previewLongPressRecognizer_->SetGestureHub(gestureEventHub_);
 }
 
 RefPtr<FrameNode> DragEventActuator::GetFrameNode() const
@@ -457,6 +475,7 @@ void DragEventActuator::OnCollectTouchTarget(const OffsetF& coordinateOffset, co
         IsBelongToMultiItemNode(frameNode)) {
         return;
     }
+    EnsurePanRecognizer();
     RecordTouchDownPoint(touchRestrict.touchEvent);
     lastTouchFingerId_ = touchRestrict.touchEvent.id;
     CaptureDownScreenLocked(touchRestrict.touchEvent);
@@ -801,6 +820,7 @@ void DragEventActuator::OnCollectTouchTarget(const OffsetF& coordinateOffset, co
         dragDropManager->SetIsAnyDraggableHit(isAllowedDrag);
         return;
     }
+    EnsureLongPressRecognizers();
     auto longPressUpdateValue = [weak = WeakClaim(this), hasContextMenuUsingGesture = hasContextMenuUsingGesture](
                                     GestureEvent& info) {
         TAG_LOGI(AceLogTag::ACE_DRAG, "Trigger long press for 500ms.");
@@ -984,7 +1004,6 @@ void DragEventActuator::OnCollectTouchTarget(const OffsetF& coordinateOffset, co
     previewLongPressRecognizer_->SetOnAction(longPressUpdate);
     previewLongPressRecognizer_->SetOnActionCancel(longPressCancel);
     previewLongPressRecognizer_->SetThumbnailCallback(std::move(preDragCallback));
-    previewLongPressRecognizer_->SetGestureHub(gestureEventHub_);
     if (!longPressRecognizer_->HasThumbnailCallback() && isAllowedDrag) {
         auto callback = [weak = WeakClaim(this)](Offset point) {
             TAG_LOGI(AceLogTag::ACE_DRAG, "Trigger 150ms timer Thumbnail callback.");
@@ -1693,7 +1712,9 @@ void DragEventActuator::ExecutePreDragFunc(const RefPtr<FrameNode>& node,
 void DragEventActuator::SetThumbnailCallback(std::function<void(Offset)>&& callback)
 {
     textDragCallback_ = callback;
-    longPressRecognizer_->SetThumbnailCallback(std::move(callback));
+    if (longPressRecognizer_) {
+        longPressRecognizer_->SetThumbnailCallback(std::move(callback));
+    }
 }
 
 void DragEventActuator::SetTextPixelMap(const RefPtr<GestureEventHub>& gestureHub)
@@ -1898,14 +1919,10 @@ void DragEventActuator::CopyDragEvent(const RefPtr<DragEventActuator>& dragEvent
 {
     userCallback_ = dragEventActuator->userCallback_;
     customCallback_ = dragEventActuator->customCallback_;
-    panRecognizer_ = MakeRefPtr<PanRecognizer>(fingers_, direction_, distance_);
-    panRecognizer_->SetGestureInfo(MakeRefPtr<GestureInfo>(GestureTypeName::DRAG, GestureTypeName::DRAG, true));
-    longPressRecognizer_ = AceType::MakeRefPtr<LongPressRecognizer>(LONG_PRESS_DURATION, fingers_, false, false);
-    longPressRecognizer_->SetGestureInfo(MakeRefPtr<GestureInfo>(GestureTypeName::DRAG, GestureTypeName::DRAG, true));
-    previewLongPressRecognizer_ =
-        AceType::MakeRefPtr<LongPressRecognizer>(PREVIEW_LONG_PRESS_RECONGNIZER, fingers_, false, false);
-    previewLongPressRecognizer_->SetGestureInfo(
-        MakeRefPtr<GestureInfo>(GestureTypeName::DRAG, GestureTypeName::DRAG, true));
+    panRecognizer_.Reset();
+    longPressRecognizer_.Reset();
+    previewLongPressRecognizer_.Reset();
+    SequencedRecognizer_.Reset();
     isNotInPreviewState_ = false;
     actionStart_ = dragEventActuator->actionStart_;
     longPressUpdate_ = dragEventActuator->longPressUpdate_;
@@ -2172,14 +2189,14 @@ bool DragEventActuator::IsSelectedItemNode(const RefPtr<UINode>& uiNode)
 {
     auto frameNode = AceType::DynamicCast<FrameNode>(uiNode);
     CHECK_NULL_RETURN(frameNode, false);
-    auto gestureHub = frameNode->GetOrCreateGestureEventHub();
-    CHECK_NULL_RETURN(gestureHub, false);
-    auto eventHub = frameNode->GetEventHub<EventHub>();
-    CHECK_NULL_RETURN(eventHub, false);
-    auto dragPreview = frameNode->GetDragPreviewOption();
-    if (!dragPreview.isMultiSelectionEnabled) {
+    auto* dragPreview = frameNode->GetDragPreviewOptionIfExist();
+    if (!dragPreview || !dragPreview->isMultiSelectionEnabled) {
         return false;
     }
+    auto eventHub = frameNode->GetEventHubOnly<EventHub>();
+    CHECK_NULL_RETURN(eventHub, false);
+    auto gestureHub = eventHub->GetGestureEventHub();
+    CHECK_NULL_RETURN(gestureHub, false);
     bool isAllowedDrag = gestureHub->IsAllowedDrag(eventHub);
     if (!isAllowedDrag) {
         return false;

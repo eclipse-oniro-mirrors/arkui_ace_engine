@@ -2290,6 +2290,7 @@ HWTEST_F(GridItemDragManagerTestNg, GridLockDragFingerAndEscapeScrollPan001, Tes
     ASSERT_NE(gestureHub, nullptr);
     auto dragEventActuator = gestureHub->GetDragEventActuator();
     ASSERT_NE(dragEventActuator, nullptr);
+    dragEventActuator->EnsurePanRecognizer();
     auto dragPan = dragEventActuator->GetDragEventPanRecognizer();
     ASSERT_NE(dragPan, nullptr);
 

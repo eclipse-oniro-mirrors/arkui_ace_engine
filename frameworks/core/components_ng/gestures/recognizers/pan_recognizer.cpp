@@ -49,6 +49,7 @@ constexpr float DEFAULT_RECYCLE_ANGLE = 180.0f;
 void PanRecognizer::ForceCleanRecognizer()
 {
     MultiFingersRecognizer::ForceCleanRecognizer();
+    ReleaseTouchEventPayload(lastTouchEvent_);
     averageDistance_.Reset();
     touchPointsDistance_.clear();
     localMatrix_.clear();
@@ -815,6 +816,7 @@ Offset PanRecognizer::GetRawGlobalLocation(int32_t postEventNodeId)
 void PanRecognizer::OnResetStatus()
 {
     MultiFingersRecognizer::OnResetStatus();
+    ReleaseTouchEventPayload(lastTouchEvent_);
     touchPoints_.clear();
     averageDistance_.Reset();
     touchPointsDistance_.clear();

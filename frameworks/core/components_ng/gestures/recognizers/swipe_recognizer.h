@@ -59,6 +59,8 @@ public:
 
     virtual RefPtr<GestureSnapshot> Dump() const override;
 
+    void ForceCleanRecognizer() override;
+
     void SetDirection(SwipeDirection direction)
     {
         direction_ = direction;

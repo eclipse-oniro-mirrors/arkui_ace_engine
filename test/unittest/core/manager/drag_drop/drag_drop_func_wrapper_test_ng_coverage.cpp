@@ -47,6 +47,7 @@
 #include "core/components_ng/base/geometry_node.h"
 #include "core/components_ng/base/ui_node.h"
 #include "core/components_ng/base/view_abstract.h"
+#include "core/components_ng/event/drag_event.h"
 #include "core/components_ng/event/event_hub.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_func_wrapper.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_global_controller.h"
@@ -855,6 +856,27 @@ HWTEST_F(DragDropFuncWrapperTestNgCoverage, TestIsSelectedItemNode, TestSize.Lev
             testCase.expectResult));
         caseNum++;
     }
+}
+
+/**
+ * @tc.name: TestIsSelectedItemNodeWithoutCreatingConfiguration
+ * @tc.desc: Test IsSelectedItemNode does not create drag-related configurations for an unconfigured node.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropFuncWrapperTestNgCoverage, TestIsSelectedItemNodeWithoutCreatingConfiguration, TestSize.Level1)
+{
+    auto frameNode = FrameNode::CreateFrameNode(
+        V2::GRID_ITEM_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<GridItemPattern>(nullptr, GridItemStyle::NONE));
+    ASSERT_NE(frameNode, nullptr);
+    ASSERT_EQ(frameNode->dragDropRelatedConfigurations_, nullptr);
+
+    EXPECT_FALSE(DragDropFuncWrapper::IsSelectedItemNode(frameNode));
+    EXPECT_EQ(frameNode->dragDropRelatedConfigurations_, nullptr);
+    EXPECT_FALSE(DragEventActuator::IsSelectedItemNode(frameNode));
+    EXPECT_EQ(frameNode->dragDropRelatedConfigurations_, nullptr);
+    EXPECT_FALSE(DragDropFuncWrapper::CheckIsNeedGather(frameNode));
+    EXPECT_EQ(frameNode->dragDropRelatedConfigurations_, nullptr);
 }
 
 /**

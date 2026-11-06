@@ -35,6 +35,12 @@ constexpr double SCALE_PER_AXIS_EVENT = 0.1f;
 
 } // namespace
 
+void PinchRecognizer::ForceCleanRecognizer()
+{
+    MultiFingersRecognizer::ForceCleanRecognizer();
+    ReleaseTouchEventPayload(lastTouchEvent_);
+}
+
 PinchRecognizer::PinchRecognizer(int32_t fingers, double distance, bool isLimitFingerCount)
     : MultiFingersRecognizer(fingers, isLimitFingerCount), distance_(distance)
 {
@@ -437,6 +443,7 @@ Offset PinchRecognizer::ComputePinchCenter()
 void PinchRecognizer::OnResetStatus()
 {
     MultiFingersRecognizer::OnResetStatus();
+    ReleaseTouchEventPayload(lastTouchEvent_);
     initialDev_ = 0.0;
     currentDev_ = 0.0;
     scale_ = 1.0;
