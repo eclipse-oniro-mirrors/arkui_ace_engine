@@ -379,8 +379,24 @@ void ScrollBarPattern::RegisterScrollBarEventTask()
         return scrollBarProxy->NotifySnapScrollWithoutChild(snapAnimationOptions);
     };
     scrollBar_->SetStartSnapAnimationCallback(std::move(startSnapAnimationCallback));
+    InitTouchStateCallback();
     InitScrollBarGestureEvent();
     RegisterScrollBarOverDragEventTask();
+}
+
+void ScrollBarPattern::InitTouchStateCallback()
+{
+    CHECK_NULL_VOID(scrollBar_);
+    auto touchStateCallback = [weak = WeakClaim(this)](bool isPressed) {
+        auto pattern = weak.Upgrade();
+        CHECK_NULL_VOID(pattern);
+        if (isPressed) {
+            pattern->StopDisappearAnimator();
+        } else if (pattern->GetDisplayMode() == DisplayMode::AUTO && !pattern->isScrolling_) {
+            pattern->StartDisappearAnimator();
+        }
+    };
+    scrollBar_->SetTouchStateCallback(std::move(touchStateCallback));
 }
 
 void ScrollBarPattern::InitScrollBarGestureEvent()
