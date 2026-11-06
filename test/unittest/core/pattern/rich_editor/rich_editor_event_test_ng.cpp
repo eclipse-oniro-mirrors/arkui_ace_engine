@@ -1530,6 +1530,551 @@ HWTEST_F(RichEditorEventTestNg, FireEventReentrancy001, TestSize.Level1)
 }
 
 /**
+ * @tc.name: FireOnIMEInputCompleteReentrancy001
+ * @tc.desc: test onIMEInputComplete_ self-destructive callback: callback clears member during
+ *           execution, local copy ensures first call succeeds; second call hits null branch
+ *           and original callback is NOT triggered.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEventTestNg, FireOnIMEInputCompleteReentrancy001, TestSize.Level1)
+{
+    auto eventHub = richEditorNode_->GetPattern<RichEditorPattern>()->GetEventHub<RichEditorEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+
+    // Step 1: Set onIMEInputComplete_ with a self-destructive callback that clears the member
+    // during execution. The refactored code uses a local copy, so the callback should still
+    // execute safely on the first call.
+    bool called = false;
+    eventHub->SetOnIMEInputComplete([&](const RichEditorAbstractSpanResult&) {
+        called = true;
+        // Dynamically set onIMEInputComplete_ to null during execution (self-destructive)
+        eventHub->SetOnIMEInputComplete(nullptr);
+    });
+    ASSERT_TRUE(static_cast<bool>(eventHub->onIMEInputComplete_));
+
+    RichEditorAbstractSpanResult spanResult;
+    eventHub->FireOnIMEInputComplete(spanResult);
+
+    // Step 2: Verify the original callback WAS triggered on first call (local copy ensures safety)
+    EXPECT_TRUE(called);
+
+    // Step 3: Verify the member is now null after self-destructive clearing
+    EXPECT_FALSE(static_cast<bool>(eventHub->onIMEInputComplete_));
+
+    // Step 4: Reset the flag and call FireOnIMEInputComplete again.
+    // The member is null, so the null/early-return branch should be hit.
+    // The original callback should NOT be triggered.
+    called = false;
+    eventHub->FireOnIMEInputComplete(spanResult);
+
+    // Step 5: Verify the original callback was NOT triggered on the second call.
+    // If called is still false (no callback ran), the null-branch logic holds.
+    EXPECT_FALSE(called);
+}
+
+/**
+ * @tc.name: FireOnReadyReentrancy001
+ * @tc.desc: test onReady_ self-destructive callback reentrancy
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEventTestNg, FireOnReadyReentrancy001, TestSize.Level1)
+{
+    auto eventHub = richEditorNode_->GetPattern<RichEditorPattern>()->GetEventHub<RichEditorEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool called = false;
+    eventHub->SetOnReady([&]() {
+        called = true;
+        eventHub->SetOnReady(nullptr);
+    });
+    ASSERT_TRUE(static_cast<bool>(eventHub->onReady_));
+    eventHub->FireOnReady();
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(static_cast<bool>(eventHub->onReady_));
+    called = false;
+    eventHub->FireOnReady();
+    EXPECT_FALSE(called);
+}
+
+/**
+ * @tc.name: FireAboutToIMEInputReentrancy001
+ * @tc.desc: test aboutToIMEInput_ self-destructive callback reentrancy
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEventTestNg, FireAboutToIMEInputReentrancy001, TestSize.Level1)
+{
+    auto eventHub = richEditorNode_->GetPattern<RichEditorPattern>()->GetEventHub<RichEditorEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool called = false;
+    eventHub->SetAboutToIMEInput([&](const RichEditorInsertValue&) {
+        called = true;
+        eventHub->SetAboutToIMEInput(nullptr);
+        return true;
+    });
+    ASSERT_TRUE(static_cast<bool>(eventHub->aboutToIMEInput_));
+    RichEditorInsertValue info;
+    EXPECT_TRUE(eventHub->FireAboutToIMEInput(info));
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(static_cast<bool>(eventHub->aboutToIMEInput_));
+    called = false;
+    EXPECT_TRUE(eventHub->FireAboutToIMEInput(info));
+    EXPECT_FALSE(called);
+}
+
+/**
+ * @tc.name: FireOnDidIMEInputReentrancy001
+ * @tc.desc: test onDidIMEInput_ self-destructive callback reentrancy
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEventTestNg, FireOnDidIMEInputReentrancy001, TestSize.Level1)
+{
+    auto eventHub = richEditorNode_->GetPattern<RichEditorPattern>()->GetEventHub<RichEditorEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool called = false;
+    eventHub->SetOnDidIMEInput([&](const TextRange&) {
+        called = true;
+        eventHub->SetOnDidIMEInput(nullptr);
+    });
+    ASSERT_TRUE(static_cast<bool>(eventHub->onDidIMEInput_));
+    TextRange range { 0, 5 };
+    eventHub->FireOnDidIMEInput(range);
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(static_cast<bool>(eventHub->onDidIMEInput_));
+    called = false;
+    eventHub->FireOnDidIMEInput(range);
+    EXPECT_FALSE(called);
+}
+
+/**
+ * @tc.name: FireAboutToDeleteReentrancy001
+ * @tc.desc: test aboutToDelete_ self-destructive callback reentrancy
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEventTestNg, FireAboutToDeleteReentrancy001, TestSize.Level1)
+{
+    auto eventHub = richEditorNode_->GetPattern<RichEditorPattern>()->GetEventHub<RichEditorEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool called = false;
+    eventHub->SetAboutToDelete([&](const RichEditorDeleteValue&) {
+        called = true;
+        eventHub->SetAboutToDelete(nullptr);
+        return true;
+    });
+    ASSERT_TRUE(static_cast<bool>(eventHub->aboutToDelete_));
+    RichEditorDeleteValue deleteValue;
+    EXPECT_TRUE(eventHub->FireAboutToDelete(deleteValue));
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(static_cast<bool>(eventHub->aboutToDelete_));
+    called = false;
+    EXPECT_TRUE(eventHub->FireAboutToDelete(deleteValue));
+    EXPECT_FALSE(called);
+}
+
+/**
+ * @tc.name: FireOnDeleteCompleteReentrancy001
+ * @tc.desc: test onDeleteComplete_ self-destructive callback reentrancy
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEventTestNg, FireOnDeleteCompleteReentrancy001, TestSize.Level1)
+{
+    auto eventHub = richEditorNode_->GetPattern<RichEditorPattern>()->GetEventHub<RichEditorEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool called = false;
+    eventHub->SetOnDeleteComplete([&]() {
+        called = true;
+        eventHub->SetOnDeleteComplete(nullptr);
+    });
+    ASSERT_TRUE(static_cast<bool>(eventHub->onDeleteComplete_));
+    eventHub->FireOnDeleteComplete();
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(static_cast<bool>(eventHub->onDeleteComplete_));
+    called = false;
+    eventHub->FireOnDeleteComplete();
+    EXPECT_FALSE(called);
+}
+
+/**
+ * @tc.name: FireOnWillChangeReentrancy001
+ * @tc.desc: test onWillChange_ self-destructive callback reentrancy
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEventTestNg, FireOnWillChangeReentrancy001, TestSize.Level1)
+{
+    auto eventHub = richEditorNode_->GetPattern<RichEditorPattern>()->GetEventHub<RichEditorEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool called = false;
+    eventHub->SetOnWillChange([&](const RichEditorChangeValue&) {
+        called = true;
+        eventHub->SetOnWillChange(nullptr);
+        return true;
+    });
+    ASSERT_TRUE(static_cast<bool>(eventHub->onWillChange_));
+    RichEditorChangeValue changeValue;
+    EXPECT_TRUE(eventHub->FireOnWillChange(changeValue));
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(static_cast<bool>(eventHub->onWillChange_));
+    called = false;
+    EXPECT_TRUE(eventHub->FireOnWillChange(changeValue));
+    EXPECT_FALSE(called);
+}
+
+/**
+ * @tc.name: FireOnDidChangeReentrancy001
+ * @tc.desc: test onDidChange_ self-destructive callback reentrancy
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEventTestNg, FireOnDidChangeReentrancy001, TestSize.Level1)
+{
+    auto eventHub = richEditorNode_->GetPattern<RichEditorPattern>()->GetEventHub<RichEditorEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool called = false;
+    eventHub->SetOnDidChange([&](const RichEditorChangeValue&) {
+        called = true;
+        eventHub->SetOnDidChange(nullptr);
+    });
+    ASSERT_TRUE(static_cast<bool>(eventHub->onDidChange_));
+    RichEditorChangeValue changeValue;
+    eventHub->FireOnDidChange(changeValue);
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(static_cast<bool>(eventHub->onDidChange_));
+    called = false;
+    eventHub->FireOnDidChange(changeValue);
+    EXPECT_FALSE(called);
+}
+
+/**
+ * @tc.name: FireOnScrollChangeReentrancy001
+ * @tc.desc: test onScrollChangeEvent_ self-destructive callback reentrancy
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEventTestNg, FireOnScrollChangeReentrancy001, TestSize.Level1)
+{
+    auto eventHub = richEditorNode_->GetPattern<RichEditorPattern>()->GetEventHub<RichEditorEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool called = false;
+    eventHub->SetOnScrollChangeEvent([&](float, float) {
+        called = true;
+        eventHub->SetOnScrollChangeEvent(nullptr);
+    });
+    ASSERT_TRUE(static_cast<bool>(eventHub->onScrollChangeEvent_));
+    eventHub->FireOnScrollChangeEvent(TEST_OFFSET_X, TEST_OFFSET_Y);
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(static_cast<bool>(eventHub->onScrollChangeEvent_));
+    called = false;
+    eventHub->FireOnScrollChangeEvent(TEST_OFFSET_X, TEST_OFFSET_Y);
+    EXPECT_FALSE(called);
+}
+
+/**
+ * @tc.name: FireOnContentSizeChangeReentrancy001
+ * @tc.desc: test onContentSizeChangeEvent_ self-destructive callback reentrancy
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEventTestNg, FireOnContentSizeChangeReentrancy001, TestSize.Level1)
+{
+    auto eventHub = richEditorNode_->GetPattern<RichEditorPattern>()->GetEventHub<RichEditorEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool called = false;
+    eventHub->SetOnContentSizeChange([&](float, float) {
+        called = true;
+        eventHub->SetOnContentSizeChange(nullptr);
+    });
+    ASSERT_TRUE(static_cast<bool>(eventHub->onContentSizeChangeEvent_));
+    eventHub->FireOnContentSizeChange(TEST_WIDTH, TEST_HEIGHT);
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(static_cast<bool>(eventHub->onContentSizeChangeEvent_));
+    called = false;
+    eventHub->FireOnContentSizeChange(TEST_WIDTH, TEST_HEIGHT);
+    EXPECT_FALSE(called);
+}
+
+/**
+ * @tc.name: FireOnCutReentrancy001
+ * @tc.desc: test onCut_ self-destructive callback reentrancy
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEventTestNg, FireOnCutReentrancy001, TestSize.Level1)
+{
+    auto eventHub = richEditorNode_->GetPattern<RichEditorPattern>()->GetEventHub<RichEditorEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool called = false;
+    eventHub->SetOnCut([&](NG::TextCommonEvent&) {
+        called = true;
+        eventHub->SetOnCut(nullptr);
+    });
+    ASSERT_TRUE(static_cast<bool>(eventHub->onCut_));
+    TextCommonEvent event;
+    eventHub->FireOnCut(event);
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(static_cast<bool>(eventHub->onCut_));
+    called = false;
+    eventHub->FireOnCut(event);
+    EXPECT_FALSE(called);
+}
+
+/**
+ * @tc.name: FireOnCopyReentrancy001
+ * @tc.desc: test onCopy_ self-destructive callback reentrancy
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEventTestNg, FireOnCopyReentrancy001, TestSize.Level1)
+{
+    auto eventHub = richEditorNode_->GetPattern<RichEditorPattern>()->GetEventHub<RichEditorEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool called = false;
+    eventHub->SetOnCopy([&](NG::TextCommonEvent&) {
+        called = true;
+        eventHub->SetOnCopy(nullptr);
+    });
+    ASSERT_TRUE(static_cast<bool>(eventHub->onCopy_));
+    TextCommonEvent event;
+    eventHub->FireOnCopy(event);
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(static_cast<bool>(eventHub->onCopy_));
+    called = false;
+    eventHub->FireOnCopy(event);
+    EXPECT_FALSE(called);
+}
+
+/**
+ * @tc.name: FireOnShareReentrancy001
+ * @tc.desc: test onShare_ self-destructive callback reentrancy
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEventTestNg, FireOnShareReentrancy001, TestSize.Level1)
+{
+    auto eventHub = richEditorNode_->GetPattern<RichEditorPattern>()->GetEventHub<RichEditorEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool called = false;
+    eventHub->SetOnShare([&](NG::TextCommonEvent&) {
+        called = true;
+        eventHub->SetOnShare(nullptr);
+    });
+    ASSERT_TRUE(static_cast<bool>(eventHub->onShare_));
+    TextCommonEvent event;
+    eventHub->FireOnShare(event);
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(static_cast<bool>(eventHub->onShare_));
+    called = false;
+    eventHub->FireOnShare(event);
+    EXPECT_FALSE(called);
+}
+
+/**
+ * @tc.name: FireOnStyledStringWillChangeReentrancy001
+ * @tc.desc: test onStyledStringWillChange_ self-destructive callback reentrancy
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEventTestNg, FireOnStyledStringWillChangeReentrancy001, TestSize.Level1)
+{
+    auto eventHub = richEditorNode_->GetPattern<RichEditorPattern>()->GetEventHub<RichEditorEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool called = false;
+    eventHub->SetOnStyledStringWillChange([&](const StyledStringChangeValue&) {
+        called = true;
+        eventHub->SetOnStyledStringWillChange(nullptr);
+        return true;
+    });
+    ASSERT_TRUE(static_cast<bool>(eventHub->onStyledStringWillChange_));
+    StyledStringChangeValue info;
+    EXPECT_TRUE(eventHub->FireOnStyledStringWillChange(info));
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(static_cast<bool>(eventHub->onStyledStringWillChange_));
+    called = false;
+    EXPECT_TRUE(eventHub->FireOnStyledStringWillChange(info));
+    EXPECT_FALSE(called);
+}
+
+/**
+ * @tc.name: FireOnStyledStringDidChangeReentrancy001
+ * @tc.desc: test onStyledStringDidChange_ self-destructive callback reentrancy
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEventTestNg, FireOnStyledStringDidChangeReentrancy001, TestSize.Level1)
+{
+    auto eventHub = richEditorNode_->GetPattern<RichEditorPattern>()->GetEventHub<RichEditorEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool called = false;
+    eventHub->SetOnStyledStringDidChange([&](const StyledStringChangeValue&) {
+        called = true;
+        eventHub->SetOnStyledStringDidChange(nullptr);
+    });
+    ASSERT_TRUE(static_cast<bool>(eventHub->onStyledStringDidChange_));
+    StyledStringChangeValue info;
+    eventHub->FireOnStyledStringDidChange(info);
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(static_cast<bool>(eventHub->onStyledStringDidChange_));
+    called = false;
+    eventHub->FireOnStyledStringDidChange(info);
+    EXPECT_FALSE(called);
+}
+
+/**
+ * @tc.name: FireOnSelectReentrancy001
+ * @tc.desc: test onSelect_ self-destructive callback reentrancy
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEventTestNg, FireOnSelectReentrancy001, TestSize.Level1)
+{
+    auto eventHub = richEditorNode_->GetPattern<RichEditorPattern>()->GetEventHub<RichEditorEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool called = false;
+    eventHub->SetOnSelect([&](const BaseEventInfo*) {
+        called = true;
+        eventHub->SetOnSelect(nullptr);
+    });
+    ASSERT_TRUE(static_cast<bool>(eventHub->onSelect_));
+    RichEditorInsertValue selectInfo;
+    eventHub->FireOnSelect(&selectInfo);
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(static_cast<bool>(eventHub->onSelect_));
+    called = false;
+    eventHub->FireOnSelect(&selectInfo);
+    EXPECT_FALSE(called);
+}
+
+/**
+ * @tc.name: FireOnSelectionChangeReentrancy001
+ * @tc.desc: test OnSelectionChange_ self-destructive callback reentrancy
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEventTestNg, FireOnSelectionChangeReentrancy001, TestSize.Level1)
+{
+    auto eventHub = richEditorNode_->GetPattern<RichEditorPattern>()->GetEventHub<RichEditorEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool called = false;
+    eventHub->SetOnSelectionChange([&](const BaseEventInfo*) {
+        called = true;
+        eventHub->SetOnSelectionChange(nullptr);
+    });
+    ASSERT_TRUE(static_cast<bool>(eventHub->OnSelectionChange_));
+    RichEditorInsertValue selectInfo;
+    eventHub->FireOnSelectionChange(&selectInfo);
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(static_cast<bool>(eventHub->OnSelectionChange_));
+    called = false;
+    eventHub->FireOnSelectionChange(&selectInfo);
+    EXPECT_FALSE(called);
+}
+
+/**
+ * @tc.name: FireOnPasteReentrancy001
+ * @tc.desc: test onPaste_ self-destructive callback reentrancy
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEventTestNg, FireOnPasteReentrancy001, TestSize.Level1)
+{
+    auto eventHub = richEditorNode_->GetPattern<RichEditorPattern>()->GetEventHub<RichEditorEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool called = false;
+    eventHub->SetOnPaste([&](NG::TextCommonEvent&) {
+        called = true;
+        eventHub->SetOnPaste(nullptr);
+    });
+    ASSERT_TRUE(static_cast<bool>(eventHub->onPaste_));
+    TextCommonEvent event;
+    eventHub->FireOnPaste(event);
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(static_cast<bool>(eventHub->onPaste_));
+    called = false;
+    eventHub->FireOnPaste(event);
+    EXPECT_FALSE(called);
+}
+
+/**
+ * @tc.name: FireOnSubmitReentrancy001
+ * @tc.desc: test onSubmit_ self-destructive callback reentrancy
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEventTestNg, FireOnSubmitReentrancy001, TestSize.Level1)
+{
+    auto eventHub = richEditorNode_->GetPattern<RichEditorPattern>()->GetEventHub<RichEditorEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool called = false;
+    eventHub->SetOnSubmit([&](int32_t, NG::TextFieldCommonEvent&) {
+        called = true;
+        eventHub->SetOnSubmit(nullptr);
+    });
+    ASSERT_TRUE(static_cast<bool>(eventHub->onSubmit_));
+    TextFieldCommonEvent event;
+    eventHub->FireOnSubmit(0, event);
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(static_cast<bool>(eventHub->onSubmit_));
+    called = false;
+    eventHub->FireOnSubmit(0, event);
+    EXPECT_FALSE(called);
+}
+
+/**
+ * @tc.name: FireOnWillAttachIMEReantrancy001
+ * @tc.desc: test onWillAttachIME_ self-destructive callback reentrancy
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEventTestNg, FireOnWillAttachIMEReantrancy001, TestSize.Level1)
+{
+    auto eventHub = richEditorNode_->GetPattern<RichEditorPattern>()->GetEventHub<RichEditorEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool called = false;
+    eventHub->SetOnWillAttachIME([&](IMEClient&) {
+        called = true;
+        eventHub->SetOnWillAttachIME(nullptr);
+    });
+    ASSERT_TRUE(static_cast<bool>(eventHub->onWillAttachIME_));
+    IMEClient imeClient;
+    eventHub->FireOnWillAttachIME(imeClient);
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(static_cast<bool>(eventHub->onWillAttachIME_));
+    called = false;
+    eventHub->FireOnWillAttachIME(imeClient);
+    EXPECT_FALSE(called);
+}
+
+/**
+ * @tc.name: FireOnInputFilterErrorReentrancy001
+ * @tc.desc: test onInputFilterError_ self-destructive callback reentrancy
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEventTestNg, FireOnInputFilterErrorReentrancy001, TestSize.Level1)
+{
+    auto eventHub = richEditorNode_->GetPattern<RichEditorPattern>()->GetEventHub<RichEditorEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool called = false;
+    eventHub->SetOnInputFilterError([&](const std::u16string&) {
+        called = true;
+        eventHub->SetOnInputFilterError(nullptr);
+    });
+    ASSERT_TRUE(static_cast<bool>(eventHub->onInputFilterError_));
+    eventHub->FireOnInputFilterError(u"test");
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(static_cast<bool>(eventHub->onInputFilterError_));
+    called = false;
+    eventHub->FireOnInputFilterError(u"test");
+    EXPECT_FALSE(called);
+}
+
+/**
+ * @tc.name: FireOnSecurityStateChangedReentrancy001
+ * @tc.desc: test onSecurityStateChanged_ self-destructive callback reentrancy
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorEventTestNg, FireOnSecurityStateChangedReentrancy001, TestSize.Level1)
+{
+    auto eventHub = richEditorNode_->GetPattern<RichEditorPattern>()->GetEventHub<RichEditorEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool called = false;
+    eventHub->SetOnSecurityStateChange([&](bool) {
+        called = true;
+        eventHub->SetOnSecurityStateChange(nullptr);
+    });
+    ASSERT_TRUE(static_cast<bool>(eventHub->onSecurityStateChanged_));
+    eventHub->FireOnSecurityStateChanged(true);
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(static_cast<bool>(eventHub->onSecurityStateChanged_));
+    called = false;
+    eventHub->FireOnSecurityStateChanged(true);
+    EXPECT_FALSE(called);
+}
+
+/**
  * @tc.name: CapiContentScroll001
  * @tc.desc: Test CAPI ContentScroll callback set/reset and trigger via HandleContentScroll.
  * @tc.type: FUNC
