@@ -1,0 +1,53 @@
+# Copyright (c) 2026 Huawei Device Co., Ltd.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import("//build/config/components/ets_frontend/es2abc_config.gni")
+import("//build/ohos.gni")
+import("//foundation/arkui/ace_engine/ace_config.gni")
+import("//foundation/arkui/ace_engine/build/ace_gen_obj.gni")
+
+# Intermediate name ("..._gen.abc") avoids a Duplicate output file collision
+# with the ohos_prebuilt_etc copy below — target_out_dir is per-directory, so
+# both targets would otherwise claim ".../web/source/hds_color_picker_wrapper.abc".
+es2abc_gen_abc("gen_hds_color_picker_wrapper_abc") {
+  src_js = rebase_path("hds_color_picker_wrapper.ets")
+  dst_file = rebase_path(target_out_dir + "/hds_color_picker_wrapper_gen.abc")
+  in_puts = [ "hds_color_picker_wrapper.ets" ]
+  out_puts = [ target_out_dir + "/hds_color_picker_wrapper_gen.abc" ]
+  extra_args = [ "--module" ]
+}
+
+gen_obj("hds_color_picker_wrapper_abc") {
+  input = get_label_info(":gen_hds_color_picker_wrapper_abc", "target_out_dir") +
+          "/hds_color_picker_wrapper_gen.abc"
+  if (use_mac || use_mingw_win || use_linux || target_os == "ios") {
+    output = target_out_dir + "/hds_color_picker_wrapper_abc.c"
+  } else {
+    output = target_out_dir + "/hds_color_picker_wrapper_abc.o"
+  }
+  snapshot_dep = [ ":gen_hds_color_picker_wrapper_abc" ]
+}
+
+source_set("hds_color_picker_wrapper") {
+  deps = [ ":gen_obj_src_hds_color_picker_wrapper_abc" ]
+}
+
+ohos_prebuilt_etc("hds_color_picker_wrapper_etc") {
+  source = get_label_info(":gen_hds_color_picker_wrapper_abc", "target_out_dir") +
+           "/hds_color_picker_wrapper_gen.abc"
+  deps = [ ":gen_hds_color_picker_wrapper_abc" ]
+  output = "hds_color_picker_wrapper.abc"
+  module_install_dir = "etc/abc/arkui"
+  subsystem_name = ace_engine_subsystem
+  part_name = ace_engine_part
+}

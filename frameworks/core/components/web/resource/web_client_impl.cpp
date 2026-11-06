@@ -1884,4 +1884,27 @@ void WebClientImpl::OnInputMethodAttached()
     ContainerScope scope(delegate->GetInstanceId());
     delegate->OnInputMethodAttached();
 }
+
+void WebClientImpl::OnColorChooserPopup(const std::string& color,
+    const std::vector<NWeb::NWebColorSuggestion>& suggestions,
+    std::shared_ptr<NWeb::NWebColorChooserCallback> callback)
+{
+    auto delegate = webDelegate_.Upgrade();
+    if (!delegate) {
+        if (callback) {
+            callback->Cancel();
+        }
+        return;
+    }
+    ContainerScope scope(delegate->GetInstanceId());
+    delegate->OnColorChooserPopup(color, suggestions, callback);
+}
+
+void WebClientImpl::OnColorChooserClose()
+{
+    auto delegate = webDelegate_.Upgrade();
+    CHECK_NULL_VOID(delegate);
+    ContainerScope scope(delegate->GetInstanceId());
+    delegate->OnColorChooserClose();
+}
 } // namespace OHOS::Ace

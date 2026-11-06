@@ -11567,4 +11567,26 @@ uint64_t WebDelegate::GetDelegateUIContextToken()
 
     return rsUIContext->GetToken();
 }
+
+void WebDelegate::OnColorChooserPopup(const std::string& color,
+    const std::vector<OHOS::NWeb::NWebColorSuggestion>& suggestions,
+    std::shared_ptr<OHOS::NWeb::NWebColorChooserCallback> callback)
+{
+    auto webPattern = webPattern_.Upgrade();
+    if (!webPattern) {
+        if (callback) {
+            callback->Cancel();
+        }
+        return;
+    }
+    webPattern->OnColorChooserPopup(color, suggestions, callback);
+}
+
+void WebDelegate::OnColorChooserClose()
+{
+    auto webPattern = webPattern_.Upgrade();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->OnColorChooserClose();
+}
+
 } // namespace OHOS::Ace

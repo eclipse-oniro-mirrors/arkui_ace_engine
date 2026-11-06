@@ -1827,6 +1827,11 @@ public:
     void FetchCloudControlWebAutoLayoutConfig();
     void UpdateTouchEventFeatureDetectionEnabled();
 
+    void OnColorChooserPopup(const std::string& color,
+        const std::vector<OHOS::NWeb::NWebColorSuggestion>& suggestions,
+        std::shared_ptr<OHOS::NWeb::NWebColorChooserCallback> callback);
+    void OnColorChooserClose();
+
     // ===== PageScene Rule-Based Perception Methods =====
 
     void ExecuteReportOnRegisterMatch(int32_t processId);
