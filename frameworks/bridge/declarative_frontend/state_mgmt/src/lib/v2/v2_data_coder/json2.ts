@@ -50,10 +50,18 @@ class JSON2 {
     // don't trust JSON replacer's arg 'val' (it turns Date objects into strings)
     const value = obj[key];
 
-    if (value === null) { throw new TypeError('Cannot read property __proto__ of null'); }
-    if (typeof value === 'string') { return `st????${value}`; }
-    if (typeof value === 'bigint') { return `bi????${value.toString()}`; }
-    if (typeof value === 'undefined') { return `re????`; }
+    if (value === null) {
+      throw new TypeError('Cannot read property __proto__ of null');
+    }
+    if (typeof value === 'string') {
+      return `st????${value}`;
+    }
+    if (typeof value === 'bigint') {
+      return `bi????${value.toString()}`;
+    }
+    if (typeof value === 'undefined') {
+      return `re????`;
+    }
     if (typeof value !== 'object') {
       return value;
     }
@@ -96,15 +104,33 @@ class JSON2 {
   private static trySpecialType_(value: object, refId: string,
     serialize: (v: unknown, isRoot?: boolean) => string,
     serializeSendable: (v: unknown) => string): string | null {
-    if (value instanceof Boolean) { return `Bo${refId}${value.toString()}`; }
-    if (value instanceof Date) { return `Da${refId}${value.toISOString()}`; }
-    if (value instanceof Number) { return `Nu${refId}${value.toString()}`; }
-    if (value instanceof String) { return `St${refId}${value}`; }
-    if (value instanceof Set) { return `Se${refId}${serialize([...value])}`; }
-    if (value instanceof SendableArray) { return `SA${refId}${serializeSendable([...value])}`; }
-    if (value instanceof SendableMap) { return `SM${refId}${serializeSendable([...value])}`; }
-    if (value instanceof SendableSet) { return `SS${refId}${serializeSendable([...value])}`; }
-    if (globalThis.isSendable(value)) { return `SO${refId}${serializeSendable(value)}`; }
+    if (value instanceof Boolean) {
+      return `Bo${refId}${value.toString()}`;
+    }
+    if (value instanceof Date) {
+      return `Da${refId}${value.toISOString()}`;
+    }
+    if (value instanceof Number) {
+      return `Nu${refId}${value.toString()}`;
+    }
+    if (value instanceof String) {
+      return `St${refId}${value}`;
+    }
+    if (value instanceof Set) {
+      return `Se${refId}${serialize([...value])}`;
+    }
+    if (value instanceof SendableArray) {
+      return `SA${refId}${serializeSendable([...value])}`;
+    }
+    if (value instanceof SendableMap) {
+      return `SM${refId}${serializeSendable([...value])}`;
+    }
+    if (value instanceof SendableSet) {
+      return `SS${refId}${serializeSendable([...value])}`;
+    }
+    if (globalThis.isSendable(value)) {
+      return `SO${refId}${serializeSendable(value)}`;
+    }
     return null;
   }
 
@@ -190,14 +216,14 @@ class JSON2 {
   // Parse JSON string with special types, gathering objects and their refIDs
   static parseStructure(text: string, objects: Map<string, object>): unknown {
     const parse = (str: string): any =>
-      JSON.parse(str, reviver)
+      JSON.parse(str, reviver);
 
-    const parseMap = (str: string): Map<string|number, string> =>
-      new Map(JSON.parse(str).map(([key, val]: [string|number, string]) => [key, parse(val)]))
+    const parseMap = (str: string): Map<string | number, string> =>
+      new Map(JSON.parse(str).map(([key, val]: [string | number, string]) => [key, parse(val)]));
 
     const parseSendable = (str: string): any =>
       // reviver is not supported by parseSendable()
-      (JSON as any)?.parseSendable(str)?? ''
+      (JSON as any)?.parseSendable(str) ?? '';
 
     const reviver = function(key: string, value: unknown): any {
       const { type, refId, payload } = JSON2.parseTRP(value as string);
@@ -242,7 +268,7 @@ class JSON2 {
   }
 
   // Iterate any collection, callback(value, key)
-  static forEach(col: object, callback: (val: unknown, key: string|number) => void): void {
+  static forEach(col: object, callback: (val: unknown, key: string | number) => void): void {
     if (col instanceof Array) {
       for (const [key, val] of col.entries()) {
         callback(val, key);
