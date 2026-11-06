@@ -246,6 +246,33 @@ private:
     WeakPtr<NG::NavigationManager> mgr_;
 };
 
+class WindowVisibilityChangedListener : public OHOS::Rosen::IWindowVisibilityChangedListener {
+public:
+    explicit WindowVisibilityChangedListener(int32_t instanceId) : instanceId_(instanceId) {}
+    ~WindowVisibilityChangedListener() = default;
+
+    void OnWindowVisibilityChangedCallback(const bool isVisible) override
+    {
+        auto container = AceContainer::GetContainer(instanceId_);
+        CHECK_NULL_VOID(container);
+        auto taskExecutor = container->GetTaskExecutor();
+        CHECK_NULL_VOID(taskExecutor);
+        auto task = [instanceId = instanceId_, isVisible]() {
+            ContainerScope scope(instanceId);
+            auto container = AceContainer::GetContainer(instanceId);
+            CHECK_NULL_VOID(container);
+            auto pipeline = AceType::DynamicCast<NG::PipelineContext>(container->GetPipelineContext());
+            CHECK_NULL_VOID(pipeline);
+            pipeline->OnWindowVisibilityChanged(isVisible);
+        };
+        taskExecutor->PostTask(std::move(task), TaskExecutor::TaskType::UI,
+            "ArkUIWindowVisibilityChanged", PriorityType::VIP);
+    }
+
+private:
+    int32_t instanceId_ = -1;
+};
+
 constexpr char DECLARATIVE_ARK_ENGINE_SHARED_LIB[] = "libace_engine_declarative_ark.z.so";
 const char* GetDeclarativeSharedLibrary()
 {
@@ -3269,7 +3296,17 @@ void AceContainer::AttachView(std::shared_ptr<Window> window, const RefPtr<AceVi
 
 void AceContainer::SetUIWindowInner(sptr<OHOS::Rosen::Window> uiWindow)
 {
+    if (uiWindow_ && windowVisibilityListener_) {
+        uiWindow_->UnregisterWindowVisibilityChangeListener(windowVisibilityListener_);
+        windowVisibilityListener_ = nullptr;
+    }
     uiWindow_ = uiWindow;
+    if (uiWindow_) {
+        windowVisibilityListener_ = new WindowVisibilityChangedListener(instanceId_);
+        auto res = uiWindow_->RegisterWindowVisibilityChangeListener(windowVisibilityListener_);
+        TAG_LOGI(AceLogTag::ACE_WINDOW, "register window visibility listener, instance: %{public}d, ret: %{public}d",
+            instanceId_, static_cast<int32_t>(res));
+    }
 }
 
 sptr<OHOS::Rosen::Window> AceContainer::GetUIWindowInner() const

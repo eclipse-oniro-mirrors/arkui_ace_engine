@@ -596,6 +596,12 @@ public:
 
     void RemoveWindowStateChangedCallback(int32_t nodeId);
 
+    void AddWindowVisibilityChangedCallback(int32_t nodeId, const std::function<void(bool)>& callback);
+
+    void RemoveWindowVisibilityChangedCallback(int32_t nodeId);
+
+    void OnWindowVisibilityChanged(bool isVisible);
+
     void AddWindowFocusChangedCallback(int32_t nodeId);
 
     void RemoveWindowFocusChangedCallback(int32_t nodeId);
@@ -1796,6 +1802,7 @@ private:
     bool isRightMouseMappingActive_ = false;
     std::function<void()> onRightMouseMappingCancel_;
     std::unique_ptr<NG::UITreeRequestState> uiTreeRequestState_;
+    std::map<int32_t, std::function<void(bool)>> onWindowVisibilityChangedCallbacks_;
 };
 
 /**

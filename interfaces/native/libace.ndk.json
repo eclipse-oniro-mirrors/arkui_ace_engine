@@ -4424,6 +4424,10 @@
         "name": "OH_ArkUI_SurfaceHolder_SetSurfaceConfig"
     },
     {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_XComponent_EnableSurfaceVisibilityLifecycle"
+    },
+    {
         "first_introduced": "22",
         "name": "OH_ArkUI_ShowCounterConfig_Create"
     },

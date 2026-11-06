@@ -81,6 +81,9 @@ protected:
     void OnDetachFromFrameNode(FrameNode* frameNode) override;
     void OnWindowHide() override;
     void OnWindowShow() override;
+    void OnVisibilityLifecycleCreate() override;
+    void OnVisibilityLifecycleDestroy() override;
+    bool IsSurfaceLifecycleReady() const override;
     void OnRebuildFrame() override;
     void OnModifyDone() override;
     void DumpInfo() override;
@@ -117,6 +120,7 @@ private:
 
     bool autoInitialize_ = true;
     bool isInitialized_ = false;
+    bool hasSurfaceInitialized_ = false;
     bool isLifecycleInterfaceCalled_ = false;
     bool usesSuperMethod_ = false;
     bool needNotifySizeChanged_ = false;

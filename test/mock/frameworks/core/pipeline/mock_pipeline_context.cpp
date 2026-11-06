@@ -578,6 +578,25 @@ void PipelineContext::RemoveWindowStateChangedCallback(int32_t nodeId)
     onWindowStateChangedCallbacks_.erase(nodeId);
 }
 
+void PipelineContext::AddWindowVisibilityChangedCallback(int32_t nodeId, const std::function<void(bool)>& callback)
+{
+    onWindowVisibilityChangedCallbacks_.emplace(nodeId, callback);
+}
+
+void PipelineContext::RemoveWindowVisibilityChangedCallback(int32_t nodeId)
+{
+    onWindowVisibilityChangedCallbacks_.erase(nodeId);
+}
+
+void PipelineContext::OnWindowVisibilityChanged(bool isVisible)
+{
+    for (const auto& entry : onWindowVisibilityChangedCallbacks_) {
+        if (entry.second) {
+            entry.second(isVisible);
+        }
+    }
+}
+
 void PipelineContext::AddNodesToNotifyMemoryLevel(int32_t nodeId) {}
 
 void PipelineContext::RemoveNodesToNotifyMemoryLevel(int32_t nodeId) {}

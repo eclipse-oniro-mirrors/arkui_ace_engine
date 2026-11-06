@@ -521,6 +521,16 @@ void ResetXComponentEnableTransparentLayerImpl(ArkUINodeHandle /*node*/)
     GetModelImpl()->EnableTransparentLayer(false);
 }
 
+void SetXComponentSurfaceVisibilityLifecycleImpl(ArkUINodeHandle /*node*/, ArkUI_Bool isVisibilityLifecycle)
+{
+    GetModelImpl()->SetSurfaceVisibilityLifecycle(isVisibilityLifecycle);
+}
+
+void ResetXComponentSurfaceVisibilityLifecycleImpl(ArkUINodeHandle /*node*/)
+{
+    GetModelImpl()->SetSurfaceVisibilityLifecycle(false);
+}
+
 void SetXComponentBufferQueueCountImpl(ArkUINodeHandle /*node*/, ArkUI_Int32 bufferQueueCount)
 {
     GetModelImpl()->SetBufferQueueCount(bufferQueueCount);
@@ -1446,6 +1456,20 @@ void ResetXComponentEnableTransparentLayer(ArkUINodeHandle node)
     XComponentModelNG::EnableTransparentLayer(frameNode, false);
 }
 
+void SetXComponentSurfaceVisibilityLifecycle(ArkUINodeHandle node, ArkUI_Bool isVisibilityLifecycle)
+{
+    auto* frameNode = GetFrameNode(node);
+    CHECK_NULL_VOID(frameNode);
+    XComponentModelNG::SetSurfaceVisibilityLifecycle(frameNode, isVisibilityLifecycle);
+}
+
+void ResetXComponentSurfaceVisibilityLifecycle(ArkUINodeHandle node)
+{
+    auto* frameNode = GetFrameNode(node);
+    CHECK_NULL_VOID(frameNode);
+    XComponentModelNG::SetSurfaceVisibilityLifecycle(frameNode, false);
+}
+
 void SetXComponentBufferQueueCount(ArkUINodeHandle node, ArkUI_Int32 bufferQueueCount)
 {
     auto* frameNode = GetFrameNode(node);
@@ -2121,6 +2145,8 @@ const ArkUIXComponentModifier* GetXComponentDynamicModifier()
             .setXComponentExtraFlag = SetXComponentExtraFlagImpl,
             .setXComponentEnableTransparentLayer = SetXComponentEnableTransparentLayerImpl,
             .resetXComponentEnableTransparentLayer = ResetXComponentEnableTransparentLayerImpl,
+            .setXComponentSurfaceVisibilityLifecycle = SetXComponentSurfaceVisibilityLifecycleImpl,
+            .resetXComponentSurfaceVisibilityLifecycle = ResetXComponentSurfaceVisibilityLifecycleImpl,
             .setXComponentBufferQueueCount = SetXComponentBufferQueueCountImpl,
             .resetXComponentBufferQueueCount = ResetXComponentBufferQueueCountImpl,
             .getXComponentBufferQueueCount = nullptr,
@@ -2242,6 +2268,8 @@ const ArkUIXComponentModifier* GetXComponentDynamicModifier()
         .setXComponentExtraFlag = SetXComponentExtraFlag,
         .setXComponentEnableTransparentLayer = SetXComponentEnableTransparentLayer,
         .resetXComponentEnableTransparentLayer = ResetXComponentEnableTransparentLayer,
+        .setXComponentSurfaceVisibilityLifecycle = SetXComponentSurfaceVisibilityLifecycle,
+        .resetXComponentSurfaceVisibilityLifecycle = ResetXComponentSurfaceVisibilityLifecycle,
         .setXComponentBufferQueueCount = SetXComponentBufferQueueCount,
         .resetXComponentBufferQueueCount = ResetXComponentBufferQueueCount,
         .getXComponentBufferQueueCount = GetXComponentBufferQueueCount,

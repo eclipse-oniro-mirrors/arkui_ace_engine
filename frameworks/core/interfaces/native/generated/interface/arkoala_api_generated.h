@@ -29414,6 +29414,8 @@ typedef struct GENERATED_ArkUIXComponentModifier {
                             Ark_Int32 value);
     void (*setBufferQueueCount)(Ark_NativePointer node,
                                 Ark_Int32 value);
+    void (*setEnableSurfaceVisibilityLifecycle)(Ark_NativePointer node,
+                                                const Opt_Boolean* value);
     void (*setHdrBrightness1)(Ark_NativePointer node,
                               const Opt_Float64* brightness,
                               const Opt_HdrType* type);

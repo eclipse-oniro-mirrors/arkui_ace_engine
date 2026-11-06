@@ -1311,6 +1311,21 @@ void OH_ArkUI_XComponentSurfaceConfig_SetIsOpaque(ArkUI_XComponentSurfaceConfig*
 int32_t OH_ArkUI_SurfaceHolder_SetSurfaceConfig(
     OH_ArkUI_SurfaceHolder *surfaceHolder,
     ArkUI_XComponentSurfaceConfig *config);
+
+/**
+ * @brief Enables the surface visibility lifecycle for an XComponent.
+ *
+ * @param component [in] Indicates the pointer to the XComponent.
+ * @param isVisibilityLifecycle [in] Indicates whether to enable the surface visibility lifecycle.
+ * @return Returns the status code of the execution.
+ *         <ul>
+ *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} the execution is successful.</li>
+ *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter error occurs.</li>
+ *         </ul>
+ * @since 26.1.0
+ */
+int32_t OH_ArkUI_XComponent_EnableSurfaceVisibilityLifecycle(
+    OH_NativeXComponent* component, bool isVisibilityLifecycle);
 #ifdef __cplusplus
 };
 #endif

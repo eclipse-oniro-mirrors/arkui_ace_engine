@@ -1883,6 +1883,7 @@ declare class ArkXComponentComponent implements CommonMethod<XComponentAttribute
     enableSecure(value: boolean): this;
     hdrBrightness(value: number, hdrType?: HdrType): this;
     enableTransparentLayer(value: boolean): this;
+    enableSurfaceVisibilityLifecycle(value: boolean): this;
     bufferQueueCount(count: number): this;
 }
 declare class ArkBadgeComponent extends ArkComponent implements BadgeAttribute {

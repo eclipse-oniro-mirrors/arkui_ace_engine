@@ -86,6 +86,7 @@ public:
     virtual void HdrBrightness(float hdrBrightness, HdrType hdrType) {}
     virtual void SetExtraFlag(uint32_t flag) {}
     virtual void EnableTransparentLayer(bool isTransparentLayer) {}
+    virtual void SetSurfaceVisibilityLifecycle(bool isVisibilityLifecycle) {}
     virtual void SetBufferQueueCount(int32_t bufferQueueCount) {}
     virtual void SetScreenId(uint64_t screenId) {}
 };

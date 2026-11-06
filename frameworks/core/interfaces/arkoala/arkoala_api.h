@@ -9911,6 +9911,8 @@ struct ArkUIXComponentModifier {
     void (*setXComponentExtraFlag)(ArkUINodeHandle node, ArkUI_Uint32 flag);
     void (*setXComponentEnableTransparentLayer)(ArkUINodeHandle node, ArkUI_Bool enable);
     void (*resetXComponentEnableTransparentLayer)(ArkUINodeHandle node);
+    void (*setXComponentSurfaceVisibilityLifecycle)(ArkUINodeHandle node, ArkUI_Bool isVisibilityLifecycle);
+    void (*resetXComponentSurfaceVisibilityLifecycle)(ArkUINodeHandle node);
     void (*setXComponentBufferQueueCount)(ArkUINodeHandle node, ArkUI_Int32 bufferQueueCount);
     void (*resetXComponentBufferQueueCount)(ArkUINodeHandle node);
     ArkUI_Int32 (*getXComponentBufferQueueCount)(ArkUINodeHandle node);

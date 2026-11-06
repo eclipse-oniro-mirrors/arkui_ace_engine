@@ -242,6 +242,17 @@ void SetEnableTransparentLayerImpl(Ark_NativePointer node,
     XComponentModelNG::EnableTransparentLayer(frameNode, convValue.value_or(false));
     #endif // XCOMPONENT_SUPPORTED
 }
+void SetEnableSurfaceVisibilityLifecycleImpl(Ark_NativePointer node,
+                                             const Opt_Boolean* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    ACE_UINODE_TRACE(frameNode);
+    #ifdef XCOMPONENT_SUPPORTED
+    auto convValue = Converter::OptConvertPtr<bool>(value);
+    XComponentModelNG::SetSurfaceVisibilityLifecycle(frameNode, convValue.value_or(false));
+    #endif // XCOMPONENT_SUPPORTED
+}
 void SetBufferQueueCountImpl(Ark_NativePointer node,
                              Ark_Int32 value)
 {
@@ -280,6 +291,8 @@ const GENERATED_ArkUIXComponentModifier* GetXComponentStaticModifier()
         modifier.setEnableTransparentLayer = XComponentAttributeModifier::SetEnableTransparentLayerImpl;
         modifier.setHdrBrightness0 = XComponentAttributeModifier::SetHdrBrightness0Impl;
         modifier.setBufferQueueCount = XComponentAttributeModifier::SetBufferQueueCountImpl;
+        modifier.setEnableSurfaceVisibilityLifecycle =
+            XComponentAttributeModifier::SetEnableSurfaceVisibilityLifecycleImpl;
         modifier.setHdrBrightness1 = XComponentAttributeModifier::SetHdrBrightness1Impl;
         // The int literal 0 prefers the SFINAE overload when the SDK table has the
         // field; if that overload is removed, 0 converts to the long no-op instead.

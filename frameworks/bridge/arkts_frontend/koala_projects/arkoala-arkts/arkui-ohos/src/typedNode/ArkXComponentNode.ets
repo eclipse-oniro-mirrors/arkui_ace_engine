@@ -84,4 +84,8 @@ export class ArkXComponentNode extends ArkBaseNode implements XComponentAttribut
         this.getPeer()?.setBufferQueueCountAttribute(count);
         return this;
     }
+    enableSurfaceVisibilityLifecycle(value: boolean | undefined): this {
+        this.getPeer()?.setEnableSurfaceVisibilityLifecycleAttribute(value);
+        return this;
+    }
 }
