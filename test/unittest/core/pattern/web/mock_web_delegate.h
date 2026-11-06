@@ -36,6 +36,12 @@ void SetMockSerializeWebState(const std::vector<uint8_t>& result);
 void ResetMockSerializeWebState();
 void SetMockRestoreWebState(bool result);
 void ResetMockRestoreWebState();
+// Test-only recording for WebDelegate::GetElementInfoForSecurityHitTest. GetRecordedSecurityHitTestInfo
+// copies the values captured from the last call and returns whether the delegate method was called;
+// ResetMockSecurityHitTestInfo clears the recording.
+void ResetMockSecurityHitTestInfo();
+bool GetRecordedSecurityHitTestInfo(int32_t& id, double& x, double& y, bool& fromOverlay,
+    int32_t& callingUid, uint64_t& sessionId, std::string& response);
 
 // Test-only knobs to capture WebDelegate::RequestNativeDomTree calls.
 // SetMockRequestNativeDomTreeCallback installs a callback invoked on every

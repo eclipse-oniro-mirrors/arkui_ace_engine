@@ -206,6 +206,14 @@ enum class VideoPlaybackNotificationType {
     ON_VIDEO_SIZE_CHANGED
 };
 
+struct WebSecurityHitTestElementInfo {
+    int32_t domNodeId = -1;
+    std::string securityLabel;
+    std::string pageUuid;
+    std::string xpath;
+    std::string elementId;
+};
+
 using CursorStyleInfo = std::tuple<OHOS::NWeb::CursorType, std::shared_ptr<OHOS::NWeb::NWebCursorInfo>>;
 
 class WebPattern : public NestableScrollContainer,
@@ -1133,6 +1141,7 @@ public:
     bool ConvertMouseToTouchByWhiteList(MouseInfo& mouseInfo, TouchEventInfo& touchEventInfo);
     virtual bool IsConvertByWhiteList();
 
+    bool ReportDecsionForSecurityHitTest(int32_t callingUid, uint64_t sessionId, std::string& response);
     void SetAILinkMenuShow(bool isAILinkMenuShow)
     {
         isAILinkMenuShow_ = isAILinkMenuShow;
@@ -1525,6 +1534,9 @@ private:
         SourceTool sourceTool = SourceTool::UNKNOWN;
     };
     static bool ParseTouchInfo(const TouchEventInfo& info, std::list<TouchInfo>& touchInfos);
+    void JudgeSecurityHitTestForValidation(const int32_t& id, const double& x, const double& y,
+        bool fromOverlay, const TouchEventInfo& eventInfo);
+    WebSecurityHitTestElementInfo ParseSecurityHitTestElementInfo(const std::string& responseJson);
     void InitEnhanceSurfaceFlag();
     void UpdateBackgroundColorRightNow(int32_t color);
     void UpdateContentOffset(const RefPtr<LayoutWrapper>& dirty);

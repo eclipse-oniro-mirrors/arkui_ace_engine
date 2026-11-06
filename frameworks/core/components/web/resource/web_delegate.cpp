@@ -75,7 +75,7 @@
 #include "core/components_ng/base/ui_node.h"
 #include "frameworks/base/utils/system_properties.h"
 #endif
-
+#include "nweb_value_callback.h"
 #include "core/common/container.h"
 #include "base/include/ark_web_errno.h"
 #include "arkweb_utils.h"
@@ -230,6 +230,30 @@ void HandleVideoStatusCallback(
         callback(value);
     }
 }
+
+class SecurityHitTestCallback : public OHOS::NWeb::NWebStringValueCallback {
+public:
+    explicit SecurityHitTestCallback(WeakPtr<WebDelegate> webDelegate,
+        std::shared_ptr<SecurityHitTestInfo> state)
+        : state_(std::move(state)), webDelegate_(webDelegate) {}
+    ~SecurityHitTestCallback() override = default;
+
+    void OnReceiveValue(const std::string& value) override
+    {
+        if(state_){
+            state_->response = value;
+        }
+        auto delegate = webDelegate_.Upgrade();
+        if (delegate) {
+            TAG_LOGD(AceLogTag::ACE_WEB, "SecurityHitTestCallback OnReceiveValue called");
+            delegate->OnTouchForSecurityHitTest(state_);
+        }
+    }
+private:
+    std::shared_ptr<SecurityHitTestInfo> state_;
+    WeakPtr<WebDelegate> webDelegate_;
+};
+
 } // namespace
 
 #define EGLCONFIG_VERSION 3
@@ -5518,6 +5542,57 @@ void WebDelegate::SetAudioMuted(bool muted)
     if (nweb_) {
         nweb_->SetAudioMuted(muted);
     }
+}
+
+void WebDelegate::GetElementInfoForSecurityHitTest(SecurityHitTestInfo& secInfo)
+{
+    auto context = context_.Upgrade();
+    CHECK_NULL_VOID(context);
+    auto state = std::make_shared<SecurityHitTestInfo>();
+    CHECK_NULL_VOID(state);
+    state->id = secInfo.id;
+    state->x = secInfo.x;
+    state->y = secInfo.y;
+    state->from_overlay = secInfo.from_overlay;
+    state->callingUid = secInfo.callingUid;
+    state->sessionId = secInfo.sessionId;
+    state->response = secInfo.response;
+
+    context->GetTaskExecutor()->PostTask(
+        [weak = WeakClaim(this), x = state->x, y= state->y, state]() {
+            auto delegate = weak.Upgrade();
+            if (!delegate) {
+                return;
+            }
+            auto callback = std::make_shared<SecurityHitTestCallback>(weak, state);
+            if (delegate->nweb_) {
+                delegate->nweb_->GetElementInfoForSecurityHitTest(x, y, callback);
+                TAG_LOGD(AceLogTag::ACE_WEB, "WebDelegate::GetElementInfoForSecurityHitTest called");
+            }
+        },
+        TaskExecutor::TaskType::PLATFORM, "ArkUIWebGetElementInfoForSecurityHitTest");
+}
+
+void WebDelegate::OnTouchForSecurityHitTest(std::shared_ptr<SecurityHitTestInfo> state)
+{
+    auto context = context_.Upgrade();
+    CHECK_NULL_VOID(context);
+    context->GetTaskExecutor()->PostTask(
+        [weak = WeakClaim(this), state]() {
+            auto delegate = weak.Upgrade();
+            CHECK_NULL_VOID(delegate);
+            auto webPattern = delegate->webPattern_.Upgrade();
+            CHECK_NULL_VOID(webPattern);
+            CHECK_NULL_VOID(state);
+            TAG_LOGD(AceLogTag::ACE_WEB, "WebDelegate::OnTouchForSecurityHitTest report");
+            bool allowed = webPattern->ReportDecsionForSecurityHitTest(
+                state->callingUid, state->sessionId, state->response);
+            if (allowed && delegate->nweb_) {
+                TAG_LOGD(AceLogTag::ACE_WEB, "WebDelegate::OnTouchForSecurityHitTest TouchPress");
+                delegate->nweb_->OnTouchPress(state->id, state->x, state->y, state->from_overlay);
+            }
+        },
+        TaskExecutor::TaskType::PLATFORM, "ArkUIWebReportForSecurityHitTest");
 }
 
 void WebDelegate::SetVideoSurface(std::string surfaceId)

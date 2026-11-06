@@ -66,6 +66,8 @@
 #include "arkweb_utils.h"
 #include "bridge/common/utils/engine_helper.h"
 #include "core/accessibility/accessibility_manager.h"
+#include "base/input_manager/input_manager.h"                                        
+#include "core/components_ng/base/node_sensitive_input.h"
 #include "core/components_ng/base/cmp_accessibility_registry.h"
 #include "core/common/ace_engine_ext.h"
 #include "core/common/ai/image_analyzer_manager.h"
@@ -134,6 +136,7 @@
 #include "frameworks/core/components_ng/base/ui_node.h"
 #include "oh_window_pip.h"
 #include "oh_window_comm.h"
+#include "pointer_event.h"
 #include "web_accessibility_session_adapter.h"
 #include "web_statusbar_click.h"
 #include "web_pattern.h"
@@ -573,6 +576,15 @@ std::vector<std::string> SplitAllByString(const std::string &src, const std::str
         result.push_back(src.substr(startPos));
     }
     return result;
+}
+
+const std::string NWEB_SECURITY_LABEL_DENY = "agentDeny";
+void ConvertAgentIdentity(OHOS::MMI::InputEvent& source, int32_t& callingUid, uint64_t& sessionId)
+{
+    const auto injectorInfo = source.GetInjectorInfo();
+    callingUid = injectorInfo.has_value() ? injectorInfo->uid : -1;
+    // Controller injection carries the opaque SAF sessionin optionalData; zero is also valid.
+    sessionId = injectorInfo.has_value() ? injectorInfo->optionalData : 0;
 }
 
 // Validate ByRect params: x, y, width, height must all be present as numbers
@@ -2853,6 +2865,74 @@ void WebPattern::SupplementMouseEventsIfNeeded(
                 1, std::vector<int32_t>{});
         delegate_->WebOnMouseEvent(mouseLeaveEvent);
     }
+}
+
+void WebPattern::JudgeSecurityHitTestForValidation(const int32_t& id, const double& x, const double& y,
+    bool fromOverlay, const TouchEventInfo& eventInfo)
+{
+    CHECK_NULL_VOID(delegate_);
+    int32_t callingUid = -1;
+    uint64_t sessionId = 0;
+    const auto pointerEvent = eventInfo.GetPointerEvent();
+    if (pointerEvent != nullptr) {
+        ConvertAgentIdentity(*pointerEvent, callingUid, sessionId);
+    }
+    SecurityHitTestInfo secInfo;
+    secInfo.id = id;
+    secInfo.x = x;
+    secInfo.y = y;
+    secInfo.from_overlay = fromOverlay;
+    secInfo.callingUid = callingUid;
+    secInfo.sessionId = sessionId;
+    delegate_->GetElementInfoForSecurityHitTest(secInfo);
+}
+
+bool WebPattern::ReportDecsionForSecurityHitTest(
+    int32_t callingUid, uint64_t sessionId, std::string& response)
+{
+    auto host = GetHost();
+    WebSecurityHitTestElementInfo resultInfo = ParseSecurityHitTestElementInfo(response);
+
+    NG::AgentInputResult result;
+    result.sessionId   = sessionId;
+    result.callingUid  = callingUid;
+    result.instanceId  = Container::CurrentId();
+    result.nodeId      = resultInfo.domNodeId;
+    result.compId      = resultInfo.elementId;
+    result.tag         = host ? host->GetTag() : "Web";
+    result.allowed     = !(resultInfo.securityLabel == NWEB_SECURITY_LABEL_DENY);
+    TAG_LOGD(AceLogTag::ACE_WEB,
+        "WebPattern::WebSecurityReportDecision report agent compId=%{public}s, decision=%{public}d",
+        result.compId.c_str(), result.allowed);
+    InputManager::ReportAgentInputDecision(result);
+    return result.allowed;
+}
+
+WebSecurityHitTestElementInfo WebPattern::ParseSecurityHitTestElementInfo(const std::string& responseJson)
+{
+    WebSecurityHitTestElementInfo result;
+    auto response = JsonUtil::ParseJsonString(responseJson);
+    if (!response || !response->IsObject()) {
+        TAG_LOGI(AceLogTag::ACE_WEB, "WebPattern::ParseSecurityHitTestElementInfo response not object");
+        return result;
+    }
+
+    auto domNodeId = response->GetValue("domNodeId");
+    auto securityLabel = response->GetValue("securityLabel");
+    auto pageUuid = response->GetValue("pageUuid");
+    auto xpath = response->GetValue("xpath");
+    auto elementId = response->GetValue("elementId");
+    if (!domNodeId || !domNodeId->IsNumber() || !securityLabel || !securityLabel->IsString() || !pageUuid ||
+        !pageUuid->IsString() || !xpath || !xpath->IsString() || !elementId || !elementId->IsString()) {
+        TAG_LOGI(AceLogTag::ACE_WEB, "WebPattern::ParseSecurityHitTestElementInfo securityLabel not object");
+        return result;
+    }
+    result.domNodeId = domNodeId->GetInt();
+    result.securityLabel = securityLabel->GetString();
+    result.pageUuid = pageUuid->GetString();
+    result.xpath = xpath->GetString();
+    result.elementId = elementId->GetString();
+    return result;
 }
 
 void WebPattern::ResetDragAction()
@@ -5892,7 +5972,11 @@ void WebPattern::HandleTouchDown(const TouchEventInfo& info, bool fromOverlay)
                     touchPoint.height, static_cast<OHOS::NWeb::SourceTool>(touchPoint.sourceTool));
             delegate_->HandleStylusTouchDown(stylus_touch_point_info, fromOverlay);
         } else {
-            delegate_->HandleTouchDown(touchPoint.id, touchPoint.x, touchPoint.y, fromOverlay);
+            if (info.IsAgent()) {
+                JudgeSecurityHitTestForValidation(touchPoint.id, touchPoint.x, touchPoint.y, fromOverlay, info);
+            } else {
+                delegate_->HandleTouchDown(touchPoint.id, touchPoint.x, touchPoint.y, fromOverlay);
+            }
         }
         UpdateImageOverlayStatus(ImageOverlayEvent::TOUCH_PRESS);
         if (overlayCreating_) {

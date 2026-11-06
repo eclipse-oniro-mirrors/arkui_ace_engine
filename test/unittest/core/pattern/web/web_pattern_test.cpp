@@ -25,6 +25,7 @@
 #include "core/event/touch_event.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
+#include "mock_web_delegate.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -50,6 +51,46 @@ std::shared_ptr<NWebTouchHandleState> g_startSelectionHandle = nullptr;
 std::shared_ptr<NWebTouchHandleState> g_endSelectionHandle = nullptr;
 
 RefPtr<WebPattern> g_webPattern = nullptr;
+
+// Constants for WebPattern security hit test tests.
+const int32_t SECURITY_TEST_TOUCH_X = 100;
+const int32_t SECURITY_TEST_TOUCH_Y = 200;
+const int32_t SECURITY_TEST_NEG_TOUCH_X = -10;
+const int32_t SECURITY_TEST_NEG_TOUCH_Y = -20;
+const int32_t SECURITY_TEST_TOUCH_ID = 0;
+const int32_t SECURITY_TEST_SECOND_TOUCH_ID = 2;
+const int32_t SECURITY_TEST_DOM_NODE_ID = 123;
+const int32_t SECURITY_TEST_DEFAULT_DOM_NODE_ID = -1;
+const std::string SECURITY_TEST_ALLOW_LABEL = "normalLabel";
+const std::string SECURITY_TEST_DENY_LABEL = "agentDeny";
+const std::string SECURITY_TEST_PAGE_UUID = "page-uuid-001";
+const std::string SECURITY_TEST_XPATH = "/html/body/div[1]";
+const std::string SECURITY_TEST_ELEMENT_ID = "element-456";
+const std::string SECURITY_TEST_DENY_ELEMENT_ID = "element-789";
+// extraParams in the response json is no longer parsed by WebPattern, kept here to mirror the
+// real response shape and pin the ignore behavior.
+const std::string SECURITY_TEST_VALID_RESPONSE = "{\"domNodeId\":123,\"securityLabel\":\"normalLabel\","
+    "\"pageUuid\":\"page-uuid-001\",\"xpath\":\"/html/body/div[1]\",\"elementId\":\"element-456\","
+    "\"extraParams\":{\"nodeType\":\"button\",\"pageUrl\":\"https://example.com\"}}";
+const std::string SECURITY_TEST_DENY_RESPONSE = "{\"domNodeId\":123,\"securityLabel\":\"agentDeny\","
+    "\"pageUuid\":\"page-uuid-001\",\"xpath\":\"/html/body/div[1]\",\"elementId\":\"element-789\","
+    "\"extraParams\":{\"nodeType\":\"button\"}}";
+const std::string SECURITY_TEST_INVALID_RESPONSE = "{invalid-json-response";
+const std::string SECURITY_TEST_WRONG_TYPE_RESPONSE = "{\"domNodeId\":\"123\",\"securityLabel\":\"normalLabel\","
+    "\"pageUuid\":\"page-uuid-001\",\"xpath\":\"/html/body/div[1]\",\"elementId\":\"element-456\","
+    "\"extraParams\":{}}";
+const std::string SECURITY_TEST_MISSING_FIELD_RESPONSE = "{\"domNodeId\":123,\"xpath\":\"/html/body/div[1]\"}";
+const std::string SECURITY_TEST_EMPTY_RESPONSE = "";
+// All required fields present but extraParams key missing, extraParams is not parsed.
+const std::string SECURITY_TEST_NO_EXTRA_PARAMS_RESPONSE = "{\"domNodeId\":123,\"securityLabel\":\"normalLabel\","
+    "\"pageUuid\":\"page-uuid-001\",\"xpath\":\"/html/body/div[1]\",\"elementId\":\"element-456\"}";
+const bool SECURITY_TEST_FROM_OVERLAY_FALSE = false;
+const bool SECURITY_TEST_FROM_OVERLAY_TRUE = true;
+const int32_t SECURITY_TEST_DEFAULT_CALLING_UID = -1;
+const uint64_t SECURITY_TEST_DEFAULT_SESSION_ID = 0;
+const int32_t SECURITY_TEST_CALLING_UID = 2000;
+const uint64_t SECURITY_TEST_SESSION_ID = 67890;
+const std::string SECURITY_TEST_EVENT_TYPE = "webtest";
 #endif
 } // namespace
 
@@ -1063,6 +1104,296 @@ HWTEST_F(WebPatternTest, ShowMagnifierTest005, TestSize.Level1)
     OffsetF offset = webPattern->magnifierController_->GetLocalOffset();
     EXPECT_NEAR(offset.GetX(), newCenterX, 0.01f);
     EXPECT_NEAR(offset.GetY(), newCenterY, 0.01f);
+#endif
+}
+
+/**
+ * @tc.name: ParseSecurityHitTestElementInfo001
+ * @tc.desc: Test ParseSecurityHitTestElementInfo returns default info when response is empty.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTest, ParseSecurityHitTestElementInfo001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto result = g_webPattern->ParseSecurityHitTestElementInfo(SECURITY_TEST_EMPTY_RESPONSE);
+    EXPECT_EQ(result.domNodeId, SECURITY_TEST_DEFAULT_DOM_NODE_ID);
+    EXPECT_TRUE(result.securityLabel.empty());
+    EXPECT_TRUE(result.pageUuid.empty());
+    EXPECT_TRUE(result.xpath.empty());
+    EXPECT_TRUE(result.elementId.empty());
+    EXPECT_TRUE(result.extraParams.empty());
+#endif
+}
+
+/**
+ * @tc.name: ParseSecurityHitTestElementInfo002
+ * @tc.desc: Test ParseSecurityHitTestElementInfo returns default info when response is invalid json.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTest, ParseSecurityHitTestElementInfo002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto result = g_webPattern->ParseSecurityHitTestElementInfo(SECURITY_TEST_INVALID_RESPONSE);
+    EXPECT_EQ(result.domNodeId, SECURITY_TEST_DEFAULT_DOM_NODE_ID);
+    EXPECT_TRUE(result.securityLabel.empty());
+    EXPECT_TRUE(result.pageUuid.empty());
+    EXPECT_TRUE(result.xpath.empty());
+    EXPECT_TRUE(result.elementId.empty());
+    EXPECT_TRUE(result.extraParams.empty());
+#endif
+}
+
+/**
+ * @tc.name: ParseSecurityHitTestElementInfo003
+ * @tc.desc: Test ParseSecurityHitTestElementInfo parses all required fields from a valid response
+ *           and ignores extraParams.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTest, ParseSecurityHitTestElementInfo003, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto result = g_webPattern->ParseSecurityHitTestElementInfo(SECURITY_TEST_VALID_RESPONSE);
+    EXPECT_EQ(result.domNodeId, SECURITY_TEST_DOM_NODE_ID);
+    EXPECT_EQ(result.securityLabel, SECURITY_TEST_ALLOW_LABEL);
+    EXPECT_EQ(result.pageUuid, SECURITY_TEST_PAGE_UUID);
+    EXPECT_EQ(result.xpath, SECURITY_TEST_XPATH);
+    EXPECT_EQ(result.elementId, SECURITY_TEST_ELEMENT_ID);
+    // extraParams in response is no longer parsed
+    EXPECT_TRUE(result.extraParams.empty());
+#endif
+}
+
+/**
+ * @tc.name: ParseSecurityHitTestElementInfo004
+ * @tc.desc: Test ParseSecurityHitTestElementInfo returns default info when domNodeId is not a number.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTest, ParseSecurityHitTestElementInfo004, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto result = g_webPattern->ParseSecurityHitTestElementInfo(SECURITY_TEST_WRONG_TYPE_RESPONSE);
+    EXPECT_EQ(result.domNodeId, SECURITY_TEST_DEFAULT_DOM_NODE_ID);
+    EXPECT_TRUE(result.securityLabel.empty());
+    EXPECT_TRUE(result.extraParams.empty());
+#endif
+}
+
+/**
+ * @tc.name: ParseSecurityHitTestElementInfo005
+ * @tc.desc: Test ParseSecurityHitTestElementInfo returns default info when required fields are missing.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTest, ParseSecurityHitTestElementInfo005, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto result = g_webPattern->ParseSecurityHitTestElementInfo(SECURITY_TEST_MISSING_FIELD_RESPONSE);
+    EXPECT_EQ(result.domNodeId, SECURITY_TEST_DEFAULT_DOM_NODE_ID);
+    EXPECT_TRUE(result.securityLabel.empty());
+    EXPECT_TRUE(result.extraParams.empty());
+#endif
+}
+
+/**
+ * @tc.name: ParseSecurityHitTestElementInfo006
+ * @tc.desc: Test ParseSecurityHitTestElementInfo returns the deny security label from response.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTest, ParseSecurityHitTestElementInfo006, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto result = g_webPattern->ParseSecurityHitTestElementInfo(SECURITY_TEST_DENY_RESPONSE);
+    EXPECT_EQ(result.domNodeId, SECURITY_TEST_DOM_NODE_ID);
+    EXPECT_EQ(result.securityLabel, SECURITY_TEST_DENY_LABEL);
+    EXPECT_EQ(result.elementId, SECURITY_TEST_DENY_ELEMENT_ID);
+#endif
+}
+
+/**
+ * @tc.name: ParseSecurityHitTestElementInfo007
+ * @tc.desc: Test ParseSecurityHitTestElementInfo parses required fields when extraParams is
+ *           missing from response.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTest, ParseSecurityHitTestElementInfo007, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    // extraParams is not parsed, required fields are still parsed when the key is missing
+    auto result = g_webPattern->ParseSecurityHitTestElementInfo(SECURITY_TEST_NO_EXTRA_PARAMS_RESPONSE);
+    EXPECT_EQ(result.domNodeId, SECURITY_TEST_DOM_NODE_ID);
+    EXPECT_EQ(result.securityLabel, SECURITY_TEST_ALLOW_LABEL);
+    EXPECT_EQ(result.pageUuid, SECURITY_TEST_PAGE_UUID);
+    EXPECT_EQ(result.xpath, SECURITY_TEST_XPATH);
+    EXPECT_EQ(result.elementId, SECURITY_TEST_ELEMENT_ID);
+    EXPECT_TRUE(result.extraParams.empty());
+#endif
+}
+
+/**
+ * @tc.name: ReportDecsionForSecurityHitTest001
+ * @tc.desc: Test ReportDecsionForSecurityHitTest returns false for deny security label.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTest, ReportDecsionForSecurityHitTest001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    std::string response = SECURITY_TEST_DENY_RESPONSE;
+    bool allowed = g_webPattern->ReportDecsionForSecurityHitTest(
+        SECURITY_TEST_CALLING_UID, SECURITY_TEST_SESSION_ID, response);
+    EXPECT_FALSE(allowed);
+#endif
+}
+
+/**
+ * @tc.name: ReportDecsionForSecurityHitTest002
+ * @tc.desc: Test ReportDecsionForSecurityHitTest returns true for allowed security label.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTest, ReportDecsionForSecurityHitTest002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    std::string response = SECURITY_TEST_VALID_RESPONSE;
+    bool allowed = g_webPattern->ReportDecsionForSecurityHitTest(
+        SECURITY_TEST_CALLING_UID, SECURITY_TEST_SESSION_ID, response);
+    EXPECT_TRUE(allowed);
+#endif
+}
+
+/**
+ * @tc.name: ReportDecsionForSecurityHitTest003
+ * @tc.desc: Test ReportDecsionForSecurityHitTest returns true when response is empty.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTest, ReportDecsionForSecurityHitTest003, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    std::string response = SECURITY_TEST_EMPTY_RESPONSE;
+    bool allowed = g_webPattern->ReportDecsionForSecurityHitTest(
+        SECURITY_TEST_CALLING_UID, SECURITY_TEST_SESSION_ID, response);
+    EXPECT_TRUE(allowed);
+#endif
+}
+
+/**
+ * @tc.name: ReportDecsionForSecurityHitTest004
+ * @tc.desc: Test ReportDecsionForSecurityHitTest returns false when pattern has no host node.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTest, ReportDecsionForSecurityHitTest004, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto webPattern = AceType::MakeRefPtr<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    std::string response = SECURITY_TEST_VALID_RESPONSE;
+    // host node is null, reporting returns false before parsing
+    bool allowed = webPattern->ReportDecsionForSecurityHitTest(
+        SECURITY_TEST_CALLING_UID, SECURITY_TEST_SESSION_ID, response);
+    EXPECT_FALSE(allowed);
+#endif
+}
+
+/**
+ * @tc.name: JudgeSecurityHitTestForValidation001
+ * @tc.desc: Test JudgeSecurityHitTestForValidation does not delegate when delegate is null.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTest, JudgeSecurityHitTestForValidation001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode = FrameNode::GetOrCreateFrameNode(
+        V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    ResetMockSecurityHitTestInfo();
+    TouchEventInfo eventInfo(SECURITY_TEST_EVENT_TYPE);
+    // delegate_ is null, validation returns before delegating
+    webPattern->JudgeSecurityHitTestForValidation(SECURITY_TEST_TOUCH_ID, SECURITY_TEST_TOUCH_X,
+        SECURITY_TEST_TOUCH_Y, SECURITY_TEST_FROM_OVERLAY_FALSE, eventInfo);
+    int32_t id = 0;
+    double x = 0.0;
+    double y = 0.0;
+    bool fromOverlay = false;
+    int32_t callingUid = 0;
+    uint64_t sessionId = 0;
+    std::string response;
+    EXPECT_FALSE(GetRecordedSecurityHitTestInfo(id, x, y, fromOverlay, callingUid, sessionId, response));
+#endif
+}
+
+/**
+ * @tc.name: JudgeSecurityHitTestForValidation002
+ * @tc.desc: Test JudgeSecurityHitTestForValidation delegates hit test info with default agent
+ *           identity when event has no pointer event.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTest, JudgeSecurityHitTestForValidation002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    MockPipelineContext::SetUp();
+    ResetMockSecurityHitTestInfo();
+    g_webPattern->OnModifyDone();
+    ASSERT_NE(g_webPattern->delegate_, nullptr);
+    TouchEventInfo eventInfo(SECURITY_TEST_EVENT_TYPE);
+    g_webPattern->JudgeSecurityHitTestForValidation(SECURITY_TEST_TOUCH_ID, SECURITY_TEST_TOUCH_X,
+        SECURITY_TEST_TOUCH_Y, SECURITY_TEST_FROM_OVERLAY_FALSE, eventInfo);
+    int32_t id = 0;
+    double x = 0.0;
+    double y = 0.0;
+    bool fromOverlay = false;
+    int32_t callingUid = 0;
+    uint64_t sessionId = 0;
+    std::string response;
+    EXPECT_TRUE(GetRecordedSecurityHitTestInfo(id, x, y, fromOverlay, callingUid, sessionId, response));
+    EXPECT_EQ(id, SECURITY_TEST_TOUCH_ID);
+    EXPECT_DOUBLE_EQ(x, SECURITY_TEST_TOUCH_X);
+    EXPECT_DOUBLE_EQ(y, SECURITY_TEST_TOUCH_Y);
+    EXPECT_FALSE(fromOverlay);
+    // event has no pointer event, agent identity falls back to defaults
+    EXPECT_EQ(callingUid, SECURITY_TEST_DEFAULT_CALLING_UID);
+    EXPECT_EQ(sessionId, SECURITY_TEST_DEFAULT_SESSION_ID);
+    EXPECT_TRUE(response.empty());
+    ResetMockSecurityHitTestInfo();
+    MockPipelineContext::TearDown();
+#endif
+}
+
+/**
+ * @tc.name: JudgeSecurityHitTestForValidation003
+ * @tc.desc: Test JudgeSecurityHitTestForValidation delegates hit test info with from overlay.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTest, JudgeSecurityHitTestForValidation003, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    MockPipelineContext::SetUp();
+    ResetMockSecurityHitTestInfo();
+    g_webPattern->OnModifyDone();
+    ASSERT_NE(g_webPattern->delegate_, nullptr);
+    TouchEventInfo eventInfo(SECURITY_TEST_EVENT_TYPE);
+    g_webPattern->JudgeSecurityHitTestForValidation(SECURITY_TEST_SECOND_TOUCH_ID, SECURITY_TEST_NEG_TOUCH_X,
+        SECURITY_TEST_NEG_TOUCH_Y, SECURITY_TEST_FROM_OVERLAY_TRUE, eventInfo);
+    int32_t id = 0;
+    double x = 0.0;
+    double y = 0.0;
+    bool fromOverlay = false;
+    int32_t callingUid = 0;
+    uint64_t sessionId = 0;
+    std::string response;
+    EXPECT_TRUE(GetRecordedSecurityHitTestInfo(id, x, y, fromOverlay, callingUid, sessionId, response));
+    EXPECT_EQ(id, SECURITY_TEST_SECOND_TOUCH_ID);
+    EXPECT_DOUBLE_EQ(x, SECURITY_TEST_NEG_TOUCH_X);
+    EXPECT_DOUBLE_EQ(y, SECURITY_TEST_NEG_TOUCH_Y);
+    EXPECT_TRUE(fromOverlay);
+    // event has no pointer event, agent identity falls back to defaults
+    EXPECT_EQ(callingUid, SECURITY_TEST_DEFAULT_CALLING_UID);
+    EXPECT_EQ(sessionId, SECURITY_TEST_DEFAULT_SESSION_ID);
+    EXPECT_TRUE(response.empty());
+    ResetMockSecurityHitTestInfo();
+    MockPipelineContext::TearDown();
 #endif
 }
 
