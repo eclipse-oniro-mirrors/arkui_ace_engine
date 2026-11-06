@@ -42,11 +42,11 @@ class JSON2 {
 
   // Type-dispatch replacement for JSON.stringify replacer (extracted from stringify).
   // 'obj' is the replacer's this-context (the object currently being traversed).
-  private static replaceValue_(obj: any, key: string, val: any, root: any,
+  private static replaceValue_(obj: Record<string, unknown>, key: string, val: unknown, root: unknown,
     visited: Map<object, string>,
     serialize: (v: unknown, isRoot?: boolean) => string,
     serializeSendable: (v: unknown) => string,
-    ignoreReadOnlyProperties: ReadOnlyPropertyFilter): any {
+    ignoreReadOnlyProperties: ReadOnlyPropertyFilter): unknown {
     // don't trust JSON replacer's arg 'val' (it turns Date objects into strings)
     const value = obj[key];
 
@@ -92,7 +92,7 @@ class JSON2 {
     }
 
     // replace property names with their aliases if any, skip disabled ones
-    const aliased = JSON2.toAliasedObject(value, ignoreReadOnlyProperties);
+    const aliased = JSON2.toAliasedObject(value as object, ignoreReadOnlyProperties);
     // skip root to prevent recursion
     if (root === value) {
       return aliased;

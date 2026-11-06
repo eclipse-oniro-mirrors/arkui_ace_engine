@@ -30,7 +30,7 @@ class DataCoder {
   public static readonly FORMAT_TAG = 'JSON2';
 
   // Track visited target objects to prevent recursion in restoreObject()
-  private static visitedTargets_ = new Set<string>();
+  private static visitedTargets_ = new Set<object>();
   // Track visited source objects to restore shared references
   private static visitedSources_ = new Map<object, object>();
 
@@ -198,7 +198,7 @@ class DataCoder {
   }
 
   // Track visited targets to prevent recursion; returns false when target was already visited.
-  private static trackVisited_(target: any, source: any): boolean {
+  private static trackVisited_(target: unknown, source: unknown): boolean {
     if (typeof target === 'object' && target != null) {
       if (this.visitedTargets_.has(target)) {
         return false;
@@ -207,15 +207,15 @@ class DataCoder {
     }
     if (typeof source === 'object' && source != null) {
       if (!this.visitedSources_.has(source)) {
-        this.visitedSources_.set(source, target);
+        this.visitedSources_.set(source, target as object);
       }
     }
     return true;
   }
 
   // Clone or copy an array/map/set item value (factory rebuild when present).
-  private static cloneOrCopy_(value: any, opts: TransformOptions<any>,
-    ignoreReadOnlyProperties: ReadOnlyPropertyFilter): any {
+  private static cloneOrCopy_(value: unknown, opts: TransformOptions<unknown>,
+    ignoreReadOnlyProperties: ReadOnlyPropertyFilter): unknown {
     if (typeof value !== 'object') {
       return value;
     }
@@ -230,11 +230,11 @@ class DataCoder {
     const newValue = clazz ? new clazz() : value;
     // we don't allow collections directly nested inside other collections
     this.throwIfCollection(newValue);
-    this.restoreObject(newValue, value, opts, ignoreReadOnlyProperties);
+    this.restoreObject(newValue, value, opts as TransformOptions<any>, ignoreReadOnlyProperties);
     return newValue;
   }
 
-  private static restoreArray_(target: any, source: any[], opts: TransformOptions<any>,
+  private static restoreArray_(target: unknown[], source: unknown[], opts: TransformOptions<unknown>,
     ignoreReadOnlyProperties: ReadOnlyPropertyFilter): void {
     this.throwIfNotInstanceOf(target, Array);
     target.length = source.length;
@@ -243,7 +243,7 @@ class DataCoder {
     });
   }
 
-  private static restoreSet_(target: any, source: Set<any>, opts: TransformOptions<any>,
+  private static restoreSet_(target: Set<unknown>, source: Set<unknown>, opts: TransformOptions<unknown>,
     ignoreReadOnlyProperties: ReadOnlyPropertyFilter): void {
     this.throwIfNotInstanceOf(target, Set);
     target.clear();
@@ -252,8 +252,8 @@ class DataCoder {
     });
   }
 
-  private static restoreMap_(target: any, source: Map<any, any>, opts: TransformOptions<any>,
-    ignoreReadOnlyProperties: ReadOnlyPropertyFilter): void {
+  private static restoreMap_(target: Map<unknown, unknown>, source: Map<unknown, unknown>,
+    opts: TransformOptions<unknown>, ignoreReadOnlyProperties: ReadOnlyPropertyFilter): void {
     this.throwIfNotInstanceOf(target, Map);
     target.clear();
     source.forEach((item, key) => {
@@ -287,10 +287,10 @@ class DataCoder {
   }
 
   // Restore target properties from source (incl. undefined) for plain objects.
-  private static restorePlainProperties_(target: any, source: any,
+  private static restorePlainProperties_(target: Record<string, unknown>, source: Record<string, unknown>,
     ignoreReadOnlyProperties: ReadOnlyPropertyFilter): void {
     // meta = { [prop]: { alias, factory, disabled } }
-    const meta = Meta.gets(target) as Record<string, TransformOptions<any>>;
+    const meta = Meta.gets(target) as Record<string, TransformOptions<unknown>>;
     // reversed map of meta = { [alias]: prop }
     const alias2prop = new Map<string, string>(
       Object.entries(meta).map(([prop, propOpts]) => [propOpts.alias ?? prop, prop])
@@ -302,7 +302,8 @@ class DataCoder {
       }
       const sourceProp = meta[targetProp]?.alias ?? targetProp;
       const propOptions = meta[targetProp] || {};
-      this.restorePropValue(target, targetProp, source, sourceProp, propOptions, ignoreReadOnlyProperties);
+      this.restorePropValue(target, targetProp, source, sourceProp,
+        propOptions as TransformOptions<any>, ignoreReadOnlyProperties);
     }
   }
 
