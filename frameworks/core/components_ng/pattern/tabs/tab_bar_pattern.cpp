@@ -1551,7 +1551,7 @@ bool TabBarPattern::CustomizeExpandSafeArea()
 
     auto tabLayoutProperty = AceType::DynamicCast<TabsLayoutProperty>(tabsNode->GetLayoutProperty());
     CHECK_NULL_RETURN(tabLayoutProperty, false);
-    return tabLayoutProperty->GetSafeAreaPaddingProperty() ? true : false;
+    return tabLayoutProperty->HasSafeAreaPaddingSource();
 }
 
 void TabBarPattern::OnSyncGeometryNode(const DirtySwapConfig& config)
@@ -1562,7 +1562,15 @@ void TabBarPattern::OnSyncGeometryNode(const DirtySwapConfig& config)
     CHECK_NULL_VOID(tabsNode);
     auto tabLayoutProperty = AceType::DynamicCast<TabsLayoutProperty>(tabsNode->GetLayoutProperty());
     CHECK_NULL_VOID(tabLayoutProperty);
-    if (!tabLayoutProperty->GetSafeAreaPaddingProperty()) {
+    if (!tabLayoutProperty->HasSafeAreaPaddingSource()) {
+        return;
+    }
+    // Floating bars are positioned independently by the layout algorithm
+    // (MeasureTabBar sets FLOATING_BAR_HEIGHT). Their paint rect should not be
+    // extended by accumulated safe area expansion, which includes both system
+    // safe area and component-level safeAreaPadding/safeAreaInset. Extending
+    // the paint rect causes the floating bar to appear taller than expected.
+    if (IsFloatingBar() || IsFloatingTopBar()) {
         return;
     }
     auto tabBarSize = host->GetGeometryNode()->GetMarginFrameSize();
