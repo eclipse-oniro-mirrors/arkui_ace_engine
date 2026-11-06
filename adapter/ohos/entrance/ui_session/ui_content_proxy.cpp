@@ -15,17 +15,45 @@
 
 #include "interfaces/inner_api/ui_session/ui_content_proxy.h"
 
+#include "interfaces/inner_api/ui_session/ui_session_json_util.h"
+#include "interfaces/inner_api/ui_session/ui_session_split_rule.h"
 #include "ipc_skeleton.h"
 
 #include "adapter/ohos/entrance/ui_session/content_change_config_impl.h"
 #include "adapter/ohos/entrance/ui_session/get_inspector_tree_config_impl.h"
-#include "adapter/ohos/entrance/ui_session/include/ui_session_trace.h"
 #include "adapter/ohos/entrance/ui_session/include/ui_session_log.h"
+#include "adapter/ohos/entrance/ui_session/include/ui_session_trace.h"
 #include "adapter/ohos/entrance/ui_session/ui_translate_request_util.h"
-#include "interfaces/inner_api/ui_session/ui_session_json_util.h"
 
 namespace OHOS::Ace {
 namespace {
+constexpr size_t SPLIT_REGISTRATION_RULE_COUNT = 1;
+
+bool IsValidPageSceneRequest(const std::string& request, bool allowRuleSetId = false)
+{
+    if (allowRuleSetId && PageSceneSplit::IsValidId(request)) {
+        return true;
+    }
+    auto root = PageSceneSplit::Parse(request);
+    std::string ruleSetId;
+    if (!cJSON_IsObject(root.get()) || !PageSceneSplit::ReadString(root.get(), "ruleSetId", ruleSetId) ||
+        !PageSceneSplit::IsValidId(ruleSetId)) {
+        return false;
+    }
+    // This is the SPLIT schema-validation boundary; receivers only decode accepted values.
+    // Preserve legacy scene parsing;
+    // registration ownership and capacity still require authoritative server state.
+    if (!PageSceneSplit::ContainsSplitRule(root.get()) && !PageSceneSplit::IsVersionedNativeRequest(root.get())) {
+        return true;
+    }
+    PageSceneSplitRuleSet parsed;
+    const cJSON* rules = nullptr;
+    // Registration accepts one SPLIT rule; one-shot queries may evaluate multiple rules.
+    return PageSceneSplit::ReadRuleSetHeader(root.get(), parsed, rules) &&
+           PageSceneSplit::ReadRuleSetItems(rules, parsed) && !parsed.rules.empty() &&
+           (allowRuleSetId || parsed.rules.size() == SPLIT_REGISTRATION_RULE_COUNT);
+}
+
 // Extract the ruleSetId used to register and route the event callback.
 std::string ExtractPageSceneRuleSetId(const std::string& ruleJson)
 {
@@ -177,7 +205,7 @@ int32_t UIContentServiceProxy::Connect(const EventCallback& eventCallback,
 int32_t UIContentServiceProxy::RegisterPageSceneRules(
     const std::string& ruleJson, const PageSceneEventCallback& eventCallback)
 {
-    if (ruleJson.empty() || eventCallback == nullptr) {
+    if (ruleJson.empty() || eventCallback == nullptr || !IsValidPageSceneRequest(ruleJson)) {
         LOGW("RegisterPageSceneRules invalid params");
         return PARAM_INVALID;
     }
@@ -216,8 +244,8 @@ int32_t UIContentServiceProxy::RegisterPageSceneRules(
 
 int32_t UIContentServiceProxy::UnregisterPageSceneRules(const std::string& ruleSetId)
 {
-    if (ruleSetId.empty()) {
-        LOGW("UnregisterPageSceneRules ruleSetId is empty");
+    if (!PageSceneSplit::IsValidId(ruleSetId)) {
+        LOGW("UnregisterPageSceneRules ruleSetId is invalid");
         return PARAM_INVALID;
     }
     MessageParcel data;
@@ -241,7 +269,8 @@ int32_t UIContentServiceProxy::UnregisterPageSceneRules(const std::string& ruleS
 int32_t UIContentServiceProxy::GetPageScene(
     const std::string& ruleJsonOrRuleSetId, const PageSceneEventCallback& eventCallback)
 {
-    if (ruleJsonOrRuleSetId.empty() || eventCallback == nullptr) {
+    if (ruleJsonOrRuleSetId.empty() || eventCallback == nullptr ||
+        !IsValidPageSceneRequest(ruleJsonOrRuleSetId, true)) {
         LOGW("GetPageScene invalid params");
         return PARAM_INVALID;
     }
