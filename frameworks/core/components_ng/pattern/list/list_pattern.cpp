@@ -1422,9 +1422,9 @@ RefPtr<NodePaintMethod> ListPattern::CreateNodePaintMethod()
     CHECK_NULL_RETURN(host, paint);
     const auto& geometryNode = host->GetGeometryNode();
     auto renderContext = host->GetRenderContext();
+    CHECK_NULL_RETURN(renderContext, paint);
     auto frameRect = renderContext->GetPaintRectWithoutTransform();
     if (!listContentModifier_) {
-        CHECK_NULL_RETURN(renderContext, paint);
         auto size = frameRect.GetSize();
         auto& padding = geometryNode->GetPadding();
         if (padding) {
@@ -6028,8 +6028,8 @@ WeakPtr<FocusHub> ListPattern::FindChildFocusNodeByIndex(
 {
     auto focusWrapMode = GetFocusWrapMode();
     auto listProperty = GetLayoutProperty<ListLayoutProperty>();
-    auto isVertical = listProperty->GetListDirection().value_or(Axis::VERTICAL) == Axis::VERTICAL;
     CHECK_NULL_RETURN(listProperty, nullptr);
+    auto isVertical = listProperty->GetListDirection().value_or(Axis::VERTICAL) == Axis::VERTICAL;
     // Only for GetNextFocusNodeInList.
     auto listFrame = GetHost();
     CHECK_NULL_RETURN(listFrame, nullptr);
