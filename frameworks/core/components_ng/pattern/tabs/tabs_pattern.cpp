@@ -2991,6 +2991,20 @@ void TabsPattern::HandleDividerDragUpdate(float xOffset)
     }
     auto host = GetHost();
     CHECK_NULL_VOID(host);
+    // When the sidebar is on the right (sidebarPosition == END, adjusted for RTL),
+    // dragging the divider leftwards (xOffset < 0) should widen the sidebar, and
+    // dragging rightwards should narrow it — the opposite of the left-sidebar case.
+    // Negate xOffset so the same width-update formula works for both sides.
+    auto layoutProperty = host->GetLayoutProperty<TabsLayoutProperty>();
+    if (layoutProperty) {
+        bool isRTL = layoutProperty->GetNonAutoLayoutDirection() == TextDirection::RTL;
+        auto sideBarPos = layoutProperty->GetSidebarPositionValue(BarPosition::START);
+        bool sideBarOnLeft = (!isRTL && sideBarPos == BarPosition::START) ||
+                             (isRTL && sideBarPos == BarPosition::END);
+        if (!sideBarOnLeft) {
+            xOffset = -xOffset;
+        }
+    }
     auto newWidth = preSideBarWidthPx_ + xOffset;
     newWidth = std::max(minSideBarWidth_, std::min(newWidth, maxSideBarWidth_));
     if (realSideBarWidthPx_.has_value() && NearEqual(realSideBarWidthPx_.value(), newWidth)) {
