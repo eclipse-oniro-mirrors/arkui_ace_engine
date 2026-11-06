@@ -60,6 +60,7 @@ void WriteWebImagesStruct(const std::map<int32_t, std::map<int32_t,
 namespace OHOS::Ace {
 void UiReportProxy::ReportCommandResult(uint64_t requestId, const std::string& resultJson)
 {
+    UiSessionCommandResultTraceBegin(requestId);
     UI_SESSION_SCOPED_TRACE("SendCommand.ResultIPC.%llu", static_cast<unsigned long long>(requestId));
     MessageParcel messageData;
     MessageParcel reply;

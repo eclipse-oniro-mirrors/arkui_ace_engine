@@ -40,6 +40,7 @@
 #include "window_manager.h"
 
 #include "adapter/ohos/entrance/ui_session/include/ui_session_log.h"
+#include "adapter/ohos/entrance/ui_session/include/ui_session_trace.h"
 #include "interfaces/inner_api/ace_kit/include/ui/base/utils/utils.h"
 
 namespace OHOS::Ace {
@@ -658,6 +659,16 @@ int32_t UiSaService::Dump(int32_t fd, const std::vector<std::u16string>& args)
     for (const auto& arg : args) {
         const auto str = Str16ToStr8(arg);
         params.emplace_back(str);
+    }
+    if (!params.empty() && params.front() == "SendCommandTraceDiagnostic") {
+        if (params.size() != PARAM_TWO || (params[1] != "on" && params[1] != "off")) {
+            dprintf(fd, "Usage: SendCommandTraceDiagnostic on|off\n");
+            return ERR_INVALID_DATA;
+        }
+        UiSessionSetCommandTraceDiagnosticEnabled(params[1] == "on");
+        dprintf(fd, "SendCommand trace diagnostic: %s (SA process only). "
+            "Use off and a fresh capture for performance measurements.\n", params[1].c_str());
+        return ERR_NONE;
     }
     OHOS::Rosen::FocusChangeInfo focusedWindowInfo;
     OHOS::Rosen::WindowManager::GetInstance(DEFAULT_APP_USER_ID).GetFocusWindowInfo(focusedWindowInfo);

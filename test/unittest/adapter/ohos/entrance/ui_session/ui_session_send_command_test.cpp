@@ -18,6 +18,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 #include "gtest/gtest.h"
 #include "adapter/ohos/entrance/ui_session/include/ui_session_trace.h"
@@ -30,9 +31,29 @@
 #include "core/components_ng/pattern/pattern.h"
 
 namespace OHOS::Ace {
+namespace {
+thread_local std::vector<std::pair<char, uint64_t>> commandResultTraceEvents;
+thread_local std::vector<std::string> commandRequestTraceEvents;
+}
+
 // Host tests have no system trace backend.
 UiSessionScopedTrace::UiSessionScopedTrace(const char*, ...) {}
 UiSessionScopedTrace::~UiSessionScopedTrace() = default;
+
+void UiSessionCommandRequestTraceBegin(const char* commandType)
+{
+    commandRequestTraceEvents.emplace_back(commandType);
+}
+
+void UiSessionCommandResultTraceBegin(uint64_t requestId)
+{
+    commandResultTraceEvents.emplace_back('S', requestId);
+}
+
+void UiSessionCommandResultTraceEnd(uint64_t requestId)
+{
+    commandResultTraceEvents.emplace_back('F', requestId);
+}
 
 namespace {
 constexpr int32_t COMMAND_NODE_ID = 42;
@@ -55,6 +76,8 @@ class SendCommandTest : public testing::Test {
 public:
     void SetUp() override
     {
+        commandResultTraceEvents.clear();
+        commandRequestTraceEvents.clear();
         MessageParcel::SetDefaultPayloadStorage(true);
         remote = std::make_shared<CommandRemote>();
         proxy = std::make_unique<UIContentServiceProxy>(sptr<IRemoteObject>(remote));
@@ -131,6 +154,41 @@ TEST_F(SendCommandTest, EmptyCallbackAndSendFailureDoNotRemainPending)
     EXPECT_EQ(count, 0);
     report->SetEventHandler(nullptr);
     EXPECT_FALSE(report->PostSendCommandCallbackRemoveTask(1));
+}
+
+TEST_F(SendCommandTest, RequestTracePrecedesIpcForAllOverloads)
+{
+    const std::vector<std::string> expected = { "Legacy.Node", "Legacy.Global", "Callback.Node", "Callback.Global" };
+    size_t sends = 0;
+    remote->send = [&sends, &expected](uint32_t, MessageParcel&, MessageParcel&, MessageOption& option) {
+        EXPECT_EQ(commandRequestTraceEvents.size(), sends + 1);
+        if (sends < expected.size() && !commandRequestTraceEvents.empty()) {
+            EXPECT_EQ(commandRequestTraceEvents.back(), expected[sends]);
+        }
+        EXPECT_EQ(option.GetFlags(), sends == 1 ? MessageOption::TF_ASYNC : MessageOption::TF_SYNC);
+        ++sends;
+        return NO_ERROR;
+    };
+    EXPECT_EQ(proxy->SendCommand(COMMAND_NODE_ID, "{}"), NO_ERROR);
+    EXPECT_EQ(proxy->SendCommand("{}"), NO_ERROR);
+    EXPECT_EQ(proxy->SendCommand(COMMAND_NODE_ID, "{}", [](const std::string&) {}), NO_ERROR);
+    report->ReportCommandResult(report->sendCommandRequestId_, "done");
+    EXPECT_EQ(proxy->SendCommand("{}", [](const std::string&) {}), NO_ERROR);
+    EXPECT_EQ(sends, expected.size());
+    EXPECT_EQ(commandRequestTraceEvents, expected);
+}
+
+TEST_F(SendCommandTest, RequestTraceIncludesRejectedAttemptsBeforeValidation)
+{
+    remote->send = [](uint32_t, MessageParcel&, MessageParcel&, MessageOption&) {
+        ADD_FAILURE() << "Rejected command must not send IPC";
+        return NO_ERROR;
+    };
+    EXPECT_EQ(proxy->SendCommand(COMMAND_NODE_ID, "{}", {}), PARAM_INVALID);
+    EXPECT_EQ(proxy->SendCommand("{}", {}), PARAM_INVALID);
+    const std::vector<std::string> expected = { "Callback.Node", "Callback.Global" };
+    EXPECT_EQ(commandRequestTraceEvents, expected);
+    EXPECT_FALSE(report->sendCommandFinishCallback_);
 }
 
 TEST_F(SendCommandTest, TimeoutOccursAtFiveSecondsAndLateResultsAreIsolated)
@@ -251,6 +309,40 @@ TEST_F(SendCommandTest, MalformedResultParcelCannotCompletePendingRequest)
     EXPECT_EQ(report->OnRemoteRequest(ReportService::REPORT_COMMAND_RESULT, data, reply, option), FAILED);
     EXPECT_EQ(count, 0);
     EXPECT_TRUE(report->sendCommandFinishCallback_);
+    EXPECT_TRUE(commandResultTraceEvents.empty());
+}
+
+TEST_F(SendCommandTest, ResultTraceStartsBeforeSendAndEndsBeforeCallback)
+{
+    uint64_t requestId = 0;
+    int count = 0;
+    ASSERT_TRUE(report->RegisterSendCommandFinishCallback([&](const std::string&) {
+        ASSERT_EQ(commandResultTraceEvents.size(), 2u);
+        EXPECT_EQ(commandResultTraceEvents.back(), std::make_pair('F', requestId));
+        ++count;
+    }, requestId));
+    auto reportRemote = std::make_shared<CommandRemote>();
+    reportRemote->send = [&](uint32_t code, MessageParcel& data, MessageParcel& reply, MessageOption& option) {
+        EXPECT_TRUE(commandResultTraceEvents.size() == 1u &&
+            commandResultTraceEvents.front() == std::make_pair('S', requestId));
+        return report->OnRemoteRequest(code, data, reply, option);
+    };
+    UiReportProxy { sptr<IRemoteObject>(reportRemote) }.ReportCommandResult(requestId, R"({"result":"SUCCESS"})");
+    EXPECT_EQ(count, 1);
+}
+
+TEST_F(SendCommandTest, ResultReceiptTraceRetainsFullRequestIdWithoutPendingCallback)
+{
+    constexpr uint64_t requestId = (1ULL << 32) + 7;
+    auto reportRemote = std::make_shared<CommandRemote>();
+    reportRemote->send = [this](uint32_t code, MessageParcel& data, MessageParcel& reply, MessageOption& option) {
+        return report->OnRemoteRequest(code, data, reply, option);
+    };
+    UiReportProxy { sptr<IRemoteObject>(reportRemote) }.ReportCommandResult(requestId, R"({"result":"SUCCESS"})");
+    ASSERT_EQ(commandResultTraceEvents.size(), 2u);
+    EXPECT_EQ(commandResultTraceEvents.front(), std::make_pair('S', requestId));
+    EXPECT_EQ(commandResultTraceEvents.back(), std::make_pair('F', requestId));
+    EXPECT_FALSE(report->sendCommandFinishCallback_);
 }
 
 TEST_F(SendCommandTest, ConcurrentRegistrationAndDuplicateResultsAreSingleShot)
