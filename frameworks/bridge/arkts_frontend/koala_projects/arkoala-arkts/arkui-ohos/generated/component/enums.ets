@@ -679,10 +679,6 @@ export enum InputEventInterceptAction {
     CONTINUE = 0,
     BLOCK = 1
 }
-export enum UIMaterialAnimationMode {
-    IMMERSIVE = 0,
-    NONE = 1
-}
 export enum GestureShortcut {
     PRIMARY = 0
 }
