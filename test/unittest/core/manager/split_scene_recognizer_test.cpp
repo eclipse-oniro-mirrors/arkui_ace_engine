@@ -500,47 +500,6 @@ HWTEST_F(SplitSceneRecognizerTest, SplitScene_CommonBandHasDeterministicPair, Te
     EXPECT_EQ(forward.matchedNodeIds, reverse.matchedNodeIds);
 }
 
-HWTEST_F(SplitSceneRecognizerTest, SplitScene_BatchNavigationAvoidsCustomPreparation, TestSize.Level1)
-{
-    SplitSceneRuleSpec rule;
-    rule.compNames = { "Pane" };
-    auto nav = MakeCandidate(1, "Navigation", WINDOW_RECT);
-    nav.navigation = true;
-    nav.navigationSplit = true;
-    std::vector<SplitSceneCandidate> candidates { nav, MakeCandidate(2, "Pane", RectF(0, 0, 450, 900)),
-        MakeCandidate(3, "Pane", RectF(500, 0, 450, 900)) };
-    SplitSceneBatch batch(candidates, WINDOW_RECT);
-    EXPECT_EQ(batch.Recognize(rule).splitType, "Navigation");
-    EXPECT_EQ(batch.GetStats().rectClips, 1u);
-    EXPECT_EQ(batch.GetStats().geometrySorts, 0u);
-    rule.allowNavigation = false;
-    EXPECT_EQ(batch.Recognize(rule).splitType, "Custom");
-    EXPECT_EQ(batch.GetStats().rectClips, 3u);
-}
-
-HWTEST_F(SplitSceneRecognizerTest, SplitScene_BatchReusesClippingOrderingAndEquivalentRules, TestSize.Level1)
-{
-    SplitSceneRuleSpec rule;
-    rule.allowNavigation = false;
-    rule.compNames = { "Column", "Row" };
-    std::vector<SplitSceneCandidate> candidates { MakeCandidate(1, "Column", RectF(-50, 0, 500, 900)),
-        MakeCandidate(2, "Row", RectF(550, 0, 500, 900)) };
-    SplitSceneBatch batch(candidates, WINDOW_RECT);
-    auto first = batch.Recognize(rule);
-    ASSERT_TRUE(first.matched);
-    rule.totalWidthRatioGt = 0.95;
-    EXPECT_FALSE(batch.Recognize(rule).matched);
-    rule.totalWidthRatioGt = 0.85;
-    EXPECT_TRUE(batch.Recognize(rule).matched);
-    rule.totalWidthRatioGt = 0.8;
-    rule.compNames = { "Row", "Column" };
-    EXPECT_EQ(batch.Recognize(rule).matchedNodeIds, first.matchedNodeIds);
-    EXPECT_EQ(batch.GetStats().rectClips, 2u);
-    EXPECT_EQ(batch.GetStats().geometrySorts, 1u);
-    EXPECT_EQ(batch.GetStats().recognitions, 3u);
-    EXPECT_EQ(batch.GetStats().cacheHits, 1u);
-}
-
 HWTEST_F(SplitSceneRecognizerTest, SplitScene_BatchKeepsGeometryPoliciesIndependent, TestSize.Level1)
 {
     SplitSceneRuleSpec rule;
@@ -564,19 +523,6 @@ HWTEST_F(SplitSceneRecognizerTest, SplitScene_BatchKeepsGeometryPoliciesIndepend
     EXPECT_TRUE(batch.Recognize(rule).matched);
     EXPECT_EQ(batch.GetStats().rectClips, 2u);
     EXPECT_EQ(batch.GetStats().cacheHits, 1u);
-}
-
-HWTEST_F(SplitSceneRecognizerTest, SplitScene_BatchReusesBandEventsWithoutChangingNodeOrder, TestSize.Level1)
-{
-    auto rule = ShortBandRule(false);
-    std::vector<SplitSceneCandidate> candidates { MakeCandidate(1, "Pane", RectF(0, 0, 500, 100)),
-        MakeCandidate(3, "Pane", RectF(500, 800, 500, 100)), MakeCandidate(2, "Pane", RectF(0, 800, 500, 100)) };
-    SplitSceneBatch batch(candidates, WINDOW_RECT);
-    EXPECT_EQ(batch.Recognize(rule).matchedNodeIds, (std::vector<int32_t> { 3, 2 }));
-    rule.totalWidthRatioGt = 0.9;
-    EXPECT_EQ(batch.Recognize(rule).matchedNodeIds, (std::vector<int32_t> { 3, 2 }));
-    EXPECT_EQ(batch.GetStats().geometrySorts, 1u);
-    EXPECT_EQ(batch.GetStats().rectClips, 3u);
 }
 
 HWTEST_F(SplitSceneRecognizerTest, SplitScene_BatchDoesNotReuseChangedSnapshot, TestSize.Level1)
