@@ -24,7 +24,7 @@
 #include "frameworks/core/common/ace_engine.h"
 #include "base/subwindow/subwindow_manager.h"
 #include "core/components/navigator/navigator_type.h"
-#include "base/utils/container.h"
+#include "core/common/container.h"
 #include "interfaces/inner_api/ace/constants.h"
 
 namespace OHOS::Ace::Framework {

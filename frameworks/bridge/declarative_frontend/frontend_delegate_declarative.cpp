@@ -32,7 +32,7 @@
 #include "jsview/js_view_abstract.h"
 #include "core/components_ng/pattern/app_bar/app_bar_view.h"
 #include "core/components_ng/manager/navigation/navigation_manager.h"
-#include "base/utils/container.h"
+#include "core/common/container.h"
 #include "interfaces/inner_api/ace/constants.h"
 
 namespace OHOS::Ace::Framework {
