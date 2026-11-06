@@ -60,6 +60,7 @@ constexpr int32_t MAX_RULES = 10;
 constexpr int32_t MAX_SELECTORS = 5;
 constexpr size_t MAX_RULE_SETS = 2;
 constexpr double SPLIT_RULE_VERSION = 1.0;
+constexpr unsigned char JSON_WHITESPACE_MAX = ' ';
 using JsonPtr = std::unique_ptr<cJSON, decltype(&cJSON_Delete)>;
 
 inline JsonPtr Parse(const std::string& json)
@@ -315,18 +316,28 @@ inline bool ReadRuleSetItems(const cJSON* rules, PageSceneSplitRuleSet& result)
             return false;
         }
     }
-    return true;
+    return !result.rules.empty();
+}
+
+// Borrows the tree and tail for this call; parseEnd must point to a valid C string.
+inline std::optional<PageSceneSplitRuleSet> ParseRuleSet(const cJSON* root, const char* parseEnd)
+{
+    // cJSON accepts bytes up to ASCII space as trailing whitespace.
+    const auto* tailEnd = parseEnd + std::char_traits<char>::length(parseEnd);
+    const bool hasTrailingData =
+        std::any_of(parseEnd, tailEnd, [](unsigned char ch) { return ch > JSON_WHITESPACE_MAX; });
+    PageSceneSplitRuleSet result;
+    const cJSON* rules = nullptr;
+    if (hasTrailingData || !ReadRuleSetHeader(root, result, rules) || !ReadRuleSetItems(rules, result)) {
+        return std::nullopt;
+    }
+    return result;
 }
 
 inline std::optional<PageSceneSplitRuleSet> ParseRuleSet(const std::string& json)
 {
     auto root = Parse(json);
-    PageSceneSplitRuleSet result;
-    const cJSON* rules = nullptr;
-    if (!ReadRuleSetHeader(root.get(), result, rules) || !ReadRuleSetItems(rules, result)) {
-        return std::nullopt;
-    }
-    return result.rules.empty() ? std::nullopt : std::make_optional(std::move(result));
+    return ParseRuleSet(root.get(), "");
 }
 } // namespace PageSceneSplit
 } // namespace OHOS::Ace

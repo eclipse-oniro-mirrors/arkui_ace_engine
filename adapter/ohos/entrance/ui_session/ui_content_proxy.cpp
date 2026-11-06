@@ -32,12 +32,13 @@ constexpr size_t SPLIT_REGISTRATION_RULE_COUNT = 1;
 bool IsValidSplitPageSceneRequest(const std::string& request, bool isQuery = false)
 {
     // Discover explicit SPLIT declarations without imposing new validation on legacy requests.
-    PageSceneSplit::JsonPtr root(cJSON_Parse(request.c_str()), cJSON_Delete);
+    const char* parseEnd = nullptr;
+    PageSceneSplit::JsonPtr root(cJSON_ParseWithOpts(request.c_str(), &parseEnd, false), cJSON_Delete);
     if (!PageSceneSplit::ContainsSplitRule(root.get())) {
         return true;
     }
-    // Strict parsing also rejects trailing data after an otherwise readable SPLIT object.
-    const auto parsed = PageSceneSplit::ParseRuleSet(request);
+    // Reuse the tree and reject trailing data only for explicitly declared SPLIT requests.
+    const auto parsed = PageSceneSplit::ParseRuleSet(root.get(), parseEnd);
     // Registration accepts one SPLIT rule; one-shot queries may evaluate multiple rules.
     return parsed && (isQuery || parsed->rules.size() == SPLIT_REGISTRATION_RULE_COUNT);
 }

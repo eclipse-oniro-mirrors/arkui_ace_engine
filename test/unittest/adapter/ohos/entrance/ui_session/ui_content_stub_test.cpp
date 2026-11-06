@@ -2756,12 +2756,26 @@ HWTEST_F(PageSceneProxyValidationTest, LegacyConnectionFailureKeepsOriginalPrior
 
 HWTEST_F(PageSceneProxyValidationTest, SplitTrailingDataIsStillRejectedBeforeSending, TestSize.Level1)
 {
-    const auto request = std::string(VALID_PROXY_SPLIT_RULE) + " trailing";
-    EXPECT_EQ(proxy->RegisterPageSceneRules(request, [](const std::string&) {}), PARAM_INVALID);
-    EXPECT_EQ(proxy->GetPageScene(request, [](const std::string&) {}), PARAM_INVALID);
+    const std::vector<std::string> tails = { " trailing", "}", " \t[]", "!", "\x80", "\xc2\xa0" };
+    for (const auto& tail : tails) {
+        const auto request = std::string(VALID_PROXY_SPLIT_RULE) + tail;
+        EXPECT_EQ(proxy->RegisterPageSceneRules(request, [](const std::string&) {}), PARAM_INVALID);
+        EXPECT_EQ(proxy->GetPageScene(request, [](const std::string&) {}), PARAM_INVALID);
+    }
     EXPECT_EQ(remote->calls, 0);
     EXPECT_TRUE(report->pageSceneEventCallbacks_.empty());
     EXPECT_FALSE(report->getPageSceneCallback_);
+}
+
+HWTEST_F(PageSceneProxyValidationTest, SplitWhitespaceTailKeepsCJsonCompatibility, TestSize.Level1)
+{
+    const std::vector<std::string> tails = { "", " \t\r\n", "\x01", "\x1f" };
+    for (const auto& tail : tails) {
+        const auto request = std::string(VALID_PROXY_SPLIT_RULE) + tail;
+        EXPECT_EQ(proxy->GetPageScene(request, [](const std::string&) {}), NO_ERROR);
+        EXPECT_EQ(remote->payload, request);
+    }
+    EXPECT_EQ(remote->calls, static_cast<int32_t>(tails.size()));
 }
 
 HWTEST_F(PageSceneProxyValidationTest, InvalidSelectorTagsNeverSendOrRegisterCallbacks, TestSize.Level1)
