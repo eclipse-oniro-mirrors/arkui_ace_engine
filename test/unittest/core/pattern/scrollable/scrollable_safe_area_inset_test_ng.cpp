@@ -19,11 +19,14 @@
 #include "gtest/gtest.h"
 #include "test/unittest/core/pattern/test_ng.h"
 
+#include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
+
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/view_abstract.h"
 #include "core/components_ng/pattern/list/list_model_ng.h"
 #include "core/components_ng/pattern/list/list_pattern.h"
 #include "core/components_ng/pattern/pattern.h"
+#include "core/components_ng/pattern/safe_area_inset/safe_area_inset_pattern.h"
 #include "core/components_ng/pattern/scroll/scroll_model_ng.h"
 #include "core/components_ng/pattern/scroll/scroll_pattern.h"
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
@@ -91,7 +94,7 @@ void SetHostSize()
 void SetRawSafeAreaPadding(float value)
 {
     PaddingProperty safeAreaPadding;
-    safeAreaPadding.SetEdges(CalcLength(value, DimensionUnit::PX));
+    safeAreaPadding.top = CalcLength(value, DimensionUnit::PX);
     ViewAbstract::SetSafeAreaPadding(safeAreaPadding);
 }
 
@@ -102,8 +105,23 @@ void ApplyInset(const std::vector<InsetItem>& items)
     ViewAbstract::SetSafeAreaInset(frameNode, BuildOptions(items), BuildContents(items));
 }
 
+RefPtr<SafeAreaInsetPattern> GetInsetPattern(const RefPtr<FrameNode>& host)
+{
+    CHECK_NULL_RETURN(host, nullptr);
+    auto container = host->GetSafeAreaInsetNode();
+    CHECK_NULL_RETURN(container, nullptr);
+    return container->GetPattern<SafeAreaInsetPattern>();
+}
+
+RefPtr<FrameNode> GetContentFrame(const RefPtr<SafeAreaInsetPattern>& pattern, SafeAreaInsetEdge edge)
+{
+    auto content = pattern->GetEdgeContent(edge);
+    return content ? AceType::DynamicCast<FrameNode>(content->GetFrameChildByIndex(0, true)) : nullptr;
+}
+
 RefPtr<FrameNode> CreateScrollHost(const std::function<void(ScrollModelNG&)>& callback)
 {
+    MockPipelineContext::GetCurrent()->SetUseFlushUITasks(true);
     ScrollModelNG model;
     model.Create();
     if (callback) {
@@ -116,6 +134,7 @@ RefPtr<FrameNode> CreateScrollHost(const std::function<void(ScrollModelNG&)>& ca
 
 RefPtr<FrameNode> CreateListHost(const std::function<void(ListModelNG&)>& callback)
 {
+    MockPipelineContext::GetCurrent()->SetUseFlushUITasks(true);
     ListModelNG model;
     model.Create();
     if (callback) {
@@ -156,6 +175,13 @@ HWTEST_F(ScrollableSafeAreaInsetTestNg, ScrollableSafeAreaInsetAvoid001, TestSiz
     auto avoid = pattern->GetAutoAdjustAvoidOffset();
     EXPECT_FLOAT_EQ(avoid.first, 28.0f); // content 20 + spacing 8
     EXPECT_FLOAT_EQ(avoid.second, 0.0f);
+
+    auto insetPattern = GetInsetPattern(host);
+    ASSERT_NE(insetPattern, nullptr);
+    EXPECT_EQ(GetContentFrame(insetPattern, SafeAreaInsetEdge::TOP)->GetGeometryNode()->GetFrameOffset(),
+        OffsetF(100.0f, 0.0f));
+    const auto& contribution = host->GetLayoutProperty()->GetSafeAreaInsetContribution();
+    EXPECT_FLOAT_EQ(contribution.top.value_or(0.0f), 28.0f);
 }
 
 /**
@@ -179,6 +205,16 @@ HWTEST_F(ScrollableSafeAreaInsetTestNg, ScrollableSafeAreaInsetAvoid002, TestSiz
     auto avoid = pattern->GetAutoAdjustAvoidOffset();
     EXPECT_FLOAT_EQ(avoid.first, 28.0f);
     EXPECT_FLOAT_EQ(avoid.second, 38.0f); // content 30 + spacing 8
+
+    auto insetPattern = GetInsetPattern(host);
+    ASSERT_NE(insetPattern, nullptr);
+    EXPECT_EQ(GetContentFrame(insetPattern, SafeAreaInsetEdge::TOP)->GetGeometryNode()->GetFrameOffset(),
+        OffsetF(100.0f, 0.0f));
+    EXPECT_EQ(GetContentFrame(insetPattern, SafeAreaInsetEdge::BOTTOM)->GetGeometryNode()->GetFrameOffset(),
+        OffsetF(100.0f, 170.0f));
+    const auto& contribution = host->GetLayoutProperty()->GetSafeAreaInsetContribution();
+    EXPECT_FLOAT_EQ(contribution.top.value_or(0.0f), 28.0f);
+    EXPECT_FLOAT_EQ(contribution.bottom.value_or(0.0f), 38.0f);
 }
 
 /**
@@ -353,5 +389,10 @@ HWTEST_F(ScrollableSafeAreaInsetTestNg, ScrollableSafeAreaInsetAvoid009, TestSiz
     auto avoid = pattern->GetAutoAdjustAvoidOffset();
     EXPECT_FLOAT_EQ(avoid.first, 28.0f);
     EXPECT_FLOAT_EQ(avoid.second, 0.0f);
+
+    auto insetPattern = GetInsetPattern(host);
+    ASSERT_NE(insetPattern, nullptr);
+    EXPECT_EQ(GetContentFrame(insetPattern, SafeAreaInsetEdge::TOP)->GetGeometryNode()->GetFrameOffset(),
+        OffsetF(100.0f, 0.0f));
 }
 } // namespace OHOS::Ace::NG
