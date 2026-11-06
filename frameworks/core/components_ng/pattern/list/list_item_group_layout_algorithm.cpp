@@ -2172,6 +2172,53 @@ void ListItemGroupLayoutAlgorithm::ResetLayoutItem(LayoutWrapper* layoutWrapper)
     }
 }
 
+void ListItemGroupLayoutAlgorithm::UpdateGroupDecodeCacheWindow(LayoutWrapper* groupWrapper, bool groupActive)
+{
+    CHECK_NULL_VOID(groupWrapper);
+    if (!ScrollableUtils::IsLowMemoryDeviceRuntime()) {
+        return;
+    }
+    if (listLayoutProperty_ && listLayoutProperty_->GetShowCachedItemsValue(false)) {
+        return;
+    }
+    if (itemPosition_.empty()) {
+        return;
+    }
+    auto cacheParam = GetCacheParam();
+    int32_t cacheForward = 0;
+    int32_t cacheBackward = 0;
+    if (cacheParam.has_value()) {
+        cacheForward = cacheParam->cacheCountForward;
+        cacheBackward = cacheParam->cacheCountBackward;
+    }
+    if (cacheForward <= 0 && cacheBackward <= 0) {
+        return;
+    }
+    const int32_t startIdx = GetStartIndex();
+    const int32_t endIdx = GetEndIndex();
+    const int32_t lanes = GetLanes();
+    const int32_t firstCacheIdx = std::max(0, startIdx - cacheBackward * lanes);
+    const int32_t lastCacheIdx = std::min(totalItemCount_ - 1, endIdx + cacheForward * lanes);
+    const int32_t decodeForward = ScrollableUtils::CalcDecodeWindowCount(cacheForward) * lanes;
+    const int32_t decodeBackward = ScrollableUtils::CalcDecodeWindowCount(cacheBackward) * lanes;
+    const int32_t decodeStart = std::max(0, startIdx - decodeBackward);
+    const int32_t decodeEnd = std::min(totalItemCount_ - 1, endIdx + decodeForward);
+
+    for (int32_t idx = firstCacheIdx; idx <= lastCacheIdx; ++idx) {
+        bool active = groupActive && ((idx >= startIdx && idx <= endIdx) ||
+                                      (idx >= decodeStart && idx <= decodeEnd));
+        auto wrapper = GetListItem(groupWrapper, idx, false, true);
+        if (!wrapper) {
+            continue;
+        }
+        auto itemFrameNode = AceType::DynamicCast<FrameNode>(wrapper);
+        if (!itemFrameNode) {
+            continue;
+        }
+        ScrollableUtils::UpdateCachedItemDecodeState(itemFrameNode, active);
+    }
+}
+
 RefPtr<LayoutWrapper> ListItemGroupLayoutAlgorithm::GetListItem(
     LayoutWrapper* layoutWrapper, int32_t index, bool addToRenderTree, bool isCache) const
 {

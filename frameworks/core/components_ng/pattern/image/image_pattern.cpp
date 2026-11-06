@@ -547,6 +547,11 @@ void ImagePattern::ReportCompleteLoadEvent(const RefPtr<FrameNode>& host)
 void ImagePattern::OnImageLoadSuccess()
 {
     CHECK_NULL_VOID(loadingCtx_);
+    if (!decodeCacheActive_) {
+        TAG_LOGD(AceLogTag::ACE_IMAGE, "OnImageLoadSuccess discarded, decode cache inactive. %{public}s",
+            imageDfxConfig_.ToStringWithoutSrc().c_str());
+        return;
+    }
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     ReportCompleteLoadEvent(host);
@@ -692,6 +697,11 @@ bool ImagePattern::CheckIfNeedLayout()
 void ImagePattern::OnImageDataReady()
 {
     CHECK_NULL_VOID(loadingCtx_);
+    if (!decodeCacheActive_) {
+        TAG_LOGD(AceLogTag::ACE_IMAGE, "OnImageDataReady discarded, decode cache inactive. %{public}s",
+            imageDfxConfig_.ToStringWithoutSrc().c_str());
+        return;
+    }
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     const auto& geometryNode = host->GetGeometryNode();
@@ -1281,6 +1291,7 @@ void ImagePattern::LoadAltImage(const ImageSourceInfo& altImageSourceInfo)
 
 void ImagePattern::LoadImageDataIfNeed()
 {
+    CHECK_NULL_VOID(decodeCacheActive_);
     auto imageLayoutProperty = GetLayoutProperty<ImageLayoutProperty>();
     CHECK_NULL_VOID(imageLayoutProperty);
     auto host = GetHost();
@@ -1658,6 +1669,7 @@ LoadSuccessNotifyTask ImagePattern::CreateLoadSuccessCallbackForAlt()
         auto pattern = weak.Upgrade();
         CHECK_NULL_VOID(pattern);
         CHECK_NULL_VOID(pattern->altLoadingCtx_);
+        CHECK_NULL_VOID(pattern->decodeCacheActive_);
         auto layoutProps = pattern->GetLayoutProperty<ImageLayoutProperty>();
         CHECK_NULL_VOID(layoutProps);
         ImageSourceInfo currentAltSrc;
@@ -1743,6 +1755,34 @@ bool ImagePattern::DoRecycleImageData(const std::string& logSuffix, const std::s
     return true;
 }
 
+void ImagePattern::SetDecodeCacheActive(bool active)
+{
+    if (decodeCacheActive_ == active) {
+        return;
+    }
+    decodeCacheActive_ = active;
+    TAG_LOGD(AceLogTag::ACE_IMAGE, "decode cache %{public}s, %{public}s",
+        active ? "activated" : "deactivated", imageDfxConfig_.ToStringWithoutSrc().c_str());
+    if (!active) {
+        if (loadingCtx_) {
+            loadingCtx_->ResetLoading();
+        }
+        if (altLoadingCtx_) {
+            altLoadingCtx_->ResetLoading();
+        }
+        if (altErrorCtx_) {
+            altErrorCtx_->ResetLoading();
+        }
+        DoRecycleImageData("decodeWindow", "DecodeWindowDeactivate", false);
+    } else {
+        isRecycledImage_ = false;
+        if (loadingCtx_ && !image_) {
+            isImageReloadNeeded_ = true;
+        }
+        LoadImageDataIfNeed();
+    }
+}
+
 void ImagePattern::OnNotifyMemoryLevel(int32_t level)
 {
     // Intentionally left blank: no handling for memory level in current version.
@@ -1778,6 +1818,7 @@ void ImagePattern::OnRecycle()
 void ImagePattern::OnReuse()
 {
     ACE_SCOPED_TRACE("OnReuse %s", imageDfxConfig_.ToStringWithSrc().c_str());
+    decodeCacheActive_ = true;
     RegisterWindowStateChangedCallback();
     auto renderProp = GetPaintProperty<ImageRenderProperty>();
     CHECK_NULL_VOID(renderProp);
@@ -2515,6 +2556,8 @@ void ImagePattern::DumpOtherInfo()
         std::string("UserRecycleImageEnabled:").append(GetIsRecycleInvisibleImageMemory() ? "true" : "false"));
     isRecycledImage_ ? DumpLog::GetInstance().AddDesc("isRecycled:true")
                      : DumpLog::GetInstance().AddDesc("isRecycled:false");
+    DumpLog::GetInstance().AddDesc(
+        std::string("decodeCacheActive:").append(decodeCacheActive_ ? "true" : "false"));
 
     if (loadingCtx_) {
         auto currentLoadImageState = loadingCtx_->GetCurrentLoadingState();
@@ -3324,6 +3367,7 @@ LoadSuccessNotifyTask ImagePattern::CreateLoadSuccessCallbackForAltError()
         auto pattern = weak.Upgrade();
         CHECK_NULL_VOID(pattern);
         CHECK_NULL_VOID(pattern->altErrorCtx_);
+        CHECK_NULL_VOID(pattern->decodeCacheActive_);
         auto layoutProps = pattern->GetLayoutProperty<ImageLayoutProperty>();
         CHECK_NULL_VOID(layoutProps);
         auto currentAltSrc = layoutProps->GetAltError().value_or(ImageSourceInfo(""));

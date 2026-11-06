@@ -102,6 +102,14 @@ struct ScrollableUtils {
 
     ACE_FORCE_EXPORT static ContentClipMode ResolveEffectiveDefaultContentClip(
         FrameNode* host, const ScrollablePaintProperty* props);
+
+    ACE_FORCE_EXPORT static bool IsLowMemoryDevice(int32_t deviceMemoryGiB);
+
+    ACE_FORCE_EXPORT static bool IsLowMemoryDeviceRuntime();
+
+    ACE_FORCE_EXPORT static int32_t CalcDecodeWindowCount(int32_t cacheCount);
+
+    ACE_FORCE_EXPORT static void UpdateCachedItemDecodeState(const RefPtr<FrameNode>& root, bool active);
 };
 } // namespace OHOS::Ace::NG
 
