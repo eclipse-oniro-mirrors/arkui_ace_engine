@@ -24,7 +24,8 @@ class JSON2 {
     const serialize = (value: unknown, isRoot: boolean = true): string => {
       const root = isRoot ? value : undefined;
       return JSON.stringify(value, function(key: string, value: unknown) {
-        return replace.call(this, key, value, root);
+        return JSON2.replaceValue_(this, key, value, root,
+          visited, serialize, serializeSendable, ignoreReadOnlyProperties);
       });
     };
 
@@ -35,63 +36,76 @@ class JSON2 {
       return (JSON as any).stringifySendable(value);
     };
 
-    const replace = function (key: string, val: any, root: any): any {
-      // don't trust JSON replacer's arg 'val' (it turns Date objects into strings)
-      const value = this[key];
-
-      if (value === null) { throw new TypeError('Cannot read property __proto__ of null'); }
-      if (typeof value === 'string') { return `st????${value}`; }
-      if (typeof value === 'bigint') { return `bi????${value.toString()}`; }
-      if (typeof value === 'undefined') { return `re????`; }
-      if (typeof value !== 'object') {
-        return value;
-      }
-
-      let refId = visited.get(value);
-      if (refId) {
-        return `re${refId}`;
-      }
-
-      refId = visited.size.toString(32).padStart(4, '0');
-      visited.set(value, refId);
-
-      if (value instanceof Boolean) { return `Bo${refId}${value.toString()}`; }
-      if (value instanceof Date) { return `Da${refId}${value.toISOString()}`; }
-      if (value instanceof Number) { return `Nu${refId}${value.toString()}`; }
-      if (value instanceof String) { return `St${refId}${value}`; }
-      if (value instanceof Set) { return `Se${refId}${serialize([...value])}`; }
-      if (value instanceof SendableArray) { return `SA${refId}${serializeSendable([...value])}`; }
-      if (value instanceof SendableMap) { return `SM${refId}${serializeSendable([...value])}`; }
-      if (value instanceof SendableSet) { return `SS${refId}${serializeSendable([...value])}`; }
-      if (globalThis.isSendable(value)) { return `SO${refId}${serializeSendable(value)}`; }
-
-      if (value instanceof Array) {
-        // serialize each item separately, then put them back together
-        const items = value.map(item => JSON.parse(serialize(item, false)));
-        // and stringify
-        return `Ar${refId}${JSON.stringify(items)}`;
-      }
-
-      if (value instanceof Map) {
-        // serialize each item separately, keep keys unchanged
-        const items = [...value].map(([key, val]) => [key, serialize(val, false)]);
-        // and stringify
-        return `Ma${refId}${JSON.stringify(items)}`;
-      }
-
-      // replace property names with their aliases if any, skip disabled ones
-      const aliased = JSON2.toAliasedObject(value, ignoreReadOnlyProperties);
-
-      // skip root to prevent recursion
-      if (root === value) {
-        return aliased;
-      }
-
-      return `Ob${refId}${serialize(aliased)}`;
-    }
-
     // wrap value to ensure the root is always a regular object
     return serialize({ $: value });
+  }
+
+  // Type-dispatch replacement for JSON.stringify replacer (extracted from stringify).
+  // 'obj' is the replacer's this-context (the object currently being traversed).
+  private static replaceValue_(obj: any, key: string, val: any, root: any,
+    visited: Map<object, string>,
+    serialize: (v: unknown, isRoot?: boolean) => string,
+    serializeSendable: (v: unknown) => string,
+    ignoreReadOnlyProperties: ReadOnlyPropertyFilter): any {
+    // don't trust JSON replacer's arg 'val' (it turns Date objects into strings)
+    const value = obj[key];
+
+    if (value === null) { throw new TypeError('Cannot read property __proto__ of null'); }
+    if (typeof value === 'string') { return `st????${value}`; }
+    if (typeof value === 'bigint') { return `bi????${value.toString()}`; }
+    if (typeof value === 'undefined') { return `re????`; }
+    if (typeof value !== 'object') {
+      return value;
+    }
+
+    let refId = visited.get(value);
+    if (refId) {
+      return `re${refId}`;
+    }
+
+    refId = visited.size.toString(32).padStart(4, '0');
+    visited.set(value, refId);
+
+    const special = JSON2.trySpecialType_(value, refId, serialize, serializeSendable);
+    if (special !== null) {
+      return special;
+    }
+
+    if (value instanceof Array) {
+      // serialize each item separately, then put them back together
+      const items = value.map(item => JSON.parse(serialize(item, false)));
+      return `Ar${refId}${JSON.stringify(items)}`;
+    }
+
+    if (value instanceof Map) {
+      // serialize each item separately, keep keys unchanged
+      const items = [...value].map(([key, val]) => [key, serialize(val, false)]);
+      return `Ma${refId}${JSON.stringify(items)}`;
+    }
+
+    // replace property names with their aliases if any, skip disabled ones
+    const aliased = JSON2.toAliasedObject(value, ignoreReadOnlyProperties);
+    // skip root to prevent recursion
+    if (root === value) {
+      return aliased;
+    }
+    return `Ob${refId}${serialize(aliased)}`;
+  }
+
+  // Try to encode a special (non-plain-object) type; returns null when not matched.
+  private static trySpecialType_(value: object, refId: string,
+    serialize: (v: unknown, isRoot?: boolean) => string,
+    serializeSendable: (v: unknown) => string): string | null {
+    if (value instanceof Boolean) { return `Bo${refId}${value.toString()}`; }
+    if (value instanceof Date) { return `Da${refId}${value.toISOString()}`; }
+    if (value instanceof Number) { return `Nu${refId}${value.toString()}`; }
+    if (value instanceof String) { return `St${refId}${value}`; }
+    if (value instanceof Set) { return `Se${refId}${serialize([...value])}`; }
+    if (value instanceof SendableArray) { return `SA${refId}${serializeSendable([...value])}`; }
+    if (value instanceof SendableMap) { return `SM${refId}${serializeSendable([...value])}`; }
+    if (value instanceof SendableSet) { return `SS${refId}${serializeSendable([...value])}`; }
+    if (globalThis.isSendable(value)) { return `SO${refId}${serializeSendable(value)}`; }
+    return null;
   }
 
   /**
