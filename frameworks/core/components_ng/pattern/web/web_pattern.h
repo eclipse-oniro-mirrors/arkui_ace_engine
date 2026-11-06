@@ -1882,7 +1882,7 @@ private:
     ScrollbarLayoutPolicy scrollbarLayoutPolicy_ = ScrollbarLayoutPolicy::CONTENT;
     bool scrollbarLayoutPolicyChanged_ = false;
     bool isLanguageRtl_ = false;
-    bool isEscKeyDownConsumed_ = false;
+    bool isEscKeyDownConsumed_ = true;
 
 protected:
     OnCreateMenuCallback onCreateMenuCallback_;

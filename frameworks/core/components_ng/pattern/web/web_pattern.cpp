@@ -3810,6 +3810,7 @@ bool WebPattern::IsShouldTriggerBack(const KeyEvent& event, bool isUsed)
     bool shouldTriggerBack = false;
     if (isKeyUp) {
         shouldTriggerBack = !isEscKeyDownConsumed_ && !isUsed;
+        isEscKeyDownConsumed_ = true;
     }
     return shouldTriggerBack;
 }
