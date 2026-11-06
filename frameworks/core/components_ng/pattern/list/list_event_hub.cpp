@@ -103,22 +103,23 @@ void ListEventHub::HandleOnItemDragStart(const GestureEvent& info)
     dragDropManager->SetDraggingPressedState(true);
     dragDropManager->SetDragStartPoint(info.GetGlobalPoint().GetX(), info.GetGlobalPoint().GetY());
 #if defined(PIXEL_MAP_SUPPORTED)
-    auto callback = [weakHost = WeakClaim(RawPtr(host)), info, weak = WeakClaim(this)](
+    // The snapshot callback runs on the RenderService thread, not the UI thread.
+    // Capture thread-safe handles (taskExecutor, instanceId) on the UI thread now,
+    // so the RS-thread callback never upgrades/holds UI objects (FrameNode /
+    // PipelineContext) before posting tasks back to the UI thread.
+    auto taskExecutor = pipeline->GetTaskExecutor();
+    CHECK_NULL_VOID(taskExecutor);
+    auto instanceId = host->GetInstanceId();
+    auto callback = [instanceId, taskExecutor, info, weak = WeakClaim(this)](
                         std::shared_ptr<Media::PixelMap> mediaPixelMap, int32_t /*arg*/,
                         const std::function<void()>& finishCallback) {
-        auto host = weakHost.Upgrade();
-        CHECK_NULL_VOID(host);
-        ContainerScope scope(host->GetInstanceId());
         if (!mediaPixelMap) {
             TAG_LOGE(AceLogTag::ACE_DRAG, "listItem drag start failed, custom component screenshot is empty.");
             return;
         }
-        auto pipeline = host->GetContext();
-        CHECK_NULL_VOID(pipeline);
-        auto taskScheduler = pipeline->GetTaskExecutor();
-        CHECK_NULL_VOID(taskScheduler);
-        taskScheduler->PostTask(
-            [finishCallback]() {
+        taskExecutor->PostTask(
+            [finishCallback, instanceId]() {
+                ContainerScope scope(instanceId);
                 if (finishCallback) {
                     finishCallback();
                 }
@@ -126,8 +127,9 @@ void ListEventHub::HandleOnItemDragStart(const GestureEvent& info)
             TaskExecutor::TaskType::UI, "ArkUIListItemDragRemoveCustomNode");
         DragDropInfo dragDropInfo;
         dragDropInfo.pixelMap = PixelMap::CreatePixelMap(reinterpret_cast<void*>(&mediaPixelMap));
-        taskScheduler->PostTask(
-            [weak, info, dragDropInfo]() {
+        taskExecutor->PostTask(
+            [weak, info, dragDropInfo, instanceId]() {
+                ContainerScope scope(instanceId);
                 auto eventHub = weak.Upgrade();
                 CHECK_NULL_VOID(eventHub);
                 eventHub->OnItemDragStart(info, dragDropInfo);
