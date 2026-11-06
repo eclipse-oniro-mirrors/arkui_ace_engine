@@ -3632,6 +3632,14 @@
         "name": "OH_ArkUI_RenderNodeUtils_InsertChildAfter"
     },
     {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_RenderNodeUtils_AddChildWithPolicy"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_RenderNodeUtils_InsertChildAfterWithPolicy"
+    },
+    {
         "first_introduced": "20",
         "name": "OH_ArkUI_RenderNodeUtils_RemoveChild"
     },

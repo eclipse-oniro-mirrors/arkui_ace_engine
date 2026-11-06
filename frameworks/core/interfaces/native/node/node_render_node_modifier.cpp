@@ -16,6 +16,7 @@
 #include "node_render_node_modifier.h"
 
 #include <list>
+#include <vector>
 
 #include "render_service_base/include/render/rs_mask.h"
 #include "render_service_client/core/modifier_ng/rs_modifier_ng.h"
@@ -40,6 +41,7 @@
 #include "frameworks/base/geometry/matrix4.h"
 #include "frameworks/core/components_ng/render/adapter/rosen_modifier_property.h"
 #include "core/interfaces/native/utility/error_message_macros.h"
+#include "interfaces/native/native_render.h"
 
 namespace OHOS::Ace::NG {
 using OHOS::Rosen::RSNode;
@@ -596,6 +598,153 @@ ArkUI_Int32 InsertChildAfter(
     auto index = GetChildIndex(parentNodePtr, siblingPtr);
     auto targetIndex = index == -1 ? -1 : index + 1;
     parentNodePtr->AddChild(childNodePtr, targetIndex);
+    return ERROR_CODE_NO_ERROR;
+}
+
+struct RenderNodeMountRequest {
+    ArkUIRenderNodeHandle parent;
+    ArkUIRenderNodeHandle child;
+    ArkUIRenderNodeHandle sibling;
+    std::shared_ptr<RSNode> parentNodePtr;
+    std::shared_ptr<RSNode> childNodePtr;
+    std::shared_ptr<RSNode> siblingPtr;
+    std::vector<std::shared_ptr<RSNode>> subtree;
+};
+
+ArkUI_Int32 ValidateDetachedRenderChild(RenderNodeMountRequest& request, ArkUI_Int32 policy)
+{
+    if (request.childNodePtr->GetParent() || HasMixedParent(request.childNodePtr)) {
+        SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(ERROR_CODE_PARAM_INVALID, "Render child already has a parent");
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    for (auto ancestor = request.parentNodePtr; ancestor; ancestor = ancestor->GetParent()) {
+        if (ancestor == request.childNodePtr) {
+            SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(ERROR_CODE_PARAM_INVALID, "Render child would create a cycle");
+            return ERROR_CODE_PARAM_INVALID;
+        }
+    }
+    if (policy != OH_ARKUI_RENDER_NODE_UTILS_ATTACH_POLICY_INHERIT_PARENT_INSTANCE) {
+        return ERROR_CODE_NO_ERROR;
+    }
+    auto targetContext = request.parentNodePtr->GetRSUIContext();
+    request.subtree.push_back(request.childNodePtr);
+    // Collect every descendant before migration, including nodes with an equal or null context.
+    for (size_t index = 0; index < request.subtree.size(); ++index) {
+        auto current = request.subtree[index];
+        if (!targetContext && current->GetRSUIContext()) {
+            SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(
+                ERROR_CODE_PARAM_INVALID, "Parent render node has no instance context");
+            return ERROR_CODE_PARAM_INVALID;
+        }
+        for (const auto& weakChild : current->GetChildren()) {
+            if (auto child = weakChild.lock()) {
+                request.subtree.push_back(child);
+            }
+        }
+    }
+    return ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_Int32 ValidateMountWithPolicy(RenderNodeMountRequest& request, ArkUI_Int32 policy)
+{
+    if (policy != OH_ARKUI_RENDER_NODE_UTILS_ATTACH_POLICY_NOT_INHERIT_PARENT_INSTANCE &&
+        policy != OH_ARKUI_RENDER_NODE_UTILS_ATTACH_POLICY_INHERIT_PARENT_INSTANCE) {
+        SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(ERROR_CODE_PARAM_INVALID, "Attach policy is invalid");
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    if (IsGetFromFrameNode(request.parent)) {
+        SetRenderNodeFromFrameError();
+        return ERROR_CODE_RENDER_IS_FROM_FRAME_NODE;
+    }
+    auto childFrameNode = GetFrameNodeFromRenderNodeHandle(request.child);
+    if (IsGetFromNativeFrameNode(request.child)) {
+        SetRenderNodeFromFrameError();
+        return ERROR_CODE_RENDER_IS_FROM_FRAME_NODE;
+    }
+    if (IsGetFromAdoptedFrameNode(request.child) && (childFrameNode == nullptr || !childFrameNode->IsAdopted())) {
+        SetRenderChildInvalidFrameError();
+        return ERROR_CODE_RENDER_HAS_INVALID_FRAME_NODE;
+    }
+    request.parentNodePtr = GetRsNodeFromStruct(request.parent);
+    if (!request.parentNodePtr) {
+        SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(ERROR_CODE_PARAM_INVALID, "Render node is invalid");
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    request.childNodePtr = GetRsNodeFromStruct(request.child);
+    if (!request.childNodePtr) {
+        SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(ERROR_CODE_PARAM_INVALID, "Render child node is invalid");
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    if (request.sibling) {
+        request.siblingPtr = GetRsNodeFromStruct(request.sibling);
+        if (!request.siblingPtr) {
+            SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(ERROR_CODE_PARAM_INVALID, "Render sibling node is invalid");
+            return ERROR_CODE_PARAM_INVALID;
+        }
+    }
+    return ValidateDetachedRenderChild(request, policy);
+}
+
+void MigrateRenderNodeToParentInstance(const RenderNodeMountRequest& request)
+{
+    auto targetContext = request.parentNodePtr->GetRSUIContext();
+    // Children migrate first, so Rosen's recursive call returns at each already migrated child.
+    for (auto iter = request.subtree.rbegin(); iter != request.subtree.rend(); ++iter) {
+        if ((*iter)->GetRSUIContext() != targetContext) {
+            (*iter)->SetRSUIContext(targetContext);
+        }
+    }
+}
+
+ArkUI_Int32 AddChildWithPolicy(ArkUIRenderNodeHandle node, ArkUIRenderNodeHandle child,
+    ArkUI_Int32 policy)
+{
+    ViewAbstract::CheckMainThread();
+    RenderNodeMountRequest request { node, child, nullptr, nullptr, nullptr, nullptr, {} };
+    auto result = ValidateMountWithPolicy(request, policy);
+    if (result != ERROR_CODE_NO_ERROR) {
+        return result;
+    }
+    auto mixedContext = GetMixedRosenContextFromRSNode(request.parentNodePtr);
+    if (policy == OH_ARKUI_RENDER_NODE_UTILS_ATTACH_POLICY_INHERIT_PARENT_INSTANCE) {
+        MigrateRenderNodeToParentInstance(request);
+    }
+    if (mixedContext) {
+        mixedContext->InsertPureRenderChildAt(request.childNodePtr, -1);
+        return ERROR_CODE_NO_ERROR;
+    }
+    request.parentNodePtr->AddChild(request.childNodePtr, -1);
+    return ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_Int32 InsertChildAfterWithPolicy(
+    ArkUIRenderNodeHandle node, ArkUIRenderNodeHandle child,
+    ArkUIRenderNodeHandle sibling, ArkUI_Int32 policy)
+{
+    ViewAbstract::CheckMainThread();
+    if (!sibling) {
+        SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(ERROR_CODE_PARAM_INVALID, "Render sibling node is invalid");
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    RenderNodeMountRequest request { node, child, sibling, nullptr, nullptr, nullptr, {} };
+    auto result = ValidateMountWithPolicy(request, policy);
+    if (result != ERROR_CODE_NO_ERROR) {
+        return result;
+    }
+    auto mixedContext = GetMixedRosenContextFromRSNode(request.parentNodePtr);
+    if (policy == OH_ARKUI_RENDER_NODE_UTILS_ATTACH_POLICY_INHERIT_PARENT_INSTANCE) {
+        MigrateRenderNodeToParentInstance(request);
+    }
+    if (mixedContext) {
+        int32_t mixedInsertIndex = -1;
+        auto isSiblingInMixedList =
+            mixedContext->GetMixedRenderChildInsertIndexAfterRSNode(request.siblingPtr, mixedInsertIndex);
+        mixedContext->InsertPureRenderChildAt(request.childNodePtr, isSiblingInMixedList ? mixedInsertIndex : -1);
+        return ERROR_CODE_NO_ERROR;
+    }
+    auto index = GetChildIndex(request.parentNodePtr, request.siblingPtr);
+    auto targetIndex = index == -1 ? -1 : index + 1;
+    request.parentNodePtr->AddChild(request.childNodePtr, targetIndex);
     return ERROR_CODE_NO_ERROR;
 }
 
@@ -2733,6 +2882,8 @@ const ArkUINDKRenderNodeModifier* GetNDKRenderNodeModifier()
         .getRSNode = GetRSNode,
         .adoptChildWithPolicy = AdoptChildWithPolicy,
         .setAdoptedChildOverlayPositionCompensation = SetAdoptedChildOverlayPositionCompensation,
+        .addChildWithPolicy = AddChildWithPolicy,
+        .insertChildAfterWithPolicy = InsertChildAfterWithPolicy,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
 
