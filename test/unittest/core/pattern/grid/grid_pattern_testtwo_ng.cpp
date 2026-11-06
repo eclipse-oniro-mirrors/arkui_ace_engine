@@ -1176,7 +1176,7 @@ HWTEST_F(GridTestNg, DumpGridAlignItemsFiltering, TestSize.Level1)
 
 /**
  * @tc.name: DumpMultiSelectableIsolationCheck
- * @tc.desc: Test Grid multiSelectable in text and JSON dump output
+ * @tc.desc: Test Grid multiSelectable in advanced text and JSON dump output
  * @tc.type: FUNC
  */
 HWTEST_F(GridTestNg, DumpMultiSelectableIsolationCheck, TestSize.Level1)
@@ -1187,13 +1187,28 @@ HWTEST_F(GridTestNg, DumpMultiSelectableIsolationCheck, TestSize.Level1)
     for (bool value : { false, true }) {
         gridPattern->SetMultiSelectable(value);
         auto& descriptions = DumpLog::GetInstance().description_;
+        const std::string expected = value ? "multiSelectable:true\n" : "multiSelectable:false\n";
         descriptions.clear();
         gridPattern->DumpInfo();
-        const std::string expected = value ? "multiSelectable: true\n" : "multiSelectable: false\n";
-        EXPECT_NE(std::find(descriptions.begin(), descriptions.end(), expected), descriptions.end());
+        EXPECT_TRUE(std::none_of(descriptions.begin(), descriptions.end(), [](const auto& description) {
+            return description.find("multiSelectable:") == 0;
+        }));
         auto json = JsonUtil::Create(true);
         gridPattern->DumpInfo(json);
-        EXPECT_EQ(json->GetString("multiSelectable"), value ? "true" : "false");
+        EXPECT_FALSE(json->Contains("multiSelectable"));
+        descriptions.clear();
+        gridPattern->DumpAdvanceInfo();
+        EXPECT_NE(std::find(descriptions.begin(), descriptions.end(), expected), descriptions.end());
+        json = JsonUtil::Create(true);
+        gridPattern->DumpAdvanceInfo(json);
+        ASSERT_TRUE(json->Contains("multiSelectable"));
+        EXPECT_EQ(json->GetBool("multiSelectable"), value);
+        ParamConfig config;
+        config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+        config.functionalProperties = true;
+        json = JsonUtil::Create(true);
+        gridPattern->DumpAdvanceInfo(json, config);
+        EXPECT_FALSE(json->Contains("multiSelectable"));
     }
 }
 
