@@ -178,7 +178,7 @@ public:
     {
         // The layered parameter scroll_bar_interactive only controls the built-in
         // rect scroll bar; the arc (round) scroll bar must stay touch interactive.
-        return scrollBarInteractive_ || shapeMode_ == ShapeMode::ROUND;
+        return shapeMode_ == ShapeMode::RECT ? scrollBarInteractive_ : true;
     }
     const Dimension& GetMinDynamicHeight() const
     {
