@@ -53,17 +53,8 @@ class JSON2 {
     if (value === null) {
       throw new TypeError('Cannot read property __proto__ of null');
     }
-    if (typeof value === 'string') {
-      return `st????${value}`;
-    }
-    if (typeof value === 'bigint') {
-      return `bi????${value.toString()}`;
-    }
-    if (typeof value === 'undefined') {
-      return `re????`;
-    }
     if (typeof value !== 'object') {
-      return value;
+      return JSON2.encodePrimitive_(value);
     }
 
     let refId = visited.get(value);
@@ -80,24 +71,47 @@ class JSON2 {
     }
 
     if (value instanceof Array) {
-      // serialize each item separately, then put them back together
-      const items = value.map(item => JSON.parse(serialize(item, false)));
-      return `Ar${refId}${JSON.stringify(items)}`;
+      return JSON2.encodeArray_(value, refId, serialize);
     }
-
     if (value instanceof Map) {
-      // serialize each item separately, keep keys unchanged
-      const items = [...value].map(([key, val]) => [key, serialize(val, false)]);
-      return `Ma${refId}${JSON.stringify(items)}`;
+      return JSON2.encodeMap_(value, refId, serialize);
     }
 
     // replace property names with their aliases if any, skip disabled ones
-    const aliased = JSON2.toAliasedObject(value as object, ignoreReadOnlyProperties);
+    const aliased = JSON2.toAliasedObject(value, ignoreReadOnlyProperties);
     // skip root to prevent recursion
     if (root === value) {
       return aliased;
     }
     return `Ob${refId}${serialize(aliased)}`;
+  }
+
+  // Serialize an Array: each item separately, then reassemble.
+  private static encodeArray_(value: unknown[], refId: string,
+    serialize: (v: unknown, isRoot?: boolean) => string): string {
+    const items = value.map(item => JSON.parse(serialize(item, false)));
+    return `Ar${refId}${JSON.stringify(items)}`;
+  }
+
+  // Serialize a Map: each value separately (keys unchanged), then reassemble.
+  private static encodeMap_(value: Map<unknown, unknown>, refId: string,
+    serialize: (v: unknown, isRoot?: boolean) => string): string {
+    const items = [...value].map(([key, val]) => [key, serialize(val, false)]);
+    return `Ma${refId}${JSON.stringify(items)}`;
+  }
+
+  // Encode a non-object primitive (string/bigint/undefined tagged, others as-is).
+  private static encodePrimitive_(value: unknown): unknown {
+    if (typeof value === 'string') {
+      return `st????${value}`;
+    }
+    if (typeof value === 'bigint') {
+      return `bi????${value.toString()}`;
+    }
+    if (typeof value === 'undefined') {
+      return `re????`;
+    }
+    return value;
   }
 
   // Try to encode a special (non-plain-object) type; returns null when not matched.
@@ -188,7 +202,7 @@ class JSON2 {
       });
 
       return obj;
-    }
+    };
 
     // parse main structure, gathering objects
     let root = JSON2.parseStructure(text, objects);
@@ -229,59 +243,63 @@ class JSON2 {
 
     const reviver = function(key: string, value: unknown): any {
       const { type, refId, payload } = JSON2.parseTRP(value as string);
-
-      let result = value;
-      if (type === 'Da') {
-        result = new Date(payload);
-      }
-      if (type === 'Bo') {
-        result = new Boolean(parse(payload));
-      }
-      if (type === 'Nu') {
-        result = new Number(parse(payload));
-      }
-      if (type === 'St') {
-        result = new String(payload);
-      }
-      if (type === 'Ar') {
-        result = parse(payload);
-      }
-      if (type === 'Ma') {
-        result = parseMap(payload);
-      }
-      if (type === 'Se') {
-        result = new Set(parse(payload));
-      }
-      if (type === 'SO') {
-        result = parseSendable(payload);
-      }
-      if (type === 'SA') {
-        result = new SendableArray(...parseSendable(payload));
-      }
-      if (type === 'SM') {
-        result = new SendableMap(parseSendable(payload));
-      }
-      if (type === 'SS') {
-        result = new SendableSet(parseSendable(payload));
-      }
-      if (type === 'Ob') {
-        result = parse(payload);
-      }
-      if (type === 'bi') {
-        result = BigInt(payload);
-      }
-
-      // don't process 're' (references) and 'st' (plain strings) here
-      // we return them as-is, and process them after parsing the full structure
-
+      const result = JSON2.decodeTypedValue_(value, type, payload, parse, parseMap, parseSendable);
       if (typeof result === 'object') {
         objects.set(refId!, result);
       }
-
       return result;
-    }
+    };
 
     return parse(text);
+  }
+
+  // Decode a typed value from its <typetag, payload>; returns original value when no tag matches.
+  private static decodeTypedValue_(value: unknown, type: string | undefined, payload: string | undefined,
+    parse: (str: string) => any,
+    parseMap: (str: string) => Map<string | number, string>,
+    parseSendable: (str: string) => any): unknown {
+    if (type === 'Da') {
+      return new Date(payload!);
+    }
+    if (type === 'Bo') {
+      return new Boolean(parse(payload!));
+    }
+    if (type === 'Nu') {
+      return new Number(parse(payload!));
+    }
+    if (type === 'St') {
+      return new String(payload);
+    }
+    if (type === 'Ar') {
+      return parse(payload!);
+    }
+    if (type === 'Ma') {
+      return parseMap(payload!);
+    }
+    if (type === 'Se') {
+      return new Set(parse(payload!));
+    }
+    if (type === 'SO') {
+      return parseSendable(payload!);
+    }
+    if (type === 'SA') {
+      return new SendableArray(...parseSendable(payload!));
+    }
+    if (type === 'SM') {
+      return new SendableMap(parseSendable(payload!));
+    }
+    if (type === 'SS') {
+      return new SendableSet(parseSendable(payload!));
+    }
+    if (type === 'Ob') {
+      return parse(payload!);
+    }
+    if (type === 'bi') {
+      return BigInt(payload!);
+    }
+    // don't process 're' (references) and 'st' (plain strings) here
+    // we return them as-is, and process them after parsing the full structure
+    return value;
   }
 
   // Parse <typetag, refId, payload> from string
