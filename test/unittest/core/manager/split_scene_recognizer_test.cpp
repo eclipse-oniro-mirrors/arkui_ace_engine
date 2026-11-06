@@ -18,6 +18,7 @@
 #include "gtest/gtest.h"
 
 #include "core/components_ng/manager/page_scene/split_scene_recognizer.h"
+#include "interfaces/inner_api/ui_session/ui_session_split_rule.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -679,6 +680,36 @@ HWTEST_F(SplitSceneRecognizerTest, SplitScene_NonFiniteGeometryCannotContributeT
         EXPECT_EQ(valid.matchedNodeIds, (std::vector<int32_t> { PREFIX_NODE_ID, WIDE_NODE_ID }));
         const RectF invalidWindow(invalid, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
         EXPECT_FALSE(SplitSceneRecognizer::Recognize(rule, { left, right }, invalidWindow).matched);
+    }
+}
+
+HWTEST_F(SplitSceneRecognizerTest, SplitRule_ExtensibleSceneTypesKeepSplitOrder, TestSize.Level1)
+{
+    const auto parsed = PageSceneSplit::ParseRuleSet(R"({"version":1, "ruleSetId":"mixed", "rules":[
+        {"ruleId":"future", "sceneType":"FUTURE_SCENE", "custom":null, "navigation":123},
+        {"ruleId":"first", "sceneType":"SPLIT"},
+        {"ruleId":"search", "sceneType":"SEARCH"},
+        {"ruleId":"second", "sceneType":"SPLIT"},
+        {"ruleId":"text", "sceneType":"TEXT_EDITOR"}]})");
+    ASSERT_TRUE(parsed.has_value());
+    ASSERT_EQ(parsed->rules.size(), 2u);
+    EXPECT_EQ(parsed->rules[0].ruleId, "first");
+    EXPECT_EQ(parsed->rules[1].ruleId, "second");
+    EXPECT_FALSE(PageSceneSplit::ParseRuleSet(R"({"version":1, "ruleSetId":"future", "rules":[
+        {"ruleId":"future", "sceneType":"FUTURE_SCENE"}]})"));
+}
+
+HWTEST_F(SplitSceneRecognizerTest, SplitRule_ExtensibleSceneTypesKeepCommonValidation, TestSize.Level1)
+{
+    const std::string prefix = R"({"version":1, "ruleSetId":"mixed", "rules":[
+        {"ruleId":"split", "sceneType":"SPLIT"}, )";
+    const std::vector<std::string> invalidItems = { R"({"ruleId":"future"})", R"({"ruleId":"future", "sceneType":""})",
+        R"({"ruleId":"future", "sceneType":123})", R"({"ruleId":"future", "sceneType":null})",
+        R"({"ruleId":"", "sceneType":"FUTURE_SCENE"})", R"({"sceneType":"FUTURE_SCENE"})",
+        R"({"ruleId":123, "sceneType":"FUTURE_SCENE"})", R"({"ruleId":"bad id", "sceneType":"FUTURE_SCENE"})",
+        R"({"ruleId":"split", "sceneType":"FUTURE_SCENE"})", "null" };
+    for (const auto& item : invalidItems) {
+        EXPECT_FALSE(PageSceneSplit::ParseRuleSet(prefix + item + "]}")) << item;
     }
 }
 

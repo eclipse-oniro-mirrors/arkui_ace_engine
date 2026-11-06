@@ -29,29 +29,17 @@ namespace OHOS::Ace {
 namespace {
 constexpr size_t SPLIT_REGISTRATION_RULE_COUNT = 1;
 
-bool IsValidPageSceneRequest(const std::string& request, bool allowRuleSetId = false)
+bool IsValidSplitPageSceneRequest(const std::string& request, bool isQuery = false)
 {
-    if (allowRuleSetId && PageSceneSplit::IsValidId(request)) {
+    // Discover explicit SPLIT declarations without imposing new validation on legacy requests.
+    PageSceneSplit::JsonPtr root(cJSON_Parse(request.c_str()), cJSON_Delete);
+    if (!PageSceneSplit::ContainsSplitRule(root.get())) {
         return true;
     }
-    auto root = PageSceneSplit::Parse(request);
-    std::string ruleSetId;
-    if (!cJSON_IsObject(root.get()) || !PageSceneSplit::ReadString(root.get(), "ruleSetId", ruleSetId) ||
-        !PageSceneSplit::IsValidId(ruleSetId)) {
-        return false;
-    }
-    // This is the SPLIT schema-validation boundary; receivers only decode accepted values.
-    // Preserve legacy scene parsing;
-    // registration ownership and capacity still require authoritative server state.
-    if (!PageSceneSplit::ContainsSplitRule(root.get()) && !PageSceneSplit::IsVersionedNativeRequest(root.get())) {
-        return true;
-    }
-    PageSceneSplitRuleSet parsed;
-    const cJSON* rules = nullptr;
+    // Strict parsing also rejects trailing data after an otherwise readable SPLIT object.
+    const auto parsed = PageSceneSplit::ParseRuleSet(request);
     // Registration accepts one SPLIT rule; one-shot queries may evaluate multiple rules.
-    return PageSceneSplit::ReadRuleSetHeader(root.get(), parsed, rules) &&
-           PageSceneSplit::ReadRuleSetItems(rules, parsed) && !parsed.rules.empty() &&
-           (allowRuleSetId || parsed.rules.size() == SPLIT_REGISTRATION_RULE_COUNT);
+    return parsed && (isQuery || parsed->rules.size() == SPLIT_REGISTRATION_RULE_COUNT);
 }
 
 // Extract the ruleSetId used to register and route the event callback.
@@ -205,7 +193,7 @@ int32_t UIContentServiceProxy::Connect(const EventCallback& eventCallback,
 int32_t UIContentServiceProxy::RegisterPageSceneRules(
     const std::string& ruleJson, const PageSceneEventCallback& eventCallback)
 {
-    if (ruleJson.empty() || eventCallback == nullptr || !IsValidPageSceneRequest(ruleJson)) {
+    if (ruleJson.empty() || eventCallback == nullptr) {
         LOGW("RegisterPageSceneRules invalid params");
         return PARAM_INVALID;
     }
@@ -223,6 +211,10 @@ int32_t UIContentServiceProxy::RegisterPageSceneRules(
     auto ruleSetId = ExtractPageSceneRuleSetId(ruleJson);
     if (ruleSetId.empty()) {
         LOGW("RegisterPageSceneRules ruleSetId is empty or invalid");
+        return PARAM_INVALID;
+    }
+    if (!IsValidSplitPageSceneRequest(ruleJson)) {
+        LOGW("RegisterPageSceneRules invalid SPLIT params");
         return PARAM_INVALID;
     }
     if (!report_->TryRegisterPageSceneEventCallback(ruleSetId, eventCallback)) {
@@ -244,8 +236,8 @@ int32_t UIContentServiceProxy::RegisterPageSceneRules(
 
 int32_t UIContentServiceProxy::UnregisterPageSceneRules(const std::string& ruleSetId)
 {
-    if (!PageSceneSplit::IsValidId(ruleSetId)) {
-        LOGW("UnregisterPageSceneRules ruleSetId is invalid");
+    if (ruleSetId.empty()) {
+        LOGW("UnregisterPageSceneRules ruleSetId is empty");
         return PARAM_INVALID;
     }
     MessageParcel data;
@@ -269,14 +261,17 @@ int32_t UIContentServiceProxy::UnregisterPageSceneRules(const std::string& ruleS
 int32_t UIContentServiceProxy::GetPageScene(
     const std::string& ruleJsonOrRuleSetId, const PageSceneEventCallback& eventCallback)
 {
-    if (ruleJsonOrRuleSetId.empty() || eventCallback == nullptr ||
-        !IsValidPageSceneRequest(ruleJsonOrRuleSetId, true)) {
+    if (ruleJsonOrRuleSetId.empty() || eventCallback == nullptr) {
         LOGW("GetPageScene invalid params");
         return PARAM_INVALID;
     }
     if (report_ == nullptr) {
         LOGW("GetPageScene reportStub is nullptr");
         return FAILED;
+    }
+    if (!IsValidSplitPageSceneRequest(ruleJsonOrRuleSetId, true)) {
+        LOGW("GetPageScene invalid SPLIT params");
+        return PARAM_INVALID;
     }
     MessageParcel data;
     MessageParcel reply;

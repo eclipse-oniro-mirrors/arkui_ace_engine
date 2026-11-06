@@ -273,34 +273,6 @@ inline bool ContainsSplitRule(const std::string& json)
     return root && ContainsSplitRule(root.get());
 }
 
-inline bool HasLegacyTextEditorRule(const cJSON* rules)
-{
-    for (int i = 0; i < cJSON_GetArraySize(rules); ++i) {
-        std::string type;
-        if (ReadString(cJSON_GetArrayItem(rules, i), "sceneType", type) && type == "TEXT_EDITOR") {
-            return true;
-        }
-    }
-    return false;
-}
-
-inline bool IsVersionedNativeRequest(const cJSON* root)
-{
-    // Keep legacy TEXT_EDITOR and Web routing intact. A versioned native
-    // request with no legacy rule is validated rather than silently accepted
-    // when its SPLIT sceneType is missing or misspelled.
-    auto version = Field(root, "version");
-    auto rules = Field(root, "rules");
-    return version && !cJSON_IsNull(version) && !Field(root, "webRules") && cJSON_IsArray(rules) &&
-           !HasLegacyTextEditorRule(rules);
-}
-
-inline bool IsSplitRequest(const std::string& json)
-{
-    auto root = Parse(json);
-    return ContainsSplitRule(root.get()) || IsVersionedNativeRequest(root.get());
-}
-
 inline bool ReadRuleSetItemType(const cJSON* item, std::set<std::string>& ids, std::string& sceneType)
 {
     std::string id;
@@ -322,7 +294,8 @@ inline bool ReadRuleSetItem(const cJSON* item, std::set<std::string>& ids, PageS
         result.rules.emplace_back(std::move(*rule));
         return true;
     }
-    return sceneType == "TEXT_EDITOR";
+    // Other scene types retain their own validation and are not collected as SPLIT rules.
+    return true;
 }
 
 inline bool ReadRuleSetHeader(const cJSON* root, PageSceneSplitRuleSet& result, const cJSON*& rules)
