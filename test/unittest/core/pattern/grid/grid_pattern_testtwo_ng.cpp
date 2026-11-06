@@ -1173,4 +1173,28 @@ HWTEST_F(GridTestNg, DumpGridAlignItemsFiltering, TestSize.Level1)
         }
     }
 }
+
+/**
+ * @tc.name: DumpMultiSelectableIsolationCheck
+ * @tc.desc: Test Grid multiSelectable in text and JSON dump output
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridTestNg, DumpMultiSelectableIsolationCheck, TestSize.Level1)
+{
+    auto gridPattern = AceType::MakeRefPtr<GridPattern>();
+    auto frameNode = FrameNode::CreateFrameNode(V2::GRID_ETS_TAG, 98765, gridPattern);
+    ASSERT_NE(frameNode, nullptr);
+    for (bool value : { false, true }) {
+        gridPattern->SetMultiSelectable(value);
+        auto& descriptions = DumpLog::GetInstance().description_;
+        descriptions.clear();
+        gridPattern->DumpInfo();
+        const std::string expected = value ? "multiSelectable: true\n" : "multiSelectable: false\n";
+        EXPECT_NE(std::find(descriptions.begin(), descriptions.end(), expected), descriptions.end());
+        auto json = JsonUtil::Create(true);
+        gridPattern->DumpInfo(json);
+        EXPECT_EQ(json->GetString("multiSelectable"), value ? "true" : "false");
+    }
+}
+
 } // namespace OHOS::Ace::NG

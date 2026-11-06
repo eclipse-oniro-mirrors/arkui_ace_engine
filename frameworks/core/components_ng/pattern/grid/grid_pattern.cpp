@@ -2562,6 +2562,7 @@ void GridPattern::GetEventDumpInfo(std::unique_ptr<JsonValue>& json)
 void GridPattern::DumpInfo()
 {
     DumpLog::GetInstance().AddDesc(std::string("LayoutMode: ").append(GetLayoutMode()));
+    DumpLog::GetInstance().AddDesc(std::string("multiSelectable: ").append(multiSelectable_ ? "true" : "false"));
     auto property = GetLayoutProperty<GridLayoutProperty>();
     CHECK_NULL_VOID(property);
     DumpLog::GetInstance().AddDesc(std::string("RowsTemplate: ").append(property->GetRowsTemplate().value_or("")));
@@ -2573,6 +2574,7 @@ void GridPattern::DumpInfo(std::unique_ptr<JsonValue>& json)
 {
     DumpLog::GetInstance().AddDesc("---- Grid Component Layout Dump ----");
     json->Put("LayoutMode", GetLayoutMode().c_str());
+    json->Put("multiSelectable", multiSelectable_ ? "true" : "false");
     auto property = GetLayoutProperty<GridLayoutProperty>();
     CHECK_NULL_VOID(property);
     json->Put("RowsTemplate", property->GetRowsTemplate().value_or("").c_str());
