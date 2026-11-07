@@ -6403,7 +6403,7 @@ void RosenRenderContext::PaintClipMask(const std::unique_ptr<ClipProperty>& clip
     CHECK_NULL_VOID(rsNode_);
     auto basicShape = clip->GetClipMaskValue();
     auto rsPath = DrawingDecorationPainter::DrawingCreatePath(basicShape, frameSize);
-
+    CHECK_NULL_VOID(basicShape);
     RSColor rsStrokeColor;
     rsStrokeColor.SetColorQuad(basicShape->GetStrokeColor());
     RSPen pen;
