@@ -23,8 +23,10 @@
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_pattern.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
+#include "core/components_ng/pattern/refresh/refresh_pattern.h"
 #include "core/components_ng/pattern/scroll/scroll_pattern.h"
 #include "core/components_ng/pattern/scrollable/scroll_viewport_coordinator.h"
+#include "core/components_ng/pattern/swiper/swiper_pattern.h"
 #include "core/components_ng/pattern/waterflow/layout/sliding_window/water_flow_layout_sw.h"
 #include "core/components_ng/pattern/waterflow/layout/top_down/water_flow_segmented_layout.h"
 
@@ -427,6 +429,89 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_ZeroClipRestoresNaturalPosition, TestSi
     clip->GetRenderContext()->UpdatePaintRect(clip->GetGeometryNode()->GetFrameRect());
     pipeline->GetScrollViewportCoordinator()->Flush(pipeline);
     EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), 200.0f);
+}
+
+/**
+ * @tc.name: WFHF_ReverseParentBlocksOuterViewport
+ * @tc.desc: A reverse WaterFlow parent cancels pinning without borrowing an outer Scroll viewport.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowHeaderFooterTest, WFHF_ReverseParentBlocksOuterViewport, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateWaterFlowItems(20);
+    SetEdges();
+    CreateDone();
+    auto outer = ParentScroll(600.0f);
+    auto parent = FrameNode::CreateFrameNode(V2::WATERFLOW_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<WaterFlowPattern>());
+    parent->GetGeometryNode()->SetFrameSize(SizeF(WATER_FLOW_WIDTH, 300.0f));
+    parent->GetRenderContext()->UpdatePaintRect(parent->GetGeometryNode()->GetFrameRect());
+    outer->RemoveChild(frameNode_);
+    outer->AddChild(parent);
+    parent->AddChild(frameNode_);
+    MoveHost(-200.0f);
+    pattern_->SetEdgeGeometry(OffsetF(), 1000.0f);
+    pattern_->SetSticky(StickyStyle::BOTH);
+    pattern_->UpdateEdgePositions();
+    EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), 200.0f);
+    EXPECT_FLOAT_EQ(GetChildRect(frameNode_, 0).Top(), 460.0f);
+
+    auto property = parent->GetLayoutProperty<WaterFlowLayoutProperty>();
+    property->UpdateWaterflowDirection(FlexDirection::COLUMN_REVERSE);
+    ASSERT_TRUE(parent->GetPattern<WaterFlowPattern>()->IsReverse());
+    pattern_->UpdateEdgePositions();
+    EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), 0.0f);
+    EXPECT_FLOAT_EQ(GetChildRect(frameNode_, 0).Top(), 960.0f);
+
+    property->UpdateWaterflowDirection(FlexDirection::COLUMN);
+    pattern_->UpdateEdgePositions();
+    EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), 200.0f);
+    EXPECT_FLOAT_EQ(GetChildRect(frameNode_, 0).Top(), 460.0f);
+}
+
+/**
+ * @tc.name: WFHF_UnsupportedParentBlocksOuterViewport
+ * @tc.desc: Swiper and Refresh block viewport lookup, but preserve an eligible viewport nested inside them.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowHeaderFooterTest, WFHF_UnsupportedParentBlocksOuterViewport, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateWaterFlowItems(20);
+    SetEdges();
+    CreateDone();
+    const std::vector<std::pair<std::string, RefPtr<Pattern>>> parents {
+        { V2::SWIPER_ETS_TAG, AceType::MakeRefPtr<SwiperPattern>() },
+        { V2::REFRESH_ETS_TAG, AceType::MakeRefPtr<RefreshPattern>() },
+    };
+    for (const auto& [tag, parentPattern] : parents) {
+        SCOPED_TRACE(tag);
+        auto outer = ParentScroll(300.0f);
+        auto parent = FrameNode::CreateFrameNode(tag,
+            ElementRegister::GetInstance()->MakeUniqueId(), parentPattern);
+        parent->GetGeometryNode()->SetFrameSize(SizeF(WATER_FLOW_WIDTH, 600.0f));
+        parent->GetRenderContext()->UpdatePaintRect(parent->GetGeometryNode()->GetFrameRect());
+        outer->RemoveChild(frameNode_);
+        outer->AddChild(parent);
+        parent->AddChild(frameNode_);
+        MoveHost(-200.0f);
+        pattern_->SetEdgeGeometry(OffsetF(), 1000.0f);
+        pattern_->SetSticky(StickyStyle::BOTH);
+        pattern_->UpdateEdgePositions();
+        EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), 0.0f);
+        EXPECT_FLOAT_EQ(GetChildRect(frameNode_, 0).Top(), 960.0f);
+
+        outer->RemoveChild(parent);
+        parent->RemoveChild(frameNode_);
+        parent->AddChild(outer);
+        outer->AddChild(frameNode_);
+        pattern_->UpdateEdgePositions();
+        EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), 200.0f);
+        EXPECT_FLOAT_EQ(GetChildRect(frameNode_, 0).Top(), 460.0f);
+        outer->RemoveChild(frameNode_);
+        parent->RemoveChild(outer);
+    }
 }
 
 /**

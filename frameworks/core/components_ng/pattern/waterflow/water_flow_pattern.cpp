@@ -2030,10 +2030,11 @@ bool ResolveStickyViewport(const RefPtr<FrameNode>& host, const OffsetF& origin,
             return false;
         }
         const auto inverse = Matrix4::Invert(contentToAncestor);
-        auto scroll = parent->GetPattern<ScrollablePattern>();
+        auto nested = parent->GetPattern<NestableScrollContainer>();
+        auto scroll = AceType::DynamicCast<ScrollablePattern>(nested);
         const auto& tag = parent->GetTag();
-        const bool boundary = scroll && (tag != PARENT_GRID_ETS_TAG || scroll->IsScrollable());
-        const bool eligible = boundary && scroll->GetAxis() == Axis::VERTICAL &&
+        const bool boundary = nested && (tag != PARENT_GRID_ETS_TAG || (scroll && scroll->IsScrollable()));
+        const bool eligible = boundary && scroll && scroll->GetAxis() == Axis::VERTICAL && !scroll->IsReverse() &&
             (tag == V2::SCROLL_ETS_TAG || tag == PARENT_LIST_ETS_TAG ||
              tag == PARENT_GRID_ETS_TAG || tag == WATERFLOW_ETS_TAG);
         const auto size = parent->GetGeometryNode()->GetFrameSize();
