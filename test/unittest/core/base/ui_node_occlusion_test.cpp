@@ -455,5 +455,86 @@ TEST(OcclusionCollectorTest, OverlayAndCrossWindowFallback)
     EXPECT_EQ(InspectorOcclusionCollector::Evaluate(crossWindow, 1.0).at(1), OcclusionDecision::VISIBLE);
 }
 
+TEST(OcclusionCollectorTest, AncestorUnsupportedPaintKeepsDescendantOcclusion)
+{
+    auto* ids = ElementRegister::GetInstance();
+    auto root = FrameNode::CreateFrameNode("root", ids->MakeUniqueId(), AceType::MakeRefPtr<Pattern>(), true);
+    auto behind =
+        FrameNode::CreateFrameNode(V2::BLANK_ETS_TAG, ids->MakeUniqueId(), AceType::MakeRefPtr<Pattern>(), true);
+    auto top = FrameNode::CreateFrameNode(V2::BLANK_ETS_TAG, ids->MakeUniqueId(), AceType::MakeRefPtr<Pattern>(), true);
+    ASSERT_NE(root, nullptr);
+    ASSERT_NE(behind, nullptr);
+    ASSERT_NE(top, nullptr);
+    auto rootContext = AceType::DynamicCast<MockRenderContext>(root->GetRenderContext());
+    auto behindContext = AceType::DynamicCast<MockRenderContext>(behind->GetRenderContext());
+    auto topContext = AceType::DynamicCast<MockRenderContext>(top->GetRenderContext());
+    ASSERT_NE(rootContext, nullptr);
+    ASSERT_NE(behindContext, nullptr);
+    ASSERT_NE(topContext, nullptr);
+    rootContext->SetPaintRectWithTransform(RectF(0.0f, 0.0f, 10.0f, 10.0f));
+    behindContext->SetPaintRectWithTransform(RectF(0.0f, 0.0f, 10.0f, 10.0f));
+    topContext->SetPaintRectWithTransform(RectF(0.0f, 0.0f, 10.0f, 10.0f));
+    topContext->UpdateBackgroundColor(Color::BLUE);
+    // An unsupported paint on the ancestor must only disqualify the ancestor itself.
+    rootContext->SetAnimationsCount(1);
+    root->SetActive(true);
+    behind->SetActive(true);
+    top->SetActive(true);
+    root->AddChild(behind);
+    root->AddChild(top);
+    root->MarkNeedSyncRenderTree();
+    root->RebuildRenderContextTree();
+    behind->RebuildRenderContextTree();
+    top->RebuildRenderContextTree();
+
+    const auto decisions = InspectorOcclusionCollector::Collect(root, 1.0, 1);
+    ASSERT_EQ(decisions.count(behind->GetId()), 1u);
+    EXPECT_EQ(decisions.at(behind->GetId()), OcclusionDecision::OCCLUDED);
+}
+
+TEST(OcclusionCollectorTest, ScrollContainerKeepsDescendantOcclusion)
+{
+    auto* ids = ElementRegister::GetInstance();
+    auto root = FrameNode::CreateFrameNode("root", ids->MakeUniqueId(), AceType::MakeRefPtr<Pattern>(), true);
+    auto scroll =
+        FrameNode::CreateFrameNode(V2::SCROLL_ETS_TAG, ids->MakeUniqueId(), AceType::MakeRefPtr<Pattern>(), true);
+    auto behind =
+        FrameNode::CreateFrameNode(V2::BLANK_ETS_TAG, ids->MakeUniqueId(), AceType::MakeRefPtr<Pattern>(), true);
+    auto top = FrameNode::CreateFrameNode(V2::BLANK_ETS_TAG, ids->MakeUniqueId(), AceType::MakeRefPtr<Pattern>(), true);
+    ASSERT_NE(root, nullptr);
+    ASSERT_NE(scroll, nullptr);
+    ASSERT_NE(behind, nullptr);
+    ASSERT_NE(top, nullptr);
+    auto rootContext = AceType::DynamicCast<MockRenderContext>(root->GetRenderContext());
+    auto scrollContext = AceType::DynamicCast<MockRenderContext>(scroll->GetRenderContext());
+    auto behindContext = AceType::DynamicCast<MockRenderContext>(behind->GetRenderContext());
+    auto topContext = AceType::DynamicCast<MockRenderContext>(top->GetRenderContext());
+    ASSERT_NE(rootContext, nullptr);
+    ASSERT_NE(scrollContext, nullptr);
+    ASSERT_NE(behindContext, nullptr);
+    ASSERT_NE(topContext, nullptr);
+    rootContext->SetPaintRectWithTransform(RectF(0.0f, 0.0f, 10.0f, 10.0f));
+    scrollContext->SetPaintRectWithTransform(RectF(0.0f, 0.0f, 10.0f, 10.0f));
+    behindContext->SetPaintRectWithTransform(RectF(0.0f, 0.0f, 10.0f, 10.0f));
+    topContext->SetPaintRectWithTransform(RectF(0.0f, 0.0f, 10.0f, 10.0f));
+    topContext->UpdateBackgroundColor(Color::BLUE);
+    root->SetActive(true);
+    scroll->SetActive(true);
+    behind->SetActive(true);
+    top->SetActive(true);
+    root->AddChild(scroll);
+    scroll->AddChild(behind);
+    scroll->AddChild(top);
+    root->MarkNeedSyncRenderTree();
+    root->RebuildRenderContextTree();
+    scroll->RebuildRenderContextTree();
+    behind->RebuildRenderContextTree();
+    top->RebuildRenderContextTree();
+
+    const auto decisions = InspectorOcclusionCollector::Collect(root, 1.0, 1);
+    ASSERT_EQ(decisions.count(behind->GetId()), 1u);
+    EXPECT_EQ(decisions.at(behind->GetId()), OcclusionDecision::OCCLUDED);
+}
+
 } // namespace
 } // namespace OHOS::Ace::NG
