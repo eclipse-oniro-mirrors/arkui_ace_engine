@@ -32,6 +32,8 @@ if (!('finalizeConstruction' in ViewPU.prototype)) {
 if (PUV2ViewBase.contextStack === undefined) {
   Reflect.set(PUV2ViewBase, 'contextStack', []);
 }
+const CustomLayoutAlgorithm = requireNapi('arkui.layoutAlgorithm').CustomLayoutAlgorithm;
+const DynamicLayout = requireNapi('arkui.components.ArkDynamicLayout').DynamicLayout;
 const curves = requireNativeModule('ohos.curves');
 const LengthMetrics = requireNapi('arkui.node').LengthMetrics;
 const LengthUnit = requireNapi('arkui.node').LengthUnit;
@@ -1455,16 +1457,8 @@ class SimpleSegmentButtonV2 extends ViewV2 {
           this.panStartIndex = index;
           if (!this.isBackgroundSystemMaterialEnabled() && this.isDragging && this.isFollowingDragEnabled()) {
             this.followingDragActive = true;
-            this.backplatePosition = {
-              x: this.selectedItemRect.position.x,
-              y: this.selectedItemRect.position.y,
-            };
           }
           if (this.isMaterialInteractionEnabled() && this.isDragging) {
-            this.backplatePosition = {
-              x: this.selectedItemRect.position.x,
-              y: this.selectedItemRect.position.y,
-            };
             if (!this.dragWithPress) {
               this.getUIContext().animateTo(
                 {
@@ -1495,20 +1489,19 @@ class SimpleSegmentButtonV2 extends ViewV2 {
             return;
           }
           if (this.isFollowingDragEnabled()) {
-            let nowX = finger.localX - this.panStartGlobalX + this.selectedItemRect.position.x;
-            let startX = this.itemRects[0].position.x;
-            let endX = this.itemRects[this.items.length - 1].position.x;
-            if (this.isRTL()) {
-              startX = this.itemRects[this.items.length - 1].position.x;
-              endX = this.itemRects[0].position.x;
+            const selectedRect = this.layoutAlgorithm.getItemRect(this.normalizedSelectedIndex);
+            const firstRect = this.layoutAlgorithm.getItemRect(0);
+            const lastRect = this.layoutAlgorithm.getItemRect(this.items.length - 1);
+            if (!selectedRect || !firstRect || !lastRect) {
+              return;
             }
-            nowX = Math.max(startX, nowX);
-            nowX = Math.min(endX, nowX);
-            this.backplatePosition = {
-              x: nowX,
-              y: this.backplatePosition.y,
-            };
-          } else {
+            const startX = Math.min(firstRect.position.x, lastRect.position.x);
+            const endX = Math.max(firstRect.position.x, lastRect.position.x);
+            const offset = this.getUIContext().vp2px(finger.localX - this.panStartGlobalX);
+            const positionX = Math.min(endX, Math.max(startX, selectedRect.position.x + offset));
+            this.selectedItemOffsetX = this.getUIContext().px2vp(positionX - selectedRect.position.x);
+          }
+          else {
             const isNormalDrag = this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG;
             const index = this.getIndexByPosition(finger.localX, finger.localY);
             this.updateSelectedIndex(index);
@@ -1521,6 +1514,7 @@ class SimpleSegmentButtonV2 extends ViewV2 {
           if (!this.isItemEnabled(this.panStartIndex)) {
             return;
           }
+          // handle mouse wheel scroll event
           if (this.isMouseWheelScroll) {
             const offset = event.offsetX !== 0 ? event.offsetX : event.offsetY;
             const deltaIndex = offset < 0 ? 1 : -1;
@@ -1528,12 +1522,14 @@ class SimpleSegmentButtonV2 extends ViewV2 {
             this.isMouseWheelScroll = false;
             return;
           }
+          // handle drag event
           if (this.isDragging) {
             const isMaterialEnabled = this.isBackgroundSystemMaterialEnabled();
             if (this.isFollowingDragEnabled()) {
               const finger = event.fingerList.find(Boolean);
               if (!finger) {
                 if (!isMaterialEnabled) {
+                  this.selectedItemOffsetX = 0;
                   this.isDragging = false;
                   this.followingDragActive = false;
                   this.dragWithPress = false;
@@ -1576,10 +1572,7 @@ class SimpleSegmentButtonV2 extends ViewV2 {
                 if (shouldUpdateSelectedIndex) {
                   this.$selectedIndex?.(realIndex);
                 }
-                this.backplatePosition = {
-                  x: isMaterialEnabled ? this.itemRects[realIndex].position.x : targetRect.position.x,
-                  y: isMaterialEnabled ? this.itemRects[realIndex].position.y : targetRect.position.y,
-                };
+                this.selectedItemOffsetX = 0;
               });
             }
             if (isMaterialEnabled) {
@@ -1600,11 +1593,13 @@ class SimpleSegmentButtonV2 extends ViewV2 {
                 this.finishSelectMaterialAnimation();
               }
             }
+            this.selectedItemOffsetX = 0;
             this.isDragging = false;
             this.followingDragActive = false;
             this.dragWithPress = false;
             return;
           }
+          // handle swipe event
           if (!this.isItemEnabled(this.normalizedSelectedIndex)) {
             return;
           }
@@ -1624,6 +1619,7 @@ class SimpleSegmentButtonV2 extends ViewV2 {
           this.isMouseWheelScroll = false;
           this.panStartIndex = -1;
           this.dragWithPress = false;
+          this.selectedItemOffsetX = 0;
           if (!this.dragWithPress) {
             this.getUIContext().animateTo(
               {
@@ -1648,172 +1644,158 @@ class SimpleSegmentButtonV2 extends ViewV2 {
       this.observeComponentCreation2((elmtId, isInitialRender) => {
         Repeat(this.getItems(), this)
           .each(repeatItem => {
-            this.observeComponentCreation2((elmtId, isInitialRender) => {
-              Button.createWithChild({ type: ButtonType.Normal });
-              Button.accessibilityGroup(true);
-              Button.accessibilitySelected(this.isSelected(repeatItem));
-              Button.accessibilityText(this.getItemAccessibilityText(repeatItem));
-              Button.accessibilityDescription(this.getItemAccessibilityDescription(repeatItem));
-              Button.accessibilityLevel(repeatItem.item?.accessibilityLevel);
-              Button.backgroundColor(Color.Transparent);
-              Button.borderRadius(this.getItemBorderRadius());
-              Button.direction(this.languageDirection);
-              Button.enabled(repeatItem.item?.enabled);
-              Button.focusScopePriority(this.focusGroupId, this.getFocusPriority(repeatItem));
-              Button.hoverEffect(HoverEffect.None);
-              Button.layoutWeight(1);
-              Button.padding(0);
-              Button.scale(this.getItemScale(repeatItem.index));
-              Button.stateEffect(false);
-              Button.onAreaChange((_, area) => {
-                this.itemRects[repeatItem.index] = {
-                  size: {
-                    width: area.width,
-                    height: area.height,
-                  },
-                  position: {
-                    x: area.position.x,
-                    y: area.position.y,
-                  },
-                  globalPosition: {
-                    x: area.globalPosition.x,
-                    y: area.globalPosition.y,
-                  },
-                };
-              });
-              globalThis.Gesture.create(GesturePriority.Low);
-              TapGesture.create();
-              TapGesture.onAction(() => {
-                this.isTapGesture = true;
-                this.onItemClicked?.(repeatItem.index);
-                this.backplatePosition = {
-                  x: this.selectedItemRect?.position.x,
-                  y: this.selectedItemRect?.position.y,
-                };
-                this.updateSelectedIndex(repeatItem.index);
-              });
-              TapGesture.pop();
-              globalThis.Gesture.pop();
-              Button.onTouch(event => {
-                if (event.type === TouchType.Down) {
-                  if (this.isSelected(repeatItem)) {
-                    this.updateItemScale(0.95);
-                  }
-                  this.updateTouchPressedItemIndex(repeatItem.index);
-                } else if ([TouchType.Up, TouchType.Cancel].includes(event.type)) {
-                  this.updateItemScale(1);
-                  this.updateTouchPressedItemIndex(-1);
-                }
-              });
-              Button.onHover(isHover => {
-                if (isHover) {
-                  this.updateHoveredItemIndex(repeatItem.index);
-                } else {
-                  this.updateHoveredItemIndex(-1);
-                }
-              });
-              Button.onMouse(event => {
-                if (event.action === MouseAction.Press) {
-                  this.updateMousePressedItemIndex(repeatItem.index);
-                } else if ([MouseAction.Release, MouseAction.CANCEL].includes(event.action)) {
-                  this.updateMousePressedItemIndex(-1);
-                }
-              });
-            }, Button);
-            {
-              this.observeComponentCreation2(
-                (elmtId, isInitialRender) => {
-                  if (isInitialRender) {
-                    let componentCall = new SegmentButtonV2ItemContent(
-                      parent ? parent : this,
-                      {
-                        theme: this.theme,
-                        item: repeatItem.item,
-                        selected: this.isSelected(repeatItem),
-                        itemMinFontScale: this.itemMinFontScale,
-                        itemMaxFontScale: this.itemMaxFontScale,
-                        itemFontColor: this.itemFontColor,
-                        itemSelectedFontColor: this.itemSelectedFontColor,
-                        itemFontSize: this.itemFontSize,
-                        itemSelectedFontSize: this.itemSelectedFontSize,
-                        itemFontWeight: this.itemFontWeight,
-                        itemSelectedFontWeight: this.itemSelectedFontWeight,
-                        itemIconSize: this.itemIconSize,
-                        itemIconFillColor: this.itemIconFillColor,
-                        itemSelectedIconFillColor: this.itemSelectedIconFillColor,
-                        itemSymbolFontSize: this.itemSymbolFontSize,
-                        itemSymbolFontColor: this.itemSymbolFontColor,
-                        itemSelectedSymbolFontColor: this.itemSelectedSymbolFontColor,
-                        itemMinHeight: this.itemMinHeight,
-                        itemPadding: this.itemPadding,
-                        languageDirection: this.languageDirection,
-                        hasHybrid: this.getItems().hasHybrid,
-                      },
-                      undefined,
-                      elmtId,
-                      () => {},
-                      { page: 'library/src/main/ets/components/SegmentButtonV2.ets', line: 603, col: 13 }
-                    );
-                    ViewV2.create(componentCall);
-                    let paramsLambda = () => {
-                      return {
-                        theme: this.theme,
-                        item: repeatItem.item,
-                        selected: this.isSelected(repeatItem),
-                        itemMinFontScale: this.itemMinFontScale,
-                        itemMaxFontScale: this.itemMaxFontScale,
-                        itemFontColor: this.itemFontColor,
-                        itemSelectedFontColor: this.itemSelectedFontColor,
-                        itemFontSize: this.itemFontSize,
-                        itemSelectedFontSize: this.itemSelectedFontSize,
-                        itemFontWeight: this.itemFontWeight,
-                        itemSelectedFontWeight: this.itemSelectedFontWeight,
-                        itemIconSize: this.itemIconSize,
-                        itemIconFillColor: this.itemIconFillColor,
-                        itemSelectedIconFillColor: this.itemSelectedIconFillColor,
-                        itemSymbolFontSize: this.itemSymbolFontSize,
-                        itemSymbolFontColor: this.itemSymbolFontColor,
-                        itemSelectedSymbolFontColor: this.itemSelectedSymbolFontColor,
-                        itemMinHeight: this.itemMinHeight,
-                        itemPadding: this.itemPadding,
-                        languageDirection: this.languageDirection,
-                        hasHybrid: this.getItems().hasHybrid,
-                      };
-                    };
-                    componentCall.paramsGenerator_ = paramsLambda;
-                  } else {
-                    this.updateStateVarsOfChildByElmtId(elmtId, {
-                      theme: this.theme,
-                      item: repeatItem.item,
-                      selected: this.isSelected(repeatItem),
-                      itemMinFontScale: this.itemMinFontScale,
-                      itemMaxFontScale: this.itemMaxFontScale,
-                      itemFontColor: this.itemFontColor,
-                      itemSelectedFontColor: this.itemSelectedFontColor,
-                      itemFontSize: this.itemFontSize,
-                      itemSelectedFontSize: this.itemSelectedFontSize,
-                      itemFontWeight: this.itemFontWeight,
-                      itemSelectedFontWeight: this.itemSelectedFontWeight,
-                      itemIconSize: this.itemIconSize,
-                      itemIconFillColor: this.itemIconFillColor,
-                      itemSelectedIconFillColor: this.itemSelectedIconFillColor,
-                      itemSymbolFontSize: this.itemSymbolFontSize,
-                      itemSymbolFontColor: this.itemSymbolFontColor,
-                      itemSelectedSymbolFontColor: this.itemSelectedSymbolFontColor,
-                      itemMinHeight: this.itemMinHeight,
-                      itemPadding: this.itemPadding,
-                      languageDirection: this.languageDirection,
-                      hasHybrid: this.getItems().hasHybrid,
-                    });
-                  }
+          this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Button.createWithChild({ type: ButtonType.Normal });
+            Button.accessibilityGroup(true);
+            Button.accessibilitySelected(this.isSelected(repeatItem));
+            Button.accessibilityText(this.getItemAccessibilityText(repeatItem));
+            Button.accessibilityDescription(this.getItemAccessibilityDescription(repeatItem));
+            Button.accessibilityLevel(repeatItem.item?.accessibilityLevel);
+            Button.backgroundColor(Color.Transparent);
+            Button.borderRadius(this.getItemBorderRadius());
+            Button.direction(this.languageDirection);
+            Button.enabled(repeatItem.item?.enabled);
+            Button.focusScopePriority(this.focusGroupId, this.getFocusPriority(repeatItem));
+            Button.hoverEffect(HoverEffect.None);
+            Button.layoutWeight(1);
+            Button.padding(0);
+            Button.scale(this.getItemScale(repeatItem.index));
+            Button.stateEffect(false);
+            Button.onAreaChange((_, area) => {
+              this.itemRects[repeatItem.index] = {
+                size: {
+                  width: area.width,
+                  height: area.height,
                 },
-                { name: 'SegmentButtonV2ItemContent' }
-              );
-            }
-            Button.pop();
-          })
-          .key(generateUniqueKye(this.focusGroupId))
-          .render(isInitialRender);
+                position: {
+                  x: area.position.x,
+                  y: area.position.y,
+                },
+                globalPosition: {
+                  x: area.globalPosition.x,
+                  y: area.globalPosition.y,
+                },
+              };
+            });
+            globalThis.Gesture.create(GesturePriority.Low);
+            TapGesture.create();
+            TapGesture.onAction(() => {
+              this.isTapGesture = true;
+              this.onItemClicked?.(repeatItem.index);
+              this.updateSelectedIndex(repeatItem.index);
+            });
+            TapGesture.pop();
+            globalThis.Gesture.pop();
+            Button.onTouch(event => {
+              if (event.type === TouchType.Down) {
+                if (this.isSelected(repeatItem)) {
+                  this.updateItemScale(0.95);
+                }
+                this.updateTouchPressedItemIndex(repeatItem.index);
+              } else if ([TouchType.Up, TouchType.Cancel].includes(event.type)) {
+                this.updateItemScale(1);
+                this.updateTouchPressedItemIndex(-1);
+              }
+            });
+            Button.onHover(isHover => {
+              if (isHover) {
+                this.updateHoveredItemIndex(repeatItem.index);
+              } else {
+                this.updateHoveredItemIndex(-1);
+              }
+            });
+            Button.onMouse(event => {
+              if (event.action === MouseAction.Press) {
+                this.updateMousePressedItemIndex(repeatItem.index);
+              } else if ([MouseAction.Release, MouseAction.CANCEL].includes(event.action)) {
+                this.updateMousePressedItemIndex(-1);
+              }
+            });
+          }, Button);
+          {
+            this.observeComponentCreation2((elmtId, isInitialRender) => {
+              if (isInitialRender) {
+                let componentCall = new SegmentButtonV2ItemContent(parent ? parent : this, {
+                  theme: this.theme,
+                  item: repeatItem.item,
+                  selected: this.isSelected(repeatItem),
+                  itemMinFontScale: this.itemMinFontScale,
+                  itemMaxFontScale: this.itemMaxFontScale,
+                  itemFontColor: this.itemFontColor,
+                  itemSelectedFontColor: this.itemSelectedFontColor,
+                  itemFontSize: this.itemFontSize,
+                  itemSelectedFontSize: this.itemSelectedFontSize,
+                  itemFontWeight: this.itemFontWeight,
+                  itemSelectedFontWeight: this.itemSelectedFontWeight,
+                  itemIconSize: this.itemIconSize,
+                  itemIconFillColor: this.itemIconFillColor,
+                  itemSelectedIconFillColor: this.itemSelectedIconFillColor,
+                  itemSymbolFontSize: this.itemSymbolFontSize,
+                  itemSymbolFontColor: this.itemSymbolFontColor,
+                  itemSelectedSymbolFontColor: this.itemSelectedSymbolFontColor,
+                  itemMinHeight: this.itemMinHeight,
+                  itemPadding: this.itemPadding,
+                  languageDirection: this.languageDirection,
+                  hasHybrid: this.getItems().hasHybrid,
+                }, undefined, elmtId, () => { }, { page: 'advanced_ui_component/segmentbuttonv2/source/segmentbuttonv2.ets', line: 662, col: 13 });
+                ViewV2.create(componentCall);
+                let paramsLambda = () => {
+                  return {
+                    theme: this.theme,
+                    item: repeatItem.item,
+                    selected: this.isSelected(repeatItem),
+                    itemMinFontScale: this.itemMinFontScale,
+                    itemMaxFontScale: this.itemMaxFontScale,
+                    itemFontColor: this.itemFontColor,
+                    itemSelectedFontColor: this.itemSelectedFontColor,
+                    itemFontSize: this.itemFontSize,
+                    itemSelectedFontSize: this.itemSelectedFontSize,
+                    itemFontWeight: this.itemFontWeight,
+                    itemSelectedFontWeight: this.itemSelectedFontWeight,
+                    itemIconSize: this.itemIconSize,
+                    itemIconFillColor: this.itemIconFillColor,
+                    itemSelectedIconFillColor: this.itemSelectedIconFillColor,
+                    itemSymbolFontSize: this.itemSymbolFontSize,
+                    itemSymbolFontColor: this.itemSymbolFontColor,
+                    itemSelectedSymbolFontColor: this.itemSelectedSymbolFontColor,
+                    itemMinHeight: this.itemMinHeight,
+                    itemPadding: this.itemPadding,
+                    languageDirection: this.languageDirection,
+                    hasHybrid: this.getItems().hasHybrid,
+                  };
+                };
+                componentCall.paramsGenerator_ = paramsLambda;
+              }
+              else {
+                this.updateStateVarsOfChildByElmtId(elmtId, {
+                  theme: this.theme,
+                  item: repeatItem.item,
+                  selected: this.isSelected(repeatItem),
+                  itemMinFontScale: this.itemMinFontScale,
+                  itemMaxFontScale: this.itemMaxFontScale,
+                  itemFontColor: this.itemFontColor,
+                  itemSelectedFontColor: this.itemSelectedFontColor,
+                  itemFontSize: this.itemFontSize,
+                  itemSelectedFontSize: this.itemSelectedFontSize,
+                  itemFontWeight: this.itemFontWeight,
+                  itemSelectedFontWeight: this.itemSelectedFontWeight,
+                  itemIconSize: this.itemIconSize,
+                  itemIconFillColor: this.itemIconFillColor,
+                  itemSelectedIconFillColor: this.itemSelectedIconFillColor,
+                  itemSymbolFontSize: this.itemSymbolFontSize,
+                  itemSymbolFontColor: this.itemSymbolFontColor,
+                  itemSelectedSymbolFontColor: this.itemSelectedSymbolFontColor,
+                  itemMinHeight: this.itemMinHeight,
+                  itemPadding: this.itemPadding,
+                  languageDirection: this.languageDirection,
+                  hasHybrid: this.getItems().hasHybrid,
+                });
+              }
+            }, { name: 'SegmentButtonV2ItemContent' });
+          }
+          Button.pop();
+        })
+          .key(generateUniqueKye(this.focusGroupId)).render(isInitialRender);
       }, Repeat);
       Flex.pop();
     };
@@ -1823,39 +1805,32 @@ class SimpleSegmentButtonV2 extends ViewV2 {
           ? PUV2ViewBase.contextStack[PUV2ViewBase.contextStack.length - 1]
           : null;
       this.observeComponentCreation2((elmtId, isInitialRender) => {
-        If.create();
-        if (this.selectedItemRect) {
-          this.ifElseBranchUpdateFunction(0, () => {
-            this.observeComponentCreation2((elmtId, isInitialRender) => {
-              Stack.create();
-              globalThis.Context.animation(
-                !this.tempDisableAnimation && this.enableStateAnimation
-                  ? { curve: curves.springMotion(0.347, 0.99) }
-                  : undefined
-              );
-              Stack.position(this.getBackplatePosition());
-              globalThis.Context.animation(null);
-              Stack.backgroundColor(this.getItemSelectedBackgroundColor());
-              Stack.borderRadius(this.getItemBorderRadius());
-              Stack.scale(this.getBackplateScale());
-              Stack.opacity(this.getBackplateOpacity());
-              Stack.shadow(this.getItemBackplateShadow());
-              Stack.height(this.selectedItemRect.size.height);
-              Stack.width(this.selectedItemRect.size.width);
-            }, Stack);
-            Stack.pop();
-          });
-        } else {
-          this.ifElseBranchUpdateFunction(1, () => {});
-        }
-      }, If);
-      If.pop();
+        Stack.create();
+        globalThis.Context.animation((!this.tempDisableAnimation && this.enableStateAnimation) ?
+          { curve: curves.springMotion(0.347, 0.99) } : undefined);
+        Stack.translate({ x: this.selectedItemOffsetX });
+        globalThis.Context.animation(null);
+        Stack.backgroundColor(this.getItemSelectedBackgroundColor());
+        Stack.borderRadius(this.getItemBorderRadius());
+        Stack.scale(this.getBackplateScale());
+        Stack.opacity(this.getBackplateOpacity());
+        Stack.shadow(this.getItemBackplateShadow());
+        Stack.height('100%');
+        Stack.width('100%');
+      }, Stack);
+      Stack.pop();
     };
     this.EffectLayer = () => {
       const parent =
         PUV2ViewBase.contextStack && PUV2ViewBase.contextStack.length
           ? PUV2ViewBase.contextStack[PUV2ViewBase.contextStack.length - 1]
           : null;
+      this.observeComponentCreation2((elmtId, isInitialRender) => {
+        Stack.create();
+        Stack.height('100%');
+        Stack.width('100%');
+        Stack.clip(false);
+      }, Stack);
       this.observeComponentCreation2((elmtId, isInitialRender) => {
         Repeat(this.getItemRects(), this)
           .each(repeatItem => {
@@ -1875,6 +1850,7 @@ class SimpleSegmentButtonV2 extends ViewV2 {
           })
           .render(isInitialRender);
       }, Repeat);
+      Stack.pop();
     };
     this.initParam('items', params && 'items' in params ? params.items : undefined);
     this.initParam('selectedIndex', params && 'selectedIndex' in params ? params.selectedIndex : undefined);
@@ -1977,7 +1953,8 @@ class SimpleSegmentButtonV2 extends ViewV2 {
     this.selectedItemScale = undefined;
     this.tempDisableAnimation = false;
     this.isTapGesture = false;
-    this.backplatePosition = { x: 0, y: 0 };
+    this.layoutAlgorithm = new SegmentButtonV2LayoutAlgorithm();
+    this.selectedItemOffsetX = 0;
     this.finalizeConstruction();
   }
   resetStateVarsOnReuse(params) {
@@ -2081,16 +2058,14 @@ class SimpleSegmentButtonV2 extends ViewV2 {
     this.selectedItemScale = undefined;
     this.tempDisableAnimation = false;
     this.isTapGesture = false;
-    this.backplatePosition = { x: 0, y: 0 };
+    this.layoutAlgorithm = new SegmentButtonV2LayoutAlgorithm();
+    this.selectedItemOffsetX = 0;
     this.resetComputed('normalizedSelectedIndex');
-    this.resetComputed('selectedItemRect');
+    this.resetMonitorsOnReuse();
   }
   get normalizedSelectedIndex() {
     const items = this.getItems();
     return normalize(this.selectedIndex, 0, items.length - 1);
-  }
-  get selectedItemRect() {
-    return this.itemRects[this.normalizedSelectedIndex];
   }
   getFocusPriority(repeatItem) {
     return this.normalizedSelectedIndex === repeatItem.index ? FocusPriority.PREVIOUS : FocusPriority.AUTO;
@@ -2107,10 +2082,6 @@ class SimpleSegmentButtonV2 extends ViewV2 {
     return inputMaterial;
   }
   startSelectMaterialAnimation() {
-    this.backplatePosition = {
-      x: this.selectedItemRect.position.x,
-      y: this.selectedItemRect.position.y,
-    };
     if (!this.openSelectedItemSystemMaterial) {
       this.getUIContext().animateTo(
         {
@@ -2165,20 +2136,7 @@ class SimpleSegmentButtonV2 extends ViewV2 {
     }
     return items[index].enabled;
   }
-  getBackplatePosition() {
-    const interactionMode = this.interactionMode;
-    if ((this.openSelectedItemSystemMaterial &&
-      interactionMode !== SegmentButtonV2InteractionMode.NORMAL_DRAG) ||
-      ((this.followingDragActive || this.isDragging) &&
-        interactionMode === SegmentButtonV2InteractionMode.FOLLOWING_DRAG)) {
-      return this.backplatePosition;
-    } else {
-      return {
-        x: this.selectedItemRect.position.x,
-        y: this.selectedItemRect.position.y,
-      };
-    }
-  }
+
   getBackplateOpacity() {
     if (this.openSelectedItemSystemMaterial) {
       return 0.7;
@@ -2226,9 +2184,14 @@ class SimpleSegmentButtonV2 extends ViewV2 {
       Stack.clip(false);
       Stack.direction(this.languageDirection);
     }, Stack);
+    this.observeComponentCreation2((elmtId, isInitialRender) => {
+      DynamicLayout.create(this.layoutAlgorithm);
+      DynamicLayout.clip(false);
+    }, DynamicLayout);
     this.EffectLayer.bind(this)();
     this.BackplateLayer.bind(this)();
     this.ContentLayer.bind(this)();
+    DynamicLayout.pop();
     Stack.pop();
     Stack.pop();
     PUV2ViewBase.contextStack && PUV2ViewBase.contextStack.pop();
@@ -2413,10 +2376,7 @@ class SimpleSegmentButtonV2 extends ViewV2 {
         return;
       }
       this.$selectedIndex?.(selectedIndex);
-      this.backplatePosition = {
-        x: targetRect.position.x,
-        y: targetRect.position.y,
-      };
+      this.selectedItemOffsetX = 0;
     });
     if (this.isBackgroundSystemMaterialEnabled() && !this.tempDisableAnimation && !isNormalDragSelection) {
       if (this.isTapGesture) {
@@ -2589,6 +2549,47 @@ class SimpleSegmentButtonV2 extends ViewV2 {
     this.updateDirtyElements();
     PUV2ViewBase.contextStack && PUV2ViewBase.contextStack.pop();
   }
+
+  prepareBackplateTransition(index) {
+    const oldRect = this.layoutAlgorithm.getItemRect(this.layoutAlgorithm.selectedIndex);
+    const targetRect = this.layoutAlgorithm.getItemRect(index);
+    if (oldRect && targetRect && this.layoutAlgorithm.selectedIndex < this.items.length) {
+      this.selectedItemOffsetX += this.getUIContext().px2vp(oldRect.position.x - targetRect.position.x);
+    }
+    else {
+      this.selectedItemOffsetX = 0;
+    }
+    this.layoutAlgorithm = this.layoutAlgorithm.cloneWith(index);
+  }
+
+  aboutToAppear() {
+    this.layoutAlgorithm = this.layoutAlgorithm.cloneWith(this.normalizedSelectedIndex);
+  }
+  aboutToReuse() {
+    this.layoutAlgorithm = this.layoutAlgorithm.cloneWith(this.normalizedSelectedIndex);
+  }
+
+  onInteractionConfigChange() {
+    if (!this.isFollowingDragEnabled()) {
+      this.selectedItemOffsetX = 0;
+    }
+  }
+
+  onSelectedIndexChange() {
+    const index = this.normalizedSelectedIndex;
+    if (this.layoutAlgorithm.selectedIndex === index) {
+      return;
+    }
+    this.prepareBackplateTransition(index);
+    if (this.enableStateAnimation) {
+      this.getUIContext().animateTo({ curve: curves.springMotion(0.347, 0.99) }, () => {
+        this.selectedItemOffsetX = 0;
+      });
+    }
+    else {
+      this.selectedItemOffsetX = 0;
+    }
+  }
 }
 __decorate([Param], SimpleSegmentButtonV2.prototype, 'items', void 0);
 __decorate([Param], SimpleSegmentButtonV2.prototype, 'selectedIndex', void 0);
@@ -2634,10 +2635,20 @@ __decorate([Param], SimpleSegmentButtonV2.prototype, 'enableStateAnimation', voi
 __decorate([Local], SimpleSegmentButtonV2.prototype, 'openSelectedItemSystemMaterial', void 0);
 __decorate([Local], SimpleSegmentButtonV2.prototype, 'selectedItemScale', void 0);
 __decorate([Local], SimpleSegmentButtonV2.prototype, 'tempDisableAnimation', void 0);
-__decorate([Local], SimpleSegmentButtonV2.prototype, 'backplatePosition', void 0);
+__decorate([
+  Local
+], SimpleSegmentButtonV2.prototype, 'layoutAlgorithm', void 0);
+__decorate([
+  Local
+], SimpleSegmentButtonV2.prototype, 'selectedItemOffsetX', void 0);
+__decorate([
+  Monitor('selectedIndex', 'items')
+], SimpleSegmentButtonV2.prototype, 'onSelectedIndexChange', null);
+__decorate([
+  Monitor('interactionMode', 'backgroundSystemMaterial')
+], SimpleSegmentButtonV2.prototype, 'onInteractionConfigChange', null);
 __decorate([Local], SimpleSegmentButtonV2.prototype, 'followingDragActive', void 0);
 __decorate([Computed], SimpleSegmentButtonV2.prototype, 'normalizedSelectedIndex', null);
-__decorate([Computed], SimpleSegmentButtonV2.prototype, 'selectedItemRect', null);
 const multiplyCapsuleTheme = {
   itemBorderRadius: {
     id: 125834846,
@@ -3802,3 +3813,70 @@ export default {
   CapsuleSegmentButtonV2,
   MultiCapsuleSegmentButtonV2,
 };
+
+class SegmentButtonV2LayoutAlgorithm extends CustomLayoutAlgorithm {
+  constructor() {
+    super();
+    this.selectedIndex = 0;
+    this.itemRects = new Map();
+  }
+  cloneWith(index) {
+    const algorithm = new SegmentButtonV2LayoutAlgorithm();
+    algorithm.selectedIndex = index;
+    algorithm.itemRects = this.itemRects;
+    return algorithm;
+  }
+  getItemRect(index) {
+    return this.itemRects.get(index);
+  }
+  onMeasure(self, constraint) {
+    const content = self.getChild(SegmentButtonV2LayoutAlgorithm.CONTENT_LAYER_CHILD_INDEX);
+    if (!content) {
+      self.setMeasuredSize({ width: 0, height: 0 });
+      return;
+    }
+    content.measure(constraint);
+    const size = content.getMeasuredSize();
+    const selectedIndex = normalize(this.selectedIndex, 0, content.getChildrenCount() - 1);
+    const selected = selectedIndex >= 0 ? content.getChild(selectedIndex) : undefined;
+    const selectedSize = selected ? selected.getMeasuredSize() : { width: 0, height: 0 };
+    const effect = self.getChild(SegmentButtonV2LayoutAlgorithm.EFFECT_LAYER_CHILD_INDEX);
+    if (effect) {
+      effect.measure({ maxSize: size, minSize: size, percentReference: size });
+    }
+    const backplate = self.getChild(SegmentButtonV2LayoutAlgorithm.BACKPLATE_LAYER_CHILD_INDEX);
+    if (backplate) {
+      backplate.measure({ maxSize: selectedSize, minSize: selectedSize, percentReference: selectedSize });
+    }
+    self.setMeasuredSize(size);
+  }
+  onLayout(self, position) {
+    const content = self.getChild(SegmentButtonV2LayoutAlgorithm.CONTENT_LAYER_CHILD_INDEX);
+    if (!content) {
+      return;
+    }
+    // Resolve the content first; both layers then use this layout pass's geometry.
+    content.layout({ x: 0, y: 0 });
+    const itemRects = new Map();
+    for (let index = 0; index < content.getChildrenCount(); index++) {
+      const item = content.getChild(index);
+      if (item) {
+        itemRects.set(index, { position: item.getLayoutPosition(), size: item.getMeasuredSize() });
+      }
+    }
+    this.itemRects = itemRects;
+    const effect = self.getChild(SegmentButtonV2LayoutAlgorithm.EFFECT_LAYER_CHILD_INDEX);
+    if (effect) {
+      effect.layout({ x: 0, y: 0 });
+    }
+    const backplate = self.getChild(SegmentButtonV2LayoutAlgorithm.BACKPLATE_LAYER_CHILD_INDEX);
+    const selectedRect = itemRects.get(normalize(this.selectedIndex, 0, content.getChildrenCount() - 1));
+    if (backplate) {
+      backplate.layout(selectedRect ? selectedRect.position : { x: 0, y: 0 });
+    }
+    self.setLayoutPosition({ x: position.x, y: position.y });
+  }
+}
+SegmentButtonV2LayoutAlgorithm.EFFECT_LAYER_CHILD_INDEX = 0;
+SegmentButtonV2LayoutAlgorithm.BACKPLATE_LAYER_CHILD_INDEX = 1;
+SegmentButtonV2LayoutAlgorithm.CONTENT_LAYER_CHILD_INDEX = 2;

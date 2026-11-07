@@ -15,6 +15,10 @@
 
 import {
   ColorMetrics,
+  CustomLayoutAlgorithm,
+  DynamicLayout,
+  DynamicLayoutAttribute,
+  LayoutConstraint,
   curves,
   ImageModifier,
   LengthMetrics,
@@ -23,7 +27,7 @@ import {
   TextModifier,
   UIContext,
 } from '@kit.ArkUI';
-import { SizeT } from '@ohos.arkui.node';
+import { FrameNode, Position as LayoutPosition, Size, SizeT } from '@ohos.arkui.node';
 import { i18n } from '@kit.LocalizationKit';
 import util from '@ohos.util';
 import uiMaterial from '@ohos.arkui.uiMaterial';
@@ -596,7 +600,8 @@ struct SimpleSegmentButtonV2 {
   @Local selectedItemScale?: ScaleOptions;
   @Local tempDisableAnimation?: boolean = false;
   @Local isTapGesture?: boolean = false;
-  @Local backplatePosition: Position = {x: 0, y: 0};
+  @Local layoutAlgorithm: SegmentButtonV2LayoutAlgorithm = new SegmentButtonV2LayoutAlgorithm();
+  @Local selectedItemOffsetX: number = 0;
 
   @Computed
   get normalizedSelectedIndex(): number {
@@ -604,9 +609,46 @@ struct SimpleSegmentButtonV2 {
     return normalize(this.selectedIndex, 0, items.length - 1);
   }
 
-  @Computed
-  get selectedItemRect(): SegmentButtonV2ItemRect | undefined {
-    return this.itemRects[this.normalizedSelectedIndex];
+  @Monitor('selectedIndex', 'items')
+  onSelectedIndexChange(): void {
+    const index: number = this.normalizedSelectedIndex;
+    if (this.layoutAlgorithm.selectedIndex === index) {
+      return;
+    }
+    this.prepareBackplateTransition(index);
+    if (this.enableStateAnimation) {
+      this.getUIContext().animateTo({ curve: curves.springMotion(0.347, 0.99) }, () => {
+        this.selectedItemOffsetX = 0;
+      });
+    } else {
+      this.selectedItemOffsetX = 0;
+    }
+  }
+
+  @Monitor('interactionMode', 'backgroundSystemMaterial')
+  onInteractionConfigChange(): void {
+    if (!this.isFollowingDragEnabled()) {
+      this.selectedItemOffsetX = 0;
+    }
+  }
+
+  aboutToAppear(): void {
+    this.layoutAlgorithm = this.layoutAlgorithm.cloneWith(this.normalizedSelectedIndex);
+  }
+
+  aboutToReuse(): void {
+    this.layoutAlgorithm = this.layoutAlgorithm.cloneWith(this.normalizedSelectedIndex);
+  }
+
+  private prepareBackplateTransition(index: number): void {
+    const oldRect = this.layoutAlgorithm.getItemRect(this.layoutAlgorithm.selectedIndex);
+    const targetRect = this.layoutAlgorithm.getItemRect(index);
+    if (oldRect && targetRect && this.layoutAlgorithm.selectedIndex < this.items.length) {
+      this.selectedItemOffsetX += this.getUIContext().px2vp(oldRect.position.x - targetRect.position.x);
+    } else {
+      this.selectedItemOffsetX = 0;
+    }
+    this.layoutAlgorithm = this.layoutAlgorithm.cloneWith(index);
   }
 
   @LocalBuilder
@@ -674,10 +716,6 @@ struct SimpleSegmentButtonV2 {
             TapGesture().onAction(() => {
               this.isTapGesture = true;
               this.onItemClicked?.(repeatItem.index);
-              this.backplatePosition = {
-                x: this.selectedItemRect?.position.x,
-                y: this.selectedItemRect?.position.y
-              }
               this.updateSelectedIndex(repeatItem.index);
             })
           )
@@ -800,16 +838,8 @@ struct SimpleSegmentButtonV2 {
 
           if (!this.isBackgroundSystemMaterialEnabled() && this.isDragging && this.isFollowingDragEnabled()) {
             this.followingDragActive = true;
-            this.backplatePosition = {
-              x: this.selectedItemRect!.position.x,
-              y: this.selectedItemRect!.position.y
-            }
           }
           if (this.isMaterialInteractionEnabled() && this.isDragging) {
-            this.backplatePosition = {
-              x: this.selectedItemRect!.position.x,
-              y: this.selectedItemRect!.position.y
-            }
             if (!this.dragWithPress) {
               this.getUIContext().animateTo({
                 curve: curves.interpolatingSpring(0, 1, 195, 14),
@@ -834,20 +864,17 @@ struct SimpleSegmentButtonV2 {
             return;
           }
           if (this.isFollowingDragEnabled()) {
-            let nowX = finger.localX - this.panStartGlobalX + this.selectedItemRect!.position.x as number;
-            let startX = this.itemRects[0]!.position.x as number;
-            let endX = this.itemRects[this.items.length - 1]!.position.x as number;
-            if (this.isRTL()) {
-              startX = this.itemRects[this.items.length - 1]!.position.x as number;
-              endX = this.itemRects[0]!.position.x as number
+            const selectedRect = this.layoutAlgorithm.getItemRect(this.normalizedSelectedIndex);
+            const firstRect = this.layoutAlgorithm.getItemRect(0);
+            const lastRect = this.layoutAlgorithm.getItemRect(this.items.length - 1);
+            if (!selectedRect || !firstRect || !lastRect) {
+              return;
             }
-            nowX = Math.max(startX, nowX);
-            nowX = Math.min(endX, nowX);
-
-            this.backplatePosition = {
-              x: nowX,
-              y: this.backplatePosition!.y
-            }
+            const startX: number = Math.min(firstRect.position.x, lastRect.position.x);
+            const endX: number = Math.max(firstRect.position.x, lastRect.position.x);
+            const offset: number = this.getUIContext().vp2px(finger.localX - this.panStartGlobalX);
+            const positionX: number = Math.min(endX, Math.max(startX, selectedRect.position.x + offset));
+            this.selectedItemOffsetX = this.getUIContext().px2vp(positionX - selectedRect.position.x);
           } else {
             const isNormalDrag = this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG;
             const index = this.getIndexByPosition(finger.localX, finger.localY);
@@ -876,6 +903,7 @@ struct SimpleSegmentButtonV2 {
               const finger = event.fingerList.find(Boolean);
               if (!finger) {
                 if (!isMaterialEnabled) {
+                  this.selectedItemOffsetX = 0;
                   this.isDragging = false;
                   this.followingDragActive = false;
                   this.dragWithPress = false;
@@ -918,10 +946,7 @@ struct SimpleSegmentButtonV2 {
                 if (shouldUpdateSelectedIndex) {
                   this.$selectedIndex?.(realIndex);
                 }
-                this.backplatePosition = {
-                  x: isMaterialEnabled ? this.itemRects[realIndex].position.x : targetRect!.position.x,
-                  y: isMaterialEnabled ? this.itemRects[realIndex].position.y : targetRect!.position.y
-                }
+                this.selectedItemOffsetX = 0;
               })
             }
             if (isMaterialEnabled) {
@@ -939,6 +964,7 @@ struct SimpleSegmentButtonV2 {
                 this.finishSelectMaterialAnimation();
               }
             }
+            this.selectedItemOffsetX = 0;
             this.isDragging = false;
             this.followingDragActive = false;
             this.dragWithPress = false;
@@ -964,6 +990,7 @@ struct SimpleSegmentButtonV2 {
           this.isMouseWheelScroll = false;
           this.panStartIndex = -1;
           this.dragWithPress = false;
+          this.selectedItemOffsetX = 0;
           if (!this.dragWithPress) {
             this.getUIContext().animateTo({
               curve: curves.interpolatingSpring(0, 1, 195, 14),
@@ -999,10 +1026,6 @@ struct SimpleSegmentButtonV2 {
   }
 
   startSelectMaterialAnimation() {
-    this.backplatePosition = {
-      x: this.selectedItemRect!.position.x,
-      y: this.selectedItemRect!.position.y
-    }
     if (!this.openSelectedItemSystemMaterial) {
       this.getUIContext().animateTo({
         curve: curves.interpolatingSpring(0, 1, 195, 14),
@@ -1056,34 +1079,17 @@ struct SimpleSegmentButtonV2 {
 
   @LocalBuilder
   private BackplateLayer() {
-    if (this.selectedItemRect) {
-      Stack()
-        .position(this.getBackplatePosition())
-        .animation((!this.tempDisableAnimation && this.enableStateAnimation) ?
-          { curve: curves.springMotion(0.347, 0.99) } : undefined)
-        .backgroundColor(this.getItemSelectedBackgroundColor())
-        .borderRadius(this.getItemBorderRadius())
-        .scale(this.getBackplateScale())
-        .opacity(this.getBackplateOpacity())
-        .shadow(this.getItemBackplateShadow())
-        .height(this.selectedItemRect.size.height)
-        .width(this.selectedItemRect.size.width)
-    }
-  }
-
-  getBackplatePosition() {
-    const interactionMode = this.interactionMode;
-    if ((this.openSelectedItemSystemMaterial &&
-      interactionMode !== SegmentButtonV2InteractionMode.NORMAL_DRAG) ||
-      ((this.followingDragActive || this.isDragging) &&
-        interactionMode === SegmentButtonV2InteractionMode.FOLLOWING_DRAG)) {
-      return this.backplatePosition;
-    } else {
-      return {
-        x: this.selectedItemRect!.position.x,
-        y: this.selectedItemRect!.position.y,
-      } as Position;
-    }
+    Stack()
+      .translate({ x: this.selectedItemOffsetX })
+      .animation((!this.tempDisableAnimation && this.enableStateAnimation) ?
+        { curve: curves.springMotion(0.347, 0.99) } : undefined)
+      .backgroundColor(this.getItemSelectedBackgroundColor())
+      .borderRadius(this.getItemBorderRadius())
+      .scale(this.getBackplateScale())
+      .opacity(this.getBackplateOpacity())
+      .shadow(this.getItemBackplateShadow())
+      .height('100%')
+      .width('100%')
   }
 
   getBackplateOpacity() {
@@ -1104,19 +1110,24 @@ struct SimpleSegmentButtonV2 {
 
   @LocalBuilder
   EffectLayer() {
-    Repeat(this.getItemRects())
-      .each((repeatItem) => {
-        Stack()
-          .backgroundColor(this.getEffectBackgroundColor(repeatItem))
-          .borderRadius(this.getItemBorderRadius())
-          .height(repeatItem.item?.size?.height)
-          .position({
-            x: repeatItem.item?.position?.x,
-            y: repeatItem.item?.position?.y
-          })
-          .scale(this.getItemScale(repeatItem.index))
-          .width(repeatItem.item?.size?.width)
-      })
+    Stack() {
+      Repeat(this.getItemRects())
+        .each((repeatItem) => {
+          Stack()
+            .backgroundColor(this.getEffectBackgroundColor(repeatItem))
+            .borderRadius(this.getItemBorderRadius())
+            .height(repeatItem.item?.size?.height)
+            .position({
+              x: repeatItem.item?.position?.x,
+              y: repeatItem.item?.position?.y
+            })
+            .scale(this.getItemScale(repeatItem.index))
+            .width(repeatItem.item?.size?.width)
+        })
+    }
+    .height('100%')
+    .width('100%')
+    .clip(false)
   }
 
   private getItemRects(): SegmentButtonV2ItemRect[] {
@@ -1133,9 +1144,12 @@ struct SimpleSegmentButtonV2 {
   build() {
     Stack() {
       Stack() {
-        this.EffectLayer()
-        this.BackplateLayer()
-        this.ContentLayer()
+        DynamicLayout(this.layoutAlgorithm) {
+          this.EffectLayer()
+          this.BackplateLayer()
+          this.ContentLayer()
+        }
+        .clip(false)
       }
       .borderRadius(this.getButtonBorderRadius())
       .backgroundBlurStyle(this.getButtonBackgroundBlurStyle(), this.getButtonBackgroundBlurStyleOptions(),
@@ -1333,10 +1347,7 @@ struct SimpleSegmentButtonV2 {
         return;
       }
       this.$selectedIndex?.(selectedIndex);
-      this.backplatePosition = {
-        x: targetRect.position.x,
-        y: targetRect.position.y
-      }
+      this.selectedItemOffsetX = 0;
     });
 
     if (this.isBackgroundSystemMaterialEnabled() && !this.tempDisableAnimation && !isNormalDragSelection) {
@@ -2067,5 +2078,78 @@ class GroupIdGenerator {
 
   public generate(): string {
     return util.generateRandomUUID() || `SegmentButton-${this.id++}`;
+  }
+}
+
+interface SegmentButtonV2LayoutRect {
+  position: LayoutPosition;
+  size: Size;
+}
+
+class SegmentButtonV2LayoutAlgorithm extends CustomLayoutAlgorithm {
+  static readonly EFFECT_LAYER_CHILD_INDEX: number = 0;
+  static readonly BACKPLATE_LAYER_CHILD_INDEX: number = 1;
+  static readonly CONTENT_LAYER_CHILD_INDEX: number = 2;
+
+  selectedIndex: number = 0;
+  private itemRects: Map<number, SegmentButtonV2LayoutRect> = new Map<number, SegmentButtonV2LayoutRect>();
+
+  cloneWith(index: number): SegmentButtonV2LayoutAlgorithm {
+    const algorithm = new SegmentButtonV2LayoutAlgorithm();
+    algorithm.selectedIndex = index;
+    algorithm.itemRects = this.itemRects;
+    return algorithm;
+  }
+
+  getItemRect(index: number): SegmentButtonV2LayoutRect | undefined {
+    return this.itemRects.get(index);
+  }
+
+  onMeasure(self: FrameNode, constraint: LayoutConstraint): void {
+    const content = self.getChild(SegmentButtonV2LayoutAlgorithm.CONTENT_LAYER_CHILD_INDEX);
+    if (!content) {
+      self.setMeasuredSize({ width: 0, height: 0 });
+      return;
+    }
+    content.measure(constraint);
+    const size = content.getMeasuredSize();
+    const selectedIndex: number = normalize(this.selectedIndex, 0, content.getChildrenCount() - 1);
+    const selected = selectedIndex >= 0 ? content.getChild(selectedIndex) : undefined;
+    const selectedSize: Size = selected ? selected.getMeasuredSize() : { width: 0, height: 0 };
+    const effect = self.getChild(SegmentButtonV2LayoutAlgorithm.EFFECT_LAYER_CHILD_INDEX);
+    if (effect) {
+      effect.measure({ maxSize: size, minSize: size, percentReference: size });
+    }
+    const backplate = self.getChild(SegmentButtonV2LayoutAlgorithm.BACKPLATE_LAYER_CHILD_INDEX);
+    if (backplate) {
+      backplate.measure({ maxSize: selectedSize, minSize: selectedSize, percentReference: selectedSize });
+    }
+    self.setMeasuredSize(size);
+  }
+
+  onLayout(self: FrameNode, position: LayoutPosition): void {
+    const content = self.getChild(SegmentButtonV2LayoutAlgorithm.CONTENT_LAYER_CHILD_INDEX);
+    if (!content) {
+      return;
+    }
+    content.layout({ x: 0, y: 0 });
+    const itemRects = new Map<number, SegmentButtonV2LayoutRect>();
+    for (let index: number = 0; index < content.getChildrenCount(); index++) {
+      const item = content.getChild(index);
+      if (item) {
+        itemRects.set(index, { position: item.getLayoutPosition(), size: item.getMeasuredSize() });
+      }
+    }
+    this.itemRects = itemRects;
+    const effect = self.getChild(SegmentButtonV2LayoutAlgorithm.EFFECT_LAYER_CHILD_INDEX);
+    if (effect) {
+      effect.layout({ x: 0, y: 0 });
+    }
+    const backplate = self.getChild(SegmentButtonV2LayoutAlgorithm.BACKPLATE_LAYER_CHILD_INDEX);
+    const selectedRect = itemRects.get(normalize(this.selectedIndex, 0, content.getChildrenCount() - 1));
+    if (backplate) {
+      backplate.layout(selectedRect ? selectedRect.position : { x: 0, y: 0 });
+    }
+    self.setLayoutPosition({ x: position.x as number, y: position.y as number });
   }
 }
