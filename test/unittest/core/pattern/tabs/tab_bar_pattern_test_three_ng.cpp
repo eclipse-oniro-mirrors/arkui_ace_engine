@@ -251,6 +251,113 @@ HWTEST_F(TabBarPatternThreeTestNg, CustomizeExpandSafeArea002, TestSize.Level1)
 }
 
 /**
+ * @tc.name: OnSyncGeometryNode001
+ * @tc.desc: test OnSyncGeometryNode with safeAreaPadding set and non-floating bar
+ *           verifies that paint rect is updated with geometry and safe area expansion
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabBarPatternThreeTestNg, OnSyncGeometryNode001, TestSize.Level1)
+{
+    TabsModelNG model = CreateTabs();
+    CreateTabContents(TABCONTENT_NUMBER);
+    CreateTabsDone(model);
+    ASSERT_NE(tabBarNode_, nullptr);
+    ASSERT_NE(tabBarPattern_, nullptr);
+    ASSERT_NE(layoutProperty_, nullptr);
+
+    PaddingProperty safeAreaPadding;
+    safeAreaPadding.SetEdges(CalcLength(0), CalcLength(0), CalcLength(0), CalcLength(10));
+    layoutProperty_->UpdateSafeAreaPadding(safeAreaPadding);
+
+    auto geometryNode = tabBarNode_->GetGeometryNode();
+    ASSERT_NE(geometryNode, nullptr);
+    geometryNode->SetFrameSize(SizeF(100.f, 50.f));
+    geometryNode->SetMarginFrameOffset(OffsetF(0.f, 350.f));
+
+    DirtySwapConfig config;
+    tabBarPattern_->OnSyncGeometryNode(config);
+
+    auto renderContext = tabBarNode_->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+    auto paintRect = renderContext->GetPaintRectWithoutTransform();
+    EXPECT_EQ(paintRect.GetY(), 350.f);
+    EXPECT_EQ(paintRect.Width(), 100.f);
+    EXPECT_EQ(paintRect.Height(), 50.f);
+}
+
+/**
+ * @tc.name: OnSyncGeometryNode002
+ * @tc.desc: test OnSyncGeometryNode with safeAreaPadding set and floating bar
+ *           verifies that paint rect is NOT extended for floating bars
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabBarPatternThreeTestNg, OnSyncGeometryNode002, TestSize.Level1)
+{
+    TabsModelNG model = CreateTabs();
+    CreateTabContents(TABCONTENT_NUMBER);
+    CreateTabsDone(model);
+    ASSERT_NE(tabBarNode_, nullptr);
+    ASSERT_NE(tabBarPattern_, nullptr);
+    ASSERT_NE(layoutProperty_, nullptr);
+
+    PaddingProperty safeAreaPadding;
+    safeAreaPadding.SetEdges(CalcLength(0), CalcLength(0), CalcLength(0), CalcLength(10));
+    layoutProperty_->UpdateSafeAreaPadding(safeAreaPadding);
+
+    tabBarPattern_->SetIsFloatingBar(true);
+
+    auto renderContext = tabBarNode_->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+    renderContext->UpdatePaintRect(RectF(0.f, 0.f, 100.f, 50.f));
+
+    auto geometryNode = tabBarNode_->GetGeometryNode();
+    ASSERT_NE(geometryNode, nullptr);
+    geometryNode->SetFrameSize(SizeF(100.f, 50.f));
+    geometryNode->SetMarginFrameOffset(OffsetF(0.f, 350.f));
+
+    DirtySwapConfig config;
+    tabBarPattern_->OnSyncGeometryNode(config);
+
+    auto paintRect = renderContext->GetPaintRectWithoutTransform();
+    EXPECT_EQ(paintRect.GetY(), 0.f);
+    EXPECT_EQ(paintRect.Height(), 50.f);
+}
+
+/**
+ * @tc.name: OnSyncGeometryNode003
+ * @tc.desc: test OnSyncGeometryNode without safeAreaPadding or safeAreaInset
+ *           verifies that method returns early and paint rect is not modified
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabBarPatternThreeTestNg, OnSyncGeometryNode003, TestSize.Level1)
+{
+    TabsModelNG model = CreateTabs();
+    CreateTabContents(TABCONTENT_NUMBER);
+    CreateTabsDone(model);
+    ASSERT_NE(tabBarNode_, nullptr);
+    ASSERT_NE(tabBarPattern_, nullptr);
+    ASSERT_NE(layoutProperty_, nullptr);
+
+    layoutProperty_->ResetSafeAreaPadding();
+
+    auto renderContext = tabBarNode_->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+    renderContext->UpdatePaintRect(RectF(0.f, 0.f, 100.f, 50.f));
+
+    auto geometryNode = tabBarNode_->GetGeometryNode();
+    ASSERT_NE(geometryNode, nullptr);
+    geometryNode->SetFrameSize(SizeF(100.f, 50.f));
+    geometryNode->SetMarginFrameOffset(OffsetF(0.f, 350.f));
+
+    DirtySwapConfig config;
+    tabBarPattern_->OnSyncGeometryNode(config);
+
+    auto paintRect = renderContext->GetPaintRectWithoutTransform();
+    EXPECT_EQ(paintRect.GetY(), 0.f);
+    EXPECT_EQ(paintRect.Height(), 50.f);
+}
+
+/**
  * @tc.name: ClickTo001
  * @tc.desc: test ClickTo
  * @tc.type: FUNC
