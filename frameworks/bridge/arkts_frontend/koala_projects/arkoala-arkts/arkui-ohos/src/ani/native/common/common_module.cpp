@@ -2037,13 +2037,17 @@ private:
 
 void ExecuteApplicationShortcutCallback(ani_vm* vm, ani_ref callback, int32_t instanceId)
 {
+    constexpr int32_t LOCAL_SCOPE_CAPACITY = 16;
     ani_env* env = nullptr;
     auto attachStatus = GetAniEnv(vm, &env);
-    if (env && env->CreateLocalScope(0) == ANI_OK) {
+    if (env && env->CreateLocalScope(LOCAL_SCOPE_CAPACITY) == ANI_OK) {
         ani_ref arg = AniUtils::CreateInt32(env, instanceId);
         if (arg) {
             ani_ref result = nullptr;
-            env->FunctionalObject_Call(static_cast<ani_fn_object>(callback), 1, &arg, &result);
+            auto status = env->FunctionalObject_Call(static_cast<ani_fn_object>(callback), 1, &arg, &result);
+            if (status != ANI_OK) {
+                HILOGW("Application shortcut callback failed, status: %{public}d", status);
+            }
         }
         ani_boolean pending = ANI_FALSE;
         if (env->ExistUnhandledError(&pending) == ANI_OK && pending) {
@@ -2051,6 +2055,8 @@ void ExecuteApplicationShortcutCallback(ani_vm* vm, ani_ref callback, int32_t in
             env->ResetError();
         }
         env->DestroyLocalScope();
+    } else {
+        HILOGW("Application shortcut callback failed to obtain ANI env or create local scope");
     }
     if (attachStatus == ANI_OK) {
         vm->DetachCurrentThread();
