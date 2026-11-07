@@ -77,7 +77,7 @@ std::pair<RefPtr<FrameNode>, RefPtr<TextPattern>> TextBases::Init()
         FrameNode::CreateFrameNodeWithTree(V2::ROOT_ETS_TAG, ROOT_NODE_ID, Referenced::MakeRefPtr<RootPattern>());
     auto clipboard = ClipboardProxy::GetInstance()->GetClipboard(pipeline->GetTaskExecutor());
     pattern->clipboard_ = clipboard;
-    return { frameNode, pattern };
+    return {frameNode, pattern};
 }
 
 void TextBases::TestUpdateScenario(const RefPtr<TextPattern>& pattern)
@@ -251,7 +251,7 @@ RefPtr<FrameNode> TextBases::CreateTextParagraph(const std::u16string& createVal
         textModel.SetLineBreakStrategy(testProperty.lineBreakStrategy.value());
     }
 
-    RefPtr<UINode> element = ViewStackProcessor::GetInstance()->Finish(); // TextView pop
+    RefPtr<UINode> element = ViewStackProcessor::GetInstance()->Finish();  // TextView pop
     return AceType::DynamicCast<FrameNode>(element);
 }
 
@@ -281,7 +281,7 @@ void TextBases::SetContentModifier(TextContentModifier& textContentModifier)
     textShadow.SetSpreadRadius(SPREADRADIUS_VALUE);
     textShadow.SetOffsetX(ADAPT_OFFSETX_VALUE);
     textShadow.SetOffsetY(ADAPT_OFFSETY_VALUE);
-    textContentModifier.SetTextShadow({ textShadow });
+    textContentModifier.SetTextShadow({textShadow});
     textContentModifier.SetFontSize(ADAPT_FONT_SIZE_VALUE, textStyle);
     textContentModifier.SetBaselineOffset(BASELINE_OFFSET_VALUE, textStyle);
     OffsetF paintOffset;
@@ -312,11 +312,11 @@ void TextBases::UpdateTextLayoutProperty(RefPtr<TextLayoutProperty> textLayoutPr
     textShadow.SetSpreadRadius(SPREADRADIUS_VALUE);
     textShadow.SetOffsetX(ADAPT_OFFSETX_VALUE);
     textShadow.SetOffsetY(ADAPT_OFFSETY_VALUE);
-    textLayoutProperty->UpdateTextShadow({ textShadow });
+    textLayoutProperty->UpdateTextShadow({textShadow});
     textLayoutProperty->UpdateTextDecorationColor(TEXT_COLOR_VALUE);
     textLayoutProperty->UpdateTextDecoration({TextDecoration::OVERLINE});
     textLayoutProperty->UpdateBaselineOffset(ADAPT_BASE_LINE_OFFSET_VALUE);
     textLayoutProperty->UpdateWordBreak(TEXT_WORD_BREAK);
     textLayoutProperty->UpdateLineBreakStrategy(TEXT_LINE_BREAK_STRATEGY);
 }
-} // namespace OHOS::Ace::NG
+}  // namespace OHOS::Ace::NG
