@@ -643,7 +643,10 @@ void NavigationToolbarUtil::SetToolbarConfiguration(const RefPtr<NavDestinationN
         nodeBase->UpdateToolBarNodeOperation(ChildNodeOperation::REPLACE);
     } else {
         auto toolbarNode = AceType::DynamicCast<NavToolbarNode>(nodeBase->GetPreToolBarNode());
-        auto containerNode = toolbarNode->GetToolbarContainerNode();
+        RefPtr<UINode> containerNode;
+        if (toolbarNode) {
+            containerNode = toolbarNode->GetToolbarContainerNode();
+        }
         if (toolbarNode && containerNode) {
             nodeBase->UpdateToolBarNodeOperation(ChildNodeOperation::REPLACE);
             auto preToolbarNode = nodeBase->GetPreToolBarNode();

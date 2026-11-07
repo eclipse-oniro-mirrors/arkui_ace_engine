@@ -589,6 +589,7 @@ bool JSNavigationStack::CreateNodeByIndex(int32_t index, const WeakPtr<NG::UINod
         return true;
     }
     node = targetNode;
+    CHECK_NULL_RETURN(desNode, true);
     auto pattern = AceType::DynamicCast<NG::NavDestinationPattern>(desNode->GetPattern());
     if (pattern) {
         pattern->SetName(name);
