@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021 Huawei Device Co., Ltd.
+ * Copyright (c) 2026 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -20,6 +20,7 @@
 #include <limits>
 #include <vector>
 
+#include "base/log/ace_trace.h"
 #include "base/log/log_wrapper.h"
 #include "core/common/container.h"
 #include "core/event/key_event.h"
@@ -49,7 +50,6 @@ int32_t ApplicationShortcutManager::RegisterApplicationShortcut(const std::strin
     if (IsUnsupportedShortcutContainer(Container::CurrentSafely(), "registration")) {
         return 0;
     }
-    std::lock_guard<std::mutex> lock(applicationShortcutMutex_);
     if (applicationShortcutId_ == std::numeric_limits<int32_t>::max()) {
         LOGE("Application shortcut registration IDs exhausted");
         return 0;
@@ -65,24 +65,14 @@ void ApplicationShortcutManager::UnregisterApplicationShortcut(int32_t registrat
     if (IsUnsupportedShortcutContainer(Container::CurrentSafely(), "unregistration")) {
         return;
     }
-    // Release the callback outside the lock: its destructor may release frontend resources.
-    std::map<int32_t, ApplicationKeyboardShortcut>::node_type removed;
-    {
-        std::lock_guard<std::mutex> lock(applicationShortcutMutex_);
-        removed = applicationKeyboardShortcuts_.extract(registrationId);
-    }
+    applicationKeyboardShortcuts_.erase(registrationId);
 }
 
 void ApplicationShortcutManager::RemoveApplicationShortcutsForCleanup(const std::vector<int32_t>& registrationIds)
 {
-    std::vector<std::map<int32_t, ApplicationKeyboardShortcut>::node_type> removed;
-    {
-        std::lock_guard<std::mutex> lock(applicationShortcutMutex_);
-        for (auto id : registrationIds) {
-            removed.emplace_back(applicationKeyboardShortcuts_.extract(id));
-        }
+    for (auto id : registrationIds) {
+        applicationKeyboardShortcuts_.erase(id);
     }
-    // Release frontend resources outside the registry lock.
 }
 
 static uint8_t GetEventModifierKeys(const KeyEvent& event)
@@ -124,22 +114,24 @@ bool ApplicationShortcutManager::TryTriggerApplicationShortcut(const KeyEvent& e
     if (IsUnsupportedShortcutContainer(Container::GetContainer(triggerInstanceId), "dispatch")) {
         return false;
     }
-    std::vector<std::function<void(int32_t)>> callbacks;
+    std::vector<ApplicationKeyboardShortcut> matched;
     const uint8_t eventModifiers = GetEventModifierKeys(event);
-    {
-        std::lock_guard<std::mutex> lock(applicationShortcutMutex_);
-        for (const auto& [registrationId, shortcut] : applicationKeyboardShortcuts_) {
-            if (MatchShortcutValue(event, shortcut.value) && eventModifiers == shortcut.keys &&
-                shortcut.onKeyboardShortcutAction) {
-                callbacks.emplace_back(shortcut.onKeyboardShortcutAction);
-            }
+    for (const auto& [registrationId, shortcut] : applicationKeyboardShortcuts_) {
+        if (MatchShortcutValue(event, shortcut.value) && eventModifiers == shortcut.keys &&
+            shortcut.onKeyboardShortcutAction) {
+            matched.push_back(shortcut);
         }
     }
     // Registrations changed by a callback take effect on the next dispatch.
-    for (const auto& callback : callbacks) {
-        callback(triggerInstanceId);
+    if (!matched.empty()) {
+        ACE_SCOPED_TRACE("ApplicationShortcut dispatch: count[%zu]", matched.size());
+        for (const auto& item : matched) {
+            ACE_SCOPED_TRACE("ApplicationShortcut callback: value[%s] keys[%u]",
+                item.value.c_str(), static_cast<uint32_t>(item.keys));
+            item.onKeyboardShortcutAction(triggerInstanceId);
+        }
     }
-    return !callbacks.empty();
+    return !matched.empty();
 }
 
 } // namespace OHOS::Ace

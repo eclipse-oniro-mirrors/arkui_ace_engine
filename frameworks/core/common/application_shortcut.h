@@ -19,7 +19,6 @@
 #include <cstdint>
 #include <functional>
 #include <map>
-#include <mutex>
 #include <string>
 #include <vector>
 
@@ -55,7 +54,6 @@ private:
 
     std::map<int32_t, ApplicationKeyboardShortcut> applicationKeyboardShortcuts_;
     int32_t applicationShortcutId_ = 0;
-    std::mutex applicationShortcutMutex_;
 };
 } // namespace OHOS::Ace
 
