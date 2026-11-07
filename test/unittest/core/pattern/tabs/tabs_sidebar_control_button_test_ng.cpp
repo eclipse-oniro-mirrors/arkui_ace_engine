@@ -1137,4 +1137,89 @@ HWTEST_F(TabsSidebarControlButtonTestNg, ShowSidebarControlButtonDynamicToggleTe
     EXPECT_NE(sideBarPattern->collapseButtonIconNode_, nullptr);
 }
 
+/**
+ * @tc.name: CollapseSideBarContentSideBarOnLeft001
+ * @tc.desc: CollapseSideBarContent with sideBarOnLeft (START + LTR) → outsideX negative.
+ *   Verifies the pre-animation translate reset path runs for the negative-X branch.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarControlButtonTestNg, CollapseSideBarContentSideBarOnLeft001, TestSize.Level1)
+{
+    CreateTabsWithSidebar(true);
+    auto sideBarPattern = GetSideBarPattern();
+    ASSERT_NE(sideBarPattern, nullptr);
+    auto sideBarNode = pattern_->GetSideBarNode();
+    ASSERT_NE(sideBarNode, nullptr);
+    auto dividerNode = pattern_->GetSideBarDividerNode();
+    ASSERT_NE(dividerNode, nullptr);
+
+    /**
+     * @tc.steps: Default BarPosition::START + LTR → sideBarOnLeft=true → outsideX < 0
+     */
+    ASSERT_NE(layoutProperty_, nullptr);
+    layoutProperty_->UpdateSidebarPosition(BarPosition::START);
+    layoutProperty_->UpdateLayoutDirection(TextDirection::LTR);
+    FlushLayoutTask(frameNode_);
+
+    EXPECT_FALSE(sideBarPattern->IsCollapsed());
+    sideBarPattern->CollapseSideBarContent();
+
+    /**
+     * @tc.expected: isCollapsed_=true; sidebar and divider set GONE by finish callback;
+     * translate pipeline ran (HasTransformTranslate true on both nodes after the
+     * pre-animation reset + animation closure).
+     */
+    EXPECT_TRUE(sideBarPattern->IsCollapsed());
+    auto sideBarRender = sideBarNode->GetRenderContext();
+    ASSERT_NE(sideBarRender, nullptr);
+    EXPECT_TRUE(sideBarRender->HasTransformTranslate());
+    auto dividerRender = dividerNode->GetRenderContext();
+    ASSERT_NE(dividerRender, nullptr);
+    EXPECT_TRUE(dividerRender->HasTransformTranslate());
+    EXPECT_EQ(sideBarNode->GetLayoutProperty()->GetVisibilityValue(VisibleType::VISIBLE), VisibleType::GONE);
+    EXPECT_EQ(dividerNode->GetLayoutProperty()->GetVisibilityValue(VisibleType::VISIBLE), VisibleType::GONE);
+}
+
+/**
+ * @tc.name: CollapseSideBarContentSideBarOnRight001
+ * @tc.desc: CollapseSideBarContent with sideBarOnRight (END + LTR) → outsideX positive.
+ *   Verifies the pre-animation translate reset path runs for the positive-X branch.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarControlButtonTestNg, CollapseSideBarContentSideBarOnRight001, TestSize.Level1)
+{
+    CreateTabsWithSidebar(true);
+    auto sideBarPattern = GetSideBarPattern();
+    ASSERT_NE(sideBarPattern, nullptr);
+    auto sideBarNode = pattern_->GetSideBarNode();
+    ASSERT_NE(sideBarNode, nullptr);
+    auto dividerNode = pattern_->GetSideBarDividerNode();
+    ASSERT_NE(dividerNode, nullptr);
+
+    /**
+     * @tc.steps: BarPosition::END + LTR → sideBarOnLeft=false → outsideX > 0
+     */
+    ASSERT_NE(layoutProperty_, nullptr);
+    layoutProperty_->UpdateSidebarPosition(BarPosition::END);
+    layoutProperty_->UpdateLayoutDirection(TextDirection::LTR);
+    FlushLayoutTask(frameNode_);
+
+    EXPECT_FALSE(sideBarPattern->IsCollapsed());
+    sideBarPattern->CollapseSideBarContent();
+
+    /**
+     * @tc.expected: isCollapsed_=true; translate pipeline ran on both nodes;
+     * visibility GONE after finish callback.
+     */
+    EXPECT_TRUE(sideBarPattern->IsCollapsed());
+    auto sideBarRender = sideBarNode->GetRenderContext();
+    ASSERT_NE(sideBarRender, nullptr);
+    EXPECT_TRUE(sideBarRender->HasTransformTranslate());
+    auto dividerRender = dividerNode->GetRenderContext();
+    ASSERT_NE(dividerRender, nullptr);
+    EXPECT_TRUE(dividerRender->HasTransformTranslate());
+    EXPECT_EQ(sideBarNode->GetLayoutProperty()->GetVisibilityValue(VisibleType::VISIBLE), VisibleType::GONE);
+    EXPECT_EQ(dividerNode->GetLayoutProperty()->GetVisibilityValue(VisibleType::VISIBLE), VisibleType::GONE);
+}
+
 } // namespace OHOS::Ace::NG
