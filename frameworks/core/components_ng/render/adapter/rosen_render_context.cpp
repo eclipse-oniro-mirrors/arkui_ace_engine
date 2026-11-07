@@ -35,6 +35,7 @@
 #include "render_service_client/core/ui/rs_canvas_node.h"
 #include "render_service_client/core/ui/rs_effect_node.h"
 #include "render_service_client/core/ui_effect/effect/include/brightness_blender.h"
+#include "render_service_client/core/ui_effect/effect/include/colorful_brightness_blender.h"
 #include "render_service_client/core/ui_effect/filter/include/filter_radius_gradient_blur_para.h"
 #include "render_service_client/core/ui_effect/property/include/rs_ui_shape_base.h"
 #include "render_service_client/core/ui/rs_node.h"
@@ -430,6 +431,22 @@ OHOS::Rosen::RectF CalcMaterialSnapshotRect(
         }
         default:
             return bound;
+    }
+}
+
+std::string VibrancyModeToString(VibrancyMode mode)
+{
+    switch (mode) {
+        case VibrancyMode::DISABLED:
+            return "DISABLED";
+        case VibrancyMode::AUTO:
+            return "AUTO";
+        case VibrancyMode::BRIGHTEN:
+            return "BRIGHTEN";
+        case VibrancyMode::DARKEN:
+            return "DARKEN";
+        default:
+            return "UNKNOWN";
     }
 }
 } // namespace
@@ -5948,6 +5965,7 @@ void RosenRenderContext::UpdateBlender(const OHOS::Rosen::Blender* blender)
     FREE_RS_CONTEXT_CHECK(UpdateBlender, blender);
     CHECK_NULL_VOID(rsNode_);
     CHECK_NULL_VOID(blender);
+    propVibrancyMode_.reset(); // invalidate vibrancyMode attribute: external blender overwrites rsNode blender
     rsNode_->SetBlender(blender);
     RequestNextFrame();
 }
@@ -5956,7 +5974,43 @@ void RosenRenderContext::ResetBlender()
 {
     FREE_RS_CONTEXT_CHECK(ResetBlender);
     CHECK_NULL_VOID(rsNode_);
+    propVibrancyMode_.reset(); // invalidate vibrancyMode attribute: external reset overwrites rsNode blender
     auto blender = OHOS::Rosen::BrightnessBlender();
+    rsNode_->SetBlender(&blender);
+    RequestNextFrame();
+}
+
+void RosenRenderContext::OnVibrancyModeUpdate(const VibrancyMode& mode)
+{
+    FREE_RS_CONTEXT_CHECK(OnVibrancyModeUpdate, mode);
+    CHECK_NULL_VOID(rsNode_);
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    VibrancyMode effectiveMode = mode;
+    if (mode == VibrancyMode::AUTO) {
+        // resolve AUTO based on effective color mode (WithTheme-aware)
+        auto localColorMode = host->GetLocalColorMode();
+        ColorMode effectiveColorMode = localColorMode;
+        if (effectiveColorMode == ColorMode::COLOR_MODE_UNDEFINED) {
+            auto pipeline = host->GetContext();
+            CHECK_NULL_VOID(pipeline);
+            effectiveColorMode = pipeline->GetColorMode();
+        }
+        effectiveMode = (effectiveColorMode == ColorMode::DARK) ? VibrancyMode::BRIGHTEN : VibrancyMode::DARKEN;
+    }
+    if (effectiveMode == VibrancyMode::DISABLED) {
+        auto blender = OHOS::Rosen::BrightnessBlender();
+        rsNode_->SetBlender(&blender);
+        RequestNextFrame();
+        return;
+    }
+    auto blender = OHOS::Rosen::ColorfulBrightnessBlender();
+    if (effectiveMode == VibrancyMode::BRIGHTEN) {
+        blender.SetDarkenWeight(0.0f);
+    } else {
+        blender.SetDarkenWeight(1.0f);
+    }
+    blender.SetFraction(0.0f);
     rsNode_->SetBlender(&blender);
     RequestNextFrame();
 }
@@ -7210,6 +7264,11 @@ void RosenRenderContext::DumpInfo()
             auto bgDynamicBrightness = graphicProps->propBgDynamicBrightnessOption->GetJsonObject();
             DumpLog::GetInstance().AddDesc(
                 std::string("backgroundBrightnessInternal:").append(bgDynamicBrightness->ToString().c_str()));
+        }
+        if (HasVibrancyMode()) {
+            auto mode = GetVibrancyModeValue();
+            std::string modeStr = VibrancyModeToString(mode);
+            DumpLog::GetInstance().AddDesc(std::string("vibrancyMode:").append(modeStr));
         }
         if (!NearZero(rsNode_->GetStagingProperties().GetCameraDistance())) {
             DumpLog::GetInstance().AddDesc(

@@ -1327,4 +1327,50 @@ HWTEST_F(ViewAbstractTestNg, ResetShadowClipModeForVisualEffect002, TestSize.Lev
     EXPECT_TRUE(rc->HasShadowClipMode());
 }
 
+/**
+ * @tc.name: SetVibrancyMode001
+ * @tc.desc: Test SetVibrancyMode skips on non-EXQUISITE devices (AC-8)
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, SetVibrancyMode001, TestSize.Level1)
+{
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    auto& rc = node->GetRenderContext();
+    ASSERT_NE(rc, nullptr);
+
+    auto backupLevel = g_uiMaterialLevel;
+    g_uiMaterialLevel = UiMaterialLevel::SMOOTH;
+
+    ViewAbstract::SetVibrancyMode(AceType::RawPtr(node), VibrancyMode::BRIGHTEN);
+    EXPECT_FALSE(rc->HasVibrancyMode());
+
+    g_uiMaterialLevel = backupLevel;
+}
+
+/**
+ * @tc.name: SetVibrancyMode002
+ * @tc.desc: Test SetVibrancyMode applies on EXQUISITE device and stores mode in RenderContext
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, SetVibrancyMode002, TestSize.Level1)
+{
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    auto& rc = node->GetRenderContext();
+    ASSERT_NE(rc, nullptr);
+
+    auto backupLevel = g_uiMaterialLevel;
+    g_uiMaterialLevel = UiMaterialLevel::EXQUISITE;
+
+    ViewAbstract::SetVibrancyMode(AceType::RawPtr(node), VibrancyMode::BRIGHTEN);
+    EXPECT_TRUE(rc->HasVibrancyMode());
+    EXPECT_EQ(rc->GetVibrancyModeValue(VibrancyMode::DISABLED), VibrancyMode::BRIGHTEN);
+
+    ViewAbstract::SetVibrancyMode(AceType::RawPtr(node), VibrancyMode::DARKEN);
+    EXPECT_EQ(rc->GetVibrancyModeValue(VibrancyMode::DISABLED), VibrancyMode::DARKEN);
+
+    g_uiMaterialLevel = backupLevel;
+}
+
 } // namespace OHOS::Ace::NG

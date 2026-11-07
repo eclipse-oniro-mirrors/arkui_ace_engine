@@ -2705,6 +2705,20 @@ void JSViewPopups::ParseAdaptToHandedness(const JSRef<JSVal>& value, NG::SheetSt
     }
 }
 
+void JSViewPopups::ParseSheetTitleBarVibrancyMode(const JSRef<JSVal>& value, NG::SheetStyle& sheetStyle)
+{
+    if (SystemProperties::GetUiMaterialLevel() != UiMaterialLevel::EXQUISITE) {
+        return;
+    }
+    if (value->IsNumber()) {
+        auto modeValue = value->ToNumber<int32_t>();
+        if (modeValue >= static_cast<int32_t>(VibrancyMode::DISABLED) &&
+            modeValue <= static_cast<int32_t>(VibrancyMode::DARKEN)) {
+            sheetStyle.titleBarVibrancyMode = static_cast<VibrancyMode>(modeValue);
+        }
+    }
+}
+
 void JSViewPopups::ParseSheetScrollBarState(const JSRef<JSVal>& value, NG::SheetStyle& sheetStyle)
 {
     if (value->IsNumber()) {
@@ -3069,6 +3083,7 @@ void JSViewAbstract::ParseSheetStyle(
     JSViewPopups::ParseSheetTitleBarHoverMode(paramObj->GetProperty("titleBarHoverMode"), sheetStyle);
     JSViewPopups::ParseSheetScrollBarState(paramObj->GetProperty("scrollBarState"), sheetStyle);
     JSViewPopups::ParseSheetCloseButtonMaterial(paramObj->GetProperty("closeButtonMaterial"), sheetStyle);
+    JSViewPopups::ParseSheetTitleBarVibrancyMode(paramObj->GetProperty("titleBarVibrancyMode"), sheetStyle);
 
     // parse ModalTransition
     auto modalTransitionValue = paramObj->GetProperty("modalTransition");

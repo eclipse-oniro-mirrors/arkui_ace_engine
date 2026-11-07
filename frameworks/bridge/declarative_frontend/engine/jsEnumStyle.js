@@ -2180,6 +2180,14 @@ let SheetTitleBarBackgroundBlur;
   SheetTitleBarBackgroundBlur[SheetTitleBarBackgroundBlur.GRADIENT = 1] = 'GRADIENT';
 })(SheetTitleBarBackgroundBlur || (SheetTitleBarBackgroundBlur = {}));
 
+let VibrancyMode;
+(function (VibrancyMode) {
+  VibrancyMode[VibrancyMode.DISABLED = 0] = 'DISABLED';
+  VibrancyMode[VibrancyMode.AUTO = 1] = 'AUTO';
+  VibrancyMode[VibrancyMode.BRIGHTEN = 2] = 'BRIGHTEN';
+  VibrancyMode[VibrancyMode.DARKEN = 3] = 'DARKEN';
+})(VibrancyMode || (VibrancyMode = {}));
+
 let FunctionKey;
 (function (FunctionKey) {
   FunctionKey[FunctionKey.ESC = 0] = 'ESC';

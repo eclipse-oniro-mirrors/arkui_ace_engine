@@ -133,15 +133,15 @@ void SheetPresentationPattern::OnModifyDone()
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     ACE_UINODE_TRACE(host);
+    auto layoutProperty = GetLayoutProperty<SheetPresentationProperty>();
+    CHECK_NULL_VOID(layoutProperty);
+    auto sheetStyle = layoutProperty->GetSheetStyleValue(SheetStyle());
     auto renderContext = host->GetRenderContext();
     if (renderContext) {
         auto pipeline = host->GetContext();
         CHECK_NULL_VOID(pipeline);
         auto sheetTheme = host->GetTheme<SheetTheme>(true);
         CHECK_NULL_VOID(sheetTheme);
-        auto layoutProperty = GetLayoutProperty<SheetPresentationProperty>();
-        CHECK_NULL_VOID(layoutProperty);
-        auto sheetStyle = layoutProperty->GetSheetStyleValue();
         BlurStyle blurStyle = static_cast<BlurStyle>(sheetTheme->GetSheetBackgroundBlurStyle());
         if (Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWELVE)
             && blurStyle != BlurStyle::NO_MATERIAL) {
@@ -166,6 +166,7 @@ void SheetPresentationPattern::OnModifyDone()
     sheetObject_->InitScrollProps();
     InitFoldCreaseRegion();
     UpdateZIndexAndTitleEffectNode();
+    UpdateTitleBarVibrancy(sheetStyle);
 }
 
 bool SheetPresentationPattern::IsBreakpointMatch()
@@ -1974,6 +1975,37 @@ void SheetPresentationPattern::OnColorConfigurationUpdate()
     UpdateSheetCloseIcon();
     UpdateSheetBackgroundColor();
     UpdateSheetBackgroundBlurStyle();
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto layoutProperty = host->GetLayoutProperty<SheetPresentationProperty>();
+    CHECK_NULL_VOID(layoutProperty);
+    const auto& sheetStyle = layoutProperty->GetSheetStyleValue();
+    // only AUTO mode needs re-application on color mode change
+    if (sheetStyle.titleBarVibrancyMode.has_value() && sheetStyle.titleBarVibrancyMode.value() == VibrancyMode::AUTO) {
+        UpdateTitleBarVibrancy(sheetStyle);
+    }
+}
+
+void SheetPresentationPattern::UpdateTitleBarVibrancy(const SheetStyle& sheetStyle)
+{
+    if (!sheetStyle.titleBarVibrancyMode.has_value()) {
+        return;
+    }
+    auto mode = sheetStyle.titleBarVibrancyMode.value();
+    // skip titleBuilderNode when CustomBuilder (isTitleBuilder=true); only SheetTitleOptions gets vibrancy
+    if (!sheetStyle.isTitleBuilder.value_or(true)) {
+        auto titleBuilderNode = GetTitleBuilderNode();
+        if (titleBuilderNode) {
+            ViewAbstract::SetVibrancyMode(AceType::RawPtr(titleBuilderNode), mode);
+        }
+    }
+    auto closeIcon = GetSheetCloseIcon();
+    if (closeIcon) {
+        auto iconSymbol = DynamicCast<FrameNode>(closeIcon->GetChildAtIndex(0));
+        if (iconSymbol) {
+            ViewAbstract::SetVibrancyMode(AceType::RawPtr(iconSymbol), mode);
+        }
+    }
 }
 
 float SheetPresentationPattern::GetWrapperHeight()

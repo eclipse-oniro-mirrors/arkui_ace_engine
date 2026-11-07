@@ -82,6 +82,7 @@ class ResponseRegion;
 class UiMaterial;
 struct ImmersiveOptions;
 struct ImmersiveMaterialConfig;
+enum class VibrancyMode : int8_t;
 }
 
 namespace OHOS::Ace::NG {
@@ -976,6 +977,7 @@ public:
     static void SetBlendApplyType(FrameNode* frameNode, BlendApplyType blendApplyType);
     static void SetBlender(FrameNode* frameNode, const OHOS::Rosen::Blender* blender);
     static void ResetBlender(FrameNode* frameNode);
+    static void SetVibrancyMode(FrameNode* frameNode, VibrancyMode mode);
     static void SetMonopolizeEvents(FrameNode* frameNode, bool monopolizeEvents);
     static void SetDraggable(FrameNode* frameNode, bool draggable);
     static void SetHoverEffect(FrameNode* frameNode, HoverEffectType hoverEffect);
