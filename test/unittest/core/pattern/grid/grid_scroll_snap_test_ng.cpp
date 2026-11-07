@@ -1842,4 +1842,53 @@ HWTEST_F(GridItemSnapTakeoverTest, NaturalStopRejectsOvershootingAndStaleSamples
     EXPECT_FLOAT_EQ(scroll->GetCurrentPos(), target);
 }
 
+/**
+ * @tc.name: ScrollSnapStrategyDump001
+ * @tc.desc: Feat-20260806915268: the configured snap strategy is visible in the inspector
+ *           attribute tree (ToJsonValue) and the pattern advance dumps (JSON + text) in all
+ *           three forms: unset (NONE), built-in align, custom provider.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollSnapTestNg, ScrollSnapStrategyDump001, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    CreateGridItems(GRID_ITEM_NUMBER, ITEM_MAIN_SIZE, ITEM_MAIN_SIZE);
+    CreateDone();
+    const InspectorFilter filter;
+
+    // Unset: the default form is dumped like List's scrollSnapAlign.
+    auto json = JsonUtil::Create(true);
+    layoutProperty_->ToJsonValue(json, filter);
+    EXPECT_EQ(json->GetString("scrollSnapStrategy"), "ScrollSnapAlign.NONE");
+
+    // Built-in align form.
+    GridModelNG::SetScrollSnapStrategy(AceType::RawPtr(frameNode_), MakeStrategy(ScrollSnapAlign::CENTER));
+    json = JsonUtil::Create(true);
+    layoutProperty_->ToJsonValue(json, filter);
+    EXPECT_EQ(json->GetString("scrollSnapStrategy"), "ScrollSnapAlign.CENTER");
+
+    // Custom provider form: closures are not serializable, only the form is dumped.
+    GridModelNG::SetScrollSnapStrategy(
+        AceType::RawPtr(frameNode_), MakeProviderStrategy([](double velocity) { return 50.0; }));
+    json = JsonUtil::Create(true);
+    layoutProperty_->ToJsonValue(json, filter);
+    EXPECT_EQ(json->GetString("scrollSnapStrategy"), "ScrollSnapOffsetProvider");
+
+    // Pattern advance JSON dump mirrors the same value.
+    auto advanceJson = JsonUtil::Create(true);
+    pattern_->DumpAdvanceInfo(advanceJson);
+    EXPECT_EQ(advanceJson->GetString("ScrollSnapStrategy"), "ScrollSnapOffsetProvider");
+
+    // Reset returns to the default; the text dump follows suit.
+    GridModelNG::ResetScrollSnapStrategy(AceType::RawPtr(frameNode_));
+    DumpLog::GetInstance().description_.clear();
+    pattern_->DumpAdvanceInfo();
+    std::string allDesc;
+    for (const auto& line : DumpLog::GetInstance().description_) {
+        allDesc += line;
+    }
+    EXPECT_NE(allDesc.find("ScrollSnapStrategy: ScrollSnapAlign.NONE\n"), std::string::npos);
+}
+
 } // namespace OHOS::Ace::NG

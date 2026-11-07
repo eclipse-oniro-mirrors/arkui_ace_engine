@@ -2304,6 +2304,9 @@ void GridPattern::DumpAdvanceGridInteractionInfo(std::unique_ptr<JsonValue>& jso
                                            : "null");
         }
     }
+    if (!config.IsPublicTree() || (config.functionalProperties && property->GetScrollSnapStrategy().has_value())) {
+        json->Put("ScrollSnapStrategy", property->GetScrollSnapStrategyString().c_str());
+    }
     if (!config.IsPublicTree()) {
         json->Put("AlignItems", property->GetAlignItems() ? "GridItemAlignment.STRETCH" : "GridItemAlignment.DEFAULT");
     } else if (config.visualProperties) {
@@ -2453,6 +2456,7 @@ void GridPattern::GetGridLayoutPropertyDumpInfo()
             break;
         }
     }
+    DumpLog::GetInstance().AddDesc("ScrollSnapStrategy:", property->GetScrollSnapStrategyString().c_str());
 }
 
 void GridPattern::GetScrollAlignDumpInfo()
