@@ -110,23 +110,23 @@ void PrintAnimationInfo(const AnimationOption& option, AnimationInterface interf
 {
     auto animationInterfaceName = GetAnimationInterfaceName(interface);
     CHECK_NULL_VOID(animationInterfaceName);
+    if (cnt) {
+        TAG_LOGI(AceLogTag::ACE_ANIMATION, "%{public}s starts, %{public}s, cnt:%{public}d",
+            animationInterfaceName, option.ToSimpleString().c_str(), cnt.value());
+    }
     if (option.GetIteration() == ANIMATION_REPEAT_INFINITE) {
         HistogramInfiniteAnimationEvent(interface);
         if (interface == AnimationInterface::KEYFRAME_ANIMATE_TO) {
-            TAG_LOGI(AceLogTag::ACE_ANIMATION,
+            TAG_LOGD(AceLogTag::ACE_ANIMATION,
                 "keyframe inf iteration. dur:%{public}d", option.GetDuration());
         } else {
             const auto& curve = option.GetCurve();
-            TAG_LOGI(AceLogTag::ACE_ANIMATION,
+            TAG_LOGD(AceLogTag::ACE_ANIMATION,
                 "%{public}s inf iteration. dur:%{public}d, curve:%{public}s",
                 animationInterfaceName, option.GetDuration(),
                 curve ? curve->ToString().c_str() : "");
         }
         return;
-    }
-    if (cnt) {
-        TAG_LOGI(AceLogTag::ACE_ANIMATION, "%{public}s starts, %{public}s, cnt:%{public}d",
-            animationInterfaceName, option.ToSimpleString().c_str(), cnt.value());
     }
 }
 
@@ -248,7 +248,7 @@ void StartAnimationForStageMode(const RefPtr<PipelineBase>& pipelineContext, con
     PrintAnimationInfo(
         option, immediately ? AnimationInterface::ANIMATE_TO_IMMEDIATELY : AnimationInterface::ANIMATE_TO, count);
     if (!ViewStackModel::GetInstance()->IsEmptyStack()) {
-        TAG_LOGW(AceLogTag::ACE_ANIMATION,
+        TAG_LOGD(AceLogTag::ACE_ANIMATION,
             "when call animateTo, node stack is not empty, not suitable for animateTo."
             "param is [option:%{public}s]", option.ToString().c_str());
     }
@@ -300,7 +300,7 @@ void StartAnimateToForFaMode(const RefPtr<PipelineBase>& pipelineContext, Animat
         option, immediately ? AnimationInterface::ANIMATE_TO_IMMEDIATELY : AnimationInterface::ANIMATE_TO, count);
     if (!ViewStackModel::GetInstance()->IsEmptyStack()) {
         const auto& curve = option.GetCurve();
-        TAG_LOGW(AceLogTag::ACE_ANIMATION,
+        TAG_LOGD(AceLogTag::ACE_ANIMATION,
             "when call animateTo, node stack is not empty, not suitable for animateTo. param is [duration:%{public}d, "
             "curve:%{public}s, iteration:%{public}d]",
             option.GetDuration(), curve ? curve->ToString().c_str() : "", option.GetIteration());
@@ -767,11 +767,8 @@ void JSViewContext::AnimateToInner(const JSCallbackInfo& info, bool immediately)
     auto container = Container::CurrentSafely();
     CHECK_NULL_VOID(container);
     if (needCheck && !Container::CheckRunOnThreadByThreadId(container->GetInstanceId(), false)) {
-        const char* funcName = immediately ? "animateToImmediately" : "animateTo";
-        TAG_LOGW(AceLogTag::ACE_ANIMATION,
-            "the context found cannot run on current thread, %{public}s failed, "
-            "please use uiContext.%{public}s to specify the context",
-            funcName, funcName);
+        const char* funcName = immediately ? "animImme" : "animTo";
+        TAG_LOGW(AceLogTag::ACE_ANIMATION, "no context %{public}s failed", funcName);
         return;
     }
     auto pipelineContext = container->GetPipelineContext();
