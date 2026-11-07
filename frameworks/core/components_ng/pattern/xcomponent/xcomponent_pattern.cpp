@@ -507,6 +507,7 @@ std::unique_ptr<JsonValue> GetXComponentCompensationAngle(const std::string& ang
 void XComponentPattern::SetCompensationAngleToRS(const RefPtr<RenderContext>& renderContext,
     FoldDisplayMode foldDisplayMode, const std::string& xcomponentId)
 {
+#ifndef CROSS_PLATFORM
     auto context = AceType::DynamicCast<NG::RosenRenderContext>(renderContext);
     CHECK_NULL_VOID(context);
     std::shared_ptr<Rosen::RSNode> rsNode = context->GetRSNode();
@@ -528,6 +529,7 @@ void XComponentPattern::SetCompensationAngleToRS(const RefPtr<RenderContext>& re
     TAG_LOGW(AceLogTag::ACE_XCOMPONENT, "XComponent[%{public}s]'s set rotation %{public}d",
         xcomponentId.c_str(), rotationInt);
     rsSurfaceNode->SetAppRotationCorrection(rotation);
+#endif
 }
 #endif
 
