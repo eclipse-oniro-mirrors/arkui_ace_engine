@@ -4318,16 +4318,16 @@ std::optional<float> SelectOverlayNode::GetParentWidth()
     return renderContext->GetPaintRectWithoutTransform().Width();
 }
 
-RefPtr<UiMaterial>& SelectOverlayNode::GetMenuUiMaterial(ColorMode colorMode)
+RefPtr<UiMaterial> SelectOverlayNode::GetMenuUiMaterial(ColorMode colorMode)
 {
-    static RefPtr<UiMaterial> menuMaterial_ = AceType::MakeRefPtr<UiMaterial>();
-    menuMaterial_->SetType(static_cast<int32_t>(MaterialType::IMMERSIVE));
+    auto menuMaterial = AceType::MakeRefPtr<UiMaterial>();
+    menuMaterial->SetType(static_cast<int32_t>(MaterialType::IMMERSIVE));
     ImmersiveOptions options {
         .style = UiMaterialStyle::THICK,
         .colorMode = colorMode,
     };
-    menuMaterial_->SetImmersiveOptions(options);
-    return menuMaterial_;
+    menuMaterial->SetImmersiveOptions(options);
+    return menuMaterial;
 }
 
 void SelectOverlayNode::UpdateNewMaterialProperties(const RefPtr<FrameNode>& frameNode, ColorMode colorMode)
@@ -4337,8 +4337,8 @@ void SelectOverlayNode::UpdateNewMaterialProperties(const RefPtr<FrameNode>& fra
         CHECK_NULL_VOID(renderContext);
         if (SystemProperties::GetUiMaterialLevel() != UiMaterialLevel::SMOOTH) {
             renderContext->UpdateBackBlurStyle(std::nullopt);
-            ViewAbstract::SetSystemMaterialForOverlay(
-                AceType::RawPtr(frameNode), AceType::RawPtr(GetMenuUiMaterial(colorMode)));
+            auto menuMaterial = GetMenuUiMaterial(colorMode);
+            ViewAbstract::SetSystemMaterialForOverlay(AceType::RawPtr(frameNode), AceType::RawPtr(menuMaterial));
         } else {
             // 降档材质
             auto pipeline = PipelineContext::GetCurrentContextSafelyWithCheck();
