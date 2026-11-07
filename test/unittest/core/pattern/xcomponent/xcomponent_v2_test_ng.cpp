@@ -346,6 +346,7 @@ HWTEST_F(XComponentV2TestNg, XComponentSurfaceLifeCycleCallback001, TestSize.Lev
     EXPECT_FALSE(surfaceHolder->node_);
     delete surfaceCallback;
     delete surfaceHolder;
+    pattern->surfaceHolder_ = nullptr;
 }
 
 /**
@@ -482,6 +483,7 @@ HWTEST_F(XComponentV2TestNg, XComponentWindowTest004, TestSize.Level1)
     pattern->OnWindowShow(); // test when hasReleasedSurface_ is not satisfied
     EXPECT_FALSE(pattern->hasReleasedSurface_);
     delete surfaceHolder;
+    pattern->surfaceHolder_ = nullptr;
 }
 
 /**
