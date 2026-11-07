@@ -15,6 +15,7 @@
 #include "core/interfaces/native/node/node_common_modifier.h"
 
 #include "base/log/log_wrapper.h"
+#include "core/common/application_shortcut.h"
 #include "core/common/container.h"
 
 #include "interfaces/native/node/native_type_visual_impl.h"
@@ -11549,6 +11550,17 @@ namespace {
 OHOS::Ace::TouchEventInfo globalEventInfo("global");
 }
 
+ArkUI_Int32 RegisterApplicationShortcut(const std::string& value, uint8_t keys,
+    std::function<void(ArkUI_Int32)>&& callback)
+{
+    return ApplicationShortcutManager::GetInstance().RegisterApplicationShortcut(value, keys, std::move(callback));
+}
+
+void UnregisterApplicationShortcut(ArkUI_Int32 registrationId)
+{
+    ApplicationShortcutManager::GetInstance().UnregisterApplicationShortcut(registrationId);
+}
+
 const ArkUICommonModifier* GetCommonModifier()
 {
     CHECK_INITIALIZED_FIELDS_BEGIN(); // don't move this line
@@ -12126,6 +12138,8 @@ const ArkUICommonModifier* GetCommonModifier()
         .getLinearGradientBlur = GetLinearGradientBlur,
         .setShadowClipMode = SetShadowClipMode,
         .resetShadowClipMode = ResetShadowClipMode,
+        .registerApplicationShortcut = RegisterApplicationShortcut,
+        .unregisterApplicationShortcut = UnregisterApplicationShortcut,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
 

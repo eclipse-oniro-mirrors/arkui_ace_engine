@@ -27,6 +27,8 @@
 #include "node_model.h"
 #include "ui_input_event.h"
 #include "event/ui_input_event_impl.h"
+#include "core/common/application_shortcut.h"
+#include "core/event/key_event.h"
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "test/mock/frameworks/core/common/mock_container.h"
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
@@ -40,6 +42,7 @@ constexpr uint32_t ARKUI_UNICODE = 98;
 constexpr int32_t ARKUI_DEVICE_ID = 1;
 constexpr uint64_t ARKUI_TIME = 20;
 const char* ARKUI_KEY_TEXT = "k";
+
 } // namespace
 class NativeKeyEventTest : public testing::Test {
 public:
@@ -1053,4 +1056,34 @@ HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0033, TestSize.Level1)
     EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&event), ARKUI_ERROR_CODE_NO_ERROR);
     EXPECT_EQ(event, nullptr);
 }
+
+/**
+ * @tc.name: ApplicationShortcutCallback
+ * @tc.desc: Register a callback and verify that triggering the shortcut updates a local variable.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeKeyEventTest, ApplicationShortcutCallback, TestSize.Level1)
+{
+    auto* key = OH_ArkUI_KeyboardShortcutKey_Create();
+    ASSERT_NE(key, nullptr);
+    OH_ArkUI_KeyboardShortcutKey_SetCharacter(key, 'A');
+    int32_t value = 0;
+    int32_t registrationId = 0;
+    auto callback = [](const OH_ArkUI_ApplicationShortcutCallbackInfo*, void* userData) {
+        *static_cast<int32_t*>(userData) = 1;
+    };
+    const auto status = OH_ArkUI_ApplicationShortcut_Register(key, OH_ARKUI_KEYBOARD_SHORTCUT_MODIFIER_CTRL,
+        &value, callback, &registrationId);
+    OH_ArkUI_KeyboardShortcutKey_Destroy(&key);
+    ASSERT_EQ(status, ARKUI_ERROR_CODE_NO_ERROR);
+    KeyEvent event;
+    event.code = KeyCode::KEY_A;
+    event.action = KeyAction::DOWN;
+    event.pressedCodes = { KeyCode::KEY_CTRL_LEFT, KeyCode::KEY_A };
+    ApplicationShortcutManager::GetInstance().TryTriggerApplicationShortcut(
+        event, MockContainer::Current()->GetInstanceId());
+    OH_ArkUI_ApplicationShortcut_Unregister(registrationId);
+    EXPECT_EQ(value, 1);
+}
+
 } // namespace OHOS::Ace

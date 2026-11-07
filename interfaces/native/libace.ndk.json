@@ -7679,5 +7679,49 @@
     {
         "first_introduced": "26.1.0",
         "name": "OH_ArkUI_NativeModule_CustomDialog_SetAdaptToHandedness"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_ApplicationShortcut_Register"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_ApplicationShortcut_Unregister"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_Create"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_Destroy"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_SetType"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_GetType"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_SetCharacter"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_GetCharacter"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_SetFunctionKey"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_GetFunctionKey"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_ApplicationShortcutCallbackInfo_GetUIContext"
     }
 ]
