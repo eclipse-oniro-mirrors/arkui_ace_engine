@@ -46,11 +46,13 @@ void RosenFontCollection::LoadFontFromList(const uint8_t* fontData, size_t lengt
         fontCollection_ = fontCollection->GetRawFontCollection();
     });
 
-    if (families_.find(familyName) != families_.end()) {
-        return;
+    {
+        std::lock_guard<std::mutex> lock(fontMutex_);
+        if (families_.find(familyName) != families_.end()) {
+            return;
+        }
+        families_.emplace(familyName);
     }
-
-    families_.emplace(familyName);
 
     if (fontCollection_) {
         TAG_LOGI(AceLogTag::ACE_FONT, "LoadFontFromList familyName:%{public}s, length:%{public}d", familyName.c_str(),
