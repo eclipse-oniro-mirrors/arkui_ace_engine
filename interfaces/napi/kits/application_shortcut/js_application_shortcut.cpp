@@ -412,7 +412,7 @@ static napi_module applicationShortcutModule = {
     .nm_filename = nullptr,
     .nm_register_func = registerFunc,
     .nm_modname = "arkui.applicationShortcut",
-    .nm_priv = ((void*)0),
+    .nm_priv = nullptr,
     .reserved = { 0 },
 };
 
