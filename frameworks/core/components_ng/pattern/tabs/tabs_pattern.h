@@ -315,6 +315,8 @@ public:
 
     void UpdateCollapseButtonIfNeeded();
 
+    void UpdateCollapseButtonForDisplayMode(TabBarDisplayMode mode);
+
     const TabsSidebarSearchableOptions& GetTabsSidebarSearchableOptions() const
     {
         return searchableOptions_;

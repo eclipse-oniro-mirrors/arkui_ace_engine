@@ -245,15 +245,13 @@ void TabBarLayoutAlgorithm::MeasureFixedMode(LayoutWrapper* layoutWrapper, SizeF
                 break;
             }
         }
-        if (!isApplySymmetricExtensible && !isFloatingTopBar_) {
+        if (!isApplySymmetricExtensible) {
             childLayoutConstraint.selfIdealSize.SetWidth(allocatedWidth);
         }
         for (int32_t index = 0; index < effectiveChildCount; index++) {
             auto childIndex = effectiveChildIndices_[index];
             MeasureItem(layoutWrapper, childLayoutConstraint, childIndex);
-            if (!isFloatingTopBar_) {
-                visibleItemPosition_[childIndex] = { allocatedWidth * index, allocatedWidth * (index + 1) };
-            }
+            visibleItemPosition_[childIndex] = { allocatedWidth * index, allocatedWidth * (index + 1) };
         }
         if (isApplySymmetricExtensible) {
             ApplySymmetricExtensible(layoutWrapper, allocatedWidth);

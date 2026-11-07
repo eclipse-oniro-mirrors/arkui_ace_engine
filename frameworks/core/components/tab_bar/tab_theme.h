@@ -236,9 +236,54 @@ public:
         return bottomTabHorizontalTextSize_;
     }
 
-    const Dimension& GetTopTabTextSize() const
+    const Dimension& GetSubTitleM() const
     {
-        return topTabTextSize_;
+        return subTitleM_;
+    }
+
+    const Dimension& GetSubTitleS() const
+    {
+        return subTitleS_;
+    }
+
+    const Dimension& GetSubTitleL() const
+    {
+        return subTitleL_;
+    }
+
+    const Color& GetFontSecondary() const
+    {
+        return fontSecondary_;
+    }
+
+    const Color& GetIconTertiary() const
+    {
+        return iconTertiary_;
+    }
+
+    const Dimension& GetSectionHeight() const
+    {
+        return sectionHeight_;
+    }
+
+    const Dimension& GetSectionBottomMargin() const
+    {
+        return sectionBottomMargin_;
+    }
+
+    const Dimension& GetCornerRadiusLevel3() const
+    {
+        return cornerRadiusLevel3_;
+    }
+
+    const Dimension& GetOutlineSmall() const
+    {
+        return outlineSmall_;
+    }
+
+    const Color& GetCompBackgroundTertiary() const
+    {
+        return compBackgroundTertiary_;
     }
 
     const Color& GetTopTabBarBackgroundColor() const
@@ -624,7 +669,16 @@ protected:
     Dimension sideBarTextFontSize_ = 16.0_fp;
     Color sideBarDividerColor_;
     Color sideBarBackgroundColor_;
-    Dimension topTabTextSize_ = 16.0_fp;
+    Dimension subTitleM_ = 16.0_fp;
+    Dimension subTitleS_ = 14.0_fp;
+    Dimension subTitleL_ = 18.0_fp;
+    Color fontSecondary_ = Color(0x99182431);
+    Color iconTertiary_ = Color(0x66182431);
+    Dimension sectionHeight_ = 56.0_vp;
+    Dimension sectionBottomMargin_ = 8.0_vp;
+    Dimension cornerRadiusLevel3_ = 6.0_vp;
+    Dimension outlineSmall_ = 1.0_px;
+    Color compBackgroundTertiary_ = Color(0x0c182431);
     Color topTabBarBackgroundColor_ = Color::WHITE;
 };
 

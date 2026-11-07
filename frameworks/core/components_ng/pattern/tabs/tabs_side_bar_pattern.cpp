@@ -900,7 +900,7 @@ void TabsSideBarPattern::OnCollapseButtonClick()
 namespace {
 constexpr int32_t SIDEBAR_COLLAPSE_ANIM_DURATION = 300; // ms
 const RefPtr<InterpolatingSpring> SIDEBAR_COLLAPSE_CURVE =
-    AceType::MakeRefPtr<InterpolatingSpring>(0.0f, 1.0f, 228.0f, 24.0f);
+    AceType::MakeRefPtr<InterpolatingSpring>(0.0f, 1.0f, 228.0f, 30.0f);
 const Dimension SIDEBAR_FALLBACK_WIDTH = 240.0_vp;
 } // namespace
 
@@ -1137,11 +1137,10 @@ void TabsSideBarPattern::ExpandSideBarContent()
                 }
             }
         },
-        [weakTabsPattern, weakTabsNode, weakThis]() {
-            // After animation: clear realSideBarWidthPx_ so future layout uses property-based width.
+        [weakTabsPattern, weakTabsNode, weakThis, restoreWidth]() {
             auto tabsPattern = weakTabsPattern.Upgrade();
             if (tabsPattern) {
-                tabsPattern->ClearRealSideBarWidthPx();
+                tabsPattern->SetRealSideBarWidthPx(restoreWidth);
             }
             auto tabsNode = weakTabsNode.Upgrade();
             if (tabsNode) {
