@@ -2261,8 +2261,7 @@ void WaterFlowPattern::UpdateEdgePositions()
             node->GetGeometryNode()->SetMarginFrameOffset(offset);
         }
         // The framework rank belongs to the wrapper; preserve an explicit child zIndex, including zero.
-        auto content = node->GetTotalChildCount() == 1
-            ? AceType::DynamicCast<FrameNode>(node->GetFrameChildByIndex(0, false)) : nullptr;
+        auto* content = node->GetTotalChildCount() == 1 ? node->GetFrameNodeChildByIndexWithoutBuild(0) : nullptr;
         auto render = node->GetRenderContext();
         if (render) {
             auto userZ = content && content->GetRenderContext() ? content->GetRenderContext()->GetZIndex()

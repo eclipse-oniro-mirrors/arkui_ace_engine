@@ -23,7 +23,11 @@ ohos_source_set("mock_dm") {
     "$ace_root/test/mock/ohos_mock/dm/display_info.cpp",
     "$ace_root/test/mock/ohos_mock/dm/display_manager.cpp",
   ]
-  configs = [ "$ace_root/test/unittest:ace_unittest_config" ]
+  configs = []
+  if (is_host_product) {
+    configs += [ "$ace_root/test/mock/ohos_mock/c_utils:mock_c_utils_config" ]
+  }
+  configs += [ "$ace_root/test/unittest:ace_unittest_config" ]
   public_configs = [ ":dm_config" ]
   if (current_os == "ohos") {
     external_deps = [ "c_utils:utils" ]

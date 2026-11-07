@@ -61,7 +61,7 @@ protected:
     RefPtr<FrameNode> Edge(float height)
     {
         auto node = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG,
-            ElementRegister::GetInstance()->MakeUniqueId(), MakeRefPtr<LinearLayoutPattern>(true));
+            ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<LinearLayoutPattern>(true));
         node->GetLayoutProperty()->UpdateUserDefinedIdealSize(CalcSize(std::nullopt, CalcLength(height)));
         return node;
     }
@@ -75,7 +75,7 @@ protected:
     RefPtr<FrameNode> ParentScroll(float height)
     {
         auto parent = FrameNode::CreateFrameNode(V2::SCROLL_ETS_TAG,
-            ElementRegister::GetInstance()->MakeUniqueId(), MakeRefPtr<ScrollPattern>());
+            ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<ScrollPattern>());
         parent->GetPattern<ScrollPattern>()->SetAxis(Axis::VERTICAL);
         parent->GetGeometryNode()->SetFrameSize(SizeF(WATER_FLOW_WIDTH, height));
         parent->GetRenderContext()->UpdatePaintRect(parent->GetGeometryNode()->GetFrameRect());
@@ -194,7 +194,7 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_TargetMeasureKeepsFooter, TestSize.Leve
 HWTEST_F(WaterFlowHeaderFooterTest, WFHF_LegacyNestedAdjustCompatibility, TestSize.Level1)
 {
     auto lazy = FrameNode::CreateFrameNode(V2::LAZY_COLUMN_LAYOUT_ETS_TAG,
-        ElementRegister::GetInstance()->MakeUniqueId(), MakeRefPtr<EdgeTestLazyPattern>());
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<EdgeTestLazyPattern>());
     auto middle = Edge(100.0f);
     middle->GetLayoutProperty()->SetNeedLazyLayout(true);
     middle->AddChild(lazy);
@@ -306,7 +306,7 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_IntrinsicEdgeHeight, TestSize.Level1)
     CreateWaterFlow();
     CreateWaterFlowItems(2);
     auto content = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG,
-        ElementRegister::GetInstance()->MakeUniqueId(), MakeRefPtr<LinearLayoutPattern>(true));
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<LinearLayoutPattern>(true));
     content->AddChild(Edge(30.0f));
     content->AddChild(Edge(WATER_FLOW_HEIGHT));
     pattern_->SetEdge(true, content, pattern_->BeginEdgeUpdate(true));
@@ -393,10 +393,12 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_ParentOnlyMove, TestSize.Level1)
     pipeline->GetScrollViewportCoordinator()->Flush(pipeline);
     EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), 250.0f);
     EXPECT_FLOAT_EQ(GetChildRect(frameNode_, 0).Top(), 510.0f);
+    EXPECT_EQ(Header()->GetRenderContext()->GetZIndexValue(-1), HeaderFooterUtils::STICKY_HEADER_Z_INDEX);
     pattern_->SetSticky(StickyStyle::NONE);
     EXPECT_FALSE(pattern_->edgeViewportRegistered_);
     EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), 0.0f);
     EXPECT_FLOAT_EQ(GetChildRect(frameNode_, 0).Top(), 960.0f);
+    EXPECT_EQ(Header()->GetRenderContext()->GetZIndexValue(-1), 0);
 }
 
 /**
@@ -438,7 +440,7 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_CoordinatorMutationAndReentry, TestSize
     CreateDone();
     auto pipeline = frameNode_->GetContext();
     ASSERT_NE(pipeline, nullptr);
-    auto coordinator = MakeRefPtr<ScrollViewportCoordinator>();
+    auto coordinator = AceType::MakeRefPtr<ScrollViewportCoordinator>();
     auto* rawCoordinator = AceType::RawPtr(coordinator);
     auto calls = std::make_shared<int32_t>(0);
     coordinator->Register(nullptr, [calls]() { ++*calls; });
@@ -478,6 +480,12 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_ExplicitZeroZIndex, TestSize.Level1)
     pattern_->UpdateEdgePositions();
     EXPECT_EQ(Header()->GetRenderContext()->GetZIndexValue(-1), 0);
     EXPECT_EQ(content->GetRenderContext()->GetZIndexValue(-1), 0);
+    content->GetRenderContext()->UpdateZIndex(7);
+    pattern_->UpdateEdgePositions();
+    EXPECT_EQ(Header()->GetRenderContext()->GetZIndexValue(-1), 7);
+    pattern_->SetSticky(StickyStyle::NONE);
+    EXPECT_EQ(Header()->GetRenderContext()->GetZIndexValue(-1), 7);
+    EXPECT_EQ(content->GetRenderContext()->GetZIndexValue(-1), 7);
 }
 
 /**
@@ -487,7 +495,7 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_ExplicitZeroZIndex, TestSize.Level1)
  */
 HWTEST_F(WaterFlowHeaderFooterTest, WFHF_RemoveSharedLazyRequest, TestSize.Level1)
 {
-    auto property = MakeRefPtr<LayoutProperty>();
+    auto property = AceType::MakeRefPtr<LayoutProperty>();
     property->SetLazyLayoutRequest(1, true);
     property->SetLazyLayoutRequest(2, true);
     property->SetLazyLayoutRequest(1, false);
@@ -555,7 +563,7 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_TransformedViewport, TestSize.Level1)
     parent->RemoveChild(frameNode_);
     parent->AddChild(wrapper);
     wrapper->AddChild(frameNode_);
-    auto render = MakeRefPtr<EdgeTransformRenderContext>();
+    auto render = AceType::MakeRefPtr<EdgeTransformRenderContext>();
     render->SetHostNode(wrapper);
     wrapper->renderContext_ = render;
     render->transform_ = Matrix4::CreateTranslate(0.0f, 50.0f, 0.0f) * Matrix4::CreateScale(2.0f, 2.0f, 1.0f);
@@ -582,7 +590,7 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_InvalidTransformRestoresNaturalPosition
     SetEdges();
     CreateDone();
     auto parent = ParentScroll(300.0f);
-    auto render = MakeRefPtr<EdgeTransformRenderContext>();
+    auto render = AceType::MakeRefPtr<EdgeTransformRenderContext>();
     render->SetHostNode(frameNode_);
     frameNode_->renderContext_ = render;
     MoveHost(-200.0f);
@@ -615,6 +623,9 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_ComposedStickyInsets, TestSize.Level1)
     auto parent = ParentScroll(300.0f);
     parent->GetPattern<ScrollPattern>()->contentStartOffset_ = 10.0f;
     parent->GetPattern<ScrollPattern>()->contentEndOffset_ = 15.0f;
+    layoutProperty_->ClearUserDefinedIdealSize(false, true);
+    pattern_->UpdateParentLazyRequest();
+    ASSERT_TRUE(layoutProperty_->GetNeedLazyLayout());
     auto constraint = layoutProperty_->GetLayoutConstraint().value();
     constraint.viewPosRef = ViewPosReference {
         .viewPosStart = 0.0f, .viewPosEnd = 300.0f, .referencePos = -200.0f,
@@ -706,7 +717,7 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_AncestorTraversalIsLinear, TestSize.Lev
     std::vector<RefPtr<EdgeTransformRenderContext>> contexts;
     for (int32_t depth = 0; depth < 100; ++depth) {
         auto wrapper = Edge(1000.0f);
-        auto render = MakeRefPtr<EdgeTransformRenderContext>();
+        auto render = AceType::MakeRefPtr<EdgeTransformRenderContext>();
         render->SetHostNode(wrapper);
         wrapper->renderContext_ = render;
         contexts.push_back(render);

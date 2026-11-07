@@ -16,6 +16,8 @@
 #include "image_base.h"
 #include <thread>
 
+#include <thread>
+
 #include "base/image/image_defines.h"
 #include "core/components_ng/render/adapter/pixelmap_image.h"
 #include "test/mock/frameworks/base/image/mock_pixel_map.h"
