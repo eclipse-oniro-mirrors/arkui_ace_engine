@@ -7991,6 +7991,7 @@ void RichEditorPattern::ProcessInsertValue(const std::u16string& insertValue, Op
     if (hasActiveFilter_ && (shouldCommitInput || !IsPreviewTextInputting())) {
         FilterWithInputFilter(text);
         if (wasNonEmpty && text.empty()) {
+            IF_TRUE(shouldCommitInput && previewTextRecord_.IsValid(), FinishTextPreviewInner());
             HandleCounterWithLength(insertValueLength, maxLength_);
             return;
         }

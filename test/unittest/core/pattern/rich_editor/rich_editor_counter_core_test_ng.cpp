@@ -340,6 +340,133 @@ HWTEST_F(RichEditorCounterCoreTestNg, ProcessInsertValueFilterEmpty001, TestSize
 }
 
 /**
+ * @tc.name: ProcessInsertValueFilterEmptyFinishPreview001
+ * @tc.desc: When filter empties insert text, shouldCommitInput=true and previewTextRecord_ is valid,
+ *           FinishTextPreviewInner is invoked and previewTextRecord_ is reset before early return.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, ProcessInsertValueFilterEmptyFinishPreview001, TestSize.Level0)
+{
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+    richEditorPattern->isSpanStringMode_ = true;
+    richEditorPattern->styledString_ = AceType::MakeRefPtr<MutableSpanString>(u"hello");
+    richEditorPattern->styledString_->SetSpanWatcher(AceType::WeakClaim(AceType::RawPtr(richEditorPattern)));
+    richEditorPattern->undoManager_ =
+        std::make_unique<StyledStringUndoManager>(AceType::WeakClaim(AceType::RawPtr(richEditorPattern)));
+
+    // Set up filter that removes all non-digit characters
+    richEditorPattern->hasActiveFilter_ = true;
+    richEditorPattern->filterDirty_ = false;
+    richEditorPattern->filterManager_.SetFilter(u"[0-9]");
+    richEditorPattern->filterErrorHandler_ = [](const std::u16string&) -> bool { return true; };
+    richEditorPattern->maxLength_ = TEST_MAX_LENGTH_10;
+
+    // Set up an in-progress preview text record. startOffset == endOffset == 0 keeps DeleteByRange a
+    // no-op (length 0) inside FinishTextPreviewInner, while previewContent non-empty makes IsValid() true.
+    richEditorPattern->previewTextRecord_.previewContent = u"preview";
+    richEditorPattern->previewTextRecord_.previewTextHasStarted = true;
+    richEditorPattern->previewTextRecord_.startOffset = 0;
+    richEditorPattern->previewTextRecord_.endOffset = 0;
+    EXPECT_TRUE(richEditorPattern->previewTextRecord_.IsValid());
+
+    // "abc" will be filtered to "" by [0-9] filter; shouldCommitInput=true triggers the new
+    // IF_TRUE(shouldCommitInput && previewTextRecord_.IsValid(), FinishTextPreviewInner()) branch.
+    richEditorPattern->ProcessInsertValue(u"abc", OperationType::IME, true);
+
+    // FinishTextPreviewInner ran -> previewTextRecord_ reset.
+    EXPECT_FALSE(richEditorPattern->previewTextRecord_.previewTextHasStarted);
+    EXPECT_FALSE(richEditorPattern->previewTextRecord_.IsValid());
+    EXPECT_TRUE(richEditorPattern->previewTextRecord_.previewContent.empty());
+
+    richEditorPattern->previewTextRecord_.Reset();
+    richEditorPattern->hasActiveFilter_ = false;
+}
+
+/**
+ * @tc.name: ProcessInsertValueFilterEmptySkipFinishPreview001
+ * @tc.desc: When filter empties insert text and shouldCommitInput=true but previewTextRecord_ is NOT
+ *           valid (previewContent empty), FinishTextPreviewInner is NOT invoked; previewTextHasStarted
+ *           stays unchanged so the IsValid() guard (not previewTextHasStarted) gates the call.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, ProcessInsertValueFilterEmptySkipFinishPreview001, TestSize.Level0)
+{
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+    richEditorPattern->isSpanStringMode_ = true;
+    richEditorPattern->styledString_ = AceType::MakeRefPtr<MutableSpanString>(u"hello");
+    richEditorPattern->styledString_->SetSpanWatcher(AceType::WeakClaim(AceType::RawPtr(richEditorPattern)));
+    richEditorPattern->undoManager_ =
+        std::make_unique<StyledStringUndoManager>(AceType::WeakClaim(AceType::RawPtr(richEditorPattern)));
+
+    // Set up filter that removes all non-digit characters
+    richEditorPattern->hasActiveFilter_ = true;
+    richEditorPattern->filterDirty_ = false;
+    richEditorPattern->filterManager_.SetFilter(u"[0-9]");
+    richEditorPattern->filterErrorHandler_ = [](const std::u16string&) -> bool { return true; };
+    richEditorPattern->maxLength_ = TEST_MAX_LENGTH_10;
+
+    // previewTextHasStarted is true but previewContent is empty -> IsValid() returns false.
+    richEditorPattern->previewTextRecord_.previewContent = u"";
+    richEditorPattern->previewTextRecord_.previewTextHasStarted = true;
+    richEditorPattern->previewTextRecord_.startOffset = 0;
+    richEditorPattern->previewTextRecord_.endOffset = 0;
+    EXPECT_FALSE(richEditorPattern->previewTextRecord_.IsValid());
+
+    richEditorPattern->ProcessInsertValue(u"abc", OperationType::IME, true);
+
+    // FinishTextPreviewInner was NOT called: previewTextHasStarted remains true.
+    EXPECT_TRUE(richEditorPattern->previewTextRecord_.previewTextHasStarted);
+    EXPECT_FALSE(richEditorPattern->previewTextRecord_.IsValid());
+
+    richEditorPattern->previewTextRecord_.Reset();
+    richEditorPattern->hasActiveFilter_ = false;
+}
+
+/**
+ * @tc.name: ProcessInsertValueFilterEmptyCommitFalseNoFinishPreview001
+ * @tc.desc: When filter empties insert text and shouldCommitInput=false, FinishTextPreviewInner is NOT
+ *           invoked even with a valid preview (the shouldCommitInput guard short-circuits the call).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, ProcessInsertValueFilterEmptyCommitFalseNoFinishPreview001, TestSize.Level0)
+{
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+    richEditorPattern->isSpanStringMode_ = true;
+    richEditorPattern->styledString_ = AceType::MakeRefPtr<MutableSpanString>(u"hello");
+    richEditorPattern->styledString_->SetSpanWatcher(AceType::WeakClaim(AceType::RawPtr(richEditorPattern)));
+    richEditorPattern->undoManager_ =
+        std::make_unique<StyledStringUndoManager>(AceType::WeakClaim(AceType::RawPtr(richEditorPattern)));
+
+    // Set up filter that removes all non-digit characters
+    richEditorPattern->hasActiveFilter_ = true;
+    richEditorPattern->filterDirty_ = false;
+    richEditorPattern->filterManager_.SetFilter(u"[0-9]");
+    richEditorPattern->filterErrorHandler_ = [](const std::u16string&) -> bool { return true; };
+    richEditorPattern->maxLength_ = TEST_MAX_LENGTH_10;
+
+    // No preview in progress -> IsPreviewTextInputting() is false, so the filter block is entered
+    // even though shouldCommitInput is false.
+    richEditorPattern->previewTextRecord_.Reset();
+    EXPECT_FALSE(richEditorPattern->previewTextRecord_.IsValid());
+
+    auto lengthBefore = richEditorPattern->GetTextContentLength();
+    richEditorPattern->ProcessInsertValue(u"abc", OperationType::IME, false);
+    auto lengthAfter = richEditorPattern->GetTextContentLength();
+
+    // Filtered text was empty -> early return, no insertion, no crash.
+    EXPECT_EQ(lengthAfter, lengthBefore);
+    EXPECT_FALSE(richEditorPattern->previewTextRecord_.IsValid());
+
+    richEditorPattern->hasActiveFilter_ = false;
+}
+
+/**
  * @tc.name: ProcessInsertValueSpanStringWithFilter001
  * @tc.desc: SpanString mode with filter reducing text → isInsertValueSplit=true passed
  * @tc.type: FUNC
