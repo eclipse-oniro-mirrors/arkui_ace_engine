@@ -27,7 +27,7 @@ class RenderNode;
 
 using RequestRotationImpl = std::function<void(bool)>;
 
-class RotationController : public virtual AceType {
+class RotationController : public AceType {
     DECLARE_ACE_TYPE(RotationController, AceType);
 
 public:

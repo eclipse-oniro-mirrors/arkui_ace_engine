@@ -179,6 +179,10 @@ struct UserUnderlineColor {
     std::optional<Color> normal = std::nullopt;
     std::optional<Color> error = std::nullopt;
     std::optional<Color> disable = std::nullopt;
+    bool operator==(const UserUnderlineColor& other) const
+    {
+        return typing == other.typing && normal == other.normal && error == other.error && disable == other.disable;
+    }
 };
 
 enum class InputStyle {
@@ -205,11 +209,6 @@ struct SelectionOptions {
     MenuPolicy menuPolicy = MenuPolicy::DEFAULT;
     HandlePolicy handlePolicy = HandlePolicy::DEFAULT;
     bool forceShowHandle = false; // Used to force show the selection menu when stylus selects text on PC.
-};
-
-enum class PreviewTextStyle {
-    NORMAL,
-    UNDERLINE,
 };
 
 class SpanStringBase;

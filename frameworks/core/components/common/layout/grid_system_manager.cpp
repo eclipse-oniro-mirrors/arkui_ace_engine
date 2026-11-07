@@ -98,19 +98,10 @@ std::string SystemGridInfo::ToString() const
     return json->ToString();
 }
 
-GridSystemManager* GridSystemManager::instance_ = nullptr;
-
-std::mutex GridSystemManager::mutex_;
-
 GridSystemManager& GridSystemManager::GetInstance()
 {
-    if (instance_ == nullptr) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (instance_ == nullptr) {
-            instance_ = new GridSystemManager();
-        }
-    }
-    return *instance_;
+    static GridSystemManager instance;
+    return instance;
 }
 
 RefPtr<GridColumnInfo> GridSystemManager::GetInfoByType(const GridColumnType& columnType)

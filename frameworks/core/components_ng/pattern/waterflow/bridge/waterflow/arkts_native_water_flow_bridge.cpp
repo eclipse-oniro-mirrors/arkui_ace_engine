@@ -14,6 +14,9 @@
  */
 #include "core/components_ng/pattern/waterflow/bridge/waterflow/arkts_native_water_flow_bridge.h"
 
+#include <cmath>
+#include <limits>
+
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
 
 #include "base/utils/string_utils.h"
@@ -21,8 +24,10 @@
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_utils.h"
 #include "bridge/declarative_frontend/jsview/js_scroller.h"
 #include "bridge/declarative_frontend/jsview/js_water_flow_sections.h"
+#include "core/common/container.h"
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/pattern/scrollable/scrollable_controller.h"
+#include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "core/components_ng/pattern/waterflow/water_flow_model_ng.h"
 #include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
 #include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
@@ -42,6 +47,7 @@ constexpr int32_t NUM_4 = 4;
 constexpr int32_t NUM_5 = 5;
 constexpr int32_t BREAKPOINT_DEFAULT = 0;
 constexpr int32_t BREAKPOINT_SM2MD3LG5 = 2;
+constexpr int32_t UNKNOWN_RESOURCE_TYPE = -1;
 const std::vector<FlexDirection> LAYOUT_DIRECTION = { FlexDirection::ROW, FlexDirection::COLUMN,
     FlexDirection::ROW_REVERSE, FlexDirection::COLUMN_REVERSE };
 const std::vector<DisplayMode> DISPLAY_MODE = { DisplayMode::OFF, DisplayMode::AUTO, DisplayMode::ON };
@@ -64,6 +70,115 @@ bool GetNativeNode(ArkUINodeHandle& nativeNode, const Local<JSValueRef>& nodeArg
 bool IsNativePointerArg(const EcmaVM* vm, const Local<JSValueRef>& nodeArg)
 {
     return vm != nullptr && !nodeArg.IsEmpty() && nodeArg->IsNativePointer(vm);
+}
+
+bool ParseItemConstraintDimensionVp(const EcmaVM* vm, const Local<JSValueRef>& value,
+    CalcDimension& result, RefPtr<ResourceObject>& resourceObject)
+{
+    if (!ArkTSUtils::ParseJsDimensionVp(vm, value, result, resourceObject, false)) {
+        return false;
+    }
+    // Parsing has already succeeded. Numeric/string dimensions have no ResourceObject.
+    // Allow those dimensions; reject Resource types that remain unknown after completion,
+    // matching the legacy JSViewAbstract behavior.
+    return !resourceObject || resourceObject->GetType() != UNKNOWN_RESOURCE_TYPE;
+}
+
+// Feat-20260806915269: the public provider uses vp and vp/s while the shared scroll pipeline uses px.
+// A finite target that overflows on scaling stays finite so that the shared resolver clamps it.
+double ConvertSnapOffsetVpToPx(double offsetVp)
+{
+    if (!std::isfinite(offsetVp)) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+    const double offsetPx = Dimension(offsetVp, DimensionUnit::VP).ConvertToPx();
+    return std::isfinite(offsetPx) ? offsetPx : std::copysign(std::numeric_limits<double>::max(), offsetPx);
+}
+
+struct SnapProviderContext {
+    EcmaVM* vm;
+    Local<ObjectRef> receiver;
+    FrameNode* frameNode;
+    bool isJSView;
+};
+
+// Wraps a provider method. It runs with the provider object as receiver (arrow functions keep their
+// lexical this); exceptions, non-number results and a destroyed node resolve to NaN so that the shared
+// snap falls back to its natural behavior.
+SnapApproachOffsetFunc MakeSnapProviderCallback(
+    const SnapProviderContext& context, const Local<JSValueRef>& callback, bool isApproach)
+{
+    auto vm = context.vm;
+    auto weakNode = AceType::WeakClaim(context.frameNode);
+    Local<panda::FunctionRef> function = callback->ToObject(vm);
+    return [func = panda::CopyableGlobal(vm, function), receiver = panda::CopyableGlobal(vm, context.receiver),
+               weakNode, isJSView = context.isJSView, isApproach, id = Container::CurrentId()](
+               double velocity, double decayOffset) -> double {
+        constexpr auto invalid = std::numeric_limits<double>::quiet_NaN();
+        auto vm = func.GetEcmaVM();
+        if (!ArkTSUtils::CheckJavaScriptScope(vm) || !weakNode.Upgrade()) {
+            return invalid;
+        }
+        ContainerScope containerScope(id);
+        panda::LocalScope scope(vm);
+        panda::TryCatch trycatch(vm);
+        PipelineContext::SetCallBackNode(weakNode);
+        Local<JSValueRef> params[] = { panda::NumberRef::New(vm, Dimension(velocity).ConvertToVp()),
+            panda::NumberRef::New(vm, Dimension(decayOffset).ConvertToVp()) };
+        auto result = func->Call(vm, receiver.ToLocal(), params, isApproach ? NUM_2 : NUM_1);
+        if (trycatch.HasCaught()) {
+            // Provider failures are part of the snap fallback contract, not uncaught application errors.
+            trycatch.ClearException();
+            return invalid;
+        }
+        if (result.IsEmpty() || (isJSView && !ArkTSUtils::HandleCallbackJobs(vm, trycatch, result))) {
+            return invalid;
+        }
+        if (!result->IsNumber() || !weakNode.Upgrade()) {
+            return invalid;
+        }
+        return ConvertSnapOffsetVpToPx(result->ToNumber(vm)->Value());
+    };
+}
+
+// Parses a ScrollSnapAlign number or a provider object; false for anything else (cleared by the caller).
+bool ParseScrollSnapStrategy(EcmaVM* vm, const Local<JSValueRef>& value, const Local<JSValueRef>& nodeArg,
+    FrameNode* frameNode, ScrollSnapStrategy& strategy)
+{
+    if (value->IsNumber()) {
+        const double align = value->ToNumber(vm)->Value();
+        if (align != static_cast<int32_t>(ScrollSnapAlign::START) &&
+            align != static_cast<int32_t>(ScrollSnapAlign::CENTER) &&
+            align != static_cast<int32_t>(ScrollSnapAlign::END)) {
+            return false;
+        }
+        strategy.align = static_cast<ScrollSnapAlign>(static_cast<int32_t>(align));
+        return true;
+    }
+    if (!value->IsObject(vm)) {
+        return false;
+    }
+    panda::TryCatch trycatch(vm);
+    auto object = value->ToObject(vm);
+    auto snap = object->Get(vm, panda::StringRef::NewFromUtf8(vm, "calculateSnapOffset"));
+    auto approach = object->Get(vm, panda::StringRef::NewFromUtf8(vm, "calculateApproachOffset"));
+    if (trycatch.HasCaught()) {
+        trycatch.ClearException();
+        return false;
+    }
+    if (snap.IsEmpty() || !snap->IsFunction(vm) || approach.IsEmpty()) {
+        return false;
+    }
+    const SnapProviderContext context { vm, object, frameNode, ArkTSUtils::IsJsView(nodeArg, vm) };
+    auto snapCallback = MakeSnapProviderCallback(context, snap, false);
+    strategy.hasProvider = true;
+    strategy.calculateSnapOffset = [snapCallback = std::move(snapCallback)](double velocity) {
+        return snapCallback(velocity, 0.0);
+    };
+    if (approach->IsFunction(vm)) {
+        strategy.calculateApproachOffset = MakeSnapProviderCallback(context, approach, true);
+    }
+    return true;
 }
 
 void SetItemConstraintSizeSendParams(CalcDimension& doubleValue, std::string& calcStrValue)
@@ -665,6 +780,41 @@ ArkUINativeModuleValue WaterFlowBridge::ResetSticky(ArkUIRuntimeCallInfo* info)
     return panda::JSValueRef::Undefined(vm);
 }
 
+ArkUINativeModuleValue WaterFlowBridge::SetScrollSnapStrategy(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    auto vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
+    auto nodeArg = runtimeCallInfo->GetCallArgRef(NUM_0);
+    auto value = runtimeCallInfo->GetCallArgRef(NUM_1);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_EQUAL_RETURN(GetNativeNode(nativeNode, nodeArg, vm), false, panda::JSValueRef::Undefined(vm));
+    auto frameNode = nativeNode ? reinterpret_cast<FrameNode*>(nativeNode)
+                                : ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
+    ScrollSnapStrategy strategy;
+    if (ParseScrollSnapStrategy(vm, value, nodeArg, frameNode, strategy)) {
+        WaterFlowModelNG::SetScrollSnapStrategy(frameNode, strategy);
+    } else {
+        // undefined / null / NONE / invalid values clear the strategy (last write wins).
+        WaterFlowModelNG::ResetScrollSnapStrategy(frameNode);
+    }
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue WaterFlowBridge::ResetScrollSnapStrategy(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    auto vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
+    auto nodeArg = runtimeCallInfo->GetCallArgRef(NUM_0);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_EQUAL_RETURN(GetNativeNode(nativeNode, nodeArg, vm), false, panda::JSValueRef::Undefined(vm));
+    auto frameNode = nativeNode ? reinterpret_cast<FrameNode*>(nativeNode)
+                                : ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
+    WaterFlowModelNG::ResetScrollSnapStrategy(frameNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
 void WaterFlowBridge::RegisterWaterFlowAttributes(Local<panda::ObjectRef> object, EcmaVM* vm)
 {
     const char* functionNames[] = {
@@ -703,6 +853,8 @@ void WaterFlowBridge::RegisterWaterFlowAttributes(Local<panda::ObjectRef> object
         "setCachedCount",
         "resetSyncLoad",
         "setSyncLoad",
+        "resetScrollPlaceholder",
+        "setScrollPlaceholder",
         "resetWaterFlowInitialize",
         "setWaterFlowInitialize",
         "resetOnScrollIndex",
@@ -723,6 +875,8 @@ void WaterFlowBridge::RegisterWaterFlowAttributes(Local<panda::ObjectRef> object
         "setJSScrollBarWidth",
         "setJSScrollBarColor",
         "setSupportLazyLoadingEmptyBranch",
+        "setScrollSnapStrategy",
+        "resetScrollSnapStrategy",
     };
     Local<JSValueRef> funcValues[] = {
         panda::FunctionRef::New(vm, WaterFlowBridge::SetHeader),
@@ -760,6 +914,8 @@ void WaterFlowBridge::RegisterWaterFlowAttributes(Local<panda::ObjectRef> object
         panda::FunctionRef::New(vm, WaterFlowBridge::SetCachedCount),
         panda::FunctionRef::New(vm, WaterFlowBridge::ResetSyncLoad),
         panda::FunctionRef::New(vm, WaterFlowBridge::SetSyncLoad),
+        panda::FunctionRef::New(vm, WaterFlowBridge::ResetScrollPlaceholder),
+        panda::FunctionRef::New(vm, WaterFlowBridge::SetScrollPlaceholder),
         panda::FunctionRef::New(vm, WaterFlowBridge::ResetWaterFlowInitialize),
         panda::FunctionRef::New(vm, WaterFlowBridge::SetWaterFlowInitialize),
         panda::FunctionRef::New(vm, WaterFlowBridge::ResetOnWaterFlowScrollIndex),
@@ -780,6 +936,8 @@ void WaterFlowBridge::RegisterWaterFlowAttributes(Local<panda::ObjectRef> object
         panda::FunctionRef::New(vm, WaterFlowBridge::SetJSScrollBarWidth),
         panda::FunctionRef::New(vm, WaterFlowBridge::SetJSScrollBarColor),
         panda::FunctionRef::New(vm, WaterFlowBridge::SetSupportLazyLoadingEmptyBranch),
+        panda::FunctionRef::New(vm, WaterFlowBridge::SetScrollSnapStrategy),
+        panda::FunctionRef::New(vm, WaterFlowBridge::ResetScrollSnapStrategy),
     };
     auto waterflow = panda::ObjectRef::NewWithNamedProperties(vm, ArraySize(functionNames), functionNames, funcValues);
     object->Set(vm, panda::StringRef::NewFromUtf8(vm, "waterFlow"), waterflow);
@@ -1020,7 +1178,7 @@ ArkUINativeModuleValue WaterFlowBridge::SetItemConstraintSize(ArkUIRuntimeCallIn
     RefPtr<ResourceObject> itemMinHeightResObj;
     RefPtr<ResourceObject> itemMaxHeightResObj;
     if (minWidthValue.IsEmpty() || minWidthValue->IsUndefined() ||
-        !ArkTSUtils::ParseJsDimensionVp(vm, minWidthValue, minWidth, itemMinWidthResObj, false)) {
+        !ParseItemConstraintDimensionVp(vm, minWidthValue, minWidth, itemMinWidthResObj)) {
         GetArkUINodeModifiers()->getWaterFlowModifier()->resetItemMinWidth(nativeNode);
     } else {
         auto itemMinWidthRawPtr = AceType::RawPtr(itemMinWidthResObj);
@@ -1029,7 +1187,7 @@ ArkUINativeModuleValue WaterFlowBridge::SetItemConstraintSize(ArkUIRuntimeCallIn
             static_cast<int32_t>(minWidth.Unit()), calcMinWidthStr.c_str(), itemMinWidthRawPtr);
     }
     if (maxWidthValue.IsEmpty() || maxWidthValue->IsUndefined() ||
-        !ArkTSUtils::ParseJsDimensionVp(vm, maxWidthValue, maxWidth, itemMaxWidthResObj, false)) {
+        !ParseItemConstraintDimensionVp(vm, maxWidthValue, maxWidth, itemMaxWidthResObj)) {
         GetArkUINodeModifiers()->getWaterFlowModifier()->resetItemMaxWidth(nativeNode);
     } else {
         auto itemMaxWidthRawPtr = AceType::RawPtr(itemMaxWidthResObj);
@@ -1038,7 +1196,7 @@ ArkUINativeModuleValue WaterFlowBridge::SetItemConstraintSize(ArkUIRuntimeCallIn
             static_cast<int32_t>(maxWidth.Unit()), calcMaxWidthStr.c_str(), itemMaxWidthRawPtr);
     }
     if (minHeightValue.IsEmpty() || minHeightValue->IsUndefined() ||
-        !ArkTSUtils::ParseJsDimensionVp(vm, minHeightValue, minHeight, itemMinHeightResObj, false)) {
+        !ParseItemConstraintDimensionVp(vm, minHeightValue, minHeight, itemMinHeightResObj)) {
         GetArkUINodeModifiers()->getWaterFlowModifier()->resetItemMinHeight(nativeNode);
     } else {
         auto itemMinHeightRawPtr = AceType::RawPtr(itemMinHeightResObj);
@@ -1047,7 +1205,7 @@ ArkUINativeModuleValue WaterFlowBridge::SetItemConstraintSize(ArkUIRuntimeCallIn
             static_cast<int32_t>(minHeight.Unit()), calcMinHeightStr.c_str(), itemMinHeightRawPtr);
     }
     if (maxHeightValue.IsEmpty() || maxHeightValue->IsUndefined() ||
-        !ArkTSUtils::ParseJsDimensionVp(vm, maxHeightValue, maxHeight, itemMaxHeightResObj, false)) {
+        !ParseItemConstraintDimensionVp(vm, maxHeightValue, maxHeight, itemMaxHeightResObj)) {
         GetArkUINodeModifiers()->getWaterFlowModifier()->resetItemMaxHeight(nativeNode);
     } else {
         auto itemMaxHeightRawPtr = AceType::RawPtr(itemMaxHeightResObj);
@@ -1367,6 +1525,86 @@ ArkUINativeModuleValue WaterFlowBridge::ResetSyncLoad(ArkUIRuntimeCallInfo* runt
     CHECK_NULL_RETURN(IsNativePointerArg(vm, node), panda::JSValueRef::Undefined(vm));
     auto nativeNode = nodePtr(node->ToNativePointer(vm)->Value());
     GetArkUINodeModifiers()->getWaterFlowModifier()->resetSyncLoad(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+// Same provider contract as ListBridge::SetListScrollPlaceholder: a non-function
+// or undefined argument clears the provider (capability off), a function is
+// wrapped into the synchronous northbound provider called while scrolling.
+// The node argument accepts both forms used on this module: a native pointer
+// (modifier path) and the boolean "current node" convention of the static path.
+ArkUINativeModuleValue WaterFlowBridge::SetScrollPlaceholder(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> node = runtimeCallInfo->GetCallArgRef(NUM_0);
+    Local<JSValueRef> providerArg = runtimeCallInfo->GetCallArgRef(NUM_1);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_EQUAL_RETURN(ArkTSUtils::GetNativeNode(nativeNode, node, vm), false, panda::JSValueRef::Undefined(vm));
+    auto frameNode = reinterpret_cast<FrameNode*>(nativeNode);
+    CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
+    if (!providerArg->IsFunction(vm)) {
+        WaterFlowModelNG::SetScrollPlaceholder(frameNode, nullptr);
+        return panda::JSValueRef::Undefined(vm);
+    }
+    panda::Local<panda::FunctionRef> providerFuncLocal = providerArg->ToObject(vm);
+    auto providerFunc = panda::CopyableGlobal(vm, providerFuncLocal);
+    ScrollPlaceholderProvider provider =
+        [vm, providerFunc = std::move(providerFunc)](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+        panda::LocalScope localScope(vm);
+        panda::TryCatch tryCatch(vm);
+        panda::Local<panda::JSValueRef> params[1] = { panda::IntegerRef::New(vm, index) };
+        auto result = providerFunc->Call(vm, providerFunc.ToLocal(), params, 1);
+        if (tryCatch.HasCaught() || !result->IsObject(vm)) {
+            // A throwing provider is treated like "no placeholder for this item":
+            // the scroll path must stay a pure calculation without error fences.
+            return std::nullopt;
+        }
+        auto obj = result->ToObject(vm);
+        ScrollPlaceholderOptions options;
+        auto id = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "id"));
+        if (id->IsString(vm)) {
+            options.id = id->ToString(vm)->ToString(vm);
+        }
+        auto size = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "size"));
+        if (size->IsObject(vm)) {
+            auto sizeObj = size->ToObject(vm);
+            ScrollPlaceholderSizeOption sizeOption;
+            auto width = sizeObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "width"));
+            if (width->IsNumber()) {
+                sizeOption.width =
+                    Dimension(static_cast<float>(width->ToNumber(vm)->Value()), DimensionUnit::VP);
+            } else if (width->IsString(vm)) {
+                // Bare numbers mean vp; suffixed strings ("100%", "10px") keep their unit.
+                sizeOption.width =
+                    StringUtils::StringToDimension(width->ToString(vm)->ToString(vm), true);
+            }
+            auto height = sizeObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "height"));
+            if (height->IsNumber()) {
+                sizeOption.height =
+                    Dimension(static_cast<float>(height->ToNumber(vm)->Value()), DimensionUnit::VP);
+            } else if (height->IsString(vm)) {
+                sizeOption.height =
+                    StringUtils::StringToDimension(height->ToString(vm)->ToString(vm), true);
+            }
+            options.size = sizeOption;
+        }
+        return options;
+    };
+    WaterFlowModelNG::SetScrollPlaceholder(frameNode, std::move(provider));
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue WaterFlowBridge::ResetScrollPlaceholder(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> node = runtimeCallInfo->GetCallArgRef(NUM_0);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_EQUAL_RETURN(ArkTSUtils::GetNativeNode(nativeNode, node, vm), false, panda::JSValueRef::Undefined(vm));
+    auto frameNode = reinterpret_cast<FrameNode*>(nativeNode);
+    CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
+    WaterFlowModelNG::SetScrollPlaceholder(frameNode, nullptr);
     return panda::JSValueRef::Undefined(vm);
 }
 
@@ -1826,7 +2064,7 @@ ArkUINativeModuleValue WaterFlowBridge::SetJSItemConstraintSize(ArkUIRuntimeCall
     RefPtr<ResourceObject> resObjMaxHeight;
     auto minWidthValue = ArkTSUtils::GetProperty(vm, sizeObj, "minWidth");
     CalcDimension minWidth;
-    if (ArkTSUtils::ParseJsDimensionVp(vm, minWidthValue, minWidth, resObjMinWidth, false)) {
+    if (ParseItemConstraintDimensionVp(vm, minWidthValue, minWidth, resObjMinWidth)) {
         std::string calcMinWidthStr = minWidth.Unit() == DimensionUnit::CALC ? minWidth.CalcValue() : "";
         GetArkUINodeModifiers()->getWaterFlowModifier()->setItemMinWidth(nativeNode,
             static_cast<ArkUI_Float32>(minWidth.Value()), static_cast<int32_t>(minWidth.Unit()),
@@ -1835,7 +2073,7 @@ ArkUINativeModuleValue WaterFlowBridge::SetJSItemConstraintSize(ArkUIRuntimeCall
 
     auto maxWidthValue = ArkTSUtils::GetProperty(vm, sizeObj, "maxWidth");
     CalcDimension maxWidth;
-    if (ArkTSUtils::ParseJsDimensionVp(vm, maxWidthValue, maxWidth, resObjMaxWidth, false)) {
+    if (ParseItemConstraintDimensionVp(vm, maxWidthValue, maxWidth, resObjMaxWidth)) {
         std::string calcMaxWidthStr = maxWidth.Unit() == DimensionUnit::CALC ? maxWidth.CalcValue() : "";
         GetArkUINodeModifiers()->getWaterFlowModifier()->setItemMaxWidth(nativeNode,
             static_cast<ArkUI_Float32>(maxWidth.Value()), static_cast<int32_t>(maxWidth.Unit()),
@@ -1844,7 +2082,7 @@ ArkUINativeModuleValue WaterFlowBridge::SetJSItemConstraintSize(ArkUIRuntimeCall
 
     auto minHeightValue = ArkTSUtils::GetProperty(vm, sizeObj, "minHeight");
     CalcDimension minHeight;
-    if (ArkTSUtils::ParseJsDimensionVp(vm, minHeightValue, minHeight, resObjMinHeight, false)) {
+    if (ParseItemConstraintDimensionVp(vm, minHeightValue, minHeight, resObjMinHeight)) {
         std::string calcMinHeightStr = minHeight.Unit() == DimensionUnit::CALC ? minHeight.CalcValue() : "";
         GetArkUINodeModifiers()->getWaterFlowModifier()->setItemMinHeight(nativeNode,
             static_cast<ArkUI_Float32>(minHeight.Value()), static_cast<int32_t>(minHeight.Unit()),
@@ -1853,7 +2091,7 @@ ArkUINativeModuleValue WaterFlowBridge::SetJSItemConstraintSize(ArkUIRuntimeCall
 
     auto maxHeightValue = ArkTSUtils::GetProperty(vm, sizeObj, "maxHeight");
     CalcDimension maxHeight;
-    if (ArkTSUtils::ParseJsDimensionVp(vm, maxHeightValue, maxHeight, resObjMaxHeight, false)) {
+    if (ParseItemConstraintDimensionVp(vm, maxHeightValue, maxHeight, resObjMaxHeight)) {
         std::string calcMaxHeightStr = maxHeight.Unit() == DimensionUnit::CALC ? maxHeight.CalcValue() : "";
         GetArkUINodeModifiers()->getWaterFlowModifier()->setItemMaxHeight(nativeNode,
             static_cast<ArkUI_Float32>(maxHeight.Value()), static_cast<int32_t>(maxHeight.Unit()),

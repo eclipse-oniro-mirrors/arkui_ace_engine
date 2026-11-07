@@ -71,7 +71,7 @@ void WaterFlowElement::PerformBuild()
 
 RefPtr<RenderNode> WaterFlowElement::RequestWaterFlowFooter()
 {
-    return footerElement_ ? AceType::DynamicCast<RenderNode>(footerElement_->GetRenderNode()) : nullptr;
+    return footerElement_ ? footerElement_->GetRenderNode() : nullptr;
 }
 
 bool WaterFlowElement::BuildChildByIndex(size_t index)

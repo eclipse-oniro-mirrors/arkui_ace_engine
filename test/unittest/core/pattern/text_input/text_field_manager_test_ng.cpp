@@ -823,8 +823,9 @@ HWTEST_F(TextFieldManagerTestNG, GenerateFillContentMap001, TestSize.Level0)
 {
     auto fillContent = "{\"userName\":\"test\"}";
     FillContentMap fillContentMap;
+    std::vector<std::pair<std::string, std::string>> accountList;
     TextFieldManagerNG text_field_manager;
-    text_field_manager.GenerateFillContentMap(fillContent, fillContentMap);
+    text_field_manager.GenerateFillContentMap(fillContent, fillContentMap, accountList);
     EXPECT_EQ(fillContentMap.size(), 1);
 }
 
@@ -837,8 +838,9 @@ HWTEST_F(TextFieldManagerTestNG, GenerateFillContentMap002, TestSize.Level0)
 {
     auto fillContent = "{\"\":\"test\"}";
     FillContentMap fillContentMap;
+    std::vector<std::pair<std::string, std::string>> accountList;
     TextFieldManagerNG text_field_manager;
-    text_field_manager.GenerateFillContentMap(fillContent, fillContentMap);
+    text_field_manager.GenerateFillContentMap(fillContent, fillContentMap, accountList);
     EXPECT_EQ(fillContentMap.size(), 0);
 }
 
@@ -852,8 +854,9 @@ HWTEST_F(TextFieldManagerTestNG, GenerateFillContentMap003, TestSize.Level0)
     auto fillContent = "{\"userName\":\"test\",\"newPassword\":\"A1xACoSOjza4Q8PF\",\"hasAccount\":\"0\",\"userName1\":"
                        "\"test\",\"userName2\":\"test\",\"userName3\":\"test\"}";
     FillContentMap fillContentMap;
+    std::vector<std::pair<std::string, std::string>> accountList;
     TextFieldManagerNG text_field_manager;
-    text_field_manager.GenerateFillContentMap(fillContent, fillContentMap);
+    text_field_manager.GenerateFillContentMap(fillContent, fillContentMap, accountList);
     EXPECT_EQ(fillContentMap.size(), 5);
 }
 
@@ -866,9 +869,118 @@ HWTEST_F(TextFieldManagerTestNG, GenerateFillContentMap004, TestSize.Level0)
 {
     auto fillContent = "[{\"userName\":\"test\"}]";
     FillContentMap fillContentMap;
+    std::vector<std::pair<std::string, std::string>> accountList;
     TextFieldManagerNG text_field_manager;
-    text_field_manager.GenerateFillContentMap(fillContent, fillContentMap);
+    text_field_manager.GenerateFillContentMap(fillContent, fillContentMap, accountList);
     EXPECT_EQ(fillContentMap.size(), 0);
+}
+
+/**
+ * @tc.name: GenerateFillContentMap005
+ * @tc.desc: test accountList parsing into {raw, normalized} pairs
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldManagerTestNG, GenerateFillContentMap005, TestSize.Level0)
+{
+    auto fillContent = "{\"userName\":\"test\",\"accountList\":[\"Alice\",\"BOB\",\" Carol \"]}";
+    FillContentMap fillContentMap;
+    std::vector<std::pair<std::string, std::string>> accountList;
+    TextFieldManagerNG text_field_manager;
+    text_field_manager.GenerateFillContentMap(fillContent, fillContentMap, accountList);
+    EXPECT_EQ(fillContentMap.size(), 1); // accountList does not enter FillContentMap
+    EXPECT_EQ(accountList.size(), 3);
+    EXPECT_EQ(accountList[0].first, "Alice");  // raw preserved
+    EXPECT_EQ(accountList[0].second, "alice"); // normalized: lowercase
+    EXPECT_EQ(accountList[1].first, "BOB");
+    EXPECT_EQ(accountList[1].second, "bob");
+    EXPECT_EQ(accountList[2].first, " Carol "); // raw preserves spaces
+    EXPECT_EQ(accountList[2].second, "carol");  // normalized: spaces stripped + lowercase
+}
+
+/**
+ * @tc.name: GenerateFillContentMap006
+ * @tc.desc: test accountList truncated to MAX_ACCOUNT_LIST_SIZE (100)
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldManagerTestNG, GenerateFillContentMap006, TestSize.Level0)
+{
+    std::string accounts = "[";
+    for (int i = 0; i < 101; ++i) {
+        if (i > 0) {
+            accounts += ",";
+        }
+        accounts += "\"acc" + std::to_string(i) + "\"";
+    }
+    accounts += "]";
+    auto fillContent = "{\"userName\":\"test\",\"accountList\":" + accounts + "}";
+    FillContentMap fillContentMap;
+    std::vector<std::pair<std::string, std::string>> accountList;
+    TextFieldManagerNG text_field_manager;
+    text_field_manager.GenerateFillContentMap(fillContent, fillContentMap, accountList);
+    EXPECT_EQ(accountList.size(), 100); // truncated
+    EXPECT_EQ(accountList[99].first, "acc99");
+}
+
+/**
+ * @tc.name: NormalizeAccount001
+ * @tc.desc: test NormalizeAccount strips spaces and folds ASCII case, preserves non-ASCII
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldManagerTestNG, NormalizeAccount001, TestSize.Level0)
+{
+    EXPECT_EQ(NormalizeAccount("Alice"), "alice");
+    EXPECT_EQ(NormalizeAccount("  AL ICE "), "alice"); // strip all spaces + lowercase
+    EXPECT_EQ(NormalizeAccount("BOB"), "bob");
+    EXPECT_EQ(NormalizeAccount(""), "");
+    EXPECT_EQ(NormalizeAccount("   "), ""); // only spaces -> empty
+    EXPECT_EQ(NormalizeAccount("张三"), "张三");           // Chinese bytes unchanged
+    EXPECT_EQ(NormalizeAccount("张 三"), "张三");          // ASCII space stripped
+}
+
+/**
+ * @tc.name: GetAccountList001
+ * @tc.desc: test GetAccountList returns parsed pairs after ParseFillContentJsonValue
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldManagerTestNG, GetAccountList001, TestSize.Level0)
+{
+    auto allFillContents = JsonUtil::CreateArray(true);
+    auto fillContentOne = JsonUtil::Create(true);
+    fillContentOne->Put("id", 100);
+    fillContentOne->Put("fillContent", "{\"userName\":\"test\",\"accountList\":[\"Alice\",\"bob\"]}");
+    allFillContents->Put(fillContentOne);
+
+    TextFieldManagerNG text_field_manager;
+    auto result = text_field_manager.ParseFillContentJsonValue(allFillContents);
+    EXPECT_EQ(result, true);
+    auto accountList = text_field_manager.GetAccountList(100);
+    EXPECT_EQ(accountList.size(), 2);
+    EXPECT_EQ(accountList[0].first, "Alice");
+    EXPECT_EQ(accountList[0].second, "alice");
+    EXPECT_EQ(accountList[1].first, "bob");
+    EXPECT_EQ(accountList[1].second, "bob");
+    EXPECT_EQ(text_field_manager.GetAccountList(999).size(), 0); // non-existent id
+}
+
+/**
+ * @tc.name: RemoveAccountList001
+ * @tc.desc: test RemoveAccountList erases cached accountList by nodeId
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldManagerTestNG, RemoveAccountList001, TestSize.Level0)
+{
+    auto allFillContents = JsonUtil::CreateArray(true);
+    auto fillContentOne = JsonUtil::Create(true);
+    fillContentOne->Put("id", 200);
+    fillContentOne->Put("fillContent", "{\"userName\":\"test\",\"accountList\":[\"Alice\"]}");
+    allFillContents->Put(fillContentOne);
+
+    TextFieldManagerNG text_field_manager;
+    text_field_manager.ParseFillContentJsonValue(allFillContents);
+    EXPECT_EQ(text_field_manager.GetAccountList(200).size(), 1);
+    text_field_manager.RemoveAccountList(200);
+    EXPECT_EQ(text_field_manager.GetAccountList(200).size(), 0);
+    text_field_manager.RemoveAccountList(999); // non-existent does not crash
 }
 
 /**

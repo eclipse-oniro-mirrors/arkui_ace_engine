@@ -63,7 +63,7 @@ constexpr int SHEET_CLOSE_ICON_BUTTON_STYLE = 1;
 // sheet height mode : LARGE(1) AUTO(2)
 constexpr int SHEET_HEIGHT_DEFAULT_MODE = 1;
 } // namespace
-class SheetTheme : public virtual Theme {
+class SheetTheme : public Theme {
     DECLARE_ACE_TYPE(SheetTheme, Theme);
 
 public:
@@ -163,6 +163,7 @@ public:
             theme->bigWindowMinHeight_ =
                 sheetPattern->GetAttr<Dimension>("big_window_min_height", SHEET_BIG_WINDOW_MIN_HEIGHT);
             theme->sheetHeightPercentMax_ = sheetPattern->GetAttr<double>("sheet_height_percent_max", 0.9f);
+            theme->titleMaskColor_ = theme->sheetBackgoundColor_;
         }
     };
     ~SheetTheme() override = default;
@@ -215,6 +216,11 @@ public:
     const Color& GetSheetBackgoundColor() const
     {
         return sheetBackgoundColor_;
+    }
+
+    const Color& GetTitleMaskColor() const
+    {
+        return titleMaskColor_;
     }
 
     const Color& GetDragBarColor() const
@@ -428,6 +434,7 @@ protected:
     Color closeIconColor_;
     Color closeIconImageColor_;
     Color closeIconSymbolColor_;
+    Color titleMaskColor_;
 
 private:
     Dimension sheetRadius_;

@@ -69,6 +69,13 @@ public:
         return isVertical_;
     }
 
+    // Restricted scroll-placeholder whitelist clone: plain layout-only container,
+    // no callbacks or cross-node state to carry over.
+    RefPtr<Pattern> CloneForPlaceholder() override
+    {
+        return MakeRefPtr<LinearLayoutPattern>(isVertical_);
+    }
+
     void SetFlexMeasureResult(FlexMeasureResult measureResult, uintptr_t addr)
     {
         measureResult_ = measureResult;
@@ -117,6 +124,15 @@ public:
         json->Put("FlexMeasureLayoutPaired", GetMeasureLayoutPaired());
         json->Put("FlexFrontSpace", static_cast<double>(layoutResult_.frontSpace));
         json->Put("FlexBetweenSpace", static_cast<double>(layoutResult_.betweenSpace));
+    }
+
+    void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json, const InspectorDumpOptions& options) override
+    {
+        // Keep derived overrides, including components with intentionally empty output.
+        DumpSimplifyInfo(json);
+        if (!ShouldIncludeDiagnostic(options)) {
+            json->Delete("FlexMeasureLayoutPaired");
+        }
     }
 
     bool IsVerticalReverseLayout() const override

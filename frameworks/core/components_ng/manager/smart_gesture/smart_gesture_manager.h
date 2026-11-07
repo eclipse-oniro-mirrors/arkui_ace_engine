@@ -37,7 +37,7 @@ struct PrimaryActionEntry {
     uint64_t order = 0;
 };
 
-class ACE_FORCE_EXPORT SmartGestureManager : public virtual AceType {
+class ACE_FORCE_EXPORT SmartGestureManager : public AceType {
     DECLARE_ACE_TYPE(SmartGestureManager, AceType);
 
 public:
@@ -119,6 +119,7 @@ private:
     bool smartTapAndSlideGesturesEnabled_ = false;
     bool autoInActive_ = false;
     SmartGestureMonitor monitorCallback_;
+    mutable std::mutex monitorMutex_;
     WeakPtr<PipelineContext> context_;
     WeakPtr<FrameNode> selectedNode_;
     WeakPtr<FrameNode> selectedPaintedNode_;

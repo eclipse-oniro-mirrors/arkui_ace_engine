@@ -22,7 +22,7 @@ import { unsafeCast, int32, int64, float32 } from '@koalaui/common'
 import { ArkUIGeneratedNativeModule } from '#components'
 import { CallbackTransformer } from './../CallbackTransformer'
 import { AlertDialogParamWithConfirm_serializer, AlertDialogParamWithButtons_serializer, AlertDialogParamWithOptions_serializer, AlertDialogParamWithConfirm, AlertDialogParamWithButtons, AlertDialogParamWithOptions, DialogAlignment } from './alertDialog'
-import { AnimateParam_serializer, TranslateOptions_serializer, KeyframeAnimateParam_serializer, KeyframeState_serializer, AnimateParam, TranslateOptions, KeyframeAnimateParam, KeyframeState, Bindable_I32_serializer, Bindable, BlurStyle, OnWillScrollCallback, OnScrollCallback, MouseEvent_serializer, AxisEvent_serializer, MouseEvent, MouseEventInternal, AxisEvent, AxisEventInternal, Bindable_WidthBreakpoint_serializer, Bindable_HeightBreakpoint_serializer, ClickEvent, ClickEventInternal, ItemDragEventHandler_serializer, OnMoveHandler, ItemDragEventHandler, UICommonEvent, UICommonEventInternal, SourceTool, SheetOptions_serializer, InputEventMonitor_serializer, KeyEvent, KeyEventInternal, SheetOptions, InputEventListener, RawInputEventWrapper, RawInputEventWrapperInternal, InputEventMonitor, OnVisibleIndexesChangeCallback, PopupCommonOptions_serializer, MenuOptions_serializer, PopupCommonOptions, MenuOptions, Callback as arkui_component_common_Callback, ThemeColorMode, HistoricalPoint_serializer, HistoricalPoint, UIScrollableCommonEvent, UIScrollableCommonEventInternal, GeometryInfo, Measurable, Layoutable, ICurve, Rectangle, ShadowOptions, ShadowStyle, BackgroundBlurStyleOptions, BackgroundEffectOptions, KeyboardAvoidMode as arkui_component_common_KeyboardAvoidMode, HoverModeAreaType, SystemUiMaterial, DistortionMode, EdgeLightMode, EventTarget, SourceType, ModifierKeyStateGetter, TouchObject, SizeResult, LinearGradientOptions, RadialGradientOptions, CommonMethod, Rectangle_serializer, ShadowOptions_serializer, BackgroundBlurStyleOptions_serializer, BackgroundEffectOptions_serializer, LinearGradientOptions_serializer, RadialGradientOptions_serializer, EventTarget_serializer, TouchObject_serializer } from './common'
+import { AnimateParam_serializer, TranslateOptions_serializer, KeyframeAnimateParam_serializer, KeyframeState_serializer, AnimateParam, TranslateOptions, KeyframeAnimateParam, KeyframeState, Bindable_I32_serializer, Bindable, BlurStyle, OnWillScrollCallback, OnScrollCallback, MouseEvent_serializer, AxisEvent_serializer, MouseEvent, MouseEventInternal, AxisEvent, AxisEventInternal, Bindable_WidthBreakpoint_serializer, Bindable_HeightBreakpoint_serializer, ClickEvent, ClickEventInternal, ItemDragEventHandler_serializer, OnMoveHandler, ItemDragEventHandler, UICommonEvent, UICommonEventInternal, SourceTool, SheetOptions_serializer, KeyEvent, KeyEventInternal, SheetOptions, InputEventListener, RawInputEventWrapper, RawInputEventWrapperInternal, OnVisibleIndexesChangeCallback, PopupCommonOptions_serializer, MenuOptions_serializer, PopupCommonOptions, MenuOptions, Callback as arkui_component_common_Callback, ThemeColorMode, HistoricalPoint_serializer, HistoricalPoint, UIScrollableCommonEvent, UIScrollableCommonEventInternal, GeometryInfo, Measurable, Layoutable, ICurve, Rectangle, ShadowOptions, ShadowStyle, BackgroundBlurStyleOptions, BackgroundEffectOptions, KeyboardAvoidMode as arkui_component_common_KeyboardAvoidMode, HoverModeAreaType, SystemUiMaterial, DistortionMode, EdgeLightMode, EventTarget, SourceType, ModifierKeyStateGetter, TouchObject, SizeResult, LinearGradientOptions, RadialGradientOptions, CommonMethod, Rectangle_serializer, ShadowOptions_serializer, BackgroundBlurStyleOptions_serializer, BackgroundEffectOptions_serializer, LinearGradientOptions_serializer, RadialGradientOptions_serializer, EventTarget_serializer, TouchObject_serializer } from './common'
 import { extractors, TouchEvent, ContentModifier, XComponentController, CustomDialogController, initializers, hookRootAttributeModifier, AttributeModifier, AttributeUpdater, hookComponentRootAttributeModifier, hookCustomBuilderRootAttributeModifier, hookCustomLayoutRootAttributeModifier } from '#handwritten'
 import { arkui_component_units_Font_serializer, Font as arkui_component_units_Font, VoidCallback, SizeOptions_serializer, Length, Resource as arkui_component_units_Resource, SizeOptions, Position_serializer, Position, ResourceColor, ItemFillPolicy_serializer, ItemFillPolicy, DrawingCanvas, ConstraintSizeOptions, Offset, Dimension, BorderRadiuses, EdgeWidths, EdgeColors, EdgeStyles, Offset_serializer, BorderRadiuses_serializer, EdgeWidths_serializer, EdgeColors_serializer, EdgeStyles_serializer } from './units'
 import { Vector2_serializer, Size_serializer, Vector3_serializer, Circle_serializer, RoundRect_serializer, CommandPath_serializer, Frame_serializer, arkui_Graphics_DrawContext_serializer } from './../framework/Graphics'
@@ -98,6 +98,7 @@ import { memo, memo_stable, memo_skip } from 'arkui.stateManagement.runtime'
 import { ComponentBuilder, Builder } from '@koalaui/builderLambda'
 import { default as curves } from '@ohos.curves'
 import { default as uiMaterial } from '@ohos.arkui.uiMaterial'
+import { HandednessFollowMode } from '@ohos.arkui.dialog'
 import { ParticleUpdater, ParticleColorOptions, VelocityOptions, EmitterParticleOptions, ParticleEmitterShape, DistributionType, DisturbanceFieldShape, ParticleColorOptions_serializer, EmitterParticleOptions_serializer, VelocityOptions_serializer } from './particle'
 import { default as router } from '@ohos.router'
 import { RootModifier } from './../RootModifier'
@@ -2445,6 +2446,17 @@ export class FrameNodeExtender {
         const peer_casted = peer as (KPointer)
         return FrameNodeExtender.isModifiable_serialize(peer_casted)
     }
+    public static dispatchInputEvent(peer: FrameNode, event: InputEventType, competitionStrategy?: CompetitionStrategy): boolean {
+        const peer_casted = peer as (FrameNode)
+        const event_casted = event as (InputEventType)
+        const competitionStrategy_casted = competitionStrategy as (CompetitionStrategy | undefined)
+        return FrameNodeExtender.dispatchInputEvent_serialize(peer_casted, event_casted, competitionStrategy_casted)
+    }
+    public static dispatchKeyEvent(peer: FrameNode, event: KeyEvent): boolean {
+        const peer_casted = peer as (FrameNode)
+        const event_casted = event as (KeyEvent)
+        return FrameNodeExtender.dispatchKeyEvent_serialize(peer_casted, event_casted)
+    }
     public static appendChild(peer: FrameNode, child: FrameNode): int32 {
         const peer_casted = peer as (FrameNode)
         const child_casted = child as (FrameNode)
@@ -2812,6 +2824,37 @@ export class FrameNodeExtender {
     }
     private static isModifiable_serialize(peer: KPointer): boolean {
         const retval = ArkUIGeneratedNativeModule._FrameNodeExtender_isModifiable(peer)
+        return retval
+    }
+    private static dispatchInputEvent_serialize(peer: FrameNode, event: InputEventType, competitionStrategy?: CompetitionStrategy): boolean {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (event instanceof TouchEvent) {
+            thisSerializer.writeInt8((0).toByte())
+            const eventForIdx0 = event as TouchEvent
+            const eventForIdx0Transformed: TouchEventProxy = extractors.transform_Ark_TouchEvent_to_Ark_TouchEventProxy(eventForIdx0)
+            TouchEventProxy_serializer.write(thisSerializer, eventForIdx0Transformed)
+        } else if (event instanceof MouseEvent) {
+            thisSerializer.writeInt8((1).toByte())
+            const eventForIdx1 = event as MouseEvent
+            MouseEvent_serializer.write(thisSerializer, eventForIdx1)
+        } else if (event instanceof AxisEvent) {
+            thisSerializer.writeInt8((2).toByte())
+            const eventForIdx2 = event as AxisEvent
+            AxisEvent_serializer.write(thisSerializer, eventForIdx2)
+        }
+        if (competitionStrategy !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const competitionStrategyTmpValue = (competitionStrategy as CompetitionStrategy)
+            thisSerializer.writeInt32(competitionStrategyTmpValue.valueOf())
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        const retval = ArkUIGeneratedNativeModule._FrameNodeExtender_dispatchInputEvent(extractors.toFrameNodePtr(peer), thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+        return retval
+    }
+    private static dispatchKeyEvent_serialize(peer: FrameNode, event: KeyEvent): boolean {
+        const retval = ArkUIGeneratedNativeModule._FrameNodeExtender_dispatchKeyEvent(extractors.toFrameNodePtr(peer), toPeerPtr(event))
         return retval
     }
     private static appendChild_serialize(peer: FrameNode, child: FrameNode): int32 {
@@ -3873,19 +3916,24 @@ export class IUIContext {
         IUIContext.enableEventPassthrough_serialize(enabled_casted, eventType_casted)
         return
     }
-    public static addLocalInputEventMonitor(eventMask: int32, listener: InputEventListener): InputEventMonitor {
+    public static addLocalInputEventMonitor(eventMask: int32, listener: InputEventListener): KPointer {
         const eventMask_casted = eventMask as (int32)
         const listener_casted = listener as (InputEventListener)
         return IUIContext.addLocalInputEventMonitor_serialize(eventMask_casted, listener_casted)
     }
-    public static removeLocalInputEventMonitor(monitor: InputEventMonitor): void {
-        const monitor_casted = monitor as (InputEventMonitor)
+    public static removeLocalInputEventMonitor(monitor: KPointer): void {
+        const monitor_casted = monitor as (KPointer)
         IUIContext.removeLocalInputEventMonitor_serialize(monitor_casted)
         return
     }
     public static setTextSelectionClearPolicy(policy: TextSelectionClearPolicy): void {
         const policy_casted = policy as (TextSelectionClearPolicy)
         IUIContext.setTextSelectionClearPolicy_serialize(policy_casted)
+        return
+    }
+    public static setTransPageEnabled(enabled: boolean | undefined): void {
+        const enabled_casted = enabled as (boolean | undefined)
+        IUIContext.setTransPageEnabled_serialize(enabled_casted)
         return
     }
     private static freezeUINode0_serialize(id: string, isFrozen: boolean): void {
@@ -3998,24 +4046,31 @@ export class IUIContext {
         ArkUIGeneratedNativeModule._IUIContext_enableEventPassthrough(thisSerializer.asBuffer(), thisSerializer.length(), eventType.valueOf())
         thisSerializer.release()
     }
-    private static addLocalInputEventMonitor_serialize(eventMask: int32, listener: InputEventListener): InputEventMonitor {
+    private static addLocalInputEventMonitor_serialize(eventMask: int32, listener: InputEventListener): KPointer {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         thisSerializer.holdAndWriteCallback(listener)
         const retval = ArkUIGeneratedNativeModule._IUIContext_addLocalInputEventMonitor(eventMask, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
-        let retvalDeserializer: DeserializerBase = new DeserializerBase(retval, retval.length)
-        const returnResult: InputEventMonitor = InputEventMonitor_serializer.read(retvalDeserializer)
-        retvalDeserializer.dispose()
-        return (returnResult as InputEventMonitor)
+        return retval
     }
-    private static removeLocalInputEventMonitor_serialize(monitor: InputEventMonitor): void {
-        const thisSerializer: SerializerBase = SerializerBase.hold()
-        InputEventMonitor_serializer.write(thisSerializer, monitor)
-        ArkUIGeneratedNativeModule._IUIContext_removeLocalInputEventMonitor(thisSerializer.asBuffer(), thisSerializer.length())
-        thisSerializer.release()
+    private static removeLocalInputEventMonitor_serialize(monitor: KPointer): void {
+        ArkUIGeneratedNativeModule._IUIContext_removeLocalInputEventMonitor(monitor)
+        return
     }
     private static setTextSelectionClearPolicy_serialize(policy: TextSelectionClearPolicy): void {
         ArkUIGeneratedNativeModule._IUIContext_setTextSelectionClearPolicy(policy.valueOf())
+    }
+    private static setTransPageEnabled_serialize(enabled: boolean | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (enabled !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const enabledTmpValue = enabled!
+            thisSerializer.writeBoolean(enabledTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._IUIContext_setTransPageEnabled(thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
     }
 }
 export class LazyBuild {
@@ -4212,6 +4267,11 @@ export class LazyForEachOps {
         LazyForEachOps.SetOptions_serialize(node_casted, options_casted)
         return
     }
+    public static ClearCache(node: KPointer): void {
+        const node_casted = node as (KPointer)
+        LazyForEachOps.ClearCache_serialize(node_casted)
+        return
+    }
     private static NotifyChange_serialize(node: KPointer, startIndex: int32, endIndex: int32, count: int32): void {
         ArkUIGeneratedNativeModule._LazyForEachOps_NotifyChange(node, startIndex, endIndex, count)
     }
@@ -4249,6 +4309,9 @@ export class LazyForEachOps {
         LazyForEachOptions_serializer.write(thisSerializer, options)
         ArkUIGeneratedNativeModule._LazyForEachOps_SetOptions(node, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
+    }
+    private static ClearCache_serialize(node: KPointer): void {
+        ArkUIGeneratedNativeModule._LazyForEachOps_ClearCache(node)
     }
 }
 export class LazyWaterFlowLayoutExtender {
@@ -7766,6 +7829,7 @@ export interface CustomDialogControllerOptionsExtender {
     systemMaterial?: SystemUiMaterial;
     distortionMode?: DistortionMode;
     edgeLightMode?: EdgeLightMode;
+    adaptToHandedness?: HandednessFollowMode;
 }
 export interface CustomDialogControllerExternalOptionsExtender {
     customStyle?: boolean;
@@ -8202,6 +8266,7 @@ export interface ImmersiveOptionsInner {
     applyShadow?: boolean;
     interactive?: boolean;
     lightEffect?: LightEffectOptionsInner | null;
+    colorBlendMode?: int32;
 }
 export interface WaterFlowSectionsInterface {
     ptr: KPointer;
@@ -10677,6 +10742,14 @@ export class ImmersiveOptionsInner_serializer {
         } else {
             valueSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
+        const valueHolderForColorBlendMode = value.colorBlendMode
+        if (valueHolderForColorBlendMode !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForColorBlendModeTmpValue = valueHolderForColorBlendMode!
+            valueSerializer.writeInt32(valueHolderForColorBlendModeTmpValue)
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
     }
     public static read(buffer: DeserializerBase): ImmersiveOptionsInner {
         let valueDeserializer: DeserializerBase = buffer
@@ -10729,7 +10802,13 @@ export class ImmersiveOptionsInner_serializer {
             lightEffectTmpBuf = LightEffectOptionsInner_serializer.read(valueDeserializer)
         }
         const lightEffectTmpResult: LightEffectOptionsInner | null | undefined = lightEffectTmpBuf
-        let value: ImmersiveOptionsInner = ({style: styleTmpResult, materialColor: materialColorTmpResult, colorInvert: colorInvertTmpResult, applyShadow: applyShadowTmpResult, interactive: interactiveTmpResult, lightEffect: lightEffectTmpResult} as ImmersiveOptionsInner)
+        const colorBlendModeTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let colorBlendModeTmpBuf: int32 | undefined = undefined
+        if ((colorBlendModeTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            colorBlendModeTmpBuf = valueDeserializer.readInt32()
+        }
+        const colorBlendModeTmpResult: int32 | undefined = colorBlendModeTmpBuf
+        let value: ImmersiveOptionsInner = ({style: styleTmpResult, materialColor: materialColorTmpResult, colorInvert: colorInvertTmpResult, applyShadow: applyShadowTmpResult, interactive: interactiveTmpResult, lightEffect: lightEffectTmpResult, colorBlendMode: colorBlendModeTmpResult} as ImmersiveOptionsInner)
         return value
     }
 }
@@ -11377,6 +11456,14 @@ export class CustomDialogControllerOptionsExtender_serializer {
         } else {
             valueSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
+        const valueHolderForAdaptToHandedness = value.adaptToHandedness
+        if (valueHolderForAdaptToHandedness !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForAdaptToHandednessTmpValue = (valueHolderForAdaptToHandedness as HandednessFollowMode)
+            valueSerializer.writeInt32(valueHolderForAdaptToHandednessTmpValue.valueOf())
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
     }
     public static read(buffer: DeserializerBase): CustomDialogControllerOptionsExtender {
         let valueDeserializer: DeserializerBase = buffer
@@ -11848,7 +11935,13 @@ export class CustomDialogControllerOptionsExtender_serializer {
             edgeLightModeTmpBuf = EdgeLightMode.fromValue(valueDeserializer.readInt32())
         }
         const edgeLightModeTmpResult: EdgeLightMode | undefined = edgeLightModeTmpBuf
-        let value: CustomDialogControllerOptionsExtender = ({builder: builderTmpResult, cancel: cancelTmpResult, autoCancel: autoCancelTmpResult, alignment: alignmentTmpResult, offset: offsetTmpResult, customStyle: customStyleTmpResult, gridCount: gridCountTmpResult, maskColor: maskColorTmpResult, maskRect: maskRectTmpResult, openAnimation: openAnimationTmpResult, closeAnimation: closeAnimationTmpResult, showInSubWindow: showInSubWindowTmpResult, displayModeInSubWindow: displayModeInSubWindowTmpResult, backgroundColor: backgroundColorTmpResult, cornerRadius: cornerRadiusTmpResult, isModal: isModalTmpResult, onWillDismiss: onWillDismissTmpResult, width: widthTmpResult, height: heightTmpResult, borderWidth: borderWidthTmpResult, borderColor: borderColorTmpResult, borderStyle: borderStyleTmpResult, shadow: shadowTmpResult, backgroundBlurStyle: backgroundBlurStyleTmpResult, backgroundBlurStyleOptions: backgroundBlurStyleOptionsTmpResult, backgroundEffect: backgroundEffectTmpResult, keyboardAvoidMode: keyboardAvoidModeTmpResult, enableHoverMode: enableHoverModeTmpResult, hoverModeArea: hoverModeAreaTmpResult, onDidAppear: onDidAppearTmpResult, onDidDisappear: onDidDisappearTmpResult, onWillAppear: onWillAppearTmpResult, onWillDisappear: onWillDisappearTmpResult, keyboardAvoidDistance: keyboardAvoidDistanceTmpResult, levelMode: levelModeTmpResult, levelUniqueId: levelUniqueIdTmpResult, immersiveMode: immersiveModeTmpResult, levelOrderExtender: levelOrderExtenderTmpResult, focusable: focusableTmpResult, systemMaterial: systemMaterialTmpResult, distortionMode: distortionModeTmpResult, edgeLightMode: edgeLightModeTmpResult} as CustomDialogControllerOptionsExtender)
+        const adaptToHandednessTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let adaptToHandednessTmpBuf: HandednessFollowMode | undefined = undefined
+        if ((adaptToHandednessTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            adaptToHandednessTmpBuf = HandednessFollowMode.fromValue(valueDeserializer.readInt32())
+        }
+        const adaptToHandednessTmpResult: HandednessFollowMode | undefined = adaptToHandednessTmpBuf
+        let value: CustomDialogControllerOptionsExtender = ({builder: builderTmpResult, cancel: cancelTmpResult, autoCancel: autoCancelTmpResult, alignment: alignmentTmpResult, offset: offsetTmpResult, customStyle: customStyleTmpResult, gridCount: gridCountTmpResult, maskColor: maskColorTmpResult, maskRect: maskRectTmpResult, openAnimation: openAnimationTmpResult, closeAnimation: closeAnimationTmpResult, showInSubWindow: showInSubWindowTmpResult, displayModeInSubWindow: displayModeInSubWindowTmpResult, backgroundColor: backgroundColorTmpResult, cornerRadius: cornerRadiusTmpResult, isModal: isModalTmpResult, onWillDismiss: onWillDismissTmpResult, width: widthTmpResult, height: heightTmpResult, borderWidth: borderWidthTmpResult, borderColor: borderColorTmpResult, borderStyle: borderStyleTmpResult, shadow: shadowTmpResult, backgroundBlurStyle: backgroundBlurStyleTmpResult, backgroundBlurStyleOptions: backgroundBlurStyleOptionsTmpResult, backgroundEffect: backgroundEffectTmpResult, keyboardAvoidMode: keyboardAvoidModeTmpResult, enableHoverMode: enableHoverModeTmpResult, hoverModeArea: hoverModeAreaTmpResult, onDidAppear: onDidAppearTmpResult, onDidDisappear: onDidDisappearTmpResult, onWillAppear: onWillAppearTmpResult, onWillDisappear: onWillDisappearTmpResult, keyboardAvoidDistance: keyboardAvoidDistanceTmpResult, levelMode: levelModeTmpResult, levelUniqueId: levelUniqueIdTmpResult, immersiveMode: immersiveModeTmpResult, levelOrderExtender: levelOrderExtenderTmpResult, focusable: focusableTmpResult, systemMaterial: systemMaterialTmpResult, distortionMode: distortionModeTmpResult, edgeLightMode: edgeLightModeTmpResult, adaptToHandedness: adaptToHandednessTmpResult} as CustomDialogControllerOptionsExtender)
         return value
     }
 }

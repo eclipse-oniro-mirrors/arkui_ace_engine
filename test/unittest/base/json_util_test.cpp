@@ -14,6 +14,16 @@
  */
 
 #include <memory>
+#include <algorithm>
+#include <cstdlib>
+#include <limits>
+#include <cstdint>
+#ifdef ACE_HOST_PRODUCT
+#include "cJSON.h"
+#include "core/components_ng/base/ui_tree_collector.h"
+#include "interfaces/native/native_type.h"
+#endif
+#include "base/json/json_util_internal.h"
 #include <sys/types.h>
 
 #include "gtest/gtest.h"
@@ -385,8 +395,7 @@ HWTEST_F(JsonUtilTest, JsonUtilTest014, TestSize.Level1)
     /**
      * @tc.steps: step3. construct the nullptr value.
      */
-    char c = '5';
-    const char* key2 = &c;
+    const char* key2 = "5";
     const char* value2 = nullptr;
     /**
      * @tc.steps: step4. get results
@@ -398,8 +407,7 @@ HWTEST_F(JsonUtilTest, JsonUtilTest014, TestSize.Level1)
     /**
      * @tc.steps: step5. construct value not null
      */
-    char c2 = 'v';
-    const char* value3 = &c2;
+    const char* value3 = "v";
     bool ret3 = jsonValue.Put(key2, value3);
     EXPECT_TRUE(ret3);
     bool ret4 = jsonValue.Put(key, value3);
@@ -451,8 +459,7 @@ HWTEST_F(JsonUtilTest, JsonUtilTest016, TestSize.Level1)
     /**
      * @tc.steps: step1. construct the nullptr value.
      */
-    char c = '5';
-    const char* key2 = &c;
+    const char* key2 = "5";
     const std::unique_ptr<JsonValue>& value2 = nullptr;
     /**
      * @tc.steps: step2. get  results
@@ -464,8 +471,7 @@ HWTEST_F(JsonUtilTest, JsonUtilTest016, TestSize.Level1)
     /**
      * @tc.steps: step3. construct the value not null
      */
-    char valueStr = '5';
-    const char* valueTemp = &valueStr;
+    const char* valueTemp = "5";
     bool ret3 = jsonValue.Put(key2, valueTemp);
     EXPECT_TRUE(ret3);
     bool ret4 = jsonValue.Put(key, valueTemp);
@@ -495,8 +501,7 @@ HWTEST_F(JsonUtilTest, JsonUtilTest017, TestSize.Level1)
     /**
      * @tc.steps: step1. construct the nullptr value.
      */
-    char c = '5';
-    const char* key2 = &c;
+    const char* key2 = "5";
     /**
      * @tc.steps: step2. get  results
      * @tc.expected: step2.  the results are correct.
@@ -1274,12 +1279,596 @@ HWTEST_F(JsonUtilTest, JsonUtilTest041, TestSize.Level1)
     JsonObject* ret = jsonValue.ReleaseJsonObject();
     ASSERT_TRUE(ret == nullptr);
     // PutRef() isRoot_ true
-    char keyChar = 'k';
-    char* keyPtr = &keyChar;
+    const char* keyPtr = "k";
     std::unique_ptr<JsonValue> value2 = JsonUtil::Create(true);
     bool ret2 = jsonValue.PutRef(keyPtr, std::move(value2));
     ASSERT_TRUE(ret2);
     bool ret3 = jsonValue.PutRef(std::move(value2));
     ASSERT_TRUE(ret3);
+}
+} // namespace OHOS::Ace
+
+namespace OHOS::Ace {
+namespace {
+constexpr uintptr_t OUTPUT_POINTER_SENTINEL = 1;
+constexpr uint32_t OUTPUT_SIZE_SENTINEL = 99;
+constexpr size_t TEST_JSON_BYTE_LIMIT = 4096;
+constexpr size_t MAX_TREE_BYTE_LIMIT = 5 * 1024 * 1024;
+constexpr int MAX_TEST_TREE_DEPTH = 5000;
+constexpr int TREE_SCHEMA_VERSION = 1;
+#ifdef ACE_HOST_PRODUCT
+constexpr int ALLOCATION_FAILURE_DISABLED = -1;
+constexpr int SUBTREE_ALLOCATION_COUNT = 5;
+constexpr int32_t REPLACEMENT_NUMBER = 42;
+constexpr char REPLACEMENT_STRING[] = "replacement";
+// cJSON hooks are process-global: these fault tests run sequentially and restore the allocator.
+int jsonAllocationCountdown = ALLOCATION_FAILURE_DISABLED;
+size_t jsonTrackedAllocations = 0;
+size_t jsonTrackedFrees = 0;
+void* FailJsonAllocation(size_t size)
+{
+    if (jsonAllocationCountdown == 0) {
+        jsonAllocationCountdown = ALLOCATION_FAILURE_DISABLED; // fail once, so cleanup and the next request can proceed
+        return nullptr;
+    }
+    if (jsonAllocationCountdown > 0) {
+        --jsonAllocationCountdown;
+    }
+    auto* allocation = std::malloc(size);
+    if (allocation) {
+        ++jsonTrackedAllocations;
+    }
+    return allocation;
+}
+void FreeJsonAllocation(void* value)
+{
+    if (value) {
+        ++jsonTrackedFrees;
+    }
+    std::free(value);
+}
+class JsonAllocationFailure final {
+public:
+    explicit JsonAllocationFailure(int countdown)
+    {
+        jsonAllocationCountdown = countdown;
+        jsonTrackedAllocations = 0;
+        jsonTrackedFrees = 0;
+        cJSON_Hooks hooks { FailJsonAllocation, FreeJsonAllocation };
+        cJSON_InitHooks(&hooks);
+    }
+    ~JsonAllocationFailure()
+    {
+        cJSON_InitHooks(nullptr);
+    }
+};
+
+template<typename Replace>
+void CheckReplaceAllocationFailures(Replace replace)
+{
+    size_t allocationCount = 0;
+    {
+        auto object = JsonUtil::Create();
+        ASSERT_TRUE(object->Put(TEST_KEY.c_str(), TEST_STRING.c_str()));
+        JsonAllocationFailure allocations(ALLOCATION_FAILURE_DISABLED);
+        ASSERT_TRUE(replace(*object));
+        allocationCount = jsonTrackedAllocations;
+    }
+    ASSERT_GT(allocationCount, 0u);
+    auto object = JsonUtil::Create();
+    ASSERT_TRUE(object->Put(TEST_KEY.c_str(), TEST_STRING.c_str()));
+    for (size_t allocation = 0; allocation < allocationCount; ++allocation) {
+        SCOPED_TRACE(allocation);
+        JsonWriteErrorScope scope;
+        JsonAllocationFailure fault(static_cast<int>(allocation));
+        EXPECT_FALSE(replace(*object));
+        EXPECT_TRUE(scope.HasError());
+        EXPECT_EQ(object->GetString(TEST_KEY), TEST_STRING);
+        EXPECT_EQ(jsonAllocationCountdown, ALLOCATION_FAILURE_DISABLED);
+        EXPECT_EQ(jsonTrackedAllocations, jsonTrackedFrees);
+    }
+    JsonWriteErrorScope recovered;
+    EXPECT_TRUE(replace(*object));
+    EXPECT_FALSE(recovered.HasError());
+}
+
+template<typename Put>
+void CheckPutAllocationFailures(Put put)
+{
+    size_t allocationCount = 0;
+    {
+        auto object = JsonUtil::Create();
+        JsonAllocationFailure allocations(ALLOCATION_FAILURE_DISABLED);
+        ASSERT_TRUE(put(*object));
+        allocationCount = jsonTrackedAllocations;
+    }
+    ASSERT_GT(allocationCount, 0u);
+    auto object = JsonUtil::Create();
+    for (size_t allocation = 0; allocation < allocationCount; ++allocation) {
+        SCOPED_TRACE(allocation);
+        JsonWriteErrorScope scope;
+        JsonAllocationFailure fault(static_cast<int>(allocation));
+        // The final allocation duplicates the key: attachment failure historically returns true.
+        EXPECT_EQ(put(*object), allocation + 1 == allocationCount);
+        EXPECT_TRUE(scope.HasError());
+        EXPECT_FALSE(object->Contains(TEST_KEY));
+        EXPECT_EQ(jsonAllocationCountdown, ALLOCATION_FAILURE_DISABLED);
+        EXPECT_EQ(jsonTrackedAllocations, jsonTrackedFrees);
+    }
+    JsonWriteErrorScope recovered;
+    EXPECT_TRUE(put(*object));
+    EXPECT_TRUE(object->Contains(TEST_KEY));
+    EXPECT_FALSE(recovered.HasError());
+}
+#endif
+
+std::string BoundedOutput(const JsonValue& value, bool pretty, size_t limit, JsonWriteResult expected)
+{
+    char* data = reinterpret_cast<char*>(OUTPUT_POINTER_SENTINEL);
+    size_t size = OUTPUT_SIZE_SENTINEL;
+    auto result = WriteJsonBounded(value, pretty, limit, &data, &size);
+    EXPECT_EQ(result, expected);
+    if (result != JsonWriteResult::SUCCESS) {
+        EXPECT_EQ(data, nullptr);
+        EXPECT_EQ(size, 0u);
+        return "";
+    }
+    EXPECT_NE(data, nullptr);
+    EXPECT_EQ(data[size], '\0');
+    std::string output(data, size);
+    std::free(data);
+    return output;
+}
+} // namespace
+
+#ifdef ACE_HOST_PRODUCT
+HWTEST_F(JsonUtilTest, EmptyTreeSerializationRejectsEveryJsonAllocationFailure, TestSize.Level1)
+{
+    auto empty = JsonUtil::CreateSharedPtrJson();
+    for (bool pretty : { false, true }) {
+        size_t allocationCount = 0;
+        {
+            JsonAllocationFailure allocations(ALLOCATION_FAILURE_DISABLED);
+            char* data = nullptr;
+            uint32_t size = 0;
+            EXPECT_EQ(NG::SerializeUITree(empty, pretty, &data, &size), ARKUI_ERROR_CODE_NO_ERROR);
+            EXPECT_NE(data, nullptr);
+            std::free(data);
+            allocationCount = jsonTrackedAllocations;
+            EXPECT_EQ(jsonTrackedAllocations, jsonTrackedFrees);
+        }
+        ASSERT_GT(allocationCount, 0u);
+        // Sweep actual allocations, including creation of the treeInfo null value.
+        for (size_t allocation = 0; allocation < allocationCount; ++allocation) {
+            SCOPED_TRACE(allocation);
+            JsonAllocationFailure fault(static_cast<int>(allocation));
+            char* data = nullptr;
+            uint32_t size = OUTPUT_SIZE_SENTINEL;
+            EXPECT_EQ(NG::SerializeUITree(empty, pretty, &data, &size), ARKUI_ERROR_CODE_RESOURCE_EXHAUSTED);
+            EXPECT_EQ(data, nullptr);
+            EXPECT_EQ(size, 0u);
+            EXPECT_EQ(jsonAllocationCountdown, ALLOCATION_FAILURE_DISABLED);
+            EXPECT_EQ(jsonTrackedAllocations, jsonTrackedFrees);
+            std::free(data);
+        }
+        char* data = nullptr;
+        uint32_t size = 0;
+        ASSERT_EQ(NG::SerializeUITree(empty, pretty, &data, &size), ARKUI_ERROR_CODE_NO_ERROR);
+        ASSERT_NE(data, nullptr);
+        auto result = JsonUtil::ParseJsonString(data);
+        std::free(data);
+        EXPECT_EQ(result->GetInt("schemaVersion"), TREE_SCHEMA_VERSION);
+        EXPECT_TRUE(result->Contains("treeInfo"));
+        EXPECT_TRUE(result->GetValue("treeInfo")->IsNull());
+    }
+}
+
+HWTEST_F(JsonUtilTest, WriteFailureScopeTracksCreateCopyAndKeyAllocation, TestSize.Level1)
+{
+    auto parent = JsonUtil::Create();
+    auto source = JsonUtil::Create();
+    source->Put("text", "value");
+    // Number allocation succeeds, then allocation of its object key fails.
+    {
+        JsonWriteErrorScope scope;
+        JsonAllocationFailure fault(1);
+        EXPECT_TRUE(parent->Put("number", 1));
+        EXPECT_TRUE(scope.HasError());
+        EXPECT_FALSE(parent->Contains("number"));
+        EXPECT_EQ(jsonTrackedAllocations, jsonTrackedFrees);
+    }
+    {
+        JsonWriteErrorScope scope;
+        JsonAllocationFailure fault(0);
+        auto value = JsonUtil::CreateArray();
+        EXPECT_FALSE(value->IsValid());
+        EXPECT_TRUE(scope.HasError());
+    }
+    // Exercise every allocation in a small subtree duplication and its final object key.
+    for (int allocation = 0; allocation < SUBTREE_ALLOCATION_COUNT; ++allocation) {
+        JsonWriteErrorScope scope;
+        JsonAllocationFailure fault(allocation);
+        EXPECT_EQ(parent->Put("subtree", source), allocation + 1 == SUBTREE_ALLOCATION_COUNT);
+        EXPECT_TRUE(scope.HasError());
+        EXPECT_FALSE(parent->Contains("subtree"));
+        EXPECT_EQ(jsonTrackedAllocations, jsonTrackedFrees);
+    }
+    JsonWriteErrorScope recovered;
+    EXPECT_TRUE(parent->Put("subtree", source));
+    EXPECT_FALSE(recovered.HasError());
+}
+
+HWTEST_F(JsonUtilTest, PutPreservesLegacyReturnValuesOnAllocationFailure, TestSize.Level1)
+{
+    CheckPutAllocationFailures([](JsonValue& object) {
+        return object.Put(TEST_KEY.c_str(), TEST_STRING.c_str());
+    });
+    CheckPutAllocationFailures([](JsonValue& object) {
+        return object.Put(TEST_KEY.c_str(), true);
+    });
+    CheckPutAllocationFailures([](JsonValue& object) {
+        return object.Put(TEST_KEY.c_str(), REPLACEMENT_NUMBER);
+    });
+    CheckPutAllocationFailures([](JsonValue& object) {
+        return object.Put(TEST_KEY.c_str(), static_cast<size_t>(REPLACEMENT_NUMBER));
+    });
+    CheckPutAllocationFailures([](JsonValue& object) {
+        return object.Put(TEST_KEY.c_str(), static_cast<double>(REPLACEMENT_NUMBER));
+    });
+    auto value = JsonUtil::Create();
+    ASSERT_TRUE(value->Put(TEST_KEY.c_str(), TEST_STRING.c_str()));
+    CheckPutAllocationFailures([&value](JsonValue& object) {
+        return object.Put(TEST_KEY.c_str(), value);
+    });
+    auto sharedValue = JsonUtil::CreateSharedPtrJson();
+    ASSERT_TRUE(sharedValue->Put(TEST_KEY.c_str(), TEST_STRING.c_str()));
+    CheckPutAllocationFailures([&sharedValue](JsonValue& object) {
+        return object.Put(TEST_KEY.c_str(), sharedValue);
+    });
+}
+
+HWTEST_F(JsonUtilTest, WriteFailureScopeTracksReplaceAllocations, TestSize.Level1)
+{
+    CheckReplaceAllocationFailures([](JsonValue& object) {
+        return object.Replace(TEST_KEY.c_str(), true);
+    });
+    CheckReplaceAllocationFailures([](JsonValue& object) {
+        return object.Replace(TEST_KEY.c_str(), REPLACEMENT_NUMBER);
+    });
+    CheckReplaceAllocationFailures([](JsonValue& object) {
+        return object.Replace(TEST_KEY.c_str(), static_cast<double>(REPLACEMENT_NUMBER));
+    });
+    CheckReplaceAllocationFailures([](JsonValue& object) {
+        return object.Replace(TEST_KEY.c_str(), REPLACEMENT_STRING);
+    });
+    auto subtree = JsonUtil::Create();
+    ASSERT_TRUE(subtree->Put(TEST_KEY.c_str(), TEST_STRING.c_str()));
+    CheckReplaceAllocationFailures([&subtree](JsonValue& object) {
+        return object.Replace(TEST_KEY.c_str(), subtree);
+    });
+}
+
+HWTEST_F(JsonUtilTest, WriteFailureScopeIgnoresMissingReplaceTargets, TestSize.Level1)
+{
+    auto object = JsonUtil::Create();
+    auto subtree = JsonUtil::Create();
+    ASSERT_TRUE(object->Put(TEST_KEY.c_str(), TEST_STRING.c_str()));
+    ASSERT_TRUE(subtree->Put(TEST_KEY.c_str(), TEST_STRING.c_str()));
+    JsonWriteErrorScope scope;
+    JsonAllocationFailure allocations(ALLOCATION_FAILURE_DISABLED);
+    EXPECT_FALSE(object->Replace(TEST_FALSE_KEY.c_str(), true));
+    EXPECT_FALSE(object->Replace(TEST_FALSE_KEY.c_str(), REPLACEMENT_NUMBER));
+    EXPECT_FALSE(object->Replace(TEST_FALSE_KEY.c_str(), static_cast<double>(REPLACEMENT_NUMBER)));
+    EXPECT_FALSE(object->Replace(TEST_FALSE_KEY.c_str(), REPLACEMENT_STRING));
+    EXPECT_FALSE(object->Replace(TEST_FALSE_KEY.c_str(), subtree));
+    EXPECT_FALSE(scope.HasError());
+    EXPECT_EQ(object->GetString(TEST_KEY), TEST_STRING);
+    EXPECT_EQ(jsonTrackedAllocations, jsonTrackedFrees);
+}
+
+HWTEST_F(JsonUtilTest, WriteFailureScopeIgnoresInvalidReplaceArguments, TestSize.Level1)
+{
+    auto object = JsonUtil::Create();
+    auto subtree = JsonUtil::Create();
+    auto invalidValue = std::make_unique<JsonValue>();
+    std::unique_ptr<JsonValue> emptyValue;
+    JsonWriteErrorScope scope;
+    JsonAllocationFailure fault(0);
+    EXPECT_FALSE(object->Replace(nullptr, true));
+    EXPECT_FALSE(object->Replace(nullptr, REPLACEMENT_NUMBER));
+    EXPECT_FALSE(object->Replace(nullptr, static_cast<double>(REPLACEMENT_NUMBER)));
+    EXPECT_FALSE(object->Replace(nullptr, REPLACEMENT_STRING));
+    EXPECT_FALSE(object->Replace(nullptr, subtree));
+    EXPECT_FALSE(object->Replace(TEST_KEY.c_str(), static_cast<const char*>(nullptr)));
+    EXPECT_FALSE(object->Replace(TEST_KEY.c_str(), emptyValue));
+    EXPECT_FALSE(object->Replace(TEST_KEY.c_str(), invalidValue));
+    EXPECT_FALSE(scope.HasError());
+    EXPECT_EQ(jsonAllocationCountdown, 0);
+    EXPECT_EQ(jsonTrackedAllocations, 0u);
+}
+
+HWTEST_F(JsonUtilTest, WriteFailureScopeIgnoresInvalidArguments, TestSize.Level1)
+{
+    auto object = JsonUtil::Create();
+    auto value = JsonUtil::Create();
+    auto sharedValue = JsonUtil::CreateSharedPtrJson();
+    auto nullValue = JsonUtil::ParseJsonString("null");
+    std::unique_ptr<JsonValue> emptyValue;
+    std::shared_ptr<JsonValue> emptySharedValue;
+    JsonWriteErrorScope scope;
+    JsonAllocationFailure fault(0);
+    EXPECT_FALSE(object->Put(nullptr, "value"));
+    EXPECT_FALSE(object->Put("key", static_cast<const char*>(nullptr)));
+    EXPECT_FALSE(object->Put(nullptr, value));
+    EXPECT_FALSE(object->Put("key", emptyValue));
+    EXPECT_FALSE(object->Put(nullptr, sharedValue));
+    EXPECT_FALSE(object->Put("key", emptySharedValue));
+    EXPECT_FALSE(object->Put(emptyValue));
+    EXPECT_FALSE(object->Put(emptySharedValue));
+    EXPECT_FALSE(object->Put(nullptr, static_cast<size_t>(1)));
+    EXPECT_FALSE(object->Put(nullptr, static_cast<int32_t>(1)));
+    EXPECT_FALSE(object->Put(nullptr, 1.0));
+    EXPECT_FALSE(object->Put(nullptr, true));
+    EXPECT_FALSE(object->PutRef(nullptr, std::move(value)));
+    EXPECT_NE(value, nullptr);
+    EXPECT_FALSE(object->PutRef("key", std::move(emptyValue)));
+    EXPECT_FALSE(object->PutRef(std::move(emptyValue)));
+    EXPECT_FALSE(object->PutRef(std::move(emptySharedValue)));
+    EXPECT_FALSE(PutJsonObjectReference(*object, nullptr, *sharedValue));
+    EXPECT_FALSE(PutJsonObjectReference(*object, "key", *nullValue));
+    EXPECT_FALSE(scope.HasError());
+    EXPECT_EQ(jsonAllocationCountdown, 0); // Invalid arguments must not attempt cJSON allocation.
+
+    EXPECT_FALSE(object->Put("key", true)); // A real allocation failure is still recorded.
+    EXPECT_TRUE(scope.HasError());
+    EXPECT_EQ(jsonAllocationCountdown, ALLOCATION_FAILURE_DISABLED);
+}
+
+HWTEST_F(JsonUtilTest, WriteFailureScopeTracksOwnershipTransfer, TestSize.Level1)
+{
+    auto parent = JsonUtil::Create();
+    JsonWriteErrorScope scope;
+    JsonAllocationFailure fault(ALLOCATION_FAILURE_DISABLED);
+    auto value = JsonUtil::Create();
+    value->Put("leaf", true);
+    jsonAllocationCountdown = 0; // only the destination key allocation should fail
+    EXPECT_TRUE(parent->PutRef("child", std::move(value)));
+    EXPECT_TRUE(scope.HasError());
+    EXPECT_FALSE(parent->Contains("child"));
+    EXPECT_EQ(jsonTrackedAllocations, jsonTrackedFrees);
+}
+
+HWTEST_F(JsonUtilTest, WriteFailureScopePreservesEmptyDestinationCompatibility, TestSize.Level1)
+{
+    JsonAllocationFailure allocations(ALLOCATION_FAILURE_DISABLED);
+    JsonWriteErrorScope scope;
+    {
+        JsonValue empty;
+        EXPECT_TRUE(empty.Put("number", 1));
+        EXPECT_TRUE(empty.Put(1.0));
+        EXPECT_TRUE(empty.Put("text", "value"));
+        auto value = JsonUtil::Create();
+        EXPECT_TRUE(value->Put("leaf", true));
+        EXPECT_TRUE(empty.Put("copy", value));
+        EXPECT_TRUE(empty.PutRef("moved", std::move(value)));
+        EXPECT_TRUE(value->IsNull());
+        EXPECT_TRUE(empty.PutRef(std::move(value)));
+        auto parent = JsonUtil::Create();
+        EXPECT_TRUE(parent->PutRef("released", std::move(value)));
+        EXPECT_FALSE(parent->Contains("released"));
+        EXPECT_TRUE(empty.IsNull());
+        EXPECT_FALSE(scope.HasError());
+    }
+    EXPECT_EQ(jsonTrackedAllocations, jsonTrackedFrees);
+}
+
+HWTEST_F(JsonUtilTest, WriteFailureScopeNestingAndOptionalReads, TestSize.Level1)
+{
+    auto object = JsonUtil::Create();
+    JsonWriteErrorScope outer;
+    EXPECT_FALSE(object->GetValue("absent")->IsValid());
+    EXPECT_FALSE(outer.HasError());
+    {
+        JsonWriteErrorScope inner;
+        JsonAllocationFailure fault(0);
+        object->Put("lost", true); // deliberately ignore the return as existing property readers do
+        EXPECT_TRUE(inner.HasError());
+    }
+    EXPECT_TRUE(outer.HasError());
+    JsonWriteErrorScope independent;
+    EXPECT_TRUE(object->Put("present", true));
+    EXPECT_FALSE(independent.HasError());
+}
+
+#endif
+
+HWTEST_F(JsonUtilTest, BoundedJsonFormatsEscapesAndNativeTypes, TestSize.Level1)
+{
+    constexpr char JSON_TYPES_SAMPLE[] = R"({"s":"中\"\\\n\t\b\f\r\u0001",)"
+                                         R"("n":1.2345678901234567,"b":true,"a":[null,false,{},[]]})";
+    auto object = JsonUtil::ParseJsonString(JSON_TYPES_SAMPLE);
+    auto compact = BoundedOutput(*object, false, TEST_JSON_BYTE_LIMIT, JsonWriteResult::SUCCESS);
+    auto pretty = BoundedOutput(*object, true, TEST_JSON_BYTE_LIMIT, JsonWriteResult::SUCCESS);
+    EXPECT_EQ(JsonUtil::ParseJsonString(compact)->ToString(), object->ToString());
+    EXPECT_EQ(JsonUtil::ParseJsonString(pretty)->ToString(), object->ToString());
+    EXPECT_EQ(compact, object->ToString());
+#ifdef ACE_HOST_PRODUCT
+    auto* nativePretty = cJSON_Print(object->GetJsonObject());
+    ASSERT_NE(nativePretty, nullptr);
+    EXPECT_EQ(pretty, nativePretty);
+    cJSON_free(nativePretty);
+#endif
+}
+
+HWTEST_F(JsonUtilTest, BoundedJsonPreservesUnkeyedObjectHistory, TestSize.Level1)
+{
+    constexpr const char* HISTORY_RECORDS[] = { "first", "second", "third" };
+    auto object = JsonUtil::Create();
+    for (const auto* record : HISTORY_RECORDS) {
+        auto entry = JsonUtil::Create();
+        ASSERT_TRUE(entry->Put("record", record));
+        ASSERT_TRUE(object->PutRef(std::move(entry)));
+    }
+    const auto legacy = object->ToString();
+    for (bool pretty : { false, true }) {
+        auto output = BoundedOutput(*object, pretty, TEST_JSON_BYTE_LIMIT, JsonWriteResult::SUCCESS);
+        auto parsed = JsonUtil::ParseJsonString(output);
+        ASSERT_TRUE(parsed->IsObject());
+        EXPECT_EQ(parsed->ToString(), legacy);
+        auto child = parsed->GetChild();
+        for (const auto* record : HISTORY_RECORDS) {
+            ASSERT_TRUE(child->IsValid());
+            EXPECT_EQ(child->GetString("record"), record);
+            child = child->GetNext();
+        }
+        EXPECT_FALSE(child->IsValid());
+        EXPECT_EQ(object->ToString(), legacy);
+    }
+}
+
+HWTEST_F(JsonUtilTest, BoundedJsonPreservesMixedObjectKeys, TestSize.Level1)
+{
+    auto object = JsonUtil::Create();
+    ASSERT_TRUE(object->Put("named", "normal"));
+    ASSERT_TRUE(object->Put("", "explicit empty key"));
+    auto entry = JsonUtil::Create();
+    ASSERT_TRUE(entry->Put("record", "unkeyed"));
+    ASSERT_TRUE(object->PutRef(std::move(entry)));
+    constexpr char EXPECTED_JSON[] = R"({"named":"normal","":"explicit empty key","":{"record":"unkeyed"}})";
+    ASSERT_EQ(object->ToString(), EXPECTED_JSON);
+    for (bool pretty : { false, true }) {
+        auto output = BoundedOutput(*object, pretty, TEST_JSON_BYTE_LIMIT, JsonWriteResult::SUCCESS);
+        auto parsed = JsonUtil::ParseJsonString(output);
+        ASSERT_TRUE(parsed->IsObject());
+        EXPECT_EQ(parsed->ToString(), EXPECTED_JSON);
+        EXPECT_EQ(object->ToString(), EXPECTED_JSON);
+    }
+}
+
+HWTEST_F(JsonUtilTest, BoundedJsonUnkeyedObjectRespectsOutputLimit, TestSize.Level1)
+{
+    auto object = JsonUtil::Create();
+    auto entry = JsonUtil::Create();
+    ASSERT_TRUE(entry->Put("record", "history"));
+    ASSERT_TRUE(object->PutRef(std::move(entry)));
+    for (bool pretty : { false, true }) {
+        auto output = BoundedOutput(*object, pretty, TEST_JSON_BYTE_LIMIT, JsonWriteResult::SUCCESS);
+        ASSERT_FALSE(output.empty());
+        EXPECT_EQ(BoundedOutput(*object, pretty, output.size(), JsonWriteResult::SUCCESS), output);
+        BoundedOutput(*object, pretty, output.size() - 1, JsonWriteResult::TOO_LARGE);
+    }
+}
+
+HWTEST_F(JsonUtilTest, BoundedJsonExactLimitsAndPrettyExpansion, TestSize.Level1)
+{
+    for (bool pretty : { false, true }) {
+        auto object = JsonUtil::Create();
+        object->Put("s", "");
+        auto overhead = BoundedOutput(*object, pretty, MAX_TREE_BYTE_LIMIT, JsonWriteResult::SUCCESS).size();
+        std::string text(MAX_TREE_BYTE_LIMIT - overhead, 'x');
+        object->Replace("s", text.c_str());
+        EXPECT_EQ(
+            BoundedOutput(*object, pretty, MAX_TREE_BYTE_LIMIT, JsonWriteResult::SUCCESS).size(), MAX_TREE_BYTE_LIMIT);
+        BoundedOutput(*object, pretty, MAX_TREE_BYTE_LIMIT - 1, JsonWriteResult::TOO_LARGE);
+    }
+    auto object = JsonUtil::ParseJsonString(R"({"a":[1,2,3]})");
+    auto compact = BoundedOutput(*object, false, MAX_TREE_BYTE_LIMIT, JsonWriteResult::SUCCESS);
+    BoundedOutput(*object, true, compact.size(), JsonWriteResult::TOO_LARGE);
+    BoundedOutput(*object, false, 0, JsonWriteResult::TOO_LARGE);
+}
+
+HWTEST_F(JsonUtilTest, BoundedJsonDeepTreeAndBorrowedEnvelope, TestSize.Level1)
+{
+    auto root = JsonUtil::Create();
+    root->Put("$type", "Text");
+    for (int depth = 1; depth < MAX_TEST_TREE_DEPTH; ++depth) {
+        auto parent = JsonUtil::Create();
+        parent->Put("$type", "Text");
+        auto children = JsonUtil::CreateArray();
+        children->PutRef(std::move(root));
+        parent->PutRef("$children", std::move(children));
+        root = std::move(parent);
+    }
+    {
+        auto envelope = JsonUtil::Create();
+        envelope->Put("schemaVersion", TREE_SCHEMA_VERSION);
+        ASSERT_TRUE(PutJsonObjectReference(*envelope, "treeInfo", *root));
+        auto compact = BoundedOutput(*envelope, false, MAX_TREE_BYTE_LIMIT, JsonWriteResult::SUCCESS);
+        EXPECT_EQ(std::count(compact.begin(), compact.end(), '['), MAX_TEST_TREE_DEPTH - 1);
+        BoundedOutput(*envelope, true, MAX_TREE_BYTE_LIMIT, JsonWriteResult::TOO_LARGE);
+    }
+    EXPECT_EQ(root->GetString("$type"), "Text"); // destroying the envelope did not consume the tree
+}
+
+HWTEST_F(JsonUtilTest, CompactMeasurementMatchesNativeOutput, TestSize.Level1)
+{
+    constexpr const char* SAMPLES[] = {
+        R"({"s":"中\"\\\n\t\b\f\r\u0001","a":[null,false,true,{},[]]})",
+        R"({"\"\u0002":"value","n":1.2345678901234567,"small":1e-300,"large":1e300})",
+        R"([0,-0.0,-2147483648,2147483647,0.1])", R"("")", "{}", "[]", "true", "false", "null"
+    };
+    for (const auto* sample : SAMPLES) {
+        auto value = JsonUtil::ParseJsonString(sample);
+        auto output = BoundedOutput(*value, false, TEST_JSON_BYTE_LIMIT, JsonWriteResult::SUCCESS);
+        size_t size = 0;
+        EXPECT_EQ(MeasureCompactJson(*value, output.size(), size), JsonWriteResult::SUCCESS);
+        EXPECT_EQ(size, output.size());
+        EXPECT_EQ(MeasureCompactJson(*value, output.size() - 1, size), JsonWriteResult::TOO_LARGE);
+        EXPECT_EQ(size, 0u);
+    }
+}
+
+HWTEST_F(JsonUtilTest, CompactMeasurementCountsOnlyImmediateChildStructure, TestSize.Level1)
+{
+    auto root = JsonUtil::ParseJsonString(
+        R"({"$type":"Root","attrs":{"$children":["included"]},"$children":[{"v":1},{"v":2}]})");
+    auto children = root->GetValue("$children");
+    size_t total = 0;
+    ASSERT_EQ(MeasureCompactJson(*root, TEST_JSON_BYTE_LIMIT, total, "$children"), JsonWriteResult::SUCCESS);
+    for (auto child = children->GetChild(); child->IsValid(); child = child->GetNext()) {
+        size_t size = 0;
+        ASSERT_EQ(MeasureCompactJson(*child, TEST_JSON_BYTE_LIMIT, size), JsonWriteResult::SUCCESS);
+        total += size;
+    }
+    EXPECT_EQ(total, BoundedOutput(*root, false, TEST_JSON_BYTE_LIMIT, JsonWriteResult::SUCCESS).size());
+}
+
+HWTEST_F(JsonUtilTest, CompactMeasurementHandlesUnkeyedMembersAndInvalidValues, TestSize.Level1)
+{
+    auto root = JsonUtil::Create();
+    auto child = JsonUtil::Create();
+    ASSERT_TRUE(child->Put("value", "unkeyed"));
+    ASSERT_TRUE(root->PutRef(std::move(child)));
+    size_t size = 0;
+    EXPECT_EQ(MeasureCompactJson(*root, TEST_JSON_BYTE_LIMIT, size), JsonWriteResult::SUCCESS);
+    EXPECT_EQ(size, BoundedOutput(*root, false, TEST_JSON_BYTE_LIMIT, JsonWriteResult::SUCCESS).size());
+    JsonValue invalid;
+    EXPECT_EQ(MeasureCompactJson(invalid, TEST_JSON_BYTE_LIMIT, size), JsonWriteResult::INVALID_VALUE);
+    EXPECT_EQ(size, 0u);
+    root->Put("invalid", std::numeric_limits<double>::infinity());
+    EXPECT_EQ(MeasureCompactJson(*root, TEST_JSON_BYTE_LIMIT, size), JsonWriteResult::INVALID_VALUE);
+    EXPECT_EQ(size, 0u);
+}
+
+#ifdef ACE_HOST_PRODUCT
+HWTEST_F(JsonUtilTest, CompactMeasurementDoesNotAllocate, TestSize.Level1)
+{
+    auto root = JsonUtil::ParseJsonString(R"({"s":"中\n","n":1.2345678901234567,"a":[true,null]})");
+    const auto expected = root->ToString().size();
+    JsonAllocationFailure allocations(ALLOCATION_FAILURE_DISABLED);
+    size_t size = 0;
+    EXPECT_EQ(MeasureCompactJson(*root, TEST_JSON_BYTE_LIMIT, size), JsonWriteResult::SUCCESS);
+    EXPECT_EQ(size, expected);
+    EXPECT_EQ(jsonTrackedAllocations, 0u);
+}
+#endif
+
+HWTEST_F(JsonUtilTest, BoundedJsonInvalidValueClearsOutput, TestSize.Level1)
+{
+    JsonValue invalid;
+    BoundedOutput(invalid, false, TEST_JSON_BYTE_LIMIT, JsonWriteResult::INVALID_VALUE);
+    auto object = JsonUtil::Create();
+    object->Put("number", std::numeric_limits<double>::infinity());
+    BoundedOutput(*object, false, TEST_JSON_BYTE_LIMIT, JsonWriteResult::INVALID_VALUE);
 }
 } // namespace OHOS::Ace

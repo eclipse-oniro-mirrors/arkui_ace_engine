@@ -145,7 +145,9 @@ public:
 
     void SetSwitchIsOn(bool value);
     bool OnThemeScopeUpdate(int32_t themeScopeId) override;
+    void ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const override;
     void DumpInfo() override;
+    void DumpInfo(std::unique_ptr<JsonValue>& json) override;
     void DumpSimplifyInfoOnlyForParamConfig(
         std::shared_ptr<JsonValue>& json, ParamConfig config = ParamConfig()) override;
     void SetIsUserSetMargin(bool isUserSetMargin)
@@ -163,6 +165,7 @@ public:
         return true;
     }
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
 
     bool HasSystemMaterial() const;
     bool IsHighGradeMaterial() const;
@@ -240,6 +243,7 @@ private:
     void ApplyBlendMode();
     std::shared_ptr<Rosen::BrightnessBlender> CreateBrightnessBlender();
     void ResetHostMaterialEffects();
+    void ResetHostMaterialEffectsInner();
 
     // Drag animation helpers
     AnimationOption CreateDragAnimationOption() const;

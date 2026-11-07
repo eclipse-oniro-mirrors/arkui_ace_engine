@@ -2558,7 +2558,7 @@ export class ListNodeDataSource extends BasicDataSource {
   }
 
   public getListItemOpacity(item: NodeInfo): number {
-    return item.getNodeCurrentNodeId() === this.getDraggingCurrentNodeId() ? this.listItemOpacity : 1;
+    return item.getNodeCurrentNodeId() === this.getDraggingCurrentNodeId() ? this.listItemOpacity : 1.0;
   }
 
   public getDragPopupPara(): DragPopup {
@@ -4594,7 +4594,7 @@ export struct TreeViewInnerV2 {
       }
       .border({
         radius: $r('sys.float.ohos_id_corner_radius_clicked'),
-        width: this.isOnFocus ? FLAG_NUMBER : 0,
+        width: this.isOnFocus ? FLAG_NUMBER : 0.0,
         color: this.isOnFocus ? this.treeViewTheme.borderFocusedColor : Color.Transparent,
         style: BorderStyle.Solid,
       })

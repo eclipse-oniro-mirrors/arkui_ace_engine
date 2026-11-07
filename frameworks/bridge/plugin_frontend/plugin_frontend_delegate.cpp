@@ -897,7 +897,7 @@ void PluginFrontendDelegate::TriggerPageUpdate(int32_t pageId, bool directExecut
     auto page = GetPage(pageId);
     CHECK_NULL_VOID(page);
 
-    auto jsPage = AceType::DynamicCast<Framework::JsAcePage>(page);
+    auto jsPage = page;
     ACE_DCHECK(jsPage);
 
     // Pop all JS command and execute them in UI thread.

@@ -793,6 +793,23 @@ void WebClientImpl::OnContextMenuDismissed()
     delegate->OnContextMenuDismissed();
 }
 
+void WebClientImpl::OnContextMenuUpdate(int32_t menuItemId, std::shared_ptr<NWeb::NWebContextMenuOptions> options)
+{
+    bool enable = false;
+    if (options) {
+        enable = options->Enable();
+    }
+    TAG_LOGI(AceLogTag::ACE_WEB, "OnContextMenuUpdate menuItemId:%{public}d, enable:%{public}d",
+        menuItemId, enable);
+    auto delegate = webDelegate_.Upgrade();
+    CHECK_NULL_VOID(delegate);
+    ContainerScope scope(delegate->GetInstanceId());
+
+    WebContextMenuOptions contextMenuOptions;
+    contextMenuOptions.enable = enable;
+    delegate->OnContextMenuUpdate(static_cast<WebContextMenuItemId>(menuItemId), contextMenuOptions);
+}
+
 bool WebClientImpl::RunContextMenu(
     std::shared_ptr<NWeb::NWebContextMenuParams> params,
     std::shared_ptr<NWeb::NWebContextMenuCallback> callback)
@@ -1770,6 +1787,16 @@ void WebClientImpl::OnDetectedBlankScreen(
     delegate->OnDetectedBlankScreen(url, blankScreenReason, detectedContentfulNodesCount);
 }
 
+void WebClientImpl::OnMonitoredBlankScreen(
+    const std::string& url, int32_t reason,
+    const std::string& extraMsg)
+{
+    auto delegate = webDelegate_.Upgrade();
+    CHECK_NULL_VOID(delegate);
+    ContainerScope scope(delegate->GetInstanceId());
+    delegate->OnMonitoredBlankScreen(url, reason, extraMsg);
+}
+
 void WebClientImpl::OnFirstScreenPaint(
     const std::string& url, int64_t navigationStartTime, int64_t firstScreenPaintTime)
 {
@@ -1856,5 +1883,46 @@ void WebClientImpl::OnInputMethodAttached()
     CHECK_NULL_VOID(delegate);
     ContainerScope scope(delegate->GetInstanceId());
     delegate->OnInputMethodAttached();
+}
+
+bool WebClientImpl::OnGetWindowBounds(int32_t& x, int32_t& y,
+                                      uint32_t& w, uint32_t& h, std::string& state)
+{
+    auto delegate = webDelegate_.Upgrade();
+    CHECK_NULL_RETURN(delegate, false);
+    ContainerScope scope(delegate->GetInstanceId());
+    return delegate->OnGetWindowBounds(x, y, w, h, state);
+}
+
+bool WebClientImpl::OnSetWindowBounds(int32_t x, int32_t y,
+                                      uint32_t w, uint32_t h, const std::string& state)
+{
+    auto delegate = webDelegate_.Upgrade();
+    CHECK_NULL_RETURN(delegate, false);
+    ContainerScope scope(delegate->GetInstanceId());
+    return delegate->OnSetWindowBounds(x, y, w, h, state);
+}
+
+void WebClientImpl::OnColorChooserPopup(const std::string& color,
+    const std::vector<NWeb::NWebColorSuggestion>& suggestions,
+    std::shared_ptr<NWeb::NWebColorChooserCallback> callback)
+{
+    auto delegate = webDelegate_.Upgrade();
+    if (!delegate) {
+        if (callback) {
+            callback->Cancel();
+        }
+        return;
+    }
+    ContainerScope scope(delegate->GetInstanceId());
+    delegate->OnColorChooserPopup(color, suggestions, callback);
+}
+
+void WebClientImpl::OnColorChooserClose()
+{
+    auto delegate = webDelegate_.Upgrade();
+    CHECK_NULL_VOID(delegate);
+    ContainerScope scope(delegate->GetInstanceId());
+    delegate->OnColorChooserClose();
 }
 } // namespace OHOS::Ace

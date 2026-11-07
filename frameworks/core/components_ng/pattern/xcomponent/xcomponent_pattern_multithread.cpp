@@ -79,8 +79,7 @@ void XComponentPattern::InitSurfaceMultiThread(const RefPtr<FrameNode>& host)
     renderSurface_ = RenderSurface::Create();
 #endif
     renderSurface_->SetInstanceId(GetHostInstanceId());
-    std::string xComponentType = GetType() == XComponentType::SURFACE ? "s" : "t";
-    renderSurface_->SetBufferUsage(std::string(BUFFER_USAGE_XCOMPONENT) + "-" + xComponentType + "-" + GetId());
+    renderSurface_->SetBufferUsage(std::string(BUFFER_USAGE_XCOMPONENT));
     if (type_ == XComponentType::SURFACE) {
         InitializeRenderContext(true);
         if (!SystemProperties::GetExtSurfaceEnabled()) {
@@ -99,6 +98,7 @@ void XComponentPattern::InitSurfaceMultiThread(const RefPtr<FrameNode>& host)
         renderContext->OnNodeNameUpdate(GetId());
     }
     renderSurface_->InitSurface();
+    renderSurface_->SetSurfaceQueueSize(bufferQueueCount_);
     renderSurface_->UpdateSurfaceConfig();
     if (type_ == XComponentType::TEXTURE) {
         renderSurface_->RegisterBufferCallback();
@@ -112,12 +112,13 @@ void XComponentPattern::InitSurfaceMultiThread(const RefPtr<FrameNode>& host)
 void XComponentPattern::InitControllerMultiThread()
 {
     CHECK_NULL_VOID(xcomponentController_);
+    auto* controllerNG = static_cast<XComponentControllerNG*>(xcomponentController_.get());
+    if (controllerNG) {
+        controllerNG->SetPattern(AceType::Claim(this));
+    }
     if (!isTypedNode_) {
         xcomponentController_->SetSurfaceId(surfaceId_);
     }
-    auto* controllerNG = static_cast<XComponentControllerNG*>(xcomponentController_.get());
-    CHECK_NULL_VOID(controllerNG);
-    controllerNG->SetPattern(AceType::Claim(this));
 }
 
 void XComponentPattern::RegisterContextEventMultiThread(const RefPtr<FrameNode>& host)
@@ -150,6 +151,9 @@ void XComponentPattern::OnAttachToMainTreeMultiThread(const RefPtr<FrameNode>& h
     if (isTypedNode_ && surfaceCallbackMode_ == SurfaceCallbackMode::DEFAULT) {
         HandleSurfaceCreated();
     }
+    if (IsSurfaceVisibilityLifecycle()) {
+        RegisterVisibilityLifecycleCallback();
+    }
     CHECK_NULL_VOID(host);
     if (host->GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_EIGHTEEN)) {
         if (needRecoverDisplaySync_ && displaySync_ && !displaySync_->IsOnPipeline()) {
@@ -167,6 +171,7 @@ void XComponentPattern::OnDetachFromMainTreeMultiThread(const RefPtr<FrameNode>&
     if (isTypedNode_ && surfaceCallbackMode_ == SurfaceCallbackMode::DEFAULT) {
         HandleSurfaceDestroyed();
     }
+    UnregisterVisibilityLifecycleCallback();
     CHECK_NULL_VOID(host);
     if (host->GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_EIGHTEEN)) {
         if (displaySync_ && displaySync_->IsOnPipeline()) {
@@ -204,12 +209,14 @@ void XComponentPattern::OnDetachFromFrameNodeMultiThread(FrameNode* frameNode)
             auto eventHub = frameNode->GetEventHub<XComponentEventHub>();
             CHECK_NULL_VOID(eventHub);
             {
+                ACE_SCOPED_TRACE("XComponent[%s] FireDestroyEvent", GetId().c_str());
                 eventHub->FireDestroyEvent(GetId());
             }
             if (id_.has_value()) {
                 eventHub->FireDetachEvent(id_.value());
             }
             {
+                ACE_SCOPED_TRACE("XComponent[%s] FireControllerDestroyedEvent", GetId().c_str());
                 eventHub->FireControllerDestroyedEvent(surfaceId_, GetId());
             }
 #ifdef RENDER_EXTRACT_SUPPORTED
@@ -232,6 +239,9 @@ void XComponentPatternV2::OnAttachToMainTreeMultiThread(const RefPtr<FrameNode>&
     isOnTree_ = true;
     if (autoInitialize_) {
         HandleSurfaceCreated();
+    }
+    if (IsSurfaceVisibilityLifecycle()) {
+        RegisterVisibilityLifecycleCallback();
     }
     CHECK_NULL_VOID(displaySync_);
     if (needRecoverDisplaySync_  && !displaySync_->IsOnPipeline()) {
@@ -259,6 +269,7 @@ void XComponentPatternV2::OnDetachFromMainTreeMultiThread(const RefPtr<FrameNode
     if (autoInitialize_) {
         HandleSurfaceDestroyed();
     }
+    UnregisterVisibilityLifecycleCallback();
     CHECK_NULL_VOID(host);
     auto id = host->GetId();
     auto pipeline = host->GetContextRefPtr();

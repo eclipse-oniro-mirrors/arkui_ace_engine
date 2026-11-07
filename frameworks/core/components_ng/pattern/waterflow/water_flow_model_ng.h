@@ -50,6 +50,10 @@ public:
     void SetLayoutDirection(FlexDirection value) override;
     void SetNestedScroll(const NestedScrollOptions& nestedOpt) override;
     void SetScrollEnabled(bool scrollEnabled) override;
+    void SetScrollSnapStrategy(const ScrollSnapStrategy& strategy) override;
+    void ResetScrollSnapStrategy() override;
+    static void SetScrollSnapStrategy(FrameNode* frameNode, const ScrollSnapStrategy& strategy);
+    static void ResetScrollSnapStrategy(FrameNode* frameNode);
 
     void SetOnReachStart(OnReachEvent&& onReachStart) override;
     void SetOnReachEnd(OnReachEvent&& onReachEnd) override;
@@ -68,6 +72,7 @@ public:
     void SetScrollBarColor(const std::optional<Color>& scrollBarColor) override;
     void SetScrollBarWidth(const std::string& value) override;
     void SetSyncLoad(bool syncLoad) override;
+    void SetScrollPlaceholder(ScrollPlaceholderProvider&& provider) override;
     void ParseResObjScrollBarColor(const RefPtr<ResourceObject>& resObj) override;
 
     RefPtr<WaterFlowSections> GetOrCreateWaterFlowSections() override;
@@ -128,9 +133,9 @@ public:
     static void SetOnScrollFrameBegin(FrameNode* frameNode, OnScrollFrameBeginEvent&& ScrollFrameBegin);
     static void SetOnScrollIndex(FrameNode* frameNode, ScrollIndexFunc&& onScrollIndex);
     static void SetScrollToIndex(FrameNode* frameNode, int32_t index, int32_t animation, int32_t alignment,
-        std::optional<float> extraOffset = std::nullopt);
+        std::optional<float> extraOffset = std::nullopt, int32_t fastScrollMode = 0);
     static void SetScrollToIndexMultiThread(FrameNode* frameNode, int32_t index, int32_t animation, int32_t alignment,
-        std::optional<float> extraOffset = std::nullopt);
+        std::optional<float> extraOffset = std::nullopt, int32_t fastScrollMode = 0);
     static void SetOnReachStart(FrameNode* frameNode, OnReachEvent&& onReachStart);
     static void SetOnReachEnd(FrameNode* frameNode, OnReachEvent&& onReachEnd);
     static void SetWaterflowFooter(FrameNode* frameNode, FrameNode* footerNode);
@@ -143,6 +148,7 @@ public:
     static void SetFooter(FrameNode* frameNode, std::function<void()>&& footer);
     static void SetSyncLoad(FrameNode* frameNode, bool syncLoad);
     static bool GetSyncLoad(FrameNode* frameNode);
+    static void SetScrollPlaceholder(FrameNode* frameNode, ScrollPlaceholderProvider&& provider);
     void ParseResObjFriction(const RefPtr<ResourceObject>& resObj) override;
     void ParseResObjRowsGap(const RefPtr<ResourceObject>& resObj) override;
     void ParseResObjColumnsGap(const RefPtr<ResourceObject>& resObj) override;

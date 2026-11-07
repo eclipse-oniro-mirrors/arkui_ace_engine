@@ -17,12 +17,14 @@
 #include "core/common/container.h"
 
 #include <string_view>
+#include <unordered_map>
 
 #include "base/input_manager/input_manager.h"
 #include "base/log/ace_trace.h"
 #include "base/memory/ace_type.h"
 #include "core/common/text_field_manager_ng.h"
 #include "core/components_ng/pattern/text_field/text_field_pattern.h"
+#include "core/components_ng/pattern/rich_editor/rich_editor_pattern.h"
 
 namespace OHOS::Ace::NG {
 constexpr std::string_view AUTO_FILL_PARAMS_USERNAME = "com.autofill.params.userName";
@@ -135,6 +137,55 @@ int32_t OnTextChangedListenerImpl::GetTextIndexAtCursor()
     };
     PostSyncTaskToUI(task, "ArkUITextFieldGetTextIndexAtCursor");
     return index;
+}
+
+MiscServices::RichTextData OnTextChangedListenerImpl::ConvertRichTextDataInfoToImfData(const RichTextDataInfo& info)
+{
+    static const std::unordered_map<RichSpanType, MiscServices::SpanType> spanTypeMap {
+        { RichSpanType::TEXT, MiscServices::SpanType::TEXT },
+        { RichSpanType::IMAGE, MiscServices::SpanType::IMAGE },
+        { RichSpanType::SYMBOL, MiscServices::SpanType::SYMBOL },
+        { RichSpanType::CUSTOM, MiscServices::SpanType::CUSTOM },
+    };
+    MiscServices::RichTextData result;
+    for (const auto& spanInfo : info.spans) {
+        auto it = spanTypeMap.find(spanInfo.type);
+        CHECK_NULL_CONTINUE(it != spanTypeMap.end());
+        result.spans.emplace_back(decltype(result.spans)::value_type{
+            .type = it->second,
+            .range = { spanInfo.range.start, spanInfo.range.end },
+            .content = spanInfo.content,
+        });
+    }
+    return result;
+}
+
+MiscServices::RichTextData OnTextChangedListenerImpl::GetLeftRichTextOfCursor(int32_t number)
+{
+    ACE_SCOPED_TRACE("GetLeftRichTextOfCursor[%d]", number);
+    RichTextDataInfo localResult;
+    auto task = [textField = pattern_, &localResult, number] {
+        auto client = textField.Upgrade();
+        CHECK_NULL_VOID(client);
+        ContainerScope scope(client->GetInstanceId());
+        localResult = client->GetLeftRichTextOfCursor(number);
+    };
+    PostSyncTaskToUI(task, "ArkUITextFieldGetLeftRichTextOfCursor");
+    return ConvertRichTextDataInfoToImfData(localResult);
+}
+
+MiscServices::RichTextData OnTextChangedListenerImpl::GetRightRichTextOfCursor(int32_t number)
+{
+    ACE_SCOPED_TRACE("GetRightRichTextOfCursor[%d]", number);
+    RichTextDataInfo localResult;
+    auto task = [textField = pattern_, &localResult, number] {
+        auto client = textField.Upgrade();
+        CHECK_NULL_VOID(client);
+        ContainerScope scope(client->GetInstanceId());
+        localResult = client->GetRightRichTextOfCursor(number);
+    };
+    PostSyncTaskToUI(task, "ArkUITextFieldGetRightRichTextOfCursor");
+    return ConvertRichTextDataInfoToImfData(localResult);
 }
 
 void OnTextChangedListenerImpl::SendKeyEventFromInputMethod(const MiscServices::KeyEvent& event) {}
@@ -386,24 +437,43 @@ void OnTextChangedListenerImpl::AutoFillReceivePrivateCommand(
     auto patternPtr = pattern.Upgrade();
     CHECK_NULL_VOID(patternPtr);
     auto textFieldPattern = AceType::DynamicCast<TextFieldPattern>(patternPtr);
-    CHECK_NULL_VOID(textFieldPattern);
+    auto richEditorPattern = AceType::DynamicCast<RichEditorPattern>(patternPtr);
+    if (!textFieldPattern && !richEditorPattern) {
+        TAG_LOGW(AceLogTag::ACE_AUTO_FILL, "pattern is neither TextField nor RichEditor");
+        return;
+    }
     bool isPopup = false;
     if (privateCommand.find(std::string(AUTO_FILL_PARAMS_USERNAME)) != privateCommand.end()) {
         auto userName = privateCommand.find(std::string(AUTO_FILL_PARAMS_USERNAME));
-        textFieldPattern->SetAutoFillUserName(std::get<std::string>(userName->second));
-        textFieldPattern->ProcessAutoFill(isPopup, true);
-        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "com.autofill.params.userName size: %{public}zu",
-            std::get<std::string>(userName->second).size());
+        const auto& userNameValue = std::get<std::string>(userName->second);
+        if (textFieldPattern) {
+            textFieldPattern->SetAutoFillUserName(userNameValue);
+            textFieldPattern->ProcessAutoFill(isPopup, true);
+        } else {
+            richEditorPattern->SetAutoFillUserName(userNameValue);
+            patternPtr->ProcessAutoFillTrigger(AceAutoFillTriggerType::AUTO_REQUEST);
+        }
+        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "com.autofill.params.userName size:%{public}zu", userNameValue.size());
     } else if (privateCommand.find(std::string(AUTO_FILL_PARAMS_NEWPASSWORD)) != privateCommand.end()) {
         auto newPassword = privateCommand.find(std::string(AUTO_FILL_PARAMS_NEWPASSWORD));
-        textFieldPattern->SetAutoFillNewPassword(std::get<std::string>(newPassword->second));
-        textFieldPattern->ProcessAutoFill(isPopup, true, true);
-        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "com.autofill.params.newPassword size: %{public}zu",
-            std::get<std::string>(newPassword->second).size());
+        const auto& newPasswordValue = std::get<std::string>(newPassword->second);
+        if (textFieldPattern) {
+            textFieldPattern->SetAutoFillNewPassword(newPasswordValue);
+            textFieldPattern->ProcessAutoFill(isPopup, true, true);
+        } else {
+            richEditorPattern->SetAutoFillNewPassword(newPasswordValue);
+            patternPtr->ProcessAutoFillTrigger(AceAutoFillTriggerType::AUTO_REQUEST);
+        }
+        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "com.autofill.params.newPassword size:%{public}zu", newPasswordValue.size());
     } else if (privateCommand.find(std::string(AUTO_FILL_PARAMS_OTHERACCOUNT)) != privateCommand.end()) {
         TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "com.autofill.params.otherAccount");
-        textFieldPattern->SetAutoFillOtherAccount(true);
-        textFieldPattern->ProcessAutoFill(isPopup, true);
+        if (textFieldPattern) {
+            textFieldPattern->SetAutoFillOtherAccount(true);
+            textFieldPattern->ProcessAutoFill(isPopup, true);
+        } else {
+            richEditorPattern->SetAutoFillOtherAccount(true);
+            patternPtr->ProcessAutoFillTrigger(AceAutoFillTriggerType::AUTO_REQUEST);
+        }
     } else {
         TAG_LOGW(AceLogTag::ACE_AUTO_FILL, "invalid autofill data privateCommand");
     }
@@ -429,6 +499,40 @@ int32_t OnTextChangedListenerImpl::SetPreviewText(const std::u16string &text, co
     return ret;
 }
 
+int32_t OnTextChangedListenerImpl::SetPreviewTextWithStyle(const std::u16string &text, const MiscServices::Range &range,
+    const MiscServices::PreviewTextStyleInner &style)
+{
+    TAG_LOGI(AceLogTag::ACE_TEXT_FIELD, "SetPreviewTextWithStyle length :%{public}d in range (%{public}d, %{public}d)",
+        static_cast<int32_t>(text.length()), range.start, range.end);
+    int32_t ret = CheckPreviewTextParams(text, {range.start, range.end});
+    if (ret != MiscServices::ErrorCode::NO_ERROR) {
+        TAG_LOGI(AceLogTag::ACE_TEXT_FIELD, "SetPreviewTextWithStyle result is %{public}d", ret);
+        return ret;
+    }
+    auto task = [textFieldPattern = pattern_, text, range, style] {
+        ACE_SCOPED_TRACE("SetPreviewTextWithStyle");
+        auto client = textFieldPattern.Upgrade();
+        CHECK_NULL_VOID(client);
+        ContainerScope scope(client->GetInstanceId());
+        TAG_LOGD(AceLogTag::ACE_TEXT_FIELD, "SetPreviewTextWithStyle  hasUnderlineColor:%{public}d "
+            "underlineColor:0x%{public}X underlineStyle:%{public}d", style.hasUnderlineColor,
+            style.underlineColor, style.underlineStyle);
+        if (style.underlineStyle >= 0 && style.underlineStyle <= static_cast<int32_t>(PreviewTextStyle::DASH_LINE)) {
+            if (style.hasUnderlineColor) {
+                client->SetPreviewTextWithStyle({ style.underlineColor,
+                    static_cast<PreviewTextStyle>(style.underlineStyle) });
+            } else {
+                client->SetPreviewTextWithStyle({ std::nullopt, static_cast<PreviewTextStyle>(style.underlineStyle) });
+            }
+        } else {
+            client->SetPreviewTextWithStyle({ std::nullopt, PreviewTextStyle::UNDERLINE });
+        }
+        client->SetPreviewText(text, { range.start, range.end });
+    };
+    PostTaskToUI(task, "SetPreviewTextWithStyle");
+    return ret;
+}
+
 void OnTextChangedListenerImpl::FinishTextPreview()
 {
     TAG_LOGI(AceLogTag::ACE_TEXT_FIELD, "FinishTextPreview");
@@ -437,6 +541,7 @@ void OnTextChangedListenerImpl::FinishTextPreview()
         auto client = textFieldPattern.Upgrade();
         CHECK_NULL_VOID(client);
         ContainerScope scope(client->GetInstanceId());
+        client->OnFinishTextPreview();
         client->FinishTextPreview();
     };
     PostTaskToUI(task, "ArkUITextFieldFinishTextPreview");
@@ -445,6 +550,10 @@ void OnTextChangedListenerImpl::FinishTextPreview()
 int32_t OnTextChangedListenerImpl::ReceivePrivateCommand(
     const std::unordered_map<std::string, MiscServices::PrivateDataValue>& privateCommand)
 {
+    TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "ReceivePrivateCommand keys=%{public}zu", privateCommand.size());
+    for (const auto& item : privateCommand) {
+        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "ReceivePrivateCommand key='%{public}s'", item.first.c_str());
+    }
     auto uiTask = [textFieldPattern = pattern_, privateCommand] {
         auto textInputClient = textFieldPattern.Upgrade();
         CHECK_NULL_VOID(textInputClient);

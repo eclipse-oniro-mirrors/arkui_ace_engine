@@ -21,7 +21,7 @@
 #include "bridge/js_frontend/engine/jsi/js_value.h"
 
 namespace OHOS::Ace::Framework {
-class BaseCanvasBridge : public virtual AceType {
+class BaseCanvasBridge : public AceType {
     DECLARE_ACE_TYPE(BaseCanvasBridge, AceType);
 
 public:

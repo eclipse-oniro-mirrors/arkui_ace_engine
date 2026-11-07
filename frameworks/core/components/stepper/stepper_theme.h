@@ -32,7 +32,7 @@ constexpr Dimension STEPPER_SCREEN_MARGIN = 4.0_vp;
  * StepperTheme defines color and styles of StepperComponent. StepperTheme should be built
  * using StepperTheme::Builder.
  */
-class StepperTheme : public virtual Theme {
+class StepperTheme : public Theme {
     DECLARE_ACE_TYPE(StepperTheme, Theme);
 
 public:

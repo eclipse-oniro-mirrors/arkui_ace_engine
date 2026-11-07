@@ -163,6 +163,7 @@ inline constexpr SystemServiceMenuDisableFlag DISABLE_AI_MENU_ADDRESS_FLAG = 1 <
 inline constexpr SystemServiceMenuDisableFlag DISABLE_AI_MENU_DATETIME_FLAG = 1 << 11;
 inline constexpr SystemServiceMenuDisableFlag DISABLE_ASK_CELIA_FLAG = 1 << 12;
 inline constexpr SystemServiceMenuDisableFlag DISABLE_AUTO_FILL_FLAG = 1 << 13;
+inline constexpr SystemServiceMenuDisableFlag DISABLE_TRANSLATE_INPUT_FLAG = 1 << 14;
 
 inline constexpr char OH_DEFAULT_CUT[] = "OH_DEFAULT_CUT";
 inline constexpr char OH_DEFAULT_COPY[] = "OH_DEFAULT_COPY";
@@ -174,6 +175,7 @@ inline constexpr char OH_DEFAULT_TRANSLATE[] = "OH_DEFAULT_TRANSLATE";
 inline constexpr char OH_DEFAULT_SEARCH[] = "OH_DEFAULT_SEARCH";
 inline constexpr char OH_DEFAULT_SHARE[] = "OH_DEFAULT_SHARE";
 inline constexpr char OH_DEFAULT_CAMERA_INPUT[] = "OH_DEFAULT_CAMERA_INPUT";
+inline constexpr char OH_DEFAULT_TRANSLATE_INPUT[] = "OH_DEFAULT_TRANSLATE_INPUT";
 inline constexpr char OH_DEFAULT_AI_WRITE[] = "OH_DEFAULT_AI_WRITE";
 inline constexpr char OH_DEFAULT_AI_MENU_PHONE[] = "OH_DEFAULT_AI_MENU_PHONE";
 inline constexpr char OH_DEFAULT_AI_MENU_URL[] = "OH_DEFAULT_AI_MENU_URL";
@@ -200,7 +202,8 @@ enum class OptionMenuActionId {
     APPEAR,
     DISAPPEAR,
     AI_MENU_OPTION,
-    ASK_CELIA
+    ASK_CELIA,
+    TRANSLATE_INPUT
 };
 enum class CloseReason {
     CLOSE_REASON_NORMAL = 1,
@@ -232,7 +235,8 @@ enum class NativeMenuId : int32_t {
     ID_AI_MENU_DATETIME = 14,
     ID_ASK_CELIA = 15,
     ID_AUTO_FILL = 16,
-    ID_PASSWORD_VAULT = 17
+    ID_PASSWORD_VAULT = 17,
+    ID_TRANSLATE_INPUT = 18
 };
 
 struct HoldSelectionInfo {
@@ -264,6 +268,7 @@ struct SelectMenuInfo {
     bool showShare = false;
     bool showSearch = false;
     bool showCameraInput = false;
+    bool showTranslateInput = false;
     bool showAIWrite = false;
     bool hasOnPrepareMenuCallback = false;
     OHOS::Ace::TextDataDetectType aiMenuOptionType = TextDataDetectType::INVALID;
@@ -288,6 +293,7 @@ struct SelectMenuInfo {
                  (showCut == info.showCut) && (showTranslate == info.showTranslate) &&
                  (showSearch == info.showSearch) && (showShare == info.showShare) &&
                  (showCameraInput == info.showCameraInput) && (showAIWrite == info.showAIWrite) &&
+                 (showTranslateInput == info.showTranslateInput) &&
                  (aiMenuOptionType == info.aiMenuOptionType) && !info.hasOnPrepareMenuCallback &&
                  (isAskCeliaEnabled == info.isAskCeliaEnabled) &&
                  (isShowAskCeliaInRightClick == info.isShowAskCeliaInRightClick));
@@ -308,6 +314,7 @@ struct SelectMenuInfo {
         JSON_STRING_PUT_BOOL(jsonValue, showSearch);
         JSON_STRING_PUT_BOOL(jsonValue, showShare);
         JSON_STRING_PUT_BOOL(jsonValue, showCameraInput);
+        JSON_STRING_PUT_BOOL(jsonValue, showTranslateInput);
         JSON_STRING_PUT_INT(jsonValue, aiMenuOptionType);
         JSON_STRING_PUT_INT(jsonValue, hasOnPrepareMenuCallback);
         JSON_STRING_PUT_INT(jsonValue, isAskCeliaEnabled);
@@ -330,6 +337,7 @@ struct SelectMenuCallback {
     std::function<void()> onSearch;
     std::function<void()> onShare;
     std::function<void()> onCameraInput;
+    std::function<void()> onTranslateInput;
     std::function<void()> onAIWrite;
     std::function<void(std::string)> onAIMenuOption;
     std::function<void()> onAskCelia;
@@ -505,6 +513,7 @@ DEFINE_MENU_CHECK_METHOD(Translate);
 DEFINE_MENU_CHECK_METHOD(Search);
 DEFINE_MENU_CHECK_METHOD(Share);
 DEFINE_MENU_CHECK_METHOD(CameraInput);
+DEFINE_MENU_CHECK_METHOD(TranslateInput);
 DEFINE_MENU_CHECK_METHOD(AIWriter);
 DEFINE_MENU_CHECK_METHOD(CollaborationService);
 DEFINE_MENU_CHECK_METHOD(AIUrl);

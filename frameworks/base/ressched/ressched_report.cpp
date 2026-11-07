@@ -14,6 +14,7 @@
  */
 
 #include "base/ressched/ressched_report.h"
+#include "base/log/ace_trace.h"
 
 #include "core/common/container.h"
 #include "core/event/key_event.h"
@@ -33,6 +34,7 @@ constexpr uint32_t RES_TYPE_AXIS_EVENT      = 123;
 constexpr uint32_t RES_TYPE_PAGE_TRANSITION = 140;
 constexpr uint32_t RES_TYPE_ABILITY_OR_PAGE_SWITCH = 156;
 constexpr uint32_t RES_TYPE_FLOAT_START_FROM_SIDEBAR = 216;
+constexpr uint32_t RES_TYPE_LV_INTO_APP_ANIM = 226;
 constexpr uint32_t RES_TYPE_CHECK_APP_IS_IN_SCHEDULE_LIST = 504;
 constexpr uint32_t SYNC_RES_TYPE_APP_IS_IN_TAIHANG_LIST = 511;
 #ifdef FFRT_EXISTS
@@ -41,6 +43,8 @@ constexpr uint32_t RES_TYPE_LONG_FRAME     = 71;
 constexpr uint32_t RES_TYPE_OVERLAY        = 151;
 constexpr uint32_t RES_TYPE_BACKPRESSED_EVENT = 184;
 constexpr uint32_t RES_TYPE_COMPONENT_STATE_CHANGE = 212;
+constexpr uint32_t RES_TYPE_DIALOG_EVENT = 225;
+constexpr int32_t COMPONENT_TYPE_SWIPER = 1;
 constexpr int32_t TOUCH_DOWN_EVENT          = 1;
 constexpr int32_t CLICK_EVENT               = 2;
 constexpr int32_t TOUCH_UP_EVENT            = 3;
@@ -77,6 +81,7 @@ constexpr char UID[] = "uid";
 constexpr char SCRTID[] = "scrTid";
 constexpr char BUNDLE_NAME[] = "bundleName";
 constexpr char ABILITY_NAME[] = "abilityName";
+constexpr char DISPLAY_ID[] = "displayId";
 constexpr char CLICK[] = "click";
 constexpr char RSS_KEY_EVENT[] = "key_event";
 constexpr char PUSH_PAGE[] = "push_page";
@@ -107,6 +112,8 @@ constexpr char ABILITY_OR_PAGE_SWITCH_START[] = "ability_or_page_switch_start";
 constexpr char ABILITY_OR_PAGE_SWITCH_END[] = "ability_or_page_switch_end";
 constexpr char FLOAT_START_FROM_SIDEBAR_START[] = "float_start_from_sidebar_start";
 constexpr char FLOAT_START_FROM_SIDEBAR_END[] = "float_start_from_sidebar_end";
+constexpr char LV_INTO_APP_ANIM_START[] = "lv_into_app_anim_start";
+constexpr char LV_INTO_APP_ANIM_END[] = "lv_into_app_anim_end";
 #ifdef FFRT_EXISTS
 constexpr char LONG_FRAME_START[] = "long_frame_start";
 constexpr char LONG_FRAME_END[] = "long_frame_end";
@@ -127,6 +134,22 @@ void LoadReportConfig(
 {
     if (config.isReportTid) {
         payload[SCRTID] = std::to_string(config.tid);
+    }
+}
+
+// Fill the displayId for event reporting: prefer targetDisplayId (the MMI-assigned
+// display where the touch landed); fall back to the container displayId when the
+// event display is invalid (< 0, e.g. injected events).
+void LoadEventDisplayId(std::unordered_map<std::string, std::string>& payload, int32_t targetDisplayId)
+{
+    if (targetDisplayId >= 0) {
+        payload[DISPLAY_ID] = std::to_string(targetDisplayId);
+        return;
+    }
+    auto container = Container::Current();
+    if (container) {
+        auto displayId = container->GetDisplayId();
+        payload[DISPLAY_ID] = std::to_string(displayId);
     }
 }
 }
@@ -314,6 +337,22 @@ void ResSchedReport::ResSchedDataReport(const char* name, const std::unordered_m
                     reportDataFunc_(RES_TYPE_FLOAT_START_FROM_SIDEBAR, 1, payload);
                 }
             },
+            { LV_INTO_APP_ANIM_START,
+                [this](std::unordered_map<std::string, std::string>& payload) {
+                    std::string targetBundle = payload[BUNDLE_NAME];
+                    LoadAceApplicationContext(payload);
+                    if (!targetBundle.empty()) {
+                        payload[BUNDLE_NAME] = targetBundle;
+                    }
+                    reportDataFunc_(RES_TYPE_LV_INTO_APP_ANIM, 0, payload);
+                }
+            },
+            { LV_INTO_APP_ANIM_END,
+                [this](std::unordered_map<std::string, std::string>& payload) {
+                    LoadAceApplicationContext(payload);
+                    reportDataFunc_(RES_TYPE_LV_INTO_APP_ANIM, 1, payload);
+                }
+            },
         };
     auto it = functionMap.find(name);
     if (it == functionMap.end()) {
@@ -495,6 +534,7 @@ void ResSchedReport::HandleTouchDown(const TouchEvent& touchEvent, const ReportC
     std::unordered_map<std::string, std::string> payload;
     payload[Ressched::NAME] = TOUCH;
     LoadReportConfig(config, payload);
+    LoadEventDisplayId(payload, touchEvent.targetDisplayId);
     ResSchedDataReport(RES_TYPE_CLICK_RECOGNIZE, TOUCH_DOWN_EVENT, payload);
     RecordTouchEvent(touchEvent, true);
     isInTouch_ = true;
@@ -516,6 +556,7 @@ void ResSchedReport::HandleTouchUp(const TouchEvent& touchEvent, const ReportCon
     payload[Ressched::NAME] = TOUCH;
     payload[UP_SPEED_KEY] = std::to_string(GetUpVelocity(lastTouchEvent_, curTouchEvent_));
     LoadAceApplicationContext(payload);
+    LoadEventDisplayId(payload, touchEvent.targetDisplayId);
     ResSchedDataReport(RES_TYPE_CLICK_RECOGNIZE, TOUCH_UP_EVENT, payload);
     isInSlide_ = false;
     isInTouch_ = false;
@@ -540,6 +581,7 @@ void ResSchedReport::HandleTouchMove(const TouchEvent& touchEvent, const ReportC
         std::unordered_map<std::string, std::string> payload;
         LoadReportConfig(config, payload);
         LoadAceApplicationContext(payload);
+        LoadEventDisplayId(payload, touchEvent.targetDisplayId);
         ResSchedDataReport(RES_TYPE_SLIDE, SLIDE_DETECTING, payload);
         isInSlide_ = true;
     }
@@ -572,6 +614,7 @@ void ResSchedReport::HandleTouchPullUp(const TouchEvent& touchEvent, const Repor
 {
     std::unordered_map<std::string, std::string> payload;
     LoadReportConfig(config, payload);
+    LoadEventDisplayId(payload, touchEvent.targetDisplayId);
     payload[Ressched::NAME] = TOUCH;
     ResSchedDataReport(RES_TYPE_CLICK_RECOGNIZE, TOUCH_PULL_UP_EVENT, payload);
     averageDistance_.Reset();
@@ -722,7 +765,15 @@ void ResSchedReport::HandlePageTransition(const PageTransitionInfo& pageTransiti
 void ResSchedReport::HandleSwiperChange(std::unordered_map<std::string, std::string>& payload)
 {
     LoadAceApplicationContext(payload);
-    ResSchedDataReport(RES_TYPE_COMPONENT_STATE_CHANGE, 0, payload);
+    ResSchedDataReport(RES_TYPE_COMPONENT_STATE_CHANGE, COMPONENT_TYPE_SWIPER, payload);
+}
+
+void ResSchedReport::ReportDialogShow()
+{
+    ACE_SCOPED_TRACE_FLAG(SystemProperties::GetDebugEnabled(), "ResSchedReport::ReportDialogShow");
+    std::unordered_map<std::string, std::string> payload;
+    LoadAceApplicationContext(payload);
+    ResSchedDataReport(RES_TYPE_DIALOG_EVENT, 0, payload);
 }
 
 ResSchedReportScope::ResSchedReportScope(const std::string& name,

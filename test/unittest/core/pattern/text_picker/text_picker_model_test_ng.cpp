@@ -1008,12 +1008,12 @@ HWTEST_F(TextPickerModelTestNg, getTextPickerRange001, TestSize.Level1)
 
     textPickerModelNG.SetCascadeColumns({});
     textPickerModelNG.SetRange({});
-    textPickerModelNG.isSingleRange_ = false;
+    textPickerModelNG.SetSingleRange(false);
 
     auto result = textPickerModelNG.getTextPickerRange(node);
     EXPECT_EQ(result.length(), 0);
 
-    textPickerModelNG.isSingleRange_ = true;
+    textPickerModelNG.SetSingleRange(true);
 
     result = textPickerModelNG.getTextPickerRange(node);
     EXPECT_EQ(result.length(), 0);
@@ -1564,5 +1564,107 @@ HWTEST_F(TextPickerModelTestNg, SetDefaultPickerItemHeightFrameNodeLpx002, TestS
     EXPECT_TRUE(
         frameNode->lpxAttributes_.find(LpxAttribute::LPX_PICKER_ITEM_HEIGHT) ==
         frameNode->lpxAttributes_.end());
+}
+
+/**
+ * @tc.name: SetTextPickerSingeRange001
+ * @tc.desc: Test SetTextPickerSingeRange with valid frameNode
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextPickerModelTestNg, SetTextPickerSingeRange001, TestSize.Level1)
+{
+    auto frameNode = TextPickerModelNG::CreateFrameNode(ElementRegister::GetInstance()->MakeUniqueId());
+    ASSERT_NE(frameNode, nullptr);
+    auto textPickerPattern = frameNode->GetPattern<TextPickerPattern>();
+    ASSERT_NE(textPickerPattern, nullptr);
+
+    TextPickerModelNG::SetTextPickerSingeRange(AceType::RawPtr(frameNode), false);
+    EXPECT_FALSE(textPickerPattern->isSingleRange_);
+
+    TextPickerModelNG::SetTextPickerSingeRange(AceType::RawPtr(frameNode), true);
+    EXPECT_TRUE(textPickerPattern->isSingleRange_);
+}
+
+/**
+ * @tc.name: SetTextPickerSingeRange002
+ * @tc.desc: Test SetTextPickerSingeRange with null frameNode
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextPickerModelTestNg, SetTextPickerSingeRange002, TestSize.Level1)
+{
+    TextPickerModelNG::SetTextPickerSingeRange(nullptr, false);
+    EXPECT_TRUE(true);
+}
+
+/**
+ * @tc.name: GetTextPickerSingeRange001
+ * @tc.desc: Test GetTextPickerSingeRange with valid frameNode
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextPickerModelTestNg, GetTextPickerSingeRange001, TestSize.Level1)
+{
+    auto frameNode = TextPickerModelNG::CreateFrameNode(ElementRegister::GetInstance()->MakeUniqueId());
+    ASSERT_NE(frameNode, nullptr);
+    auto textPickerPattern = frameNode->GetPattern<TextPickerPattern>();
+    ASSERT_NE(textPickerPattern, nullptr);
+
+    textPickerPattern->SetSingleRange(false);
+    EXPECT_FALSE(TextPickerModelNG::GetTextPickerSingeRange(AceType::RawPtr(frameNode)));
+
+    textPickerPattern->SetSingleRange(true);
+    EXPECT_TRUE(TextPickerModelNG::GetTextPickerSingeRange(AceType::RawPtr(frameNode)));
+}
+
+/**
+ * @tc.name: GetTextPickerSingeRange002
+ * @tc.desc: Test GetTextPickerSingeRange with null frameNode returns default true
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextPickerModelTestNg, GetTextPickerSingeRange002, TestSize.Level1)
+{
+    EXPECT_TRUE(TextPickerModelNG::GetTextPickerSingeRange(nullptr));
+}
+
+/**
+ * @tc.name: SetSingleRangeInstance001
+ * @tc.desc: Test instance SetSingleRange and GetSingleRange
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextPickerModelTestNg, SetSingleRangeInstance001, TestSize.Level1)
+{
+    auto theme = MockPipelineContext::GetCurrent()->GetTheme<PickerTheme>();
+    ASSERT_NE(theme, nullptr);
+    TextPickerModelNG::GetInstance()->Create(theme, TEXT);
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto textPickerPattern = frameNode->GetPattern<TextPickerPattern>();
+    ASSERT_NE(textPickerPattern, nullptr);
+
+    TextPickerModelNG::GetInstance()->SetSingleRange(false);
+    EXPECT_FALSE(textPickerPattern->isSingleRange_);
+    EXPECT_FALSE(TextPickerModelNG::GetInstance()->GetSingleRange());
+
+    TextPickerModelNG::GetInstance()->SetSingleRange(true);
+    EXPECT_TRUE(textPickerPattern->isSingleRange_);
+    EXPECT_TRUE(TextPickerModelNG::GetInstance()->GetSingleRange());
+}
+
+/**
+ * @tc.name: IsSingleRangeMultiInstance001
+ * @tc.desc: Test isSingleRange isolation between two instances
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextPickerModelTestNg, IsSingleRangeMultiInstance001, TestSize.Level1)
+{
+    auto frameNode1 = TextPickerModelNG::CreateFrameNode(ElementRegister::GetInstance()->MakeUniqueId());
+    auto frameNode2 = TextPickerModelNG::CreateFrameNode(ElementRegister::GetInstance()->MakeUniqueId());
+    ASSERT_NE(frameNode1, nullptr);
+    ASSERT_NE(frameNode2, nullptr);
+
+    TextPickerModelNG::SetTextPickerSingeRange(AceType::RawPtr(frameNode1), false);
+    TextPickerModelNG::SetTextPickerSingeRange(AceType::RawPtr(frameNode2), true);
+
+    EXPECT_FALSE(TextPickerModelNG::GetTextPickerSingeRange(AceType::RawPtr(frameNode1)));
+    EXPECT_TRUE(TextPickerModelNG::GetTextPickerSingeRange(AceType::RawPtr(frameNode2)));
 }
 } // namespace OHOS::Ace::NG

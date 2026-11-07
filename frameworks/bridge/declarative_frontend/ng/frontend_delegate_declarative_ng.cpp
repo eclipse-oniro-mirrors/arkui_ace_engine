@@ -24,6 +24,8 @@
 #include "frameworks/core/common/ace_engine.h"
 #include "base/subwindow/subwindow_manager.h"
 #include "core/components/navigator/navigator_type.h"
+#include "core/common/container.h"
+#include "interfaces/inner_api/ace/constants.h"
 
 namespace OHOS::Ace::Framework {
 
@@ -106,6 +108,18 @@ void FrontendDelegateDeclarativeNG::SetOnCompleteContinuationCallBack(
 void FrontendDelegateDeclarativeNG::SetOnSaveDataCallBack(OnSaveDataCallBack&& onSaveDataCallBack)
 {
     onSaveDataCallBack_ = onSaveDataCallBack;
+}
+
+void FrontendDelegateDeclarativeNG::SetRecoverableSnapshotCallBack(
+    RecoverableSnapshotCallBack&& recoverableSnapshotCallBack)
+{
+    recoverableSnapshotCallBack_ = recoverableSnapshotCallBack;
+}
+
+void FrontendDelegateDeclarativeNG::SetRecoverableRestoreCallBack(
+    RecoverableRestoreCallBack&& recoverableRestoreCallBack)
+{
+    recoverableRestoreCallBack_ = recoverableRestoreCallBack;
 }
 
 void FrontendDelegateDeclarativeNG::SetOnRemoteTerminatedCallBack(
@@ -783,7 +797,8 @@ void FrontendDelegateDeclarativeNG::ShowDialog(const PromptDialogAttr& dialogAtt
         .onDidDisappear = dialogAttr.onDidDisappear,
         .onWillAppear = dialogAttr.onWillAppear,
         .onWillDisappear = dialogAttr.onWillDisappear, .systemMaterial = dialogAttr.systemMaterial,
-        .distortionMode = dialogAttr.distortionMode, .edgeLightMode = dialogAttr.edgeLightMode
+        .distortionMode = dialogAttr.distortionMode, .edgeLightMode = dialogAttr.edgeLightMode,
+        .adaptToHandedness = dialogAttr.adaptToHandedness
     };
     if (dialogAttr.alignment.has_value()) {
         dialogProperties.alignment = dialogAttr.alignment.value();
@@ -903,6 +918,7 @@ DialogProperties FrontendDelegateDeclarativeNG::ParsePropertiesFromAttr(const Pr
         .dialogImmersiveMode = dialogAttr.dialogImmersiveMode,
         .systemMaterial = dialogAttr.systemMaterial,
         .distortionMode = dialogAttr.distortionMode, .edgeLightMode = dialogAttr.edgeLightMode,
+        .adaptToHandedness = dialogAttr.adaptToHandedness,
     };
     ParsePartialPropertiesFromAttr(dialogProperties, dialogAttr);
     return dialogProperties;
@@ -955,8 +971,7 @@ void FrontendDelegateDeclarativeNG::CloseCustomDialog(const int32_t dialogId, st
 {
     auto task = [dialogId, callback](const RefPtr<NG::OverlayManager>& overlayManager) mutable {
         CHECK_NULL_VOID(overlayManager);
-        auto needCallback = true;
-        auto finalCallback = [&needCallback, callback](int32_t errorCode) {
+        auto finalCallback = [callback](int32_t errorCode) {
             callback(errorCode);
         };
         overlayManager->CloseCustomDialog(dialogId, std::move(finalCallback));
@@ -1098,6 +1113,7 @@ void FrontendDelegateDeclarativeNG::ShowActionMenu(const PromptDialogAttr& dialo
         .systemMaterial = dialogAttr.systemMaterial,
         .distortionMode = dialogAttr.distortionMode,
         .edgeLightMode = dialogAttr.edgeLightMode,
+        .adaptToHandedness = dialogAttr.adaptToHandedness,
     };
 #if defined(PREVIEW)
     if (dialogProperties.isShowInSubWindow) {
@@ -1493,6 +1509,31 @@ void FrontendDelegateDeclarativeNG::CreateSnapshotFromComponent(const RefPtr<NG:
 #endif
 }
 
+
+namespace {
+// ===== RecoverableStorage bridge helpers (local, per-TU — no shared header to avoid fan-out) =====
+
+bool IsRecoverableContentInfoType(ContentInfoType type)
+{
+    return type == ContentInfoType::APP_RECOVERY || type == ContentInfoType::RESOURCESCHEDULE_RECOVERY;
+}
+
+std::string GetRecoverableStorageSection(const RecoverableSnapshotCallBack& callback)
+{
+    std::string section;
+    if (!callback) {
+        return section;
+    }
+    // Direct JSI call — no PostSyncTask to the JS message loop: on the APP_FREEZE
+    // save path this runs on a worker thread while the JS main loop is blocked;
+    // PostSyncTask (0ms = no timeout) would deadlock the save chain.
+    int32_t instanceId = Container::CurrentId();
+    callback(instanceId, section);
+    return section;
+}
+
+} // anonymous namespace
+
 std::string FrontendDelegateDeclarativeNG::GetContentInfo(ContentInfoType type)
 {
     auto jsonContentInfo = JsonUtil::Create(true);
@@ -1510,6 +1551,15 @@ std::string FrontendDelegateDeclarativeNG::GetContentInfo(ContentInfoType type)
         auto pipelineContext = pipelineContextHolder_.Get();
         CHECK_NULL_RETURN(pipelineContext, jsonContentInfo->ToString());
         jsonContentInfo->Put("nodeInfo", pipelineContext->GetStoredNodeInfo());
+    }
+
+    // RecoverableStorage snapshot section: appended for both recovery contentInfo types
+    // (APP_RECOVERY = 2 / RESOURCESCHEDULE_RECOVERY = 3), never for CONTINUATION.
+    if (IsRecoverableContentInfoType(type)) {
+        auto recoverableSection = GetRecoverableStorageSection(recoverableSnapshotCallBack_);
+        if (!recoverableSection.empty()) {
+            jsonContentInfo->Put("recoverableStorage", recoverableSection.c_str());
+        }
     }
 
     return jsonContentInfo->ToString();

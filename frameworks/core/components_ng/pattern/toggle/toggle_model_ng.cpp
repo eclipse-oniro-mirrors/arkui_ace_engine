@@ -318,10 +318,10 @@ RefPtr<FrameNode> ToggleModelNG::CreateButtonFrameNode(int32_t nodeId, bool isOn
 {
     auto buttonModifier = NodeModifier::GetButtonCustomModifier();
     CHECK_NULL_RETURN(buttonModifier, nullptr);
-    auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createToggleButtonPattern());
-    CHECK_NULL_RETURN(rawPattern, nullptr);
+    auto buttonPattern = buttonModifier->createToggleButtonPattern();
+    CHECK_NULL_RETURN(buttonPattern, nullptr);
     auto frameNode =
-        FrameNode::CreateFrameNode(TOGGLE_ETS_TAG, nodeId, AceType::Claim(rawPattern));
+        FrameNode::CreateFrameNode(TOGGLE_ETS_TAG, nodeId, buttonPattern);
 
     UpdateToggleButtonIsOn(frameNode, isOn);
     return frameNode;

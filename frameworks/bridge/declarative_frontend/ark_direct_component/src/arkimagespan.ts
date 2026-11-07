@@ -69,8 +69,9 @@ function loadComponent(): ComponentObj | undefined {
 					}
 					else {
 						getUINativeModule().imageSpan.setTextBackgroundStyle(node, textBackgroundStyle.color,
-							textBackgroundStyle.radius.topLeft, textBackgroundStyle.radius.topRight,
-							textBackgroundStyle.radius.bottomLeft, textBackgroundStyle.radius.bottomRight);
+						textBackgroundStyle.radius.topLeft, textBackgroundStyle.radius.topRight,
+						textBackgroundStyle.radius.bottomLeft, textBackgroundStyle.radius.bottomRight,
+						textBackgroundStyle.borderColor, textBackgroundStyle.borderWidth);
 					}
 				}
 			}
@@ -399,10 +400,14 @@ class JSImageSpan extends JSViewAbstract {
 
 	static resizable(value: any): void {
 		if (isUndefined(value) || isNull(value)) {
+			getUINativeModule().imageSpan.resetResizableSlice(true);
+			getUINativeModule().imageSpan.resetResizableLattice(true);
 			return;
 		}
 		if (!isUndefined(value.lattice) && !isNull(value.lattice)) {
 			getUINativeModule().imageSpan.setResizableLattice(true, value.lattice);
+		} else {
+			getUINativeModule().imageSpan.resetResizableLattice(true);
 		}
 		let sliceLeft: any;
 		let sliceTop: any;

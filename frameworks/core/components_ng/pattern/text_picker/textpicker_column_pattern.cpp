@@ -126,7 +126,7 @@ bool TextPickerColumnPattern::OnDirtyLayoutWrapperSwap(
 
     CHECK_NULL_RETURN(isChange, false);
     CHECK_NULL_RETURN(dirty, false);
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto layoutAlgorithm = DynamicCast<TextPickerLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(layoutAlgorithm, false);
@@ -1404,11 +1404,13 @@ Dimension TextPickerColumnPattern::LinearFontSize(
 {
     Dimension start = startFontSize;
     Dimension end = endFontSize;
-    if (start.Unit() == DimensionUnit::LPX) {
+    if (start.Unit() == DimensionUnit::VP || start.Unit() == DimensionUnit::FP ||
+        start.Unit() == DimensionUnit::LPX) {
         start = Dimension(start.ConvertToPx());
     }
 
-    if (end.Unit() == DimensionUnit::LPX) {
+    if (end.Unit() == DimensionUnit::VP || end.Unit() == DimensionUnit::FP ||
+        end.Unit() == DimensionUnit::LPX) {
         end = Dimension(end.ConvertToPx());
     }
 

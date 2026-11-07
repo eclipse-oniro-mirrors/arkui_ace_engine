@@ -23,7 +23,6 @@ if (is_host_product) {
     "$ace_root/frameworks/core/common/rosen/rosen_asset_manager.cpp",
     "$ace_root/frameworks/core/common/rosen/rosen_convert_helper.cpp",
     "$ace_root/frameworks/core/common/rosen/rosen_window.cpp",
-    "$ace_root/frameworks/core/common/sharedata/share_data.cpp",
     "$ace_root/frameworks/core/common/storage/storage_proxy.cpp",
     "$ace_root/frameworks/core/common/vibrator/vibrator_proxy.cpp",
     "asset/asset_test.cpp",
@@ -33,7 +32,6 @@ if (is_host_product) {
     "multi_thread_build_manager/multi_thread_build_manager_test.cpp",
     "resource/pattern_resource_manager_test.cpp",
     "rosen/rosen_test.cpp",
-    "sharedata/sharedata_test.cpp",
     "storage/storage_test.cpp",
     "transform/input_compatible_manager_test_ng.cpp",
     "vibrator/vibrator_test.cpp",
@@ -51,11 +49,15 @@ if (is_host_product) {
       sources = [
         "common_test_core.cpp",
         "common_test_min.cpp",
+        "$ace_root/frameworks/core/common/ui_observer/ui_observer_store.cpp",
+        "ui_observer_store_test.cpp",
       ]
     } else {
       sources += [
         "common_test_core.cpp",
         "common_test_min.cpp",
+        "$ace_root/frameworks/core/common/ui_observer/ui_observer_store.cpp",
+        "ui_observer_store_test.cpp",
       ]
     }
   }
@@ -68,7 +70,6 @@ if (is_host_product) {
     "$ace_root/frameworks/core/common/rosen/rosen_asset_manager.cpp",
     "$ace_root/frameworks/core/common/rosen/rosen_convert_helper.cpp",
     "$ace_root/frameworks/core/common/rosen/rosen_window.cpp",
-    "$ace_root/frameworks/core/common/sharedata/share_data.cpp",
     "$ace_root/frameworks/core/common/storage/storage_proxy.cpp",
     "$ace_root/frameworks/core/common/task_runner_adapter_impl.cpp",
     "$ace_root/frameworks/core/common/vibrator/vibrator_proxy.cpp",
@@ -79,7 +80,6 @@ if (is_host_product) {
     "multi_thread_build_manager/multi_thread_build_manager_test.cpp",
     "resource/pattern_resource_manager_test.cpp",
     "rosen/rosen_test.cpp",
-    "sharedata/sharedata_test.cpp",
     "storage/storage_test.cpp",
     "task_runner_adapter_impl/task_runner_adapter_test.cpp",
     "transform/input_compatible_manager_test_ng.cpp",
@@ -99,11 +99,15 @@ if (is_host_product) {
       sources = [
         "common_test_core.cpp",
         "common_test_min.cpp",
+        "$ace_root/frameworks/core/common/ui_observer/ui_observer_store.cpp",
+        "ui_observer_store_test.cpp",
       ]
     } else {
       sources += [
         "common_test_core.cpp",
         "common_test_min.cpp",
+        "$ace_root/frameworks/core/common/ui_observer/ui_observer_store.cpp",
+        "ui_observer_store_test.cpp",
       ]
     }
 

@@ -117,7 +117,7 @@ HWTEST_F(TextFieldPatternFuncTest, TextPatternFunc078, TestSize.Level1)
     auto host = pattern->GetHost();
     auto nodeId = host->GetId();
     pattern->keyboardOverlay_->customKeyboardMap_.emplace(std::make_pair(nodeId, AceType::RawPtr(keyboardScd)));
-    textFieldManager->onFocusTextField_ = AceType::DynamicCast<Pattern>(pattern);
+    textFieldManager->onFocusTextField_ = pattern;
     textFieldManager->TriggerCustomKeyboardAvoid();
     EXPECT_EQ(keyboardScd->GetPattern<KeyboardPattern>()->safeHeight_, 1);
 }
@@ -148,7 +148,7 @@ HWTEST_F(TextFieldPatternFuncTest, TextPatternFunc079, TestSize.Level1)
     auto host = pattern->GetHost();
     auto nodeId = host->GetId();
     pattern->keyboardOverlay_->customKeyboardMap_.emplace(std::make_pair(nodeId, AceType::RawPtr(keyboardScd)));
-    textFieldManager->onFocusTextField_ = AceType::DynamicCast<Pattern>(pattern);
+    textFieldManager->onFocusTextField_ = pattern;
     textFieldManager->TriggerCustomKeyboardAvoid();
     EXPECT_EQ(keyboardScd->GetPattern<KeyboardPattern>()->safeHeight_, 3);
 }
@@ -179,7 +179,7 @@ HWTEST_F(TextFieldPatternFuncTest, TextPatternFunc080, TestSize.Level1)
     auto host = pattern->GetHost();
     auto nodeId = host->GetId();
     pattern->keyboardOverlay_->customKeyboardMap_.emplace(std::make_pair(nodeId, AceType::RawPtr(keyboardScd)));
-    textFieldManager->onFocusTextField_ = AceType::DynamicCast<Pattern>(pattern);
+    textFieldManager->onFocusTextField_ = pattern;
     textFieldManager->TriggerAvoidOnCaretChange();
     EXPECT_EQ(keyboardScd->GetPattern<KeyboardPattern>()->safeHeight_, 0);
 }
@@ -207,7 +207,7 @@ HWTEST_F(TextFieldPatternFuncTest, TextPatternFunc081, TestSize.Level1)
     element->tag_ = "Panel";
     textFieldNode->SetParent(element, false);
     Offset menuOffset(960, 1660);
-    textFieldManager->onFocusTextField_ = AceType::DynamicCast<Pattern>(pattern);
+    textFieldManager->onFocusTextField_ = pattern;
     textFieldManager->SetClickPosition(menuOffset);
     EXPECT_NE(textFieldManager->position_, menuOffset);
 }
@@ -235,7 +235,7 @@ HWTEST_F(TextFieldPatternFuncTest, TextPatternFunc082, TestSize.Level1)
     element->tag_ = "SheetPage";
     textFieldNode->SetParent(element, false);
     Offset menuOffset(960, 0.0f);
-    textFieldManager->onFocusTextField_ = AceType::DynamicCast<Pattern>(pattern);
+    textFieldManager->onFocusTextField_ = pattern;
     textFieldManager->SetClickPosition(menuOffset);
     EXPECT_NE(textFieldManager->position_, menuOffset);
 }
@@ -265,7 +265,7 @@ HWTEST_F(TextFieldPatternFuncTest, TextPatternFunc083, TestSize.Level1)
     /*
      * @tc.step2: set click position.
      */
-    textFieldManager->onFocusTextField_ = AceType::DynamicCast<Pattern>(pattern);
+    textFieldManager->onFocusTextField_ = pattern;
     textFieldManager->SetClickPosition(menuOffset);
     EXPECT_NE(textFieldManager->optionalPosition_, menuOffset);
 }
@@ -289,7 +289,7 @@ HWTEST_F(TextFieldPatternFuncTest, TextPatternFunc084, TestSize.Level1)
     ASSERT_NE(textFieldManager, nullptr);
     MockContainer::SetUp();
     Offset menuOffset(960, 100);
-    textFieldManager->onFocusTextField_ = AceType::DynamicCast<Pattern>(pattern);
+    textFieldManager->onFocusTextField_ = pattern;
     textFieldManager->SetClickPosition(menuOffset);
     EXPECT_NE(textFieldManager->optionalPosition_, menuOffset);
 }
@@ -682,7 +682,7 @@ HWTEST_F(TextFieldPatternFuncTest, TextFieldSelectOverlay001, TestSize.Level1)
     pattern->selectOverlay_->OnOverlayClick(event, true);
     pattern->selectOverlay_->isSingleHandle_ = true;
     pattern->selectOverlay_->OnOverlayClick(event, true);
-    pattern->multipleClickRecognizer_ = pattern->GetOrCreateMultipleClickRecognizer();
+    pattern->multipleClickRecognizer_ = AceType::MakeRefPtr<MultipleClickRecognizer>();
     pattern->multipleClickRecognizer_->clickCountTask_.Reset([] {});
     pattern->selectOverlay_->OnOverlayClick(event, true);
     pattern->multipleClickRecognizer_->lastClickPosition_ = Offset(0.0f, 0.0f);

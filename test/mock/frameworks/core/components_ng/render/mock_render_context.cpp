@@ -359,5 +359,15 @@ std::optional<Dimension> RenderContext::GetBackBlurRadius() const { return std::
 std::optional<BlurStyleOption> RenderContext::GetBackBlurStyle() const { return std::nullopt; }
 std::optional<EffectOption> RenderContext::GetBackgroundEffect() const { return std::nullopt; }
 void RenderContext::SetIsFree(bool) {}
+void RenderContext::UpdateVibrancyMode(const VibrancyMode& mode)
+{
+    if (mode != VibrancyMode::AUTO) {
+        if (propVibrancyMode_.has_value() && NearEqual(propVibrancyMode_.value(), mode)) {
+            return;
+        }
+    }
+    propVibrancyMode_ = mode;
+    OnVibrancyModeUpdate(mode);
+}
 
 } // namespace OHOS::Ace::NG

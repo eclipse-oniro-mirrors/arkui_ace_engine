@@ -14,6 +14,8 @@
  */
 
 #include "core/components_ng/pattern/ui_extension/ui_extension_component/ui_extension_pattern.h"
+
+#include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/accessibility/accessibility_manager.h"
 
 #include <atomic>
@@ -71,6 +73,7 @@ namespace {
 constexpr char ABILITY_KEY_ASYNC[] = "ability.want.params.KeyAsync";
 constexpr char ABILITY_KEY_IS_MODAL[] = "ability.want.params.IsModal";
 constexpr char ATOMIC_SERVICE_PREFIX[] = "com.atomicservice.";
+constexpr char BRAND_COLOR_KEY[] = "ohos.application.brandColor";
 constexpr char PROHIBIT_NESTING_FAIL_NAME[] = "Prohibit_Nesting_SecurityUIExtensionComponent";
 constexpr char PROHIBIT_NESTING_FAIL_MESSAGE[] =
     "Prohibit nesting uIExtensionExtensionComponent in securityUIAbility";
@@ -166,13 +169,17 @@ UIExtensionPattern::~UIExtensionPattern()
         return;
     }
 
-    auto instanceId = GetInstanceIdFromHost();
+    auto host = GetHost();
+    auto instanceId = host ? host->GetInstanceId() : instanceId_;
     ContainerScope scope(instanceId);
     auto ngPipeline = NG::PipelineContext::GetCurrentContext();
     CHECK_NULL_VOID(ngPipeline);
     auto frontend = ngPipeline->GetFrontend();
     CHECK_NULL_VOID(frontend);
-    auto accessibilityManager = frontend->GetAccessibilityManager();
+    auto mainAccessibilityManager = frontend->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = host ? mainAccessibilityManager->GetAccessibilityManagerForNode(host)
+                                     : mainAccessibilityManager;
     CHECK_NULL_VOID(accessibilityManager);
     accessibilityManager->DeregisterAccessibilityChildTreeCallback(
         accessibilityChildTreeCallback_->GetAccessibilityId());
@@ -281,7 +288,7 @@ void UIExtensionPattern::OnAttachContext(PipelineContext *context)
     }
     AddWindowStateChangedCallback();
     RegisterAvoidInfoChangeListener(instanceId_);
-
+    RegisterBrandColorChangeListener();
     /* only for 1.2 begin */
     if (context->GetFrontendType() == FrontendType::ARK_TS) {
         auto wantWrap = GetWantWrap();
@@ -303,6 +310,7 @@ void UIExtensionPattern::UpdateSessionInstanceId(int32_t instanceId)
     }
 
     sessionWrapperImpl->UpdateInstanceId(instanceId);
+    NotifyBrandColorChange(instanceId);
 }
 
 void UIExtensionPattern::RegisterEvent(int32_t instanceId)
@@ -310,6 +318,33 @@ void UIExtensionPattern::RegisterEvent(int32_t instanceId)
     RegisterUIExtensionManagerEvent(instanceId);
     RegisterPipelineEvent(instanceId);
     hasDetachContext_ = false;
+}
+
+void UIExtensionPattern::RegisterBrandColorChangeListener()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    CHECK_NULL_VOID(storage);
+    NG::BrandColorChangeCallback internalCallback =
+        [weak = WeakClaim(this), instanceId = instanceId_](
+            int32_t, const std::optional<Color>&,
+            const std::optional<NG::BrandColorStrategy>&) {
+            auto pattern = weak.Upgrade();
+            CHECK_NULL_VOID(pattern);
+            ContainerScope scope(instanceId);
+            pattern->NotifyBrandColorChange(instanceId);
+        };
+    storage->RegisterBrandColorChangeListener(instanceId_, host->GetId(), internalCallback);
+}
+
+void UIExtensionPattern::UnRegisterBrandColorChangeListener()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    CHECK_NULL_VOID(storage);
+    storage->UnregisterBrandColorChangeListener(instanceId_, host->GetId());
 }
 
 void UIExtensionPattern::RegisterPipelineEvent(int32_t instanceId)
@@ -366,6 +401,7 @@ void UIExtensionPattern::UnRegisterEvent(int32_t instanceId)
 {
     UnRegisterUIExtensionManagerEvent(instanceId);
     UnRegisterPipelineEvent(instanceId);
+    UnRegisterBrandColorChangeListener();
     UnRegisterAvoidInfoChangeListener();
     hasDetachContext_ = true;
 }
@@ -616,7 +652,7 @@ void UIExtensionPattern::UpdateSessionViewportConfigFromContext()
     auto pipeline = PipelineContext::GetCurrentContext();
     CHECK_NULL_VOID(pipeline);
     SessionViewportConfig sessionViewportConfig;
-    sessionViewportConfig.isDensityFollowHost_ = GetDensityDpi();
+    sessionViewportConfig.dpiFollowStrategy_ = GetEffectiveDpiFollowStrategy();
     sessionViewportConfig.density_ = pipeline->GetCurrentDensity();
     sessionViewportConfig.displayId_ = container->GetCurrentDisplayId();
     sessionViewportConfig.orientation_ = static_cast<int32_t>(SystemProperties::GetDeviceOrientation());
@@ -673,6 +709,7 @@ void UIExtensionPattern::OnConnect()
     surfaceNode->SetForeground(usage_ == UIExtensionUsage::MODAL);
     auto focusHub = host->GetFocusHub();
     bool isFocusedBeforeCallback = focusHub && focusHub->IsCurrentFocus();
+    isUeaConnecting_ = true;
     FireOnRemoteReadyCallback();
     bool isFocusedAfterCallback = focusHub && focusHub->IsCurrentFocus();
     if ((usage_ == UIExtensionUsage::MODAL) && focusHub && isModalRequestFocus_) {
@@ -861,6 +898,7 @@ void UIExtensionPattern::OnDisconnect(bool isAbnormal)
     host->RemoveChildAtIndex(0);
     host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
     SetCurPlaceholderType(PlaceholderType::NONE);
+    isUeaConnecting_ = false;
 }
 
 void UIExtensionPattern::OnSyncGeometryNode(const DirtySwapConfig& config)
@@ -940,6 +978,7 @@ void UIExtensionPattern::NotifyForeground()
             sessionWrapper_->NotifyDisplayArea(displayArea_);
             displayAreaChanged_ = false;
         }
+        NotifyBrandColorChangeToUEA(instanceId_, brandColorStr_);
     }
 }
 
@@ -958,6 +997,7 @@ void UIExtensionPattern::NotifyDestroy()
         state_ != AbilityState::NONE) {
         UIEXT_LOGI("The state is changing from '%{public}s' to 'DESTRUCTION'.", ToString(state_));
         state_ = AbilityState::DESTRUCTION;
+        isUeaConnecting_ = false;
         sessionWrapper_->NotifyDestroy();
         sessionWrapper_->DestroySession();
     }
@@ -1559,8 +1599,10 @@ void UIExtensionPattern::FireOnRemoteReadyCallback()
         onRemoteReadyCallback_(MakeRefPtr<UIExtensionProxy>(sessionWrapper_, Claim(this)));
     }
     if (onModalRemoteReadyCallback_) {
-        onModalRemoteReadyCallback_(std::make_shared<ModalUIExtensionProxyImpl>(sessionWrapper_));
+        auto innerProxy = MakeRefPtr<UIExtensionProxy>(sessionWrapper_, Claim(this));
+        onModalRemoteReadyCallback_(std::make_shared<ModalUIExtensionProxyImpl>(innerProxy));
     }
+    NotifyBrandColorChangeToUEA(instanceId_, brandColorStr_);
 }
 
 void UIExtensionPattern::SetModalOnDestroy(const std::function<void()>&& callback)
@@ -1758,14 +1800,32 @@ void UIExtensionPattern::FireBindModalCallback()
     }
 }
 
-void UIExtensionPattern::SetDensityDpi(bool densityDpi)
+void UIExtensionPattern::SetDpiFollowStrategy(DpiFollowStrategy dpiFollowStrategy, bool isDpiFollowStrategySet)
 {
-    densityDpi_ = densityDpi;
+    dpiFollowStrategy_ = dpiFollowStrategy;
+    isDpiFollowStrategySet_ = isDpiFollowStrategySet;
 }
 
-bool UIExtensionPattern::GetDensityDpi()
+DpiFollowStrategy UIExtensionPattern::GetDpiFollowStrategy()
 {
-    return densityDpi_;
+    return dpiFollowStrategy_;
+}
+
+DpiFollowStrategy UIExtensionPattern::GetEffectiveDpiFollowStrategy()
+{
+    ContainerScope scope(instanceId_);
+    auto context = PipelineBase::GetCurrentContext();
+    DpiFollowStrategy hostDpiFollowStrategy =
+        context ? context->GetUIExtensionDensityFollowHost() : DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI;
+    // Developer-configured strategy takes precedence (even when it is the default value,
+    // i.e. an explicit opt-out); when not configured at all, fall back to the strategy
+    // saved from UIContent::SetUIExtensionDensityFollowHost.
+    DpiFollowStrategy effectiveStrategy = isDpiFollowStrategySet_ ? dpiFollowStrategy_ : hostDpiFollowStrategy;
+    UIEXT_LOGI("GetEffectiveDpiFollowStrategy: dpiFollowStrategy=%{public}d, isDpiFollowStrategySet=%{public}d, "
+               "hostDpiFollowStrategy=%{public}d, effective=%{public}d, instanceId=%{public}d.",
+        static_cast<int32_t>(dpiFollowStrategy_), isDpiFollowStrategySet_, static_cast<int32_t>(hostDpiFollowStrategy),
+        static_cast<int32_t>(effectiveStrategy), instanceId_);
+    return effectiveStrategy;
 }
 
 void UIExtensionPattern::OnVisibleChange(bool visible)
@@ -1795,10 +1855,12 @@ void UIExtensionPattern::InitializeAccessibility()
     CHECK_NULL_VOID(ngPipeline);
     auto frontend = ngPipeline->GetFrontend();
     CHECK_NULL_VOID(frontend);
-    auto accessibilityManager = frontend->GetAccessibilityManager();
-    CHECK_NULL_VOID(accessibilityManager);
     auto frameNode = frameNode_.Upgrade();
     CHECK_NULL_VOID(frameNode);
+    auto mainAccessibilityManager = frontend->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(frameNode);
+    CHECK_NULL_VOID(accessibilityManager);
     int64_t accessibilityId = frameNode->GetAccessibilityId();
     accessibilityChildTreeCallback_ = std::make_shared<UIExtensionAccessibilityChildTreeCallback>(
         WeakClaim(this), accessibilityId);
@@ -1927,7 +1989,7 @@ void UIExtensionPattern::RegisterVisibleAreaChange()
         uiExtension->HandleVisibleAreaChange(visible, ratio);
     };
     std::vector<double> ratioList = { SHOW_START, SHOW_FULL };
-    pipeline->AddVisibleAreaChangeNode(host, ratioList, callback, false);
+    pipeline->AddVisibleAreaChangeNode(host, ratioList, callback, false, true);
 }
 
 void UIExtensionPattern::HandleVisibleAreaChange(bool visible, double ratio)
@@ -2036,6 +2098,20 @@ const char* UIExtensionPattern::ToString(AbilityState state)
     }
 }
 
+void UIExtensionPattern::DumpDpiFollowInfo()
+{
+    ContainerScope dpiScope(instanceId_);
+    auto dpiContext = PipelineBase::GetCurrentContext();
+    DumpLog::GetInstance().AddDesc(std::string("dpiFollowStrategy: ")
+        .append(std::to_string(static_cast<int32_t>(dpiFollowStrategy_))));
+    DumpLog::GetInstance().AddDesc(std::string("isDpiFollowStrategySet: ")
+        .append(std::to_string(isDpiFollowStrategySet_)));
+    DumpLog::GetInstance().AddDesc(std::string("uiExtensionDpiFollowHost: ")
+        .append(std::to_string(dpiContext ? static_cast<int32_t>(dpiContext->GetUIExtensionDensityFollowHost()) : -1)));
+    DumpLog::GetInstance().AddDesc(std::string("dpiFollowStrategyEffective: ")
+        .append(std::to_string(static_cast<int32_t>(GetEffectiveDpiFollowStrategy()))));
+}
+
 void UIExtensionPattern::DumpInfo()
 {
     CHECK_NULL_VOID(sessionWrapper_);
@@ -2047,11 +2123,15 @@ void UIExtensionPattern::DumpInfo()
     DumpLog::GetInstance().AddDesc(std::string("reason: ").append(std::to_string(sessionWrapper_->GetReasonDump())));
     DumpLog::GetInstance().AddDesc(std::string("focusStatus: ").append(std::to_string(focusState_)));
     DumpLog::GetInstance().AddDesc(std::string("abilityState: ").append(ToString(state_)));
+    DumpDpiFollowInfo();
     std::string eventProxyStr = "[]";
     if (platformEventProxy_) {
         eventProxyStr = platformEventProxy_->GetCurEventProxyToString();
     }
     DumpLog::GetInstance().AddDesc(std::string("eventProxy: ").append(eventProxyStr));
+    DumpLog::GetInstance().AddDesc(std::string("brandColorStr: ").append(brandColorStr_)
+        .append(", lastSentBrandColorStr: ").append(lastSentBrandColorStr_).append(", isUeaConnecting: ")
+        .append(std::to_string(isUeaConnecting_)));
 
     auto container = Platform::AceContainer::GetContainer(instanceId_);
     CHECK_NULL_VOID(container);
@@ -2094,11 +2174,22 @@ void UIExtensionPattern::DumpInfo(std::unique_ptr<JsonValue>& json)
     json->Put("reason: ", std::to_string(sessionWrapper_->GetReasonDump()).c_str());
     json->Put("focusStatus: ", std::to_string(focusState_).c_str());
     json->Put("abilityState: ", ToString(state_));
+    ContainerScope dpiScope(instanceId_);
+    auto dpiContext = PipelineBase::GetCurrentContext();
+    json->Put("dpiFollowStrategy: ", std::to_string(static_cast<int32_t>(dpiFollowStrategy_)).c_str());
+    json->Put("isDpiFollowStrategySet: ", std::to_string(isDpiFollowStrategySet_).c_str());
+    json->Put("uiExtensionDpiFollowHost: ",
+        std::to_string(dpiContext ? static_cast<int32_t>(dpiContext->GetUIExtensionDensityFollowHost()) : -1).c_str());
+    json->Put("dpiFollowStrategyEffective: ",
+        std::to_string(static_cast<int32_t>(GetEffectiveDpiFollowStrategy())).c_str());
     std::string eventProxyStr = "[]";
     if (platformEventProxy_) {
         eventProxyStr = platformEventProxy_->GetCurEventProxyToString();
     }
     json->Put("eventProxy: ", eventProxyStr.c_str());
+    json->Put("brandColorStr: ", brandColorStr_.c_str());
+    json->Put("lastSentBrandColorStr: ", lastSentBrandColorStr_.c_str());
+    json->Put("isUeaConnecting: ", std::to_string(isUeaConnecting_).c_str());
 
     auto container = Platform::AceContainer::GetContainer(instanceId_);
     CHECK_NULL_VOID(container);
@@ -2168,7 +2259,12 @@ void UIExtensionPattern::AddExtraInfoWithParamConfig(std::shared_ptr<JsonValue>&
     CHECK_EQUAL_VOID(config.withUIExtension, false);
     CHECK_NULL_VOID(sessionWrapper_);
     auto container = Platform::AceContainer::GetContainer(instanceId_);
-    CHECK_NULL_VOID(container);
+    if (!container) {
+        if (config.inspectorContext) {
+            config.inspectorContext->ReportError(InspectorTreeError::COLLECTION_FAILED);
+        }
+        return;
+    }
     std::vector<std::string> params;
     params.push_back("-allInfoWithParamConfigTotal");
     params.push_back("1");
@@ -2179,6 +2275,8 @@ void UIExtensionPattern::AddExtraInfoWithParamConfig(std::shared_ptr<JsonValue>&
     params.push_back(config.withUIExtension ? "1" : "0");
     params.push_back(config.rectCulling ? "1" : "0");
     params.push_back(std::to_string(config.minOpacity));
+    params.push_back(config.withResponseRegion ? "1" : "0");
+    params.push_back(config.withCustomContent ? "1" : "0");
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     if (!container->IsUIExtensionWindow()) {
@@ -2186,18 +2284,26 @@ void UIExtensionPattern::AddExtraInfoWithParamConfig(std::shared_ptr<JsonValue>&
     }
     params.push_back(std::to_string(getpid()));
 
-    ExecuteDumpTask(json, params, host);
+    ExecuteDumpTask(json, params, host, config.inspectorContext);
 }
 
 void UIExtensionPattern::ExecuteDumpTask(
-    std::shared_ptr<JsonValue>& json, const std::vector<std::string>& params, const RefPtr<FrameNode>& host)
+    std::shared_ptr<JsonValue>& json, const std::vector<std::string>& params, const RefPtr<FrameNode>& host,
+    InspectorTreeRequestContext* request)
 {
     ACE_SCOPED_TRACE("UIExtensionPattern::ExecuteDumpTask");
     const int32_t GET_INSPECTOR_TREE_TIMEOUT_TIME = 900;
-    auto context = host->GetContext();
-    CHECK_NULL_VOID(context);
-    auto taskExecutor = context->GetTaskExecutor();
-    CHECK_NULL_VOID(taskExecutor);
+    const auto fail = [request]() {
+        if (request) {
+            request->ReportError(InspectorTreeError::COLLECTION_FAILED);
+        }
+    };
+    auto context = host ? host->GetContext() : nullptr;
+    auto taskExecutor = context ? context->GetTaskExecutor() : nullptr;
+    if (!taskExecutor) {
+        fail();
+        return;
+    }
 
     // Capture sessionWrapper_ on the calling thread to avoid cross-thread data race
     // when the lambda runs on the background thread.
@@ -2207,6 +2313,7 @@ void UIExtensionPattern::ExecuteDumpTask(
     // with a promise/future pair to run the IPC call (NotifyUieDump) on the background
     // thread and wait for the result with a timeout on the calling thread.
     if (!sessionWrapper) {
+        fail();
         return;
     }
 
@@ -2220,12 +2327,22 @@ void UIExtensionPattern::ExecuteDumpTask(
     }, TaskExecutor::TaskType::BACKGROUND, "UiSessionGetInspectorTree");
     if (!postResult) {
         taskValid->store(false, std::memory_order_release);
+        fail();
         return;
     }
 
     auto result = future.wait_for(std::chrono::milliseconds(GET_INSPECTOR_TREE_TIMEOUT_TIME));
     if (result == std::future_status::timeout) {
         taskValid->store(false, std::memory_order_release);
+        return;
+    }
+    if (request) {
+        auto child = json ? json->GetValue("$child-uec") : nullptr;
+        if (!child) {
+            fail();
+            return;
+        }
+        request->AcceptExtensionTree(*child);
     }
 }
 
@@ -2506,5 +2623,84 @@ void UIExtensionPattern::UpdateWMSUIExtProperty(UIContentBusinessCode code, cons
         return;
     }
     SendBusinessData(code, data, BusinessDataSendType::ASYNC, subSystemId);
+}
+
+void UIExtensionPattern::NotifyBrandColorChangeToUEA(
+    int32_t instanceId, const std::string& brandColorStr)
+{
+    CHECK_NULL_VOID(sessionWrapper_);
+    if (state_ != AbilityState::FOREGROUND || !isUeaConnecting_) {
+        UIEXT_LOGW("NotifyBrandColorChangeToUEA: skip, "
+            "state=%{public}d, isUeaConnecting=%{public}d",
+            static_cast<int32_t>(state_), isUeaConnecting_);
+        return;
+    }
+    if (!brandColorStr.empty()) {
+        auto brandColor = Color::FromString(brandColorStr);
+        if (brandColor.GetAlpha() == 0) {
+            UIEXT_LOGW("NotifyBrandColorChangeToUEA: brandColor is transparent, skip, "
+                "instanceId=%{public}d, brandColorStr=%{public}s",
+                instanceId, brandColorStr.c_str());
+            return;
+        }
+    }
+    if (brandColorStr == lastSentBrandColorStr_) {
+        UIEXT_LOGI("NotifyBrandColorChangeToUEA: brandColorStr not changed, skip, "
+            "instanceId=%{public}d, brandColorStr=%{public}s",
+            instanceId, brandColorStr.c_str());
+        return;
+    }
+    AAFwk::Want want;
+    want.SetParam(BRAND_COLOR_KEY, brandColorStr);
+    UIEXT_LOGI("NotifyBrandColorChangeToUEA: instanceId=%{public}d, "
+        "brandColorStr=%{public}s, sessionId=%{public}d",
+        instanceId, brandColorStr.c_str(), GetSessionId());
+    sessionWrapper_->SendBusinessData(
+        UIContentBusinessCode::NOTIFY_BRAND_COLOR_CHANGE, want,
+        BusinessDataSendType::ASYNC, RSSubsystemId::ABILITY_UIEXT);
+    lastSentBrandColorStr_ = brandColorStr;
+}
+
+void UIExtensionPattern::NotifyBrandColorChange(int32_t instanceId)
+{
+    auto brandColorStr = GetBrandColorStr();
+    NotifyBrandColorChangeToUEA(instanceId, brandColorStr);
+    brandColorStr_ = brandColorStr;
+}
+
+std::string UIExtensionPattern::ResolveBrandColor(int32_t themeScopeId) const
+{
+    auto brandColor = TokenThemeStorage::GetInstance()->ResolveBrandColor(themeScopeId);
+    if (!brandColor.has_value()) {
+        UIEXT_LOGW("ResolveBrandColor: themeColors is null, "
+                "themeScopeId=%{public}d, instanceId=%{public}d",
+            themeScopeId, instanceId_);
+        return DEFAULT_BRAND_COLOR_STR;
+    }
+    if (brandColor.value().GetAlpha() == 0) {
+        UIEXT_LOGW("ResolveBrandColor: brandColor is transparent, "
+            "instanceId=%{public}d, brandColorStr=%{public}s, fromTheme=1",
+            instanceId_, brandColor.value().ToString().c_str());
+        return DEFAULT_BRAND_COLOR_STR;
+    }
+    UIEXT_LOGI("ResolveBrandColor: instanceId=%{public}d, brandColorStr=%{public}s, fromTheme=1",
+        instanceId_, brandColor.value().ToString().c_str());
+    return brandColor.value().ToString();
+}
+
+std::string UIExtensionPattern::GetBrandColorStr() const
+{
+    auto hostNode = GetHost();
+    int32_t themeScopeId = hostNode ? hostNode->GetThemeScopeId() : 0;
+    return ResolveBrandColor(themeScopeId);
+}
+
+bool UIExtensionPattern::OnThemeScopeUpdate(int32_t themeScopeId)
+{
+    UIEXT_LOGI("OnThemeScopeUpdate: themeScopeId=%{public}d, instanceId=%{public}d, sessionId=%{public}d",
+        themeScopeId, instanceId_, GetSessionId());
+    brandColorStr_ = ResolveBrandColor(themeScopeId);
+    NotifyBrandColorChangeToUEA(instanceId_, brandColorStr_);
+    return true;
 }
 } // namespace OHOS::Ace::NG

@@ -95,7 +95,7 @@ void ImageDecoder::AddToPixelMapCache(
     }
     std::unique_lock<std::shared_mutex> lock(pixelMapMtx_);
     auto key = ImageUtils::GenerateImageKey(imageSourceInfo, size);
-    weakPixelMapCache_.emplace(key, weakPixelMap);
+    weakPixelMapCache_.insert_or_assign(key, weakPixelMap);
 }
 
 RefPtr<CanvasImage> ImageDecoder::MakeDrawingImage(

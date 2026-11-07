@@ -36,6 +36,8 @@ public:
 
     virtual RefPtr<GestureSnapshot> Dump() const override;
 
+    void ForceCleanRecognizer() override;
+
     void SetDistance(double distance)
     {
         distance_ = distance;

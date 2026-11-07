@@ -41,7 +41,7 @@ struct EventTarget final {
     DimensionOffset origin;
 };
 
-class BaseEventInfo : public virtual TypeInfoBase {
+class BaseEventInfo : public TypeInfoBase {
     DECLARE_RELATIONSHIP_OF_CLASSES(BaseEventInfo, TypeInfoBase);
 
 public:

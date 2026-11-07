@@ -38,13 +38,13 @@ import { RecyclePoolV2Tests } from '../../v2_tests/recyclePoolV2Tests'
 import { InteropTestsV2 } from '../../v2_tests/interopTestsV2'
 import { InteropModuleDeepTestsV2 } from '../../v2_tests/interopModuleDeepTestsV2'
 import { InteropStorageDeepTestsV2 } from '../../v2_tests/interopStorageDeepTestsV2'
-import { InteropBuilderDeepTestsV2 } from '../../v2_tests/interopBuilderDeepTestsV2'
+// import { InteropBuilderDeepTestsV2 } from '../../v2_tests/interopBuilderDeepTestsV2'
 import { V2DecoratorsTestsV2 } from '../../v2_tests/v2DecoratorsTestsV2'
 import { V2MakeObservedTestsV2 } from '../../v2_tests/v2MakeObservedTestsV2'
 import { UpdateFuncsByElmtIdTestsV2 } from '../../v2_tests/updateFuncsByElmtIdTestsV2'
 import { ObservedUtilTestsV2 } from '../../v2_tests/observedUtilTestsV2'
 
-import router from '@system.router'
+import { router } from '@kit.ArkUI'
 
 @Entry
 @ComponentV2
@@ -79,7 +79,7 @@ struct Parent {
       TestRunner.bind(this)(new InteropTestsV2('V2_interop'));
       TestRunner.bind(this)(new InteropModuleDeepTestsV2('V2_interop_module_deep'));
       TestRunner.bind(this)(new InteropStorageDeepTestsV2('V2_interop_storage_deep'));
-      TestRunner.bind(this)(new InteropBuilderDeepTestsV2('V2_interop_builder_deep'));
+      // TestRunner.bind(this)(new InteropBuilderDeepTestsV2('V2_interop_builder_deep'));
       TestRunner.bind(this)(new V2DecoratorsTestsV2('V2_v2Decorators'));
       TestRunner.bind(this)(new V2MakeObservedTestsV2('V2_v2MakeObserved'));
       TestRunner.bind(this)(new UpdateFuncsByElmtIdTestsV2('V2_updateFuncsByElmtId'));

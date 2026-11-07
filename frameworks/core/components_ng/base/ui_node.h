@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_BASE_UI_NODE_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_BASE_UI_NODE_H
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <list>
@@ -66,6 +67,7 @@ class FocusHub;
 class LayoutWrapperNode;
 class FrameNode;
 class CustomNode;
+struct InspectorGetterEntry;
 
 struct ExtraInfo {
     std::string page;
@@ -131,7 +133,7 @@ enum class UINodeType {
 };
 
 // UINode is the base class of FrameNode and SyntaxNode.
-class ACE_FORCE_EXPORT UINode : public virtual AceType {
+class ACE_FORCE_EXPORT UINode : public AceType {
     DECLARE_ACE_TYPE(UINode, AceType);
 
 public:
@@ -244,6 +246,14 @@ public:
         return false;
     }
 
+    // Determine if the node can host an external inspector subtree getter
+    // (registration-time host-type policy). CustomNode overrides this to
+    // return true; XComponent hosts are identified by tag instead.
+    virtual bool IsInspectorSubtreeHost() const
+    {
+        return false;
+    }
+
     void UpdateModalUiextensionCount(bool addNode);
 
     int32_t TotalChildCount() const;
@@ -272,6 +282,21 @@ public:
         return children_;
     }
 
+    // Read-only snapshot for the Native API detector; does not invoke virtual GetChildren().
+    // Only called when multi-thread tree operation check is enabled (inside GetTreeMutex()).
+    std::vector<RefPtr<UINode>> GetChildrenForNativeTreeCheck() const;
+
+    // Native operation occupancy, not the node's UI-thread affinity.
+    uint64_t GetNativeTreeOperationThreadId() const
+    {
+        return nativeTreeOperationThreadId_.load(std::memory_order_acquire);
+    }
+
+    void SetNativeTreeOperationThreadId(uint64_t threadId)
+    {
+        nativeTreeOperationThreadId_.store(threadId, std::memory_order_release);
+    }
+
     RefPtr<UINode> GetLastChild() const;
 
     RefPtr<UINode> GetFirstChild() const;
@@ -289,9 +314,11 @@ public:
 
     int32_t GetChildIndexById(int32_t id);
 
-    RefPtr<UINode> GetParent() const
+    // Cross the adopt boundary only when explicitly requested; ordinary parents take precedence.
+    RefPtr<UINode> GetParent(bool crossAdoptBoundary = false) const
     {
-        return parent_.Upgrade();
+        auto parent = parent_.Upgrade();
+        return parent || !crossAdoptBoundary ? parent : adoptParent_.Upgrade();
     }
 
     RefPtr<UINode> GetAdoptParent() const
@@ -353,15 +380,14 @@ public:
     // DFX info.
     virtual void DumpTree(int32_t depth, bool hasJson = false, const std::string& desc = "");
     void DumpTreeJsonForDiff(std::unique_ptr<JsonValue>& json);
+    virtual void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& current, ParamConfig config);
     void DumpSimplifyTreeBase(std::shared_ptr<JsonValue>& current);
     void DumpSimplifyTree(int32_t depth, std::shared_ptr<JsonValue>& current);
     void DumpSimplifyTreeNode(std::shared_ptr<JsonValue>& current, ParamConfig config);
-#ifndef CROSS_PLATFORM
     void DumpSimplifyTreeWithParamConfig(int32_t depth, std::shared_ptr<JsonValue>& current,
         bool onlyNeedVisible, ParamConfig config = ParamConfig(),
         std::function<std::pair<bool, bool>(const RefPtr<UINode>&)> dumpChecker = nullptr,
         double parentFinalOpacity = DEFAULT_NODE_OPACITY);
-#endif
     virtual bool IsContextTransparent();
 
     bool DumpTreeById(int32_t depth, const std::string& id, bool hasJson = false);
@@ -584,6 +610,11 @@ public:
             return AceType::DynamicCast<T>(uiNode);
         }
         return nullptr;
+    }
+
+    const std::list<std::tuple<RefPtr<UINode>, uint32_t, int32_t>>& GetDisappearingChildren() const
+    {
+        return disappearingChildren_;
     }
 
     // utility function for adding child to disappearingChildren_
@@ -847,6 +878,17 @@ public:
     int32_t GetInstanceId() const
     {
         return instanceId_;
+    }
+
+    // External inspector-tree getter entry bound to this node (managed by
+    // InspectorTreeProviderRegistry; lifecycle follows the node).
+    InspectorGetterEntry* GetInspectorGetterEntry() const
+    {
+        return inspectorGetterEntry_;
+    }
+    void SetInspectorGetterEntry(InspectorGetterEntry* entry)
+    {
+        inspectorGetterEntry_ = entry;
     }
 
     static std::set<std::string> GetLayoutTags()
@@ -1357,11 +1399,9 @@ protected:
 private:
     struct RectCullingState;
 
-#ifndef CROSS_PLATFORM
     void DumpSimplifyTreeWithParamConfigInner(int32_t depth, std::shared_ptr<JsonValue>& current, bool onlyNeedVisible,
         ParamConfig config, std::function<std::pair<bool, bool>(const RefPtr<UINode>&)> dumpChecker,
         double parentFinalOpacity, const RectCullingState& rectCullingState);
-#endif
     RectCullingState CreateRectCullingState(bool onlyNeedVisible, ParamConfig config);
     RectCullingState CreateChildRectCullingState(const RectCullingState& rectCullingState);
     bool IsCulledByRect(const RectCullingState& rectCullingState, bool hasInspectableChildren);
@@ -1425,6 +1465,7 @@ private:
     // Used for IsolatedThread consistency validation: node should operate on pipeline
     // with matching IsolatedThread identity to avoid cross-domain routing issues.
     bool isIsolatedThread_ = false;
+    std::atomic<uint64_t> nativeTreeOperationThreadId_ { 0 };
     bool isFree_ = false; // the thread safe node in free state can be operated by non UI threads
     bool isRunningPendingUnsafeTask_ = false;
     std::vector<std::function<void()>> afterAttachMainTreeTasks_;
@@ -1448,6 +1489,7 @@ private:
     bool isNodeAdapter_ = false;
 
     int32_t restoreId_ = -1;
+    InspectorGetterEntry* inspectorGetterEntry_ = nullptr;
 
     bool useOffscreenProcess_ = false;
 

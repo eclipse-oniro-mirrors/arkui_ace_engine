@@ -122,6 +122,8 @@ void GridItemDragManager::Reset()
     autoScrollForward_ = false;
     inAutoScrollHotZone_ = false;
     suppressAutoScroll_ = false;
+    coexistScrollDriven_ = false;
+    isMouseDrag_ = false;
     pattern->SetHotZoneScrollCallback(nullptr);
     pattern->SetDragScrollCallback(nullptr);
     pattern->GetMutableLayoutInfo().ClearOnMoveDragState();
@@ -224,6 +226,8 @@ void GridItemDragManager::HandleOnItemLongPress(const GestureEvent& info)
 {
     dragState_ = GridItemDragState::LONG_PRESS;
     suppressAutoScroll_ = false;
+    coexistScrollDriven_ = false;
+    isMouseDrag_ = (info.GetSourceTool() == SourceTool::MOUSE);
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto renderContext = host->GetRenderContext();
@@ -322,11 +326,12 @@ void GridItemDragManager::HandleContainerScroll(int32_t source)
     CHECK_NULL_VOID(grid);
     auto pattern = grid->GetPattern<GridPattern>();
     CHECK_NULL_VOID(pattern);
-    // Both actions need a second finger on the Grid that really drives it: a finger
-    // merely resting on the container, a wheel/crown scroll or a programmatic scroll
-    // must neither drop the float nor disable the drag edge auto-scroll.
-    if (pattern->GetActiveTouchFingerIdsSize() <= 1 ||
-        !ScrollablePattern::IsFingerDrivenScrollSource(source)) {
+    // For a mouse drag a single touch finger already is the "second finger" scrolling the
+    // container; for a touch drag 2+ touch fingers are needed, one dragging plus one scrolling.
+    bool isSecondPointerScrolling = isMouseDrag_
+        ? (pattern->GetActiveTouchFingerIdsSize() >= 1)
+        : (pattern->GetActiveTouchFingerIdsSize() > 1);
+    if (!isSecondPointerScrolling) {
         return;
     }
     if (dragState_ == GridItemDragState::LONG_PRESS) {
@@ -338,6 +343,13 @@ void GridItemDragManager::HandleContainerScroll(int32_t source)
     // One finger dragging while another scrolls is the supported coexistence case, the
     // drag is kept alive, only its edge auto-scroll is handed over to that finger.
     suppressAutoScroll_ = true;
+    // Remember for the rest of the session that the content was scrolled out from under a
+    // resting dragging finger, including the fling that finger leaves behind. This is the
+    // only situation FindVisualSwapTarget() is allowed to recover from.
+    coexistScrollDriven_ = true;
+    // A finger driven scroll moved the Grid content, so the item swap has to be re-evaluated
+    // even when the drag pointer (e.g. the mouse) never moved.
+    TriggerSwapOnContainerScroll();
 }
 
 void GridItemDragManager::HandleOnItemDragStart(const GestureEvent& info)
@@ -356,6 +368,9 @@ void GridItemDragManager::HandleOnItemDragStart(const GestureEvent& info)
     CHECK_NULL_VOID(grid);
     auto paddingOffset = GetParentPaddingOffset();
     dragOffset_ = dragOffset_ - paddingOffset;
+    // A container scroll frame may arrive before the first drag update, seed the drag
+    // position with the slot the item was picked up from instead of leaving it at zero.
+    realOffset_ = dragOffset_;
     auto pattern = grid->GetPattern<GridPattern>();
     CHECK_NULL_VOID(pattern);
     axis_ = pattern->GetAxis();
@@ -466,6 +481,7 @@ void GridItemDragManager::HandleOnItemDragEnd(const GestureEvent& info)
         scrolling_ = false;
     }
     suppressAutoScroll_ = false;
+    coexistScrollDriven_ = false;
     HandleDragEndAnimation();
     int32_t to = GetIndex();
     pattern->GetMutableLayoutInfo().ClearOnMoveDragState();
@@ -476,6 +492,7 @@ void GridItemDragManager::HandleOnItemDragEnd(const GestureEvent& info)
         forEach->FireOnDrop(to);
     }
     dragState_ = GridItemDragState::IDLE;
+    isMouseDrag_ = false;
     moveThroughIndex_ = -1;
 }
 
@@ -492,6 +509,7 @@ void GridItemDragManager::HandleOnItemDragCancel()
         scrolling_ = false;
     }
     suppressAutoScroll_ = false;
+    coexistScrollDriven_ = false;
     autoScrollForward_ = false;
     inAutoScrollHotZone_ = false;
     HandleDragEndAnimation();
@@ -506,6 +524,7 @@ void GridItemDragManager::HandleOnItemDragCancel()
         }
     }
     dragState_ = GridItemDragState::IDLE;
+    isMouseDrag_ = false;
     moveThroughIndex_ = -1;
 }
 
@@ -1166,7 +1185,10 @@ int32_t GridItemDragManager::FindSwapTarget(int32_t currentIndex, const OffsetF&
     CHECK_NULL_RETURN(pattern, currentIndex);
     auto& info = pattern->GetMutableLayoutInfo();
     if (!IsItemInViewport(currentIndex, info)) {
-        return currentIndex;
+        // The index is behind the laid out range, so neither CollectSwapCandidates nor
+        // CalculateFromNewPosition can score anything for it. Recover from where the item
+        // is visually held instead, if this session is allowed to.
+        return FindVisualSwapTarget(currentIndex, info);
     }
     auto candidates = CollectSwapCandidates(currentIndex, delta, info);
     if (candidates.empty()) {
@@ -1174,6 +1196,106 @@ int32_t GridItemDragManager::FindSwapTarget(int32_t currentIndex, const OffsetF&
     }
     auto [currentRow, endRow] = GetRowRangeForItem(currentIndex, info);
     return FindBestCandidate(currentIndex, candidates, delta, currentRow, endRow, info);
+}
+
+int32_t GridItemDragManager::FindVisualSwapTarget(int32_t currentIndex, const GridLayoutInfo& info) const
+{
+    // Narrow recovery, scoped to the one finger dragging plus one finger scrolling
+    // coexistence session: a lone dragging finger, a wheel/crown scroll and a programmatic
+    // scroll never arm coexistScrollDriven_ and keep the previous behaviour.
+    if (!coexistScrollDriven_ || dragState_ != GridItemDragState::DRAGGING) {
+        return currentIndex;
+    }
+    auto grid = gridNode_.Upgrade();
+    CHECK_NULL_RETURN(grid, currentIndex);
+    auto layoutProperty = grid->GetLayoutProperty<GridLayoutProperty>();
+    // A mirrored cross axis would need the same RTL handling as ApplyAlignmentAndRTL, and
+    // an item spanning several cells is not a single cell swap: both are out of scope here.
+    if (layoutProperty && layoutProperty->GetNonAutoLayoutDirection() == TextDirection::RTL) {
+        return currentIndex;
+    }
+    auto spanInfo = GetIrregularItemInfoAndSpan(currentIndex);
+    if (spanInfo.isIrregular || spanInfo.rowSpan > 1 || spanInfo.colSpan > 1) {
+        return currentIndex;
+    }
+    float mainGap = 0.0f;
+    float crossGap = 0.0f;
+    CalculateGaps(mainGap, crossGap, info);
+    // Same reference as FindBestCandidate(): the position the item is visually held at.
+    OffsetF dragPosition = realOffset_ + GetParentPaddingOffset();
+    float mainCenter = dragPosition.GetMainOffset(axis_) + GetItemMainSize(currentIndex, info) / 2.0f; /* 2: center */
+    float crossCenter = dragPosition.GetCrossOffset(axis_) + GetItemCrossSize(currentIndex, info) / 2.0f;
+    int32_t row = FindVisualRow(mainCenter, mainGap, info);
+    if (row < 0) {
+        return currentIndex;
+    }
+    int32_t col = FindVisualCol(grid, layoutProperty, crossCenter, crossGap, info);
+    if (col < 0) {
+        return currentIndex;
+    }
+    auto rowIt = info.gridMatrix_.find(row);
+    if (rowIt == info.gridMatrix_.end()) {
+        return currentIndex;
+    }
+    auto colIt = rowIt->second.find(col);
+    if (colIt == rowIt->second.end()) {
+        return currentIndex;
+    }
+    // Negative values mark a cell covered by a multi row item, the index is its absolute value.
+    int32_t globalIndex = std::abs(colIt->second);
+    if (globalIndex < info.startIndex_ || globalIndex > info.endIndex_) {
+        return currentIndex;
+    }
+    int32_t to = globalIndex - forEachStartIndex_;
+    if (to < 0 || to >= totalCount_ || to == currentIndex) {
+        return currentIndex;
+    }
+    return to;
+}
+
+int32_t GridItemDragManager::FindVisualRow(float dragMainCenter, float mainGap, const GridLayoutInfo& info) const
+{
+    int32_t nearestRow = -1;
+    float nearestDistance = std::numeric_limits<float>::max();
+    for (const auto& [row, height] : info.lineHeightMap_) {
+        float rowTop = info.GetItemTopPos(row, mainGap);
+        float rowBottom = rowTop + height;
+        if (GreatOrEqual(dragMainCenter, rowTop) && LessNotEqual(dragMainCenter, rowBottom)) {
+            return row;
+        }
+        float distance = LessNotEqual(dragMainCenter, rowTop) ? rowTop - dragMainCenter
+                                                             : dragMainCenter - rowBottom;
+        if (LessNotEqual(distance, nearestDistance)) {
+            nearestDistance = distance;
+            nearestRow = row;
+        }
+    }
+    return nearestRow;
+}
+
+int32_t GridItemDragManager::FindVisualCol(const RefPtr<FrameNode>& grid,
+    const RefPtr<GridLayoutProperty>& layoutProperty, float dragCrossCenter,
+    float crossGap, const GridLayoutInfo& info) const
+{
+    auto gridGeometry = grid ? grid->GetGeometryNode() : nullptr;
+    auto [crossLens, adjustedCrossGap] = ResolveCrossLens(gridGeometry, layoutProperty, crossGap, info);
+    int32_t nearestCol = -1;
+    float nearestDistance = std::numeric_limits<float>::max();
+    auto colCount = std::min(info.crossCount_, static_cast<int32_t>(crossLens.size()));
+    for (int32_t col = 0; col < colCount; ++col) {
+        float colStart = CalculateCrossPosition(col, adjustedCrossGap, crossLens, gridGeometry);
+        float colEnd = colStart + static_cast<float>(crossLens[col]);
+        if (GreatOrEqual(dragCrossCenter, colStart) && LessNotEqual(dragCrossCenter, colEnd)) {
+            return col;
+        }
+        float distance = LessNotEqual(dragCrossCenter, colStart) ? colStart - dragCrossCenter
+                                                                : dragCrossCenter - colEnd;
+        if (LessNotEqual(distance, nearestDistance)) {
+            nearestDistance = distance;
+            nearestCol = col;
+        }
+    }
+    return nearestCol;
 }
 
 float GridItemDragManager::GetItemMainSize(int32_t currentIndex, const GridLayoutInfo& info) const
@@ -1656,6 +1778,25 @@ void GridItemDragManager::HandleScrollCallback()
         scrolling_ = false;
         autoScrollForward_ = false;
         inAutoScrollHotZone_ = false;
+    }
+    auto paddingOffset = GetParentPaddingOffset();
+    ScaleNearbyItems(from, frameRect, realOffset_ - frameRect.GetOffset() + paddingOffset);
+    ProcessSwap(from);
+}
+
+void GridItemDragManager::TriggerSwapOnContainerScroll()
+{
+    if (dragState_ != GridItemDragState::DRAGGING || !isMouseDrag_) {
+        return;
+    }
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto geometry = host->GetGeometryNode();
+    CHECK_NULL_VOID(geometry);
+    auto frameRect = geometry->GetMarginFrameRect();
+    int32_t from = GetIndex();
+    if (from < 0) {
+        return;
     }
     auto paddingOffset = GetParentPaddingOffset();
     ScaleNearbyItems(from, frameRect, realOffset_ - frameRect.GetOffset() + paddingOffset);

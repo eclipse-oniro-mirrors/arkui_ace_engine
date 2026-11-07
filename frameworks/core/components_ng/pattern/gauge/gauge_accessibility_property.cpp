@@ -15,6 +15,7 @@
 
 #include "core/components_ng/pattern/gauge/gauge_accessibility_property.h"
 
+#include "base/i18n/localization.h"
 #include "core/components_ng/pattern/gauge/gauge_pattern.h"
 
 namespace OHOS::Ace::NG {
@@ -25,8 +26,8 @@ AccessibilityValue GaugeAccessibilityProperty::GetAccessibilityValue() const
     CHECK_NULL_RETURN(frameNode, accessibilityValue);
     auto gaugePaintProperty = frameNode->GetPaintProperty<NG::GaugePaintProperty>();
     CHECK_NULL_RETURN(gaugePaintProperty, accessibilityValue);
-    accessibilityValue.min = gaugePaintProperty->GetMin().value_or(0);
-    accessibilityValue.max = gaugePaintProperty->GetMax().value_or(0);
+    accessibilityValue.min = std::round(gaugePaintProperty->GetMin().value_or(0));
+    accessibilityValue.max = std::round(gaugePaintProperty->GetMax().value_or(0));
     accessibilityValue.current = gaugePaintProperty->GetValue().value_or(0);
     return accessibilityValue;
 }
@@ -37,6 +38,9 @@ std::string GaugeAccessibilityProperty::GetText() const
     CHECK_NULL_RETURN(frameNode, "");
     auto gaugePaintProperty = frameNode->GetPaintProperty<NG::GaugePaintProperty>();
     CHECK_NULL_RETURN(gaugePaintProperty, "");
-    return std::to_string(gaugePaintProperty->GetValue().value_or(0));
+    auto gaugeValue = gaugePaintProperty->GetValue().value_or(0);
+    return Localization::GetInstance()->GetLanguage() != "zh"
+        ? Localization::GetInstance()->NumberFormat(gaugeValue)
+        : std::to_string(gaugeValue);
 }
 } // namespace OHOS::Ace::NG

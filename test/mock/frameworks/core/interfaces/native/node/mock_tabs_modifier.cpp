@@ -19,6 +19,7 @@
 #include "core/components_ng/pattern/tabs/tabs_controller.h"
 #include "core/components_ng/pattern/tabs/tabs_model_ng.h"
 #include "core/components_ng/pattern/tabs/tabs_node.h"
+#include "core/components_ng/pattern/tabs/tabs_pattern.h"
 #include "core/interfaces/native/node/tabs_modifier.h"
 #include "interfaces/inner_api/ace_kit/include/ui/resource/resource_object.h"
 
@@ -106,13 +107,13 @@ void SetTabsBarBackgroundEffect(ArkUINodeHandle node, void* effectOption)
     TabsModelNG::SetBarBackgroundEffect(frameNode, *effect);
 }
 
-void SetTabsTabBarWidth(ArkUINodeHandle node, void* tabBarWidth)
+void SetTabsTabBarWidth(ArkUINodeHandle node, void* tabBarWidth, bool updateForSideBar)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     auto* width = reinterpret_cast<Dimension*>(tabBarWidth);
     CHECK_NULL_VOID(frameNode);
     CHECK_NULL_VOID(width);
-    TabsModelNG::SetTabBarWidth(frameNode, *width);
+    TabsModelNG::SetTabBarWidth(frameNode, *width, updateForSideBar);
 }
 
 void SetTabsTabBarHeight(ArkUINodeHandle node, void* tabBarHeight)
@@ -124,13 +125,13 @@ void SetTabsTabBarHeight(ArkUINodeHandle node, void* tabBarHeight)
     TabsModelNG::SetTabBarHeight(frameNode, *height);
 }
 
-void SetTabsDivider(ArkUINodeHandle node, void* divider)
+void SetTabsDivider(ArkUINodeHandle node, void* divider, bool updateForSideBar)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     auto* tabsDivider = reinterpret_cast<TabsItemDivider*>(divider);
     CHECK_NULL_VOID(frameNode);
     CHECK_NULL_VOID(tabsDivider);
-    TabsModelNG::SetDivider(frameNode, *tabsDivider);
+    TabsModelNG::SetDivider(frameNode, *tabsDivider, updateForSideBar);
 }
 
 void SetTabsEffectNodeOption(ArkUINodeHandle node, void* option)
@@ -331,6 +332,28 @@ int32_t GetBarDisplayModeCustom(ArkUINodeHandle node)
     return static_cast<int32_t>(tabsController->GetBarDisplayMode());
 }
 
+void SetTabsTabBarClickInterceptCustom(ArkUINodeHandle node, ArkUI_Bool active)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetTabBarClickIntercept(active);
+}
+
+void TabBarClickCustom(ArkUINodeHandle node, ArkUI_Int32 index)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto tabsNode = AceType::DynamicCast<TabsNode>(frameNode);
+    CHECK_NULL_VOID(tabsNode);
+    auto tabBarNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
+    CHECK_NULL_VOID(tabBarNode);
+    auto tabBarPattern = tabBarNode->GetPattern<TabBarPattern>();
+    CHECK_NULL_VOID(tabBarPattern);
+    tabBarPattern->TapToHandle(index, true);
+}
+
 void SetTabsIndexMock(ArkUINodeHandle node, ArkUI_Int32 indexVal)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -362,6 +385,13 @@ void SetCachedMaxCountForJsMock(ArkUINodeHandle node, ArkUI_Int32 count, ArkUI_I
     TabsModelNG::SetCachedMaxCountForJs(frameNode, count, cacheMode);
 }
 
+void SetTabsKeepTabBarInSideBarCustom(ArkUINodeHandle node, ArkUI_Bool keep)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabsModelNG::SetKeepTabBarInSideBar(frameNode, keep);
+}
+
 namespace NodeModifier {
 const ArkUITabsModifier* GetTabsModifier()
 {
@@ -390,6 +420,7 @@ const ArkUITabsCustomModifier* GetTabsCustomModifier()
         .setTabBarWidth = SetTabsTabBarWidth,
         .setTabBarHeight = SetTabsTabBarHeight,
         .setDivider = SetTabsDivider,
+        .setKeepTabBarInSideBar = SetTabsKeepTabBarInSideBarCustom,
         .setEffectNodeOption = SetTabsEffectNodeOption,
         .setTabBarMode = SetTabsTabBarMode,
         .setScrollableBarModeOptions = SetTabsScrollableBarModeOptions,
@@ -412,6 +443,8 @@ const ArkUITabsCustomModifier* GetTabsCustomModifier()
         .setTabBarOpacity = SetTabsTabBarOpacityCustom,
         .swipeTo = TabsSwipeToCustom,
         .getBarDisplayMode = GetBarDisplayModeCustom,
+        .setTabBarClickIntercept = SetTabsTabBarClickInterceptCustom,
+        .tabBarClick = TabBarClickCustom,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;

@@ -46,6 +46,7 @@
 #include "frameworks/bridge/declarative_frontend/jsview/js_view_abstract.h"
 #include "frameworks/bridge/declarative_frontend/view_stack_processor.h"
 #include "frameworks/bridge/js_frontend/engine/common/js_engine.h"
+#include "interfaces/napi/kits/ui_material/ui_material_napi.h"
 
 namespace OHOS::Ace::Framework {
 namespace {
@@ -152,25 +153,27 @@ RefPtr<OHOS::Ace::WantWrap> CreateWantWrapFromNapiValue(JSRef<JSVal> obj)
 
 const Rosen::VisualEffect* CreateRSEffectFromNapiValue(JSRef<JSVal> obj)
 {
-    auto visualEffectPtr = static_cast<Rosen::VisualEffect*>(UnwrapNapiValue(obj));
+    auto visualEffectPtr = static_cast<Rosen::VisualEffect*>(
+        UnwrapNapiValueWithType(obj, &VISUAL_EFFECT_TYPE_TAG));
     return visualEffectPtr;
 }
 
 const Rosen::Filter* CreateRSFilterFromNapiValue(JSRef<JSVal> obj)
 {
-    auto filterPtr = static_cast<Rosen::Filter*>(UnwrapNapiValue(obj));
+    auto filterPtr = static_cast<Rosen::Filter*>(UnwrapNapiValueWithType(obj, &FILTER_TYPE_TAG));
     return filterPtr;
 }
 
 const UiMaterial* CreateUiMaterialFromNapiValue(JSRef<JSVal> obj)
 {
-    auto uiMaterialPtr = static_cast<UiMaterial*>(UnwrapNapiValue(obj));
+    auto uiMaterialPtr = static_cast<UiMaterial*>(
+        UnwrapNapiValueWithType(obj, &OHOS::Ace::Napi::UI_MATERIAL_TYPE_TAG));
     return uiMaterialPtr;
 }
 
 const Rosen::Blender* CreateRSBlenderFromNapiValue(JSRef<JSVal> obj)
 {
-    auto blenderPtr = static_cast<Rosen::Blender*>(UnwrapNapiValue(obj));
+    auto blenderPtr = static_cast<Rosen::Blender*>(UnwrapNapiValueWithType(obj, &BLENDER_TYPE_TAG));
     return blenderPtr;
 }
 

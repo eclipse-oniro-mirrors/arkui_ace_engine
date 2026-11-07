@@ -85,6 +85,7 @@ declare class ArkComponent implements CommonMethod<CommonAttribute> {
     layoutWeight(value: number | string): this;
     padding(value: Padding | Length): this;
     safeAreaPadding(value: Padding | LengthMetrics | LocalizedPadding): this;
+    safeAreaInset(options?: SafeAreaInsetOptions): this;
     margin(value: Margin | Length): this;
     background(content: CustomBuilder | ResourceColor, options?: BackgroundOptions): this;
     backgroundColor(value: ResourceColor): this;
@@ -401,6 +402,7 @@ declare class ArkImageAnimatorComponent extends ArkComponent implements CommonMe
     fixedSize(value: boolean): ImageAnimatorAttribute;
     preDecode(value: number): ImageAnimatorAttribute;
     fillMode(value: FillMode): ImageAnimatorAttribute;
+    interpolation(value: ImageInterpolation): ImageAnimatorAttribute;
     iterations(value: number): ImageAnimatorAttribute;
     monitorInvisibleArea(value: boolean): ImageAnimatorAttribute;
     onStart(event: VoidCallback): VideoAttribute;
@@ -1881,6 +1883,8 @@ declare class ArkXComponentComponent implements CommonMethod<XComponentAttribute
     enableSecure(value: boolean): this;
     hdrBrightness(value: number, hdrType?: HdrType): this;
     enableTransparentLayer(value: boolean): this;
+    enableSurfaceVisibilityLifecycle(value: boolean): this;
+    bufferQueueCount(count: number): this;
 }
 declare class ArkBadgeComponent extends ArkComponent implements BadgeAttribute {
     constructor(nativePtr: KNode, classType?: ModifierType);
@@ -2037,7 +2041,7 @@ declare class ArkTabsComponent extends ArkComponent implements TabsAttribute {
     onContentDidScroll(handler: OnTabsContentDidScrollCallback | undefined): TabsAttribute;
     fadingEdge(value: boolean): TabsAttribute;
     divider(value: DividerStyle | null): TabsAttribute;
-    barOverlap(value: boolean): TabsAttribute;
+    barOverlap(value: BarOverlapMode | boolean): TabsAttribute;
     barBackgroundColor(value: ResourceColor): TabsAttribute;
     sidebarSelectedIconColor(value: ResourceColor): TabsAttribute;
     sidebarSelectedTextColor(value: ResourceColor): TabsAttribute;
@@ -2057,6 +2061,8 @@ declare class ArkTabsComponent extends ArkComponent implements TabsAttribute {
     sidebarPosition(value: BarPosition): TabsAttribute;
     sidebarDisplayStyle(value: TabsSidebarDisplayStyle): TabsAttribute;
     sidebarHeader(value: ComponentContent): TabsAttribute;
+    sidebarFooter(value: ComponentContent): TabsAttribute;
+    sidebarBottomBar(value: ComponentContent): TabsAttribute;
     sidebarSearchable(value?: TabsSidebarSearchableOptions): TabsAttribute;
     barDisplayModeBreakpoint(value: TabsBreakpointType<TabBarDisplayMode>): TabsAttribute;
     onBarDisplayModeChange(event: (mode: TabBarDisplayMode) => void): TabsAttribute;
@@ -2067,6 +2073,7 @@ declare class ArkTabsComponent extends ArkComponent implements TabsAttribute {
     sidebarBackgroundColor(value: Optional<ResourceColor>): TabsAttribute;
     sidebarBackgroundBlurStyle(value: Optional<BlurStyle>): TabsAttribute;
     sidebarDivider(value: Optional<DividerStyle>): TabsAttribute;
+    tabViewCustomization(value: Optional<TabViewCustomization>): TabsAttribute;
 }
 declare class ArkTabContentComponent extends ArkComponent implements TabContentAttribute {
     constructor(nativePtr: KNode, classType?: ModifierType);
@@ -2076,6 +2083,7 @@ declare class ArkTabContentComponent extends ArkComponent implements TabContentA
     width(value: Length): this;
     height(value: Length): this;
     tabBarVisibility(visibility: TabVisibility, displayMode?: TabBarDisplayMode): this;
+    sidebarSection(section: Optional<SidebarSection>): this;
 }
 declare class ArkUIExtensionComponentComponent extends ArkComponent implements UIExtensionComponentAttribute {
     constructor(nativePtr: KNode, classType?: ModifierType);

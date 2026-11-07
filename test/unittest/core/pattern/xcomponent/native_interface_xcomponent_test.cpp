@@ -45,6 +45,16 @@ constexpr int32_t TEST_RATE_MAX = 120;
 constexpr int32_t TEST_RATE_EXPECTED = 60;
 constexpr int32_t BAD_PARAMETER_RESULT = OH_NATIVEXCOMPONENT_RESULT_BAD_PARAMETER;
 constexpr int32_t SUCCESS_RESULT = OH_NATIVEXCOMPONENT_RESULT_SUCCESS;
+
+void OnSurfaceCreated(OH_ArkUI_SurfaceHolder*) {}
+
+void OnSurfaceChanged(OH_ArkUI_SurfaceHolder*, uint64_t, uint64_t) {}
+
+void OnSurfaceDestroyed(OH_ArkUI_SurfaceHolder*) {}
+
+void OnSurfaceShow(OH_ArkUI_SurfaceHolder*) {}
+
+void OnSurfaceHide(OH_ArkUI_SurfaceHolder*) {}
 } // namespace
 
 class NativeInterfaceXComponentTestNg : public testing::Test {
@@ -1543,5 +1553,18 @@ HWTEST_F(NativeInterfaceXComponentTestNg, NativeXComponent_DetachNativeRootNode_
     EXPECT_EQ(OH_NativeXComponent_DetachNativeRootNode(nullptr, nullptr), BAD_PARAMETER_RESULT);
 
     SUCCEED();
+}
+
+/**
+ * @tc.name: NativeXComponent_GetNativeWindow_NullImpl
+ * @tc.desc: Test GetNativeWindow returns BAD_PARAMETER when xcomponentImpl is nullptr
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeInterfaceXComponentTestNg, NativeXComponent_GetNativeWindow_NullImpl, TestSize.Level1)
+{
+    auto* comp = new OH_NativeXComponent(nullptr);
+    void* window = nullptr;
+    EXPECT_EQ(comp->GetNativeWindow(&window), BAD_PARAMETER_RESULT);
+    delete comp;
 }
 } // namespace OHOS::Ace::NG

@@ -149,6 +149,9 @@ void AssignArkValue(Ark_RichEditorImageSpanResult& dst, const RichEditorAbstract
     dst.imageStyle.layoutStyle = ArkValue<Opt_RichEditorLayoutStyle>(imageStyleResult);
     dst.offsetInSpan.value0 = Converter::ArkValue<Ark_Int32>(src.OffsetInSpan());
     dst.offsetInSpan.value1 = Converter::ArkValue<Ark_Int32>(src.OffsetInSpan() + src.GetEraseLength());
+    if (src.GetImageTag().has_value()) {
+        dst.imageTag = Converter::ArkValue<Opt_String>(src.GetImageTag().value(), ctx);
+    }
 }
 
 template<typename To>

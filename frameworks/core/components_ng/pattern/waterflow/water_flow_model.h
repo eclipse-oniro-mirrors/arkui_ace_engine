@@ -24,12 +24,14 @@
 
 #include "core/common/resource/resource_object.h"
 #include "core/components/common/layout/constants.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_types.h"
 #include "core/components_ng/pattern/scrollable/scrollable_properties.h"
 #include "core/components_ng/pattern/waterflow/layout/water_flow_layout_mode.h"
 
 namespace OHOS::Ace {
 class ScrollControllerBase;
 class ScrollProxy;
+struct ScrollSnapStrategy;
 }
 
 namespace OHOS::Ace::NG {
@@ -67,6 +69,9 @@ public:
     virtual void SetLayoutDirection(FlexDirection value) = 0;
     virtual void SetNestedScroll(const NestedScrollOptions& nestedOpt) = 0;
     virtual void SetScrollEnabled(bool scrollEnabled) = 0;
+    // Feat-20260806915269: item scroll snap strategy (built-in align or custom offset provider).
+    virtual void SetScrollSnapStrategy(const ScrollSnapStrategy& /* strategy */) {}
+    virtual void ResetScrollSnapStrategy() {}
 
     virtual void SetOnReachStart(OnReachEvent&& onReachStart) = 0;
     virtual void SetOnReachEnd(OnReachEvent&& onReachEnd) = 0;
@@ -111,6 +116,8 @@ public:
     virtual void ParseResObjItemMaxHeight(const RefPtr<ResourceObject>& resObj) {};
 
     virtual void SetSyncLoad(bool syncLoad) {}
+    // FEAT scroll placeholder: a null provider resets the capability (see WaterFlowPattern).
+    virtual void SetScrollPlaceholder(NG::ScrollPlaceholderProvider&& provider) {}
     virtual void ParseResObjScrollBarColor(const RefPtr<ResourceObject>& resObj) {};
     virtual void SetSupportLazyLoadingEmptyBranch(bool enable) {};
 private:

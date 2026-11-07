@@ -56,7 +56,7 @@ constexpr uint32_t SELECT_MENU_CHECK_MARK_DEFAULT_COLOR = 0xFF182431;
  * SelectTheme defines color and styles of SelectComponent. SelectTheme should be build
  * using SelectTheme::Builder.
  */
-class SelectTheme : public virtual Theme {
+class SelectTheme : public Theme {
     DECLARE_ACE_TYPE(SelectTheme, Theme);
 
 public:

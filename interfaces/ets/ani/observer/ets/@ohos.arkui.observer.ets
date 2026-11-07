@@ -89,6 +89,8 @@ import { Size } from '@ohos.arkui.node'
         }
 
         public native on(type: string, callback: object) : void;
+        public native onNodeSensitiveInput(id: int, key: string, callback: object, dispatcher: object): void;
+        public native offNodeSensitiveInput(id: int, key: string, callback?: object): void;
         public native off(type: string, callback?: object) : void;
 
         public native on(type: string, options: NavDestinationSwitchObserverOptions, callback: object): void;
@@ -229,6 +231,8 @@ import { Size } from '@ohos.arkui.node'
         ON_WILL_DISAPPEAR = 7,
         ON_ACTIVE = 8,
         ON_INACTIVE = 9,
+        ABOUT_TO_APPEAR = 10,
+        ABOUT_TO_DISAPPEAR = 11,
         ON_BACKPRESS = 100
     }
 
@@ -284,6 +288,10 @@ import { Size } from '@ohos.arkui.node'
                 return NavDestinationState.ON_ACTIVE;
             } else if (value === 9) {
                 return NavDestinationState.ON_INACTIVE;
+            } else if (value === 10) {
+                return NavDestinationState.ABOUT_TO_APPEAR;
+            } else if (value === 11) {
+                return NavDestinationState.ABOUT_TO_DISAPPEAR;
             } else if (value === 100) {
                 return NavDestinationState.ON_BACKPRESS;
             } else {

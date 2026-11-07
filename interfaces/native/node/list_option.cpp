@@ -170,6 +170,7 @@ void OH_ArkUI_ListItemSwipeActionOption_SetOnOffsetChangeWithUserData(ArkUI_List
 
 int32_t OH_ArkUI_List_CloseAllSwipeActions(ArkUI_NodeHandle node, void* userData, void (*onFinish)(void* userData))
 {
+    CHECK_UI_THREAD("OH_ArkUI_List_CloseAllSwipeActions");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__, "node is null");
     CHECK_NODE_DISPOSED(node, "Node has been disposed");
     if (node->type != ARKUI_NODE_LIST) {
@@ -286,6 +287,7 @@ float OH_ArkUI_ListChildrenMainSizeOption_GetMainSize(ArkUI_ListChildrenMainSize
 
 int32_t OH_ArkUI_ListItemSwipeAction_Expand(ArkUI_NodeHandle node, ArkUI_ListItemSwipeActionDirection direction)
 {
+    CHECK_UI_THREAD("OH_ArkUI_ListItemSwipeAction_Expand");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__, "node is null");
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN_WITH_MESSAGE(
@@ -301,6 +303,7 @@ int32_t OH_ArkUI_ListItemSwipeAction_Expand(ArkUI_NodeHandle node, ArkUI_ListIte
 
 int32_t OH_ArkUI_ListItemSwipeAction_Collapse(ArkUI_NodeHandle node)
 {
+    CHECK_UI_THREAD("OH_ArkUI_ListItemSwipeAction_Collapse");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__, "node is null");
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN_WITH_MESSAGE(

@@ -36,7 +36,7 @@ constexpr int32_t DEFAULT_HEIGHT_DIMENSION = 112; // default height in vp
 using NavigationBarShowFunc = std::function<void()>;
 using NavigationBarHideFunc = std::function<void()>;
 
-class NavigationBarController : public virtual AceType {
+class NavigationBarController : public AceType {
     DECLARE_ACE_TYPE(NavigationBarController, AceType);
 
 public:
@@ -72,7 +72,7 @@ enum class NavigationBarType {
 
 class TitleBarBuilder;
 
-struct NavigationBarData : public virtual AceType {
+struct NavigationBarData : public AceType {
     DECLARE_ACE_TYPE(NavigationBarData, AceType);
 
 public:

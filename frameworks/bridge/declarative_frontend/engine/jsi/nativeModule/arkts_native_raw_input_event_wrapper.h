@@ -16,13 +16,22 @@
 #ifndef FRAMEWORKS_BRIDGE_DECLARATIVE_FRONTEND_ENGINE_JSI_NATIVEMODULE_ARKTS_NATIVE_RAW_INPUT_EVENT_WRAPPER_H
 #define FRAMEWORKS_BRIDGE_DECLARATIVE_FRONTEND_ENGINE_JSI_NATIVEMODULE_ARKTS_NATIVE_RAW_INPUT_EVENT_WRAPPER_H
 
-#include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_api_bridge.h"
+#include "ecmascript/napi/include/jsnapi.h"
+
+#include "base/utils/macros.h"
 #include "core/common/input_event_monitor_manager.h"
+
+namespace OHOS::Ace::NG {
+class FrameNode;
+} // namespace OHOS::Ace::NG
 
 namespace OHOS::Ace::Framework {
 class ArkTSNativeRawInputEventWrapper {
 public:
-    static NG::ArkUINativeModuleValue Create(const RawInputEventWrapper& wrapper, EcmaVM* vm);
+    static panda::Local<panda::JSValueRef> Create(
+        const RawInputEventWrapper& wrapper, panda::ecmascript::EcmaVM* vm);
+    ACE_FORCE_EXPORT static panda::Local<panda::JSValueRef> CreateSensitiveInputEvent(
+        const RawInputEventWrapper& wrapper, panda::ecmascript::EcmaVM* vm, const RefPtr<NG::FrameNode>& node);
 };
 } // namespace OHOS::Ace::Framework
 

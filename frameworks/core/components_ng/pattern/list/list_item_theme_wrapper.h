@@ -20,7 +20,7 @@
 
 #include "core/components/common/properties/color.h"
 #include "core/components/list/list_item_theme.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
@@ -28,7 +28,7 @@ namespace OHOS::Ace::NG {
  * ListItemThemeWrapper defines color and styles of ListItem basing on TokenTheme's data.
  * ListItemThemeWrapper should be built using ListItemThemeWrapper::WrapperBuilder.
  */
-class ListItemThemeWrapper : public ListItemTheme, public TokenThemeWrapper {
+class ListItemThemeWrapper : public ListItemTheme {
     DECLARE_ACE_TYPE(ListItemThemeWrapper, ListItemTheme);
 
 public:
@@ -37,10 +37,10 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<ListItemThemeWrapper>();
-            auto theme = AceType::DynamicCast<ListItemTheme>(wrapper);
+            RefPtr<ListItemTheme> theme = wrapper;
             if (!themeConstants) {
                 return wrapper;
             }
@@ -60,7 +60,7 @@ public:
             hoverColor_ = colors->InteractiveHover();
             pressColor_ = colors->InteractiveClick();
             selectedColor_ = colors->CompBackgroundEmphasize();
-            selectedColorWithAlpha_ = selectedColor_.BlendOpacity(selectedAlpha_);
+            selectedColorWithAlpha_ = colors->CompEmphasizeTertiary();
         }
     }
 

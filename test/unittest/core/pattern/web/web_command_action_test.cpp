@@ -1795,4 +1795,59 @@ HWTEST_F(WebCommandActionTest, WebCommandResult_InputMethodErrorCodes_0100, Test
     EXPECT_EQ(static_cast<int>(WebCommandResult::JSON_INVALID_NO_NEED_KEYBOARD), 233);
 }
 
+/**
+ * @tc.name: BuildAutoFillActionInfo_NodeId_0100
+ * @tc.desc: Accept decimal-string node IDs without changing XPath-only items.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebCommandActionTest, BuildAutoFillActionInfo_NodeId_0100, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto comJson = JsonUtil::ParseJsonString(R"({"items": [
+        {"xpath": "/first", "nodeId": "12", "content": "a"},
+        {"xpath": "/second", "nodeId": "34", "content": "b"},
+        {"xpath": "/legacy", "content": "c"}
+    ]})");
+    ASSERT_NE(comJson, nullptr);
+    std::shared_ptr<OHOS::NWeb::NWebCommandActionInfo> actionInfo;
+    ASSERT_EQ(WebCommandWrapper::BuildAutoFillActionInfo(comJson, actionInfo), WEB_COMMAND_BUILD_SUCCESS);
+    ASSERT_NE(actionInfo, nullptr);
+    auto items = actionInfo->GetAutoFillItems();
+    ASSERT_EQ(items.size(), 3u);
+    EXPECT_EQ(items[0]->GetNodeId(), 12);
+    EXPECT_EQ(items[1]->GetNodeId(), 34);
+    EXPECT_EQ(items[2]->GetNodeId(), 0);
+    EXPECT_EQ(items[2]->GetXPath(), "/legacy");
+#endif
+}
+
+/**
+ * @tc.name: BuildAutoFillActionInfo_InvalidNodeId_0100
+ * @tc.desc: Invalid node IDs do not replace a valid XPath target.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebCommandActionTest, BuildAutoFillActionInfo_InvalidNodeId_0100, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto comJson = JsonUtil::ParseJsonString(R"({"items": [
+        {"xpath": "/zero", "nodeId": "0", "content": "a"},
+        {"xpath": "/number", "nodeId": 12, "content": "b"},
+        {"xpath": "/negative-string", "nodeId": "-1", "content": "b"},
+        {"xpath": "/fraction", "nodeId": 1.5, "content": "b"},
+        {"xpath": "/overflow", "nodeId": "2147483648", "content": "c"},
+        {"xpath": "/invalid", "nodeId": "12x", "content": "d"}
+    ]})");
+    ASSERT_NE(comJson, nullptr);
+    std::shared_ptr<OHOS::NWeb::NWebCommandActionInfo> actionInfo;
+    ASSERT_EQ(WebCommandWrapper::BuildAutoFillActionInfo(comJson, actionInfo), WEB_COMMAND_BUILD_SUCCESS);
+    ASSERT_NE(actionInfo, nullptr);
+    auto items = actionInfo->GetAutoFillItems();
+    ASSERT_EQ(items.size(), 6u);
+    for (const auto& item : items) {
+        EXPECT_EQ(item->GetNodeId(), 0);
+        EXPECT_FALSE(item->GetXPath().empty());
+    }
+#endif
+}
+
 } // namespace OHOS::Ace::NG

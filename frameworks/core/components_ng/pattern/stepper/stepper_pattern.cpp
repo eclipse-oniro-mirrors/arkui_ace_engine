@@ -192,11 +192,11 @@ void StepperPattern::CreateLeftButtonNode()
     CHECK_NULL_VOID(buttonModifier);
     // Create buttonNode
     auto buttonId = hostNode->GetLeftButtonId();
-    auto* buttonPattern = reinterpret_cast<ButtonPattern*>(buttonModifier->createButtonPattern());
+    auto buttonPattern = AceType::DynamicCast<ButtonPattern>(buttonModifier->createButtonPattern());
     CHECK_NULL_VOID(buttonPattern);
     buttonPattern->setComponentButtonType(ComponentButtonType::STEPPER);
     buttonPattern->SetFocusBorderColor(stepperTheme->GetFocusColor());
-    auto buttonNode = FrameNode::CreateFrameNode(BUTTON_ETS_TAG, buttonId, AceType::Claim(buttonPattern));
+    auto buttonNode = FrameNode::CreateFrameNode(BUTTON_ETS_TAG, buttonId, buttonPattern);
     CHECK_NULL_VOID(buttonNode);
     auto buttonHandle = reinterpret_cast<ArkUINodeHandle>(AceType::RawPtr(buttonNode));
     CHECK_NULL_VOID(buttonHandle);
@@ -354,9 +354,7 @@ void StepperPattern::CreateArrowRightButtonNode(int32_t index, bool isDisabled)
         BUTTON_ETS_TAG, hostNode->GetRightButtonId(), []() -> RefPtr<Pattern> {
             auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
             CHECK_NULL_RETURN(buttonModifier, nullptr);
-            auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-            CHECK_NULL_RETURN(rawPattern, nullptr);
-            return AceType::Claim(rawPattern);
+            return buttonModifier->createButtonPattern();
         });
     if (hasRightButton) {
         buttonNode->Clean(true);
@@ -472,9 +470,7 @@ void StepperPattern::CreateArrowlessRightButtonNode(int32_t index, bool isDisabl
         BUTTON_ETS_TAG, hostNode->GetRightButtonId(), []() -> RefPtr<Pattern> {
             auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
             CHECK_NULL_RETURN(buttonModifier, nullptr);
-            auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-            CHECK_NULL_RETURN(rawPattern, nullptr);
-            return AceType::Claim(rawPattern);
+            return buttonModifier->createButtonPattern();
         });
     if (hasRightButton) {
         buttonNode->Clean(true);

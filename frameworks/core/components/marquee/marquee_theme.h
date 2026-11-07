@@ -31,7 +31,7 @@ namespace {
  * MarqueeTheme defines color and styles of MarqueeComponent. MarqueeTheme should be built
  * using MarqueeTheme::Builder.
  */
-class MarqueeTheme : public virtual Theme {
+class MarqueeTheme : public Theme {
     DECLARE_ACE_TYPE(MarqueeTheme, Theme);
 
 public:

@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_COMMON_PROPERTIES_UI_MATERIAL_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_COMMON_PROPERTIES_UI_MATERIAL_H
 
+#include <atomic>
 #include <memory>
 #include <optional>
 
@@ -27,6 +28,9 @@
 #include "core/components/common/properties/shadow.h"
 #include "core/components_ng/property/border_property.h"
 
+struct ArkUIMaterialFuncRegistry;
+struct ArkUIMaterialFilterFuncRegistry;
+
 namespace OHOS::Rosen {
 class Filter;
 class RSNGFilterBase;
@@ -34,9 +38,6 @@ class RSNGShaderBase;
 }
 
 namespace OHOS::Ace {
-extern const char UI_MATERIAL_EXTENSION_SO_PATH[];
-extern const char UI_MATERIAL_FUNC_NAME[];
-extern const char UI_MATERIAL_FUNC_GET_ID[];
 
 namespace NG {
 class PipelineContext;
@@ -89,16 +90,22 @@ struct UiMaterialParam {
 
 struct ImmersiveMaterialConfig {
     UiMaterialMapKey key {};
-    std::optional<Color> materialColor = std::nullopt;
+
+    /** ------------------ enum params ------------------ */
+    MaterialColorBlendMode colorBlendMode = MaterialColorBlendMode::LINEAR_MIX;
+
+    /** ------------------ bool params ------------------ */
     bool colorInvert = false;
     bool applyShadow = true;
-    float dipScale = 1.0f;
     // the result of interactive after the calculation of component.
     bool interactive = false;
-    // Store the lightEffectOptions (color and colorResObj). nullptr means no lightEffect.
-    std::shared_ptr<LightEffectOptions> lightEffectOptions;
     // when needSplitOverlayShader is true, split material shader into base and overlay layers
     bool needSplitOverlayShader = false;
+
+    std::optional<Color> materialColor = std::nullopt;
+    float dipScale = 1.0f;
+    // Store the lightEffectOptions (color and colorResObj). nullptr means no lightEffect.
+    std::shared_ptr<LightEffectOptions> lightEffectOptions;
 
     // return true if same, return false if different.
     bool CompareLightEffectOptions(const ImmersiveMaterialConfig& other) const
@@ -107,12 +114,17 @@ struct ImmersiveMaterialConfig {
                (lightEffectOptions && other.lightEffectOptions && *lightEffectOptions == *other.lightEffectOptions);
     }
 
+    /**
+     * @notice When adding a new field to ImmersiveMaterialConfig:
+     *         1. [MUST] Add it to operator== below
+     *         2. [Optional] Add a TDD test case verifying != when only that field differs
+     */
     bool operator==(const ImmersiveMaterialConfig& other) const
     {
         return key == other.key && materialColor == other.materialColor && colorInvert == other.colorInvert &&
                applyShadow == other.applyShadow && interactive == other.interactive &&
                NearEqual(dipScale, other.dipScale) && CompareLightEffectOptions(other) &&
-               needSplitOverlayShader == other.needSplitOverlayShader;
+               needSplitOverlayShader == other.needSplitOverlayShader && colorBlendMode == other.colorBlendMode;
     }
 
     bool HasLightEffect() const
@@ -148,18 +160,16 @@ public:
     // Get material config with component scale adjustment (for drag scenario)
     static std::optional<ImmersiveMaterialConfig> GetImmersiveMaterialConfigWithScale(
         const std::shared_ptr<ImmersiveOptions>& options, const RefPtr<NG::FrameNode>& node, float componentScale);
-    static bool GetUiMaterialFilter(
-        const ImmersiveMaterialConfig& params, std::shared_ptr<Rosen::RSNGFilterBase>& filter);
+    static bool GetUiMaterialFilter(const ImmersiveMaterialConfig& params,
+        std::shared_ptr<Rosen::RSNGFilterBase>& filter, const ExtraGlassParam* extraParam);
     static bool GetUiMaterialFilterEC(
         const ImmersiveMaterialConfig& params, std::shared_ptr<Rosen::RSNGFilterBase>& filter);
-    static bool GetUiMaterialShaderECSub(
-        const ImmersiveMaterialConfig& params, std::shared_ptr<Rosen::RSNGShaderBase>& shader);
-    static bool GetUiMaterialECSubShaderOverlay(
-        const ImmersiveMaterialConfig& params, std::shared_ptr<Rosen::RSNGShaderBase>& shader);
+    static bool GetUiMaterialShaderECSub(const ImmersiveMaterialConfig& params,
+        std::shared_ptr<Rosen::RSNGShaderBase>& shader, const ExtraGlassParam* extraParam);
+    static bool GetUiMaterialECSubShaderOverlay(const ImmersiveMaterialConfig& params,
+        std::shared_ptr<Rosen::RSNGShaderBase>& shader, const ExtraGlassParam* extraParam);
     static Shadow GetImmersiveShadow(float dipScale);
     static Shadow GetImmersiveEmptyShadow();
-    static bool GetGlobalMaterialLevel(UiMaterialLevel& result);
-    static bool GetDeviceUiMaterialEnabled(bool& result);
     static MaterialState GetConfiguredMaterialState();
     static MaterialType GetConfiguredMaterialType();
     static bool IsMaterialDisabled();
@@ -177,12 +187,16 @@ public:
     static const UiMaterial* PreProcessMaterial(const UiMaterial* material);
     static std::shared_ptr<Rosen::Filter> CreateRosenFilter(const ImmersiveMaterialConfig& params);
     static ColorMode GetNodeColorMode(const RefPtr<NG::FrameNode>& node);
+    static void RegisterMaterialFunc(const ArkUIMaterialFuncRegistry* registry);
+    static void RegisterMaterialFilterFunc(const ArkUIMaterialFilterFuncRegistry* registry);
 
 private:
     static bool ValidColorInvert(const std::shared_ptr<ImmersiveOptions>& options, UiMaterialLevel systemLevel,
         UiMaterialTransparency systemTransparency);
     static MaterialState ParseMaterialState(const std::string& value);
     static MaterialType ParseMaterialType(const std::string& value);
+    static std::atomic<const ArkUIMaterialFuncRegistry*> materialFuncRegistry_;
+    static std::atomic<const ArkUIMaterialFilterFuncRegistry*> materialFilterFuncRegistry_;
 };
 } // namespace OHOS::Ace
 

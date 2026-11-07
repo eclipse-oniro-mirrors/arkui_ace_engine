@@ -22,7 +22,7 @@
 
 namespace OHOS::Ace {
 
-class ACE_FORCE_EXPORT UiMaterialTheme : public virtual Theme {
+class ACE_FORCE_EXPORT UiMaterialTheme : public Theme {
     DECLARE_ACE_TYPE(UiMaterialTheme, Theme);
 
 public:

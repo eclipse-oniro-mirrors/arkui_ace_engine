@@ -29,7 +29,7 @@
 
 namespace OHOS::Ace {
 
-class AnimatedImagePlayer : public virtual AceType {
+class AnimatedImagePlayer : public AceType {
     DECLARE_ACE_TYPE(AnimatedImagePlayer, AceType);
 
 public:

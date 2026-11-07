@@ -16,10 +16,12 @@
 #include "core/components_ng/base/observer_handler.h"
 #include "core/components_ng/gestures/recognizers/pinch_recognizer.h"
 #include "core/components_ng/manager/event/json_child_report.h"
+#include "core/components_ng/manager/interaction_observer/ui_info_collection_manager.h"
 #include "core/common/reporter/reporter.h"
 #include "core/components_ng/event/event_constants.h"
 #include "core/components_ng/manager/event/json_report.h"
 
+#include "base/log/log_wrapper_without_instance.h"
 #include "base/ressched/ressched_report.h"
 
 namespace OHOS::Ace::NG {
@@ -32,6 +34,12 @@ constexpr Dimension DEFAULT_PINCH_DISTANCE = Dimension(5.0, DimensionUnit::VP);
 constexpr double SCALE_PER_AXIS_EVENT = 0.1f;
 
 } // namespace
+
+void PinchRecognizer::ForceCleanRecognizer()
+{
+    MultiFingersRecognizer::ForceCleanRecognizer();
+    ReleaseTouchEventPayload(lastTouchEvent_);
+}
 
 PinchRecognizer::PinchRecognizer(int32_t fingers, double distance, bool isLimitFingerCount)
     : MultiFingersRecognizer(fingers, isLimitFingerCount), distance_(distance)
@@ -57,7 +65,7 @@ void PinchRecognizer::OnAccepted()
     }
     
     auto node = GetAttachedNode().Upgrade();
-    TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW, "PINCH RACC, T: %{public}s",
+    TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW, "PINCH RACC, T: %{public}s",
         node ? node->GetTag().c_str() : "null");
 #ifndef CROSS_PLATFORM
     ResSchedReport::GetInstance().ResSchedDataReport("click");
@@ -360,7 +368,7 @@ void PinchRecognizer::HandleTouchCancelEvent(const TouchEvent& event)
         lastRefereeState_ = RefereeState::READY;
         refereeState_ = RefereeState::READY;
     } else if (refereeState_ == RefereeState::SUCCEED) {
-        TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW,
+        TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW,
             "PinchRecognizer activeFingers size not equal fingers_, not send cancel callback.");
     }
 }
@@ -435,6 +443,7 @@ Offset PinchRecognizer::ComputePinchCenter()
 void PinchRecognizer::OnResetStatus()
 {
     MultiFingersRecognizer::OnResetStatus();
+    ReleaseTouchEventPayload(lastTouchEvent_);
     initialDev_ = 0.0;
     currentDev_ = 0.0;
     scale_ = 1.0;
@@ -452,9 +461,9 @@ void PinchRecognizer::SendCallbackMsg(const std::unique_ptr<GestureEventFunc>& c
     if (gestureInfo_ && gestureInfo_->GetDisposeTag()) {
         return;
     }
+    GestureEvent info;
+    GetGestureEventInfo(info);
     if (callback && *callback) {
-        GestureEvent info;
-        GetGestureEventInfo(info);
         // callback may be overwritten in its invoke so we copy it first
         auto callbackFunction = *callback;
         HandleGestureAccept(info, type, GestureListenerType::PINCH);
@@ -464,6 +473,8 @@ void PinchRecognizer::SendCallbackMsg(const std::unique_ptr<GestureEventFunc>& c
         HandleReports(info, type);
 #endif
     }
+    // Always-on delivery for NDK interaction observers.
+    UIInfoCollectionManager::GetInstance().NotifyPinch(GetAttachedNode().Upgrade(), info, type);
 #ifdef GESTURE_DEBUG_BOUNDARY_SUPPORTED
     ReportToGestureDebugManager(type, GestureListenerType::PINCH);
 #endif

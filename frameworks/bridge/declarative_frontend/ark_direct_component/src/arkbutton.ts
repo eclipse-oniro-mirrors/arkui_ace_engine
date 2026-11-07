@@ -724,13 +724,13 @@ class JSButton extends JSContainerBase {
   }
 
   static size(value: any): void {
-    if (!isObject(value)) {
+    if (value) {
+      JSViewAbstract.width(value.width);
+      JSViewAbstract.height(value.height);
+    } else {
       JSViewAbstract.width(undefined);
       JSViewAbstract.height(undefined);
-      return;
     }
-    JSViewAbstract.width(value.width);
-    JSViewAbstract.height(value.height);
   }
 
   static padding(value: any): void {

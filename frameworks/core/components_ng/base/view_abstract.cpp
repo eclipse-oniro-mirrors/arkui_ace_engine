@@ -14,8 +14,11 @@
  */
 
 #include "core/components_ng/base/view_abstract.h"
+#include "core/components_ng/property/safe_area_inset_property.h"
 
 #include <cstdint>
+
+#include "core/components_ng/base/safe_area_inset_view.h"
 #include <functional>
 #include <unordered_map>
 
@@ -68,6 +71,7 @@
 #include "core/components_ng/pattern/overlay/overlay_manager.h"
 #include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/pattern/scroll/scroll_event_hub.h"
+#include "core/components_ng/pattern/safe_area_inset/safe_area_inset_pattern.h"
 #include "core/components_ng/pattern/scrollable/scrollable_event_hub.h"
 #include "core/components_ng/pattern/stack/stack_pattern.h"
 #include "core/components_ng/pattern/text_field/text_field_paint_property.h"
@@ -80,6 +84,7 @@
 #include "core/interfaces/native/node/dialog_modifier.h"
 #include "core/interfaces/native/node/menu_item_modifier.h"
 #include "core/interfaces/native/node/menu_modifier.h"
+#include "core/pipeline/base/element_register.h"
 
 namespace OHOS::Ace::NG {
 
@@ -1552,6 +1557,107 @@ void ViewAbstract::ResetSafeAreaPadding()
     }
     ACE_RESET_LAYOUT_PROPERTY(LayoutProperty, SafeAreaPadding);
 }
+
+namespace SafeAreaInsetView {
+
+void SetSafeAreaInset(
+    FrameNode* frameNode, const SafeAreaInsetOptions& options, const SafeAreaInsetContentArray& contents)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto layoutProperty = frameNode->GetLayoutProperty();
+    CHECK_NULL_VOID(layoutProperty);
+
+    SafeAreaInsetOptions effectiveOptions = options;
+    SafeAreaInsetContentArray effectiveContents = contents;
+    bool hasLpxSpacing = false;
+    for (size_t index = 0; index < SAFE_AREA_INSET_EDGE_COUNT; ++index) {
+        auto& edge = effectiveOptions.edges[index];
+        auto& content = effectiveContents[index];
+        if (!edge.has_value() || !content) {
+            edge.reset();
+            content.Reset();
+            continue;
+        }
+        for (size_t previous = 0; previous < index; ++previous) {
+            if (effectiveContents[previous] == content) {
+                edge.reset();
+                content.Reset();
+                break;
+            }
+        }
+        if (edge.has_value() && edge->spacing.GetDimension().Unit() == DimensionUnit::LPX) {
+            hasLpxSpacing = true;
+        }
+    }
+    if (effectiveOptions.Empty()) {
+        ResetSafeAreaInset(frameNode);
+        return;
+    }
+
+    if (hasLpxSpacing) {
+        frameNode->RegisterLpxAttribute(LpxAttribute::LPX_SAFE_AREA_INSET_SPACING);
+    } else {
+        frameNode->UnRegisterLpxAttribute(LpxAttribute::LPX_SAFE_AREA_INSET_SPACING);
+    }
+
+    auto insetContainer = frameNode->GetSafeAreaInsetNode();
+    auto insetPattern = insetContainer ? insetContainer->GetPattern<SafeAreaInsetPattern>() : nullptr;
+    if (!insetPattern) {
+        insetPattern = AceType::MakeRefPtr<SafeAreaInsetPattern>();
+        insetContainer = FrameNode::CreateFrameNode(SAFE_AREA_INSET_CONTAINER_TAG,
+            ElementRegister::GetInstance()->MakeUniqueId(), insetPattern);
+        CHECK_NULL_VOID(insetContainer);
+        insetContainer->SetInternal();
+        insetContainer->SetHitTestMode(HitTestMode::HTMTRANSPARENT_SELF);
+    }
+    bool contentChanged = false;
+    // Release changed slots before mounting the new snapshot, including roots moved between edges.
+    for (size_t index = 0; index < SAFE_AREA_INSET_EDGE_COUNT; ++index) {
+        auto edge = static_cast<SafeAreaInsetEdge>(index);
+        if (insetPattern->GetEdgeContent(edge) != effectiveContents[index]) {
+            contentChanged = insetPattern->SetEdgeContent(edge, nullptr) || contentChanged;
+        }
+    }
+    for (size_t index = 0; index < SAFE_AREA_INSET_EDGE_COUNT; ++index) {
+        contentChanged = insetPattern->SetEdgeContent(
+            static_cast<SafeAreaInsetEdge>(index), effectiveContents[index]) || contentChanged;
+    }
+    if (insetPattern->Empty()) {
+        ResetSafeAreaInset(frameNode);
+        return;
+    }
+
+    const auto* currentOptions = layoutProperty->GetSafeAreaInsetState().GetSafeAreaInset();
+    const bool optionsChanged = !currentOptions || *currentOptions != effectiveOptions;
+    layoutProperty->UpdateSafeAreaInset(effectiveOptions);
+    if (frameNode->GetSafeAreaInsetNode() != insetContainer) {
+        frameNode->SetSafeAreaInsetNode(insetContainer);
+    } else if (contentChanged) {
+        frameNode->MarkNeedSyncRenderTree(true);
+    }
+    if (optionsChanged || contentChanged) {
+        frameNode->ResetSafeAreaPadding();
+        frameNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    }
+}
+
+void ResetSafeAreaInset(FrameNode* frameNode)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto layoutProperty = frameNode->GetLayoutProperty();
+    CHECK_NULL_VOID(layoutProperty);
+    if (!frameNode->GetSafeAreaInsetNode() && !layoutProperty->GetSafeAreaInsetState().GetSafeAreaInset() &&
+        !layoutProperty->GetSafeAreaInsetState().GetSafeAreaInsetContribution().HasValue()) {
+        return;
+    }
+    frameNode->UnRegisterLpxAttribute(LpxAttribute::LPX_SAFE_AREA_INSET_SPACING);
+    layoutProperty->ResetSafeAreaInset();
+    frameNode->SetSafeAreaInsetNode(nullptr);
+    frameNode->ResetSafeAreaPadding();
+    frameNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+}
+
+} // namespace SafeAreaInsetView
 
 void ViewAbstract::SetSafeAreaPadding(FrameNode* frameNode, const CalcLength& value)
 {
@@ -3595,6 +3701,13 @@ void ViewAbstract::SetHitTestMode(HitTestMode hitTestMode)
     auto gestureHub = ViewStackProcessor::GetInstance()->GetMainFrameNodeGestureEventHub();
     CHECK_NULL_VOID(gestureHub);
     gestureHub->SetHitTestMode(hitTestMode);
+}
+
+void ViewAbstract::SetAgentControlMode(const std::optional<AgentControlMode>& mode)
+{
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    frameNode->SetAgentControlMode(mode);
 }
 
 void ViewAbstract::SetOnTouchTestFunc(NG::OnChildTouchTestFunc&& onChildTouchTest)
@@ -6201,6 +6314,125 @@ void ViewAbstract::SetClipEdge(FrameNode* frameNode, bool isClip)
     }
 }
 
+void ViewAbstract::SetShadowShapeLpxCallback(FrameNode* frameNode, const RefPtr<BasicShape>& basicShape)
+{
+    if (CheckDimensionUseLPX(basicShape->GetWidth()) || CheckDimensionUseLPX(basicShape->GetHeight())) {
+        auto lpxUpdateFunc = [weak = AceType::WeakClaim(frameNode), shape = basicShape]() {
+            auto frameNode = weak.Upgrade();
+            CHECK_NULL_VOID(frameNode);
+            auto target = frameNode->GetRenderContext();
+            CHECK_NULL_VOID(target);
+            target->ResetShadowShape();
+            target->UpdateShadowShape(shape);
+        };
+        ACE_SET_NODE_LPX_UPDATE_CALLBACK(true, LpxAttribute::LPX_SHADOW_SHAPE, lpxUpdateFunc, frameNode);
+    } else {
+        ACE_SET_NODE_LPX_UPDATE_CALLBACK(false, LpxAttribute::LPX_SHADOW_SHAPE, EMPTY_CALLBACK, frameNode);
+    }
+}
+
+void ViewAbstract::SetShadowShape(const RefPtr<BasicShape>& basicShape)
+{
+    if (!ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess()) {
+        return;
+    }
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ViewAbstract::SetShadowShape(frameNode, basicShape);
+}
+
+void ViewAbstract::SetShadowShape(FrameNode* frameNode, const RefPtr<BasicShape>& basicShape)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto target = frameNode->GetRenderContext();
+    CHECK_NULL_VOID(target);
+    if (!basicShape) {
+        if (SystemProperties::ConfigChangePerform()) {
+            auto pattern = frameNode->GetPattern();
+            CHECK_NULL_VOID(pattern);
+            pattern->RemoveResObj("shadowShape");
+        }
+        ACE_SET_NODE_LPX_UPDATE_CALLBACK(false, LpxAttribute::LPX_SHADOW_SHAPE, EMPTY_CALLBACK, frameNode);
+        target->ResetShadowShape();
+        target->OnShadowShapeUpdate(nullptr);
+        return;
+    }
+    if (SystemProperties::ConfigChangePerform()) {
+        auto pattern = frameNode->GetPattern();
+        CHECK_NULL_VOID(pattern);
+        if (basicShape->HasResourceObj()) {
+            RefPtr<ResourceObject> resObj = AceType::MakeRefPtr<ResourceObject>("", "", -1);
+            auto&& updateFunc = [shape = basicShape, weak = AceType::WeakClaim(frameNode)](
+                                    const RefPtr<ResourceObject>& resObj) mutable {
+                auto frameNode = weak.Upgrade();
+                CHECK_NULL_VOID(frameNode);
+                CHECK_NULL_VOID(shape);
+                shape->ReloadResources();
+                auto renderContext = frameNode->GetRenderContext();
+                CHECK_NULL_VOID(renderContext);
+                renderContext->ResetShadowShape();
+                renderContext->UpdateShadowShape(shape);
+            };
+            pattern->AddResObj("shadowShape", resObj, std::move(updateFunc));
+        } else {
+            pattern->RemoveResObj("shadowShape");
+        }
+    }
+    target->UpdateShadowShape(basicShape);
+    SetShadowShapeLpxCallback(frameNode, basicShape);
+}
+
+void ViewAbstract::ResetShadowShape()
+{
+    if (!ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess()) {
+        return;
+    }
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ViewAbstract::ResetShadowShape(frameNode);
+}
+
+void ViewAbstract::ResetShadowShape(FrameNode* frameNode)
+{
+    CHECK_NULL_VOID(frameNode);
+    if (SystemProperties::ConfigChangePerform()) {
+        auto pattern = frameNode->GetPattern();
+        CHECK_NULL_VOID(pattern);
+        pattern->RemoveResObj("shadowShape");
+    }
+    ACE_SET_NODE_LPX_UPDATE_CALLBACK(false, LpxAttribute::LPX_SHADOW_SHAPE, EMPTY_CALLBACK, frameNode);
+    auto target = frameNode->GetRenderContext();
+    CHECK_NULL_VOID(target);
+    target->ResetShadowShape();
+    target->OnShadowShapeUpdate(nullptr);
+}
+
+void ViewAbstract::SetShadowClipMode(ShadowClipMode clipMode)
+{
+    if (!ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess()) {
+        return;
+    }
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ViewAbstract::SetShadowClipMode(frameNode, clipMode);
+}
+
+void ViewAbstract::SetShadowClipMode(FrameNode* frameNode, ShadowClipMode clipMode)
+{
+    ACE_UPDATE_NODE_RENDER_CONTEXT(ShadowClipMode, clipMode, frameNode);
+}
+
+void ViewAbstract::ResetShadowClipMode()
+{
+    if (!ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess()) {
+        return;
+    }
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ViewAbstract::ResetShadowClipMode(frameNode);
+}
+
+void ViewAbstract::ResetShadowClipMode(FrameNode* frameNode)
+{
+    ACE_UPDATE_NODE_RENDER_CONTEXT(ShadowClipMode, ShadowClipMode::DEFAULT_SHAPE, frameNode);
+}
+
 std::function<void()> ViewAbstract::GetMaskShapeFuncForLPX(const RefPtr<BasicShape>& basicShape)
 {
     auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
@@ -7262,7 +7494,7 @@ void ViewAbstract::SetOverlayBuilder(FrameNode* frameNode, const RefPtr<NG::UINo
     overlayNode->SetParent(AceType::WeakClaim(frameNode));
     overlayNode->SetActive(true);
     overlayNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
-    auto layoutProperty = AceType::DynamicCast<LayoutProperty>(overlayNode->GetLayoutProperty());
+    auto layoutProperty = overlayNode->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
     layoutProperty->SetIsOverlayNode(true);
     layoutProperty->UpdateMeasureType(MeasureType::MATCH_PARENT);
@@ -7300,7 +7532,7 @@ void ViewAbstract::AddOverlayToFrameNode(const RefPtr<NG::FrameNode>& overlayNod
     overlayNode->SetParent(AceType::WeakClaim(frameNode));
     overlayNode->SetActive(true);
     overlayNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
-    auto layoutProperty = AceType::DynamicCast<LayoutProperty>(overlayNode->GetLayoutProperty());
+    auto layoutProperty = overlayNode->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
     layoutProperty->SetIsOverlayNode(true);
     layoutProperty->UpdateMeasureType(MeasureType::MATCH_PARENT);
@@ -8261,6 +8493,12 @@ void ViewAbstract::SetHitTestMode(FrameNode* frameNode, HitTestMode hitTestMode)
     gestureHub->SetHitTestMode(hitTestMode);
 }
 
+void ViewAbstract::SetAgentControlMode(FrameNode* frameNode, const std::optional<AgentControlMode>& mode)
+{
+    CHECK_NULL_VOID(frameNode);
+    frameNode->SetAgentControlMode(mode);
+}
+
 void ViewAbstract::SetOpacity(FrameNode* frameNode, double opacity)
 {
     CHECK_NULL_VOID(frameNode);
@@ -8452,7 +8690,7 @@ void ViewAbstract::SetOverlayNode(FrameNode* frameNode, FrameNode* node, const N
     overlayNode->SetParent(AceType::WeakClaim(frameNode));
     overlayNode->SetActive(true);
     overlayNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
-    auto layoutProperty = AceType::DynamicCast<LayoutProperty>(overlayNode->GetLayoutProperty());
+    auto layoutProperty = overlayNode->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
     layoutProperty->SetIsOverlayNode(true);
     layoutProperty->UpdateMeasureType(MeasureType::MATCH_PARENT);
@@ -9923,6 +10161,18 @@ void ViewAbstract::ResetBlender(FrameNode* frameNode)
     renderContext->ResetBlender();
 }
 
+void ViewAbstract::SetVibrancyMode(FrameNode* frameNode, VibrancyMode mode)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto renderContext = frameNode->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    // only EXQUISITE level devices take effect
+    if (SystemProperties::GetUiMaterialLevel() != UiMaterialLevel::EXQUISITE) {
+        return;
+    }
+    renderContext->UpdateVibrancyMode(mode);
+}
+
 void ViewAbstract::SetDragPreviewOptions(FrameNode* frameNode, const DragPreviewOption& previewOption)
 {
     CHECK_NULL_VOID(frameNode);
@@ -10190,6 +10440,20 @@ void ViewAbstract::SetKeyboardShortcut(FrameNode* frameNode, const std::string& 
     }
     eventHub->SetKeyboardShortcut(value, key, onKeyboardShortcutAction);
     eventManager->AddKeyboardShortcutNode(WeakPtr<NG::FrameNode>(frameNodeRef));
+}
+
+void ViewAbstract::RemoveKeyboardShortcut(FrameNode* frameNode, const std::string& value,
+    const std::vector<ModifierKey>& keys)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pipeline = frameNode->GetContext();
+    CHECK_NULL_VOID(pipeline);
+    auto eventManager = pipeline->GetEventManager();
+    CHECK_NULL_VOID(eventManager);
+    auto eventHub = frameNode->GetEventHub<EventHub>();
+    CHECK_NULL_VOID(eventHub);
+    auto key = eventManager->GetKeyboardShortcutKeys(keys);
+    eventHub->RemoveKeyboardShortcut(value, key);
 }
 
 void ViewAbstract::SetOnAppear(FrameNode* frameNode, std::function<void()> &&onAppear)

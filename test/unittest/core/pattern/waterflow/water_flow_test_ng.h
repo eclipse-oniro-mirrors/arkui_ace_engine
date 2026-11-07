@@ -30,6 +30,7 @@
 #include "core/components_ng/pattern/waterflow/water_flow_paint_method.h"
 #include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
 #include "core/components_ng/pattern/waterflow/water_flow_accessibility_property.h"
+#include "core/components_ng/syntax/repeat_virtual_scroll_2_node.h"
 #undef private
 #undef protected
 

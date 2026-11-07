@@ -42,6 +42,8 @@
 #include "core/components/common/properties/animation_option.h"
 #include "core/components/common/properties/popup_param.h"
 #include "core/components_ng/base/observer_handler.h"
+#include "core/components_ng/token_theme/brand_color_info.h"
+#include "core/components_ng/token_theme/token_theme_storage.h"
 
 namespace OHOS::Accessibility {
 class AccessibilityElementInfo;
@@ -51,6 +53,12 @@ namespace OHOS::Rosen {
 class RSSyncTransactionController;
 class RSSyncTransactionHandler;
 } // namespace OHOS::Rosen
+
+namespace OHOS::Ace::NG {
+class ForceSplitManager;
+class PageSceneRuleManager;
+struct ForceSplitParam;
+} // namespace OHOS::Ace::NG
 
 namespace OHOS::Ace {
 struct DecorButtonStyle;
@@ -101,8 +109,10 @@ public:
     void DestroyUIDirector() override;
     void SetUIContentType(UIContentType uIContentType) override;
     void SetHostParams(const OHOS::AAFwk::WantParams& params) override;
+    void SetUIExtensionDensityFollowHost(OHOS::Rosen::DpiFollowStrategy dpiFollowStrategy) override;
     void UpdateFontScale(const std::shared_ptr<OHOS::AppExecFwk::Configuration>& config);
     static int32_t GetUIContentWindowID(int32_t instanceId);
+    static bool IsBrandColorValid(const std::string& brandColorStr);
     OHOS::Rosen::Window* GetUIContentWindow() override;
     void ForceRequestFrame() override;
     // UI content event process
@@ -140,7 +150,11 @@ public:
     void UpdateTitleInTargetPos(bool isShow, int32_t height) override;
     void NotifyRotationAnimationEnd() override;
     void RegisterExeAppAIFunction(const WeakPtr<TaskExecutor>& taskExecutor);
-    void PostTraverseWebTask(const WeakPtr<TaskExecutor>& weakTaskExecutor, std::function<void()>&& task);
+    bool PostTraverseWebTask(const WeakPtr<TaskExecutor>& weakTaskExecutor, std::function<void()>&& task);
+    int32_t HandleWebPageSceneRegister(const WeakPtr<TaskExecutor>& weakTaskExecutor, int32_t processId,
+        const std::string& ruleJson);
+    int32_t HandleWebPageSceneGet(const WeakPtr<TaskExecutor>& weakTaskExecutor, int32_t processId,
+        const std::string& ruleJson, bool isGetResult);
     void SaveTraverseWebForPageSceneCallback(const WeakPtr<TaskExecutor>& taskExecutor);
     void SaveGetStateMgmtInfoFunction(const WeakPtr<TaskExecutor>& taskExecutor);
     void SaveGetWebInfoByRequestFunction(const WeakPtr<TaskExecutor>& taskExecutor);
@@ -185,6 +199,7 @@ public:
     std::shared_ptr<Rosen::RSSurfaceNode> GetFormRootNode() override;
     void UpdateFormData(const std::string& data) override;
     void UpdateFormSharedImage(const std::map<std::string, sptr<OHOS::AppExecFwk::FormAshmem>>& imageDataMap) override;
+    void SetFormImageCacheThreshold(int32_t threshold) override;
     void ReloadForm(const std::string& url) override;
 
     void SetFormWidth(float width) override { formWidth_ = width; }
@@ -321,6 +336,7 @@ public:
     void SetContainerModalTitleVisible(bool customTitleSettedShow, bool floatingTitleSettedShow) override;
     bool GetContainerModalTitleVisible(bool isImmersive) override;
     void SetContainerModalTitleHeight(int32_t height) override;
+    void SetContainerModalTitleHeightWithVp(double heightVp) override;
     void SetContainerButtonStyle(const Rosen::DecorButtonStyle& buttonStyle) override;
     int32_t GetContainerModalTitleHeight() override;
     void SetFrameMetricsCallBack(std::function<void(FrameMetrics info)>&& callback) override;
@@ -424,11 +440,13 @@ public:
     void SetTopWindowBoundaryByID(const std::string& stringId) override;
     void SetupGetPixelMapCallback(const WeakPtr<TaskExecutor>& taskExecutor);
     void SaveGetHitTestInfoCallback(const WeakPtr<TaskExecutor>& taskExecutor);
+    void SaveComponentTreeQueryFunction(const WeakPtr<TaskExecutor>& taskExecutor);
     void RelaxedCommandCallbackInner(const WeakPtr<TaskExecutor>& taskExecutor);
     void RegisterGetSpecifiedContentOffsetsCallback(const WeakPtr<TaskExecutor>& taskExecutor);
     void RegisterHighlightSpecifiedContentCallback(const WeakPtr<TaskExecutor>& taskExecutor);
     void RegisterSelectTextCallback(const WeakPtr<TaskExecutor>& taskExecutor);
     void SetupGetImagesByIdCallback(const WeakPtr<TaskExecutor>& taskExecutor);
+    void InitInspectorWindowSnapshotCallback();
     void InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& taskExecutor);
     void InitSendCommandFunctionsCallbacks(const WeakPtr<TaskExecutor>& taskExecutor);
     bool SendUIExtProprty(uint32_t code, const AAFwk::Want& data,
@@ -505,6 +523,8 @@ protected:
     void DestroyCallback() const;
     void ProcessDestructCallbacks();
     void SetConfiguration(const std::shared_ptr<OHOS::AppExecFwk::Configuration>& config);
+    void ApplyUIExtensionDensityFollowHost(NG::DpiFollowStrategy strategy);
+    void ApplyPendingDpiFollowStrategy();
 
     void InitializeSafeArea(const RefPtr<Platform::AceContainer>& container);
     void InitializeDisplayAvailableRect(const RefPtr<Platform::AceContainer>& container);
@@ -542,6 +562,14 @@ protected:
     OHOS::Rosen::Window* window_ = nullptr;
     std::string startUrl_;
     int32_t instanceId_ = -1;
+    std::shared_ptr<NG::PageSceneRuleManager> pageSceneMatcher_;
+    // The window may call SetUIExtensionDensityFollowHost before Initialize assigns
+    // instanceId_, so the latest received strategy is cached here and applied to the
+    // pipeline once the container is ready (see ApplyPendingDpiFollowStrategy).
+    bool isDpiFollowStrategyReceived_ = false;
+    // Zero-initialized to Rosen::DpiFollowStrategy::NONE (the default); meaningful only
+    // when isDpiFollowStrategyReceived_ is true.
+    OHOS::Rosen::DpiFollowStrategy pendingDpiFollowStrategy_ {};
     int32_t lastRotation = -1;
     OHOS::sptr<OHOS::Rosen::IWindowDragListener> dragWindowListener_ = nullptr;
     OHOS::sptr<OHOS::Rosen::IAvoidAreaChangedListener> avoidAreaChangedListener_ = nullptr;
@@ -610,8 +638,17 @@ protected:
     VMType vmType_ = VMType::NORMAL;
 
 private:
+    static void ApplyForceSplitParams(
+        const RefPtr<NG::ForceSplitManager>& forceSplitMgr, NG::ForceSplitParam& config, bool isRouter);
     void ProcessWindowSizeLayoutBreakPointChange(double density);
     void ApplyFloatNavigationAvoidArea(bool enable);
+    void InitBrandColor();
+    static void UpdateBrandColor(
+        const std::weak_ptr<OHOS::AbilityRuntime::Context>& weakContext, int32_t instanceId);
+    static void NotifyBrandColorChangeToUEC(int32_t instanceId, const std::optional<Color>& brandColor,
+        const std::optional<NG::BrandColorStrategy>& colorStrategy);
+    static void HandleBrandColorChanged(
+        const std::weak_ptr<OHOS::AbilityRuntime::Context>& weakContext, int32_t instanceId);
 };
 
 } // namespace OHOS::Ace

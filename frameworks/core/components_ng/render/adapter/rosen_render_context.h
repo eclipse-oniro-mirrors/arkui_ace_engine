@@ -288,8 +288,11 @@ public:
 
     Rosen::SHADOW_COLOR_STRATEGY ToShadowColorStrategy(ShadowColorStrategy shadowColorStrategy);
     void OnBackShadowUpdate(const Shadow& shadow) override;
+    void OnShadowShapeUpdate(const RefPtr<BasicShape>& basicShape) override;
+    void OnShadowClipModeUpdate(ShadowClipMode clipMode) override;
     void OnBackBlendModeUpdate(BlendMode blendMode) override;
     void OnBackBlendApplyTypeUpdate(BlendApplyType applyType) override;
+    void OnVibrancyModeUpdate(const VibrancyMode& mode) override;
     void UpdateBorderWidthF(const BorderWidthPropertyF& value) override;
 
     void UpdateMaterialInteractionEffect(float scaleX, float scaleY, float offsetX, float offsetY) override;
@@ -369,6 +372,7 @@ public:
     void SetIsBackground(bool isBackground) override;
     void SetHDRBrightness(float hdrBrightness) override;
     void SetHDRBrightness(float hdrBrightness, uint32_t type) override;
+    void SetSolidLayerEnabled(bool enabled) override;
     void SetImageHDRBrightness(float hdrBrightness) override;
     void SetImageHDRPresent(bool hdrPresent) override;
     void SetTransparentLayer(bool isTransparentLayer) override;
@@ -386,6 +390,13 @@ public:
     void SetUnionSpacing(float spacing) override;
 
     RectF GetPaintRectWithTransform() override;
+    bool HasRenderNode() const override;
+
+    static RectF GetPaintRectWithTransform(
+        const std::shared_ptr<Rosen::RSNode>& rsNode, const RectF& paintRect);
+
+    static Matrix4 GetMatrixWithTransformRotate(
+        const std::shared_ptr<Rosen::RSNode>& rsNode, const RectF& paintRect);
 
     std::pair<RectF, bool> GetPaintRectWithTranslate() override;
 
@@ -413,7 +424,9 @@ public:
     void GetPointTransformRotate(PointF& point) override;
 
     Matrix4 GetMatrixWithTransformRotate() override;
-    Matrix4 GetMatrixWithTransformRotateInner();
+    static Matrix4 GetMatrixWithTransformRotateInner(
+        const std::shared_ptr<Rosen::RSNode>& rsNode, const RectF& paintRect,
+        const std::shared_ptr<Rosen::ModifierNG::RSTransformModifier>& transformModifier);
 
     void GetPointWithTransform(PointF& point) override;
     void GetPointWithTransformInner(PointF& point);
@@ -448,8 +461,10 @@ public:
     void DumpInfo() override;
     void DumpInfo(std::unique_ptr<JsonValue>& json) override;
     void DumpSimplifyStagingProperties(std::unique_ptr<JsonValue>& json);
+    bool HasRenderContent() const override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void SetAdvanceInfo(std::unique_ptr<JsonValue>& json);
     void BuildStagingInfo(std::unique_ptr<JsonValue>& json);
     void BuildPositionInfo(std::unique_ptr<JsonValue>& json);
@@ -645,7 +660,7 @@ public:
     void UpdateForegroundFilterDistortionParam(const DistortionParam& param) override;
 
     std::shared_ptr<Rosen::RSNGFilterBase> CreateFrostedGlassFilter(
-        const FrostedGlassParam& param, float dipScale) override;
+        const FrostedGlassParam& param, float dipScale, const ExtraGlassParam* extraParam) override;
 
     void SetBackgroundNGFilterEC(const std::shared_ptr<Rosen::RSNGFilterBase>& materialFilter) override;
     void SetMaterialShaderECSub(const std::shared_ptr<Rosen::RSNGShaderBase>& materialFilter) override;
@@ -808,6 +823,7 @@ protected:
     void PaintClipShape(const std::unique_ptr<ClipProperty>& clip, const SizeF& frameSize);
     void PaintClipMask(const std::unique_ptr<ClipProperty>& clip, const SizeF& frameSize);
     void PaintClip(const SizeF& frameSize);
+    void PaintShadowShape(const RefPtr<BasicShape>& basicShape, const SizeF& frameSize);
     void PaintProgressMask();
     void PaintSideBarContentMask(const Color& maskColor);
     void PaintGradient(const SizeF& frameSize);
@@ -1058,8 +1074,17 @@ protected:
     ACE_DISALLOW_COPY_AND_MOVE(RosenRenderContext);
 
 private:
+    void DumpAdvanceVisualInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceBlendAndGradientInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceBackgroundInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void SetAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceLightInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceImageAndLightInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceSourceInfo(std::unique_ptr<JsonValue>& json, const char* key,
+        const ImageSourceInfo& source, const ParamConfig& config);
+
     void ModifyCustomBackground();
-    bool ShouldSkipAffineTransformation(std::shared_ptr<RSNode>& rsNode);
+    static bool ShouldSkipAffineTransformation(const std::shared_ptr<RSNode>& rsNode);
     void InsertFrameChildBefore(const RefPtr<UINode>& child, const RefPtr<UINode>& nextSibling);
     void RemoveMixedFrameChild(const RefPtr<UINode>& child);
     void NotifyMixedListChanged();

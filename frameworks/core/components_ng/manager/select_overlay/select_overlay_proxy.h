@@ -28,7 +28,7 @@
 namespace OHOS::Ace::NG {
 
 // SelectOverlayProxy is the class to control select handle and select menu.
-class ACE_EXPORT SelectOverlayProxy : public virtual AceType {
+class ACE_EXPORT SelectOverlayProxy : public AceType {
     DECLARE_ACE_TYPE(SelectOverlayProxy, AceType);
 
 public:

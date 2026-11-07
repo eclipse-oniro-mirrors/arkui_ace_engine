@@ -19,6 +19,8 @@
 // Add the following two macro definitions to test the private and protected method.
 #define private public
 #define protected public
+#include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
+#include "core/animation/evaluator.h"
 #include "base/geometry/animatable_matrix4.h"
 
 using namespace testing;
@@ -195,5 +197,84 @@ HWTEST_F(AnimatableMatrix4Test, AnimatableMatrix4Test006, TestSize.Level1)
     animatableMatrix4Obj2.SetContextAndCallback(nullptr, [&flagEventCbk]() { flagEventCbk = true; });
     animatableMatrix4Obj2 = animatableMatrix4Obj1;
     ASSERT_NE(animatableMatrix4Obj2.animationCallback_, nullptr);
+}
+
+/**
+ * @tc.name: AnimatableMatrix4Test007
+ * @tc.desc: Test AnimateTo with evaluator and stopCallback, running controller reset.
+ * @tc.type: FUNC
+ */
+HWTEST_F(AnimatableMatrix4Test, AnimatableMatrix4Test007, TestSize.Level1)
+{
+    AnimatableMatrix4 animatableMatrix4Obj;
+    animatableMatrix4Obj.SetEvaluator(AceType::MakeRefPtr<LinearEvaluator<TransformOperation>>());
+    animatableMatrix4Obj.SetContextAndCallback(nullptr, []() {});
+    animatableMatrix4Obj.SetAnimationStopCallback([]() {});
+    AnimationOption finishOption;
+    finishOption.SetDuration(100);
+    finishOption.SetOnFinishEvent([]() {});
+    animatableMatrix4Obj.SetAnimationOption(finishOption);
+    animatableMatrix4Obj.MoveTo(Matrix4::CreateIdentity());
+
+    Matrix4 endValue = Matrix4::CreateIdentity();
+    endValue.Set(VALID_ROW0, VALID_COL0, 10.0);
+    // different value: run through AnimateTo fully, evaluator_ and stopCallback_ branches
+    animatableMatrix4Obj.AnimateTo(endValue);
+    EXPECT_NE(animatableMatrix4Obj.animationController_, nullptr);
+
+    // same value with evaluator_: !evaluator_ false branch, then ResetController stop branch
+    animatableMatrix4Obj.AnimateTo(endValue);
+    EXPECT_NE(animatableMatrix4Obj.animationController_, nullptr);
+
+    animatableMatrix4Obj.SetEvaluator(nullptr);
+    // same value without evaluator_: early return branch
+    animatableMatrix4Obj.MoveTo(endValue);
+    animatableMatrix4Obj.animationController_ = nullptr;
+    animatableMatrix4Obj.AnimateTo(endValue);
+    EXPECT_EQ(animatableMatrix4Obj.animationController_, nullptr);
+}
+
+/**
+ * @tc.name: AnimatableMatrix4Test008
+ * @tc.desc: Test operator= with valid pipeline context and explicit animation option.
+ * @tc.type: FUNC
+ */
+HWTEST_F(AnimatableMatrix4Test, AnimatableMatrix4Test008, TestSize.Level1)
+{
+    NG::MockPipelineContext::SetUp();
+    auto pipelineContext = NG::MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipelineContext, nullptr);
+
+    AnimationOption explicitOption;
+    explicitOption.SetDuration(200);
+    pipelineContext->SaveExplicitAnimationOption(explicitOption);
+
+    AnimationOption srcOption;
+    srcOption.SetDuration(100);
+    AnimatableMatrix4 srcMatrix(
+        Matrix4::CreateIdentity(), srcOption);
+    AnimatableMatrix4 dstMatrix;
+    dstMatrix.SetContextAndCallback(AceType::WeakClaim(AceType::RawPtr(pipelineContext)), []() {});
+    // explicit animation valid branch
+    dstMatrix = srcMatrix;
+    EXPECT_FALSE(dstMatrix.isFirstAssign_);
+
+    pipelineContext->ClearExplicitAnimationOption();
+    // animationOption_ valid branch
+    AnimatableMatrix4 dstMatrix2;
+    dstMatrix2.SetContextAndCallback(AceType::WeakClaim(AceType::RawPtr(pipelineContext)), []() {});
+    dstMatrix2.isFirstAssign_ = false;
+    dstMatrix2 = srcMatrix;
+
+    // animationOption_ invalid branch: reset controller and assign directly
+    AnimatableMatrix4 plainSrc(Matrix4::CreateIdentity());
+    AnimatableMatrix4 dstMatrix3;
+    dstMatrix3.SetContextAndCallback(AceType::WeakClaim(AceType::RawPtr(pipelineContext)), []() {});
+    dstMatrix3.animationController_ = CREATE_ANIMATOR(nullptr);
+    dstMatrix3 = plainSrc;
+    EXPECT_EQ(dstMatrix3.animationController_, nullptr);
+    EXPECT_FALSE(dstMatrix3.isFirstAssign_);
+
+    NG::MockPipelineContext::TearDown();
 }
 } // namespace OHOS::Ace

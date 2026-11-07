@@ -43,7 +43,7 @@ AceCollectionItemInfo GridItemAccessibilityProperty::GetCollectionItemInfo() con
     CHECK_NULL_RETURN(gridItemPattern, aceCollectionItemInfo);
     auto gridItemLayoutProperty = frameNode->GetLayoutProperty<GridItemLayoutProperty>();
     CHECK_NULL_RETURN(gridItemLayoutProperty, aceCollectionItemInfo);
-    auto uiNode = DynamicCast<UINode>(frameNode);
+    RefPtr<UINode> uiNode = frameNode;
     CHECK_NULL_RETURN(uiNode, aceCollectionItemInfo);
     while (uiNode->GetTag() != GRID_ETS_TAG) {
         uiNode = uiNode->GetParent();

@@ -28,7 +28,7 @@
 
 namespace OHOS::Ace::Framework {
 
-class FocusStrategyOsal : public virtual AceType {
+class FocusStrategyOsal : public AceType {
     DECLARE_ACE_TYPE(FocusStrategyOsal, AceType);
 public:
     FocusStrategyOsal(const WeakPtr<AccessibilityManager>& accessibilityManager)

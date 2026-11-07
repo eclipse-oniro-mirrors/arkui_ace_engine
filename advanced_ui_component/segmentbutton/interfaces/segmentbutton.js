@@ -273,6 +273,11 @@ function initFontWeight(defaultValue) {
       return defaultValue;
   }
 }
+export var SegmentButtonInteractionMode;
+(function (SegmentButtonInteractionMode) {
+  SegmentButtonInteractionMode[SegmentButtonInteractionMode['FOLLOWING_DRAG'] = 0] = 'FOLLOWING_DRAG';
+  SegmentButtonInteractionMode[SegmentButtonInteractionMode['NORMAL_DRAG'] = 1] = 'NORMAL_DRAG';
+})(SegmentButtonInteractionMode || (SegmentButtonInteractionMode = {}));
 export var BorderRadiusMode;
 (function (BorderRadiusMode) {
   BorderRadiusMode[(BorderRadiusMode['DEFAULT'] = 0)] = 'DEFAULT';
@@ -401,6 +406,7 @@ let SegmentButtonOptions = (SegmentButtonOptions_1 = class SegmentButtonOptions 
       options.backgroundBlurStyle ?? LengthMetrics.resource(segmentButtonTheme.BACKGROUND_BLUR_STYLE).value;
     this.localizedTextPadding = options.localizedTextPadding;
     this.localizedButtonPadding = options.localizedButtonPadding;
+    this.interactionMode = options.interactionMode;
     this.direction = options.direction ?? Direction.Auto;
     this.borderRadiusMode = options.borderRadiusMode ?? BorderRadiusMode.DEFAULT;
     if (this.borderRadiusMode !== BorderRadiusMode.DEFAULT && this.borderRadiusMode !== BorderRadiusMode.CUSTOM) {
@@ -473,6 +479,7 @@ let SegmentButtonOptions = (SegmentButtonOptions_1 = class SegmentButtonOptions 
       borderRadiusMode: options.borderRadiusMode,
       backgroundBorderRadius: options.backgroundBorderRadius,
       itemBorderRadius: options.itemBorderRadius,
+      interactionMode: options.interactionMode,
       backgroundSystemMaterial: options.backgroundSystemMaterial,
     });
   }
@@ -499,6 +506,7 @@ let SegmentButtonOptions = (SegmentButtonOptions_1 = class SegmentButtonOptions 
       borderRadiusMode: options.borderRadiusMode,
       backgroundBorderRadius: options.backgroundBorderRadius,
       itemBorderRadius: options.itemBorderRadius,
+      interactionMode: options.interactionMode,
       backgroundSystemMaterial: options.backgroundSystemMaterial,
     });
   }
@@ -2926,7 +2934,7 @@ export class SegmentButton extends ViewPU {
       SwipeGesture.pop();
       LongPressGesture.create({ repeat: false, duration: 200 });
       LongPressGesture.onAction(event => {
-        if (!this.isBackgroundSystemMaterialEnabled()) {
+        if (!this.isMaterialInteractionEnabled()) {
           return;
         }
         if (this.options === void 0 || this.options.buttons === void 0) {
@@ -2954,7 +2962,12 @@ export class SegmentButton extends ViewPU {
         }
       });
       LongPressGesture.onActionCancel(event => {
-        if (!this.isBackgroundSystemMaterialEnabled()) {
+        if (!this.isMaterialInteractionEnabled()) {
+          if (this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG) {
+            this.isCurrentPositionPressed = false;
+            this.openSelectedItemSystemMaterial = false;
+            this.selectedItemScale = undefined;
+          }
           return;
         }
         if (this.options === void 0 || this.options.buttons === void 0) {
@@ -2969,7 +2982,12 @@ export class SegmentButton extends ViewPU {
         this.isCurrentPositionPressed = false;
       });
       LongPressGesture.onActionEnd(event => {
-        if (!this.isBackgroundSystemMaterialEnabled()) {
+        if (!this.isMaterialInteractionEnabled()) {
+          if (this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG) {
+            this.isCurrentPositionPressed = false;
+            this.openSelectedItemSystemMaterial = false;
+            this.selectedItemScale = undefined;
+          }
           return;
         }
         if (this.options === void 0 || this.options.buttons === void 0) {
@@ -3010,7 +3028,7 @@ export class SegmentButton extends ViewPU {
             break;
           }
         }
-        if (this.isBackgroundSystemMaterialEnabled() && this.isCurrentPositionSelected) {
+        if (this.isMaterialInteractionEnabled() && this.isCurrentPositionSelected) {
           this.getUIContext().animateTo(
             {
               curve: curves.interpolatingSpring(0, 1, 195, 14),
@@ -3039,7 +3057,9 @@ export class SegmentButton extends ViewPU {
         if (!this.isPanGestureMoved && this.isMovedFromPanGestureStartPoint(fingerInfo.globalX, fingerInfo.globalY)) {
           this.isPanGestureMoved = true;
         }
-        if (this.isBackgroundSystemMaterialEnabled()) {
+        const isMaterialEnabled = this.isBackgroundSystemMaterialEnabled();
+        if ((!this.isMouseWheelScroll(event) && this.isFollowingDragEnabled(isMaterialEnabled)) ||
+          (isMaterialEnabled && this.isMouseWheelScroll(event))) {
           const alg = this.layoutAlgorithm;
           let buttonLength = Math.min(this.options.buttons.length, this.buttonItemsSize.length);
           const startX = Math.min(alg.getButtonX(0), alg.getButtonX(buttonLength - 1));
@@ -3062,6 +3082,11 @@ export class SegmentButton extends ViewPU {
               break;
             }
           }
+          if (isMaterialEnabled || this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG) {
+            this.panGestureStartPoint = { x: fingerInfo.globalX, y: fingerInfo.globalY };
+          }
+        }
+        if (!isMaterialEnabled) {
           this.zoomScaleArray.forEach((_, index) => {
             if (index === this.selectedIndexes[0]) {
               Context.animateTo({ curve: curves.interpolatingSpring(10, 1, 410, 38) }, () => {
@@ -3089,6 +3114,10 @@ export class SegmentButton extends ViewPU {
         }
         let fingerInfo = event.fingerList.find(Boolean);
         if (fingerInfo === void 0) {
+          if (!this.isBackgroundSystemMaterialEnabled() &&
+            this.options?.interactionMode === SegmentButtonInteractionMode.FOLLOWING_DRAG) {
+            this.selectedItemOffsetX = 0;
+          }
           this.isPanGestureMoved = false;
           this.swipeHandled = false;
           return;
@@ -3142,7 +3171,9 @@ export class SegmentButton extends ViewPU {
           this.swipeHandled = false;
           return;
         }
-        if (this.isBackgroundSystemMaterialEnabled()) {
+        const isMaterialEnabled = this.isBackgroundSystemMaterialEnabled();
+        if ((!this.isMouseWheelScroll(event) && this.isFollowingDragEnabled(isMaterialEnabled)) ||
+          (isMaterialEnabled && this.isMouseWheelScroll(event))) {
           let selectedInfo = fingerInfo.localX;
           let buttonLength = Math.min(this.options.buttons.length, this.buttonItemsSize.length);
           let realIndex = -1;
@@ -3160,7 +3191,11 @@ export class SegmentButton extends ViewPU {
             this.selectedIndexes[0] = realIndex;
             this.selectedItemOffsetX = 0;
           });
-          this.finishSelectMaterialAnimation();
+          if (!isMaterialEnabled) {
+            Context.animateTo({ curve: curves.interpolatingSpring(10, 1, 410, 38) }, () => {
+              this.zoomScaleArray.fill(1);
+            });
+          }
         } else {
           if (this.isMouseWheelScroll(event)) {
             let offset = event.offsetX !== 0 ? event.offsetX : event.offsetY;
@@ -3180,6 +3215,9 @@ export class SegmentButton extends ViewPU {
           Context.animateTo({ curve: curves.interpolatingSpring(10, 1, 410, 38) }, () => {
             this.zoomScaleArray[this.selectedIndexes[0]] = 1;
           });
+        }
+        if (isMaterialEnabled) {
+          this.finishSelectMaterialAnimation();
         }
         this.isCurrentPositionSelected = false;
         this.isPanGestureMoved = false;
@@ -3203,7 +3241,11 @@ export class SegmentButton extends ViewPU {
         this.isCurrentPositionSelected = false;
         this.isPanGestureMoved = false;
         this.swipeHandled = false;
-        if (this.isBackgroundSystemMaterialEnabled()) {
+        if (!this.isBackgroundSystemMaterialEnabled() &&
+          this.options?.interactionMode === SegmentButtonInteractionMode.FOLLOWING_DRAG) {
+          this.selectedItemOffsetX = 0;
+        }
+        if (this.isMaterialInteractionEnabled()) {
           this.finishSelectMaterialAnimation();
         }
       });
@@ -3483,6 +3525,17 @@ export class SegmentButton extends ViewPU {
     If.pop();
     Stack.pop();
   }
+  isFollowingDragEnabled(isMaterialEnabled) {
+    return this.options?.interactionMode === SegmentButtonInteractionMode.FOLLOWING_DRAG ||
+      (isMaterialEnabled &&
+        this.options?.interactionMode !== SegmentButtonInteractionMode.NORMAL_DRAG);
+  }
+
+  isMaterialInteractionEnabled() {
+    // Material feedback is independent of drag positioning and selection timing.
+    return this.isBackgroundSystemMaterialEnabled();
+  }
+
   isBackgroundSystemMaterialEnabled() {
     return this.options !== undefined && this.options.backgroundSystemMaterial !== undefined;
   }
@@ -3542,6 +3595,9 @@ export class SegmentButton extends ViewPU {
     return curves.springMotion(0.347, 0.99);
   }
   updateAnimatedProperty(curve) {
+    // Cross-item selection must not replay material press/release while dragging.
+    const isNormalDragSelection = this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG &&
+      this.isGestureInProgress && !this.isTapGesture;
     let setAnimatedPropertyFunc = () => {
       this.selectedItemOffsetX = 0;
       this.buttonItemsSelected.forEach((selected, index) => {
@@ -3559,7 +3615,7 @@ export class SegmentButton extends ViewPU {
       this.isTapGesture = false;
       return;
     }
-    if (this.options.backgroundSystemMaterial) {
+    if (this.options.backgroundSystemMaterial && !isNormalDragSelection) {
       if (this.isTapGesture) {
         this.openSelectedItemSystemMaterial = true;
         this.getUIContext().animateTo({ curve: curve }, setAnimatedPropertyFunc);
@@ -3794,4 +3850,5 @@ export default {
   SegmentButtonItemOptionsArray,
   SegmentButtonItemOptions,
   BorderRadiusMode,
+  SegmentButtonInteractionMode,
 };

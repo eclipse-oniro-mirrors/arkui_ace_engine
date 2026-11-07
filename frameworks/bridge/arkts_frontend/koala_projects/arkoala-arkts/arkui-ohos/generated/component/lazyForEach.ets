@@ -46,6 +46,7 @@ export interface LazyForEachOptions {
     customComponentFreezeMode?: LazyForEachCustomComponentFreezeMode;
     releaseStrategy?: LazyForEachReleaseStrategy;
     memoryOptimizationStrategy?: LazyForEachMemOptStrategy;
+    controller?: object;
 }
 export interface DataAddOperation {
     type: DataOperationType;
@@ -116,6 +117,14 @@ export class LazyForEachOptions_serializer {
         } else {
             valueSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
+        const valueHolderForController = value.controller
+        if (valueHolderForController !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForControllerTmpValue = valueHolderForController!
+            valueSerializer.writeCustomObject('object', valueHolderForControllerTmpValue)
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
     }
     public static read(buffer: DeserializerBase): LazyForEachOptions {
         let valueDeserializer: DeserializerBase = buffer
@@ -137,7 +146,13 @@ export class LazyForEachOptions_serializer {
             memoryOptimizationStrategyTmpBuf = LazyForEachMemOptStrategy.fromValue(valueDeserializer.readInt32())
         }
         const memoryOptimizationStrategyTmpResult: LazyForEachMemOptStrategy | undefined = memoryOptimizationStrategyTmpBuf
-        let value: LazyForEachOptions = ({customComponentFreezeMode: customComponentFreezeModeTmpResult, releaseStrategy: releaseStrategyTmpResult, memoryOptimizationStrategy: memoryOptimizationStrategyTmpResult} as LazyForEachOptions)
+        const controllerTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let controllerTmpBuf: object | undefined = undefined
+        if ((controllerTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            controllerTmpBuf = (valueDeserializer.readCustomObject('object') as object)
+        }
+        const controllerTmpResult: object | undefined = controllerTmpBuf
+        let value: LazyForEachOptions = ({customComponentFreezeMode: customComponentFreezeModeTmpResult, releaseStrategy: releaseStrategyTmpResult, memoryOptimizationStrategy: memoryOptimizationStrategyTmpResult, controller: controllerTmpResult} as LazyForEachOptions)
         return value
     }
 }

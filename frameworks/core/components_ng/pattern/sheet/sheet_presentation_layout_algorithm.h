@@ -32,6 +32,7 @@
 #include "core/components_ng/pattern/sheet/sheet_style.h"
 
 namespace OHOS::Ace::NG {
+
 class ACE_EXPORT SheetPresentationLayoutAlgorithm : public LinearLayoutAlgorithm {
     DECLARE_ACE_TYPE(SheetPresentationLayoutAlgorithm, LayoutAlgorithm);
 
@@ -88,6 +89,7 @@ private:
     void ComputeCenterStyleOffset(LayoutWrapper* layoutWrapper);
     void ComputeCenterOffsetForUECSubwindow(LayoutWrapper* layoutWrapper);
     void ComputeCenterOffsetForNotUECSubwindow(LayoutWrapper* layoutWrapper);
+    float ComputeHandednessOffsetX(LayoutWrapper* layoutWrapper, float defaultCenterX);
     void ComputePopupStyleOffset(LayoutWrapper* layoutWrapper);
     void ComputeWidthAndHeight(LayoutWrapper* layoutWrapper);
     float ComputeMaxHeight(const float parentConstraintHeight, const float parentConstraintWidth,

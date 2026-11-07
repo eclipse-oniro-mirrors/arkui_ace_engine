@@ -41,6 +41,8 @@ public:
     void OnAttachToMainTree() override;
     void OnModifyDone() override;
     void BeforeCreateLayoutWrapper() override;
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
     bool IsAtomicNode() const override;
@@ -50,6 +52,7 @@ public:
     ScopeFocusAlgorithm GetScopeFocusAlgorithm() override;
     AdjustOffset GetAdjustOffset() const override;
     AdjustOffset GetAndResetAdjustOffset() override;
+    std::optional<LazyPremeasureResult> Premeasure(LayoutWrapper* wrapper) override;
     bool HasStickyHeader() const override;
 
     void SetOnVisibleIndexesChange(std::function<void(int32_t, int32_t)>&& onVisibleIndexesChange);
@@ -90,7 +93,10 @@ public:
     StickyStyle GetStickyStyle() const;
 
 private:
+    bool ApplyPreparedGeometry(const PreparedLayoutGeometry& geometry) override;
+
     bool OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config) override;
+    void ResetPremeasuredMainSizeIfGone(const RefPtr<LayoutWrapper>& dirty);
     // Validate a header / footer candidate. isHeader picks which side is the peerEdge.
     bool IsValidHeaderFooter(const RefPtr<UINode>& edge, bool isHeader) const;
     // Sync header/footer positions in the child sequence (header first, footer last). markDirty controls whether to

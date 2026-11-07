@@ -494,48 +494,70 @@ void ScrollBar::SetGestureEvent()
     if (!touchEvent_) {
         touchEvent_ = MakeRefPtr<TouchEventImpl>([weak = WeakClaim(this)](const TouchEventInfo& info) {
             auto scrollBar = weak.Upgrade();
-            CHECK_NULL_VOID(scrollBar && scrollBar->IsScrollable());
-            CHECK_NULL_VOID(scrollBar->GetScrollBarInteractive());
-            if (info.GetTouches().empty()) {
-                return;
-            }
-            auto touch = info.GetTouches().front();
-            if (touch.GetTouchType() == TouchType::DOWN) {
-                TAG_LOGI(AceLogTag::ACE_SCROLL_BAR, "inner scrollBar touch down, panDirection: %{public}u",
-                    scrollBar->GetPanDirection());
-                Point point(touch.GetLocalLocation().GetX(), touch.GetLocalLocation().GetY());
-                bool inRegion = false;
-                if (info.GetSourceDevice() == SourceType::TOUCH) {
-                    inRegion = scrollBar->InBarTouchRegion(point);
-                } else if (info.GetSourceDevice() == SourceType::MOUSE) {
-                    inRegion = scrollBar->InBarHoverRegion(point);
-                    scrollBar->MarkNeedRender();
-                }
-                if (inRegion) {
-                    scrollBar->fingerId_ = touch.GetFingerId();
-                }
-                if (!scrollBar->IsPressed()) {
-                    scrollBar->SetPressed(inRegion);
-                }
-                if (inRegion && !scrollBar->IsHover()) {
-                    scrollBar->PlayScrollBarGrowAnimation();
-                }
-            }
-            if ((info.GetTouches().front().GetTouchType() == TouchType::UP ||
-                    info.GetTouches().front().GetTouchType() == TouchType::CANCEL) &&
-                    (scrollBar->fingerId_ == info.GetTouches().front().GetFingerId())) {
-                if (scrollBar->IsPressed() && !scrollBar->IsHover()) {
-                    scrollBar->PlayScrollBarShrinkAnimation();
-                    scrollBar->ScheduleDisappearDelayTask();
-                }
-                scrollBar->SetPressed(false);
-                scrollBar->fingerId_ = OGN_FIGNERID;
-                scrollBar->MarkNeedRender();
-            }
+            CHECK_NULL_VOID(scrollBar);
+            scrollBar->HandleTouchEvent(info);
         });
     }
     if (!panRecognizer_) {
         InitPanRecognizer();
+    }
+}
+
+void ScrollBar::HandleTouchEvent(const TouchEventInfo& info)
+{
+    CHECK_NULL_VOID(IsScrollable() && GetScrollBarInteractive());
+    if (info.GetTouches().empty()) {
+        return;
+    }
+    const auto& touch = info.GetTouches().front();
+    if (touch.GetTouchType() == TouchType::DOWN) {
+        HandleTouchDown(info, touch);
+    } else if (touch.GetTouchType() == TouchType::UP || touch.GetTouchType() == TouchType::CANCEL) {
+        HandleTouchUp(touch);
+    }
+}
+
+void ScrollBar::HandleTouchDown(const TouchEventInfo& info, const TouchLocationInfo& touch)
+{
+    TAG_LOGI(AceLogTag::ACE_SCROLL_BAR, "inner scrollBar touch down, panDirection: %{public}u", GetPanDirection());
+    Point point(touch.GetLocalLocation().GetX(), touch.GetLocalLocation().GetY());
+    bool inRegion = false;
+    if (info.GetSourceDevice() == SourceType::TOUCH) {
+        inRegion = InBarTouchRegion(point);
+    } else if (info.GetSourceDevice() == SourceType::MOUSE) {
+        inRegion = InBarHoverRegion(point);
+        MarkNeedRender();
+    }
+    if (inRegion) {
+        fingerId_ = touch.GetFingerId();
+    }
+    if (!IsPressed()) {
+        SetPressed(inRegion);
+    }
+    if (!inRegion || IsHover()) {
+        return;
+    }
+    NotifyTouchState(true);
+    PlayScrollBarGrowAnimation();
+}
+
+void ScrollBar::HandleTouchUp(const TouchLocationInfo& touch)
+{
+    CHECK_NE_VOID(fingerId_, touch.GetFingerId());
+    if (IsPressed() && !IsHover()) {
+        PlayScrollBarShrinkAnimation();
+        ScheduleDisappearDelayTask();
+        NotifyTouchState(false);
+    }
+    SetPressed(false);
+    fingerId_ = OGN_FIGNERID;
+    MarkNeedRender();
+}
+
+void ScrollBar::NotifyTouchState(bool isPressed)
+{
+    if (touchStateCallback_) {
+        touchStateCallback_(isPressed);
     }
 }
 
@@ -1160,6 +1182,63 @@ void ScrollBar::GetPanDirectionDumpInfo()
     }
 }
 
+void ScrollBar::DumpAdvanceHistoryInfo(std::unique_ptr<JsonValue>& json)
+{
+    std::unique_ptr<JsonValue> children = JsonUtil::CreateArray(true);
+    for (const auto& info : innerScrollBarLayoutInfos_) {
+        std::unique_ptr<JsonValue> child = JsonUtil::Create(true);
+        info.ToJson(child);
+        children->Put(child);
+    }
+    json->Put("innerScrollBarLayoutInfos", children);
+}
+
+void ScrollBar::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    const bool isPublicTree = config.IsPublicTree();
+    if (!isPublicTree || config.visualProperties) {
+        json->Put("activeRect", activeRect_.ToString().c_str());
+        json->Put("trackRect", trackRect_.ToString().c_str());
+        json->Put("touchRegion", touchRegion_.ToString().c_str());
+        json->Put("hoverRegion", hoverRegion_.ToString().c_str());
+        json->Put("normalWidth", normalWidth_.ToString().c_str());
+        json->Put("activeWidth", activeWidth_.ToString().c_str());
+        json->Put("touchWidth", touchWidth_.ToString().c_str());
+        json->Put("hoverWidth", hoverWidth_.ToString().c_str());
+        GetShapeModeDumpInfo(json);
+        GetPositionModeDumpInfo(json);
+        if (!isPublicTree) {
+            GetAxisDumpInfo(json);
+            GetPanDirectionDumpInfo(json);
+        }
+        json->Put("hostBorderRadius", hostBorderRadius_.ToString().c_str());
+        json->Put("startReservedHeight", startReservedHeight_.ToString().c_str());
+        json->Put("endReservedHeight", endReservedHeight_.ToString().c_str());
+        // Public output keeps an already emitted host property instead of duplicating its key.
+        if (!isPublicTree || !json->Contains("scrollBarHeight")) {
+            json->Put("scrollBarHeight", scrollBarHeight_.ToString().c_str());
+        }
+        json->Put("scrollBarStartMargin", scrollBarStartMargin_.ToString().c_str());
+        if (!isPublicTree || (scrollBarMargin_.has_value() && !json->Contains("scrollBarMargin"))) {
+            json->Put("scrollBarMargin", scrollBarMargin_.value_or(ScrollBarMargin()).ToString().c_str());
+        }
+    }
+    if (!isPublicTree || config.functionalProperties) {
+        if (isPublicTree) {
+            json->Put("autoAdjustScrollBarMargin", static_cast<bool>(autoAdjustScrollBarMargin_.value_or(false)));
+            json->Put("isScrollable", isScrollable_);
+            json->Put("isReverse", isReverse_);
+        } else {
+            json->Put("autoAdjustScrollBarMargin", autoAdjustScrollBarMargin_.value_or(false) ? "true" : "false");
+            json->Put("isScrollable", std::to_string(isScrollable_).c_str());
+            json->Put("isReverse", std::to_string(isReverse_).c_str());
+        }
+    }
+    if (!isPublicTree) {
+        DumpAdvanceHistoryInfo(json);
+    }
+}
+
 void ScrollBar::DumpAdvanceInfo()
 {
     DumpLog::GetInstance().AddDesc(std::string("activeRect: ").append(activeRect_.ToString()));
@@ -1421,34 +1500,6 @@ void ScrollBar::GetPanDirectionDumpInfo(std::unique_ptr<JsonValue>& json)
 
 void ScrollBar::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    json->Put("activeRect", activeRect_.ToString().c_str());
-    json->Put("trackRect", trackRect_.ToString().c_str());
-    json->Put("touchRegion", touchRegion_.ToString().c_str());
-    json->Put("hoverRegion", hoverRegion_.ToString().c_str());
-    json->Put("normalWidth", normalWidth_.ToString().c_str());
-    json->Put("activeWidth", activeWidth_.ToString().c_str());
-    json->Put("touchWidth", touchWidth_.ToString().c_str());
-    json->Put("hoverWidth", hoverWidth_.ToString().c_str());
-    GetShapeModeDumpInfo(json);
-    GetPositionModeDumpInfo(json);
-    GetAxisDumpInfo(json);
-    GetPanDirectionDumpInfo(json);
-    json->Put("hostBorderRadius", hostBorderRadius_.ToString().c_str());
-    json->Put("startReservedHeight", startReservedHeight_.ToString().c_str());
-    json->Put("endReservedHeight", endReservedHeight_.ToString().c_str());
-    json->Put("scrollBarHeight", scrollBarHeight_.ToString().c_str());
-    json->Put("scrollBarStartMargin", scrollBarStartMargin_.ToString().c_str());
-    json->Put("scrollBarMargin", scrollBarMargin_.value_or(ScrollBarMargin()).ToString().c_str());
-    json->Put("autoAdjustScrollBarMargin", autoAdjustScrollBarMargin_.value_or(false) ? "true" : "false");
-    json->Put("isScrollable", std::to_string(isScrollable_).c_str());
-    json->Put("isReverse", std::to_string(isReverse_).c_str());
-
-    std::unique_ptr<JsonValue> children = JsonUtil::CreateArray(true);
-    for (const auto& info : innerScrollBarLayoutInfos_) {
-        std::unique_ptr<JsonValue> child = JsonUtil::Create(true);
-        info.ToJson(child);
-        children->Put(child);
-    }
-    json->Put("innerScrollBarLayoutInfos", children);
+    ScrollBar::DumpAdvanceInfo(json, ParamConfig());
 }
 } // namespace OHOS::Ace::NG

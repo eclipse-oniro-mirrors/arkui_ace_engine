@@ -28,7 +28,7 @@
 #include "frameworks/core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace {
-class ACE_EXPORT SubContainer : public virtual AceType {
+class ACE_EXPORT SubContainer : public AceType {
     DECLARE_ACE_TYPE(SubContainer, AceType);
 
 public:

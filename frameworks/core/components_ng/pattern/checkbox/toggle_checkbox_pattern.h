@@ -92,6 +92,11 @@ public:
         return RET_SUCCESS;
     }
 
+    CommandResult OnInjectionEventWithResult(const std::string& command) override
+    {
+        return ConvertLegacyInjectionEventResult(command, { "onToggleChange" }, CommandErrorType::EXECUTE_FAIL);
+    }
+
     bool ReportInjectionResult(bool isSuccess, const std::string& reason)
     {
 #ifndef CROSS_PLATFORM

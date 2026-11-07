@@ -40,6 +40,10 @@ public:
     {
         return nullptr;
     }
+    virtual bool HasChildTree(int64_t elementId)
+    {
+        return false;
+    }
 };
 } // namespace OHOS::Ace
 

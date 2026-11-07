@@ -45,10 +45,15 @@ public:
     static ArkUINativeModuleValue GetAttachedFrameNodeById(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue RequireDynamicSyncScene(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue EnableEventPassthrough(ArkUIRuntimeCallInfo* runtimeCallInfo);
+    static ArkUINativeModuleValue SetTransPageEnabled(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue SetFrameRateRange(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue SetMarqueeFrameRateRange(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue LoadNativeModule(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue GetPageRootNode(ArkUIRuntimeCallInfo* runtimeCallInfo);
+#ifdef MODAL_UI_EXTENSION_SUPPORTED
+    static ArkUINativeModuleValue CreateModalUIExtension(ArkUIRuntimeCallInfo* runtimeCallInfo);
+    static ArkUINativeModuleValue CloseModalUIExtension(ArkUIRuntimeCallInfo* runtimeCallInfo);
+#endif
     // ArkTSCard start
     static ArkUINativeModuleValue GetArkUINativeModuleForm(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static void RegisterArkUINativeModuleFormLite(Local<panda::ObjectRef> object, EcmaVM* vm);
@@ -80,6 +85,7 @@ private:
     static void RegisterEmbeddedComponentAttributes(Local<panda::ObjectRef> object, EcmaVM* vm);
 #endif
     static void RegisterContainerPickerAttributes(Local<panda::ObjectRef> object, EcmaVM* vm);
+    static void RegisterScrollPlaceholderRegisterModule(Local<panda::ObjectRef> object, EcmaVM* vm);
     static void RegisterGlobalMethods(Local<panda::ObjectRef> object, EcmaVM* vm);
     static void RegisterNativeUtils(Local<panda::ObjectRef> object, EcmaVM* vm);
     static void RegisterCommonAttributes(Local<panda::ObjectRef> object, EcmaVM* vm);

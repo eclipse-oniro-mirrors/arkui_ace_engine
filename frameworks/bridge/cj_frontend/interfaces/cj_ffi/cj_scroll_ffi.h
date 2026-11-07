@@ -97,6 +97,8 @@ CJ_EXPORT void FfiOHOSAceFrameworkScrollEnablePaging(bool enablePaging);
 CJ_EXPORT void FfiOHOSAceFrameworkScrollInteraction(bool interaction);
 CJ_EXPORT void FfiOHOSAceFrameworkScrollFriction(double friction);
 CJ_EXPORT void FfiOHOSAceFrameworkScrollEdgeEffect(int32_t edgeEffect, bool alwaysEnabled);
+CJ_EXPORT void FfiOHOSAceFrameworkScrollEdgeEffectWithOptions(
+    int32_t edgeEffect, bool alwaysEnabled, int32_t effectEdge);
 CJ_EXPORT void FfiOHOSAceFrameworkScrollScrollsnap(ScrollSnapOptionsParams params);
 CJ_EXPORT void FfiOHOSAceFrameworkScrollInitialOffset(float xOffset, int32_t xUnit, float yOffset, int32_t yUnit);
 CJ_EXPORT void FfiOHOSAceFrameworkScrollOnScroll(void (*callback)(CJOffset offset));

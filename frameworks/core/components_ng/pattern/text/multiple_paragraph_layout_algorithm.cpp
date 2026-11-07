@@ -198,8 +198,10 @@ void MultipleParagraphLayoutAlgorithm::ConstructTextStyles(
     textStyle.SetMinimumLineHeight(textLayoutProperty->GetMinimumLineHeight());
     textStyle.SetMaximumLineHeight(textLayoutProperty->GetMaximumLineHeight());
     textStyle.SetOrphanCharOptimization(textLayoutProperty->GetOrphanCharOptimizationValue(false));
-    textStyle.SetIncludeFontPadding(textLayoutProperty->GetIncludeFontPaddingValue(false));
-    textStyle.SetFallbackLineSpacing(textLayoutProperty->GetFallbackLineSpacingValue(false));
+    textStyle.SetIncludeFontPadding(textLayoutProperty->GetIncludeFontPaddingValue(
+        pipeline->GetConfigTextStyleOptimizeFlag()));
+    textStyle.SetFallbackLineSpacing(textLayoutProperty->GetFallbackLineSpacingValue(
+        pipeline->GetConfigTextStyleOptimizeFlag()));
     // Determines whether a foreground color is set or inherited.
     UpdateTextColorIfForeground(frameNode, textStyle, layoutTextColor, textColor);
     // Stroke color defaults to the font color when only stroke width is set.
@@ -455,7 +457,7 @@ void MultipleParagraphLayoutAlgorithm::FontRegisterCallback(
         frameNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
         auto pattern = frameNode->GetPattern<TextPattern>();
         CHECK_NULL_VOID(pattern);
-        auto modifier = DynamicCast<TextContentModifier>(pattern->GetContentModifier());
+        auto modifier = pattern->GetContentModifier();
         CHECK_NULL_VOID(modifier);
         modifier->SetFontReady(true);
         TAG_LOGI(AceLogTag::ACE_TEXT, "FontRegisterCallback callback id:%{public}d", frameNode->GetId());
@@ -478,7 +480,7 @@ void MultipleParagraphLayoutAlgorithm::FontRegisterCallback(
             auto pattern = frameNode->GetPattern<TextPattern>();
             CHECK_NULL_VOID(pattern);
             pattern->SetIsCustomFont(true);
-            auto modifier = DynamicCast<TextContentModifier>(pattern->GetContentModifier());
+            auto modifier = pattern->GetContentModifier();
             CHECK_NULL_VOID(modifier);
             modifier->SetIsCustomFont(true);
         }

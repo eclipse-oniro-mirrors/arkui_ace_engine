@@ -29,10 +29,13 @@
 #include "base/log/log_wrapper.h"
 #include "base/utils/system_properties.h"
 #include "base/utils/utils.h"
+#include "base/input_manager/input_manager.h"
 #include "core/common/container.h"
 #include "core/common/event_manager.h"
 #include "core/components/theme/app_theme.h"
 #include "core/components_ng/event/error_reporter/general_interaction_error_reporter.h"
+#include "core/components_ng/base/node_sensitive_input.h"
+#include "core/components_ng/event/event_constants.h"
 #include "core/components_ng/event/event_hub.h"
 #include "core/components_ng/event/focus_hub.h"
 #include "core/components_ng/event/gesture_event_hub.h"
@@ -69,6 +72,31 @@ RefPtr<FrameNode> SmartGestureProposal::GetTargetNode() const
 namespace {
 constexpr double HALF_DIVISOR = 2.0;
 constexpr int32_t CENTER_HIT_TEST_TOUCH_ID = 0;
+
+bool RejectAgentSmartGestureClick(const RefPtr<FrameNode>& node, const KeyEvent& event)
+{
+    CHECK_NULL_RETURN(node, false);
+    if (!event.isAgent || !InputManager::HasControlComponentPermission() ||
+        node->GetAgentControlMode() != AgentControlMode::DENY) {
+        return false;
+    }
+    if (event.hasSafSessionId && node->HasAgentControlMode()) {
+        auto compId = node->GetInspectorId().value_or("");
+        if (compId.empty()) {
+            compId = std::to_string(node->GetId());
+        }
+        AgentInputResult result;
+        result.sessionId = event.safSessionId;
+        result.callingUid = event.callingUid;
+        result.instanceId = Container::CurrentId();
+        result.nodeId = node->GetId();
+        result.compId = compId;
+        result.tag = node->GetTag();
+        result.allowed = false;
+        InputManager::ReportAgentInputDecision(result);
+    }
+    return true;
+}
 
 SmartGestureProposal BuildNoneActionProposal(SmartGestureTrigger trigger)
 {
@@ -230,7 +258,7 @@ void CollectPanGestureNodes(std::vector<RefPtr<FrameNode>>& centerHitPath, std::
     }
 
     for (const auto& childRecognizer : recognizerGroup->GetGroupRecognizer()) {
-        auto childGestureRecognizer = AceType::DynamicCast<NGGestureRecognizer>(childRecognizer);
+        auto childGestureRecognizer = childRecognizer;
         CollectPanGestureNodes(centerHitPath, visitedNodeIds, childGestureRecognizer);
     }
 }
@@ -384,6 +412,7 @@ void SmartGestureManager::RefreshProductGestureEnabled()
 
 void SmartGestureManager::SetMonitor(SmartGestureMonitor&& callback)
 {
+    std::lock_guard<std::mutex> lock(monitorMutex_);
     monitorCallback_ = std::move(callback);
 }
 
@@ -573,6 +602,7 @@ RefPtr<PipelineContext> SmartGestureManager::GetPipelineContext() const
 
 SmartGestureManager::SmartGestureMonitor SmartGestureManager::GetMonitorHandle() const
 {
+    std::lock_guard<std::mutex> lock(monitorMutex_);
     return monitorCallback_;
 }
 
@@ -701,6 +731,14 @@ void SmartGestureManager::RevealSelectedNodeIfNeeded(const RefPtr<FrameNode>& no
 void SmartGestureManager::PaintSelectedNode(const RefPtr<FrameNode>& node)
 {
     CHECK_NULL_VOID(node);
+    auto renderContext = node->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    auto paintRect = renderContext->GetPaintRectWithoutTransform();
+    if (paintRect.Width() <= 0 || paintRect.Height() <= 0) {
+        TAG_LOGI(AceLogTag::ACE_GESTURE,
+            "paintSelectedNode skipped, node not laid out, deferred until SyncGeometryNode retry");
+        return;
+    }
     auto focusHub = node->GetFocusHub();
     if (focusHub && focusHub->PaintFocusStateToRenderContext()) {
         selectedPaintedNode_ = node;
@@ -708,8 +746,6 @@ void SmartGestureManager::PaintSelectedNode(const RefPtr<FrameNode>& node)
     }
     auto context = GetPipelineContext();
     CHECK_NULL_VOID(context);
-    auto renderContext = node->GetRenderContext();
-    CHECK_NULL_VOID(renderContext);
     auto appTheme = context->GetTheme<AppTheme>();
     CHECK_NULL_VOID(appTheme);
     renderContext->PaintFocusState(appTheme->GetFocusOutPaddingVp(), appTheme->GetFocusColor(),
@@ -966,6 +1002,10 @@ bool SmartGestureManager::ExecuteClickProposal(const RefPtr<FrameNode>& node, co
         return false;
     }
     UpdateSelectedNode(node);
+    if (RejectAgentSmartGestureClick(node, event)) {
+        ReportSmartGestureError(GetPipelineContext(), BuildSmartGestureErrorTag("agent click denied", node));
+        return false;
+    }
     auto dispatchResult = DispatchSmartGestureClick(node, event);
     if (!dispatchResult) {
         ReportSmartGestureError(GetPipelineContext(), BuildSmartGestureErrorTag("click dispatch failed", node));

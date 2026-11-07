@@ -23,9 +23,11 @@ namespace OHOS::Ace {
 
 void LifeCycleCheckable::OnDetectedObjDestroyInUse()
 {
+#ifdef ACE_DEBUG
     if (SystemProperties::DetectObjDestroyInUse()) {
         LOGF_ABORT("this object is still in use, use_count=%{public}d", usingCount_.load());
     }
+#endif
 }
 
 void Referenced::OnDetectedClaimDeathObj(bool isNewOrRecycle)

@@ -15,6 +15,8 @@
 
 #include "core/components_ng/pattern/grid/grid_layout_base_algorithm.h"
 
+#include "base/log/log_wrapper.h"
+#include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_observer.h"
 #include "core/components_ng/pattern/grid/grid_item_model_ng.h"
 #include "core/components_ng/pattern/grid/grid_item_layout_property.h"
@@ -22,6 +24,7 @@
 #include "core/components_ng/pattern/grid/grid_layout_property.h"
 #include "core/components_ng/pattern/grid/grid_pattern.h"
 #include "core/components_ng/pattern/scrollable/scrollable_paint_property.h"
+#include "core/components_ng/pattern/scrollable/scrollable_utils.h"
 #include "core/components_ng/pattern/grid/grid_layout_base_algorithm.h"
 #include "core/components_ng/property/measure_utils.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -324,6 +327,22 @@ RefPtr<LayoutWrapper> GridLayoutBaseAlgorithm::GetGridItem(
     LayoutWrapper* layoutWrapper, int32_t index, bool addToRenderTree, bool isCache)
 {
     const auto& layoutProperty = DynamicCast<GridLayoutProperty>(layoutWrapper->GetLayoutProperty());
+    // Scroll placeholder acquisition pre-check (ADR-2/ADR-7, 2026-10-12): the
+    // budget decision and shell mounting stay with the pattern (it owns the frame
+    // context); the index->wrapper substitution itself executes in
+    // FrameProxy::GetFrameNodeByIndex, gated by an explicit per-acquisition
+    // declaration. Only a fill loop of an enabled host passes the declaration
+    // down, so every other caller of the host acquisition keeps the unmodified
+    // semantics. Cache/preload paths never substitute.
+    bool allowPlaceholderSubstitution = false;
+    if (!isCache && layoutWrapper) {
+        const auto& host = layoutWrapper->GetHostNode();
+        const auto& pattern = host ? host->GetPattern<GridPattern>() : nullptr;
+        if (pattern && pattern->IsScrollPlaceholderEnabled()) {
+            pattern->PrepareScrollPlaceholderForAcquisition(index);
+            allowPlaceholderSubstitution = true;
+        }
+    }
     // Scroll placeholder load observation at the Grid child build call point: predict before
     // the real builder runs on an unbuilt index and sample its duration afterwards. Observation
     // only; the dummy empty-branch fallback is reported after the acquisition so it never feeds
@@ -331,15 +350,95 @@ RefPtr<LayoutWrapper> GridLayoutBaseAlgorithm::GetGridItem(
     ScrollPlaceholderItemBuildScope buildScope(
         ScrollPlaceholderComponentType::GRID, layoutWrapper, index, isCache);
     if (layoutProperty->GetSupportLazyLoadingEmptyBranch().value_or(false)) {
-        auto wrapper = layoutWrapper->GetOrCreateChildByIndex(index, addToRenderTree, isCache);
+        auto wrapper = layoutWrapper->GetOrCreateChildByIndex(
+            index, addToRenderTree, isCache, allowPlaceholderSubstitution);
         buildScope.SetAcquiredWrapper(wrapper);
         if (!wrapper) {
             wrapper = CreateDummyGridItemChild();
         }
         return wrapper;
     }
-    auto wrapper = layoutWrapper->GetOrCreateChildByIndex(index, addToRenderTree, isCache);
+    auto wrapper = layoutWrapper->GetOrCreateChildByIndex(
+        index, addToRenderTree, isCache, allowPlaceholderSubstitution);
     buildScope.SetAcquiredWrapper(wrapper);
     return wrapper;
+}
+
+void GridLayoutBaseAlgorithm::UpdateGridDecodeCacheWindow(
+    LayoutWrapper* layoutWrapper, int32_t cacheCount, bool expandToFullMatrix)
+{
+    CHECK_NULL_VOID(layoutWrapper);
+    if (!ScrollableUtils::IsLowMemoryDeviceRuntime()) {
+        return;
+    }
+    auto host = layoutWrapper->GetHostNode();
+    CHECK_NULL_VOID(host);
+    auto props = host->GetLayoutProperty<GridLayoutProperty>();
+    CHECK_NULL_VOID(props);
+    if (props->GetShowCachedItemsValue(false)) {
+        return;
+    }
+    if (cacheCount <= 0 || info_.gridMatrix_.empty()) {
+        return;
+    }
+    const int32_t decodeWindow = ScrollableUtils::CalcDecodeWindowCount(cacheCount);
+    if (decodeWindow <= 0) {
+        return;
+    }
+    const int32_t startLine = info_.startMainLineIndex_;
+    const int32_t endLine = info_.endMainLineIndex_;
+    TAG_LOGD(AceLogTag::ACE_GRID,
+        "decode window: cacheCount=%{public}d, window=%{public}d, visible=[%{public}d,%{public}d], "
+        "decode=[%{public}d,%{public}d], cache=[%{public}d,%{public}d]",
+        cacheCount, decodeWindow, startLine, endLine,
+        startLine - decodeWindow, endLine + decodeWindow,
+        startLine - cacheCount, endLine + cacheCount);
+    auto decodeItems = CollectDecodeItems(startLine - decodeWindow, endLine + decodeWindow);
+    int32_t cacheStartLine = startLine - cacheCount;
+    int32_t cacheEndLine = endLine + cacheCount;
+    if (expandToFullMatrix) {
+        cacheStartLine = std::min(cacheStartLine, info_.gridMatrix_.begin()->first);
+        cacheEndLine = std::max(cacheEndLine, info_.gridMatrix_.rbegin()->first);
+    }
+    ApplyItemDecodeState(host, cacheStartLine, cacheEndLine, decodeItems);
+}
+
+std::set<int32_t> GridLayoutBaseAlgorithm::CollectDecodeItems(int32_t decodeStartLine, int32_t decodeEndLine) const
+{
+    std::set<int32_t> decodeItems;
+    for (auto lineIt = info_.gridMatrix_.lower_bound(decodeStartLine);
+         lineIt != info_.gridMatrix_.end() && lineIt->first <= decodeEndLine; ++lineIt) {
+        for (const auto& entry : lineIt->second) {
+            int32_t itemIdx = entry.second;
+            decodeItems.insert(itemIdx < 0 ? -itemIdx : itemIdx);
+        }
+    }
+    return decodeItems;
+}
+
+void GridLayoutBaseAlgorithm::ApplyItemDecodeState(
+    const RefPtr<FrameNode>& host, int32_t cacheStartLine, int32_t cacheEndLine, const std::set<int32_t>& decodeItems)
+{
+    CHECK_NULL_VOID(host);
+    std::set<int32_t> processed;
+    std::set<int32_t> processedNodeIds;
+    for (auto lineIt = info_.gridMatrix_.lower_bound(cacheStartLine);
+         lineIt != info_.gridMatrix_.end() && lineIt->first <= cacheEndLine; ++lineIt) {
+        for (const auto& entry : lineIt->second) {
+            int32_t itemIdx = entry.second;
+            itemIdx = itemIdx < 0 ? -itemIdx : itemIdx;
+            if (processed.count(itemIdx) > 0) {
+                continue;
+            }
+            processed.insert(itemIdx);
+            bool active = decodeItems.count(itemIdx) > 0;
+            auto itemFrameNode = AceType::Claim(host->GetFrameNodeChildByIndexWithoutBuild(itemIdx));
+            CHECK_NULL_CONTINUE(itemFrameNode);
+            if (!processedNodeIds.insert(itemFrameNode->GetId()).second) {
+                continue;
+            }
+            ScrollableUtils::UpdateCachedItemDecodeState(itemFrameNode, active);
+        }
+    }
 }
 } // namespace OHOS::Ace::NG

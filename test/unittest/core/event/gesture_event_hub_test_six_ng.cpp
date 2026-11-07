@@ -60,9 +60,9 @@ HWTEST_F(GestureEventHubTestSixNg, TryDoDragStartAnimation003, TestSize.Level1)
     auto event = gestureEventHub->eventHub_.Upgrade();
     event->host_ = AceType::WeakClaim(AceType::RawPtr(frameNode));
 
-    RefPtr<PipelineContext> context = AceType::DynamicCast<PipelineContext>(NG::MockPipelineContext::pipeline_);
+    RefPtr<PipelineContext> context = NG::MockPipelineContext::pipeline_;
     frameNode->AttachContext(AceType::RawPtr(context));
-    auto pipeline = AceType::DynamicCast<PipelineContext>(context);
+    auto pipeline = context;
     ASSERT_NE(pipeline, nullptr);
 
     auto mockContainer = AceType::MakeRefPtr<MockContainer>(context);

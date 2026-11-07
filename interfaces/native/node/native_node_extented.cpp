@@ -18,6 +18,7 @@
 #include "native_styled_string.h"
 #include "node_extened.h"
 #include "node_model.h"
+#include "config_manager.h"
 #include "styled_string.h"
 
 #include "base/error/error_code.h"
@@ -1947,6 +1948,7 @@ ArkUI_ErrorCode OH_ArkUI_TextEditorSelectionMenuOptions_SetContentNode(
 {
     CHECK_NULL_RETURN(options, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
     CHECK_NULL_RETURN(node, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     options->contentNode = node;
     return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
 }
@@ -1956,6 +1958,7 @@ ArkUI_ErrorCode OH_ArkUI_TextEditorSelectionMenuOptions_GetContentNode(
 {
     CHECK_NULL_RETURN(options, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
     CHECK_NULL_RETURN(node, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    CHECK_NODE_DISPOSED(options->contentNode, "Node has been disposed");
     *node = options->contentNode;
     return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
 }

@@ -44,7 +44,6 @@ constexpr int32_t SERVICE_PANEL_PARAM_COUNT = 2;
 constexpr int32_t PARAM_FIRST = 1;
 constexpr int32_t PARAM_ERROR = -1;
 
-static std::map<std::string, std::function<void(const JSCallbackInfo& info)>> nativeFucMap_;
 } // namespace
 
 void JSAppBar::OnMenuClick(const JSCallbackInfo& info)
@@ -214,7 +213,7 @@ void JSAppBar::OnThirdClickCloseEvent(const JSCallbackInfo& info)
 
 void JSAppBar::CallNative(const JSCallbackInfo& info)
 {
-    nativeFucMap_ = {
+    static const std::map<std::string, std::function<void(const JSCallbackInfo& info)>> nativeFucMap_ = {
         { EVENT_NAME_CUSTOM_APP_BAR_MENU_CLICK, JSAppBar::OnMenuClick },
         { EVENT_NAME_CUSTOM_APP_BAR_CLOSE_CLICK, JSAppBar::OnCloseClick },
         { EVENT_NAME_CUSTOM_APP_BAR_CLOSE_CLICK_NG, JSAppBar::RequestAtomicServiceTerminate },
@@ -222,7 +221,7 @@ void JSAppBar::CallNative(const JSCallbackInfo& info)
         { EVENT_NAME_CUSTOM_APP_BAR_CREATE_SERVICE_PANEL, JSAppBar::OnCreateServicePanel },
         { EVENT_NAME_APP_BAR_ON_BACK_PRESSED, JSAppBar::RequestAtomicServiceTerminate },
         { EVENT_NAME_APP_BAR_ON_BACK_PRESSED_CONSUMED, JSAppBar::SetOnBackPressedConsumed },
-         { EVENT_NAME_CUSTOM_APP_BAR_THIRD_CLOSE, JSAppBar::OnThirdClickCloseEvent },
+        { EVENT_NAME_CUSTOM_APP_BAR_THIRD_CLOSE, JSAppBar::OnThirdClickCloseEvent },
     };
 
     if (info.Length() < 1) {

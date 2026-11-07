@@ -102,16 +102,15 @@ void CancelTouchImpl(Ark_TouchRecognizer peer)
     auto eventManager = pipeline->GetEventManager();
     CHECK_NULL_VOID(eventManager);
     auto& touchTestResult = eventManager->touchTestResults_;
-    std::vector<std::pair<int32_t, TouchTestResult::iterator>> legacyTarget;
+    std::vector<std::pair<int32_t, TouchTestResult::value_type>> legacyTarget;
     for (const auto& fingerId : peer->fingerIds_) {
         if (touchTestResult.find(fingerId) == touchTestResult.end()) {
             continue;
         }
         auto& targetsList = touchTestResult[fingerId];
-        auto it = std::find_if(targetsList.begin(), targetsList.end(),
-            [&target](const RefPtr<TouchEventTarget>& t) { return t == target; });
+        auto it = std::find(targetsList.begin(), targetsList.end(), target);
         if (it != targetsList.end()) {
-            legacyTarget.emplace_back(fingerId, it);
+            legacyTarget.emplace_back(fingerId, target);
         }
     }
     eventManager->DispatchTouchCancelToRecognizer(OHOS::Ace::AceType::RawPtr(target), legacyTarget);
@@ -123,7 +122,7 @@ Ark_Boolean IsHostBelongsToImpl(Ark_TouchRecognizer peer,
     CHECK_NULL_RETURN(peer, false);
     auto target = peer->target_.Upgrade();
     CHECK_NULL_RETURN(target, false);
-    auto node = AceType::DynamicCast<FrameNode>(target->GetAttachedNode().Upgrade());
+    auto node = target->GetAttachedNode().Upgrade();
     return Converter::ArkValue<Ark_Boolean>(IsNodeBelongsTo(node, uniqueId));
 }
 } // TouchRecognizerAccessor

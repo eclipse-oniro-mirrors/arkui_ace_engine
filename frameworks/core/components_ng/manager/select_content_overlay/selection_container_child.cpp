@@ -74,19 +74,19 @@ ScrollableParentResult SelectionContainerChild::FindNearestScrollable() const
         selectionContainer = GetSelectionContainerFromNode(node);
     }
     auto containerNode = selectionContainer ? selectionContainer->GetHostNode() : nullptr;
-    auto parent = node->GetAncestorNodeOfFrame(true);
+    auto parent = node->GetCoordinateAncestorNodeOfFrame(true);
     bool passedContainer = false;
     while (parent) {
         if (containerNode && parent == containerNode) {
             passedContainer = true;
-            parent = parent->GetAncestorNodeOfFrame(true);
+            parent = parent->GetCoordinateAncestorNodeOfFrame(true);
             continue;
         }
         auto scrollablePattern = parent->GetPattern<ScrollablePattern>();
         if (scrollablePattern && scrollablePattern->IsScrollable()) {
             return { scrollablePattern, !passedContainer };
         }
-        parent = parent->GetAncestorNodeOfFrame(true);
+        parent = parent->GetCoordinateAncestorNodeOfFrame(true);
     }
     return {};
 }
@@ -101,7 +101,7 @@ void SelectionContainerChild::RegisterChild()
     }
     auto selectionContainerManager = GetSelectionContainerManagerFromNode(node);
     CHECK_NULL_VOID(selectionContainerManager);
-    auto child = AceType::DynamicCast<SelectionContainerChild>(WeakClaim(this).Upgrade());
+    auto child = WeakClaim(this).Upgrade();
     CHECK_NULL_VOID(child);
     selectionContainerManager->RegisterChild(selectionContainerId, child);
 }
@@ -461,7 +461,7 @@ void SelectionContainerChild::UpdateMenuOnWindowSizeChanged(WindowSizeChangeReas
 
 void SelectionContainerChild::ProcessOverlay(const OverlayRequest& request)
 {
-    auto self = AceType::DynamicCast<SelectionContainerChild>(Claim(this));
+    auto self = Claim(this);
     CHECK_NULL_VOID(self);
     auto parentContainer = GetSelectionContainer();
     if (parentContainer) {

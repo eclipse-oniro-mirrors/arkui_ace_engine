@@ -1,0 +1,5 @@
+{
+  "name": "libinspector_tree_provider.so",
+  "version": "1.0.0",
+  "types": "./Index.d.ts"
+}

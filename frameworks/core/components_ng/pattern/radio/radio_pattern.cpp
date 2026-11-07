@@ -74,6 +74,22 @@ void RadioPattern::OnDetachFromFrameNode(FrameNode* frameNode)
     UpdateGroupStatus(frameNode);
 }
 
+void RadioPattern::OnAttachToMainTree()
+{
+    Pattern::OnAttachToMainTree();
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    if (!isPendingGroupValueUpdate_) {
+        return;
+    }
+    isPendingGroupValueUpdate_ = false;
+    auto groupManager = GetGroupManager();
+    CHECK_NULL_VOID(groupManager);
+    auto radioEventHub = GetEventHub<RadioEventHub>();
+    CHECK_NULL_VOID(radioEventHub);
+    groupManager->UpdateRadioGroupValue(radioEventHub->GetGroup(), host->GetId());
+}
+
 void RadioPattern::OnDetachFromMainTree()
 {
     auto host = GetHost();
@@ -121,12 +137,12 @@ void RadioPattern::OnModifyDone()
     CHECK_NULL_VOID(host);
     auto* pipeline = host->GetContext();
     CHECK_NULL_VOID(pipeline);
-    auto radioTheme = pipeline->GetTheme<RadioTheme>();
+    auto radioTheme = host->GetTheme<RadioTheme>(true);
     CHECK_NULL_VOID(radioTheme);
     if (!makeFunc_.has_value() && host->GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWELVE)) {
         auto radioPaintProperty = host->GetPaintProperty<RadioPaintProperty>();
         if (!radioModifier_) {
-            radioModifier_ = AceType::MakeRefPtr<RadioModifier>();
+            radioModifier_ = AceType::MakeRefPtr<RadioModifier>(host);
         }
         if (radioPaintProperty && !radioPaintProperty->HasRadioCheck()) {
             radioPaintProperty->UpdateRadioCheck(false);
@@ -291,7 +307,7 @@ void RadioPattern::ImageNodeCreate()
         auto node = FrameNode::GetOrCreateFrameNode(V2::IMAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
             []() { return AceType::MakeRefPtr<ImagePattern>(); });
         CHECK_NULL_VOID(node);
-        builderChildNode_ = AceType::DynamicCast<FrameNode>(node);
+        builderChildNode_ = node;
         CHECK_NULL_VOID(builderChildNode_);
         auto gesturehub = builderChildNode_->GetOrCreateGestureEventHub();
         CHECK_NULL_VOID(gesturehub);
@@ -302,9 +318,7 @@ void RadioPattern::ImageNodeCreate()
     CHECK_NULL_VOID(radioPaintProperty);
     auto imageProperty = builderChildNode_->GetLayoutProperty<ImageLayoutProperty>();
     CHECK_NULL_VOID(imageProperty);
-    auto* pipeline = host->GetContext();
-    CHECK_NULL_VOID(pipeline);
-    auto radioTheme = pipeline->GetTheme<RadioTheme>();
+    auto radioTheme = host->GetTheme<RadioTheme>(true);
     CHECK_NULL_VOID(radioTheme);
     imageProperty->UpdateUserDefinedIdealSize(GetChildContentSize(radioTheme));
     auto imageSourceInfo = GetImageSourceInfoFromTheme(radioPaintProperty->GetRadioIndicator().value_or(0), radioTheme);
@@ -651,6 +665,7 @@ void RadioPattern::UpdateUncheckStatus(const RefPtr<FrameNode>& frameNode)
         isOnAnimationFlag_ = false;
     }
     preCheck_ = false;
+    isPendingGroupValueUpdate_ = false;
 }
 
 void RadioPattern::startEnterAnimation()
@@ -661,10 +676,10 @@ void RadioPattern::startEnterAnimation()
         DEFAULT_INTERPOLATINGSPRING_MASS, DEFAULT_INTERPOLATINGSPRING_STIFFNESS, DEFAULT_INTERPOLATINGSPRING_DAMPING);
     AnimationOption delayOption;
 
+    auto radioTheme = host->GetTheme<RadioTheme>(true);
+    CHECK_NULL_VOID(radioTheme);
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
-    auto radioTheme = pipeline->GetTheme<RadioTheme>();
-    CHECK_NULL_VOID(radioTheme);
     if (radioTheme->IsCircleDial()) {
         delayOption.SetCurve(Curves::FAST_OUT_SLOW_IN);
         delayOption.SetDelay(DEFAULT_RADIO_ANIMATION_DURATION_CIRCLE);
@@ -702,10 +717,10 @@ void RadioPattern::startExitAnimation()
 
     auto host = GetHost();
     CHECK_NULL_VOID(host);
+    auto radioTheme = host->GetTheme<RadioTheme>(true);
+    CHECK_NULL_VOID(radioTheme);
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
-    auto radioTheme = pipeline->GetTheme<RadioTheme>();
-    CHECK_NULL_VOID(radioTheme);
     if (radioTheme->IsCircleDial()) {
         delayOption.SetCurve(Curves::FAST_OUT_SLOW_IN);
         delayOption.SetDelay(DEFAULT_RADIO_ANIMATION_DURATION_CIRCLE);
@@ -838,8 +853,13 @@ void RadioPattern::UpdateGroupCheckStatus(
     auto radioEventHub = GetEventHub<RadioEventHub>();
     CHECK_NULL_VOID(radioEventHub);
     if (check) {
-        groupManager->UpdateRadioGroupValue(radioEventHub->GetGroup(), frameNode->GetId());
+        if (frameNode->IsOnMainTree()) {
+            groupManager->UpdateRadioGroupValue(radioEventHub->GetGroup(), frameNode->GetId());
+        } else {
+            isPendingGroupValueUpdate_ = true;
+        }
     } else {
+        isPendingGroupValueUpdate_ = false;
         auto radioPaintProperty = frameNode->GetPaintProperty<RadioPaintProperty>();
         CHECK_NULL_VOID(radioPaintProperty);
         radioPaintProperty->UpdateRadioCheck(check);
@@ -899,9 +919,7 @@ void RadioPattern::GetInnerFocusPaintRect(RoundRect& paintRect)
 {
     auto host = GetHost();
     CHECK_NULL_VOID(host);
-    auto* pipeline = host->GetContext();
-    CHECK_NULL_VOID(pipeline);
-    auto radioTheme = pipeline->GetTheme<RadioTheme>();
+    auto radioTheme = host->GetTheme<RadioTheme>(true);
     CHECK_NULL_VOID(radioTheme);
     auto focusPaintPadding = radioTheme->GetFocusPaintPadding().ConvertToPx();
     float outCircleRadius = size_.Width() / 2 + focusPaintPadding;
@@ -920,9 +938,7 @@ FocusPattern RadioPattern::GetFocusPattern() const
 {
     auto host = GetHost();
     CHECK_NULL_RETURN(host, FocusPattern());
-    auto pipeline = host->GetContext();
-    CHECK_NULL_RETURN(pipeline, FocusPattern());
-    auto radioTheme = pipeline->GetTheme<RadioTheme>();
+    auto radioTheme = host->GetTheme<RadioTheme>(true);
     CHECK_NULL_RETURN(radioTheme, FocusPattern());
     FocusPaintParam focusPaintParam;
     if (host->GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWELVE)) {
@@ -1006,7 +1022,7 @@ void RadioPattern::HandleEnabled()
         enabled_ = enabled;
         if (!enabled_ && host->GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWELVE)) {
             if (!radioModifier_) {
-                radioModifier_ = AceType::MakeRefPtr<RadioModifier>();
+                radioModifier_ = AceType::MakeRefPtr<RadioModifier>(host);
             }
             if (!radioPaintProperty->HasRadioCheck() || !radioPaintProperty->GetRadioCheckValue()) {
                 radioModifier_->SetUIStatus(UIStatus::UNSELECTED);
@@ -1163,6 +1179,48 @@ void RadioPattern::SetPrePageIdToLastPageId()
     }
 }
 
+bool RadioPattern::OnThemeScopeUpdate(int32_t themeScopeId)
+{
+    if (!Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY_SIX)) {
+        return false;
+    }
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, false);
+    auto* pipeline = host->GetContext();
+    CHECK_NULL_RETURN(pipeline, false);
+    auto paintProperty = host->GetPaintProperty<RadioPaintProperty>();
+    CHECK_NULL_RETURN(paintProperty, false);
+    auto radioTheme = pipeline->GetTheme<RadioTheme>(themeScopeId);
+    CHECK_NULL_RETURN(radioTheme, false);
+
+    bool needRender = false;
+
+    if (!paintProperty->GetRadioCheckedBackgroundColorSetByUser().value_or(false)) {
+        auto activeColor = radioTheme->GetActiveColor();
+        paintProperty->UpdateRadioCheckedBackgroundColor(activeColor);
+        needRender = true;
+    }
+
+    if (!paintProperty->GetRadioUncheckedBorderColorSetByUser().value_or(false)) {
+        auto inActiveColor = radioTheme->GetInactiveColor();
+        paintProperty->UpdateRadioUncheckedBorderColor(inActiveColor);
+        needRender = true;
+    }
+
+    if (!paintProperty->GetRadioIndicatorColorSetByUser().value_or(false)) {
+        auto pointColor = radioTheme->GetPointColor();
+        paintProperty->UpdateRadioIndicatorColor(pointColor);
+        needRender = true;
+    }
+
+    if (needRender) {
+        ImageNodeCreate();
+        host->MarkModifyDone();
+        host->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
+    }
+    return needRender;
+}
+
 void RadioPattern::OnColorConfigurationUpdate()
 {
     if (!SystemProperties::ConfigChangePerform()) {
@@ -1170,11 +1228,13 @@ void RadioPattern::OnColorConfigurationUpdate()
     }
     auto host = GetHost();
     CHECK_NULL_VOID(host);
+    if (Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY_SIX)) {
+        OnThemeScopeUpdate(host->GetThemeScopeId());
+        return;
+    }
     auto paintProperty = host->GetPaintProperty<RadioPaintProperty>();
     CHECK_NULL_VOID(paintProperty);
-    auto pipeline = host->GetContext();
-    CHECK_NULL_VOID(pipeline);
-    auto radioTheme = pipeline->GetTheme<RadioTheme>();
+    auto radioTheme = host->GetTheme<RadioTheme>(true);
     CHECK_NULL_VOID(radioTheme);
     auto pattern = host->GetPattern<RadioPattern>();
     CHECK_NULL_VOID(pattern);
@@ -1210,6 +1270,11 @@ void RadioPattern::OnColorModeChange(uint32_t colorMode)
 {
     Pattern::OnColorModeChange(colorMode);
     InitDefaultMargin();
+}
+
+CommandResult RadioPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "checked" });
 }
 
 int32_t RadioPattern::OnInjectionEvent(const std::string& command)

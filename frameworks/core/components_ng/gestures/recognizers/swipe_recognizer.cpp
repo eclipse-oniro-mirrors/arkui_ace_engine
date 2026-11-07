@@ -15,10 +15,12 @@
 
 #include "core/components_ng/gestures/recognizers/swipe_recognizer.h"
 
+#include "base/log/log_wrapper_without_instance.h"
 #include "core/common/reporter/reporter.h"
 #include "core/components_ng/base/observer_handler.h"
 #include "core/components_ng/event/event_constants.h"
 #include "core/components_ng/manager/event/json_child_report.h"
+#include "core/components_ng/manager/interaction_observer/ui_info_collection_manager.h"
 #include "core/components_ng/manager/event/json_report.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "core/pipeline/base/constants.h"
@@ -55,6 +57,13 @@ double ComputeAngle(double x, double y)
 }
 } // namespace
 
+void SwipeRecognizer::ForceCleanRecognizer()
+{
+    MultiFingersRecognizer::ForceCleanRecognizer();
+    ReleaseTouchEventPayload(lastTouchEvent_);
+    downEvents_.clear();
+}
+
 void SwipeRecognizer::OnAccepted()
 {
     int64_t acceptTime = GetSysTimestamp();
@@ -69,7 +78,7 @@ void SwipeRecognizer::OnAccepted()
     firstInputTime_.reset();
 
     auto node = GetAttachedNode().Upgrade();
-    TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW, "SWIPE RACC, T: %{public}s",
+    TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW, "SWIPE RACC, T: %{public}s",
         node ? node->GetTag().c_str() : "null");
     auto lastRefereeState = refereeState_;
     LogStateChange(refereeState_, RefereeState::SUCCEED, StateChangeReason::SWIPE_SPEED_REACHED);
@@ -415,6 +424,7 @@ void SwipeRecognizer::OnResetStatus()
     axisOffset_.Reset();
     resultSpeed_ = 0.0;
     lastTouchEvent_ = TouchEvent();
+    ReleaseTouchEventPayload(lastTouchEvent_);
     downEvents_.clear();
     time_ = TimeStamp();
     touchDownTime_ = TimeStamp();
@@ -430,9 +440,9 @@ void SwipeRecognizer::SendCallbackMsg(const std::unique_ptr<GestureEventFunc>& c
     if (gestureInfo_ && gestureInfo_->GetDisposeTag()) {
         return;
     }
+    GestureEvent info;
+    GetGestureEventInfo(info);
     if (callback && *callback) {
-        GestureEvent info;
-        GetGestureEventInfo(info);
         // callback may be overwritten in its invoke so we copy it first
         auto callbackFunction = *callback;
         HandleGestureAccept(info, type, GestureListenerType::SWIPE);
@@ -442,6 +452,10 @@ void SwipeRecognizer::SendCallbackMsg(const std::unique_ptr<GestureEventFunc>& c
         HandleReports(info, type);
 #endif
     }
+    // Always-on delivery for NDK interaction observers; the configured speed
+    // threshold is reported next to the recognized speed.
+    UIInfoCollectionManager::GetInstance().NotifySwipe(
+        GetAttachedNode().Upgrade(), info, direction_.type, speed_.ConvertToPx(), downEvents_);
 #ifdef GESTURE_DEBUG_BOUNDARY_SUPPORTED
     ReportToGestureDebugManager(type, GestureListenerType::SWIPE);
 #endif

@@ -124,7 +124,7 @@ WeakPtr<SecurityUIExtensionPattern> SecuritySessionWrapperImplTestNg::CreateSecu
     config.placeholderNode = placeholderNode;
     config.sessionType = SessionType::SECURITY_UI_EXTENSION_ABILITY;
     config.transferringCaller = true;
-    config.densityDpi = true;
+    config.dpiFollowStrategy = DpiFollowStrategy::FOLLOW_HOST_DPI;
 
     // create SecurityUEC
     UIExtensionModelNG uecNG;
@@ -481,8 +481,8 @@ HWTEST_F(SecuritySessionWrapperImplTestNg, SecuritySessionWrapperImplTestNg007, 
     /**
      * @tc.steps: step3. test SetDensityDpiImpl
      */
-    sessionWrapper->SetDensityDpiImpl(true);
-    sessionWrapper->SetDensityDpiImpl(false);
+    sessionWrapper->SetDensityDpiImpl(DpiFollowStrategy::FOLLOW_HOST_DPI);
+    sessionWrapper->SetDensityDpiImpl(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
 
     /**
      * @tc.steps: step4. test SendDataSync
@@ -907,6 +907,67 @@ HWTEST_F(SecuritySessionWrapperImplTestNg, SecuritySessionWrapperImplTestNg020, 
     sessionWrapper->foregroundCallback_(OHOS::Rosen::WSError::WS_DO_NOTHING, 0);
     EXPECT_TRUE(isForegroundErrorNotified);
     EXPECT_EQ(foregroundErrorCode, ERROR_CODE_UIEXTENSION_FOREGROUND_FAILED);
+#endif
+}
+
+/**
+ * @tc.name: SecuritySessionWrapperBrandColorTest001
+ * @tc.desc: Test pattern GetBrandColorStr returns DEFAULT_BRAND_COLOR_STR by default
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecuritySessionWrapperImplTestNg, SecuritySessionWrapperBrandColorTest001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<SecurityUIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto result = pattern->GetBrandColorStr();
+    EXPECT_EQ(result, "");
+#endif
+}
+
+/**
+ * @tc.name: SecuritySessionWrapperBrandColorTest002
+ * @tc.desc: Test pattern ResolveBrandColor returns DEFAULT_BRAND_COLOR_STR with invalid themeScopeId
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecuritySessionWrapperImplTestNg, SecuritySessionWrapperBrandColorTest002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<SecurityUIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto result = pattern->ResolveBrandColor(999);
+    EXPECT_EQ(result, "");
+#endif
+}
+
+/**
+ * @tc.name: SecuritySessionWrapperBrandColorTest003
+ * @tc.desc: Test NotifyBrandColorChangeToUEA with transparent brand color is skipped
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecuritySessionWrapperImplTestNg, SecuritySessionWrapperBrandColorTest003, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<SecurityUIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->NotifyBrandColorChangeToUEA(200, "#00EEEEEE");
+    EXPECT_TRUE(pattern->lastSentBrandColorStr_.empty());
+#endif
+}
+
+/**
+ * @tc.name: SecuritySessionWrapperBrandColorTest004
+ * @tc.desc: Test NotifyBrandColorChangeToUEA with unchanged brand color is skipped
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecuritySessionWrapperImplTestNg, SecuritySessionWrapperBrandColorTest004, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<SecurityUIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->lastSentBrandColorStr_ = "#FF00FF00";
+    pattern->NotifyBrandColorChangeToUEA(200, "#FF00FF00");
+    EXPECT_EQ(pattern->lastSentBrandColorStr_, "#FF00FF00");
 #endif
 }
 } // namespace OHOS::Ace::NG

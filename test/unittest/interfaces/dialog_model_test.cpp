@@ -13,6 +13,11 @@
  * limitations under the License.
  */
 
+#include <functional>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <csignal>
+
 #include "animate_impl.h"
 #include "core/interfaces/arkoala/arkoala_api.h"
 #include "dialog_model.h"
@@ -25,6 +30,8 @@
 #include "node_extened.h"
 #include "node_model.h"
 #include "native_dialog.h"
+#include "interfaces/native/node/config_manager.h"
+#include "test/mock/frameworks/base/log/mock_log_wrapper.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -1307,5 +1314,264 @@ HWTEST_F(DialogModelTest, DialogModelTest075, TestSize.Level1)
     std::string errorMessageStr(errorMessage);
     EXPECT_NE(errorMessageStr.find("SetBackgroundBlurStyle"), std::string::npos);
     delete nativeDialogHandle;
+    nativeDialogHandle = nullptr;
+}
+
+namespace {
+// Value of OH_ARKUI_NATIVEMODULE_CHECK_TYPE_NODE_DISPOSED, kept in sync with
+// native_interface.h; the raw value mirrors the NativeXComponentUafTest setup.
+constexpr int32_t DIALOG_UAF_CHECK_TYPE_NODE_DISPOSED = 1;
+
+// Restore the process-wide disposed-node check to DISABLED so later tests in
+// this binary are unaffected by the modes configured below.
+void RestoreDialogUafCheckMode()
+{
+    EXPECT_TRUE(OHOS::Ace::NodeModel::ConfigManager::SetRuntimeCheckMode(DIALOG_UAF_CHECK_TYPE_NODE_DISPOSED,
+        static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED)));
+}
+
+// Switches the process-wide disposed-node check to the given mode for the assertions
+// that follow; the fixture TearDown restores DISABLED.
+void EnableDialogUafCheckMode(int32_t mode)
+{
+    ASSERT_TRUE(OHOS::Ace::NodeModel::ConfigManager::SetRuntimeCheckMode(
+        DIALOG_UAF_CHECK_TYPE_NODE_DISPOSED, mode));
+}
+
+// Asserts one captured diagnostic log carries the three stable fields: the check name
+// NODE_DISPOSED, the given API name and the fixed reason text.
+void AssertDiagnosticLog(const DiagnosticLog* diag, const char* apiName)
+{
+    ASSERT_NE(diag, nullptr);
+    ASSERT_NE(diag->checkName, nullptr);
+    ASSERT_NE(diag->apiName, nullptr);
+    ASSERT_NE(diag->reason, nullptr);
+    EXPECT_NE(std::string(diag->checkName).find("NODE_DISPOSED"), std::string::npos);
+    EXPECT_NE(std::string(diag->apiName).find(apiName), std::string::npos);
+    EXPECT_NE(std::string(diag->reason).find("Node has been disposed"), std::string::npos);
+}
+
+// The disposed-node check state is configured through ConfigManager::SetRuntimeCheckMode,
+// whose thread guard calls isCurrentThreadSafe from the basic API table provided by the
+// runtime image (libace_compatible.z.so of the device system; the test run does not ship
+// its own). That callback only exists once the runtime ships the runtime-check mechanism;
+// runtime images of the same struct revision but built before that merge fill the slot
+// with unrelated small data and the call crashes (observed as a branch to a garbage
+// address on an older image). Reading the slot value is safe (no call); a populated
+// slot holds a text address.
+bool RuntimeHasNodeDisposedCheck()
+{
+    const auto* full = OHOS::Ace::NodeModel::GetFullImpl();
+    const auto* basic = (full != nullptr) ? full->getBasicAPI() : nullptr;
+    if (basic == nullptr) {
+        return false;
+    }
+    const uintptr_t callback = reinterpret_cast<uintptr_t>(basic->isCurrentThreadSafe);
+    return callback > 0x1000;
+}
+} // namespace
+
+class NativeDialogUafTest : public testing::Test {
+public:
+    NativeDialogUafTest() = default;
+    ~NativeDialogUafTest() override = default;
+    static void SetUpTestCase() {}
+    static void TearDownTestCase() {}
+    void SetUp() override {}
+    void TearDown() override
+    {
+        RestoreDialogUafCheckMode();
+    }
+};
+
+/**
+ * @tc.name: NativeDialogUafTest001
+ * @tc.desc: A disposed-style content node hits the NODE_DISPOSED guard in LOG mode on both
+ *           listed dialog APIs: the diagnostic log carries NODE_DISPOSED, the API name and
+ *           the reason; the return values stay identical to DISABLED mode; the error
+ *           message query channel stays free of disposed content.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeDialogUafTest, NativeDialogUafTest001, TestSize.Level1)
+{
+    ASSERT_TRUE(OHOS::Ace::NodeModel::InitialFullImpl());
+    if (!RuntimeHasNodeDisposedCheck()) {
+        GTEST_SKIP() << "runtime libace_compatible predates the runtime-check mechanism "
+                        "(no OH_ArkUI_NativeModule_SetRuntimeCheckMode); run on a version-matched runtime";
+    }
+    ArkUI_NativeDialogHandle nativeDialogHandle = Create();
+    ASSERT_NE(nativeDialogHandle, nullptr);
+    // Stack-controlled sample: the magic field drives the disposed-state check while
+    // uiNodeHandle stays null, so the inner dialog implementation only sees its
+    // existing null-content contract (same shape as DialogModelTest004).
+    ArkUI_Node disposedNode;
+    disposedNode.uiNodeHandle = nullptr;
+    disposedNode.magic = ARKUI_NODE_MAGIC_INVALID;
+
+    EnableDialogUafCheckMode(static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED));
+    ResetDiagnosticLog();
+    const int32_t setContentDisabled = SetContent(nativeDialogHandle, &disposedNode);
+    ArkUI_CustomDialogOptions* createOptionsDisabled = OH_ArkUI_CustomDialog_CreateOptions(&disposedNode);
+    EXPECT_EQ(GetDiagnosticLogCount(), 0);
+
+    EnableDialogUafCheckMode(static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG));
+    ResetDiagnosticLog();
+    const int32_t setContentLog = SetContent(nativeDialogHandle, &disposedNode);
+    ASSERT_EQ(GetDiagnosticLogCount(), 1);
+    AssertDiagnosticLog(GetLastDiagnosticLog(), "SetContent");
+
+    ArkUI_CustomDialogOptions* createOptionsLog = OH_ArkUI_CustomDialog_CreateOptions(&disposedNode);
+    ASSERT_EQ(GetDiagnosticLogCount(), 2);
+    AssertDiagnosticLog(GetLastDiagnosticLog(), "OH_ArkUI_CustomDialog_CreateOptions");
+
+    // LOG only diagnoses and never short-circuits: both APIs keep the DISABLED
+    // mode return values.
+    EXPECT_EQ(setContentLog, setContentDisabled);
+    EXPECT_EQ(createOptionsLog != nullptr, createOptionsDisabled != nullptr);
+    // The error message query channel does not carry disposed content from this check.
+    const char* errorMessage = OH_ArkUI_NativeModule_GetErrorMessage();
+    if (errorMessage != nullptr) {
+        EXPECT_EQ(std::string(errorMessage).find("has been disposed"), std::string::npos);
+    }
+    OH_ArkUI_CustomDialog_DisposeOptions(createOptionsDisabled);
+    OH_ArkUI_CustomDialog_DisposeOptions(createOptionsLog);
+    Dispose(nativeDialogHandle);
+    nativeDialogHandle = nullptr;
+    RestoreDialogUafCheckMode();
+}
+
+/**
+ * @tc.name: NativeDialogUafTest002
+ * @tc.desc: Valid magic never triggers the guard: LOG/DISABLED/CRASH modes keep identical
+ *           return values on both listed APIs for a valid handle and CRASH does not
+ *           terminate the process.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeDialogUafTest, NativeDialogUafTest002, TestSize.Level1)
+{
+    ASSERT_TRUE(OHOS::Ace::NodeModel::InitialFullImpl());
+    if (!RuntimeHasNodeDisposedCheck()) {
+        GTEST_SKIP() << "runtime libace_compatible predates the runtime-check mechanism "
+                        "(no OH_ArkUI_NativeModule_SetRuntimeCheckMode); run on a version-matched runtime";
+    }
+    ArkUI_NativeDialogHandle nativeDialogHandle = Create();
+    ASSERT_NE(nativeDialogHandle, nullptr);
+    ArkUI_Node validNode;
+    validNode.uiNodeHandle = nullptr;
+    validNode.magic = ARKUI_NODE_MAGIC_VALID;
+
+    EnableDialogUafCheckMode(static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG));
+    ResetDiagnosticLog();
+    const int32_t setContentLog = SetContent(nativeDialogHandle, &validNode);
+    ArkUI_CustomDialogOptions* createOptionsLog = OH_ArkUI_CustomDialog_CreateOptions(&validNode);
+    EXPECT_EQ(GetDiagnosticLogCount(), 0);
+
+    EnableDialogUafCheckMode(static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED));
+    const int32_t setContentDisabled = SetContent(nativeDialogHandle, &validNode);
+    ArkUI_CustomDialogOptions* createOptionsDisabled = OH_ArkUI_CustomDialog_CreateOptions(&validNode);
+
+    // A valid handle does not trigger the check in CRASH mode either (no termination).
+    EnableDialogUafCheckMode(static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_CRASH));
+    const int32_t setContentCrash = SetContent(nativeDialogHandle, &validNode);
+    ArkUI_CustomDialogOptions* createOptionsCrash = OH_ArkUI_CustomDialog_CreateOptions(&validNode);
+    EXPECT_EQ(GetDiagnosticLogCount(), 0);
+
+    EXPECT_EQ(setContentDisabled, setContentLog);
+    EXPECT_EQ(setContentCrash, setContentLog);
+    EXPECT_EQ(createOptionsDisabled != nullptr, createOptionsLog != nullptr);
+    EXPECT_EQ(createOptionsCrash != nullptr, createOptionsLog != nullptr);
+    OH_ArkUI_CustomDialog_DisposeOptions(createOptionsLog);
+    OH_ArkUI_CustomDialog_DisposeOptions(createOptionsDisabled);
+    OH_ArkUI_CustomDialog_DisposeOptions(createOptionsCrash);
+    Dispose(nativeDialogHandle);
+    nativeDialogHandle = nullptr;
+    RestoreDialogUafCheckMode();
+}
+
+/**
+ * @tc.name: NativeDialogUafTest003
+ * @tc.desc: Null inputs keep the existing parameter-error contracts on both listed APIs;
+ *           the entry guard is null-safe and stays silent.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeDialogUafTest, NativeDialogUafTest003, TestSize.Level1)
+{
+    ASSERT_TRUE(OHOS::Ace::NodeModel::InitialFullImpl());
+    if (!RuntimeHasNodeDisposedCheck()) {
+        GTEST_SKIP() << "runtime libace_compatible predates the runtime-check mechanism "
+                        "(no OH_ArkUI_NativeModule_SetRuntimeCheckMode); run on a version-matched runtime";
+    }
+    ArkUI_NativeDialogHandle nativeDialogHandle = Create();
+    ASSERT_NE(nativeDialogHandle, nullptr);
+    EnableDialogUafCheckMode(static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG));
+    ResetDiagnosticLog();
+
+    EXPECT_EQ(SetContent(nativeDialogHandle, nullptr), OHOS::Ace::ERROR_CODE_PARAM_INVALID);
+    const char* setContentError = OH_ArkUI_NativeModule_GetErrorMessage();
+    ASSERT_NE(setContentError, nullptr);
+    EXPECT_NE(std::string(setContentError).find("content is null"), std::string::npos);
+
+    EXPECT_EQ(OH_ArkUI_CustomDialog_CreateOptions(nullptr), nullptr);
+    const char* createOptionsError = OH_ArkUI_NativeModule_GetErrorMessage();
+    ASSERT_NE(createOptionsError, nullptr);
+    EXPECT_NE(std::string(createOptionsError).find("content is null"), std::string::npos);
+
+    EXPECT_EQ(GetDiagnosticLogCount(), 0);
+    Dispose(nativeDialogHandle);
+    nativeDialogHandle = nullptr;
+    RestoreDialogUafCheckMode();
+}
+
+/**
+ * @tc.name: NativeDialogUafTest004
+ * @tc.desc: CRASH mode diagnoses and aborts on a disposed-style content node before the
+ *           content pointer is read, on both listed APIs. Uses manual fork instead of
+ *           EXPECT_DEATH to avoid GoogleTest's CapturedStream which requires /tmp.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeDialogUafTest, NativeDialogUafTest004, TestSize.Level1)
+{
+    ASSERT_TRUE(OHOS::Ace::NodeModel::InitialFullImpl());
+    if (!RuntimeHasNodeDisposedCheck()) {
+        GTEST_SKIP() << "runtime libace_compatible predates the runtime-check mechanism "
+                        "(no OH_ArkUI_NativeModule_SetRuntimeCheckMode); run on a version-matched runtime";
+    }
+    ArkUI_NativeDialogHandle nativeDialogHandle = Create();
+    ASSERT_NE(nativeDialogHandle, nullptr);
+    ArkUI_Node disposedNode;
+    disposedNode.uiNodeHandle = nullptr;
+    disposedNode.magic = ARKUI_NODE_MAGIC_INVALID;
+
+    EnableDialogUafCheckMode(static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_CRASH));
+
+    // Manually fork to verify CRASH mode aborts; EXPECT_DEATH relies on GoogleTest's
+    // CapturedStream which creates temp files in /tmp, a directory that may not exist
+    // on device environments (e.g. rk3568), causing the test process itself to abort.
+    auto expectAbort = [](const std::function<void()>& fn) {
+        fflush(stdout);
+        fflush(stderr);
+        pid_t pid = fork();
+        if (pid < 0) {
+            ADD_FAILURE() << "fork() failed";
+            return;
+        }
+        if (pid == 0) {
+            fn();
+            _exit(0); // Should never reach here if CRASH mode works correctly
+        }
+        int status = 0;
+        if (waitpid(pid, &status, 0) != pid) {
+            ADD_FAILURE() << "waitpid() failed";
+            return;
+        }
+        EXPECT_TRUE(WIFSIGNALED(status)) << "expected signal termination, got exit code: " << WEXITSTATUS(status);
+        EXPECT_EQ(WTERMSIG(status), SIGABRT) << "expected SIGABRT, got signal: " << WTERMSIG(status);
+    };
+
+    expectAbort([&]() { SetContent(nativeDialogHandle, &disposedNode); });
+    expectAbort([&]() { OH_ArkUI_CustomDialog_CreateOptions(&disposedNode); });
+
+    RestoreDialogUafCheckMode();
+    Dispose(nativeDialogHandle);
     nativeDialogHandle = nullptr;
 }

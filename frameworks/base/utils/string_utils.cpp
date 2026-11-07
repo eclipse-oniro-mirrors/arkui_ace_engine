@@ -195,6 +195,26 @@ void ReplaceTabAndNewLine(std::string& data)
     ReplaceSpace(data);
 }
 
+std::string EscapeJsonString(const std::string& value)
+{
+    constexpr uint32_t hexDigitBits = 4;
+    constexpr char hex[] = "0123456789abcdef";
+    std::string escaped = "\"";
+    for (const unsigned char byte : value) {
+        if (byte == '"' || byte == '\\') {
+            escaped += '\\';
+            escaped += static_cast<char>(byte);
+        } else if (byte < 0x20) {
+            escaped += "\\u00";
+            escaped += hex[byte >> hexDigitBits];
+            escaped += hex[byte & 0x0F];
+        } else {
+            escaped += static_cast<char>(byte);
+        }
+    }
+    return escaped + "\"";
+}
+
 std::string RestoreEscape(const std::string& src)
 {
     std::string res;

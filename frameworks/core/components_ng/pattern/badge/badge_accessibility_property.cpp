@@ -15,6 +15,7 @@
 
 #include "core/components_ng/pattern/badge/badge_accessibility_property.h"
 
+#include "base/i18n/localization.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/badge/badge_layout_property.h"
 
@@ -27,7 +28,10 @@ std::string BadgeAccessibilityProperty::GetText() const
     CHECK_NULL_RETURN(badgeLayoutProperty, "");
     auto badgeCount = badgeLayoutProperty->GetBadgeCount();
     if (badgeCount.has_value()) {
-        return std::to_string(badgeCount.value_or(0));
+        auto count = badgeCount.value_or(0);
+        return Localization::GetInstance()->GetLanguage() != "zh"
+            ? Localization::GetInstance()->NumberFormat(count)
+            : std::to_string(count);
     } else {
         auto badgeValue = badgeLayoutProperty->GetBadgeValue();
         return badgeValue.value_or("");

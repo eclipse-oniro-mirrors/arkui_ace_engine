@@ -96,7 +96,7 @@ private:
     void UpdateRichTextRect(const SizeF& textSize, LayoutWrapper* layoutWrapper);
     RefPtr<RichEditorPattern> GetRichEditorPattern(LayoutWrapper* layoutWrapper);
     void LayoutCancelButton(LayoutWrapper* layoutWrapper);
-    void MeasureCancelButton(LayoutWrapper* layoutWrapper);
+    void MeasureCancelButton(LayoutWrapper* layoutWrapper, LayoutConstraintF& constraint);
     RefPtr<LayoutWrapper> FindContentLayoutWrapper(const ChildrenListWithGuard& children);
 
     bool SetPlaceholder(LayoutWrapper* layoutWrapper);
@@ -116,6 +116,8 @@ private:
     bool IsContentWidthUnlimited() const;
     bool IsWidthAdaptive(LayoutWrapper* layoutWrapper) const;
     bool IsWidthFix(LayoutWrapper* layoutWrapper) const;
+    void MeasurePasswordResponseArea(LayoutWrapper* layoutWrapper, LayoutConstraintF& constraint);
+    void LayoutPasswordResponseArea(LayoutWrapper* layoutWrapper);
     void ReLayoutParagraphBySpan(const ParagraphStyle& paraStyle, LayoutWrapper* layoutWrapper,
         std::vector<TextStyle>& textStyles, std::list<RefPtr<SpanItem>>& group,
         bool& needReLayout, bool& needReLayoutParagraph, std::optional<TextStyle>& firstValidTextStyle);
@@ -147,7 +149,6 @@ private:
     std::unordered_set<uint64_t> paragraphKeySet_;
     bool isHorizontalScrolling_ = false;
     bool isSingleLineMode_ = false;
-    float cancelButtonWidth_ = 0.0f;
     ACE_DISALLOW_COPY_AND_MOVE(RichEditorLayoutAlgorithm);
 };
 } // namespace OHOS::Ace::NG

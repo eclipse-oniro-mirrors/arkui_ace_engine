@@ -170,8 +170,8 @@ public:
     bool HandleEvent(const TouchEvent& point) override;
     bool HandleEvent(const AxisEvent& event) override;
 
-    void HandleBridgeModeEvent(const TouchEvent& point);
-    void HandleEventToBridgeObjList(
+    bool HandleBridgeModeEvent(const TouchEvent& point);
+    bool HandleEventToBridgeObjList(
         const TouchEvent& point, const std::list<WeakPtr<NGGestureRecognizer>>& bridgeObjList);
     void HandleBridgeModeEvent(const AxisEvent& event);
 
@@ -574,9 +574,9 @@ protected:
 
     void ReconcileGestureInfoFrom(const RefPtr<NGGestureRecognizer>& recognizer);
     bool ProcessTouchEvent(const TouchEvent& point);
-    void HandleTouchDown(const TouchEvent& point);
-    void HandleTouchUp(const TouchEvent& point);
-    void HandleTouchCancel(const TouchEvent& point);
+    bool HandleTouchDown(const TouchEvent& point);
+    bool HandleTouchUp(const TouchEvent& point);
+    bool HandleTouchCancel(const TouchEvent& point);
     void HandleGestureAccept(const GestureEvent& info, GestureCallbackType type, GestureListenerType listenerType);
     void ReportToGestureDebugManager(GestureCallbackType type, GestureListenerType listenerType);
     void SetGestureEventCurrentLocalLocation(GestureEvent& info, const TouchEvent& touchPoint);

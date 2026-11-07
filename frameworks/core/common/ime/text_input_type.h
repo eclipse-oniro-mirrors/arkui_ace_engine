@@ -69,6 +69,13 @@ inline bool ShouldShowAIWriteForInputType(TextInputType type)
     return type == TextInputType::UNSPECIFIED || type == TextInputType::TEXT;
 }
 
+enum class PreviewTextStyle {
+    NORMAL,
+    UNDERLINE,
+    WAVY,
+    DASH_LINE
+};
+
 } // namespace OHOS::Ace
 
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMMON_IME_TEXT_INPUT_TYPE_H

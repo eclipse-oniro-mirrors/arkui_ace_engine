@@ -929,6 +929,30 @@ LazyWaterFlowLane* LazyWaterFlowLayoutInfo::GetMutableLane(int32_t itemIdx)
     return const_cast<LazyWaterFlowLane*>(GetLane(itemIdx));
 }
 
+void LazyWaterFlowLayoutInfo::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree()) {
+        CHECK_NULL_VOID(json);
+        json->Put("itemStartIndex", startIndex_);
+        json->Put("itemEndIndex", endIndex_);
+        json->Put("visibleStartIndex", visibleStartIndex_);
+        json->Put("visibleEndIndex", visibleEndIndex_);
+        json->Put("itemTotalCount", totalItemCount_);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("headerMainSize", headerMainSize_);
+        json->Put("footerMainSize", footerMainSize_);
+        json->Put("estimatedItemSize", estimateItemSize_);
+        json->Put("totalMainSize", totalMainSize_);
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("layoutedStartIndex", layoutedStartIndex_);
+        json->Put("layoutedEndIndex", layoutedEndIndex_);
+        json->Put("cachedStartIndex", cachedStartIndex_);
+        json->Put("cachedEndIndex", cachedEndIndex_);
+    }
+}
+
 void LazyWaterFlowLayoutInfo::DumpAdvanceInfo()
 {
     DumpLog::GetInstance().AddDesc("itemStartIndex:" + std::to_string(startIndex_));
@@ -948,20 +972,7 @@ void LazyWaterFlowLayoutInfo::DumpAdvanceInfo()
 
 void LazyWaterFlowLayoutInfo::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    CHECK_NULL_VOID(json);
-    json->Put("itemStartIndex", startIndex_);
-    json->Put("itemEndIndex", endIndex_);
-    json->Put("visibleStartIndex", visibleStartIndex_);
-    json->Put("visibleEndIndex", visibleEndIndex_);
-    json->Put("itemTotalCount", totalItemCount_);
-    json->Put("headerMainSize", headerMainSize_);
-    json->Put("footerMainSize", footerMainSize_);
-    json->Put("estimatedItemSize", estimateItemSize_);
-    json->Put("totalMainSize", totalMainSize_);
-    json->Put("layoutedStartIndex", layoutedStartIndex_);
-    json->Put("layoutedEndIndex", layoutedEndIndex_);
-    json->Put("cachedStartIndex", cachedStartIndex_);
-    json->Put("cachedEndIndex", cachedEndIndex_);
+    LazyWaterFlowLayoutInfo::DumpAdvanceInfo(json, ParamConfig());
 }
 
 } // namespace OHOS::Ace::NG

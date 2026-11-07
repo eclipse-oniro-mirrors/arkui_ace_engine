@@ -56,6 +56,8 @@ public:
 
     bool ReusedNodeSkipMeasure() override;
     ArkUI_AccessibilityProvider* GetNativeAccessibilityProvider();
+    RefPtr<AccessibilityProvider> GetOrCreateAccessibilityProvider() override;
+    void AddInspectorTreeInfo(std::shared_ptr<JsonValue>& node, InspectorTreeRequestContext& context) override;
     void InitializeAccessibility(PipelineContext* context);
     void UninitializeAccessibility(FrameNode* frameNode, PipelineContext* context);
     bool OnAccessibilityChildTreeRegister(uint32_t windowId, int32_t treeId);
@@ -70,6 +72,8 @@ public:
     RefPtr<VerticalOverflowHandler> GetOrCreateVerticalOverflowHandler(const WeakPtr<FrameNode>& host) override;
 
     void DumpInfo() override;
+    void AddExtraInfoWithParamConfig(
+        std::shared_ptr<JsonValue>& json, ParamConfig config = ParamConfig()) override;
 
     bool GetIsVertical() const override
     {

@@ -68,7 +68,7 @@ enum ControlBtnColorType {
     UNFOCUS,
     UNFOCUS_FILL,
 };
-class ContainerModalTheme : public virtual Theme {
+class ContainerModalTheme : public Theme {
     DECLARE_ACE_TYPE(ContainerModalTheme, Theme);
 
 public:

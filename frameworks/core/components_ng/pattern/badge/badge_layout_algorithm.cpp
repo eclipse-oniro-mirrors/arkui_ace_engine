@@ -50,7 +50,7 @@ void BadgeLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     auto textGeometryNode = textWrapper->GetGeometryNode();
     CHECK_NULL_VOID(textGeometryNode);
 
-    auto pipeline = AceType::DynamicCast<NG::PipelineContext>(host->GetContextWithCheck());
+    auto pipeline = host->GetContextWithCheck();
     CHECK_NULL_VOID(pipeline);
     auto badgeTheme = pipeline->GetTheme<BadgeTheme>();
     CHECK_NULL_VOID(badgeTheme);
@@ -267,7 +267,7 @@ void BadgeLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
     auto layoutProperty = DynamicCast<BadgeLayoutProperty>(layoutWrapper->GetLayoutProperty());
     CHECK_NULL_VOID(layoutProperty);
 
-    auto pipeline = AceType::DynamicCast<NG::PipelineContext>(host->GetContextWithCheck());
+    auto pipeline = host->GetContextWithCheck();
     CHECK_NULL_VOID(pipeline);
     auto badgeTheme = pipeline->GetTheme<BadgeTheme>();
     CHECK_NULL_VOID(badgeTheme);
@@ -393,7 +393,7 @@ void BadgeLayoutAlgorithm::PerformMeasureSelf(LayoutWrapper* layoutWrapper)
     const auto& padding = layoutWrapper->GetLayoutProperty()->CreatePaddingAndBorder();
     OptionalSizeF frameSize;
 
-    auto layoutProperty = AceType::DynamicCast<LayoutProperty>(layoutWrapper->GetLayoutProperty());
+    auto layoutProperty = layoutWrapper->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
     auto layoutPolicy = layoutProperty->GetLayoutPolicyProperty();
     frameSize.UpdateSizeWithCheck(layoutConstraint->selfIdealSize);

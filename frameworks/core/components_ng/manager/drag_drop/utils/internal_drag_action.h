@@ -63,7 +63,11 @@ struct ArkUIInteralDragAction {
     std::mutex mutex;
     std::mutex dragStateMutex;
     std::vector<RefPtr<PixelMap>> pixelMapList;
-    bool hasHandle = false;
+    // Exactly-once delivery gate, guarded by `mutex`: each status is delivered at most once
+    // per drag session (one ArkUIInteralDragAction per StartDrag call), so a racing STARTED
+    // can never mask ENDED and a duplicated ENDED never re-fires the listener.
+    bool startedHandled = false;
+    bool endedHandled = false;
     float touchPointX = 0.0;
     float touchPointY = 0.0;
     bool hasTouchPoint = false;

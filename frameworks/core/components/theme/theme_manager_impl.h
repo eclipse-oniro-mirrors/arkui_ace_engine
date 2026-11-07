@@ -20,7 +20,7 @@
 #include "core/components/theme/resource_adapter.h"
 #include "core/components/theme/theme_constants.h"
 #include "core/components/theme/theme_manager.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace {
 class ACE_FORCE_EXPORT ThemeManagerImpl : public ThemeManager {
@@ -145,7 +145,7 @@ public:
     RefPtr<Theme> GetThemeKit(ThemeType type, int32_t themeScopeId);
 
 private:
-    using ThemeWrappers = std::unordered_map<ThemeType, RefPtr<TokenThemeWrapper>>;
+    using ThemeWrappers = std::unordered_map<ThemeType, RefPtr<Theme>>;
     std::unordered_map<ThemeType, RefPtr<Theme>> themes_;
     ThemeWrappers themeWrappersLight_;
     ThemeWrappers themeWrappersDark_;

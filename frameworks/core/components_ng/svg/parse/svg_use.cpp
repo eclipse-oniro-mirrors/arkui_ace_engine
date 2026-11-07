@@ -55,6 +55,11 @@ RefPtr<SvgNode> SvgUse::Create()
 RSRecordingPath SvgUse::AsPath(const Size& viewPort) const
 {
     auto svgContext = svgContext_.Upgrade();
+    uint32_t currentVersion = svgContext ? svgContext->GetRenderCacheVersion() : 0;
+    SizePathCacheKey key{viewPort, currentVersion, attributes_.fillState.IsEvenodd()};
+    if (sizePathCacheKey_.has_value() && sizePathCacheKey_.value() == key) {
+        return sizePathCache_.value();
+    }
     CHECK_NULL_RETURN(svgContext, RSRecordingPath());
     if (attributes_.href.empty()) {
         LOGE("href is empty");
@@ -82,12 +87,20 @@ RSRecordingPath SvgUse::AsPath(const Size& viewPort) const
 
     AttributeScope scope(refSvgNode);
     refSvgNode->InheritAttr(attributes_);
-    return refSvgNode->AsPath(viewPort);
+    auto result = refSvgNode->AsPath(viewPort);
+    sizePathCache_ = result;
+    sizePathCacheKey_ = key;
+    return result;
 }
 
 RSRecordingPath SvgUse::AsPath(const SvgLengthScaleRule& lengthRule)
 {
     auto svgContext = svgContext_.Upgrade();
+    uint32_t currentVersion = svgContext ? svgContext->GetRenderCacheVersion() : 0;
+    RulePathCacheKey key{lengthRule, currentVersion};
+    if (rulePathCacheKey_.has_value() && rulePathCacheKey_.value() == key) {
+        return rulePathCache_.value();
+    }
     CHECK_NULL_RETURN(svgContext, RSRecordingPath());
     if (attributes_.href.empty()) {
         LOGE("href is empty");
@@ -115,7 +128,10 @@ RSRecordingPath SvgUse::AsPath(const SvgLengthScaleRule& lengthRule)
 
     AttributeScope scope(refSvgNode);
     refSvgNode->InheritAttr(attributes_);
-    return refSvgNode->AsPath(lengthRule);
+    auto result = refSvgNode->AsPath(lengthRule);
+    rulePathCache_ = result;
+    rulePathCacheKey_ = key;
+    return result;
 }
 
 void SvgUse::OnDraw(RSCanvas& canvas, const Size& layout, const std::optional<Color>& color)

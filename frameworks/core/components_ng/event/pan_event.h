@@ -29,7 +29,7 @@ namespace OHOS::Ace::NG {
 class GestureEventHub;
 class PanRecognizer;
 
-class PanEvent : public virtual AceType {
+class PanEvent : public AceType {
     DECLARE_ACE_TYPE(PanEvent, AceType);
 public:
     PanEvent(GestureEventFunc&& actionStart, GestureEventFunc&& actionUpdate, GestureEventFunc&& actionEnd,

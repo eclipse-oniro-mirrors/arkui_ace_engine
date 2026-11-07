@@ -169,7 +169,7 @@ HWTEST_F(TextTestNg, SetTextDetectEnable003, TestSize.Level1)
     textModelNG.ResetSelectedBackgroundColor(frameNode);
     ASSERT_EQ(textModelNG.GetSelectedBackgroundColor(frameNode), Color::BLACK);
     textModelNG.SetTextContentWithStyledString(frameNode, nullptr);
-    ASSERT_EQ(textPattern->GetExternalParagraph(), nullptr);
+    EXPECT_FALSE(textPattern->GetExternalParagraph().has_value());
 
     int32_t startIndex = 1;
     int32_t endIndex = 10;

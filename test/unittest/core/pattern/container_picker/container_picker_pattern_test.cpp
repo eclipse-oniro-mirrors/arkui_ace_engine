@@ -404,7 +404,7 @@ HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_CreateChildrenCl
     containerPickerNode->AddChild(textNode);
     containerPickerNode->AddChild(symbolNode);
 
-    RefPtr<UINode> pickerUiNode = AceType::DynamicCast<UINode>(containerPickerNode);
+    RefPtr<UINode> pickerUiNode = containerPickerNode;
     ASSERT_NE(pickerUiNode, nullptr);
     EXPECT_FALSE(pickerUiNode->GetInteractionEventBindingInfo().builtInEventRegistered);
 
@@ -2955,4 +2955,644 @@ HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_OnThemeScopeUpda
     container->SetApiTargetVersion(backupApiVersion);
 }
 
+/**
+ * @tc.name: ContainerPickerPatternTest_SetTargetIndexValid001
+ * @tc.desc: Test SetTargetIndex with valid index triggers SwipeTo.
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_SetTargetIndexValid001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->totalItemCount_ = 5;
+    pattern->selectedIndex_ = 1;
+    pattern->SetTargetIndex(3);
+    EXPECT_TRUE(pattern->targetIndex_.has_value());
+    EXPECT_EQ(pattern->targetIndex_.value(), 3);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_SetTargetIndexSame001
+ * @tc.desc: Test SetTargetIndex with same index does nothing.
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_SetTargetIndexSame001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->totalItemCount_ = 5;
+    pattern->selectedIndex_ = 2;
+    pattern->targetIndex_.reset();
+    pattern->SetTargetIndex(2);
+    EXPECT_FALSE(pattern->targetIndex_.has_value());
+    EXPECT_EQ(pattern->selectedIndex_, 2);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_ItemCountChangeResetDelta001
+ * @tc.desc: Test currentDelta_ reset when totalItemCount changes.
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_ItemCountChangeResetDelta001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->totalItemCount_ = 5;
+    pattern->prevTotalItemCount_ = 3;
+    pattern->currentDelta_ = 50.0f;
+    EXPECT_EQ(pattern->currentDelta_, 50.0f);
+    pattern->totalItemCount_ = 7;
+    pattern->prevTotalItemCount_ = 5;
+    pattern->currentDelta_ = 0.0f;
+    EXPECT_EQ(pattern->currentDelta_, 0.0f);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_CreateLayoutAlgorithmSync001
+ * @tc.desc: Test CreateLayoutAlgorithm updates totalItemCount_ correctly.
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_CreateLayoutAlgorithmSync001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->totalItemCount_ = 5;
+    pattern->selectedIndex_ = 2;
+    pattern->CreateLayoutAlgorithm();
+    EXPECT_EQ(pattern->totalItemCount_, pattern->GetRealTotalItemCount());
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_CreateLayoutAlgorithmItemChangeSync001
+ * @tc.desc: Test CreateLayoutAlgorithm syncs selectedIndex when item count changes (true branch).
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_CreateLayoutAlgorithmItemChangeSync001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    pattern->totalItemCount_ = 5;
+    pattern->selectedIndex_ = 1;
+
+    auto props = frameNode->GetLayoutProperty<ContainerPickerLayoutProperty>();
+    ASSERT_NE(props, nullptr);
+    props->UpdateSelectedIndex(3);
+    EXPECT_TRUE(props->HasSelectedIndex());
+
+    pattern->CreateLayoutAlgorithm();
+
+    EXPECT_EQ(pattern->selectedIndex_, 3);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_CreateLayoutAlgorithmNoSync001
+ * @tc.desc: Test CreateLayoutAlgorithm does not sync selectedIndex when prevTotalCount is 0 (false branch).
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_CreateLayoutAlgorithmNoSync001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    pattern->totalItemCount_ = 0;
+    pattern->selectedIndex_ = 2;
+
+    auto props = frameNode->GetLayoutProperty<ContainerPickerLayoutProperty>();
+    ASSERT_NE(props, nullptr);
+    props->UpdateSelectedIndex(0);
+    EXPECT_TRUE(props->HasSelectedIndex());
+
+    pattern->CreateLayoutAlgorithm();
+
+    EXPECT_EQ(pattern->selectedIndex_, 2);
+}
+
+/**
+ * @tc.name: CreateLayoutAlgorithmNoSyncSameCount001
+ * @tc.desc: Test CreateLayoutAlgorithm does not sync when prevTotalCount==totalItemCount_ (false branch).
+ */
+HWTEST_F(ContainerPickerPatternTest, CreateLayoutAlgorithmNoSyncSameCount001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    for (int i = 0; i < 5; i++) {
+        auto textNode = FrameNode::CreateFrameNode(V2::TEXT_ETS_TAG,
+            ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<TextPattern>());
+        frameNode->AddChild(textNode);
+    }
+
+    auto realCount = pattern->GetRealTotalItemCount();
+    ASSERT_EQ(realCount, 5);
+
+    pattern->totalItemCount_ = realCount;
+    pattern->selectedIndex_ = 2;
+
+    auto props = frameNode->GetLayoutProperty<ContainerPickerLayoutProperty>();
+    ASSERT_NE(props, nullptr);
+    props->UpdateSelectedIndex(0);
+    EXPECT_TRUE(props->HasSelectedIndex());
+
+    pattern->CreateLayoutAlgorithm();
+
+    EXPECT_EQ(pattern->totalItemCount_, realCount);
+    EXPECT_EQ(pattern->selectedIndex_, 2);
+}
+/**
+ * @tc.name: CreateLayoutAlgorithmNoSelectedIndex001
+ * @tc.desc: Test CreateLayoutAlgorithm does not sync when HasSelectedIndex is false.
+ */
+HWTEST_F(ContainerPickerPatternTest, CreateLayoutAlgorithmNoSelectedIndex001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    pattern->totalItemCount_ = 5;
+    pattern->selectedIndex_ = 2;
+
+    auto props = frameNode->GetLayoutProperty<ContainerPickerLayoutProperty>();
+    ASSERT_NE(props, nullptr);
+    EXPECT_FALSE(props->HasSelectedIndex());
+
+    pattern->CreateLayoutAlgorithm();
+
+    EXPECT_EQ(pattern->selectedIndex_, 2);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_HasSelectedTextStyle001
+ * @tc.desc: Test HasSelectedTextStyle returns false by default and true after setting fontSize or textColor.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_HasSelectedTextStyle001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    EXPECT_FALSE(pattern->HasSelectedTextStyle());
+
+    PickerTextStyle style;
+    style.fontSize = Dimension(20.0, DimensionUnit::FP);
+    pattern->SetSelectedTextStyleVal(style);
+    EXPECT_TRUE(pattern->HasSelectedTextStyle());
+
+    PickerTextStyle style2;
+    style2.textColor = Color::RED;
+    pattern->SetSelectedTextStyleVal(style2);
+    EXPECT_TRUE(pattern->HasSelectedTextStyle());
+
+    pattern->SetSelectedTextStyleVal(PickerTextStyle());
+    EXPECT_FALSE(pattern->HasSelectedTextStyle());
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_SetSelectedTextStyleVal001
+ * @tc.desc: Test SetSelectedTextStyleVal and GetSelectedTextStyleVal round-trip preserves all fields.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_SetSelectedTextStyleVal001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    PickerTextStyle style;
+    style.textColor = Color::BLUE;
+    style.fontSize = Dimension(18.0, DimensionUnit::FP);
+    style.fontWeight = FontWeight::BOLD;
+    pattern->SetSelectedTextStyleVal(style);
+
+    auto retrieved = pattern->GetSelectedTextStyleVal();
+    EXPECT_TRUE(retrieved.textColor.has_value());
+    EXPECT_EQ(retrieved.textColor.value(), Color::BLUE);
+    EXPECT_TRUE(retrieved.fontSize.has_value());
+    EXPECT_EQ(retrieved.fontSize.value().Value(), 18.0);
+    EXPECT_TRUE(retrieved.fontWeight.has_value());
+    EXPECT_EQ(retrieved.fontWeight.value(), FontWeight::BOLD);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_FindTextNode001
+ * @tc.desc: Test FindTextNode returns nullptr for null input, returns node itself for TEXT tag, and
+ *            recursively finds nested text node.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_FindTextNode001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    EXPECT_EQ(pattern->FindTextNode(nullptr), nullptr);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto found = pattern->FindTextNode(textNode);
+    EXPECT_EQ(found, textNode);
+
+    auto columnPattern = AceType::MakeRefPtr<Pattern>();
+    auto columnNode = CreateChildNode(V2::COLUMN_ETS_TAG, columnPattern);
+    ASSERT_NE(columnNode, nullptr);
+    EXPECT_EQ(pattern->FindTextNode(columnNode), nullptr);
+
+    columnNode->AddChild(textNode);
+    auto foundNested = pattern->FindTextNode(columnNode);
+    EXPECT_EQ(foundNested, textNode);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_LinearFontSize001
+ * @tc.desc: Test LinearFontSize interpolation at percent 0, 0.5, 1.0 and above 1.0, plus LPX unit conversion.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_LinearFontSize001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    Dimension start(10.0, DimensionUnit::FP);
+    Dimension end(20.0, DimensionUnit::FP);
+
+    auto result0 = pattern->LinearFontSize(start, end, 0.0);
+    EXPECT_FLOAT_EQ(result0.Value(), 10.0);
+
+    auto resultHalf = pattern->LinearFontSize(start, end, 0.5);
+    EXPECT_FLOAT_EQ(resultHalf.Value(), 15.0);
+
+    auto resultFull = pattern->LinearFontSize(start, end, 1.0);
+    EXPECT_FLOAT_EQ(resultFull.Value(), 20.0);
+
+    auto resultOver = pattern->LinearFontSize(start, end, 1.5);
+    EXPECT_FLOAT_EQ(resultOver.Value(), 20.0);
+
+    Dimension startLpx(10.0, DimensionUnit::LPX);
+    Dimension endLpx(20.0, DimensionUnit::LPX);
+    auto resultLpx = pattern->LinearFontSize(startLpx, endLpx, 0.0);
+    EXPECT_EQ(resultLpx.Unit(), DimensionUnit::PX);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_CacheOriginalItemStyle001
+ * @tc.desc: Test CacheOriginalItemStyle caches on first call and skips on second call when already cached.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_CacheOriginalItemStyle001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+    Color originalColor = Color::RED;
+    textLayoutProperty->UpdateTextColor(originalColor);
+
+    Dimension defaultSize(20.0, DimensionUnit::FP);
+    Color defaultColor = Color::BLACK;
+    pattern->CacheOriginalItemStyle(0, textLayoutProperty, defaultSize, defaultColor);
+    EXPECT_EQ(pattern->originalItemStyle_.size(), static_cast<size_t>(1));
+    EXPECT_EQ(pattern->originalItemStyle_[0].currentColor, originalColor);
+
+    Color newColor = Color::GREEN;
+    textLayoutProperty->UpdateTextColor(newColor);
+    pattern->CacheOriginalItemStyle(0, textLayoutProperty, defaultSize, defaultColor);
+    EXPECT_EQ(pattern->originalItemStyle_.size(), static_cast<size_t>(1));
+    EXPECT_EQ(pattern->originalItemStyle_[0].currentColor, originalColor);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_ApplyCenterItemSelectedStyle001
+ * @tc.desc: Test ApplyCenterItemSelectedStyle updates fontSize, textColor, fontWeight and alignment
+ *            from selectedTextStyle_.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_ApplyCenterItemSelectedStyle001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    PickerTextStyle style;
+    style.fontSize = Dimension(22.0, DimensionUnit::FP);
+    style.textColor = Color::GREEN;
+    style.fontWeight = FontWeight::BOLD;
+    pattern->SetSelectedTextStyleVal(style);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    Color applyColor = Color::RED;
+    pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+
+    EXPECT_TRUE(textLayoutProperty->HasFontSize());
+    EXPECT_FLOAT_EQ(textLayoutProperty->GetFontSize().value().Value(), 22.0);
+    EXPECT_TRUE(textLayoutProperty->HasTextColor());
+    EXPECT_EQ(textLayoutProperty->GetTextColor().value(), Color::GREEN);
+    EXPECT_TRUE(textLayoutProperty->HasFontWeight());
+    EXPECT_EQ(textLayoutProperty->GetFontWeight().value(), FontWeight::BOLD);
+    EXPECT_EQ(applyColor, Color::GREEN);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_RestoreItemOriginalStyle001
+ * @tc.desc: Test RestoreItemOriginalStyle restores cached values and is no-op when index not in cache.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_RestoreItemOriginalStyle001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+    Color cachedColor = Color::RED;
+    textLayoutProperty->UpdateTextColor(cachedColor);
+
+    Dimension defaultSize(20.0, DimensionUnit::FP);
+    Color defaultColor = Color::BLACK;
+    pattern->CacheOriginalItemStyle(0, textLayoutProperty, defaultSize, defaultColor);
+
+    textLayoutProperty->UpdateTextColor(Color::GREEN);
+    Color applyColor = Color::BLACK;
+    pattern->RestoreItemOriginalStyle(0, textLayoutProperty, applyColor);
+    EXPECT_EQ(textLayoutProperty->GetTextColor().value(), cachedColor);
+    EXPECT_EQ(applyColor, cachedColor);
+
+    Color applyColor2 = Color::BLACK;
+    pattern->RestoreItemOriginalStyle(999, textLayoutProperty, applyColor2);
+    EXPECT_EQ(applyColor2, Color::BLACK);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_ApplyTextStyleToItem001
+ * @tc.desc: Test ApplyTextStyleToItem applies style when isSelected is true and HasSelectedTextStyle,
+ *            and is no-op when isSelected is false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_ApplyTextStyleToItem001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    PickerTextStyle style;
+    style.textColor = Color::BLUE;
+    style.fontSize = Dimension(24.0, DimensionUnit::FP);
+    pattern->SetSelectedTextStyleVal(style);
+    pattern->isModified_ = false;
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    pattern->ApplyTextStyleToItem(textNode, true);
+    EXPECT_TRUE(pattern->isModified_);
+    EXPECT_TRUE(textLayoutProperty->HasTextColor());
+    EXPECT_EQ(textLayoutProperty->GetTextColor().value(), Color::BLUE);
+    EXPECT_TRUE(textLayoutProperty->HasFontSize());
+    EXPECT_FLOAT_EQ(textLayoutProperty->GetFontSize().value().Value(), 24.0);
+
+    pattern->isModified_ = false;
+    textLayoutProperty->UpdateTextColor(Color::RED);
+    pattern->ApplyTextStyleToItem(textNode, false);
+    EXPECT_FALSE(pattern->isModified_);
+    EXPECT_EQ(textLayoutProperty->GetTextColor().value(), Color::RED);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_FlushAnimationTextProperties001
+ * @tc.desc: Test FlushAnimationTextProperties erases front when isDown, inserts at front when not isDown,
+ *            and is no-op when empty.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_FlushAnimationTextProperties001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    pattern->animationProperties_.clear();
+    pattern->FlushAnimationTextProperties(true);
+    EXPECT_EQ(pattern->animationProperties_.size(), static_cast<size_t>(0));
+
+    TextProperties props1;
+    props1.fontSize = Dimension(10.0, DimensionUnit::FP);
+    props1.currentColor = Color::RED;
+    TextProperties props2;
+    props2.fontSize = Dimension(20.0, DimensionUnit::FP);
+    props2.currentColor = Color::GREEN;
+    pattern->animationProperties_.push_back(props1);
+    pattern->animationProperties_.push_back(props2);
+
+    pattern->FlushAnimationTextProperties(true);
+    EXPECT_EQ(pattern->animationProperties_.size(), static_cast<size_t>(1));
+    EXPECT_FLOAT_EQ(pattern->animationProperties_[0].fontSize.Value(), 20.0);
+
+    pattern->animationProperties_.push_back(props2);
+    pattern->FlushAnimationTextProperties(false);
+    EXPECT_EQ(pattern->animationProperties_.size(), static_cast<size_t>(3));
+    EXPECT_FLOAT_EQ(pattern->animationProperties_[0].fontSize.Value(), 20.0);
+    EXPECT_FLOAT_EQ(pattern->animationProperties_[1].fontSize.Value(), 20.0);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_UpdateScrollTextAnimation001
+ * @tc.desc: Test UpdateScrollTextAnimation early returns when HasSelectedTextStyle is false or pickerItemHeight_ <= 0.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_UpdateScrollTextAnimation001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    pattern->pickerItemHeight_ = 100.0f;
+    pattern->mainDeltaSum_ = 50.0f;
+    pattern->distancePercent_ = 0.0;
+    pattern->SetSelectedTextStyleVal(PickerTextStyle());
+    pattern->UpdateScrollTextAnimation(10.0);
+    EXPECT_EQ(pattern->distancePercent_, 0.0);
+
+    PickerTextStyle style;
+    style.fontSize = Dimension(20.0, DimensionUnit::FP);
+    pattern->SetSelectedTextStyleVal(style);
+    pattern->pickerItemHeight_ = 0.0f;
+    pattern->UpdateScrollTextAnimation(10.0);
+    EXPECT_EQ(pattern->distancePercent_, 0.0);
+
+    pattern->pickerItemHeight_ = 100.0f;
+    pattern->mainDeltaSum_ = 50.0f;
+    pattern->UpdateScrollTextAnimation(10.0);
+    EXPECT_FLOAT_EQ(pattern->distancePercent_, 0.5);
+}
+/**
+ * @tc.name: ContainerPickerPatternTest_SetSelectedTextStyleRestoreApply001
+ * @tc.desc: Switch from full style to partial style (only color), verify size and weight reset to default
+ *           through restore-then-apply sequence.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_SetSelectedTextStyleRestoreApply001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    Dimension defaultSize(16.0, DimensionUnit::FP);
+    Color defaultColor = Color::BLACK;
+    pattern->CacheOriginalItemStyle(0, textLayoutProperty, defaultSize, defaultColor);
+
+    PickerTextStyle fullStyle;
+    fullStyle.textColor = Color::BLUE;
+    fullStyle.fontSize = Dimension(22.0, DimensionUnit::FP);
+    fullStyle.fontWeight = FontWeight::BOLD;
+    pattern->SetSelectedTextStyleVal(fullStyle);
+
+    Color applyColor = defaultColor;
+    pattern->RestoreItemOriginalStyle(0, textLayoutProperty, applyColor);
+    pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+
+    EXPECT_TRUE(textLayoutProperty->HasTextColor());
+    EXPECT_EQ(textLayoutProperty->GetTextColor().value(), Color::BLUE);
+    EXPECT_TRUE(textLayoutProperty->HasFontSize());
+    EXPECT_FLOAT_EQ(textLayoutProperty->GetFontSize().value().Value(), 22.0);
+    EXPECT_TRUE(textLayoutProperty->HasFontWeight());
+    EXPECT_EQ(textLayoutProperty->GetFontWeight().value(), FontWeight::BOLD);
+
+    PickerTextStyle partialStyle;
+    partialStyle.textColor = Color::RED;
+    pattern->SetSelectedTextStyleVal(partialStyle);
+
+    pattern->RestoreItemOriginalStyle(0, textLayoutProperty, applyColor);
+    pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+
+    EXPECT_TRUE(textLayoutProperty->HasTextColor());
+    EXPECT_EQ(textLayoutProperty->GetTextColor().value(), Color::RED);
+    EXPECT_TRUE(textLayoutProperty->HasFontSize());
+    EXPECT_FLOAT_EQ(textLayoutProperty->GetFontSize().value().Value(), 16.0);
+    EXPECT_TRUE(textLayoutProperty->HasFontWeight());
+    EXPECT_NE(textLayoutProperty->GetFontWeight().value(), FontWeight::BOLD);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_SetSelectedTextStyleRestoreApply002
+ * @tc.desc: Switch from full style to empty style, verify all fields reset to default
+ *           through restore-then-apply sequence.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_SetSelectedTextStyleRestoreApply002, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    Dimension defaultSize(16.0, DimensionUnit::FP);
+    Color defaultColor = Color::BLACK;
+    pattern->CacheOriginalItemStyle(0, textLayoutProperty, defaultSize, defaultColor);
+
+    PickerTextStyle fullStyle;
+    fullStyle.textColor = Color::BLUE;
+    fullStyle.fontSize = Dimension(22.0, DimensionUnit::FP);
+    fullStyle.fontWeight = FontWeight::BOLD;
+    pattern->SetSelectedTextStyleVal(fullStyle);
+
+    Color applyColor = defaultColor;
+    pattern->RestoreItemOriginalStyle(0, textLayoutProperty, applyColor);
+    pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+
+    EXPECT_TRUE(textLayoutProperty->HasTextColor());
+    EXPECT_TRUE(textLayoutProperty->HasFontSize());
+    EXPECT_TRUE(textLayoutProperty->HasFontWeight());
+
+    pattern->SetSelectedTextStyleVal(PickerTextStyle());
+    pattern->RestoreItemOriginalStyle(0, textLayoutProperty, applyColor);
+
+    EXPECT_TRUE(textLayoutProperty->HasTextColor());
+    EXPECT_EQ(textLayoutProperty->GetTextColor().value(), Color::BLACK);
+    EXPECT_TRUE(textLayoutProperty->HasFontSize());
+    EXPECT_FLOAT_EQ(textLayoutProperty->GetFontSize().value().Value(), 16.0);
+    EXPECT_TRUE(textLayoutProperty->HasFontWeight());
+    EXPECT_NE(textLayoutProperty->GetFontWeight().value(), FontWeight::BOLD);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_SetSelectedTextStyleRestoreApply003
+ * @tc.desc: First time setting full style with restore-then-apply, verify all fields applied correctly.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_SetSelectedTextStyleRestoreApply003, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    Dimension defaultSize(16.0, DimensionUnit::FP);
+    Color defaultColor = Color::BLACK;
+    pattern->CacheOriginalItemStyle(0, textLayoutProperty, defaultSize, defaultColor);
+
+    PickerTextStyle style;
+    style.textColor = Color::GREEN;
+    style.fontSize = Dimension(25.0, DimensionUnit::FP);
+    style.fontWeight = FontWeight::MEDIUM;
+    pattern->SetSelectedTextStyleVal(style);
+
+    Color applyColor = defaultColor;
+    pattern->RestoreItemOriginalStyle(0, textLayoutProperty, applyColor);
+    pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+
+    EXPECT_TRUE(textLayoutProperty->HasTextColor());
+    EXPECT_EQ(textLayoutProperty->GetTextColor().value(), Color::GREEN);
+    EXPECT_TRUE(textLayoutProperty->HasFontSize());
+    EXPECT_FLOAT_EQ(textLayoutProperty->GetFontSize().value().Value(), 25.0);
+    EXPECT_TRUE(textLayoutProperty->HasFontWeight());
+    EXPECT_EQ(textLayoutProperty->GetFontWeight().value(), FontWeight::MEDIUM);
+}
 } // namespace OHOS::Ace::NG

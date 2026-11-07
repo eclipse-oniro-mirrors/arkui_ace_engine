@@ -19,6 +19,10 @@
 
 #include "core/common/frontend.h"
 #include "core/common/container.h"
+#include "core/components_ng/base/node_sensitive_input.h"
+#include "core/components_ng/event/touch_event.h"
+#include "core/event/key_event.h"
+#include "core/event/mouse_event.h"
 #include "core/components_ng/pattern/navigation/navigation_pattern.h"
 #include "core/components_ng/pattern/navigation/navigation_stack.h"
 #include "core/components_ng/pattern/navrouter/navdestination_pattern.h"
@@ -27,6 +31,9 @@
 
 namespace OHOS::Ace::NG {
 namespace {
+constexpr int32_t ABOUT_TO_API_MAJOR = 26;
+constexpr int32_t ABOUT_TO_API_MINOR = 1;
+constexpr int32_t ABOUT_TO_API_PATCH = 0;
 std::string GetNavigationId(const RefPtr<NavDestinationPattern>& pattern)
 {
     CHECK_NULL_RETURN(pattern, "");
@@ -159,6 +166,71 @@ UIObserverHandler& UIObserverHandler::GetInstance()
     return instance;
 }
 
+namespace {
+EventTarget GetNodeSensitiveTarget(const RefPtr<FrameNode>& node)
+{
+    auto hub = node ? node->GetEventHub<NG::EventHub>() : nullptr;
+    return hub ? hub->CreateGetEventTargetImpl()().value_or(EventTarget()) : EventTarget();
+}
+
+} // namespace
+
+TouchEventInfo CreateNodeSensitiveTouchInfo(const TouchEvent& event, FrameNode* frameNode)
+{
+    auto node = AceType::Claim(frameNode);
+    auto info = TouchEventActuator::CreateInputEventInfo(event, node);
+    info.SetTarget(GetNodeSensitiveTarget(node));
+    return info;
+}
+
+MouseInfo CreateNodeSensitiveMouseInfo(const MouseEvent& event, FrameNode* frameNode)
+{
+    auto node = AceType::Claim(frameNode);
+    MouseEventTarget target("nodeSensitiveInput", node ? node->GetId() : -1);
+    target.AttachFrameNode(node);
+    auto info = target.CreateMouseInfo(event);
+    info.SetTarget(GetNodeSensitiveTarget(node));
+    return info;
+}
+
+KeyEventInfo CreateNodeSensitiveKeyInfo(const KeyEvent& event, FrameNode* frameNode)
+{
+    auto node = AceType::Claim(frameNode);
+    auto info = KeyEventInfo(event);
+    if (event.HasKey(KeyCode::KEY_META_LEFT) || event.HasKey(KeyCode::KEY_META_RIGHT)) {
+        info.SetMetaKey(1);
+    }
+    info.SetTarget(GetNodeSensitiveTarget(node));
+    return info;
+}
+
+void NotifyNodeSensitiveInput(const RefPtr<FrameNode>& node, const NodeSensitiveInputInfo& info)
+{
+    UIObserverHandler::GetInstance().NotifyNodeSensitiveInput(node, info);
+}
+
+void UIObserverHandler::NotifyNodeSensitiveInput(const RefPtr<FrameNode>& node, const NodeSensitiveInputInfo& info)
+{
+    auto callbackForAni = nodeSensitiveInputHandleFuncForAni_;
+    if (callbackForAni) {
+        callbackForAni(node, info);
+    }
+    auto callback = nodeSensitiveInputHandleFunc_;
+    if (callback) {
+        callback(node, info);
+    }
+}
+
+void UIObserverHandler::SetNodeSensitiveInputHandleFunc(NodeSensitiveInputHandleFunc&& func)
+{
+    nodeSensitiveInputHandleFunc_ = std::move(func);
+}
+
+void UIObserverHandler::SetNodeSensitiveInputHandleFuncForAni(NodeSensitiveInputHandleFunc&& func)
+{
+    nodeSensitiveInputHandleFuncForAni_ = std::move(func);
+}
+
 void UIObserverHandler::NotifyNavigationStateChange(const WeakPtr<AceType>& weakPattern, NavDestinationState state)
 {
     NotifyNavigationStateChangeForAni(weakPattern, state);
@@ -187,6 +259,10 @@ void UIObserverHandler::NotifyNavigationStateChange(const WeakPtr<AceType>& weak
         state == NavDestinationState::ON_ACTIVE || state == NavDestinationState::ON_INACTIVE)) {
         return;
     }
+    if (Container::LessThanAPITargetVersionFull(ABOUT_TO_API_MAJOR, ABOUT_TO_API_MINOR, ABOUT_TO_API_PATCH) &&
+        (state == NavDestinationState::ABOUT_TO_APPEAR || state == NavDestinationState::ABOUT_TO_DISAPPEAR)) {
+        return;
+    }
     std::shared_ptr<NavPathInfoScope> scope = nullptr;
     scope = pathInfo->Scope();
     NavDestinationInfo info(GetNavigationId(pattern), pattern->GetName(), state, context->GetIndex(),
@@ -206,6 +282,10 @@ void UIObserverHandler::NotifyNavigationStateChangeForAni(
     const WeakPtr<AceType>& weakPattern, NavDestinationState state)
 {
     CHECK_NULL_VOID(navigationHandleFuncForAni_);
+    if (Container::LessThanAPITargetVersionFull(ABOUT_TO_API_MAJOR, ABOUT_TO_API_MINOR, ABOUT_TO_API_PATCH) &&
+        (state == NavDestinationState::ABOUT_TO_APPEAR || state == NavDestinationState::ABOUT_TO_DISAPPEAR)) {
+        return;
+    }
     auto ref = weakPattern.Upgrade();
     CHECK_NULL_VOID(ref);
     auto pattern = AceType::DynamicCast<NavDestinationPattern>(ref);
@@ -711,13 +791,7 @@ void UIObserverHandler::HandleDrawCommandSendCallBack()
 {
     CHECK_NULL_VOID(drawCommandSendHandleFunc_);
     ACE_LAYOUT_SCOPED_TRACE("drawCommandSend");
-    auto container = Container::Current();
-    CHECK_NULL_VOID(container);
-    auto taskExecutor = container->GetTaskExecutor();
-    CHECK_NULL_VOID(taskExecutor);
-    taskExecutor->PostTask(
-        [callback = drawCommandSendHandleFunc_] { callback(); },
-        TaskExecutor::TaskType::JS, "ArkUIObserverDrawCommandSend");
+    drawCommandSendHandleFunc_();
 }
 
 void UIObserverHandler::HandleLayoutDoneCallBack()

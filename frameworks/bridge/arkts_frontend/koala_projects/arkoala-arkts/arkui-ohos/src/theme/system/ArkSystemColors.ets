@@ -76,6 +76,9 @@ export class ArkSystemColors implements Colors {
     public interactiveActive: ResourceColor;
     public interactiveSelect: ResourceColor;
     public interactiveClick: ResourceColor;
+    public primary?: ResourceColor;
+    public onPrimary?: ResourceColor;
+    public container?: ResourceColor;
 
     constructor() {
         this.brand = _r(125830976, 10001, '', '', 'sys.color.brand');
@@ -197,6 +200,9 @@ export class ArkSystemCustomColors implements CustomColors {
     public interactiveActive?: ResourceColor;
     public interactiveSelect?: ResourceColor;
     public interactiveClick?: ResourceColor;
+    public primary?: ResourceColor;
+    public onPrimary?: ResourceColor;
+    public container?: ResourceColor;
 
     constructor() {}
 }

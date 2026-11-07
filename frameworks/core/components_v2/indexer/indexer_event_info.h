@@ -19,10 +19,11 @@
 #include "core/event/ace_events.h"
 
 namespace OHOS::Ace::V2 {
-class IndexerEventInfo : public BaseEventInfo, public EventToJSONStringAdapter {
-    DECLARE_RELATIONSHIP_OF_CLASSES(IndexerEventInfo, BaseEventInfo, EventToJSONStringAdapter);
+class IndexerEventInfo : public JSONStringifiableEventInfo {
+    DECLARE_RELATIONSHIP_OF_CLASSES(IndexerEventInfo, JSONStringifiableEventInfo);
 public:
-    explicit IndexerEventInfo(int32_t selectedIndex) : BaseEventInfo("indexer"), selectedIndex_(selectedIndex)
+    explicit IndexerEventInfo(int32_t selectedIndex)
+        : JSONStringifiableEventInfo("indexer"), selectedIndex_(selectedIndex)
     {}
 
     ~IndexerEventInfo() = default;

@@ -428,7 +428,7 @@ HWTEST_F(MenuLayout3TwoTestNg, InitWrapperRect002, TestSize.Level1)
     layoutAlgorithm->canExpandCurrentWindow_ = true;
     layoutAlgorithm->isExpandDisplay_ = true;
     layoutAlgorithm->param_.menuWindowRect = Rect(ZERO, ZERO, WIDTH, HEIGHT);
-    layoutAlgorithm->InitWrapperRect(property, menuPattern);
+    layoutAlgorithm->InitWrapperRect(property, menuPattern, SafeAreaInsets{});
     EXPECT_EQ(layoutAlgorithm->wrapperSize_.width_, TEN);
 }
 
@@ -454,8 +454,147 @@ HWTEST_F(MenuLayout3TwoTestNg, InitWrapperRect003, TestSize.Level1)
     layoutAlgorithm->canExpandCurrentWindow_ = true;
     layoutAlgorithm->isExpandDisplay_ = true;
     layoutAlgorithm->param_.menuWindowRect = Rect(ZERO, ZERO, WIDTH, HEIGHT);
-    layoutAlgorithm->InitWrapperRect(property, menuPattern);
+    layoutAlgorithm->InitWrapperRect(property, menuPattern, SafeAreaInsets{});
     EXPECT_EQ(layoutAlgorithm->wrapperSize_.width_, TEN);
+}
+
+/**
+ * @tc.name: GetParentOffset001
+ * @tc.desc: When the menu wrapper is hiding, GetParentOffset returns the cached wrapper parent offset.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuLayout3TwoTestNg, GetParentOffset001, TestSize.Level1)
+{
+    auto wrapperNode =
+        FrameNode::CreateFrameNode(V2::MENU_WRAPPER_ETS_TAG, TARGET_ID, AceType::MakeRefPtr<MenuWrapperPattern>(1));
+    auto menuNode = FrameNode::CreateFrameNode(
+        V2::MENU_ETS_TAG, NODE_ID, AceType::MakeRefPtr<MenuPattern>(NODE_ID, "", MenuType::MENU));
+    ASSERT_NE(menuNode, nullptr);
+    menuNode->MountToParent(wrapperNode);
+    auto menuPattern = menuNode->GetPattern<MenuPattern>();
+    ASSERT_NE(menuPattern, nullptr);
+    auto menuWrapper = menuPattern->GetMenuWrapper();
+    ASSERT_NE(menuWrapper, nullptr);
+    auto menuWrapperPattern = menuWrapper->GetPattern<MenuWrapperPattern>();
+    ASSERT_NE(menuWrapperPattern, nullptr);
+    // cache a known parent offset and mark the wrapper as hiding
+    OffsetF cachedOffset(TEN, FIFTY);
+    menuPattern->SetWrapperParentOffset(cachedOffset);
+    menuWrapperPattern->SetMenuStatus(MenuStatus::HIDE);
+    ASSERT_TRUE(menuWrapperPattern->IsHide());
+    RefPtr<MenuLayoutAlgorithm> layoutAlgorithm = AceType::MakeRefPtr<MenuLayoutAlgorithm>();
+    auto parentOffset = layoutAlgorithm->GetParentOffset(menuNode, menuPattern);
+    EXPECT_EQ(parentOffset, cachedOffset);
+    // the cache must be preserved untouched while hiding
+    EXPECT_EQ(menuPattern->GetWrapperParentOffset(), cachedOffset);
+}
+
+/**
+ * @tc.name: GetParentOffset002
+ * @tc.desc: When the wrapper is visible, GetParentOffset refreshes the cache from the host paint offset.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuLayout3TwoTestNg, GetParentOffset002, TestSize.Level1)
+{
+    auto wrapperNode =
+        FrameNode::CreateFrameNode(V2::MENU_WRAPPER_ETS_TAG, TARGET_ID, AceType::MakeRefPtr<MenuWrapperPattern>(1));
+    auto menuNode = FrameNode::CreateFrameNode(
+        V2::MENU_ETS_TAG, NODE_ID, AceType::MakeRefPtr<MenuPattern>(NODE_ID, "", MenuType::MENU));
+    ASSERT_NE(menuNode, nullptr);
+    menuNode->MountToParent(wrapperNode);
+    auto menuPattern = menuNode->GetPattern<MenuPattern>();
+    ASSERT_NE(menuPattern, nullptr);
+    auto menuWrapper = menuPattern->GetMenuWrapper();
+    ASSERT_NE(menuWrapper, nullptr);
+    auto menuWrapperPattern = menuWrapper->GetPattern<MenuWrapperPattern>();
+    ASSERT_NE(menuWrapperPattern, nullptr);
+    // a stale cached value that must be overwritten by the host offset
+    menuPattern->SetWrapperParentOffset(OffsetF(TEN, FIFTY));
+    menuWrapperPattern->SetMenuStatus(MenuStatus::SHOW);
+    ASSERT_FALSE(menuWrapperPattern->IsHide());
+    RefPtr<MenuLayoutAlgorithm> layoutAlgorithm = AceType::MakeRefPtr<MenuLayoutAlgorithm>();
+    auto parentOffset = layoutAlgorithm->GetParentOffset(menuNode, menuPattern);
+    auto hostOffset = menuNode->GetPaintRectOffset(true, true);
+    EXPECT_EQ(parentOffset, hostOffset);
+    // the cache must be refreshed to the host offset instead of the stale value
+    EXPECT_EQ(menuPattern->GetWrapperParentOffset(), hostOffset);
+}
+
+/**
+ * @tc.name: GetParentOffset003
+ * @tc.desc: GetParentOffset returns OffsetF() when the menuPattern is null.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuLayout3TwoTestNg, GetParentOffset003, TestSize.Level1)
+{
+    auto menuNode = FrameNode::CreateFrameNode(
+        V2::MENU_ETS_TAG, NODE_ID, AceType::MakeRefPtr<MenuPattern>(NODE_ID, "", MenuType::MENU));
+    ASSERT_NE(menuNode, nullptr);
+    RefPtr<MenuLayoutAlgorithm> layoutAlgorithm = AceType::MakeRefPtr<MenuLayoutAlgorithm>();
+    auto parentOffset = layoutAlgorithm->GetParentOffset(menuNode, nullptr);
+    EXPECT_EQ(parentOffset, OffsetF());
+}
+
+/**
+ * @tc.name: GetParentOffset004
+ * @tc.desc: GetParentOffset returns OffsetF() when the menu has no wrapper node.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuLayout3TwoTestNg, GetParentOffset004, TestSize.Level1)
+{
+    auto menuNode = FrameNode::CreateFrameNode(
+        V2::MENU_ETS_TAG, NODE_ID, AceType::MakeRefPtr<MenuPattern>(NODE_ID, "", MenuType::MENU));
+    ASSERT_NE(menuNode, nullptr);
+    auto menuPattern = menuNode->GetPattern<MenuPattern>();
+    ASSERT_NE(menuPattern, nullptr);
+    ASSERT_EQ(menuPattern->GetMenuWrapper(), nullptr);
+    RefPtr<MenuLayoutAlgorithm> layoutAlgorithm = AceType::MakeRefPtr<MenuLayoutAlgorithm>();
+    auto parentOffset = layoutAlgorithm->GetParentOffset(menuNode, menuPattern);
+    EXPECT_EQ(parentOffset, OffsetF());
+}
+
+/**
+ * @tc.name: GetParentOffset005
+ * @tc.desc: GetParentOffset returns the cached offset while the wrapper is in ON_HIDE_ANIMATION.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuLayout3TwoTestNg, GetParentOffset005, TestSize.Level1)
+{
+    auto wrapperNode =
+        FrameNode::CreateFrameNode(V2::MENU_WRAPPER_ETS_TAG, TARGET_ID, AceType::MakeRefPtr<MenuWrapperPattern>(1));
+    auto menuNode = FrameNode::CreateFrameNode(
+        V2::MENU_ETS_TAG, NODE_ID, AceType::MakeRefPtr<MenuPattern>(NODE_ID, "", MenuType::MENU));
+    ASSERT_NE(menuNode, nullptr);
+    menuNode->MountToParent(wrapperNode);
+    auto menuPattern = menuNode->GetPattern<MenuPattern>();
+    ASSERT_NE(menuPattern, nullptr);
+    auto menuWrapper = menuPattern->GetMenuWrapper();
+    ASSERT_NE(menuWrapper, nullptr);
+    auto menuWrapperPattern = menuWrapper->GetPattern<MenuWrapperPattern>();
+    ASSERT_NE(menuWrapperPattern, nullptr);
+    OffsetF cachedOffset(ONE_HUNDRED, FIFTY);
+    menuPattern->SetWrapperParentOffset(cachedOffset);
+    menuWrapperPattern->SetMenuStatus(MenuStatus::ON_HIDE_ANIMATION);
+    ASSERT_TRUE(menuWrapperPattern->IsHide());
+    RefPtr<MenuLayoutAlgorithm> layoutAlgorithm = AceType::MakeRefPtr<MenuLayoutAlgorithm>();
+    auto parentOffset = layoutAlgorithm->GetParentOffset(menuNode, menuPattern);
+    EXPECT_EQ(parentOffset, cachedOffset);
+    EXPECT_EQ(menuPattern->GetWrapperParentOffset(), cachedOffset);
+}
+
+/**
+ * @tc.name: WrapperParentOffset001
+ * @tc.desc: Verify SetWrapperParentOffset/GetWrapperParentOffset round trip on MenuPattern.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuLayout3TwoTestNg, WrapperParentOffset001, TestSize.Level1)
+{
+    RefPtr<MenuPattern> menuPattern = AceType::MakeRefPtr<MenuPattern>(NODE_ID, "", MenuType::MENU);
+    ASSERT_NE(menuPattern, nullptr);
+    EXPECT_EQ(menuPattern->GetWrapperParentOffset(), OffsetF());
+    OffsetF offset(ONE_HUNDRED, FIFTY);
+    menuPattern->SetWrapperParentOffset(offset);
+    EXPECT_EQ(menuPattern->GetWrapperParentOffset(), offset);
 }
 
 /**
@@ -1166,13 +1305,16 @@ HWTEST_F(MenuLayout3TwoTestNg, CalculateSafeAreaIntersection001, TestSize.Level1
 {
     auto menuAlgorithm = AceType::MakeRefPtr<MenuLayoutAlgorithm>();
     ASSERT_NE(menuAlgorithm, nullptr);
+    auto menuNode = FrameNode::CreateFrameNode(
+        V2::MENU_ETS_TAG, NODE_ID, AceType::MakeRefPtr<MenuPattern>(NODE_ID, "", MenuType::MENU));
+    auto menuPattern = menuNode->GetPattern<MenuPattern>();
+    ASSERT_NE(menuPattern, nullptr);
     menuAlgorithm->targetInUIExtension_ = false;
-    menuAlgorithm->left_ = 10.0f;
-    menuAlgorithm->top_ = 20.0f;
-    menuAlgorithm->right_ = 30.0f;
-    menuAlgorithm->bottom_ = 40.0f;
-    menuAlgorithm->width_ = 500.0f;
-    menuAlgorithm->height_ = 800.0f;
+    menuAlgorithm->param_.left = 10.0f;
+    menuAlgorithm->param_.top = 20.0f;
+    menuAlgorithm->param_.right = 30.0f;
+    menuAlgorithm->param_.bottom = 40.0f;
+    menuAlgorithm->param_.menuWindowRect = Rect(0, 0, 500.0f, 800.0f);
     SafeAreaInsets safeAreaInsets;
     SafeAreaInsets::Inset topInset;
     topInset.start = 0;
@@ -1182,13 +1324,13 @@ HWTEST_F(MenuLayout3TwoTestNg, CalculateSafeAreaIntersection001, TestSize.Level1
     bottomInset.start = 700;
     bottomInset.end = 800;
     safeAreaInsets.bottom_ = bottomInset;
-    menuAlgorithm->CalculateSafeAreaIntersection(safeAreaInsets, nullptr, nullptr, nullptr);
-    float expectedWidth = menuAlgorithm->width_ - menuAlgorithm->left_ - menuAlgorithm->right_;
-    float expectedHeight = menuAlgorithm->height_ - menuAlgorithm->top_ - menuAlgorithm->bottom_;
+    menuAlgorithm->CalculateSafeAreaIntersection(safeAreaInsets, nullptr, nullptr, menuPattern);
+    float expectedWidth = 500.0f - menuAlgorithm->param_.left - menuAlgorithm->param_.right;
+    float expectedHeight = 800.0f - menuAlgorithm->param_.top - menuAlgorithm->param_.bottom;
     EXPECT_EQ(menuAlgorithm->wrapperRect_.Width(), expectedWidth);
     EXPECT_EQ(menuAlgorithm->wrapperRect_.Height(), expectedHeight);
-    EXPECT_EQ(menuAlgorithm->wrapperRect_.Left(), menuAlgorithm->left_);
-    EXPECT_EQ(menuAlgorithm->wrapperRect_.Top(), menuAlgorithm->top_);
+    EXPECT_EQ(menuAlgorithm->wrapperRect_.Left(), menuAlgorithm->param_.left);
+    EXPECT_EQ(menuAlgorithm->wrapperRect_.Top(), menuAlgorithm->param_.top);
 }
 
 /**
@@ -1229,6 +1371,7 @@ HWTEST_F(MenuLayout3TwoTestNg, CalculateSafeAreaIntersection003, TestSize.Level1
     ASSERT_NE(menuAlgorithm, nullptr);
     menuAlgorithm->targetInUIExtension_ = true;
     menuAlgorithm->param_.menuWindowRect = Rect(0.0f, 700.0f, 500.0f, 300.0f);
+    menuAlgorithm->UIExtensionHostWindowRect_ = RectF(0.0f, 0.0f, 500.0f, 1000.0f);
     SafeAreaInsets safeAreaInsets;
     SafeAreaInsets::Inset topInset;
     topInset.start = 0;
@@ -1255,6 +1398,7 @@ HWTEST_F(MenuLayout3TwoTestNg, CalculateSafeAreaIntersection004, TestSize.Level1
     ASSERT_NE(menuAlgorithm, nullptr);
     menuAlgorithm->targetInUIExtension_ = true;
     menuAlgorithm->param_.menuWindowRect = Rect(0.0f, 0.0f, 500.0f, 1000.0f);
+    menuAlgorithm->UIExtensionHostWindowRect_ = RectF(0.0f, 0.0f, 500.0f, 1050.0f);
     SafeAreaInsets safeAreaInsets;
     SafeAreaInsets::Inset topInset;
     topInset.start = 0;
@@ -1365,6 +1509,7 @@ HWTEST_F(MenuLayout3TwoTestNg, CalculateSafeAreaIntersection008, TestSize.Level1
     ASSERT_NE(menuAlgorithm, nullptr);
     menuAlgorithm->targetInUIExtension_ = true;
     menuAlgorithm->param_.menuWindowRect = Rect(0.0f, 0.0f, 500.0f, 800.0f);
+    menuAlgorithm->UIExtensionHostWindowRect_ = RectF(0.0f, 0.0f, 500.0f, 800.0f);
     SafeAreaInsets safeAreaInsets;
     SafeAreaInsets::Inset topInset;
     topInset.start = 0;
@@ -1406,6 +1551,7 @@ HWTEST_F(MenuLayout3TwoTestNg, CalculateSafeAreaIntersection009, TestSize.Level1
     ASSERT_NE(menuAlgorithm, nullptr);
     menuAlgorithm->targetInUIExtension_ = true;
     menuAlgorithm->param_.menuWindowRect = Rect(0.0f, 0.0f, 500.0f, 1000.0f);
+    menuAlgorithm->UIExtensionHostWindowRect_ = RectF(0.0f, 0.0f, 500.0f, 1000.0f);
     SafeAreaInsets safeAreaInsets;
     SafeAreaInsets::Inset topInset;
     topInset.start = 0;

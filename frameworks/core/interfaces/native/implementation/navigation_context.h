@@ -26,7 +26,7 @@
 
 namespace OHOS::Ace::NG::GeneratedModifier::NavigationContext {
 
-class ExternalDataKeeper : public virtual Referenced {
+class ExternalDataKeeper : public Referenced {
 public:
     ExternalDataKeeper() = default;
     ~ExternalDataKeeper() override
@@ -92,6 +92,9 @@ public:
     bool isForceSet_ = false;
     bool isFromSingleToNMoved_ = false;
     std::shared_ptr<PathInfo> replacedDestinationInfo_ = nullptr;
+    bool autoCleaned_ = false;
+    bool autoCleanCanRecovery_ = true;
+    std::string autoCleanedState_;
 
     void InvokeOnPop(const PopInfo& popInfo);
 };
@@ -173,7 +176,7 @@ constexpr LaunchMode DEFAULT_LAUNCH_MODE = LaunchMode::STANDARD;
 
 // this duplicates the functionality of JS NavPathStack class
 // (frameworks/bridge/declarative_frontend/engine/jsEnumStyle.js)
-class PathStack : public virtual Referenced {
+class PathStack : public virtual AceType {
 public:
     enum IsReplace {
         NO_ANIM_NO_REPLACE = 0, // replace value 0: don't do anything;
@@ -374,6 +377,14 @@ public:
     int32_t GetRecoveredDestinationMode(int32_t index) override;
     bool CheckIsReplacedDestination(int32_t index, std::string& replacedName, int32_t& replacedIndex) override;
     void SetRecoveryFromReplaceDestination(int32_t index, bool value) override;
+
+    bool IsAutoCleaned(int32_t index) const override;
+    bool GetAutoCleanedCanRecovery(int32_t index) const override;
+    void ClearAutoCleanedState(int32_t index) override;
+    std::string GetAutoCleanedState(int32_t index) const override;
+    void SaveStateToJsCallback(
+        int32_t index, const std::string& name, uint64_t navDestinationId, const std::string& state) override;
+    void MarkAutoCleanedFlag(uint64_t navDestinationId, bool canRecovery = true) override;
     ParamType GetParamByIndex(int32_t index) const;
     void RegisterOnResultCallback();
 

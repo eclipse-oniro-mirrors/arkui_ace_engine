@@ -16,7 +16,7 @@
 #include "interfaces/inner_api/ui_session/ui_content_stub_impl.h"
 
 #include "ipc_skeleton.h"
-
+#include "interfaces/inner_api/ui_session/component_tree_query_type.h"
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
 
 namespace OHOS::Ace {
@@ -84,20 +84,41 @@ int32_t UIContentServiceStubImpl::RegisterSelectTextEventCallback(const EventCal
     return NO_ERROR;
 }
 
-int32_t UIContentServiceStubImpl::SendCommand(int32_t id, const std::string& command)
+int32_t UIContentServiceStubImpl::SendCommand(int32_t id, const std::string& command, SecurityAuthInfo securityAuth)
 {
-    UiSessionManager::GetInstance()->NotifySendCommandPattern(id, command);
+    UiSessionManager::GetInstance()->NotifySendCommandPattern(id, command, securityAuth);
     return NO_ERROR;
 }
 
-int32_t UIContentServiceStubImpl::SendCommandSync(int32_t id, const std::string& command)
+int32_t UIContentServiceStubImpl::SendCommandSync(int32_t id, const std::string& command, SecurityAuthInfo securityAuth)
 {
-    return UiSessionManager::GetInstance()->NotifySendCommandSyncPattern(id, command);
+    return UiSessionManager::GetInstance()->NotifySendCommandSyncPattern(id, command, securityAuth);
 }
 
-int32_t UIContentServiceStubImpl::SendCommand(const std::string command)
+int32_t UIContentServiceStubImpl::SendCommand(const std::string command, SecurityAuthInfo securityAuth)
 {
-    UiSessionManager::GetInstance()->SendCommand(command);
+    UiSessionManager::GetInstance()->SendCommand(command, securityAuth);
+    return NO_ERROR;
+}
+
+int32_t UIContentServiceStubImpl::SendCommand(
+    int32_t id, const std::string& command, const SendCommandFinishCallback& finishCallback,
+    SecurityAuthInfo securityAuth)
+{
+    if (!finishCallback) {
+        return PARAM_INVALID;
+    }
+    UiSessionManager::GetInstance()->NotifySendCommandPatternWithResult(id, command, finishCallback, securityAuth);
+    return NO_ERROR;
+}
+
+int32_t UIContentServiceStubImpl::SendCommand(
+    const std::string command, const SendCommandFinishCallback& finishCallback, SecurityAuthInfo securityAuth)
+{
+    if (!finishCallback) {
+        return PARAM_INVALID;
+    }
+    UiSessionManager::GetInstance()->SendCommandWithResult(command, finishCallback, securityAuth);
     return NO_ERROR;
 }
 
@@ -362,5 +383,44 @@ int32_t UIContentServiceStubImpl::GetPageScene(
     }
     int32_t processId = IPCSkeleton::GetCallingRealPid();
     return UiSessionManager::GetInstance()->GetPageScene(processId, ruleJsonOrRuleSetId);
+}
+
+int32_t UIContentServiceStubImpl::GetNavigationContentByPoint(float x, float y, const std::string& pattern,
+    [[maybe_unused]] const std::function<void(const std::string&)>& eventCallback,
+    [[maybe_unused]] int32_t timeout)
+{
+    ComponentTreeQueryRequest request;
+    request.type = ComponentTreeQueryType::NAVIGATION_CONTENT_BY_POINT;
+    request.x = x;
+    request.y = y;
+    request.pattern = pattern;
+    UiSessionManager::GetInstance()->ComponentTreeQuery(request);
+    return NO_ERROR;
+}
+
+int32_t UIContentServiceStubImpl::GetLazyForEachDataByPoint(float x, float y,
+    [[maybe_unused]] const std::function<void(const std::string&)>& eventCallback,
+    [[maybe_unused]] int32_t timeout)
+{
+    ComponentTreeQueryRequest request;
+    request.type = ComponentTreeQueryType::LAZY_FOREACH_DATA_BY_POINT;
+    request.x = x;
+    request.y = y;
+    UiSessionManager::GetInstance()->ComponentTreeQuery(request);
+    return NO_ERROR;
+}
+
+int32_t UIContentServiceStubImpl::GetNodesInRect(float x1, float y1, float x2, float y2,
+    [[maybe_unused]] const std::function<void(const std::string&)>& eventCallback,
+    [[maybe_unused]] int32_t timeout)
+{
+    ComponentTreeQueryRequest request;
+    request.type = ComponentTreeQueryType::NODES_IN_RECT;
+    request.x = x1;
+    request.y = y1;
+    request.extraX = x2;
+    request.extraY = y2;
+    UiSessionManager::GetInstance()->ComponentTreeQuery(request);
+    return NO_ERROR;
 }
 } // namespace OHOS::Ace

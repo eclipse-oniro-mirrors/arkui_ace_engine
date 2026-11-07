@@ -49,6 +49,9 @@ constexpr int32_t WEB_NATIVE_PARAM_INDEX = 0;
 
 constexpr char WEB_INTERFACE_REQUEST_DOM_TREE[] = "RequestArkWebDomTree";
 constexpr char WEB_INTERFACE_REQUEST_DOM_TREE_VIEWPORT[] = "RequestArkWebDomTreeViewport";
+constexpr char WEB_INTERFACE_REQUEST_DOM_TREE_BY_NATIVE[] = "RequestArkWebDomTreeByNative";
+constexpr char WEB_INTERFACE_REQUEST_DOM_TREE_BY_RECT[] = "RequestArkWebDomTreeByRect";
+constexpr char WEB_INTERFACE_REQUEST_DOM_TREE_BY_POINT[] = "RequestArkWebDomTreeByPoint";
 
 struct ActiveNode {
     int32_t id;
@@ -84,7 +87,7 @@ private:
     std::vector<std::shared_ptr<WebDomNode>> children_;
 };
 
-class WebDomDocument : public virtual AceType {
+class WebDomDocument : public AceType {
     DECLARE_ACE_TYPE(WebDomDocument, AceType);
 
 public:

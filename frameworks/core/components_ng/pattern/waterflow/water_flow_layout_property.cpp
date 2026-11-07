@@ -15,6 +15,8 @@
 
 #include "core/components_ng/pattern/waterflow/water_flow_layout_property.h"
 
+#include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
+
 #include "base/geometry/dimension.h"
 #include "base/utils/system_properties.h"
 #include "base/utils/utils.h"
@@ -26,6 +28,53 @@
 #include "frameworks/core/components_ng/property/templates_parser.h"
 
 namespace OHOS::Ace::NG {
+std::optional<ScrollSnapStrategy> WaterFlowLayoutProperty::GetScrollSnapStrategy() const
+{
+    if (!snapAlign_) {
+        return std::nullopt;
+    }
+    return ScrollSnapStrategy { snapAlign_.value(), snapHasProvider_, snapApproachOffset_, snapOffset_ };
+}
+
+void WaterFlowLayoutProperty::UpdateScrollSnapStrategy(const ScrollSnapStrategy& strategy)
+{
+    if (snapAlign_ && !snapHasProvider_ && !strategy.hasProvider && snapAlign_.value() == strategy.align) {
+        return;
+    }
+    snapAlign_ = strategy.align;
+    snapHasProvider_ = strategy.hasProvider;
+    snapApproachOffset_ = strategy.calculateApproachOffset;
+    snapOffset_ = strategy.calculateSnapOffset;
+    UpdatePropertyChangeFlag(PROPERTY_UPDATE_MEASURE);
+}
+
+void WaterFlowLayoutProperty::ResetScrollSnapStrategy()
+{
+    snapAlign_.reset();
+    snapHasProvider_ = false;
+    snapApproachOffset_ = nullptr;
+    snapOffset_ = nullptr;
+}
+
+std::string WaterFlowLayoutProperty::GetScrollSnapStrategyString() const
+{
+    auto strategy = GetScrollSnapStrategy().value_or(ScrollSnapStrategy());
+    // Provider closures cannot be serialized; dump the configured form only.
+    if (strategy.hasProvider) {
+        return "ScrollSnapOffsetProvider";
+    }
+    switch (strategy.align) {
+        case ScrollSnapAlign::START:
+            return "ScrollSnapAlign.START";
+        case ScrollSnapAlign::CENTER:
+            return "ScrollSnapAlign.CENTER";
+        case ScrollSnapAlign::END:
+            return "ScrollSnapAlign.END";
+        default:
+            return "ScrollSnapAlign.NONE";
+    }
+}
+
 void WaterFlowLayoutProperty::ResetWaterflowLayoutInfoAndMeasure() const
 {
     auto host = GetHost();
@@ -94,6 +143,7 @@ void WaterFlowLayoutProperty::ToJsonValue(std::unique_ptr<JsonValue>& json, cons
     }
     json->PutExtAttr("enableScrollInteraction", propScrollEnabled_.value_or(true), filter);
     json->PutExtAttr("syncLoad", propSyncLoad_.value_or(true), filter);
+    json->PutExtAttr("scrollSnapStrategy", GetScrollSnapStrategyString().c_str(), filter);
     if (!propItemFillPolicy_.has_value()) {
         return;
     }

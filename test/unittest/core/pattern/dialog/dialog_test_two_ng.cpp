@@ -69,28 +69,6 @@ constexpr float FONT_SIZE_SCALE_TEST1 = 1.75f;
 constexpr float FONT_SIZE_SCALE_TEST2 = 3.20f;
 } // namespace
 
-class MockDialogTheme : public DialogTheme, public ButtonTheme {
-    DECLARE_ACE_TYPE(MockDialogTheme, DialogTheme, ButtonTheme);
-
-public:
-    class Builder {
-    public:
-        Builder() = default;
-        ~Builder() = default;
-
-        RefPtr<MockDialogTheme> Build(const RefPtr<ThemeConstants>& themeConstants) const
-        {
-            RefPtr<MockDialogTheme> theme = AceType::MakeRefPtr<MockDialogTheme>();
-            return theme;
-        }
-    };
-
-    ~MockDialogTheme() override = default;
-
-protected:
-    MockDialogTheme() = default;
-};
-
 class DialogPatternTwoTestNg : public testing::Test {
 public:
     static void SetUpTestCase();
@@ -199,8 +177,12 @@ void DialogPatternTwoTestNg::TearDownTestCase()
 void DialogPatternTwoTestNg::SetDialogTheme()
 {
     auto themeManager = AceType::DynamicCast<MockThemeManager>(MockPipelineContext::GetCurrent()->GetThemeManager());
-    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(AceType::MakeRefPtr<MockDialogTheme>()));
-    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(AceType::MakeRefPtr<MockDialogTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(AceType::MakeRefPtr<DialogTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(AceType::MakeRefPtr<DialogTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(ButtonTheme::TypeId()))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(ButtonTheme::TypeId(), _))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
 }
 
 void DialogPatternTwoTestNg::UpdateDialogProperties(DialogProperties& props)
@@ -956,9 +938,13 @@ HWTEST_F(DialogPatternTwoTestNg, DialogPatternThemeScopeTest001, TestSize.Level1
 {
     auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
     MockPipelineContext::GetCurrent()->SetThemeManager(themeManager);
-    auto dialogTheme = AceType::MakeRefPtr<MockDialogTheme>();
+    auto dialogTheme = AceType::MakeRefPtr<DialogTheme>();
     EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(dialogTheme));
     EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(dialogTheme));
+    EXPECT_CALL(*themeManager, GetTheme(ButtonTheme::TypeId()))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(ButtonTheme::TypeId(), _))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
 
     DialogProperties props;
     props.type = DialogType::ALERT_DIALOG;
@@ -985,9 +971,13 @@ HWTEST_F(DialogPatternTwoTestNg, DialogPatternThemeScopeTest002, TestSize.Level1
 {
     auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
     MockPipelineContext::GetCurrent()->SetThemeManager(themeManager);
-    auto dialogTheme = AceType::MakeRefPtr<MockDialogTheme>();
+    auto dialogTheme = AceType::MakeRefPtr<DialogTheme>();
     EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(dialogTheme));
     EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(dialogTheme));
+    EXPECT_CALL(*themeManager, GetTheme(ButtonTheme::TypeId()))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(ButtonTheme::TypeId(), _))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
 
     DialogProperties props;
     props.type = DialogType::ALERT_DIALOG;
@@ -1012,9 +1002,13 @@ HWTEST_F(DialogPatternTwoTestNg, DialogPatternThemeScopeTest003, TestSize.Level1
 {
     auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
     MockPipelineContext::GetCurrent()->SetThemeManager(themeManager);
-    auto dialogTheme = AceType::MakeRefPtr<MockDialogTheme>();
+    auto dialogTheme = AceType::MakeRefPtr<DialogTheme>();
     EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(dialogTheme));
     EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(dialogTheme));
+    EXPECT_CALL(*themeManager, GetTheme(ButtonTheme::TypeId()))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(ButtonTheme::TypeId(), _))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
 
     DialogProperties props;
     props.type = DialogType::ALERT_DIALOG;

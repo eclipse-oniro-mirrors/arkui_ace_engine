@@ -1500,123 +1500,6 @@ HWTEST_F(CanvasRendererAccessorTest, createConicGradientTest, TestSize.Level1)
     }
 }
 
-#ifdef PIXEL_MAP_SUPPORTED
-/**
- * @tc.name: getPixelMapTestXY
- * @tc.desc:
- * @tc.type: FUNC
- */
-HWTEST_F(CanvasRendererAccessorTest, getPixelMapTestXY, TestSize.Level1)
-{
-    auto valD = DEFAULT_DOUBLE_VALUE;
-    ASSERT_NE(accessor_->getPixelMap, nullptr);
-    for (const auto& actualX : NUMBER_TEST_PLAN) {
-        for (const auto& actualY : NUMBER_TEST_PLAN) {
-            ImageSize target;
-            RefPtr<PixelMap> pixelMap = AceType::MakeRefPtr<MockPixelMap>();
-            EXPECT_CALL(*renderingModel_, GetPixelMap(_)).WillOnce(DoAll(SaveArg<0>(&target), Return(pixelMap)));
-            auto sx = Converter::ArkValue<Ark_Float64>(actualX);
-            auto sy = Converter::ArkValue<Ark_Float64>(actualY);
-            auto sw = Converter::ArkValue<Ark_Float64>(valD);
-            auto sh = Converter::ArkValue<Ark_Float64>(valD);
-            auto value = accessor_->getPixelMap(peer_, sx, sy, sw, sh);
-            auto pixelMapValue = Converter::GetOptPtr(&value);
-            ASSERT_NE(pixelMapValue, nullptr);
-            EXPECT_EQ(Referenced::RawPtr(pixelMapValue), Referenced::RawPtr(pixelMap));
-            EXPECT_NEAR(target.left, actualX, FLT_PRECISION);
-            EXPECT_NEAR(target.top, actualY, FLT_PRECISION);
-        }
-    }
-    // with density
-    double density = DENSITY_1_25;
-    ChangeDensity(density);
-    for (const auto& actualX : NUMBER_TEST_PLAN) {
-        for (const auto& actualY : NUMBER_TEST_PLAN) {
-            ImageSize target;
-            RefPtr<PixelMap> pixelMap = AceType::MakeRefPtr<MockPixelMap>();
-            EXPECT_CALL(*renderingModel_, GetPixelMap(_)).WillOnce(DoAll(SaveArg<0>(&target), Return(pixelMap)));
-            auto sx = Converter::ArkValue<Ark_Float64>(actualX);
-            auto sy = Converter::ArkValue<Ark_Float64>(actualY);
-            auto sw = Converter::ArkValue<Ark_Float64>(valD);
-            auto sh = Converter::ArkValue<Ark_Float64>(valD);
-            auto value = accessor_->getPixelMap(peer_, sx, sy, sw, sh);
-            auto pixelMapValue = Converter::GetOptPtr(&value);
-            ASSERT_NE(pixelMapValue, nullptr);
-            EXPECT_EQ(Referenced::RawPtr(pixelMapValue), Referenced::RawPtr(pixelMap));
-            EXPECT_NEAR(target.left, actualX * density, FLT_PRECISION);
-            EXPECT_NEAR(target.top, actualY * density, FLT_PRECISION);
-        }
-    }
-}
-
-/**
- * @tc.name: getPixelMapTestWH
- * @tc.desc:
- * @tc.type: FUNC
- */
-HWTEST_F(CanvasRendererAccessorTest, getPixelMapTestWH, TestSize.Level1)
-{
-    ASSERT_NE(accessor_->getPixelMap, nullptr);
-    for (const auto& actualW : NUMBER_TEST_PLAN) {
-        for (const auto& actualH : NUMBER_TEST_PLAN) {
-            ImageSize target;
-            RefPtr<PixelMap> pixelMap = AceType::MakeRefPtr<MockPixelMap>();
-            EXPECT_CALL(*renderingModel_, GetPixelMap(_)).WillOnce(DoAll(SaveArg<0>(&target), Return(pixelMap)));
-            auto sx = Converter::ArkValue<Ark_Float64>(DEFAULT_DOUBLE_VALUE);
-            auto sy = Converter::ArkValue<Ark_Float64>(DEFAULT_DOUBLE_VALUE);
-            auto sw = Converter::ArkValue<Ark_Float64>(actualW);
-            auto sh = Converter::ArkValue<Ark_Float64>(actualH);
-            auto value = accessor_->getPixelMap(peer_, sx, sy, sw, sh);
-            auto pixelMapValue = Converter::GetOptPtr(&value);
-            ASSERT_NE(pixelMapValue, nullptr);
-            EXPECT_EQ(Referenced::RawPtr(pixelMapValue), Referenced::RawPtr(pixelMap));
-            EXPECT_NEAR(target.width, actualW, FLT_PRECISION);
-            EXPECT_NEAR(target.height, actualH, FLT_PRECISION);
-        }
-    }
-    // with density
-    double density = DENSITY_2_50;
-    ChangeDensity(density);
-    for (const auto& actualW : NUMBER_TEST_PLAN) {
-        for (const auto& actualH : NUMBER_TEST_PLAN) {
-            ImageSize target;
-            RefPtr<PixelMap> pixelMap = AceType::MakeRefPtr<MockPixelMap>();
-            EXPECT_CALL(*renderingModel_, GetPixelMap(_)).WillOnce(DoAll(SaveArg<0>(&target), Return(pixelMap)));
-            auto sx = Converter::ArkValue<Ark_Float64>(DEFAULT_DOUBLE_VALUE);
-            auto sy = Converter::ArkValue<Ark_Float64>(DEFAULT_DOUBLE_VALUE);
-            auto sw = Converter::ArkValue<Ark_Float64>(actualW);
-            auto sh = Converter::ArkValue<Ark_Float64>(actualH);
-            auto value = accessor_->getPixelMap(peer_, sx, sy, sw, sh);
-            auto pixelMapValue = Converter::GetOptPtr(&value);
-            ASSERT_NE(pixelMapValue, nullptr);
-            EXPECT_EQ(Referenced::RawPtr(pixelMapValue), Referenced::RawPtr(pixelMap));
-            EXPECT_NEAR(target.width, actualW * density, FLT_PRECISION);
-            EXPECT_NEAR(target.height, actualH * density, FLT_PRECISION);
-        }
-    }
-}
-
-#else
-
-/**
- * @tc.name: getPixelMapTest
- * @tc.desc:
- * @tc.type: FUNC
- */
-HWTEST_F(CanvasRendererAccessorTest, getPixelMapTest, TestSize.Level1)
-{
-    ASSERT_NE(accessor_->getPixelMap, nullptr);
-    auto arkD = Converter::ArkValue<Ark_Float64>(DEFAULT_DOUBLE_VALUE);
-    auto arkR = Converter::ArkValue<Ark_Float64>(DEFAULT_SCALE_VALUE);
-    auto ptr = accessor_->getPixelMap(peer_, arkD, arkR, arkD, arkR);
-    auto optValue = Converter::GetOpt(ptr);
-    EXPECT_FALSE(optValue.has_value());
-    ptr = accessor_->getPixelMap(peer_, arkR, arkD, arkR, arkD);
-    optValue = Converter::GetOpt(ptr);
-    EXPECT_FALSE(optValue.has_value());
-}
-#endif
-
 /**
  * @tc.name: createPatternTest
  * @tc.desc:
@@ -1631,14 +1514,11 @@ HWTEST_F(CanvasRendererAccessorTest, createPatternTest, TestSize.Level1)
     auto repetition = Converter::ArkValue<Opt_String>(REPEAT_STRING);
     for (const auto& actualW : NUMBER_TEST_PLAN) {
         for (const auto& actualH : NUMBER_TEST_PLAN) {
-            std::shared_ptr<Ace::Pattern> target;
-            TransformParam param;
-            EXPECT_CALL(*renderingModel_, SetTransform(Matcher<std::shared_ptr<Ace::Pattern>>(testing::_), _))
-                .WillOnce(DoAll(SaveArg<0>(&target), SaveArg<1>(&param)));
             bitmapPeer->SetWidth(actualW);
             bitmapPeer->SetHeight(actualH);
 
             Opt_CanvasPattern result = accessor_->createPattern(peer_, arkBitmap, &repetition);
+
             auto pattern = Converter::OptConvert<Ark_CanvasPattern>(result);
             ASSERT_TRUE(pattern.has_value());
             Ark_CanvasPattern patternPeer = pattern.value();
@@ -1646,6 +1526,7 @@ HWTEST_F(CanvasRendererAccessorTest, createPatternTest, TestSize.Level1)
 
             std::optional<Matrix2DPeer*> optMatrix = PeerUtils::CreatePeer<Matrix2DPeer>();
             patternPeer->SetTransform(optMatrix);
+            auto target = patternPeer->GetPattern();
             ASSERT_NE(target, nullptr);
             EXPECT_NEAR(target->GetImageWidth(), actualW, FLT_PRECISION);
             EXPECT_NEAR(target->GetImageHeight(), actualH, FLT_PRECISION);

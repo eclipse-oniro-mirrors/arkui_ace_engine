@@ -40,6 +40,15 @@ bool InspectorFilter::IsFreeNodesEnabled() const
 {
     return isFreeNodesEnable;
 }
+void InspectorFilter::SetWebEnable(bool enable)
+{
+    isWebEnable = enable;
+}
+
+bool InspectorFilter::IsWebEnable() const
+{
+    return isWebEnable;
+}
 bool InspectorFilter::CheckFixedAttr(const FixedAttrBit attrBit) const
 {
     if (FilterEmpty()) {

@@ -295,6 +295,10 @@ public:
     void DisableChildrenAndCachesRecycle() override;
     void SetEnableSyncLoad(bool value) override;
     void SetIsSyncLoad(bool value) override;
+    // Controller binding (creation-time, immutable): a node accepts only its first
+    // binding; later TryBindController calls return false and are ignored
+    // (options.controller is read once at Repeat creation).
+    bool TryBindController();
 
     void DumpInfo() override;
     void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json) override;
@@ -365,6 +369,8 @@ private:
     bool restoringCache_ = false;
     int64_t cacheTaskPostTime_ = 0;
     int64_t setActiveRangeTime_ = 0;
+
+    bool controllerBound_ = false;
 
     // pending rids to be removed
     std::vector<uint32_t> pendingRemoveRids_;

@@ -15,6 +15,8 @@
 
 #include "core/components_ng/pattern/menu/menu_pattern.h"
 
+#include "core/components_ng/pattern/overlay/overlay_content_change_report.h"
+
 #include "base/perfmonitor/perf_constants.h"
 #include "base/perfmonitor/perf_monitor.h"
 #include "base/subwindow/subwindow_manager.h"
@@ -61,6 +63,17 @@
 
 namespace OHOS::Ace::NG {
 namespace {
+std::string MaterialTypeToString(int32_t type)
+{
+    static const std::string MaterialTypeStyles[] = { "MaterialType.NONE", "MaterialType.SEMI_TRANSPARENT",
+        "MaterialType.IMMERSIVE" };
+    if (type >= static_cast<int32_t>(MaterialType::NONE) &&
+        type <= static_cast<int32_t>(MaterialType::IMMERSIVE)) {
+        return MaterialTypeStyles[type];
+    }
+    return MaterialTypeStyles[0];
+}
+
 const TrailOptimization trailOptimization = {
     .progressThreshold = 0.98f,
     .responseDecayFactor = 0.9f,
@@ -305,6 +318,7 @@ void MenuPattern::OnAttachToFrameNode()
     };
     foldStatusChangedCallbackId_ =
         pipelineContext->RegisterFoldStatusChangedCallback(std::move(foldStatusChangeCallback));
+    foldStatusPipeline_ = pipelineContext;
 }
 
 int32_t MenuPattern::RegisterHalfFoldHover(const RefPtr<FrameNode>& menuNode)
@@ -335,19 +349,24 @@ int32_t MenuPattern::RegisterHalfFoldHover(const RefPtr<FrameNode>& menuNode)
             pipelineContext->FlushUITasks();
         });
     });
+    halfFoldHoverPipeline_ = pipelineContext;
     return callbackId;
 }
 
 void MenuPattern::OnDetachFromFrameNode(FrameNode* frameNode)
 {
     CHECK_NULL_VOID(frameNode);
-    auto pipeline = frameNode->GetContext();
-    CHECK_NULL_VOID(pipeline);
     if (foldStatusChangedCallbackId_.has_value()) {
-        pipeline->UnRegisterFoldStatusChangedCallback(foldStatusChangedCallbackId_.value_or(-1));
+        auto pipeline = foldStatusPipeline_.Upgrade();
+        if (pipeline) {
+            pipeline->UnRegisterFoldStatusChangedCallback(foldStatusChangedCallbackId_.value_or(-1));
+        }
     }
     if (halfFoldHoverCallbackId_.has_value()) {
-        pipeline->UnRegisterHalfFoldHoverChangedCallback(halfFoldHoverCallbackId_.value_or(-1));
+        auto pipeline = halfFoldHoverPipeline_.Upgrade();
+        if (pipeline) {
+            pipeline->UnRegisterHalfFoldHoverChangedCallback(halfFoldHoverCallbackId_.value_or(-1));
+        }
     }
 
     auto targetNode = FrameNode::GetFrameNode(targetTag_, targetId_);
@@ -592,7 +611,7 @@ void MenuPattern::BuildDivider()
     if (!IsSelectOverlayExtensionMenuWithSubMenu()) {
         isNeedDivider_ = false;
     }
-    auto uiNode = AceType::DynamicCast<UINode>(host);
+    RefPtr<UINode> uiNode = host;
     RefPtr<UINode> previousNode = nullptr;
     UpdateMenuItemChildren(uiNode, previousNode);
     RemoveLastNodeDivider(previousNode);
@@ -702,22 +721,12 @@ void MenuPattern::OnTouchEvent(const TouchEventInfo& info)
         return;
     }
     auto touchType = info.GetTouches().front().GetTouchType();
-    // Treat the gesture as a click iff the finger stays inside the menu bounds during the whole touch
-    // sequence (down/move/up), mirroring ClickRecognizer::IsPointInRegion instead of the old down->up
-    // straight-line distance check which is stricter than onClick.
     if (touchType == TouchType::DOWN) {
         lastTouchOffset_ = info.GetTouches().front().GetLocalLocation();
-        movedOutOfRegion_ = false;
-    } else if (touchType == TouchType::MOVE) {
-        // mirror ClickRecognizer: once the finger leaves the menu bounds, it is no longer a click
-        if (!movedOutOfRegion_ && !IsOffsetInNodeBounds(GetHost(), info.GetTouches().front().GetLocalLocation())) {
-            movedOutOfRegion_ = true;
-        }
     } else if (touchType == TouchType::UP) {
         auto touchUpOffset = info.GetTouches().front().GetLocalLocation();
-        bool isClick = lastTouchOffset_.has_value() && !movedOutOfRegion_ &&
-            IsOffsetInNodeBounds(GetHost(), touchUpOffset);
-        if (isClick) {
+        if (lastTouchOffset_.has_value() &&
+            (touchUpOffset - lastTouchOffset_.value()).GetDistance() <= DEFAULT_CLICK_DISTANCE) {
             auto touchGlobalLocation = info.GetTouches().front().GetGlobalLocation();
             auto position = OffsetF(static_cast<float>(touchGlobalLocation.GetX()),
                 static_cast<float>(touchGlobalLocation.GetY()));
@@ -725,7 +734,6 @@ void MenuPattern::OnTouchEvent(const TouchEventInfo& info)
             HideMenu(true, position, HideMenuType::MENU_TOUCH_UP);
         }
         lastTouchOffset_.reset();
-        movedOutOfRegion_ = false;
     }
 }
 
@@ -982,13 +990,13 @@ void MenuPattern::UpdateDividerProperty(
     }
     auto host = GetHost();
     CHECK_NULL_VOID(host);
-    const auto& children = GetOptions();
+    auto children = GetOptions();
     auto childCount = children.size();
     auto paramCount = params.size();
     size_t updateCount = std::min(paramCount, childCount);
     auto childIt = children.begin();
     for (size_t i = 0; i < updateCount; i++, childIt++) {
-        const auto& childNode = AceType::DynamicCast<FrameNode>(*childIt);
+        const auto childNode = *childIt;
         CHECK_NULL_VOID(childNode);
         if (i == 0) {
             auto props = childNode->GetPaintProperty<MenuItemPaintProperty>();
@@ -1037,7 +1045,7 @@ void MenuPattern::UpdateSelectOptionTextByIndex(int32_t index, const std::string
         return;
     }
     auto childIt = children.at(index);
-    const auto& childNode = AceType::DynamicCast<FrameNode>(childIt);
+    const auto childNode = childIt;
     CHECK_NULL_VOID(childNode);
     auto optionPattern = childNode->GetPattern<MenuItemPattern>();
     CHECK_NULL_VOID(optionPattern);
@@ -1060,7 +1068,7 @@ void MenuPattern::UpdateSelectOptionIconByIndex(int32_t index, const std::string
         return;
     }
     auto childIt = children.at(index);
-    const auto& childNode = AceType::DynamicCast<FrameNode>(childIt);
+    const auto childNode = childIt;
     CHECK_NULL_VOID(childNode);
     auto optionPattern = childNode->GetPattern<MenuItemPattern>();
     CHECK_NULL_VOID(optionPattern);
@@ -1750,14 +1758,14 @@ void MenuPattern::ShowPreviewMenuScaleAnimation(
     }, nullptr, nullptr, host->GetContextRefPtr());
 }
 
-MenuParam MenuPattern::GetMenuParam() const
+const MenuParam& MenuPattern::GetMenuParam() const
 {
+    static const MenuParam emptyParam;
     auto menuWrapper = GetMenuWrapper();
-    CHECK_NULL_RETURN(menuWrapper, MenuParam());
+    CHECK_NULL_RETURN(menuWrapper, emptyParam);
     auto menuWrapperPattern = menuWrapper->GetPattern<MenuWrapperPattern>();
-    CHECK_NULL_RETURN(menuWrapperPattern, MenuParam());
-    auto menuParam = menuWrapperPattern->GetMenuParam();
-    return menuParam;
+    CHECK_NULL_RETURN(menuWrapperPattern, emptyParam);
+    return menuWrapperPattern->GetMenuParam();
 }
 
 bool MenuPattern::ShouldUpdateShadow() const
@@ -1811,6 +1819,10 @@ bool MenuPattern::IsUseDistortionAnimation() const
     }
     auto menuSystemMaterialType =
         MaterialUtils::GetTypeFromMaterial(AceType::RawPtr(menuSystemMaterial)).value_or(MaterialType::NONE);
+    if (menuSystemMaterialType != MaterialType::IMMERSIVE &&
+        Ace::AceType::TypeId(AceType::RawPtr(menuSystemMaterial)) == Ace::UiMaterial::TypeId()) {
+        return false;
+    }
     auto menuDistortionMode = menuParam.distortionMode.value_or(DistortionMode::DISTORTION_AUTO);
     if ((menuSystemMaterialType == MaterialType::IMMERSIVE ||
             Ace::AceType::TypeId(AceType::RawPtr(menuSystemMaterial)) != Ace::UiMaterial::TypeId()) &&
@@ -1863,13 +1875,14 @@ void MenuPattern::ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorF
     if (filter.IsFastFilter()) {
         return;
     }
-    auto menuParam = GetMenuParam();
+    const auto& menuParam = GetMenuParam();
     json->PutExtAttr("distortionMode",
         DistortionModeToString(menuParam.distortionMode.value_or(DistortionMode::DISTORTION_AUTO)).c_str(), filter);
     json->PutExtAttr("edgeLightMode",
         EdgeLightModeToString(menuParam.edgeLightMode.value_or(EdgeLightMode::EDGELIGHT_AUTO)).c_str(), filter);
     json->PutExtAttr("distortionEnabled", IsUseDistortionAnimation() ? "true" : "false", filter);
     json->PutExtAttr("edgeLightEnabled", IsUseEdgeLightAnimation() ? "true" : "false", filter);
+    json->PutExtAttr("hasSystemMaterial", menuParam.systemMaterial ? "true" : "false", filter);
 }
 
 OffsetF MenuPattern::GetDistortionMenuOffset(Placement placement) const
@@ -3128,7 +3141,7 @@ void MenuPattern::ShowMenuDisappearAnimation()
 
 void MenuPattern::UpdateClipPath(const RefPtr<LayoutWrapper>& dirty)
 {
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_VOID(layoutAlgorithmWrapper);
     auto menuLayoutAlgorithm = DynamicCast<MenuLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_VOID(menuLayoutAlgorithm);
@@ -3538,6 +3551,23 @@ void MenuPattern::DumpInfo()
 {
     DumpLog::GetInstance().AddDesc(
         std::string("MenuType: ").append(std::to_string(static_cast<int32_t>(GetMenuType()))));
+    const auto& menuParam = GetMenuParam();
+    bool hasSystemMaterial = menuParam.systemMaterial != nullptr;
+    DumpLog::GetInstance().AddDesc("HasSystemMaterial: " + std::string(hasSystemMaterial ? "true" : "false"));
+    if (hasSystemMaterial) {
+        auto nativeMaterial = MaterialUtils::PreProcessMaterial(AceType::RawPtr(menuParam.systemMaterial));
+        auto materialType = MaterialUtils::GetTypeFromMaterial(nativeMaterial);
+        DumpLog::GetInstance().AddDesc("MaterialType: " +
+            (materialType.has_value() ? MaterialTypeToString(static_cast<int32_t>(materialType.value()))
+                                      : std::string("MaterialType.NONE")));
+    }
+    DumpLog::GetInstance().AddDesc(
+        "DistortionMode: " +
+        DistortionModeToString(menuParam.distortionMode.value_or(DistortionMode::DISTORTION_AUTO)));
+    DumpLog::GetInstance().AddDesc(
+        "EdgeLightMode: " + EdgeLightModeToString(menuParam.edgeLightMode.value_or(EdgeLightMode::EDGELIGHT_AUTO)));
+    DumpLog::GetInstance().AddDesc("DistortionEnabled: " + std::string(IsUseDistortionAnimation() ? "true" : "false"));
+    DumpLog::GetInstance().AddDesc("EdgeLightEnabled: " + std::string(IsUseEdgeLightAnimation() ? "true" : "false"));
 }
 
 float MenuPattern::GetSelectMenuWidth()
@@ -3680,7 +3710,7 @@ RefPtr<UINode> MenuPattern::GetForEachMenuItem(const RefPtr<UINode>& parent, boo
     }
     auto node = GetSyntaxNode(parent);
     CHECK_NULL_RETURN(node, nullptr);
-    auto forEachNode = AceType::DynamicCast<UINode>(node->GetParent());
+    auto forEachNode = node->GetParent();
     if (node->GetTag() == JS_SYNTAX_ITEM_ETS_TAG) {
         CHECK_NULL_RETURN(forEachNode, nullptr);
         auto syntIndex = forEachNode->GetChildIndex(node);
@@ -3708,7 +3738,7 @@ RefPtr<UINode> MenuPattern::GetForEachMenuItem(const RefPtr<UINode>& parent, boo
 
 RefPtr<UINode> MenuPattern::GetOutsideForEachMenuItem(const RefPtr<UINode>& forEachNode, bool next)
 {
-    auto parentForEachNode = AceType::DynamicCast<UINode>(forEachNode->GetParent());
+    auto parentForEachNode = forEachNode->GetParent();
     CHECK_NULL_RETURN(parentForEachNode, nullptr);
     auto forEachIndex = parentForEachNode->GetChildIndex(forEachNode);
     int32_t shift = next ? 1 : -1;
@@ -3760,6 +3790,22 @@ bool MenuPattern::IsMenuScrollable() const
 void MenuPattern::DumpInfo(std::unique_ptr<JsonValue>& json)
 {
     json->Put("MenuType", static_cast<int32_t>(GetMenuType()));
+    const auto& menuParam = GetMenuParam();
+    bool hasSystemMaterial = menuParam.systemMaterial != nullptr;
+    json->Put("HasSystemMaterial", hasSystemMaterial ? "true" : "false");
+    if (hasSystemMaterial) {
+        auto nativeMaterial = MaterialUtils::PreProcessMaterial(AceType::RawPtr(menuParam.systemMaterial));
+        auto materialType = MaterialUtils::GetTypeFromMaterial(nativeMaterial);
+        json->Put("MaterialType",
+            materialType.has_value() ? MaterialTypeToString(static_cast<int32_t>(materialType.value())).c_str()
+                                     : "MaterialType.NONE");
+    }
+    json->Put("DistortionMode",
+        DistortionModeToString(menuParam.distortionMode.value_or(DistortionMode::DISTORTION_AUTO)).c_str());
+    json->Put("EdgeLightMode",
+        EdgeLightModeToString(menuParam.edgeLightMode.value_or(EdgeLightMode::EDGELIGHT_AUTO)).c_str());
+    json->Put("DistortionEnabled", IsUseDistortionAnimation() ? "true" : "false");
+    json->Put("EdgeLightEnabled", IsUseEdgeLightAnimation() ? "true" : "false");
 }
 
 OffsetF MenuPattern::GetPreviewMenuAnimationOffset(
@@ -3883,6 +3929,7 @@ void MenuPattern::UpdateMenuPathParams(std::optional<MenuPathParams> pathParams)
 
 void MenuPattern::OnDetachFromMainTree()
 {
+    ReportCapiSubMenuEvent(GetHost(), false);
     auto wrapperNode = GetMenuWrapper();
     CHECK_NULL_VOID(wrapperNode);
     auto pattern = wrapperNode->GetPattern<MenuWrapperPattern>();

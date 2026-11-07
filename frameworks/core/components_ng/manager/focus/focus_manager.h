@@ -31,7 +31,7 @@ namespace OHOS::Ace::NG {
 class PipelineContext;
 
 template<typename ContainerType, typename... Args>
-class ACE_EXPORT FocusCallbackManager : public virtual AceType {
+class ACE_EXPORT FocusCallbackManager : public AceType {
     DECLARE_ACE_TYPE(FocusCallbackManager, AceType);
 
 public:
@@ -153,7 +153,7 @@ public:                                                                         
         return nullptr;                                                                      \
     }
 
-class FocusCallbacks : public virtual AceType {
+class FocusCallbacks : public AceType {
     DECLARE_ACE_TYPE(FocusCallbacks, AceType);
 
 public:
@@ -169,7 +169,7 @@ public:
     RefPtr<FocusChangeCallbackManager> focusChangeCallbacks_;
     RefPtr<IsFocusActiveUpdateEventManager> isFocusActiveUpdateEvents_;
 };
-class FocusManager : public virtual AceType {
+class FocusManager : public AceType {
     DECLARE_ACE_TYPE(FocusManager, AceType);
 
 public:
@@ -310,6 +310,14 @@ public:
 
     void UpdateCurrentFocus(const RefPtr<FocusHub>& current, SwitchingUpdateReason reason);
     RefPtr<FocusHub> GetCurrentFocus();
+    std::optional<bool> GetIsSwitchingFocus() const
+    {
+        return isSwitchingFocus_;
+    }
+    std::optional<SwitchingStartReason> GetStartReason() const
+    {
+        return startReason_;
+    }
     void UpdateSwitchingEndReason(SwitchingEndReason reason)
     {
         if (isSwitchingFocus_.value_or(false)) {

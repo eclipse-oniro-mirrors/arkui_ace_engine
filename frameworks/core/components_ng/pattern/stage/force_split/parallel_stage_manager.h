@@ -97,6 +97,11 @@ public:
         return isTopFullScreenPageChanged_;
     }
 
+    void SetNeedOperationInSplitModeWithFullScreen(bool needOperationInSplitMode)
+    {
+        needOperationInSplitMode_ = needOperationInSplitMode;
+    }
+
     bool IsTopFullScreenPage() const override
     {
         return isTopFullScreenPage_;
@@ -136,6 +141,8 @@ public:
         touchedSecondaryColumnPage_.Reset();
         return page;
     }
+
+    ACE_FORCE_EXPORT ForceSplitPageColumnType GetPageColumnType(const RefPtr<FrameNode>& page) const;
     void OnStageNodeStructureChanged() override;
 
     bool IsVirtualStackBasedSplit() const;
@@ -159,7 +166,8 @@ private:
     void OnModeChange();
     void OnWindowStateChange(bool show);
     RefPtr<FrameNode> GetHomePage() const;
-
+    void ResetPageLevelDisplaceHomeTypes(const RefPtr<FrameNode>& homePage);
+    void ResetPageLevelNavigationHomes(const RefPtr<FrameNode>& homePage);
     void FirePageHideOnPushPage(RouterPageType newPageType, const RefPtr<FrameNode>& lastPage,
         const RefPtr<FrameNode>& topRelatedOrPhPage, const RefPtr<FrameNode>& preHomePage,
         PageTransitionType hideTransitionType, bool newPageIsFullScreenPage);
@@ -260,7 +268,6 @@ private:
         const RefPtr<FrameNode>& page, PageTransitionType transitionType, int32_t animationId);
     void ResetRouterAnimatedPages();
     int32_t GetPrimaryNodeCount() const;
-    ForceSplitPageColumnType GetPageColumnType(const RefPtr<FrameNode>& page) const;
     void SetPageColumnType(const RefPtr<FrameNode>& page, ForceSplitPageColumnType columnType);
     void ClearRouterPageState(const RefPtr<FrameNode>& page);
     bool IsSecondaryPushToPrimaryScene(const RefPtr<FrameNode>& prePrimaryTopPage,
@@ -280,6 +287,7 @@ private:
     bool needClearSecondaryPage_ = false;
     bool isTopFullScreenPage_ = false;
     bool isTopFullScreenPageChanged_ = false;
+    bool needOperationInSplitModeWithFullScreen_ = false;
     mutable std::vector<WeakPtr<FrameNode>> primaryNodes_;
     mutable std::vector<WeakPtr<FrameNode>> secondaryNodes_;
     mutable bool routerColumnNodesDirty_ = true;

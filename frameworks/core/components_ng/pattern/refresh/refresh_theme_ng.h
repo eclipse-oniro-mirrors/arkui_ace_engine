@@ -25,7 +25,7 @@ namespace OHOS::Ace::NG {
 /**
  * RefreshThemeNG should be built using RefreshThemeNG::Builder.
  */
-class RefreshThemeNG : public virtual Theme {
+class RefreshThemeNG : public Theme {
     DECLARE_ACE_TYPE(RefreshThemeNG, Theme);
 
 public:

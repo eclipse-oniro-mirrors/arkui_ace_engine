@@ -16,6 +16,9 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_OVERLAY_SHEET_MANAGER_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_OVERLAY_SHEET_MANAGER_H
 
+#include <atomic>
+#include <mutex>
+
 #include "base/utils/singleton.h"
 #include "core/components_ng/pattern/overlay/overlay_manager.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -179,27 +182,30 @@ public:
     int32_t CloseBindSheetByUIContext(const RefPtr<NG::FrameNode>& sheetContentNode, int32_t currentInstanceId);
     void CleanBindSheetMap(int32_t instanceId, int32_t sheetContentNodeId)
     {
+        std::lock_guard<std::mutex> lock(sheetMutex_);
         overlayManagerMap_.erase(SheetContentKey(instanceId, sheetContentNodeId));
         targetIdMap_.erase(SheetContentKey(instanceId, sheetContentNodeId));
     }
 
     void SetDismissSheet(int32_t dismissId)
     {
-        sheetDismissId_ = dismissId;
+        sheetDismissId_.store(dismissId, std::memory_order_relaxed);
     }
 
-    int32_t GetDismissSheet()
+    int32_t GetDismissSheet() const
     {
-        return sheetDismissId_;
+        return sheetDismissId_.load(std::memory_order_relaxed);
     }
 
     void SetFocusSheetId(const std::optional<int32_t>& id)
     {
+        std::lock_guard<std::mutex> lock(focusMutex_);
         sheetFocusId_ = id;
     }
 
     std::optional<int32_t> GetFocusSheetId() const
     {
+        std::lock_guard<std::mutex> lock(focusMutex_);
         return sheetFocusId_;
     }
 
@@ -229,11 +235,13 @@ private:
         }
     };
 
-    int32_t sheetDismissId_ = 0;
+    std::atomic<int32_t> sheetDismissId_ = 0;
     std::optional<int32_t> sheetFocusId_;
     std::map<SheetContentKey, RefPtr<OverlayManager>> overlayManagerMap_;
     // Value:  The uniqueId of the FrameNode to which BindSheet is attached
     std::map<SheetContentKey, int32_t> targetIdMap_;
+    mutable std::mutex sheetMutex_;
+    mutable std::mutex focusMutex_;
 };
 } // namespace OHOS::Ace::NG
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_OVERLAY_SHEET_MANAGER_H

@@ -32,13 +32,13 @@ ExecutorResult StrictContentSwitchExecutor::ExecuteStep()
     auto context = context_.Upgrade();
     if (!context) {
         TAG_LOGW(AceLogTag::ACE_UIEVENT, "Pipeline context is null");
-        return ExecutorResult::FAILED;
+        return SetFailureState(ExecutionState::TARGET_NOT_FOUND);
     }
 
     auto result = FindFrameNode(coordinates_.GetX(), coordinates_.GetY(), ContentSwitchRecognizerPred());
     if (!result.GetNode()) {
         TAG_LOGW(AceLogTag::ACE_UIEVENT, "No frame node found at current coordinates");
-        return ExecutorResult::FAILED;
+        return SetFailureState(ExecutionState::TARGET_NOT_FOUND);
     }
 
     return TriggerContentSwitch(result.GetNode());

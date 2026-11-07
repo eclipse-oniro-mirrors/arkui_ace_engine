@@ -710,8 +710,7 @@ void JsDragSpringLoadingContext::GetDragInfos(const JSCallbackInfo& args)
 {
     CHECK_NULL_VOID(context_);
     JSRef<JSObject> dragInfosObj = JSRef<JSObject>::New();
-    auto summary = context_->GetSummary();
-    napi_value nativeValue = UdmfClient::GetInstance()->TransformSummary(summary);
+    napi_value nativeValue = UdmfClient::GetInstance()->TransformSummary(context_->GetSummaryInfo());
     CHECK_NULL_VOID(nativeValue);
     auto jsValue = JsConverter::ConvertNapiValueToJsVal(nativeValue);
     dragInfosObj->SetPropertyObject("dataSummary", jsValue);

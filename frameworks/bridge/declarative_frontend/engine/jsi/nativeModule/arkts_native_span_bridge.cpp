@@ -45,6 +45,8 @@ constexpr int NUM_4 = 4;
 constexpr int NUM_5 = 5;
 constexpr int NUM_6 = 6;
 constexpr int NUM_7 = 7;
+constexpr int BORDER_COLOR_ARG_INDEX = 6;
+constexpr int BORDER_WIDTH_ARG_INDEX = 7;
 const std::vector<OHOS::Ace::FontStyle> FONT_STYLES = { OHOS::Ace::FontStyle::NORMAL, OHOS::Ace::FontStyle::ITALIC };
 
 bool ParseFontVariations(EcmaVM* vm, const Local<JSValueRef>& jsValue, std::vector<std::string>& axisValues,
@@ -633,6 +635,8 @@ ArkUINativeModuleValue SpanBridge::SetTextBackgroundStyle(ArkUIRuntimeCallInfo* 
 {
     EcmaVM* vm = runtimeCallInfo->GetVM();
     Color color;
+    Color borderColor;
+    CalcDimension borderWidth;
     std::vector<ArkUI_Float32> radiusArray;
     std::vector<ArkUI_Int32> valueUnits;
     Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(NUM_0);
@@ -641,12 +645,21 @@ ArkUINativeModuleValue SpanBridge::SetTextBackgroundStyle(ArkUIRuntimeCallInfo* 
     auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
     std::shared_ptr<TextBackgroundStyle> style = std::make_shared<TextBackgroundStyle>();
     RefPtr<ResourceObject> colorResObj;
+    RefPtr<ResourceObject> borderColorResObj;
+    RefPtr<ResourceObject> borderWidthResObj;
     auto nodeInfo = ArkTSUtils::MakeNativeNodeInfo(nativeNode);
     if (!(ArkTSUtils::ParseJsColorAlpha(vm, secondArg, color, colorResObj, nodeInfo))) {
         color = Color::TRANSPARENT;
     }
+    Local<JSValueRef> borderColorArg = runtimeCallInfo->GetCallArgRef(BORDER_COLOR_ARG_INDEX);
+    if (!ArkTSUtils::ParseJsColorAlpha(vm, borderColorArg, borderColor, borderColorResObj, nodeInfo)) {
+        borderColor = Color::TRANSPARENT;
+    }
+    Local<JSValueRef> borderWidthArg = runtimeCallInfo->GetCallArgRef(BORDER_WIDTH_ARG_INDEX);
+    ArkTSUtils::ParseJsDimensionVp(vm, borderWidthArg, borderWidth, borderWidthResObj);
     ArkTSUtils::ParseOuterBorderRadius(runtimeCallInfo, vm, radiusArray, valueUnits, NUM_2, style);
-    ArkTSUtils::SetTextBackgroundStyle(style, color, colorResObj, radiusArray.data(), valueUnits.data());
+    ArkTSUtils::SetTextBackgroundStyle(style, color, colorResObj, radiusArray.data(), valueUnits.data(),
+        borderColor, borderColorResObj, borderWidth, borderWidthResObj);
     GetArkUINodeModifiers()->getSpanModifier()->setSpanTextBackgroundStyle(
         nativeNode, color.GetValue(), radiusArray.data(), valueUnits.data(), static_cast<int32_t>(radiusArray.size()),
         style.get());

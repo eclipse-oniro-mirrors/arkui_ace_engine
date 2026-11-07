@@ -13,17 +13,33 @@
  * limitations under the License.
  */
 
+#include "core/components_ng/base/ui_tree_collector.h"
+#include "core/components_ng/base/page_text_collector.h"
+#include "core/interfaces/native/node/page_text_api.h"
+#include "core/components_ng/manager/interaction_observer/ui_info_collection_manager.h"
+#include "core/interfaces/native/node/interaction_observer_api.h"
+#include "core/interfaces/native/node/content_change_api.h"
+
 #include "core/interfaces/native/node/node_api.h"
+#include "core/interfaces/native/node/ui_tree_api.h"
 
 #include <securec.h>
+#include <atomic>
+#include <cmath>
+#include <cstdlib>
 #include <vector>
 
+#include "base/log/log_wrapper.h"
+#include "base/utils/time_util.h"
 #include "interfaces/native/native_type.h"
+#include "interfaces/native/node/config_manager.h"
 
 #include "core/common/ace_application_info.h"
 #include "core/common/ace_engine.h"
 #include "core/common/container.h"
+#include "core/components/common/properties/ui_material.h"
 #include "core/components_ng/base/observer_handler.h"
+#include "core/components_ng/manager/content_change_manager/content_change_manager.h"
 #include "core/components_ng/base/view_stack_model.h"
 #include "core/components_ng/manager/navigation/navigation_manager.h"
 #include "core/components_ng/pattern/navigation/navigation_stack.h"
@@ -49,6 +65,7 @@
 #include "core/interfaces/native/node/node_date_picker_modifier.h"
 #include "core/interfaces/native/node/node_drag_modifier.h"
 #include "core/interfaces/native/node/node_image_modifier.h"
+#include "core/interfaces/native/node/node_image_collection.h"
 #include "core/interfaces/native/node/node_image_span_modifier.h"
 #include "core/interfaces/native/node/node_list_item_modifier.h"
 #include "core/interfaces/native/node/node_list_modifier.h"
@@ -68,6 +85,7 @@
 #include "core/interfaces/native/node/search_modifier.h"
 #include "core/interfaces/native/node/select_modifier.h"
 #include "core/interfaces/native/node/styled_string_impl.h"
+#include "core/interfaces/native/node/ui_tree_api.h"
 #include "core/interfaces/native/node/util_modifier.h"
 #include "core/interfaces/native/node/view_model.h"
 #include "core/interfaces/native/node/water_flow_modifier.h"
@@ -332,6 +350,16 @@ void RegisterOEMVisualEffect(ArkUIOEMVisualEffectFuncHandle func)
     ViewAbstract::RegisterOEMVisualEffect(oemFunc);
 }
 
+void RegisterOEMMaterialFunc(ArkUIMaterialFuncHandle handle)
+{
+    MaterialUtils::RegisterMaterialFunc(handle);
+}
+
+void RegisterOEMMaterialFilterFunc(ArkUIMaterialFilterFuncHandle handle)
+{
+    MaterialUtils::RegisterMaterialFilterFunc(handle);
+}
+
 void SetOnNodeDestroyCallback(ArkUINodeHandle node, void (*onDestroy)(ArkUINodeHandle node))
 {
     auto* uiNode = reinterpret_cast<UINode*>(node);
@@ -344,6 +372,29 @@ void SetOnNodeDestroyCallback(ArkUINodeHandle node, void (*onDestroy)(ArkUINodeH
 
 void DisposeNode(ArkUINodeHandle node)
 {
+    auto* uiNode = reinterpret_cast<UINode*>(node);
+    if (uiNode && uiNode->GetParent()) {
+        constexpr int64_t logMinIntervalNs = 5000000000;
+        static std::atomic<int64_t> lastLogTime { 0 };
+        auto last = lastLogTime.load(std::memory_order_relaxed);
+        const auto now = GetSysTimestamp();
+        if ((last == 0 || now - last >= logMinIntervalNs) &&
+            lastLogTime.compare_exchange_strong(last, now, std::memory_order_relaxed)) {
+            std::string rectInfo = "unavailable";
+            auto* frameNode = AceType::DynamicCast<FrameNode>(uiNode);
+            if (frameNode && frameNode->GetGeometryNode()) {
+                const auto rect = frameNode->GetGeometryNode()->GetFrameRect();
+                rectInfo = std::to_string(std::lround(rect.Left())) + ", " +
+                    std::to_string(std::lround(rect.Top())) + ", " + std::to_string(std::lround(rect.Width())) + ", " +
+                    std::to_string(std::lround(rect.Height()));
+            }
+            const auto& componentId = uiNode->GetInspectorId();
+            const std::string componentInfo = componentId.has_value() ? ", ComponentID: " + componentId.value() : "";
+            LOGI("The node to be disposed still has a parent: nodeId: %{public}d, tag: %{public}s, "
+                "rect [%{public}s]%{public}s",
+                uiNode->GetId(), uiNode->GetTag().c_str(), rectInfo.c_str(), componentInfo.c_str());
+        }
+    }
     ViewModel::DisposeNode(node);
 }
 
@@ -2050,6 +2101,7 @@ ArkUI_Int32 PostFrameCallback(ArkUI_Int32 instanceId, void* userData,
         return ERROR_CODE_NATIVE_IMPL_NOT_MAIN_THREAD;
     }
     auto onframeCallbackFuncFromCAPI = [userData, callback](uint64_t nanoTimestamp, uint32_t frameCount) -> void {
+        LOG_CALLBACK("OH_ArkUI_PostFrameCallback", callback);
         callback(nanoTimestamp, frameCount, userData);
     };
 
@@ -2072,6 +2124,7 @@ ArkUI_Int32 PostIdleCallback(ArkUI_Int32 instanceId, void* userData,
         return ERROR_CODE_NATIVE_IMPL_NOT_MAIN_THREAD;
     }
     auto onidleCallbackFuncFromCAPI = [userData, callback](uint64_t nanoTimeLeft, uint32_t frameCount) -> void {
+        LOG_CALLBACK("OH_ArkUI_PostIdleCallback", callback);
         callback(nanoTimeLeft, frameCount, userData);
     };
 
@@ -2176,16 +2229,28 @@ const char* GetErrorMessage()
     return OHOS::Ace::ErrorMessageManager::GetInstance().GetErrorMessage();
 }
 
-ArkUI_Bool IsDebugVersion()
+ArkUI_Bool IsCurrentThreadSafe()
+{
+    auto pipeline = PipelineContext::GetCurrentContextSafely();
+    return (pipeline == nullptr || pipeline->IsCurrentThreadSafe()) ? 1 : 0;
+}
+
+ArkUI_Bool IsDebugForParallel()
 {
     return AceApplicationInfo::GetInstance().IsDebugForParallel() ? 1 : 0;
 }
 
-ArkUI_Bool IsCurrentThreadSafe()
+ArkUI_Bool IsDebugForParallelSet()
 {
-    auto pipeline = PipelineContext::GetCurrentContextSafely();
-    CHECK_NULL_RETURN(pipeline, true);
-    return pipeline->IsCurrentThreadSafe() ? 1 : 0;
+    return AceApplicationInfo::GetInstance().IsDebugForParallelSet() ? 1 : 0;
+}
+
+ArkUI_Int32 EnableTouchPadEvent(ArkUI_Bool enabled)
+{
+    auto pipeline = PipelineContext::GetCurrentContext();
+    CHECK_NULL_RETURN(pipeline, ARKUI_ERROR_CODE_CAPI_INIT_ERROR);
+    pipeline->SetTouchPadEventEnabled(enabled);
+    return ARKUI_ERROR_CODE_NO_ERROR;
 }
 
 const ArkUIBasicAPI* GetBasicAPI()
@@ -2227,8 +2292,10 @@ const ArkUIBasicAPI* GetBasicAPI()
         .setErrorCodeAndMessage = SetErrorCodeAndMessage,
         .setErrorFunctionName = SetErrorFunctionName,
         .getErrorMessage = GetErrorMessage,
-        .isDebugVersion = IsDebugVersion,
         .isCurrentThreadSafe = IsCurrentThreadSafe,
+        .isDebugForParallel = IsDebugForParallel,
+        .isDebugForParallelSet = IsDebugForParallelSet,
+        .enableTouchPadEvent = EnableTouchPadEvent,
     };
     CHECK_INITIALIZED_FIELDS_END(basicImpl, 0, 0, 0); // don't move this line
     return &basicImpl;
@@ -2323,6 +2390,8 @@ ArkUIExtendedNodeAPI impl_extended = {
     .setOnNodeDestroyCallback = SetOnNodeDestroyCallback,
     .createCustomNodeByNodeId = CreateCustomNodeByNodeId,
     .createCustomNodeWithParam = CreateCustomNodeWithParam,
+    .registerOEMMaterialFunc = RegisterOEMMaterialFunc,
+    .registerOEMMaterialFilterFunc = RegisterOEMMaterialFilterFunc,
 };
 /* clang-format on */
 
@@ -2529,6 +2598,13 @@ const ArkUIAnimation* GetAnimationAPI()
         .interpolatingSpring = CreateInterpolatingSpring,
         .customCurve = CreateCustomCurve,
         .disposeCurve = DisposeCurve,
+        .addAnimationGroup = ViewAnimate::AddAnimationGroup,
+        .removeAnimationGroup = ViewAnimate::RemoveAnimationGroup,
+        .pauseAnimationGroup = ViewAnimate::PauseAnimationGroup,
+        .resumeAnimationGroup = ViewAnimate::ResumeAnimationGroup,
+        .finishAnimationGroup = ViewAnimate::FinishAnimationGroup,
+        .getAnimationGroupState = ViewAnimate::GetAnimationGroupState,
+        .hasAnimationGroup = ViewAnimate::HasAnimationGroup,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;
@@ -2650,7 +2726,9 @@ const ArkUISnapshotAPI* GetComponentSnapshotAPI()
         .snapshotOptionsSetColorMode = SnapshotOptionsSetColorMode,
         .snapshotOptionsSetDynamicRangeMode = SnapshotOptionsSetDynamicRangeMode,
         .getSyncSnapshot = GetNodeSnapshot,
-        .getSizeLimitation = GetSnapshotSizeLimitation
+        .getSizeLimitation = GetSnapshotSizeLimitation,
+        .postImageCollectionTask = PostImageCollectionTask,
+        .getImageByNodeId = GetImageByNodeId
     };
     CHECK_INITIALIZED_FIELDS_END(impl, 0, 0, 0); // don't move this line
     return &impl;
@@ -2808,9 +2886,87 @@ CJUIFullNodeAPI fullCJUIApi {
 
 extern "C" {
 
+ACE_FORCE_EXPORT const ArkUIContentChangeAPI* GetArkUIContentChangeAPI(int32_t version)
+{
+    using OHOS::Ace::ErrorMessageManager;
+    static const ArkUIContentChangeAPI api {
+        [](int32_t instanceId, bool withStart, uint32_t eventMask, uint32_t ignoreMask,
+            void* cookie, void (*sink)(uint32_t, uint64_t, const char*, uint32_t, void*),
+            void (*release)(void*), uint64_t* subscriptionId) -> int32_t {
+            auto pipeline = OHOS::Ace::NG::PipelineContext::GetContextByContainerId(instanceId);
+            CHECK_NULL_RETURN_WITH_BACKEND_MESSAGE(pipeline && !pipeline->IsDestroyed(),
+                ARKUI_ERROR_CODE_UI_CONTEXT_INVALID, "UI context is invalid");
+            auto executor = pipeline->GetTaskExecutor();
+            if (!executor || !executor->WillRunOnCurrentThread(OHOS::Ace::TaskExecutor::TaskType::UI)) {
+                LOGF_ABORT("RegisterUIContentChangeEvent must be called on the UI thread");
+            }
+            auto manager = pipeline->GetContentChangeManager();
+            CHECK_NULL_RETURN_WITH_BACKEND_MESSAGE(manager,
+                ARKUI_ERROR_CODE_UI_CONTEXT_INVALID, "Content change manager is unavailable");
+            auto id = manager->RegisterCapiContentChangeEvent(withStart, eventMask, ignoreMask, cookie, sink, release);
+            CHECK_NULL_RETURN_WITH_BACKEND_MESSAGE(id,
+                ARKUI_ERROR_CODE_PARAM_INVALID, "Content change subscription could not be created");
+            *subscriptionId = id;
+            return ARKUI_ERROR_CODE_NO_ERROR;
+        },
+        [](int32_t instanceId, uint64_t subscriptionId) -> int32_t {
+            auto pipeline = OHOS::Ace::NG::PipelineContext::GetContextByContainerId(instanceId);
+            CHECK_NULL_RETURN_WITH_BACKEND_MESSAGE(pipeline && !pipeline->IsDestroyed(),
+                ARKUI_ERROR_CODE_UI_CONTEXT_INVALID, "UI context is invalid");
+            auto executor = pipeline->GetTaskExecutor();
+            if (!executor || !executor->WillRunOnCurrentThread(OHOS::Ace::TaskExecutor::TaskType::UI)) {
+                LOGF_ABORT("UnregisterUIContentChangeEvent must be called on the UI thread");
+            }
+            auto manager = pipeline->GetContentChangeManager();
+            CHECK_NULL_RETURN_WITH_BACKEND_MESSAGE(manager,
+                ARKUI_ERROR_CODE_UI_CONTEXT_INVALID, "Content change manager is unavailable");
+            CHECK_NULL_RETURN_WITH_BACKEND_MESSAGE(manager->UnregisterCapiContentChangeEvent(subscriptionId),
+                ARKUI_ERROR_CODE_PARAM_INVALID, "Subscription ID is unknown or already removed");
+            return ARKUI_ERROR_CODE_NO_ERROR;
+        }
+    };
+    return version == ARKUI_CONTENT_CHANGE_API_VERSION ? &api : nullptr;
+}
+
 ACE_FORCE_EXPORT CJUIFullNodeAPI* GetCJUIFullNodeAPI()
 {
     return &OHOS::Ace::NG::fullCJUIApi;
+}
+
+ACE_FORCE_EXPORT const ArkUITreeAPI* GetArkUITreeAPI(int32_t version)
+{
+    static const ArkUITreeAPI api { OHOS::Ace::NG::CollectUITree, OHOS::Ace::NG::SubmitUITree,
+        [](char* data) { std::free(data); } };
+    return version == 1 ? &api : nullptr;
+}
+
+ACE_FORCE_EXPORT const ArkUIPageTextAPI* GetArkUIPageTextAPI(int32_t version)
+{
+    static const ArkUIPageTextAPI api { OHOS::Ace::NG::CollectPageText, [](char* data) { std::free(data); } };
+    return version == 1 ? &api : nullptr;
+}
+
+ACE_FORCE_EXPORT const ArkUIInteractionObserverAPI* GetArkUIInteractionObserverAPI(int32_t version)
+{
+    static const ArkUIInteractionObserverAPI api {
+        [](int32_t instanceId, uint32_t eventMask,
+            void (*callback)(const OH_ArkUI_NativeModule_UIJsonWrapper* json, void* userData), void* userData,
+            OH_ArkUI_NativeModule_UIJsonWrapper* (*createWrapper)(const char* data, uint32_t size),
+            void (*destroyWrapper)(const OH_ArkUI_NativeModule_UIJsonWrapper* wrapper), uint32_t* registerID) {
+            OHOS::Ace::NG::UIInfoCollectionManager::RegisterParam param;
+            param.instanceId = instanceId;
+            param.eventMask = eventMask;
+            param.callback = callback;
+            param.userData = userData;
+            param.createWrapper = createWrapper;
+            param.destroyWrapper = destroyWrapper;
+            return OHOS::Ace::NG::UIInfoCollectionManager::GetInstance().RegisterObserver(param, registerID);
+        },
+        [](uint32_t registerID) {
+            return OHOS::Ace::NG::UIInfoCollectionManager::GetInstance().UnregisterObserver(registerID);
+        },
+    };
+    return version == 1 ? &api : nullptr;
 }
 
 ACE_FORCE_EXPORT ArkUIAnyAPI* GetArkUIAnyFullNodeAPI(int version)

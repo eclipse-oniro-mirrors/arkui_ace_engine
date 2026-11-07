@@ -84,6 +84,9 @@ protected:
     bool FinishParentLayout(LayoutWrapper* wrapper, const RefPtr<WaterFlowLayoutInfoBase>& info, SizeF size);
     void MeasureEdges(LayoutWrapper* wrapper, const RefPtr<WaterFlowLayoutInfoBase>& info, const SizeF& size);
     void LayoutEdges(LayoutWrapper* wrapper, const RefPtr<WaterFlowLayoutInfoBase>& info, float bodyEnd);
+    void BeginTargetPreparation();
+    bool YieldTargetPreparation(LayoutWrapper* wrapper);
+    void ReleaseTargetPreparationItems(LayoutWrapper* wrapper);
     /**
      * @brief Register an IdleTask to preload (create/measure/layout) items in cache range.
      */

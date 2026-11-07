@@ -24,7 +24,7 @@
 namespace OHOS::Ace::NG {
 class FrameNode;
 
-class DateTimeAnimationController : public virtual AceType {
+class DateTimeAnimationController : public AceType {
     DECLARE_ACE_TYPE(DateTimeAnimationController, AceType);
 
 public:

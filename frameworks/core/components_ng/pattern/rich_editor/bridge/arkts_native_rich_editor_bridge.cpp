@@ -766,6 +766,14 @@ panda::Local<panda::ObjectRef> CreateTextBackGroundStyleObject(EcmaVM* vm,
         panda::StringRef::NewFromUtf8(vm, textBackgroundStyle->backgroundColor->ToString().c_str()));
     returnObject->Set(vm, panda::StringRef::NewFromUtf8(vm, "radius"),
         panda::StringRef::NewFromUtf8(vm, textBackgroundStyle->backgroundRadius->ToString().c_str()));
+    if (textBackgroundStyle->borderWidth.has_value()) {
+        returnObject->Set(vm, panda::StringRef::NewFromUtf8(vm, "borderWidth"),
+            panda::StringRef::NewFromUtf8(vm, textBackgroundStyle->borderWidth->ToString().c_str()));
+    }
+    if (textBackgroundStyle->borderColor.has_value()) {
+        returnObject->Set(vm, panda::StringRef::NewFromUtf8(vm, "borderColor"),
+            panda::StringRef::NewFromUtf8(vm, textBackgroundStyle->borderColor->ColorToString().c_str()));
+    }
     return returnObject;
 }
 
@@ -1172,6 +1180,10 @@ Local<panda::ObjectRef> CreateSpanResultObject(EcmaVM *vm, const ResultObject& r
         }
         resultObj->Set(vm, panda::StringRef::NewFromUtf8(vm, "imageStyle"),
             CreateImageStyleResult(vm, resultObject.imageStyle));
+        if (resultObject.imageTag.has_value()) {
+            resultObj->Set(vm, panda::StringRef::NewFromUtf8(vm, "imageTag"),
+                panda::StringRef::NewFromUtf16(vm, resultObject.imageTag.value().c_str()));
+        }
     }
 
     return resultObj;
@@ -1241,6 +1253,10 @@ void SetImageChangeSpanResult(
     imageStyleResult.borderRadius = spanResult.GetBorderRadius();
     imageStyleResult.margin = spanResult.GetMargin();
     resultObj->Set(vm, panda::StringRef::NewFromUtf8(vm, "imageStyle"), CreateImageStyleResult(vm, imageStyleResult));
+    if (spanResult.GetImageTag().has_value()) {
+        resultObj->Set(vm, panda::StringRef::NewFromUtf8(vm, "imageTag"),
+            panda::StringRef::NewFromUtf16(vm, spanResult.GetImageTag().value().c_str()));
+    }
 }
 
 void SetChangeTextSpans(EcmaVM* vm, const std::vector<NG::RichEditorAbstractSpanResult>& spanList,
@@ -1470,6 +1486,10 @@ void SetDeleteSpan(EcmaVM* vm, panda::Local<panda::ObjectRef>& spanResultObj,
             auto layoutStyleObj = panda::ObjectRef::NewWithNamedProperties(vm, ArraySize(keys), keys, values);
             imageStyleObj->Set(vm, panda::StringRef::NewFromUtf8(vm, "layoutStyle"), layoutStyleObj);
             spanResultObj->Set(vm, panda::StringRef::NewFromUtf8(vm, "imageStyle"), imageStyleObj);
+            if (spanResult.GetImageTag().has_value()) {
+                spanResultObj->Set(vm, panda::StringRef::NewFromUtf8(vm, "imageTag"),
+                    panda::StringRef::NewFromUtf16(vm, spanResult.GetImageTag().value().c_str()));
+            }
             break;
         }
         case NG::SpanResultType::SYMBOL: {

@@ -25,6 +25,7 @@
 #include "core/components_ng/pattern/date_picker/picker_theme.h"
 #include "core/components_ng/pattern/picker_utils/toss_animation_controller.h"
 
+#include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "test/mock/frameworks/core/common/mock_container.h"
 #include "test/mock/frameworks/core/common/mock_theme_default.h"
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
@@ -538,6 +539,17 @@ HWTEST_F(DatePickerTestToss, OnDetachFromMainTreeMultiThread001, TestSize.Level1
     ASSERT_NE(columnNode, nullptr);
     auto columnPattern = columnNode->GetPattern<DatePickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
+    auto container = MockContainer::Current();
+    container->pipelineContext_ = MockPipelineContext::GetCurrent();
+    auto taskExecutor = AceType::MakeRefPtr<MockTaskExecutor>();
+    EXPECT_CALL(*taskExecutor, PostTask(_, _, _, _))
+        .Times(testing::AtLeast(0))
+        .WillRepeatedly([](std::function<void()>&& task, TaskExecutor::TaskType,
+                     const std::string&, PriorityType) -> bool {
+            if (task) { task(); }
+            return true;
+        });
+    container->pipelineContext_->taskExecutor_ = taskExecutor;
     auto pipeline = columnNode->GetContext();
     ASSERT_NE(pipeline, nullptr);
     columnPattern->hapticController_ = PickerAudioHapticFactory::GetInstance();

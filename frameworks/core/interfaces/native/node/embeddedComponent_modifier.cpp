@@ -14,6 +14,8 @@
  */
 #include "core/interfaces/native/node/embeddedComponent_modifier.h"
 
+#include "base/log/log_wrapper.h"
+
 #include <securec.h>
 #include <cstring>
 
@@ -97,6 +99,7 @@ void SetEmbeddedComponentOnError(FrameNode* frameNode, ArkUIEmbeddedComponentOpt
             return;
         }
 
+        LOG_CALLBACK("OH_ArkUI_EmbeddedComponentOption_SetOnError", func);
         func(code, name.c_str(), message.c_str());
     };
 
@@ -133,9 +136,13 @@ void SetEmbeddedComponentOnTerminated(FrameNode* frameNode, ArkUIEmbeddedCompone
             AbilityBase_Element element;
             TransformToCWantElement(element, wantWrap->GetWant());
             cwant.element = element;
-            func(code, &cwant);
+            {
+                LOG_CALLBACK("OH_ArkUI_EmbeddedComponentOption_SetOnTerminated", func);
+                func(code, &cwant);
+            }
             DestoryCWantElement(element);
         } else {
+            LOG_CALLBACK("OH_ArkUI_EmbeddedComponentOption_SetOnTerminated", func);
             func(code, nullptr);
         }
     };

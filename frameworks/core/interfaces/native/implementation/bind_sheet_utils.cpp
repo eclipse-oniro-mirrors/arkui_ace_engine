@@ -17,6 +17,7 @@
 #include "core/common/container.h"
 #include "core/components/common/properties/ui_material.h"
 #include "core/components_ng/pattern/overlay/modal_style.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/pattern/sheet/sheet_theme.h"
 #include "core/interfaces/native/implementation/spring_back_action_peer.h"
 #include "core/interfaces/native/implementation/sheet_dismiss_peer.h"
@@ -180,10 +181,6 @@ void BindSheetUtil::ParseSheetParams(SheetStyle& sheetStyle, const Ark_SheetOpti
     sheetStyle.systemMaterial = material ? material->Copy() : nullptr;
 #endif // WRONG_GEN_v140
 
-    if (Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY_SIX) &&
-        MaterialUtils::IsMaterialEnabled() && !sheetStyle.systemMaterial) {
-        sheetStyle.systemMaterial = MaterialUtils::GetInitMaterial(UiMaterialStyle::ULTRA_THICK);
-    }
     if (sheetStyle.systemMaterial &&
         !MaterialUtils::IsImmersiveMaterialSupported(sheetStyle.systemMaterial.GetRawPtr())) {
         sheetStyle.systemMaterial = nullptr;
@@ -220,6 +217,8 @@ void BindSheetUtil::ParseSheetParams(SheetStyle& sheetStyle, const Ark_SheetOpti
     sheetOffset.SetX(offsetVal.first.value().ConvertToPx());
     sheetOffset.SetY(offsetVal.second.value().ConvertToPx());
     sheetStyle.bottomOffset = sheetOffset;
+    sheetStyle.titleBarHoverMode = OptConvert<SheetTitleBarHoverMode>(sheetOptions.titleBarHoverMode);
+    sheetStyle.adaptToHandedness = OptConvert<HandednessFollowMode>(sheetOptions.adaptToHandedness);
 }
 
 void BindSheetUtil::ModifySheetStyle(

@@ -1148,7 +1148,7 @@ export class NavPathStack implements MaterializedBase {
     }
     private preloadPath_serialize(info: NavPathInfo, options?: PreloadOptions): Promise<void> {
         const thisSerializer: SerializerBase = SerializerBase.hold()
-        if (options !== undefined) {
+        if (options !== undefined && options !== null) {
             thisSerializer.writeInt8(RuntimeType.OBJECT)
             const optionsTmpValue = options!
             PreloadOptions_serializer.write(thisSerializer, optionsTmpValue)

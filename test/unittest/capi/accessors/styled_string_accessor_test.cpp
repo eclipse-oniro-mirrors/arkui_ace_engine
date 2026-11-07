@@ -1129,9 +1129,7 @@ HWTEST_F(StyledStringAccessorUnionStringTest, marshalling0Test, TestSize.Level1)
     auto onUnmarshalling = [](Ark_VMContext context, const Ark_Int32 resourceId,
         const Opt_StyledString value, const Opt_Array_String error) {
         EXPECT_FALSE(Converter::GetOpt(error).has_value());
-        auto arkPeer = Converter::GetOpt(value);
-        ASSERT_TRUE(arkPeer.has_value());
-        auto peer = arkPeer.value();
+        auto peer = Converter::GetOpt(value).value_or(nullptr);
         ASSERT_TRUE(peer);
         checkSpanString = peer->spanString;
     };
@@ -1144,13 +1142,9 @@ HWTEST_F(StyledStringAccessorUnionStringTest, marshalling0Test, TestSize.Level1)
     EXPECT_FALSE(checkSpanString);
 
     AsyncWorkTestHelper::DoExeceute();
-#ifdef ACE_ENGINE_BUG
-    // Looks like there is bug in ace engine. Unmarshal data length is not equal to marshal data.
+    // Round-trip contract: the bytes the unmarshall callback receives must equal the
+    // bytes the marshall callback produced (no trailing TLV_END / next-record bytes).
     EXPECT_EQ(unmarshallResult, marshallResult);
-#else
-    // Temporary check for head of data
-    EXPECT_TRUE(std::equal(marshallResult.begin(), marshallResult.end(), unmarshallResult->begin()));
-#endif
     ASSERT_TRUE(checkSpanString);
     EXPECT_EQ(checkSpanString->GetString(), peer_->spanString->GetString());
     auto spans = checkSpanString->GetSpans(0, std::strlen(STRING_TEST_VALUE), SpanType::ExtSpan);

@@ -14,6 +14,8 @@
  */
 #include <memory>
 
+#include "base/log/log_wrapper.h"
+
 #include "interfaces/native/native_type.h"
 #include "interfaces/native/node/grid_layout_option.h"
 #include "interfaces/native/node/node_model.h"
@@ -825,7 +827,11 @@ void SetGridLayoutOptions(ArkUINodeHandle node, ArkUIGridLayoutOptions option)
         auto callback = reinterpret_cast<GridSizeCallback>(option->onGetIrregularSizeByIndex);
         void* userData = option->irregularSizeUserData;
         gridLayoutOptions.getSizeByIndex = [callback, userData](int32_t index) -> GridItemSize {
-            ArkUI_GridItemSize arkSize = callback(index, userData);
+            ArkUI_GridItemSize arkSize {};
+            {
+                LOG_CALLBACK("OH_ArkUI_GridLayoutOptions_RegisterGetIrregularSizeByIndexCallback", callback);
+                arkSize = callback(index, userData);
+            }
             return GridItemSize { arkSize.rowSpan, arkSize.columnSpan };
         };
     }
@@ -833,7 +839,11 @@ void SetGridLayoutOptions(ArkUINodeHandle node, ArkUIGridLayoutOptions option)
         auto callback = reinterpret_cast<GridRectCallback>(option->onRectByIndexCallback);
         void* userData = option->rectByIndexUserData;
         gridLayoutOptions.getRectByIndex = [callback, userData](int32_t index) -> GridItemRect {
-            ArkUI_GridItemRect arkRect = callback(index, userData);
+            ArkUI_GridItemRect arkRect {};
+            {
+                LOG_CALLBACK("OH_ArkUI_GridLayoutOptions_RegisterGetRectByIndexCallback", callback);
+                arkRect = callback(index, userData);
+            }
             return GridItemRect { arkRect.rowStart, arkRect.rowSpan, arkRect.columnStart, arkRect.columnSpan };
         };
     }
@@ -1520,7 +1530,7 @@ void SetEnableEditModeChangeEvent(ArkUINodeHandle node, void* event)
     auto* frameNode = GetFrameNode(node);
     CHECK_NULL_VOID(frameNode);
     auto enableEditModeChangeEvent = reinterpret_cast<std::function<void(bool)>*>(event);
-    GridModelNG::SetEnableEditModeChangeEvent(frameNode, std::move(*enableEditModeChangeEvent));
+    GridModelNG::SetEnableEditModeBindingEvent(frameNode, std::move(*enableEditModeChangeEvent));
 }
 
 void SetDirection(ArkUINodeHandle node, ArkUI_Int32 direction)

@@ -23,6 +23,7 @@
 #include "test/unittest/core/pattern/scrollable/mock_scrollable.h"
 #define protected public
 #define private public
+#include "core/animation/animator.h"
 #include "core/animation/bezier_variable_velocity_motion.h"
 #include "core/components_ng/pattern/navigation/nav_bar_pattern.h"
 #include "core/components_ng/pattern/scroll/inner/scroll_bar.h"
@@ -531,6 +532,105 @@ HWTEST_F(ScrollableTestNg, CanOverScrollDirection003, TestSize.Level1)
     scrollPn->animateOverScrollEnd_ = false;
     EXPECT_TRUE(scrollPn->CanOverScrollStart(SCROLL_FROM_BAR_OVER_DRAG));
     EXPECT_TRUE(scrollPn->CanOverScrollEnd(SCROLL_FROM_BAR_OVER_DRAG));
+}
+
+/**
+ * @tc.name: HandleEdgeEffectAnimateOverScrollStart001
+ * @tc.desc: Test HandleEdgeEffect sets start flag only for top positive animation offset
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollableTestNg, HandleEdgeEffectAnimateOverScrollStart001, TestSize.Level1)
+{
+    auto scrollPn = scroll_->GetPattern<PartiallyMockedScrollable>();
+    ASSERT_NE(scrollPn, nullptr);
+    EXPECT_CALL(*scrollPn, IsAtTop()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*scrollPn, IsAtBottom(_)).WillRepeatedly(Return(false));
+    scrollPn->scrollEffect_ = AceType::MakeRefPtr<ScrollEdgeEffect>(EdgeEffect::SPRING);
+    scrollPn->SetEdgeEffect(EdgeEffect::SPRING, false, EffectEdge::ALL);
+    scrollPn->animateCanOverScroll_ = true;
+
+    auto ret = scrollPn->HandleEdgeEffect(10.0f, SCROLL_FROM_ANIMATION_CONTROLLER, SizeF(100.0f, 100.0f));
+
+    EXPECT_TRUE(ret);
+    EXPECT_TRUE(scrollPn->animateOverScrollStart_);
+    EXPECT_FALSE(scrollPn->animateOverScrollEnd_);
+}
+
+/**
+ * @tc.name: HandleEdgeEffectAnimateOverScrollEnd002
+ * @tc.desc: Test HandleEdgeEffect sets end flag only for bottom negative animation offset
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollableTestNg, HandleEdgeEffectAnimateOverScrollEnd002, TestSize.Level1)
+{
+    auto scrollPn = scroll_->GetPattern<PartiallyMockedScrollable>();
+    ASSERT_NE(scrollPn, nullptr);
+    EXPECT_CALL(*scrollPn, IsAtTop()).WillRepeatedly(Return(false));
+    EXPECT_CALL(*scrollPn, IsAtBottom(_)).WillRepeatedly(Return(true));
+    scrollPn->scrollEffect_ = AceType::MakeRefPtr<ScrollEdgeEffect>(EdgeEffect::SPRING);
+    scrollPn->SetEdgeEffect(EdgeEffect::SPRING, false, EffectEdge::ALL);
+    scrollPn->animateCanOverScroll_ = true;
+
+    auto ret = scrollPn->HandleEdgeEffect(-10.0f, SCROLL_FROM_ANIMATION_CONTROLLER, SizeF(100.0f, 100.0f));
+
+    EXPECT_TRUE(ret);
+    EXPECT_FALSE(scrollPn->animateOverScrollStart_);
+    EXPECT_TRUE(scrollPn->animateOverScrollEnd_);
+}
+
+/**
+ * @tc.name: HandleEdgeEffectAnimateOverScrollStart003
+ * @tc.desc: Test HandleEdgeEffect keeps the start flag in the base scrollable implementation
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollableTestNg, HandleEdgeEffectAnimateOverScrollStart003, TestSize.Level1)
+{
+    auto scrollPn = scroll_->GetPattern<PartiallyMockedScrollable>();
+    ASSERT_NE(scrollPn, nullptr);
+    EXPECT_CALL(*scrollPn, IsAtTop()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*scrollPn, IsAtBottom(_)).WillRepeatedly(Return(false));
+    scrollPn->scrollEffect_ = AceType::MakeRefPtr<ScrollEdgeEffect>(EdgeEffect::SPRING);
+    scrollPn->SetEdgeEffect(EdgeEffect::SPRING, false, EffectEdge::ALL);
+    scrollPn->animateCanOverScroll_ = true;
+    scrollPn->animateOverScrollStart_ = true;
+    scrollPn->animateOverScrollEnd_ = true;
+
+    auto ret = scrollPn->HandleEdgeEffect(-10.0f, SCROLL_FROM_ANIMATION_CONTROLLER, SizeF(100.0f, 100.0f));
+
+    EXPECT_TRUE(ret);
+    EXPECT_TRUE(scrollPn->animateOverScrollStart_);
+    EXPECT_FALSE(scrollPn->animateOverScrollEnd_);
+}
+
+/**
+ * @tc.name: HandleEdgeEffectAnimateOverScrollEnd004
+ * @tc.desc: Test HandleEdgeEffect keeps the end flag in the base scrollable implementation
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollableTestNg, HandleEdgeEffectAnimateOverScrollEnd004, TestSize.Level1)
+{
+    auto scrollPn = scroll_->GetPattern<PartiallyMockedScrollable>();
+    ASSERT_NE(scrollPn, nullptr);
+    EXPECT_CALL(*scrollPn, IsAtTop()).WillRepeatedly(Return(false));
+    EXPECT_CALL(*scrollPn, IsAtBottom(_)).WillRepeatedly(Return(true));
+    EXPECT_CALL(*scrollPn, IsScrollable).WillRepeatedly(Return(true));
+    scrollPn->scrollEffect_ = AceType::MakeRefPtr<ScrollEdgeEffect>(EdgeEffect::SPRING);
+    scrollPn->SetEdgeEffect(EdgeEffect::SPRING, false, EffectEdge::ALL);
+    scrollPn->animateCanOverScroll_ = true;
+    scrollPn->animateOverScrollStart_ = true;
+    scrollPn->animateOverScrollEnd_ = true;
+    auto scrollable = scrollPn->GetScrollableEvent()->GetScrollable();
+    ASSERT_NE(scrollable, nullptr);
+    scrollable->state_ = Scrollable::AnimationState::IDLE;
+    scrollable->isTouching_ = false;
+
+    auto ret = scrollPn->HandleEdgeEffect(10.0f, SCROLL_FROM_ANIMATION_CONTROLLER, SizeF(100.0f, 100.0f));
+    scrollPn->animateCanOverScroll_ = false;
+
+    EXPECT_TRUE(ret);
+    EXPECT_FALSE(scrollPn->animateOverScrollStart_);
+    EXPECT_TRUE(scrollPn->animateOverScrollEnd_);
+    EXPECT_TRUE(scrollPn->CanOverScrollEnd(SCROLL_FROM_JUMP));
 }
 
 /**

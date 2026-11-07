@@ -63,6 +63,16 @@ public:
         return displayInfo_;
     }
 
+    uint64_t GetDisplayId() const override
+    {
+        return mockDisplayId_;
+    }
+
+    void SetMockDisplayId(uint64_t displayId)
+    {
+        mockDisplayId_ = displayId;
+    }
+
     static void SetUp();
     static void SetUp(RefPtr<PipelineBase> pipelineContext);
     static void TearDown();
@@ -210,6 +220,7 @@ public:
     MOCK_METHOD(bool, WindowIsShow, (), (const, override));
     MOCK_METHOD(bool, IsMainWindow, (), (const, override));
     MOCK_METHOD(bool, IsSubWindow, (), (const, override));
+    MOCK_METHOD(bool, IsPipWindow, (), (const, override));
     MOCK_METHOD(Rect, GetGlobalScaledRect, (), (const, override));
     static RefPtr<MockContainer> container_;
     static ColorMode mockColorMode_;
@@ -229,6 +240,7 @@ private:
     bool isSceneBoardWindow_ = false;
     bool isCrossAxisWindow_ = false;
     RefPtr<DisplayInfo> displayInfo_ = MakeRefPtr<DisplayInfo>();
+    uint64_t mockDisplayId_ = static_cast<uint64_t>(-1);
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_TEST_MOCK_CORE_COMMON_MOCK_CONTAINER_H

@@ -44,4 +44,9 @@ void PixelMapImage::DrawToRSCanvas(
 void PixelMapImage::DrawRect(RSCanvas& canvas, const RSRect& dstRect) {}
 
 void PixelMapImage::DrawRect(RSCanvas& canvas, const RSRect& srcRect, const RSRect& dstRect) {}
+
+std::string PixelMapImage::PixelSamplingDump() const
+{
+    return "";
+}
 } // namespace OHOS::Ace::NG

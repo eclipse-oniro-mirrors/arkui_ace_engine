@@ -65,6 +65,7 @@ public:
 
     std::vector<RefPtr<PixelMap>> GetPixelMapList() const
     {
+        std::shared_lock<std::shared_mutex> lock(callMutx_);
         return pixelMapList_;
     }
 
@@ -111,11 +112,20 @@ private:
 
     RefPtr<PixelMap> GetFrameByIndex(int32_t index, int32_t nodeId);
 
+    // Must be called with callMutx_ already held (shared or unique)
+    RefPtr<PixelMap> GetFrameByIndexInternal(int32_t index, int32_t nodeId);
+
     void CreateParamsFromImageSource(int32_t nodeId);
 
     void CreateAnimator(int32_t nodeId);
 
     FillMode ToFillMode() const;
+
+    // Internal versions - must be called with callMutx_ already held
+    uint32_t GetFrameCountInternal() const;
+    int32_t GetTotalDurationInternal();
+    std::vector<int32_t> GetDurationsInternal();
+    int32_t GetIterationsInternal() const;
 
     bool autoPlay_ = true;
     AnimationStopMode stopMode_ = AnimationStopMode::FIRST_FRAME;

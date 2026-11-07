@@ -65,7 +65,10 @@ template("ace_ohos_standard_source_set") {
       "$ace_root/adapter/ohos/entrance/ui_content_impl.cpp",
       "$ace_root/adapter/ohos/entrance/ui_event_tracker.cpp",
       "$ace_root/adapter/ohos/entrance/ui_event_impl.cpp",
+      "$ace_root/adapter/ohos/entrance/ui_session/page_scene_split_adapter.cpp",
       "$ace_root/adapter/ohos/entrance/ui_session/ui_session_batch_command.cpp",
+      "$ace_root/adapter/ohos/entrance/ui_session/ui_session_command_result.cpp",
+      "$ace_root/adapter/ohos/entrance/ui_session/ui_session_accessibility_command.cpp",
       "$ace_root/adapter/ohos/entrance/utils.cpp",
 
       # drag window
@@ -82,6 +85,9 @@ template("ace_ohos_standard_source_set") {
 
       #Miscdevice Vibrator
       "$ace_root/adapter/ohos/entrance/vibrator/vibrator_utils.cpp",
+
+      # Text AI utils
+      "$ace_root/adapter/ohos/entrance/text/text_ai_utils.cpp",
 
       # CJUtils
       "$ace_root/adapter/ohos/entrance/cj_utils/cj_utils.cpp",
@@ -219,6 +225,10 @@ template("ace_ohos_standard_source_set") {
 
     if (defined(config.accessibility_support) && config.accessibility_support) {
       external_deps += [ "accessibility:accessibilityconfig" ]
+    }
+
+    if (defined(config.enable_standard_input) && config.enable_standard_input) {
+      external_deps += [ "imf:inputmethod_client" ]
     }
 
     deps +=

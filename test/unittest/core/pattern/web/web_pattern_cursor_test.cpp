@@ -643,6 +643,7 @@ HWTEST_F(WebPatternCursorTest, NotifyMenuLifeCycleEvent_Hovering_001, TestSize.L
     web_pattern_->NotifyMenuLifeCycleEvent(MenuLifeCycleEvent::ON_DID_DISAPPEAR);
 
     EXPECT_FALSE(web_pattern_->isMenuShownFromWeb_);
+    Mock::VerifyAndClearExpectations(AceType::RawPtr(mockMouseStyle));
 #endif
 }
 
@@ -666,6 +667,7 @@ HWTEST_F(WebPatternCursorTest, NotifyMenuLifeCycleEvent_HoverExit_001, TestSize.
     web_pattern_->NotifyMenuLifeCycleEvent(MenuLifeCycleEvent::ON_DID_DISAPPEAR);
 
     EXPECT_FALSE(web_pattern_->isMenuShownFromWeb_);
+    Mock::VerifyAndClearExpectations(AceType::RawPtr(mockMouseStyle));
 #endif
 }
 

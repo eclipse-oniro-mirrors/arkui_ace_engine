@@ -90,6 +90,12 @@ const std::vector<int32_t> SubwindowManager::GetAllSubContainerId(int32_t parent
     return {};
 }
 
+const RefPtr<Subwindow> SubwindowManager::GetSubwindowById(int32_t subinstanceId)
+{
+    auto iter = instanceSubwindowMap_.find(subinstanceId);
+    return iter == instanceSubwindowMap_.end() ? nullptr : iter->second;
+}
+
 const RefPtr<Subwindow> SubwindowManager::GetSubwindow(int32_t instanceId)
 {
     return nullptr;

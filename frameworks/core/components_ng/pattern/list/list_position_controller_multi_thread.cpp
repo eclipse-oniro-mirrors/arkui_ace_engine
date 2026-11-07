@@ -28,6 +28,7 @@ void ListPositionController::JumpToItemInGroupMultiThread(
     auto listPattern = AceType::DynamicCast<ListPattern>(pattern);
     CHECK_NULL_VOID(listPattern);
     auto host = listPattern->GetHost();
+    CHECK_NULL_VOID(host);
     if (align == ScrollAlign::NONE) {
         align = ScrollAlign::START;
     }

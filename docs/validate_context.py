@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-from __future__ import annotations
 
 # Copyright (c) 2026 Huawei Device Co., Ltd.
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -31,6 +30,8 @@ Usage:
   python3 docs/validate_context.py --all-specs
   python3 docs/validate_context.py --warnings-as-errors
 """
+
+from __future__ import annotations
 
 import argparse
 import json

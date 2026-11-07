@@ -30,7 +30,7 @@ class ThemeStyle;
  * ButtonTheme defines color and styles of ButtonComponent. ButtonTheme should be built
  * using ButtonTheme::Builder.
  */
-class ButtonTheme : public virtual Theme {
+class ButtonTheme : public Theme {
     DECLARE_ACE_TYPE(ButtonTheme, Theme);
 
 public:

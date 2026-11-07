@@ -14,7 +14,9 @@
  */
 #include "core/interfaces/native/node/web_modifier.h"
 
+#include "base/utils/system_properties.h"
 #include "bridge/common/utils/utils.h"
+#include "core/common/resource/resource_object.h"
 #include "core/components_ng/pattern/text/text_model.h"
 #include "core/components_ng/pattern/web/web_model_ng.h"
 #include "core/interfaces/native/node/node_drag_modifier.h"
@@ -25,6 +27,7 @@ namespace {
 constexpr bool DEFAULT_JS_ACCESS_ENABLED = true;
 constexpr bool DEFAULT_FILE_ACCESS_ENABLED = false;
 constexpr bool DEFAULT_DOM_STORAGE_ACCESS_ENABLED = false;
+constexpr bool DEFAULT_VISITED_LINK_PERSIST_ENABLED = false;
 constexpr MixedModeContent DEFAULT_MIXED_MODE = MixedModeContent::MIXED_CONTENT_NEVER_ALLOW;
 constexpr int32_t DEFAULT_ZOOM_ACCESS_ENABLED = true;
 constexpr bool DEFAULT_ZOOM_CONTROL_ACCESS = false;
@@ -38,6 +41,7 @@ constexpr bool DEFAULT_VERTICAL_SCROLL_BAR_ACCESS_ENABLED = false;
 constexpr bool DEFAULT_HORIZONTAL_SCROLL_BAR_ACCESS_ENABLED = false;
 constexpr int32_t DEFAULT_TEXT_ZOOM_RATIO = 100;
 constexpr float DEFAULT_INITIAL_SCALE = 100.0f;
+constexpr float DEFAULT_FLING_SPEED_LIMIT = 0.0f;
 constexpr bool DEFAULT_GEOLOCATION_ACCESS_ENABLED = false;
 constexpr bool DEFAULT_DATABASE_ACCESS_ENABLED = false;
 constexpr bool DEFAULT_OVERVIEW_MODE_ACCESS = false;
@@ -79,6 +83,7 @@ constexpr WebRotateEffect DEFAULT_WEB_ROTATE_EFFECT = WebRotateEffect::TOPLEFT_E
 constexpr bool DEFAULT_ENABLE_DATA_DETECTOR = false;
 constexpr bool DEFAULT_ENABLE_SELECTED_DATA_DETECTOR = true;
 const std::vector<double> BLANK_SCREEN_DETECTION_DEFAULT_TIMING = { 1.0, 3.0, 5.0 };
+constexpr bool DEFAULT_WEB_BLANK_SCREEN_MONITOR_ENABLED = false;
 constexpr bool DEFAULT_WEB_MEDIA_AV_SESSION_ENABLED = true;
 constexpr bool DEFAULT_WEB_MEDIA_NETWORK_PROXY_ENABLED = false;
 constexpr bool DEFAULT_NATIVE_MEDIA_PLAYER_ENABLED = false;
@@ -1513,6 +1518,35 @@ void ResetOverScrollMode(ArkUINodeHandle node)
     WebModelNG::SetOverScrollMode(frameNode, DEFAULT_OVERSCROLL_MODE);
 }
 
+void SetWebCaretColor(ArkUINodeHandle node, ArkUI_Uint32 color, void* colorRawPtr)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetCaretColor(frameNode, Color(color));
+    if (SystemProperties::ConfigChangePerform()) {
+        auto pattern = frameNode->GetPattern();
+        CHECK_NULL_VOID(pattern);
+        if (colorRawPtr) {
+            auto resourceObject = AceType::Claim(reinterpret_cast<ResourceObject*>(colorRawPtr));
+            pattern->RegisterResource<Color>("WebCaretColor", resourceObject, Color(color));
+        } else {
+            pattern->UnRegisterResource("WebCaretColor");
+        }
+    }
+}
+
+void ResetWebCaretColor(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetCaretColor(frameNode, Color(0));
+    if (SystemProperties::ConfigChangePerform()) {
+        auto pattern = frameNode->GetPattern();
+        CHECK_NULL_VOID(pattern);
+        pattern->UnRegisterResource("WebCaretColor");
+    }
+}
+
 void SetOnTouchIconUrlReceivedCallBack(ArkUINodeHandle node, void* extraParam)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -1888,6 +1922,36 @@ void ResetOnDetectedBlankScreen(ArkUINodeHandle node)
     WebModelNG::SetOnDetectedBlankScreen(frameNode, callback);
 }
 
+void SetOnMonitoredBlankScreen(ArkUINodeHandle node, void* extraParam)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    if (extraParam) {
+        auto* onMonitoredBlankScreenCallBackPtr =
+            reinterpret_cast<std::function<void(const MonitoredBlankScreenEvent&)>*>(extraParam);
+        CHECK_NULL_VOID(onMonitoredBlankScreenCallBackPtr);
+        auto onMonitoredBlankScreenCallBack = *onMonitoredBlankScreenCallBackPtr;
+        auto callback = [onMonitoredBlankScreenCallBack](const BaseEventInfo* event) {
+            CHECK_NULL_VOID(event);
+            auto monitoredBlankScreenEvent = static_cast<const MonitoredBlankScreenEvent*>(event);
+            if (monitoredBlankScreenEvent) {
+                auto& nonConstEvent = const_cast<MonitoredBlankScreenEvent&>(*monitoredBlankScreenEvent);
+                onMonitoredBlankScreenCallBack(nonConstEvent);
+            }
+        };
+        WebModelNG::SetOnMonitoredBlankScreen(frameNode, std::move(callback));
+    } else {
+        WebModelNG::SetOnMonitoredBlankScreen(frameNode, nullptr);
+    }
+}
+ 
+void ResetOnMonitoredBlankScreen(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto callback = [](const BaseEventInfo* info) {};
+    WebModelNG::SetOnMonitoredBlankScreen(frameNode, callback);
+}
+
 void SetBlankScreenDetectionConfig(
     ArkUINodeHandle node, const struct ArkUIBlankScreenDetectionConfigStruct* arkUIBlankScreenDetectionConfig)
 {
@@ -1939,6 +2003,20 @@ void ResetBlankScreenDetectionConfig(ArkUINodeHandle node)
     WebModelNG::SetBlankScreenDetectionConfig(frameNode, detectConfig);
 }
 
+void SetEnableBlankScreenMonitor(ArkUINodeHandle node, ArkUI_Bool value)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetWebBlankScreenMonitorEnabled(frameNode, value);
+}
+
+void ResetEnableBlankScreenMonitor(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetWebBlankScreenMonitorEnabled(frameNode, DEFAULT_WEB_BLANK_SCREEN_MONITOR_ENABLED);
+}
+
 void SetOnContextMenuShow(ArkUINodeHandle node, void* extraParam)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -1964,6 +2042,31 @@ void ResetOnContextMenuShow(ArkUINodeHandle node)
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
     WebModelNG::SetOnContextMenuShow(frameNode, nullptr);
+}
+
+void SetOnContextMenuUpdateCallBack(ArkUINodeHandle node, void* extraParam)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    if (extraParam) {
+        using UpdateCallback = std::function<void(WebContextMenuItemId, const WebContextMenuOptions&)>;
+        auto* originalCallbackPtr = reinterpret_cast<UpdateCallback*>(extraParam);
+        CHECK_NULL_VOID(originalCallbackPtr);
+        auto callback = [originalCallback = *originalCallbackPtr](
+            WebContextMenuItemId menuItemId, const WebContextMenuOptions& options) {
+            originalCallback(menuItemId, options);
+        };
+        WebModelNG::SetOnContextMenuUpdate(frameNode, std::move(callback));
+    } else {
+        WebModelNG::SetOnContextMenuUpdate(frameNode, nullptr);
+    }
+}
+
+void ResetOnContextMenuUpdateCallBack(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetOnContextMenuUpdate(frameNode, nullptr);
 }
 
 void SetOnSafeBrowsingCheckResultCallBack(ArkUINodeHandle node, void* extraParam)
@@ -2648,6 +2751,34 @@ void ResetForceEnableZoom(ArkUINodeHandle node)
     WebModelNG::SetForceEnableZoom(frameNode, DEFAULT_FORCE_ENABLE_ZOOM_ENABLED);
 }
 
+void SetFlingSpeedLimit(ArkUINodeHandle node, ArkUI_Float32 value)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetFlingSpeedLimit(frameNode, value);
+}
+
+void ResetFlingSpeedLimit(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetFlingSpeedLimit(frameNode, DEFAULT_FLING_SPEED_LIMIT);
+}
+
+void SetVisitedLinkPersistEnabled(ArkUINodeHandle node, ArkUI_Bool value)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetVisitedLinkPersistEnabled(frameNode, value);
+}
+
+void ResetVisitedLinkPersistEnabled(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetVisitedLinkPersistEnabled(frameNode, DEFAULT_VISITED_LINK_PERSIST_ENABLED);
+}
+
 void SetBackToTop(ArkUINodeHandle node, ArkUI_Bool value)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -2841,8 +2972,6 @@ const ArkUIWebModifier* GetWebModifier()
         .resetAllowWindowOpenMethod = ResetAllowWindowOpenMethod,
         .setKeyboardAvoidMode = SetKeyboardAvoidMode,
         .resetKeyboardAvoidMode = ResetKeyboardAvoidMode,
-        .setKeyboardAppearance = SetKeyboardAppearance,
-        .resetKeyboardAppearance = ResetKeyboardAppearance,
         .setOnControllerAttached = SetOnControllerAttached,
         .resetOnControllerAttached = ResetOnControllerAttached,
         .setVerticalScrollBarAccessEnabled = SetVerticalScrollBarAccessEnabled,
@@ -2863,6 +2992,8 @@ const ArkUIWebModifier* GetWebModifier()
         .resetOnRequestSelectedCallBack = ResetOnRequestSelectedCallBack,
         .setOnContextMenuHideCallBack = SetOnContextMenuHideCallBack,
         .resetOnContextMenuHideCallBack = ResetOnContextMenuHideCallBack,
+        .setOnContextMenuUpdateCallBack = SetOnContextMenuUpdateCallBack,
+        .resetOnContextMenuUpdateCallBack = ResetOnContextMenuUpdateCallBack,
         .setGeolocationAccess = SetGeolocationAccess,
         .resetGeolocationAccess = ResetGeolocationAccess,
         .setDatabaseAccess = SetDatabaseAccess,
@@ -2991,12 +3122,14 @@ const ArkUIWebModifier* GetWebModifier()
         .resetOnTextSelectionChange = ResetOnTextSelectionChange,
         .setOnDetectedBlankScreen = SetOnDetectedBlankScreen,
         .resetOnDetectedBlankScreen = ResetOnDetectedBlankScreen,
+        .setOnMonitoredBlankScreen = SetOnMonitoredBlankScreen,
+        .resetOnMonitoredBlankScreen = ResetOnMonitoredBlankScreen,
         .setBlankScreenDetectionConfig = SetBlankScreenDetectionConfig,
         .resetBlankScreenDetectionConfig = ResetBlankScreenDetectionConfig,
+        .setEnableBlankScreenMonitor = SetEnableBlankScreenMonitor,
+        .resetEnableBlankScreenMonitor = ResetEnableBlankScreenMonitor,
         .setOnFirstScreenPaint = SetOnFirstScreenPaint,
         .resetOnFirstScreenPaint = ResetOnFirstScreenPaint,
-        .setEnableImageAnalyzer = SetEnableImageAnalyzer,
-        .resetEnableImageAnalyzer = ResetEnableImageAnalyzer,
         .setOnContextMenuShow = SetOnContextMenuShow,
         .resetOnContextMenuShow = ResetOnContextMenuShow,
         .setOnSafeBrowsingCheckResultCallBack = SetOnSafeBrowsingCheckResultCallBack,
@@ -3043,8 +3176,12 @@ const ArkUIWebModifier* GetWebModifier()
         .resetOnBeforeUnload = ResetOnBeforeUnload,
         .setJavaScriptProxy = SetJavaScriptProxy,
         .resetJavaScriptProxy = ResetJavaScriptProxy,
+        .setEnableImageAnalyzer = SetEnableImageAnalyzer,
+        .resetEnableImageAnalyzer = ResetEnableImageAnalyzer,
         .setForceEnableZoom = SetForceEnableZoom,
         .resetForceEnableZoom = ResetForceEnableZoom,
+        .setFlingSpeedLimit = SetFlingSpeedLimit,
+        .resetFlingSpeedLimit = ResetFlingSpeedLimit,
         .setBackToTop = SetBackToTop,
         .resetBackToTop = ResetBackToTop,
         .setOnCameraCaptureStateChanged = SetOnCameraCaptureStateChanged,
@@ -3063,18 +3200,24 @@ const ArkUIWebModifier* GetWebModifier()
         .resetEnableNativeMediaPlayer = ResetEnableNativeMediaPlayer,
         .setEnableWebAVSession = SetEnableWebAVSession,
         .resetEnableWebAVSession = ResetEnableWebAVSession,
-        .setEnableMediaNetworkProxy = SetEnableMediaNetworkProxy,
-        .resetEnableMediaNetworkProxy = ResetEnableMediaNetworkProxy,
         .setEnableDrag = SetEnableDrag,
         .resetEnableDrag = ResetEnableDrag,
+        .setEnableMediaNetworkProxy = SetEnableMediaNetworkProxy,
+        .resetEnableMediaNetworkProxy = ResetEnableMediaNetworkProxy,
         .setScrollbarLayoutPolicy = SetScrollbarLayoutPolicy,
         .resetScrollbarLayoutPolicy = ResetScrollbarLayoutPolicy,
         .setOnInputMethodAttached = SetOnInputMethodAttached,
         .resetOnInputMethodAttached = ResetOnInputMethodAttached,
+        .setKeyboardAppearance = SetKeyboardAppearance,
+        .resetKeyboardAppearance = ResetKeyboardAppearance,
         .setEnableFullscreenVideoOverlay = SetEnableFullscreenVideoOverlay,
         .resetEnableFullscreenVideoOverlay = ResetEnableFullscreenVideoOverlay,
         .setOnZoomChangeCallBack = SetOnZoomChangeCallBack,
         .resetOnZoomChangeCallBack = ResetOnZoomChangeCallBack,
+        .setVisitedLinkPersistEnabled = SetVisitedLinkPersistEnabled,
+        .resetVisitedLinkPersistEnabled = ResetVisitedLinkPersistEnabled,
+        .setCaretColor = SetWebCaretColor,
+        .resetCaretColor = ResetWebCaretColor,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;
@@ -3110,8 +3253,6 @@ const CJUIWebModifier* GetCJUIWebModifier()
         .resetAllowWindowOpenMethod = ResetAllowWindowOpenMethod,
         .setKeyboardAvoidMode = SetKeyboardAvoidMode,
         .resetKeyboardAvoidMode = ResetKeyboardAvoidMode,
-        .setKeyboardAppearance = SetKeyboardAppearance,
-        .resetKeyboardAppearance = ResetKeyboardAppearance,
         .setOnControllerAttached = SetOnControllerAttached,
         .resetOnControllerAttached = ResetOnControllerAttached,
         .setVerticalScrollBarAccessEnabled = SetVerticalScrollBarAccessEnabled,
@@ -3132,6 +3273,8 @@ const CJUIWebModifier* GetCJUIWebModifier()
         .resetOnRequestSelectedCallBack = ResetOnRequestSelectedCallBack,
         .setOnContextMenuHideCallBack = SetOnContextMenuHideCallBack,
         .resetOnContextMenuHideCallBack = ResetOnContextMenuHideCallBack,
+        .setOnContextMenuUpdateCallBack = SetOnContextMenuUpdateCallBack,
+        .resetOnContextMenuUpdateCallBack = ResetOnContextMenuUpdateCallBack,
         .setGeolocationAccess = SetGeolocationAccess,
         .resetGeolocationAccess = ResetGeolocationAccess,
         .setDatabaseAccess = SetDatabaseAccess,
@@ -3256,16 +3399,18 @@ const CJUIWebModifier* GetCJUIWebModifier()
         .resetOnPromptCallBack = ResetOnPromptCallBack,
         .setOnShowFileSelector = SetOnShowFileSelector,
         .resetOnShowFileSelector = ResetOnShowFileSelector,
-        .setOnTextSelectionChange = SetOnTextSelectionChange,
-        .resetOnTextSelectionChange = ResetOnTextSelectionChange,
         .setOnDetectedBlankScreen = SetOnDetectedBlankScreen,
         .resetOnDetectedBlankScreen = ResetOnDetectedBlankScreen,
+        .setOnMonitoredBlankScreen = SetOnMonitoredBlankScreen,
+        .resetOnMonitoredBlankScreen = ResetOnMonitoredBlankScreen,
+        .setOnTextSelectionChange = SetOnTextSelectionChange,
+        .resetOnTextSelectionChange = ResetOnTextSelectionChange,
         .setBlankScreenDetectionConfig = SetBlankScreenDetectionConfig,
         .resetBlankScreenDetectionConfig = ResetBlankScreenDetectionConfig,
+        .setEnableBlankScreenMonitor = SetEnableBlankScreenMonitor,
+        .resetEnableBlankScreenMonitor = ResetEnableBlankScreenMonitor,
         .setOnFirstScreenPaint = SetOnFirstScreenPaint,
         .resetOnFirstScreenPaint = ResetOnFirstScreenPaint,
-        .setEnableImageAnalyzer = SetEnableImageAnalyzer,
-        .resetEnableImageAnalyzer = ResetEnableImageAnalyzer,
         .setOnContextMenuShow = SetOnContextMenuShow,
         .resetOnContextMenuShow = ResetOnContextMenuShow,
         .setOnSafeBrowsingCheckResultCallBack = SetOnSafeBrowsingCheckResultCallBack,
@@ -3312,8 +3457,12 @@ const CJUIWebModifier* GetCJUIWebModifier()
         .resetOnBeforeUnload = ResetOnBeforeUnload,
         .setJavaScriptProxy = SetJavaScriptProxy,
         .resetJavaScriptProxy = ResetJavaScriptProxy,
+        .setEnableImageAnalyzer = SetEnableImageAnalyzer,
+        .resetEnableImageAnalyzer = ResetEnableImageAnalyzer,
         .setForceEnableZoom = SetForceEnableZoom,
         .resetForceEnableZoom = ResetForceEnableZoom,
+        .setFlingSpeedLimit = SetFlingSpeedLimit,
+        .resetFlingSpeedLimit = ResetFlingSpeedLimit,
         .setBackToTop = SetBackToTop,
         .resetBackToTop = ResetBackToTop,
         .setOnCameraCaptureStateChanged = SetOnCameraCaptureStateChanged,
@@ -3340,10 +3489,16 @@ const CJUIWebModifier* GetCJUIWebModifier()
         .resetScrollbarLayoutPolicy = ResetScrollbarLayoutPolicy,
         .setOnInputMethodAttached = SetOnInputMethodAttached,
         .resetOnInputMethodAttached = ResetOnInputMethodAttached,
+        .setKeyboardAppearance = SetKeyboardAppearance,
+        .resetKeyboardAppearance = ResetKeyboardAppearance,
         .setEnableFullscreenVideoOverlay = SetEnableFullscreenVideoOverlay,
         .resetEnableFullscreenVideoOverlay = ResetEnableFullscreenVideoOverlay,
         .setOnZoomChangeCallBack = SetOnZoomChangeCallBack,
         .resetOnZoomChangeCallBack = ResetOnZoomChangeCallBack,
+        .setVisitedLinkPersistEnabled = SetVisitedLinkPersistEnabled,
+        .resetVisitedLinkPersistEnabled = ResetVisitedLinkPersistEnabled,
+        .setCaretColor = SetWebCaretColor,
+        .resetCaretColor = ResetWebCaretColor,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;

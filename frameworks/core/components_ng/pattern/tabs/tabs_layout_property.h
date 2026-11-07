@@ -43,12 +43,15 @@ public:
         value->propAxis_ = CloneAxis();
         value->propTabBarMode_ = CloneTabBarMode();
         value->propDivider_ = CloneDivider();
+        value->propDividerForSideBar_ = CloneDividerForSideBar();
         value->propEffectNodeOption_ = CloneEffectNodeOption();
         value->propBarWidth_ = CloneBarWidth();
+        value->propBarWidthForSideBar_ = CloneBarWidthForSideBar();
         value->propBarHeight_ = CloneBarHeight();
         value->propIndex_ = CloneIndex();
         value->propIndexSetByUser_ = CloneIndexSetByUser();
         value->propBarOverlap_ = CloneBarOverlap();
+        value->propBarOverlapMode_ = CloneBarOverlapMode();
         value->propWidthAuto_ = CloneWidthAuto();
         value->propHeightAuto_ = CloneHeightAuto();
         value->propCachedMaxCount_ = CloneCachedMaxCount();
@@ -56,6 +59,7 @@ public:
         value->propSidebarDisplayStyle_ = CloneSidebarDisplayStyle();
         value->propBarLayoutStyle_ = CloneBarLayoutStyle();
         value->propBarDisplayModeBreakpoint_ = CloneBarDisplayModeBreakpoint();
+        value->propBarTopFloatingStyle_ = CloneBarTopFloatingStyle();
         value->propSidebarPosition_ = CloneSidebarPosition();
         value->propSidebarSelectedIconColor_ = CloneSidebarSelectedIconColor();
         value->propSidebarSelectedTextColor_ = CloneSidebarSelectedTextColor();
@@ -63,6 +67,7 @@ public:
         value->propSidebarUnselectedTextColor_ = CloneSidebarUnselectedTextColor();
         value->propSidebarSelectedBoardColor_ = CloneSidebarSelectedBoardColor();
         value->propBarBackgroundColor_ = CloneBarBackgroundColor();
+        value->propBarBackgroundColorForSideBar_ = CloneBarBackgroundColorForSideBar();
         value->propSidebarWidth_ = CloneSidebarWidth();
         value->propMinSidebarWidth_ = CloneMinSidebarWidth();
         value->propMaxSidebarWidth_ = CloneMaxSidebarWidth();
@@ -73,6 +78,7 @@ public:
         value->propSidebarDividerColorSetByUser_ = CloneSidebarDividerColorSetByUser();
         value->propDividerColorSetByUser_ = CloneDividerColorSetByUser();
         value->propBarBackgroundColorSetByUser_ = CloneBarBackgroundColorSetByUser();
+        value->propKeepTabBarInSideBar_ = CloneKeepTabBarInSideBar();
         return value;
     }
 
@@ -83,12 +89,15 @@ public:
         ResetAxis();
         ResetTabBarMode();
         ResetDivider();
+        ResetDividerForSideBar();
         ResetEffectNodeOption();
         ResetBarWidth();
+        ResetBarWidthForSideBar();
         ResetBarHeight();
         ResetIndex();
         ResetIndexSetByUser();
         ResetBarOverlap();
+        ResetBarOverlapMode();
         ResetCachedMaxCount();
         ResetCacheMode();
         ResetSidebarDisplayStyle();
@@ -101,6 +110,7 @@ public:
         ResetSidebarUnselectedTextColor();
         ResetSidebarSelectedBoardColor();
         ResetBarBackgroundColor();
+        ResetBarBackgroundColorForSideBar();
         ResetSidebarWidth();
         ResetMinSidebarWidth();
         ResetMaxSidebarWidth();
@@ -111,6 +121,8 @@ public:
         ResetSidebarDividerColorSetByUser();
         ResetDividerColorSetByUser();
         ResetBarBackgroundColorSetByUser();
+        ResetKeepTabBarInSideBar();
+        ResetBarTopFloatingStyle();
     }
 
     void ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const override
@@ -152,6 +164,15 @@ public:
             json->PutExtAttr("divider", divider, filter);
         }
         json->PutExtAttr("barOverlap", propBarOverlap_.value_or(false) ? "true" : "false", filter);
+        auto effectiveMode = GetEffectiveBarOverlapMode();
+        std::string modeStr = "BarOverlapMode.STANDARD";
+        if (effectiveMode == BarOverlapMode::STACK) {
+            modeStr = "BarOverlapMode.STACK";
+        } else if (effectiveMode == BarOverlapMode::SAFE_AREA_PADDING) {
+            modeStr = "BarOverlapMode.SAFE_AREA_PADDING";
+        }
+        json->PutExtAttr("barOverlapMode", modeStr.c_str(), filter);
+        json->PutExtAttr("keepTabBarInSideBar", propKeepTabBarInSideBar_.value_or(false) ? "true" : "false", filter);
         if (propCachedMaxCount_.has_value()) {
             auto cacheInfo = JsonUtil::Create(true);
             cacheInfo->Put("count", propCachedMaxCount_.value());
@@ -163,6 +184,18 @@ public:
         }
 
         ToJsonValueWithBarFloatingStyle(json, filter);
+        ToJsonValueWithBarTopFloatingStyle(json, filter);
+    }
+
+    BarOverlapMode GetEffectiveBarOverlapMode() const
+    {
+        if (propBarOverlapMode_.has_value()) {
+            return propBarOverlapMode_.value();
+        }
+        if (propBarOverlap_.value_or(false)) {
+            return BarOverlapMode::STACK;
+        }
+        return BarOverlapMode::STANDARD;
     }
 
     void ToJsonValueWithBarFloatingStyle(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const
@@ -188,7 +221,46 @@ public:
         auto maskHeight = propBarFloatingStyle_.value().maskHeight;
         root->Put("maskHeight", maskHeight.has_value() ? maskHeight.value().ToString().c_str() : "");
         root->Put("adaptToHandedness",  propBarFloatingStyle_.value().adaptToHandedness.value_or(false));
+        auto offsetX = propBarFloatingStyle_.value().offsetX;
+        auto offsetY = propBarFloatingStyle_.value().offsetY;
+        if (offsetX.has_value() || offsetY.has_value()) {
+            auto offset = JsonUtil::Create(true);
+            offset->Put("x", offsetX.has_value() ? offsetX.value().ToString().c_str() : "");
+            offset->Put("y", offsetY.has_value() ? offsetY.value().ToString().c_str() : "");
+            root->Put("offset", offset);
+        }
+        auto maxWidth = propBarFloatingStyle_.value().maxWidth;
+        root->Put("maxWidth", maxWidth.has_value() ? maxWidth.value().ToString().c_str() : "");
         json->PutExtAttr("barFloatingStyle", root, filter);
+    }
+
+    void ToJsonValueWithBarTopFloatingStyle(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const
+    {
+        if (!propBarTopFloatingStyle_.has_value()) {
+            return;
+        }
+        auto root = JsonUtil::Create(true);
+        auto barWidth = propBarTopFloatingStyle_.value().barWidth;
+        root->Put("barWidth", barWidth.has_value() ? barWidth.value().ToString().c_str() : "");
+        auto barSideMargin = propBarTopFloatingStyle_.value().barSideMargin;
+        root->Put("barSideMargin", barSideMargin.has_value() ? barSideMargin.value().ToString().c_str() : "");
+        auto barTopMargin = propBarTopFloatingStyle_.value().barTopMargin;
+        root->Put("barTopMargin", barTopMargin.has_value() ? barTopMargin.value().ToString().c_str() : "");
+        auto maskColor = propBarTopFloatingStyle_.value().maskColor;
+        root->Put("maskColor", maskColor.has_value() ? maskColor.value().ToString().c_str() : "");
+        auto maskHeight = propBarTopFloatingStyle_.value().maskHeight;
+        root->Put("maskHeight", maskHeight.has_value() ? maskHeight.value().ToString().c_str() : "");
+        auto offsetX = propBarTopFloatingStyle_.value().offsetX;
+        auto offsetY = propBarTopFloatingStyle_.value().offsetY;
+        if (offsetX.has_value() || offsetY.has_value()) {
+            auto offset = JsonUtil::Create(true);
+            offset->Put("x", offsetX.has_value() ? offsetX.value().ToString().c_str() : "");
+            offset->Put("y", offsetY.has_value() ? offsetY.value().ToString().c_str() : "");
+            root->Put("offset", offset);
+        }
+        auto maxWidth = propBarTopFloatingStyle_.value().maxWidth;
+        root->Put("maxWidth", maxWidth.has_value() ? maxWidth.value().ToString().c_str() : "");
+        json->PutExtAttr("barTopFloatingStyle", root, filter);
     }
 
     void FromJson(const std::unique_ptr<JsonValue>& json) override
@@ -218,12 +290,15 @@ public:
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(Axis, Axis, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(TabBarMode, TabBarMode, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(Divider, TabsItemDivider, PROPERTY_UPDATE_MEASURE);
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(DividerForSideBar, TabsItemDivider, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(EffectNodeOption, TabsEffectNodeOption, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(BarWidth, Dimension, PROPERTY_UPDATE_MEASURE);
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(BarWidthForSideBar, Dimension, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(BarHeight, Dimension, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(Index, int32_t, PROPERTY_UPDATE_NORMAL);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(IndexSetByUser, int32_t, PROPERTY_UPDATE_MEASURE_SELF_AND_PARENT);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(BarOverlap, bool, PROPERTY_UPDATE_MEASURE);
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(BarOverlapMode, BarOverlapMode, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(WidthAuto, bool, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(HeightAuto, bool, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(CachedMaxCount, int32_t, PROPERTY_UPDATE_MEASURE_SELF);
@@ -231,6 +306,8 @@ public:
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(DividerColorSetByUser, bool, PROPERTY_UPDATE_RENDER);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(BarBackgroundColorSetByUser, bool, PROPERTY_UPDATE_RENDER);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(BarFloatingStyle, BarFloatingStyleParameters, PROPERTY_UPDATE_MEASURE);
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(
+        BarTopFloatingStyle, BarTopFloatingStyleParameters, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(SidebarDisplayStyle, SidebarDisplayStyle, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(BarLayoutStyle, TabBarLayoutStyle, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(
@@ -242,6 +319,7 @@ public:
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(SidebarUnselectedTextColor, Color, PROPERTY_UPDATE_RENDER);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(SidebarSelectedBoardColor, Color, PROPERTY_UPDATE_RENDER);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(BarBackgroundColor, Color, PROPERTY_UPDATE_RENDER);
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(BarBackgroundColorForSideBar, Color, PROPERTY_UPDATE_RENDER);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(SidebarWidth, Dimension, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(MinSidebarWidth, Dimension, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(MaxSidebarWidth, Dimension, PROPERTY_UPDATE_MEASURE);
@@ -250,6 +328,7 @@ public:
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(SidebarBackgroundColorSetByUser, bool, PROPERTY_UPDATE_RENDER);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(SidebarDivider, TabsItemDivider, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(SidebarDividerColorSetByUser, bool, PROPERTY_UPDATE_RENDER);
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(KeepTabBarInSideBar, bool, PROPERTY_UPDATE_MEASURE);
 };
 
 } // namespace OHOS::Ace::NG

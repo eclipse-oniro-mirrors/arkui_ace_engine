@@ -154,7 +154,7 @@ protected:
     WeakPtr<ThemeStyle> parentStyle_;
 };
 
-class StateResource : public virtual AceType {
+class StateResource : public AceType {
     DECLARE_ACE_TYPE(StateResource, AceType);
 
 public:

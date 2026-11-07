@@ -87,6 +87,11 @@ public:
     bool RenderCustomChild(int64_t deadline) override;
 
 private:
+    UINode* GetCustomNodeOwner() const override
+    {
+        return const_cast<CustomMeasureLayoutNode*>(this);
+    }
+
     void BuildChildren(const RefPtr<FrameNode>& child);
     std::function<void(LayoutWrapper* layoutWrapper)> layoutFunc_;
     std::function<void(LayoutWrapper* layoutWrapper)> measureFunc_;

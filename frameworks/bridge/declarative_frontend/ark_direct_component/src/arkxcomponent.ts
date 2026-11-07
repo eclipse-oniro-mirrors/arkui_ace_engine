@@ -434,8 +434,28 @@ function loadComponent(): ComponentObj | undefined {
           XComponentHdrBrightnessModifier, { brightness: value, hdrType: hdrType });
         return this;
       }
+      setExtraFlag(value: number): this {
+        modifierWithKey(this._modifiersWithKeys, XComponentExtraFlagModifier.identity,
+          XComponentExtraFlagModifier, value);
+        return this;
+      }
       enableTransparentLayer(value: any): this {
         modifierWithKey(this._modifiersWithKeys, XComponentEnableTransparentLayerModifier.identity, XComponentEnableTransparentLayerModifier, value);
+        return this;
+      }
+      enableSurfaceVisibilityLifecycle(value: boolean): this {
+        modifierWithKey(this._modifiersWithKeys, XComponentEnableSurfaceVisibilityLifecycleModifier.identity,
+          XComponentEnableSurfaceVisibilityLifecycleModifier, value);
+        return this;
+      }
+      bufferQueueCount(count: number): this {
+        if (isUndefined(count) || isNull(count)) {
+          modifierWithKey(this._modifiersWithKeys, XComponentBufferQueueCountModifier.identity,
+            XComponentBufferQueueCountModifier, undefined);
+          return this;
+        }
+        modifierWithKey(this._modifiersWithKeys, XComponentBufferQueueCountModifier.identity,
+          XComponentBufferQueueCountModifier, count);
         return this;
       }
     }
@@ -588,6 +608,19 @@ function loadComponent(): ComponentObj | undefined {
       }
     }
 
+    class XComponentExtraFlagModifier extends ModifierWithKey<number> {
+      constructor(value: number) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('xComponentExtraFlag');
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          return;
+        }
+        getUINativeModule().xComponent.setExtraFlag(node, this.value);
+      }
+    }
+
     class XComponentEnableTransparentLayerModifier extends ModifierWithKey<boolean> {
       constructor(value: boolean) {
         super(value);
@@ -598,6 +631,42 @@ function loadComponent(): ComponentObj | undefined {
           getUINativeModule().xComponent.resetEnableTransparentLayer(node);
         } else {
           getUINativeModule().xComponent.setEnableTransparentLayer(node, this.value);
+        }
+      }
+
+      checkObjectDiff(): boolean {
+        return !isBaseOrResourceEqual(this.stageValue, this.value);
+      }
+    }
+
+    class XComponentEnableSurfaceVisibilityLifecycleModifier extends ModifierWithKey<boolean> {
+      constructor(value: boolean) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('xComponentEnableSurfaceVisibilityLifecycle');
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().xComponent.resetEnableSurfaceVisibilityLifecycle(node);
+        } else {
+          getUINativeModule().xComponent.setEnableSurfaceVisibilityLifecycle(node, this.value);
+        }
+      }
+
+      checkObjectDiff(): boolean {
+        return !isBaseOrResourceEqual(this.stageValue, this.value);
+      }
+    }
+
+    class XComponentBufferQueueCountModifier extends ModifierWithKey<number> {
+      constructor(value: number) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('xComponentBufferQueueCount');
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().xComponent.resetBufferQueueCount(node);
+        } else {
+          getUINativeModule().xComponent.setBufferQueueCount(node, this.value);
         }
       }
 
@@ -758,8 +827,20 @@ class JSXComponent extends JSContainerBase {
     getUINativeModule().xComponent.setHdrBrightness(true, hdrBrightness, hdrType);
   }
 
+  static setExtraFlag(extraFlag: number): void {
+    getUINativeModule().xComponent.setExtraFlag(true, extraFlag);
+  }
+
   static enableTransparentLayer(value: any): void {
     getUINativeModule().xComponent.setEnableTransparentLayer(true, value);
+  }
+
+  static enableSurfaceVisibilityLifecycle(value: boolean): void {
+    getUINativeModule().xComponent.setEnableSurfaceVisibilityLifecycle(true, value);
+  }
+
+  static bufferQueueCount(count: any): void {
+    getUINativeModule().xComponent.setBufferQueueCount(true, count);
   }
   
   static blendMode(blendMode: any, blendApplyType: any): void {

@@ -2611,6 +2611,58 @@ ArkUI_ErrorCode OH_ArkUI_BackgroundColorStyle_GetRadius(const OH_ArkUI_Backgroun
     float* topRight, float* bottomLeft, float* bottomRight);
 
 /**
+ * @brief Set the border width of the background color style.
+ *
+ * @param style Pointer to the <b>OH_ArkUI_BackgroundColorStyle</b> object.
+ * @param borderWidth border width of the text background, in vp.
+ * @return Returns the result code.
+ *         Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_BackgroundColorStyle_SetBorderWidth(
+    OH_ArkUI_BackgroundColorStyle* style, float borderWidth);
+
+/**
+ * @brief Get the border width of the background color style.
+ *
+ * @param style Pointer to the <b>OH_ArkUI_BackgroundColorStyle</b> object.
+ * @param borderWidth border width of the text background, in vp.
+ * @return Returns the result code.
+ *         Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_BackgroundColorStyle_GetBorderWidth(
+    const OH_ArkUI_BackgroundColorStyle* style, float* borderWidth);
+
+/**
+ * @brief Set the border color of the background color style.
+ *
+ * @param style Pointer to the <b>OH_ArkUI_BackgroundColorStyle</b> object.
+ * @param borderColor border color of the text background, in 0xARGB format.
+ * @return Returns the result code.
+ *         Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_BackgroundColorStyle_SetBorderColor(
+    OH_ArkUI_BackgroundColorStyle* style, uint32_t borderColor);
+
+/**
+ * @brief Get the border color of the background color style.
+ *
+ * @param style Pointer to the <b>OH_ArkUI_BackgroundColorStyle</b> object.
+ * @param borderColor border color of the text background, in 0xARGB format.
+ * @return Returns the result code.
+ *         Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_BackgroundColorStyle_GetBorderColor(
+    const OH_ArkUI_BackgroundColorStyle* style, uint32_t* borderColor);
+
+/**
  * @brief Create an <b>OH_ArkUI_UrlStyle</b> object.
  *
  * @note When the object is no longer in use, invoke <b> OH_ArkUI_UrlStyle_Destroy </b> to destroy it.
@@ -2827,6 +2879,41 @@ ArkUI_ErrorCode OH_ArkUI_ImageAttachment_SetResource(OH_ArkUI_ImageAttachment* i
  */
 ArkUI_ErrorCode OH_ArkUI_ImageAttachment_GetResource(const OH_ArkUI_ImageAttachment* imageAttachment,
     char* buffer, int32_t bufferSize, int32_t* writeLength);
+
+/**
+ * @brief Set the image text tag of the image attachment.
+ *
+ * @note All input pointer parameters must be allocated, managed, and released by the caller.
+ * @param imageAttachment Pointer to the <b>OH_ArkUI_ImageAttachment</b> object.
+ * @param imageTag The image text tag string.
+ * @return Returns the result code.
+ *         Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.
+ * @since 26.2.0
+ */
+ArkUI_ErrorCode OH_ArkUI_ImageAttachment_SetImageTag(
+    OH_ArkUI_ImageAttachment* imageAttachment, const char* imageTag);
+
+/**
+ * @brief Get the image text tag of the image attachment.
+ *
+ * @note All input pointer parameters must be allocated, managed, and released by the caller.
+ * @param imageAttachment Pointer to the <b>OH_ArkUI_ImageAttachment</b> object.
+ * @param bufferSize The buffer size.
+ * @param buffer The buffer to which the image text tag writes to the memory,
+ *               memory space needs to be allocated by the developer.
+ * @param writeLength Indicates the string length actually written to the buffer
+ *                    when returning {@link ARKUI_ERROR_CODE_NO_ERROR}.
+ *                    Indicates the minimum buffer size that can accommodate the target
+ *                    when {@link ARKUI_ERROR_CODE_BUFFER_SIZE_ERROR} is returned.
+ * @return Returns the result code.
+ *         Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.
+ *         Returns {@link ARKUI_ERROR_CODE_BUFFER_SIZE_ERROR} If the buffer size is less than the minimum buffer size.
+ * @since 26.2.0
+ */
+ArkUI_ErrorCode OH_ArkUI_ImageAttachment_GetImageTag(const OH_ArkUI_ImageAttachment* imageAttachment,
+    int32_t bufferSize, char* buffer, int32_t* writeLength);
 
 /**
  * @brief Set image width of the image attachment.

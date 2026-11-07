@@ -24,6 +24,7 @@
 #include "base/utils/string_utils.h"
 #include "base/utils/utf_helper.h"
 #include "core/components_ng/pattern/pattern.h"
+#include "core/components_ng/pattern/text_field/auto_fill_host.h"
 #include "core/components_ng/render/paragraph.h"
 
 namespace OHOS::Ace::NG {
@@ -34,11 +35,11 @@ enum class AutoFillContentLengthMode { INVALID, SHORT, MEDIUM, LONG, EXTRA_LONG 
 
 enum class AutoFillInsertStatus { INIT, PENDING, INSERTING };
 
-class AutoFillController : public virtual AceType {
+class AutoFillController : public AceType {
     DECLARE_ACE_TYPE(AutoFillController, AceType);
 
 public:
-    explicit AutoFillController(const WeakPtr<Pattern>& pattern) : pattern_(pattern) {}
+    explicit AutoFillController(const WeakPtr<IAutoFillHost>& host) : host_(host) {}
     ~AutoFillController() override = default;
     void StartAutoFillAnimation(const std::function<void()>& onFinishCallback, const std::u16string& content);
     void ResetAutoFillAnimationStatus();
@@ -102,7 +103,21 @@ public:
     {
         return insertStatus_;
     }
-    TextDirection GetTextDirection(const RefPtr<LayoutProperty>& layoutProperty);
+
+    TextDirection GetTextDirection()
+    {
+        auto host = host_.Upgrade();
+        CHECK_NULL_RETURN(host, TextDirection::LTR);
+        return host->GetAutoFillTextDirection();
+    }
+
+    // Shared drawing logic — called by both TextFieldContentModifier and RichEditorContentModifier.
+    // The modifier passes in its current animated property values + theme colors;
+    // the controller supplies the paragraph, content rect, direction, frame rect, border radius,
+    // and animation text rect from its own state and the host interface.
+    void DrawAutoFill(RSCanvas& canvas, const OffsetF& contentOffset, float translationOffset,
+        float textScrollOffset, float defaultCharIndex, const Color& emphasizeCharTextColor,
+        const Color& defaultCharInitTextColor, const std::optional<Color>& originTextColor);
 
 private:
     void PlayAutoFillIconShowAnimation(const AutoFillContentLengthMode& mode);
@@ -118,19 +133,21 @@ private:
     float GetSpringAnimationResponse(const AutoFillContentLengthMode& mode);
     float GetSpringAnimationDamping(const AutoFillContentLengthMode& mode);
     void UpdateAnimationTextRect();
+    void GetFrameRectClip(RSRect& clipRect, std::vector<RSPoint>& clipRadius);
 
-    WeakPtr<Pattern> pattern_;
+    WeakPtr<IAutoFillHost> host_;
     RefPtr<Paragraph> autoFillParagraph_;
     AutoFillAnimationStatus autoFillAnimationStatus_ = AutoFillAnimationStatus::INIT;
     WeakPtr<FrameNode> autoFillIconNode_;
     std::u16string autofillTextUtf16Value_;
     float autoFillFirstCharOffset_ = 0.0f;
+    float autoFillIconYOffset_ = 0.0f;
     Color autoFillOriginTextColor_;
     RectF animationTextRect_;
     // for MANUAL_REQUEST
-    int32_t selectedStart_;
-    int32_t selectedEnd_;
-    AutoFillInsertStatus insertStatus_;
+    int32_t selectedStart_ = -1;
+    int32_t selectedEnd_ = -1;
+    AutoFillInsertStatus insertStatus_ = AutoFillInsertStatus::INIT;
 };
 } // namespace OHOS::Ace::NG
 

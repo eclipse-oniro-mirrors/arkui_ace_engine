@@ -14,10 +14,13 @@
  */
 
 #include <optional>
+#include <type_traits>
 #include "core/accessibility/accessibility_manager.h"
 #include <utility>
 
 #include "gtest/gtest.h"
+
+#include "core/interfaces/arkoala/arkoala_api.h"
 
 #define private public
 #define protected public
@@ -27,6 +30,7 @@
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 #include "test/unittest/core/pattern/test_ng.h"
 
+#include "base/i18n/localization.h"
 #include "core/components/badge/badge_theme.h"
 #include "core/components/common/layout/grid_container_info.h"
 #include "core/components/common/layout/constants.h"
@@ -226,6 +230,20 @@ HWTEST_F(BadgeTestNg, BadgeFrameNodeCreator002, TestSize.Level0)
     EXPECT_EQ(layoutProperty_->GetBadgeTextColor(), Color::GREEN);
     EXPECT_EQ(layoutProperty_->GetBadgeFontSize(), BADGE_FONT_SIZE);
     EXPECT_EQ(layoutProperty_->GetBadgeCircleSize(), BADGE_CIRCLE_SIZE);
+}
+
+/**
+ * @tc.name: BadgeArkoalaParamSignedType001
+ * @tc.desc: Test assigning the signed result of Int32Value(vm) does not trigger signed/unsigned mixing.
+ * @tc.type: FUNC
+ * @tc.author:
+ */
+HWTEST_F(BadgeTestNg, BadgeArkoalaParamSignedType001, TestSize.Level1)
+{
+    EXPECT_TRUE((std::is_same<decltype(ArkUIBadgeJSParam {}.badgeCount), ArkUI_Int32>::value));
+    EXPECT_TRUE((std::is_same<decltype(ArkUIBadgeJSParam {}.badgeMaxCount), ArkUI_Int32>::value));
+    EXPECT_TRUE(std::is_signed<decltype(ArkUIBadgeJSParam {}.badgeCount)>::value);
+    EXPECT_TRUE(std::is_signed<decltype(ArkUIBadgeJSParam {}.badgeMaxCount)>::value);
 }
 
 /**
@@ -2262,5 +2280,60 @@ HWTEST_F(BadgeTestNg, BadgeLpxOuterBorderWidth006, TestSize.Level1)
     }
 
     EXPECT_TRUE(frameNode_->GetChildren().empty());
+}
+
+/**
+ * @tc.name: FormatBadgeCountTest001
+ * @tc.desc: Test FormatBadgeCount in non-Chinese (NumberFormat) and Chinese (to_string) locales.
+ * @tc.type: FUNC
+ */
+HWTEST_F(BadgeTestNg, FormatBadgeCountTest001, TestSize.Level0)
+{
+    BadgeModelNG badge;
+    BadgeParameters badgeParameters;
+    badge.Create(badgeParameters);
+    GetInstance();
+    ASSERT_NE(pattern_, nullptr);
+
+    // non-"zh" (languageTag_ empty => "Chinese") => NumberFormat path
+    Localization::GetInstance()->SetLocaleImpl("", "", "", "", "");
+    EXPECT_EQ(pattern_->FormatBadgeCount(5), "5");
+    EXPECT_EQ(pattern_->FormatBadgeCount(99), "99");
+    EXPECT_EQ(pattern_->FormatBadgeCount(0), "0");
+
+    // "zh" => to_string path
+    Localization::GetInstance()->SetLocaleImpl("zh", "", "", "", "");
+    EXPECT_EQ(pattern_->FormatBadgeCount(5), "5");
+    EXPECT_EQ(pattern_->FormatBadgeCount(99), "99");
+    EXPECT_EQ(pattern_->FormatBadgeCount(0), "0");
+
+    // restore
+    Localization::GetInstance()->SetLocaleImpl("", "", "", "", "");
+}
+
+/**
+ * @tc.name: BadgeAccessibilityGetTextTest001
+ * @tc.desc: Test BadgeAccessibilityProperty GetText in non-Chinese (NumberFormat) and Chinese (to_string) locales.
+ * @tc.type: FUNC
+ */
+HWTEST_F(BadgeTestNg, BadgeAccessibilityGetTextTest001, TestSize.Level0)
+{
+    BadgeModelNG badge;
+    BadgeParameters badgeParameters;
+    badgeParameters.badgeCount = 5;
+    badge.Create(badgeParameters);
+    GetInstance();
+    ASSERT_NE(accessibilityProperty_, nullptr);
+
+    // non-"zh" (languageTag_ empty => "Chinese") => NumberFormat path
+    Localization::GetInstance()->SetLocaleImpl("", "", "", "", "");
+    EXPECT_EQ(accessibilityProperty_->GetText(), "5");
+
+    // "zh" => to_string path
+    Localization::GetInstance()->SetLocaleImpl("zh", "", "", "", "");
+    EXPECT_EQ(accessibilityProperty_->GetText(), "5");
+
+    // restore
+    Localization::GetInstance()->SetLocaleImpl("", "", "", "", "");
 }
 } // namespace OHOS::Ace::NG

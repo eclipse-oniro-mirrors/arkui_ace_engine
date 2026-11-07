@@ -47,11 +47,16 @@ public:
     std::u16string GetLeftTextOfCursor(int32_t number) override;
     std::u16string GetRightTextOfCursor(int32_t number) override;
     int32_t GetTextIndexAtCursor() override;
+    MiscServices::RichTextData GetLeftRichTextOfCursor(int32_t number) override;
+    MiscServices::RichTextData GetRightRichTextOfCursor(int32_t number) override;
     void NotifyPanelStatusInfo(const MiscServices::PanelStatusInfo& info) override;
     static void AutoFillReceivePrivateCommand(
         const std::unordered_map<std::string, MiscServices::PrivateDataValue>& privateCommand,
         const WeakPtr<TextInputClient>& pattern);
     int32_t SetPreviewText(const std::u16string &text, const MiscServices::Range &range) override;
+    int32_t SetPreviewTextWithStyle(const std::u16string &text, const MiscServices::Range &range,
+        const MiscServices::PreviewTextStyleInner &style) override;
+    bool IsSupportPreviewTextWithStyle() override { return true; }
     void FinishTextPreview() override;
     int32_t ReceivePrivateCommand(
         const std::unordered_map<std::string, MiscServices::PrivateDataValue> &privateCommand) override;
@@ -66,6 +71,7 @@ private:
     int32_t CheckPreviewTextParams(const std::u16string &text, const MiscServices::Range &range);
     int32_t HandlePrivateCommand(
         const std::unordered_map<std::string, MiscServices::PrivateDataValue>& privateCommand);
+    static MiscServices::RichTextData ConvertRichTextDataInfoToImfData(const RichTextDataInfo& info);
 
     WeakPtr<TextInputClient> pattern_;
     int32_t patternInstanceId_ = -1;

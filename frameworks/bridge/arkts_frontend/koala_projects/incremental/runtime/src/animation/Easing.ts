@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Huawei Device Co., Ltd.
+ * Copyright (c) 2022-2026 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -65,7 +65,7 @@ export class Easing {
      * @internal
      */
     static restarted(easing: EasingCurve): EasingCurve {
-        return (value: float64) => easing(value < 1 ? value : 0)
+        return (value: float64) => easing(value < 1 ? value : 0.0)
     }
 
     /**
@@ -160,7 +160,7 @@ export class Easing {
         if (!Number.isInteger(stops) || stops <= 1) {
             throw new Error('easing stops must be a positive integer, but is ' + stops)
         }
-        const delta = jump === EasingStepJump.None || jump === EasingStepJump.End ? 0 : 1
+        const delta = jump === EasingStepJump.None || jump === EasingStepJump.End ? 0.0 : 1.0
         const count: uint32 = jump === EasingStepJump.None ? stops - 1 : jump === EasingStepJump.Both ? stops + 1 : stops
         return (value: float64) => (value > 0 ? Math.min(stops - 1, Math.floor(stops * value)) + delta : delta) / count
     }

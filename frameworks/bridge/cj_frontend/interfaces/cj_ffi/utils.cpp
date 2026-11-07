@@ -14,6 +14,7 @@
  */
 
 #include "bridge/cj_frontend/interfaces/cj_ffi/utils.h"
+#include "core/event/function_key.h"
 
 
 using namespace OHOS::Ace;
@@ -48,25 +49,37 @@ RefPtr<Frontend> Utils::GetCurrentFrontend()
 
 std::string Utils::GetFunctionKey(int32_t functionKey)
 {
-    std::map<FunctionKey, std::string> keyNameMap {
-        {FunctionKey::ESC, "ESC"},
-        {FunctionKey::F1, "F1"},
-        {FunctionKey::F2, "F2"},
-        {FunctionKey::F3, "F3"},
-        {FunctionKey::F4, "F4"},
-        {FunctionKey::F5, "F5"},
-        {FunctionKey::F6, "F6"},
-        {FunctionKey::F7, "F7"},
-        {FunctionKey::F8, "F8"},
-        {FunctionKey::F9, "F9"},
-        {FunctionKey::F10, "F10"},
-        {FunctionKey::F11, "F11"},
-        {FunctionKey::F12, "F12"},
-        {FunctionKey::TAB, "TAB"},
-        {FunctionKey::DPAD_UP, "DPAD_UP"},
-        {FunctionKey::DPAD_DOWN, "DPAD_DOWN"},
-        {FunctionKey::DPAD_LEFT, "DPAD_LEFT"},
-        {FunctionKey::DPAD_RIGHT, "DPAD_RIGHT"}
+    static const std::map<FunctionKey, std::string> keyNameMap {
+        {FunctionKey::FK_ESC, "ESC"},
+        {FunctionKey::FK_F1, "F1"},
+        {FunctionKey::FK_F2, "F2"},
+        {FunctionKey::FK_F3, "F3"},
+        {FunctionKey::FK_F4, "F4"},
+        {FunctionKey::FK_F5, "F5"},
+        {FunctionKey::FK_F6, "F6"},
+        {FunctionKey::FK_F7, "F7"},
+        {FunctionKey::FK_F8, "F8"},
+        {FunctionKey::FK_F9, "F9"},
+        {FunctionKey::FK_F10, "F10"},
+        {FunctionKey::FK_F11, "F11"},
+        {FunctionKey::FK_F12, "F12"},
+        {FunctionKey::FK_TAB, "TAB"},
+        {FunctionKey::FK_DPAD_UP, "DPAD_UP"},
+        {FunctionKey::FK_DPAD_DOWN, "DPAD_DOWN"},
+        {FunctionKey::FK_DPAD_LEFT, "DPAD_LEFT"},
+        {FunctionKey::FK_DPAD_RIGHT, "DPAD_RIGHT"},
+        {FunctionKey::FK_CAPS_LOCK, "CAPS_LOCK"},
+        {FunctionKey::FK_SCROLL_LOCK, "SCROLL_LOCK"},
+        {FunctionKey::FK_PAUSE_BREAK, "PAUSE_BREAK"},
+        {FunctionKey::FK_NUM_LOCK, "NUM_LOCK"},
+        {FunctionKey::FK_INSERT, "INSERT"},
+        {FunctionKey::FK_DELETE, "DELETE"},
+        {FunctionKey::FK_HOME, "HOME"},
+        {FunctionKey::FK_END, "END"},
+        {FunctionKey::FK_PAGE_UP, "PAGE_UP"},
+        {FunctionKey::FK_PAGE_DOWN, "PAGE_DOWN"},
+        {FunctionKey::FK_ENTER, "ENTER"},
+        {FunctionKey::FK_BACKSPACE, "BACKSPACE"}
     };
     auto result = keyNameMap.find(static_cast<FunctionKey>(functionKey));
     return (result != keyNameMap.end()) ? result->second : std::string();

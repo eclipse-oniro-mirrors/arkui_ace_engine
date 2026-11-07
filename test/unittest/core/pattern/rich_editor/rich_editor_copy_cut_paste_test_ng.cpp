@@ -592,47 +592,6 @@ HWTEST_F(RichEditorCopyCutPasteTestNg, OnModifyDone001, TestSize.Level0)
 }
 
 /**
- * @tc.name: AddUdmfData001
- * @tc.desc: test AddUdmfData
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorCopyCutPasteTestNg, AddUdmfData001, TestSize.Level0)
-{
-    ASSERT_NE(richEditorNode_, nullptr);
-    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-
-    ResultObject resultObject;
-    richEditorPattern->dragResultObjects_.emplace_back(resultObject);
-
-    resultObject.type = SelectSpanType::TYPESYMBOLSPAN;
-    richEditorPattern->dragResultObjects_.emplace_back(resultObject);
-
-    resultObject.type = SelectSpanType::TYPEIMAGE;
-    resultObject.valueString = INIT_VALUE_1;
-    richEditorPattern->dragResultObjects_.emplace_back(resultObject);
-
-    resultObject.type = SelectSpanType::TYPEIMAGE;
-    resultObject.valueString.clear();
-    richEditorPattern->dragResultObjects_.emplace_back(resultObject);
-
-    resultObject.type = SelectSpanType::TYPEIMAGE;
-    resultObject.valuePixelMap = PixelMap::CreatePixelMap(nullptr);
-    ASSERT_NE(resultObject.valuePixelMap, nullptr);
-    richEditorPattern->dragResultObjects_.emplace_back(resultObject);
-
-    richEditorPattern->AddImageSpan(IMAGE_SPAN_OPTIONS_1);
-
-    auto event = AceType::MakeRefPtr<Ace::DragEvent>();
-    richEditorPattern->AddUdmfData(event);
-    if (UdmfClient::GetInstance()->CreateUnifiedData()) {
-        EXPECT_NE(event->GetData(), 0);
-    } else {
-        EXPECT_EQ(event->GetData(), 0);
-    }
-}
-
-/**
  * @tc.name: AsyncHandleOnCopyStyledStringHtml
  * @tc.desc: Test AsyncHandleOnCopyStyledStringHtml.
  * @tc.type: FUNC
@@ -826,5 +785,80 @@ HWTEST_F(RichEditorCopyCutPasteTestNg, HandleOnCut002, TestSize.Level0)
     EXPECT_EQ(changeReason, TextChangeReason::CUT); // not preventDefault
     EXPECT_EQ(richEditorPattern->caretUpdateType_, CaretUpdateType::NONE);
     EXPECT_EQ(isEventCalled, true);
+}
+
+/**
+ * @tc.name: AddUdmfData001
+ * @tc.desc: test AddUdmfData
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCopyCutPasteTestNg, AddUdmfData001, TestSize.Level0)
+{
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+
+    ResultObject resultObject;
+    richEditorPattern->dragResultObjects_.emplace_back(resultObject);
+
+    resultObject.type = SelectSpanType::TYPESYMBOLSPAN;
+    richEditorPattern->dragResultObjects_.emplace_back(resultObject);
+
+    resultObject.type = SelectSpanType::TYPEIMAGE;
+    resultObject.valueString = INIT_VALUE_1;
+    richEditorPattern->dragResultObjects_.emplace_back(resultObject);
+
+    resultObject.type = SelectSpanType::TYPEIMAGE;
+    resultObject.valueString.clear();
+    richEditorPattern->dragResultObjects_.emplace_back(resultObject);
+
+    resultObject.type = SelectSpanType::TYPEIMAGE;
+    resultObject.valuePixelMap = PixelMap::CreatePixelMap(nullptr);
+    ASSERT_NE(resultObject.valuePixelMap, nullptr);
+    richEditorPattern->dragResultObjects_.emplace_back(resultObject);
+
+    richEditorPattern->AddImageSpan(IMAGE_SPAN_OPTIONS_1);
+
+    auto event = AceType::MakeRefPtr<Ace::DragEvent>();
+    richEditorPattern->AddUdmfData(event);
+    if (UdmfClient::GetInstance()->CreateUnifiedData()) {
+        EXPECT_NE(event->GetData(), 0);
+    } else {
+        EXPECT_EQ(event->GetData(), 0);
+    }
+}
+
+/**
+ * @tc.name: HandleCopyOrCutCommand001
+ * @tc.desc: Test HandleCopyOrCutCommand early return when copyOption_ is None.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCopyCutPasteTestNg, HandleCopyOrCutCommand001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->copyOption_ = CopyOptions::None;
+    pattern->HandleCopyOrCutCommand("copy", richEditorNode_->GetId());
+    pattern->HandleCopyOrCutCommand("cut", richEditorNode_->GetId());
+    pattern->copyOption_ = CopyOptions::Distributed;
+    pattern->HandleCopyOrCutCommand("unknown", richEditorNode_->GetId());
+    EXPECT_NE(pattern->copyOption_, CopyOptions::None);
+}
+
+/**
+ * @tc.name: PasteStr003
+ * @tc.desc: Test AddPasteStr / GetPasteStr / ClearPasteStr.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCopyCutPasteTestNg, PasteStr003, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->ClearPasteStr();
+    EXPECT_TRUE(pattern->GetPasteStr().empty());
+    pattern->AddPasteStr("hello");
+    EXPECT_EQ(pattern->GetPasteStr(), u"hello");
+    pattern->ClearPasteStr();
+    EXPECT_TRUE(pattern->GetPasteStr().empty());
 }
 }

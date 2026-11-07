@@ -33,6 +33,10 @@
 #include "core/event/event_info_convertor.h"
 #include "nweb_handler.h"
 
+#if defined(ENABLE_STANDARD_INPUT)
+#include "input_method_controller.h"
+#endif
+
 namespace OHOS::Ace::NG {
 constexpr Dimension SELECT_HANDLE_DEFAULT_HEIGHT = 16.0_vp;
 constexpr float SELECT_MENE_HEIGHT = 140.0f;
@@ -40,6 +44,17 @@ constexpr int32_t HALF = 2;
 static constexpr std::string_view ASK_CELIA_TAG = "askCelia";
 
 namespace {
+bool IsTranslateInputSupported()
+{
+#if defined(ENABLE_STANDARD_INPUT)
+    auto inputMethod = MiscServices::InputMethodController::GetInstance();
+    CHECK_NULL_RETURN(inputMethod, false);
+    return inputMethod->IsInputTypeSupported(MiscServices::InputType::TRANSLATION_INPUT);
+#else
+    return false;
+#endif
+}
+
 struct InitStrategyTools {
     RefPtr<PipelineContext> pipeline = nullptr;
     RefPtr<TextOverlayTheme> theme = nullptr;
@@ -377,44 +392,23 @@ void WebSelectOverlay::SetMenuOptions(SelectOverlayInfo& selectInfo,
     CHECK_NULL_VOID(delegate);
     auto copyOption = delegate->GetCopyOptionMode();
     uint32_t flags = static_cast<uint32_t>(params->GetEditStateFlags());
-    if (!(flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_CUT) ||
-        copyOption == OHOS::NWeb::NWebPreference::CopyOptionMode::NONE) {
-        selectInfo.menuInfo.showCut = false;
-    } else {
-        selectInfo.menuInfo.showCut = true;
-    }
-    if (!(flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_COPY)) {
-        selectInfo.menuInfo.showCopy = false;
-    } else {
-        selectInfo.menuInfo.showCopy = true;
-    }
-    if (!(flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_PASTE)) {
-        selectInfo.menuInfo.showPaste = false;
-    } else {
-        selectInfo.menuInfo.showPaste = true;
-    }
-    if (!(flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_SELECT_ALL)) {
-        selectInfo.menuInfo.showCopyAll = false;
-    } else {
-        selectInfo.menuInfo.showCopyAll = true;
-    }
+    selectInfo.menuInfo.showCut = (flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_CUT) &&
+        copyOption != OHOS::NWeb::NWebPreference::CopyOptionMode::NONE;
+    selectInfo.menuInfo.showCopy = (flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_COPY) != 0;
+    selectInfo.menuInfo.showPaste = (flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_PASTE) != 0;
+    selectInfo.menuInfo.showCopyAll = (flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_SELECT_ALL) != 0;
     selectInfo.menuInfo.showAutoFill = IsShowMenuOfAutoFill(flags, selectInfo);
+    selectInfo.menuInfo.showTranslateInput = selectInfo.isSingleHandle &&
+        (flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_TRANSLATE_INPUT) && CanShowTranslateInput();
 
     auto value = GetSelectedText();
     auto queryWord = std::regex_replace(value, std::regex("^\\s+|\\s+$"), "");
-    selectInfo.menuInfo.showSearch = false;
-    selectInfo.menuInfo.showTranslate = false;
-    if (!queryWord.empty()) {
-        selectInfo.menuInfo.showSearch = true;
-        selectInfo.menuInfo.showTranslate = true;
-    }
+    selectInfo.menuInfo.showSearch = !queryWord.empty();
+    selectInfo.menuInfo.showTranslate = !queryWord.empty();
     bool canCopyOut = (copyOption != OHOS::NWeb::NWebPreference::CopyOptionMode::NONE) &&
                       (copyOption != OHOS::NWeb::NWebPreference::CopyOptionMode::IN_APP);
-    selectInfo.menuInfo.showAIWrite = false;
-    if (pattern->IsShowAIWrite() && canCopyOut &&
-        (selectInfo.isSingleHandle || (flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_CUT))) {
-        selectInfo.menuInfo.showAIWrite = true;
-    }
+    selectInfo.menuInfo.showAIWrite = pattern->IsShowAIWrite() && canCopyOut &&
+        (selectInfo.isSingleHandle || (flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_CUT));
     selectInfo.menuInfo.showShare = canCopyOut && !queryWord.empty();
     canShowAIMenu_ = canCopyOut && !(flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_CUT) && !queryWord.empty();
     selectInfo.menuInfo.isAskCeliaEnabled = canShowAIMenu_;
@@ -531,7 +525,7 @@ void WebSelectOverlay::StartListenSelectOverlayParentScroll(const RefPtr<FrameNo
         }
         return;
     }
-    auto parent = host->GetParent();
+    auto parent = host->GetParent(true);
     while (parent && parent->GetTag() != V2::PAGE_ETS_TAG) {
         auto parentNode = AceType::DynamicCast<FrameNode>(parent);
         if (parentNode) {
@@ -541,7 +535,7 @@ void WebSelectOverlay::StartListenSelectOverlayParentScroll(const RefPtr<FrameNo
                 RegisterSelectOverlayParentScrollCallback(parentNode->GetId(), hostId);
             }
         }
-        parent = parent->GetParent();
+        parent = parent->GetParent(true);
     }
     scrollableParentInfo_.hasParent = !scrollableParentInfo_.parentIds.empty();
     TAG_LOGI(AceLogTag::ACE_WEB, "find scrollable parent %{public}d", scrollableParentInfo_.hasParent);
@@ -931,6 +925,26 @@ bool WebSelectOverlay::IsTouchHandleValid(std::shared_ptr<OHOS::NWeb::NWebTouchH
     return (handle != nullptr) && (handle->IsEnable());
 }
 
+bool WebSelectOverlay::CanShowTranslateInput() const
+{
+    return TextSystemMenu::IsShowTranslateInput() && IsTranslateInputSupported();
+}
+
+void WebSelectOverlay::HandleOnTranslateInput()
+{
+    auto pattern = GetPattern<WebPattern>();
+    CHECK_NULL_VOID(pattern);
+    bool canRequest = quickMenuCallback_ && webSelectInfo_.isSingleHandle &&
+        webSelectInfo_.menuInfo.showTranslateInput;
+    // Reuse the eligibility established for this menu; IMF validates the request.
+    webSelectInfo_.menuInfo.showTranslateInput = false;
+    if (canRequest) {
+        quickMenuCallback_->Continue(OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_TRANSLATE_INPUT,
+            OHOS::NWeb::MenuEventFlags::EF_LEFT_MOUSE_BUTTON);
+    }
+    pattern->CloseSelectOverlay();
+}
+
 void WebSelectOverlay::OnMenuItemAction(OptionMenuActionId id, OptionMenuType type)
 {
     TAG_LOGI(AceLogTag::ACE_WEB, "OnMenuItemAction menu option id %{public}d", id);
@@ -964,6 +978,9 @@ void WebSelectOverlay::OnMenuItemAction(OptionMenuActionId id, OptionMenuType ty
             quickMenuCallback_->Continue(OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_SELECT_ALL,
                 OHOS::NWeb::MenuEventFlags::EF_LEFT_MOUSE_BUTTON);
             isSelectAll_ = true;
+            break;
+        case OptionMenuActionId::TRANSLATE_INPUT:
+            HandleOnTranslateInput();
             break;
         case OptionMenuActionId::TRANSLATE:
             HandleOnTranslate();
@@ -1307,6 +1324,7 @@ void WebSelectOverlay::OnUpdateSelectOverlayInfo(SelectOverlayInfo &selectInfo, 
     selectInfo.onCreateCallback = webSelectInfo_.onCreateCallback;
     selectInfo.onClose = webSelectInfo_.onClose;
     selectInfo.onClick = webSelectInfo_.onClick;
+    selectInfo.handlerColor = GetHandleColor();
     selectInfo.enableHandleLevel = true;
     selectInfo.enableSubWindowMenu = true;
     if (IS_CALLING_FROM_M114()) {
@@ -1337,6 +1355,18 @@ bool WebSelectOverlay::IsNeedMenuShareForWeb()
     const auto trimmedLen = end - start + 1;
     const auto maxShareLength = static_cast<size_t>(TextShareAdapter::GetMaxTextShareLength());
     return trimmedLen <= maxShareLength;
+}
+
+std::optional<Color> WebSelectOverlay::GetHandleColor()
+{
+    auto pattern = GetPattern<WebPattern>();
+    CHECK_NULL_RETURN(pattern, std::nullopt);
+    std::optional<Color> caretColor = pattern->GetCaretColor();
+    // Fully transparent color is treated as unset, keep the theme default handle color.
+    if (caretColor.has_value() && caretColor.value().GetValue() != 0) {
+        return caretColor;
+    }
+    return std::nullopt;
 }
 
 void WebSelectOverlay::OnHandleMarkInfoChange(

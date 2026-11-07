@@ -20,6 +20,7 @@
 
 #include "core/components/web/web_event.h"
 #include "core/components/web/resource/web_delegate.h"
+#include "core/components/web/resource/web_string_value_callback_impl.h"
 #include "core/components_ng/pattern/web/web_pattern.h"
 #include "core/components_ng/pattern/web/web_util.h"
 #include "arkweb_utils.h"
@@ -36,8 +37,22 @@ const std::string STATUS_FALSE = "false";
 static bool g_serializeWebStateConfigurable = false;
 static std::vector<uint8_t> g_serializeWebStateResult;
 static bool g_restoreWebStateResult = false;
+// Recording for WebDelegate::GetElementInfoForSecurityHitTest so tests can verify the values the
+// WebPattern passed to the delegate. Empty/not-recorded by default.
+static bool g_securityHitTestInfoRecorded = false;
+static int32_t g_securityHitTestId = 0;
+static double g_securityHitTestX = 0.0;
+static double g_securityHitTestY = 0.0;
+static bool g_securityHitTestFromOverlay = false;
+static int32_t g_securityHitTestCallingUid = -1;
+static uint64_t g_securityHitTestSessionId = 0;
+static std::string g_securityHitTestResponse = "";
 std::shared_ptr<NWeb::NWebAccessibilityNodeInfo> g_customAccessibilityNode = nullptr;
 std::shared_ptr<NWeb::NWebAgentManager> g_nwebAgentManager = nullptr;
+// Mock state for WebDelegate::RequestNativeDomTree.
+MockRequestNativeDomTreeCall g_mockRequestNativeDomTreeCall;
+std::function<void(const NG::OffsetF&, const std::string&)> g_mockRequestNativeDomTreeCb;
+std::string g_mockRequestNativeDomTreeResult = R"([{"tag":"div"}])";
 std::map<std::string, std::string> htmlElementToSurfaceMap = { { "existhtmlElementId", "existSurfaceId" },
     { "existhtmlElementIdOther", "existSurfaceIdOther" } };
 std::map<std::string, std::string> surfaceToHtmlElementMap = { { "existSurfaceId", "existhtmlElementId" },
@@ -696,6 +711,7 @@ void WebDelegate::UpdateLoadsImagesAutomatically(const bool& isImageAccessEnable
 void WebDelegate::UpdateMixedContentMode(const MixedModeContent& mixedMode) {}
 void WebDelegate::UpdateSupportZoom(const bool& isZoomAccessEnabled) {}
 void WebDelegate::UpdateDomStorageEnabled(const bool& isDomStorageAccessEnabled) {}
+void WebDelegate::UpdateVisitedLinkPersistEnabled(const bool& enabled) {}
 void WebDelegate::UpdateGeolocationEnabled(const bool& isGeolocationAccessEnabled) {}
 void WebDelegate::UpdateCacheMode(const WebCacheMode& mode) {}
 void WebDelegate::UpdateOptimizeParserBudgetEnabled(const bool enable) {}
@@ -749,6 +765,7 @@ void WebDelegate::UpdateGestureFocusMode(const GestureFocusMode& mode) {}
 void WebDelegate::UpdateNativeEmbedRuleTag(const std::string& tag) {}
 void WebDelegate::UpdateNativeEmbedRuleType(const std::string& type) {}
 void WebDelegate::UpdateScrollBarColor(const std::string& colorValue) {}
+void WebDelegate::UpdateCaretColor(const Color& caretColor) {}
 void WebDelegate::LoadUrl() {}
 void WebDelegate::OnInactive() {}
 void WebDelegate::SetOfflineWebActiveStatus(bool isActive) {}
@@ -762,6 +779,18 @@ void WebDelegate::OnOnlineRenderToForeground() {}
 void WebDelegate::SetShouldFrameSubmissionBeforeDraw(bool should) {}
 void WebDelegate::NotifyMemoryLevel(int32_t level) {}
 void WebDelegate::SetIsOfflineWebComponent() {}
+void WebDelegate::GetElementInfoForSecurityHitTest(SecurityHitTestInfo& secInfo)
+{
+    g_securityHitTestInfoRecorded = true;
+    g_securityHitTestId = secInfo.id;
+    g_securityHitTestX = secInfo.x;
+    g_securityHitTestY = secInfo.y;
+    g_securityHitTestFromOverlay = secInfo.from_overlay;
+    g_securityHitTestCallingUid = secInfo.callingUid;
+    g_securityHitTestSessionId = secInfo.sessionId;
+    g_securityHitTestResponse = secInfo.response;
+}
+void WebDelegate::OnTouchForSecurityHitTest(std::shared_ptr<SecurityHitTestInfo> state) {}
 void WebDelegate::SetAudioMuted(bool muted) {}
 void WebDelegate::Zoom(float factor) {}
 bool WebDelegate::ZoomIn()
@@ -920,6 +949,7 @@ bool WebDelegate::OnContextMenuShow(const std::shared_ptr<BaseEventInfo>& info)
 #endif
 }
 void WebDelegate::OnContextMenuHide(const std::string& info) {}
+void WebDelegate::OnContextMenuUpdate(WebContextMenuItemId menuItemId, WebContextMenuOptions options) {}
 bool WebDelegate::OnHandleInterceptUrlLoading(const std::string& data)
 {
     return false;
@@ -1480,6 +1510,52 @@ void ResetMockRestoreWebState()
 {
     g_restoreWebStateResult = false;
 }
+void ResetMockSecurityHitTestInfo()
+{
+    g_securityHitTestInfoRecorded = false;
+    g_securityHitTestId = 0;
+    g_securityHitTestX = 0.0;
+    g_securityHitTestY = 0.0;
+    g_securityHitTestFromOverlay = false;
+    g_securityHitTestCallingUid = -1;
+    g_securityHitTestSessionId = 0;
+    g_securityHitTestResponse = "";
+}
+bool GetRecordedSecurityHitTestInfo(int32_t& id, double& x, double& y, bool& fromOverlay,
+    int32_t& callingUid, uint64_t& sessionId, std::string& response)
+{
+    if (!g_securityHitTestInfoRecorded) {
+        return false;
+    }
+    id = g_securityHitTestId;
+    x = g_securityHitTestX;
+    y = g_securityHitTestY;
+    fromOverlay = g_securityHitTestFromOverlay;
+    callingUid = g_securityHitTestCallingUid;
+    sessionId = g_securityHitTestSessionId;
+    response = g_securityHitTestResponse;
+    return true;
+}
+void SetMockRequestNativeDomTreeCallback(std::function<void(const NG::OffsetF&, const std::string&)> cb)
+{
+    g_mockRequestNativeDomTreeCb = std::move(cb);
+}
+const MockRequestNativeDomTreeCall& GetMockRequestNativeDomTreeLastCall()
+{
+    return g_mockRequestNativeDomTreeCall;
+}
+void ResetMockRequestNativeDomTree()
+{
+    g_mockRequestNativeDomTreeCall.called = false;
+    g_mockRequestNativeDomTreeCall.offset = NG::OffsetF();
+    g_mockRequestNativeDomTreeCall.rectJson = "";
+    g_mockRequestNativeDomTreeCb = nullptr;
+    g_mockRequestNativeDomTreeResult = R"([{"tag":"div"}])";
+}
+void SetMockRequestNativeDomTreeResult(const std::string& result)
+{
+    g_mockRequestNativeDomTreeResult = result;
+}
 int WebDelegate::SendCommandActionToNWeb(const std::shared_ptr<OHOS::NWeb::NWebCommandAction>& simulatedAction)
 {
     return -1;
@@ -1585,6 +1661,7 @@ bool WebDelegate::RestoreWebState(const std::vector<uint8_t>& state)
 {
     return g_restoreWebStateResult;
 }
+void WebDelegate::SetFlingSpeedLimit(float speedLimit) {}
 void WebDelegate::SetEnableAutoFill(bool isEnabled) {}
 void WebDelegate::SetEnableDrag(bool isEnabled) {}
 void WebDelegate::UpdateWebMediaNetworkProxyEnabled(bool isEnabled) {}
@@ -1600,8 +1677,11 @@ void WebDelegate::OnTextSelectionChange(const std::string& selectionText) {}
 std::string WebDelegate::GetLastSelectionText() const { return ""; }
 void WebDelegate::OnDetectedBlankScreen(
     const std::string& url, int32_t blankScreenReason, int32_t detectedContentfulNodesCount) {}
+void WebDelegate::OnMonitoredBlankScreen(
+    const std::string& url, int32_t reason, const std::string& extraMsg) {}
 void WebDelegate::UpdateBlankScreenDetectionConfig(bool enable, const std::vector<double>& detectionTiming,
     const std::vector<int32_t>& detectionMethods, int32_t contentfulNodesCountThreshold) {}
+void WebDelegate::UpdateWebBlankScreenMonitorEnabled(bool isEnabled) {}
 void WebDelegate::OnRequestAutofill(int32_t menuType) {}
 void WebDelegate::OnSwitchFreeMultiWindow(bool enable) {}
 void WebDelegate::RegisterFreeMultiWindowListener() {}
@@ -1609,6 +1689,27 @@ void WebDelegate::UnregisterFreeMultiWindowListener() {}
 void WebDelegate::RequestWebDomJsonString(const std::function<void(const std::string)>&& callback) {}
 void WebDelegate::RequestWebDomJsonStringWithOptions(
     const std::function<void(const std::string)>&& callback, int32_t mode) {}
+
+void WebDelegate::RequestNativeDomTree(
+    std::function<void(const std::string&)>&& callback, const NG::OffsetF& offset, const std::string& rectJson)
+{
+    g_mockRequestNativeDomTreeCall.called = true;
+    g_mockRequestNativeDomTreeCall.offset = offset;
+    g_mockRequestNativeDomTreeCall.rectJson = rectJson;
+    if (g_mockRequestNativeDomTreeCb) {
+        g_mockRequestNativeDomTreeCb(offset, rectJson);
+    }
+    if (callback) {
+        callback(g_mockRequestNativeDomTreeResult);
+    }
+}
+void WebDelegate::RequestNativeDomTreeInner(const WeakPtr<WebDelegate>& weak,
+    std::function<void(const std::string&)>&& callback, const NG::OffsetF& offset, const std::string& rectJson) {}
+std::string WebDelegate::BuildNativeDomCommand(const NG::OffsetF& offset, const std::string& rectJson)
+{
+    return "";
+}
+
 void WebDelegate::UpdateFullScreenVideoOverlayEnable(bool) {}
 void WebDelegate::OnFullScreenVideoOverlayEnter(const char*) {}
 void WebDelegate::OnVideoStatusChanged(const int action, const std::map<std::string, std::string>& param) {}
@@ -1627,7 +1728,7 @@ void WebDelegate::QueryPageControls(const std::string&,
     const std::string&, const std::vector<std::string>&,
     std::function<void(const std::string&)>&&) {}
 
-void WebDelegate::ExecuteGetPageSceneMatch(int32_t, const WebPageSceneRuleSet&, bool) {}
+void WebDelegate::ExecuteGetPageSceneMatch(int32_t, const WebPageSceneRuleSet&) {}
 void WebDelegate::ExecuteAllRuleSetMatch() {}
 void WebDelegate::ProcessPageSceneDomReadyResult(const std::string&, const std::string&) {}
 void WebDelegate::ExecuteReportOnRegisterMatch(int32_t) {}
@@ -1637,4 +1738,12 @@ int32_t WebDelegate::GetHostNodeId() { return -1; }
 void FullScreenVideoOverlayHandlerOhos::SetVideoSurface(std::string surfaceId) {}
 
 void FullScreenVideoOverlayHandlerOhos::RequestMediaControl(int32_t action, std::string param) {}
+
+void WebStringValueCallbackImpl::OnReceiveValue(const std::string& value)
+{
+    auto callback = std::move(callback_);
+    if (callback) {
+        callback(value);
+    }
+}
 } // namespace OHOS::Ace

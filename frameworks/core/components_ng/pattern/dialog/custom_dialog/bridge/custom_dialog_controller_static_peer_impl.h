@@ -22,7 +22,7 @@
 #include "core/interfaces/native/utility/reverse_converter.h"
 
 namespace OHOS::Ace::NG::GeneratedModifier {
-class CustomDialogControllerPeerImpl : public virtual AceType {
+class CustomDialogControllerPeerImpl : public AceType {
     DECLARE_ACE_TYPE(CustomDialogControllerPeerImpl, AceType);
 
 public:
@@ -84,6 +84,7 @@ public:
     void SetSystemMaterial(Opt_uiMaterial_Material systemMaterial);
     void SetDistortionMode(Opt_DistortionMode distortionMode);
     void SetEdgeLightMode(Opt_EdgeLightMode edgeLightMode);
+    void SetAdaptToHandedness(Opt_HandednessFollowMode adaptToHandedness);
 
     DialogProperties GetDialogProperties() const;
 

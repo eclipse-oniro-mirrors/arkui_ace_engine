@@ -28,7 +28,7 @@
 
 namespace OHOS::Ace::NG {
 
-class ACE_EXPORT SelectionContainerManager : public virtual AceType {
+class ACE_EXPORT SelectionContainerManager : public AceType {
     DECLARE_ACE_TYPE(SelectionContainerManager, AceType);
 
 public:

@@ -95,6 +95,7 @@ public:
         return irregularItemInfo_;
     }
 
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
 
@@ -147,6 +148,11 @@ protected:
     void OnModifyDone() override;
 
 private:
+    void DumpAdvanceItemRangeInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    void DumpAdvanceDiagnostics(std::unique_ptr<JsonValue>& json);
+    void DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
     void SetAccessibilityAction();
     void OnAttachToFrameNode() override;
     void OnAttachToFrameNodeMultiThread();

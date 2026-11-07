@@ -20,7 +20,7 @@
 #include "core/components_ng/pattern/canvas/canvas_render_context.h"
 #include "core/components_ng/render/drawing.h"
 namespace OHOS::Ace::NG {
-class ACE_EXPORT CanvasRenderContextDeferred : public virtual CanvasRenderContext {
+class ACE_EXPORT CanvasRenderContextDeferred : public CanvasRenderContext {
     DECLARE_ACE_TYPE(CanvasRenderContextDeferred, CanvasRenderContext);
 
 public:

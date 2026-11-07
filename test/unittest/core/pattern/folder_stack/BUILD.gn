@@ -28,6 +28,7 @@ if (is_host_product) {
     sources = test_sources
     sources += [
       "$ace_root/adapter/ohos/osal/display_info_utils.cpp",
+      "$ace_root/test/mock/adapter/ohos/osal/mock_system_properties.cpp",
     ]
     cflags = [ "-fno-access-control" ]
     extra_deps = []
@@ -47,6 +48,9 @@ if (is_host_product) {
         "folder_stack_test_core.cpp",
       ]
     }
-    sources += [ "$ace_root/adapter/ohos/osal/display_info_utils.cpp" ]
+    sources += [
+      "$ace_root/adapter/ohos/osal/display_info_utils.cpp",
+      "$ace_root/test/mock/adapter/ohos/osal/mock_system_properties.cpp",
+    ]
   }
 }

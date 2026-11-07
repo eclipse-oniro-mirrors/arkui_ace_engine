@@ -567,6 +567,61 @@ HWTEST_F(KeyEventTestNg, KeyEvent_IsFunctionKey002, TestSize.Level1)
 
     event.code = KeyCode::KEY_0;
     EXPECT_FALSE(event.IsFunctionKey());
+
+    event.code = KeyCode::KEY_PRINT;
+    EXPECT_FALSE(event.IsFunctionKey());
+
+    event.code = KeyCode::KEY_SPACE;
+    EXPECT_FALSE(event.IsFunctionKey());
+}
+
+/**
+ * @tc.name: KeyEvent_IsFunctionKey003
+ * @tc.desc: Test IsFunctionKey returns true for 12 extended function keys.
+ * @tc.type: FUNC
+ */
+HWTEST_F(KeyEventTestNg, KeyEvent_IsFunctionKey003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Set code to 12 extended function key codes.
+     * @tc.expected: IsFunctionKey returns true for all.
+     */
+    KeyEvent event;
+    event.code = KeyCode::KEY_CAPS_LOCK;
+    EXPECT_TRUE(event.IsFunctionKey());
+
+    event.code = KeyCode::KEY_SCROLL_LOCK;
+    EXPECT_TRUE(event.IsFunctionKey());
+
+    event.code = KeyCode::KEY_BREAK;
+    EXPECT_TRUE(event.IsFunctionKey());
+
+    event.code = KeyCode::KEY_NUM_LOCK;
+    EXPECT_TRUE(event.IsFunctionKey());
+
+    event.code = KeyCode::KEY_INSERT;
+    EXPECT_TRUE(event.IsFunctionKey());
+
+    event.code = KeyCode::KEY_FORWARD_DEL;
+    EXPECT_TRUE(event.IsFunctionKey());
+
+    event.code = KeyCode::KEY_MOVE_HOME;
+    EXPECT_TRUE(event.IsFunctionKey());
+
+    event.code = KeyCode::KEY_MOVE_END;
+    EXPECT_TRUE(event.IsFunctionKey());
+
+    event.code = KeyCode::KEY_PAGE_UP;
+    EXPECT_TRUE(event.IsFunctionKey());
+
+    event.code = KeyCode::KEY_PAGE_DOWN;
+    EXPECT_TRUE(event.IsFunctionKey());
+
+    event.code = KeyCode::KEY_ENTER;
+    EXPECT_TRUE(event.IsFunctionKey());
+
+    event.code = KeyCode::KEY_DEL;
+    EXPECT_TRUE(event.IsFunctionKey());
 }
 
 /**
@@ -917,6 +972,61 @@ HWTEST_F(KeyEventTestNg, KeyEvent_ConvertInputCodeToString006, TestSize.Level1)
     KeyEvent event;
     event.code = KeyCode::KEY_UNKNOWN;
     EXPECT_EQ(event.ConvertInputCodeToString(), "");
+}
+
+/**
+ * @tc.name: KeyEvent_ConvertInputCodeToString007
+ * @tc.desc: Test ConvertInputCodeToString for 14 extended function keys.
+ * @tc.type: FUNC
+ */
+HWTEST_F(KeyEventTestNg, KeyEvent_ConvertInputCodeToString007, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Set code to 14 extended function key codes.
+     * @tc.expected: ConvertInputCodeToString returns expected string for each.
+     */
+    KeyEvent event;
+    event.code = KeyCode::KEY_CAPS_LOCK;
+    EXPECT_EQ(event.ConvertInputCodeToString(), "CAPS_LOCK");
+
+    event.code = KeyCode::KEY_PRINT;
+    EXPECT_EQ(event.ConvertInputCodeToString(), "PRINT_SCREEN");
+
+    event.code = KeyCode::KEY_SCROLL_LOCK;
+    EXPECT_EQ(event.ConvertInputCodeToString(), "SCROLL_LOCK");
+
+    event.code = KeyCode::KEY_BREAK;
+    EXPECT_EQ(event.ConvertInputCodeToString(), "PAUSE_BREAK");
+
+    event.code = KeyCode::KEY_NUM_LOCK;
+    EXPECT_EQ(event.ConvertInputCodeToString(), "NUM_LOCK");
+
+    event.code = KeyCode::KEY_INSERT;
+    EXPECT_EQ(event.ConvertInputCodeToString(), "INSERT");
+
+    event.code = KeyCode::KEY_FORWARD_DEL;
+    EXPECT_EQ(event.ConvertInputCodeToString(), "DELETE");
+
+    event.code = KeyCode::KEY_MOVE_HOME;
+    EXPECT_EQ(event.ConvertInputCodeToString(), "HOME");
+
+    event.code = KeyCode::KEY_MOVE_END;
+    EXPECT_EQ(event.ConvertInputCodeToString(), "END");
+
+    event.code = KeyCode::KEY_PAGE_UP;
+    EXPECT_EQ(event.ConvertInputCodeToString(), "PAGE_UP");
+
+    event.code = KeyCode::KEY_PAGE_DOWN;
+    EXPECT_EQ(event.ConvertInputCodeToString(), "PAGE_DOWN");
+
+    event.code = KeyCode::KEY_ENTER;
+    EXPECT_EQ(event.ConvertInputCodeToString(), "ENTER");
+
+    event.code = KeyCode::KEY_DEL;
+    EXPECT_EQ(event.ConvertInputCodeToString(), "BACKSPACE");
+
+    event.code = KeyCode::KEY_SPACE;
+    EXPECT_EQ(event.ConvertInputCodeToString(), " ");
 }
 
 /**

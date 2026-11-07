@@ -1165,6 +1165,92 @@ int32_t OH_ArkUI_NativeModule_GetNativeAccessibilityProvider(
  */
 int32_t OH_ArkUI_AccessibilityElementInfoSetComponentIdentifier(
     ArkUI_AccessibilityElementInfo *elementInfo, const char *identifier);
+
+/**
+ * @brief Binds an exported ArkUI subtree to a specified placeholder node in the accessibility tree
+ * of a third-party framework (e.g. CMP), creating a sub accessibility manager and registering
+ * the subtree to AAMS (Accessibility Ability Manager Service).
+ *
+ * The binding is identified by {@code bindId}, which is also the accessibility ID of the
+ * mount node in the third-party framework's accessibility tree (the node is reported by the
+ * third-party framework). Multiple bindings can coexist on the same owner with different bindIds.
+ *
+ * @param owner Indicates the ArkUI node handle of the placeholder node (ArkUIView) in the
+ *              third-party framework's accessibility tree. Must be an ARKUI_NODE_CUSTOM,
+ *              ARKUI_NODE_XCOMPONENT or ARKUI_NODE_XCOMPONENT_TEXTURE node.
+ * @param bindId Indicates the binding identifier. Also serves as the accessibility ID of the
+ *               mount node in the third-party framework's tree. Must be unique within the
+ *               same owner node.
+ * @param exportedRoot Indicates the ArkUI node handle of the exported subtree root.
+ *                     Adoption via {@code AdoptChild} is NOT required.
+ * @return Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if the owner or exportedRoot handle
+ *         is invalid, or the owner node type is not ARKUI_NODE_CUSTOM,
+ *         ARKUI_NODE_XCOMPONENT or ARKUI_NODE_XCOMPONENT_TEXTURE.
+ * @since 26
+ */
+int32_t OH_ArkUI_Accessibility_BindExportTree(
+    ArkUI_NodeHandle owner, int64_t bindId, ArkUI_NodeHandle exportedRoot);
+
+/**
+ * @brief Unbinds a previously bound exported ArkUI subtree from the third-party framework's
+ * accessibility tree: deregisters grandchild trees, deregisters the subtree from AAMS, and
+ * releases the sub accessibility manager with the binding (binding lifecycle: created on
+ * Bind, released on Unbind — independent of {@code AdoptChild}/{@code RemoveAdoptedChild}
+ * calls, which only manage render-tree placement).
+ *
+ * @param owner Indicates the ArkUI node handle of the placeholder node (ArkUIView).
+ * @param bindId Indicates the binding identifier to unbind.
+ * @return Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if the owner handle is invalid.
+ *         Unbinding an unknown or already-unbound bindId is a no-op (idempotent, returns NO_ERROR).
+ * @since 26
+ */
+int32_t OH_ArkUI_Accessibility_UnbindExportTree(
+    ArkUI_NodeHandle owner, int64_t bindId);
+
+/**
+ * @brief Registers a handler for third-party accessibility hover hit testing.
+ *
+ * When screen reading is enabled, ArkUI calls the handler with coordinates relative to the host,
+ * in px. The third-party framework fills the output elementInfo with the hit component information.
+ * After the callback returns, ArkUI reports the corresponding hover event. Event types are managed
+ * by ArkUI and are not passed to the callback. The registered host's subtree is not hit-tested by ArkUI.
+ * Re-registering the same host replaces both the handler and userData.
+ * This function is not thread-safe. The handler runs synchronously on the UI thread and must return promptly.
+ *
+ * @param node [in] Host of type ARKUI_NODE_XCOMPONENT, ARKUI_NODE_CUSTOM or ARKUI_NODE_XCOMPONENT_TEXTURE.
+ * @param userData [in] Custom data passed unchanged to the handler. ArkUI does not own or release it.
+ * @param handleAccessibilityHoverEvent [in] Non-null handler. x/y are host-relative coordinates in px;
+ *     requestId identifies the current ArkUI request. elementInfo is an output object owned by ArkUI,
+ *     valid for the handler only during the callback. Fill it using the existing element-info setters;
+ *     do not retain or release the pointer. Leaving it unfilled means no hit.
+ * @return ARKUI_ERROR_CODE_NO_ERROR on success; ARKUI_ERROR_CODE_PARAM_INVALID if node is null;
+ *     ARKUI_ERROR_CODE_PARAM_ERROR if handleAccessibilityHoverEvent is null;
+ *     ARKUI_ERROR_CODE_ATTRIBUTE_OR_EVENT_NOT_SUPPORTED if the node type is unsupported.
+ * @see OH_ArkUI_Accessibility_UnregisterAccessibilityHoverEventHandler
+ * @since 26.1.0
+ */
+int32_t OH_ArkUI_Accessibility_RegisterAccessibilityHoverEventHandler(ArkUI_NodeHandle node, void* userData,
+    void (*handleAccessibilityHoverEvent)(void *userData, int32_t x, int32_t y,
+        int32_t requestId, ArkUI_AccessibilityElementInfo *elementInfo));
+
+/**
+ * @brief Unregisters a third-party accessibility hover handler and restores the existing hover rules.
+ *
+ * Unregistering a supported host without a handler succeeds. ArkUI no longer calls the removed handler and does
+ * not release userData; the caller manages its lifetime. This function is not thread-safe.
+ *
+ * @param node [in] Host of type ARKUI_NODE_XCOMPONENT, ARKUI_NODE_CUSTOM or ARKUI_NODE_XCOMPONENT_TEXTURE
+ *     from which the handler is removed.
+ * @return ARKUI_ERROR_CODE_NO_ERROR on success, including an unregistered node;
+ *     ARKUI_ERROR_CODE_PARAM_INVALID if node is null;
+ *     ARKUI_ERROR_CODE_ATTRIBUTE_OR_EVENT_NOT_SUPPORTED if the node type is unsupported.
+ * @see OH_ArkUI_Accessibility_RegisterAccessibilityHoverEventHandler
+ * @since 26.1.0
+ */
+int32_t OH_ArkUI_Accessibility_UnregisterAccessibilityHoverEventHandler(ArkUI_NodeHandle node);
+
 #ifdef __cplusplus
 };
 #endif

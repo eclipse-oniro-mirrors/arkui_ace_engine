@@ -13,6 +13,7 @@
 * limitations under the License.
 */
 
+#include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "core/components_ng/pattern/grid/grid_model_static.h"
 
 #include "base/utils/multi_thread.h"
@@ -23,6 +24,7 @@
 #include "core/components_ng/pattern/grid/grid_layout_property.h"
 #include "core/components_ng/pattern/grid/grid_pattern.h"
 #include "core/components_ng/pattern/scroll_bar/proxy/scroll_bar_proxy.h"
+#include "core/components_ng/pattern/scrollable/scrollable_layout_property.h"
 #include "core/components_ng/pattern/scrollable/scrollable_model_ng.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
@@ -250,6 +252,17 @@ void GridModelStatic::SetNestedScroll(FrameNode* frameNode, const NestedScrollOp
     auto pattern = frameNode->GetPattern<GridPattern>();
     CHECK_NULL_VOID(pattern);
     pattern->SetNestedScroll(nestedOpt);
+}
+
+void GridModelStatic::SetScrollSnapStrategy(
+    FrameNode* frameNode, const std::optional<ScrollSnapStrategy>& scrollSnapStrategy)
+{
+    CHECK_NULL_VOID(frameNode);
+    if (scrollSnapStrategy.has_value()) {
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(GridLayoutProperty, ScrollSnapStrategy, scrollSnapStrategy.value(), frameNode);
+    } else {
+        ACE_RESET_NODE_LAYOUT_PROPERTY(GridLayoutProperty, ScrollSnapStrategy, frameNode);
+    }
 }
 
 void GridModelStatic::SetScrollEnabled(FrameNode* frameNode, const std::optional<bool>& scrollEnabled)

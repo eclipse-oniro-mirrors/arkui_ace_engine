@@ -17,6 +17,7 @@ import(
 build_component_ng("event_ng") {
   sources = [
     "click_event.cpp",
+    "developer_response_publisher.cpp",
     "drag_drop_event.cpp",
     "drag_event.cpp",
     "error_reporter/general_interaction_error_reporter.cpp",

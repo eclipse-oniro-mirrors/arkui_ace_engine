@@ -145,7 +145,10 @@ void SubwindowManager::ShowDialogStatic(DialogProperties& dialogProps,
             CHECK_NULL_VOID(subwindow->CheckHostWindowStatus());
             subwindow->InitContainer();
             CHECK_NULL_VOID(subwindow->GetIsRosenWindowCreate());
-            AddSubwindow(containerId, SubwindowType::TYPE_DIALOG, subwindow);
+            if (!AddSubwindow(containerId, SubwindowType::TYPE_DIALOG, subwindow)) {
+                subwindow->DestroyWindow();
+                subwindow = GetSubwindowByType(containerId, SubwindowType::TYPE_DIALOG);
+            }
         }
         subwindow->ShowDialogStatic(dialogProps, std::move(callback));
     }
@@ -177,7 +180,10 @@ void SubwindowManager::ShowActionMenuStatic(DialogProperties& dialogProps,
             CHECK_NULL_VOID(subwindow->CheckHostWindowStatus());
             subwindow->InitContainer();
             CHECK_NULL_VOID(subwindow->GetIsRosenWindowCreate());
-            AddSubwindow(containerId, SubwindowType::TYPE_DIALOG, subwindow);
+            if (!AddSubwindow(containerId, SubwindowType::TYPE_DIALOG, subwindow)) {
+                subwindow->DestroyWindow();
+                subwindow = GetSubwindowByType(containerId, SubwindowType::TYPE_DIALOG);
+            }
         }
         subwindow->ShowActionMenuStatic(dialogProps, std::move(callback));
     }
@@ -204,7 +210,10 @@ void SubwindowManager::OpenCustomDialogStatic(DialogProperties &dialogProps,
             CHECK_NULL_VOID(subwindow->CheckHostWindowStatus());
             subwindow->InitContainer();
             CHECK_NULL_VOID(subwindow->GetIsRosenWindowCreate());
-            AddSubwindow(containerId, SubwindowType::TYPE_DIALOG, subwindow);
+            if (!AddSubwindow(containerId, SubwindowType::TYPE_DIALOG, subwindow)) {
+                subwindow->DestroyWindow();
+                subwindow = GetSubwindowByType(containerId, SubwindowType::TYPE_DIALOG);
+            }
         }
         subwindow->OpenCustomDialogStatic(tmpDialogProps, std::move(callback));
     }

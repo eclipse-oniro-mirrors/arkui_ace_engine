@@ -46,7 +46,7 @@ namespace {
 constexpr float DEFAULT_SIZE = -1.0f;
 }
 
-class ListChildrenMainSize : public virtual AceType {
+class ListChildrenMainSize : public AceType {
     DECLARE_ACE_TYPE(ListChildrenMainSize, AceType);
 public:
     ListChildrenMainSize() = default;

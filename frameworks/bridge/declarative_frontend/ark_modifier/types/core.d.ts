@@ -314,13 +314,27 @@ type TabBarSymbol = object;
 type LayoutMode = object;
 type TabBarIconStyle = object;
 type barFloatingStyleOptions = object;
-type TabBarStyle = 'bottom' | 'sidebar' | 'sidebarAdaptable';
+type topBarFloatingStyleOptions = object;
+type TabBarStyle = 'bottom' | 'sidebar' | 'sidebarAdaptable' | 'top';
 type TabsSidebarDisplayStyle = 'embed' | 'displace';
 type TabsSidebarSearchableOptions = object;
-type TabBarDisplayMode = 'bottomTabbar' | 'sidebar';
+type TabBarDisplayMode = 'bottomTabbar' | 'sidebar' | 'topTabbar';
 type TabsBreakpointType<T> = object;
 type TabVisibility = 'visible' | 'hidden';
-
+enum SidebarSectionTitleStyle {
+    STANDARD = 0,
+    EMPHASIZED = 1
+}
+interface SidebarSection {
+    title: ResourceStr;
+    order?: number;
+    titleStyle?: SidebarSectionTitleStyle;
+}
+interface TabViewCustomization {
+    visibilityMap?: Map<number, TabVisibility>;
+    sectionMap?: Map<number, SidebarSection>;
+    orderMap?: Map<number, number>
+};
 declare class Indicator {
     left(value: LengthMetrics | undefined): this;
     top(value: LengthMetrics | undefined): this;
@@ -550,6 +564,7 @@ type DistortionMode = 'distortion_auto' | 'distortion_enabled' | 'distortion_dis
 type EdgeLightMode = 'edgeLight_auto' | 'edgeLight_enabled' | 'edgeLight_disabled';
 
 type CalendarAlign = 'start' | 'center' | 'end';
+type CalendarFirstDayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 type CalendarTextStyle = object;
 type DatePickerResult = { year: number; month: number; day: number };
 type PickerTextStyle = object;
@@ -575,6 +590,7 @@ type LayoutStyle = 'alwaysCenter' | 'alwaysAverageSplit' | 'spaceAroundAverage' 
 type TabsAnimationMode = 'none' | 'content' | 'actionSheet';
 type ScrollableBarModeOptions = object;
 type BarOverlapOptions = object;
+type BarOverlapMode = 'STANDARD' | 'STACK' | 'SAFE_AREA_PADDING';
 type TabBarOptions = object | CustomBuilder;
 type FlexDirection = 'row' | 'rowReverse' | 'column' | 'columnReverse';
 type ScrollState = 'idle' | 'scroll' | 'fling';
@@ -737,6 +753,13 @@ type TextDecorationOptions = object;
 type SliderConfiguration = object;
 type DateTimeOptions = object;
 type NestedScrollOptions = object;
+declare enum ScrollSnapAlign {
+    NONE = 0,
+    START = 1,
+    CENTER = 2,
+    END = 3,
+}
+type ScrollSnapOffsetProvider = object;
 
 declare class ArkLogConsole {
     public static log(...args: unknown[]): void;

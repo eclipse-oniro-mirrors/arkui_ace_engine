@@ -24,6 +24,7 @@
 #include "test/mock/frameworks/core/common/mock_container.h"
 
 #include "core/components_ng/pattern/web/web_pattern.h"
+#include "core/components_ng/pattern/web/web_model_ng.h"
 #include "core/components_ng/pattern/web/web_select_overlay.h"
 #undef protected
 #undef private
@@ -1951,6 +1952,37 @@ void WebSelectOverlayTest::TearDownTestCase()
 }
 void WebSelectOverlayTest::SetUp() {}
 void WebSelectOverlayTest::TearDown() {}
+
+/**
+ * @tc.name: CaretColorUpdatesOuterHandleOnly
+ * @tc.desc: Verify a non-zero Web caret color overrides the handle outer color and zero restores the theme fallback.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebSelectOverlayTest, CaretColorUpdatesOuterHandleOnly, TestSize.Level1)
+{
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    auto overlay = AceType::MakeRefPtr<WebSelectOverlay>(AceType::WeakClaim(AceType::RawPtr(webPattern)));
+
+    WebModelNG::SetCaretColor(AceType::RawPtr(frameNode), Color::RED);
+    ASSERT_TRUE(overlay->GetHandleColor().has_value());
+    EXPECT_EQ(overlay->GetHandleColor().value(), Color::RED);
+    SelectOverlayInfo selectInfo;
+    overlay->OnUpdateSelectOverlayInfo(selectInfo, 0);
+    ASSERT_TRUE(selectInfo.handlerColor.has_value());
+    EXPECT_EQ(selectInfo.handlerColor.value(), Color::RED);
+
+    WebModelNG::SetCaretColor(AceType::RawPtr(frameNode), Color(0));
+    EXPECT_FALSE(overlay->GetHandleColor().has_value());
+    overlay->OnUpdateSelectOverlayInfo(selectInfo, 0);
+    EXPECT_FALSE(selectInfo.handlerColor.has_value());
+}
 
 std::vector<MenuOptionsParam> CreateMenuOptionsV2(const std::vector<NG::MenuItemParam>&)
 {
@@ -6293,7 +6325,7 @@ HWTEST_F(WebSelectOverlayTest, UpdateTouchHandleForOverlayTestSelectAll, TestSiz
     auto manager = SelectContentOverlayManager::GetOverlayManager();
     EXPECT_NE(manager, nullptr);
     auto holder = AceType::MakeRefPtr<SelectOverlayHolder>();
-    auto contentManager = AceType::DynamicCast<SelectContentOverlayManager>(manager);
+    auto contentManager = manager;
     auto g_webPattern = frameNode->GetPattern<WebPattern>();
     EXPECT_NE(g_webPattern, nullptr);
     WebSelectOverlay overlay(g_webPattern);
@@ -7464,6 +7496,198 @@ HWTEST_F(WebSelectOverlayTest, OnHandleGlobalTouchEvent_002, TestSize.Level1)
     // Test touch up closes overlay
     overlay.OnHandleGlobalTouchEvent(SourceType::TOUCH, TouchType::UP, true);
     EXPECT_TRUE(overlay.IsShowHandle());
+#endif
+}
+/**
+ * @tc.name: TranslateInputRequiresCapabilityAndSingleCaret
+ * @tc.desc: Old kernels and selected text cannot expose translation input.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebSelectOverlayTest, TranslateInputRequiresCapabilityAndSingleCaret, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto nodeId = ViewStackProcessor::GetInstance()->ClaimNodeId();
+    auto node = FrameNode::GetOrCreateFrameNode(
+        V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    auto pattern = node->GetPattern<WebPattern>();
+    pattern->OnModifyDone();
+    ASSERT_NE(pattern->delegate_, nullptr);
+    WebSelectOverlay overlay(pattern);
+    auto params = std::make_shared<NWebQuickMenuParamsSelectImpl>();
+    auto callback = std::make_shared<NWebQuickMenuCallbackMock>();
+    SelectOverlayInfo info;
+    info.isSingleHandle = true;
+    auto oldFlags = g_editStateFlags;
+    g_editStateFlags = 0;
+    overlay.SetMenuOptions(info, params, callback);
+    EXPECT_FALSE(info.menuInfo.showTranslateInput);
+    g_editStateFlags = NWebQuickMenuParams::QM_EF_CAN_TRANSLATE_INPUT;
+    info.isSingleHandle = false;
+    overlay.SetMenuOptions(info, params, callback);
+    EXPECT_FALSE(info.menuInfo.showTranslateInput);
+    g_editStateFlags = oldFlags;
+#endif
+}
+
+/**
+ * @tc.name: TranslateInputRejectsUnadvertisedAction
+ * @tc.desc: An action without a visible entry never invokes the native callback.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebSelectOverlayTest, TranslateInputRejectsUnadvertisedAction, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    class RecordingCallback final : public NWebQuickMenuCallback {
+    public:
+        void Continue(int32_t, MenuEventFlags) override { ++calls; }
+        void Cancel() override {}
+        int32_t calls = 0;
+    };
+    auto nodeId = ViewStackProcessor::GetInstance()->ClaimNodeId();
+    auto node = FrameNode::GetOrCreateFrameNode(
+        V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    auto pattern = node->GetPattern<WebPattern>();
+    pattern->OnModifyDone();
+    WebSelectOverlay overlay(pattern);
+    auto callback = std::make_shared<RecordingCallback>();
+    overlay.quickMenuCallback_ = callback;
+    overlay.webSelectInfo_.isSingleHandle = true;
+    overlay.webSelectInfo_.menuInfo.showTranslateInput = false;
+    overlay.OnMenuItemAction(OptionMenuActionId::TRANSLATE_INPUT, OptionMenuType::TOUCH_MENU);
+    EXPECT_EQ(callback->calls, 0);
+#endif
+}
+
+namespace {
+#ifdef OHOS_STANDARD_SYSTEM
+class TranslateInputOverlay final : public WebSelectOverlay {
+public:
+    explicit TranslateInputOverlay(const WeakPtr<TextBase>& textBase) : WebSelectOverlay(textBase) {}
+    bool CanShowTranslateInput() const override
+    {
+        ++eligibilityQueries_;
+        return supported_;
+    }
+    mutable int32_t eligibilityQueries_ = 0;
+    bool supported_ = true;
+};
+
+class TranslateInputCallback final : public NWebQuickMenuCallback {
+public:
+    explicit TranslateInputCallback(WebSelectOverlay& overlay) : overlay_(overlay) {}
+    void Continue(int32_t command, MenuEventFlags flags) override
+    {
+        ++calls_;
+        command_ = command;
+        flags_ = flags;
+        visibleInCallback_ = overlay_.webSelectInfo_.menuInfo.showTranslateInput;
+    }
+    void Cancel() override {}
+    int32_t calls_ = 0;
+    int32_t command_ = 0;
+    MenuEventFlags flags_ = MenuEventFlags::EF_NONE;
+    bool visibleInCallback_ = true;
+
+private:
+    WebSelectOverlay& overlay_;
+};
+#endif
+} // namespace
+
+class WebTranslateInputActionTest : public WebSelectOverlayTest {
+protected:
+    void SetUp() override
+    {
+        WebSelectOverlayTest::SetUp();
+#ifdef OHOS_STANDARD_SYSTEM
+        auto nodeId = ViewStackProcessor::GetInstance()->ClaimNodeId();
+        node_ = FrameNode::GetOrCreateFrameNode(
+            V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+        ASSERT_NE(node_, nullptr);
+        pattern_ = node_->GetPattern<WebPattern>();
+        ASSERT_NE(pattern_, nullptr);
+        pattern_->OnModifyDone();
+        ASSERT_NE(pattern_->delegate_, nullptr);
+        overlay_ = std::make_unique<TranslateInputOverlay>(pattern_);
+        callback_ = std::make_shared<TranslateInputCallback>(*overlay_);
+        overlay_->quickMenuCallback_ = callback_;
+        overlay_->webSelectInfo_.isSingleHandle = true;
+        overlay_->webSelectInfo_.menuInfo.showTranslateInput = true;
+#endif
+    }
+
+#ifdef OHOS_STANDARD_SYSTEM
+    RefPtr<FrameNode> node_;
+    RefPtr<WebPattern> pattern_;
+    std::unique_ptr<TranslateInputOverlay> overlay_;
+    std::shared_ptr<TranslateInputCallback> callback_;
+#endif
+};
+
+/**
+ * @tc.name: ContinueUsesTranslationCommandAndConsumesEntry
+ * @tc.desc: A supported click dispatches once with the native command and mouse flag.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebTranslateInputActionTest, ContinueUsesTranslationCommandAndConsumesEntry, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    overlay_->OnMenuItemAction(OptionMenuActionId::TRANSLATE_INPUT, OptionMenuType::TOUCH_MENU);
+    EXPECT_EQ(callback_->calls_, 1);
+    EXPECT_EQ(callback_->command_, NWebQuickMenuParams::QM_EF_CAN_TRANSLATE_INPUT);
+    EXPECT_EQ(callback_->flags_, MenuEventFlags::EF_LEFT_MOUSE_BUTTON);
+    EXPECT_FALSE(callback_->visibleInCallback_);
+    EXPECT_FALSE(overlay_->webSelectInfo_.menuInfo.showTranslateInput);
+    overlay_->OnMenuItemAction(OptionMenuActionId::TRANSLATE_INPUT, OptionMenuType::TOUCH_MENU);
+    EXPECT_EQ(callback_->calls_, 1);
+#endif
+}
+
+/**
+ * @tc.name: ClickReusesMenuEligibilityWithoutQuery
+ * @tc.desc: Clicking an advertised entry reuses menu eligibility and delegates final validation to IMF.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebTranslateInputActionTest, ClickReusesMenuEligibilityWithoutQuery, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    overlay_->supported_ = false;
+    overlay_->OnMenuItemAction(OptionMenuActionId::TRANSLATE_INPUT, OptionMenuType::TOUCH_MENU);
+    EXPECT_EQ(callback_->calls_, 1);
+    EXPECT_EQ(overlay_->eligibilityQueries_, 0);
+    EXPECT_FALSE(overlay_->webSelectInfo_.menuInfo.showTranslateInput);
+    overlay_->OnMenuItemAction(OptionMenuActionId::TRANSLATE_INPUT, OptionMenuType::TOUCH_MENU);
+    EXPECT_EQ(callback_->calls_, 1);
+    EXPECT_EQ(overlay_->eligibilityQueries_, 0);
+#endif
+}
+
+/**
+ * @tc.name: SelectedTextDoesNotContinue
+ * @tc.desc: A selection range cannot use an earlier single-caret entry.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebTranslateInputActionTest, SelectedTextDoesNotContinue, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    overlay_->webSelectInfo_.isSingleHandle = false;
+    overlay_->OnMenuItemAction(OptionMenuActionId::TRANSLATE_INPUT, OptionMenuType::TOUCH_MENU);
+    EXPECT_EQ(callback_->calls_, 0);
+    EXPECT_FALSE(overlay_->webSelectInfo_.menuInfo.showTranslateInput);
+#endif
+}
+
+/**
+ * @tc.name: MissingCallbackDoesNotContinue
+ * @tc.desc: A click without a callback returns safely without dispatching.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebTranslateInputActionTest, MissingCallbackDoesNotContinue, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    overlay_->quickMenuCallback_.reset();
+    overlay_->OnMenuItemAction(OptionMenuActionId::TRANSLATE_INPUT, OptionMenuType::TOUCH_MENU);
+    EXPECT_EQ(callback_->calls_, 0);
 #endif
 }
 } // namespace OHOS::Ace::NG

@@ -17,14 +17,19 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMMON_IME_TEXT_INPUT_CLIENT_H
 
 #include <cstdint>
+#include <optional>
+#include <unordered_map>
+#include <vector>
 
 #include "base/memory/ace_type.h"
 #include "base/utils/string_utils.h"
 #include "base/utils/utf_helper.h"
+#include "base/view_data/ace_auto_fill_type.h"
 #include "core/common/ime/text_editing_value.h"
 #include "core/common/ime/text_input_action.h"
-#include "core/event/key_code.h"
+#include "core/common/ime/text_input_type.h"
 #include "core/components_ng/pattern/text_field/text_field_model.h"
+#include "core/event/key_code.h"
 
 namespace OHOS::Ace {
 struct KeyEvent;
@@ -67,6 +72,11 @@ struct PreviewRange {
     }
 };
 
+struct PreviewTextStyling {
+    std::optional<uint32_t> underlineColor = std::nullopt;
+    PreviewTextStyle underlineShape = PreviewTextStyle::NORMAL;
+};
+
 struct KeyComb final {
     KeyCode code;
     int32_t modKeyFlags;
@@ -81,6 +91,32 @@ struct KeyComb final {
     bool operator==(const KeyComb& other) const
     {
         return code == other.code && modKeyFlags == other.modKeyFlags;
+    }
+};
+
+enum class RichSpanType : uint32_t {
+    TEXT = 0,
+    IMAGE = 1,
+    SYMBOL = 2,
+    CUSTOM = 3,
+};
+
+struct RichRange {
+    int32_t start = INVALID_VALUE;
+    int32_t end = INVALID_VALUE;
+};
+
+struct RichTextSpanInfo {
+    RichSpanType type { RichSpanType::TEXT };
+    RichRange range;
+    std::string content;
+};
+
+struct RichTextDataInfo {
+    std::vector<RichTextSpanInfo> spans;
+    bool IsEmpty() const
+    {
+        return spans.empty();
     }
 };
 
@@ -118,6 +154,16 @@ public:
     virtual int32_t GetTextIndexAtCursor()
     {
         return -1;
+    }
+
+    virtual RichTextDataInfo GetLeftRichTextOfCursor(int32_t number)
+    {
+        return {};
+    }
+
+    virtual RichTextDataInfo GetRightRichTextOfCursor(int32_t number)
+    {
+        return {};
     }
 
     virtual void HandleSetSelection(int32_t start, int32_t end, bool showHandle = true) {}
@@ -227,8 +273,33 @@ public:
         return 0;
     }
 
+    virtual int32_t SetPreviewTextWithStyle(const PreviewTextStyling& styling)
+    {
+        isNeedPreviewTextStyling_ = true;
+        SetPreviewTextStyling(styling);
+        return 0;
+    }
+
+    virtual void OnFinishTextPreview()
+    {
+        if (isNeedPreviewTextStyling_) {
+            previewStyling_ = {};
+        }
+        isNeedPreviewTextStyling_ = false;
+    }
+
     virtual void FinishTextPreview() {}
-    virtual void ReceivePreviewTextStyle (const std::string& style) {}
+    virtual void ReceivePreviewTextStyle(const std::string& style) {}
+
+    virtual void SetPreviewTextStyling(const PreviewTextStyling& styling)
+    {
+        previewStyling_ = styling;
+    }
+
+    const PreviewTextStyling& GetPreviewStyling() const
+    {
+        return previewStyling_;
+    }
 
     virtual int32_t CheckPreviewTextValidate(const std::string& previewValue, const PreviewRange range)
     {
@@ -262,9 +333,25 @@ public:
     virtual void ResetOriginCaretPosition() {};
     virtual bool RecordOriginCaretPosition() { return false; };
     virtual bool IsShortCutBlocked() { return false; };
+    // Dispatch AutoFill processing to the concrete pattern (TextField / RichEditor).
+    // Virtual dispatch avoids cross-split-SO link-time symbol dependencies between
+    // the text_field and rich_editor component shared libraries.
+    virtual void ProcessAutoFillTrigger(AceAutoFillTriggerType triggerType) {}
+    virtual std::string GetAutoFillUserName() { return ""; }
+    virtual std::string GetAutoFillNewPassword() { return ""; }
+    virtual void SetAutoFillUserName(const std::string& userName) {}
+    virtual void SetAutoFillNewPassword(const std::string& newPassword) {}
+ 
+    // Shared mapping from AutoFill content type to the TextInputType that drives
+    // IME keyboard selection (e.g. password -> secure keyboard, email -> email
+    // keyboard). Lives on TextInputClient so both TextField and RichEditor can
+    // reuse it without a cross-component-SO static dependency.
+    ACE_FORCE_EXPORT static const std::unordered_map<AceAutoFillType, TextInputType>& GetAutoFillKeyboardMap();
 protected:
     int32_t instanceId_ = -1;
     bool shiftFlag_ = false;
+    PreviewTextStyling previewStyling_;
+    bool isNeedPreviewTextStyling_ = false;
 };
 
 } // namespace OHOS::Ace

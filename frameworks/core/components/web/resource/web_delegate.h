@@ -314,6 +314,9 @@ public:
     std::string GetSelectionText() const override;
     void GetImageRect(int32_t& x, int32_t& y, int32_t& width, int32_t& height) const override;
     bool IsAILink() const override;
+    bool ShouldOfferLinkToText() const override;
+    bool IsOverTextFragment() const override;
+    std::string GetTextFragmentGeneratedLink() const override;
     int GetSourceTypeV2() const override;
     int GetMediaTypeV2() const override;
     int GetContextMenuMediaType() const override;
@@ -341,6 +344,8 @@ public:
     void Redo() const override;
     void PasteAndMatchStyle() const override;
     void RequestPasswordAutoFill() const override;
+    void CopyLinkToTextMenu() const override;
+    void RemoveFragments() const override;
 
 private:
     std::shared_ptr<OHOS::NWeb::NWebContextMenuCallback> callback_;
@@ -777,7 +782,7 @@ private:
     WeakPtr<PipelineBase> context_ = nullptr;
 };
 
-class WebDelegateObserver : public virtual AceType {
+class WebDelegateObserver : public AceType {
 DECLARE_ACE_TYPE(WebDelegateObserver, AceType);
 public:
     WebDelegateObserver(const RefPtr<WebDelegate>& delegate, WeakPtr<PipelineBase> context)
@@ -792,6 +797,16 @@ private:
     RefPtr<WebDelegate> delegate_;
     WeakPtr<PipelineBase> context_;
 };
+
+typedef struct SecurityHitTestInfoTag {
+    int32_t id;
+    double x;
+    double y;
+    bool from_overlay;
+    int32_t callingUid;
+    uint64_t sessionId;
+    std::string response;
+}SecurityHitTestInfo;
 
 class GestureEventResultOhos : public GestureEventResult {
     DECLARE_ACE_TYPE(GestureEventResultOhos, GestureEventResult);
@@ -1182,6 +1197,7 @@ private:
 
 class WebDelegate : public WebResource {
     DECLARE_ACE_TYPE(WebDelegate, WebResource);
+    friend class WebStringValueCallbackImpl;
 
 public:
     using CreatedCallback = std::function<void()>;
@@ -1293,6 +1309,7 @@ public:
     void UpdateVerticalScrollBarAccess(bool isVerticalScrollBarAccessEnabled);
     void UpdateOverlayScrollbarEnabled(bool isEnabled);
     void UpdateScrollBarColor(const std::string& colorValue);
+    void UpdateCaretColor(const Color& caretColor);
     void UpdateOverScrollMode(const int32_t overscrollModeValue);
     void UpdateBlurOnKeyboardHideMode(const int32_t isBlurOnKeyboardHideEnable);
     void UpdateNativeEmbedModeEnabled(bool isEmbedModeEnabled);
@@ -1455,6 +1472,7 @@ public:
     void OnRefreshAccessedHistory(const std::string& url, bool isRefreshed, bool isMainFrame = false);
     bool OnFileSelectorShow(const std::shared_ptr<BaseEventInfo>& info);
     void OnContextMenuDismissed();
+    void OnContextMenuUpdate(WebContextMenuItemId menuItemId, WebContextMenuOptions options);
     bool OnContextMenuShow(const std::shared_ptr<BaseEventInfo>& info);
     void OnContextMenuHide(const std::string& info);
     bool OnHandleInterceptUrlLoading(const std::string& url);
@@ -1462,6 +1480,7 @@ public:
     void OnResourceLoad(const std::string& url);
     void OnScaleChange(float oldScaleFactor, float newScaleFactor);
     void OnZoomChange(double oldZoomFactor, double newZoomFactor);
+    void UpdateVisitedLinkPersistEnabled(const bool& enabled);
     void OnScroll(double xOffset, double yOffset);
     bool LoadDataWithRichText();
     void OnSearchResultReceive(int activeMatchOrdinal, int numberOfMatches, bool isDoneCounting);
@@ -1525,6 +1544,10 @@ public:
     void OnNativeEmbedMouseEvent(std::shared_ptr<NWeb::NWebNativeEmbedMouseEvent> event);
     void OnNativeEmbedObjectParamChange(std::shared_ptr<NWeb::NWebNativeEmbedParamDataInfo> paramDataInfo);
     void SetNGWebPattern(const RefPtr<NG::WebPattern>& webPattern);
+    bool OnGetWindowBounds(int32_t& x, int32_t& y,
+                           uint32_t& w, uint32_t& h, std::string& state);
+    bool OnSetWindowBounds(int32_t x, int32_t y,
+                           uint32_t w, uint32_t h, const std::string& state);
     bool RequestFocus(OHOS::NWeb::NWebFocusSource source = OHOS::NWeb::NWebFocusSource::FOCUS_SOURCE_DEFAULT);
     bool IsCurrentFocus();
     void SetDrawSize(const Size& drawSize);
@@ -1562,6 +1585,8 @@ public:
     bool OnNestedScroll(float& x, float& y, float& xVelocity, float& yVelocity, bool& isAvailable);
     bool OnNestedScrollV2(float& x, float& y);
     bool OnNestedFling(float& xVelocity, float& yVelocity);
+    void GetElementInfoForSecurityHitTest(SecurityHitTestInfo& secInfo);
+    void OnTouchForSecurityHitTest(std::shared_ptr<SecurityHitTestInfo> state);
 #if defined(ENABLE_ROSEN_BACKEND)
     void SetSurface(const sptr<Surface>& surface);
     void SetPopupSurface(const RefPtr<NG::RenderSurface>& popupSurface);
@@ -1777,8 +1802,11 @@ public:
     std::string GetLastSelectionText() const;
     void OnTextSelectionChange(const std::string& selectionText);
     void OnDetectedBlankScreen(const std::string& url, int32_t blankScreenReason, int32_t detectedContentfulNodesCount);
+    void OnMonitoredBlankScreen(const std::string& url, int32_t reason,
+        const std::string& extraMsg);
     void UpdateBlankScreenDetectionConfig(bool enable, const std::vector<double>& detectionTiming,
         const std::vector<int32_t>& detectionMethods, int32_t contentfulNodesCountThreshold);
+    void UpdateWebBlankScreenMonitorEnabled(bool isEnabled);
     void OnFirstScreenPaint(const std::string& url, int64_t navigationStartTime, int64_t firstScreenPaintTime);
     void UpdateEnableImageAnalyzer(bool enable);
     void OnPdfScrollAtBottom(const std::string& url);
@@ -1798,6 +1826,7 @@ public:
 #endif
     }
     void SetForceEnableZoom(bool isEnabled);
+    void SetFlingSpeedLimit(float speedLimit);
     bool IsShowHandle();
     void OnSafeBrowsingCheckFinish(int threat_type);
     bool IsPcMode();
@@ -1816,6 +1845,11 @@ public:
     void FetchCloudControlWebAutoLayoutConfig();
     void UpdateTouchEventFeatureDetectionEnabled();
 
+    void OnColorChooserPopup(const std::string& color,
+        const std::vector<OHOS::NWeb::NWebColorSuggestion>& suggestions,
+        std::shared_ptr<OHOS::NWeb::NWebColorChooserCallback> callback);
+    void OnColorChooserClose();
+
     // ===== PageScene Rule-Based Perception Methods =====
 
     void ExecuteReportOnRegisterMatch(int32_t processId);
@@ -1828,11 +1862,20 @@ public:
 
     // Page scene match execution
     void ProcessPageSceneDomReadyResult(const std::string& resultJson, const std::string& selectorJson);
-    void ExecuteGetPageSceneMatch(int32_t processId, const WebPageSceneRuleSet& ruleSet, bool isTemporary);
+    void ExecuteGetPageSceneMatch(int32_t processId, const WebPageSceneRuleSet& ruleSet);
     void ExecuteAllRuleSetMatch();
+
+    void RequestNativeDomTree(std::function<void(const std::string&)>&& callback,
+        const NG::OffsetF& offset, const std::string& rectJson = std::string());
 
 private:
     void ExecuteAllRuleSetMatchInternal();
+    static void ExecutePageSceneQuery(const WeakPtr<WebDelegate>& delegateWeak,
+        const std::string& selectorJson, const std::string& ruleId,
+        const std::vector<std::string>& nodeTypes,
+        std::function<void(const std::string& resultJson)>&& callback);
+    static void ForwardPageSceneQueryResult(const WeakPtr<WebDelegate>& delegateWeak,
+        const std::function<void(const std::string& resultJson)>& func, const std::string& result);
     void ResetPageSceneOnNavigate();
     void InitWebEvent();
     void RegisterWebEvent();
@@ -1861,6 +1904,10 @@ private:
     void SendAccessibilityPageChangeEvent(const RefPtr<NG::FrameNode>& webNode,
         const RefPtr<AccessibilityManager>& accessibilityManager);
     void HandleNativeEmbedLifecycle(std::shared_ptr<NWeb::NWebNativeEmbedDataInfo> dataInfo);
+
+    static std::string BuildNativeDomCommand(const NG::OffsetF& offset, const std::string& rectJson);
+    static void RequestNativeDomTreeInner(const WeakPtr<WebDelegate>& weak,
+        std::function<void(const std::string&)>&& callback, const NG::OffsetF& offset, const std::string& rectJson);
 
 #ifdef OHOS_STANDARD_SYSTEM
     sptr<OHOS::Rosen::Window> CreateWindow();

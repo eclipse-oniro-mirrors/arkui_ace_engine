@@ -28,6 +28,7 @@ enum class TabBarLayoutStyle {
     BOTTOM = 0,
     SIDEBAR,
     SIDEBAR_ADAPTABLE,
+    TOP,
 };
 
 enum class SidebarDisplayStyle {
@@ -38,6 +39,7 @@ enum class SidebarDisplayStyle {
 enum class TabBarDisplayMode {
     BOTTOMTABBAR = 0,
     SIDEBAR,
+    TOP_TABBAR,
 };
 
 enum class TabVisibility {
@@ -64,6 +66,17 @@ struct TabContentDefaultVisibility {
     bool operator!=(const TabContentDefaultVisibility& other) const
     {
         return !(*this == other);
+    }
+
+    bool ShouldHide(TabBarDisplayMode activeDisplayMode) const
+    {
+        if (isNull || visibility == TabVisibility::VISIBLE) {
+            return false;
+        }
+        if (!displayMode.has_value()) {
+            return true;
+        }
+        return displayMode.value() == activeDisplayMode;
     }
 };
 

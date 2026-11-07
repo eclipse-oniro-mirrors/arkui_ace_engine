@@ -123,6 +123,16 @@ void RatingTwoTestNg::SetUpTestCase()
             return nullptr;
         }
     });
+    EXPECT_CALL(*themeManager, GetTheme(_, _))
+        .WillRepeatedly([](ThemeType type, int32_t themeScopeId) -> RefPtr<Theme> {
+        if (type == RatingTheme::TypeId()) {
+            return AceType::MakeRefPtr<RatingTheme>();
+        } else if (type == IconTheme::TypeId()) {
+            return AceType::MakeRefPtr<IconTheme>();
+        } else {
+            return nullptr;
+        }
+    });
     MockPipelineContext::GetCurrent()->SetThemeManager(themeManager);
 }
 
@@ -755,6 +765,7 @@ HWTEST_F(RatingTwoTestNg, RatingPatternTest017, TestSize.Level1)
     auto ratingTheme = AceType::MakeRefPtr<RatingTheme>();
     ratingTheme->cancelAnimation_ = 1;
     EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(ratingTheme));
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(ratingTheme));
     /**
      * @tc.steps: step1. create rating FrameNode and Pattern, and initialize rating modifier.
      */
@@ -812,6 +823,7 @@ HWTEST_F(RatingTwoTestNg, RatingPatternTest018, TestSize.Level1)
     auto ratingTheme = AceType::MakeRefPtr<RatingTheme>();
     ratingTheme->cancelAnimation_ = 1;
     EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(ratingTheme));
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(ratingTheme));
     /**
      * @tc.steps: step1. create rating FrameNode and Pattern, and initialize rating modifier.
      */
@@ -869,6 +881,7 @@ HWTEST_F(RatingTwoTestNg, RatingPatternTest019, TestSize.Level1)
     auto ratingTheme = AceType::MakeRefPtr<RatingTheme>();
     ratingTheme->cancelAnimation_ = 1;
     EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(ratingTheme));
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(ratingTheme));
     /**
      * @tc.steps: step1. create rating FrameNode and Pattern, and initialize rating modifier.
      */

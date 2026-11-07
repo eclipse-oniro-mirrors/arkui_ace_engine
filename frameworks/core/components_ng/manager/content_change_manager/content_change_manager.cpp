@@ -13,9 +13,13 @@
  * limitations under the License.
  */
 
-#include "content_change_manager.h"
+#include "content_change_manager_impl.h"
+#include "page_scene_split_state.h"
 
+#include <algorithm>
 #include <cinttypes>
+#include <iterator>
+#include <map>
 #include <sstream>
 
 #include "base/log/ace_trace.h"
@@ -238,7 +242,8 @@ private:
 };
 #endif
 
-ContentChangeManager::ContentChangeManager(const RefPtr<TaskExecutor>& taskExecutor) : taskExecutor_(taskExecutor)
+ContentChangeManager::ContentChangeManager(const RefPtr<TaskExecutor>& taskExecutor)
+    : capiImpl_(std::make_unique<CapiImpl>()), taskExecutor_(taskExecutor)
 {
 #ifndef IS_RELEASE_VERSION
     dumpMgr_ = std::make_shared<ContentChangeDumpManager>();
@@ -370,7 +375,7 @@ std::optional<ChangeType> ContentChangeManager::GetStartChangeType(ChangeType ty
     }
 }
 
-void ContentChangeManager::OnContentChangeStart(const RefPtr<FrameNode>& keyNode, ChangeType type)
+void ContentChangeManager::OnContentChangeStartInner(const RefPtr<FrameNode>& keyNode, ChangeType type)
 {
     if (!keyNode || !currentContentChangeConfig_.has_value() || !currentContentChangeConfig_->reportStartEvent) {
         return;
@@ -425,7 +430,7 @@ void ContentChangeManager::ReportContentChangeEnd(const ActiveContentChange& act
     UiSessionManager::GetInstance()->ReportContentChangeEvent(activeChange.endType, endJson->ToString());
 }
 
-void ContentChangeManager::OnContentChangeInterrupted(const RefPtr<FrameNode>& keyNode, ChangeType type)
+void ContentChangeManager::OnContentChangeInterruptedInner(const RefPtr<FrameNode>& keyNode, ChangeType type)
 {
     CHECK_NULL_VOID(keyNode);
     bool shouldReportEnd = true;
@@ -456,7 +461,7 @@ void ContentChangeManager::OnContentChangeInterrupted(const RefPtr<FrameNode>& k
     }
 }
 
-void ContentChangeManager::OnContentChangeNodeDestroyed(int32_t nodeId)
+void ContentChangeManager::OnContentChangeNodeDestroyedInner(int32_t nodeId)
 {
     scrollingNodes_.erase(nodeId);
     transitioningNodes_.erase(nodeId);
@@ -555,6 +560,7 @@ void ContentChangeManager::MarkSwiperNormalEndPending(
 {
     CHECK_NULL_VOID(reportNode);
     CHECK_NULL_VOID(logicalNode);
+    pendingSwiperChanges_[reportNode->GetId()][type] = { logicalNode->GetId(), false, reportNode };
     auto nodeIter = activeContentChanges_.find(logicalNode->GetId());
     if (nodeIter == activeContentChanges_.end()) {
         return;
@@ -565,7 +571,6 @@ void ContentChangeManager::MarkSwiperNormalEndPending(
     }
     typeIter->second.normalEndPending = true;
     typeIter->second.pendingReportNodeId = reportNode->GetId();
-    pendingSwiperChanges_[reportNode->GetId()][type] = { logicalNode->GetId(), false };
 }
 
 bool ContentChangeManager::ConsumeCanceledSwiperEnd(int32_t reportNodeId, ChangeType type)
@@ -850,6 +855,8 @@ void ContentChangeManager::ResetTranslateTextNode(int32_t nodeId)
     ResetTranslateNodes(translateTextNodes_, nodeId);
     ResetTranslateNodes(translateTextSnapshotNodes_, nodeId);
     if (nodeId < 0) {
+        // Reset-all keeps the live-node tracking set but clears the snapshot cache.
+        translateTextSnapshotNodes_.clear();
         translateTextVersions_.clear();
         translateTextSnapshotVersions_.clear();
         return;
@@ -858,10 +865,14 @@ void ContentChangeManager::ResetTranslateTextNode(int32_t nodeId)
     translateTextSnapshotVersions_.erase(nodeId);
 }
 
-void ContentChangeManager::OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode)
+void ContentChangeManager::OnPageTransitionEndInner(const RefPtr<FrameNode>& keyNode, int32_t transitionId)
 {
-    CHECK_NULL_VOID(keyNode);
-    OnTransitionRemoved(keyNode->GetId());
+    // The saved transition ID also permits cleanup when the report node has expired.
+    OnTransitionRemoved(transitionId);
+    if (!keyNode) {
+        CompleteContentChange(transitionId, ChangeType::PAGE);
+        return;
+    }
     bool contentChangeEnabled = IsContentChangeDetectEnable();
     bool pageSceneEnabled = NeedPageSceneDetect();
     if (!contentChangeEnabled && !pageSceneEnabled) {
@@ -872,7 +883,7 @@ void ContentChangeManager::OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode)
         auto simpleTree = JsonUtil::CreateSharedPtrJson(true);
         keyNode->DumpSimplifyTreeWithParamConfig(0, simpleTree, false, { false, false, false });
         UiSessionManager::GetInstance()->ReportContentChangeEvent(ChangeType::PAGE, simpleTree->ToString());
-        CompleteContentChange(keyNode->GetId(), ChangeType::PAGE);
+        CompleteContentChange(transitionId, ChangeType::PAGE);
         lastTransitionReportTime_ = static_cast<uint64_t>(GetSysTimestamp());
 #ifndef IS_RELEASE_VERSION
         dumpMgr_->AddReportRecord(std::make_tuple(ChangeType::PAGE, keyNode->GetId(), keyNode->GetTag()));
@@ -881,14 +892,14 @@ void ContentChangeManager::OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode)
     NotifyPageSceneContentChanged(true);
 }
 
-void ContentChangeManager::OnScrollChangeEnd(const RefPtr<FrameNode>& keyNode, uint32_t type)
+void ContentChangeManager::OnScrollChangeEndInner(const RefPtr<FrameNode>& keyNode, uint32_t type)
 {
     CHECK_NULL_VOID(keyNode);
     bool ignored = IsIgnoringEventType(type);
     bool contentChangeEnabled = IsContentChangeDetectEnable();
     bool pageSceneEnabled = NeedPageSceneDetect();
     if (!contentChangeEnabled && !pageSceneEnabled) {
-        OnScrollRemoved(keyNode->GetId());
+        OnScrollRemovedInner(keyNode->GetId());
         return;
     }
     ACE_SCOPED_TRACE("[ContentChangeManager] OnScrollChangeEnd");
@@ -916,24 +927,8 @@ void ContentChangeManager::OnScrollChangeEnd(const RefPtr<FrameNode>& keyNode, u
     NotifyPageSceneContentChanged(true);
 }
 
-namespace {
-RefPtr<FrameNode> GetSwiperContentChangeNode(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor)
-{
-    if (hasTabsAncestor) {
-        auto parent = keyNode->GetParent();
-        while (parent) {
-            auto frameNode = AceType::DynamicCast<FrameNode>(parent);
-            if (frameNode && frameNode->GetTag() == V2::TABS_ETS_TAG) {
-                return frameNode;
-            }
-            parent = parent->GetParent();
-        }
-    }
-    return keyNode;
-}
-} // namespace
 
-void ContentChangeManager::OnSwiperChangeStart(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor)
+void ContentChangeManager::OnSwiperChangeStartInner(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor)
 {
     if (!keyNode || !IsStartEventReportEnabled()) {
         return;
@@ -942,11 +937,11 @@ void ContentChangeManager::OnSwiperChangeStart(const RefPtr<FrameNode>& keyNode,
     if (paintProperty && paintProperty->GetAutoPlay().value_or(false)) {
         return;
     }
-    OnContentChangeStart(
+    OnContentChangeStartInner(
         GetSwiperContentChangeNode(keyNode, hasTabsAncestor), hasTabsAncestor ? ChangeType::TABS : ChangeType::SWIPER);
 }
 
-void ContentChangeManager::OnSwiperChangeEnd(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor)
+void ContentChangeManager::OnSwiperChangeEndInner(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor)
 {
     CHECK_NULL_VOID(keyNode);
     OnTransitionRemoved(keyNode->GetId());
@@ -965,8 +960,18 @@ void ContentChangeManager::OnSwiperChangeEnd(const RefPtr<FrameNode>& keyNode, b
     NotifyPageSceneContentChanged(false);
 }
 
-void ContentChangeManager::OnSwiperChangeCancel(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor)
+void ContentChangeManager::OnSwiperChangeCancelInner(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor)
 {
+    if (keyNode) {
+        auto pending = pendingSwiperChanges_.find(keyNode->GetId());
+        if (pending != pendingSwiperChanges_.end()) {
+            auto type = hasTabsAncestor ? ChangeType::TABS : ChangeType::SWIPER;
+            auto change = pending->second.find(type);
+            if (change != pending->second.end()) {
+                change->second.canceled = true;
+            }
+        }
+    }
     if (!keyNode || !IsStartEventReportEnabled()) {
         return;
     }
@@ -993,7 +998,7 @@ void ContentChangeManager::OnSwiperChangeCancel(const RefPtr<FrameNode>& keyNode
     UiSessionManager::GetInstance()->ReportContentChangeEvent(cancelType, json->ToString());
 }
 
-void ContentChangeManager::OnDialogChangeEnd(const RefPtr<FrameNode>& keyNode, bool isShow)
+void ContentChangeManager::OnDialogChangeEndInner(const RefPtr<FrameNode>& keyNode, bool isShow)
 {
     bool contentChangeEnabled = IsContentChangeDetectEnable();
     bool pageSceneEnabled = NeedPageSceneDetect();
@@ -1041,7 +1046,7 @@ void ContentChangeManager::OnVsyncStart()
     StartTextAABBCollecting();
 }
 
-void ContentChangeManager::OnVsyncEnd(const RectF& rootRect)
+void ContentChangeManager::OnVsyncEndInner(const RectF& rootRect)
 {
     bool contentChangeEnabled = IsContentChangeDetectEnable();
     bool pageSceneEnabled = NeedPageSceneDetect();
@@ -1062,11 +1067,25 @@ void ContentChangeManager::ProcessSwiperNodes()
 {
     std::set<std::pair<WeakPtr<FrameNode>, bool>> changedSwiperNodes;
     changedSwiperNodes_.swap(changedSwiperNodes);
+    bool hasExpiredReportNode = false;
     for (auto [weak, hasTabsAncestor] : changedSwiperNodes) {
         auto node = weak.Upgrade();
-        CHECK_NULL_CONTINUE(node);
+        if (!node) {
+            hasExpiredReportNode = true;
+            continue;
+        }
 
         ReportSwiperEvent(node, hasTabsAncestor);
+    }
+    if (hasExpiredReportNode) {
+        // Detach alone must preserve normal END. Only reclaim records whose reporting node no longer exists.
+        for (auto iter = pendingSwiperChanges_.begin(); iter != pendingSwiperChanges_.end();) {
+            if (iter->second.empty() || iter->second.begin()->second.reportNode.Invalid()) {
+                iter = pendingSwiperChanges_.erase(iter);
+            } else {
+                ++iter;
+            }
+        }
     }
 }
 
@@ -1178,6 +1197,10 @@ void ContentChangeManager::StopTextAABBCollecting(const RectF& rootRect)
 
 bool ContentChangeManager::NeedPageSceneDetect() const
 {
+    // Keep installed tracking and pending queries active until their UI-side cleanup.
+    if (!pageSceneQueries_.empty() || IsPageSceneSplitTracking()) {
+        return true;
+    }
     auto uiSessionManager = UiSessionManager::GetInstance();
     return uiSessionManager && uiSessionManager->GetPageSceneRulesRegistered();
 }
@@ -1189,6 +1212,7 @@ bool ContentChangeManager::NeedContentChangeReportOrPageSceneDetect() const
 
 void ContentChangeManager::NotifyPageSceneContentChanged(bool flushNow)
 {
+    MarkPageSceneSplitDirty();
     auto uiSessionManager = UiSessionManager::GetInstance();
     if (!uiSessionManager || !uiSessionManager->GetPageSceneRulesRegistered()) {
         return;
@@ -1201,6 +1225,8 @@ void ContentChangeManager::NotifyPageSceneContentChanged(bool flushNow)
 
 void ContentChangeManager::FlushPageSceneNodeChanged()
 {
+    FlushPageSceneQueries();
+    FlushPageSceneSplitDetection();
     if (IsContentChanging()) {
         return;
     }
@@ -1210,19 +1236,11 @@ void ContentChangeManager::FlushPageSceneNodeChanged()
     }
 }
 
-void ContentChangeManager::OnSwiperScrollEnd(const RefPtr<FrameNode>& keyNode)
-{
-    CHECK_NULL_VOID(keyNode);
-    ACE_SCOPED_TRACE("[ContentChangeManager] OnSwiperScrollEnd");
-    scrollingSwiperNodes_.erase(keyNode->GetId());
-}
-
-void ContentChangeManager::OnSwiperScrollStart(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor)
+void ContentChangeManager::OnSwiperScrollStartInner(const RefPtr<FrameNode>& keyNode)
 {
     CHECK_NULL_VOID(keyNode);
     ACE_SCOPED_TRACE("[ContentChangeManager] OnSwiperScrollStart");
     scrollingSwiperNodes_.emplace(keyNode->GetId());
-    OnSwiperChangeStart(keyNode, hasTabsAncestor);
 }
 
 bool ContentChangeManager::IsSwiperScrolling() const
@@ -1230,7 +1248,7 @@ bool ContentChangeManager::IsSwiperScrolling() const
     return !scrollingSwiperNodes_.empty();
 }
 
-void ContentChangeManager::OnScrollChangeStart(const RefPtr<FrameNode>& keyNode)
+void ContentChangeManager::OnScrollChangeStartInner(const RefPtr<FrameNode>& keyNode)
 {
     bool contentChangeEnabled = IsContentChangeDetectEnable();
     bool pageSceneEnabled = NeedPageSceneDetect();
@@ -1245,25 +1263,10 @@ void ContentChangeManager::OnScrollChangeStart(const RefPtr<FrameNode>& keyNode)
 #endif
 }
 
-void ContentChangeManager::OnScrollRemoved(int32_t nodeId)
+void ContentChangeManager::OnScrollRemovedInner(int32_t nodeId)
 {
     if (scrollingNodes_.count(nodeId)) {
         scrollingNodes_.erase(nodeId);
-    }
-}
-
-void ContentChangeManager::OnTransitionAdded(int32_t nodeId)
-{
-    if (!NeedContentChangeReportOrPageSceneDetect()) {
-        return;
-    }
-    transitioningNodes_.emplace(nodeId);
-}
-
-void ContentChangeManager::OnTransitionRemoved(int32_t nodeId)
-{
-    if (transitioningNodes_.count(nodeId)) {
-        transitioningNodes_.erase(nodeId);
     }
 }
 
@@ -1425,4 +1428,540 @@ bool ContentChangeManager::IsInTransitionDelayWindow() const
     uint64_t curr = static_cast<uint64_t>(GetSysTimestamp());
     return curr < lastTransitionReportTime_ + componentReportDelayTime_;
 }
+
+void ContentChangeManager::DeferPageSceneQuery(
+    int32_t processId, std::function<bool()>&& run, std::function<void()>&& cancel)
+{
+    auto query = std::make_shared<DeferredPageSceneQuery>();
+    query->run = std::move(run);
+    query->cancel = std::move(cancel);
+    pageSceneQueries_[processId] = std::move(query);
+}
+
+size_t ContentChangeManager::GetPendingPageSceneQueryCount() const
+{
+    return pageSceneQueries_.size();
+}
+
+void ContentChangeManager::CancelPageSceneQuery(int32_t processId)
+{
+    auto pending = pageSceneQueries_.extract(processId);
+    // Destruction invokes cancellation after the entry is detached, allowing reentrancy.
+}
+
+void ContentChangeManager::FlushPageSceneQueries()
+{
+    auto pending = std::move(pageSceneQueries_);
+    pageSceneQueries_.clear();
+    for (auto& [pid, query] : pending) {
+        if (query->run()) {
+            query->cancel = nullptr;
+        } else {
+            pageSceneQueries_.try_emplace(pid, std::move(query));
+        }
+    }
+}
+
+namespace {
+std::atomic<uint32_t> g_pageSceneSplitTrackers { 0 };
+
+bool IsAllowedSplitRoot(const RefPtr<UINode>& node, const std::unordered_map<int32_t, WeakPtr<FrameNode>>& roots)
+{
+    auto found = roots.find(node->GetId());
+    return found != roots.end() && found->second.Upgrade() == node;
+}
+
+bool IsSplitScopeBlocked(const RefPtr<UINode>& node)
+{
+    auto frame = AceType::DynamicCast<FrameNode>(node);
+    return frame && frame->IsWindowBoundary();
+}
+
+bool FindPageSceneSplitRoot(RefPtr<UINode> current, const std::unordered_map<int32_t, WeakPtr<FrameNode>>& roots)
+{
+    while (current) {
+        if (IsAllowedSplitRoot(current, roots)) {
+            return true;
+        }
+        if (IsSplitScopeBlocked(current)) {
+            return false;
+        }
+        current = current->GetParent();
+    }
+    return false;
+}
+
+} // namespace
+
+ContentChangeManager::SplitTrackingState::SplitTrackingState()
+{
+    g_pageSceneSplitTrackers.fetch_add(1, std::memory_order_relaxed);
+}
+
+ContentChangeManager::SplitTrackingState::~SplitTrackingState()
+{
+    g_pageSceneSplitTrackers.fetch_sub(1, std::memory_order_relaxed);
+}
+
+bool ContentChangeManager::HasPageSceneSplitTracking()
+{
+    return g_pageSceneSplitTrackers.load(std::memory_order_relaxed) != 0;
+}
+
+bool ContentChangeManager::IsPageSceneSplitTracking() const
+{
+    return splitTracking_ != nullptr;
+}
+
+uint64_t ContentChangeManager::GetPageSceneSplitSeedVisits() const
+{
+    return splitTracking_ ? splitTracking_->seedVisits : 0;
+}
+
+void ContentChangeManager::SplitTrackingState::PrunePageSceneSplitTags(const std::set<std::string>& tags)
+{
+    auto& state = *this;
+    std::vector<int32_t> removed;
+    for (const auto& [id, tag] : state.nodeTags) {
+        if (tags.count(tag) == 0) {
+            removed.emplace_back(id);
+        }
+    }
+    ErasePageSceneSplitNodes(removed);
+}
+
+void ContentChangeManager::ConfigurePageSceneSplitTracking(const std::set<std::string>& tags, bool trackNavigation)
+{
+    if (IsPageSceneSplitInSubwindow()) {
+        return;
+    }
+    auto nextTags = tags;
+    if (trackNavigation) {
+        nextTags.insert(V2::NAVIGATION_VIEW_ETS_TAG);
+    }
+    if (nextTags.empty()) {
+        splitTracking_.reset();
+        return;
+    }
+    if (!splitTracking_) {
+        splitTracking_ = std::make_unique<SplitTrackingState>();
+    }
+    splitTracking_->UpdatePageSceneSplitTags(nextTags);
+}
+
+void ContentChangeManager::SplitTrackingState::UpdatePageSceneSplitTags(const std::set<std::string>& tags)
+{
+    auto& state = *this;
+    if (state.tags == tags) {
+        return;
+    }
+    std::set_difference(tags.begin(), tags.end(), state.tags.begin(), state.tags.end(),
+        std::inserter(state.pendingTags, state.pendingTags.end()));
+    std::set<std::string> retained;
+    std::set_intersection(state.pendingTags.begin(), state.pendingTags.end(), tags.begin(), tags.end(),
+        std::inserter(retained, retained.end()));
+    state.pendingTags.swap(retained);
+    PrunePageSceneSplitTags(tags);
+    state.tags = tags;
+    state.trackedTags.clear();
+    state.trackedTags.insert(tags.begin(), tags.end());
+    state.dirty = true;
+}
+
+void ContentChangeManager::SetPageSceneSplitDetector(std::function<void()>&& detector)
+{
+    if (!splitTracking_ || IsPageSceneSplitInSubwindow()) {
+        return;
+    }
+    auto& state = *splitTracking_;
+    state.detector = std::move(detector);
+}
+
+bool ContentChangeManager::SplitTrackingState::IsInsidePageSceneSplitRoots(const RefPtr<UINode>& node) const
+{
+    return FindPageSceneSplitRoot(node, this->roots);
+}
+
+void ContentChangeManager::SplitTrackingState::RemovePageSceneSplitAncestors(int32_t nodeId)
+{
+    auto& state = *this;
+    auto record = state.nodeAncestors.find(nodeId);
+    if (record == state.nodeAncestors.end()) {
+        return;
+    }
+    for (auto id : record->second) {
+        auto count = state.ancestorIds.find(id);
+        if (count != state.ancestorIds.end() && --count->second == 0) {
+            state.ancestorIds.erase(count);
+        }
+    }
+    state.nodeAncestors.erase(record);
+}
+
+void ContentChangeManager::SplitTrackingState::AddPageSceneSplitNode(const RefPtr<FrameNode>& node)
+{
+    if (!node) {
+        return;
+    }
+    if (!ContentChangeManager::IsPageSceneSplitWindowSupported(node->GetContext())) {
+        return;
+    }
+    IndexPageSceneSplitNode(node);
+}
+
+void ContentChangeManager::SplitTrackingState::IndexPageSceneSplitNode(const RefPtr<FrameNode>& node)
+{
+    auto& state = *this;
+    if (state.trackedTags.count(node->GetTag()) == 0) {
+        return;
+    }
+    RemovePageSceneSplitAncestors(node->GetId());
+    state.nodes[node->GetId()] = node;
+    state.nodeTags[node->GetId()] = node->GetTag();
+    state.tagBuckets[node->GetTag()][node->GetId()] = node;
+    // Ancestors outside the discovery roots remain state and geometry dependencies.
+    auto ancestor = node->GetParent();
+    auto& ids = state.nodeAncestors[node->GetId()];
+    while (ancestor) {
+        ids.emplace_back(ancestor->GetId());
+        ++state.ancestorIds[ancestor->GetId()];
+        ancestor = ancestor->GetParent();
+    }
+}
+
+namespace {
+bool IsForeignSplitBranch(const RefPtr<UINode>& node)
+{
+    auto frame = AceType::DynamicCast<FrameNode>(node);
+    if (!frame) {
+        return false;
+    }
+    if (frame->IsWindowBoundary()) {
+        return true;
+    }
+    auto context = frame->GetContext();
+    if (!context) {
+        return false;
+    }
+    return !ContentChangeManager::IsPageSceneSplitWindowSupported(context);
+}
+
+bool CanDiscoverSplitBranch(const RefPtr<UINode>& node, bool root)
+{
+    if (!node) {
+        return false;
+    }
+    return root || !IsForeignSplitBranch(node);
+}
+
+std::set<int32_t> GetSupportedSplitRootIds(const std::vector<RefPtr<FrameNode>>& roots)
+{
+    std::set<int32_t> ids;
+    for (const auto& root : roots) {
+        if (root && ContentChangeManager::IsPageSceneSplitWindowSupported(root->GetContext())) {
+            ids.insert(root->GetId());
+        }
+    }
+    return ids;
+}
+} // namespace
+
+void ContentChangeManager::SplitTrackingState::SeedPageSceneSplitSubtree(
+    const RefPtr<UINode>& node, const std::set<std::string>& tags, bool root)
+{
+    if (!CanDiscoverSplitBranch(node, root)) {
+        return;
+    }
+    ++this->seedVisits;
+    if (tags.count(node->GetTag()) != 0) {
+        AddPageSceneSplitNode(AceType::DynamicCast<FrameNode>(node));
+    }
+    // Retain weak entries for hidden branches, allowing visibility restoration
+    // without a new tree scan. Discovery never requests geometry or a frame.
+    for (const auto& child : node->GetChildren()) {
+        SeedPageSceneSplitSubtree(child, tags);
+    }
+}
+
+void ContentChangeManager::SplitTrackingState::PrunePageSceneSplitRoots()
+{
+    auto& state = *this;
+    std::vector<int32_t> removed;
+    for (const auto& [id, weak] : state.nodes) {
+        if (!IsInsidePageSceneSplitRoots(weak.Upgrade())) {
+            removed.emplace_back(id);
+        }
+    }
+    ErasePageSceneSplitNodes(removed);
+}
+
+namespace {
+bool HasSupportedSplitRoots(const std::vector<RefPtr<FrameNode>>& roots, const std::set<int32_t>& ids)
+{
+    return roots.empty() || !ids.empty();
+}
+} // namespace
+
+void ContentChangeManager::SeedPageSceneSplitNodes(const std::vector<RefPtr<FrameNode>>& roots)
+{
+    if (!IsPageSceneSplitTracking() || IsPageSceneSplitInSubwindow()) {
+        return;
+    }
+    auto ids = GetSupportedSplitRootIds(roots);
+    if (!HasSupportedSplitRoots(roots, ids)) {
+        return;
+    }
+    splitTracking_->RefreshPageSceneSplitRoots(roots, std::move(ids));
+}
+
+void ContentChangeManager::SplitTrackingState::RefreshPageSceneSplitRoots(
+    const std::vector<RefPtr<FrameNode>>& roots, std::set<int32_t> ids)
+{
+    auto& state = *this;
+    std::set<int32_t> added;
+    std::unordered_map<int32_t, WeakPtr<FrameNode>> nextRoots;
+    for (const auto& root : roots) {
+        if (!root || ids.count(root->GetId()) == 0) {
+            continue;
+        }
+        auto previous = state.roots.find(root->GetId());
+        if (previous == state.roots.end() || previous->second.Upgrade() != root) {
+            added.insert(root->GetId());
+        }
+        nextRoots.emplace(root->GetId(), root);
+    }
+    const bool rootsChanged = ids != state.rootIds || !added.empty();
+    if (!rootsChanged && state.pendingTags.empty()) {
+        return;
+    }
+    state.rootIds = std::move(ids);
+    state.roots = std::move(nextRoots);
+    if (rootsChanged) {
+        PrunePageSceneSplitRoots();
+        // During detection this batch already evaluates removals and exits.
+        state.dirty = state.dirty || !state.detecting;
+    }
+    for (const auto& root : roots) {
+        if (!root || state.rootIds.count(root->GetId()) == 0) {
+            continue;
+        }
+        const auto& tags = added.count(root->GetId()) != 0 ? state.tags : state.pendingTags;
+        if (!tags.empty()) {
+            SeedPageSceneSplitSubtree(root, tags, true);
+        }
+    }
+    state.pendingTags.clear();
+}
+
+bool ContentChangeManager::SplitTrackingState::IsPageSceneSplitNavigationDependency(const FrameNode* node) const
+{
+    if (this->trackedTags.count(V2::NAVIGATION_VIEW_ETS_TAG) == 0) {
+        return false;
+    }
+    return node->GetTag() == V2::NAVBAR_ETS_TAG || node->GetTag() == V2::NAVDESTINATION_VIEW_ETS_TAG;
+}
+
+bool ContentChangeManager::IsPageSceneSplitNodeRelevant(const FrameNode* node) const
+{
+    if (!IsPageSceneSplitTracking()) {
+        return false;
+    }
+    const auto& state = *splitTracking_;
+    if (state.trackedTags.count(node->GetTag()) != 0) {
+        return true;
+    }
+    return state.ancestorIds.count(node->GetId()) != 0 ||
+           splitTracking_->IsPageSceneSplitNavigationDependency(node);
+}
+
+void ContentChangeManager::SplitTrackingState::AttachPageSceneSplitNode(const RefPtr<FrameNode>& node)
+{
+    auto& state = *this;
+    if (state.trackedTags.count(node->GetTag()) == 0 || !IsInsidePageSceneSplitRoots(node)) {
+        return;
+    }
+    IndexPageSceneSplitNode(node);
+}
+
+void ContentChangeManager::SplitTrackingState::MarkPageSceneSplitNodeDirty(const RefPtr<FrameNode>& node)
+{
+    auto& state = *this;
+    if (state.dirty) {
+        return;
+    }
+    if (HasRelevantPageSceneSplitNode(node->GetId())) {
+        state.dirty = true;
+        return;
+    }
+    MarkPageSceneSplitNavigationDirty(node);
+}
+
+bool ContentChangeManager::SplitTrackingState::IsTrackedSplitNavigation(const RefPtr<UINode>& node) const
+{
+    return node->GetTag() == V2::NAVIGATION_VIEW_ETS_TAG && this->nodes.count(node->GetId()) != 0;
+}
+
+void ContentChangeManager::SplitTrackingState::MarkPageSceneSplitNavigationDirty(const RefPtr<FrameNode>& node)
+{
+    if (!IsPageSceneSplitNavigationDependency(AceType::RawPtr(node))) {
+        return;
+    }
+    auto& state = *this;
+    auto ancestor = node->GetParent();
+    while (ancestor) {
+        if (IsTrackedSplitNavigation(ancestor)) {
+            state.dirty = true;
+            return;
+        }
+        ancestor = ancestor->GetParent();
+    }
+}
+
+bool ContentChangeManager::NeedsPageSceneSplitNodeUpdate(bool attached) const
+{
+    return IsPageSceneSplitTracking() && (attached || !splitTracking_->dirty);
+}
+
+void ContentChangeManager::NotifyPageSceneSplitNodeChanged(const RefPtr<FrameNode>& node, bool attached)
+{
+    if (!node || !IsPageSceneSplitNodeRelevant(AceType::RawPtr(node))) {
+        return;
+    }
+    if (NeedsPageSceneSplitNodeUpdate(attached)) {
+        splitTracking_->HandlePageSceneSplitNodeChanged(node, attached);
+    }
+}
+
+void ContentChangeManager::NotifyPageSceneSplitChanged(const RefPtr<FrameNode>& node, bool attached)
+{
+    // Context validation (thread safety, window eligibility, manager routing) is
+    // done by FrameNode; only the manager bound to the node is invoked there.
+    if (!node || !IsPageSceneSplitTracking()) {
+        return;
+    }
+    NotifyPageSceneSplitNodeChanged(node, attached);
+}
+
+void ContentChangeManager::SplitTrackingState::HandlePageSceneSplitNodeChanged(
+    const RefPtr<FrameNode>& node, bool attached)
+{
+    if (!ContentChangeManager::IsPageSceneSplitWindowSupported(node->GetContext())) {
+        return;
+    }
+    if (attached) {
+        AttachPageSceneSplitNode(node);
+    }
+    MarkPageSceneSplitNodeDirty(node);
+}
+
+void ContentChangeManager::SplitTrackingState::ErasePageSceneSplitNode(int32_t nodeId)
+{
+    auto& state = *this;
+    auto tag = state.nodeTags.find(nodeId);
+    if (tag != state.nodeTags.end()) {
+        auto& bucket = state.tagBuckets[tag->second];
+        bucket.erase(nodeId);
+        if (bucket.empty()) {
+            state.tagBuckets.erase(tag->second);
+        }
+        state.nodeTags.erase(tag);
+    }
+    state.nodes.erase(nodeId);
+    RemovePageSceneSplitAncestors(nodeId);
+}
+
+bool ContentChangeManager::SplitTrackingState::HasRelevantPageSceneSplitNode(int32_t nodeId) const
+{
+    const auto& state = *this;
+    return state.nodes.count(nodeId) != 0 || state.ancestorIds.count(nodeId) != 0;
+}
+
+void ContentChangeManager::SplitTrackingState::ErasePageSceneSplitNodes(const std::vector<int32_t>& nodeIds)
+{
+    for (auto id : nodeIds) {
+        ErasePageSceneSplitNode(id);
+    }
+}
+
+void ContentChangeManager::RemovePageSceneSplitNode(int32_t nodeId)
+{
+    if (!IsPageSceneSplitTracking() || IsPageSceneSplitInSubwindow()) {
+        return;
+    }
+    auto& state = *splitTracking_;
+    const auto relevant = splitTracking_->HasRelevantPageSceneSplitNode(nodeId);
+    splitTracking_->ErasePageSceneSplitNode(nodeId);
+    state.dirty = state.dirty || relevant;
+}
+
+void ContentChangeManager::SplitTrackingState::AppendPageSceneSplitBucket(
+    const std::string& tag, std::vector<RefPtr<FrameNode>>& nodes)
+{
+    auto& state = *this;
+    auto bucket = state.tagBuckets.find(tag);
+    if (bucket == state.tagBuckets.end()) {
+        return;
+    }
+    std::vector<int32_t> expired;
+    for (const auto& [id, weak] : bucket->second) {
+        auto node = weak.Upgrade();
+        if (!IsInsidePageSceneSplitRoots(node)) {
+            expired.emplace_back(id);
+        } else {
+            nodes.emplace_back(std::move(node));
+        }
+    }
+    ErasePageSceneSplitNodes(expired);
+}
+
+std::vector<RefPtr<FrameNode>> ContentChangeManager::GetPageSceneSplitNodes(const std::set<std::string>& tags)
+{
+    std::vector<RefPtr<FrameNode>> nodes;
+    if (!IsPageSceneSplitTracking() || IsPageSceneSplitInSubwindow()) {
+        return nodes;
+    }
+    for (const auto& tag : tags) {
+        splitTracking_->AppendPageSceneSplitBucket(tag, nodes);
+    }
+    // Only requested buckets are upgraded/sorted; stable node order is preserved.
+    std::sort(
+        nodes.begin(), nodes.end(), [](const auto& left, const auto& right) { return left->GetId() < right->GetId(); });
+    return nodes;
+}
+
+std::vector<RefPtr<FrameNode>> ContentChangeManager::GetPageSceneSplitNodes()
+{
+    if (!IsPageSceneSplitTracking()) {
+        return {};
+    }
+    return GetPageSceneSplitNodes(splitTracking_->tags);
+}
+
+void ContentChangeManager::MarkPageSceneSplitDirty()
+{
+    if (!splitTracking_ || IsPageSceneSplitInSubwindow()) {
+        return;
+    }
+    splitTracking_->dirty = true;
+}
+
+void ContentChangeManager::FlushPageSceneSplitDetection()
+{
+    auto* state = splitTracking_.get();
+    if (!state || !state->dirty || state->detecting || IsContentChanging() || !state->detector ||
+        IsPageSceneSplitInSubwindow()) {
+        return;
+    }
+    state->dirty = false;
+    state->detecting = true;
+    // A detector may clear the last registration. Copy the callable before
+    // invocation and access the state only through the owning unique_ptr after
+    // that callback, so a discarded state is never touched.
+    auto detector = state->detector;
+    detector();
+    if (splitTracking_ && splitTracking_.get() == state) {
+        splitTracking_->detecting = false;
+    }
+}
+
 } // namespace OHOS::Ace::NG

@@ -53,6 +53,19 @@ std::string BasicShapeTypeToString(BasicShapeType type)
     return "";
 }
 
+std::string ShadowClipModeToString(ShadowClipMode mode)
+{
+    static const LinearEnumMapNode<ShadowClipMode, std::string> toStringMap[] = {
+        { ShadowClipMode::DEFAULT_SHAPE, "ShadowClipMode.DEFAULT_SHAPE" },
+        { ShadowClipMode::BOUNDS_SHAPE, "ShadowClipMode.BOUNDS_SHAPE" },
+    };
+    auto idx = BinarySearchFindIndex(toStringMap, ArraySize(toStringMap), mode);
+    if (idx >= 0) {
+        return toStringMap[idx].value;
+    }
+    return "ShadowClipMode.DEFAULT_SHAPE";
+}
+
 std::string LinearGradientBlurDirection(GradientDirection direction)
 {
         static const LinearEnumMapNode<GradientDirection, std::string> toStringMap[] = {
@@ -88,6 +101,21 @@ void SerializeRotateAngleToJson(std::unique_ptr<JsonValue>& json, const Dimensio
     auto centerZ = center.GetZ().value_or(Dimension());
     jsonValue->Put("centerZ", centerZ.ToString().c_str());
     json->PutExtAttr("rotate", jsonValue, filter);
+}
+
+void SerializeShadowShapeToJson(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter,
+    const std::optional<RefPtr<BasicShape>>& propShadowShape)
+{
+    if (!propShadowShape.has_value() || !propShadowShape.value()) {
+        return;
+    }
+    auto jsonShadowShape = JsonUtil::Create(true);
+    auto shape = propShadowShape.value();
+    auto shapeType = BasicShapeTypeToString(shape->GetBasicShapeType());
+    if (!shapeType.empty()) {
+        jsonShadowShape->Put("shape", shapeType.c_str());
+    }
+    json->PutExtAttr("shadowShape", jsonShadowShape, filter);
 }
 } // namespace
 
@@ -162,35 +190,6 @@ void GraphicsProperty::ToJsonValue(std::unique_ptr<JsonValue>& json, const Inspe
     jsonBgBrightness->Put(
         "dynamicLightUpDegree", propDynamicLightUpDegree.has_value() ? propDynamicLightUpDegree.value() : 0.0);
     json->PutExtAttr("BackgroundBrightness", jsonBgBrightness, filter);
-    auto jsonShadow = JsonUtil::Create(true);
-    auto shadow = propBackShadow.value_or(Shadow());
-    if (shadow.GetStyle() == ShadowStyle::OuterDefaultXS) {
-        json->PutExtAttr("shadow", "ShadowStyle.OuterDefaultXS", filter);
-    } else if (shadow.GetStyle() == ShadowStyle::OuterDefaultSM) {
-        json->PutExtAttr("shadow", "ShadowStyle.OuterDefaultSM", filter);
-    } else if (shadow.GetStyle() == ShadowStyle::OuterDefaultMD) {
-        json->PutExtAttr("shadow", "ShadowStyle.OuterDefaultMD", filter);
-    } else if (shadow.GetStyle() == ShadowStyle::OuterDefaultLG) {
-        json->PutExtAttr("shadow", "ShadowStyle.OuterDefaultLG", filter);
-    } else if (shadow.GetStyle() == ShadowStyle::OuterFloatingSM) {
-        json->PutExtAttr("shadow", "ShadowStyle.OuterFloatingSM", filter);
-    } else if (shadow.GetStyle() == ShadowStyle::OuterFloatingMD) {
-        json->PutExtAttr("shadow", "ShadowStyle.OuterFloatingMD", filter);
-    } else {
-        jsonShadow->Put("radius", std::to_string(shadow.GetBlurRadius()).c_str());
-        if (shadow.GetShadowColorStrategy() == ShadowColorStrategy::AVERAGE) {
-            jsonShadow->Put("color", "ColoringStrategy.AVERAGE");
-        } else if (shadow.GetShadowColorStrategy() == ShadowColorStrategy::PRIMARY) {
-            jsonShadow->Put("color", "ColoringStrategy.PRIMARY");
-        } else {
-            jsonShadow->Put("color", shadow.GetColor().ColorToString().c_str());
-        }
-        jsonShadow->Put("offsetX", std::to_string(shadow.GetOffset().GetX()).c_str());
-        jsonShadow->Put("offsetY", std::to_string(shadow.GetOffset().GetY()).c_str());
-        jsonShadow->Put("type", std::to_string(static_cast<int32_t>(shadow.GetShadowType())).c_str());
-        jsonShadow->Put("fill", std::to_string(shadow.GetIsFilled()).c_str());
-        json->PutExtAttr("shadow", jsonShadow, filter);
-    }
     if (propFrontInvert.has_value()) {
         if (propFrontInvert->index() == 0) {
             json->PutExtAttr("invert", std::get<float>(propFrontInvert.value()), filter);
@@ -227,6 +226,49 @@ void GraphicsProperty::ToJsonValue(std::unique_ptr<JsonValue>& json, const Inspe
     }
     if (propBgDynamicBrightnessOption.has_value()) {
         propBgDynamicBrightnessOption->ToJsonValue(json, filter, "backgroundBrightnessInternal");
+    }
+}
+
+void VisualProperty::ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const
+{
+    /* no fixed attr below, just return */
+    if (filter.IsFastFilter()) {
+        return;
+    }
+    auto jsonShadow = JsonUtil::Create(true);
+    auto shadow = propBackShadow.value_or(Shadow());
+    if (shadow.GetStyle() == ShadowStyle::OuterDefaultXS) {
+        json->PutExtAttr("shadow", "ShadowStyle.OuterDefaultXS", filter);
+    } else if (shadow.GetStyle() == ShadowStyle::OuterDefaultSM) {
+        json->PutExtAttr("shadow", "ShadowStyle.OuterDefaultSM", filter);
+    } else if (shadow.GetStyle() == ShadowStyle::OuterDefaultMD) {
+        json->PutExtAttr("shadow", "ShadowStyle.OuterDefaultMD", filter);
+    } else if (shadow.GetStyle() == ShadowStyle::OuterDefaultLG) {
+        json->PutExtAttr("shadow", "ShadowStyle.OuterDefaultLG", filter);
+    } else if (shadow.GetStyle() == ShadowStyle::OuterFloatingSM) {
+        json->PutExtAttr("shadow", "ShadowStyle.OuterFloatingSM", filter);
+    } else if (shadow.GetStyle() == ShadowStyle::OuterFloatingMD) {
+        json->PutExtAttr("shadow", "ShadowStyle.OuterFloatingMD", filter);
+    } else {
+        jsonShadow->Put("radius", std::to_string(shadow.GetBlurRadius()).c_str());
+        if (shadow.GetShadowColorStrategy() == ShadowColorStrategy::AVERAGE) {
+            jsonShadow->Put("color", "ColoringStrategy.AVERAGE");
+        } else if (shadow.GetShadowColorStrategy() == ShadowColorStrategy::PRIMARY) {
+            jsonShadow->Put("color", "ColoringStrategy.PRIMARY");
+        } else {
+            jsonShadow->Put("color", shadow.GetColor().ColorToString().c_str());
+        }
+        jsonShadow->Put("offsetX", std::to_string(shadow.GetOffset().GetX()).c_str());
+        jsonShadow->Put("offsetY", std::to_string(shadow.GetOffset().GetY()).c_str());
+        jsonShadow->Put("type", std::to_string(static_cast<int32_t>(shadow.GetShadowType())).c_str());
+        jsonShadow->Put("fill", std::to_string(shadow.GetIsFilled()).c_str());
+        json->PutExtAttr("shadow", jsonShadow, filter);
+    }
+
+    SerializeShadowShapeToJson(json, filter, propShadowShape);
+
+    if (propShadowClipMode.has_value()) {
+        json->PutExtAttr("shadowClipMode", ShadowClipModeToString(propShadowClipMode.value()).c_str(), filter);
     }
 }
 

@@ -32,6 +32,7 @@ build_component("web") {
     sources += [
       "resource/web_javascript_execute_callback.cpp",
       "resource/web_javascript_result_callback.cpp",
+      "resource/web_string_value_callback_impl.cpp",
     ]
   }
 
@@ -56,6 +57,7 @@ build_component("web") {
       "webview:libnweb",
       "webview:ohos_base_glue_source",
       "window_manager:libwm",
+      "samgr:samgr_proxy",
     ]
     if (defined(global_parts_info) && defined(global_parts_info.web_webview)) {
       external_deps += [ "webview:libarkweb_utils" ]

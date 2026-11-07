@@ -1348,4 +1348,146 @@ HWTEST_F(SelectPatternTestControlSizeNg, SetSelectedOptionTextModifier001, TestS
     EXPECT_EQ(property->GetTextColor(), Color::RED);
     EXPECT_EQ(propertySelectd->GetTextColor(), Color::BLUE);
 }
+
+/**
+ * @tc.name: SelectLayoutAlgorithmMeasureAndGetTextSizeApiVersionEleven
+ * @tc.desc: Test SelectLayoutAlgorithm::MeasureAndGetTextSize with API target version below VERSION_TWELVE.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectPatternTestControlSizeNg, SelectLayoutAlgorithmMeasureAndGetTextSizeApiVersionEleven, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create SelectLayoutAlgorithm and set API target version to VERSION_ELEVEN.
+     * @tc.expected: Algorithm is created and API version is set successfully.
+     */
+    auto layoutAlgorithm = AceType::MakeRefPtr<SelectLayoutAlgorithm>();
+    ASSERT_NE(layoutAlgorithm, nullptr);
+    int32_t rollbackApiVersion = MockContainer::Current()->GetApiTargetVersion();
+    MockContainer::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_ELEVEN));
+    /**
+     * @tc.steps: step2. Call MeasureAndGetTextSize with fontSize=5.0 and textSize width=9.0.
+     * @tc.expected: When API < 12, minCharVal is MIN_CHAR_VAL(2.0), 9 < 5*2=10, isTextMin becomes true and
+     *               textSize width becomes 10.0f.
+     */
+    double fontSize = 5.0;
+    SizeF textSize(9.0f, 20.0f);
+    bool isTextMin = false;
+    layoutAlgorithm->MeasureAndGetTextSize(fontSize, textSize, isTextMin);
+    EXPECT_TRUE(isTextMin);
+    EXPECT_EQ(textSize.Width(), 10.0f);
+    /**
+     * @tc.steps: step3. Restore the API target version.
+     */
+    MockContainer::Current()->SetApiTargetVersion(rollbackApiVersion);
+}
+
+/**
+ * @tc.name: SelectLayoutAlgorithmMeasureAndGetTextSizeApiVersionTwelve
+ * @tc.desc: Test SelectLayoutAlgorithm::MeasureAndGetTextSize with API target version at VERSION_TWELVE.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectPatternTestControlSizeNg, SelectLayoutAlgorithmMeasureAndGetTextSizeApiVersionTwelve, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create SelectLayoutAlgorithm and set API target version to VERSION_TWELVE.
+     * @tc.expected: Algorithm is created and API version is set successfully.
+     */
+    auto layoutAlgorithm = AceType::MakeRefPtr<SelectLayoutAlgorithm>();
+    ASSERT_NE(layoutAlgorithm, nullptr);
+    int32_t rollbackApiVersion = MockContainer::Current()->GetApiTargetVersion();
+    MockContainer::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWELVE));
+    /**
+     * @tc.steps: step2. Call MeasureAndGetTextSize with fontSize=5.0 and textSize width=4.0.
+     * @tc.expected: When API >= 12, minCharVal is SMALL_MIN_CHAR_VAL(1.0), 4 < 5*1=5, isTextMin becomes true and
+     *               textSize width becomes 5.0f.
+     */
+    double fontSize = 5.0;
+    SizeF textSize(4.0f, 20.0f);
+    bool isTextMin = false;
+    layoutAlgorithm->MeasureAndGetTextSize(fontSize, textSize, isTextMin);
+    EXPECT_TRUE(isTextMin);
+    EXPECT_EQ(textSize.Width(), 5.0f);
+    /**
+     * @tc.steps: step3. Restore the API target version.
+     */
+    MockContainer::Current()->SetApiTargetVersion(rollbackApiVersion);
+}
+
+/**
+ * @tc.name: SelectLayoutAlgorithmMeasureAndGetTextSizeNotMin
+ * @tc.desc: Test SelectLayoutAlgorithm::MeasureAndGetTextSize when text width is not below the minimum.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectPatternTestControlSizeNg, SelectLayoutAlgorithmMeasureAndGetTextSizeNotMin, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create SelectLayoutAlgorithm.
+     * @tc.expected: Algorithm is created successfully.
+     */
+    auto layoutAlgorithm = AceType::MakeRefPtr<SelectLayoutAlgorithm>();
+    ASSERT_NE(layoutAlgorithm, nullptr);
+    /**
+     * @tc.steps: step2. Call MeasureAndGetTextSize with fontSize=5.0 and textSize width=100.0.
+     * @tc.expected: 100 is not below 5*minCharVal, isTextMin stays false and textSize width stays 100.0f.
+     */
+    double fontSize = 5.0;
+    SizeF textSize(100.0f, 20.0f);
+    bool isTextMin = false;
+    layoutAlgorithm->MeasureAndGetTextSize(fontSize, textSize, isTextMin);
+    EXPECT_FALSE(isTextMin);
+    EXPECT_EQ(textSize.Width(), 100.0f);
+}
+
+/**
+ * @tc.name: SelectLayoutAlgorithmRemoveParentRestrictionsForFixIdealNull
+ * @tc.desc: Test SelectLayoutAlgorithm::RemoveParentRestrictionsForFixIdeal with a null layoutProperty.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectPatternTestControlSizeNg, SelectLayoutAlgorithmRemoveParentRestrictionsForFixIdealNull, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create SelectLayoutAlgorithm and a LayoutConstraintF with maxSize(500.0, 500.0).
+     * @tc.expected: Algorithm and constraint are created successfully.
+     */
+    auto layoutAlgorithm = AceType::MakeRefPtr<SelectLayoutAlgorithm>();
+    ASSERT_NE(layoutAlgorithm, nullptr);
+    LayoutConstraintF constraint;
+    constraint.maxSize = SizeF(500.0f, 500.0f);
+    /**
+     * @tc.steps: step2. Call RemoveParentRestrictionsForFixIdeal with a null layoutProperty.
+     * @tc.expected: The function does not crash and the constraint remains unchanged.
+     */
+    RefPtr<LayoutProperty> nullLayoutProperty = nullptr;
+    layoutAlgorithm->RemoveParentRestrictionsForFixIdeal(nullLayoutProperty, constraint);
+    EXPECT_EQ(constraint.maxSize.Width(), 500.0f);
+    EXPECT_EQ(constraint.maxSize.Height(), 500.0f);
+}
+
+/**
+ * @tc.name: SelectLayoutAlgorithmRemoveParentRestrictionsForFixIdealNoPolicy
+ * @tc.desc: Test SelectLayoutAlgorithm::RemoveParentRestrictionsForFixIdeal when no layout policy is set.
+ * @tc.type: FUNC
+ */
+HWTEST_F(
+    SelectPatternTestControlSizeNg, SelectLayoutAlgorithmRemoveParentRestrictionsForFixIdealNoPolicy, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create SelectLayoutAlgorithm, a fresh LayoutProperty and a LayoutConstraintF with
+     *           maxSize(500.0, 500.0).
+     * @tc.expected: Algorithm, layoutProperty and constraint are created successfully.
+     */
+    auto layoutAlgorithm = AceType::MakeRefPtr<SelectLayoutAlgorithm>();
+    ASSERT_NE(layoutAlgorithm, nullptr);
+    auto layoutProperty = AceType::MakeRefPtr<LayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    LayoutConstraintF constraint;
+    constraint.maxSize = SizeF(500.0f, 500.0f);
+    /**
+     * @tc.steps: step2. Call RemoveParentRestrictionsForFixIdeal with the fresh layoutProperty.
+     * @tc.expected: layoutPolicyProperty.has_value() is false, the constraint remains unchanged.
+     */
+    layoutAlgorithm->RemoveParentRestrictionsForFixIdeal(layoutProperty, constraint);
+    EXPECT_EQ(constraint.maxSize.Width(), 500.0f);
+    EXPECT_EQ(constraint.maxSize.Height(), 500.0f);
+}
 } // namespace OHOS::Ace::NG

@@ -167,6 +167,11 @@ public:
             resourceUpdater.updateFunc(resourceUpdater.resObj, *this);
         }
     }
+
+    bool HasResourceObj()
+    {
+        return resMap_.size() > 0;
+    }
 protected:
     BasicShapeType basicShapeType_ = BasicShapeType::NONE;
     Dimension width_;

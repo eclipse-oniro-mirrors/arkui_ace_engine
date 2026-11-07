@@ -19,7 +19,6 @@
 #include "gtest/gtest.h"
 
 #include "base/resource/shared_image_manager.h"
-#include "base/utils/system_properties.h"
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 
 using namespace testing;
@@ -38,12 +37,30 @@ public:
 
 /**
  * @tc.name: GetFormSharedImageCacheThreshold_001
- * @tc.desc: Verify the default form shared image cache threshold equals 30 after config change.
+ * @tc.desc: Verify the default shared image cache threshold equals DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD.
  * @tc.type: FUNC
  */
 HWTEST_F(SharedImageManagerTest, GetFormSharedImageCacheThreshold_001, TestSize.Level1)
 {
-    EXPECT_EQ(SystemProperties::getFormSharedImageCacheThreshold(), 30);
+    auto taskExecutor = AceType::MakeRefPtr<MockTaskExecutor>(true);
+    auto manager = AceType::MakeRefPtr<SharedImageManager>(taskExecutor);
+    EXPECT_EQ(manager->GetImageCacheThreshold(), DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD);
+}
+
+/**
+ * @tc.name: SetImageCacheThreshold_001
+ * @tc.desc: Verify SetImageCacheThreshold changes the threshold value.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SharedImageManagerTest, SetImageCacheThreshold_001, TestSize.Level1)
+{
+    auto taskExecutor = AceType::MakeRefPtr<MockTaskExecutor>(true);
+    auto manager = AceType::MakeRefPtr<SharedImageManager>(taskExecutor);
+    EXPECT_EQ(manager->GetImageCacheThreshold(), DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD);
+    manager->SetImageCacheThreshold(FORM_MULTI_IMAGE_CACHE_THRESHOLD);
+    EXPECT_EQ(manager->GetImageCacheThreshold(), FORM_MULTI_IMAGE_CACHE_THRESHOLD);
+    manager->SetImageCacheThreshold(DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD);
+    EXPECT_EQ(manager->GetImageCacheThreshold(), DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD);
 }
 
 /**
@@ -83,17 +100,71 @@ HWTEST_F(SharedImageManagerTest, SharedImageManagerAddSharedImage_002, TestSize.
 
 /**
  * @tc.name: SharedImageManagerAddSharedImage_003
- * @tc.desc: Add up to cache threshold (30) distinct images and verify size reaches 30.
+ * @tc.desc: Add up to cache threshold distinct images and verify size reaches threshold.
  * @tc.type: FUNC
  */
 HWTEST_F(SharedImageManagerTest, SharedImageManagerAddSharedImage_003, TestSize.Level1)
 {
     auto taskExecutor = AceType::MakeRefPtr<MockTaskExecutor>(true);
     auto manager = AceType::MakeRefPtr<SharedImageManager>(taskExecutor);
-    for (int i = 0; i < 30; ++i) {
+    for (int i = 0; i < DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD; ++i) {
         std::string name = "img" + std::to_string(i);
         manager->AddSharedImage(name, std::vector<uint8_t>{ static_cast<uint8_t>(i) });
     }
-    EXPECT_EQ(manager->GetSharedImageMap().size(), 30u);
+    EXPECT_EQ(manager->GetSharedImageMap().size(),
+        static_cast<size_t>(DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD));
+}
+
+/**
+ * @tc.name: SharedImageManagerAddSharedImage_004
+ * @tc.desc: Add threshold+1 images at default threshold (exceed boundary, no crash).
+ * @tc.type: FUNC
+ */
+HWTEST_F(SharedImageManagerTest, SharedImageManagerAddSharedImage_004, TestSize.Level2)
+{
+    auto taskExecutor = AceType::MakeRefPtr<MockTaskExecutor>(true);
+    auto manager = AceType::MakeRefPtr<SharedImageManager>(taskExecutor);
+    int32_t exceedCount = DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD + 1;
+    for (int i = 0; i < exceedCount; ++i) {
+        std::string name = "img" + std::to_string(i);
+        manager->AddSharedImage(name, std::vector<uint8_t>{ static_cast<uint8_t>(i) });
+    }
+    EXPECT_EQ(manager->GetSharedImageMap().size(), static_cast<size_t>(exceedCount));
+}
+
+/**
+ * @tc.name: SharedImageManagerAddSharedImage_005
+ * @tc.desc: Add up to multi image cache threshold images at threshold 30 (boundary, no exceed).
+ * @tc.type: FUNC
+ */
+HWTEST_F(SharedImageManagerTest, SharedImageManagerAddSharedImage_005, TestSize.Level1)
+{
+    auto taskExecutor = AceType::MakeRefPtr<MockTaskExecutor>(true);
+    auto manager = AceType::MakeRefPtr<SharedImageManager>(taskExecutor);
+    manager->SetImageCacheThreshold(FORM_MULTI_IMAGE_CACHE_THRESHOLD);
+    for (int i = 0; i < FORM_MULTI_IMAGE_CACHE_THRESHOLD; ++i) {
+        std::string name = "img" + std::to_string(i);
+        manager->AddSharedImage(name, std::vector<uint8_t>{ static_cast<uint8_t>(i) });
+    }
+    EXPECT_EQ(manager->GetSharedImageMap().size(),
+        static_cast<size_t>(FORM_MULTI_IMAGE_CACHE_THRESHOLD));
+}
+
+/**
+ * @tc.name: SharedImageManagerAddSharedImage_006
+ * @tc.desc: Add threshold+1 images at threshold 30 (exceed boundary, no crash).
+ * @tc.type: FUNC
+ */
+HWTEST_F(SharedImageManagerTest, SharedImageManagerAddSharedImage_006, TestSize.Level2)
+{
+    auto taskExecutor = AceType::MakeRefPtr<MockTaskExecutor>(true);
+    auto manager = AceType::MakeRefPtr<SharedImageManager>(taskExecutor);
+    manager->SetImageCacheThreshold(FORM_MULTI_IMAGE_CACHE_THRESHOLD);
+    int32_t exceedCount = FORM_MULTI_IMAGE_CACHE_THRESHOLD + 1;
+    for (int i = 0; i < exceedCount; ++i) {
+        std::string name = "img" + std::to_string(i);
+        manager->AddSharedImage(name, std::vector<uint8_t>{ static_cast<uint8_t>(i) });
+    }
+    EXPECT_EQ(manager->GetSharedImageMap().size(), static_cast<size_t>(exceedCount));
 }
 } // namespace OHOS::Ace

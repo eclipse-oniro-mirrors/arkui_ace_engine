@@ -80,6 +80,9 @@ declare const envFactoryMap: {
 };
 
 // 声明环境值类型
+type SimpleEnvValueType = 'number' | 'boolean';
+type SimpleTypeEnvKey = string;
+
 interface WindowSizeLayoutBreakpointInfo {
   width: number;
   height: number;
@@ -129,14 +132,22 @@ declare class EnvV2 {
   public static readonly ENV_DECO_META: symbol;
   public static readonly ENV_KEY_PREFIX: string;
 
-  public static addEnvKeyVariableDecoMeta<K extends keyof EnvTypeMap>(
+  public static addEnvKeyVariableDecoMeta<K extends string>(
     proto: Object, varName: string, key: K): void;
+  public static getEnvVarNameFromView<K extends string>(
+    key: K, view: ViewBuildNodeBase): Array<string> | undefined;
   public static findEnvValueFromView<K extends keyof EnvTypeMap>(
-    key: K, view: ViewBuildNodeBase): IEnvironmentValue<EnvTypeMap[K]> | undefined;
+    key: K, view: PUV2ViewBase): IEnvironmentValue<EnvTypeMap[K]> | undefined;
   public static findEnvRecursively<K extends keyof EnvTypeMap>(
     key: K, view: ViewBuildNodeBase, viewInstanceId: number): IEnvironmentValue<EnvTypeMap[K]> | undefined;
+  public static isDirectQuerySystemEnvKey(key: string): boolean;
+  public static getDirectQuerySystemEnvDefaultValue(key: string): unknown;
+  public static registerSimpleTypeMonitorFunc<K extends SimpleTypeEnvKey>(
+    key: K, envValue: IEnvironmentValue<any>, view: PUV2ViewBase, varName: string): void;
   public static registerEnv<K extends keyof EnvTypeMap>(
-    key: K, view: PUV2ViewBase, varName: string, newInstanceId?: number): IEnvironmentValue<EnvTypeMap[K]>;
+    key: K, view: PUV2ViewBase, varName: string, newInstanceId?: number): IEnvironmentValue<EnvTypeMap[K]> | SimpleEnvValueType;
+  public static isSimpleTypeKey(key: string): key is SimpleTypeEnvKey;
+  public static getSimpleEnvProp(key: SimpleTypeEnvKey): string;
   public static unregisterEnv<K extends keyof EnvTypeMap>(key: K, instanceId: number): void;
   public static unregisterAll(instanceId: number): void;
 }
@@ -297,7 +308,7 @@ class DestroyableEnvValue implements IEnvironmentValue<string> {
 }
 
 // 模拟视图基类
-class MockView extends ViewBuildNodeBase {
+class MockView extends PUV2ViewBase {
   private _debugInfo: string;
   private _uiContext: UIContext;
   private _mainInstanceId: number;

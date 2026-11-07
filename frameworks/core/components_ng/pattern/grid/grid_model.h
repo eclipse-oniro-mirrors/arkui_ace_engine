@@ -25,6 +25,7 @@
 #include "base/memory/ace_type.h"
 #include "core/components/common/layout/constants.h"
 #include "core/components/common/properties/color.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_types.h"
 #include "core/components_ng/pattern/grid/grid_constants.h"
 #include "core/components_ng/pattern/grid/grid_layout_options.h"
 #include "core/components_ng/pattern/grid/grid_properties.h"
@@ -34,6 +35,7 @@ namespace OHOS::Ace {
 class ResourceObject;
 class ScrollControllerBase;
 class ScrollProxy;
+struct ScrollSnapStrategy;
 } // namespace OHOS::Ace
 
 namespace OHOS::Ace::NG {
@@ -73,6 +75,9 @@ public:
     virtual void SetSupportDragAnimation(bool value) = 0;
     virtual void SetEdgeEffect(EdgeEffect edgeEffect, bool alwaysEnabled, EffectEdge effectEdge = EffectEdge::ALL) = 0;
     virtual void SetNestedScroll(const NestedScrollOptions& nestedOpt) = 0;
+    // Feat-20260806915268: two-stage item scroll snap strategy (built-in align or custom offset provider).
+    virtual void SetScrollSnapStrategy(const ScrollSnapStrategy& scrollSnapStrategy) {}
+    virtual void ResetScrollSnapStrategy() {}
     virtual void SetScrollEnabled(bool scrollEnabled) = 0;
     virtual void SetFriction(double friction) = 0;
     virtual void SetFocusWrapMode(const std::optional<FocusWrapMode>& focusWrapMode) {}
@@ -95,6 +100,8 @@ public:
     virtual void SetOnReachStart(std::function<void()>&& onReachStart) = 0;
     virtual void SetOnReachEnd(std::function<void()>&& onReachEnd) = 0;
     virtual void SetSyncLoad(bool syncLoad) {}
+    // FEAT scroll placeholder: a null provider resets the capability (see GridPattern).
+    virtual void SetScrollPlaceholder(NG::ScrollPlaceholderProvider&& provider) {}
     virtual void SetEditModeOptions(NG::EditModeOptions& editModeOptions) {};
     virtual void SetEnableEditMode(bool enableEditMode) {};
     virtual void SetEnableEditModeChangeEvent(std::function<void(bool)>&& changeEvent) {};

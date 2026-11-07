@@ -17,11 +17,11 @@
 #define FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_TOGGLE_SWITCH_THEME_WRAPPER_H
 
 #include "core/components/checkable/checkable_theme.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
-class SwitchThemeWrapper : public SwitchTheme, public TokenThemeWrapper {
+class SwitchThemeWrapper : public SwitchTheme {
     DECLARE_ACE_TYPE(SwitchThemeWrapper, SwitchTheme);
 
 public:
@@ -30,10 +30,10 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto themeWrapper = AceType::MakeRefPtr<SwitchThemeWrapper>();
-            auto theme = AceType::DynamicCast<SwitchTheme>(themeWrapper);
+            RefPtr<SwitchTheme> theme = themeWrapper;
             if (!themeConstants) {
                 return themeWrapper;
             }

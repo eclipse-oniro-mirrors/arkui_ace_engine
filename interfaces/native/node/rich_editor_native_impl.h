@@ -75,6 +75,8 @@ struct OH_ArkUI_TextEditorTextStyle {
     int32_t strokeWidth;
     uint32_t strokeColor;
     std::vector<OH_ArkUI_ShadowOptions> textShadow;
+    float textBackgroundBorderWidth = 0.0f;
+    uint32_t textBackgroundBorderColor = 0x00000000;
 };
 #ifdef __cplusplus
 }

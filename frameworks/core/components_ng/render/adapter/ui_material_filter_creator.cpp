@@ -385,7 +385,11 @@ constexpr FrostedGlassParam Gentle_UltraThick_Transparency3_Light {
     .edLightAngles = { 75.0f, 85.0f },
     .edLightDir = { 0.0f, -1.0f },
     .edLightRates = {},
+#if defined(ACE_ENGINE_IMMERSIVE_MATERIAL_TV)
+    .edLightKBS = { 1.5f, 0.15f, 1.5f },
+#else
     .edLightKBS = { 0.8f, 0.3922f, 1.5f },
+#endif
     .edLightPos = { 1.0f, 1.5f, 2.0f },
     .edLightNeg = { 1.7f, 3.0f, 1.0f },
     .darkModeBlurParams = { 12.0f, 1.0f },
@@ -395,7 +399,11 @@ constexpr FrostedGlassParam Gentle_UltraThick_Transparency3_Light {
     .darkModeBgPos = { 0.5f, 0.7f, 2.0f },
     .darkModeBgNeg = { 1.0f, 1.0f, 1.0f },
     .darkModeEdLightAngles = { 75.0f, 120.0f },
+#if defined(ACE_ENGINE_IMMERSIVE_MATERIAL_TV)
+    .darkModeEdLightKBS = { 1.5f, 0.15f, 1.5f },
+#else
     .darkModeEdLightKBS = { 1.2f, 0.294f, 1.5f },
+#endif
 };
 constexpr FrostedGlassParam Gentle_UltraThick_Transparency3_Dark {
     .blurParams = { 12.0f, 1.0f },
@@ -410,7 +418,11 @@ constexpr FrostedGlassParam Gentle_UltraThick_Transparency3_Dark {
     .edLightAngles = { 75.0f, 120.0f },
     .edLightDir = { 0.0f, -1.0f },
     .edLightRates = {},
+#if defined(ACE_ENGINE_IMMERSIVE_MATERIAL_TV)
+    .edLightKBS = { 1.5f, 0.15f, 1.5f },
+#else
     .edLightKBS = { 1.2f, 0.294f, 1.5f },
+#endif
     .edLightPos = { 1.0f, 1.5f, 2.0f },
     .edLightNeg = { 1.7f, 3.0f, 1.0f },
     .darkModeBlurParams = { 12.0f, 1.0f },
@@ -420,7 +432,11 @@ constexpr FrostedGlassParam Gentle_UltraThick_Transparency3_Dark {
     .darkModeBgPos = { 0.5f, 0.7f, 2.0f },
     .darkModeBgNeg = { 1.0f, 1.0f, 1.0f },
     .darkModeEdLightAngles = { 75.0f, 120.0f },
+#if defined(ACE_ENGINE_IMMERSIVE_MATERIAL_TV)
+    .darkModeEdLightKBS = { 1.5f, 0.15f, 1.5f },
+#else
     .darkModeEdLightKBS = { 1.2f, 0.294f, 1.5f },
+#endif
 };
 constexpr FrostedGlassParam Gentle_UltraThick_Transparency4_Light {
     .blurParams = { 25.0f, 1.0f },
@@ -499,7 +515,11 @@ constexpr FrostedGlassParam Gentle_Thick_Transparency3_Light {
     .edLightAngles = { 75.0f, 85.0f },
     .edLightDir = { 0.0f, -1.0f },
     .edLightRates = {},
+#if defined(ACE_ENGINE_IMMERSIVE_MATERIAL_TV)
+    .edLightKBS = { 1.5f, 0.15f, 1.5f },
+#else
     .edLightKBS = { 0.8f, 0.3922f, 1.5f },
+#endif
     .edLightPos = { 1.0f, 1.5f, 2.0f },
     .edLightNeg = { 1.7f, 3.0f, 1.0f },
     .darkModeBlurParams = { 12.0f, 1.0f },
@@ -509,7 +529,11 @@ constexpr FrostedGlassParam Gentle_Thick_Transparency3_Light {
     .darkModeBgPos = { 1.7f, 1.5f, 1.5f },
     .darkModeBgNeg = { 1.2f, 2.5f, 1.0f },
     .darkModeEdLightAngles = { 75.0f, 120.0f },
+#if defined(ACE_ENGINE_IMMERSIVE_MATERIAL_TV)
+    .darkModeEdLightKBS = { 1.5f, 0.15f, 1.5f },
+#else
     .darkModeEdLightKBS = { 1.2f, 0.294f, 1.5f },
+#endif
 };
 constexpr FrostedGlassParam Gentle_Thick_Transparency3_Dark {
     .blurParams = { 12.0f, 1.0f },
@@ -524,7 +548,11 @@ constexpr FrostedGlassParam Gentle_Thick_Transparency3_Dark {
     .edLightAngles = { 75.0f, 120.0f },
     .edLightDir = { 0.0f, -1.0f },
     .edLightRates = {},
+#if defined(ACE_ENGINE_IMMERSIVE_MATERIAL_TV)
+    .edLightKBS = { 1.5f, 0.15f, 1.5f },
+#else
     .edLightKBS = { 1.2f, 0.294f, 1.5f },
+#endif
     .edLightPos = { 1.0f, 1.5f, 2.0f },
     .edLightNeg = { 1.7f, 3.0f, 1.0f },
     .darkModeBlurParams = { 12.0f, 1.0f },
@@ -534,7 +562,11 @@ constexpr FrostedGlassParam Gentle_Thick_Transparency3_Dark {
     .darkModeBgPos = { 1.7f, 1.5f, 1.5f },
     .darkModeBgNeg = { 1.2f, 2.5f, 1.0f },
     .darkModeEdLightAngles = { 75.0f, 120.0f },
+#if defined(ACE_ENGINE_IMMERSIVE_MATERIAL_TV)
+    .darkModeEdLightKBS = { 1.5f, 0.15f, 1.5f },
+#else
     .darkModeEdLightKBS = { 1.2f, 0.294f, 1.5f },
+#endif
 };
 constexpr FrostedGlassParam Gentle_Thick_Transparency4_Light {
     .blurParams = { 25.0f, 1.0f },
@@ -730,18 +762,22 @@ const std::unordered_map<UiMaterialMapKey, const FrostedGlassParam*, UiMaterialM
 std::shared_ptr<Rosen::RSNGFilterBase> UiMaterialFilterCreator::ConvertToUiMaterialFilter(
     const ImmersiveMaterialConfig& params)
 {
+    auto materialColor = params.materialColor.value_or(Color::TRANSPARENT);
+    bool isTintedGlass = (params.colorBlendMode == MaterialColorBlendMode::TINTED_GLASS);
+    ExtraGlassParam extraParam { materialColor.GetAlpha() / 255.0f };
+    const ExtraGlassParam* pExtra = isTintedGlass ? &extraParam : nullptr;
+
     std::shared_ptr<Rosen::RSNGFilterBase> filter;
-    if (!MaterialUtils::GetUiMaterialFilter(params, filter)) {
+    if (!MaterialUtils::GetUiMaterialFilter(params, filter, pExtra)) {
         auto iter = MATERIAL_PARAM_MAP.find(params.key);
         if (iter == MATERIAL_PARAM_MAP.end()) {
             return nullptr;
         }
-        filter = RosenEffectConverter::ConvertToFrostedGlassFilter(*(iter->second), params.dipScale);
+        filter = RosenEffectConverter::ConvertToFrostedGlassFilter(*(iter->second), params.dipScale, pExtra);
     }
     auto glassFilter = std::static_pointer_cast<Rosen::RSNGFrostedGlassFilter>(filter);
     CHECK_NULL_RETURN(glassFilter, nullptr);
-    auto materialColor = params.materialColor.value_or(Color::TRANSPARENT);
-    if (materialColor.GetAlpha() > 0) {
+    if (!isTintedGlass && materialColor.GetAlpha() > 0) {
         glassFilter->Setter<Rosen::FrostedGlassWeightsEmbossTag>(EMPTY_ROSEN_VECTOR2F);
         glassFilter->Setter<Rosen::FrostedGlassDarkModeWeightsEmbossTag>(EMPTY_ROSEN_VECTOR2F);
     }
@@ -775,23 +811,27 @@ std::shared_ptr<Rosen::RSNGShaderBase> UiMaterialFilterCreator::ConvertToUiMater
     ImmersiveMaterialConfig newConfig = params;
     newConfig.key.style = static_cast<UiMaterialStyle>(style % UI_MATERIAL_STYLES_COUNT);
 
+    auto materialColor = newConfig.materialColor.value_or(Color::TRANSPARENT);
+    bool isTintedGlass = (newConfig.colorBlendMode == MaterialColorBlendMode::TINTED_GLASS);
+    ExtraGlassParam extraParam { materialColor.GetAlpha() / 255.0f };
+    const ExtraGlassParam* pExtra = isTintedGlass ? &extraParam : nullptr;
+
     std::shared_ptr<Rosen::RSNGShaderBase> shader;
     bool needSplitOverlayShader = params.needSplitOverlayShader;
-    if (!MaterialUtils::GetUiMaterialShaderECSub(newConfig, shader)) {
+    if (!MaterialUtils::GetUiMaterialShaderECSub(newConfig, shader, pExtra)) {
         auto iter = MATERIAL_PARAM_MAP.find(newConfig.key);
         if (iter == MATERIAL_PARAM_MAP.end()) {
             return nullptr;
         }
         shader = RosenEffectConverter::ConvertToRSNGFrostedGlassEffectECSub(
-            *(iter->second), newConfig.dipScale, needSplitOverlayShader);
+            *(iter->second), newConfig.dipScale, needSplitOverlayShader, pExtra);
     }
 #if defined(CROSS_PLATFORM)
     return shader;
 #else
     auto glassEffect = std::static_pointer_cast<Rosen::RSNGFrostedGlassEffect>(shader);
     CHECK_NULL_RETURN(glassEffect, nullptr);
-    auto materialColor = newConfig.materialColor.value_or(Color::TRANSPARENT);
-    if (materialColor.GetAlpha() > 0) {
+    if (!isTintedGlass && materialColor.GetAlpha() > 0) {
         glassEffect->Setter<Rosen::FrostedGlassEffectWeightsEmbossTag>(EMPTY_ROSEN_VECTOR2F);
         // no darkmode param till now
     }
@@ -812,21 +852,24 @@ std::shared_ptr<Rosen::RSNGShaderBase> UiMaterialFilterCreator::ConvertToUiMater
     ImmersiveMaterialConfig newConfig = params;
     newConfig.key.style = static_cast<UiMaterialStyle>(style % UI_MATERIAL_STYLES_COUNT);
 
+    auto materialColor = newConfig.materialColor.value_or(Color::TRANSPARENT);
+    bool isTintedGlass = (newConfig.colorBlendMode == MaterialColorBlendMode::TINTED_GLASS);
+    ExtraGlassParam extraParam { materialColor.GetAlpha() / 255.0f };
+    const ExtraGlassParam* pExtra = isTintedGlass ? &extraParam : nullptr;
+
     std::shared_ptr<Rosen::RSNGShaderBase> overlay;
-    if (!MaterialUtils::GetUiMaterialECSubShaderOverlay(newConfig, overlay)) {
+    if (!MaterialUtils::GetUiMaterialECSubShaderOverlay(newConfig, overlay, pExtra)) {
         auto iter = MATERIAL_PARAM_MAP.find(newConfig.key);
         if (iter == MATERIAL_PARAM_MAP.end()) {
             return nullptr;
         }
-        overlay =
-            RosenEffectConverter::ConvertToRSNGFrostedGlassEffectECSubOverlay(*(iter->second), newConfig.dipScale);
+        overlay = RosenEffectConverter::ConvertToRSNGFrostedGlassEffectECSubOverlay(
+            *(iter->second), newConfig.dipScale, pExtra);
     }
     auto glassEffect = std::static_pointer_cast<Rosen::RSNGFrostedGlassEffect>(overlay);
     CHECK_NULL_RETURN(glassEffect, nullptr);
-    auto materialColor = newConfig.materialColor.value_or(Color::TRANSPARENT);
-    if (materialColor.GetAlpha() > 0) {
+    if (!isTintedGlass && materialColor.GetAlpha() > 0) {
         glassEffect->Setter<Rosen::FrostedGlassEffectWeightsEmbossTag>(EMPTY_ROSEN_VECTOR2F);
-        // no darkmode param till now
     }
     return overlay;
 }

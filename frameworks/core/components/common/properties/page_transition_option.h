@@ -40,7 +40,7 @@ enum class TransitionDirection {
     TRANSITION_OUT,
 };
 
-class TransitionTweenOption : public virtual AceType {
+class TransitionTweenOption : public AceType {
     DECLARE_ACE_TYPE(TransitionTweenOption, AceType);
 public:
     TransitionTweenOption(bool isRightToLeft, const WeakPtr<PipelineContext>& context);

@@ -84,6 +84,30 @@ ace_unittest("form_test_ng") {
   }
 }
 
+ace_unittest("form_manager_delegate_test") {
+  flutter_skia = true
+  render = true
+  type = "new"
+  module_name = "NavigationSet-Router"
+  sources = [
+    "$ace_root/frameworks/core/components/form/resource/form_manager_delegate.cpp",
+    "form_manager_delegate_test.cpp",
+  ]
+
+  if (is_ohos_standard_system) {
+    external_deps = [
+      "ability_base:want",
+      "bundle_framework:appexecfwk_base",
+      "bundle_framework:appexecfwk_core",
+      "form_fwk:fmskit_native",
+      "form_fwk:form_common_info",
+      "form_fwk:form_render_info",
+      "hilog:libhilog",
+      "ipc:ipc_core",
+    ]
+  }
+}
+
 ace_unittest("form_node_test") {
   flutter_skia = true
   render = true
@@ -342,6 +366,7 @@ ohos_unittest("form_task_executor_test") {
 group("ace_form_test") {
   testonly = true
   deps = [
+    ":form_manager_delegate_test",
     # ":form_node_test",
     ":form_pattern_test",
     ":form_scoped_rs_transaction_test",

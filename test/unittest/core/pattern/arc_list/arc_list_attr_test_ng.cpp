@@ -17,6 +17,7 @@
 
 #include "core/components_ng/pattern/scroll/scroll_edge_effect.h"
 #include "core/components_ng/pattern/scrollable/scrollable_model_static.h"
+#include "core/components_ng/pattern/scrollable/scrollable_model_ng.h"
 
 namespace OHOS::Ace::NG {
 
@@ -1642,4 +1643,77 @@ HWTEST_F(ArcListAttrTestNg, ListItemDisableEvent006, TestSize.Level1)
     UpdateDisableEventState(testContext, false, DISABLED_DYNAMIC_OPACITY);
     EXPECT_EQ(testContext.renderContext->GetOpacityValue(ENABLED_DYNAMIC_OPACITY), DISABLED_ALPHA);
 }
+
+/**
+ * @tc.name: SetScrollBarWidth_001
+ * @tc.desc: ArcList static scrollBarWidth preserves the LengthMetrics unit instead of forcing VP.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ArcListAttrTestNg, SetScrollBarWidth_001, TestSize.Level1)
+{
+    ListModelNG model = CreateList();
+    model.SetListScrollBar(AceType::RawPtr(frameNode_), static_cast<int32_t>(DisplayMode::ON));
+    model.SetScrollBarWidth("20px");
+    CreateDone();
+
+    auto barWidth = paintProperty_->GetScrollBarWidth();
+    ASSERT_TRUE(barWidth.has_value());
+    EXPECT_FLOAT_EQ(barWidth.value().Value(), 20.0f);
+    EXPECT_EQ(barWidth.value().Unit(), DimensionUnit::PX);
+}
+
+/**
+ * @tc.name: SetScrollBarWidth_002
+ * @tc.desc: ArcList attribute modifier preserves all supported LengthMetrics units.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ArcListAttrTestNg, SetScrollBarWidth_002, TestSize.Level1)
+{
+    ListModelNG model = CreateList();
+    model.SetListScrollBar(AceType::RawPtr(frameNode_), static_cast<int32_t>(DisplayMode::ON));
+    CreateDone();
+
+    struct WidthCase {
+        const char* width;
+        double value;
+        DimensionUnit unit;
+    };
+    const WidthCase cases[] = {
+        { "16vp", 16.0, DimensionUnit::VP },
+        { "20px", 20.0, DimensionUnit::PX },
+        { "24fp", 24.0, DimensionUnit::FP },
+        { "32lpx", 32.0, DimensionUnit::LPX },
+    };
+    for (const auto& item : cases) {
+        ListModelNG::SetListScrollBarWidth(AceType::RawPtr(frameNode_), item.width);
+        auto barWidth = paintProperty_->GetScrollBarWidth();
+        ASSERT_TRUE(barWidth.has_value());
+        EXPECT_FLOAT_EQ(barWidth.value().Value(), item.value);
+        EXPECT_EQ(barWidth.value().Unit(), item.unit);
+    }
+}
+
+/**
+ * @tc.name: ResetScrollBarWidth_001
+ * @tc.desc: ArcList attribute modifier resets an invalid LengthMetrics value to the theme default.
+ * @tc.type: RELI
+ */
+HWTEST_F(ArcListAttrTestNg, ResetScrollBarWidth_001, TestSize.Level2)
+{
+    ListModelNG model = CreateList();
+    model.SetListScrollBar(AceType::RawPtr(frameNode_), static_cast<int32_t>(DisplayMode::ON));
+    CreateDone();
+
+    ListModelNG::SetListScrollBarWidth(AceType::RawPtr(frameNode_), "20px");
+    ASSERT_TRUE(paintProperty_->GetScrollBarWidth().has_value());
+
+    ListModelNG::SetListScrollBarWidth(AceType::RawPtr(frameNode_), "0vp");
+    ListModelNG::CreateWithResourceObjScrollBarWidth(AceType::RawPtr(frameNode_), nullptr);
+
+    auto barWidth = paintProperty_->GetScrollBarWidth();
+    ASSERT_TRUE(barWidth.has_value());
+    EXPECT_EQ(barWidth.value().Value(), 0.0f);
+    EXPECT_EQ(barWidth.value().Unit(), DimensionUnit::VP);
+}
+
 } // namespace OHOS::Ace::NG

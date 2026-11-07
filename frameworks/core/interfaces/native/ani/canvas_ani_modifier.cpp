@@ -159,6 +159,17 @@ void GetImageData(ArkUICanvasRenderer peer, uint8_t* buffer, ani_double sx, ani_
     peerImpl->GetImageData(imageSize, buffer);
 }
 
+void* GetPixelMap(ArkUICanvasRenderer peer, ani_double sx, ani_double sy, ani_double sw, ani_double sh)
+{
+    CHECK_NULL_RETURN(peer, nullptr);
+    auto peerImpl = reinterpret_cast<GeneratedModifier::CanvasRendererPeerImpl*>(peer);
+    CHECK_NULL_RETURN(peerImpl, nullptr);
+    auto pixelMap = peerImpl->GetPixelMap(static_cast<double>(sx), static_cast<double>(sy),
+        static_cast<double>(sw), static_cast<double>(sh));
+    CHECK_NULL_RETURN(pixelMap, nullptr);
+    return reinterpret_cast<void*>(image_PixelMapPeer::Create(pixelMap));
+}
+
 void CopyFromBuffer(Ace::ImageData& imageData, uint8_t* buffer, size_t bufferLength, int32_t imgWidth)
 {
     for (int32_t i = std::max(imageData.dirtyY, 0); i < imageData.dirtyY + imageData.dirtyHeight; ++i) {
@@ -257,6 +268,7 @@ const ArkUIAniCanvasModifier* GetCanvasAniModifier()
         .getCanvasDensity = CanvasAniModifier::GetCanvasDensity,
         .getSystemDensity = CanvasAniModifier::GetSystemDensity,
         .getImageData = CanvasAniModifier::GetImageData,
+        .getPixelMap = CanvasAniModifier::GetPixelMap,
         .putImageData0 = CanvasAniModifier::PutImageData0,
         .putImageData1 = CanvasAniModifier::PutImageData1,
         .getDrawingCanvas = CanvasAniModifier::GetDrawingCanvas,

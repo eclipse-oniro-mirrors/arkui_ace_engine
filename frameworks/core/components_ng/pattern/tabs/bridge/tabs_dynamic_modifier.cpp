@@ -287,6 +287,14 @@ void SetBarOverlapImpl(ArkUINodeHandle node, ArkUI_Bool barOverlap)
     tabsModelImpl->SetBarOverlap(barOverlap);
 }
 
+void SetBarOverlapModeImpl(ArkUINodeHandle node, ArkUI_Int32 barOverlapMode)
+{
+    (void)node;
+    auto tabsModelImpl = GetTabsModelImpl();
+    CHECK_NULL_VOID(tabsModelImpl);
+    tabsModelImpl->SetBarOverlapMode(static_cast<BarOverlapMode>(barOverlapMode));
+}
+
 void SetIsVerticalImpl(ArkUINodeHandle node, ArkUI_Bool isVertical)
 {
     (void)node;
@@ -480,6 +488,11 @@ void ResetBarBackgroundBlurStyleImpl(ArkUINodeHandle node)
 void ResetBarOverlapImpl(ArkUINodeHandle node)
 {
     SetBarOverlapImpl(node, false);
+}
+
+void ResetBarOverlapModeImpl(ArkUINodeHandle node)
+{
+    SetBarOverlapModeImpl(node, static_cast<ArkUI_Int32>(BarOverlapMode::STANDARD));
 }
 
 void ResetIsVerticalImpl(ArkUINodeHandle node)
@@ -907,6 +920,24 @@ void ResetTabsBarFloatingStyleImpl(ArkUINodeHandle node)
     tabsModelImpl->ResetBarFloatingStyle();
 }
 
+void SetTabsBarTopFloatingStyleImpl(ArkUINodeHandle node, void* paramRawPtr)
+{
+    (void)node;
+    auto tabsModelImpl = GetTabsModelImpl();
+    CHECK_NULL_VOID(tabsModelImpl);
+    auto param = reinterpret_cast<BarTopFloatingStyleParameters*>(paramRawPtr);
+    CHECK_NULL_VOID(param);
+    tabsModelImpl->SetBarTopFloatingStyle(*param);
+}
+
+void ResetTabsBarTopFloatingStyleImpl(ArkUINodeHandle node)
+{
+    (void)node;
+    auto tabsModelImpl = GetTabsModelImpl();
+    CHECK_NULL_VOID(tabsModelImpl);
+    tabsModelImpl->ResetBarTopFloatingStyle();
+}
+
 void CreateWithResourceObjImpl(ArkUINodeHandle node, void* paramRawPtr)
 {
     (void)node;
@@ -933,9 +964,21 @@ void SetSidebarHeaderImpl(ArkUINodeHandle node, ArkUINodeHandle headerNode) {}
 
 void ResetSidebarHeaderImpl(ArkUINodeHandle node) {}
 
+void SetSidebarFooterImpl(ArkUINodeHandle node, ArkUINodeHandle footerNode) {}
+
+void ResetSidebarFooterImpl(ArkUINodeHandle node) {}
+
+void SetSidebarBottomBarImpl(ArkUINodeHandle node, ArkUINodeHandle bottomBarNode) {}
+
+void ResetSidebarBottomBarImpl(ArkUINodeHandle node) {}
+
 void SetSidebarSearchableImpl(ArkUINodeHandle node, struct ArkUITabsSidebarSearchableOptions* options) {}
 
 void ResetSidebarSearchableImpl(ArkUINodeHandle node) {}
+
+void SetShowSidebarControlButtonImpl(ArkUINodeHandle node, ArkUI_Bool showControlButton) {}
+
+void ResetShowSidebarControlButtonImpl(ArkUINodeHandle node) {}
 
 void SetBarDisplayModeBreakpointImpl(ArkUINodeHandle node, struct ArkUITabBarDisplayModeBreakpoint* breakpoint) {}
 
@@ -979,6 +1022,12 @@ void SetSidebarDividerColorByUserImpl(ArkUINodeHandle node, ArkUI_Bool isByUser)
 void ResetSidebarDividerImpl(ArkUINodeHandle node) {}
 
 void CreateWithSidebarResourceObjImpl(ArkUINodeHandle node, void* paramRawPtr) {}
+
+void MarkUserSetSafeAreaOptsImpl(ArkUINodeHandle node) {}
+
+void SetTabViewCustomizationImpl(ArkUINodeHandle node, const ArkUITabViewCustomization* customization) {}
+
+void ResetTabViewCustomizationImpl(ArkUINodeHandle node) {}
 #endif
 
 void CreateWithSidebarResourceObj(ArkUINodeHandle node, void* paramRawPtr);
@@ -1326,6 +1375,13 @@ void SetBarOverlap(ArkUINodeHandle node, ArkUI_Bool barOverlap)
     CHECK_NULL_VOID(frameNode);
     TabsModelNG::SetBarOverlap(frameNode, barOverlap);
 }
+void SetBarOverlapMode(ArkUINodeHandle node, ArkUI_Int32 barOverlapMode)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto mode = static_cast<BarOverlapMode>(barOverlapMode);
+    TabsModelNG::SetBarOverlapMode(frameNode, mode);
+}
 void SetIsVertical(ArkUINodeHandle node, ArkUI_Bool isVertical)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -1533,6 +1589,12 @@ void ResetBarOverlap(ArkUINodeHandle node)
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
     TabsModelNG::SetBarOverlap(frameNode, false);
+}
+void ResetBarOverlapMode(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabsModelNG::ResetBarOverlapMode(frameNode);
 }
 void ResetIsVertical(ArkUINodeHandle node)
 {
@@ -2002,6 +2064,21 @@ void ResetTabsBarFloatingStyle(ArkUINodeHandle node)
     TabsModelNG::ResetBarFloatingStyle(frameNode);
 }
 
+void SetTabsBarTopFloatingStyle(ArkUINodeHandle node, void* paramRawPtr)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto param = reinterpret_cast<BarTopFloatingStyleParameters*>(paramRawPtr);
+    TabsModelNG::SetBarTopFloatingStyle(frameNode, *param);
+}
+
+void ResetTabsBarTopFloatingStyle(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabsModelNG::ResetBarTopFloatingStyle(frameNode);
+}
+
 void CreateWithResourceObj(ArkUINodeHandle node, void* paramRawPtr)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -2072,6 +2149,42 @@ void ResetSidebarHeader(ArkUINodeHandle node)
     TabsModelNG::SetSidebarHeader(frameNode, nullptr);
 }
 
+void SetSidebarFooter(ArkUINodeHandle node, ArkUINodeHandle footerNode)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    if (footerNode) {
+        TabsModelNG::SetSidebarFooter(frameNode, AceType::Claim(reinterpret_cast<AceType*>(footerNode)));
+    } else {
+        TabsModelNG::SetSidebarFooter(frameNode, nullptr);
+    }
+}
+
+void ResetSidebarFooter(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabsModelNG::SetSidebarFooter(frameNode, nullptr);
+}
+
+void SetSidebarBottomBar(ArkUINodeHandle node, ArkUINodeHandle bottomBarNode)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    if (bottomBarNode) {
+        TabsModelNG::SetSidebarBottomBar(frameNode, AceType::Claim(reinterpret_cast<AceType*>(bottomBarNode)));
+    } else {
+        TabsModelNG::SetSidebarBottomBar(frameNode, nullptr);
+    }
+}
+
+void ResetSidebarBottomBar(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabsModelNG::SetSidebarBottomBar(frameNode, nullptr);
+}
+
 void SetSidebarSearchable(ArkUINodeHandle node, struct ArkUITabsSidebarSearchableOptions* options)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -2113,13 +2226,27 @@ void ResetSidebarSearchable(ArkUINodeHandle node)
     TabsModelNG::SetSidebarSearchableOptions(frameNode, options);
 }
 
+void SetShowSidebarControlButton(ArkUINodeHandle node, ArkUI_Bool showControlButton)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabsModelNG::SetShowSidebarControlButton(frameNode, showControlButton);
+}
+
+void ResetShowSidebarControlButton(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabsModelNG::SetShowSidebarControlButton(frameNode, false);
+}
+
 void SetBarDisplayModeBreakpoint(ArkUINodeHandle node, struct ArkUITabBarDisplayModeBreakpoint* breakpoint)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
     CHECK_NULL_VOID(breakpoint);
     static const std::vector<TabBarDisplayMode> BAR_DISPLAY_MODES =
-        { TabBarDisplayMode::BOTTOMTABBAR, TabBarDisplayMode::SIDEBAR };
+        { TabBarDisplayMode::BOTTOMTABBAR, TabBarDisplayMode::SIDEBAR, TabBarDisplayMode::TOP_TABBAR };
     TabBarDisplayModeBreakpoint bp;
     bp.isNull = breakpoint->isNull;
     if (!breakpoint->isNull) {
@@ -2340,6 +2467,87 @@ void CreateWithSidebarResourceObj(ArkUINodeHandle node, void* paramRawPtr)
     TabsModelNG::CreateWithSidebarResourceObj(frameNode, param->jsResourceType, resObj);
 }
 
+void MarkUserSetSafeAreaOpts(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabsModelNG::MarkUserSetSafeAreaOpts(frameNode);
+}
+
+void SetTabViewCustomization(ArkUINodeHandle node, const ArkUITabViewCustomization* customization)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    CHECK_NULL_VOID(customization);
+    TabViewCustomization result;
+    for (ArkUI_Int32 i = 0; i < customization->visibilityCount; i++) {
+        int32_t key = customization->visibilityKeys[i];
+        if (key < 0) {
+            TAG_LOGW(AceLogTag::ACE_TABS,
+                "SetTabViewCustomization visibilityMap skip invalid key:%{public}d (must be >= 0)", key);
+            continue;
+        }
+        int32_t visVal = customization->visibilityValues[i];
+        if (visVal != static_cast<int32_t>(TabVisibility::VISIBLE) &&
+            visVal != static_cast<int32_t>(TabVisibility::HIDDEN)) {
+            TAG_LOGW(AceLogTag::ACE_TABS,
+                "SetTabViewCustomization visibilityMap key:%{public}d skip invalid value:%{public}d "
+                "(must be 0=VISIBLE or 1=HIDDEN)", key, visVal);
+            continue;
+        }
+        result.visibilityMap[key] = static_cast<TabVisibility>(visVal);
+    }
+    for (ArkUI_Int32 i = 0; i < customization->sectionCount; i++) {
+        int32_t key = customization->sectionKeys[i];
+        if (key < 0) {
+            TAG_LOGW(AceLogTag::ACE_TABS,
+                "SetTabViewCustomization sectionMap skip invalid key:%{public}d (must be >= 0)", key);
+            continue;
+        }
+        SidebarSection section;
+        if (customization->sectionValues[i].title != nullptr) {
+            section.title = std::string(customization->sectionValues[i].title);
+        }
+        if (customization->sectionValues[i].hasOrder) {
+            section.order = customization->sectionValues[i].order;
+        }
+        auto titleStyleVal = customization->sectionValues[i].titleStyle;
+        if (titleStyleVal == static_cast<ArkUI_Int32>(SidebarSectionTitleStyle::STANDARD) ||
+            titleStyleVal == static_cast<ArkUI_Int32>(SidebarSectionTitleStyle::EMPHASIZED)) {
+            section.titleStyle = static_cast<SidebarSectionTitleStyle>(titleStyleVal);
+        } else {
+            section.titleStyle = SidebarSectionTitleStyle::STANDARD;
+        }
+        section.resourceTitleObject =
+            AceType::Claim(static_cast<ResourceObject*>(customization->sectionValues[i].titleResourceObject));
+        result.sectionMap[key] = std::move(section);
+    }
+    for (ArkUI_Int32 i = 0; i < customization->orderCount; i++) {
+        int32_t key = customization->orderKeys[i];
+        if (key < 0) {
+            TAG_LOGW(AceLogTag::ACE_TABS,
+                "SetTabViewCustomization orderMap skip invalid key:%{public}d (must be >= 0)", key);
+            continue;
+        }
+        int32_t val = customization->orderValues[i];
+        if (val < 0) {
+            TAG_LOGW(AceLogTag::ACE_TABS,
+                "SetTabViewCustomization orderMap key:%{public}d skip invalid value:%{public}d (must be >= 0)",
+                key, val);
+            continue;
+        }
+        result.orderMap[key] = val;
+    }
+    TabsModelNG::SetTabViewCustomization(frameNode, result);
+}
+
+void ResetTabViewCustomization(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabsModelNG::ResetTabViewCustomization(frameNode);
+}
+
 namespace NodeModifier {
 const ArkUITabsModifier* GetTabsModifier()
 {
@@ -2372,6 +2580,7 @@ const ArkUITabsModifier* GetTabsModifier()
             .setBarBackgroundBlurStyle = SetBarBackgroundBlurStyle,
             .setBarBackgroundBlurStyleWithStyleOption = SetBarBackgroundBlurStyleWithStyleOption,
             .setBarOverlap = SetBarOverlap,
+            .setBarOverlapMode = SetBarOverlapMode,
             .setIsVertical = SetIsVertical,
             .setTabBarPosition = SetTabBarPosition,
             .setTabsOptionsIndex = SetTabsOptionsIndex,
@@ -2394,6 +2603,7 @@ const ArkUITabsModifier* GetTabsModifier()
             .resetBarBackgroundColor = ResetBarBackgroundColor,
             .resetBarBackgroundBlurStyle = ResetBarBackgroundBlurStyle,
             .resetBarOverlap = ResetBarOverlap,
+            .resetBarOverlapMode = ResetBarOverlapMode,
             .resetIsVertical = ResetIsVertical,
             .resetTabBarPosition = ResetTabBarPosition,
             .resetTabsOptionsIndex = ResetTabsOptionsIndex,
@@ -2452,21 +2662,29 @@ const ArkUITabsModifier* GetTabsModifier()
             .createBarBackgroundEffectWithResourceObj = CreateBarBackgroundEffectWithResourceObj,
             .setTabsBarFloatingStyle = SetTabsBarFloatingStyle,
             .resetTabsBarFloatingStyle = ResetTabsBarFloatingStyle,
+            .setTabsBarTopFloatingStyle = SetTabsBarTopFloatingStyle,
+            .resetTabsBarTopFloatingStyle = ResetTabsBarTopFloatingStyle,
             .createWithResourceObj = CreateWithResourceObj,
-            .setSidebarDisplayStyle = SetSidebarDisplayStyle,
-            .resetSidebarDisplayStyle = ResetSidebarDisplayStyle,
             .setBarStyle = SetBarStyle,
             .resetBarStyle = ResetBarStyle,
             .setSidebarPosition = SetSidebarPosition,
             .resetSidebarPosition = ResetSidebarPosition,
             .setSidebarHeader = SetSidebarHeader,
             .resetSidebarHeader = ResetSidebarHeader,
+            .setSidebarFooter = SetSidebarFooter,
+            .resetSidebarFooter = ResetSidebarFooter,
+            .setSidebarBottomBar = SetSidebarBottomBar,
+            .resetSidebarBottomBar = ResetSidebarBottomBar,
             .setSidebarSearchable = SetSidebarSearchable,
             .resetSidebarSearchable = ResetSidebarSearchable,
+            .setShowSidebarControlButton = SetShowSidebarControlButton,
+            .resetShowSidebarControlButton = ResetShowSidebarControlButton,
             .setBarDisplayModeBreakpoint = SetBarDisplayModeBreakpoint,
             .resetBarDisplayModeBreakpoint = ResetBarDisplayModeBreakpoint,
             .setOnBarDisplayModeChange = SetOnBarDisplayModeChange,
             .resetOnBarDisplayModeChange = ResetOnBarDisplayModeChange,
+            .setSidebarDisplayStyle = SetSidebarDisplayStyle,
+            .resetSidebarDisplayStyle = ResetSidebarDisplayStyle,
             .setTabsIndex = SetTabsIndex,
             .setTabsOnChangeEvent = SetTabsOnChangeEvent,
             .setTabSidebarWidth = SetTabSidebarWidth,
@@ -2486,6 +2704,9 @@ const ArkUITabsModifier* GetTabsModifier()
             .setSidebarDividerColorByUser = SetSidebarDividerColorByUser,
             .resetSidebarDivider = ResetSidebarDivider,
             .createWithSidebarResourceObj = CreateWithSidebarResourceObj,
+            .markUserSetSafeAreaOpts = MarkUserSetSafeAreaOpts,
+            .setTabViewCustomization = SetTabViewCustomization,
+            .resetTabViewCustomization = ResetTabViewCustomization,
         };
         CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
         return &modifier;
@@ -2518,6 +2739,7 @@ const ArkUITabsModifier* GetTabsModifier()
         .setBarBackgroundBlurStyle = SetBarBackgroundBlurStyleImpl,
         .setBarBackgroundBlurStyleWithStyleOption = SetBarBackgroundBlurStyleWithStyleOptionImpl,
         .setBarOverlap = SetBarOverlapImpl,
+        .setBarOverlapMode = SetBarOverlapModeImpl,
         .setIsVertical = SetIsVerticalImpl,
         .setTabBarPosition = SetTabBarPositionImpl,
         .setTabsOptionsIndex = SetTabsOptionsIndexImpl,
@@ -2540,6 +2762,7 @@ const ArkUITabsModifier* GetTabsModifier()
         .resetBarBackgroundColor = ResetBarBackgroundColorImpl,
         .resetBarBackgroundBlurStyle = ResetBarBackgroundBlurStyleImpl,
         .resetBarOverlap = ResetBarOverlapImpl,
+        .resetBarOverlapMode = ResetBarOverlapModeImpl,
         .resetIsVertical = ResetIsVerticalImpl,
         .resetTabBarPosition = ResetTabBarPositionImpl,
         .resetTabsOptionsIndex = ResetTabsOptionsIndexImpl,
@@ -2598,21 +2821,29 @@ const ArkUITabsModifier* GetTabsModifier()
         .createBarBackgroundEffectWithResourceObj = CreateBarBackgroundEffectWithResourceObjImpl,
         .setTabsBarFloatingStyle = SetTabsBarFloatingStyleImpl,
         .resetTabsBarFloatingStyle = ResetTabsBarFloatingStyleImpl,
+        .setTabsBarTopFloatingStyle = SetTabsBarTopFloatingStyleImpl,
+        .resetTabsBarTopFloatingStyle = ResetTabsBarTopFloatingStyleImpl,
         .createWithResourceObj = CreateWithResourceObjImpl,
-        .setSidebarDisplayStyle = SetSidebarDisplayStyleImpl,
-        .resetSidebarDisplayStyle = ResetSidebarDisplayStyleImpl,
         .setBarStyle = SetBarStyleImpl,
         .resetBarStyle = ResetBarStyleImpl,
         .setSidebarPosition = SetSidebarPositionImpl,
         .resetSidebarPosition = ResetSidebarPositionImpl,
         .setSidebarHeader = SetSidebarHeaderImpl,
         .resetSidebarHeader = ResetSidebarHeaderImpl,
+        .setSidebarFooter = SetSidebarFooterImpl,
+        .resetSidebarFooter = ResetSidebarFooterImpl,
+        .setSidebarBottomBar = SetSidebarBottomBarImpl,
+        .resetSidebarBottomBar = ResetSidebarBottomBarImpl,
         .setSidebarSearchable = SetSidebarSearchableImpl,
         .resetSidebarSearchable = ResetSidebarSearchableImpl,
+        .setShowSidebarControlButton = SetShowSidebarControlButtonImpl,
+        .resetShowSidebarControlButton = ResetShowSidebarControlButtonImpl,
         .setBarDisplayModeBreakpoint = SetBarDisplayModeBreakpointImpl,
         .resetBarDisplayModeBreakpoint = ResetBarDisplayModeBreakpointImpl,
         .setOnBarDisplayModeChange = SetOnBarDisplayModeChangeImpl,
         .resetOnBarDisplayModeChange = ResetOnBarDisplayModeChangeImpl,
+        .setSidebarDisplayStyle = SetSidebarDisplayStyleImpl,
+        .resetSidebarDisplayStyle = ResetSidebarDisplayStyleImpl,
         .setTabsIndex = SetTabsIndexImpl,
         .setTabsOnChangeEvent = SetTabsOnChangeEventImpl,
         .setTabSidebarWidth = SetTabSidebarWidthImpl,
@@ -2632,6 +2863,9 @@ const ArkUITabsModifier* GetTabsModifier()
         .setSidebarDividerColorByUser = SetSidebarDividerColorByUserImpl,
         .resetSidebarDivider = ResetSidebarDividerImpl,
         .createWithSidebarResourceObj = CreateWithSidebarResourceObjImpl,
+        .markUserSetSafeAreaOpts = MarkUserSetSafeAreaOptsImpl,
+        .setTabViewCustomization = SetTabViewCustomizationImpl,
+        .resetTabViewCustomization = ResetTabViewCustomizationImpl,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;

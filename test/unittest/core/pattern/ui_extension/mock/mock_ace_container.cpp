@@ -297,6 +297,11 @@ bool AceContainer::IsCrossAxisWindow()
     return false;
 }
 
+bool AceContainer::IsPipWindow() const
+{
+    return false;
+}
+
 void AceContainer::GetExtensionConfig(AAFwk::WantParams& want) {}
 
 void AceContainer::DispatchExtensionDataToHostWindow(
@@ -317,4 +322,8 @@ void AceContainer::TerminateUIExtensionInner(int32_t code) {}
 
 void AceContainer::GetOriginalEventInfo(const EventPositionInfo& eventPositionInfo,
     EventPositionInfo& originalPos) {}
+
+void AceContainer::RefreshLiveFoldCreaseRegion() {}
+
+void AceContainer::RefreshFoldCreaseDirection() {}
 } // namespace OHOS::Ace::NG

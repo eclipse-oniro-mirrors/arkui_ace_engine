@@ -17,6 +17,7 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_GRID_GRID_PATTERN_H
 
 #include <list>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -24,6 +25,8 @@
 #include <utility>
 #include <vector>
 
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_manager.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_types.h"
 #include "core/components_ng/pattern/grid/grid_focus.h"
 #include "core/components_ng/pattern/grid/grid_layout_base_algorithm.h"
 #include "core/components_ng/pattern/grid/grid_layout_info.h"
@@ -39,6 +42,73 @@ class ACE_EXPORT GridPattern : public SelectableContainerPattern {
 public:
     GridPattern();
     ~GridPattern() override;
+
+    // FEAT scroll placeholder: the per-item provider, enable flag and host
+    // generation are owned by the pattern (never written into the clonable
+    // layout property); a null provider resets the capability.
+    void SetScrollPlaceholder(ScrollPlaceholderProvider&& provider);
+    bool IsScrollPlaceholderEnabled() const
+    {
+        return scrollPlaceholderProvider_ != nullptr;
+    }
+    const ScrollPlaceholderProvider& GetScrollPlaceholderProvider() const
+    {
+        return scrollPlaceholderProvider_;
+    }
+    void ResetScrollPlaceholder();
+
+    // ---- Component call-site placeholder replacement (ADR-2/ADR-7, 2026-10-12) ----
+    // An item whose real build got deferred shows a placeholder shell mounted as a
+    // direct child of the Grid host — never inside any LazyForEach/Repeat cache
+    // (syntax layer untouched). All methods run on the UI thread only.
+    struct ScrollPlaceholderItemInfo {
+        RefPtr<FrameNode> shell;
+        std::string templateId;
+        uint64_t templateGen = 0;
+        // Fast-scroll freeze state: true while the last layout round's fill loops no
+        // longer covered this index and the shell's render output is suppressed
+        // (opacity 0) — its frame geometry froze the moment the loops stopped
+        // re-acquiring it (the fill loops position an index only while it stays
+        // inside the round's gridMatrix_ window). Cleared — and the render output
+        // restored — as soon as a later layout round covers the index again.
+        bool frozenHidden = false;
+    };
+    // Decision + acquire + mount + framed enqueue at the child build call point.
+    // Returns the mounted shell when this index is deferred to a placeholder,
+    // null when the caller should keep the existing (build-real) acquisition.
+    // A deferred index is also recorded in the manager's deferral table, so the
+    // acquisition itself (FrameProxy::GetFrameNodeByIndex) substitutes the shell.
+    RefPtr<FrameNode> CreateScrollPlaceholderShell(int32_t index);
+    // Decision-side entry invoked from the layout fill loop right before the normal
+    // child acquisition: predicts with the remaining frame budget and, on defer,
+    // mounts the shell and records the deferral. The wrapper substitution itself is
+    // NOT done here — the acquisition below flows through FrameProxy, which resolves
+    // the recorded deferral, so skip-flag inheritance and activation match real items.
+    void PrepareScrollPlaceholderForAcquisition(int32_t index);
+    bool HasScrollPlaceholderItem(int32_t index) const;
+    // Real-build closure executed by the pipeline framed flush: builds the real
+    // item through the existing build-style acquisition (syntax path as-is),
+    // then requests the local remeasure that completes the replacement.
+    bool CommitScrollPlaceholderRealBuild(int32_t index);
+    // Layout-round reconcile: drops placeholders whose index already holds a real
+    // child or fell out of the just-finished layout round's window, and retires
+    // shells whose real item was committed (removed from the host and the template
+    // content returned to the pool). layoutInfo is the fresh result of that round:
+    // its gridMatrix_ mirrors exactly the indices the fill loops covered, so a
+    // shell the round no longer covered is visually suppressed
+    // (SyncScrollPlaceholderShellCoverage) instead of painting its frozen
+    // stale-viewport geometry over the scrolling rows.
+    void ReconcileScrollPlaceholderItems(const GridLayoutInfo& layoutInfo);
+    // Frame-cadence companion of ReconcileScrollPlaceholderItems: runs from the
+    // manager post-flush hook after every FlushRealBuild iteration, retiring
+    // pending shells whose index the visible window or a real child already
+    // left, so a load-heavy decay (commits stretching across frames with no
+    // layout round in between) can not keep stale shells mounted.
+    void SweepStaleScrollPlaceholderShells();
+    // Defensive sweep: retires mounted shells that neither placeholder table tracks
+    // anymore, so a bookkeeping miss can never leave a shell on the tree (index-based
+    // cleanup can not see shells by design — zero frame count).
+    void SweepOrphanPlaceholderShells();
 
     RefPtr<LayoutProperty> CreateLayoutProperty() override;
 
@@ -89,7 +159,7 @@ public:
         multiSelectable_ = multiSelectable;
     }
 
-    bool MultiSelectable() const
+    bool MultiSelectable() const override
     {
         return multiSelectable_;
     }
@@ -179,6 +249,63 @@ public:
         return info_.reachStart_;
     }
 
+    // Feat-20260806915268: item scroll snap (scrollSnapStrategy) integration.
+    SnapType GetSnapType() override;
+    // Reflects the ACTUAL capability, not the property presence: cross-row and other gated
+    // layouts keep the grid fully snap-inactive, and the inherited property-only answer would
+    // wrongly bypass PARENT_FIRST nested-scroll forwarding for those grids.
+    bool IsScrollSnap() override
+    {
+        return GetSnapType() == SnapType::LIST_SNAP;
+    }
+    bool StartSnapAnimation(SnapAnimationOptions snapAnimationOptions) override;
+    ScrollSnapStrategy GetScrollSnapStrategy() const override;
+    std::vector<SnapCandidate> BuildItemSnapCandidates(ScrollSnapAlign align) override;
+    std::optional<float> GetItemSnapNeighborAnchor(ScrollSnapAlign align, bool towardSmaller) override;
+    // Feat-20260806915268 fix: snap anchors must not read live geometry at the settle callback — after an
+    // early-stopped friction (interrupted fling, residual velocity) child frame rects lag the
+    // final offset by one frame and every anchor shifts by that lag. Instead the visible items'
+    // CONTENT-space geometry is captured in OnDirtyLayoutWrapperSwap (same-frame fresh layout)
+    // and consumed later; content positions are scroll-invariant, so the capture frame's offset
+    // cancels out and the anchors stay exact whenever they are read.
+    struct SnapItemGeometry {
+        float contentStart = 0.0f;
+        float mainSize = 0.0f;
+        int32_t index = -1;
+    };
+    void UpdateSnapItemGeometryCache();
+    // Feat-20260806915268 cmetrics helpers: verbatim extractions from OnDirtyLayoutWrapperSwap
+    // (zero behavior change) to keep it under the 50-nbnc gate.
+    bool UpdateScrollBarAndIndexEventsOnLayout(const GridLayoutInfo& gridLayoutInfo);
+    void FinalizeLayoutSwap(bool sizeDiminished, bool frameSizeChange);
+    void SyncIndexesAndProcessEvents(
+        const RefPtr<GridLayoutBaseAlgorithm>& gridLayoutAlgorithm, bool safeAreaIntermediatePass);
+    std::vector<SnapItemGeometry> snapItemGeometryCache_;
+    bool SupportsTrackedItemSnap() const override
+    {
+        return !HasCrossRowItem();
+    }
+    void BeginTrackedItemSnap(float coordinate) override;
+    std::vector<SnapCandidate> BuildTrackedItemSnapCandidates(ScrollSnapAlign align) override;
+    float ToLogicalMainStart(float physicalStart, float itemMainSize, Axis axis, float viewportMainSize) const;
+    float GetSnapAnchor(
+        ScrollSnapAlign align, float itemStartContent, float itemMainSize, float viewportMainSize) const;
+    bool GetItemMainGeometry(
+        const RefPtr<LayoutWrapper>& item, Axis axis, float& physicalStart, float& itemMainSize) const;
+    bool HasVirtualChildSource() const;
+    std::optional<float> ProbeNeighborItemAnchors(
+        const std::function<float(float, float)>& anchorOfItem, Axis axis, float currentOffset,
+        bool towardSmaller);
+    std::optional<float> EstimateNeighborAnchorFromBoundary(
+        ScrollSnapAlign align, Axis axis, float viewportMainSize, bool towardSmaller);
+    float GetItemSnapCalibrationMargin() const override;
+    float GetItemSnapMaxOffset() const override;
+    float GetItemSnapMinOffset() const override;
+
+    // Feat-20260806915268 (2026-09-15 scope): cross-row items are not supported — true when any item
+    // spans multiple main-axis lines (info_.hasMultiLineItem_) or the irregular layout is on.
+    bool HasCrossRowItem() const;
+
     bool IsAtBottom(bool considerRepeat = false) const override
     {
         return considerRepeat ? (info_.offsetEnd_ && info_.repeatDifference_ == 0) : info_.offsetEnd_;
@@ -217,6 +344,8 @@ public:
     float GetTotalHeight() const override;
 
     void OnAnimateStop() override;
+    void HandleOnDragStatusCallback(
+        const DragEventType& dragEventType, const RefPtr<NotifyDragEvent>& notifyDragEvent) override;
 
     void AnimateTo(float position, float duration, const RefPtr<Curve>& curve, bool smooth, bool canOverScroll = false,
         bool useTotalOffset = true) override;
@@ -246,6 +375,8 @@ public:
 
     void DumpInfo() override;
     void DumpInfo(std::unique_ptr<JsonValue>& json) override;
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
     void GetEventDumpInfo() override;
@@ -259,10 +390,10 @@ public:
     void PrintGridMatrix();
     void PrintLineHeightMap();
     void PrintIrregularItemsPosition();
-    void BuildGridStateInfo(std::unique_ptr<JsonValue>& json);
-    void BuildGridOffsetInfo(std::unique_ptr<JsonValue>& json);
-    void BuildGridIndexInfo(std::unique_ptr<JsonValue>& json);
-    void BuildGridLayoutPropertyInfo(std::unique_ptr<JsonValue>& json);
+    void BuildGridStateInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config = ParamConfig());
+    void BuildGridOffsetInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config = ParamConfig());
+    void BuildGridIndexInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config = ParamConfig());
+    void BuildGridLayoutPropertyInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config = ParamConfig());
     void BuildGridLayoutInfo(std::unique_ptr<JsonValue>& json);
     void BuildScrollAlignInfo(std::unique_ptr<JsonValue>& json);
     void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json) override;
@@ -345,6 +476,16 @@ public:
         int32_t endLine) const;
 
 private:
+    void DumpAdvanceGridInteractionInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    void DumpAdvanceGridSizeInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    void DumpAdvanceGridTemplateInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    // Coordinate origins sampled with snapItemGeometryCache_ during the last layout.
+    float snapGeometryEstimatedOffset_ = 0.0f;
+    float snapGeometryStableOffset_ = 0.0f;
+
     /**
      * @brief calculate where startMainLine_ should be after spring animation.
      * @return main axis position relative to viewport, positive when below viewport.
@@ -358,6 +499,25 @@ private:
     SizeF GetContentSize() const;
     void OnModifyDone() override;
     bool OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config) override;
+    bool OnScrollCallback(float offset, int32_t source) override;
+
+    // Scroll placeholder per-host state (see the public ADR-2/ADR-7 block): the
+    // scroll-activity window gates prediction to scroll time only.
+    std::optional<ScrollPlaceholderOptions> PredictScrollPlaceholderDefer(
+        const RefPtr<ScrollPlaceholderManager>& manager, const RefPtr<FrameNode>& host, int32_t index);
+    void RetireScrollPlaceholderShell(const RefPtr<FrameNode>& shell, const std::string& templateId);
+    // Coverage sync for one live shell against the just-finished layout round: hides
+    // (restores) the shell's render output when its index left (re-entered) that
+    // round's gridMatrix_ fill coverage. See the freeze note on ScrollPlaceholderItemInfo.
+    void SyncScrollPlaceholderShellCoverage(int32_t index, ScrollPlaceholderItemInfo& info,
+        const GridLayoutInfo& layoutInfo);
+    // Drops queued real-build tasks (and their mounted shells) for indices outside the
+    // visible window; reports the window to the manager for flush-time banding.
+    void SweepScrollPlaceholderOutOfRange(int32_t start, int32_t end);
+    // Submits the deferred real-build closure for a placeholder item into the
+    // framed UI-thread queue (flushed by the pipeline).
+    void EnqueueScrollPlaceholderRealBuild(const RefPtr<ScrollPlaceholderManager>& manager,
+        const ScrollPlaceholderPredictParams& params, uint64_t templateGen);
 
     void InitOnKeyEvent(const RefPtr<FocusHub>& focusHub);
     bool OnKeyEvent(const KeyEvent& event);
@@ -391,10 +551,12 @@ private:
     void FireOnScrollIndex(bool indexChanged, const ScrollIndexFunc& onScrollIndex);
     void ReportOnItemGridEvent(const std::string& event);
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
 
     inline bool UseIrregularLayout() const;
 
     std::string GetIrregularIndexesString() const;
+    std::string GetIrregularIndexesString(const ParamConfig& config) const;
     float GetOffsetWithLimit(float offset) const override;
 
     std::string GetLayoutMode() const;
@@ -410,6 +572,17 @@ private:
     bool userDefined_ = false; // true if onGetStartIndex
     bool prevMeasureBreak_ = false;
     std::optional<ExpandEdges> safeAreaPad_;
+
+    // Timestamp of the last scroll callback; 0 = no scroll happened yet.
+    int64_t lastScrollCallbackNs_ = 0;
+    ScrollPlaceholderProvider scrollPlaceholderProvider_;
+    std::map<int32_t, ScrollPlaceholderItemInfo> scrollPlaceholderItems_;
+    std::list<std::pair<RefPtr<FrameNode>, std::string>> retiringPlaceholderShells_;
+    // Every shell this pattern mounted on the host (shell -> its template id), the
+    // single source of truth for the orphan sweep: shells are invisible to index-based
+    // cleanup (zero frame count by design), so retirement bookkeeping misses are
+    // caught here rather than leaking a mounted shell onto the tree.
+    std::map<RefPtr<FrameNode>, std::string> mountedPlaceholderShells_;
 
     RefPtr<GridContentModifier> gridContentModifier_;
 
@@ -428,6 +601,7 @@ private:
     std::unique_ptr<GridLayoutInfo> infoCopy_; // legacy impl to save independent data for animation.
     GridLayoutInfo info_;
     std::list<GridPreloadItem> preloadItemList_; // list of GridItems to build preemptively in IdleTask
+    std::optional<double> dragAutoScrollStartOffset_;
 
     ACE_DISALLOW_COPY_AND_MOVE(GridPattern);
 };

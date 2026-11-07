@@ -19,6 +19,7 @@
 #include "message_parcel.h"
 #include "message_option.h"
 #include "iremote_object.h"
+#include "iremote_broker.h"
 
 namespace OHOS {
 class IPCObjectStub : public IRemoteObject {
@@ -37,6 +38,19 @@ class IRemoteStub : public IPCObjectStub, public T {
 public:
     IRemoteStub() = default;
     virtual ~IRemoteStub() override = default;
+
+    sptr<IRemoteBroker> QueryLocalInterface(const std::u16string& descriptor) override
+    {
+        if (descriptor != T::GetDescriptor()) {
+            return {};
+        }
+        // Stack/uniquely owned mocks have no shared control block to retain.
+        auto owner = this->weak_from_this().lock();
+        if (!owner) {
+            return {};
+        }
+        return sptr<IRemoteBroker>(std::shared_ptr<IRemoteBroker>(owner, static_cast<T*>(this)));
+    }
 
     int32_t OnRemoteRequest(uint32_t code, MessageParcel& data, MessageParcel& reply, MessageOption& option) override
     {

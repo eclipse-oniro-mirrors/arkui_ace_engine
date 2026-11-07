@@ -70,7 +70,7 @@ void BuildDialogPropertiesCallbacks(const Ark_CalendarDialogOptions options, Dia
 DialogProperties BuildDialogProperties(const Ark_CalendarDialogOptions options)
 {
     DialogProperties dialogProps;
-    dialogProps.alignment = DialogAlignment::CENTER;
+    dialogProps.alignment = DialogAlignment::DEFAULT;
     auto blurStyle = Converter::OptConvert<BlurStyle>(options.backgroundBlurStyle);
     if (blurStyle.has_value()) {
         dialogProps.backgroundBlurStyle = static_cast<int32_t>(blurStyle.value());
@@ -93,6 +93,10 @@ DialogProperties BuildDialogProperties(const Ark_CalendarDialogOptions options)
     auto edgeLightMode = Converter::OptConvert<EdgeLightMode>(options.edgeLightMode);
     if (edgeLightMode) {
         dialogProps.edgeLightMode = edgeLightMode.value();
+    }
+    auto adaptToHandedness = Converter::OptConvert<HandednessFollowMode>(options.adaptToHandedness);
+    if (adaptToHandedness) {
+        dialogProps.adaptToHandedness = adaptToHandedness.value();
     }
     BuildDialogPropertiesCallbacks(options, dialogProps);
     return dialogProps;
@@ -120,6 +124,10 @@ CalendarSettingData BuildSettingData(const Ark_CalendarDialogOptions options)
     auto markToday = Converter::OptConvert<bool>(options.markToday);
     if (markToday.has_value()) {
         settingData.markToday = markToday.value();
+    }
+    auto firstDayOfWeekOpt = Converter::GetOptPtr(&options.firstDayOfWeek);
+    if (firstDayOfWeekOpt) {
+        settingData.firstDayOfWeek = static_cast<int32_t>(*firstDayOfWeekOpt);
     }
     return settingData;
 }

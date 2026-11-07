@@ -30,7 +30,8 @@ class ContainerSpanTextBackgroundStyleModifier extends ModifierWithKey<TextBackg
           textBackgroundStyle.color, textBackgroundStyle.radius.topLeft,
           textBackgroundStyle.radius.topRight,
           textBackgroundStyle.radius.bottomLeft,
-          textBackgroundStyle.radius.bottomRight);
+          textBackgroundStyle.radius.bottomRight,
+          textBackgroundStyle.borderColor, textBackgroundStyle.borderWidth);
       }
     }
   }

@@ -14,11 +14,15 @@
  */
 
 #include "node_model.h"
+#include "core/interfaces/native/node/content_change_api.h"
+#include "core/interfaces/native/node/page_text_api.h"
+#include "core/interfaces/native/node/ui_tree_api.h"
+#include "core/interfaces/native/node/interaction_observer_api.h"
+#include "node/config_manager.h"
 
 #include <cstring>
 #include <memory>
 
-#include "config_manager.h"
 #include "event_converter.h"
 #include "interfaces/native/event/ui_input_event_impl.h"
 #include "node_extened.h"
@@ -192,6 +196,50 @@ bool InitialFullNodeImpl(int version, ArkUIFullNodeAPI*& inputImpl)
 }
 } // namespace
 
+const ArkUIPageTextAPI* GetPageTextAPI()
+{
+    using Entry = const ArkUIPageTextAPI* (*)(int32_t);
+    auto* module = FindModule();
+    if (!module) {
+        return nullptr;
+    }
+    auto entry = reinterpret_cast<Entry>(FindFunction(module, "GetArkUIPageTextAPI"));
+    return entry ? entry(1) : nullptr;
+}
+
+const ArkUITreeAPI* GetTreeAPI()
+{
+    using Entry = const ArkUITreeAPI* (*)(int32_t);
+    auto* module = FindModule();
+    if (!module) {
+        return nullptr;
+    }
+    auto entry = reinterpret_cast<Entry>(FindFunction(module, "GetArkUITreeAPI"));
+    return entry ? entry(1) : nullptr;
+}
+
+const ArkUIInteractionObserverAPI* GetInteractionObserverAPI()
+{
+    using Entry = const ArkUIInteractionObserverAPI* (*)(int32_t);
+    auto* module = FindModule();
+    if (!module) {
+        return nullptr;
+    }
+    auto entry = reinterpret_cast<Entry>(FindFunction(module, "GetArkUIInteractionObserverAPI"));
+    return entry ? entry(1) : nullptr;
+}
+
+const ArkUIContentChangeAPI* GetContentChangeAPI()
+{
+    using Entry = const ArkUIContentChangeAPI* (*)(int32_t);
+    auto* module = FindModule();
+    if (!module) {
+        return nullptr;
+    }
+    auto entry = reinterpret_cast<Entry>(FindFunction(module, "GetArkUIContentChangeAPI"));
+    return entry ? entry(ARKUI_CONTENT_CHANGE_API_VERSION) : nullptr;
+}
+
 ArkUIFullNodeAPI* GetFullImpl()
 {
     return impl;
@@ -205,12 +253,33 @@ ArkUIFullNodeAPI* GetOrCreateFullImpl()
     return impl;
 }
 
+ArkUIFullNodeAPI* GetFullImplForAnyThread()
+{
+    static auto* api = []() -> ArkUIFullNodeAPI* {
+        auto* module = FindModule();
+        if (!module) {
+            return nullptr;
+        }
+        using GetAPI = ArkUIAnyAPI* (*)(int);
+        auto entry = reinterpret_cast<GetAPI>(FindFunction(module, "GetArkUIAnyFullNodeAPI"));
+        auto* resolved = entry ? reinterpret_cast<ArkUIFullNodeAPI*>(entry(ARKUI_NODE_API_VERSION)) : nullptr;
+        return resolved && resolved->version == ARKUI_NODE_API_VERSION ? resolved : nullptr;
+    }();
+    return api;
+}
+
 ArkUIFullNodeAPI* GetFullImplForErrorMessage()
 {
     if (!errorMessageImpl && !InitialFullNodeImpl(ARKUI_NODE_API_VERSION, errorMessageImpl)) {
         return nullptr;
     }
     return errorMessageImpl;
+}
+
+const ArkUIBasicAPI* GetBasicAPI()
+{
+    const auto* full = GetOrCreateFullImpl();
+    return full == nullptr ? nullptr : full->getBasicAPI();
 }
 
 bool InitialFullImpl()
@@ -563,7 +632,11 @@ int32_t RegisterNodeEvent(ArkUI_NodeHandle nodePtr, ArkUI_NodeEventType eventTyp
 
 int32_t RegisterNodeEvent(ArkUI_NodeHandle nodePtr, ArkUI_NodeEventType eventType, int32_t targetId, void* userData)
 {
-    if (nodePtr == nullptr || !CheckIsCNode(nodePtr)) {
+    if (nodePtr == nullptr) {
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    CHECK_NODE_DISPOSED(nodePtr, "Node has been disposed");
+    if (!CheckIsCNode(nodePtr)) {
         return ERROR_CODE_PARAM_INVALID;
     }
     auto originEventType = ConvertOriginEventType(eventType, nodePtr->type);
@@ -647,10 +720,11 @@ int32_t RegisterNodeEvent(ArkUI_NodeHandle nodePtr, ArkUI_NodeEventType eventTyp
 
 void UnregisterNodeEvent(ArkUI_NodeHandle nodePtr, ArkUI_NodeEventType eventType)
 {
-    if (nodePtr == nullptr || !CheckIsCNode(nodePtr)) {
+    if (nodePtr == nullptr) {
         return;
     }
-    if (!nodePtr->extraData) {
+    CHECK_NODE_DISPOSED(nodePtr, "Node has been disposed");
+    if (!CheckIsCNode(nodePtr) || !nodePtr->extraData) {
         return;
     }
     if (nodePtr->type == -1 && !nodePtr->isBindNative) {
@@ -919,6 +993,7 @@ void HandleNodeEvent(ArkUI_NodeEvent* event)
         TriggerNodeEvent(event, eventListenersSet);
     }
     if (g_eventReceiver) {
+        LOG_CALLBACK("ArkUI_NativeNodeAPI_1.registerNodeEventReceiver", g_eventReceiver);
         g_eventReceiver(event);
     }
 }
@@ -937,7 +1012,10 @@ void TriggerNodeEvent(ArkUI_NodeEvent* event, std::set<void (*)(ArkUI_NodeEvent*
 
     // Use the copy for iteration and callbacks
     for (const auto& eventListener : listenersCopy) {
-        eventListener(event);
+        {
+            LOG_CALLBACK("ArkUI_NativeNodeAPI_1.addNodeEventReceiver", eventListener);
+            eventListener(event);
+        }
         if (!IsValidArkUINode(event->node)) {
             break;
         }
@@ -1026,6 +1104,13 @@ void TriggerNodeCommonEvent(ArkUI_NodeEvent* event, int32_t eventType,
     auto it = commonEventListenersMap->find(eventType);
     if (it != commonEventListenersMap->end()) {
         const auto& eventListener = it->second;
+        const char* source = "OH_ArkUI_NativeModule_RegisterCommonEvent";
+        if (eventType == NODE_VISIBLE_AREA_APPROXIMATE_CHANGE_EVENT) {
+            source = "OH_ArkUI_NativeModule_RegisterCommonVisibleAreaApproximateChangeEvent";
+        } else if (eventType == NODE_EVENT_ON_AREA_CHANGE) {
+            source = "OH_ArkUI_NativeModule_RegisterCommonAreaApproximateChangeEvent";
+        }
+        LOG_CALLBACK(source, eventListener);
         (*eventListener)(event);
     }
 }
@@ -1125,7 +1210,11 @@ void MarkDirty(ArkUI_NodeHandle nodePtr, ArkUI_NodeDirtyFlag dirtyFlag)
 
 int32_t AddNodeEventReceiver(ArkUI_NodeHandle nodePtr, void (*eventReceiver)(ArkUI_NodeEvent* event))
 {
-    if (!nodePtr || !eventReceiver || !CheckIsCNode(nodePtr)) {
+    if (!nodePtr || !eventReceiver) {
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    CHECK_NODE_DISPOSED(nodePtr, "Node has been disposed");
+    if (!CheckIsCNode(nodePtr)) {
         return ERROR_CODE_PARAM_INVALID;
     }
     if (!nodePtr->eventListeners) {
@@ -1141,7 +1230,11 @@ int32_t AddNodeEventReceiver(ArkUI_NodeHandle nodePtr, void (*eventReceiver)(Ark
 
 int32_t RemoveNodeEventReceiver(ArkUI_NodeHandle nodePtr, void (*eventReceiver)(ArkUI_NodeEvent* event))
 {
-    if (!nodePtr || !eventReceiver || !nodePtr->eventListeners || !CheckIsCNode(nodePtr)) {
+    if (!nodePtr || !eventReceiver) {
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    CHECK_NODE_DISPOSED(nodePtr, "Node has been disposed");
+    if (!nodePtr->eventListeners || !CheckIsCNode(nodePtr)) {
         return ERROR_CODE_PARAM_INVALID;
     }
     auto eventListenersSet = reinterpret_cast<std::set<void (*)(ArkUI_NodeEvent*)>*>(nodePtr->eventListeners);
@@ -1748,7 +1841,9 @@ int32_t GetNodeTypeByTag(ArkUI_NodeHandle node)
         { OHOS::Ace::V2::CUSTOM_ETS_TAG, ArkUI_NodeType::ARKUI_NODE_CUSTOM },
     };
 
-    const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
+    // GetOrCreateFullImpl (NOT GetFullImpl): this resolution may be the caller's FIRST access to the NDK-side NodeModel bundle (e.g.
+    const auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
+    CHECK_NULL_RETURN(impl, -1);
     auto value = impl->getNodeModifiers()->getFrameNodeModifier()->getNodeType(node->uiNodeHandle);
     auto iter = nodeTypeMap.find(value);
     if (iter != nodeTypeMap.end()) {
@@ -1877,6 +1972,7 @@ extern "C" {
 
 int32_t OH_ArkUI_NodeContent_AddNode(ArkUI_NodeContentHandle content, ArkUI_NodeHandle node)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NodeContent_AddNode");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN_WITH_MESSAGE(impl, OHOS::Ace::ERROR_CODE_NATIVE_IMPL_LIBRARY_NOT_FOUND,
         __FUNCTION__, "Native module not initialized");
@@ -1893,6 +1989,7 @@ int32_t OH_ArkUI_NodeContent_AddNode(ArkUI_NodeContentHandle content, ArkUI_Node
 
 int32_t OH_ArkUI_NodeContent_InsertNode(ArkUI_NodeContentHandle content, ArkUI_NodeHandle node, int32_t position)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NodeContent_InsertNode");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN_WITH_MESSAGE(impl, OHOS::Ace::ERROR_CODE_NATIVE_IMPL_LIBRARY_NOT_FOUND,
         __FUNCTION__, "Native module not initialized");
@@ -1909,6 +2006,7 @@ int32_t OH_ArkUI_NodeContent_InsertNode(ArkUI_NodeContentHandle content, ArkUI_N
 
 int32_t OH_ArkUI_NodeContent_RemoveNode(ArkUI_NodeContentHandle content, ArkUI_NodeHandle node)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NodeContent_RemoveNode");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN_WITH_MESSAGE(impl, OHOS::Ace::ERROR_CODE_NATIVE_IMPL_LIBRARY_NOT_FOUND,
         __FUNCTION__, "Native module not initialized");
@@ -1925,6 +2023,7 @@ int32_t OH_ArkUI_NodeContent_RemoveNode(ArkUI_NodeContentHandle content, ArkUI_N
 
 int32_t OH_ArkUI_NodeContent_RegisterCallback(ArkUI_NodeContentHandle content, ArkUI_NodeContentCallback callback)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NodeContent_RegisterCallback");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN_WITH_MESSAGE(impl, OHOS::Ace::ERROR_CODE_NATIVE_IMPL_LIBRARY_NOT_FOUND,
         __FUNCTION__, "Native module not initialized");
@@ -1953,6 +2052,7 @@ ArkUI_NodeContentHandle OH_ArkUI_NodeContentEvent_GetNodeContentHandle(ArkUI_Nod
 
 int32_t OH_ArkUI_NodeContent_SetUserData(ArkUI_NodeContentHandle content, void* userData)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NodeContent_SetUserData");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN_WITH_MESSAGE(impl, OHOS::Ace::ERROR_CODE_NATIVE_IMPL_LIBRARY_NOT_FOUND,
         __FUNCTION__, "Native module not initialized");
@@ -1966,6 +2066,7 @@ int32_t OH_ArkUI_NodeContent_SetUserData(ArkUI_NodeContentHandle content, void* 
 
 void* OH_ArkUI_NodeContent_GetUserData(ArkUI_NodeContentHandle content)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NodeContent_GetUserData");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN(impl, nullptr);
     return impl->getNodeModifiers()->getNodeContentModifier()->getUserData(

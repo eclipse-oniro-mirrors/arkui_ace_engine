@@ -746,10 +746,11 @@ HWTEST_F(VideoStateMachinePatternTestNg, OnCurrentTimeChange_DurationZero001, Te
 
     auto mockMediaPlayer = AceType::MakeRefPtr<TestableMockMediaPlayer>();
     EXPECT_CALL(*mockMediaPlayer, IsMediaPlayerValid()).WillRepeatedly(Return(true));
-    EXPECT_CALL(*mockMediaPlayer, GetDuration(_)).WillRepeatedly([](int32_t& duration) {
+    auto getDuration = [](int32_t& duration) {
         duration = 60000;
         return 0;
-    });
+    };
+    EXPECT_CALL(*mockMediaPlayer, GetDuration(_)).WillRepeatedly(getDuration);
     pattern->mediaPlayer_ = mockMediaPlayer;
 
     pattern->duration_ = 0;
@@ -775,7 +776,7 @@ HWTEST_F(VideoStateMachinePatternTestNg, HandleSetPlaybackRateResult_Success001,
     ASSERT_TRUE(pattern);
 
     std::string errorMsg = "";
-    pattern->HandleSetPlaybackRateResult(1.0, ERROR_CODE_SUCCESS, errorMsg);
+    pattern->HandleSetPlaybackRateResult(pattern->mediaPlayer_, pattern->hostId_, 1.0, ERROR_CODE_SUCCESS, errorMsg);
 }
 
 /**
@@ -796,7 +797,7 @@ HWTEST_F(VideoStateMachinePatternTestNg, HandleSetPlaybackRateResult_InvalidVal0
     pattern->mediaPlayer_ = mockMediaPlayer;
 
     std::string errorMsg = "";
-    pattern->HandleSetPlaybackRateResult(1.0, ERROR_CODE_INVALID_VAL, errorMsg);
+    pattern->HandleSetPlaybackRateResult(mockMediaPlayer, pattern->hostId_, 1.0, ERROR_CODE_INVALID_VAL, errorMsg);
 }
 
 /**
@@ -812,7 +813,8 @@ HWTEST_F(VideoStateMachinePatternTestNg, HandleSetPlaybackRateResult_InvalidOper
     ASSERT_TRUE(pattern);
 
     std::string errorMsg = "";
-    pattern->HandleSetPlaybackRateResult(1.0, ERROR_CODE_INVALID_OPERATION, errorMsg);
+    pattern->HandleSetPlaybackRateResult(
+        pattern->mediaPlayer_, pattern->hostId_, 1.0, ERROR_CODE_INVALID_OPERATION, errorMsg);
 }
 
 /**
@@ -833,7 +835,7 @@ HWTEST_F(VideoStateMachinePatternTestNg, HandleSetPlaybackRateResult_Default001,
     pattern->mediaPlayer_ = mockMediaPlayer;
 
     std::string errorMsg = "";
-    pattern->HandleSetPlaybackRateResult(1.0, ERROR_CODE_UNKNOWN, errorMsg);
+    pattern->HandleSetPlaybackRateResult(mockMediaPlayer, pattern->hostId_, 1.0, ERROR_CODE_UNKNOWN, errorMsg);
 }
 
 
@@ -1402,10 +1404,18 @@ HWTEST_F(VideoStateMachinePatternTestNg, Start_CannotSetPending001, TestSize.Lev
     EXPECT_CALL(*mockMediaPlayer, IsMediaPlayerValid()).WillRepeatedly(Return(true));
     pattern->mediaPlayer_ = mockMediaPlayer;
 
-    pattern->stateManager_->state_ = VideoPlaybackState::PLAYING;
+    pattern->stateManager_->state_ = VideoPlaybackState::PREPARED;
     pattern->stateManager_->SetPendingCommand(VideoPlaybackCommand::PLAY, nullptr);
 
-    pattern->Start();
+    bool callbackCalled = false;
+    pattern->Start([&callbackCalled](bool success, const std::string& reason) {
+        callbackCalled = true;
+        EXPECT_FALSE(success);
+        EXPECT_EQ(reason, "command conflict");
+    });
+    EXPECT_TRUE(callbackCalled);
+    EXPECT_EQ(pattern->stateManager_->GetPendingCommand(), VideoPlaybackCommand::PLAY);
+    EXPECT_TRUE(pattern->stateManager_->serialBgTaskQueue_.empty());
 }
 
 /**
@@ -1528,10 +1538,18 @@ HWTEST_F(VideoStateMachinePatternTestNg, Pause_CannotSetPending001, TestSize.Lev
     EXPECT_CALL(*mockMediaPlayer, IsMediaPlayerValid()).WillRepeatedly(Return(true));
     pattern->mediaPlayer_ = mockMediaPlayer;
 
-    pattern->stateManager_->state_ = VideoPlaybackState::PAUSED;
+    pattern->stateManager_->state_ = VideoPlaybackState::PLAYING;
     pattern->stateManager_->SetPendingCommand(VideoPlaybackCommand::PAUSE, nullptr);
 
-    pattern->Pause();
+    bool callbackCalled = false;
+    pattern->Pause([&callbackCalled](bool success, const std::string& reason) {
+        callbackCalled = true;
+        EXPECT_FALSE(success);
+        EXPECT_EQ(reason, "command conflict");
+    });
+    EXPECT_TRUE(callbackCalled);
+    EXPECT_EQ(pattern->stateManager_->GetPendingCommand(), VideoPlaybackCommand::PAUSE);
+    EXPECT_TRUE(pattern->stateManager_->serialBgTaskQueue_.empty());
 }
 
 
@@ -1592,10 +1610,18 @@ HWTEST_F(VideoStateMachinePatternTestNg, Stop_CannotSetPending001, TestSize.Leve
     EXPECT_CALL(*mockMediaPlayer, IsMediaPlayerValid()).WillRepeatedly(Return(true));
     pattern->mediaPlayer_ = mockMediaPlayer;
 
-    pattern->stateManager_->state_ = VideoPlaybackState::STOPPED;
+    pattern->stateManager_->state_ = VideoPlaybackState::PLAYING;
     pattern->stateManager_->SetPendingCommand(VideoPlaybackCommand::STOP, nullptr);
 
-    pattern->Stop();
+    bool callbackCalled = false;
+    pattern->Stop([&callbackCalled](bool success, const std::string& reason) {
+        callbackCalled = true;
+        EXPECT_FALSE(success);
+        EXPECT_EQ(reason, "command conflict");
+    });
+    EXPECT_TRUE(callbackCalled);
+    EXPECT_EQ(pattern->stateManager_->GetPendingCommand(), VideoPlaybackCommand::STOP);
+    EXPECT_TRUE(pattern->stateManager_->serialBgTaskQueue_.empty());
 }
 
 

@@ -21,18 +21,11 @@
 #include "frameworks/bridge/declarative_frontend/jsview/js_container_base.h"
 
 namespace OHOS::Ace {
-std::unique_ptr<DistortionComponentModel> DistortionComponentModel::instance_ = nullptr;
-std::mutex DistortionComponentModel::mutex_;
 
 DistortionComponentModel* DistortionComponentModel::GetInstance()
 {
-    if (!instance_) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (!instance_) {
-            instance_.reset(new NG::DistortionComponentModelNG());
-        }
-    }
-    return instance_.get();
+    static NG::DistortionComponentModelNG instance;
+    return &instance;
 }
 } // namespace OHOS::Ace
 

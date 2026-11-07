@@ -40,7 +40,7 @@
 #include "core/components/web/web_property.h" // Unscoped enum types
 #include "core/common/ime/text_range.h"
 #include "core/components/common/properties/text_style.h"
-#include "core/components_ng/pattern/list/list_item_group_pattern.h" // Unscoped enum types
+#include "core/components_ng/pattern/list/list_properties.h" // Unscoped enum types
 #include "core/components_ng/pattern/slider/slider_model.h" // Inner types
 #include "core/components_ng/pattern/tabs/tab_content_model.h"
 #include "core/components_ng/pattern/text/text_styles.h"
@@ -68,6 +68,7 @@ class SpanBase;
 class ResponseRegion;
 class UiMaterial;
 enum class AutoCapitalizationMode;
+enum class BarOverlapMode;
 enum class CanvasUnit;
 enum class CancelButtonStyle;
 enum class ChainEdgeEffect;
@@ -85,6 +86,7 @@ enum class LineJoinStyle;
 enum class MenuPolicy;
 enum class NavigationType;
 enum class ParticleDisturbanceShapeType : uint32_t;
+enum class ScrollAlign;
 enum class TabBarDisplayMode;
 enum class SidebarDisplayStyle;
 enum class TabsCacheMode;
@@ -98,6 +100,7 @@ class PickerDate;
 class PickerTime;
 struct DateTimeType;
 struct Font;
+struct ListItemGroupIndex;
 struct PickerIndicatorStyle;
 struct PreviewText;
 struct SelectionOptions;
@@ -127,6 +130,7 @@ enum class TextContentType;
 enum class TextResponseType;
 enum class TextSpanType;
 enum class ToggleType;
+enum class HandednessFollowMode;
 struct BarItem;
 struct KeyboardOptions;
 struct NavDestinationTransition;
@@ -691,6 +695,7 @@ namespace Converter {
     template<> ACE_FORCE_EXPORT DimensionRect Convert(const Ark_Rectangle &src);
     template<> ACE_FORCE_EXPORT DistortionMode Convert(const Ark_DistortionMode& options);
     template<> ACE_FORCE_EXPORT EdgeLightMode Convert(const Ark_EdgeLightMode& options);
+    template<> ACE_FORCE_EXPORT HandednessFollowMode Convert(const Ark_HandednessFollowMode& options);
     template<> EdgesParam Convert(const Ark_Edges& src);
     template<> EdgesParam Convert(const Ark_LocalizedEdges& src);
     template<> ACE_FORCE_EXPORT EffectOption Convert(const Ark_BackgroundEffectOptions& src);
@@ -924,6 +929,8 @@ namespace Converter {
     template<> void AssignCast(std::optional<DynamicRangeMode>& dst, const Ark_DynamicRangeMode& src);
     template<> ACE_FORCE_EXPORT void AssignCast(std::optional<EdgeEffect>& dst, const Ark_EdgeEffect& src);
     template<> ACE_FORCE_EXPORT void AssignCast(std::optional<EdgeLightMode>& dst, const Ark_EdgeLightMode& src);
+    template<> ACE_FORCE_EXPORT void AssignCast(std::optional<HandednessFollowMode>& dst,
+        const Ark_HandednessFollowMode& src);
     template<> void AssignCast(std::optional<EdgeLightPosition>& dst, const Ark_EdgeLightPosition& src);
     template<> void AssignCast(std::optional<EffectLayer>& dst, const Ark_EffectLayer& src);
     template<> void AssignCast(std::optional<UnionMode>& dst, const Ark_UnionMode& src);
@@ -1070,6 +1077,7 @@ namespace Converter {
     ACE_FORCE_EXPORT void AssignCast(std::optional<SubMenuExpandingMode>& dst, const Ark_SubMenuExpandingMode& src);
     template<> void AssignCast(std::optional<SwipeActionState>& dst, const Ark_SwipeActionState& src);
     template<> void AssignCast(std::optional<SwipeDirection>& dst, const Ark_SwipeDirection& src);
+    template<> ACE_FORCE_EXPORT void AssignCast(std::optional<BarOverlapMode>& dst, const Ark_BarOverlapMode& src);
     template<> ACE_FORCE_EXPORT void AssignCast(std::optional<SymbolData>& dst, const Ark_Resource& src);
     template<> ACE_FORCE_EXPORT void AssignCast(std::optional<TabAnimateMode>& dst, const Ark_AnimationMode& src);
     template<> ACE_FORCE_EXPORT void AssignCast(std::optional<TabBarMode>& dst, const Ark_BarMode& src);
@@ -1162,6 +1170,15 @@ namespace Converter {
     template<> void AssignCast(std::optional<ImmersiveOptions>& dst, const Ark_ImmersiveOptionsInner& src);
     template<> void AssignCast(std::optional<BlurSnapshotOptions>& dst, const Ark_BlurSnapshotOptions& src);
     template<> void AssignCast(std::optional<LightEffectOptions>& dst, const Ark_LightEffectOptionsInner& src);
+    template<> void AssignCast(std::optional<SheetTitleBarHoverMode>& dst, const Ark_SheetTitleBarHoverMode& src);
+    template<> void AssignCast(std::optional<ShadowClipMode>& dst, const Ark_ShadowClipMode& src);
+#ifndef WINDOWS_PLATFORM
+#if defined(ARKUI_CAPI_UNITTEST) || defined(LINUX_PLATFORM) || defined(MAC_PLATFORM) || defined(CROSS_PLATFORM)
+    template<> void AssignCast(std::optional<WebContextMenuItemId>& dst, const WebContextMenuItemId& src);
+#else
+    template<> void AssignCast(std::optional<WebContextMenuItemId>& dst, const Ark_WebContextMenuItemId& src);
+#endif
+#endif
     // DO NOT ADD NEW DECLARATIONS HERE!!! Add in alphabetic order above!
 
     template<typename From>
@@ -1182,11 +1199,10 @@ namespace Converter {
         return std::nullopt;
     }
 
-    class ConverterState {
-    public:
-        inline static DimensionUnit defDimensionUnit = DimensionUnit::VP;
-        inline static double defShadowBlurRadius = -1.0;
-    };
+    namespace ConverterState {
+        extern ACE_FORCE_EXPORT DimensionUnit defDimensionUnit;
+        extern ACE_FORCE_EXPORT double defShadowBlurRadius;
+    } // namespace OHOS::Ace::NG::Converter::ConverterState
 
     template<> inline Dimension Convert(const Ark_LengthMetricsProxy& src)
     {

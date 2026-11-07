@@ -1634,6 +1634,40 @@ float SwiperIndicatorPattern::HandleTouchClickMargin()
     return ((axis == Axis::HORIZONTAL ? frameSize.Width() : frameSize.Height()) - contentWidth) * 0.5f;
 }
 
+void SwiperIndicatorPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("isHover", isHover_);
+        json->Put("isPressed", isPressed_);
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("isClicked", isClicked_);
+        json->Put("isRepeatClicked", isRepeatClicked_);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        DumpAdvanceVisualProperties(json, config);
+    }
+}
+
+void SwiperIndicatorPattern::DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    switch (GetIndicatorType()) {
+        case SwiperIndicatorType::DOT:
+            json->Put("SwiperIndicatorType", "DOT");
+            break;
+        case SwiperIndicatorType::DIGIT:
+            json->Put("SwiperIndicatorType", "DIGIT");
+            break;
+        case SwiperIndicatorType::ARC_DOT:
+            if (config.IsPublicTree()) {
+                json->Put("SwiperIndicatorType", "ARC_DOT");
+            }
+            break;
+        default:
+            break;
+    }
+}
+
 void SwiperIndicatorPattern::DumpAdvanceInfo()
 {
     isHover_ ? DumpLog::GetInstance().AddDesc("isHover:true") : DumpLog::GetInstance().AddDesc("isHover:false");
@@ -2148,23 +2182,7 @@ bool SwiperIndicatorPattern::GetDigitFrameSize(RefPtr<GeometryNode>& geoNode, Si
 
 void SwiperIndicatorPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    json->Put("isHover", isHover_);
-    json->Put("isPressed", isPressed_);
-    json->Put("isClicked", isClicked_);
-    json->Put("isRepeatClicked", isRepeatClicked_);
-    switch (GetIndicatorType()) {
-        case SwiperIndicatorType::DOT: {
-            json->Put("SwiperIndicatorType", "DOT");
-            break;
-        }
-        case SwiperIndicatorType::DIGIT: {
-            json->Put("SwiperIndicatorType", "DIGIT");
-            break;
-        }
-        default: {
-            break;
-        }
-    }
+    SwiperIndicatorPattern::DumpAdvanceInfo(json, ParamConfig());
 }
 
 bool SwiperIndicatorPattern::OnThemeScopeUpdate(int32_t themeScopeId)

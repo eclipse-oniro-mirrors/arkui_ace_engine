@@ -20,7 +20,9 @@
 
 #include "base/geometry/dimension.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/pattern/container_picker/container_picker_model.h"
 #include "core/components_ng/pattern/container_picker/container_picker_model_static.h"
+#include "core/components_ng/pattern/date_picker/picker_text_style.h"
 #include "core/interfaces/native/utility/callback_helper.h"
 #include "core/interfaces/native/utility/converter.h"
 #include "core/interfaces/native/utility/reverse_converter.h"
@@ -137,6 +139,76 @@ void SetDisplayedItemCountImpl(Ark_NativePointer node, const Opt_Int32* value)
     auto convertedValue = Converter::OptConvertPtr<int32_t>(value);
     ContainerPickerModelStatic::SetDisplayedItemCount(frameNode, convertedValue);
 }
+void ParsePickerComponentFont(const Ark_arkui_component_units_Font& font, NG::PickerTextStyle& style)
+{
+    if (font.size.tag != INTEROP_TAG_UNDEFINED) {
+        auto sizeOpt = Converter::OptConvertFromArkLength(font.size.value, DimensionUnit::FP);
+        if (sizeOpt.has_value() && sizeOpt->IsValid() && !sizeOpt->IsNegative()) {
+            style.fontSize = sizeOpt.value();
+        }
+    }
+    Converter::VisitUnion(font.weight,
+        [&style](const Ark_FontWeight& v) {
+            auto weightOpt = Converter::OptConvert<FontWeight>(v);
+            if (weightOpt.has_value()) {
+                style.fontWeight = weightOpt.value();
+            }
+        },
+        [&style](const Ark_Int32& v) {
+            auto weightOpt = Converter::OptConvert<FontWeight>(v);
+            if (weightOpt.has_value()) {
+                style.fontWeight = weightOpt.value();
+            }
+        },
+        [&style](const Ark_String& v) {
+            auto str = Converter::Convert<std::string>(v);
+            auto [parseOk, val] = StringUtils::ParseFontWeight(str);
+            if (parseOk) {
+                style.fontWeight = val;
+            }
+        },
+        []() {});
+}
+
+void SetSelectedTextStyleImpl(Ark_NativePointer node,
+    const Opt_PickerComponentTextStyle* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    if (!value || value->tag == INTEROP_TAG_UNDEFINED) {
+        ContainerPickerModel::ResetSelectedTextStyle(frameNode);
+        return;
+    }
+    const auto& ts = value->value;
+    NG::PickerTextStyle style;
+    auto colorOpt = Converter::OptConvert<Color>(ts.color);
+    if (colorOpt.has_value()) {
+        style.textColor = colorOpt.value();
+        style.textColorSetByUser = true;
+    }
+    if (ts.font.tag != INTEROP_TAG_UNDEFINED) {
+        ParsePickerComponentFont(ts.font.value, style);
+    }
+    auto minFontSizeOpt = Converter::OptConvertFromF64ResourceStr(ts.minFontSize, DimensionUnit::FP);
+    if (minFontSizeOpt.has_value() && minFontSizeOpt->IsValid() && !minFontSizeOpt->IsNegative()) {
+        style.minFontSize = minFontSizeOpt.value();
+    }
+    auto maxFontSizeOpt = Converter::OptConvertFromF64ResourceStr(ts.maxFontSize, DimensionUnit::FP);
+    if (maxFontSizeOpt.has_value() && maxFontSizeOpt->IsValid() && !maxFontSizeOpt->IsNegative()) {
+        style.maxFontSize = maxFontSizeOpt.value();
+    }
+    auto overflowOpt = Converter::OptConvert<Ace::TextOverflow>(ts.overflow);
+    if (overflowOpt.has_value()) {
+        style.textOverflow = overflowOpt.value();
+    }
+    if (!style.fontSize.has_value() && !style.textColor.has_value() &&
+        !style.fontWeight.has_value() && !style.minFontSize.has_value() &&
+        !style.maxFontSize.has_value() && !style.textOverflow.has_value()) {
+        ContainerPickerModel::ResetSelectedTextStyle(frameNode);
+        return;
+    }
+    ContainerPickerModel::SetSelectedTextStyle(frameNode, style);
+}
 } // UIPickerComponentAttributeModifier
 const GENERATED_ArkUIUIPickerComponentModifier* GetUIPickerComponentModifier()
 {
@@ -150,6 +222,7 @@ const GENERATED_ArkUIUIPickerComponentModifier* GetUIPickerComponentModifier()
         UIPickerComponentAttributeModifier::SetSelectionIndicatorImpl,
         UIPickerComponentAttributeModifier::SetItemHeightImpl,
         UIPickerComponentAttributeModifier::SetDisplayedItemCountImpl,
+        UIPickerComponentAttributeModifier::SetSelectedTextStyleImpl,
     };
     return &ArkUIUIPickerComponentModifierImpl;
 }

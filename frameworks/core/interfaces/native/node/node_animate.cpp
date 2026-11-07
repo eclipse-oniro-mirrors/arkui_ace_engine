@@ -14,20 +14,25 @@
  */
 
 #include "core/interfaces/native/node/node_animate.h"
+
+#include "base/log/log_wrapper.h"
+
 #include "ui/animation/animation_constants.h"
 
 #include "base/error/error_code.h"
 #include "base/log/ace_trace.h"
-#include "core/interfaces/native/utility/error_message_macros.h"
 #include "core/animation/animation_pub.h"
 #include "core/animation/animator.h"
 #include "core/animation/curve_animation.h"
-#include "core/animation/spring_curve.h"
 #include "core/animation/keyframe_animation.h"
+#include "core/animation/spring_curve.h"
 #include "core/common/ace_engine.h"
+#include "core/components_ng/animation/animation_group_adapter.h"
 #include "core/components_ng/base/view_stack_model.h"
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/render/animation_utils.h"
+#include "core/interfaces/native/node/node_render_node_modifier.h"
+#include "core/interfaces/native/utility/error_message_macros.h"
 
 namespace OHOS::Ace::NG::ViewAnimate {
 namespace {
@@ -126,6 +131,16 @@ void FlushDirtyNodesWhenExist(const RefPtr<PipelineBase>& pipelineContext,
         isDirtyLayoutNodesEmpty = pipelineContext->IsDirtyLayoutNodesEmpty();
         flushCount++;
     }
+}
+
+void SetKeyframeOnFinishEvent(AnimationOption& option, const ArkUIKeyframeAnimateOption* animateOption, int32_t id)
+{
+    auto onFinishEvent = [onFinish = animateOption->onFinish, userData = animateOption->userData, id]() {
+        ContainerScope scope(id);
+        LOG_CALLBACK("OH_ArkUI_KeyframeAnimateOption_RegisterOnFinishCallback", onFinish);
+        onFinish(userData);
+    };
+    option.SetOnFinishEvent(onFinishEvent);
 }
 } // namespace
 
@@ -243,6 +258,7 @@ void AnimateTo(ArkUIContext* context, ArkUIAnimateOption option, void (*event)(v
 
     auto onEvent = [event, user]() {
         if (event) {
+            LOG_CALLBACK("ArkUI_NativeAnimateAPI_1.animateTo:update", event);
             event(user);
         }
     };
@@ -254,6 +270,7 @@ void AnimateTo(ArkUIContext* context, ArkUIAnimateOption option, void (*event)(v
             ACE_SCOPED_TRACE("nodeAnimate:onFinish[cnt:%d]", count.value());
             TAG_LOGI(AceLogTag::ACE_ANIMATION, "nodeAnimate:animateTo finish, cnt:%{public}d", count.value());
             auto* onFinishFunc = reinterpret_cast<void (*)(void*)>(option.onFinishCallback);
+            LOG_CALLBACK("ArkUI_NativeAnimateAPI_1.animateTo:finish", onFinishFunc);
             onFinishFunc(option.user);
         };
     }
@@ -281,7 +298,10 @@ void StartKeyframeAnimation(const RefPtr<PipelineBase>& pipelineContext, Animati
             continue;
         }
         auto event = [&keyframe, &pipelineContext]() {
-            keyframe.event(keyframe.userData);
+            {
+                LOG_CALLBACK("OH_ArkUI_KeyframeAnimateOption_RegisterOnEventCallback", keyframe.event);
+                keyframe.event(keyframe.userData);
+            }
             pipelineContext->FlushBuild();
             if (!pipelineContext->IsLayouting()) {
                 pipelineContext->FlushUITasks(true);
@@ -313,12 +333,7 @@ void KeyframeAnimateTo(ArkUIContext* context, ArkUIKeyframeAnimateOption* animat
     std::optional<int32_t> count;
     if (animateOption->onFinish) {
         count = GetAnimationFinishCount();
-        auto onFinishEvent = [onFinish = animateOption->onFinish, userData = animateOption->userData,
-                                 id = context->id]() {
-            ContainerScope scope(id);
-            onFinish(userData);
-        };
-        option.SetOnFinishEvent(onFinishEvent);
+        SetKeyframeOnFinishEvent(option, animateOption, context->id);
     }
     option.SetDelay(animateOption->delay);
     option.SetIteration(animateOption->iterations);
@@ -407,6 +422,7 @@ void RegisterAnimatorOnFrameEvent(const RefPtr<Animator>& animator, ArkUIAnimato
             ArkUI_AnimatorOnFrameEvent event;
             event.progress = static_cast<ArkUI_Float32>(value);
             event.userData = userData;
+            LOG_CALLBACK("OH_ArkUI_AnimatorOption_RegisterOnFrameCallback", callback);
             callback(&event);
         }
     };
@@ -430,6 +446,7 @@ void RegisterAnimatorEvent(const RefPtr<Animator>& animator, ArkUIAnimatorOption
         if (callback) {
             ArkUI_AnimatorEvent event;
             event.userData = userData;
+            LOG_CALLBACK("OH_ArkUI_AnimatorOption_RegisterOnFinishCallback", callback);
             callback(&event);
         }
     });
@@ -439,6 +456,7 @@ void RegisterAnimatorEvent(const RefPtr<Animator>& animator, ArkUIAnimatorOption
         if (callback) {
             ArkUI_AnimatorEvent event;
             event.userData = userData;
+            LOG_CALLBACK("OH_ArkUI_AnimatorOption_RegisterOnCancelCallback", callback);
             callback(&event);
         }
     });
@@ -448,6 +466,7 @@ void RegisterAnimatorEvent(const RefPtr<Animator>& animator, ArkUIAnimatorOption
         if (callback) {
             ArkUI_AnimatorEvent event;
             event.userData = userData;
+            LOG_CALLBACK("OH_ArkUI_AnimatorOption_RegisterOnRepeatCallback", callback);
             callback(&event);
         }
     });
@@ -636,6 +655,7 @@ ArkUICurveHandle CreateCustomCurve(ArkUI_Float32 (*interpolate)(ArkUI_Float32 fr
 {
     auto func = [interpolate, userData](float value) -> float {
         if (interpolate) {
+            LOG_CALLBACK("OH_ArkUI_Curve_CreateCustomCurve", interpolate);
             return interpolate(value, userData);
         }
         return 0.0f;
@@ -652,5 +672,102 @@ void DisposeCurve(ArkUICurveHandle curve)
     if (curvePtr) {
         curvePtr->DecRefCount();
     }
+}
+
+ArkUI_Int32 AddAnimationGroup(ArkUIContext* context, ArkUIAnimationGroupHandle group,
+    const ArkUIRenderNodeHandle* resolvedTargets, ArkUI_Uint32 targetCount, ArkUI_CharPtr key)
+{
+    CHECK_NULL_RETURN(context, ERROR_CODE_PARAM_INVALID);
+    CHECK_NULL_RETURN(group, ERROR_CODE_PARAM_INVALID);
+    CHECK_NULL_RETURN(key, ERROR_CODE_PARAM_INVALID);
+    auto instanceId = context->id;
+    std::string keyStr(key);
+    const auto* renderNodeModifier = NodeModifier::GetNDKRenderNodeModifier();
+    CHECK_NULL_RETURN(renderNodeModifier, ERROR_CODE_PARAM_INVALID);
+
+    std::vector<OHOS::Rosen::RSNode*> childRawRSNodes;
+    for (ArkUI_Uint32 i = 0; i < targetCount; i++) {
+        auto rsNodeHandle = renderNodeModifier->getRSNode(resolvedTargets[i]);
+        auto* rawRSNode = reinterpret_cast<OHOS::Rosen::RSNode*>(rsNodeHandle);
+        CHECK_NULL_RETURN(rawRSNode, ERROR_CODE_SUB_ANIMATION_INVALID);
+        childRawRSNodes.push_back(rawRSNode);
+    }
+    if (!ValidateRSNodeInstance(childRawRSNodes, instanceId)) {
+        return ERROR_CODE_TARGET_NODE_NOT_IN_SAME_CONTEXT;
+    }
+    auto createFn = [childRawRSNodes = std::move(childRawRSNodes), group](
+        int32_t instanceId, const std::string& k, int64_t gen)
+        -> AnimationGroupCreateResult {
+        return CreateAndStartGroupAnimation(group, childRawRSNodes, instanceId, k, gen);
+    };
+    return AnimationGroupAdapter::GetInstance().AddAnimationGroup(instanceId, keyStr, createFn);
+}
+
+ArkUI_Int32 RemoveAnimationGroup(ArkUIContext* context, ArkUI_CharPtr key)
+{
+    CHECK_NULL_RETURN(context, ERROR_CODE_PARAM_INVALID);
+    CHECK_NULL_RETURN(key, ERROR_CODE_PARAM_INVALID);
+    auto instanceId = context->id;
+    std::string keyStr(key);
+    return AnimationGroupAdapter::GetInstance().RemoveAnimationGroup(instanceId, keyStr);
+}
+
+ArkUI_Int32 PauseAnimationGroup(ArkUIContext* context, ArkUI_CharPtr key)
+{
+    CHECK_NULL_RETURN(context, ERROR_CODE_PARAM_INVALID);
+    CHECK_NULL_RETURN(key, ERROR_CODE_PARAM_INVALID);
+    auto instanceId = context->id;
+    std::string keyStr(key);
+    return AnimationGroupAdapter::GetInstance().PauseAnimationGroup(instanceId, keyStr);
+}
+
+ArkUI_Int32 ResumeAnimationGroup(ArkUIContext* context, ArkUI_CharPtr key)
+{
+    CHECK_NULL_RETURN(context, ERROR_CODE_PARAM_INVALID);
+    CHECK_NULL_RETURN(key, ERROR_CODE_PARAM_INVALID);
+    auto instanceId = context->id;
+    std::string keyStr(key);
+    return AnimationGroupAdapter::GetInstance().ResumeAnimationGroup(instanceId, keyStr);
+}
+
+ArkUI_Int32 FinishAnimationGroup(ArkUIContext* context, ArkUI_CharPtr key, ArkUI_Int32 mode)
+{
+    CHECK_NULL_RETURN(context, ERROR_CODE_PARAM_INVALID);
+    CHECK_NULL_RETURN(key, ERROR_CODE_PARAM_INVALID);
+    InteractiveAnimationFinishPosition position = InteractiveAnimationFinishPosition::TO_END;
+    switch (static_cast<InteractiveAnimationFinishPosition>(mode)) {
+        case InteractiveAnimationFinishPosition::TO_START:
+            position = InteractiveAnimationFinishPosition::TO_START;
+            break;
+        case InteractiveAnimationFinishPosition::TO_CURRENT:
+            position = InteractiveAnimationFinishPosition::TO_CURRENT;
+            break;
+        case InteractiveAnimationFinishPosition::TO_END:
+            position = InteractiveAnimationFinishPosition::TO_END;
+            break;
+        default:
+            return ERROR_CODE_PARAM_INVALID;
+    }
+    auto instanceId = context->id;
+    std::string keyStr(key);
+    return AnimationGroupAdapter::GetInstance().FinishAnimationGroup(instanceId, keyStr, position);
+}
+
+ArkUI_Int32 GetAnimationGroupState(ArkUIContext* context, ArkUI_CharPtr key, ArkUI_Int32* state)
+{
+    CHECK_NULL_RETURN(context, ERROR_CODE_PARAM_INVALID);
+    CHECK_NULL_RETURN(key, ERROR_CODE_PARAM_INVALID);
+    auto instanceId = context->id;
+    std::string keyStr(key);
+    return AnimationGroupAdapter::GetInstance().GetAnimationGroupState(instanceId, keyStr, state);
+}
+
+ArkUI_Int32 HasAnimationGroup(ArkUIContext* context, ArkUI_CharPtr key, bool* exists)
+{
+    CHECK_NULL_RETURN(context, ERROR_CODE_PARAM_INVALID);
+    CHECK_NULL_RETURN(key, ERROR_CODE_PARAM_INVALID);
+    auto instanceId = context->id;
+    std::string keyStr(key);
+    return AnimationGroupAdapter::GetInstance().HasAnimationGroup(instanceId, keyStr, exists);
 }
 } // namespace OHOS::Ace::NG::ViewAnimate

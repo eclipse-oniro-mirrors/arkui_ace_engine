@@ -62,7 +62,7 @@ enum class FadeOutState {
     FADE_OUT_RIGHT,
     FADE_OUT_BILATERAL
 };
-class SwiperIndicatorTheme : public virtual Theme {
+class SwiperIndicatorTheme : public Theme {
     DECLARE_ACE_TYPE(SwiperIndicatorTheme, Theme);
 
 public:

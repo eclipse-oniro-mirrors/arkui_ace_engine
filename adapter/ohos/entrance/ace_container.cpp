@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "core/components_ng/base/ui_tree_collector.h"
 #include "adapter/ohos/entrance/ace_container.h"
 #include "core/accessibility/accessibility_manager.h"
 #include "core/accessibility/accessibility_manager_ng.h"
@@ -55,6 +56,7 @@
 #include "adapter/ohos/osal/view_data_wrap_ohos.h"
 #include "adapter/ohos/osal/window_utils.h"
 #include "base/i18n/localization.h"
+#include "base/input_manager/input_manager.h"
 #include "base/log/event_report.h"
 #include "base/log/jank_frame_report.h"
 #include "base/memory/referenced.h"
@@ -88,6 +90,7 @@
 #include "core/components_ng/render/adapter/rosen_render_context.h"
 #include "core/components_ng/render/adapter/rosen_window.h"
 #include "core/components_ng/manager/force_split/force_split_manager.h"
+#include "core/components_ng/manager/page_scene/developer_response_observer.h"
 #include "core/components_ng/token_theme/token_theme_storage.h"
 #include "core/event/crown_event.h"
 #include "frameworks/core/common/dynamic_module_helper.h"
@@ -242,6 +245,33 @@ public:
 private:
     int32_t instanceId_ = -1;
     WeakPtr<NG::NavigationManager> mgr_;
+};
+
+class WindowVisibilityChangedListener : public OHOS::Rosen::IWindowVisibilityChangedListener {
+public:
+    explicit WindowVisibilityChangedListener(int32_t instanceId) : instanceId_(instanceId) {}
+    ~WindowVisibilityChangedListener() = default;
+
+    void OnWindowVisibilityChangedCallback(const bool isVisible) override
+    {
+        auto container = AceContainer::GetContainer(instanceId_);
+        CHECK_NULL_VOID(container);
+        auto taskExecutor = container->GetTaskExecutor();
+        CHECK_NULL_VOID(taskExecutor);
+        auto task = [instanceId = instanceId_, isVisible]() {
+            ContainerScope scope(instanceId);
+            auto container = AceContainer::GetContainer(instanceId);
+            CHECK_NULL_VOID(container);
+            auto pipeline = AceType::DynamicCast<NG::PipelineContext>(container->GetPipelineContext());
+            CHECK_NULL_VOID(pipeline);
+            pipeline->OnWindowVisibilityChanged(isVisible);
+        };
+        taskExecutor->PostTask(std::move(task), TaskExecutor::TaskType::UI,
+            "ArkUIWindowVisibilityChanged", PriorityType::VIP);
+    }
+
+private:
+    int32_t instanceId_ = -1;
 };
 
 constexpr char DECLARATIVE_ARK_ENGINE_SHARED_LIB[] = "libace_engine_declarative_ark.z.so";
@@ -571,6 +601,8 @@ bool AceContainer::IsKeyboard()
 void AceContainer::Initialize()
 {
     ContainerScope scope(instanceId_);
+    // Cache the application permission before any input is dispatched.
+    InputManager::HasControlComponentPermission();
     // For DECLARATIVE_JS frontend use UI as JS Thread, so InitializeFrontend after UI thread created.
     // For STATIC_HYBRID_DYNAMIC and DYNAMIC_HYBRID_STATIC frontend, also initialize after AttachView
     if (type_ != FrontendType::DECLARATIVE_JS && type_ != FrontendType::DECLARATIVE_CJ &&
@@ -597,6 +629,10 @@ void AceContainer::Destroy()
 {
     LOGI("AceContainer Destroy begin");
     ContainerScope scope(instanceId_);
+    // UIObserver is Stage-thread confined. Clear the container-owned store
+    // before frontend/pipeline teardown so NAPI listeners are released on the
+    // owner thread and cannot observe a partially destroyed container.
+    ClearUIObserverStore();
     RemoveWatchSystemParameter();
     RemoveUISessionCallbacks();
     ReleaseResourceAdapter();
@@ -1062,6 +1098,10 @@ void AceContainer::OnHide(int32_t instanceId)
         auto pipelineBase = container->GetPipelineContext();
         CHECK_NULL_VOID(pipelineBase);
         pipelineBase->OnHide();
+        // A previously reported RESPONSE scene leaves the screen together with the window.
+        // Run the stable-point sweep here so the exit event (AC-9.10) does not depend on a
+        // frame being produced while the window is hidden.
+        NG::PageSceneResponseObserver::GetInstance()->OnContentStable();
     };
 
     // stege model needn't post task when already run on UI
@@ -1387,6 +1427,13 @@ void AceContainer::InitializeCallback()
     };
     aceView_->RegisterTouchEventCallback(touchEventCallback);
 
+    pipelineContext_->SetTouchPadRawEventEnableCallback(
+        [weakView = WeakPtr<AceView>(aceView_)](bool enabled) {
+            auto view = weakView.Upgrade();
+            CHECK_NULL_VOID(view);
+            view->EnableTouchpadRawEvent(enabled);
+        });
+
     auto&& mouseEventCallback = [context = pipelineContext_, id = instanceId_](const MouseEvent& event,
                                     const std::function<void()>& markProcess,
                                     const RefPtr<OHOS::Ace::NG::FrameNode>& node) {
@@ -1683,8 +1730,17 @@ void AceContainer::DestroyContainer(int32_t instanceId, const std::function<void
     CHECK_NULL_VOID(container);
     auto taskExecutor = container->GetTaskExecutor();
     CHECK_NULL_VOID(taskExecutor);
-    taskExecutor->PostSyncTask([] { LOGI("Wait UI thread before destroy..."); },
-        TaskExecutor::TaskType::UI, "ArkUIWaitLog");
+    // Complete pending tree requests on UI before destroying the pipeline.
+    taskExecutor->PostSyncTask(
+        [weakContainer = WeakPtr<Container>(container)]() {
+            LOGI("Wait UI thread before destroy...");
+            auto owner = weakContainer.Upgrade();
+            CHECK_NULL_VOID(owner);
+            auto pipeline = AceType::DynamicCast<NG::PipelineContext>(owner->GetPipelineContext());
+            CHECK_NULL_VOID(pipeline);
+            NG::CloseUITreeRequests(*pipeline);
+        },
+        TaskExecutor::TaskType::UI, "ArkUICloseUITreeRequests");
     container->Destroy();
     // unregister watchdog before stop thread to avoid UI_BLOCK report
     AceEngine::Get().UnRegisterFromWatchDog(instanceId);
@@ -2212,7 +2268,7 @@ void AceContainer::FillAutoFillViewData(const RefPtr<NG::FrameNode>& node, RefPt
     CHECK_NULL_VOID(node);
     CHECK_NULL_VOID(viewDataWrap);
     auto nodeInfoWraps = viewDataWrap->GetPageNodeInfoWraps();
-    auto pattern = node->GetPattern<NG::TextFieldPattern>();
+    auto pattern = node->GetPattern<TextInputClient>();
     CHECK_NULL_VOID(pattern);
     auto autoFillUserName = pattern->GetAutoFillUserName();
     auto autoFillNewPassword = pattern->GetAutoFillNewPassword();
@@ -3246,7 +3302,17 @@ void AceContainer::AttachView(std::shared_ptr<Window> window, const RefPtr<AceVi
 
 void AceContainer::SetUIWindowInner(sptr<OHOS::Rosen::Window> uiWindow)
 {
+    if (uiWindow_ && windowVisibilityListener_) {
+        uiWindow_->UnregisterWindowVisibilityChangeListener(windowVisibilityListener_);
+        windowVisibilityListener_ = nullptr;
+    }
     uiWindow_ = uiWindow;
+    if (uiWindow_) {
+        windowVisibilityListener_ = new WindowVisibilityChangedListener(instanceId_);
+        auto res = uiWindow_->RegisterWindowVisibilityChangeListener(windowVisibilityListener_);
+        TAG_LOGI(AceLogTag::ACE_WINDOW, "register window visibility listener, instance: %{public}d, ret: %{public}d",
+            instanceId_, static_cast<int32_t>(res));
+    }
 }
 
 sptr<OHOS::Rosen::Window> AceContainer::GetUIWindowInner() const
@@ -3682,18 +3748,42 @@ void AceContainer::ProcessThemeUpdate(const ParsedConfig& parsedConfig, Configur
 {
     if (!parsedConfig.themeTag.empty()) {
         std::unique_ptr<JsonValue> json = JsonUtil::ParseJsonString(parsedConfig.themeTag);
-        int fontUpdate = json->GetInt("fonts");
-        configurationChange.fontUpdate = configurationChange.fontUpdate || fontUpdate;
-        int iconUpdate = json->GetInt("icons");
-        configurationChange.iconUpdate = iconUpdate;
-        int skinUpdate = json->GetInt("skin");
-        if (!skinUpdate && lastThemeHasSkin_) {
-            configurationChange.skinUpdate = true;
+        uint32_t currentFonts = json->GetUInt("fonts");
+        uint32_t currentIcons = json->GetUInt("icons");
+        uint32_t currentSkin = json->GetUInt("skin");
+        bool isFirst = lastThemeFonts_ == 0 && lastThemeIcons_ == 0 && lastThemeSkin_ == 0;
+        if (isFirst) {
+            if (!parsedConfig.themeSkin.empty()) {
+                configurationChange.skinUpdate = true;
+            }
+            if (!parsedConfig.themeIcon.empty()) {
+                configurationChange.iconUpdate = true;
+            }
+            if (!parsedConfig.fontId.empty()) {
+                configurationChange.fontUpdate = true;
+            }
         } else {
-            configurationChange.skinUpdate = skinUpdate;
+            if (currentFonts != lastThemeFonts_) {
+                configurationChange.fontUpdate = true;
+            }
+            if (currentIcons != lastThemeIcons_) {
+                configurationChange.iconUpdate = true;
+            }
+            if (currentSkin != lastThemeSkin_) {
+                configurationChange.skinUpdate = true;
+            }
         }
-        lastThemeHasSkin_ = skinUpdate;
-        if ((isDynamicRender_ || isFormRender_) && fontUpdate) {
+        TAG_LOGD(AceLogTag::ACE_THEME,
+            "ProcessThemeUpdate fonts %{public}u(last %{public}u) icons %{public}u(last %{public}u) "
+            "skin %{public}u(last %{public}u), fontUpdate %{public}d iconUpdate %{public}d "
+            "skinUpdate %{public}d, isFirst %{public}d",
+            currentFonts, lastThemeFonts_, currentIcons, lastThemeIcons_, currentSkin, lastThemeSkin_,
+            configurationChange.fontUpdate, configurationChange.iconUpdate, configurationChange.skinUpdate,
+            isFirst);
+        lastThemeFonts_ = currentFonts;
+        lastThemeIcons_ = currentIcons;
+        lastThemeSkin_ = currentSkin;
+        if ((isDynamicRender_ || isFormRender_) && configurationChange.fontUpdate) {
             CheckAndSetFontFamily();
         }
     }
@@ -4229,6 +4319,12 @@ bool AceContainer::IsSubWindow() const
 {
     CHECK_NULL_RETURN(uiWindow_, false);
     return uiWindow_->GetType() == Rosen::WindowType::WINDOW_TYPE_APP_SUB_WINDOW;
+}
+
+bool AceContainer::IsPipWindow() const
+{
+    CHECK_NULL_RETURN(uiWindow_, false);
+    return uiWindow_->GetType() == Rosen::WindowType::WINDOW_TYPE_PIP;
 }
 
 bool AceContainer::IsDialogWindow() const
@@ -5344,5 +5440,15 @@ void AceContainer::GetOriginalEventInfo(const EventPositionInfo& eventPositionIn
     uiWindow_->GetEventOriginalPosition(winEventPositionInfo, winOriginalPos);
     originalPos.displayX = winOriginalPos.displayX;
     originalPos.displayY = winOriginalPos.displayY;
+}
+
+void AceContainer::RefreshLiveFoldCreaseRegion()
+{
+    displayManager_->GetLiveFoldCreaseRegion();
+}
+
+void AceContainer::RefreshFoldCreaseDirection()
+{
+    displayManager_->GetFoldCreaseDirection();
 }
 } // namespace OHOS::Ace::Platform

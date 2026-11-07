@@ -15,6 +15,7 @@
 #include "accessibility_frame_node_utils.h"
 
 #include "base/log/log_wrapper.h"
+#include "core/components_ng/base/cmp_accessibility_registry.h"
 #include "core/components_ng/event/focus_hub.h"
 #include "core/components_ng/pattern/list/list_pattern.h"
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
@@ -113,6 +114,23 @@ bool IsInPageNodes(int32_t pageId, const std::vector<WeakPtr<FrameNode>>& pageNo
     return false;
 }
 
+// Preserve the ordinary children reference unless an inset subtree must be appended.
+// The caller owns the scratch list; no list nodes are allocated for ordinary trees.
+const std::list<RefPtr<UINode>>& GetAccessibilityChildren(
+    const RefPtr<UINode>& uiNode, std::list<RefPtr<UINode>>& insetChildren)
+{
+    const auto& children = uiNode->GetChildren(true);
+    auto frameNode = AceType::DynamicCast<FrameNode>(uiNode);
+    auto insetNode = frameNode ? frameNode->GetSafeAreaInsetNode() : nullptr;
+    if (!insetNode) {
+        return children;
+    }
+    insetChildren = children;
+    const auto& content = insetNode->GetChildren(true);
+    insetChildren.insert(insetChildren.end(), content.begin(), content.end());
+    return insetChildren;
+}
+
 void GetFrameNodeChildren(
     const RefPtr<UINode>& uiNode,
     std::vector<RefPtr<FrameNode>>& children,
@@ -121,6 +139,11 @@ void GetFrameNodeChildren(
 {
     CHECK_NULL_VOID(uiNode);
     auto frameNode = AceType::DynamicCast<FrameNode>(uiNode);
+    // Exported-subtree roots are owned by their CMP binding's operator (T_sub path): cut them from the focus-strategy traversal too.
+    if (OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::IsRegisteredExportedRoot(
+        frameNode.GetRawPtr())) {
+        return;
+    }
     if (AccessibilityFrameNodeUtils::IsValidEmbedTarget(frameNode, accessibilityManager)) {
         return;
     }
@@ -151,7 +174,9 @@ void GetFrameNodeChildren(
         }
     }
 
-    for (const auto& frameChild : uiNode->GetChildren(true)) {
+    std::list<RefPtr<UINode>> insetChildren;
+    const auto& frameChildren = GetAccessibilityChildren(uiNode, insetChildren);
+    for (const auto& frameChild : frameChildren) {
         GetFrameNodeChildren(frameChild, children, handleParam, accessibilityManager);
     }
 }
@@ -349,7 +374,8 @@ RefPtr<NG::FrameNode> AccessibilityFrameNodeUtils::GetFramenodeByAccessibilityId
 
             auto hasVirtualNodeAccessibilityProperty = current->HasVirtualNodeAccessibilityProperty();
             if (!hasVirtualNodeAccessibilityProperty) {
-                const auto& children = current->GetChildren(true);
+                std::list<RefPtr<NG::UINode>> insetChildren;
+                const auto& children = GetAccessibilityChildren(current, insetChildren);
                 for (auto& child: children) {
                     auto frameNode = AceType::DynamicCast<NG::FrameNode>(child.GetRawPtr());
                     if (FindFrameNodeByAccessibilityId(id, frameNode)) {
@@ -413,7 +439,8 @@ RefPtr<NG::FrameNode> AccessibilityFrameNodeUtils::GetFramenodeByCondition(
                 return frameNodeResult;
             }
         } else {
-            const auto& children = current->GetChildren(true);
+            std::list<RefPtr<NG::UINode>> insetChildren;
+            const auto& children = GetAccessibilityChildren(current, insetChildren);
             if (FindFrameNodeByCondition(children, nodes, frameNodeResult, condition)) {
                 return frameNodeResult;
             }
@@ -460,7 +487,9 @@ void AccessibilityFrameNodeUtils::GetChildrenFromFrameNode(
             GetFrameNodeChildren(virtualNode, children, handleParam, accessibilityManager);
         }
     } else {
-        for (const auto& item : node->GetChildren(true)) {
+        std::list<RefPtr<UINode>> insetChildren;
+        const auto& uiChildren = GetAccessibilityChildren(node, insetChildren);
+        for (const auto& item : uiChildren) {
             GetFrameNodeChildren(item, children, handleParam, accessibilityManager);
         }
 

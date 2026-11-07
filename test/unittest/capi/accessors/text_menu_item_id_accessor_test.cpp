@@ -233,6 +233,19 @@ HWTEST_F(TextMenuItemIdAccessorTest, getTRANSLATETest, TestSize.Level1)
 }
 
 /**
+ * @tc.name: getTRANSLATETest
+ * @tc.desc:
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextMenuItemIdAccessorTest, getTRANSLATEINPUTTest, TestSize.Level1)
+{
+    ASSERT_NE(accessor_->getTRANSLATE_INPUT, nullptr);
+    Ark_TextMenuItemId peer = accessor_->getTRANSLATE_INPUT();
+    EXPECT_EQ(peer->id, "OH_DEFAULT_TRANSLATE_INPUT");
+    finalyzer_(peer);
+}
+
+/**
  * @tc.name: getSEARCHTest
  * @tc.desc:
  * @tc.type: FUNC

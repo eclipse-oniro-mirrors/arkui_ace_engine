@@ -226,4 +226,294 @@ HWTEST_F(SwiperAccessibilityTestNg, IndicatorAccessibilityProperty001, TestSize.
     auto indicatorAccessibilityProperty = AceType::MakeRefPtr<IndicatorAccessibilityProperty>();
     EXPECT_EQ(indicatorAccessibilityProperty->GetAccessibilityLevel(), "auto");
 }
+
+/**
+ * @tc.name: IndicatorAccessibilityPropertyIsScrollable001
+ * @tc.desc: Test SwiperIndicatorAccessibilityProperty::IsScrollable when swiper is scrollable (default loop, multiple
+ * items)
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperAccessibilityTestNg, IndicatorAccessibilityPropertyIsScrollable001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create swiper with default settings (loop=true, 4 items)
+     * @tc.expected: IsScrollable returns true
+     */
+    CreateSwiper();
+    CreateSwiperItems();
+    CreateSwiperDone();
+    auto indicatorAcc = indicatorNode_->GetAccessibilityProperty<SwiperIndicatorAccessibilityProperty>();
+    ASSERT_NE(indicatorAcc, nullptr);
+    EXPECT_TRUE(indicatorAcc->IsScrollable());
+}
+
+/**
+ * @tc.name: IndicatorAccessibilityPropertyIsScrollable002
+ * @tc.desc: Test SwiperIndicatorAccessibilityProperty::IsScrollable when swiper is not scrollable (disableSwipe=true)
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperAccessibilityTestNg, IndicatorAccessibilityPropertyIsScrollable002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create swiper with disableSwipe=true
+     * @tc.expected: IsScrollable returns false
+     */
+    SwiperModelNG model = CreateSwiper();
+    model.SetDisableSwipe(true);
+    CreateSwiperItems();
+    CreateSwiperDone();
+    auto indicatorAcc = indicatorNode_->GetAccessibilityProperty<SwiperIndicatorAccessibilityProperty>();
+    ASSERT_NE(indicatorAcc, nullptr);
+    EXPECT_FALSE(indicatorAcc->IsScrollable());
+}
+
+/**
+ * @tc.name: IndicatorAccessibilityPropertyIsScrollable003
+ * @tc.desc: Test SwiperIndicatorAccessibilityProperty::IsScrollable when swiper is not scrollable (loop=false, single
+ * item)
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperAccessibilityTestNg, IndicatorAccessibilityPropertyIsScrollable003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create swiper with loop=false and only 1 item
+     * @tc.expected: IsScrollable returns false
+     */
+    SwiperModelNG model = CreateSwiper();
+    model.SetLoop(false);
+    CreateSwiperItems(1);
+    CreateSwiperDone();
+    auto indicatorAcc = indicatorNode_->GetAccessibilityProperty<SwiperIndicatorAccessibilityProperty>();
+    ASSERT_NE(indicatorAcc, nullptr);
+    EXPECT_FALSE(indicatorAcc->IsScrollable());
+}
+
+/**
+ * @tc.name: IndicatorAccessibilityPropertySetSpecificSupportAction001
+ * @tc.desc: Test SetSpecificSupportAction when swiper is not scrollable, no actions should be added
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperAccessibilityTestNg, IndicatorAccessibilityPropertySetSpecificSupportAction001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create non-scrollable swiper (disableSwipe=true)
+     * @tc.expected: No support actions are set on indicator
+     */
+    SwiperModelNG model = CreateSwiper();
+    model.SetDisableSwipe(true);
+    CreateSwiperItems();
+    CreateSwiperDone();
+    auto indicatorAcc = indicatorNode_->GetAccessibilityProperty<SwiperIndicatorAccessibilityProperty>();
+    ASSERT_NE(indicatorAcc, nullptr);
+    indicatorAcc->ResetSupportAction();
+    std::unordered_set<AceAction> expectedActions = {};
+    EXPECT_EQ(indicatorAcc->GetSupportAction(), expectedActions);
+}
+
+/**
+ * @tc.name: IndicatorAccessibilityPropertySetSpecificSupportAction002
+ * @tc.desc: Test SetSpecificSupportAction when swiper is scrollable and loop=true, both forward and backward actions
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperAccessibilityTestNg, IndicatorAccessibilityPropertySetSpecificSupportAction002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create scrollable swiper with loop=true (default)
+     * @tc.expected: Both ACTION_SCROLL_FORWARD and ACTION_SCROLL_BACKWARD are set
+     */
+    CreateSwiper();
+    CreateSwiperItems();
+    CreateSwiperDone();
+    auto indicatorAcc = indicatorNode_->GetAccessibilityProperty<SwiperIndicatorAccessibilityProperty>();
+    ASSERT_NE(indicatorAcc, nullptr);
+    indicatorAcc->ResetSupportAction();
+    std::unordered_set<AceAction> expectedActions = {
+        AceAction::ACTION_SCROLL_FORWARD,
+        AceAction::ACTION_SCROLL_BACKWARD
+    };
+    EXPECT_EQ(indicatorAcc->GetSupportAction(), expectedActions);
+}
+
+/**
+ * @tc.name: IndicatorAccessibilityPropertySetSpecificSupportAction003
+ * @tc.desc: Test SetSpecificSupportAction when loop=false and current is first page
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperAccessibilityTestNg, IndicatorAccessibilityPropertySetSpecificSupportAction003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create swiper with loop=false, current index is 0 (first page)
+     * @tc.expected: Only ACTION_SCROLL_FORWARD is set (no ACTION_SCROLL_BACKWARD)
+     */
+    SwiperModelNG model = CreateSwiper();
+    model.SetLoop(false);
+    CreateSwiperItems();
+    CreateSwiperDone();
+    auto indicatorAcc = indicatorNode_->GetAccessibilityProperty<SwiperIndicatorAccessibilityProperty>();
+    ASSERT_NE(indicatorAcc, nullptr);
+    EXPECT_EQ(indicatorAcc->GetCurrentIndex(), 0);
+    indicatorAcc->ResetSupportAction();
+    std::unordered_set<AceAction> expectedActions = { AceAction::ACTION_SCROLL_FORWARD };
+    EXPECT_EQ(indicatorAcc->GetSupportAction(), expectedActions);
+}
+
+/**
+ * @tc.name: IndicatorAccessibilityPropertySetSpecificSupportAction004
+ * @tc.desc: Test SetSpecificSupportAction when loop=false and current is middle page
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperAccessibilityTestNg, IndicatorAccessibilityPropertySetSpecificSupportAction004, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create swiper with loop=false, navigate to middle page (index=1)
+     * @tc.expected: Both ACTION_SCROLL_FORWARD and ACTION_SCROLL_BACKWARD are set
+     */
+    SwiperModelNG model = CreateSwiper();
+    model.SetLoop(false);
+    CreateSwiperItems();
+    CreateSwiperDone();
+    ChangeIndex(1);
+    auto indicatorAcc = indicatorNode_->GetAccessibilityProperty<SwiperIndicatorAccessibilityProperty>();
+    ASSERT_NE(indicatorAcc, nullptr);
+    EXPECT_EQ(indicatorAcc->GetCurrentIndex(), 1);
+    indicatorAcc->ResetSupportAction();
+    std::unordered_set<AceAction> expectedActions = {
+        AceAction::ACTION_SCROLL_FORWARD,
+        AceAction::ACTION_SCROLL_BACKWARD
+    };
+    EXPECT_EQ(indicatorAcc->GetSupportAction(), expectedActions);
+}
+
+/**
+ * @tc.name: IndicatorAccessibilityPropertySetSpecificSupportAction005
+ * @tc.desc: Test SetSpecificSupportAction when loop=false and current is last page
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperAccessibilityTestNg, IndicatorAccessibilityPropertySetSpecificSupportAction005, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create swiper with loop=false, navigate to last page (index=3)
+     * @tc.expected: Only ACTION_SCROLL_BACKWARD is set (no ACTION_SCROLL_FORWARD)
+     */
+    SwiperModelNG model = CreateSwiper();
+    model.SetLoop(false);
+    CreateSwiperItems();
+    CreateSwiperDone();
+    ChangeIndex(3);
+    auto indicatorAcc = indicatorNode_->GetAccessibilityProperty<SwiperIndicatorAccessibilityProperty>();
+    ASSERT_NE(indicatorAcc, nullptr);
+    EXPECT_EQ(indicatorAcc->GetCurrentIndex(), 3);
+    indicatorAcc->ResetSupportAction();
+    std::unordered_set<AceAction> expectedActions = { AceAction::ACTION_SCROLL_BACKWARD };
+    EXPECT_EQ(indicatorAcc->GetSupportAction(), expectedActions);
+}
+
+/**
+ * @tc.name: IndicatorAccessibilityPropertySetSpecificSupportAction006
+ * @tc.desc: Test SetSpecificSupportAction when loop=false, displayCount=2, current at first page
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperAccessibilityTestNg, IndicatorAccessibilityPropertySetSpecificSupportAction006, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create swiper with loop=false, displayCount=2, 4 items, current index=0
+     * @tc.expected: Only ACTION_SCROLL_FORWARD (0 < 4-2=2), no ACTION_SCROLL_BACKWARD (index=0)
+     */
+    SwiperModelNG model = CreateSwiper();
+    model.SetLoop(false);
+    model.SetDisplayCount(2);
+    CreateSwiperItems();
+    CreateSwiperDone();
+    auto indicatorAcc = indicatorNode_->GetAccessibilityProperty<SwiperIndicatorAccessibilityProperty>();
+    ASSERT_NE(indicatorAcc, nullptr);
+    EXPECT_EQ(indicatorAcc->GetCurrentIndex(), 0);
+    indicatorAcc->ResetSupportAction();
+    std::unordered_set<AceAction> expectedActions = { AceAction::ACTION_SCROLL_FORWARD };
+    EXPECT_EQ(indicatorAcc->GetSupportAction(), expectedActions);
+}
+
+/**
+ * @tc.name: IndicatorAccessibilityPropertySetSpecificSupportAction007
+ * @tc.desc: Test SetSpecificSupportAction when loop=false, displayCount=2, current at last valid page
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperAccessibilityTestNg, IndicatorAccessibilityPropertySetSpecificSupportAction007, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create swiper with loop=false, displayCount=2, 4 items, navigate to index=2 (last valid page)
+     * @tc.expected: Only ACTION_SCROLL_BACKWARD (2 >= 4-2=2, no forward), index>0 so backward
+     */
+    SwiperModelNG model = CreateSwiper();
+    model.SetLoop(false);
+    model.SetDisplayCount(2);
+    CreateSwiperItems();
+    CreateSwiperDone();
+    ChangeIndex(2);
+    auto indicatorAcc = indicatorNode_->GetAccessibilityProperty<SwiperIndicatorAccessibilityProperty>();
+    ASSERT_NE(indicatorAcc, nullptr);
+    EXPECT_EQ(indicatorAcc->GetCurrentIndex(), 2);
+    indicatorAcc->ResetSupportAction();
+    std::unordered_set<AceAction> expectedActions = { AceAction::ACTION_SCROLL_BACKWARD };
+    EXPECT_EQ(indicatorAcc->GetSupportAction(), expectedActions);
+}
+
+/**
+ * @tc.name: IndicatorAccessibilityPropertySetSpecificSupportAction008
+ * @tc.desc: Test SetSpecificSupportAction when loop=false, displayCount=2, current at middle page
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperAccessibilityTestNg, IndicatorAccessibilityPropertySetSpecificSupportAction008, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create swiper with loop=false, displayCount=2, 4 items, navigate to index=1 (middle page)
+     * @tc.expected: Both ACTION_SCROLL_FORWARD (1 < 4-2=2) and ACTION_SCROLL_BACKWARD (1 > 0)
+     */
+    SwiperModelNG model = CreateSwiper();
+    model.SetLoop(false);
+    model.SetDisplayCount(2);
+    CreateSwiperItems();
+    CreateSwiperDone();
+    ChangeIndex(1);
+    auto indicatorAcc = indicatorNode_->GetAccessibilityProperty<SwiperIndicatorAccessibilityProperty>();
+    ASSERT_NE(indicatorAcc, nullptr);
+    EXPECT_EQ(indicatorAcc->GetCurrentIndex(), 1);
+    indicatorAcc->ResetSupportAction();
+    std::unordered_set<AceAction> expectedActions = {
+        AceAction::ACTION_SCROLL_FORWARD,
+        AceAction::ACTION_SCROLL_BACKWARD
+    };
+    EXPECT_EQ(indicatorAcc->GetSupportAction(), expectedActions);
+}
+
+/**
+ * @tc.name: IndicatorAccessibilityPropertySetSpecificSupportAction009
+ * @tc.desc: Test SetSpecificSupportAction when loop is toggled from false to true at runtime
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperAccessibilityTestNg, IndicatorAccessibilityPropertySetSpecificSupportAction009, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create swiper with loop=false, navigate to last page
+     * @tc.expected: Only ACTION_SCROLL_BACKWARD at last page with loop=false
+     */
+    SwiperModelNG model = CreateSwiper();
+    model.SetLoop(false);
+    CreateSwiperItems();
+    CreateSwiperDone();
+    ChangeIndex(3);
+    auto indicatorAcc = indicatorNode_->GetAccessibilityProperty<SwiperIndicatorAccessibilityProperty>();
+    ASSERT_NE(indicatorAcc, nullptr);
+    indicatorAcc->ResetSupportAction();
+    std::unordered_set<AceAction> expectedActions = { AceAction::ACTION_SCROLL_BACKWARD };
+    EXPECT_EQ(indicatorAcc->GetSupportAction(), expectedActions);
+
+    /**
+     * @tc.steps: step2. Toggle loop to true
+     * @tc.expected: Both ACTION_SCROLL_FORWARD and ACTION_SCROLL_BACKWARD are set
+     */
+    model.SetLoop(AceType::RawPtr(frameNode_), true);
+    indicatorAcc->ResetSupportAction();
+    expectedActions = { AceAction::ACTION_SCROLL_FORWARD, AceAction::ACTION_SCROLL_BACKWARD };
+    EXPECT_EQ(indicatorAcc->GetSupportAction(), expectedActions);
+}
 } // namespace OHOS::Ace::NG

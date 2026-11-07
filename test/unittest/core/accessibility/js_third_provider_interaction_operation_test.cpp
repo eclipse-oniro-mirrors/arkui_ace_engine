@@ -20,8 +20,6 @@
 
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "test/mock/frameworks/core/common/mock_container.h"
-#include "test/mock/frameworks/core/common/mock_frontend.h"
-#include "test/mock/frameworks/core/components_ng/render/mock_render_context.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 #include "accessibility_def.h"
@@ -31,6 +29,7 @@
 
 #include "frameworks/core/accessibility/accessibility_node.h"
 #include "frameworks/core/accessibility/accessibility_utils.h"
+#include "frameworks/core/accessibility/accessibility_session_adapter.h"
 #include "frameworks/core/accessibility/native_interface_accessibility_provider.h"
 #include "frameworks/core/components_ng/pattern/ui_extension/ui_extension_manager.h"
 #include "frameworks/core/components_ng/pattern/stage/page_pattern.h"
@@ -45,6 +44,8 @@ namespace OHOS::Ace {
 int32_t g_mockErrorCode = -1;
 std::string TEST_CONTENT_STR = "testForFindByText";
 
+// This callback has a different layout from the shared test callback. Keep its symbols local.
+namespace {
 class MockAccessibilityElementOperatorCallback : public Accessibility::AccessibilityElementOperatorCallback {
 public:
     ~MockAccessibilityElementOperatorCallback() = default;
@@ -134,6 +135,7 @@ public:
     bool mockFocusable_ = false;
     int32_t mockCursorPosition_ = 0;
 };
+} // namespace
 } // namespace OHOS::Ace
 
 namespace OHOS::Ace::NG {
@@ -1077,6 +1079,102 @@ HWTEST_F(JsThirdProviderInteractionOperationTest, DefaultGetThirdCustomProperty0
     EXPECT_EQ(manager->GetThirdCustomProperty(1), nullptr);
 }
 
+// ==================== SetChildTreeIdAndWinId ====================
+
+/**
+ * @tc.name: SetChildTreeIdAndWinId001
+ * @tc.desc: SetChildTreeIdAndWinId records the child tree pointer for the mount node; the mount
+ *           node info returned to AAMS carries childTreeId/childWindowId, other nodes do not.
+ * @tc.type: FUNC
+ */
+HWTEST_F(JsThirdProviderInteractionOperationTest, SetChildTreeIdAndWinId001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. construct operation and query mount node before any child tree registered
+     * @tc.expected: no info carries a child tree pointer
+     */
+    auto ohAccessibilityProvider = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
+    auto frameNode = FrameNode::CreateFrameNode("framenode", 1, AceType::MakeRefPtr<Pattern>(), true);
+    auto jsAccessibilityManager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    auto context = NG::PipelineContext::GetCurrentContext();
+    jsAccessibilityManager->SetPipelineContext(context);
+    jsAccessibilityManager->Register(true);
+
+    auto jsInteractionOperation = AceType::MakeRefPtr<Framework::JsThirdProviderInteractionOperation>(
+        ohAccessibilityProvider, jsAccessibilityManager, frameNode);
+    jsInteractionOperation->SetBelongTreeId(0);
+
+    int32_t requestId = 2;
+    int32_t mode = 8; // PREFETCH_RECURSIVE_CHILDREN
+    MockAccessibilityElementOperatorCallback operatorCallback;
+    int64_t mountNodeId = 3;
+
+    jsInteractionOperation->SearchElementInfoByAccessibilityId(
+        mountNodeId, requestId, operatorCallback, mode);
+    ASSERT_EQ(operatorCallback.mockInfos_.size(), 7); // nodes 3..9
+    for (const auto& info : operatorCallback.mockInfos_) {
+        EXPECT_EQ(info.GetChildTreeId(), -1);
+        EXPECT_EQ(info.GetChildWindowId(), -1);
+    }
+
+    /**
+     * @tc.steps: step2. AAMS notifies a child tree (treeId 5, windowId 7) registered at the
+     *            spliced mount node id, then query the mount node again
+     * @tc.expected: only the mount node info carries childTreeId 5 / childWindowId 7
+     */
+    int64_t splicedMountNodeId = mountNodeId;
+    AccessibilitySystemAbilityClient::SetSplicElementIdTreeId(2, splicedMountNodeId);
+    jsInteractionOperation->SetChildTreeIdAndWinId(splicedMountNodeId, 5, 7);
+
+    ohAccessibilityProvider->providerMockResult_.Reset();
+    jsInteractionOperation->SearchElementInfoByAccessibilityId(
+        mountNodeId, requestId, operatorCallback, mode);
+    ASSERT_EQ(operatorCallback.mockInfos_.size(), 7);
+    const auto& mountInfo = operatorCallback.mockInfos_.front();
+    EXPECT_EQ(mountInfo.GetChildTreeId(), 5);
+    EXPECT_EQ(mountInfo.GetChildWindowId(), 7);
+    for (auto it = std::next(operatorCallback.mockInfos_.begin()); it != operatorCallback.mockInfos_.end();
+        ++it) {
+        EXPECT_EQ(it->GetChildTreeId(), -1);
+        EXPECT_EQ(it->GetChildWindowId(), -1);
+    }
+}
+
+/**
+ * @tc.name: SetChildTreeIdAndWinId002
+ * @tc.desc: FindFocusedElementInfo result of the mount node carries childTreeId/childWindowId
+ * @tc.type: FUNC
+ */
+HWTEST_F(JsThirdProviderInteractionOperationTest, SetChildTreeIdAndWinId002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. register a child tree at the focused node, then query focused element
+     * @tc.expected: focused node info carries the child tree pointer
+     */
+    auto ohAccessibilityProvider = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
+    auto frameNode = FrameNode::CreateFrameNode("framenode", 1, AceType::MakeRefPtr<Pattern>(), true);
+    auto jsAccessibilityManager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    auto context = NG::PipelineContext::GetCurrentContext();
+    jsAccessibilityManager->SetPipelineContext(context);
+    jsAccessibilityManager->Register(true);
+
+    auto jsInteractionOperation = AceType::MakeRefPtr<Framework::JsThirdProviderInteractionOperation>(
+        ohAccessibilityProvider, jsAccessibilityManager, frameNode);
+    jsInteractionOperation->SetBelongTreeId(0);
+
+    // Mock provider returns focusElementInfo_ (id 11) for any focus query.
+    int64_t focusNodeId = ohAccessibilityProvider->providerMockResult_.focusElementInfo_.GetElementId();
+    jsInteractionOperation->SetChildTreeIdAndWinId(focusNodeId, 6, 8);
+
+    int32_t requestId = 3;
+    MockAccessibilityElementOperatorCallback operatorCallback;
+    jsInteractionOperation->FindFocusedElementInfo(
+        focusNodeId, static_cast<int32_t>(Accessibility::FOCUS_TYPE_ACCESSIBILITY), requestId,
+        operatorCallback);
+    EXPECT_EQ(operatorCallback.mockInfo_.GetChildTreeId(), 6);
+    EXPECT_EQ(operatorCallback.mockInfo_.GetChildWindowId(), 8);
+}
+
 // ==================== AccessibilityProvider default GetThirdAccessibilityManager ====================
 
 /**
@@ -1096,201 +1194,503 @@ HWTEST_F(JsThirdProviderInteractionOperationTest, ProviderDefaultGetThirdAccessi
     EXPECT_TRUE(weakThirdManager.expired());
 }
 
+// ==================== HasChildTree / FocusMoveSearchWithCondition child tree ====================
+
+/**
+ * @tc.name: JsThirdProviderInteractionOperationHasChildTree001
+ * @tc.desc: HasChildTree reflects bindId mount nodes recorded by SetChildTreeIdAndWinId
+ * @tc.type: FUNC
+ */
+HWTEST_F(JsThirdProviderInteractionOperationTest, JsThirdProviderInteractionOperationHasChildTree001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. construct operation and bind a child tree at the bindId mount node
+     */
+    auto ohAccessibilityProvider
+        = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
+    auto frameNode = FrameNode::CreateFrameNode("framenode", 1, AceType::MakeRefPtr<Pattern>(), true);
+    auto jsAccessibilityManager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    auto jsInteractionOperation = AceType::MakeRefPtr<Framework::JsThirdProviderInteractionOperation>(
+        ohAccessibilityProvider, jsAccessibilityManager, frameNode);
+
+    int64_t bindId = MAX_TEST_ELEMENT_COUNT - 1;
+    int32_t childTreeId = 5;
+    int32_t childWindowId = 100;
+
+    /**
+     * @tc.steps: step2. no child tree bound yet
+     * @tc.expected: HasChildTree returns false
+     */
+    EXPECT_FALSE(jsInteractionOperation->HasChildTree(bindId));
+
+    /**
+     * @tc.steps: step3. bind child tree at bindId
+     * @tc.expected: HasChildTree returns true only for bindId
+     */
+    jsInteractionOperation->SetChildTreeIdAndWinId(bindId, childTreeId, childWindowId);
+    EXPECT_TRUE(jsInteractionOperation->HasChildTree(bindId));
+    EXPECT_FALSE(jsInteractionOperation->HasChildTree(bindId - 1));
+}
+
+/**
+ * @tc.name: JsThirdProviderInteractionOperationFocusMoveSearchWithCondition001
+ * @tc.desc: focus move search hitting the bindId mount node returns DOUBLE_CHECK_CHILD_PROPERTY_AND_GET_LAST
+ *           and the returned node info carries childTreeId/childWindowId
+ * @tc.type: FUNC
+ */
+HWTEST_F(JsThirdProviderInteractionOperationTest, JsThirdProviderInteractionOperationFocusMoveSearchWithCondition001,
+    TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. construct operation, wire it as the provider's third manager (mirrors
+     *            RegisterThirdProviderInteractionOperationAsChildTree) and bind a child tree at
+     *            the last node of the provider chain (bindId mount node)
+     */
+    auto ohAccessibilityProvider
+        = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
+    auto frameNode = FrameNode::CreateFrameNode("framenode", 1, AceType::MakeRefPtr<Pattern>(), true);
+    auto jsAccessibilityManager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    auto context = NG::PipelineContext::GetCurrentContext();
+    jsAccessibilityManager->SetPipelineContext(context);
+    // std::make_shared (not AceType::MakeRefPtr): SendThirdAccessibilityProvider takes
+    // std::weak_ptr<ThirdAccessibilityManager>, RefPtr cannot convert to it implicitly.
+    auto jsInteractionOperation = std::make_shared<Framework::JsThirdProviderInteractionOperation>(
+        ohAccessibilityProvider, jsAccessibilityManager, frameNode);
+    jsInteractionOperation->SetBelongTreeId(0);
+    ohAccessibilityProvider->SendThirdAccessibilityProvider(jsInteractionOperation);
+
+    int64_t bindId = MAX_TEST_ELEMENT_COUNT - 1;
+    int32_t childTreeId = 5;
+    int32_t childWindowId = 100;
+    jsInteractionOperation->SetChildTreeIdAndWinId(bindId, childTreeId, childWindowId);
+
+    /**
+     * @tc.steps: step2. FIND_LAST search from the tree root
+     * @tc.expected: result is DOUBLE_CHECK_CHILD_PROPERTY_AND_GET_LAST, target is the bindId node
+     *               and its info carries childTreeId/childWindowId
+     */
+    Accessibility::AccessibilityElementInfo info;
+    info.SetAccessibilityId(0);
+    Accessibility::AccessibilityFocusMoveParam param;
+    param.direction = Accessibility::FocusMoveDirection::FIND_LAST;
+    int32_t requestId = 1;
+    MockAccessibilityElementOperatorCallback operatorCallback;
+
+    jsInteractionOperation->FocusMoveSearchWithCondition(info, param, requestId, operatorCallback);
+
+    EXPECT_EQ(operatorCallback.mockResult_.resultType,
+        Accessibility::FocusMoveResultType::DOUBLE_CHECK_CHILD_PROPERTY_AND_GET_LAST);
+    ASSERT_EQ(operatorCallback.mockInfos_.size(), 1);
+    EXPECT_EQ(operatorCallback.mockInfos_.front().GetAccessibilityId(), bindId);
+    EXPECT_EQ(operatorCallback.mockInfos_.front().GetChildTreeId(), childTreeId);
+    EXPECT_EQ(operatorCallback.mockInfos_.front().GetChildWindowId(), childWindowId);
+}
+
+/**
+ * @tc.name: JsThirdProviderInteractionOperationFocusMoveSearchWithCondition002
+ * @tc.desc: focus move search does not emit the child tree signal when no child tree is bound
+ * @tc.type: FUNC
+ */
+HWTEST_F(JsThirdProviderInteractionOperationTest, JsThirdProviderInteractionOperationFocusMoveSearchWithCondition002,
+    TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. construct operation without any child tree binding
+     */
+    auto ohAccessibilityProvider
+        = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
+    auto frameNode = FrameNode::CreateFrameNode("framenode", 1, AceType::MakeRefPtr<Pattern>(), true);
+    auto jsAccessibilityManager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    auto context = NG::PipelineContext::GetCurrentContext();
+    jsAccessibilityManager->SetPipelineContext(context);
+    auto jsInteractionOperation = std::make_shared<Framework::JsThirdProviderInteractionOperation>(
+        ohAccessibilityProvider, jsAccessibilityManager, frameNode);
+    jsInteractionOperation->SetBelongTreeId(0);
+    ohAccessibilityProvider->SendThirdAccessibilityProvider(jsInteractionOperation);
+
+    /**
+     * @tc.steps: step2. FIND_LAST search from the tree root
+     * @tc.expected: last node is returned as a normal success without the double check signal
+     */
+    Accessibility::AccessibilityElementInfo info;
+    info.SetAccessibilityId(0);
+    Accessibility::AccessibilityFocusMoveParam param;
+    param.direction = Accessibility::FocusMoveDirection::FIND_LAST;
+    int32_t requestId = 1;
+    MockAccessibilityElementOperatorCallback operatorCallback;
+
+    jsInteractionOperation->FocusMoveSearchWithCondition(info, param, requestId, operatorCallback);
+
+    EXPECT_EQ(operatorCallback.mockResult_.resultType, Accessibility::FocusMoveResultType::SEARCH_SUCCESS);
+    ASSERT_EQ(operatorCallback.mockInfos_.size(), 1);
+    EXPECT_EQ(operatorCallback.mockInfos_.front().GetAccessibilityId(), MAX_TEST_ELEMENT_COUNT - 1);
+    EXPECT_EQ(operatorCallback.mockInfos_.front().GetChildTreeId(),
+        Accessibility::AccessibilityElementInfo::UNDEFINED_TREE_ID);
+}
+
+/**
+ * @tc.name: FocusMoveSearchWithConditionDetectRepliesInline
+ * @tc.desc: detect-focusable search from an in-process UI-thread caller replies synchronously in
+ *           the caller's frame and never defers through a posted task, so a stack-scoped callback
+ *           (e.g. the hidumper focus-search dump) is always answered before it is destroyed
+ * @tc.type: FUNC
+ */
+HWTEST_F(JsThirdProviderInteractionOperationTest, FocusMoveSearchWithConditionDetectRepliesInline,
+    TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. construct an operation without any CMP subtree binding
+     */
+    auto ohAccessibilityProvider = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
+    auto frameNode = FrameNode::CreateFrameNode("framenode", 1, AceType::MakeRefPtr<Pattern>(), true);
+    auto jsAccessibilityManager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    auto context = NG::PipelineContext::GetCurrentContext();
+    jsAccessibilityManager->SetPipelineContext(context);
+    // std::make_shared (not AceType::MakeRefPtr): SendThirdAccessibilityProvider takes
+    // std::weak_ptr<ThirdAccessibilityManager>, RefPtr cannot convert to it implicitly.
+    auto jsInteractionOperation = std::make_shared<Framework::JsThirdProviderInteractionOperation>(
+        ohAccessibilityProvider, jsAccessibilityManager, frameNode);
+    jsInteractionOperation->SetBelongTreeId(0);
+    ohAccessibilityProvider->SendThirdAccessibilityProvider(jsInteractionOperation);
+
+    /**
+     * @tc.steps: step2. swap in a delay-run executor: any posted task is dropped without running,
+     *            so a reply can only be produced by an inline same-thread execution
+     */
+    auto pipelineContext = MockContainer::Current()->pipelineContext_;
+    auto savedExecutor = pipelineContext->taskExecutor_;
+    pipelineContext->taskExecutor_ = AceType::MakeRefPtr<MockTaskExecutor>(true);
+
+    /**
+     * @tc.steps: step3. DETECT_FOCUSABLE search from the current (UI) thread
+     * @tc.expected: the NOT_SUPPORT reply arrives in-frame; with the old posted-only flow the
+     *               reply would be dropped together with the task and the callback stays untouched
+     */
+    Accessibility::AccessibilityElementInfo info;
+    info.SetAccessibilityId(0);
+    Accessibility::AccessibilityFocusMoveParam param;
+    param.direction = Accessibility::FocusMoveDirection::DETECT_FOCUSABLE_IN_FOCUS_MOVE;
+    int32_t requestId = 1;
+    MockAccessibilityElementOperatorCallback operatorCallback;
+
+    jsInteractionOperation->FocusMoveSearchWithCondition(info, param, requestId, operatorCallback);
+
+    pipelineContext->taskExecutor_ = savedExecutor;
+
+    EXPECT_EQ(operatorCallback.mockResult_.resultType, Accessibility::FocusMoveResultType::NOT_SUPPORT);
+    EXPECT_EQ(operatorCallback.mockRequestId, requestId);
+    EXPECT_TRUE(operatorCallback.mockInfos_.empty());
+}
+
+HWTEST_F(JsThirdProviderInteractionOperationTest, RemovedMountNoLongerHandsFocusToChildTree, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
+    auto host = FrameNode::CreateFrameNode("host", 2081, AceType::MakeRefPtr<Pattern>(), true);
+    auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    manager->SetPipelineContext(PipelineContext::GetCurrentContext());
+    auto operation = std::make_shared<Framework::JsThirdProviderInteractionOperation>(provider, manager, host);
+    operation->SetBelongTreeId(0);
+    provider->SendThirdAccessibilityProvider(operation);
+    const int64_t mountId = MAX_TEST_ELEMENT_COUNT - 1;
+    operation->SetChildTreeIdAndWinId(mountId, 5, 100);
+    Accessibility::AccessibilityElementInfo origin;
+    origin.SetAccessibilityId(0);
+    Accessibility::AccessibilityFocusMoveParam param;
+    param.direction = Accessibility::FocusMoveDirection::FIND_LAST;
+    MockAccessibilityElementOperatorCallback before;
+    operation->FocusMoveSearchWithCondition(origin, param, 1, before);
+    ASSERT_EQ(before.mockResult_.resultType,
+        Accessibility::FocusMoveResultType::DOUBLE_CHECK_CHILD_PROPERTY_AND_GET_LAST);
+    operation->RemoveChildTreeIdAndWinId(mountId);
+    MockAccessibilityElementOperatorCallback after;
+    operation->FocusMoveSearchWithCondition(origin, param, 2, after);
+    EXPECT_FALSE(operation->HasChildTree(mountId));
+    EXPECT_EQ(after.mockResult_.resultType, Accessibility::FocusMoveResultType::SEARCH_SUCCESS);
+    ASSERT_EQ(after.mockInfos_.size(), 1u);
+    EXPECT_LE(after.mockInfos_.front().GetChildTreeId(), 0);
+    operation->SetChildTreeIdAndWinId(mountId, 6, 101);
+    operation->SetChildTreeIdAndWinId(mountId, -1, 0);
+    EXPECT_FALSE(operation->HasChildTree(mountId));
+}
+
+// Native hover must preserve the provider tree identity and use the supplied result without another query.
+HWTEST_F(JsThirdProviderInteractionOperationTest, NativeHoverEventKeepsProviderTree, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
+    auto host = FrameNode::CreateFrameNode("framenode", 8001, AceType::MakeRefPtr<Pattern>(), true);
+    auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    manager->SetPipelineContext(NG::PipelineContext::GetCurrentContext());
+    auto operation = std::make_shared<Framework::JsThirdProviderInteractionOperation>(provider, manager, host);
+    operation->SetBelongTreeId(7);
+    ArkUI_AccessibilityElementInfo info;
+    info.SetElementId(123);
+    info.SetComponentType("Button");
+    info.SetContents("hover target");
+    Accessibility::AccessibilityEventInfo event;
+    ASSERT_TRUE(operation->BuildNativeHoverEvent(info, AccessibilityHoverEventType::ENTER, event));
+    int64_t elementId = -1;
+    int32_t treeId = -1;
+    AccessibilitySystemAbilityClient::GetTreeIdAndElementIdBySplitElementId(
+        event.GetAccessibilityId(), elementId, treeId);
+    EXPECT_EQ(elementId, 123);
+    EXPECT_EQ(treeId, 7);
+    EXPECT_EQ(event.GetEventType(), Accessibility::EventType::TYPE_VIEW_HOVER_ENTER_EVENT);
+    EXPECT_EQ(event.GetElementInfo().GetContent(), "hover target");
+    ASSERT_TRUE(operation->BuildNativeHoverEvent(info, AccessibilityHoverEventType::EXIT, event));
+    EXPECT_EQ(event.GetEventType(), Accessibility::EventType::TYPE_VIEW_HOVER_EXIT_EVENT);
+    EXPECT_FALSE(operation->BuildNativeHoverEvent(info, AccessibilityHoverEventType::MOVE, event));
+    EXPECT_FALSE(operation->BuildNativeHoverEvent(info, AccessibilityHoverEventType::CANCEL, event));
+}
+
+HWTEST_F(JsThirdProviderInteractionOperationTest, NativeHoverMissingHostIsRejected, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
+    auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    auto operation = std::make_shared<Framework::JsThirdProviderInteractionOperation>(provider, manager, nullptr);
+    ArkUI_AccessibilityElementInfo info;
+    info.SetElementId(123);
+    EXPECT_FALSE(operation->SendNativeHoverEvent(info, AccessibilityHoverEventType::ENTER));
+}
+
 namespace {
-class MockThirdExecuteJsAccessibilityManager : public Framework::JsAccessibilityManager {
+class CollectedActionProvider : public AccessibilityProvider {
+    DECLARE_ACE_TYPE(CollectedActionProvider, AccessibilityProvider);
+
 public:
-    MOCK_METHOD0(GenerateAccessibilityWorkMode, AccessibilityWorkMode());
+    CollectedActionProvider() = default;
+    ~CollectedActionProvider() override = default;
+
+    int32_t FindAccessibilityNodeInfosById(const int64_t elementId, const int32_t mode,
+        const int32_t requestId, std::vector<ArkUI_AccessibilityElementInfo>& infos) override
+    {
+        if (noCallbacks) {
+            return 0;
+        }
+        if (elementId != targetId) {
+            return -1;
+        }
+        ArkUI_AccessibilityElementInfo info;
+        info.SetElementId(returnWrongTarget ? targetId + 1 : targetId);
+        info.AddOperationAction({ static_cast<ArkUI_Accessibility_ActionType>(declaredAction), nullptr });
+        infos.push_back(info);
+        return 0;
+    }
+    int32_t FindAccessibilityNodeInfosByText(const int64_t elementId, std::string text,
+        const int32_t requestId, std::vector<ArkUI_AccessibilityElementInfo>& infos) override
+    {
+        return 0;
+    }
+    int32_t FindFocusedAccessibilityNode(const int64_t elementId, int32_t focusType,
+        const int32_t requestId, ArkUI_AccessibilityElementInfo& elementInfo) override
+    {
+        return 0;
+    }
+    int32_t FindNextFocusAccessibilityNode(const int64_t elementId, int32_t direction,
+        const int32_t requestId, ArkUI_AccessibilityElementInfo& elementInfo) override
+    {
+        return 0;
+    }
+    int32_t ExecuteAccessibilityAction(const int64_t elementId, int32_t action, const int32_t requestId,
+        const std::map<std::string, std::string>& actionArguments) override
+    {
+        if (elementId != targetId || action != declaredAction) {
+            return -1;
+        }
+        auto text = actionArguments.find("setText");
+        receivedText = text == actionArguments.end() ? "" : text->second;
+        ++executionCount;
+        return executeResult;
+    }
+    int32_t ClearFocusedAccessibilityNode() override
+    {
+        return 0;
+    }
+    int32_t GetAccessibilityNodeCursorPosition(const int64_t elementId,
+        const int32_t requestId, int32_t& cursorPosition) override
+    {
+        return 0;
+    }
+    int32_t SendAccessibilityAsyncEvent(const ArkUI_AccessibilityEventInfo& accessibilityEvent,
+        void (*callback)(int32_t errorCode)) override
+    {
+        return 0;
+    }
+
+    int64_t targetId = 77;
+    int32_t declaredAction = 0;
+    int32_t executeResult = 0;
+    int32_t executionCount = 0;
+    bool noCallbacks = false;
+    bool returnWrongTarget = false;
+    std::string receivedText;
 };
-
-void SetScreenReaderEnabledForThirdExecute(
-    const RefPtr<Framework::JsAccessibilityManager>& manager, bool enabled)
-{
-    manager->isScreenReaderEnabled_ = enabled;
-    manager->isScreenReaderEnabledInitialized_ = true;
-}
-
-void PrepareThirdExecuteEnvironment(const RefPtr<NG::PipelineContext>& context,
-    const RefPtr<MockFrontend>& mockFrontend,
-    const RefPtr<MockThirdExecuteJsAccessibilityManager>& manager, bool screenReaderEnabled)
-{
-    ON_CALL(*manager, GenerateAccessibilityWorkMode())
-        .WillByDefault(testing::Return(AccessibilityWorkMode { .isTouchExplorationEnabled = true }));
-    manager->SetPipelineContext(context);
-    manager->Register(true);
-    SetScreenReaderEnabledForThirdExecute(manager, screenReaderEnabled);
-    RefPtr<AccessibilityManager> accessibilityManager = manager;
-    ON_CALL(*mockFrontend, GetAccessibilityManager()).WillByDefault(testing::Return(accessibilityManager));
-    context->weakFrontend_ = mockFrontend;
-}
 } // namespace
 
 /**
- * @tc.name: ExecuteActionForThirdSendFocusEvent001
- * @tc.desc: screen reader enabled, accessibility focus action sends focused event and draws focus bound
+ * @tc.name: SendCommandCollectedProviderAction
+ * @tc.desc: A collected third-party target uses its own registered provider and declared action.
  * @tc.type: FUNC
  */
-HWTEST_F(JsThirdProviderInteractionOperationTest, ExecuteActionForThirdSendFocusEvent001, TestSize.Level1)
+HWTEST_F(JsThirdProviderInteractionOperationTest, SendCommandCollectedProviderAction, TestSize.Level1)
 {
-    auto context = NG::PipelineContext::GetCurrentContext();
-    auto manager = AceType::MakeRefPtr<testing::NiceMock<MockThirdExecuteJsAccessibilityManager>>();
-    auto mockFrontend = AceType::MakeRefPtr<testing::NiceMock<MockFrontend>>();
-    PrepareThirdExecuteEnvironment(context, mockFrontend, manager, true);
+    constexpr int32_t click = static_cast<int32_t>(Accessibility::ActionType::ACCESSIBILITY_ACTION_CLICK);
+    auto provider = AceType::MakeRefPtr<CollectedActionProvider>();
+    provider->targetId = 77;
+    provider->declaredAction = click;
+    auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    auto host = FrameNode::CreateFrameNode("Custom", 1234567, AceType::MakeRefPtr<Pattern>(), true);
+    auto operation = std::make_shared<Framework::JsThirdProviderInteractionOperation>(
+        provider, manager, host);
+    operation->Initialize();
+    const int64_t targetId = provider->targetId;
 
-    auto provider = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
-    auto hostNode = FrameNode::CreateFrameNode("framenode", 1, AceType::MakeRefPtr<Pattern>(), true);
-    auto hostRender = AceType::MakeRefPtr<MockRenderContext>();
-    hostNode->renderContext_ = hostRender;
-    auto jsInteractionOperation = AceType::MakeRefPtr<Framework::JsThirdProviderInteractionOperation>(
-        provider, manager, hostNode);
-    jsInteractionOperation->SetBelongTreeId(0);
+    EXPECT_EQ(operation->ExecuteActionForCollectedNode(targetId, click, {}),
+        UiSessionAccessibilityResult::SUCCESS);
+    EXPECT_EQ(provider->executionCount, 1);
+    EXPECT_EQ(operation->ExecuteActionForCollectedNode(targetId + 1, click, {}),
+        UiSessionAccessibilityResult::NODE_NOT_FOUND);
+    EXPECT_EQ(provider->executionCount, 1);
+    EXPECT_EQ(operation->ExecuteActionForCollectedNode(targetId,
+        static_cast<int32_t>(Accessibility::ActionType::ACCESSIBILITY_ACTION_LONG_CLICK), {}),
+        UiSessionAccessibilityResult::EXECUTE_FAIL);
+    EXPECT_EQ(provider->executionCount, 1);
+    provider->executeResult = -1;
+    EXPECT_EQ(operation->ExecuteActionForCollectedNode(targetId, click, {}),
+        UiSessionAccessibilityResult::EXECUTE_FAIL);
+    EXPECT_EQ(provider->executionCount, 2);
+    provider->executeResult = 0;
 
-    OHOS::Accessibility::AccessibilityElementInfo nodeInfo;
-    OHOS::Accessibility::Rect screenRect(0, 0, 100, 100);
-    nodeInfo.SetRectInScreen(screenRect);
+    {
+        WeakPtr<AccessibilityProvider> expiredProvider;
+        {
+            auto registeredProvider = AceType::MakeRefPtr<CollectedActionProvider>();
+            expiredProvider = WeakPtr<AccessibilityProvider>(registeredProvider);
+        }
+        auto orphanOperation = std::make_shared<Framework::JsThirdProviderInteractionOperation>(
+            expiredProvider, manager, host);
+        EXPECT_EQ(orphanOperation->ExecuteActionForCollectedNode(targetId, click, {}),
+            UiSessionAccessibilityResult::NODE_NOT_FOUND);
+    }
+    {
+        auto unregisteredProvider = AceType::MakeRefPtr<CollectedActionProvider>();
+        unregisteredProvider->noCallbacks = true;
+        auto unregisteredOperation = std::make_shared<Framework::JsThirdProviderInteractionOperation>(
+            unregisteredProvider, manager, host);
+        EXPECT_EQ(unregisteredOperation->ExecuteActionForCollectedNode(targetId, click, {}),
+            UiSessionAccessibilityResult::NODE_NOT_FOUND);
+    }
+    EXPECT_EQ(provider->executionCount, 2);
 
-    provider->providerMockResult_.elementId_ = -100;
-
-    auto ret = jsInteractionOperation->ExecuteActionForThird(5, nodeInfo,
-        static_cast<int32_t>(OHOS::Accessibility::ActionType::ACCESSIBILITY_ACTION_ACCESSIBILITY_FOCUS));
-
-    EXPECT_EQ(ret, true);
-    // focus bound is drawn on host node
-    EXPECT_EQ(hostRender->GetAccessibilityFocus().value_or(false), true);
-    // screen reader enabled + focus action: accessibility focused event is sent,
-    // provider is queried with the tree id spliced element id
-    EXPECT_EQ(provider->providerMockResult_.elementId_, 5);
+    provider->declaredAction = static_cast<int32_t>(Accessibility::ActionType::ACCESSIBILITY_ACTION_CUSTOM);
+    EXPECT_EQ(operation->ExecuteActionForCollectedNode(
+        targetId, provider->declaredAction, {{ "customAction", "open" }}),
+        UiSessionAccessibilityResult::EXECUTE_FAIL);
+    EXPECT_EQ(provider->executionCount, 2);
+    provider->declaredAction = static_cast<int32_t>(Accessibility::ActionType::ACCESSIBILITY_ACTION_SET_TEXT);
+    EXPECT_EQ(operation->ExecuteActionForCollectedNode(
+        targetId, provider->declaredAction, {{ "setText", "provider text" }}),
+        UiSessionAccessibilityResult::SUCCESS);
+    EXPECT_EQ(provider->receivedText, "provider text");
+    EXPECT_EQ(provider->executionCount, 3);
+    EXPECT_EQ(operation->ExecuteActionForCollectedNode(targetId, click, {}),
+        UiSessionAccessibilityResult::EXECUTE_FAIL);
+    EXPECT_EQ(provider->executionCount, 3);
+    EXPECT_EQ(operation->ExecuteActionForCollectedNode(targetId, provider->declaredAction, {}, false),
+        UiSessionAccessibilityResult::INVALID_PARAM);
+    EXPECT_EQ(provider->executionCount, 3);
+    provider->returnWrongTarget = true;
+    EXPECT_EQ(operation->ExecuteActionForCollectedNode(targetId, provider->declaredAction, {}, false),
+        UiSessionAccessibilityResult::NODE_NOT_FOUND);
+    EXPECT_EQ(provider->executionCount, 3);
+    EXPECT_EQ(operation->ExecuteActionForCollectedNode(targetId, provider->declaredAction, {}),
+        UiSessionAccessibilityResult::NODE_NOT_FOUND);
+    EXPECT_EQ(provider->executionCount, 3);
+    provider->returnWrongTarget = false;
+    const std::vector<Accessibility::ActionType> mappingActions = {
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_FOCUS,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_CLEAR_FOCUS,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_SELECT,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_CLEAR_SELECTION,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_NEXT_TEXT,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_PREVIOUS_TEXT,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_SPAN_CLICK,
+    };
+    for (auto systemAction : mappingActions) {
+        provider->declaredAction = static_cast<int32_t>(systemAction);
+        auto before = provider->executionCount;
+        std::map<std::string, std::string> arguments;
+        if (systemAction == Accessibility::ActionType::ACCESSIBILITY_ACTION_SPAN_CLICK) {
+            arguments["spanId"] = "0";
+        }
+        EXPECT_EQ(operation->ExecuteActionForCollectedNode(
+            targetId, static_cast<int32_t>(systemAction), arguments),
+            UiSessionAccessibilityResult::SUCCESS);
+        EXPECT_EQ(provider->executionCount, before + 1);
+    }
+    EXPECT_EQ(ExecuteUiSessionAccessibilityAction(host, targetId,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_CLICK, {}),
+        UiSessionAccessibilityResult::NODE_NOT_FOUND);
+    EXPECT_EQ(ExecuteUiSessionAccessibilityAction(host, targetId,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_INVALID, {}),
+        UiSessionAccessibilityResult::EXECUTE_FAIL);
+    EXPECT_EQ(provider->executionCount, static_cast<int32_t>(mappingActions.size()) + 3);
 }
 
-/**
- * @tc.name: ExecuteActionForThirdNoEventScreenReaderOff002
- * @tc.desc: screen reader disabled, accessibility focus action draws focus bound but sends no event
- * @tc.type: FUNC
- */
-HWTEST_F(JsThirdProviderInteractionOperationTest, ExecuteActionForThirdNoEventScreenReaderOff002, TestSize.Level1)
-{
-    auto context = NG::PipelineContext::GetCurrentContext();
-    auto manager = AceType::MakeRefPtr<testing::NiceMock<MockThirdExecuteJsAccessibilityManager>>();
-    auto mockFrontend = AceType::MakeRefPtr<testing::NiceMock<MockFrontend>>();
-    PrepareThirdExecuteEnvironment(context, mockFrontend, manager, false);
+namespace {
+class FallbackTestPattern : public Pattern {
+public:
+    explicit FallbackTestPattern(const RefPtr<AccessibilityProvider>& provider) : provider_(provider) {}
 
-    auto provider = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
-    auto hostNode = FrameNode::CreateFrameNode("framenode", 1, AceType::MakeRefPtr<Pattern>(), true);
-    auto hostRender = AceType::MakeRefPtr<MockRenderContext>();
-    hostNode->renderContext_ = hostRender;
-    auto jsInteractionOperation = AceType::MakeRefPtr<Framework::JsThirdProviderInteractionOperation>(
-        provider, manager, hostNode);
-    jsInteractionOperation->SetBelongTreeId(0);
+    RefPtr<AccessibilityProvider> GetOrCreateAccessibilityProvider() override
+    {
+        return provider_;
+    }
 
-    OHOS::Accessibility::AccessibilityElementInfo nodeInfo;
-    OHOS::Accessibility::Rect screenRect(0, 0, 100, 100);
-    nodeInfo.SetRectInScreen(screenRect);
-
-    provider->providerMockResult_.elementId_ = -100;
-
-    auto ret = jsInteractionOperation->ExecuteActionForThird(6, nodeInfo,
-        static_cast<int32_t>(OHOS::Accessibility::ActionType::ACCESSIBILITY_ACTION_ACCESSIBILITY_FOCUS));
-
-    EXPECT_EQ(ret, true);
-    // focus bound is still drawn without screen reader
-    EXPECT_EQ(hostRender->GetAccessibilityFocus().value_or(false), true);
-    // screen reader disabled: no accessibility focused event sent
-    EXPECT_EQ(provider->providerMockResult_.elementId_, -100);
-}
+private:
+    RefPtr<AccessibilityProvider> provider_;
+};
+} // namespace
 
 /**
- * @tc.name: ExecuteActionForThirdSendClearFocusEvent003
- * @tc.desc: screen reader enabled, clear accessibility focus action sends focus cleared event and clears focus
+ * @tc.name: SendCommandCollectedActionWithoutAms
+ * @tc.desc: A third-party action executes through the pattern-owned provider when no AAMS operation exists.
  * @tc.type: FUNC
  */
-HWTEST_F(JsThirdProviderInteractionOperationTest, ExecuteActionForThirdSendClearFocusEvent003, TestSize.Level1)
+HWTEST_F(JsThirdProviderInteractionOperationTest, SendCommandCollectedActionWithoutAms, TestSize.Level1)
 {
-    auto context = NG::PipelineContext::GetCurrentContext();
-    auto manager = AceType::MakeRefPtr<testing::NiceMock<MockThirdExecuteJsAccessibilityManager>>();
-    auto mockFrontend = AceType::MakeRefPtr<testing::NiceMock<MockFrontend>>();
-    PrepareThirdExecuteEnvironment(context, mockFrontend, manager, true);
+    constexpr int64_t targetId = 55;
+    constexpr int32_t click = static_cast<int32_t>(Accessibility::ActionType::ACCESSIBILITY_ACTION_CLICK);
+    auto provider = AceType::MakeRefPtr<CollectedActionProvider>();
+    provider->targetId = targetId;
+    provider->declaredAction = click;
 
-    auto provider = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
-    auto hostNode = FrameNode::CreateFrameNode("framenode", 1, AceType::MakeRefPtr<Pattern>(), true);
-    auto hostRender = AceType::MakeRefPtr<MockRenderContext>();
-    hostNode->renderContext_ = hostRender;
-    auto jsInteractionOperation = AceType::MakeRefPtr<Framework::JsThirdProviderInteractionOperation>(
-        provider, manager, hostNode);
-    jsInteractionOperation->SetBelongTreeId(0);
+    auto emptyHost = FrameNode::CreateFrameNode("Custom", 2345670,
+        AceType::MakeRefPtr<FallbackTestPattern>(nullptr), true);
+    EXPECT_EQ(ExecuteUiSessionAccessibilityAction(emptyHost, targetId,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_CLICK, {}),
+        UiSessionAccessibilityResult::NODE_NOT_FOUND);
+    EXPECT_EQ(provider->executionCount, 0);
 
-    OHOS::Accessibility::AccessibilityElementInfo nodeInfo;
-    OHOS::Accessibility::Rect screenRect(0, 0, 100, 100);
-    nodeInfo.SetRectInScreen(screenRect);
+    auto host = FrameNode::CreateFrameNode("Custom", 2345671,
+        AceType::MakeRefPtr<FallbackTestPattern>(provider), true);
+    EXPECT_EQ(ExecuteUiSessionAccessibilityAction(host, targetId,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_CLICK, {}),
+        UiSessionAccessibilityResult::SUCCESS);
+    EXPECT_EQ(provider->executionCount, 1);
+    EXPECT_EQ(ExecuteUiSessionAccessibilityAction(host, targetId + 1,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_CLICK, {}),
+        UiSessionAccessibilityResult::NODE_NOT_FOUND);
+    EXPECT_EQ(provider->executionCount, 1);
+    provider->declaredAction = static_cast<int32_t>(Accessibility::ActionType::ACCESSIBILITY_ACTION_LONG_CLICK);
+    EXPECT_EQ(ExecuteUiSessionAccessibilityAction(host, targetId,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_CLICK, {}),
+        UiSessionAccessibilityResult::EXECUTE_FAIL);
+    EXPECT_EQ(provider->executionCount, 1);
 
-    // host node currently holds accessibility focus
-    hostRender->UpdateAccessibilityFocus(true);
-    provider->providerMockResult_.elementId_ = -100;
-
-    auto ret = jsInteractionOperation->ExecuteActionForThird(7, nodeInfo,
-        static_cast<int32_t>(OHOS::Accessibility::ActionType::ACCESSIBILITY_ACTION_CLEAR_ACCESSIBILITY_FOCUS));
-
-    EXPECT_EQ(ret, true);
-    // focus bound is cleared on host node
-    EXPECT_EQ(hostRender->GetAccessibilityFocus().value_or(true), false);
-    // screen reader enabled + clear focus action: accessibility focus cleared event is sent
-    EXPECT_EQ(provider->providerMockResult_.elementId_, 7);
-}
-
-/**
- * @tc.name: ExecuteActionForThirdNoEventOtherAction004
- * @tc.desc: other actions send no accessibility event and do not touch focus bound
- * @tc.type: FUNC
- */
-HWTEST_F(JsThirdProviderInteractionOperationTest, ExecuteActionForThirdNoEventOtherAction004, TestSize.Level1)
-{
-    auto context = NG::PipelineContext::GetCurrentContext();
-    auto manager = AceType::MakeRefPtr<testing::NiceMock<MockThirdExecuteJsAccessibilityManager>>();
-    auto mockFrontend = AceType::MakeRefPtr<testing::NiceMock<MockFrontend>>();
-    PrepareThirdExecuteEnvironment(context, mockFrontend, manager, true);
-
-    auto provider = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
-    auto hostNode = FrameNode::CreateFrameNode("framenode", 1, AceType::MakeRefPtr<Pattern>(), true);
-    auto hostRender = AceType::MakeRefPtr<MockRenderContext>();
-    hostNode->renderContext_ = hostRender;
-    auto jsInteractionOperation = AceType::MakeRefPtr<Framework::JsThirdProviderInteractionOperation>(
-        provider, manager, hostNode);
-    jsInteractionOperation->SetBelongTreeId(0);
-
-    OHOS::Accessibility::AccessibilityElementInfo nodeInfo;
-    provider->providerMockResult_.elementId_ = -100;
-
-    auto ret = jsInteractionOperation->ExecuteActionForThird(8, nodeInfo,
-        static_cast<int32_t>(OHOS::Accessibility::ActionType::ACCESSIBILITY_ACTION_CLICK));
-
-    EXPECT_EQ(ret, true);
-    // other action: no event sent and focus bound untouched
-    EXPECT_EQ(provider->providerMockResult_.elementId_, -100);
-    EXPECT_EQ(hostRender->GetAccessibilityFocus().has_value(), false);
-}
-
-/**
- * @tc.name: ExecuteActionForThirdNoContext005
- * @tc.desc: execute action for third returns false when pipeline context is not set
- * @tc.type: FUNC
- */
-HWTEST_F(JsThirdProviderInteractionOperationTest, ExecuteActionForThirdNoContext005, TestSize.Level1)
-{
-    auto manager = AceType::MakeRefPtr<testing::NiceMock<MockThirdExecuteJsAccessibilityManager>>();
-    ON_CALL(*manager, GenerateAccessibilityWorkMode())
-        .WillByDefault(testing::Return(AccessibilityWorkMode { .isTouchExplorationEnabled = true }));
-    manager->Register(true);
-
-    auto provider = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
-    auto hostNode = FrameNode::CreateFrameNode("framenode", 1, AceType::MakeRefPtr<Pattern>(), true);
-    auto jsInteractionOperation = AceType::MakeRefPtr<Framework::JsThirdProviderInteractionOperation>(
-        provider, manager, hostNode);
-    jsInteractionOperation->SetBelongTreeId(0);
-
-    OHOS::Accessibility::AccessibilityElementInfo nodeInfo;
-
-    auto ret = jsInteractionOperation->ExecuteActionForThird(0, nodeInfo,
-        static_cast<int32_t>(OHOS::Accessibility::ActionType::ACCESSIBILITY_ACTION_ACCESSIBILITY_FOCUS));
-
-    EXPECT_EQ(ret, false);
+    auto plainHost = FrameNode::CreateFrameNode("FrameNode", 2345672, AceType::MakeRefPtr<Pattern>(), true);
+    EXPECT_EQ(ExecuteUiSessionAccessibilityAction(plainHost, targetId,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_CLICK, {}),
+        UiSessionAccessibilityResult::NODE_NOT_FOUND);
 }
 
 } // namespace OHOS::Ace::NG

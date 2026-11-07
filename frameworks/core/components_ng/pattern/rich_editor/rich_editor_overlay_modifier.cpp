@@ -16,6 +16,7 @@
 #include "core/components_ng/pattern/rich_editor/rich_editor_overlay_modifier.h"
 
 #include "base/utils/utils.h"
+#include "core/components_ng/pattern/common_text/preview_text_decoration_utils.h"
 #include "core/components_ng/pattern/progress/progress_modifier.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_pattern.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_scroll_controller.h"
@@ -62,8 +63,6 @@ RichEditorOverlayModifier::RichEditorOverlayModifier(const WeakPtr<OHOS::Ace::NG
     AttachProperty(scrollBarOpacityType_);
     textHeight_ = AceType::MakeRefPtr<PropertyFloat>(0.0f);
     AttachProperty(textHeight_);
-    previewTextDecorationColor_ = AceType::MakeRefPtr<PropertyColor>(Color());
-    AttachProperty(previewTextDecorationColor_);
     previewTextUnderlineWidth_ = AceType::MakeRefPtr<PropertyFloat>(0.0f);
     AttachProperty(previewTextUnderlineWidth_);
     showPreviewTextDecoration_ = AceType::MakeRefPtr<PropertyBool>(false);
@@ -72,11 +71,10 @@ RichEditorOverlayModifier::RichEditorOverlayModifier(const WeakPtr<OHOS::Ace::NG
     AttachProperty(changeOverlay_);
     hoverColor_ = AceType::MakeRefPtr<PropertyInt>(0);
     AttachProperty(hoverColor_);
-}
-
-void RichEditorOverlayModifier::SetPreviewTextDecorationColor(const Color& value)
-{
-    previewTextDecorationColor_->Set(value);
+    underlineColor_ = AceType::MakeRefPtr<PropertyColor>(Color());
+    AttachProperty(underlineColor_);
+    underlineWidth_ = AceType::MakeRefPtr<PropertyFloat>(0.0f);
+    AttachProperty(underlineWidth_);
 }
 
 void RichEditorOverlayModifier::SetPreviewTextUnderlineWidth(float value)
@@ -89,9 +87,14 @@ void RichEditorOverlayModifier::SetShowPreviewTextDecoration(bool value)
     showPreviewTextDecoration_->Set(value);
 }
 
-void RichEditorOverlayModifier::SetPreviewTextStyle(const PreviewTextStyle& value)
+void RichEditorOverlayModifier::SetUnderlineColor(const Color& value)
 {
-    previewTextStyle_ = value;
+    underlineColor_->Set(value);
+}
+
+void RichEditorOverlayModifier::SetUnderlineWidth(float value)
+{
+    underlineWidth_->Set(value);
 }
 
 void RichEditorOverlayModifier::SetCaretOffsetAndHeight(const OffsetF& cursorOffset, float height)
@@ -189,41 +192,82 @@ bool RichEditorOverlayModifier::GetFloatCaretLanding() const
 void RichEditorOverlayModifier::PaintPreviewTextDecoration(DrawingContext& drawingContext) const
 {
     CHECK_NULL_VOID(showPreviewTextDecoration_->Get());
-    if (previewTextStyle_ != PreviewTextStyle::UNDERLINE) {
-        TAG_LOGW(AceLogTag::ACE_RICH_TEXT, "is not UNDERLINE style");
-        return;
-    }
     auto pattern = AceType::DynamicCast<RichEditorPattern>(pattern_.Upgrade());
     CHECK_NULL_VOID(pattern);
-
-    auto previewTextDecorationColor = caretColor_->Get();
-    auto previewTextUnderlineWidth = previewTextUnderlineWidth_->Get();
-    auto roundRectRadius = previewTextUnderlineWidth / 2;
+    auto styling = pattern->GetPreviewStyling();
+    CHECK_EQUAL_VOID(styling.underlineShape, PreviewTextStyle::NORMAL);
+    auto underlineWidth = previewTextUnderlineWidth_->Get();
     auto previewTextRects = pattern->GetPreviewTextRects();
     drawingContext.canvas.Save();
     RSBrush brush;
     brush.SetAntiAlias(true);
-    brush.SetColor(previewTextDecorationColor);
+    if (styling.underlineColor.has_value()) {
+        brush.SetColor(styling.underlineColor.value());
+    } else {
+        brush.SetColor(pattern->GetCaretColor().GetValue());
+    }
     drawingContext.canvas.AttachBrush(brush);
-    for (const auto& previewTextRect : previewTextRects) {
-        auto padding = &previewTextRect == &previewTextRects.back() ? 0 : roundRectRadius;
-        RSRect rect(previewTextRect.Left(), previewTextRect.Bottom() - previewTextUnderlineWidth,
-            previewTextRect.Right() + padding, previewTextRect.Bottom());
-        drawingContext.canvas.DrawRoundRect(RSRoundRect(rect, roundRectRadius, roundRectRadius));
+    float startOffset = 0.0f;
+    for (const auto& rect : previewTextRects) {
+        PreviewDecorationParams params { rect.Left(), rect.Right(), rect.Bottom(),
+            underlineWidth, styling.underlineShape,
+            &rect == &previewTextRects.back(),
+            styling.underlineColor.has_value()
+                ? RSColor(styling.underlineColor.value())
+                : RSColor(pattern->GetCaretColor().GetValue()),
+            startOffset };
+        DrawPreviewTextUnderline(drawingContext.canvas, params);
+        // Accumulate this segment's width so the next segment continues the dash/wavy
+        // phase continuously instead of restarting the pattern at the new left edge.
+        startOffset += rect.Right() - rect.Left();
     }
     drawingContext.canvas.DetachBrush();
     drawingContext.canvas.Restore();
 }
 
-void RichEditorOverlayModifier::PaintCaret(DrawingContext& drawingContext) const
+void RichEditorOverlayModifier::PaintUnderline(RSCanvas& canvas) const
 {
-    if (!caretVisible_->Get()) {
+    auto richEditorPattern = AceType::DynamicCast<RichEditorPattern>(pattern_.Upgrade());
+    CHECK_NULL_VOID(richEditorPattern);
+    if (!richEditorPattern->IsUnderlineMode() || isContentNode_) {
         return;
     }
-    bool isShowOriginCaret = floatingCaretVisible_->Get() && originCaretVisible_->Get();
-    CHECK_NULL_VOID(!floatingCaretVisible_->Get() || isShowOriginCaret);
-    auto& canvas = drawingContext.canvas;
-    auto offset = caretOffset_->Get();
+    auto layoutProperty = richEditorPattern->GetLayoutProperty<RichEditorLayoutProperty>();
+    CHECK_NULL_VOID(layoutProperty);
+    if (!(layoutProperty->GetShowUnderlineValue(false))) {
+        return;
+    }
+    auto contentRect = richEditorPattern->GetTextContentRect();
+    auto frameHeight = frameSize_->Get().Height();
+    auto frameRect = richEditorPattern->GetFrameRect();
+    auto responseAreaWidth = richEditorPattern->GetAllResponseAreaWidth();
+    auto hasResponseArea = GreatNotEqual(responseAreaWidth, 0.0f);
+    auto isRTL = layoutProperty->GetNonAutoLayoutDirection() == TextDirection::RTL;
+    PointF leftPoint(contentRect.Left(), frameHeight);
+    PointF rightPoint(contentRect.Right(), frameHeight);
+    auto isNeedToAddPadding = richEditorPattern->IsUnderlineAndButtonMode();
+    if (isRTL) {
+        auto contentLeft = isNeedToAddPadding ? contentRect.Left() - richEditorPattern->GetPaddingLeft() :
+            contentRect.Left();
+        leftPoint.SetX(hasResponseArea ? 0.0f : contentLeft);
+        rightPoint.SetX(contentRect.Right());
+    } else {
+        auto contentRight = isNeedToAddPadding ? contentRect.Right() + richEditorPattern->GetPaddingRight() :
+            contentRect.Right();
+        leftPoint.SetX(contentRect.Left());
+        rightPoint.SetX(hasResponseArea ? frameRect.Width() : contentRight);
+    }
+    RSPen pen;
+    pen.SetColor(ToRSColor(underlineColor_->Get()));
+    pen.SetWidth(underlineWidth_->Get());
+    pen.SetAntiAlias(true);
+    canvas.AttachPen(pen);
+    canvas.DrawLine(ToRSPoint(leftPoint), ToRSPoint(rightPoint));
+    canvas.DetachPen();
+}
+
+void RichEditorOverlayModifier::DrawCaretInternal(RSCanvas& canvas, const OffsetF& offset, int32_t caretColor) const
+{
     canvas.Save();
     RSPen pen;
     pen.SetAntiAlias(true);
@@ -231,7 +275,7 @@ void RichEditorOverlayModifier::PaintCaret(DrawingContext& drawingContext) const
     float caretHeight = caretHeight_->Get();
     pen.SetWidth(caretWidth);
     pen.SetCapStyle(RSPen::CapStyle::ROUND_CAP);
-    pen.SetColor(isShowOriginCaret ? originCaretColor_->Get() : caretColor_->Get());
+    pen.SetColor(caretColor);
     canvas.AttachPen(pen);
     float midPosX = offset.GetX() + caretWidth / 2;
     float startPosY = offset.GetY();
@@ -242,27 +286,22 @@ void RichEditorOverlayModifier::PaintCaret(DrawingContext& drawingContext) const
     canvas.Restore();
 }
 
+void RichEditorOverlayModifier::PaintCaret(DrawingContext& drawingContext) const
+{
+    if (!caretVisible_->Get()) {
+        return;
+    }
+    bool isShowOriginCaret = floatingCaretVisible_->Get() && originCaretVisible_->Get();
+    CHECK_NULL_VOID(!floatingCaretVisible_->Get() || isShowOriginCaret);
+    auto offset = caretOffset_->Get();
+    auto caretColor = isShowOriginCaret ? originCaretColor_->Get() : caretColor_->Get();
+    DrawCaretInternal(drawingContext.canvas, offset, caretColor);
+}
+
 void RichEditorOverlayModifier::PaintFloatingCaret(DrawingContext& drawingContext) const
 {
     CHECK_NULL_VOID(floatingCaretVisible_->Get());
-    auto& canvas = drawingContext.canvas;
-    auto floatingCaretOffset = floatingCaretOffset_->Get();
-    canvas.Save();
-    RSPen pen;
-    pen.SetAntiAlias(true);
-    float caretWidth = caretWidth_->Get();
-    float caretHeight = caretHeight_->Get();
-    pen.SetWidth(caretWidth);
-    pen.SetCapStyle(RSPen::CapStyle::ROUND_CAP);
-    pen.SetColor(caretColor_->Get());
-    canvas.AttachPen(pen);
-    float midPosX = floatingCaretOffset.GetX() + caretWidth / 2;
-    float startPosY = floatingCaretOffset.GetY();
-    float endPosY = startPosY + caretHeight;
-    float roundCapRadius = caretWidth / 2;
-    canvas.DrawLine(RSPoint(midPosX, startPosY + roundCapRadius), RSPoint(midPosX, endPosY - roundCapRadius));
-    canvas.DetachPen();
-    canvas.Restore();
+    DrawCaretInternal(drawingContext.canvas, floatingCaretOffset_->Get(), caretColor_->Get());
 }
 
 void RichEditorOverlayModifier::PaintScrollBar(DrawingContext& context)
@@ -299,6 +338,7 @@ void RichEditorOverlayModifier::onDraw(DrawingContext& drawingContext)
     if (isContentNode_) {
         DrawContent(drawingContext);
     } else {
+        PaintUnderline(drawingContext.canvas);
         DrawScrollBar(drawingContext);
         // Draw hover/press circle for cancelButton (same as TextFieldOverlayModifier)
         if (!hoverRects_.empty()) {
@@ -332,10 +372,10 @@ void RichEditorOverlayModifier::DrawContent(DrawingContext& drawingContext)
     drawingContext.canvas.ClipRect(ToRSRect(contentRect), RSClipOp::INTERSECT);
     PaintCaret(drawingContext);
     PaintFloatingCaret(drawingContext);
-    PaintPreviewTextDecoration(drawingContext);
     SetSelectedColor(richEditorPattern->GetSelectedBackgroundColor().GetValue());
     TextOverlayModifier::onDraw(drawingContext);
     drawingContext.canvas.Restore();
+    PaintPreviewTextDecoration(drawingContext);
 }
 
 void RichEditorOverlayModifier::DrawScrollBar(DrawingContext& drawingContext)

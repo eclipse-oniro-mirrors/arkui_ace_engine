@@ -223,11 +223,28 @@ AccessibilityHoverAction HoverEventTarget::ConvertAccessibilityHoverAction(Touch
     }
 }
 
+Offset MouseInfo::GetCurrentLocalLocation() const
+{
+    if (currentLocalLocationGetter_) {
+        return currentLocalLocationGetter_();
+    }
+    return localLocation_;
+}
+
 bool MouseEventTarget::HandleMouseEvent(const MouseEvent& event)
 {
     if (!onMouseCallback_) {
         return false;
     }
+    auto info = CreateMouseInfo(event);
+    // onMouseCallback_ may be overwritten in its invoke so we copy it first
+    auto onMouseCallback = onMouseCallback_;
+    onMouseCallback(info);
+    return info.IsStopPropagation();
+}
+
+MouseInfo MouseEventTarget::CreateMouseInfo(const MouseEvent& event) const
+{
     MouseInfo info;
     info.SetPointerEvent(event.GetMouseEventPointerEvent());
     info.SetButton(event.button);
@@ -266,10 +283,7 @@ bool MouseEventTarget::HandleMouseEvent(const MouseEvent& event)
     for (const auto& historyEvent : event.history) {
         info.AddHistoryLocationInfo(CreateMouseHistoricalPoint(historyEvent, needPostEvent));
     }
-    // onMouseCallback_ may be overwritten in its invoke so we copy it first
-    auto onMouseCallback = onMouseCallback_;
-    onMouseCallback(info);
-    return info.IsStopPropagation();
+    return info;
 }
 MouseHistoricalPoint MouseEventTarget::CreateMouseHistoricalPoint(const MouseEvent& event, bool needPostEvent) const
 {
@@ -316,6 +330,11 @@ MouseEvent MouseEvent::operator-(const Offset& offset) const
     mouseEvent.originalId = originalId;
     mouseEvent.pressedKeyCodes_ = pressedKeyCodes_;
     mouseEvent.isInjected = isInjected;
+    mouseEvent.isAgent = isAgent;
+    mouseEvent.agentWindowId = agentWindowId;
+    mouseEvent.callingUid = callingUid;
+    mouseEvent.hasSafSessionId = hasSafSessionId;
+    mouseEvent.safSessionId = safSessionId;
     mouseEvent.isPrivacyMode = isPrivacyMode;
     mouseEvent.isStylusMouseMode = isStylusMouseMode;
     mouseEvent.rawDeltaX = rawDeltaX;
@@ -362,22 +381,25 @@ MouseEvent MouseInfo::ConvertToMouseEvent() const
     return mouseEvent;
 }
 
-MouseEvent MouseInfo::ConvertToMouseEventForStatic() const
+MouseEvent MouseInfo::ConvertToMouseEventForStatic(float density) const
 {
+    if (NearEqual(density, 0.f)) {
+        density = 1.0f;
+    }
     MouseEvent mouseEvent;
     mouseEvent.sourceType = GetSourceDevice();
     mouseEvent.sourceTool = GetSourceTool();
     mouseEvent.time = GetTimeStamp();
     mouseEvent.deviceId = GetDeviceId();
     mouseEvent.targetDisplayId = GetTargetDisplayId();
-    mouseEvent.x = globalLocation_.GetX();
-    mouseEvent.y = globalLocation_.GetY();
-    mouseEvent.globalDisplayX = globalDisplayLocation_.GetX();
-    mouseEvent.globalDisplayY = globalDisplayLocation_.GetY();
+    mouseEvent.x = globalLocation_.GetX() / density;
+    mouseEvent.y = globalLocation_.GetY() / density;
+    mouseEvent.globalDisplayX = globalDisplayLocation_.GetX() / density;
+    mouseEvent.globalDisplayY = globalDisplayLocation_.GetY() / density;
     mouseEvent.button = button_;
     mouseEvent.action = action_;
-    mouseEvent.screenX = screenLocation_.GetX();
-    mouseEvent.screenY = screenLocation_.GetY();
+    mouseEvent.screenX = screenLocation_.GetX() / density;
+    mouseEvent.screenY = screenLocation_.GetY() / density;
     mouseEvent.rawDeltaX = rawDeltaX_;
     mouseEvent.rawDeltaY = rawDeltaY_;
     mouseEvent.pressedKeyCodes_ = GetPressedKeyCodes();
@@ -439,6 +461,11 @@ MouseEvent MouseEvent::CloneWith(float scale) const
         mouseEvent.history.emplace_back(std::move(clonedHistoryEvent));
     }
     mouseEvent.isInjected = isInjected;
+    mouseEvent.isAgent = isAgent;
+    mouseEvent.agentWindowId = agentWindowId;
+    mouseEvent.callingUid = callingUid;
+    mouseEvent.hasSafSessionId = hasSafSessionId;
+    mouseEvent.safSessionId = safSessionId;
     mouseEvent.isPrivacyMode = isPrivacyMode;
     mouseEvent.isScreenLocked = isScreenLocked;
     mouseEvent.mockFlushEvent = mockFlushEvent;
@@ -512,6 +539,11 @@ TouchEvent MouseEvent::CreateTouchPoint() const
         .SetOriginalId(pointOriginalId)
         .SetEventHandleId(pointId)
         .SetIsInjected(isInjected);
+    event.isAgent = isAgent;
+    event.agentWindowId = agentWindowId;
+    event.callingUid = callingUid;
+    event.hasSafSessionId = hasSafSessionId;
+    event.safSessionId = safSessionId;
     event.isPrivacyMode = isPrivacyMode;
     event.isStylusMouseMode = isStylusMouseMode;
     event.pointers.emplace_back(std::move(point));

@@ -20,7 +20,7 @@
 
 namespace OHOS::Ace::Framework {
 
-class JsiComponentApiBridge : virtual public AceType {
+class JsiComponentApiBridge : public AceType {
     DECLARE_ACE_TYPE(JsiComponentApiBridge, AceType);
 
 public:

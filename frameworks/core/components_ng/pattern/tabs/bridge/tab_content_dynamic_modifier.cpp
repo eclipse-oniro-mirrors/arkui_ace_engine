@@ -312,6 +312,29 @@ void SetTabBarVisibilityImpl(
     ArkUINodeHandle node, ArkUI_Int32 visibility, ArkUI_Int32 displayMode, ArkUI_Bool hasDisplayMode) {}
 
 void ResetTabBarVisibilityImpl(ArkUINodeHandle node) {}
+
+void SetTabBarBadgeImpl(ArkUINodeHandle node, void* badgeParamRawPtr)
+{
+    (void)node;
+    (void)badgeParamRawPtr;
+}
+
+void SetSidebarSectionImpl(
+    ArkUINodeHandle node, ArkUI_CharPtr title, ArkUI_Bool hasOrder, ArkUI_Int32 order,
+    ArkUI_Int32 titleStyle, ArkUI_VoidPtr resObjRawPtr)
+{
+    (void)node;
+    (void)title;
+    (void)hasOrder;
+    (void)order;
+    (void)titleStyle;
+    (void)resObjRawPtr;
+}
+
+void ResetSidebarSectionImpl(ArkUINodeHandle node)
+{
+    (void)node;
+}
 #endif
 } // namespace
 
@@ -537,6 +560,10 @@ void SetTabBar(ArkUINodeHandle node, void* paramRawPtr, bool fromJsView)
     }
 #if defined(IOS_PLATFORM)
     TabContentModelNG::AddTabBarItem(AceType::Claim(frameNode), DEFAULT_NODE_SLOT, true);
+#else
+    if (!fromJsView) {
+        TabContentModelNG::AddTabBarItem(AceType::Claim(frameNode), DEFAULT_NODE_SLOT, true);
+    }
 #endif
 }
 
@@ -629,6 +656,48 @@ void ResetTabBarVisibility(ArkUINodeHandle node)
     TabContentModelNG::SetDefaultVisibility(frameNode, defaultVisibility);
 }
 
+void SetTabBarBadge(ArkUINodeHandle node, void* badgeParamRawPtr)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto* param = reinterpret_cast<std::optional<TabBarBadgeParam>*>(badgeParamRawPtr);
+    CHECK_NULL_VOID(param);
+    TabContentModelNG::SetTabBarBadge(frameNode, *param);
+}
+
+void SetSidebarSection(ArkUINodeHandle node, ArkUI_CharPtr title, ArkUI_Bool hasOrder, ArkUI_Int32 order,
+    ArkUI_Int32 titleStyle, ArkUI_VoidPtr resObjRawPtr)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    SidebarSection section;
+    if (title != nullptr) {
+        section.title = std::string(title);
+    }
+    if (hasOrder) {
+        section.order = order;
+    }
+    if (titleStyle == static_cast<ArkUI_Int32>(SidebarSectionTitleStyle::STANDARD) ||
+        titleStyle == static_cast<ArkUI_Int32>(SidebarSectionTitleStyle::EMPHASIZED)) {
+        section.titleStyle = static_cast<SidebarSectionTitleStyle>(titleStyle);
+    } else {
+        section.titleStyle = SidebarSectionTitleStyle::STANDARD;
+    }
+    auto* resObj = reinterpret_cast<ResourceObject*>(resObjRawPtr);
+    section.resourceTitleObject = resObj ? AceType::Claim(resObj) : nullptr;
+    TabContentModelNG::SetSidebarSection(frameNode, section);
+}
+
+void ResetSidebarSection(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    SidebarSection section;
+    section.title = "";
+    section.order = std::nullopt;
+    TabContentModelNG::SetSidebarSection(frameNode, section);
+}
+
 namespace NodeModifier {
 const ArkUITabContentModifier* GetTabContentDynamicModifier()
 {
@@ -669,6 +738,9 @@ const ArkUITabContentModifier* GetTabContentDynamicModifier()
             .setTabBar = SetTabBar,
             .setTabBarVisibility = SetTabBarVisibility,
             .resetTabBarVisibility = ResetTabBarVisibility,
+            .setTabBarBadge = SetTabBarBadge,
+            .setSidebarSection = SetSidebarSection,
+            .resetSidebarSection = ResetSidebarSection,
         };
         CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
         return &modifier;
@@ -709,6 +781,9 @@ const ArkUITabContentModifier* GetTabContentDynamicModifier()
         .setTabBar = SetTabBarImpl,
         .setTabBarVisibility = SetTabBarVisibilityImpl,
         .resetTabBarVisibility = ResetTabBarVisibilityImpl,
+        .setTabBarBadge = SetTabBarBadgeImpl,
+        .setSidebarSection = SetSidebarSectionImpl,
+        .resetSidebarSection = ResetSidebarSectionImpl,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;

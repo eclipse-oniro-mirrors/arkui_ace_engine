@@ -298,7 +298,7 @@ HWTEST_F(ScrollBarOverDragTestNg, NestedScrollOverDragTest002, TestSize.Level1)
  */
 HWTEST_F(ScrollBarOverDragTestNg, CheckRestartSpringTest001, TestSize.Level1)
 {
-    auto container = AceType::DynamicCast<Container>(MockContainer::Current());
+    RefPtr<Container> container = MockContainer::Current();
     ASSERT_NE(container, nullptr);
     container->SetApiTargetVersion((int32_t)PlatformVersion::VERSION_TWENTY_THREE);
     InitScrollBar();
@@ -325,7 +325,7 @@ HWTEST_F(ScrollBarOverDragTestNg, CheckRestartSpringTest001, TestSize.Level1)
  */
 HWTEST_F(ScrollBarOverDragTestNg, CheckRestartSpringTest002, TestSize.Level1)
 {
-    auto container = AceType::DynamicCast<Container>(MockContainer::Current());
+    RefPtr<Container> container = MockContainer::Current();
     ASSERT_NE(container, nullptr);
     container->SetApiTargetVersion((int32_t)PlatformVersion::VERSION_TWENTY_THREE);
     InitScrollBarWithChild();

@@ -296,6 +296,11 @@ void AceViewOhos::RegisterTouchEventCallback(TouchEventCallback&& callback)
     touchEventCallback_ = std::move(callback);
 }
 
+void AceViewOhos::EnableTouchpadRawEvent(bool enabled)
+{
+    MMI::InputManager::GetInstance()->EnableTouchpadRawEvent(enabled);
+}
+
 void AceViewOhos::RegisterMouseTargetHitCallback(MouseTargetHitCallback&& callback)
 {
     ACE_DCHECK(callback);

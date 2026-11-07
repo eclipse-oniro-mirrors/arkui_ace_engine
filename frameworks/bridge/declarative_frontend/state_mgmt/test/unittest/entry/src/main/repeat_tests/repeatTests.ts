@@ -64,6 +64,7 @@ interface RepeatAPI<T> {
         onTotalCount?(): number;
         onLazyLoading?(index: number): void;
         reusable?: boolean;
+        memoryOptimizationStrategy?: RepeatMemOptStrategy;
     }) => RepeatAPI<T>;
     templateId: (typeFunc: RepeatTTypeGenFunc<T>) => RepeatAPI<T>;
     template: (type: string, itemGenFunc: RepeatItemGenFunc<T>, options?: RepeatTemplateOptions) => RepeatAPI<T>;
@@ -126,6 +127,12 @@ interface __RepeatConfig<T> {
     onMoveHandler?: OnMoveHandler;
     itemDragEventHandler?: ItemDragEventHandler;
     reusable?: boolean;
+    memOptStrategy?: RepeatMemOptStrategy;
+}
+enum RepeatMemOptStrategy {
+    UNDEFINED = -1,
+    DEFAULT = 0,
+    ENABLE_AUTO_CACHE_OPTIMIZATION = 1
 }
 declare const RepeatEachFuncTtype: string;
 declare class __Repeat<T> implements RepeatAPI<T> {
@@ -140,6 +147,7 @@ declare class __Repeat<T> implements RepeatAPI<T> {
         onTotalCount?: () => number;
         onLazyLoading?: (index: number) => void;
         reusable?: boolean;
+        memoryOptimizationStrategy?: RepeatMemOptStrategy;
     }): RepeatAPI<T>;
     templateId(ttypeGenFunc: RepeatTTypeGenFunc<T>): RepeatAPI<T>;
     template(ttype: string, itemGenFunc: RepeatItemGenFunc<T>, options?: RepeatTemplateOptions): RepeatAPI<T>;

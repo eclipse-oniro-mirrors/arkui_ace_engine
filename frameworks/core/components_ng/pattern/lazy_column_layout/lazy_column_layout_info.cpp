@@ -140,7 +140,7 @@ float LazyColumnLayoutInfo::UpdatePosWithIter(
     return delta;
 }
 
-void LazyColumnLayoutInfo::UpdatePosMap(float prevBodyMainSize)
+bool LazyColumnLayoutInfo::UpdatePosMap(float prevBodyMainSize, std::optional<float> knownBodyMainSize)
 {
     float prevTotalMainSize_ = prevBodyMainSize;
     if (!Positive(estimateItemSize_)) {
@@ -176,6 +176,59 @@ void LazyColumnLayoutInfo::UpdatePosMap(float prevBodyMainSize)
     cachedUpdatedStart_ = INT_MAX;
     cachedUpdatedEnd_ = -1;
     spaceUpdated_ = false;
+    return !knownBodyMainSize || ApplyKnownBodySize(prevBodyMainSize, knownBodyMainSize.value());
+}
+
+bool LazyColumnLayoutInfo::ApplyKnownBodySize(float prevBodyMainSize, float knownBodyMainSize)
+{
+    if (!std::isfinite(knownBodyMainSize) ||
+        LessNotEqualCustomPrecision(knownBodyMainSize, 0.0, 0.0) || totalItemCount_ < 0) {
+        return false;
+    }
+    double measuredSize = 0.0;
+    for (const auto& [index, pos] : posMap_) {
+        const float size = pos.endPos - pos.startPos;
+        if (index < 0 || index >= totalItemCount_ || !std::isfinite(size) ||
+            LessNotEqualCustomPrecision(size, 0.0, 0.0)) {
+            return false;
+        }
+        measuredSize += size;
+    }
+    const int32_t unknownCount = totalItemCount_ - static_cast<int32_t>(posMap_.size());
+    const double remaining = knownBodyMainSize - measuredSize -
+        static_cast<double>(std::max(totalItemCount_ - 1, 0)) * space_;
+    if (!std::isfinite(remaining) || LessNotEqualCustomPrecision(remaining, 0.0, 0.0) ||
+        (unknownCount == 0 && !NearZero(remaining))) {
+        return false;
+    }
+    auto anchor = posMap_.find(startIndex_);
+    const float oldAnchor = anchor == posMap_.end() ? 0.0f : anchor->second.startPos;
+    const double estimateSize = unknownCount > 0 ? remaining / unknownCount : 0.0;
+    if (unknownCount > 0) {
+        estimateItemSize_ = static_cast<float>(estimateSize);
+    }
+    RebaseKnownItems(estimateSize, knownBodyMainSize);
+    if (anchor != posMap_.end()) {
+        adjustOffset_.start += anchor->second.startPos - oldAnchor;
+    }
+    totalMainSize_ = knownBodyMainSize;
+    adjustOffset_.end = totalMainSize_ - prevBodyMainSize - adjustOffset_.start;
+    return true;
+}
+
+void LazyColumnLayoutInfo::RebaseKnownItems(double estimateSize, float knownBodyMainSize)
+{
+    double measuredPrefix = 0.0;
+    int32_t measuredCount = 0;
+    for (auto& [index, pos] : posMap_) {
+        const float size = pos.endPos - pos.startPos;
+        const double cursor = index == totalItemCount_ - 1 ? static_cast<double>(knownBodyMainSize) - size :
+            (index - measuredCount) * estimateSize + measuredPrefix + static_cast<double>(index) * space_;
+        pos.startPos = static_cast<float>(cursor);
+        pos.endPos = index == totalItemCount_ - 1 ? knownBodyMainSize : static_cast<float>(cursor + size);
+        measuredPrefix += size;
+        ++measuredCount;
+    }
 }
 
 void LazyColumnLayoutInfo::SetSpace(float space)
@@ -233,6 +286,21 @@ bool LazyColumnLayoutInfo::NeedPredict() const
         (LessNotEqual(layoutedEnd_, cacheEndPos_) && layoutedEndIndex_ < totalItemCount_ - 1));
 }
 
+void LazyColumnLayoutInfo::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree()) {
+        json->Put("itemStartIndex", startIndex_);
+        json->Put("itemEndIndex", endIndex_);
+        json->Put("itemTotalCount", totalItemCount_);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("headerMainSize", headerMainSize_);
+        json->Put("footerMainSize", footerMainSize_);
+        json->Put("space", space_);
+        json->Put("totalMainSize", totalMainSize_);
+    }
+}
+
 void LazyColumnLayoutInfo::DumpAdvanceInfo()
 {
     DumpLog::GetInstance().AddDesc("itemStartIndex:" + std::to_string(startIndex_));
@@ -246,12 +314,6 @@ void LazyColumnLayoutInfo::DumpAdvanceInfo()
 
 void LazyColumnLayoutInfo::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    json->Put("itemStartIndex", startIndex_);
-    json->Put("itemEndIndex", endIndex_);
-    json->Put("itemTotalCount", totalItemCount_);
-    json->Put("headerMainSize", headerMainSize_);
-    json->Put("footerMainSize", footerMainSize_);
-    json->Put("space", space_);
-    json->Put("totalMainSize", totalMainSize_);
+    LazyColumnLayoutInfo::DumpAdvanceInfo(json, ParamConfig());
 }
 } // namespace OHOS::Ace::NG

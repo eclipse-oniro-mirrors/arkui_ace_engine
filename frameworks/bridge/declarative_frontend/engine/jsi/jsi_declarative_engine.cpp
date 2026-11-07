@@ -31,6 +31,7 @@
 #endif
 
 #include "base/thread/task_executor.h"
+#include "base/utils/napi_scope_raii.h"
 #include "base/utils/utils.h"
 #include "base/utils/system_properties.h"
 #include "bridge/js_frontend/engine/common/js_engine.h"
@@ -2977,16 +2978,14 @@ void JsiDeclarativeEngine::FireExternalEvent(
             return;
         }
 
-        napi_handle_scope handleScope;
-        napi_status status = napi_open_handle_scope(reinterpret_cast<napi_env>(nativeEngine_), &handleScope);
-        if (status != napi_ok) {
+        ScopeRAII handleScope(reinterpret_cast<napi_env>(nativeEngine_));
+        if (!handleScope) {
             return;
         }
         CHECK_NULL_VOID(xcomponentModifier->getSoPath);
         auto soPath = std::string(xcomponentModifier->getSoPath(frameNode));
         auto loadSuccess =
             LoadNativeXComponentModule(arkNativeEngine, nativeXComponent, libraryName, componentId, soPath);
-        napi_close_handle_scope(reinterpret_cast<napi_env>(nativeEngine_), handleScope);
         if (!loadSuccess) {
             return;
         }
@@ -3056,15 +3055,13 @@ void JsiDeclarativeEngine::FireExternalEvent(
         return;
     }
 
-    napi_handle_scope handleScope;
-    napi_status status = napi_open_handle_scope(reinterpret_cast<napi_env>(nativeEngine_), &handleScope);
-    if (status != napi_ok) {
+    ScopeRAII handleScope(reinterpret_cast<napi_env>(nativeEngine_));
+    if (!handleScope) {
         return;
     }
     auto soPath = xcomponent->GetSoPath().value_or("");
     auto loadSuccess = LoadNativeXComponentModule(
         arkNativeEngine, nativeXComponent_, xcomponent->GetLibraryName(), componentId, soPath);
-    napi_close_handle_scope(reinterpret_cast<napi_env>(nativeEngine_), handleScope);
     if (!loadSuccess) {
         return;
     }
@@ -3516,14 +3513,12 @@ void JsiDeclarativeEngine::SetJsContextWithDeserialize(const std::shared_ptr<voi
 void JsiDeclarativeEngine::SetContext(int32_t instanceId, NativeReference* nativeValue)
 {
 #ifdef USE_ARK_ENGINE
-    napi_handle_scope scope;
-    napi_status status = napi_open_handle_scope(reinterpret_cast<napi_env>(GetNativeEngine()), &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(reinterpret_cast<napi_env>(GetNativeEngine()));
+    if (!scope) {
         return;
     }
     auto arkRuntime = std::static_pointer_cast<ArkJSRuntime>(JsiDeclarativeEngineInstance::GetCurrentRuntime());
     if (!arkRuntime || !arkRuntime->GetEcmaVm()) {
-        napi_close_handle_scope(reinterpret_cast<napi_env>(GetNativeEngine()), scope);
         return;
     }
     auto localRef = NapiValueToLocalValue(nativeValue->GetNapiValue());
@@ -3531,7 +3526,6 @@ void JsiDeclarativeEngine::SetContext(int32_t instanceId, NativeReference* nativ
     if (jsValue->IsObject(arkRuntime)) {
         JsiContextModule::AddContext(instanceId_, jsValue);
     }
-    napi_close_handle_scope(reinterpret_cast<napi_env>(GetNativeEngine()), scope);
 #endif
 }
 
@@ -3613,6 +3607,58 @@ void JsiDeclarativeEngine::OnSaveData(std::string& data)
     if (CallAppFunc("onSaveData", argv)) {
         data = object->GetJsonString(runtime);
     }
+}
+
+// Calls globalThis.__RecoverableStorageHook__.extractSnapshot(instanceId) registered by the
+// state_mgmt TS bundle (recoverable_storage.ts). Returns "" when the hook is absent
+// (no RecoverableStorage usage in the app) or the call fails.
+std::string JsiDeclarativeEngine::GetRecoverableStorageSnapshot(int32_t instanceId)
+{
+    shared_ptr<JsRuntime> runtime = engineInstance_->GetJsRuntime();
+    if (!runtime) {
+        return "";
+    }
+    shared_ptr<JsValue> global = runtime->GetGlobal();
+    if (!global || !global->IsObject(runtime)) {
+        return "";
+    }
+    shared_ptr<JsValue> hook = global->GetProperty(runtime, "__RecoverableStorageHook__");
+    if (!hook || !hook->IsObject(runtime)) {
+        return "";
+    }
+    shared_ptr<JsValue> func = hook->GetProperty(runtime, "extractSnapshot");
+    if (!func || !func->IsFunction(runtime)) {
+        return "";
+    }
+    std::vector<shared_ptr<JsValue>> argv = { runtime->NewInt32(instanceId) };
+    shared_ptr<JsValue> result = func->Call(runtime, hook, argv, argv.size());
+    if (!result || result->IsUndefined(runtime) || result->IsException(runtime)) {
+        return "";
+    }
+    return result->ToString(runtime);
+}
+
+// Calls globalThis.__RecoverableStorageHook__.setRestoredData(instanceId, sectionJson).
+void JsiDeclarativeEngine::SetRecoverableStorageData(int32_t instanceId, const std::string& data)
+{
+    shared_ptr<JsRuntime> runtime = engineInstance_->GetJsRuntime();
+    if (!runtime) {
+        return;
+    }
+    shared_ptr<JsValue> global = runtime->GetGlobal();
+    if (!global || !global->IsObject(runtime)) {
+        return;
+    }
+    shared_ptr<JsValue> hook = global->GetProperty(runtime, "__RecoverableStorageHook__");
+    if (!hook || !hook->IsObject(runtime)) {
+        return;
+    }
+    shared_ptr<JsValue> func = hook->GetProperty(runtime, "setRestoredData");
+    if (!func || !func->IsFunction(runtime)) {
+        return;
+    }
+    std::vector<shared_ptr<JsValue>> argv = { runtime->NewInt32(instanceId), runtime->NewString(data) };
+    func->Call(runtime, hook, argv, argv.size());
 }
 
 void JsiDeclarativeEngine::SetErrorEventHandler(
@@ -3739,15 +3785,23 @@ void JsiDeclarativeEngine::JsUnregisterInstanceId()
     auto globalObj = JSNApi::GetGlobalObject(vm);
     const auto globalObject = JSRef<JSObject>::Make(globalObj);
     const JSRef<JSVal> unregisterInstanceIdFun = globalObject->GetProperty("unregisterInstanceIdForEnv");
-    if (!unregisterInstanceIdFun->IsFunction()) {
-        return;
+    if (unregisterInstanceIdFun->IsFunction()) {
+        const auto func = JSRef<JSFunc>::Cast(unregisterInstanceIdFun);
+        ContainerScope scope(instanceId_);
+        shared_ptr<JsRuntime> runtime = engineInstance_->GetJsRuntime();
+        std::vector<shared_ptr<JsValue>> argv = { runtime->NewNumber(instanceId_) };
+        JSRef<JSVal> param = JSRef<JSVal>::Make(JsiValueConvertor::toJsiValueWithVM(vm, instanceId_));
+        func->Call(globalObject, 1, &param);
     }
-    const auto func = JSRef<JSFunc>::Cast(unregisterInstanceIdFun);
-    ContainerScope scope(instanceId_);
-    shared_ptr<JsRuntime> runtime = engineInstance_->GetJsRuntime();
-    std::vector<shared_ptr<JsValue>> argv = { runtime->NewNumber(instanceId_) };
-    JSRef<JSVal> param = JSRef<JSVal>::Make(JsiValueConvertor::toJsiValueWithVM(vm, instanceId_));
-    func->Call(globalObject, 1, &param);
+    // RecoverableStorage instance cleanup (design ADR-5): same destroy point as @Env.
+    const JSRef<JSVal> unregisterRecoverableFun =
+        globalObject->GetProperty("unregisterInstanceIdForRecoverable");
+    if (unregisterRecoverableFun->IsFunction()) {
+        const auto recoverableFunc = JSRef<JSFunc>::Cast(unregisterRecoverableFun);
+        JSRef<JSVal> recoverableParam =
+            JSRef<JSVal>::Make(JsiValueConvertor::toJsiValueWithVM(vm, instanceId_));
+        recoverableFunc->Call(globalObject, 1, &recoverableParam);
+    }
 #endif
 }
 

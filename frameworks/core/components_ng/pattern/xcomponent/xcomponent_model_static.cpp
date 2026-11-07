@@ -15,8 +15,6 @@
 
 #include "core/components_ng/pattern/xcomponent/xcomponent_model_static.h"
 
-#include <any>
-
 #include "base/utils/utils.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_pattern.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_pattern_v2.h"
@@ -218,6 +216,13 @@ void XComponentStaticPattern::InitializeNativeXComponent()
     CHECK_NULL_VOID(nativeXComponentImpl_);
     nativeXComponentImpl_->SetXComponentId(GetId());
     nativeXComponent_ = std::make_shared<OH_NativeXComponent>(AceType::RawPtr(nativeXComponentImpl_));
+    // wire the visibility lifecycle callback at every creation site, otherwise
+    // the C API entry stays silent for this paradigm
+    nativeXComponentImpl_->SetVisibilityLifecycleEventCallback([weak = AceType::WeakClaim(this)]() {
+        auto pattern = weak.Upgrade();
+        CHECK_NULL_VOID(pattern);
+        pattern->UpdateVisibilityLifecycleRegistration();
+    });
     CHECK_EQUAL_VOID(isTypedNode_, false);
     InitializeAccessibility();
     SetExpectedRateRangeInit();

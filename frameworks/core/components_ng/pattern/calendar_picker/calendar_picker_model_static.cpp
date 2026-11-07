@@ -123,5 +123,13 @@ void CalendarPickerModelStatic::SetMarkToday(FrameNode* frameNode, const std::op
     CHECK_NULL_VOID(pickerPattern);
     pickerPattern->SetMarkToday(isMarkToday.value_or(false));
 }
+
+void CalendarPickerModelStatic::SetFirstDayOfWeek(FrameNode* frameNode, const std::optional<int32_t>& firstDayOfWeek)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pickerPattern = frameNode->GetPattern<CalendarPickerPattern>();
+    CHECK_NULL_VOID(pickerPattern);
+    pickerPattern->SetFirstDayOfWeek(firstDayOfWeek.value_or(0));
+}
 } // namespace OHOS::Ace::NG
   

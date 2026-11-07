@@ -34,43 +34,6 @@
 using namespace OHOS::Ace;
 using namespace OHOS::Ace::Framework;
 
-namespace OHOS::Ace {
-std::unique_ptr<DatePickerDialogModel> DatePickerDialogModel::datePickerDialogInstance_ = nullptr;
-std::unique_ptr<TimePickerModel> TimePickerModel::timePickerInstance_ = nullptr;
-
-DatePickerDialogModel* DatePickerDialogModel::GetInstance()
-{
-    // Dynamically load the independently compiled so library
-    // from frameworks/core/components_ng/pattern/date_picker directory
-    auto* module = DynamicModuleHelper::GetInstance().GetDynamicModule("DatePickerDialog");
-    if (module == nullptr) {
-        LOGF_ABORT("Can't find DatePickerDialog dynamic module");
-    }
-    auto* model = reinterpret_cast<const NG::DatePickerDialogModelNG*>(module->GetModel());
-    CHECK_NULL_RETURN(model, nullptr);
-    std::call_once(
-        onceFlag_, [model]() { datePickerDialogInstance_.reset(const_cast<NG::DatePickerDialogModelNG*>(model)); });
-
-    return datePickerDialogInstance_.get();
-}
-
-TimePickerModel* TimePickerModel::GetInstance()
-{
-    // Dynamically load the independently compiled so library
-    // from frameworks/core/components_ng/pattern/time_picker directory
-    auto* module = DynamicModuleHelper::GetInstance().GetDynamicModule("TimePicker");
-    if (module == nullptr) {
-        LOGF("Can't find TimePicker dynamic module");
-        abort();
-    }
-    auto* model = reinterpret_cast<const NG::TimePickerModelNG*>(module->GetModel());
-    CHECK_NULL_RETURN(model, nullptr);
-    std::call_once(onceFlag_, [model]() { timePickerInstance_.reset(const_cast<NG::TimePickerModelNG*>(model)); });
-
-    return timePickerInstance_.get();
-}
-} // namespace OHOS::Ace
-
 namespace {
 const int MAX_YEAR = 2100;
 const int MIN_YEAR = 1900;

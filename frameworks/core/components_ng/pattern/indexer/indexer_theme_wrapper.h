@@ -17,12 +17,12 @@
 #define FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_INDEXER_INDEXER_THEME_WRAPPER_H
 
 #include "core/components/indexer/indexer_theme.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
-class IndexerThemeWrapper : public IndexerTheme, public TokenThemeWrapper {
-    DECLARE_ACE_TYPE(IndexerThemeWrapper, IndexerTheme, TokenThemeWrapper);
+class IndexerThemeWrapper : public IndexerTheme {
+    DECLARE_ACE_TYPE(IndexerThemeWrapper, IndexerTheme);
 
 public:
     class WrapperBuilder : public Builder {
@@ -30,7 +30,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto themeWrapper = AceType::MakeRefPtr<IndexerThemeWrapper>();
             auto theme = AceType::DynamicCast<IndexerTheme>(themeWrapper);

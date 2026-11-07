@@ -198,9 +198,7 @@ void SheetView::CreateCloseIconButtonNode(RefPtr<FrameNode> sheetNode, NG::Sheet
         ElementRegister::GetInstance()->MakeUniqueId(), []() -> RefPtr<Pattern> {
             auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
             CHECK_NULL_RETURN(buttonModifier, nullptr);
-            auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-            CHECK_NULL_RETURN(rawPattern, nullptr);
-            return AceType::Claim(rawPattern);
+            return buttonModifier->createButtonPattern();
         });
     CHECK_NULL_VOID(buttonNode);
     ACE_UINODE_TRACE(buttonNode);
@@ -324,6 +322,10 @@ RefPtr<FrameNode> SheetView::CreateScrollNode(const NG::SheetStyle& sheetStyle)
             false, static_cast<EffectEdge>(sheetStyle.sheetEffectEdge.value_or(NG::SheetEffectEdge::ALL)));
     }
     pattern->SetScrollToSafeAreaHelper(false);
+    if (sheetStyle.titleBarHoverMode.value_or(SheetTitleBarHoverMode::STANDARD) ==
+        SheetTitleBarHoverMode::SAFE_AREA_PADDING) {
+        paintProps->UpdateContentClip(ContentClip(ContentClipMode::SAFE_AREA, nullptr));
+    }
     props->UpdateAlignment(Alignment::TOP_CENTER);
     if (AceApplicationInfo::GetInstance().GreatOrEqualTargetAPIVersion(PlatformVersion::VERSION_TWELVE)) {
         NestedScrollOptions nestedOpt = {

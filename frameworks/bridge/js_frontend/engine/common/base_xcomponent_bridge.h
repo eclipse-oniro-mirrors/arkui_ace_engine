@@ -19,7 +19,7 @@
 #include "base/memory/ace_type.h"
 
 namespace OHOS::Ace::Framework {
-class BaseXComponentBridge : public virtual AceType {
+class BaseXComponentBridge : public AceType {
     DECLARE_ACE_TYPE(BaseXComponentBridge, AceType);
 
 public:

@@ -41,8 +41,11 @@
 #include "core/common/container.h"
 #include "core/common/container_scope.h"
 #include "core/components_ng/pattern/ui_extension/platform_container_handler.h"
+#include "core/components_ng/pattern/ui_extension/ui_extension_utils.h"
 #include "core/components_ng/pattern/ui_extension/session_wrapper.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_container_handler.h"
+#include "interfaces/inner_api/ace_kit/include/ui/view/theme/token_colors.h"
+#include "interfaces/inner_api/ace_kit/include/ui/view/theme/token_theme.h"
 #include "core/components_ng/pattern/window_scene/helper/window_scene_helper.h"
 #include "core/components_ng/pattern/window_scene/scene/system_window_scene.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -656,7 +659,7 @@ void SessionWrapperImpl::UpdateInstanceId(int32_t instanceId)
 Rosen::SessionViewportConfig ConvertToRosenSessionViewportConfig(const SessionViewportConfig& config)
 {
     Rosen::SessionViewportConfig config_ = {
-        .isDensityFollowHost_ = config.isDensityFollowHost_,
+        .dpiFollowStrategy_ = ConvertToRosenDpiFollowStrategy(config.dpiFollowStrategy_),
         .density_ = config.density_,
         .displayId_ = config.displayId_,
         .orientation_ = config.orientation_,
@@ -668,6 +671,8 @@ Rosen::SessionViewportConfig ConvertToRosenSessionViewportConfig(const SessionVi
 void SessionWrapperImpl::CreateSession(const AAFwk::Want& want, const SessionConfig& config)
 {
     ACE_UINODE_TRACE(GetFrameNodeId());
+    auto pattern = hostPattern_.Upgrade();
+    CHECK_NULL_VOID(pattern);
     ContainerScope scope(instanceId_);
     UIEXT_LOGI("The session is created with bundle=%{public}s, ability=%{public}s,"
         " componentId=%{public}d, sessionType=%{public}d.", want.GetElement().GetBundleName().c_str(),
@@ -687,8 +692,6 @@ void SessionWrapperImpl::CreateSession(const AAFwk::Want& want, const SessionCon
         }
         if ((container->IsUIExtensionAbilityHost() && container->IsUIExtensionSubWindow())) {
             UIEXT_LOGE("The UIExtensionComponent does not allow nested pulling of another.");
-            auto pattern = hostPattern_.Upgrade();
-            CHECK_NULL_VOID(pattern);
             pattern->FireOnErrorCallback(ERROR_CODE_UIEXTENSION_FORBID_CASCADE, PULL_FAIL_NAME, PULL_FAIL_MESSAGE);
             return;
         }
@@ -697,8 +700,6 @@ void SessionWrapperImpl::CreateSession(const AAFwk::Want& want, const SessionCon
         if ((container->IsUIExtensionWindow()) ||
             (container->IsUIExtensionAbilityProcess() && container->IsUIExtensionSubWindow())) {
             UIEXT_LOGE("The EmbeddedComponent does not allow nested pulling of another.");
-            auto pattern = hostPattern_.Upgrade();
-            CHECK_NULL_VOID(pattern);
             pattern->FireOnErrorCallback(ERROR_CODE_UIEXTENSION_FORBID_CASCADE, PULL_FAIL_NAME, PULL_FAIL_MESSAGE);
             return;
         }
@@ -719,15 +720,18 @@ void SessionWrapperImpl::CreateSession(const AAFwk::Want& want, const SessionCon
     auto parentToken = container->GetParentToken();
     auto context = PipelineContext::GetCurrentContext();
     CHECK_NULL_VOID(context);
-    auto pattern = hostPattern_.Upgrade();
-    CHECK_NULL_VOID(pattern);
     SessionViewportConfig sessionViewportConfig;
-    sessionViewportConfig.isDensityFollowHost_ = pattern->GetDensityDpi();
+    sessionViewportConfig.dpiFollowStrategy_ = pattern->GetEffectiveDpiFollowStrategy();
     sessionViewportConfig.density_ = context->GetCurrentDensity();
     sessionViewportConfig.displayId_ = container->GetCurrentDisplayId();
     sessionViewportConfig.orientation_ = static_cast<int32_t>(SystemProperties::GetDeviceOrientation());
     sessionViewportConfig.transform_ = context->GetTransformHint();
+    auto brandColorStr = pattern->GetBrandColorStr();
     pattern->SetSessionViewportConfig(sessionViewportConfig);
+    UIEXT_LOGI("SessionViewportConfig compose: uiExtensionDpiFollowHost=%{public}d, "
+               "dpiFollowStrategy=%{public}d, componentId=%{public}d, brandColorStr=%{public}s.",
+        static_cast<int32_t>(context->GetUIExtensionDensityFollowHost()),
+        static_cast<int32_t>(sessionViewportConfig.dpiFollowStrategy_), GetFrameNodeId(), brandColorStr.c_str());
     Rosen::SessionInfo extensionSessionInfo;
     extensionSessionInfo.bundleName_ = want.GetElement().GetBundleName();
     extensionSessionInfo.abilityName_ = want.GetElement().GetAbilityName();
@@ -739,12 +743,15 @@ void SessionWrapperImpl::CreateSession(const AAFwk::Want& want, const SessionCon
     extensionSessionInfo.uiExtensionUsage_ = static_cast<uint32_t>(config.uiExtensionUsage);
     extensionSessionInfo.isAsyncModalBinding_ = config.isAsyncModalBinding;
     extensionSessionInfo.config_ = ConvertToRosenSessionViewportConfig(sessionViewportConfig);
+    extensionSessionInfo.brandColorStr_ = brandColorStr;
     SetConnectToRenderInner(pipeline, extensionSessionInfo);
-    session_ = Rosen::ExtensionSessionManager::GetInstance().RequestExtensionSession(extensionSessionInfo);
-    CHECK_NULL_VOID(session_);
+    auto session = Rosen::ExtensionSessionManager::GetInstance().RequestExtensionSession(extensionSessionInfo);
+    CHECK_NULL_VOID(session);
+    SetSession(session);
+    pattern->SetLastSentBrandColorStr(brandColorStr);
     UpdateSessionConfig();
     lifecycleListener_ = std::make_shared<UIExtensionLifecycleListener>(AceType::WeakClaim(this));
-    session_->RegisterLifecycleListener(lifecycleListener_);
+    session->RegisterLifecycleListener(lifecycleListener_);
     InitAllCallback();
     RegisterDataConsumer();
 }
@@ -774,6 +781,13 @@ void SessionWrapperImpl::UpdateSessionConfig()
     session_->SetSystemConfig(extConfig);
 }
 
+void SessionWrapperImpl::SetSession(sptr<Rosen::ExtensionSession> session)
+{
+    std::lock_guard<std::mutex> lock(sessionMutex_);
+    session_ = session;
+    persistentId_ = session ? session->GetPersistentId() : 0;
+}
+
 void SessionWrapperImpl::DestroySession()
 {
     CHECK_NULL_VOID(session_);
@@ -785,7 +799,7 @@ void SessionWrapperImpl::DestroySession()
         dataHandler->UnregisterDataConsumer(subSystemId_);
     }
     customWant_ = nullptr;
-    session_ = nullptr;
+    SetSession(nullptr);
 }
 
 void SessionWrapperImpl::UpdateWantPtr(std::shared_ptr<AAFwk::Want>& wantPtr)
@@ -877,7 +891,8 @@ bool SessionWrapperImpl::IsSessionValid()
 
 int32_t SessionWrapperImpl::GetSessionId() const
 {
-    return session_ ? session_->GetPersistentId() : 0;
+    std::lock_guard<std::mutex> lock(sessionMutex_);
+    return persistentId_;
 }
 
 int32_t SessionWrapperImpl::GetInstanceId() const
@@ -1115,7 +1130,7 @@ void SessionWrapperImpl::OnReleaseDone()
         session_->GetPersistentId(), GetFrameNodeId());
     session_->UnregisterLifecycleListener(lifecycleListener_);
     Rosen::ExtensionSessionManager::GetInstance().RequestExtensionSessionDestructionDone(session_);
-    session_ = nullptr;
+    SetSession(nullptr);
 }
 
 void SessionWrapperImpl::NotifyDestroy(bool isHandleError)
@@ -1407,7 +1422,7 @@ void SessionWrapperImpl::NotifyOriginAvoidArea(const Rosen::AvoidArea& avoidArea
     session_->UpdateRectWithLayoutInfo({ std::round(displayArea_.Left()), std::round(displayArea_.Top()),
         std::round(displayArea_.Width()), std::round(displayArea_.Height()) },
         Rosen::SizeChangeReason::AVOID_AREA_CHANGE, "NotifyOriginAvoidArea",
-        nullptr, avoidAreas);
+        nullptr, avoidAreas, true);
 }
 
 bool SessionWrapperImpl::RefreshOccupiedAreaChangeInfo()
@@ -1527,10 +1542,11 @@ void SessionWrapperImpl::UpdateSessionViewportConfig()
     auto pattern = hostPattern_.Upgrade();
     CHECK_NULL_VOID(pattern);
     auto config = pattern->GetSessionViewportConfig();
-    UIEXT_LOGI("SessionViewportConfig: isDensityFollowHost=%{public}d, density=%{public}f, "
-        "displayId=%{public}" PRIu64", orientation=%{public}d, transform=%{public}d, componentId=%{public}d.",
-        config.isDensityFollowHost_, config.density_, config.displayId_, config.orientation_, config.transform_,
-        GetFrameNodeId());
+    UIEXT_LOGI("SessionViewportConfig: dpiFollowStrategy=%{public}d, "
+               "density=%{public}f, displayId=%{public}" PRIu64 ", orientation=%{public}d, transform=%{public}d, "
+               "componentId=%{public}d.",
+        static_cast<int32_t>(config.dpiFollowStrategy_), config.density_, config.displayId_, config.orientation_,
+        config.transform_, GetFrameNodeId());
     session_->UpdateSessionViewportConfig(ConvertToRosenSessionViewportConfig(config));
 }
 

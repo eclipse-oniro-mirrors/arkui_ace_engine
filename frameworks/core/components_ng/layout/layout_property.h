@@ -53,6 +53,8 @@ struct PositionProperty;
 struct SafeAreaExpandOpts;
 class GeometryTransition;
 struct SafeAreaInsets;
+struct SafeAreaInsetOptions;
+class SafeAreaInsetState;
 using BiasPair = std::pair<float, float>;
 using ChainWeightPair = std::pair<std::optional<float>, std::optional<float>>; // <horizontal,vertical>
 
@@ -109,6 +111,16 @@ public:
     void UpdatePadding(const PaddingProperty& value);
     void UpdateSafeAreaPadding(const PaddingProperty& value);
     void ResetSafeAreaPadding();
+    // safeAreaInset state is owned opaquely; the state class and its accessors live in
+    // safe_area_inset_property.h and their bodies in layout_property.cpp.
+    const SafeAreaInsetState& GetSafeAreaInsetState() const;
+    SafeAreaInsetState& EnsureSafeAreaInsetState();
+    void UpdateSafeAreaInset(const SafeAreaInsetOptions& value);
+    void ResetSafeAreaInset();
+    void UpdateSafeAreaInsetContribution(const PaddingPropertyF& value);
+    void CheckLocalizedSafeAreaInset(const TextDirection& direction);
+    bool HasSafeAreaPaddingSource() const;
+    bool HasEffectiveSafeAreaPadding();
 
     void UpdateMargin(const MarginProperty& value);
 
@@ -235,6 +247,7 @@ public:
     void UpdateLayoutConstraintWithLayoutRect();
 
     LayoutConstraintF CreateChildConstraint() const;
+    LayoutConstraintF CreateSafeAreaInsetConstraint();
 
     LayoutConstraintF CreateContentConstraint() const;
 
@@ -374,6 +387,8 @@ private:
     std::pair<std::vector<std::string>, std::vector<std::string>> calcMinSizeRpn_;
     std::pair<std::vector<std::string>, std::vector<std::string>> calcMaxSizeRpn_;
     std::unique_ptr<PaddingProperty> safeAreaPadding_;
+    // Opaque safeAreaInset state; complete type and accessors live in safe_area_inset_property.h.
+    std::unique_ptr<SafeAreaInsetState> safeAreaInsetState_;
     std::unique_ptr<PaddingProperty> padding_;
     std::unique_ptr<MarginProperty> margin_;
     std::optional<MarginPropertyF> marginResult_;

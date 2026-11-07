@@ -50,6 +50,8 @@ public:
     void SetSupportDragAnimation(bool value) override;
     void SetEdgeEffect(EdgeEffect edgeEffect, bool alwaysEnabled, EffectEdge edge = EffectEdge::ALL) override;
     void SetNestedScroll(const NestedScrollOptions& nestedOpt) override;
+    void SetScrollSnapStrategy(const ScrollSnapStrategy& scrollSnapStrategy) override;
+    void ResetScrollSnapStrategy() override;
     void SetScrollEnabled(bool scrollEnabled) override;
     void SetFriction(double friction) override;
     void SetFocusWrapMode(const std::optional<FocusWrapMode>& focusWrapMode) override;
@@ -69,6 +71,7 @@ public:
     void SetOnReachStart(OnReachEvent&& onReachStart) override;
     void SetOnReachEnd(OnReachEvent&& onReachEnd) override;
     void SetSyncLoad(bool syncLoad) override;
+    void SetScrollPlaceholder(ScrollPlaceholderProvider&& provider) override;
     void SetEditModeOptions(EditModeOptions& editModeOptions) override;
     void SetEnableEditMode(bool enableEditMode) override;
     void SetEnableEditModeChangeEvent(std::function<void(bool)>&& changeEvent) override;
@@ -123,6 +126,8 @@ public:
         FrameNode* frameNode, const std::optional<EdgeEffect>& edgeEffect, const std::optional<bool>& alwaysEnabled,
         EffectEdge edge = EffectEdge::ALL);
     static void SetNestedScroll(FrameNode* frameNode, const NestedScrollOptions& nestedOpt);
+    static void SetScrollSnapStrategy(FrameNode* frameNode, const ScrollSnapStrategy& scrollSnapStrategy);
+    static void ResetScrollSnapStrategy(FrameNode* frameNode);
     static NestedScrollOptions GetNestedScroll(FrameNode* frameNode);
     static void SetScrollEnabled(FrameNode* frameNode, bool scrollEnabled);
     static bool GetScrollEnabled(FrameNode* frameNode);
@@ -155,6 +160,7 @@ public:
 
     static void SetSyncLoad(FrameNode* frameNode, bool syncLoad);
     static bool GetSyncLoad(FrameNode* frameNode);
+    static void SetScrollPlaceholder(FrameNode* frameNode, ScrollPlaceholderProvider&& provider);
     static void SetEditModeOptions(FrameNode* frameNode, EditModeOptions& editModeOptions);
     static EditModeOptions GetEditModeOptions(FrameNode* frameNode);
     static void SetEnableEditMode(FrameNode* frameNode, bool enableEditMode);

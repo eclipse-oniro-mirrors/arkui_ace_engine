@@ -13,9 +13,16 @@
  * limitations under the License.
  */
 
+#include <cmath>
+#include <limits>
+
+#include "base/geometry/dimension.h"
+#include "core/common/container_scope.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "core/components_ng/pattern/scrollable/scrollable_model_static.h"
 #include "core/components_ng/pattern/waterflow/bridge/waterflow/water_flow_sections_accessor_peer_impl.h"
+#include "core/components_ng/pattern/waterflow/water_flow_model_ng.h"
 #include "core/components_ng/pattern/waterflow/water_flow_model_static.h"
 #include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
 #include "core/interfaces/native/implementation/water_flow_scroller_peer_impl.h"
@@ -23,9 +30,38 @@
 #include "core/interfaces/native/utility/converter.h"
 #include "core/interfaces/native/utility/reverse_converter.h"
 #include "core/interfaces/native/utility/validators.h"
+#include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
 namespace Converter {
+// The provider size follows the ArkTS Length convention; the unit must survive
+// the conversion into the layout-side option (same contract as List's
+// SetScrollPlaceholderImpl).
+template<>
+inline ScrollPlaceholderOptions Convert(const Ark_PlaceholderOptions& src)
+{
+    ScrollPlaceholderOptions options;
+    options.id = Converter::OptConvert<std::string>(src.id).value_or("");
+    if (src.size.tag != INTEROP_TAG_UNDEFINED) {
+        ScrollPlaceholderSizeOption sizeOption;
+        // Keep the converted Dimension with its unit: "100%" maps to
+        // Dimension(1.0, PERCENT), and Value() would collapse it to 1.0.
+        sizeOption.width = Converter::OptConvert<Dimension>(src.size.value.width);
+        sizeOption.height = Converter::OptConvert<Dimension>(src.size.value.height);
+        options.size = sizeOption;
+    }
+    return options;
+}
+
+template<>
+inline std::optional<ScrollPlaceholderOptions> OptConvert(const Opt_PlaceholderOptions& src)
+{
+    if (src.tag == INTEROP_TAG_UNDEFINED) {
+        return std::nullopt;
+    }
+    return Convert<ScrollPlaceholderOptions>(src.value);
+}
+
 template<>
 void AssignCast(std::optional<WaterFlowLayoutMode>& dst, const Ark_WaterFlowLayoutMode& src)
 {
@@ -102,6 +138,66 @@ void SetWaterFlowOptionsImpl(Ark_NativePointer node,
 }
 } // WaterFlowInterfaceModifier
 namespace WaterFlowAttributeModifier {
+template<typename Callback, typename... Args>
+double InvokeSnapProvider(const CallbackHelper<Callback>& callback, const WeakPtr<FrameNode>& weakNode,
+    int32_t instanceId, Args... args)
+{
+    constexpr auto invalid = std::numeric_limits<double>::quiet_NaN();
+    CHECK_NULL_RETURN(weakNode.Upgrade(), invalid);
+    ContainerScope scope(instanceId);
+    PipelineContext::SetCallBackNode(weakNode);
+    // Public callbacks use vp and vp/s; the shared scroll runtime uses px and px/s.
+    auto result = callback.template InvokeWithOptConvertResult<double, Ark_Float64, synthetic_Callback_F64_Void>(
+        Converter::ArkValue<Ark_Float64>(Dimension(args).ConvertToVp())...);
+    if (!result || !std::isfinite(result.value()) || !weakNode.Upgrade()) {
+        return invalid;
+    }
+    const double resultPx = Dimension(result.value(), DimensionUnit::VP).ConvertToPx();
+    // Preserve a finite overflowing target so the shared resolver can clamp it to the scroll range.
+    return std::isfinite(resultPx) ? resultPx : std::copysign(std::numeric_limits<double>::max(), resultPx);
+}
+
+void SetScrollSnapStrategyImpl(Ark_NativePointer node,
+    const Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    Converter::VisitUnionPtr(value,
+        [frameNode](const Ark_ScrollSnapAlign& align) {
+            ScrollSnapStrategy strategy;
+            switch (align) {
+                case ARK_SCROLL_SNAP_ALIGN_START: strategy.align = ScrollSnapAlign::START; break;
+                case ARK_SCROLL_SNAP_ALIGN_CENTER: strategy.align = ScrollSnapAlign::CENTER; break;
+                case ARK_SCROLL_SNAP_ALIGN_END: strategy.align = ScrollSnapAlign::END; break;
+                default:
+                    WaterFlowModelStatic::SetScrollSnapStrategy(frameNode, std::nullopt);
+                    return;
+            }
+            WaterFlowModelStatic::SetScrollSnapStrategy(frameNode, strategy);
+        },
+        [frameNode](const Ark_ScrollSnapOffsetProviderProxy& provider) {
+            if (!provider.calculateApproachOffset.callSync || !provider.calculateSnapOffset.callSync) {
+                WaterFlowModelStatic::SetScrollSnapStrategy(frameNode, std::nullopt);
+                return;
+            }
+            const auto weakNode = AceType::WeakClaim(frameNode);
+            const auto instanceId = frameNode->GetInstanceId();
+            ScrollSnapStrategy strategy;
+            strategy.hasProvider = true;
+            strategy.calculateApproachOffset =
+                [callback = CallbackHelper(provider.calculateApproachOffset), weakNode, instanceId](
+                    double velocity, double decayOffset) {
+                    return InvokeSnapProvider(callback, weakNode, instanceId, velocity, decayOffset);
+                };
+            strategy.calculateSnapOffset =
+                [callback = CallbackHelper(provider.calculateSnapOffset), weakNode, instanceId](double velocity) {
+                    return InvokeSnapProvider(callback, weakNode, instanceId, velocity);
+                };
+            WaterFlowModelStatic::SetScrollSnapStrategy(frameNode, strategy);
+        },
+        [frameNode]() { WaterFlowModelStatic::SetScrollSnapStrategy(frameNode, std::nullopt); });
+}
+
 void SetColumnsTemplateImpl(Ark_NativePointer node,
                             const Opt_Union_String_ItemFillPolicy* value)
 {
@@ -283,6 +379,34 @@ void SetOnDidScrollImpl(Ark_NativePointer node,
     };
     ScrollableModelStatic::SetOnDidScroll(frameNode, std::move(onDidScroll));
 }
+void SetScrollPlaceholderImpl(Ark_NativePointer node,
+                              const Opt_PlaceholderProvider* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto optValue = Converter::GetOptPtr(value);
+    if (!optValue) {
+        TAG_LOGI(AceLogTag::ACE_SCROLL,
+            "WaterFlow scrollPlaceholder: provider cleared, node=%{public}s, id=%{public}d",
+            frameNode->GetTag().c_str(), frameNode->GetId());
+        WaterFlowModelNG::SetScrollPlaceholder(frameNode, nullptr);
+        return;
+    }
+    TAG_LOGI(AceLogTag::ACE_SCROLL,
+        "WaterFlow scrollPlaceholder: provider set, node=%{public}s, id=%{public}d "
+        "(placeholders appear only while this WaterFlow scrolls under load)",
+        frameNode->GetTag().c_str(), frameNode->GetId());
+    // The provider is a synchronous northbound callback: the continuation is
+    // invoked on the spot, so the invoke converts into a plain optional result.
+    auto provider = [arkCallback = CallbackHelper(*optValue)](
+        int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+        Ark_Int32 arkIndex = Converter::ArkValue<Ark_Int32>(index);
+        auto result = arkCallback.InvokeWithOptConvertResult<ScrollPlaceholderOptions, Opt_PlaceholderOptions,
+            Callback_Opt_PlaceholderOptions_Void>(arkIndex);
+        return result;
+    };
+    WaterFlowModelNG::SetScrollPlaceholder(frameNode, std::move(provider));
+}
 void SetCachedCount1Impl(Ark_NativePointer node,
                          const Opt_Int32* count,
                          const Opt_Boolean* show)
@@ -362,6 +486,7 @@ const GENERATED_ArkUIWaterFlowModifier* GetWaterFlowStaticModifier()
         WaterFlowAttributeModifier::SetColumnsGapImpl,
         WaterFlowAttributeModifier::SetRowsGapImpl,
         WaterFlowAttributeModifier::SetLayoutDirectionImpl,
+        WaterFlowAttributeModifier::SetScrollSnapStrategyImpl,
         WaterFlowAttributeModifier::SetCachedCount0Impl,
         WaterFlowAttributeModifier::SetSyncLoadImpl,
         WaterFlowAttributeModifier::SetSupportEmptyBranchInLazyLoadingImpl,
@@ -369,6 +494,7 @@ const GENERATED_ArkUIWaterFlowModifier* GetWaterFlowStaticModifier()
         WaterFlowAttributeModifier::SetOnScrollIndexImpl,
         WaterFlowAttributeModifier::SetOnWillScrollImpl,
         WaterFlowAttributeModifier::SetOnDidScrollImpl,
+        WaterFlowAttributeModifier::SetScrollPlaceholderImpl,
         WaterFlowAttributeModifier::SetCachedCount1Impl,
     };
     return &ArkUIWaterFlowModifierImpl;

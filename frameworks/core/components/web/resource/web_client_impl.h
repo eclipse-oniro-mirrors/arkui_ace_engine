@@ -224,6 +224,7 @@ public:
         const std::vector<std::string>& issuers) override;
     void OnPermissionRequest(std::shared_ptr<NWeb::NWebAccessRequest> request) override;
     void OnContextMenuDismissed() override;
+    void OnContextMenuUpdate(int32_t menuItemId, std::shared_ptr<NWeb::NWebContextMenuOptions> options) override;
     bool RunContextMenu(std::shared_ptr<NWeb::NWebContextMenuParams> params,
         std::shared_ptr<NWeb::NWebContextMenuCallback> callback) override;
     void UpdateClippedSelectionBounds(int x, int y, int w, int h) override;
@@ -387,6 +388,9 @@ public:
     void OnTextSelectionChange(const std::string& selectionText) override;
     void OnDetectedBlankScreen(
         const std::string& url, int32_t blankScreenReason, int32_t detectedContentfulNodesCount) override;
+    void OnMonitoredBlankScreen(
+        const std::string& url, int32_t reason,
+        const std::string& extraMsg) override;
     void OnFirstScreenPaint(const std::string& url, int64_t navigationStartTime, int64_t firstScreenPaintTime) override;
     void OnPdfScrollAtBottom(const std::string& url) override;
     void OnPdfLoadEvent(int32_t result, const std::string& url) override;
@@ -411,6 +415,17 @@ public:
     void OnFullScreenOverlayEnter(const char* mediaInfo) override;
     void OnVideoStatusChanged(const int action, const std::map<std::string, std::string> &param) override;
     void OnInputMethodAttached() override;
+
+    bool OnGetWindowBounds(int32_t& x, int32_t& y,
+                           uint32_t& w, uint32_t& h, std::string& state) override;
+    bool OnSetWindowBounds(int32_t x, int32_t y,
+                           uint32_t w, uint32_t h, const std::string& state) override;
+
+    void OnColorChooserPopup(const std::string& color,
+        const std::vector<NWeb::NWebColorSuggestion>& suggestions,
+        std::shared_ptr<NWeb::NWebColorChooserCallback> callback) override;
+    void OnColorChooserClose() override;
+
 private:
     std::weak_ptr<OHOS::NWeb::NWeb> webviewWeak_;
     WeakPtr<WebDelegate> webDelegate_;

@@ -369,18 +369,16 @@ void JSTouchRecognizer::CancelTouch(const JSCallbackInfo& args)
     auto eventManager = pipeline->GetEventManager();
     CHECK_NULL_VOID(eventManager);
     auto& touchTestResult = eventManager->touchTestResults_;
-    std::vector<std::pair<int32_t, TouchTestResult::iterator>> legacyTarget;
+    std::vector<std::pair<int32_t, TouchTestResult::value_type>> legacyTarget;
     for (const auto& fingerId : fingerIds_) {
         if (touchTestResult.find(fingerId) == touchTestResult.end()) {
             continue;
         }
 
         auto& targetsList = touchTestResult[fingerId];
-        auto it = std::find_if(targetsList.begin(), targetsList.end(),
-            [&target](const RefPtr<TouchEventTarget>& t) { return t == target; });
-
+        auto it = std::find(targetsList.begin(), targetsList.end(), target);
         if (it != targetsList.end()) {
-            legacyTarget.emplace_back(fingerId, it);
+            legacyTarget.emplace_back(fingerId, target);
         }
     }
 

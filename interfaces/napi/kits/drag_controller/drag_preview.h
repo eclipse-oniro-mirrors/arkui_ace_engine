@@ -40,6 +40,7 @@ namespace {
 constexpr int32_t ARG_COUNT_1 = 1;
 constexpr int32_t ARG_COUNT_2 = 2;
 constexpr int32_t DEFAULT_DURATION_VALUE = 1000;
+constexpr napi_type_tag DRAG_PREVIEW_TYPE_TAG = { 0x1a2b3c4d5e6f7081, 0x9a8b7c6d5e4f3021 };
 } // namespace
 
 class DragPreview {
@@ -67,10 +68,9 @@ public:
             return nullptr;
         }
 
-        DragPreview* dragPreview = nullptr;
-        napi_unwrap(env, result, (void**)&dragPreview);
+        DragPreview* dragPreview = UnwrapDragPreview(env, result);
         if (dragPreview == nullptr) {
-            LOGE("dragPreview is nullptr");
+            LOGE("dragPreview is nullptr or type mismatch");
             return nullptr;
         }
         dragPreview->SetColor(foregroundColor);
@@ -109,10 +109,9 @@ public:
             return nullptr;
         }
 
-        DragPreview* dragPreview = nullptr;
-        napi_unwrap(env, result, (void**)&dragPreview);
+        DragPreview* dragPreview = UnwrapDragPreview(env, result);
         if (dragPreview == nullptr) {
-            LOGE("dragPreview is nullptr");
+            LOGE("dragPreview is nullptr or type mismatch");
             return nullptr;
         }
         dragPreview->hasAnimation_ = true;
@@ -154,6 +153,7 @@ public:
             LOGE("napi_wrap failed");
             return;
         }
+        napi_type_tag_object(env, result, &DRAG_PREVIEW_TYPE_TAG);
         /* insert callback functions */
         const char* funName = "setForegroundColor";
         napi_value funcValue = nullptr;
@@ -165,6 +165,18 @@ public:
         napi_set_named_property(env, result, funName, funcValue);
     }
 private:
+    static DragPreview* UnwrapDragPreview(napi_env env, napi_value result)
+    {
+        bool isDragPreview = false;
+        napi_check_object_type_tag(env, result, &DRAG_PREVIEW_TYPE_TAG, &isDragPreview);
+        if (!isDragPreview) {
+            return nullptr;
+        }
+        DragPreview* dragPreview = nullptr;
+        napi_unwrap(env, result, (void**)&dragPreview);
+        return dragPreview;
+    }
+
     void SetColor(const Color& color)
     {
         auto iter = std::find(previewStyle_.types.begin(), previewStyle_.types.end(),

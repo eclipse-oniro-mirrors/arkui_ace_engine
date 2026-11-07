@@ -60,7 +60,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<MenuItemLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propFontStyle_ = CloneFontStyle();
         value->propLabelFontStyle_ = CloneLabelFontStyle();
         value->propStartIcon_ = CloneStartIcon();

@@ -270,6 +270,93 @@ HWTEST_F(UISessionBatchCommandParserTest, ParseNullNodeIdDoesNotShadowValidNode,
     EXPECT_EQ(result.items[0].canonicalCommand, R"({"cmd":"setText","params":{"value":"valid"}})");
     ASSERT_EQ(result.diagnostics.size(), 1u);
     EXPECT_EQ(result.diagnostics[0].reason, BatchDiagnosticReason::INVALID_NODE_ID);
+    EXPECT_EQ(result.diagnostics[0].keyLength, 7u);
+}
+
+HWTEST_F(UISessionBatchCommandParserTest, ParseReportsDecodedNodeIdKeyLength, TestSize.Level1)
+{
+    struct TestCase {
+        const char* key;
+        size_t length;
+    };
+    const TestCase cases[] = {
+        { R"(6\u0000suffix)", 8u },
+        { R"(\u0000)", 1u },
+        { R"(\u00006)", 2u },
+        { R"(6\u0000)", 2u },
+        { R"(6\u0000\u0000suffix)", 9u },
+        { R"(6\\u0000suffix)", 13u },
+        { R"(\u0036\u0000suffix)", 8u },
+        { R"(\u6587\u0000suffix)", 10u },
+        { R"(\uD83D\uDE00\u0000suffix)", 11u },
+    };
+    for (const auto& testCase : cases) {
+        SCOPED_TRACE(testCase.key);
+        std::string command = std::string(R"({"cmd":"batch","commands":{")") + testCase.key;
+        command += "\":{\"cmd\":\"setText\",\"params\":{\"value\":\"bad\"}},";
+        command += R"("8":{"cmd":"setText","params":{"value":"SURVIVOR"}}}})";
+        const auto result = UiSessionBatchCommand::Parse(command);
+
+        ASSERT_EQ(result.status, BatchParseStatus::VALID_BATCH);
+        ASSERT_EQ(result.diagnostics.size(), 1u);
+        EXPECT_FALSE(result.diagnostics[0].hasNodeId);
+        EXPECT_EQ(result.diagnostics[0].ordinal, 1u);
+        EXPECT_EQ(result.diagnostics[0].keyLength, testCase.length);
+        EXPECT_EQ(result.diagnostics[0].reason, BatchDiagnosticReason::INVALID_NODE_ID);
+        ASSERT_EQ(result.items.size(), 1u);
+        EXPECT_EQ(result.items[0].nodeId, 8);
+        EXPECT_EQ(result.items[0].semanticError, BatchDiagnosticReason::NONE);
+    }
+}
+
+HWTEST_F(UISessionBatchCommandParserTest, ParseRejectsInvalidUnicodeEscapes, TestSize.Level1)
+{
+    const std::vector<std::string> escapes = {
+        R"(\uG000)",
+        R"(\u0G00)",
+        R"(\u00G0)",
+        R"(\u000G)",
+        R"(\uZZZZ)",
+        R"(\u12x4)",
+    };
+    for (const auto& escape : escapes) {
+        const std::vector<std::string> commands = {
+            R"({"cmd":"batch","commands":{"6)" + escape + R"(suffix":{"cmd":"setText","params":{"value":"bad"}}}})",
+            R"({"cmd":"batch","commands":{"8":{"cmd":"setText)" + escape + R"(suffix","params":{"value":"bad"}}}})",
+            R"({"cmd":"batch","commands":{"8":{"cmd":"setText","params":{"value":"abc)" + escape + R"(suffix"}}}})",
+            R"({"cmd":"batch)" + escape + R"(suffix","commands":{"8":{"cmd":"setText","params":{"value":"bad"}}}})",
+            R"({"cmd)" + escape + R"(suffix":"batch","commands":{"8":{"cmd":"setText","params":{"value":"bad"}}}})",
+            R"({"cmd":"batch","commands)" + escape + R"(suffix":{"8":{"cmd":"setText","params":{"value":"bad"}}}})",
+            R"({"cmd":"batch","ignored":[")" + escape +
+                "\"],\"commands\":{\"8\":{\"cmd\":\"setText\",\"params\":{\"value\":\"bad\"}}}}",
+        };
+        for (const auto& command : commands) {
+            SCOPED_TRACE(command);
+            const auto result = UiSessionBatchCommand::Parse(command);
+            EXPECT_EQ(result.status, BatchParseStatus::INVALID_BATCH);
+            EXPECT_EQ(result.batchReason, BatchDiagnosticReason::INVALID_BATCH_ENVELOPE);
+            EXPECT_TRUE(result.items.empty());
+            EXPECT_TRUE(result.diagnostics.empty());
+        }
+    }
+}
+
+HWTEST_F(UISessionBatchCommandParserTest, ParseAcceptsUnicodeAndEscapedUnicodeLiterals, TestSize.Level1)
+{
+    std::string command = R"({"\u0063md":"\u0062atch","\u0063ommands":{"\u0038":{"cmd":"setT\u0065xt",)";
+    command += R"("params":{"value":"\u0061\u00E9\u6587\uD83D\uDE00\\uZZZZ"}},)";
+    command += R"("6\\u000Gsuffix":{"cmd":"setText","params":{"value":"bad"}}}})";
+    const auto result = UiSessionBatchCommand::Parse(command);
+
+    ASSERT_EQ(result.status, BatchParseStatus::VALID_BATCH);
+    ASSERT_EQ(result.items.size(), 1u);
+    EXPECT_EQ(result.items[0].nodeId, 8);
+    EXPECT_EQ(result.items[0].semanticError, BatchDiagnosticReason::NONE);
+    EXPECT_EQ(result.items[0].valueLength, 16);
+    EXPECT_EQ(result.items[0].canonicalCommand, R"({"cmd":"setText","params":{"value":"aé文😀\\uZZZZ"}})");
+    ASSERT_EQ(result.diagnostics.size(), 1u);
+    EXPECT_EQ(result.diagnostics[0].reason, BatchDiagnosticReason::INVALID_NODE_ID);
+    EXPECT_EQ(result.diagnostics[0].keyLength, 13u);
 }
 
 HWTEST_F(UISessionBatchCommandParserTest, ParseRejectsNullTextAndKeepsOtherItems, TestSize.Level1)
@@ -390,6 +477,47 @@ HWTEST_F(UISessionBatchCommandDispatchTest, DispatchValidBatchPostsExactlyOneTas
     task_();
     EXPECT_EQ(resolveCount_, 1);
     EXPECT_EQ(executeCount_, 1);
+}
+
+HWTEST_F(UISessionBatchCommandDispatchTest, DispatchNullNodeIdReportsLengthAndKeepsValidItem, TestSize.Level1)
+{
+    EXPECT_TRUE(UiSessionBatchCommand::Dispatch(
+        R"({"cmd":"batch","commands":{"6\u0000suffix":{"cmd":"setText","params":{"value":"PR89218_SECRET_VALUE"}},)"
+        R"("8":{"cmd":"setText","params":{"value":"SURVIVOR"}}}})",
+        callbacks_));
+
+    ASSERT_EQ(itemDiagnostics_.size(), 1u);
+    EXPECT_FALSE(itemDiagnostics_[0].hasNodeId);
+    EXPECT_EQ(itemDiagnostics_[0].ordinal, 1u);
+    EXPECT_EQ(itemDiagnostics_[0].keyLength, 8u);
+    EXPECT_EQ(itemDiagnostics_[0].reason, BatchDiagnosticReason::INVALID_NODE_ID);
+    EXPECT_EQ(itemDiagnostics_[0].commandSummary, BatchCommandSummary::SET_TEXT);
+    EXPECT_EQ(itemDiagnostics_[0].valueLength, 20);
+    EXPECT_EQ(postCount_, 1);
+    ASSERT_TRUE(task_);
+    task_();
+    EXPECT_EQ(resolvedIds_, std::vector<int32_t>({ 8 }));
+    EXPECT_EQ(executedIds_, std::vector<int32_t>({ 8 }));
+    ASSERT_EQ(executedCommands_.size(), 1u);
+    EXPECT_EQ(executedCommands_[0], R"({"cmd":"setText","params":{"value":"SURVIVOR"}})");
+    EXPECT_EQ(itemDiagnostics_.size(), 1u);
+    EXPECT_TRUE(batchDiagnostics_.empty());
+}
+
+HWTEST_F(UISessionBatchCommandDispatchTest, DispatchInvalidUnicodeDoesNotPostTask, TestSize.Level1)
+{
+    EXPECT_TRUE(UiSessionBatchCommand::Dispatch(
+        R"({"cmd":"batch","commands":{"8":{"cmd":"setText","params":{"value":"SURVIVOR"}},)"
+        R"("6\uZZZZsuffix":{"cmd":"setText","params":{"value":"bad"}}}})",
+        callbacks_));
+
+    EXPECT_EQ(postCount_, 0);
+    EXPECT_FALSE(task_);
+    EXPECT_EQ(resolveCount_, 0);
+    EXPECT_EQ(executeCount_, 0);
+    EXPECT_TRUE(itemDiagnostics_.empty());
+    ASSERT_EQ(batchDiagnostics_.size(), 1u);
+    EXPECT_EQ(batchDiagnostics_[0].reason, BatchDiagnosticReason::INVALID_BATCH_ENVELOPE);
 }
 
 HWTEST_F(UISessionBatchCommandDispatchTest, DispatchChecksTargetBeforeCommandSemanticError, TestSize.Level1)

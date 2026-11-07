@@ -36,6 +36,8 @@ public:
 
     Rosen::Drawing::Lattice* GetLattice();
     std::string DumpToString() override;
+    void* GetDrawingLatticeNative() override;
+    napi_value GetDrawingLatticeNapiValue(NativeEngine* nativeEngine) override;
 
 private:
     DrawingLatticeImpl() = default;

@@ -17,6 +17,7 @@
 
 #include <cmath>
 
+#include "core/animation/animator.h"
 #include "core/common/back_press_handler_manager.h"
 #include "core/components_ng/base/inspector_filter.h"
 #include "core/components_ng/event/gesture_event_hub.h"
@@ -393,7 +394,8 @@ void SelectableContainerPattern::SelectWithScroll()
         });
         selectMotion_->AddListener([weakScroll = AceType::WeakClaim(this)](double offset) {
             auto pattern = weakScroll.Upgrade();
-            CHECK_NULL_VOID(pattern);
+            // Animator dispatches motion updates before checking completion.
+            CHECK_NULL_VOID(pattern && pattern->mousePressed_);
             offset = pattern->GetOffsetWithLimit(offset);
             pattern->UpdateCurrentOffset(offset, SCROLL_FROM_AXIS);
             pattern->UpdateMouseStart(offset);

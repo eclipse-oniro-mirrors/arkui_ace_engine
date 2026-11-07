@@ -38,6 +38,7 @@ enum class DumpMode {
     TREE,
     NODE,
     HANDLE_EVENT,
+    THIRD_FOCUS_SEARCH,
     HOVER_TEST,
     EVENT_TEST,
     INJECT_ACTION_TEST,
@@ -90,6 +91,8 @@ struct DumpInfoArgument {
     int32_t performAction = 0;
     int64_t webAccId = -1;
     int32_t focusMoveRule = -1;
+    int32_t focusDirection = 0;
+    int32_t focusCondition = 0;
     std::string webAccFun = "tree";
 };
 
@@ -101,6 +104,7 @@ struct ExecuteActionArgument {
 
 class AccessibilityHidumper {
 public:
+    static bool ParseThirdFocusSearch(const std::vector<std::string>& params, DumpInfoArgument& argument);
     static bool DumpProcessInjectActionParameters(
         const std::vector<std::string>& params,
         int64_t& nodeId,

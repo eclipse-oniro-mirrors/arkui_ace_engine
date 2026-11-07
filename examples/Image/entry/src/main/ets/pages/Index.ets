@@ -136,7 +136,7 @@ struct Index {
 
           Button('router ImageTextCompositeExample').onClick(() => {
             console.log('router ImageTextCompositeExample');
-            routerser.pushUrl({ url: 'pages/example/ImageTextCompositeExample' })
+            router.pushUrl({ url: 'pages/example/ImageTextCompositeExample' })
           })
 
           Button('router ImageRealWorldExample').onClick(() => {
@@ -312,6 +312,42 @@ struct Index {
           Button('router ImageAvatarGalleryExample').onClick(() => {
             console.log('router ImageAvatarGalleryExample');
             router.pushUrl({ url: 'pages/example/ImageAvatarGalleryExample' })
+          })
+
+          Button('router ImagePixelMapTransformExample').onClick(() => {
+            router.pushUrl({ url: 'pages/example/ImagePixelMapTransformExample' })
+          })
+
+          Button('router ImageSourcePropertiesExample').onClick(() => {
+            router.pushUrl({ url: 'pages/example/ImageSourcePropertiesExample' })
+          })
+
+          Button('router ImagePackerAdvancedExample').onClick(() => {
+            router.pushUrl({ url: 'pages/example/ImagePackerAdvancedExample' })
+          })
+
+          Button('router ImageReceiverCreatorExample').onClick(() => {
+            router.pushUrl({ url: 'pages/example/ImageReceiverCreatorExample' })
+          })
+
+          Button('router PictureMetadataExample').onClick(() => {
+            router.pushUrl({ url: 'pages/example/PictureMetadataExample' })
+          })
+
+          Button('router SendableImageTaskPoolExample').onClick(() => {
+            router.pushUrl({ url: 'pages/example/SendableImageTaskPoolExample' })
+          })
+
+          Button('router VideoProcessingEngineExample').onClick(() => {
+            router.pushUrl({ url: 'pages/example/VideoProcessingEngineExample' })
+          })
+
+          Button('router ImageComponentAttributeGapExample').onClick(() => {
+            router.pushUrl({ url: 'pages/example/ImageComponentAttributeGapExample' })
+          })
+
+          Button('router ImageSpanAnimatorGapExample').onClick(() => {
+            router.pushUrl({ url: 'pages/example/ImageSpanAnimatorGapExample' })
           })
 
         }

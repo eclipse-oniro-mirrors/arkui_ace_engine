@@ -115,7 +115,7 @@ void RichEditorCallbackContentNoChangeTestNg::InitDeleteCallback(RichEditorModel
  * @tc.desc: test set on select
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorCallbackContentNoChangeTestNg, SetOnSelect, TestSize.Level0)
+HWTEST_F(RichEditorCallbackContentNoChangeTestNg, SetOnSelect, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -162,7 +162,7 @@ HWTEST_F(RichEditorCallbackContentNoChangeTestNg, SetOnSelect, TestSize.Level0)
  * @tc.desc: test set on select
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorCallbackContentNoChangeTestNg, SetOnSelect2, TestSize.Level0)
+HWTEST_F(RichEditorCallbackContentNoChangeTestNg, SetOnSelect2, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -202,7 +202,7 @@ HWTEST_F(RichEditorCallbackContentNoChangeTestNg, SetOnSelect2, TestSize.Level0)
  * @tc.desc: test Set On Select
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorCallbackContentNoChangeTestNg, SetOnSelect003, TestSize.Level0)
+HWTEST_F(RichEditorCallbackContentNoChangeTestNg, SetOnSelect003, TestSize.Level1)
 {
     /**
      * @tc.steps: step1. get richEditor controller
@@ -244,7 +244,7 @@ HWTEST_F(RichEditorCallbackContentNoChangeTestNg, SetOnSelect003, TestSize.Level
  * @tc.desc: test Set On Select
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorCallbackContentNoChangeTestNg, SetOnSelect004, TestSize.Level0)
+HWTEST_F(RichEditorCallbackContentNoChangeTestNg, SetOnSelect004, TestSize.Level1)
 {
     /**
      * @tc.steps: step1. get richEditor controller
@@ -281,11 +281,12 @@ HWTEST_F(RichEditorCallbackContentNoChangeTestNg, SetOnSelect004, TestSize.Level
  * @tc.desc: test on handle move
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorCallbackContentNoChangeTestNg, OnHandleMove001, TestSize.Level0)
+HWTEST_F(RichEditorCallbackContentNoChangeTestNg, OnHandleMove001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
+
     richEditorPattern->selectOverlay_->OnHandleMove(RectF(0.0f, 0.0f, 10.0f, 10.0f), true);
     EXPECT_EQ(richEditorPattern->caretPosition_, 0);
 
@@ -298,7 +299,7 @@ HWTEST_F(RichEditorCallbackContentNoChangeTestNg, OnHandleMove001, TestSize.Leve
  * @tc.desc: test OnAreaChangedInner
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorCallbackContentNoChangeTestNg, OnAreaChangedInner001, TestSize.Level0)
+HWTEST_F(RichEditorCallbackContentNoChangeTestNg, OnAreaChangedInner001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -319,7 +320,7 @@ HWTEST_F(RichEditorCallbackContentNoChangeTestNg, OnAreaChangedInner001, TestSiz
  * @tc.desc: test HandleSurfaceChanged
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorCallbackContentNoChangeTestNg, HandleSurfaceChanged001, TestSize.Level0)
+HWTEST_F(RichEditorCallbackContentNoChangeTestNg, HandleSurfaceChanged001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -337,7 +338,7 @@ HWTEST_F(RichEditorCallbackContentNoChangeTestNg, HandleSurfaceChanged001, TestS
  * @tc.desc: test IsStopBackPress
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorCallbackContentNoChangeTestNg, IsStopBackPress001, TestSize.Level0)
+HWTEST_F(RichEditorCallbackContentNoChangeTestNg, IsStopBackPress001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -353,7 +354,7 @@ HWTEST_F(RichEditorCallbackContentNoChangeTestNg, IsStopBackPress001, TestSize.L
  * @tc.desc: test OnBackPressed
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorCallbackContentNoChangeTestNg, OnBackPressed001, TestSize.Level0)
+HWTEST_F(RichEditorCallbackContentNoChangeTestNg, OnBackPressed001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();

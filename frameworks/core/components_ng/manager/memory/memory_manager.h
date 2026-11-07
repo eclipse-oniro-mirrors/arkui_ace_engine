@@ -28,7 +28,7 @@ namespace OHOS::Ace::NG {
 class FrameNode;
 class UINode;
 
-class MemoryManager : public virtual AceType {
+class MemoryManager : public AceType {
     DECLARE_ACE_TYPE(MemoryManager, AceType);
 public:
     using RecycleImageByPageCallback = std::function<RefPtr<FrameNode>()>;
@@ -46,6 +46,7 @@ public:
     bool RegisterNavDestinationHiddenChange(const RefPtr<FrameNode>& imageNode,
         OnNavDestinationHiddenChangeCallback&& callback);
     void UnregisterNavDestinationHiddenChange(int32_t imageNodeId);
+    bool CheckNeedSkipRecycle(int32_t imageNodeId);
 
 private:
     void RebuildImage(const RefPtr<UINode>& node);

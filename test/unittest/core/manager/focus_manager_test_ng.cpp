@@ -3067,4 +3067,144 @@ HWTEST_F(FocusManagerTestNg, FocusManagerTest119, TestSize.Level1)
     focusManager->FocusViewClose(pagePattern);
     EXPECT_EQ(focusManager->focusViewStackState_, FocusViewStackState::CLOSE);
 }
+
+/**
+ * @tc.name: FocusManagerTest120
+ * @tc.desc: Test FocusViewShow early-return path: same view shown again should
+ *           refresh stack position without changing focusViewStackState_.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FocusManagerTestNg, FocusManagerTest120, TestSize.Level1)
+{
+    auto focusManager = AceType::MakeRefPtr<FocusManager>(nullptr);
+    auto rootNode = FrameNode::CreateFrameNode(V2::ROOT_ETS_TAG, -1, AceType::MakeRefPtr<RootPattern>());
+    auto pagePattern = AceType::MakeRefPtr<PagePattern>(AceType::MakeRefPtr<PageInfo>());
+    auto pageNode = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, -1, pagePattern);
+    rootNode->AddChild(pageNode);
+
+    focusManager->FocusViewShow(pagePattern);
+    ASSERT_EQ(focusManager->focusViewStack_.size(), SIZE_1);
+    ASSERT_EQ(focusManager->lastFocusView_.Upgrade(), pagePattern);
+    ASSERT_EQ(focusManager->focusViewStackState_, FocusViewStackState::SHOW);
+
+    focusManager->focusViewStackState_ = FocusViewStackState::CLOSE;
+    focusManager->FocusViewShow(pagePattern);
+    EXPECT_EQ(focusManager->focusViewStack_.size(), SIZE_1);
+    EXPECT_EQ(focusManager->focusViewStack_.back().Upgrade(), pagePattern);
+    EXPECT_EQ(focusManager->lastFocusView_.Upgrade(), pagePattern);
+    EXPECT_EQ(focusManager->focusViewStackState_, FocusViewStackState::CLOSE);
+}
+
+/**
+ * @tc.name: FocusManagerTest121
+ * @tc.desc: Test FocusViewShow early-return path: same view re-shown should be
+ *           moved to top (back) of multi-element stack.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FocusManagerTestNg, FocusManagerTest121, TestSize.Level1)
+{
+    auto focusManager = AceType::MakeRefPtr<FocusManager>(nullptr);
+    auto rootNode = FrameNode::CreateFrameNode(V2::ROOT_ETS_TAG, -1, AceType::MakeRefPtr<RootPattern>());
+    auto pagePattern = AceType::MakeRefPtr<PagePattern>(AceType::MakeRefPtr<PageInfo>());
+    auto pageNode = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, -1, pagePattern);
+    rootNode->AddChild(pageNode);
+    auto otherPattern = AceType::MakeRefPtr<PagePattern>(AceType::MakeRefPtr<PageInfo>());
+    auto otherNode = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, -1, otherPattern);
+    rootNode->AddChild(otherNode);
+
+    focusManager->FocusViewShow(pagePattern);
+    focusManager->FocusViewShow(otherPattern);
+    ASSERT_EQ(focusManager->focusViewStack_.size(), 2);
+    ASSERT_EQ(focusManager->focusViewStack_.front().Upgrade(), pagePattern);
+    ASSERT_EQ(focusManager->focusViewStack_.back().Upgrade(), otherPattern);
+
+    focusManager->lastFocusView_ = AceType::WeakClaim(AceType::RawPtr(pagePattern));
+    focusManager->focusViewStackState_ = FocusViewStackState::CLOSE;
+    focusManager->FocusViewShow(pagePattern);
+    EXPECT_EQ(focusManager->focusViewStack_.size(), 2);
+    EXPECT_EQ(focusManager->focusViewStack_.back().Upgrade(), pagePattern);
+    EXPECT_EQ(focusManager->focusViewStack_.front().Upgrade(), otherPattern);
+    EXPECT_EQ(focusManager->lastFocusView_.Upgrade(), pagePattern);
+    EXPECT_EQ(focusManager->focusViewStackState_, FocusViewStackState::CLOSE);
+}
+
+/**
+ * @tc.name: FocusManagerTest122
+ * @tc.desc: Test FocusViewShow early-return path: parent shown after child should
+ *           keep stack unchanged (ancestor branch preserves base behavior).
+ * @tc.type: FUNC
+ */
+HWTEST_F(FocusManagerTestNg, FocusManagerTest122, TestSize.Level1)
+{
+    auto focusManager = AceType::MakeRefPtr<FocusManager>(nullptr);
+    auto rootNode = FrameNode::CreateFrameNode(V2::ROOT_ETS_TAG, -1, AceType::MakeRefPtr<RootPattern>());
+    auto parentPattern = AceType::MakeRefPtr<PagePattern>(AceType::MakeRefPtr<PageInfo>());
+    auto parentNode = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, -1, parentPattern);
+    auto childPattern = AceType::MakeRefPtr<PagePattern>(AceType::MakeRefPtr<PageInfo>());
+    auto childNode = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, -1, childPattern);
+    rootNode->AddChild(parentNode);
+    parentNode->AddChild(childNode);
+
+    focusManager->FocusViewShow(parentPattern);
+    focusManager->FocusViewShow(childPattern);
+    ASSERT_EQ(focusManager->lastFocusView_.Upgrade(), childPattern);
+    ASSERT_EQ(focusManager->focusViewStack_.size(), 2);
+    ASSERT_EQ(focusManager->focusViewStack_.front().Upgrade(), parentPattern);
+    ASSERT_EQ(focusManager->focusViewStack_.back().Upgrade(), childPattern);
+
+    if (!childPattern->IsChildFocusViewOf(parentPattern)) {
+        GTEST_SKIP() << "focus hub hierarchy not set up in test env";
+    }
+
+    focusManager->focusViewStackState_ = FocusViewStackState::CLOSE;
+    focusManager->FocusViewShow(parentPattern);
+    EXPECT_EQ(focusManager->focusViewStack_.size(), 2);
+    EXPECT_EQ(focusManager->focusViewStack_.front().Upgrade(), parentPattern);
+    EXPECT_EQ(focusManager->focusViewStack_.back().Upgrade(), childPattern);
+    EXPECT_EQ(focusManager->lastFocusView_.Upgrade(), childPattern);
+    EXPECT_EQ(focusManager->focusViewStackState_, FocusViewStackState::CLOSE);
+}
+
+/**
+ * @tc.name: FocusManagerTest123
+ * @tc.desc: Test FocusViewHide sets lastFocusView_ to nullptr when hiding the
+ *           current last focus view.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FocusManagerTestNg, FocusManagerTest123, TestSize.Level1)
+{
+    auto focusManager = AceType::MakeRefPtr<FocusManager>(nullptr);
+    auto rootNode = FrameNode::CreateFrameNode(V2::ROOT_ETS_TAG, -1, AceType::MakeRefPtr<RootPattern>());
+    auto pagePattern = AceType::MakeRefPtr<PagePattern>(AceType::MakeRefPtr<PageInfo>());
+    auto pageNode = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, -1, pagePattern);
+    rootNode->AddChild(pageNode);
+
+    focusManager->FocusViewShow(pagePattern);
+    ASSERT_EQ(focusManager->lastFocusView_.Upgrade(), pagePattern);
+
+    focusManager->FocusViewHide(pagePattern);
+    EXPECT_EQ(focusManager->lastFocusView_.Upgrade(), nullptr);
+}
+
+/**
+ * @tc.name: FocusManagerTest124
+ * @tc.desc: Test FlushFocusView sets lastFocusView_ to the currently focused
+ *           view found in the stack.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FocusManagerTestNg, FocusManagerTest124, TestSize.Level1)
+{
+    auto focusManager = AceType::MakeRefPtr<FocusManager>(nullptr);
+    auto rootNode = FrameNode::CreateFrameNode(V2::ROOT_ETS_TAG, -1, AceType::MakeRefPtr<RootPattern>());
+    auto pagePattern = AceType::MakeRefPtr<PagePattern>(AceType::MakeRefPtr<PageInfo>());
+    auto pageNode = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, -1, pagePattern);
+    rootNode->AddChild(pageNode);
+
+    focusManager->FocusViewShow(pagePattern);
+    ASSERT_EQ(focusManager->lastFocusView_.Upgrade(), pagePattern);
+
+    focusManager->lastFocusView_ = nullptr;
+    focusManager->FlushFocusView();
+    EXPECT_EQ(focusManager->lastFocusView_.Upgrade(), nullptr);
+}
 } // namespace OHOS::Ace::NG

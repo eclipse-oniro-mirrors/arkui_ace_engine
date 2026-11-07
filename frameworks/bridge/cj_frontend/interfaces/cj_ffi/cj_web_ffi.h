@@ -144,6 +144,7 @@ CJ_EXPORT void FfiOHOSAceFrameworkNestedScrollExt(
     int32_t scrollUp, int32_t scrollDown, int32_t scrollLeft, int32_t scrollRight);
 CJ_EXPORT void FfiOHOSAceFrameworkWebUserAgent(const std::string& userAgent);
 CJ_EXPORT void FfiOHOSAceFrameworkWebBackgroundColor(uint32_t color);
+CJ_EXPORT void FfiOHOSAceFrameworkWebCaretColor(uint32_t color);
 CJ_EXPORT void FfiOHOSAceFrameworkWebDarkMode(int32_t darkMode);
 CJ_EXPORT void FfiOHOSAceFrameworkWebForceDarkAccess(bool access);
 CJ_EXPORT void FfiOHOSAceFrameworkWebSetRotate(CJSetRotate value);

@@ -55,26 +55,20 @@
 
 namespace OHOS::Ace {
 
-std::unique_ptr<ViewContextModel> ViewContextModel::instance_ = nullptr;
-std::mutex ViewContextModel::mutex_;
-
 ViewContextModel* ViewContextModel::GetInstance()
 {
-    if (!instance_) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (!instance_) {
 #ifdef NG_BUILD
-            instance_.reset(new NG::ViewContextModelNG());
+    static NG::ViewContextModelNG instance;
+    return &instance;
 #else
-            if (Container::IsCurrentUseNewPipeline()) {
-                instance_.reset(new NG::ViewContextModelNG());
-            } else {
-                instance_.reset(new Framework::ViewContextModelImpl());
-            }
-#endif
-        }
+    if (Container::IsCurrentUseNewPipeline()) {
+        static NG::ViewContextModelNG instance;
+        return &instance;
+    } else {
+        static Framework::ViewContextModelImpl instance;
+        return &instance;
     }
-    return instance_.get();
+#endif
 }
 
 } // namespace OHOS::Ace
@@ -116,21 +110,23 @@ void PrintAnimationInfo(const AnimationOption& option, AnimationInterface interf
 {
     auto animationInterfaceName = GetAnimationInterfaceName(interface);
     CHECK_NULL_VOID(animationInterfaceName);
-    if (option.GetIteration() == ANIMATION_REPEAT_INFINITE) {
-        HistogramInfiniteAnimationEvent(interface);
-        if (interface == AnimationInterface::KEYFRAME_ANIMATE_TO) {
-            TAG_LOGI(AceLogTag::ACE_ANIMATION,
-                "keyframe inf iteration. dur:%{public}d", option.GetDuration());
-        } else {
-            TAG_LOGI(AceLogTag::ACE_ANIMATION,
-                "%{public}s inf iteration. dur:%{public}d, curve:%{public}s",
-                animationInterfaceName, option.GetDuration(), option.GetCurve()->ToString().c_str());
-        }
-        return;
-    }
     if (cnt) {
         TAG_LOGI(AceLogTag::ACE_ANIMATION, "%{public}s starts, %{public}s, cnt:%{public}d",
             animationInterfaceName, option.ToSimpleString().c_str(), cnt.value());
+    }
+    if (option.GetIteration() == ANIMATION_REPEAT_INFINITE) {
+        HistogramInfiniteAnimationEvent(interface);
+        if (interface == AnimationInterface::KEYFRAME_ANIMATE_TO) {
+            TAG_LOGD(AceLogTag::ACE_ANIMATION,
+                "keyframe inf iteration. dur:%{public}d", option.GetDuration());
+        } else {
+            const auto& curve = option.GetCurve();
+            TAG_LOGD(AceLogTag::ACE_ANIMATION,
+                "%{public}s inf iteration. dur:%{public}d, curve:%{public}s",
+                animationInterfaceName, option.GetDuration(),
+                curve ? curve->ToString().c_str() : "");
+        }
+        return;
     }
 }
 
@@ -252,7 +248,7 @@ void StartAnimationForStageMode(const RefPtr<PipelineBase>& pipelineContext, con
     PrintAnimationInfo(
         option, immediately ? AnimationInterface::ANIMATE_TO_IMMEDIATELY : AnimationInterface::ANIMATE_TO, count);
     if (!ViewStackModel::GetInstance()->IsEmptyStack()) {
-        TAG_LOGW(AceLogTag::ACE_ANIMATION,
+        TAG_LOGD(AceLogTag::ACE_ANIMATION,
             "when call animateTo, node stack is not empty, not suitable for animateTo."
             "param is [option:%{public}s]", option.ToString().c_str());
     }
@@ -303,10 +299,11 @@ void StartAnimateToForFaMode(const RefPtr<PipelineBase>& pipelineContext, Animat
     PrintAnimationInfo(
         option, immediately ? AnimationInterface::ANIMATE_TO_IMMEDIATELY : AnimationInterface::ANIMATE_TO, count);
     if (!ViewStackModel::GetInstance()->IsEmptyStack()) {
-        TAG_LOGW(AceLogTag::ACE_ANIMATION,
+        const auto& curve = option.GetCurve();
+        TAG_LOGD(AceLogTag::ACE_ANIMATION,
             "when call animateTo, node stack is not empty, not suitable for animateTo. param is [duration:%{public}d, "
             "curve:%{public}s, iteration:%{public}d]",
-            option.GetDuration(), option.GetCurve()->ToString().c_str(), option.GetIteration());
+            option.GetDuration(), curve ? curve->ToString().c_str() : "", option.GetIteration());
     }
     NG::ScopedViewStackProcessor scopedProcessor;
     pipelineContext->FlushBuild();
@@ -695,8 +692,9 @@ void JSViewContext::JSAnimation(const JSCallbackInfo& info)
         option.SetAllowRunningAsynchronously(true);
     }
     PrintAnimationInfo(option, AnimationInterface::ANIMATION, std::nullopt);
+    const auto& curveTrace = option.GetCurve();
     AceScopedTrace paramTrace("duration:%d, curve:%s, iteration:%d", option.GetDuration(),
-        option.GetCurve()->ToString().c_str(), option.GetIteration());
+        curveTrace ? curveTrace->ToString().c_str() : "", option.GetIteration());
     option.SetAnimationInterface(AnimationInterface::ANIMATION);
     ViewContextModel::GetInstance()->openAnimation(option);
 #ifndef CROSS_PLATFORM
@@ -769,11 +767,8 @@ void JSViewContext::AnimateToInner(const JSCallbackInfo& info, bool immediately)
     auto container = Container::CurrentSafely();
     CHECK_NULL_VOID(container);
     if (needCheck && !Container::CheckRunOnThreadByThreadId(container->GetInstanceId(), false)) {
-        const char* funcName = immediately ? "animateToImmediately" : "animateTo";
-        TAG_LOGW(AceLogTag::ACE_ANIMATION,
-            "the context found cannot run on current thread, %{public}s failed, "
-            "please use uiContext.%{public}s to specify the context",
-            funcName, funcName);
+        const char* funcName = immediately ? "animImme" : "animTo";
+        TAG_LOGW(AceLogTag::ACE_ANIMATION, "no context %{public}s failed", funcName);
         return;
     }
     auto pipelineContext = container->GetPipelineContext();
@@ -1545,6 +1540,16 @@ void JSViewContext::JSIsEasySplit(const JSCallbackInfo& info)
     info.SetReturnValue(JSRef<JSVal>::Make(ToJSValue(result)));
 }
 
+void JSViewContext::JSIsTransPageEnabled(const JSCallbackInfo& info)
+{
+    auto context = NG::PipelineContext::GetCurrentContext();
+    if (!context) {
+        info.SetReturnValue(JSRef<JSVal>::Make(JSVal(ToJSValue(true))));
+        return;
+    }
+    info.SetReturnValue(JSRef<JSVal>::Make(ToJSValue(context->IsTransPageEnabled())));
+}
+
 void JSViewContext::JSSetTextSelectionClearPolicy(const JSCallbackInfo& info)
 {
     if (info.Length() < 1 || !info[0]->IsNumber()) {
@@ -1597,6 +1602,7 @@ void JSViewContext::JSBind(BindingTarget globalObj)
     JSClass<JSViewContext>::StaticMethod(
         "setCustomKeyboardContinueFeature",  JSViewContext::JSSetCustomKeyboardContinueFeature);
     JSClass<JSViewContext>::StaticMethod("isEasySplit", JSViewContext::JSIsEasySplit);
+    JSClass<JSViewContext>::StaticMethod("isTransPageEnabled", JSViewContext::JSIsTransPageEnabled);
     JSClass<JSViewContext>::StaticMethod("setTextSelectionClearPolicy", JSViewContext::JSSetTextSelectionClearPolicy);
     JSClass<JSViewContext>::Bind<>(globalObj);
 }

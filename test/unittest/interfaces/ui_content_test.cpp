@@ -19,6 +19,7 @@
 #include "gtest/gtest.h"
 #include "core/common/container_consts.h"
 #include "interfaces/inner_api/ace/ui_content.h"
+#include "core/components_ng/pattern/ui_extension/ui_extension_utils.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -111,5 +112,29 @@ HWTEST_F(UiContentTest, GetWindowIdTest001, TestSize.Level1)
      */
     auto windowIdByDefault = UIContent::GetUIContentWindowID(CONTAINER_ID_DIVIDE_SIZE);
     EXPECT_TRUE(windowIdByDefault == -1);
+}
+
+/**
+ * @tc.name: UIExtensionDensityFollowHostApiTest001
+ * @tc.desc: test UIContent::SetUIExtensionDensityFollowHost interface existence and default behavior
+ * @tc.type: FUNC
+ */
+HWTEST_F(UiContentTest, UIExtensionDensityFollowHostApiTest001, TestSize.Level1)
+{
+    /**
+     * @tc.steps1: Take pointer-to-member of UIContent::SetUIExtensionDensityFollowHost
+     * @tc.expected: The virtual interface is declared (compile-time contract)
+     */
+    void (UIContent::*setter)(OHOS::Rosen::DpiFollowStrategy) = &UIContent::SetUIExtensionDensityFollowHost;
+    EXPECT_NE(setter, nullptr);
+
+    /**
+     * @tc.steps2: Call UIContent::Create with null parameters and invoke SetUIExtensionDensityFollowHost
+     * @tc.expected: Default empty implementation returns normally without crash
+     */
+    std::shared_ptr<UIContent> ret = UIContent::Create(nullptr, nullptr);
+    ASSERT_TRUE(ret);
+    ret->SetUIExtensionDensityFollowHost(
+        static_cast<OHOS::Rosen::DpiFollowStrategy>(NG::ROSEN_FOLLOW_HOST_DPI_ALL));
 }
 } // namespace OHOS::Ace

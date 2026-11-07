@@ -32,6 +32,7 @@
 #include "core/components_ng/base/view_abstract_model_ng.h"
 #include "core/components_ng/base/view_stack_model.h"
 #include "core/components_ng/pattern/text/span/span_string.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "bridge/declarative_frontend/jsview/js_utils.h"
 #include "bridge/declarative_frontend/jsview/js_popups.h"
 #include "bridge/declarative_frontend/style_string/js_span_string.h"
@@ -2687,10 +2688,33 @@ void JSViewPopups::ParseSheetTitleBarHoverMode(const JSRef<JSVal>& value, NG::Sh
     if (value->IsNumber()) {
         auto modeValue = value->ToNumber<int32_t>();
         if (modeValue >= static_cast<int32_t>(NG::SheetTitleBarHoverMode::STANDARD) &&
-            modeValue <= static_cast<int32_t>(NG::SheetTitleBarHoverMode::STACK)) {
+            modeValue <= static_cast<int32_t>(NG::SheetTitleBarHoverMode::SAFE_AREA_PADDING)) {
             sheetStyle.titleBarHoverMode = static_cast<NG::SheetTitleBarHoverMode>(modeValue);
-        } else {
-            sheetStyle.titleBarHoverMode = NG::SheetTitleBarHoverMode::STANDARD;
+        }
+    }
+}
+
+void JSViewPopups::ParseAdaptToHandedness(const JSRef<JSVal>& value, NG::SheetStyle& sheetStyle)
+{
+    if (value->IsNumber()) {
+        auto handnessValue = value->ToNumber<int32_t>();
+        if (handnessValue >= static_cast<int32_t>(NG::HandednessFollowMode::NONE) &&
+            handnessValue <= static_cast<int32_t>(NG::HandednessFollowMode::FOLLOW_GRIP_HAND)) {
+            sheetStyle.adaptToHandedness = static_cast<NG::HandednessFollowMode>(handnessValue);
+        }
+    }
+}
+
+void JSViewPopups::ParseSheetTitleBarVibrancyMode(const JSRef<JSVal>& value, NG::SheetStyle& sheetStyle)
+{
+    if (SystemProperties::GetUiMaterialLevel() != UiMaterialLevel::EXQUISITE) {
+        return;
+    }
+    if (value->IsNumber()) {
+        auto modeValue = value->ToNumber<int32_t>();
+        if (modeValue >= static_cast<int32_t>(VibrancyMode::DISABLED) &&
+            modeValue <= static_cast<int32_t>(VibrancyMode::DARKEN)) {
+            sheetStyle.titleBarVibrancyMode = static_cast<VibrancyMode>(modeValue);
         }
     }
 }
@@ -2884,6 +2908,8 @@ void JSViewAbstract::ParseSheetStyle(
         sheetStyle.placementOnTarget = placementOnTarget->ToBoolean();
     }
 
+    JSViewPopups::ParseAdaptToHandedness(paramObj->GetProperty("adaptToHandedness"), sheetStyle);
+
     Color color;
     if (SystemProperties::ConfigChangePerform()) {
         // When the switch is turned on, the sheet background color and its resource are parsed together.
@@ -3057,6 +3083,7 @@ void JSViewAbstract::ParseSheetStyle(
     JSViewPopups::ParseSheetTitleBarHoverMode(paramObj->GetProperty("titleBarHoverMode"), sheetStyle);
     JSViewPopups::ParseSheetScrollBarState(paramObj->GetProperty("scrollBarState"), sheetStyle);
     JSViewPopups::ParseSheetCloseButtonMaterial(paramObj->GetProperty("closeButtonMaterial"), sheetStyle);
+    JSViewPopups::ParseSheetTitleBarVibrancyMode(paramObj->GetProperty("titleBarVibrancyMode"), sheetStyle);
 
     // parse ModalTransition
     auto modalTransitionValue = paramObj->GetProperty("modalTransition");

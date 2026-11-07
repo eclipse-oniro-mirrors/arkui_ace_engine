@@ -469,7 +469,7 @@ HWTEST_F(MenuPattern1TwoTestNg, MenuPatternTestNg038, TestSize.Level1)
     auto menuPattern = mainMenu->GetPattern<MenuPattern>();
     menuPattern->type_ = MenuType::CONTEXT_MENU;
     auto testNode = menuPattern->GetForEachMenuItem(parentNode, false);
-    auto forEachNode = AceType::DynamicCast<UINode>(parentNode->GetParent());
+    auto forEachNode = parentNode->GetParent();
     auto& children = forEachNode->GetChildren();
     ASSERT_NE(forEachNode, nullptr);
     auto syntIndex = forEachNode->GetChildIndex(parentNode);

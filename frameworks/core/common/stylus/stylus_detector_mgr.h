@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMMON_STYLUS_STYLUS_DETECTOR_MGR_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMMON_STYLUS_STYLUS_DETECTOR_MGR_H
 
+#include <atomic>
 #include <cstdint>
 #include <unordered_map>
 #include <unordered_set>
@@ -99,7 +100,7 @@ private:
 
     StylusDetectorInstance engine_ = nullptr;
     bool isRegistered_ = false;
-    int32_t nodeId_ = 0;
+    std::atomic<int32_t> nodeId_ = 0;
     WeakPtr<NG::LayoutInfoInterface> layoutInfo_;
     int32_t sInd_ = -1;
     int32_t eInd_ = -1;

@@ -15,6 +15,8 @@
 
 #include "core/event/key_event_recognizer.h"
 
+#include <cstring>
+
 namespace OHOS::Ace {
 namespace {
 
@@ -433,6 +435,12 @@ const char* KeyCodeToString(int32_t keyCode)
         return "KEYCODE_INVALID";
     }
     return iter->second.c_str();
+}
+
+bool IsValidKeyCode(int32_t code)
+{
+    return code >= 0 && (code == static_cast<int32_t>(KeyCode::KEY_WRIST_TURN) ||
+        std::strcmp(KeyCodeToString(code), "KEYCODE_INVALID") != 0);
 }
 
 KeyIntention keyItemsTransKeyIntention(const std::vector<KeyCode> &items)

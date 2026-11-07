@@ -1,0 +1,517 @@
+diff --git a/.gitignore b/.gitignore
+index 7376b512ebd491b15f2c8949dc6752b9ef1e1625..0d0841fb131ea19d76018c3388eab6d30cd97787 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -8,3 +8,9 @@ eval/reports/*.json
+ eval/reports/*.md
+ eval/design-points/*/reports/
+ .reasonix
++
++# ODK bridge workspaces
++openspec/
++docs/superpowers/
++matspec/
++.matspec-cli/
+diff --git a/eval/prompts/protocol-summary.md b/eval/prompts/protocol-summary.md
+index dba70ed1072aae72b8c814e7fe97e350a5764cf9..c02814d703c91fbcda6bc1518b588c49fd1a5399 100644
+--- a/eval/prompts/protocol-summary.md
++++ b/eval/prompts/protocol-summary.md
+@@ -1,6 +1,6 @@
+ <!--
+   对齐源: specification/harmonyos-a2ui-protocol.md
+-  最后同步: 2026-09-02 | GAP-092
++  最后同步: 2026-09-12 | GAP-093
+   同步规则: 修改 spec 中语法、组件、表达式、事件、样式等评估相关内容时，必须同步更新本文件
+ -->
+ 
+@@ -261,3 +261,6 @@ Button 额外支持 A2UI 原生 `action` 属性，用于表单提交或原生 ac
+ | opacity | 透明度 | `0.8` |
+ | visibility | 可见性（样式属性） | `"visible"`, `"hidden"`, `"none"` |
+ | backdropBlur | 背景模糊 | `{"radius": 20, "grayscale": [10, 10]}` |
++| rotate | 旋转 | `{"angleZ": 45}` |
++| scale | 缩放 | `{"x": 1.5, "y": 0.5}` |
++| translate | 平移 | `{"x": 100, "y": 10}` |
+diff --git a/protocol-gaps/GAPS.md b/protocol-gaps/GAPS.md
+index 0af466e912facbee54de42f27f9ea9976754425c..ec82a12831dc3f5b8f5cea51adb366e48d1d8abc 100644
+--- a/protocol-gaps/GAPS.md
++++ b/protocol-gaps/GAPS.md
+@@ -121,9 +121,10 @@
+ | GAP-090 | 新增 backdropBlur 通用样式属性 — 对象类型 {radius, grayscale}，控制组件背景模糊效果 | 协议设计 | P1 | **resolved+合入** | 2026-08-24 | eval/design-points/backdrop-blur | FP-03 | 2026-08-24 |
+ | GAP-091 | Form 协议动态数据绑定 FunctionCall 绑定澄清 — §3.8 明确三种绑定机制（Expression + PathBinding + FunctionCall），FunctionCall 改为调用自定义函数、删除 formatString 内置值函数误导；同步 §3.6.1 规则8、§3.5.1 预定义函数措辞、form_catalog.json `ExtendedDynamicValueRef`、protocol-form-summary.md | 协议规范 | P2 | **resolved+合入（轻量修复，跳过评估）** | 2026-09-01 | — | —（Form 无独立 eval 用例） | 2026-09-01 |
+ | GAP-092 | 补全 opacity 通用样式声明 — spec §4.2.1.2 + CommonStyles schema 缺失 opacity，prompt 已声明但正文/schema 未定义 | 协议规范 | P2 | **resolved+合入（轻量修复，全量回归通过）** | 2026-08-31 | — | FP-03 | 2026-09-02 |
++| GAP-093 | 新增 rotate/scale/translate 通用样式属性 — rotate=RotateAngleOptions 全属性（angleX/angleY/angleZ+center+perspective），scale/translate 简化 x/y 分轴；协议层+FormRender+Full Render 三仓实现 | 协议设计 | P1 | **pending** | 2026-09-12 | — | FP-03 | — |
+ 
+ ## 统计
+ 
+-- 总计: 90
++- 总计: 91
+ - resolved: 88
+-- pending: 2
++- pending: 3
+diff --git a/protocol-gaps/pending/GAP-093-visual-transform/README.md b/protocol-gaps/pending/GAP-093-visual-transform/README.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b85891fd2655ecc4e372a367bac4d82133452573
+--- /dev/null
++++ b/protocol-gaps/pending/GAP-093-visual-transform/README.md
+@@ -0,0 +1,65 @@
++# GAP-093: 新增 rotate/scale/translate 通用样式属性
++
++## 问题描述
++
++生成式UI协议 CommonStyles 当前不支持 rotate（旋转）、scale（缩放）、translate（平移）3 组视觉变换属性。PB演唱会场景需要丰富的视觉效果（透明度叠加、背景模糊、旋转、缩放、平移），当前应用开发者需手动编码实现上述视觉效果，无法通过协议声明方式快速交付。
++
++已有的 opacity（GAP-092）和 backdropBlur（GAP-090）仅覆盖透明度和背景模糊，缺少 3D 变换能力。
++
++## 影响范围
++
++- 协议章节: §4.2.1.2 通用样式表（全量 + Form）
++- JSON Schema: extended_catalog.json 和 form_catalog.json 的 `$defs.CommonStyles.properties`
++- 测试分类: FP-03（样式测试）
++- 渲染引擎: FormRender（StyleMapper.ets）+ Full Render（ExtendedCommonStyleModifier.ets）
++
++## 候选修复方案
++
++选定方案 P-B（经需求导入评审流程 RR-30094578 确认，SIG 评审会议接纳）：
++
++- **rotate**: 对象类型 `{ angleX?, angleY?, angleZ?, centerX?, centerY?, centerZ?, perspective? }` — 对齐 ArkUI RotateAngleOptions（API 20+），欧拉角模型
++- **scale**: 对象类型 `{ x?, y? }` — 仅 x/y 分轴，简化设计
++- **translate**: 对象类型 `{ x?, y? }` — 仅 x/y 分轴，简化设计
++
++未选方案：
++- P-A（完整对齐 ArkUI 原生 API）：scale 含 z + center，translate 含 z — 参数过多影响 LLM 生成亲和性
++- P-C（统一 transform 属性）：单一属性封装 — 与现有协议独立属性设计模式不一致
++
++## 验证计划
++
++**缺口类型**：实质性修复（新增能力，LLM 需学习新行为）
++
++**验证方式**：eval/design-points A/B 对比验证
++- 策略A（旧协议）：当前协议无 rotate/scale/translate
++- 策略B（新协议）：新增 3 组属性定义
++- 评估维度：D1-D6 六维评分
++- 测试用例：策略感知测试用例（含 shared_rules + strategy_rules），覆盖 rotate 3D 旋转、scale 分轴缩放、translate 分轴平移
++- 预期指标：策略B 达到 A 级（MA ≥ 80%）
++
++**C API 已验证**：
++- `OH_ArkUI_RenderNodeUtils_SetRotation(node, float x, float y, float z)` — 直接支持 angleX/angleY/angleZ
++- `OH_ArkUI_RenderNodeUtils_SetScale(node, float x, float y)` — 直接支持 x/y
++- `OH_ArkUI_RenderNodeUtils_SetOpacity(node, float opacity)` — opacity 直接
++- `OH_ArkUI_RenderNodeUtils_SetBackgroundBlurOption(node, blurOption)` — backdropBlur 直接
++- translate: Matrix4 间接（CreateIdentity → Matrix4_Translate → SetTransform）
++
++**ArkUI TS API 已验证**：
++- `rotate(RotateAngleOptions)` API 20+ — OH 7.1 已确认对应 API 20+
++- `scale(ScaleOptions)` / `translate(TranslateOptions)` API 9+
++
++## 评估报告
++
++<验证完成后填写，指向评估报告路径>
++
++## 最终结论
++
++<归档时填写>
++
++## 关联文档
++
++- 需求基线: `docs/features/genui-visual-properties/01-requirement.md`（RR-30094578）
++- 可行性分析: `docs/features/genui-visual-properties/02-feasibility.md`
++- 方案决策: `docs/features/genui-visual-properties/03-arch-decision-record.md`
++- Feature 基线: `docs/features/genui-visual-properties/04-feature.md`
++- 代码预检证据: `tmp/ohos_kb_precheck_genui-visual-properties.md`
++- SDD 产物: `.codespec/changes/genui_protocol_analysis/RR-30094578/`（proposal.md + design.md + spec.md + execution-plan.md）
+diff --git a/protocol-gaps/pending/GAP-093-visual-transform/prompt-diff.md b/protocol-gaps/pending/GAP-093-visual-transform/prompt-diff.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..5766073fff0b1d206669bdfd8989d34974ec24d7
+--- /dev/null
++++ b/protocol-gaps/pending/GAP-093-visual-transform/prompt-diff.md
+@@ -0,0 +1,17 @@
++# GAP-093 Prompt 修改
++
++## 修改: protocol-summary.md
++
++### 1. 版本标记更新
++- 修改前: `最后同步: 2026-09-02 | GAP-092`
++- 修改后: `最后同步: 2026-09-12 | GAP-093`
++
++### 2. 通用样式表新增 3 行
++- 位置: 通用样式属性表 backdropBlur 行后
++- 新增:
++  - `| rotate | 旋转 | {"angleZ": 45} |`
++  - `| scale | 缩放 | {"x": 1.5, "y": 0.5} |`
++  - `| translate | 平移 | {"x": 100, "y": 10} |`
++
++## Few-shot 修改
++- 无（后续评估阶段如需要再补充）
+diff --git a/protocol-gaps/pending/GAP-093-visual-transform/protocol-diff.md b/protocol-gaps/pending/GAP-093-visual-transform/protocol-diff.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..f4caf7f27dac258a9a2ebcef42900e2992af9b74
+--- /dev/null
++++ b/protocol-gaps/pending/GAP-093-visual-transform/protocol-diff.md
+@@ -0,0 +1,36 @@
++# GAP-093 协议修改
++
++## 修改 1: 全量协议 §4.2.1.2 通用样式表新增 rotate/scale/translate 属性行
++- 位置: specification/harmonyos-a2ui-protocol.md §4.2.1.2 (opacity 行后)
++- 修改前: opacity 行后直接是空行（无 rotate/scale/translate）
++- 修改后: 新增 3 行属性行
++  - rotate: 对象 {angleX, angleY, angleZ, centerX, centerY, centerZ, perspective}
++  - scale: 对象 {x, y}
++  - translate: 对象 {x, y}
++- 理由: PB演唱会场景需要 rotate/scale/translate 视觉效果，当前协议不支持
++
++## 修改 2: Form 协议 §4.2.1.2 通用样式表同步新增
++- 位置: specification/harmonyos-a2ui-form-protocol.md §4.2.1.2 (opacity 行后)
++- 修改前: opacity 行后直接是空行
++- 修改后: 同步新增 rotate/scale/translate 3 行属性行
++- 理由: Form 协议与全量协议通用样式表保持一致
++
++## 修改 3: Extended Catalog CommonStyles Schema 新增属性定义
++- 位置: specification/json/extended_catalog.json → $defs.CommonStyles.properties
++- 修改前: properties 中无 rotate/scale/translate
++- 修改后: 新增 rotate (object, 7 子属性)、scale (object, 2 子属性)、translate (object, 2 子属性)
++- 理由: JSON Schema 需与协议正文同步
++
++## 修改 4: Form Catalog CommonStyles Schema 同步新增
++- 位置: specification/json/form_catalog.json → $defs.CommonStyles.properties
++- 修改前: properties 中无 rotate/scale/translate
++- 修改后: 同步新增 3 个属性定义
++- 理由: Form Catalog 与 Extended Catalog 保持一致
++
++## 修改 5（必填）: 修改记录表 — 新增 GAP-093 条目
++- 位置: specification/modification-history.md 头部 ## 修改记录（倒序最前）
++- 新增条目: | 2026-09-12 | GAP-093：新增 rotate/scale/translate 通用样式属性 | §4.2.1.2, JSON Schema |
++
++## 修改 6（必填）: Form 修改记录表 — 新增 GAP-093 条目
++- 位置: specification/modification-history-form.md 头部 ## 修改记录（倒序最前）
++- 新增条目: | 2026-09-12 | GAP-093：新增 rotate/scale/translate 通用样式属性 |
+diff --git a/specification/harmonyos-a2ui-form-protocol.md b/specification/harmonyos-a2ui-form-protocol.md
+index 27be2c25291bad9ce5b28d7ca77da9d2e31f2aff..e53e5285dfb2dc0e8ac69ac47fc48d54aa8940bb 100644
+--- a/specification/harmonyos-a2ui-form-protocol.md
++++ b/specification/harmonyos-a2ui-form-protocol.md
+@@ -988,6 +988,9 @@ EventHandler 是函数调用的一层封装，通过 `call` 字段指定要执
+ | aspectRatio | 宽高比 (width/height) | 数字，默认值：1.0。指定当前组件的宽高比，aspectRatio=width/height。仅设置width、aspectRatio时，height = width/aspectRatio。<br>仅设置height、aspectRatio时，width = height * aspectRatio。<br>同时设置width、height和aspectRatio时，height不生效，height = width / aspectRatio。<br>设置aspectRatio属性后，组件宽高会受父组件内容区大小限制，constraintSize的优先级高于aspectRatio。 | 否 | 是 | "aspectRatio": 1.5 |
+ | backdropBlur | 背景模糊效果 | 对象 {radius, grayscale}<br>radius:必选，数值，背景模糊半径。取值范围：[0, +∞)。单位：vp。设置小于0的值时，按值为0处理。<br>grayscale:可选，二元数组 [number, number]，灰度模糊参数。每项取值范围：[0, 127]。第一个值调整黑色亮度（提亮），第二个值调整白色暗度（压暗）。值越大调整越明显。默认值：[0, 0]，不调整。 | 否 | 否 | "backdropBlur": { "radius": 20, "grayscale": [10, 10] } |
+ | opacity | 透明度 | 数值，取值范围[0,1]，默认值1（完全不透明）。0表示完全透明，1表示完全不透明。设置小于0的值时按0处理，大于1的值时按1处理。 | 否 | 是 | "opacity": 0.8 |
++| rotate | 旋转 | 对象 {angleX, angleY, angleZ, centerX, centerY, centerZ, perspective}<br>angleX:可选，数值，X轴旋转角（度）。正值为顺时针。默认值：0<br>angleY:可选，数值，Y轴旋转角（度）。正值为顺时针。默认值：0<br>angleZ:可选，数值，Z轴旋转角（度）。正值为顺时针。默认值：0<br>centerX:可选，数值，变换中心点X坐标（vp）。默认值：组件中心(50%)<br>centerY:可选，数值，变换中心点Y坐标（vp）。默认值：组件中心(50%)<br>centerZ:可选，数值，3D旋转中心点Z坐标（vp）。默认值：0<br>perspective:可选，数值，相机Z坐标（px），控制透视效果。0为自动计算。默认值：0 | 否 | 否 | "rotate": { "angleZ": 45 } |
++| scale | 缩放 | 对象 {x, y}<br>x:可选，数值，X轴缩放倍数。默认值：1。x>1放大，0<x<1缩小，x<0反向缩放<br>y:可选，数值，Y轴缩放倍数。默认值：1。y>1放大，0<y<1缩小，y<0反向缩放 | 否 | 否 | "scale": { "x": 1.5, "y": 0.5 } |
++| translate | 平移 | 对象 {x, y}<br>x:可选，数值，X轴平移距离（vp）。正值为正向移动，负值为反向移动。默认值：0<br>y:可选，数值，Y轴平移距离（vp）。正值为正向移动，负值为反向移动。默认值：0 | 否 | 否 | "translate": { "x": 100, "y": 10 } |
+ 
+ ##### 4.2.1.3 通用事件
+ 
+diff --git a/specification/harmonyos-a2ui-protocol.md b/specification/harmonyos-a2ui-protocol.md
+index b411684c5ec4089a836ec021497d9a8ae8d443e0..d147afafb96081d3c5a40ef97363d6c925a47990 100644
+--- a/specification/harmonyos-a2ui-protocol.md
++++ b/specification/harmonyos-a2ui-protocol.md
+@@ -1812,6 +1812,9 @@ If 是一个条件渲染组件，可以根据条件表达式的值动态选择
+ | aspectRatio | 宽高比 (width/height) | 数字，默认值：1.0。指定当前组件的宽高比，aspectRatio=width/height。仅设置width、aspectRatio时，height = width/aspectRatio。<br>仅设置height、aspectRatio时，width = height * aspectRatio。<br>同时设置width、height和aspectRatio时，height不生效，height = width / aspectRatio。<br>设置aspectRatio属性后，组件宽高会受父组件内容区大小限制，constraintSize的优先级高于aspectRatio。 | 否 | 是 | "aspectRatio": 1.5 |
+ | backdropBlur | 背景模糊效果 | 对象 {radius, grayscale}<br>radius:必选，数值，背景模糊半径。取值范围：[0, +∞)。单位：vp。设置小于0的值时，按值为0处理。<br>grayscale:可选，二元数组 [number, number]，灰度模糊参数。每项取值范围：[0, 127]。第一个值调整黑色亮度（提亮），第二个值调整白色暗度（压暗）。值越大调整越明显。默认值：[0, 0]，不调整。 | 否 | 否 | "backdropBlur": { "radius": 20, "grayscale": [10, 10] } |
+ | opacity | 透明度 | 数值，取值范围[0,1]，默认值1（完全不透明）。0表示完全透明，1表示完全不透明。设置小于0的值时按0处理，大于1的值时按1处理。 | 否 | 是 | "opacity": 0.8 |
++| rotate | 旋转 | 对象 {angleX, angleY, angleZ, centerX, centerY, centerZ, perspective}<br>angleX:可选，数值，X轴旋转角（度）。正值为顺时针。默认值：0<br>angleY:可选，数值，Y轴旋转角（度）。正值为顺时针。默认值：0<br>angleZ:可选，数值，Z轴旋转角（度）。正值为顺时针。默认值：0<br>centerX:可选，数值，变换中心点X坐标（vp）。默认值：组件中心(50%)<br>centerY:可选，数值，变换中心点Y坐标（vp）。默认值：组件中心(50%)<br>centerZ:可选，数值，3D旋转中心点Z坐标（vp）。默认值：0<br>perspective:可选，数值，相机Z坐标（px），控制透视效果。0为自动计算。默认值：0 | 否 | 否 | "rotate": { "angleZ": 45 } |
++| scale | 缩放 | 对象 {x, y}<br>x:可选，数值，X轴缩放倍数。默认值：1。x>1放大，0<x<1缩小，x<0反向缩放<br>y:可选，数值，Y轴缩放倍数。默认值：1。y>1放大，0<y<1缩小，y<0反向缩放 | 否 | 否 | "scale": { "x": 1.5, "y": 0.5 } |
++| translate | 平移 | 对象 {x, y}<br>x:可选，数值，X轴平移距离（vp）。正值为正向移动，负值为反向移动。默认值：0<br>y:可选，数值，Y轴平移距离（vp）。正值为正向移动，负值为反向移动。默认值：0 | 否 | 否 | "translate": { "x": 100, "y": 10 } |
+ 
+ ##### 4.2.1.3 通用事件
+ 
+diff --git a/specification/json/extended_catalog.json b/specification/json/extended_catalog.json
+index 8eb8f4aead6bb773af0de747d98cf68f85527fc6..62714f3f1bce7e1ac3857dbc9ea9e6411fb7146d 100644
+--- a/specification/json/extended_catalog.json
++++ b/specification/json/extended_catalog.json
+@@ -878,10 +878,15 @@
+               },
+               "minItems": 2,
+               "maxItems": 2,
+-              "default": [0, 0]
++              "default": [
++                0,
++                0
++              ]
+             }
+           },
+-          "required": ["radius"],
++          "required": [
++            "radius"
++          ],
+           "additionalProperties": false
+         },
+         "opacity": {
+@@ -897,6 +902,82 @@
+               "$ref": "#/$defs/ExtendedDynamicValueRef"
+             }
+           ]
++        },
++        "rotate": {
++          "description": "Component rotation using Euler angles. Supports 3D rotation with angle per axis. All angles in degrees. Defaults: angleX=0, angleY=0, angleZ=0 (no rotation). centerX/centerY default '50%' (component center). centerZ default 0 (vp). perspective default 0 (px, auto-calculated).",
++          "type": "object",
++          "properties": {
++            "angleX": {
++              "type": "number",
++              "description": "Rotation angle around X axis in degrees. Positive = clockwise. Default: 0.",
++              "default": 0
++            },
++            "angleY": {
++              "type": "number",
++              "description": "Rotation angle around Y axis in degrees. Positive = clockwise. Default: 0.",
++              "default": 0
++            },
++            "angleZ": {
++              "type": "number",
++              "description": "Rotation angle around Z axis in degrees. Positive = clockwise. Default: 0.",
++              "default": 0
++            },
++            "centerX": {
++              "type": "number",
++              "description": "Transform center X coordinate in vp. Default: component center (50%).",
++              "default": "50%"
++            },
++            "centerY": {
++              "type": "number",
++              "description": "Transform center Y coordinate in vp. Default: component center (50%).",
++              "default": "50%"
++            },
++            "centerZ": {
++              "type": "number",
++              "description": "3D rotation center Z coordinate in vp. Default: 0.",
++              "default": 0
++            },
++            "perspective": {
++              "type": "number",
++              "description": "Camera Z position in px for perspective effect. 0 = auto-calculated. Default: 0.",
++              "default": 0
++            }
++          },
++          "additionalProperties": false
++        },
++        "scale": {
++          "description": "Component scale. X/Y axis scaling factors. Default: 1 (no scaling). x>1 enlarge, 0<x<1 shrink, x<0 flip and scale. x=0 invisible on X axis.",
++          "type": "object",
++          "properties": {
++            "x": {
++              "type": "number",
++              "description": "X axis scale factor. Default: 1.",
++              "default": 1
++            },
++            "y": {
++              "type": "number",
++              "description": "Y axis scale factor. Default: 1.",
++              "default": 1
++            }
++          },
++          "additionalProperties": false
++        },
++        "translate": {
++          "description": "Component translation. X/Y axis translation distances in vp. Positive = forward, negative = backward. Default: 0 (no translation).",
++          "type": "object",
++          "properties": {
++            "x": {
++              "type": "number",
++              "description": "X axis translation in vp. Default: 0.",
++              "default": 0
++            },
++            "y": {
++              "type": "number",
++              "description": "Y axis translation in vp. Default: 0.",
++              "default": 0
++            }
++          },
++          "additionalProperties": false
+         }
+       },
+       "additionalProperties": true
+@@ -3030,7 +3111,67 @@
+                         "oneOf": [
+                           {
+                             "type": "string",
+-                            "enum": ["accountCircle", "add", "arrowBack", "arrowForward", "attachFile", "calendarToday", "call", "camera", "check", "close", "delete", "download", "edit", "event", "error", "fastForward", "favorite", "favoriteOff", "folder", "help", "home", "info", "locationOn", "lock", "lockOpen", "mail", "menu", "moreVert", "moreHoriz", "notificationsOff", "notifications", "pause", "payment", "person", "phone", "photo", "play", "print", "refresh", "rewind", "search", "send", "settings", "share", "shoppingCart", "skipNext", "skipPrevious", "star", "starHalf", "starOff", "stop", "upload", "visibility", "visibilityOff", "volumeDown", "volumeMute", "volumeOff", "volumeUp", "warning"]
++                            "enum": [
++                              "accountCircle",
++                              "add",
++                              "arrowBack",
++                              "arrowForward",
++                              "attachFile",
++                              "calendarToday",
++                              "call",
++                              "camera",
++                              "check",
++                              "close",
++                              "delete",
++                              "download",
++                              "edit",
++                              "event",
++                              "error",
++                              "fastForward",
++                              "favorite",
++                              "favoriteOff",
++                              "folder",
++                              "help",
++                              "home",
++                              "info",
++                              "locationOn",
++                              "lock",
++                              "lockOpen",
++                              "mail",
++                              "menu",
++                              "moreVert",
++                              "moreHoriz",
++                              "notificationsOff",
++                              "notifications",
++                              "pause",
++                              "payment",
++                              "person",
++                              "phone",
++                              "photo",
++                              "play",
++                              "print",
++                              "refresh",
++                              "rewind",
++                              "search",
++                              "send",
++                              "settings",
++                              "share",
++                              "shoppingCart",
++                              "skipNext",
++                              "skipPrevious",
++                              "star",
++                              "starHalf",
++                              "starOff",
++                              "stop",
++                              "upload",
++                              "visibility",
++                              "visibilityOff",
++                              "volumeDown",
++                              "volumeMute",
++                              "volumeOff",
++                              "volumeUp",
++                              "warning"
++                            ]
+                           },
+                           {
+                             "$ref": "#/$defs/ExtendedDynamicValueRef"
+diff --git a/specification/json/form_catalog.json b/specification/json/form_catalog.json
+index b323731caf70d6250afa5c4482c711937cdb7dd1..a58e57054aceb4662341ca5cff034c6718ff1001 100644
+--- a/specification/json/form_catalog.json
++++ b/specification/json/form_catalog.json
+@@ -820,10 +820,15 @@
+               },
+               "minItems": 2,
+               "maxItems": 2,
+-              "default": [0, 0]
++              "default": [
++                0,
++                0
++              ]
+             }
+           },
+-          "required": ["radius"],
++          "required": [
++            "radius"
++          ],
+           "additionalProperties": false
+         },
+         "opacity": {
+@@ -839,6 +844,82 @@
+               "$ref": "#/$defs/ExtendedDynamicValueRef"
+             }
+           ]
++        },
++        "rotate": {
++          "description": "Component rotation using Euler angles. Supports 3D rotation with angle per axis. All angles in degrees. Defaults: angleX=0, angleY=0, angleZ=0 (no rotation). centerX/centerY default '50%' (component center). centerZ default 0 (vp). perspective default 0 (px, auto-calculated).",
++          "type": "object",
++          "properties": {
++            "angleX": {
++              "type": "number",
++              "description": "Rotation angle around X axis in degrees. Positive = clockwise. Default: 0.",
++              "default": 0
++            },
++            "angleY": {
++              "type": "number",
++              "description": "Rotation angle around Y axis in degrees. Positive = clockwise. Default: 0.",
++              "default": 0
++            },
++            "angleZ": {
++              "type": "number",
++              "description": "Rotation angle around Z axis in degrees. Positive = clockwise. Default: 0.",
++              "default": 0
++            },
++            "centerX": {
++              "type": "number",
++              "description": "Transform center X coordinate in vp. Default: component center (50%).",
++              "default": "50%"
++            },
++            "centerY": {
++              "type": "number",
++              "description": "Transform center Y coordinate in vp. Default: component center (50%).",
++              "default": "50%"
++            },
++            "centerZ": {
++              "type": "number",
++              "description": "3D rotation center Z coordinate in vp. Default: 0.",
++              "default": 0
++            },
++            "perspective": {
++              "type": "number",
++              "description": "Camera Z position in px for perspective effect. 0 = auto-calculated. Default: 0.",
++              "default": 0
++            }
++          },
++          "additionalProperties": false
++        },
++        "scale": {
++          "description": "Component scale. X/Y axis scaling factors. Default: 1 (no scaling). x>1 enlarge, 0<x<1 shrink, x<0 flip and scale. x=0 invisible on X axis.",
++          "type": "object",
++          "properties": {
++            "x": {
++              "type": "number",
++              "description": "X axis scale factor. Default: 1.",
++              "default": 1
++            },
++            "y": {
++              "type": "number",
++              "description": "Y axis scale factor. Default: 1.",
++              "default": 1
++            }
++          },
++          "additionalProperties": false
++        },
++        "translate": {
++          "description": "Component translation. X/Y axis translation distances in vp. Positive = forward, negative = backward. Default: 0 (no translation).",
++          "type": "object",
++          "properties": {
++            "x": {
++              "type": "number",
++              "description": "X axis translation in vp. Default: 0.",
++              "default": 0
++            },
++            "y": {
++              "type": "number",
++              "description": "Y axis translation in vp. Default: 0.",
++              "default": 0
++            }
++          },
++          "additionalProperties": false
+         }
+       },
+       "additionalProperties": true
+diff --git a/specification/modification-history-form.md b/specification/modification-history-form.md
+index e59021e44946516abb7a6df9ac1d870e9d988212..3826cff99334ab0fc10044d1ba634d695f64628e 100644
+--- a/specification/modification-history-form.md
++++ b/specification/modification-history-form.md
+@@ -12,6 +12,7 @@
+ 
+ | 日期 | 描述 |
+ |------|------|
++| 2026-09-12 | GAP-093：新增 rotate/scale/translate 通用样式属性 — rotate 对象类型 {angleX, angleY, angleZ, centerX, centerY, centerZ, perspective}，对齐 ArkUI RotateAngleOptions（API 20+）欧拉角模型；scale 对象类型 {x, y} 简化 x/y 分轴；translate 对象类型 {x, y} 简化 x/y 分轴。 |
+ | 2026-09-02 | GAP-092：补全 opacity 通用样式声明 — number 类型，取值范围 [0,1]，默认 1（完全不透明），越界值 clamp 到 [0,1]；补全 Form spec §4.2.1.2 通用样式表与 Form CommonStyles Schema，消除 prompt 已声明但正文/schema 缺失的不一致。 |
+ | 2026-09-01 | GAP-091：Form 动态数据绑定 FunctionCall 绑定澄清 — §3.8 明确三种绑定机制（Expression + PathBinding + FunctionCall），FunctionCall 改为调用自定义函数、删除 formatString 内置值函数误导；§3.6.1 规则8 与 form_catalog.json `ExtendedDynamicValueRef` 明确三种数据源；§3.5.1 预定义函数标注「当前未支持」；protocol-form-summary.md 同步函数绑定条目。 |
+ | 2026-08-24 | GAP-090：新增 backdropBlur 通用样式属性 — 对象类型 {radius, grayscale}，控制组件背景模糊效果。radius 必选数值 [0,+∞) 单位 vp；grayscale 可选二元数组 [number, number]，每项 [0,127]，灰度模糊参数，默认 [0,0]。 |
+diff --git a/specification/modification-history.md b/specification/modification-history.md
+index 1ec62f8dc8cf50d8e1d7d8b9ca5764116d5fd99a..0ea6c1e3216b0e112c0b21d6e6de0613296c6958 100644
+--- a/specification/modification-history.md
++++ b/specification/modification-history.md
+@@ -12,6 +12,7 @@
+ 
+ | 日期 | 描述 | 涉及章节 |
+ |------|------|----------|
++| 2026-09-12 | GAP-093：新增 rotate/scale/translate 通用样式属性 — rotate 对象类型 {angleX, angleY, angleZ, centerX, centerY, centerZ, perspective}，对齐 ArkUI RotateAngleOptions（API 20+）欧拉角模型；scale 对象类型 {x, y} 简化 x/y 分轴；translate 对象类型 {x, y} 简化 x/y 分轴。 | §4.2.1.2, JSON Schema |
+ | 2026-09-02 | GAP-092：补全 opacity 通用样式声明 — number 类型，取值范围 [0,1]，默认 1（完全不透明），越界值 clamp 到 [0,1]；补全 spec §4.2.1.2 通用样式表与 CommonStyles Schema（全量 + Form），消除 prompt 已声明但正文/schema 缺失的不一致。 | §4.2.1.2, JSON Schema |
+ | 2026-08-24 | GAP-090：新增 backdropBlur 通用样式属性 — 对象类型 {radius, grayscale}，控制组件背景模糊效果。radius 必选数值 [0,+∞) 单位 vp；grayscale 可选二元数组 [number, number]，每项 [0,127]，灰度模糊参数，默认 [0,0]。 | §4.2.1.2, JSON Schema |
+ | 2026-08-06 | GAP-089：LayoutWeight 公共样式默认值 1 → 0 — 对齐 ArkUI 原生默认值（不参与剩余空间分配），同步 Catalog Schema `default` 与描述。commit `1daf624` | §4.2.1.2, JSON Schema |

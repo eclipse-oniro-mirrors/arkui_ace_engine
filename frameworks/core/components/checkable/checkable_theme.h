@@ -25,7 +25,7 @@ namespace OHOS::Ace {
 class ThemeConstants;
 
 constexpr Color DEFAULT_UNCHECK_BORDER_COLOR = Color(0x4B181819);
-class CheckableTheme : public virtual Theme {
+class CheckableTheme : public Theme {
     DECLARE_ACE_TYPE(CheckableTheme, Theme);
 
 public:

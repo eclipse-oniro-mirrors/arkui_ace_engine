@@ -31,29 +31,48 @@ constexpr int32_t DEFAULT_DURATION = 1000;
 
 DrawableDescriptorLoadResult AnimatedDrawableDescriptor::LoadSync()
 {
-    std::scoped_lock<std::mutex> lock(loadMutx_);
-    if (!pixelMapList_.empty()) {
-        auto pixelMap = pixelMapList_[0];
-        return { pixelMap->GetWidth(), pixelMap->GetHeight(), 0 };
+    {
+        std::shared_lock<std::shared_mutex> callLock(callMutx_);
+        if (!pixelMapList_.empty()) {
+            auto pixelMap = pixelMapList_[0];
+            return { pixelMap->GetWidth(), pixelMap->GetHeight(), 0 };
+        }
+        if (imageSize_.width > 0) {
+            return { imageSize_.width, imageSize_.height, 0 };
+        }
     }
     if (!info_) {
         LOGW("Must to set resource/base64/file info.");
         return { 0, 0, ERROR_CODE_DRAWABLE_LOADER_ERROR };
     }
-    if (imageSize_.width > 0) {
-        return { imageSize_.width, imageSize_.height, 0 };
+    std::scoped_lock<std::mutex> lock(loadMutx_);
+    {
+        std::shared_lock<std::shared_mutex> callLock(callMutx_);
+        if (imageSize_.width > 0) {
+            return { imageSize_.width, imageSize_.height, 0 };
+        }
     }
     auto mediaData = DrawableDescriptorLoader::GetInstance()->LoadData(info_);
-    rawData_.len = mediaData.len;
-    rawData_.data.reset(mediaData.data.release());
-    auto imageSource = ImageSource::Create(rawData_.data.get(), rawData_.len, svgLimitsId_);
+    uint8_t* rawDataPtr = nullptr;
+    size_t rawDataLen = 0;
+    {
+        std::unique_lock<std::shared_mutex> callLock(callMutx_);
+        rawData_.len = mediaData.len;
+        rawData_.data.reset(mediaData.data.release());
+        rawDataPtr = rawData_.data.get();
+        rawDataLen = rawData_.len;
+    }
+    auto imageSource = ImageSource::Create(rawDataPtr, rawDataLen, svgLimitsId_);
     if (!imageSource) {
         LOGW("Image source create failed.");
         return { 0, 0, ERROR_CODE_DRAWABLE_LOADER_ERROR };
     }
     auto size = imageSource->GetImageSize();
-    imageSize_.width = size.first;
-    imageSize_.height = size.second;
+    {
+        std::unique_lock<std::shared_mutex> callLock(callMutx_);
+        imageSize_.width = size.first;
+        imageSize_.height = size.second;
+    }
     return { size.first, size.second, 0 };
 }
 
@@ -71,22 +90,26 @@ void AnimatedDrawableDescriptor::LoadAsync(const LoadCallback&& callback)
 
 void AnimatedDrawableDescriptor::ControllAnimation(int32_t nodeId, bool play)
 {
-    // first: find animator
-    auto it = animators_.find(nodeId);
-    if (it == animators_.end()) {
+    RefPtr<ControlledAnimator> animator;
+    auto status = ControlledAnimator::ControlStatus::STOPPED;
+    bool autoPlay = false;
+    {
+        std::shared_lock<std::shared_mutex> lock(callMutx_);
+        auto it = animators_.find(nodeId);
+        if (it == animators_.end()) {
+            return;
+        }
+        animator = it->second;
+        status = animator->GetControlStatus();
+        autoPlay = autoPlay_;
+    }
+    if (play && !autoPlay) {
+        FlushUpdateCallbacksByNodeId(0, nodeId);
         return;
     }
-    auto animator = it->second;
-    // second: animator operate
-    // visible and auto play is true, start to forward.
-    if (play && !autoPlay_) {
-        FlushUpdateCallbacksByNodeId(0, nodeId);
-    }
-    if (play && autoPlay_) {
+    if (play && autoPlay) {
         animator->Forward();
     }
-    // invisible, pause animation.
-    auto status = animator->GetControlStatus();
     if (!play && status == ControlledAnimator::ControlStatus::RUNNING) {
         animator->Pause();
     }
@@ -94,6 +117,7 @@ void AnimatedDrawableDescriptor::ControllAnimation(int32_t nodeId, bool play)
 
 RefPtr<ControlledAnimator> AnimatedDrawableDescriptor::GetControlledAnimator(const std::string& id)
 {
+    std::shared_lock<std::shared_mutex> lock(callMutx_);
     if (animators_.size() == 1) {
         return animators_.begin()->second;
     }
@@ -111,6 +135,7 @@ RefPtr<ControlledAnimator> AnimatedDrawableDescriptor::GetControlledAnimator(con
 
 RefPtr<ControlledAnimator> AnimatedDrawableDescriptor::GetControlledAnimator(const int32_t id)
 {
+    std::shared_lock<std::shared_mutex> lock(callMutx_);
     if (animators_.size() == 1) {
         return animators_.begin()->second;
     }
@@ -124,6 +149,7 @@ RefPtr<ControlledAnimator> AnimatedDrawableDescriptor::GetControlledAnimator(con
 
 RefPtr<PixelMap> AnimatedDrawableDescriptor::GetPixelMap()
 {
+    std::shared_lock<std::shared_mutex> lock(callMutx_);
     if (!pixelMapList_.empty()) {
         return pixelMapList_[0];
     }
@@ -154,35 +180,39 @@ int32_t AnimatedDrawableDescriptor::GetOriginalHeight()
 
 uint32_t AnimatedDrawableDescriptor::GetFrameCount() const
 {
+    std::shared_lock<std::shared_mutex> lock(callMutx_);
     return frameCount_;
 }
 
 int32_t AnimatedDrawableDescriptor::GetIterations() const
 {
+    std::shared_lock<std::shared_mutex> lock(callMutx_);
     return iterations_;
 }
 
 int32_t AnimatedDrawableDescriptor::GetTotalDuration()
 {
+    std::shared_lock<std::shared_mutex> lock(callMutx_);
     if (totalDuration_ >= 0 || isSetDurations_) {
         return totalDuration_;
     }
     if (pixelMapList_.size() > 0) {
-        totalDuration_ = static_cast<int32_t>(pixelMapList_.size()) * DEFAULT_DURATION;
+        return static_cast<int32_t>(pixelMapList_.size()) * DEFAULT_DURATION;
     }
     if (selfDurations_.size() > 0) {
-        totalDuration_ = std::accumulate(selfDurations_.begin(), selfDurations_.end(), 0);
+        return std::accumulate(selfDurations_.begin(), selfDurations_.end(), 0);
     }
     return totalDuration_;
 }
 
 std::vector<int32_t> AnimatedDrawableDescriptor::GetDurations()
 {
+    std::shared_lock<std::shared_mutex> lock(callMutx_);
     if (userDurations_.size() > 0) {
         return userDurations_;
     }
     if (totalDuration_ >= 0) {
-        auto frameCount = GetFrameCount();
+        auto frameCount = frameCount_;
         if (frameCount == 0) {
             return {};
         }
@@ -203,6 +233,7 @@ void AnimatedDrawableDescriptor::SetDurations(const std::vector<int32_t>& durati
     if (durations.size() == 0) {
         return;
     }
+    std::unique_lock<std::shared_mutex> lock(callMutx_);
     userDurations_ = durations;
     isSetDurations_ = true;
     totalDuration_ = std::accumulate(userDurations_.begin(), userDurations_.end(), 0);
@@ -210,6 +241,7 @@ void AnimatedDrawableDescriptor::SetDurations(const std::vector<int32_t>& durati
 
 void AnimatedDrawableDescriptor::SetTotalDuration(const int32_t totalDuration)
 {
+    std::unique_lock<std::shared_mutex> lock(callMutx_);
     if (isSetDurations_ || totalDuration < 0) {
         return;
     }
@@ -218,6 +250,7 @@ void AnimatedDrawableDescriptor::SetTotalDuration(const int32_t totalDuration)
 
 void AnimatedDrawableDescriptor::SetIterations(const int32_t iterations)
 {
+    std::unique_lock<std::shared_mutex> lock(callMutx_);
     if (iterations < -1) {
         iterations_ = 1;
         return;
@@ -227,6 +260,7 @@ void AnimatedDrawableDescriptor::SetIterations(const int32_t iterations)
 
 void AnimatedDrawableDescriptor::SetPixelMapList(const std::vector<RefPtr<PixelMap>>& pixelMapList)
 {
+    std::unique_lock<std::shared_mutex> lock(callMutx_);
     pixelMapList_ = pixelMapList;
     frameCount_ = static_cast<uint32_t>(pixelMapList_.size());
 }
@@ -242,18 +276,63 @@ void AnimatedDrawableDescriptor::CreateParamsFromImageSource(int32_t nodeId)
     imageSources_.insert({ nodeId, imageSource });
 }
 
+uint32_t AnimatedDrawableDescriptor::GetFrameCountInternal() const
+{
+    return frameCount_;
+}
+
+int32_t AnimatedDrawableDescriptor::GetTotalDurationInternal()
+{
+    if (totalDuration_ >= 0 || isSetDurations_) {
+        return totalDuration_;
+    }
+    if (pixelMapList_.size() > 0) {
+        return static_cast<int32_t>(pixelMapList_.size()) * DEFAULT_DURATION;
+    }
+    if (selfDurations_.size() > 0) {
+        return std::accumulate(selfDurations_.begin(), selfDurations_.end(), 0);
+    }
+    return totalDuration_;
+}
+
+std::vector<int32_t> AnimatedDrawableDescriptor::GetDurationsInternal()
+{
+    if (userDurations_.size() > 0) {
+        return userDurations_;
+    }
+    if (totalDuration_ >= 0) {
+        if (frameCount_ == 0) {
+            return {};
+        }
+        std::vector<int32_t> result;
+        result.resize(frameCount_, totalDuration_ / frameCount_);
+        return result;
+    }
+    if (totalDuration_ < 0 && pixelMapList_.size() > 0) {
+        std::vector<int32_t> result;
+        result.resize(pixelMapList_.size(), DEFAULT_DURATION);
+        return result;
+    }
+    return selfDurations_;
+}
+
+int32_t AnimatedDrawableDescriptor::GetIterationsInternal() const
+{
+    return iterations_;
+}
+
 void AnimatedDrawableDescriptor::CreateAnimator(int32_t nodeId)
 {
     auto animator = AceType::MakeRefPtr<ControlledAnimator>();
     animators_.insert({ nodeId, animator });
-    auto durations = GetDurations();
-    auto totalDuration = GetTotalDuration();
-    auto iterations = GetIterations();
+    auto durations = GetDurationsInternal();
+    auto totalDuration = GetTotalDurationInternal();
+    auto iterations = GetIterationsInternal();
     animator->SetDuration(totalDuration);
     animator->SetIteration(iterations);
     animator->SetFillMode(ToFillMode());
     auto pictureAnimation = std::vector<PictureInfo>();
-    for (uint32_t index = 0; index < static_cast<int32_t>(durations.size()); ++index) {
+    for (uint32_t index = 0; index < static_cast<uint32_t>(durations.size()); ++index) {
         pictureAnimation.emplace_back(
             durations[index] / static_cast<float>(totalDuration), static_cast<int32_t>(index));
     }
@@ -289,7 +368,7 @@ void AnimatedDrawableDescriptor::RegisterUpdateCallback(int32_t nodeId, const Up
 {
     std::unique_lock<std::shared_mutex> lock(callMutx_);
     CreateParamsFromImageSource(nodeId);
-    if (GetFrameCount() <= 0) {
+    if (GetFrameCountInternal() <= 0) {
         return;
     }
     CreateAnimator(nodeId);
@@ -298,44 +377,60 @@ void AnimatedDrawableDescriptor::RegisterUpdateCallback(int32_t nodeId, const Up
 
 void AnimatedDrawableDescriptor::UnRegisterUpdateCallback(int32_t nodeId)
 {
-    // unregister callbacks and remove animator by node id
-    auto it = animators_.find(nodeId);
-    if (it != animators_.end()) {
-        it->second->Pause();
+    RefPtr<ControlledAnimator> animator;
+    {
+        std::unique_lock<std::shared_mutex> lock(callMutx_);
+        auto it = animators_.find(nodeId);
+        if (it != animators_.end()) {
+            animator = it->second;
+        }
+        updateCallbacks_.erase(nodeId);
+        animators_.erase(nodeId);
+        imageSources_.erase(nodeId);
     }
-    std::unique_lock<std::shared_mutex> lock(callMutx_);
-    updateCallbacks_.erase(nodeId);
-    animators_.erase(nodeId);
-    imageSources_.erase(nodeId);
+    if (animator) {
+        animator->Pause();
+    }
 }
 
 void AnimatedDrawableDescriptor::FlushUpdateCallbacksByNodeId(int32_t index, int32_t nodeId)
 {
-    if (index < 0 || index >= static_cast<int32_t>(GetFrameCount())) {
-        return;
+    UpdateCallback callback;
+    RefPtr<PixelMap> pixelMap;
+    {
+        std::shared_lock<std::shared_mutex> lock(callMutx_);
+        if (index < 0 || index >= static_cast<int32_t>(frameCount_)) {
+            return;
+        }
+        auto it = updateCallbacks_.find(nodeId);
+        if (it == updateCallbacks_.end()) {
+            return;
+        }
+        callback = it->second;
+        pixelMap = GetFrameByIndexInternal(index, nodeId);
     }
-    std::shared_lock<std::shared_mutex> lock(callMutx_);
-    auto it = updateCallbacks_.find(nodeId);
-    if (it == updateCallbacks_.end()) {
-        return;
-    }
-    auto pixelMap = GetFrameByIndex(index, nodeId);
     CHECK_NULL_VOID(pixelMap);
-    it->second(pixelMap);
+    callback(pixelMap);
 }
 
 RefPtr<PixelMap> AnimatedDrawableDescriptor::GetFrameByIndex(int32_t index, int32_t nodeId)
 {
+    std::shared_lock<std::shared_mutex> lock(callMutx_);
+    return GetFrameByIndexInternal(index, nodeId);
+}
+
+RefPtr<PixelMap> AnimatedDrawableDescriptor::GetFrameByIndexInternal(int32_t index, int32_t nodeId)
+{
     if (!pixelMapList_.empty()) {
         return pixelMapList_[index];
     }
-    auto imageSource = imageSources_[nodeId];
-    if (!imageSource) {
+    auto it = imageSources_.find(nodeId);
+    if (it == imageSources_.end() || !it->second) {
         LOGE("Find imageSource failed, nodeId: %{public}d", nodeId);
         return nullptr;
     }
     uint32_t errorCode = 0;
-    auto frame = imageSource->CreatePixelMap(index, { -1, -1 }, errorCode, {});
+    auto frame = it->second->CreatePixelMap(index, { -1, -1 }, errorCode, {});
     return frame;
 }
 } // namespace OHOS::Ace

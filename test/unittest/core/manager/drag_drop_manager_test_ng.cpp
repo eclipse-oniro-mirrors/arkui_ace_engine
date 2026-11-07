@@ -1334,7 +1334,7 @@ HWTEST_F(DragDropManagerTestNg, DragDropManagerTest033, TestSize.Level1)
     frameNodeNull->SetGeometryNode(geometryNode);
     auto pipelineTmp = NG::PipelineContext::GetCurrentContext();
     auto parentNodeTmp = pipelineTmp->GetRootElement();
-    auto parentFrameNodeTmp = AceType::DynamicCast<FrameNode>(parentNodeTmp);
+    auto parentFrameNodeTmp = parentNodeTmp;
     parentFrameNodeTmp->frameChildren_.insert(WeakPtr<NG::FrameNode>(frameNodeNull));
     dragDropManager->AddGridDragFrameNode(frameNodeNull->GetId(), frameNodeNull);
     std::map<int32_t, WeakPtr<FrameNode>> frameNodes = dragDropManager->gridDragFrameNodes_;
@@ -1355,7 +1355,7 @@ HWTEST_F(DragDropManagerTestNg, DragDropManagerTest033, TestSize.Level1)
     auto pipeline = NG::PipelineContext::GetCurrentContext();
     auto manager = pipeline->GetOverlayManager();
     auto parentNode = pipeline->GetRootElement();
-    auto parentFrameNode = AceType::DynamicCast<FrameNode>(parentNode);
+    auto parentFrameNode = parentNode;
     auto children = parentFrameNode->GetFrameChildren();
     EXPECT_FALSE(children.empty());
     for (auto iter = children.rbegin(); iter != children.rend(); iter++) {
@@ -1363,7 +1363,7 @@ HWTEST_F(DragDropManagerTestNg, DragDropManagerTest033, TestSize.Level1)
         if (child == nullptr) {
             continue;
         }
-        auto childNode = AceType::DynamicCast<UINode>(child);
+        auto childNode = child;
         auto childFindResult = dragDropManager->FindTargetInChildNodes(childNode, hitFrameNodes, true);
         EXPECT_FALSE(childFindResult);
     }

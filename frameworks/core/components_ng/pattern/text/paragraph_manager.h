@@ -25,7 +25,7 @@
 #include "core/components_ng/render/paragraph.h"
 namespace OHOS::Ace::NG {
 
-class ACE_FORCE_EXPORT ParagraphManager : public virtual AceType {
+class ACE_FORCE_EXPORT ParagraphManager : public AceType {
     DECLARE_ACE_TYPE(ParagraphManager, AceType);
 
 public:

@@ -17,6 +17,7 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_RICH_EDITOR_RICH_EDITOR_SELECTION_H
 
 #include <list>
+#include <optional>
 
 #include "base/image/pixel_map.h"
 #include "base/memory/ace_type.h"
@@ -134,6 +135,7 @@ struct ResultObject {
     SelectSpanType type = SelectSpanType::TYPESPAN;
     int32_t offsetInSpan[2] = { 0, 0 };
     std::u16string valueString;
+    std::optional<std::u16string> imageTag = std::nullopt;
     std::u16string previewText;
     std::u16string urlAddress;
     RefPtr<PixelMap> valuePixelMap;

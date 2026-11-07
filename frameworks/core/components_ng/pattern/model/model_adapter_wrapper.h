@@ -50,7 +50,7 @@ struct CameraProperty {
     float fov_ = 60.0f;
 };
 
-class ModelAdapterWrapper : public virtual AceType {
+class ModelAdapterWrapper : public AceType {
     DECLARE_ACE_TYPE(ModelAdapterWrapper, AceType);
 public:
     using PaintFinishCallback = std::function<void()>;

@@ -104,6 +104,9 @@ declare_args() {
 
   #Enable material param customized
   ace_engine_feature_enable_material_customized = false
+
+  #Enable material param TV
+  ace_engine_feature_enable_material_tv = false
 }
 
 enable_dump_drawcmd = false
@@ -322,6 +325,11 @@ if (defined(global_parts_info) &&
   uiservice_xcollie_enable = true
 } else {
   uiservice_xcollie_enable = false
+}
+ 
+if (defined(global_parts_info) &&
+    defined(global_parts_info.msdp_motion)) {
+  ace_common_defines += [ "MSDP_MOTION_EXISTS" ]
 }
 
 if (!defined(global_parts_info) ||

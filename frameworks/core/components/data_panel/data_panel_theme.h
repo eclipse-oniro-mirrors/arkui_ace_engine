@@ -22,7 +22,7 @@
 
 namespace OHOS::Ace {
 
-class DataPanelTheme : public virtual Theme {
+class DataPanelTheme : public Theme {
     DECLARE_ACE_TYPE(DataPanelTheme, Theme);
 
 public:

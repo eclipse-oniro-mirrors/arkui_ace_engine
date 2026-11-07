@@ -20,6 +20,17 @@
 
 namespace OHOS::Ace::NG {
 
+bool InputEventHub::HasTreeInteraction() const
+{
+    return userMouseFunc_ || userJSFrameNodeMouseFunc_ || !mouseInputEvents_.empty() || mouseEventActuator_ ||
+           userHoverFunc_ || userJSFrameNodeHoverFunc_ || !hoverInputEvents_.empty() || hoverEventActuator_ ||
+           userHoverMoveFunc_ || userJSFrameNodeHoverMoveFunc_ || !hoverMoveInputEvents_.empty() ||
+           hoverMoveEventActuator_ || hoverEffectActuator_ || userAxisFunc_ || !axisInputEvents_.empty() ||
+           axisEventActuator_ || userCoastingAxisFunc_ || coastingAxisEventActuator_ ||
+           userAccessibilityHoverFunc_ || accessibilityHoverEventActuator_ || showMenu_ ||
+           hoverEffectType_ != HoverEffectType::UNKNOWN || hoverEffectAuto_ != HoverEffectType::UNKNOWN;
+}
+
 InputEventHub::InputEventHub(const WeakPtr<EventHub>& eventHub) : eventHub_(eventHub) {}
 
 RefPtr<FrameNode> InputEventHub::GetFrameNode() const
@@ -258,5 +269,23 @@ void InputEventHub::CreateAccessibilityHoverEventActuator()
     if (userAccessibilityHoverFunc_) {
         accessibilityHoverEventActuator_->ReplaceInputEvent(std::move(userAccessibilityHoverFunc_));
     }
+}
+
+void InputEventHub::CopyEvent(const RefPtr<InputEventHub>& source)
+{
+    CHECK_NULL_VOID(source);
+    userMouseFunc_ = source->userMouseFunc_;
+    userJSFrameNodeMouseFunc_ = source->userJSFrameNodeMouseFunc_;
+    userHoverFunc_ = source->userHoverFunc_;
+    userJSFrameNodeHoverFunc_ = source->userJSFrameNodeHoverFunc_;
+    userHoverMoveFunc_ = source->userHoverMoveFunc_;
+    userJSFrameNodeHoverMoveFunc_ = source->userJSFrameNodeHoverMoveFunc_;
+    userAxisFunc_ = source->userAxisFunc_;
+    userCoastingAxisFunc_ = source->userCoastingAxisFunc_;
+    userAccessibilityHoverFunc_ = source->userAccessibilityHoverFunc_;
+    mouseInputEvents_ = source->mouseInputEvents_;
+    hoverInputEvents_ = source->hoverInputEvents_;
+    hoverMoveInputEvents_ = source->hoverMoveInputEvents_;
+    axisInputEvents_ = source->axisInputEvents_;
 }
 } // namespace OHOS::Ace::NG

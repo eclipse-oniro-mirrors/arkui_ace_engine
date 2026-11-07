@@ -32,7 +32,7 @@ namespace OHOS::Ace {
  * SearchTheme defines color and styles of SearchComponent. SearchTheme should be built
  * using SearchTheme::Builder.
  */
-class SearchTheme : public virtual Theme {
+class SearchTheme : public Theme {
     DECLARE_ACE_TYPE(SearchTheme, Theme);
 
 public:

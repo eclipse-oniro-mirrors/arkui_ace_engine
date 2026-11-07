@@ -16,9 +16,11 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_FORM_FORM_LAYOUT_WRAPPER_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_FORM_FORM_LAYOUT_WRAPPER_H
 
+#include "base/memory/ace_type.h"
+
 namespace OHOS::Ace::NG {
 
-class FormLayoutWrapper : public virtual Referenced {
+class FormLayoutWrapper : public virtual AceType {
 public:
     FormLayoutWrapper() {}
     ~FormLayoutWrapper() = default;

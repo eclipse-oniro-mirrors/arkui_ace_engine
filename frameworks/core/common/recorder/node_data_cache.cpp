@@ -71,23 +71,27 @@ NodeDataCache::NodeDataCache()
 
 void NodeDataCache::OnPageReady()
 {
+    std::unique_lock<std::shared_mutex> pageLock(pageUrlMutex_);
     prePageUrl_ = pageUrl_;
     pageUrl_ = GetCurrentPageUrl();
 }
 
 void NodeDataCache::OnPageShow(const std::string& pageUrl)
 {
+    std::unique_lock<std::shared_mutex> pageLock(pageUrlMutex_);
     prePageUrl_ = pageUrl_;
     pageUrl_ = pageUrl;
 }
 
 void NodeDataCache::OnBeforePagePop(bool destroy)
 {
-    if (destroy) {
-        Clear(prePageUrl_);
-    } else {
-        Clear(pageUrl_);
+    std::unique_lock<std::shared_mutex> configLock(configMutex_);
+    std::string pageUrl;
+    {
+        std::shared_lock<std::shared_mutex> pageLock(pageUrlMutex_);
+        pageUrl = destroy ? prePageUrl_ : pageUrl_;
     }
+    Clear(pageUrl);
     shouldCollectFull_ = false;
 }
 
@@ -103,7 +107,7 @@ bool NodeDataCache::PutString(const RefPtr<NG::FrameNode>& node, const std::stri
     if (id.empty() || value.empty() || value.length() > MAX_DATA_LENGTH) {
         return false;
     }
-    if (mergedConfig_->shareNodes.empty()) {
+    if (IsShareNodeEmpty()) {
         return false;
     }
     auto pageUrl = GetPageUrlByNode(node);
@@ -218,6 +222,7 @@ void NodeDataCache::Reset()
 {
     std::unique_lock<std::shared_mutex> lock(cacheMutex_);
     container_->clear();
+    std::unique_lock<std::shared_mutex> pageLock(pageUrlMutex_);
     pageUrl_ = "";
     prePageUrl_ = "";
 }

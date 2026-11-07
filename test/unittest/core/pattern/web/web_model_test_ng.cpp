@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <limits>
+
 #include "gtest/gtest.h"
 #include "core/accessibility/accessibility_manager.h"
 
@@ -534,6 +536,37 @@ HWTEST_F(WebModelTestNg, SetOnContextMenuHide002, TestSize.Level1)
     WebModelNG webModelNG;
     webModelNG.SetOnContextMenuHide(callback);
     EXPECT_EQ(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>(), nullptr);
+#endif
+}
+
+/**
+ * @tc.name: SetOnContextMenuUpdate001
+ * @tc.desc: Test WebModelNG::SetOnContextMenuUpdate() callback
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelTestNg, SetOnContextMenuUpdate001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    int callCount = 0;
+    auto* stack = ViewStackProcessor::GetInstance();
+    stack->ClearStack();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+
+    WebModelNG webModelNG;
+    auto enterFunction =
+        [&callCount](WebContextMenuItemId menuItemId, const WebContextMenuOptions& options) { callCount++; };
+    webModelNG.SetOnContextMenuUpdate(std::move(enterFunction));
+
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    auto callback = webPattern->GetOnContextMenuUpdateCallback();
+    ASSERT_TRUE(callback);
+    callback(WebContextMenuItemId::MENU_COPY_LINK, WebContextMenuOptions {});
+    EXPECT_EQ(callCount, 1);
 #endif
 }
 
@@ -1060,6 +1093,50 @@ HWTEST_F(WebModelTestNg, SetDomStorageAccessEnabled002, TestSize.Level1)
     WebModelNG webModelNG;
     webModelNG.SetDomStorageAccessEnabled(AccessibilityManager::RawPtr(frameNode), true);
     EXPECT_EQ(webPattern->GetOrCreateWebProperty()->CheckDomStorageAccessEnabled(true), true);
+#endif
+}
+
+/**
+ * @tc.name: SetVisitedLinkPersistEnabled001
+ * @tc.desc: Test web_model_ng.cpp
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelTestNg, SetVisitedLinkPersistEnabled001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+
+    WebModelNG webModelNG;
+    webModelNG.SetVisitedLinkPersistEnabled(true);
+    EXPECT_EQ(webPattern->GetOrCreateWebProperty()->CheckVisitedLinkPersistEnabled(true), true);
+#endif
+}
+
+/**
+ * @tc.name: SetVisitedLinkPersistEnabled002
+ * @tc.desc: Test web_model_ng.cpp
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelTestNg, SetVisitedLinkPersistEnabled002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+
+    WebModelNG webModelNG;
+    webModelNG.SetVisitedLinkPersistEnabled(AccessibilityManager::RawPtr(frameNode), true);
+    EXPECT_EQ(webPattern->GetOrCreateWebProperty()->CheckVisitedLinkPersistEnabled(true), true);
 #endif
 }
 
@@ -2650,7 +2727,7 @@ HWTEST_F(WebModelTestNg, SetNativeEmbedMouseEventId001, TestSize.Level1)
     WebModelNG webModelNG;
     auto NativeEmbedMouseEventId = [&callCount](const BaseEventInfo* info) { callCount++; };
     webModelNG.SetNativeEmbedMouseEventId(NativeEmbedMouseEventId);
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnNativeEmbedMouseEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -2668,7 +2745,7 @@ HWTEST_F(WebModelTestNg, SetNativeEmbedObjectParamChangeId001, TestSize.Level1)
     WebModelNG webModelNG;
     auto nativeEmbedObjectParamChangeId = [&callCount](const BaseEventInfo* info) { callCount++; };
     webModelNG.SetNativeEmbedObjectParamChangeId(std::move(nativeEmbedObjectParamChangeId));
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnNativeEmbedObjectParamChangeEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -2742,7 +2819,7 @@ HWTEST_F(WebModelTestNg, SetOnControllerAttached010, TestSize.Level1)
     };
     WebModelNG webModelNG;
     webModelNG.SetOnControllerAttached(AccessibilityManager::RawPtr(frameNode), callback);
-    AceType::DynamicCast<WebPattern>(ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>()
         ->onControllerAttachedCallback_();
     EXPECT_NE(callCount, 0);
 #endif
@@ -3472,7 +3549,7 @@ HWTEST_F(WebModelTestNg, SetNativeEmbedLifecycleChangeId018, TestSize.Level1)
     auto NativeEmbedLifecycleChangeId = [&callCount](const BaseEventInfo* info) { callCount++; };
     webModelNG.SetNativeEmbedLifecycleChangeId(
         AccessibilityManager::RawPtr(frameNode), std::move(NativeEmbedLifecycleChangeId));
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnNativeEmbedLifecycleChangeEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -3498,7 +3575,7 @@ HWTEST_F(WebModelTestNg, SetNativeEmbedObjectParamChangeId002, TestSize.Level1)
     auto NativeEmbedObjectParamChangeId = [&callCount](const BaseEventInfo* info) { callCount++; };
     webModelNG.SetNativeEmbedObjectParamChangeId(
         AccessibilityManager::RawPtr(frameNode), std::move(NativeEmbedObjectParamChangeId));
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnNativeEmbedObjectParamChangeEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -3746,7 +3823,7 @@ HWTEST_F(WebModelTestNg, SetRenderProcessNotRespondingId003, TestSize.Level1)
     int callCount = 0;
     auto renderProcessNotRespondingId = [&callCount](const BaseEventInfo* info) { callCount++; };
     webModelNG.SetRenderProcessNotRespondingId(AccessibilityManager::RawPtr(frameNode), renderProcessNotRespondingId);
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnRenderProcessNotRespondingEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -4125,7 +4202,7 @@ HWTEST_F(WebModelTestNg, SetNativeEmbedGestureEventId019, TestSize.Level1)
     WebModelNG webModelNG;
     auto NativeEmbedGestureEventId = [&callCount](const BaseEventInfo* info) { callCount++; };
     webModelNG.SetNativeEmbedGestureEventId(AccessibilityManager::RawPtr(frameNode), NativeEmbedGestureEventId);
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnNativeEmbedGestureEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -4151,7 +4228,7 @@ HWTEST_F(WebModelTestNg, SetNativeEmbedMouseEventId, TestSize.Level1)
     WebModelNG webModelNG;
     auto NativeEmbedMouseEventId = [&callCount](const BaseEventInfo* info) { callCount++; };
     webModelNG.SetNativeEmbedMouseEventId(AccessibilityManager::RawPtr(frameNode), NativeEmbedMouseEventId);
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnNativeEmbedMouseEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -4205,7 +4282,7 @@ HWTEST_F(WebModelTestNg, SetPermissionRequestEventId028, TestSize.Level1)
     WebModelNG webModelNG;
     auto screenCaptureRequestEventId = [&callCount](const BaseEventInfo* info) { callCount++; };
     webModelNG.SetScreenCaptureRequestEventId(AccessibilityManager::RawPtr(frameNode), screenCaptureRequestEventId);
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnScreenCaptureRequestEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -4410,6 +4487,36 @@ HWTEST_F(WebModelTestNg, SetOnFileSelectorShow002, TestSize.Level1)
 
     auto mockEventInfo = std::make_shared<MockBaseEventInfo>();
     webEventHub->FireOnDetectedBlankScreenEvent(mockEventInfo);
+    EXPECT_TRUE(callbackCalled);
+#endif
+}
+
+/**
+ * @tc.name: SetOnMonitoredBlankScreenEvent
+ * @tc.desc: Test web_model_ng.cpp
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelTestNg, SetOnMonitoredBlankScreenEvent, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    bool callbackCalled = false;
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    WebModelNG webModelNG;
+    webModelNG.SetOnMonitoredBlankScreen(
+        AccessibilityManager::RawPtr(frameNode), [&callbackCalled](const BaseEventInfo* info) {
+            callbackCalled = true;
+        });
+ 
+    auto webEventHub = ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>();
+    ASSERT_NE(webEventHub, nullptr);
+ 
+    auto mockEventInfo = std::make_shared<MockBaseEventInfo>();
+    webEventHub->FireOnMonitoredBlankScreenEvent(mockEventInfo);
     EXPECT_TRUE(callbackCalled);
 #endif
 }
@@ -5637,6 +5744,28 @@ HWTEST_F(WebModelTestNg, SetOnDetectedBlankScreen001, TestSize.Level1)
 }
 
 /**
+ * @tc.name: SetOnMonitoredBlankScreen001
+ * @tc.desc: Test web_model_ng.cpp
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelTestNg, SetOnMonitoredBlankScreen001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    int callCount = 0;
+    WebModelNG webModelNG;
+    auto onMonitoredBlankScreen = [&callCount](const BaseEventInfo* info) {
+        callCount++;
+    };
+    webModelNG.SetOnMonitoredBlankScreen(std::move(onMonitoredBlankScreen));
+    auto mockEventInfo = std::make_shared<MockBaseEventInfo>();
+    auto webEventHub = ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>();
+    ASSERT_NE(webEventHub, nullptr);
+    webEventHub->FireOnMonitoredBlankScreenEvent(mockEventInfo);
+    EXPECT_NE(callCount, 0);
+#endif
+}
+
+/**
  * @tc.name: SetBlankScreenDetectionConfig001
  * @tc.desc: Test web_model_ng.cpp
  * @tc.type: FUNC
@@ -5656,6 +5785,54 @@ HWTEST_F(WebModelTestNg, SetBlankScreenDetectionConfig001, TestSize.Level1)
     webModelNG.SetBlankScreenDetectionConfig(true, {}, { 0 }, 1);
     BlankScreenDetectionConfig config { true, {}, { 0 }, 1 };
     EXPECT_EQ(webPattern->GetOrCreateWebProperty()->GetBlankScreenDetectionConfigValue(), config);
+#endif
+}
+
+/**
+ * @tc.name: SetWebBlankScreenMonitorEnabled001
+ * @tc.desc: Test web_model_ng.cpp
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelTestNg, SetWebBlankScreenMonitorEnabled001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+
+    WebModelNG webModelNG;
+    webModelNG.SetWebBlankScreenMonitorEnabled(false);
+    EXPECT_EQ(webPattern->GetOrCreateWebProperty()->CheckWebBlankScreenMonitorEnabled(false), true);
+    webModelNG.SetWebBlankScreenMonitorEnabled(true);
+    EXPECT_EQ(webPattern->GetOrCreateWebProperty()->CheckWebBlankScreenMonitorEnabled(true), true);
+#endif
+}
+
+/**
+ * @tc.name: SetWebBlankScreenMonitorEnabled002
+ * @tc.desc: Test web_model_ng.cpp
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelTestNg, SetWebBlankScreenMonitorEnabled002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+
+    WebModelNG webModelNG;
+    webModelNG.SetWebBlankScreenMonitorEnabled(AccessibilityManager::RawPtr(frameNode), false);
+    EXPECT_EQ(webPattern->GetOrCreateWebProperty()->CheckWebBlankScreenMonitorEnabled(false), true);
+    webModelNG.SetWebBlankScreenMonitorEnabled(AccessibilityManager::RawPtr(frameNode), true);
+    EXPECT_EQ(webPattern->GetOrCreateWebProperty()->CheckWebBlankScreenMonitorEnabled(true), true);
 #endif
 }
 
@@ -6501,6 +6678,82 @@ HWTEST_F(WebModelTestNg, SetEnableFullscreenVideoOverlay004, TestSize.Level1)
     WebModelNG webModelNG;
     webModelNG.SetEnableFullscreenVideoOverlay(AccessibilityManager::RawPtr(frameNode), false);
     EXPECT_EQ(webPattern->GetOrCreateWebProperty()->CheckFullScreenVideoOverlay(false), true);
+#endif
+}
+
+/**
+ * @tc.name: SetFlingSpeedLimit001
+ * @tc.desc: Test WebModelNG::SetFlingSpeedLimit updates WebPattern property.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelTestNg, SetFlingSpeedLimit001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+
+    WebModelNG webModelNG;
+    webModelNG.SetFlingSpeedLimit(5000.0f);
+    EXPECT_EQ(webPattern->GetOrCreateWebProperty()->CheckFlingSpeedLimit(5000.0f), true);
+#endif
+}
+
+/**
+ * @tc.name: SetFlingSpeedLimit002
+ * @tc.desc: Test WebModelNG::SetFlingSpeedLimit with different value updates property.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelTestNg, SetFlingSpeedLimit002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+
+    WebModelNG webModelNG;
+    webModelNG.SetFlingSpeedLimit(9000.0f);
+    EXPECT_EQ(webPattern->GetOrCreateWebProperty()->CheckFlingSpeedLimit(9000.0f), true);
+    EXPECT_NE(webPattern->GetOrCreateWebProperty()->CheckFlingSpeedLimit(5000.0f), true);
+#endif
+}
+
+/**
+ * @tc.name: SetFlingSpeedLimitInvalid001
+ * @tc.desc: Invalid fling speed values are normalized to the default sentinel.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelTestNg, SetFlingSpeedLimitInvalid001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+
+    WebModelNG webModelNG;
+    webModelNG.SetFlingSpeedLimit(std::numeric_limits<float>::quiet_NaN());
+    EXPECT_TRUE(webPattern->GetOrCreateWebProperty()->CheckFlingSpeedLimit(0.0f));
+    webModelNG.SetFlingSpeedLimit(std::numeric_limits<float>::infinity());
+    EXPECT_TRUE(webPattern->GetOrCreateWebProperty()->CheckFlingSpeedLimit(0.0f));
+    webModelNG.SetFlingSpeedLimit(-1.0f);
+    EXPECT_TRUE(webPattern->GetOrCreateWebProperty()->CheckFlingSpeedLimit(0.0f));
+    WebModelNG::SetFlingSpeedLimit(AceType::RawPtr(frameNode), 5000.0f);
+    EXPECT_TRUE(webPattern->GetOrCreateWebProperty()->CheckFlingSpeedLimit(5000.0f));
+    WebModelNG::SetFlingSpeedLimit(AceType::RawPtr(frameNode), std::numeric_limits<float>::infinity());
+    EXPECT_TRUE(webPattern->GetOrCreateWebProperty()->CheckFlingSpeedLimit(0.0f));
 #endif
 }
 } // namespace OHOS::Ace::NG

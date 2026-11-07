@@ -14,13 +14,19 @@
  */
 #include "core/components_ng/pattern/scrollable/scrollable_utils.h"
 
+#include <unordered_map>
+#include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/pattern/image/image_pattern.h"
 #include "core/components_ng/pattern/scrollable/scrollable_accessibility_utils.h"
+#include "core/components_ng/pattern/scrollable/scrollable_paint_property.h"
 #include "core/components_ng/syntax/if_else_node.h"
 #include "core/components_ng/syntax/lazy_for_each_node.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_2_node.h"
-#include "core/components_v2/inspector/inspector_constants.h"
 #include "core/pipeline_ng/pipeline_context.h"
+#include "base/utils/system_properties.h"
 namespace OHOS::Ace::NG {
+constexpr int32_t LOW_MEMORY_DECODE_THRESHOLD_GB = 8; // 8 : GiB
+
 namespace {
 Dimension FOCUS_SCROLL_MARGIN = 5.0_vp;
 
@@ -281,5 +287,79 @@ bool ScrollableUtils::IsChildLazy(const RefPtr<FrameNode>& frameNode, int32_t in
         }
     }
     return false;
+}
+
+std::optional<ImmersiveStrategy> ScrollableUtils::StrategyForClipHostTag(const std::string& tag)
+{
+    static const std::unordered_map<std::string, ImmersiveStrategy> tagMap = {
+        { "Grid", ImmersiveStrategy::GRID_EXPAND_SAFE_AREA },
+        { "List", ImmersiveStrategy::LIST_EXPAND_SAFE_AREA },
+        { "Scroll", ImmersiveStrategy::SCROLL_EXPAND_SAFE_AREA },
+        { "WaterFlow", ImmersiveStrategy::WATER_FLOW_EXPAND_SAFE_AREA },
+    };
+    auto it = tagMap.find(tag);
+    if (it != tagMap.end()) {
+        return it->second;
+    }
+    return std::nullopt;
+}
+
+ContentClipMode ScrollableUtils::ResolveEffectiveDefaultContentClip(
+    FrameNode* host, const ScrollablePaintProperty* props)
+{
+    CHECK_NULL_RETURN(props, ContentClipMode::CONTENT_ONLY);
+    const auto builtInDefault = props->GetDefaultContentClip();
+    CHECK_NULL_RETURN(host, builtInDefault);
+    const auto strategy = StrategyForClipHostTag(host->GetTag());
+    if (!strategy.has_value()) {
+        return builtInDefault;
+    }
+    const auto pipeline = host->GetContext();
+    CHECK_NULL_RETURN(pipeline, builtInDefault);
+    return pipeline->IsImmersiveStrategySet(*strategy) ? ContentClipMode::SAFE_AREA : builtInDefault;
+}
+
+ContentClipMode ScrollableUtils::ResolveEffectiveDefaultContentClip(
+    const RefPtr<FrameNode>& host, const ScrollablePaintProperty* props)
+{
+    return ResolveEffectiveDefaultContentClip(AceType::RawPtr(host), props);
+}
+
+bool ScrollableUtils::IsLowMemoryDevice(int32_t deviceMemoryGiB)
+{
+    return deviceMemoryGiB > 0 && deviceMemoryGiB <= LOW_MEMORY_DECODE_THRESHOLD_GB;
+}
+
+bool ScrollableUtils::IsLowMemoryDeviceRuntime()
+{
+    static bool cached = IsLowMemoryDevice(SystemProperties::GetBootVendorDdrSize());
+    return cached;
+}
+
+int32_t ScrollableUtils::CalcDecodeWindowCount(int32_t cacheCount)
+{
+    if (cacheCount <= 0) {
+        return 0;
+    }
+    int32_t window = (cacheCount + 4) / 5;
+    if (window < 1) {
+        window = 1;
+    }
+    if (window > cacheCount) {
+        window = cacheCount;
+    }
+    return window;
+}
+
+void ScrollableUtils::UpdateCachedItemDecodeState(const RefPtr<FrameNode>& root, bool active)
+{
+    CHECK_NULL_VOID(root);
+    auto pattern = root->GetPattern<ImagePattern>();
+    if (pattern) {
+        pattern->SetDecodeCacheActive(active);
+    }
+    for (const auto& child : root->GetChildren()) {
+        UpdateCachedItemDecodeState(AceType::DynamicCast<FrameNode>(child), active);
+    }
 }
 } // namespace OHOS::Ace::NG

@@ -28,7 +28,7 @@ class ThemeConstants;
  * SliderTheme defines color and styles of SliderComponent. SliderTheme should be built
  * using SliderTheme::Builder.
  */
-class SliderTheme : public virtual Theme {
+class SliderTheme : public Theme {
     DECLARE_ACE_TYPE(SliderTheme, Theme);
 
 public:

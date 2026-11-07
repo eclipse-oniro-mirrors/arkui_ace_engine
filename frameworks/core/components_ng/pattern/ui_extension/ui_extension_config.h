@@ -50,6 +50,12 @@ enum class BusinessDataSendType : uint32_t {
     SYNC,
 };
 
+enum class DpiFollowStrategy : int32_t {
+    FOLLOW_HOST_DPI = 0,
+    FOLLOW_UI_EXTENSION_ABILITY_DPI = 1,
+    FOLLOW_HOST_DPI_ALL = 2,
+};
+
 enum class UIContentBusinessCode : uint32_t {
     UNDEFINED = 0,
     SEND_STATAUSBAR_TYPE = 1,
@@ -60,6 +66,8 @@ enum class UIContentBusinessCode : uint32_t {
     // avoid info business begin
     NOTIFY_AVOID_INFO_CHANGE = 3001,
     GET_AVOID_INFO = 3002,
+    // brand color business
+    NOTIFY_BRAND_COLOR_CHANGE = 4001,
     // extension window code from 10000 to 20000
     WINDOW_CODE_BEGIN = 10000,
     WINDOW_CODE_END = 20000,

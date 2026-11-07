@@ -500,4 +500,134 @@ HWTEST_F(SwiperCommonTestTwoNg, UpdateAnimationProperty001, TestSize.Level1)
     pattern_->UpdateAnimationProperty(100);
     EXPECT_EQ(pattern_->targetIndex_, 0);
 }
+
+/**
+ * @tc.name: SidebarContentEmptyPreserveTargetIndex001
+ * @tc.desc: In Tabs sidebar mode when contentMainSize_ is zero, SwipeTo sets targetIndex_ and
+ *           BeforeCreateLayoutWrapper must NOT override it with jumpIndex_ (which would reset
+ *           targetIndex_ and lose the pending tab switch).
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperCommonTestTwoNg, SidebarContentEmptyPreserveTargetIndex001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create swiper with 6 items.
+     */
+    SwiperModelNG model = CreateSwiper();
+    CreateSwiperItems(6);
+    CreateSwiperDone();
+
+    /**
+     * @tc.steps: step2. Simulate Tabs sidebar mode where sidebar width >= container width.
+     *           contentMainSize_ is 0, itemPosition_ is empty, isTabsSidebarDisplayMode_ is true.
+     */
+    pattern_->isTabsSidebarDisplayMode_ = true;
+    pattern_->contentMainSize_ = 0.0f;
+    pattern_->itemPosition_.clear();
+    pattern_->isVoluntarilyClear_ = false;
+    ASSERT_TRUE(pattern_->itemPosition_.empty());
+
+    /**
+     * @tc.steps: step3. SwipeTo sets targetIndex_ to 3.
+     *           isTabsSidebarDisplayMode_ bypasses the IsVisibleChildrenSizeLessThanSwiper early return.
+     * @tc.expected: targetIndex_ is set to 3.
+     */
+    pattern_->SwipeTo(3);
+    ASSERT_TRUE(pattern_->targetIndex_.has_value());
+    EXPECT_EQ(pattern_->targetIndex_.value(), 3);
+
+    /**
+     * @tc.steps: step4. Trigger BeforeCreateLayoutWrapper which would normally reset targetIndex_
+     *           when itemPosition_ is empty.
+     * @tc.expected: The sidebar guard prevents jumpIndex_ from being set, so targetIndex_ is preserved.
+     */
+    pattern_->BeforeCreateLayoutWrapper();
+    EXPECT_TRUE(pattern_->targetIndex_.has_value());
+    EXPECT_EQ(pattern_->targetIndex_.value(), 3);
+    EXPECT_FALSE(pattern_->jumpIndex_.has_value());
+}
+
+/**
+ * @tc.name: SidebarContentEmptyPreserveTargetIndex002
+ * @tc.desc: Without the sidebar guard (isTabsSidebarDisplayMode_ = false), the old behavior is
+ *           preserved: when itemPosition_ is empty and contentMainSize_ is zero,
+ *           BeforeCreateLayoutWrapper sets jumpIndex_ and resets targetIndex_.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperCommonTestTwoNg, SidebarContentEmptyPreserveTargetIndex002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create swiper with 6 items.
+     */
+    SwiperModelNG model = CreateSwiper();
+    CreateSwiperItems(6);
+    CreateSwiperDone();
+
+    /**
+     * @tc.steps: step2. Simulate non-sidebar scenario where contentMainSize_ is zero.
+     *           isTabsSidebarDisplayMode_ is false (normal swiper, not Tabs sidebar mode).
+     */
+    pattern_->isTabsSidebarDisplayMode_ = false;
+    pattern_->contentMainSize_ = 0.0f;
+    pattern_->itemPosition_.clear();
+    pattern_->isVoluntarilyClear_ = false;
+    ASSERT_TRUE(pattern_->itemPosition_.empty());
+
+    /**
+     * @tc.steps: step3. Manually set targetIndex_ (simulating what SwipeTo would do).
+     */
+    pattern_->targetIndex_ = std::make_optional<int>(3);
+    ASSERT_TRUE(pattern_->targetIndex_.has_value());
+
+    /**
+     * @tc.steps: step4. Trigger BeforeCreateLayoutWrapper.
+     * @tc.expected: Without the sidebar guard, jumpIndex_ is set and targetIndex_ is reset.
+     *           This confirms the guard only affects sidebar mode.
+     */
+    pattern_->BeforeCreateLayoutWrapper();
+    EXPECT_FALSE(pattern_->targetIndex_.has_value());
+    EXPECT_TRUE(pattern_->jumpIndex_.has_value());
+}
+
+/**
+ * @tc.name: SidebarContentEmptySwipeToWithoutAnimation001
+ * @tc.desc: In Tabs sidebar mode when contentMainSize_ is zero, SwipeToWithoutAnimation sets
+ *           jumpIndex_ and BeforeCreateLayoutWrapper must preserve the pending targetIndex_.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperCommonTestTwoNg, SidebarContentEmptySwipeToWithoutAnimation001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create swiper with 6 items.
+     */
+    SwiperModelNG model = CreateSwiper();
+    CreateSwiperItems(6);
+    CreateSwiperDone();
+
+    /**
+     * @tc.steps: step2. Simulate Tabs sidebar mode where sidebar width >= container width.
+     */
+    pattern_->isTabsSidebarDisplayMode_ = true;
+    pattern_->contentMainSize_ = 0.0f;
+    pattern_->itemPosition_.clear();
+    pattern_->isVoluntarilyClear_ = false;
+    ASSERT_TRUE(pattern_->itemPosition_.empty());
+
+    /**
+     * @tc.steps: step3. SwipeToWithoutAnimation sets jumpIndex_ directly.
+     *           isTabsSidebarDisplayMode_ bypasses the IsVisibleChildrenSizeLessThanSwiper early return.
+     * @tc.expected: jumpIndex_ is set to 4.
+     */
+    pattern_->SwipeToWithoutAnimation(4);
+    ASSERT_TRUE(pattern_->jumpIndex_.has_value());
+    EXPECT_EQ(pattern_->jumpIndex_.value(), 4);
+
+    /**
+     * @tc.steps: step4. When jumpIndex_ has a value, BeforeCreateLayoutWrapper consumes it and
+     *           resets targetIndex_. This is the expected flow for SwipeToWithoutAnimation —
+     *           the tab switch is recorded via jumpIndex_, not targetIndex_.
+     * @tc.expected: jumpIndex_ is consumed, targetIndex_ is not set (or reset).
+     */
+    EXPECT_FALSE(pattern_->targetIndex_.has_value());
+}
 } // namespace OHOS::Ace::NG

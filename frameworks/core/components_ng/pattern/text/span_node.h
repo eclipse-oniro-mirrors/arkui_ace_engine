@@ -349,6 +349,60 @@ public:                                                                \
         spanItem_->MarkReCreateParagraph();                            \
     }
 
+namespace OHOS::Ace {
+namespace NG {
+class BaseSpan;
+}
+
+// A span capability shares its owning node's lifetime.
+// RefPtr and WeakPtr retain their original storage and public interfaces.
+template<>
+struct RefPtrTraits<NG::BaseSpan> {
+    static NG::UINode* GetOwner(const NG::BaseSpan* view);
+
+    template<class T>
+    class SpanAccess final {
+    public:
+        explicit SpanAccess(T* view) : guard_(GetOwner(view)), view_(view) {}
+        T* operator->() const
+        {
+            return view_;
+        }
+        SpanAccess(const SpanAccess&) = delete;
+        SpanAccess& operator=(const SpanAccess&) = delete;
+
+    private:
+        LifeCycleCheckable::PtrHolder<NG::UINode> guard_;
+        T* view_;
+    };
+
+    static SpanAccess<NG::BaseSpan> Access(NG::BaseSpan* view)
+    {
+        return SpanAccess<NG::BaseSpan>(view);
+    }
+
+    template<class T>
+    static T* DynamicCast(NG::BaseSpan* view)
+    {
+        return TypeInfoHelper::DynamicCast<std::remove_const_t<T>>(view);
+    }
+
+    template<class T>
+    static const T* DynamicCast(const NG::BaseSpan* view)
+    {
+        return TypeInfoHelper::DynamicCast<std::remove_const_t<T>>(view);
+    }
+};
+
+template<>
+struct RefPtrTraits<const NG::BaseSpan> : RefPtrTraits<NG::BaseSpan> {
+    static SpanAccess<const NG::BaseSpan> Access(const NG::BaseSpan* view)
+    {
+        return SpanAccess<const NG::BaseSpan>(view);
+    }
+};
+} // namespace OHOS::Ace
+
 namespace OHOS::Ace::NG {
 using FONT_FEATURES_LIST = std::list<std::pair<std::string, int32_t>>;
 class InspectorFilter;
@@ -769,12 +823,16 @@ private:
     RefPtr<PatternResourceManager> resourceMgr_;
 };
 
-class ACE_EXPORT BaseSpan : public virtual AceType {
-    DECLARE_ACE_TYPE(BaseSpan, AceType);
+class ACE_EXPORT BaseSpan : public virtual TypeInfoBase {
+    DECLARE_ACE_TYPE(BaseSpan, TypeInfoBase);
 
 public:
+    ~BaseSpan() override = default;
+    ACE_DISALLOW_COPY_AND_MOVE(BaseSpan);
+
     explicit BaseSpan(int32_t id) : groupId_(id)
     {}
+
     virtual void MarkTextDirty() = 0;
     virtual void SetTextBackgroundStyle(const TextBackgroundStyle& style);
     virtual void UpdateTextBackgroundFromParent(const std::optional<TextBackgroundStyle>& style)
@@ -815,7 +873,7 @@ public:
         std::function<void(const RefPtr<ResourceObject>&)>&& updateFunc)
     {
         if (resourceMgr_ == nullptr) {
-            resourceMgr_ = MakeRefPtr<PatternResourceManager>();
+            resourceMgr_ = AceType::MakeRefPtr<PatternResourceManager>();
         }
         resourceMgr_->AddResource(key, resObj, std::move(updateFunc));
     }
@@ -823,7 +881,7 @@ public:
     void AddResCache(const std::string& key, const std::string& value)
     {
         if (resourceMgr_ == nullptr) {
-            resourceMgr_ = MakeRefPtr<PatternResourceManager>();
+            resourceMgr_ = AceType::MakeRefPtr<PatternResourceManager>();
         }
         resourceMgr_->AddResCache(key, value);
     }
@@ -847,6 +905,11 @@ public:
     }
 
 private:
+    friend UINode* RefPtrTraits<BaseSpan>::GetOwner(const BaseSpan* view);
+
+    // Stable owner for the entire capability lifetime.
+    virtual UINode* GetSpanOwner() const = 0;
+
     std::optional<TextBackgroundStyle> textBackgroundStyle_;
     RefPtr<PatternResourceManager> resourceMgr_;
     int32_t groupId_ = 0;
@@ -1211,6 +1274,11 @@ protected:
     void DumpInfo(std::unique_ptr<JsonValue>& json) override;
 
 private:
+    UINode* GetSpanOwner() const override
+    {
+        return const_cast<SpanNode*>(this);
+    }
+
     std::list<RefPtr<SpanNode>> spanChildren_;
     RefPtr<SpanItem> spanItem_ = MakeRefPtr<SpanItem>();
     std::vector<int32_t> symbolFontColorResObjIndexArr_;
@@ -1579,8 +1647,20 @@ public:
     void UpdatePropertyImpl(const std::string& key, RefPtr<PropertyValueBase> value);
 
 private:
+    UINode* GetSpanOwner() const override
+    {
+        return const_cast<ContainerSpanNode*>(this);
+    }
+
     ACE_DISALLOW_COPY_AND_MOVE(ContainerSpanNode);
 };
 } // namespace OHOS::Ace::NG
+
+namespace OHOS::Ace {
+inline NG::UINode* RefPtrTraits<NG::BaseSpan>::GetOwner(const NG::BaseSpan* view)
+{
+    return view ? view->GetSpanOwner() : nullptr;
+}
+} // namespace OHOS::Ace
 
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_SYNTAX_FOR_EACH_NODE_H

@@ -429,6 +429,41 @@ HWTEST_F(ScrollAccessibilityTestNg, ScrollA11ySourceUserSwipe001, TestSize.Level
 }
 
 /**
+ * @tc.name: ScrollA11ySourceUserAxisEdge001
+ * @tc.desc: Verify SCROLL_END extraEventInfo["scrollSource"]=="user" when mouse wheel
+ *           (SCROLL_FROM_AXIS) keeps scrolling while Scroll already stays at edge,
+ *           where no offset is applied by UpdateCurrentOffset.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollAccessibilityTestNg, ScrollA11ySourceUserAxisEdge001, TestSize.Level1)
+{
+    AceApplicationInfo::GetInstance().SetAccessibilityEnabled(true);
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    auto pipeline = MockPipelineContext::GetCurrent();
+    auto scrollable = pattern_->GetScrollable();
+    ASSERT_NE(scrollable, nullptr);
+    EXPECT_TRUE(pattern_->IsAtTop());
+
+    /**
+     * @tc.steps: step1. Wheel scroll towards the top edge while already at top:
+     *           the axis animator starts, an axis frame is rejected at edge,
+     *           then the axis scrolling finishes.
+     * @tc.expected: SCROLL_END event with scrollSource="user" is fired.
+     */
+    auto captured = CaptureSendAccessibilityEventInfo(pipeline);
+    scrollable->ProcessAxisUpdateEvent(ITEM_MAIN_SIZE);
+    scrollable->HandleScroll(ITEM_MAIN_SIZE, SCROLL_FROM_AXIS, NestedState::GESTURE);
+    EXPECT_EQ(pattern_->GetAccessibilityScrollSource(), "user");
+    scrollable->ProcessScrollMotionStop(SCROLL_FROM_AXIS);
+    FlushUITasks();
+    EXPECT_EQ(captured->type, AccessibilityEventType::SCROLL_END);
+    EXPECT_EQ(captured->extraEventInfo["scrollSource"], "user");
+    EXPECT_TRUE(pattern_->GetAccessibilityScrollSource().empty());
+}
+
+/**
  * @tc.name: ScrollA11ySourceApiFling001
  * @tc.desc: Verify SCROLL_END extraEventInfo["scrollSource"]=="api" for Fling in Scroll.
  * @tc.type: FUNC
@@ -721,5 +756,71 @@ HWTEST_F(ScrollAccessibilityTestNg, ScrollA11yScrollBarDragBounceBack001, TestSi
     for (const auto& source : scrollEndSources) {
         EXPECT_FALSE(source.empty()) << "scrollSource should not be empty";
     }
+}
+
+/**
+ * @tc.name: ScrollA11ySourceMouseWheelSnap001
+ * @tc.desc: Mouse-wheel scrolling on a Scroll with scrollSnap must report
+ *           scrollSource="user" (not empty) in the SCROLL_END accessibility event.
+ *           The wheel routes through the snap animation whose per-frame source is
+ *           source-neutral (SCROLL_FROM_ANIMATION), so the user-gesture source is
+ *           applied when the snap animation starts.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollAccessibilityTestNg, ScrollA11ySourceMouseWheelSnap001, TestSize.Level1)
+{
+    AceApplicationInfo::GetInstance().SetAccessibilityEnabled(true);
+    ScrollModelNG model = CreateScroll();
+    model.SetScrollSnap(ScrollSnapAlign::START, Dimension(ITEM_MAIN_SIZE), {}, { true, true });
+    CreateContent();
+    CreateScrollDone();
+    auto scrollable = pattern_->GetScrollableEvent()->GetScrollable();
+    auto pipeline = MockPipelineContext::GetCurrent();
+
+    /**
+     * @tc.steps: step1. Capture all SCROLL_END accessibility events.
+     */
+    std::vector<std::string> scrollEndSources;
+    EXPECT_CALL(*pipeline, SendEventToAccessibility(_))
+        .WillRepeatedly(testing::Invoke([&](const AccessibilityEvent& event) {
+            if (event.type == AccessibilityEventType::SCROLL_END) {
+                auto it = event.extraEventInfo.find("scrollSource");
+                if (it != event.extraEventInfo.end()) {
+                    scrollEndSources.push_back(it->second);
+                } else {
+                    scrollEndSources.push_back("");
+                }
+            }
+        }));
+
+    /**
+     * @tc.steps: step2. Simulate a mouse-wheel (AXIS) gesture that triggers scrollSnap.
+     */
+    MockAnimationManager::GetInstance().SetTicks(TICK);
+    // Bump the mock vsync: ProcessAxisUpdateEvent skips a wheel tick whose vsync equals
+    // the previous one, and the mock vsyncTime_ defaults to 0.
+    pipeline->SetVsyncTime(1);
+    GestureEvent wheel;
+    wheel.SetInputEventType(InputEventType::AXIS);
+    wheel.SetSourceTool(SourceTool::MOUSE);
+    wheel.SetGlobalPoint(Point(0, HEIGHT / 2));
+    wheel.SetGlobalLocation({ 0, HEIGHT / 2 });
+    wheel.SetLocalLocation({ 0, HEIGHT / 2 });
+    scrollable->HandleDragStart(wheel);
+    FlushUITasks();
+
+    wheel.SetMainDelta(-ITEM_MAIN_SIZE);
+    wheel.SetMainVelocity(-200);
+    scrollable->HandleDragUpdate(wheel);
+    FlushUITasks();
+
+    scrollable->HandleDragEnd(wheel);
+    TickToFinish();
+
+    /**
+     * @tc.expected: The snap-triggered SCROLL_END carries scrollSource="user".
+     */
+    ASSERT_FALSE(scrollEndSources.empty());
+    EXPECT_EQ(scrollEndSources.back(), "user") << "mouse-wheel snap scrollSource should be user";
 }
 } // namespace OHOS::Ace::NG

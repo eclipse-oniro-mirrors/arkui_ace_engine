@@ -27,7 +27,7 @@ enum class SplitType {
     COLUMN_SPLIT,
 };
 
-class ACE_EXPORT SplitContainerComponent : virtual public ComponentGroup {
+class ACE_EXPORT SplitContainerComponent : public ComponentGroup {
     DECLARE_ACE_TYPE(SplitContainerComponent, ComponentGroup);
 
 public:

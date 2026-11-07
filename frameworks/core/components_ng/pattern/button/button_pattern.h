@@ -216,6 +216,8 @@ public:
     bool IsDynamicSwitchButtonStyle(const BorderWidthProperty& width, RefPtr<ButtonTheme>& buttonTheme);
 
     void DumpInfo() override;
+    void DumpInfo(std::unique_ptr<JsonValue>& json) override;
+    bool HasSystemMaterial() const;
 
     void DumpSubInfo(RefPtr<ButtonLayoutProperty> layoutProperty);
 
@@ -246,6 +248,7 @@ public:
     }
 
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
 
     void ReportButtonClickResult();
 

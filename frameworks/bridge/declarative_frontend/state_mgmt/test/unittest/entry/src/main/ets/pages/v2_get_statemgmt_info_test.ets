@@ -16,7 +16,7 @@
 import { TestRunner } from '../../lib/testRunner'
 import { PageController } from '../../lib/pageController'
 import { getStateMgmtInfoTests } from '../../common_tests/getStateMgmtInfoTests'
-import router from '@system.router'
+import { router } from '@kit.ArkUI'
 
 const json: string = '{"groupId":"7578","userId":null,"comment_group_id":7577,"isCommonRequest":true}';
 const nestedJson: string = '{"a":{"b":{"groupId":"888"}}}';

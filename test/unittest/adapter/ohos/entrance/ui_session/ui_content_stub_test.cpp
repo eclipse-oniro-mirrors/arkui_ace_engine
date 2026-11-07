@@ -22,13 +22,17 @@
 
 #include "interfaces/inner_api/ui_session/ui_content_stub_impl.h"
 #include "interfaces/inner_api/ui_session/ui_content_proxy.h"
+#include "interfaces/inner_api/ui_session/ui_report_proxy.h"
 #include "interfaces/inner_api/ui_session/ui_report_stub.h"
+#include "interfaces/inner_api/ui_session/ui_session_json_util.h"
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
+#include "interfaces/inner_api/ui_session/component_tree_query_type.h"
 #include "interfaces/inner_api/ui_session/ui_session_request_guard.h"
 #include "adapter/ohos/entrance/ui_session/ui_translate_request_util.h"
 #include "test/mock/interfaces/inner_api/ui_session/mock_ui_session_manager.h"
 
 #include "accesstoken_kit.h"
+#include "ipc_skeleton.h"
 
 #include <functional>
 #include <memory>
@@ -68,6 +72,11 @@ constexpr int64_t TRANSLATE_SECOND_VERSION = 2;
 constexpr int64_t TRANSLATE_THIRD_VERSION = 3;
 constexpr int64_t TRANSLATE_LARGE_VERSION = 3000000000;
 
+constexpr uint32_t UI_SA_UID = 16666;
+constexpr uint32_t MSDP_UID = 6699;
+constexpr uint32_t APP_CONTROLLER_SERVICE_UID = 7101;
+constexpr uint32_t UNTRUSTED_CALLER_UID = 1000;
+
 struct TranslateScopeTestData {
     int32_t scope;
     bool expected;
@@ -101,7 +110,18 @@ void PrepareValidUiSessionParcel(MessageParcel& data)
 }
 } // namespace
 
-class UIContentStubTest : public testing::Test {};
+class UIContentStubTest : public testing::Test {
+public:
+    void SetUp() override
+    {
+        IPCSkeleton::mockCallingUid_ = UI_SA_UID;
+    }
+
+    void TearDown() override
+    {
+        IPCSkeleton::mockCallingUid_ = 0;
+    }
+};
 
 /**
  * @tc.name: UIContentStubTest001
@@ -1400,17 +1420,17 @@ HWTEST_F(UIContentStubTest, UIContentStubTest045, TestSize.Level1)
 HWTEST_F(UIContentStubTest, UIContentStubTest046, TestSize.Level1)
 {
     const TranslateResultParseTestData testData[] = {
-        { R"({"nodeId":6,"version":0,"translatedText":"\u6807\u9898"})", true, 1 },
-        { R"({"nodeId":7,"version":2,"text":"详情中文"})", true, 1 },
-        { R"({"results":[{"nodeId":6,"version":1,"translatedText":"\u6807\u9898"},)"
-          R"({"nodeId":13,"version":1,"text":"输入框提示"}]})",
+        { R"({"nodeId":6, "version":0, "translatedText":"\u6807\u9898"})", true, 1 },
+        { R"({"nodeId":7, "version":2, "text":"详情中文"})", true, 1 },
+        { R"({"results":[{"nodeId":6, "version":1, "translatedText":"\u6807\u9898"},)"
+          R"({"nodeId":13, "version":1, "text":"输入框提示"}]})",
             true, 2 },
-        { R"([{"nodeId":6,"version":3,"translatedText":"标题"},{"nodeId":7,"version":3,"text":"详情"}])", true, 2 },
+        { R"([{"nodeId":6, "version":3, "translatedText":"标题"}, {"nodeId":7, "version":3, "text":"详情"}])", true, 2 },
         { R"({"results":[]})", false, 0 },
-        { R"({"results":[1,false]})", false, 0 },
-        { R"({"version":1,"translatedText":"标题"})", false, 0 },
-        { R"({"nodeId":6,"translatedText":"标题"})", false, 0 },
-        { R"({"nodeId":6,"version":1,"translatedText":""})", false, 0 },
+        { R"({"results":[1, false]})", false, 0 },
+        { R"({"version":1, "translatedText":"标题"})", false, 0 },
+        { R"({"nodeId":6, "translatedText":"标题"})", false, 0 },
+        { R"({"nodeId":6, "version":1, "translatedText":""})", false, 0 },
         { R"("invalid")", false, 0 },
     };
 
@@ -1422,8 +1442,8 @@ HWTEST_F(UIContentStubTest, UIContentStubTest046, TestSize.Level1)
 
     std::vector<TranslateResult> results;
     ASSERT_TRUE(PageTranslateRequestUtil::ParseTranslateResults(
-        R"({"results":[{"nodeId":6,"version":3000000000,"translatedText":"\u6807\u9898"},)"
-        R"({"nodeId":13,"version":2,"text":"输入框提示"}]})",
+        R"({"results":[{"nodeId":6, "version":3000000000, "translatedText":"\u6807\u9898"},)"
+        R"({"nodeId":13, "version":2, "text":"输入框提示"}]})",
         results));
     ASSERT_EQ(results.size(), 2U);
     EXPECT_EQ(results[0].nodeId, 6);
@@ -1442,22 +1462,22 @@ HWTEST_F(UIContentStubTest, UIContentStubTest046, TestSize.Level1)
 HWTEST_F(UIContentStubTest, UIContentStubTest047, TestSize.Level1)
 {
     const TranslateResultIdentityTestData testData[] = {
-        { R"({"nodeId":6,"version":0,"translatedText":"\u6807\u9898"})",
+        { R"({"nodeId":6, "version":0, "translatedText":"\u6807\u9898"})",
             { { TRANSLATE_TITLE_NODE_ID, TRANSLATE_SNAPSHOT_VERSION } } },
-        { R"({"results":[{"nodeId":6,"version":1,"translatedText":"\u6807\u9898"},)"
-          R"({"nodeId":13,"version":2,"text":"输入框提示"},{"nodeId":16,"version":0,"text":"按钮"}]})",
+        { R"({"results":[{"nodeId":6, "version":1, "translatedText":"\u6807\u9898"},)"
+          R"({"nodeId":13, "version":2, "text":"输入框提示"}, {"nodeId":16, "version":0, "text":"按钮"}]})",
             { { TRANSLATE_TITLE_NODE_ID, TRANSLATE_FIRST_VERSION },
                 { TRANSLATE_PLACEHOLDER_NODE_ID, TRANSLATE_SECOND_VERSION },
                 { TRANSLATE_BUTTON_NODE_ID, TRANSLATE_SNAPSHOT_VERSION } } },
-        { R"([{"nodeId":6,"version":3,"translatedText":"标题"},{"nodeId":13,"version":2,"text":"详情"}])",
+        { R"([{"nodeId":6, "version":3, "translatedText":"标题"}, {"nodeId":13, "version":2, "text":"详情"}])",
             { { TRANSLATE_TITLE_NODE_ID, TRANSLATE_THIRD_VERSION },
                 { TRANSLATE_PLACEHOLDER_NODE_ID, TRANSLATE_SECOND_VERSION } } },
-        { R"({"nodeId":6,"version":3000000000,"translatedText":"标题"})",
+        { R"({"nodeId":6, "version":3000000000, "translatedText":"标题"})",
             { { TRANSLATE_TITLE_NODE_ID, TRANSLATE_LARGE_VERSION } } },
-        { R"({"results":[{"nodeId":-1,"version":1},{"nodeId":16,"version":0},{"nodeId":)"
+        { R"({"results":[{"nodeId":-1, "version":1}, {"nodeId":16, "version":0}, {"nodeId":)"
           R"(7}]})",
             { { TRANSLATE_BUTTON_NODE_ID, TRANSLATE_SNAPSHOT_VERSION } } },
-        { R"({"nodeId":6,"translatedText":"missing version"})", {} },
+        { R"({"nodeId":6, "translatedText":"missing version"})", {} },
         { R"({"results":[]})", {} },
         { R"("invalid")", {} },
         { R"(invalid json)", {} },
@@ -1522,7 +1542,7 @@ HWTEST_F(UIContentStubTest, UIContentStubTest049, TestSize.Level1)
         std::function<void(MessageParcel&)> writePayload;
         std::function<void()> expectCall;
     };
-    const std::string translateResult = R"({"nodeId":6,"version":1,"translatedText":"标题"})";
+    const std::string translateResult = R"({"nodeId":6, "version":1, "translatedText":"标题"})";
     const ControlTransactionCase testData[] = {
         {
             IUiContentService::END_PAGE_TRANSLATE,
@@ -1675,4 +1695,1555 @@ HWTEST_F(UIContentStubTest, UIContentStubTest054, TestSize.Level1)
     EXPECT_EQ(receivedSize, 0u);
 }
 
+/**
+ * @tc.name: UIContentStubTestGetNavigationContentByPoint001
+ * @tc.desc: Test GET_NAVIGATION_CONTENT_BY_POINT IPC dispatch with parameters.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestGetNavigationContentByPoint001, TestSize.Level1)
+{
+    sptr<UIContentServiceStubImpl> ptr = std::make_shared<UIContentServiceStubImpl>();
+    MessageParcel data = MessageParcel();
+    MessageParcel reply = MessageParcel();
+    MessageOption option = MessageOption();
+
+    auto res = ptr->OnRemoteRequest(0, data, reply, option);
+    EXPECT_EQ(res, -1);
+
+    Security::AccessToken::AccessTokenKit::mockTokenTypeFlag_ = Security::AccessToken::ATokenTypeEnum::TOKEN_NATIVE;
+    data.WriteInterfaceToken(u"ohos.ace.UIContentService");
+    data.WriteFloat(100.0f);
+    data.WriteFloat(200.0f);
+    data.WriteString("nav.*");
+
+    res = ptr->OnRemoteRequest(IUiContentService::GET_NAVIGATION_CONTENT_BY_POINT, data, reply, option);
+    EXPECT_EQ(res, 0);
+    EXPECT_EQ(reply.ReadInt32(), 0);
 }
+
+/**
+ * @tc.name: UIContentStubTestGetLazyForEachDataByPoint001
+ * @tc.desc: Test GET_LAZY_FOREACH_DATA_BY_POINT IPC dispatch with parameters.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestGetLazyForEachDataByPoint001, TestSize.Level1)
+{
+    sptr<UIContentServiceStubImpl> ptr = std::make_shared<UIContentServiceStubImpl>();
+    MessageParcel data = MessageParcel();
+    MessageParcel reply = MessageParcel();
+    MessageOption option = MessageOption();
+
+    auto res = ptr->OnRemoteRequest(0, data, reply, option);
+    EXPECT_EQ(res, -1);
+
+    Security::AccessToken::AccessTokenKit::mockTokenTypeFlag_ = Security::AccessToken::ATokenTypeEnum::TOKEN_NATIVE;
+    data.WriteInterfaceToken(u"ohos.ace.UIContentService");
+    data.WriteFloat(50.0f);
+    data.WriteFloat(75.0f);
+
+    res = ptr->OnRemoteRequest(IUiContentService::GET_LAZY_FOREACH_DATA_BY_POINT, data, reply, option);
+    EXPECT_EQ(res, 0);
+    EXPECT_EQ(reply.ReadInt32(), 0);
+}
+
+/**
+ * @tc.name: UIContentStubTestGetNodesInRect001
+ * @tc.desc: Test GET_NODES_IN_RECT IPC dispatch with parameters.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestGetNodesInRect001, TestSize.Level1)
+{
+    sptr<UIContentServiceStubImpl> ptr = std::make_shared<UIContentServiceStubImpl>();
+    MessageParcel data = MessageParcel();
+    MessageParcel reply = MessageParcel();
+    MessageOption option = MessageOption();
+
+    auto res = ptr->OnRemoteRequest(0, data, reply, option);
+    EXPECT_EQ(res, -1);
+
+    Security::AccessToken::AccessTokenKit::mockTokenTypeFlag_ = Security::AccessToken::ATokenTypeEnum::TOKEN_NATIVE;
+    data.WriteInterfaceToken(u"ohos.ace.UIContentService");
+    data.WriteFloat(0.0f);
+    data.WriteFloat(0.0f);
+    data.WriteFloat(100.0f);
+    data.WriteFloat(100.0f);
+
+    res = ptr->OnRemoteRequest(IUiContentService::GET_NODES_IN_RECT, data, reply, option);
+    EXPECT_EQ(res, 0);
+    EXPECT_EQ(reply.ReadInt32(), 0);
+}
+
+/**
+ * @tc.name: UIContentStubTestPageSceneDualRuleSet001
+ * @tc.desc: A merged presence event dispatches only each callback's registered ruleSet evidence.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestPageSceneDualRuleSet001, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    int32_t callbackACount = 0;
+    int32_t callbackBCount = 0;
+    std::string lastA;
+    std::string lastB;
+    report->RegisterPageSceneEventCallback("search-set-a",
+        [&callbackACount, &lastA](const std::string& data) {
+            ++callbackACount;
+            lastA = data;
+        });
+    report->RegisterPageSceneEventCallback("search-set-b",
+        [&callbackBCount, &lastB](const std::string& data) {
+            ++callbackBCount;
+            lastB = data;
+        });
+
+    const std::string mergedJson = R"({"eventType":"presence", "hasSearch":true, "pageName":"Home",
+        "hits":[{"ruleSetId":"search-set-a", "ruleId":"r1"},
+                {"ruleSetId":"search-set-b", "ruleId":"r1"}]})";
+    report->ReportPageSceneEvent(mergedJson, false);
+    EXPECT_EQ(callbackACount, 1);
+    EXPECT_EQ(callbackBCount, 1);
+    for (const auto& [payload, ruleSetId] :
+        { std::make_pair(lastA, "search-set-a"), std::make_pair(lastB, "search-set-b") }) {
+        auto root = InspectorJsonUtil::ParseJsonString(payload);
+        ASSERT_TRUE(root->IsObject());
+        EXPECT_EQ(root->GetString("eventType"), "presence");
+        EXPECT_EQ(root->GetString("pageName"), "Home");
+        EXPECT_EQ(root->GetValue("hasSearch")->ToString(), "true");
+        auto hits = root->GetValue("hits");
+        ASSERT_EQ(hits->GetArraySize(), 1);
+        EXPECT_EQ(hits->GetArrayItem(0)->GetString("ruleSetId"), ruleSetId);
+        EXPECT_EQ(hits->GetArrayItem(0)->GetString("ruleId"), "r1");
+    }
+}
+
+/**
+ * @tc.name: UIContentStubTestPageSceneLegacyCallback001
+ * @tc.desc: Legacy entry/exit payloads route by top-level ruleSetId without changing the JSON.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestPageSceneLegacyCallback001, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    std::vector<std::string> received;
+    int32_t otherCount = 0;
+    report->RegisterPageSceneEventCallback("legacy-set",
+        [&received](const std::string& data) { received.emplace_back(data); });
+    report->RegisterPageSceneEventCallback("search-set",
+        [&otherCount](const std::string&) { ++otherCount; });
+    const std::string entered = R"({"ruleSetId":"legacy-set", "ruleId":"editor",
+        "sceneType":"TEXT_EDITOR", "eventName":"TEXT_EDITOR", "matched":true, "nodes":[]})";
+    const std::string exited = R"({"ruleSetId":"legacy-set", "ruleId":"editor",
+        "sceneType":"TEXT_EDITOR", "eventName":"TEXT_EDITOR_EXIT", "matched":false, "nodes":[]})";
+    report->ReportPageSceneEvent(entered, false);
+    report->ReportPageSceneEvent(exited, false);
+    EXPECT_EQ(received, (std::vector<std::string> { entered, exited }));
+    EXPECT_EQ(otherCount, 0);
+    report->UnregisterPageSceneEventCallback("legacy-set");
+    report->ReportPageSceneEvent(entered, false);
+    EXPECT_EQ(received.size(), 2U);
+}
+
+/**
+ * @tc.name: UIContentStubTestPageSceneLegacyCallback002
+ * @tc.desc: Deduplicate ids across legacy/search fields and retain independent GetPageScene delivery.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestPageSceneLegacyCallback002, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    int32_t eventCount = 0;
+    int32_t getCount = 0;
+    report->RegisterPageSceneEventCallback("legacy-set",
+        [&eventCount](const std::string&) { ++eventCount; });
+    report->RegisterGetPageSceneCallback([&getCount](const std::string&) { ++getCount; });
+    const std::string payload = R"({"ruleSetId":"legacy-set",
+        "hits":[{"ruleSetId":"legacy-set"}], "exits":[{"ruleSetId":"legacy-set"}]})";
+    report->ReportPageSceneEvent(payload, false);
+    EXPECT_EQ(eventCount, 1);
+    report->ReportPageSceneEvent(payload, true);
+    EXPECT_EQ(eventCount, 1);
+    EXPECT_EQ(getCount, 1);
+}
+
+/**
+ * @tc.name: UIContentStubTestPageSceneDualRuleSet002
+ * @tc.desc: Unregister one ruleSet keeps the other; a missing callback does not
+ *           block the present one. Exit events route by ruleSetId.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestPageSceneDualRuleSet002, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    int32_t callbackACount = 0;
+    int32_t callbackBCount = 0;
+    report->RegisterPageSceneEventCallback("search-set-a",
+        [&callbackACount](const std::string&) { ++callbackACount; });
+    report->RegisterPageSceneEventCallback("search-set-b",
+        [&callbackBCount](const std::string&) { ++callbackBCount; });
+
+    const std::string mergedJson = R"({"eventType":"presence", "hasSearch":true, "pageName":"Home",
+        "hits":[{"ruleSetId":"search-set-a", "ruleId":"r1"},
+                {"ruleSetId":"search-set-b", "ruleId":"r1"}]})";
+    report->ReportPageSceneEvent(mergedJson, false);
+    EXPECT_EQ(callbackACount, 1);
+    EXPECT_EQ(callbackBCount, 1);
+
+    report->UnregisterPageSceneEventCallback("search-set-a");
+    report->ReportPageSceneEvent(mergedJson, false);
+    EXPECT_EQ(callbackACount, 1);
+    EXPECT_EQ(callbackBCount, 2);
+
+    // Exit events route by ruleSetId.
+    const std::string falseJson = R"({"eventType":"presence", "hasSearch":false, "pageName":"Home",
+        "exits":[{"ruleSetId":"search-set-b", "ruleId":"r1"}]})";
+    report->ReportPageSceneEvent(falseJson, false);
+    EXPECT_EQ(callbackACount, 1);
+    EXPECT_EQ(callbackBCount, 3);
+}
+
+/**
+ * @tc.name: UIContentStubTestPageSceneFilteredEvent001
+ * @tc.desc: Filter both hits and exits, preserving all matching rules and excluding unowned entries.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestPageSceneFilteredEvent001, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    std::string lastA;
+    std::string lastB;
+    report->RegisterPageSceneEventCallback("a", [&lastA](const std::string& data) { lastA = data; });
+    report->RegisterPageSceneEventCallback("b", [&lastB](const std::string& data) { lastB = data; });
+    report->ReportPageSceneEvent(R"({"eventType":"presence", "hasSearch":false, "pageName":"Home",
+        "hits":[{"ruleSetId":"a", "ruleId":"r1"}, {"ruleSetId":"b", "ruleId":"r2"}],
+        "exits":[{"ruleSetId":"b", "ruleId":"r2"}, {"ruleSetId":"a", "ruleId":"r1"},
+                 {"ruleSetId":"a", "ruleId":"r3"}, {"ruleId":"unowned"}, null]})", false);
+
+    for (const auto& [payload, ruleSetId] : { std::make_pair(lastA, "a"), std::make_pair(lastB, "b") }) {
+        auto root = InspectorJsonUtil::ParseJsonString(payload);
+        ASSERT_TRUE(root->IsObject());
+        EXPECT_EQ(root->GetValue("hasSearch")->ToString(), "false");
+        EXPECT_EQ(root->GetString("pageName"), "Home");
+        auto hits = root->GetValue("hits");
+        ASSERT_EQ(hits->GetArraySize(), 1);
+        EXPECT_EQ(hits->GetArrayItem(0)->GetString("ruleSetId"), ruleSetId);
+        auto exits = root->GetValue("exits");
+        ASSERT_EQ(exits->GetArraySize(), std::string(ruleSetId) == "a" ? 2 : 1);
+        for (int32_t index = 0; index < exits->GetArraySize(); ++index) {
+            EXPECT_EQ(exits->GetArrayItem(index)->GetString("ruleSetId"), ruleSetId);
+        }
+    }
+    auto rootA = InspectorJsonUtil::ParseJsonString(lastA);
+    auto exitsA = rootA->GetValue("exits");
+    EXPECT_EQ(exitsA->GetArrayItem(0)->GetString("ruleId"), "r1");
+    EXPECT_EQ(exitsA->GetArrayItem(1)->GetString("ruleId"), "r3");
+}
+
+/**
+ * @tc.name: UIContentStubTestPageSceneFilteredEvent002
+ * @tc.desc: Click evidence remains complete after filtering, and callbacks can unregister themselves.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestPageSceneFilteredEvent002, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    std::string lastA;
+    std::string lastB;
+    report->RegisterPageSceneEventCallback("a", [&lastA, &report](const std::string& data) {
+        lastA = data;
+        report->UnregisterPageSceneEventCallback("a");
+    });
+    report->RegisterPageSceneEventCallback("b", [&lastB](const std::string& data) { lastB = data; });
+    const std::string payload = R"({"eventType":"click", "pageName":"Home+Dialog", "hits":[
+        {"ruleSetId":"a", "ruleId":"r1", "matchType":"inspectorId", "matchedKeyword":"search",
+         "responseNode":{"inspectorId":"search-button", "nodeId":7, "type":"Button",
+                         "rect":{"x":1, "y":2, "width":30, "height":40}}},
+        {"ruleSetId":"b", "ruleId":"r2", "responseNode":{"nodeId":8}}]})";
+    report->ReportPageSceneEvent(payload, false);
+
+    auto rootA = InspectorJsonUtil::ParseJsonString(lastA);
+    ASSERT_TRUE(rootA->IsObject());
+    EXPECT_EQ(rootA->GetString("eventType"), "click");
+    EXPECT_EQ(rootA->GetString("pageName"), "Home+Dialog");
+    auto hitsA = rootA->GetValue("hits");
+    ASSERT_EQ(hitsA->GetArraySize(), 1);
+    auto hitA = hitsA->GetArrayItem(0);
+    EXPECT_EQ(hitA->GetString("ruleSetId"), "a");
+    EXPECT_EQ(hitA->GetString("matchedKeyword"), "search");
+    auto original = InspectorJsonUtil::ParseJsonString(payload);
+    EXPECT_EQ(hitA->ToString(), original->GetValue("hits")->GetArrayItem(0)->ToString());
+    auto rootB = InspectorJsonUtil::ParseJsonString(lastB);
+    ASSERT_TRUE(rootB->IsObject());
+    ASSERT_EQ(rootB->GetValue("hits")->GetArraySize(), 1);
+    EXPECT_EQ(rootB->GetValue("hits")->GetArrayItem(0)->GetString("ruleSetId"), "b");
+    EXPECT_EQ(report->pageSceneEventCallbacks_.count("a"), 0U);
+}
+
+/**
+ * @tc.name: UIContentStubTestPageSceneFilteredEvent003
+ * @tc.desc: Legacy top-level data cannot be delivered to a different ruleSet named in an array.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestPageSceneFilteredEvent003, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    std::string received;
+    int32_t otherCount = 0;
+    report->RegisterPageSceneEventCallback("legacy", [&received](const std::string& data) { received = data; });
+    report->RegisterPageSceneEventCallback("other", [&otherCount](const std::string&) { ++otherCount; });
+    report->ReportPageSceneEvent(R"({"ruleSetId":"legacy", "nodes":[{"nodeId":1}],
+        "hits":[{"ruleSetId":"other", "ruleId":"r1"}]})", false);
+    auto root = InspectorJsonUtil::ParseJsonString(received);
+    ASSERT_TRUE(root->IsObject());
+    EXPECT_EQ(root->GetString("ruleSetId"), "legacy");
+    EXPECT_EQ(root->GetValue("nodes")->GetArraySize(), 1);
+    EXPECT_EQ(root->GetValue("hits")->GetArraySize(), 0);
+    EXPECT_EQ(otherCount, 0);
+}
+
+/**
+ * @tc.name: UIContentStubTestPageSceneCallbackRegistration001
+ * @tc.desc: Duplicate callback reservation preserves the original callback; unregister permits a retry.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestPageSceneCallbackRegistration001, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    int32_t originalCount = 0;
+    int32_t replacementCount = 0;
+    PageSceneEventCallback original = [&originalCount](const std::string&) { ++originalCount; };
+    PageSceneEventCallback replacement = [&replacementCount](const std::string&) { ++replacementCount; };
+    EXPECT_FALSE(report->TryRegisterPageSceneEventCallback("", original));
+    EXPECT_FALSE(report->TryRegisterPageSceneEventCallback("a", nullptr));
+    ASSERT_TRUE(report->TryRegisterPageSceneEventCallback("a", original));
+    EXPECT_FALSE(report->TryRegisterPageSceneEventCallback("a", replacement));
+    const std::string payload = R"({"eventType":"presence", "hits":[{"ruleSetId":"a", "ruleId":"r1"}]})";
+    report->ReportPageSceneEvent(payload, false);
+    EXPECT_EQ(originalCount, 1);
+    EXPECT_EQ(replacementCount, 0);
+    report->UnregisterPageSceneEventCallback("a");
+    ASSERT_TRUE(report->TryRegisterPageSceneEventCallback("a", replacement));
+    report->ReportPageSceneEvent(payload, false);
+    EXPECT_EQ(originalCount, 1);
+    EXPECT_EQ(replacementCount, 1);
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryRegister001
+ * @tc.desc: Register succeeds when empty; duplicate registration rejected.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryRegister001, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    bool called = false;
+    auto callback = [&called](const std::string&) { called = true; };
+
+    EXPECT_TRUE(report->RegisterNavigationQueryCallback(callback));
+    EXPECT_FALSE(report->RegisterNavigationQueryCallback(callback));
+    EXPECT_FALSE(called);
+    report->UnregisterNavigationQueryCallback();
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryRegister002
+ * @tc.desc: After unregister, re-registration succeeds.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryRegister002, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    auto callback = [](const std::string&) {};
+
+    EXPECT_TRUE(report->RegisterNavigationQueryCallback(callback));
+    report->UnregisterNavigationQueryCallback();
+    EXPECT_TRUE(report->RegisterNavigationQueryCallback(callback));
+    report->UnregisterNavigationQueryCallback();
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryRegister003
+ * @tc.desc: Navigation and LazyForEach register independently.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryRegister003, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    auto navCb = [](const std::string&) {};
+    auto lazyCb = [](const std::string&) {};
+
+    EXPECT_TRUE(report->RegisterNavigationQueryCallback(navCb));
+    EXPECT_TRUE(report->RegisterLazyForEachQueryCallback(lazyCb));
+    EXPECT_FALSE(report->RegisterNavigationQueryCallback(navCb));
+    EXPECT_FALSE(report->RegisterLazyForEachQueryCallback(lazyCb));
+    report->UnregisterNavigationQueryCallback();
+    report->UnregisterLazyForEachQueryCallback();
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryUnregister001
+ * @tc.desc: Unregister clears callback; subsequent Report silently drops data.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryUnregister001, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    int32_t callCount = 0;
+    auto callback = [&callCount](const std::string&) { ++callCount; };
+
+    EXPECT_TRUE(report->RegisterNavigationQueryCallback(callback));
+    report->UnregisterNavigationQueryCallback();
+    report->ReportNavigationQueryResult("test-data");
+    EXPECT_EQ(callCount, 0);
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryPostTimeout001
+ * @tc.desc: PostTimeout without event handler returns false and clears callback.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryPostTimeout001, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    auto callback = [](const std::string&) {};
+
+    EXPECT_TRUE(report->RegisterNavigationQueryCallback(callback));
+    EXPECT_FALSE(report->PostNavigationQueryCallbackRemoveTask(1000));
+    EXPECT_FALSE(report->navigationQueryCallback_);
+    EXPECT_TRUE(report->RegisterNavigationQueryCallback(callback));
+    report->UnregisterNavigationQueryCallback();
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryPostTimeout002
+ * @tc.desc: LazyForEach PostTimeout without event handler returns false and clears callback.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryPostTimeout002, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    auto callback = [](const std::string&) {};
+
+    EXPECT_TRUE(report->RegisterLazyForEachQueryCallback(callback));
+    EXPECT_FALSE(report->PostLazyForEachQueryCallbackRemoveTask(1000));
+    EXPECT_FALSE(report->lazyForEachQueryCallback_);
+    EXPECT_TRUE(report->RegisterLazyForEachQueryCallback(callback));
+    report->UnregisterLazyForEachQueryCallback();
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryReport001
+ * @tc.desc: Registered callback receives data; callback cleared after report.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryReport001, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    std::string received;
+    auto callback = [&received](const std::string& data) { received = data; };
+
+    EXPECT_TRUE(report->RegisterNavigationQueryCallback(callback));
+    report->ReportNavigationQueryResult("hello-world");
+    EXPECT_EQ(received, "hello-world");
+    EXPECT_FALSE(report->navigationQueryCallback_);
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryReport002
+ * @tc.desc: Without registered callback, Report silently drops data (no crash).
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryReport002, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    report->ReportNavigationQueryResult("orphan-data");
+    EXPECT_FALSE(report->navigationQueryCallback_);
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryReport003
+ * @tc.desc: Navigation report does not affect LazyForEach callback and vice versa.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryReport003, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    std::string navReceived;
+    std::string lazyReceived;
+    auto navCb = [&navReceived](const std::string& data) { navReceived = data; };
+    auto lazyCb = [&lazyReceived](const std::string& data) { lazyReceived = data; };
+
+    EXPECT_TRUE(report->RegisterNavigationQueryCallback(navCb));
+    EXPECT_TRUE(report->RegisterLazyForEachQueryCallback(lazyCb));
+
+    report->ReportNavigationQueryResult("nav-result");
+    EXPECT_EQ(navReceived, "nav-result");
+    EXPECT_TRUE(lazyReceived.empty());
+    EXPECT_TRUE(report->lazyForEachQueryCallback_);
+
+    report->ReportLazyForEachQueryResult("lazy-result");
+    EXPECT_EQ(lazyReceived, "lazy-result");
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryReport004
+ * @tc.desc: LazyForEach registered callback receives data; callback cleared after report.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryReport004, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    std::string received;
+    auto callback = [&received](const std::string& data) { received = data; };
+
+    EXPECT_TRUE(report->RegisterLazyForEachQueryCallback(callback));
+    report->ReportLazyForEachQueryResult("lazy-data");
+    EXPECT_EQ(received, "lazy-data");
+    EXPECT_FALSE(report->lazyForEachQueryCallback_);
+}
+
+HWTEST_F(UIContentStubTest, SendCommandWithFinishCallback_002, TestSize.Level1)
+{
+    sptr<UIContentServiceStubImpl> stub = std::make_shared<UIContentServiceStubImpl>();
+    auto manager = static_cast<OHOS::Ace::MockUiSessionManager*>(UiSessionManager::GetInstance());
+    ASSERT_NE(manager, nullptr);
+    constexpr uint64_t requestId = 0x123456789ABCULL;
+    constexpr int32_t nodeId = 42;
+    const std::string command = R"({"cmd":"setText","params":{"value":"test"}})";
+    const std::string resultJson = R"({"result":"SUCCESS"})";
+
+    EXPECT_CALL(*manager, NotifySendCommandPatternWithResult(nodeId, command, _, _))
+        .WillOnce(Invoke([&](int32_t, const std::string&, const UiSessionManager::CommandResultCallback& callback,
+                             const SecurityAuthInfo&) {
+            callback(resultJson);
+        }));
+    int reportCount = 0;
+    EXPECT_CALL(*manager, MakeCommandResultCallback(_, requestId))
+        .Times(2).WillRepeatedly(Return([&](const std::string& json) { EXPECT_EQ(json, resultJson); ++reportCount; }));
+    MessageParcel data;
+    MessageParcel reply;
+    MessageOption option;
+    data.EnablePayloadStorage();
+    PrepareValidUiSessionParcel(data);
+    ASSERT_TRUE(data.WriteUint64(requestId));
+    ASSERT_TRUE(data.WriteInt32(nodeId));
+    ASSERT_TRUE(data.WriteString(command));
+    ASSERT_TRUE(data.WriteBool(false));
+    ASSERT_TRUE(data.WriteUint64(UINT64_MAX));
+    EXPECT_EQ(stub->OnRemoteRequest(IUiContentService::SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK, data, reply, option),
+        NO_ERROR);
+
+    EXPECT_CALL(*manager, SendCommandWithResult(command, _, _))
+        .WillOnce(Invoke([&](const std::string&, const UiSessionManager::CommandResultCallback& callback,
+                             const SecurityAuthInfo&) {
+            callback(resultJson);
+        }));
+    MessageParcel keyData;
+    keyData.EnablePayloadStorage();
+    PrepareValidUiSessionParcel(keyData);
+    ASSERT_TRUE(keyData.WriteUint64(requestId));
+    ASSERT_TRUE(keyData.WriteString(command));
+    ASSERT_TRUE(keyData.WriteBool(false));
+    ASSERT_TRUE(keyData.WriteUint64(UINT64_MAX));
+    EXPECT_EQ(stub->OnRemoteRequest(IUiContentService::SEND_COMMAND_WITH_FINISH_CALLBACK, keyData, reply, option),
+        NO_ERROR);
+    Mock::VerifyAndClearExpectations(manager);
+    EXPECT_EQ(reportCount, 2);
+}
+
+/**
+ * @tc.name: SendCommandSecurityAuthFlag001
+ * @tc.desc: The SendCommand finish-callback entry forwards the SecurityAuthInfo
+ *           request from the IPC parcel to the session manager.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, SendCommandSecurityAuthFlag001, TestSize.Level1)
+{
+    sptr<UIContentServiceStubImpl> stub = std::make_shared<UIContentServiceStubImpl>();
+    auto manager = static_cast<OHOS::Ace::MockUiSessionManager*>(UiSessionManager::GetInstance());
+    ASSERT_NE(manager, nullptr);
+    constexpr uint64_t requestId = 0x99887766ULL;
+    constexpr int32_t nodeId = 7;
+    constexpr uint64_t tokenId = 0x1234567890ABCDEFULL;
+    const std::string command = R"({"cmd":"setText","params":{"value":"x"}})";
+
+    SecurityAuthInfo observed;
+    EXPECT_CALL(*manager, NotifySendCommandPatternWithResult(nodeId, command, _, _))
+        .WillOnce(Invoke([&](int32_t, const std::string&, const UiSessionManager::CommandResultCallback& callback,
+                             const SecurityAuthInfo& securityAuth) {
+            observed = securityAuth;
+            callback(R"({"result":"SUCCESS"})");
+        }));
+    EXPECT_CALL(*manager, MakeCommandResultCallback(_, requestId))
+        .WillOnce(Return([](const std::string&) {}));
+    MessageParcel data;
+    MessageParcel reply;
+    MessageOption option;
+    data.EnablePayloadStorage();
+    PrepareValidUiSessionParcel(data);
+    ASSERT_TRUE(data.WriteUint64(requestId));
+    ASSERT_TRUE(data.WriteInt32(nodeId));
+    ASSERT_TRUE(data.WriteString(command));
+    ASSERT_TRUE(data.WriteBool(true));
+    ASSERT_TRUE(data.WriteUint64(tokenId));
+    EXPECT_EQ(stub->OnRemoteRequest(IUiContentService::SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK, data, reply, option),
+        NO_ERROR);
+    EXPECT_TRUE(observed.needSecurityAuth);
+    EXPECT_EQ(observed.tokenId, tokenId);
+    Mock::VerifyAndClearExpectations(manager);
+}
+
+/**
+ * @tc.name: SendCommandAccessibilityEnvelopeForwarded
+ * @tc.desc: The SendCommand request carrying the protocol envelope is forwarded to the session manager.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, SendCommandAccessibilityEnvelopeForwarded, TestSize.Level1)
+{
+    sptr<UIContentServiceStubImpl> stub = std::make_shared<UIContentServiceStubImpl>();
+    auto manager = static_cast<OHOS::Ace::MockUiSessionManager*>(UiSessionManager::GetInstance());
+    ASSERT_NE(manager, nullptr);
+    constexpr uint64_t requestId = 0x123456789ABDULL;
+    constexpr int32_t hostId = 84;
+    const std::string command = R"({"protocol":"arkui.accessibility","version":1,"elementId":"77",)"
+        R"("action":"ACTION_CLICK","arguments":{}})";
+    const std::string resultJson = R"({"result":"SUCCESS"})";
+    int reportCount = 0;
+    EXPECT_CALL(*manager, NotifySendCommandPatternWithResult(hostId, command, _, _))
+        .WillOnce(Invoke([&](int32_t, const std::string&, const UiSessionManager::CommandResultCallback& callback,
+                             const SecurityAuthInfo&) {
+            callback(resultJson);
+        }));
+    EXPECT_CALL(*manager, MakeCommandResultCallback(_, requestId))
+        .WillOnce(Return([&](const std::string& json) { EXPECT_EQ(json, resultJson); ++reportCount; }));
+    MessageParcel data;
+    MessageParcel reply;
+    MessageOption option;
+    data.EnablePayloadStorage();
+    PrepareValidUiSessionParcel(data);
+    ASSERT_TRUE(data.WriteUint64(requestId));
+    ASSERT_TRUE(data.WriteInt32(hostId));
+    ASSERT_TRUE(data.WriteString(command));
+    EXPECT_EQ(stub->OnRemoteRequest(IUiContentService::SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK, data, reply, option),
+        NO_ERROR);
+    EXPECT_EQ(reportCount, 1);
+    Mock::VerifyAndClearExpectations(manager);
+}
+
+/**
+ * @tc.name: SendCommandLegacyParcelKeepsDefaults001
+ * @tc.desc: A legacy parcel without the SecurityAuthInfo fields keeps the defaults.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, SendCommandLegacyParcelKeepsDefaults001, TestSize.Level1)
+{
+    sptr<UIContentServiceStubImpl> stub = std::make_shared<UIContentServiceStubImpl>();
+    auto manager = static_cast<OHOS::Ace::MockUiSessionManager*>(UiSessionManager::GetInstance());
+    ASSERT_NE(manager, nullptr);
+    constexpr uint64_t requestId = 0x99887766ULL;
+    constexpr int32_t nodeId = 7;
+    const std::string command = R"({"cmd":"setText","params":{"value":"x"}})";
+
+    SecurityAuthInfo legacy;
+    EXPECT_CALL(*manager, NotifySendCommandPatternWithResult(nodeId, command, _, _))
+        .WillOnce(Invoke([&](int32_t, const std::string&, const UiSessionManager::CommandResultCallback& callback,
+                             const SecurityAuthInfo& securityAuth) {
+            legacy = securityAuth;
+            callback(R"({"result":"SUCCESS"})");
+        }));
+    EXPECT_CALL(*manager, MakeCommandResultCallback(_, requestId))
+        .WillOnce(Return([](const std::string&) {}));
+    MessageParcel legacyData;
+    MessageParcel reply;
+    MessageOption option;
+    legacyData.EnablePayloadStorage();
+    PrepareValidUiSessionParcel(legacyData);
+    ASSERT_TRUE(legacyData.WriteUint64(requestId));
+    ASSERT_TRUE(legacyData.WriteInt32(nodeId));
+    ASSERT_TRUE(legacyData.WriteString(command));
+    EXPECT_EQ(
+        stub->OnRemoteRequest(IUiContentService::SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK, legacyData, reply, option),
+        NO_ERROR);
+    EXPECT_FALSE(legacy.needSecurityAuth);
+    EXPECT_EQ(legacy.tokenId, UINT64_MAX);
+    Mock::VerifyAndClearExpectations(manager);
+}
+
+HWTEST_F(UIContentStubTest, SearchReview_ClickFlushDoesNotDetectPages, TestSize.Level1)
+{
+    class SearchClickSession : public UiSessionManager {
+    public:
+        void NotifyPageSceneContentChanged() override { ++detectCount; }
+        void FlushPageSceneNodeChanged() override { ++detectCount; }
+        int detectCount = 0;
+    };
+    SearchClickSession manager;
+    int flushCount = 0;
+    // No callback is a safe no-op, including during UIContent teardown.
+    manager.FlushPendingSearchClicksIfStable();
+    manager.SaveSearchClickFlushFunction([&manager, &flushCount] {
+        ++flushCount;
+        // Replacement must be safe: the dispatcher cannot hold its mutex here.
+        manager.SaveSearchClickFlushFunction({});
+    });
+    manager.FlushPendingSearchClicksIfStable();
+    manager.FlushPendingSearchClicksIfStable();
+    EXPECT_EQ(flushCount, 1);
+    EXPECT_EQ(manager.detectCount, 0);
+}
+
+/**
+ * @tc.name: UIContentStubTestGetNavigationContentByPoint002
+ * @tc.desc: Navigation query dispatches SaveProcessId (key is a literal in the Inner) and
+ *           ComponentTreeQuery (request type is an enum literal). x/y/pattern passthrough is
+ *           NOT asserted: the host MessageParcel mock is stateless (WriteFloat/WriteString
+ *           store nothing; ReadFloat returns 0.0f, ReadString returns "mockString"), so the
+ *           Inner always reads mock constants regardless of what the test writes.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestGetNavigationContentByPoint002, TestSize.Level1)
+{
+    sptr<UIContentServiceStubImpl> ptr = std::make_shared<UIContentServiceStubImpl>();
+    auto manager = static_cast<OHOS::Ace::MockUiSessionManager*>(UiSessionManager::GetInstance());
+    ASSERT_NE(manager, nullptr);
+
+    ComponentTreeQueryRequest captured;
+    EXPECT_CALL(*manager, SaveProcessId(StrEq("componentTreeQuery"), _)).Times(1);
+    EXPECT_CALL(*manager, ComponentTreeQuery(_)).Times(1).WillOnce(SaveArg<0>(&captured));
+
+    MessageParcel data;
+    MessageParcel reply;
+    MessageOption option;
+    PrepareValidUiSessionParcel(data);
+    data.WriteFloat(10.5f);
+    data.WriteFloat(20.5f);
+    data.WriteString("bar.*");
+
+    EXPECT_EQ(ptr->OnRemoteRequest(IUiContentService::GET_NAVIGATION_CONTENT_BY_POINT, data, reply, option), NO_ERROR);
+    EXPECT_EQ(reply.ReadInt32(), NO_ERROR);
+    EXPECT_EQ(captured.type, ComponentTreeQueryType::NAVIGATION_CONTENT_BY_POINT);
+    Mock::VerifyAndClearExpectations(manager);
+}
+
+/**
+ * @tc.name: UIContentStubTestGetNavigationContentByPoint003
+ * @tc.desc: Navigation impl field-mapping contract. Calling GetNavigationContentByPoint
+ *           directly (bypassing the stateless MessageParcel mock) verifies x/y/pattern reach
+ *           the ComponentTreeQueryRequest. The impl is linear with no boundary-specific logic,
+ *           so the non-positive coordinates and empty pattern here are representative inputs,
+ *           not a boundary-behavior probe. SaveProcessId is NOT expected (only the Inner calls
+ *           it; the impl does not). Guards against regressions like swapped x/y or an omitted
+ *           pattern field, and pins the impl contract independently of the Inner/parcel path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestGetNavigationContentByPoint003, TestSize.Level1)
+{
+    sptr<UIContentServiceStubImpl> ptr = std::make_shared<UIContentServiceStubImpl>();
+    auto manager = static_cast<OHOS::Ace::MockUiSessionManager*>(UiSessionManager::GetInstance());
+    ASSERT_NE(manager, nullptr);
+
+    ComponentTreeQueryRequest captured;
+    EXPECT_CALL(*manager, ComponentTreeQuery(_)).Times(1).WillOnce(SaveArg<0>(&captured));
+
+    EXPECT_EQ(ptr->GetNavigationContentByPoint(-1.0f, 0.0f, "", nullptr), NO_ERROR);
+    EXPECT_EQ(captured.type, ComponentTreeQueryType::NAVIGATION_CONTENT_BY_POINT);
+    EXPECT_FLOAT_EQ(captured.x, -1.0f);
+    EXPECT_FLOAT_EQ(captured.y, 0.0f);
+    EXPECT_TRUE(captured.pattern.empty());
+    Mock::VerifyAndClearExpectations(manager);
+}
+
+/**
+ * @tc.name: UIContentStubTestGetLazyForEachDataByPoint002
+ * @tc.desc: LazyForEach query dispatches SaveProcessId (key literal) and ComponentTreeQuery
+ *           (type literal). x/y passthrough is NOT asserted (stateless MessageParcel mock;
+ *           see UIContentStubTestGetNavigationContentByPoint002 for rationale).
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestGetLazyForEachDataByPoint002, TestSize.Level1)
+{
+    sptr<UIContentServiceStubImpl> ptr = std::make_shared<UIContentServiceStubImpl>();
+    auto manager = static_cast<OHOS::Ace::MockUiSessionManager*>(UiSessionManager::GetInstance());
+    ASSERT_NE(manager, nullptr);
+
+    ComponentTreeQueryRequest captured;
+    EXPECT_CALL(*manager, SaveProcessId(StrEq("lazyForEachQuery"), _)).Times(1);
+    EXPECT_CALL(*manager, ComponentTreeQuery(_)).Times(1).WillOnce(SaveArg<0>(&captured));
+
+    MessageParcel data;
+    MessageParcel reply;
+    MessageOption option;
+    PrepareValidUiSessionParcel(data);
+    data.WriteFloat(50.0f);
+    data.WriteFloat(75.0f);
+
+    EXPECT_EQ(ptr->OnRemoteRequest(IUiContentService::GET_LAZY_FOREACH_DATA_BY_POINT, data, reply, option), NO_ERROR);
+    EXPECT_EQ(reply.ReadInt32(), NO_ERROR);
+    EXPECT_EQ(captured.type, ComponentTreeQueryType::LAZY_FOREACH_DATA_BY_POINT);
+    Mock::VerifyAndClearExpectations(manager);
+}
+
+/**
+ * @tc.name: UIContentStubTestGetLazyForEachDataByPoint003
+ * @tc.desc: LazyForEach impl field-mapping contract. Calling GetLazyForEachDataByPoint directly
+ *           verifies x/y reach the ComponentTreeQueryRequest. The impl is linear with no
+ *           boundary-specific logic; the zero/negative coordinates are representative inputs.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestGetLazyForEachDataByPoint003, TestSize.Level1)
+{
+    sptr<UIContentServiceStubImpl> ptr = std::make_shared<UIContentServiceStubImpl>();
+    auto manager = static_cast<OHOS::Ace::MockUiSessionManager*>(UiSessionManager::GetInstance());
+    ASSERT_NE(manager, nullptr);
+
+    ComponentTreeQueryRequest captured;
+    EXPECT_CALL(*manager, ComponentTreeQuery(_)).Times(1).WillOnce(SaveArg<0>(&captured));
+
+    EXPECT_EQ(ptr->GetLazyForEachDataByPoint(0.0f, -100.0f, nullptr), NO_ERROR);
+    EXPECT_EQ(captured.type, ComponentTreeQueryType::LAZY_FOREACH_DATA_BY_POINT);
+    EXPECT_FLOAT_EQ(captured.x, 0.0f);
+    EXPECT_FLOAT_EQ(captured.y, -100.0f);
+    EXPECT_TRUE(captured.pattern.empty());
+    Mock::VerifyAndClearExpectations(manager);
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryTimeout001
+ * @tc.desc: HandleNavigationQueryCallbackTimeout invokes callback with errorCode and clears it.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryTimeout001, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    std::string received;
+    auto callback = [&received](const std::string& data) { received = data; };
+
+    EXPECT_TRUE(report->RegisterNavigationQueryCallback(callback));
+    report->HandleNavigationQueryCallbackTimeout();
+    EXPECT_EQ(received, R"({"errorCode":8})");
+    EXPECT_FALSE(report->navigationQueryCallback_);
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryRegister004
+ * @tc.desc: NodesInRect register succeeds when empty; duplicate rejected; independent of Nav/Lazy.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryRegister004, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    auto rectCb = [](const std::string&) {};
+    auto navCb = [](const std::string&) {};
+    auto lazyCb = [](const std::string&) {};
+
+    EXPECT_TRUE(report->RegisterNodesInRectQueryCallback(rectCb));
+    EXPECT_FALSE(report->RegisterNodesInRectQueryCallback(rectCb));
+    // NodesInRect is independent from Navigation and LazyForEach.
+    EXPECT_TRUE(report->RegisterNavigationQueryCallback(navCb));
+    EXPECT_TRUE(report->RegisterLazyForEachQueryCallback(lazyCb));
+    EXPECT_FALSE(report->RegisterNavigationQueryCallback(navCb));
+    EXPECT_FALSE(report->RegisterLazyForEachQueryCallback(lazyCb));
+    report->UnregisterNodesInRectQueryCallback();
+    report->UnregisterNavigationQueryCallback();
+    report->UnregisterLazyForEachQueryCallback();
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryPostTimeout005
+ * @tc.desc: NodesInRect PostTimeout without event handler returns false and clears callback.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryPostTimeout005, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    auto callback = [](const std::string&) {};
+
+    EXPECT_TRUE(report->RegisterNodesInRectQueryCallback(callback));
+    EXPECT_FALSE(report->PostNodesInRectQueryCallbackRemoveTask(1000));
+    EXPECT_FALSE(report->nodesInRectQueryCallback_);
+    EXPECT_TRUE(report->RegisterNodesInRectQueryCallback(callback));
+    report->UnregisterNodesInRectQueryCallback();
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryReport005
+ * @tc.desc: NodesInRect registered callback receives data; callback cleared after report;
+ * independent from Navigation / LazyForEach reports.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryReport005, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    std::string rectReceived;
+    std::string navReceived;
+    std::string lazyReceived;
+    auto rectCb = [&rectReceived](const std::string& data) { rectReceived = data; };
+    auto navCb = [&navReceived](const std::string& data) { navReceived = data; };
+    auto lazyCb = [&lazyReceived](const std::string& data) { lazyReceived = data; };
+
+    EXPECT_TRUE(report->RegisterNodesInRectQueryCallback(rectCb));
+    EXPECT_TRUE(report->RegisterNavigationQueryCallback(navCb));
+    EXPECT_TRUE(report->RegisterLazyForEachQueryCallback(lazyCb));
+
+    report->ReportNodesInRectQueryResult("rect-result");
+    EXPECT_EQ(rectReceived, "rect-result");
+    EXPECT_TRUE(navReceived.empty());
+    EXPECT_TRUE(lazyReceived.empty());
+    EXPECT_FALSE(report->nodesInRectQueryCallback_);
+    EXPECT_TRUE(report->navigationQueryCallback_);
+    EXPECT_TRUE(report->lazyForEachQueryCallback_);
+
+    // Navigation / LazyForEach reports do not leak into NodesInRect.
+    report->ReportNavigationQueryResult("nav-result");
+    EXPECT_EQ(navReceived, "nav-result");
+    EXPECT_TRUE(rectReceived == "rect-result");
+    report->ReportLazyForEachQueryResult("lazy-result");
+    EXPECT_EQ(lazyReceived, "lazy-result");
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryReport006
+ * @tc.desc: Without registered NodesInRect callback, Report silently drops data (no crash).
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryReport006, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    report->ReportNodesInRectQueryResult("orphan-data");
+    EXPECT_FALSE(report->nodesInRectQueryCallback_);
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryTimeout002
+ * @tc.desc: HandleNavigationQueryCallbackTimeout without registered callback returns silently.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryTimeout002, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    report->HandleNavigationQueryCallbackTimeout();
+    EXPECT_FALSE(report->navigationQueryCallback_);
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryTimeout003
+ * @tc.desc: HandleLazyForEachQueryCallbackTimeout invokes callback with errorCode and clears it.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryTimeout003, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    std::string received;
+    auto callback = [&received](const std::string& data) { received = data; };
+
+    EXPECT_TRUE(report->RegisterLazyForEachQueryCallback(callback));
+    report->HandleLazyForEachQueryCallbackTimeout();
+    EXPECT_EQ(received, R"({"errorCode":8})");
+    EXPECT_FALSE(report->lazyForEachQueryCallback_);
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryTimeout004
+ * @tc.desc: HandleLazyForEachQueryCallbackTimeout without registered callback returns silently.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryTimeout004, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    report->HandleLazyForEachQueryCallbackTimeout();
+    EXPECT_FALSE(report->lazyForEachQueryCallback_);
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryPostTimeout003
+ * @tc.desc: PostNavigationQueryCallbackRemoveTask without handler invokes callback with errorCode.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryPostTimeout003, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    std::string received;
+    auto callback = [&received](const std::string& data) { received = data; };
+
+    EXPECT_TRUE(report->RegisterNavigationQueryCallback(callback));
+    EXPECT_FALSE(report->PostNavigationQueryCallbackRemoveTask(1000));
+    EXPECT_EQ(received, R"({"errorCode":8})");
+    EXPECT_FALSE(report->navigationQueryCallback_);
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryPostTimeout004
+ * @tc.desc: PostLazyForEachQueryCallbackRemoveTask without handler invokes callback with errorCode.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryPostTimeout004, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    std::string received;
+    auto callback = [&received](const std::string& data) { received = data; };
+
+    EXPECT_TRUE(report->RegisterLazyForEachQueryCallback(callback));
+    EXPECT_FALSE(report->PostLazyForEachQueryCallbackRemoveTask(1000));
+    EXPECT_EQ(received, R"({"errorCode":8})");
+    EXPECT_FALSE(report->lazyForEachQueryCallback_);
+}
+
+HWTEST_F(UIContentStubTest, UIContentStubTestSplitEventsIsolation, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    std::vector<std::string> order;
+    std::string a;
+    std::string b;
+    ASSERT_TRUE(report->RegisterPageSceneEventCallback("a", [&](const std::string& json) {
+        order.emplace_back("a");
+        a = json;
+    }));
+    ASSERT_TRUE(report->RegisterPageSceneEventCallback("b", [&](const std::string& json) {
+        order.emplace_back("b");
+        b = json;
+    }));
+    report->ReportPageSceneEvent(R"({"events":[
+        {"ruleSetId":"b", "ruleId":"b1", "sceneType":"SPLIT", "eventName":"SPLIT", "matched":true},
+        {"ruleSetId":"a", "ruleId":"a1", "sceneType":"SPLIT", "eventName":"SPLIT_EXIT", "matched":false},
+        {"ruleSetId":"b", "ruleId":"b2", "sceneType":"SPLIT", "eventName":"SPLIT", "matched":true}]})",
+        false);
+    ASSERT_EQ(order, std::vector<std::string>({ "b", "a" }));
+    auto rootA = InspectorJsonUtil::ParseJsonString(a);
+    auto rootB = InspectorJsonUtil::ParseJsonString(b);
+    auto eventsA = rootA->GetValue("events");
+    auto eventsB = rootB->GetValue("events");
+    ASSERT_EQ(eventsA->GetArraySize(), 1);
+    ASSERT_EQ(eventsB->GetArraySize(), 2);
+    EXPECT_EQ(eventsA->GetArrayItem(0)->GetString("ruleId"), "a1");
+    EXPECT_EQ(eventsA->GetArrayItem(0)->GetValue("matched")->ToString(), "false");
+    EXPECT_EQ(eventsB->GetArrayItem(0)->GetString("ruleId"), "b1");
+    EXPECT_EQ(eventsB->GetArrayItem(1)->GetString("ruleId"), "b2");
+}
+
+HWTEST_F(UIContentStubTest, UIContentStubTestSplitCallbackReentrantUnregister, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    int calls = 0;
+    ASSERT_TRUE(report->RegisterPageSceneEventCallback("a", [&](const std::string&) {
+        ++calls;
+        report->UnregisterPageSceneEventCallback("a");
+    }));
+    const std::string json = R"({"events":[{"ruleSetId":"a", "eventName":"SPLIT", "matched":true}]})";
+    report->ReportPageSceneEvent(json, false);
+    report->ReportPageSceneEvent(json, false);
+    EXPECT_EQ(calls, 1);
+    EXPECT_TRUE(report->RegisterPageSceneEventCallback("a", [&](const std::string&) { ++calls; }));
+    EXPECT_FALSE(report->TryRegisterPageSceneEventCallback("a", [&](const std::string&) { calls += 100; }));
+    report->ReportPageSceneEvent(json, false);
+    EXPECT_EQ(calls, 2);
+}
+
+HWTEST_F(UIContentStubTest, UIContentStubTestSplitQueryIsIndependentFromSubscription, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    int queryCalls = 0;
+    int subscriptionCalls = 0;
+    std::string received;
+    ASSERT_TRUE(report->RegisterPageSceneEventCallback("mixed", [&](const std::string&) { ++subscriptionCalls; }));
+    report->RegisterGetPageSceneCallback([&](const std::string& json) {
+        ++queryCalls;
+        received = json;
+    });
+    const std::string json = R"({"events":[
+        {"ruleSetId":"mixed", "ruleId":"split", "sceneType":"SPLIT", "matched":false},
+        {"ruleSetId":"mixed", "ruleId":"text", "sceneType":"TEXT_EDITOR", "matched":true}]})";
+    report->ReportPageSceneEvent(json, true);
+    EXPECT_EQ(queryCalls, 1);
+    EXPECT_EQ(received, json);
+    EXPECT_EQ(subscriptionCalls, 0);
+    report->UnregisterGetPageSceneCallback();
+    report->ReportPageSceneEvent(json, true);
+    EXPECT_EQ(queryCalls, 1);
+    report->ReportPageSceneEvent(json, false);
+    EXPECT_EQ(subscriptionCalls, 1);
+}
+
+HWTEST_F(UIContentStubTest, UIContentStubTestSplitReportFailureDoesNotRetry, TestSize.Level1)
+{
+    class FailingRemote final : public IRemoteObject {
+    public:
+        int32_t SendRequest(uint32_t code, MessageParcel& data, MessageParcel&, MessageOption& option) override
+        {
+            ++calls;
+            token = data.ReadInterfaceToken();
+            payload = data.ReadString();
+            isGet = data.ReadBool();
+            flags = option.GetFlags();
+            return -1;
+        }
+        int calls = 0;
+        int flags = 0;
+        bool isGet = true;
+        std::u16string token;
+        std::string payload;
+    };
+    sptr<FailingRemote> remote = std::make_shared<FailingRemote>();
+    UiReportProxy proxy(remote);
+    const std::string payload = R"({"events":[{"ruleSetId":"a", "eventName":"SPLIT", "matched":true}]})";
+    MessageParcel::SetDefaultPayloadStorage(true);
+    proxy.ReportPageSceneEvent(payload, false);
+    MessageParcel::SetDefaultPayloadStorage(false);
+    EXPECT_EQ(remote->calls, 1);
+    EXPECT_EQ(remote->payload, payload);
+    EXPECT_FALSE(remote->isGet);
+    EXPECT_NE(remote->flags & MessageOption::TF_ASYNC, 0);
+    EXPECT_EQ(remote->token, ReportService::GetDescriptor());
+}
+
+namespace {
+constexpr size_t INVALID_PAGE_SCENE_ID_LENGTH = 129;
+constexpr char VALID_PROXY_SPLIT_RULE[] =
+    R"({"version":1, "ruleSetId":"split_rules", "rules":[{"ruleId":"split", "sceneType":"SPLIT"}]})";
+constexpr char VALID_PROXY_CUSTOM_RULE[] = R"({"version":1, "ruleSetId":"split_rules", "rules":[{
+    "ruleId":"split", "sceneType":"SPLIT", "navigation":false,
+    "custom":{"selectors":[{"compName":"Column"}], "geometry":{
+        "heightRatioGt":0.8, "widthRatioLte":0.5, "totalWidthRatioGt":0.8, "nonOverlapping":true}}}]})";
+
+class PageSceneValidationRemote final : public IRemoteObject {
+public:
+    int32_t SendRequest(uint32_t code, MessageParcel& data, MessageParcel& reply, MessageOption&) override
+    {
+        ++calls;
+        lastCode = code;
+        EXPECT_EQ(data.ReadInterfaceToken(), IUiContentService::GetDescriptor());
+        payload = data.ReadString();
+        reply.WriteInt32(result);
+        return 0;
+    }
+    int calls = 0;
+    int32_t result = NO_ERROR;
+    uint32_t lastCode = 0;
+    std::string payload;
+};
+
+class PageSceneProxyValidationTest : public testing::Test {
+public:
+    void SetUp() override
+    {
+        MessageParcel::SetDefaultPayloadStorage(true);
+        remote = std::make_shared<PageSceneValidationRemote>();
+        proxy = std::make_unique<UIContentServiceProxy>(sptr<IRemoteObject>(remote));
+        report = std::make_shared<UiReportStub>();
+        proxy->report_ = report;
+    }
+    void TearDown() override
+    {
+        proxy.reset();
+        report = nullptr;
+        remote = nullptr;
+        MessageParcel::SetDefaultPayloadStorage(false);
+    }
+    sptr<PageSceneValidationRemote> remote;
+    sptr<UiReportStub> report;
+    std::unique_ptr<UIContentServiceProxy> proxy;
+};
+} // namespace
+
+HWTEST_F(PageSceneProxyValidationTest, EmptyRequestsKeepOriginalCallback, TestSize.Level1)
+{
+    int calls = 0;
+    report->RegisterGetPageSceneCallback([&calls](const std::string&) { ++calls; });
+    EXPECT_EQ(proxy->RegisterPageSceneRules("", [](const std::string&) {}), PARAM_INVALID);
+    EXPECT_EQ(proxy->GetPageScene("", [](const std::string&) {}), PARAM_INVALID);
+    EXPECT_EQ(proxy->UnregisterPageSceneRules(""), PARAM_INVALID);
+    EXPECT_EQ(remote->calls, 0);
+    EXPECT_TRUE(report->pageSceneEventCallbacks_.empty());
+    report->ReportPageSceneEvent("{}", true);
+    EXPECT_EQ(calls, 1);
+}
+
+HWTEST_F(PageSceneProxyValidationTest, InvalidSplitShapeNeverSends, TestSize.Level1)
+{
+    const std::vector<std::string> requests = {
+        R"({"version":2, "ruleSetId":"split_rules", "rules":[{"ruleId":"s", "sceneType":"SPLIT"}]})",
+        R"({"version":1, "ruleSetId":"bad id", "rules":[{"ruleId":"s", "sceneType":"SPLIT"}]})",
+        R"({"version":1, "ruleSetId":"split_rules", "rules":[{"ruleId":"s", "sceneType":"SPLIT", "enabled":1}]})",
+        R"({"version":1, "ruleSetId":"split_rules", "rules":[{"ruleId":"s", "sceneType":"SPLIT",
+            "navigation":false}]})",
+        R"({"version":1, "ruleSetId":"split_rules", "rules":[{"ruleId":"s", "sceneType":"SPLIT"},
+            {"ruleId":"other", "sceneType":123}]})",
+        R"({"version":1, "ruleSetId":"split_rules", "rules":[{"ruleId":"s", "sceneType":"SPLIT"},
+            {"ruleId":"s", "sceneType":"TEXT_EDITOR"}]})",
+        R"({"version":1, "ruleSetId":"split_rules", "rules":[{"ruleId":"s", "sceneType":"SPLIT",
+            "policy":{"minReportIntervalMs":-1}}]})"
+    };
+    for (const auto& request : requests) {
+        EXPECT_EQ(proxy->RegisterPageSceneRules(request, [](const std::string&) {}), PARAM_INVALID);
+        EXPECT_EQ(proxy->GetPageScene(request, [](const std::string&) {}), PARAM_INVALID);
+    }
+    EXPECT_EQ(remote->calls, 0);
+    EXPECT_TRUE(report->pageSceneEventCallbacks_.empty());
+    EXPECT_FALSE(report->getPageSceneCallback_);
+}
+
+HWTEST_F(PageSceneProxyValidationTest, MixedFutureSceneKeepsPayloadAndReceiverResult, TestSize.Level1)
+{
+    const std::string request = R"({"version":1, "ruleSetId":"split_rules", "rules":[
+        {"ruleId":"future", "sceneType":"FUTURE_SCENE", "custom":null, "navigation":123},
+        {"ruleId":"split", "sceneType":"SPLIT"}]})";
+    EXPECT_EQ(proxy->RegisterPageSceneRules(request, [](const std::string&) {}), NO_ERROR);
+    EXPECT_EQ(remote->lastCode, IUiContentService::REGISTER_PAGE_SCENE_RULES);
+    EXPECT_EQ(remote->payload, request);
+    remote->result = PARAM_INVALID;
+    EXPECT_EQ(proxy->GetPageScene(request, [](const std::string&) {}), PARAM_INVALID);
+    EXPECT_EQ(remote->lastCode, IUiContentService::GET_PAGE_SCENE);
+    EXPECT_EQ(remote->payload, request);
+    EXPECT_EQ(remote->calls, 2);
+}
+
+HWTEST_F(PageSceneProxyValidationTest, CustomGeometryIsValidatedBeforeSending, TestSize.Level1)
+{
+    std::string invalid = VALID_PROXY_CUSTOM_RULE;
+    auto position = invalid.find("0.8");
+    ASSERT_NE(position, std::string::npos);
+    invalid.replace(position, std::string("0.8").size(), "1.1");
+    EXPECT_EQ(proxy->RegisterPageSceneRules(invalid, [](const std::string&) {}), PARAM_INVALID);
+    EXPECT_EQ(proxy->GetPageScene(invalid, [](const std::string&) {}), PARAM_INVALID);
+    EXPECT_EQ(remote->calls, 0);
+    EXPECT_EQ(proxy->RegisterPageSceneRules(VALID_PROXY_CUSTOM_RULE, [](const std::string&) {}), NO_ERROR);
+    EXPECT_EQ(remote->calls, 1);
+    EXPECT_EQ(remote->lastCode, IUiContentService::REGISTER_PAGE_SCENE_RULES);
+    EXPECT_EQ(remote->payload, VALID_PROXY_CUSTOM_RULE);
+}
+
+HWTEST_F(PageSceneProxyValidationTest, CustomGeometryRatioLowerBoundIsRejected, TestSize.Level1)
+{
+    // heightRatioGt < 0.5 -> PARAM_INVALID
+    std::string invalidHeight = VALID_PROXY_CUSTOM_RULE;
+    auto pos = invalidHeight.find("heightRatioGt\":0.8");
+    ASSERT_NE(pos, std::string::npos);
+    invalidHeight.replace(pos, 17, "heightRatioGt\":0.4");
+    EXPECT_EQ(proxy->RegisterPageSceneRules(invalidHeight, [](const std::string&) {}), PARAM_INVALID);
+    EXPECT_EQ(remote->calls, 0);
+
+    // widthRatioLte < 0.2 -> PARAM_INVALID
+    std::string invalidWidth = VALID_PROXY_CUSTOM_RULE;
+    pos = invalidWidth.find("widthRatioLte\":0.5");
+    ASSERT_NE(pos, std::string::npos);
+    invalidWidth.replace(pos, 17, "widthRatioLte\":0.1");
+    EXPECT_EQ(proxy->RegisterPageSceneRules(invalidWidth, [](const std::string&) {}), PARAM_INVALID);
+    EXPECT_EQ(remote->calls, 0);
+
+    // totalWidthRatioGt < 0.5 -> PARAM_INVALID
+    std::string invalidTotal = VALID_PROXY_CUSTOM_RULE;
+    pos = invalidTotal.find("totalWidthRatioGt\":0.8");
+    ASSERT_NE(pos, std::string::npos);
+    invalidTotal.replace(pos, 22, "totalWidthRatioGt\":0.4");
+    EXPECT_EQ(proxy->RegisterPageSceneRules(invalidTotal, [](const std::string&) {}), PARAM_INVALID);
+    EXPECT_EQ(remote->calls, 0);
+}
+
+HWTEST_F(PageSceneProxyValidationTest, CustomGeometryRatioLowerBoundEqualIsValid, TestSize.Level1)
+{
+    // Each sub-test uses a distinct ruleSetId to avoid the proxy single-registration gate.
+    // heightRatioGt = 0.8 (lower bound) -> NO_ERROR
+    std::string minHeight = VALID_PROXY_CUSTOM_RULE;
+    auto pos = minHeight.find("heightRatioGt\":0.8");
+    ASSERT_NE(pos, std::string::npos);
+    minHeight.replace(pos, 17, "heightRatioGt\":0.8");
+    minHeight.replace(minHeight.find("\"split_rules\""), 13, "\"lower_h\"");
+    EXPECT_EQ(proxy->RegisterPageSceneRules(minHeight, [](const std::string&) {}), NO_ERROR);
+    EXPECT_EQ(remote->calls, 1);
+    remote->calls = 0;
+
+    // widthRatioLte = 0.2 (lower bound) -> NO_ERROR
+    std::string minWidth = VALID_PROXY_CUSTOM_RULE;
+    pos = minWidth.find("widthRatioLte\":0.5");
+    ASSERT_NE(pos, std::string::npos);
+    minWidth.replace(pos, 17, "widthRatioLte\":0.2");
+    minWidth.replace(minWidth.find("\"split_rules\""), 13, "\"lower_w\"");
+    EXPECT_EQ(proxy->RegisterPageSceneRules(minWidth, [](const std::string&) {}), NO_ERROR);
+    EXPECT_EQ(remote->calls, 1);
+    remote->calls = 0;
+
+    // totalWidthRatioGt = 0.8 (lower bound) -> NO_ERROR
+    std::string minTotal = VALID_PROXY_CUSTOM_RULE;
+    pos = minTotal.find("totalWidthRatioGt\":0.8");
+    ASSERT_NE(pos, std::string::npos);
+    minTotal.replace(pos, 22, "totalWidthRatioGt\":0.8");
+    minTotal.replace(minTotal.find("\"split_rules\""), 13, "\"lower_t\"");
+    EXPECT_EQ(proxy->RegisterPageSceneRules(minTotal, [](const std::string&) {}), NO_ERROR);
+    EXPECT_EQ(remote->calls, 1);
+}
+
+HWTEST_F(PageSceneProxyValidationTest, LegacyIdsKeepReceiverValidation, TestSize.Level1)
+{
+    remote->result = PARAM_INVALID;
+    const std::vector<std::string> ids = { "bad id", "bad/id", std::string(INVALID_PAGE_SCENE_ID_LENGTH, 'a') };
+    for (const auto& id : ids) {
+        EXPECT_EQ(proxy->GetPageScene(id, [](const std::string&) {}), PARAM_INVALID);
+        EXPECT_EQ(remote->lastCode, IUiContentService::GET_PAGE_SCENE);
+        EXPECT_EQ(remote->payload, id);
+        EXPECT_EQ(proxy->UnregisterPageSceneRules(id), PARAM_INVALID);
+        EXPECT_EQ(remote->lastCode, IUiContentService::UNREGISTER_PAGE_SCENE_RULES);
+        EXPECT_EQ(remote->payload, id);
+    }
+    EXPECT_EQ(remote->calls, static_cast<int32_t>(ids.size() + ids.size()));
+    remote->result = NO_ERROR;
+    EXPECT_EQ(proxy->GetPageScene("split_rules-1", [](const std::string&) {}), NO_ERROR);
+    EXPECT_EQ(proxy->UnregisterPageSceneRules("split_rules-1"), NO_ERROR);
+}
+
+HWTEST_F(PageSceneProxyValidationTest, LegacyScenesKeepServerValidationAndOriginalPayload, TestSize.Level1)
+{
+    const std::vector<std::string> requests = {
+        R"({"version":1, "ruleSetId":"legacy", "rules":[{"sceneType":"TEXT_EDITOR", "condition":null}]})",
+        R"({"ruleSetId":"search", "rules":[{"sceneType":"SEARCH"}]})",
+        R"({"version":1, "ruleSetId":"web", "sourceConfig":{"web":true}, "webRules":[]})"
+    };
+    for (const auto& request : requests) {
+        EXPECT_EQ(proxy->RegisterPageSceneRules(request, [](const std::string&) {}), NO_ERROR);
+        EXPECT_EQ(remote->payload, request);
+        EXPECT_EQ(proxy->GetPageScene(request, [](const std::string&) {}), NO_ERROR);
+        EXPECT_EQ(remote->payload, request);
+    }
+}
+
+HWTEST_F(PageSceneProxyValidationTest, RegistrationCountAndRemoteFailureRemainIndependent, TestSize.Level1)
+{
+    const std::string multiple = R"({"version":1, "ruleSetId":"split_rules", "rules":[
+        {"ruleId":"a", "sceneType":"SPLIT"}, {"ruleId":"b", "sceneType":"SPLIT"}]})";
+    EXPECT_EQ(proxy->RegisterPageSceneRules(multiple, [](const std::string&) {}), PARAM_INVALID);
+    EXPECT_EQ(remote->calls, 0);
+    EXPECT_EQ(proxy->GetPageScene(multiple, [](const std::string&) {}), NO_ERROR);
+    remote->result = PARAM_INVALID;
+    EXPECT_EQ(proxy->RegisterPageSceneRules(VALID_PROXY_SPLIT_RULE, [](const std::string&) {}), PARAM_INVALID);
+    EXPECT_TRUE(report->pageSceneEventCallbacks_.empty());
+    remote->result = NO_ERROR;
+    EXPECT_EQ(proxy->RegisterPageSceneRules(VALID_PROXY_SPLIT_RULE, [](const std::string&) {}), NO_ERROR);
+    EXPECT_EQ(report->pageSceneEventCallbacks_.count("split_rules"), 1u);
+}
+
+HWTEST_F(PageSceneProxyValidationTest, LegacyMalformedQueriesKeepOriginalForwarding, TestSize.Level1)
+{
+    remote->result = LAST_UNFINISH;
+    const std::vector<std::string> requests = { " ", "[]", "{}", "{} trailing", "{\"version\":1", "[1,2]",
+        "\"quoted-id\"" };
+    for (const auto& request : requests) {
+        EXPECT_EQ(proxy->GetPageScene(request, [](const std::string&) {}), LAST_UNFINISH);
+        EXPECT_EQ(remote->payload, request);
+        EXPECT_FALSE(report->getPageSceneCallback_);
+    }
+    EXPECT_EQ(remote->calls, static_cast<int32_t>(requests.size()));
+}
+
+HWTEST_F(PageSceneProxyValidationTest, LegacyRegistrationKeepsReceiverValidation, TestSize.Level1)
+{
+    remote->result = LAST_UNFINISH;
+    const std::vector<std::string> requests = {
+        R"({"version":1,"ruleSetId":"legacy.id","rules":[{"sceneType":"TEXT_EDITOR"}]})",
+        R"({"version":1,"ruleSetId":"unknown","rules":[{"sceneType":"SPILT"}]})",
+        R"({"version":1,"ruleSetId":"empty","rules":[]})",
+        R"({"version":1,"ruleSetId":"web","sourceConfig":{"web":true},"rules":[]})",
+        R"({"ruleSetId":"search.id","rules":[{"pageType":"Router"}]})" };
+    for (const auto& request : requests) {
+        EXPECT_EQ(proxy->RegisterPageSceneRules(request, [](const std::string&) {}), LAST_UNFINISH);
+        EXPECT_EQ(remote->payload, request);
+        EXPECT_EQ(proxy->GetPageScene(request, [](const std::string&) {}), LAST_UNFINISH);
+        EXPECT_EQ(remote->payload, request);
+    }
+    EXPECT_EQ(remote->calls, static_cast<int32_t>(requests.size() + requests.size()));
+    EXPECT_TRUE(report->pageSceneEventCallbacks_.empty());
+}
+
+HWTEST_F(PageSceneProxyValidationTest, LegacyConnectionFailureKeepsOriginalPriority, TestSize.Level1)
+{
+    proxy->report_ = nullptr;
+    for (const auto& request : { "invalid", "{}", "bad id" }) {
+        EXPECT_EQ(proxy->RegisterPageSceneRules(request, [](const std::string&) {}), FAILED);
+        EXPECT_EQ(proxy->GetPageScene(request, [](const std::string&) {}), FAILED);
+    }
+    EXPECT_EQ(proxy->RegisterPageSceneRules("", [](const std::string&) {}), PARAM_INVALID);
+    EXPECT_EQ(proxy->GetPageScene("", [](const std::string&) {}), PARAM_INVALID);
+    EXPECT_EQ(remote->calls, 0);
+}
+
+HWTEST_F(PageSceneProxyValidationTest, SplitTrailingDataIsStillRejectedBeforeSending, TestSize.Level1)
+{
+    const std::vector<std::string> tails = { " trailing", "}", " \t[]", "!", "\x80", "\xc2\xa0" };
+    for (const auto& tail : tails) {
+        const auto request = std::string(VALID_PROXY_SPLIT_RULE) + tail;
+        EXPECT_EQ(proxy->RegisterPageSceneRules(request, [](const std::string&) {}), PARAM_INVALID);
+        EXPECT_EQ(proxy->GetPageScene(request, [](const std::string&) {}), PARAM_INVALID);
+    }
+    EXPECT_EQ(remote->calls, 0);
+    EXPECT_TRUE(report->pageSceneEventCallbacks_.empty());
+    EXPECT_FALSE(report->getPageSceneCallback_);
+}
+
+HWTEST_F(PageSceneProxyValidationTest, SplitWhitespaceTailKeepsCJsonCompatibility, TestSize.Level1)
+{
+    const std::vector<std::string> tails = { "", " \t\r\n", "\x01", "\x1f" };
+    for (const auto& tail : tails) {
+        const auto request = std::string(VALID_PROXY_SPLIT_RULE) + tail;
+        EXPECT_EQ(proxy->GetPageScene(request, [](const std::string&) {}), NO_ERROR);
+        EXPECT_EQ(remote->payload, request);
+    }
+    EXPECT_EQ(remote->calls, static_cast<int32_t>(tails.size()));
+}
+
+HWTEST_F(PageSceneProxyValidationTest, InvalidSelectorTagsNeverSendOrRegisterCallbacks, TestSize.Level1)
+{
+    for (const auto* tag : { "column", "Column ", "width", "unknown", "ForEach", "Span", "MyColumn" }) {
+        std::string json = VALID_PROXY_CUSTOM_RULE;
+        const std::string original = "\"Column\"";
+        auto position = json.find(original);
+        ASSERT_NE(position, std::string::npos);
+        json.replace(position, original.size(), "\"" + std::string(tag) + "\"");
+        EXPECT_EQ(proxy->RegisterPageSceneRules(json, [](const std::string&) {}), PARAM_INVALID) << tag;
+        EXPECT_EQ(proxy->GetPageScene(json, [](const std::string&) {}), PARAM_INVALID) << tag;
+    }
+    EXPECT_EQ(remote->calls, 0);
+    EXPECT_TRUE(report->pageSceneEventCallbacks_.empty());
+    EXPECT_FALSE(report->getPageSceneCallback_);
+    EXPECT_EQ(proxy->RegisterPageSceneRules(VALID_PROXY_CUSTOM_RULE, [](const std::string&) {}), NO_ERROR);
+}
+
+class RemoteStubLifetimeTest : public testing::Test {};
+
+HWTEST_F(RemoteStubLifetimeTest, UnownedStubReturnsNoLocalInterface, TestSize.Level1)
+{
+    UiReportStub stackStub;
+    EXPECT_EQ(stackStub.QueryLocalInterface(ReportService::GetDescriptor()), nullptr);
+    auto uniqueStub = std::make_unique<UiReportStub>();
+    EXPECT_EQ(uniqueStub->QueryLocalInterface(ReportService::GetDescriptor()), nullptr);
+}
+
+HWTEST_F(RemoteStubLifetimeTest, LocalInterfaceRetainsSharedOwner, TestSize.Level1)
+{
+    std::weak_ptr<UiReportStub> weak;
+    sptr<IRemoteBroker> local;
+    {
+        auto stub = std::make_shared<UiReportStub>();
+        weak = stub;
+        local = stub->QueryLocalInterface(ReportService::GetDescriptor());
+        ASSERT_NE(local, nullptr);
+        EXPECT_EQ(local.GetRefPtr(), static_cast<ReportService*>(stub.get()));
+    }
+    EXPECT_FALSE(weak.expired());
+    local = {};
+    EXPECT_TRUE(weak.expired());
+}
+
+HWTEST_F(RemoteStubLifetimeTest, LocalInterfaceRetainsRawSptrOwner, TestSize.Level1)
+{
+    std::weak_ptr<UiReportStub> weak;
+    sptr<ReportService> service;
+    {
+        sptr<UiReportStub> stub = new UiReportStub();
+        weak = stub.GetStdSharedPtr();
+        service = iface_cast<ReportService>(stub);
+        ASSERT_NE(service, nullptr);
+        EXPECT_EQ(service.GetRefPtr(), static_cast<ReportService*>(stub.GetRefPtr()));
+    }
+    EXPECT_FALSE(weak.expired());
+    service = {};
+    EXPECT_TRUE(weak.expired());
+}
+
+HWTEST_F(RemoteStubLifetimeTest, DescriptorMismatchDoesNotRetainOwner, TestSize.Level1)
+{
+    auto stub = std::make_shared<UiReportStub>();
+    const auto owners = stub.use_count();
+    auto local = stub->QueryLocalInterface(u"unrelated.interface");
+    EXPECT_EQ(local, nullptr);
+    EXPECT_EQ(stub.use_count(), owners);
+}
+
+class UIContentStubCallerWhitelistTest : public testing::Test {
+public:
+    void SetUp() override
+    {
+        Security::AccessToken::AccessTokenKit::mockTokenTypeFlag_ =
+            Security::AccessToken::ATokenTypeEnum::TOKEN_NATIVE;
+        IPCSkeleton::mockCallingUid_ = UI_SA_UID;
+    }
+
+    void TearDown() override
+    {
+        Security::AccessToken::AccessTokenKit::mockTokenTypeFlag_ =
+            Security::AccessToken::ATokenTypeEnum::TOKEN_INVALID;
+        IPCSkeleton::mockCallingUid_ = UI_SA_UID;
+    }
+
+    static int32_t Dispatch(const sptr<UIContentServiceStubImpl>& stub, uint32_t code)
+    {
+        MessageParcel data = MessageParcel();
+        MessageParcel reply = MessageParcel();
+        MessageOption option = MessageOption();
+        data.WriteInterfaceToken(u"ohos.ace.UIContentService");
+        return stub->OnRemoteRequest(code, data, reply, option);
+    }
+};
+
+/**
+ * @tc.name: UIContentStubCallerWhitelistTest001
+ * @tc.desc: The three whitelisted SA uids are accepted.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubCallerWhitelistTest, UIContentStubCallerWhitelistTest001, TestSize.Level1)
+{
+    EXPECT_TRUE(UiContentStub::IsTrustedCallerUid(UI_SA_UID));
+    EXPECT_TRUE(UiContentStub::IsTrustedCallerUid(MSDP_UID));
+    EXPECT_TRUE(UiContentStub::IsTrustedCallerUid(APP_CONTROLLER_SERVICE_UID));
+}
+
+/**
+ * @tc.name: UIContentStubCallerWhitelistTest002
+ * @tc.desc: Uids outside the whitelist are rejected.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubCallerWhitelistTest, UIContentStubCallerWhitelistTest002, TestSize.Level1)
+{
+    EXPECT_FALSE(UiContentStub::IsTrustedCallerUid(0));
+    EXPECT_FALSE(UiContentStub::IsTrustedCallerUid(UNTRUSTED_CALLER_UID));
+    EXPECT_FALSE(UiContentStub::IsTrustedCallerUid(5523));
+    EXPECT_FALSE(UiContentStub::IsTrustedCallerUid(UI_SA_UID + 1));
+}
+
+/**
+ * @tc.name: UIContentStubCallerWhitelistTest003
+ * @tc.desc: A whitelisted caller uid may query and connect.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubCallerWhitelistTest, UIContentStubCallerWhitelistTest003, TestSize.Level1)
+{
+    auto stub = std::make_shared<UIContentServiceStubImpl>();
+    EXPECT_EQ(Dispatch(stub, IUiContentService::UI_CONTENT_SERVICE_GET_TREE), NO_ERROR);
+    EXPECT_EQ(Dispatch(stub, IUiContentService::GET_VISIBLE_TREE), NO_ERROR);
+}
+
+/**
+ * @tc.name: UIContentStubCallerWhitelistTest004
+ * @tc.desc: A caller uid outside the whitelist cannot query or connect.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubCallerWhitelistTest, UIContentStubCallerWhitelistTest004, TestSize.Level1)
+{
+    IPCSkeleton::mockCallingUid_ = UNTRUSTED_CALLER_UID;
+    auto stub = std::make_shared<UIContentServiceStubImpl>();
+    EXPECT_EQ(Dispatch(stub, IUiContentService::UI_CONTENT_SERVICE_GET_TREE), -1);
+    EXPECT_EQ(Dispatch(stub, IUiContentService::UI_CONTENT_CONNECT), -1);
+    EXPECT_EQ(Dispatch(stub, IUiContentService::GET_VISIBLE_TREE), -1);
+}
+
+/**
+ * @tc.name: UIContentStubCallerWhitelistTest005
+ * @tc.desc: Only native SA tokens may pass, application and shell tokens are rejected.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubCallerWhitelistTest, UIContentStubCallerWhitelistTest005, TestSize.Level1)
+{
+    using namespace Security::AccessToken;
+    auto stub = std::make_shared<UIContentServiceStubImpl>();
+    for (auto token : { ATokenTypeEnum::TOKEN_HAP, ATokenTypeEnum::TOKEN_SHELL, ATokenTypeEnum::TOKEN_INVALID }) {
+        AccessTokenKit::mockTokenTypeFlag_ = token;
+        EXPECT_EQ(Dispatch(stub, IUiContentService::UI_CONTENT_SERVICE_GET_TREE), -1);
+    }
+}
+
+} // namespace OHOS::Ace::NG

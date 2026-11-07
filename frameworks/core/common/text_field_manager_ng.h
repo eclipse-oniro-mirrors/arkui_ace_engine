@@ -19,6 +19,7 @@
 #include "base/geometry/offset.h"
 #include "base/memory/ace_type.h"
 #include "base/utils/macros.h"
+#include "base/view_data/ace_auto_fill_type.h"
 #include "core/common/ime/text_input_type.h"
 #include "core/common/manager_interface.h"
 #include "core/components_ng/pattern/pattern.h"
@@ -27,12 +28,30 @@
 
 namespace OHOS::Ace::NG {
 
+// Normalize an account name for prefix matching: drop all spaces and fold to
+// lower-case. Only ASCII A-Z is folded; non-ASCII bytes (e.g. UTF-8 Chinese)
+// pass through unchanged, so Chinese account names are preserved byte-for-byte.
+// Inline so both manager and pattern share one definition without crossing
+// the .so boundary (no libace.map export needed).
+inline std::string NormalizeAccount(const std::string& s)
+{
+    std::string out;
+    out.reserve(s.size());
+    for (char c : s) {
+        if (c != ' ') {
+            out.push_back(c >= 'A' && c <= 'Z' ? static_cast<char>(c | 0x20) : c);
+        }
+    }
+    return out;
+}
+
 struct TextFieldInfo {
     int32_t nodeId = -1;
     TextInputType inputType;
     TextContentType contentType;
     int32_t autoFillContainerNodeId = -1;
     bool enableAutoFill = true;
+    AceAutoFillType autoFillType = AceAutoFillType::ACE_UNSPECIFIED;
 };
 
 struct LaterAvoidInfo {
@@ -275,6 +294,9 @@ public:
     void UpdateTextFieldInfo(const TextFieldInfo& textFieldInfo);
     bool HasAutoFillPasswordNodeInContainer(const int32_t& autoFillContainerNodeId,
         const int32_t& nodeId);
+    RefPtr<FrameNode> GetUserNameNodeInContainer(const int32_t& autoFillContainerNodeId, const int32_t& nodeId);
+    std::vector<std::pair<std::string, std::string>> GetAccountList(int32_t id);
+    void RemoveAccountList(int32_t id);
     bool NeedCloseKeyboard();
     void ProcessCustomKeyboard(bool matched, int32_t nodeId);
     void CloseTextCustomKeyboard(int32_t nodeId, bool isUIExtension);
@@ -384,7 +406,8 @@ private:
     bool ScrollToSafeAreaHelper(const SafeAreaInsets::Inset& bottomInset, bool isShowKeyboard);
     RefPtr<FrameNode> FindNavNode(const RefPtr<FrameNode>& textField);
     bool IsAutoFillPasswordType(const TextFieldInfo& textFieldInfo);
-    void GenerateFillContentMap(const std::string& fillContent, FillContentMap& map);
+    void GenerateFillContentMap(const std::string& fillContent, FillContentMap& map,
+        std::vector<std::pair<std::string, std::string>>& accountList);
 
     RefPtr<FrameNode> FindCorrectScrollNode(const SafeAreaInsets::Inset& bottomInset,
         bool isShowKeyboard);
@@ -419,6 +442,7 @@ private:
     std::unordered_map<int32_t, std::function<void()>> avoidCustomKeyboardCallbacks_;
     float lastKeyboardOffset_ = 0.0f;
     std::unordered_map<int32_t, FillContentMap> textFieldFillContentMaps_;
+    std::unordered_map<int32_t, std::vector<std::pair<std::string, std::string>>> textFieldAccountLists_;
     std::unordered_map<int32_t, std::string> textFieldMSDPAutoFillTypes_;
     int32_t currentCustomId_ = -1;
     WeakPtr<FrameNode> preNode_;

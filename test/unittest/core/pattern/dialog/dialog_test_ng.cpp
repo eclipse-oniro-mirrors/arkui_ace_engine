@@ -68,28 +68,6 @@ constexpr int BUTTONINDEX_TEST_1 = 1;
 const Dimension DIALOG_BUTTON_BORDER_RADIUS { 20.0, DimensionUnit::VP };
 } // namespace
 
-class MockDialogTheme : public DialogTheme, public ButtonTheme {
-    DECLARE_ACE_TYPE(MockDialogTheme, DialogTheme, ButtonTheme);
-
-public:
-    class Builder {
-    public:
-        Builder() = default;
-        ~Builder() = default;
-
-        RefPtr<MockDialogTheme> Build(const RefPtr<ThemeConstants>& themeConstants) const
-        {
-            RefPtr<MockDialogTheme> theme = AceType::MakeRefPtr<MockDialogTheme>();
-            return theme;
-        }
-    };
-
-    ~MockDialogTheme() override = default;
-
-protected:
-    MockDialogTheme() = default;
-};
-
 class DialogPatternTestNg : public testing::Test {
 public:
     static void SetUpTestCase();
@@ -198,8 +176,12 @@ void DialogPatternTestNg::TearDownTestCase()
 void DialogPatternTestNg::SetDialogTheme()
 {
     auto themeManager = AceType::DynamicCast<MockThemeManager>(MockPipelineContext::GetCurrent()->GetThemeManager());
-    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(AceType::MakeRefPtr<MockDialogTheme>()));
-    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(AceType::MakeRefPtr<MockDialogTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(AceType::MakeRefPtr<DialogTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(AceType::MakeRefPtr<DialogTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(ButtonTheme::TypeId()))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(ButtonTheme::TypeId(), _))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
 }
 
 void DialogPatternTestNg::UpdateDialogProperties(DialogProperties& props)
@@ -1163,7 +1145,8 @@ HWTEST_F(DialogPatternTestNg, DialogPatternTest011, TestSize.Level0)
         auto dialog = overlayManager->ShowDialog(props, nullptr);
         ASSERT_NE(dialog, nullptr);
         auto dialogProp = AceType::DynamicCast<DialogLayoutProperty>(dialog->GetLayoutProperty());
-        dialogLayoutAlgorithm.MultipleDialog(dialogProp, childSize, selfSize, overlayManager);
+        auto dialogPattern = dialog->GetPattern<DialogPattern>();
+        dialogLayoutAlgorithm.MultipleDialog(dialogProp, childSize, selfSize, overlayManager, dialogPattern);
     }
     /**
      * @tc.steps: step5. test DialogLayoutAlgorithm's MultipleDialog function.
@@ -1175,7 +1158,8 @@ HWTEST_F(DialogPatternTestNg, DialogPatternTest011, TestSize.Level0)
     auto dialog = overlayManager->ShowDialog(props, nullptr);
     ASSERT_NE(dialog, nullptr);
     auto dialogProp = AceType::DynamicCast<DialogLayoutProperty>(dialog->GetLayoutProperty());
-    dialogLayoutAlgorithm.MultipleDialog(dialogProp, newChildSize, newSelfSize, overlayManager);
+    auto dialogPattern = dialog->GetPattern<DialogPattern>();
+    dialogLayoutAlgorithm.MultipleDialog(dialogProp, newChildSize, newSelfSize, overlayManager, dialogPattern);
     EXPECT_EQ(dialogLayoutAlgorithm.touchingBoundaryFlag_, TouchingBoundaryType::NotTouchBoundary);
 }
 

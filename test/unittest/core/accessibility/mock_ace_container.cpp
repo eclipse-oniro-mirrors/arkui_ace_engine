@@ -161,6 +161,10 @@ bool AceContainer::IsSubWindow() const
 {
     return true;
 }
+bool AceContainer::IsPipWindow() const
+{
+    return false;
+}
 bool AceContainer::IsDialogWindow() const
 {
     return true;
@@ -322,4 +326,8 @@ void AceContainer::TerminateUIExtensionInner(int32_t code) {}
 
 void AceContainer::GetOriginalEventInfo(const EventPositionInfo& eventPositionInfo,
     EventPositionInfo& originalPos) {}
+
+void AceContainer::RefreshLiveFoldCreaseRegion() {}
+
+void AceContainer::RefreshFoldCreaseDirection() {}
 } // namespace OHOS::Ace::Platform

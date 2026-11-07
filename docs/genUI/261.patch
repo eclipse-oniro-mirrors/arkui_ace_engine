@@ -1,0 +1,311 @@
+diff --git a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/ComponentProps.ets b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/ComponentProps.ets
+index 4da40185fedd275dc68e000b6ad41a6556ee34df..bc7004c6998b1d5e537d6d293cc6291c1270af2b 100644
+--- a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/ComponentProps.ets
++++ b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/ComponentProps.ets
+@@ -22,6 +22,26 @@ export interface BackdropBlurOptions {
+   grayscale?: [number, number];
+ }
+ 
++export interface RotateTransformOptions {
++  angleX?: number;
++  angleY?: number;
++  angleZ?: number;
++  centerX?: number | string;
++  centerY?: number | string;
++  centerZ?: number;
++  perspective?: number;
++}
++
++export interface ScaleTransformOptions {
++  x?: number;
++  y?: number;
++}
++
++export interface TranslateTransformOptions {
++  x?: number;
++  y?: number;
++}
++
+ export class ComponentProps {
+   public id: string;
+   public parentId?: string;
+@@ -53,6 +73,9 @@ export class ComponentProps {
+   public linearGradientObj?: LinearGradientOptions;
+   public backdropBlurObj?: BackdropBlurOptions;
+   public opacityValue?: number;
++  public rotateObj?: RotateTransformOptions;
++  public scaleObj?: ScaleTransformOptions;
++  public translateObj?: TranslateTransformOptions;
+ 
+   public padding?: Margin | Length;
+   public margin?: Margin | Length;
+diff --git a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/properties/CommonPropertySpecs.ets b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/properties/CommonPropertySpecs.ets
+index f39e6e08bbdd431e9ad984461c43f4cca843cf6e..acad41945694a2b649f82d025e253d531cf31019 100644
+--- a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/properties/CommonPropertySpecs.ets
++++ b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/properties/CommonPropertySpecs.ets
+@@ -43,6 +43,9 @@ function buildCommonPropertySpecs(): Map<string, PropertySpec> {
+   m.set('shadow', s((p, v) => { p.shadowObj = StyleMapper.mapShadow(v); }));
+   m.set('backdropBlur', s((p, v) => { p.backdropBlurObj = StyleMapper.mapBackdropBlur(v); }));
+   m.set('opacity', s((p, v) => { p.opacityValue = StyleMapper.mapOpacity(v); }));
++  m.set('rotate', s((p, v) => { p.rotateObj = StyleMapper.mapRotate(v); }));
++  m.set('scale', s((p, v) => { p.scaleObj = StyleMapper.mapScale(v); }));
++  m.set('translate', s((p, v) => { p.translateObj = StyleMapper.mapTranslate(v); }));
+   m.set('linearGradient', s((p, v) => { p.linearGradientObj = StyleMapper.mapLinearGradient(v); }));
+   m.set('flexShrink', s((p, v) => { p.flexShrink = StyleMapper.mapFlexShrink(v); }));
+   m.set('constraintSize', s((p, v) => { p.constraintSize = StyleMapper.mapConstraintSize(v); }));
+diff --git a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/ButtonRenderNode.ets b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/ButtonRenderNode.ets
+index 3e4587724af6fdfc44f000cba69b789729d68dfd..ef86629a518e2223fd06e500e173169ca043b06e 100644
+--- a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/ButtonRenderNode.ets
++++ b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/ButtonRenderNode.ets
+@@ -130,6 +130,9 @@ export struct ButtonRenderNode {
+     .backdropBlur(this.descriptor.getProps().backdropBlurObj?.radius, this.descriptor.getProps().backdropBlurObj?.grayscale ? { grayscale: this.descriptor.getProps().backdropBlurObj!.grayscale } : undefined)
+     .linearGradient(this.descriptor.getProps().linearGradientObj)
+     .opacity(this.descriptor.getProps().opacityValue)
++    .rotate(this.descriptor.getProps().rotateObj as RotateOptions)
++    .scale(this.descriptor.getProps().scaleObj as ScaleOptions)
++    .translate(this.descriptor.getProps().translateObj as TranslateOptions)
+     .margin(this.descriptor.getProps().margin)
+     .width(this.descriptor.getProps().width)
+     .height(this.descriptor.getProps().height)
+diff --git a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/CheckboxRenderNode.ets b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/CheckboxRenderNode.ets
+index ca5711a91f4f825b11ef3fbce1d4bb94fd32ca96..d341beb0681b42f89bf1dff1e1be0c1f93cc82a5 100644
+--- a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/CheckboxRenderNode.ets
++++ b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/CheckboxRenderNode.ets
+@@ -117,6 +117,9 @@ export struct CheckboxRenderNode {
+     .backdropBlur(this.descriptor.getProps().backdropBlurObj?.radius, this.descriptor.getProps().backdropBlurObj?.grayscale ? { grayscale: this.descriptor.getProps().backdropBlurObj!.grayscale } : undefined)
+     .linearGradient(this.descriptor.getProps().linearGradientObj)
+     .opacity(this.descriptor.getProps().opacityValue)
++    .rotate(this.descriptor.getProps().rotateObj as RotateOptions)
++    .scale(this.descriptor.getProps().scaleObj as ScaleOptions)
++    .translate(this.descriptor.getProps().translateObj as TranslateOptions)
+     .margin(this.descriptor.getProps().margin)
+     .width(this.descriptor.getProps().width)
+     .height(this.descriptor.getProps().height)
+diff --git a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/ColumnRenderNode.ets b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/ColumnRenderNode.ets
+index c1ced1e3e9897fcc3c98bbe8ab705c9713df1252..36252c9c50b57dfe54244974888fc2db3fb3095f 100644
+--- a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/ColumnRenderNode.ets
++++ b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/ColumnRenderNode.ets
+@@ -107,6 +107,9 @@ export struct ColumnRenderNode {
+     .backdropBlur(this.descriptor.getProps().backdropBlurObj?.radius, this.descriptor.getProps().backdropBlurObj?.grayscale ? { grayscale: this.descriptor.getProps().backdropBlurObj!.grayscale } : undefined)
+     .linearGradient(this.descriptor.getProps().linearGradientObj)
+     .opacity(this.descriptor.getProps().opacityValue)
++    .rotate(this.descriptor.getProps().rotateObj as RotateOptions)
++    .scale(this.descriptor.getProps().scaleObj as ScaleOptions)
++    .translate(this.descriptor.getProps().translateObj as TranslateOptions)
+     .margin(this.descriptor.getProps().margin)
+     .width(this.descriptor.getProps().width)
+     .height(this.descriptor.getProps().height)
+diff --git a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/DividerRenderNode.ets b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/DividerRenderNode.ets
+index 526dce05c037affe475f8ccfab1e54e393846d2f..8a5d5279b34a35e7ec003e9a33b19b34d98468de 100644
+--- a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/DividerRenderNode.ets
++++ b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/DividerRenderNode.ets
+@@ -104,6 +104,9 @@ export struct DividerRenderNode {
+     .backdropBlur(this.descriptor.getProps().backdropBlurObj?.radius, this.descriptor.getProps().backdropBlurObj?.grayscale ? { grayscale: this.descriptor.getProps().backdropBlurObj!.grayscale } : undefined)
+     .linearGradient(this.descriptor.getProps().linearGradientObj)
+     .opacity(this.descriptor.getProps().opacityValue)
++    .rotate(this.descriptor.getProps().rotateObj as RotateOptions)
++    .scale(this.descriptor.getProps().scaleObj as ScaleOptions)
++    .translate(this.descriptor.getProps().translateObj as TranslateOptions)
+     .margin(this.descriptor.getProps().margin)
+     .width(this.descriptor.getProps().width)
+     .height(this.descriptor.getProps().height)
+diff --git a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/ImageRenderNode.ets b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/ImageRenderNode.ets
+index 2b50c6a18a72e38bc988d59e22f7ecd452d4720c..efe3af170e2517f5bdc7545cc53979393c255706 100644
+--- a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/ImageRenderNode.ets
++++ b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/ImageRenderNode.ets
+@@ -117,6 +117,9 @@ export struct ImageRenderNode {
+     .backdropBlur(this.descriptor.getProps().backdropBlurObj?.radius, this.descriptor.getProps().backdropBlurObj?.grayscale ? { grayscale: this.descriptor.getProps().backdropBlurObj!.grayscale } : undefined)
+     .linearGradient(this.descriptor.getProps().linearGradientObj)
+     .opacity(this.descriptor.getProps().opacityValue)
++    .rotate(this.descriptor.getProps().rotateObj as RotateOptions)
++    .scale(this.descriptor.getProps().scaleObj as ScaleOptions)
++    .translate(this.descriptor.getProps().translateObj as TranslateOptions)
+     .margin(this.descriptor.getProps().margin)
+     .width(this.descriptor.getProps().width)
+     .height(this.descriptor.getProps().height)
+diff --git a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/ListRenderNode.ets b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/ListRenderNode.ets
+index 38f2c7e995c31066d840cfe7b2e587caa15552c0..386cfbfd863b8662b381af644d9f66f1e2c56f7b 100644
+--- a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/ListRenderNode.ets
++++ b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/ListRenderNode.ets
+@@ -121,6 +121,9 @@ export struct ListRenderNode {
+     .backdropBlur(this.descriptor.getProps().backdropBlurObj?.radius, this.descriptor.getProps().backdropBlurObj?.grayscale ? { grayscale: this.descriptor.getProps().backdropBlurObj!.grayscale } : undefined)
+     .linearGradient(this.descriptor.getProps().linearGradientObj)
+     .opacity(this.descriptor.getProps().opacityValue)
++    .rotate(this.descriptor.getProps().rotateObj as RotateOptions)
++    .scale(this.descriptor.getProps().scaleObj as ScaleOptions)
++    .translate(this.descriptor.getProps().translateObj as TranslateOptions)
+     .margin(this.descriptor.getProps().margin)
+     .width(this.descriptor.getProps().width)
+     .height(this.descriptor.getProps().height)
+diff --git a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/ProgressRenderNode.ets b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/ProgressRenderNode.ets
+index a4a0d5f3ccfed8db8520ba8ab1982184c2336a0a..ecbf09104c6f438419e680ae59bf402abddd0444 100644
+--- a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/ProgressRenderNode.ets
++++ b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/ProgressRenderNode.ets
+@@ -156,6 +156,9 @@ export struct ProgressRenderNode {
+     .backdropBlur(this.descriptor.getProps().backdropBlurObj?.radius, this.descriptor.getProps().backdropBlurObj?.grayscale ? { grayscale: this.descriptor.getProps().backdropBlurObj!.grayscale } : undefined)
+     .linearGradient(this.descriptor.getProps().linearGradientObj)
+     .opacity(this.descriptor.getProps().opacityValue)
++    .rotate(this.descriptor.getProps().rotateObj as RotateOptions)
++    .scale(this.descriptor.getProps().scaleObj as ScaleOptions)
++    .translate(this.descriptor.getProps().translateObj as TranslateOptions)
+     .margin(this.descriptor.getProps().margin)
+     .width(this.descriptor.getProps().width)
+     .height(this.descriptor.getProps().height)
+diff --git a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/RenderNodeCommonStylesTemplate.ets b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/RenderNodeCommonStylesTemplate.ets
+index a4b21d919414737ccfb742f31331818701aeb2b3..5dc155f212ab5ce9d968b8610b11b60bfcd10026 100644
+--- a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/RenderNodeCommonStylesTemplate.ets
++++ b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/RenderNodeCommonStylesTemplate.ets
+@@ -57,6 +57,9 @@ struct RenderNodeCommonStylesTemplate {
+     .backdropBlur(this.descriptor.getProps().backdropBlurObj?.radius, this.descriptor.getProps().backdropBlurObj?.grayscale ? { grayscale: this.descriptor.getProps().backdropBlurObj!.grayscale } : undefined)
+     .linearGradient(this.descriptor.getProps().linearGradientObj)
+     .opacity(this.descriptor.getProps().opacityValue)
++    .rotate(this.descriptor.getProps().rotateObj as RotateOptions)
++    .scale(this.descriptor.getProps().scaleObj as ScaleOptions)
++    .translate(this.descriptor.getProps().translateObj as TranslateOptions)
+     .margin(this.descriptor.getProps().margin)
+     .width(this.descriptor.getProps().width)
+     .height(this.descriptor.getProps().height)
+diff --git a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/RowRenderNode.ets b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/RowRenderNode.ets
+index ea32a1dde9c57874647c98f32a109b88519e184a..23fb6de24420f192d0f475dc0c9fd95e25970ff9 100644
+--- a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/RowRenderNode.ets
++++ b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/RowRenderNode.ets
+@@ -107,6 +107,9 @@ export struct RowRenderNode {
+     .backdropBlur(this.descriptor.getProps().backdropBlurObj?.radius, this.descriptor.getProps().backdropBlurObj?.grayscale ? { grayscale: this.descriptor.getProps().backdropBlurObj!.grayscale } : undefined)
+     .linearGradient(this.descriptor.getProps().linearGradientObj)
+     .opacity(this.descriptor.getProps().opacityValue)
++    .rotate(this.descriptor.getProps().rotateObj as RotateOptions)
++    .scale(this.descriptor.getProps().scaleObj as ScaleOptions)
++    .translate(this.descriptor.getProps().translateObj as TranslateOptions)
+     .margin(this.descriptor.getProps().margin)
+     .width(this.descriptor.getProps().width)
+     .height(this.descriptor.getProps().height)
+diff --git a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/StackRenderNode.ets b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/StackRenderNode.ets
+index 19df23836679a06fc5410fb699e31b3b54c7acab..05dcb5ed833a51bbf65344d30316a86106222dd0 100644
+--- a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/StackRenderNode.ets
++++ b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/StackRenderNode.ets
+@@ -97,6 +97,9 @@ export struct StackRenderNode {
+     .backdropBlur(this.descriptor.getProps().backdropBlurObj?.radius, this.descriptor.getProps().backdropBlurObj?.grayscale ? { grayscale: this.descriptor.getProps().backdropBlurObj!.grayscale } : undefined)
+     .linearGradient(this.descriptor.getProps().linearGradientObj)
+     .opacity(this.descriptor.getProps().opacityValue)
++    .rotate(this.descriptor.getProps().rotateObj as RotateOptions)
++    .scale(this.descriptor.getProps().scaleObj as ScaleOptions)
++    .translate(this.descriptor.getProps().translateObj as TranslateOptions)
+     .margin(this.descriptor.getProps().margin)
+     .width(this.descriptor.getProps().width)
+     .height(this.descriptor.getProps().height)
+diff --git a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/TextRenderNode.ets b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/TextRenderNode.ets
+index dec1cf2584fe60ec4159e07eefc550776e99239f..9bd9c0a29b6dce4ab3211b79a458d601b891b6f8 100644
+--- a/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/TextRenderNode.ets
++++ b/libs/genui_form_lib/genui_form/src/main/ets/engine/components/render/renderers/TextRenderNode.ets
+@@ -156,6 +156,9 @@ export struct TextRenderNode {
+     .backdropBlur(this.descriptor.getProps().backdropBlurObj?.radius, this.descriptor.getProps().backdropBlurObj?.grayscale ? { grayscale: this.descriptor.getProps().backdropBlurObj!.grayscale } : undefined)
+     .linearGradient(this.descriptor.getProps().linearGradientObj)
+     .opacity(this.descriptor.getProps().opacityValue)
++    .rotate(this.descriptor.getProps().rotateObj as RotateOptions)
++    .scale(this.descriptor.getProps().scaleObj as ScaleOptions)
++    .translate(this.descriptor.getProps().translateObj as TranslateOptions)
+     .margin(this.descriptor.getProps().margin)
+     .width(this.descriptor.getProps().width)
+     .height(this.descriptor.getProps().height)
+diff --git a/libs/genui_form_lib/genui_form/src/main/ets/engine/core/StyleMapper.ets b/libs/genui_form_lib/genui_form/src/main/ets/engine/core/StyleMapper.ets
+index f5c37705b3c387b4e2c99bc9f95d94a61e66a888..742624732bd9c7cda741183ec0180baca3b8f495 100644
+--- a/libs/genui_form_lib/genui_form/src/main/ets/engine/core/StyleMapper.ets
++++ b/libs/genui_form_lib/genui_form/src/main/ets/engine/core/StyleMapper.ets
+@@ -13,7 +13,7 @@
+  * limitations under the License.
+  */
+ 
+-import { ComponentProps, BackdropBlurOptions } from '../components/ComponentProps';
++import { ComponentProps, BackdropBlurOptions, RotateTransformOptions, ScaleTransformOptions, TranslateTransformOptions } from '../components/ComponentProps';
+ import { Logger } from '../utils/Logger';
+ import {
+   ERROR_CODE_INVALID_VALUE,
+@@ -959,6 +959,88 @@ export class StyleMapper {
+     return num;
+   }
+ 
++  static mapRotate(val: Object | undefined): RotateTransformOptions | undefined {
++    if (val === undefined || val === null || Array.isArray(val) || !(val instanceof Object)) {
++      Logger.warn('StyleMapper.rotate ignored: value is not a recognized object');
++      return undefined;
++    }
++    let raw = val as Record<string, Object>;
++    let result: RotateTransformOptions = {};
++    let angleX = raw['angleX'];
++    if (angleX !== undefined && angleX !== null && typeof angleX === 'number' && Number.isFinite(angleX as number)) {
++      result.angleX = angleX as number;
++    }
++    let angleY = raw['angleY'];
++    if (angleY !== undefined && angleY !== null && typeof angleY === 'number' && Number.isFinite(angleY as number)) {
++      result.angleY = angleY as number;
++    }
++    let angleZ = raw['angleZ'];
++    if (angleZ !== undefined && angleZ !== null && typeof angleZ === 'number' && Number.isFinite(angleZ as number)) {
++      result.angleZ = angleZ as number;
++    }
++    let centerX = raw['centerX'];
++    if (centerX !== undefined && centerX !== null) {
++      if (typeof centerX === 'number' && Number.isFinite(centerX as number)) {
++        result.centerX = centerX as number;
++      } else if (typeof centerX === 'string') {
++        result.centerX = centerX as string;
++      }
++    }
++    let centerY = raw['centerY'];
++    if (centerY !== undefined && centerY !== null) {
++      if (typeof centerY === 'number' && Number.isFinite(centerY as number)) {
++        result.centerY = centerY as number;
++      } else if (typeof centerY === 'string') {
++        result.centerY = centerY as string;
++      }
++    }
++    let centerZ = raw['centerZ'];
++    if (centerZ !== undefined && centerZ !== null && typeof centerZ === 'number' && Number.isFinite(centerZ as number)) {
++      result.centerZ = centerZ as number;
++    }
++    let perspective = raw['perspective'];
++    if (perspective !== undefined && perspective !== null && typeof perspective === 'number' && Number.isFinite(perspective as number)) {
++      result.perspective = perspective as number;
++    }
++    return result;
++  }
++
++  static mapScale(val: Object | undefined): ScaleTransformOptions | undefined {
++    if (val === undefined || val === null || Array.isArray(val) || !(val instanceof Object)) {
++      Logger.warn('StyleMapper.scale ignored: value is not a recognized object');
++      return undefined;
++    }
++    let raw = val as Record<string, Object>;
++    let result: ScaleTransformOptions = {};
++    let x = raw['x'];
++    if (x !== undefined && x !== null && typeof x === 'number' && Number.isFinite(x as number)) {
++      result.x = x as number;
++    }
++    let y = raw['y'];
++    if (y !== undefined && y !== null && typeof y === 'number' && Number.isFinite(y as number)) {
++      result.y = y as number;
++    }
++    return result;
++  }
++
++  static mapTranslate(val: Object | undefined): TranslateTransformOptions | undefined {
++    if (val === undefined || val === null || Array.isArray(val) || !(val instanceof Object)) {
++      Logger.warn('StyleMapper.translate ignored: value is not a recognized object');
++      return undefined;
++    }
++    let raw = val as Record<string, Object>;
++    let result: TranslateTransformOptions = {};
++    let x = raw['x'];
++    if (x !== undefined && x !== null && typeof x === 'number' && Number.isFinite(x as number)) {
++      result.x = x as number;
++    }
++    let y = raw['y'];
++    if (y !== undefined && y !== null && typeof y === 'number' && Number.isFinite(y as number)) {
++      result.y = y as number;
++    }
++    return result;
++  }
++
+   static mapShadow(val: Object | undefined): ShadowOptions | ShadowStyle | undefined {
+     let shadowStyle = StyleMapper.mapShadowStyle(val);
+     if (shadowStyle !== undefined) {

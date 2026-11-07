@@ -21,7 +21,7 @@
 #include "base/memory/ace_type.h"
 
 namespace OHOS::Ace::NG {
-class XComponentSurfaceConfigInterface : public virtual AceType {
+class XComponentSurfaceConfigInterface : public AceType {
 public:
     /**
      * @brief Set XComponent surface config.

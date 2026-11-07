@@ -141,7 +141,7 @@ HWTEST_F(GridScrollLayoutTestThreeNg, GetResetMode001, TestSize.Level1)
     CreateFixedItems(40);
     CreateDone();
 
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto layoutAlgorithm =
         AceType::DynamicCast<GridScrollLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto* wrapper = AceType::RawPtr(frameNode_);
@@ -247,6 +247,48 @@ HWTEST_F(GridScrollLayoutTestThreeNg, Stretch001, TestSize.Level1)
     auto childRect0 = pattern_->GetItemRect(0);
     auto childRect1 = pattern_->GetItemRect(1);
     EXPECT_EQ(childRect0.Height(), childRect1.Height());
+}
+
+/**
+ * @tc.name: DumpAlignItemsMatchesLayout
+ * @tc.desc: Public alignment agrees with measured child height for unset, DEFAULT and STRETCH.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestThreeNg, DumpAlignItemsMatchesLayout, TestSize.Level1)
+{
+    auto model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    CreateFixedHeightItems(1, 80.0f);
+    CreateGridItem(FILL_VALUE);
+    CreateColumn(FILL_VALUE, 30.0f);
+    ViewStackProcessor::GetInstance()->Pop();
+    ViewStackProcessor::GetInstance()->StopGetAccessRecording();
+    ViewStackProcessor::GetInstance()->Pop();
+    ViewStackProcessor::GetInstance()->StopGetAccessRecording();
+    CreateDone();
+    const struct {
+        std::optional<GridItemAlignment> alignment;
+        float height;
+        const char* dumpValue;
+    } cases[] = {
+        { std::nullopt, 30.0f, "GridItemAlignment.DEFAULT" },
+        { GridItemAlignment::DEFAULT, 30.0f, "GridItemAlignment.DEFAULT" },
+        { GridItemAlignment::STRETCH, 80.0f, "GridItemAlignment.STRETCH" },
+    };
+    for (const auto& item : cases) {
+        SCOPED_TRACE(item.dumpValue);
+        GridModelNG::SetAlignItems(AceType::RawPtr(frameNode_), item.alignment);
+        frameNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+        FlushUITasks();
+        EXPECT_FLOAT_EQ(pattern_->GetItemRect(0).Height(), 80.0f);
+        EXPECT_FLOAT_EQ(pattern_->GetItemRect(1).Height(), item.height);
+        ParamConfig config;
+        config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+        config.visualProperties = true;
+        auto json = JsonUtil::Create();
+        pattern_->DumpAdvanceInfo(json, config);
+        EXPECT_EQ(json->GetString("AlignItems"), item.dumpValue);
+    }
 }
 
 /**

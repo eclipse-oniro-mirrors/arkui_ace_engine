@@ -14,6 +14,7 @@
  */
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_PICKER_UTILS_PICKER_COLUMN_PATTERN_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_PICKER_UTILS_PICKER_COLUMN_PATTERN_H
+#include <atomic>
 #include <cstdint>
 #include "adapter/ohos/entrance/picker/picker_haptic_factory.h"
 #include "core/components_ng/base/modifier.h"
@@ -50,7 +51,7 @@ struct PickerOptionProperty {
     float nextDistance = 0.0f; // between the next item and itself when scroll down
 };
 
-class PickerEventParam : public virtual AceType {
+class PickerEventParam : public AceType {
     DECLARE_ACE_TYPE(PickerEventParam, AceType);
 
 public:
@@ -348,7 +349,7 @@ protected:
     bool isShow_ = true;
     bool isEnableHaptic_ = true;
     bool isHapticPlayOnce_ = true;
-    bool isTossPlaying_ = false;
+    std::atomic<bool> isTossPlaying_ = false;
     std::shared_ptr<IPickerAudioHaptic> hapticController_ = nullptr;
     RefPtr<NodeAnimatablePropertyFloat> scrollProperty_;
     RefPtr<TossAnimationController> tossAnimationController_ = AceType::MakeRefPtr<TossAnimationController>();

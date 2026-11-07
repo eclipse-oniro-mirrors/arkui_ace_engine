@@ -39,7 +39,7 @@ struct WindowTypeConfig {
     bool isSceneBoardWindow = false;
 };
 
-class ACE_FORCE_EXPORT SafeAreaManager : public virtual AceType {
+class ACE_FORCE_EXPORT SafeAreaManager : public AceType {
     DECLARE_ACE_TYPE(SafeAreaManager, AceType);
 
 public:
@@ -84,6 +84,12 @@ public:
     bool UpdateFloatNavSafeArea(
         const SafeAreaInsets& safeArea, NG::OptionalSize<uint32_t> rootSize = NG::OptionalSize<uint32_t>());
 
+    bool UpdateTitleButtonSafeArea(
+        const SafeAreaInsets& safeArea, NG::OptionalSize<uint32_t> rootSize = NG::OptionalSize<uint32_t>());
+
+    bool CheckTitleButtonSafeArea(
+        const SafeAreaInsets& safeArea, NG::OptionalSize<uint32_t> rootSize = NG::OptionalSize<uint32_t>());
+
     /**
      * @brief Retrieves the system safe area insets.
      *
@@ -104,6 +110,13 @@ public:
     SafeAreaInsets GetFloatNavSafeAreaWithoutProcess() const
     {
         return floatNavSafeArea_;
+    }
+
+    SafeAreaInsets GetTitleButtonSafeArea() const;
+
+    SafeAreaInsets GetTitleButtonSafeAreaWithoutProcess() const
+    {
+        return titleButtonSafeArea_;
     }
 
     /**
@@ -340,6 +353,9 @@ public:
 
     bool IsSafeAreaValid() const;
 
+    SafeAreaInsets GetTitleButtonSafeAreaInternal() const;
+    SafeAreaInsets::Inset GetKeyboardBottomInset(bool withoutProcess, const SafeAreaInsets::Inset& current) const;
+
     // check if the page node needs to be avoid keyboard
     bool CheckPageNeedAvoidKeyboard(const RefPtr<FrameNode>& frameNode);
 
@@ -403,6 +419,8 @@ public:
         getKeyboardInset = method;
     }
 
+    bool IsImmersiveEffectEnabled() const;
+
 private:
     bool isAtomicService_ = false;
 
@@ -431,8 +449,8 @@ private:
     std::optional<bool> useCutout_;
 
     KeyBoardAvoidMode keyboardAvoidMode_ = KeyBoardAvoidMode::OFFSET;
-    bool IsModeResize();
-    bool IsModeOffset();
+    bool IsModeResize() const;
+    bool IsModeOffset() const;
 
     std::function<void(bool)> floatNavPullDelegate_;
 
@@ -440,6 +458,7 @@ private:
     SafeAreaInsets cutoutSafeArea_;
     SafeAreaInsets navSafeArea_;
     SafeAreaInsets floatNavSafeArea_;
+    SafeAreaInsets titleButtonSafeArea_;
     // keyboard is bottom direction only
     SafeAreaInsets::Inset keyboardInset_;
     SafeAreaInsets::Inset keyboardWebInset_;

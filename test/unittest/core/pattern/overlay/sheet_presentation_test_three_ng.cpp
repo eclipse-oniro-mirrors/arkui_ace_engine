@@ -387,7 +387,7 @@ HWTEST_F(SheetPresentationTestThreeNg, UpdateTranslateOffsetWithPlacement001, Te
     OffsetF translate;
     auto layoutWrapperNode = AceType::MakeRefPtr<LayoutWrapperNode>(
         sheetNode, sheetNode->GetGeometryNode(), sheetNode->GetLayoutProperty());
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     sheetLayoutAlgorithm->UpdateTranslateOffsetWithPlacement(translate, layoutWrapper);
     EXPECT_EQ(translate.GetX(), 0.0f);
     EXPECT_EQ(translate.GetY(), 8.0f);
@@ -417,7 +417,7 @@ HWTEST_F(SheetPresentationTestThreeNg, UpdateTranslateOffsetWithPlacement002, Te
     OffsetF translate;
     auto layoutWrapperNode = AceType::MakeRefPtr<LayoutWrapperNode>(
         sheetNode, sheetNode->GetGeometryNode(), sheetNode->GetLayoutProperty());
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     sheetLayoutAlgorithm->UpdateTranslateOffsetWithPlacement(translate, layoutWrapper);
     EXPECT_EQ(translate.GetX(), 0.0f);
     EXPECT_EQ(translate.GetY(), 0.0f);
@@ -447,7 +447,7 @@ HWTEST_F(SheetPresentationTestThreeNg, UpdateTranslateOffsetWithPlacement003, Te
     OffsetF translate;
     auto layoutWrapperNode = AceType::MakeRefPtr<LayoutWrapperNode>(
         sheetNode, sheetNode->GetGeometryNode(), sheetNode->GetLayoutProperty());
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     sheetLayoutAlgorithm->UpdateTranslateOffsetWithPlacement(translate, layoutWrapper);
     EXPECT_EQ(translate.GetX(), 0.0f);
     EXPECT_EQ(translate.GetY(), 0.0f);
@@ -479,7 +479,7 @@ HWTEST_F(SheetPresentationTestThreeNg, UpdateTranslateOffsetWithPlacement004, Te
     OffsetF translate;
     auto layoutWrapperNode = AceType::MakeRefPtr<LayoutWrapperNode>(
         sheetNode, sheetNode->GetGeometryNode(), sheetNode->GetLayoutProperty());
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     sheetLayoutAlgorithm->UpdateTranslateOffsetWithPlacement(translate, layoutWrapper);
     EXPECT_EQ(translate.GetX(), 0.0f);
     EXPECT_EQ(translate.GetY(), 0.0f);
@@ -517,7 +517,7 @@ HWTEST_F(SheetPresentationTestThreeNg, UpdateTranslateOffsetWithPlacement005, Te
     OffsetF translate;
     auto layoutWrapperNode = AceType::MakeRefPtr<LayoutWrapperNode>(
         sheetNode, sheetNode->GetGeometryNode(), sheetNode->GetLayoutProperty());
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     sheetLayoutAlgorithm->UpdateTranslateOffsetWithPlacement(translate, layoutWrapper);
     EXPECT_EQ(translate.GetX(), 0.0f);
     EXPECT_EQ(translate.GetY(), 8.0f);
@@ -1332,7 +1332,7 @@ HWTEST_F(SheetPresentationTestThreeNg, UpdateMaxSizeWithPlacement001, TestSize.L
     float maxHeight = 2000.0f;
     auto layoutWrapperNode = AceType::MakeRefPtr<LayoutWrapperNode>(
         sheetNode, sheetNode->GetGeometryNode(), sheetNode->GetLayoutProperty());
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     sheetLayoutAlgorithm->UpdateMaxSizeWithPlacement(maxWidth, maxHeight, layoutWrapper);
     EXPECT_EQ(maxWidth, 3000.0f);
     EXPECT_EQ(maxHeight, 1992.0f);
@@ -1363,7 +1363,7 @@ HWTEST_F(SheetPresentationTestThreeNg, UpdateMaxSizeWithPlacement002, TestSize.L
     float maxHeight = 2000.0f;
     auto layoutWrapperNode = AceType::MakeRefPtr<LayoutWrapperNode>(
         sheetNode, sheetNode->GetGeometryNode(), sheetNode->GetLayoutProperty());
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     sheetLayoutAlgorithm->UpdateMaxSizeWithPlacement(maxWidth, maxHeight, layoutWrapper);
     EXPECT_EQ(maxWidth, 3000.0f);
     EXPECT_EQ(maxHeight, 2000.0f);
@@ -1394,7 +1394,7 @@ HWTEST_F(SheetPresentationTestThreeNg, UpdateMaxSizeWithPlacement003, TestSize.L
     float maxHeight = 2000.0f;
     auto layoutWrapperNode = AceType::MakeRefPtr<LayoutWrapperNode>(
         sheetNode, sheetNode->GetGeometryNode(), sheetNode->GetLayoutProperty());
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     sheetLayoutAlgorithm->UpdateMaxSizeWithPlacement(maxWidth, maxHeight, layoutWrapper);
     EXPECT_EQ(maxWidth, 3000.0f);
     EXPECT_EQ(maxHeight, 2000.0f);
@@ -1427,7 +1427,7 @@ HWTEST_F(SheetPresentationTestThreeNg, UpdateMaxSizeWithPlacement004, TestSize.L
     float maxHeight = 2000.0f;
     auto layoutWrapperNode = AceType::MakeRefPtr<LayoutWrapperNode>(
         sheetNode, sheetNode->GetGeometryNode(), sheetNode->GetLayoutProperty());
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     sheetLayoutAlgorithm->UpdateMaxSizeWithPlacement(maxWidth, maxHeight, layoutWrapper);
     EXPECT_EQ(maxWidth, 3000.0f);
     EXPECT_EQ(maxHeight, 2000.0f);
@@ -1465,7 +1465,7 @@ HWTEST_F(SheetPresentationTestThreeNg, UpdateMaxSizeWithPlacement005, TestSize.L
     float maxHeight = 2000.0f;
     auto layoutWrapperNode = AceType::MakeRefPtr<LayoutWrapperNode>(
         sheetNode, sheetNode->GetGeometryNode(), sheetNode->GetLayoutProperty());
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     sheetLayoutAlgorithm->UpdateMaxSizeWithPlacement(maxWidth, maxHeight, layoutWrapper);
     EXPECT_EQ(maxWidth, 3000.0f);
     EXPECT_EQ(maxHeight, 1992.0f);
@@ -1529,7 +1529,7 @@ HWTEST_F(SheetPresentationTestThreeNg, UpdateMaxSizeWithPlacement006, TestSize.L
     float maxHeight = 2000.0f;
     auto layoutWrapperNode = AceType::MakeRefPtr<LayoutWrapperNode>(
         sheetNode, sheetNode->GetGeometryNode(), sheetNode->GetLayoutProperty());
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     sheetLayoutAlgorithm->UpdateMaxSizeWithPlacement(maxWidth, maxHeight, layoutWrapper);
     EXPECT_EQ(maxWidth, 2992.0f);
     EXPECT_EQ(maxHeight, 2000.0f);
@@ -1971,7 +1971,7 @@ HWTEST_F(SheetPresentationTestThreeNg, LayoutScrollNode001, TestSize.Level1)
     auto layoutWrapperNode =
         AceType::MakeRefPtr<LayoutWrapperNode>(sheetNode, sheetNode->GetGeometryNode(), sheetNode->GetLayoutProperty());
     EXPECT_NE(layoutWrapperNode, nullptr);
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     EXPECT_NE(layoutWrapper, nullptr);
     sheetLayoutAlgorithm->LayoutScrollNode(translate, layoutWrapper);
     EXPECT_EQ(dragBar->frame_.rect_.GetOffset(), OffsetF(0.0f, 20.0f));
@@ -1998,7 +1998,7 @@ HWTEST_F(SheetPresentationTestThreeNg, LayoutTitleBuilder001, TestSize.Level1)
     auto layoutWrapperNode =
         AceType::MakeRefPtr<LayoutWrapperNode>(sheetNode, sheetNode->GetGeometryNode(), sheetNode->GetLayoutProperty());
     EXPECT_NE(layoutWrapperNode, nullptr);
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     EXPECT_NE(layoutWrapper, nullptr);
     auto sheetGeometryNode = sheetNode->GetGeometryNode();
     EXPECT_NE(sheetGeometryNode, nullptr);

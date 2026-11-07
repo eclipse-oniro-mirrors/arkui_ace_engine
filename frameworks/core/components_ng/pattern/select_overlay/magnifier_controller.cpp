@@ -16,6 +16,7 @@
 #include "core/components_ng/pattern/select_overlay/magnifier_controller.h"
 #include "core/common/container.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include <chrono>
 #include <cmath>
 #include <cinttypes>
@@ -148,7 +149,12 @@ void MagnifierController::SetLocalOffset(const OffsetF& localOffset, const TimeS
         point = point + paintOffset;
         patternOffset = patternOffset + paintOffset;
         renderContext->GetPointTransform(point);
-        node = node ->GetAncestorNodeOfFrame(true);
+        auto ancestor = node->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(node.GetRawPtr())) {
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(node.GetRawPtr(), point);
+            patternOffset += FrameNodeAdoptedCompensation::GetAdoptedCompensationOffset(node.GetRawPtr());
+        }
+        node = ancestor;
     }
     patternOffset_ = patternOffset;
     globalOffset_.SetX(point.GetX());
@@ -454,9 +460,9 @@ RefPtr<FrameNode> MagnifierController::GetRootNode()
 RefPtr<UINode> MagnifierController::FindWindowScene(const RefPtr<FrameNode>& targetNode)
 {
     CHECK_NULL_RETURN(targetNode, nullptr);
-    auto parent = targetNode->GetParent();
+    auto parent = targetNode->GetParent(true);
     while (parent && parent->GetTag() != V2::WINDOW_SCENE_ETS_TAG) {
-        parent = parent->GetParent();
+        parent = parent->GetParent(true);
     }
     CHECK_NULL_RETURN(parent, nullptr);
     return parent;
@@ -595,7 +601,7 @@ void MagnifierController::CreateMagnifierChildNode()
     ViewAbstract::SetWidth(AceType::RawPtr(childNode), CalcLength(magnifierNodeWidth_));
     ViewAbstract::SetHeight(AceType::RawPtr(childNode), CalcLength(magnifierNodeHeight_));
     ViewAbstract::SetOpacity(AceType::RawPtr(childNode), 0.0);
-    auto layoutProperty = AceType::DynamicCast<LayoutProperty>(childNode->GetLayoutProperty());
+    auto layoutProperty = childNode->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
     layoutProperty->UpdateVisibility(VisibleType::VISIBLE);
     childNode->ForceSyncGeometryNode();

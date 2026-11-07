@@ -56,6 +56,8 @@ enum class SheetMiniDefaultShowPosition {
     LeftBottom,
     RightBottom,
 };
+class ScrollablePaintProperty;
+
 class ACE_EXPORT SheetPresentationPattern : public LinearLayoutPattern,
                                             public PopupBasePattern,
                                             public FocusView,
@@ -319,6 +321,7 @@ public:
     bool AdditionalScrollTo(const RefPtr<FrameNode>& scroll, float height);
     void SetColumnMinSize(bool reset = false);
     float InitialSingleGearHeight(NG::SheetStyle& sheetStyle);
+    double GetScreenHeight();
     float GetSheetTopSafeArea();
     float UpdateSheetTransitionOffset();
 
@@ -358,6 +361,7 @@ public:
     void ClearSheetCloseIconMaterial();
     void SetSheetCloseIconMaterial(RefPtr<UiMaterial> closeButtonNodeMaterial);
     void UpdateSheetScrollBar(const NG::SheetStyle& sheetStyle);
+    void UpdateSheetScrollBarMargin();
 
     double GetTitleBarEffectHeight(const SheetStyle& sheetStyle, float titleBarHeight);
 
@@ -373,7 +377,7 @@ public:
     void UpdateZIndexAndTitleEffectNode();
     void OnContentScrollUpdate(double currentOffset, double frameOffset, bool isFling);
     void OnFlingEnd(double currentOffset);
-    void UpdateStackModeZIndex();
+    void UpdateTitleBarZIndex();
     RefPtr<FrameNode> GetTitleBarEffectNode() const
     {
         return titleBarEffectNode_;
@@ -384,7 +388,7 @@ public:
     }
     void MountTitleBarEffectNode();
     void ResetTitleBarEffectNode();
-    Color GetTitleBarEffectBgColor(const NG::SheetStyle& sheetStyle, UiMaterialLevel materialLevel, bool isDarkMode);
+    Color GetTitleBarEffectBgColor(const NG::SheetStyle& sheetStyle, UiMaterialLevel materialLevel);
 
     void ClearSheetRenderMaterial();
     void SetSheetRenderMaterial();
@@ -805,6 +809,7 @@ public:
     void UpdateTitleColumnSize();
 
     float GetTitleBuilderHeightStackMode() const;
+    float GetRealPreScrollHeight(float scrollHeight, float titleHeightStackMode, bool useStackModeHeight) const;
     bool CheckSheetHaveTitle(const NG::SheetStyle& sheetStyle);
     bool CheckTitleIsStackMode(const SheetStyle& sheetStyle);
     bool CheckTitleIsHasEffectNode(const SheetStyle& sheetStyle);
@@ -851,6 +856,7 @@ public:
     void UpdateSheetCloseIcon();
     void UpdateSheetBackgroundColor();
     void UpdateSheetBackgroundBlurStyle();
+    void UpdateTitleBarVibrancy(const SheetStyle& sheetStyle);
 
     Color GetMaskBackgroundColor() const
     {
@@ -911,6 +917,8 @@ public:
     RefPtr<FrameNode> GetFirstFrameNodeOfBuilder() const;
     void GetBuilderInitHeight();
     void ChangeSheetPage(float height);
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
 
@@ -1040,6 +1048,9 @@ public:
         auto scrollNode = scrolNode_.Upgrade();
         return scrollNode;
     }
+
+    void UpdateSafeAreaPaddingClip(const RefPtr<ScrollablePaintProperty>& scrollPaintProps,
+        SheetTitleBarHoverMode hoverMode, float top);
 
     const SheetEffectEdge& GetSheetEffectEdge() const
     {
@@ -1207,12 +1218,16 @@ public:
     }
 
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
     bool OnThemeScopeUpdate(int32_t themeScopeId) override;
 
 protected:
     void OnDetachFromFrameNode(FrameNode* sheetNode) override;
 
 private:
+    void DumpAdvanceGeometryInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceStyleInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
     enum class SheetCmdType { CMD_UNKNOWN, CMD_SLIDE, CMD_CLOSE };
     int32_t ParseCommand(const std::string& command, SheetCmdType& cmdType);
     void HandleBindSheetEvent(SheetCmdType& cmdType);

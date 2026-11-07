@@ -37,11 +37,11 @@ HWTEST_F(TextFieldPatternTestten, SetCustomKeyboardWithNode001, TestSize.Level1)
     auto textFieldPattern = AceType::MakeRefPtr<TextFieldPattern>();
     ASSERT_NE(textFieldPattern, nullptr);
     textFieldPattern->customKeyboard_ =
-        AceType::DynamicCast<NG::UINode>(AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>()));
+        AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>());
     ASSERT_NE(textFieldPattern->customKeyboard_, nullptr);
     textFieldPattern->isCustomKeyboardAttached_ = true;
     RefPtr<UINode> keyboardBuilder =
-        AceType::DynamicCast<NG::UINode>(AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>()));
+        AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>());
     textFieldPattern->SetCustomKeyboardWithNode(keyboardBuilder);
     EXPECT_EQ(textFieldPattern->customKeyboard_, keyboardBuilder);
 }
@@ -72,11 +72,11 @@ HWTEST_F(TextFieldPatternTestten, SetCustomKeyboardWithNode003, TestSize.Level1)
     auto textFieldPattern = AceType::MakeRefPtr<TextFieldPattern>();
     ASSERT_NE(textFieldPattern, nullptr);
     textFieldPattern->customKeyboard_ =
-        AceType::DynamicCast<NG::UINode>(AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>()));
+        AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>());
     ASSERT_NE(textFieldPattern->customKeyboard_, nullptr);
     textFieldPattern->isCustomKeyboardAttached_ = false;
     RefPtr<UINode> keyboardBuilder =
-        AceType::DynamicCast<NG::UINode>(AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>()));
+        AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>());
     textFieldPattern->SetCustomKeyboardWithNode(keyboardBuilder);
     EXPECT_EQ(textFieldPattern->customKeyboard_, keyboardBuilder);
 }
@@ -91,7 +91,7 @@ HWTEST_F(TextFieldPatternTestten, SetCustomKeyboardWithNode004, TestSize.Level1)
     auto textFieldPattern = AceType::MakeRefPtr<TextFieldPattern>();
     ASSERT_NE(textFieldPattern, nullptr);
     textFieldPattern->customKeyboard_ =
-        AceType::DynamicCast<NG::UINode>(AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>()));
+        AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>());
     ASSERT_NE(textFieldPattern->customKeyboard_, nullptr);
     textFieldPattern->isCustomKeyboardAttached_ = true;
     RefPtr<UINode> keyboardBuilder = nullptr;
@@ -111,7 +111,7 @@ HWTEST_F(TextFieldPatternTestten, SetCustomKeyboardWithNode005, TestSize.Level1)
     textFieldPattern->customKeyboard_ = nullptr;
     textFieldPattern->isCustomKeyboardAttached_ = true;
     RefPtr<UINode> keyboardBuilder =
-        AceType::DynamicCast<NG::UINode>(AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>()));
+        AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>());
     textFieldPattern->SetCustomKeyboardWithNode(keyboardBuilder);
     EXPECT_EQ(textFieldPattern->customKeyboard_, keyboardBuilder);
 }
@@ -142,7 +142,7 @@ HWTEST_F(TextFieldPatternTestten, SetCustomKeyboardWithNode007, TestSize.Level1)
     auto textFieldPattern = AceType::MakeRefPtr<TextFieldPattern>();
     ASSERT_NE(textFieldPattern, nullptr);
     textFieldPattern->customKeyboard_ =
-        AceType::DynamicCast<NG::UINode>(AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>()));
+        AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>());
     ASSERT_NE(textFieldPattern->customKeyboard_, nullptr);
     textFieldPattern->isCustomKeyboardAttached_ = false;
     RefPtr<UINode> keyboardBuilder = nullptr;
@@ -162,7 +162,7 @@ HWTEST_F(TextFieldPatternTestten, SetCustomKeyboardWithNode008, TestSize.Level1)
     textFieldPattern->customKeyboard_ = nullptr;
     textFieldPattern->isCustomKeyboardAttached_ = false;
     RefPtr<UINode> keyboardBuilder =
-        AceType::DynamicCast<NG::UINode>(AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>()));
+        AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>());
     textFieldPattern->SetCustomKeyboardWithNode(keyboardBuilder);
     EXPECT_EQ(textFieldPattern->customKeyboard_, keyboardBuilder);
 }
@@ -308,7 +308,7 @@ HWTEST_F(TextFieldPatternTestten, SetUnitNode001, TestSize.Level1)
     textFieldPattern->responseArea_ = AceType::MakeRefPtr<CleanNodeResponseArea>(textFieldPattern);
     ASSERT_NE(textFieldPattern->responseArea_, nullptr);
     RefPtr<NG::UINode> unitNode =
-        AceType::DynamicCast<NG::UINode>(AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>()));
+        AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>());
     ASSERT_NE(unitNode, nullptr);
     textFieldPattern->SetUnitNode(unitNode);
     EXPECT_EQ(textFieldPattern->responseArea_, 1);
@@ -340,7 +340,7 @@ HWTEST_F(TextFieldPatternTestten, SetUnitNode003, TestSize.Level1)
     ASSERT_NE(textFieldPattern, nullptr);
     textFieldPattern->responseArea_ = nullptr;
     RefPtr<NG::UINode> unitNode =
-        AceType::DynamicCast<NG::UINode>(AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>()));
+        AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>());
     ASSERT_NE(unitNode, nullptr);
     textFieldPattern->SetUnitNode(unitNode);
     EXPECT_EQ(textFieldPattern->responseArea_, 0);

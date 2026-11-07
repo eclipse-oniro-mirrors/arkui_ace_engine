@@ -203,6 +203,8 @@ public:
     void ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const override;
     void SetMarkToday(bool isMarkToday);
     bool GetMarkToday();
+    void SetFirstDayOfWeek(int32_t firstDayOfWeek);
+    int32_t GetFirstDayOfWeek();
     void SetDisabledDateRange(const std::vector<std::pair<PickerDate, PickerDate>>& disabledDateRange);
     std::string GetDisabledDateRange();
     void UpdateTextStyle(const PickerTextStyle& textStyle);
@@ -212,6 +214,7 @@ private:
     void OnDetachFromFrameNode(FrameNode* frameNode) override;
     void OnWindowSizeChanged(int32_t width, int32_t height, WindowSizeChangeReason type) override;
     void OnColorConfigurationUpdate() override;
+    void OnLanguageConfigurationUpdate() override;
     bool OnThemeScopeUpdate(int32_t themeScopeId) override;
     void InitDateIndex();
     void InitClickEvent();

@@ -517,20 +517,40 @@ abstract class PUV2ViewBase extends ViewBuildNodeBase {
   }
 
   protected __onCustomEnvValueUpdate__Internal(envKey: number, updatedEnvValue?: CustomEnvValue): void {
-    stateMgmtConsole.debug(`${this.debugInfo__()}: custom env update ignored for key ${envKey}, no @CustomEnv property registered`);
+    const customEnvProperties = this.__getCustomEnvPropertyNameToKey__Internal();
+
+    stateMgmtConsole.debug(`${this.debugInfo__()}: received custom env update from backend, key ${envKey},
+      hasValue ${updatedEnvValue}, registeredProperties ${customEnvProperties.length}`);
+
+    if (customEnvProperties.length === 0) {
+      stateMgmtConsole.debug(
+        `${this.debugInfo__()}: custom env update ignored for key ${envKey}: no @CustomEnv property registered`);
+      return;
+    }
+    const matchingProperties = envKey ?
+      customEnvProperties.filter(([, customEnvKey]) => customEnvKey === envKey) : customEnvProperties;
+    if (matchingProperties.length === 0) {
+      stateMgmtConsole.debug(
+        `${this.debugInfo__()}: custom env update ignored for key ${envKey}: no matching @CustomEnv property`);
+      return;
+    }
     let needUpdated: boolean = false;
-    this.__getCustomEnvPropertyNameToKey__Internal()
-      .forEach(([varName, customEnvKey]) => {
-        if (envKey && customEnvKey !== envKey) {
-          stateMgmtConsole.debug(`${this.debugInfo__()}: custom env update ignored for key ${envKey}, no matching @CustomEnv property`);
-          return;
-        }
-        const storeProp = ObserveV2.OB_PREFIX + varName;
-        this[storeProp] = updatedEnvValue;
+    // A callback without a value invalidates the cached value. Query the backend again because it does not
+    // necessarily mean that the override was removed. Two arguments preserve an explicitly supplied undefined.
+    const hasUpdatedEnvValue = arguments.length > 1;
+    matchingProperties.forEach(([varName, customEnvKey]) => {
+      const storeProp = ObserveV2.OB_PREFIX + varName;
+      const queriedValue = hasUpdatedEnvValue ? undefined : this.findCustomValueByKey(customEnvKey);
+      const effectiveValue = hasUpdatedEnvValue ? updatedEnvValue :
+        (queriedValue?.found ? queriedValue.value : this[ObserveV2.CUSTOM_ENV_LOCAL_PREFIX + varName]);
+      if (this[storeProp] !== effectiveValue) {
+        ObserveV2.unregisterCustomEnvOwner(this, this[storeProp], varName);
+        this[storeProp] = effectiveValue;
         ObserveV2.getObserve().fireChange(this, varName);
         this.__notifyDecoratedWatch__Internal(varName);
         needUpdated = true;
-      });
+      }
+    });
     if (needUpdated) {
       stateMgmtConsole.debug(`${this.debugInfo__()}: custom env update for key ${envKey}`);
       ObserveV2.getObserve().updateDirty2(false);
@@ -567,13 +587,17 @@ abstract class PUV2ViewBase extends ViewBuildNodeBase {
     stateMgmtConsole.debug(`${this.debugInfo__()}: start processing WithEnv tree state ${treeState}`);
     let needUpdated: boolean = false;
     this.__getEnvPropertyNameToKey__Internal().forEach(([varName, key]) => {
-      const storeProp = ObserveV2.ENV_PREFIX + varName;
-      if (!EnvV2.isDirectQuerySystemEnvKey(key) || !Object.prototype.hasOwnProperty.call(this, storeProp)) {
+      if (!EnvV2.isDirectQuerySystemEnvKey(key)) {
         return;
       }
+      const storeProp = ObserveV2.ENV_PREFIX + varName;
       const defaultValue = EnvV2.getDirectQuerySystemEnvDefaultValue(key);
       const effectiveValue = isAttached ? this.findEnvValueByKey(key) ?? defaultValue : defaultValue;
-      if (this[storeProp] !== effectiveValue) {
+      // An uninitialized backing store means the property has not been read yet. Compare against the default
+      // value, mirroring the @CustomEnv local-value seeding below, so the first attach reports a change and
+      // notifies @Watch when the backend value differs from the default.
+      const hasStore = Object.prototype.hasOwnProperty.call(this, storeProp);
+      if ((hasStore ? this[storeProp] : defaultValue) !== effectiveValue) {
         this[storeProp] = effectiveValue;
         ObserveV2.getObserve().fireChange(this, varName);
         this.__notifyDecoratedWatch__Internal(varName);
@@ -582,13 +606,18 @@ abstract class PUV2ViewBase extends ViewBuildNodeBase {
     });
     this.__getCustomEnvPropertyNameToKey__Internal().forEach(([varName, key]) => {
       const storeProp = ObserveV2.OB_PREFIX + varName;
+      const localValueProp = ObserveV2.CUSTOM_ENV_LOCAL_PREFIX + varName;
       if (!Object.prototype.hasOwnProperty.call(this, storeProp)) {
-        return;
+        if (!Object.prototype.hasOwnProperty.call(this, localValueProp)) {
+          return;
+        }
+        this[storeProp] = this[localValueProp];
       }
-      const defaultValue = this[ObserveV2.CUSTOM_ENV_LOCAL_PREFIX + varName];
       const queriedValue = isAttached ? this.findCustomValueByKey(key) : undefined;
-      const effectiveValue = queriedValue !== undefined ? queriedValue : defaultValue;
+
+      const effectiveValue = queriedValue?.found ? queriedValue.value : this[localValueProp];
       if (this[storeProp] !== effectiveValue) {
+        ObserveV2.unregisterCustomEnvOwner(this, this[storeProp], varName);
         this[storeProp] = effectiveValue;
         ObserveV2.getObserve().fireChange(this, varName);
         this.__notifyDecoratedWatch__Internal(varName);
@@ -850,7 +879,7 @@ abstract class PUV2ViewBase extends ViewBuildNodeBase {
           this.__notifyDecoratedWatch__Internal(varName);
           needUpdated = true;
         }
-      })
+      });
     if (needUpdated) {
       // update ui synchronously
       stateMgmtConsole.debug(`updateInstanceIdForEnvValue ${this.debugInfo__()} instance, there are envValue updated, update ui synchronously.`);
@@ -1016,6 +1045,39 @@ abstract class PUV2ViewBase extends ViewBuildNodeBase {
   }
 
   /**
+   * @function __getDefaultReusePool__Internal
+   * @description
+   * Returns the default reuse pool of this component (getDefaultReusePool API):
+   * the per-instance pool this component's recycled child components are cached in —
+   * a RecyclePoolV2 for a ViewV2 owner, a RecycleManager for a ViewPU owner.
+   * Returns undefined when no default reuse pool exists yet.
+   * The returned handle holds only a weak reference to the pool, so calling
+   * clearCache() after the owning component was destroyed is a safe no-op.
+   * @returns {IDefaultReusePool | undefined} The default reuse pool handle.
+   */
+  __getDefaultReusePool__Internal(): IDefaultReusePool | undefined {
+    let pool: RecycleManager | RecyclePoolV2 | undefined = undefined;
+    if (this instanceof ViewV2) {
+      pool = this.getRecyclePool();
+    } else if (this instanceof ViewPU) {
+      pool = this.getRecycleManager();
+    }
+    if (!pool) {
+      return undefined;
+    }
+    const weakPool = new WeakRef<RecycleManager | RecyclePoolV2>(pool);
+    return {
+      clearCache(reuseId?: string): void {
+        const currentPool = weakPool.deref();
+        if (!currentPool) {
+          return;
+        }
+        currentPool.clearCache(reuseId);
+      }
+    };
+  }
+
+  /**
    * @function __getCustomComponentContext__Internal
    * @description
    * Returns a per-instance ICustomComponentContext that captures `this` in a
@@ -1031,6 +1093,9 @@ abstract class PUV2ViewBase extends ViewBuildNodeBase {
       this.__customComponentContext__Internal = ((thizz: PUV2ViewBase): CustomComponentContext => ({
         getReusePool(): IReusePool | undefined {
           return PUV2ViewBase.prototype.getReusePool.call(thizz);
+        },
+        getDefaultReusePool(): IDefaultReusePool | undefined {
+          return PUV2ViewBase.prototype.__getDefaultReusePool__Internal.call(thizz);
         }
       }))(this);
     }
@@ -1269,9 +1334,10 @@ abstract class PUV2ViewBase extends ViewBuildNodeBase {
    * on first render create a new Instance of Repeat
    * on re-render connect to existing instance
    * @param arr
+   * @param options RepeatOptions, only read when the instance is first created
    * @returns
    */
-  abstract __mkRepeatAPI<I>(arr: Array<I>): RepeatAPI<I>;
+  abstract __mkRepeatAPI<I>(arr: Array<I>, options?: RepeatOptions): RepeatAPI<I>;
 
   public findViewInHierarchy(id: number): ViewPU | ViewV2 {
     let weakChild = this.childrenWeakrefMap_.get(id);

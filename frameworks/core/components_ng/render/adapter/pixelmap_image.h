@@ -50,6 +50,7 @@ public:
     RefPtr<CanvasImage> Clone() override;
 
     void NotifyDrawCompletion(const RefPtr<PixelMap>& pixmap, const RSRect& dstRect);
+    std::string PixelSamplingDump() const override;
     void DrawToRSCanvas(
         RSCanvas& canvas, const RSRect& srcRect, const RSRect& dstRect, const BorderRadiusArray& radiusXY) override;
     void DrawRect(RSCanvas& canvas, const RSRect& srcRect, const RSRect& dstRect) override;

@@ -65,7 +65,7 @@ public:
             return nullptr;
         }
         if (!radioModifier_) {
-            radioModifier_ = AceType::MakeRefPtr<RadioModifier>();
+            radioModifier_ = AceType::MakeRefPtr<RadioModifier>(GetHost());
         }
         radioModifier_->SetUseContentModifier(UseContentModifier());
         auto paintMethod = MakeRefPtr<RadioPaintMethod>(radioModifier_);
@@ -206,6 +206,7 @@ public:
 
     void UpdateRadioComponentColor(const Color& color, const RadioColorType radioColorType);
     void OnColorConfigurationUpdate() override;
+    bool OnThemeScopeUpdate(int32_t themeScopeId) override;
     void OnColorModeChange(uint32_t colorMode) override;
     void SetUncheckedBorderColorByJSRadioTheme(bool flag)
     {
@@ -225,6 +226,7 @@ public:
     }
 
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
     bool ReportInitOnChangeEvent(int32_t nodeId, bool isChecked);
     bool ReportOnChangeEvent(int32_t nodeId, bool isChecked, bool force = false);
     static bool IsJsonValid(const std::unique_ptr<JsonValue>& json);
@@ -234,6 +236,7 @@ private:
     void OnAttachToFrameNode() override;
     void OnDetachFromFrameNode(FrameNode* frameNode) override;
     void OnDetachFromFrameNodeMultiThread();
+    void OnAttachToMainTree() override;
     void OnDetachFromMainTree() override;
     void OnDetachFromMainTreeMultiThread(const RefPtr<FrameNode>& frameNode);
     void OnModifyDone() override;
@@ -306,6 +309,7 @@ private:
     OffsetF hotZoneOffset_;
     SizeF hotZoneSize_;
     bool isGroupChanged_ = false;
+    bool isPendingGroupValueUpdate_ = false;
     TouchHoverAnimationType touchHoverType_ = TouchHoverAnimationType::NONE;
     bool isOnAnimationFlag_ = false;
     bool preTypeIsBuilder_ = false;

@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <string>
 #include <utility>
 
 #include "gtest/gtest-message.h"
@@ -728,9 +729,9 @@ HWTEST_F(TimePickerOrderTestNg, TimePickerOrder017, TestSize.Level1)
 
     /**
      * @tc.step: step2. Check if the dateTimeOrder of all child nodes is corrected.
-     * @tc.expected: amPmNode is the first, and hourNode is the last.
+     * @tc.expected: amPmNode is the first, and secondNode is the last (standard order).
      */
-    std::vector<std::string> columnOrder = {"amPm", "second", "minute", "hour"};
+    std::vector<std::string> columnOrder = {"amPm", "hour", "minute", "second"};
     VerifyTimeOrder(columnOrder);
 }
 
@@ -760,12 +761,12 @@ HWTEST_F(TimePickerOrderTestNg, TimePickerOrder018, TestSize.Level1)
     timePickerRowPattern->amPmTimeOrder_ = AMPM_TIME;
     timePickerRowPattern->language_ = language;
     timePickerRowPattern->UpdateAllChildNode();
-    
+
     /**
      * @tc.step: step2. Check if the dateTimeOrder of all child nodes is corrected.
-     * @tc.expected: amPmNode is the first, and hourNode is the last.
+     * @tc.expected: amPmNode is the first, and minuteNode is the last (standard order).
      */
-    std::vector<std::string> columnOrder = {"amPm", "minute", "hour"};
+    std::vector<std::string> columnOrder = {"amPm", "hour", "minute"};
     VerifyTimeOrder(columnOrder);
 }
 
@@ -869,14 +870,13 @@ HWTEST_F(TimePickerOrderTestNg, TimePickerOrder021, TestSize.Level1)
     timePickerRowPattern->amPmTimeOrder_ = AMPM_TIME;
     timePickerRowPattern->language_ = "ug";
     timePickerRowPattern->isAmPmTimeOrderUpdate_ = false;
-    timePickerRowPattern->UpdateNodePositionForUg();
     timePickerRowPattern->UpdateAllChildNode();
-    
+
     /**
      * @tc.step: step2. Check if the dateTimeOrder of all child nodes is corrected.
-     * @tc.expected: amPmNode is the first, and hourNode is the last.
+     * @tc.expected: amPmNode is the first, then hour, then minute (standard order, ug no longer special-cased).
      */
-    std::vector<std::string> columnOrder = {"amPm", "minute", "hour"};
+    std::vector<std::string> columnOrder = {"amPm", "hour", "minute"};
     VerifyTimeOrder(columnOrder);
 }
 
@@ -1113,13 +1113,14 @@ HWTEST_F(TimePickerOrderTestNg, TimePickerOrder028, TestSize.Level1)
 
     /**
      * @tc.steps: steps3. Switch language and city.
+     * @tc.expected: Direction stays LTR (creation default, OnLanguageConfigurationUpdate does not touch direction).
      */
     AceApplicationInfo::GetInstance().SetLocale("ug", "Kashgar", "Uyghur", "");
 
     auto timePickerRowPattern = frameNode->GetPattern<TimePickerRowPattern>();
     ASSERT_NE(timePickerRowPattern, nullptr);
     timePickerRowPattern->OnLanguageConfigurationUpdate();
-    EXPECT_EQ(pickerProperty->GetLayoutDirection(), TextDirection::AUTO);
+    EXPECT_EQ(pickerProperty->GetLayoutDirection(), TextDirection::LTR);
 }
 
 /**
@@ -1175,21 +1176,22 @@ HWTEST_F(TimePickerOrderTestNg, TimePickerOrder029, TestSize.Level1)
 
     /**
      * @tc.steps: steps3. Switch language and city.
+     * @tc.expected: Direction stays LTR (creation default, OnLanguageConfigurationUpdate does not touch direction).
      */
     AceApplicationInfo::GetInstance().SetLocale("ug", "Kashgar", "Uyghur", "");
 
     auto timePickerRowPattern = timePickerNode->GetPattern<TimePickerRowPattern>();
     ASSERT_NE(timePickerRowPattern, nullptr);
     timePickerRowPattern->OnLanguageConfigurationUpdate();
-    EXPECT_EQ(pickerProperty->GetLayoutDirection(), TextDirection::AUTO);
+    EXPECT_EQ(pickerProperty->GetLayoutDirection(), TextDirection::LTR);
 }
 
 /**
- * @tc.name: OnLanguageConfigurationUpdateTest
- * @tc.desc: Cover OnLanguageConfigurationUpdate branch when childrenCount > targetIndex (amPmTimeOrder == "10")
+ * @tc.name: HandleAmPmReorderBackwardTest
+ * @tc.desc: Cover HandleAmPmReorder branch when amPmTimeOrder == "10" and isAmPmTimeOrderUpdate_ == true.
  * @tc.type: FUNC
  */
-HWTEST_F(TimePickerOrderTestNg, OnLanguageConfigurationUpdateTest, TestSize.Level0)
+HWTEST_F(TimePickerOrderTestNg, HandleAmPmReorderBackwardTest, TestSize.Level0)
 {
     auto theme = MockPipelineContext::GetCurrent()->GetTheme<PickerTheme>();
     TimePickerModelNG::GetInstance()->CreateTimePicker(theme);
@@ -1209,33 +1211,12 @@ HWTEST_F(TimePickerOrderTestNg, OnLanguageConfigurationUpdateTest, TestSize.Leve
     auto candidateBefore = host->GetChildAtIndex(static_cast<int>(targetIndex));
     ASSERT_NE(candidateBefore, nullptr);
 
-    // Set global locale to a language that maps to amPmTimeOrder == "10" (Arabic)
-    AceApplicationInfo::GetInstance().SetLocale("ar", "Egypt", "Arabic", "");
-    // This should take the branch where childrenCount > targetIndex and move candidate to index 0
-    timePickerRowPattern->OnLanguageConfigurationUpdate();
-    EXPECT_EQ(timePickerRowPattern->amPmTimeOrder_, "10");
-    EXPECT_EQ(timePickerRowPattern->isAmPmTimeOrderUpdate_, true);
+    // Set amPmTimeOrder == "10" (amPm first) and trigger HandleAmPmReorder to move candidate to index 0
+    timePickerRowPattern->amPmTimeOrder_ = "10";
+    timePickerRowPattern->isAmPmTimeOrderUpdate_ = true;
+    timePickerRowPattern->HandleAmPmReorder();
 
-    auto candidateAfter = host->GetChildAtIndex(0);
-    bool foundOriginal = false;
-    auto children = host->GetChildren();
-    int idx = 0;
-    for (const auto& child : children) {
-        if (child == candidateBefore) {
-            EXPECT_EQ(idx, 0) << "Original candidate moved but not to index 0";
-            foundOriginal = true;
-            break;
-        }
-        ++idx;
-    }
-    if (!foundOriginal) {
-        // If original node was replaced, verify the logical mapping: amPm should now be at index 0
-        auto allChildNode = timePickerRowPattern->GetAllChildNode();
-        ASSERT_NE(allChildNode.count("amPm"), 0U);
-        auto expectedAmPm = allChildNode["amPm"].Upgrade();
-        ASSERT_NE(expectedAmPm, nullptr);
-        EXPECT_EQ(host->GetChildAtIndex(0), expectedAmPm);
-    }
+    EXPECT_EQ(host->GetChildAtIndex(0), candidateBefore);
 }
 
 /**
@@ -1270,23 +1251,37 @@ HWTEST_F(TimePickerOrderTestNg, MoveAmPmForwardTest, TestSize.Level0)
     EXPECT_EQ(timePickerRowPattern->amPmTimeOrder_, "01");
     EXPECT_EQ(timePickerRowPattern->isAmPmTimeOrderUpdate_, true);
 
-    bool foundOriginal = false;
+    EXPECT_EQ(host->GetChildAtIndex(static_cast<int>(targetIndex)), candidateBefore);
+}
+
+/**
+ * @tc.name: TimePickerOrderUgStandardArrangement
+ * @tc.desc: Verify ug locale uses standard column arrangement (not old S:M:H hardcode).
+ * @tc.type: FUNC
+ */
+HWTEST_F(TimePickerOrderTestNg, TimePickerOrderUgStandardArrangement, TestSize.Level1)
+{
+    const std::string language = "ug";
+    const std::string countryOrRegion = "Kashgar";
+    const std::string script = "Uyghur";
+    const std::string keywordsAndValues = "";
+    AceApplicationInfo::GetInstance().SetLocale(language, countryOrRegion, script, keywordsAndValues);
+    auto theme = MockPipelineContext::GetCurrent()->GetTheme<PickerTheme>();
+    TimePickerModelNG::GetInstance()->CreateTimePicker(theme, false);
+    TimePickerModelNG::GetInstance()->SetHour24(false);
+    TimePickerModelNG::GetInstance()->SetSelectedTime(TIME_PICKED);
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ASSERT_NE(frameNode, nullptr);
+    frameNode->MarkModifyDone();
+    auto timePickerRowPattern = frameNode->GetPattern<TimePickerRowPattern>();
+    ASSERT_NE(timePickerRowPattern, nullptr);
+    auto host = timePickerRowPattern->GetHost();
+    ASSERT_NE(host, nullptr);
     auto children = host->GetChildren();
-    int idx = 0;
-    for (const auto& child : children) {
-        if (child == candidateBefore) {
-            EXPECT_EQ(idx, static_cast<int>(targetIndex)) << "Original candidate moved but not to targetIndex";
-            foundOriginal = true;
-            break;
-        }
-        ++idx;
-    }
-    if (!foundOriginal) {
-        auto allChildNode = timePickerRowPattern->GetAllChildNode();
-        ASSERT_NE(allChildNode.count("amPm"), 0U);
-        auto expectedAmPm = allChildNode["amPm"].Upgrade();
-        ASSERT_NE(expectedAmPm, nullptr);
-        EXPECT_EQ(host->GetChildAtIndex(static_cast<int>(targetIndex)), expectedAmPm);
-    }
+    EXPECT_EQ(children.size(), 3u);
+    auto allChildNode = timePickerRowPattern->GetAllChildNode();
+    EXPECT_NE(allChildNode.count("hour"), 0u);
+    EXPECT_NE(allChildNode.count("minute"), 0u);
+    EXPECT_NE(allChildNode.count("amPm"), 0u);
 }
 } // namespace OHOS::Ace::NG

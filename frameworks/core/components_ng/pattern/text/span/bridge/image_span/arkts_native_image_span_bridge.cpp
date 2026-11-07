@@ -35,6 +35,8 @@ constexpr int NUM_1 = 1;
 constexpr int NUM_2 = 2;
 constexpr int NUM_3 = 3;
 constexpr int NUM_4 = 4;
+constexpr int NUM_6 = 6;
+constexpr int NUM_7 = 7;
 constexpr int SIZE_OF_FOUR = 4;
 const std::vector<float> DEFAULT_COLOR_FILTER_MATRIX = {
     1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
@@ -193,10 +195,18 @@ ArkUINativeModuleValue ImageSpanBridge::SetTextBackgroundStyle(ArkUIRuntimeCallI
         if (!ArkTSUtils::ParseJsColorAlpha(vm, secondArg, option.color, option.colorResObj, nodeInfo)) {
             option.color = Color::TRANSPARENT;
         }
+        Local<JSValueRef> borderColorArg = runtimeCallInfo->GetCallArgRef(NUM_6);
+        if (!ArkTSUtils::ParseJsColorAlpha(vm, borderColorArg, option.borderColor, option.borderColorResObj,
+            nodeInfo)) {
+            option.borderColor = Color::TRANSPARENT;
+        }
+        Local<JSValueRef> borderWidthArg = runtimeCallInfo->GetCallArgRef(NUM_7);
+        ArkTSUtils::ParseJsDimensionVp(vm, borderWidthArg, option.borderWidth, option.borderWidthResObj);
         ArkTSUtils::ParseOuterBorderRadius(runtimeCallInfo, vm, option.radiusValues, option.radiusUnits, NUM_2,
             option.style);
-        ArkTSUtils::SetTextBackgroundStyle(
-            option.style, option.color, option.colorResObj, option.radiusValues.data(), option.radiusUnits.data());
+        ArkTSUtils::SetTextBackgroundStyle(option.style, option.color, option.colorResObj,
+            option.radiusValues.data(), option.radiusUnits.data(),
+            option.borderColor, option.borderColorResObj, option.borderWidth, option.borderWidthResObj);
     }
     GetArkUINodeModifiers()->getImageSpanModifier()->setImageSpanTextBackgroundStyle(
         nativeNode, &option);
@@ -671,8 +681,8 @@ ArkUINativeModuleValue ImageSpanBridge::ResetResizableSlice(ArkUIRuntimeCallInfo
     EcmaVM* vm = runtimeCallInfo->GetVM();
     CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
     Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(0);
-    CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
-    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
     GetArkUINodeModifiers()->getImageSpanModifier()->resetImageSpanResizableSlice(nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }
@@ -683,8 +693,8 @@ ArkUINativeModuleValue ImageSpanBridge::SetResizableLattice(ArkUIRuntimeCallInfo
     CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
 #ifndef CROSS_PLATFORM
     Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(0);
-    CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
-    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
     Local<JSValueRef> latticeArg = runtimeCallInfo->GetCallArgRef(NUM_1);
     if (latticeArg->IsUndefined() || latticeArg->IsNull() || !latticeArg->IsObject(vm)) {
         GetArkUINodeModifiers()->getImageSpanModifier()->resetImageSpanResizableLattice(nativeNode);
@@ -709,8 +719,8 @@ ArkUINativeModuleValue ImageSpanBridge::ResetResizableLattice(ArkUIRuntimeCallIn
     EcmaVM* vm = runtimeCallInfo->GetVM();
     CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
     Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(0);
-    CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
-    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
     GetArkUINodeModifiers()->getImageSpanModifier()->resetImageSpanResizableLattice(nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }

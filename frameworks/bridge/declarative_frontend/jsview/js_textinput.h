@@ -23,7 +23,7 @@
 
 namespace OHOS::Ace::Framework {
 
-class JSTextInputController final : public virtual AceType {
+class JSTextInputController final : public AceType {
     DECLARE_ACE_TYPE(JSTextInputController, AceType);
 
 public:

@@ -18,9 +18,14 @@
 #define private public
 #define protected public
 
+#include "test/mock/frameworks/core/common/mock_container.h"
+#include "test/mock/frameworks/core/common/mock_theme_manager.h"
+#include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
+
 #include "core/common/resource/resource_object.h"
 #include "core/common/resource/resource_parse_utils.h"
 #include "core/components/common/properties/color.h"
+#include "core/components/theme/theme_constants.h"
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/syntax/with_theme_node.h"
 #include "core/components_ng/token_theme/token_theme_storage.h"
@@ -490,6 +495,66 @@ HWTEST_F(WithThemeTestNg, WithThemeTest012, TestSize.Level0)
 }
 
 /**
+ * @tc.name: CacheRemoveClearsUserFlags
+ * @tc.desc: Removing a theme releases its color flags and preserves other themes.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WithThemeTestNg, CacheRemoveClearsUserFlags, TestSize.Level1)
+{
+    TokenThemeStorage storage;
+    constexpr int32_t removedThemeId = 20001;
+    constexpr int32_t retainedThemeId = 20002;
+    storage.CacheSet(AceType::MakeRefPtr<TokenTheme>(removedThemeId));
+    storage.CacheSet(AceType::MakeRefPtr<TokenTheme>(retainedThemeId));
+    storage.SetIsThemeColorSetByUser(removedThemeId, false, 0, true);
+    storage.InitDarkThemeMapWithoutUserSet(removedThemeId, true);
+    storage.SetIsThemeColorSetByUser(retainedThemeId, false, 0, true);
+
+    storage.CacheRemove(removedThemeId);
+
+    EXPECT_EQ(storage.CacheGet(removedThemeId), nullptr);
+    EXPECT_EQ(storage.themeColorSetByUser_.count(removedThemeId), 0);
+    EXPECT_NE(storage.CacheGet(retainedThemeId), nullptr);
+    EXPECT_TRUE(storage.GetIsThemeColorSetByUser(retainedThemeId, false, 0));
+}
+
+/**
+ * @tc.name: CacheRemoveUncachedThemeClearsUserFlags
+ * @tc.desc: Flags are released even if theme creation did not populate the cache.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WithThemeTestNg, CacheRemoveUncachedThemeClearsUserFlags, TestSize.Level1)
+{
+    TokenThemeStorage storage;
+    for (int32_t themeId = 1; themeId <= 1000; ++themeId) {
+        storage.SetIsThemeColorSetByUser(themeId, false, 0, true);
+        storage.InitDarkThemeMapWithoutUserSet(themeId, true);
+        storage.CacheRemove(themeId);
+    }
+    EXPECT_TRUE(storage.themeColorSetByUser_.empty());
+}
+
+/**
+ * @tc.name: CacheClearClearsUserFlags
+ * @tc.desc: Clearing cached themes also clears their color flags.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WithThemeTestNg, CacheClearClearsUserFlags, TestSize.Level1)
+{
+    TokenThemeStorage storage;
+    for (int32_t themeId = 1; themeId <= 10; ++themeId) {
+        storage.CacheSet(AceType::MakeRefPtr<TokenTheme>(themeId));
+        storage.SetIsThemeColorSetByUser(themeId, false, 0, true);
+        storage.SetIsThemeColorSetByUser(themeId, true, 0, true);
+    }
+
+    storage.CacheClear();
+
+    EXPECT_TRUE(storage.themeCache_.empty());
+    EXPECT_TRUE(storage.themeColorSetByUser_.empty());
+}
+
+/**
  * @tc.name: WithThemeTestNg013
  * @tc.desc: reset cache color test
  * @tc.type: FUNC
@@ -846,5 +911,80 @@ HWTEST_F(WithThemeTestNg, WithThemeNodeBuildStackTest003, TestSize.Level1)
     EXPECT_EQ(innerObserver->observedBuildingNodeIds.front(), innerThemeNodeId);
     EXPECT_EQ(afterInnerObserver->observedBuildingNodeIds.front(), outerThemeNodeId);
     EXPECT_FALSE(WithThemeNode::GetCurrentBuildingNodeId().has_value());
+}
+
+/**
+ * @tc.name: CreateSystemTokenThemeWithoutSpecifiedId001
+ * @tc.desc: When specifiedThemeId is empty, CreateSystemTokenTheme uses the system theme id
+ *           derived from colorMode and fills colors via the single-arg GetColor overload
+ *           (legacy path unaffected by the colorMode-aware GetColor change).
+ * @tc.type: FUNC
+ */
+HWTEST_F(WithThemeTestNg, CreateSystemTokenThemeWithoutSpecifiedId001, TestSize.Level0)
+{
+    // Set up container -> pipeline -> themeManager -> themeConstants chain so
+    // CreateSystemTokenTheme can reach themeConstants->GetColor.
+    MockPipelineContext::SetUp();
+    auto pipeline = MockPipelineContext::GetCurrent();
+    MockContainer::SetUp(pipeline);
+    MockContainer::SetMockColorMode(ColorMode::DARK);
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    auto themeConstants = AceType::MakeRefPtr<ThemeConstants>(nullptr);
+    pipeline->SetThemeManager(themeManager);
+    EXPECT_CALL(*themeManager, GetThemeConstants()).WillRepeatedly(Return(themeConstants));
+
+    // Legacy path: do not pass specifiedThemeId. Expected themeId = SYSTEM_THEME_DARK_ID.
+    auto theme = TokenThemeStorage::GetInstance()->CreateSystemTokenTheme(ColorMode::DARK);
+    ASSERT_TRUE(theme);
+    EXPECT_EQ(theme->GetId(), TokenThemeStorage::SYSTEM_THEME_DARK_ID);
+
+    // Both colors and darkColors vectors must be fully filled (TOTAL_NUMBER entries).
+    // private members are exposed via the test macro; access them directly since
+    // Colors() depends on the static IsDarkMode() which is not controlled here.
+    ASSERT_TRUE(theme->colors_);
+    ASSERT_TRUE(theme->darkColors_);
+    // Mock GetColor returns Color::RED when no theme style is loaded.
+    EXPECT_EQ(theme->colors_->Brand(), Color::RED);
+    EXPECT_EQ(theme->darkColors_->Brand(), Color::RED);
+
+    pipeline->SetThemeManager(nullptr);
+    MockContainer::TearDown();
+    MockPipelineContext::TearDown();
+}
+
+/**
+ * @tc.name: CreateSystemTokenThemeWithSpecifiedId001
+ * @tc.desc: When specifiedThemeId has a value, CreateSystemTokenTheme uses the specified id
+ *           and fills colors via the colorMode-aware GetColor overload (new scenario path).
+ * @tc.type: FUNC
+ */
+HWTEST_F(WithThemeTestNg, CreateSystemTokenThemeWithSpecifiedId001, TestSize.Level0)
+{
+    constexpr int32_t SPECIFIED_THEME_ID = 50001;
+
+    MockPipelineContext::SetUp();
+    auto pipeline = MockPipelineContext::GetCurrent();
+    MockContainer::SetUp(pipeline);
+    MockContainer::SetMockColorMode(ColorMode::DARK);
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    auto themeConstants = AceType::MakeRefPtr<ThemeConstants>(nullptr);
+    pipeline->SetThemeManager(themeManager);
+    EXPECT_CALL(*themeManager, GetThemeConstants()).WillRepeatedly(Return(themeConstants));
+
+    // New scenario: pass specifiedThemeId. Expected themeId = SPECIFIED_THEME_ID (not system id).
+    std::optional<int32_t> specifiedId = SPECIFIED_THEME_ID;
+    auto theme = TokenThemeStorage::GetInstance()->CreateSystemTokenTheme(ColorMode::DARK, specifiedId);
+    ASSERT_TRUE(theme);
+    EXPECT_EQ(theme->GetId(), SPECIFIED_THEME_ID);
+    EXPECT_NE(theme->GetId(), TokenThemeStorage::SYSTEM_THEME_DARK_ID);
+
+    ASSERT_TRUE(theme->colors_);
+    ASSERT_TRUE(theme->darkColors_);
+    EXPECT_EQ(theme->colors_->Brand(), Color::RED);
+    EXPECT_EQ(theme->darkColors_->Brand(), Color::RED);
+
+    pipeline->SetThemeManager(nullptr);
+    MockContainer::TearDown();
+    MockPipelineContext::TearDown();
 }
 } //namespace OHOS::Ace::NG

@@ -243,4 +243,40 @@ HWTEST_F(DatePickerWindowFullscreenTest, DatePickerOnWindowSizeChanged006, TestS
     EXPECT_TRUE(datePickerPattern->IsWindowFullscreen());
 }
 
+/**
+ * @tc.name: DatePickerOnWindowSizeChanged007
+ * @tc.desc: Test OnWindowSizeChanged with MOVE reason (early return, no state change)
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerWindowFullscreenTest, DatePickerOnWindowSizeChanged007, TestSize.Level1)
+{
+    auto datePickerNode = FrameNode::GetOrCreateFrameNode(
+        V2::DATE_PICKER_ETS_TAG, 1, []() { return AceType::MakeRefPtr<DatePickerPattern>(); });
+    ASSERT_NE(datePickerNode, nullptr);
+    auto datePickerPattern = datePickerNode->GetPattern<DatePickerPattern>();
+    ASSERT_NE(datePickerPattern, nullptr);
+
+    EXPECT_TRUE(datePickerPattern->IsWindowFullscreen());
+    datePickerPattern->OnWindowSizeChanged(TEST_WIDTH, TEST_HEIGHT, WindowSizeChangeReason::MOVE);
+    EXPECT_TRUE(datePickerPattern->IsWindowFullscreen());
+}
+
+/**
+ * @tc.name: DatePickerOnWindowSizeChanged008
+ * @tc.desc: Test OnWindowSizeChanged with DRAG_MOVE reason (early return, no state change)
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerWindowFullscreenTest, DatePickerOnWindowSizeChanged008, TestSize.Level1)
+{
+    auto datePickerNode = FrameNode::GetOrCreateFrameNode(
+        V2::DATE_PICKER_ETS_TAG, 1, []() { return AceType::MakeRefPtr<DatePickerPattern>(); });
+    ASSERT_NE(datePickerNode, nullptr);
+    auto datePickerPattern = datePickerNode->GetPattern<DatePickerPattern>();
+    ASSERT_NE(datePickerPattern, nullptr);
+
+    EXPECT_TRUE(datePickerPattern->IsWindowFullscreen());
+    datePickerPattern->OnWindowSizeChanged(TEST_WIDTH, TEST_HEIGHT, WindowSizeChangeReason::DRAG_MOVE);
+    EXPECT_TRUE(datePickerPattern->IsWindowFullscreen());
+}
+
 } // namespace OHOS::Ace::NG

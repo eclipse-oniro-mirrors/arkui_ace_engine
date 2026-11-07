@@ -408,15 +408,20 @@ export struct ChipGroupV2 {
   @Param chipGroupSpace?: ChipGroupV2Space = defaultTheme.chipGroupSpace;
   @Param chipGroupPadding?: ChipGroupV2Padding = defaultTheme.chipGroupPadding;
   @Event onChange?: Callback<Array<number>>;
+  @Event onItemsChange?: Callback<ChipGroupV2Items> = undefined;
   @BuilderParam suffix?: Callback<void>;
   @Provider() chipSize: ChipV2Size | SizeT<LengthMetrics> = defaultTheme.size;
   private scroller: Scroller = new Scroller();
   @Local selectedIndexesInternal: Array<number> | undefined = [0];
   @Local isReachEnd: boolean = this.scroller.isAtEnd();
   @Local isRefresh: boolean = true;
+  private closedIndexes: number[] = [];
 
   @Monitor('items')
-  onItemsChange() {
+  onItemsChangeInternal() {
+    if (this.closedIndexes.length > 0) {
+      this.closedIndexes = [];
+    }
     this.isRefresh = !this.isRefresh;
   }
 
@@ -436,6 +441,14 @@ export struct ChipGroupV2 {
   @Monitor('selectedIndexes')
   selectedIndexesOnChange() {
     this.selectedIndexesInternal = this.selectedIndexes?.filter(()=>true);
+  }
+
+  private onItemClose(index: number): void {
+    if (!this.onItemsChange || this.closedIndexes.includes(index)) {
+      return;
+    }
+    this.closedIndexes.push(index);
+    this.onItemsChange?.(this.items.filter((element, i) => !this.closedIndexes.includes(i)));
   }
 
   aboutToAppear() {
@@ -660,6 +673,7 @@ export struct ChipGroupV2 {
               this.$items?.(this.items.filter((element) => {
                 return element !== chipItem;
               }))
+              this.onItemClose(index);
             }
           })})
         }

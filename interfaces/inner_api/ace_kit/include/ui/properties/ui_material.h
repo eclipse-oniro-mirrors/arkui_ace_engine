@@ -37,20 +37,26 @@ struct LightEffectOptions {
 };
 
 struct ImmersiveOptions {
+    /** ------------------ enum params ------------------ */
     UiMaterialStyle style = UiMaterialStyle::REGULAR;
-    std::optional<Color> materialColor = std::nullopt;
+    ColorMode colorMode = ColorMode::COLOR_MODE_UNDEFINED;
+    MaterialColorBlendMode colorBlendMode = MaterialColorBlendMode::LINEAR_MIX;
+
+    /** ------------------ bool params ------------------ */
     bool colorInvert = false;
     bool applyShadow = true;
     // when disableLightEffect is true, do not add lightEffect. lightEffectOptions has no effect.
     bool disableLightEffect = false;
-    // std::nullopt means follow the behavior of component, otherwise is set by user.
-    std::optional<bool> interactive = std::nullopt;
-    // "std::nullopt and disableLightEffect==false" means follow the behavior of component, otherwise is set by user.
-    std::optional<LightEffectOptions> lightEffectOptions = std::nullopt;
-    RefPtr<ResourceObject> colorResObj = nullptr;
-    ColorMode colorMode = ColorMode::COLOR_MODE_UNDEFINED; // options' colorMode will override GetNodeColorMode
     // when needSplitOverlayShader is true, split material shader into base and overlay layers
     bool needSplitOverlayShader = false;
+
+    /** ------------------ complex params ------------------ */
+    std::optional<Color> materialColor = std::nullopt;
+    RefPtr<ResourceObject> colorResObj = nullptr;
+    // "std::nullopt and disableLightEffect==false" means follow the behavior of component, otherwise is set by user.
+    std::optional<LightEffectOptions> lightEffectOptions = std::nullopt;
+    // std::nullopt means follow the behavior of component, otherwise is set by user.
+    std::optional<bool> interactive = std::nullopt;
 
     bool HasLightEffect() const
     {
@@ -114,10 +120,9 @@ public:
     // Check if material is enabled (state == ENABLE).
     static bool IsMaterialEnabled();
     static RefPtr<UiMaterial> CreateEmpty();
-protected:
     // copy member of self.
     virtual void CopyTo(RefPtr<UiMaterial>& other) const;
-
+protected:
     int32_t type_{0};
     bool isEmpty_{false};
     std::shared_ptr<ImmersiveOptions> immersiveOptions_;

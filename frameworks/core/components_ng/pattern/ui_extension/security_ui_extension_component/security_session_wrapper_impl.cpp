@@ -35,7 +35,9 @@
 #include "base/utils/utils.h"
 #include "core/common/container.h"
 #include "core/common/container_scope.h"
+#include "core/components_ng/pattern/ui_extension/ui_extension_utils.h"
 #include "core/components_ng/pattern/ui_extension/session_wrapper.h"
+#include "core/components_ng/token_theme/token_theme_storage.h"
 #include "core/components_ng/pattern/window_scene/helper/window_scene_helper.h"
 #include "core/components_ng/pattern/window_scene/scene/system_window_scene.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -339,6 +341,8 @@ void SecuritySessionWrapperImpl::InitAllCallback()
 /*********************** Begin: About session ************************************/
 void SecuritySessionWrapperImpl::CreateSession(const AAFwk::Want& want, const SessionConfig& config)
 {
+    auto pattern = hostPattern_.Upgrade();
+    CHECK_NULL_VOID(pattern);
     PLATFORM_LOGI("The session is created with bundle = %{public}s, ability = %{public}s",
         want.GetElement().GetBundleName().c_str(), want.GetElement().GetAbilityName().c_str());
     auto container = Platform::AceContainer::GetContainer(instanceId_);
@@ -348,8 +352,6 @@ void SecuritySessionWrapperImpl::CreateSession(const AAFwk::Want& want, const Se
     UpdateWantPtr(wantPtr);
     if (sessionType_ != SessionType::SECURITY_UI_EXTENSION_ABILITY) {
         PLATFORM_LOGE("The UIExtensionComponent does not allow nested pulling of another.");
-        auto pattern = hostPattern_.Upgrade();
-        CHECK_NULL_VOID(pattern);
         pattern->FireOnErrorCallback(
             ERROR_CODE_UIEXTENSION_FORBID_CASCADE, PULL_FAIL_NAME, PULL_FAIL_MESSAGE);
         return;
@@ -362,8 +364,9 @@ void SecuritySessionWrapperImpl::CreateSession(const AAFwk::Want& want, const Se
     } else {
         parentWindowType = container->GetWindowType();
     }
-    PLATFORM_LOGI("isNotifyOccupiedAreaChange is %{public}d, parentWindowType: %{public}u",
-        isNotifyOccupiedAreaChange_, parentWindowType);
+    auto brandColorStr = pattern->GetBrandColorStr();
+    PLATFORM_LOGI("isNotifyOccupiedAreaChange is %{public}d, parentWindowType: %{public}u, brandColorStr: %{public}s",
+        isNotifyOccupiedAreaChange_, parentWindowType, brandColorStr.c_str());
     auto callerToken = container->GetToken();
     auto parentToken = container->GetParentToken();
     Rosen::SessionInfo extensionSessionInfo;
@@ -375,6 +378,7 @@ void SecuritySessionWrapperImpl::CreateSession(const AAFwk::Want& want, const Se
     extensionSessionInfo.parentWindowType_ = parentWindowType;
     extensionSessionInfo.uiExtensionUsage_ = static_cast<uint32_t>(config.uiExtensionUsage);
     extensionSessionInfo.isAsyncModalBinding_ = config.isAsyncModalBinding;
+    extensionSessionInfo.brandColorStr_ = brandColorStr;
     auto setConnectToRender = [container, &extensionSessionInfo]() {
         auto pipeline = container->GetPipelineContext();
         CHECK_NULL_VOID(pipeline);
@@ -389,6 +393,7 @@ void SecuritySessionWrapperImpl::CreateSession(const AAFwk::Want& want, const Se
     setConnectToRender();
     session_ = Rosen::ExtensionSessionManager::GetInstance().RequestExtensionSession(extensionSessionInfo);
     CHECK_NULL_VOID(session_);
+    pattern->SetLastSentBrandColorStr(brandColorStr);
     lifecycleListener_ = std::make_shared<SecurityUIExtensionLifecycleListener>(
         AceType::WeakClaim(this));
     session_->RegisterLifecycleListener(lifecycleListener_);
@@ -855,13 +860,11 @@ bool SecuritySessionWrapperImpl::NotifyOccupiedAreaChangeInfo(
     return true;
 }
 
-void SecuritySessionWrapperImpl::SetDensityDpiImpl(bool isDensityDpi)
+void SecuritySessionWrapperImpl::SetDensityDpiImpl(DpiFollowStrategy dpiFollowStrategy)
 {
     CHECK_NULL_VOID(session_);
-    if (isDensityDpi) {
-        float density = PipelineBase::GetCurrentDensity();
-        session_->NotifyDensityFollowHost(isDensityDpi, density);
-    }
+    float density = PipelineBase::GetCurrentDensity();
+    session_->NotifyDensityFollowHost(ConvertToRosenDpiFollowStrategy(dpiFollowStrategy), density);
 }
 
 void SecuritySessionWrapperImpl::SendDataAsync(const AAFwk::WantParams& params) const

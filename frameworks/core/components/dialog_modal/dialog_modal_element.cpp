@@ -137,7 +137,7 @@ void DialogModalElement::RegisterTransitionListener()
             return;
         }
         if (event == TransitionEvent::POP_START) {
-            auto page = AceType::DynamicCast<PageElement>(out.Upgrade());
+            auto page = out.Upgrade();
             if (!page) {
                 LOGE("Handle pop transition event failed. page out is null.");
                 return;
@@ -145,7 +145,7 @@ void DialogModalElement::RegisterTransitionListener()
             auto pageHeight = GetPageLayoutSize(page).Height();
             dialogRender->AnimateTo(pageHeight, true);
         } else if (event == TransitionEvent::PUSH_START) {
-            auto page = AceType::DynamicCast<PageElement>(in.Upgrade());
+            auto page = in.Upgrade();
             if (!page) {
                 // push first page.
                 dialogRender->SetLayoutNotify([weak]() {

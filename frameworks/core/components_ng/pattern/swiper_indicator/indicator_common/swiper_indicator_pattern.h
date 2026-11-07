@@ -263,6 +263,7 @@ public:
         startIndex_ = startIndex;
     }
 
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
     void SetIndicatorInteractive(bool isInteractive);
@@ -289,6 +290,7 @@ public:
     void OnModifyDone() override;
     void IndicatorOnChange();
     void InitIndicatorEvent();
+    virtual void OnIndicatorChangeAccessibilityEvent() {}
     virtual bool GetDigitFrameSize(RefPtr<GeometryNode>& geoNode, SizeF& frameSize) const;
     virtual int32_t RealTotalCount() const;
     virtual int32_t GetCurrentIndex() const;
@@ -340,6 +342,8 @@ public:
     }
     
 private:
+    void DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
     void OnAttachToFrameNode() override;
     bool OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config) override;
     void InitClickEvent(const RefPtr<GestureEventHub>& gestureHub);

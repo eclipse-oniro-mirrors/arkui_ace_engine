@@ -172,7 +172,7 @@ const MediaQueryerRule CSS_LEVEL4_RIGHT(
 
 // condition such as: min-width: 1000
 const MediaQueryerRule CSS_LEVEL3_RULE(
-    std::regex("\\((min|max)-([a-z-]+):([\\d\\.]+)(dpi|dppx|dpcm|vp)?\\)"),
+    std::regex("\\((min|max)-([a-z-]+):([\\d\\.]+)(dpi|dppx|dpcm|px|vp)?\\)"),
     [](const std::smatch& matchResults, const MediaFeature& mediaFeature, MediaError& failReason) {
         static constexpr int32_t RELATIONSHIP = 1;
         static constexpr int32_t MEDIA_FEATURE = 2;
@@ -315,8 +315,8 @@ bool DoMatchCondition(const std::string& condition, const MediaFeature& mediaFea
             if (failReason == MediaError::SYNTAX) {
                 return false;
             }
-            if (i + 1 == len) {
-                return (inverse && !result) || (!inverse && result);
+            if (result) {
+                return !inverse;
             }
         } else {
             if (ParseSingleCondition(conditionArr[i], mediaFeature, failReason)) {

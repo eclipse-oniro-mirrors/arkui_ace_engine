@@ -150,6 +150,7 @@ public:
 
     RefPtr<MonitorIdentity> AddLocalInputMonitor(uint32_t eventMask, InputEventListenerCallback handler);
     void RemoveLocalInputMonitor(const RefPtr<MonitorIdentity>& identity);
+    void RemoveLocalInputMonitor(MonitorIdentity* identity);
 
     bool ProcessMouseEvent(MouseEvent& event);
     bool ProcessTouchEvent(TouchEvent& event);

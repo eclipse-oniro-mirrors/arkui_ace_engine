@@ -125,6 +125,10 @@ class LazyArkGridComponent extends ArkScrollable {
     this.lazyComponent.nestedScroll(value);
     return this;
   }
+  scrollSnapStrategy(value: ScrollSnapAlign | ScrollSnapOffsetProvider): this {
+    this.lazyComponent.scrollSnapStrategy(value);
+    return this;
+  }
   enableScrollInteraction(value: boolean): this {
     this.lazyComponent.enableScrollInteraction(value);
     return this;
@@ -194,7 +198,7 @@ class LazyArkGridComponent extends ArkScrollable {
     this.lazyComponent.onDidScroll(callback);
     return this;
   }
-  supportEmptyBranchInLazyLoading(value: any): this {
+  supportEmptyBranchInLazyLoading(value: boolean | undefined): this {
     this.lazyComponent.supportEmptyBranchInLazyLoading(value);
     return this;
   }

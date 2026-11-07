@@ -113,6 +113,7 @@ template("ace_core_source_set") {
       "accessibility/native_interface_accessibility_impl.cpp",
       "accessibility/native_interface_accessibility_provider.cpp",
       "accessibility/static/accessibility_static_utils.cpp",
+      "accessibility/third_provider_tree_exporter.cpp",
 
       # animation
       "animation/animatable_data.cpp",
@@ -145,6 +146,7 @@ template("ace_core_source_set") {
 
       # common
       "common/ace_application_info.cpp",
+      "common/application_shortcut.cpp",
       "common/ace_engine.cpp",
       "common/ace_engine_ext.cpp",
       "common/agingadapation/aging_adapation_dialog_util.cpp",
@@ -156,6 +158,7 @@ template("ace_core_source_set") {
       "common/clipboard/clipboard_proxy.cpp",
       "common/color_inverter.cpp",
       "common/container.cpp",
+      "common/ui_observer/ui_observer_store.cpp",
       "common/container_scope.cpp",
       "common/environment/environment_proxy.cpp",
       "common/event_manager.cpp",
@@ -175,7 +178,6 @@ template("ace_core_source_set") {
       "common/resource/pattern_resource_manager.cpp",
       "common/resource/resource_manager.cpp",
       "common/resource/resource_parse_utils.cpp",
-      "common/sharedata/share_data.cpp",
       "common/statistic_event_reporter.cpp",
       "components_ng/pattern/text_field/text_field_type_utils.cpp",
       "common/storage/storage_proxy.cpp",
@@ -274,6 +276,8 @@ template("ace_core_source_set") {
       "common/ime/text_input_configuration.cpp",
       "common/ime/text_input_connection.cpp",
       "common/ime/text_input_formatter.cpp",
+      "common/ime/text_input_keyboard_utils.cpp",
+      "common/ime/text_input_obscure_utils.cpp",
       "common/ime/text_input_proxy.cpp",
       "common/ime/text_input_type.cpp",
 
@@ -324,6 +328,7 @@ template("ace_core_source_set") {
         "components_ng/relaxed_interaction/executor_generator.cpp",
         "components_ng/relaxed_interaction/executors/backpress_executor.cpp",
         "components_ng/relaxed_interaction/executors/fallback_executor.cpp",
+        "components_ng/relaxed_interaction/executors/key_executor.cpp",
         "components_ng/relaxed_interaction/executors/scroll_simulating_executor.cpp",
         "components_ng/relaxed_interaction/executors/scroll_touch_executor.cpp",
         "components_ng/relaxed_interaction/executors/simulate_touch_executor.cpp",
@@ -335,6 +340,7 @@ template("ace_core_source_set") {
         "components_ng/relaxed_interaction/parsers/click_command_parser.cpp",
         "components_ng/relaxed_interaction/parsers/content_switch_command_parser.cpp",
         "components_ng/relaxed_interaction/parsers/fallback_command_parser.cpp",
+        "components_ng/relaxed_interaction/parsers/key_command_parser.cpp",
         "components_ng/relaxed_interaction/parsers/scroll_command_parser.cpp",
         "components_ng/relaxed_interaction/parsers/slide_command_parser.cpp",
         "components_ng/relaxed_interaction/parsers/tap_command_parser.cpp",
@@ -382,6 +388,16 @@ template("ace_core_source_set") {
     ]
 
     external_deps = []
+    # The third-party exporter owns its checked JSON builder.
+    if (is_arkui_x) {
+      deps += [ "//third_party/cJSON:cjson_static" ]
+    } else {
+      external_deps += [ "cJSON:cjson" ]
+    }
+    if (defined(config.enable_standard_input) && config.enable_standard_input) {
+      external_deps += [ "imf:inputmethod_client" ]
+      external_deps += [ "input:libmmi-client" ]
+    }
     if (!ace_engine_feature_enable_event_extra_handling) {
       sources += [ "event/event_info_convertor.cpp" ]
     }
@@ -506,6 +522,7 @@ template("ace_core_source_set") {
       "$ace_root/frameworks/core/components_ng/image_provider:ace_core_components_image_provider_ng_$platform",
       "$ace_root/frameworks/core/components_ng/layout:ace_core_components_layout_ng_$platform",
       "$ace_root/frameworks/core/components_ng/manager:ace_core_components_manager_ng_$platform",
+      "$ace_root/frameworks/core/components_ng/manager/handedness:ace_core_components_handedness_manager_ng_$platform",
       "$ace_root/frameworks/core/components_ng/pattern:ace_core_components_pattern_ng_$platform",
       "$ace_root/frameworks/core/components_ng/property:ace_core_components_property_ng_$platform",
       "$ace_root/frameworks/core/components_ng/render:ace_core_components_render_ng_$platform",
@@ -705,6 +722,9 @@ template("ace_core_source_set") {
     if (ace_engine_feature_enable_material_customized) {
       defines += [ "ACE_ENGINE_IMMERSIVE_MATERIAL_CUSTOMIZED" ]
     }
+    if (ace_engine_feature_enable_material_tv) {
+      defines += [ "ACE_ENGINE_IMMERSIVE_MATERIAL_TV" ]
+    }
 
     # arkoala C interface
     deps += [ "$ace_root/frameworks/core/interfaces/native:ace_core_interfaces_native_node_$platform" ]
@@ -742,6 +762,7 @@ template("ace_core_ng_source_set") {
       "accessibility/native_interface_accessibility_impl.cpp",
       "accessibility/native_interface_accessibility_provider.cpp",
       "accessibility/static/accessibility_static_utils.cpp",
+      "accessibility/third_provider_tree_exporter.cpp",
 
       # animation
       "animation/animatable_data.cpp",
@@ -771,6 +792,7 @@ template("ace_core_ng_source_set") {
 
       # common
       "common/ace_application_info.cpp",
+      "common/application_shortcut.cpp",
       "common/ace_engine.cpp",
       "common/ace_engine_ext.cpp",
       "common/agingadapation/aging_adapation_dialog_util.cpp",
@@ -782,6 +804,7 @@ template("ace_core_ng_source_set") {
       "common/clipboard/clipboard_proxy.cpp",
       "common/color_inverter.cpp",
       "common/container.cpp",
+      "common/ui_observer/ui_observer_store.cpp",
       "common/container_scope.cpp",
       "common/environment/environment_proxy.cpp",
       "common/event_manager.cpp",
@@ -801,7 +824,6 @@ template("ace_core_ng_source_set") {
       "common/resource/pattern_resource_manager.cpp",
       "common/resource/resource_manager.cpp",
       "common/resource/resource_parse_utils.cpp",
-      "common/sharedata/share_data.cpp",
       "common/statistic_event_reporter.cpp",
       "components_ng/pattern/text_field/text_field_type_utils.cpp",
       "common/storage/storage_proxy.cpp",
@@ -891,6 +913,8 @@ template("ace_core_ng_source_set") {
       "common/ime/text_input_configuration.cpp",
       "common/ime/text_input_connection.cpp",
       "common/ime/text_input_formatter.cpp",
+      "common/ime/text_input_keyboard_utils.cpp",
+      "common/ime/text_input_obscure_utils.cpp",
       "common/ime/text_input_proxy.cpp",
       "common/ime/text_input_type.cpp",
 
@@ -1004,6 +1028,7 @@ template("ace_core_ng_source_set") {
         "components_ng/relaxed_interaction/executor_generator.cpp",
         "components_ng/relaxed_interaction/executors/backpress_executor.cpp",
         "components_ng/relaxed_interaction/executors/fallback_executor.cpp",
+        "components_ng/relaxed_interaction/executors/key_executor.cpp",
         "components_ng/relaxed_interaction/executors/scroll_simulating_executor.cpp",
         "components_ng/relaxed_interaction/executors/scroll_touch_executor.cpp",
         "components_ng/relaxed_interaction/executors/simulate_touch_executor.cpp",
@@ -1015,6 +1040,7 @@ template("ace_core_ng_source_set") {
         "components_ng/relaxed_interaction/parsers/click_command_parser.cpp",
         "components_ng/relaxed_interaction/parsers/content_switch_command_parser.cpp",
         "components_ng/relaxed_interaction/parsers/fallback_command_parser.cpp",
+        "components_ng/relaxed_interaction/parsers/key_command_parser.cpp",
         "components_ng/relaxed_interaction/parsers/scroll_command_parser.cpp",
         "components_ng/relaxed_interaction/parsers/slide_command_parser.cpp",
         "components_ng/relaxed_interaction/parsers/tap_command_parser.cpp",
@@ -1060,6 +1086,16 @@ template("ace_core_ng_source_set") {
     }
 
     external_deps = []
+    # The third-party exporter owns its checked JSON builder.
+    if (is_arkui_x) {
+      deps += [ "//third_party/cJSON:cjson_static" ]
+    } else {
+      external_deps += [ "cJSON:cjson" ]
+    }
+    if (defined(config.enable_standard_input) && config.enable_standard_input) {
+      external_deps += [ "imf:inputmethod_client" ]
+      external_deps += [ "input:libmmi-client" ]
+    }
     if (defined(ffrt_support) && ffrt_support) {
       defines += [ "FFRT_SUPPORT" ]
       external_deps += [ "ffrt:libffrt" ]
@@ -1103,6 +1139,7 @@ template("ace_core_ng_source_set") {
       "$ace_root/frameworks/core/components_ng/image_provider:ace_core_components_image_provider_ng_$platform",
       "$ace_root/frameworks/core/components_ng/layout:ace_core_components_layout_ng_$platform",
       "$ace_root/frameworks/core/components_ng/manager:ace_core_components_manager_ng_$platform",
+      "$ace_root/frameworks/core/components_ng/manager/handedness:ace_core_components_handedness_manager_ng_$platform",
       "$ace_root/frameworks/core/components_ng/pattern:ace_core_components_pattern_ng_$platform",
       "$ace_root/frameworks/core/components_ng/property:ace_core_components_property_ng_$platform",
       "$ace_root/frameworks/core/components_ng/render:ace_core_components_render_ng_$platform",
@@ -1252,6 +1289,9 @@ template("ace_core_ng_source_set") {
 
     if (ace_engine_feature_enable_material_customized) {
       defines += [ "ACE_ENGINE_IMMERSIVE_MATERIAL_CUSTOMIZED" ]
+    }
+    if (ace_engine_feature_enable_material_tv) {
+      defines += [ "ACE_ENGINE_IMMERSIVE_MATERIAL_TV" ]
     }
 
     cflags_cc = []

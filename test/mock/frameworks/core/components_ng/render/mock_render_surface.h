@@ -35,6 +35,8 @@ public:
     MOCK_METHOD1(SetInstanceId, void(int32_t));
     MOCK_METHOD1(SetSurfaceBufferOpaque, void(bool));
     MOCK_METHOD1(UpdateBufferTypeLeak, void(const std::string&));
+    MOCK_METHOD1(SetSurfaceQueueSize, void(int32_t));
+    MOCK_METHOD0(UpdateSurfaceConfig, void());
 };
 } // namespace OHOS::Ace::NG
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_MOCK_RENDER_SURFACE_H

@@ -44,6 +44,10 @@
 
 #include "test/unittest/core/pattern/web/mock_web_delegate.h"
 
+#define private public
+#include "core/common/ace_translate_manager.h"
+#undef private
+
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_v2/inspector/inspector_constants.h"
 
@@ -1389,6 +1393,273 @@ HWTEST_F(WebPatternMethodTestNg, CloseImageOverlaySelection_001, TestSize.Level1
     webPattern->imageOverlayIsSelected_ = false;
     ret = webPattern->CloseImageOverlaySelection();
     EXPECT_EQ(ret, false);
+#endif
+}
+
+namespace {
+bool InvokeGetWebInfoByRequestAndCheck(const std::string& request, const std::string& expectRectJson)
+{
+    auto frameNode = FrameNode::CreateFrameNode(V2::WEB_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<WebPattern>());
+    EXPECT_NE(frameNode, nullptr);
+    if (!frameNode) {
+        return false;
+    }
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    EXPECT_NE(webPattern, nullptr);
+    if (!webPattern) {
+        return false;
+    }
+    webPattern->OnModifyDone();
+    EXPECT_NE(webPattern->delegate_, nullptr);
+    if (!webPattern->delegate_) {
+        return false;
+    }
+
+    ResetMockRequestNativeDomTree();
+
+    int32_t winId = 100;
+    int32_t webId = 200;
+    std::string capturedResult;
+    WebRequestErrorCode capturedCode = WebRequestErrorCode::INVALID_REQUEST;
+    auto finishCallback = [&capturedResult, &capturedCode](int32_t, int32_t, const std::string&,
+        const std::string& result, WebRequestErrorCode code) {
+        capturedResult = result;
+        capturedCode = code;
+    };
+    webPattern->GetWebInfoByRequest(winId, webId, request, finishCallback);
+
+    const auto& call = GetMockRequestNativeDomTreeLastCall();
+    EXPECT_TRUE(call.called);
+    EXPECT_EQ(call.rectJson, expectRectJson);
+    EXPECT_EQ(capturedResult, R"([{"tag":"div"}])");
+    EXPECT_EQ(capturedCode, WebRequestErrorCode::OK);
+    return call.called && call.rectJson == expectRectJson &&
+        capturedResult == R"([{"tag":"div"}])" && capturedCode == WebRequestErrorCode::OK;
+}
+} // namespace
+
+namespace {
+bool InvokeGetWebInfoByRequestAndExpectError(const std::string& request)
+{
+    auto frameNode = FrameNode::CreateFrameNode(V2::WEB_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<WebPattern>());
+    EXPECT_NE(frameNode, nullptr);
+    if (!frameNode) {
+        return false;
+    }
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    EXPECT_NE(webPattern, nullptr);
+    if (!webPattern) {
+        return false;
+    }
+    webPattern->OnModifyDone();
+    EXPECT_NE(webPattern->delegate_, nullptr);
+    if (!webPattern->delegate_) {
+        return false;
+    }
+
+    ResetMockRequestNativeDomTree();
+
+    int32_t winId = 100;
+    int32_t webId = 200;
+    std::string capturedResult = "non_empty";
+    WebRequestErrorCode capturedCode = WebRequestErrorCode::OK;
+    auto finishCallback = [&capturedResult, &capturedCode](int32_t, int32_t, const std::string&,
+        const std::string& result, WebRequestErrorCode code) {
+        capturedResult = result;
+        capturedCode = code;
+    };
+    webPattern->GetWebInfoByRequest(winId, webId, request, finishCallback);
+
+    const auto& call = GetMockRequestNativeDomTreeLastCall();
+    EXPECT_FALSE(call.called);
+    EXPECT_EQ(capturedResult, "[]");
+    EXPECT_EQ(capturedCode, WebRequestErrorCode::INVALID_REQUEST);
+    return !call.called && capturedResult == "[]" && capturedCode == WebRequestErrorCode::INVALID_REQUEST;
+}
+} // namespace
+
+/**
+ * @tc.name: GetWebInfoByRequest_ByNative_001
+ * @tc.desc: Test GetWebInfoByRequest dispatches ByNative request to RequestNativeDomTree with empty rectJson.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternMethodTestNg, GetWebInfoByRequest_ByNative_001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    EXPECT_TRUE(InvokeGetWebInfoByRequestAndCheck("RequestArkWebDomTreeByNative", ""));
+#endif
+}
+
+/**
+ * @tc.name: GetWebInfoByRequest_ByRect_001
+ * @tc.desc: Test GetWebInfoByRequest dispatches ByRect request with JSON suffix to RequestNativeDomTree.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternMethodTestNg, GetWebInfoByRequest_ByRect_001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    EXPECT_TRUE(InvokeGetWebInfoByRequestAndCheck(
+        "RequestArkWebDomTreeByRect:{\"x\":1,\"y\":2,\"width\":3,\"height\":4}",
+        "{\"x\":1,\"y\":2,\"width\":3,\"height\":4}"));
+#endif
+}
+
+/**
+ * @tc.name: GetWebInfoByRequest_ByRect_002
+ * @tc.desc: Test GetWebInfoByRequest ByRect branch returns INVALID_REQUEST when rectJson is empty.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternMethodTestNg, GetWebInfoByRequest_ByRect_002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    EXPECT_TRUE(InvokeGetWebInfoByRequestAndExpectError("RequestArkWebDomTreeByRect"));
+#endif
+}
+
+/**
+ * @tc.name: GetWebInfoByRequest_ByPoint_001
+ * @tc.desc: Test GetWebInfoByRequest dispatches ByPoint request with JSON suffix to RequestNativeDomTree.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternMethodTestNg, GetWebInfoByRequest_ByPoint_001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    EXPECT_TRUE(InvokeGetWebInfoByRequestAndCheck(
+        "RequestArkWebDomTreeByPoint:{\"pointX\":5,\"pointY\":6}",
+        "{\"pointX\":5,\"pointY\":6}"));
+#endif
+}
+
+/**
+ * @tc.name: GetWebInfoByRequest_ByPoint_002
+ * @tc.desc: Test GetWebInfoByRequest ByPoint branch returns INVALID_REQUEST when pointJson is empty.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternMethodTestNg, GetWebInfoByRequest_ByPoint_002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    EXPECT_TRUE(InvokeGetWebInfoByRequestAndExpectError("RequestArkWebDomTreeByPoint"));
+#endif
+}
+
+/**
+ * @tc.name: GetWebInfoByRequest_UnknownRequest_001
+ * @tc.desc: Test GetWebInfoByRequest does not call RequestNativeDomTree for unknown request strings.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternMethodTestNg, GetWebInfoByRequest_UnknownRequest_001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto frameNode = FrameNode::CreateFrameNode(V2::WEB_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<WebPattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    ResetMockRequestNativeDomTree();
+
+    int32_t winId = 100;
+    int32_t webId = 200;
+    bool callbackInvoked = false;
+    auto finishCallback = [&callbackInvoked](int32_t, int32_t, const std::string&,
+        const std::string&, WebRequestErrorCode) {
+        callbackInvoked = true;
+    };
+    webPattern->GetWebInfoByRequest(winId, webId, "UnknownRequest", finishCallback);
+
+    const auto& call = GetMockRequestNativeDomTreeLastCall();
+    EXPECT_FALSE(call.called);
+    EXPECT_TRUE(callbackInvoked);
+#endif
+}
+
+/**
+ * @tc.name: GetWebInfoByRequest_JSDomTreeBranch_001
+ * @tc.desc: Test GetWebInfoByRequest still routes RequestArkWebDomTree (JS path) without calling
+ *           RequestNativeDomTree, ensuring JS path regression.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternMethodTestNg, GetWebInfoByRequest_JSDomTreeBranch_001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto frameNode = FrameNode::CreateFrameNode(V2::WEB_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<WebPattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    ResetMockRequestNativeDomTree();
+
+    int32_t winId = 100;
+    int32_t webId = 200;
+    bool callbackInvoked = false;
+    auto finishCallback = [&callbackInvoked](int32_t, int32_t, const std::string&,
+        const std::string&, WebRequestErrorCode) {
+        callbackInvoked = true;
+    };
+    webPattern->GetWebInfoByRequest(winId, webId, "RequestArkWebDomTree", finishCallback);
+
+    const auto& call = GetMockRequestNativeDomTreeLastCall();
+    EXPECT_FALSE(call.called);
+    EXPECT_FALSE(callbackInvoked);
+#endif
+}
+
+/**
+ * @tc.name: GetWebInfoByRequest_ByNative_EmptyResult_001
+ * @tc.desc: Test GetWebInfoByRequest returns INVALID_REQUEST when native callback returns empty result.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternMethodTestNg, GetWebInfoByRequest_ByNative_EmptyResult_001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto frameNode = FrameNode::CreateFrameNode(V2::WEB_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<WebPattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    ResetMockRequestNativeDomTree();
+    SetMockRequestNativeDomTreeResult("");
+
+    int32_t winId = 100;
+    int32_t webId = 200;
+    WebRequestErrorCode capturedCode = WebRequestErrorCode::OK;
+    std::string capturedResult = "non_empty";
+    auto finishCallback = [&capturedResult, &capturedCode](int32_t, int32_t, const std::string&,
+        const std::string& result, WebRequestErrorCode code) {
+        capturedResult = result;
+        capturedCode = code;
+    };
+    webPattern->GetWebInfoByRequest(winId, webId, "RequestArkWebDomTreeByNative", finishCallback);
+
+    EXPECT_TRUE(GetMockRequestNativeDomTreeLastCall().called);
+    EXPECT_EQ(capturedResult, "");
+    EXPECT_EQ(capturedCode, WebRequestErrorCode::INVALID_REQUEST);
+#endif
+}
+
+/**
+ * @tc.name: GetWebInfoByRequest_WebIdNotFound_001
+ * @tc.desc: Test UiTranslateManagerImpl::GetWebInfoByRequest with webId not in listenerMap_ does not crash (EX-5 fix).
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternMethodTestNg, GetWebInfoByRequest_WebIdNotFound_001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto manager = std::make_shared<UiTranslateManagerImpl>(nullptr);
+    ASSERT_NE(manager, nullptr);
+    EXPECT_TRUE(manager->listenerMap_.empty());
+    manager->GetWebInfoByRequest(100, 999999, "RequestArkWebDomTreeByNative");
+    EXPECT_TRUE(manager->listenerMap_.empty());
 #endif
 }
 } // namespace OHOS::Ace::NG

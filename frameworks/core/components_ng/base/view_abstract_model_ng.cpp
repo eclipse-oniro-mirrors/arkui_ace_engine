@@ -31,6 +31,7 @@
 #include "core/components_ng/base/modifier.h"
 #include "core/components_ng/base/ui_node.h"
 #include "core/components_ng/base/view_abstract.h"
+#include "core/components_ng/base/safe_area_inset_view.h"
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/event/focus_hub.h"
 #include "core/components_ng/event/gesture_event_hub.h"
@@ -69,6 +70,9 @@
 #include "core/components/common/properties/placement.h"
 namespace OHOS::Ace::NG {
 namespace {
+// SafeAreaInsetBuilderArray in view_abstract_model.h spells the edge count to
+// avoid including the full safeAreaInset option definitions from the header.
+static_assert(std::tuple_size<SafeAreaInsetBuilderArray>::value == SAFE_AREA_INSET_EDGE_COUNT);
 constexpr int32_t LONG_PRESS_DURATION = 800;
 constexpr int32_t HOVER_IMAGE_LONG_PRESS_DURATION = 250;
 constexpr int32_t HOVER_IMAGE_INTERRUPT_DURATION = 500;
@@ -105,6 +109,11 @@ NG::OffsetF UpdateMenuPostion(const NG::OffsetF& menuPosition, const MenuParam& 
                  targetNodePosition.GetY() };
     }
     return menuPosition;
+}
+
+void ViewAbstractModelNG::SetAgentControlMode(const std::optional<NG::AgentControlMode>& mode)
+{
+    ViewAbstract::SetAgentControlMode(mode);
 }
 
 void ViewAbstractModelNG::BindMenuGesture(
@@ -280,6 +289,8 @@ void ViewAbstractModelNG::BindMenu(
     CHECK_NULL_VOID(targetNode);
     auto targetId = targetNode->GetId();
     ACE_UPDATE_LAYOUT_PROPERTY(LayoutProperty, IsBindOverlay, true);
+    targetNode->SetInspectorMenuBinding((!params.empty() || buildFunc) ?
+        std::make_optional(menuParam.isShowInSubWindow) : std::nullopt);
     if (CheckMenuIsShow(menuParam, targetId, targetNode)) {
         TAG_LOGI(AceLogTag::ACE_MENU, "hide menu done %{public}d %{public}d.", menuParam.isShowInSubWindow, targetId);
     } else if (menuParam.isShow) {
@@ -1223,6 +1234,18 @@ RefPtr<PipelineContext> ViewAbstractModelNG::GetSheetContext(NG::SheetStyle& she
     return context;
 }
 
+void ViewAbstractModelNG::ApplySheetImmersiveStrategyDefaults(
+    const RefPtr<PipelineContext>& context, NG::SheetStyle& sheetStyle)
+{
+    CHECK_NULL_VOID(context);
+    if (!context->IsImmersiveStrategySet(ImmersiveStrategy::BIND_SHEET_EXPAND_SAFE_AREA)) {
+        return;
+    }
+    if (!sheetStyle.titleBarHoverMode.has_value()) {
+        sheetStyle.titleBarHoverMode = SheetTitleBarHoverMode::SAFE_AREA_PADDING;
+    }
+}
+
 void ViewAbstractModelNG::BindSheet(bool isShow, std::function<void(const std::string&)>&& callback,
     std::function<void()>&& buildFunc, std::function<void()>&& titleBuildFunc, NG::SheetStyle& sheetStyle,
     std::function<void()>&& onAppear, std::function<void()>&& onDisappear, std::function<void()>&& shouldDismiss,
@@ -1250,6 +1273,7 @@ void ViewAbstractModelNG::BindSheet(bool isShow, std::function<void(const std::s
     };
     auto context = GetSheetContext(sheetStyle);
     CHECK_NULL_VOID(context);
+    ApplySheetImmersiveStrategyDefaults(context, sheetStyle);
     auto overlayManager = context->GetOverlayManager();
     auto* sheetModifier = NodeModifier::GetSheetManagerInnerModifier();
     CHECK_NULL_VOID(sheetModifier);
@@ -1467,7 +1491,7 @@ void ViewAbstractModelNG::SetAccessibilityVirtualNode(std::function<void()>&& bu
     auto virtualFrameNode = AceType::DynamicCast<NG::FrameNode>(virtualNode);
     CHECK_NULL_VOID(virtualFrameNode);
     virtualFrameNode->SetAccessibilityNodeVirtual();
-    virtualFrameNode->SetAccessibilityVirtualNodeParent(AceType::Claim(AceType::DynamicCast<NG::UINode>(frameNode)));
+    virtualFrameNode->SetAccessibilityVirtualNodeParent(AceType::Claim(frameNode));
     virtualFrameNode->SetFirstAccessibilityVirtualNode();
     frameNode->HasAccessibilityVirtualNode(true);
     accessibilityProperty->SaveAccessibilityVirtualNode(virtualNode);
@@ -2237,6 +2261,62 @@ void ViewAbstractModelNG::SetSafeAreaPaddings(const std::optional<CalcDimension>
     ViewAbstract::SetSafeAreaPadding(paddings);
 }
 
+void ViewAbstractModelNG::SetSafeAreaInset(
+    const SafeAreaInsetOptions& options, SafeAreaInsetBuilderArray&& builders)
+{
+    if (!ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess()) {
+        return;
+    }
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    SetSafeAreaInset(frameNode, options, std::move(builders));
+}
+
+void ViewAbstractModelNG::SetSafeAreaInset(
+    FrameNode* frameNode, const SafeAreaInsetOptions& options, SafeAreaInsetBuilderArray&& builders)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto effectiveOptions = options;
+    SafeAreaInsetContentArray contents;
+    for (size_t index = 0; index < SAFE_AREA_INSET_EDGE_COUNT; ++index) {
+        if (!effectiveOptions.edges[index].has_value()) {
+            continue;
+        }
+        auto& builder = builders[index];
+        if (!builder) {
+            effectiveOptions.edges[index].reset();
+            continue;
+        }
+        ScopedViewStackProcessor builderViewStackProcessor;
+        builder();
+        contents[index] = ViewStackProcessor::GetInstance()->Finish();
+        if (!contents[index]) {
+            effectiveOptions.edges[index].reset();
+        }
+    }
+    if (effectiveOptions.Empty()) {
+        SafeAreaInsetView::ResetSafeAreaInset(frameNode);
+        return;
+    }
+    SafeAreaInsetView::SetSafeAreaInset(frameNode, effectiveOptions, contents);
+}
+
+void ViewAbstractModelNG::ResetSafeAreaInset()
+{
+    if (!ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess()) {
+        return;
+    }
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    ResetSafeAreaInset(frameNode);
+}
+
+void ViewAbstractModelNG::ResetSafeAreaInset(FrameNode* frameNode)
+{
+    CHECK_NULL_VOID(frameNode);
+    SafeAreaInsetView::ResetSafeAreaInset(frameNode);
+}
+
 void ViewAbstractModelNG::SetAccessibilityCustomActions(
     FrameNode* frameNode, const std::vector<AccessibilityCustomAction>& actions)
 {
@@ -2266,5 +2346,15 @@ void ViewAbstractModelNG::ResetAccessibilityCustomActions()
     auto frameNode = NG::ViewStackProcessor::GetInstance()->GetMainFrameNode();
     CHECK_NULL_VOID(frameNode);
     ResetAccessibilityCustomActions(frameNode);
+}
+
+void ViewAbstractModelNG::SetShadowShape(const RefPtr<BasicShape>& basicShape)
+{
+    ViewAbstract::SetShadowShape(basicShape);
+}
+
+void ViewAbstractModelNG::SetShadowClipMode(ShadowClipMode clipMode)
+{
+    ViewAbstract::SetShadowClipMode(clipMode);
 }
 } // namespace OHOS::Ace::NG

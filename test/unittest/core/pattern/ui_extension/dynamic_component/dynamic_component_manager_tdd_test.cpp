@@ -24,6 +24,7 @@
 #include "test/mock/frameworks/core/common/mock_container.h"
 #include "frameworks/core/components_ng/pattern/ui_extension/dynamic_component/dynamic_component_manager.h"
 
+#include "core/components_ng/event/event_hub_callback_sets.h"
 #include "core/components_ng/pattern/stage/stage_manager.h"
 
 using namespace testing;
@@ -296,7 +297,7 @@ HWTEST_F(DynamicComponentManagerTddTestNg,
 
     auto innerCallback = [](const RectF& oldRect,
         const OffsetF& oldOrigin, const RectF& rect, const OffsetF& origin) {};
-    eventHub->onAreaChangedInnerCallbacks_[0] = std::move(innerCallback);
+    eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[0] = std::move(innerCallback);
     ASSERT_TRUE(eventHub->HasInnerOnAreaChanged());
 
     /**
@@ -468,7 +469,7 @@ HWTEST_F(DynamicComponentManagerTddTestNg,
 
     auto innerCallback = [](const RectF& oldRect,
         const OffsetF& oldOrigin, const RectF& rect, const OffsetF& origin) {};
-    eventHub->onAreaChangedInnerCallbacks_[0] = std::move(innerCallback);
+    eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[0] = std::move(innerCallback);
     ASSERT_TRUE(eventHub->HasInnerOnAreaChanged());
 
     /**
@@ -581,7 +582,7 @@ HWTEST_F(DynamicComponentManagerTddTestNg,
     // Add inner callback
     auto innerCallback = [](const RectF& oldRect,
         const OffsetF& oldOrigin, const RectF& rect, const OffsetF& origin) {};
-    eventHub->onAreaChangedInnerCallbacks_[0] = std::move(innerCallback);
+    eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[0] = std::move(innerCallback);
     ASSERT_TRUE(eventHub->HasInnerOnAreaChanged());
 
     // Add outer callback
@@ -626,7 +627,7 @@ HWTEST_F(DynamicComponentManagerTddTestNg,
 
     auto innerCallback = [](const RectF& oldRect,
         const OffsetF& oldOrigin, const RectF& rect, const OffsetF& origin) {};
-    eventHub->onAreaChangedInnerCallbacks_[0] = std::move(innerCallback);
+    eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[0] = std::move(innerCallback);
     ASSERT_TRUE(eventHub->HasInnerOnAreaChanged());
 
     auto callback = [](const RectF& oldRect,
@@ -737,7 +738,7 @@ HWTEST_F(DynamicComponentManagerTddTestNg,
 
     auto innerCallback = [](const RectF& oldRect,
         const OffsetF& oldOrigin, const RectF& rect, const OffsetF& origin) {};
-    eventHub->onAreaChangedInnerCallbacks_[0] = std::move(innerCallback);
+    eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[0] = std::move(innerCallback);
 
     auto callback = [](const RectF& oldRect,
         const OffsetF& oldOrigin, const RectF& rect, const OffsetF& origin) {};

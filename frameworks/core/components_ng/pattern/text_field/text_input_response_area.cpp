@@ -23,7 +23,7 @@
 #include "core/accessibility/accessibility_manager.h"
 #include "core/common/container.h"
 #include "core/common/ime/text_input_type.h"
-#include "core/common/password_icon_host.h"
+#include "core/components_ng/pattern/text_field/password_icon_host.h"
 #include "core/components/common/layout/constants.h"
 #include "core/components/theme/icon_theme.h"
 #include "core/components_ng/layout/layout_property.h"
@@ -198,9 +198,10 @@ void TextInputResponseArea::SetHoverRectForTV(RefPtr<FrameNode>& stackNode, Rect
         hoverRectHeight + DOUBLE_PADDING * iconOffsetPadding, hoverRectHeight + DOUBLE_PADDING * iconOffsetPadding);
 }
 
-void TextInputResponseArea::SetHotZoneRect(DimensionRect& hotZoneRegion, float iconSize, float hotZoneHeight)
+void TextInputResponseArea::SetHotZoneRect(DimensionRect& hotZoneRegion, float iconSize, float hotZoneHeight,
+    float imageOffsetX)
 {
-    auto hotZoneX = - (hotZoneHeight - iconSize) / HALF_SPACE;
+    auto hotZoneX = - (hotZoneHeight - iconSize) / HALF_SPACE + imageOffsetX;
     auto hotZoneY = - (hotZoneHeight - iconSize) / HALF_SPACE;
 
     OffsetF hotZoneOffset;
@@ -213,6 +214,57 @@ void TextInputResponseArea::SetHotZoneRect(DimensionRect& hotZoneRegion, float i
     hotZoneRegion.SetOffset(DimensionOffset(Dimension(hotZoneOffset.GetX()), Dimension(hotZoneOffset.GetY())));
 }
 // TextInputResponseArea end
+
+// ResponseAreaMeasureHelper begin
+float ResponseAreaMeasureHelper::MeasureAndDeductConstraint(
+    const RefPtr<TextInputResponseArea>& area, LayoutWrapper* layoutWrapper, LayoutConstraintF& constraint)
+{
+    CHECK_NULL_RETURN(area, 0.0f);
+    CHECK_NULL_RETURN(layoutWrapper, 0.0f);
+    auto frameNode = layoutWrapper->GetHostNode();
+    CHECK_NULL_RETURN(frameNode, 0.0f);
+    auto childIndex = frameNode->GetChildIndex(area->GetFrameNode());
+    auto iconSize = area->Measure(layoutWrapper, childIndex);
+    auto areaWidth = iconSize.Width();
+    constraint.maxSize.SetWidth(std::max(constraint.maxSize.Width() - areaWidth, 0.0f));
+    constraint.minSize.SetWidth(std::max(constraint.minSize.Width() - areaWidth, 0.0f));
+    if (constraint.selfIdealSize.Width()) {
+        constraint.selfIdealSize.SetWidth(constraint.selfIdealSize.Width().value() - areaWidth);
+    }
+    return areaWidth;
+}
+
+void ResponseAreaMeasureHelper::LayoutArea(
+    const RefPtr<TextInputResponseArea>& area, LayoutWrapper* layoutWrapper, float& nodeWidth)
+{
+    CHECK_NULL_VOID(area);
+    CHECK_NULL_VOID(layoutWrapper);
+    auto frameNode = layoutWrapper->GetHostNode();
+    CHECK_NULL_VOID(frameNode);
+    auto childIndex = frameNode->GetChildIndex(area->GetFrameNode());
+    area->Layout(layoutWrapper, childIndex, nodeWidth);
+}
+
+OffsetF ResponseAreaMeasureHelper::AdjustContentOffsetForRTL(
+    const OffsetF& contentOffset, float areaWidth, LayoutWrapper* layoutWrapper)
+{
+    auto result = contentOffset;
+    CHECK_NULL_RETURN(areaWidth > 0.0f, result);
+    CHECK_NULL_RETURN(layoutWrapper, result);
+    auto layoutProperty = layoutWrapper->GetLayoutProperty();
+    CHECK_NULL_RETURN(layoutProperty, result);
+    CHECK_NULL_RETURN(layoutProperty->GetNonAutoLayoutDirection() == TextDirection::RTL, result);
+    auto geometryNode = layoutWrapper->GetGeometryNode();
+    CHECK_NULL_RETURN(geometryNode, result);
+    const auto& content = geometryNode->GetContent();
+    if (content) {
+        auto offset = content->GetRect().GetOffset();
+        content->SetOffset(OffsetF(offset.GetX() + areaWidth, offset.GetY()));
+    }
+    result.SetX(result.GetX() + areaWidth);
+    return result;
+}
+// ResponseAreaMeasureHelper end
 
 // PasswordResponseArea begin
 void PasswordResponseArea::InitResponseArea()
@@ -257,7 +309,7 @@ RefPtr<FrameNode> PasswordResponseArea::CreateNode()
     CHECK_NULL_RETURN(stackLayoutProperty, nullptr);
     stackLayoutProperty->UpdateUserDefinedIdealSize(CalcSize(CalcLength(hotZoneSize), std::nullopt));
     CHECK_NULL_RETURN(passwordHost->CheckLayoutProperty(), nullptr);
-    stackLayoutProperty->UpdateAlignment(GetStackAlignment(passwordHost->GetLayoutDirection()));
+    stackLayoutProperty->UpdateAlignment(GetStackAlignment(passwordHost->GetPasswordIconDirection()));
     AddEvent(stackNode);
     stackNode->MarkModifyDone();
 
@@ -477,7 +529,7 @@ void PasswordResponseArea::Refresh()
     if (passwordHost && stackNode_) {
         auto stackLayoutProperty = stackNode_->GetLayoutProperty<LayoutProperty>();
         if (stackLayoutProperty && passwordHost->CheckLayoutProperty()) {
-            stackLayoutProperty->UpdateAlignment(GetStackAlignment(passwordHost->GetLayoutDirection()));
+            stackLayoutProperty->UpdateAlignment(GetStackAlignment(passwordHost->GetPasswordIconDirection()));
         }
         if (stackLayoutProperty) {
             auto iconSize = GetIconSize();
@@ -930,15 +982,28 @@ void CleanNodeResponseArea::AddIconHotZoneRect()
     CHECK_NULL_VOID(imageGeometryNode);
     auto imageRect = imageGeometryNode->GetFrameRect();
     auto iconSize = imageRect.Height();
+    // Calculate image offset within stack for RTL alignment compensation.
+    // SetHotZoneRect assumes icon at x=0 (CENTER_LEFT), but in RTL the icon
+    // is at x=rightOffset (CENTER_RIGHT), so the response region must shift.
+    float imageOffsetX = 0.0f;
+    auto layoutProperty = pattern->GetLayoutProperty<LayoutProperty>();
+    if (layoutProperty) {
+        auto alignment = GetStackAlignment(layoutProperty->GetLayoutDirection());
+        if (alignment == Alignment::CENTER_RIGHT) {
+            auto stackGeometryNode = cleanNode_->GetGeometryNode();
+            CHECK_NULL_VOID(stackGeometryNode);
+            imageOffsetX = stackGeometryNode->GetFrameRect().Width() - imageRect.Width();
+        }
+    }
     auto hotZoneHeight = static_cast<float>(DEFAULT_ICON_HOT_ZONE.ConvertToPx());
     hotZoneHeight = cancelHoverSize_ > hotZoneHeight ? cancelHoverSize_ : hotZoneHeight;
     DimensionRect hotZoneRegion;
-    SetHotZoneRect(hotZoneRegion, iconSize, hotZoneHeight);
+    SetHotZoneRect(hotZoneRegion, iconSize, hotZoneHeight, imageOffsetX);
 
     auto defaultHoverSize = static_cast<float>(DEFAULT_HOVER_SIZE.ConvertToPx());
     auto mouseHotZoneHeight = NearZero(cancelHoverSize_) ? defaultHoverSize : cancelHoverSize_;
     DimensionRect mouseHotZoneRegion;
-    SetHotZoneRect(mouseHotZoneRegion, iconSize, mouseHotZoneHeight);
+    SetHotZoneRect(mouseHotZoneRegion, iconSize, mouseHotZoneHeight, imageOffsetX);
 
     std::vector<DimensionRect> mouseRegion;
     mouseRegion.emplace_back(mouseHotZoneRegion);

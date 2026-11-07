@@ -1239,9 +1239,8 @@ void ANISpringLoadingContextGetDragInfos(ani_long ptr, ArkUIDragInfos& info)
     auto context = peer->context;
     CHECK_NULL_VOID(context);
     info.extraInfo = context->GetExtraInfos();
-    auto summary = context->GetSummary();
     auto summaryPtr = info.summary.GetSharedPtr();
-    UdmfClient::GetInstance()->TransformSummaryANI(summary, summaryPtr);
+    UdmfClient::GetInstance()->TransformSummaryANI(context->GetSummaryInfo(), summaryPtr);
 }
 
 ArkUIDragSpringLoadingConfiguration ANISpringLoadingContextGetCurrentConfig(ani_long ptr)

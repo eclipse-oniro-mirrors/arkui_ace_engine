@@ -19,7 +19,8 @@
 import { __context, __id, remember } from '@koalaui/runtime'
 import { int32 } from "@koalaui/common";
 import { RepeatImplForOptions } from '../base/RepeatImpl'
-import { DynamicNode, OnMoveHandler, ItemDragEventHandler } from '#generated'
+import { DynamicNode, OnMoveHandler, ItemDragEventHandler, LazyForEachOps } from '#generated'
+import { LazyNodePeer } from '../base/SyntaxNodeBase'
 
 export interface RepeatItem<T> {
     readonly item: T;
@@ -50,6 +51,45 @@ export interface TemplateOptions {
     cachedCount?: int32;
 }
 
+/**
+ * Controller actively releasing the prebuilt cache of the Repeat component it is bound
+ * to (@since 26.1.0). One controller controls exactly one Repeat; the binding is
+ * established once at creation through RepeatOptions.controller and is immutable
+ * afterwards on the component side, while binding the controller to another Repeat
+ * replaces the previous binding (last-bind-wins). Pure TS implementation: the node is
+ * tracked weakly, so a destroyed Repeat results in a safe no-op clearCache().
+ */
+export class RepeatController {
+    private node?: WeakRef<LazyNodePeer> = undefined;
+
+    constructor() {
+    }
+
+    /**
+     * Actively releases the prebuilt cache of the bound (still-alive) Repeat.
+     * @since 26.1.0
+     */
+    clearCache(): void {
+        const node = this.node?.deref();
+        if (node === undefined) {
+            return;
+        }
+        LazyForEachOps.ClearCache(node.getPeerPtr());
+    }
+
+    // Records the lazy node of a Repeat that received this controller through
+    // RepeatOptions.controller. Called when the node is created; one-to-one,
+    // last-bind-wins: binding this controller to another Repeat replaces the
+    // previous binding.
+    __bindNode__Internal(node: LazyNodePeer): void {
+        this.node = new WeakRef<LazyNodePeer>(node);
+    }
+}
+
+export interface RepeatOptions {
+    controller?: RepeatController;
+}
+
 export interface RepeatAttribute<T> extends DynamicNode {
     arr: RepeatArray<T>;
     each(itemGenerator: RepeatItemBuilder<T>): RepeatAttribute<T>;
@@ -62,14 +102,24 @@ export interface RepeatAttribute<T> extends DynamicNode {
     setRepeatOptions(arr: RepeatArray<T>): this {
         return this;
     }
+    setRepeatOptions(arr: RepeatArray<T>, options?: RepeatOptions): this {
+        return this;
+    }
     applyAttributesFinish(): void{}
     debugLine(sourceLine: string, moduleName?: string): this;
 }
 
 export class ArkRepeatComponent<T> implements RepeatAttribute<T> {
     public arr: RepeatArray<T> = [];
+    public controller?: RepeatController = undefined;
     public setRepeatOptions(arr: RepeatArray<T>): this {
         this.arr = arr;
+        this.controller = undefined;
+        return this;
+    }
+    public setRepeatOptions(arr: RepeatArray<T>, options?: RepeatOptions): this {
+        this.arr = arr;
+        this.controller = options?.controller;
         return this;
     }
     public each(itemGenerator: RepeatItemBuilder<T>): RepeatAttribute<T> {
@@ -110,7 +160,7 @@ export function RepeatImpl<T>(
         return new ArkRepeatComponent<T>()
     })
     style?.(receiver)
-    RepeatImplForOptions<T>(style, receiver.arr);
+    RepeatImplForOptions<T>(style, receiver.arr, receiver.controller);
 }
 
 /** @memo */
@@ -122,5 +172,5 @@ export function Repeat<T>(
         return new ArkRepeatComponent<T>()
     })
     style?.(receiver)
-    RepeatImplForOptions<T>(style, receiver.arr);
+    RepeatImplForOptions<T>(style, receiver.arr, receiver.controller);
 }

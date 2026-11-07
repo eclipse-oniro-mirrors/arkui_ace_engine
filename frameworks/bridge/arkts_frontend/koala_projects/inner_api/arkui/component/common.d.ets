@@ -183,6 +183,25 @@ type VisualEffect = uiEffect.VisualEffect;
 type Filter = uiEffect.Filter;
 type BrightnessBlender = uiEffect.BrightnessBlender;
 
+export declare enum SafeAreaInsetAlignment {
+    START = 0,
+    CENTER = 1,
+    END = 2
+}
+
+export interface SafeAreaInsetEdgeConfig {
+    content: CustomBuilder;
+    spacing?: LengthMetrics;
+    alignment?: SafeAreaInsetAlignment;
+}
+
+export interface SafeAreaInsetOptions {
+    top?: SafeAreaInsetEdgeConfig;
+    end?: SafeAreaInsetEdgeConfig;
+    bottom?: SafeAreaInsetEdgeConfig;
+    start?: SafeAreaInsetEdgeConfig;
+}
+
 export interface Literal_Alignment_align {
     align?: Alignment;
 }
@@ -226,6 +245,7 @@ export interface CommonMethod {
     chainWeight(value: ChainWeightOptions | undefined): this;
     padding(value: Padding | Length | LocalizedPadding | undefined): this;
     safeAreaPadding(value: Padding | LengthMetrics | LocalizedPadding | undefined): this;
+    safeAreaInset(options?: SafeAreaInsetOptions): this;
     margin(value: Padding | Length | LocalizedPadding | undefined): this;
     backgroundColor(value: ResourceColor | undefined): this;
     pixelRound(value: PixelRoundPolicy | undefined): this;
@@ -454,6 +474,7 @@ export declare class ArkCommonMethodPeer extends PeerNode {
     public chainWeightAttribute(value: ChainWeightOptions | undefined): void;
     public paddingAttribute(value: Padding | Length | LocalizedPadding | undefined): void;
     public setSafeAreaPaddingAttribute(value: Padding | LengthMetrics | LocalizedPadding | undefined): void;
+    public setSafeAreaInsetAttribute(options: SafeAreaInsetOptions | undefined): void;
     public marginAttribute(value: Padding | Length | LocalizedPadding | undefined): void;
     public backgroundColor0Attribute(value: ResourceColor | undefined): void;
     public backgroundColor1Attribute(value: ResourceColor | undefined): void;
@@ -788,6 +809,7 @@ export declare class ArkCommonMethodPeer extends PeerNode {
     public chainWeight(value: ChainWeightOptions | undefined): this;
     public padding(value: Padding | Length | LocalizedPadding | undefined): this;
     public safeAreaPadding(value: Padding | LengthMetrics | LocalizedPadding | undefined): this;
+    public safeAreaInset(options?: SafeAreaInsetOptions): this;
     public margin(value: Padding | Length | LocalizedPadding | undefined): this;
     public backgroundColor(value: ResourceColor | undefined): this;
     public pixelRound(value: PixelRoundPolicy | undefined): this;

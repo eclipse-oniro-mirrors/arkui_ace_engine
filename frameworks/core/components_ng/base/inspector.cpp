@@ -21,6 +21,7 @@
 #include "base/log/log_wrapper.h"
 #include "core/common/container.h"
 #include "core/components_ng/base/distributed_ui.h"
+#include "core/components_ng/base/inspector_external_subtree.h"
 #include "core/components_ng/pattern/navrouter/navdestination_group_node.h"
 #include "core/components_ng/pattern/navrouter/navdestination_pattern.h"
 #include "core/components_ng/pattern/stage/page_pattern.h"
@@ -55,6 +56,25 @@ const std::vector SUPPORT_METHOD = {"ArkUI.tree", "ArkUI.tree.3D", "ArkUI.queryA
 
 const uint32_t LONG_PRESS_DELAY = 1000;
 RectF deviceRect;
+
+namespace {
+// The carrier is implementation-only, including when layout Inspector asks
+// for internal IDs. Preserve the original child-query flag and expose its content.
+template<typename Visitor>
+void ForEachInspectorChild(const RefPtr<UINode>& node, const Visitor& visitor, bool notDetach = false)
+{
+    for (const auto& child : node->GetChildren(notDetach)) {
+        visitor(child);
+    }
+    auto frameNode = AceType::DynamicCast<FrameNode>(node);
+    auto inset = frameNode ? frameNode->GetSafeAreaInsetNode() : nullptr;
+    if (inset) {
+        for (const auto& child : inset->GetChildren(notDetach)) {
+            visitor(child);
+        }
+    }
+}
+} // namespace
 
 TouchEvent GetUpPoint(const TouchEvent& downPoint)
 {
@@ -97,9 +117,9 @@ void GetFrameNodeChildren(const RefPtr<NG::UINode>& uiNode, std::vector<RefPtr<N
         }
     }
 
-    for (const auto& frameChild : uiNode->GetChildren()) {
+    ForEachInspectorChild(uiNode, [&](const RefPtr<UINode>& frameChild) {
         GetFrameNodeChildren(frameChild, children, pageId);
-    }
+    });
 }
 
 void GetSpanInspector(
@@ -185,9 +205,9 @@ void GetInspectorChildren(const RefPtr<NG::UINode>& parent, std::unique_ptr<OHOS
     PutNodeInfoToJsonNode(node, inspectorParameters.isActive, jsonNode, parent);
 
     std::vector<RefPtr<NG::UINode>> children;
-    for (const auto& item : parent->GetChildren()) {
+    ForEachInspectorChild(parent, [&](const RefPtr<UINode>& item) {
         GetFrameNodeChildren(item, children, inspectorParameters.pageId);
-    }
+    });
     if (node != nullptr) {
         auto overlayNode = node->GetOverlayNode();
         if (overlayNode != nullptr) {
@@ -199,6 +219,7 @@ void GetInspectorChildren(const RefPtr<NG::UINode>& parent, std::unique_ptr<OHOS
         for (auto uiNode : children) {
             GetInspectorChildren(uiNode, jsonChildrenArray, inspectorParameters, filter, depth - 1);
         }
+        AppendExternalSubtreeToChildren(parent, jsonChildrenArray, filter);
         if (jsonChildrenArray->GetArraySize()) {
             jsonNode->PutRef(INSPECTOR_CHILDREN, std::move(jsonChildrenArray));
         }
@@ -239,9 +260,9 @@ void GetFrameNodeChildren(const RefPtr<NG::UINode>& uiNode, std::vector<RefPtr<N
             }
         }
     }
-    for (const auto& frameChild : uiNode->GetChildren()) {
+    ForEachInspectorChild(uiNode, [&](const RefPtr<UINode>& frameChild) {
         GetFrameNodeChildren(frameChild, children, pageId, isLayoutInspector, needHandleInternal);
-    }
+    });
 }
 
 void GetAllPageNodes(std::vector<RefPtr<NG::UINode>>& children,
@@ -421,10 +442,10 @@ void GetInspectorChildren(const RefPtr<NG::UINode>& parent, std::unique_ptr<OHOS
         return;
     }
     std::vector<RefPtr<NG::UINode>> children;
-    for (const auto& item : parent->GetChildren()) {
+    ForEachInspectorChild(parent, [&](const RefPtr<UINode>& item) {
         GetFrameNodeChildren(item, children, inspectorParameters.pageId, inspectorParameters.isLayoutInspector,
             inspectorParameters.needHandleInternal);
-    }
+    });
     if (node) {
         auto overlayNode = node->GetOverlayNode();
         if (overlayNode != nullptr) {
@@ -472,6 +493,7 @@ void GetInspectorChildren(const RefPtr<NG::UINode>& parent, std::unique_ptr<OHOS
             GetInspectorChildren(uiNode, jsonChildrenArray, inspectorParameters, filter, depth - 1);
         }
     }
+    AppendExternalSubtreeToChildren(parent, jsonChildrenArray, filter);
     if (jsonChildrenArray->GetArraySize() > 0) {
         jsonNodeNew->PutRef(INSPECTOR_CHILDREN, std::move(jsonChildrenArray));
     }
@@ -583,7 +605,7 @@ std::set<RefPtr<UINode>, RootComp> GetAllRoots()
     return roots;
 }
 void GetFreeNodeContent(const std::unique_ptr<JsonValue>& jsonTree, const RefPtr<UINode>& currentRoot,
-    InspectorChildrenParameters inspectorParameters)
+    InspectorChildrenParameters inspectorParameters, const InspectorFilter& filter)
 {
     auto jsonNodeArray = JsonUtil::CreateArray(true);
     for (auto& uiNode : GetAllRoots()) {
@@ -593,7 +615,7 @@ void GetFreeNodeContent(const std::unique_ptr<JsonValue>& jsonTree, const RefPtr
         if (uiNode->GetId() == currentRoot->GetId()) {
             continue;
         }
-        GetInspectorChildren(uiNode, jsonNodeArray, inspectorParameters);
+        GetInspectorChildren(uiNode, jsonNodeArray, inspectorParameters, filter);
     }
     jsonTree->PutRef("other_contents", std::move(jsonNodeArray));
 }
@@ -623,7 +645,7 @@ std::string GetInspectorInfo(std::vector<RefPtr<NG::UINode>> children, int32_t p
             jsonTree->Put("ProcessID", getpid());
             jsonTree->Put("WindowID", (int32_t)pipeline->GetWindowId());
             if (filter.IsFreeNodesEnabled()) {
-                GetFreeNodeContent(jsonTree, pipeline->GetRootElement(), inspectorParameters);
+                GetFreeNodeContent(jsonTree, pipeline->GetRootElement(), inspectorParameters, filter);
             }
         }
         return jsonTree->ToString();
@@ -774,12 +796,16 @@ std::string Inspector::GetFreeNodesInspector()
 {
     InspectorFilter filter;
     filter.EnableFreeNodes();
+    filter.SetWebEnable(true);
     bool needThrow = false;
     return GetInspector(true, filter, needThrow);
 }
 std::string Inspector::GetInspector(bool isLayoutInspector)
 {
     InspectorFilter filter;
+    if (isLayoutInspector) {
+        filter.SetWebEnable(true);
+    }
     bool needThrow = false;
     return GetInspector(isLayoutInspector, filter, needThrow);
 }
@@ -815,9 +841,9 @@ std::string Inspector::GetInspector(bool isLayoutInspector, const InspectorFilte
     auto pageId = context->GetStageManager()->GetLastPage()->GetPageId();
     std::vector<RefPtr<NG::UINode>> children;
     if (key.empty()) {
-        for (const auto& item : pageRootNode->GetChildren()) {
+        ForEachInspectorChild(pageRootNode, [&](const RefPtr<UINode>& item) {
             GetFrameNodeChildren(item, children, pageId, isLayoutInspector);
-        }
+        });
         if (filter.IsFreeNodesEnabled()) {
             GetAllPageNodes(children, pageRootNode);
         }
@@ -835,7 +861,7 @@ std::string Inspector::GetInspectorOfNode(RefPtr<NG::UINode> node)
 {
     auto jsonRoot = JsonUtil::Create(true);
 
-    auto context = NG::PipelineContext::GetCurrentContext();
+    auto context = NG::PipelineContext::GetCurrentContextSafely();
     CHECK_NULL_RETURN(context, jsonRoot->ToString());
     GetContextInfo(context, jsonRoot);
     CHECK_NULL_RETURN(node, jsonRoot->ToString());
@@ -854,6 +880,25 @@ std::string Inspector::GetInspectorOfNode(RefPtr<NG::UINode> node)
     return jsonRoot->ToString();
 }
 
+std::string Inspector::GetInspectorOfNodeSubtree(RefPtr<NG::UINode> node)
+{
+    auto context = NG::PipelineContext::GetCurrentContextSafely();
+    CHECK_NULL_RETURN(context, "{}");
+    CHECK_NULL_RETURN(node, "{}");
+    auto jsonRoot = JsonUtil::CreateSharedPtrJson(true);
+    auto scale = context->GetViewScale();
+    auto rootHeight = context->GetRootHeight();
+    auto rootWidth = context->GetRootWidth();
+    deviceRect.SetRect(0, 0, rootWidth * scale, rootHeight * scale);
+    jsonRoot->Put(INSPECTOR_WIDTH, std::to_string(rootWidth * scale).c_str());
+    jsonRoot->Put(INSPECTOR_HEIGHT, std::to_string(rootHeight * scale).c_str());
+    jsonRoot->Put(INSPECTOR_RESOLUTION, std::to_string(PipelineBase::GetCurrentDensity()).c_str());
+#ifndef CROSS_PLATFORM
+    node->DumpSimplifyTreeWithParamConfig(0, jsonRoot, false);
+#endif
+    return jsonRoot->ToString();
+}
+
 RefPtr<UINode> Inspector::GetInspectorByKey(const RefPtr<FrameNode>& root, const std::string& key, bool notDetach)
 {
     bool keyIsNull = key == "";
@@ -864,11 +909,10 @@ RefPtr<UINode> Inspector::GetInspectorByKey(const RefPtr<FrameNode>& root, const
 
     std::vector<RefPtr<UINode>> elements;
     std::vector<RefPtr<UINode>> elementsNext;
-    const auto& children = root->GetChildren(notDetach);
-    elements.reserve(children.size());
-    for (const auto& child : children) {
+    elements.reserve(root->GetChildren(notDetach).size());
+    ForEachInspectorChild(root, [&](const RefPtr<UINode>& child) {
         elements.emplace_back(child);
-    }
+    }, notDetach);
     while (!elements.empty()) {
         for (auto& current: elements) {
             const auto& id = current->GetInspectorId();
@@ -879,10 +923,9 @@ RefPtr<UINode> Inspector::GetInspectorByKey(const RefPtr<FrameNode>& root, const
 
         elementsNext.reserve(elements.size() * 2); // double size
         for (auto& current: elements) {
-            const auto& children = current->GetChildren(notDetach);
-            for (const auto& child : children) {
+            ForEachInspectorChild(current, [&](const RefPtr<UINode>& child) {
                 elementsNext.emplace_back(child);
-            }
+            }, notDetach);
         }
         elements.swap(elementsNext);
         elementsNext.clear();
@@ -1020,9 +1063,9 @@ void Inspector::GetInspectorTree(InspectorTreeMap& treesInfo)
     CHECK_NULL_VOID(rootNode);
     auto pageId = pageRootNode->GetPageId();
     std::vector<RefPtr<NG::UINode>> children;
-    for (const auto& item : pageRootNode->GetChildren()) {
+    ForEachInspectorChild(pageRootNode, [&](const RefPtr<UINode>& item) {
         GetFrameNodeChildren(item, children, pageId, false);
-    }
+    });
     auto overlayNode = GetOverlayNode(pageRootNode);
     if (overlayNode) {
         GetFrameNodeChildren(overlayNode, children, pageId, false);
@@ -1037,9 +1080,9 @@ void Inspector::RecordOnePageNodes(const RefPtr<NG::UINode>& pageNode, Inspector
     auto pageId = pageNode->GetPageId();
     auto rootNode = AddInspectorTreeNode(pageNode, treesInfo);
     CHECK_NULL_VOID(rootNode);
-    for (const auto& item : pageNode->GetChildren()) {
+    ForEachInspectorChild(pageNode, [&](const RefPtr<UINode>& item) {
         GetFrameNodeChildren(item, children, pageId, true);
-    }
+    });
     auto overlayNode = GetOverlayNode(pageNode);
     if (overlayNode) {
         GetFrameNodeChildren(overlayNode, children, pageId, true);
@@ -1110,6 +1153,11 @@ RefPtr<RecNode> Inspector::AddInspectorTreeNode(const RefPtr<NG::UINode>& uiNode
     }
     auto parentNode = uiNode->GetParent();
     while (parentNode != nullptr) {
+        auto owner = AceType::DynamicCast<FrameNode>(parentNode->GetParent());
+        if (owner && owner->GetSafeAreaInsetNode() == parentNode) {
+            parentNode = owner;
+            continue;
+        }
         if (CanBeProcessedNodeType(parentNode)) {
             recNode->SetParentId(parentNode->GetId());
             break;
@@ -1133,9 +1181,9 @@ void Inspector::GetInspectorChildrenInfo(
     const RefPtr<NG::UINode>& parent, InspectorTreeMap& recNodes, int32_t pageId, uint32_t depth)
 {
     std::vector<RefPtr<NG::UINode>> children;
-    for (const auto& item : parent->GetChildren()) {
+    ForEachInspectorChild(parent, [&](const RefPtr<UINode>& item) {
         GetFrameNodeChildren(item, children, pageId, true);
-    }
+    });
     auto node = AceType::DynamicCast<FrameNode>(parent);
     if (node != nullptr) {
         auto overlayNode = node->GetOverlayNode();

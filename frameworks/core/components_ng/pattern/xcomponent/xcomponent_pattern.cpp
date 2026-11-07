@@ -14,7 +14,11 @@
  */
 
 #include "core/components_ng/pattern/xcomponent/xcomponent_pattern.h"
+
+#include "base/log/log_wrapper.h"
 #include "core/accessibility/accessibility_manager.h"
+#include "core/accessibility/third_provider_tree_exporter.h"
+#include "core/components_ng/base/inspector_tree_request_context.h"
 
 #include <cmath>
 #include <string_view>
@@ -31,7 +35,6 @@
 #include "base/geometry/ng/size_t.h"
 #include "base/log/dump_log.h"
 #include "base/log/frame_report.h"
-#include "base/log/log_wrapper.h"
 #include "base/memory/ace_type.h"
 #include "base/perfmonitor/perf_monitor.h"
 #include "base/ressched/ressched_report.h"
@@ -47,7 +50,6 @@
 #include "core/components_ng/event/gesture_event_hub.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_controller_ng.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_resolution_config.h"
-#include "core/components_ng/property/accessibility_property.h"
 #include "core/event/axis_event.h"
 #ifdef NG_BUILD
 #include "bridge/declarative_frontend/ng/declarative_frontend_ng.h"
@@ -69,7 +71,6 @@
 #endif
 
 #include "core/components_ng/event/input_event.h"
-#include "core/components_ng/export_texture_info/export_texture_info.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_accessibility_child_tree_callback.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_accessibility_session_adapter.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_event_hub.h"
@@ -87,26 +88,6 @@ std::atomic<bool> XComponentPattern::compensationAngleFlag_{false};
 std::mutex XComponentPattern::angleMtx_;
 std::string XComponentPattern::compensationAngleFromFeatureManager_ = "";
 namespace {
-
-constexpr std::string_view BUFFER_USAGE_XCOMPONENT = "xcomponent";
-#ifdef ENABLE_ROSEN_BACKEND
-constexpr char X_COMPONENT_COMPENSATION_ANGLE[] = "xcomponentCompensationAngle";
-const int32_t ROTATION_0 = 0;
-const int32_t ROTATION_90 = 90;
-const int32_t ROTATION_180 = 180;
-const int32_t ROTATION_270 = 270;
-constexpr char UNKNOWN[] = "0";
-constexpr char FULL[] = "1";
-constexpr char MAIN[] = "2";
-constexpr char SUB[] = "3";
-constexpr char COORDINATION[] = "4";
-constexpr char ANGLE_KEY[] = "logic_device";
-#endif
-
-#if defined(RENDER_EXTRACT_SUPPORTED) && defined(IOS_PLATFORM)
-const int TEXTURETYPE_XCOMPONENT = 1;
-#endif
-
 void SendStatisticEvent(RefPtr<FrameNode> frameNode, StatisticEventType type)
 {
     CHECK_NULL_VOID(frameNode);
@@ -130,6 +111,27 @@ void SendStatisticEvent(RefPtr<FrameNode> frameNode, std::list<StatisticEventTyp
     }
     types.clear();
 }
+
+constexpr uint32_t XCOMPONENT_EXTRA_FLAG_ENABLE_SOLID_COLOR = 0x01;
+constexpr std::string_view BUFFER_USAGE_XCOMPONENT = "xcomponent";
+#ifdef ENABLE_ROSEN_BACKEND
+constexpr char X_COMPONENT_COMPENSATION_ANGLE[] = "xcomponentCompensationAngle";
+constexpr char UNKNOWN[] = "0";
+constexpr char FULL[] = "1";
+constexpr char MAIN[] = "2";
+constexpr char SUB[] = "3";
+constexpr char COORDINATION[] = "4";
+constexpr char ANGLE_KEY[] = "logic_device";
+const int32_t ROTATION_0 = 0;
+const int32_t ROTATION_90 = 90;
+const int32_t ROTATION_180 = 180;
+const int32_t ROTATION_270 = 270;
+#endif
+
+#if defined(RENDER_EXTRACT_SUPPORTED) && defined(IOS_PLATFORM)
+const int TEXTURETYPE_XCOMPONENT = 1;
+#endif
+
 } // namespace
 
 XComponentPattern::XComponentPattern(const std::optional<std::string>& id, XComponentType type,
@@ -166,6 +168,14 @@ void XComponentPattern::InitNativeXComponent()
         isNativeXComponent_ = true;
         nativeXComponentImpl_ = AceType::MakeRefPtr<NativeXComponentImpl>();
         nativeXComponent_ = std::make_shared<OH_NativeXComponent>(AceType::RawPtr(nativeXComponentImpl_));
+        // the pair may be created here instead of GetNativeXComponent (whose
+        // guard then skips), so the callback must be wired at every creation
+        // site or the C API entry stays silent
+        nativeXComponentImpl_->SetVisibilityLifecycleEventCallback([weak = AceType::WeakClaim(this)]() {
+            auto xComponentPattern = weak.Upgrade();
+            CHECK_NULL_VOID(xComponentPattern);
+            xComponentPattern->UpdateVisibilityLifecycleRegistration();
+        });
     }
 }
 
@@ -246,6 +256,7 @@ void XComponentPattern::InitSurface()
         renderContext->OnNodeNameUpdate(GetId());
     }
     renderSurface_->InitSurface();
+    renderSurface_->SetSurfaceQueueSize(bufferQueueCount_);
     renderSurface_->UpdateSurfaceConfig();
     if (type_ == XComponentType::TEXTURE) {
         renderSurface_->RegisterBufferCallback();
@@ -360,6 +371,9 @@ void XComponentPattern::OnAttachToMainTree()
     if (isTypedNode_ && surfaceCallbackMode_ == SurfaceCallbackMode::DEFAULT) {
         HandleSurfaceCreated();
     }
+    if (IsSurfaceVisibilityLifecycle()) {
+        RegisterVisibilityLifecycleCallback();
+    }
     if (type_ == XComponentType::SURFACE) {
         applyBackGroundColor();
     }
@@ -400,6 +414,7 @@ void XComponentPattern::OnDetachFromMainTree()
     if (isTypedNode_ && surfaceCallbackMode_ == SurfaceCallbackMode::DEFAULT) {
         HandleSurfaceDestroyed();
     }
+    UnregisterVisibilityLifecycleCallback();
     CHECK_NULL_VOID(host);
     if (host->GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_EIGHTEEN)) {
         if (displaySync_ && displaySync_->IsOnPipeline()) {
@@ -410,19 +425,16 @@ void XComponentPattern::OnDetachFromMainTree()
         }
     }
     displaySync_->NotifyXComponentExpectedFrameRate(GetId(), 0);
-    uint64_t uniqueId = 0;
-    std::string surfaceName;
-    if (renderSurface_) {
-        uniqueId = renderSurface_->GetUniqueIdNum();
-        surfaceName = renderSurface_->GetPSurfaceName();
-    }
+    CHECK_NULL_VOID(renderSurface_);
     auto customNode = host->GetParentCustomNode();
-    std::string viewName = customNode ? customNode->GetJSViewName() : "";
+    CHECK_NULL_VOID(customNode);
     auto pipelineContext = host->GetContextRefPtr();
     auto bundleName = pipelineContext ? pipelineContext->GetBundleName() : "";
 #ifndef CROSS_PLATFORM
-    PerfMonitor::GetPerfMonitor()->ReportComponentDetach(uniqueId, surfaceName, viewName, bundleName, getpid());
+    PerfMonitor::GetPerfMonitor()->ReportComponentDetach(renderSurface_->GetUniqueIdNum(),
+        renderSurface_->GetPSurfaceName(), customNode->GetJSViewName(), bundleName.c_str(), getpid());
 #endif
+    CHECK_NULL_VOID(pipelineContext);
     host->UnregisterNodeChangeListener();
 }
 
@@ -435,10 +447,10 @@ std::string FoldDisplayModeToString(FoldDisplayMode foldDisplayMode)
         case FoldDisplayMode::MAIN: return MAIN;
         case FoldDisplayMode::SUB: return SUB;
         case FoldDisplayMode::COORDINATION: return COORDINATION;
-        default: return "0";
+        default: return UNKNOWN;
     }
 }
- 
+
 Rosen::ScreenRotation RotationIntToScreenRotation(int32_t rotation)
 {
     switch (rotation) {
@@ -474,7 +486,7 @@ std::string XComponentPattern::GetCompensationAngleFromFeatureManager()
     compensationAngleFlag_.store(true, std::memory_order_release);
     return compensationAngleFromFeatureManager_;
 }
- 
+
 std::unique_ptr<JsonValue> GetXComponentCompensationAngle(const std::string& angleConfigJson)
 {
     std::string tempAngleConfigJson = angleConfigJson;
@@ -483,27 +495,29 @@ std::unique_ptr<JsonValue> GetXComponentCompensationAngle(const std::string& ang
         tempAngleConfigJson = compensationAngleFromFeatureManager;
     }
     if (tempAngleConfigJson.empty()) {
-        LOGE("UIContent set compensation angle empty");
+        TAG_LOGD(AceLogTag::ACE_XCOMPONENT, "UIContent set compensation angle empty");
         return nullptr;
     }
     auto jsonConfig = JsonUtil::ParseJsonString(tempAngleConfigJson);
     if (jsonConfig == nullptr) {
-        LOGE("UIContent set compensasion angle %{public}s is invalid", tempAngleConfigJson.c_str());
+        TAG_LOGE(AceLogTag::ACE_XCOMPONENT,
+            "UIContent set compensasion angle %{public}s is invalid", tempAngleConfigJson.c_str());
         return nullptr;
     }
     auto angleConfig = jsonConfig->GetObject(X_COMPONENT_COMPENSATION_ANGLE);
     if (angleConfig == nullptr) {
-        LOGE("UIContent can not get angle info from %{public}s", tempAngleConfigJson.c_str());
+        TAG_LOGE(AceLogTag::ACE_XCOMPONENT,
+            "UIContent can not get angle info from %{public}s", tempAngleConfigJson.c_str());
         return nullptr;
     }
     auto result = angleConfig->ToString();
-    LOGI("get angle info: %{public}s", result.c_str());
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "get angle info: %{public}s", result.c_str());
     if (result.empty()) {
         return nullptr;
     }
     return JsonUtil::ParseJsonString(result);
 }
- 
+
 void XComponentPattern::SetCompensationAngleToRS(const RefPtr<RenderContext>& renderContext,
     FoldDisplayMode foldDisplayMode, const std::string& xcomponentId)
 {
@@ -729,7 +743,7 @@ void XComponentPattern::applyBackGroundColor()
     CHECK_NULL_VOID(handlingSurfaceRenderContext_);
     auto bkColor = renderContext->GetBackgroundColor().value_or(Color::BLACK);
     handlingSurfaceRenderContext_->UpdateBackgroundColor(
-        (bkColor.GetAlpha() < UINT8_MAX) ? Color::TRANSPARENT : bkColor);
+        (!IsSolidColorEnabled() && bkColor.GetAlpha() < UINT8_MAX) ? Color::TRANSPARENT : bkColor);
 }
 
 void XComponentPattern::OnAreaChangedInner()
@@ -823,14 +837,21 @@ void XComponentPattern::OnDetachFromFrameNode(FrameNode* frameNode)
             return;
         }
         if (type_ == XComponentType::SURFACE || type_ == XComponentType::TEXTURE) {
-            OnSurfaceDestroyed();
             auto eventHub = frameNode->GetEventHub<XComponentEventHub>();
             CHECK_NULL_VOID(eventHub);
+            // when surface events were already fired by visibility lifecycle,
+            // keep create/destroy paired; only OnSurfaceDestroyed and the
+            // controller-destroyed event are skipped here
+            if (!isVisibilityLifecycleDestroyed_) {
+                OnSurfaceDestroyed();
+            }
             eventHub->FireDestroyEvent(GetId());
             if (id_.has_value()) {
                 eventHub->FireDetachEvent(id_.value());
             }
-            eventHub->FireControllerDestroyedEvent(surfaceId_, GetId());
+            if (!isVisibilityLifecycleDestroyed_) {
+                eventHub->FireControllerDestroyedEvent(surfaceId_, GetId());
+            }
         }
     }
 
@@ -885,6 +906,13 @@ void XComponentPattern::OnAttachContext(PipelineContext* context)
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     context->AddWindowStateChangedCallback(host->GetId());
+    // safety net: visibility lifecycle callbacks are pipeline-scoped; re-register
+    // against the current pipeline so a context switch cannot leave them on the
+    // old pipeline only. The flag guard keeps this idempotent with the register
+    // call in OnAttachToMainTree
+    if (IsSurfaceVisibilityLifecycle()) {
+        RegisterVisibilityLifecycleCallback();
+    }
     CHECK_NULL_VOID(renderSurface_);
     renderSurface_->SetInstanceId(context->GetInstanceId());
     auto initialContext = initialContext_.Upgrade();
@@ -917,6 +945,10 @@ void XComponentPattern::OnDetachContext(PipelineContext* context)
     CHECK_NULL_VOID(context);
     auto host = GetHost();
     CHECK_NULL_VOID(host);
+    // safety net: run before context_ is cleared (DetachContext is invoked
+    // while the pipeline is still reachable), covering detach paths that
+    // skip OnDetachFromMainTree; the flag guard keeps it idempotent
+    UnregisterVisibilityLifecycleCallback();
     UninitializeAccessibility(host.GetRawPtr());
     context->RemoveWindowStateChangedCallback(host->GetId());
     context->UnRegisterFoldDisplayModeChangedCallback(foldDisplayCallbackId_);
@@ -931,7 +963,10 @@ void XComponentPattern::ToJsonValue(std::unique_ptr<JsonValue>& json, const Insp
     json->PutExtAttr("enableAnalyzer", isEnableAnalyzer_ ? "true" : "false", filter);
     json->PutExtAttr("enableSecure", isEnableSecure_ ? "true" : "false", filter);
     json->PutExtAttr("hdrBrightness", std::to_string(hdrBrightness_).c_str(), filter);
+    json->PutExtAttr("extraFlag", IsSolidColorEnabled() ? "ENABLE_SOLID_COLOR" : "", filter);
     json->PutExtAttr("enableTransparentLayer", isTransparentLayer_ ? "true" : "false", filter);
+    json->PutExtAttr("isVisibilityLifecycle", isVisibilityLifecycle_ ? "true" : "false", filter);
+    json->PutExtAttr("bufferQueueCount", std::to_string(bufferQueueCount_).c_str(), filter);
     json->PutExtAttr("screenId", screenId_.has_value() ? std::to_string(screenId_.value()).c_str() : "", filter);
     if (type_ == XComponentType::SURFACE) {
         json->PutExtAttr(
@@ -1046,6 +1081,25 @@ void XComponentPattern::DumpAdvanceInfo()
     DumpLog::GetInstance().AddDesc(
         std::string("screenId: ").append(screenId_.has_value() ? std::to_string(screenId_.value()).c_str() : ""));
     DumpLog::GetInstance().AddDesc(std::string("isOpaque: ").append(isOpaque_ ? "true" : "false"));
+    auto hostForDump = GetHost();
+    DumpLog::GetInstance().AddDesc(std::string("visibilityLifecycleState: [jsEnabled=")
+        .append(isVisibilityLifecycle_ ? "true" : "false")
+        .append(", nativeEnabled=")
+        .append(nativeXComponentImpl_ && nativeXComponentImpl_->IsVisibilityLifecycle() ? "true" : "false")
+        .append(", registered=")
+        .append(isVisibilityLifecycleRegistered_ ? "true" : "false")
+        .append(", destroyed=")
+        .append(isVisibilityLifecycleDestroyed_ ? "true" : "false")
+        .append(", changing=")
+        .append(isInVisibilityLifecycleChange_ ? "true" : "false")
+        .append(", init=")
+        .append(hasXComponentInit_ ? "true" : "false")
+        .append(", released=")
+        .append(hasReleasedSurface_ ? "true" : "false")
+        .append(", onTree=")
+        .append(hostForDump && hostForDump->IsOnMainTree() ? "true" : "false")
+        .append("]"));
+    DumpLog::GetInstance().AddDesc(std::string("bufferQueueCount: ").append(std::to_string(bufferQueueCount_)));
     if (renderSurface_) {
         renderSurface_->DumpInfo();
     }
@@ -1077,7 +1131,7 @@ void XComponentPattern::NativeXComponentDispatchTouchEvent(
     const auto* callback = nativeXComponentImpl_->GetCallback();
     CHECK_NULL_VOID(callback);
     CHECK_NULL_VOID(callback->DispatchTouchEvent);
-    LOG_CALLBACK(callback->DispatchTouchEvent);
+    LOG_CALLBACK(__FUNCTION__, callback->DispatchTouchEvent);
     callback->DispatchTouchEvent(nativeXComponent_.get(), surface);
 }
 
@@ -1184,7 +1238,9 @@ void XComponentPattern::InitializeAccessibility()
         "InitializeAccessibility accessibilityId: %{public}" PRId64 "", accessibilityId);
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto pipelineAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_VOID(pipelineAccessibilityManager);
+    auto accessibilityManager = pipelineAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
     accessibilityChildTreeCallback_ = std::make_shared<XComponentAccessibilityChildTreeCallback>(
         WeakClaim(this), host->GetAccessibilityId());
@@ -1203,7 +1259,10 @@ void XComponentPattern::UninitializeAccessibility(FrameNode* frameNode)
     int64_t accessibilityId = frameNode->GetAccessibilityId();
     auto pipeline = frameNode->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto host = GetHost();
+    auto pipelineAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_VOID(pipelineAccessibilityManager);
+    auto accessibilityManager = pipelineAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
     if (accessibilityManager->IsRegister() && accessibilityChildTreeCallback_) {
         OnAccessibilityChildTreeDeregister(frameNode);
@@ -1214,7 +1273,7 @@ void XComponentPattern::UninitializeAccessibility(FrameNode* frameNode)
 
 ArkUI_AccessibilityProvider* XComponentPattern::GetNativeProvider()
 {
-    if(useNodeHandleAccessibilityProvider_) {
+    if (useNodeHandleAccessibilityProvider_) {
         return arkuiAccessibilityProvider_;
     }
     auto pair = GetNativeXComponent();
@@ -1223,19 +1282,25 @@ ArkUI_AccessibilityProvider* XComponentPattern::GetNativeProvider()
     return nativeXComponentImpl->GetAccessbilityProvider().get();
 }
 
+RefPtr<AccessibilityProvider> XComponentPattern::GetOrCreateAccessibilityProvider()
+{
+    if (accessibilityProvider_ == nullptr) {
+        accessibilityProvider_ = AceType::MakeRefPtr<XComponentAccessibilityProvider>(WeakClaim(this));
+    }
+    return accessibilityProvider_;
+}
+
 bool XComponentPattern::OnAccessibilityChildTreeRegister(uint32_t windowId, int32_t treeId)
 {
     auto host = GetHost();
     CHECK_NULL_RETURN(host, false);
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_RETURN(pipeline, false);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto pipelineAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_RETURN(pipelineAccessibilityManager, false);
+    auto accessibilityManager = pipelineAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_RETURN(accessibilityManager, false);
-    if (accessibilityProvider_ == nullptr) {
-        accessibilityProvider_ =
-            AceType::MakeRefPtr<XComponentAccessibilityProvider>(WeakClaim(this));
-    }
-
+    GetOrCreateAccessibilityProvider();
     auto nativeProvider = GetNativeProvider();
     CHECK_NULL_RETURN(nativeProvider, false);
     if (!nativeProvider->IsRegister()) {
@@ -1266,15 +1331,19 @@ bool XComponentPattern::OnAccessibilityChildTreeDeregister(FrameNode* frameNode)
     TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "OnAccessibilityChildTreeDeregister, "
         "windowId: %{public}u, treeId: %{public}d.", windowId_, treeId_);
     RefPtr<PipelineContext> pipeline;
+    RefPtr<FrameNode> nodeForAM;
     if (!frameNode) {
-        auto host = GetHost();
-        CHECK_NULL_RETURN(host, false);
-        pipeline = host->GetContextRefPtr();
+        nodeForAM = GetHost();
+        CHECK_NULL_RETURN(nodeForAM, false);
+        pipeline = nodeForAM->GetContextRefPtr();
     } else {
+        nodeForAM = frameNode;
         pipeline = frameNode->GetContextRefPtr();
     }
     CHECK_NULL_RETURN(pipeline, false);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto pipelineAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_RETURN(pipelineAccessibilityManager, false);
+    auto accessibilityManager = pipelineAccessibilityManager->GetAccessibilityManagerForNode(nodeForAM);
     CHECK_NULL_RETURN(accessibilityManager, false);
     auto nativeProvider = GetNativeProvider();
     CHECK_NULL_RETURN(nativeProvider, false);
@@ -1322,7 +1391,9 @@ void XComponentPattern::HandleRegisterAccessibilityEvent(bool isRegister)
     CHECK_NULL_VOID(host);
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto pipelineAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_VOID(pipelineAccessibilityManager);
+    auto accessibilityManager = pipelineAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
     if (!isRegister) {
         accessibilityChildTreeCallback_->OnDeregister();
@@ -1427,6 +1498,7 @@ void XComponentPattern::HandleFocusEvent()
     auto* surface = const_cast<void*>(nativeXComponentImpl_->GetSurface());
     const auto focusEventCallback = nativeXComponentImpl_->GetFocusEventCallback();
     CHECK_NULL_VOID(focusEventCallback);
+    LOG_CALLBACK("OH_NativeXComponent_RegisterFocusEventCallback", focusEventCallback);
     focusEventCallback(nativeXComponent_.get(), surface);
 }
 
@@ -1441,11 +1513,15 @@ bool XComponentPattern::HandleKeyEvent(const KeyEvent& event)
     auto* surface = const_cast<void*>(nativeXComponentImpl_->GetSurface());
     const auto keyEventCallbackWithResult = nativeXComponentImpl_->GetKeyEventCallbackWithResult();
     if (keyEventCallbackWithResult) {
+        LOG_CALLBACK("OH_NativeXComponent_RegisterKeyEventCallbackWithResult", keyEventCallbackWithResult);
         return keyEventCallbackWithResult(nativeXComponent_.get(), surface);
     }
     const auto keyEventCallback = nativeXComponentImpl_->GetKeyEventCallback();
     CHECK_NULL_RETURN(keyEventCallback, false);
-    keyEventCallback(nativeXComponent_.get(), surface);
+    {
+        LOG_CALLBACK("OH_NativeXComponent_RegisterKeyEventCallback", keyEventCallback);
+        keyEventCallback(nativeXComponent_.get(), surface);
+    }
     return false;
 }
 
@@ -1456,6 +1532,7 @@ void XComponentPattern::HandleBlurEvent()
     auto* surface = const_cast<void*>(nativeXComponentImpl_->GetSurface());
     const auto blurEventCallback = nativeXComponentImpl_->GetBlurEventCallback();
     CHECK_NULL_VOID(blurEventCallback);
+    LOG_CALLBACK("OH_NativeXComponent_RegisterBlurEventCallback", blurEventCallback);
     blurEventCallback(nativeXComponent_.get(), surface);
 }
 
@@ -1503,6 +1580,7 @@ void XComponentPattern::InitOnTouchIntercept(const RefPtr<GestureEventHub>& gest
         auto event = touchEvent.ConvertToTouchEvent();
         ArkUI_UIInputEvent uiEvent { ARKUI_UIINPUTEVENT_TYPE_TOUCH, TOUCH_EVENT_ID, &event, false,
             Container::GetCurrentApiTargetVersion(), hostNode->GetId(), .usePXUnit = true };
+        LOG_CALLBACK("OH_NativeXComponent_RegisterOnTouchInterceptCallback", onTouchInterceptCallback);
         return static_cast<NG::HitTestMode>(onTouchInterceptCallback(pattern->nativeXComponent_.get(), &uiEvent));
     });
 }
@@ -1543,19 +1621,21 @@ void XComponentPattern::InitMouseHoverEvent(const RefPtr<InputEventHub>& inputHu
 void XComponentPattern::ReportChangeEvent(const TouchEventInfo& info, const Offset& screenOffset,
     const TouchLocationInfo& touchInfo)
 {
+    auto type = touchInfo.GetTouchType();
     if (info.GetSourceDevice() != SourceType::TOUCH) {
         return;
     }
-    auto type = touchInfo.GetTouchType();
     if ((type != TouchType::DOWN) && (type != TouchType::UP)) {
         return;
     }
     std::unique_ptr<JsonValue> json = JsonUtil::Create(true);
     auto host = GetHost();
-    CHECK_NULL_VOID(host);
+    if (!host) {
+        return;
+    }
     json->Put("id", host->GetId());
-    json->Put("fingerId", touchInfo.GetFingerId());
     const auto timeStamp = info.GetTimeStamp().time_since_epoch().count();
+    json->Put("fingerId", touchInfo.GetFingerId());
     json->Put("timeStamp", static_cast<double>(timeStamp));
     json->Put("offset", screenOffset.ToString().c_str());
     json->Put("eventId", touchInfo.GetTouchEventId());
@@ -1636,7 +1716,7 @@ void XComponentPattern::HandleMouseHoverEvent(bool isHover)
     const auto* callback = nativeXComponentImpl_->GetMouseEventCallback();
     CHECK_NULL_VOID(callback);
     CHECK_NULL_VOID(callback->DispatchHoverEvent);
-    LOG_CALLBACK(callback->DispatchHoverEvent);
+    LOG_CALLBACK(__FUNCTION__, callback->DispatchHoverEvent);
     callback->DispatchHoverEvent(nativeXComponent_.get(), isHover);
 }
 
@@ -1652,7 +1732,7 @@ void XComponentPattern::NativeXComponentDispatchMouseEvent(const OH_NativeXCompo
     const auto* callback = nativeXComponentImpl_->GetMouseEventCallback();
     CHECK_NULL_VOID(callback);
     CHECK_NULL_VOID(callback->DispatchMouseEvent);
-    LOG_CALLBACK(callback->DispatchMouseEvent);
+    LOG_CALLBACK(__FUNCTION__, callback->DispatchMouseEvent);
     callback->DispatchMouseEvent(nativeXComponent_.get(), surface);
 }
 
@@ -1665,6 +1745,7 @@ void XComponentPattern::NativeXComponentDispatchAxisEvent(AxisEvent* axisEvent)
     CHECK_NULL_VOID(callback);
     ArkUI_UIInputEvent uiEvent { ARKUI_UIINPUTEVENT_TYPE_AXIS, AXIS_EVENT_ID, axisEvent, false,
         Container::GetCurrentApiTargetVersion(), GetHost()->GetId(), .usePXUnit = true };
+    LOG_CALLBACK("OH_NativeXComponent_RegisterUIInputEventCallback", callback);
     callback(nativeXComponent_.get(), &uiEvent, ArkUI_UIInputEvent_Type::ARKUI_UIINPUTEVENT_TYPE_AXIS);
 }
 
@@ -1896,8 +1977,11 @@ void XComponentPattern::HandleOnFrameEvent()
         auto xComponentPattern = weak.Upgrade();
         CHECK_NULL_VOID(xComponentPattern);
         CHECK_NULL_VOID(xComponentPattern->nativeXComponentImpl_->GetOnFrameCallback());
-        xComponentPattern->nativeXComponentImpl_->GetOnFrameCallback()(xComponentPattern->nativeXComponent_.get(),
-            displaySyncData->GetTimestamp(), displaySyncData->GetTargetTimestamp());
+        const auto onFrameCallback = xComponentPattern->nativeXComponentImpl_->GetOnFrameCallback();
+        LOG_CALLBACK("OH_NativeXComponent_RegisterOnFrameCallback", onFrameCallback);
+        onFrameCallback(
+            xComponentPattern->nativeXComponent_.get(), displaySyncData->GetTimestamp(),
+            displaySyncData->GetTargetTimestamp());
     });
     TAG_LOGD(AceLogTag::ACE_XCOMPONENT, "Id: %{public}" PRIu64 " RegisterOnFrame",
         displaySync_->GetId());
@@ -2164,7 +2248,7 @@ void XComponentPattern::OnSurfaceCreated()
         CHECK_NULL_VOID(callback->OnSurfaceCreated);
         TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent[%{public}s] native OnSurfaceCreated", GetId().c_str());
         ACE_SCOPED_TRACE("XComponent[%s] NativeSurfaceCreated[w:%f,h:%f]", GetId().c_str(), width, height);
-        LOG_CALLBACK(callback->OnSurfaceCreated);
+        LOG_CALLBACK(__FUNCTION__, callback->OnSurfaceCreated);
         callback->OnSurfaceCreated(nativeXComponent_.get(), nativeWindow_);
     } else {
         auto host = GetHost();
@@ -2211,7 +2295,7 @@ void XComponentPattern::OnSurfaceChanged(const RectF& surfaceRect, bool needResi
         CHECK_NULL_VOID(callback->OnSurfaceChanged);
         {
             ACE_SCOPED_TRACE("XComponent[%s] native OnSurfaceChanged[w:%f,h:%f]", GetId().c_str(), width, height);
-            LOG_CALLBACK(callback->OnSurfaceChanged);
+            LOG_CALLBACK(__FUNCTION__, callback->OnSurfaceChanged);
             callback->OnSurfaceChanged(nativeXComponent_.get(), surface);
         }
     } else {
@@ -2233,8 +2317,10 @@ void XComponentPattern::OnSurfaceDestroyed(FrameNode* frameNode)
         CHECK_NULL_VOID(callback->OnSurfaceDestroyed);
         TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent[%{public}s] native OnSurfaceDestroyed", GetId().c_str());
         ACE_SCOPED_TRACE("XComponent[%s] native OnSurfaceDestroyed", GetId().c_str());
-        LOG_CALLBACK(callback->OnSurfaceDestroyed);
-        callback->OnSurfaceDestroyed(nativeXComponent_.get(), surface);
+        {
+            LOG_CALLBACK(__FUNCTION__, callback->OnSurfaceDestroyed);
+            callback->OnSurfaceDestroyed(nativeXComponent_.get(), surface);
+        }
         nativeXComponentImpl_->SetSurface(nullptr);
     } else if (isTypedNode_) {
         RefPtr<FrameNode> host;
@@ -2296,13 +2382,17 @@ void XComponentPattern::HandleSurfaceCreated()
     surfaceId_ = screenId_.has_value() ? "" : renderSurface_->GetUniqueId();
     CHECK_NULL_VOID(xcomponentController_);
     xcomponentController_->SetSurfaceId(surfaceId_);
+    // real create fires here, the visibility lifecycle pairing state is reset
+    isVisibilityLifecycleDestroyed_ = false;
     OnSurfaceCreated();
 }
 
 void XComponentPattern::HandleSurfaceDestroyed(FrameNode* frameNode)
 {
     CHECK_NULL_VOID(xcomponentController_);
-    OnSurfaceDestroyed(frameNode);
+    if (!isVisibilityLifecycleDestroyed_) {
+        OnSurfaceDestroyed(frameNode);
+    }
     xcomponentController_->SetSurfaceId("");
     CHECK_NULL_VOID(renderSurface_);
     renderSurface_->ReleaseSurfaceBuffers();
@@ -2317,6 +2407,7 @@ void XComponentPattern::NativeSurfaceShow()
     auto* surface = const_cast<void*>(nativeXComponentImpl_->GetSurface());
     const auto surfaceShowCallback = nativeXComponentImpl_->GetSurfaceShowCallback();
     CHECK_NULL_VOID(surfaceShowCallback);
+    LOG_CALLBACK("OH_NativeXComponent_RegisterSurfaceShowCallback", surfaceShowCallback);
     surfaceShowCallback(nativeXComponent_.get(), surface);
 }
 
@@ -2328,13 +2419,19 @@ void XComponentPattern::NativeSurfaceHide()
     auto* surface = const_cast<void*>(nativeXComponentImpl_->GetSurface());
     const auto surfaceHideCallback = nativeXComponentImpl_->GetSurfaceHideCallback();
     CHECK_NULL_VOID(surfaceHideCallback);
-    surfaceHideCallback(nativeXComponent_.get(), surface);
+    {
+        LOG_CALLBACK("OH_NativeXComponent_RegisterSurfaceHideCallback", surfaceHideCallback);
+        surfaceHideCallback(nativeXComponent_.get(), surface);
+    }
     CHECK_NULL_VOID(renderSurface_);
     renderSurface_->ReleaseSurfaceBuffers();
 }
 
 void XComponentPattern::OnWindowHide()
 {
+    // window-level visibility feeds the same pairing state machine as the
+    // component-level visible-area callback; the state guard keeps pairs intact
+    OnVisibilityLifecycleChange(false);
     if (!hasXComponentInit_ || hasReleasedSurface_ ||
         (type_ != XComponentType::SURFACE && type_ != XComponentType::TEXTURE)) {
         return;
@@ -2348,6 +2445,9 @@ void XComponentPattern::OnWindowHide()
 
 void XComponentPattern::OnWindowShow()
 {
+    // window-level visibility feeds the same pairing state machine as the
+    // component-level visible-area callback; the state guard keeps pairs intact
+    OnVisibilityLifecycleChange(true);
     if (!hasXComponentInit_ || !hasReleasedSurface_ ||
         (type_ != XComponentType::SURFACE && type_ != XComponentType::TEXTURE)) {
         return;
@@ -2477,7 +2577,7 @@ void XComponentPattern::StartImageAnalyzer(void* config, OnAnalyzedCallback& onA
 
     auto host = GetHost();
     CHECK_NULL_VOID(host);
-    auto* context = host->GetContext();
+    auto context = host->GetContext();
     CHECK_NULL_VOID(context);
     auto uiTaskExecutor = SingleTaskExecutor::Make(context->GetTaskExecutor(), TaskExecutor::TaskType::UI);
     uiTaskExecutor.PostTask(
@@ -2605,6 +2705,25 @@ void XComponentPattern::DumpInfo(std::unique_ptr<JsonValue>& json)
 
 void XComponentPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
+    auto hostForDump = GetHost();
+    std::string state = std::string("jsEnabled=")
+        .append(isVisibilityLifecycle_ ? "true" : "false")
+        .append(", nativeEnabled=")
+        .append(nativeXComponentImpl_ && nativeXComponentImpl_->IsVisibilityLifecycle() ? "true" : "false")
+        .append(", registered=")
+        .append(isVisibilityLifecycleRegistered_ ? "true" : "false")
+        .append(", destroyed=")
+        .append(isVisibilityLifecycleDestroyed_ ? "true" : "false")
+        .append(", changing=")
+        .append(isInVisibilityLifecycleChange_ ? "true" : "false")
+        .append(", init=")
+        .append(hasXComponentInit_ ? "true" : "false")
+        .append(", released=")
+        .append(hasReleasedSurface_ ? "true" : "false")
+        .append(", onTree=")
+        .append(hostForDump && hostForDump->IsOnMainTree() ? "true" : "false")
+        .append("]");
+    json->Put("visibilityLifecycleState", state.c_str());
     if (renderSurface_) {
         renderSurface_->DumpInfo(json);
     }
@@ -2649,6 +2768,27 @@ void XComponentPattern::HdrBrightness(float hdrBrightness, HdrType hdrType)
     hdrType_ = hdrType;
 }
 
+void XComponentPattern::SetExtraFlag(uint32_t flag)
+{
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT,
+        "XComponent[%{public}s] SetExtraFlag (pattern) entry, flag: 0x%{public}x, type: %{public}d",
+        GetId().c_str(), flag, static_cast<int32_t>(type_));
+    extraFlag_ = flag;
+    if (type_ == XComponentType::SURFACE) {
+        bool isSolidColorEnabled = IsSolidColorEnabled();
+        CHECK_NULL_VOID(renderContextForSurface_);
+        renderContextForSurface_->SetSolidLayerEnabled(isSolidColorEnabled);
+        if (handlingSurfaceRenderContext_ == renderContextForSurface_) {
+            applyBackGroundColor();
+        }
+    }
+}
+
+bool XComponentPattern::IsSolidColorEnabled() const
+{
+    return (extraFlag_ & XCOMPONENT_EXTRA_FLAG_ENABLE_SOLID_COLOR) == XCOMPONENT_EXTRA_FLAG_ENABLE_SOLID_COLOR;
+}
+
 void XComponentPattern::EnableTransparentLayer(bool isTransparentLayer)
 {
     if (type_ != XComponentType::SURFACE) {
@@ -2657,6 +2797,218 @@ void XComponentPattern::EnableTransparentLayer(bool isTransparentLayer)
     CHECK_NULL_VOID(renderContextForSurface_);
     renderContextForSurface_->SetTransparentLayer(isTransparentLayer);
     isTransparentLayer_ = isTransparentLayer;
+}
+
+void XComponentPattern::SetBufferQueueCount(int32_t bufferQueueCount)
+{
+    bufferQueueCount_ = std::clamp(bufferQueueCount, MIN_BUFFER_QUEUE_COUNT, MAX_BUFFER_QUEUE_COUNT);
+    CHECK_NULL_VOID(renderSurface_);
+    renderSurface_->SetSurfaceQueueSize(bufferQueueCount_);
+    renderSurface_->UpdateSurfaceConfig();
+}
+
+int32_t XComponentPattern::GetBufferQueueCount() const
+{
+    return bufferQueueCount_;
+}
+
+void XComponentPattern::SetSurfaceVisibilityLifecycle(bool isVisibilityLifecycle)
+{
+    if (isVisibilityLifecycle_ == isVisibilityLifecycle) {
+        return;
+    }
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent[%{public}s] visibility lifecycle enabled by js: %{public}d",
+        GetId().c_str(), isVisibilityLifecycle);
+    isVisibilityLifecycle_ = isVisibilityLifecycle;
+    UpdateVisibilityLifecycleRegistration();
+}
+
+void XComponentPattern::UpdateVisibilityLifecycleRegistration()
+{
+    // either entry (JS attribute or C API flag on NativeXComponentImpl) may flip the
+    // feature; the getter's OR semantics keep it on while any source stays enabled
+    if (!IsSurfaceVisibilityLifecycle()) {
+        TAG_LOGI(AceLogTag::ACE_XCOMPONENT,
+            "XComponent[%{public}s] visibility lifecycle disabled, destroyed before restore: %{public}d",
+            GetId().c_str(), isVisibilityLifecycleDestroyed_);
+        // restore the surface lifecycle before leaving the feature, keeping create/destroy paired
+        if (isVisibilityLifecycleDestroyed_) {
+            isVisibilityLifecycleDestroyed_ = false;
+            OnVisibilityLifecycleCreate();
+        }
+        UnregisterVisibilityLifecycleCallback();
+        return;
+    }
+    auto host = GetHost();
+    if (host && host->IsOnMainTree()) {
+        RegisterVisibilityLifecycleCallback();
+    } else {
+        TAG_LOGD(AceLogTag::ACE_XCOMPONENT,
+            "XComponent[%{public}s] skip register visibility lifecycle, host on main tree: %{public}d",
+            GetId().c_str(), host && host->IsOnMainTree());
+    }
+}
+
+bool XComponentPattern::IsSurfaceLifecycleReady() const
+{
+    return hasXComponentInit_;
+}
+
+bool XComponentPattern::IsSurfaceVisibilityLifecycle() const
+{
+    return (nativeXComponentImpl_ ? nativeXComponentImpl_->IsVisibilityLifecycle() : false) ||
+        isVisibilityLifecycle_;
+}
+
+void XComponentPattern::RegisterVisibilityLifecycleCallback()
+{
+    if (isVisibilityLifecycleRegistered_) {
+        TAG_LOGD(AceLogTag::ACE_XCOMPONENT, "XComponent[%{public}s] visibility lifecycle already registered",
+            GetId().c_str());
+        return;
+    }
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto pipeline = host->GetContextRefPtr();
+    CHECK_NULL_VOID(pipeline);
+    auto callback = [weak = WeakClaim(this)](bool visible, double ratio) {
+        auto pattern = weak.Upgrade();
+        if (!pattern) {
+            TAG_LOGD(AceLogTag::ACE_XCOMPONENT,
+                "XComponent pattern released, drop visible area event, visible: %{public}d", visible);
+            return;
+        }
+        pattern->OnVisibilityLifecycleChange(visible);
+    };
+    std::vector<double> ratioList = { 0.0 };
+    // mark registered BEFORE the Add calls: if any registration synchronously
+    // dispatches the callback, re-entry must hit the guard above instead of
+    // recursing through RegisterVisibilityLifecycleCallback endlessly
+    isVisibilityLifecycleRegistered_ = true;
+    pipeline->AddVisibleAreaChangeNode(host, ratioList, callback, false, true);
+    // window session visibility (occlusion/minimize etc.), separate from the
+    // component-level visible area callback above; both feed the same state machine
+    pipeline->AddWindowVisibilityChangedCallback(host->GetId(),
+        [weak = WeakClaim(this)](bool visible) {
+            auto pattern = weak.Upgrade();
+            if (!pattern) {
+                TAG_LOGD(AceLogTag::ACE_XCOMPONENT,
+                    "XComponent pattern released, drop window visibility event, visible: %{public}d", visible);
+                return;
+            }
+            pattern->OnVisibilityLifecycleChange(visible);
+        });
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent[%{public}s] visibility lifecycle callbacks registered",
+        GetId().c_str());
+}
+
+void XComponentPattern::UnregisterVisibilityLifecycleCallback()
+{
+    if (!isVisibilityLifecycleRegistered_) {
+        return;
+    }
+    isVisibilityLifecycleRegistered_ = false;
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto pipeline = host->GetContextRefPtr();
+    if (pipeline) {
+        pipeline->RemoveVisibleAreaChangeNode(host->GetId());
+        pipeline->RemoveWindowVisibilityChangedCallback(host->GetId());
+        TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent[%{public}s] visibility lifecycle callbacks unregistered",
+            GetId().c_str());
+    }
+    // EventHub inner callback is a single slot and replaced on re-register;
+    // the framework cleans it up at node destruction (HandleAreaChangeDestruct).
+}
+
+void XComponentPattern::OnVisibilityLifecycleChange(bool visible)
+{
+    // synchronous re-entry (e.g. a callback dispatched during registration or a
+    // nested visibility event) is dropped: the outer call owns the state machine
+    // transition, keeping create/destroy pairs intact
+    if (isInVisibilityLifecycleChange_) {
+        TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent[%{public}s] drop reentrant visibility event: %{public}d",
+            GetId().c_str(), visible);
+        return;
+    }
+    isInVisibilityLifecycleChange_ = true;
+    HandleVisibilityLifecycleChange(visible);
+    isInVisibilityLifecycleChange_ = false;
+}
+
+void XComponentPattern::HandleVisibilityLifecycleChange(bool visible)
+{
+    // the getter also covers the C API entry (flag stored on NativeXComponentImpl)
+    if (!IsSurfaceVisibilityLifecycle()) {
+        TAG_LOGD(AceLogTag::ACE_XCOMPONENT, "XComponent[%{public}s] visibility event dropped, feature disabled",
+            GetId().c_str());
+        return;
+    }
+    if ((visible && !isVisibilityLifecycleDestroyed_) || (!visible && isVisibilityLifecycleDestroyed_)) {
+        TAG_LOGD(AceLogTag::ACE_XCOMPONENT,
+            "XComponent[%{public}s] visibility event deduped, visible: %{public}d, destroyed: %{public}d",
+            GetId().c_str(), visible, isVisibilityLifecycleDestroyed_);
+        // pairing state machine: the surface is already in the target state,
+        // duplicated create/destroy from either visibility source is dropped
+        return;
+    }
+    auto host = GetHost();
+    if (!host || !host->IsOnMainTree() || !IsSurfaceLifecycleReady() ||
+        (type_ != XComponentType::SURFACE && type_ != XComponentType::TEXTURE)) {
+        TAG_LOGD(AceLogTag::ACE_XCOMPONENT,
+            "XComponent[%{public}s] visibility event skipped, onTree: %{public}d, init: %{public}d, type: %{public}d",
+            GetId().c_str(), host && host->IsOnMainTree(), IsSurfaceLifecycleReady(), static_cast<int32_t>(type_));
+        // outside pairing scope: off tree / surface not created / not a surface type
+        return;
+    }
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent[%{public}s] visibility lifecycle change, visible: %{public}d",
+        GetId().c_str(), visible);
+    // backstop: the C API entry registers immediately through the NativeXComponentImpl
+    // event callback; this only fires if that callback has not been installed yet
+    if (!isVisibilityLifecycleRegistered_) {
+        RegisterVisibilityLifecycleCallback();
+    }
+    if (visible) {
+        isVisibilityLifecycleDestroyed_ = false;
+        // OnVisibilityLifecycleCreate dispatches per component kind internally
+        // and needs no special casing here
+        OnVisibilityLifecycleCreate();
+    } else {
+        isVisibilityLifecycleDestroyed_ = true;
+        if (renderSurface_) {
+            renderSurface_->ReleaseSurfaceBuffers();
+        }
+        OnVisibilityLifecycleDestroy();
+    }
+}
+
+void XComponentPattern::OnVisibilityLifecycleCreate()
+{
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent[%{public}s] visibility lifecycle create", GetId().c_str());
+    OnSurfaceCreated();
+}
+
+void XComponentPattern::OnVisibilityLifecycleDestroy()
+{
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent[%{public}s] visibility lifecycle destroy", GetId().c_str());
+    if (isTypedNode_) {
+        // typed: OnSurfaceDestroyed fires the controller destroyed event
+        OnSurfaceDestroyed();
+        return;
+    }
+    if (isNativeXComponent_) {
+        // classic with native library: native callback path
+        OnSurfaceDestroyed();
+    }
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    // ArkTS-side trigger, fired directly like OnDetachFromFrameNode;
+    // FireDestroyEvent/FireDetachEvent stay with real detach only. For the
+    // plain declarative path this also bypasses the RENDER_EXTRACT-isolated
+    // branch inside OnSurfaceDestroyed
+    auto eventHub = host->GetEventHub<XComponentEventHub>();
+    CHECK_NULL_VOID(eventHub);
+    eventHub->FireControllerDestroyedEvent(surfaceId_, GetId());
 }
 
 RenderFit XComponentPattern::GetSurfaceRenderFit() const
@@ -2746,6 +3098,28 @@ void XComponentPattern::SetSurfaceIsOpaque(bool isOpaque)
     }
 }
 
+void XComponentPattern::DumpSimplifyInfo(std::shared_ptr<JsonValue>& json)
+{
+    json->Put("$SurfaceId", surfaceId_.c_str());
+}
+
+void XComponentPattern::AddExtraInfoWithParamConfig(
+    std::shared_ptr<JsonValue>& json, ParamConfig config)
+{
+    if (!config.withCustomContent || config.inspectorContext) {
+        return;
+    }
+    CHECK_NULL_VOID(json);
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* provider = GetNativeProvider();
+    CHECK_NULL_VOID(provider);
+    auto providerTree = ThirdProviderTreeExporter::ExportToInspectorJson(provider, host);
+    if (providerTree) {
+        json->Put(THIRD_PROVIDER_JSON_CHILDREN, providerTree);
+    }
+}
+
 void XComponentPattern::UpdateSdrRatioIfNeed()
 {
     if (xcomponentTouchSdrRatio_ < std::numeric_limits<float>::epsilon() &&
@@ -2766,6 +3140,13 @@ void XComponentPattern::UpdateSdrRatioIfNeed()
         TAG_LOGD(AceLogTag::ACE_XCOMPONENT,
             "XComponentPattern[UpdateSdrRatioIfNeed] touchSdrRatio_:%{public}f, sizeSdrRatio_:%{public}f",
             xcomponentTouchSdrRatio_, xcomponentSizeSdrRatio_);
+    }
+}
+
+void XComponentPattern::AddInspectorTreeInfo(std::shared_ptr<JsonValue>& node, InspectorTreeRequestContext& context)
+{
+    if (context.config.withCustomContent && !context.ShouldStop()) {
+        context.CollectCustomContent(GetNativeProvider(), GetHost(), node);
     }
 }
 

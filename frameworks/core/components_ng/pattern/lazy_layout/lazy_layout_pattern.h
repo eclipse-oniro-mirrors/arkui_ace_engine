@@ -32,10 +32,26 @@ public:
 
     virtual AdjustOffset GetAdjustOffset() const = 0;
     virtual AdjustOffset GetAndResetAdjustOffset() = 0;
+    // nullopt rejects preflight; partial results retain compensation and distinguish retryable from unsupported.
+    virtual std::optional<LazyPremeasureResult> Premeasure(LayoutWrapper* wrapper)
+    {
+        return std::nullopt;
+    }
     virtual bool HasStickyHeader() const
     {
         return false;
     }
+
+    // Seed normal window measurement once per logical preparation, including newly rebuilt/rebound nodes.
+    void RestorePreparedGeometry(const std::shared_ptr<const PreparedLayoutGeometry>& geometry);
+    std::shared_ptr<const PreparedLayoutGeometry> GetPreparedGeometry() const;
+
+    // Borrowed only during a synchronous boundary Measure; no preparation state is allocated by this query.
+    LayoutWrapper* GetPremeasureWrapper() const
+    {
+        return preparedState_ ? preparedState_->premeasureWrapper : nullptr;
+    }
+    LayoutWrapper* SwapPremeasureWrapper(LayoutWrapper* wrapper);
 
     // LazyColumnLayout publishes handoff gaps, defers mid-layout invalidation, and clears the state on detach.
     void PublishNextStickyHeaderGap(const std::optional<float>& gap);
@@ -50,13 +66,16 @@ public:
     void OnDetachFromMainTree() override;
 
 protected:
+    virtual bool ApplyPreparedGeometry(const PreparedLayoutGeometry& geometry)
+    {
+        return false;
+    }
     // Called while the Pattern is attached to its FrameNode. Derived patterns that reuse LazyLayoutPattern without
     // participating in nested lazy prediction must opt out before attachment.
     virtual bool IsLazyLayoutEnabled() const
     {
         return true;
     }
-
     void DumpStickyHeaderHandoffInfo() const;
     void DumpStickyHeaderHandoffInfo(std::unique_ptr<JsonValue>& json) const;
 
@@ -65,6 +84,11 @@ private:
 
     std::optional<float> nextStickyHeaderGap_;
     std::optional<bool> lastNotifiedHasStickyHeader_;
+    struct PreparedLayoutState {
+        std::weak_ptr<const PreparedLayoutGeometry> geometry;
+        LayoutWrapper* premeasureWrapper = nullptr;
+    };
+    std::unique_ptr<PreparedLayoutState> preparedState_;
 };
 }
 #endif

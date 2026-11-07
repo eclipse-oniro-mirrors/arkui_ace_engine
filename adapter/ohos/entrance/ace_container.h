@@ -96,12 +96,14 @@ struct ParsedConfig {
     std::string mnc;
     std::string preferredLanguage;
     std::string fontId;
+    std::string themeSkin;
+    std::string themeIcon;
     bool IsValid() const
     {
         return !(colorMode.empty() && deviceAccess.empty() && languageTag.empty() && direction.empty() &&
                  densitydpi.empty() && themeTag.empty() && fontScale.empty() && fontWeightScale.empty() &&
                  colorModeIsSetByApp.empty() && mcc.empty() && mnc.empty() && fontFamily.empty() &&
-                 preferredLanguage.empty() && fontId.empty());
+                 preferredLanguage.empty() && fontId.empty() && themeSkin.empty() && themeIcon.empty());
     }
 };
 
@@ -720,6 +722,7 @@ public:
     bool IsSceneBoardEnabled() override;
     bool IsMainWindow() const override;
     bool IsSubWindow() const override;
+    bool IsPipWindow() const override;
     bool IsDialogWindow() const override;
     bool IsSystemWindow() const override;
     bool IsHostMainWindow() const override;
@@ -873,7 +876,7 @@ public:
     Rect GetUIExtensionHostWindowRect() override
     {
         CHECK_NULL_RETURN(IsUIExtensionWindow(), Rect());
-        auto hostWindowId = uiWindow_->GetRealParentId();
+        auto hostWindowId = uiWindow_->GetHostWindowId();
         auto rect = uiWindow_->GetHostWindowRect(hostWindowId);
         return Rect(rect.posX_, rect.posY_, rect.width_, rect.height_);
     }
@@ -928,6 +931,10 @@ public:
     {
         foldStatusFromListener_ = GetCurrentFoldStatus();
     }
+
+    void RefreshLiveFoldCreaseRegion() override;
+
+    void RefreshFoldCreaseDirection() override;
 
     void DispatchExtensionDataToHostWindow(uint32_t code, const AAFwk::Want& data, int32_t persistentId);
 
@@ -1045,6 +1052,7 @@ private:
     int32_t pageId_ = 0;
     bool useCurrentEventRunner_ = false;
     sptr<OHOS::Rosen::Window> uiWindow_ = nullptr;
+    sptr<OHOS::Rosen::IWindowVisibilityChangedListener> windowVisibilityListener_ = nullptr;
     std::string windowName_;
     uint32_t windowId_ = OHOS::Rosen::INVALID_WINDOW_ID;
     float windowScale_ = 1.0f;
@@ -1105,7 +1113,9 @@ private:
 
     SingleHandTransform singleHandTransform_;
 
-    bool lastThemeHasSkin_ = false;
+    uint32_t lastThemeFonts_ = 0;
+    uint32_t lastThemeIcons_ = 0;
+    uint32_t lastThemeSkin_ = 0;
 
     // for multiple frontEnd
     // valid only when type_ is STATIC_HYBRID_DYNAMIC or DYNAMIC_HYBRID_STATIC

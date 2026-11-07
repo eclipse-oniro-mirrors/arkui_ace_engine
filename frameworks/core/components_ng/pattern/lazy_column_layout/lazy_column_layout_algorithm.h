@@ -36,6 +36,9 @@ public:
     void Measure(LayoutWrapper* layoutWrapper) override;
     void Layout(LayoutWrapper* layoutWrapper) override;
 
+    // Nullopt rejects preflight; an unsupported result still carries committed size/adjustment for the caller.
+    std::optional<LazyPremeasureResult> Premeasure(LayoutWrapper* layoutWrapper);
+
     // Inject the header FrameNode (optional). Pattern calls it once in CreateLayoutAlgorithm.
     void SetHeader(const RefPtr<FrameNode>& header)
     {
@@ -54,6 +57,20 @@ public:
     }
 
 private:
+    std::optional<LazyPremeasureResult> MeasureBoundaryRange(LayoutWrapper* layoutWrapper);
+    bool PrepareBoundaryMeasure(LayoutWrapper* layoutWrapper, OptionalSizeF& ideal);
+    LazyPremeasureResult MeasureBoundaryItems(LayoutWrapper* layoutWrapper, bool forward);
+    void RecordBoundaryItemGeometry(
+        int32_t index, const LazyPremeasureResult& item, LazyPremeasureResult& result);
+    float CommitBoundaryItem(int32_t index, float cursor, bool forward, const LazyPremeasureResult& item);
+    std::optional<LazyPremeasureResult> MeasureBoundaryItem(
+        const RefPtr<LayoutWrapper>& child, float cursor, bool forward);
+    bool FinishBoundaryMeasure(LazyPremeasureResult& result, float oldTotal, float oldHeader,
+        const std::optional<float>& oldAnchor);
+    void CapturePreparedGeometry(PreparedLayoutGeometry& geometry) const;
+    std::optional<float> GetKnownBodySize() const;
+    AdjustOffset PrepareKnownBodyMeasure();
+    void RebasePremeasureWindow(float bodyAnchorAdjust);
     void UpdatePosReference(LayoutWrapper* layoutWrapper, std::optional<ViewPosReference>& posRef);
     void UpdateAttribute(const RefPtr<LazyColumnLayoutProperty>& layoutProperty,
         const LayoutConstraintF& contentConstraint);
@@ -131,8 +148,11 @@ private:
 
     int32_t totalItemCount_ = 0;
     float totalMainSize_ = 0.0f;
+    std::optional<float> premeasuredMainSize_;
     // Last frame's body extent (captured before the edges are remeasured); keeps edge resizes out of adjustOffset_.
     float prevBodyMainSize_ = 0.0f;
+    // Refreshed from the current content constraint, never retained by the pattern.
+    std::optional<float> knownMainSize_;
     // False only on the very first layout (previous total == 0); a recycled child re-entering still counts as laid.
     bool hadMeasuredItems_ = true;
     bool needAllLayout_ = true;

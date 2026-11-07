@@ -277,6 +277,26 @@ HWTEST_F(SmartLayoutEngineLoaderTest, SmartLayoutEngineLoaderTest008, TestSize.L
     EXPECT_TRUE(loader.loadAttempted_.load(std::memory_order_acquire));
     EXPECT_EQ(loader.soHandle_, nullptr);
 }
+
+/**
+ * @tc.name: SmartLayoutEngineLoaderTest010
+ * @tc.desc: Test LoadEngine keeps clean retryable state when so or its exported factory symbol is unavailable
+ * @tc.type: FUNC
+ */
+HWTEST_F(SmartLayoutEngineLoaderTest, SmartLayoutEngineLoaderTest010, TestSize.Level1)
+{
+    SmartLayoutEngineLoader loader;
+    if (loader.LoadEngine()) {
+        EXPECT_NE(loader.engine_, nullptr);
+        EXPECT_NE(loader.soHandle_, nullptr);
+        return;
+    }
+    EXPECT_EQ(loader.engine_, nullptr);
+    EXPECT_EQ(loader.soHandle_, nullptr);
+    EXPECT_FALSE(loader.LoadEngine());
+    EXPECT_EQ(loader.engine_, nullptr);
+    EXPECT_EQ(loader.soHandle_, nullptr);
+}
 #endif
 
 } // namespace OHOS::Ace::NG

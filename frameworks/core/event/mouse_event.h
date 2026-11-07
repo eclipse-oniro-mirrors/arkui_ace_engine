@@ -69,6 +69,11 @@ struct MouseEvent final : public PointerEvent {
     std::vector<MouseEvent> history;
     WeakPtr<NG::FrameNode> node;
     bool isInjected = false;
+    bool isAgent = false;
+    int32_t agentWindowId = -1;
+    int32_t callingUid = -1;
+    bool hasSafSessionId = false;
+    uint64_t safSessionId = 0;
     bool isPrivacyMode = false;
     bool isStylusMouseMode = false;
     bool isScreenLocked = false;
@@ -220,13 +225,7 @@ public:
     {
         return localLocation_;
     }
-    Offset GetCurrentLocalLocation() const
-    {
-        if (currentLocalLocationGetter_) {
-            return currentLocalLocationGetter_();
-        }
-        return localLocation_;
-    }
+    ACE_FORCE_EXPORT Offset GetCurrentLocalLocation() const;
     MouseInfo& SetCurrentLocalLocationGetter(CurrentLocalLocationGetter&& currentLocalLocationGetter)
     {
         currentLocalLocationGetter_ = std::move(currentLocalLocationGetter);
@@ -284,7 +283,7 @@ public:
     }
 
     MouseEvent ConvertToMouseEvent() const;
-    MouseEvent ConvertToMouseEventForStatic() const;
+    MouseEvent ConvertToMouseEventForStatic(float density = 1.0f) const;
     void SetIsRightButtonEventFromDoulbeTap(bool isRightButtonEventFromDoulbeTap)
     {
         isRightButtonEventFromDoulbeTap_ = isRightButtonEventFromDoulbeTap;
@@ -474,7 +473,7 @@ using OnHoverEventFunc = std::function<void(bool)>;
 
 using OnAccessibilityHoverFunc = std::function<void(bool, AccessibilityHoverInfo& info)>;
 
-class MouseEventTarget : public virtual TouchEventTarget {
+class MouseEventTarget : public TouchEventTarget {
     DECLARE_ACE_TYPE(MouseEventTarget, TouchEventTarget);
 
 public:
@@ -487,6 +486,7 @@ public:
     }
 
     bool HandleMouseEvent(const MouseEvent& event);
+    MouseInfo CreateMouseInfo(const MouseEvent& event) const;
 
     bool DispatchEvent(const TouchEvent& point) override
     {
@@ -503,7 +503,7 @@ private:
     OnMouseEventFunc onMouseCallback_;
 };
 
-class HoverEventTarget : public virtual TouchEventTarget {
+class HoverEventTarget : public TouchEventTarget {
     DECLARE_ACE_TYPE(HoverEventTarget, TouchEventTarget);
 
 public:
@@ -596,7 +596,7 @@ private:
     OnHoverMoveFunc onPenHoverMoveEventCallback_;
 };
 
-class HoverEffectTarget : public virtual TouchEventTarget {
+class HoverEffectTarget : public TouchEventTarget {
     DECLARE_ACE_TYPE(HoverEffectTarget, TouchEventTarget);
 
 public:

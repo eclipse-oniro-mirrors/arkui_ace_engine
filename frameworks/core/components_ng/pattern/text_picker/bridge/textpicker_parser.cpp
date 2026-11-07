@@ -44,6 +44,8 @@ const char* BOTTOM_START_PROPERTY = "bottomStart";
 const char* BOTTOM_END_PROPERTY = "bottomEnd";
 const std::vector<TextOverflow> TEXT_OVERFLOWS = { TextOverflow::NONE, TextOverflow::CLIP, TextOverflow::ELLIPSIS,
     TextOverflow::MARQUEE };
+constexpr int32_t NAME_BASED_RESOURCE_ID = -1;
+constexpr int32_t UNKNOWN_RESOURCE_TYPE = -1;
 
 bool GetResourceIdAndType(const EcmaVM* vm, const Local<panda::ObjectRef>& jsObj, int32_t& resId, int32_t& resType)
 {
@@ -55,6 +57,28 @@ bool GetResourceIdAndType(const EcmaVM* vm, const Local<panda::ObjectRef>& jsObj
 
     resId = id->Int32Value(vm);
     resType = type->Int32Value(vm);
+    return true;
+}
+
+bool IsSafeResourceValue(const EcmaVM* vm, const Local<JSValueRef>& value)
+{
+    if (!value->IsObject(vm)) {
+        return true;
+    }
+    auto obj = value->ToObject(vm);
+    auto id = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "id"));
+    if (!id->IsNumber()) {
+        return true;
+    }
+    auto type = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "type"));
+    int32_t typeNum = UNKNOWN_RESOURCE_TYPE;
+    if (type->IsNumber()) {
+        typeNum = type->Int32Value(vm);
+    }
+    if (id->Int32Value(vm) == NAME_BASED_RESOURCE_ID || typeNum == UNKNOWN_RESOURCE_TYPE) {
+        auto params = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "params"));
+        return params->IsArray(vm);
+    }
     return true;
 }
 
@@ -122,7 +146,8 @@ void TextPickerParser::ParseTextStyleFontSize(
         textStyle.fontSize = Dimension(-1);
     } else {
         CalcDimension size;
-        if (!ArkTSUtils::ParseJsDimensionFp(vm, fontSize, size, textStyle.fontSizeResObj) ||
+        if (!IsSafeResourceValue(vm, fontSize) ||
+            !ArkTSUtils::ParseJsDimensionFp(vm, fontSize, size, textStyle.fontSizeResObj) ||
             size.Unit() == DimensionUnit::PERCENT) {
             textStyle.fontSize = Dimension(-1);
         } else {
@@ -139,14 +164,16 @@ void TextPickerParser::ParseDefaultTextStyle(
 
     if (!minFontSize->IsNull() && !minFontSize->IsUndefined()) {
         CalcDimension minSize;
-        if (ArkTSUtils::ParseJsDimensionFp(vm, minFontSize, minSize, textStyle.minFontSizeResObj) &&
+        if (IsSafeResourceValue(vm, minFontSize) &&
+            ArkTSUtils::ParseJsDimensionFp(vm, minFontSize, minSize, textStyle.minFontSizeResObj) &&
             minSize.Unit() != DimensionUnit::PERCENT) {
             textStyle.minFontSize = minSize;
         }
     }
     if (!maxFontSize->IsNull() && !maxFontSize->IsUndefined()) {
         CalcDimension maxSize;
-        if (ArkTSUtils::ParseJsDimensionFp(vm, maxFontSize, maxSize, textStyle.maxFontSizeResObj) &&
+        if (IsSafeResourceValue(vm, maxFontSize) &&
+            ArkTSUtils::ParseJsDimensionFp(vm, maxFontSize, maxSize, textStyle.maxFontSizeResObj) &&
             maxSize.Unit() != DimensionUnit::PERCENT) {
             textStyle.maxFontSize = maxSize;
         }
@@ -180,7 +207,8 @@ void TextPickerParser::ParseTextStyle(
     auto fontOptions = ArkTSUtils::GetProperty(vm, secondArg, "font");
 
     Color textColor;
-    if (ArkTSUtils::ParseJsColor(vm, fontColor, textColor, textStyle.textColorResObj)) {
+    if (IsSafeResourceValue(vm, fontColor) &&
+        ArkTSUtils::ParseJsColor(vm, fontColor, textColor, textStyle.textColorResObj)) {
         textStyle.textColor = textColor;
         textStyle.textColorSetByUser = true;
     }
@@ -198,14 +226,15 @@ void TextPickerParser::ParseTextStyle(
         std::string weight;
         if (fontWeight->IsNumber()) {
             weight = std::to_string(static_cast<int32_t>(fontWeight->ToNumber(vm)->Value()));
-        } else {
+        } else if (IsSafeResourceValue(vm, fontWeight)) {
             ArkTSUtils::ParseJsString(vm, fontWeight, weight);
         }
         textStyle.fontWeight = Framework::ConvertStrToFontWeight(weight);
     }
     if (!fontFamily->IsNull() && !fontFamily->IsUndefined()) {
         std::vector<std::string> families;
-        if (ArkTSUtils::ParseJsFontFamilies(vm, fontFamily, families, textStyle.fontFamilyResObj)) {
+        if (IsSafeResourceValue(vm, fontFamily) &&
+            ArkTSUtils::ParseJsFontFamilies(vm, fontFamily, families, textStyle.fontFamilyResObj)) {
             textStyle.fontFamily = families;
             IsUserDefinedFontFamily(pos);
         }
@@ -226,7 +255,7 @@ bool TextPickerParser::GenerateCascadeOptionsInternal(
     TextCascadePickerOptions option;
     auto text = ArkTSUtils::GetProperty(vm, jsObj, "text");
     std::string textStr = "";
-    if (ArkTSUtils::ParseJsString(vm, text, textStr, option.rangeResultResObj)) {
+    if (IsSafeResourceValue(vm, text) && ArkTSUtils::ParseJsString(vm, text, textStr, option.rangeResultResObj)) {
         option.rangeResult.emplace_back(textStr);
     } else {
         return false;
@@ -304,7 +333,7 @@ bool TextPickerParser::ParseInternalArray(const EcmaVM* vm, const Local<panda::A
             auto jsObj = element->ToObject(vm);
             auto getText = ArkTSUtils::GetProperty(vm, jsObj, "text");
             std::string textStr = "";
-            if (ArkTSUtils::ParseJsString(vm, getText, textStr)) {
+            if (IsSafeResourceValue(vm, getText) && ArkTSUtils::ParseJsString(vm, getText, textStr)) {
                 resultStr.emplace_back(textStr);
             } else {
                 return false;
@@ -430,7 +459,7 @@ bool TextPickerParser::ParseMultiTextArrayValue(
         TextPickerParser::ParseMultiTextArrayValueInternal(param.options, param.values);
     } else {
         std::string value;
-        if (ArkTSUtils::ParseJsString(vm, jsValue, value)) {
+        if (IsSafeResourceValue(vm, jsValue) && ArkTSUtils::ParseJsString(vm, jsValue, value)) {
             TextPickerParser::ParseMultiTextArrayValueSingleInternal(param.options, value, param.values);
         } else {
             for (uint32_t i = 0; i < param.options.size(); i++) {
@@ -573,7 +602,7 @@ bool TextPickerParser::ParseCascadeTextArray(const EcmaVM* vm, const Local<panda
         }
     } else {
         std::string value = "";
-        if (!ArkTSUtils::ParseJsString(vm, getValue, value)) {
+        if (!IsSafeResourceValue(vm, getValue) || !ArkTSUtils::ParseJsString(vm, getValue, value)) {
             value = "";
         }
         values.emplace_back(value);
@@ -610,7 +639,7 @@ bool TextPickerParser::ParseJsStrArrayInternal(const EcmaVM* vm, const panda::Lo
             result.emplace_back(value->ToString(vm)->ToString(vm));
         } else if (value->IsObject(vm)) {
             std::string singleResStr;
-            if (ArkTSUtils::ParseJsString(vm, value, singleResStr, resObj)) {
+            if (IsSafeResourceValue(vm, value) && ArkTSUtils::ParseJsString(vm, value, singleResStr, resObj)) {
                 result.emplace_back(singleResStr);
             } else {
                 resObjArray.clear();
@@ -638,6 +667,9 @@ bool TextPickerParser::ParseJsStrArray(const EcmaVM* vm, const Local<JSValueRef>
     int32_t resIdNum;
     int32_t resType;
     auto jsObj = jsValue->ToObject(vm);
+    if (!IsSafeResourceValue(vm, jsValue)) {
+        return false;
+    }
     ArkTSUtils::CompleteResourceObject(vm, jsObj);
     if (jsObj->IsNull() || !GetResourceIdAndType(vm, jsObj, resIdNum, resType)) {
         return false;
@@ -679,6 +711,10 @@ bool TextPickerParser::ParseJsLengthMetricsArray(const EcmaVM* vm, const Local<J
         for (uint32_t i = 0; i < length; i++) {
             RefPtr<ResourceObject> resObj;
             auto value = panda::ArrayRef::GetValueAt(vm, arrayObj, i);
+            if (value->IsObject(vm) &&
+                !IsSafeResourceValue(vm, ArkTSUtils::GetProperty(vm, value->ToObject(vm), "res"))) {
+                return false;
+            }
             Dimension calc;
             ArkTSUtils::ParseJsLengthMetricsToDimension(vm, value, calc, resObj);
             result.emplace_back(calc);
@@ -737,13 +773,13 @@ bool TextPickerParser::ParseIconTextArray(
         std::string text;
         RefPtr<ResourceObject> iconResObj;
         RefPtr<ResourceObject> textResObj;
-        if (ArkTSUtils::ParseJsMedia(vm, rangeIcon, icon, iconResObj)) {
+        if (IsSafeResourceValue(vm, rangeIcon) && ArkTSUtils::ParseJsMedia(vm, rangeIcon, icon, iconResObj)) {
             content.icon_ = icon;
             param.kind |= ICON;
             content.iconResObj_ = iconResObj;
         }
 
-        if (ArkTSUtils::ParseJsString(vm, rangeText, text, textResObj)) {
+        if (IsSafeResourceValue(vm, rangeText) && ArkTSUtils::ParseJsString(vm, rangeText, text, textResObj)) {
             content.text_ = text;
             param.kind |= TEXT;
             content.textResObj_ = textResObj;
@@ -796,7 +832,8 @@ bool TextPickerParser::ParseTextArray(
             }
         }
 
-        bool valueParsed = ArkTSUtils::ParseJsString(vm, getValue, param.value, param.valueResObj);
+        bool valueParsed = IsSafeResourceValue(vm, getValue) &&
+            ArkTSUtils::ParseJsString(vm, getValue, param.value, param.valueResObj);
         if (!valueParsed && !getRangeVector.empty()) {
             param.value = getRangeVector.front();
         }
@@ -891,26 +928,30 @@ void TextPickerParser::ParseBorderRadiusProps(
     std::optional<CalcDimension> radiusBottomRight;
     CalcDimension topLeft;
     RefPtr<ResourceObject> topStartResObj;
-    if (ArkTSUtils::ParseJsDimensionVpNG(
-            vm, ArkTSUtils::GetProperty(vm, object, "topLeft"), topLeft, topStartResObj, true)) {
+    auto topLeftValue = ArkTSUtils::GetProperty(vm, object, "topLeft");
+    if (IsSafeResourceValue(vm, topLeftValue) &&
+        ArkTSUtils::ParseJsDimensionVpNG(vm, topLeftValue, topLeft, topStartResObj, true)) {
         radiusTopLeft = topLeft;
     }
     CalcDimension topRight;
     RefPtr<ResourceObject> topEndResObj;
-    if (ArkTSUtils::ParseJsDimensionVpNG(
-            vm, ArkTSUtils::GetProperty(vm, object, "topRight"), topRight, topEndResObj, true)) {
+    auto topRightValue = ArkTSUtils::GetProperty(vm, object, "topRight");
+    if (IsSafeResourceValue(vm, topRightValue) &&
+        ArkTSUtils::ParseJsDimensionVpNG(vm, topRightValue, topRight, topEndResObj, true)) {
         radiusTopRight = topRight;
     }
     CalcDimension bottomLeft;
     RefPtr<ResourceObject> bottomStartResObj;
-    if (ArkTSUtils::ParseJsDimensionVpNG(
-            vm, ArkTSUtils::GetProperty(vm, object, "bottomLeft"), bottomLeft, bottomStartResObj, true)) {
+    auto bottomLeftValue = ArkTSUtils::GetProperty(vm, object, "bottomLeft");
+    if (IsSafeResourceValue(vm, bottomLeftValue) &&
+        ArkTSUtils::ParseJsDimensionVpNG(vm, bottomLeftValue, bottomLeft, bottomStartResObj, true)) {
         radiusBottomLeft = bottomLeft;
     }
     CalcDimension bottomRight;
     RefPtr<ResourceObject> bottomEndResObj;
-    if (ArkTSUtils::ParseJsDimensionVpNG(
-            vm, ArkTSUtils::GetProperty(vm, object, "bottomRight"), bottomRight, bottomEndResObj, true)) {
+    auto bottomRightValue = ArkTSUtils::GetProperty(vm, object, "bottomRight");
+    if (IsSafeResourceValue(vm, bottomRightValue) &&
+        ArkTSUtils::ParseJsDimensionVpNG(vm, bottomRightValue, bottomRight, bottomEndResObj, true)) {
         radiusBottomRight = bottomRight;
     }
     CheckLengthMetrics(vm, object);
@@ -931,6 +972,9 @@ std::optional<CalcDimension> TextPickerParser::ParseBindSheetBorderRadiusProp(
     }
     if (ArkTSUtils::HasProperty(vm, object, prop) && ArkTSUtils::GetProperty(vm, object, prop)->IsObject(vm)) {
         auto propObj = ArkTSUtils::GetProperty(vm, object, prop)->ToObject(vm);
+        if (!IsSafeResourceValue(vm, ArkTSUtils::GetProperty(vm, propObj, "res"))) {
+            return std::nullopt;
+        }
         CalcDimension calcDimension;
         if (ArkTSUtils::ParseJsLengthMetrics(vm, propObj, calcDimension, resourceObj)) {
             return calcDimension;
@@ -986,7 +1030,7 @@ void TextPickerParser::ParsePickerBackgroundStyle(
     auto borderRadius = ArkTSUtils::GetProperty(vm, paramObject, "borderRadius");
     if (!color->IsUndefined() && !color->IsNull()) {
         Color buttonBgColor;
-        if (ArkTSUtils::ParseJsColor(vm, color, buttonBgColor, bgStyle.colorResObj)) {
+        if (IsSafeResourceValue(vm, color) && ArkTSUtils::ParseJsColor(vm, color, buttonBgColor, bgStyle.colorResObj)) {
             bgStyle.color = buttonBgColor;
             bgStyle.textColorSetByUser = true;
         }
@@ -994,7 +1038,12 @@ void TextPickerParser::ParsePickerBackgroundStyle(
     if (!borderRadius->IsUndefined() && !borderRadius->IsNull()) {
         CalcDimension calcDimension;
         BorderRadiusProperty borderRadiusProperty;
-        if (ArkTSUtils::ParseLengthMetricsToDimension(vm, borderRadius, calcDimension, bgStyle.borderRadiusResObj)) {
+        bool isRadiusResSafe = true;
+        if (borderRadius->IsObject(vm)) {
+            isRadiusResSafe = IsSafeResourceValue(vm, ArkTSUtils::GetProperty(vm, borderRadius->ToObject(vm), "res"));
+        }
+        if (isRadiusResSafe &&
+            ArkTSUtils::ParseLengthMetricsToDimension(vm, borderRadius, calcDimension, bgStyle.borderRadiusResObj)) {
             if (GreatOrEqual(calcDimension.Value(), 0.0f)) {
                 bgStyle.borderRadius = BorderRadiusProperty(calcDimension);
             } else {

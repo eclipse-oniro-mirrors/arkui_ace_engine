@@ -29,7 +29,7 @@ namespace OHOS::Ace::NG {
 
 class PipelineContext;
 
-class RecoverableManager : public virtual AceType {
+class RecoverableManager : public AceType {
     DECLARE_ACE_TYPE(RecoverableManager, AceType);
 public:
     RecoverableManager() = default;

@@ -27,6 +27,7 @@ struct NonPointerEvent : public PointerEvent {
     int32_t repeatTime = 0;
     int64_t deviceId = 0;
     SourceType sourceType { SourceType::NONE };
+    bool isInjected = false;
     ~NonPointerEvent() = default;
     NonPointerEvent() {}
 

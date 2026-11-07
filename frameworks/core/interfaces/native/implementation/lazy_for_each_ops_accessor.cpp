@@ -202,6 +202,14 @@ void SetOptionsImpl(Ark_NativePointer node, const Ark_LazyForEachOptions* option
         optReleaseStrategy.value_or(LazyForEachReleaseStrategy::BATCH),
         optMemOptStrategy.value_or(LazyForEachMemOptStrategy::DEFAULT) });
 }
+void ClearCacheImpl(Ark_NativePointer node)
+{
+    auto* uiNode = reinterpret_cast<UINode*>(node);
+    CHECK_NULL_VOID(uiNode);
+    ArkoalaLazyNode* lazyNode = AceType::DynamicCast<ArkoalaLazyNode>(uiNode);
+    CHECK_NULL_VOID(lazyNode);
+    lazyNode->CleanCache(false, true);
+}
 } // LazyForEachOpsAccessor
 const GENERATED_ArkUILazyForEachOpsAccessor* GetLazyForEachOpsAccessor()
 {
@@ -210,6 +218,7 @@ const GENERATED_ArkUILazyForEachOpsAccessor* GetLazyForEachOpsAccessor()
         LazyForEachOpsAccessor::SyncImpl,
         LazyForEachOpsAccessor::SyncOnMoveOpsImpl,
         LazyForEachOpsAccessor::SetOptionsImpl,
+        LazyForEachOpsAccessor::ClearCacheImpl,
     };
     return &LazyForEachOpsAccessorImpl;
 }

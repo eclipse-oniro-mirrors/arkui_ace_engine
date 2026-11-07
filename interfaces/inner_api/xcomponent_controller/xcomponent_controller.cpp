@@ -59,7 +59,7 @@ XComponentControllerErrorCode ChangeSurfaceCallbackMode(void* frameNode, char mo
 {
     static ChangeSurfaceCallbackModeFunc entry = nullptr;
     if (entry == nullptr) {
-        LIBHANDLE handle = LOADLIB(AceForwardCompatibility::GetAceLibName());
+        LIBHANDLE handle = LOADLIB(AceForwardCompatibility::GetAceXComponentLibName());
         CHECK_NULL_RETURN(handle, XComponentControllerErrorCode::XCOMPONENT_CONTROLLER_BAD_PARAMETER);
         entry = reinterpret_cast<ChangeSurfaceCallbackModeFunc>(
             LOADSYM(handle, XCOMPONENT_CHANGE_SURFACE_CALLBACKMODE_FUNC));
@@ -106,14 +106,14 @@ std::shared_ptr<XComponentController> XComponentController::GetXComponentControl
         HILOG_ERROR("XComponentController GetXComponentControllerFromAniValue cannot get peer");
         return nullptr;
     }
-    ani_object obj = static_cast<ani_object>(ref);
-    ani_long ptr;
-    auto ret = env->Object_GetFieldByName_Long(obj, "ptr", &ptr);
+    ani_object a1_obj = static_cast<ani_object>(ref);
+    ani_long a2_ptr;
+    auto ret = env->Object_GetFieldByName_Long(a1_obj, "ptr", &a2_ptr);
     if (ret != ANI_OK) {
         HILOG_ERROR("XComponentController GetXComponentControllerFromAniValue cannot get ptr %{public}d", ret);
         return nullptr;
     }
-    auto* controllerPeer = reinterpret_cast<NG::GeneratedModifier::XComponentControllerNativePeerImpl*>(ptr);
+    auto* controllerPeer = reinterpret_cast<NG::GeneratedModifier::XComponentControllerNativePeerImpl*>(a2_ptr);
     if (controllerPeer == nullptr) {
         HILOG_ERROR("XComponentController GetXComponentControllerFromAniValue controllerPeer is null");
         return nullptr;
@@ -149,12 +149,12 @@ XComponentControllerErrorCode XComponentController::SetSurfaceCallbackModeFromAn
         HILOG_ERROR("XComponentController SetSurfaceCallbackModeFromAniValue env is null");
         return XComponentControllerErrorCode::XCOMPONENT_CONTROLLER_BAD_PARAMETER;
     }
-    ani_ref framenodePeerRef;
-    if (env->Object_GetFieldByName_Ref(node, "nodePtr_", &framenodePeerRef) != ANI_OK) {
+    ani_ref frameNodePeerRef;
+    if (env->Object_GetFieldByName_Ref(node, "nodePtr_", &frameNodePeerRef) != ANI_OK) {
         HILOG_ERROR("XComponentController fail to get nodePtr in node");
         return XComponentControllerErrorCode::XCOMPONENT_CONTROLLER_BAD_PARAMETER;
     }
-    ani_object frameNodePeerObj = static_cast<ani_object>(framenodePeerRef);
+    ani_object frameNodePeerObj = static_cast<ani_object>(frameNodePeerRef);
     ani_class pointerClass;
     env->FindClass("std.core.Long", &pointerClass);
     ani_boolean isPointer;
@@ -166,7 +166,7 @@ XComponentControllerErrorCode XComponentController::SetSurfaceCallbackModeFromAn
     ani_long frameNodePeerPtr;
     status = env->Object_CallMethodByName_Long(frameNodePeerObj, "toLong", ":l", &frameNodePeerPtr);
     if (status != ANI_OK) {
-        HILOG_ERROR("XComponentController fail to unbox frameNodePeerPtr");
+        HILOG_ERROR("XComponentController fail to unbox frameNodePeerObj");
         return XComponentControllerErrorCode::XCOMPONENT_CONTROLLER_BAD_PARAMETER;
     }
     auto* frameNodePeer = reinterpret_cast<FrameNodePeer*>(frameNodePeerPtr);
@@ -183,7 +183,7 @@ XComponentControllerErrorCode XComponentController::SetRenderFitBySurfaceId(
 {
     static SetRenderFitFunc setRenderFitMethod = nullptr;
     if (setRenderFitMethod == nullptr) {
-        LIBHANDLE handle = LOADLIB(AceForwardCompatibility::GetAceLibName());
+        LIBHANDLE handle = LOADLIB(AceForwardCompatibility::GetAceXComponentLibName());
         CHECK_NULL_RETURN(handle, XComponentControllerErrorCode::XCOMPONENT_CONTROLLER_LOAD_LIB_FAILED);
         setRenderFitMethod = reinterpret_cast<SetRenderFitFunc>(LOADSYM(handle, XCOMPONENT_SET_RENDER_FIT_FUNC));
         if (setRenderFitMethod == nullptr) {
@@ -199,7 +199,7 @@ XComponentControllerErrorCode XComponentController::GetRenderFitBySurfaceId(
 {
     static GetRenderFitFunc getRenderFitMethod = nullptr;
     if (getRenderFitMethod == nullptr) {
-        LIBHANDLE handle = LOADLIB(AceForwardCompatibility::GetAceLibName());
+        LIBHANDLE handle = LOADLIB(AceForwardCompatibility::GetAceXComponentLibName());
         CHECK_NULL_RETURN(handle, XComponentControllerErrorCode::XCOMPONENT_CONTROLLER_LOAD_LIB_FAILED);
         getRenderFitMethod = reinterpret_cast<GetRenderFitFunc>(LOADSYM(handle, XCOMPONENT_GET_RENDER_FIT_FUNC));
         if (getRenderFitMethod == nullptr) {
@@ -215,7 +215,7 @@ XComponentControllerErrorCode XComponentController::GetSurfaceRotationBySurfaceI
 {
     static GetSurfaceRotationFunc getSurfaceRotationMethod = nullptr;
     if (getSurfaceRotationMethod == nullptr) {
-        LIBHANDLE handle = LOADLIB(AceForwardCompatibility::GetAceLibName());
+        LIBHANDLE handle = LOADLIB(AceForwardCompatibility::GetAceXComponentLibName());
         CHECK_NULL_RETURN(handle, XComponentControllerErrorCode::XCOMPONENT_CONTROLLER_LOAD_LIB_FAILED);
         getSurfaceRotationMethod =
             reinterpret_cast<GetSurfaceRotationFunc>(LOADSYM(handle, XCOMPONENT_GET_SURFACE_ROTATION_FUNC));

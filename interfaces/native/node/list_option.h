@@ -17,6 +17,7 @@
 
 #include <vector>
 #include "core/interfaces/arkoala/arkoala_api.h"
+#include "interfaces/native/node/scroll_option.h"
 
 #ifdef __cplusplus
 extern "C" {

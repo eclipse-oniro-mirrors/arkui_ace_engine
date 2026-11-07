@@ -997,7 +997,7 @@ HWTEST_F(DragEventTestNg, DragEventActuatorMountGatherNodeTest010, TestSize.Leve
     framenode->GetOrCreateFocusHub();
     dragEventActuator->OnCollectTouchTarget(
         COORDINATE_OFFSET, DRAG_TOUCH_RESTRICT, getEventTargetImpl, finalResult, responseLinkResult);
-    EXPECT_EQ(dragEventActuator->panRecognizer_->onActionEnd_, nullptr);
+    EXPECT_EQ(dragEventActuator->panRecognizer_, nullptr);
     EXPECT_TRUE(finalResult.empty());
     double unknownPropertyValue = GESTURE_EVENT_PROPERTY_DEFAULT_VALUE;
     GestureEventFunc actionStart = [&unknownPropertyValue](

@@ -258,6 +258,7 @@ void WindowScene::OnDetachFromFrameNode(FrameNode* frameNode)
     CHECK_NULL_VOID(session_);
     session_->SetUINodeId(0);
     session_->SetAttachState(false, initWindowMode_);
+    session_->SetStartWithSnapshot(false);
     auto surfaceNode = session_->GetSurfaceNode();
     if (surfaceNode) {
         surfaceNode->SetVisible(true);
@@ -274,6 +275,12 @@ void WindowScene::OnDetachFromFrameNode(FrameNode* frameNode)
     TAG_LOGW(AceLogTag::ACE_WINDOW_SCENE,
         "OnDetachFromFrameNode id: %{public}d, node id: %{public}d, type: %{public}d, name: %{public}s",
         session_->GetPersistentId(), frameNode->GetId(), session_->GetWindowType(), windowName.c_str());
+    CHECK_EQUAL_VOID(session_->GetHidingStartingWindow(), false);
+    session_->SetHidingStartingWindow(false);
+    session_->SetLeashWindowAlpha(false);
+    TAG_LOGW(AceLogTag::ACE_WINDOW_SCENE,
+        "OnDetachFromFrameNode id: %{public}d, node id: %{public}d, reset hiding starting window",
+        session_->GetPersistentId(), frameNode->GetId());
 }
 
 void WindowScene::OnMountToParentDone()
@@ -628,6 +635,7 @@ void WindowScene::OnActivation()
         self->session_->SetShowRecent(false);
         auto host = self->GetHost();
         CHECK_NULL_VOID(host);
+
         if (self->destroyed_) {
             self->destroyed_ = false;
             self->RemoveChild(host, self->startingWindow_, self->startingWindowName_);
@@ -646,19 +654,16 @@ void WindowScene::OnActivation()
             host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
         } else if (showingInRecents &&
             self->session_->GetSessionState() == Rosen::SessionState::STATE_DISCONNECT && self->snapshotWindow_) {
-            self->RemoveChild(host, self->snapshotWindow_, self->snapshotWindowName_);
-            self->snapshotWindow_.Reset();
-            self->session_->SetNeedSnapshot(true);
-            self->SetSubSessionVisible();
-            if (self->session_->IsPrelaunch()) {
-                TAG_LOGI(AceLogTag::ACE_WINDOW_SCENE, "OnActivation CreateBlankWindow");
-                self->CreateBlankWindow(self->startingWindow_);
-                self->isPrelaunch_.store(true, std::memory_order_release);
+            if (self->session_->GetTryUseSnapshot() && self->session_->HasPersistentSnapshot()) {
+                TAG_LOGI(AceLogTag::ACE_WINDOW_SCENE,
+                    "OnActivation tryUseSnapshot id: %{public}d, keep snapshot window",
+                    self->session_->GetPersistentId());
+                self->session_->SetNeedSnapshot(true);
+                self->SetSubSessionVisible();
+                host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
             } else {
-                self->CreateStartingWindow();
+                self->ReplaceSnapshotWithStartingWindow();
             }
-            self->AddChild(host, self->startingWindow_, self->startingWindowName_);
-            host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
         } else if (self->startingWindow_ &&
             self->session_->GetSessionState() != Rosen::SessionState::STATE_DISCONNECT) {
             auto surfaceNode = self->session_->GetSurfaceNode();
@@ -677,6 +682,25 @@ void WindowScene::OnActivation()
     auto pipelineContext = PipelineContext::GetCurrentContext();
     CHECK_NULL_VOID(pipelineContext);
     pipelineContext->PostAsyncEvent(std::move(uiTask), "ArkUIWindowSceneActivation", TaskExecutor::TaskType::UI);
+}
+
+void WindowScene::ReplaceSnapshotWithStartingWindow()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    RemoveChild(host, snapshotWindow_, snapshotWindowName_);
+    snapshotWindow_.Reset();
+    session_->SetNeedSnapshot(true);
+    SetSubSessionVisible();
+    if (session_->IsPrelaunch()) {
+        TAG_LOGI(AceLogTag::ACE_WINDOW_SCENE, "OnActivation CreateBlankWindow");
+        CreateBlankWindow(startingWindow_);
+        isPrelaunch_.store(true, std::memory_order_release);
+    } else {
+        CreateStartingWindow();
+    }
+    AddChild(host, startingWindow_, startingWindowName_);
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 
 void WindowScene::DisposeSnapshotAndBlankWindow()
@@ -1133,7 +1157,7 @@ bool WindowScene::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, c
     if (surfaceNode) {
         surfaceNode->SetBufferAvailableCallback(callback_);
     }
-    CHECK_EQUAL_RETURN(session_->GetSystemConfig().IsPcWindow(), true, false);
+    CHECK_EQUAL_RETURN(session_->GetSystemConfig().IsDisplayInFreeMultiWindow(session_->GetScreenId()), true, false);
     CHECK_EQUAL_RETURN(session_->GetSystemConfig().freeMultiWindowEnable_, true, false);
     CHECK_NULL_RETURN(dirty, false);
     auto geometryNode = dirty->GetGeometryNode();

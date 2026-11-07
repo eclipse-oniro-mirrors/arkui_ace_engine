@@ -2039,4 +2039,215 @@ HWTEST_F(MenuItemPatternBasicTestNg, InitLongPressEvent002, TestSize.Level1)
     menuItemPattern->InitLongPressEvent();
     EXPECT_NE(menuItemPattern->longPressEvent_, nullptr);
 }
+
+// ===================== UpdateNextNodeDivider Tests =====================
+
+namespace {
+// Build a menu -> column -> [section, sectionDivider, item0(idx=0), item1(idx=1,host), item2(idx=2)] rig.
+// For array-grid menus the prepended section nodes make index_+1 point to the wrong sibling;
+// the fix uses parent->GetChildIndex(host)+1 to land on item2.
+struct ArrayGridDividerRig {
+    RefPtr<FrameNode> menuNode;   // retained so the child->parent weak chain stays valid for GetMenu()
+    RefPtr<FrameNode> columnNode;
+    RefPtr<FrameNode> item0; // list index_ = 0
+    RefPtr<FrameNode> item1; // list index_ = 1, the host under test
+    RefPtr<FrameNode> item2; // list index_ = 2, the real next sibling of item1
+};
+
+ArrayGridDividerRig BuildArrayGridDividerRig(bool isArrayGrid)
+{
+    ArrayGridDividerRig rig;
+    rig.menuNode = FrameNode::CreateFrameNode(V2::MENU_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<MenuPattern>(TARGET_ID, TEXT_TAG, MenuType::MENU));
+    if (rig.menuNode) {
+        if (auto mp = rig.menuNode->GetPattern<MenuPattern>()) {
+            mp->SetIsArrayGridMenu(isArrayGrid);
+        }
+    }
+    rig.columnNode = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>());
+    if (rig.columnNode && rig.menuNode) {
+        rig.columnNode->MountToParent(rig.menuNode);
+    }
+    auto makeNonItem = []() {
+        return FrameNode::CreateFrameNode("section", ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<Pattern>());
+    };
+    auto makeItem = [](int32_t idx) {
+        auto node = FrameNode::CreateFrameNode(V2::MENU_ITEM_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<MenuItemPattern>());
+        if (node) {
+            if (auto p = node->GetPattern<MenuItemPattern>()) {
+                p->SetIndex(idx);
+            }
+        }
+        return node;
+    };
+    auto section = makeNonItem();
+    auto sectionDivider = makeNonItem();
+    rig.item0 = makeItem(0);
+    rig.item1 = makeItem(1);
+    rig.item2 = makeItem(2);
+    if (rig.columnNode) {
+        if (section) {
+            section->MountToParent(rig.columnNode);
+        }
+        if (sectionDivider) {
+            sectionDivider->MountToParent(rig.columnNode);
+        }
+        if (rig.item0) {
+            rig.item0->MountToParent(rig.columnNode);
+        }
+        if (rig.item1) {
+            rig.item1->MountToParent(rig.columnNode);
+        }
+        if (rig.item2) {
+            rig.item2->MountToParent(rig.columnNode);
+        }
+    }
+    return rig;
+}
+} // namespace
+
+/**
+ * @tc.name: UpdateNextNodeDivider001
+ * @tc.desc: Non-array-grid menu: the next sibling is located by index_+1 and receives the divider.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuItemPatternBasicTestNg, UpdateNextNodeDivider001, TestSize.Level1)
+{
+    auto menuNode = FrameNode::CreateFrameNode(V2::MENU_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<MenuPattern>(TARGET_ID, TEXT_TAG, MenuType::MENU));
+    ASSERT_NE(menuNode, nullptr);
+    if (auto mp = menuNode->GetPattern<MenuPattern>()) {
+        mp->SetIsArrayGridMenu(false);
+    }
+    auto columnNode = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(columnNode, nullptr);
+    columnNode->MountToParent(menuNode);
+
+    auto makeItem = [](int32_t idx) {
+        auto node = FrameNode::CreateFrameNode(V2::MENU_ITEM_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<MenuItemPattern>());
+        if (node) {
+            if (auto p = node->GetPattern<MenuItemPattern>()) {
+                p->SetIndex(idx);
+            }
+        }
+        return node;
+    };
+    auto item0 = makeItem(0);
+    auto item1 = makeItem(1);
+    auto item2 = makeItem(2);
+    ASSERT_TRUE(item0 && item1 && item2);
+    item0->MountToParent(columnNode);
+    item1->MountToParent(columnNode);
+    item2->MountToParent(columnNode);
+
+    auto host = item1->GetPattern<MenuItemPattern>();
+    ASSERT_NE(host, nullptr);
+    host->UpdateNextNodeDivider(true);
+
+    auto nextPaint = item2->GetPaintProperty<MenuItemPaintProperty>();
+    ASSERT_NE(nextPaint, nullptr);
+    EXPECT_TRUE(nextPaint->HasNeedDivider());
+    ASSERT_TRUE(nextPaint->GetNeedDivider().has_value());
+    EXPECT_TRUE(nextPaint->GetNeedDivider().value());
+}
+
+/**
+ * @tc.name: UpdateNextNodeDivider002
+ * @tc.desc: Array-grid menu with prepended section nodes: the fix locates the real next sibling
+ *           (item2) via parent->GetChildIndex(host)+1 instead of index_+1 (which wrongly hits item0).
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuItemPatternBasicTestNg, UpdateNextNodeDivider002, TestSize.Level1)
+{
+    auto rig = BuildArrayGridDividerRig(true);
+    ASSERT_TRUE(rig.columnNode && rig.item0 && rig.item1 && rig.item2);
+
+    auto host = rig.item1->GetPattern<MenuItemPattern>();
+    ASSERT_NE(host, nullptr);
+    host->UpdateNextNodeDivider(true);
+
+    // item2 is the correct next sibling; it must receive the divider.
+    auto nextPaint = rig.item2->GetPaintProperty<MenuItemPaintProperty>();
+    ASSERT_NE(nextPaint, nullptr);
+    EXPECT_TRUE(nextPaint->HasNeedDivider());
+    ASSERT_TRUE(nextPaint->GetNeedDivider().has_value());
+    EXPECT_TRUE(nextPaint->GetNeedDivider().value());
+
+    // item0 is NOT the next sibling; it must not be touched (proves the index_+1 bug is fixed).
+    auto prevPaint = rig.item0->GetPaintProperty<MenuItemPaintProperty>();
+    ASSERT_NE(prevPaint, nullptr);
+    EXPECT_FALSE(prevPaint->HasNeedDivider());
+}
+
+/**
+ * @tc.name: UpdateNextNodeDivider003
+ * @tc.desc: Array-grid menu: when the located next sibling is selected, the divider is not applied.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuItemPatternBasicTestNg, UpdateNextNodeDivider003, TestSize.Level1)
+{
+    auto rig = BuildArrayGridDividerRig(true);
+    ASSERT_TRUE(rig.columnNode && rig.item0 && rig.item1 && rig.item2);
+
+    auto nextPattern = rig.item2->GetPattern<MenuItemPattern>();
+    ASSERT_NE(nextPattern, nullptr);
+    nextPattern->isSelected_ = true; // make IsSelected() return true -> early return
+    // Pre-set a known divider state; the early return must leave it untouched.
+    auto nextPaint = rig.item2->GetPaintProperty<MenuItemPaintProperty>();
+    ASSERT_NE(nextPaint, nullptr);
+    nextPaint->UpdateNeedDivider(false);
+
+    auto host = rig.item1->GetPattern<MenuItemPattern>();
+    ASSERT_NE(host, nullptr);
+    host->UpdateNextNodeDivider(true);
+
+    ASSERT_TRUE(nextPaint->GetNeedDivider().has_value());
+    EXPECT_FALSE(nextPaint->GetNeedDivider().value());
+}
+
+/**
+ * @tc.name: UpdateNextNodeDivider004
+ * @tc.desc: When GetMenu() returns null (no Menu ancestor), index_+1 is used to find the next sibling.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuItemPatternBasicTestNg, UpdateNextNodeDivider004, TestSize.Level1)
+{
+    // column has no Menu ancestor -> GetMenu() returns null -> nextIndex stays index_+1.
+    auto columnNode = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(columnNode, nullptr);
+
+    auto makeItem = [](int32_t idx) {
+        auto node = FrameNode::CreateFrameNode(V2::MENU_ITEM_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<MenuItemPattern>());
+        if (node) {
+            if (auto p = node->GetPattern<MenuItemPattern>()) {
+                p->SetIndex(idx);
+            }
+        }
+        return node;
+    };
+    auto item0 = makeItem(0);
+    auto item1 = makeItem(1);
+    auto item2 = makeItem(2);
+    ASSERT_TRUE(item0 && item1 && item2);
+    item0->MountToParent(columnNode);
+    item1->MountToParent(columnNode);
+    item2->MountToParent(columnNode);
+
+    auto host = item1->GetPattern<MenuItemPattern>();
+    ASSERT_NE(host, nullptr);
+    host->UpdateNextNodeDivider(true);
+
+    auto nextPaint = item2->GetPaintProperty<MenuItemPaintProperty>();
+    ASSERT_NE(nextPaint, nullptr);
+    EXPECT_TRUE(nextPaint->HasNeedDivider());
+    ASSERT_TRUE(nextPaint->GetNeedDivider().has_value());
+    EXPECT_TRUE(nextPaint->GetNeedDivider().value());
+}
 } // namespace OHOS::Ace::NG

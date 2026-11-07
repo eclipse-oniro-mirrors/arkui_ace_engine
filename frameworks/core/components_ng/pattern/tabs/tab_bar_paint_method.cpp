@@ -47,14 +47,15 @@ CanvasDrawFunction TabBarPaintMethod::GetForegroundDrawFunction(PaintWrapper* pa
     }
 
     auto paintFunc = [gradientRegions = gradientRegions_, barRect = frameRect_, backgroundColor = backgroundColor_,
-                         padding](RSCanvas& canvas) {
-        PaintGradient(canvas, barRect, backgroundColor, gradientRegions, padding);
+                         padding, isTopFloating = isTopFloating_](RSCanvas& canvas) {
+        PaintGradient(canvas, barRect, backgroundColor, gradientRegions, padding, isTopFloating);
     };
     return paintFunc;
 }
 
 void TabBarPaintMethod::PaintGradient(RSCanvas& canvas, const RectF& barRect, const Color& backgroundColor,
-    const std::vector<bool>& gradientRegions, const MarginPropertyF& padding)
+    const std::vector<bool>& gradientRegions, const MarginPropertyF& padding,
+    bool isTopFloating)
 {
     auto pipelineContext = PipelineContext::GetCurrentContextSafelyWithCheck();
     CHECK_NULL_VOID(pipelineContext);
@@ -62,6 +63,10 @@ void TabBarPaintMethod::PaintGradient(RSCanvas& canvas, const RectF& barRect, co
     CHECK_NULL_VOID(tabTheme);
     float shadowMargin = static_cast<float>(tabTheme->GetTabBarShadowMargin().ConvertToPx());
     float gradientWidth = static_cast<float>(tabTheme->GetTabBarGradientWidth().ConvertToPx());
+    if (isTopFloating) {
+        shadowMargin = 0.0f;
+        gradientWidth = static_cast<float>(Dimension(80, DimensionUnit::VP).ConvertToPx());
+    }
 
     auto leftPadding = padding.left.value_or(0.0f);
     auto rightPadding = padding.right.value_or(0.0f);

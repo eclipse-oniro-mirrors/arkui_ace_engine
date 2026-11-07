@@ -14,14 +14,20 @@
  */
 
 #include "gtest/gtest.h"
+#include <deque>
+#include <functional>
+#include <future>
+#include <limits>
+#include <thread>
+
+#include "core/pipeline/base/element_register.h"
+#include "core/accessibility/native_interface_accessibility_impl.h"
 
 #define private public
 #define protected public
 
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "test/mock/frameworks/core/common/mock_container.h"
-#include "test/mock/frameworks/core/common/mock_frontend.h"
-#include "test/mock/frameworks/core/components_ng/render/mock_render_context.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 #include "accessibility_system_ability_client.h"
@@ -349,7 +355,7 @@ HWTEST_F(JsThirdAccessibilityHoverNgTest, JsThirdAccessibilityHoverNgTest005, Te
 
     auto ret = jsAccessibilityManager->GetElementInfoForThird(-1, rootInfo, hostElementId);
     EXPECT_EQ(ret, true);
-    auto path = jsAccessibilityManager->HoverPathForThird(hostElementId, point, rootInfo);
+    auto path = jsAccessibilityManager->HoverPathForThird(hostElementId, point, rootInfo, {});
     EXPECT_EQ(path.size(), elementInfoListSize);
 }
 
@@ -442,201 +448,436 @@ HWTEST_F(JsThirdAccessibilityHoverNgTest, JsThirdAccessibilityHoverNgTest007, Te
 }
 
 namespace {
-class MockThirdFocusJsAccessibilityManager : public Framework::JsAccessibilityManager {
+class NativeHoverTaskExecutor : public MockTaskExecutor {
 public:
-    MOCK_METHOD0(GenerateAccessibilityWorkMode, AccessibilityWorkMode());
+    bool OnPostTask(Task&& task, TaskType, uint32_t, const std::string& name,
+        PriorityType = PriorityType::LOW,
+        VsyncBarrierOption = VsyncBarrierOption::NO_BARRIER) const override
+    {
+        if (name == "ArkUIHandleAccessibilityHoverForThird") {
+            if (!acceptHover) {
+                return false;
+            }
+            hoverTasks.emplace_back(std::move(task));
+        } else if (name == "SetSearchElementInfoByTextResult") {
+            ++eventCount;
+            auto callback = std::move(onEvent);
+            onEvent = nullptr;
+            if (callback) {
+                callback();
+            }
+        }
+        return true;
+    }
+    bool WillRunOnCurrentThread(TaskType type) const override
+    {
+        return type == TaskType::UI && onUiThread;
+    }
+    void DrainHoverTasks()
+    {
+        while (!hoverTasks.empty()) {
+            auto task = std::move(hoverTasks.front());
+            hoverTasks.pop_front();
+            task();
+        }
+    }
+    bool onUiThread = true;
+    bool acceptHover = true;
+    mutable size_t eventCount = 0;
+    mutable std::function<void()> onEvent;
+    mutable std::deque<Task> hoverTasks;
 };
 
-void SetScreenReaderEnabledForThirdFocus(
-    const RefPtr<Framework::JsAccessibilityManager>& manager, bool enabled)
+struct NativeHoverCallbackData {
+    int64_t id = 100;
+    std::string actionDescription;
+    int32_t calls = 0;
+    int32_t x = -1;
+    int32_t y = -1;
+    bool fill = true;
+    RefPtr<FrameNode> unregisterHost;
+    std::thread::id callbackThread;
+};
+
+void FillNativeHoverResult(void* userData, int32_t x, int32_t y, int32_t requestId,
+    ArkUI_AccessibilityElementInfo* info)
 {
-    manager->isScreenReaderEnabled_ = enabled;
-    manager->isScreenReaderEnabledInitialized_ = true;
+    ASSERT_NE(userData, nullptr);
+    ASSERT_NE(info, nullptr);
+    auto& data = *static_cast<NativeHoverCallbackData*>(userData);
+    ++data.calls;
+    data.x = x;
+    data.y = y;
+    data.callbackThread = std::this_thread::get_id();
+    EXPECT_GE(requestId, 0);
+    if (data.fill) {
+        info->SetElementId(data.id);
+        info->SetComponentType("Button");
+        info->SetContents("native result");
+        if (!data.actionDescription.empty()) {
+            info->AddOperationAction({ ARKUI_ACCESSIBILITY_NATIVE_ACTION_TYPE_CLICK,
+                data.actionDescription.c_str() });
+        }
+    }
+    if (data.unregisterHost) {
+        NativeAccessibilityHoverRegistry::GetInstance().Unregister(data.unregisterHost);
+    }
 }
 
-void SetContextAccessibilityManagerForThirdFocus(
-    const RefPtr<NG::PipelineContext>& context,
-    const RefPtr<MockFrontend>& mockFrontend,
-    const RefPtr<MockThirdFocusJsAccessibilityManager>& manager)
-{
-    RefPtr<AccessibilityManager> accessibilityManager = manager;
-    ON_CALL(*mockFrontend, GetAccessibilityManager()).WillByDefault(testing::Return(accessibilityManager));
-    context->weakFrontend_ = mockFrontend;
-}
+struct NativeHoverScenario {
+    NativeHoverScenario()
+    {
+        context = PipelineContext::GetCurrentContext();
+        previousExecutor = context->GetTaskExecutor();
+        executor = AceType::MakeRefPtr<NativeHoverTaskExecutor>();
+        context->taskExecutor_ = executor;
+        manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+        manager->SetPipelineContext(context);
+        host = FrameNode::CreateFrameNode("nativeHost", ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<Pattern>(), true);
+        provider = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
+        operation = std::make_shared<Framework::JsThirdProviderInteractionOperation>(provider, manager, host);
+        operation->SetBelongTreeId(7);
+        manager->RegisterJsThirdProviderInteractionOperation(host->GetAccessibilityId(), operation);
+        EXPECT_EQ(NativeAccessibilityHoverRegistry::GetInstance().Register(host, &data, FillNativeHoverResult), 0);
+    }
+    ~NativeHoverScenario()
+    {
+        NativeAccessibilityHoverRegistry::GetInstance().Unregister(host);
+        context->taskExecutor_ = previousExecutor;
+    }
+    void Transfer(AccessibilityHoverEventType type)
+    {
+        manager->TransferThirdProviderHoverEvent(host, PointF(25, 24), SourceType::TOUCH, type, TimeStamp());
+    }
+    void FailLegacyQuery()
+    {
+        provider->providerMockResult_.elementId_ = 999;
+        provider->SetInjectResult(-1);
+    }
+    RefPtr<PipelineContext> context;
+    RefPtr<TaskExecutor> previousExecutor;
+    RefPtr<NativeHoverTaskExecutor> executor;
+    RefPtr<Framework::JsAccessibilityManager> manager;
+    RefPtr<FrameNode> host;
+    RefPtr<MockOhAccessibilityProvider> provider;
+    std::shared_ptr<Framework::JsThirdProviderInteractionOperation> operation;
+    NativeHoverCallbackData data;
+};
 } // namespace
 
-/**
- * @tc.name: ActThirdAccessibilityFocusKeepThirdProviderFocus002
- * @tc.desc: screen reader disabled, focusing one third node keeps other focused third provider nodes
- * @tc.type: FUNC
- */
-HWTEST_F(JsThirdAccessibilityHoverNgTest, ActThirdAccessibilityFocusKeepThirdProviderFocus002, TestSize.Level1)
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeCallbackRunsBeforeBackgroundTransfer, TestSize.Level1)
 {
-    auto context = NG::PipelineContext::GetCurrentContext();
-    auto manager = AceType::MakeRefPtr<testing::NiceMock<MockThirdFocusJsAccessibilityManager>>();
-    ON_CALL(*manager, GenerateAccessibilityWorkMode())
-        .WillByDefault(testing::Return(AccessibilityWorkMode { .isTouchExplorationEnabled = true }));
-    manager->SetPipelineContext(context);
-    manager->Register(true);
-    auto mockFrontend = AceType::MakeRefPtr<testing::NiceMock<MockFrontend>>();
-    SetContextAccessibilityManagerForThirdFocus(context, mockFrontend, manager);
-    SetScreenReaderEnabledForThirdFocus(manager, false);
-
-    auto currentHost = FrameNode::CreateFrameNode("currentHost", 1, AceType::MakeRefPtr<Pattern>(), true);
-    auto otherHost = FrameNode::CreateFrameNode("otherHost", 2, AceType::MakeRefPtr<Pattern>(), true);
-    auto currentRender = AceType::MakeRefPtr<MockRenderContext>();
-    auto otherRender = AceType::MakeRefPtr<MockRenderContext>();
-    currentHost->renderContext_ = currentRender;
-    otherHost->renderContext_ = otherRender;
-
-    auto currentProvider = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
-    currentProvider->providerMockResult_.receiveClear_ = false;
-    auto otherProvider = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
-    otherProvider->providerMockResult_.receiveClear_ = false;
-    auto currentOp = std::make_shared<Framework::JsThirdProviderInteractionOperation>(
-        currentProvider, manager, currentHost);
-    auto otherOp = std::make_shared<Framework::JsThirdProviderInteractionOperation>(
-        otherProvider, manager, otherHost);
-    currentOp->SetBelongTreeId(0);
-    otherOp->SetBelongTreeId(0);
-    manager->RegisterJsThirdProviderInteractionOperation(1, currentOp);
-    manager->RegisterJsThirdProviderInteractionOperation(2, otherOp);
-
-    otherRender->UpdateAccessibilityFocus(true);
-
-    Accessibility::AccessibilityElementInfo nodeInfo;
-    Accessibility::Rect screenRect(0, 0, 100, 100);
-    nodeInfo.SetRectInScreen(screenRect);
-
-    auto ret = manager->ActThirdAccessibilityFocus(2, nodeInfo, currentHost, context, false);
-
-    EXPECT_EQ(ret, true);
-    // screen reader disabled: other focused provider is kept
-    EXPECT_EQ(otherProvider->providerMockResult_.receiveClear_, false);
-    EXPECT_EQ(otherRender->GetAccessibilityFocus().value_or(false), true);
-    // current host still gains focus
-    EXPECT_EQ(currentRender->GetAccessibilityFocus().value_or(false), true);
+    NativeHoverScenario scenario;
+    scenario.provider->providerMockResult_.elementId_ = 999;
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    EXPECT_EQ(scenario.data.calls, 1);
+    EXPECT_EQ(scenario.data.callbackThread, std::this_thread::get_id());
+    EXPECT_EQ(scenario.data.x, 25);
+    EXPECT_EQ(scenario.data.y, 24);
+    ASSERT_EQ(scenario.executor->hoverTasks.size(), 1);
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.nodesHovering.empty());
+    scenario.data.id = 200; // An already queued result is an owned snapshot.
+    scenario.executor->DrainHoverTasks();
+    ASSERT_TRUE(scenario.manager->hoverForThirdState_.nativeHoverInfo);
+    EXPECT_EQ(scenario.manager->hoverForThirdState_.nodesHovering, std::vector<int64_t>({100}));
+    EXPECT_EQ(scenario.provider->providerMockResult_.elementId_, 999); // No provider tree query.
+    EXPECT_EQ(scenario.executor->eventCount, 1);
 }
 
-/**
- * @tc.name: ActThirdAccessibilityFocusClearSelfOnly003
- * @tc.desc: clear focus action only clears the given node, never triggers provider focus clear
- * @tc.type: FUNC
- */
-HWTEST_F(JsThirdAccessibilityHoverNgTest, ActThirdAccessibilityFocusClearSelfOnly003, TestSize.Level1)
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeTargetSwitchAndExitUseExistingThirdState, TestSize.Level1)
 {
-    auto context = NG::PipelineContext::GetCurrentContext();
-    auto manager = AceType::MakeRefPtr<testing::NiceMock<MockThirdFocusJsAccessibilityManager>>();
-    ON_CALL(*manager, GenerateAccessibilityWorkMode())
-        .WillByDefault(testing::Return(AccessibilityWorkMode { .isTouchExplorationEnabled = true }));
-    manager->SetPipelineContext(context);
-    manager->Register(true);
-    auto mockFrontend = AceType::MakeRefPtr<testing::NiceMock<MockFrontend>>();
-    SetContextAccessibilityManagerForThirdFocus(context, mockFrontend, manager);
-    SetScreenReaderEnabledForThirdFocus(manager, true);
-
-    auto currentHost = FrameNode::CreateFrameNode("currentHost", 1, AceType::MakeRefPtr<Pattern>(), true);
-    auto otherHost = FrameNode::CreateFrameNode("otherHost", 2, AceType::MakeRefPtr<Pattern>(), true);
-    auto currentRender = AceType::MakeRefPtr<MockRenderContext>();
-    auto otherRender = AceType::MakeRefPtr<MockRenderContext>();
-    currentHost->renderContext_ = currentRender;
-    otherHost->renderContext_ = otherRender;
-
-    auto currentProvider = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
-    currentProvider->providerMockResult_.receiveClear_ = false;
-    auto otherProvider = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
-    otherProvider->providerMockResult_.receiveClear_ = false;
-    auto currentOp = std::make_shared<Framework::JsThirdProviderInteractionOperation>(
-        currentProvider, manager, currentHost);
-    auto otherOp = std::make_shared<Framework::JsThirdProviderInteractionOperation>(
-        otherProvider, manager, otherHost);
-    currentOp->SetBelongTreeId(0);
-    otherOp->SetBelongTreeId(0);
-    manager->RegisterJsThirdProviderInteractionOperation(1, currentOp);
-    manager->RegisterJsThirdProviderInteractionOperation(2, otherOp);
-
-    currentRender->UpdateAccessibilityFocus(true);
-    otherRender->UpdateAccessibilityFocus(true);
-
-    Accessibility::AccessibilityElementInfo nodeInfo;
-    Accessibility::Rect screenRect(0, 0, 100, 100);
-    nodeInfo.SetRectInScreen(screenRect);
-
-    auto ret = manager->ActThirdAccessibilityFocus(1, nodeInfo, currentHost, context, true);
-
-    EXPECT_EQ(ret, true);
-    // only the given node focus is cleared, other focused provider is untouched
-    EXPECT_EQ(currentRender->GetAccessibilityFocus().value_or(true), false);
-    EXPECT_EQ(otherRender->GetAccessibilityFocus().value_or(false), true);
-    EXPECT_EQ(otherProvider->providerMockResult_.receiveClear_, false);
-    EXPECT_EQ(currentProvider->providerMockResult_.receiveClear_, false);
+    NativeHoverScenario scenario;
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.executor->DrainHoverTasks();
+    scenario.Transfer(AccessibilityHoverEventType::MOVE);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_EQ(scenario.executor->eventCount, 1);
+    scenario.data.id = 200;
+    scenario.Transfer(AccessibilityHoverEventType::MOVE);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_EQ(scenario.executor->eventCount, 3); // EXIT old, ENTER new.
+    EXPECT_EQ(scenario.manager->hoverForThirdState_.nodesHovering, std::vector<int64_t>({200}));
+    scenario.Transfer(AccessibilityHoverEventType::EXIT);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_EQ(scenario.executor->eventCount, 4);
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.nodesHovering.empty());
+    EXPECT_FALSE(scenario.manager->hoverForThirdState_.nativeHoverInfo);
+    EXPECT_EQ(scenario.data.calls, 3); // EXIT never invokes the hit-test callback.
 }
 
-/**
- * @tc.name: ActThirdAccessibilityFocusSkipInvalidThirdProvider004
- * @tc.desc: null host, expired operator and unfocused host are skipped safely when clearing focus
- * @tc.type: FUNC
- */
-HWTEST_F(JsThirdAccessibilityHoverNgTest, ActThirdAccessibilityFocusSkipInvalidThirdProvider004, TestSize.Level1)
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeEmptyResultFallsBackToProviderTree, TestSize.Level1)
 {
-    auto context = NG::PipelineContext::GetCurrentContext();
-    auto manager = AceType::MakeRefPtr<testing::NiceMock<MockThirdFocusJsAccessibilityManager>>();
-    ON_CALL(*manager, GenerateAccessibilityWorkMode())
-        .WillByDefault(testing::Return(AccessibilityWorkMode { .isTouchExplorationEnabled = true }));
-    manager->SetPipelineContext(context);
-    manager->Register(true);
-    auto mockFrontend = AceType::MakeRefPtr<testing::NiceMock<MockFrontend>>();
-    SetContextAccessibilityManagerForThirdFocus(context, mockFrontend, manager);
-    SetScreenReaderEnabledForThirdFocus(manager, true);
+    NativeHoverScenario scenario;
+    scenario.data.fill = false;
+    scenario.FailLegacyQuery();
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_EQ(scenario.data.calls, 1);
+    EXPECT_EQ(scenario.provider->providerMockResult_.elementId_, -1);
+    EXPECT_FALSE(scenario.manager->hoverForThirdState_.nativeHoverInfo);
+    EXPECT_EQ(scenario.executor->eventCount, 0);
+}
 
-    auto currentHost = FrameNode::CreateFrameNode("currentHost", 1, AceType::MakeRefPtr<Pattern>(), true);
-    auto currentRender = AceType::MakeRefPtr<MockRenderContext>();
-    currentHost->renderContext_ = currentRender;
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeReentrantUnregisterDiscardsResult, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    scenario.data.unregisterHost = scenario.host;
+    scenario.FailLegacyQuery();
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_EQ(scenario.data.calls, 1);
+    EXPECT_FALSE(NativeAccessibilityHoverRegistry::GetInstance().HasHandler(scenario.host));
+    EXPECT_FALSE(scenario.manager->hoverForThirdState_.nativeHoverInfo);
+    EXPECT_EQ(scenario.executor->eventCount, 0);
+}
 
-    // 1. operator with null host
-    auto nullHostProvider = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
-    nullHostProvider->providerMockResult_.receiveClear_ = false;
-    RefPtr<FrameNode> nullHost;
-    auto nullHostOp = std::make_shared<Framework::JsThirdProviderInteractionOperation>(
-        nullHostProvider, manager, nullHost);
-    nullHostOp->SetBelongTreeId(0);
-    manager->RegisterJsThirdProviderInteractionOperation(10, nullHostOp);
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeQueuedResultIsRejectedAfterUnregister, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    scenario.FailLegacyQuery();
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    NativeAccessibilityHoverRegistry::GetInstance().Unregister(scenario.host);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_EQ(scenario.provider->providerMockResult_.elementId_, -1);
+    EXPECT_FALSE(scenario.manager->hoverForThirdState_.nativeHoverInfo);
+    EXPECT_EQ(scenario.executor->eventCount, 0);
+}
 
-    // 2. operator that will expire before the focus act
-    {
-        auto tempHost = FrameNode::CreateFrameNode("tempHost", 2, AceType::MakeRefPtr<Pattern>(), true);
-        tempHost->renderContext_ = AceType::MakeRefPtr<MockRenderContext>();
-        auto tempProvider = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
-        tempProvider->providerMockResult_.receiveClear_ = false;
-        auto tempOp = std::make_shared<Framework::JsThirdProviderInteractionOperation>(
-            tempProvider, manager, tempHost);
-        tempOp->SetBelongTreeId(0);
-        manager->RegisterJsThirdProviderInteractionOperation(11, tempOp);
-        tempHost->renderContext_->UpdateAccessibilityFocus(true);
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeSameIdReplacementStartsNewTarget, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.executor->DrainHoverTasks();
+    auto generation = scenario.manager->hoverForThirdState_.nativeHoverGeneration;
+    NativeAccessibilityHoverRegistry::GetInstance().Register(scenario.host, &scenario.data, FillNativeHoverResult);
+    scenario.Transfer(AccessibilityHoverEventType::MOVE);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_NE(scenario.manager->hoverForThirdState_.nativeHoverGeneration, generation);
+    EXPECT_EQ(scenario.executor->eventCount, 3);
+}
+
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeUnregisterRestoresProviderTraversal, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.executor->DrainHoverTasks();
+    NativeAccessibilityHoverRegistry::GetInstance().Unregister(scenario.host);
+    scenario.FailLegacyQuery();
+    scenario.Transfer(AccessibilityHoverEventType::MOVE);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_EQ(scenario.data.calls, 1);
+    EXPECT_EQ(scenario.provider->providerMockResult_.elementId_, -1);
+    EXPECT_EQ(scenario.executor->eventCount, 2); // Includes EXIT from the saved native snapshot.
+    EXPECT_FALSE(scenario.manager->hoverForThirdState_.nativeHoverInfo);
+}
+
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeMissingProviderDoesNotKeepTarget, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    scenario.manager->DeregisterJsThirdProviderInteractionOperation(scenario.host->GetAccessibilityId());
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.nodesHovering.empty());
+    EXPECT_FALSE(scenario.manager->hoverForThirdState_.nativeHoverInfo);
+    EXPECT_EQ(scenario.executor->eventCount, 0);
+}
+
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeInvalidCoordinatesAndBackgroundNeverCallHandler, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    Framework::AccessibilityHoverForThirdConfig config;
+    config.nativeHoverHost = scenario.host;
+    config.context = scenario.context;
+    for (float x : { std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity(),
+        static_cast<float>(std::numeric_limits<int32_t>::max()) }) {
+        config.point = PointF(x, 1);
+        scenario.manager->PrepareNativeHoverResult(config);
+        EXPECT_FALSE(config.nativeHoverInfo);
     }
+    config.point = PointF(1, 2);
+    scenario.executor->onUiThread = false;
+    scenario.manager->PrepareNativeHoverResult(config);
+    EXPECT_FALSE(config.nativeHoverInfo);
+    EXPECT_EQ(scenario.data.calls, 0);
+}
 
-    // 3. operator whose host is not accessibility focused
-    auto unfocusedHost = FrameNode::CreateFrameNode("unfocusedHost", 3, AceType::MakeRefPtr<Pattern>(), true);
-    unfocusedHost->renderContext_ = AceType::MakeRefPtr<MockRenderContext>();
-    auto unfocusedProvider = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
-    unfocusedProvider->providerMockResult_.receiveClear_ = false;
-    auto unfocusedOp = std::make_shared<Framework::JsThirdProviderInteractionOperation>(
-        unfocusedProvider, manager, unfocusedHost);
-    unfocusedOp->SetBelongTreeId(0);
-    manager->RegisterJsThirdProviderInteractionOperation(12, unfocusedOp);
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeQueuedEnterThenExitClearsHover, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.Transfer(AccessibilityHoverEventType::EXIT);
+    ASSERT_EQ(scenario.executor->hoverTasks.size(), 1);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_EQ(scenario.executor->eventCount, 2);
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.nodesHovering.empty());
+    EXPECT_FALSE(scenario.manager->hoverForThirdState_.nativeHoverInfo);
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.idle);
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.thirdOperationIdle.load());
+}
 
-    Accessibility::AccessibilityElementInfo nodeInfo;
-    Accessibility::Rect screenRect(0, 0, 100, 100);
-    nodeInfo.SetRectInScreen(screenRect);
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeQueuedEnterThenCancelClearsHover, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.Transfer(AccessibilityHoverEventType::CANCEL);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_EQ(scenario.executor->eventCount, 2);
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.nodesHovering.empty());
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.idle);
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.thirdOperationIdle.load());
+}
 
-    auto ret = manager->ActThirdAccessibilityFocus(1, nodeInfo, currentHost, context, false);
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeQueuedMovesKeepLatestTarget, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    for (int64_t id = 101; id <= 200; ++id) {
+        scenario.data.id = id;
+        scenario.Transfer(AccessibilityHoverEventType::MOVE);
+    }
+    ASSERT_EQ(scenario.executor->hoverTasks.size(), 1);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_EQ(scenario.manager->hoverForThirdState_.nodesHovering, std::vector<int64_t>({200}));
+    EXPECT_EQ(scenario.executor->eventCount, 3);
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.thirdOperationIdle.load());
+}
 
-    EXPECT_EQ(ret, true);
-    // invalid operators are skipped without clearing
-    EXPECT_EQ(nullHostProvider->providerMockResult_.receiveClear_, false);
-    EXPECT_EQ(unfocusedProvider->providerMockResult_.receiveClear_, false);
-    // current host still gains focus
-    EXPECT_EQ(currentRender->GetAccessibilityFocus().value_or(false), true);
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeQueuedRestartSurvivesMoveCoalescing, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.executor->DrainHoverTasks();
+    scenario.Transfer(AccessibilityHoverEventType::MOVE);
+    scenario.Transfer(AccessibilityHoverEventType::EXIT);
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.Transfer(AccessibilityHoverEventType::MOVE);
+    ASSERT_EQ(scenario.executor->hoverTasks.size(), 1);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_EQ(scenario.executor->eventCount, 3); // Same ID, but a new hover session.
+    EXPECT_EQ(scenario.manager->hoverForThirdState_.nodesHovering, std::vector<int64_t>({100}));
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.thirdOperationIdle.load());
+}
+
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeQueuedSnapshotOwnsActionDescriptions, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    scenario.data.actionDescription = "original action";
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.data.actionDescription[0] = 'X';
+    scenario.executor->DrainHoverTasks();
+    auto snapshot = scenario.manager->hoverForThirdState_.nativeHoverInfo;
+    ASSERT_NE(snapshot, nullptr);
+    ASSERT_EQ(snapshot->GetOperationActions().size(), 1);
+    EXPECT_STREQ(snapshot->GetOperationActions().front().description, "original action");
+}
+
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeExitDuringWorkerExecutionIsDrained, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    scenario.executor->onEvent = [&scenario] { scenario.Transfer(AccessibilityHoverEventType::EXIT); };
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_EQ(scenario.executor->eventCount, 2);
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.nodesHovering.empty());
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.thirdOperationIdle.load());
+}
+
+HWTEST_F(JsThirdAccessibilityHoverNgTest, LegacyCancelClearsSavedHoverWithoutHitTest, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    auto& state = scenario.manager->hoverForThirdState_;
+    state.hostElementId = scenario.host->GetAccessibilityId();
+    state.nodesHovering = {100};
+    state.idle = false;
+    scenario.Transfer(AccessibilityHoverEventType::CANCEL);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_TRUE(state.nodesHovering.empty());
+    EXPECT_TRUE(state.idle);
+    EXPECT_EQ(scenario.provider->providerMockResult_.elementId_, 100); // EXIT queries the saved target only.
+}
+
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeConcurrentExitIsNotLost, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    std::promise<void> entered;
+    std::promise<void> resume;
+    auto enteredFuture = entered.get_future();
+    auto resumeFuture = resume.get_future();
+    scenario.executor->onEvent = [&entered, &resumeFuture] {
+        entered.set_value();
+        resumeFuture.wait();
+    };
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    std::thread worker([&scenario] { scenario.executor->DrainHoverTasks(); });
+    auto status = enteredFuture.wait_for(std::chrono::seconds(10));
+    if (status == std::future_status::ready) {
+        scenario.Transfer(AccessibilityHoverEventType::EXIT);
+    }
+    resume.set_value();
+    worker.join();
+    ASSERT_EQ(status, std::future_status::ready);
+    EXPECT_EQ(scenario.executor->eventCount, 2);
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.nodesHovering.empty());
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.thirdOperationIdle.load());
+}
+
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeContinuousPendingEventsEndSafely, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    size_t queuedMoves = 0;
+    constexpr size_t maxQueuedMoves = 100;
+    std::function<void()> queueMove;
+    queueMove = [&scenario, &queuedMoves, &queueMove] {
+        if (queuedMoves >= maxQueuedMoves) {
+            return;
+        }
+        ++queuedMoves;
+        ++scenario.data.id;
+        scenario.Transfer(AccessibilityHoverEventType::MOVE);
+        scenario.executor->onEvent = queueMove;
+    };
+    scenario.executor->onEvent = queueMove;
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.executor->DrainHoverTasks();
+    scenario.executor->onEvent = nullptr;
+    EXPECT_LT(queuedMoves, maxQueuedMoves);
+    EXPECT_FALSE(scenario.manager->pendingHover_.has_value());
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.nodesHovering.empty());
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.thirdOperationIdle.load());
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_EQ(scenario.manager->hoverForThirdState_.nodesHovering, std::vector<int64_t>({scenario.data.id}));
+}
+
+HWTEST_F(JsThirdAccessibilityHoverNgTest, NativeRejectedWorkerClearsPreviousHover, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.executor->DrainHoverTasks();
+    scenario.executor->acceptHover = false;
+    scenario.Transfer(AccessibilityHoverEventType::EXIT);
+    EXPECT_TRUE(scenario.executor->hoverTasks.empty());
+    EXPECT_EQ(scenario.executor->eventCount, 2);
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.nodesHovering.empty());
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.thirdOperationIdle.load());
+    scenario.executor->acceptHover = true;
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_EQ(scenario.executor->eventCount, 3);
+}
+
+HWTEST_F(JsThirdAccessibilityHoverNgTest, PendingEventsDoNotRetainContext, TestSize.Level1)
+{
+    NativeHoverScenario scenario;
+    scenario.Transfer(AccessibilityHoverEventType::ENTER);
+    const auto references = scenario.context->RefCount();
+    scenario.Transfer(AccessibilityHoverEventType::EXIT);
+    EXPECT_EQ(scenario.context->RefCount(), references);
+    scenario.executor->DrainHoverTasks();
+    EXPECT_EQ(scenario.executor->eventCount, 2);
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.nodesHovering.empty());
+    EXPECT_TRUE(scenario.manager->hoverForThirdState_.thirdOperationIdle.load());
 }
 
 } // namespace OHOS::Ace::NG

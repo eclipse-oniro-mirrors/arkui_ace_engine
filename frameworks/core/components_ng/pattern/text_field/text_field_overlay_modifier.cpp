@@ -17,6 +17,7 @@
 #include "core/common/container.h"
 
 #include "base/utils/utils.h"
+#include "core/components_ng/pattern/common_text/preview_text_decoration_utils.h"
 #include "core/components_ng/pattern/text_field/text_field_free_scroller.h"
 #include "core/components_ng/pattern/text_field/text_field_model.h"
 #include "core/components_ng/pattern/text_field/text_field_pattern.h"
@@ -58,8 +59,6 @@ TextFieldOverlayModifier::TextFieldOverlayModifier(
     secondHandleOffset_ = AceType::MakeRefPtr<PropertyOffsetF>(OffsetF());
     showPreviewText_ = AceType::MakeRefPtr<PropertyBool>(false);
     changePreviewTextRects_ = AceType::MakeRefPtr<PropertyBool>(false);
-    previewTextDecorationColor_ = AceType::MakeRefPtr<PropertyColor>(Color());
-    previewTextStyle_ = PreviewTextStyle::NORMAL;
     contentChange_ = AceType::MakeRefPtr<PropertyBool>(false);
     hoverColor_ = AceType::MakeRefPtr<PropertyInt>(0);
     ModifierAttachProperty();
@@ -87,7 +86,6 @@ void TextFieldOverlayModifier::ModifierAttachProperty()
     AttachProperty(secondHandleOffset_);
     AttachProperty(showPreviewText_);
     AttachProperty(changePreviewTextRects_);
-    AttachProperty(previewTextDecorationColor_);
     AttachProperty(contentChange_);
 }
 
@@ -433,51 +431,84 @@ void TextFieldOverlayModifier::PaintScrollBar(DrawingContext& context)
     }
 }
 
+std::optional<Color> TextFieldOverlayModifier::GetPreviewDecorationColor(const PreviewTextStyling& styling) const
+{
+    auto textFieldPattern = DynamicCast<TextFieldPattern>(pattern_.Upgrade());
+    CHECK_NULL_RETURN(textFieldPattern, std::nullopt);
+
+    if (styling.underlineColor.has_value()) {
+        return Color(styling.underlineColor.value());
+    }
+
+    auto paintProperty = textFieldPattern->GetPaintProperty<TextFieldPaintProperty>();
+    CHECK_NULL_RETURN(paintProperty, std::nullopt);
+    auto frameNode = textFieldPattern->GetHost();
+    CHECK_NULL_RETURN(frameNode, std::nullopt);
+    Color decorationColor = paintProperty->GetCursorColorValue(textFieldPattern->GetPreviewDecorationColor());
+    if (frameNode->GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY_SIX) &&
+        !paintProperty->HasCaretColorFlagByUser()) {
+        decorationColor = textFieldPattern->GetPreviewDecorationColor();
+    }
+    return decorationColor;
+}
+
+RSRect TextFieldOverlayModifier::GetPreviewTextClipRect(const TextFieldPattern& textFieldPattern,
+    PreviewTextStyle underlineShape, bool isTextArea) const
+{
+    float adjustClipHeight = underlineShape == PreviewTextStyle::WAVY
+        ? DEFAULT_FONTSIZE.ConvertToPx() / WAVY_WIDTH_DIVISOR : 0.0f;
+    auto paintOffset = contentOffset_->Get();
+    float clipRectHeight = paintOffset.GetY() + contentSize_->Get().Height();
+    auto contentWidth = contentSize_->Get().Width();
+    if (!textFieldPattern.IsNormalInlineState() || isTextArea) {
+        return RSRect(paintOffset.GetX(), paintOffset.GetY(),
+            paintOffset.GetX() + contentWidth + textFieldPattern.GetInlinePadding(),
+            clipRectHeight + adjustClipHeight);
+    }
+    return RSRect(paintOffset.GetX(), 0.0f,
+        paintOffset.GetX() + contentWidth,
+        textFieldPattern.GetFrameRect().Height() + adjustClipHeight);
+}
+
 void TextFieldOverlayModifier::PaintPreviewTextDecoration(DrawingContext& context) const
 {
-    if (previewTextStyle_ != PreviewTextStyle::UNDERLINE ||
-        (!showPreviewText_->Get() && !needPaintPreviewText)) {
-        return;
-    }
+    auto textFieldPattern = DynamicCast<TextFieldPattern>(pattern_.Upgrade());
+    CHECK_NULL_VOID(textFieldPattern);
+    auto styling = textFieldPattern->GetPreviewStyling();
+    CHECK_EQUAL_VOID(styling.underlineShape, PreviewTextStyle::NORMAL);
+    CHECK_EQUAL_VOID(!showPreviewText_->Get() && !needPaintPreviewText, true);
+    auto decorationColor = GetPreviewDecorationColor(styling);
+    CHECK_EQUAL_VOID(decorationColor.has_value(), false);
 
     auto& canvas = context.canvas;
     canvas.Save();
-    auto textFieldPattern = DynamicCast<TextFieldPattern>(pattern_.Upgrade());
-    CHECK_NULL_VOID(textFieldPattern);
-
-    auto textRect = textFieldPattern->GetTextRect();
     bool isTextArea = textFieldPattern->IsTextArea();
-
-    bool isNotAllowScrollX = isTextArea && !textFieldPattern->IsHorizontalScrollEnabled();
-    float offsetX = isNotAllowScrollX ? contentOffset_->Get().GetX() : textRect.GetX();
-    float offsetY = isTextArea ? textRect.GetY() : contentOffset_->Get().GetY();
+    float offsetX = (isTextArea && !textFieldPattern->IsHorizontalScrollEnabled())
+        ? contentOffset_->Get().GetX() : textFieldPattern->GetTextRect().GetX();
+    float offsetY = isTextArea ? textFieldPattern->GetTextRect().GetY() : contentOffset_->Get().GetY();
     auto previewTextRect = textFieldPattern->GetPreviewTextRects();
     if (previewTextRect.empty()) {
+        canvas.Restore();
         return;
     }
-
-    auto paintOffset = contentOffset_->Get();
-    float clipRectHeight = paintOffset.GetY() + contentSize_->Get().Height();
-    RSRect clipInnerRect;
-    auto defaultStyle = !textFieldPattern->IsNormalInlineState() || isTextArea;
-    if (defaultStyle) {
-        clipInnerRect = RSRect(paintOffset.GetX(), paintOffset.GetY(),
-            paintOffset.GetX() + contentSize_->Get().Width() + textFieldPattern->GetInlinePadding(), clipRectHeight);
-    } else {
-        clipInnerRect = RSRect(paintOffset.GetX(), 0.0f, paintOffset.GetX() + contentSize_->Get().Width(),
-            textFieldPattern->GetFrameRect().Height());
-    }
+    auto clipInnerRect = GetPreviewTextClipRect(*textFieldPattern, styling.underlineShape, isTextArea);
     canvas.ClipRect(clipInnerRect, RSClipOp::INTERSECT);
 
     auto underlineWidth = textFieldPattern->GetPreviewUnderlineWidth();
+    auto color = ToRSColor(decorationColor.value());
     RSBrush brush;
     brush.SetAntiAlias(true);
-    brush.SetColor(ToRSColor(previewTextDecorationColor_->Get()));
+    brush.SetColor(color);
     canvas.AttachBrush(brush);
-    for (const auto& drawRect : previewTextRect) {
-        RSRect rect(drawRect.Left() + offsetX, drawRect.Bottom() + offsetY - underlineWidth,
-                drawRect.Right() + offsetX, drawRect.Bottom() + offsetY);
-        canvas.DrawRoundRect(RSRoundRect(rect, underlineWidth / 2, underlineWidth / 2));
+    float startOffset = 0.0f;
+    for (const auto& rect : previewTextRect) {
+        PreviewDecorationParams params { rect.Left() + offsetX, rect.Right() + offsetX,
+            rect.Bottom() + offsetY, underlineWidth, styling.underlineShape,
+            &rect == &previewTextRect.back(), color, startOffset };
+        DrawPreviewTextUnderline(canvas, params);
+        // Accumulate this segment's width so the next segment continues the dash/wavy
+        // phase continuously instead of restarting the pattern at the new left edge.
+        startOffset += rect.Right() - rect.Left();
     }
     canvas.DetachBrush();
     canvas.Restore();
@@ -587,13 +618,5 @@ void TextFieldOverlayModifier::SetPreviewTextRects(bool value)
         changePreviewTextRects_->Set(!changePreviewTextRects_->Get());
     }
     needPaintPreviewText = value;
-}
-void TextFieldOverlayModifier::SetPreviewTextDecorationColor(const Color& value)
-{
-    previewTextDecorationColor_->Set(value);
-}
-void TextFieldOverlayModifier::SetPreviewTextStyle(PreviewTextStyle style)
-{
-    previewTextStyle_ = style;
 }
 } // namespace OHOS::Ace::NG

@@ -23,7 +23,7 @@
 
 namespace OHOS::Ace {
 
-class CardTheme : public virtual Theme {
+class CardTheme : public Theme {
     DECLARE_ACE_TYPE(CardTheme, Theme);
 
 public:

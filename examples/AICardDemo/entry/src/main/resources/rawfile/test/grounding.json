@@ -1,0 +1,99 @@
+{
+  "actions": [
+    {
+      "result": {
+        "index": 0,
+        "status": 17,
+        "isFinal": false,
+        "streamingText": "人工智能卡片组件用于"
+      }
+    },
+    {
+      "result": {
+        "index": 1,
+        "status": 0,
+        "isFinal": false,
+        "streamingText": "<grounding>人工智能卡片组件用于展示智能搜索结果，支持流式打字机渲染、乱序重组、grounding替换与折叠展开序重组，**开发者可经配置快速集成1**</grounding>"
+      }
+    },
+    {
+      "result": {
+        "index": 2,
+        "status": 17,
+        "isFinal": false,
+        "streamingText": "(忽略)"
+      }
+    },
+    {
+      "result": {
+        "index": 3,
+        "status": 0,
+        "isFinal": true,
+        "streamingText": "",
+        "relevant": [
+          {
+            "title": "什么是人工智能"
+          },
+          {
+            "title": "AI 能帮我做什么"
+          },
+          {
+            "title": "推荐一些 AI 学习资源"
+          }
+        ],
+        "cards": [
+          {
+            "type": "card",
+            "title": "定义概念",
+            "data": {}
+          },
+          {
+            "type": "card",
+            "title": "核心特性",
+            "data": {}
+          },
+          {
+            "type": "card",
+            "title": "应用场景",
+            "data": {}
+          },
+          {
+            "type": "card",
+            "title": "技术架构",
+            "data": {}
+          },
+          {
+            "type": "card",
+            "title": "发展历程",
+            "data": {}
+          },
+          {
+            "type": "card",
+            "title": "未来趋势",
+            "data": {}
+          },
+          {
+            "type": "card",
+            "title": "行业案例",
+            "data": {}
+          },
+          {
+            "type": "card",
+            "title": "常见问题",
+            "data": {}
+          },
+          {
+            "type": "card",
+            "title": "最佳实践",
+            "data": {}
+          },
+          {
+            "type": "card",
+            "title": "相关工具",
+            "data": {}
+          }
+        ]
+      }
+    }
+  ]
+}

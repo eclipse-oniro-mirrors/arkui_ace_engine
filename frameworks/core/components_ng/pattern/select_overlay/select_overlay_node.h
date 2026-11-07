@@ -140,7 +140,7 @@ public:
     {
         return scopeId_;
     }
-    static RefPtr<UiMaterial>& GetMenuUiMaterial(ColorMode colorMode = ColorMode::COLOR_MODE_UNDEFINED);
+    static RefPtr<UiMaterial> GetMenuUiMaterial(ColorMode colorMode = ColorMode::COLOR_MODE_UNDEFINED);
     static void UpdateNewMaterialProperties(const RefPtr<FrameNode>& frameNode, ColorMode colorMode);
 
 private:
@@ -178,6 +178,8 @@ private:
         float maxWidth, float& allocatedSize, std::shared_ptr<SelectOverlayInfo>& info, const std::string& label);
     void ShowCamera(
         float maxWidth, float& allocatedSize, std::shared_ptr<SelectOverlayInfo>& info, const std::string& label);
+    void ShowTranslateInput(
+        float maxWidth, float& allocatedSize, std::shared_ptr<SelectOverlayInfo>& info, const std::string& label);
     void ShowAIWrite(
         float maxWidth, float& allocatedSize, std::shared_ptr<SelectOverlayInfo>& info, const std::string& label);
     void ShowAIMenuOptions(
@@ -209,6 +211,8 @@ private:
     void BackAnimation(bool noAnimation);
     void PlaySelectMenuToExtensionAnimation(
         const RectF& selectMenuTargetRect, const std::function<void()>& onFinish);
+    std::function<void()> CreateSelectMenuToExtensionFinishCallback(const std::function<void()>& onFinish);
+    void RequestExtensionMenuAccessibilityFocusAfterLayout(const RefPtr<FrameNode>& extensionMenu);
     void PlayExtensionMenuDistortAnimation(const RefPtr<FrameNode>& extensionMenu, const OffsetF& menuPosition);
     void ContinuePlayExtensionMenuDistortAnimation(
         const RefPtr<FrameNode>& extensionMenu, const OffsetF& adjustedMenuPosition, Placement finalPlacement,
@@ -306,7 +310,7 @@ private:
     bool isExtensionMenu_ = false;
 
     // Label whether the menu default button needs to appear within the extended menu
-    bool isShowInDefaultMenu_[12] = { false }; // OPTION_INDEX_AUTO_FILL + 1
+    bool isShowInDefaultMenu_[13] = { false }; // OPTION_INDEX_TRANSLATE_INPUT + 1
 
     bool isDefaultBtnOverMaxWidth_ = false;
 

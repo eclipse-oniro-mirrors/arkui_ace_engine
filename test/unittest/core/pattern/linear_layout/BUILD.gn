@@ -19,6 +19,7 @@ test_sources = [
   "old_cases/linear_layout_test_ng.cpp",
   "linear_layout_test_min.cpp",
   "linear_layout_test_core.cpp",
+  "linear_layout_branch_coverage_test_ng.cpp",
 ]
 
 if (is_host_product) {

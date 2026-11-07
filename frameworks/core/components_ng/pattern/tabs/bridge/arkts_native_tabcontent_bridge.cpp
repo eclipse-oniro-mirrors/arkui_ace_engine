@@ -16,6 +16,9 @@
 #include "core/components_ng/pattern/tabs/bridge/arkts_native_tabcontent_bridge.h"
 #include "ui/base/utils/utils.h"
 
+#include <cmath>
+#include <climits>
+
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/base/view_stack_model.h"
@@ -45,7 +48,7 @@ constexpr int TABCONTENT_ARG_INDEX_2 = 2;
 constexpr int32_t TAB_VISIBILITY_VISIBLE = static_cast<int32_t>(TabVisibility::VISIBLE);
 constexpr int32_t TAB_VISIBILITY_HIDDEN = static_cast<int32_t>(TabVisibility::HIDDEN);
 constexpr int32_t BAR_DISPLAY_MODE_BOTTOMTABBAR = static_cast<int32_t>(TabBarDisplayMode::BOTTOMTABBAR);
-constexpr int32_t BAR_DISPLAY_MODE_SIDEBAR = static_cast<int32_t>(TabBarDisplayMode::SIDEBAR);
+constexpr int32_t BAR_DISPLAY_MODE_TOP = static_cast<int32_t>(TabBarDisplayMode::TOP_TABBAR);
 #ifdef PIXEL_MAP_SUPPORTED
 constexpr char DRAWABLE_DESCRIPTOR_NAME[] = "DrawableDescriptor";
 constexpr char LAYERED_DRAWABLE_DESCRIPTOR_NAME[] = "LayeredDrawableDescriptor";
@@ -98,10 +101,46 @@ void ApplyCreatePaddingVerWithResourceObj(const RefPtr<ResourceObject>& resObjTo
 
 void ApplySetTabBar(TabBarStyle style, const std::optional<std::string>& text,
     const std::optional<std::string>& icon, const std::optional<TabBarSymbol>& tabBarSymbol,
-    std::function<void()>* builder, FrameNode* content, bool fromJsView)
+    std::function<void()>* builder, FrameNode* content, bool fromJsView,
+    ArkUINodeHandle node = nullptr)
 {
     TabContentTabBarParam param { style, text, icon, tabBarSymbol, builder, content };
-    GetArkUINodeModifiers()->getTabContentModifier()->setTabBar(GetCurrentTabContentNode(), &param, fromJsView);
+    auto targetNode = node ? node : GetCurrentTabContentNode();
+    GetArkUINodeModifiers()->getTabContentModifier()->setTabBar(targetNode, &param, fromJsView);
+}
+
+std::optional<TabBarBadgeParam> ParseBadgeParameters(EcmaVM* vm, const Local<JSValueRef>& badgeVal)
+{
+    if (!badgeVal->IsObject(vm) || badgeVal->IsFunction(vm)) {
+        return std::nullopt;
+    }
+    TabBarBadgeParam badgeParam;
+    auto obj = badgeVal->ToObject(vm);
+
+    auto value = ArkTSUtils::GetProperty(vm, obj, "value");
+    if (value->IsNumber()) {
+        badgeParam.badgeCount = value->Int32Value(vm);
+    } else {
+        std::string valueStr;
+        RefPtr<ResourceObject> resObj;
+        if (ArkTSUtils::ParseJsString(vm, value, valueStr, resObj)) {
+            badgeParam.badgeValue = valueStr;
+            badgeParam.resourceBadgeValueObject = resObj;
+        }
+    }
+
+    auto maxCount = ArkTSUtils::GetProperty(vm, obj, "maxCount");
+    if (maxCount->IsNumber()) {
+        badgeParam.badgeMaxCount = maxCount->Int32Value(vm);
+    }
+
+    return badgeParam;
+}
+
+void ApplySetTabBarBadge(ArkUINodeHandle node, const std::optional<TabBarBadgeParam>& badgeParam)
+{
+    auto badgeParamCopy = badgeParam;
+    GetArkUINodeModifiers()->getTabContentModifier()->setTabBarBadge(node, &badgeParamCopy);
 }
 
 void SetTabBarSymbolOptionApply(EcmaVM* vm, TabBarSymbol& symbolApply,
@@ -682,7 +721,7 @@ void SetId(EcmaVM* vm, const Local<JSValueRef>& info)
     GetArkUINodeModifiers()->getTabContentModifier()->setId(GetCurrentTabContentNode(), id.c_str());
 }
 
-void SetSubTabBarStyle(EcmaVM* vm, const Local<ObjectRef>& paramObject, FrameNode* frameNode)
+void SetSubTabBarStyle(EcmaVM* vm, const Local<ObjectRef>& paramObject, FrameNode* frameNode, bool isJsView)
 {
     auto contentParam = ArkTSUtils::GetProperty(vm, paramObject, "content");
     SetBuilderNode(vm, paramObject);
@@ -717,7 +756,8 @@ void SetSubTabBarStyle(EcmaVM* vm, const Local<ObjectRef>& paramObject, FrameNod
     SetId(vm, idParam);
 
     ApplyCreateWithResourceObj(TabContentJsType::TEXT_CONTENT, resTextObj);
-    ApplySetTabBar(TabBarStyle::SUBTABBATSTYLE, contentOpt, std::nullopt, std::nullopt, nullptr, nullptr, false);
+    ApplySetTabBar(TabBarStyle::SUBTABBATSTYLE, contentOpt, std::nullopt, std::nullopt, nullptr, nullptr, isJsView,
+        reinterpret_cast<ArkUINodeHandle>(frameNode));
 }
 
 void SetLayoutMode(EcmaVM* vm, const Local<JSValueRef>& info)
@@ -796,7 +836,7 @@ void SetIconStyle(EcmaVM* vm, const Local<JSValueRef>& info, FrameNode* frameNod
     GetArkUINodeModifiers()->getTabContentModifier()->setIconStyle(GetCurrentTabContentNode(), &iconStyle);
 }
 
-void SetBottomTabBarStyle(EcmaVM* vm, const Local<JSValueRef>& info, FrameNode* frameNode)
+void SetBottomTabBarStyle(EcmaVM* vm, const Local<JSValueRef>& info, FrameNode* frameNode, bool isJsView)
 {
     auto paramObject = info->ToObject(vm);
     auto textParam = ArkTSUtils::GetProperty(vm, paramObject, "text");
@@ -851,7 +891,10 @@ void SetBottomTabBarStyle(EcmaVM* vm, const Local<JSValueRef>& info, FrameNode* 
 
     ApplyCreateWithResourceObj(TabContentJsType::TEXT_CONTENT, resTextObj);
     ApplyCreateWithResourceObj(TabContentJsType::BOTTOM_TAB_BAR_STYLE_ICON, resIconObj);
-    ApplySetTabBar(TabBarStyle::BOTTOMTABBATSTYLE, textOpt, iconOpt, tabBarSymbol, nullptr, nullptr, false);
+    auto badgeParams = ParseBadgeParameters(vm, ArkTSUtils::GetProperty(vm, paramObject, "badge"));
+    ApplySetTabBarBadge(reinterpret_cast<ArkUINodeHandle>(frameNode), badgeParams);
+    ApplySetTabBar(TabBarStyle::BOTTOMTABBATSTYLE, textOpt, iconOpt, tabBarSymbol, nullptr, nullptr, isJsView,
+        reinterpret_cast<ArkUINodeHandle>(frameNode));
 }
 }
 
@@ -867,6 +910,7 @@ void TabContentBridge::RegisterTabContentAttributes(panda::Local<panda::ObjectRe
         "setTabContentOnWillShow", "resetTabContentOnWillShow",
         "setTabContentOnWillHide", "resetTabContentOnWillHide",
         "setTabBarVisibility", "resetTabBarVisibility",
+        "setSidebarSection", "resetSidebarSection",
     };
     Local<panda::JSValueRef> funcValues[] = {
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabContentBridge::Create),
@@ -885,6 +929,8 @@ void TabContentBridge::RegisterTabContentAttributes(panda::Local<panda::ObjectRe
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabContentBridge::ResetTabContentOnWillHide),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabContentBridge::SetTabBarVisibility),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabContentBridge::ResetTabBarVisibility),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabContentBridge::SetSidebarSection),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabContentBridge::ResetSidebarSection),
     };
     auto tabContent = panda::ObjectRef::NewWithNamedProperties(
         vm, ArraySize(functionNames), functionNames, funcValues);
@@ -934,6 +980,7 @@ ArkUINativeModuleValue TabContentBridge::SetTabBar(ArkUIRuntimeCallInfo* runtime
     if (tabBarInfo.IsNull()) {
         return panda::JSValueRef::Undefined(vm);
     }
+    bool isJsView = ArkTSUtils::IsJsView(nodeArg, vm);
 
     TabContentResourceObjParam param_TEXT_CONTENT { TabContentJsType::TEXT_CONTENT, nullptr };
     GetArkUINodeModifiers()->getTabContentModifier()->createWithResourceObj(nativeNode, &param_TEXT_CONTENT);
@@ -945,7 +992,8 @@ ArkUINativeModuleValue TabContentBridge::SetTabBar(ArkUIRuntimeCallInfo* runtime
     RefPtr<ResourceObject> resTextObj;
     std::string infoStr;
     if (ArkTSUtils::ParseJsString(vm, tabBarInfo, infoStr, resTextObj)) {
-        ApplySetTabBar(TabBarStyle::NOSTYLE, infoStr, std::nullopt, std::nullopt, nullptr, nullptr, true);
+        ApplySetTabBar(
+            TabBarStyle::NOSTYLE, infoStr, std::nullopt, std::nullopt, nullptr, nullptr, isJsView, nativeNode);
         if (SystemProperties::ConfigChangePerform()) {
             ApplyCreateWithResourceObj(TabContentJsType::TEXT_CONTENT, resTextObj);
         }
@@ -953,7 +1001,8 @@ ArkUINativeModuleValue TabContentBridge::SetTabBar(ArkUIRuntimeCallInfo* runtime
     }
 
     if (!tabBarInfo->IsObject(vm)) {
-        ApplySetTabBar(TabBarStyle::NOSTYLE, std::nullopt, std::nullopt, std::nullopt, nullptr, nullptr, false);
+        ApplySetTabBar(TabBarStyle::NOSTYLE, std::nullopt, std::nullopt, std::nullopt, nullptr, nullptr, isJsView,
+            nativeNode);
         return panda::JSValueRef::Undefined(vm);
     }
 
@@ -966,7 +1015,8 @@ ArkUINativeModuleValue TabContentBridge::SetTabBar(ArkUIRuntimeCallInfo* runtime
             auto* node = nodeptr->ToNativePointer(vm)->Value();
             auto* frameNode = reinterpret_cast<NG::FrameNode*>(node);
             CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
-            ApplySetTabBar(TabBarStyle::NOSTYLE, std::nullopt, std::nullopt, std::nullopt, nullptr, frameNode, false);
+            ApplySetTabBar(TabBarStyle::NOSTYLE, std::nullopt, std::nullopt, std::nullopt, nullptr, frameNode, isJsView,
+                nativeNode);
             return panda::JSValueRef::Undefined(vm);
         }
     }
@@ -984,18 +1034,19 @@ ArkUINativeModuleValue TabContentBridge::SetTabBar(ArkUIRuntimeCallInfo* runtime
                 ArkTSUtils::HandleCallbackJobs(vm, trycatch, result);
             }
         };
-        ApplySetTabBar(TabBarStyle::NOSTYLE, std::nullopt, std::nullopt, std::nullopt, &builder, nullptr, false);
+        ApplySetTabBar(TabBarStyle::NOSTYLE, std::nullopt, std::nullopt, std::nullopt, &builder, nullptr, isJsView,
+            nativeNode);
         return panda::JSValueRef::Undefined(vm);
     }
     auto typeParam = ArkTSUtils::GetProperty(vm, paramObject, "type");
     if (!typeParam.IsNull() &&!typeParam->IsUndefined() && typeParam->IsString(vm)) {
         auto type = typeParam->ToString(vm)->ToString(vm);
         if (type == "SubTabBarStyle") {
-            SetSubTabBarStyle(vm, paramObject, frameNode);
+            SetSubTabBarStyle(vm, paramObject, frameNode, isJsView);
             return panda::JSValueRef::Undefined(vm);
         }
         if (type == "BottomTabBarStyle") {
-            SetBottomTabBarStyle(vm, tabBarInfo, frameNode);
+            SetBottomTabBarStyle(vm, tabBarInfo, frameNode, isJsView);
             return panda::JSValueRef::Undefined(vm);
         }
     }
@@ -1021,8 +1072,10 @@ ArkUINativeModuleValue TabContentBridge::SetTabBar(ArkUIRuntimeCallInfo* runtime
             iconOpt = icon;
         }
     }
-    ApplySetTabBar(TabBarStyle::NOSTYLE, textOpt, iconOpt, std::nullopt, nullptr, nullptr, false);
     ApplyCreateWithResourceObj(TabContentJsType::TAB_BAR_OPTIONS_ICON, resIconObj);
+    auto badgeParams = ParseBadgeParameters(vm, ArkTSUtils::GetProperty(vm, paramObject, "badge"));
+    ApplySetTabBarBadge(nativeNode, badgeParams);
+    ApplySetTabBar(TabBarStyle::NOSTYLE, textOpt, iconOpt, std::nullopt, nullptr, nullptr, isJsView, nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }
 
@@ -1199,7 +1252,7 @@ ArkUINativeModuleValue TabContentBridge::SetTabBarVisibility(ArkUIRuntimeCallInf
     ArkUI_Bool hasDisplayMode = false;
     if (!displayModeArg.IsNull() && !displayModeArg->IsUndefined() && displayModeArg->IsNumber()) {
         auto displayModeVal = displayModeArg->Int32Value(vm);
-        if (displayModeVal >= BAR_DISPLAY_MODE_BOTTOMTABBAR && displayModeVal <= BAR_DISPLAY_MODE_SIDEBAR) {
+        if (displayModeVal >= BAR_DISPLAY_MODE_BOTTOMTABBAR && displayModeVal <= BAR_DISPLAY_MODE_TOP) {
             displayMode = displayModeVal;
             hasDisplayMode = true;
         }
@@ -1217,6 +1270,63 @@ ArkUINativeModuleValue TabContentBridge::ResetTabBarVisibility(ArkUIRuntimeCallI
     CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
     auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
     GetArkUINodeModifiers()->getTabContentModifier()->resetTabBarVisibility(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue TabContentBridge::SetSidebarSection(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(TABCONTENT_ARG_INDEX_0);
+    Local<JSValueRef> sectionArg = runtimeCallInfo->GetCallArgRef(TABCONTENT_ARG_INDEX_1);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+
+    std::string title;
+    if (!sectionArg.IsNull() && !sectionArg->IsUndefined() && sectionArg->IsObject(vm)) {
+        auto sectionObj = sectionArg->ToObject(vm);
+        // Parse "title" - can be string or Resource
+        Local<JSValueRef> titleVal = ArkTSUtils::GetProperty(vm, sectionObj, "title");
+        RefPtr<ResourceObject> resTitleObj;
+        if (SystemProperties::ConfigChangePerform()) {
+            if (!titleVal.IsNull() && !titleVal->IsUndefined()) {
+                ArkTSUtils::ParseJsString(vm, titleVal, title, resTitleObj);
+            }
+        } else if (!titleVal.IsNull() && !titleVal->IsUndefined()) {
+            ArkTSUtils::ParseJsString(vm, titleVal, title);
+        }
+        // Parse "order" - optional number, range [0, INT32_MAX), out-of-range treated as unset
+        Local<JSValueRef> orderVal = ArkTSUtils::GetProperty(vm, sectionObj, "order");
+        ArkUI_Bool hasOrder = false;
+        ArkUI_Int32 order = 0;
+        if (!orderVal.IsNull() && !orderVal->IsUndefined() && orderVal->IsNumber()) {
+            double orderNum = orderVal->ToNumber(vm)->Value();
+            int64_t orderInt = static_cast<int64_t>(std::floor(orderNum));
+            if (orderInt >= 0 && orderInt < static_cast<int64_t>(INT32_MAX)) {
+                order = static_cast<ArkUI_Int32>(orderInt);
+                hasOrder = true;
+            }
+        }
+        // Parse "titleStyle" - optional enum, 0=STANDARD (medium), 1=EMPHASIZED (bold)
+        Local<JSValueRef> titleStyleVal = ArkTSUtils::GetProperty(vm, sectionObj, "titleStyle");
+        ArkUI_Int32 titleStyle = 0; // default STANDARD
+        if (!titleStyleVal.IsNull() && !titleStyleVal->IsUndefined() && titleStyleVal->IsNumber()) {
+            titleStyle = static_cast<ArkUI_Int32>(titleStyleVal->ToNumber(vm)->Value());
+        }
+        GetArkUINodeModifiers()->getTabContentModifier()->setSidebarSection(
+            nativeNode, title.c_str(), hasOrder, order, titleStyle, resTitleObj.GetRawPtr());
+    }
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue TabContentBridge::ResetSidebarSection(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(0);
+    CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
+    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    GetArkUINodeModifiers()->getTabContentModifier()->resetSidebarSection(nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }
 } // namespace OHOS::Ace::NG

@@ -61,6 +61,9 @@ constexpr char CONNECT_TO_RENDER[] = "ohos.connect.to.render";
 constexpr int32_t RENDER_DEAD_CODE = 16501006;
 constexpr int32_t FORM_NOT_TRUST_CODE = 16501007;
 constexpr int32_t FORM_STATUS_TIME_OUT = 16501009;
+constexpr int32_t FMS_DEATH_RECOVERY_FIRST_DELAY_MS = 500; // wait for restarted FMS to initialize
+constexpr int32_t FMS_DEATH_RECOVERY_RETRY_INTERVAL_MS = 1000;
+constexpr int32_t FMS_DEATH_RECOVERY_MAX_RETRY = 5; // total retry time within 5 seconds
 constexpr char ALLOW_UPDATE[] = "allowUpdate";
 constexpr char IS_DYNAMIC[] = "isDynamic";
 constexpr uint32_t DELAY_TIME_FOR_FORM_SNAPSHOT_10S = 10000;
@@ -165,6 +168,10 @@ void FormManagerDelegate::AddForm(const WeakPtr<PipelineBase>& context, const Re
     }
     formCallbackClient_->SetFormManagerDelegate(AceType::WeakClaim(this));
     clientInstance->AddForm(formCallbackClient_, formJsInfo);
+    // Death callback enables automatic re-add after FMS restarts.
+    if (!OHOS::AppExecFwk::FormMgr::GetInstance().CheckIsDeathCallbackRegistered(formCallbackClient_)) {
+        OHOS::AppExecFwk::FormMgr::GetInstance().RegisterDeathCallback(formCallbackClient_);
+    }
 
     runningCardId_ = formJsInfo.formId;
     runningCompId_ = std::to_string(info.index);
@@ -1000,7 +1007,7 @@ void FormManagerDelegate::HandleLockFormCallback(bool lock)
     lockFormCallback_(lock);
 }
 
-void FormManagerDelegate::ReAddForm()
+int32_t FormManagerDelegate::TryReAddForm()
 {
     std::lock_guard<std::mutex> lock(wantCacheMutex_);
     ClearFormRendererDispatcher(); // formRendererDispatcher_ need reset, otherwise PointerEvent will disable
@@ -1009,15 +1016,22 @@ void FormManagerDelegate::ReAddForm()
         wantCache_.RemoveParam(PARAM_FORM_MIGRATE_FORM_KEY);
     }
     auto clientInstance = OHOS::AppExecFwk::FormHostClient::GetInstance();
-    wantCache_.SetParam(FORM_RENDERER_PROCESS_ON_ADD_SURFACE, renderDelegate_->AsObject());
+    if (renderDelegate_) {
+        wantCache_.SetParam(FORM_RENDERER_PROCESS_ON_ADD_SURFACE, renderDelegate_->AsObject());
+    }
     if (rsUIContext_ && rsUIContext_->GetConnectToRender()) {
         auto connectToRender = rsUIContext_->GetConnectToRender();
         wantCache_.SetParam(CONNECT_TO_RENDER, connectToRender);
     } else {
         TAG_LOGE(AceLogTag::ACE_FORM, "rsUIContext_ or connectToRender is null");
     }
-    auto ret =
-        OHOS::AppExecFwk::FormMgr::GetInstance().AddForm(formJsInfo_.formId, wantCache_, clientInstance, formJsInfo_);
+    return OHOS::AppExecFwk::FormMgr::GetInstance().AddForm(
+        formJsInfo_.formId, wantCache_, clientInstance, formJsInfo_);
+}
+
+void FormManagerDelegate::ReAddForm()
+{
+    auto ret = TryReAddForm();
     if (ret != 0) {
         auto errorMsg = OHOS::AppExecFwk::FormMgr::GetInstance().GetErrorMessage(ret);
         TAG_LOGW(AceLogTag::ACE_FORM, "Re-add form failed, ret:%{public}d detail:%{public}s", ret, errorMsg.c_str());
@@ -1125,6 +1139,10 @@ void FormManagerDelegate::ReleaseForm()
 
     auto clientInstance = OHOS::AppExecFwk::FormHostClient::GetInstance();
     clientInstance->RemoveForm(formCallbackClient_, runningCardId_);
+    // FormMgr holds death callbacks process-wide; unregister to avoid stale entries.
+    if (formCallbackClient_ != nullptr) {
+        OHOS::AppExecFwk::FormMgr::GetInstance().UnRegisterDeathCallback(formCallbackClient_);
+    }
 }
 
 void FormManagerDelegate::ProcessFormUpdate(const AppExecFwk::FormJsInfo& formJsInfo)
@@ -1185,10 +1203,65 @@ void FormManagerDelegate::ProcessFormUninstall(const int64_t formId)
 
 void FormManagerDelegate::OnDeathReceived()
 {
-    AppExecFwk::FormJsInfo formJsInfo;
-    std::lock_guard<std::mutex> lock(wantCacheMutex_);
-    OHOS::AppExecFwk::FormMgr::GetInstance().AddForm(
-        runningCardId_, wantCache_, OHOS::AppExecFwk::FormHostClient::GetInstance(), formJsInfo);
+    TAG_LOGI(AceLogTag::ACE_FORM, "FMS died and recovered, formId: %{public}" PRId64, runningCardId_);
+    if (runningCardId_ <= 0) {
+        return;
+    }
+    bool expected = false;
+    if (!deathRecoveryRunning_.compare_exchange_strong(expected, true)) {
+        TAG_LOGW(AceLogTag::ACE_FORM, "death recovery already running, formId: %{public}" PRId64, runningCardId_);
+        return;
+    }
+    ScheduleDeathRecoveryTask(0);
+}
+
+void FormManagerDelegate::ScheduleDeathRecoveryTask(int32_t round)
+{
+    auto context = context_.Upgrade();
+    if (!context) {
+        TAG_LOGE(AceLogTag::ACE_FORM, "pipeline context is null, stop death recovery");
+        deathRecoveryRunning_.store(false);
+        return;
+    }
+    auto taskExecutor = SingleTaskExecutor::Make(context->GetTaskExecutor(), TaskExecutor::TaskType::PLATFORM);
+    int32_t delay = round <= 0 ? FMS_DEATH_RECOVERY_FIRST_DELAY_MS : FMS_DEATH_RECOVERY_RETRY_INTERVAL_MS;
+    // Delayed background tasks are rejected by the task executor, so use the platform queue.
+    bool posted = taskExecutor.PostDelayedTask([weak = WeakClaim(this), round]() {
+        auto delegate = weak.Upgrade();
+        if (delegate) {
+            delegate->ExecuteDeathRecovery(round);
+        }
+    }, delay, "ArkUIFormFmsDeathRecover");
+    if (!posted) {
+        TAG_LOGE(AceLogTag::ACE_FORM, "post death recovery task failed, formId: %{public}" PRId64, runningCardId_);
+        deathRecoveryRunning_.store(false);
+    }
+}
+
+void FormManagerDelegate::ExecuteDeathRecovery(int32_t round)
+{
+    if (runningCardId_ <= 0) {
+        TAG_LOGW(AceLogTag::ACE_FORM, "form released during death recovery");
+        deathRecoveryRunning_.store(false);
+        return;
+    }
+    int32_t ret = TryReAddForm();
+    if (ret == 0) {
+        TAG_LOGI(AceLogTag::ACE_FORM, "FMS death recovery success, formId: %{public}" PRId64, runningCardId_);
+        deathRecoveryRunning_.store(false);
+        return;
+    }
+    if (round + 1 >= FMS_DEATH_RECOVERY_MAX_RETRY) {
+        TAG_LOGW(AceLogTag::ACE_FORM, "FMS death recovery exhausted, formId: %{public}" PRId64, runningCardId_);
+        deathRecoveryRunning_.store(false);
+        // Runs on the UI queue: same error path as the initial AddForm failure.
+        auto errorMsg = OHOS::AppExecFwk::FormMgr::GetInstance().GetErrorMessage(ret);
+        OnFormError(std::to_string(ret), errorMsg);
+        return;
+    }
+    TAG_LOGW(AceLogTag::ACE_FORM, "FMS death recovery retry, round:%{public}d ret:%{public}d formId:%{public}" PRId64,
+        round, ret, runningCardId_);
+    ScheduleDeathRecoveryTask(round + 1);
 }
 
 void FormManagerDelegate::SetFormUtils(const std::shared_ptr<FormUtils>& formUtils)

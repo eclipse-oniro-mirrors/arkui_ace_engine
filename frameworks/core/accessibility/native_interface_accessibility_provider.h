@@ -16,10 +16,12 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_ACCESSIBILITY_NATIVE_INTERFACE_ACCESSIBILITY_HANDLE_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_ACCESSIBILITY_NATIVE_INTERFACE_ACCESSIBILITY_HANDLE_H
 
+#include <atomic>
 #include <functional>
-#include "base/utils/macros.h"
 #include <memory>
+#include <mutex>
 
+#include "base/utils/macros.h"
 #include "core/accessibility/accessibility_provider.h"
 
 enum AccessibilityProviderOperatorErrorCode : int32_t {
@@ -65,10 +67,21 @@ public:
     void SetRegisterCallback(RegisterCallback callback);
 
 private:
-    ArkUI_AccessibilityProviderCallbacks accessibilityProviderCallbacks_ {};
-    ArkUI_AccessibilityProviderCallbacksWithInstance accessibilityProviderCallbacksWithInstance_ {};
+    void NotifyRegisterCallback(bool isRegister);
+
+    struct CallbackSnapshot {
+        ArkUI_AccessibilityProviderCallbacks callbacks {};
+        ArkUI_AccessibilityProviderCallbacksWithInstance callbacksWithInstance {};
+        std::string instanceId;
+    };
+    CallbackSnapshot GetCallbackSnapshot();
+
+    std::mutex callbacksMutex_;
+    CallbackSnapshot callbacks_;
     OHOS::Ace::WeakPtr<OHOS::Ace::AccessibilityProvider> accessibilityProvider_;
+    std::mutex accessibilityProviderMutex_;
     RegisterCallback registerCallback_;
-    std::string instanceId_;
+    std::mutex registerCallbackMutex_;
+    std::atomic<bool> callbacksRegistered_ { false };
 };
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_ACCESSIBILITY_NATIVE_INTERFACE_ACCESSIBILITY_HANDLE_H

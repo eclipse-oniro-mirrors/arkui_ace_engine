@@ -301,6 +301,32 @@ std::string Localization::FormatDuration(uint32_t duration, const std::string& f
     return ret;
 }
 
+std::string Localization::FormatDurationLocalized(uint32_t duration, const std::string& format)
+{
+    WaitingForInit();
+    UErrorCode status = U_ZERO_ERROR;
+
+    auto patternGenerator = DateTimePatternGenerator::createInstance(locale_->instance, status);
+    CHECK_RETURN(status, "");
+    UnicodeString pattern = patternGenerator->getBestPattern(UnicodeString(format.c_str()), status);
+    delete patternGenerator;
+    CHECK_RETURN(status, "");
+
+    auto simpleDateFormat = std::make_unique<SimpleDateFormat>(pattern, locale_->instance, status);
+    CHECK_RETURN(status, "");
+    TimeZone* timeZone = TimeZone::createTimeZone("GMT+0:00");
+    simpleDateFormat->setTimeZone(*timeZone);
+
+    UnicodeString simpleStr;
+    simpleDateFormat->format(1.0 * duration, simpleStr, status);
+    delete timeZone;
+    CHECK_RETURN(status, "");
+
+    std::string ret;
+    UnicodeString2String(simpleStr, ret);
+    return ret;
+}
+
 const std::string Localization::FormatDateTime(DateTime dateTime, const std::string& format)
 {
     WaitingForInit();
@@ -316,6 +342,37 @@ const std::string Localization::FormatDateTime(DateTime dateTime, const std::str
     auto patternGenerator = DateTimePatternGenerator::createInstance(locale_->instance, status);
     CHECK_RETURN(status, "");
     UnicodeString pattern = patternGenerator->getBestPattern(UnicodeString(format.c_str()), status);
+    delete patternGenerator;
+    CHECK_RETURN(status, "");
+
+    auto dateFormat = std::make_unique<SimpleDateFormat>(pattern, locale_->instance, status);
+    CHECK_RETURN(status, "");
+
+    UnicodeString dateTimeStr;
+    dateFormat->format(date, dateTimeStr, status);
+    CHECK_RETURN(status, "");
+
+    std::string ret;
+    UnicodeString2String(dateTimeStr, ret);
+    return ret;
+}
+
+const std::string Localization::FormatDateTimeMatchHourField(DateTime dateTime, const std::string& format)
+{
+    WaitingForInit();
+    UErrorCode status = U_ZERO_ERROR;
+    auto cal = Calendar::createInstance(locale_->instance, status);
+    CHECK_RETURN(status, "");
+    cal->set(dateTime.year, dateTime.month, dateTime.day, dateTime.hour, dateTime.minute, dateTime.second);
+
+    UDate date = cal->getTime(status);
+    delete cal;
+    CHECK_RETURN(status, "");
+
+    auto patternGenerator = DateTimePatternGenerator::createInstance(locale_->instance, status);
+    CHECK_RETURN(status, "");
+    UnicodeString pattern = patternGenerator->getBestPattern(UnicodeString(format.c_str()),
+        UDATPG_MATCH_HOUR_FIELD_LENGTH, status);
     delete patternGenerator;
     CHECK_RETURN(status, "");
 
@@ -745,6 +802,41 @@ std::string Localization::NumberFormat(double number)
     return ret;
 }
 
+std::string Localization::NumberFormat(int32_t number)
+{
+    WaitingForInit();
+    UErrorCode status = U_ZERO_ERROR;
+
+    icu::number::LocalizedNumberFormatter formatter = icu::number::NumberFormatter::withLocale(locale_->instance);
+    icu::number::FormattedNumber formattedNumber = formatter.formatInt(number, status);
+    CHECK_RETURN(status, "");
+
+    UnicodeString numberFormat = formattedNumber.toString(status);
+    CHECK_RETURN(status, "");
+
+    std::string ret;
+    UnicodeString2String(numberFormat, ret);
+    return ret;
+}
+
+std::string Localization::FormatPercent(int32_t number)
+{
+    WaitingForInit();
+    UErrorCode status = U_ZERO_ERROR;
+
+    icu::number::LocalizedNumberFormatter formatter = icu::number::NumberFormatter::withLocale(locale_->instance);
+    auto percentFormatter = formatter.unit(NoUnit::percent());
+    auto formattedNumber = percentFormatter.formatInt(number, status);
+    CHECK_RETURN(status, "");
+
+    UnicodeString percentFormat = formattedNumber.toString(status);
+    CHECK_RETURN(status, "");
+
+    std::string ret;
+    UnicodeString2String(percentFormat, ret);
+    return ret;
+}
+
 std::vector<std::u16string> Localization::GetLetters(bool alphabet)
 {
     WaitingForInit();
@@ -1089,6 +1181,42 @@ bool Localization::LocalizeNumber(const std::string &inputNum, std::string &outp
     outputNum.clear();
     UnicodeString2String(formattedNum, outputNum);
     return true;
+}
+
+std::string Localization::LocalizeDigits(const std::string& numStr)
+{
+    if (numStr.empty()) {
+        return numStr;
+    }
+    WaitingForInit();
+    if (!locale_) {
+        return numStr;
+    }
+
+    icu::number::LocalizedNumberFormatter numberFormat =
+        icu::number::NumberFormatter::withLocale(locale_->instance);
+
+    std::string result;
+    result.reserve(numStr.size());
+    for (char ch : numStr) {
+        if (ch >= '0' && ch <= '9') {
+            UErrorCode status = U_ZERO_ERROR;
+            icu::number::FormattedNumber formatted = numberFormat.formatInt(ch - '0', status);
+            if (U_FAILURE(status)) {
+                result.push_back(ch);
+                continue;
+            }
+            UnicodeString digitStr = formatted.toString(status);
+            if (U_FAILURE(status)) {
+                result.push_back(ch);
+                continue;
+            }
+            UnicodeString2String(digitStr, result);
+        } else {
+            result.push_back(ch);
+        }
+    }
+    return result;
 }
 
 } // namespace OHOS::Ace

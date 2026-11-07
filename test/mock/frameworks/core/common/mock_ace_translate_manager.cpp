@@ -14,15 +14,90 @@
  */
 #include <cstdint>
 
+#include "base/log/log_wrapper.h"
 #include "base/utils/macros.h"
 #include "core/common/ace_translate_manager.h"
+#include "core/components_ng/pattern/page_translate/page_translate_node.h"
+#include "core/components_ng/pattern/pattern.h"
+#include "core/components_v2/inspector/inspector_constants.h"
+#include "interfaces/inner_api/ui_session/ui_session_manager.h"
 
 namespace OHOS::Ace {
 void UiTranslateManagerImpl::AddPixelMap(int32_t nodeId, RefPtr<PixelMap> pixelMap) {}
 
 void UiTranslateManagerImpl::GetAllPixelMap(RefPtr<NG::FrameNode> node) {}
 
-void UiTranslateManagerImpl::AddTranslateListener(const WeakPtr<NG::FrameNode> node) {}
+// Keep registry behavior aligned with ace_translate_manager.cpp; external services are stubbed below.
+void UiTranslateManagerImpl::AddTranslateListener(const WeakPtr<NG::FrameNode> node)
+{
+    auto frame = node.Upgrade();
+    CHECK_NULL_VOID(frame);
+    auto carrier = AceType::DynamicCast<NG::PageTranslateNode>(frame->GetPattern());
+    CHECK_NULL_VOID(carrier);
+    auto id = carrier->GetPageTranslateNodeId();
+    CHECK_NULL_VOID(id >= 0);
+    listenerMap_[id] = { node, WeakPtr<NG::PageTranslateNode>(carrier) };
+}
 
-void UiTranslateManagerImpl::RemoveTranslateListener(int32_t nodeId) {}
+void UiTranslateManagerImpl::RemoveTranslateListener(int32_t nodeId)
+{
+    listenerMap_.erase(nodeId);
+}
+
+void UiTranslateManagerImpl::ForEachArkUITranslateFrameNode(
+    const std::function<void(const WeakPtr<NG::FrameNode>&)>& callback) const
+{
+    CHECK_NULL_VOID(callback);
+    for (const auto& listener : listenerMap_) {
+        // Host component tests do not link the platform WebPattern implementation.
+        auto frame = listener.second.frameNode.Upgrade();
+        if (frame && frame->GetTag() == V2::WEB_ETS_TAG) {
+            continue;
+        }
+        callback(listener.second.frameNode);
+    }
+}
+
+void UiTranslateManagerImpl::GetWebViewCurrentLanguage() {}
+void UiTranslateManagerImpl::GetTranslateText(std::string, bool) {}
+void UiTranslateManagerImpl::GetPageTranslateText(int32_t, const std::string&) {}
+void UiTranslateManagerImpl::StartPageTranslate(int32_t, const std::string&) {}
+void UiTranslateManagerImpl::EndPageTranslate(int32_t) {}
+void UiTranslateManagerImpl::ResetPageTranslate(int32_t) {}
+void UiTranslateManagerImpl::SendPageTranslateResult(const std::vector<TranslateResult>&) {}
+void UiTranslateManagerImpl::SendTranslateResult(int32_t, std::vector<std::string>, std::vector<int32_t>) {}
+void UiTranslateManagerImpl::ResetTranslate(int32_t) {}
+void UiTranslateManagerImpl::SendTranslateResult(int32_t, std::string) {}
+void UiTranslateManagerImpl::ClearMap() {}
+void UiTranslateManagerImpl::PostToUI(const std::function<void()>&) {}
+
+void UiTranslateManagerImpl::GetWebInfoByRequest(uint32_t windowId, int32_t webId, const std::string& request)
+{
+    auto iter = listenerMap_.find(webId);
+    if (iter != listenerMap_.end()) {
+        auto translateNode = iter->second.translateNode.Upgrade();
+        CHECK_NULL_VOID(translateNode);
+        const auto& finishCallback = []
+            (uint32_t windowId, int32_t webId, const std::string& request, const std::string& result,
+                WebRequestErrorCode errorCode) {
+                UiSessionManager::GetInstance()->SendWebInfoByRequest(windowId, webId, request, result, errorCode);
+            };
+        finishCallback(windowId, webId, request, "", WebRequestErrorCode::INVALID_REQUEST);
+        return;
+    }
+    std::string availableWebIds;
+    for (const auto& listener : listenerMap_) {
+        if (!listener.second.translateNode.Upgrade()) {
+            continue;
+        }
+        if (!availableWebIds.empty()) {
+            availableWebIds += ",";
+        }
+        availableWebIds += std::to_string(listener.first);
+    }
+    LOGI("GetWebInfoByRequest webId:%{public}d not found, available webIds: [%{public}s]",
+        webId, availableWebIds.c_str());
+    UiSessionManager::GetInstance()->SendWebInfoByRequest(
+        windowId, webId, request, "", WebRequestErrorCode::INVALID_WEB_ID);
+}
 } // namespace OHOS::Ace

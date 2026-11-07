@@ -1511,4 +1511,100 @@ HWTEST_F(MovingphotoTestNg, MovingPhotoPatternTest037, TestSize.Level1)
     ASSERT_TRUE(property->HasVideoSize());
     EXPECT_EQ(property->GetVideoSizeValue(SizeF(0, 0)).Height(), 100);
 }
+
+
+/**
+ * @tc.name: MovingPhotoPatternTest038
+ * @tc.desc: Test Prepare when the player is not prepared yet.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MovingphotoTestNg, MovingPhotoPatternTest038, TestSize.Level1)
+{
+    auto frameNode = CreateMovingPhotoNode(g_testProperty);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<MovingPhotoPattern>();
+    ASSERT_NE(pattern, nullptr);
+ 
+    /**
+     * @tc.steps: step2. Call Prepare before the player is prepared.
+     * @tc.expected: step2. prepare is deferred until the PREPARED status arrives.
+     */
+    pattern->isPrepared_ = false;
+    pattern->currentPlayStatus_ = PlaybackStatus::NONE;
+    pattern->Prepare();
+    EXPECT_TRUE(pattern->isPrepareMode_);
+    EXPECT_TRUE(pattern->isPendingPrepare_);
+}
+ 
+/**
+ * @tc.name: MovingPhotoPatternTest039
+ * @tc.desc: Test Prepare when the player is already prepared.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MovingphotoTestNg, MovingPhotoPatternTest039, TestSize.Level1)
+{
+    auto frameNode = CreateMovingPhotoNode(g_testProperty);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<MovingPhotoPattern>();
+    ASSERT_NE(pattern, nullptr);
+ 
+    /**
+     * @tc.steps: step2. Call Prepare with a prepared player.
+     * @tc.expected: step2. cover hidden, seek issued and callback pending.
+     */
+    pattern->isPrepared_ = true;
+    pattern->currentPlayStatus_ = PlaybackStatus::PREPARED;
+    pattern->Prepare();
+    EXPECT_TRUE(pattern->isPrepareMode_);
+    EXPECT_FALSE(pattern->isPendingPrepare_);
+}
+ 
+/**
+ * @tc.name: MovingPhotoPatternTest040
+ * @tc.desc: Test StartPlayAfterPrepare.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MovingphotoTestNg, MovingPhotoPatternTest040, TestSize.Level1)
+{
+    auto frameNode = CreateMovingPhotoNode(g_testProperty);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<MovingPhotoPattern>();
+    ASSERT_NE(pattern, nullptr);
+ 
+    /**
+     * @tc.steps: step2. StartPlay with a prepared, non-started player.
+     * @tc.expected: step2. playback is controller driven.
+     */
+    pattern->isPrepared_ = true;
+    pattern->isPlayByController_ = false;
+    pattern->currentPlayStatus_ = PlaybackStatus::PREPARED;
+    pattern->StartPlay(true);
+    EXPECT_TRUE(pattern->isPlayByController_);
+ 
+    /**
+     * @tc.steps: step3. StartPlayAfterPrepare while already started is a no-op.
+     * @tc.expected: step3. state unchanged.
+     */
+    pattern->isPlayByController_ = false;
+    pattern->currentPlayStatus_ = PlaybackStatus::STARTED;
+    pattern->StartPlay(true);
+    EXPECT_FALSE(pattern->isPlayByController_);
+}
+ 
+/**
+ * @tc.name: MovingPhotoPatternTest041
+ * @tc.desc: Test FirePendingSeekCallback is safe without a pending callback.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MovingphotoTestNg, MovingPhotoPatternTest041, TestSize.Level1)
+{
+    auto frameNode = CreateMovingPhotoNode(g_testProperty);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<MovingPhotoPattern>();
+    ASSERT_NE(pattern, nullptr);
+ 
+    pattern->pendingSeekCallback_ = nullptr;
+    pattern->OnMediaPlayerSeekDone();
+    EXPECT_FALSE(static_cast<bool>(pattern->pendingSeekCallback_));
+}
 } //namespace OHOS::Ace::NG

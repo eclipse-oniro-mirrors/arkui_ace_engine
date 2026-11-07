@@ -22,6 +22,7 @@
 #include "core/common/container.h"
 #include "base/utils/utf_helper.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include "core/components_ng/manager/select_content_overlay/select_overlay_holder.h"
 #include "core/components_ng/pattern/scrollable/nestable_scroll_container.h"
 #include "core/components_ng/pattern/text/text_event_hub.h"
@@ -208,13 +209,13 @@ std::optional<RectF> TextSelectionChild::GetAncestorNodeViewPortForChild()
         }
     }
 
-    auto parent = host->GetAncestorNodeOfFrame(true);
+    auto parent = host->GetCoordinateAncestorNodeOfFrame(true);
     while (parent) {
         auto scrollableContainer = parent->GetPattern<NestableScrollContainer>();
         if (scrollableContainer) {
             return parent->GetTransformRectRelativeToWindow();
         }
-        parent = parent->GetAncestorNodeOfFrame(true);
+        parent = parent->GetCoordinateAncestorNodeOfFrame(true);
     }
     return std::nullopt;
 }
@@ -226,7 +227,7 @@ std::vector<AncestorNodeViewPortInfo> TextSelectionChild::GetAncestorNodeViewPor
     CHECK_NULL_RETURN(pattern, infos);
     auto host = pattern->GetHost();
     CHECK_NULL_RETURN(host, infos);
-    auto parent = host->GetAncestorNodeOfFrame(true);
+    auto parent = host->GetCoordinateAncestorNodeOfFrame(true);
     while (parent) {
         auto scrollableContainer = parent->GetPattern<NestableScrollContainer>();
         if (scrollableContainer) {
@@ -246,7 +247,7 @@ std::vector<AncestorNodeViewPortInfo> TextSelectionChild::GetAncestorNodeViewPor
             info.viewPort = visibleRect;
             infos.emplace_back(info);
         }
-        parent = parent->GetAncestorNodeOfFrame(true);
+        parent = parent->GetCoordinateAncestorNodeOfFrame(true);
     }
     return infos;
 }
@@ -462,7 +463,12 @@ OffsetF TextSelectionChild::GetChildPaintOffsetWithoutTransform() const
         auto renderContext = parent->GetRenderContext();
         CHECK_NULL_RETURN(renderContext, {});
         offset += renderContext->GetPaintRectWithoutTransform().GetOffset();
-        parent = parent->GetAncestorNodeOfFrame(true);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor && parent->IsAdopted() &&
+            FrameNodeAdoptedCompensation::UseAdoptedCompensation(parent.GetRawPtr())) {
+            offset += FrameNodeAdoptedCompensation::GetAdoptedCompensationOffset(parent.GetRawPtr());
+        }
+        parent = ancestor;
     }
     return offset;
 }

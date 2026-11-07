@@ -65,6 +65,8 @@ public:
     void UpdateOuterBorderWidth(const CalcDimension& outerBorderWidth, bool isFirstLoad = false);
     void OnColorConfigurationUpdate() override;
     bool OnThemeScopeUpdate(int32_t themeScopeId) override;
+    void OnLanguageConfigurationUpdate() override;
+    std::string FormatBadgeCount(int32_t count);
 
 private:
     void OnModifyDone() override;

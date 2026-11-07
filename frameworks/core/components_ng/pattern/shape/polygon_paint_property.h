@@ -36,7 +36,7 @@ public:
     RefPtr<PaintProperty> Clone() const override
     {
         auto value = MakeRefPtr<PolygonPaintProperty>();
-        value->PaintProperty::UpdatePaintProperty(DynamicCast<PaintProperty>(this));
+        value->PaintProperty::UpdatePaintProperty(this);
         value->propPoints_ = ClonePoints();
         value->propFill_ = CloneFill();
         value->propFillOpacity_ = CloneFillOpacity();

@@ -19,10 +19,14 @@
 #include <unordered_set>
 
 #include "base/log/log_wrapper.h"
+#include "base/utils/time_util.h"
 #include "core/common/event_manager.h"
 #include "core/common/reporter/reporter.h"
+#include "core/components_ng/event/developer_response_publisher.h"
 #include "core/components_ng/manager/event/json_child_report.h"
+#include "core/components_ng/manager/page_scene/search_scene_click_matcher.h"
 #include "core/pipeline_ng/pipeline_context.h"
+#include <string>
 
 namespace OHOS::Ace::NG {
 
@@ -93,25 +97,7 @@ bool TouchEventActuator::TriggerInteractionCallBack(TouchEventInfo& event)
 
 bool TouchEventActuator::TriggerTouchCallBack(const TouchEvent& point)
 {
-    if (point.type == TouchType::DOWN &&
-        firstInputTimeWithId_.find(point.id) == firstInputTimeWithId_.end()) {
-        firstInputTimeWithId_[point.id] = point.time;
-    }
-    if (point.type == TouchType::UP &&
-        firstInputTimeWithId_.find(point.id) != firstInputTimeWithId_.end()) {
-        int64_t overTime = GetSysTimestamp();
-        int64_t inputTime = static_cast<int64_t>(firstInputTimeWithId_[point.id].time_since_epoch().count());
-        if (SystemProperties::GetTraceInputEventEnabled()) {
-            ACE_SCOPED_TRACE("UserEvent InputTime:%lld OverTime:%lld InputType:TouchEvent",
-                static_cast<long long>(inputTime), static_cast<long long>(overTime));
-        }
-        if (SystemProperties::GetTraceInputEventEnabled()) {
-            ACE_SCOPED_TRACE("UserEvent InputTime:%lld AcceptTime:%lld InputType:TouchEvent",
-                static_cast<long long>(inputTime), static_cast<long long>(overTime));
-        }
-        firstInputTimeWithId_.erase(point.id);
-    }
-
+    UpdateFirstInputTime(point);
     if (touchEvents_.empty() && !touchAfterEvents_ && !userCallback_ && !onTouchEventCallback_ &&
         !commonTouchEventCallback_) {
         return true;
@@ -136,7 +122,59 @@ bool TouchEventActuator::TriggerTouchCallBack(const TouchEvent& point)
         event.AddHistoryPointerEvent(item.GetTouchEventPointerEvent());
     }
     TriggerCallBacks(event);
+    // Search click observation: publish one candidate per touch
+    // operation start when a developer onTouch callback is actually bound.
+    PublishSearchClickCandidate(point);
     return !event.IsStopPropagation();
+}
+
+void TouchEventActuator::UpdateFirstInputTime(const TouchEvent& point)
+{
+    if (point.type == TouchType::DOWN &&
+        firstInputTimeWithId_.find(point.id) == firstInputTimeWithId_.end()) {
+        firstInputTimeWithId_[point.id] = point.time;
+    }
+    if (point.type == TouchType::UP &&
+        firstInputTimeWithId_.find(point.id) != firstInputTimeWithId_.end()) {
+        int64_t overTime = GetSysTimestamp();
+        int64_t inputTime = static_cast<int64_t>(firstInputTimeWithId_[point.id].time_since_epoch().count());
+        if (SystemProperties::GetTraceInputEventEnabled()) {
+            ACE_SCOPED_TRACE("UserEvent InputTime:%lld OverTime:%lld InputType:TouchEvent",
+                static_cast<long long>(inputTime), static_cast<long long>(overTime));
+        }
+        if (SystemProperties::GetTraceInputEventEnabled()) {
+            ACE_SCOPED_TRACE("UserEvent InputTime:%lld AcceptTime:%lld InputType:TouchEvent",
+                static_cast<long long>(inputTime), static_cast<long long>(overTime));
+        }
+        firstInputTimeWithId_.erase(point.id);
+    }
+}
+
+void TouchEventActuator::PublishSearchClickCandidate(const TouchEvent& point)
+{
+    if (point.type != TouchType::DOWN || !SearchClickObserver::GetInstance().HasHandlers() ||
+        (!userCallback_ && !onTouchEventCallback_ && !commonTouchEventCallback_)) {
+        return;
+    }
+    auto responseNode = GetAttachedNode().Upgrade();
+    if (!responseNode) {
+        return;
+    }
+    SearchClickCandidate candidate;
+    candidate.nodeId = responseNode->GetId();
+    candidate.inspectorId = responseNode->GetInspectorId().value_or("");
+    candidate.nodeType = responseNode->GetTag();
+    int64_t now = GetSysTimestamp();
+    candidate.operationTimestampMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::nanoseconds(now)).count();
+    auto pressedTime = point.pressedTime.time_since_epoch().count();
+    if (pressedTime <= 0) {
+        pressedTime = point.time.time_since_epoch().count();
+    }
+    candidate.operationId = SearchClickObserver::BuildOperationId(
+        point.deviceId, point.id, pressedTime > 0 ? pressedTime : now, candidate.nodeId);
+    candidate.responseNode = WeakPtr<FrameNode>(responseNode);
+    SearchClickObserver::GetInstance().Publish(candidate);
 }
 
 bool TouchEventActuator::ShouldResponse()
@@ -155,6 +193,22 @@ bool TouchEventActuator::ShouldResponse()
     }
     ctrl->TrySetFirstResponse(frameNode);
     return true;
+}
+
+TouchEventInfo TouchEventActuator::CreateInputEventInfo(const TouchEvent& event, const RefPtr<FrameNode>& node)
+{
+    TouchEventActuator actuator;
+    actuator.AttachFrameNode(node);
+    auto info = actuator.CreateTouchEventInfo(event);
+    info.AddChangedTouchLocationInfo(actuator.CreateChangedTouchInfo(event, event));
+    for (const auto& point : event.pointers) {
+        info.AddTouchLocationInfo(actuator.CreateTouchItemInfo(point, event, event.type));
+    }
+    for (const auto& history : event.history) {
+        info.AddHistoryLocationInfo(actuator.CreateHistoryTouchItemInfo(history, event));
+        info.AddHistoryPointerEvent(history.GetTouchEventPointerEvent());
+    }
+    return info;
 }
 
 TouchEventInfo TouchEventActuator::CreateTouchEventInfo(const TouchEvent& lastPoint)
@@ -374,6 +428,34 @@ void TouchEventActuator::TriggerCallBacks(TouchEventInfo& event)
         auto commonTouchEventCallback = commonTouchEventCallback_;
         (*commonTouchEventCallback)(event);
     }
+    PublishDeveloperResponse(event);
+}
+
+void TouchEventActuator::PublishDeveloperResponse(TouchEventInfo& event)
+{
+    // Only a node with a developer-visible touch callback can produce a RESPONSE operation.
+    // Pressed-state, focus, tips and other framework-internal touch listeners land in
+    // touchEvents_ as well, so gating on the public callback members is what keeps a plain
+    // component (for example a Button with no onClick/onTouch) from being reported.
+    if (!HasDeveloperTouchCallback()) {
+        return;
+    }
+    const auto& changedTouches = event.GetChangedTouches();
+    if (changedTouches.empty()) {
+        return;
+    }
+    auto touchType = changedTouches.front().GetTouchType();
+    if (touchType != TouchType::DOWN && touchType != TouchType::UP && touchType != TouchType::CANCEL) {
+        return;
+    }
+    auto frameNode = GetAttachedNode().Upgrade();
+    CHECK_NULL_VOID(frameNode);
+    DeveloperResponseCandidate candidate;
+    candidate.node = AceType::WeakClaim(AceType::RawPtr(frameNode));
+    candidate.operationToken = "touch_" + std::to_string(event.GetTouchEventId());
+    candidate.callbackType = DeveloperResponseCallbackType::TOUCH;
+    candidate.touchType = touchType;
+    DeveloperResponsePublisher::GetInstance()->PublishTouch(candidate);
 }
 
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING

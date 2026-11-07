@@ -20,7 +20,7 @@
 
 namespace OHOS::Ace {
 
-struct ToolBarItem : public virtual AceType {
+struct ToolBarItem : public AceType {
     DECLARE_ACE_TYPE(ToolBarItem, AceType);
 
 public:
@@ -42,7 +42,7 @@ enum class NavigationTitleMode {
     MINI,
 };
 
-struct ACE_EXPORT NavigationDeclaration : public virtual AceType {
+struct ACE_EXPORT NavigationDeclaration : public AceType {
     DECLARE_ACE_TYPE(NavigationDeclaration, AceType);
 
 public:

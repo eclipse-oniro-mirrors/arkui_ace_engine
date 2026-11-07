@@ -32,7 +32,7 @@ constexpr double CAPSULE_HOVER_EFFECT_SCALE = 2.0;
  * ProgressTheme defines color and styles of ProgressComponent. ProgressTheme should be built
  * using ProgressTheme::Builder.
  */
-class ProgressTheme : public virtual Theme {
+class ProgressTheme : public Theme {
     DECLARE_ACE_TYPE(ProgressTheme, Theme);
 
 public:

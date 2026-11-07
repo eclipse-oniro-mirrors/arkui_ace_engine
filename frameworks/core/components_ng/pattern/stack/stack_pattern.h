@@ -40,6 +40,12 @@ public:
         return MakeRefPtr<StackLayoutProperty>();
     }
 
+    // Restricted scroll-placeholder whitelist clone: plain layout-only container.
+    RefPtr<Pattern> CloneForPlaceholder() override
+    {
+        return MakeRefPtr<StackPattern>();
+    }
+
     bool IsAtomicNode() const override
     {
         return false;

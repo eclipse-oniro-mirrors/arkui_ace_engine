@@ -17,6 +17,7 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_TEXT_PICKER_BRIDGE_TEXTPICKER_PARSER_H
 
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_api_bridge.h"
+#include "core/components_ng/pattern/text_picker/bridge/textpicker_options.h"
 #include "core/components_ng/pattern/text_picker/textpicker_types.h"
 
 namespace OHOS::Ace::NG {
@@ -37,22 +38,6 @@ struct ParseTextArrayParam {
     std::vector<RefPtr<ResourceObject>> columnWidthResObjs;
     std::vector<RefPtr<ResourceObject>> valueArrResObj;
 };
-struct TextPickerOptions {
-    std::vector<RangeContent> range;
-    uint32_t kind = 0;
-    uint32_t selected = 0;
-    std::string value = "";
-    std::vector<TextCascadePickerOptions> options;
-    std::vector<uint32_t> selecteds;
-    std::vector<std::string> values;
-    std::vector<Dimension> columnWidths;
-    bool hasValue = false;
-    bool hasSelected = false;
-    bool isCascade = false;
-    uint32_t maxCount = 0;
-};
-void ValidateSingleTextPickerOptions(TextPickerOptions& options);
-void ValidateMultiTextPickerOptions(TextPickerOptions& options);
 class TextPickerParser {
 public:
     static void ParseTextStyleFontSize(const EcmaVM* vm, const Local<JSValueRef>& fontSize, PickerTextStyle& textStyle);

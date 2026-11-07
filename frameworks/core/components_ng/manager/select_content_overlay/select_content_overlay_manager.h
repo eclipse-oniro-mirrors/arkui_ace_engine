@@ -38,7 +38,7 @@ enum class NodeType {
     HANDLE, TOUCH_MENU, HANDLE_WITH_MENU, RIGHT_CLICK_MENU
 };
 
-class ACE_FORCE_EXPORT SelectContentOverlayManager : public virtual AceType {
+class ACE_FORCE_EXPORT SelectContentOverlayManager : public AceType {
     DECLARE_ACE_TYPE(SelectContentOverlayManager, AceType);
 
 public:

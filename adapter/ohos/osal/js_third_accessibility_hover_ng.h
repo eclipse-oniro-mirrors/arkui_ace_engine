@@ -16,6 +16,10 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_BRIDGE_COMMON_ACCESSIBILITY_JS_THIRD_ACCESSIBILITY_HOVER_NG_H
 #define FOUNDATION_ACE_FRAMEWORKS_BRIDGE_COMMON_ACCESSIBILITY_JS_THIRD_ACCESSIBILITY_HOVER_NG_H
 
+#include <atomic>
+#include <memory>
+#include <mutex>
+#include <optional>
 #include <vector>
 
 #include "accessibility_config.h"
@@ -30,6 +34,8 @@
 #include "core/event/ace_events.h"
 #include "frameworks/bridge/common/accessibility/accessibility_node_manager.h"
 
+struct ArkUI_AccessibilityElementInfo;
+
 namespace OHOS::Ace {
 struct MouseEvent;
 struct TouchEvent;
@@ -38,6 +44,7 @@ namespace Framework {
 class JsAccessibilityManager;
 struct ActionParam;
 class JsThirdProviderInteractionOperation;
+class ThirdAccessibilityTraversal;
 
 using namespace OHOS::Accessibility;
 
@@ -46,7 +53,10 @@ struct AccessibilityHoverForThirdState {
     std::vector<int64_t> nodesHovering;
     TimeStamp time;
     bool idle = true;
-    bool thirdOperationIdle = true;
+    std::atomic<bool> thirdOperationIdle { true };
+    int64_t hostElementId = -1;
+    std::shared_ptr<const ArkUI_AccessibilityElementInfo> nativeHoverInfo;
+    uint64_t nativeHoverGeneration = 0;
 };
 
 struct AccessibilityHoverForThirdConfig {
@@ -56,20 +66,26 @@ struct AccessibilityHoverForThirdConfig {
     NG::AccessibilityHoverEventType eventType = NG::AccessibilityHoverEventType::ENTER;
     TimeStamp time = std::chrono::high_resolution_clock::now();
     RefPtr<NG::PipelineContext> context;
+    std::vector<int64_t> mountBindIds {};
+    int32_t ownerNodeId = -1;
+    WeakPtr<NG::FrameNode> nativeHoverHost;
+    std::shared_ptr<const ArkUI_AccessibilityElementInfo> nativeHoverInfo;
+    uint64_t nativeHoverGeneration = 0;
 };
 
 using AccessibilityHoverTestPathForThird = std::vector<int64_t>;
 
-class AccessibilityHoverManagerForThirdNG : public AceType {
+class AccessibilityHoverManagerForThirdNG : public virtual AceType {
     DECLARE_ACE_TYPE(AccessibilityHoverManagerForThirdNG, AceType);
 
 public:
+    void PrepareNativeHoverResult(AccessibilityHoverForThirdConfig& config);
     void HandleAccessibilityHoverForThird(
         const AccessibilityHoverForThirdConfig& config);
     bool GetElementInfoForThird(
         int64_t elementId,
         AccessibilityElementInfo& info,
-        int64_t hostElementId);
+        int64_t hostElementId, ThirdAccessibilityTraversal* traversal = nullptr);
 
     bool ActThirdAccessibilityFocus(
         int64_t elementId,
@@ -81,10 +97,12 @@ public:
         int64_t hostElementId,
         const std::shared_ptr<JsThirdProviderInteractionOperation>& jsThirdProviderOperator);
     void DeregisterJsThirdProviderInteractionOperation(int64_t hostElementId);
-    std::weak_ptr<JsThirdProviderInteractionOperation> &GetJsThirdProviderInteractionOperation(
-        int64_t hostElementId)
+    std::weak_ptr<JsThirdProviderInteractionOperation> GetJsThirdProviderInteractionOperation(int64_t hostElementId)
     {
-        return jsThirdProviderOperator_[hostElementId];
+        std::lock_guard<std::mutex> lock(thirdProviderMutex_);
+        auto operation = jsThirdProviderOperator_.find(hostElementId);
+        return operation == jsThirdProviderOperator_.end() ?
+            std::weak_ptr<JsThirdProviderInteractionOperation>() : operation->second;
     }
 
     bool OnDumpChildInfoForThirdRecursive(
@@ -97,16 +115,47 @@ public:
 private:
     void HandleAccessibilityHoverForThirdInner(
         const AccessibilityHoverForThirdConfig& config);
+    void DrainPendingHoverForThird(AccessibilityHoverForThirdConfig config);
+    void SendHoverExitForThird();
+    void HandleNativeHoverForThird(const AccessibilityHoverForThirdConfig& config);
+    // CMP mixed-rendering: if hit node is a bindId mount node within an exported subtree, transfer hover to native.
+    void TransferHoverToExportedSubtreeIfNeeded(
+        int64_t hitElementId,
+        const AccessibilityHoverForThirdConfig& config);
+    void TransferHoverToExportedSubtreeOnUI(int64_t hitElementId,
+        const AccessibilityHoverForThirdConfig& config);
+    void UpdateHoverTransferOnUI(const RefPtr<NG::FrameNode>& exportedRoot,
+        const NG::PointF& point, const AccessibilityHoverForThirdConfig& config);
+    // Coordinate geometry of one hover transfer (provider-space point → exportedRoot's ArkUI-parent space), per the.
+    struct HoverTransferGeometry {
+        float rootWinX = 0.0f;
+        float rootWinY = 0.0f;
+        float hostOffsetX = 0.0f;
+        float hostOffsetY = 0.0f;
+        float paintOriginX = 0.0f;
+        float paintOriginY = 0.0f;
+    };
+    // Compute the transfer offsets for the exported root's window position per mounting form.
+    bool ComputeHoverTransferOffsets(const RefPtr<NG::FrameNode>& exportedRoot, bool adoptedMount,
+        int64_t splitHitId, const AccessibilityHoverForThirdConfig& config,
+        HoverTransferGeometry& geometry);
     void ResetHoverForThirdState();
     AccessibilityHoverTestPathForThird HoverPathForThird(
         const int64_t hostElementId,
         const NG::PointF& point,
-        AccessibilityElementInfo& rootInfo);
+        AccessibilityElementInfo& rootInfo,
+        const std::vector<int64_t>& mountBindIds);
+    struct ThirdHoverContext {
+        int64_t hostElementId;
+        const NG::PointF& point;
+        const std::vector<int64_t>& mountBindIds;
+        AccessibilityHoverTestPathForThird& path;
+        ThirdAccessibilityTraversal& traversal;
+    };
     bool HoverPathForThirdRecursive(
-        const int64_t hostElementId,
-        const NG::PointF& hoverPoint,
-        const AccessibilityElementInfo& nodeInfo,
-        AccessibilityHoverTestPathForThird& path);
+        const AccessibilityElementInfo& nodeInfo, ThirdHoverContext& context, size_t depth);
+    bool HoverChildrenForThird(
+        const AccessibilityElementInfo& nodeInfo, ThirdHoverContext& context, size_t depth);
     std::pair<bool, bool> GetSearchStrategyForThird(
         const AccessibilityElementInfo& nodeInfo);
     bool IsAccessibilityFocusable(const AccessibilityElementInfo& nodeInfo);
@@ -129,6 +178,14 @@ private:
         const std::shared_ptr<JsThirdProviderInteractionOperation>& jsThirdProviderOperator);
 
     AccessibilityHoverForThirdState hoverForThirdState_;
+    std::mutex hoverTaskMutex_;
+    std::optional<AccessibilityHoverForThirdConfig> pendingHover_;
+    WeakPtr<NG::PipelineContext> pendingHoverContext_;
+    WeakPtr<NG::FrameNode> nativeHoverRoot_;
+    WeakPtr<NG::PipelineContext> nativeHoverContext_;
+    NG::PointF nativeHoverPoint_;
+    SourceType nativeHoverSource_ = SourceType::NONE;
+    std::mutex thirdProviderMutex_;
     std::unordered_map<int64_t, std::weak_ptr<JsThirdProviderInteractionOperation>>
         jsThirdProviderOperator_;
 };

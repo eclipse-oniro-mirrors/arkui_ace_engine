@@ -132,6 +132,7 @@ private:
     void InitNotifyExtensionEventFunc();
     void InitGetStatusBarHeightFunc();
     void UpdateSessionConfig();
+    void SetSession(sptr<Rosen::ExtensionSession> session);
     RefPtr<SystemWindowScene> GetWindowScene();
     int32_t GetWindowSceneId();
     Rosen::WSRect GetWindowSceneRect();
@@ -156,6 +157,8 @@ private:
     int32_t uiExtensionId_ = 0;
     int64_t lastOccupiedAreaTime_ = 0;
     sptr<Rosen::ExtensionSession> session_;
+    int32_t persistentId_ = 0;
+    mutable std::mutex sessionMutex_;
     Rect displayAreaWindow_;
     RectF displayArea_;
     uint32_t reason_ = (uint32_t)Rosen::SizeChangeReason::UNDEFINED;

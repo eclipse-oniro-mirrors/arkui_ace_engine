@@ -150,7 +150,7 @@ function loadComponent(): ComponentObj | undefined {
         modifierWithKey(this._modifiersWithKeys, TabsDividerModifier.identity, TabsDividerModifier, value);
         return this;
       }
-      barOverlap(value: boolean): TabsAttribute {
+      barOverlap(value: BarOverlapMode | boolean): TabsAttribute {
         modifierWithKey(this._modifiersWithKeys, BarOverlapModifier.identity, BarOverlapModifier, value);
         return this;
       }
@@ -254,6 +254,10 @@ function loadComponent(): ComponentObj | undefined {
         modifierWithKey(this._modifiersWithKeys, TabBarFloatingStyleModifier.identity, TabBarFloatingStyleModifier, value);
         return this;
       }
+      topBarFloatingStyle(value: topBarFloatingStyleOptions): TabsAttribute {
+        modifierWithKey(this._modifiersWithKeys, TabTopBarFloatingStyleModifier.identity, TabTopBarFloatingStyleModifier, value);
+        return this;
+      }
       onContentWillChange(handler: (currentIndex: number, targetIndex: number) => void): TabsAttribute {
         modifierWithKey(this._modifiersWithKeys, TabsOnContentWillChange.identity, TabsOnContentWillChange, handler);
         return this;
@@ -274,8 +278,20 @@ function loadComponent(): ComponentObj | undefined {
         modifierWithKey(this._modifiersWithKeys, TabsSidebarHeaderModifier.identity, TabsSidebarHeaderModifier, value);
         return this;
       }
+      sidebarFooter(value: ComponentContent): TabsAttribute {
+        modifierWithKey(this._modifiersWithKeys, TabsSidebarFooterModifier.identity, TabsSidebarFooterModifier, value);
+        return this;
+      }
+      sidebarBottomBar(value: ComponentContent): TabsAttribute {
+        modifierWithKey(this._modifiersWithKeys, TabsSidebarBottomBarModifier.identity, TabsSidebarBottomBarModifier, value);
+        return this;
+      }
       sidebarSearchable(value: TabsSidebarSearchableOptions): TabsAttribute {
         modifierWithKey(this._modifiersWithKeys, TabsSidebarSearchableModifier.identity, TabsSidebarSearchableModifier, value);
+        return this;
+      }
+      showSidebarControlButton(value: boolean): TabsAttribute {
+        modifierWithKey(this._modifiersWithKeys, ShowSidebarControlButtonModifier.identity, ShowSidebarControlButtonModifier, value);
         return this;
       }
       barDisplayModeBreakpoint(value: TabsBreakpointType<TabBarDisplayMode>): TabsAttribute {
@@ -302,6 +318,10 @@ function loadComponent(): ComponentObj | undefined {
         modifierWithKey(this._modifiersWithKeys, TabMinContentWidthModifier.identity, TabMinContentWidthModifier, value);
         return this;
       }
+      tabViewCustomization(value: Optional<TabViewCustomization>): TabsAttribute {
+        modifierWithKey(this._modifiersWithKeys, TabsTabViewCustomizationModifier.identity, TabsTabViewCustomizationModifier, value);
+        return this;
+      }
       sidebarBackgroundColor(value: Optional<ResourceColor>): TabsAttribute {
         modifierWithKey(this._modifiersWithKeys, TabSidebarBackgroundColorModifier.identity, TabSidebarBackgroundColorModifier, value);
         return this;
@@ -312,6 +332,11 @@ function loadComponent(): ComponentObj | undefined {
       }
       sidebarDivider(value: Optional<DividerStyle>): TabsAttribute {
         modifierWithKey(this._modifiersWithKeys, TabSidebarDividerModifier.identity, TabSidebarDividerModifier, value);
+        return this;
+      }
+      expandSafeArea(types?: Array<SafeAreaType>, edges?: Array<SafeAreaEdge>): TabsAttribute {
+        super.expandSafeArea(types, edges);
+        getUINativeModule().tabs.markUserSetSafeAreaOpts(this.nativePtr);
         return this;
       }
     }
@@ -327,6 +352,21 @@ function loadComponent(): ComponentObj | undefined {
           getUINativeModule().tabs.resetTabsBarFloatingStyle(node);
         } else {
           getUINativeModule().tabs.setTabsBarFloatingStyle(node, this.value);
+        }
+      }
+    }
+
+    class TabTopBarFloatingStyleModifier extends ModifierWithKey<topBarFloatingStyleOptions> {
+      constructor(value: topBarFloatingStyleOptions) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('topBarFloatingStyle');
+
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().tabs.resetTabsBarTopFloatingStyle(node);
+        } else {
+          getUINativeModule().tabs.setTabsBarTopFloatingStyle(node, this.value);
         }
       }
     }
@@ -445,8 +485,8 @@ function loadComponent(): ComponentObj | undefined {
       }
     }
     
-    class BarOverlapModifier extends ModifierWithKey<boolean> {
-      constructor(value: boolean) {
+    class BarOverlapModifier extends ModifierWithKey<BarOverlapMode | boolean> {
+      constructor(value: BarOverlapMode | boolean) {
         super(value);
       }
       static identity: Symbol = Symbol('barOverlap');
@@ -1205,6 +1245,36 @@ function loadComponent(): ComponentObj | undefined {
       }
     }
 
+    class TabsSidebarFooterModifier extends ModifierWithKey<ComponentContent> {
+      constructor(value: ComponentContent) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('tabsSidebarFooter');
+
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().tabs.resetSidebarFooter(node);
+        } else {
+          getUINativeModule().tabs.setSidebarFooter(node, this.value);
+        }
+      }
+    }
+
+    class TabsSidebarBottomBarModifier extends ModifierWithKey<ComponentContent> {
+      constructor(value: ComponentContent) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('tabsSidebarBottomBar');
+
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().tabs.resetSidebarBottomBar(node);
+        } else {
+          getUINativeModule().tabs.setSidebarBottomBar(node, this.value);
+        }
+      }
+    }
+
     class TabsSidebarSearchableModifier extends ModifierWithKey<TabsSidebarSearchableOptions> {
       constructor(value: TabsSidebarSearchableOptions) {
         super(value);
@@ -1217,6 +1287,25 @@ function loadComponent(): ComponentObj | undefined {
         } else {
           getUINativeModule().tabs.setSidebarSearchable(node, this.value);
         }
+      }
+    }
+
+    class ShowSidebarControlButtonModifier extends ModifierWithKey<boolean> {
+      constructor(value: boolean) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('showSidebarControlButton');
+
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().tabs.resetShowSidebarControlButton(node);
+        } else {
+          getUINativeModule().tabs.setShowSidebarControlButton(node, this.value);
+        }
+      }
+
+      checkObjectDiff(): boolean {
+        return !isBaseOrResourceEqual(this.stageValue, this.value);
       }
     }
 
@@ -1365,6 +1454,21 @@ function loadComponent(): ComponentObj | undefined {
           this.stageValue?.color === this.value?.color &&
           this.stageValue?.startMargin === this.value?.startMargin &&
           this.stageValue?.endMargin === this.value?.endMargin);
+      }
+    }
+
+    class TabsTabViewCustomizationModifier extends ModifierWithKey<Optional<TabViewCustomization>> {
+      constructor(value: Optional<TabViewCustomization>) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('tabViewCustomization');
+
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().tabs.resetTabViewCustomization(node);
+        } else {
+          getUINativeModule().tabs.setTabViewCustomization(node, this.value);
+        }
       }
     }
         loadComponent.componentObj = { 'component': ArkTabsComponent };
@@ -1559,6 +1663,10 @@ class JSTabs extends JSContainerBase {
     getUINativeModule().tabs.setTabsBarFloatingStyle(true, value);
   }
 
+  static topBarFloatingStyle(value: any): void {
+    getUINativeModule().tabs.setTabsBarTopFloatingStyle(true, value);
+  }
+
   static sidebarDisplayStyle(value: any): void {
     getUINativeModule().tabs.setSidebarDisplayStyle(true, value);
   }
@@ -1575,8 +1683,20 @@ class JSTabs extends JSContainerBase {
     getUINativeModule().tabs.setSidebarHeader(true, value);
   }
 
+  static sidebarFooter(value: any): void {
+    getUINativeModule().tabs.setSidebarFooter(true, value);
+  }
+
+  static sidebarBottomBar(value: any): void {
+    getUINativeModule().tabs.setSidebarBottomBar(true, value);
+  }
+
   static sidebarSearchable(value: any): void {
     getUINativeModule().tabs.setSidebarSearchable(true, value);
+  }
+
+  static showSidebarControlButton(value: any): void {
+    getUINativeModule().tabs.setShowSidebarControlButton(true, value);
   }
 
   static barDisplayModeBreakpoint(value: any): void {
@@ -1603,6 +1723,10 @@ class JSTabs extends JSContainerBase {
     getUINativeModule().tabs.setTabMinContentWidth(true, value);
   }
 
+  static tabViewCustomization(value: any): void {
+    getUINativeModule().tabs.setTabViewCustomization(true, value);
+  }
+
   static sidebarBackgroundColor(value: any): void {
     getUINativeModule().tabs.setTabSidebarBackgroundColor(true, value);
   }
@@ -1613,6 +1737,11 @@ class JSTabs extends JSContainerBase {
 
   static sidebarDivider(value: any): void {
     getUINativeModule().tabs.setTabSidebarDivider(true, value);
+  }
+
+  static expandSafeArea(types?: Array<SafeAreaType>, edges?: Array<SafeAreaEdge>): void {
+    JSViewAbstract.expandSafeArea(types, edges);
+    getUINativeModule().tabs.markUserSetSafeAreaOpts(true);
   }
 
   static attributeModifier(modifier: any): void {

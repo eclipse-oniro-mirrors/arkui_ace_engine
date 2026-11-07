@@ -65,28 +65,6 @@ constexpr float FIRST_ITEM_HEIGHT = 50.0f;
 const SizeF FIRST_ITEM_SIZE(FIRST_ITEM_WIDTH, FIRST_ITEM_HEIGHT);
 } // namespace
 
-class MockDialogTheme : public DialogTheme, public ButtonTheme {
-    DECLARE_ACE_TYPE(MockDialogTheme, DialogTheme, ButtonTheme);
-
-public:
-    class Builder {
-    public:
-        Builder() = default;
-        ~Builder() = default;
-
-        RefPtr<MockDialogTheme> Build(const RefPtr<ThemeConstants>& themeConstants) const
-        {
-            RefPtr<MockDialogTheme> theme = AceType::MakeRefPtr<MockDialogTheme>();
-            return theme;
-        }
-    };
-
-    ~MockDialogTheme() override = default;
-
-protected:
-    MockDialogTheme() = default;
-};
-
 class DialogLayoutTestNg : public testing::Test {
 public:
     static void SetUpTestCase();
@@ -165,8 +143,12 @@ void DialogLayoutTestNg::TearDownTestCase()
 void DialogLayoutTestNg::SetDialogTheme()
 {
     auto themeManager = AceType::DynamicCast<MockThemeManager>(MockPipelineContext::GetCurrent()->GetThemeManager());
-    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(AceType::MakeRefPtr<MockDialogTheme>()));
-    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(AceType::MakeRefPtr<MockDialogTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(AceType::MakeRefPtr<DialogTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(AceType::MakeRefPtr<DialogTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(ButtonTheme::TypeId()))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(ButtonTheme::TypeId(), _))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
 }
 
 RefPtr<LayoutWrapperNode> CreatlayoutWrapper()
@@ -1200,7 +1182,7 @@ HWTEST_F(DialogLayoutTestNg, DialogLayoutAlgorithmAdjustHeightForKeyboard001, Te
     RefPtr<LayoutWrapper> child = customNode->CreateLayoutWrapper(true, true);
     ASSERT_NE(child, nullptr);
     auto layoutWrapperNode = dialogWithCustom->CreateLayoutWrapper(true, true);
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     ASSERT_NE(layoutWrapper, nullptr);
     /**
      * @tc.steps: step2. test DialogLayoutAlgorithm functions.
@@ -1251,7 +1233,7 @@ HWTEST_F(DialogLayoutTestNg, DialogLayoutAlgorithmAdjustHeightForKeyboard002, Te
     RefPtr<LayoutWrapper> child = customNode->CreateLayoutWrapper(true, true);
     ASSERT_NE(child, nullptr);
     auto layoutWrapperNode = dialogWithCustom->CreateLayoutWrapper(true, true);
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     ASSERT_NE(layoutWrapper, nullptr);
     /**
      * @tc.steps: step2. test DialogLayoutAlgorithm functions.
@@ -1356,7 +1338,7 @@ HWTEST_F(DialogLayoutTestNg, DialogLayoutAlgorithmUpdateIsScrollHeightNegative, 
     RefPtr<LayoutWrapper> child = frameNode->CreateLayoutWrapper(true, true);
     ASSERT_NE(child, nullptr);
     auto layoutWrapperNode = frameNode->CreateLayoutWrapper(true, true);
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     ASSERT_NE(layoutWrapper, nullptr);
     /**
      * @tc.steps: step2. test DialogLayoutAlgorithm functions.

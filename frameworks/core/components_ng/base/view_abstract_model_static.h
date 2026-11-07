@@ -368,6 +368,7 @@ public:
     static void SetSpatialEffect(FrameNode* frameNode, const std::optional<SpatialEffectParams>& params);
     static void SetBlendApplyType(FrameNode* frameNode, const std::optional<BlendApplyType>& blendApplyType);
     static void SetPrivacySensitive(FrameNode* frameNode, const std::optional<bool>& flag);
+    static void SetAgentControlMode(FrameNode* frameNode, const std::optional<AgentControlMode>& mode);
     static void SetOnTouchTestFunc(FrameNode* frameNode, NG::OnChildTouchTestFunc&& onChildTouchTest);
     static void SetOnGestureRecognizerJudgeBegin(
         FrameNode* frameNode, GestureRecognizerJudgeFunc&& gestureRecognizerJudgeFunc, bool innerGestureFlag = false);
@@ -408,6 +409,7 @@ private:
         std::function<void()>&& buildFunc, const MenuParam& menuParam, std::function<void()>&& previewBuildFunc);
     static void BindContextMenuSingleWithOptions(FrameNode* targetNode,
         std::vector<NG::OptionParam>&& param, const MenuParam& menuParam, std::function<void()>&& previewBuildFunc);
+    static void ApplySheetImmersiveStrategyDefaults(const RefPtr<PipelineContext>& context, SheetStyle& sheetStyle);
 };
 
 

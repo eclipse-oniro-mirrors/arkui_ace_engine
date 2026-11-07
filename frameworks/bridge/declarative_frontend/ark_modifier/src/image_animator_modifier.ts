@@ -63,6 +63,11 @@ class LazyArkImageAnimatorComponent extends ArkComponent {
     return this;
   }
 
+  interpolation(value: ImageInterpolation): this {
+    this.lazyComponent.interpolation(value);
+    return this;
+  }
+
   iterations(value: number): this {
     this.lazyComponent.iterations(value);
     return this;
@@ -70,6 +75,31 @@ class LazyArkImageAnimatorComponent extends ArkComponent {
 
   monitorInvisibleArea(value: boolean): this {
     this.lazyComponent.monitorInvisibleArea(value);
+    return this;
+  }
+
+  onStart(event: () => void): this {
+    this.lazyComponent.onStart(event);
+    return this;
+  }
+
+  onPause(event: () => void): this {
+    this.lazyComponent.onPause(event);
+    return this;
+  }
+
+  onRepeat(event: () => void): this {
+    this.lazyComponent.onRepeat(event);
+    return this;
+  }
+
+  onCancel(event: () => void): this {
+    this.lazyComponent.onCancel(event);
+    return this;
+  }
+
+  onFinish(event: () => void): this {
+    this.lazyComponent.onFinish(event);
     return this;
   }
 }

@@ -137,7 +137,7 @@ class LazyArkTabsComponent extends ArkComponent {
     return this;
   }
 
-  barOverlap(value: boolean): this {
+  barOverlap(value: BarOverlapMode | boolean): this {
     this.lazyComponent.barOverlap(value);
     return this;
   }
@@ -244,8 +244,23 @@ class LazyArkTabsComponent extends ArkComponent {
     return this;
   }
 
+  sidebarFooter(value: ComponentContent): this {
+    this.lazyComponent.sidebarFooter(value);
+    return this;
+  }
+
+  sidebarBottomBar(value: ComponentContent): this {
+    this.lazyComponent.sidebarBottomBar(value);
+    return this;
+  }
+
   sidebarSearchable(value: TabsSidebarSearchableOptions): this {
     this.lazyComponent.sidebarSearchable(value);
+    return this;
+  }
+
+  showSidebarControlButton(value: boolean): this {
+    this.lazyComponent.showSidebarControlButton(value);
     return this;
   }
 
@@ -279,6 +294,11 @@ class LazyArkTabsComponent extends ArkComponent {
     return this;
   }
 
+  tabViewCustomization(value: Optional<TabViewCustomization>): this {
+    this.lazyComponent.tabViewCustomization(value);
+    return this;
+  }
+
   sidebarBackgroundColor(value: Optional<ResourceColor>): this {
     this.lazyComponent.sidebarBackgroundColor(value);
     return this;
@@ -291,6 +311,11 @@ class LazyArkTabsComponent extends ArkComponent {
 
   sidebarDivider(value: Optional<DividerStyle>): this {
     this.lazyComponent.sidebarDivider(value);
+    return this;
+  }
+
+  expandSafeArea(types?: Array<SafeAreaType>, edges?: Array<SafeAreaEdge>): this {
+    this.lazyComponent.expandSafeArea(types, edges);
     return this;
   }
 }

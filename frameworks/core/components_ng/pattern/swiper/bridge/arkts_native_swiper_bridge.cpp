@@ -22,6 +22,7 @@
 #include "base/utils/string_utils.h"
 #include "base/utils/utils.h"
 #include "base/log/ace_scoring_log.h"
+#include "base/hiviewdfx/histogram_wrapper.h"
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_common_bridge.h"
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_utils_bridge.h"
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_utils.h"
@@ -112,6 +113,7 @@ constexpr int32_t ARROW_RESOURCE_COLOR = 3;
 constexpr int32_t ARROW_RESOURCE_VECTOR_LENGTH = 4;
 constexpr float ARROW_SIZE_COEFFICIENT = 0.75f;
 constexpr char DOM_ANIMATION_TIMING_FUNCTION_CUSTOM[] = "customCallback";
+const std::vector<SwiperDisplayMode> DISPLAY_MODE = { SwiperDisplayMode::STRETCH, SwiperDisplayMode::AUTO_LINEAR };
 
 enum class DotIndicatorThemeMode {
     APPLY,
@@ -181,7 +183,8 @@ void SetSwiperIndexChangeEvent(EcmaVM* vm, ArkUINodeHandle nativeNode, const Loc
         nativeNode, reinterpret_cast<void*>(&callback));
 }
 
-std::string ParseDisplayCountObject(Local<JSValueRef> valueArg, EcmaVM* vm, std::string& type)
+std::string ParseDisplayCountObject(
+    Local<JSValueRef> valueArg, EcmaVM* vm, std::string& type, int32_t& displayCountType)
 {
     if (!valueArg->IsObject(vm)) {
         return "";
@@ -189,9 +192,11 @@ std::string ParseDisplayCountObject(Local<JSValueRef> valueArg, EcmaVM* vm, std:
     auto obj = valueArg->ToObject(vm);
     auto minSizeParam = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "minSize"));
     if (!minSizeParam->IsUndefined()) {
+        displayCountType = 2;
         type = "minSize";
         return minSizeParam->ToString(vm)->ToString(vm);
     }
+    displayCountType = 3;
     type = "fillType";
     auto fillTypeParam = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "fillType"));
     int32_t fillTypeValue = 0;
@@ -1245,6 +1250,8 @@ ArkUINativeModuleValue SwiperBridge::SetSwiperDisplayCount(ArkUIRuntimeCallInfo*
         if (valueArg.IsNull()) {
             return panda::JSValueRef::Undefined(vm);
         }
+        // DisplayCount type enum: 0=string(auto), 1=number, 2=object-minSize, 3=object-fillType, 4=default
+        int32_t displayCountType = 0;
         if (argc == NUM_3) {
             Local<JSValueRef> swipeByGroupArg = runtimeCallInfo->GetCallArgRef(CALL_ARG_TYPE_INDEX);
             if (!swipeByGroupArg.IsNull() && !swipeByGroupArg->IsUndefined() && swipeByGroupArg->IsBoolean()) {
@@ -1257,29 +1264,35 @@ ArkUINativeModuleValue SwiperBridge::SetSwiperDisplayCount(ArkUIRuntimeCallInfo*
 
         if (Container::GreatOrEqualAPIVersion(PlatformVersion::VERSION_TEN)) {
             if (valueArg->IsString(vm) && valueArg->ToString(vm)->ToString(vm) == "auto") {
+                displayCountType = 0;
                 GetArkUINodeModifiers()->getSwiperModifier()->setSwiperDisplayCount(nativeNode, "auto", "string");
             } else if (valueArg->IsNumber() && valueArg->Int32Value(vm) > 0) {
+                displayCountType = 1;
                 std::string displayCountValue = std::to_string(valueArg->Int32Value(vm));
                 GetArkUINodeModifiers()->getSwiperModifier()->setSwiperDisplayCount(
                     nativeNode, displayCountValue.c_str(), "number");
             } else if (valueArg->IsObject(vm)) {
                 std::string type;
-                std::string displayCountValue = ParseDisplayCountObject(valueArg, vm, type);
+                std::string displayCountValue = ParseDisplayCountObject(valueArg, vm, type, displayCountType);
                 GetArkUINodeModifiers()->getSwiperModifier()->setSwiperDisplayCount(
                     nativeNode, displayCountValue.c_str(), type.c_str());
             } else {
+                displayCountType = 4;
                 GetArkUINodeModifiers()->getSwiperModifier()->setSwiperDisplayCount(
                     nativeNode, "DEFAULT_DISPLAY_COUNT", "DEFAULT_DISPLAY_COUNT");
             }
             return panda::JSValueRef::Undefined(vm);
         }
         if (valueArg->IsString(vm) && valueArg->ToString(vm)->ToString(vm) == "auto") {
+            displayCountType = 0;
             GetArkUINodeModifiers()->getSwiperModifier()->setSwiperDisplayCount(nativeNode, "auto", "string");
         } else if (valueArg->IsNumber()) {
+            displayCountType = 1;
             std::string displayCountValue = std::to_string(valueArg->Int32Value(vm));
             GetArkUINodeModifiers()->getSwiperModifier()->setSwiperDisplayCount(
                 nativeNode, displayCountValue.c_str(), "number");
         }
+        ACE_ENGINE_HISTOGRAM_ENUMERATION("Swiper.DisplayCount", displayCountType, 3);
         return panda::JSValueRef::Undefined(vm);
     }
 
@@ -1673,6 +1686,7 @@ ArkUINativeModuleValue SwiperBridge::SetSwiperDisplayMode(ArkUIRuntimeCallInfo* 
     Local<JSValueRef> valueArg = runtimeCallInfo->GetCallArgRef(CALL_ARG_VALUE_INDEX);
     if (!valueArg.IsNull() && !valueArg->IsUndefined() && valueArg->IsNumber()) {
         int32_t index = valueArg->Int32Value(vm);
+        ACE_ENGINE_HISTOGRAM_ENUMERATION("Swiper.DisplayMode", index, static_cast<int32_t>(DISPLAY_MODE.size()) - 1);
         GetArkUINodeModifiers()->getSwiperModifier()->setSwiperDisplayMode(nativeNode, index);
     } else {
         GetArkUINodeModifiers()->getSwiperModifier()->resetSwiperDisplayMode(nativeNode);
@@ -2429,6 +2443,7 @@ ArkUINativeModuleValue SwiperBridge::SetSwiperIndicatorStyle(ArkUIRuntimeCallInf
     CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, nodeArg, vm), true, panda::JSValueRef::Undefined(vm));
     Local<JSValueRef> styleArg = runtimeCallInfo->GetCallArgRef(CALL_ARG_VALUE_INDEX);
     SwiperParameters swiperParameters;
+    ACE_ENGINE_HISTOGRAM_BOOLEAN("Swiper.IndicatorStyle", 1);
     if (!styleArg.IsNull() && !styleArg->IsUndefined() && styleArg->IsObject(vm)) {
         bool isCustomSize = false;
         swiperParameters = ParseJsViewIndicatorStyle(vm, nativeNode, styleArg, isCustomSize);

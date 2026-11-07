@@ -26,7 +26,7 @@ namespace OHOS::Ace::NG {
 namespace {
 constexpr int32_t INVALID_SUBWINDOW_ID = -1;
 }
-class SheetWrapperPattern : virtual public PopupBasePattern {
+class SheetWrapperPattern : public PopupBasePattern {
     DECLARE_ACE_TYPE(SheetWrapperPattern, PopupBasePattern);
 
 public:

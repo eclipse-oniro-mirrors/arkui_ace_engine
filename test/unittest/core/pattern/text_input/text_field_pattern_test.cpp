@@ -324,9 +324,15 @@ HWTEST_F(TextFieldPatternTest, TextPattern012, TestSize.Level1)
     auto textFieldNode = FrameNode::GetOrCreateFrameNode(V2::TEXTINPUT_ETS_TAG,
         ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<TextFieldPattern>(); });
     ASSERT_NE(textFieldNode, nullptr);
+    /**
+     * @tc.steps: step2. textFieldNode->GetPattern
+     */
     RefPtr<TextFieldPattern> pattern = textFieldNode->GetPattern<TextFieldPattern>();
     ASSERT_NE(pattern, nullptr);
     pattern->hasPreviewText_ = true;
+    /**
+     * @tc.steps: step3. HandleDoubleClickEvent
+     */
     pattern->HandleDoubleClickEvent(info);
     pattern->showSelect_ = false;
     pattern->hasPreviewText_ = false;
@@ -377,7 +383,13 @@ HWTEST_F(TextFieldPatternTest, TextPattern014, TestSize.Level1)
     ASSERT_NE(textFieldNode, nullptr);
     RefPtr<TextFieldPattern> pattern = textFieldNode->GetPattern<TextFieldPattern>();
     ASSERT_NE(pattern, nullptr);
+    /**
+     * @tc.steps: step2. SetAutoFillTriggeredStateByType ACE_USER_NAME
+     */
     pattern->SetAutoFillTriggeredStateByType(AceAutoFillType::ACE_USER_NAME);
+    /**
+     * @tc.steps: step3. SetAutoFillTriggeredStateByType ACE_PASSWORD
+     */
     pattern->SetAutoFillTriggeredStateByType(AceAutoFillType::ACE_PASSWORD);
     pattern->SetAutoFillTriggeredStateByType(AceAutoFillType::ACE_NEW_PASSWORD);
 }
@@ -397,8 +409,14 @@ HWTEST_F(TextFieldPatternTest, TextPattern015, TestSize.Level1)
     auto textFieldNode = FrameNode::GetOrCreateFrameNode(V2::TEXTINPUT_ETS_TAG,
         ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<TextFieldPattern>(); });
     ASSERT_NE(textFieldNode, nullptr);
+    /**
+     * @tc.steps: step2. GetPattern<TextFieldPattern>
+     */
     RefPtr<TextFieldPattern> pattern = textFieldNode->GetPattern<TextFieldPattern>();
     ASSERT_NE(pattern, nullptr);
+    /**
+     * @tc.steps: step3. hasPreviewText_
+     */
     pattern->hasPreviewText_ = true;
     pattern->HandleTripleClickEvent(info);
     pattern->hasPreviewText_ = false;
@@ -426,7 +444,9 @@ HWTEST_F(TextFieldPatternTest, TextPattern016, TestSize.Level1)
     ASSERT_NE(pattern, nullptr);
     pattern->mouseStatus_ = MouseStatus::MOVE;
     pattern->HandleSingleClickEvent(info);
-
+    /**
+     * @tc.steps: step2. UpdateMaxLines
+     */
     layoutProperty_->UpdateMaxLines(100000);
     pattern->contentRect_ = RectF(0.0f, 0.0f, 150.0f, 200.0f);
     pattern->textRect_ = RectF(0.0f, 0.0f, 100.0f, 100.0f);
@@ -434,6 +454,9 @@ HWTEST_F(TextFieldPatternTest, TextPattern016, TestSize.Level1)
     EXPECT_EQ(caretOffset.GetX(), 150.0f);
     EXPECT_EQ(caretOffset.GetY(), 75.0f);
     pattern->textRect_ = RectF(0.0f, 0.0f, 100.0f, 400.0f);
+    /**
+     * @tc.steps: step3. GetCaretClickLocalOffset
+     */
     caretOffset = pattern->GetCaretClickLocalOffset(Offset(20.0f, 250.0f));
     EXPECT_EQ(caretOffset.GetX(), 150.0f);
     EXPECT_EQ(caretOffset.GetY(), 175.0f);

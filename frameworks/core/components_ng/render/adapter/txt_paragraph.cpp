@@ -599,7 +599,7 @@ bool TxtParagraph::ComputeOffsetForCaretUpstream(int32_t extent, CaretMetricsF& 
         }
     }
 
-    if (isnan(textBox.rect.GetRight()) || isnan(textBox.rect.GetLeft())) {
+    if (std::isnan(textBox.rect.GetRight()) || std::isnan(textBox.rect.GetLeft())) {
         LOGI("Right or left of textBox is NaN.");
         return false;
     }
@@ -1135,7 +1135,11 @@ RSParagraph* TxtParagraph::GetParagraph()
     if (paragraph_) {
         return paragraph_.get();
     }
+#ifndef ACE_UNITTEST
+    return externalParagraph_.Get();
+#else
     return externalParagraph_;
+#endif
 }
 
 std::unique_ptr<RSParagraph> TxtParagraph::GetParagraphUniquePtr()

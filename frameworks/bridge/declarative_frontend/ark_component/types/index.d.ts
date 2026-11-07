@@ -145,6 +145,10 @@ declare enum ShadowStyle {
   OUTLINE_MD = 8,
   COSINE = 9,
 }
+declare enum ShadowClipMode {
+  DEFAULT_SHAPE = 0,
+  BOUNDS_SHAPE,
+}
 declare interface BlurOptions {
   low?: number;
   high?: number;
@@ -361,6 +365,22 @@ declare interface DragEvent {
   enableInternalDropAnimation(configuration: string): void;
 }
 type CustomBuilder = () => void;
+declare enum SafeAreaInsetAlignment {
+  START = 0,
+  CENTER = 1,
+  END = 2
+}
+declare interface SafeAreaInsetEdgeConfig {
+  content: CustomBuilder;
+  spacing?: LengthMetrics;
+  alignment?: SafeAreaInsetAlignment;
+}
+declare interface SafeAreaInsetOptions {
+  top?: SafeAreaInsetEdgeConfig;
+  end?: SafeAreaInsetEdgeConfig;
+  bottom?: SafeAreaInsetEdgeConfig;
+  start?: SafeAreaInsetEdgeConfig;
+}
 declare interface DragItemInfo {
   pixelMap?: PixelMap;
   builder?: CustomBuilder;
@@ -516,7 +536,9 @@ declare enum ObscuredReasons {
 }
 declare enum FunctionKey {
   ESC, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, TAB,
-  DPAD_UP, DPAD_DOWN, DPAD_LEFT, DPAD_RIGHT
+  DPAD_UP, DPAD_DOWN, DPAD_LEFT, DPAD_RIGHT,
+  CAPS_LOCK = 18, SCROLL_LOCK = 20, PAUSE_BREAK = 21, NUM_LOCK = 22, INSERT = 23, DELETE = 24,
+  HOME = 25, END = 26, PAGE_UP = 27, PAGE_DOWN = 28, ENTER = 29, BACKSPACE = 30
 }
 declare enum ModifierKey {
   CTRL,
@@ -1391,6 +1413,11 @@ declare interface ItemDragInfo {
   y: number;
 }
 declare interface EditModeOptions {}
+declare interface PlaceholderOptions {
+  id?: string;
+  size?: SizeOptions;
+}
+declare type PlaceholderProvider = (index: number) => PlaceholderOptions | undefined;
 declare interface Scroller {}
 declare enum FocusWrapMode {
   DEFAULT = 0,
@@ -1447,6 +1474,8 @@ declare enum ImageContent {
 declare interface TextBackgroundStyle {
   color?: ResourceColor;
   radius?: BorderRadiuses;
+  borderColor?: ResourceColor;
+  borderWidth?: Dimension;
 }
 declare type LinearIndicatorStyle = any;
 declare type OnLinearIndicatorChangeCallback = any;
@@ -1581,6 +1610,7 @@ declare enum TabBarStyle {
   BOTTOM = 0,
   SIDEBAR = 1,
   SIDEBAR_ADAPTABLE = 2,
+  TOP = 3,
 }
 declare enum TabsSidebarDisplayStyle {
   EMBED = 0,
@@ -1596,6 +1626,7 @@ declare interface TabsSidebarSearchableOptions {
 declare enum TabBarDisplayMode {
   BOTTOM_TABBAR = 0,
   SIDEBAR = 1,
+  TOP_TABBAR = 2,
 }
 declare enum TabVisibility {
   VISIBLE = 0,
@@ -1609,6 +1640,20 @@ declare interface TabsBreakpointType<T> {
   sm?: T;
   md?: T;
   lg?: T;
+}
+declare enum SidebarSectionTitleStyle {
+  STANDARD = 0,
+  EMPHASIZED = 1,
+}
+declare interface SidebarSection {
+  title: ResourceStr;
+  order?: number;
+  titleStyle?: SidebarSectionTitleStyle;
+}
+declare interface TabViewCustomization {
+  visibilityMap?: Map<number, TabVisibility>;
+  sectionMap?: Map<number, SidebarSection>;
+  orderMap?: Map<number, number>;
 }
 declare enum NestedScrollMode {
   SELF_ONLY,
@@ -1643,6 +1688,10 @@ declare enum ScrollSnapAlign {
   START = 1,
   CENTER = 2,
   END = 3,
+}
+declare interface ScrollSnapOffsetProvider {
+  calculateSnapOffset: (velocity: number) => number;
+  calculateApproachOffset?: (velocity: number, decayOffset: number) => number;
 }
 declare class SymbolEffect {}
 declare enum TextDataDetectorType {
@@ -2027,8 +2076,10 @@ declare interface NestedScrollOptionsExt {
 }
 declare type OnCameraCaptureStateChangeCallback = (event: any) => void;
 declare type OnContextMenuHideCallback = () => void;
+declare type OnContextMenuUpdateCallback = () => void;
 declare type OnDetectBlankScreenCallback = (event: any) => void;
 declare type OnFirstScreenPaintCallback = (firstScreenPaint: any) => void;
+declare type OnMonitorBlankScreenCallback = (event: any) => void;
 declare type OnMicrophoneCaptureStateChangeCallback = (event: any) => void;
 declare type OnNavigationEntryCommittedCallback = (loadCommittedDetails: any) => void;
 declare type OnOverrideUrlLoadingCallback = (webResourceRequest: WebResourceRequest) => boolean;
@@ -2067,6 +2118,13 @@ declare type PickerIndicatorStyle = any;
 declare interface PickerTextStyle {
   color?: ResourceColor;
   font?: Font;
+}
+declare interface PickerComponentTextStyle {
+  color?: ResourceColor;
+  font?: Font;
+  minFontSize?: number | ResourceStr;
+  maxFontSize?: number | ResourceStr;
+  overflow?: TextOverflow;
 }
 declare type PluginComponentAttribute = any;
 declare type RemoteWindowAttribute = any;
@@ -2214,6 +2272,16 @@ declare enum CalendarAlign {
   START = 0,
   CENTER = 1,
   END = 2,
+}
+declare enum CalendarFirstDayOfWeek {
+  LOCAL = 0,
+  MON = 1,
+  TUE = 2,
+  WED = 3,
+  THU = 4,
+  FRI = 5,
+  SAT = 6,
+  SUN = 7,
 }
 declare type CalendarPickerAttribute = any;
 declare type CheckboxAttribute = any;

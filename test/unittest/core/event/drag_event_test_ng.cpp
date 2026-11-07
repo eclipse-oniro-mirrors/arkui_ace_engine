@@ -176,7 +176,7 @@ HWTEST_F(DragEventTestNg, DragEventActuatorOnCollectTouchTargetTest003, TestSize
 
     /**
      * @tc.steps: step2. Invoke OnCollectTouchTarget without setting userCallback_.
-     * @tc.expected:  userCallback_ is null and return directly.
+     * @tc.expected: userCallback_ is null, recognizers stay uninitialized and the method returns directly.
      */
     auto getEventTargetImpl = eventHub->CreateGetEventTargetImpl();
     EXPECT_NE(getEventTargetImpl, nullptr);
@@ -185,11 +185,9 @@ HWTEST_F(DragEventTestNg, DragEventActuatorOnCollectTouchTargetTest003, TestSize
     frameNode->GetOrCreateFocusHub();
     dragEventActuator->OnCollectTouchTarget(
         COORDINATE_OFFSET, DRAG_TOUCH_RESTRICT, getEventTargetImpl, finalResult, responseLinkResult);
-    EXPECT_EQ(dragEventActuator->panRecognizer_->onActionStart_, nullptr);
-    EXPECT_EQ(dragEventActuator->panRecognizer_->onActionStart_, nullptr);
-    EXPECT_EQ(dragEventActuator->panRecognizer_->onActionUpdate_, nullptr);
-    EXPECT_EQ(dragEventActuator->panRecognizer_->onActionEnd_, nullptr);
-    EXPECT_EQ(dragEventActuator->panRecognizer_->onActionCancel_, nullptr);
+    EXPECT_EQ(dragEventActuator->panRecognizer_, nullptr);
+    EXPECT_EQ(dragEventActuator->longPressRecognizer_, nullptr);
+    EXPECT_EQ(dragEventActuator->previewLongPressRecognizer_, nullptr);
     EXPECT_TRUE(finalResult.empty());
 
     /**
@@ -208,8 +206,6 @@ HWTEST_F(DragEventTestNg, DragEventActuatorOnCollectTouchTargetTest003, TestSize
     };
     auto dragEvent = AceType::MakeRefPtr<DragEvent>(
         std::move(actionStart), std::move(actionUpdate), std::move(actionEnd), std::move(actionCancel));
-    dragEventActuator->panRecognizer_->onActionCancel_ = std::make_unique<GestureEventFunc>(
-        [&unknownPropertyValue](GestureEvent& info) { unknownPropertyValue = GESTURE_EVENT_PROPERTY_VALUE; });
     dragEventActuator->ReplaceDragEvent(dragEvent);
     dragEventActuator->SetCustomDragEvent(dragEvent);
     EXPECT_NE(dragEventActuator->userCallback_, nullptr);
@@ -434,14 +430,14 @@ HWTEST_F(DragEventTestNg, DragEventTestNg003, TestSize.Level1)
     dragEventActuator->SetCustomDragEvent(dragEvent);
     EXPECT_NE(dragEventActuator->userCallback_, nullptr);
     /**
-     * @tc.steps: step3. Invoke OnCollectTouchTarget when callback_ is not null.
-     * @tc.expected: longPressRecognizer is not nullptr and longPressRecognizer's HasThumbnailCallback() return true.
+     * @tc.steps: step3. Invoke OnCollectTouchTarget before the recognizers are initialized.
+     * @tc.expected: longPressRecognizer is initialized lazily and receives the thumbnail callback.
      */
     TouchTestResult finalResult;
     ResponseLinkResult responseLinkResult;
     auto getEventTargetImpl = eventHub->CreateGetEventTargetImpl();
     EXPECT_NE(getEventTargetImpl, nullptr);
-    EXPECT_EQ(dragEventActuator->longPressRecognizer_->HasThumbnailCallback(), false);
+    EXPECT_EQ(dragEventActuator->longPressRecognizer_, nullptr);
     frameNode->GetOrCreateFocusHub();
     dragEventActuator->OnCollectTouchTarget(
         COORDINATE_OFFSET, DRAG_TOUCH_RESTRICT, getEventTargetImpl, finalResult, responseLinkResult);
@@ -503,7 +499,7 @@ HWTEST_F(DragEventTestNg, DragEventTestNg004, TestSize.Level1)
     EXPECT_NE(dragEventActuator->userCallback_, nullptr);
     /**
      * @tc.steps: step3. Call the function OnCollectTouchTarget when sourceType is SourceType::MOUSE.
-     * @tc.expected: cover touchRestrict.sourceType == SourceType::MOUSE.
+     * @tc.expected: only the pan recognizer is initialized for a mouse event.
      */
     auto getEventTargetImpl = eventHub->CreateGetEventTargetImpl();
     EXPECT_NE(getEventTargetImpl, nullptr);
@@ -513,6 +509,9 @@ HWTEST_F(DragEventTestNg, DragEventTestNg004, TestSize.Level1)
     dragEventActuator->OnCollectTouchTarget(
         COORDINATE_OFFSET, DRAG_TOUCH_RESTRICT_MOUSE, getEventTargetImpl, finalResult, responseLinkResult);
     EXPECT_FALSE(finalResult.empty());
+    EXPECT_NE(dragEventActuator->panRecognizer_, nullptr);
+    EXPECT_EQ(dragEventActuator->longPressRecognizer_, nullptr);
+    EXPECT_EQ(dragEventActuator->previewLongPressRecognizer_, nullptr);
 }
 
 /**
@@ -1505,7 +1504,7 @@ HWTEST_F(DragEventTestNg, TestIsBelongToMultiItemNode001, TestSize.Level1)
     eventHub->host_ = AceType::WeakClaim(AceType::RawPtr(listItemNode));
     listItemNode->eventHub_ = eventHub;
     listItemNode->SetDraggable(true);
-    auto gestureEventHub = AceType::MakeRefPtr<GestureEventHub>(AceType::WeakClaim(AceType::RawPtr(eventHub)));
+    auto gestureEventHub = listItemNode->GetOrCreateGestureEventHub();
     ASSERT_NE(gestureEventHub, nullptr);
     auto dragEventActuator = AceType::MakeRefPtr<DragEventActuator>(
         AceType::WeakClaim(AceType::RawPtr(gestureEventHub)), DRAG_DIRECTION, FINGERS_NUMBER, DISTANCE);
@@ -1554,7 +1553,7 @@ HWTEST_F(DragEventTestNg, TestIsBelongToMultiItemNode002, TestSize.Level1)
     eventHub->host_ = AceType::WeakClaim(AceType::RawPtr(gridItemNode));
     gridItemNode->eventHub_ = eventHub;
     gridItemNode->SetDraggable(true);
-    auto gestureEventHub = AceType::MakeRefPtr<GestureEventHub>(AceType::WeakClaim(AceType::RawPtr(eventHub)));
+    auto gestureEventHub = gridItemNode->GetOrCreateGestureEventHub();
     ASSERT_NE(gestureEventHub, nullptr);
     auto dragEventActuator = AceType::MakeRefPtr<DragEventActuator>(
         AceType::WeakClaim(AceType::RawPtr(gestureEventHub)), DRAG_DIRECTION, FINGERS_NUMBER, DISTANCE);
@@ -1597,7 +1596,7 @@ HWTEST_F(DragEventTestNg, TestIsSelectedItemNode001, TestSize.Level1)
     eventHub->host_ = AceType::WeakClaim(AceType::RawPtr(gridItemNode));
     gridItemNode->eventHub_ = eventHub;
     gridItemNode->SetDraggable(true);
-    auto gestureEventHub = AceType::MakeRefPtr<GestureEventHub>(AceType::WeakClaim(AceType::RawPtr(eventHub)));
+    auto gestureEventHub = gridItemNode->GetOrCreateGestureEventHub();
     ASSERT_NE(gestureEventHub, nullptr);
     auto dragEventActuator = AceType::MakeRefPtr<DragEventActuator>(
         AceType::WeakClaim(AceType::RawPtr(gestureEventHub)), DRAG_DIRECTION, FINGERS_NUMBER, DISTANCE);
@@ -1640,7 +1639,7 @@ HWTEST_F(DragEventTestNg, TestIsSelectedItemNode002, TestSize.Level1)
     eventHub->host_ = AceType::WeakClaim(AceType::RawPtr(listItemNode));
     listItemNode->eventHub_ = eventHub;
     listItemNode->SetDraggable(true);
-    auto gestureEventHub = AceType::MakeRefPtr<GestureEventHub>(AceType::WeakClaim(AceType::RawPtr(eventHub)));
+    auto gestureEventHub = listItemNode->GetOrCreateGestureEventHub();
     ASSERT_NE(gestureEventHub, nullptr);
     auto dragEventActuator = AceType::MakeRefPtr<DragEventActuator>(
         AceType::WeakClaim(AceType::RawPtr(gestureEventHub)), DRAG_DIRECTION, FINGERS_NUMBER, DISTANCE);
@@ -1698,7 +1697,7 @@ HWTEST_F(DragEventTestNg, TestIsNeedGather001, TestSize.Level1)
     eventHub->host_ = AceType::WeakClaim(AceType::RawPtr(listItemNode1));
     listItemNode1->eventHub_ = eventHub;
     listItemNode1->SetDraggable(true);
-    auto gestureEventHub = AceType::MakeRefPtr<GestureEventHub>(AceType::WeakClaim(AceType::RawPtr(eventHub)));
+    auto gestureEventHub = listItemNode1->GetOrCreateGestureEventHub();
     auto dragEventActuator = AceType::MakeRefPtr<DragEventActuator>(
         AceType::WeakClaim(AceType::RawPtr(gestureEventHub)), DRAG_DIRECTION, FINGERS_NUMBER, DISTANCE);
     /**
@@ -2581,6 +2580,30 @@ HWTEST_F(DragEventTestNg, DragEventSummaryInfo001, TestSize.Level1)
     dragEvent->SetSummary(legacySummary);
     EXPECT_EQ(dragEvent->GetSummary(), legacySummary);
     EXPECT_EQ(dragEvent->GetSummaryInfo().summary, legacySummary);
+}
+
+/**
+ * @tc.name: DragSpringLoadingContextSummaryInfo001
+ * @tc.desc: Test the complete spring loading summary information.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragEventTestNg, DragSpringLoadingContextSummaryInfo001, TestSize.Level1)
+{
+    auto context = AceType::MakeRefPtr<OHOS::Ace::DragSpringLoadingContext>();
+    ASSERT_NE(context, nullptr);
+    DragSummaryInfo summaryInfo;
+    summaryInfo.summary = { { "general.file", 2 } };
+    summaryInfo.filenameExtensions = { ".jpg", ".png" };
+
+    context->SetSummaryInfo(summaryInfo);
+
+    EXPECT_EQ(context->GetSummary(), summaryInfo.summary);
+    EXPECT_EQ(context->GetSummaryInfo().filenameExtensions, summaryInfo.filenameExtensions);
+
+    std::map<std::string, int64_t> legacySummary = { { "general.text", 1 } };
+    context->SetSummary(legacySummary);
+    EXPECT_EQ(context->GetSummary(), legacySummary);
+    EXPECT_EQ(context->GetSummaryInfo().summary, legacySummary);
 }
 
 } // namespace OHOS::Ace::NG

@@ -33,7 +33,7 @@ extern const char XCOMPONENT_METHOD[];
 extern const char XCOMPONENT_EVENT[];
 extern const char XCOMPONENT_RESULT_FAIL[];
 
-class XComponentResource : public virtual AceType {
+class XComponentResource : public AceType {
     DECLARE_ACE_TYPE(XComponentResource, AceType);
 
 public:

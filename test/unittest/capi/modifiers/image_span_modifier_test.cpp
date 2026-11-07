@@ -34,7 +34,7 @@ namespace  {
     constexpr auto ATTRIBUTE_RAWSRC_NAME = "rawSrc";
     constexpr auto ATTRIBUTE_RAWSRC_DEFAULT_VALUE = "";
     const auto TEST_VALUE = "test";
-    const std::string IMAGES_OK_STR = "img_public_ok";
+    const int64_t IMAGES_OK_ID = 9877;
 } // namespace
 
 class ImageSpanModifierTest : public ModifierTestBase<
@@ -46,7 +46,7 @@ public:
     static void SetUpTestCase()
     {
         ModifierTestBase::SetUpTestCase();
-        AddResource(IMAGES_OK_STR, TEST_VALUE);
+        AddResource(IMAGES_OK_ID, TEST_VALUE);
     }
     RefPtr<PixelMap> CreatePixelMap(std::string& src);
 };
@@ -104,7 +104,7 @@ HWTEST_F(ImageSpanModifierTest, setImageSpanOptionsTestValidResValues, TestSize.
     std::optional<std::string> resultStr;
     std::string expectedStr = TEST_VALUE;
     auto subvalue = Converter::ArkUnion<Ark_ResourceStr, Ark_Resource>(
-        CreateResource(IMAGES_OK_STR.c_str(), ResourceType::STRING));
+        CreateResource(IMAGES_OK_ID, ResourceType::STRING));
     auto options = Converter::ArkUnion<Ark_Union_ResourceStr_PixelMap, Ark_ResourceStr>(subvalue);
     modifier_->setImageSpanOptions(node_, &options);
     std::unique_ptr<JsonValue> jsonValue = GetJsonValue(node_);

@@ -20,11 +20,11 @@
 
 #include "base/memory/ace_type.h"
 #include "core/components_ng/pattern/container_picker/container_picker_theme.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
-class ContainerPickerThemeWrapper : public ContainerPickerTheme, public TokenThemeWrapper {
+class ContainerPickerThemeWrapper : public ContainerPickerTheme {
     DECLARE_ACE_TYPE(ContainerPickerThemeWrapper, ContainerPickerTheme);
 
 public:
@@ -33,7 +33,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto theme = AceType::MakeRefPtr<ContainerPickerThemeWrapper>();
             InitTheme(theme, themeConstants);

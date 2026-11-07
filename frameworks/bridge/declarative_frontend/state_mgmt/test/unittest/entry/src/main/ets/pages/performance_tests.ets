@@ -19,7 +19,7 @@ import { DefinePropertyTest } from '../../performance_tests/definePropertyTest'
 import { PageController } from '../../lib/pageController'
 import { TestRunner } from '../../lib/testRunner'
 
-import router from '@system.router'
+import { router } from '@kit.ArkUI'
 
 @Entry
 @ComponentV2

@@ -16,17 +16,20 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_BRIDGE_COMMON_ACCESSIBILITY_JS_THIRD_PROVIDER_INTERATION_OPERATION_H
 #define FOUNDATION_ACE_FRAMEWORKS_BRIDGE_COMMON_ACCESSIBILITY_JS_THIRD_PROVIDER_INTERATION_OPERATION_H
 
+#include <atomic>
 #include <mutex>
 #include <unordered_map>
 
 #include "core/accessibility/accessibility_provider.h"
 #include "core/accessibility/third_accessibility_manager.h"
+#include "adapter/ohos/osal/ui_session_accessibility_action.h"
 #include "js_accessibility_manager.h"
 
 namespace OHOS::Ace::NG {
 class CustomAccessibilityProperty;
 }
 namespace OHOS::Ace::Framework {
+class ThirdAccessibilityTraversal;
 struct NodeConfig {
     OHOS::Ace::NG::OffsetF offset;
     int32_t pageId = -1;
@@ -72,12 +75,15 @@ public:
     void ExecuteAction(const int64_t elementId, const int32_t action,
         const std::map<std::string, std::string>& actionArguments, const int32_t requestId,
         Accessibility::AccessibilityElementOperatorCallback& callback) override;
+    UiSessionAccessibilityResult ExecuteActionForCollectedNode(int64_t providerElementId, int32_t action,
+        const std::map<std::string, std::string>& actionArguments, bool argumentsValid = true);
     void ClearFocus() override;
     void OutsideTouch() override;
     void GetCursorPosition(const int64_t elementId, const int32_t requestId,
         Accessibility::AccessibilityElementOperatorCallback &callback) override;
     void SetChildTreeIdAndWinId(
         const int64_t nodeId, const int32_t treeId, const int32_t childWindowId) override;
+    void RemoveChildTreeIdAndWinId(int64_t rawElementId);
     void SetBelongTreeId(const int32_t treeId) override;
     void FocusMoveSearchWithCondition(const AccessibilityElementInfo& info, const AccessibilityFocusMoveParam param,
         const int32_t requestId, AccessibilityElementOperatorCallback &callback) override;
@@ -112,7 +118,7 @@ public:
 
     int32_t GetBelongTreeId() const
     {
-        return belongTreeId_;
+        return belongTreeId_.load();
     }
 
     static void FillNodeConfig(const NodeConfig& config, Accessibility::AccessibilityElementInfo& info);
@@ -120,18 +126,38 @@ public:
     static bool FindNativeInfoById(
         const WeakPtr<AccessibilityProvider>& accessibilityProvider,
         int64_t splitElementId,
-        std::shared_ptr<ArkUI_AccessibilityElementInfo>& nativeInfo);
+        std::shared_ptr<ArkUI_AccessibilityElementInfo>& nativeInfo,
+        ThirdAccessibilityTraversal* traversal = nullptr);
 
     void CheckAndSendHoverEnterByReadableRules(int64_t thirdElementId);
+    bool SendNativeHoverEvent(const ArkUI_AccessibilityElementInfo& info, NG::AccessibilityHoverEventType eventType);
 
     void SetThirdCustomProperty(int64_t elementId, const RefPtr<NG::CustomAccessibilityProperty>& property);
     RefPtr<NG::CustomAccessibilityProperty> GetThirdCustomProperty(int64_t elementId) override;
+    bool HasChildTree(int64_t elementId) override;
     void RemoveThirdCustomProperty(int64_t elementId);
     void ClearAllThirdCustomProperties();
+    // Synchronous WithCondition focus-move search: the provider strategy walk and the id splicing run on the CALLING.
+    Accessibility::FocusMoveResult SearchFocusMoveWithConditionSync(
+        int64_t elementId, const Accessibility::AccessibilityFocusMoveParam& param,
+        Accessibility::AccessibilityElementInfo& info);
 
 private:
+    friend class ThirdAccessibilityTraversal;
+    struct NodeQueryOptions {
+        int32_t mode = 0;
+        int32_t requestId = 0;
+        bool ignoreHostOffset = false;
+        ThirdAccessibilityTraversal* traversal = nullptr;
+    };
+    bool FindNodeInfosFromProvider(int64_t elementId, const NodeQueryOptions& options,
+        std::list<Accessibility::AccessibilityElementInfo>& infos);
+    bool BuildNativeHoverEvent(const ArkUI_AccessibilityElementInfo& info,
+        NG::AccessibilityHoverEventType eventType, Accessibility::AccessibilityEventInfo& event);
     void GetHostRectTranslateInfo(NodeConfig& config);
     void GetNodeConfig(NodeConfig& nodeConfig);
+    void ApplyChildTreeIdAndWinId(Accessibility::AccessibilityElementInfo& info);
+    void ApplyChildTreeIdAndWinId(std::list<Accessibility::AccessibilityElementInfo>& infos);
     void SetSearchElementInfoByAccessibilityIdResult(
         AccessibilityElementOperatorCallback& callback,
         std::list<AccessibilityElementInfo>&& infos,
@@ -187,11 +213,16 @@ private:
     void HandleActionWhenFindNodeFail(const int32_t action);
 
     int32_t GetParentWindowId();
+    void NotifyCmpTreeDeregistered(int32_t treeId);
 
     WeakPtr<AccessibilityProvider> accessibilityProvider_;
     WeakPtr<JsAccessibilityManager> jsAccessibilityManager_;
     WeakPtr<NG::FrameNode> host_;
-    int32_t belongTreeId_ = AccessibilityElementInfo::UNDEFINED_TREE_ID;
+    std::atomic<int32_t> belongTreeId_ { AccessibilityElementInfo::UNDEFINED_TREE_ID };
+
+    mutable std::mutex childTreeIdWinIdMapMutex_;
+    // Raw element id -> (childTreeId, childWindowId), recorded by SetChildTreeIdAndWinId when AAMS registers a child tree (e.g.
+    std::unordered_map<int64_t, std::pair<int32_t, int32_t>> childTreeIdWinIdMap_;
 
     mutable std::mutex thirdCustomPropertiesMutex_;
     std::unordered_map<int64_t, RefPtr<NG::CustomAccessibilityProperty>> thirdCustomProperties_;

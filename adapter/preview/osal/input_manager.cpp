@@ -28,4 +28,18 @@ std::shared_ptr<MMI::PointerEvent> InputManager::CreatePointerEvent(
     return nullptr;
 }
 
+bool InputManager::IsAgentEvent(const std::shared_ptr<MMI::PointerEvent>& pointerEvent)
+{
+    return false;
+}
+
+bool InputManager::HasControlComponentPermission()
+{
+    return false;
+}
+
+void InputManager::ReportAgentInputDecision(const NG::AgentInputResult&)
+{
+}
+
 } // namespace OHOS::Ace

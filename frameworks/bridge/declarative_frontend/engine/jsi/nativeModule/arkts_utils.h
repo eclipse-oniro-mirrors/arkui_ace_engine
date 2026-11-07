@@ -114,6 +114,10 @@ struct TextBackgroundStyleParseOption {
     std::vector<ArkUI_Float32> radiusValues;
     std::vector<ArkUI_Int32> radiusUnits;
     std::shared_ptr<TextBackgroundStyle> style;
+    Color borderColor = Color::TRANSPARENT;
+    RefPtr<ResourceObject> borderColorResObj;
+    CalcDimension borderWidth;
+    RefPtr<ResourceObject> borderWidthResObj;
 };
 
 class ACE_FORCE_EXPORT ArkTSUtils {
@@ -422,12 +426,15 @@ public:
     static void ParseOuterBorderRadius(ArkUIRuntimeCallInfo* runtimeCallInfo,
         EcmaVM* vm, std::vector<ArkUI_Float32>& values, int32_t argsIndex);
     static void SetTextBackgroundStyle(std::shared_ptr<TextBackgroundStyle> style, Color color,
-        RefPtr<ResourceObject>& colorResObj, const ArkUI_Float32* values, const ArkUI_Int32* units);
+        RefPtr<ResourceObject>& colorResObj, const ArkUI_Float32* values, const ArkUI_Int32* units,
+        Color borderColor, RefPtr<ResourceObject>& borderColorResObj,
+        CalcDimension borderWidth, RefPtr<ResourceObject>& borderWidthResObj);
     static void ParseJsViewTextBackgroundStyle(EcmaVM* vm, ArkUINodeHandle nativeNode,
         const Local<JSValueRef>& styleArg, TextBackgroundStyleParseOption& option);
     static void RegisterTextBackgroundStyleResource(std::shared_ptr<TextBackgroundStyle> textBackgroundStyle,
         RefPtr<ResourceObject>& resObjTopLeft, RefPtr<ResourceObject>& resObjTopRight,
-        RefPtr<ResourceObject>& resObjBottomLeft, RefPtr<ResourceObject>& resObjBottomRight);
+        RefPtr<ResourceObject>& resObjBottomLeft, RefPtr<ResourceObject>& resObjBottomRight,
+        RefPtr<ResourceObject>& borderColorResObj, RefPtr<ResourceObject>& borderWidthResObj);
     static void ParseOuterBorderRadius(ArkUIRuntimeCallInfo* runtimeCallInfo,
         EcmaVM* vm, std::vector<ArkUI_Float32>& values, std::vector<ArkUI_Int32>& units, int32_t argsIndex);
     static void ParseOuterBorderRadius(ArkUIRuntimeCallInfo* runtimeCallInfo,

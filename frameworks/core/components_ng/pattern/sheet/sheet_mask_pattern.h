@@ -25,7 +25,7 @@
 #include "core/components_ng/pattern/sheet/sheet_mask_accessibility_property.h"
 
 namespace OHOS::Ace::NG {
-class SheetMaskPattern : virtual public PopupBasePattern {
+class SheetMaskPattern : public PopupBasePattern {
     DECLARE_ACE_TYPE(SheetMaskPattern, PopupBasePattern);
 
 public:

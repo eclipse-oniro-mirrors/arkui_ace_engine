@@ -179,6 +179,7 @@ void LayoutContent(LayoutWrapper* layoutWrapper, const RefPtr<NavDestinationGrou
         auto offsetX = safeExpand.left.value_or(0.0f);
         auto offsetY = safeExpand.top.value_or(0.0f);
 
+        CHECK_NULL_VOID(pattern);
         auto barStyle = pattern->GetTitleBarStyle().value_or(BarStyle::STANDARD);
         auto navBaseLayoutProperty = hostNode->GetLayoutProperty<NavDestinationLayoutPropertyBase>();
         CHECK_NULL_VOID(navBaseLayoutProperty);

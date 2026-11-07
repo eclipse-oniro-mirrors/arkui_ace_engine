@@ -17,13 +17,22 @@
 
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
+#include "core/common/event_manager.h"
+
 #include "base/geometry/ng/point_t.h"
 #include "base/memory/ace_type.h"
 #include "base/memory/referenced.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/event/event_constants.h"
+#include "core/components_ng/gestures/recognizers/pan_recognizer.h"
+#include "core/components_ng/pattern/command/ui_command_security_gate.h"
+#include "core/components_ng/pattern/pattern.h"
+#include "core/components_ng/pattern/scroll/scroll_pattern.h"
 #include "core/components_ng/relaxed_interaction/executors/scroll_touch_executor.h"
 #include "core/components_ng/relaxed_interaction/relaxed_interaction_types.h"
+#include "core/components_v2/inspector/inspector_constants.h"
 #include "core/pipeline_ng/pipeline_context.h"
+#include "test/mock/adapter/ohos/osal/mock_input_manager.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -70,6 +79,94 @@ HWTEST_F(ScrollTouchExecutorConstructorTest, StrictClickExecutor_Constructor_Lar
     EXPECT_FLOAT_EQ(executor.cmd_.actionInfo.coordinates.y1, 100.0f);
     EXPECT_FLOAT_EQ(executor.cmd_.actionInfo.coordinates.x2, 120.0f);
     EXPECT_FLOAT_EQ(executor.cmd_.actionInfo.coordinates.y2, 700.0f);
+}
+
+namespace {
+class MockFrameNodeForScrollTouch : public FrameNode {
+    DECLARE_ACE_TYPE(MockFrameNodeForScrollTouch, FrameNode);
+
+public:
+    MockFrameNodeForScrollTouch(const std::string& tag, int32_t nodeId, const RefPtr<Pattern>& pattern)
+        : FrameNode(tag, nodeId, pattern) {}
+
+    HitTestResult TouchTest(const PointF& globalPoint, const PointF& parentLocalPoint, // NOLINT
+        const PointF& parentRevertPoint, TouchRestrict& touchRestrict, TouchTestResult& result,
+        int32_t touchId, ResponseLinkResult& responseLinkResult, bool isDispatch = false) override
+    {
+        if (onTouchTest_) {
+            onTouchTest_(result);
+        }
+        return HitTestResult::STOP_BUBBLING;
+    }
+
+    void SetTouchTestCallback(std::function<void(TouchTestResult&)> callback)
+    {
+        onTouchTest_ = std::move(callback);
+    }
+
+private:
+    std::function<void(TouchTestResult&)> onTouchTest_;
+};
+} // namespace
+
+/**
+ * @tc.name: ExecuteStep_SecurityDeniedRefusesBeforeScroll
+ * @tc.desc: AC-4/R-8: with the security auth request on and the scrollable target found
+ *           by the recognizer declaring DENY plus the permission granted, the scroll
+ *           command is refused before any side effect.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollTouchExecuteStepTest, ExecuteStep_SecurityDeniedRefusesBeforeScroll, TestSize.Level1)
+{
+    // ScrollRecognizerPred passes for a pan recognizer attached to a scroll-family
+    // node; FORWARD skips the axis check (see ScrollRecognizerPred tests).
+    auto scrollNode = AceType::MakeRefPtr<FrameNode>("Scroll", 421, AceType::MakeRefPtr<Pattern>());
+    scrollNode->SetAgentControlMode(AgentControlMode::DENY);
+    auto panRecognizer = AceType::MakeRefPtr<PanRecognizer>(1, PanDirection(), 5.0);
+    panRecognizer->AttachFrameNode(scrollNode);
+
+    auto context = WeakPtr<PipelineContext>(mockPipelineContext_);
+    auto rootNode = AceType::MakeRefPtr<MockFrameNodeForScrollTouch>("Root", 422, AceType::MakeRefPtr<Pattern>());
+    rootNode->SetTouchTestCallback([&panRecognizer](TouchTestResult& result) {
+        result.push_back(panRecognizer);
+    });
+    auto rootBackup = mockPipelineContext_->rootNode_;
+    mockPipelineContext_->SetEventManager(AceType::MakeRefPtr<EventManager>());
+    mockPipelineContext_->rootNode_ = rootNode;
+
+    int reportCount = 0;
+    auto savedReporter = MockInputManager::agentInputReporter;
+    const bool savedGranted = MockInputManager::controlComponentPermissionGranted;
+    auto savedCache = MockInputManager::controlComponentPermissionCache;
+    MockInputManager::controlComponentPermissionGranted = true;
+    MockInputManager::controlComponentPermissionCache.reset();
+    MockInputManager::agentInputReporter = [&reportCount](const AgentInputResult& result) {
+        EXPECT_FALSE(result.allowed);
+        ++reportCount;
+    };
+
+    Command tmpCmd;
+    tmpCmd.type = "scroll";
+    tmpCmd.mode = ExecuteMode::TARGET;
+    tmpCmd.actionInfo.direction = RelaxedScrollDirection::FORWARD;
+    tmpCmd.actionInfo.distance = 1200.0;
+    tmpCmd.actionInfo.coordinates.x1 = 100.0;
+    tmpCmd.actionInfo.coordinates.y1 = 100.0;
+    tmpCmd.actionInfo.coordinates.x2 = 120.0;
+    tmpCmd.actionInfo.coordinates.y2 = 700.0;
+    ScrollTouchExecutor executor(context, tmpCmd);
+    CommandSecurityContext security;
+    security.needSecurityAuth = true;
+    NG::UiCommandSecurityGate::SetContext(security);
+
+    EXPECT_EQ(reportCount, 0);
+
+    MockInputManager::agentInputReporter = savedReporter;
+    MockInputManager::controlComponentPermissionGranted = savedGranted;
+    MockInputManager::controlComponentPermissionCache = savedCache;
+    NG::UiCommandSecurityGate::ClearContext();
+        mockPipelineContext_->eventManager_.Reset();
+    mockPipelineContext_->rootNode_ = rootBackup;
 }
 
 HWTEST_F(ScrollTouchExecuteStepTest, ExecuteStep_NullContext_ReturnsFailed, TestSize.Level1)

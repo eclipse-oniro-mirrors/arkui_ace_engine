@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "interfaces/inner_api/ui_session/param_config.h"
 #include "lazy_column_layout_test.h"
 
 #include <vector>
@@ -25,8 +26,10 @@
 #include "test/unittest/core/pattern/lazy_layout/lazy_layout_test_utils.h"
 
 #include "core/components_ng/pattern/lazy_column_layout/lazy_column_layout_model.h"
+#include "core/components_ng/pattern/common_view/common_view_pattern.h"
 #include "core/components_ng/pattern/lazy_column_layout/lazy_column_layout_algorithm.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
+#include "core/components_ng/pattern/lazy_layout/prepared_layout_geometry.h"
 #include "core/components_ng/pattern/list/list_model_ng.h"
 #include "core/components_ng/pattern/list/list_item_model_ng.h"
 #include "core/components_ng/pattern/list/list_pattern.h"
@@ -42,6 +45,17 @@
 #include "core/components_ng/layout/layout_wrapper_node.h"
 
 namespace OHOS::Ace::NG {
+namespace {
+constexpr int32_t REJECTED_HEADER_NODE_ID = 4700;
+constexpr int32_t REJECTED_ITEM_COUNT = 5;
+constexpr int32_t REJECTED_CHILD_NODE_ID = 4701;
+constexpr int32_t REJECTED_ITEM_INDEX = 2;
+constexpr int32_t COMMITTED_ITEM_COUNT = 8;
+constexpr int32_t COMMITTED_NODE_ID = 5100;
+constexpr int32_t COMMITTED_TALL_INDEX = 6;
+constexpr int32_t COMMITTED_REJECTED_INDEX = 5;
+} // namespace
+
 
 using GetChildByIndexCallback = std::function<std::pair<std::string, RefPtr<NG::UINode>>(int32_t index)>;
 
@@ -151,6 +165,30 @@ HWTEST_F(LazyColumnLayoutTest, LazyColumnLayoutPattern_CachedParentMatrix_001, T
         EXPECT_TRUE(LazyLayoutUtils::ValidateAndSetLazyLayoutParent(context.lazyNode, Axis::VERTICAL));
         EXPECT_TRUE(context.lazyNode->IsNeedLazyLayout());
     }
+}
+
+/**
+ * @tc.name: LazyColumnLayoutCachePrediction001
+ * @tc.desc: Cache coverage continues to request prediction independently of FastScroll completion.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyColumnLayoutTest, LazyColumnLayoutCachePrediction001, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<LazyColumnLayoutPattern>();
+    auto frameNode = FrameNode::CreateFrameNode(V2::LAZY_COLUMN_LAYOUT_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), pattern);
+    ASSERT_NE(frameNode, nullptr);
+    ASSERT_NE(pattern->layoutInfo_, nullptr);
+
+    auto& layoutInfo = pattern->layoutInfo_;
+    layoutInfo->layoutedEnd_ = 100.0f;
+    layoutInfo->cacheEndPos_ = 200.0f;
+    layoutInfo->layoutedEndIndex_ = 1;
+    layoutInfo->totalItemCount_ = 10;
+    EXPECT_TRUE(layoutInfo->NeedPredict());
+
+    layoutInfo->layoutedEndIndex_ = layoutInfo->totalItemCount_ - 1;
+    EXPECT_FALSE(layoutInfo->NeedPredict());
 }
 
 RefPtr<FrameNode> LazyColumnLayoutTest::GetMainFrameNode()
@@ -2252,4 +2290,846 @@ HWTEST_F(LazyColumnLayoutTest, EstimateItemsTotalHeight001, TestSize.Level1)
     EXPECT_FLOAT_EQ(layoutInfo->totalMainSize_, 536.0f);
     EXPECT_FLOAT_EQ(layoutInfo->estimateItemSize_, -1.0f);
 }
+/**
+ * @tc.name: PremeasureContainerMeasureLifecycle001
+ * @tc.desc: The real container Measure callback runs without publishing preparation geometry.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyColumnLayoutTest, PremeasureContainerMeasureLifecycle001, TestSize.Level1)
+{
+    CreateScroll();
+    CreateLazyColumnLayout();
+    CreateContent(30);
+    CreateDone();
+    const auto published = frameNode_->GetGeometryNode();
+    const auto frameRect = published->GetFrameRect();
+    auto callbackCount = std::make_shared<int32_t>(0);
+    auto callbackHeight = std::make_shared<float>(0.0f);
+    frameNode_->SetMeasureCallback([callbackCount, callbackHeight, weak = WeakPtr<FrameNode>(frameNode_)](
+        RefPtr<Kit::FrameNode>) {
+        ++*callbackCount;
+        auto node = weak.Upgrade();
+        if (node) {
+            *callbackHeight = node->GetGeometryNode()->GetMarginFrameSize().Height();
+        }
+    });
+    auto constraint = published->GetParentLayoutConstraint().value();
+    constraint.viewPosRef = ViewPosReference {
+        .viewPosStart = -250.0f, .viewPosEnd = 0.0f, .referencePos = 0.0f,
+        .referenceEdge = ReferenceEdge::END, .axis = Axis::VERTICAL,
+    };
+    std::vector<WeakPtr<FrameNode>> measuredNodes;
+    const auto result = LazyLayoutUtils::Premeasure(frameNode_, constraint, &measuredNodes);
+    ASSERT_TRUE(result && result->complete);
+    EXPECT_EQ(*callbackCount, 1);
+    EXPECT_FLOAT_EQ(*callbackHeight, result->marginMainSize);
+    EXPECT_EQ(frameNode_->GetGeometryNode(), published);
+    EXPECT_EQ(published->GetFrameRect(), frameRect);
+    EXPECT_TRUE(std::any_of(measuredNodes.begin(), measuredNodes.end(), [node = frameNode_](const auto& weak) {
+        return weak.Upgrade() == node;
+    }));
+}
+
+/**
+ * @tc.name: PremeasureSuffixKeepsDisplayedAnchor001
+ * @tc.desc: A suffix keeps the live head and its pending adjustment unchanged while storing real tail sizes.
+ * @tc.type: FUNC
+ */
+class LazyColumnHistoryPremeasureTest : public LazyColumnLayoutTest, public testing::WithParamInterface<bool> {};
+
+/**
+ * @tc.name: PremeasureRefreshesHistory001
+ * @tc.desc: Current spacing and child count replace historical values without publishing a new window.
+ * @tc.type: FUNC
+ */
+HWTEST_P(LazyColumnHistoryPremeasureTest, PremeasureRefreshesHistory001, TestSize.Level1)
+{
+    CreateScroll();
+    CreateLazyColumnLayout();
+    CreateContent(30);
+    CreateDone();
+    auto info = pattern_->layoutInfo_;
+    ASSERT_FALSE(info->posMap_.empty());
+    const auto published = frameNode_->GetGeometryNode();
+    const auto frameRect = published->GetFrameRect();
+    const auto visible = std::make_pair(info->visibleStartIndex_, info->visibleEndIndex_);
+    if (GetParam()) {
+        layoutProperty_->UpdateSpace(Dimension(10.0f, DimensionUnit::PX));
+    } else {
+        for (int32_t index = 0; index < 5; ++index) {
+            frameNode_->RemoveChild(frameNode_->GetLastChild());
+        }
+    }
+    auto constraint = published->GetParentLayoutConstraint().value();
+    constraint.viewPosRef = ViewPosReference {
+        .viewPosStart = -250.0f, .viewPosEnd = 0.0f, .referencePos = 0.0f,
+        .referenceEdge = ReferenceEdge::END, .axis = Axis::VERTICAL,
+    };
+    const auto result = LazyLayoutUtils::Premeasure(frameNode_, constraint);
+    ASSERT_TRUE(result && result->complete);
+    const int32_t count = GetParam() ? 30 : 25;
+    const float space = GetParam() ? 10.0f : 0.0f;
+    EXPECT_EQ(info->totalItemCount_, count);
+    EXPECT_FLOAT_EQ(info->space_, space);
+    EXPECT_FLOAT_EQ(result->marginMainSize, count * ITEM_HEIGHT + (count - 1) * space);
+    EXPECT_FLOAT_EQ(info->posMap_.at(count - 1).endPos, info->totalMainSize_);
+    EXPECT_EQ(info->posMap_.rbegin()->first, count - 1);
+    EXPECT_EQ(std::make_pair(info->visibleStartIndex_, info->visibleEndIndex_), visible);
+    EXPECT_EQ(frameNode_->GetGeometryNode(), published);
+    EXPECT_EQ(published->GetFrameRect(), frameRect);
+}
+
+INSTANTIATE_TEST_SUITE_P(CurrentProperties, LazyColumnHistoryPremeasureTest, testing::Bool());
+
+HWTEST_F(LazyColumnLayoutTest, PremeasureSuffixKeepsDisplayedAnchor001, TestSize.Level1)
+{
+    auto info = AceType::MakeRefPtr<LazyColumnLayoutInfo>();
+    auto algorithm = AceType::MakeRefPtr<LazyColumnLayoutAlgorithm>(info);
+    auto context = CreateCachedLazyLayoutTestContext(V2::LAZY_COLUMN_LAYOUT_ETS_TAG,
+        AceType::MakeRefPtr<LazyColumnLayoutPattern>(), algorithm, SizeF(SCROLL_WIDTH, SCROLL_HEIGHT));
+    int32_t measured = 0;
+    for (int32_t index = 0; index < 10; ++index) {
+        AppendFixedHeightChild(context.wrapper, -4200 - index, index < 6 ? 50.0f : 225.0f, measured);
+    }
+    info->SetTotalItemCount(10);
+    info->SetPosMap(0, { 0.0f, 50.0f });
+    info->UpdatePosMap(0.0f);
+    info->startIndex_ = 0;
+    info->endIndex_ = 0;
+    info->visibleStartIndex_ = 0;
+    info->visibleEndIndex_ = 0;
+    info->adjustOffset_ = { 3.0f, 4.0f };
+    context.wrapper->GetGeometryNode()->SetFrameSize(SizeF(SCROLL_WIDTH, 500.0f));
+    auto active = context.wrapper->GetOrCreateChildByIndex(0, false, true);
+    active->SetActive(true);
+    auto constraint = context.parentConstraint;
+    constraint.maxSize.SetHeight(Infinity<float>());
+    constraint.viewPosRef = ViewPosReference {
+        .viewPosStart = -900.0f, .viewPosEnd = 0.0f, .referencePos = 0.0f,
+        .referenceEdge = ReferenceEdge::END, .axis = Axis::VERTICAL,
+    };
+    auto result = LazyLayoutUtils::Premeasure(context.wrapper, constraint);
+    ASSERT_TRUE(result);
+    EXPECT_TRUE(result->complete);
+    EXPECT_FALSE(result->reachedOppositeEdge);
+    EXPECT_EQ(measured, 4);
+    EXPECT_FLOAT_EQ(result->marginMainSize, 1200.0f);
+    EXPECT_FLOAT_EQ(info->totalMainSize_ - info->posMap_.at(6).startPos, 900.0f);
+    EXPECT_FLOAT_EQ(result->adjust.start, 0.0f);
+    EXPECT_FLOAT_EQ(result->adjust.end, 700.0f);
+    EXPECT_FLOAT_EQ(info->adjustOffset_.start, 3.0f);
+    EXPECT_FLOAT_EQ(info->adjustOffset_.end, 4.0f);
+    EXPECT_EQ(info->startIndex_, 0);
+    EXPECT_EQ(info->endIndex_, 0);
+    EXPECT_EQ(info->visibleStartIndex_, 0);
+    EXPECT_EQ(info->visibleEndIndex_, 0);
+    EXPECT_TRUE(active->IsActive());
+}
+
+class LazyColumnRepeatedPremeasureTest : public LazyColumnLayoutTest,
+    public testing::WithParamInterface<std::tuple<bool, bool>> {};
+
+/**
+ * @tc.name: RepeatedPremeasureSeparatesAnchorAndInset
+ * @tc.desc: Internal anchor changes are incremental, whereas unpublished outer padding and margin remain absolute.
+ * @tc.type: FUNC
+ */
+HWTEST_P(LazyColumnRepeatedPremeasureTest, RepeatedPremeasureSeparatesAnchorAndInset, TestSize.Level1)
+{
+    const auto [forward, decorated] = GetParam();
+    auto info = AceType::MakeRefPtr<LazyColumnLayoutInfo>();
+    auto context = CreateCachedLazyLayoutTestContext(V2::LAZY_COLUMN_LAYOUT_ETS_TAG,
+        AceType::MakeRefPtr<LazyColumnLayoutPattern>(), AceType::MakeRefPtr<LazyColumnLayoutAlgorithm>(info),
+        SizeF(SCROLL_WIDTH, SCROLL_HEIGHT));
+    int32_t measured = 0;
+    for (int32_t index = 0; index < 10; ++index) {
+        AppendFixedHeightChild(context.wrapper, -5200 - index, index < 5 ? 100.0f : 500.0f, measured);
+    }
+    info->totalItemCount_ = 10;
+    info->estimateItemSize_ = 100.0f;
+    info->totalMainSize_ = 1000.0f;
+    info->posMap_[7] = { 700.0f, 800.0f };
+    info->startIndex_ = info->visibleStartIndex_ = info->endIndex_ = info->visibleEndIndex_ = 7;
+    context.wrapper->GetGeometryNode()->SetFrameSize(SizeF(SCROLL_WIDTH, 1000.0f));
+    if (decorated) {
+        PaddingProperty padding;
+        padding.top = CalcLength(13.0f);
+        padding.bottom = CalcLength(19.0f);
+        MarginProperty margin;
+        margin.top = CalcLength(11.0f);
+        margin.bottom = CalcLength(17.0f);
+        context.wrapper->GetLayoutProperty()->UpdatePadding(padding);
+        context.wrapper->GetLayoutProperty()->UpdateMargin(margin);
+    }
+    context.parentConstraint.maxSize.SetHeight(Infinity<float>());
+    context.parentConstraint.viewPosRef = ViewPosReference {
+        .viewPosStart = forward ? 0.0f : -10000.0f, .viewPosEnd = forward ? 10000.0f : 0.0f,
+        .referencePos = 0.0f, .referenceEdge = forward ? ReferenceEdge::START : ReferenceEdge::END,
+        .axis = Axis::VERTICAL,
+    };
+    for (int32_t attempt = 0; attempt < 3; ++attempt) {
+        SCOPED_TRACE(attempt);
+        auto result = LazyLayoutUtils::Premeasure(context.wrapper, context.parentConstraint);
+        ASSERT_TRUE(result && result->complete);
+        EXPECT_FLOAT_EQ(result->startInsetAdjustment, decorated ? 24.0f : 0.0f);
+        EXPECT_FLOAT_EQ(result->adjust.start - result->startInsetAdjustment, attempt == 0 ? 800.0f : 0.0f);
+        EXPECT_FLOAT_EQ(result->marginMainSize, decorated ? 3060.0f : 3000.0f);
+        EXPECT_FLOAT_EQ(result->adjust.start + result->adjust.end, decorated ? 2060.0f : 2000.0f);
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(ReferenceEdges, LazyColumnRepeatedPremeasureTest,
+    testing::Combine(testing::Bool(), testing::Bool()));
+
+/**
+ * @tc.name: PremeasureThroughCommonView001
+ * @tc.desc: A legal intermediate forwards the range and includes its padding without activating children.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyColumnLayoutTest, PremeasureThroughCommonView001, TestSize.Level1)
+{
+    auto info = AceType::MakeRefPtr<LazyColumnLayoutInfo>();
+    auto algorithm = AceType::MakeRefPtr<LazyColumnLayoutAlgorithm>(info);
+    auto context = CreateCachedLazyLayoutTestContext(V2::LAZY_COLUMN_LAYOUT_ETS_TAG,
+        AceType::MakeRefPtr<LazyColumnLayoutPattern>(), algorithm, SizeF(SCROLL_WIDTH, SCROLL_HEIGHT));
+    auto host = FrameNode::CreateFrameNode(V2::COMMON_VIEW_ETS_TAG, -4300, AceType::MakeRefPtr<CommonViewPattern>());
+    host->SetNeedLazyLayout(true);
+    host->GetLayoutProperty()->UpdatePadding(CreatePadding(0.0f, 10.0f, 0.0f, 20.0f));
+    context.parent->RemoveChild(context.host);
+    host->AddChild(context.host);
+    auto wrapper = AceType::MakeRefPtr<LayoutWrapperNode>(
+        host, AceType::MakeRefPtr<GeometryNode>(), host->GetLayoutProperty());
+    wrapper->SetLayoutAlgorithm(AceType::MakeRefPtr<LayoutAlgorithmWrapper>(AceType::MakeRefPtr<BoxLayoutAlgorithm>()));
+    wrapper->AppendChild(context.wrapper);
+    context.wrapper->SetActive(false);
+    int32_t measured = 0;
+    for (int32_t index = 0; index < 10; ++index) {
+        AppendFixedHeightChild(context.wrapper, -4301 - index, index < 2 ? 100.0f : 225.0f, measured);
+    }
+    auto constraint = context.parentConstraint;
+    constraint.maxSize.SetHeight(Infinity<float>());
+    constraint.viewPosRef = ViewPosReference {
+        .viewPosStart = 0.0f, .viewPosEnd = 210.0f, .referencePos = 0.0f,
+        .referenceEdge = ReferenceEdge::START, .axis = Axis::VERTICAL,
+    };
+    auto result = LazyLayoutUtils::Premeasure(wrapper, constraint);
+    ASSERT_TRUE(result);
+    EXPECT_TRUE(result->complete);
+    EXPECT_FALSE(result->reachedOppositeEdge);
+    EXPECT_EQ(measured, 2);
+    EXPECT_FLOAT_EQ(result->marginMainSize, 1030.0f);
+    EXPECT_FALSE(context.wrapper->IsActive());
+    EXPECT_EQ(info->visibleStartIndex_, -1);
+    EXPECT_EQ(info->visibleEndIndex_, -1);
+    constraint.viewPosRef->knownMainSize = 2030.0f;
+    result = LazyLayoutUtils::Premeasure(wrapper, constraint);
+    ASSERT_TRUE(result);
+    EXPECT_TRUE(result->complete);
+    EXPECT_FLOAT_EQ(result->marginMainSize, 2030.0f);
+    EXPECT_FLOAT_EQ(info->totalMainSize_, 2000.0f);
+    EXPECT_EQ(info->posMap_.size(), 2);
+}
+
+namespace {
+std::pair<RefPtr<FrameNode>, RefPtr<LayoutWrapperNode>> CreateNestedColumnPremeasureWrapper(
+    const CachedLazyLayoutTestContext& inner, const RefPtr<LazyColumnLayoutInfo>& outerInfo)
+{
+    constexpr int32_t outerNodeId = -4400;
+    auto host = FrameNode::CreateFrameNode(
+        V2::LAZY_COLUMN_LAYOUT_ETS_TAG, outerNodeId, AceType::MakeRefPtr<LazyColumnLayoutPattern>());
+    inner.parent->RemoveChild(inner.host);
+    host->AddChild(inner.host);
+    auto outer = AceType::MakeRefPtr<LayoutWrapperNode>(
+        host, AceType::MakeRefPtr<GeometryNode>(), host->GetLayoutProperty());
+    outer->SetLayoutAlgorithm(AceType::MakeRefPtr<LayoutAlgorithmWrapper>(
+        AceType::MakeRefPtr<LazyColumnLayoutAlgorithm>(outerInfo)));
+    outer->AppendChild(inner.wrapper);
+    return { host, outer };
+}
+} // namespace
+
+/**
+ * @tc.name: PremeasureNestedSuffixIsNotWholeColumn001
+ * @tc.desc: A partially measured nested section must not make its one-item parent report an exact whole extent.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyColumnLayoutTest, PremeasureNestedSuffixIsNotWholeColumn001, TestSize.Level1)
+{
+    auto innerInfo = AceType::MakeRefPtr<LazyColumnLayoutInfo>();
+    auto inner = CreateCachedLazyLayoutTestContext(V2::LAZY_COLUMN_LAYOUT_ETS_TAG,
+        AceType::MakeRefPtr<LazyColumnLayoutPattern>(), AceType::MakeRefPtr<LazyColumnLayoutAlgorithm>(innerInfo),
+        SizeF(SCROLL_WIDTH, SCROLL_HEIGHT));
+    auto outerInfo = AceType::MakeRefPtr<LazyColumnLayoutInfo>();
+    auto [host, outer] = CreateNestedColumnPremeasureWrapper(inner, outerInfo);
+    int32_t measured = 0;
+    for (int32_t index = 0; index < 10; ++index) {
+        AppendFixedHeightChild(inner.wrapper, -4401 - index, 100.0f, measured);
+    }
+    auto constraint = inner.parentConstraint;
+    constraint.maxSize.SetHeight(Infinity<float>());
+    constraint.viewPosRef = ViewPosReference {
+        .viewPosStart = -200.0f, .viewPosEnd = 0.0f, .referencePos = 0.0f,
+        .referenceEdge = ReferenceEdge::END, .axis = Axis::VERTICAL,
+    };
+    auto result = LazyLayoutUtils::Premeasure(outer, constraint);
+    ASSERT_TRUE(result);
+    EXPECT_TRUE(result->complete);
+    EXPECT_FALSE(result->reachedOppositeEdge);
+    EXPECT_EQ(measured, 2);
+    EXPECT_FLOAT_EQ(result->marginMainSize, 1000.0f);
+    EXPECT_FLOAT_EQ(outer->GetGeometryNode()->GetFrameSize().Height(), 0.0f);
+    EXPECT_EQ(innerInfo->posMap_.begin()->first, 8);
+    EXPECT_EQ(innerInfo->visibleStartIndex_, -1);
+    EXPECT_EQ(outerInfo->visibleStartIndex_, -1);
+    ASSERT_NE(result->geometry, nullptr);
+    ASSERT_EQ(result->geometry->children.count(0), 1u);
+    EXPECT_EQ(result->geometry->children.at(0)->positions.begin()->first, 8);
+
+    innerInfo->estimateItemSize_ = 50.0f;
+    inner.wrapper->GetOrCreateChildByIndex(7, false, true)->GetLayoutAlgorithm()->SetLayoutAlgorithm(nullptr);
+    constraint.viewPosRef->viewPosStart = -400.0f;
+    result = LazyLayoutUtils::Premeasure(outer, constraint);
+    ASSERT_TRUE(result);
+    EXPECT_FALSE(result->complete);
+    EXPECT_FALSE(result->reachedOppositeEdge);
+    EXPECT_FLOAT_EQ(result->marginMainSize, 600.0f);
+    // Neither preparation published the outer frame. Compensation remains relative to its original zero extent.
+    EXPECT_FLOAT_EQ(result->adjust.start + result->adjust.end, 600.0f);
+    EXPECT_EQ(innerInfo->posMap_.size(), 2);
+    EXPECT_EQ(innerInfo->visibleStartIndex_, -1);
+    EXPECT_EQ(outerInfo->visibleStartIndex_, -1);
+}
+
+/**
+ * @tc.name: PreparedGeometryColdNestedColumnFillsFromSuffix001
+ * @tc.desc: Cold nested normal layout imports request values and fills only the missing window, not the prefix.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyColumnLayoutTest, PreparedGeometryColdNestedColumnFillsFromSuffix001, TestSize.Level1)
+{
+    auto innerPattern = AceType::MakeRefPtr<LazyColumnLayoutPattern>();
+    auto inner = CreateCachedLazyLayoutTestContext(V2::LAZY_COLUMN_LAYOUT_ETS_TAG, innerPattern,
+        AceType::MakeRefPtr<LazyColumnLayoutAlgorithm>(innerPattern->layoutInfo_), SizeF(SCROLL_WIDTH, SCROLL_HEIGHT));
+    auto outerPattern = AceType::MakeRefPtr<LazyColumnLayoutPattern>();
+    auto host = FrameNode::CreateFrameNode(V2::LAZY_COLUMN_LAYOUT_ETS_TAG, -4500, outerPattern);
+    inner.parent->RemoveChild(inner.host);
+    host->AddChild(inner.host);
+    auto outer = AceType::MakeRefPtr<LayoutWrapperNode>(
+        host, AceType::MakeRefPtr<GeometryNode>(), host->GetLayoutProperty());
+    outer->SetLayoutAlgorithm(AceType::MakeRefPtr<LayoutAlgorithmWrapper>(
+        AceType::MakeRefPtr<LazyColumnLayoutAlgorithm>(outerPattern->layoutInfo_)));
+    outer->AppendChild(inner.wrapper);
+    int32_t measured = 0;
+    for (int32_t index = 0; index < 10; ++index) {
+        AppendFixedHeightChild(inner.wrapper, -4501 - index, index < 8 ? 50.0f : 100.0f, measured);
+    }
+    auto constraint = inner.parentConstraint;
+    constraint.maxSize.SetHeight(Infinity<float>());
+    constraint.viewPosRef = ViewPosReference {
+        .viewPosStart = -200.0f, .viewPosEnd = 0.0f, .referencePos = 0.0f,
+        .referenceEdge = ReferenceEdge::END, .axis = Axis::VERTICAL,
+    };
+    auto result = LazyLayoutUtils::Premeasure(outer, constraint);
+    ASSERT_TRUE(result && result->complete);
+    ASSERT_EQ(measured, 2);
+    innerPattern->layoutInfo_ = AceType::MakeRefPtr<LazyColumnLayoutInfo>();
+    outerPattern->layoutInfo_ = AceType::MakeRefPtr<LazyColumnLayoutInfo>();
+    inner.wrapper->SetLayoutAlgorithm(AceType::MakeRefPtr<LayoutAlgorithmWrapper>(
+        AceType::MakeRefPtr<LazyColumnLayoutAlgorithm>(innerPattern->layoutInfo_)));
+    outer->SetLayoutAlgorithm(AceType::MakeRefPtr<LayoutAlgorithmWrapper>(
+        AceType::MakeRefPtr<LazyColumnLayoutAlgorithm>(outerPattern->layoutInfo_)));
+    outerPattern->RestorePreparedGeometry(result->geometry);
+    constraint.viewPosRef->viewPosStart = -250.0f;
+    constraint.viewPosRef->viewPosEnd = -150.0f;
+    outer->Measure(constraint);
+    outer->Layout();
+    EXPECT_EQ(innerPattern->GetPreparedGeometry(), result->geometry->children.at(0));
+    // Normal backward layout includes the item touching the window's leading boundary.
+    EXPECT_EQ(measured, 4);
+    EXPECT_EQ(innerPattern->layoutInfo_->posMap_.begin()->first, 6);
+    EXPECT_FLOAT_EQ(innerPattern->layoutInfo_->totalMainSize_ -
+        innerPattern->layoutInfo_->posMap_.at(8).startPos, 200.0f);
+}
+/**
+ * @tc.name: KnownExtentKeepsRealItems001
+ * @tc.desc: A known outer extent rebases a measured suffix without resizing its real children.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyColumnLayoutTest, KnownExtentKeepsRealItems001, TestSize.Level1)
+{
+    auto info = AceType::MakeRefPtr<LazyColumnLayoutInfo>();
+    info->totalItemCount_ = 4;
+    info->space_ = 10.0f;
+    info->startIndex_ = 3;
+    info->posMap_[0] = { 0.0f, 100.0f };
+    info->posMap_[3] = { 600.0f, 800.0f };
+    ASSERT_TRUE(info->ApplyKnownBodySize(800.0f, 730.0f));
+    EXPECT_FLOAT_EQ(info->estimateItemSize_, 200.0f);
+    EXPECT_FLOAT_EQ(info->posMap_.at(0).endPos, 100.0f);
+    EXPECT_FLOAT_EQ(info->posMap_.at(3).startPos, 530.0f);
+    EXPECT_FLOAT_EQ(info->posMap_.at(3).endPos, 730.0f);
+    EXPECT_FLOAT_EQ(info->adjustOffset_.start, -70.0f);
+    EXPECT_FLOAT_EQ(info->adjustOffset_.end, 0.0f);
+    EXPECT_EQ(info->posMap_.size(), 2);
+    EXPECT_FALSE(info->ApplyKnownBodySize(730.0f, 300.0f));
+    EXPECT_FLOAT_EQ(info->posMap_.at(3).startPos, 530.0f);
+}
+
+namespace {
+CachedLazyLayoutTestContext CreateUnsupportedColumnContext(
+    const RefPtr<LazyColumnLayoutInfo>& info, int32_t& measured)
+{
+    auto pattern = AceType::MakeRefPtr<LazyColumnLayoutPattern>();
+    auto context = CreateCachedLazyLayoutTestContext(V2::LAZY_COLUMN_LAYOUT_ETS_TAG, pattern,
+        AceType::MakeRefPtr<LazyColumnLayoutAlgorithm>(info), SizeF(SCROLL_WIDTH, SCROLL_HEIGHT));
+    AppendFixedHeightChild(context.wrapper, -REJECTED_HEADER_NODE_ID, 70.0f, measured);
+    pattern->header_ = context.wrapper->GetOrCreateChildByIndex(0, false, true)->GetHostNode();
+    for (int32_t index = 0; index < REJECTED_ITEM_COUNT; ++index) {
+        AppendFixedHeightChild(context.wrapper, -REJECTED_CHILD_NODE_ID - index,
+            index == 0 ? 300.0f : 100.0f, measured);
+        if (index >= REJECTED_ITEM_INDEX) {
+            info->posMap_[index] = { index * 100.0f, (index + 1) * 100.0f };
+        }
+    }
+    // This non-forwarding child rejects lazy preflight after the first real item was committed.
+    context.wrapper->GetOrCreateChildByIndex(REJECTED_ITEM_INDEX, false, true)->GetHostNode()->SetNeedLazyLayout(true);
+    info->totalItemCount_ = REJECTED_ITEM_COUNT;
+    info->estimateItemSize_ = 100.0f;
+    info->headerMainSize_ = 50.0f;
+    info->totalMainSize_ = 550.0f;
+    info->startIndex_ = info->layoutedStartIndex_ = info->cachedStartIndex_ = REJECTED_ITEM_INDEX;
+    info->endIndex_ = info->layoutedEndIndex_ = info->cachedEndIndex_ = REJECTED_ITEM_INDEX;
+    info->visibleStartIndex_ = info->visibleEndIndex_ = REJECTED_ITEM_INDEX;
+    info->layoutedStart_ = info->cacheStartPos_ = 200.0f;
+    info->layoutedEnd_ = info->cacheEndPos_ = 300.0f;
+    info->adjustOffset_ = { 7.0f, 9.0f };
+    context.wrapper->GetGeometryNode()->SetFrameSize(SizeF(SCROLL_WIDTH, 550.0f));
+    context.parentConstraint.maxSize.SetHeight(Infinity<float>());
+    context.parentConstraint.viewPosRef = ViewPosReference {
+        .viewPosStart = 0.0f, .viewPosEnd = 500.0f, .referencePos = 0.0f,
+        .referenceEdge = ReferenceEdge::START, .axis = Axis::VERTICAL,
+    };
+    return context;
+}
+} // namespace
+
+/**
+ * @tc.name: PremeasureUnsupportedFinalizesPrefix001
+ * @tc.desc: A rejected child retains real prefix sizes, resized edges and the displayed anchor's adjustment.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyColumnLayoutTest, PremeasureUnsupportedFinalizesPrefix001, TestSize.Level1)
+{
+    auto info = AceType::MakeRefPtr<LazyColumnLayoutInfo>();
+    int32_t measured = 0;
+    auto context = CreateUnsupportedColumnContext(info, measured);
+    auto active = context.wrapper->GetOrCreateChildByIndex(3, false, true);
+    active->SetActive(true);
+    auto result = LazyLayoutUtils::Premeasure(context.wrapper, context.parentConstraint);
+    ASSERT_TRUE(result);
+    EXPECT_TRUE(result->unsupported);
+    EXPECT_FALSE(result->complete);
+    EXPECT_FALSE(result->reachedOppositeEdge);
+    EXPECT_EQ(measured, 2);
+    EXPECT_FLOAT_EQ(info->headerMainSize_, 70.0f);
+    EXPECT_FLOAT_EQ(info->totalMainSize_, 770.0f);
+    EXPECT_FLOAT_EQ(result->marginMainSize, 770.0f);
+    EXPECT_FLOAT_EQ(result->adjust.start, 220.0f);
+    EXPECT_FLOAT_EQ(result->adjust.end, 0.0f);
+    EXPECT_EQ(info->posMap_.size(), 4);
+    EXPECT_EQ(info->posMap_.count(1), 0);
+    EXPECT_FLOAT_EQ(info->posMap_.at(0).endPos, 300.0f);
+    EXPECT_FLOAT_EQ(info->posMap_.at(2).startPos, 400.0f);
+    EXPECT_FLOAT_EQ(info->posMap_.at(4).endPos, 700.0f);
+    EXPECT_EQ(info->updatedStart_, INT_MAX);
+    EXPECT_EQ(info->updatedEnd_, -1);
+    EXPECT_FLOAT_EQ(info->layoutedStart_, 400.0f);
+    EXPECT_FLOAT_EQ(info->layoutedEnd_, 500.0f);
+    EXPECT_FLOAT_EQ(info->cacheStartPos_, 400.0f);
+    EXPECT_FLOAT_EQ(info->cacheEndPos_, 500.0f);
+    EXPECT_EQ(info->startIndex_, 2);
+    EXPECT_EQ(info->endIndex_, 2);
+    EXPECT_EQ(info->visibleStartIndex_, 2);
+    EXPECT_EQ(info->visibleEndIndex_, 2);
+    EXPECT_TRUE(active->IsActive());
+    EXPECT_FLOAT_EQ(info->adjustOffset_.start, 7.0f);
+    EXPECT_FLOAT_EQ(info->adjustOffset_.end, 9.0f);
+    EXPECT_FLOAT_EQ(context.wrapper->GetGeometryNode()->GetFrameSize().Height(), 550.0f);
+}
+
+/**
+ * @tc.name: PremeasureUnsupportedThenNormalMeasure001
+ * @tc.desc: Normal measurement reuses the finalized partial prefix without overlapping or compensating twice.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyColumnLayoutTest, PremeasureUnsupportedThenNormalMeasure001, TestSize.Level1)
+{
+    auto info = AceType::MakeRefPtr<LazyColumnLayoutInfo>();
+    int32_t measured = 0;
+    auto context = CreateUnsupportedColumnContext(info, measured);
+    auto result = LazyLayoutUtils::Premeasure(context.wrapper, context.parentConstraint);
+    ASSERT_TRUE(result);
+    ASSERT_TRUE(result->unsupported);
+    auto constraint = context.parentConstraint;
+    constraint.viewPosRef->viewPosStart = 250.0f;
+    constraint.viewPosRef->viewPosEnd = 350.0f;
+    constraint.viewPosRef->referencePos -= result->adjust.start;
+    context.wrapper->SetActive(true);
+    context.wrapper->Measure(constraint);
+    ASSERT_EQ(info->posMap_.size(), 5);
+    EXPECT_FLOAT_EQ(info->posMap_.at(0).endPos, 300.0f);
+    EXPECT_FLOAT_EQ(info->posMap_.at(1).startPos, 300.0f);
+    EXPECT_FLOAT_EQ(info->posMap_.at(1).endPos, 400.0f);
+    EXPECT_FLOAT_EQ(info->posMap_.at(2).startPos, 400.0f);
+    EXPECT_FLOAT_EQ(info->totalMainSize_, 770.0f);
+    EXPECT_FLOAT_EQ(info->adjustOffset_.start, 0.0f);
+    EXPECT_FLOAT_EQ(info->adjustOffset_.end, 0.0f);
+}
+
+/**
+ * @tc.name: PremeasureNestedUnsupportedFinalizesParent001
+ * @tc.desc: A nested terminal result carries its committed extent and internal anchor to its parent.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyColumnLayoutTest, PremeasureNestedUnsupportedFinalizesParent001, TestSize.Level1)
+{
+    auto innerInfo = AceType::MakeRefPtr<LazyColumnLayoutInfo>();
+    int32_t measured = 0;
+    auto inner = CreateUnsupportedColumnContext(innerInfo, measured);
+    auto outerInfo = AceType::MakeRefPtr<LazyColumnLayoutInfo>();
+    auto host = FrameNode::CreateFrameNode(
+        V2::LAZY_COLUMN_LAYOUT_ETS_TAG, -4800, AceType::MakeRefPtr<LazyColumnLayoutPattern>());
+    inner.parent->RemoveChild(inner.host);
+    host->AddChild(inner.host);
+    auto outer = AceType::MakeRefPtr<LayoutWrapperNode>(
+        host, AceType::MakeRefPtr<GeometryNode>(), host->GetLayoutProperty());
+    outer->SetLayoutAlgorithm(AceType::MakeRefPtr<LayoutAlgorithmWrapper>(
+        AceType::MakeRefPtr<LazyColumnLayoutAlgorithm>(outerInfo)));
+    outer->AppendChild(inner.wrapper);
+    outer->GetGeometryNode()->SetFrameSize(SizeF(SCROLL_WIDTH, 550.0f));
+    outerInfo->totalItemCount_ = 1;
+    outerInfo->totalMainSize_ = 550.0f;
+    outerInfo->posMap_[0] = { 0.0f, 550.0f };
+    outerInfo->startIndex_ = outerInfo->endIndex_ = 0;
+    auto result = LazyLayoutUtils::Premeasure(outer, inner.parentConstraint);
+    ASSERT_TRUE(result);
+    EXPECT_TRUE(result->unsupported);
+    EXPECT_FALSE(result->complete);
+    EXPECT_FALSE(result->reachedOppositeEdge);
+    EXPECT_EQ(measured, 2);
+    EXPECT_FLOAT_EQ(innerInfo->totalMainSize_, 770.0f);
+    EXPECT_FLOAT_EQ(outerInfo->totalMainSize_, 770.0f);
+    EXPECT_FLOAT_EQ(outerInfo->posMap_.at(0).endPos, 770.0f);
+    EXPECT_FLOAT_EQ(result->marginMainSize, 770.0f);
+    EXPECT_FLOAT_EQ(result->adjust.start, 220.0f);
+    EXPECT_FLOAT_EQ(result->adjust.end, 0.0f);
+    EXPECT_FLOAT_EQ(inner.wrapper->GetGeometryNode()->GetFrameSize().Height(), 550.0f);
+    EXPECT_FLOAT_EQ(outer->GetGeometryNode()->GetFrameSize().Height(), 550.0f);
+}
+
+/**
+ * @tc.name: PremeasureRejectedKnownExtentKeepsPartial001
+ * @tc.desc: Inconsistent known sizes reject completion without discarding the finalized measured prefix.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyColumnLayoutTest, PremeasureRejectedKnownExtentKeepsPartial001, TestSize.Level1)
+{
+    auto info = AceType::MakeRefPtr<LazyColumnLayoutInfo>();
+    int32_t measured = 0;
+    auto context = CreateUnsupportedColumnContext(info, measured);
+    context.parentConstraint.viewPosRef->viewPosEnd = 270.0f;
+    context.parentConstraint.viewPosRef->knownMainSize = 170.0f;
+    auto result = LazyLayoutUtils::Premeasure(context.wrapper, context.parentConstraint);
+    ASSERT_TRUE(result);
+    EXPECT_TRUE(result->unsupported);
+    EXPECT_FALSE(result->complete);
+    EXPECT_FALSE(result->reachedOppositeEdge);
+    EXPECT_EQ(measured, 2);
+    EXPECT_FLOAT_EQ(result->marginMainSize, 770.0f);
+    EXPECT_FLOAT_EQ(result->adjust.start, 220.0f);
+    EXPECT_FLOAT_EQ(result->adjust.end, 0.0f);
+    EXPECT_FLOAT_EQ(info->totalMainSize_, 770.0f);
+    EXPECT_EQ(info->updatedStart_, INT_MAX);
+}
+
+namespace {
+CachedLazyLayoutTestContext CreateUnpublishedColumnContext(
+    const RefPtr<LazyColumnLayoutInfo>& info, int32_t& measured)
+{
+    auto pattern = AceType::MakeRefPtr<LazyColumnLayoutPattern>();
+    pattern->layoutInfo_ = info;
+    auto context = CreateCachedLazyLayoutTestContext(V2::LAZY_COLUMN_LAYOUT_ETS_TAG, pattern,
+        AceType::MakeRefPtr<LazyColumnLayoutAlgorithm>(info), SizeF(SCROLL_WIDTH, SCROLL_HEIGHT));
+    for (int32_t index = 0; index < COMMITTED_ITEM_COUNT; ++index) {
+        AppendFixedHeightChild(context.wrapper, -COMMITTED_NODE_ID - index,
+            index == COMMITTED_TALL_INDEX ? 400.0f : 100.0f, measured);
+        info->posMap_[index] = { index * 100.0f, (index + 1) * 100.0f };
+    }
+    context.wrapper->GetOrCreateChildByIndex(COMMITTED_REJECTED_INDEX, false, true)
+        ->GetHostNode()->SetNeedLazyLayout(true);
+    info->totalItemCount_ = COMMITTED_ITEM_COUNT;
+    info->estimateItemSize_ = 100.0f;
+    info->totalMainSize_ = 800.0f;
+    info->startIndex_ = info->visibleStartIndex_ = 0;
+    info->endIndex_ = info->visibleEndIndex_ = 0;
+    context.wrapper->GetGeometryNode()->SetFrameSize(SizeF(SCROLL_WIDTH, 800.0f));
+    context.parentConstraint.maxSize.SetHeight(Infinity<float>());
+    context.parentConstraint.viewPosRef = ViewPosReference {
+        .viewPosStart = -600.0f, .viewPosEnd = 0.0f, .referencePos = 0.0f,
+        .referenceEdge = ReferenceEdge::END, .axis = Axis::VERTICAL,
+    };
+    return context;
+}
+} // namespace
+
+/**
+ * @tc.name: PremeasureCrossFrameEndUsesCommittedExtent001
+ * @tc.desc: A new algorithm sees the real tail even when preparation never published source geometry.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyColumnLayoutTest, PremeasureCrossFrameEndUsesCommittedExtent001, TestSize.Level1)
+{
+    auto info = AceType::MakeRefPtr<LazyColumnLayoutInfo>();
+    int32_t measured = 0;
+    auto context = CreateUnpublishedColumnContext(info, measured);
+    auto result = LazyLayoutUtils::Premeasure(context.wrapper, context.parentConstraint);
+    ASSERT_TRUE(result && result->unsupported);
+    EXPECT_FLOAT_EQ(result->marginMainSize, 1100.0f);
+    EXPECT_FLOAT_EQ(context.wrapper->GetGeometryNode()->GetFrameSize().Height(), 800.0f);
+    ASSERT_TRUE(info->premeasuredMainSize_);
+    auto normal = AceType::MakeRefPtr<LazyColumnLayoutAlgorithm>(info);
+    context.wrapper->SetLayoutAlgorithm(AceType::MakeRefPtr<LayoutAlgorithmWrapper>(normal));
+    context.parentConstraint.viewPosRef->viewPosStart = -50.0f;
+    context.parentConstraint.viewPosRef->viewPosEnd = 50.0f;
+    context.wrapper->SetActive(true);
+    context.wrapper->Measure(context.parentConstraint);
+    context.wrapper->Layout();
+    ASSERT_TRUE(normal->premeasuredMainSize_);
+    EXPECT_FLOAT_EQ(normal->premeasuredMainSize_.value(), 1100.0f);
+    EXPECT_FLOAT_EQ(normal->startPos_, 1050.0f);
+    EXPECT_FALSE(info->premeasuredMainSize_);
+    EXPECT_EQ(info->visibleStartIndex_, 7);
+    EXPECT_EQ(info->visibleEndIndex_, 7);
+    auto tail = context.wrapper->GetOrCreateChildByIndex(7, false, true);
+    EXPECT_TRUE(tail->IsActive());
+    EXPECT_FLOAT_EQ(tail->GetGeometryNode()->GetFrameOffset().GetY(), 1000.0f);
+    EXPECT_FLOAT_EQ(info->totalMainSize_, 1100.0f);
+    EXPECT_FLOAT_EQ(info->adjustOffset_.start, 0.0f);
+    EXPECT_FLOAT_EQ(info->adjustOffset_.end, 0.0f);
+}
+
+/**
+ * @tc.name: PremeasureSameFrameEndConsumesAdjustOnce001
+ * @tc.desc: Parent-consumed end compensation and the committed extent preserve the existing head window once.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyColumnLayoutTest, PremeasureSameFrameEndConsumesAdjustOnce001, TestSize.Level1)
+{
+    auto info = AceType::MakeRefPtr<LazyColumnLayoutInfo>();
+    int32_t measured = 0;
+    auto context = CreateUnpublishedColumnContext(info, measured);
+    auto result = LazyLayoutUtils::Premeasure(context.wrapper, context.parentConstraint);
+    ASSERT_TRUE(result && result->unsupported);
+    ASSERT_FLOAT_EQ(result->adjust.end, 300.0f);
+    context.parentConstraint.viewPosRef->viewPosStart = 0.0f;
+    context.parentConstraint.viewPosRef->viewPosEnd = 100.0f;
+    context.parentConstraint.viewPosRef->referencePos = 750.0f + result->adjust.end;
+    context.wrapper->SetActive(true);
+    context.wrapper->Measure(context.parentConstraint);
+    auto normal = AceType::DynamicCast<LazyColumnLayoutAlgorithm>(
+        context.wrapper->GetLayoutAlgorithm()->GetLayoutAlgorithm());
+    ASSERT_NE(normal, nullptr);
+    EXPECT_FLOAT_EQ(normal->startPos_, 50.0f);
+    EXPECT_FLOAT_EQ(normal->endPos_, 150.0f);
+    EXPECT_EQ(info->visibleStartIndex_, 0);
+    EXPECT_EQ(info->visibleEndIndex_, 1);
+    EXPECT_FALSE(info->premeasuredMainSize_);
+    EXPECT_FLOAT_EQ(info->adjustOffset_.start, 0.0f);
+    EXPECT_FLOAT_EQ(info->adjustOffset_.end, 0.0f);
+    context.wrapper->Measure(context.parentConstraint);
+    EXPECT_FLOAT_EQ(normal->startPos_, 50.0f);
+    EXPECT_FLOAT_EQ(info->adjustOffset_.end, 0.0f);
+}
+
+/**
+ * @tc.name: PremeasureExtentSurvivesCountChange001
+ * @tc.desc: A subsequent data update is measured against the committed baseline, not unpublished geometry.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyColumnLayoutTest, PremeasureExtentSurvivesCountChange001, TestSize.Level1)
+{
+    auto info = AceType::MakeRefPtr<LazyColumnLayoutInfo>();
+    int32_t measured = 0;
+    auto context = CreateUnpublishedColumnContext(info, measured);
+    ASSERT_TRUE(LazyLayoutUtils::Premeasure(context.wrapper, context.parentConstraint));
+    AppendFixedHeightChild(context.wrapper, -5110, 100.0f, measured);
+    context.parentConstraint.viewPosRef->viewPosStart = -50.0f;
+    context.parentConstraint.viewPosRef->viewPosEnd = 50.0f;
+    context.wrapper->Measure(context.parentConstraint);
+    auto normal = AceType::DynamicCast<LazyColumnLayoutAlgorithm>(
+        context.wrapper->GetLayoutAlgorithm()->GetLayoutAlgorithm());
+    ASSERT_NE(normal, nullptr);
+    ASSERT_TRUE(normal->premeasuredMainSize_);
+    EXPECT_FLOAT_EQ(normal->premeasuredMainSize_.value(), 1100.0f);
+    EXPECT_FALSE(info->premeasuredMainSize_);
+    EXPECT_EQ(info->totalItemCount_, 9);
+    EXPECT_EQ(info->visibleEndIndex_, 8);
+    EXPECT_FLOAT_EQ(info->totalMainSize_, 1200.0f);
+}
+
+/**
+ * @tc.name: PremeasureExtentClearsOnlyForPublishedGone001
+ * @tc.desc: Temporary GONE measurement preserves the marker until a real zero-size GONE frame is published.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyColumnLayoutTest, PremeasureExtentClearsOnlyForPublishedGone001, TestSize.Level1)
+{
+    auto info = AceType::MakeRefPtr<LazyColumnLayoutInfo>();
+    int32_t measured = 0;
+    auto context = CreateUnpublishedColumnContext(info, measured);
+    ASSERT_TRUE(LazyLayoutUtils::Premeasure(context.wrapper, context.parentConstraint));
+    context.host->GetLayoutProperty()->UpdateVisibility(VisibleType::GONE);
+    auto gone = LazyLayoutUtils::Premeasure(context.wrapper, context.parentConstraint);
+    ASSERT_TRUE(gone && gone->complete);
+    EXPECT_FLOAT_EQ(gone->marginMainSize, 0.0f);
+    EXPECT_FLOAT_EQ(context.host->GetGeometryNode()->GetFrameSize().Height(), 800.0f);
+    EXPECT_TRUE(info->premeasuredMainSize_);
+    context.host->Measure(context.parentConstraint);
+    EXPECT_FLOAT_EQ(context.host->GetGeometryNode()->GetFrameSize().Height(), 0.0f);
+    EXPECT_FALSE(context.host->IsLayoutDirtyMarked());
+    DirtySwapConfig config;
+    config.skipMeasure = true;
+    config.skipLayout = true;
+    context.host->GetPattern<LazyColumnLayoutPattern>()->OnDirtyLayoutWrapperSwap(context.host, config);
+    EXPECT_FALSE(info->premeasuredMainSize_);
+}
+/**
+ * @tc.name: BackwardRangeReadsGeometryAtOriginalPoint001
+ * @tc.desc: Ordinary backward layout reads current geometry after frame-baseline capture, not before it.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyColumnLayoutTest, BackwardRangeReadsGeometryAtOriginalPoint001, TestSize.Level1)
+{
+    auto info = AceType::MakeRefPtr<LazyColumnLayoutInfo>();
+    info->totalMainSize_ = 1000.0f;
+    auto algorithm = AceType::MakeRefPtr<LazyColumnLayoutAlgorithm>(info);
+    auto context = CreateCachedLazyLayoutTestContext(V2::LAZY_COLUMN_LAYOUT_ETS_TAG,
+        AceType::MakeRefPtr<LazyColumnLayoutPattern>(), algorithm, SizeF(SCROLL_WIDTH, 200.0f));
+    algorithm->CaptureFrameBaseline();
+    context.wrapper->GetGeometryNode()->SetFrameSize(SizeF(SCROLL_WIDTH, 450.0f));
+    ViewPosReference reference { .viewPosStart = -100.0f, .viewPosEnd = 0.0f,
+        .referenceEdge = ReferenceEdge::END, .axis = Axis::VERTICAL };
+    ASSERT_TRUE(algorithm->UpdateViewRange(AceType::RawPtr(context.wrapper), reference));
+    EXPECT_FLOAT_EQ(algorithm->referencePos_, 550.0f);
+    EXPECT_FLOAT_EQ(algorithm->endPos_, 450.0f);
+}
+
+/**
+ * @tc.name: BackwardRangeUsesOptionalPremeasureBaseline001
+ * @tc.desc: A saved extent, including zero, replaces unpublished geometry only for the prepared frame.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyColumnLayoutTest, BackwardRangeUsesOptionalPremeasureBaseline001, TestSize.Level1)
+{
+    for (float baseline : { 0.0f, 1100.0f }) {
+        SCOPED_TRACE(baseline);
+        auto info = AceType::MakeRefPtr<LazyColumnLayoutInfo>();
+        info->totalMainSize_ = 1000.0f;
+        info->premeasuredMainSize_ = baseline;
+        auto algorithm = AceType::MakeRefPtr<LazyColumnLayoutAlgorithm>(info);
+        auto context = CreateCachedLazyLayoutTestContext(V2::LAZY_COLUMN_LAYOUT_ETS_TAG,
+            AceType::MakeRefPtr<LazyColumnLayoutPattern>(), algorithm, SizeF(SCROLL_WIDTH, 200.0f));
+        algorithm->CaptureFrameBaseline();
+        EXPECT_FALSE(info->premeasuredMainSize_);
+        context.wrapper->GetGeometryNode()->SetFrameSize(SizeF(SCROLL_WIDTH, 450.0f));
+        ViewPosReference reference { .viewPosStart = -100.0f, .viewPosEnd = 0.0f,
+            .referenceEdge = ReferenceEdge::END, .axis = Axis::VERTICAL };
+        ASSERT_TRUE(algorithm->UpdateViewRange(AceType::RawPtr(context.wrapper), reference));
+        EXPECT_FLOAT_EQ(algorithm->endPos_, baseline);
+        algorithm->CaptureFrameBaseline();
+        ASSERT_TRUE(algorithm->UpdateViewRange(AceType::RawPtr(context.wrapper), reference));
+        EXPECT_FLOAT_EQ(algorithm->endPos_, 450.0f);
+    }
+}
+
+/**
+ * @tc.name: BackwardRangeWithoutGeometryKeepsLegacyGuard001
+ * @tc.desc: Without a prepared baseline, the original missing-geometry guard still rejects backward layout.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyColumnLayoutTest, BackwardRangeWithoutGeometryKeepsLegacyGuard001, TestSize.Level1)
+{
+    auto info = AceType::MakeRefPtr<LazyColumnLayoutInfo>();
+    LazyColumnLayoutAlgorithm algorithm(info);
+    LayoutWrapperNode wrapper(nullptr, nullptr, AceType::MakeRefPtr<LazyColumnLayoutProperty>());
+    ViewPosReference reference { .referenceEdge = ReferenceEdge::END, .axis = Axis::VERTICAL };
+    EXPECT_FALSE(algorithm.UpdateViewRange(&wrapper, reference));
+}
+
+/**
+ * @tc.name: PublicDumpPreservesFlatLayoutFields
+ * @tc.desc: Public filtering preserves legacy field values without a layoutInfo wrapper.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyColumnLayoutTest, PublicDumpPreservesFlatLayoutFields, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<LazyColumnLayoutPattern>();
+    ASSERT_NE(pattern->layoutInfo_, nullptr);
+    pattern->layoutInfo_->headerMainSize_ = 12.0f;
+    pattern->layoutInfo_->footerMainSize_ = 24.0f;
+    pattern->layoutInfo_->totalMainSize_ = 240.0f;
+    auto legacy = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(legacy);
+    ASSERT_TRUE(legacy->Contains("itemStartIndex"));
+    for (bool visual : { false, true }) {
+        for (bool functional : { false, true }) {
+            ParamConfig config;
+            config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+            config.visualProperties = visual;
+            config.functionalProperties = functional;
+            auto json = JsonUtil::Create();
+            pattern->DumpAdvanceInfo(json, config);
+            EXPECT_FALSE(json->Contains("layoutInfo"));
+            EXPECT_FALSE(json->Contains("itemStartIndex"));
+            EXPECT_EQ(json->Contains("headerMainSize"), visual);
+            EXPECT_EQ(json->Contains("totalMainSize"), visual);
+            EXPECT_EQ(json->Contains("space"), visual);
+            if (visual) {
+                EXPECT_EQ(json->GetDouble("headerMainSize"), legacy->GetDouble("headerMainSize"));
+                EXPECT_EQ(json->GetDouble("footerMainSize"), legacy->GetDouble("footerMainSize"));
+                EXPECT_DOUBLE_EQ(json->GetDouble("totalMainSize"), 240.0);
+            } else {
+                EXPECT_EQ(json->ToString(), "{}");
+            }
+        }
+    }
+    auto after = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(after);
+    EXPECT_EQ(after->ToString(), legacy->ToString());
+}
+
+
+/**
+ * @tc.name: LegacyDumpMatchesBaselineSnapshot
+ * @tc.desc: Preserve the baseline layout diagnostic keys, numeric values and insertion order.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyColumnLayoutTest, LegacyDumpMatchesBaselineSnapshot, TestSize.Level1)
+{
+    auto info = AceType::MakeRefPtr<LazyColumnLayoutInfo>();
+    info->startIndex_ = 2;
+    info->endIndex_ = 6;
+    info->totalItemCount_ = 9;
+    info->headerMainSize_ = 12.0f;
+    info->footerMainSize_ = 24.0f;
+    info->space_ = 3.0f;
+    info->totalMainSize_ = 240.0f;
+    // Frozen from fdf7d63988ed9fa338051a11c19fadf1f86653dc; compare serialized key order and types.
+    const std::string expected = R"({"itemStartIndex":2,"itemEndIndex":6,"itemTotalCount":9,)"
+        R"("headerMainSize":12,"footerMainSize":24,"space":3,"totalMainSize":240})";
+    auto json = JsonUtil::Create();
+    info->DumpAdvanceInfo(json);
+    EXPECT_EQ(json->ToString(), expected);
+}
+
 } // namespace OHOS::Ace::NG

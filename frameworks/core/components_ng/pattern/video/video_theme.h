@@ -29,7 +29,7 @@ namespace OHOS::Ace {
  * VideoTheme defines color and styles of VideoComponent. VideoTheme should be built
  * using VideoTheme::Builder.
  */
-class VideoTheme : public virtual Theme {
+class VideoTheme : public Theme {
     DECLARE_ACE_TYPE(VideoTheme, Theme);
 
 public:

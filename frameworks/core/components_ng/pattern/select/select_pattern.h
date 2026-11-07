@@ -50,6 +50,11 @@ class SelectPattern : public Pattern {
     DECLARE_ACE_TYPE(SelectPattern, Pattern);
 
 public:
+    void AddInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context) override;
+
+    void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context) override;
+
+    bool HasInspectorSelection() const override { return true; }
     SelectPattern() = default;
     ~SelectPattern() override = default;
 
@@ -169,6 +174,7 @@ public:
     void ShowOptions(int32_t index);
     bool ParseCommand(const std::string& command, int32_t& targetIndex, std::string& targetValue);
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
     bool FindOptionIndexByValue(const std::string& value, int32_t& index);
     void ReportInjectResult(const std::string& event, bool success, const std::string& reason = "");
     bool ReportOnSelectEvent(int32_t index, const std::string& value);
@@ -298,6 +304,8 @@ public:
     }
     void ResetFontColor();
     void DumpInfo() override;
+    void DumpInfo(std::unique_ptr<JsonValue>& json) override;
+    bool HasSystemMaterial() const;
     void SetTextModifierApply(const std::function<void(WeakPtr<NG::FrameNode>)>& textApply);
     void SetArrowModifierApply(const std::function<void(WeakPtr<NG::FrameNode>)>& arrowApply);
     void SetArrowColor(const Color& color);
@@ -432,6 +440,9 @@ private:
     void UpdateTargetSize();
     bool GetShadowFromTheme(ShadowStyle shadowStyle, Shadow& shadow);
     void ShowScrollBar();
+    void RegisterScrollToSelectedTask();
+    void ScrollToSelectedOption();
+    void RegisterScrollAreaChangeCallback();
     void UpdateMenuBorderStyle(const RefPtr<FrameNode>& menu);
     std::vector<RefPtr<FrameNode>> options_;
     std::vector<RefPtr<FrameNode>> builderOptions_;
@@ -442,6 +453,7 @@ private:
 
     // index of selected option
     int32_t selected_ = -1;
+    float lastAutoScrollOffset_ = 0.0f;
     // props when selected
     struct OptionFont {
         // text style when selected

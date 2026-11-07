@@ -164,7 +164,9 @@ void OverlayManagerTestOneNG::SetUpTestCase()
 }
 void OverlayManagerTestOneNG::TearDownTestCase()
 {
-    MockPipelineContext::GetCurrent()->themeManager_ = nullptr;
+    if (auto* mockPipeCtx = MockPipelineContext::GetCurrent().GetRawPtr()) {
+        mockPipeCtx->themeManager_ = nullptr;
+    }
     MockPipelineContext::TearDown();
     MockContainer::TearDown();
 }
@@ -1390,6 +1392,43 @@ HWTEST_F(OverlayManagerTestOneNG, RemoveFilterAnimation001, TestSize.Level1)
     overlayManager->SetFilterColumnNode(columnNode);
     overlayManager->RemoveFilterAnimation();
     EXPECT_FALSE(overlayManager->hasFilter_);
+}
+
+/**
+ * @tc.name: RemoveFilterAnimation002
+ * @tc.desc: RemoveFilterAnimation skips ShowFilterDisappearAnimation when hasFilterActived_ is true, so
+ *           previewFilterTask_ is not cancelled and the filter id is not registered on disappear.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayManagerTestOneNG, RemoveFilterAnimation002, TestSize.Level1)
+{
+    SetUpTestCase();
+    auto rootNode = FrameNode::CreateFrameNode(V2::ROOT_ETS_TAG, 1, AceType::MakeRefPtr<RootPattern>());
+    EXPECT_NE(rootNode, nullptr);
+    auto overlayManager = AceType::MakeRefPtr<OverlayManager>(rootNode);
+    EXPECT_NE(overlayManager, nullptr);
+
+    auto columnNode = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<LinearLayoutPattern>(true));
+    EXPECT_NE(columnNode, nullptr);
+    columnNode->MountToParent(rootNode);
+    rootNode->MarkDirtyNode();
+
+    overlayManager->SetHasFilter(true);
+    overlayManager->SetFilterColumnNode(columnNode);
+    overlayManager->hasFilterActived_ = true;
+    auto filterId = columnNode->GetId();
+    auto callback = []() {};
+    overlayManager->previewFilterTask_.Reset(callback);
+    EXPECT_TRUE(overlayManager->previewFilterTask_);
+
+    overlayManager->RemoveFilterAnimation();
+
+    // hasFilterActived_==true takes the early return, so ShowFilterDisappearAnimation is never entered:
+    // previewFilterTask_ stays scheduled (not cancelled) and the filter id is not registered.
+    EXPECT_TRUE(overlayManager->previewFilterTask_);
+    EXPECT_FALSE(overlayManager->IsFilterOnDisappear(filterId));
+    EXPECT_TRUE(overlayManager->hasFilter_);
 }
 
 /**

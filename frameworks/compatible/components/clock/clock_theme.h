@@ -27,7 +27,7 @@ namespace OHOS::Ace {
  * ClockTheme defines styles of ClockComponent. ClockTheme should be built
  * using ClockTheme::Builder.
  */
-class ClockTheme : public virtual Theme {
+class ClockTheme : public Theme {
     DECLARE_ACE_TYPE(ClockTheme, Theme);
 
 public:

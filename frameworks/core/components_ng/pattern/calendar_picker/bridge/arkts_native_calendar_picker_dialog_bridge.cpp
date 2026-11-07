@@ -31,6 +31,7 @@
 #include "core/components/common/properties/text_enums.h"
 #include "core/components/dialog/dialog_theme.h"
 #include "core/components/theme/shadow_theme.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/pattern/calendar_picker/calendar_picker_model_ng.h"
 #include "core/components_ng/pattern/calendar_picker/calendar_type_define.h"
 #include "core/components_ng/pattern/overlay/overlay_manager.h"
@@ -731,6 +732,19 @@ void ParseMarkToday(EcmaVM* vm, const panda::Local<panda::ObjectRef>& paramObj, 
     settingData.markToday = isMarkToday;
 }
 
+void ParseFirstDayOfWeek(EcmaVM* vm, const panda::Local<panda::ObjectRef>& paramObj,
+    NG::CalendarSettingData& settingData)
+{
+    auto firstDayOfWeek = paramObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "firstDayOfWeek"));
+    if (firstDayOfWeek->IsInt()) {
+        int32_t value = firstDayOfWeek->Int32Value(vm);
+        if (value < FIRST_DAY_OF_WEEK_LOCAL || value > MAX_FIRST_DAY_OF_WEEK) {
+            value = FIRST_DAY_OF_WEEK_LOCAL;
+        }
+        settingData.firstDayOfWeek = value;
+    }
+}
+
 DialogProperties CalendarPickerDialogBridge::BuildDialogProperties(EcmaVM* vm,
     const panda::Local<panda::ObjectRef>& paramObj)
 {
@@ -745,7 +759,7 @@ DialogProperties CalendarPickerDialogBridge::BuildDialogProperties(EcmaVM* vm,
 
     properties.alignment = theme->GetAlignment();
     if (Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWELVE)) {
-        properties.alignment = DialogAlignment::CENTER;
+        properties.alignment = DialogAlignment::DEFAULT;
     }
     
     auto backgroundColorValue = paramObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "backgroundColor"));
@@ -804,7 +818,17 @@ DialogProperties CalendarPickerDialogBridge::BuildDialogProperties(EcmaVM* vm,
             properties.edgeLightMode = static_cast<EdgeLightMode>(edgeLightMode);
         }
     }
-    
+
+    auto adaptToHandednessValue =
+        paramObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "adaptToHandedness"));
+    if (adaptToHandednessValue->IsNumber()) {
+        auto adaptToHandedness = adaptToHandednessValue->ToNumber(vm)->Int32Value(vm);
+        if (adaptToHandedness >= static_cast<int32_t>(HandednessFollowMode::NONE) &&
+            adaptToHandedness <= static_cast<int32_t>(HandednessFollowMode::FOLLOW_GRIP_HAND)) {
+            properties.adaptToHandedness = static_cast<HandednessFollowMode>(adaptToHandedness);
+        }
+    }
+
     return properties;
 }
 
@@ -817,6 +841,7 @@ void CalendarPickerDialogBridge::CalendarPickerDialogShow(EcmaVM* vm, const pand
 
     NG::CalendarSettingData settingData;
     ParseMarkToday(vm, paramObj, settingData);
+    ParseFirstDayOfWeek(vm, paramObj, settingData);
     ParseSelectedStartEndDate(vm, paramObj, settingData);
     CalcDimension radius;
     auto hintRadiusValue = paramObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "hintRadius"));

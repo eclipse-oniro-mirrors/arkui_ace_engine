@@ -119,6 +119,8 @@ public:
     RectF ComputeTouchHandleRect(std::shared_ptr<OHOS::NWeb::NWebTouchHandleState> touchHandle);
     RectF ComputeSelectAreaRect(RectF& selectArea);
     RectF GetViewPortFromHandle();
+    virtual bool CanShowTranslateInput() const;
+    void HandleOnTranslateInput();
     void SetMenuOptions(SelectOverlayInfo& selectInfo,
         std::shared_ptr<OHOS::NWeb::NWebQuickMenuParams> params,
         std::shared_ptr<OHOS::NWeb::NWebQuickMenuCallback> callback);
@@ -165,6 +167,7 @@ public:
     void OnResetTextSelection() override {}
     void AfterCloseOverlay() override;
     bool AllowTranslate() override { return true; }
+    std::optional<Color> GetHandleColor() override;
     // override BaseTextSelectOverlay end
 
     // override SelectOverlayHolder

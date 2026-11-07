@@ -35,7 +35,7 @@ inline constexpr uint32_t ARC_SCROLL_BAR_BACKGROUND_COLOR = 0x7F7F7F7F;
  * ScrollBarTheme defines styles of scrollBar. ScrollBarTheme should be built
  * using ScrollBarTheme::Builder.
  */
-class ScrollBarTheme : public virtual Theme {
+class ScrollBarTheme : public Theme {
     DECLARE_ACE_TYPE(ScrollBarTheme, Theme);
 
 public:

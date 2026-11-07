@@ -24,7 +24,7 @@ namespace OHOS::Ace {
 
 using ChangeStatusFunc = std::function<void(const std::string&, const std::string&)>;
 
-class StepperController : public virtual AceType {
+class StepperController : public AceType {
     DECLARE_ACE_TYPE(StepperController, AceType);
 
 public:

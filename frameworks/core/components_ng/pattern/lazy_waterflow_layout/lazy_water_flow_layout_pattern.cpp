@@ -130,7 +130,7 @@ bool LazyWaterFlowLayoutPattern::OnDirtyLayoutWrapperSwap(
         return false;
     }
     CHECK_NULL_RETURN(layoutInfo_, false);
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto layoutAlgorithm = DynamicCast<LazyWaterFlowLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(layoutAlgorithm, false);
@@ -342,6 +342,19 @@ void LazyWaterFlowLayoutPattern::OnAttachToMainTree()
     LazyLayoutUtils::ValidateLazyLayoutParent(GetHost(), "LazyVWaterFlowLayout");
 }
 
+void LazyWaterFlowLayoutPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    CHECK_NULL_VOID(layoutInfo_);
+    if (!config.IsPublicTree()) {
+        layoutInfo_->DumpAdvanceInfo(json, config);
+        DumpStickyHeaderHandoffInfo(json);
+        return;
+    }
+    if (config.visualProperties) {
+        layoutInfo_->DumpAdvanceInfo(json, config);
+    }
+}
+
 void LazyWaterFlowLayoutPattern::DumpAdvanceInfo()
 {
     CHECK_NULL_VOID(layoutInfo_);
@@ -351,9 +364,7 @@ void LazyWaterFlowLayoutPattern::DumpAdvanceInfo()
 
 void LazyWaterFlowLayoutPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    CHECK_NULL_VOID(layoutInfo_);
-    layoutInfo_->DumpAdvanceInfo(json);
-    DumpStickyHeaderHandoffInfo(json);
+    LazyWaterFlowLayoutPattern::DumpAdvanceInfo(json, ParamConfig());
 }
 
 } // namespace OHOS::Ace::NG

@@ -29,7 +29,9 @@ private:
     ani_vm* vm_ = nullptr;
     ani_ref func_ = nullptr;
 };
+void SetSafeAreaInset(ani_env* env, ani_object obj, ani_long ptr, ani_array edges);
 ani_boolean IsEasySplit([[maybe_unused]] ani_env* env, ani_object obj, ani_int instaceId);
+ani_boolean IsTransPageEnabled([[maybe_unused]] ani_env* env, ani_object obj, ani_int instanceId);
 ani_object GetHostContext([[maybe_unused]] ani_env* env, ani_object obj, ani_int key);
 void SetFrameRateRange([[maybe_unused]] ani_env* env, ani_object obj, ani_long key, ani_object value, ani_int type);
 ani_object GetSharedLocalStorage([[maybe_unused]] ani_env* env);
@@ -89,6 +91,7 @@ ani_string getWindowName(ani_env* env, ani_object obj, ani_int instanceId);
 ani_int getWindowId(ani_env* env, ani_object obj, ani_int instanceId);
 ani_int getWindowWidthBreakpoint(ani_env* env, ani_object obj);
 ani_int getWindowHeightBreakpoint(ani_env* env, ani_object obj);
+ani_boolean isWindowInfoInitialized(ani_env* env, ani_object obj, ani_int instanceId);
 void* TransferKeyEventPointer(ani_env* env, ani_object obj, ani_long pointer);
 void* CreateKeyEventAccessorWithPointer(ani_env* env, [[maybe_unused]] ani_object obj, ani_long pointer);
 void* CreateEventTargetInfoAccessor(ani_env* env, [[maybe_unused]] ani_object obj);
@@ -141,6 +144,9 @@ ani_boolean GetKeyEventModifierKeyState(
     ani_env* env, [[maybe_unused]] ani_object obj, ani_long pointer, ani_array keys);
 void SetClickEventPreventDefault(ani_env* env, [[maybe_unused]] ani_object obj, ani_long pointer);
 void SetTouchEventPreventDefault(ani_env* env, [[maybe_unused]] ani_object obj, ani_long pointer);
+ani_int RegisterApplicationShortcut(ani_env* env, ani_object obj, ani_string value,
+    ani_int modifiers, ani_fn_object callback);
+void UnregisterApplicationShortcut(ani_env* env, ani_object obj, ani_int registrationId);
 ani_int GetCallingScopeUIContext(ani_env* env, [[maybe_unused]]ani_object obj);
 ani_int GetLastFocusedUIContext(ani_env* env, [[maybe_unused]]ani_object obj);
 ani_int GetLastForegroundUIContext(ani_env* env, [[maybe_unused]]ani_object obj);

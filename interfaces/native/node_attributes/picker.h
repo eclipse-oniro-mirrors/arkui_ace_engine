@@ -37,6 +37,8 @@
 #define ARKUI_NATIVE_NODE_ATTRIBUTES_PICKER_H
 
 #include <stdint.h>
+#include "text.h"
+#include "text_common.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -418,6 +420,33 @@ ArkUI_PickerIndicatorStyle* OH_ArkUI_PickerIndicatorStyle_Create(ArkUI_PickerInd
 * @since 23
 */
 void OH_ArkUI_PickerIndicatorStyle_Dispose(ArkUI_PickerIndicatorStyle* style);
+
+/**
+ * @brief Defines the text style for the picker component.
+ *
+ * @since 26.1.0
+ */
+typedef struct ArkUI_PickerComponentTextStyle ArkUI_PickerComponentTextStyle;
+
+/**
+ * @brief Creates a text style instance for the picker component. After use, call
+ * {@link OH_ArkUI_PickerComponentTextStyle_Dispose} to dispose of the instance.
+ *
+ * @return Pointer to the {@link ArkUI_PickerComponentTextStyle} instance. If a null pointer is returned,
+ *     the creation fails.
+ * @release OH_ArkUI_PickerComponentTextStyle_Dispose {return}
+ * @since 26.1.0
+ */
+ArkUI_PickerComponentTextStyle* OH_ArkUI_PickerComponentTextStyle_Create(void);
+
+/**
+ * @brief Disposes of a text style instance of the picker component.
+ *
+ * @param style Pointer to the {@link ArkUI_PickerComponentTextStyle} instance to be disposed of. If a null
+ *     pointer is passed, no operation is performed.
+ * @since 26.1.0
+ */
+void OH_ArkUI_PickerComponentTextStyle_Dispose(ArkUI_PickerComponentTextStyle* style);
 
 #ifdef __cplusplus
 }

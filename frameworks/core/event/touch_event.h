@@ -30,6 +30,7 @@ struct AxisEvent;
 // Forward declarations
 namespace NG {
 class NGGestureRecognizer;
+class FrameNode;
 } // namespace NG
 
 enum class MouseAction : int32_t {
@@ -83,6 +84,7 @@ struct TouchRestrict final {
     // use to dump event tree
     NG::EventTreeType touchTestType = NG::EventTreeType::TOUCH;
     bool isCoastingAxisEvent = false;
+    WeakPtr<NG::FrameNode> sensitiveInputHitNode;
 };
 
 class TouchCallBackInfo : public BaseEventInfo {
@@ -137,7 +139,7 @@ struct StateRecord {
     void Dump(std::unique_ptr<JsonValue>& json) const;
 };
 
-struct GestureSnapshot : public virtual AceType {
+struct GestureSnapshot : public AceType {
     DECLARE_ACE_TYPE(GestureSnapshot, AceType);
 
 public:

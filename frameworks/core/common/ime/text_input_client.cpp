@@ -21,6 +21,56 @@
 namespace OHOS::Ace {
 namespace {
 using tic = TextInputClient; // give it a shorter name to maintain a good code layout
+
+// AutoFill content type -> TextInputType mapping shared by TextField and RichEditor.
+// Moved here from text_field_pattern.cpp so both component shared libraries can
+// reference it via TextInputClient::GetAutoFillKeyboardMap() without a cross-SO
+// static dependency.
+const std::unordered_map<AceAutoFillType, TextInputType> autoFillKeyboardMap = {
+    { AceAutoFillType::ACE_PASSWORD, TextInputType::VISIBLE_PASSWORD},
+    { AceAutoFillType::ACE_USER_NAME, TextInputType::USER_NAME },
+    { AceAutoFillType::ACE_NEW_PASSWORD, TextInputType::NEW_PASSWORD },
+    { AceAutoFillType::ACE_FULL_STREET_ADDRESS, TextInputType::TEXT },
+    { AceAutoFillType::ACE_HOUSE_NUMBER, TextInputType::TEXT },
+    { AceAutoFillType::ACE_DISTRICT_ADDRESS, TextInputType::TEXT },
+    { AceAutoFillType::ACE_CITY_ADDRESS, TextInputType::TEXT },
+    { AceAutoFillType::ACE_PROVINCE_ADDRESS, TextInputType::TEXT },
+    { AceAutoFillType::ACE_COUNTRY_ADDRESS, TextInputType::TEXT },
+    { AceAutoFillType::ACE_PERSON_FULL_NAME, TextInputType::TEXT },
+    { AceAutoFillType::ACE_PERSON_LAST_NAME, TextInputType::TEXT },
+    { AceAutoFillType::ACE_PERSON_FIRST_NAME, TextInputType::TEXT },
+    { AceAutoFillType::ACE_PHONE_NUMBER, TextInputType::PHONE },
+    { AceAutoFillType::ACE_PHONE_COUNTRY_CODE, TextInputType::PHONE },
+    { AceAutoFillType::ACE_FULL_PHONE_NUMBER, TextInputType::PHONE },
+    { AceAutoFillType::ACE_EMAIL_ADDRESS, TextInputType::EMAIL_ADDRESS },
+    { AceAutoFillType::ACE_BANK_CARD_NUMBER, TextInputType::NUMBER },
+    { AceAutoFillType::ACE_ID_CARD_NUMBER, TextInputType::NUMBER },
+    { AceAutoFillType::ACE_PRECISE_TIME, TextInputType::NUMBER },
+    { AceAutoFillType::ACE_HOUR_AND_MINUTE, TextInputType::NUMBER },
+    { AceAutoFillType::ACE_DATE, TextInputType::NUMBER },
+    { AceAutoFillType::ACE_MONTH, TextInputType::NUMBER },
+    { AceAutoFillType::ACE_YEAR, TextInputType::NUMBER },
+    { AceAutoFillType::ACE_NICKNAME, TextInputType::TEXT },
+    { AceAutoFillType::ACE_DETAIL_INFO_WITHOUT_STREET, TextInputType::TEXT },
+    { AceAutoFillType::ACE_FORMAT_ADDRESS, TextInputType::TEXT },
+    { AceAutoFillType::ACE_PASSPORT_NUMBER, TextInputType::TEXT },
+    { AceAutoFillType::ACE_VALIDITY, TextInputType::TEXT },
+    { AceAutoFillType::ACE_ISSUE_AT, TextInputType::TEXT },
+    { AceAutoFillType::ACE_ORGANIZATION, TextInputType::TEXT },
+    { AceAutoFillType::ACE_TAX_ID, TextInputType::TEXT },
+    { AceAutoFillType::ACE_ADDRESS_CITY_AND_STATE, TextInputType::TEXT },
+    { AceAutoFillType::ACE_FLIGHT_NUMBER, TextInputType::TEXT },
+    { AceAutoFillType::ACE_LICENSE_NUMBER, TextInputType::TEXT },
+    { AceAutoFillType::ACE_LICENSE_FILE_NUMBER, TextInputType::TEXT },
+    { AceAutoFillType::ACE_LICENSE_PLATE, TextInputType::TEXT },
+    { AceAutoFillType::ACE_ENGINE_NUMBER, TextInputType::TEXT },
+    { AceAutoFillType::ACE_LICENSE_CHASSIS_NUMBER, TextInputType::TEXT },
+};
+} // namespace
+ 
+const std::unordered_map<AceAutoFillType, TextInputType>& TextInputClient::GetAutoFillKeyboardMap()
+{
+    return autoFillKeyboardMap;
 }
 
 // Here declares function keys which can be handled by TextInputClient.

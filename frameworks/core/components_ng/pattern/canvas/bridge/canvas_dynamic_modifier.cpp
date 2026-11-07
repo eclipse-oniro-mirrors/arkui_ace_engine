@@ -148,11 +148,11 @@ ArkUINodeHandle CreateFrameNode(int32_t nodeId)
 
 void SetInvalidate(ArkUINodeHandle node)
 {
-    // node may be a FrameNode* (NG pipeline) or AceType*/CanvasPattern* (peer impl path).
-    // Try DynamicCast first, then fallback to reinterpret_cast<FrameNode*>.
-    auto* pattern = AceType::DynamicCast<CanvasPattern>(reinterpret_cast<AceType*>(node));
+    // These callbacks receive the AceType subobject of a CanvasPattern or FrameNode.
+    auto* owner = reinterpret_cast<AceType*>(node);
+    auto* pattern = AceType::DynamicCast<CanvasPattern>(owner);
     if (!pattern) {
-        auto* frameNode = reinterpret_cast<FrameNode*>(node);
+        auto* frameNode = AceType::DynamicCast<FrameNode>(owner);
         CHECK_NULL_VOID(frameNode);
         auto patternRef = AceType::DynamicCast<CanvasPattern>(CanvasModelNG::GetCanvasPattern(frameNode));
         pattern = AceType::RawPtr(patternRef);
@@ -172,9 +172,10 @@ void SetAntiAlias(ArkUINodeHandle node, ArkUI_Bool antialias)
 
 void SetRSCanvasCallback(ArkUINodeHandle node, void* callback)
 {
-    auto* pattern = AceType::DynamicCast<CanvasPattern>(reinterpret_cast<AceType*>(node));
+    auto* owner = reinterpret_cast<AceType*>(node);
+    auto* pattern = AceType::DynamicCast<CanvasPattern>(owner);
     if (!pattern) {
-        auto* frameNode = reinterpret_cast<FrameNode*>(node);
+        auto* frameNode = AceType::DynamicCast<FrameNode>(owner);
         CHECK_NULL_VOID(frameNode);
         auto patternRef = AceType::DynamicCast<CanvasPattern>(CanvasModelNG::GetCanvasPattern(frameNode));
         pattern = AceType::RawPtr(patternRef);
@@ -186,9 +187,10 @@ void SetRSCanvasCallback(ArkUINodeHandle node, void* callback)
 
 void SetUpdateContextCallback(ArkUINodeHandle node, void* callback)
 {
-    auto* pattern = AceType::DynamicCast<CanvasPattern>(reinterpret_cast<AceType*>(node));
+    auto* owner = reinterpret_cast<AceType*>(node);
+    auto* pattern = AceType::DynamicCast<CanvasPattern>(owner);
     if (!pattern) {
-        auto* frameNode = reinterpret_cast<FrameNode*>(node);
+        auto* frameNode = AceType::DynamicCast<FrameNode>(owner);
         CHECK_NULL_VOID(frameNode);
         auto patternRef = AceType::DynamicCast<CanvasPattern>(CanvasModelNG::GetCanvasPattern(frameNode));
         pattern = AceType::RawPtr(patternRef);
@@ -200,9 +202,10 @@ void SetUpdateContextCallback(ArkUINodeHandle node, void* callback)
 
 void SetRSCanvasForDrawingContext(ArkUINodeHandle node)
 {
-    auto* pattern = AceType::DynamicCast<CanvasPattern>(reinterpret_cast<AceType*>(node));
+    auto* owner = reinterpret_cast<AceType*>(node);
+    auto* pattern = AceType::DynamicCast<CanvasPattern>(owner);
     if (!pattern) {
-        auto* frameNode = reinterpret_cast<FrameNode*>(node);
+        auto* frameNode = AceType::DynamicCast<FrameNode>(owner);
         CHECK_NULL_VOID(frameNode);
         auto patternRef = AceType::DynamicCast<CanvasPattern>(CanvasModelNG::GetCanvasPattern(frameNode));
         pattern = AceType::RawPtr(patternRef);

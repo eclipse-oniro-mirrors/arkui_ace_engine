@@ -115,6 +115,7 @@ public:
         return customHomeDestination_;
     }
     const RefPtr<UINode>& GetNavBarOrHomeDestinationNode() const;
+    RefPtr<FrameNode> GetContentChangeNode(const RefPtr<FrameNode>& keyNode);
     bool IsNavBarOrHomeDestination(const RefPtr<UINode>& node) const;
 
     const std::optional<bool> GetUseHomeDestination() const
@@ -500,7 +501,7 @@ private:
         const RefPtr<FrameNode>& curNode, bool isNavBar, bool preUseCustomTransition, bool curUseCustomTransition,
         const NavigationGroupNode::AnimationFinishCallback& callback);
     bool HandleBackForHomeOrRelatedDestination();
-    void ContentChangeReport(const RefPtr<FrameNode>& keyNode);
+    void ContentChangeReport(const RefPtr<FrameNode>& keyNode, bool isPopPage = false);
     RefPtr<FrameNode> GetStaticDeveloperPlaceholderNode(const RefPtr<UINode>& node);
 
     //-------for force split------- begin------

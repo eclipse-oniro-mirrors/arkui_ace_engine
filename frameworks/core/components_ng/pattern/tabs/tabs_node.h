@@ -120,6 +120,11 @@ public:
         return backgroundMaskId_.value();
     }
 
+    int32_t GetTopBackgroundMaskId()
+    {
+        return GetBackgroundMaskId();
+    }
+
     int32_t GetEffectId()
     {
         if (!effectId_.has_value()) {
@@ -197,9 +202,19 @@ public:
         return GetChildAtIndex(itemIndex_.bgMaskIndex);
     }
 
+    RefPtr<UINode> GetTopBackgroundMask() const
+    {
+        return GetBackgroundMask();
+    }
+
     RefPtr<UINode> GetEffectNode()
     {
-        return GetChildAtIndex(itemIndex_.effectIndex);
+        return GetChildAtIndex(GetEffectNodeIndex());
+    }
+
+    int32_t GetEffectNodeIndex()
+    {
+        return GetChildIndexById(GetEffectId());
     }
 
     ItemIndex GetItemIndex() const
@@ -232,6 +247,7 @@ private:
     std::string GetEdgeEffect() const;
     std::unique_ptr<JsonValue> GetBarBackgroundEffect() const;
     void SidebarInfoToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const;
+    void TabViewCustomizationToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const;
 
     std::optional<int32_t> swiperId_;
     std::optional<int32_t> tabBarId_;

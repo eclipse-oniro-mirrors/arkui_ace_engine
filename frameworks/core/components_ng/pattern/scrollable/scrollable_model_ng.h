@@ -122,6 +122,7 @@ public:
     static int32_t GetEdgeEffect(FrameNode* frameNode);
     static int32_t GetAlwaysEnabled(FrameNode* frameNode);
     static EffectEdge GetEffectEdge(FrameNode* frameNode);
+    static int32_t GetScrollState(FrameNode* frameNode);
     static void SetOnScroll(FrameNode* frameNode, OnScrollEvent&& onScroll);
     static void SetOnScrollStart(FrameNode* frameNode, OnScrollStartEvent&& onScrollStart);
     static void SetOnScrollStop(FrameNode* frameNode, OnScrollStopEvent&& onScrollStop);
@@ -166,6 +167,11 @@ public:
     static void SetEnableScrollWithMouse(FrameNode* frameNode, bool enableScrollWithMouse);
     static void ResetEnableScrollWithMouse(FrameNode* frameNode);
     static bool GetEnableScrollWithMouse(FrameNode* frameNode);
+    static void SetEnableScrollWithKeyboard(bool enableScrollWithKeyboard);
+    static void ResetEnableScrollWithKeyboard();
+    static void SetEnableScrollWithKeyboard(FrameNode* frameNode, bool enableScrollWithKeyboard);
+    static void ResetEnableScrollWithKeyboard(FrameNode* frameNode);
+    static bool GetEnableScrollWithKeyboard(FrameNode* frameNode);
     static void SetScrollBarMargin(const ScrollBarMargin& scrollBarMargin);
     static void SetScrollBarMargin(FrameNode* frameNode, const ScrollBarMargin& scrollBarMargin);
     static void ResetScrollBarMargin(FrameNode* frameNode);

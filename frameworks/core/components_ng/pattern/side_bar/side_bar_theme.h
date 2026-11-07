@@ -25,7 +25,7 @@ namespace OHOS::Ace::NG {
  * SideBarTheme defines color and styles of SideBarPattern. SideBarTheme should be built
  * using SideBarTheme::Builder.
  */
-class SideBarTheme : public virtual Theme {
+class SideBarTheme : public Theme {
     DECLARE_ACE_TYPE(SideBarTheme, Theme);
 
 public:

@@ -22,7 +22,7 @@
 #include "core/components/theme/theme_constants.h"
 #include "core/components/theme/theme_manager.h"
 namespace OHOS::Ace::V2 {
-class PatternLockTheme : public virtual Theme {
+class PatternLockTheme : public Theme {
     DECLARE_ACE_TYPE(PatternLockTheme, Theme);
 
 public:

@@ -86,6 +86,9 @@ public:
     MOCK_METHOD(int32_t, GetYCoord, (), (const, override));
     MOCK_METHOD(bool, HasImageContents, (), (const, override));
     MOCK_METHOD(std::string, GetSelectionText, (), (const, override));
+    MOCK_METHOD(bool, ShouldOfferLinkToText, (), (const, override));
+    MOCK_METHOD(bool, IsOverTextFragment, (), (const, override));
+    MOCK_METHOD(std::string, GetTextFragmentGeneratedLink, (), (const, override));
 };
 
 class MockContextMenuResult : public ContextMenuResult {
@@ -105,6 +108,8 @@ public:
     MOCK_METHOD(void, Redo, (), (const, override));
     MOCK_METHOD(void, PasteAndMatchStyle, (), (const, override));
     MOCK_METHOD(void, RequestPasswordAutoFill, (), (const, override));
+    MOCK_METHOD(void, CopyLinkToTextMenu, (), (const, override));
+    MOCK_METHOD(void, RemoveFragments, (), (const, override));
 };
 
 class WebContextSelectOverlayTest : public testing::Test {

@@ -75,10 +75,11 @@ void AssignArkValue(Map_String_Object& dst, const std::string& src, ConvContext 
         return;
     }
     ConvContext localCtx;
-    dst = localCtx.AllocateMap<Map_String_Object>(keys.size());
+    ConvContext* useCtx = ctx ? ctx : &localCtx;
+    dst = useCtx->AllocateMap<Map_String_Object>(keys.size());
     dst.size = static_cast<Ark_Int32>(keys.size());
     for (size_t i = 0; i < keys.size(); i++) {
-        AssignArkValue(dst.keys[i], keys[i], &localCtx);
+        AssignArkValue(dst.keys[i], keys[i], useCtx);
         dst.values[i] = {};
     }
 }
@@ -528,9 +529,10 @@ void SetOnRestoreStateImpl(Ark_NativePointer node,
         return;
     }
     auto callback = [func = CallbackHelper(value->value)](const std::string& state) {
+        Converter::ConvContext ctx;
         Opt_Map_String_Object optValue = {
             .tag = InteropTag::INTEROP_TAG_OBJECT,
-            .value = Converter::ArkValue<Map_String_Object>(state)
+            .value = Converter::ArkValue<Map_String_Object>(state, &ctx)
         };
         func.InvokeSync(optValue);
     };

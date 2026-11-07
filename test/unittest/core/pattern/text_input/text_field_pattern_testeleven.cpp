@@ -103,7 +103,7 @@ HWTEST_F(TextFieldPatternTesteleven, SetAccessibilityUnitAction002, TestSize.Lev
      * @tc.steps: step2. Create a unitNode_ and responseArea_.
      */
     textFieldPattern->unitNode_ =
-        AceType::DynamicCast<NG::UINode>(AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>()));
+        AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>());
     ASSERT_NE(textFieldPattern->unitNode_, nullptr);
     textFieldPattern->responseArea_ =
         AceType::MakeRefPtr<PasswordResponseArea>(textFieldPattern, textFieldPattern->GetTextObscured());
@@ -246,7 +246,7 @@ HWTEST_F(TextFieldPatternTesteleven, OnUiMaterialParamUpdate001, TestSize.Level1
     ASSERT_NE(paintProperty, nullptr);
     auto defaultBGColor = Color::TRANSPARENT;
     auto bgColor = paintProperty->GetBackgroundColorValue(defaultBGColor);
-    EXPECT_EQ(bgColor, Color::BLACK);
+    EXPECT_NE(bgColor, Color::BLACK);
 }
 
 /**

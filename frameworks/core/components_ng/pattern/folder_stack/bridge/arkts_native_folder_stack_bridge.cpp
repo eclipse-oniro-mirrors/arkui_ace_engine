@@ -141,11 +141,12 @@ ArkUINativeModuleValue FolderStackBridge::SetOnFolderStateChange(ArkUIRuntimeCal
     }
     CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
     panda::Local<panda::FunctionRef> func = callbackArg->ToObject(vm);
-    std::function<void(FolderEventInfo&)> callback = [vm, isJsView, frameNode, func = panda::CopyableGlobal(vm, func)](
+    std::function<void(FolderEventInfo&)> callback = [vm, isJsView, weakNode = AceType::WeakClaim(frameNode),
+                                                         func = panda::CopyableGlobal(vm, func)](
                                                          FolderEventInfo& value) {
         panda::LocalScope pandaScope(vm);
         panda::TryCatch trycatch(vm);
-        PipelineContext::SetCallBackNode(AceType::WeakClaim(frameNode));
+        PipelineContext::SetCallBackNode(weakNode);
         const char* keys[] = { "foldStatus" };
         Local<JSValueRef> values[] = { panda::NumberRef::New(vm, static_cast<int32_t>(value.GetFolderState())) };
         auto eventObject = panda::ObjectRef::NewWithNamedProperties(vm, ArraySize(keys), keys, values);
@@ -195,11 +196,12 @@ ArkUINativeModuleValue FolderStackBridge::SetOnHoverStatusChange(ArkUIRuntimeCal
     }
     CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
     panda::Local<panda::FunctionRef> func = callbackArg->ToObject(vm);
-    std::function<void(FolderEventInfo&)> callback = [vm, isJsView, frameNode, func = panda::CopyableGlobal(vm, func)](
+    std::function<void(FolderEventInfo&)> callback = [vm, isJsView, weakNode = AceType::WeakClaim(frameNode),
+                                                         func = panda::CopyableGlobal(vm, func)](
                                                          FolderEventInfo& value) {
         panda::LocalScope pandaScope(vm);
         panda::TryCatch trycatch(vm);
-        PipelineContext::SetCallBackNode(AceType::WeakClaim(frameNode));
+        PipelineContext::SetCallBackNode(weakNode);
         const char* keys[] = { "foldStatus", "isHoverMode", "appRotation", "windowStatusType" };
         Local<JSValueRef> values[] = { panda::NumberRef::New(vm, static_cast<int32_t>(value.GetFolderState())),
             panda::BooleanRef::New(vm, value.IsHoverMode()),

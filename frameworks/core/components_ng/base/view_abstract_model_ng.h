@@ -29,6 +29,7 @@ class CalcDimensionRect;
 class BorderImage;
 }
 namespace OHOS::Ace::NG {
+struct SafeAreaInsetOptions;
 constexpr int32_t MAT4_ZERO = 0;
 constexpr int32_t MAT4_ONE = 1;
 constexpr int32_t MAT4_TWO = 2;
@@ -347,6 +348,12 @@ public:
 
     void SetSafeAreaPaddings(const std::optional<CalcDimension>& top, const std::optional<CalcDimension>& bottom,
         const std::optional<CalcDimension>& left, const std::optional<CalcDimension>& right) override;
+
+    static void SetSafeAreaInset(const SafeAreaInsetOptions& options, SafeAreaInsetBuilderArray&& builders);
+    static void SetSafeAreaInset(FrameNode* frameNode, const SafeAreaInsetOptions& options,
+        SafeAreaInsetBuilderArray&& builders);
+    static void ResetSafeAreaInset();
+    static void ResetSafeAreaInset(FrameNode* frameNode);
 
     void SetMargin(const CalcDimension& value) override
     {
@@ -966,6 +973,9 @@ public:
         ViewAbstract::SetClipShape(frameNode, basicShape);
     }
 
+    void SetShadowShape(const RefPtr<BasicShape>& basicShape) override;
+    void SetShadowClipMode(ShadowClipMode clipMode) override;
+
     void SetClipEdge(bool isClip) override
     {
         ViewAbstract::SetClipEdge(isClip);
@@ -1550,6 +1560,8 @@ public:
         ViewAbstract::SetHitTestMode(hitTestMode);
     }
 
+    void SetAgentControlMode(const std::optional<NG::AgentControlMode>& mode) override;
+
     void SetOnTouchTestFunc(NG::OnChildTouchTestFunc&& onChildTouchTest) override
     {
         ViewAbstract::SetOnTouchTestFunc(std::move(onChildTouchTest));
@@ -1678,6 +1690,7 @@ public:
         std::function<void(const float)>&& onWidthDidChange,
         std::function<void(const float)>&& onTypeDidChange, std::function<void()>&& sheetSpringBack) override;
     RefPtr<PipelineContext> GetSheetContext(NG::SheetStyle& sheetStyle);
+    void ApplySheetImmersiveStrategyDefaults(const RefPtr<PipelineContext>& context, NG::SheetStyle& sheetStyle);
     void DismissSheet() override;
     void DismissContentCover() override;
     void SheetSpringBack() override;
@@ -1999,6 +2012,12 @@ public:
         const std::vector<ModifierKey>& keys, std::function<void()>&& onKeyboardShortcutAction)
     {
         ViewAbstract::SetKeyboardShortcut(frameNode, value, keys, std::move(onKeyboardShortcutAction));
+    }
+
+    static void RemoveKeyboardShortcut(FrameNode* frameNode, const std::string& value,
+        const std::vector<ModifierKey>& keys)
+    {
+        ViewAbstract::RemoveKeyboardShortcut(frameNode, value, keys);
     }
 
     static void ClearWidthOrHeight(FrameNode* frameNode, bool isWidth)

@@ -396,4 +396,26 @@ void WebJavaScriptResultCallBack::GetJavaScriptObjectMethodsV2(int32_t objectId,
     // webcontroller not support object, so nothing to do
 }
 
+void WebJavaScriptResultCallBack::GetJavaScriptResultV3(const std::vector<std::shared_ptr<NWebHapValue>>& args,
+    const std::string& method, const std::string& objectName,
+    std::shared_ptr<NWebJsCallInfo> callInfo, std::shared_ptr<NWebHapValue> result)
+{
+    // webcontroller not support object, so the callInfo fields are not used
+    (void)callInfo;
+
+    GetWebViewValueV2(GetJavaScriptResult(GetWebJSValueV2(args), method, objectName), result);
+}
+
+void WebJavaScriptResultCallBack::GetJavaScriptResultFlowbufV3(const std::vector<std::shared_ptr<NWebHapValue>>& args,
+    const std::string& method, const std::string& objectName,
+    std::shared_ptr<NWebJsCallInfo> callInfo, std::shared_ptr<NWebHapValue> result)
+{
+    (void)callInfo;
+    (void)args;
+    (void)method;
+    (void)result;
+    (void)objectName;
+    // webcontroller not support object, so nothing to do
+}
+
 } // namespace OHOS::Ace

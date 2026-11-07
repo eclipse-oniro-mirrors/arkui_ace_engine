@@ -33,7 +33,7 @@ constexpr int32_t GRID_COUNT = 2;
 constexpr int32_t MAX_LINES = 6;
 }
 
-class AgingAdapationDialogTheme : public virtual Theme {
+class AgingAdapationDialogTheme : public Theme {
     DECLARE_ACE_TYPE(AgingAdapationDialogTheme, Theme);
 
 public:

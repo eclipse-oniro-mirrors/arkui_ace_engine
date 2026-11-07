@@ -348,7 +348,7 @@ void UIExtensionManager::UpdateSessionViewportConfig(const ViewportConfig& confi
             displayId = container->GetCurrentDisplayId();
         }
         SessionViewportConfig newConfig = {
-            .isDensityFollowHost_ = uiExtension->GetDensityDpi(),
+            .dpiFollowStrategy_ = uiExtension->GetEffectiveDpiFollowStrategy(),
             .density_ = config.Density(),
             .displayId_ = displayId,
             .orientation_ = config.Orientation(),
@@ -697,7 +697,7 @@ void UIExtensionManager::NotifyUECProviderIfNeedded()
         }
         uecPattern->SetIsUpdateDisplayArea(false);
         const auto& preAvoidInfo = uecPattern->GetAvoidInfo();
-        auto uecNode = AceType::DynamicCast<FrameNode>(uecPattern->GetHost());
+        auto uecNode = uecPattern->GetHost();
         CHECK_NULL_CONTINUE(uecNode);
         ContainerModalAvoidInfo newAvoidInfo;
         AvoidInfoManager::GetContainerModalAvoidInfoForUEC(uecNode, newAvoidInfo);
@@ -733,7 +733,7 @@ void UIExtensionManager::NotifyNestedUECProvidersIfNeeded()
         }
         uecPattern->SetIsUpdateDisplayArea(false);
         const auto& preAvoidInfo = uecPattern->GetAvoidInfo();
-        auto uecNode = AceType::DynamicCast<FrameNode>(uecPattern->GetHost());
+        auto uecNode = uecPattern->GetHost();
         CHECK_NULL_CONTINUE(uecNode);
         ContainerModalAvoidInfo newAvoidInfo;
         avoidInfoMgr->GetNewAvoidInfoForUEC(uecNode, newAvoidInfo);

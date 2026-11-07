@@ -35,6 +35,7 @@ public:
     static void UpdateL1Rid4Index(const JSCallbackInfo& info);
 
     static void OnMove(const JSCallbackInfo& info);
+    static void Controller(const JSCallbackInfo& info);
     static void SetCreateByTemplate(const JSCallbackInfo& info);
     static void JsParseItemDragEventHandler(
         const JsiExecutionContext& context, const JSRef<JSObject>& itemDragEventObj, int32_t repeatElmtId);

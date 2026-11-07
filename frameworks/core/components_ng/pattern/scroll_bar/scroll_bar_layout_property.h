@@ -35,7 +35,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<ScrollBarLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propAxis_ = CloneAxis();
         value->propDisplayMode_ = CloneDisplayMode();
         return value;

@@ -22,7 +22,7 @@
 
 namespace OHOS::Ace {
 
-class SemiModalTheme : public virtual Theme {
+class SemiModalTheme : public Theme {
     DECLARE_ACE_TYPE(SemiModalTheme, Theme);
 
 public:

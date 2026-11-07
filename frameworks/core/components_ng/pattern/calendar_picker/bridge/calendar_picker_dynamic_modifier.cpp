@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 #include "bridge/declarative_frontend/jsview/models/view_abstract_model_impl.h"
+#include "base/log/log_wrapper.h"
 #include "core/common/container.h"
 #include "core/common/resource/resource_parse_utils.h"
 #include "core/components/calendar/calendar_theme.h"
@@ -52,6 +53,7 @@ constexpr int NUM_4 = 4;
 constexpr int NUM_12 = 12;
 constexpr int DATE_SIZE = 3;
 const bool DEFAULT_MARK_TODAY = false;
+const ArkUI_Int32 DEFAULT_FIRST_DAY_OF_WEEK = 0;
 thread_local std::string g_strValue;
 constexpr int TEXT_STYLE_FONT_INFO_SIZE = 2;
 constexpr int TEXT_STYLE_FONT_SIZE_INDEX = 0;
@@ -205,13 +207,14 @@ void SetTextStyle(ArkUINodeHandle node, uint32_t color, const char* fontSize, co
     NG::PickerTextStyle textStyle;
     textStyle.textColor = Color(color);
     CalcDimension fontSizeDimension =
-        StringUtils::StringToCalcDimension(std::string(fontSize), false, DimensionUnit::FP);
+        StringUtils::StringToCalcDimension(fontSize ? std::string(fontSize) : "", false, DimensionUnit::FP);
     if (fontSizeDimension.Unit() == DimensionUnit::PERCENT) {
         textStyle.fontSize = Dimension(-1);
     } else {
         textStyle.fontSize = fontSizeDimension;
     }
-    textStyle.fontWeight = StringUtils::StringToFontWeight(fontweight, FontWeight::NORMAL);
+    textStyle.fontWeight =
+        StringUtils::StringToFontWeight(fontweight ? std::string(fontweight) : "", FontWeight::NORMAL);
     CalendarPickerModelNG::SetTextStyle(frameNode, textStyle);
 }
 
@@ -246,7 +249,7 @@ void SetTextStyleWithResObj(ArkUINodeHandle node, const struct ArkUIPickerTextSt
 
     NG::PickerTextStyle textStyle;
     std::vector<std::string> res;
-    std::string fontValues = std::string(textStyleStruct->fontInfo);
+    std::string fontValues = textStyleStruct && textStyleStruct->fontInfo ? std::string(textStyleStruct->fontInfo) : "";
     StringUtils::StringSplitter(fontValues, DEFAULT_DELIMITER, res);
     if (res.size() != TEXT_STYLE_FONT_INFO_SIZE) {
         return;
@@ -573,6 +576,27 @@ ArkUI_Bool GetCalendarPickerMarkToday(ArkUINodeHandle node)
     return isMarkToday;
 }
 
+void SetCalendarPickerFirstDayOfWeek(ArkUINodeHandle node, ArkUI_Int32 firstDayOfWeek)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    CalendarPickerModelNG::SetFirstDayOfWeek(frameNode, firstDayOfWeek);
+}
+
+void ResetCalendarPickerFirstDayOfWeek(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    CalendarPickerModelNG::SetFirstDayOfWeek(frameNode, DEFAULT_FIRST_DAY_OF_WEEK);
+}
+
+ArkUI_Int32 GetCalendarPickerFirstDayOfWeek(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_RETURN(frameNode, DEFAULT_FIRST_DAY_OF_WEEK);
+    return CalendarPickerModelNG::GetFirstDayOfWeek(frameNode);
+}
+
 bool IsValidDate(uint32_t year, uint32_t month, uint32_t day)
 {
     if (year <= 0) {
@@ -613,7 +637,7 @@ void SetCalendarPickerDisabledDateRange(ArkUINodeHandle node, ArkUI_CharPtr disa
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
     std::vector<std::string> dateStrVector;
-    StringUtils::StringSplitter(std::string(disabledDateRangeStr), ',', dateStrVector);
+    StringUtils::StringSplitter(disabledDateRangeStr ? std::string(disabledDateRangeStr) : "", ',', dateStrVector);
     std::vector<std::pair<PickerDate, PickerDate>> disabledDateRange;
     for (size_t i = 0; i + 1 < dateStrVector.size(); i += 2) { // 2 pair size
         std::pair<PickerDate, PickerDate> pickerDateRange;
@@ -687,7 +711,7 @@ void JSCalendarPickerRemoveResObj(ArkUINodeHandle node, const ArkUI_CharPtr key)
     CHECK_NULL_VOID(frameNode);
     auto pickerPattern = frameNode->GetPattern<CalendarPickerPattern>();
     CHECK_NULL_VOID(pickerPattern);
-    auto keyStr = std::string(key);
+    auto keyStr = key ? std::string(key) : "";
     pickerPattern->RemoveResObj(keyStr);
 }
 
@@ -700,7 +724,7 @@ void JSResetResObj(ArkUINodeHandle node, ArkUI_CharPtr key)
     CHECK_NULL_VOID(frameNode);
     auto pattern = frameNode->GetPattern<Pattern>();
     CHECK_NULL_VOID(pattern);
-    auto keyStr = std::string(key);
+    auto keyStr = key ? std::string(key) : "";
     pattern->RemoveResObj(keyStr);
 }
 
@@ -713,7 +737,7 @@ void JSRemoveResObj(ArkUINodeHandle node, ArkUI_CharPtr key)
     CHECK_NULL_VOID(frameNode);
     auto pattern = frameNode->GetPattern<Pattern>();
     CHECK_NULL_VOID(pattern);
-    pattern->RemoveResObj(key);
+    pattern->RemoveResObj(key ? std::string(key) : std::string());
 }
 
 void SetJSBorderColor(ArkUINodeHandle node, const uint32_t value)
@@ -1295,6 +1319,8 @@ const ArkUICalendarPickerModifier* GetCalendarPickerDynamicModifier()
             .resetEndDate = nullptr,
             .setCalendarPickerMarkToday = nullptr,
             .resetCalendarPickerMarkToday = nullptr,
+            .setCalendarPickerFirstDayOfWeek = nullptr,
+            .resetCalendarPickerFirstDayOfWeek = nullptr,
             .setCalendarPickerDisabledDateRange = nullptr,
             .resetCalendarPickerDisabledDateRange = nullptr,
             .setEdgeAlign = nullptr,
@@ -1310,6 +1336,7 @@ const ArkUICalendarPickerModifier* GetCalendarPickerDynamicModifier()
             .getStartDate = nullptr,
             .getEndDate = nullptr,
             .getCalendarPickerMarkToday = nullptr,
+            .getCalendarPickerFirstDayOfWeek = nullptr,
             .getCalendarPickerDisabledDateRange = nullptr,
             .getEdgeAlign = nullptr,
             .setCalendarPickerHeight = nullptr,
@@ -1373,6 +1400,8 @@ const ArkUICalendarPickerModifier* GetCalendarPickerDynamicModifier()
             .resetEndDate = ResetEndDate,
             .setCalendarPickerMarkToday = SetCalendarPickerMarkToday,
             .resetCalendarPickerMarkToday = ResetCalendarPickerMarkToday,
+            .setCalendarPickerFirstDayOfWeek = SetCalendarPickerFirstDayOfWeek,
+            .resetCalendarPickerFirstDayOfWeek = ResetCalendarPickerFirstDayOfWeek,
             .setCalendarPickerDisabledDateRange = SetCalendarPickerDisabledDateRange,
             .resetCalendarPickerDisabledDateRange = ResetCalendarPickerDisabledDateRange,
             .setEdgeAlign = SetEdgeAlign,
@@ -1388,6 +1417,7 @@ const ArkUICalendarPickerModifier* GetCalendarPickerDynamicModifier()
             .getStartDate = GetStartDate,
             .getEndDate = GetEndDate,
             .getCalendarPickerMarkToday = GetCalendarPickerMarkToday,
+            .getCalendarPickerFirstDayOfWeek = GetCalendarPickerFirstDayOfWeek,
             .getCalendarPickerDisabledDateRange = GetCalendarPickerDisabledDateRange,
             .getEdgeAlign = GetEdgeAlign,
             .setCalendarPickerHeight = SetCalendarPickerHeight,
@@ -1452,6 +1482,8 @@ const CJUICalendarPickerModifier* GetCJUICalendarPickerModifier()
         .resetEndDate = ResetEndDate,
         .setCalendarPickerMarkToday = SetCalendarPickerMarkToday,
         .resetCalendarPickerMarkToday = ResetCalendarPickerMarkToday,
+        .setCalendarPickerFirstDayOfWeek = SetCalendarPickerFirstDayOfWeek,
+        .resetCalendarPickerFirstDayOfWeek = ResetCalendarPickerFirstDayOfWeek,
         .setCalendarPickerDisabledDateRange = SetCalendarPickerDisabledDateRange,
         .resetCalendarPickerDisabledDateRange = ResetCalendarPickerDisabledDateRange,
         .setEdgeAlign = SetEdgeAlign,
@@ -1466,6 +1498,7 @@ const CJUICalendarPickerModifier* GetCJUICalendarPickerModifier()
         .getStartDate = GetStartDate,
         .getEndDate = GetEndDate,
         .getCalendarPickerMarkToday = GetCalendarPickerMarkToday,
+        .getCalendarPickerFirstDayOfWeek = GetCalendarPickerFirstDayOfWeek,
         .getCalendarPickerDisabledDateRange = GetCalendarPickerDisabledDateRange,
         .getEdgeAlign = GetEdgeAlign,
         .setCalendarPickerHeight = SetCalendarPickerHeight,

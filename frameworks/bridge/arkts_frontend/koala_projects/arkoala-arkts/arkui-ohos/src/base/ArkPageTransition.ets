@@ -54,8 +54,8 @@ const ZERO_TRANSLATE:TranslateOptions = { x: 0.0, y: 0.0, z:0.0 } as TranslateOp
 const KEY_PAGE_TRANSITION_PROPERTY = 'pageTransitionProperty' // See frameworks/core/components_ng/pattern/stage/page_pattern.cpp
 
 function sizeNotEmpty(size: SizeOptions): boolean {
-    const w = size.width !== undefined ? size.width as number : 0
-    const h = size.height !== undefined ? size.height as number : 0
+    const w = size.width !== undefined ? size.width as number : 0.0
+    const h = size.height !== undefined ? size.height as number : 0.0
     return w > 0 && h > 0
 }
 

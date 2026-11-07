@@ -728,7 +728,7 @@ void SearchModelNG::SetOnChange(std::function<void(const ChangeValueInfo&)>&& on
         }
         auto pattern = weak.Upgrade();
         CHECK_NULL_VOID(pattern);
-        auto searchPattern = AceType::DynamicCast<SearchPattern>(pattern);
+        auto searchPattern = pattern;
         CHECK_NULL_VOID(searchPattern);
         searchPattern->UpdateChangeEvent(info.value + info.previewText.value);
     };
@@ -1182,9 +1182,7 @@ void SearchModelNG::CreateButton(const RefPtr<SearchNode>& parentNode, bool hasB
         FrameNode::GetOrCreateFrameNode(BUTTON_ETS_TAG, nodeId, []() -> RefPtr<Pattern> {
             auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
             CHECK_NULL_RETURN(buttonModifier, nullptr);
-            auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-            CHECK_NULL_RETURN(rawPattern, nullptr);
-            return AceType::Claim(rawPattern);
+            return buttonModifier->createButtonPattern();
         });
     CHECK_NULL_VOID(frameNode);
     auto pipeline = frameNode->GetContext();
@@ -1275,9 +1273,7 @@ void SearchModelNG::CreateCancelButton(const RefPtr<SearchNode>& parentNode, boo
         FrameNode::GetOrCreateFrameNode(BUTTON_ETS_TAG, nodeId, []() -> RefPtr<Pattern> {
             auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
             CHECK_NULL_RETURN(buttonModifier, nullptr);
-            auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-            CHECK_NULL_RETURN(rawPattern, nullptr);
-            return AceType::Claim(rawPattern);
+            return buttonModifier->createButtonPattern();
         });
     CHECK_NULL_VOID(frameNode);
     auto pipeline = frameNode->GetContext();
@@ -1357,7 +1353,7 @@ void SearchModelNG::SetOnChangeEvent(std::function<void(const std::u16string&)>&
         }
         auto pattern = weak.Upgrade();
         CHECK_NULL_VOID(pattern);
-        auto searchPattern = AceType::DynamicCast<SearchPattern>(pattern);
+        auto searchPattern = pattern;
         CHECK_NULL_VOID(searchPattern);
         searchPattern->UpdateChangeEvent(value);
     };
@@ -2247,7 +2243,7 @@ void SearchModelNG::SetOnChange(FrameNode* frameNode, std::function<void(const C
         }
         auto pattern = weak.Upgrade();
         CHECK_NULL_VOID(pattern);
-        auto searchPattern = AceType::DynamicCast<SearchPattern>(pattern);
+        auto searchPattern = pattern;
         CHECK_NULL_VOID(searchPattern);
         searchPattern->UpdateChangeEvent(info.value + info.previewText.value);
     };
@@ -2270,7 +2266,7 @@ void SearchModelNG::SetOnChangeEvent(FrameNode* frameNode, std::function<void(co
         }
         auto pattern = weak.Upgrade();
         CHECK_NULL_VOID(pattern);
-        auto searchPattern = AceType::DynamicCast<SearchPattern>(pattern);
+        auto searchPattern = pattern;
         CHECK_NULL_VOID(searchPattern);
         searchPattern->UpdateChangeEvent(value);
     };

@@ -30,6 +30,11 @@
 #include "frameworks/core/interfaces/arkoala/arkoala_api.h"
 
 
+namespace OHOS::Ace::NodeModel {
+extern void (*g_eventReceiver)(ArkUI_NodeEvent* event);
+extern void (*g_customEventReceiver)(ArkUI_NodeCustomEvent* event);
+} // namespace OHOS::Ace::NodeModel
+
 using namespace testing;
 using namespace testing::ext;
 class NativeGestureTestTwo : public testing::Test {
@@ -149,4 +154,74 @@ HWTEST_F(NativeGestureTestTwo, NativeGestureTest003, TestSize.Level1)
     gestureAPI->gestureApi1->dispose(swipeGesture);
     gestureAPI->gestureApi1->dispose(pinchGesture);
     gestureAPI->gestureApi1->dispose(rotateGesture);
+}
+
+/**
+ * @tc.name: GestureApi3ParallelRejectsNullNode
+ * @tc.desc: Call the API3 parallel gesture entry with a null node.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeGestureTestTwo, GestureApi3ParallelRejectsNullNode, TestSize.Level1)
+{
+    auto* api = static_cast<ArkUI_NativeGestureAPI_3*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_GESTURE, "ArkUI_NativeGestureAPI_3"));
+    ASSERT_NE(api, nullptr);
+    ASSERT_NE(api->setGestureParallelTo, nullptr);
+    int32_t userData = 1;
+    auto parallelGesture = [](ArkUI_ParallelGestureEvent*) -> ArkUI_GestureRecognizer* { return nullptr; };
+    EXPECT_EQ(api->setGestureParallelTo(nullptr, &userData, parallelGesture), ARKUI_ERROR_CODE_PARAM_INVALID);
+}
+
+/**
+ * @tc.name: NodeEventReceiverRegistrationEntries
+ * @tc.desc: Call node event receiver registration and unregistration entries on the test thread.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeGestureTestTwo, NodeEventReceiverRegistrationEntries, TestSize.Level1)
+{
+    auto* api = static_cast<ArkUI_NativeNodeAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
+    ASSERT_NE(api, nullptr);
+    ASSERT_NE(api->registerNodeEventReceiver, nullptr);
+    ASSERT_NE(api->unregisterNodeEventReceiver, nullptr);
+    auto receiver = +[](ArkUI_NodeEvent*) {};
+    api->registerNodeEventReceiver(receiver);
+    EXPECT_EQ(OHOS::Ace::NodeModel::g_eventReceiver, receiver);
+    api->unregisterNodeEventReceiver();
+    EXPECT_EQ(OHOS::Ace::NodeModel::g_eventReceiver, nullptr);
+}
+
+/**
+ * @tc.name: NodeCustomEventReceiverRegistrationEntries
+ * @tc.desc: Call custom node event receiver registration and unregistration entries on the test thread.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeGestureTestTwo, NodeCustomEventReceiverRegistrationEntries, TestSize.Level1)
+{
+    auto* api = static_cast<ArkUI_NativeNodeAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
+    ASSERT_NE(api, nullptr);
+    ASSERT_NE(api->registerNodeCustomEventReceiver, nullptr);
+    ASSERT_NE(api->unregisterNodeCustomEventReceiver, nullptr);
+    auto receiver = +[](ArkUI_NodeCustomEvent*) {};
+    api->registerNodeCustomEventReceiver(receiver);
+    EXPECT_EQ(OHOS::Ace::NodeModel::g_customEventReceiver, receiver);
+    api->unregisterNodeCustomEventReceiver();
+    EXPECT_EQ(OHOS::Ace::NodeModel::g_customEventReceiver, nullptr);
+}
+
+/**
+ * @tc.name: GestureApi1InnerParallelRejectsNullNode
+ * @tc.desc: Call the inner parallel gesture entry with a null node.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeGestureTestTwo, GestureApi1InnerParallelRejectsNullNode, TestSize.Level1)
+{
+    auto* api = static_cast<ArkUI_NativeGestureAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_GESTURE, "ArkUI_NativeGestureAPI_1"));
+    ASSERT_NE(api, nullptr);
+    ASSERT_NE(api->setInnerGestureParallelTo, nullptr);
+    int32_t userData = 1;
+    auto parallelGesture = [](ArkUI_ParallelInnerGestureEvent*) -> ArkUI_GestureRecognizer* { return nullptr; };
+    EXPECT_EQ(api->setInnerGestureParallelTo(nullptr, &userData, parallelGesture), ARKUI_ERROR_CODE_PARAM_INVALID);
 }

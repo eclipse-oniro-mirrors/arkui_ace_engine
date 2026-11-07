@@ -824,21 +824,6 @@ HWTEST_F(TextFieldUXTest, NeedSoftKeyboard001, TestSize.Level1)
 }
 
 /**
- * @tc.name: SetCaretTest001
- * @tc.desc: test textInput SetCaretPos
- * @tc.type: FUNC
- */
-HWTEST_F(TextFieldUXTest, SetCaretTest001, TestSize.Level1)
-{
-    /**
-     * @tc.steps: Create Text field node
-     * @tc.expected:
-     */
-    CreateTextField(DEFAULT_TEXT);
-    pattern_->ProcessPendingCaretEvent();
-}
-
-/**
  * @tc.name: MaxLength001
  * @tc.desc: test textInput maxLength
  * @tc.type: FUNC
@@ -1782,16 +1767,22 @@ HWTEST_F(TextFieldUXTest, TextSelectOverlayTestOnUpdateMenuInfo008, TestSize.Lev
     });
     frameNode_->MarkModifyDone();
     GetFocus();
+    /**
+     * @tc.steps: step2. update selector.
+     */
     auto textFieldTheme = pattern_->GetTheme();
     ASSERT_NE(textFieldTheme, nullptr);
     pattern_->textSelector_.Update(0, 0);
+    /**
+     * @tc.steps: step3. Initialize theme.
+     */
     textFieldTheme->aiWriteBundleName_ = "BundleName";
     textFieldTheme->aiWriteAbilityName_ = "AbilityName";
     textFieldTheme->aiWriteIsSupport_ = "true";
     auto textSelectOverlay = pattern_->selectOverlay_;
     ASSERT_NE(textSelectOverlay, nullptr);
     /**
-     * @tc.steps: step2. Do OnUpdateMenuInfo
+     * @tc.steps: step4. Do OnUpdateMenuInfo
      */
     SelectMenuInfo menuInfo;
     textSelectOverlay->OnUpdateMenuInfo(menuInfo, DIRTY_ALL_MENU_ITEM);

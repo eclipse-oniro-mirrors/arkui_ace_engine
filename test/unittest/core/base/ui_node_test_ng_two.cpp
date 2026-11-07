@@ -29,6 +29,7 @@
 #include "base/log/dump_log.h"
 #include "base/log/log_wrapper.h"
 #include "core/common/builder_util.h"
+#include "core/components_ng/pattern/custom/custom_node.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/ui_node.h"
 #include "core/components_ng/export_texture_info/export_texture_info.h"
@@ -60,6 +61,7 @@ void UINodeTestNgTwo::SetUpTestSuite()
 
 void UINodeTestNgTwo::TearDownTestSuite()
 {
+    DetachGlobalTestNodes();
     MockPipelineContext::TearDown();
 }
 
@@ -1581,4 +1583,136 @@ HWTEST_F(UINodeTestNgTwo, UINodeTestNgTwo076, TestSize.Level1)
     EXPECT_EQ(root->GetFrameNodeByUniqueIdInSubTree(-1), nullptr);
     EXPECT_EQ(root->GetFrameNodeByUniqueIdInSubTree(999999), nullptr);
 }
+
+/**
+ * @tc.name: SafeAreaInsetDumpTree001
+ * @tc.desc: DumpTree records the auxiliary subtree exactly once and stops recording it after removal.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UINodeTestNgTwo, SafeAreaInsetDumpTree001, TestSize.Level0)
+{
+    auto makeNode = [](const char* tag) {
+        return FrameNode::CreateFrameNode(tag, ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<Pattern>());
+    };
+    auto host = makeNode("insetDumpHost");
+    auto carrier = makeNode("insetDumpCarrier");
+    carrier->SetInternal();
+    auto content = makeNode("insetDumpContent");
+    content->MountToParent(carrier);
+    host->SetSafeAreaInsetNode(carrier);
+    auto dumpTree = [&](bool json = false) {
+        auto& log = DumpLog::GetInstance();
+        auto previousStream = std::move(log.ostream_);
+        auto previousResult = std::move(log.result_);
+        auto previousDescriptions = std::move(log.description_);
+        const bool previousAll = log.IsDumpAllNodes();
+        log.SetDumpFile(std::make_unique<std::ostringstream>());
+        log.SetDumpAllNodes(true);
+        log.result_.clear();
+        host->DumpTree(0, json);
+        auto result = log.result_;
+        log.SetDumpFile(std::move(previousStream));
+        log.result_ = std::move(previousResult);
+        log.description_ = std::move(previousDescriptions);
+        log.SetDumpAllNodes(previousAll);
+        return result;
+    };
+    auto text = dumpTree();
+    EXPECT_NE(text.find("SafeAreaInsetNode"), std::string::npos);
+    auto first = text.find("insetDumpContent");
+    ASSERT_NE(first, std::string::npos);
+    EXPECT_EQ(text.find("insetDumpContent", first + 1), std::string::npos);
+    auto json = dumpTree(true);
+    EXPECT_NE(json.find("insetDumpContent"), std::string::npos);
+    host->SetSafeAreaInsetNode(nullptr);
+    text = dumpTree();
+    EXPECT_EQ(text.find("SafeAreaInsetNode"), std::string::npos);
+    EXPECT_EQ(text.find("insetDumpContent"), std::string::npos);
+    EXPECT_EQ(dumpTree(true).find("insetDumpContent"), std::string::npos);
+}
+
+/**
+ * @tc.name: SafeAreaInsetDumpLookup001
+ * @tc.desc: Four auxiliary edges remain reachable by numeric ID, inspector ID and custom component name.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UINodeTestNgTwo, SafeAreaInsetDumpLookup001, TestSize.Level0)
+{
+    auto makeNode = [](const char* tag) {
+        return FrameNode::CreateFrameNode(tag, ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<Pattern>());
+    };
+    auto host = makeNode("dumpLookupHost");
+    auto business = makeNode("dumpLookupBusiness");
+    business->MountToParent(host);
+    auto overlay = makeNode("dumpLookupOverlay");
+    host->SetOverlayNode(overlay);
+    auto carrier = makeNode("dumpLookupCarrier");
+    carrier->SetInternal();
+    std::vector<RefPtr<FrameNode>> contents;
+    for (int32_t edge = 0; edge < 4; ++edge) {
+        auto content = makeNode("dumpLookupContent");
+        content->UpdateInspectorId("dump-edge-" + std::to_string(edge));
+        content->MountToParent(carrier);
+        contents.emplace_back(content);
+    }
+    auto custom = CustomNode::CreateCustomNode(ElementRegister::GetInstance()->MakeUniqueId(), "dump-custom-key");
+    custom->SetJSViewName("InsetDumpCustomComponent");
+    auto nested = makeNode("dumpLookupNested");
+    nested->MountToParent(custom);
+    custom->MountToParent(contents.back());
+    host->SetSafeAreaInsetNode(carrier);
+    auto capture = [&](const std::function<bool()>& operation, bool all = true) {
+        auto& log = DumpLog::GetInstance();
+        auto previousStream = std::move(log.ostream_);
+        auto previousResult = std::move(log.result_);
+        auto previousDescriptions = std::move(log.description_);
+        const bool previousAll = log.IsDumpAllNodes();
+        auto stream = std::make_unique<std::ostringstream>();
+        auto* output = stream.get();
+        log.SetDumpFile(std::move(stream));
+        log.SetDumpAllNodes(all);
+        log.result_.clear();
+        const bool found = operation();
+        const auto result = output->str() + log.result_;
+        log.SetDumpFile(std::move(previousStream));
+        log.result_ = std::move(previousResult);
+        log.description_ = std::move(previousDescriptions);
+        log.SetDumpAllNodes(previousAll);
+        return std::make_pair(found, result);
+    };
+    for (bool json : { false, true }) {
+        for (const auto& content : contents) {
+            EXPECT_TRUE(capture([&]() { return host->DumpTreeById(0, std::to_string(content->GetId()), json); }).first);
+            auto result = capture([&]() { return host->DumpTreeById(0, content->GetInspectorIdValue(""), json); });
+            EXPECT_TRUE(result.first);
+            EXPECT_NE(result.second.find("dumpLookupContent"), std::string::npos);
+        }
+        EXPECT_TRUE(capture([&]() { return host->DumpTreeById(0, std::to_string(nested->GetId()), json); }).first);
+        auto full = capture([&]() { host->DumpTree(0, json); return true; }).second;
+        EXPECT_NE(full.find("dumpLookupBusiness"), std::string::npos);
+        EXPECT_NE(full.find("dumpLookupOverlay"), std::string::npos);
+        EXPECT_NE(full.find("dumpLookupNested"), std::string::npos);
+    }
+    auto byName = capture([&]() { return host->DumpTreeByComponentName("InsetDumpCustom"); });
+    EXPECT_TRUE(byName.first);
+    EXPECT_NE(byName.second.find("dumpLookupNested"), std::string::npos);
+    host->SetActive(false);
+    auto hidden = capture([&]() { host->DumpTree(0); return true; }, false).second;
+    EXPECT_EQ(hidden.find("dumpLookupNested"), std::string::npos);
+    host->SetActive(true);
+    carrier->RemoveChild(contents.front());
+    EXPECT_FALSE(capture([&]() { return host->DumpTreeById(0, "dump-edge-0", false); }).first);
+    EXPECT_TRUE(capture([&]() { return host->DumpTreeById(0, "dump-edge-1", false); }).first);
+    host->SetSafeAreaInsetNode(nullptr);
+    for (bool json : { false, true }) {
+        EXPECT_FALSE(capture([&]() { return host->DumpTreeById(0, "dump-edge-1", json); }).first);
+        EXPECT_TRUE(capture([&]() { return host->DumpTreeById(0, std::to_string(business->GetId()), json); }).first);
+    }
+    EXPECT_FALSE(capture([&]() { return host->DumpTreeByComponentName("InsetDumpCustom"); }).first);
+    EXPECT_EQ(host->GetChildren().size(), 1);
+    EXPECT_EQ(host->GetOverlayNode(), overlay);
+}
+
 } // namespace OHOS::Ace::NG

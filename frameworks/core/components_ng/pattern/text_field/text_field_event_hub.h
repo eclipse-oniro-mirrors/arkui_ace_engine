@@ -64,7 +64,7 @@ struct ChangeValueInfo {
     PreviewText oldPreviewText;
 };
 
-class IMEExtraInfo : public virtual AceType {
+class IMEExtraInfo : public AceType {
     DECLARE_ACE_TYPE(IMEExtraInfo, AceType);
 
 public:

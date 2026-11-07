@@ -17,10 +17,12 @@
 
 #include <memory>
 #include "napi/native_node_api.h"
+#include "node/config_manager.h"
 #include "node/node_extened.h"
 #include "node/node_model.h"
 
 #include "base/error/error_code.h"
+#include "base/utils/napi_scope_raii.h"
 #include "core/components_ng/base/frame_node.h"
 #include "interfaces/native/native_error_message_macros.h"
 
@@ -51,9 +53,9 @@ void GetStringFromNapiValue(napi_env env, napi_value value, std::string& result)
 
 int32_t OH_ArkUI_GetNodeHandleFromNapiValue(napi_env env, napi_value value, ArkUI_NodeHandle* handle)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env, &scope);
-    if (status != napi_ok) {
+    CHECK_UI_THREAD("OH_ArkUI_GetNodeHandleFromNapiValue");
+    OHOS::Ace::ScopeRAII scope(env);
+    if (!scope) {
         SET_ERROR_MESSAGE(OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Failed to open napi handle scope");
         return OHOS::Ace::ERROR_CODE_PARAM_INVALID;
     }
@@ -66,7 +68,6 @@ int32_t OH_ArkUI_GetNodeHandleFromNapiValue(napi_env env, napi_value value, ArkU
         if (result != napi_ok) {
             LOGE("fail to get nodePtr");
             SET_ERROR_MESSAGE(OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Failed to get nodePtr property");
-            napi_close_handle_scope(env, scope);
             return OHOS::Ace::ERROR_CODE_PARAM_INVALID;
         }
         // BuilderNode case.
@@ -76,7 +77,6 @@ int32_t OH_ArkUI_GetNodeHandleFromNapiValue(napi_env env, napi_value value, ArkU
             LOGE("fail to get nodePtr external value");
             SET_ERROR_MESSAGE(OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__,
                 "Failed to get nodePtr external value");
-            napi_close_handle_scope(env, scope);
             return OHOS::Ace::ERROR_CODE_PARAM_INVALID;
         }
         auto* uiNodePtr = reinterpret_cast<OHOS::Ace::NG::UINode*>(nativePtr);
@@ -96,7 +96,6 @@ int32_t OH_ArkUI_GetNodeHandleFromNapiValue(napi_env env, napi_value value, ArkU
         if (impl) {
             impl->getExtendedAPI()->setAttachNodePtr((*handle)->uiNodeHandle, reinterpret_cast<void*>(*handle));
         }
-        napi_close_handle_scope(env, scope);
         return OHOS::Ace::ERROR_CODE_NO_ERROR;
     }
     result = napi_has_named_property(env, value, "builderNode_", &hasProperty);
@@ -107,7 +106,6 @@ int32_t OH_ArkUI_GetNodeHandleFromNapiValue(napi_env env, napi_value value, ArkU
         if (result != napi_ok) {
             LOGE("fail to get builderNode");
             SET_ERROR_MESSAGE(OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Failed to get builderNode property");
-            napi_close_handle_scope(env, scope);
             return OHOS::Ace::ERROR_CODE_PARAM_INVALID;
         }
         napi_value nodePtr = nullptr;
@@ -116,7 +114,6 @@ int32_t OH_ArkUI_GetNodeHandleFromNapiValue(napi_env env, napi_value value, ArkU
             LOGE("fail to get nodePtr in builderNode");
             SET_ERROR_MESSAGE(OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__,
                 "Failed to get nodePtr property in builderNode");
-            napi_close_handle_scope(env, scope);
             return OHOS::Ace::ERROR_CODE_PARAM_INVALID;
         }
         void* nativePtr = nullptr;
@@ -125,7 +122,6 @@ int32_t OH_ArkUI_GetNodeHandleFromNapiValue(napi_env env, napi_value value, ArkU
             LOGE("fail to get nodePtr external value in builderNode");
             SET_ERROR_MESSAGE(OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__,
                 "Failed to get nodePtr external value in builderNode");
-            napi_close_handle_scope(env, scope);
             return OHOS::Ace::ERROR_CODE_PARAM_INVALID;
         }
         auto* uiNode = reinterpret_cast<OHOS::Ace::NG::UINode*>(nativePtr);
@@ -134,7 +130,6 @@ int32_t OH_ArkUI_GetNodeHandleFromNapiValue(napi_env env, napi_value value, ArkU
             LOGE("fail to get frameNode value in builderNode");
             SET_ERROR_MESSAGE(OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__,
                 "Failed to get frameNode value in builderNode");
-            napi_close_handle_scope(env, scope);
             return OHOS::Ace::ERROR_CODE_PARAM_INVALID;
         }
         if (frameNode->GetTag() == "BuilderProxyNode") {
@@ -142,7 +137,6 @@ int32_t OH_ArkUI_GetNodeHandleFromNapiValue(napi_env env, napi_value value, ArkU
             if (!impl) {
                 SET_ERROR_MESSAGE(OHOS::Ace::ERROR_CODE_NATIVE_IMPL_LIBRARY_NOT_FOUND,
                     __FUNCTION__, "Native module not initialized");
-                napi_close_handle_scope(env, scope);
                 return OHOS::Ace::ERROR_CODE_NATIVE_IMPL_LIBRARY_NOT_FOUND;
             }
             auto* child = impl->getNodeModifiers()->getFrameNodeModifier()->getChild(
@@ -151,7 +145,6 @@ int32_t OH_ArkUI_GetNodeHandleFromNapiValue(napi_env env, napi_value value, ArkU
                 LOGE("fail to get child in BuilderProxyNode");
                 SET_ERROR_MESSAGE(OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__,
                     "Failed to get child node in BuilderProxyNode");
-                napi_close_handle_scope(env, scope);
                 return OHOS::Ace::ERROR_CODE_PARAM_INVALID;
             }
             frameNode = reinterpret_cast<OHOS::Ace::NG::FrameNode*>(child);
@@ -165,16 +158,15 @@ int32_t OH_ArkUI_GetNodeHandleFromNapiValue(napi_env env, napi_value value, ArkU
         if (impl) {
             impl->getExtendedAPI()->setAttachNodePtr((*handle)->uiNodeHandle, reinterpret_cast<void*>(*handle));
         }
-        napi_close_handle_scope(env, scope);
         return OHOS::Ace::ERROR_CODE_NO_ERROR;
     }
-    napi_close_handle_scope(env, scope);
     SET_ERROR_MESSAGE(OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Failed to get node handle from napi value");
     return OHOS::Ace::ERROR_CODE_PARAM_INVALID;
 }
 
 int32_t OH_ArkUI_GetContextFromNapiValue(napi_env env, napi_value value, ArkUI_ContextHandle* context)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetContextFromNapiValue");
     bool hasProperty = false;
     auto result = napi_has_named_property(env, value, "instanceId_", &hasProperty);
     if (result != napi_ok || !hasProperty) {
@@ -211,6 +203,7 @@ int32_t OH_ArkUI_GetContextFromNapiValue(napi_env env, napi_value value, ArkUI_C
 
 int32_t OH_ArkUI_GetNodeContentFromNapiValue(napi_env env, napi_value value, ArkUI_NodeContentHandle* content)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetNodeContentFromNapiValue");
     bool hasProperty = false;
     auto result = napi_has_named_property(env, value, "nativePtr_", &hasProperty);
     if (result != napi_ok || !hasProperty) {
@@ -238,6 +231,7 @@ int32_t OH_ArkUI_GetNodeContentFromNapiValue(napi_env env, napi_value value, Ark
 
 ArkUI_ErrorCode OH_ArkUI_InitModuleForArkTSEnv(napi_env env)
 {
+    CHECK_UI_THREAD("OH_ArkUI_InitModuleForArkTSEnv");
     CHECK_NULL_RETURN_WITH_MESSAGE(env, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Napi environment is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(OHOS::Ace::NodeModel::InitialFullImpl(), ARKUI_ERROR_CODE_CAPI_INIT_ERROR,
         __FUNCTION__, "Failed to initialize native module");
@@ -352,6 +346,7 @@ ArkUI_ErrorCode OH_ArkUI_InitModuleForArkTSEnv(napi_env env)
 
 void OH_ArkUI_NotifyArkTSEnvDestroy(napi_env env)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NotifyArkTSEnvDestroy");
     CHECK_NULL_VOID(env);
     CHECK_NULL_VOID(OHOS::Ace::NodeModel::InitialFullImpl());
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
@@ -362,6 +357,7 @@ void OH_ArkUI_NotifyArkTSEnvDestroy(napi_env env)
 int32_t OH_ArkUI_GetDrawableDescriptorFromNapiValue(
     napi_env env, napi_value value, ArkUI_DrawableDescriptor** drawableDescriptor)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetDrawableDescriptorFromNapiValue");
     void* objectNapi = nullptr;
     napi_unwrap(env, value, &objectNapi);
     if (!objectNapi) {
@@ -395,6 +391,7 @@ int32_t OH_ArkUI_GetDrawableDescriptorFromNapiValue(
 int32_t OH_ArkUI_GetDrawableDescriptorFromResourceNapiValue(
     napi_env env, napi_value value, ArkUI_DrawableDescriptor** drawableDescriptor)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetDrawableDescriptorFromResourceNapiValue");
     auto parseApi = reinterpret_cast<void (*)(void*, void*)>(OHOS::Ace::NodeModel::GetParseJsMedia());
     if (!parseApi) {
         return OHOS::Ace::ERROR_CODE_PARAM_INVALID;
@@ -411,8 +408,10 @@ int32_t OH_ArkUI_GetDrawableDescriptorFromResourceNapiValue(
 ArkUI_ErrorCode  OH_ArkUI_GetNavigationId(
     ArkUI_NodeHandle node, char* buffer, int32_t bufferSize, int32_t* writeLength)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetNavigationId");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(buffer, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Buffer is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(writeLength, ARKUI_ERROR_CODE_PARAM_INVALID,
@@ -431,8 +430,10 @@ ArkUI_ErrorCode  OH_ArkUI_GetNavigationId(
 ArkUI_ErrorCode OH_ArkUI_GetNavDestinationName(
     ArkUI_NodeHandle node, char* buffer, int32_t bufferSize, int32_t* writeLength)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetNavDestinationName");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(buffer, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Buffer is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(writeLength, ARKUI_ERROR_CODE_PARAM_INVALID,
@@ -450,8 +451,10 @@ ArkUI_ErrorCode OH_ArkUI_GetNavDestinationName(
 
 ArkUI_ErrorCode OH_ArkUI_GetNavStackLength(ArkUI_NodeHandle node, int32_t* length)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetNavStackLength");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(length, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Length is null");
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
@@ -473,8 +476,10 @@ ArkUI_ErrorCode OH_ArkUI_GetNavStackLength(ArkUI_NodeHandle node, int32_t* lengt
 ArkUI_ErrorCode OH_ArkUI_GetNavDestinationNameByIndex(
     ArkUI_NodeHandle node, int32_t index, char* buffer, int32_t bufferSize, int32_t* writeLength)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetNavDestinationNameByIndex");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(buffer, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Buffer is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(writeLength, ARKUI_ERROR_CODE_PARAM_INVALID,
@@ -493,8 +498,10 @@ ArkUI_ErrorCode OH_ArkUI_GetNavDestinationNameByIndex(
 ArkUI_ErrorCode OH_ArkUI_GetNavDestinationId(
     ArkUI_NodeHandle node, char* buffer, int32_t bufferSize, int32_t* writeLength)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetNavDestinationId");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(buffer, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Buffer is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(writeLength, ARKUI_ERROR_CODE_PARAM_INVALID,
@@ -512,8 +519,10 @@ ArkUI_ErrorCode OH_ArkUI_GetNavDestinationId(
 
 ArkUI_ErrorCode OH_ArkUI_GetNavDestinationState(ArkUI_NodeHandle node, ArkUI_NavDestinationState* state)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetNavDestinationState");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(state, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "State is null");
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
@@ -535,8 +544,10 @@ ArkUI_ErrorCode OH_ArkUI_GetNavDestinationState(ArkUI_NodeHandle node, ArkUI_Nav
 
 ArkUI_ErrorCode OH_ArkUI_GetNavDestinationIndex(ArkUI_NodeHandle node, int32_t* index)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetNavDestinationIndex");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(index, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Index is null");
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
@@ -558,10 +569,12 @@ ArkUI_ErrorCode OH_ArkUI_GetNavDestinationIndex(ArkUI_NodeHandle node, int32_t* 
 
 napi_value OH_ArkUI_GetNavDestinationParam(ArkUI_NodeHandle node)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetNavDestinationParam");
     if (!node) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node is null");
         return nullptr;
     }
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!fullImpl) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_GET_INFO_FAILED, __FUNCTION__,
@@ -579,8 +592,10 @@ napi_value OH_ArkUI_GetNavDestinationParam(ArkUI_NodeHandle node)
 
 ArkUI_ErrorCode OH_ArkUI_GetRouterPageIndex(ArkUI_NodeHandle node, int32_t* index)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetRouterPageIndex");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(index, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Index is null");
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
@@ -603,8 +618,10 @@ ArkUI_ErrorCode OH_ArkUI_GetRouterPageIndex(ArkUI_NodeHandle node, int32_t* inde
 ArkUI_ErrorCode OH_ArkUI_GetRouterPageName(
     ArkUI_NodeHandle node, char* buffer, int32_t bufferSize, int32_t* writeLength)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetRouterPageName");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(buffer, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Buffer is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(writeLength, ARKUI_ERROR_CODE_PARAM_INVALID,
@@ -623,8 +640,10 @@ ArkUI_ErrorCode OH_ArkUI_GetRouterPageName(
 ArkUI_ErrorCode OH_ArkUI_GetRouterPagePath(
     ArkUI_NodeHandle node, char* buffer, int32_t bufferSize, int32_t* writeLength)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetRouterPagePath");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(buffer, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Buffer is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(writeLength, ARKUI_ERROR_CODE_PARAM_INVALID,
@@ -642,8 +661,10 @@ ArkUI_ErrorCode OH_ArkUI_GetRouterPagePath(
 
 ArkUI_ErrorCode OH_ArkUI_GetRouterPageState(ArkUI_NodeHandle node, ArkUI_RouterPageState* state)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetRouterPageState");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(state, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "State is null");
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
@@ -666,8 +687,10 @@ ArkUI_ErrorCode OH_ArkUI_GetRouterPageState(ArkUI_NodeHandle node, ArkUI_RouterP
 ArkUI_ErrorCode OH_ArkUI_GetRouterPageId(
     ArkUI_NodeHandle node, char* buffer, int32_t bufferSize, int32_t* writeLength)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetRouterPageId");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(buffer, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Buffer is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(writeLength, ARKUI_ERROR_CODE_PARAM_INVALID,
@@ -686,6 +709,7 @@ ArkUI_ErrorCode OH_ArkUI_GetRouterPageId(
 int32_t OH_ArkUI_PostFrameCallback(ArkUI_ContextHandle uiContext, void* userData,
     void (*callback)(uint64_t nanoTimestamp, uint32_t frameCount, void* userData))
 {
+    CHECK_UI_THREAD("OH_ArkUI_PostFrameCallback");
     CHECK_NULL_RETURN_WITH_MESSAGE(
         uiContext, ARKUI_ERROR_CODE_UI_CONTEXT_INVALID, __FUNCTION__, "UI context parameter is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(
@@ -711,6 +735,7 @@ int32_t OH_ArkUI_PostFrameCallback(ArkUI_ContextHandle uiContext, void* userData
 int32_t OH_ArkUI_PostIdleCallback(ArkUI_ContextHandle uiContext, void* userData,
     void (*callback)(uint64_t nanoTimeLeft, uint32_t frameCount, void* userData))
 {
+    CHECK_UI_THREAD("OH_ArkUI_PostIdleCallback");
     CHECK_NULL_RETURN_WITH_MESSAGE(
         uiContext, ARKUI_ERROR_CODE_UI_CONTEXT_INVALID, __FUNCTION__, "UI context parameter is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(
@@ -736,6 +761,7 @@ int32_t OH_ArkUI_PostIdleCallback(ArkUI_ContextHandle uiContext, void* userData,
 ArkUI_ErrorCode OH_ArkUI_EnableEventPassthrough(ArkUI_ContextHandle uiContext, bool enabled,
     ArkUI_RawInputEventType type)
 {
+    CHECK_UI_THREAD("OH_ArkUI_EnableEventPassthrough");
     CHECK_NULL_RETURN(uiContext, ARKUI_ERROR_CODE_PARAM_INVALID);
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN(fullImpl, ARKUI_ERROR_CODE_CAPI_INIT_ERROR);

@@ -31,7 +31,7 @@ using EtsCardTouchEventCallback = std::function<void(const TouchEvent&, Serializ
 using EtsCardAxisEventCallback = std::function<void(const AxisEvent&, SerializedGesture& serializedGesture)>;
 
 namespace NG {
-class FormEventManager : public virtual AceType {
+class FormEventManager : public AceType {
     DECLARE_ACE_TYPE(FormEventManager, AceType);
 public:
     FormEventManager() = default;

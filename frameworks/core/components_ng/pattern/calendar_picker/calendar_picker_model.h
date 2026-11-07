@@ -51,6 +51,7 @@ public:
     virtual void ClearBorderWidth() = 0;
     virtual void ClearPadding() = 0;
     virtual void SetMarkToday(bool isMarkToday) = 0;
+    virtual void SetFirstDayOfWeek(int32_t firstDayOfWeek) = 0;
     virtual void CalendarPickerRemoveResObj(const std::string& key) = 0;
 
 private:

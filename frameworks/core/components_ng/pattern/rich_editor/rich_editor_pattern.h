@@ -36,6 +36,7 @@
 #include "core/components_ng/pattern/text/selection_info.h"
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
 #include "core/components_ng/pattern/text/text_pattern.h"
+#include "core/event/mouse_event.h"
 #include "core/components_ng/pattern/text_field/text_field_model.h"
 #include "core/components_ng/pattern/text_field/text_keyboard_common_type.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_model.h"
@@ -43,6 +44,15 @@
 #include "core/components_ng/pattern/rich_editor/rich_editor_paragraph_manager.h"
 #include "core/components_ng/pattern/common_text/counter_host.h"
 #include "core/text/text_emoji_processor.h"
+#include "base/view_data/ace_auto_fill_type.h"
+#include "core/components_ng/pattern/text_field/password_icon_host.h"
+#include "core/components_ng/pattern/text_field/auto_fill_host.h"
+#ifdef ENABLE_AUTO_FILL_CONTROLLER
+#include "core/components_ng/pattern/text_field/auto_fill_controller.h"
+#endif
+#include "core/components/text_field/textfield_theme.h"
+#include "core/components_ng/pattern/rich_editor/span_string_mode_switcher.h"
+#include "core/common/text_field_manager_ng.h"
 
 #include "core/components_ng/pattern/text_field/clean_node_host.h"
 
@@ -97,6 +107,7 @@ class NodePaintMethod;
 class OneStepDragController;
 struct OverlayRequest;
 class RichEditorAccessibilityProperty;
+class PasswordResponseArea;
 class RichEditorContentModifier;
 class RichEditorContentPattern;
 class RichEditorForegroundModifier;
@@ -212,6 +223,12 @@ enum class OperationType {
     UNDO
 };
 
+enum class RichEditorAutoFillReason {
+    UNKNOWN = 0,
+    SINGLE_CLICK,
+    EDITOR_FOCUS,
+};
+
 const std::unordered_map<OperationType, TextChangeReason> OPERATION_REASON_MAP = {
     { OperationType::DEFAULT, TextChangeReason::INPUT },
     { OperationType::DRAG, TextChangeReason::DRAG },
@@ -260,13 +277,20 @@ private:
     bool& scopeFlag_;
 };
 
+using RichEditorCapability = TextCapability;
+
 class RichEditorPattern
     : public TextPattern, public ScrollablePattern, public TextInputClient, public SpanWatcher,
-      public CleanNodeHostBase<RichEditorPattern, RichEditorLayoutProperty>, public ICounterHost {
+      public CleanNodeHostBase<RichEditorPattern, RichEditorLayoutProperty>, public ICounterHost,
+      public PasswordIconHostBase<RichEditorPattern, RichEditorLayoutProperty>,
+      public AutoFillHostBase<RichEditorPattern, RichEditorLayoutProperty> {
     DECLARE_ACE_TYPE(RichEditorPattern, TextPattern, ScrollablePattern, TextInputClient, SpanWatcher, ICleanNodeHost,
-        ICounterHost);
+        ICounterHost, IPasswordIconHost, IAutoFillHost);
 
 public:
+    void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context) override;
+
+    RefPtr<NG::FrameNode> GetHost() const override { return TextPattern::GetHost(); }
     RichEditorPattern(bool isStyledStringMode = false);
     ~RichEditorPattern() override;
 
@@ -342,7 +366,6 @@ public:
     bool IsPreviewTextInputting();
     std::vector<RectF> GetPreviewTextRects();
     float GetPreviewTextUnderlineWidth() const;
-    PreviewTextStyle GetPreviewTextStyle() const;
     void SetSupportPreviewText(bool isTextPreviewSupported);
     bool IsSupportPreviewText();
 
@@ -405,7 +428,7 @@ public:
     void MountImageNode(const RefPtr<ImageSpanItem>& imageItem);
     void SetImageLayoutProperty(RefPtr<ImageSpanNode> imageNode, const ImageSpanOptions& options);
     void InsertValueInStyledString(const std::u16string& insertValue, bool shouldCommitInput = false,
-        bool isPaste = false, bool preFiltered = false);
+        bool isPaste = false, bool preFiltered = false, bool isInsertValueSplit = false);
     void HandleStyledStringInsertion(RefPtr<SpanString> insertStyledString, const UndoRedoRecord& record,
         std::u16string& subValue, bool needReplaceInTextPreview, bool shouldCommitInput);
     void HandleComposingTextBeforeInsertion(const std::u16string& insertValue);
@@ -429,8 +452,11 @@ public:
     void ResetAfterPaste();
     void OnModifyDone() override;
     void BeforeCreateLayoutWrapper() override;
+    void AdjustBoundsRect(RectF& bounds);
     bool OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config) override;
     void HandleSelectOverlayOnLayoutSwap();
+    void ProcessOnLayoutSwap(const RectF& originalFrameRect, const DirtySwapConfig& config);
+    void HandleDragDropOnSwap();
     void FireOnReady();
     void MoveCaretOnLayoutSwap();
     void MoveTextRectOnLayoutSwap();
@@ -466,6 +492,7 @@ public:
     void DeleteBackward(int32_t length = 1) override;
     void DeleteBackward(int32_t length, TextChangeReason reason, bool isByIME = false);
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
     void DeleteBackwardFunction();
     void ReportSelectionChangeEvent(int32_t nodeId, const std::string& str, int32_t start, int32_t end);
     void ReportCommandExecution(int32_t nodeId, const std::string& command);
@@ -630,6 +657,7 @@ public:
     void UpdateParagraphStyle(RefPtr<SpanNode> spanNode, const struct UpdateParagraphStyle& style);
     std::vector<ParagraphInfo> GetParagraphInfo(int32_t start, int32_t end);
     void SetTypingStyle(std::optional<struct UpdateSpanStyle> typingStyle, std::optional<TextStyle> textStyle);
+    void SyncTypingStyleToPlainText();
     void SetTypingParagraphStyle(std::optional<struct UpdateParagraphStyle> typingParagraphStyle);
     void SetPlaceholderStyledString(const RefPtr<SpanString>& value);
     std::optional<struct UpdateSpanStyle> GetTypingStyle();
@@ -650,6 +678,9 @@ public:
     std::u16string GetLeftTextOfCursor(int32_t number) override;
     std::u16string GetRightTextOfCursor(int32_t number) override;
     int32_t GetTextIndexAtCursor() override;
+    RichTextDataInfo GetLeftRichTextOfCursor(int32_t number) override;
+    RichTextDataInfo GetRightRichTextOfCursor(int32_t number) override;
+    RichTextDataInfo BuildRichText(int32_t start, int32_t end);
     void ProcessOverlay(const OverlayRequest& request = OverlayRequest()) override;
     void ShowSelectOverlay(const RectF& firstHandle, const RectF& secondHandle, bool isCopyAll = false,
         TextResponseType responseType = TextResponseType::LONG_PRESS, bool handlReverse = false);
@@ -686,8 +717,12 @@ public:
     RefPtr<SpanString> ToStyledString(int32_t start, int32_t end);
     SelectionInfo FromStyledString(const RefPtr<SpanString>& spanString);
     bool BeforeAddSymbol(RichEditorChangeValue& changeValue, const SymbolSpanOptions& options);
-    void AfterContentChange(RichEditorChangeValue& changeValue);
-    void ReportAfterContentChangeEvent();
+    void AfterContentChange(RichEditorChangeValue& changeValue,
+        const std::optional<std::u16string>& addText = std::nullopt,
+        const std::optional<std::u16string>& deleteText = std::nullopt);
+    void ReportAfterContentChangeEvent(
+        const std::optional<std::u16string>& addText = std::nullopt,
+        const std::optional<std::u16string>& deleteText = std::nullopt);
     void ReportTextChange();
     void ReportEditorEvent(const std::string& eventType);
     void DeleteToMaxLength(std::optional<int32_t> length);
@@ -761,7 +796,7 @@ public:
     void OnColorModeChange(uint32_t colorMode) override;
     void OnColorConfigurationUpdate() override;
     void HandleColorConfigurationUpdate();
-    bool IsDisabled() const;
+    bool IsDisabled() const override;
     float GetLineHeight() const override;
     size_t GetLineCount() const override;
     std::vector<ParagraphManager::TextBox> GetRectsForRange(int32_t start, int32_t end,
@@ -794,6 +829,10 @@ public:
     void OnScrollEndCallback() override;
     bool IsScrollable() const override;
     void SetScrollable(bool scrollable);
+    bool IsReverse() const override
+    {
+        return false;
+    }
     bool IsAtomicNode() const override;
     RefPtr<FrameNode> GetClientHost() const override;
     bool IsSelectAreaVisible();
@@ -802,6 +841,7 @@ public:
     TextSpanType GetEditorType() const;
     std::string GetPlaceHolder() const;
     void HandleOnCameraInput() override;
+    void HandleOnTranslateInput();
     void HandleOnAIWrite();
     void GetAIWriteInfo(AIWriteInfo& info);
     void HandleAIWriteResult(int32_t start, int32_t end, std::vector<uint8_t>& buffer);
@@ -848,7 +888,6 @@ public:
     void SetCustomKeyboardOption(bool supportAvoidance);
     void SetCustomKeyboardWithNode(const RefPtr<UINode>& keyboardBuilder);
     void StopEditing();
-    void ResetKeyboardIfNeed();
     void ProcessCustomKeyboard(bool matched, int32_t nodeId) override;
     bool NeedCloseKeyboard() override;
     void CloseTextCustomKeyboard(int32_t nodeId, bool isUIExtension) override;
@@ -875,6 +914,10 @@ public:
     void UpdateSelectionType(const SelectionInfo& textSelectInfo);
     std::list<RefPtr<SpanItem>>::iterator GetSpanIter(int32_t index);
     SpanItemType GetSpanType(int32_t index);
+
+    // RichEditor has no approved fields from TextPattern's advanced entry.
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override
+    {}
 
     void DumpAdvanceInfo() override {}
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override  {}
@@ -949,6 +992,73 @@ public:
     void MarkAISpanStyleChanged() override;
     void HandleOnAskCelia() override;
 
+    void UpdateAIMenuOptions() override;
+    void SelectAIDetect() override;
+    bool IsInPasswordMode() const override;
+    void FilterTextStyleForPasswordMode(TextStyle& textStyle, const TextStyle& inheritedStyle) const override;
+    bool IsSingleLineForPassword() const override;
+    std::u16string GetObscureContent() const override;
+    int32_t GetObscureCaretPosition() const override;
+    bool HasObscureContent() const override;
+    void ApplyPasswordObscure(std::u16string& content) const override;
+    void ApplyNewlineFilter(std::u16string& content) const override;
+
+    RefPtr<TextFieldTheme> GetTextFieldThemeImpl() const
+    {
+        return GetTheme<TextFieldTheme>();
+    }
+    RefPtr<RichEditorEventHub> GetSecurityEventHubImpl() const
+    {
+        auto host = GetHost();
+        return host ? host->GetEventHub<RichEditorEventHub>() : nullptr;
+    }
+    void OnObscuredChanged(bool isObscured) override;
+    void RestoreDefaultMouseState() override;
+    // Shared overlay-modifier hover bridge for both password-icon and clean-button hover
+    // (PasswordIconHostBase::SetHoverColorAndRectsOnModifier and
+    // CleanNodeHostBase::SetCleanHoverColorAndRect delegate here).
+    bool SetOverlayHoverColorAndRects(const std::vector<RoundRect>& rects, uint32_t color);
+    bool ClearOverlayHoverColorAndRects();
+    NG::PropertyChangeFlag GetHoverDirtyFlag() const override
+    {
+        return NG::PROPERTY_UPDATE_MEASURE_SELF_AND_PARENT;
+    }
+
+    bool IsInPlainTextInputMode() const;
+    TextInputType GetKeyboard() const;
+    TextInputType GetAutoFillKeyboardType();
+    void SwitchStyledStringByInputMode();
+    void InitPasswordMode();
+    RefPtr<SpanString> FilterSpanStringByInputType(const RefPtr<SpanString>& src, bool checkPreview);
+    void FilterTextByInputType(std::u16string& text);
+    void FilterInitializeTextByInputType();
+    bool IsDynamicInputTypeSwitchAligned(TextInputType currentType);
+
+    float GetAllResponseAreaWidth() const;
+
+    AceLogTag GetLogTag() const override { return AceLogTag::ACE_RICH_TEXT; }
+    RefPtr<NG::PasswordResponseArea> GetPasswordResponseArea() override;
+    void SetPasswordResponseArea(const RefPtr<NG::PasswordResponseArea>& area) override
+    {
+        passwordResponseArea_ = area;
+    }
+    void ClearLeftoverPasswordArea();
+    void OnObscureDirty(PropertyChangeFlag flag) override;
+    bool ShouldDoDynamicSwitch(TextInputType currentType) override
+    {
+        return IsDynamicInputTypeSwitchAligned(currentType);
+    }
+    void DoDynamicSwitch(TextInputType currentType) override;
+    void OnKeyboardTypeChanged() override;
+    bool IsKeyboardTypeChanged() override
+    {
+        return isSingleLineMode_ && PasswordIconHostBase::IsKeyboardTypeChanged();
+    }
+    void ResetPreviewTextState() override;
+    void DoKeyboardResetPlatform(const RefPtr<NG::FrameNode>& host, bool needToResetKeyboard, bool isDynamic) override;
+
+    bool IsCustomKeyboardAttached() const override { return isCustomKeyboardAttached_; }
+
 #if defined(IOS_PLATFORM)
     const TextEditingValue& GetInputEditingValue() const override;
 #endif
@@ -977,11 +1087,81 @@ public:
         RefPtr<PageNodeInfoWrap> nodeWrap, AceAutoFillType autoFillType,
         AceAutoFillTriggerType triggerType = AceAutoFillTriggerType::AUTO_REQUEST) override;
     void DumpViewDataPageNode(RefPtr<ViewDataWrap> viewDataWrap, bool needsRecordData = false) override;
-    bool ProcessAutoFill(AceAutoFillTriggerType triggerType = AceAutoFillTriggerType::AUTO_REQUEST);
+    bool CheckAutoSave() override;
+    void FillAutoFillPageNodeInfo(const RefPtr<ViewDataWrap>& viewDataWrap, const RefPtr<PageNodeInfoWrap>& info);
+    std::pair<bool, bool> ProcessAutoFill(bool isNewPassWord = false, bool ignoreFillType = false,
+        AceAutoFillTriggerType triggerType = AceAutoFillTriggerType::AUTO_REQUEST);
+    bool CheckAutoFill(AceAutoFillTriggerType triggerType, bool ignoreFillType = false);
+    void SetAutoFillTriggeredStateByType(const AceAutoFillType& autoFillType);
+    bool GetAutoFillTriggeredStateByType(const AceAutoFillType& autoFillType);
     void ProcessAutoFillOnPaste();
     void HandleOnPasswordVault();
     bool IsShowAutoFill();
+    bool IsAutoFillEnabled() const;
+    AceAutoFillType GetAutoFillType();
+    void SetFillRequestFinish(bool success) { isFillRequestFinish_ = success; }
+    bool IsFillRequestFinish() { return isFillRequestFinish_; }
+    bool IsAutoFillPasswordType(const AceAutoFillType& autoFillType);
+    bool IsAutoFillUserName(const AceAutoFillType& autoFillType);
+    bool HasAutoFillPasswordNode();
+    bool IsTriggerAutoFillPassword();
+    bool ProcessAutoFillOnFocus();
+    bool DoProcessAutoFill(RichEditorAutoFillReason autoFillReason, SourceType sourceType = SourceType::NONE);
+    bool ProcessAutoFillAndKeyboard(RichEditorAutoFillReason autoFillReason, SourceType sourceType = SourceType::NONE);
+    void SetAutoFillRequestSuccessOnFocus(bool success) { autoFillRequestSuccessOnFocus_ = success; }
+    bool IsAutoFillRequestSuccessOnFocus() const { return autoFillRequestSuccessOnFocus_; }
+    bool IsModalCovered();
+    void AutoFillValueChanged();
+    void NotifyFillRequestFailed(int32_t errCode, const std::string& fillContent = "", bool isPopup = false) override;
+    TextFieldInfo GenerateTextFieldInfo();
+    void AddAutoFillNodeInfo();
+    void RemoveAutoFillNodeInfo();
+    void UpdateAutoFillNodeInfo();
+    void SyncAutoFillNodeInfo();
+
+    void HandleAutoRequestFill(const std::u16string& fillData, const RefPtr<PageNodeInfoWrap>& nodeWrap,
+        bool fromOtherAccount);
+    void HandleOnAutoFillSecurePaste(const std::u16string& fillData);
+    // AutoFill password-vault IME bridge — mirrors TextFieldPattern's
+    // SendAccountRecommendCommand path so IMF can surface the password-vault
+    // button on the soft keyboard for password-mode RichEditor.
+    void SetAutoFillUserName(const std::string& userName) override
+    {
+        autoFillUserName_ = userName;
+    }
+    void SetAutoFillNewPassword(const std::string& newPassword) override
+    {
+        autoFillNewPassword_ = newPassword;
+    }
+    std::string GetAutoFillUserName() override
+    {
+        return autoFillUserName_;
+    }
+
+    std::string GetAutoFillNewPassword() override
+    {
+        return autoFillNewPassword_;
+    }
+    void SetAutoFillOtherAccount(bool otherAccount)
+    {
+        autoFillOtherAccount_ = otherAccount;
+    }
+    void SendAccountRecommendCommand(const RefPtr<TextFieldManagerNG>& textFieldManager);
+    // TextInputClient virtual dispatch entry — routes to ProcessAutoFill(triggerType).
+    // Implemented in rich_editor_pattern.cpp so the symbol stays local to this SO.
+    void ProcessAutoFillTrigger(AceAutoFillTriggerType triggerType) override;
     bool IsInterceptInput(const bool shouldCommitInput, const OperationType operationType);
+
+#ifdef ENABLE_AUTO_FILL_CONTROLLER
+    RefPtr<FrameNode> GetAutoFillHostNode() override;
+    RectF GetAutoFillTextContentRect() override;
+    RectF GetAutoFillTextRect() override;
+    RefPtr<Paragraph> GetAutoFillParagraph() override;
+    IAutoFillContentModifier* GetAutoFillContentModifier() override;
+    RefPtr<TextFieldTheme> GetAutoFillTheme() override { return GetTheme<TextFieldTheme>(); }
+    TextDirection GetAutoFillParagraphDirection(TextDirection fallback) override;
+    void ExecuteAutoFillInsert(const std::u16string& content) override;
+#endif
 
     // local/global coordinate conversion with render transform.
     Offset ConvertToLocalOffsetWithTransform(const Offset& globalOffset);
@@ -1036,6 +1216,7 @@ public:
     void SetThemeBorderAttr() override;
 
     // ===== ICounterHost interface (optional override) =====
+    bool ShouldUseHostTextLength() const override { return true; }
     int32_t GetCounterType() const override;
     bool GetShowHighlightBorder() const override;
     bool HasCounterTextColor() const override;
@@ -1043,11 +1224,15 @@ public:
     bool HasCounterTextOverflowColor() const override;
     Color GetCounterTextOverflowColor() const override;
     float GetFontScaleFromEnv(const RefPtr<FrameNode>& host) const override;
+    bool IsUnspecifiedOrTextType() const;
+    bool IsUnderlineMode() const override;
+    bool IsUnderlineAndButtonMode() const override;
     TextDirection GetLayoutDirection() const override;
     TextDirection GetNonAutoLayoutDirection() const override;
     std::optional<MarginProperty> GetMarginProperty() const override;
     bool NeedRestoreMeasureConstraint() const override;
-
+    float GetPaddingLeft() const override;
+    float GetPaddingRight() const override;
     // ===== counter behavior logic (RichEditor-specific) =====
     void ProcessCounter();
     void AddCounterNode();
@@ -1069,10 +1254,41 @@ public:
     Dimension GetInnerBorderWidthValue() const;
     Color GetInnerBorderColorValue(const Color& defaultColor) const;
     RefPtr<TextComponentDecorator> GetCounterDecorator() const override;
+    std::vector<RefPtr<TextInputResponseArea>> GetAllResponseArea() const override
+    {
+        return { cleanNodeResponseArea_, passwordResponseArea_ };
+    }
 
-    // Public for RichEditorModelNG access
-    RefPtr<FrameNode> GetHost() const override;
     void MarkCancelButtonDirty() { cancelButtonDirty_ = true; }
+    bool RequestKeyboard(bool isFocusViewChanged, bool needStartTwinkling, bool needShowSoftKeyboard,
+        SourceType sourceType = SourceType::NONE);
+
+    // Tab focus navigation (shared logic via CleanNodeHostBase CRTP)
+    bool HandleOnTab(bool backward) override;
+    bool HandleSwithFocus(FocuseIndex index);
+    void FocusForwardStopTwinkling();
+    void PaintCancelRect();
+    void PaintTextRect();
+    void GetInnerFocusPaintRect(RoundRect& paintRect);
+    bool CancelNodeIsShow() const;
+    bool ProcessFocusIndexAction();
+    bool HandleSpaceKeyClickEvent();
+    void CleanNodeResponseKeyEvent();
+    FocuseIndex GetFocusIndex() const
+    {
+        return focusIndex_;
+    }
+    const std::unordered_map<FocuseIndex, FocuseIndex>& GetFocusForwardMap() const;
+    const std::unordered_map<FocuseIndex, FocuseIndex>& GetFocusBackwardMap() const;
+
+    Color GetUnderlineColor() const;
+    Dimension GetUnderlineWidth() const;
+    void UpdateUnderlineStyle();
+    void UpdateUnderlineErrorStyle();
+    const RectF& GetFrameRect() const
+    {
+        return frameRect_;
+    }
 
 protected:
     RefPtr<TextSelectOverlay> GetOrCreateSelectOverlay() override;
@@ -1085,6 +1301,7 @@ protected:
 
 private:
     friend class RichEditorSelectOverlay;
+    friend class AutoFillHostBase<RichEditorPattern, RichEditorLayoutProperty>;
     friend class OneStepDragController;
     friend class RichEditorUndoManager;
     friend class StyledStringUndoManager;
@@ -1099,6 +1316,7 @@ private:
     friend class RichEditorFreeScrollController;
     friend class RichEditorBaseController;
     friend class RichEditorModelNG;
+    friend class PasswordIconHostBase<RichEditorPattern, RichEditorLayoutProperty>;
     bool ParseCommand(const std::string& command);
     bool HandleUrlSpanClickEvent(const GestureEvent& info);
     void HandleUrlSpanForegroundClear();
@@ -1247,7 +1465,7 @@ private:
     // REQUIRES: 0 <= start < end
     std::vector<RefPtr<SpanNode>> GetParagraphNodes(int32_t start, int32_t end) const;
     std::pair<int32_t, int32_t> CalcSpansRange(const std::vector<RefPtr<SpanNode>>& spanNodes) const;
-    void OnHover(bool isHover, const HoverInfo& info);
+    void OnHover(bool isHover, const HoverInfo& info) override;
     void ChangeMouseStyle(MouseFormat format, bool freeMouseHoldNode = false);
 
     // ICleanNodeHost implementations
@@ -1257,8 +1475,6 @@ private:
     bool HasUserAccessibilityText() const override;
     bool GetIsDisabled() const override;
     // ICleanNodeHost behavioral hooks
-    void SetCleanHoverColorAndRect(const RoundRect& rect, uint32_t color) override;
-    void ClearCleanHoverColorAndRects() override;
     void OnCleanNodeHoverEnter() override;
     bool IsCancelButtonTouched() const override;
     void SetCancelButtonTouched(bool touched) override;
@@ -1273,8 +1489,6 @@ private:
         return cleanNodeResponseArea_;
     }
     void SetCancelButtonIconColor(const Color& color);
-    bool RequestKeyboard(bool isFocusViewChanged, bool needStartTwinkling, bool needShowSoftKeyboard,
-        SourceType sourceType = SourceType::NONE);
     void UpdateCaretInfoToController();
     IMEClient GetIMEClientInfo();
     void FireOnWillAttachIME(IMEClient& imeClient);
@@ -1373,6 +1587,7 @@ private:
     void AdjustCursorPosition(int32_t& pos);
     void AdjustPlaceholderSelection(int32_t& start, int32_t& end, const Offset& pos);
     bool AdjustWordSelection(int32_t& start, int32_t& end);
+    bool AdjustWordSelectionForPassword(int32_t& start, int32_t& end);
     bool IsTouchAtLineEnd(int32_t caretPos, const Offset& textOffset);
     bool IsTouchBeforeCaret(int32_t caretPos, const Offset& textOffset);
     bool IsClickBoundary(const int32_t position);
@@ -1508,6 +1723,19 @@ private:
     bool isCursorAlwaysDisplayed_ = false;
     bool isClickOnAISpan_ = false;
     bool isOnlyRequestFocus_ = false;
+
+    // Autofill request lifecycle
+    std::string lastAutoFillTextValue_;
+    bool isFillRequestFinish_ = true;
+    uint32_t autoFillSessionId_ = 0;
+    bool autoFillRequestSuccessOnFocus_ = false;
+    bool shouldSkipAutoFillOnFocus_ = false;
+    WeakPtr<FrameNode> firstAutoFillContainerNode_;
+
+    // AutoFill IME bridge state — set by IMF PrivateCommand, consumed by ProcessAutoFill.
+    std::string autoFillUserName_;
+    std::string autoFillNewPassword_;
+    bool autoFillOtherAccount_ = false;
     int32_t moveLength_ = 0;
     int32_t insertValueLength_ = 0;
     int32_t lastCaretPosition_ = 0;
@@ -1570,10 +1798,8 @@ private:
     bool isInterceptMouseRightRelease_ = false;
     bool isEditing_ = false;
     int32_t dragPosition_ = 0;
-    // Action when "enter" pressed.
-    TextInputAction action_ = TextInputAction::NEW_LINE;
-    // What the keyboard appears.
-    TextInputType keyboard_ = TextInputType::UNSPECIFIED;
+    SpanStringModeSwitcher modeSwitcher_;
+    RefPtr<NG::PasswordResponseArea> passwordResponseArea_;
     ACE_DISALLOW_COPY_AND_MOVE(RichEditorPattern);
     int32_t richEditorInstanceId_ = -1;
     int32_t frameId_ = -1;
@@ -1627,6 +1853,7 @@ private:
     bool GetPreviewReplaceRange(int32_t& start, int32_t& length);
     void FilterWithInputFilter(std::u16string& text);
     std::u16string GetActiveFilter();
+    std::string GetInputFilter() const;
     bool PrepareFilter(std::function<bool(const std::u16string&)>& onError);
     bool FilterInitializeText(const std::u16string& oldText = u"");
     bool TryRestoreFilteredContent(const std::u16string& originalContent,
@@ -1669,11 +1896,15 @@ private:
     bool lastContentEmptyForCancel_ = true;
     bool cancelButtonDirty_ = true;
     bool cancelButtonTouched_ = false;
+    FocuseIndex focusIndex_ = FocuseIndex::TEXT;
     std::string lastReportSelectionText_ = "";
 
     // ===== counter members =====
     RefPtr<CounterDecorator> counterDecorator_;
     bool showCountBorderStyle_ = false;
+
+    Color underlineColor_ = Color::TRANSPARENT;
+    Dimension underlineWidth_ = 0.0_vp;
 
 #if defined(CROSS_PLATFORM)
     std::shared_ptr<TextEditingValue> editingValue_;

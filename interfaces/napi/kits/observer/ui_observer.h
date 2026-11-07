@@ -17,6 +17,7 @@
 #define FOUNDATION_ACE_INTERFACES_OBSERVER_H
 
 #include <list>
+#include <memory>
 #include <optional>
 #include <unordered_map>
 #include <string>
@@ -24,8 +25,6 @@
 #include "napi/native_api.h"
 #include "napi/native_common.h"
 #include "napi/native_node_api.h"
-
-#include "ui_observer_listener.h"
 
 #include "core/components_ng/base/observer_handler.h"
 #include "core/components_ng/gestures/recognizers/gesture_recognizer.h"
@@ -35,6 +34,8 @@ class NodeRenderStatusMonitor;
 }
 
 namespace OHOS::Ace::Napi {
+class RenderLayoutObserverListener;
+class UIObserverListener;
 class UIObserver {
 public:
     struct NodeRenderListener {
@@ -77,10 +78,11 @@ public:
         int32_t uiContextInstanceId, const std::shared_ptr<UIObserverListener>& listener);
     static void UnRegisterWinSizeLayoutBreakpointCallback(int32_t uiContextInstanceId, napi_value callback);
     static void HandleWinSizeLayoutBreakpointChange(int32_t instanceId, const WindowSizeBreakpoint& info);
-    static void RegisterDrawCallback(int32_t uiContextInstanceId, const std::shared_ptr<UIObserverListener>& listener);
+    static void RegisterDrawCallback(
+        int32_t uiContextInstanceId, const std::shared_ptr<RenderLayoutObserverListener>& listener);
     static void UnRegisterDrawCallback(int32_t uiContextInstanceId, napi_value callback);
     static void RegisterLayoutCallback(
-        int32_t uiContextInstanceId, const std::shared_ptr<UIObserverListener>& listener);
+        int32_t uiContextInstanceId, const std::shared_ptr<RenderLayoutObserverListener>& listener);
     static void UnRegisterLayoutCallback(int32_t uiContextInstanceId, napi_value callback);
     static void HandDrawCommandSendChange();
     static void HandLayoutDoneChange();
@@ -192,6 +194,11 @@ public:
         const std::shared_ptr<UIObserverListener>& listener, const RefPtr<NG::NodeRenderStatusMonitor>& monitor);
     static void UnRegisterNodeRenderStateChangeCallback(
         RefPtr<NG::FrameNode> frameNode, napi_value callback, const RefPtr<NG::NodeRenderStatusMonitor>& monitor);
+    static void RegisterNodeSensitiveInputCallback(RefPtr<NG::FrameNode> frameNode,
+        const std::shared_ptr<UIObserverListener>& listener, napi_value callback);
+    static void UnRegisterNodeSensitiveInputCallback(RefPtr<NG::FrameNode> frameNode, napi_value callback);
+    static void HandleNodeSensitiveInput(
+        const RefPtr<NG::FrameNode>& frameNode, const NG::NodeSensitiveInputInfo& info);
 
     static bool ParseStringFromNapi(napi_env env, napi_value val, std::string& str);
     static bool MatchValueType(napi_env env, napi_value value, napi_valuetype targetType);
@@ -208,6 +215,8 @@ private:
     static void GetAbilityInfos(napi_env env, napi_value abilityContext, NG::AbilityContextInfo& info);
     static napi_env GetCurrentNapiEnv();
     static napi_value GetContextValue();
+    static void DispatchDrawOrLayout(int32_t instanceId, bool isDraw);
+    static void DispatchDrawOrLayoutOnCurrentThread(int32_t instanceId, bool isDraw);
 
     static std::list<std::shared_ptr<UIObserverListener>> unspecifiedNavigationListeners_;
     static std::unordered_map<std::string, std::list<std::shared_ptr<UIObserverListener>>>
@@ -259,9 +268,9 @@ private:
         specifiedAfterPanEndListeners_;
     static std::unordered_map<NG::FrameNode*, std::shared_ptr<NodeRenderListener>>
         specifiedNodeRenderStateListeners_;
+    static std::unordered_map<NG::FrameNode*, std::list<std::shared_ptr<UIObserverListener>>>
+        specifiedNodeSensitiveInputListeners_;
     
-    static std::unordered_map<int32_t, std::list<std::shared_ptr<UIObserverListener>>> specifiedDrawListeners_;
-    static std::unordered_map<int32_t, std::list<std::shared_ptr<UIObserverListener>>> specifiedLayoutListeners_;
     static std::list<std::shared_ptr<UIObserverListener>> textChangeEventListeners_;
     static std::unordered_map<std::string, std::list<std::shared_ptr<UIObserverListener>>>
         specifiedTextChangeEventListeners_;

@@ -147,9 +147,13 @@ private:
     void UpdateStartingWindowProperty(const Rosen::SessionInfo& sessionInfo,
         Color &color, ImageSourceInfo &sourceInfo);
     bool IsSnapshotSizeChanged();
+    bool CheckAndHandleStartWithSnapshot();
     bool CheckAndHandleRestartApp();
     bool CheckAndAddStartingWindowAboveLocked();
     bool CheckAndAddStartingWindowForPrelaunch();
+    void HandlePrelaunchConnect(const RefPtr<FrameNode>& host);
+    void HandleStateDisconnect(const RefPtr<FrameNode>& host);
+    void HandleDefaultAttach(const RefPtr<FrameNode>& host);
     void HideStartingWindow();
     void AddBackgroundColorDelayed();
     CancelableCallback<void()> interruptStartingTask_;

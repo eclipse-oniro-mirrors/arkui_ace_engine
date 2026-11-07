@@ -290,7 +290,7 @@ bool DOMTextarea::AddSpecializedEvent(int32_t pageId, const std::string& event)
 void DOMTextarea::CallSpecializedMethod(const std::string& method, const std::string& args)
 {
     if (method == DOM_INPUT_METHOD_DELETE) {
-        auto textField = AceType::DynamicCast<TextFieldComponent>(textAreaChild_);
+        auto textField = textAreaChild_;
         if (!textField) {
             return;
         }

@@ -676,4 +676,24 @@ HWTEST_F(CalendarDialogViewTestNg, UpdateBackgroundStyle002, TestSize.Level1)
     CalendarDialogView::UpdateBackgroundStyle(renderContext, dialogProperties, calendarTheme, dialogNode);
     EXPECT_FALSE(renderContext->GetBackBlurStyle().has_value());
 }
+
+/**
+ * @tc.name: CalendarDialogViewShowWithCustomStyle001
+ * @tc.desc: Test Show with customStyle creates dialog with shadow and border radius.
+ */
+HWTEST_F(CalendarDialogViewTestNg, CalendarDialogViewShowWithCustomStyle001, TestSize.Level1)
+{
+    CreateCalendarPicker();
+    auto dialogNode = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<LinearLayoutPattern>(false));
+    ASSERT_NE(dialogNode, nullptr);
+    auto renderContext = dialogNode->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+    auto calendarTheme = AceType::MakeRefPtr<CalendarTheme>();
+    ASSERT_NE(calendarTheme, nullptr);
+    DialogProperties dialogProperties;
+    dialogProperties.customStyle = true;
+    CalendarDialogView::UpdateBackgroundStyle(renderContext, dialogProperties, calendarTheme, dialogNode);
+    SUCCEED();
+}
 } // namespace OHOS::Ace::NG

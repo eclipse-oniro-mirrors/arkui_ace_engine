@@ -25,12 +25,252 @@
 #include "core/components_ng/layout/utils.h"
 #include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
+#include "core/components_ng/pattern/lazy_layout/prepared_layout_geometry.h"
 #include "core/components_ng/pattern/lazy_grid_layout/lazy_grid_layout_pattern.h"
 #include "core/components_ng/property/measure_utils.h"
 #include "core/components_ng/property/position_property.h"
 #include "core/components_ng/property/templates_parser.h"
 
 namespace OHOS::Ace::NG {
+
+std::optional<LazyPremeasureResult> LazyGridLayoutAlgorithm::Premeasure(LayoutWrapper* layoutWrapper)
+{
+    LazyGridLayoutAlgorithm measure(layoutInfo_);
+    measure.axis_ = axis_;
+    measure.header_ = header_;
+    measure.footer_ = footer_;
+    if (isDynamicLayout_ || axis_ != Axis::VERTICAL) {
+        return std::nullopt;
+    }
+    return measure.MeasureBoundaryRange(layoutWrapper);
+}
+
+std::optional<bool> LazyGridLayoutAlgorithm::MeasureBoundaryLine(
+    LayoutWrapper* layoutWrapper, int32_t first, int32_t last, float& size)
+{
+    size = 0.0f;
+    for (int32_t index = first; index <= last; ++index) {
+        const bool displayed = (index >= layoutInfo_->startIndex_ && index <= layoutInfo_->endIndex_) ||
+            (index >= layoutInfo_->cachedStartIndex_ && index <= layoutInfo_->cachedEndIndex_);
+        auto child = layoutWrapper->GetOrCreateChildByIndex(GetRawIndexForItem(index), false, !displayed);
+        CHECK_NULL_RETURN(child, false);
+        // Nested lazy sections are supported by LazyColumn, not packed into a grid cell.
+        if (child->GetLayoutProperty()->GetNeedLazyLayout()) {
+            return std::nullopt;
+        }
+        child->Measure(childLayoutConstraints_[index - first]);
+        CHECK_NULL_RETURN(LazyLayoutUtils::IsChildMeasureComplete(child), false);
+        const float mainSize = child->GetGeometryNode()->GetMarginFrameSize().MainSize(axis_);
+        if (!std::isfinite(mainSize) || Negative(mainSize)) {
+            return false;
+        }
+        size = std::max(size, mainSize);
+    }
+    return true;
+}
+
+std::optional<LazyPremeasureResult> LazyGridLayoutAlgorithm::MeasureBoundaryRange(LayoutWrapper* layoutWrapper)
+{
+    OptionalSizeF ideal;
+    CHECK_NULL_RETURN(PrepareBoundaryMeasure(layoutWrapper, ideal), std::nullopt);
+    const float oldTotal = layoutInfo_->totalMainSize_;
+    const float oldHeader = layoutInfo_->headerMainSize_;
+    prevBodyMainSize_ = std::max(0.0f, oldTotal - oldHeader - layoutInfo_->footerMainSize_);
+    const auto oldAdjust = layoutInfo_->adjustOffset_;
+    const auto anchor = layoutInfo_->posMap_.find(layoutInfo_->startIndex_);
+    const std::optional<float> oldAnchor = anchor == layoutInfo_->posMap_.end()
+        ? std::nullopt : std::optional<float>(anchor->second.startPos + oldHeader);
+    MeasureHeader(layoutWrapper);
+    MeasureFooter(layoutWrapper);
+    layoutInfo_->SetLanes(lanes_);
+    layoutInfo_->SetSpace(spaceWidth_);
+    layoutInfo_->SetTotalItemCount(totalItemCount_);
+    const auto& property = layoutWrapper->GetLayoutProperty();
+    auto result = MeasureBoundaryLines(layoutWrapper, property->GetContentLayoutConstraint()->viewPosRef.value());
+    const bool accepted = FinishBoundaryMeasure(result, oldTotal, oldHeader, oldAnchor);
+    CapturePreparedGeometry(*result.geometry);
+    result.unsupported = result.unsupported || !accepted;
+    // Only the caller owns the new compensation. Preserve any previously pending normal-layout adjustment.
+    layoutInfo_->adjustOffset_ = oldAdjust;
+    result.complete = result.complete && !result.unsupported;
+    result.reachedOppositeEdge = result.reachedOppositeEdge && result.complete;
+    SetFrameSize(layoutWrapper, ideal, property->CreatePaddingAndBorder());
+    result.marginMainSize = layoutWrapper->GetGeometryNode()->GetMarginFrameSize().Height();
+    return result;
+}
+
+bool LazyGridLayoutAlgorithm::PrepareBoundaryMeasure(LayoutWrapper* layoutWrapper, OptionalSizeF& ideal)
+{
+    CHECK_NULL_RETURN(layoutWrapper, false);
+    auto property = AceType::DynamicCast<LazyGridLayoutProperty>(layoutWrapper->GetLayoutProperty());
+    CHECK_NULL_RETURN(property && layoutInfo_ && property->GetContentLayoutConstraint(), false);
+    const auto& constraint = property->GetContentLayoutConstraint().value();
+    CHECK_NULL_RETURN(constraint.viewPosRef, false);
+    knownMainSize_ = constraint.viewPosRef->knownMainSize;
+    // A fixed/clipped frame end is not necessarily the content end used by this boundary walk.
+    if (constraint.selfIdealSize.Height() || Positive(constraint.minSize.Height()) ||
+        !GreaterOrEqualToInfinity(constraint.maxSize.Height())) {
+        return false;
+    }
+    UpdateHeaderFooterIndexes(layoutWrapper);
+    totalItemCount_ = CalculateItemCount(layoutWrapper);
+    ideal = CreateIdealSize(constraint, axis_, property->GetMeasureType());
+    ResolveContentCrossSize(constraint, ideal);
+    UpdateGap(property, ideal);
+    auto childConstraint = property->CreateChildConstraint();
+    UpdateGridItemConstraint(ideal, childConstraint);
+    return true;
+}
+
+LazyPremeasureResult LazyGridLayoutAlgorithm::MeasureBoundaryLines(
+    LayoutWrapper* layoutWrapper, const ViewPosReference& reference)
+{
+    LazyPremeasureResult result;
+    const auto range = LazyLayoutUtils::CalculateViewRange(reference,
+        prevBodyMainSize_ + layoutInfo_->headerMainSize_ + layoutInfo_->footerMainSize_);
+    const bool forward = reference.referenceEdge == ReferenceEdge::START;
+    result.geometry = std::make_shared<PreparedLayoutGeometry>();
+    result.geometry->fromEnd = !forward;
+    const float limit = (forward ? range.end : range.start) - layoutInfo_->headerMainSize_;
+    float cursor = forward ? 0.0f : prevBodyMainSize_;
+    int32_t index = forward ? 0 : totalItemCount_ - 1;
+    result.complete = true;
+    while (index >= 0 && index < totalItemCount_ &&
+        (forward ? LessNotEqual(cursor, limit) : GreatNotEqual(cursor, limit))) {
+        const int32_t first = LanesFloor(index);
+        const int32_t last = LanesCeil(index);
+        float size = 0.0f;
+        const auto measured = MeasureBoundaryLine(layoutWrapper, first, last, size);
+        if (!measured || !measured.value()) {
+            result.complete = false;
+            result.unsupported = !measured;
+            break;
+        }
+        const float start = forward ? cursor : cursor - size;
+        for (int32_t item = first; item <= last; ++item) {
+            layoutInfo_->SetPosMap(item, { item - first, start, start + size });
+            result.geometry->positions.try_emplace(item);
+        }
+        index = forward ? last + 1 : first - 1;
+        cursor = forward ? start + size + spaceWidth_ : start - spaceWidth_;
+    }
+    result.reachedOppositeEdge = result.complete && (index < 0 || index >= totalItemCount_);
+    return result;
+}
+
+void LazyGridLayoutAlgorithm::CapturePreparedGeometry(PreparedLayoutGeometry& geometry) const
+{
+    geometry.type = PreparedLayoutType::GRID;
+    geometry.itemCount = totalItemCount_;
+    geometry.lanes = lanes_;
+    geometry.bodyMainSize = layoutInfo_->totalMainSize_ - layoutInfo_->headerMainSize_ - layoutInfo_->footerMainSize_;
+    geometry.headerMainSize = layoutInfo_->headerMainSize_;
+    geometry.footerMainSize = layoutInfo_->footerMainSize_;
+    geometry.space = spaceWidth_;
+    geometry.estimatedItemSize = layoutInfo_->estimateItemSize_;
+    const float origin = geometry.fromEnd ? geometry.bodyMainSize : 0.0f;
+    for (auto& [index, item] : geometry.positions) {
+        const auto& position = layoutInfo_->posMap_.at(index);
+        item = { position.startPos - origin, position.endPos - origin, position.laneIdx };
+    }
+}
+
+bool LazyGridLayoutAlgorithm::FinishBoundaryMeasure(LazyPremeasureResult& result, float oldTotal, float oldHeader,
+    const std::optional<float>& oldAnchor)
+{
+    layoutInfo_->totalMainSize_ = prevBodyMainSize_;
+    bool accepted = true;
+    if (totalItemCount_ > 0 || knownMainSize_) {
+        if (!Positive(layoutInfo_->estimateItemSize_)) {
+            layoutInfo_->EstimateBoundaryItemSize();
+        }
+        accepted = layoutInfo_->UpdatePosMap(prevBodyMainSize_, GetKnownBodySize());
+    } else {
+        layoutInfo_->totalMainSize_ = 0.0f;
+    }
+    totalMainSize_ = layoutInfo_->totalMainSize_ + layoutInfo_->headerMainSize_ + layoutInfo_->footerMainSize_;
+    layoutInfo_->totalMainSize_ = totalMainSize_;
+    layoutInfo_->premeasuredMainSize_ = totalMainSize_;
+    const auto anchor = layoutInfo_->posMap_.find(layoutInfo_->startIndex_);
+    if (oldAnchor && anchor != layoutInfo_->posMap_.end()) {
+        result.adjust.start = anchor->second.startPos + layoutInfo_->headerMainSize_ - oldAnchor.value();
+    }
+    RebasePremeasureWindow(oldAnchor ? result.adjust.start - layoutInfo_->headerMainSize_ + oldHeader : 0.0f);
+    result.adjust.end = totalMainSize_ - oldTotal - result.adjust.start;
+    return accepted;
+}
+
+std::optional<float> LazyGridLayoutAlgorithm::GetKnownBodySize() const
+{
+    if (!knownMainSize_) {
+        return std::nullopt;
+    }
+    return knownMainSize_.value() - layoutInfo_->headerMainSize_ - layoutInfo_->footerMainSize_;
+}
+
+AdjustOffset LazyGridLayoutAlgorithm::PrepareKnownBodyMeasure()
+{
+    const auto knownBody = GetKnownBodySize();
+    CHECK_NULL_RETURN(knownBody && !isDynamicLayout_, AdjustOffset());
+    layoutInfo_->SetLanes(lanes_);
+    layoutInfo_->SetSpace(spaceWidth_);
+    layoutInfo_->SetTotalItemCount(totalItemCount_);
+    CHECK_NULL_RETURN(layoutInfo_->ApplyKnownBodySize(prevBodyMainSize_, knownBody.value()), AdjustOffset());
+    const auto adjust = layoutInfo_->adjustOffset_;
+    prevBodyMainSize_ = layoutInfo_->totalMainSize_;
+    totalMainSize_ = prevBodyMainSize_ + layoutInfo_->headerMainSize_ + layoutInfo_->footerMainSize_;
+    RebasePremeasureWindow(adjust.start);
+    layoutInfo_->adjustOffset_ = {};
+    return hadMeasuredItems_ ? adjust : AdjustOffset();
+}
+
+AdjustOffset LazyGridLayoutAlgorithm::MeasureInitialEdges(LayoutWrapper* layoutWrapper)
+{
+    MeasureHeader(layoutWrapper);
+    if (knownMainSize_) {
+        MeasureFooter(layoutWrapper);
+    }
+    return PrepareKnownBodyMeasure();
+}
+
+void LazyGridLayoutAlgorithm::RebasePremeasureWindow(float bodyAnchorAdjust)
+{
+    // Retain the same displayed/cached indexes; only their body-coordinate bookkeeping changes.
+    const float bodyEnd = totalMainSize_ - layoutInfo_->headerMainSize_ - layoutInfo_->footerMainSize_;
+    auto first = layoutInfo_->posMap_.find(layoutInfo_->layoutedStartIndex_);
+    if (layoutInfo_->layoutedStartIndex_ >= totalItemCount_) {
+        layoutInfo_->layoutedStart_ = bodyEnd;
+    } else if (first != layoutInfo_->posMap_.end()) {
+        layoutInfo_->layoutedStart_ = first->first == 0 ? 0.0f : first->second.startPos - spaceWidth_;
+    }
+    auto last = layoutInfo_->posMap_.find(layoutInfo_->layoutedEndIndex_);
+    if (layoutInfo_->layoutedEndIndex_ >= totalItemCount_ - 1) {
+        layoutInfo_->layoutedEnd_ = bodyEnd;
+    } else if (last != layoutInfo_->posMap_.end()) {
+        layoutInfo_->layoutedEnd_ = last->second.endPos + spaceWidth_;
+    }
+    layoutInfo_->cacheStartPos_ += bodyAnchorAdjust;
+    layoutInfo_->cacheEndPos_ += bodyAnchorAdjust;
+}
+
+bool LazyGridLayoutAlgorithm::ShouldSeedFromKnownTail() const
+{
+    if (!knownMainSize_ || !Positive(prevBodyMainSize_)) {
+        return false;
+    }
+    const float lastMeasuredEnd = layoutInfo_->posMap_.empty() ? 0.0f : layoutInfo_->posMap_.rbegin()->second.endPos;
+    return GreatNotEqual(startPos_ - lastMeasuredEnd, prevBodyMainSize_ - startPos_);
+}
+
+bool LazyGridLayoutAlgorithm::ShouldSeedFromKnownHead() const
+{
+    if (!knownMainSize_ || !Positive(prevBodyMainSize_)) {
+        return false;
+    }
+    const float firstMeasuredStart = layoutInfo_->posMap_.empty() ? prevBodyMainSize_ :
+        layoutInfo_->posMap_.begin()->second.startPos;
+    return LessNotEqual(endPos_, firstMeasuredStart - endPos_);
+}
 
 void LazyGridLayoutAlgorithm::ShiftLayoutWindow(float delta)
 {
@@ -52,11 +292,15 @@ void LazyGridLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     CHECK_NULL_VOID(layoutProperty);
     auto hostNode = layoutWrapper->GetHostNode();
     auto pattern = hostNode ? hostNode->GetPattern<LazyLayoutPattern>() : nullptr;
+    if (LazyLayoutUtils::MeasurePreparedBoundary(AceType::RawPtr(pattern))) {
+        return;
+    }
     if (pattern) {
         pattern->NotifyParentOnStickyHeaderChange();
     }
     const auto& padding = layoutProperty->CreatePaddingAndBorder();
     auto contentConstraint = layoutProperty->GetContentLayoutConstraint().value();
+    knownMainSize_ = contentConstraint.viewPosRef ? contentConstraint.viewPosRef->knownMainSize : std::nullopt;
     auto contentIdealSize = CreateIdealSize(contentConstraint, axis_, layoutProperty->GetMeasureType());
     ResolveContentCrossSize(contentConstraint, contentIdealSize);
     realMainSize_ = layoutWrapper->GetGeometryNode()->GetPaddingSize().MainSize(axis_);
@@ -67,7 +311,7 @@ void LazyGridLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     UpdateGridItemConstraint(contentIdealSize, childLayoutConstraint);
 
     // Header first: UpdateReferencePos needs this frame's header to convert the viewport to body coords.
-    MeasureHeader(layoutWrapper);
+    const auto knownAdjust = MeasureInitialEdges(layoutWrapper);
     UpdateReferencePos(layoutWrapper, contentConstraint.viewPosRef);
 
     // Section extent was needed above for backward-anchor conversion; item-window math below is body-local.
@@ -81,15 +325,27 @@ void LazyGridLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
 
     MeasureItemsByMode(layoutWrapper, padding);
 
-    MeasureFooter(layoutWrapper);
-    totalMainSize_ += layoutInfo_->headerMainSize_ + layoutInfo_->footerMainSize_;
-    layoutInfo_->totalMainSize_ = totalMainSize_;
+    UpdateMeasuredMainSize(layoutWrapper, knownAdjust);
 
     SetFrameSize(layoutWrapper, contentIdealSize, padding);
 }
 
+void LazyGridLayoutAlgorithm::UpdateMeasuredMainSize(
+    LayoutWrapper* layoutWrapper, const AdjustOffset& knownAdjust)
+{
+    if (!knownMainSize_) {
+        MeasureFooter(layoutWrapper);
+    }
+    totalMainSize_ += layoutInfo_->headerMainSize_ + layoutInfo_->footerMainSize_;
+    layoutInfo_->totalMainSize_ = totalMainSize_;
+    layoutInfo_->adjustOffset_.start += knownAdjust.start;
+    layoutInfo_->adjustOffset_.end += knownAdjust.end;
+}
+
 void LazyGridLayoutAlgorithm::MeasureItemsByMode(LayoutWrapper* layoutWrapper, const PaddingPropertyF& padding)
 {
+    const bool updateKnownSize = knownMainSize_ && (totalItemCount_ == 0 || isEstimatePass_ ||
+        (!layoutInfo_->deadline_ && (needAllLayout_ || needSkipLayout_)));
     if (totalItemCount_ == 0) {
         layoutInfo_->SetTotalItemCount(0);
         totalMainSize_ = 0.0f;
@@ -102,6 +358,11 @@ void LazyGridLayoutAlgorithm::MeasureItemsByMode(LayoutWrapper* layoutWrapper, c
     } else if (!needSkipLayout_) {
         MeasureGridItemLazy(layoutWrapper);
     }
+    if (updateKnownSize) {
+        layoutInfo_->UpdatePosMap(prevBodyMainSize_, GetKnownBodySize());
+        totalMainSize_ = layoutInfo_->totalMainSize_;
+    }
+    layoutInfo_->premeasuredMainSize_.reset();
 }
 
 void LazyGridLayoutAlgorithm::ResolveContentCrossSize(
@@ -119,6 +380,8 @@ void LazyGridLayoutAlgorithm::ResolveContentCrossSize(
 
 void LazyGridLayoutAlgorithm::CaptureFrameBaseline()
 {
+    // Keep the committed baseline identifiable until this frame selects its measured window.
+    realMainSize_ = layoutInfo_->premeasuredMainSize_.value_or(realMainSize_);
     totalMainSize_ = layoutInfo_->totalMainSize_;
     // Edge sizes still hold last frame's values here.
     prevBodyMainSize_ = std::max(0.0f, totalMainSize_ - layoutInfo_->headerMainSize_ - layoutInfo_->footerMainSize_);
@@ -565,7 +828,7 @@ void LazyGridLayoutAlgorithm::MeasureGridItemLazy(LayoutWrapper* layoutWrapper)
         }
     }
     CheckRecycle();
-    layoutInfo_->UpdatePosMap(prevBodyMainSize_);
+    layoutInfo_->UpdatePosMap(prevBodyMainSize_, GetKnownBodySize());
     ShiftLayoutWindow(layoutInfo_->adjustOffset_.start);
     if (!hadMeasuredItems_) {
         // First layout: no parent anchor to preserve.
@@ -582,8 +845,8 @@ void LazyGridLayoutAlgorithm::MeasureGridItemLazy(LayoutWrapper* layoutWrapper)
 
 void LazyGridLayoutAlgorithm::GetStartIndexInfo(int32_t& index, float& pos)
 {
-    // Clamp against the body extent (skipped on the first layout: extent unknown, measure from item 0 instead).
-    if (hadMeasuredItems_ && GreatNotEqual(startPos_, prevBodyMainSize_)) {
+    // An unknown first-frame extent cannot be used to seed a tail window.
+    if ((hadMeasuredItems_ || knownMainSize_) && GreatNotEqual(startPos_, prevBodyMainSize_)) {
         index = layoutInfo_->totalItemCount_;
         pos = prevBodyMainSize_;
         return;
@@ -591,16 +854,26 @@ void LazyGridLayoutAlgorithm::GetStartIndexInfo(int32_t& index, float& pos)
         pos = 0.0f;
         index = -1;
         return;
-    } else if (LessOrEqual(startPos_, 0) || layoutInfo_->endIndex_ < 0) {
+    }
+    if (ShouldSeedFromKnownTail()) {
+        index = totalItemCount_;
+        pos = prevBodyMainSize_ + spaceWidth_;
+        return;
+    }
+    const bool prepared = layoutInfo_->premeasuredMainSize_.has_value() || knownMainSize_.has_value();
+    if (LessOrEqual(startPos_, 0) || layoutInfo_->posMap_.empty() || (!prepared && layoutInfo_->endIndex_ < 0)) {
         pos = 0.0f;
         index = 0;
         return;
     }
     auto it = layoutInfo_->posMap_.find(layoutInfo_->startIndex_);
     if (it == layoutInfo_->posMap_.end()) {
-        pos = 0.0f;
-        index = 0;
-        return;
+        if (!layoutInfo_->premeasuredMainSize_ && !knownMainSize_) {
+            index = 0;
+            pos = 0.0f;
+            return;
+        }
+        it = layoutInfo_->posMap_.begin();
     }
     auto nextIt = it;
     ++nextIt;
@@ -633,7 +906,7 @@ void LazyGridLayoutAlgorithm::GetEndIndexInfo(int32_t& index, float& pos)
         index = -1;
         pos = 0;
         return;
-    } else if (hadMeasuredItems_ && GreatNotEqual(startPos_, prevBodyMainSize_)) {
+    } else if ((hadMeasuredItems_ || knownMainSize_) && GreatNotEqual(startPos_, prevBodyMainSize_)) {
         index = totalItemCount_;
         pos = prevBodyMainSize_;
         return;
@@ -642,11 +915,19 @@ void LazyGridLayoutAlgorithm::GetEndIndexInfo(int32_t& index, float& pos)
         index = LanesCeil(totalItemCount_ - 1);
         return;
     }
+    if (ShouldSeedFromKnownHead()) {
+        index = -1;
+        pos = -spaceWidth_;
+        return;
+    }
     auto it = layoutInfo_->posMap_.find(layoutInfo_->endIndex_);
     if (it == layoutInfo_->posMap_.end()) {
-        pos = prevBodyMainSize_;
-        index = LanesCeil(layoutInfo_->totalItemCount_ - 1);
-        return;
+        if (!layoutInfo_->premeasuredMainSize_ || layoutInfo_->posMap_.empty()) {
+            pos = prevBodyMainSize_;
+            index = LanesCeil(layoutInfo_->totalItemCount_ - 1);
+            return;
+        }
+        it = std::prev(layoutInfo_->posMap_.end());
     }
     std::reverse_iterator<std::map<int, GridItemMainPos>::iterator> rit(++it);
     auto nextIt = rit;
@@ -1035,9 +1316,9 @@ void LazyGridLayoutAlgorithm::LayoutCachedItemsBackward(LayoutWrapper* layoutWra
     auto rIter = layoutInfo_->posMap_.rbegin();
     // h/f/s: see note in LayoutCachedItemsForward — sentinel uses body-local end (bodyEnd) to match cacheStartPos_.
     const float bodyEnd = totalMainSize_ - layoutInfo_->headerMainSize_ - layoutInfo_->footerMainSize_;
-    if (layoutInfo_->startIndex_ == 0) {
+    if (layoutInfo_->startIndex_ <= 0) {
         layoutedStart_ = 0.0f;
-        cachedStartIndex_ = 0;
+        cachedStartIndex_ = layoutInfo_->startIndex_;
     } else if (layoutInfo_->startIndex_ >= totalItemCount_) {
         layoutedStart_ = bodyEnd;
         cachedStartIndex_ = totalItemCount_;
@@ -1085,10 +1366,10 @@ bool LazyGridLayoutAlgorithm::InitPredictForwardState(int32_t& currIndex, int32_
     currLane = 0;
     currPos = layoutedEnd;
     mainSize = 0.0f;
-    // Allow forward prediction when not yet laid out (currIndex<0) and forward layout,
-    // or when already laid out (currIndex>=0) and item exists in posMap
-    if (currIndex < 0 && forwardLayout_) {
+    // Before-first is a head anchor whatever the parent's reference edge, unless the grid can only start from its tail.
+    if (currIndex < 0 && !StartsFromTail()) {
         currIndex = -1;
+        currLane = -1;
         return true;
     } else if (currIndex >= 0 && layoutInfo_->posMap_.find(currIndex) != layoutInfo_->posMap_.end()) {
         auto iter = layoutInfo_->posMap_.find(currIndex);
@@ -1164,10 +1445,13 @@ bool LazyGridLayoutAlgorithm::InitPredictBackwardState(int32_t& currIndex, int32
     currLane = lanes_ - 1;
     currPos = layoutedStart;
     mainSize = 0.0f;
-    // Allow backward prediction when not yet laid out (currIndex<0) and backward layout,
-    // or when already laid out (currIndex>=0) and item exists in posMap
-    if (currIndex < 0 && !forwardLayout_) {
+    // Only the past-last sentinel anchors the tail; a negative index is before the grid unless it starts from its tail.
+    const bool tailAnchor = currIndex >= totalItemCount_ || (currIndex < 0 && StartsFromTail());
+    if (tailAnchor && totalItemCount_ > 0) {
         currIndex = totalItemCount_;
+        currLane = totalItemCount_ % lanes_;
+        layoutedStart = hadMeasuredItems_ ? EstimateTailPos(layoutedStart) : AnchorUnmeasuredTail();
+        currPos = layoutedStart;
         return true;
     } else if (currIndex >= 0 && layoutInfo_->posMap_.find(currIndex) != layoutInfo_->posMap_.end()) {
         auto iter = layoutInfo_->posMap_.find(currIndex);
@@ -1239,6 +1523,49 @@ void LazyGridLayoutAlgorithm::PredictLayoutBackward(LayoutWrapper* layoutWrapper
     layoutedStart_ = layoutedStart;
 }
 
+bool LazyGridLayoutAlgorithm::StartsFromTail() const
+{
+    // Without a baseline, an end reference gives this grid an end-relative window, so it is predicted from the tail.
+    return !hadMeasuredItems_ && !forwardLayout_;
+}
+
+float LazyGridLayoutAlgorithm::AnchorUnmeasuredTail()
+{
+    // The extent is unknown yet: predict against a tail at 0, and SyncPredictLayoutInfo rebases by the new extent.
+    // Nothing follows the tail, so the forward side is complete.
+    rebaseTail_ = true;
+    layoutedEndIndex_ = totalItemCount_ - 1;
+    cachedEndIndex_ = totalItemCount_ - 1;
+    layoutedEnd_ = 0.0f;
+    return 0.0f;
+}
+
+float LazyGridLayoutAlgorithm::EstimateTailPos(float storedTail)
+{
+    // The stored tail is an earlier extent, stale once the item count changes without a relayout. Derive it from the
+    // last placed row instead (posMap_ is trimmed to the count), estimating any unplaced rows like UpdateTotalMainSize.
+    const auto& posMap = layoutInfo_->posMap_;
+    if (posMap.empty()) {
+        return storedTail;
+    }
+    auto last = posMap.rbegin();
+    const int32_t missingLines = std::max(0, layoutInfo_->LineCount(last->first, totalItemCount_ - 1));
+    if (missingLines > 0 && !Positive(layoutInfo_->estimateItemSize_)) {
+        layoutInfo_->EstimateItemSize();
+    }
+    return last->second.endPos + missingLines * (layoutInfo_->estimateItemSize_ + spaceWidth_);
+}
+
+void LazyGridLayoutAlgorithm::RebaseTailWindow()
+{
+    // UpdatePosMap moved the items ending at 0 to the new extent; move the end-relative window with them.
+    const float delta = totalMainSize_;
+    layoutInfo_->layoutedStart_ += delta;
+    layoutInfo_->layoutedEnd_ += delta;
+    layoutInfo_->cacheStartPos_ += delta;
+    layoutInfo_->cacheEndPos_ += delta;
+}
+
 void LazyGridLayoutAlgorithm::SyncPredictLayoutInfo(LayoutWrapper* layoutWrapper)
 {
     // Recycle items outside visible and cache range
@@ -1271,13 +1598,18 @@ void LazyGridLayoutAlgorithm::SyncPredictLayoutInfo(LayoutWrapper* layoutWrapper
     // Skip posMap update if only self measure changed, as child positions remain valid
     auto layoutProperty = layoutWrapper->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
-    if (layoutProperty->GetPropertyChangeFlag() == PROPERTY_UPDATE_MEASURE_SELF) {
+    // Without a baseline there is no previous body to reuse, and a tail prediction still has to be rebased.
+    if (hadMeasuredItems_ && !knownMainSize_ &&
+        layoutProperty->GetPropertyChangeFlag() == PROPERTY_UPDATE_MEASURE_SELF) {
         // Reuse last frame's body; old section minus CURRENT edges would lock the total across an edge resize.
         totalMainSize_ = prevBodyMainSize_;
         return;
     }
-    layoutInfo_->UpdatePosMap(prevBodyMainSize_);
+    layoutInfo_->UpdatePosMap(prevBodyMainSize_, GetKnownBodySize());
     totalMainSize_ = layoutInfo_->totalMainSize_;
+    if (rebaseTail_) {
+        RebaseTailWindow();
+    }
 }
 
 void LazyGridLayoutAlgorithm::FixPosMapBackward(int32_t index)

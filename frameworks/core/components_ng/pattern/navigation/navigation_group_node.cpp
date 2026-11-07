@@ -94,10 +94,11 @@ void UpdateTransitionAnimationId(const RefPtr<FrameNode>& node, int32_t id)
 }
 
 int32_t TriggerNavDestinationTransition(const RefPtr<NavDestinationGroupNode>& navDestination,
-    NavigationOperation operation, bool isEnter)
+    NavigationOperation operation, bool isEnter, bool reportHomeTransition = false,
+    bool reportCapiHomeTransition = false)
 {
     CHECK_NULL_RETURN(navDestination, INVALID_ANIMATION_ID);
-    return navDestination->DoTransition(operation, isEnter);
+    return navDestination->DoTransition(operation, isEnter, reportHomeTransition, reportCapiHomeTransition);
 }
 
 bool IsFullScreenOverlayNode(const RefPtr<FrameNode>& node)
@@ -1050,13 +1051,23 @@ void NavigationGroupNode::TransitionWithPop(const RefPtr<FrameNode>& preNode, co
         preUseCustomTransition = false;
     }
     auto curUseCustomTransition = true;
+    auto curDestination = DynamicCast<NavDestinationGroupNode>(curNode);
+    bool reportHomeTransition = false;
+#ifndef CROSS_PLATFORM
+    auto context = GetContext();
+    auto mgr = context ? context->GetContentChangeManager() : nullptr;
+    reportHomeTransition = preUseCustomTransition && curDestination && curDestination->IsHomeDestination() &&
+        mgr && mgr->IsStartEventReportEnabled();
+#endif
     int32_t curAnimationId = TriggerNavDestinationTransition(
-        DynamicCast<NavDestinationGroupNode>(curNode), NavigationOperation::POP, true);
+        curDestination, NavigationOperation::POP, true, reportHomeTransition,
+        preUseCustomTransition && curDestination && curDestination->IsHomeDestination());
     if (curAnimationId == INVALID_ANIMATION_ID) {
         curAnimationId = popAnimationId;
         curUseCustomTransition = false;
     }
     if (preUseCustomTransition && curUseCustomTransition) {
+        // Both nodes own their animations; the entering Home also owns content-change completion.
         return;
     }
     // When the top page is an overlay, the underlying page becomes visible before the exit
@@ -1081,6 +1092,11 @@ void NavigationGroupNode::TransitionWithPop(const RefPtr<FrameNode>& preNode, co
 #endif
             navigation->CleanPopAnimations();
             auto preNavDesNode = weakPreNode.Upgrade();
+            if (!preNavDesNode && preUseCustomTransition) {
+                // A custom exit may remove the old page before the entering animation finishes.
+                navigation->ContentChangeReport(weakCurNode.Upgrade(), true);
+                return;
+            }
             CHECK_NULL_VOID(preNavDesNode);
             auto preNavdestination = AceType::DynamicCast<NavDestinationGroupNode>(preNavDesNode);
             CHECK_NULL_VOID(preNavdestination);
@@ -1108,7 +1124,7 @@ void NavigationGroupNode::TransitionWithPop(const RefPtr<FrameNode>& preNode, co
             if (!curNavDesNode) {
                 curNavDesNode = AceType::DynamicCast<FrameNode>(navigation->GetNavBarOrHomeDestinationNode());
             }
-            navigation->ContentChangeReport(curNavDesNode);
+            navigation->ContentChangeReport(curNavDesNode, true);
         };
     AnimationFinishCallback callback = [onFinishCb = std::move(onFinish), weakNavigation = WeakClaim(this)]() {
         auto navigation = weakNavigation.Upgrade();
@@ -1223,8 +1239,9 @@ void NavigationGroupNode::CreateAnimationWithPush(const TransitionUnitInfo& preI
             PerfMonitor::GetPerfMonitor()->Start(PerfConstants::ABILITY_OR_PAGE_SWITCH, PerfActionType::LAST_UP, "");
 #endif
             TAG_LOGI(AceLogTag::ACE_NAVIGATION, "navigation push animation start");
-            if (!overlayPush && ((isNavBarOrHomeDestination && !pattern->IsForceSplitSuccess()) ||
-                (preNode && !preUseCustomTransition))) {
+            if (preNode && !overlayPush &&
+                ((isNavBarOrHomeDestination && !pattern->IsForceSplitSuccess()) ||
+                    (!isNavBarOrHomeDestination && !preUseCustomTransition))) {
                 auto nodeBase = AceType::DynamicCast<NavDestinationNodeBase>(preNode);
                 CHECK_NULL_VOID(nodeBase);
                 nodeBase->SystemTransitionPushEnd(false);
@@ -1396,7 +1413,7 @@ void NavigationGroupNode::StartSplitPopAnimation(
             if (curNode) {
                 curNode->SplitTransitionPopFinish(popAnimationId);
             }
-            navigation->ContentChangeReport(curNode);
+            navigation->ContentChangeReport(curNode, true);
             navigation->RemoveDialogDestination();
             auto id = navigation->GetTopDestination() ? navigation->GetTopDestination()->GetAccessibilityId() : -1;
             navigation->OnAccessibilityEvent(
@@ -1664,12 +1681,21 @@ void NavigationGroupNode::TransitionWithPush(const RefPtr<FrameNode>& preNode, c
                     }
                     navBarOrHomeDestination->GetRenderContext()->SetOpacity(1.0f);
                 } else {
-                    auto preDestination = AceType::DynamicCast<NavDestinationGroupNode>(preNode);
-                    CHECK_NULL_VOID(preDestination);
                     if (overlayPush || preUseCustomTransition) {
-                        // no need handle pre node here. it will be handled in its custom transition callback.
+                        // Overlay does not animate preNode. Custom transitions own their cleanup.
                         break;
                     }
+
+                    auto preNavBar = AceType::DynamicCast<NavBarNode>(preNode);
+                    if (preNavBar) {
+                        // Force split keeps NavBar visible; only finalize its system transition.
+                        preNavBar->SystemTransitionPushFinish(false, preAnimationId);
+                        preNavBar->GetRenderContext()->SetOpacity(1.0f);
+                        break;
+                    }
+
+                    auto preDestination = AceType::DynamicCast<NavDestinationGroupNode>(preNode);
+                    CHECK_NULL_BREAK(preDestination);
                     if (preDestination->NeedRemoveInPush()) {
                         navigation->hideNodes_.emplace_back(std::make_pair(preDestination, true));
                         break;
@@ -2132,10 +2158,9 @@ void NavigationGroupNode::OnAttachToMainTree(bool recursive)
     GroupNode::OnAttachToMainTree(recursive);
 
     auto pattern = AceType::DynamicCast<NavigationPattern>(GetPattern());
-    if (pattern) {
-        pattern->AttachNavigationStackToParent();
-        pattern->AttachToManager();
-    }
+    CHECK_NULL_VOID(pattern);
+    pattern->AttachNavigationStackToParent();
+    pattern->AttachToManager();
     RefPtr<UINode> parentCustomNode;
     bool findParentNode = false;
     auto curNode = GetParent();
@@ -2478,7 +2503,7 @@ void NavigationGroupNode::TransitionWithDialogPop(const RefPtr<FrameNode>& preNo
                 navigation->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF_AND_CHILD);
             }
             navigation->RemoveDialogDestination();
-            navigation->ContentChangeReport(curNode);
+            navigation->ContentChangeReport(curNode, true);
             auto context = navigation->GetContextWithCheck();
             CHECK_NULL_VOID(context);
             context->MarkNeedFlushMouseEvent();
@@ -2576,7 +2601,8 @@ void NavigationGroupNode::PreNodeFinishCallback(const RefPtr<FrameNode>& preNode
     }
     if (preNode->GetTag() == V2::NAVDESTINATION_VIEW_ETS_TAG) {
         auto preDestination = AceType::DynamicCast<NavDestinationGroupNode>(preNode);
-        if (preDestination && preDestination->NeedRemoveInPush()) {
+        CHECK_NULL_VOID(preDestination);
+        if (preDestination->NeedRemoveInPush()) {
             hideNodes_.emplace_back(std::make_pair(preDestination, true));
         }
         preDestination->SystemTransitionPushFinish(false, preDestination->GetAnimationId());
@@ -2894,7 +2920,7 @@ void NavigationGroupNode::DialogTransitionPopAnimation(const RefPtr<FrameNode>& 
             if (!curNode) {
                 curNode = AceType::DynamicCast<FrameNode>(navigation->GetNavBarOrHomeDestinationNode());
             }
-            navigation->ContentChangeReport(curNode);
+            navigation->ContentChangeReport(curNode, true);
             auto id = curNode ? curNode->GetAccessibilityId() : -1;
             navigation->OnAccessibilityEvent(
                 AccessibilityEventType::PAGE_CHANGE, id, WindowsContentChangeTypes::CONTENT_CHANGE_TYPE_INVALID);
@@ -3462,15 +3488,23 @@ bool NavigationGroupNode::IsHomeNodeAndShouldShow(const RefPtr<NavDestinationGro
         !navigationPattern->IsTopFullScreenPage();
 }
 
-void NavigationGroupNode::ContentChangeReport(const RefPtr<FrameNode>& keyNode)
+RefPtr<FrameNode> NavigationGroupNode::GetContentChangeNode(const RefPtr<FrameNode>& keyNode)
 {
-#ifndef CROSS_PLATFORM
-    auto context = GetContextWithCheck();
-    CHECK_NULL_VOID(context);
-    auto mgr = context->GetContentChangeManager();
-    CHECK_NULL_VOID(mgr);
-    mgr->OnPageTransitionEnd(keyNode);
-#endif
+    if (keyNode) {
+        return keyNode;
+    }
+    auto contentChangeNode = AceType::DynamicCast<FrameNode>(GetNavBarOrHomeDestinationNode());
+    if (contentChangeNode) {
+        return contentChangeNode;
+    }
+    return AceType::Claim(this);
+}
+
+void NavigationGroupNode::ContentChangeReport(const RefPtr<FrameNode>& keyNode, bool isPopPage)
+{
+    auto pattern = GetPattern<NavigationPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->ContentChangeReport(keyNode, isPopPage);
 }
 
 RefPtr<FrameNode> NavigationGroupNode::GetOrCreateMaskNode(bool isLeft)

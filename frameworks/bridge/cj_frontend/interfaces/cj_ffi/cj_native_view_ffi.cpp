@@ -219,6 +219,16 @@ int32_t FfiOHOSAceFrameworkNativeViewGetUINodeId(int64_t nativeViewId)
     return uiNode->GetId();
 }
 
+int32_t FfiOHOSAceFrameworkNativeViewGetInstanceId(int64_t nativeViewId)
+{
+    auto view = FFIData::GetData<NativeView>(nativeViewId);
+    if (!view) {
+        LOGE("FfiOHOSAceFrameworkNativeViewGetInstanceId fail, no NativeView of %{public}" PRId64, nativeViewId);
+        return -1;
+    }
+    return view->GetInstanceId();
+}
+
 void FfiOHOSAceFrameworkViewDeletedElmtIdsHaveBeenPurged(int64_t nativeViewId, VectorCJInt64Handle vec)
 {
     auto view = FFIData::GetData<NativeView>(nativeViewId);

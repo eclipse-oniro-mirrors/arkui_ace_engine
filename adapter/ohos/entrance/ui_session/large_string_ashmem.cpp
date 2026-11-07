@@ -51,6 +51,10 @@ bool LargeStringAshmem::ReadFromParcel(Parcel& parcel)
     stringSize_ = messageParcel->ReadInt32();
     if (stringSize_ != 0) {
         ashmem_ = messageParcel->ReadAshmem();
+        if (ashmem_ == nullptr) {
+            LOGW("LargeStringAshmem read ashmem failed, stringSize=%{public}d", stringSize_);
+            return false;
+        }
     }
     return true;
 }

@@ -298,10 +298,17 @@ void MovingPhotoAni::SetEnableAnalyzer([[maybe_unused]] ani_env *env, [[maybe_un
     NG::MovingPhotoModelNG::EnableAnalyzer(movingPhotoNode, enabled);
 }
 
-void MovingPhotoAni::StartPlayback([[maybe_unused]] ani_env *env, [[maybe_unused]] ani_class object, ani_long nodeptr)
+void MovingPhotoAni::StartPlayback(ani_env *env, [[maybe_unused]] ani_class object, ani_long nodeptr,
+    ani_ref modeRef)
 {
     NG::MovingPhotoController* controller = reinterpret_cast<NG::MovingPhotoController*>(nodeptr);
-    controller->StartPlayback();
+    CHECK_NULL_VOID(controller);
+    auto mode = ParseDisplayMode(env, modeRef);
+    if (mode == MovingPhotoDisplayMode::IMAGE_AND_VIDEO) {
+        controller->StartPlayback();
+        return;
+    }
+    controller->StartPlay(mode == MovingPhotoDisplayMode::VIDEO_ONLY);
 }
 
 void MovingPhotoAni::StopPlayback([[maybe_unused]] ani_env *env, [[maybe_unused]] ani_class object, ani_long nodeptr)
@@ -357,6 +364,70 @@ void MovingPhotoAni::EnableAutoPlay([[maybe_unused]] ani_env *env, [[maybe_unuse
 {
     NG::MovingPhotoController* controller = reinterpret_cast<NG::MovingPhotoController*>(nodeptr);
     controller->EnableAutoPlay(static_cast<bool>(options));
+}
+
+void MovingPhotoAni::Prepare(ani_env *env, [[maybe_unused]] ani_class object, ani_long nodeptr, ani_ref callback)
+{
+    NG::MovingPhotoController* controller = reinterpret_cast<NG::MovingPhotoController*>(nodeptr);
+    CHECK_NULL_VOID(controller);
+    if (AniUtils::GetIsUndefinedObject(env, callback)) {
+        return;
+    }
+    auto asyncEvent = std::make_shared<AniAsyncEvent>(env, callback);
+    CHECK_NULL_VOID(asyncEvent);
+    auto onPrepared = [asyncEvent]() {
+        asyncEvent->Call(0, nullptr);
+    };
+    controller->Prepare(std::move(onPrepared));
+}
+
+void MovingPhotoAni::StartPlayAfterPrepare([[maybe_unused]] ani_env *env, [[maybe_unused]] ani_class object,
+    ani_long nodeptr)
+{
+    NG::MovingPhotoController* controller = reinterpret_cast<NG::MovingPhotoController*>(nodeptr);
+    CHECK_NULL_VOID(controller);
+    controller->StartPlay(true);
+}
+
+void MovingPhotoAni::SetDisplayMode(ani_env *env, [[maybe_unused]] ani_class object, ani_long nodeptr,
+    ani_ref modeRef, ani_ref callback)
+{
+    NG::MovingPhotoController* controller = reinterpret_cast<NG::MovingPhotoController*>(nodeptr);
+    CHECK_NULL_VOID(controller);
+    if (AniUtils::GetIsUndefinedObject(env, callback)) {
+        return;
+    }
+    auto asyncEvent = std::make_shared<AniAsyncEvent>(env, callback);
+    CHECK_NULL_VOID(asyncEvent);
+    auto onDisplayModeComplete = [asyncEvent]() {
+        asyncEvent->Call(0, nullptr);
+    };
+    auto mode = ParseDisplayMode(env, modeRef);
+    if (mode == MovingPhotoDisplayMode::VIDEO_ONLY) {
+        controller->Prepare(std::move(onDisplayModeComplete));
+    } else {
+        controller->JumpToCover(std::move(onDisplayModeComplete));
+    }
+}
+
+MovingPhotoDisplayMode MovingPhotoAni::ParseDisplayMode(ani_env *env, ani_ref modeRef)
+{
+    auto mode = MovingPhotoDisplayMode::IMAGE_AND_VIDEO;
+    if (AniUtils::GetIsUndefinedObject(env, modeRef)) {
+        return mode;
+    }
+    if (AniUtils::GetIsEnum(env, modeRef, OHOS::Ace::ANI_MOVINGPHOTO_DISPLAYMODE)) {
+        ani_int displayModeAni;
+        if (ANI_OK != env->EnumItem_GetValue_Int(static_cast<ani_enum_item>(modeRef), &displayModeAni)) {
+            return mode;
+        }
+        int32_t displayModeNum;
+        if (ANI_OK != AniUtils::GetInt32(env, displayModeAni, displayModeNum)) {
+            return mode;
+        }
+        return static_cast<MovingPhotoDisplayMode>(displayModeNum);
+    }
+    return mode;
 }
 
 void MovingPhotoAni::SetMovingPhotoViewOptions([[maybe_unused]] ani_env *env, [[maybe_unused]] ani_class object,
@@ -539,6 +610,8 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm *vm, uint32_t *result)
             reinterpret_cast<void *>(OHOS::Ace::MovingPhotoAni::SetPlaybackPeriod)},
         ani_native_function{"enableAutoPlay", nullptr,
             reinterpret_cast<void *>(OHOS::Ace::MovingPhotoAni::EnableAutoPlay)},
+        ani_native_function{"setDisplayMode", nullptr,
+            reinterpret_cast<void *>(OHOS::Ace::MovingPhotoAni::SetDisplayMode)},
     };
     if (ANI_OK != env->Class_BindStaticNativeMethods(cls, methods.data(), methods.size())) {
         return ANI_INVALID_TYPE;

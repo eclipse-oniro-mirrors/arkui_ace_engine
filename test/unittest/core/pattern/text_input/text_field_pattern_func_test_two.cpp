@@ -999,7 +999,7 @@ HWTEST_F(TextFieldPatternFuncTestTwo, TextPatternFunc057, TestSize.Level1)
     ASSERT_NE(pattern, nullptr);
 
     std::u16string insertValue = u"1";
-    pattern->obscureTickCountDown_ = 10;
+    pattern->obscureHelper_.tickCountDown_ = 10;
     pattern->UpdateObscure(insertValue, false);
 }
 
@@ -1499,7 +1499,7 @@ HWTEST_F(TextFieldPatternFuncTestTwo, TextPatternFunc077, TestSize.Level1)
     auto host = pattern->GetHost();
     auto nodeId = host->GetId();
     pattern->keyboardOverlay_->customKeyboardMap_.emplace(std::make_pair(nodeId, AceType::RawPtr(keyboardScd)));
-    textFieldManager->onFocusTextField_ = AceType::DynamicCast<Pattern>(pattern);
+    textFieldManager->onFocusTextField_ = pattern;
     textFieldManager->TriggerCustomKeyboardAvoid();
     EXPECT_EQ(keyboardScd->GetPattern<KeyboardPattern>()->safeHeight_, 0);
 }

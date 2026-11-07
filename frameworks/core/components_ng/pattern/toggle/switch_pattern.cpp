@@ -42,6 +42,17 @@
 
 namespace OHOS::Ace::NG {
 namespace {
+std::string MaterialTypeToString(int32_t type)
+{
+    static const std::string MaterialTypeStyles[] = { "MaterialType.NONE", "MaterialType.SEMI_TRANSPARENT",
+        "MaterialType.IMMERSIVE" };
+    if (type >= static_cast<int32_t>(MaterialType::NONE) &&
+        type <= static_cast<int32_t>(MaterialType::IMMERSIVE)) {
+        return MaterialTypeStyles[type];
+    }
+    return MaterialTypeStyles[0];
+}
+
 constexpr int32_t DEFAULT_DURATION = 200;
 const Color ITEM_FILL_COLOR = Color::TRANSPARENT;
 constexpr double NUMBER_TWO = 2.0;
@@ -97,7 +108,7 @@ bool SwitchPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty,
         currentOffset_ = GetSwitchWidth();
     }
 
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto switchLayoutAlgorithm = DynamicCast<SwitchLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(switchLayoutAlgorithm, false);
@@ -908,9 +919,26 @@ void SwitchPattern::ResetHostMaterialEffects()
     auto material = renderContext->GetSystemMaterial();
     CHECK_NULL_VOID(material);
 
-    // Clear SO-level material effects
-    MaterialUtils::CallSetMaterial(AceType::RawPtr(host), nullptr);
+    AnimationUtils::ExecuteWithoutAnimation(
+        [weak = WeakClaim(this)]() {
+            auto pattern = weak.Upgrade();
+            CHECK_NULL_VOID(pattern);
+            pattern->ResetHostMaterialEffectsInner();
+        },
+        host->GetContextRefPtr());
+}
 
+void SwitchPattern::ResetHostMaterialEffectsInner()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto renderContext = host->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+
+    // Clear SO-level material effects
+    if (!MaterialUtils::CallSetMaterial(AceType::RawPtr(host), nullptr)) {
+        ViewAbstract::SetSystemMaterialImmediate(AceType::RawPtr(host), nullptr);
+    }
     // Clear RS material filter
     renderContext->UpdateUiMaterialFilter(nullptr);
 
@@ -1016,6 +1044,9 @@ void SwitchPattern::HideMaterialNodes()
     if (blurCoverNode_) {
         host->RemoveChild(blurCoverNode_);
     }
+
+    host->RebuildRenderContextTree();
+
     auto renderContext = host->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
     renderContext->SetAlphaOffscreen(true);
@@ -1299,6 +1330,7 @@ void SwitchPattern::ShowMaterialNode()
 
     RegisterMaterialNodePositionCallback();
     ApplyDragFrameNodeSystemMaterial();
+
 #ifndef ACE_UNITTEST
     ApplyBlendMode();
 #endif
@@ -1526,7 +1558,7 @@ void SwitchPattern::ApplyDragFrameNodeSystemMaterial()
     dragFrameMaterialParam.refractParams[0] = -0.008f + t * (-0.01f - (-0.008f));
     dragFrameMaterialParam.refractParams[1] = 0.15f + t * (0.13f - 0.15f);
     float dipScale = static_cast<float>(pipeline->GetDipScale());
-    auto filter = RosenEffectConverter::ConvertToFrostedGlassFilter(dragFrameMaterialParam, dipScale);
+    auto filter = RosenEffectConverter::ConvertToFrostedGlassFilter(dragFrameMaterialParam, dipScale, nullptr);
     if (filter) {
         auto renderContext = dragFrameNode_->GetRenderContext();
         if (renderContext) {
@@ -1535,6 +1567,8 @@ void SwitchPattern::ApplyDragFrameNodeSystemMaterial()
             auto shadow = MaterialUtils::GetImmersiveShadow(dipScale * 0.8);
             shadow.SetColor(Color(0x1F050505));
             renderContext->UpdateBackShadow(shadow);
+
+            pipeline->AddTaskOverlayNodeMaterialArea(dragFrameNode_, "Switch ShowMaterialNode");
         }
     }
     ResetHostMaterialEffects();
@@ -1659,6 +1693,14 @@ bool SwitchPattern::OnThemeScopeUpdate(int32_t themeScopeId)
     return result;
 }
 
+void SwitchPattern::ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const
+{
+    if (filter.IsFastFilter()) {
+        return;
+    }
+    json->PutExtAttr("hasSystemMaterial", HasSystemMaterial() ? "true" : "false", filter);
+}
+
 void SwitchPattern::DumpInfo()
 {
     auto paintProperty = GetPaintProperty<SwitchPaintProperty>();
@@ -1681,6 +1723,58 @@ void SwitchPattern::DumpInfo()
     if (paintProperty->HasTrackBorderRadius()) {
         DumpLog::GetInstance().AddDesc(
             "TrackBorderRadius: " + paintProperty->GetTrackBorderRadius().value().ToString());
+    }
+    DumpLog::GetInstance().AddDesc("HasSystemMaterial: " + std::string(HasSystemMaterial() ? "true" : "false"));
+    bool hasSystemMaterial = HasSystemMaterial();
+    if (hasSystemMaterial) {
+        auto host = GetHost();
+        CHECK_NULL_VOID(host);
+        auto renderContext = host->GetRenderContext();
+        CHECK_NULL_VOID(renderContext);
+        auto material = renderContext->GetSystemMaterial();
+        auto nativeMaterial = MaterialUtils::PreProcessMaterial(AceType::RawPtr(material));
+        auto materialType = MaterialUtils::GetTypeFromMaterial(nativeMaterial);
+        DumpLog::GetInstance().AddDesc("MaterialType: " +
+            (materialType.has_value() ? MaterialTypeToString(static_cast<int32_t>(materialType.value()))
+                                      : std::string("MaterialType.NONE")));
+    }
+}
+
+void SwitchPattern::DumpInfo(std::unique_ptr<JsonValue>& json)
+{
+    auto paintProperty = GetPaintProperty<SwitchPaintProperty>();
+    CHECK_NULL_VOID(paintProperty);
+    if (paintProperty->HasIsOn()) {
+        json->Put("IsOn", paintProperty->GetIsOn().value() ? "true" : "false");
+    }
+    if (paintProperty->HasSelectedColor()) {
+        json->Put("SelectedColor", paintProperty->GetSelectedColor().value().ToString().c_str());
+    }
+    if (paintProperty->HasUnselectedColor()) {
+        json->Put("UnselectedColor", paintProperty->GetUnselectedColor().value().ToString().c_str());
+    }
+    if (paintProperty->HasSwitchPointColor()) {
+        json->Put("SwitchPointColor", paintProperty->GetSwitchPointColor().value().ToString().c_str());
+    }
+    if (paintProperty->HasPointRadius()) {
+        json->Put("PointRadius", paintProperty->GetPointRadius().value().ToString().c_str());
+    }
+    if (paintProperty->HasTrackBorderRadius()) {
+        json->Put("TrackBorderRadius", paintProperty->GetTrackBorderRadius().value().ToString().c_str());
+    }
+    bool hasSystemMaterial = HasSystemMaterial();
+    json->Put("HasSystemMaterial", hasSystemMaterial ? "true" : "false");
+    if (hasSystemMaterial) {
+        auto host = GetHost();
+        CHECK_NULL_VOID(host);
+        auto renderContext = host->GetRenderContext();
+        CHECK_NULL_VOID(renderContext);
+        auto material = renderContext->GetSystemMaterial();
+        auto nativeMaterial = MaterialUtils::PreProcessMaterial(AceType::RawPtr(material));
+        auto materialType = MaterialUtils::GetTypeFromMaterial(nativeMaterial);
+        json->Put("MaterialType",
+            materialType.has_value() ? MaterialTypeToString(static_cast<int32_t>(materialType.value())).c_str()
+                                     : "MaterialType.NONE");
     }
 }
 
@@ -1788,6 +1882,11 @@ bool SwitchPattern::ParseCommand(const std::string& command, bool& isOn)
     }
     isOn = isOnJson->GetBool();
     return true;
+}
+
+CommandResult SwitchPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "onToggleChange" }, CommandErrorType::EXECUTE_FAIL);
 }
 
 int32_t SwitchPattern::OnInjectionEvent(const std::string& command)

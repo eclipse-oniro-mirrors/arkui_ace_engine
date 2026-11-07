@@ -51,7 +51,11 @@ class AccessibilityChildTreeCallback;
 enum class StatisticEventType;
 }
 namespace OHOS::Ace::NG {
+constexpr int32_t MIN_BUFFER_QUEUE_COUNT = 2;
+constexpr int32_t MAX_BUFFER_QUEUE_COUNT = 5;
+constexpr int32_t DEFAULT_BUFFER_QUEUE_COUNT = 5;
 class XComponentExtSurfaceCallbackClient;
+
 class XComponentPattern : public Pattern {
     DECLARE_ACE_TYPE(XComponentPattern, Pattern);
 
@@ -126,6 +130,11 @@ public:
             // for XComponentType::NODE
             nativeXComponentImpl_ = AceType::MakeRefPtr<NativeXComponentImpl>();
             nativeXComponent_ = std::make_shared<OH_NativeXComponent>(AceType::RawPtr(nativeXComponentImpl_));
+            nativeXComponentImpl_->SetVisibilityLifecycleEventCallback([weak = AceType::WeakClaim(this)]() {
+                auto xComponentPattern = weak.Upgrade();
+                CHECK_NULL_VOID(xComponentPattern);
+                xComponentPattern->UpdateVisibilityLifecycleRegistration();
+            });
         }
         return std::make_pair(nativeXComponentImpl_, nativeXComponent_);
     }
@@ -367,14 +376,25 @@ public:
     void EnableSecure(bool isSecure);
     void HdrBrightness(float hdrBrightness);
     void HdrBrightness(float hdrBrightness, HdrType hdrType);
+    void SetExtraFlag(uint32_t flag);
+    bool IsSolidColorEnabled() const;
     void EnableTransparentLayer(bool isTransparentLayer);
+    void SetSurfaceVisibilityLifecycle(bool isVisibilityLifecycle);
+    bool IsSurfaceVisibilityLifecycle() const;
+    void OnVisibilityLifecycleChange(bool visible);
+    void HandleVisibilityLifecycleChange(bool visible);
+    void UpdateVisibilityLifecycleRegistration();
     RenderFit GetSurfaceRenderFit() const;
     bool GetEnableAnalyzer();
     void NativeStartImageAnalyzer(std::function<void(int32_t)>& callback);
     RSCanvas* LockCanvas();
     void UnlockCanvasAndPost(RSCanvas* canvas);
     void SetSurfaceIsOpaque(bool isOpaque);
+    void SetBufferQueueCount(int32_t bufferQueueCount);
+    int32_t GetBufferQueueCount() const;
     ArkUI_AccessibilityProvider* GetNativeProvider();
+    RefPtr<AccessibilityProvider> GetOrCreateAccessibilityProvider() override;
+    void AddInspectorTreeInfo(std::shared_ptr<JsonValue>& node, InspectorTreeRequestContext& context) override;
     void PushType(StatisticEventType type);
     void OnFrameNodeChanged(FrameNodeChangeInfoFlag flag) override;
     static std::string GetCompensationAngleFromFeatureManager();
@@ -396,6 +416,11 @@ protected:
     void UpdateAnalyzerUIConfig(const RefPtr<NG::GeometryNode>& geometryNode);
     void RegisterTransformHintCallback(PipelineContext* context);
     void LoadNative();
+    void RegisterVisibilityLifecycleCallback();
+    void UnregisterVisibilityLifecycleCallback();
+    virtual bool IsSurfaceLifecycleReady() const;
+    virtual void OnVisibilityLifecycleCreate();
+    virtual void OnVisibilityLifecycleDestroy();
     void OnSurfaceCreated();
 
     std::optional<std::string> id_;
@@ -403,6 +428,7 @@ protected:
     XComponentType type_;
     bool hasGotSurfaceHolder_ = false;
     bool hasGotNativeXComponent_ = false;
+    bool hasXComponentInit_ = false;
     bool isNativeXComponentDisabled_ = false;
     bool isCNode_ = false;
     bool useNodeHandleAccessibilityProvider_ = false;
@@ -425,11 +451,17 @@ protected:
     bool isOnTree_ = false;
     float hdrBrightness_ = 1.0f;
     HdrType hdrType_ = HdrType::DEFAULT;
+    uint32_t extraFlag_ = 0;
     bool isTransparentLayer_ = false;
     bool isEnableSecure_ = false;
+    bool isVisibilityLifecycle_ = false;
+    bool isVisibilityLifecycleDestroyed_ = false;
+    bool isVisibilityLifecycleRegistered_ = false;
+    bool isInVisibilityLifecycleChange_ = false;
     bool isSurfaceLock_ = false;
     bool isOpaque_ = false;
     RenderFit renderFit_ = RenderFit::RESIZE_FILL;
+    int32_t bufferQueueCount_ = DEFAULT_BUFFER_QUEUE_COUNT;
     RefPtr<UIXComponentDisplaySync> displaySync_ = AceType::MakeRefPtr<UIXComponentDisplaySync>();
     bool needRecoverDisplaySync_ = false;
     std::shared_ptr<AccessibilityChildTreeCallback> accessibilityChildTreeCallback_;
@@ -456,9 +488,12 @@ protected:
     const std::string& xcomponentId);
 #endif
 
+    void AddExtraInfoWithParamConfig(
+        std::shared_ptr<JsonValue>& json, ParamConfig config = ParamConfig()) override;
+
 private:
     void OnAreaChangedInner() override;
-    void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json) override {}
+    void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json) override;
     void DumpInfo(std::unique_ptr<JsonValue>& json) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
@@ -495,6 +530,8 @@ private:
     void ReportChangeEvent(const TouchEventInfo& info, const Offset& screenOffset,
         const TouchLocationInfo& touchInfo);
     ExternalEvent CreateExternalEvent();
+    void RegisterNode();
+    void UnregisterNode();
 
     void SetTouchPoint(
         const std::list<TouchLocationInfo>& touchInfoList, int64_t timeStamp, const TouchType& touchType);
@@ -515,8 +552,6 @@ private:
     void RegisterSurfaceRenderContext();
     void UnregisterSurfaceRenderContext();
     std::shared_ptr<Rosen::RSUIContext> GetRSUIContext(const RefPtr<FrameNode>& frameNode);
-    void RegisterNode();
-    void UnregisterNode();
 
     void InitSurfaceMultiThread(const RefPtr<FrameNode>& host);
     void InitControllerMultiThread();
@@ -541,7 +576,6 @@ private:
     std::optional<std::string> soPath_;
     std::optional<uint64_t> screenId_;
     WeakPtr<XComponentPattern> extPattern_;
-    bool hasXComponentInit_ = false;
     bool isXComponentSizeInit_ = false;
 
     RefPtr<TouchEventImpl> touchEvent_;

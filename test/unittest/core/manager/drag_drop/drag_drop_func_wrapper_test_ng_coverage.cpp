@@ -13,12 +13,16 @@
  * limitations under the License.
  */
 
+#include <atomic>
 #include <optional>
+#include <thread>
+#include <vector>
 
 #include "gtest/gtest.h"
 #define private public
 
 #include "test/mock/adapter/ohos/osal/mock_system_properties.h"
+#include "test/mock/frameworks/base/image/mock_pixel_map.h"
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
 #include "test/mock/frameworks/core/components_ng/render/mock_render_context.h"
 #include "test/mock/frameworks/base/window/mock_drag_window.h"
@@ -43,6 +47,7 @@
 #include "core/components_ng/base/geometry_node.h"
 #include "core/components_ng/base/ui_node.h"
 #include "core/components_ng/base/view_abstract.h"
+#include "core/components_ng/event/drag_event.h"
 #include "core/components_ng/event/event_hub.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_func_wrapper.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_global_controller.h"
@@ -851,6 +856,27 @@ HWTEST_F(DragDropFuncWrapperTestNgCoverage, TestIsSelectedItemNode, TestSize.Lev
             testCase.expectResult));
         caseNum++;
     }
+}
+
+/**
+ * @tc.name: TestIsSelectedItemNodeWithoutCreatingConfiguration
+ * @tc.desc: Test IsSelectedItemNode does not create drag-related configurations for an unconfigured node.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropFuncWrapperTestNgCoverage, TestIsSelectedItemNodeWithoutCreatingConfiguration, TestSize.Level1)
+{
+    auto frameNode = FrameNode::CreateFrameNode(
+        V2::GRID_ITEM_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<GridItemPattern>(nullptr, GridItemStyle::NONE));
+    ASSERT_NE(frameNode, nullptr);
+    ASSERT_EQ(frameNode->dragDropRelatedConfigurations_, nullptr);
+
+    EXPECT_FALSE(DragDropFuncWrapper::IsSelectedItemNode(frameNode));
+    EXPECT_EQ(frameNode->dragDropRelatedConfigurations_, nullptr);
+    EXPECT_FALSE(DragEventActuator::IsSelectedItemNode(frameNode));
+    EXPECT_EQ(frameNode->dragDropRelatedConfigurations_, nullptr);
+    EXPECT_FALSE(DragDropFuncWrapper::CheckIsNeedGather(frameNode));
+    EXPECT_EQ(frameNode->dragDropRelatedConfigurations_, nullptr);
 }
 
 /**
@@ -2239,5 +2265,225 @@ HWTEST_F(DragDropFuncWrapperTestNgCoverage, ParseDragPreviewMaterialInfo004, Tes
         EXPECT_EQ(materialInfo.materialId, -1);
         EXPECT_EQ(materialInfo.materialFilter, nullptr);
     }
+}
+/**
+ * @tc.name: GetShadowInfoArrayEmpty001
+ * @tc.desc: Empty and all-null pixel map lists produce no shadow information.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropFuncWrapperTestNgCoverage, GetShadowInfoArrayEmpty001, TestSize.Level1)
+{
+    auto dragAction = std::make_shared<ArkUIInteralDragAction>();
+    dragAction->pixelMapList = { nullptr, nullptr };
+    dragAction->instanceId = 0;
+    MockContainer::Current()->pipelineContext_ = MockPipelineContext::GetCurrentContext();
+    AceEngine::Get().AddContainer(0, MockContainer::container_);
+    dragAction->callback = [](const DragNotifyMsg&, int32_t) {};
+    EXPECT_EQ(DragDropFuncWrapper::StartDragAction(dragAction), -1);
+}
+
+/**
+ * @tc.name: GetShadowInfoArrayMixed001
+ * @tc.desc: Skip null entries without losing or reordering valid shadows and their touch offsets.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropFuncWrapperTestNgCoverage, GetShadowInfoArrayMixed001, TestSize.Level1)
+{
+    auto dragAction = std::make_shared<ArkUIInteralDragAction>();
+    auto first = AceType::MakeRefPtr<MockPixelMap>();
+    auto second = AceType::MakeRefPtr<MockPixelMap>();
+    dragAction->pixelMapList = { nullptr, first, nullptr, second, nullptr };
+    dragAction->previewOption.isScaleEnabled = false;
+    dragAction->windowScale = 0.5;
+    dragAction->hasTouchPoint = true;
+    dragAction->touchPointX = 10;
+    dragAction->touchPointY = 20;
+    dragAction->instanceId = 0;
+    MockContainer::Current()->pipelineContext_ = MockPipelineContext::GetCurrentContext();
+    AceEngine::Get().AddContainer(0, MockContainer::container_);
+    dragAction->callback = [](const DragNotifyMsg&, int32_t) {};
+    EXPECT_CALL(*first, GetWidth()).Times(2).WillRepeatedly(Return(100));
+    EXPECT_CALL(*first, GetHeight()).Times(2).WillRepeatedly(Return(200));
+    EXPECT_CALL(*second, GetWidth()).Times(2).WillRepeatedly(Return(80));
+    EXPECT_CALL(*second, GetHeight()).Times(2).WillRepeatedly(Return(120));
+    EXPECT_CALL(*first, Scale(0.5f, 0.5f, AceAntiAliasingOption::HIGH)).Times(1);
+    EXPECT_CALL(*second, Scale(0.5f, 0.5f, AceAntiAliasingOption::HIGH)).Times(1);
+
+    EXPECT_EQ(DragDropFuncWrapper::StartDragAction(dragAction), 0);
+}
+
+/**
+ * @tc.name: TryBindAndMarkSending001
+ * @tc.desc: Test DragDropManager::TryBindAndMarkSending session guard
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropFuncWrapperTestNgCoverage, TryBindAndMarkSending001, TestSize.Level1)
+{
+    auto dragDropManager = AceType::MakeRefPtr<DragDropManager>();
+    ASSERT_NE(dragDropManager, nullptr);
+    EXPECT_FALSE(dragDropManager->TryBindAndMarkSending(nullptr));
+
+    auto firstAction = std::make_shared<OHOS::Ace::NG::ArkUIInteralDragAction>();
+    EXPECT_TRUE(dragDropManager->TryBindAndMarkSending(firstAction));
+    EXPECT_EQ(firstAction->dragState, DragAdapterState::SENDING);
+    EXPECT_EQ(dragDropManager->GetDragAction(), firstAction);
+
+    // A second session is rejected while the bound action is SENDING.
+    auto secondAction = std::make_shared<OHOS::Ace::NG::ArkUIInteralDragAction>();
+    EXPECT_FALSE(dragDropManager->TryBindAndMarkSending(secondAction));
+    EXPECT_EQ(secondAction->dragState, DragAdapterState::INIT);
+
+    // Once the bound session leaves SENDING, the next session is accepted.
+    {
+        std::lock_guard<std::mutex> lock(firstAction->dragStateMutex);
+        firstAction->dragState = DragAdapterState::INIT;
+    }
+    EXPECT_TRUE(dragDropManager->TryBindAndMarkSending(secondAction));
+    EXPECT_EQ(secondAction->dragState, DragAdapterState::SENDING);
+    EXPECT_EQ(dragDropManager->GetDragAction(), secondAction);
+}
+
+/**
+ * @tc.name: HandleCallbackExactlyOnce001
+ * @tc.desc: STARTED and ENDED are each delivered exactly once per drag session
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropFuncWrapperTestNgCoverage, HandleCallbackExactlyOnce001, TestSize.Level1)
+{
+    auto container = Container::Current();
+    AceEngine& aceEngine = AceEngine::Get();
+    aceEngine.AddContainer(0, container);
+    MockContainer::Current()->pipelineContext_ = MockPipelineContext::GetCurrentContext();
+    int32_t startedCount = 0;
+    int32_t endedCount = 0;
+    auto dragAction = std::make_shared<OHOS::Ace::NG::ArkUIInteralDragAction>();
+    dragAction->instanceId = 0;
+    dragAction->callback = [&startedCount, &endedCount](const DragNotifyMsg& info, int32_t status) {
+        if (status == static_cast<int32_t>(DragAdapterStatus::STARTED)) {
+            ++startedCount;
+        } else if (status == static_cast<int32_t>(DragAdapterStatus::ENDED)) {
+            ++endedCount;
+        }
+    };
+    DragDropFuncWrapper::HandleCallback(dragAction, DragNotifyMsg {}, DragAdapterStatus::STARTED);
+    DragDropFuncWrapper::HandleCallback(dragAction, DragNotifyMsg {}, DragAdapterStatus::STARTED);
+    EXPECT_EQ(startedCount, 1);
+    // ENDED must not be masked by an already delivered STARTED.
+    DragDropFuncWrapper::HandleCallback(dragAction, DragNotifyMsg {}, DragAdapterStatus::ENDED);
+    DragDropFuncWrapper::HandleCallback(dragAction, DragNotifyMsg {}, DragAdapterStatus::ENDED);
+    EXPECT_EQ(endedCount, 1);
+}
+
+/**
+ * @tc.name: TryBindAndMarkSendingStress001
+ * @tc.desc: Concurrent StartDrag attempts: exactly one passes the SENDING guard per round
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropFuncWrapperTestNgCoverage, TryBindAndMarkSendingStress001, TestSize.Level1)
+{
+    constexpr int32_t threadCount = 8;
+    constexpr int32_t roundCount = 200;
+    auto dragDropManager = AceType::MakeRefPtr<DragDropManager>();
+    ASSERT_NE(dragDropManager, nullptr);
+    for (int32_t round = 0; round < roundCount; ++round) {
+        std::vector<int32_t> results(threadCount, 0);
+        std::vector<std::thread> workers;
+        for (int32_t i = 0; i < threadCount; ++i) {
+            workers.emplace_back([&dragDropManager, &results, i]() {
+                auto action = std::make_shared<OHOS::Ace::NG::ArkUIInteralDragAction>();
+                results[i] = dragDropManager->TryBindAndMarkSending(action) ? 1 : 0;
+            });
+        }
+        for (auto& worker : workers) {
+            worker.join();
+        }
+        int32_t winners = 0;
+        for (auto result : results) {
+            winners += result;
+        }
+        // Exactly one concurrent StartDrag may pass the SENDING guard per round.
+        ASSERT_EQ(winners, 1);
+        auto bound = dragDropManager->GetDragAction();
+        ASSERT_NE(bound, nullptr);
+        {
+            std::lock_guard<std::mutex> lock(bound->dragStateMutex);
+            bound->dragState = DragAdapterState::INIT;
+        }
+    }
+}
+
+/**
+ * @tc.name: HandleCallbackConcurrent001
+ * @tc.desc: Overlapping STARTED/ENDED callbacks (fast swipe): each status exactly once
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropFuncWrapperTestNgCoverage, HandleCallbackConcurrent001, TestSize.Level1)
+{
+    auto container = Container::Current();
+    AceEngine& aceEngine = AceEngine::Get();
+    aceEngine.AddContainer(0, container);
+    MockContainer::Current()->pipelineContext_ = MockPipelineContext::GetCurrentContext();
+    std::atomic<int32_t> startedCount { 0 };
+    std::atomic<int32_t> endedCount { 0 };
+    auto dragAction = std::make_shared<OHOS::Ace::NG::ArkUIInteralDragAction>();
+    dragAction->instanceId = 0;
+    dragAction->callback = [&startedCount, &endedCount](const DragNotifyMsg& info, int32_t status) {
+        if (status == static_cast<int32_t>(DragAdapterStatus::STARTED)) {
+            ++startedCount;
+        } else if (status == static_cast<int32_t>(DragAdapterStatus::ENDED)) {
+            ++endedCount;
+        }
+    };
+    constexpr int32_t repeatCount = 100;
+    std::vector<std::thread> workers;
+    // STARTED and ENDED fire concurrently, mimicking a fast swipe where the two msdp
+    // callbacks overlap; each status must still be delivered exactly once.
+    workers.emplace_back([dragAction]() {
+        for (int32_t i = 0; i < repeatCount; ++i) {
+            DragDropFuncWrapper::HandleCallback(dragAction, DragNotifyMsg {}, DragAdapterStatus::STARTED);
+        }
+    });
+    workers.emplace_back([dragAction]() {
+        for (int32_t i = 0; i < repeatCount; ++i) {
+            DragDropFuncWrapper::HandleCallback(dragAction, DragNotifyMsg {}, DragAdapterStatus::ENDED);
+        }
+    });
+    for (auto& worker : workers) {
+        worker.join();
+    }
+    // ENDED is always delivered exactly once; STARTED is delivered at most once and is
+    // skipped entirely if ENDED won the race (fast swipe: listeners then see END only).
+    EXPECT_LE(startedCount.load(), 1);
+    EXPECT_EQ(endedCount.load(), 1);
+}
+
+/**
+ * @tc.name: HandleCallbackEndedFirstSkipsStarted001
+ * @tc.desc: If ENDED was delivered first, a late STARTED is skipped (no reorder, no resurrect)
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropFuncWrapperTestNgCoverage, HandleCallbackEndedFirstSkipsStarted001, TestSize.Level1)
+{
+    auto container = Container::Current();
+    AceEngine& aceEngine = AceEngine::Get();
+    aceEngine.AddContainer(0, container);
+    MockContainer::Current()->pipelineContext_ = MockPipelineContext::GetCurrentContext();
+    int32_t startedCount = 0;
+    int32_t endedCount = 0;
+    auto dragAction = std::make_shared<OHOS::Ace::NG::ArkUIInteralDragAction>();
+    dragAction->instanceId = 0;
+    dragAction->callback = [&startedCount, &endedCount](const DragNotifyMsg& info, int32_t status) {
+        if (status == static_cast<int32_t>(DragAdapterStatus::STARTED)) {
+            ++startedCount;
+        } else if (status == static_cast<int32_t>(DragAdapterStatus::ENDED)) {
+            ++endedCount;
+        }
+    };
+    // ENDED delivered first (fast swipe raced ahead of the posted start task).
+    DragDropFuncWrapper::HandleCallback(dragAction, DragNotifyMsg {}, DragAdapterStatus::ENDED);
+    // The late STARTED must be skipped: no END-then-START reorder, no resurrected flag.
+    DragDropFuncWrapper::HandleCallback(dragAction, DragNotifyMsg {}, DragAdapterStatus::STARTED);
+    EXPECT_EQ(endedCount, 1);
+    EXPECT_EQ(startedCount, 0);
 }
 } // namespace OHOS::Ace::NG

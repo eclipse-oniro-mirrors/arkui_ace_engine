@@ -157,6 +157,7 @@ public:
     }
     const Offset& GetGlobalLocation() const;
     AxisEvent ConvertToAxisEvent() const;
+    AxisEvent ConvertToAxisEvent(bool isForStatic, float density) const;
     const std::shared_ptr<const MMI::PointerEvent>& GetPointerEvent() const;
 private:
     AxisAction action_ = AxisAction::NONE;
@@ -233,7 +234,7 @@ private:
 using OnAxisEventFunc = std::function<void(AxisInfo&)>;
 using OnCoastingAxisEventFunc = std::function<void(CoastingAxisInfo&)>;
 
-class AxisEventTarget : public virtual TouchEventTarget {
+class AxisEventTarget : public TouchEventTarget {
     DECLARE_ACE_TYPE(AxisEventTarget, TouchEventTarget);
 
 public:

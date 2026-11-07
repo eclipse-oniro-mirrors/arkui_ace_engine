@@ -17,6 +17,7 @@
 
 #include "core/components_ng/pattern/linear_layout/column_model_ng.h"
 #include "frameworks/core/components_ng/syntax/arkoala_lazy_node.h"
+#include "base/log/dump_log.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -807,56 +808,64 @@ TEST_F(ArkoalaLazyNodeTest, NeedBuildAll001)
 }
 
 /**
- * @tc.name: CleanCache001
- * @tc.desc: Test ArkoalaLazyNode CleanCache.
+ * @tc.name: ArkoalaLazyNodeRepeatMemOptDump001
+ * @tc.desc: Test ArkoalaLazyNode(Repeat) DumpInfo shows RepeatMemOpt enablement.
+ *           Covers the mem-opt (auto cache clear) dump display on Repeat nodes.
  * @tc.type: FUNC
  */
-TEST_F(ArkoalaLazyNodeTest, CleanCache001)
+HWTEST_F(ArkoalaLazyNodeTest, ArkoalaLazyNodeRepeatMemOptDump001, TestSize.Level1)
 {
-    auto lazyNode = AceType::MakeRefPtr<ArkoalaLazyNode>(GetNextId());
-    int32_t releaseCount = 0;
-    int32_t releasedIndex = -1;
-    int32_t updateStart = -1;
-    int32_t updateEnd = -1;
-    int32_t updateCacheStart = -1;
-    int32_t updateCacheEnd = -1;
-    bool updateIsLoop = true;
-    lazyNode->SetCallbacks(
-        [this](int32_t, bool) { return CreateFrameNode(GetNextId()); },
-        [&updateStart, &updateEnd, &updateCacheStart, &updateCacheEnd, &updateIsLoop](
-            int32_t start, int32_t end, int32_t cacheStart, int32_t cacheEnd, bool isLoop) {
-            updateStart = start;
-            updateEnd = end;
-            updateCacheStart = cacheStart;
-            updateCacheEnd = cacheEnd;
-            updateIsLoop = isLoop;
-        },
-        []() {},
-        [&releaseCount, &releasedIndex](int32_t index) {
-            ++releaseCount;
-            releasedIndex = index;
-        });
+    auto repeatNode = CreateRepeatNode(GetNextId());
+    ASSERT_NE(repeatNode, nullptr);
 
-    lazyNode->options_.memOptStrategy = LazyForEachMemOptStrategy::ENABLE_AUTO_CACHE_OPTIMIZATION;
-    lazyNode->activeRangeParam_ = { 0, 0, 1, 1 };
-    lazyNode->node4Index_.Put(0, CreateFrameNode(GetNextId()));
-    lazyNode->node4Index_.Put(1, CreateFrameNode(GetNextId()));
-    lazyNode->pendingCleanCache_ = true;
-    lazyNode->pendingRestoreCache_ = true;
+    auto findMemOpt = [](const std::string& needle) -> bool {
+        for (const auto& desc : DumpLog::GetInstance().description_) {
+            if (desc.find(needle) != std::string::npos) {
+                return true;
+            }
+        }
+        return false;
+    };
 
-    lazyNode->CleanCache(true);
+    /**
+     * @tc.steps: step1. ENABLE_AUTO_CACHE_OPTIMIZATION -> dump shows "enabled".
+     */
+    repeatNode->SetRepeatMemoryOptimizationStrategy(1);
+    DumpLog::GetInstance().description_.clear();
+    repeatNode->DumpInfo();
+    EXPECT_TRUE(findMemOpt("RepeatMemOpt: enabled"));
 
-    EXPECT_EQ(lazyNode->node4Index_.Size(), 1);
-    EXPECT_TRUE(lazyNode->node4Index_.ContainsKey(0));
-    EXPECT_FALSE(lazyNode->node4Index_.ContainsKey(1));
-    EXPECT_EQ(releaseCount, 1);
-    EXPECT_EQ(releasedIndex, 1);
-    EXPECT_EQ(updateStart, 0);
-    EXPECT_EQ(updateEnd, 0);
-    EXPECT_EQ(updateCacheStart, 0);
-    EXPECT_EQ(updateCacheEnd, 0);
-    EXPECT_FALSE(updateIsLoop);
-    EXPECT_FALSE(lazyNode->pendingCleanCache_);
-    EXPECT_FALSE(lazyNode->pendingRestoreCache_);
+    /**
+     * @tc.steps: step2. DEFAULT -> dump shows "disabled".
+     */
+    repeatNode->SetRepeatMemoryOptimizationStrategy(0);
+    DumpLog::GetInstance().description_.clear();
+    repeatNode->DumpInfo();
+    EXPECT_TRUE(findMemOpt("RepeatMemOpt: disabled"));
+
+    DumpLog::GetInstance().description_.clear();
+}
+
+/**
+ * @tc.name: ArkoalaLazyNodeRepeatMemOptDump002
+ * @tc.desc: Non-repeat ArkoalaLazyNode must NOT emit RepeatMemOpt (only isRepeat_ nodes do).
+ * @tc.type: FUNC
+ */
+HWTEST_F(ArkoalaLazyNodeTest, ArkoalaLazyNodeRepeatMemOptDump002, TestSize.Level1)
+{
+    auto lazyNode = CreateLazyForEachNode(GetNextId());
+    ASSERT_NE(lazyNode, nullptr);
+    lazyNode->SetRepeatMemoryOptimizationStrategy(1);
+    DumpLog::GetInstance().description_.clear();
+    lazyNode->DumpInfo();
+    bool found = false;
+    for (const auto& desc : DumpLog::GetInstance().description_) {
+        if (desc.find("RepeatMemOpt:") != std::string::npos) {
+            found = true;
+            break;
+        }
+    }
+    EXPECT_FALSE(found);
+    DumpLog::GetInstance().description_.clear();
 }
 } // namespace OHOS::Ace::NG

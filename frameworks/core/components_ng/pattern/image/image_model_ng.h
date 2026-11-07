@@ -149,6 +149,7 @@ public:
     static void SetResizableLattice(FrameNode* frameNode, const RefPtr<DrawingLattice>& lattice);
     static void ResetResizableLattice(FrameNode* frameNode);
     static ImageResizableSlice GetResizableSlice(FrameNode* frameNode);
+    static RefPtr<DrawingLattice> GetResizableLattice(FrameNode* frameNode);
     static void SetDynamicRangeMode(FrameNode* frameNode, DynamicRangeMode dynamicRangeMode);
     static void SetHdrBrightness(FrameNode* frameNode, float hdrBrightness);
     static void SetEnhancedImageQuality(FrameNode* frameNode, AIImageQuality imageQuality);

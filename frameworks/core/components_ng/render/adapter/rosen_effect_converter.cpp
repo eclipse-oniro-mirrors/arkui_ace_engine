@@ -30,20 +30,40 @@ constexpr uint32_t maskSdParams = 0b0111u;
 constexpr uint32_t maskEnvLightParams = 0b0111u;
 constexpr uint32_t maskEdLightParams = 0b0011u;
 const Rosen::Vector2f EMPTY_ROSEN_VECTOR2F { 0.0f, 0.0f };
+constexpr FrostedGlassParam::Array2 TINTED_GLASS_BG_RATES { 0.0f, 0.0f };
+constexpr FrostedGlassParam::Array3 TINTED_GLASS_BG_KBS { 1.0f, 0.0f, 1.0f };
+constexpr FrostedGlassParam::Array3 TINTED_GLASS_BG_POS { 1.0f, 1.0f, 1.0f };
+constexpr FrostedGlassParam::Array3 TINTED_GLASS_BG_NEG { 1.0f, 1.0f, 1.0f };
+const Rosen::Vector3f TINTED_GLASS_LUMA_PARAMS { 0.6628f, 0.3137f, 0.1538f };
+constexpr float TINTED_GLASS_MATERIAL_COLOR_FRACTION = 0.0f;
+
+inline float InterpolateFloat(float a, float b, float fraction)
+{
+    return a * fraction + b * (1.0f - fraction);
+}
+
+Rosen::Vector2f InterpolateToVec2f(
+    const FrostedGlassParam::Array2& a, const FrostedGlassParam::Array2& b, float alpha)
+{
+    return { InterpolateFloat(a[0], b[0], alpha), InterpolateFloat(a[1], b[1], alpha) };
+}
+
+Rosen::Vector3f InterpolateToVec3f(
+    const FrostedGlassParam::Array3& a, const FrostedGlassParam::Array3& b, float alpha)
+{
+    return { InterpolateFloat(a[0], b[0], alpha), InterpolateFloat(a[1], b[1], alpha),
+             InterpolateFloat(a[2], b[2], alpha) };
+}
 #endif
 } // namespace
 std::shared_ptr<Rosen::RSNGFilterBase> RosenEffectConverter::ConvertToFrostedGlassFilter(
-    const FrostedGlassParam& param, float oneVpValue)
+    const FrostedGlassParam& param, float oneVpValue, const ExtraGlassParam* extraParam)
 {
 #if !defined(PREVIEW)
     auto filter = std::make_shared<Rosen::RSNGFrostedGlassFilter>();
     filter->Setter<Rosen::FrostedGlassBlurParamsTag>(ConvertToVector2f(param.blurParams, oneVpValue, maskBlurParams));
     filter->Setter<Rosen::FrostedGlassWeightsEmbossTag>(ConvertToVector2f(param.weightsEmboss));
     filter->Setter<Rosen::FrostedGlassWeightsEdlTag>(ConvertToVector2f(param.weightsEdl));
-    filter->Setter<Rosen::FrostedGlassBgRatesTag>(ConvertToVector2f(param.bgRates));
-    filter->Setter<Rosen::FrostedGlassBgKBSTag>(ConvertToVector3f(param.bgKBS));
-    filter->Setter<Rosen::FrostedGlassBgPosTag>(ConvertToVector3f(param.bgPos));
-    filter->Setter<Rosen::FrostedGlassBgNegTag>(ConvertToVector3f(param.bgNeg));
     filter->Setter<Rosen::FrostedGlassBgAlphaTag>(param.bgAlpha);
     filter->Setter<Rosen::FrostedGlassRefractParamsTag>(
         ConvertToVector3f(param.refractParams, oneVpValue, maskRefactorParams));
@@ -71,10 +91,36 @@ std::shared_ptr<Rosen::RSNGFilterBase> RosenEffectConverter::ConvertToFrostedGla
     filter->Setter<Rosen::FrostedGlassDarkModeBlurParamsTag>(
         ConvertToVector2f(param.darkModeBlurParams, oneVpValue, maskBlurParams));
     filter->Setter<Rosen::FrostedGlassDarkModeWeightsEmbossTag>(ConvertToVector2f(param.darkModeWeightsEmboss));
-    filter->Setter<Rosen::FrostedGlassDarkModeBgRatesTag>(ConvertToVector2f(param.darkModeBgRates));
-    filter->Setter<Rosen::FrostedGlassDarkModeBgKBSTag>(ConvertToVector3f(param.darkModeBgKBS));
-    filter->Setter<Rosen::FrostedGlassDarkModeBgPosTag>(ConvertToVector3f(param.darkModeBgPos));
-    filter->Setter<Rosen::FrostedGlassDarkModeBgNegTag>(ConvertToVector3f(param.darkModeBgNeg));
+    // no FrostedGlassDarkModeEdLightAnglesTag in env.
+    // no FrostedGlassDarkModeEdLightKBSTag in env.
+    if (extraParam) {
+        float alpha = extraParam->alpha;
+        filter->Setter<Rosen::FrostedGlassColorBlendModeTag>(static_cast<int>(MaterialColorBlendMode::TINTED_GLASS));
+        filter->Setter<Rosen::FrostedGlassVibrancyStrengthTag>(1.0f - alpha);
+        filter->Setter<Rosen::FrostedGlassLumaParamsTag>(TINTED_GLASS_LUMA_PARAMS);
+        filter->Setter<Rosen::FrostedGlassMaterialColorFractionTag>(TINTED_GLASS_MATERIAL_COLOR_FRACTION);
+        filter->Setter<Rosen::FrostedGlassBgRatesTag>(InterpolateToVec2f(TINTED_GLASS_BG_RATES, param.bgRates, alpha));
+        filter->Setter<Rosen::FrostedGlassBgKBSTag>(InterpolateToVec3f(TINTED_GLASS_BG_KBS, param.bgKBS, alpha));
+        filter->Setter<Rosen::FrostedGlassBgPosTag>(InterpolateToVec3f(TINTED_GLASS_BG_POS, param.bgPos, alpha));
+        filter->Setter<Rosen::FrostedGlassBgNegTag>(InterpolateToVec3f(TINTED_GLASS_BG_NEG, param.bgNeg, alpha));
+        filter->Setter<Rosen::FrostedGlassDarkModeBgRatesTag>(
+            InterpolateToVec2f(TINTED_GLASS_BG_RATES, param.darkModeBgRates, alpha));
+        filter->Setter<Rosen::FrostedGlassDarkModeBgKBSTag>(
+            InterpolateToVec3f(TINTED_GLASS_BG_KBS, param.darkModeBgKBS, alpha));
+        filter->Setter<Rosen::FrostedGlassDarkModeBgPosTag>(
+            InterpolateToVec3f(TINTED_GLASS_BG_POS, param.darkModeBgPos, alpha));
+        filter->Setter<Rosen::FrostedGlassDarkModeBgNegTag>(
+            InterpolateToVec3f(TINTED_GLASS_BG_NEG, param.darkModeBgNeg, alpha));
+    } else {
+        filter->Setter<Rosen::FrostedGlassBgRatesTag>(ConvertToVector2f(param.bgRates));
+        filter->Setter<Rosen::FrostedGlassBgKBSTag>(ConvertToVector3f(param.bgKBS));
+        filter->Setter<Rosen::FrostedGlassBgPosTag>(ConvertToVector3f(param.bgPos));
+        filter->Setter<Rosen::FrostedGlassBgNegTag>(ConvertToVector3f(param.bgNeg));
+        filter->Setter<Rosen::FrostedGlassDarkModeBgRatesTag>(ConvertToVector2f(param.darkModeBgRates));
+        filter->Setter<Rosen::FrostedGlassDarkModeBgKBSTag>(ConvertToVector3f(param.darkModeBgKBS));
+        filter->Setter<Rosen::FrostedGlassDarkModeBgPosTag>(ConvertToVector3f(param.darkModeBgPos));
+        filter->Setter<Rosen::FrostedGlassDarkModeBgNegTag>(ConvertToVector3f(param.darkModeBgNeg));
+    }
     return filter;
 #else
     return nullptr;
@@ -99,7 +145,7 @@ std::shared_ptr<Rosen::RSNGFilterBase> RosenEffectConverter::ConvertToFrostedGla
 }
 
 std::shared_ptr<Rosen::RSNGShaderBase> RosenEffectConverter::ConvertToRSNGFrostedGlassEffectECSub(
-    const FrostedGlassParam& param, float oneVpValue, bool needSplitOverlayShader)
+    const FrostedGlassParam& param, float oneVpValue, bool needSplitOverlayShader, const ExtraGlassParam* extraParam)
 {
 #if !defined(PREVIEW) && !defined(CROSS_PLATFORM)
     auto filter = std::make_shared<Rosen::RSNGFrostedGlassEffect>();
@@ -107,14 +153,12 @@ std::shared_ptr<Rosen::RSNGShaderBase> RosenEffectConverter::ConvertToRSNGFroste
     if (needSplitOverlayShader) {
         filter->Setter<Rosen::FrostedGlassEffectWeightsEmbossTag>(EMPTY_ROSEN_VECTOR2F);
         filter->Setter<Rosen::FrostedGlassEffectWeightsEdlTag>(EMPTY_ROSEN_VECTOR2F);
+        // no FrostedGlassEffectDarkModeWeightsEmbossTag in env.
     } else {
         filter->Setter<Rosen::FrostedGlassEffectWeightsEmbossTag>(ConvertToVector2f(param.weightsEmboss));
         filter->Setter<Rosen::FrostedGlassEffectWeightsEdlTag>(ConvertToVector2f(param.weightsEdl));
+        // no FrostedGlassEffectDarkModeWeightsEmbossTag in env.
     }
-    filter->Setter<Rosen::FrostedGlassEffectBgRatesTag>(ConvertToVector2f(param.bgRates));
-    filter->Setter<Rosen::FrostedGlassEffectBgKBSTag>(ConvertToVector3f(param.bgKBS));
-    filter->Setter<Rosen::FrostedGlassEffectBgPosTag>(ConvertToVector3f(param.bgPos));
-    filter->Setter<Rosen::FrostedGlassEffectBgNegTag>(ConvertToVector3f(param.bgNeg));
     filter->Setter<Rosen::FrostedGlassEffectBgAlphaTag>(param.bgAlpha);
     filter->Setter<Rosen::FrostedGlassEffectRefractParamsTag>(
         ConvertToVector3f(param.refractParams, oneVpValue, maskRefactorParams));
@@ -137,14 +181,35 @@ std::shared_ptr<Rosen::RSNGShaderBase> RosenEffectConverter::ConvertToRSNGFroste
     filter->Setter<Rosen::FrostedGlassEffectEdLightKBSTag>(ConvertToVector3f(param.edLightKBS));
     filter->Setter<Rosen::FrostedGlassEffectEdLightPosTag>(ConvertToVector3f(param.edLightPos));
     filter->Setter<Rosen::FrostedGlassEffectEdLightNegTag>(ConvertToVector3f(param.edLightNeg));
-    // no FrostedGlassEffectDarkModeWeightsEmbossTag in blue env.
-    // no FrostedGlassEffectDarkModeBgRatesTag in blue env.
-    // no FrostedGlassEffectDarkModeBgKBSTag in blue env.
-    // no FrostedGlassEffectDarkModeBgPosTag in blue env.
-    // no FrostedGlassEffectDarkModeBgNegTag in blue env.
     // no FrostedGlassEffectDarkModeEdLightAnglesTag in blue env.
     // no FrostedGlassEffectDarkModeEdLightKBSTag in blue env.
 
+    if (extraParam) {
+        float alpha = extraParam->alpha;
+        filter->Setter<Rosen::FrostedGlassEffectColorBlendModeTag>(
+            static_cast<int>(MaterialColorBlendMode::TINTED_GLASS));
+        filter->Setter<Rosen::FrostedGlassEffectVibrancyStrengthTag>(1.0f - alpha);
+        filter->Setter<Rosen::FrostedGlassEffectLumaParamsTag>(TINTED_GLASS_LUMA_PARAMS);
+        filter->Setter<Rosen::FrostedGlassEffectMaterialColorFractionTag>(TINTED_GLASS_MATERIAL_COLOR_FRACTION);
+        filter->Setter<Rosen::FrostedGlassEffectBgRatesTag>(
+            InterpolateToVec2f(TINTED_GLASS_BG_RATES, param.bgRates, alpha));
+        filter->Setter<Rosen::FrostedGlassEffectBgKBSTag>(InterpolateToVec3f(TINTED_GLASS_BG_KBS, param.bgKBS, alpha));
+        filter->Setter<Rosen::FrostedGlassEffectBgPosTag>(InterpolateToVec3f(TINTED_GLASS_BG_POS, param.bgPos, alpha));
+        filter->Setter<Rosen::FrostedGlassEffectBgNegTag>(InterpolateToVec3f(TINTED_GLASS_BG_NEG, param.bgNeg, alpha));
+        // no FrostedGlassEffectDarkModeBgRatesTag in env.
+        // no FrostedGlassEffectDarkModeBgKBSTag in env.
+        // no FrostedGlassEffectDarkModeBgPosTag in env.
+        // no FrostedGlassEffectDarkModeBgNegTag in env.
+    } else {
+        filter->Setter<Rosen::FrostedGlassEffectBgRatesTag>(ConvertToVector2f(param.bgRates));
+        filter->Setter<Rosen::FrostedGlassEffectBgKBSTag>(ConvertToVector3f(param.bgKBS));
+        filter->Setter<Rosen::FrostedGlassEffectBgPosTag>(ConvertToVector3f(param.bgPos));
+        filter->Setter<Rosen::FrostedGlassEffectBgNegTag>(ConvertToVector3f(param.bgNeg));
+        // no FrostedGlassEffectDarkModeBgRatesTag in env.
+        // no FrostedGlassEffectDarkModeBgKBSTag in env.
+        // no FrostedGlassEffectDarkModeBgPosTag in env.
+        // no FrostedGlassEffectDarkModeBgNegTag in env.
+    }
     return filter;
 #else
     return nullptr;
@@ -152,17 +217,13 @@ std::shared_ptr<Rosen::RSNGShaderBase> RosenEffectConverter::ConvertToRSNGFroste
 }
 
 std::shared_ptr<Rosen::RSNGShaderBase> RosenEffectConverter::ConvertToRSNGFrostedGlassEffectECSubOverlay(
-    const FrostedGlassParam& param, float oneVpValue)
+    const FrostedGlassParam& param, float oneVpValue, const ExtraGlassParam* extraParam)
 {
 #if !defined(PREVIEW) && !defined(CROSS_PLATFORM)
     auto filter = std::make_shared<Rosen::RSNGFrostedGlassEffect>();
     auto envLightParams = ConvertToVector3f(param.envLightParams, oneVpValue, maskEnvLightParams);
     filter->Setter<Rosen::FrostedGlassEffectWeightsEmbossTag>(ConvertToVector2f(param.weightsEmboss));
     filter->Setter<Rosen::FrostedGlassEffectWeightsEdlTag>(ConvertToVector2f(param.weightsEdl));
-    filter->Setter<Rosen::FrostedGlassEffectBgRatesTag>(ConvertToVector2f(param.bgRates));
-    filter->Setter<Rosen::FrostedGlassEffectBgKBSTag>(ConvertToVector3f(param.bgKBS));
-    filter->Setter<Rosen::FrostedGlassEffectBgPosTag>(ConvertToVector3f(param.bgPos));
-    filter->Setter<Rosen::FrostedGlassEffectBgNegTag>(ConvertToVector3f(param.bgNeg));
     filter->Setter<Rosen::FrostedGlassEffectBgAlphaTag>(0.0f);
     filter->Setter<Rosen::FrostedGlassEffectRefractParamsTag>(
         ConvertToVector3f(param.refractParams, oneVpValue, maskRefactorParams));
@@ -186,13 +247,35 @@ std::shared_ptr<Rosen::RSNGShaderBase> RosenEffectConverter::ConvertToRSNGFroste
     filter->Setter<Rosen::FrostedGlassEffectEdLightPosTag>(ConvertToVector3f(param.edLightPos));
     filter->Setter<Rosen::FrostedGlassEffectEdLightNegTag>(ConvertToVector3f(param.edLightNeg));
     // no FrostedGlassEffectDarkModeWeightsEmbossTag in blue env.
-    // no FrostedGlassEffectDarkModeBgRatesTag in blue env.
-    // no FrostedGlassEffectDarkModeBgKBSTag in blue env.
-    // no FrostedGlassEffectDarkModeBgPosTag in blue env.
-    // no FrostedGlassEffectDarkModeBgNegTag in blue env.
     // no FrostedGlassEffectDarkModeEdLightAnglesTag in blue env.
     // no FrostedGlassEffectDarkModeEdLightKBSTag in blue env.
 
+    if (extraParam) {
+        float alpha = extraParam->alpha;
+        filter->Setter<Rosen::FrostedGlassEffectColorBlendModeTag>(
+            static_cast<int>(MaterialColorBlendMode::TINTED_GLASS));
+        filter->Setter<Rosen::FrostedGlassEffectVibrancyStrengthTag>(1.0f - alpha);
+        filter->Setter<Rosen::FrostedGlassEffectLumaParamsTag>(TINTED_GLASS_LUMA_PARAMS);
+        filter->Setter<Rosen::FrostedGlassEffectMaterialColorFractionTag>(TINTED_GLASS_MATERIAL_COLOR_FRACTION);
+        filter->Setter<Rosen::FrostedGlassEffectBgRatesTag>(
+            InterpolateToVec2f(TINTED_GLASS_BG_RATES, param.bgRates, alpha));
+        filter->Setter<Rosen::FrostedGlassEffectBgKBSTag>(InterpolateToVec3f(TINTED_GLASS_BG_KBS, param.bgKBS, alpha));
+        filter->Setter<Rosen::FrostedGlassEffectBgPosTag>(InterpolateToVec3f(TINTED_GLASS_BG_POS, param.bgPos, alpha));
+        filter->Setter<Rosen::FrostedGlassEffectBgNegTag>(InterpolateToVec3f(TINTED_GLASS_BG_NEG, param.bgNeg, alpha));
+        // no FrostedGlassEffectDarkModeBgRatesTag in env.
+        // no FrostedGlassEffectDarkModeBgKBSTag in env.
+        // no FrostedGlassEffectDarkModeBgPosTag in env.
+        // no FrostedGlassEffectDarkModeBgNegTag in env.
+    } else {
+        filter->Setter<Rosen::FrostedGlassEffectBgRatesTag>(ConvertToVector2f(param.bgRates));
+        filter->Setter<Rosen::FrostedGlassEffectBgKBSTag>(ConvertToVector3f(param.bgKBS));
+        filter->Setter<Rosen::FrostedGlassEffectBgPosTag>(ConvertToVector3f(param.bgPos));
+        filter->Setter<Rosen::FrostedGlassEffectBgNegTag>(ConvertToVector3f(param.bgNeg));
+        // no FrostedGlassEffectDarkModeBgRatesTag in env.
+        // no FrostedGlassEffectDarkModeBgKBSTag in env.
+        // no FrostedGlassEffectDarkModeBgPosTag in env.
+        // no FrostedGlassEffectDarkModeBgNegTag in env.
+    }
     return filter;
 #else
     return nullptr;

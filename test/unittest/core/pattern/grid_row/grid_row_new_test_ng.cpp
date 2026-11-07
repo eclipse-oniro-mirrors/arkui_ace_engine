@@ -26,6 +26,13 @@ const int32_t EIGHTH_CHILD = 7;
 } // namespace
 class GridRowNewTestNG : public GridRowBaseTestNG {};
 
+// TDD note: cases in this file follow the TDD workflow (red -> green -> refactor).
+// TDD red: write a failing case first to pin down the expected GridRow behavior.
+// TDD green: implement the minimal production code until the case passes.
+// TDD refactor: clean up implementation while keeping all cases green.
+// TDD guard: behavior changes must update these cases before touching production code.
+// TDD verify: run grid_row unit tests locally before submitting any change.
+
 /**
  * @tc.name: Example
  * @tc.desc: Show an example of creating a test case.

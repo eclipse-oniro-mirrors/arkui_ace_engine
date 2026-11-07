@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "PickerTest module"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "PickerTest entry ability"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "PickerTest"
+    }
+  ]
+}

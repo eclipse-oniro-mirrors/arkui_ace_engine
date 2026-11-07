@@ -1,0 +1,12 @@
+{
+  "actions": [
+    {
+      "result": {
+        "index": 0,
+        "status": 17,
+        "isFinal": false,
+        "streamingText": "人工智能卡片组件用于展示智能搜索结果，支持流式打字机渲染、乱序重组、grounding替换与折叠展开序重组，**开发者可经配置快速集成1**"
+      }
+    }
+  ]
+}

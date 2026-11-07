@@ -30,12 +30,12 @@ public:
 
     static Matrix4 CreateMatrix4(const std::vector<NG::TransformInfo>& transformVec, const Offset& globalPivot,
         const SvgLengthScaleRule& lengthRule);
-    static bool CreateTranslate(const std::vector<std::string>& paramVec, RSMatrix& matrix);
+    static bool CreateTranslate(const std::vector<double>& paramVec, RSMatrix& matrix);
     static double ObjectBoundingBoxTransform(double srcLength, const SvgLengthScaleRule& rule,
         SvgLengthType lengthType);
 private:
     static bool UpdateSingleTransform(
-        const std::string& funcType, const std::vector<std::string>& paramVec, Matrix4& matrix,
+        const std::string& funcType, const std::vector<double>& paramVec, Matrix4& matrix,
         const SvgLengthScaleRule& lengthRule);
 
     static void ApplyTransformPivot(const std::string& funcType, const Offset& finalPivot, Matrix4& matrix);

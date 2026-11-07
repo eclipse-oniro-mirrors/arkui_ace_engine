@@ -283,6 +283,7 @@ ohos_unittest("web_accessibility_event_report_unit_test_ohos") {
     "$ace_root/frameworks/bridge/common/dom/dom_type.cpp",
     "$ace_root/frameworks/core/accessibility/accessibility_manager_ng.cpp",
     "$ace_root/frameworks/core/accessibility/accessibility_session_adapter.cpp",
+    "$ace_root/frameworks/core/accessibility/node_utils/cmp_accessibility_registry.cpp",
     "$ace_root/frameworks/core/accessibility/hidumper/accessibility_hidumper.cpp",
     "$ace_root/frameworks/core/accessibility/js_inspector/inspect_badge.cpp",
     "$ace_root/frameworks/core/accessibility/js_inspector/inspect_button.cpp",

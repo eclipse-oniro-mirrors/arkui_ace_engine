@@ -104,6 +104,8 @@ public:
     V2::SwipeEdgeEffect GetEdgeEffect();
     void MarkDirtyNode();
     void UpdatePostion(float delta);
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
 
@@ -262,7 +264,14 @@ protected:
     std::optional<double> enableOpacity_;
 
 private:
+    void DumpAdvanceSwipeStateInfo(std::unique_ptr<JsonValue>& json);
+
+    void DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
     void InitSwiperAction(bool axisChanged);
+    void SetAccessibilitySelectAction(const RefPtr<AccessibilityProperty>& listItemAccessibilityProperty);
+    void SetAccessibilityClearSelectionAction(const RefPtr<AccessibilityProperty>& listItemAccessibilityProperty);
+    void SetAccessibilityScrollAction(const RefPtr<AccessibilityProperty>& listItemAccessibilityProperty);
     float GetFriction();
     void ChangeDeleteAreaStage();
     void StartSpringMotion(float start, float end, float velocity, bool isCloseAllSwipeActions = false);
@@ -316,6 +325,7 @@ private:
     RefPtr<SpringMotion> springMotion_;
 
     RefPtr<ListItemDragManager> dragManager_;
+    Color itemSelectedColor_ = Color::TRANSPARENT;
 
     OnFinishFunc onFinishEvent_;
     bool isLayouted_ = false;

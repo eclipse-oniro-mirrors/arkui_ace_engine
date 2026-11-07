@@ -24,6 +24,7 @@
 
 #include "test/mock/adapter/ohos/osal/mock_system_properties.h"
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
+#include "test/mock/frameworks/core/common/mock_resource_adapter_v2.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 #include "test/mock/frameworks/core/components_ng/render/mock_paragraph.h"
 
@@ -1164,9 +1165,12 @@ HWTEST_F(TextTimerTestNg, TextTimerPatternTest008, TestSize.Level0)
     Color testColor = theme->GetTextStyle().GetTextColor();
     EXPECT_EQ(layoutProperty->GetTextColor(), testColor);
 
-    ResourceObjectParams params { .value = "test", .type = ResourceObjectParamType::STRING };
+    const std::string textTimerColorResName = "textTimerColor008";
+    const Color textTimerColorResValue(0xFF123456);
+    ResourceObjectParams params { .value = textTimerColorResName, .type = ResourceObjectParamType::STRING };
     std::vector<ResourceObjectParams> resObjParamsList;
     resObjParamsList.push_back(params);
+    AddMockResourceDataByName(textTimerColorResName, textTimerColorResValue);
     RefPtr<ResourceObject> resObjWithId =
         AceType::MakeRefPtr<ResourceObject>(100000, 100001, resObjParamsList, "com.example.test", "entry", 100000);
     RefPtr<ResourceObject> resObjId =
@@ -1178,7 +1182,83 @@ HWTEST_F(TextTimerTestNg, TextTimerPatternTest008, TestSize.Level0)
     jsResourceType = JsTextTimerResourceType::FONTFAMILY;
     textTimerModel.CreateWithResourceObj(jsResourceType, resObjWithId);
     pattern->OnColorModeChange(colorMode);
-    EXPECT_EQ(layoutProperty->GetTextColor(), testColor);
+    EXPECT_EQ(layoutProperty->GetTextColor(), textTimerColorResValue);
+}
+
+/**
+ * @tc.name: TextTimerPatternTest009
+ * @tc.desc: Test OnLanguageConfigurationUpdate in stopwatch (non-countdown) mode.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTimerTestNg, TextTimerPatternTest009, TestSize.Level0)
+{
+    /**
+     * @tc.steps: step1. create texttimer frameNode in stopwatch mode.
+     */
+    TestProperty testProperty;
+    testProperty.format = std::make_optional(TEXT_TIMER_FORMAT);
+    testProperty.isCountDown = std::make_optional(IS_COUNT_DOWN);
+    testProperty.startTime = std::make_optional(START_TIME);
+    auto frameNode = CreateTextTimerParagraph(testProperty);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<TextTimerPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto textNode = AceType::DynamicCast<FrameNode>(frameNode->GetLastChild());
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    /**
+     * @tc.steps: step2. init pattern and set elapsed time.
+     */
+    pattern->InitTextTimerController();
+    pattern->OnModifyDone();
+    pattern->elapsedTime_ = ELAPSED_TIME_1;
+
+    /**
+     * @tc.steps: step3. call OnLanguageConfigurationUpdate.
+     * @tc.expected: text content refreshed through FormatDurationLocalized (mock returns "08:00:00").
+     */
+    pattern->OnLanguageConfigurationUpdate();
+    EXPECT_EQ(textLayoutProperty->GetContent(), FORMAT_DATA);
+}
+
+/**
+ * @tc.name: TextTimerPatternTest010
+ * @tc.desc: Test OnLanguageConfigurationUpdate in countdown mode.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTimerTestNg, TextTimerPatternTest010, TestSize.Level0)
+{
+    /**
+     * @tc.steps: step1. create texttimer frameNode in countdown mode.
+     */
+    TestProperty testProperty;
+    testProperty.format = std::make_optional(TEXT_TIMER_FORMAT);
+    testProperty.isCountDown = std::make_optional(IS_COUNT_DOWN_2);
+    testProperty.inputCount = std::make_optional(INPUT_COUNT);
+    auto frameNode = CreateTextTimerParagraph(testProperty);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<TextTimerPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto textNode = AceType::DynamicCast<FrameNode>(frameNode->GetLastChild());
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    /**
+     * @tc.steps: step2. init pattern and set elapsed time within inputCount.
+     */
+    pattern->InitTextTimerController();
+    pattern->OnModifyDone();
+    pattern->elapsedTime_ = ELAPSED_TIME_1;
+
+    /**
+     * @tc.steps: step3. call OnLanguageConfigurationUpdate.
+     * @tc.expected: remaining time computed and text content refreshed (mock returns "08:00:00").
+     */
+    pattern->OnLanguageConfigurationUpdate();
+    EXPECT_EQ(textLayoutProperty->GetContent(), FORMAT_DATA);
 }
 
 /**

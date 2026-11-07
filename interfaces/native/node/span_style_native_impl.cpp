@@ -15,6 +15,8 @@
 
 #include "securec.h"
 
+#include "base/log/log_wrapper.h"
+
 #include "gesture_impl.h"
 #include "node_extened.h"
 #include "node_model.h"
@@ -151,7 +153,10 @@ void ParseGestureStyleLonPress(const OH_ArkUI_GestureStyle& gestureStyle, ArkUIG
         uiEvent->apiVersion = event.apiVersion;
         uiEvent->inputEvent = gestureEvent->eventData.rawPointerEvent;
         gestureEvent->eventData.rawPointerEvent = uiEvent;
-        longPressFunc(gestureEvent);
+        {
+            LOG_CALLBACK("OH_ArkUI_GestureStyle_RegisterOnLongPressCallback", longPressFunc);
+            longPressFunc(gestureEvent);
+        }
         delete uiEvent;
         uiEvent = nullptr;
         gestureEvent->eventData.rawPointerEvent = nullptr;
@@ -174,6 +179,7 @@ ArkUIGestureStyle ConvertToOriginGestureStyle(const OH_ArkUI_GestureStyle& gestu
             uiEvent.inputEvent = &(event.clickEvent);
             uiEvent.apiVersion = event.apiVersion;
             nodeEvent.origin = &uiEvent;
+            LOG_CALLBACK("OH_ArkUI_GestureStyle_RegisterOnClickCallback", clickFunc);
             clickFunc(&nodeEvent);
         };
     }
@@ -193,6 +199,7 @@ ArkUIGestureStyle ConvertToOriginGestureStyle(const OH_ArkUI_GestureStyle& gestu
         uiEvent.inputEvent = &(event.touchEvent);
         uiEvent.apiVersion = event.apiVersion;
         nodeEvent.origin = &uiEvent;
+        LOG_CALLBACK("OH_ArkUI_GestureStyle_RegisterOnTouchCallback", touchFunc);
         touchFunc(&nodeEvent);
     };
     return originStyle;
@@ -282,6 +289,9 @@ ArkUIBackgroundColorStyle ConvertToOriginBackgroundColorStyle(const OH_ArkUI_Bac
     backgroundColorStyle.topRightRadius = style.topRightRadius;
     backgroundColorStyle.bottomLeftRadius = style.bottomLeftRadius;
     backgroundColorStyle.bottomRightRadius = style.bottomRightRadius;
+    backgroundColorStyle.borderWidth = style.borderWidth;
+    backgroundColorStyle.borderColor = style.borderColor;
+    backgroundColorStyle.hasBorderColor = style.hasBorderColor;
     return backgroundColorStyle;
 }
 
@@ -307,6 +317,7 @@ ArkUIImageAttachment ConvertToOriginImageAttachment(const OH_ArkUI_ImageAttachme
         }
     }
     imageAttachment.resource = attachment.resource;
+    imageAttachment.imageTag = attachment.imageTag;
     imageAttachment.width = attachment.width;
     imageAttachment.height = attachment.height;
     imageAttachment.verticalAlign = attachment.verticalAlign;
@@ -537,6 +548,7 @@ OH_ArkUI_ImageAttachment ConvertToCImageAttachment(const ArkUIImageAttachment& a
         imageAttachment.pixelMap = pixelmapNative.release();
     }
     imageAttachment.resource = attachment.resource;
+    imageAttachment.imageTag = attachment.imageTag;
     imageAttachment.width = attachment.width;
     imageAttachment.height = attachment.height;
     imageAttachment.verticalAlign = static_cast<ArkUI_ImageSpanAlignment>(attachment.verticalAlign);
@@ -578,6 +590,9 @@ OH_ArkUI_BackgroundColorStyle ConvertToCBackgroundColorStyle(const ArkUIBackgrou
     backgroundColorStyle.topRightRadius = style.topRightRadius;
     backgroundColorStyle.bottomLeftRadius = style.bottomLeftRadius;
     backgroundColorStyle.bottomRightRadius = style.bottomRightRadius;
+    backgroundColorStyle.borderWidth = style.borderWidth;
+    backgroundColorStyle.borderColor = style.borderColor;
+    backgroundColorStyle.hasBorderColor = style.hasBorderColor;
     return backgroundColorStyle;
 }
 
@@ -1143,6 +1158,9 @@ ArkUI_ErrorCode OH_ArkUI_SpanStyle_SetBackgroundColorStyle(
     spanStyle->backgroundColorStyle.topRightRadius = backgroundColorStyle->topRightRadius;
     spanStyle->backgroundColorStyle.bottomLeftRadius = backgroundColorStyle->bottomLeftRadius;
     spanStyle->backgroundColorStyle.bottomRightRadius = backgroundColorStyle->bottomRightRadius;
+    spanStyle->backgroundColorStyle.borderWidth = backgroundColorStyle->borderWidth;
+    spanStyle->backgroundColorStyle.borderColor = backgroundColorStyle->borderColor;
+    spanStyle->backgroundColorStyle.hasBorderColor = backgroundColorStyle->hasBorderColor;
     return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
 }
 
@@ -1157,6 +1175,9 @@ ArkUI_ErrorCode OH_ArkUI_SpanStyle_GetBackgroundColorStyle(
     backgroundColorStyle->topRightRadius = spanStyle->backgroundColorStyle.topRightRadius;
     backgroundColorStyle->bottomLeftRadius = spanStyle->backgroundColorStyle.bottomLeftRadius;
     backgroundColorStyle->bottomRightRadius = spanStyle->backgroundColorStyle.bottomRightRadius;
+    backgroundColorStyle->borderWidth = spanStyle->backgroundColorStyle.borderWidth;
+    backgroundColorStyle->borderColor = spanStyle->backgroundColorStyle.borderColor;
+    backgroundColorStyle->hasBorderColor = spanStyle->backgroundColorStyle.hasBorderColor;
     return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
 }
 
@@ -1236,6 +1257,7 @@ ArkUI_ErrorCode OH_ArkUI_SpanStyle_SetImageAttachment(
     spanStyle->imageAttachment.resizableSliceRight = imageAttachment->resizableSliceRight;
     spanStyle->imageAttachment.resizableSliceBottom = imageAttachment->resizableSliceBottom;
     spanStyle->imageAttachment.resizableLattice = imageAttachment->resizableLattice;
+    spanStyle->imageAttachment.imageTag = imageAttachment->imageTag;
     return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
 }
 
@@ -1275,6 +1297,7 @@ ArkUI_ErrorCode OH_ArkUI_SpanStyle_GetImageAttachment(
     imageAttachment->resizableSliceRight = spanStyle->imageAttachment.resizableSliceRight;
     imageAttachment->resizableSliceBottom = spanStyle->imageAttachment.resizableSliceBottom;
     imageAttachment->resizableLattice = spanStyle->imageAttachment.resizableLattice;
+    imageAttachment->imageTag = spanStyle->imageAttachment.imageTag;
     return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
 }
 
@@ -2116,6 +2139,40 @@ ArkUI_ErrorCode OH_ArkUI_BackgroundColorStyle_GetRadius(const OH_ArkUI_Backgroun
     return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
 }
 
+ArkUI_ErrorCode OH_ArkUI_BackgroundColorStyle_SetBorderWidth(OH_ArkUI_BackgroundColorStyle* style, float borderWidth)
+{
+    CHECK_NULL_RETURN(style, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    style->borderWidth = borderWidth;
+    return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_BackgroundColorStyle_GetBorderWidth(
+    const OH_ArkUI_BackgroundColorStyle* style, float* borderWidth)
+{
+    CHECK_NULL_RETURN(style, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    CHECK_NULL_RETURN(borderWidth, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    *borderWidth = style->borderWidth;
+    return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_BackgroundColorStyle_SetBorderColor(
+    OH_ArkUI_BackgroundColorStyle* style, uint32_t borderColor)
+{
+    CHECK_NULL_RETURN(style, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    style->borderColor = borderColor;
+    style->hasBorderColor = true;
+    return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_BackgroundColorStyle_GetBorderColor(
+    const OH_ArkUI_BackgroundColorStyle* style, uint32_t* borderColor)
+{
+    CHECK_NULL_RETURN(style, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    CHECK_NULL_RETURN(borderColor, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    *borderColor = style->borderColor;
+    return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
+}
+
 OH_ArkUI_UrlStyle* OH_ArkUI_UrlStyle_Create()
 {
     return new OH_ArkUI_UrlStyle;
@@ -2271,6 +2328,30 @@ ArkUI_ErrorCode OH_ArkUI_ImageAttachment_GetResource(
     }
     auto size = static_cast<size_t>(bufferSize);
     if (strncpy_s(buffer, size, imageAttachment->resource.c_str(), contentLength) != 0) {
+        return ArkUI_ErrorCode::ARKUI_ERROR_CODE_BUFFER_SIZE_ERROR;
+    }
+    return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_ImageAttachment_SetImageTag(OH_ArkUI_ImageAttachment* imageAttachment, const char* imageTag)
+{
+    CHECK_NULL_RETURN(imageAttachment && imageTag, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    imageAttachment->imageTag = std::string(imageTag);
+    return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_ImageAttachment_GetImageTag(
+    const OH_ArkUI_ImageAttachment* imageAttachment, int32_t bufferSize, char* buffer, int32_t* writeLength)
+{
+    CHECK_NULL_RETURN(imageAttachment && buffer && writeLength, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    const auto& tag = imageAttachment->imageTag.value_or("");
+    int32_t contentLength = static_cast<int32_t>(tag.size());
+    *writeLength = contentLength;
+    if (bufferSize < contentLength + 1) {
+        return ArkUI_ErrorCode::ARKUI_ERROR_CODE_BUFFER_SIZE_ERROR;
+    }
+    auto size = static_cast<size_t>(bufferSize);
+    if (strncpy_s(buffer, size, tag.c_str(), contentLength) != 0) {
         return ArkUI_ErrorCode::ARKUI_ERROR_CODE_BUFFER_SIZE_ERROR;
     }
     return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;

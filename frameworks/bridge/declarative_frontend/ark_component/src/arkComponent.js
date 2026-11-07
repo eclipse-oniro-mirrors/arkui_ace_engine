@@ -813,6 +813,21 @@ class EnableScrollWithMouseModifier extends ModifierWithKey {
 }
 EnableScrollWithMouseModifier.identity = Symbol('enableScrollWithMouse');
 
+class EnableScrollWithKeyboardModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().scrollable.resetEnableScrollWithKeyboard(node);
+    }
+    else {
+      getUINativeModule().scrollable.setEnableScrollWithKeyboard(node, this.value);
+    }
+  }
+}
+EnableScrollWithKeyboardModifier.identity = Symbol('enableScrollWithKeyboard');
+
 class ScrollBarMarginModifier extends ModifierWithKey {
   constructor(value) {
     super(value);
@@ -987,6 +1002,10 @@ class ArkScrollable extends ArkComponent {
   }
   enableScrollWithMouse(value) {
     modifierWithKey(this._modifiersWithKeys, EnableScrollWithMouseModifier.identity, EnableScrollWithMouseModifier, value);
+    return this;
+  }
+  enableScrollWithKeyboard(value) {
+    modifierWithKey(this._modifiersWithKeys, EnableScrollWithKeyboardModifier.identity, EnableScrollWithKeyboardModifier, value);
     return this;
   }
   scrollBarMargin(value) {
@@ -2294,7 +2313,7 @@ class SpanTextBackgroundStyleModifier extends ModifierWithKey {
         getUINativeModule().span.resetTextBackgroundStyle(node);
       }
       else {
-        getUINativeModule().span.setTextBackgroundStyle(node, textBackgroundStyle.color, textBackgroundStyle.radius.topLeft, textBackgroundStyle.radius.topRight, textBackgroundStyle.radius.bottomLeft, textBackgroundStyle.radius.bottomRight);
+        getUINativeModule().span.setTextBackgroundStyle(node, textBackgroundStyle.color, textBackgroundStyle.radius.topLeft, textBackgroundStyle.radius.topRight, textBackgroundStyle.radius.bottomLeft, textBackgroundStyle.radius.bottomRight, textBackgroundStyle.borderColor, textBackgroundStyle.borderWidth);
       }
     }
   }
@@ -5690,16 +5709,20 @@ class ArkTextBackGroundStyle {
   constructor() {
     this.color = undefined;
     this.radius = new ArkBorderRadius();
+    this.borderColor = undefined;
+    this.borderWidth = undefined;
   }
   isEqual(another) {
     return (this.color === another.color &&
-      this.radius.isEqual(another.arkRadius));
+      this.radius.isEqual(another.arkRadius) &&
+      this.borderColor === another.borderColor &&
+      this.borderWidth === another.borderWidth);
   }
   checkObjectDiff(another) {
     return !this.isEqual(another);
   }
   convertTextBackGroundStyleOptions(value) {
-    let _a, _b, _c, _d;
+    let _a, _b, _c, _d, _e, _f;
     if (isUndefined(value)) {
       return false;
     }
@@ -5721,6 +5744,18 @@ class ArkTextBackGroundStyle {
         this.radius.topRight = (_b = value.radius) === null || _b === void 0 ? void 0 : _b.topRight;
         this.radius.bottomLeft = (_c = value.radius) === null || _c === void 0 ? void 0 : _c.bottomLeft;
         this.radius.bottomRight = (_d = value.radius) === null || _d === void 0 ? void 0 : _d.bottomRight;
+      }
+    }
+    if (!isUndefined(value === null || value === void 0 ? void 0 : value.borderColor) &&
+        (value === null || value === void 0 ? void 0 : value.borderColor) !== null) {
+      if (isNumber(value.borderColor) || isString(value.borderColor) || isResource(value.borderColor)) {
+        this.borderColor = value.borderColor;
+      }
+    }
+    if (!isUndefined(value === null || value === void 0 ? void 0 : value.borderWidth) &&
+        (value === null || value === void 0 ? void 0 : value.borderWidth) !== null) {
+      if (isNumber(value.borderWidth) || isString(value.borderWidth) || isResource(value.borderWidth)) {
+        this.borderWidth = value.borderWidth;
       }
     }
     return true;
@@ -9567,6 +9602,10 @@ class ArkWebComponent extends ArkComponent {
     modifierWithKey(this._modifiersWithKeys, WebOnDetectedBlankScreenModifier.identity, WebOnDetectedBlankScreenModifier, callback);
     return this;
   }
+  onMonitoredBlankScreen(callback) {
+    modifierWithKey(this._modifiersWithKeys, WebOnMonitoredBlankScreenModifier.identity, WebOnMonitoredBlankScreenModifier, callback);
+    return this;
+  }
   blankScreenDetectionConfig(config) {
     if (config === undefined || config === null) {
       return this;
@@ -9577,6 +9616,10 @@ class ArkWebComponent extends ArkComponent {
     detectConfig.detectionMethods = config.detectionMethods;
     detectConfig.contentfulNodesCountThreshold = config.contentfulNodesCountThreshold;
     modifierWithKey(this._modifiersWithKeys, WebBlankScreenDetectionConfigModifier.identity, WebBlankScreenDetectionConfigModifier, detectConfig);
+    return this;
+  }
+  enableBlankScreenMonitor(enabled) {
+    modifierWithKey(this._modifiersWithKeys, WebEnableBlankScreenMonitorModifier.identity, WebEnableBlankScreenMonitorModifier, enabled);
     return this;
   }
   onFirstScreenPaint(callback) {
@@ -9665,6 +9708,10 @@ class ArkWebComponent extends ArkComponent {
   }
   defaultFontSize(size) {
     modifierWithKey(this._modifiersWithKeys, WebDefaultFontSizeModifier.identity, WebDefaultFontSizeModifier, size);
+    return this;
+  }
+  caretColor(value) {
+    modifierWithKey(this._modifiersWithKeys, WebCaretColorModifier.identity, WebCaretColorModifier, value);
     return this;
   }
   minFontSize(size) {
@@ -9861,6 +9908,10 @@ class ArkWebComponent extends ArkComponent {
     modifierWithKey(this._modifiersWithKeys, WebOnContextMenuHideModifier.identity, WebOnContextMenuHideModifier, callback);
     return this;
   }
+  onContextMenuUpdate(callback) {
+    modifierWithKey(this._modifiersWithKeys, WebOnContextMenuUpdateModifier.identity, WebOnContextMenuUpdateModifier, callback);
+    return this;
+  }
   keyboardAvoidMode(mode) {
     modifierWithKey(this._modifiersWithKeys, WebKeyboardAvoidModeModifier.identity, WebKeyboardAvoidModeModifier, mode);
     return this;
@@ -9912,6 +9963,14 @@ class ArkWebComponent extends ArkComponent {
   }
   forceEnableZoom(enabled) {
     modifierWithKey(this._modifiersWithKeys, WebForceEnableZoomModifier.identity, WebForceEnableZoomModifier, enabled);
+    return this;
+  }
+  flingSpeedLimit(value) {
+    modifierWithKey(this._modifiersWithKeys, WebFlingSpeedLimitModifier.identity, WebFlingSpeedLimitModifier, value);
+    return this;
+  }
+  visitedLinkPersistEnabled(enabled) {
+    modifierWithKey(this._modifiersWithKeys, VisitedLinkPersistEnabledModifier.identity, VisitedLinkPersistEnabledModifier, enabled);
     return this;
   }
   rotateRenderEffect(effect) {
@@ -10192,6 +10251,23 @@ class WebTextZoomRatioModifier extends ModifierWithKey {
 }
 WebTextZoomRatioModifier.identity = Symbol('webTextZoomRatioModifier');
 
+class WebCaretColorModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().web.resetCaretColor(node);
+    } else {
+      getUINativeModule().web.setCaretColor(node, this.value);
+    }
+  }
+  checkObjectDiff() {
+    return !isBaseOrResourceEqual(this.stageValue, this.value);
+  }
+}
+WebCaretColorModifier.identity = Symbol('webCaretColor');
+
 class WebInitialScaleModifier extends ModifierWithKey {
   constructor(value) {
     super(value);
@@ -10236,6 +10312,7 @@ class WebOnZoomChangeModifier extends ModifierWithKey {
     }
 }
 WebOnZoomChangeModifier.identity = Symbol('webOnZoomChangeModifier');
+
 
 class WebOnRequestSelectedModifier extends ModifierWithKey {
     constructor(value) {
@@ -10296,6 +10373,22 @@ class WebOnContextMenuHideModifier extends ModifierWithKey {
   }
 }
 WebOnContextMenuHideModifier.identity = Symbol('webOnContextMenuHideModifier');
+
+class WebOnContextMenuUpdateModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().web.resetOnContextMenuUpdate(node);
+    }
+    else {
+      getUINativeModule().web.setOnContextMenuUpdate(node, this.value);
+    }
+  }
+}
+WebOnContextMenuUpdateModifier.identity = Symbol('webOnContextMenuUpdateModifier');
+
 class WebGeolocationAccessModifier extends ModifierWithKey {
   constructor (value) {
     super(value);
@@ -11257,6 +11350,21 @@ class WebOnDetectedBlankScreenModifier extends ModifierWithKey {
 }
 WebOnDetectedBlankScreenModifier.identity = Symbol('webOnDetectedBlankScreenModifier');
 
+class WebOnMonitoredBlankScreenModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().web.resetOnMonitoredBlankScreen(node);
+    }
+    else {
+      getUINativeModule().web.setOnMonitoredBlankScreen(node, this.value);
+    }
+  }
+}
+WebOnMonitoredBlankScreenModifier.identity = Symbol('webOnMonitoredBlankScreenModifier');
+
 class WebBlankScreenDetectionConfigModifier extends ModifierWithKey {
   constructor(value) {
     super(value);
@@ -11278,6 +11386,20 @@ class WebBlankScreenDetectionConfigModifier extends ModifierWithKey {
   }
 }
 WebBlankScreenDetectionConfigModifier.identity = Symbol('webBlankScreenDetectionConfigModifier');
+
+class WebEnableBlankScreenMonitorModifier extends ModifierWithKey {
+  constructor(value) {
+      super(value);
+  }
+  applyPeer(node, reset) {
+      if (reset) {
+          getUINativeModule().web.resetEnableBlankScreenMonitor(node);
+      } else {
+          getUINativeModule().web.setEnableBlankScreenMonitor(node, this.value);
+      }
+  }
+}
+WebEnableBlankScreenMonitorModifier.identity = Symbol('webEnableBlankScreenMonitorModifier');
 
 class WebOnFirstScreenPaintModifier extends ModifierWithKey {
   constructor(value) {
@@ -11662,6 +11784,36 @@ class WebForceEnableZoomModifier extends ModifierWithKey {
   }
 }
 WebForceEnableZoomModifier.identity = Symbol('webForceEnableZoomModifier');
+
+class WebFlingSpeedLimitModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().web.resetFlingSpeedLimit(node);
+    } else {
+      getUINativeModule().web.setFlingSpeedLimit(node, this.value);
+    }
+  }
+}
+WebFlingSpeedLimitModifier.identity = Symbol('webFlingSpeedLimit');
+
+class VisitedLinkPersistEnabledModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  static identity = undefined;
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().web.resetVisitedLinkPersistEnabled(node);
+    } else {
+      getUINativeModule().web.setVisitedLinkPersistEnabled(node, this.value);
+    }
+  }
+}
+VisitedLinkPersistEnabledModifier.identity = Symbol('visitedLinkPersistEnabled');
+
 
 class WebBackToTopModifier extends ModifierWithKey {
   constructor(value) {
@@ -12145,6 +12297,19 @@ class ListSyncLoadModifier extends ModifierWithKey {
   }
 }
 ListSyncLoadModifier.identity = Symbol('listSyncLoad');
+class ListScrollPlaceholderModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().list.resetListScrollPlaceholder(node);
+    } else {
+      getUINativeModule().list.setListScrollPlaceholder(node, this.value);
+    }
+  }
+}
+ListScrollPlaceholderModifier.identity = Symbol('listScrollPlaceholder');
 class ListEditModeOptionsModifier extends ModifierWithKey {
   constructor(value) {
     super(value);
@@ -12707,6 +12872,11 @@ class ArkListComponent extends ArkScrollable {
   syncLoad(value) {
     modifierWithKey(this._modifiersWithKeys, ListSyncLoadModifier.identity,
       ListSyncLoadModifier, value);
+    return this;
+  }
+  scrollPlaceholder(provider) {
+    modifierWithKey(this._modifiersWithKeys, ListScrollPlaceholderModifier.identity,
+      ListScrollPlaceholderModifier, provider);
     return this;
   }
   editModeOptions(options) {
@@ -13665,7 +13835,8 @@ class ContainerSpanTextBackgroundStyleModifier extends ModifierWithKey {
           textBackgroundStyle.radius.topLeft,
           textBackgroundStyle.radius.topRight,
           textBackgroundStyle.radius.bottomLeft,
-          textBackgroundStyle.radius.bottomRight);
+          textBackgroundStyle.radius.bottomRight,
+          textBackgroundStyle.borderColor, textBackgroundStyle.borderWidth);
       }
     }
   }
@@ -13723,7 +13894,7 @@ class LazyColumnLayoutSpaceModifier extends ModifierWithKey {
     super(value);
   }
   applyPeer(node, reset) {
-    if (reset || !isObject(this.value)) {
+    if (reset) {
       getUINativeModule().lazyColumnLayout.resetSpace(node);
     }
     else {
@@ -13907,6 +14078,10 @@ class ArkContainerPickerComponent extends ArkComponent {
     modifierWithKey(this._modifiersWithKeys, ContainerPickerItemHeightModifier.identity, ContainerPickerItemHeightModifier, height);
     return this;
   }
+  selectedTextStyle(style) {
+    modifierWithKey(this._modifiersWithKeys, ContainerPickerSelectedTextStyleModifier.identity, ContainerPickerSelectedTextStyleModifier, style);
+    return this;
+  }
 
 }
 
@@ -14040,6 +14215,27 @@ class ContainerPickerItemHeightModifier extends ModifierWithKey {
   }
 }
 ContainerPickerItemHeightModifier.identity = Symbol('containerPickerItemHeight');
+
+class ContainerPickerSelectedTextStyleModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().containerPicker.resetContainerPickerSelectedTextStyle(node);
+    } else {
+      const style = this.value;
+      const color = style === null || style === void 0 ? void 0 : style.color;
+      const fontSize = style === null || style === void 0 ? void 0 : (style.font === null || style.font === void 0 ? void 0 : style.font.size);
+      const fontWeight = style === null || style === void 0 ? void 0 : (style.font === null || style.font === void 0 ? void 0 : style.font.weight);
+      const minFontSize = style === null || style === void 0 ? void 0 : style.minFontSize;
+      const maxFontSize = style === null || style === void 0 ? void 0 : style.maxFontSize;
+      const overflow = style === null || style === void 0 ? void 0 : style.overflow;
+      getUINativeModule().containerPicker.setContainerPickerSelectedTextStyle(node, color, fontSize, fontWeight, minFontSize, maxFontSize, overflow);
+    }
+  }
+}
+ContainerPickerSelectedTextStyleModifier.identity = Symbol('containerPickerSelectedTextStyle');
 // @ts-ignore
 if (globalThis.UIPickerComponent !== undefined) {
   globalThis.UIPickerComponent.attributeModifier = function (modifier) {

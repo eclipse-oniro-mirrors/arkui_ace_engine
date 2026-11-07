@@ -601,6 +601,40 @@ class ShadowModifier extends ModifierWithKey<ShadowOptions | ArkShadowStyle> {
   }
 }
 
+class ShadowShapeModifier extends ModifierWithKey<object | undefined> {
+  constructor(value: object | undefined) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('shadowShape');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().common.resetShadowShape(node);
+    } else {
+      getUINativeModule().common.setShadowShape(node, this.value);
+    }
+  }
+  checkObjectDiff(): boolean {
+    return true;
+  }
+}
+
+class ShadowClipModeModifier extends ModifierWithKey<ShadowClipMode | undefined> {
+  constructor(value: ShadowClipMode | undefined) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('shadowClipMode');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().common.resetShadowClipMode(node);
+    } else {
+      getUINativeModule().common.setShadowClipMode(node, this.value);
+    }
+  }
+  checkObjectDiff(): boolean {
+    return this.stageValue !== this.value;
+  }
+}
+
 class HitTestBehaviorModifier extends ModifierWithKey<number> {
   constructor(value: number) {
     super(value);
@@ -612,6 +646,16 @@ class HitTestBehaviorModifier extends ModifierWithKey<number> {
     } else {
       getUINativeModule().common.setHitTestBehavior(node, this.value);
     }
+  }
+}
+
+class AgentControlModeModifier extends ModifierWithKey<number> {
+  constructor(value: number) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('agentControlMode');
+  applyPeer(node: KNode, reset: boolean): void {
+    getUINativeModule().common.setAgentControlMode(node, reset ? undefined : this.value);
   }
 }
 
@@ -2685,6 +2729,43 @@ class SafeAreaPaddingModifier extends ModifierWithKey<ArkPadding> {
   }
 }
 
+function isSafeAreaInsetEdgeEqual(
+  stage: SafeAreaInsetEdgeConfig | undefined, value: SafeAreaInsetEdgeConfig | undefined): boolean {
+  if (stage === value) {
+    return true;
+  }
+  if (stage === undefined || value === undefined) {
+    return false;
+  }
+  return isBaseOrResourceEqual(stage.content, value.content) &&
+    isBaseOrResourceEqual(stage.spacing, value.spacing) &&
+    isBaseOrResourceEqual(stage.alignment, value.alignment);
+}
+
+class SafeAreaInsetModifier extends ModifierWithKey<SafeAreaInsetOptions | undefined> {
+  constructor(value: SafeAreaInsetOptions | undefined) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('safeAreaInset');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().common.resetSafeAreaInset(node);
+    } else {
+      getUINativeModule().common.setSafeAreaInset(node, this.value);
+    }
+  }
+
+  checkObjectDiff(): boolean {
+    if (this.stageValue === undefined || this.value === undefined) {
+      return this.stageValue !== this.value;
+    }
+    return !isSafeAreaInsetEdgeEqual(this.stageValue.top, this.value.top) ||
+      !isSafeAreaInsetEdgeEqual(this.stageValue.end, this.value.end) ||
+      !isSafeAreaInsetEdgeEqual(this.stageValue.bottom, this.value.bottom) ||
+      !isSafeAreaInsetEdgeEqual(this.stageValue.start, this.value.start);
+  }
+}
+
 class IgnoreLayoutSafeAreaCommonModifier extends ModifierWithKey<ArkSafeAreaExpandOpts | undefined> {
   constructor(value: ArkSafeAreaExpandOpts | undefined) {
     super(value);
@@ -4649,6 +4730,16 @@ class ArkComponent {
     return this;
   }
 
+
+  agentControlMode(value: number | undefined): this {
+    if (typeof value === 'number') {
+      modifierWithKey(this._modifiersWithKeys, AgentControlModeModifier.identity, AgentControlModeModifier, value);
+    } else {
+      modifierWithKey(this._modifiersWithKeys, AgentControlModeModifier.identity, AgentControlModeModifier, undefined);
+    }
+    return this;
+  }
+
   layoutWeight(value: number | string): this {
     if (isNumber(value)) {
       modifierWithKey(this._modifiersWithKeys, LayoutWeightModifier.identity, LayoutWeightModifier, value);
@@ -4720,6 +4811,15 @@ class ArkComponent {
       modifierWithKey(this._modifiersWithKeys, SafeAreaPaddingModifier.identity, SafeAreaPaddingModifier, arkValue);
     } else {
       modifierWithKey(this._modifiersWithKeys, SafeAreaPaddingModifier.identity, SafeAreaPaddingModifier, undefined);
+    }
+    return this;
+  }
+
+  safeAreaInset(options?: SafeAreaInsetOptions): this {
+    if (options === null || options === undefined || !isObject(options)) {
+      modifierWithKey(this._modifiersWithKeys, SafeAreaInsetModifier.identity, SafeAreaInsetModifier, undefined);
+    } else {
+      modifierWithKey(this._modifiersWithKeys, SafeAreaInsetModifier.identity, SafeAreaInsetModifier, options);
     }
     return this;
   }
@@ -5775,6 +5875,16 @@ class ArkComponent {
       return this;
     }
     modifierWithKey(this._modifiersWithKeys, ShadowModifier.identity, ShadowModifier, value);
+    return this;
+  }
+
+  shadowShape(shape: CircleShape | EllipseShape | PathShape | RectShape | undefined): this {
+    modifierWithKey(this._modifiersWithKeys, ShadowShapeModifier.identity, ShadowShapeModifier, shape);
+    return this;
+  }
+
+  shadowClipMode(mode: ShadowClipMode | undefined): this {
+    modifierWithKey(this._modifiersWithKeys, ShadowClipModeModifier.identity, ShadowClipModeModifier, mode);
     return this;
   }
 

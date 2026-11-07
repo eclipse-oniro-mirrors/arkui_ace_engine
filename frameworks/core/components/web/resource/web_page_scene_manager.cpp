@@ -305,10 +305,18 @@ int32_t WebPageSceneManager::BeginGetPageScene(int32_t processId,
     const std::string& ruleJsonOrRuleSetId, std::optional<WebPageSceneRuleSet>& ruleSetOut)
 {
     std::lock_guard<std::mutex> lock(mutex_);
+    // If already in-flight, reuse the stored ruleSet for subsequent webids
     if (pendingGetProcesses_.find(processId) != pendingGetProcesses_.end()) {
-        TAG_LOGW(AceLogTag::ACE_WEB,
-            "BeginGetPageScene: already has in-flight get, processId=%{public}d", processId);
-        return PAGE_SCENE_ERR_LAST_UNFINISH;
+        auto pendIt = pendingGetRules_.find(processId);
+        if (pendIt != pendingGetRules_.end()) {
+            ruleSetOut = pendIt->second;
+            return PAGE_SCENE_ERR_OK;
+        }
+        auto regIt = registeredRules_.find(processId);
+        if (regIt != registeredRules_.end()) {
+            ruleSetOut = regIt->second;
+            return PAGE_SCENE_ERR_OK;
+        }
     }
     // Check if already registered with matching ruleSetId — reuse
     auto regIt = registeredRules_.find(processId);
@@ -341,6 +349,167 @@ void WebPageSceneManager::CompleteGetPageScene(int32_t processId)
     std::lock_guard<std::mutex> lock(mutex_);
     pendingGetRules_.erase(processId);
     pendingGetProcesses_.erase(processId);
+    pendingGetRemaining_.erase(processId);
+    pendingGetReported_.erase(processId);
+}
+
+void WebPageSceneManager::InitGetRemaining(int32_t processId, int32_t count)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    // Clean any residual round state for the same processId — whether the previous
+    // round is still in-flight (counter > 0) or already zeroed inside its report/cleanup
+    // window. The previous round's own cleanup is instance-guarded (CompleteRoundPageScene)
+    // and will skip once the new counter is installed below, so residual pendingGetRules_
+    // must be cleared here — otherwise the new round's first BeginGetPageScene would
+    // reuse the previous round's temporary rule set via the in-flight branch.
+    auto prevIt = pendingGetRemaining_.find(processId);
+    if (prevIt != pendingGetRemaining_.end()) {
+        pendingGetRules_.erase(processId);
+        pendingGetProcesses_.erase(processId);
+        pendingGetRemaining_.erase(processId);
+    }
+    pendingGetRemaining_[processId] = std::make_shared<std::atomic<int32_t>>(count);
+    pendingGetReported_[processId] = false;
+}
+
+void WebPageSceneManager::DecrementGetRemaining(int32_t processId)
+{
+    std::shared_ptr<std::atomic<int32_t>> remaining;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = pendingGetRemaining_.find(processId);
+        if (it == pendingGetRemaining_.end()) {
+            return;
+        }
+        remaining = it->second;
+    }
+    DecrementCounterAndComplete(processId, remaining);
+}
+
+void WebPageSceneManager::ReportEmptyWebRound(int32_t processId)
+{
+    // Replace any previous in-flight round instance with a fresh zero counter so late
+    // callbacks from the previous round are discarded by the round validation instead
+    // of being reported again as this round's answer; the zero counter's completion
+    // fallback then emits the single empty result for this round.
+    InitGetRemaining(processId, 0);
+    DecrementGetRemaining(processId);
+}
+
+std::shared_ptr<std::atomic<int32_t>> WebPageSceneManager::GetRoundRemaining(int32_t processId)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto it = pendingGetRemaining_.find(processId);
+    if (it == pendingGetRemaining_.end()) {
+        return nullptr;
+    }
+    return it->second;
+}
+
+void WebPageSceneManager::DecrementRoundRemaining(int32_t processId,
+    const std::shared_ptr<std::atomic<int32_t>>& roundRemaining)
+{
+    if (!roundRemaining) {
+        return;
+    }
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = pendingGetRemaining_.find(processId);
+        // Stale round: this counter instance has been replaced by a newer round.
+        // Ignore the late callback so it cannot consume the new round's budget.
+        if (it == pendingGetRemaining_.end() || it->second != roundRemaining) {
+            return;
+        }
+    }
+    DecrementCounterAndComplete(processId, roundRemaining);
+}
+
+void WebPageSceneManager::DecrementCounterAndComplete(int32_t processId,
+    const std::shared_ptr<std::atomic<int32_t>>& remaining)
+{
+    if (!remaining) {
+        return;
+    }
+    int32_t rem = remaining->fetch_sub(1, std::memory_order_acq_rel) - 1;
+    if (rem > 0) {
+        return;
+    }
+    bool needFallbackReport = false;
+    {
+        // Re-validate under lock: the round may have been superseded (or completed)
+        // while this thread was decrementing.
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = pendingGetRemaining_.find(processId);
+        if (it == pendingGetRemaining_.end() || it->second != remaining) {
+            return;
+        }
+        needFallbackReport = !pendingGetReported_[processId];
+    }
+    if (needFallbackReport) {
+        // Guarantee at least one report per round: if nothing was reported (all patterns
+        // gone, all rules disabled, or only error payloads), emit a single empty result
+        // so the session-side pending get cannot deadlock. OnMatchResultForRound
+        // re-validates the round instance so a superseded round never emits it.
+        OnMatchResultForRound(processId, "", remaining);
+    }
+    // Reporting can synchronously reach the session side and admit a new round for the
+    // same pid on another thread, so the cleanup below is gated on this round's counter
+    // instance still being current — erasing by pid unconditionally could wipe the new
+    // round's state and leave it unable to complete.
+    CompleteRoundPageScene(processId, remaining);
+}
+
+bool WebPageSceneManager::IsRoundCurrent(int32_t processId,
+    const std::shared_ptr<std::atomic<int32_t>>& roundRemaining)
+{
+    if (!roundRemaining) {
+        return false;
+    }
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto it = pendingGetRemaining_.find(processId);
+    return it != pendingGetRemaining_.end() && it->second == roundRemaining;
+}
+
+void WebPageSceneManager::OnMatchResultForRound(int32_t processId, const std::string& sceneJson,
+    const std::shared_ptr<std::atomic<int32_t>>& roundRemaining)
+{
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = pendingGetRemaining_.find(processId);
+        if (it == pendingGetRemaining_.end() || it->second != roundRemaining) {
+            // Stale round: a late callback must not answer the current round.
+            return;
+        }
+        // The reported flag is set inside the same critical section as the round
+        // validation: re-marking after the synchronous report IPC below could
+        // interleave with a newer round's InitGetRemaining and wrongly suppress that
+        // round's fallback empty report, so the report body must not mark again.
+        pendingGetReported_[processId] = true;
+    }
+    ReportMatchResult(processId, sceneJson, true);
+}
+
+void WebPageSceneManager::CompleteRoundPageScene(int32_t processId,
+    const std::shared_ptr<std::atomic<int32_t>>& roundRemaining)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto it = pendingGetRemaining_.find(processId);
+    // Only clean up when this round is still current: reporting before this point can
+    // synchronously release the session-side pending and admit a new round for the same
+    // pid on another thread; erasing by pid unconditionally would wipe the new round.
+    if (it == pendingGetRemaining_.end() || it->second != roundRemaining) {
+        return;
+    }
+    pendingGetRules_.erase(processId);
+    pendingGetProcesses_.erase(processId);
+    pendingGetRemaining_.erase(processId);
+    pendingGetReported_.erase(processId);
+}
+
+void WebPageSceneManager::MarkGetReported(int32_t processId)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    pendingGetReported_[processId] = true;
 }
 
 namespace {
@@ -455,10 +624,21 @@ void WebPageSceneManager::FlushExitOnNavigate(int32_t processId, int32_t webId, 
 
 void WebPageSceneManager::OnMatchResult(int32_t processId, const std::string& sceneJson, bool isGetResult)
 {
+    ReportMatchResult(processId, sceneJson, isGetResult);
+    if (isGetResult) {
+        MarkGetReported(processId);
+    }
+}
+
+void WebPageSceneManager::ReportMatchResult(int32_t processId, const std::string& sceneJson, bool isGetResult)
+{
     if (sceneJson.empty()) {
         TAG_LOGI(AceLogTag::ACE_WEB,
             "PageSceneReport: OnMatchResult EMPTY processId=%{public}d isGetResult=%{public}d",
             processId, isGetResult);
+        if (isGetResult) {
+            UiSessionManager::GetInstance()->ReportPageSceneEvent(processId, sceneJson, isGetResult);
+        }
         return;
     }
     auto root = JsonUtil::ParseJsonString(sceneJson);
@@ -902,8 +1082,35 @@ void WebPageSceneManager::ProcessQueryResult(int32_t processId, int32_t webId, i
     const std::string& selectorJson, const std::string& rawResult, bool isGetResult)
 {
     auto results = ProcessQueryResultCore(processId, webId, hostNodeId, selectorJson, rawResult, isGetResult);
+    if (results.empty()) {
+        // Unify the empty-result reporting path through OnMatchResult so that logging and
+        // reporting share a single exit. Decrement stays in the localRemaining closure of
+        // ExecuteGetPageSceneMatch (unchanged); OnMatchResult only reports here.
+        OnMatchResult(processId, "", isGetResult);
+        return;
+    }
     for (const auto& sceneJson : results) {
         OnMatchResult(processId, sceneJson, isGetResult);
+    }
+}
+
+void WebPageSceneManager::ProcessQueryResultForRound(int32_t processId, int32_t webId, int32_t hostNodeId,
+    const std::string& selectorJson, const std::string& rawResult,
+    const std::shared_ptr<std::atomic<int32_t>>& roundRemaining)
+{
+    if (!IsRoundCurrent(processId, roundRemaining)) {
+        // Stale round: the late callback is discarded entirely — it must neither update
+        // the current round's rule state nor report its data (or its empty string) as
+        // the new round's answer.
+        return;
+    }
+    auto results = ProcessQueryResultCore(processId, webId, hostNodeId, selectorJson, rawResult, true);
+    if (results.empty()) {
+        OnMatchResultForRound(processId, "", roundRemaining);
+        return;
+    }
+    for (const auto& sceneJson : results) {
+        OnMatchResultForRound(processId, sceneJson, roundRemaining);
     }
 }
 

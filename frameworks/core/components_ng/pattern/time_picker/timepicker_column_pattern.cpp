@@ -160,7 +160,7 @@ bool TimePickerColumnPattern::IsStartEndTimeDefined()
 
 bool TimePickerColumnPattern::IsTossNeedToStop()
 {
-    return IsStartEndTimeDefined();
+    return !GetCanLoopFromLayoutPropertyWithStartEnd();
 }
 
 void TimePickerColumnPattern::InitTextFontFamily()
@@ -527,12 +527,30 @@ bool TimePickerColumnPattern::GetCanLoopFromLayoutPropertyWithStartEnd() const
     CHECK_NULL_RETURN(parentNode, false);
     auto timePickerRowPattern = parentNode->GetPattern<TimePickerRowPattern>();
     CHECK_NULL_RETURN(timePickerRowPattern, false);
-    if (timePickerRowPattern->IsStartEndTimeDefined()) {
-        return false;
-    }
     auto layoutProperty = parentNode->GetLayoutProperty<TimePickerLayoutProperty>();
     CHECK_NULL_RETURN(layoutProperty, false);
-    return layoutProperty->GetLoopValue(true);
+    bool canLoop = layoutProperty->GetLoopValue(true);
+    if (!canLoop) {
+        return false;
+    }
+    if (!timePickerRowPattern->IsStartEndTimeDefined()) {
+        return true;
+    }
+    bool atHourBoundary = timePickerRowPattern->IsAtStartHour() || timePickerRowPattern->IsAtEndHour();
+    auto hourColumn = timePickerRowPattern->GetHourColumnNode();
+    auto minuteColumn = timePickerRowPattern->GetMinuteColumnNode();
+    auto secondColumn = timePickerRowPattern->GetSecondColumnNode();
+    if (host == hourColumn) {
+        return false;
+    }
+    if (host == minuteColumn) {
+        return !atHourBoundary;
+    }
+    if (host == secondColumn) {
+        bool atMinuteBoundary = timePickerRowPattern->IsAtStartMinute() || timePickerRowPattern->IsAtEndMinute();
+        return !atMinuteBoundary;
+    }
+    return !atHourBoundary;
 }
 
 void TimePickerColumnPattern::InitOnKeyEvent(const RefPtr<FocusHub>& focusHub)

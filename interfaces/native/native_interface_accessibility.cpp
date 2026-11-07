@@ -23,8 +23,10 @@
 #include "base/utils/utils.h"
 #include "frameworks/core/accessibility/native_interface_accessibility_impl.h"
 #include "frameworks/core/accessibility/native_interface_accessibility_provider.h"
+#include "interfaces/native/node/config_manager.h"
 #include "interfaces/native/node/node_model.h"
 #include "interfaces/native/native_error_message_macros.h"
+#include "native_node.h"
 #include "native_type.h"
 
 namespace {
@@ -789,6 +791,7 @@ int32_t OH_ArkUI_AccessibilityElementInfoSetComponentIdentifier(
 int32_t OH_ArkUI_NativeModule_GetNativeAccessibilityProvider(
     ArkUI_NodeHandle* node, ArkUI_AccessibilityProvider** provider)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NativeModule_GetNativeAccessibilityProvider");
     if ((node == nullptr) || (provider == nullptr)) {
         SET_ERROR_MESSAGE(
             ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__,
@@ -797,6 +800,7 @@ int32_t OH_ArkUI_NativeModule_GetNativeAccessibilityProvider(
     }
     ArkUI_NodeHandle nativeNode = *node;
     *provider = nullptr;
+    CHECK_NODE_DISPOSED(nativeNode, "Node has been disposed");
 
     if (!OHOS::Ace::NodeModel::IsValidArkUINode(nativeNode)) {
         SET_ERROR_MESSAGE(
@@ -826,6 +830,134 @@ int32_t OH_ArkUI_NativeModule_GetNativeAccessibilityProvider(
     }
     *provider = arkuiProvider;
     return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+// ============================================================================
+// CMP mixed-rendering: BindExportTree / UnbindExportTree CAPI implementation.
+// ============================================================================
+
+namespace {
+using namespace OHOS::Ace;
+
+// The owner must be a node type capable of hosting CMP mixed-rendered content.
+bool IsSupportedOwnerNodeType(const ArkUI_NodeHandle node)
+{
+    if (node == nullptr) {
+        return false;
+    }
+    int32_t nodeType = node->type;
+    return nodeType == -1 || nodeType == ARKUI_NODE_CUSTOM || nodeType == ARKUI_NODE_XCOMPONENT ||
+        nodeType == ARKUI_NODE_XCOMPONENT_TEXTURE;
+}
+
+// Hover registration accepts only drawing hosts, including handles whose type is resolved from the tag.
+bool IsSupportedHoverNodeType(const ArkUI_NodeHandle node)
+{
+    if (node == nullptr) {
+        return false;
+    }
+    int32_t nodeType = node->type;
+    if (nodeType == -1) {
+        nodeType = OHOS::Ace::NodeModel::GetNodeTypeByTag(node);
+    }
+    return nodeType == ARKUI_NODE_CUSTOM || nodeType == ARKUI_NODE_XCOMPONENT ||
+        nodeType == ARKUI_NODE_XCOMPONENT_TEXTURE;
+}
+} // namespace
+
+int32_t OH_ArkUI_Accessibility_BindExportTree(
+    ArkUI_NodeHandle owner, int64_t bindId, ArkUI_NodeHandle exportedRoot)
+{
+    // Null check first: CheckIsCNode dereferences the handle (no internal null guard), so a nullptr must be rejected.
+    if (owner == nullptr || exportedRoot == nullptr) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__,
+            "owner or exportedRoot is null");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    if (!OHOS::Ace::NodeModel::CheckIsCNode(owner) ||
+        !OHOS::Ace::NodeModel::CheckIsCNode(exportedRoot)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__,
+            "owner or exportedRoot is invalid");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    if (!IsSupportedOwnerNodeType(owner)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__,
+            "owner type must be ARKUI_NODE_CUSTOM, ARKUI_NODE_XCOMPONENT or ARKUI_NODE_XCOMPONENT_TEXTURE");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    const auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
+    CHECK_NULL_RETURN_WITH_MESSAGE(
+        impl, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "impl is null");
+    // Frame node modifier route (validation and dispatch live behind the modifier).
+    return impl->getNodeModifiers()->getFrameNodeModifier()->bindAccessibilityExportTree(
+        owner->uiNodeHandle, bindId, exportedRoot->uiNodeHandle);
+}
+
+int32_t OH_ArkUI_Accessibility_UnbindExportTree(
+    ArkUI_NodeHandle owner, int64_t bindId)
+{
+    // Null check first (same rationale as BindExportTree): reject nullptr with 401 before CheckIsCNode dereferences the handle.
+    if (owner == nullptr) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "owner is null");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    if (!OHOS::Ace::NodeModel::CheckIsCNode(owner)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "owner is invalid");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    if (!IsSupportedOwnerNodeType(owner)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__,
+            "owner type must be ARKUI_NODE_CUSTOM, ARKUI_NODE_XCOMPONENT or ARKUI_NODE_XCOMPONENT_TEXTURE");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    const auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
+    CHECK_NULL_RETURN_WITH_MESSAGE(
+        impl, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "impl is null");
+    // Frame node modifier route.
+    return impl->getNodeModifiers()->getFrameNodeModifier()->unbindAccessibilityExportTree(
+        owner->uiNodeHandle, bindId);
+}
+
+int32_t OH_ArkUI_Accessibility_RegisterAccessibilityHoverEventHandler(ArkUI_NodeHandle node, void* userData,
+    void (*handleAccessibilityHoverEvent)(void*, int32_t, int32_t, int32_t, ArkUI_AccessibilityElementInfo*))
+{
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
+    CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "node is null");
+    CHECK_NULL_RETURN_WITH_MESSAGE(handleAccessibilityHoverEvent, ARKUI_ERROR_CODE_PARAM_ERROR,
+        __FUNCTION__, "handleAccessibilityHoverEvent is null");
+    if (!IsSupportedHoverNodeType(node)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_ATTRIBUTE_OR_EVENT_NOT_SUPPORTED, __FUNCTION__,
+            "node type must be ARKUI_NODE_XCOMPONENT, ARKUI_NODE_CUSTOM or ARKUI_NODE_XCOMPONENT_TEXTURE");
+        return ARKUI_ERROR_CODE_ATTRIBUTE_OR_EVENT_NOT_SUPPORTED;
+    }
+    const auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
+    CHECK_NULL_RETURN_WITH_MESSAGE(impl, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "impl is null");
+    const auto* modifier = impl->getNodeModifiers()->getFrameNodeModifier();
+    CHECK_NULL_RETURN_WITH_MESSAGE(modifier->registerAccessibilityHoverEventHandler,
+        ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "hover handler registration is unavailable");
+    return ReturnAccessibilityResultWithFunctionName(modifier->registerAccessibilityHoverEventHandler(
+        node->uiNodeHandle, userData, handleAccessibilityHoverEvent), ARKUI_ERROR_CODE_NO_ERROR, __FUNCTION__);
+}
+
+int32_t OH_ArkUI_Accessibility_UnregisterAccessibilityHoverEventHandler(ArkUI_NodeHandle node)
+{
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
+    if (node == nullptr) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "node is null");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    if (!IsSupportedHoverNodeType(node)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_ATTRIBUTE_OR_EVENT_NOT_SUPPORTED, __FUNCTION__,
+            "node type must be ARKUI_NODE_XCOMPONENT, ARKUI_NODE_CUSTOM or ARKUI_NODE_XCOMPONENT_TEXTURE");
+        return ARKUI_ERROR_CODE_ATTRIBUTE_OR_EVENT_NOT_SUPPORTED;
+    }
+    const auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
+    CHECK_NULL_RETURN_WITH_MESSAGE(impl, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "impl is null");
+    const auto* modifier = impl->getNodeModifiers()->getFrameNodeModifier();
+    CHECK_NULL_RETURN_WITH_MESSAGE(modifier->unregisterAccessibilityHoverEventHandler,
+        ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "hover handler unregistration is unavailable");
+    return ReturnAccessibilityResultWithFunctionName(modifier->unregisterAccessibilityHoverEventHandler(
+        node->uiNodeHandle), ARKUI_ERROR_CODE_NO_ERROR, __FUNCTION__);
 }
 
 #ifdef __cplusplus

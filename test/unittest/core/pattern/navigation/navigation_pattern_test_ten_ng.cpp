@@ -944,4 +944,184 @@ HWTEST_F(NavigationPatternTestTenNg, ClearContentStackIfNeeded009, TestSize.Leve
     ASSERT_EQ(pattern->homeNodeTouched_, std::nullopt);
     ASSERT_FALSE(pattern->needSyncWithJsStack_);
 }
+
+/**
+ * @tc.name: StartTransitionPreChange001
+ * @tc.desc: Test StartTransition reports PAGE_PRE_CHANGE with valid topDestination (animation path)
+ *           PAGE_PRE_CHANGE fires at StartTransition entry before any transition logic executes
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestTenNg, StartTransitionPreChange001, TestSize.Level1)
+{
+    NavigationPatternTestTenNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto& stack = pattern->navigationStack_;
+    ASSERT_NE(stack, nullptr);
+    auto preTop = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(preTop, nullptr);
+    std::pair<std::string, RefPtr<UINode>> testPair1{"page01", preTop};
+    auto curTop = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(curTop, nullptr);
+    std::pair<std::string, RefPtr<UINode>> testPair2{"page02", curTop};
+    stack->navPathList_.clear();
+    stack->navPathList_.push_back(testPair1);
+    stack->navPathList_.push_back(testPair2);
+    pattern->forceSplitSuccess_ = false;
+    pattern->prePrimaryNodes_.clear();
+    pattern->prePrimaryNodes_.push_back(WeakPtr(preTop));
+
+    // isAnimated=true takes animation path; prePrimaryNodes_ not cleared synchronously
+    pattern->StartTransition(preTop, curTop, true, false, true);
+    EXPECT_FALSE(pattern->isReplace_);
+}
+
+/**
+ * @tc.name: StartTransitionPreChange002
+ * @tc.desc: Test StartTransition reports PAGE_PRE_CHANGE for no-animation path
+ *           isAnimated=false triggers TransitionWithOutAnimation, PAGE_PRE_CHANGE fires at entry
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestTenNg, StartTransitionPreChange002, TestSize.Level1)
+{
+    NavigationPatternTestTenNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto& stack = pattern->navigationStack_;
+    ASSERT_NE(stack, nullptr);
+    auto preTop = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(preTop, nullptr);
+    std::pair<std::string, RefPtr<UINode>> testPair1{"page01", preTop};
+    auto curTop = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(curTop, nullptr);
+    std::pair<std::string, RefPtr<UINode>> testPair2{"page02", curTop};
+    stack->navPathList_.clear();
+    stack->navPathList_.push_back(testPair1);
+    stack->navPathList_.push_back(testPair2);
+    pattern->forceSplitSuccess_ = false;
+    pattern->prePrimaryNodes_.push_back(WeakPtr(preTop));
+
+    // isAnimated=false takes no-animation path; prePrimaryNodes_ cleared by StartTransition
+    pattern->StartTransition(preTop, curTop, false, true, false);
+    EXPECT_TRUE(pattern->prePrimaryNodes_.empty());
+}
+
+/**
+ * @tc.name: StartTransitionPreChange003
+ * @tc.desc: Test StartTransition with null topDestination reports PAGE_PRE_CHANGE with id=-1
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestTenNg, StartTransitionPreChange003, TestSize.Level1)
+{
+    NavigationPatternTestTenNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->forceSplitSuccess_ = false;
+    auto tempDest = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(tempDest, nullptr);
+    pattern->prePrimaryNodes_.push_back(WeakPtr(tempDest));
+
+    // null topDestination — accessibilityId is -1, no-animation path clears prePrimaryNodes_
+    pattern->StartTransition(nullptr, nullptr, false, true, false);
+    EXPECT_TRUE(pattern->prePrimaryNodes_.empty());
+    EXPECT_FALSE(pattern->isReplace_);
+}
+
+/**
+ * @tc.name: RecoveryToLastStackPreChange001
+ * @tc.desc: Test RecoveryToLastStack reports PAGE_PRE_CHANGE before lifecycle changes
+ *           PAGE_PRE_CHANGE fires after UpdateNavDestinationNodeWithoutMarkDirty,
+ *           before ON_INACTIVE/ON_HIDE/ON_ACTIVE lifecycle notifications
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestTenNg, RecoveryToLastStackPreChange001, TestSize.Level1)
+{
+    NavigationPatternTestTenNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->navigationStack_ = AceType::MakeRefPtr<MockNavigationStack>();
+    ASSERT_NE(pattern->navigationStack_, nullptr);
+    auto preTop = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(preTop, nullptr);
+    auto newTop = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(newTop, nullptr);
+    NavPathList navPathList;
+    navPathList.emplace_back(std::make_pair("page01", preTop));
+    pattern->navigationStack_->SetNavPathList(navPathList);
+    pattern->navigationStack_->UpdateRecoveryList();
+    pattern->OnModifyDone();
+    navNode->isOnAnimation_ = true;
+
+    // RecoveryToLastStack: PAGE_PRE_CHANGE before lifecycle, SetIsOnAnimation(false) at end
+    pattern->RecoveryToLastStack(preTop, newTop);
+    EXPECT_FALSE(navNode->isOnAnimation_);
+}
+
+/**
+ * @tc.name: RecoveryToLastStackPreChange002
+ * @tc.desc: Test RecoveryToLastStack with null destinations reports PAGE_PRE_CHANGE with id=-1
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestTenNg, RecoveryToLastStackPreChange002, TestSize.Level1)
+{
+    NavigationPatternTestTenNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->navigationStack_ = AceType::MakeRefPtr<MockNavigationStack>();
+    ASSERT_NE(pattern->navigationStack_, nullptr);
+    NavPathList navPathList;
+    navPathList.emplace_back(std::make_pair("page01", nullptr));
+    pattern->navigationStack_->SetNavPathList(navPathList);
+    pattern->navigationStack_->UpdateRecoveryList();
+    pattern->OnModifyDone();
+    navNode->isOnAnimation_ = true;
+
+    // null destinations — id from GetTopDestination() is -1, SetIsOnAnimation(false) still called
+    pattern->RecoveryToLastStack(nullptr, nullptr);
+    EXPECT_FALSE(navNode->isOnAnimation_);
+}
 } // namespace OHOS::Ace::NG

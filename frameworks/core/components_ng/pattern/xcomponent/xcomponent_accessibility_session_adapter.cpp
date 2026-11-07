@@ -31,7 +31,10 @@ void XcomponentAccessibilitySessionAdapter::TransferHoverEvent(
     CHECK_NULL_VOID(host);
     auto pipeline = host->GetContext();
     CHECK_NULL_VOID(pipeline);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    // Four-type AM routing, mirroring the registration (XComponentPattern:: OnAccessibilityChildTreeRegister): for a.
+    auto pipelineAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_VOID(pipelineAccessibilityManager);
+    auto accessibilityManager = pipelineAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
     accessibilityManager->TransferThirdProviderHoverEvent(
         host_, point, source,  eventType, time);

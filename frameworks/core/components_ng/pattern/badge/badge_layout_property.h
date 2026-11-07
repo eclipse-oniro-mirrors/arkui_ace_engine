@@ -35,7 +35,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<BadgeLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(AceType::DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propBadgeValue_ = CloneBadgeValue();
         value->propBadgeCount_ = CloneBadgeCount();
         value->propBadgeMaxCount_ = CloneBadgeMaxCount();

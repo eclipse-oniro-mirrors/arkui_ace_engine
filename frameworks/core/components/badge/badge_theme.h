@@ -25,7 +25,7 @@
 
 namespace OHOS::Ace {
 
-class BadgeTheme : public virtual Theme {
+class BadgeTheme : public Theme {
     DECLARE_ACE_TYPE(BadgeTheme, Theme);
 
 public:

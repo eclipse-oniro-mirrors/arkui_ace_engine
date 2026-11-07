@@ -39,7 +39,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<MarqueeLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propPlayerStatus_ = ClonePlayerStatus();
         value->propScrollAmount_ = CloneScrollAmount();
         value->propDirection_ = CloneDirection();

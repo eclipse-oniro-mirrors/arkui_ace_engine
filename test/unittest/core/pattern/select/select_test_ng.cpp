@@ -48,6 +48,7 @@
 #include "core/components_ng/pattern/menu/menu_pattern.h"
 #include "core/components_ng/pattern/menu/wrapper/menu_wrapper_pattern.h"
 #include "core/components_ng/pattern/scroll/scroll_layout_property.h"
+#include "core/components_ng/pattern/scroll/scroll_pattern.h"
 #include "core/components_ng/pattern/select/select_model_ng.h"
 #include "core/components_ng/pattern/select/select_paint_property.h"
 #include "core/components_ng/pattern/select/select_pattern.h"
@@ -1690,5 +1691,358 @@ HWTEST_F(SelectTestNg, SetSecondaryFontColor001, TestSize.Level1)
     theme->secondaryFontColor_ = Color::RED;
     theme->SetSecondaryFontColor(secondaryFontColor);
     EXPECT_EQ(theme->GetSecondaryFontColor(), secondaryFontColor);
+}
+
+namespace {
+constexpr int32_t SCROLL_SELECTED_OPTION_COUNT = 20;
+constexpr float SCROLL_SELECTED_OPTION_HEIGHT = 48.0f;
+constexpr float SCROLL_SELECTED_VIEWPORT = 240.0f;
+constexpr float SCROLL_SELECTED_VIEWPORT_PARTIAL = 260.0f;
+constexpr float SCROLL_SELECTED_EPSILON = 1.0f;
+
+void SetSelectMenuScrollGeometry(const RefPtr<SelectPattern>& pattern, float viewport)
+{
+    auto menu = pattern->GetMenuNode();
+    ASSERT_NE(menu, nullptr);
+    auto scroll = AceType::DynamicCast<FrameNode>(menu->GetFirstChild());
+    ASSERT_NE(scroll, nullptr);
+    auto column = AceType::DynamicCast<FrameNode>(scroll->GetFirstChild());
+    ASSERT_NE(column, nullptr);
+    auto scrollPattern = scroll->GetPattern<ScrollPattern>();
+    ASSERT_NE(scrollPattern, nullptr);
+    float contentHeight = SCROLL_SELECTED_OPTION_COUNT * SCROLL_SELECTED_OPTION_HEIGHT;
+    scrollPattern->viewPortLength_ = viewport;
+    scrollPattern->scrollableDistance_ = contentHeight - viewport;
+    scroll->GetGeometryNode()->SetFrameSize(SizeF(360.0f, viewport));
+    column->GetGeometryNode()->SetFrameOffset(OffsetF(0.0f, 0.0f));
+    auto optionCount = static_cast<int32_t>(column->GetChildren().size());
+    for (int32_t index = 0; index < optionCount; ++index) {
+        auto option = AceType::DynamicCast<FrameNode>(column->GetChildAtIndex(index));
+        ASSERT_NE(option, nullptr);
+        option->GetGeometryNode()->SetFrameSize(SizeF(360.0f, SCROLL_SELECTED_OPTION_HEIGHT));
+        option->GetGeometryNode()->SetFrameOffset(OffsetF(0.0f, index * SCROLL_SELECTED_OPTION_HEIGHT));
+    }
+}
+
+RefPtr<ScrollPattern> GetSelectMenuScrollPattern(const RefPtr<SelectPattern>& pattern)
+{
+    auto menu = pattern->GetMenuNode();
+    CHECK_NULL_RETURN(menu, nullptr);
+    auto scroll = AceType::DynamicCast<FrameNode>(menu->GetFirstChild());
+    CHECK_NULL_RETURN(scroll, nullptr);
+    return scroll->GetPattern<ScrollPattern>();
+}
+
+std::vector<SelectParam> CreateScrollSelectedParams()
+{
+    std::vector<SelectParam> params;
+    for (int32_t index = 0; index < SCROLL_SELECTED_OPTION_COUNT; ++index) {
+        params.push_back({ OPTION_TEXT });
+    }
+    return params;
+}
+} // namespace
+
+/**
+ * @tc.name: ScrollToSelectedTest001
+ * @tc.desc: Menu scrolls to make the selected option vertically centered when it is out of the first screen.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectTestNg, ScrollToSelectedTest001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create select with 20 options and select the 15th option (index 14).
+     */
+    TestProperty testProperty;
+    auto frameNode = CreateSelect(CreateScrollSelectedParams(), testProperty);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SelectPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetSelected(14);
+
+    /**
+     * @tc.steps: step2. Show menu, inject scroll geometry (viewport 240, option height 48) and flush
+     * build finish callbacks.
+     * @tc.expected: Menu scrolls to 14 * 48 - (240 - 48) / 2 = 576 so the selected option is centered.
+     */
+    pattern->ShowSelectMenu();
+    SetSelectMenuScrollGeometry(pattern, SCROLL_SELECTED_VIEWPORT);
+    MockPipelineContext::GetCurrent()->FlushBuildFinishCallbacks();
+    auto scrollPattern = GetSelectMenuScrollPattern(pattern);
+    ASSERT_NE(scrollPattern, nullptr);
+    EXPECT_NEAR(scrollPattern->GetTotalOffset(), 576.0f, SCROLL_SELECTED_EPSILON);
+}
+
+/**
+ * @tc.name: ScrollToSelectedTest002
+ * @tc.desc: Menu scrolls to the max scrollable distance when centering the last option exceeds it.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectTestNg, ScrollToSelectedTest002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create select with 20 options and select the last option (index 19).
+     */
+    TestProperty testProperty;
+    auto frameNode = CreateSelect(CreateScrollSelectedParams(), testProperty);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SelectPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetSelected(19);
+
+    /**
+     * @tc.steps: step2. Show menu, inject scroll geometry and flush build finish callbacks.
+     * @tc.expected: Center target 19 * 48 - 96 = 816 exceeds max distance 20 * 48 - 240 = 720, so the
+     * scroll position is clamped to 720 and the last option stays fully visible.
+     */
+    pattern->ShowSelectMenu();
+    SetSelectMenuScrollGeometry(pattern, SCROLL_SELECTED_VIEWPORT);
+    MockPipelineContext::GetCurrent()->FlushBuildFinishCallbacks();
+    auto scrollPattern = GetSelectMenuScrollPattern(pattern);
+    ASSERT_NE(scrollPattern, nullptr);
+    EXPECT_NEAR(scrollPattern->GetTotalOffset(), scrollPattern->GetScrollableDistance(),
+        SCROLL_SELECTED_EPSILON);
+    EXPECT_NEAR(scrollPattern->GetTotalOffset(), 720.0f, SCROLL_SELECTED_EPSILON);
+}
+
+/**
+ * @tc.name: ScrollToSelectedTest003
+ * @tc.desc: Menu scrolls to center the selected option when it crosses the bottom edge of the first screen.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectTestNg, ScrollToSelectedTest003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create select with 20 options and select the option crossing the first screen
+     * bottom edge (index 5, top 240 within viewport 260, bottom 288 beyond it).
+     */
+    TestProperty testProperty;
+    auto frameNode = CreateSelect(CreateScrollSelectedParams(), testProperty);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SelectPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetSelected(5);
+
+    /**
+     * @tc.steps: step2. Show menu, inject scroll geometry with viewport 260 and flush build finish callbacks.
+     * @tc.expected: Menu scrolls to 240 - (260 - 48) / 2 = 134 so the partially visible option is centered.
+     */
+    pattern->ShowSelectMenu();
+    SetSelectMenuScrollGeometry(pattern, SCROLL_SELECTED_VIEWPORT_PARTIAL);
+    MockPipelineContext::GetCurrent()->FlushBuildFinishCallbacks();
+    auto scrollPattern = GetSelectMenuScrollPattern(pattern);
+    ASSERT_NE(scrollPattern, nullptr);
+    EXPECT_NEAR(scrollPattern->GetTotalOffset(), 134.0f, SCROLL_SELECTED_EPSILON);
+}
+
+/**
+ * @tc.name: ScrollToSelectedTest004
+ * @tc.desc: Menu keeps its initial position when the selected option is fully inside the first screen.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectTestNg, ScrollToSelectedTest004, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create select with 20 options and select the second option (index 1).
+     */
+    TestProperty testProperty;
+    auto frameNode = CreateSelect(CreateScrollSelectedParams(), testProperty);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SelectPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetSelected(1);
+
+    /**
+     * @tc.steps: step2. Show menu, inject scroll geometry and flush build finish callbacks.
+     * @tc.expected: The selected option (top 48, bottom 96) is fully inside the viewport (240), so the
+     * scroll position stays at the initial value 0.
+     */
+    pattern->ShowSelectMenu();
+    SetSelectMenuScrollGeometry(pattern, SCROLL_SELECTED_VIEWPORT);
+    MockPipelineContext::GetCurrent()->FlushBuildFinishCallbacks();
+    auto scrollPattern = GetSelectMenuScrollPattern(pattern);
+    ASSERT_NE(scrollPattern, nullptr);
+    EXPECT_NEAR(scrollPattern->GetTotalOffset(), 0.0f, SCROLL_SELECTED_EPSILON);
+}
+
+/**
+ * @tc.name: ScrollToSelectedTest005
+ * @tc.desc: Menu keeps its initial position when no option is selected.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectTestNg, ScrollToSelectedTest005, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create select with 20 options and do not select any option.
+     */
+    TestProperty testProperty;
+    auto frameNode = CreateSelect(CreateScrollSelectedParams(), testProperty);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SelectPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_EQ(pattern->GetSelected(), -1);
+
+    /**
+     * @tc.steps: step2. Show menu, inject scroll geometry and flush build finish callbacks.
+     * @tc.expected: No option is selected, so the scroll position stays at the initial value 0.
+     */
+    pattern->ShowSelectMenu();
+    SetSelectMenuScrollGeometry(pattern, SCROLL_SELECTED_VIEWPORT);
+    MockPipelineContext::GetCurrent()->FlushBuildFinishCallbacks();
+    auto scrollPattern = GetSelectMenuScrollPattern(pattern);
+    ASSERT_NE(scrollPattern, nullptr);
+    EXPECT_NEAR(scrollPattern->GetTotalOffset(), 0.0f, SCROLL_SELECTED_EPSILON);
+}
+
+/**
+ * @tc.name: ScrollToSelectedTest006
+ * @tc.desc: Menu keeps its initial position when the selected index is out of range.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectTestNg, ScrollToSelectedTest006, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create select with 20 options and set an out-of-range selected index directly.
+     */
+    TestProperty testProperty;
+    auto frameNode = CreateSelect(CreateScrollSelectedParams(), testProperty);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SelectPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->selected_ = SCROLL_SELECTED_OPTION_COUNT + 5;
+
+    /**
+     * @tc.steps: step2. Show menu, inject scroll geometry and flush build finish callbacks.
+     * @tc.expected: The selected index (25) is out of range, so the scroll position stays at the initial
+     * value 0 and no crash occurs.
+     */
+    pattern->ShowSelectMenu();
+    SetSelectMenuScrollGeometry(pattern, SCROLL_SELECTED_VIEWPORT);
+    MockPipelineContext::GetCurrent()->FlushBuildFinishCallbacks();
+    auto scrollPattern = GetSelectMenuScrollPattern(pattern);
+    ASSERT_NE(scrollPattern, nullptr);
+    EXPECT_NEAR(scrollPattern->GetTotalOffset(), 0.0f, SCROLL_SELECTED_EPSILON);
+}
+
+/**
+ * @tc.name: ScrollToSelectedTest007
+ * @tc.desc: Menu scrolling to the selected option completes without animation.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectTestNg, ScrollToSelectedTest007, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create select with 20 options and select the 15th option (index 14).
+     */
+    TestProperty testProperty;
+    auto frameNode = CreateSelect(CreateScrollSelectedParams(), testProperty);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SelectPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetSelected(14);
+
+    /**
+     * @tc.steps: step2. Show menu, inject scroll geometry and flush build finish callbacks.
+     * @tc.expected: The scroll position reaches the final value 576 immediately after the callback, and
+     * stays stable after another callback flush, which means the positioning jumps directly without
+     * any animated transition.
+     */
+    pattern->ShowSelectMenu();
+    SetSelectMenuScrollGeometry(pattern, SCROLL_SELECTED_VIEWPORT);
+    MockPipelineContext::GetCurrent()->FlushBuildFinishCallbacks();
+    auto scrollPattern = GetSelectMenuScrollPattern(pattern);
+    ASSERT_NE(scrollPattern, nullptr);
+    EXPECT_NEAR(scrollPattern->GetTotalOffset(), 576.0f, SCROLL_SELECTED_EPSILON);
+    MockPipelineContext::GetCurrent()->FlushBuildFinishCallbacks();
+    EXPECT_NEAR(scrollPattern->GetTotalOffset(), 576.0f, SCROLL_SELECTED_EPSILON);
+}
+
+/**
+ * @tc.name: ScrollToSelectedSubWindowTest001
+ * @tc.desc: Sub-window menu scrolls to center the selected option when it is out of the first screen.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectTestNg, ScrollToSelectedSubWindowTest001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create select with 20 options and select the 15th option (index 14).
+     */
+    TestProperty testProperty;
+    auto frameNode = CreateSelect(CreateScrollSelectedParams(), testProperty);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SelectPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetSelected(14);
+
+    /**
+     * @tc.steps: step2. Show menu in sub-window, inject scroll geometry and flush build finish callbacks.
+     * @tc.expected: The sub-window menu scrolls to the same centered position 576 as the main window.
+     */
+    pattern->ShowSelectMenuInSubWindow();
+    SetSelectMenuScrollGeometry(pattern, SCROLL_SELECTED_VIEWPORT);
+    MockPipelineContext::GetCurrent()->FlushBuildFinishCallbacks();
+    auto scrollPattern = GetSelectMenuScrollPattern(pattern);
+    ASSERT_NE(scrollPattern, nullptr);
+    EXPECT_NEAR(scrollPattern->GetTotalOffset(), 576.0f, SCROLL_SELECTED_EPSILON);
+}
+
+/**
+ * @tc.name: ScrollToSelectedSubWindowTest002
+ * @tc.desc: Sub-window menu keeps its initial position when the selected option is in the first screen.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectTestNg, ScrollToSelectedSubWindowTest002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create select with 20 options and select the second option (index 1).
+     */
+    TestProperty testProperty;
+    auto frameNode = CreateSelect(CreateScrollSelectedParams(), testProperty);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SelectPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetSelected(1);
+
+    /**
+     * @tc.steps: step2. Show menu in sub-window, inject scroll geometry and flush build finish callbacks.
+     * @tc.expected: The selected option is fully inside the viewport, so the sub-window menu keeps the
+     * initial scroll position 0, consistent with the main window.
+     */
+    pattern->ShowSelectMenuInSubWindow();
+    SetSelectMenuScrollGeometry(pattern, SCROLL_SELECTED_VIEWPORT);
+    MockPipelineContext::GetCurrent()->FlushBuildFinishCallbacks();
+    auto scrollPattern = GetSelectMenuScrollPattern(pattern);
+    ASSERT_NE(scrollPattern, nullptr);
+    EXPECT_NEAR(scrollPattern->GetTotalOffset(), 0.0f, SCROLL_SELECTED_EPSILON);
+}
+
+/**
+ * @tc.name: ScrollToSelectedSubWindowTest003
+ * @tc.desc: Sub-window menu keeps its initial position when no option is selected.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectTestNg, ScrollToSelectedSubWindowTest003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create select with 20 options and do not select any option.
+     */
+    TestProperty testProperty;
+    auto frameNode = CreateSelect(CreateScrollSelectedParams(), testProperty);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SelectPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_EQ(pattern->GetSelected(), -1);
+
+    /**
+     * @tc.steps: step2. Show menu in sub-window, inject scroll geometry and flush build finish callbacks.
+     * @tc.expected: No option is selected, so the sub-window menu keeps the initial scroll position 0,
+     * consistent with the main window.
+     */
+    pattern->ShowSelectMenuInSubWindow();
+    SetSelectMenuScrollGeometry(pattern, SCROLL_SELECTED_VIEWPORT);
+    MockPipelineContext::GetCurrent()->FlushBuildFinishCallbacks();
+    auto scrollPattern = GetSelectMenuScrollPattern(pattern);
+    ASSERT_NE(scrollPattern, nullptr);
+    EXPECT_NEAR(scrollPattern->GetTotalOffset(), 0.0f, SCROLL_SELECTED_EPSILON);
 }
 } // namespace OHOS::Ace::NG

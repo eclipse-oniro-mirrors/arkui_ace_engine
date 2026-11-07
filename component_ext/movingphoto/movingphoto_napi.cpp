@@ -15,6 +15,7 @@
 
 #include "movingphoto_napi.h"
 
+#include "base/utils/napi_scope_raii.h"
 #include "ext_napi_utils.h"
 #include "movingphoto_model_ng.h"
 
@@ -179,6 +180,7 @@ napi_value JsOnComplete(napi_env env, napi_callback_info info)
     }
     auto asyncEvent = std::make_shared<NapiAsyncEvent>(env, argv[0]);
     auto onComplete = [asyncEvent]() {
+        ScopeRAII scope(asyncEvent->GetEnv());
         asyncEvent->Call(0, nullptr);
     };
     NG::MovingPhotoModelNG::GetInstance()->SetOnComplete(std::move(onComplete));
@@ -197,6 +199,7 @@ napi_value JsOnStart(napi_env env, napi_callback_info info)
     }
     auto asyncEvent = std::make_shared<NapiAsyncEvent>(env, argv[0]);
     auto onStart = [asyncEvent]() {
+        ScopeRAII scope(asyncEvent->GetEnv());
         asyncEvent->Call(0, nullptr);
     };
     NG::MovingPhotoModelNG::GetInstance()->SetOnStart(std::move(onStart));
@@ -215,6 +218,7 @@ napi_value JsOnStop(napi_env env, napi_callback_info info)
     }
     auto asyncEvent = std::make_shared<NapiAsyncEvent>(env, argv[0]);
     auto onStop = [asyncEvent]() {
+        ScopeRAII scope(asyncEvent->GetEnv());
         asyncEvent->Call(0, nullptr);
     };
     NG::MovingPhotoModelNG::GetInstance()->SetOnStop(std::move(onStop));
@@ -233,6 +237,7 @@ napi_value JsOnPause(napi_env env, napi_callback_info info)
     }
     auto asyncEvent = std::make_shared<NapiAsyncEvent>(env, argv[0]);
     auto onPause = [asyncEvent]() {
+        ScopeRAII scope(asyncEvent->GetEnv());
         asyncEvent->Call(0, nullptr);
     };
     NG::MovingPhotoModelNG::GetInstance()->SetOnPause(std::move(onPause));
@@ -251,6 +256,7 @@ napi_value JsOnFinish(napi_env env, napi_callback_info info)
     }
     auto asyncEvent = std::make_shared<NapiAsyncEvent>(env, argv[0]);
     auto onFinish = [asyncEvent]() {
+        ScopeRAII scope(asyncEvent->GetEnv());
         asyncEvent->Call(0, nullptr);
     };
     NG::MovingPhotoModelNG::GetInstance()->SetOnFinish(std::move(onFinish));
@@ -269,6 +275,7 @@ napi_value JsOnError(napi_env env, napi_callback_info info)
     }
     auto asyncEvent = std::make_shared<NapiAsyncEvent>(env, argv[0]);
     auto onError = [asyncEvent]() {
+        ScopeRAII scope(asyncEvent->GetEnv());
         asyncEvent->Call(0, nullptr);
     };
     NG::MovingPhotoModelNG::GetInstance()->SetOnError(std::move(onError));
@@ -287,6 +294,7 @@ napi_value JsOnPrepared(napi_env env, napi_callback_info info)
     }
     auto asyncEvent = std::make_shared<NapiAsyncEvent>(env, argv[0]);
     auto onPrepared = [asyncEvent]() {
+        ScopeRAII scope(asyncEvent->GetEnv());
         asyncEvent->Call(0, nullptr);
     };
     NG::MovingPhotoModelNG::GetInstance()->SetOnPrepared(std::move(onPrepared));
@@ -320,13 +328,23 @@ napi_value InitView(napi_env env, napi_value exports)
 napi_value StartPlayback(napi_env env, napi_callback_info info)
 {
     napi_value thisVar = nullptr;
-    NAPI_CALL(env, napi_get_cb_info(env, info, nullptr, nullptr, &thisVar, NULL));
+    size_t argc = MAX_ARG_NUM;
+    napi_value argv[MAX_ARG_NUM] = { nullptr };
+    NAPI_CALL(env, napi_get_cb_info(env, info, &argc, argv, &thisVar, nullptr));
     NG::MovingPhotoController* controller = nullptr;
     napi_unwrap(env, thisVar, (void**)&controller);
     if (controller == nullptr) {
         return ExtNapiUtils::CreateNull(env);
     }
-    controller->StartPlayback();
+    auto mode = MovingPhotoDisplayMode::IMAGE_AND_VIDEO;
+    if (argc >= ARG_NUM_ONE && ExtNapiUtils::CheckTypeForNapiValue(env, argv[PARAM_INDEX_ZERO], napi_number)) {
+        mode = static_cast<MovingPhotoDisplayMode>(ExtNapiUtils::GetCInt32(env, argv[PARAM_INDEX_ZERO]));
+    }
+    if (argc >= ARG_NUM_ONE && mode == MovingPhotoDisplayMode::VIDEO_ONLY) {
+        controller->StartPlay(mode == MovingPhotoDisplayMode::VIDEO_ONLY);
+    } else {
+        controller->StartPlayback();
+    }
     return ExtNapiUtils::CreateNull(env);
 }
 
@@ -472,6 +490,37 @@ napi_value NotifyTransition(napi_env env, napi_callback_info info)
     return ExtNapiUtils::CreateNull(env);
 }
 
+napi_value SetDisplayMode(napi_env env, napi_callback_info info)
+{
+    napi_value thisVar = nullptr;
+    size_t argc = MAX_ARG_NUM;
+    napi_value argv[MAX_ARG_NUM] = { nullptr };
+    NAPI_CALL(env, napi_get_cb_info(env, info, &argc, argv, &thisVar, nullptr));
+    NAPI_ASSERT(env, argc >= ARG_NUM_TWO, "Wrong number of arguments");
+    if (!ExtNapiUtils::CheckTypeForNapiValue(env, argv[PARAM_INDEX_ONE], napi_function)) {
+        return ExtNapiUtils::CreateNull(env);
+    }
+    auto asyncEvent = std::make_shared<NapiAsyncEvent>(env, argv[PARAM_INDEX_ONE]);
+    auto onDisplayModeComplete = [asyncEvent]() {
+        ScopeRAII scope(asyncEvent->GetEnv());
+        asyncEvent->Call(0, nullptr);
+    };
+    NG::MovingPhotoController* controller = nullptr;
+    napi_unwrap(env, thisVar, reinterpret_cast<void**>(&controller));
+    if (controller == nullptr) {
+        return ExtNapiUtils::CreateNull(env);
+    }
+    auto mode = MovingPhotoDisplayMode::IMAGE_AND_VIDEO;
+    if (ExtNapiUtils::CheckTypeForNapiValue(env, argv[PARAM_INDEX_ZERO], napi_number)) {
+        mode = static_cast<MovingPhotoDisplayMode>(ExtNapiUtils::GetCInt32(env, argv[PARAM_INDEX_ZERO]));
+    }
+    if (mode == MovingPhotoDisplayMode::VIDEO_ONLY) {
+        controller->Prepare(std::move(onDisplayModeComplete));
+    } else {
+        controller->JumpToCover(std::move(onDisplayModeComplete));
+    }
+    return ExtNapiUtils::CreateNull(env);
+}
 
 napi_value MovingPhotoControllerConstructor(napi_env env, napi_callback_info info)
 {
@@ -506,6 +555,7 @@ napi_value InitController(napi_env env, napi_value exports)
         DECLARE_NAPI_FUNCTION("setPlaybackPeriod", SetPlaybackPeriod),
         DECLARE_NAPI_FUNCTION("enableAutoPlay", EnableAutoPlay),
         DECLARE_NAPI_FUNCTION("notifyMovingPhotoTransition", NotifyTransition),
+        DECLARE_NAPI_FUNCTION("setDisplayMode", SetDisplayMode),
     };
     NAPI_CALL(env, napi_define_class(env, "MovingPhotoViewController", NAPI_AUTO_LENGTH,
         MovingPhotoControllerConstructor, nullptr, sizeof(properties) / sizeof(*properties), properties,

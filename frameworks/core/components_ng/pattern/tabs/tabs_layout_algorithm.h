@@ -22,8 +22,12 @@
 #include "core/components_ng/layout/layout_wrapper.h"
 #include "core/components_ng/pattern/tabs/tabs_layout_property.h"
 #include "core/components_ng/pattern/tabs/tabs_node.h"
+#include "core/components_ng/render/animation_utils.h"
+#include "ui/properties/ng/measure_property.h"
 
 namespace OHOS::Ace::NG {
+
+class TabsPattern;
 
 class ACE_EXPORT TabsLayoutAlgorithm : public LayoutAlgorithm {
     DECLARE_ACE_TYPE(TabsLayoutAlgorithm, LayoutAlgorithm);
@@ -92,6 +96,16 @@ public:
         lastFloatingBar_ = lastFloatingBar;
     }
 
+    void SetIsFloatingTopBar(bool isFloatingTopBar)
+    {
+        isFloatingTopBar_ = isFloatingTopBar;
+    }
+
+    void SetLastFloatingTopBar(bool lastFloatingTopBar)
+    {
+        lastFloatingTopBar_ = lastFloatingTopBar;
+    }
+
     void SetBarDisplayMode(std::optional<TabBarDisplayMode> mode)
     {
         currentBarDisplayMode_ = mode;
@@ -107,21 +121,42 @@ private:
         const RefPtr<LayoutWrapper>& effectNodeWrapper, const SizeF& idealSize);
     SizeF MeasureSwiper(const RefPtr<TabsLayoutProperty>& layoutProperty, RefPtr<LayoutWrapper>& swiperWrapper,
         const SizeF& idealSize, const SizeF& tabBarSize, const float dividerWidth);
+    void ApplySafeAreaPaddingForTabBar(RefPtr<LayoutWrapper>& swiperWrapper, const SizeF& tabBarSize,
+        float dividerWidth, Axis axis, BarPosition barPosition, float extraPadding);
+    void ResetSafeAreaPaddingForTabBar(RefPtr<LayoutWrapper>& swiperWrapper, Axis axis, BarPosition barPosition);
     std::vector<OffsetF> LayoutOffsetList(LayoutWrapper* layoutWrapper, const RefPtr<LayoutWrapper>& tabBarWrapper,
         const RefPtr<LayoutWrapper>& effectNodeWrapper, const SizeF& frameSize) const;
 
     void MeasureBackgroundMask(LayoutWrapper* layoutWrapper, const SizeF& idealSize, const SizeF& tabBarSize);
     SizeF MeasureTabBar(LayoutWrapper* layoutWrapper, LayoutConstraintF childLayoutConstraint);
     std::optional<float> CalcFloatingBarWidth(LayoutWrapper* layoutWrapper, float barHeight);
+    float CalcTopBarGridMaxWidth(float tabWidth, float barSideMargin);
     std::optional<float> ParseBarWidthAndMargin(LayoutWrapper* layoutWrapper, float tabsWidth, float tabsHeight);
     void UpdateBarMargin(LayoutWrapper* layoutWrapper, OffsetF& barOffset) const;
+    void UpdateTopBarMargin(LayoutWrapper* layoutWrapper, OffsetF& barOffset) const;
+    void UpdateFloatingBarTransform(LayoutWrapper* layoutWrapper) const;
+    void ClampFloatingBarOffset(LayoutWrapper* layoutWrapper) const;
+    struct FloatingBarSafeBoundary {
+        float left = 0.0f;
+        float right = 0.0f;
+        float top = 0.0f;
+        float bottom = 0.0f;
+        float expandTop = 0.0f;
+        float expandBottom = 0.0f;
+        float expandLeft = 0.0f;
+        float expandRight = 0.0f;
+    };
+    FloatingBarSafeBoundary GetFloatingBarSafeBoundary(LayoutWrapper* layoutWrapper) const;
+    void ApplyExpandSafeArea(FloatingBarSafeBoundary& boundary, const RefPtr<LayoutProperty>& layoutProperty,
+        PipelineContext* pipeline, float tabsGlobalLeft, float tabsGlobalTop,
+        float tabsGlobalRight, float tabsGlobalBottom) const;
     void LayoutBackgroundMask(LayoutWrapper* layoutWrapper);
 
     void UpdateSideBarAndSideBarDividerVisibility(LayoutWrapper* layoutWrapper, bool isVisible);
     void UpdateTabBarAndDividerVisibility(LayoutWrapper* layoutWrapper, bool isVisible);
     void UpdateBgMaskNodeVisibility(LayoutWrapper* layoutWrapper, bool isVisible);
-    void MeasureInSideBarMode(
-        LayoutWrapper* layoutWrapper, const RefPtr<TabsLayoutProperty>& layoutProperty, const SizeF& idealSize);
+    void MeasureInSideBarMode(LayoutWrapper* layoutWrapper, const RefPtr<TabsLayoutProperty>& layoutProperty,
+        const SizeF& idealSize, bool needMeasureEnterComponents);
     float MeasureSideBar(
         LayoutWrapper* layoutWrapper, const RefPtr<TabsLayoutProperty>& layoutProperty, const SizeF& idealSize);
     float MeasureSideBarDivider(
@@ -137,6 +172,14 @@ private:
         const RefPtr<LayoutWrapper>& effectNodeWrapper, const SizeF& frameSize,
         const OffsetF& paddingOffset, std::vector<OffsetF>& offsetList) const;
     void LayoutInSideBarMode(LayoutWrapper* layoutWrapper);
+    bool CheckIfNeedModeChangeAnimation(const RefPtr<TabsLayoutProperty>& layoutProperty,
+        const RefPtr<TabsPattern>& tabsPattern, bool displayModeChanged, bool firstLayout);
+    void LayoutSidebarForAnimation(LayoutWrapper* layoutWrapper,
+        const RefPtr<TabsLayoutProperty>& layoutProperty,
+        const RefPtr<GeometryNode>& geometryNode);
+    void LayoutBottomComponentsForAnimation(LayoutWrapper* layoutWrapper,
+        const RefPtr<TabsLayoutProperty>& layoutProperty, const RefPtr<TabsNode>& tabsNode,
+        const RefPtr<GeometryNode>& geometryNode);
 
     LayoutCalPolicy widthLayoutPolicy_ = LayoutCalPolicy::NO_MATCH;
     LayoutCalPolicy heightLayoutPolicy_ = LayoutCalPolicy::NO_MATCH;
@@ -145,8 +188,15 @@ private:
     ItemIndex itemIndex_;
     bool isFloatingBar_ = false;
     bool lastFloatingBar_ = false;
+    bool isFloatingTopBar_ = false;
+    bool lastFloatingTopBar_ = false;
     std::optional<float> floatingBarMargin_;
+    std::optional<float> floatingTopBarMargin_;
     std::optional<TabBarDisplayMode> currentBarDisplayMode_;
+    // True only during the animation-start Measure/Layout pass (fromMode layout that also
+    // measures+layouts the entering component). Reset after Layout; the re-entrant layout
+    // inside the animation closure does not set this.
+    bool measuringForAnimStart_ = false;
 };
 
 } // namespace OHOS::Ace::NG

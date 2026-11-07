@@ -44,10 +44,10 @@ public:
     void SetScrollBarOpacityType(int32_t type);
     void SetTextHeight(float value);
     void SetFrameSize(const SizeF& value);
-    void SetPreviewTextDecorationColor(const Color& value);
     void SetPreviewTextUnderlineWidth(float value);
     void SetShowPreviewTextDecoration(bool value);
-    void SetPreviewTextStyle(const PreviewTextStyle& value);
+    void SetUnderlineColor(const Color& value);
+    void SetUnderlineWidth(float value);
     float GetCaretHeight() const;
     float GetCaretWidth() const;
     OffsetF GetCaretOffset() const;
@@ -69,8 +69,10 @@ public:
     void ClearHoverColorAndRects();
 private:
     void PaintPreviewTextDecoration(DrawingContext& drawingContext) const;
+    void PaintUnderline(RSCanvas& canvas) const;
     void PaintCaret(DrawingContext& drawingContext) const;
     void PaintFloatingCaret(DrawingContext& drawingContext) const;
+    void DrawCaretInternal(RSCanvas& canvas, const OffsetF& offset, int32_t caretColor) const;
     void PaintScrollBar(DrawingContext& context);
     void PaintFreeScrollBar(DrawingContext& context, const RefPtr<RichEditorPattern>& pattern);
     void PaintFixedScrollBar(DrawingContext& context);
@@ -94,11 +96,11 @@ private:
     WeakPtr<ScrollEdgeEffect> edgeEffect_;
     WeakPtr<ScrollBarOverlayModifier> scrollBarOverlayModifier_;
     RefPtr<PropertySizeF> frameSize_;
-    RefPtr<PropertyColor> previewTextDecorationColor_;
     RefPtr<PropertyFloat> previewTextUnderlineWidth_;
     RefPtr<PropertyBool> showPreviewTextDecoration_;
+    RefPtr<PropertyColor> underlineColor_;
+    RefPtr<PropertyFloat> underlineWidth_;
     RefPtr<PropertyBool> changeOverlay_;
-    PreviewTextStyle previewTextStyle_;
     bool caretLanding_ = false;
     bool isContentNode_ = false;
     std::vector<RoundRect> hoverRects_;

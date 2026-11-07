@@ -235,9 +235,7 @@ void SwiperArrowPattern::InitNavigationArrow()
         V2::BUTTON_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), []() -> RefPtr<Pattern> {
             auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
             CHECK_NULL_RETURN(buttonModifier, nullptr);
-            auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-            CHECK_NULL_RETURN(rawPattern, nullptr);
-            return AceType::Claim(rawPattern);
+            return buttonModifier->createButtonPattern();
         });
     auto buttonAccessibilityProperty = buttonNode->GetAccessibilityProperty<AccessibilityProperty>();
     CHECK_NULL_VOID(buttonAccessibilityProperty);
@@ -585,6 +583,20 @@ void SwiperArrowPattern::UpdateArrowContent()
     }
 }
 
+void SwiperArrowPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree()) {
+        json->Put("index", index_);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("isTouch", isTouch_);
+        json->Put("isHover", isHover_);
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("hoverOnClickFlag", hoverOnClickFlag_);
+    }
+}
+
 void SwiperArrowPattern::DumpAdvanceInfo()
 {
     DumpLog::GetInstance().AddDesc("index:" + std::to_string(index_));
@@ -596,10 +608,7 @@ void SwiperArrowPattern::DumpAdvanceInfo()
 
 void SwiperArrowPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    json->Put("index", index_);
-    json->Put("isTouch", isTouch_);
-    json->Put("isHover", isHover_);
-    json->Put("hoverOnClickFlag", hoverOnClickFlag_);
+    SwiperArrowPattern::DumpAdvanceInfo(json, ParamConfig());
 }
 
 RefPtr<SwiperPattern> SwiperArrowPattern::GetSwiperPattern() const

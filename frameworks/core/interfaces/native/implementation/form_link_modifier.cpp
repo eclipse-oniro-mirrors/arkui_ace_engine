@@ -21,22 +21,19 @@
 #include "core/interfaces/native/utility/converter.h"
 
 namespace OHOS::Ace {
-std::unique_ptr<FormLinkModel> FormLinkModel::stsInstance_ = nullptr;
-std::mutex FormLinkModel::stsMutex_;
-
 FormLinkModel* FormLinkModel::GetStsInstance()
 {
-    if (!stsInstance_) {
-        std::lock_guard<std::mutex> lock(stsMutex_);
-        if (!stsInstance_) {
 #ifdef NG_BUILD
-            stsInstance_.reset(new NG::FormLinkModelNG());
+    static NG::FormLinkModelNG instance;
+    return &instance;
 #else
-            stsInstance_.reset(Container::IsCurrentUseNewPipeline() ? new NG::FormLinkModelNG() : nullptr);
-#endif
-        }
+    if (Container::IsCurrentUseNewPipeline()) {
+        static NG::FormLinkModelNG instance;
+        return &instance;
+    } else {
+        return nullptr;
     }
-    return stsInstance_.get();
+#endif
 }
 } // namespace OHOS::Ace
 

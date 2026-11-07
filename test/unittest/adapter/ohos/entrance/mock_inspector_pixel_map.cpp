@@ -115,4 +115,8 @@ uint32_t PixelMapOhos::GetInnerColorGamut() const
 void PixelMapOhos::SetMemoryName(std::string pixelMapName) const
 {
 }
+bool PixelMapOhos::ReadPixel(int32_t x, int32_t y, uint32_t& pixel) const
+{
+    return false;
+}
 } // namespace OHOS::Ace

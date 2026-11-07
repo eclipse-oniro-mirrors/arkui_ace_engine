@@ -36,6 +36,10 @@
 #include "core/components_ng/gestures/recognizers/long_press_recognizer.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
+namespace OHOS::Ace {
+struct ParamConfig;
+}
+
 namespace OHOS::Ace::NG {
 
 constexpr double FACTOR_HALF = 0.5;
@@ -48,6 +52,7 @@ constexpr Color PRESSED_BLEND_COLOR = Color(0x19000000);
 using DragFRCSceneCallback = std::function<void(double velocity, NG::SceneStatus sceneStatus)>;
 using ScrollBarPositionCallback = std::function<bool(double, int32_t source, bool isMouseWheelScroll)>;
 using GetOverScrollOffsetCallback = std::function<OverScrollOffset(double contentDelta)>;
+using TouchStateCallback = std::function<void(bool isPressed)>;
 
 enum class BarDirection {
     BAR_NONE = 0,
@@ -178,7 +183,7 @@ public:
     {
         // The layered parameter scroll_bar_interactive only controls the built-in
         // rect scroll bar; the arc (round) scroll bar must stay touch interactive.
-        return scrollBarInteractive_ || shapeMode_ == ShapeMode::ROUND;
+        return shapeMode_ == ShapeMode::RECT ? scrollBarInteractive_ : true;
     }
     const Dimension& GetMinDynamicHeight() const
     {
@@ -473,6 +478,8 @@ public:
     void GetAxisDumpInfo(std::unique_ptr<JsonValue>& json);
     void GetPanDirectionDumpInfo();
     void GetPanDirectionDumpInfo(std::unique_ptr<JsonValue>& json);
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
     void DumpAdvanceInfo();
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json);
     void StopFlingAnimation();
@@ -534,6 +541,11 @@ public:
     void SetGetAvoidScrollBarMargin(std::function<std::pair<double, double>()>&& func)
     {
         getAvoidScrollBarMargin_ = std::move(func);
+    }
+
+    void SetTouchStateCallback(TouchStateCallback&& callback)
+    {
+        touchStateCallback_ = std::move(callback);
     }
 
 protected:
@@ -725,6 +737,8 @@ protected:
     }
 
 private:
+    void DumpAdvanceHistoryInfo(std::unique_ptr<JsonValue>& json);
+
     void SetRectTrickRegion(const Offset& offset, const Size& size, const Offset& lastOffset, double mainScrollExtent,
         int32_t scrollSource, const RefPtr<PipelineContext>& context = nullptr);
 
@@ -743,6 +757,10 @@ private:
         float& startRadius, float& endRadius, float& padding, const RefPtr<PipelineContext>& context = nullptr);
     void CalcFlingVelocity(float offset);
     bool DragEndOverScroll();
+    void HandleTouchEvent(const TouchEventInfo& info);
+    void HandleTouchDown(const TouchEventInfo& info, const TouchLocationInfo& touch);
+    void HandleTouchUp(const TouchLocationInfo& touch);
+    void NotifyTouchState(bool isPressed);
     DisplayMode displayMode_ = DisplayMode::AUTO;
     ShapeMode shapeMode_ = ShapeMode::RECT;
     PositionMode positionMode_ = PositionMode::RIGHT;
@@ -858,6 +876,7 @@ private:
     // pair.first: Padding + SafeAreaPadding + ContentStartOffset
     // pair.second: ContentEndOffset + SafeAreaPadding + Padding
     std::function<std::pair<double, double>()> getAvoidScrollBarMargin_;
+    TouchStateCallback touchStateCallback_;
 };
 
 } // namespace OHOS::Ace::NG

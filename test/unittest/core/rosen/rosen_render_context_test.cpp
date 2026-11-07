@@ -362,24 +362,6 @@ HWTEST_F(RosenRenderContextTest, RosenRenderContextTest013, TestSize.Level1)
 }
 
 /**
- * @tc.name: RosenRenderContextTest014
- * @tc.desc: CreateHardwareSurface().
- * @tc.type: FUNC
- */
-HWTEST_F(RosenRenderContextTest, RosenRenderContextTest014, TestSize.Level1)
-{
-    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
-    auto rosenRenderContext = InitRosenRenderContext(frameNode);
-    std::optional<RenderContext::ContextParam> param = std::make_optional(RenderContext::ContextParam());
-    bool isTextureExportNode = true;
-    auto rsUIDirector = OHOS::Rosen::RSUIDirector::Create(nullptr);
-    auto rsUIContext = rsUIDirector->GetRSUIContext();
-    std::shared_ptr<Rosen::RSNode> ret = rosenRenderContext->CreateHardwareSurface(
-        param, isTextureExportNode, rsUIContext);
-    EXPECT_NE(ret, nullptr);
-}
-
-/**
  * @tc.name: GetOrCreateRSUIContext001
  * @tc.desc: Test GetOrCreateRSUIContext creates RSUIDirector when RSUIContext is null.
  * @tc.type: FUNC
@@ -871,6 +853,23 @@ HWTEST_F(RosenRenderContextTest, RosenRenderContextTest026, TestSize.Level1)
     rosenRenderContext->GetRSNode()->SetRotation(270.0f);
     RectF ret5 = rosenRenderContext->GetPaintRectWithTransform();
     EXPECT_EQ(ret5.x_, 0.0f);
+
+    rosenRenderContext->paintRect_ = RectF(10.0f, 20.0f, 100.0f, 80.0f);
+    rosenRenderContext->GetRSNode()->SetPivot(0.25f, 0.75f);
+    rosenRenderContext->GetRSNode()->SetScale(1.5f, 2.0f);
+    rosenRenderContext->GetRSNode()->SetRotation(90.0f);
+    auto memberRect = rosenRenderContext->GetPaintRectWithTransform();
+    auto staticRect = RosenRenderContext::GetPaintRectWithTransform(
+        rosenRenderContext->GetRSNode(), rosenRenderContext->GetPaintRectWithoutTransform());
+    EXPECT_EQ(staticRect, memberRect);
+    auto memberMatrix = rosenRenderContext->GetMatrixWithTransformRotate();
+    auto staticMatrix = RosenRenderContext::GetMatrixWithTransformRotate(
+        rosenRenderContext->GetRSNode(), rosenRenderContext->GetPaintRectWithoutTransform());
+    for (int32_t row = 0; row < Matrix4::DIMENSION; ++row) {
+        for (int32_t column = 0; column < Matrix4::DIMENSION; ++column) {
+            EXPECT_NEAR(staticMatrix.Get(row, column), memberMatrix.Get(row, column), 0.001);
+        }
+    }
 }
 
 /**
@@ -3007,5 +3006,116 @@ HWTEST_F(RosenRenderContextTest, SetSandbox003, TestSize.Level1)
     rosenRenderContext->SetSandBox(parentPosition);
     auto modifier = rosenRenderContext->rsNode_->GetModifierByType(Rosen::ModifierNG::RSModifierType::TRANSFORM);
     EXPECT_NE(modifier, nullptr);
+}
+
+/**
+ * @tc.name: GetPointWithTransformGRectRefresh001
+ * @tc.desc: Verify GetPointWithTransform refreshes gRect before use so that a stale gRect left by
+ *           GetPaintRectWithTransformWithoutDegree does not corrupt the rotation center calculation.
+ *           Regression test for stale gRect causing gesture click abnormality.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RosenRenderContextTest, GetPointWithTransformGRectRefresh001, TestSize.Level1)
+{
+    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
+    auto rosenRenderContext = InitRosenRenderContext(frameNode);
+    ASSERT_NE(rosenRenderContext, nullptr);
+    ASSERT_NE(rosenRenderContext->rsNode_, nullptr);
+    bool backupContainerDeleteFlag = SystemProperties::containerDeleteFlag_;
+    SystemProperties::containerDeleteFlag_ = false;
+    // Non-square paint rect so that GetPaintRectWithTransform (with-degree) and
+    // GetPaintRectWithTransformWithoutDegree produce different gRect values when rotation != 0.
+    rosenRenderContext->paintRect_ = RectF(0.0f, 0.0f, 200.0f, 100.0f);
+    rosenRenderContext->GetRSNode()->SetRotation(90.0f);
+
+    // Confirm the test setup is meaningful: with-degree and without-degree rects differ.
+    auto withDegreeRect = rosenRenderContext->GetPaintRectWithTransform();
+    auto withoutDegreeRect = rosenRenderContext->GetPaintRectWithTransformWithoutDegree();
+    ASSERT_FALSE(NearEqual(withDegreeRect.GetX(), withoutDegreeRect.GetX(), 0.001) &&
+                 NearEqual(withDegreeRect.GetY(), withoutDegreeRect.GetY(), 0.001));
+
+    // Establish the correct gRect before the first call.
+    rosenRenderContext->GetPaintRectWithTransform();
+    PointF point(50.0f, 25.0f);
+    PointF point1 = point;
+    rosenRenderContext->GetPointWithTransform(point1);
+
+    // Pollute gRect with the without-degree rect (stale for rotation calculations).
+    rosenRenderContext->GetPaintRectWithTransformWithoutDegree();
+
+    // Second call: after the fix gRect is refreshed inside GetPointWithTransform,
+    // so the result must match the first call. Without the fix, the stale gRect
+    // produces a different (incorrect) rotation center and thus a different point.
+    PointF point2 = point;
+    rosenRenderContext->GetPointWithTransform(point2);
+    EXPECT_TRUE(NearEqual(point1.GetX(), point2.GetX(), 0.001));
+    EXPECT_TRUE(NearEqual(point1.GetY(), point2.GetY(), 0.001));
+    SystemProperties::containerDeleteFlag_ = backupContainerDeleteFlag;
+}
+
+/**
+ * @tc.name: GetPointWithTransformWithRotation002
+ * @tc.desc: Verify GetPointWithTransform actually transforms a point when rotation and a non-zero
+ *           non-square paint rect are set, confirming gRect is populated and used.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RosenRenderContextTest, GetPointWithTransformWithRotation002, TestSize.Level1)
+{
+    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
+    auto rosenRenderContext = InitRosenRenderContext(frameNode);
+    ASSERT_NE(rosenRenderContext, nullptr);
+    ASSERT_NE(rosenRenderContext->rsNode_, nullptr);
+    bool backupContainerDeleteFlag = SystemProperties::containerDeleteFlag_;
+    SystemProperties::containerDeleteFlag_ = false;
+    rosenRenderContext->paintRect_ = RectF(0.0f, 0.0f, 200.0f, 100.0f);
+    rosenRenderContext->GetRSNode()->SetRotation(90.0f);
+
+    // Refresh gRect to the correct with-degree rect before transforming.
+    rosenRenderContext->GetPaintRectWithTransform();
+    PointF point(50.0f, 25.0f);
+    PointF original = point;
+    rosenRenderContext->GetPointWithTransform(point);
+
+    // The point must be transformed by the 90-degree rotation; it cannot stay identical.
+    EXPECT_FALSE(NearEqual(point.GetX(), original.GetX(), 0.001) &&
+                 NearEqual(point.GetY(), original.GetY(), 0.001));
+    SystemProperties::containerDeleteFlag_ = backupContainerDeleteFlag;
+}
+
+/**
+ * @tc.name: GetPointWithTransformGRectRefresh003
+ * @tc.desc: Verify gRect refresh consistency with a non-special rotation angle (45 degrees) that
+ *           exercises a different SetCorner path than 90/180/270.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RosenRenderContextTest, GetPointWithTransformGRectRefresh003, TestSize.Level1)
+{
+    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
+    auto rosenRenderContext = InitRosenRenderContext(frameNode);
+    ASSERT_NE(rosenRenderContext, nullptr);
+    ASSERT_NE(rosenRenderContext->rsNode_, nullptr);
+    bool backupContainerDeleteFlag = SystemProperties::containerDeleteFlag_;
+    SystemProperties::containerDeleteFlag_ = false;
+    rosenRenderContext->paintRect_ = RectF(0.0f, 0.0f, 200.0f, 100.0f);
+    rosenRenderContext->GetRSNode()->SetRotation(45.0f);
+
+    // Confirm the test setup is meaningful.
+    auto withDegreeRect = rosenRenderContext->GetPaintRectWithTransform();
+    auto withoutDegreeRect = rosenRenderContext->GetPaintRectWithTransformWithoutDegree();
+    ASSERT_FALSE(NearEqual(withDegreeRect.GetX(), withoutDegreeRect.GetX(), 0.001) &&
+                 NearEqual(withDegreeRect.GetY(), withoutDegreeRect.GetY(), 0.001));
+
+    rosenRenderContext->GetPaintRectWithTransform();
+    PointF point(80.0f, 40.0f);
+    PointF point1 = point;
+    rosenRenderContext->GetPointWithTransform(point1);
+
+    rosenRenderContext->GetPaintRectWithTransformWithoutDegree();
+    PointF point2 = point;
+    rosenRenderContext->GetPointWithTransform(point2);
+
+    EXPECT_TRUE(NearEqual(point1.GetX(), point2.GetX(), 0.001));
+    EXPECT_TRUE(NearEqual(point1.GetY(), point2.GetY(), 0.001));
+    SystemProperties::containerDeleteFlag_ = backupContainerDeleteFlag;
 }
 } // namespace OHOS::Ace::NG

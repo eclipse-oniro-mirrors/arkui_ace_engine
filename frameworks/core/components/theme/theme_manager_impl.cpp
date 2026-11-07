@@ -95,6 +95,7 @@
 #include "core/components_ng/pattern/toggle/toggle_theme_wrapper.h"
 #include "core/components_ng/token_theme/token_theme_storage.h"
 #include "core/components_ng/pattern/checkbox/checkbox_theme_wrapper.h"
+#include "core/components_ng/pattern/radio/radio_theme_wrapper.h"
 #include "core/components_ng/pattern/counter/counter_theme_wrapper.h"
 #include "core/components_ng/pattern/progress/progress_theme_wrapper.h"
 #include "core/components_ng/pattern/dialog/dialog_theme_wrapper.h"
@@ -214,22 +215,23 @@ const std::unordered_map<ThemeType, RefPtr<Theme>(*)(const RefPtr<ThemeConstants
 };
 
 template<class T>
-RefPtr<TokenThemeWrapper> ThemeWrapperBuildFunc(const RefPtr<ThemeConstants>& themeConstants)
+RefPtr<Theme> ThemeWrapperBuildFunc(const RefPtr<ThemeConstants>& themeConstants)
 {
     return T().BuildWrapper(themeConstants);
 }
 
-RefPtr<TokenThemeWrapper> RichEditorThemeWrapperBuildFunc(const RefPtr<ThemeConstants>& themeConstants)
+RefPtr<Theme> RichEditorThemeWrapperBuildFunc(const RefPtr<ThemeConstants>& themeConstants)
 {
     auto* customModifier = NG::NodeModifier::GetRichEditorCustomModifier();
     CHECK_NULL_RETURN(customModifier, nullptr);
     return customModifier->buildRichEditorThemeWrapper(themeConstants);
 }
 
-const std::unordered_map<ThemeType, RefPtr<TokenThemeWrapper>(*)(const RefPtr<ThemeConstants>&)>
+const std::unordered_map<ThemeType, RefPtr<Theme>(*)(const RefPtr<ThemeConstants>&)>
     TOKEN_THEME_WRAPPER_BUILDERS = {
         { ButtonTheme::TypeId(), &ThemeWrapperBuildFunc<NG::ButtonThemeWrapper::WrapperBuilder> },
         { CheckboxTheme::TypeId(), &ThemeWrapperBuildFunc<NG::CheckboxThemeWrapper::WrapperBuilder> },
+        { RadioTheme::TypeId(), &ThemeWrapperBuildFunc<NG::RadioThemeWrapper::WrapperBuilder> },
         { SwitchTheme::TypeId(), &ThemeWrapperBuildFunc<NG::SwitchThemeWrapper::WrapperBuilder> },
         { ToggleTheme::TypeId(), &ThemeWrapperBuildFunc<NG::ToggleThemeWrapper::WrapperBuilder> },
         { CounterTheme::TypeId(), &ThemeWrapperBuildFunc<NG::CounterThemeWrapper::WrapperBuilder> },
@@ -404,7 +406,7 @@ RefPtr<Theme> ThemeManagerImpl::GetThemeOrigin(ThemeType type, int32_t themeScop
     if (findIter != themeWrappers.end()) {
         auto wrapper = findIter->second;
         wrapper->ApplyTokenTheme(*tokenTheme);
-        return AceType::DynamicCast<Theme>(wrapper);
+        return wrapper;
     }
 
     auto builderIter = TOKEN_THEME_WRAPPER_BUILDERS.find(type);
@@ -430,7 +432,7 @@ RefPtr<Theme> ThemeManagerImpl::GetThemeOrigin(ThemeType type, int32_t themeScop
     }
     wrapper->ApplyTokenTheme(*tokenTheme);
     themeWrappers.emplace(type, wrapper);
-    return AceType::DynamicCast<Theme>(wrapper);
+    return wrapper;
 }
 
 RefPtr<Theme> ThemeManagerImpl::GetThemeKit(ThemeType type, int32_t themeScopeId)
@@ -449,7 +451,7 @@ RefPtr<Theme> ThemeManagerImpl::GetThemeKit(ThemeType type, int32_t themeScopeId
     if (findIter != themeWrappers.end()) {
         auto wrapper = findIter->second;
         wrapper->ApplyTokenTheme(*tokenTheme);
-        return AceType::DynamicCast<Theme>(wrapper);
+        return wrapper;
     }
 
     auto builderIter = TOKEN_THEME_WRAPPER_BUILDERS_KIT.find(type);
@@ -475,7 +477,7 @@ RefPtr<Theme> ThemeManagerImpl::GetThemeKit(ThemeType type, int32_t themeScopeId
     }
     wrapper->ApplyTokenTheme(*tokenTheme);
     themeWrappers.emplace(type, wrapper);
-    return AceType::DynamicCast<Theme>(wrapper);
+    return wrapper;
 }
 
 Color ThemeManagerImpl::GetBackgroundColor() const

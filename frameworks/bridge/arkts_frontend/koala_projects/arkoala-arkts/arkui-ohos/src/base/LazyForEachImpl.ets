@@ -23,7 +23,7 @@ import { InternalListener } from './DataChangeListener'
 import { setNeedCreate } from '../ArkComponentRoot'
 import { IDataSource } from '../component/lazyForEach'
 import { OnMoveHandler, ItemDragEventHandler, LazyForEachOps, LazyForEachOptions } from '#generated'
-import { LazyNodePeer, LazyItemNode, NodeHolder } from './SyntaxNodeBase'
+import { LazyNodePeer, LazyItemNode, NodeHolder, resgisterDetachedRootPtrNeedDestroyImmediately, unresgisterDetachedRootPtrNeedDestroyImmediately } from './SyntaxNodeBase'
 import { CustomComponent } from '../component/customComponent'
 import { ObserveSingleton } from '../stateManagement/base/observeSingleton'
 import { ExtendableComponent } from '../component/extendableComponent'
@@ -31,6 +31,7 @@ import { STATE_MGMT_FACTORY } from '../stateManagement/decorator'
 import { KoalaCallsiteKey } from '@koalaui/common'
 import { getRepeatReuseKey } from './RepeatImpl.ets'
 import { RepeatArray, RepeatItemBuilder, TemplateTypedFunc } from '../component/repeat'
+import { LazyForEachController } from '../component/lazyForEach'
 
 let globalLazyItems = new Map<ComputableState<LazyItemNode>, int32>() // V: age
 
@@ -63,6 +64,10 @@ export function LazyForEachImplForOptions<T>(dataSource: IDataSource<T>,
 ) {
     const node = createLazyNode(isRepeat)
     if (node instanceof LazyNodePeer) {
+        if (options !== undefined && options?.controller !== undefined) {
+            const controller = options!.controller! as LazyForEachController;
+            controller.__bindNode__Internal(node);
+        }
         onNodeCreated?.(node)
     }
 
@@ -190,15 +195,17 @@ class LazyItemPool implements Disposable {
     public total: int32 = 0 // total count of data source
     private _lastRange?: [int32, int32, int32, int32, boolean]
     disposed: boolean = false
+    private _isRepeat: boolean = false
 
     /**
      * 
      * @param parent direct parent node (should be the scroll container node)
      * @param root root object of the current CustomComponent
      */
-    constructor(parent: PeerNode, root?: Object) {
+    constructor(parent: PeerNode, root?: Object, isRepeat: boolean = false) {
         this._parent = parent
         this._componentRoot = root
+        this._isRepeat = isRepeat
     }
 
     dispose(): void {
@@ -221,6 +228,10 @@ class LazyItemPool implements Disposable {
         }
 
         const lazyItemRoot = state.value
+        const ptr = (lazyItemRoot as LazyItemNode).getPeerPtr()
+        if (this._isRepeat && this._parent instanceof LazyNodePeer && ptr !== nullptr) {
+            unresgisterDetachedRootPtrNeedDestroyImmediately(ptr)
+        }
         this.markForbidRecycle((lazyItemRoot as IncrementalNode).firstChild, true)
         scheduleCallback(() => {
             state.dispose()
@@ -266,7 +277,11 @@ class LazyItemPool implements Disposable {
 
         this._activeItems.set(index, node)
         globalLazyItems.set(node, 0)
-        return node.value.getPeerPtr()
+        const ptr = node.value.getPeerPtr()
+        if (this._isRepeat && this._parent instanceof LazyNodePeer && ptr !== nullptr) {
+            resgisterDetachedRootPtrNeedDestroyImmediately(ptr)
+        }
+        return ptr
     }
 
     /**

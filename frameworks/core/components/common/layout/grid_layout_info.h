@@ -46,7 +46,7 @@ enum class GridColumnType {
     DRAG_PANEL,
 };
 
-class GridLayoutInfo : public virtual AceType {
+class GridLayoutInfo : public AceType {
     DECLARE_ACE_TYPE(GridLayoutInfo, AceType);
 };
 

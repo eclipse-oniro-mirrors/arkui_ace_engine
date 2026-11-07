@@ -34,6 +34,15 @@ const int32_t TEST_ID_ONE = 21;
 const int32_t TEST_ID_TWO = 22;
 constexpr size_t SIZE_ZERO = 0;
 constexpr size_t SIZE_ONE = 1;
+
+void DetachGlobalTestNodes()
+{
+    // Global fixtures outlive the mock pipeline and must release their context before it is destroyed.
+    for (const auto& node : { TEN0, ZERO, ONE, TWO, THREE, FOUR, FIVE, F_ONE }) {
+        node->DetachFromMainTree(true);
+        node->DetachContext(true);
+    }
+}
 } // namespace
 
 class TestNode : public UINode {

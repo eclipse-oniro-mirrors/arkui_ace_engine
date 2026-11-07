@@ -29,16 +29,50 @@ declare class ReadonlySystemEnvKey<T> extends SystemEnvKey {
   constructor(keyId: string);
 }
 
+declare enum Direction {}
+
+declare interface Rect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+declare interface AvoidArea {
+  visible: boolean;
+  leftRect: Rect;
+  topRect: Rect;
+  rightRect: Rect;
+  bottomRect: Rect;
+}
+
+declare interface UIEnvAvoidArea {
+  statusBar: AvoidArea;
+  cutout: AvoidArea;
+  keyboard: AvoidArea;
+  navigationIndicator: AvoidArea;
+}
+
+declare interface SizeInVp {
+  widthVp: number;
+  heightVp: number;
+}
+
+declare interface Size {
+  width: number;
+  height: number;
+}
+
 declare class WritableEnvKey {
-  static readonly DIRECTION: WritableSystemEnvKey<Object>;
+  static readonly DIRECTION: WritableSystemEnvKey<Direction>;
   static readonly FONT_SCALE: WritableSystemEnvKey<number>;
 }
 
 declare class ReadonlyEnvKey {
-  static readonly WINDOW_AVOID_AREA: ReadonlySystemEnvKey<Object>;
-  static readonly WINDOW_AVOID_AREA_PX: ReadonlySystemEnvKey<Object>;
-  static readonly WINDOW_SIZE: ReadonlySystemEnvKey<Object>;
-  static readonly WINDOW_SIZE_PX: ReadonlySystemEnvKey<Object>;
+  static readonly WINDOW_AVOID_AREA: ReadonlySystemEnvKey<UIEnvAvoidArea>;
+  static readonly WINDOW_AVOID_AREA_PX: ReadonlySystemEnvKey<UIEnvAvoidArea>;
+  static readonly WINDOW_SIZE: ReadonlySystemEnvKey<SizeInVp>;
+  static readonly WINDOW_SIZE_PX: ReadonlySystemEnvKey<Size>;
   static readonly WINDOW_DISPLAY_ID: ReadonlySystemEnvKey<number>;
   static readonly WINDOW_SYSTEM_DENSITY: ReadonlySystemEnvKey<number>;
   static readonly WINDOW_IS_FOCUSED: ReadonlySystemEnvKey<boolean>;

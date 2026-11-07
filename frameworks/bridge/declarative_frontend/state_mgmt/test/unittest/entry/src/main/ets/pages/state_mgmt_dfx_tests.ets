@@ -16,7 +16,7 @@
 import { TestRunner } from '../../lib/testRunner'
 import { PageController } from '../../lib/pageController'
 import { StateMgmtDFXTests } from '../../common_tests/stateMgmtDFXTests'
-import router from '@system.router'
+import { router } from '@kit.ArkUI'
 
 @Entry
 @ComponentV2

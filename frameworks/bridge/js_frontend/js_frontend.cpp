@@ -887,9 +887,9 @@ void JsEventHandler::HandleAsyncEvent(const EventMarker& eventMarker, const Base
         DragDropInfoToString(info, eventParam);
     }
     std::string param;
-    auto adapter = TypeInfoHelper::DynamicCast<EventToJSONStringAdapter>(&info);
-    if (adapter) {
-        param = adapter->ToJSONString();
+    auto jsonEvent = TypeInfoHelper::DynamicCast<JSONStringifiableEventInfo>(&info);
+    if (jsonEvent) {
+        param = jsonEvent->ToJSONString();
     } else {
         param = eventMarker.GetData().GetEventParam();
         if (eventParam.empty()) {

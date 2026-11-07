@@ -27,6 +27,7 @@
 #include "core/common/ace_application_info.h"
 #include "core/components/checkable/checkable_theme.h"
 #include "core/components/toggle/toggle_theme.h"
+#include "core/components_ng/base/view_abstract.h"
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/layout/layout_wrapper_node.h"
 #include "core/components_ng/pattern/toggle/switch_event_hub.h"
@@ -983,5 +984,143 @@ HWTEST_F(ToggleSwitchOneTestNg, ToggleSwitchLayoutTest015, TestSize.Level1)
         frameWidth, frameHeight);
     EXPECT_EQ(frameWidth, TEST_ZERO);
     EXPECT_EQ(frameHeight, TEST_ZERO);
+}
+
+/**
+ * @tc.name: ToggleSwitchLayoutPolicyByViewAbstractTest001
+ * @tc.desc: Test imperative LayoutPolicy semantics through ViewAbstract entry points (bridge sinks):
+ *           applying matchParent clears user-defined size and matchParent fills parentIdealSize.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ToggleSwitchOneTestNg, ToggleSwitchLayoutPolicyByViewAbstractTest001, TestSize.Level1)
+{
+    int32_t rollbackApiVersion = MockContainer::Current()->GetApiTargetVersion();
+    int32_t setApiVersion = static_cast<int32_t>(PlatformVersion::VERSION_TWELVE);
+    MockContainer::Current()->SetApiTargetVersion(setApiVersion);
+
+    /**
+     * @tc.steps: step1. create switch node and layout wrapper.
+     */
+    ToggleModelNG toggleModelNG;
+    toggleModelNG.Create(ToggleType::SWITCH, IS_ON);
+    auto switchFrameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    ASSERT_NE(switchFrameNode, nullptr);
+    auto switchPattern = AceType::DynamicCast<SwitchPattern>(switchFrameNode->GetPattern());
+    ASSERT_NE(switchPattern, nullptr);
+    RefPtr<GeometryNode> geometryNode = AceType::MakeRefPtr<GeometryNode>();
+    LayoutWrapperNode layoutWrapper =
+        LayoutWrapperNode(switchFrameNode, geometryNode, switchFrameNode->GetLayoutProperty());
+    auto switchLayoutAlgorithm = AceType::DynamicCast<SwitchLayoutAlgorithm>(switchPattern->CreateLayoutAlgorithm());
+    ASSERT_NE(switchLayoutAlgorithm, nullptr);
+    layoutWrapper.SetLayoutAlgorithm(AccessibilityManager::MakeRefPtr<LayoutAlgorithmWrapper>(switchLayoutAlgorithm));
+    auto layoutProperty = switchFrameNode->GetLayoutProperty();
+    ASSERT_NE(layoutProperty, nullptr);
+    LayoutConstraintF contentConstraint;
+    contentConstraint.parentIdealSize.SetSize(TEST_CONTAINER_SIZE);
+
+    /**
+     * @tc.steps: step2. imperative numeric height set (bridge success-path sink).
+     * @tc.expected: user-defined height exists and height policy is not MATCH_PARENT.
+     */
+    ViewAbstract::SetHeight(AceType::RawPtr(switchFrameNode), CalcLength(TOGGLE_HEIGHT));
+    const auto& calcConstraint = layoutProperty->GetCalcLayoutConstraint();
+    ASSERT_NE(calcConstraint, nullptr);
+    ASSERT_TRUE(calcConstraint->selfIdealSize.has_value());
+    EXPECT_TRUE(calcConstraint->selfIdealSize->Height().has_value());
+    EXPECT_FALSE(layoutProperty->GetLayoutPolicyProperty().has_value() &&
+                 layoutProperty->GetLayoutPolicyProperty()->IsHeightMatch());
+
+    /**
+     * @tc.steps: step3. imperative policy apply (bridge parse-fail branch sink).
+     * @tc.expected: policies become MATCH_PARENT and user-defined height is cleared.
+     */
+    ViewAbstract::UpdateLayoutPolicyProperty(
+        AceType::RawPtr(switchFrameNode), LayoutCalPolicy::MATCH_PARENT, true);
+    ViewAbstract::UpdateLayoutPolicyProperty(
+        AceType::RawPtr(switchFrameNode), LayoutCalPolicy::MATCH_PARENT, false);
+    auto layoutPolicy = layoutProperty->GetLayoutPolicyProperty();
+    ASSERT_TRUE(layoutPolicy.has_value());
+    EXPECT_TRUE(layoutPolicy->IsWidthMatch());
+    EXPECT_TRUE(layoutPolicy->IsHeightMatch());
+    EXPECT_FALSE(calcConstraint->selfIdealSize.has_value() &&
+                 calcConstraint->selfIdealSize->Height().has_value());
+
+    /**
+     * @tc.steps: step4. apply policy handling with parentIdealSize (direct helper invocation,
+     *               MeasureContent needs an attached pipeline context in mock environment).
+     * @tc.expected: matchParent fills parent on both axes.
+     */
+    float frameWidth = 0.0f;
+    float frameHeight = 0.0f;
+    switchLayoutAlgorithm->LayoutPolicyIsMatchParent(
+        contentConstraint, layoutProperty->GetLayoutPolicyProperty(), frameWidth, frameHeight);
+    EXPECT_EQ(frameWidth, TEST_CONTAINER_SIZE.Width());
+    EXPECT_EQ(frameHeight, TEST_CONTAINER_SIZE.Height());
+
+    MockContainer::Current()->SetApiTargetVersion(rollbackApiVersion);
+}
+
+/**
+ * @tc.name: ToggleSwitchLayoutPolicyByViewAbstractTest002
+ * @tc.desc: Test imperative LayoutPolicy semantics through ViewAbstract entry points (bridge sinks):
+ *           explicit reset and numeric set clear the policy (mutual exclusion per axis).
+ * @tc.type: FUNC
+ */
+HWTEST_F(ToggleSwitchOneTestNg, ToggleSwitchLayoutPolicyByViewAbstractTest002, TestSize.Level1)
+{
+    int32_t rollbackApiVersion = MockContainer::Current()->GetApiTargetVersion();
+    int32_t setApiVersion = static_cast<int32_t>(PlatformVersion::VERSION_TWELVE);
+    MockContainer::Current()->SetApiTargetVersion(setApiVersion);
+
+    /**
+     * @tc.steps: step1. create switch node, apply matchParent policy on both axes.
+     */
+    ToggleModelNG toggleModelNG;
+    toggleModelNG.Create(ToggleType::SWITCH, IS_ON);
+    auto switchFrameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    ASSERT_NE(switchFrameNode, nullptr);
+    auto layoutProperty = switchFrameNode->GetLayoutProperty();
+    ASSERT_NE(layoutProperty, nullptr);
+    LayoutConstraintF contentConstraint;
+    contentConstraint.parentIdealSize.SetSize(TEST_CONTAINER_SIZE);
+    ViewAbstract::UpdateLayoutPolicyProperty(
+        AceType::RawPtr(switchFrameNode), LayoutCalPolicy::MATCH_PARENT, true);
+    ViewAbstract::UpdateLayoutPolicyProperty(
+        AceType::RawPtr(switchFrameNode), LayoutCalPolicy::MATCH_PARENT, false);
+
+    /**
+     * @tc.steps: step2. imperative explicit reset (bridge modifier reset sink).
+     * @tc.expected: policies return to NO_MATCH and parent size is no longer applied.
+     */
+    ViewAbstract::ResetLayoutPolicyProperty(AceType::RawPtr(switchFrameNode), true);
+    ViewAbstract::ResetLayoutPolicyProperty(AceType::RawPtr(switchFrameNode), false);
+    auto layoutPolicy = layoutProperty->GetLayoutPolicyProperty();
+    EXPECT_FALSE(layoutPolicy.has_value() && layoutPolicy->IsWidthMatch());
+    EXPECT_FALSE(layoutPolicy.has_value() && layoutPolicy->IsHeightMatch());
+    float frameWidth = 0.0f;
+    float frameHeight = 0.0f;
+    SwitchLayoutAlgorithm switchLayoutAlgorithm;
+    switchLayoutAlgorithm.LayoutPolicyIsMatchParent(
+        contentConstraint, layoutProperty->GetLayoutPolicyProperty(), frameWidth, frameHeight);
+    EXPECT_NE(frameWidth, TEST_CONTAINER_SIZE.Width());
+    EXPECT_NE(frameHeight, TEST_CONTAINER_SIZE.Height());
+
+    /**
+     * @tc.steps: step3. mutual exclusion other direction: apply policy, then numeric set with
+     *               policy reset (bridge success path).
+     * @tc.expected: user-defined height exists again and height policy stays NO_MATCH.
+     */
+    ViewAbstract::UpdateLayoutPolicyProperty(
+        AceType::RawPtr(switchFrameNode), LayoutCalPolicy::MATCH_PARENT, false);
+    ViewAbstract::SetHeight(AceType::RawPtr(switchFrameNode), CalcLength(TOGGLE_HEIGHT));
+    ViewAbstract::ResetLayoutPolicyProperty(AceType::RawPtr(switchFrameNode), false);
+    EXPECT_FALSE(layoutProperty->GetLayoutPolicyProperty().has_value() &&
+                 layoutProperty->GetLayoutPolicyProperty()->IsHeightMatch());
+    const auto& calcConstraint = layoutProperty->GetCalcLayoutConstraint();
+    ASSERT_NE(calcConstraint, nullptr);
+    ASSERT_TRUE(calcConstraint->selfIdealSize.has_value());
+    EXPECT_TRUE(calcConstraint->selfIdealSize->Height().has_value());
+
+    MockContainer::Current()->SetApiTargetVersion(rollbackApiVersion);
 }
 } // namespace OHOS::Ace::NG

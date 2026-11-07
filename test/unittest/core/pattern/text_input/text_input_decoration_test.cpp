@@ -1274,4 +1274,136 @@ HWTEST_F(TextInputDecorationUXTest, TextInputToJsonValue034, TestSize.Level1)
      */
     EXPECT_EQ(json->GetString("lineHeight"), "3.00px");
 }
+
+/**
+ * @tc.name: TextFieldPatternGetShaderStyleInJson001
+ * @tc.desc: Test GetShaderStyleInJson when pattern has no layout property
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextInputDecorationUXTest, TextFieldPatternGetShaderStyleInJson001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a standalone pattern without host node
+     */
+    auto pattern = AceType::MakeRefPtr<TextFieldPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    /**
+     * @tc.steps: step2. Call GetShaderStyleInJson
+     * @tc.expected: Should return an empty json when layout property is null
+     */
+    auto json = pattern->GetShaderStyleInJson();
+    ASSERT_NE(json, nullptr);
+    EXPECT_EQ(json->ToString(), "{}");
+}
+
+/**
+ * @tc.name: TextFieldPatternGetShaderStyleInJson002
+ * @tc.desc: Test GetShaderStyleInJson with linear gradient shader style
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextInputDecorationUXTest, TextFieldPatternGetShaderStyleInJson002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create TextField and set linear gradient shader style
+     */
+    CreateTextField();
+    ASSERT_NE(pattern_, nullptr);
+    Gradient gradient;
+    gradient.type_ = GradientType::LINEAR;
+    LinearGradient linearGradient;
+    linearGradient.angle = std::make_optional(Dimension(2.0, DimensionUnit::VP));
+    gradient.SetLinearGradient(linearGradient);
+    layoutProperty_->UpdateGradientShaderStyle(gradient);
+
+    /**
+     * @tc.steps: step2. Call GetShaderStyleInJson
+     * @tc.expected: Should return linear gradient json
+     */
+    auto json = pattern_->GetShaderStyleInJson();
+    ASSERT_NE(json, nullptr);
+    auto expected = GradientJsonUtils::LinearGradientToJson(gradient);
+    ASSERT_NE(expected, nullptr);
+    EXPECT_NE(json->ToString(), "{}");
+    EXPECT_EQ(json->ToString(), expected->ToString());
+}
+
+/**
+ * @tc.name: TextFieldPatternGetShaderStyleInJson003
+ * @tc.desc: Test GetShaderStyleInJson with radial gradient shader style
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextInputDecorationUXTest, TextFieldPatternGetShaderStyleInJson003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create TextField and set radial gradient shader style
+     */
+    CreateTextField();
+    ASSERT_NE(pattern_, nullptr);
+    Gradient gradient;
+    gradient.type_ = GradientType::RADIAL;
+    RadialGradient radialGradient;
+    radialGradient.radialCenterX = std::make_optional(Dimension(25.0, DimensionUnit::VP));
+    radialGradient.radialCenterY = std::make_optional(Dimension(25.0, DimensionUnit::VP));
+    gradient.SetRadialGradient(radialGradient);
+    layoutProperty_->UpdateGradientShaderStyle(gradient);
+
+    /**
+     * @tc.steps: step2. Call GetShaderStyleInJson
+     * @tc.expected: Should return radial gradient json
+     */
+    auto json = pattern_->GetShaderStyleInJson();
+    ASSERT_NE(json, nullptr);
+    auto expected = GradientJsonUtils::RadialGradientToJson(gradient);
+    ASSERT_NE(expected, nullptr);
+    EXPECT_NE(json->ToString(), "{}");
+    EXPECT_EQ(json->ToString(), expected->ToString());
+}
+
+/**
+ * @tc.name: TextFieldPatternGetShaderStyleInJson004
+ * @tc.desc: Test GetShaderStyleInJson with default gradient type
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextInputDecorationUXTest, TextFieldPatternGetShaderStyleInJson004, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create TextField and set gradient shader style with default type
+     */
+    CreateTextField();
+    ASSERT_NE(pattern_, nullptr);
+    Gradient gradient;
+    layoutProperty_->UpdateGradientShaderStyle(gradient);
+
+    /**
+     * @tc.steps: step2. Call GetShaderStyleInJson
+     * @tc.expected: Should return an empty json when gradient type is neither linear nor radial
+     */
+    auto json = pattern_->GetShaderStyleInJson();
+    ASSERT_NE(json, nullptr);
+    EXPECT_EQ(json->ToString(), "{}");
+}
+
+/**
+ * @tc.name: TextFieldPatternGetShaderStyleInJson005
+ * @tc.desc: Test GetShaderStyleInJson with color shader style
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextInputDecorationUXTest, TextFieldPatternGetShaderStyleInJson005, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create TextField and set color shader style
+     */
+    CreateTextField();
+    ASSERT_NE(pattern_, nullptr);
+    layoutProperty_->UpdateColorShaderStyle(Color::RED);
+
+    /**
+     * @tc.steps: step2. Call GetShaderStyleInJson
+     * @tc.expected: Should return color json string
+     */
+    auto json = pattern_->GetShaderStyleInJson();
+    ASSERT_NE(json, nullptr);
+    EXPECT_EQ(json->ToString(), "{\"color\":\"#FFFF0000\"}");
+}
 } // namespace OHOS::Ace::NG

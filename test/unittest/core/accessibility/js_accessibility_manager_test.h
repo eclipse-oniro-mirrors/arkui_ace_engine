@@ -89,7 +89,7 @@ public:
     }
 
     void SetUpdateCustomAccessibilityPropertyResult(
-        const OperateVirtualNodeResult result, const int32_t requestId) override
+        const Accessibility::OperateVirtualNodeResult result, const int32_t requestId) override
     {
         mockOperateResult_ = result;
         mockRequestId = requestId;
@@ -97,7 +97,7 @@ public:
     }
 
     void SetAddAccessibilityVirtualNodeResult(
-        const OperateVirtualNodeResult result, const int32_t requestId) override
+        const Accessibility::OperateVirtualNodeResult result, const int32_t requestId) override
     {
         mockOperateResult_ = result;
         mockRequestId = requestId;
@@ -105,7 +105,7 @@ public:
     }
 
     void SetRemoveAccessibilityVirtualNodeResult(
-        const OperateVirtualNodeResult result, const int32_t requestId) override
+        const Accessibility::OperateVirtualNodeResult result, const int32_t requestId) override
     {
         mockOperateResult_ = result;
         mockRequestId = requestId;

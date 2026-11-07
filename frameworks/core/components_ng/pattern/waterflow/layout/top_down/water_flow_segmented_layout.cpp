@@ -24,7 +24,6 @@
 #include "core/components_ng/base/distributed_ui.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/layout/layout_wrapper.h"
-#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_observer.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
 #include "core/components_ng/pattern/waterflow/layout/top_down/water_flow_layout_info.h"
 #include "core/components_ng/pattern/waterflow/layout/water_flow_layout_utils.h"
@@ -134,6 +133,9 @@ void WaterFlowSegmentedLayout::Measure(LayoutWrapper* wrapper)
 
 void WaterFlowSegmentedLayout::Layout(LayoutWrapper* wrapper)
 {
+    if (info_->targetPreparation_ && info_->measureInNextFrame_) {
+        return;
+    }
     if (!info_->isDataValid_) {
         LayoutEdges(wrapper, info_, info_->headerHeight_);
         return;
@@ -256,6 +258,10 @@ int32_t WaterFlowSegmentedLayout::CheckDirtyItem(bool forceMeasure) const
 
 void WaterFlowSegmentedLayout::Init(const SizeF& frameSize, double originalWidth)
 {
+    const bool childDirty = props_->GetPropertyChangeFlag() & PROPERTY_UPDATE_BY_CHILD_REQUEST;
+    if (GetUpdateIdx(wrapper_, info_->footerIndex_) >= 0 || wrapper_->ConstraintChanged() || childDirty) {
+        info_->targetPreparation_.reset();
+    }
     if (sections_) {
         const auto& sections = sections_->GetSectionInfo();
         if (info_->margins_.empty()) {
@@ -282,7 +288,6 @@ void WaterFlowSegmentedLayout::Init(const SizeF& frameSize, double originalWidth
         info_->ClearCacheAfterIndex(updateIdx - 1);
     }
 
-    const bool childDirty = props_->GetPropertyChangeFlag() & PROPERTY_UPDATE_BY_CHILD_REQUEST;
     const int32_t dirtyItem = CheckDirtyItem(childDirty);
     if (dirtyItem != -1) {
         PrepareJump(info_, postJumpOffset_);
@@ -553,6 +558,10 @@ void WaterFlowSegmentedLayout::MeasureToTarget(int32_t targetIdx, std::optional<
             }
         }
         info_->RecordItem(i, position, itemHeight);
+        if (!cacheDeadline && info_->targetPreparation_ && i < targetIdx &&
+            YieldTargetPreparation(wrapper_)) {
+            break;
+        }
         if (cacheDeadline && GetSysTimestamp() > *cacheDeadline) {
             break;
         }
@@ -592,7 +601,8 @@ void WaterFlowSegmentedLayout::Fill(int32_t startIdx)
             Fill(i);
             break;
         }
-        if (!syncLoad_ && wrapper_->ReachResponseDeadline()) {
+        if (!syncLoad_ && wrapper_->ReachResponseDeadline() &&
+            !WaterFlowLayoutUtils::IsScrollPlaceholderEnabled(wrapper_)) {
             info_->measureInNextFrame_ = true;
             break;
         }
@@ -613,12 +623,12 @@ void WaterFlowSegmentedLayout::MeasureLazyLayoutItem(const RefPtr<LayoutWrapper>
 RefPtr<LayoutWrapper> WaterFlowSegmentedLayout::MeasureItem(
     int32_t idx, std::pair<int32_t, float> position, float userDefMainSize, std::optional<int64_t> deadline) const
 {
-    // Scroll placeholder load observation at the WaterFlow child build call point.
-    ScrollPlaceholderItemBuildScope buildScope(
-        ScrollPlaceholderComponentType::WATER_FLOW, wrapper_, idx, deadline.has_value());
-    auto item = wrapper_->GetOrCreateChildByIndex(
-        info_->edgeSlots_ ? info_->NodeIdx(idx) : idx, !deadline.has_value(), deadline.has_value());
-    buildScope.SetAcquiredWrapper(item);
+    // Scroll placeholder funnel entry (same as the other two algorithms): the
+    // budget pre-check, shell mounting and the acquisition substitution all
+    // live in WaterFlowLayoutUtils::GetWaterFlowItem — its build scope replaces
+    // the local one this function used to carry.
+    auto item = WaterFlowLayoutUtils::GetWaterFlowItem(
+        wrapper_, info_->edgeSlots_ ? info_->NodeIdx(idx) : idx, !deadline.has_value(), deadline.has_value());
     CHECK_NULL_RETURN(item, nullptr);
     // override user-defined main size
     if (NonNegative(userDefMainSize)) {
@@ -672,7 +682,11 @@ void WaterFlowSegmentedLayout::LayoutItem(int32_t idx, float crossPos, const Off
     }
 
     OffsetF offset = (axis_ == Axis::VERTICAL) ? OffsetF(crossPos, mainOffset) : OffsetF(mainOffset, crossPos);
-    auto wrapper = wrapper_->GetChildByIndex(info_->edgeSlots_ ? info_->NodeIdx(idx) : idx, isCache);
+    // Shell-aware lookup: a live placeholder shell of this index is invisible
+    // to the plain lazy index walk, and skipping it here would leave the
+    // measured shell at the stale origin offset (blank reserved slot).
+    auto wrapper = WaterFlowLayoutUtils::GetWaterFlowItemForLayout(
+        wrapper_, info_->edgeSlots_ ? info_->NodeIdx(idx) : idx, isCache);
     CHECK_NULL_VOID(wrapper);
     wrapper->GetGeometryNode()->SetMarginFrameOffset(offset + padding);
     if (CheckNeedLayout(wrapper, isCache)) {
@@ -750,9 +764,13 @@ void WaterFlowSegmentedLayout::PerformMeasurement()
         MeasureOnJump(info_->jumpIndex_);
         info_->jumpIndex_ = WaterFlowLayoutInfoBase::EMPTY_JUMP_INDEX;
     } else if (info_->targetIndex_) {
+        BeginTargetPreparation();
         MeasureToTarget(*info_->targetIndex_, std::nullopt);
-        info_->targetIndex_.reset();
-        info_->duringPositionCalc_ = false;
+        ReleaseTargetPreparationItems(wrapper_);
+        if (!info_->measureInNextFrame_) {
+            info_->targetIndex_.reset();
+            info_->duringPositionCalc_ = false;
+        }
     } else {
         MeasureOnOffset();
     }

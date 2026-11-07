@@ -258,7 +258,7 @@ void FontManager::RebuildFontNode()
     for (auto iter = fontNodes_.begin(); iter != fontNodes_.end();) {
         auto fontNode = iter->Upgrade();
         CHECK_NULL_VOID(fontNode);
-        auto renderNode = DynamicCast<RenderNode>(fontNode);
+        auto renderNode = fontNode;
         if (renderNode) {
             renderNode->MarkNeedLayout();
             ++iter;
@@ -270,7 +270,7 @@ void FontManager::RebuildFontNode()
     for (auto iter = fontNodesNG_.begin(); iter != fontNodesNG_.end();) {
         auto fontNode = iter->Upgrade();
         CHECK_NULL_VOID(fontNode);
-        auto uiNode = DynamicCast<NG::UINode>(fontNode);
+        auto uiNode = fontNode;
         if (uiNode) {
             uiNode->MarkDirtyNode(NG::PROPERTY_UPDATE_LAYOUT);
             ++iter;
@@ -309,7 +309,7 @@ void FontManager::RebuildFontNodeNG()
             iter = fontNodesNG_.erase(iter);
             continue;
         }
-        auto uiNode = DynamicCast<NG::UINode>(fontNode);
+        auto uiNode = fontNode;
         if (uiNode) {
             uiNode->MarkDirtyNode(NG::PROPERTY_UPDATE_MEASURE);
             auto frameNode = DynamicCast<NG::FrameNode>(fontNode);
@@ -359,7 +359,7 @@ void FontManager::NotifyVariationNodes()
     for (const auto& node : variationNodes_) {
         auto refNode = node.Upgrade();
         CHECK_NULL_VOID(refNode);
-        auto renderNode = DynamicCast<RenderNode>(refNode);
+        auto renderNode = refNode;
         CHECK_NULL_VOID(renderNode);
         auto text = DynamicCast<RenderText>(renderNode);
         if (text) {

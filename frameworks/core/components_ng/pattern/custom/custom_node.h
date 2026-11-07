@@ -38,6 +38,11 @@ class ACE_FORCE_EXPORT CustomNode : public UINode, public CustomNodeBase {
 public:
     static RefPtr<CustomNode> CreateCustomNode(int32_t nodeId, const std::string& viewKey);
 
+    bool IsInspectorSubtreeHost() const override
+    {
+        return true;
+    }
+
     CustomNode(int32_t nodeId, const std::string& viewKey)
     : UINode(V2::JS_VIEW_ETS_TAG, nodeId, MakeRefPtr<CustomNodePattern>()), viewKey_(viewKey) {}
     ~CustomNode() override
@@ -297,6 +302,11 @@ public:
     void DisableReleaseExpiringNode(const WeakPtr<LazyForEachNode>& node);
     bool ReleaseExpiringNode(std::string reuseId);
 private:
+    UINode* GetCustomNodeOwner() const override
+    {
+        return const_cast<CustomNode*>(this);
+    }
+
     // for DFX
     void DumpComponentInfo(std::unique_ptr<JsonValue>& componentInfo);
     void DumpDecoratorInfo(std::unique_ptr<JsonValue>& decoratorInfo);

@@ -145,6 +145,11 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             reinterpret_cast<void*>(OHOS::Ace::Ani::QueryRouterPageInfo)
         },
         ani_native_function {
+            "_Common_SetSafeAreaInset",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::SetSafeAreaInset)
+        },
+        ani_native_function {
             "_Common_GetHostContext",
             nullptr,
             reinterpret_cast<void*>(OHOS::Ace::Ani::GetHostContext)
@@ -490,6 +495,11 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             reinterpret_cast<void*>(OHOS::Ace::Ani::getWindowHeightBreakpoint)
         },
         ani_native_function {
+            "_Common_isWindowInfoInitialized",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::isWindowInfoInitialized)
+        },
+        ani_native_function {
             "_SyntaxItem_Construct",
             "i:l",
             reinterpret_cast<void*>(OHOS::Ace::Ani::ConstructSyntaxItem)
@@ -518,6 +528,16 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             "_SetCustomCallbackWithCheckForFrameNodes",
             nullptr,
             reinterpret_cast<void*>(OHOS::Ace::Ani::SetCustomCallbackWithCheckForFrameNodes)
+        },
+        ani_native_function {
+            "_RegisterApplicationShortcut",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::RegisterApplicationShortcut)
+        },
+        ani_native_function {
+            "_UnregisterApplicationShortcut",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::UnregisterApplicationShortcut)
         },
         ani_native_function {
             "_GetCallingScopeUIContext",

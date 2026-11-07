@@ -27,6 +27,7 @@
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 #include "test/unittest/core/pattern/test_ng.h"
 
+#include "base/i18n/localization.h"
 #include "core/components/badge/badge_theme.h"
 #include "core/components/common/layout/constants.h"
 #include "core/components_ng/base/frame_node.h"
@@ -210,6 +211,39 @@ HWTEST_F(BadgeTestToJson, BadgeLayoutPropertyToJsonCount, TestSize.Level1)
      * @tc.expected: it should be the value we set.
      */
     EXPECT_EQ(json->GetString("count"), "1");
+}
+
+/**
+ * @tc.name: BadgeLayoutPropertyToJsonLocalizedCount
+ * @tc.desc: Test BadgeLayoutProperty ToJsonValue localizedCount field (zh / non-zh).
+ * @tc.type: FUNC
+ */
+HWTEST_F(BadgeTestToJson, BadgeLayoutPropertyToJsonLocalizedCount, TestSize.Level1)
+{
+    BadgeModelNG badge;
+    BadgeParameters badgeParameters;
+    badgeParameters.badgeCount = 5;
+    badge.Create(badgeParameters);
+    GetInstance();
+
+    InspectorFilter filter;
+
+    // non-"zh" (languageTag_ empty => "Chinese") => NumberFormat path
+    Localization::GetInstance()->SetLocaleImpl("", "", "", "", "");
+    auto json1 = JsonUtil::Create(true);
+    layoutProperty_->ToJsonValue(json1, filter);
+    EXPECT_EQ(json1->GetString("count"), "5");
+    EXPECT_EQ(json1->GetString("localizedCount"), "5");
+
+    // "zh" => to_string path
+    Localization::GetInstance()->SetLocaleImpl("zh", "", "", "", "");
+    auto json2 = JsonUtil::Create(true);
+    layoutProperty_->ToJsonValue(json2, filter);
+    EXPECT_EQ(json2->GetString("count"), "5");
+    EXPECT_EQ(json2->GetString("localizedCount"), "5");
+
+    // restore
+    Localization::GetInstance()->SetLocaleImpl("", "", "", "", "");
 }
 
 /**

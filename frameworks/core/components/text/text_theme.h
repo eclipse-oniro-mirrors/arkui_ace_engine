@@ -32,7 +32,7 @@ constexpr double DEFAULT_TEXT_OPACITY = 0.9;
  * TextTheme defines color and styles of ThemeComponent. TextTheme should be built
  * using TextTheme::Builder.
  */
-class TextTheme : public virtual Theme {
+class TextTheme : public Theme {
     DECLARE_ACE_TYPE(TextTheme, Theme);
 
 public:

@@ -246,6 +246,8 @@ docs/kb/
 | KeyboardAvoidTimingChange | 键盘避让执行顺序变化 | `docs/kb/issues/layout/keyboard-avoid-timing-change.md` | 新建 |
 | ResourceAdapterInstanceIdMismatch | 资源适配器实例ID缓存不匹配 | `docs/kb/issues/rendering/resource-adapter-instance-id-mismatch.md` | 新建 |
 | AboutToDisappearUnmountBlockedOnReuse | aboutToDisappear下树屏蔽与组件复用冲突 | `docs/kb/issues/lifecycle/about-to-disappear-unmount-blocked-on-reuse.md` | 新建 |
+| RepeatRenderDataDuplicate | Repeat 渲染数据重复 | `docs/kb/issues/rendering/repeat-render-data-duplicate.md` | 新建 |
+| LazyForEachPrebuildNodeRepeatCreation | LazyForEach 预加载节点反复创建 | `docs/kb/issues/rendering/lazy-for-each-prebuild-node-repeat-creation.md` | 新建 |
 | MenuSwipeMisrecognizedAsClick | Menu滑动误判为点击关闭 | `docs/kb/issues/interaction/menu-swipe-misrecognized-as-click.md` | 新建 |
 | ScrollEndNotifyOnDetach | 滚动组件下树误触发父组件onScrollEnd | `docs/kb/issues/interaction/scroll-end-notify-on-detach.md` | 新建 |
 | UIContextInstanceIdLeak | UIContext 实例 ID 泄漏 | `docs/kb/issues/lifecycle/uicontext-instance-id-leak.md` | 新建 |
@@ -261,6 +263,7 @@ docs/kb/
 | VisibleAreaChangeNodeIdLeak | 可见区域变化事件注册组件id泄漏问题 | `docs/kb/issues/performance/visible-area-change-node-id-leak.md` | 新建 |
 | EtcAbcLoadingFailure | etc目录ABC文件加载失败 | `docs/kb/issues/compatibility/etc-abc-loading-failure.md` | 新建 |
 | ElementRegisterThreadLocalLeak | ElementRegister线程局部内存泄漏与VM生命周期稳定性风险 | `docs/kb/issues/lifecycle/element-register-thread-local-leak.md` | 新建 |
+| KeyboardEventFocusChain | 键盘事件目标与焦点链 | `docs/kb/issues/interaction/keyboard-event-focus-chain.md` | 新建 |
 
 ## 检索
 

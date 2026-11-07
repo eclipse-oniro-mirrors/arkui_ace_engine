@@ -25,6 +25,7 @@
 #include "core/components/common/layout/constants.h"
 #include "core/components_ng/pattern/container_picker/container_picker_event_hub.h"
 #include "core/components_ng/pattern/container_picker/container_picker_layout_property.h"
+#include "core/components_ng/pattern/date_picker/picker_text_style.h"
 
 namespace OHOS::Ace::NG {
 
@@ -40,6 +41,8 @@ public:
     static void SetOnScrollStop(ContainerPickerChangeEvent&& onScrollStop);
     static void SetIndicatorStyle(const PickerIndicatorStyle& style);
     static void ResetIndicatorStyle();
+    static void SetSelectedTextStyle(const PickerTextStyle& style);
+    static void ResetSelectedTextStyle();
     static void SetDisplayedItemCount(std::optional<int32_t> count);
     static void SetItemHeight(std::optional<Dimension> height);
     static void SetSelectedIndex(int32_t index);
@@ -49,6 +52,9 @@ public:
     static void SetOnScrollStop(FrameNode* frameNode, ContainerPickerChangeEvent&& onScrollStop);
     static void SetIndicatorStyle(FrameNode* frameNode, const PickerIndicatorStyle& style);
     static void ResetIndicatorStyle(FrameNode* frameNode);
+    static void SetSelectedTextStyle(FrameNode* frameNode, const PickerTextStyle& style);
+    static void ResetSelectedTextStyle(FrameNode* frameNode);
+    static PickerTextStyle GetSelectedTextStyle(FrameNode* frameNode);
     static void SetDisplayedItemCount(FrameNode* frameNode, std::optional<int32_t> count);
     static void SetItemHeight(FrameNode* frameNode, std::optional<Dimension> height);
     static void SetSelectedIndex(FrameNode* frameNode, int32_t index);

@@ -36,10 +36,16 @@ HWTEST_F(GridRowLayoutPolicyTestNG, MeasureSelfByLayoutPolicyTest01, TestSize.Le
     layoutProperty->UpdateLayoutConstraint(layoutConstraint);
     auto selfSize = algorithm.MeasureSelfByLayoutPolicy(Referenced::RawPtr(frameNode), 90,
         LayoutCalPolicy::MATCH_PARENT, LayoutCalPolicy::MATCH_PARENT);
+    /**
+     * @tc.expected:  selfSize == OptionalSizeF(300, 350)
+     */
     EXPECT_EQ(selfSize, OptionalSizeF(300, 350)) << selfSize.ToString();
 
     selfSize = algorithm.MeasureSelfByLayoutPolicy(Referenced::RawPtr(frameNode), 90,
         LayoutCalPolicy::NO_MATCH, LayoutCalPolicy::NO_MATCH);
+    /**
+     * @tc.expected:  selfSize == OptionalSizeF(std::nullopt, std::nullopt)
+     */
     EXPECT_EQ(selfSize, OptionalSizeF(std::nullopt, std::nullopt));
 
     selfSize = algorithm.MeasureSelfByLayoutPolicy(Referenced::RawPtr(frameNode), 90,

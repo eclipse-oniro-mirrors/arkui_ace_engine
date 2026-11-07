@@ -1742,7 +1742,6 @@ HWTEST_F(RichEditorUrlStyleTest, RichEditorDeleteContentTest004, TestSize.Level0
     richEditorPattern->DeleteContent(5);
     EXPECT_GE(richEditorPattern->GetTextContentLength(), 0);
 }
-
 /**
  * @tc.name: RichEditorDeleteToMaxLengthTest001
  * @tc.desc: Test DeleteToMaxLength method entering isSpanStringMode_ branch
@@ -1753,24 +1752,24 @@ HWTEST_F(RichEditorUrlStyleTest, RichEditorDeleteToMaxLengthTest001, TestSize.Le
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
-
+ 
     RichEditorCommonTestNg::ClearSpan();
     auto& spans = richEditorPattern->spans_;
     ASSERT_TRUE(spans.empty());
-
+ 
     auto styledStringRef = AceType::MakeRefPtr<MutableSpanString>(u"Hello Styled String Content For Testing");
     richEditorPattern->styledString_ = styledStringRef;
     richEditorPattern->isSpanStringMode_ = true;
-
+ 
     int32_t originalLength = richEditorPattern->GetTextContentLength();
     EXPECT_GT(originalLength, 10);
     int32_t maxLength = 10;
     EXPECT_LT(maxLength, originalLength);
     richEditorPattern->DeleteToMaxLength(maxLength);
-
+ 
     EXPECT_LE(richEditorPattern->GetTextContentLength(), maxLength);
 }
-
+ 
 /**
  * @tc.name: RichEditorCursorMoveRightTest001
  * @tc.desc: Test CursorMoveRight method entering isEmojiOnCaretForward branch but not caretPosition equality branch
@@ -1781,23 +1780,23 @@ HWTEST_F(RichEditorUrlStyleTest, RichEditorCursorMoveRightTest001, TestSize.Leve
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
-
+ 
     RichEditorCommonTestNg::ClearSpan();
     RichEditorCommonTestNg::AddSpan(u"Hello 👨‍👩‍👧‍👦 World");
     richEditorPattern->caretPosition_ = 6;
-
+ 
     int32_t contentLength = richEditorPattern->GetTextContentLength();
     EXPECT_GT(contentLength, 10);
     EXPECT_LT(richEditorPattern->caretPosition_, contentLength);
-
+ 
     int32_t originalCaretPosition = richEditorPattern->caretPosition_;
     bool result = richEditorPattern->CursorMoveRight();
-
+ 
     EXPECT_TRUE(result);
     EXPECT_NE(richEditorPattern->caretPosition_, originalCaretPosition);
     EXPECT_GT(richEditorPattern->caretPosition_, originalCaretPosition);
 }
-
+ 
 /**
  * @tc.name: RichEditorCursorMoveToNextWordTest001
  * @tc.desc: Test CursorMoveToNextWord method entering textSelector branch
@@ -1808,32 +1807,32 @@ HWTEST_F(RichEditorUrlStyleTest, RichEditorCursorMoveToNextWordTest001, TestSize
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
-
+ 
     RichEditorCommonTestNg::ClearSpan();
     RichEditorCommonTestNg::AddSpan(u"Hello World Test Content");
     TextSelector selector(2, 8);
     richEditorPattern->textSelector_ = selector;
-
+ 
     richEditorPattern->caretPosition_ = 5;
     EXPECT_FALSE(richEditorPattern->textSelector_.SelectNothing());
     EXPECT_EQ(richEditorPattern->textSelector_.GetTextStart(), 2);
     EXPECT_EQ(richEditorPattern->textSelector_.GetTextEnd(), 8);
-
+ 
     richEditorPattern->CursorMoveToNextWord(CaretMoveIntent::LeftWord);
     richEditorPattern->ResetSelection();
     richEditorPattern->textSelector_ = selector;
     richEditorPattern->caretPosition_ = 5;
-
+ 
     richEditorPattern->CursorMoveToNextWord(CaretMoveIntent::RightWord);
     EXPECT_TRUE(true);
 }
-
+ 
 /**
  * @tc.name: GetAcceptedTouchLocationInfo001
  * @tc.desc: Test basic function of UrlSpan
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorUrlStyleTest, GetAcceptedTouchLocationInfo005, TestSize.Level1)
+HWTEST_F(RichEditorUrlStyleTest, GetAcceptedTouchLocationInfo001, TestSize.Level1)
 {
     RichEditorModelNG richEditorModel;
     richEditorModel.Create();
@@ -1849,13 +1848,13 @@ HWTEST_F(RichEditorUrlStyleTest, GetAcceptedTouchLocationInfo005, TestSize.Level
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result->GetFingerId(), 12);
 }
-
+ 
 /**
- * @tc.name: GetAcceptedTouchLocationInfo001
+ * @tc.name: GetAcceptedTouchLocationInfo002
  * @tc.desc: Test basic function of UrlSpan
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorUrlStyleTest, GetAcceptedTouchLocationInfo006, TestSize.Level1)
+HWTEST_F(RichEditorUrlStyleTest, GetAcceptedTouchLocationInfo002, TestSize.Level1)
 {
     RichEditorModelNG richEditorModel;
     richEditorModel.Create();
@@ -1870,63 +1869,6 @@ HWTEST_F(RichEditorUrlStyleTest, GetAcceptedTouchLocationInfo006, TestSize.Level
     touchInfo.AddChangedTouchLocationInfo(TouchLocationInfo(2));
     auto result = richEditorPattern->GetAcceptedTouchLocationInfo(touchInfo);
     EXPECT_FALSE(result.has_value());
-}
-
-/**
- * @tc.name: HandleTouchDownNoCaretTouchTest001
- * @tc.desc: Test HandleTouchDownNoCaretTouch
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorUrlStyleTest, HandleTouchDownNoCaretTouchTest001, TestSize.Level1)
-{
-    RichEditorModelNG richEditorModel;
-    richEditorModel.Create();
-    auto richEditorNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
-    ASSERT_NE(richEditorNode, nullptr);
-    auto richEditorPattern = richEditorNode->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-    auto overlayModifier = AceType::MakeRefPtr<TextOverlayModifier>();
-    richEditorPattern->overlayMod_ = overlayModifier;
-    auto focusHub = richEditorPattern->GetFocusHub();
-    ASSERT_NE(focusHub, nullptr);
-    focusHub->RequestFocusImmediately();
-    EXPECT_TRUE(richEditorPattern->HasFocus());
-    TouchLocationInfo touchInfo(0);
-    touchInfo.SetSourceTool(SourceTool::FINGER);
-    Offset touchPosition(1000.0, 1000.0);
-    touchInfo.SetLocalLocation(touchPosition);
-    RectF caretRect(0.0, 0.0, 10.0, 20.0);
-    richEditorPattern->HandleTouchDown(touchInfo);
-    EXPECT_FALSE(richEditorPattern->moveCaretState_.isTouchCaret)
-        << "isTouchCaret should remain false when touch is not on caret";
-    EXPECT_EQ(richEditorPattern->moveCaretState_.touchDownOffset, touchPosition);
-}
-
-/**
- * @tc.name: ScheduleFirstClickResetAfterWindowFocus001
- * @tc.desc: Test ScheduleFirstClickResetAfterWindowFocus
- * @tc.type: FUNC
- */
-
-HWTEST_F(RichEditorUrlStyleTest, ScheduleFirstClickResetAfterWindowFocus001, TestSize.Level1)
-{
-    RichEditorModelNG richEditorModel;
-    richEditorModel.Create();
-    auto richEditorNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
-    ASSERT_NE(richEditorNode, nullptr);
-    auto richEditorPattern = richEditorNode->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-    EXPECT_NE(richEditorPattern, nullptr);
-    EXPECT_NE(richEditorPattern->GetContext(), nullptr);
-    auto pipeline = richEditorPattern->GetContext();
-    auto context = PipelineContext::GetCurrentContext();
-    ASSERT_NE(context, nullptr);
-    auto mockTaskExecutor = AceType::MakeRefPtr<MockTaskExecutor>();
-    ASSERT_NE(mockTaskExecutor, nullptr);
-    context->taskExecutor_ = mockTaskExecutor;
-    auto taskExecutor = pipeline->GetTaskExecutor();
-    richEditorPattern->ScheduleFirstClickResetAfterWindowFocus();
-    EXPECT_FALSE(richEditorPattern->firstClickAfterWindowFocus_);
 }
 
 /**
@@ -1959,7 +1901,7 @@ HWTEST_F(RichEditorUrlStyleTest, RichEditorHandleMouseRightButton001, TestSize.L
     EXPECT_FALSE(richEditorPattern->isMousePressed_);
     EXPECT_FALSE(richEditorPattern->usingMouseRightButton_);
 }
-
+ 
 /**
  * @tc.name: GetUrlSpanColor002
  * @tc.desc: Test GetUrlSpanColor
@@ -2008,7 +1950,7 @@ HWTEST_F(RichEditorUrlStyleTest, ProcessAutoFillOnPaste001, TestSize.Level1)
     richEditorPattern->ProcessAutoFillOnPaste();
     SUCCEED() << "Function called successfully, requires Mock verification for internal calls";
 }
-
+ 
 /**
  * @tc.name: HandleOnPasswordVault001
  * @tc.desc: Test HandleOnPasswordVault

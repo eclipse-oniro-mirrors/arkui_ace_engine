@@ -74,13 +74,13 @@ RefPtr<AccessibilityManagerNG> PipelineContext::GetAccessibilityManagerNG()
     return nullptr;
 }
 
-#ifndef WINDOW_SCENE_SUPPORTED
-const RefPtr<UIExtensionManager>& PipelineContext::GetUIExtensionManager()
+// The shared mock library may be built without the target-local WINDOW_SCENE_SUPPORTED define.
+// Keep a fallback here; use the shared library definition when it is available.
+__attribute__((weak)) const RefPtr<UIExtensionManager>& PipelineContext::GetUIExtensionManager()
 {
     static RefPtr<UIExtensionManager> manager = AceType::MakeRefPtr<UIExtensionManager>();
     return manager;
 }
-#endif
 
 } // OHOS::Ace::NG
 

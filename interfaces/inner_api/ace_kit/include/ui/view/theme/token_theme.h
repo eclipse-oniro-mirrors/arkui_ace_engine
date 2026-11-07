@@ -24,7 +24,7 @@ namespace OHOS::Ace {
 
 using TokenThemeScopeId = int32_t;
 
-class ACE_FORCE_EXPORT TokenTheme : public virtual AceType {
+class ACE_FORCE_EXPORT TokenTheme : public AceType {
     DECLARE_ACE_TYPE(TokenTheme, AceType);
 
 public:
@@ -37,11 +37,17 @@ public:
     void SetColors(const RefPtr<TokenColors>& colors)
     {
         colors_ = colors;
+        if (colors_) {
+            colors_->SetThemeId(id_);
+        }
     }
 
     void SetDarkColors(const RefPtr<TokenColors>& darkColors)
     {
         darkColors_ = darkColors;
+        if (darkColors_) {
+            darkColors_->SetThemeId(id_);
+        }
     }
 
     const RefPtr<TokenColors>& Colors() const

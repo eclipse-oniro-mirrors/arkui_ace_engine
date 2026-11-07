@@ -310,8 +310,7 @@ void DatePickerColumnPattern::FlushCurrentOptions(
     if (!isUpateTextContentOnly) {
         animationProperties_.clear();
     }
-    bool isLoop_ =
-        datePickerPattern->IsNotSetStartEndDate() ? dataPickerRowLayoutProperty->GetCanLoopValue(true) : false;
+    bool isLoop_ = GetCanLoopFromLayoutPropertyWithStartEnd();
     auto actualOptionCount = showOptionCount < child.size() ? showOptionCount : child.size();
     for (uint32_t index = 0; index < actualOptionCount; index++) {
         currentChildIndex_ = static_cast<int32_t>(index);
@@ -694,7 +693,28 @@ bool DatePickerColumnPattern::GetCanLoopFromLayoutPropertyWithStartEnd() const
     auto datePickerPattern = parentNode->GetPattern<DatePickerPattern>();
     CHECK_NULL_RETURN(datePickerPattern, false);
     auto dataPickerRowLayoutProperty = parentNode->GetLayoutProperty<DataPickerRowLayoutProperty>();
-    return datePickerPattern->IsNotSetStartEndDate() ? dataPickerRowLayoutProperty->GetCanLoopValue(true) : false;
+    CHECK_NULL_RETURN(dataPickerRowLayoutProperty, false);
+    bool canLoop = dataPickerRowLayoutProperty->GetCanLoopValue(true);
+    if (!canLoop) {
+        return false;
+    }
+    if (datePickerPattern->IsNotSetStartEndDate()) {
+        return true;
+    }
+    auto allChildNode = datePickerPattern->GetAllChildNode();
+    auto yearNode = allChildNode["year"];
+    auto monthNode = allChildNode["month"];
+    auto dayNode = allChildNode["day"];
+    if (host == yearNode) {
+        return false;
+    }
+    if (host == monthNode) {
+        return !(datePickerPattern->IsAtStartYear() || datePickerPattern->IsAtEndYear());
+    }
+    if (host == dayNode) {
+        return !(datePickerPattern->IsAtStartMonth() || datePickerPattern->IsAtEndMonth());
+    }
+    return false;
 }
 
 bool DatePickerColumnPattern::IsTossNeedToStop()

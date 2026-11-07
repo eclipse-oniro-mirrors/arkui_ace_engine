@@ -6,7 +6,7 @@ import { wrapSystemCallback } from './InteropOps'
 import { KSerializerBuffer } from './InteropTypes'
 
 const API_KIND_MAX = 100
-const apiEventHandlers: (EventHandler | undefined)[] = new Array(API_KIND_MAX).fill(undefined)
+const apiEventHandlers: (EventHandler | undefined)[] = new Array(API_KIND_MAX + 1).fill(undefined)
 export type EventHandler = (deserializer: DeserializerBase) => void
 export function registerApiEventHandler(apiKind: int32, handler: EventHandler): void {
     if (apiKind < 0 || apiKind > API_KIND_MAX) {

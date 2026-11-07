@@ -936,7 +936,7 @@ HWTEST_F(TextPickerTestNg, TextPickerModelTest003, TestSize.Level0)
      */
     auto theme = MockPipelineContext::GetCurrent()->GetTheme<PickerTheme>();
     TextPickerModelNG::GetInstance()->Create(theme, TEXT);
-    auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
     ASSERT_NE(frameNode, nullptr);
     frameNode->MarkModifyDone();
     auto textPickerLayoutProperty = frameNode->GetLayoutProperty<TextPickerLayoutProperty>();
@@ -1045,14 +1045,14 @@ HWTEST_F(TextPickerTestNg, TextPickerModelTest006, TestSize.Level0)
      * @tc.expected: prop is set as expected
      */
     TextPickerModelNG::GetInstance()->SetIsCascade(true);
-    TextPickerModelNG::isSingleRange_ = !TextPickerModelNG::isSingleRange_;
+    TextPickerModelNG::SetTextPickerSingeRange(node, !TextPickerModelNG::GetTextPickerSingeRange(node));
     NG::TextCascadePickerOptions options1;
     options1.rangeResult = { "11", "12", "13" };
     options.emplace_back(options1);
     TextPickerModelNG::SetColumns(node, options);
     TextPickerModelNG::getTextPickerRange(node);
     EXPECT_EQ(TextPickerModelNG::GetInstance()->IsCascade(), true);
-    EXPECT_EQ(TextPickerModelNG::isSingleRange_, false);
+    EXPECT_EQ(TextPickerModelNG::GetTextPickerSingeRange(node), false);
 }
 
 
@@ -1081,7 +1081,7 @@ HWTEST_F(TextPickerTestNg, TextPickerModelTest007, TestSize.Level0)
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     AceApplicationInfo::GetInstance().isRightToLeft_ = true;
     columnPattern->FlushCurrentOptions(false, false);

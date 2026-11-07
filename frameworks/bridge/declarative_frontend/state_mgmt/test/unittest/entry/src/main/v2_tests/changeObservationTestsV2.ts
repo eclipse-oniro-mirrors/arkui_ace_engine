@@ -60,12 +60,12 @@ declare class ObserveV2 {
   public stopRecordDependencies(): void;
   public addRef(target: object, attrName: string): void;
   public addRef4IdInternal(id: number, target: any, attrName: string): void;
-  public fireChange(target: any, attrName: string, value?: any): void;
+  public fireChange(target: object, attrName: string, excludeElmtIds?: Set<number>, ignoreOnProfiler?: boolean): void;
   public getDecoratorInfo(target: object, attrName: string): string;
   public clearBindingInternal(elmtId: number): void;
   public setUnmonitored(obj: any, prop: string, value: any): void;
   public executeUnobserved(fn: () => void): void;
-  public updateDirtyOptimized(): void;
+  public updateDirty2Optimized(): void;
   public resetMonitorValues(): void;
 }
 

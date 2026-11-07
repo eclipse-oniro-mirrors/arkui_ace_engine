@@ -21,7 +21,7 @@ export type AbilityWant = undefined
 export class ArkUIAniUIExtensionOptions {
     constructor() {
         this.isTransferringCaller = false;
-        this.dpiFollowStrategy = 0;
+        this.dpiFollowStrategy = -1; // Unset; keep consistent with the ArkTS ANI options.
     }
 
     isTransferringCaller: boolean;

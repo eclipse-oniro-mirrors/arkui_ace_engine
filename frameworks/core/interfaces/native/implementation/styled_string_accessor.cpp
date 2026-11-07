@@ -469,10 +469,13 @@ Opt_Buffer Marshalling0Impl(Ark_StyledString styledString,
         auto arkCallback = CallbackHelper(*callback_);
         RefPtr<UserDataSpanHolder> currentSpan = nullptr;
         auto handlerDataFunc = [&tlvData, &currentSpan](const Ark_Buffer arkBuff) {
+            std::vector<uint8_t> spanInfo;
+            TLVUtil::WriteInt32(spanInfo, currentSpan->GetStartIndex());
+            TLVUtil::WriteInt32(spanInfo, currentSpan->GetLength());
             TLVUtil::WriteUint8(tlvData, TLV_CUSTOM_MARSHALL_BUFFER_START);
-            TLVUtil::WriteInt32(tlvData, arkBuff.length + sizeof(int32_t) + sizeof(int32_t));
-            TLVUtil::WriteInt32(tlvData, currentSpan->GetStartIndex());
-            TLVUtil::WriteInt32(tlvData, currentSpan->GetLength());
+            TLVUtil::WriteInt32(tlvData,
+                static_cast<int32_t>(arkBuff.length) + static_cast<int32_t>(spanInfo.size()));
+            tlvData.insert(tlvData.end(), spanInfo.begin(), spanInfo.end());
             auto arkBuffData = static_cast<const uint8_t*>(arkBuff.data);
             tlvData.insert(tlvData.end(), arkBuffData, arkBuffData + arkBuff.length);
         };

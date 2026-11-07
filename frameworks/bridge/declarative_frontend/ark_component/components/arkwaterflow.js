@@ -14,6 +14,21 @@
  */
 
 /// <reference path='./import.ts' />
+class WaterFlowScrollSnapStrategyModifier extends ModifierWithKey {
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().waterFlow.resetScrollSnapStrategy(node);
+    } else {
+      getUINativeModule().waterFlow.setScrollSnapStrategy(node, this.value);
+    }
+  }
+  checkObjectDiff() {
+    // Provider methods can change while the object identity remains the same.
+    return typeof this.value === 'object' || this.stageValue !== this.value;
+  }
+}
+WaterFlowScrollSnapStrategyModifier.identity = Symbol('waterFlowScrollSnapStrategy');
+
 class ItemConstraintSizeModifier extends ModifierWithKey {
   constructor(value) {
     super(value);
@@ -246,6 +261,21 @@ class WaterFlowSyncLoadModifier extends ModifierWithKey {
 }
 WaterFlowSyncLoadModifier.identity = Symbol('waterFlowSyncLoad');
 
+class WaterFlowScrollPlaceholderModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().waterFlow.resetScrollPlaceholder(node);
+    }
+    else {
+      getUINativeModule().waterFlow.setScrollPlaceholder(node, this.value);
+    }
+  }
+}
+WaterFlowScrollPlaceholderModifier.identity = Symbol('waterFlowScrollPlaceholder');
+
 class WaterFlowOnScrollFrameBeginModifier extends ModifierWithKey {
   constructor(value) {
     super(value);
@@ -446,6 +476,11 @@ class ArkWaterFlowComponent extends ArkScrollable {
     return this;
   }
 
+  scrollSnapStrategy(value) {
+    modifierWithKey(this._modifiersWithKeys, WaterFlowScrollSnapStrategyModifier.identity,
+      WaterFlowScrollSnapStrategyModifier, value);
+    return this;
+  }
   columnsTemplate(value) {
     modifierWithKey(this._modifiersWithKeys, ColumnsTemplateModifier.identity, ColumnsTemplateModifier, value);
     return this;
@@ -507,6 +542,11 @@ class ArkWaterFlowComponent extends ArkScrollable {
   }
   syncLoad(value) {
     modifierWithKey(this._modifiersWithKeys, WaterFlowSyncLoadModifier.identity, WaterFlowSyncLoadModifier, value);
+    return this;
+  }
+  scrollPlaceholder(provider) {
+    modifierWithKey(this._modifiersWithKeys, WaterFlowScrollPlaceholderModifier.identity,
+      WaterFlowScrollPlaceholderModifier, provider);
     return this;
   }
   onReachStart(event) {
@@ -592,6 +632,9 @@ class JSWaterFlow extends JSContainerBase {
   static create(params) {
     getUINativeModule().waterFlow.create(params);
   }
+  static scrollSnapStrategy(value) {
+    getUINativeModule().waterFlow.setScrollSnapStrategy(true, value);
+  }
   static columnsGap(value) {
     getUINativeModule().waterFlow.setJSColumnsGap(true, value);
   }
@@ -633,6 +676,9 @@ class JSWaterFlow extends JSContainerBase {
   }
   static syncLoad(value) {
     getUINativeModule().waterFlow.setSyncLoad(true, value);
+  }
+  static scrollPlaceholder(provider) {
+    getUINativeModule().waterFlow.setScrollPlaceholder(true, provider);
   }
   static scrollBar(value) {
     getUINativeModule().waterFlow.setJSScrollBar(true, value);

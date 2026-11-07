@@ -132,18 +132,21 @@ let DpiFollowStrategy;
 (function (DpiFollowStrategy) {
   DpiFollowStrategy[DpiFollowStrategy.FOLLOW_HOST_DPI = 0] = 'follow-host-dpi';
   DpiFollowStrategy[DpiFollowStrategy.FOLLOW_UI_EXTENSION_ABILITY_DPI = 1] = 'follow-ui-extension-ability-dpi';
+  DpiFollowStrategy[DpiFollowStrategy.FOLLOW_HOST_DPI_ALL = 2] = 'follow-host-dpi-all';
 })(DpiFollowStrategy || (DpiFollowStrategy = {}));
 
 let EmbeddedDpiFollowStrategy;
 (function (EmbeddedDpiFollowStrategy) {
   EmbeddedDpiFollowStrategy[EmbeddedDpiFollowStrategy.FOLLOW_HOST_DPI = 0] = 'follow-host-dpi';
   EmbeddedDpiFollowStrategy[EmbeddedDpiFollowStrategy.FOLLOW_UI_EXTENSION_ABILITY_DPI = 1] = 'follow-ui-extension-ability-dpi';
+  EmbeddedDpiFollowStrategy[EmbeddedDpiFollowStrategy.FOLLOW_HOST_DPI_ALL = 2] = 'follow-host-dpi-all';
 })(EmbeddedDpiFollowStrategy || (EmbeddedDpiFollowStrategy = {}));
 
 let SecurityDpiFollowStrategy;
 (function (SecurityDpiFollowStrategy) {
   SecurityDpiFollowStrategy[SecurityDpiFollowStrategy.FOLLOW_HOST_DPI = 0] = 'follow-host-dpi';
   SecurityDpiFollowStrategy[SecurityDpiFollowStrategy.FOLLOW_UI_EXTENSION_ABILITY_DPI = 1] = 'follow-ui-extension-ability-dpi';
+  SecurityDpiFollowStrategy[SecurityDpiFollowStrategy.FOLLOW_HOST_DPI_ALL = 2] = 'follow-host-dpi-all';
 })(SecurityDpiFollowStrategy || (SecurityDpiFollowStrategy = {}));
 
 let PreviewDpiFollowStrategy;
@@ -373,6 +376,14 @@ let ImmersiveStrategy;
 (function (ImmersiveStrategy) {
   ImmersiveStrategy[ImmersiveStrategy.AVOID_CUTOUT = 0] = 'AVOID_CUTOUT';
   ImmersiveStrategy[ImmersiveStrategy.AVOID_FLOAT_NAV = 1] = 'AVOID_FLOAT_NAV';
+  ImmersiveStrategy[ImmersiveStrategy.GRID_EXPAND_SAFE_AREA = 2] = 'GRID_EXPAND_SAFE_AREA';
+  ImmersiveStrategy[ImmersiveStrategy.LIST_EXPAND_SAFE_AREA = 3] = 'LIST_EXPAND_SAFE_AREA';
+  ImmersiveStrategy[ImmersiveStrategy.SCROLL_EXPAND_SAFE_AREA = 4] = 'SCROLL_EXPAND_SAFE_AREA';
+  ImmersiveStrategy[ImmersiveStrategy.WATER_FLOW_EXPAND_SAFE_AREA = 5] = 'WATER_FLOW_EXPAND_SAFE_AREA';
+  ImmersiveStrategy[ImmersiveStrategy.AVOID_WINDOW_CONTROLS = 6] = 'AVOID_WINDOW_CONTROLS';
+  ImmersiveStrategy[ImmersiveStrategy.BIND_SHEET_EXPAND_SAFE_AREA = 7] = 'BIND_SHEET_EXPAND_SAFE_AREA';
+  ImmersiveStrategy[ImmersiveStrategy.NAVIGATION_EXPAND_SAFE_AREA = 8] = 'NAVIGATION_EXPAND_SAFE_AREA';
+  ImmersiveStrategy[ImmersiveStrategy.TABS_EXPAND_SAFE_AREA = 9] = 'TABS_EXPAND_SAFE_AREA';
 })(ImmersiveStrategy || (ImmersiveStrategy = {}));
 
 let VerticalAlign;
@@ -809,6 +820,18 @@ class LayoutPolicy {
 
 globalThis.LayoutPolicy = LayoutPolicy;
 
+var BlurStyle;
+(function (BlurStyle) {
+  BlurStyle[BlurStyle.SmallLight = 100] = 'SmallLight';
+  BlurStyle[BlurStyle.MediumLight = 101] = 'MediumLight';
+  BlurStyle[BlurStyle.LargeLight = 102] = 'LargeLight';
+  BlurStyle[BlurStyle.XlargeLight = 103] = 'XlargeLight';
+  BlurStyle[BlurStyle.SmallDark = 104] = 'SmallDark';
+  BlurStyle[BlurStyle.MediumDark = 105] = 'MediumDark';
+  BlurStyle[BlurStyle.LargeDark = 106] = 'LargeDark';
+  BlurStyle[BlurStyle.XlargeDark = 107] = 'XlargeDark';
+})(BlurStyle || (BlurStyle = {}));
+
 let Edge;
 (function (Edge) {
   Edge[Edge.Top = 0] = 'Top';
@@ -1078,6 +1101,7 @@ let TabBarStyle;
   TabBarStyle[TabBarStyle.BOTTOM = 0] = 'BOTTOM';
   TabBarStyle[TabBarStyle.SIDEBAR = 1] = 'SIDEBAR';
   TabBarStyle[TabBarStyle.SIDEBAR_ADAPTABLE = 2] = 'SIDEBAR_ADAPTABLE';
+  TabBarStyle[TabBarStyle.TOP = 3] = 'TOP';
 })(TabBarStyle || (TabBarStyle = {}));
 
 let TabsSidebarDisplayStyle;
@@ -1090,6 +1114,7 @@ let TabBarDisplayMode;
 (function (TabBarDisplayMode) {
   TabBarDisplayMode[TabBarDisplayMode.BOTTOM_TABBAR = 0] = 'BOTTOM_TABBAR';
   TabBarDisplayMode[TabBarDisplayMode.SIDEBAR = 1] = 'SIDEBAR';
+  TabBarDisplayMode[TabBarDisplayMode.TOP_TABBAR = 2] = 'TOP_TABBAR';
 })(TabBarDisplayMode || (TabBarDisplayMode = {}));
 
 let TabVisibility;
@@ -1251,6 +1276,12 @@ let BarStyle;
   BarStyle[BarStyle.STACK = 1] = 'STACK';
   BarStyle[BarStyle.SAFE_AREA_PADDING = 2] = 'SAFE_AREA_PADDING';
 })(BarStyle || (BarStyle = {}));
+let BarOverlapMode;
+(function (BarOverlapMode) {
+  BarOverlapMode[BarOverlapMode.STANDARD = 0] = 'STANDARD';
+  BarOverlapMode[BarOverlapMode.STACK = 1] = 'STACK';
+  BarOverlapMode[BarOverlapMode.SAFE_AREA_PADDING = 2] = 'SAFE_AREA_PADDING';
+})(BarOverlapMode || (BarOverlapMode = {}));
 let NavigationMode;
 (function (NavigationMode) {
   NavigationMode[NavigationMode.Stack = 0] = 'Stack';
@@ -1878,7 +1909,7 @@ let ListItemAlign;
   ListItemAlign[ListItemAlign.End = 2] = 'End';
 })(ListItemAlign || (ListItemAlign = {}));
 
-let BlurStyle;
+var BlurStyle;
 (function (BlurStyle) {
   BlurStyle[BlurStyle.NoMaterial = 0] = 'NoMaterial';
   BlurStyle[BlurStyle.Thin = 1] = 'Thin';
@@ -1898,14 +1929,6 @@ let BlurStyle;
   BlurStyle[BlurStyle.COMPONENT_THICK = 11] = 'COMPONENT_THICK';
   BlurStyle[BlurStyle.COMPONENT_ULTRA_THICK = 12] = 'COMPONENT_ULTRA_THICK';
   BlurStyle[BlurStyle.NONE = 0] = 'NONE';
-  BlurStyle[BlurStyle.SmallLight = 100] = 'SmallLight';
-  BlurStyle[BlurStyle.MediumLight = 101] = 'MediumLight';
-  BlurStyle[BlurStyle.LargeLight = 102] = 'LargeLight';
-  BlurStyle[BlurStyle.XlargeLight = 103] = 'XlargeLight';
-  BlurStyle[BlurStyle.SmallDark = 104] = 'SmallDark';
-  BlurStyle[BlurStyle.MediumDark = 105] = 'MediumDark';
-  BlurStyle[BlurStyle.LargeDark = 106] = 'LargeDark';
-  BlurStyle[BlurStyle.XlargeDark = 107] = 'XlargeDark';
 })(BlurStyle || (BlurStyle = {}));
 
 let BlurStyleActivePolicy;
@@ -1967,6 +1990,12 @@ let ShadowStyle;
   ShadowStyle[ShadowStyle.OUTER_FLOATING_MD = 5] = 'OUTER_FLOATING_MD';
 })(ShadowStyle || (ShadowStyle = {}));
 
+let ShadowClipMode;
+(function (ShadowClipMode) {
+  ShadowClipMode[ShadowClipMode.DEFAULT_SHAPE = 0] = 'DEFAULT_SHAPE';
+  ShadowClipMode[ShadowClipMode.BOUNDS_SHAPE = 1] = 'BOUNDS_SHAPE';
+})(ShadowClipMode || (ShadowClipMode = {}));
+
 let UnionMode;
 (function (UnionMode) {
   UnionMode[UnionMode.SMOOTH_UNION = 0] = 'SMOOTH_UNION';
@@ -1990,6 +2019,12 @@ let GridRowDirection;
   GridRowDirection[GridRowDirection.Row = 0] = 'Row';
   GridRowDirection[GridRowDirection.RowReverse = 1] = 'RowReverse';
 })(GridRowDirection || (GridRowDirection = {}));
+
+let AgentControlMode;
+(function (AgentControlMode) {
+  AgentControlMode[AgentControlMode.ALLOW = 0] = 'ALLOW';
+  AgentControlMode[AgentControlMode.DENY = 1] = 'DENY';
+})(AgentControlMode || (AgentControlMode = {}));
 
 let HitTestMode;
 (function (HitTestMode) {
@@ -2152,6 +2187,7 @@ let SheetTitleBarHoverMode;
 (function (SheetTitleBarHoverMode) {
   SheetTitleBarHoverMode[SheetTitleBarHoverMode.STANDARD = 0] = 'STANDARD';
   SheetTitleBarHoverMode[SheetTitleBarHoverMode.STACK = 1] = 'STACK';
+  SheetTitleBarHoverMode[SheetTitleBarHoverMode.SAFE_AREA_PADDING = 2] = 'SAFE_AREA_PADDING';
 })(SheetTitleBarHoverMode || (SheetTitleBarHoverMode = {}));
 
 let SheetTitleBarBackgroundBlur;
@@ -2159,6 +2195,14 @@ let SheetTitleBarBackgroundBlur;
   SheetTitleBarBackgroundBlur[SheetTitleBarBackgroundBlur.NONE = 0] = 'NONE';
   SheetTitleBarBackgroundBlur[SheetTitleBarBackgroundBlur.GRADIENT = 1] = 'GRADIENT';
 })(SheetTitleBarBackgroundBlur || (SheetTitleBarBackgroundBlur = {}));
+
+let VibrancyMode;
+(function (VibrancyMode) {
+  VibrancyMode[VibrancyMode.DISABLED = 0] = 'DISABLED';
+  VibrancyMode[VibrancyMode.AUTO = 1] = 'AUTO';
+  VibrancyMode[VibrancyMode.BRIGHTEN = 2] = 'BRIGHTEN';
+  VibrancyMode[VibrancyMode.DARKEN = 3] = 'DARKEN';
+})(VibrancyMode || (VibrancyMode = {}));
 
 let FunctionKey;
 (function (FunctionKey) {
@@ -2180,6 +2224,18 @@ let FunctionKey;
   FunctionKey[FunctionKey.DPAD_DOWN = 15] = 'DPAD_DOWN';
   FunctionKey[FunctionKey.DPAD_LEFT = 16] = 'DPAD_LEFT';
   FunctionKey[FunctionKey.DPAD_RIGHT = 17] = 'DPAD_RIGHT';
+  FunctionKey[FunctionKey.CAPS_LOCK = 18] = 'CAPS_LOCK';
+  FunctionKey[FunctionKey.SCROLL_LOCK = 20] = 'SCROLL_LOCK';
+  FunctionKey[FunctionKey.PAUSE_BREAK = 21] = 'PAUSE_BREAK';
+  FunctionKey[FunctionKey.NUM_LOCK = 22] = 'NUM_LOCK';
+  FunctionKey[FunctionKey.INSERT = 23] = 'INSERT';
+  FunctionKey[FunctionKey.DELETE = 24] = 'DELETE';
+  FunctionKey[FunctionKey.HOME = 25] = 'HOME';
+  FunctionKey[FunctionKey.END = 26] = 'END';
+  FunctionKey[FunctionKey.PAGE_UP = 27] = 'PAGE_UP';
+  FunctionKey[FunctionKey.PAGE_DOWN = 28] = 'PAGE_DOWN';
+  FunctionKey[FunctionKey.ENTER = 29] = 'ENTER';
+  FunctionKey[FunctionKey.BACKSPACE = 30] = 'BACKSPACE';
 })(FunctionKey || (FunctionKey = {}));
 
 let ContentType;
@@ -2364,6 +2420,10 @@ class BottomTabBarStyle {
   }
   iconStyle(arg) {
     this.iconStyle = arg;
+    return this;
+  }
+  badge(arg) {
+    this.badge = arg;
     return this;
   }
 }
@@ -2649,6 +2709,10 @@ class TextMenuItemId {
 
   static get CAMERA_INPUT() {
     return new TextMenuItemId('OH_DEFAULT_CAMERA_INPUT');
+  }
+
+  static get TRANSLATE_INPUT() {
+    return new TextMenuItemId('OH_DEFAULT_TRANSLATE_INPUT');
   }
 
   static get AI_WRITER() {
@@ -4414,6 +4478,12 @@ let XComponentType;
   XComponentType[XComponentType.NODE = 3] = 'NODE';
 })(XComponentType || (XComponentType = {}));
 
+let XComponentExtraFlag;
+(function (XComponentExtraFlag) {
+  XComponentExtraFlag[XComponentExtraFlag.ENABLE_SOLID_COLOR = 1] = 'ENABLE_SOLID_COLOR';
+})(XComponentExtraFlag || (XComponentExtraFlag = {}));
+
+
 let NestedScrollMode;
 (function (NestedScrollMode) {
   NestedScrollMode[NestedScrollMode.SELF_ONLY = 0] = 'SELF_ONLY';
@@ -4440,6 +4510,13 @@ let ScrollAlign;
   ScrollAlign[ScrollAlign.AUTO = 3] = 'AUTO';
 })(ScrollAlign || (ScrollAlign = {}));
 
+let FastScrollMode;
+(function (FastScrollMode) {
+  FastScrollMode[FastScrollMode.NONE = 0] = 'NONE';
+  FastScrollMode[FastScrollMode.SKIP_MEASURE = 1] = 'SKIP_MEASURE';
+  FastScrollMode[FastScrollMode.SKIP_CREATE_AND_MEASURE = 2] = 'SKIP_CREATE_AND_MEASURE';
+})(FastScrollMode || (FastScrollMode = {}));
+
 let SafeAreaType;
 (function (SafeAreaType) {
   SafeAreaType[SafeAreaType.SYSTEM = 0] = 'SYSTEM';
@@ -4454,6 +4531,13 @@ let SafeAreaEdge;
   SafeAreaEdge[SafeAreaEdge.START = 2] = 'START';
   SafeAreaEdge[SafeAreaEdge.END = 3] = 'END';
 })(SafeAreaEdge || (SafeAreaEdge = {}));
+
+let SafeAreaInsetAlignment;
+(function (SafeAreaInsetAlignment) {
+  SafeAreaInsetAlignment[SafeAreaInsetAlignment.START = 0] = 'START';
+  SafeAreaInsetAlignment[SafeAreaInsetAlignment.CENTER = 1] = 'CENTER';
+  SafeAreaInsetAlignment[SafeAreaInsetAlignment.END = 2] = 'END';
+})(SafeAreaInsetAlignment || (SafeAreaInsetAlignment = {}));
 
 let LayoutSafeAreaType;
 (function (LayoutSafeAreaType) {
@@ -4504,6 +4588,18 @@ let CalendarAlign;
   CalendarAlign[CalendarAlign.CENTER = 1] = 'CENTER';
   CalendarAlign[CalendarAlign.END = 2] = 'END';
 })(CalendarAlign || (CalendarAlign = {}));
+
+let CalendarFirstDayOfWeek;
+(function (CalendarFirstDayOfWeek) {
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.LOCAL = 0] = 'LOCAL';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.MON = 1] = 'MON';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.TUE = 2] = 'TUE';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.WED = 3] = 'WED';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.THU = 4] = 'THU';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.FRI = 5] = 'FRI';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.SAT = 6] = 'SAT';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.SUN = 7] = 'SUN';
+})(CalendarFirstDayOfWeek || (CalendarFirstDayOfWeek = {}));
 
 let DragBehavior;
 (function (DragBehavior) {
@@ -4581,6 +4677,12 @@ let PageFlipMode;
   PageFlipMode[PageFlipMode.CONTINUOUS = 0] = 'CONTINUOUS';
   PageFlipMode[PageFlipMode.SINGLE = 1] = 'SINGLE';
 })(PageFlipMode || (PageFlipMode = {}));
+
+let SidebarSectionTitleStyle;
+(function (SidebarSectionTitleStyle) {
+  SidebarSectionTitleStyle[SidebarSectionTitleStyle.STANDARD = 0] = 'STANDARD';
+  SidebarSectionTitleStyle[SidebarSectionTitleStyle.EMPHASIZED = 1] = 'EMPHASIZED';
+})(SidebarSectionTitleStyle || (SidebarSectionTitleStyle = {}));
 
 let CheckBoxStyle;
 (function (CheckBoxStyle) {
@@ -5335,6 +5437,11 @@ let PickerIndicatorType;
   PickerIndicatorType[PickerIndicatorType.BACKGROUND = 0] = 'BACKGROUND';
   PickerIndicatorType[PickerIndicatorType.DIVIDER = 1] = 'DIVIDER';
 })(PickerIndicatorType || (PickerIndicatorType = {}));
+
+let WebContextMenuItemId;
+(function (WebContextMenuItemId) {
+  WebContextMenuItemId[WebContextMenuItemId.MENU_COPY_LINK = 11] = 'MENU_COPY_LINK';
+})(WebContextMenuItemId || (WebContextMenuItemId = {}));
 
 let BlankScreenDetectionMethod;
 (function (BlankScreenDetectionMethod) {

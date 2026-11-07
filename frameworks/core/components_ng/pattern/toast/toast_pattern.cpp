@@ -25,6 +25,7 @@
 #include "core/components/common/layout/grid_system_manager.h"
 #include "core/components/dialog/dialog_theme.h"
 #include "core/components/toast/toast_theme.h"
+#include "core/components_ng/layout/overlay_safe_area_helper.h"
 #include "core/components_ng/pattern/text/text_layout_property.h"
 #include "core/components_ng/pattern/overlay/dialog_manager.h"
 #include "core/components_ng/pattern/overlay/overlay_manager.h"
@@ -39,6 +40,41 @@ constexpr int32_t API_VERSION_9 = 9;
 constexpr Dimension ADAPT_TOAST_MIN_FONT_SIZE = 12.0_fp;
 constexpr Dimension LIMIT_SPACING = 8.0_vp;
 
+// Derives per-edge safe area insets from the OverlaySafeAreaHelper result.
+// Toast uses avoidSafeArea for own-window safe area data plus avoidDisplayLimit for screen-level
+// data of subwindow-hosted toasts, matching the Menu path (Func-04-02-01-Feat-09 ADR-3).
+// subwindowType is selected by ShowMode so the display-limit clip (super-fold branch)
+// resolves the correct subwindow: SYSTEM_TOP_MOST_TOAST for system top-most toasts,
+// TOP_MOST_TOAST for top-most toasts. DEFAULT toast is not a sub-container, so
+// GetDisplayAvailableRect returns early before consulting subwindowType — TYPE_TOP_MOST_TOAST
+// is a safe fallback that is never consumed for DEFAULT.
+SafeAreaInsets DeriveInsetsFromHelper(
+    const RefPtr<FrameNode>& frameNode, const RectF& base, ToastShowMode showMode)
+{
+    AvoidConfig config;
+    config.avoidSafeArea = true;
+    config.avoidDisplayLimit = false;
+    SubwindowType subwindowType = SubwindowType::TYPE_TOP_MOST_TOAST;
+    if (showMode == ToastShowMode::SYSTEM_TOP_MOST) {
+        subwindowType = SubwindowType::TYPE_SYSTEM_TOP_MOST_TOAST;
+    }
+    auto displayable = OverlaySafeAreaHelper::ComputeDisplayableRect(frameNode, config,
+        static_cast<int32_t>(subwindowType));
+    float topShrink = std::max(0.0f, displayable.Top() - base.Top());
+    float bottomShrink = std::max(0.0f, base.Bottom() - displayable.Bottom());
+    float leftShrink = std::max(0.0f, displayable.Left() - base.Left());
+    float rightShrink = std::max(0.0f, base.Right() - displayable.Right());
+    SafeAreaInsets insets;
+    insets.top_ = SafeAreaInsets::Inset { .start = 0, .end = static_cast<uint32_t>(topShrink) };
+    insets.bottom_ = SafeAreaInsets::Inset {
+        .start = static_cast<uint32_t>(std::max(0.0f, base.Height() - bottomShrink)),
+        .end = static_cast<uint32_t>(base.Height()) };
+    insets.left_ = SafeAreaInsets::Inset { .start = 0, .end = static_cast<uint32_t>(leftShrink) };
+    insets.right_ = SafeAreaInsets::Inset {
+        .start = static_cast<uint32_t>(std::max(0.0f, base.Width() - rightShrink)),
+        .end = static_cast<uint32_t>(base.Width()) };
+    return insets;
+}
 } // namespace
 
 int32_t ToastPattern::GetToastParentContainerId(const RefPtr<FrameNode>& host)
@@ -189,10 +225,24 @@ void ToastPattern::InitWrapperRect(LayoutWrapper* layoutWrapper, const RefPtr<To
     ACE_UINODE_TRACE(host);
     auto pipelineContext = IsDefaultToast() ? host->GetContextRefPtr() : DialogManager::GetMainPipelineContext(host);
     CHECK_NULL_VOID(pipelineContext);
-    auto safeAreaInsets = OverlayManager::GetSafeAreaInsets(host);
-    float safeAreaTop = safeAreaInsets.top_.Length();
     auto toastProp = DynamicCast<ToastLayoutProperty>(layoutWrapper->GetLayoutProperty());
     CHECK_NULL_VOID(toastProp);
+    // Safe area insets are sourced from OverlaySafeAreaHelper so Toast avoids cutout/float-nav via
+    // the same unified path as Menu/Dialog (Func-04-02-01-Feat-09). The base rect is the root rect
+    // of the pipeline the helper resolves to (pipelineContext for DEFAULT is the toast's own pipeline
+    // which equals the main pipeline; for non-DEFAULT it is DialogManager::GetMainPipelineContext),
+    // keeping the shrink coordinates consistent with ComputeDisplayableRect's internal base.
+    auto showMode = toastProp->GetShowModeValue(ToastShowMode::DEFAULT);
+    auto safeAreaInsets = DeriveInsetsFromHelper(host, pipelineContext->GetRootRect(), showMode);
+    float safeAreaTop = safeAreaInsets.top_.Length();
+    // In landscape mode the cutout / gesture insets appear on the left/right
+    // sides. Previously the wrapperRect started at X=0 and spanned the full
+    // width, so a Toast could overlap the side cutouts. Offsetting the rect
+    // origin by safeAreaLeft and shrinking the width by both side insets keeps
+    // the Toast inside the safe region. wrapperFullWidth_/Height preserve the
+    // unshrunken dimensions for center-alignment clamping in GetOffsetX/InitOffsetY.
+    float safeAreaLeft = safeAreaInsets.left_.Length();
+    float safeAreaRight = safeAreaInsets.right_.Length();
     Alignment alignment = toastProp->GetToastAlignmentValue(Alignment::BOTTOM_CENTER);
     if (alignment == Alignment::TOP_LEFT || alignment == Alignment::TOP_CENTER || alignment == Alignment::TOP_RIGHT) {
         auto toastTheme = pipelineContext->GetTheme<ToastTheme>();
@@ -210,17 +260,30 @@ void ToastPattern::InitWrapperRect(LayoutWrapper* layoutWrapper, const RefPtr<To
     if (IsSystemTopMost()) {
         wrapperRect_ = pipelineContext->GetDisplayWindowRectInfo();
         auto windowSize = GetSystemTopMostSubwindowSize();
-        wrapperRect_.SetRect(0, safeAreaTop, static_cast<double>(windowSize.Width()),
+        wrapperFullWidth_ = static_cast<float>(windowSize.Width());
+        wrapperFullHeight_ = static_cast<float>(windowSize.Height());
+        wrapperRect_.SetRect(safeAreaLeft, safeAreaTop,
+            static_cast<double>(windowSize.Width()) - safeAreaLeft - safeAreaRight,
             static_cast<double>(windowSize.Height()) - safeAreaTop - safeAreaBottom);
     } else if (IsAlignedWithHostWindow()) {
         wrapperRect_ = uiExtensionHostWindowRect_;
-        wrapperRect_.SetRect(wrapperRect_.Left(), safeAreaTop,
-            uiExtensionHostWindowRect_.Width(), uiExtensionHostWindowRect_.Height() - safeAreaTop - safeAreaBottom);
+        wrapperFullWidth_ = static_cast<float>(uiExtensionHostWindowRect_.Width());
+        wrapperFullHeight_ = static_cast<float>(uiExtensionHostWindowRect_.Height());
+        wrapperRect_.SetRect(safeAreaLeft, safeAreaTop,
+            uiExtensionHostWindowRect_.Width() - safeAreaLeft - safeAreaRight,
+            uiExtensionHostWindowRect_.Height() - safeAreaTop - safeAreaBottom);
     } else {
         wrapperRect_ = pipelineContext->GetDisplayWindowRectInfo();
-        wrapperRect_.SetRect(wrapperRect_.Left(), safeAreaTop,
-            pipelineContext->GetRootWidth(), pipelineContext->GetRootHeight() - safeAreaTop - safeAreaBottom);
+        wrapperFullWidth_ = static_cast<float>(pipelineContext->GetRootWidth());
+        wrapperFullHeight_ = static_cast<float>(pipelineContext->GetRootHeight());
+        wrapperRect_.SetRect(safeAreaLeft, safeAreaTop,
+            pipelineContext->GetRootWidth() - safeAreaLeft - safeAreaRight,
+            pipelineContext->GetRootHeight() - safeAreaTop - safeAreaBottom);
     }
+    TAG_LOGD(AceLogTag::ACE_OVERLAY,
+        "toast wrapperRect safeArea left: %{public}f, right: %{public}f, "
+        "top: %{public}f, bottom: %{public}f, wrapperRect: %{public}s",
+        safeAreaLeft, safeAreaRight, safeAreaTop, safeAreaBottom, wrapperRect_.ToString().c_str());
     
     isHoverMode_ = pipelineContext->IsHalfFoldHoverStatus();
     if (isHoverMode_ && toastInfo_.enableHoverMode) {
@@ -370,6 +433,7 @@ bool ToastPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, 
     ACE_UINODE_TRACE(host);
     auto context = IsDefaultToast() ? host->GetContextRefPtr() : DialogManager::GetMainPipelineContext(host);
     CHECK_NULL_RETURN(context, false);
+    context->ReportOverlayNodeMaterialArea(host, "Toast OnDirtyLayoutWrapperSwap");
     auto toastNode = dirty->GetHostNode();
     CHECK_NULL_RETURN(toastNode, false);
     ACE_UINODE_TRACE(toastNode);
@@ -442,6 +506,7 @@ Dimension ToastPattern::GetOffsetX(const RefPtr<LayoutWrapper>& layoutWrapper)
     auto textWidth = text->GetGeometryNode()->GetMarginFrameSize().Width();
     Alignment alignment = toastProp->GetToastAlignmentValue(Alignment::BOTTOM_CENTER);
     Dimension offsetX;
+    bool isCenterAlignment = false;
     if (alignment == Alignment::TOP_LEFT || alignment == Alignment::CENTER_LEFT ||
         alignment == Alignment::BOTTOM_LEFT) {
         offsetX = Dimension(0.0);
@@ -450,8 +515,24 @@ Dimension ToastPattern::GetOffsetX(const RefPtr<LayoutWrapper>& layoutWrapper)
         offsetX = Dimension(rootWidth - textWidth);
     } else {
         offsetX = Dimension((rootWidth - textWidth) / 2.0f);
+        isCenterAlignment = true;
     }
-    return offsetX + toastProp->GetToastOffsetValue(DimensionOffset()).GetX();
+    auto result = offsetX + Dimension(wrapperRect_.Left()) + toastProp->GetToastOffsetValue(DimensionOffset()).GetX();
+    // Center-alignment clamping: the wrapperRect was shrunk by the left/right
+    // safe-area insets, so centering inside the shrunk rect alone would shift
+    // the Toast away from the true screen center. Re-center against the full
+    // window width and then clamp into the safe region so the Toast stays
+    // visually centered without overlapping cutouts.
+    if (isCenterAlignment) {
+        float safeLeft = wrapperRect_.Left();
+        float safeRight = safeLeft + rootWidth;
+        float fullWidth = GreatNotEqual(wrapperFullWidth_, 0.0f) ? wrapperFullWidth_ : rootWidth;
+        float centered = (fullWidth - textWidth) / 2.0f;
+        float maxLeft = std::max(safeLeft, safeRight - textWidth);
+        result = Dimension(std::clamp(centered, safeLeft, maxLeft)) +
+            toastProp->GetToastOffsetValue(DimensionOffset()).GetX();
+    }
+    return result;
 }
 
 Dimension ToastPattern::GetOffsetY(const RefPtr<LayoutWrapper>& layoutWrapper)
@@ -543,6 +624,15 @@ Dimension ToastPattern::InitOffsetY(const RefPtr<LayoutWrapper>& layoutWrapper, 
         } else if (alignment == Alignment::CENTER_LEFT || alignment == Alignment::CENTER ||
                    alignment == Alignment::CENTER_RIGHT) {
             offsetY = Dimension((rootHeight - textHeight) / 2.0f);
+            // Vertical center clamping: same rationale as GetOffsetX horizontal
+            // clamping — re-center against the full height then clamp into the
+            // vertical safe region.
+            float safeTop = wrapperRect_.Top();
+            float safeBottom = safeTop + rootHeight;
+            float fullHeight = GreatNotEqual(wrapperFullHeight_, 0.0f) ? wrapperFullHeight_ : rootHeight;
+            float centered = (fullHeight - static_cast<float>(textHeight)) / 2.0f;
+            float maxTop = std::max(safeTop, safeBottom - static_cast<float>(textHeight));
+            offsetY = Dimension(std::clamp(centered, safeTop, maxTop) - safeTop);
         } else {
             offsetY = Dimension(rootHeight - textHeight);
         }
@@ -812,7 +902,12 @@ double ToastPattern::GetTextMaxHeight()
         TAG_LOGE(AceLogTag::ACE_OVERLAY, "Device height is invalid when show toast.");
         deviceHeight = static_cast<double>(SystemProperties::GetDeviceHeight());
     }
-    auto safeAreaInsets = OverlayManager::GetSafeAreaInsets(host);
+    SafeAreaInsets safeAreaInsets;
+    if (pipelineContext) {
+        auto toastProp = DynamicCast<ToastLayoutProperty>(host->GetLayoutProperty());
+        auto showMode = toastProp ? toastProp->GetShowModeValue(ToastShowMode::DEFAULT) : ToastShowMode::DEFAULT;
+        safeAreaInsets = DeriveInsetsFromHelper(host, pipelineContext->GetRootRect(), showMode);
+    }
     auto bottom = safeAreaInsets.bottom_.Length();
     auto top = safeAreaInsets.top_.Length();
     auto toastTheme = pipelineContext->GetTheme<ToastTheme>();
@@ -867,7 +962,7 @@ int32_t ToastPattern::GetTextLineHeight(const RefPtr<FrameNode>& textNode)
     auto textLayoutWrapper = textNode->CreateLayoutWrapper();
     CHECK_NULL_RETURN(textLayoutWrapper, 0);
     textLayoutWrapper->Measure(layoutConstraint);
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(textLayoutWrapper->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = textLayoutWrapper->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, 0);
     auto textLayoutAlgorithm = DynamicCast<TextLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(textLayoutAlgorithm, 0);

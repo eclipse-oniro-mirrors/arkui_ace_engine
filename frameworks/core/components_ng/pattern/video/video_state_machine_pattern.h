@@ -270,6 +270,7 @@ public:
     void SetCurrentVolume(float currentVolume);
     float GetCurrentVolume() const;
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
     PlaybackStatus GetCurrentPlaybackStatus() const
     {
         return currentPlaybackStatus_;
@@ -348,7 +349,11 @@ private:
     bool SetSourceForMediaPlayer();
     void UpdateLooping();
     void UpdateSpeed();
-    void HandleSetPlaybackRateResult(double progress, int32_t errorCode, std::string& errorMsg);
+    // Runs on the serial bg queue; operates on the captured media player instead of the
+    // pattern member so the UI thread may concurrently swap mediaPlayer_ on transitions.
+    static void HandleSetPlaybackRateResult(
+        const RefPtr<MediaPlayer>& mediaPlayer, int32_t hostId, double progress, int32_t errorCode,
+        std::string& errorMsg);
     void UpdateMuted();
     void PrepareSurface();
 

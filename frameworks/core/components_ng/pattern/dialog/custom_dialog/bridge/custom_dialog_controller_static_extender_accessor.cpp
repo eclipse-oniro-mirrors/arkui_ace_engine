@@ -73,6 +73,7 @@ Ark_CustomDialogControllerExtender ConstructImpl(const Ark_CustomDialogControlle
     peer->SetSystemMaterial(value->systemMaterial);
     peer->SetDistortionMode(value->distortionMode);
     peer->SetEdgeLightMode(value->edgeLightMode);
+    peer->SetAdaptToHandedness(value->adaptToHandedness);
 
     return AceType::RawPtr(peer);
 }

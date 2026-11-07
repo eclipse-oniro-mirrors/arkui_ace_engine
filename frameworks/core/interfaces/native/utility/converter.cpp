@@ -33,6 +33,7 @@
 #include "core/components/common/layout/constants.h"
 #include "core/components/common/properties/depth_option.h"
 #include "core/components/common/properties/paint_state.h"
+#include "core/components/scroll/scroll_controller_base.h"
 #include "core/components/tab_bar/tab_theme.h"
 #include "core/components/theme/shadow_theme.h"
 #include "core/components_ng/pattern/container_picker/container_picker_theme.h"
@@ -210,6 +211,8 @@ std::optional<double> FloatToDouble(const std::optional<float>& src)
 }
 
 namespace OHOS::Ace::NG::Converter {
+ACE_FORCE_EXPORT DimensionUnit ConverterState::defDimensionUnit = DimensionUnit::VP;
+ACE_FORCE_EXPORT double ConverterState::defShadowBlurRadius = -1.0;
 struct DecorationStyleInterface {
     std::optional<TextDecoration> type;
     std::optional<Color> color;
@@ -3360,6 +3363,8 @@ TextBackgroundStyle Convert(const Ark_TextBackgroundStyle& src)
         Validator::ValidateNonPercent(dst.backgroundRadius->radiusBottomLeft);
         Validator::ValidateNonPercent(dst.backgroundRadius->radiusBottomRight);
     }
+    dst.borderWidth = Converter::OptConvert<Dimension>(src.borderWidth);
+    dst.borderColor = Converter::OptConvert<Color>(src.borderColor);
     return dst;
 }
 
@@ -4622,6 +4627,12 @@ void AssignCast(std::optional<ImmersiveOptions>& dst, const Ark_ImmersiveOptions
     if (lightEffectOptions.has_value()) {
         immersiveOptions.lightEffectOptions = lightEffectOptions;
     }
+    auto colorBlendMode = Converter::OptConvert<int32_t>(src.colorBlendMode);
+    if (colorBlendMode.has_value() &&
+        colorBlendMode.value() >= static_cast<int32_t>(MaterialColorBlendMode::LINEAR_MIX) &&
+        colorBlendMode.value() <= static_cast<int32_t>(MaterialColorBlendMode::TINTED_GLASS)) {
+        immersiveOptions.colorBlendMode = static_cast<MaterialColorBlendMode>(colorBlendMode.value());
+    }
 
     dst = immersiveOptions;
 }
@@ -4693,6 +4704,27 @@ ACE_FORCE_EXPORT void AssignCast(std::optional<SidebarDisplayStyle>& dst, const 
         case ARK_TABS_SIDEBAR_DISPLAY_STYLE_EMBED: dst = SidebarDisplayStyle::EMBED; break;
         case ARK_TABS_SIDEBAR_DISPLAY_STYLE_DISPLACE: dst = SidebarDisplayStyle::DISPLACE; break;
         default: LOGE("Unexpected enum value in Ark_TabsSidebarDisplayStyle: %{public}d", src);
+    }
+}
+
+template<>
+void AssignCast(std::optional<SheetTitleBarHoverMode>& dst, const Ark_SheetTitleBarHoverMode& src)
+{
+    switch (src) {
+        case ARK_SHEET_TITLE_BAR_HOVER_MODE_STANDARD: dst = SheetTitleBarHoverMode::STANDARD; break;
+        case ARK_SHEET_TITLE_BAR_HOVER_MODE_STACK: dst = SheetTitleBarHoverMode::STACK; break;
+        case ARK_SHEET_TITLE_BAR_HOVER_MODE_SAFE_AREA_PADDING: dst = SheetTitleBarHoverMode::SAFE_AREA_PADDING; break;
+        default: LOGE("Unexpected enum value in Ark_SheetTitleBarHoverMode: %{public}d", src);
+    }
+}
+
+template<>
+void AssignCast(std::optional<ShadowClipMode>& dst, const Ark_ShadowClipMode& src)
+{
+    switch (src) {
+        case ARK_SHADOW_CLIP_MODE_DEFAULT_SHAPE: dst = ShadowClipMode::DEFAULT_SHAPE; break;
+        case ARK_SHADOW_CLIP_MODE_BOUNDS_SHAPE: dst = ShadowClipMode::BOUNDS_SHAPE; break;
+        default: LOGE("Unexpected enum value in Ark_ShadowClipMode: %{public}d", src);
     }
 }
 } // namespace OHOS::Ace::NG::Converter

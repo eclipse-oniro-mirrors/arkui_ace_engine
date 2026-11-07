@@ -25,6 +25,7 @@
 #include "core/interfaces/native/utility/converter.h"
 #include "core/interfaces/native/utility/reverse_converter.h"
 #include "core/interfaces/native/utility/validators.h"
+#include "base/utils/string_utils.h"
 #include "core/components_ng/property/measure_utils.h"
 #include "pixel_map_peer.h"
 #include "rich_editor_controller_peer_impl.h"
@@ -371,6 +372,10 @@ ImageSpanOptions Convert(const Ark_RichEditorImageSpanOptions& src)
     ret.userGestureOption = Converter::OptConvert<UserGestureOptions>(src.gesture).value_or(UserGestureOptions {});
     ret.userMouseOption = Converter::OptConvert<UserMouseOptions>(src.onHover).value_or(UserMouseOptions {});
     ret.imageAttribute = Converter::OptConvert<ImageSpanAttribute>(src.imageStyle);
+    auto imageTagOpt = Converter::OptConvert<std::string>(src.imageTag);
+    if (imageTagOpt.has_value()) {
+        ret.imageTag = StringUtils::Str8ToStr16(imageTagOpt.value());
+    }
     return ret;
 }
 
@@ -788,6 +793,7 @@ void AssignArkValue(Ark_RichEditorImageSpanResult& dst, const ResultObject& src,
         : ArkValue<Ark_RichEditorImageSpanStyleResult>(imageStyle);
     dst.offsetInSpan.value0 = ArkValue<Ark_Int32>(src.offsetInSpan[0]);
     dst.offsetInSpan.value1 = ArkValue<Ark_Int32>(src.offsetInSpan[1]);
+    dst.imageTag = Converter::ArkValue<Opt_String>(src.imageTag, ctx);
 }
 
 void AssignArkValue(Ark_RichEditorSelection& dst, const SelectionInfo& src, ConvContext *ctx)

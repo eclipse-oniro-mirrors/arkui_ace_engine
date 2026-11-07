@@ -47,7 +47,7 @@ enum class ValueType {
 using VariantValue = std::variant<std::string, std::u16string, float, double, Color, CalcDimension,
     std::vector<std::string>, FontWeight>;
 
-class PropertyValueBase : public virtual AceType {
+class PropertyValueBase : public AceType {
     DECLARE_ACE_TYPE(PropertyValueBase, AceType);
 public:
     virtual ~PropertyValueBase() = default;

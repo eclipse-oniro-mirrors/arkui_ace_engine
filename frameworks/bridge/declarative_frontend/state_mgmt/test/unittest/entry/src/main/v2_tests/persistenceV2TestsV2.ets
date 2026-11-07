@@ -603,13 +603,12 @@ export class PersistenceV2TestsV2 implements ITestFile {
   //
 
   testCircularRefs() {
-    class A {
-      @Type(() => B)
-      refB?: B;
-    }
     class B {
-      @Type(A)
       refA?: A;
+    }
+    class A {
+      @Type(B)
+      refB?: B;
     }
     class Data {
       @Type(A)

@@ -38,7 +38,7 @@ constexpr int32_t CALCLINEEND_POSITION = 0;
 const std::u16string TEST_INSERT_LINE_SPACE = u" ";
 } // namespace
 
-class RichEditorTextCalTestNg : public RichEditorCommonTestNg {
+class RichEditorTextCalTestNg  : public RichEditorCommonTestNg {
 public:
     void SetUp() override;
     void TearDown() override;
@@ -48,7 +48,7 @@ private:
     float CheckMaxLinesHeight(float maxLinesHeight);
 };
 
-void RichEditorTextCalTestNg::SetUp()
+void RichEditorTextCalTestNg ::SetUp()
 {
     MockPipelineContext::SetUp();
     MockContainer::SetUp();
@@ -66,18 +66,18 @@ void RichEditorTextCalTestNg::SetUp()
     richEditorNode_->GetGeometryNode()->SetContentSize({});
 }
 
-void RichEditorTextCalTestNg::TearDown()
+void RichEditorTextCalTestNg ::TearDown()
 {
     richEditorNode_ = nullptr;
     MockParagraph::TearDown();
 }
 
-void RichEditorTextCalTestNg::TearDownTestSuite()
+void RichEditorTextCalTestNg ::TearDownTestSuite()
 {
     TestNG::TearDownTestSuite();
 }
 
-int32_t RichEditorTextCalTestNg::CheckMaxLines(int32_t maxLines)
+int32_t RichEditorTextCalTestNg ::CheckMaxLines(int32_t maxLines)
 {
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     richEditorPattern->SetMaxLines(maxLines);
@@ -89,19 +89,12 @@ int32_t RichEditorTextCalTestNg::CheckMaxLines(int32_t maxLines)
  * @tc.desc: test GetChildByIndex
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, GetChildByIndex001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , GetChildByIndex001, TestSize.Level1)
 {
-    /**
-     * @tc.steps: step1. get RichEditorPattern and set caret position
-     */
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
     richEditorPattern->caretPosition_ = 0;
-
-    /**
-     * @tc.steps: step2. AddSpan
-     */
     AddSpan(INIT_VALUE_1);
     auto ret1 = richEditorPattern->GetChildByIndex(1);
     EXPECT_EQ(ret1, nullptr);
@@ -116,7 +109,7 @@ HWTEST_F(RichEditorTextCalTestNg, GetChildByIndex001, TestSize.Level0)
  * @tc.desc: test get child by index
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, GetChildByIndex002, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , GetChildByIndex002, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -134,7 +127,7 @@ HWTEST_F(RichEditorTextCalTestNg, GetChildByIndex002, TestSize.Level0)
  * @tc.desc: test CreateNodePaintMethod
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, CreateNodePaintMethod001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , CreateNodePaintMethod001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -149,7 +142,7 @@ HWTEST_F(RichEditorTextCalTestNg, CreateNodePaintMethod001, TestSize.Level0)
  * @tc.desc: test GetSpanItemByIndex
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, GetSpanItemByIndex001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , GetSpanItemByIndex001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -168,7 +161,7 @@ HWTEST_F(RichEditorTextCalTestNg, GetSpanItemByIndex001, TestSize.Level0)
  * @tc.desc: test BeforeAddImage
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, BeforeAddImage001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , BeforeAddImage001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -223,7 +216,7 @@ public:
  * @tc.desc: test RichEditorPattern UnableStandardInput
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, UnableStandardInput001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , UnableStandardInput001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -238,7 +231,7 @@ HWTEST_F(RichEditorTextCalTestNg, UnableStandardInput001, TestSize.Level0)
  * @tc.desc: test RichEditorPattern UnableStandardInput
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, UnableStandardInput002, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , UnableStandardInput002, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -256,7 +249,7 @@ HWTEST_F(RichEditorTextCalTestNg, UnableStandardInput002, TestSize.Level0)
  * @tc.desc: test provide abilityName information to inputmethod function
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, ProvideabilityNameText, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , ProvideabilityNameText, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -280,7 +273,7 @@ HWTEST_F(RichEditorTextCalTestNg, ProvideabilityNameText, TestSize.Level0)
  * @tc.desc: test GetTextContentLength
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, GetTextContentLength001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , GetTextContentLength001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -308,7 +301,7 @@ HWTEST_F(RichEditorTextCalTestNg, GetTextContentLength001, TestSize.Level0)
  * @tc.desc: test CalcLineBeginPosition
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, CalcLineBeginPosition001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , CalcLineBeginPosition001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -323,7 +316,7 @@ HWTEST_F(RichEditorTextCalTestNg, CalcLineBeginPosition001, TestSize.Level0)
  * @tc.desc: test CalcLineEndPosition
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, CalcLineEndPosition, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , CalcLineEndPosition, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -338,7 +331,7 @@ HWTEST_F(RichEditorTextCalTestNg, CalcLineEndPosition, TestSize.Level0)
  * @tc.desc: test MoveTextRect
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, MoveTextRect001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , MoveTextRect001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -356,7 +349,7 @@ HWTEST_F(RichEditorTextCalTestNg, MoveTextRect001, TestSize.Level0)
  * @tc.desc: test AdjustIndexSkipLineSeparator
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, AdjustIndexSkipLineSeparator001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , AdjustIndexSkipLineSeparator001, TestSize.Level1)
 {
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
@@ -370,7 +363,7 @@ HWTEST_F(RichEditorTextCalTestNg, AdjustIndexSkipLineSeparator001, TestSize.Leve
  * @tc.desc: test AdjustIndexSkipLineSeparator
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, AdjustIndexSkipLineSeparator002, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , AdjustIndexSkipLineSeparator002, TestSize.Level1)
 {
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
@@ -384,7 +377,7 @@ HWTEST_F(RichEditorTextCalTestNg, AdjustIndexSkipLineSeparator002, TestSize.Leve
  * @tc.desc: test AdjustIndexSkipLineSeparator
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, AdjustIndexSkipLineSeparator003, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , AdjustIndexSkipLineSeparator003, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -401,7 +394,7 @@ HWTEST_F(RichEditorTextCalTestNg, AdjustIndexSkipLineSeparator003, TestSize.Leve
  * @tc.desc: test IsTextEditableForStylus
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, IsTextEditableForStylus001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , IsTextEditableForStylus001, TestSize.Level1)
 {
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
@@ -414,7 +407,7 @@ HWTEST_F(RichEditorTextCalTestNg, IsTextEditableForStylus001, TestSize.Level0)
  * @tc.desc: test IsTextEditableForStylus
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, IsTextEditableForStylus002, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , IsTextEditableForStylus002, TestSize.Level1)
 {
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
@@ -429,7 +422,7 @@ HWTEST_F(RichEditorTextCalTestNg, IsTextEditableForStylus002, TestSize.Level0)
  * @tc.desc: test IsTextEditableForStylus
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, IsTextEditableForStylus003, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , IsTextEditableForStylus003, TestSize.Level1)
 {
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
@@ -447,7 +440,7 @@ HWTEST_F(RichEditorTextCalTestNg, IsTextEditableForStylus003, TestSize.Level0)
  * @tc.desc: test GetRightWordPosition
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, GetRightWordPosition001, TestSize.Level2)
+HWTEST_F(RichEditorTextCalTestNg , GetRightWordPosition001, TestSize.Level2)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -463,7 +456,7 @@ HWTEST_F(RichEditorTextCalTestNg, GetRightWordPosition001, TestSize.Level2)
  * @tc.desc: test GetRightWordPosition
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, GetRightWordPosition002, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , GetRightWordPosition002, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -482,7 +475,7 @@ HWTEST_F(RichEditorTextCalTestNg, GetRightWordPosition002, TestSize.Level0)
  * @tc.desc: test GetRightWordPosition
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, GetRightWordPosition003, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , GetRightWordPosition003, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -502,7 +495,7 @@ HWTEST_F(RichEditorTextCalTestNg, GetRightWordPosition003, TestSize.Level0)
  * @tc.desc: test GetRightWordPosition
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, GetRightWordPosition004, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , GetRightWordPosition004, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -528,7 +521,7 @@ HWTEST_F(RichEditorTextCalTestNg, GetRightWordPosition004, TestSize.Level0)
  * @tc.desc: test GetRightWordPosition
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, GetRightWordPosition005, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , GetRightWordPosition005, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -553,7 +546,7 @@ HWTEST_F(RichEditorTextCalTestNg, GetRightWordPosition005, TestSize.Level0)
  * @tc.desc: test GetParagraphEndPosition
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, GetParagraphEndPosition001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , GetParagraphEndPosition001, TestSize.Level0)
 {
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
@@ -575,7 +568,7 @@ HWTEST_F(RichEditorTextCalTestNg, GetParagraphEndPosition001, TestSize.Level0)
  * @tc.desc: test GetLeftWordPosition
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, GetLeftWordPosition001, TestSize.Level2)
+HWTEST_F(RichEditorTextCalTestNg , GetLeftWordPosition001, TestSize.Level2)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -590,7 +583,7 @@ HWTEST_F(RichEditorTextCalTestNg, GetLeftWordPosition001, TestSize.Level2)
  * @tc.desc: test GetLeftWordPosition
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, GetLeftWordPosition002, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , GetLeftWordPosition002, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -658,7 +651,7 @@ HWTEST_F(RichEditorTextCalTestNg, GetLeftWordPosition005, TestSize.Level0)
  * @tc.desc: test HandleOnEscape
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, HandleOnEscape001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , HandleOnEscape001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -671,7 +664,7 @@ HWTEST_F(RichEditorTextCalTestNg, HandleOnEscape001, TestSize.Level0)
  * @tc.desc: test ClearContent
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, ClearContent001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , ClearContent001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -691,7 +684,7 @@ HWTEST_F(RichEditorTextCalTestNg, ClearContent001, TestSize.Level0)
  * @tc.desc: test ClearContent
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, ClearContent002, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , ClearContent002, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -708,7 +701,7 @@ HWTEST_F(RichEditorTextCalTestNg, ClearContent002, TestSize.Level0)
  * @tc.desc: test ConvertGlobalToTextOffset
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, ConvertGlobalToTextOffset001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , ConvertGlobalToTextOffset001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -724,7 +717,7 @@ HWTEST_F(RichEditorTextCalTestNg, ConvertGlobalToTextOffset001, TestSize.Level0)
  * @tc.desc: test AfterContentChange
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, AfterContentChange001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , AfterContentChange001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -740,7 +733,7 @@ HWTEST_F(RichEditorTextCalTestNg, AfterContentChange001, TestSize.Level0)
  * @tc.desc: Test ReportAfterContentChangeEvent non-span string mode with content added
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, ReportAfterContentChangeEvent001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , ReportAfterContentChangeEvent001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -762,7 +755,7 @@ HWTEST_F(RichEditorTextCalTestNg, ReportAfterContentChangeEvent001, TestSize.Lev
  * @tc.desc: Test ReportAfterContentChangeEvent in span mode with content removed
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, ReportAfterContentChangeEvent002, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , ReportAfterContentChangeEvent002, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -779,7 +772,7 @@ HWTEST_F(RichEditorTextCalTestNg, ReportAfterContentChangeEvent002, TestSize.Lev
  * @tc.desc: Test ReportAfterContentChangeEvent non-span string mode with content modified
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, ReportAfterContentChangeEvent003, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , ReportAfterContentChangeEvent003, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -801,7 +794,7 @@ HWTEST_F(RichEditorTextCalTestNg, ReportAfterContentChangeEvent003, TestSize.Lev
  * @tc.desc: test SetInputMethodStatus
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, SetInputMethodStatus001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , SetInputMethodStatus001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -819,7 +812,7 @@ HWTEST_F(RichEditorTextCalTestNg, SetInputMethodStatus001, TestSize.Level0)
  * @tc.desc: test ToJsonValue
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, RichEditorToJsonValue001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , RichEditorToJsonValue001, TestSize.Level1)
 {
     /**
      * @tc.steps: step1. init and call function.
@@ -910,7 +903,7 @@ HWTEST_F(RichEditorTextCalTestNg, SetOrphanCharOptimization001, TestSize.Level0)
  * @tc.desc: test FixMoveDownChange
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, FixMoveDownChange001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , FixMoveDownChange001, TestSize.Level1)
 {
     /**
      * @tc.steps: step1. declare and init variables and call function.
@@ -931,7 +924,7 @@ HWTEST_F(RichEditorTextCalTestNg, FixMoveDownChange001, TestSize.Level0)
     RichEditorAbstractSpanResult& firstInfo = changeValue.originalSpans_.front();
     int32_t firstLength = static_cast<int32_t>(firstInfo.GetValue().length());
     firstInfo.SetEraseLength(firstLength);
-    auto spanIndex = 0;
+    int32_t spanIndex = 0;
     richEditorPattern->FixMoveDownChange(changeValue, 0);
     EXPECT_EQ(spanIndex, firstInfo.GetSpanIndex());
 }
@@ -941,7 +934,7 @@ HWTEST_F(RichEditorTextCalTestNg, FixMoveDownChange001, TestSize.Level0)
  * @tc.desc: test IsLineSeparatorInLast
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, IsLineSeparatorInLast001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , IsLineSeparatorInLast001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -964,7 +957,7 @@ HWTEST_F(RichEditorTextCalTestNg, IsLineSeparatorInLast001, TestSize.Level0)
  * @tc.desc: test SetMaxLength
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, SetMaxLength001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , SetMaxLength001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -978,7 +971,7 @@ HWTEST_F(RichEditorTextCalTestNg, SetMaxLength001, TestSize.Level0)
  * @tc.desc: test SetMaxLength
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, SetMaxLength002, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , SetMaxLength002, TestSize.Level1)
 {
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     EXPECT_EQ(richEditorPattern->GetMaxLength(), INT_MAX);
@@ -1051,7 +1044,7 @@ HWTEST_F(RichEditorTextCalTestNg, ResetMaxLength001, TestSize.Level0)
  * @tc.desc: test SetMaxLines
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, SetMaxLines001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , SetMaxLines001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     EXPECT_EQ(CheckMaxLines(1), 1);
@@ -1062,7 +1055,7 @@ HWTEST_F(RichEditorTextCalTestNg, SetMaxLines001, TestSize.Level0)
  * @tc.desc: test SetMaxLines
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, SetMaxLines002, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , SetMaxLines002, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -1074,7 +1067,7 @@ HWTEST_F(RichEditorTextCalTestNg, SetMaxLines002, TestSize.Level0)
  * @tc.desc: test SetMaxLines
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, SetMaxLines003, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , SetMaxLines003, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -1123,7 +1116,7 @@ HWTEST_F(RichEditorTextCalTestNg, SetMaxLines005, TestSize.Level0)
     EXPECT_EQ(richEditorPattern->GetMaxLines(), 2);
 }
 
-float RichEditorTextCalTestNg::CheckMaxLinesHeight(float maxLinesHeight)
+float RichEditorTextCalTestNg ::CheckMaxLinesHeight(float maxLinesHeight)
 {
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     richEditorPattern->SetMaxLinesHeight(maxLinesHeight);
@@ -1135,7 +1128,7 @@ float RichEditorTextCalTestNg::CheckMaxLinesHeight(float maxLinesHeight)
  * @tc.desc: test SetMaxLinesHeight
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, SetMaxLinesHeight001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , SetMaxLinesHeight001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     EXPECT_EQ(CheckMaxLinesHeight(0.0f), 0.0f);
@@ -1146,7 +1139,7 @@ HWTEST_F(RichEditorTextCalTestNg, SetMaxLinesHeight001, TestSize.Level0)
  * @tc.desc: test SetMaxLinesHeight
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, SetMaxLinesHeight002, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , SetMaxLinesHeight002, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     EXPECT_EQ(CheckMaxLinesHeight(10.0f), 10.0f);
@@ -1157,7 +1150,7 @@ HWTEST_F(RichEditorTextCalTestNg, SetMaxLinesHeight002, TestSize.Level0)
  * @tc.desc: test SetMaxLinesHeight
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, SetMaxLinesHeight003, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , SetMaxLinesHeight003, TestSize.Level1)
 {
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     EXPECT_EQ(richEditorPattern->GetMaxLinesHeight(), FLT_MAX);
@@ -1168,7 +1161,7 @@ HWTEST_F(RichEditorTextCalTestNg, SetMaxLinesHeight003, TestSize.Level0)
  * @tc.desc: test ReportTextChange
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, ReportTextChange001, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , ReportTextChange001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -1188,7 +1181,7 @@ HWTEST_F(RichEditorTextCalTestNg, ReportTextChange001, TestSize.Level0)
  * @tc.desc: test ReportTextChange
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorTextCalTestNg, ReportTextChange002, TestSize.Level0)
+HWTEST_F(RichEditorTextCalTestNg , ReportTextChange002, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();

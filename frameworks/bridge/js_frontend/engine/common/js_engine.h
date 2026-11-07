@@ -296,6 +296,14 @@ public:
 
     virtual void OnSaveData(std::string& data) {}
 
+    // RecoverableStorage snapshot bridge (save chain): returns the instance-level
+    // "recoverableStorage" section produced by the state_mgmt TS singleton.
+    virtual std::string GetRecoverableStorageSnapshot(int32_t instanceId) { return ""; }
+
+    // RecoverableStorage restore bridge: delivers the section parsed from contentInfo
+    // to the state_mgmt TS singleton (one-shot, see design INV-4).
+    virtual void SetRecoverableStorageData(int32_t instanceId, const std::string& data) {}
+
     virtual bool OnRestoreData(const std::string& data)
     {
         return false;

@@ -35,7 +35,7 @@ public:
     RefPtr<PaintProperty> Clone() const override
     {
         auto value = MakeRefPtr<ToggleButtonPaintProperty>();
-        value->PaintProperty::UpdatePaintProperty(DynamicCast<PaintProperty>(this));
+        value->PaintProperty::UpdatePaintProperty(this);
         value->propIsOn_ = CloneIsOn();
         value->propSelectedColor_ = CloneSelectedColor();
         value->propBackgroundColor_ = CloneBackgroundColor();

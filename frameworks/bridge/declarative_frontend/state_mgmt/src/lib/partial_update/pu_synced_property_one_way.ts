@@ -419,7 +419,7 @@ class SynchedPropertyOneWayPU<C> extends ObservedPropertyAbstractPU<C>
 
   // do not use this function from outside unless it is for testing purposes.
   public static deepCopyObjectInternal<C>(obj: C, variable?: string): C {
-    if (!obj || typeof obj !== 'object') {
+    if (!obj || typeof obj !== 'object' || Reflect.get(obj, '__MATERIAL_REFERENCE__')) {
       return obj;
     }
 
@@ -428,7 +428,7 @@ class SynchedPropertyOneWayPU<C> extends ObservedPropertyAbstractPU<C>
     return getDeepCopyOfObjectRecursive(obj);
 
     function getDeepCopyOfObjectRecursive(obj: any): any {
-      if (!obj || typeof obj !== 'object' || Reflect.get(obj, '__MATERIAL_REFERENCE__')) {
+      if (!obj || typeof obj !== 'object') {
         return obj;
       }
 

@@ -179,12 +179,13 @@ void DialogManagerStatic::CloseToastStatic(const int32_t toastId, std::function<
     if (containerId < 0) {
         currentId = Container::CurrentId();
     }
-    ContainerScope scope(currentId);
-    auto context = NG::PipelineContext::GetCurrentContext();
-    CHECK_NULL_VOID(context);
-    auto overlayManager = context->GetOverlayManager();
-    CHECK_NULL_VOID(overlayManager);
-    overlayManager->CloseToast(toastId, std::move(callback));
+    auto task = [toastId, callbackParam = std::move(callback), currentId](
+        const RefPtr<NG::OverlayManager>& overlayManager) {
+        CHECK_NULL_VOID(overlayManager);
+        ContainerScope scope(currentId);
+        overlayManager->CloseToast(toastId, std::move(const_cast<std::function<void(int32_t)>&&>(callbackParam)));
+    };
+    MainWindowOverlayStatic(std::move(task), "ArkUIOverlayCloseToast", nullptr, currentId);
 }
 
 void DialogManagerStatic::ShowDialogStatic(DialogProperties& dialogProps,
@@ -403,7 +404,14 @@ void DialogManagerStatic::RemoveCustomDialog(int32_t instanceId)
 {
     TAG_LOGI(AceLogTag::ACE_DIALOG, "Dismiss custom dialog, instanceId: %{public}d", instanceId);
     ContainerScope scope(instanceId);
-    NG::ViewAbstract::DismissDialog();
+    auto context = NG::PipelineContext::GetCurrentContext();
+    CHECK_NULL_VOID(context);
+    context->GetTaskExecutor()->PostTask(
+        [instanceId] {
+            ContainerScope scope(instanceId);
+            NG::ViewAbstract::DismissDialog();
+        },
+        TaskExecutor::TaskType::UI, "ArkUIOverlayDismissDialog");
 }
 
 void DialogManagerStatic::OpenOrderOverlayStatic(const WeakPtr<NG::UINode>& node,

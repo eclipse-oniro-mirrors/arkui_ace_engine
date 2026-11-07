@@ -243,7 +243,7 @@ void RecognizerGroup::AddHittedRecognizerType(
                 hittedRecognizerInfo.emplace(AceType::TypeName(item), std::list<NG::TouchTestResultInfo>());
                 continue;
             }
-            auto frameNode = AceType::DynamicCast<NG::FrameNode>(node);
+            auto frameNode = node;
             if (!frameNode) {
                 hittedRecognizerInfo.emplace(AceType::TypeName(item), std::list<NG::TouchTestResultInfo>());
                 continue;

@@ -937,7 +937,7 @@ bool TitleBarPattern::GetColorParamWithColorInvertSupported(IconColorParam& para
     CHECK_NULL_RETURN(host, false);
     auto context = host->GetContextRefPtr();
     CHECK_NULL_RETURN(context, false);
-    auto theme = context->GetTheme<NavigationBarTheme>();
+    auto theme = NavigationGetTheme(host->GetThemeScopeId());
     CHECK_NULL_RETURN(theme, false);
     ColorMode colorMode = ColorMode::DARK;
     bool isColorInvertEnabled = IsColorInvertEnabled();
@@ -972,7 +972,7 @@ std::optional<TitleBarPattern::IconColorParam> TitleBarPattern::GetCurrentIconCo
     CHECK_NULL_RETURN(host, std::nullopt);
     auto context = host->GetContextRefPtr();
     CHECK_NULL_RETURN(context, std::nullopt);
-    auto theme = context->GetTheme<NavigationBarTheme>();
+    auto theme = NavigationGetTheme(host->GetThemeScopeId());
     CHECK_NULL_RETURN(theme, std::nullopt);
     ColorMode colorMode = GetCurrentColorMode(false);
     const auto& options = options_.bgOptions.scrollEffectOptions;
@@ -2045,6 +2045,35 @@ bool TitleBarPattern::OnThemeScopeUpdate(int32_t themeScopeId)
     shouldResetMainTitleProperty_ = true;
     shouldResetSubTitleProperty_ = true;
     host->MarkModifyDone();
+    // Only refresh the menu items' focus border color so the focus outline follows
+    // the updated token theme. Avoid the heavier UpdateMenuIconEffect here, which
+    // also re-applies icon/hover/pressed colors not affected by theme scope changes.
+    auto menuNode = host->GetMenu();
+    CHECK_NULL_RETURN(menuNode, false);
+    if (menuNode->GetTag() != V2::NAVIGATION_MENU_ETS_TAG) {
+        return false;
+    }
+    auto theme = NavigationGetTheme(host->GetThemeScopeId());
+    CHECK_NULL_RETURN(theme, false);
+    auto focusColor = theme->GetBackgroundFocusOutlineColor();
+    auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
+    CHECK_NULL_RETURN(buttonModifier, false);
+    for (const auto& child : menuNode->GetChildren()) {
+        auto menuItemNode = AceType::DynamicCast<FrameNode>(child);
+        CHECK_NULL_CONTINUE(menuItemNode);
+        if (menuItemNode->GetTag() != V2::MENU_ITEM_ETS_TAG) {
+            continue;
+        }
+        auto nodeHandle = reinterpret_cast<ArkUINodeHandle>(AceType::RawPtr(menuItemNode));
+        if (!buttonModifier->isButtonPattern(nodeHandle)) {
+            continue;
+        }
+        buttonModifier->setFocusBorderColor(nodeHandle, focusColor);
+        auto focusHub = menuItemNode->GetFocusHub();
+        if (focusHub) {
+            focusHub->SetPaintColor(focusColor);
+        }
+    }
     return false;
 }
 

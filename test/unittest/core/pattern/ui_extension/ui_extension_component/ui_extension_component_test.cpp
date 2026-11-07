@@ -414,10 +414,10 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionPatternValidSessionTest, TestSiz
     pattern->OnVisibleChange(true);
     pattern->OnVisibleChange(false);
     pattern->isVisible_ = true;
-    pattern->SetDensityDpi(true);
-    EXPECT_EQ(pattern->GetDensityDpi(), true);
+    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_HOST_DPI);
+    EXPECT_EQ(pattern->GetDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_HOST_DPI);
     pattern->OnDpiConfigurationUpdate();
-    EXPECT_EQ(pattern->GetDensityDpi(), true);
+    EXPECT_EQ(pattern->GetDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_HOST_DPI);
     pattern->OnWindowShow();
     pattern->OnWindowHide();
     const DirtySwapConfig config;
@@ -454,10 +454,10 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionPatternInValidSessionTest, TestS
     pattern->OnVisibleChange(true);
     pattern->OnVisibleChange(false);
     pattern->isVisible_ = true;
-    pattern->SetDensityDpi(true);
-    EXPECT_EQ(pattern->GetDensityDpi(), true);
+    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_HOST_DPI);
+    EXPECT_EQ(pattern->GetDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_HOST_DPI);
     pattern->OnDpiConfigurationUpdate();
-    EXPECT_EQ(pattern->GetDensityDpi(), true);
+    EXPECT_EQ(pattern->GetDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_HOST_DPI);
     pattern->OnWindowShow();
     pattern->OnWindowHide();
     const DirtySwapConfig config;
@@ -491,7 +491,7 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionUpdateWantTest1, TestSize.Level1
     pattern->UpdateWant(nullptr);
     RefPtr<WantWrap> wantOhos = AceType::MakeRefPtr<WantWrapOhos>("123", "123");
     pattern->UpdateWant(wantOhos);
-    auto wantOhos2 = AceType::DynamicCast<WantWrap>(wantOhos);
+    auto wantOhos2 = wantOhos;
     pattern->UpdateWant(wantOhos2);
 #endif
 }
@@ -1264,7 +1264,7 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionPlaceholderTest, TestSize.Level1
 
 /**
  * @tc.name: UIExtensionComponentTest002
- * @tc.desc: Test pattern SetDensityDpi function
+ * @tc.desc: Test pattern SetDpiFollowStrategy function
  * @tc.type: FUNC
  */
 HWTEST_F(UIExtensionComponentTestNg, UIExtensionComponentTest002, TestSize.Level1)
@@ -1283,21 +1283,21 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionComponentTest002, TestSize.Level
      */
     auto pattern = uiExtensionNode->GetPattern<UIExtensionPattern>();
     ASSERT_NE(pattern, nullptr);
-    bool densityDpi = pattern->GetDensityDpi();
+    bool densityDpi = pattern->GetDpiFollowStrategy() == DpiFollowStrategy::FOLLOW_HOST_DPI;
     EXPECT_FALSE(densityDpi);
 
     /**
-     * @tc.steps: step3. SetDensityDpi false
+     * @tc.steps: step3. SetDpiFollowStrategy FOLLOW_UI_EXTENSION_ABILITY_DPI
      */
-    pattern->SetDensityDpi(false);
-    densityDpi = pattern->GetDensityDpi();
+    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+    densityDpi = pattern->GetDpiFollowStrategy() == DpiFollowStrategy::FOLLOW_HOST_DPI;
     EXPECT_FALSE(densityDpi);
 
     /**
-     * @tc.steps: step4. SetDensityDpi true
+     * @tc.steps: step4. SetDpiFollowStrategy FOLLOW_HOST_DPI
      */
-    pattern->SetDensityDpi(true);
-    densityDpi = pattern->GetDensityDpi();
+    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_HOST_DPI);
+    densityDpi = pattern->GetDpiFollowStrategy() == DpiFollowStrategy::FOLLOW_HOST_DPI;
     EXPECT_TRUE(densityDpi);
 }
 
@@ -2437,15 +2437,15 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionComponentEmbeddedInitOptionsTest
     config.wantWrap = wantWrap;
     config.sessionType = SessionType::EMBEDDED_UI_EXTENSION;
     config.placeholderMap = placeholderMap;
-    config.densityDpi = true;
+    config.dpiFollowStrategy = DpiFollowStrategy::FOLLOW_HOST_DPI;
     config.isWindowModeFollowHost = true;
     model.Create(config);
-    auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
     ASSERT_NE(frameNode, nullptr);
     auto pattern = frameNode->GetPattern<UIExtensionPattern>();
     ASSERT_NE(pattern, nullptr);
 
-    EXPECT_TRUE(pattern->densityDpi_);
+    EXPECT_TRUE(pattern->dpiFollowStrategy_ == DpiFollowStrategy::FOLLOW_HOST_DPI);
     EXPECT_TRUE(pattern->isWindowModeFollowHost_);
     EXPECT_FALSE(pattern->placeholderMap_.empty());
 
@@ -2454,5 +2454,312 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionComponentEmbeddedInitOptionsTest
     ASSERT_NE(pattern->onDrawReadyCallback_, nullptr);
     pattern->onDrawReadyCallback_();
     EXPECT_TRUE(onDrawReadyCalled);
+}
+
+/**
+ * @tc.name: UIExtensionPatternDpiWhitelist001
+ * @tc.desc: Test pattern GetEffectiveDpiFollowStrategy: developer-configured strategy takes
+ *           precedence, otherwise the host saved strategy (UIContent::SetUIExtensionDensityFollowHost) applies.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionPatternDpiWhitelist001, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto pipeline = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+
+    /**
+     * @tc.steps: step1. developer strategy not set (default), host strategy not set (default)
+     * @tc.expected: effective value is default
+     */
+    pipeline->SetUIExtensionDensityFollowHost(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI, false);
+    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+
+    /**
+     * @tc.steps: step2. developer strategy not set, host strategy FOLLOW_HOST_DPI_ALL (whitelist)
+     * @tc.expected: effective value follows the host saved strategy
+     */
+    pipeline->SetUIExtensionDensityFollowHost(DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+
+    /**
+     * @tc.steps: step3. developer strategy FOLLOW_HOST_DPI, host strategy FOLLOW_HOST_DPI_ALL
+     * @tc.expected: developer-configured strategy takes precedence over host strategy
+     */
+    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_HOST_DPI);
+    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_HOST_DPI);
+
+    /**
+     * @tc.steps: step4. developer strategy FOLLOW_HOST_DPI_ALL, host strategy default
+     * @tc.expected: developer-configured strategy takes precedence over default
+     */
+    pipeline->SetUIExtensionDensityFollowHost(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+
+    /**
+     * @tc.steps: step5. developer strategy not set, host strategy replaced with FOLLOW_HOST_DPI
+     * @tc.expected: saved value is replaced by the passed one and becomes the effective strategy
+     */
+    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI, false);
+    pipeline->SetUIExtensionDensityFollowHost(DpiFollowStrategy::FOLLOW_HOST_DPI);
+    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_HOST_DPI);
+
+    /**
+     * @tc.steps: step6. developer explicitly configured the default strategy (opt-out), host FOLLOW_HOST_DPI_ALL
+     * @tc.expected: developer explicit configuration takes precedence, effective value is the default strategy
+     */
+    pipeline->SetUIExtensionDensityFollowHost(DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI, true);
+    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+}
+
+/**
+ * @tc.name: UIExtensionBrandColorTest001
+ * @tc.desc: Test NotifyBrandColorChangeToUEA with null sessionWrapper
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sessionWrapper_ = nullptr;
+    pattern->NotifyBrandColorChangeToUEA(100, "");
+    EXPECT_EQ(pattern->sessionWrapper_, nullptr);
+#endif
+}
+
+/**
+ * @tc.name: UIExtensionBrandColorTest002
+ * @tc.desc: Test NotifyBrandColorChangeToUEA skipped when state is not FOREGROUND
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ValidSessionWrapper(pattern);
+    Color testColor(0xFF0000FF);
+    pattern->NotifyBrandColorChangeToUEA(100, testColor.ToString());
+    EXPECT_EQ(pattern->lastSentBrandColorStr_, "");
+#endif
+}
+
+/**
+ * @tc.name: UIExtensionBrandColorTest003
+ * @tc.desc: Test NotifyBrandColorChangeToUEA sends when state is FOREGROUND and isUeaConnecting_ is true
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest003, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ValidSessionWrapper(pattern);
+    pattern->state_ = UIExtensionPattern::AbilityState::FOREGROUND;
+    pattern->isUeaConnecting_ = true;
+    Color testColor(0xFF0000FF);
+    pattern->NotifyBrandColorChangeToUEA(100, testColor.ToString());
+    EXPECT_EQ(pattern->lastSentBrandColorStr_, testColor.ToString());
+#endif
+}
+
+/**
+ * @tc.name: UIExtensionBrandColorTest004
+ * @tc.desc: Test NotifyBrandColorChangeToUEA skips transparent brand color
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest004, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ValidSessionWrapper(pattern);
+    pattern->state_ = UIExtensionPattern::AbilityState::FOREGROUND;
+    pattern->isUeaConnecting_ = true;
+    pattern->NotifyBrandColorChangeToUEA(100, "#00EEEEEE");
+    EXPECT_TRUE(pattern->lastSentBrandColorStr_.empty());
+#endif
+}
+
+/**
+ * @tc.name: UIExtensionBrandColorTest005
+ * @tc.desc: Test NotifyBrandColorChangeToUEA skips unchanged brand color
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest005, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ValidSessionWrapper(pattern);
+    pattern->state_ = UIExtensionPattern::AbilityState::FOREGROUND;
+    pattern->isUeaConnecting_ = true;
+    pattern->lastSentBrandColorStr_ = "#FF0000FF";
+    pattern->NotifyBrandColorChangeToUEA(100, "#FF0000FF");
+    EXPECT_EQ(pattern->lastSentBrandColorStr_, "#FF0000FF");
+#endif
+}
+
+/**
+ * @tc.name: UIExtensionBrandColorTest006
+ * @tc.desc: Test NOTIFY_BRAND_COLOR_CHANGE business code value
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest006, TestSize.Level1)
+{
+    EXPECT_EQ(static_cast<uint32_t>(UIContentBusinessCode::NOTIFY_BRAND_COLOR_CHANGE), 4001u);
+}
+
+/**
+ * @tc.name: UIExtensionBrandColorTest007
+ * @tc.desc: Test brandColorStr_ defaults to DEFAULT_BRAND_COLOR_STR
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest007, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_TRUE(pattern->brandColorStr_.empty());
+#endif
+}
+
+/**
+ * @tc.name: UIExtensionBrandColorTest008
+ * @tc.desc: Test isUeaConnecting_ defaults to false
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest008, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_FALSE(pattern->isUeaConnecting_);
+#endif
+}
+
+/**
+ * @tc.name: UIExtensionBrandColorTest009
+ * @tc.desc: Test OnThemeScopeUpdate returns true and does not crash
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest009, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ValidSessionWrapper(pattern);
+    auto result = pattern->OnThemeScopeUpdate(999);
+    EXPECT_TRUE(result);
+#endif
+}
+
+/**
+ * @tc.name: UIExtensionBrandColorTest010
+ * @tc.desc: Test OnThemeScopeUpdate with null sessionWrapper still returns true
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest010, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sessionWrapper_ = nullptr;
+    auto result = pattern->OnThemeScopeUpdate(999);
+    EXPECT_TRUE(result);
+#endif
+}
+
+/**
+ * @tc.name: UIExtensionBrandColorTest011
+ * @tc.desc: Test FireOnRemoteReadyCallback does not crash with default brandColorStr_
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest011, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ValidSessionWrapper(pattern);
+    pattern->FireOnRemoteReadyCallback();
+    EXPECT_TRUE(pattern->brandColorStr_.empty());
+#endif
+}
+
+/**
+ * @tc.name: UIExtensionBrandColorTest012
+ * @tc.desc: Test FireOnRemoteReadyCallback with brandColorStr_ set does not clear it
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest012, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ValidSessionWrapper(pattern);
+    pattern->brandColorStr_ = "#FF0000FF";
+    pattern->FireOnRemoteReadyCallback();
+    EXPECT_EQ(pattern->brandColorStr_, "#FF0000FF");
+#endif
+}
+
+/**
+ * @tc.name: UIExtensionBrandColorTest013
+ * @tc.desc: Test NotifyForeground re-sends brandColorStr_ when entering foreground
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest013, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ValidSessionWrapper(pattern);
+    pattern->isUeaConnecting_ = true;
+    pattern->brandColorStr_ = "#FF0000FF";
+    pattern->NotifyForeground();
+    EXPECT_EQ(pattern->state_, UIExtensionPattern::AbilityState::FOREGROUND);
+    EXPECT_EQ(pattern->lastSentBrandColorStr_, "#FF0000FF");
+#endif
+}
+
+/**
+ * @tc.name: UIExtensionBrandColorTest014
+ * @tc.desc: Test NotifyForeground does not re-send when already FOREGROUND
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest014, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ValidSessionWrapper(pattern);
+    pattern->state_ = UIExtensionPattern::AbilityState::FOREGROUND;
+    pattern->isUeaConnecting_ = true;
+    pattern->brandColorStr_ = "#FF0000FF";
+    pattern->lastSentBrandColorStr_ = "#FF0000FF";
+    pattern->NotifyForeground();
+    EXPECT_EQ(pattern->lastSentBrandColorStr_, "#FF0000FF");
+#endif
+}
+
+/**
+ * @tc.name: UIExtensionBrandColorTest015
+ * @tc.desc: Test SetLastSentBrandColorStr updates both brandColorStr_ and lastSentBrandColorStr_
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest015, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetLastSentBrandColorStr("#FF0000FF");
+    EXPECT_EQ(pattern->brandColorStr_, "#FF0000FF");
+    EXPECT_EQ(pattern->lastSentBrandColorStr_, "#FF0000FF");
+#endif
 }
 } // namespace OHOS::Ace::NG

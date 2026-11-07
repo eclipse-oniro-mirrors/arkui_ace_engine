@@ -50,7 +50,7 @@ void TextPickerTossAnimationController::SetStart(double y)
     auto weak = AceType::WeakClaim(this);
     auto ref = weak.Upgrade();
     CHECK_NULL_VOID(ref);
-    auto column = AceType::DynamicCast<TextPickerColumnPattern>(ref->column_.Upgrade());
+    auto column = ref->column_.Upgrade();
     CHECK_NULL_VOID(column);
     auto isTouchBreak = column->GetTouchBreakStatus();
     if (isTouchBreak == false) {
@@ -78,7 +78,7 @@ bool TextPickerTossAnimationController::Play()
     auto weak = AceType::WeakClaim(this);
     auto ref = weak.Upgrade();
     CHECK_NULL_RETURN(ref, false);
-    auto column = AceType::DynamicCast<TextPickerColumnPattern>(ref->column_.Upgrade());
+    auto column = ref->column_.Upgrade();
     CHECK_NULL_RETURN(column, false);
     auto timeDiff = timeEnd_ - timeStart_;
     if (timeDiff < MIN_TIME) {
@@ -99,7 +99,7 @@ void TextPickerTossAnimationController::StartSpringMotion()
     auto weak = AceType::WeakClaim(this);
     auto ref = weak.Upgrade();
     CHECK_NULL_VOID(ref);
-    auto column = AceType::DynamicCast<TextPickerColumnPattern>(ref->column_.Upgrade());
+    auto column = ref->column_.Upgrade();
     CHECK_NULL_VOID(column);
     auto columnNode = column->GetHost();
     CHECK_NULL_VOID(columnNode);
@@ -149,7 +149,7 @@ void TextPickerTossAnimationController::StopTossAnimation()
     auto weak = AceType::WeakClaim(this);
     auto ref = weak.Upgrade();
     CHECK_NULL_VOID(ref);
-    auto column = AceType::DynamicCast<TextPickerColumnPattern>(ref->column_.Upgrade());
+    auto column = ref->column_.Upgrade();
     CHECK_NULL_VOID(column);
     column->SetTossStatus(false);
     AnimationOption option;
@@ -199,7 +199,7 @@ void TextPickerTossAnimationController::CreatePropertyCallback()
     auto weak = AceType::WeakClaim(this);
     auto ref = weak.Upgrade();
     CHECK_NULL_VOID(ref);
-    auto column = AceType::DynamicCast<TextPickerColumnPattern>(ref->column_.Upgrade());
+    auto column = ref->column_.Upgrade();
     CHECK_NULL_VOID(column);
     auto propertyCallback = [weak, column](float position) {
         auto isTouchBreak = column->GetTouchBreakStatus();

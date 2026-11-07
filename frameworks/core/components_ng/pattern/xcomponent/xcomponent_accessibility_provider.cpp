@@ -127,6 +127,7 @@ int32_t XComponentAccessibilityProvider::SendAccessibilityAsyncEvent(
     auto thirdAccessibilityManager = thirdAccessibilityManager_.lock();
     if (thirdAccessibilityManager == nullptr) {
         if (callback) {
+            LOG_CALLBACK("OH_ArkUI_SendAccessibilityAsyncEvent", callback);
             callback(SEND_EVENT_FAILED);
         }
         return SEND_EVENT_FAILED;

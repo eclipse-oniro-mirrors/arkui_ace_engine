@@ -19,13 +19,17 @@
 
 #include "core/interfaces/native/implementation/render_node_peer_impl.h"
 #include "common_ani_modifier.h"
+#include "safe_area_inset_ani_modifier.h"
 #include "securec.h"
+
 #include "ui/properties/color.h"
 #include "base/log/container_scope_wrapper.h"
 #include "base/log/log.h"
 #include "base/log/dump_log.h"
 #include "base/memory/ace_type.h"
 #include "core/common/container.h"
+#include "core/common/ace_application_info.h"
+#include "core/common/application_shortcut.h"
 #include "core/common/multi_thread_build_manager.h"
 #include "core/common/thread_checker.h"
 #include "core/components_ng/base/extension_handler.h"
@@ -46,6 +50,10 @@
 #include "core/interfaces/native/implementation/mouse_event_peer.h"
 #include "core/interfaces/native/implementation/touch_event_peer.h"
 #include "core/interfaces/native/utility/accessor_utils.h"
+#include "interfaces/inner_api/ace/ui_content.h"
+#include "interfaces/inner_api/ace/modal_ui_extension_config.h"
+#include "interfaces/inner_api/ace/modal_ui_extension_proxy.h"
+#include "core/components_ng/pattern/overlay/overlay_manager.h"
 #include "core/components_ng/token_theme/token_theme_storage.h"
 #include "core/interfaces/native/ani/ani_theme.h"
 #include "core/interfaces/native/ani/ani_theme_module.h"
@@ -126,6 +134,16 @@ ani_boolean IsEasySplit(ArkUI_Int32 instanceId)
         return false;
     }
     return context->IsDisplayInForceSplitMode();
+}
+
+ani_boolean IsTransPageEnabled(ArkUI_Int32 instanceId)
+{
+    auto context = NG::PipelineContext::GetContextByContainerId(instanceId);
+    if (context == nullptr) {
+        TAG_LOGE(AceLogTag::ACE_NAVIGATION, "IsTransPageEnabled-ani can not get current context.");
+        return true;
+    }
+    return context->IsTransPageEnabled();
 }
 
 ani_ref* GetHostContext(ArkUI_Int32 key)
@@ -746,6 +764,15 @@ ani_int GetWindowHeightBreakpoint()
     return ViewAbstract::GetWindowHeightBreakpoint();
 }
 
+ani_boolean IsWindowInfoInitialized(ani_int instanceId)
+{
+    auto context = NG::PipelineContext::GetContextByContainerId(instanceId);
+    CHECK_NULL_RETURN(context, false);
+    auto window = context->GetWindow();
+    CHECK_NULL_RETURN(window, false);
+    return window->IsWindowInfoInitialized();
+}
+
 void* TransferKeyEventPointer(ani_long nativePtr)
 {
     CHECK_NULL_RETURN(nativePtr, nullptr);
@@ -1240,6 +1267,33 @@ ani_long GetPageRootNodeInStatic()
     return 0;
 }
 
+int32_t CreateModalUIExtensionInStatic(
+    const AAFwk::Want& want, const ModalUIExtensionCallbacks& callbacks, const ModalUIExtensionConfig& config,
+    const NG::InnerExtraConfig& extraConfig, ArkUI_Int32 instanceId)
+{
+    auto pipeline = NG::PipelineContext::GetContextByContainerId(instanceId);
+    CHECK_NULL_RETURN(pipeline, 0);
+    auto overlay = pipeline->GetOverlayManager();
+    CHECK_NULL_RETURN(overlay, 0);
+    return overlay->CreateModalUIExtension(want, callbacks, config, extraConfig);
+}
+
+void CloseModalUIExtensionInStatic(int32_t sessionId, ArkUI_Int32 instanceId)
+{
+    auto pipeline = NG::PipelineContext::GetContextByContainerId(instanceId);
+    CHECK_NULL_VOID(pipeline);
+    auto overlay = pipeline->GetOverlayManager();
+    CHECK_NULL_VOID(overlay);
+    overlay->CloseModalUIExtension(sessionId);
+}
+
+void ModalUIExtensionProxySendInStatic(
+    std::shared_ptr<ModalUIExtensionProxy>& proxy, const AAFwk::WantParams& params)
+{
+    CHECK_NULL_VOID(proxy);
+    proxy->SendData(params);
+}
+
 void DumpLogPrintImpl(int32_t depth, const char* content)
 {
     DumpLog::GetInstance().Print(depth, std::string(content));
@@ -1286,6 +1340,21 @@ int32_t GetBuilderNodeParentViewId(ani_long nodePtr)
     return NUM_NEG_1;
 }
 
+int32_t RegisterApplicationShortcutInStatic(const std::string& value, uint8_t modifiers,
+    std::function<void(int32_t)>&& callback)
+{
+    return ApplicationShortcutManager::GetInstance().RegisterApplicationShortcut(value, modifiers,
+        [callback = std::move(callback)](int32_t instanceId) {
+            ContainerScope scope(instanceId);
+            callback(instanceId);
+        });
+}
+
+void UnregisterApplicationShortcutInStatic(int32_t registrationId)
+{
+    ApplicationShortcutManager::GetInstance().UnregisterApplicationShortcut(registrationId);
+}
+
 const ArkUIAniCommonModifier* GetCommonAniModifier()
 {
     static const ArkUIAniCommonModifier impl = {
@@ -1328,6 +1397,7 @@ const ArkUIAniCommonModifier* GetCommonAniModifier()
         .getWindowId = OHOS::Ace::NG::GetWindowId,
         .getWindowHeightBreakpoint = OHOS::Ace::NG::GetWindowHeightBreakpoint,
         .getWindowWidthBreakpoint = OHOS::Ace::NG::GetWindowWidthBreakpoint,
+        .isWindowInfoInitialized = OHOS::Ace::NG::IsWindowInfoInitialized,
         .transferKeyEventPointer = OHOS::Ace::NG::TransferKeyEventPointer,
         .createKeyEventAccessorWithPointer = OHOS::Ace::NG::CreateKeyEventAccessorWithPointer,
         .createEventTargetInfoAccessor = OHOS::Ace::NG::CreateEventTargetInfoAccessor,
@@ -1376,12 +1446,19 @@ const ArkUIAniCommonModifier* GetCommonAniModifier()
         .resolveUIContext = OHOS::Ace::NG::ResolveUIContext,
         .getPageRootNode = OHOS::Ace::NG::GetPageRootNodeInStatic,
         .isEasySplit = OHOS::Ace::NG::IsEasySplit,
+        .isTransPageEnabled = OHOS::Ace::NG::IsTransPageEnabled,
         .dumpLogPrint = OHOS::Ace::NG::DumpLogPrintImpl,
         .getBuilderNodeParentViewId = OHOS::Ace::NG::GetBuilderNodeParentViewId,
         .setOnNodeDestroyEvent = OHOS::Ace::NG::SetOnNodeDestroyEvent,
         .fireArkUIObjectLifecycleCallback = OHOS::Ace::NG::FireArkUIObjectLifecycleCallbackImpl,
         .GetIdString = OHOS::Ace::NG::GetIdString,
+        .createModalUIExtension = OHOS::Ace::NG::CreateModalUIExtensionInStatic,
+        .closeModalUIExtension = OHOS::Ace::NG::CloseModalUIExtensionInStatic,
+        .modalUIExtensionProxySend = OHOS::Ace::NG::ModalUIExtensionProxySendInStatic,
         .interopProxyNodeConstruct = OHOS::Ace::NG::InteropProxyNodeConstruct,
+        .setSafeAreaInset = OHOS::Ace::NG::SetSafeAreaInsetStatic,
+        .registerApplicationShortcut = OHOS::Ace::NG::RegisterApplicationShortcutInStatic,
+        .unregisterApplicationShortcut = OHOS::Ace::NG::UnregisterApplicationShortcutInStatic,
     };
     return &impl;
 }

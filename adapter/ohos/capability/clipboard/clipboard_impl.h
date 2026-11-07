@@ -16,12 +16,17 @@
 #ifndef FOUNDATION_ACE_ACE_ENGINE_ADAPTER_OHOS_CAPABILITY_CLIPBOARD_CLIPBOARD_IMPL_H
 #define FOUNDATION_ACE_ACE_ENGINE_ADAPTER_OHOS_CAPABILITY_CLIPBOARD_CLIPBOARD_IMPL_H
 
-#ifdef SYSTEM_CLIPBOARD_SUPPORTED
-#include "pasteboard_client.h"
-#endif
+#include <map>
+#include <memory>
+#include <set>
 
 #include "core/common/clipboard/clipboard_interface.h"
 #include "core/common/clipboard/paste_data.h"
+
+namespace OHOS::MiscServices {
+class PasteData;
+class PasteDataRecord;
+} // namespace OHOS::MiscServices
 
 namespace OHOS::Ace {
 class PasteDataImpl;
@@ -58,7 +63,6 @@ public:
     void GetSpanStringData(
         const std::function<void(std::vector<std::vector<uint8_t>>&, const std::string&, bool&, bool&)>& callback,
         bool syncMode = false) override;
-#ifdef SYSTEM_CLIPBOARD_SUPPORTED
 private:
     void GetDataSync(const std::function<void(const std::string&, bool)>& callback);
     void GetDataAsync(const std::function<void(const std::string&, bool)>& callback);
@@ -79,9 +83,6 @@ private:
     void ProcessSpanStringData(std::vector<std::vector<uint8_t>>& arrays,
         const OHOS::MiscServices::PasteData& pasteData, std::string& text, bool& isMultiTypeRecord,
         bool& isFromAutoFill);
-    const std::string GetMimeType(
-        std::map<std::string, std::shared_ptr<OHOS::MiscServices::EntryValue>> multiTypeDataMap);
-#endif
 };
 
 class ClipboardProxyImpl final : public ClipboardInterface {
@@ -103,13 +104,11 @@ public:
     PasteDataImpl() = default;
     ~PasteDataImpl() = default;
 
-#ifdef SYSTEM_CLIPBOARD_SUPPORTED
     std::shared_ptr<OHOS::MiscServices::PasteData> GetPasteDataData();
     void SetUnifiedData(std::shared_ptr<OHOS::MiscServices::PasteData> pasteData);
 
 private:
     std::shared_ptr<OHOS::MiscServices::PasteData> pasteData_;
-#endif
 };
 
 class MultiTypeRecordImpl : public MultiTypeRecordMix {

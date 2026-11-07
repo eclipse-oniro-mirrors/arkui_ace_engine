@@ -14,6 +14,7 @@
  */
 
 #include "text_input_base.h"
+#include "core/components_ng/pattern/select_content_overlay/select_content_overlay_pattern.h"
 
 namespace OHOS::Ace::NG {
 
@@ -261,7 +262,7 @@ HWTEST_F(TextFieldPatternTestFour, OnCursorMoveDone001, TestSize.Level0)
     layoutProperty->UpdateMaxLines(0);
     layoutProperty->UpdateTextInputType(TextInputType::VISIBLE_PASSWORD);
     pattern->OnObscuredChanged(true);
-    pattern->obscureTickCountDown_ = 1024;
+    pattern->obscureHelper_.tickCountDown_ = 1024;
     pattern->OnCursorMoveDone();
 }
 
@@ -520,6 +521,42 @@ HWTEST_F(TextFieldPatternTestFour, HandleParentGlobalOffsetChange001, TestSize.L
     soi.menuInfo.menuType = OptionMenuType::MOUSE_MENU;
     manager->CreateSelectOverlay(soi, true);
     pattern->HandleParentGlobalOffsetChange();
+}
+
+/**
+ * @tc.name: HandleParentGlobalOffsetChange002
+ * @tc.desc: test testInput text HandleParentGlobalOffsetChange with hidden single handle
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestFour, HandleParentGlobalOffsetChange002, TestSize.Level0)
+{
+    CreateTextField();
+    auto textFieldNode = FrameNode::GetOrCreateFrameNode(V2::TEXTINPUT_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<TextFieldPattern>(); });
+    ASSERT_NE(textFieldNode, nullptr);
+    RefPtr<TextFieldPattern> pattern = textFieldNode->GetPattern<TextFieldPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto manager = SelectContentOverlayManager::GetOverlayManager();
+    ASSERT_NE(manager, nullptr);
+    auto holder = AceType::MakeRefPtr<SelectOverlayHolder>();
+    ASSERT_NE(holder, nullptr);
+    manager->selectOverlayHolder_ = holder;
+    pattern->selectOverlay_->OnBind(manager);
+    Ace::NG::SelectOverlayInfo soi;
+    soi.isSingleHandle = true;
+    soi.isUseOverlayNG = true;
+    manager->CreateSelectOverlay(soi, true);
+    auto handlePattern = AceType::DynamicCast<SelectContentOverlayPattern>(manager->GetHandlePattern());
+    ASSERT_NE(handlePattern, nullptr);
+    handlePattern->isHiddenHandle_ = true;
+    pattern->selectOverlay_->SetIsSingleHandle(true);
+
+    /**
+     * @tc.steps: call HandleParentGlobalOffsetChange with hidden single handle
+     * @tc.expected: ProcessOverlayOnAreaChanged branch should be executed without crash
+     */
+    pattern->HandleParentGlobalOffsetChange();
+    EXPECT_TRUE(pattern->selectOverlay_->SelectOverlayIsOn());
 }
 
 /**

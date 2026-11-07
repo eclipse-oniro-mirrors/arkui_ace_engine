@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_INTERFACE_INNERKITS_ACE_TEST_MOCK_MOCK_IREMOTE_BROKER_H
 #define FOUNDATION_ACE_INTERFACE_INNERKITS_ACE_TEST_MOCK_MOCK_IREMOTE_BROKER_H
 
+#include "iremote_object.h"
 #include "refbase.h"
 namespace OHOS {
 #define DECLARE_INTERFACE_DESCRIPTOR(DESCRIPTOR)                         \
@@ -30,6 +31,16 @@ public:
     IRemoteBroker() = default;
     virtual ~IRemoteBroker() = default;
 };
+
+template<typename T>
+sptr<T> iface_cast(const sptr<IRemoteObject>& object)
+{
+    if (!object) {
+        return {};
+    }
+    auto local = object->QueryLocalInterface(T::GetDescriptor());
+    return sptr<T>(std::static_pointer_cast<T>(local.GetStdSharedPtr()));
+}
 
 template <typename T>
 class BrokerDelegator {

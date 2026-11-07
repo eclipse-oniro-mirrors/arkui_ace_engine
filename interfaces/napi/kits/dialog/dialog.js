@@ -79,6 +79,13 @@ let DialogState;
     DialogState[DialogState.DISAPPEARED = 5] = 'DISAPPEARED';
 })(DialogState || (DialogState = {}));
 
+let HandednessFollowMode;
+(function (HandednessFollowMode) {
+  HandednessFollowMode[HandednessFollowMode.NONE = 0] = 'NONE';
+  HandednessFollowMode[HandednessFollowMode.FOLLOW_ANCHOR = 1] = 'FOLLOW_ANCHOR';
+  HandednessFollowMode[HandednessFollowMode.FOLLOW_GRIP_HAND = 2] = 'FOLLOW_GRIP_HAND';
+})(HandednessFollowMode || (HandednessFollowMode = {}));
+
 export default {
     DialogBaseController,
     presentDialog,
@@ -87,5 +94,6 @@ export default {
     dismissDialog,
     DialogBaseAlignment,
     DialogButtonOrientation,
-    DialogState
+    DialogState,
+    HandednessFollowMode
 };

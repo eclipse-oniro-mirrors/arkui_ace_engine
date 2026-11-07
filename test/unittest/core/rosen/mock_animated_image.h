@@ -19,7 +19,7 @@
 #include "core/components_ng/render/canvas_image.h"
 
 namespace OHOS::Ace::NG {
-class MockAnimatedImage : public virtual CanvasImage {
+class MockAnimatedImage : public CanvasImage {
 public:
     MockAnimatedImage() = default;
     ~MockAnimatedImage() override = default;

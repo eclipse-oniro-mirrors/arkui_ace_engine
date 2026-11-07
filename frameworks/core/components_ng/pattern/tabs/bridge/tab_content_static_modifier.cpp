@@ -14,6 +14,7 @@
  */
 
 #include "base/utils/string_utils.h"
+#include "core/common/container.h"
 #include "core/components/common/properties/color.h"
 #include "core/components_ng/pattern/tabs/tab_content_model_ng.h"
 #include "core/components_ng/pattern/tabs/tab_content_model_static.h"
@@ -30,6 +31,7 @@ namespace {
     struct TabBarOptions {
         std::optional<std::string> text;
         std::optional<std::string> icon;
+        std::optional<TabBarBadgeParam> badge;
     };
 
     using TabBarOptionsVariant = std::variant<
@@ -66,6 +68,27 @@ void SetTabBarCustomBuilder(FrameNode* frameNode, const CustomNodeBuilder& arkBu
         },
         arkNode);
 }
+
+// Extract ResourceObject from Ark_ResourceStr (union of String + Resource).
+// selector 0 = string literal, selector 1 = Ark_Resource.
+RefPtr<ResourceObject> GetResourceObjectFromResourceStr(const Ark_ResourceStr& resStr)
+{
+    if (resStr.selector != SELECTOR_ID_1) {
+        return nullptr;
+    }
+    Converter::ResourceConverter converter(resStr.value1);
+    auto symbolId = converter.ToSymbol();
+    if (!symbolId.has_value() || symbolId.value() > INT32_MAX) {
+        return nullptr;
+    }
+    auto resourceId = static_cast<int32_t>(symbolId.value());
+    std::vector<ResourceObjectParams> resObjParamsList;
+    auto type = Converter::OptConvert<int32_t>(resStr.value1.type).value_or(0);
+    auto bundleName = Converter::Convert<std::string>(resStr.value1.bundleName);
+    auto moduleName = Converter::Convert<std::string>(resStr.value1.moduleName);
+    return AceType::MakeRefPtr<ResourceObject>(
+        resourceId, type, resObjParamsList, bundleName, moduleName, Container::CurrentIdSafely());
+}
 } // namespace
 
 auto g_setSubTabBarStyle = [](FrameNode* frameNode, const Ark_SubTabBarStyle& style) {
@@ -98,16 +121,53 @@ auto g_setBottomTabBarStyle = [](FrameNode* frameNode, const Ark_BottomTabBarSty
     TabContentModelStatic::SetId(frameNode, style->id);
     TabContentModelStatic::SetTabBarStyle(frameNode, TabBarStyle::BOTTOMTABBATSTYLE);
     TabContentModelStatic::SetTabBar(frameNode, style->text, style->icon, nullptr);
+    TabContentModelNG::SetTabBarBadge(frameNode, style->badge);
     TabbarAddTabBarItem(AceType::WeakClaim(frameNode));
 };
 
 namespace Converter {
+template<>
+inline TabBarBadgeParam Convert(const Ark_TabBarBadgeStyle& src)
+{
+    TabBarBadgeParam param;
+    auto badgeTypeOpt = Converter::GetOptPtr(&src.value);
+    if (badgeTypeOpt) {
+        Converter::VisitUnion(
+            badgeTypeOpt.value(),
+            [&param](const Ark_Int32& num) {
+                param.badgeCount = static_cast<int32_t>(num);
+            },
+            [&param](const Ark_ResourceStr& resStr) {
+                auto optStr = Converter::OptConvert<std::string>(resStr);
+                if (optStr) {
+                    param.badgeValue = optStr.value();
+                }
+            },
+            []() {}
+        );
+    }
+    auto maxCountOpt = Converter::GetOptPtr(&src.maxCount);
+    if (maxCountOpt) {
+        param.badgeMaxCount = static_cast<int32_t>(Converter::Convert<uint32_t>(maxCountOpt.value()));
+    }
+    return param;
+}
+
+template<>
+inline void AssignTo(std::optional<TabBarBadgeParam>& dst, const Opt_TabBarBadgeStyle& src)
+{
+    if (src.tag != INTEROP_TAG_UNDEFINED) {
+        dst = Converter::Convert<TabBarBadgeParam>(src.value);
+    }
+}
+
 template<>
 inline TabBarOptions Convert(const Ark_TabBarOptions& src)
 {
     TabBarOptions options;
     options.text = OptConvert<std::string>(src.text);
     options.icon = OptConvert<std::string>(src.icon);
+    options.badge = OptConvertPtr<TabBarBadgeParam>(&src.badge);
     return options;
 }
 
@@ -288,12 +348,15 @@ void SetTabBarImpl(Ark_NativePointer node,
         [frameNode](const Ark_TabBarOptions& arkTabBarOptions) {
             std::optional<std::string> label;
             std::optional<std::string> icon;
+            std::optional<TabBarBadgeParam> badge;
             if (auto tabBarOptions = Converter::OptConvert<TabBarOptions>(arkTabBarOptions)) {
                 label = tabBarOptions->text;
                 icon = tabBarOptions->icon;
+                badge = tabBarOptions->badge;
             }
             TabContentModelStatic::SetTabBarStyle(frameNode, TabBarStyle::NOSTYLE);
             TabContentModelStatic::SetTabBar(frameNode, label, icon, nullptr);
+            TabContentModelNG::SetTabBarBadge(frameNode, badge);
             TabbarAddTabBarItem(AceType::WeakClaim(frameNode));
         },
         [frameNode]() {
@@ -329,6 +392,28 @@ void SetOnWillHideImpl(Ark_NativePointer node,
     auto onWillHide = GetSyncInvoker(*optValue);
     TabContentModelStatic::SetOnWillHide(frameNode, std::move(onWillHide));
 }
+void SetSidebarSectionImpl(Ark_NativePointer node, const Opt_SidebarSection* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto optValue = Converter::GetOptPtr(value);
+    if (!optValue) {
+        return;
+    }
+    const auto& section = optValue.value();
+    SidebarSection sidebarSection;
+    sidebarSection.title = Converter::OptConvert<std::string>(section.title).value_or("");
+    sidebarSection.resourceTitleObject = GetResourceObjectFromResourceStr(section.title);
+    auto orderOpt = Converter::GetOptPtr(&section.order);
+    if (orderOpt) {
+        sidebarSection.order = static_cast<int32_t>(orderOpt.value());
+    }
+    auto titleStyleOpt = Converter::GetOptPtr(&section.titleStyle);
+    if (titleStyleOpt) {
+        sidebarSection.titleStyle = static_cast<SidebarSectionTitleStyle>(titleStyleOpt.value());
+    }
+    TabContentModelNG::SetSidebarSection(frameNode, sidebarSection);
+}
 void SetTabBarVisibilityImpl(Ark_NativePointer node,
                              Ark_TabVisibility visibility,
                              const Opt_TabBarDisplayMode* displayMode)
@@ -356,6 +441,7 @@ const GENERATED_ArkUITabContentModifier* GetTabContentModifier()
         TabContentAttributeModifier::SetTabBarImpl,
         TabContentAttributeModifier::SetOnWillShowImpl,
         TabContentAttributeModifier::SetOnWillHideImpl,
+        TabContentAttributeModifier::SetSidebarSectionImpl,
         TabContentAttributeModifier::SetTabBarVisibilityImpl,
     };
     return &ArkUITabContentModifierImpl;

@@ -25,7 +25,7 @@
 
 namespace OHOS::Ace::NG {
 
-class ACE_EXPORT ExportTextureInfo : public virtual AceType {
+class ACE_EXPORT ExportTextureInfo : public AceType {
 public:
     ExportTextureInfo() = default;
     ~ExportTextureInfo() override = default;

@@ -1054,7 +1054,7 @@ HWTEST_F(CalendarPickerTestNg, CalendarPickerTextDirectionTest001, TestSize.Leve
     ASSERT_NE(contentFrameNode, nullptr);
     auto contentLayoutProperty = contentFrameNode->GetLayoutProperty<LinearLayoutProperty>();
     ASSERT_NE(contentLayoutProperty, nullptr);
-    EXPECT_EQ(contentLayoutProperty->GetLayoutDirection(), TextDirection::LTR);
+    EXPECT_EQ(contentLayoutProperty->GetLayoutDirection(), TextDirection::AUTO);
 }
 
 /**
@@ -1322,7 +1322,7 @@ HWTEST_F(CalendarPickerTestNg, CalendarPickerLayoutAlgorithmTest002, TestSize.Le
     layoutWrapper->GetLayoutProperty()->UpdateLayoutConstraint(LayoutConstraintVaildSize);
     layoutWrapper->GetLayoutProperty()->UpdateContentConstraint();
 
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(layoutWrapper->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = layoutWrapper->GetLayoutAlgorithm();
     EXPECT_NE(layoutAlgorithmWrapper, nullptr);
     auto calendarPickerLayoutAlgorithm =
         AceType::DynamicCast<CalendarPickerLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());

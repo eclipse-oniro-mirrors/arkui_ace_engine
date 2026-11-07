@@ -14,18 +14,145 @@
  */
 
 #include "js_third_provider_interaction_operation.h"
+
+#include <algorithm>
+#include <cmath>
+#include <cstring>
+#include <limits>
 #include "core/accessibility/accessibility_manager.h"
 #include "core/accessibility/native_interface_accessibility_impl.h"
 
 #include "accessibility_system_ability_client.h"
 
 #include "adapter/ohos/osal/accessibility/focus_move/accessibility_focus_move_osal_third.h"
+#include "base/log/log_wrapper.h"
+#include "adapter/ohos/osal/accessibility/third_accessibility_traversal.h"
 #include "core/components_ng/property/accessibility_property.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "js_third_provider_interaction_operation_utils.h"
 
 namespace OHOS::Ace::Framework {
 namespace {
+// Native action descriptions are borrowed pointers. A request snapshot must own
+// them before another provider callback can replace their backing storage.
+struct ThirdNodeSnapshot : ArkUI_AccessibilityElementInfo {
+    explicit ThirdNodeSnapshot(const ArkUI_AccessibilityElementInfo& source)
+        : ArkUI_AccessibilityElementInfo(source)
+    {
+        const auto& actions = source.GetOperationActions();
+        descriptions.reserve(actions.size());
+        for (const auto& action : actions) {
+            descriptions.emplace_back(action.description ? action.description : "");
+        }
+        ClearOperationActions();
+        for (size_t i = 0; i < actions.size(); ++i) {
+            auto action = actions[i];
+            action.description = descriptions[i].c_str();
+            AddOperationAction(action);
+        }
+    }
+    std::vector<std::string> descriptions;
+};
+constexpr int32_t COLLECTED_ACTION_REQUEST_ID = 0;
+
+int32_t TransformThirdCoordinate(int32_t value, float scale, float offset)
+{
+    // Keep normal float arithmetic, but never cast a non-finite/out-of-range value to int.
+    if (!std::isfinite(scale) || !std::isfinite(offset)) {
+        return 0;
+    }
+    const double transformed = static_cast<double>(value * scale + std::trunc(offset));
+    if (std::isnan(transformed)) {
+        return 0;
+    }
+    return static_cast<int32_t>(std::clamp(transformed,
+        static_cast<double>(std::numeric_limits<int32_t>::min()),
+        static_cast<double>(std::numeric_limits<int32_t>::max())));
+}
+
+bool ValidateThirdNodePayload(const ArkUI_AccessibilityElementInfo& node, ThirdAccessibilityTraversal& traversal)
+{
+    const auto id = node.GetElementId();
+    size_t payloadBytes = 0;
+    auto addBytes = [&traversal, &payloadBytes, id](size_t bytes) {
+        if (bytes > traversal.RemainingBytes() - payloadBytes) {
+            traversal.Record(ThirdAccessibilityTraversal::PAYLOAD_LIMIT, id);
+            return false;
+        }
+        payloadBytes += bytes;
+        return true;
+    };
+    if (!addBytes(sizeof(node)) ||
+        !addBytes(node.GetChildNodeIds().size() * sizeof(int64_t)) ||
+        node.GetOperationActions().size() > ThirdAccessibilityTraversal::MAX_BYTES / sizeof(ArkUI_AccessibleAction)) {
+        traversal.Record(ThirdAccessibilityTraversal::PAYLOAD_LIMIT, id);
+        return false;
+    }
+    if (!addBytes(node.GetOperationActions().size() * sizeof(ArkUI_AccessibleAction))) {
+        return false;
+    }
+    const auto strings = { &ArkUI_AccessibilityElementInfo::GetComponentType,
+        &ArkUI_AccessibilityElementInfo::GetContents, &ArkUI_AccessibilityElementInfo::GetHintText,
+        &ArkUI_AccessibilityElementInfo::GetAccessibilityText,
+        &ArkUI_AccessibilityElementInfo::GetAccessibilityDescription,
+        &ArkUI_AccessibilityElementInfo::GetAccessibilityLevel, &ArkUI_AccessibilityElementInfo::GetBackgroundColor,
+        &ArkUI_AccessibilityElementInfo::GetBackgroundImage, &ArkUI_AccessibilityElementInfo::GetBlur,
+        &ArkUI_AccessibilityElementInfo::GetHitTestBehavior, &ArkUI_AccessibilityElementInfo::GetComponentIdentifier };
+    for (auto getter : strings) {
+        if (!addBytes((node.*getter)().size())) {
+            return false;
+        }
+    }
+    for (const auto& action : node.GetOperationActions()) {
+        if (action.description && !addBytes(
+            strnlen(action.description, ThirdAccessibilityTraversal::MAX_BYTES + 1))) {
+            return false;
+        }
+    }
+    return traversal.ConsumeBytes(payloadBytes, id);
+}
+
+bool ValidateThirdNodeResponse(int64_t queryId, const std::vector<ArkUI_AccessibilityElementInfo>& infos,
+    ThirdAccessibilityTraversal& traversal)
+{
+    if (infos.empty()) {
+        traversal.Record(ThirdAccessibilityTraversal::QUERY_FAILED, queryId);
+        return false;
+    }
+    const auto id = infos.front().GetElementId();
+    if (id < 0 || (queryId != -1 && id != queryId)) {
+        traversal.Record(ThirdAccessibilityTraversal::ID_MISMATCH, queryId);
+        return false;
+    }
+    if (infos.size() > ThirdAccessibilityTraversal::MAX_NODES ||
+        infos.front().GetChildNodeIds().size() > ThirdAccessibilityTraversal::MAX_EDGES) {
+        traversal.Record(ThirdAccessibilityTraversal::PAYLOAD_LIMIT, id);
+        return false;
+    }
+    if (queryId == -1) {
+        std::unordered_set<int32_t> ids { id };
+        for (size_t i = 1; i < infos.size(); ++i) {
+            auto candidateId = infos[i].GetElementId();
+            if (!ids.insert(candidateId).second) {
+                traversal.Record(ThirdAccessibilityTraversal::DUPLICATE_ID, candidateId);
+            }
+            if (candidateId != id) {
+                traversal.Record(ThirdAccessibilityTraversal::MULTIPLE_ROOTS, candidateId);
+            }
+        }
+    } else if (infos.size() != 1) {
+        traversal.Record(ThirdAccessibilityTraversal::EXTRA_RESULTS, queryId);
+        std::unordered_set<int32_t> ids;
+        for (const auto& info : infos) {
+            if (!ids.insert(info.GetElementId()).second) {
+                traversal.Record(ThirdAccessibilityTraversal::DUPLICATE_ID, info.GetElementId());
+            }
+        }
+        return false; // A mode=0 lookup must not choose arbitrarily between conflicting payloads.
+    }
+    return ValidateThirdNodePayload(infos.front(), traversal);
+}
+
 void LogAccessibilityElementInfo(
     const std::string& tag, const Accessibility::AccessibilityElementInfo& info)
 {
@@ -158,11 +285,10 @@ bool CheckEventIgnoreHostOffset(
     switch (eventType) {
         case ArkUI_AccessibilityEventType::
             ARKUI_ACCESSIBILITY_NATIVE_EVENT_TYPE_FOCUS_NODE_UPDATE:
-            TAG_LOGD(AceLogTag::ACE_ACCESSIBILITY, "ignoreHostOffset keep false by focus update");
             ignoreHostOffset = true;
             break;
         default:
-            TAG_LOGD(AceLogTag::ACE_ACCESSIBILITY, "ignoreHostOffset keep false by other eventType");
+            break;
     }
     return ignoreHostOffset;
 }
@@ -180,6 +306,12 @@ void RemoveKeysForClickAction(
     args.erase(ACTION_ARGU_CLICK_TIMESTAMP);
 }
 } // namespace
+
+std::shared_ptr<ArkUI_AccessibilityElementInfo> AccessibilityThirdProviderUtils::MakeNodeSnapshot(
+    const ArkUI_AccessibilityElementInfo& source)
+{
+    return std::make_shared<ThirdNodeSnapshot>(source);
+}
 
 void AccessibilityThirdProviderUtils::TransformAccessibilityElementInfoBasic(
     const ArkUI_AccessibilityElementInfo& nativeInfo,
@@ -296,6 +428,7 @@ JsThirdProviderInteractionOperation::JsThirdProviderInteractionOperation(
 
 JsThirdProviderInteractionOperation::~JsThirdProviderInteractionOperation()
 {
+    NotifyCmpTreeDeregistered(GetBelongTreeId());
     ClearAllThirdCustomProperties();
     TAG_LOGI(AceLogTag::ACE_ACCESSIBILITY, "JsThirdProviderInteractionOperation Destory");
 }
@@ -311,10 +444,10 @@ void JsThirdProviderInteractionOperation::FillNodeConfig(
 {
     OHOS::Accessibility::Rect oldRect = info.GetRectInScreen();
     OHOS::Accessibility::Rect newRect = OHOS::Accessibility::Rect(
-        oldRect.GetLeftTopXScreenPostion() * config.scaleX + static_cast<int32_t>(config.offset.GetX()),
-        oldRect.GetLeftTopYScreenPostion() * config.scaleY + static_cast<int32_t>(config.offset.GetY()),
-        oldRect.GetRightBottomXScreenPostion() * config.scaleX + static_cast<int32_t>(config.offset.GetX()),
-        oldRect.GetRightBottomYScreenPostion() * config.scaleY + static_cast<int32_t>(config.offset.GetY()));
+        TransformThirdCoordinate(oldRect.GetLeftTopXScreenPostion(), config.scaleX, config.offset.GetX()),
+        TransformThirdCoordinate(oldRect.GetLeftTopYScreenPostion(), config.scaleY, config.offset.GetY()),
+        TransformThirdCoordinate(oldRect.GetRightBottomXScreenPostion(), config.scaleX, config.offset.GetX()),
+        TransformThirdCoordinate(oldRect.GetRightBottomYScreenPostion(), config.scaleY, config.offset.GetY()));
     info.SetRectInScreen(newRect);
     info.SetPageId(config.pageId);
     info.SetWindowId(config.windowId);
@@ -352,7 +485,13 @@ RetError JsThirdProviderInteractionOperation::SearchElementInfoByAccessibilityId
         infos.clear();
     }
 
-    // 3. Return result
+    auto registeringAM = jsAccessibilityManager_.Upgrade();
+    if (splitElementId == -1 && !infos.empty() && registeringAM && registeringAM->IsCmpSubAM()) {
+        constexpr int32_t CHILD_TREE_INVALID_PARENT_ID = -2100000;
+        infos.front().SetParent(CHILD_TREE_INVALID_PARENT_ID);
+    }
+
+    // 4. Return result
     SetSearchElementInfoByAccessibilityIdResult(callback, std::move(infos), requestId);
     return RET_OK;
 }
@@ -360,14 +499,30 @@ RetError JsThirdProviderInteractionOperation::SearchElementInfoByAccessibilityId
 bool JsThirdProviderInteractionOperation::FindNativeInfoById(
     const WeakPtr<AccessibilityProvider>& accessibilityProvider,
     int64_t splitElementId,
-    std::shared_ptr<ArkUI_AccessibilityElementInfo>& nativeInfo)
+    std::shared_ptr<ArkUI_AccessibilityElementInfo>& nativeInfo, ThirdAccessibilityTraversal* traversal)
 {
     CHECK_NULL_RETURN(nativeInfo, false);
     auto provider = accessibilityProvider.Upgrade();
-    CHECK_NULL_RETURN(provider, false);
+    if (!provider) {
+        if (traversal) {
+            traversal->Record(ThirdAccessibilityTraversal::QUERY_FAILED, splitElementId);
+        }
+        return false;
+    }
     std::vector<ArkUI_AccessibilityElementInfo> nativeInfos;
     int32_t code = provider->FindAccessibilityNodeInfosById(
         splitElementId, 0, 0, nativeInfos);
+    if (traversal) {
+        if (code != 0) {
+            traversal->Record(ThirdAccessibilityTraversal::QUERY_FAILED, splitElementId);
+            return false;
+        }
+        if (!ValidateThirdNodeResponse(splitElementId, nativeInfos, *traversal)) {
+            return false;
+        }
+        *nativeInfo = nativeInfos.front();
+        return true;
+    }
     if (code != 0) {
         TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
             "FindNativeInfoById failed: %{public}d", code);
@@ -376,29 +531,81 @@ bool JsThirdProviderInteractionOperation::FindNativeInfoById(
     if (nativeInfos.empty()) {
         return false;
     }
+    if (splitElementId == -1) {
+        const auto rootId = nativeInfos.front().GetElementId();
+        for (const auto& candidate : nativeInfos) {
+            if (candidate.GetElementId() != rootId) {
+                TAG_LOGE(AceLogTag::ACE_ACCESSIBILITY,
+                    "Third provider multi-root response: queryId=-1, nodeCount=%{public}zu, "
+                    "selectedRootId=%{public}d, extraRootId=%{public}d"
+                    ". Only the first root is used.",
+                    nativeInfos.size(), rootId, candidate.GetElementId());
+                break;
+            }
+        }
+    }
     *nativeInfo = nativeInfos.front();
     return true;
+}
+
+bool ThirdAccessibilityTraversal::FindNodeInfos(JsThirdProviderInteractionOperation& operation,
+    int64_t elementId, std::list<Accessibility::AccessibilityElementInfo>& infos, bool ignoreHostOffset)
+{
+    JsThirdProviderInteractionOperation::NodeQueryOptions options;
+    options.ignoreHostOffset = ignoreHostOffset;
+    options.traversal = this;
+    return operation.FindNodeInfosFromProvider(elementId, options, infos);
 }
 
 bool JsThirdProviderInteractionOperation::FindAccessibilityNodeInfosByIdFromProvider(
     const int64_t splitElementId, const int32_t mode, const int32_t requestId,
     std::list<Accessibility::AccessibilityElementInfo>& infos, bool ignoreHostOffset)
 {
+    NodeQueryOptions options;
+    options.mode = mode;
+    options.requestId = requestId;
+    options.ignoreHostOffset = ignoreHostOffset;
+    return FindNodeInfosFromProvider(splitElementId, options, infos);
+}
+
+bool JsThirdProviderInteractionOperation::FindNodeInfosFromProvider(
+    int64_t splitElementId, const NodeQueryOptions& options,
+    std::list<Accessibility::AccessibilityElementInfo>& infos)
+{
     auto provider = accessibilityProvider_.Upgrade();
-    CHECK_NULL_RETURN(provider, false);
+    if (!provider) {
+        if (options.traversal) {
+            options.traversal->Record(ThirdAccessibilityTraversal::QUERY_FAILED, splitElementId);
+        }
+        return false;
+    }
     std::vector<ArkUI_AccessibilityElementInfo> nativeInfos;
     int32_t code = provider->FindAccessibilityNodeInfosById(
-        splitElementId, mode, requestId, nativeInfos);
-    if (code != 0) {
+        splitElementId, options.mode, options.requestId, nativeInfos);
+    auto* traversal = options.traversal;
+    if (traversal) {
+        if (code != 0) {
+            traversal->Record(ThirdAccessibilityTraversal::QUERY_FAILED, splitElementId);
+            return false;
+        }
+        if (!ValidateThirdNodeResponse(splitElementId, nativeInfos, *traversal)) {
+            return false;
+        }
+        nativeInfos.resize(1);
+    } else if (code != 0) {
         TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
             "FindAccessibilityNodeInfosByIdFromProvider failed: %{public}d", code);
         return false;
     }
 
     NodeConfig config;
-    config.ignoreHostOffset = ignoreHostOffset;
+    config.ignoreHostOffset = options.ignoreHostOffset;
     GetNodeConfig(config);
-    CopyNativeInfosToAccessibilityElementInfos(nativeInfos, config, infos, &thirdCustomProperties_);
+    {
+        std::lock_guard<std::mutex> lock(thirdCustomPropertiesMutex_);
+        CopyNativeInfosToAccessibilityElementInfos(nativeInfos, config, infos, &thirdCustomProperties_);
+    }
+    ApplyChildTreeIdAndWinId(infos);
     return !infos.empty();
 }
 
@@ -502,7 +709,11 @@ bool JsThirdProviderInteractionOperation::FindAccessibilityNodeInfosByTextFromPr
 
     NodeConfig config;
     GetNodeConfig(config);
-    CopyNativeInfosToAccessibilityElementInfos(nativeInfos, config, infos, &thirdCustomProperties_);
+    {
+        std::lock_guard<std::mutex> lock(thirdCustomPropertiesMutex_);
+        CopyNativeInfosToAccessibilityElementInfos(nativeInfos, config, infos, &thirdCustomProperties_);
+    }
+    ApplyChildTreeIdAndWinId(infos);
     return true;
 }
 
@@ -570,7 +781,11 @@ bool JsThirdProviderInteractionOperation::FindFocusedElementInfoFromProvider(
 
     NodeConfig config;
     GetNodeConfig(config);
-    CopyNativeInfoToAccessibilityElementInfo(nativeInfo, config, info, &thirdCustomProperties_);
+    {
+        std::lock_guard<std::mutex> lock(thirdCustomPropertiesMutex_);
+        CopyNativeInfoToAccessibilityElementInfo(nativeInfo, config, info, &thirdCustomProperties_);
+    }
+    ApplyChildTreeIdAndWinId(info);
     return true;
 }
 
@@ -639,7 +854,11 @@ bool JsThirdProviderInteractionOperation::FocusMoveSearchProvider(
 
     NodeConfig config;
     GetNodeConfig(config);
-    CopyNativeInfoToAccessibilityElementInfo(nativeInfo, config, info, &thirdCustomProperties_);
+    {
+        std::lock_guard<std::mutex> lock(thirdCustomPropertiesMutex_);
+        CopyNativeInfoToAccessibilityElementInfo(nativeInfo, config, info, &thirdCustomProperties_);
+    }
+    ApplyChildTreeIdAndWinId(info);
     return true;
 }
 
@@ -701,6 +920,45 @@ void JsThirdProviderInteractionOperation::ExecuteAction(
     SetExecuteActionResult(callback, ret, requestId);
 }
 
+UiSessionAccessibilityResult JsThirdProviderInteractionOperation::ExecuteActionForCollectedNode(
+    int64_t providerElementId, int32_t action,
+    const std::map<std::string, std::string>& actionArguments, bool argumentsValid)
+{
+    auto provider = accessibilityProvider_.Upgrade();
+    CHECK_NULL_RETURN(provider, UiSessionAccessibilityResult::NODE_NOT_FOUND);
+    std::vector<ArkUI_AccessibilityElementInfo> infos;
+    if (provider->FindAccessibilityNodeInfosById(providerElementId,
+        ARKUI_ACCESSIBILITY_NATIVE_SEARCH_MODE_PREFETCH_CURRENT, COLLECTED_ACTION_REQUEST_ID, infos) != 0) {
+        return UiSessionAccessibilityResult::NODE_NOT_FOUND;
+    }
+    const auto target = std::find_if(infos.begin(), infos.end(), [providerElementId](const auto& info) {
+        return info.GetElementId() == providerElementId;
+    });
+    if (target == infos.end()) {
+        return UiSessionAccessibilityResult::NODE_NOT_FOUND;
+    }
+    if (!argumentsValid) {
+        return UiSessionAccessibilityResult::INVALID_PARAM;
+    }
+    if (action == static_cast<int32_t>(Accessibility::ActionType::ACCESSIBILITY_ACTION_INVALID) ||
+        action == static_cast<int32_t>(Accessibility::ActionType::ACCESSIBILITY_ACTION_CUSTOM)) {
+        return UiSessionAccessibilityResult::EXECUTE_FAIL;
+    }
+    const auto& actions = target->GetOperationActions();
+    const bool supported = std::any_of(actions.begin(), actions.end(),
+        [action](const ArkUI_AccessibleAction& declared) {
+            return static_cast<int32_t>(declared.actionType) == action;
+        });
+    if (!supported) {
+        return UiSessionAccessibilityResult::EXECUTE_FAIL;
+    }
+    auto filteredArguments = actionArguments;
+    RemoveKeysForClickAction(action, filteredArguments);
+    return provider->ExecuteAccessibilityAction(
+        providerElementId, action, COLLECTED_ACTION_REQUEST_ID, filteredArguments) == 0
+        ? UiSessionAccessibilityResult::SUCCESS : UiSessionAccessibilityResult::EXECUTE_FAIL;
+}
+
 bool JsThirdProviderInteractionOperation::ExecuteActionFromProvider(
     int64_t elementId, const int32_t action,
     const std::map<std::string, std::string>& actionArguments, const int32_t requestId)
@@ -732,28 +990,14 @@ bool JsThirdProviderInteractionOperation::ExecuteActionForThird(
     CHECK_NULL_RETURN(context, false);
     auto ngPipeline = AceType::DynamicCast<NG::PipelineContext>(context);
     CHECK_NULL_RETURN(ngPipeline, false);
-    Accessibility::EventType eventType = Accessibility::EventType::TYPE_VIEW_INVALID;
-    bool actResult = false;
     if (action == static_cast<int32_t>(
         Accessibility::ActionType::ACCESSIBILITY_ACTION_ACCESSIBILITY_FOCUS)) {
-        eventType = Accessibility::EventType::TYPE_VIEW_ACCESSIBILITY_FOCUSED_EVENT;
-        actResult = jsAccessibilityManager->ActThirdAccessibilityFocus(
+        jsAccessibilityManager->ActThirdAccessibilityFocus(
             elementId, nodeInfo, hostNode, ngPipeline, false);
     } else if (action == static_cast<int32_t>(
         Accessibility::ActionType::ACCESSIBILITY_ACTION_CLEAR_ACCESSIBILITY_FOCUS)) {
-        eventType = Accessibility::EventType::TYPE_VIEW_ACCESSIBILITY_FOCUS_CLEARED_EVENT;
-        actResult = jsAccessibilityManager->ActThirdAccessibilityFocus(
+        jsAccessibilityManager->ActThirdAccessibilityFocus(
             elementId, nodeInfo, hostNode, ngPipeline, true);
-    }
-    if (actResult && jsAccessibilityManager->IsScreenReaderEnabled() &&
-        eventType != Accessibility::EventType::TYPE_VIEW_INVALID) {
-        int64_t combinedElementId = elementId;
-        AccessibilitySystemAbilityClient::SetSplicElementIdTreeId(belongTreeId_, combinedElementId);
-        SendAccessibilityAsyncEventForThird(combinedElementId, eventType);
-        TAG_LOGI(AceLogTag::ACE_ACCESSIBILITY,
-            "send accessibility componentType:%{public}s event:%{public}d action:%{public}d "
-            "accessibilityId:%{public}" PRId64,
-            nodeInfo.GetComponentType().c_str(), static_cast<int32_t>(eventType), action, combinedElementId);
     }
     return true;
 }
@@ -868,20 +1112,180 @@ void JsThirdProviderInteractionOperation::GetNodeConfig(NodeConfig& config)
 void JsThirdProviderInteractionOperation::SetChildTreeIdAndWinId(
     const int64_t nodeId, const int32_t treeId, const int32_t childWindowId)
 {
+    // AAMS registered a child tree under this node (SetChildTreeIdAndWinId).
+    int64_t splitElementId = AccessibilityElementInfo::UNDEFINED_ACCESSIBILITY_ID;
+    int32_t splitTreeId = AccessibilityElementInfo::UNDEFINED_TREE_ID;
+    AccessibilitySystemAbilityClient::GetTreeIdAndElementIdBySplitElementId(nodeId, splitElementId, splitTreeId);
     TAG_LOGI(AceLogTag::ACE_ACCESSIBILITY, "SetChildTreeIdAndWinId, node: %{public}" PRId64 ","
-        "treeId: %{public}d, childWindowId: %{public}d", nodeId, treeId, childWindowId);
+        "treeId: %{public}d, childWindowId: %{public}d", splitElementId, treeId, childWindowId);
+    std::lock_guard<std::mutex> lock(childTreeIdWinIdMapMutex_);
+    if (treeId <= 0) {
+        childTreeIdWinIdMap_.erase(splitElementId);
+    } else {
+        childTreeIdWinIdMap_[splitElementId] = std::make_pair(treeId, childWindowId);
+    }
+}
+
+void JsThirdProviderInteractionOperation::RemoveChildTreeIdAndWinId(int64_t rawElementId)
+{
+    std::lock_guard<std::mutex> lock(childTreeIdWinIdMapMutex_);
+    childTreeIdWinIdMap_.erase(rawElementId);
+}
+
+void JsThirdProviderInteractionOperation::ApplyChildTreeIdAndWinId(
+    Accessibility::AccessibilityElementInfo& info)
+{
+    std::lock_guard<std::mutex> lock(childTreeIdWinIdMapMutex_);
+    if (childTreeIdWinIdMap_.empty()) {
+        return;
+    }
+    int64_t splitElementId = AccessibilityElementInfo::UNDEFINED_ACCESSIBILITY_ID;
+    int32_t splitTreeId = AccessibilityElementInfo::UNDEFINED_TREE_ID;
+    AccessibilitySystemAbilityClient::GetTreeIdAndElementIdBySplitElementId(
+        info.GetAccessibilityId(), splitElementId, splitTreeId);
+    auto it = childTreeIdWinIdMap_.find(splitElementId);
+    if (it == childTreeIdWinIdMap_.end()) {
+        return;
+    }
+    info.SetChildTreeIdAndWinId(it->second.first, it->second.second);
+}
+
+bool JsThirdProviderInteractionOperation::HasChildTree(int64_t elementId)
+{
+    std::lock_guard<std::mutex> lock(childTreeIdWinIdMapMutex_);
+    return childTreeIdWinIdMap_.find(elementId) != childTreeIdWinIdMap_.end();
+}
+
+void JsThirdProviderInteractionOperation::ApplyChildTreeIdAndWinId(
+    std::list<Accessibility::AccessibilityElementInfo>& infos)
+{
+    for (auto& info : infos) {
+        ApplyChildTreeIdAndWinId(info);
+    }
+}
+
+void JsThirdProviderInteractionOperation::NotifyCmpTreeDeregistered(int32_t treeId)
+{
+    CHECK_EQUAL_VOID(treeId <= 0, true);
+    auto manager = jsAccessibilityManager_.Upgrade();
+    auto context = manager ? manager->GetPipelineContext().Upgrade() : nullptr;
+    auto executor = context ? context->GetTaskExecutor() : nullptr;
+    CHECK_NULL_VOID(executor);
+    executor->PostTask(
+        [weak = jsAccessibilityManager_, host = host_, treeId] {
+            auto manager = weak.Upgrade();
+            auto owner = host.Upgrade();
+            if (manager && owner) {
+                manager->OnCmpTreeDeregistered(owner.GetRawPtr(), treeId);
+            }
+        }, TaskExecutor::TaskType::UI, "ArkUICmpTreeDeregistered");
 }
 
 void JsThirdProviderInteractionOperation::SetBelongTreeId(const int32_t treeId)
 {
-    TAG_LOGD(AceLogTag::ACE_ACCESSIBILITY, "SetBelongTreeId treeId: %{public}d", treeId);
-    belongTreeId_ = treeId;
+    auto oldTreeId = belongTreeId_.exchange(treeId);
+    if (treeId <= 0) {
+        NotifyCmpTreeDeregistered(oldTreeId);
+        return;
+    }
+    // CMP mixed-rendering convergence: the CMP tree's own treeId just arrived.
+    auto jsAccessibilityManager = jsAccessibilityManager_.Upgrade();
+    auto hostNode = host_.Upgrade();
+    if (!jsAccessibilityManager || !hostNode) {
+        return;
+    }
+    auto context = jsAccessibilityManager->GetPipelineContext().Upgrade();
+    CHECK_NULL_VOID(context);
+    auto taskExecutor = context->GetTaskExecutor();
+    CHECK_NULL_VOID(taskExecutor);
+    taskExecutor->PostTask(
+        [weak = jsAccessibilityManager_, host = host_, treeId] {
+            auto jsAccessibilityManager = weak.Upgrade();
+            auto hostNode = host.Upgrade();
+            if (!jsAccessibilityManager || !hostNode) {
+                return;
+            }
+            if (jsAccessibilityManager->GetThirdProviderTreeIdForHost(hostNode.GetRawPtr()) != treeId) {
+                return;
+            }
+            jsAccessibilityManager->OnCmpTreeRegistered(hostNode.GetRawPtr(), treeId);
+        }, TaskExecutor::TaskType::UI, "ArkUICmpTreeRegistered");
 }
 
 int32_t JsThirdProviderInteractionOperation::GetParentWindowId()
 {
     return 0;
 }
+
+namespace {
+// Terminal NOT_SUPPORT reply shared by the detect-focusable delegation paths (unresolvable delegation anchors and the third-party fallback).
+void ReplyFocusMoveNotSupport(AccessibilityElementOperatorCallback& callback, const int32_t requestId)
+{
+    std::list<Accessibility::AccessibilityElementInfo> failInfos;
+    Accessibility::FocusMoveResult failResult = {
+        .resultType = Accessibility::FocusMoveResultType::NOT_SUPPORT,
+        .nowLevelBelongTreeId = -1,
+        .parentWindowId = 0,
+        .changeToNewInfo = false,
+        .needTerminate = true,
+    };
+    callback.SetFocusMoveSearchWithConditionResult(failInfos, failResult, requestId);
+}
+
+// UI-thread continuation of the detect-focusable delegation to an exported subtree (PostTask body): resolves the.
+void RunCmpDetectFocusableOnUI(const WeakPtr<JsAccessibilityManager>& weakSubAM,
+    const WeakPtr<NG::FrameNode>& weakRoot, const AccessibilityElementInfo& elementInfo,
+    const AccessibilityFocusMoveParam& subtreeParam, const int32_t requestId,
+    AccessibilityElementOperatorCallback& callback)
+{
+    auto subAM = weakSubAM.Upgrade();
+    auto exportedRoot = weakRoot.Upgrade();
+    if (!subAM || !exportedRoot) {
+        ReplyFocusMoveNotSupport(callback, requestId);
+        return;
+    }
+    subAM->DetectElementInfoFocusableFromRoot(elementInfo, subtreeParam, requestId, callback, exportedRoot);
+}
+
+// Detect-focusable branch of FocusMoveSearchWithCondition.
+void DelegateDetectFocusableToSubtree(const RefPtr<JsAccessibilityManager>& jsAccessibilityManager,
+    int32_t ownerNodeId,
+    const AccessibilityElementInfo& info, const AccessibilityFocusMoveParam& param,
+    const int32_t requestId, AccessibilityElementOperatorCallback& callback)
+{
+    int64_t splitParentId = AccessibilityElementInfo::UNDEFINED_ACCESSIBILITY_ID;
+    int32_t splitParentTreeId = AccessibilityElementInfo::UNDEFINED_TREE_ID;
+    AccessibilitySystemAbilityClient::GetTreeIdAndElementIdBySplitElementId(
+        param.parentId, splitParentId, splitParentTreeId);
+    auto binding = jsAccessibilityManager->GetCmpBindingForHover(ownerNodeId, splitParentId);
+    if (binding.has_value()) {
+        auto subAM = binding->subAM;
+        auto context = subAM->GetPipelineContext().Upgrade();
+        if (context && context->GetTaskExecutor()) {
+            AccessibilityFocusMoveParam subtreeParam = param;
+            subtreeParam.SetParentId(-1);
+            WeakPtr<JsAccessibilityManager> weakSubAM = subAM;
+            // The callback may be a caller-stack object (e.g. the hidumper focus-search dump, which
+            // already runs on the UI thread); run inline on the target thread so the reply never
+            // outlives the caller's frame. Cross-thread IPC entries keep the posted behavior,
+            // where the callback is a long-lived AccessibilityElementOperatorImpl member.
+            auto runCmpDetect = [weakSubAM, root = binding->exportedRoot, elementInfo = info,
+                subtreeParam, requestId, &callback] {
+                    RunCmpDetectFocusableOnUI(
+                        weakSubAM, root, elementInfo, subtreeParam, requestId, callback);
+                };
+            if (context->GetTaskExecutor()->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
+                runCmpDetect();
+                return;
+            }
+            context->GetTaskExecutor()->PostTask(std::move(runCmpDetect),
+                TaskExecutor::TaskType::UI, "ArkUICmpDetectFocusable");
+            return;
+        }
+    }
+    ReplyFocusMoveNotSupport(callback, requestId);
+}
+} // namespace
 
 void JsThirdProviderInteractionOperation::FocusMoveSearchWithCondition(
     const AccessibilityElementInfo& info, const AccessibilityFocusMoveParam param,
@@ -892,11 +1296,21 @@ void JsThirdProviderInteractionOperation::FocusMoveSearchWithCondition(
     int32_t splitTreeId = AccessibilityElementInfo::UNDEFINED_TREE_ID;
     AccessibilitySystemAbilityClient::GetTreeIdAndElementIdBySplitElementId(
         elementId, splitElementId, splitTreeId);
+    if (splitTreeId > 0 && splitTreeId != GetBelongTreeId()) {
+        TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+            "Third accessibility focus: tree mismatch, requested=%{public}d registered=%{public}d",
+            splitTreeId, GetBelongTreeId());
+        ReplyFocusMoveNotSupport(callback, requestId);
+        return;
+    }
     Accessibility::AccessibilityElementInfo nodeInfo;
     std::list<Accessibility::AccessibilityElementInfo> infos;
     auto jsAccessibilityManager = jsAccessibilityManager_.Upgrade();
-    CHECK_NULL_VOID(jsAccessibilityManager);
     auto accessibilityProvider = accessibilityProvider_.Upgrade();
+    if (!jsAccessibilityManager || !accessibilityProvider) {
+        ReplyFocusMoveNotSupport(callback, requestId);
+        return;
+    }
     NodeConfig config;
     GetNodeConfig(config);
     FocusStrategyOsalThird strategy(jsAccessibilityManager, accessibilityProvider, config);
@@ -906,25 +1320,44 @@ void JsThirdProviderInteractionOperation::FocusMoveSearchWithCondition(
         result.parentWindowId = GetParentWindowId();
         HILOG_INFO_FOCUS("focus move search third scroll result id %{public}" PRId64 ", "
             "ret %{public}d treeId %{public}d parentWindowId %{public}d requestID %{public}d",
-            nodeInfo.GetAccessibilityId(), result.resultType, result.nowLevelBelongTreeId,
+            splitElementId, result.resultType, result.nowLevelBelongTreeId,
             result.parentWindowId, requestId);
         jsAccessibilityManager->UpdateElementInfosTreeId(infos);
         callback.SetFocusMoveSearchWithConditionResult(infos, result, requestId);
         return;
     }
     if (FocusStrategyOsal::IsProcessDetectFocusable(param)) {
-        FocusMoveResult result = {
-            .resultType = FocusMoveResultType::NOT_SUPPORT,
-            .nowLevelBelongTreeId = -1,
-            .parentWindowId = 0,
-            .changeToNewInfo = false,
-            .needTerminate = true,
-        };
-        callback.SetFocusMoveSearchWithConditionResult(infos, result, requestId);
+        auto context = jsAccessibilityManager->GetPipelineContext().Upgrade();
+        auto executor = context ? context->GetTaskExecutor() : nullptr;
+        if (!executor) {
+            ReplyFocusMoveNotSupport(callback, requestId);
+            return;
+        }
+        // The callback may be a caller-stack object (e.g. the hidumper focus-search dump, which
+        // already runs on the UI thread); run inline on the UI thread so the reply never outlives
+        // the caller's frame. Cross-thread IPC entries keep the posted behavior, where the
+        // callback is a long-lived AccessibilityElementOperatorImpl member.
+        auto resolveDetectOwner = [weak = jsAccessibilityManager_, host = host_, info, param,
+            requestId, &callback] {
+                auto manager = weak.Upgrade();
+                auto owner = host.Upgrade();
+                if (!manager || !owner) {
+                    ReplyFocusMoveNotSupport(callback, requestId);
+                    return;
+                }
+                DelegateDetectFocusableToSubtree(manager, owner->GetId(), info, param, requestId, callback);
+            };
+        if (executor->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
+            resolveDetectOwner();
+            return;
+        }
+        executor->PostTask(std::move(resolveDetectOwner), TaskExecutor::TaskType::UI,
+            "ArkUICmpResolveFocusableOwner");
         return;
     }
     auto result = strategy.ExecuteFocusMoveSearch(splitElementId, param, nodeInfo);
     infos.emplace_back(nodeInfo);
+    ApplyChildTreeIdAndWinId(infos);
     result.nowLevelBelongTreeId = GetBelongTreeId();
     result.parentWindowId = GetParentWindowId();
     HILOG_INFO_FOCUS("focus move search third result id %{public}" PRId64 ", "
@@ -933,6 +1366,54 @@ void JsThirdProviderInteractionOperation::FocusMoveSearchWithCondition(
         result.parentWindowId, requestId);
     jsAccessibilityManager->UpdateElementInfosTreeId(infos);
     callback.SetFocusMoveSearchWithConditionResult(infos, result, requestId);
+}
+
+Accessibility::FocusMoveResult JsThirdProviderInteractionOperation::SearchFocusMoveWithConditionSync(
+    int64_t elementId, const Accessibility::AccessibilityFocusMoveParam& param,
+    Accessibility::AccessibilityElementInfo& info)
+{
+    Accessibility::FocusMoveResult failResult = {
+        .resultType = Accessibility::FocusMoveResultType::NOT_SUPPORT,
+        .nowLevelBelongTreeId = -1,
+        .parentWindowId = 0,
+        .changeToNewInfo = false,
+        .needTerminate = true,
+    };
+    // The out-param is valid ONLY when filled below with a routable target.
+    info.SetValidElement(false);
+    auto jsAccessibilityManager = jsAccessibilityManager_.Upgrade();
+    CHECK_NULL_RETURN(jsAccessibilityManager, failResult);
+    auto accessibilityProvider = accessibilityProvider_.Upgrade();
+    CHECK_NULL_RETURN(accessibilityProvider, failResult);
+    NodeConfig config;
+    GetNodeConfig(config);
+    FocusStrategyOsalThird strategy(jsAccessibilityManager, accessibilityProvider, config);
+    Accessibility::AccessibilityElementInfo nodeInfo;
+    auto result = strategy.ExecuteFocusMoveSearch(elementId, param, nodeInfo);
+    HILOG_INFO_FOCUS("focus move search third sync result id %{public}" PRId64 ", "
+        "ret %{public}d direction %{public}d",
+        nodeInfo.GetAccessibilityId(), result.resultType, param.direction);
+    if (result.resultType != Accessibility::FocusMoveResultType::SEARCH_SUCCESS) {
+        return result;
+    }
+    // Routable-target guard: the provider root is addressed by elementId = -1.
+    if (nodeInfo.GetAccessibilityId() < 0 || nodeInfo.GetBelongTreeId() <= 0) {
+        TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+            "SearchFocusMoveWithConditionSync: unroutable target rejected: elementId=%{public}" PRId64
+            ", belongTreeId=%{public}d, componentType=%{public}s",
+            nodeInfo.GetAccessibilityId(), nodeInfo.GetBelongTreeId(),
+            nodeInfo.GetComponentType().c_str());
+        return failResult;
+    }
+    // Same outbound wiring as the operator-level main path: child-tree pointers on mount nodes, T_cmp splicing for.
+    std::list<Accessibility::AccessibilityElementInfo> infos = { nodeInfo };
+    ApplyChildTreeIdAndWinId(infos);
+    info = infos.front();
+    info.SetValidElement(true);
+    result.nowLevelBelongTreeId = GetBelongTreeId();
+    result.parentWindowId = GetParentWindowId();
+    jsAccessibilityManager->UpdateElementInfoTreeId(info);
+    return result;
 }
 
 void JsThirdProviderInteractionOperation::UpdateCustomAccessibilityProperty(
@@ -1079,6 +1560,7 @@ int32_t JsThirdProviderInteractionOperation::SendAccessibilityAsyncEvent(
         TAG_LOGI(AceLogTag::ACE_ACCESSIBILITY, "Inner SendAccessibilityAsyncEvent");
         SendAccessibilitySyncEventToService(accessibilityEventInfo, callback);
     }
+    LOG_CALLBACK("OH_ArkUI_SendAccessibilityAsyncEvent", callback);
     callback(0);
     return 0;
 }
@@ -1159,6 +1641,33 @@ bool JsThirdProviderInteractionOperation::SendAccessibilitySyncEventToService(
     return true;
 }
 
+bool JsThirdProviderInteractionOperation::SendNativeHoverEvent(
+    const ArkUI_AccessibilityElementInfo& info, NG::AccessibilityHoverEventType eventType)
+{
+    Accessibility::AccessibilityEventInfo event;
+    return BuildNativeHoverEvent(info, eventType, event) && SendAccessibilitySyncEventToService(event, nullptr);
+}
+
+bool JsThirdProviderInteractionOperation::BuildNativeHoverEvent(const ArkUI_AccessibilityElementInfo& info,
+    NG::AccessibilityHoverEventType eventType, Accessibility::AccessibilityEventInfo& event)
+{
+    CHECK_NULL_RETURN(host_.Upgrade(), false);
+    if (eventType != NG::AccessibilityHoverEventType::ENTER && eventType != NG::AccessibilityHoverEventType::EXIT) {
+        return false;
+    }
+    Accessibility::AccessibilityElementInfo elementInfo;
+    AccessibilityThirdProviderUtils::TransformAccessibilityElementInfo(info, elementInfo);
+    event.SetElementInfo(elementInfo);
+    event.SetEventType(eventType == NG::AccessibilityHoverEventType::ENTER ?
+        Accessibility::EventType::TYPE_VIEW_HOVER_ENTER_EVENT : Accessibility::EventType::TYPE_VIEW_HOVER_EXIT_EVENT);
+    event.SetTimeStamp(GetMicroTickCount());
+    event.SetWindowChangeTypes(Accessibility::WindowUpdateType::WINDOW_UPDATE_INVALID);
+    event.SetWindowContentChangeTypes(Accessibility::WindowsContentChangeTypes::CONTENT_CHANGE_TYPE_INVALID);
+    event.SetBundleName(AceApplicationInfo::GetInstance().GetPackageName());
+    GetAccessibilityEventInfoFromNativeEvent(event, false);
+    return true;
+}
+
 void JsThirdProviderInteractionOperation::CheckAndSendHoverEnterByReadableRules(int64_t thirdElementId)
 {
     int64_t splitElementId = AccessibilityElementInfo::UNDEFINED_ACCESSIBILITY_ID;
@@ -1191,6 +1700,7 @@ void JsThirdProviderInteractionOperation::SetThirdCustomProperty(
 
 RefPtr<NG::CustomAccessibilityProperty> JsThirdProviderInteractionOperation::GetThirdCustomProperty(int64_t elementId)
 {
+    std::lock_guard<std::mutex> lock(thirdCustomPropertiesMutex_);
     auto it = thirdCustomProperties_.find(elementId);
     if (it != thirdCustomProperties_.end()) {
         return it->second;

@@ -101,7 +101,7 @@ using RegisterColorPickerCallback = std::function<void(const RefPtr<FrameNode>& 
     int32_t brightThreshold, int32_t darkThreshold, ColorPickerCallback&& callback)>;
 using UnregisterColorPickerCallback = std::function<void(const RefPtr<FrameNode>& node)>;
 
-class NavigationManager : public virtual AceType {
+class NavigationManager : public AceType {
     DECLARE_ACE_TYPE(NavigationManager, AceType);
 public:
     using DumpLogDepth = int;

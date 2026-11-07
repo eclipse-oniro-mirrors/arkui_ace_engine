@@ -74,30 +74,26 @@ constexpr uint32_t APP_DOMAIN = 0xC0D0;
 #endif
 #if defined(STRIP_RELEASE_LOG)
 #define LOGD(fmt, ...) ((void)0)
-#define LOGI(fmt, ...) ((void)0)
-#define LOGW(fmt, ...) ((void)0)
 #else
 #define LOGD(fmt, ...) TAG_LOGD(OHOS::Ace::AceLogTag::ACE_DEFAULT_DOMAIN, fmt, ##__VA_ARGS__)
+#endif
 #define LOGI(fmt, ...) TAG_LOGI(OHOS::Ace::AceLogTag::ACE_DEFAULT_DOMAIN, fmt, ##__VA_ARGS__)
 #define LOGW(fmt, ...) TAG_LOGW(OHOS::Ace::AceLogTag::ACE_DEFAULT_DOMAIN, fmt, ##__VA_ARGS__)
-#endif
 #define LOGE(fmt, ...) TAG_LOGE(OHOS::Ace::AceLogTag::ACE_DEFAULT_DOMAIN, fmt, ##__VA_ARGS__)
 #define LOGF(fmt, ...) TAG_LOGF(OHOS::Ace::AceLogTag::ACE_DEFAULT_DOMAIN, fmt, ##__VA_ARGS__)
 
 #if defined(STRIP_RELEASE_LOG)
 #define TAG_LOGD(tag, fmt, ...) ((void)0)
-#define TAG_LOGI(tag, fmt, ...) ((void)0)
-#define TAG_LOGW(tag, fmt, ...) ((void)0)
 #else
 #define TAG_LOGD(tag, fmt, ...) PRINT_LOG(DEBUG, tag, fmt, ##__VA_ARGS__)
+#endif
 #define TAG_LOGI(tag, fmt, ...) PRINT_LOG(INFO, tag, fmt, ##__VA_ARGS__)
 #define TAG_LOGW(tag, fmt, ...) PRINT_LOG(WARN, tag, fmt, ##__VA_ARGS__)
-#endif
 #define TAG_LOGE(tag, fmt, ...) PRINT_LOG(ERROR, tag, fmt, ##__VA_ARGS__)
 #define TAG_LOGF(tag, fmt, ...) PRINT_LOG(FATAL, tag, fmt, ##__VA_ARGS__)
 
 #define LOG_FUNCTION() LOGD("function track: %{public}s", __FUNCTION__)
-#define LOG_CALLBACK(callback) CallbackLogger _(__FUNCTION__, reinterpret_cast<uintptr_t>(callback))
+#define LOG_CALLBACK(funcName, callback) CallbackLogger _(funcName, reinterpret_cast<uintptr_t>(callback))
 
 #define LOGF_ABORT(fmt, ...)      \
     do {                          \
@@ -107,13 +103,11 @@ constexpr uint32_t APP_DOMAIN = 0xC0D0;
 
 #if defined(STRIP_RELEASE_LOG)
 #define APP_LOGD(fmt, ...) ((void)0)
-#define APP_LOGI(fmt, ...) ((void)0)
-#define APP_LOGW(fmt, ...) ((void)0)
 #else
 #define APP_LOGD(fmt, ...) PRINT_APP_LOG(DEBUG, fmt, ##__VA_ARGS__)
+#endif
 #define APP_LOGI(fmt, ...) PRINT_APP_LOG(INFO, fmt, ##__VA_ARGS__)
 #define APP_LOGW(fmt, ...) PRINT_APP_LOG(WARN, fmt, ##__VA_ARGS__)
-#endif
 #define APP_LOGE(fmt, ...) PRINT_APP_LOG(ERROR, fmt, ##__VA_ARGS__)
 #define APP_LOGF(fmt, ...) PRINT_APP_LOG(FATAL, fmt, ##__VA_ARGS__)
 
@@ -295,6 +289,7 @@ private:
     ~LogWrapper() = delete;
 
     static LogLevel level_;
+    static LogLevel& GetLogLevelStorage();
 };
 
 ACE_FORCE_EXPORT bool LogBacktrace(size_t maxFrameNums = 256);

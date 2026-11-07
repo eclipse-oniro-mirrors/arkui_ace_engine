@@ -1043,6 +1043,10 @@ export class AxisEventTransfer {
 }
 
 export class TouchEventHandwritten implements TouchEvent {
+    private inputOwner?: Object = undefined
+    public retainInputOwner(owner: Object): void {
+        this.inputOwner = owner
+    }
     public ptr: KPointer
     public getModifierKeyState?: ModifierKeyStateGetter | undefined
     public type: TouchType
@@ -1051,12 +1055,16 @@ export class TouchEventHandwritten implements TouchEvent {
     public target: EventTarget
     public timestamp: int64
     public source: SourceType
+    public axisHorizontal?: double | undefined
+    public axisVertical?: double | undefined
     public pressure: double
     public tiltX: double
     public tiltY: double
+    public rollAngle?: double | undefined
     public sourceTool: SourceTool
     public deviceId?: int32 | undefined
     public targetDisplayId?: int32 | undefined
+    public axisPinch?: double | undefined
     constructor(peerPtr: KPointer) {
         this.ptr = peerPtr
         this.getModifierKeyState = this.getGetModifierKeyState()

@@ -25,6 +25,8 @@
 #include "core/components/button/button_theme.h"
 #include "core/components/theme/app_theme.h"
 #include "core/components/theme/theme_attributes.h"
+#include "core/components_ng/pattern/button/button_theme_wrapper.h"
+#include "core/components_ng/pattern/counter/counter_theme_wrapper.h"
 #include "frameworks/core/components/theme/theme_manager_impl.h"
 
 using namespace testing;
@@ -47,6 +49,85 @@ void ThemeManagerTestNg::TearDownTestCase()
 {
     MockPipelineContext::TearDown();
     MockContainer::TearDown();
+}
+
+/**
+ * @tc.name: ApplyTokenTheme_001
+ * @tc.desc: A wrapper returned as Theme applies tokens and retains its component type.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ThemeManagerTestNg, ApplyTokenTheme_001, TestSize.Level1)
+{
+    RefPtr<Theme> theme = ButtonThemeWrapper::WrapperBuilder().BuildWrapper(nullptr);
+    auto buttonTheme = AceType::DynamicCast<ButtonTheme>(theme);
+    ASSERT_NE(buttonTheme, nullptr);
+    EXPECT_NE(AceType::DynamicCast<ButtonThemeWrapper>(theme), nullptr);
+
+    auto colors = AceType::MakeRefPtr<TokenColors>();
+    colors->SetColor(TokenColors::BACKGROUND_EMPHASIZE, Color::RED);
+    auto tokenTheme = AceType::MakeRefPtr<TokenTheme>(1);
+    tokenTheme->SetColors(colors);
+    tokenTheme->SetColorMode(ColorMode::LIGHT);
+
+    theme->ApplyTokenTheme(*tokenTheme);
+    EXPECT_EQ(buttonTheme->GetBgColor(), Color::RED);
+
+    colors->SetColor(TokenColors::BACKGROUND_EMPHASIZE, Color::BLUE);
+    theme->ApplyTokenTheme(*tokenTheme);
+    EXPECT_EQ(buttonTheme->GetBgColor(), Color::BLUE);
+}
+
+/**
+ * @tc.name: ApplyTokenTheme_002
+ * @tc.desc: Counter wrapper has an unambiguous Theme base and shared reference-counted lifetime.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ThemeManagerTestNg, ApplyTokenTheme_002, TestSize.Level1)
+{
+    auto wrapper = AceType::MakeRefPtr<CounterThemeWrapper>();
+    RefPtr<Theme> theme = wrapper;
+    auto weak = AceType::WeakClaim(AceType::RawPtr(wrapper));
+    wrapper.Reset();
+    ASSERT_NE(weak.Upgrade(), nullptr);
+
+    auto colors = AceType::MakeRefPtr<TokenColors>();
+    colors->SetColor(TokenColors::FONT_PRIMARY, Color::RED);
+    auto tokenTheme = AceType::MakeRefPtr<TokenTheme>(1);
+    tokenTheme->SetColors(colors);
+    tokenTheme->SetColorMode(ColorMode::LIGHT);
+    theme->ApplyTokenTheme(*tokenTheme);
+
+    auto counterTheme = AceType::DynamicCast<CounterTheme>(theme);
+    ASSERT_NE(counterTheme, nullptr);
+    EXPECT_EQ(counterTheme->GetContentTextStyle().GetTextColor(), Color::RED);
+    theme.Reset();
+    EXPECT_NE(weak.Upgrade(), nullptr);
+    counterTheme.Reset();
+    EXPECT_EQ(weak.Upgrade(), nullptr);
+}
+
+/**
+ * @tc.name: ApplyTokenTheme_003
+ * @tc.desc: A regular component theme preserves its values when applying tokens.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ThemeManagerTestNg, ApplyTokenTheme_003, TestSize.Level1)
+{
+    auto buttonTheme = ButtonTheme::Builder().Build(nullptr);
+    ASSERT_NE(buttonTheme, nullptr);
+    const auto background = buttonTheme->GetBgColor();
+    RefPtr<Theme> theme = buttonTheme;
+
+    auto colors = AceType::MakeRefPtr<TokenColors>();
+    const auto tokenBackground = background == Color::RED ? Color::BLUE : Color::RED;
+    colors->SetColor(TokenColors::BACKGROUND_EMPHASIZE, tokenBackground);
+    auto tokenTheme = AceType::MakeRefPtr<TokenTheme>(1);
+    tokenTheme->SetColors(colors);
+    tokenTheme->SetColorMode(ColorMode::LIGHT);
+    theme->ApplyTokenTheme(*tokenTheme);
+
+    EXPECT_EQ(buttonTheme->GetBgColor(), background);
+    EXPECT_EQ(AceType::DynamicCast<ButtonTheme>(theme), buttonTheme);
 }
 
 /**

@@ -25,10 +25,16 @@
 #include "core/components_ng/pattern/tabs/tab_content_node.h"
 #include "core/components_ng/pattern/tabs/tab_bar_layout_property.h"
 
+namespace OHOS::Ace {
+struct BadgeParameters;
+}
+
 namespace OHOS::Ace::NG {
 class TextLayoutProperty;
 class TabContentPattern;
 class TabsNode;
+class BadgeLayoutProperty;
+class LinearLayoutProperty;
 }
 
 namespace OHOS::Ace::NG {
@@ -86,6 +92,7 @@ public:
         TabBarBuilderFunc&& builder, bool useContentOnly);
     static void SetTabBarWithContent(FrameNode* node, const RefPtr<NG::UINode>& content);
     static void SetTabBarStyle(FrameNode* node, TabBarStyle tabBarStyle);
+    static void SetTabBarBadge(FrameNode* node, const std::optional<TabBarBadgeParam>& badgeParam);
     static void SetIndicator(FrameNode* node, const IndicatorStyle& indicator);
     static void SetDrawableIndicatorConfig(FrameNode* node, const ImageInfoConfig& config);
     static void SetDrawableIndicatorFlag(FrameNode* node, bool isDrawableIndicator);
@@ -110,6 +117,7 @@ public:
     void SetCustomStyleNode(const RefPtr<NG::FrameNode>& customStyleNode) override;
     void SetDefaultVisibility(const NG::TabContentDefaultVisibility& defaultVisibility) override;
     static void SetDefaultVisibility(FrameNode* node, const NG::TabContentDefaultVisibility& defaultVisibility);
+    static void SetSidebarSection(FrameNode* node, const SidebarSection& section);
     static void SetCustomTabBar(FrameNode* node, FrameNode* tabBar);
     static void UpdateDefaultSymbol(RefPtr<TabTheme>& tabTheme, RefPtr<TextLayoutProperty> symbolProperty);
     static void UpdateSymbolEffect(RefPtr<TextLayoutProperty> symbolProperty, bool isActive);
@@ -138,6 +146,8 @@ public:
         const RefPtr<ResourceObject>& resObj);
     static void InitTabText(const RefPtr<TextLayoutProperty>& textLayoutProperty);
     static void UpdateLabelStyle(const LabelStyle& labelStyle, RefPtr<TextLayoutProperty> textLayoutProperty);
+    static void CreateSidebarSectionTitleWithResourceObj(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj);
+    static void ScheduleEllipsePositionAdjustment(const RefPtr<FrameNode>& badgeNode);
 
 private:
     static RefPtr<TabContentPattern> GetTabContentPattern(FrameNode* node);
@@ -145,6 +155,27 @@ private:
     static void AddSideBarAdaptableStyleTabBarItem(const RefPtr<UINode>& tabContent, int32_t position, bool update);
     static void RemoveBottomStyleTabBarItem(const RefPtr<TabContentNode>& tabContentNode);
     static void RemoveSideBarAdaptableStyleTabBarItem(const RefPtr<TabContentNode>& tabContentNode);
+    static BadgeParameters BuildBadgeParameters(const TabBarBadgeParam& badgeParam, bool& isDefaultFontSize,
+        bool& isDefaultBadgeSize, bool& isEllipseMode);
+    static bool ResolveBadgeRTL(const RefPtr<FrameNode>& badgeNode);
+    static float CalculateEllipseRtlPositionX(const RefPtr<FrameNode>& badgeNode, float eightVpPx);
+    static void WrapWithBadge(const RefPtr<FrameNode>& columnNode, const RefPtr<FrameNode>& iconNode,
+        const RefPtr<FrameNode>& textNode, const TabBarBadgeParam& badgeParam,
+        const RefPtr<LinearLayoutProperty>& columnLayoutProperty);
+    static RefPtr<FrameNode> CreateBadgeContentChild(const RefPtr<FrameNode>& iconNode,
+        const RefPtr<FrameNode>& textNode, const RefPtr<LinearLayoutProperty>& columnLayoutProperty);
+    static RefPtr<FrameNode> ConfigureBadgeNode(const TabBarBadgeParam& badgeParam, bool& isEllipseMode);
+    static void UpdateBottomStyleBadge(const RefPtr<FrameNode>& columnNode,
+        const RefPtr<TabContentPattern>& tabContentPattern, bool hasBadge,
+        const RefPtr<LinearLayoutProperty>& linearLayoutProperty);
+    static void AddBadgeToColumn(const RefPtr<FrameNode>& columnNode,
+        const RefPtr<TabContentPattern>& tabContentPattern,
+        const RefPtr<LinearLayoutProperty>& linearLayoutProperty);
+    static void RemoveBadgeFromColumn(const RefPtr<FrameNode>& columnNode,
+        const RefPtr<FrameNode>& existingBadgeNode);
+    static void UpdateExistingBadge(const RefPtr<FrameNode>& columnNode,
+        const RefPtr<FrameNode>& existingBadgeNode,
+        const RefPtr<TabContentPattern>& tabContentPattern);
 };
 
 } // namespace OHOS::Ace::NG

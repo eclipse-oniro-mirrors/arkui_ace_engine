@@ -209,4 +209,16 @@ void FfiOHOSAceFrameworkDataPanelSetTrackShadow(NativeDataPanelShadow nativeData
     shadow.colors = valueColors;
     GetDataPanelModel()->SetShadowOption(shadow);
 }
+
+void FfiOHOSAceFrameworkDataPanelResetShadowColors(double radius, double offsetX, double offsetY)
+{
+    std::vector<OHOS::Ace::NG::Gradient> colors;
+    ConvertThemeColor(colors);
+    OHOS::Ace::NG::DataPanelShadow shadow;
+    shadow.radius = radius;
+    shadow.offsetX = offsetX;
+    shadow.offsetY = offsetY;
+    shadow.colors = colors;
+    GetDataPanelModel()->SetShadowOption(shadow);
+}
 }

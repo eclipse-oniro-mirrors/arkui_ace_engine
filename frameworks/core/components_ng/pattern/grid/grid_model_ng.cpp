@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "core/components_ng/pattern/grid/grid_model_ng.h"
 
 #include "base/hiviewdfx/histogram_wrapper.h"
@@ -26,6 +27,7 @@
 #include "core/components_ng/pattern/grid/grid_pattern.h"
 #include "core/components_ng/pattern/grid/grid_utils.h"
 #include "core/components_ng/pattern/scroll_bar/proxy/scroll_bar_proxy.h"
+#include "core/components_ng/pattern/scrollable/scrollable_layout_property.h"
 #include "core/components_ng/pattern/scrollable/scrollable_model_ng.h"
 #include "core/components_ng/pattern/scrollable/scrollable_properties.h"
 #include "core/components_ng/manager/scroll_adjust/scroll_adjust_manager.h"
@@ -309,6 +311,16 @@ void GridModelNG::SetScrollEnabled(bool scrollEnabled)
 {
     ACE_ENGINE_HISTOGRAM_BOOLEAN(SCROLLABLE_GRID_ATTRIBUTE "SetScrollEnabled", scrollEnabled);
     ACE_UPDATE_LAYOUT_PROPERTY(GridLayoutProperty, ScrollEnabled, scrollEnabled);
+}
+
+void GridModelNG::SetScrollSnapStrategy(const ScrollSnapStrategy& scrollSnapStrategy)
+{
+    ACE_UPDATE_LAYOUT_PROPERTY(GridLayoutProperty, ScrollSnapStrategy, scrollSnapStrategy);
+}
+
+void GridModelNG::ResetScrollSnapStrategy()
+{
+    ACE_RESET_LAYOUT_PROPERTY(GridLayoutProperty, ScrollSnapStrategy);
 }
 
 void GridModelNG::SetFriction(double friction)
@@ -768,6 +780,16 @@ void GridModelNG::SetNestedScroll(FrameNode* frameNode, const NestedScrollOption
     pattern->SetNestedScroll(nestedOpt);
 }
 
+void GridModelNG::SetScrollSnapStrategy(FrameNode* frameNode, const ScrollSnapStrategy& scrollSnapStrategy)
+{
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(GridLayoutProperty, ScrollSnapStrategy, scrollSnapStrategy, frameNode);
+}
+
+void GridModelNG::ResetScrollSnapStrategy(FrameNode* frameNode)
+{
+    ACE_RESET_NODE_LAYOUT_PROPERTY(GridLayoutProperty, ScrollSnapStrategy, frameNode);
+}
+
 NestedScrollOptions GridModelNG::GetNestedScroll(FrameNode* frameNode)
 {
     NestedScrollOptions defaultOptions;
@@ -1135,6 +1157,21 @@ void GridModelNG::SetSyncLoad(FrameNode* frameNode, bool syncLoad)
 {
     ACE_ENGINE_HISTOGRAM_BOOLEAN(SCROLLABLE_GRID_ATTRIBUTE "SetSyncLoad", syncLoad);
     ACE_UPDATE_NODE_LAYOUT_PROPERTY(GridLayoutProperty, SyncLoad, syncLoad, frameNode);
+}
+
+void GridModelNG::SetScrollPlaceholder(ScrollPlaceholderProvider&& provider)
+{
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    SetScrollPlaceholder(frameNode, std::move(provider));
+}
+
+void GridModelNG::SetScrollPlaceholder(FrameNode* frameNode, ScrollPlaceholderProvider&& provider)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<GridPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetScrollPlaceholder(std::move(provider));
 }
 
 bool GridModelNG::GetSyncLoad(FrameNode* frameNode)

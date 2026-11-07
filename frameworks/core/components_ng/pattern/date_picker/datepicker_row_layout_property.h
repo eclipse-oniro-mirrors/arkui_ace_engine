@@ -44,7 +44,7 @@ public:
     {
         auto value = MakeRefPtr<DataPickerRowLayoutProperty>();
         Clone(value);
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propSelectedDate_ = CloneSelectedDate();
         value->propLunar_ = CloneLunar();
         value->propCanLoop_ = CloneCanLoop();

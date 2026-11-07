@@ -12,6 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "core/components_ng/pattern/grid/bridge/grid/arkts_native_grid_bridge.h"
 
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
@@ -23,13 +24,17 @@
 #include "bridge/declarative_frontend/jsview/js_scroller.h"
 #include "bridge/declarative_frontend/view_stack_processor.h"
 #include "core/components_ng/pattern/grid/grid_constants.h"
+#include "core/components_ng/pattern/grid/grid_model_ng.h"
 #include "core/components_ng/pattern/grid/grid_event_hub.h"
 #include "core/components_ng/pattern/grid/grid_layout_options.h"
 #include "core/components_ng/pattern/scroll_bar/proxy/scroll_bar_proxy.h"
+#include "core/components_ng/pattern/scrollable/scrollable_layout_property.h"
 #include "core/components_ng/pattern/scrollable/scrollable_controller.h"
 #include "core/components_ng/pattern/scrollable/selectable_container_pattern.h"
 #include "core/components_v2/grid/grid_event.h"
 #include "core/pipeline_ng/pipeline_context.h"
+
+#include <limits>
 
 using namespace OHOS::Ace::Framework;
 
@@ -493,8 +498,12 @@ void GridBridge::RegisterGridAttributes(Local<panda::ObjectRef> object, EcmaVM* 
         "resetAlignItems",
         "setSyncLoad",
         "resetSyncLoad",
+        "setScrollPlaceholder",
+        "resetScrollPlaceholder",
         "setEditModeOptions",
         "resetEditModeOptions",
+        "setScrollSnapStrategy",
+        "resetScrollSnapStrategy",
         "setGridEnableEditMode",
         "resetGridEnableEditMode",
         "setOnEditModeChange",
@@ -576,8 +585,12 @@ void GridBridge::RegisterGridAttributes(Local<panda::ObjectRef> object, EcmaVM* 
         panda::FunctionRef::New(vm, GridBridge::ResetAlignItems),
         panda::FunctionRef::New(vm, GridBridge::SetSyncLoad),
         panda::FunctionRef::New(vm, GridBridge::ResetSyncLoad),
+        panda::FunctionRef::New(vm, GridBridge::SetScrollPlaceholder),
+        panda::FunctionRef::New(vm, GridBridge::ResetScrollPlaceholder),
         panda::FunctionRef::New(vm, GridBridge::SetEditModeOptions),
         panda::FunctionRef::New(vm, GridBridge::ResetEditModeOptions),
+        panda::FunctionRef::New(vm, GridBridge::SetScrollSnapStrategy),
+        panda::FunctionRef::New(vm, GridBridge::ResetScrollSnapStrategy),
         panda::FunctionRef::New(vm, GridBridge::SetEnableEditMode),
         panda::FunctionRef::New(vm, GridBridge::ResetEnableEditMode),
         panda::FunctionRef::New(vm, GridBridge::SetOnEditModeChange),
@@ -1463,6 +1476,217 @@ ArkUINativeModuleValue GridBridge::ResetSyncLoad(ArkUIRuntimeCallInfo* runtimeCa
     CHECK_NULL_RETURN(node->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
     auto nativeNode = nodePtr(node->ToNativePointer(vm)->Value());
     GetArkUINodeModifiers()->getGridModifier()->resetSyncLoad(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+// Same provider contract as ListBridge::SetListScrollPlaceholder: a non-function
+// or undefined argument clears the provider (capability off), a function is
+// wrapped into the synchronous northbound provider called while scrolling.
+// The node argument accepts both forms used on this module: a native pointer
+// (modifier path) and the boolean "current node" convention of the static path.
+ArkUINativeModuleValue GridBridge::SetScrollPlaceholder(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> node = runtimeCallInfo->GetCallArgRef(CALL_ARG_0);
+    Local<JSValueRef> providerArg = runtimeCallInfo->GetCallArgRef(CALL_ARG_1);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_EQUAL_RETURN(ArkTSUtils::GetNativeNode(nativeNode, node, vm), false, panda::JSValueRef::Undefined(vm));
+    auto frameNode = reinterpret_cast<FrameNode*>(nativeNode);
+    CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
+    if (!providerArg->IsFunction(vm)) {
+        GridModelNG::SetScrollPlaceholder(frameNode, nullptr);
+        return panda::JSValueRef::Undefined(vm);
+    }
+    panda::Local<panda::FunctionRef> providerFuncLocal = providerArg->ToObject(vm);
+    auto providerFunc = panda::CopyableGlobal(vm, providerFuncLocal);
+    ScrollPlaceholderProvider provider =
+        [vm, providerFunc = std::move(providerFunc)](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+        panda::LocalScope localScope(vm);
+        panda::TryCatch tryCatch(vm);
+        panda::Local<panda::JSValueRef> params[1] = { panda::IntegerRef::New(vm, index) };
+        auto result = providerFunc->Call(vm, providerFunc.ToLocal(), params, 1);
+        if (tryCatch.HasCaught() || !result->IsObject(vm)) {
+            // A throwing provider is treated like "no placeholder for this item":
+            // the scroll path must stay a pure calculation without error fences.
+            return std::nullopt;
+        }
+        auto obj = result->ToObject(vm);
+        ScrollPlaceholderOptions options;
+        auto id = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "id"));
+        if (id->IsString(vm)) {
+            options.id = id->ToString(vm)->ToString(vm);
+        }
+        auto size = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "size"));
+        if (size->IsObject(vm)) {
+            auto sizeObj = size->ToObject(vm);
+            ScrollPlaceholderSizeOption sizeOption;
+            auto width = sizeObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "width"));
+            if (width->IsNumber()) {
+                sizeOption.width =
+                    Dimension(static_cast<float>(width->ToNumber(vm)->Value()), DimensionUnit::VP);
+            } else if (width->IsString(vm)) {
+                // Bare numbers mean vp; suffixed strings ("100%", "10px") keep their unit.
+                sizeOption.width =
+                    StringUtils::StringToDimension(width->ToString(vm)->ToString(vm), true);
+            }
+            auto height = sizeObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "height"));
+            if (height->IsNumber()) {
+                sizeOption.height =
+                    Dimension(static_cast<float>(height->ToNumber(vm)->Value()), DimensionUnit::VP);
+            } else if (height->IsString(vm)) {
+                sizeOption.height =
+                    StringUtils::StringToDimension(height->ToString(vm)->ToString(vm), true);
+            }
+            options.size = sizeOption;
+        }
+        return options;
+    };
+    GridModelNG::SetScrollPlaceholder(frameNode, std::move(provider));
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue GridBridge::ResetScrollPlaceholder(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> node = runtimeCallInfo->GetCallArgRef(CALL_ARG_0);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_EQUAL_RETURN(ArkTSUtils::GetNativeNode(nativeNode, node, vm), false, panda::JSValueRef::Undefined(vm));
+    auto frameNode = reinterpret_cast<FrameNode*>(nativeNode);
+    CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
+    GridModelNG::SetScrollPlaceholder(frameNode, nullptr);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+
+namespace {
+// The provider contract exposed to ArkTS is vp-based (velocity in vp/s, offsets in vp, see
+// scroll_common.d.ts), while the internal scroll pipeline is px-based. Convert at this boundary
+// with the same Dimension conversions the other JS-facing geometry callbacks in this file use.
+// Wraps a JS provider callback with panda TryCatch protection: non-JS-thread, thrown exceptions
+// and non-number results resolve to NaN so the runtime falls back to the natural snap behavior.
+SnapOffsetFunc MakeSnapOffsetProvider(
+    EcmaVM* vm, const Local<JSValueRef>& funcValue, const Local<JSValueRef>& thisValue,
+    FrameNode* frameNode, bool isJSView)
+{
+    auto weakNode = AceType::WeakClaim(frameNode);
+    Local<panda::FunctionRef> funcRef = funcValue->ToObject(vm);
+    // Keep the provider object: the callbacks are methods and must run with the provider as
+    // their receiver, or every `this.xxx` member read inside them resolves to undefined.
+    auto receiver = panda::CopyableGlobal(vm, thisValue->ToObject(vm));
+    return [func = panda::CopyableGlobal(vm, funcRef), receiver, weakNode, isJSView](double velocity) -> double {
+        auto vm = func.GetEcmaVM();
+        CHECK_EQUAL_RETURN(ArkTSUtils::CheckJavaScriptScope(vm), false,
+            std::numeric_limits<double>::quiet_NaN());
+        panda::LocalScope scope(vm);
+        panda::TryCatch trycatch(vm);
+        PipelineContext::SetCallBackNode(weakNode);
+        panda::Local<JSValueRef> params[] = { panda::NumberRef::New(vm, Dimension(velocity).ConvertToVp()) };
+        auto result = func->Call(vm, receiver.ToLocal(), params, 1); // 1: array length
+        if (isJSView) {
+            ArkTSUtils::HandleCallbackJobs(vm, trycatch, result);
+        }
+        if (!result->IsNumber()) {
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+        return Dimension(result->ToNumber(vm)->Value(), DimensionUnit::VP).ConvertToPx();
+    };
+}
+
+SnapApproachOffsetFunc MakeSnapApproachOffsetProvider(
+    EcmaVM* vm, const Local<JSValueRef>& funcValue, const Local<JSValueRef>& thisValue,
+    FrameNode* frameNode, bool isJSView)
+{
+    auto weakNode = AceType::WeakClaim(frameNode);
+    Local<panda::FunctionRef> funcRef = funcValue->ToObject(vm);
+    auto receiver = panda::CopyableGlobal(vm, thisValue->ToObject(vm));
+    return [func = panda::CopyableGlobal(vm, funcRef), receiver, weakNode, isJSView](
+               double velocity, double decayOffset) -> double {
+        auto vm = func.GetEcmaVM();
+        CHECK_EQUAL_RETURN(ArkTSUtils::CheckJavaScriptScope(vm), false,
+            std::numeric_limits<double>::quiet_NaN());
+        panda::LocalScope scope(vm);
+        panda::TryCatch trycatch(vm);
+        PipelineContext::SetCallBackNode(weakNode);
+        panda::Local<JSValueRef> params[] = { panda::NumberRef::New(vm, Dimension(velocity).ConvertToVp()),
+            panda::NumberRef::New(vm, Dimension(decayOffset).ConvertToVp()) };
+        auto result = func->Call(vm, receiver.ToLocal(), params, 2); // 2: array length
+        if (isJSView) {
+            ArkTSUtils::HandleCallbackJobs(vm, trycatch, result);
+        }
+        if (!result->IsNumber()) {
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+        return Dimension(result->ToNumber(vm)->Value(), DimensionUnit::VP).ConvertToPx();
+    };
+}
+
+// Parses the ArkTS scrollSnapStrategy argument: a ScrollSnapAlign number or a provider object
+// with calculateSnapOffset / calculateApproachOffset functions. Returns false for anything else.
+bool ParseScrollSnapStrategyValue(EcmaVM* vm, const Local<JSValueRef>& valueArg,
+    const Local<JSValueRef>& node, FrameNode* frameNode, ScrollSnapStrategy& strategy)
+{
+    if (valueArg->IsNumber()) {
+        int32_t align = valueArg->Int32Value(vm);
+        if (align <= static_cast<int32_t>(ScrollSnapAlign::NONE) ||
+            align > static_cast<int32_t>(ScrollSnapAlign::END)) {
+            return false;
+        }
+        strategy.align = static_cast<ScrollSnapAlign>(align);
+        return true;
+    }
+    if (!valueArg->IsObject(vm)) {
+        return false;
+    }
+    auto obj = valueArg->ToObject(vm);
+    auto snapFuncValue = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "calculateSnapOffset"));
+    auto approachFuncValue = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "calculateApproachOffset"));
+    // A custom provider requires calculateSnapOffset to be a function.
+    if (!snapFuncValue->IsFunction(vm)) {
+        return false;
+    }
+    strategy.hasProvider = true;
+    bool isJSView = ArkTSUtils::IsJsView(vm, node);
+    strategy.calculateSnapOffset = MakeSnapOffsetProvider(vm, snapFuncValue, obj, frameNode, isJSView);
+    if (approachFuncValue->IsFunction(vm)) {
+        strategy.calculateApproachOffset =
+            MakeSnapApproachOffsetProvider(vm, approachFuncValue, obj, frameNode, isJSView);
+    }
+    return true;
+}
+} // namespace
+
+ArkUINativeModuleValue GridBridge::SetScrollSnapStrategy(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
+    ArkUINodeHandle nativeNode = nullptr;
+    Local<JSValueRef> node = runtimeCallInfo->GetCallArgRef(CALL_ARG_0);
+    Local<JSValueRef> valueArg = runtimeCallInfo->GetCallArgRef(CALL_ARG_1);
+    CHECK_EQUAL_RETURN(ArkTSUtils::GetNativeNode(nativeNode, node, vm), false, panda::JSValueRef::Undefined(vm));
+    auto frameNode = reinterpret_cast<FrameNode*>(nativeNode);
+    CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
+    ScrollSnapStrategy strategy;
+    if (ParseScrollSnapStrategyValue(vm, valueArg, node, frameNode, strategy)) {
+        GridModelNG::SetScrollSnapStrategy(frameNode, strategy);
+    } else {
+        // undefined / null / invalid value clears the strategy (last-set-wins default).
+        GridModelNG::ResetScrollSnapStrategy(frameNode);
+    }
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue GridBridge::ResetScrollSnapStrategy(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
+    ArkUINodeHandle nativeNode = nullptr;
+    Local<JSValueRef> node = runtimeCallInfo->GetCallArgRef(CALL_ARG_0);
+    CHECK_EQUAL_RETURN(ArkTSUtils::GetNativeNode(nativeNode, node, vm), false, panda::JSValueRef::Undefined(vm));
+    auto frameNode = reinterpret_cast<FrameNode*>(nativeNode);
+    CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
+    GridModelNG::ResetScrollSnapStrategy(frameNode);
     return panda::JSValueRef::Undefined(vm);
 }
 

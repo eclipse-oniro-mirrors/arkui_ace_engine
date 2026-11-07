@@ -106,6 +106,20 @@ public:
         return IsDefaultToast();
     }
 
+    // Safe area avoidance is handled entirely by OverlaySafeAreaHelper via DeriveInsetsFromHelper,
+    // matching the Menu path. AvoidBottom/AvoidCutout return false so the framework's
+    // ContentRootPattern::CreateSafeAreaInsets does not record separate insets that could
+    // double-stack with the helper-derived ones (Func-04-02-01-Feat-09).
+    bool AvoidBottom() const override
+    {
+        return false;
+    }
+
+    bool AvoidCutout() const override
+    {
+        return false;
+    }
+
     void UpdateFoldDisplayModeChangedCallbackId(std::optional<int32_t> id)
     {
         foldDisplayModeChangedCallbackId_ = id;
@@ -159,6 +173,16 @@ public:
     void SetOriginalTextHeight(double originalTextHeight)
     {
         originalTextHeight_ = originalTextHeight;
+    }
+
+    void SetIsUserSetMaterial(bool isUserSetMaterial)
+    {
+        isUserSetMaterial_ = isUserSetMaterial;
+    }
+
+    bool IsUserSetMaterial() const
+    {
+        return isUserSetMaterial_;
     }
 
 private:
@@ -226,6 +250,11 @@ private:
     ToastInfo toastInfo_;
     ACE_DISALLOW_COPY_AND_MOVE(ToastPattern);
     Rect wrapperRect_;
+    // Full (unshrunk) window dimensions, preserved alongside the safe-area-
+    // shrunk wrapperRect_ so that center-alignment can re-center against the
+    // full window and then clamp into the safe region.
+    float wrapperFullWidth_ = 0.0f;
+    float wrapperFullHeight_ = 0.0f;
     bool isHoverMode_ = false;
     Dimension defaultBottom_;
     bool expandDisplay_ = false;
@@ -233,6 +262,7 @@ private:
     Dimension limitPos_;
     int32_t rowKeyboardCallbackId_ = -1;
     double originalTextHeight_ = 0;
+    bool isUserSetMaterial_ = false;
 };
 } // namespace OHOS::Ace::NG
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_TOAST_TOAST_PATTERN_H

@@ -21,7 +21,7 @@
 
 namespace OHOS::Ace::Framework {
 
-class JsiStepperBridge : virtual public AceType {
+class JsiStepperBridge : public AceType {
     DECLARE_ACE_TYPE(JsiStepperBridge, AceType);
 
 public:

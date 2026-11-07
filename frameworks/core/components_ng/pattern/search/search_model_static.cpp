@@ -703,7 +703,7 @@ void SearchModelStatic::SetOnChangeEvent(FrameNode* frameNode,
         }
         auto pattern = weak.Upgrade();
         CHECK_NULL_VOID(pattern);
-        auto searchPattern = AceType::DynamicCast<SearchPattern>(pattern);
+        auto searchPattern = pattern;
         CHECK_NULL_VOID(searchPattern);
         searchPattern->UpdateChangeEvent(value);
     };

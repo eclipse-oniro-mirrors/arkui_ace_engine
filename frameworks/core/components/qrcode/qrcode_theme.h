@@ -32,7 +32,7 @@ constexpr double QRCODE_SIZE = 200.0;
 constexpr Color QRCODE_DEFAULT_COLOR = Color(0xff000000);
 } // namespace
 
-class QrcodeTheme : public virtual Theme {
+class QrcodeTheme : public Theme {
     DECLARE_ACE_TYPE(QrcodeTheme, Theme);
 
 public:

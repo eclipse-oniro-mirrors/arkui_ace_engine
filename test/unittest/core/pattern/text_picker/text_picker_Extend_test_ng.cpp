@@ -1092,7 +1092,7 @@ HWTEST_F(TextPickerExTestNg, PatternGetSelectedObject001, TestSize.Level1)
     auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
     ASSERT_NE(frameNode, nullptr);
 
-    auto textPickerPattern = AceType::DynamicCast<FrameNode>(frameNode)->GetPattern<TextPickerPattern>();
+    auto textPickerPattern = frameNode->GetPattern<TextPickerPattern>();
     ASSERT_NE(textPickerPattern, nullptr);
     TextPickerModelNG::GetInstance()->SetSelected(0);
     auto result = textPickerPattern->GetSelectedObject(false, 1);
@@ -1120,7 +1120,7 @@ HWTEST_F(TextPickerExTestNg, PatternGetSelectedObject002, TestSize.Level1)
     TextPickerModelNG::GetInstance()->SetValues(values);
     auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
     ASSERT_NE(frameNode, nullptr);
-    auto pattern = AceType::DynamicCast<FrameNode>(frameNode)->GetPattern<TextPickerPattern>();
+    auto pattern = frameNode->GetPattern<TextPickerPattern>();
     ASSERT_NE(pattern, nullptr);
 
     auto pickerNodeLayout = frameNode->GetLayoutProperty<TextPickerLayoutProperty>();

@@ -24,7 +24,7 @@
 
 namespace OHOS::Ace {
 
-class VideoControllerAsync : public virtual AceType {
+class VideoControllerAsync : public AceType {
     DECLARE_ACE_TYPE(VideoControllerAsync, AceType);
 
 public:

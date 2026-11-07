@@ -16,6 +16,7 @@
 #include "frameworks/bridge/declarative_frontend/jsview/js_lazy_foreach.h"
 
 #include <functional>
+#include <memory>
 #include <set>
 #include <string>
 #include <utility>
@@ -23,12 +24,18 @@
 #include "base/memory/ace_type.h"
 #include "base/memory/referenced.h"
 #include "base/utils/utils.h"
+#include "bridge/common/utils/engine_helper.h"
 #include "bridge/common/utils/utils.h"
 #include "bridge/declarative_frontend/ark_theme/theme_apply/js_lazy_foreach_theme.h"
 #include "bridge/declarative_frontend/engine/functions/js_callback_state.h"
+#include "bridge/declarative_frontend/engine/js_converter.h"
 #include "bridge/declarative_frontend/engine/js_object_template.h"
+#include "bridge/declarative_frontend/jsview/js_utils.h"
+#include "interfaces/inner_api/ui_session/component_tree_query_type.h"
+#include "napi/native_api.h"
 #include "bridge/declarative_frontend/jsview/js_lazy_foreach_actuator.h"
 #include "bridge/declarative_frontend/jsview/js_lazy_foreach_builder.h"
+#include "bridge/declarative_frontend/jsview/js_lazy_foreach_controller.h"
 #ifndef NG_BUILD
 #include "bridge/declarative_frontend/jsview/js_lazy_foreach_component.h"
 #endif
@@ -61,6 +68,79 @@ LazyForEachModel* LazyForEachModel::GetInstance()
 } // namespace OHOS::Ace
 
 namespace OHOS::Ace::Framework {
+namespace {
+napi_env GetNapiEnvForDataExtraction()
+{
+    auto engine = EngineHelper::GetCurrentEngine();
+    CHECK_NULL_RETURN(engine, nullptr);
+    NativeEngine* nativeEngine = engine->GetNativeEngine();
+    CHECK_NULL_RETURN(nativeEngine, nullptr);
+    return reinterpret_cast<napi_env>(nativeEngine);
+}
+
+std::string StringifyJsValue(const JSRef<JSVal>& value)
+{
+    auto env = GetNapiEnvForDataExtraction();
+    if (env == nullptr || value.IsEmpty()) {
+        return "";
+    }
+    ScopeRAII scope(env);
+    napi_value napiValue = JsConverter::ConvertJsValToNapiValue(value);
+    if (napiValue == nullptr) {
+        return "";
+    }
+    napi_value globalValue = nullptr;
+    if (napi_get_global(env, &globalValue) != napi_ok || globalValue == nullptr) {
+        return "";
+    }
+    napi_value jsonClass = nullptr;
+    if (napi_get_named_property(env, globalValue, "JSON", &jsonClass) != napi_ok || jsonClass == nullptr) {
+        return "";
+    }
+    napi_value stringifyFunc = nullptr;
+    if (napi_get_named_property(env, jsonClass, "stringify", &stringifyFunc) != napi_ok ||
+        stringifyFunc == nullptr) {
+        return "";
+    }
+    napi_value stringifyResult = nullptr;
+    if (napi_call_function(env, jsonClass, stringifyFunc, 1, &napiValue, &stringifyResult) != napi_ok) {
+        napi_get_and_clear_last_exception(env, &stringifyResult);
+        return "";
+    }
+    size_t len = 0;
+    if (napi_get_value_string_utf8(env, stringifyResult, nullptr, 0, &len) != napi_ok) {
+        return "";
+    }
+    std::unique_ptr<char[]> buffer = std::make_unique<char[]>(len + 1);
+    if (napi_get_value_string_utf8(env, stringifyResult, buffer.get(), len + 1, &len) != napi_ok) {
+        return "";
+    }
+    return buffer.get();
+}
+} // namespace
+
+std::string JSLazyForEachBuilder::GetDataByIndexAsJson(int32_t index, int32_t& errorCode)
+{
+    errorCode = static_cast<int32_t>(ComponentTreeQueryError::DATA_SOURCE_ERROR);
+    JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(executionContext_, "");
+    if (getDataFunc_.IsEmpty()) {
+        return "";
+    }
+    if (index < 0) {
+        return "";
+    }
+    auto data = CallJSFunction(getDataFunc_, dataSourceObj_, index);
+    if (data.IsEmpty() || data->IsNull() || data->IsUndefined()) {
+        return "";
+    }
+    auto dataJson = StringifyJsValue(data);
+    if (dataJson.empty()) {
+        errorCode = static_cast<int32_t>(ComponentTreeQueryError::SERIALIZATION_ERROR);
+        return "";
+    }
+    errorCode = static_cast<int32_t>(ComponentTreeQueryError::OK);
+    return dataJson;
+}
 
 void JSDataChangeListener::JSBind(BindingTarget globalObj)
 {
@@ -246,6 +326,22 @@ LazyForEachOptions ParseOptions(const JSRef<JSVal>& optionsVal)
     return options;
 }
 
+// Extracts the LazyForEachController instance from the options object
+// (LazyForEachOptions.controller, @since 26.1.0). Returns nullptr when absent or not a
+// controller instance (safe no-bind).
+RefPtr<JSLazyForEachController> ParseController(const JSRef<JSVal>& optionsVal)
+{
+    if (!optionsVal->IsObject() || optionsVal->IsUndefined()) {
+        return nullptr;
+    }
+    JSRef<JSVal> controllerVal = JSRef<JSObject>::Cast(optionsVal)->GetProperty("controller");
+    if (!controllerVal->IsObject()) {
+        return nullptr;
+    }
+    void* controllerPtr = JSRef<JSObject>::Cast(controllerVal)->Unwrap<JSLazyForEachController>();
+    return Referenced::Claim(reinterpret_cast<JSLazyForEachController*>(controllerPtr));
+}
+
 } // namespace
 
 namespace {
@@ -312,13 +408,26 @@ void JSLazyForEach::Create(const JSCallbackInfo& info)
     actuator->SetUpdateChangedNodeFlag(params.updateChangedNode);
     actuator->SetOptions(ParseOptions(params.options));
 
+    // Bind the LazyForEachController carried by options.controller when the node is created;
+    // the binding is immutable on the node side (first-bind-wins) and one-to-one on the
+    // controller side (last-bind-wins: binding the controller to another LazyForEach
+    // replaces its previous binding).
+    auto controller = ParseController(params.options);
+    auto bindController = [controller]() {
+        CHECK_NULL_VOID(controller);
+        LazyForEachModel::GetInstance()->SetController(
+            [controller](const RefPtr<NG::LazyForEachNode>& node) { controller->BindToNode(node); });
+    };
+
     if (ViewStackModel::GetInstance()->IsPrebuilding()) {
-        auto createFunc = [actuator]() {
+        auto createFunc = [actuator, bindController]() {
             LazyForEachModel::GetInstance()->Create(actuator);
+            bindController();
         };
         return ViewStackModel::GetInstance()->PushPrebuildCompCmd("[JSLazyForEach][create]", createFunc);
     }
     LazyForEachModel::GetInstance()->Create(actuator);
+    bindController();
 }
 
 void JSLazyForEach::Pop()

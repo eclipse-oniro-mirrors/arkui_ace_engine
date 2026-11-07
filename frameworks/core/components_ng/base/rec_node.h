@@ -22,7 +22,7 @@
 #include "base/memory/referenced.h"
 
 namespace OHOS::Ace::NG {
-class ACE_FORCE_EXPORT RecNode : public virtual AceType {
+class ACE_FORCE_EXPORT RecNode : public AceType {
     DECLARE_ACE_TYPE(RecNode, AceType);
 
 public:

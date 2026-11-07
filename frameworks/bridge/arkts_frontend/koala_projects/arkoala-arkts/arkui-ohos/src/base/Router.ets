@@ -241,7 +241,7 @@ class MockEntryPoint extends EntryPoint {
 }
 
 export class RouterImpl implements Router {
-    private readonly moduleName: string
+    private readonly moduleSourcePath: string
     // list of jsViewNode
     private peerNodeList = new Array<KPointer>
     // infos of pages in stack
@@ -255,8 +255,8 @@ export class RouterImpl implements Router {
     private static namedRouter: Map<string, NamedRouterInfo> = new Map<string, NamedRouterInfo>
     private runtimeLinker: RuntimeLinker | undefined = undefined;
 
-    constructor(moduleName: string) {
-        this.moduleName = moduleName
+    constructor(moduleSourcePath: string) {
+        this.moduleSourcePath = moduleSourcePath
     }
 
     public GetRuntimeLinker(): RuntimeLinker | undefined {
@@ -280,7 +280,13 @@ export class RouterImpl implements Router {
     }
 
     private getClassName(url: string): string {
-        let className: string = this.moduleName + "/src/main/ets/" + url + "/__EntryWrapper";
+        // moduleSourcePath may be a full source root path (e.g. "entry/src/ohosTest/ets") resolved
+        // from srcEntrance by native side, or a plain module name (e.g. "entry") as before.
+        let sourcePath: string = this.moduleSourcePath;
+        if (sourcePath.indexOf("/src/") === -1) {
+            sourcePath = sourcePath + "/src/main/ets";
+        }
+        let className: string = sourcePath + "/" + url + "/__EntryWrapper";
         return className.replaceAll('/', '.');
     }
 
@@ -1419,10 +1425,10 @@ export class RouterImpl implements Router {
 export function Routed(
     @memo
     initial: () => void,
-    moduleName: string,
+    moduleSourcePath: string,
     initialUrl?: string,
 ): void {
-    let routerImp = new RouterImpl(moduleName)
+    let routerImp = new RouterImpl(moduleSourcePath)
     // Init default global router.
     router.setRouter(routerImp)
 }

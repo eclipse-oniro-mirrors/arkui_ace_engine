@@ -19,7 +19,7 @@
 #include "base/memory/ace_type.h"
 
 namespace OHOS::Ace::NG {
-class THPExtraManager : public virtual AceType {
+class THPExtraManager : public AceType {
     DECLARE_ACE_TYPE(THPExtraManager, AceType);
 public:
     THPExtraManager() = default;

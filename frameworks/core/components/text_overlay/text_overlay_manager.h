@@ -166,7 +166,7 @@ private:
 };
 
 class PipelineContext;
-class TextOverlayManager : public virtual AceType {
+class TextOverlayManager : public AceType {
     DECLARE_ACE_TYPE(TextOverlayManager, AceType);
 
 public:

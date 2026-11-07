@@ -167,8 +167,10 @@ void TextFieldLayoutAlgorithm::ConstructTextStylesAppend(const RefPtr<FrameNode>
     textStyle.SetOrphanCharOptimization(textFieldLayoutProperty->GetOrphanCharOptimizationValue(false));
     textStyle.SetCompressLeadingPunctuation(textFieldLayoutProperty->GetCompressLeadingPunctuationValue(false));
     textStyle.SetPunctuationOverflow(textFieldLayoutProperty->GetPunctuationOverflowValue(false));
-    textStyle.SetIncludeFontPadding(textFieldLayoutProperty->GetIncludeFontPaddingValue(false));
-    textStyle.SetFallbackLineSpacing(textFieldLayoutProperty->GetFallbackLineSpacingValue(false));
+    textStyle.SetIncludeFontPadding(textFieldLayoutProperty->GetIncludeFontPaddingValue(
+        pipeline->GetConfigTextStyleOptimizeFlag()));
+    textStyle.SetFallbackLineSpacing(textFieldLayoutProperty->GetFallbackLineSpacingValue(
+        pipeline->GetConfigTextStyleOptimizeFlag()));
     // use for modifier.
     auto contentModifier = pattern->GetContentModifier();
     CHECK_NULL_VOID(contentModifier);
@@ -1088,7 +1090,7 @@ void TextFieldLayoutAlgorithm::FontRegisterCallback(
         frameNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
         auto pattern = frameNode->GetPattern<TextFieldPattern>();
         CHECK_NULL_VOID(pattern);
-        auto modifier = DynamicCast<TextFieldContentModifier>(pattern->GetContentModifier());
+        auto modifier = pattern->GetContentModifier();
         CHECK_NULL_VOID(modifier);
         modifier->SetFontReady(true);
     };
@@ -1107,7 +1109,7 @@ void TextFieldLayoutAlgorithm::FontRegisterCallback(
         auto pattern = frameNode->GetPattern<TextFieldPattern>();
         CHECK_NULL_VOID(pattern);
         pattern->SetIsCustomFont(true);
-        auto modifier = DynamicCast<TextFieldContentModifier>(pattern->GetContentModifier());
+        auto modifier = pattern->GetContentModifier();
         CHECK_NULL_VOID(modifier);
         modifier->SetIsCustomFont(true);
     }

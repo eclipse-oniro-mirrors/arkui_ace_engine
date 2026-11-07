@@ -15,6 +15,7 @@
 
 #include <cstdint>
 
+#include "interfaces/inner_api/ui_session/param_config.h"
 #include "test/unittest/core/pattern/test_ng.h"
 
 #include "core/components_ng/pattern/scroll/inner/scroll_bar.h"
@@ -313,5 +314,83 @@ HWTEST_F(ScrollDumpTestNg, DumpAdvanceInfo001, TestSize.Level1)
     auto json = JsonUtil::Create(true);
     scrollbar->DumpAdvanceInfo(json);
     EXPECT_EQ(json->GetString("isReverse"), "1");
+}
+
+/**
+ * @tc.name: DumpAdvanceInfoPublicProperties
+ * @tc.desc: Public property filters preserve boolean reverse values and exclude diagnostics.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollDumpTestNg, DumpAdvanceInfoPublicProperties, TestSize.Level1)
+{
+    auto scrollbar = AceType::MakeRefPtr<ScrollBar>(DisplayMode::AUTO);
+    auto panGestureOption = AceType::MakeRefPtr<PanGestureOption>();
+    scrollbar->panRecognizer_ = AceType::MakeRefPtr<PanRecognizer>(panGestureOption);
+    scrollbar->panRecognizer_->direction_.type = PanDirection::VERTICAL;
+    for (bool reverse : { false, true }) {
+        scrollbar->SetReverse(reverse);
+        const auto axis = reverse ? Axis::HORIZONTAL : Axis::VERTICAL;
+        scrollbar->SetAxis(axis);
+        for (bool visual : { false, true }) {
+            for (bool functional : { false, true }) {
+                ParamConfig config;
+                config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+                config.visualProperties = visual;
+                config.functionalProperties = functional;
+                auto json = JsonUtil::Create(true);
+                scrollbar->DumpAdvanceInfo(json, config);
+                EXPECT_EQ(json->Contains("activeRect"), visual);
+                EXPECT_EQ(json->Contains("scrollBarHeight"), visual);
+                EXPECT_FALSE(json->Contains("scrollBarMargin"));
+                EXPECT_FALSE(json->Contains("axis"));
+                EXPECT_FALSE(json->Contains("panDirection"));
+                EXPECT_FALSE(json->Contains("innerScrollBarLayoutInfos"));
+                EXPECT_EQ(json->Contains("isReverse"), functional);
+                if (functional) {
+                    EXPECT_TRUE(json->GetValue("isReverse")->IsBool());
+                    EXPECT_EQ(json->GetBool("isReverse"), reverse);
+                }
+            }
+        }
+        auto legacy = JsonUtil::Create(true);
+        scrollbar->DumpAdvanceInfo(legacy);
+        EXPECT_EQ(legacy->GetString("isReverse"), reverse ? "1" : "0");
+        EXPECT_EQ(legacy->GetString("axis"), axis == Axis::HORIZONTAL ? "HORIZONTAL" : "VERTICAL");
+        EXPECT_TRUE(legacy->Contains("panDirection"));
+        EXPECT_TRUE(legacy->Contains("scrollBarMargin"));
+        EXPECT_TRUE(legacy->Contains("innerScrollBarLayoutInfos"));
+    }
+}
+
+/**
+ * @tc.name: DumpAdvanceInfoPublicPreservesHostProperties
+ * @tc.desc: Public scrollbar output retains host height and margin without duplicate keys.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollDumpTestNg, DumpAdvanceInfoPublicPreservesHostProperties, TestSize.Level1)
+{
+    auto scrollbar = AceType::MakeRefPtr<ScrollBar>(DisplayMode::AUTO);
+    scrollbar->scrollBarMargin_ = ScrollBarMargin();
+    ParamConfig config;
+    config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+    config.visualProperties = true;
+    auto json = JsonUtil::Create(true);
+    scrollbar->DumpAdvanceInfo(json, config);
+    EXPECT_TRUE(json->Contains("scrollBarMargin"));
+
+    json = JsonUtil::Create(true);
+    json->Put("scrollBarHeight", "hostHeight");
+    json->Put("scrollBarMargin", "hostMargin");
+    scrollbar->DumpAdvanceInfo(json, config);
+    EXPECT_EQ(json->GetString("scrollBarHeight"), "hostHeight");
+    EXPECT_EQ(json->GetString("scrollBarMargin"), "hostMargin");
+    int heightCount = 0;
+    int marginCount = 0;
+    for (auto item = json->GetChild(); item && item->IsValid(); item = item->GetNext()) {
+        heightCount += item->GetKey() == "scrollBarHeight";
+        marginCount += item->GetKey() == "scrollBarMargin";
+    }
+    EXPECT_EQ(heightCount, 1);
+    EXPECT_EQ(marginCount, 1);
 }
 } // namespace OHOS::Ace::NG

@@ -58,7 +58,9 @@ RefPtr<FrameNode> UIExtensionModelNG::Create(
     auto pattern = frameNode->GetPattern<UIExtensionPattern>();
     CHECK_NULL_RETURN(pattern, frameNode);
     pattern->SetModalRequestFocus(config.isModalRequestFocus);
-    pattern->SetDensityDpi(config.isDensityFollowHost);
+    pattern->SetDpiFollowStrategy(config.isDensityFollowHost ? DpiFollowStrategy::FOLLOW_HOST_DPI
+                                                              : DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI,
+        config.isDensityFollowHost);
     pattern->SetIsWindowModeFollowHost(config.isWindowModeFollowHost);
     pattern->SetIsModalFixFocus(config.isModalFixFocus);
     pattern->UpdateWant(want);
@@ -69,13 +71,14 @@ RefPtr<FrameNode> UIExtensionModelNG::Create(
     pattern->SetOnReceiveCallback(std::move(callbacks.onReceive));
     pattern->SetModalOnRemoteReadyCallback(std::move(callbacks.onRemoteReady));
     pattern->SetModalOnDestroy(std::move(callbacks.onDestroy));
+    pattern->SetOnDrawReadyCallback(std::move(callbacks.onDrawReady));
     pattern->SetOnAbilityErrorCodeCallback(std::move(callbacks.onAbilityErrorCode));
     return frameNode;
 }
 
 void UIExtensionModelNG::Create(const RefPtr<OHOS::Ace::WantWrap>& wantWrap,
-    const std::map<PlaceholderType, RefPtr<NG::FrameNode>>& placeholderMap,
-    bool transferringCaller, bool densityDpi, bool isWindowModeFollowHost)
+    const std::map<PlaceholderType, RefPtr<NG::FrameNode>>& placeholderMap, bool transferringCaller,
+    DpiFollowStrategy dpiFollowStrategy, bool isDpiFollowStrategySet, bool isWindowModeFollowHost)
 {
     auto* stack = ViewStackProcessor::GetInstance();
     auto nodeId = stack->ClaimNodeId();
@@ -86,8 +89,9 @@ void UIExtensionModelNG::Create(const RefPtr<OHOS::Ace::WantWrap>& wantWrap,
     CHECK_NULL_VOID(pattern);
     pattern->SetNeedCheckWindowSceneId(true);
     pattern->SetPlaceholderMap(placeholderMap);
-    pattern->SetDensityDpi(densityDpi);
+    pattern->SetDpiFollowStrategy(dpiFollowStrategy, isDpiFollowStrategySet);
     pattern->SetIsWindowModeFollowHost(isWindowModeFollowHost);
+    stack->ApplyParentThemeScopeId(frameNode);
     pattern->UpdateWant(wantWrap);
     stack->Push(frameNode);
     pattern->AddWindowStateChangedCallback();
@@ -107,9 +111,10 @@ void UIExtensionModelNG::Create(const EmbeddedUIExtensionConfig& config)
     pattern->SetNeedCheckWindowSceneId(true);
     pattern->SetWantWrap(config.wantWrap);
     pattern->SetPlaceholderMap(config.placeholderMap);
-    pattern->SetDensityDpi(config.densityDpi);
+    pattern->SetDpiFollowStrategy(config.dpiFollowStrategy, config.isDpiFollowStrategySet);
     pattern->SetIsWindowModeFollowHost(config.isWindowModeFollowHost);
     if (frameNode->GetNodeStatus() == NodeStatus::NORMAL_NODE) {
+        stack->ApplyParentThemeScopeId(frameNode);
         pattern->UpdateWant(config.wantWrap);
     }
     stack->Push(frameNode);
@@ -177,8 +182,9 @@ void UIExtensionModelNG::CreateSecurityUIExtension(const UIExtensionConfig& conf
     CHECK_NULL_VOID(pattern);
     pattern->Initialize(config);
     pattern->SetPlaceholderNode(config.placeholderNode);
+    stack->ApplyParentThemeScopeId(frameNode);
     pattern->UpdateWant(config.wantWrap);
-    pattern->SetDensityDpi(config.densityDpi);
+    pattern->SetDpiFollowStrategy(config.dpiFollowStrategy, config.isDpiFollowStrategySet);
     stack->Push(frameNode);
     auto pipeline = PipelineContext::GetCurrentContext();
     CHECK_NULL_VOID(pipeline);

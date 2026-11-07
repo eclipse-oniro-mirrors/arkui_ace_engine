@@ -30,6 +30,8 @@ namespace OHOS::Ace::NG {
 class MockRenderContext : public RenderContext {
     DECLARE_ACE_TYPE(MockRenderContext, RenderContext);
 public:
+    MOCK_CONST_METHOD0(HasRenderContent, bool());
+
     MockRenderContext() = default;
     ~MockRenderContext() override = default;
 
@@ -51,6 +53,7 @@ public:
     MOCK_METHOD1(RemoveOverlayModifier, void(const RefPtr<OverlayModifier>&));
     MOCK_METHOD0(UpdateCustomBackground, void());
     MOCK_METHOD1(SetSurfaceBufferOpaque, void(bool));
+    MOCK_METHOD1(RemoveChild, void(const RefPtr<RenderContext>&));
 
     const RefPtr<NG::ChainedTransitionEffect> GetChainedTransitionEffect()
     {

@@ -14,6 +14,11 @@
  */
 
 #include "common_module.h"
+#include "modal_ui_extension/modal_ui_extension_module.h"
+
+#include <array>
+
+#include "core/components_ng/property/safe_area_inset_property.h"
 
 #if !defined(PREVIEW)
 #define OHOS_AAFWK_HILOG_TAG_WRAPPER_H
@@ -88,6 +93,33 @@ void CommonModuleCallbackAni::Call(ani_env* env, ani_size argc, ani_ref* argv, a
     env->FunctionalObject_Call(static_cast<ani_fn_object>(func_), argc, argv, result);
 }
 
+void SetSafeAreaInset(ani_env* env, [[maybe_unused]] ani_object obj, ani_long ptr, ani_array edges)
+{
+    CHECK_NULL_VOID(env);
+    const auto* modifier = GetNodeAniModifier();
+    CHECK_NULL_VOID(modifier);
+    auto common = modifier->getCommonAniModifier();
+    CHECK_NULL_VOID(common);
+    std::array<ArkUIAniSafeAreaInsetEdge, NG::SAFE_AREA_INSET_EDGE_COUNT> snapshot;
+    ani_size count = 0;
+    ANI_CALL(env, Array_GetLength(edges, &count), return);
+    if (count != snapshot.size()) {
+        return;
+    }
+    for (ani_size i = 0; i < count; ++i) {
+        ani_ref item;
+        ANI_CALL(env, Array_Get(edges, i, &item), return);
+        auto edge = static_cast<ani_object>(item);
+        ani_long contentPtr = 0;
+        ANI_CALL(env, Object_GetPropertyByName_Long(edge, "content", &contentPtr), return);
+        snapshot[i].content = reinterpret_cast<ArkUINodeHandle>(contentPtr);
+        ANI_CALL(env, Object_GetPropertyByName_Double(edge, "spacing", &snapshot[i].spacing), return);
+        ANI_CALL(env, Object_GetPropertyByName_Int(edge, "unit", &snapshot[i].unit), return);
+        ANI_CALL(env, Object_GetPropertyByName_Int(edge, "alignment", &snapshot[i].alignment), return);
+    }
+    common->setSafeAreaInset(reinterpret_cast<ArkUINodeHandle>(ptr), snapshot.data(), snapshot.size());
+}
+
 ani_boolean IsEasySplit([[maybe_unused]] ani_env* env, ani_object obj, ani_int instanceId)
 {
     const auto* modifier = GetNodeAniModifier();
@@ -95,6 +127,15 @@ ani_boolean IsEasySplit([[maybe_unused]] ani_env* env, ani_object obj, ani_int i
         return ANI_FALSE;
     }
     return modifier->getCommonAniModifier()->isEasySplit(instanceId);
+}
+
+ani_boolean IsTransPageEnabled([[maybe_unused]] ani_env* env, ani_object obj, ani_int instanceId)
+{
+    const auto* modifier = GetNodeAniModifier();
+    if (!modifier || !modifier->getCommonAniModifier() || !env) {
+        return ANI_TRUE;
+    }
+    return modifier->getCommonAniModifier()->isTransPageEnabled(instanceId);
 }
 
 ani_object GetHostContext([[maybe_unused]] ani_env* env, ani_object obj, ani_int key)
@@ -1393,6 +1434,15 @@ ani_int getWindowHeightBreakpoint(ani_env* env, ani_object obj)
     return modifier->getCommonAniModifier()->getWindowHeightBreakpoint();
 }
 
+ani_boolean isWindowInfoInitialized(ani_env* env, ani_object obj, ani_int instanceId)
+{
+    const auto* modifier = GetNodeAniModifier();
+    if (!modifier || !modifier->getCommonAniModifier() || !env) {
+        return false;
+    }
+    return modifier->getCommonAniModifier()->isWindowInfoInitialized(instanceId);
+}
+
 void* TransferKeyEventPointer(ani_env* env, ani_object obj, ani_long pointer)
 {
     const auto* modifier = GetNodeAniModifier();
@@ -1954,6 +2004,99 @@ ani_long GetPageRootNode(ani_env* env, [[maybe_unused]] ani_object obj)
     const auto* modifier = GetNodeAniModifier();
     CHECK_NULL_RETURN(modifier, 0);
     return modifier->getCommonAniModifier()->getPageRootNode();
+}
+
+namespace {
+class ApplicationShortcutCallbackRef final {
+public:
+    ApplicationShortcutCallbackRef(ani_vm* vm, ani_ref callback) : vm_(vm), callback_(callback) {}
+    ApplicationShortcutCallbackRef(const ApplicationShortcutCallbackRef&) = delete;
+    ApplicationShortcutCallbackRef& operator=(const ApplicationShortcutCallbackRef&) = delete;
+
+    ~ApplicationShortcutCallbackRef()
+    {
+        ani_env* env = nullptr;
+        auto attachStatus = GetAniEnv(vm_, &env);
+        if (env) {
+            env->GlobalReference_Delete(callback_);
+        }
+        if (attachStatus == ANI_OK) {
+            vm_->DetachCurrentThread();
+        }
+    }
+
+    ani_ref Get() const
+    {
+        return callback_;
+    }
+
+private:
+    ani_vm* vm_;
+    ani_ref callback_;
+};
+
+void ExecuteApplicationShortcutCallback(ani_vm* vm, ani_ref callback, int32_t instanceId)
+{
+    constexpr int32_t LOCAL_SCOPE_CAPACITY = 16;
+    ani_env* env = nullptr;
+    auto attachStatus = GetAniEnv(vm, &env);
+    if (env && env->CreateLocalScope(LOCAL_SCOPE_CAPACITY) == ANI_OK) {
+        ani_ref arg = AniUtils::CreateInt32(env, instanceId);
+        if (arg) {
+            ani_ref result = nullptr;
+            auto status = env->FunctionalObject_Call(static_cast<ani_fn_object>(callback), 1, &arg, &result);
+            if (status != ANI_OK) {
+                HILOGW("Application shortcut callback failed, status: %{public}d", status);
+            }
+        }
+        ani_boolean pending = ANI_FALSE;
+        if (env->ExistUnhandledError(&pending) == ANI_OK && pending) {
+            env->DescribeError();
+            env->ResetError();
+        }
+        env->DestroyLocalScope();
+    } else {
+        HILOGW("Application shortcut callback failed to obtain ANI env or create local scope");
+    }
+    if (attachStatus == ANI_OK) {
+        vm->DetachCurrentThread();
+    }
+}
+} // namespace
+
+ani_int RegisterApplicationShortcut(ani_env* env, [[maybe_unused]] ani_object obj, ani_string value,
+    ani_int modifiers, ani_fn_object callback)
+{
+    CHECK_NULL_RETURN(env, 0);
+    CHECK_NULL_RETURN(callback, 0);
+    const auto* modifier = GetNodeAniModifier();
+    CHECK_NULL_RETURN(modifier, 0);
+    auto common = modifier->getCommonAniModifier();
+    CHECK_NULL_RETURN(common && common->registerApplicationShortcut, 0);
+    ani_vm* vm = nullptr;
+    if (env->GetVM(&vm) != ANI_OK || !vm) {
+        return 0;
+    }
+    ani_ref ref = nullptr;
+    if (env->GlobalReference_Create(callback, &ref) != ANI_OK) {
+        return 0;
+    }
+    auto callbackRef = std::make_shared<ApplicationShortcutCallbackRef>(vm, ref);
+    auto shortcut = AniUtils::ANIStringToStdString(env, value);
+    return common->registerApplicationShortcut(shortcut, static_cast<uint8_t>(modifiers),
+        [vm, callbackRef](int32_t instanceId) {
+            ExecuteApplicationShortcutCallback(vm, callbackRef->Get(), instanceId);
+        });
+}
+
+void UnregisterApplicationShortcut([[maybe_unused]] ani_env* env, [[maybe_unused]] ani_object obj,
+    ani_int registrationId)
+{
+    const auto* modifier = GetNodeAniModifier();
+    CHECK_NULL_VOID(modifier);
+    auto common = modifier->getCommonAniModifier();
+    CHECK_NULL_VOID(common && common->unregisterApplicationShortcut);
+    common->unregisterApplicationShortcut(registrationId);
 }
 
 ani_int GetCallingScopeUIContext(ani_env* env, [[maybe_unused]] ani_object obj)

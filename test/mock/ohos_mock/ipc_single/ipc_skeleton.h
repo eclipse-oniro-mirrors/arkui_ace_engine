@@ -26,6 +26,9 @@ public:
 
     static uint32_t GetCallingTokenID();
     static uint32_t GetCallingRealPid();
+    static uint32_t GetCallingUid();
+
+    static uint32_t mockCallingUid_;
 };
 }
 #endif

@@ -130,7 +130,7 @@ struct CalendarThemeStructure {
     Dimension boundaryColOffset;
 };
 
-class CalendarTheme : public virtual Theme {
+class CalendarTheme : public Theme {
     DECLARE_ACE_TYPE(CalendarTheme, Theme);
 
 public:

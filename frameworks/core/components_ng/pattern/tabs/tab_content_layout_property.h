@@ -60,7 +60,9 @@ public:
         auto jsonValue = JsonUtil::Create(true);
         jsonValue->Put("icon", propIcon_.value_or("").c_str());
         jsonValue->Put("text", propText_.value_or("").c_str());
+        BadgeToJsonValue(jsonValue, filter);
         json->PutExtAttr("tabBar", jsonValue->ToString().c_str(), filter);
+        SidebarSectionToJsonValue(json, filter);
     }
 
     void FromJson(const std::unique_ptr<JsonValue>& json) override
@@ -77,6 +79,10 @@ public:
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(LabelSelectedColorSetByUser, bool, PROPERTY_UPDATE_LAYOUT);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(IconUnselectedColorSetByUser, bool, PROPERTY_UPDATE_LAYOUT);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(IconSelectedColorSetByUser, bool, PROPERTY_UPDATE_LAYOUT);
+
+private:
+    void BadgeToJsonValue(std::unique_ptr<JsonValue>& jsonValue, const InspectorFilter& filter) const;
+    void SidebarSectionToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const;
 };
 
 } // namespace OHOS::Ace::NG

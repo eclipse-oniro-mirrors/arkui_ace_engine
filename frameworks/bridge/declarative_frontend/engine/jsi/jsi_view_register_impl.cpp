@@ -71,6 +71,7 @@
 #include "bridge/declarative_frontend/jsview/js_immersive_strategy.h"
 #include "bridge/declarative_frontend/jsview/js_layout_manager.h"
 #include "bridge/declarative_frontend/jsview/js_lazy_foreach.h"
+#include "bridge/declarative_frontend/jsview/js_lazy_foreach_controller.h"
 #include "bridge/declarative_frontend/jsview/js_linear_gradient.h"
 #include "bridge/declarative_frontend/jsview/js_linear_indicator.h"
 #include "bridge/declarative_frontend/jsview/js_linear_indicator_controller.h"
@@ -101,6 +102,7 @@
 #include "bridge/declarative_frontend/jsview/js_repeat.h"
 #include "bridge/declarative_frontend/jsview/js_repeat_virtual_scroll.h"
 #include "bridge/declarative_frontend/jsview/js_repeat_virtual_scroll_2.h"
+#include "bridge/declarative_frontend/jsview/js_repeat_controller.h"
 #include "bridge/declarative_frontend/jsview/js_richeditor.h"
 #include "bridge/declarative_frontend/jsview/js_row.h"
 #include "bridge/declarative_frontend/jsview/js_save_button.h"
@@ -127,7 +129,6 @@
 #include "bridge/declarative_frontend/jsview/js_water_flow_sections_binding.h"
 #include "bridge/declarative_frontend/jsview/menu/js_context_menu.h"
 #include "bridge/declarative_frontend/jsview/scroll_bar/js_scroll_bar.h"
-#include "bridge/declarative_frontend/sharedata/js_share_data.h"
 #include "bridge/declarative_frontend/style_string/js_span_string.h"
 #include "bridge/declarative_frontend/style_string/js_text_layout.h"
 #include "core/components_ng/pattern/custom/custom_title_node.h"
@@ -701,6 +702,8 @@ void RegisterAllModule(BindingTarget globalObj, void* nativeEngine, bool isCusto
     JSIndicatorControllerBinding::JSBind(globalObj);
     JSTabsControllerBinding::JSBind(globalObj);
     JSScrollerBinding::JSBind(globalObj);
+    JSLazyForEachController::JSBind(globalObj);
+    JSRepeatController::JSBind(globalObj);
     JSListScroller::JSBind(globalObj);
     JSCalendarController::JSBind(globalObj);
     JSRenderingContext::JSBind(globalObj);
@@ -753,6 +756,8 @@ void RegisterAllFormModule(BindingTarget globalObj, void* nativeEngine)
     JSSwiperControllerBinding::JSBind(globalObj);
     JSIndicatorControllerBinding::JSBind(globalObj);
     JSScrollerBinding::JSBind(globalObj);
+    JSLazyForEachController::JSBind(globalObj);
+    JSRepeatController::JSBind(globalObj);
     JSListScroller::JSBind(globalObj);
     JSCalendarController::JSBind(globalObj);
     JSRenderingContext::JSBind(globalObj);
@@ -792,6 +797,22 @@ void RegisterFormModuleByName(BindingTarget globalObj, const std::string& module
     }
     if (module == "TextTimer") {
         JSTextTimerController::JSBind(globalObj);
+        return;
+    }
+    if (module == "__Rect__") {
+        JSRect::JSBind(globalObj);
+        return;
+    }
+    if (module == "__Path__") {
+        JSPath::JSBind(globalObj);
+        return;
+    }
+    if (module == "__Circle__") {
+        JSCircle::JSBind(globalObj);
+        return;
+    }
+    if (module == "__Ellipse__") {
+        JSEllipse::JSBind(globalObj);
         return;
     }
 #if !defined(WEARABLE_PRODUCT) && defined(PLAYER_FRAMEWORK_EXISTS) && defined(VIDEO_SUPPORTED)
@@ -917,6 +938,8 @@ void JsBindFormViews(
         JSTouchHandler::JSBind(globalObj);
         JSPersistent::JSBind(globalObj);
         JSScrollerBinding::JSBind(globalObj);
+        JSLazyForEachController::JSBind(globalObj);
+        JSRepeatController::JSBind(globalObj);
         JSListScroller::JSBind(globalObj);
 
         JSProfiler::JSBind(globalObj);
@@ -933,6 +956,10 @@ void JsBindFormViews(
         JSEllipseShape::JSBind(globalObj);
         JSPathShape::JSBind(globalObj);
         JSWithEnv::JSBind(globalObj);
+        JSRect::JSBind(globalObj);
+        JSCircle::JSBind(globalObj);
+        JSEllipse::JSBind(globalObj);
+        JSPath::JSBind(globalObj);
     }
 
     if (!formModuleList.empty()) {
@@ -982,9 +1009,10 @@ void JsBindViews(BindingTarget globalObj, void* nativeEngine, bool isCustomEnvSu
     JSPanGestureOption::JSBind(globalObj);
     JsDragFunction::JSBind(globalObj);
     JSCustomDialogController::JSBind(globalObj);
-    JSShareData::JSBind(globalObj);
     JSPersistent::JSBind(globalObj);
     JSScrollerBinding::JSBind(globalObj);
+    JSLazyForEachController::JSBind(globalObj);
+    JSRepeatController::JSBind(globalObj);
     JSListScroller::JSBind(globalObj);
     JSMagnifierController::JSBind(globalObj);
 

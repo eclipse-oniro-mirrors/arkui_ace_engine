@@ -48,6 +48,7 @@
 #include "core/components_ng/property/border_property.h"
 #include "core/components_ng/render/canvas_image.h"
 #include "core/components_ng/render/drawing.h"
+#include "core/components_ng/render/adapter/pixelmap_image.h"
 #include "core/drawable/animated_drawable_descriptor.h"
 #include "core/drawable/picture_drawable_descriptor.h"
 #include "core/gestures/drag_event.h"
@@ -62,6 +63,59 @@ constexpr int32_t NEED_MASK_INDEX = 3;
 constexpr int32_t KERNEL_MAX_LENGTH_EXCEPT_OTHER = 245;
 constexpr size_t NEED_MASK_START_OFFSET = 2;
 constexpr int32_t INVALID_ID = -1;
+constexpr char DMA_RELEASE_ASYNC_TRACE_NAME[] = "RecycledDmaPixelMapsRelease";
+using DmaPixelMapList = std::vector<std::shared_ptr<Media::PixelMap>>;
+
+void CollectDmaPixelMap(const RefPtr<CanvasImage>& canvasImage, DmaPixelMapList& pixelMaps)
+{
+    auto pixelMapImage = AceType::DynamicCast<PixelMapImage>(canvasImage);
+    CHECK_NULL_VOID(pixelMapImage);
+    auto pixelMap = pixelMapImage->GetPixelMap();
+    if (!pixelMap || pixelMap->GetAllocatorType() != AllocatorType::DMA_ALLOC) {
+        return;
+    }
+    auto mediaPixelMap = pixelMap->GetPixelMapSharedPtr();
+    CHECK_NULL_VOID(mediaPixelMap);
+    auto iter = std::find_if(pixelMaps.begin(), pixelMaps.end(), [&mediaPixelMap](const auto& item) {
+        return item.get() == mediaPixelMap.get();
+    });
+    if (iter == pixelMaps.end()) {
+        pixelMaps.emplace_back(std::move(mediaPixelMap));
+    }
+}
+
+template<typename T>
+RefPtr<CanvasImage> GetCanvasImageFromHolder(const RefPtr<T>& holder)
+{
+    return holder ? holder->GetCanvasImage() : nullptr;
+}
+
+DmaPixelMapList CollectDmaPixelMaps(std::initializer_list<RefPtr<CanvasImage>> canvasImages)
+{
+    DmaPixelMapList pixelMaps;
+    for (const auto& canvasImage : canvasImages) {
+        CollectDmaPixelMap(canvasImage, pixelMaps);
+    }
+    return pixelMaps;
+}
+
+void ReleaseDmaPixelMapsOnBackground(DmaPixelMapList&& pixelMaps)
+{
+    if (pixelMaps.empty()) {
+        return;
+    }
+    static std::atomic<int32_t> releaseIdGenerator = 0;
+    auto releaseId = releaseIdGenerator.fetch_add(1, std::memory_order_relaxed);
+    ACE_SCOPED_TRACE("PostRecycledDmaPixelMaps releaseId:%d count:%zu", releaseId, pixelMaps.size());
+    AceAsyncTraceBegin(releaseId, DMA_RELEASE_ASYNC_TRACE_NAME);
+    ImageUtils::PostToBg(
+        [releaseId, pixelMaps = std::move(pixelMaps)]() mutable {
+            ACE_SCOPED_TRACE("RunRecycledDmaPixelMaps releaseId:%d count:%zu", releaseId, pixelMaps.size());
+            pixelMaps.clear();
+            AceAsyncTraceEnd(releaseId, DMA_RELEASE_ASYNC_TRACE_NAME);
+        },
+        "ArkUIImageReleaseRecycledDmaPixelMaps", Container::CurrentId(), PriorityType::LOW);
+}
 
 std::string GetImageInterpolation(ImageInterpolation interpolation)
 {
@@ -324,7 +378,7 @@ void ImagePattern::CheckHandles(SelectHandleInfo& handleInfo)
     const auto& geometryNode = host->GetGeometryNode();
     auto contentRect = geometryNode->GetContentRect();
     RectF visibleContentRect(contentRect.GetOffset() + parentGlobalOffset_, contentRect.GetSize());
-    auto parent = host->GetAncestorNodeOfFrame(true);
+    auto parent = host->GetCoordinateAncestorNodeOfFrame(true);
     visibleContentRect = GetVisibleContentRect(parent, visibleContentRect);
     auto paintRect = handleInfo.paintRect;
     PointF bottomPoint = { paintRect.Left(), paintRect.Bottom() - BOX_EPSILON };
@@ -493,6 +547,11 @@ void ImagePattern::ReportCompleteLoadEvent(const RefPtr<FrameNode>& host)
 void ImagePattern::OnImageLoadSuccess()
 {
     CHECK_NULL_VOID(loadingCtx_);
+    if (!decodeCacheActive_) {
+        TAG_LOGD(AceLogTag::ACE_IMAGE, "OnImageLoadSuccess discarded, decode cache inactive. %{public}s",
+            imageDfxConfig_.ToStringWithoutSrc().c_str());
+        return;
+    }
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     ReportCompleteLoadEvent(host);
@@ -638,6 +697,11 @@ bool ImagePattern::CheckIfNeedLayout()
 void ImagePattern::OnImageDataReady()
 {
     CHECK_NULL_VOID(loadingCtx_);
+    if (!decodeCacheActive_) {
+        TAG_LOGD(AceLogTag::ACE_IMAGE, "OnImageDataReady discarded, decode cache inactive. %{public}s",
+            imageDfxConfig_.ToStringWithoutSrc().c_str());
+        return;
+    }
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     const auto& geometryNode = host->GetGeometryNode();
@@ -864,10 +928,21 @@ void ImagePattern::StartDecoding(const SizeF& dstSize)
                                  ? renderProp->GetContentTransition().value_or(ContentTransitionType::IDENTITY)
                                  : ContentTransitionType::IDENTITY;
 
+    bool forcePixelCap = false;
+    if (!autoResizeExplicitlySet && loadingCtx_) {
+        auto originImageSize = loadingCtx_->GetOriginImageSize();
+        if (originImageSize.IsPositive() &&
+            static_cast<double>(originImageSize.Width()) * static_cast<double>(originImageSize.Height()) >
+                IMAGE_PIXEL_COUNT_THRESHOLD) {
+            forcePixelCap = true;
+        }
+    }
+
     if (loadingCtx_) {
         loadingCtx_->SetIsHdrDecoderNeed(isHdrDecoderNeed);
         loadingCtx_->SetImageQuality(GetImageQuality());
         loadingCtx_->SetPhotoDecodeFormat(GetExternalDecodeFormat());
+        loadingCtx_->SetForcePixelCap(forcePixelCap);
         loadingCtx_->MakeCanvasImageIfNeed(
             dstSize, GetAutoResizeForCtx(autoResize, autoResizeExplicitlySet, loadingCtx_), imageFit, sourceSize,
             hasValidSlice);
@@ -876,6 +951,7 @@ void ImagePattern::StartDecoding(const SizeF& dstSize)
         altErrorCtx_->SetIsHdrDecoderNeed(isHdrDecoderNeed);
         altErrorCtx_->SetImageQuality(GetImageQuality());
         altErrorCtx_->SetPhotoDecodeFormat(GetExternalDecodeFormat());
+        altErrorCtx_->SetForcePixelCap(forcePixelCap);
         altErrorCtx_->MakeCanvasImageIfNeed(
             dstSize, GetAutoResizeForCtx(autoResize, autoResizeExplicitlySet, altErrorCtx_), imageFit, sourceSize,
             hasValidSlice);
@@ -884,6 +960,7 @@ void ImagePattern::StartDecoding(const SizeF& dstSize)
         altLoadingCtx_->SetIsHdrDecoderNeed(isHdrDecoderNeed);
         altLoadingCtx_->SetImageQuality(GetImageQuality());
         altLoadingCtx_->SetPhotoDecodeFormat(GetExternalDecodeFormat());
+        altLoadingCtx_->SetForcePixelCap(forcePixelCap);
         altLoadingCtx_->MakeCanvasImageIfNeed(
             dstSize, GetAutoResizeForCtx(autoResize, autoResizeExplicitlySet, altLoadingCtx_), imageFit, sourceSize,
             hasValidSlice);
@@ -914,7 +991,6 @@ bool ImagePattern::GetAutoResizeForCtx(
     }
     CHECK_NULL_RETURN(ctx, autoResize);
     // Memory protection for large images: force autoResize when pixel count exceeds this threshold
-    static constexpr double IMAGE_PIXEL_COUNT_THRESHOLD = 50000000.0;
     auto originImageSize = ctx->GetOriginImageSize();
     if (originImageSize.IsPositive() &&
         static_cast<double>(originImageSize.Width()) * static_cast<double>(originImageSize.Height()) >
@@ -1215,6 +1291,7 @@ void ImagePattern::LoadAltImage(const ImageSourceInfo& altImageSourceInfo)
 
 void ImagePattern::LoadImageDataIfNeed()
 {
+    CHECK_NULL_VOID(decodeCacheActive_);
     auto imageLayoutProperty = GetLayoutProperty<ImageLayoutProperty>();
     CHECK_NULL_VOID(imageLayoutProperty);
     auto host = GetHost();
@@ -1592,6 +1669,7 @@ LoadSuccessNotifyTask ImagePattern::CreateLoadSuccessCallbackForAlt()
         auto pattern = weak.Upgrade();
         CHECK_NULL_VOID(pattern);
         CHECK_NULL_VOID(pattern->altLoadingCtx_);
+        CHECK_NULL_VOID(pattern->decodeCacheActive_);
         auto layoutProps = pattern->GetLayoutProperty<ImageLayoutProperty>();
         CHECK_NULL_VOID(layoutProps);
         ImageSourceInfo currentAltSrc;
@@ -1677,6 +1755,34 @@ bool ImagePattern::DoRecycleImageData(const std::string& logSuffix, const std::s
     return true;
 }
 
+void ImagePattern::SetDecodeCacheActive(bool active)
+{
+    if (decodeCacheActive_ == active) {
+        return;
+    }
+    decodeCacheActive_ = active;
+    TAG_LOGD(AceLogTag::ACE_IMAGE, "decode cache %{public}s, %{public}s",
+        active ? "activated" : "deactivated", imageDfxConfig_.ToStringWithoutSrc().c_str());
+    if (!active) {
+        if (loadingCtx_) {
+            loadingCtx_->ResetLoading();
+        }
+        if (altLoadingCtx_) {
+            altLoadingCtx_->ResetLoading();
+        }
+        if (altErrorCtx_) {
+            altErrorCtx_->ResetLoading();
+        }
+        DoRecycleImageData("decodeWindow", "DecodeWindowDeactivate", false);
+    } else {
+        isRecycledImage_ = false;
+        if (loadingCtx_ && !image_) {
+            isImageReloadNeeded_ = true;
+        }
+        LoadImageDataIfNeed();
+    }
+}
+
 void ImagePattern::OnNotifyMemoryLevel(int32_t level)
 {
     // Intentionally left blank: no handling for memory level in current version.
@@ -1698,13 +1804,21 @@ void ImagePattern::OnRecycle()
 {
     TAG_LOGD(AceLogTag::ACE_IMAGE, "OnRecycle. %{public}s", imageDfxConfig_.ToStringWithoutSrc().c_str());
     ACE_SCOPED_TRACE("OnRecycle %s", imageDfxConfig_.ToStringWithSrc().c_str());
+    auto dmaPixelMaps = CollectDmaPixelMaps({ image_, altImage_, altErrorImage_,
+        GetCanvasImageFromHolder(loadingCtx_), GetCanvasImageFromHolder(altLoadingCtx_),
+        GetCanvasImageFromHolder(altErrorCtx_), GetCanvasImageFromHolder(imagePaintMethod_),
+        GetCanvasImageFromHolder(contentMod_) });
+
     DoRecycleImageData("OnRecycle", "OnRecycle", false);
     UnregisterWindowStateChangedCallback();
+
+    ReleaseDmaPixelMapsOnBackground(std::move(dmaPixelMaps));
 }
 
 void ImagePattern::OnReuse()
 {
     ACE_SCOPED_TRACE("OnReuse %s", imageDfxConfig_.ToStringWithSrc().c_str());
+    decodeCacheActive_ = true;
     RegisterWindowStateChangedCallback();
     auto renderProp = GetPaintProperty<ImageRenderProperty>();
     CHECK_NULL_VOID(renderProp);
@@ -1959,6 +2073,14 @@ void ImagePattern::CancelNavDestRecycleTask()
 void ImagePattern::ExecuteNavDestRecycle()
 {
     navDestRecycleCallback_.reset();
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto pipeline = host->GetContext();
+    CHECK_NULL_VOID(pipeline);
+    auto memoryManager = pipeline->GetMemoryManager();
+    if (memoryManager && memoryManager->CheckNeedSkipRecycle(host->GetId())) {
+        return;
+    }
     DoRecycleImageData("recycleImageData for Nav", "OnRecycleImageDataForNav");
 }
 
@@ -2277,6 +2399,7 @@ void ImagePattern::DumpRenderInfo()
     DumpResizable(renderProp);
     DumpHdrBrightness(renderProp);
     DumpAntiAlias(renderProp);
+    DumpInterpolation(renderProp);
 }
 
 inline void ImagePattern::DumpAntiAlias(const RefPtr<OHOS::Ace::NG::ImageRenderProperty>& renderProp)
@@ -2424,6 +2547,9 @@ void ImagePattern::DumpOtherInfo()
 {
     DumpLog::GetInstance().AddDesc("---- Image Component (Excluding Layout and Drawing) Other Info Dump ----");
     DumpLog::GetInstance().AddDesc(renderedImageInfo_.ToString());
+    if (image_) {
+        DumpLog::GetInstance().AddDesc(std::string("PixelSamplingDump: ").append(image_->PixelSamplingDump()));
+    }
     syncLoad_ ? DumpLog::GetInstance().AddDesc("syncLoad:true") : DumpLog::GetInstance().AddDesc("syncLoad:false");
     DumpLog::GetInstance().AddDesc(std::string("SystemRecycleImageEnabled:")
             .append(SystemProperties::GetRecycleImageEnabled() ? "true" : "false"));
@@ -2433,6 +2559,8 @@ void ImagePattern::DumpOtherInfo()
         std::string("UserRecycleImageEnabled:").append(GetIsRecycleInvisibleImageMemory() ? "true" : "false"));
     isRecycledImage_ ? DumpLog::GetInstance().AddDesc("isRecycled:true")
                      : DumpLog::GetInstance().AddDesc("isRecycled:false");
+    DumpLog::GetInstance().AddDesc(
+        std::string("decodeCacheActive:").append(decodeCacheActive_ ? "true" : "false"));
 
     if (loadingCtx_) {
         auto currentLoadImageState = loadingCtx_->GetCurrentLoadingState();
@@ -2471,6 +2599,60 @@ void ImagePattern::DumpInfo()
     DumpRenderInfo();
     DumpSvgInfo();
     DumpOtherInfo();
+}
+
+void ImagePattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    auto layoutProp = GetLayoutProperty<ImageLayoutProperty>();
+    CHECK_NULL_VOID(layoutProp);
+    auto src = layoutProp->GetImageSourceInfo().value_or(ImageSourceInfo(""));
+    if (!config.IsPublicTree()) {
+        json->Put("url", src.ToString().c_str());
+    } else if (config.functionalProperties) {
+        DumpAdvanceSourceInfo(json, config);
+    }
+    if (!config.IsPublicTree() || config.functionalProperties) {
+        json->Put("syncLoad", syncLoad_);
+    }
+    if (!config.IsPublicTree() && loadingCtx_) {
+        auto currentLoadImageState = loadingCtx_->GetCurrentLoadingState();
+        json->Put("currentLoadImageState", currentLoadImageState.c_str());
+    }
+}
+
+void ImagePattern::DumpAdvanceSourceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& /* config */)
+{
+    auto property = GetLayoutProperty<ImageLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    const auto& source = property->GetImageSourceInfo();
+    if (!source.has_value()) {
+        return;
+    }
+    // Only resource references are allowed; pixel maps, streams and embedded bytes are excluded.
+    switch (source->GetSrcType()) {
+        case SrcType::FILE:
+        case SrcType::ASSET:
+        case SrcType::NETWORK:
+        case SrcType::RESOURCE:
+        case SrcType::DATA_ABILITY:
+        case SrcType::DATA_ABILITY_DECODED:
+            if (!source->GetSrc().empty()) {
+                json->Put("url", source->GetSrc().c_str());
+            }
+            break;
+        case SrcType::RESOURCE_ID: {
+            auto resource = JsonUtil::Create();
+            resource->Put("id", static_cast<int32_t>(source->GetResourceId()));
+            json->PutRef("url", std::move(resource));
+            break;
+        }
+        default: {
+            auto descriptor = JsonUtil::Create();
+            descriptor->Put("sourceType", source->GetSrcTypeName());
+            json->PutRef("url", std::move(descriptor));
+            break;
+        }
+    }
 }
 
 void ImagePattern::DumpAdvanceInfo()
@@ -3039,15 +3221,7 @@ void ImagePattern::DumpRenderInfo(std::unique_ptr<JsonValue>& json)
 
 void ImagePattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    auto layoutProp = GetLayoutProperty<ImageLayoutProperty>();
-    CHECK_NULL_VOID(layoutProp);
-    auto src = layoutProp->GetImageSourceInfo().value_or(ImageSourceInfo(""));
-    json->Put("url", src.ToString().c_str());
-    json->Put("syncLoad", syncLoad_);
-    if (loadingCtx_) {
-        auto currentLoadImageState = loadingCtx_->GetCurrentLoadingState();
-        json->Put("currentLoadImageState", currentLoadImageState.c_str());
-    }
+    ImagePattern::DumpAdvanceInfo(json, ParamConfig());
 }
 
 void ImagePattern::AddPixelMapToUiManager()
@@ -3196,6 +3370,7 @@ LoadSuccessNotifyTask ImagePattern::CreateLoadSuccessCallbackForAltError()
         auto pattern = weak.Upgrade();
         CHECK_NULL_VOID(pattern);
         CHECK_NULL_VOID(pattern->altErrorCtx_);
+        CHECK_NULL_VOID(pattern->decodeCacheActive_);
         auto layoutProps = pattern->GetLayoutProperty<ImageLayoutProperty>();
         CHECK_NULL_VOID(layoutProps);
         auto currentAltSrc = layoutProps->GetAltError().value_or(ImageSourceInfo(""));

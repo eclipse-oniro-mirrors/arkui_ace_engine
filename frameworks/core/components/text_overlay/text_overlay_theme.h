@@ -37,7 +37,7 @@ constexpr Dimension OVERLAY_MENU_HORIZONTAL_GAP = 16.0_vp;
  * DialogTheme defines color and styles of PopupComponent. PopupTheme should be built
  * using DialogTheme::Builder.
  */
-class TextOverlayTheme : public virtual Theme {
+class TextOverlayTheme : public Theme {
     DECLARE_ACE_TYPE(TextOverlayTheme, Theme);
 
 public:
@@ -73,7 +73,7 @@ public:
             theme->passwordVaultSymbolId_ = themeConstants->GetSymbolByName("sys.symbol.key_horizontal");
             theme->pasteSymbolId_ = themeConstants->GetSymbolByName("sys.symbol.plus_square_dashed_on_square");
             theme->cameraInputSymbolId_ = themeConstants->GetSymbolByName("sys.symbol.auto_camera");
-            theme->aiWriteSymbolId_ = themeConstants->GetSymbolByName("sys.symbol.edit_badge_star");
+            theme->aiWriteSymbolId_ = themeConstants->GetSymbolByName("sys.symbol.AI_pencil");
             theme->searchSymbolId_ = themeConstants->GetSymbolByName("sys.symbol.magnifyingglass");
             theme->translateSymbolId_ = themeConstants->GetSymbolByName("sys.symbol.translate_c2e");
             theme->shareSymbolId_ = themeConstants->GetSymbolByName("sys.symbol.share");
@@ -363,6 +363,11 @@ public:
     const std::string& GetCameraInput() const
     {
         return cameraInput_;
+    }
+
+    const std::string& GetTranslateInput() const
+    {
+        return translateInput_;
     }
 
     const std::string& GetAIWrite() const
@@ -678,6 +683,7 @@ private:
     Dimension previewMenuPadding_;
     double alphaDisabled_ = 0.0;
     std::string cameraInput_;
+    std::string translateInput_ = "快捷翻译";
     std::string aiWrite_;
     std::string copyLabelInfo_;
     std::string pasteLabelInfo_;

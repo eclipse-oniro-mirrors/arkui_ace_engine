@@ -63,7 +63,19 @@ constexpr float PICKER_MAXFONTSCALE = 1.0f;
 constexpr uint32_t PRECISION_TWO = 2;
 constexpr float DEFAULT_SIZE_ZERO = 0.0f;
 const Dimension PICKER_BUTTON_PADDING = 6.0_vp;
+constexpr int32_t BUFFER_NODE_NUMBER = 2;
 } // namespace
+
+uint32_t TextPickerPattern::GetShowCount() const
+{
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, 0);
+    auto context = host->GetContext();
+    CHECK_NULL_RETURN(context, 0);
+    auto pickerTheme = context->GetTheme<PickerTheme>(host->GetThemeScopeId());
+    CHECK_NULL_RETURN(pickerTheme, 0);
+    return BUFFER_NODE_NUMBER + pickerTheme->GetShowOptionCount();
+}
 
 RefPtr<EventHub> TextPickerPattern::CreateEventHub()
 {
@@ -1784,7 +1796,7 @@ void TextPickerPattern::OnColorConfigurationUpdate()
             layoutRenderContext->UpdateBackgroundColor(dialogTheme->GetButtonBackgroundColor());
         }
     }
-    auto frameNode = DynamicCast<FrameNode>(host);
+    auto frameNode = host;
     CHECK_NULL_VOID(frameNode);
     FrameNode::ProcessOffscreenNode(frameNode);
     host->MarkModifyDone();
@@ -1825,7 +1837,7 @@ void TextPickerPattern::CheckAndUpdateColumnSize(SizeF& size, RefPtr<FrameNode>&
 {
     auto host = GetHost();
     CHECK_NULL_VOID(host);
-    auto pickerNode = DynamicCast<FrameNode>(host);
+    auto pickerNode = host;
     CHECK_NULL_VOID(pickerNode);
     auto stackNode = DynamicCast<FrameNode>(pickerNode->GetFirstChild());
     CHECK_NULL_VOID(stackNode);
@@ -2305,6 +2317,15 @@ void TextPickerPattern::BeforeCreateLayoutWrapper()
 
 void TextPickerPattern::OnWindowSizeChanged(int32_t width, int32_t height, WindowSizeChangeReason type)
 {
+    // MOVE and DRAG_MOVE indicate window position-only changes with no size change.
+    // Picker display (text content, padding, font) depends on window size, not position.
+    // Skipping FlushCurrentOptions and MarkDirtyNode avoids unnecessary dirty propagation
+    // to parent dialog, which would trigger AvoidScreen repositioning during free-window
+    // dragging on PC.
+    if (type == WindowSizeChangeReason::MOVE || type == WindowSizeChangeReason::DRAG_MOVE) {
+        return;
+    }
+
     auto frameNodes = GetColumnNodes();
     for (auto& it : frameNodes) {
         auto columnNode = it.second;
@@ -2314,6 +2335,15 @@ void TextPickerPattern::OnWindowSizeChanged(int32_t width, int32_t height, Windo
             columnPattern->FlushCurrentOptions(false, false, false, false);
         }
         columnNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    }
+}
+
+void TextPickerPattern::DumpInspectorTreeInfo(
+    std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context)
+{
+    Pattern::DumpInspectorTreeInfo(attrs, context);
+    if (!GetIsShowInDialog()) {
+        attrs->Put("expanded", true);
     }
 }
 

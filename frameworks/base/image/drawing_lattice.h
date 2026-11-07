@@ -18,6 +18,9 @@
 
 #include "base/memory/ace_type.h"
 
+class NativeEngine;
+typedef struct napi_value__* napi_value;
+
 namespace OHOS {
 namespace Ace {
 class ACE_FORCE_EXPORT DrawingLattice : public AceType {
@@ -28,6 +31,14 @@ public:
     static RefPtr<DrawingLattice> CreateDrawingLatticeFromNative(void* addr);
 
     virtual std::string DumpToString() = 0;
+    virtual void* GetDrawingLatticeNative()
+    {
+        return nullptr;
+    }
+    virtual napi_value GetDrawingLatticeNapiValue(NativeEngine* nativeEngine)
+    {
+        return nullptr;
+    }
 };
 
 } // namespace Ace

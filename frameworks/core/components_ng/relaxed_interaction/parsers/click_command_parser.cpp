@@ -29,30 +29,43 @@ ClickCommandParser::ClickCommandParser(WeakPtr<PipelineContext> context) : BaseC
 
 std::vector<std::unique_ptr<BaseExecutor>> ClickCommandParser::Parse(const std::unique_ptr<JsonValue>& json)
 {
-    std::vector<std::unique_ptr<BaseExecutor>> executors;
+    ExecuteMode mode = ExecuteMode::AUTO;
+    PointF coordinates(0.0f, 0.0f);
+    if (!ParseParameters(json, mode, coordinates)) {
+        return {};
+    }
+    return CreateExecutor(mode, coordinates);
+}
 
+bool ClickCommandParser::Validate(const std::unique_ptr<JsonValue>& json)
+{
+    ExecuteMode mode = ExecuteMode::AUTO;
+    PointF coordinates(0.0f, 0.0f);
+    return ParseParameters(json, mode, coordinates);
+}
+
+bool ClickCommandParser::ParseParameters(
+    const std::unique_ptr<JsonValue>& json, ExecuteMode& mode, PointF& coordinates)
+{
     if (!json || !json->IsObject()) {
         TAG_LOGE(AceLogTag::ACE_UIEVENT, "Invalid json object");
-        return executors;
+        return false;
     }
 
-    ExecuteMode mode = ExecuteMode::AUTO;
     if (!ParseMode(json.get(), mode)) {
         TAG_LOGE(AceLogTag::ACE_UIEVENT, "Invalid mode, must be one of: auto, simulating, target");
-        return executors;
+        return false;
     }
-
-    PointF coordinates(0.0f, 0.0f);
 
     // action_info.coordinates is required for all modes
     if (!ParseCoordinates(json.get(), coordinates)) {
         TAG_LOGE(AceLogTag::ACE_UIEVENT, "Failed to parse required action_info.coordinates");
-        return executors;
+        return false;
     }
 
     TAG_LOGD(AceLogTag::ACE_UIEVENT, "Parsed click command: mode=%{public}d", mode);
 
-    return CreateExecutor(mode, coordinates);
+    return true;
 }
 
 bool ClickCommandParser::ParseMode(const JsonValue* cmdJson, ExecuteMode& mode)

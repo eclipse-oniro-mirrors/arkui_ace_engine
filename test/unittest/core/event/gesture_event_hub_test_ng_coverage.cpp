@@ -15,6 +15,7 @@
 
 #include "test/unittest/core/event/gesture_event_hub_test_ng.h"
 #include "core/common/event_manager.h"
+#include "core/components_ng/gestures/recognizers/parallel_recognizer.h"
 #include "core/components_ng/manager/gesture/active_recognizer_manager.h"
 
 #include "test/mock/frameworks/core/common/mock_container.h"
@@ -28,6 +29,11 @@ using namespace testing;
 using namespace testing::ext;
 
 namespace OHOS::Ace::NG {
+
+void CollectLeafTargetsForIntercept(const TouchTestResult& targets,
+    std::vector<RefPtr<NGGestureRecognizer>>& gestureRecognizers,
+    std::vector<RefPtr<TouchEventTarget>>& touchRecognizers);
+
 void GestureEventHubTestCoverageNg::SetUpTestSuite()
 {
     MockContainer::SetUp();
@@ -209,7 +215,7 @@ HWTEST_F(GestureEventHubTestCoverageNg, GestureEventHubTestCoverage004, TestSize
     frameNode->GetOrCreateFocusHub();
     auto mainPipeline = PipelineContext::GetMainPipelineContext();
     auto overlayManager = mainPipeline->GetOverlayManager();
-    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(AceType::DynamicCast<FrameNode>(frameNode));
+    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(frameNode);
     gestureEventHub->OnDragStart(gestureEvent, pipeline, frameNode, dragDropInfo, event);
     gestureEventHub->dragEventActuator_->itemParentNode_ = patternNode;
     auto mockPn = AceType::MakeRefPtr<FullyMockedScrollable>();
@@ -263,7 +269,7 @@ HWTEST_F(GestureEventHubTestCoverageNg, GestureEventHubTestCoverage005, TestSize
     EXPECT_CALL(*pixmap, GetWidth()).WillRepeatedly(Return(200));
     auto mainPipeline = PipelineContext::GetMainPipelineContext();
     auto overlayManager = mainPipeline->GetOverlayManager();
-    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(AceType::DynamicCast<FrameNode>(frameNode));
+    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(frameNode);
     gestureEventHub->textDraggable_ = true;
     gestureEventHub->OnDragStart(gestureEvent, pipeline, frameNode, dragDropInfo, event);
     textPattern->dragNode_ = childNode;
@@ -307,7 +313,7 @@ HWTEST_F(GestureEventHubTestCoverageNg, GestureEventHubTestCoverage006, TestSize
     EXPECT_CALL(*pixmap, GetWidth()).WillRepeatedly(Return(200));
     auto mainPipeline = PipelineContext::GetMainPipelineContext();
     auto overlayManager = mainPipeline->GetOverlayManager();
-    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(AceType::DynamicCast<FrameNode>(frameNode));
+    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(frameNode);
     gestureEventHub->textDraggable_ = true;
     gestureEventHub->OnDragStart(gestureEvent, pipeline, frameNode, dragDropInfo, event);
     EXPECT_EQ(gestureEventHub->textDraggable_, true);
@@ -382,7 +388,7 @@ HWTEST_F(GestureEventHubTestCoverageNg, GestureEventHubTestCoverage009, TestSize
     frameNode->GetOrCreateFocusHub();
     auto mainPipeline = PipelineContext::GetMainPipelineContext();
     auto overlayManager = mainPipeline->GetOverlayManager();
-    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(AceType::DynamicCast<FrameNode>(frameNode));
+    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(frameNode);
     gestureEventHub->OnDragStart(gestureEvent, pipeline, frameNode, dragDropInfo, event);
     gestureEventHub->dragEventActuator_->itemParentNode_ = patternNode;
     auto mockPn = AceType::MakeRefPtr<FullyMockedScrollable>();
@@ -539,7 +545,7 @@ HWTEST_F(GestureEventHubTestCoverageNg, GestureEventHubTestCoverage013, TestSize
     dragPreviewDropInfo.extraInfo = "drag preview extraInfo";
     auto customNode = AceType::MakeRefPtr<FrameNode>(NODE_TAG, -1, AceType::MakeRefPtr<Pattern>());
     dragPreviewDropInfo.customNode = customNode;
-    auto buildFunc = [node = customNode]() -> RefPtr<NG::UINode> { return AceType::DynamicCast<NG::UINode>(node); };
+    auto buildFunc = [node = customNode]() -> RefPtr<NG::UINode> { return node; };
     dragPreviewDropInfo.buildFunc = buildFunc;
     dragPreviewDropInfo.onlyForLifting = true;
     dragPreviewDropInfo.delayCreating = false;
@@ -603,7 +609,7 @@ HWTEST_F(GestureEventHubTestCoverageNg, GestureEventHubTestCoverage014, TestSize
     dragPreviewDropInfo.extraInfo = "drag preview extraInfo";
     auto customNode = AceType::MakeRefPtr<FrameNode>(NODE_TAG, -1, AceType::MakeRefPtr<Pattern>());
     dragPreviewDropInfo.customNode = nullptr;
-    auto buildFunc = [node = customNode]() -> RefPtr<NG::UINode> { return AceType::DynamicCast<NG::UINode>(node); };
+    auto buildFunc = [node = customNode]() -> RefPtr<NG::UINode> { return node; };
     dragPreviewDropInfo.buildFunc = buildFunc;
     dragPreviewDropInfo.onlyForLifting = false;
     dragPreviewDropInfo.delayCreating = true;
@@ -676,7 +682,7 @@ HWTEST_F(GestureEventHubTestCoverageNg, GestureEventHubTestCoverage015, TestSize
     ASSERT_NE(mainPipeline, nullptr);
     auto overlayManager = mainPipeline->GetOverlayManager();
     ASSERT_NE(overlayManager, nullptr);
-    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(AceType::DynamicCast<FrameNode>(frameNode));
+    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(frameNode);
     gestureEventHub->OnDragStart(gestureEvent, pipeline, frameNode, dragDropInfo, event);
     gestureEventHub->dragEventActuator_->itemParentNode_ = patternNode;
     auto mockPn = AceType::MakeRefPtr<FullyMockedScrollable>();
@@ -785,7 +791,7 @@ HWTEST_F(GestureEventHubTestCoverageNg, GestureEventHubOnDragStartTestCoverage00
     frameNode->GetOrCreateFocusHub();
     auto mainPipeline = PipelineContext::GetMainPipelineContext();
     auto overlayManager = mainPipeline->GetOverlayManager();
-    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(AceType::DynamicCast<FrameNode>(frameNode));
+    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(frameNode);
     gestureEventHub->OnDragStart(gestureEvent, pipeline, frameNode, dragDropInfo, event);
     EXPECT_EQ(DragDropGlobalController::GetInstance().dragStartRequestStatus_, DragStartRequestStatus::READY);
 }
@@ -828,7 +834,7 @@ HWTEST_F(GestureEventHubTestCoverageNg, GestureEventHubOnDragStartTestCoverage00
     frameNode->GetOrCreateFocusHub();
     auto mainPipeline = PipelineContext::GetMainPipelineContext();
     auto overlayManager = mainPipeline->GetOverlayManager();
-    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(AceType::DynamicCast<FrameNode>(frameNode));
+    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(frameNode);
     gestureEvent.inputEventType_ = InputEventType::MOUSE_BUTTON;
     gestureEventHub->OnDragStart(gestureEvent, pipeline, frameNode, dragDropInfo, event);
     EXPECT_EQ(DragDropGlobalController::GetInstance().dragStartRequestStatus_, DragStartRequestStatus::READY);
@@ -1027,5 +1033,306 @@ HWTEST_F(GestureEventHubTestCoverageNg, GestureEventHubRegisterBasicRecognizers0
 
     gestureEventHub->RegisterBasicRecognizers(recognizers, TOUCH_ID);
     EXPECT_EQ(activeManager->GetActiveRecognizerCount(), initialCount + 2);
+}
+
+/**
+ * @tc.name: CollectLeafTargetsForIntercept001
+ * @tc.desc: Cover empty targets list - loop body never executes.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GestureEventHubTestCoverageNg, CollectLeafTargetsForIntercept001, TestSize.Level1)
+{
+    TouchTestResult targets;
+    std::vector<RefPtr<NGGestureRecognizer>> gestureRecognizers;
+    std::vector<RefPtr<TouchEventTarget>> touchRecognizers;
+
+    CollectLeafTargetsForIntercept(targets, gestureRecognizers, touchRecognizers);
+
+    EXPECT_TRUE(gestureRecognizers.empty());
+    EXPECT_TRUE(touchRecognizers.empty());
+}
+
+/**
+ * @tc.name: CollectLeafTargetsForIntercept002
+ * @tc.desc: Cover branch where target is NGGestureRecognizer but NOT RecognizerGroup.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GestureEventHubTestCoverageNg, CollectLeafTargetsForIntercept002, TestSize.Level1)
+{
+    auto clickRecognizer = AceType::MakeRefPtr<ClickRecognizer>(1, 1);
+
+    TouchTestResult targets;
+    targets.emplace_back(clickRecognizer);
+
+    std::vector<RefPtr<NGGestureRecognizer>> gestureRecognizers;
+    std::vector<RefPtr<TouchEventTarget>> touchRecognizers;
+
+    CollectLeafTargetsForIntercept(targets, gestureRecognizers, touchRecognizers);
+
+    EXPECT_EQ(gestureRecognizers.size(), 1u);
+    EXPECT_TRUE(touchRecognizers.empty());
+    EXPECT_EQ(gestureRecognizers[0], clickRecognizer);
+}
+
+/**
+ * @tc.name: CollectLeafTargetsForIntercept003
+ * @tc.desc: Cover branch where target is a RecognizerGroup - recursive flatten.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GestureEventHubTestCoverageNg, CollectLeafTargetsForIntercept003, TestSize.Level1)
+{
+    auto child1 = AceType::MakeRefPtr<ClickRecognizer>(1, 1);
+    auto child2 = AceType::MakeRefPtr<ClickRecognizer>(2, 1);
+    std::vector<RefPtr<NGGestureRecognizer>> children = { child1, child2 };
+    auto parallelRecognizer = AceType::MakeRefPtr<ParallelRecognizer>(children);
+
+    TouchTestResult targets;
+    targets.emplace_back(parallelRecognizer);
+
+    std::vector<RefPtr<NGGestureRecognizer>> gestureRecognizers;
+    std::vector<RefPtr<TouchEventTarget>> touchRecognizers;
+
+    CollectLeafTargetsForIntercept(targets, gestureRecognizers, touchRecognizers);
+
+    EXPECT_EQ(gestureRecognizers.size(), 2u);
+    EXPECT_TRUE(touchRecognizers.empty());
+}
+
+/**
+ * @tc.name: CollectLeafTargetsForIntercept004
+ * @tc.desc: Cover branch where target is NOT an NGGestureRecognizer.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GestureEventHubTestCoverageNg, CollectLeafTargetsForIntercept004, TestSize.Level1)
+{
+    auto touchEventActuator = AceType::MakeRefPtr<TouchEventActuator>();
+
+    TouchTestResult targets;
+    targets.emplace_back(touchEventActuator);
+
+    std::vector<RefPtr<NGGestureRecognizer>> gestureRecognizers;
+    std::vector<RefPtr<TouchEventTarget>> touchRecognizers;
+
+    CollectLeafTargetsForIntercept(targets, gestureRecognizers, touchRecognizers);
+
+    EXPECT_TRUE(gestureRecognizers.empty());
+    EXPECT_EQ(touchRecognizers.size(), 1u);
+    EXPECT_EQ(touchRecognizers[0], touchEventActuator);
+}
+
+/**
+ * @tc.name: CollectLeafTargetsForIntercept005
+ * @tc.desc: Cover mixed targets - all three branches in a single iteration.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GestureEventHubTestCoverageNg, CollectLeafTargetsForIntercept005, TestSize.Level1)
+{
+    auto leafRecognizer = AceType::MakeRefPtr<ClickRecognizer>(1, 1);
+    auto groupChild = AceType::MakeRefPtr<ClickRecognizer>(2, 1);
+    std::vector<RefPtr<NGGestureRecognizer>> groupChildren = { groupChild };
+    auto parallelRecognizer = AceType::MakeRefPtr<ParallelRecognizer>(groupChildren);
+    auto touchEventActuator = AceType::MakeRefPtr<TouchEventActuator>();
+
+    TouchTestResult targets;
+    targets.emplace_back(leafRecognizer);
+    targets.emplace_back(parallelRecognizer);
+    targets.emplace_back(touchEventActuator);
+
+    std::vector<RefPtr<NGGestureRecognizer>> gestureRecognizers;
+    std::vector<RefPtr<TouchEventTarget>> touchRecognizers;
+
+    CollectLeafTargetsForIntercept(targets, gestureRecognizers, touchRecognizers);
+
+    EXPECT_EQ(gestureRecognizers.size(), 2u);
+    EXPECT_EQ(touchRecognizers.size(), 1u);
+}
+
+/**
+ * @tc.name: CollectLeafTargetsForIntercept006
+ * @tc.desc: Cover nested RecognizerGroup - group containing another group.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GestureEventHubTestCoverageNg, CollectLeafTargetsForIntercept006, TestSize.Level1)
+{
+    auto leaf = AceType::MakeRefPtr<ClickRecognizer>(1, 1);
+    std::vector<RefPtr<NGGestureRecognizer>> innerChildren = { leaf };
+    auto innerGroup = AceType::MakeRefPtr<ParallelRecognizer>(innerChildren);
+
+    std::vector<RefPtr<NGGestureRecognizer>> outerChildren = { innerGroup };
+    auto outerGroup = AceType::MakeRefPtr<ParallelRecognizer>(outerChildren);
+
+    TouchTestResult targets;
+    targets.emplace_back(outerGroup);
+
+    std::vector<RefPtr<NGGestureRecognizer>> gestureRecognizers;
+    std::vector<RefPtr<TouchEventTarget>> touchRecognizers;
+
+    CollectLeafTargetsForIntercept(targets, gestureRecognizers, touchRecognizers);
+
+    EXPECT_EQ(gestureRecognizers.size(), 1u);
+    EXPECT_TRUE(touchRecognizers.empty());
+    EXPECT_EQ(gestureRecognizers[0], leaf);
+}
+
+/**
+ * @tc.name: GetClickDistanceBranch001
+ * @tc.desc: Cover GetClickDistance with parallelCombineClick = false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GestureEventHubTestCoverageNg, GetClickDistanceBranch001, TestSize.Level1)
+{
+    auto eventHub = AceType::MakeRefPtr<EventHub>();
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(NODE_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    eventHub->AttachHost(frameNode);
+    auto gestureEventHub = AceType::MakeRefPtr<GestureEventHub>(eventHub);
+    ASSERT_NE(gestureEventHub, nullptr);
+
+    gestureEventHub->parallelCombineClick = false;
+    double threshold = 15.0;
+    gestureEventHub->SetUserOnClick([](GestureEvent& info) {}, threshold);
+
+    EXPECT_FALSE(gestureEventHub->parallelCombineClick);
+    ASSERT_NE(gestureEventHub->clickEventActuator_, nullptr);
+    auto clickRecognizer = gestureEventHub->clickEventActuator_->GetClickRecognizer();
+    ASSERT_NE(clickRecognizer, nullptr);
+    double expectedDistance = clickRecognizer->GetDistanceThreshold();
+
+    double result = gestureEventHub->GetClickDistance();
+    EXPECT_EQ(result, expectedDistance);
+}
+
+/**
+ * @tc.name: GetClickDistanceBranch002
+ * @tc.desc: Cover GetClickDistance with parallelCombineClick = true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GestureEventHubTestCoverageNg, GetClickDistanceBranch002, TestSize.Level1)
+{
+    auto eventHub = AceType::MakeRefPtr<EventHub>();
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(NODE_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    eventHub->AttachHost(frameNode);
+    auto gestureEventHub = AceType::MakeRefPtr<GestureEventHub>(eventHub);
+    ASSERT_NE(gestureEventHub, nullptr);
+
+    gestureEventHub->parallelCombineClick = true;
+    double threshold = 25.0;
+    gestureEventHub->SetUserOnClick([](GestureEvent& info) {}, threshold);
+
+    EXPECT_TRUE(gestureEventHub->parallelCombineClick);
+    ASSERT_NE(gestureEventHub->userParallelClickEventActuator_, nullptr);
+    auto clickRecognizer = gestureEventHub->userParallelClickEventActuator_->GetClickRecognizer();
+    ASSERT_NE(clickRecognizer, nullptr);
+    double expectedDistance = clickRecognizer->GetDistanceThreshold();
+
+    double result = gestureEventHub->GetClickDistance();
+    EXPECT_EQ(result, expectedDistance);
+}
+
+/**
+ * @tc.name: SetUserOnClickDoubleBranch001
+ * @tc.desc: Cover SetUserOnClick(double) with parallelCombineClick = false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GestureEventHubTestCoverageNg, SetUserOnClickDoubleBranch001, TestSize.Level1)
+{
+    auto eventHub = AceType::MakeRefPtr<EventHub>();
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(NODE_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    eventHub->AttachHost(frameNode);
+    auto gestureEventHub = AceType::MakeRefPtr<GestureEventHub>(eventHub);
+    ASSERT_NE(gestureEventHub, nullptr);
+
+    gestureEventHub->parallelCombineClick = false;
+    std::string msg;
+    auto callback = [&msg](GestureEvent& info) { msg = "clicked"; };
+    double threshold = 10.0;
+    gestureEventHub->SetUserOnClick(std::move(callback), threshold);
+
+    ASSERT_NE(gestureEventHub->clickEventActuator_, nullptr);
+    auto clickRecognizer = gestureEventHub->clickEventActuator_->GetClickRecognizer();
+    ASSERT_NE(clickRecognizer, nullptr);
+    double distance = clickRecognizer->GetDistanceThreshold();
+    EXPECT_GT(distance, 0.0);
+    auto commonClickEvent = gestureEventHub->GetCommonClickEvent();
+    EXPECT_NE(commonClickEvent, nullptr);
+}
+
+/**
+ * @tc.name: SetUserOnClickDoubleBranch002
+ * @tc.desc: Cover SetUserOnClick(double) with parallelCombineClick = true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GestureEventHubTestCoverageNg, SetUserOnClickDoubleBranch002, TestSize.Level1)
+{
+    auto eventHub = AceType::MakeRefPtr<EventHub>();
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(NODE_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    eventHub->AttachHost(frameNode);
+    auto gestureEventHub = AceType::MakeRefPtr<GestureEventHub>(eventHub);
+    ASSERT_NE(gestureEventHub, nullptr);
+
+    gestureEventHub->parallelCombineClick = true;
+    std::string msg;
+    auto callback = [&msg](GestureEvent& info) { msg = "clicked"; };
+    double threshold = 30.0;
+    gestureEventHub->SetUserOnClick(std::move(callback), threshold);
+
+    ASSERT_NE(gestureEventHub->userParallelClickEventActuator_, nullptr);
+    auto clickRecognizer = gestureEventHub->userParallelClickEventActuator_->GetClickRecognizer();
+    ASSERT_NE(clickRecognizer, nullptr);
+    double distance = clickRecognizer->GetDistanceThreshold();
+    EXPECT_GT(distance, 0.0);
+    auto commonClickEvent = gestureEventHub->GetCommonClickEvent();
+    EXPECT_NE(commonClickEvent, nullptr);
+}
+
+/**
+ * @tc.name: SetUserOnClickDimensionBranch001
+ * @tc.desc: Cover SetUserOnClick(Dimension) with parallelCombineClick = false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GestureEventHubTestCoverageNg, SetUserOnClickDimensionBranch001, TestSize.Level1)
+{
+    auto eventHub = AceType::MakeRefPtr<EventHub>();
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(NODE_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    eventHub->AttachHost(frameNode);
+    auto gestureEventHub = AceType::MakeRefPtr<GestureEventHub>(eventHub);
+    ASSERT_NE(gestureEventHub, nullptr);
+
+    gestureEventHub->parallelCombineClick = false;
+    Dimension threshold(40.0, DimensionUnit::VP);
+    gestureEventHub->SetUserOnClick([](GestureEvent& info) {}, threshold);
+
+    ASSERT_NE(gestureEventHub->clickEventActuator_, nullptr);
+    auto clickRecognizer = gestureEventHub->clickEventActuator_->GetClickRecognizer();
+    ASSERT_NE(clickRecognizer, nullptr);
+    double distance = clickRecognizer->GetDistanceThreshold();
+    EXPECT_GT(distance, 0.0);
+    auto commonClickEvent = gestureEventHub->GetCommonClickEvent();
+    EXPECT_NE(commonClickEvent, nullptr);
+}
+
+/**
+ * @tc.name: SetUserOnClickDimensionBranch002
+ * @tc.desc: Cover SetUserOnClick(Dimension) with parallelCombineClick = true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GestureEventHubTestCoverageNg, SetUserOnClickDimensionBranch002, TestSize.Level1)
+{
+    auto eventHub = AceType::MakeRefPtr<EventHub>();
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(NODE_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    eventHub->AttachHost(frameNode);
+    auto gestureEventHub = AceType::MakeRefPtr<GestureEventHub>(eventHub);
+    ASSERT_NE(gestureEventHub, nullptr);
+
+    gestureEventHub->parallelCombineClick = true;
+    Dimension threshold(50.0, DimensionUnit::VP);
+    gestureEventHub->SetUserOnClick([](GestureEvent& info) {}, threshold);
+
+    ASSERT_NE(gestureEventHub->userParallelClickEventActuator_, nullptr);
+    auto clickRecognizer = gestureEventHub->userParallelClickEventActuator_->GetClickRecognizer();
+    ASSERT_NE(clickRecognizer, nullptr);
+    double distance = clickRecognizer->GetDistanceThreshold();
+    EXPECT_GT(distance, 0.0);
+    auto commonClickEvent = gestureEventHub->GetCommonClickEvent();
+    EXPECT_NE(commonClickEvent, nullptr);
 }
 } // namespace OHOS::Ace::NG

@@ -20,8 +20,6 @@
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
 #include "core/components_v2/inspector/inspector_constants.h"
 
-#include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
-
 namespace OHOS::Ace::NG {
 
 static bool IsLazyLayoutScrollableContainer(const std::string& tag)
@@ -42,8 +40,8 @@ AdjustOffset LazyLayoutUtils::ConsumeNestedLazyAdjustOffset(const RefPtr<UINode>
             if (!frame->GetLayoutProperty()->GetNeedLazyLayout()) {
                 return {};
             }
-            if (auto waterFlow = frame->GetPattern<WaterFlowPattern>()) {
-                return waterFlow->ConsumeParentAdjustOffset();
+            if (auto scrollable = frame->GetPattern<ScrollablePattern>()) {
+                return scrollable->ConsumeParentAdjustOffset();
             }
             if (lazy) {
                 return allowNestedLazy ? lazy->GetAndResetAdjustOffset() : AdjustOffset {};

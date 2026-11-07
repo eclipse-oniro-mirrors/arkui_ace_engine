@@ -35,8 +35,8 @@ public:
     RefPtr<PaintProperty> Clone() const override
     {
         auto value = MakeRefPtr<SliderPaintProperty>();
-        value->PaintProperty::UpdatePaintProperty(DynamicCast<PaintProperty>(this));
-        value->PaintProperty::UpdatePaintPropertyHost(DynamicCast<PaintProperty>(this));
+        value->PaintProperty::UpdatePaintProperty(this);
+        value->PaintProperty::UpdatePaintPropertyHost(this);
         value->propSliderPaintStyle_ = CloneSliderPaintStyle();
         value->propSliderTipStyle_ = CloneSliderTipStyle();
         return value;

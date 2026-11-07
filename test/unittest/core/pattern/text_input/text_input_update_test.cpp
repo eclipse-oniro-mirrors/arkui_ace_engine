@@ -46,7 +46,7 @@ HWTEST_F(TextInputUpdateTestNg, HandleLongPress001, TestSize.Level1)
      * @tc.steps: step2. Set secondhandle. Call function HandleLongPress.
      * @tc.expected: Check if return true.
      */
-    pattern_->obscureTickCountDown_ = 1;
+    pattern_->obscureHelper_.tickCountDown_ = 1;
     pattern_->longPressEvent_->operator()(gestureEvent);
     EXPECT_TRUE(pattern_->showSelect_);
 }

@@ -19,7 +19,9 @@
 // Add the following two macro definitions to test the private and protected method.
 #define private public
 #define protected public
+#include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 #include "core/animation/animator.h"
+#include "core/animation/evaluator.h"
 #include "base/geometry/animatable_dimension.h"
 
 using namespace testing;
@@ -273,5 +275,88 @@ HWTEST_F(AnimatableDimensionTest, AnimatableDimensionTest007, TestSize.Level1)
     EXPECT_NE(animatableDimensionObj1.animationController_, nullptr);
     auto status2 = animatableDimensionObj1.GetAnimationStatus();
     EXPECT_EQ(status2, AnimatorStatus::IDLE);
+}
+
+/**
+ * @tc.name: AnimatableDimensionTest008
+ * @tc.desc: Test AnimateTo with evaluator, stopCallback and finish event branches.
+ * @tc.type: FUNC
+ */
+HWTEST_F(AnimatableDimensionTest, AnimatableDimensionTest008, TestSize.Level1)
+{
+    AnimatableDimension animatableDimensionObj1;
+    animatableDimensionObj1.SetContextAndCallbackAfterFirstAssign(nullptr, []() {});
+    animatableDimensionObj1.SetEvaluator(AceType::MakeRefPtr<LinearEvaluator<double>>());
+    animatableDimensionObj1.SetAnimationStopCallback([]() {});
+    AnimationOption finishOption;
+    finishOption.SetDuration(100);
+    finishOption.SetOnFinishEvent([]() {});
+    animatableDimensionObj1.SetAnimationOption(finishOption);
+
+    // different value: run through AnimateTo fully, evaluator_ true + stopCallback_ true
+    animatableDimensionObj1.AnimateTo(DEFAULT_DOUBLE1);
+    EXPECT_NE(animatableDimensionObj1.animationController_, nullptr);
+
+    // same value with evaluator_: NearEqual true but !evaluator_ false, also stops running controller
+    animatableDimensionObj1.MoveTo(DEFAULT_DOUBLE2);
+    animatableDimensionObj1.AnimateTo(DEFAULT_DOUBLE2);
+    EXPECT_NE(animatableDimensionObj1.animationController_, nullptr);
+
+    animatableDimensionObj1.SetEvaluator(nullptr);
+    // same value without evaluator_: early return
+    animatableDimensionObj1.AnimateTo(DEFAULT_DOUBLE2);
+    animatableDimensionObj1.animationController_ = nullptr;
+    animatableDimensionObj1.AnimateTo(DEFAULT_DOUBLE2);
+    EXPECT_EQ(animatableDimensionObj1.animationController_, nullptr);
+}
+
+/**
+ * @tc.name: AnimatableDimensionTest009
+ * @tc.desc: Test operator= with valid pipeline context, explicit animation and CALC unit.
+ * @tc.type: FUNC
+ */
+HWTEST_F(AnimatableDimensionTest, AnimatableDimensionTest009, TestSize.Level1)
+{
+    NG::MockPipelineContext::SetUp();
+    auto pipelineContext = NG::MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipelineContext, nullptr);
+
+    AnimationOption explicitOption;
+    explicitOption.SetDuration(200);
+    pipelineContext->SaveExplicitAnimationOption(explicitOption);
+
+    AnimatableDimension srcDimension(DEFAULT_DOUBLE1, DimensionUnit::VP, AnimationOption());
+    AnimatableDimension dstDimension;
+    dstDimension.SetContextAndCallback(AceType::WeakClaim(AceType::RawPtr(pipelineContext)), []() {});
+    // explicit animation valid branch
+    dstDimension = srcDimension;
+    EXPECT_FALSE(dstDimension.isFirstAssign_);
+
+    pipelineContext->ClearExplicitAnimationOption();
+    // animationOption_ valid branch
+    AnimationOption srcOption;
+    srcOption.SetDuration(100);
+    AnimatableDimension srcWithOption(DEFAULT_DOUBLE2, DimensionUnit::VP, srcOption);
+    AnimatableDimension dstDimension2;
+    dstDimension2.SetContextAndCallback(AceType::WeakClaim(AceType::RawPtr(pipelineContext)), []() {});
+    dstDimension2.isFirstAssign_ = false;
+    dstDimension2 = srcWithOption;
+
+    // animationOption_ invalid branch with CALC unit
+    AnimatableDimension calcDimension(std::string("10"), DimensionUnit::CALC, AnimationOption());
+    AnimatableDimension dstDimension3;
+    dstDimension3.SetContextAndCallback(AceType::WeakClaim(AceType::RawPtr(pipelineContext)), []() {});
+    dstDimension3.animationController_ = CREATE_ANIMATOR(nullptr);
+    dstDimension3 = calcDimension;
+    EXPECT_EQ(dstDimension3.animationController_, nullptr);
+    EXPECT_EQ(dstDimension3.Unit(), DimensionUnit::CALC);
+
+    // animationOption_ invalid branch with VP unit
+    AnimatableDimension dstDimension4;
+    dstDimension4.SetContextAndCallback(AceType::WeakClaim(AceType::RawPtr(pipelineContext)), []() {});
+    dstDimension4 = srcDimension;
+    EXPECT_DOUBLE_EQ(dstDimension4.Value(), DEFAULT_DOUBLE1);
+
+    NG::MockPipelineContext::TearDown();
 }
 } // namespace OHOS::Ace

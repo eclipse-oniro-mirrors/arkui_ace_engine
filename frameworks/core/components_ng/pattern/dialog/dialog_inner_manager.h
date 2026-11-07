@@ -47,7 +47,7 @@ using DialogGestureEvent = std::function<void(const GestureEvent& info)>;
 using DialogCancelEvent = std::function<void()>;
 using DialogTextEvent = std::function<void(const std::string&)>;
 
-class ACE_EXPORT DialogInnerManager : public virtual AceType {
+class ACE_EXPORT DialogInnerManager : public AceType {
     DECLARE_ACE_TYPE(DialogInnerManager, AceType);
 
 public:
@@ -145,7 +145,8 @@ private:
         bool showComponentContent);
     void DeleteDialogHotAreas(const RefPtr<FrameNode>& dialogNode);
     void OnDialogCloseEvent(const RefPtr<OverlayManager>& overlayManager, const RefPtr<FrameNode>& node);
-    void PostDialogFinishEvent(const RefPtr<OverlayManager>& overlayManager, const WeakPtr<FrameNode>& nodeWk);
+    void PostDialogFinishEvent(
+        const RefPtr<OverlayManager>& overlayManager, const WeakPtr<FrameNode>& nodeWk, bool reportCapiHide);
     void UpdateChildInvisible(
         const RefPtr<OverlayManager>& overlayManager, const RefPtr<FrameNode>& node, const RefPtr<FrameNode>& child);
     void CloseMaskAndContentMatchTransition(

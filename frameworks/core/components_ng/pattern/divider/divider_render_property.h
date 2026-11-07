@@ -34,7 +34,7 @@ public:
     RefPtr<PaintProperty> Clone() const override
     {
         auto value = MakeRefPtr<DividerRenderProperty>();
-        value->PaintProperty::UpdatePaintProperty(DynamicCast<PaintProperty>(this));
+        value->PaintProperty::UpdatePaintProperty(this);
         value->propDividerColor_ = CloneDividerColor();
         value->propLineCap_ = CloneLineCap();
         return value;

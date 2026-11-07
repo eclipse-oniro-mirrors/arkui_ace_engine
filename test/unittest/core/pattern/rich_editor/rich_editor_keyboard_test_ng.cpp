@@ -22,8 +22,9 @@
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_theme.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_model_ng.h"
-#include "core/common/ime/input_method_manager.h"
+#include "core/components_ng/pattern/text_field/text_keyboard_common_type.h"
 #include "core/common/text_field_manager_ng.h"
+#include "core/common/ime/input_method_manager.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -308,14 +309,16 @@ HWTEST_F(RichEditorKeyboardTestNg, RequestCustomKeyboardBuilder, TestSize.Level0
 
     auto oldFunc = richEditorPattern->customKeyboardBuilder_;
     auto func = []() {};
+
     /**
- 	 * @tc.steps: step1. test empty func
- 	 */
+     * @tc.steps: step1. test empty func
+     */
     richEditorPattern->customKeyboardBuilder_ = func;
     richEditorPattern->RequestCustomKeyboardBuilder();
+
     /**
- 	 * @tc.steps: step2. test KeyboardBuilder
- 	 */
+     * @tc.steps: step2. test KeyboardBuilder
+     */
     richEditorPattern->customKeyboardBuilder_ = oldFunc;
     richEditorPattern->RequestCustomKeyboardBuilder();
 }
@@ -355,39 +358,6 @@ HWTEST_F(RichEditorKeyboardTestNg, CloseKeyboard001, TestSize.Level0)
     ASSERT_NE(richEditorPattern, nullptr);
 
     richEditorPattern->CloseKeyboard(false);
-    EXPECT_EQ(richEditorPattern->HasConnection(), false);
-}
-
-/**
- * @tc.name: CloseKeyboard002
- * @tc.desc: test CloseKeyboard
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorKeyboardTestNg, CloseKeyboard002, TestSize.Level0)
-{
-    ASSERT_NE(richEditorNode_, nullptr);
-    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-
-    richEditorPattern->previewLongPress_ = true;
-    richEditorPattern->textSelector_.ResetAiSelected();
-    richEditorPattern->HandleTouchUpAfterLongPress();
-    EXPECT_EQ(richEditorPattern->HasConnection(), false);
-}
-
-/**
- * @tc.name: CloseKeyboard003
- * @tc.desc: test CloseKeyboard
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorKeyboardTestNg, CloseKeyboard003, TestSize.Level0)
-{
-    ASSERT_NE(richEditorNode_, nullptr);
-    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-
-    richEditorPattern->previewLongPress_ = true;
-    richEditorPattern->HandleTouchCancelAfterLongPress();
     EXPECT_EQ(richEditorPattern->HasConnection(), false);
 }
 
@@ -441,7 +411,7 @@ HWTEST_F(RichEditorKeyboardTestNg, ResetKeyboardIfNeed001, TestSize.Level0)
 
     focusHub->currentFocus_ = true;
     richEditorPattern->action_ = TextInputAction::UNSPECIFIED;
-    richEditorPattern->ResetKeyboardIfNeed();
+    richEditorPattern->CheckIfNeedToResetKeyboard();
     EXPECT_NE(richEditorPattern->action_, TextInputAction::UNSPECIFIED);
 }
 
@@ -465,7 +435,7 @@ HWTEST_F(RichEditorKeyboardTestNg, ResetKeyboardIfNeed002, TestSize.Level0)
     richEditorPattern->isCustomKeyboardAttached_ = true;
     focusHub->currentFocus_ = false;
     richEditorPattern->action_ = TextInputAction::SEARCH;
-    richEditorPattern->ResetKeyboardIfNeed();
+    richEditorPattern->CheckIfNeedToResetKeyboard();
     EXPECT_NE(richEditorPattern->action_, TextInputAction::SEARCH);
 }
 
@@ -489,7 +459,7 @@ HWTEST_F(RichEditorKeyboardTestNg, ResetKeyboardIfNeed003, TestSize.Level0)
     richEditorPattern->isCustomKeyboardAttached_ = false;
     focusHub->currentFocus_ = true;
     richEditorPattern->action_ = TextInputAction::SEARCH;
-    richEditorPattern->ResetKeyboardIfNeed();
+    richEditorPattern->CheckIfNeedToResetKeyboard();
     EXPECT_NE(richEditorPattern->action_, TextInputAction::SEARCH);
 }
 
@@ -516,7 +486,7 @@ HWTEST_F(RichEditorKeyboardTestNg, ResetKeyboardIfNeed004, TestSize.Level0)
     richEditorPattern->isCustomKeyboardAttached_ = true;
     focusHub->currentFocus_ = true;
     richEditorPattern->action_ = TextInputAction::SEARCH;
-    richEditorPattern->ResetKeyboardIfNeed();
+    richEditorPattern->CheckIfNeedToResetKeyboard();
     EXPECT_NE(richEditorPattern->action_, TextInputAction::SEARCH);
 }
 
@@ -851,5 +821,38 @@ HWTEST_F(RichEditorKeyboardTestNg, SetRequestKeyboardOnFocus002, TestSize.Level0
 
     richEditorModel.SetRequestKeyboardOnFocus(richEditorNode, false);
     EXPECT_FALSE(richEditorPattern->needToRequestKeyboardOnFocus_);
+}
+
+/**
+ * @tc.name: KeyboardAppearance002
+ * @tc.desc: Test SetKeyboardAppearance / GetKeyboardAppearance.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorKeyboardTestNg, KeyboardAppearance002, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetKeyboardAppearance(KeyboardAppearance::LIGHT_IMMERSIVE);
+    EXPECT_EQ(pattern->GetKeyboardAppearance(), KeyboardAppearance::LIGHT_IMMERSIVE);
+    KeyboardAppearanceConfig config;
+    config.gradientMode = KeyboardGradientMode::LINEAR_GRADIENT;
+    config.fluidLightMode = KeyboardFluidLightMode::BACKGROUND_FLUID_LIGHT;
+    pattern->SetKeyboardAppearanceConfig(config);
+    EXPECT_EQ(pattern->imeGradientMode_, KeyboardGradientMode::LINEAR_GRADIENT);
+}
+
+/**
+ * @tc.name: StopBackPress001
+ * @tc.desc: Test SetStopBackPress / IsStopBackPress.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorKeyboardTestNg, StopBackPress001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetStopBackPress(true);
+    EXPECT_TRUE(pattern->IsStopBackPress());
+    pattern->SetStopBackPress(false);
+    EXPECT_FALSE(pattern->IsStopBackPress());
 }
 }

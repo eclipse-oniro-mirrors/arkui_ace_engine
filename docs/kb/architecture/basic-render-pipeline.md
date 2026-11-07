@@ -52,7 +52,7 @@
 
 ```
 FlushVsync(nano, frameCount):
-  FlushAnimation → FlushModifierAnimation
+  DispatchDisplaySync (非恢复帧) → FlushRebuildRenderTree → FlushAnimation → FlushFrameCallback → FlushModifierAnimation
   FlushTouchEvents / FlushDragEvents
   FlushBuild → FlushDirtyNodeUpdate (dirtyPropertyNodes_ + dirtyNodes_ ×≤3)
   taskScheduler_->FlushTask (Layout+Render do-while ≤2)
@@ -60,6 +60,11 @@ FlushVsync(nano, frameCount):
   FlushMessages → SendMessages (RS 唯一提交点)
   FlushAfterRenderTask / FlushVsync / A11y
 ```
+
+`FrameMetrics::animationDuration` 以纳秒累计 UI 线程上 `DispatchDisplaySync` 和
+`FlushModifierAnimation` 两个阶段的耗时，分别计时，不包含中间的渲染树重建和帧回调。
+恢复帧（`frameCount == UINT64_MAX`）跳过 DisplaySync 派发，只累计 Modifier 动画阶段。
+NG 的 `FlushAnimation` 当前不执行动画计算；Scheduler 的动画帧回调通过 DisplaySync 派发。
 
 关键架构规则（锁定于 design.md ADR）：
 - ADR-1: FlushVsync 子阶段固定硬序列，不可动态调整

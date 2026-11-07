@@ -40,7 +40,7 @@ enum DynamicLayoutType {
 
 using DynamicLayoutAlgorithmFunc = std::function<void(LayoutWrapper* layoutWrapper)>;
 
-class AlgorithmParamBase : public virtual AceType {
+class AlgorithmParamBase : public AceType {
     DECLARE_ACE_TYPE(AlgorithmParamBase, AceType);
 public:
     DynamicLayoutType GetDynamicLayoutType() const;

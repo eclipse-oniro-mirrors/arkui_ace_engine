@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+#include <thread>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -47,6 +49,48 @@ namespace OHOS::Ace {
 namespace OHOS::Ace::NG {
 namespace {
 const int32_t NUMTWO = 2;
+
+class QueuedAccessibilityEventExecutor : public MockTaskExecutor {
+    DECLARE_ACE_TYPE(QueuedAccessibilityEventExecutor, MockTaskExecutor);
+
+public:
+    bool WillRunOnCurrentThread(TaskType type) const override
+    {
+        return type == TaskType::UI && std::this_thread::get_id() == uiThread_;
+    }
+
+    bool OnPostTask(Task&& task, TaskType type, uint32_t delayTime, const std::string& name,
+        PriorityType priorityType, VsyncBarrierOption barrierOption) const override
+    {
+        EXPECT_EQ(type, TaskType::UI);
+        std::lock_guard<std::mutex> lock(mutex_);
+        tasks_.push_back(std::move(task));
+        return true;
+    }
+
+    void RunTasks()
+    {
+        std::vector<Task> tasks;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            tasks.swap(tasks_);
+        }
+        for (auto& task : tasks) {
+            task();
+        }
+    }
+
+    size_t GetTaskCount() const
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return tasks_.size();
+    }
+
+private:
+    const std::thread::id uiThread_ = std::this_thread::get_id();
+    mutable std::mutex mutex_;
+    mutable std::vector<Task> tasks_;
+};
 
 class MockFrameNode : public FrameNode {
     DECLARE_ACE_TYPE(MockFrameNode, FrameNode);
@@ -454,13 +498,13 @@ HWTEST_F(JsAccessibilityManagerTest, JsAccessibilityManager007, TestSize.Level1)
      * @tc.steps: step4. test SubscribeStateObserver
      */
     ret = jsAccessibilityManager->SubscribeStateObserver(16);
-    EXPECT_EQ(ret, false);
+    EXPECT_EQ(ret, true);
 
     /**
      * @tc.steps: step5. test UnsubscribeStateObserver
      */
     ret = jsAccessibilityManager->UnsubscribeStateObserver(16);
-    EXPECT_EQ(ret, false);
+    EXPECT_EQ(ret, true);
 }
 
 /**
@@ -2670,6 +2714,67 @@ HWTEST_F(JsAccessibilityManagerTest, IsSendAccessibilityEventTest003, TestSize.L
 }
 
 /**
+* @tc.name: IsSendAccessibilityEventTest005
+* @tc.desc: IsSendAccessibilityEvent with PAGE_PRE_CHANGE treated as page event
+* @tc.type: FUNC
+*/
+HWTEST_F(JsAccessibilityManagerTest, IsSendAccessibilityEventTest005, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. construct jsAccessibilityManager, test node
+     */
+    auto jsAccessibilityManager = AceType::MakeRefPtr<MockJsAccessibilityManager>();
+    ASSERT_NE(jsAccessibilityManager, nullptr);
+    auto frameNode = FrameNode::CreateFrameNode("framenode", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>(), false);
+    auto context = NG::PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto root = context->GetRootElement();
+    ASSERT_NE(root, nullptr);
+
+    jsAccessibilityManager->SetPipelineContext(context);
+    auto container = Platform::AceContainer::GetContainer(context->GetInstanceId());
+    ASSERT_NE(container, nullptr);
+
+    AccessibilityEvent accessibilityEvent {
+        .nodeId = root->GetAccessibilityId(),
+        .type = AccessibilityEventType::PAGE_PRE_CHANGE
+    };
+
+    jsAccessibilityManager->AddToPageEventController(root);
+    /**
+     * @tc.steps: step2. PAGE_PRE_CHANGE is a page event, cached when touch exploration enabled
+     */
+    AccessibilityWorkMode accessibilityWorkMode { .isTouchExplorationEnabled = true };
+    EXPECT_CALL(*jsAccessibilityManager,
+        GenerateAccessibilityWorkMode()).WillOnce(::testing::Return(accessibilityWorkMode));
+    auto result = jsAccessibilityManager->IsSendAccessibilityEvent(accessibilityEvent);
+    EXPECT_EQ(result, false);
+}
+
+/**
+* @tc.name: IsDetachFocusCacheClearEventTest001
+* @tc.desc: IsDetachFocusCacheClearEvent with PAGE_PRE_CHANGE as cache clear event
+* @tc.type: FUNC
+*/
+HWTEST_F(JsAccessibilityManagerTest, IsDetachFocusCacheClearEventTest001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. construct jsAccessibilityManager
+     */
+    auto jsAccessibilityManager = AceType::MakeRefPtr<MockJsAccessibilityManager>();
+    ASSERT_NE(jsAccessibilityManager, nullptr);
+
+    /**
+     * @tc.steps: step2. PAGE_PRE_CHANGE clears detach focus fallback cache as page family event
+     * @tc.expected: PAGE_PRE_CHANGE and PAGE_CLOSE return true, CLICK returns false
+     */
+    EXPECT_TRUE(jsAccessibilityManager->IsDetachFocusCacheClearEvent(AccessibilityEventType::PAGE_PRE_CHANGE));
+    EXPECT_TRUE(jsAccessibilityManager->IsDetachFocusCacheClearEvent(AccessibilityEventType::PAGE_CLOSE));
+    EXPECT_FALSE(jsAccessibilityManager->IsDetachFocusCacheClearEvent(AccessibilityEventType::CLICK));
+}
+
+/**
 * @tc.name: IsSendAccessibilityEventForHostTest001
 * @tc.desc: IsSendAccessibilityEventForHost
 * @tc.type: FUNC
@@ -4320,6 +4425,33 @@ HWTEST_F(JsAccessibilityManagerTest, SetBelongTreeId001, TestSize.Level1)
     jsAccessibilityManager->UpdatePageMode(std::string("FULL_SILENT"));
     jsInteractionOperation->SetBelongTreeId(1);
     EXPECT_TRUE(jsAccessibilityManager->eventQueue_.empty());
+}
+
+/**
+ * @tc.name: AccessibilityTreeIdRunsOnUI
+ * @tc.desc: Binder tree-id assignment is queued before updating UI state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(JsAccessibilityManagerTest, AccessibilityTreeIdRunsOnUI, TestSize.Level1)
+{
+    auto context = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto previousExecutor = context->taskExecutor_;
+    auto executor = AceType::MakeRefPtr<QueuedAccessibilityEventExecutor>();
+    auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    manager->SetPipelineContext(context);
+    auto operation = std::make_shared<Framework::JsAccessibilityManager::JsInteractionOperation>(1);
+    operation->SetHandler(manager);
+    context->taskExecutor_ = executor;
+    const auto initialTreeId = manager->GetTreeId();
+    std::thread binder([&] { operation->SetBelongTreeId(7); });
+    binder.join();
+    EXPECT_EQ(manager->GetTreeId(), initialTreeId);
+    EXPECT_EQ(executor->GetTaskCount(), 1u);
+    executor->RunTasks();
+    EXPECT_EQ(manager->GetTreeId(), 7);
+    EXPECT_EQ(executor->GetTaskCount(), 0u);
+    context->taskExecutor_ = previousExecutor;
 }
 
 /**

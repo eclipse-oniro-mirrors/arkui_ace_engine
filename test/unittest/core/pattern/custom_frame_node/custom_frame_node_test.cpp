@@ -13,7 +13,14 @@
  * limitations under the License.
  */
 
+#include <atomic>
+#include <functional>
+#include <mutex>
+#include <thread>
+#include <vector>
+
 #include "gtest/gtest.h"
+#include "test/mock/frameworks/base/thread/mock_task_executor.h"
 
 #include "core/components_ng/pattern/pattern.h"
 
@@ -21,12 +28,13 @@
 #define protected public
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
+#include "core/accessibility/native_interface_accessibility_provider.h"
+#include "core/components_ng/pattern/custom_frame_node/custom_accessibility_child_tree_callback.h"
+#include "core/components_ng/pattern/custom_frame_node/custom_accessibility_provider.h"
 #include "core/components_ng/pattern/custom_frame_node/custom_frame_node.h"
 #include "core/components_ng/pattern/custom_frame_node/custom_frame_node_layout_algorithm.h"
 #include "core/components_ng/pattern/custom_frame_node/custom_frame_node_pattern.h"
 #include "core/components_ng/pattern/custom_frame_node/custom_pattern.h"
-#include "core/components_ng/pattern/custom_frame_node/custom_accessibility_child_tree_callback.h"
-#include "core/components_ng/pattern/custom_frame_node/custom_accessibility_provider.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -34,6 +42,72 @@ using namespace testing::ext;
 namespace OHOS::Ace::NG {
 namespace {
 const std::string CHILD_NODE = "ChildNode";
+
+class QueuedAccessibilityTaskExecutor : public MockTaskExecutor {
+    DECLARE_ACE_TYPE(QueuedAccessibilityTaskExecutor, MockTaskExecutor);
+
+public:
+    bool WillRunOnCurrentThread(TaskType type) const override
+    {
+        return type == TaskType::UI && std::this_thread::get_id() == uiThread_;
+    }
+
+    bool OnPostTask(Task&& task, TaskType type, uint32_t delayTime, const std::string& name, PriorityType priorityType,
+        VsyncBarrierOption barrierOption) const override
+    {
+        EXPECT_EQ(type, TaskType::UI);
+        std::lock_guard<std::mutex> lock(mutex_);
+        tasks_.push_back(std::move(task));
+        return true;
+    }
+
+    void RunTasks()
+    {
+        std::vector<Task> tasks;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            tasks.swap(tasks_);
+        }
+        for (auto& task : tasks) {
+            task();
+        }
+    }
+
+private:
+    const std::thread::id uiThread_ = std::this_thread::get_id();
+    mutable std::mutex mutex_;
+    mutable std::vector<Task> tasks_;
+};
+
+class RecordingAccessibilityChildTreeCallback : public CustomAccessibilityChildTreeCallback {
+public:
+    explicit RecordingAccessibilityChildTreeCallback(const WeakPtr<CustomPattern>& pattern)
+        : CustomAccessibilityChildTreeCallback(pattern, 1)
+    {}
+
+    bool OnDeregister() override
+    {
+        ++calls;
+        calledOn = std::this_thread::get_id();
+        return true;
+    }
+
+    int32_t calls = 0;
+    std::thread::id calledOn;
+};
+
+class EventThirdAccessibilityManager : public ThirdAccessibilityManager {
+public:
+    std::function<void()> onSend;
+
+    int32_t SendAccessibilityAsyncEvent(const ArkUI_AccessibilityEventInfo& event, void (*callback)(int32_t)) override
+    {
+        if (onSend) {
+            onSend();
+        }
+        return 0;
+    }
+};
 } // namespace
 
 class CustomFrameNodeTestNg : public testing::Test {
@@ -626,6 +700,103 @@ HWTEST_F(CustomFrameNodeTestNg, InitializeAccessibilityTest, TestSize.Level1)
 }
 
 /**
+ * @tc.name: AccessibilityRegistrationOnUiThread
+ * @tc.desc: Worker notifications run on UI; UI notifications retain synchronous behavior.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CustomFrameNodeTestNg, AccessibilityRegistrationOnUiThread, TestSize.Level1)
+{
+    auto context = MockPipelineContext::GetCurrent();
+    auto previousExecutor = context->GetTaskExecutor();
+    auto executor = AceType::MakeRefPtr<QueuedAccessibilityTaskExecutor>();
+    context->SetTaskExecutor(executor);
+    auto node = FrameNode::CreateFrameNode("custom", 1, AceType::MakeRefPtr<CustomPattern>());
+    auto pattern = node->GetPattern<CustomPattern>();
+    auto callback = std::make_shared<RecordingAccessibilityChildTreeCallback>(pattern);
+    pattern->accessibilityChildTreeCallback_ = callback;
+    pattern->InitializeAccessibilityCallback();
+    auto nativeProvider = pattern->GetNativeAccessibilityProvider();
+    ArkUI_AccessibilityProviderCallbacks callbacks {};
+
+    std::thread worker([&] { nativeProvider->AccessibilityProviderRegisterCallback(&callbacks); });
+    worker.join();
+    EXPECT_EQ(callback->calls, 0);
+    executor->RunTasks();
+    EXPECT_EQ(callback->calls, 1);
+    EXPECT_EQ(callback->calledOn, std::this_thread::get_id());
+
+    nativeProvider->AccessibilityProviderRegisterCallback(&callbacks);
+    EXPECT_EQ(callback->calls, 2);
+    executor->RunTasks();
+    EXPECT_EQ(callback->calls, 2);
+    context->SetTaskExecutor(previousExecutor);
+}
+
+/**
+ * @tc.name: AccessibilityRegistrationAfterDetach
+ * @tc.desc: Notifications queued before detach do not call the detached callback.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CustomFrameNodeTestNg, AccessibilityRegistrationAfterDetach, TestSize.Level1)
+{
+    auto context = MockPipelineContext::GetCurrent();
+    auto previousExecutor = context->GetTaskExecutor();
+    auto executor = AceType::MakeRefPtr<QueuedAccessibilityTaskExecutor>();
+    context->SetTaskExecutor(executor);
+    auto node = FrameNode::CreateFrameNode("custom", 1, AceType::MakeRefPtr<CustomPattern>());
+    auto pattern = node->GetPattern<CustomPattern>();
+    auto callback = std::make_shared<RecordingAccessibilityChildTreeCallback>(pattern);
+    pattern->accessibilityChildTreeCallback_ = callback;
+    pattern->InitializeAccessibilityCallback();
+    auto nativeProvider = pattern->GetNativeAccessibilityProvider();
+    ArkUI_AccessibilityProviderCallbacks callbacks {};
+
+    std::thread worker([&] { nativeProvider->AccessibilityProviderRegisterCallback(&callbacks); });
+    worker.join();
+    pattern->UninitializeAccessibility(node.GetRawPtr(), context.GetRawPtr());
+    EXPECT_EQ(pattern->accessibilityChildTreeCallback_, nullptr);
+    executor->RunTasks();
+    EXPECT_EQ(callback->calls, 0);
+    context->SetTaskExecutor(previousExecutor);
+}
+
+/**
+ * @tc.name: AccessibilityRegistrationAfterReattach
+ * @tc.desc: Old notifications cannot register or deregister the replacement attachment.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CustomFrameNodeTestNg, AccessibilityRegistrationAfterReattach, TestSize.Level1)
+{
+    auto context = MockPipelineContext::GetCurrent();
+    auto previousExecutor = context->GetTaskExecutor();
+    auto executor = AceType::MakeRefPtr<QueuedAccessibilityTaskExecutor>();
+    context->SetTaskExecutor(executor);
+    auto node = FrameNode::CreateFrameNode("custom", 1, AceType::MakeRefPtr<CustomPattern>());
+    auto pattern = node->GetPattern<CustomPattern>();
+    auto oldCallback = std::make_shared<RecordingAccessibilityChildTreeCallback>(pattern);
+    pattern->accessibilityChildTreeCallback_ = oldCallback;
+    pattern->InitializeAccessibilityCallback();
+    auto nativeProvider = pattern->GetNativeAccessibilityProvider();
+    ArkUI_AccessibilityProviderCallbacks callbacks {};
+
+    std::thread worker([&] { nativeProvider->AccessibilityProviderRegisterCallback(&callbacks); });
+    worker.join();
+    pattern->UninitializeAccessibility(node.GetRawPtr(), context.GetRawPtr());
+    auto newCallback = std::make_shared<RecordingAccessibilityChildTreeCallback>(pattern);
+    pattern->accessibilityChildTreeCallback_ = newCallback;
+    pattern->InitializeAccessibilityCallback();
+    executor->RunTasks();
+    EXPECT_EQ(oldCallback->calls, 0);
+    EXPECT_EQ(newCallback->calls, 0);
+
+    std::thread newWorker([&] { nativeProvider->AccessibilityProviderRegisterCallback(&callbacks); });
+    newWorker.join();
+    executor->RunTasks();
+    EXPECT_EQ(newCallback->calls, 1);
+    context->SetTaskExecutor(previousExecutor);
+}
+
+/**
  * @tc.name: OnDumpChildInfoTest
  * @tc.desc: Test OnDumpChildInfo Func
  * @tc.type: FUNC
@@ -677,7 +848,74 @@ HWTEST_F(CustomFrameNodeTestNg, SendThirdAccessibilityProviderTest, TestSize.Lev
      */
     auto thirdAccessibilityManager = std::make_shared<ThirdAccessibilityManager>();
     customAccessibilityProvider->SendThirdAccessibilityProvider(thirdAccessibilityManager);
-    EXPECT_TRUE(customAccessibilityProvider->thirdAccessibilityManager_.lock());
+    EXPECT_EQ(customAccessibilityProvider->GetThirdAccessibilityManager().lock(), thirdAccessibilityManager);
+}
+
+/**
+ * @tc.name: ConcurrentThirdAccessibilityManager
+ * @tc.desc: Register and release managers concurrently with event sending and manager snapshots.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CustomFrameNodeTestNg, ConcurrentThirdAccessibilityManager, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<CustomAccessibilityProvider>(WeakPtr<CustomPattern>());
+    std::atomic<bool> start { false };
+    std::atomic<int32_t> calls { 0 };
+    constexpr int32_t ITERATIONS = 2000;
+    std::thread writer([&] {
+        while (!start.load()) {
+            std::this_thread::yield();
+        }
+        for (int32_t i = 0; i < ITERATIONS; ++i) {
+            auto manager = std::make_shared<EventThirdAccessibilityManager>();
+            manager->onSend = [&] { ++calls; };
+            provider->SendThirdAccessibilityProvider(manager);
+            provider->SendThirdAccessibilityProvider({});
+        }
+    });
+    ArkUI_AccessibilityEventInfo event;
+    int32_t successful = 0;
+    start.store(true);
+    for (int32_t i = 0; i < ITERATIONS; ++i) {
+        auto manager = provider->GetThirdAccessibilityManager().lock();
+        if (manager) {
+            manager->SendAccessibilityAsyncEvent(event, nullptr);
+            ++successful;
+        }
+        auto result = provider->SendAccessibilityAsyncEvent(event, nullptr);
+        EXPECT_TRUE(result == 0 || result == -1);
+        successful += result == 0;
+    }
+    writer.join();
+    EXPECT_EQ(calls.load(), successful);
+    EXPECT_TRUE(provider->GetThirdAccessibilityManager().expired());
+}
+
+/**
+ * @tc.name: ThirdAccessibilityManagerReentrantSend
+ * @tc.desc: Event dispatch holds a strong snapshot without holding the registration mutex.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CustomFrameNodeTestNg, ThirdAccessibilityManagerReentrantSend, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<CustomAccessibilityProvider>(WeakPtr<CustomPattern>());
+    auto manager = std::make_shared<EventThirdAccessibilityManager>();
+    std::weak_ptr<ThirdAccessibilityManager> weakManager = manager;
+    manager->onSend = [&] {
+        provider->SendThirdAccessibilityProvider({});
+        manager.reset();
+        EXPECT_FALSE(weakManager.expired());
+    };
+    provider->SendThirdAccessibilityProvider(manager);
+    ArkUI_AccessibilityEventInfo event;
+    EXPECT_EQ(provider->SendAccessibilityAsyncEvent(event, nullptr), 0);
+    EXPECT_TRUE(weakManager.expired());
+    EXPECT_EQ(provider->SendAccessibilityAsyncEvent(event, nullptr), -1);
+
+    manager = std::make_shared<EventThirdAccessibilityManager>();
+    provider->SendThirdAccessibilityProvider(manager);
+    manager.reset();
+    EXPECT_TRUE(provider->GetThirdAccessibilityManager().expired());
 }
 
 /**

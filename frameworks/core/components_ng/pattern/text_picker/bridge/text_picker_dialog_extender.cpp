@@ -26,7 +26,7 @@
 #include "core/components_ng/pattern/date_picker/picker_theme.h"
 #include "core/components_ng/pattern/text_picker/textpicker_event_types.h"
 #include "core/components_ng/pattern/text_picker/textpicker_model.h"
-#include "core/components_ng/pattern/text_picker/bridge/textpicker_parser.h"
+#include "core/components_ng/pattern/text_picker/bridge/textpicker_options.h"
 #include "core/interfaces/native/utility/callback_helper.h"
 #include "core/interfaces/native/utility/converter.h"
 #include "core/interfaces/native/utility/reverse_converter.h"
@@ -451,6 +451,10 @@ void BuildTextPickerDialogExt(const T& options, TextPickerDialog& pickerDialog)
     auto edgeLightMode = Converter::OptConvert<EdgeLightMode>(options.edgeLightMode);
     if (edgeLightMode) {
         pickerDialog.edgeLightMode = edgeLightMode.value();
+    }
+    auto adaptToHandedness = Converter::OptConvert<HandednessFollowMode>(options.adaptToHandedness);
+    if (adaptToHandedness) {
+        pickerDialog.adaptToHandedness = adaptToHandedness.value();
     }
 }
 

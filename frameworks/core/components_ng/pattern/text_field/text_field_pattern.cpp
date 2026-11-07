@@ -15,6 +15,7 @@
 
 #define NAPI_VERSION 8
 
+#include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/components_ng/pattern/text_field/text_field_pattern.h"
 #include "core/pipeline/container_window_manager.h"
 #include "core/accessibility/accessibility_manager.h"
@@ -37,6 +38,7 @@
 #include "core/common/clipboard/clipboard_proxy.h"
 #include "core/common/container_scope.h"
 #include "core/common/ime/input_method_manager.h"
+#include "core/common/ime/text_input_keyboard_utils.h"
 #include "core/common/ime/text_input_filter.h"
 #include "core/common/ime/text_input_formatter.h"
 #include "core/common/ime/text_input_obscure_utils.h"
@@ -54,6 +56,7 @@
 #include "core/components_ng/base/observer_handler.h"
 #include "core/components_ng/event/focus_hub.h"
 #include "core/components_ng/event/state_style_manager.h"
+#include "core/event/mouse_event.h"
 #include "core/components_ng/pattern/select/select_pattern.h"
 #include "core/components_ng/pattern/stage/page_pattern.h"
 #include "core/components_ng/pattern/text/span/span_string.h"
@@ -123,7 +126,6 @@ constexpr std::string_view FIELD_TEXT_CHANGE_EVENT = "textChange";
 constexpr std::string_view FIELD_BLUR_EVENT = "blur";
 constexpr std::string_view FIELD_FOCUS_EVENT = "focus";
 constexpr int32_t PREVIEW_TEXT_RANGE_DEFAULT = -1;
-constexpr std::string_view PREVIEW_STYLE_NORMAL = "normal";
 constexpr std::string_view PREVIEW_STYLE_UNDERLINE = "underline";
 
 constexpr int32_t PREVIEW_NO_ERROR = 0;
@@ -147,115 +149,6 @@ constexpr int32_t ENTER_OFFSET = 1;
 constexpr int MAX_SELECTED_AI_ENTITY = 1;
 constexpr double DEFAULT_OPACITY = 0.2;
 const int32_t DEFAULT_ALPHA = 255;
-
-static std::unordered_map<AceAutoFillType, TextInputType> keyBoardMap_ = {
-    { AceAutoFillType::ACE_PASSWORD, TextInputType::VISIBLE_PASSWORD},
-    { AceAutoFillType::ACE_USER_NAME, TextInputType::USER_NAME },
-    { AceAutoFillType::ACE_NEW_PASSWORD, TextInputType::NEW_PASSWORD },
-    { AceAutoFillType::ACE_FULL_STREET_ADDRESS, TextInputType::TEXT },
-    { AceAutoFillType::ACE_HOUSE_NUMBER, TextInputType::TEXT },
-    { AceAutoFillType::ACE_DISTRICT_ADDRESS, TextInputType::TEXT },
-    { AceAutoFillType::ACE_CITY_ADDRESS, TextInputType::TEXT },
-    { AceAutoFillType::ACE_PROVINCE_ADDRESS, TextInputType::TEXT },
-    { AceAutoFillType::ACE_COUNTRY_ADDRESS, TextInputType::TEXT },
-    { AceAutoFillType::ACE_PERSON_FULL_NAME, TextInputType::TEXT },
-    { AceAutoFillType::ACE_PERSON_LAST_NAME, TextInputType::TEXT },
-    { AceAutoFillType::ACE_PERSON_FIRST_NAME, TextInputType::TEXT },
-    { AceAutoFillType::ACE_PHONE_NUMBER, TextInputType::PHONE },
-    { AceAutoFillType::ACE_PHONE_COUNTRY_CODE, TextInputType::PHONE },
-    { AceAutoFillType::ACE_FULL_PHONE_NUMBER, TextInputType::PHONE },
-    { AceAutoFillType::ACE_EMAIL_ADDRESS, TextInputType::EMAIL_ADDRESS },
-    { AceAutoFillType::ACE_BANK_CARD_NUMBER, TextInputType::NUMBER },
-    { AceAutoFillType::ACE_ID_CARD_NUMBER, TextInputType::NUMBER },
-    { AceAutoFillType::ACE_PRECISE_TIME, TextInputType::NUMBER },
-    { AceAutoFillType::ACE_HOUR_AND_MINUTE, TextInputType::NUMBER },
-    { AceAutoFillType::ACE_DATE, TextInputType::NUMBER },
-    { AceAutoFillType::ACE_MONTH, TextInputType::NUMBER },
-    { AceAutoFillType::ACE_YEAR, TextInputType::NUMBER },
-    { AceAutoFillType::ACE_NICKNAME, TextInputType::TEXT },
-    { AceAutoFillType::ACE_DETAIL_INFO_WITHOUT_STREET, TextInputType::TEXT },
-    { AceAutoFillType::ACE_FORMAT_ADDRESS, TextInputType::TEXT },
-    { AceAutoFillType::ACE_PASSPORT_NUMBER, TextInputType::TEXT },
-    { AceAutoFillType::ACE_VALIDITY, TextInputType::TEXT },
-    { AceAutoFillType::ACE_ISSUE_AT, TextInputType::TEXT },
-    { AceAutoFillType::ACE_ORGANIZATION, TextInputType::TEXT },
-    { AceAutoFillType::ACE_TAX_ID, TextInputType::TEXT },
-    { AceAutoFillType::ACE_ADDRESS_CITY_AND_STATE, TextInputType::TEXT },
-    { AceAutoFillType::ACE_FLIGHT_NUMBER, TextInputType::TEXT },
-    { AceAutoFillType::ACE_LICENSE_NUMBER, TextInputType::TEXT },
-    { AceAutoFillType::ACE_LICENSE_FILE_NUMBER, TextInputType::TEXT },
-    { AceAutoFillType::ACE_LICENSE_PLATE, TextInputType::TEXT },
-    { AceAutoFillType::ACE_ENGINE_NUMBER, TextInputType::TEXT },
-    { AceAutoFillType::ACE_LICENSE_CHASSIS_NUMBER, TextInputType::TEXT }};
-
-static std::unordered_map<TextContentType, std::pair<AceAutoFillType, std::string>> contentTypeMap_ = {
-    {TextContentType::VISIBLE_PASSWORD,
-        std::make_pair(AceAutoFillType::ACE_PASSWORD, "TextContentType.VISIBLE_PASSWORD")},
-    {TextContentType::USER_NAME, std::make_pair(AceAutoFillType::ACE_USER_NAME, "TextContentType.USER_NAME")},
-    {TextContentType::NEW_PASSWORD, std::make_pair(AceAutoFillType::ACE_NEW_PASSWORD, "TextContentType.NEW_PASSWORD")},
-    {TextContentType::FULL_STREET_ADDRESS,
-        std::make_pair(AceAutoFillType::ACE_FULL_STREET_ADDRESS, "TextContentType.FULL_STREET_ADDRESS")},
-    {TextContentType::HOUSE_NUMBER, std::make_pair(AceAutoFillType::ACE_HOUSE_NUMBER, "TextContentType.HOUSE_NUMBER")},
-    {TextContentType::DISTRICT_ADDRESS,
-        std::make_pair(AceAutoFillType::ACE_DISTRICT_ADDRESS, "TextContentType.DISTRICT_ADDRESS")},
-    {TextContentType::CITY_ADDRESS, std::make_pair(AceAutoFillType::ACE_CITY_ADDRESS, "TextContentType.CITY_ADDRESS")},
-    {TextContentType::PROVINCE_ADDRESS,
-        std::make_pair(AceAutoFillType::ACE_PROVINCE_ADDRESS, "TextContentType.PROVINCE_ADDRESS")},
-    {TextContentType::COUNTRY_ADDRESS,
-        std::make_pair(AceAutoFillType::ACE_COUNTRY_ADDRESS, "TextContentType.COUNTRY_ADDRESS")},
-    {TextContentType::PERSON_FULL_NAME,
-        std::make_pair(AceAutoFillType::ACE_PERSON_FULL_NAME, "TextContentType.PERSON_FULL_NAME")},
-    {TextContentType::PERSON_LAST_NAME,
-        std::make_pair(AceAutoFillType::ACE_PERSON_LAST_NAME, "TextContentType.PERSON_LAST_NAME")},
-    {TextContentType::PERSON_FIRST_NAME,
-        std::make_pair(AceAutoFillType::ACE_PERSON_FIRST_NAME, "TextContentType.PERSON_FIRST_NAME")},
-    {TextContentType::PHONE_NUMBER, std::make_pair(AceAutoFillType::ACE_PHONE_NUMBER, "TextContentType.PHONE_NUMBER")},
-    {TextContentType::PHONE_COUNTRY_CODE,
-        std::make_pair(AceAutoFillType::ACE_PHONE_COUNTRY_CODE, "TextContentType.PHONE_COUNTRY_CODE")},
-    {TextContentType::FULL_PHONE_NUMBER,
-        std::make_pair(AceAutoFillType::ACE_FULL_PHONE_NUMBER, "TextContentType.FULL_PHONE_NUMBER")},
-    {TextContentType::EMAIL_ADDRESS,
-        std::make_pair(AceAutoFillType::ACE_EMAIL_ADDRESS, "TextContentType.EMAIL_ADDRESS")},
-    {TextContentType::BANK_CARD_NUMBER,
-        std::make_pair(AceAutoFillType::ACE_BANK_CARD_NUMBER, "TextContentType.BANK_CARD_NUMBER")},
-    {TextContentType::ID_CARD_NUMBER,
-        std::make_pair(AceAutoFillType::ACE_ID_CARD_NUMBER, "TextContentType.ID_CARD_NUMBER")},
-    {TextContentType::PRECISE_TIME, std::make_pair(AceAutoFillType::ACE_PRECISE_TIME, "TextContentType.PRECISE_TIME")},
-    {TextContentType::HOUR_AND_MINUTE,
-        std::make_pair(AceAutoFillType::ACE_HOUR_AND_MINUTE, "TextContentType.HOUR_AND_MINUTE")},
-    {TextContentType::DATE, std::make_pair(AceAutoFillType::ACE_DATE, "TextContentType.DATE")},
-    {TextContentType::MONTH, std::make_pair(AceAutoFillType::ACE_MONTH, "TextContentType.MONTH")},
-    {TextContentType::YEAR, std::make_pair(AceAutoFillType::ACE_YEAR, "TextContentType.YEAR")},
-    {TextContentType::NICKNAME, std::make_pair(AceAutoFillType::ACE_NICKNAME, "TextContentType.NICKNAME")},
-    {TextContentType::DETAIL_INFO_WITHOUT_STREET,
-        std::make_pair(AceAutoFillType::ACE_DETAIL_INFO_WITHOUT_STREET, "TextContentType.DETAIL_INFO_WITHOUT_STREET")},
-    {TextContentType::FORMAT_ADDRESS,
-        std::make_pair(AceAutoFillType::ACE_FORMAT_ADDRESS, "TextContentType.FORMAT_ADDRESS")},
-    {TextContentType::PASSPORT_NUMBER,
-        std::make_pair(AceAutoFillType::ACE_PASSPORT_NUMBER, "TextContentType.PASSPORT_NUMBER")},
-    {TextContentType::VALIDITY,
-        std::make_pair(AceAutoFillType::ACE_VALIDITY, "TextContentType.VALIDITY")},
-    {TextContentType::ISSUE_AT,
-        std::make_pair(AceAutoFillType::ACE_ISSUE_AT, "TextContentType.ISSUE_AT")},
-    {TextContentType::ORGANIZATION,
-        std::make_pair(AceAutoFillType::ACE_ORGANIZATION, "TextContentType.ORGANIZATION")},
-    {TextContentType::TAX_ID,
-        std::make_pair(AceAutoFillType::ACE_TAX_ID, "TextContentType.TAX_ID")},
-    {TextContentType::ADDRESS_CITY_AND_STATE,
-        std::make_pair(AceAutoFillType::ACE_ADDRESS_CITY_AND_STATE, "TextContentType.ADDRESS_CITY_AND_STATE")},
-    {TextContentType::FLIGHT_NUMBER,
-        std::make_pair(AceAutoFillType::ACE_FLIGHT_NUMBER, "TextContentType.FLIGHT_NUMBER")},
-    {TextContentType::LICENSE_NUMBER,
-        std::make_pair(AceAutoFillType::ACE_LICENSE_NUMBER, "TextContentType.LICENSE_NUMBER")},
-    {TextContentType::LICENSE_FILE_NUMBER,
-        std::make_pair(AceAutoFillType::ACE_LICENSE_FILE_NUMBER, "TextContentType.LICENSE_FILE_NUMBER")},
-    {TextContentType::LICENSE_PLATE,
-        std::make_pair(AceAutoFillType::ACE_LICENSE_PLATE, "TextContentType.LICENSE_PLATE")},
-    {TextContentType::ENGINE_NUMBER,
-        std::make_pair(AceAutoFillType::ACE_ENGINE_NUMBER, "TextContentType.ENGINE_NUMBER")},
-    {TextContentType::LICENSE_CHASSIS_NUMBER,
-        std::make_pair(AceAutoFillType::ACE_LICENSE_CHASSIS_NUMBER, "TextContentType.LICENSE_CHASSIS_NUMBER")},
-    {TextContentType::UNSPECIFIED, std::make_pair(AceAutoFillType::ACE_UNSPECIFIED, "TextContentType.UNSPECIFIED")}};
 
 void SwapIfLarger(int32_t& a, int32_t& b)
 {
@@ -550,6 +443,28 @@ void TextFieldPattern::ReportRequestKeyboardEvent(const RefPtr<FrameNode>& frame
             "event", value->ToString(), ComponentEventType::COMPONENT_EVENT_TEXT_INPUT);
     }
 #endif
+}
+
+CommandResult TextFieldPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    auto json = JsonUtil::ParseJsonString(command);
+    if (json && json->IsObject() && json->GetString("cmd") == "requestKeyboard") {
+        auto host = GetHost();
+        CHECK_NULL_RETURN(host, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+        auto hub = host->GetEventHub<EventHub>();
+        if (!hub || !hub->IsEnabled() || HasFocus()) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        }
+        auto focusHub = GetFocusHub();
+        if (!focusHub || !focusHub->RequestFocusImmediately()) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        }
+        ReportRequestKeyboardEvent(host);
+        return CommandResult::Success();
+    }
+    return ConvertLegacyInjectionEventResult(command,
+        { "MSDP_AutoFill", "addText", "setText", "deleteText", "selectText", "copy", "cut",
+            "clear", "requestKeyboard", "setCaretPosition" });
 }
 
 int32_t TextFieldPattern::OnInjectionEvent(const std::string& command)
@@ -910,7 +825,7 @@ bool TextFieldPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dir
     auto oldContentRect = contentRect_;
     contentRect_ = dirty->GetGeometryNode()->GetContentRect();
     frameRect_ = dirty->GetGeometryNode()->GetFrameRect();
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto textFieldLayoutAlgorithm = DynamicCast<TextFieldLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(textFieldLayoutAlgorithm, false);
@@ -1020,20 +935,6 @@ void TextFieldPattern::UpdateSelectionAndHandleVisibility()
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     host->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
-}
-
-void TextFieldPattern::SetAccessibilityPasswordIconAction()
-{
-    CHECK_NULL_VOID(IsShowPasswordIcon());
-    auto passwordArea = AceType::DynamicCast<PasswordResponseArea>(responseArea_);
-    CHECK_NULL_VOID(passwordArea);
-    auto node = passwordArea->GetFrameNode();
-    CHECK_NULL_VOID(node);
-    auto textAccessibilityProperty = node->GetAccessibilityProperty<AccessibilityProperty>();
-    CHECK_NULL_VOID(textAccessibilityProperty);
-    textAccessibilityProperty->SetAccessibilityLevel("yes");
-    textAccessibilityProperty->SetAccessibilityText(GetPasswordIconPromptInformation(passwordArea->IsObscured()));
-    textAccessibilityProperty->SetAccessibilityCustomRole("button");
 }
 
 void TextFieldPattern::SetAccessibilityClearAction()
@@ -1591,30 +1492,6 @@ void TextFieldPattern::ProcessAutoFillOnFocus()
         DoProcessAutoFill(RequestAutoFillReason::FIELD_FOCUS_EVENT);
     }
 #endif
-}
-
-void TextFieldPattern::CheckAndUpdateInputTypeForOTP()
-{
-    auto host = GetHost();
-    CHECK_NULL_VOID(host);
-    auto layoutProperty = host->GetLayoutProperty<TextFieldLayoutProperty>();
-    CHECK_NULL_VOID(layoutProperty);
-    auto currentType = layoutProperty->GetTextInputTypeValue(TextInputType::UNSPECIFIED);
-    if (currentType != TextInputType::NUMBER || keyboard_ != TextInputType::NUMBER) {
-        return;
-    }
-    auto placeholder = layoutProperty->GetPlaceholderValue(u"");
-    if (placeholder.empty() || !TextInputFilter::IsVerificationCodePlaceholder(placeholder)) {
-        return;
-    }
-    layoutProperty->UpdateTypeChanged(true);
-    SetIsFilterChanged(true);
-    layoutProperty->UpdateTextInputType(TextInputType::ONE_TIME_CODE_NUMBER);
-    keyboard_ = TextInputType::ONE_TIME_CODE_NUMBER;
-    TAG_LOGI(AceLogTag::ACE_TEXT_FIELD, "%{public}d detected verify code, update type to OTC", host->GetId());
-    if (HasFocus()) {
-        RequestKeyboardNotByFocusSwitch(RequestKeyboardReason::RESET_KEYBOARD);
-    }
 }
 
 void TextFieldPattern::ProcessFocusStyle()
@@ -2193,7 +2070,7 @@ bool TextFieldPattern::HandleOnKeyBack()
 
 bool TextFieldPattern::HandleOnTab(bool backward)
 {
-    return backward ? UpdateFocusBackward() : UpdateFocusForward();
+    return CleanNodeHostBase::HandleOnTabImpl(backward);
 }
 
 void TextFieldPattern::HandleOnUndoAction()
@@ -2385,13 +2262,6 @@ std::string TextFieldPattern::GetCancelImageText()
     auto theme = GetTheme();
     CHECK_NULL_RETURN(theme, "");
     return theme->GetCancelImageText();
-}
-
-std::string TextFieldPattern::GetPasswordIconPromptInformation(bool show)
-{
-    auto theme = GetTheme();
-    CHECK_NULL_RETURN(theme, "");
-    return show ? theme->GetShowPasswordPromptInformation() : theme->GetHiddenPasswordPromptInformation();
 }
 
 void TextFieldPattern::UpdateShowCountBorderStyle()
@@ -2598,6 +2468,21 @@ void TextFieldPattern::HandleOnCameraInput()
         pattern->CloseSelectOverlay(true);
         pattern->StartTwinkling();
     });
+}
+
+void TextFieldPattern::HandleOnTranslateInput()
+{
+#if defined(ENABLE_STANDARD_INPUT)
+    auto inputMethod = MiscServices::InputMethodController::GetInstance();
+    if (inputMethod) {
+        TAG_LOGI(AceLogTag::ACE_TEXT_FIELD, "HandleOnTranslateInput");
+        inputMethod->RequestSystemInputCapability(MiscServices::InputCapabilityType::TRANSLATION);
+    } else {
+        TAG_LOGI(AceLogTag::ACE_TEXT_FIELD, "HandleOnTranslateInput, IMC is null");
+    }
+#endif
+    CloseSelectOverlay(true);
+    StartTwinkling();
 }
 
 void TextFieldPattern::SetVoiceKBShown(bool voiceKbShown)
@@ -4113,9 +3998,10 @@ void TextFieldPattern::OnCursorTwinkling()
 {
     cursorTwinklingTask_.Cancel();
     cursorVisible_ = !cursorVisible_;
-    auto shouldMeasure = !IsTextArea() && IsInPasswordMode() && GetTextObscured() && obscureTickCountDown_ == 1;
-    if (IsInPasswordMode() && GetTextObscured() && obscureTickCountDown_ > 0) {
-        --obscureTickCountDown_;
+    auto shouldMeasure = !IsTextArea() && IsInPasswordMode() &&
+        GetTextObscured() && obscureHelper_.GetTickCountDown() == 1;
+    if (IsInPasswordMode() && GetTextObscured() && obscureHelper_.GetTickCountDown() > 0) {
+        obscureHelper_.TickDown();
     }
     auto host = GetHost();
     CHECK_NULL_VOID(host);
@@ -4159,53 +4045,17 @@ void TextFieldPattern::ShowCaretAndStopTwinkling()
     }
 }
 
-void TextFieldPattern::CheckIfNeedToResetKeyboard()
+bool TextFieldPattern::IsKeyboardTypeChanged()
 {
-    auto tmpHost = GetHost();
-    CHECK_NULL_VOID(tmpHost);
-    auto layoutProperty = tmpHost->GetLayoutProperty<TextFieldLayoutProperty>();
-    CHECK_NULL_VOID(layoutProperty);
-    bool needToResetKeyboard = false;
-    // check unspecified for first time entrance
-    if (keyboard_ != layoutProperty->GetTextInputTypeValue(TextInputType::UNSPECIFIED)) {
-        auto autoFillType = GetAutoFillType(false);
-        if (layoutProperty->GetTextInputTypeValue(TextInputType::UNSPECIFIED) != TextInputType::UNSPECIFIED ||
-            keyBoardMap_.find(autoFillType) == keyBoardMap_.end() || keyboard_ != keyBoardMap_[autoFillType]) {
-            TAG_LOGI(AceLogTag::ACE_TEXT_FIELD, "%{public}d KBType %{public}d -> %{public}d",
-                tmpHost->GetId(), (int)keyboard_, layoutProperty->GetTextInputTypeValue(TextInputType::UNSPECIFIED));
-            keyboard_ = layoutProperty->GetTextInputTypeValue(TextInputType::UNSPECIFIED);
-            ResetPreviewTextState();
-            needToResetKeyboard = true;
-        }
-    }
-    CheckAndUpdateInputTypeForOTP();
-    if (!needToResetKeyboard && action_ != TextInputAction::UNSPECIFIED) {
-        needToResetKeyboard = action_ != GetTextInputActionValue(GetDefaultTextInputAction());
-    }
-    action_ = GetTextInputActionValue(GetDefaultTextInputAction());
-#if defined(OHOS_STANDARD_SYSTEM) && !defined(PREVIEW)
-    if (needToResetKeyboard && HasFocus()) {
-        if (isCustomKeyboardAttached_ || IsOneTimeCodeType()) {
-            RequestKeyboardNotByFocusSwitch(RequestKeyboardReason::RESET_KEYBOARD);
-            return;
-        }
-#if defined(ENABLE_STANDARD_INPUT)
-        auto inputMethod = MiscServices::InputMethodController::GetInstance();
-        CHECK_NULL_VOID(inputMethod);
-        MiscServices::Configuration config;
-        TAG_LOGI(AceLogTag::ACE_TEXT_FIELD, "%{public}d KB action:%{public}d",
-            tmpHost->GetId(), action_);
-        config.SetEnterKeyType(static_cast<MiscServices::EnterKeyType>(action_));
-        config.SetTextInputType(static_cast<MiscServices::TextInputType>(keyboard_));
-        inputMethod->OnConfigurationChange(config);
-#endif
-    }
-#else
-    if (needToResetKeyboard && HasConnection()) {
-        CloseKeyboard(true);
-        RequestKeyboard(false, true, true);
-    }
-#endif
+    auto layoutProperty = GetLayoutProperty<TextFieldLayoutProperty>();
+    CHECK_NULL_RETURN(layoutProperty, false);
+    auto currentType = layoutProperty->GetTextInputTypeValue(TextInputType::UNSPECIFIED);
+    CHECK_NULL_RETURN(keyboard_ != currentType, false);
+    auto autoFillType = GetAutoFillType(false);
+    const auto& keyBoardMap = TextInputClient::GetAutoFillKeyboardMap();
+    return currentType != TextInputType::UNSPECIFIED ||
+        keyBoardMap.find(autoFillType) == keyBoardMap.end() ||
+        keyboard_ != keyBoardMap.at(autoFillType);
 }
 
 void TextFieldPattern::ProcessScroll()
@@ -4673,15 +4523,13 @@ void TextFieldPattern::AutoFillValueChanged()
 
 std::string TextFieldPattern::GetInspectorId() const
 {
-    std:: string inspectorId = "";
     auto host = GetHost();
     CHECK_NULL_RETURN(host, "");
     auto parent = host->GetParent();
     CHECK_NULL_RETURN(parent, "");
-    if (host->GetInspectorId()->find(INSPECTOR_PREFIX) != std::string::npos && parent->GetTag() == "Search") {
-        inspectorId = host->GetParent()->GetInspectorId().value_or("");
-    } else {
-        inspectorId = host->GetInspectorId().value_or("");
+    auto inspectorId = host->GetInspectorId().value_or("");
+    if (inspectorId.find(INSPECTOR_PREFIX) != std::string::npos && parent->GetTag() == "Search") {
+        inspectorId = parent->GetInspectorId().value_or("");
     }
     return inspectorId;
 }
@@ -4824,13 +4672,13 @@ void TextFieldPattern::FilterInitializeText()
         changeValueInfo.oldPreviewText.value = GetPreviewTextValue();
         changeValueInfo.rangeBefore = TextRange { 0, changeValueInfo.oldContent.length() };
         auto textChanged = contentController_->FilterValue();
-        if (isFilterChanged_) {
+        if (IsFilterChanged()) {
             changeValueInfo.value = GetBodyTextValue();
             changeValueInfo.previewText.offset = hasPreviewText_ ? GetPreviewTextStart() : -1;
             changeValueInfo.previewText.value = GetPreviewTextValue();
             changeValueInfo.rangeAfter = TextRange { 0, changeValueInfo.value.length() };
             bool isWillChange = FireOnWillChange(changeValueInfo);
-            isFilterChanged_ = false;
+            SetFilterChanged(false);
             if (!isWillChange) {
                 RecoverTextValueAndCaret(changeValueInfo.oldContent, originCaretIndex);
                 return;
@@ -4844,17 +4692,6 @@ void TextFieldPattern::FilterInitializeText()
         selectController_->UpdateCaretIndex(static_cast<int32_t>(GetTextUtf16Value().length()));
     }
     UpdateShowCountBorderStyle();
-}
-
-bool TextFieldPattern::IsDisabled()
-{
-    auto host = GetHost();
-    CHECK_NULL_RETURN(host, true);
-    auto eventHub = host->GetEventHub<TextFieldEventHub>();
-    CHECK_NULL_RETURN(eventHub, true);
-    auto layoutProperty = host->GetLayoutProperty<TextFieldLayoutProperty>();
-    CHECK_NULL_RETURN(layoutProperty, true);
-    return !eventHub->IsEnabled();
 }
 
 Edge TextFieldPattern::GetUnderlinePadding(const RefPtr<TextFieldTheme>& theme,
@@ -5870,10 +5707,11 @@ void TextFieldPattern::KeyboardContentTypeToInputType()
         return;
     }
     auto autoFillType = GetAutoFillType(false);
-    if (keyBoardMap_.find(autoFillType) != keyBoardMap_.end()) {
+    const auto& keyBoardMap = TextInputClient::GetAutoFillKeyboardMap();
+    if (keyBoardMap.find(autoFillType) != keyBoardMap.end()) {
         TAG_LOGI(AceLogTag::ACE_TEXT_FIELD,
-            "Set InputType to %{public}d because of contentType", keyBoardMap_[autoFillType]);
-        keyboard_ = keyBoardMap_[autoFillType];
+            "Set InputType to %{public}d because of contentType", keyBoardMap.at(autoFillType));
+        keyboard_ = keyBoardMap.at(autoFillType);
     }
 }
 
@@ -5978,10 +5816,7 @@ bool TextFieldPattern::RequestKeyboard(bool isFocusViewChanged, bool needStartTw
         SendAttachPrivateCommand(inputMethod, textFieldManager);
     }
     UpdateCaretInfoToController(true);
-    auto fillContentMap = textFieldManager->GetFillContentMap(tmpHost->GetId());
-    if (!fillContentMap.empty() && NeedsSendFillContent()) {
-        inputMethod->SendPrivateCommand(fillContentMap);
-    }
+    SendAccountRecommendCommand(textFieldManager);
 #else
     ok = RequestKeyboardCrossPlatForm(isFocusViewChanged);
 #endif
@@ -6141,24 +5976,12 @@ void TextFieldPattern::GetInlinePositionYAndHeight(double& positionY, double& he
 
 AceAutoFillType TextFieldPattern::ConvertToAceAutoFillType(TextInputType type)
 {
-    static std::unordered_map<TextInputType, AceAutoFillType> convertMap = {
-        { TextInputType::VISIBLE_PASSWORD, AceAutoFillType::ACE_PASSWORD },
-        { TextInputType::USER_NAME, AceAutoFillType::ACE_USER_NAME },
-        { TextInputType::NEW_PASSWORD, AceAutoFillType::ACE_NEW_PASSWORD },
-        { TextInputType::NUMBER_PASSWORD, AceAutoFillType::ACE_PASSWORD } };
-    auto it = convertMap.find(type);
-    if (it != convertMap.end()) {
-        return it->second;
-    }
-    return AceAutoFillType::ACE_UNSPECIFIED;
+    return NG::ConvertToAceAutoFillType(type);
 }
 
 AceAutoFillType TextFieldPattern::TextContentTypeToAceAutoFillType(const TextContentType& type)
 {
-    if (contentTypeMap_.find(type) != contentTypeMap_.end()) {
-        return contentTypeMap_[type].first;
-    }
-    return contentTypeMap_[TextContentType::UNSPECIFIED].first;
+    return NG::TextContentTypeToAceAutoFillType(type);
 }
 
 bool TextFieldPattern::CloseKeyboard(bool forceClose)
@@ -6634,28 +6457,24 @@ bool TextFieldPattern::FinishTextPreviewByPreview(const std::u16string& insertVa
     return false;
 }
 
-void TextFieldPattern::UpdateObscure(const std::u16string& insertValue, bool hasInsertValue)
+bool TextFieldPattern::IsSingleLineForPassword() const
 {
-    if (!IsTextArea() && IsInPasswordMode() && GetTextObscured()) {
-        auto host = GetHost();
-        CHECK_NULL_VOID(host);
-        auto layoutProperty = host->GetLayoutProperty<TextFieldLayoutProperty>();
-        CHECK_NULL_VOID(layoutProperty);
-        auto inputType = layoutProperty->GetTextInputTypeValue(TextInputType::UNSPECIFIED);
-        if (insertValue.length() == 1 &&
-            (inputType != TextInputType::NUMBER_PASSWORD || std::isdigit(insertValue[0])) &&
-            hasInsertValue) {
-            auto content = contentController_->GetTextUtf16Value();
-            auto result = TextInputObscureUtils::UpdateObscureState(
-                inputType, insertValue, hasInsertValue, content,
-                selectController_->GetCaretIndex());
-            obscureTickCountDown_ = result.tickCountDown;
-            nakedCharPosition_ = result.nakedCharPosition;
-        } else {
-            obscureTickCountDown_ = 0;
-            nakedCharPosition_ = -1;
-        }
-    }
+    return !IsTextArea();
+}
+
+std::u16string TextFieldPattern::GetObscureContent() const
+{
+    return contentController_->GetTextUtf16Value();
+}
+
+int32_t TextFieldPattern::GetObscureCaretPosition() const
+{
+    return selectController_->GetCaretIndex();
+}
+
+bool TextFieldPattern::HasObscureContent() const
+{
+    return !contentController_->GetTextUtf16Value().empty();
 }
 
 void TextFieldPattern::InsertValue(const std::u16string& insertValue, bool isIME)
@@ -7608,15 +7427,7 @@ bool TextFieldPattern::RequestKeyboardNotByFocusSwitch(RequestKeyboardReason rea
     TAG_LOGI(AceLogTag::ACE_TEXT_FIELD, "%{public}d requestKB, reason: %{public}s, sourceType:%{public}d",
         tmpHost->GetId(), TextFieldPattern::RequestKeyboardReasonToString(reason).c_str(),
         static_cast<int32_t>(sourceType));
-    if (!RequestKeyboard(false, true, true, sourceType)) {
-        return false;
-    }
-    auto context = tmpHost->GetContextRefPtr();
-    CHECK_NULL_RETURN(context, true);
-    auto textFieldManager = DynamicCast<TextFieldManagerNG>(context->GetTextFieldManager());
-    CHECK_NULL_RETURN(textFieldManager, true);
-    textFieldManager->SetNeedToRequestKeyboard(false);
-    return true;
+    return DoRequestKeyboardNotByFocusSwitch(sourceType);
 }
 
 bool TextFieldPattern::TextFieldRequestFocus(RequestFocusReason reason)
@@ -8467,18 +8278,6 @@ void TextFieldPattern::HandleCloseKeyboard(bool forceClose)
             FocusHub::LostFocusToViewRoot();
         }
     }
-}
-
-int32_t TextFieldPattern::GetNakedCharPosition() const
-{
-    if (!TextInputObscureUtils::ShouldRevealNakedChar(
-            !IsTextArea(), IsInPasswordMode(), GetTextObscured(), obscureTickCountDown_)) {
-        return -1;
-    }
-    auto layoutProperty = GetLayoutProperty<TextFieldLayoutProperty>();
-    CHECK_NULL_RETURN(layoutProperty, -1);
-    auto content = contentController_->GetTextUtf16Value();
-    return content.empty() ? -1 : nakedCharPosition_;
 }
 
 std::string TextFieldPattern::TextInputTypeToString() const
@@ -9527,31 +9326,6 @@ void TextFieldPattern::ApplyInlineTheme()
     ProcessInlinePaddingAndMargin();
 }
 
-bool TextFieldPattern::ResetObscureTickCountDown()
-{
-    auto oldTickCountDown_ = obscureTickCountDown_;
-    if (!IsTextArea() && GetTextObscured() && IsInPasswordMode()) {
-        obscureTickCountDown_ = 0;
-    }
-    return oldTickCountDown_ != obscureTickCountDown_;
-}
-
-bool TextFieldPattern::IsInPasswordMode() const
-{
-    auto layoutProperty = GetLayoutProperty<TextFieldLayoutProperty>();
-    CHECK_NULL_RETURN(layoutProperty, false);
-    auto inputType = layoutProperty->GetTextInputTypeValue(TextInputType::UNSPECIFIED);
-    return IsPasswordInputType(inputType);
-}
-
-bool TextFieldPattern::IsOneTimeCodeType() const
-{
-    auto layoutProperty = GetLayoutProperty<TextFieldLayoutProperty>();
-    CHECK_NULL_RETURN(layoutProperty, false);
-    auto inputType = layoutProperty->GetTextInputTypeValue(TextInputType::UNSPECIFIED);
-    return IsOneTimeCodeInputType(inputType);
-}
-
 bool TextFieldPattern::IsNormalInlineState() const
 {
     auto paintProperty = GetPaintProperty<TextFieldPaintProperty>();
@@ -10034,6 +9808,40 @@ void TextFieldPattern::DumpInfo()
     DumpAdvanceInfo();
 }
 
+void TextFieldPattern::DumpInspectorTreeInfo(
+    std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context)
+{
+    const auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    const auto render = host->GetRenderContext();
+    const bool obscured = render && !render->GetObscuredValue({}).empty();
+    const bool password = IsInPasswordMode();
+    const bool canExport = context.CanExportText(InspectorTextKind::INPUT_VALUE, password, obscured);
+    attrs->Put("content", canExport ? GetTextValue().c_str() : "");
+    attrs->Put("placeholder", UtfUtils::Str16ToStr8(GetPlaceHolder()).c_str());
+    const auto layout = GetLayoutProperty<TextFieldLayoutProperty>();
+    if (layout && layout->HasEnableAutoFill()) {
+        attrs->Put("enableAutoFill", layout->GetEnableAutoFillValue(true));
+    }
+    if (!context.config.accessibilityInfo) {
+        return;
+    }
+    attrs->Put("password", password);
+    attrs->Put("multiLine", IsTextArea());
+    const auto property = host->GetAccessibilityProperty<AccessibilityProperty>();
+    CHECK_NULL_VOID(property);
+    attrs->Put("selectionStart", property->GetTextSelectionStart());
+    attrs->Put("selectionEnd", property->GetTextSelectionEnd());
+    attrs->Put("inputType", static_cast<int32_t>(property->GetTextInputType()));
+    if (layout && layout->HasMaxLength() && GetMaxLength() < Infinity<uint32_t>()) {
+        attrs->Put("textLengthLimit", static_cast<int64_t>(GetMaxLength()));
+    }
+    const auto error = GetErrorTextState() ? UtfUtils::Str16ToStr8(GetErrorTextString()) : "";
+    if (!error.empty()) {
+        attrs->Put("error", error.c_str());
+    }
+}
+
 void TextFieldPattern::DumpSimplifyInfo(std::shared_ptr<JsonValue>& json)
 {
     json->Put("content", IsInPasswordMode() ? "" : GetTextValue().c_str());
@@ -10112,6 +9920,45 @@ void TextFieldPattern::DumpTextEngineInfo()
         .append(std::to_string(paragraph_->GetLongestLine()))
         .append(" GetLongestLineWithIndent:")
         .append(std::to_string(paragraph_->GetLongestLineWithIndent())));
+}
+
+void TextFieldPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree()) {
+        Pattern::DumpAdvanceInfo(json);
+        return;
+    }
+    if (config.visualProperties) {
+        DumpAdvanceVisualProperties(json, config);
+    }
+    if (config.functionalProperties) {
+        DumpAdvanceFunctionalProperties(json, config);
+    }
+}
+
+void TextFieldPattern::DumpAdvanceVisualProperties(
+    std::unique_ptr<JsonValue>& json, const ParamConfig& /* config */)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto theme = GetTheme();
+    CHECK_NULL_VOID(theme);
+    auto property = GetLayoutProperty<TextFieldLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    json->Put("FontColor", property->GetTextColorValue(theme->GetTextColor()).ColorToString().c_str());
+    // Preserve local layout rectangles without adding input-method cursor geometry.
+    json->Put("textRect", textRect_.ToString().c_str());
+    json->Put("contentRect", contentRect_.ToString().c_str());
+}
+
+void TextFieldPattern::DumpAdvanceFunctionalProperties(
+    std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (config.IsPublicTree()) {
+        json->Put("CustomKeyboard", static_cast<bool>((customKeyboard_ || customKeyboardBuilder_)));
+    } else {
+        json->Put("CustomKeyboard", (customKeyboard_ || customKeyboardBuilder_) ? "true" : "false");
+    }
 }
 
 void TextFieldPattern::DumpAdvanceInfo()
@@ -10545,13 +10392,11 @@ void TextFieldPattern::OnObscuredChanged(bool isObscured)
     if (obscuredChange_) {
         selectController_->UpdateCaretIndex(static_cast<int32_t>(contentController_->GetTextUtf16Value().length()));
     }
+    if (obscuredChange_) {
+        FireSecurityStateChanged(!isObscured);
+    }
     auto host = GetHost();
     CHECK_NULL_VOID(host);
-    if (obscuredChange_) {
-        auto eventHub = host->GetEventHub<TextFieldEventHub>();
-        CHECK_NULL_VOID(eventHub);
-        eventHub->FireOnSecurityStateChanged(!isObscured);
-    }
     host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF_AND_PARENT);
 }
 
@@ -10623,15 +10468,6 @@ bool TextFieldPattern::IsShowUnit() const
            unitNode_ != nullptr;
 }
 
-bool TextFieldPattern::IsShowPasswordIcon() const
-{
-    auto layoutProperty = GetLayoutProperty<TextFieldLayoutProperty>();
-    CHECK_NULL_RETURN(layoutProperty, false);
-    auto textfieldTheme = GetTheme();
-    CHECK_NULL_RETURN(textfieldTheme, false);
-    return IsShowPasswordIconImpl(layoutProperty, textfieldTheme->IsShowPasswordIcon()) && IsInPasswordMode();
-}
-
 std::optional<bool> TextFieldPattern::IsShowPasswordText() const
 {
     auto layoutProperty = GetLayoutProperty<TextFieldLayoutProperty>();
@@ -10656,18 +10492,16 @@ bool TextFieldPattern::IsShowVoiceButtonMode() const
         !customKeyboard_ && !customKeyboardBuilder_;
 }
 
-void TextFieldPattern::CheckPasswordAreaState()
+std::optional<bool> TextFieldPattern::GetObscuredState()
 {
-    auto showPasswordState = IsShowPasswordText();
-    if (!showPasswordState.has_value()) {
-        return;
-    }
-    auto passwordArea = AceType::DynamicCast<PasswordResponseArea>(responseArea_);
-    CHECK_NULL_VOID(passwordArea);
-    if (!showPasswordState_.has_value() || showPasswordState_.value() != showPasswordState.value()) {
-        passwordArea->SetObscured(!showPasswordState.value());
-        showPasswordState_ = showPasswordState.value();
-    }
+    auto showPasswordText = IsShowPasswordText();
+    CHECK_NULL_RETURN(showPasswordText.has_value(), std::nullopt);
+    return !showPasswordText.value();
+}
+
+RefPtr<NG::PasswordResponseArea> TextFieldPattern::GetPasswordResponseArea()
+{
+    return AceType::DynamicCast<NG::PasswordResponseArea>(responseArea_);
 }
 
 void TextFieldPattern::ProcessCancelButton()
@@ -10703,28 +10537,7 @@ void TextFieldPattern::ProcessResponseArea()
     ACE_UINODE_TRACE(host);
     ProcessCancelButton();
     ProcessVoiceButton();
-    if (IsInPasswordMode()) {
-        auto passwordArea = AceType::DynamicCast<PasswordResponseArea>(responseArea_);
-        if (passwordArea) {
-            if (IsShowPasswordIcon()) {
-                passwordArea->Refresh();
-            } else {
-                passwordArea->ClearArea();
-            }
-            CheckPasswordAreaState();
-            return;
-        }
-        // responseArea_ may not be a password area.
-        if (responseArea_) {
-            responseArea_->ClearArea();
-        }
-        responseArea_ = AceType::MakeRefPtr<PasswordResponseArea>(WeakClaim(this), GetTextObscured());
-        if (IsShowPasswordIcon()) {
-            responseArea_->InitResponseArea();
-        } else {
-            responseArea_->ClearArea();
-        }
-        CheckPasswordAreaState();
+    if (ProcessPasswordArea()) {
         return;
     }
 
@@ -10860,36 +10673,22 @@ void TextFieldPattern::FocusForwardStopTwinkling()
 
 bool TextFieldPattern::UpdateFocusForward()
 {
-    return HandleFocusForward(focusIndex_);
-}
-
-bool TextFieldPattern::HandleFocusForward(FocuseIndex index)
-{
-    if (!HasFocus()) {
-        return false;
-    }
-    auto next = focusForwardMap_.find(index);
-    if (next == focusForwardMap_.end()) {
-        return false;
-    }
-    return HandleSwithFocus(next->second) || HandleFocusForward(next->second);
+    return CleanNodeHostBase::HandleFocusForwardImpl(focusIndex_);
 }
 
 bool TextFieldPattern::UpdateFocusBackward()
 {
-    return HandleFocusBackward(focusIndex_);
+    return CleanNodeHostBase::HandleFocusBackwardImpl(focusIndex_);
 }
 
-bool TextFieldPattern::HandleFocusBackward(FocuseIndex index)
+const std::unordered_map<FocuseIndex, FocuseIndex>& TextFieldPattern::GetFocusForwardMap() const
 {
-    if (!HasFocus()) {
-        return false;
-    }
-    auto next = focusBackwardMap_.find(index);
-    if (next == focusBackwardMap_.end()) {
-        return false;
-    }
-    return HandleSwithFocus(next->second) || HandleFocusBackward(next->second);
+    return focusForwardMap_;
+}
+
+const std::unordered_map<FocuseIndex, FocuseIndex>& TextFieldPattern::GetFocusBackwardMap() const
+{
+    return focusBackwardMap_;
 }
 
 bool TextFieldPattern::HandleSwithFocus(FocuseIndex index)
@@ -11818,29 +11617,16 @@ int32_t TextFieldPattern::CheckPreviewTextValidate(const std::string& previewVal
     return CheckPreviewTextValidate(UtfUtils::Str8DebugToStr16(previewValue), range);
 }
 
-PreviewTextStyle TextFieldPattern::GetPreviewTextStyle() const
-{
-    auto defaultStyle = PreviewTextStyle::NORMAL;
-    auto paintProperty = GetPaintProperty<TextFieldPaintProperty>();
-    CHECK_NULL_RETURN(paintProperty, defaultStyle);
-    if (paintProperty->HasPreviewTextStyle()) {
-        auto style = paintProperty->GetPreviewTextStyle();
-        CHECK_NULL_RETURN(style, defaultStyle);
-        if (style.value() == PREVIEW_STYLE_NORMAL) {
-            return PreviewTextStyle::NORMAL;
-        } else if (style.value() == PREVIEW_STYLE_UNDERLINE) {
-            return PreviewTextStyle::UNDERLINE;
-        }
-    }
-    return defaultStyle;
-}
-
 void TextFieldPattern::ReceivePreviewTextStyle(const std::string& style)
 {
     auto paintProperty = GetPaintProperty<TextFieldPaintProperty>();
     CHECK_NULL_VOID(paintProperty);
     if (!style.empty()) {
-        paintProperty->UpdatePreviewTextStyle(style);
+        PreviewTextStyling previewTextStyling;
+        if (style == PREVIEW_STYLE_UNDERLINE) {
+            previewTextStyling.underlineShape = PreviewTextStyle::UNDERLINE;
+        }
+        SetPreviewTextStyling(previewTextStyling);
     }
 }
 
@@ -12602,6 +12388,7 @@ TextFieldInfo TextFieldPattern::GenerateTextFieldInfo()
     textFieldInfo.enableAutoFill = layoutProperty->GetEnableAutoFillValue(true);
     textFieldInfo.inputType = layoutProperty->GetTextInputTypeValue(TextInputType::UNSPECIFIED);
     textFieldInfo.contentType = layoutProperty->GetTextContentTypeValue(TextContentType::UNSPECIFIED);
+    textFieldInfo.autoFillType = GetAutoFillType();
     return textFieldInfo;
 }
 
@@ -13270,20 +13057,6 @@ void TextFieldPattern::InitPasswordButtonMouseEvent()
 
 // ICleanNodeHost behavioral hooks — implementations moved to CleanNodeResponseArea.
 
-void TextFieldPattern::SetCleanHoverColorAndRect(const RoundRect& rect, uint32_t color)
-{
-    CHECK_NULL_VOID(textFieldOverlayModifier_);
-    std::vector<RoundRect> roundRectVector;
-    roundRectVector.push_back(rect);
-    textFieldOverlayModifier_->SetHoverColorAndRects(roundRectVector, color);
-}
-
-void TextFieldPattern::ClearCleanHoverColorAndRects()
-{
-    CHECK_NULL_VOID(textFieldOverlayModifier_);
-    textFieldOverlayModifier_->ClearHoverColorAndRects();
-}
-
 void TextFieldPattern::OnCleanNodeHover(bool isHover, const HoverInfo& info)
 {
     OnHover(isHover, info);
@@ -13299,33 +13072,17 @@ void TextFieldPattern::SetCancelButtonTouched(bool touched)
     cancelButtonTouched_ = touched;
 }
 
-bool TextFieldPattern::SetPasswordIconHoverColor(const std::vector<RoundRect>& rects, uint32_t color)
+bool TextFieldPattern::SetOverlayHoverColorAndRects(const std::vector<RoundRect>& rects, uint32_t color)
 {
-    auto host = GetHost();
-    CHECK_NULL_RETURN(host, false);
-    return SetPasswordIconHoverColorImpl(textFieldOverlayModifier_, rects, color, host, PROPERTY_UPDATE_MEASURE_SELF);
-}
-
-bool TextFieldPattern::ClearPasswordIconHoverColor()
-{
-    auto host = GetHost();
-    CHECK_NULL_RETURN(host, false);
-    return ClearPasswordIconHoverColorImpl(textFieldOverlayModifier_, host, PROPERTY_UPDATE_MEASURE_SELF);
-}
-
-bool TextFieldPattern::GetPasswordIconHoverColor(uint32_t& color)
-{
-    auto textFieldTheme = GetTheme();
-    CHECK_NULL_RETURN(textFieldTheme, false);
-    color = textFieldTheme->GetHoverColor().GetValue();
+    CHECK_NULL_RETURN(textFieldOverlayModifier_, false);
+    textFieldOverlayModifier_->SetHoverColorAndRects(rects, color);
     return true;
 }
 
-bool TextFieldPattern::GetPasswordIconPressColor(uint32_t& color)
+bool TextFieldPattern::ClearOverlayHoverColorAndRects()
 {
-    auto textFieldTheme = GetTheme();
-    CHECK_NULL_RETURN(textFieldTheme, false);
-    color = textFieldTheme->GetPressColor().GetValue();
+    CHECK_NULL_RETURN(textFieldOverlayModifier_, false);
+    textFieldOverlayModifier_->ClearHoverColorAndRects();
     return true;
 }
 
@@ -13495,59 +13252,37 @@ void TextFieldPattern::OnReportSubmitEvent(const RefPtr<FrameNode>& frameNode)
 }
 
 #ifdef ENABLE_AUTO_FILL_CONTROLLER
-void TextFieldPattern::BeforeAutoFillAnimation(const std::u16string& content, const AceAutoFillType& type)
+// BeforeAutoFillAnimation is now provided by AutoFillHostBase (delegates to ExecuteBeforeAutoFillAnimation).
+// Only the component-specific hooks are implemented here.
+std::u16string TextFieldPattern::PrepareAutoFillText(const std::u16string& content)
 {
-    auto host = GetHost();
-    CHECK_NULL_VOID(host);
-    auto layoutProperty = GetLayoutProperty<TextFieldLayoutProperty>();
-    CHECK_NULL_VOID(layoutProperty);
-    auto enableAutoFillAnimation = layoutProperty->GetEnableAutoFillAnimationValue(true);
     auto textValue = content;
     contentController_->FilterValue(textValue);
-    CHECK_NULL_VOID(GetOrCreateAutoFillController());
-    autoFillController_->SetAutoFillTextUtf16Value(textValue);
-    auto onFinishCallback = [weak = AceType::WeakClaim(this), textValue, unFilteredValue = content]() {
-        auto textFieldPattern = weak.Upgrade();
-        CHECK_NULL_VOID(textFieldPattern);
-        auto autoFillController = textFieldPattern->GetOrCreateAutoFillController();
-        CHECK_NULL_VOID(autoFillController);
-        autoFillController->ResetAutoFillAnimationStatus();
-        auto hostNode = textFieldPattern->GetHost();
-        CHECK_NULL_VOID(hostNode);
-        if (!textFieldPattern->OnWillChangePreSetValue(unFilteredValue)) {
-            hostNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
-            return;
-        }
-        auto contentController = textFieldPattern->GetTextContentController();
-        CHECK_NULL_VOID(contentController);
-        contentController->SetTextValue(unFilteredValue);
-        auto textLength = static_cast<int32_t>(contentController->GetTextUtf16Value().length());
-        auto selectController = textFieldPattern->GetTextSelectController();
-        CHECK_NULL_VOID(selectController);
-        selectController->UpdateCaretIndex(textLength);
-        hostNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
-    };
-    auto pipeline = PipelineContext::GetCurrentContextSafelyWithCheck();
-    auto needsAnimation = pipeline && enableAutoFillAnimation &&
-                          (type == AceAutoFillType::ACE_NEW_PASSWORD || type == AceAutoFillType::ACE_PASSWORD) &&
-                          textValue.length() > 0;
-    if (needsAnimation) {
-        autoFillController_->SetAutoFillAnimationStatus(AutoFillAnimationStatus::SHOW_ICON);
-        host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
-        pipeline->AddAfterLayoutTask(
-            [weak = AceType::WeakClaim(this), onFinish = std::move(onFinishCallback), textValue]() {
-                auto textFieldPattern = weak.Upgrade();
-                CHECK_NULL_VOID(textFieldPattern);
-                auto autoFillController = textFieldPattern->GetOrCreateAutoFillController();
-                CHECK_NULL_VOID(autoFillController);
-                autoFillController->StartAutoFillAnimation(onFinish, textValue);
-            });
-    } else {
-        onFinishCallback();
+    return textValue;
+}
+ 
+bool TextFieldPattern::IsAutoFillAnimationEnabled() const
+{
+    auto layoutProperty = GetLayoutProperty<TextFieldLayoutProperty>();
+    CHECK_NULL_RETURN(layoutProperty, true);
+    return layoutProperty->GetEnableAutoFillAnimationValue(true);
+}
+ 
+void TextFieldPattern::ExecuteAutoFillInsert(const std::u16string& content)
+{
+    if (!OnWillChangePreSetValue(content)) {
+        return;
     }
+    auto contentController = GetTextContentController();
+    CHECK_NULL_VOID(contentController);
+    contentController->SetTextValue(content);
+    auto textLength = static_cast<int32_t>(contentController->GetTextUtf16Value().length());
+    auto selectController = GetTextSelectController();
+    CHECK_NULL_VOID(selectController);
+    selectController->UpdateCaretIndex(textLength);
 }
 #else
-void TextFieldPattern::BeforeAutoFillAnimation(const std::u16string& content, const AceAutoFillType& type) {}
+// hooks are no-ops when ENABLE_AUTO_FILL_CONTROLLER is off (default impls from IAutoFillHost)
 #endif
 
 void TextFieldPattern::RemoveFillContentMap()
@@ -13560,6 +13295,7 @@ void TextFieldPattern::RemoveFillContentMap()
     CHECK_NULL_VOID(textFieldManager);
     auto nodeId = host->GetId();
     textFieldManager->RemoveFillContentMap(nodeId);
+    textFieldManager->RemoveAccountList(nodeId);
 }
 
 void TextFieldPattern::RemoveMSDPAutoFillType()
@@ -13571,6 +13307,54 @@ void TextFieldPattern::RemoveMSDPAutoFillType()
     auto textFieldManager = DynamicCast<TextFieldManagerNG>(pipeline->GetTextFieldManager());
     CHECK_NULL_VOID(textFieldManager);
     textFieldManager->RemoveMSDPAutoFillType(host->GetId());
+}
+
+void TextFieldPattern::TryRecommendTypedUserName(
+    const RefPtr<TextFieldManagerNG>& textFieldManager, FillContentMap& fillContentMap)
+{
+    auto autoFillContainerNode = firstAutoFillContainerNode_.Upgrade();
+    CHECK_NULL_VOID(autoFillContainerNode);
+    auto containerId = autoFillContainerNode->GetId();
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto userNameNode = textFieldManager->GetUserNameNodeInContainer(containerId, host->GetId());
+    CHECK_NULL_VOID(userNameNode);
+    auto userNamePattern = userNameNode->GetPattern<TextFieldPattern>();
+    CHECK_NULL_VOID(userNamePattern);
+    auto typedName = userNamePattern->GetTextValue();
+    if (typedName.empty()) {
+        return;
+    }
+    auto normTyped = NormalizeAccount(typedName);
+    if (normTyped.empty()) {
+        return;
+    }
+    auto accountList = textFieldManager->GetAccountList(host->GetId());
+    // Prefix match on normalized forms (ignore spaces and case); each cached
+    // entry is {raw, normalized}. Push the raw account so the vault can
+    // resolve it on click.
+    for (const auto& account : accountList) {
+        if (account.second.compare(0, normTyped.size(), normTyped) == 0) {
+            fillContentMap["userName"] = account.first;
+            return;
+        }
+    }
+}
+
+void TextFieldPattern::SendAccountRecommendCommand(const RefPtr<TextFieldManagerNG>& textFieldManager)
+{
+#if defined(ENABLE_STANDARD_INPUT)
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto fillContentMap = textFieldManager->GetFillContentMap(host->GetId());
+    if (fillContentMap.empty() || !NeedsSendFillContent()) {
+        return;
+    }
+    TryRecommendTypedUserName(textFieldManager, fillContentMap);
+    auto inputMethod = MiscServices::InputMethodController::GetInstance();
+    CHECK_NULL_VOID(inputMethod);
+    inputMethod->SendPrivateCommand(fillContentMap);
+#endif
 }
 
 bool TextFieldPattern::NeedsSendFillContent()
@@ -14965,6 +14749,25 @@ std::string TextFieldPattern::GetPageTranslateTextForReport() const
         return "";
     }
     return UtfUtils::Str16DebugToStr8(currentPlaceholder);
+}
+
+std::string TextFieldPattern::GetPageTextForReport(bool includeInput) const
+{
+    if (includeInput && !IsInPasswordMode() && !GetTextUtf16Value().empty()) {
+        return UtfUtils::Str16DebugToStr8(GetTextUtf16Value());
+    }
+    return GetPageTranslateTextForReport();
+}
+
+int32_t TextFieldPattern::GetPageTextPlaceholderNodeId() const
+{
+    if (placeholderResponseArea_) {
+        auto node = placeholderResponseArea_->GetFrameNode();
+        if (node) {
+            return node->GetId();
+        }
+    }
+    return -1;
 }
 
 bool TextFieldPattern::ApplyPageTranslateResult(const std::string& result, int64_t version)

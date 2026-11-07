@@ -84,6 +84,14 @@ public:
         return userCallback_ != nullptr;
     }
 
+    // Whether a developer-visible click callback is bound. clickEvents_ also carries
+    // component-internal click listeners (toggle, menu item, search and so on), so only the
+    // public callback members count as a developer response for the PageScene RESPONSE scene.
+    bool HasDeveloperClickCallback() const
+    {
+        return userCallback_ != nullptr || jsFrameNodeCallback_ != nullptr;
+    }
+
     bool IsComponentClickable() const;
 
     void AddClickEvent(const RefPtr<ClickEvent>& clickEvent);
@@ -130,6 +138,7 @@ public:
     void CopyClickEvent(const RefPtr<ClickEventActuator>& clickEventActuator);
     
 private:
+    void PublishClick(GestureEvent& info);
     WeakPtr<GestureEventHub> gestureEventHub_;
     std::list<RefPtr<ClickEvent>> clickEvents_;
     RefPtr<ClickEvent> clickAfterEvents_;

@@ -18,9 +18,9 @@
 #include "core/components_ng/render/divider_painter.h"
 
 namespace OHOS::Ace::NG {
-DividerModifier::DividerModifier()
+DividerModifier::DividerModifier(const LinearColor& initialColor)
 {
-    color_ = AceType::MakeRefPtr<AnimatablePropertyColor>(LinearColor::BLUE);
+    color_ = AceType::MakeRefPtr<AnimatablePropertyColor>(initialColor);
     strokeWidth_ = AceType::MakeRefPtr<AnimatablePropertyFloat>(0.0);
     dividerLength_ = AceType::MakeRefPtr<PropertyFloat>(0.0);
     lineCap_ = AceType::MakeRefPtr<PropertyInt>(0);

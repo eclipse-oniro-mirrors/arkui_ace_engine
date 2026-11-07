@@ -19,6 +19,7 @@
 #include "base/hiviewdfx/histogram_wrapper.h"
 #include "base/log/log_wrapper.h"
 #include "base/thread/frame_trace_adapter.h"
+#include "base/utils/napi_scope_raii.h"
 #include "core/animation/animation.h"
 #include "core/animation/curve_animation.h"
 
@@ -357,7 +358,7 @@ static napi_value JSReset(napi_env env, napi_callback_info info)
         NapiThrow(env, "Internal error. Animator is null in AnimatorResult.", ERROR_CODE_INTERNAL_ERROR);
         return nullptr;
     }
-    TAG_LOGI(AceLogTag::ACE_ANIMATION, "jsAnimator reset, id:%{public}d", animator->GetId());
+    TAG_LOGD(AceLogTag::ACE_ANIMATION, "jsAnimator reset, id:%{public}d", animator->GetId());
     if (option->iterations == ANIMATION_REPEAT_INFINITE && option->duration == 0) {
         ACE_ENGINE_HISTOGRAM_BOOLEAN("@ohos.animator.reset", 1);
     }
@@ -369,9 +370,8 @@ static napi_value JSReset(napi_env env, napi_callback_info info)
         auto onFrameCallback = [env, onframeRef, id = animator->GetId(),
                                    weakOption = std::weak_ptr<AnimatorOption>(animatorResult->GetAnimatorOption())](
                                    double value) {
-            napi_handle_scope scope = nullptr;
-            napi_open_handle_scope(env, &scope);
-            if (scope == nullptr) {
+            ScopeRAII scope(env);
+            if (!scope) {
                 TAG_LOGW(
                     AceLogTag::ACE_ANIMATION, "jsAnimator call onFrame failed, scope is null, id:%{public}d", id);
                 return;
@@ -385,14 +385,12 @@ static napi_value JSReset(napi_env env, napi_callback_info info)
                 TAG_LOGW(AceLogTag::ACE_ANIMATION,
                     "jsAnimator call onFrame failed, get reference result:%{public}d, id:%{public}d",
                     result == napi_ok, id);
-                napi_close_handle_scope(env, scope);
                 return;
             }
             ACE_SCOPED_TRACE(
                 "jsAnimator onframe. duration:%d, curve:%s, id:%d", option->duration, option->easing.c_str(), id);
             napi_create_double(env, value, &valueNapi);
             napi_call_function(env, nullptr, onframe, 1, &valueNapi, &ret);
-            napi_close_handle_scope(env, scope);
         };
         RefPtr<Animation<double>> animation;
         RefPtr<Motion> motion = ParseOptionToMotion(option);
@@ -476,7 +474,7 @@ static napi_value JSPause(napi_env env, napi_callback_info info)
     if (!animator) {
         return nullptr;
     }
-    TAG_LOGI(AceLogTag::ACE_ANIMATION, "jsAnimator pause, id:%{public}d", animator->GetId());
+    TAG_LOGD(AceLogTag::ACE_ANIMATION, "jsAnimator pause, id:%{public}d", animator->GetId());
     animator->Pause();
     napi_value result;
     napi_get_null(env, &result);
@@ -522,7 +520,7 @@ static napi_value JSReverse(napi_env env, napi_callback_info info)
             return nullptr;
         }
     }
-    TAG_LOGI(AceLogTag::ACE_ANIMATION, "jsAnimator reverse, id:%{public}d", animator->GetId());
+    TAG_LOGD(AceLogTag::ACE_ANIMATION, "jsAnimator reverse, id:%{public}d", animator->GetId());
     animator->Reverse();
     napi_value result;
     napi_get_null(env, &result);
@@ -638,9 +636,8 @@ static napi_value SetOnframe(napi_env env, napi_callback_info info)
     auto onFrameCallback = [env, onframeRef, id = animator->GetId(),
                                weakOption = std::weak_ptr<AnimatorOption>(animatorResult->GetAnimatorOption())](
                                double value) {
-        napi_handle_scope scope = nullptr;
-        napi_open_handle_scope(env, &scope);
-        if (scope == nullptr) {
+        ScopeRAII scope(env);
+        if (!scope) {
             TAG_LOGW(AceLogTag::ACE_ANIMATION, "jsAnimator call onFrame failed, scope is null, id:%{public}d", id);
             return;
         }
@@ -653,14 +650,12 @@ static napi_value SetOnframe(napi_env env, napi_callback_info info)
             TAG_LOGW(AceLogTag::ACE_ANIMATION,
                 "jsAnimator call onFrame failed, get reference result:%{public}d, id:%{public}d", result == napi_ok,
                 id);
-            napi_close_handle_scope(env, scope);
             return;
         }
         ACE_SCOPED_TRACE(
             "jsAnimator onframe. duration:%d, curve:%s, id:%d", option->duration, option->easing.c_str(), id);
         napi_create_double(env, value, &valueNapi);
         napi_call_function(env, nullptr, onframe, 1, &valueNapi, &ret);
-        napi_close_handle_scope(env, scope);
     };
     RefPtr<Animation<double>> animation;
     RefPtr<Motion> motion = ParseOptionToMotion(option);
@@ -715,11 +710,10 @@ static napi_value SetOnfinish(napi_env env, napi_callback_info info)
     napi_create_reference(env, onfinish, 1, &onfinishRef);
     animatorResult->SetOnfinishRef(onfinishRef);
     animator->ClearStopListeners();
-    TAG_LOGI(AceLogTag::ACE_ANIMATION, "jsAnimator set onFinish, id:%{public}d", animator->GetId());
+    TAG_LOGD(AceLogTag::ACE_ANIMATION, "jsAnimator set onFinish, id:%{public}d", animator->GetId());
     animator->AddStopListener([env, onfinishRef, id = animator->GetId()] {
-        napi_handle_scope scope = nullptr;
-        napi_open_handle_scope(env, &scope);
-        if (scope == nullptr) {
+        ScopeRAII scope(env);
+        if (!scope) {
             TAG_LOGW(AceLogTag::ACE_ANIMATION,
                 "jsAnimator set onFinish failed, scope is null, id:%{public}d", id);
             return;
@@ -728,19 +722,17 @@ static napi_value SetOnfinish(napi_env env, napi_callback_info info)
         napi_value onfinish = nullptr;
         auto result = napi_get_reference_value(env, onfinishRef, &onfinish);
         if (result != napi_ok || onfinish == nullptr) {
-            napi_close_handle_scope(env, scope);
             TAG_LOGW(AceLogTag::ACE_ANIMATION,
                 "jsAnimator set onFinish failed, id:%{public}d", id);
             return;
         }
         ACE_SCOPED_TRACE("jsAnimator finishCallback, id:%d", id);
-        TAG_LOGI(AceLogTag::ACE_ANIMATION, "jsAnimator set onFinish, id:%{public}d", id);
+        TAG_LOGI(AceLogTag::ACE_ANIMATION, "jsAnimator call onFinish, id:%{public}d", id);
         result = napi_call_function(env, NULL, onfinish, 0, NULL, &ret);
         if (result != napi_ok) {
             TAG_LOGW(
                 AceLogTag::ACE_ANIMATION, "jsAnimator call onFinish failed, err:%{public}d, id:%{public}d", result, id);
         }
-        napi_close_handle_scope(env, scope);
     });
     napi_value undefined;
     napi_get_undefined(env, &undefined);
@@ -781,20 +773,17 @@ static napi_value SetOncancel(napi_env env, napi_callback_info info)
     animatorResult->SetOncancelRef(oncancelRef);
     animator->ClearIdleListeners();
     animator->AddIdleListener([env, oncancelRef] {
-        napi_handle_scope scope = nullptr;
-        napi_open_handle_scope(env, &scope);
-        if (scope == nullptr) {
+        ScopeRAII scope(env);
+        if (!scope) {
             return;
         }
         napi_value ret = nullptr;
         napi_value oncancel = nullptr;
         auto result = napi_get_reference_value(env, oncancelRef, &oncancel);
         if (result != napi_ok || oncancel == nullptr) {
-            napi_close_handle_scope(env, scope);
             return;
         }
         napi_call_function(env, NULL, oncancel, 0, NULL, &ret);
-        napi_close_handle_scope(env, scope);
     });
     napi_value undefined;
     napi_get_undefined(env, &undefined);
@@ -835,20 +824,17 @@ static napi_value SetOnrepeat(napi_env env, napi_callback_info info)
     animatorResult->SetOnrepeatRef(onrepeatRef);
     animator->ClearRepeatListeners();
     animator->AddRepeatListener([env, onrepeatRef] {
-        napi_handle_scope scope = nullptr;
-        napi_open_handle_scope(env, &scope);
-        if (scope == nullptr) {
+        ScopeRAII scope(env);
+        if (!scope) {
             return;
         }
         napi_value ret = nullptr;
         napi_value onrepeat = nullptr;
         auto result = napi_get_reference_value(env, onrepeatRef, &onrepeat);
         if (result != napi_ok || onrepeat == nullptr) {
-            napi_close_handle_scope(env, scope);
             return;
         }
         napi_call_function(env, NULL, onrepeat, 0, NULL, &ret);
-        napi_close_handle_scope(env, scope);
     });
     napi_value undefined;
     napi_get_undefined(env, &undefined);

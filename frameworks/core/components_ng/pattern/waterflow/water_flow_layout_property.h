@@ -20,6 +20,10 @@
 #include "core/components_ng/layout/layout_property.h"
 #include "core/components_ng/pattern/scrollable/scrollable_layout_property.h"
 
+namespace OHOS::Ace {
+struct ScrollSnapStrategy;
+}
+
 namespace OHOS::Ace::NG {
 class InspectorFilter;
 
@@ -35,6 +39,7 @@ public:
     void Reset() override
     {
         ScrollableLayoutProperty::Reset();
+        ResetScrollSnapStrategy();
         ResetColumnsTemplate();
         ResetRowsTemplate();
         ResetColumnsGap();
@@ -150,6 +155,11 @@ public:
 
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(ScrollEnabled, bool, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(SyncLoad, bool, PROPERTY_UPDATE_NORMAL);
+    // Feat-20260806915269: item scroll snap strategy (built-in align or custom offset provider).
+    std::optional<ScrollSnapStrategy> GetScrollSnapStrategy() const;
+    void UpdateScrollSnapStrategy(const ScrollSnapStrategy& strategy);
+    void ResetScrollSnapStrategy();
+    std::string GetScrollSnapStrategyString() const;
     std::optional<std::string> GetFinalColumnsTemplate(double width);
 
     void UpdateContentClip(std::optional<ContentClip> contentClip) override
@@ -165,7 +175,7 @@ protected:
     {
         auto value = DynamicCast<WaterFlowLayoutProperty>(property);
         ScrollableLayoutProperty::Clone(value);
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propRowsTemplate_ = CloneRowsTemplate();
         value->propColumnsTemplate_ = CloneColumnsTemplate();
         value->propRowsGap_ = CloneRowsGap();
@@ -173,6 +183,10 @@ protected:
         value->propWaterflowDirection_ = CloneWaterflowDirection();
         value->propScrollEnabled_ = CloneScrollEnabled();
         value->propSyncLoad_ = CloneSyncLoad();
+        value->snapAlign_ = snapAlign_;
+        value->snapHasProvider_ = snapHasProvider_;
+        value->snapApproachOffset_ = snapApproachOffset_;
+        value->snapOffset_ = snapOffset_;
         if (itemLayoutConstraint_) {
             value->itemLayoutConstraint_ = std::make_unique<MeasureProperty>(*itemLayoutConstraint_);
         }
@@ -187,6 +201,10 @@ private:
     std::string GetWaterflowDirectionStr() const;
     std::unique_ptr<MeasureProperty> itemLayoutConstraint_;
     std::optional<ContentClip> contentClip_;
+    std::optional<ScrollSnapAlign> snapAlign_;
+    bool snapHasProvider_ = false;
+    std::function<double(double, double)> snapApproachOffset_;
+    std::function<double(double)> snapOffset_;
 };
 } // namespace OHOS::Ace::NG
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_WATERFLOW_WATER_FLOW_LAYOUT_PROPERTY_H

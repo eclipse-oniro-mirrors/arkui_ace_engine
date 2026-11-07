@@ -13,7 +13,10 @@
  * limitations under the License.
  */
 #include "interfaces/native/node/node_model.h"
+
+#include "base/log/log_wrapper.h"
 #include "interfaces/native/node/waterflow_section_option.h"
+#include "interfaces/native/node/scroll_option.h"
 #include "ui/base/utils/utils.h"
 
 #include "core/common/container.h"
@@ -637,6 +640,10 @@ void SetWaterFlowSectionOptions(ArkUINodeHandle node, ArkUI_Int32 start, ArkUIWa
                 // onGetItemMainSizeByIndex是一个返回float的函数指针
                 using FuncType = float (*)(int32_t, void*);
                 FuncType func = reinterpret_cast<FuncType>(sectionData.onGetItemMainSizeByIndex);
+                LOG_CALLBACK(sectionData.userData ?
+                    "OH_ArkUI_WaterFlowSectionOption_RegisterGetItemMainSizeCallbackByIndexWithUserData" :
+                    "OH_ArkUI_WaterFlowSectionOption_RegisterGetItemMainSizeCallbackByIndex",
+                    func);
                 float result = func(value, sectionData.userData);
                 return result;
             };
@@ -723,7 +730,16 @@ ArkUI_Float32 GetWaterFlowFriction(ArkUINodeHandle node)
     CHECK_NULL_RETURN(frameNode, 1);
     return WaterFlowModelNG::GetFriction(frameNode);
 }
-void SetScrollToIndex(
+void SetScrollToIndex(ArkUINodeHandle node, ArkUI_Int32 index, const ArkUIScrollToIndexOptions* options)
+{
+    auto* frameNode = GetFrameNode(node);
+    CHECK_NULL_VOID(frameNode);
+    CHECK_NULL_VOID(options);
+    WaterFlowModelNG::SetScrollToIndex(frameNode, index, options->smooth, options->align, options->extraOffset,
+        options->fastScrollMode);
+}
+
+void SetScrollToIndexCJ(
     ArkUINodeHandle node, ArkUI_Int32 index, ArkUI_Int32 animation, ArkUI_Int32 alignment, float options)
 {
     auto* frameNode = GetFrameNode(node);
@@ -1798,7 +1814,7 @@ const CJUIWaterFlowModifier* GetCJUIWaterFlowModifier()
         .getWaterFlowFriction = GetWaterFlowFriction,
         .setWaterflowFooter = SetWaterflowFooter,
         .resetWaterflowFooter = ResetWaterflowFooter,
-        .setScrollToIndex = SetScrollToIndex,
+        .setScrollToIndex = SetScrollToIndexCJ,
         .setWaterFlowFlingSpeedLimit = SetWaterFlowFlingSpeedLimit,
         .resetWaterFlowFlingSpeedLimit = ResetWaterFlowFlingSpeedLimit,
     };
