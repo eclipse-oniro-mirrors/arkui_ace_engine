@@ -472,31 +472,48 @@ void SetStickyImpl(Ark_NativePointer node, const Opt_StickyStyle* value)
 }
 
 } // WaterFlowAttributeModifier
+namespace {
+// SDK preview builds can still use the table generated before the edge attributes.
+template<typename Modifier>
+constexpr auto SetEdgeModifiersIfSupported(Modifier& modifier, int)
+    -> decltype(modifier.setHeader, void())
+{
+    modifier.setHeader = WaterFlowAttributeModifier::SetHeaderImpl;
+    modifier.setFooter = WaterFlowAttributeModifier::SetFooterImpl;
+    modifier.setSticky = WaterFlowAttributeModifier::SetStickyImpl;
+}
+
+template<typename Modifier>
+constexpr void SetEdgeModifiersIfSupported(Modifier&, long)
+{}
+} // namespace
+
 const GENERATED_ArkUIWaterFlowModifier* GetWaterFlowStaticModifier()
 {
-    static const GENERATED_ArkUIWaterFlowModifier ArkUIWaterFlowModifierImpl {
-        WaterFlowModifier::ConstructImpl,
-        WaterFlowInterfaceModifier::SetWaterFlowOptionsImpl,
-        WaterFlowAttributeModifier::SetHeaderImpl,
-        WaterFlowAttributeModifier::SetFooterImpl,
-        WaterFlowAttributeModifier::SetStickyImpl,
-        WaterFlowAttributeModifier::SetColumnsTemplateImpl,
-        WaterFlowAttributeModifier::SetItemConstraintSizeImpl,
-        WaterFlowAttributeModifier::SetRowsTemplateImpl,
-        WaterFlowAttributeModifier::SetColumnsGapImpl,
-        WaterFlowAttributeModifier::SetRowsGapImpl,
-        WaterFlowAttributeModifier::SetLayoutDirectionImpl,
-        WaterFlowAttributeModifier::SetScrollSnapStrategyImpl,
-        WaterFlowAttributeModifier::SetCachedCount0Impl,
-        WaterFlowAttributeModifier::SetSyncLoadImpl,
-        WaterFlowAttributeModifier::SetSupportEmptyBranchInLazyLoadingImpl,
-        WaterFlowAttributeModifier::SetOnScrollFrameBeginImpl,
-        WaterFlowAttributeModifier::SetOnScrollIndexImpl,
-        WaterFlowAttributeModifier::SetOnWillScrollImpl,
-        WaterFlowAttributeModifier::SetOnDidScrollImpl,
-        WaterFlowAttributeModifier::SetScrollPlaceholderImpl,
-        WaterFlowAttributeModifier::SetCachedCount1Impl,
-    };
+    static constexpr GENERATED_ArkUIWaterFlowModifier ArkUIWaterFlowModifierImpl = [] {
+        GENERATED_ArkUIWaterFlowModifier modifier {};
+        modifier.construct = WaterFlowModifier::ConstructImpl;
+        modifier.setWaterFlowOptions = WaterFlowInterfaceModifier::SetWaterFlowOptionsImpl;
+        modifier.setColumnsTemplate = WaterFlowAttributeModifier::SetColumnsTemplateImpl;
+        modifier.setItemConstraintSize = WaterFlowAttributeModifier::SetItemConstraintSizeImpl;
+        modifier.setRowsTemplate = WaterFlowAttributeModifier::SetRowsTemplateImpl;
+        modifier.setColumnsGap = WaterFlowAttributeModifier::SetColumnsGapImpl;
+        modifier.setRowsGap = WaterFlowAttributeModifier::SetRowsGapImpl;
+        modifier.setLayoutDirection = WaterFlowAttributeModifier::SetLayoutDirectionImpl;
+        modifier.setScrollSnapStrategy = WaterFlowAttributeModifier::SetScrollSnapStrategyImpl;
+        modifier.setCachedCount0 = WaterFlowAttributeModifier::SetCachedCount0Impl;
+        modifier.setSyncLoad = WaterFlowAttributeModifier::SetSyncLoadImpl;
+        modifier.setSupportEmptyBranchInLazyLoading =
+            WaterFlowAttributeModifier::SetSupportEmptyBranchInLazyLoadingImpl;
+        modifier.setOnScrollFrameBegin = WaterFlowAttributeModifier::SetOnScrollFrameBeginImpl;
+        modifier.setOnScrollIndex = WaterFlowAttributeModifier::SetOnScrollIndexImpl;
+        modifier.setOnWillScroll = WaterFlowAttributeModifier::SetOnWillScrollImpl;
+        modifier.setOnDidScroll = WaterFlowAttributeModifier::SetOnDidScrollImpl;
+        modifier.setScrollPlaceholder = WaterFlowAttributeModifier::SetScrollPlaceholderImpl;
+        modifier.setCachedCount1 = WaterFlowAttributeModifier::SetCachedCount1Impl;
+        SetEdgeModifiersIfSupported(modifier, 0);
+        return modifier;
+    }();
     return &ArkUIWaterFlowModifierImpl;
 }
 
