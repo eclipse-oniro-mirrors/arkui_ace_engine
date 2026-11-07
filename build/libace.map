@@ -848,7 +848,10 @@
       "OHOS::Ace::LinearColor::TRANSPARENT";
       "OHOS::Ace::LineHeightSpan::LineHeightSpan(OHOS::Ace::Dimension, int, int)";
       "OHOS::Ace::Localization::FormatDateTime(OHOS::Ace::DateTime, std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
+      "OHOS::Ace::Localization::FormatDateTimeMatchHourField(OHOS::Ace::DateTime, std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
       "OHOS::Ace::Localization::FormatDuration(unsigned int, bool)";
+      "OHOS::Ace::Localization::FormatDurationLocalized(unsigned int, std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
+      "OHOS::Ace::Localization::FormatPercent(int)";
       "OHOS::Ace::Localization::GetAmPmStrings()";
       "OHOS::Ace::Localization::GetDateOrder(std::__h::vector<std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>>, std::__h::allocator<std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>>>>&)";
       "OHOS::Ace::Localization::GetEntryLetters(std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
@@ -864,7 +867,9 @@
       "OHOS::Ace::Localization::GetMonths(bool, std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
       "OHOS::Ace::Localization::GetRelativeDateTime(double)";
       "OHOS::Ace::Localization::GetWeekdays(bool)";
+      "OHOS::Ace::Localization::LocalizeDigits(std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
       "OHOS::Ace::Localization::NumberFormat(double)";
+      "OHOS::Ace::Localization::NumberFormat(int)";
       "OHOS::Ace::LogWrapper::GetIdWithReason()";
       "OHOS::Ace::LogWrapper::GetSeparatorCharacter()";
       "OHOS::Ace::LunarCalculator::LUNAR_INFO";

@@ -291,6 +291,15 @@ void TextTimerModelNG::SetFormat(FrameNode* frameNode, const std::string& format
     ACE_UPDATE_NODE_LAYOUT_PROPERTY(TextTimerLayoutProperty, Format, format, frameNode);
 }
 
+void TextTimerModelNG::ResetFormat(FrameNode* frameNode)
+{
+    CHECK_NULL_VOID(frameNode);
+    ACE_RESET_NODE_LAYOUT_PROPERTY_WITH_FLAG(TextTimerLayoutProperty, Format, PROPERTY_UPDATE_MEASURE, frameNode);
+    auto pattern = frameNode->GetPattern<TextTimerPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->ResetCount();
+}
+
 void TextTimerModelNG::SetTextShadow(FrameNode* frameNode, const std::vector<Shadow>& value)
 {
     CHECK_NULL_VOID(frameNode);

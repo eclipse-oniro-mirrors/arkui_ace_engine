@@ -104,6 +104,7 @@ public:
     void DumpInfo(std::unique_ptr<JsonValue>& json) override;
     void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json) override {}
     void OnColorConfigurationUpdate() override;
+    void OnLanguageConfigurationUpdate() override;
 
     void UpdateTextColor(const Color& color, bool isFirstLoad = false);
     void UpdateFontWeight(const FontWeight& value, bool isFirstLoad = false);

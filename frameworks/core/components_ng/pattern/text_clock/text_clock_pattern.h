@@ -113,7 +113,7 @@ public:
         return nodeId_;
     }
 
-    ZeroPrefixType GetPrefixHour()
+    ZeroPrefixType GetPrefixHour() const
     {
         auto textClockLayoutProperty = GetLayoutProperty<TextClockLayoutProperty>();
         CHECK_NULL_RETURN(textClockLayoutProperty, prefixHour_);
@@ -179,6 +179,7 @@ private:
     std::string AddZeroPrefix(const std::string& strTimeValue);
     std::string RemoveZeroPrefix(const std::string& strTimeValue);
     std::string GetFormat() const;
+    std::string GetDefaultFormat() const;
     float GetHoursWest() const;
     RefPtr<FrameNode> GetTextNode();
     void FireBuilder();

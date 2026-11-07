@@ -15,6 +15,7 @@
 #include "core/components_ng/pattern/gauge/gauge_pattern.h"
 #include "ui/base/versions.h"
 
+#include "base/i18n/localization.h"
 #include "core/components_ng/layout/layout_wrapper.h"
 #include "core/components_ng/pattern/gauge/gauge_layout_algorithm.h"
 #include "core/components_ng/pattern/gauge/gauge_theme.h"
@@ -196,8 +197,10 @@ void GaugePattern::InitLimitValueText(int32_t valueTextId, bool isMin)
     } else {
         limitValueColor = isMin ? (*GAUGE_DEFAULT_COLOR.begin()) : (*GAUGE_DEFAULT_COLOR.rbegin());
     }
-    std::ostringstream out;
-    out << std::setiosflags(std::ios::fixed) << std::setprecision(0) << limitValue;
+    auto gaugeValue = static_cast<int32_t>(std::round(limitValue));
+    std::string content = Localization::GetInstance()->GetLanguage() != "zh"
+        ? Localization::GetInstance()->NumberFormat(gaugeValue)
+        : std::to_string(gaugeValue);
 
     auto pipelineContext = PipelineBase::GetCurrentContext();
     CHECK_NULL_VOID(pipelineContext);
@@ -205,7 +208,7 @@ void GaugePattern::InitLimitValueText(int32_t valueTextId, bool isMin)
 
     auto limitValueTextProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
     CHECK_NULL_VOID(limitValueTextProperty);
-    limitValueTextProperty->UpdateContent(out.str());
+    limitValueTextProperty->UpdateContent(content);
     limitValueTextProperty->UpdateTextColor(limitValueColor);
     limitValueTextProperty->UpdateMaxLines(1);
     limitValueTextProperty->UpdateAdaptMaxFontSize(LIMIT_VALUE_MAX_FONTSIZE);
@@ -518,5 +521,12 @@ void GaugePattern::OnColorConfigurationUpdate()
 FocusPattern GaugePattern::GetFocusPattern() const
 {
     return { FocusType::NODE, false, FocusStyleType::OUTER_BORDER };
+}
+
+void GaugePattern::OnLanguageConfigurationUpdate()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 } // namespace OHOS::Ace::NG

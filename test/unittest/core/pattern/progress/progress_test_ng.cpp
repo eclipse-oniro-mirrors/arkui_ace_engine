@@ -17,6 +17,7 @@
 #include "test/mock/adapter/ohos/osal/mock_system_properties.h"
 #include "test/mock/frameworks/core/common/mock_container.h"
 
+#include "base/i18n/localization.h"
 #include "core/components_ng/pattern/progress/progress_model_static.h"
 #include "core/components_ng/pattern/text/text_layout_property.h"
 
@@ -620,6 +621,29 @@ HWTEST_F(ProgressTestNg, ProgressAccessibilityPropertyTestNg002, TestSize.Level0
     CreateDone();
     paintProperty_->UpdateValue(VALUE_OF_PROGRESS);
     EXPECT_EQ(accessibilityProperty_->GetText(), std::to_string(VALUE_OF_PROGRESS));
+}
+
+/**
+ * @tc.name: ProgressAccessibilityPropertyTestNg003
+ * @tc.desc: Test GetText in non-Chinese (NumberFormat) and Chinese (to_string) locales.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ProgressTestNg, ProgressAccessibilityPropertyTestNg003, TestSize.Level0)
+{
+    CreateProgress(VALUE_OF_PROGRESS, MAX_VALUE_OF_PROGRESS, PROGRESS_TYPE_LINEAR);
+    CreateDone();
+    paintProperty_->UpdateValue(VALUE_OF_PROGRESS);
+
+    // non-"zh" (languageTag_ empty => "Chinese") => NumberFormat path
+    Localization::GetInstance()->SetLocaleImpl("", "", "", "", "");
+    EXPECT_EQ(accessibilityProperty_->GetText(), std::to_string(VALUE_OF_PROGRESS));
+
+    // "zh" => to_string path
+    Localization::GetInstance()->SetLocaleImpl("zh", "", "", "", "");
+    EXPECT_EQ(accessibilityProperty_->GetText(), std::to_string(VALUE_OF_PROGRESS));
+
+    // restore
+    Localization::GetInstance()->SetLocaleImpl("", "", "", "", "");
 }
 
 /**

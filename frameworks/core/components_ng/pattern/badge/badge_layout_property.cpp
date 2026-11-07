@@ -17,6 +17,7 @@
 
 #include "core/components/badge/badge_theme.h"
 #include "core/pipeline/pipeline_base.h"
+#include "base/i18n/localization.h"
 
 namespace OHOS::Ace::NG {
 
@@ -47,6 +48,11 @@ void BadgeLayoutProperty::ToJsonValue(std::unique_ptr<JsonValue>& json, const In
     json->PutExtAttr("position",
         GetBadgePositionString(GetBadgePosition().value_or(badgeTheme->GetBadgePosition())).c_str(), filter);
     json->PutExtAttr("count", std::to_string(GetBadgeCount().value_or(DEFAULT_COUNT)).c_str(), filter);
+    auto badgeCountValue = GetBadgeCount().value_or(DEFAULT_COUNT);
+    auto localizedCount = Localization::GetInstance()->GetLanguage() != "zh"
+        ? Localization::GetInstance()->NumberFormat(badgeCountValue)
+        : std::to_string(badgeCountValue);
+    json->PutExtAttr("localizedCount", localizedCount.c_str(), filter);
     json->PutExtAttr("maxCount", std::to_string(GetBadgeMaxCount().value_or(DEFAULT_MAX_COUNT)).c_str(), filter);
     json->PutExtAttr("value", GetBadgeValue().value_or("").c_str(), filter);
 
