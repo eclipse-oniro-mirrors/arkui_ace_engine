@@ -988,17 +988,6 @@ public:
         callback(source);
     }
 
-    // True when the scroll was driven by a finger on this container: the drag itself,
-    // the fling that follows it, or a scroll bar drag. Wheel/crown (SCROLL_FROM_AXIS,
-    // SCROLL_FROM_CROWN) and programmatic scrolls (JUMP, LAYOUT, INDEXER, STATUSBAR,
-    // ANIMATION_CONTROLLER) are not, and must not be mistaken for "another finger is
-    // scrolling".
-    static bool IsFingerDrivenScrollSource(int32_t source)
-    {
-        return source == SCROLL_FROM_UPDATE || source == SCROLL_FROM_ANIMATION ||
-            source == SCROLL_FROM_BAR || source == SCROLL_FROM_BAR_FLING;
-    }
-
     void SetIsOverScroll(bool val);
     bool GetIsOverScroll() const;
 

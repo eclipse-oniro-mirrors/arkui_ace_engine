@@ -49,6 +49,10 @@ constexpr float DRAG_SCROLL_COEXIST_SIZE = 100.0f;
 constexpr float DRAG_SCROLL_COEXIST_MID_MAIN_OFFSET = 200.0f;
 constexpr int32_t DRAG_FINGER_ID = 0;
 constexpr int32_t SCROLL_FINGER_ID = 1;
+// first index still laid out after the simulated content scroll in the fallback tests
+constexpr int32_t VISUAL_FALLBACK_ANCHOR_INDEX = 4;
+// how many rows below the top of the laid out rows the dragged item is held
+constexpr float ROWS_HELD_BELOW = 2.0f;
 } // namespace
 
 class GridItemDragManagerTestNg : public GridTestNg {
@@ -2185,8 +2189,9 @@ HWTEST_F(GridItemDragManagerTestNg, ScaleDiagonalNeighborScalesSuccessfully001, 
 
 /**
  * @tc.name: GridDragScrollCoexistAutoScrollSuppression001
- * @tc.desc: only a second finger that really scrolls the container stops the drag edge
- *           auto-scroll, and it is actively stopped instead of merely skipped
+ * @tc.desc: a second pointer on the Grid together with a scroll stops the drag edge
+ *           auto-scroll, whatever drove that scroll, and it is actively stopped instead of
+ *           merely skipped
  * @tc.type: FUNC
  */
 HWTEST_F(GridItemDragManagerTestNg, GridDragScrollCoexistAutoScrollSuppression001, TestSize.Level1)
@@ -2252,19 +2257,18 @@ HWTEST_F(GridItemDragManagerTestNg, GridDragScrollCoexistAutoScrollSuppression00
     EXPECT_NE(pattern_->hotZoneScrollCallback_, nullptr);
 
     /**
-     * @tc.steps: step5. both fingers down again, but the container moves because of a
-     *              wheel/crown scroll rather than a finger.
-     * @tc.expected: that is not "another finger scrolling", the edge auto-scroll is
-     *              left alone.
+     * @tc.steps: step5. both fingers down again and the container moves, whatever drove
+     *              that movement.
+     * @tc.expected: the scroll source is not discriminated, so a second pointer on the Grid
+     *              together with a scroll takes the edge auto-scroll over and actively
+     *              stops it.
      */
     pattern_->activeTouchFingerIds_ = { DRAG_FINGER_ID, SCROLL_FINGER_ID };
     manager->HandleContainerScroll(SCROLL_FROM_AXIS);
-    EXPECT_FALSE(manager->suppressAutoScroll_);
+    EXPECT_TRUE(manager->suppressAutoScroll_);
     manager->HandleAutoScroll(0, center, frameRect);
-    EXPECT_TRUE(manager->scrolling_);
-    EXPECT_NE(pattern_->hotZoneScrollCallback_, nullptr);
-    manager->StopAutoScroll();
     EXPECT_FALSE(manager->scrolling_);
+    EXPECT_EQ(pattern_->hotZoneScrollCallback_, nullptr);
 }
 
 /**
@@ -2337,7 +2341,9 @@ HWTEST_F(GridItemDragManagerTestNg, GridLockDragFingerAndEscapeScrollPan001, Tes
 /**
  * @tc.name: GridItemDragFloatInterruptedByContainerScroll001
  * @tc.desc: A floating GridItem (long press, the finger never moved) is dropped as soon as
- *           another finger scrolls the Grid; a scroll without a second finger keeps it.
+ *           another pointer takes the Grid over, which is a second finger on the Grid
+ *           together with a scroll, whatever drove that scroll; a scroll with only the
+ *           dragging finger on the Grid keeps the float.
  * @tc.type: FUNC
  */
 HWTEST_F(GridItemDragManagerTestNg, GridItemDragFloatInterruptedByContainerScroll001, TestSize.Level1)
@@ -2368,25 +2374,17 @@ HWTEST_F(GridItemDragManagerTestNg, GridItemDragFloatInterruptedByContainerScrol
     EXPECT_NE(pattern_->dragScrollCallback_, nullptr);
 
     /**
-     * @tc.steps: step3. A second finger is down, but the container moves because of a
-     *              wheel/crown scroll rather than that finger.
-     * @tc.expected: the float survives, only a finger really scrolling drops it.
-     */
-    pattern_->activeTouchFingerIds_ = { DRAG_FINGER_ID, SCROLL_FINGER_ID };
-    pattern_->FireDragScrollCallback(SCROLL_FROM_AXIS);
-    EXPECT_EQ(manager->dragState_, GridItemDragState::LONG_PRESS);
-    EXPECT_NE(pattern_->dragScrollCallback_, nullptr);
-
-    /**
-     * @tc.steps: step4. That second finger really scrolls the container.
-     * @tc.expected: the pending float is interrupted and the drag auto-scroll state is
-     *              cleared with it.
+     * @tc.steps: step3. A second finger is down and the container moves, no matter what
+     *              drove that movement.
+     * @tc.expected: the scroll source is not discriminated, a second pointer on the Grid
+     *              together with a scroll takes the container over, so the pending float is
+     *              dropped and the drag auto-scroll state is cleared with it.
      */
     manager->scrolling_ = true;
     manager->inAutoScrollHotZone_ = true;
     pattern_->SetHotZoneScrollCallback([]() {});
     pattern_->activeTouchFingerIds_ = { DRAG_FINGER_ID, SCROLL_FINGER_ID };
-    pattern_->FireDragScrollCallback(SCROLL_FROM_UPDATE);
+    pattern_->FireDragScrollCallback(SCROLL_FROM_AXIS);
     EXPECT_EQ(manager->dragState_, GridItemDragState::IDLE);
     EXPECT_EQ(pattern_->dragScrollCallback_, nullptr);
     EXPECT_EQ(pattern_->hotZoneScrollCallback_, nullptr);
@@ -2418,14 +2416,15 @@ HWTEST_F(GridItemDragManagerTestNg, GridItemDragNotInterruptedWhileDragging001, 
     ASSERT_EQ(manager->dragState_, GridItemDragState::DRAGGING);
 
     /**
-     * @tc.steps: step2. A second finger is down but the container moves because of a
-     *              wheel/crown scroll rather than that finger.
-     * @tc.expected: the drag edge auto-scroll is not handed over.
+     * @tc.steps: step2. A second finger is down and the container moves, whatever drove
+     *              that movement.
+     * @tc.expected: the scroll source is not discriminated, the drag edge auto-scroll is
+     *              handed over while the running drag itself is left alone.
      */
     pattern_->activeTouchFingerIds_ = { DRAG_FINGER_ID, SCROLL_FINGER_ID };
     pattern_->FireDragScrollCallback(SCROLL_FROM_AXIS);
     EXPECT_EQ(manager->dragState_, GridItemDragState::DRAGGING);
-    EXPECT_FALSE(manager->suppressAutoScroll_);
+    EXPECT_TRUE(manager->suppressAutoScroll_);
 
     /**
      * @tc.steps: step3. That second finger really scrolls the container.
@@ -2446,6 +2445,395 @@ HWTEST_F(GridItemDragManagerTestNg, GridItemDragNotInterruptedWhileDragging001, 
     EXPECT_EQ(pattern_->dragScrollCallback_, nullptr);
     EXPECT_EQ(manager->dragState_, GridItemDragState::IDLE);
     EXPECT_FALSE(manager->suppressAutoScroll_);
+}
+
+/**
+ * @tc.name: GridDragScrollCoexistSwapTargetFollowsScrolledContent001
+ * @tc.desc: The swap target is derived from the gap between the finger driven position of
+ *           the item and the slot the layout gave it, so a container that scrolled under a
+ *           resting dragging finger already yields the item to swap with.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridItemDragManagerTestNg, GridDragScrollCoexistSwapTargetFollowsScrolledContent001, TestSize.Level1)
+{
+    auto manager = CreateDragManagerWithForEachAndChildren();
+    ASSERT_NE(manager, nullptr);
+    auto gridNode = pattern_->GetHost();
+    ASSERT_NE(gridNode, nullptr);
+    manager->gridNode_ = AceType::WeakClaim(AceType::RawPtr(gridNode));
+    GestureEvent info;
+    manager->HandleOnItemLongPress(info);
+    manager->HandleOnItemDragStart(info);
+    ASSERT_EQ(manager->dragState_, GridItemDragState::DRAGGING);
+    auto host = manager->GetHost();
+    ASSERT_NE(host, nullptr);
+    auto geometry = host->GetGeometryNode();
+    ASSERT_NE(geometry, nullptr);
+    auto frameRect = geometry->GetMarginFrameRect();
+    ASSERT_GT(frameRect.Height(), 0.0f);
+
+    /**
+     * @tc.steps: step1. The dragging finger never moved, the container scrolled one row.
+     * @tc.expected: the dragged item is one row away from its slot and the item of the
+     *              next row is picked as the swap target.
+     */
+    manager->realOffset_ = frameRect.GetOffset() - manager->GetParentPaddingOffset() +
+        OffsetF(0.0f, frameRect.Height());
+    auto delta = manager->realOffset_ - frameRect.GetOffset() + manager->GetParentPaddingOffset();
+    EXPECT_GT(delta.GetMainOffset(Axis::VERTICAL), 0.0f);
+    EXPECT_GT(manager->FindSwapTarget(0, delta), 0);
+
+    /**
+     * @tc.steps: step2. Nothing scrolled, the finger rests on the slot of the item.
+     * @tc.expected: no swap target other than the item itself.
+     */
+    manager->realOffset_ = frameRect.GetOffset() - manager->GetParentPaddingOffset();
+    auto noDelta = manager->realOffset_ - frameRect.GetOffset() + manager->GetParentPaddingOffset();
+    EXPECT_EQ(manager->FindSwapTarget(0, noDelta), 0);
+}
+
+/**
+ * @tc.name: GridDragScrollCoexistSessionArmedBySecondFinger001
+ * @tc.desc: A second finger really scrolling the Grid arms the coexistence session for the
+ *           rest of that drag, which is the gate of the visual swap fallback, and hands the
+ *           edge auto-scroll over to that finger.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridItemDragManagerTestNg, GridDragScrollCoexistSessionArmedBySecondFinger001, TestSize.Level1)
+{
+    auto manager = CreateDragManagerWithForEachAndChildren();
+    ASSERT_NE(manager, nullptr);
+    auto gridNode = pattern_->GetHost();
+    ASSERT_NE(gridNode, nullptr);
+    manager->gridNode_ = AceType::WeakClaim(AceType::RawPtr(gridNode));
+    GestureEvent info;
+    manager->HandleOnItemLongPress(info);
+    manager->HandleOnItemDragStart(info);
+    ASSERT_EQ(manager->dragState_, GridItemDragState::DRAGGING);
+    EXPECT_FALSE(manager->coexistScrollDriven_);
+
+    /**
+     * @tc.steps: step1. A second finger really scrolls the Grid, the dragging finger rests.
+     * @tc.expected: the coexistence session and the edge auto-scroll suppression are armed,
+     *              the running drag itself is left alone.
+     */
+    pattern_->activeTouchFingerIds_ = { DRAG_FINGER_ID, SCROLL_FINGER_ID };
+    pattern_->FireDragScrollCallback(SCROLL_FROM_UPDATE);
+    EXPECT_EQ(manager->dragState_, GridItemDragState::DRAGGING);
+    EXPECT_TRUE(manager->suppressAutoScroll_);
+    EXPECT_TRUE(manager->coexistScrollDriven_);
+
+    /**
+     * @tc.steps: step2. That finger is lifted again, the container keeps moving as a fling.
+     * @tc.expected: the session flag survives, so the fallback still covers the fling; the
+     *              auto-scroll suppression is cleared with the finger count.
+     */
+    pattern_->activeTouchFingerIds_ = { DRAG_FINGER_ID };
+    auto host = manager->GetHost();
+    ASSERT_NE(host, nullptr);
+    manager->HandleAutoScroll(0, PointF(0.0f, 0.0f), host->GetGeometryNode()->GetMarginFrameRect());
+    EXPECT_FALSE(manager->suppressAutoScroll_);
+    EXPECT_TRUE(manager->coexistScrollDriven_);
+}
+
+/**
+ * @tc.name: GridDragScrollCoexistSessionArmedByAnyScrollSource001
+ * @tc.desc: A second pointer on the Grid together with a scroll arms the coexistence session
+ *           and hands the edge auto-scroll over, whatever drove that scroll; a scroll with
+ *           only the dragging finger on the Grid arms neither.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridItemDragManagerTestNg, GridDragScrollCoexistSessionArmedByAnyScrollSource001, TestSize.Level1)
+{
+    auto manager = CreateDragManagerWithForEachAndChildren();
+    ASSERT_NE(manager, nullptr);
+    auto gridNode = pattern_->GetHost();
+    ASSERT_NE(gridNode, nullptr);
+    manager->gridNode_ = AceType::WeakClaim(AceType::RawPtr(gridNode));
+    GestureEvent info;
+    manager->HandleOnItemLongPress(info);
+    manager->HandleOnItemDragStart(info);
+    ASSERT_EQ(manager->dragState_, GridItemDragState::DRAGGING);
+    EXPECT_FALSE(manager->coexistScrollDriven_);
+
+    /**
+     * @tc.steps: step1. Only the dragging finger is on the Grid, the container moves as the
+     *              fling of a scroll whose finger is already gone.
+     * @tc.expected: no second pointer on the Grid, nothing is armed.
+     */
+    pattern_->activeTouchFingerIds_ = { DRAG_FINGER_ID };
+    pattern_->FireDragScrollCallback(SCROLL_FROM_ANIMATION);
+    EXPECT_EQ(manager->dragState_, GridItemDragState::DRAGGING);
+    EXPECT_FALSE(manager->suppressAutoScroll_);
+    EXPECT_FALSE(manager->coexistScrollDriven_);
+
+    /**
+     * @tc.steps: step2. A second finger is down and the container moves, whatever drove it.
+     * @tc.expected: both are armed and the running drag is left alone.
+     */
+    pattern_->activeTouchFingerIds_ = { DRAG_FINGER_ID, SCROLL_FINGER_ID };
+    pattern_->FireDragScrollCallback(SCROLL_FROM_AXIS);
+    EXPECT_EQ(manager->dragState_, GridItemDragState::DRAGGING);
+    EXPECT_TRUE(manager->suppressAutoScroll_);
+    EXPECT_TRUE(manager->coexistScrollDriven_);
+}
+
+/**
+ * @tc.name: GridDragScrollCoexistFloatNotDroppedByFling001
+ * @tc.desc: A floating GridItem is dropped only when a second finger really takes the
+ *           container over, the fling of a finger that is already gone does not.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridItemDragManagerTestNg, GridDragScrollCoexistFloatNotDroppedByFling001, TestSize.Level1)
+{
+    auto manager = CreateDragManagerWithForEachAndChildren();
+    ASSERT_NE(manager, nullptr);
+    auto gridNode = pattern_->GetHost();
+    ASSERT_NE(gridNode, nullptr);
+    manager->gridNode_ = AceType::WeakClaim(AceType::RawPtr(gridNode));
+    GestureEvent info;
+    manager->HandleOnItemLongPress(info);
+    ASSERT_EQ(manager->dragState_, GridItemDragState::LONG_PRESS);
+
+    pattern_->activeTouchFingerIds_ = { DRAG_FINGER_ID };
+    pattern_->FireDragScrollCallback(SCROLL_FROM_ANIMATION);
+    EXPECT_EQ(manager->dragState_, GridItemDragState::LONG_PRESS);
+    EXPECT_NE(pattern_->dragScrollCallback_, nullptr);
+}
+
+/**
+ * @tc.name: GridDragScrollCoexistVisualSwapFallbackAfterContentScrolledAway001
+ * @tc.desc: When a second finger scrolled the content out from under a resting dragging
+ *           finger, the dragged index ends up behind the laid out range and the matrix
+ *           based swap search can no longer score anything. The visual fallback then swaps
+ *           with the item occupying the cell the dragged item is held over.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridItemDragManagerTestNg, GridDragScrollCoexistVisualSwapFallbackAfterContentScrolledAway001,
+    TestSize.Level1)
+{
+    auto manager = CreateDragManagerWithForEachAndChildren();
+    ASSERT_NE(manager, nullptr);
+    auto gridNode = pattern_->GetHost();
+    ASSERT_NE(gridNode, nullptr);
+    manager->gridNode_ = AceType::WeakClaim(AceType::RawPtr(gridNode));
+    GestureEvent info;
+    manager->HandleOnItemLongPress(info);
+    manager->HandleOnItemDragStart(info);
+    ASSERT_EQ(manager->dragState_, GridItemDragState::DRAGGING);
+    auto& layoutInfo = GetLayoutInfo();
+    ASSERT_GE(layoutInfo.endIndex_, VISUAL_FALLBACK_ANCHOR_INDEX);
+    auto host = manager->GetHost();
+    ASSERT_NE(host, nullptr);
+    auto geometry = host->GetGeometryNode();
+    ASSERT_NE(geometry, nullptr);
+    auto itemSize = geometry->GetMarginFrameRect().GetSize();
+    ASSERT_GT(itemSize.Height(), 0.0f);
+    ASSERT_GT(itemSize.Width(), 0.0f);
+
+    /**
+     * @tc.steps: step1. A second finger really scrolls the Grid while the dragged item is
+     *              still inside the laid out range.
+     * @tc.expected: that arms the coexistence session for the rest of the drag.
+     */
+    pattern_->activeTouchFingerIds_ = { DRAG_FINGER_ID, SCROLL_FINGER_ID };
+    pattern_->FireDragScrollCallback(SCROLL_FROM_UPDATE);
+    ASSERT_TRUE(manager->coexistScrollDriven_);
+
+    /**
+     * @tc.steps: step2. The content scrolled away, only the items behind the dragged one
+     *              are laid out now, and the dragging finger is held two rows below them.
+     * @tc.expected: the matrix based search has nothing to score, the visual fallback
+     *              picks the item occupying the cell the dragged item is held over.
+     */
+    layoutInfo.startIndex_ = VISUAL_FALLBACK_ANCHOR_INDEX;
+    layoutInfo.endIndex_ = VISUAL_FALLBACK_ANCHOR_INDEX + 3; /* 3: last item of the range */
+    ASSERT_FALSE(manager->IsItemInViewport(0, layoutInfo));
+    manager->realOffset_ = OffsetF(0.0f, itemSize.Height() * ROWS_HELD_BELOW);
+    EXPECT_EQ(manager->FindSwapTarget(0, OffsetF(0.0f, 0.0f)), VISUAL_FALLBACK_ANCHOR_INDEX);
+
+    /**
+     * @tc.steps: step3. The same state, but the session was never driven by a second finger.
+     * @tc.expected: the fallback stays off and no swap target is found, as before.
+     */
+    manager->coexistScrollDriven_ = false;
+    EXPECT_EQ(manager->FindSwapTarget(0, OffsetF(0.0f, 0.0f)), 0);
+}
+
+/**
+ * @tc.name: GridDragScrollCoexistVisualSwapFallbackArmedBySecondPointer001
+ * @tc.desc: The visual swap fallback is unlocked once a second pointer on the Grid moved the
+ *           content, whatever drove that scroll. With only the dragging finger on the Grid
+ *           nothing is unlocked, so an item the content left behind stays where it is.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridItemDragManagerTestNg, GridDragScrollCoexistVisualSwapFallbackArmedBySecondPointer001, TestSize.Level1)
+{
+    auto manager = CreateDragManagerWithForEachAndChildren();
+    ASSERT_NE(manager, nullptr);
+    auto gridNode = pattern_->GetHost();
+    ASSERT_NE(gridNode, nullptr);
+    manager->gridNode_ = AceType::WeakClaim(AceType::RawPtr(gridNode));
+    GestureEvent info;
+    manager->HandleOnItemLongPress(info);
+    manager->HandleOnItemDragStart(info);
+    ASSERT_EQ(manager->dragState_, GridItemDragState::DRAGGING);
+    auto& layoutInfo = GetLayoutInfo();
+    auto host = manager->GetHost();
+    ASSERT_NE(host, nullptr);
+    auto itemSize = host->GetGeometryNode()->GetMarginFrameRect().GetSize();
+
+    /**
+     * @tc.steps: step1. A second finger is on the Grid and the wheel moves the content.
+     * @tc.expected: the session is armed for the rest of the drag.
+     */
+    pattern_->activeTouchFingerIds_ = { DRAG_FINGER_ID, SCROLL_FINGER_ID };
+    pattern_->FireDragScrollCallback(SCROLL_FROM_AXIS);
+    ASSERT_TRUE(manager->coexistScrollDriven_);
+
+    /**
+     * @tc.steps: step2. The content is now away, only the items behind the dragged one are
+     *              laid out, and the dragging finger is held two rows below them.
+     * @tc.expected: the matrix search has nothing to score, the visual fallback picks the
+     *              item occupying the cell the dragged item is held over.
+     */
+    layoutInfo.startIndex_ = VISUAL_FALLBACK_ANCHOR_INDEX;
+    layoutInfo.endIndex_ = VISUAL_FALLBACK_ANCHOR_INDEX + 3; /* 3: last item of the range */
+    manager->realOffset_ = OffsetF(0.0f, itemSize.Height() * ROWS_HELD_BELOW);
+    ASSERT_FALSE(manager->IsItemInViewport(0, layoutInfo));
+    EXPECT_EQ(manager->FindSwapTarget(0, OffsetF(0.0f, 0.0f)), VISUAL_FALLBACK_ANCHOR_INDEX);
+
+    /**
+     * @tc.steps: step3. A fresh session, only the dragging finger left on the Grid, the
+     *              content moving as the fling of a scroll whose finger is already gone.
+     * @tc.expected: no second pointer, nothing is armed, the stranded item stays put.
+     */
+    manager->HandleOnItemLongPress(info);
+    manager->HandleOnItemDragStart(info);
+    ASSERT_EQ(manager->dragState_, GridItemDragState::DRAGGING);
+    EXPECT_FALSE(manager->coexistScrollDriven_);
+    pattern_->activeTouchFingerIds_ = { DRAG_FINGER_ID };
+    pattern_->FireDragScrollCallback(SCROLL_FROM_ANIMATION);
+    EXPECT_FALSE(manager->coexistScrollDriven_);
+    EXPECT_EQ(manager->FindSwapTarget(0, OffsetF(0.0f, 0.0f)), 0);
+}
+
+/**
+ * @tc.name: GridDragScrollCoexistVisualSwapFallbackSkippedForRtl001
+ * @tc.desc: A mirrored cross axis needs the RTL handling of the regular swap path, the
+ *           visual fallback leaves the drag alone instead of guessing a column.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridItemDragManagerTestNg, GridDragScrollCoexistVisualSwapFallbackSkippedForRtl001, TestSize.Level1)
+{
+    auto manager = CreateDragManagerWithForEachAndChildren();
+    ASSERT_NE(manager, nullptr);
+    auto gridNode = pattern_->GetHost();
+    ASSERT_NE(gridNode, nullptr);
+    manager->gridNode_ = AceType::WeakClaim(AceType::RawPtr(gridNode));
+    GestureEvent info;
+    manager->HandleOnItemLongPress(info);
+    manager->HandleOnItemDragStart(info);
+    ASSERT_EQ(manager->dragState_, GridItemDragState::DRAGGING);
+    auto& layoutInfo = GetLayoutInfo();
+    auto host = manager->GetHost();
+    ASSERT_NE(host, nullptr);
+    auto itemSize = host->GetGeometryNode()->GetMarginFrameRect().GetSize();
+    pattern_->activeTouchFingerIds_ = { DRAG_FINGER_ID, SCROLL_FINGER_ID };
+    pattern_->FireDragScrollCallback(SCROLL_FROM_UPDATE);
+    ASSERT_TRUE(manager->coexistScrollDriven_);
+
+    /**
+     * @tc.steps: step1. The content scrolled away and the item is held two rows below.
+     * @tc.expected: the visual fallback recovers the swap target.
+     */
+    layoutInfo.startIndex_ = VISUAL_FALLBACK_ANCHOR_INDEX;
+    layoutInfo.endIndex_ = VISUAL_FALLBACK_ANCHOR_INDEX + 3; /* 3: last item of the range */
+    manager->realOffset_ = OffsetF(0.0f, itemSize.Height() * ROWS_HELD_BELOW);
+    ASSERT_EQ(manager->FindSwapTarget(0, OffsetF(0.0f, 0.0f)), VISUAL_FALLBACK_ANCHOR_INDEX);
+
+    /**
+     * @tc.steps: step2. The Grid lays out right to left.
+     * @tc.expected: the fallback leaves the drag alone instead of guessing a mirrored
+     *              column, the regular swap path owns that case.
+     */
+    auto layoutProperty = gridNode->GetLayoutProperty<GridLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->layoutDirection_ = TextDirection::RTL;
+    EXPECT_EQ(manager->FindSwapTarget(0, OffsetF(0.0f, 0.0f)), 0);
+}
+
+/**
+ * @tc.name: GridDragScrollCoexistVisualSwapFallbackReleasedWithSession001
+ * @tc.desc: The coexistence session flag is released with the drag session, a later drag
+ *           starts with the fallback off again.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridItemDragManagerTestNg, GridDragScrollCoexistVisualSwapFallbackReleasedWithSession001, TestSize.Level1)
+{
+    auto manager = CreateDragManagerWithForEachAndChildren();
+    ASSERT_NE(manager, nullptr);
+    auto gridNode = pattern_->GetHost();
+    ASSERT_NE(gridNode, nullptr);
+    manager->gridNode_ = AceType::WeakClaim(AceType::RawPtr(gridNode));
+    GestureEvent info;
+    manager->HandleOnItemLongPress(info);
+    manager->HandleOnItemDragStart(info);
+    pattern_->activeTouchFingerIds_ = { DRAG_FINGER_ID, SCROLL_FINGER_ID };
+    pattern_->FireDragScrollCallback(SCROLL_FROM_UPDATE);
+    ASSERT_TRUE(manager->coexistScrollDriven_);
+
+    /**
+     * @tc.steps: step1. The drag ends, then a new float is taken and cancelled.
+     * @tc.expected: both release the coexistence session flag.
+     */
+    manager->HandleOnItemDragEnd(info);
+    EXPECT_FALSE(manager->coexistScrollDriven_);
+    manager->coexistScrollDriven_ = true;
+    manager->HandleOnItemDragCancel();
+    EXPECT_FALSE(manager->coexistScrollDriven_);
+    manager->coexistScrollDriven_ = true;
+    manager->HandleOnItemLongPress(info);
+    EXPECT_FALSE(manager->coexistScrollDriven_);
+}
+
+/**
+ * @tc.name: GridDragScrollCoexistFindVisualRow001
+ * @tc.desc: FindVisualRow maps a main axis position to the row covering it, and to the
+ *           nearest row when the position sits in a gap or outside the laid out rows.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridItemDragManagerTestNg, GridDragScrollCoexistFindVisualRow001, TestSize.Level1)
+{
+    auto manager = CreateDragManagerWithForEachAndChildren();
+    ASSERT_NE(manager, nullptr);
+    manager->axis_ = Axis::VERTICAL;
+    auto& layoutInfo = GetLayoutInfo();
+    constexpr float rowGap = 50.0f;
+    auto firstRow = layoutInfo.lineHeightMap_.begin();
+    ASSERT_NE(firstRow, layoutInfo.lineHeightMap_.end());
+    auto lastRow = layoutInfo.lineHeightMap_.rbegin();
+    float rowHeight = firstRow->second;
+    ASSERT_GT(rowHeight, 0.0f);
+
+    /**
+     * @tc.steps: step1. A position inside the first row.
+     * @tc.expected: the first row is returned.
+     */
+    EXPECT_EQ(manager->FindVisualRow(rowHeight / 2.0f, rowGap, layoutInfo), firstRow->first);
+
+    /**
+     * @tc.steps: step2. A position inside the gap between the first and the second row.
+     * @tc.expected: the nearer row wins, which is the first one.
+     */
+    float inGap = rowHeight + rowGap / 4.0f; /* 4: a quarter into the gap */
+    EXPECT_EQ(manager->FindVisualRow(inGap, rowGap, layoutInfo), firstRow->first);
+
+    /**
+     * @tc.steps: step3. A position far below every laid out row.
+     * @tc.expected: the last laid out row is returned instead of giving up.
+     */
+    EXPECT_EQ(manager->FindVisualRow(rowHeight * 1000.0f, rowGap, layoutInfo), lastRow->first);
 }
 
 } // namespace OHOS::Ace::NG
