@@ -20,7 +20,9 @@
 
 #include "base/geometry/dimension.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/pattern/container_picker/container_picker_model.h"
 #include "core/components_ng/pattern/container_picker/container_picker_model_static.h"
+#include "core/components_ng/pattern/date_picker/picker_text_style.h"
 #include "core/interfaces/native/utility/callback_helper.h"
 #include "core/interfaces/native/utility/converter.h"
 #include "core/interfaces/native/utility/reverse_converter.h"
@@ -137,6 +139,47 @@ void SetDisplayedItemCountImpl(Ark_NativePointer node, const Opt_Int32* value)
     auto convertedValue = Converter::OptConvertPtr<int32_t>(value);
     ContainerPickerModelStatic::SetDisplayedItemCount(frameNode, convertedValue);
 }
+void SetSelectedTextStyleImpl(Ark_NativePointer node,
+    const Opt_PickerComponentTextStyle* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    if (!value || value->tag == INTEROP_TAG_UNDEFINED) {
+        ContainerPickerModel::ResetSelectedTextStyle(frameNode);
+        return;
+    }
+    const auto& ts = value->value;
+    NG::PickerTextStyle style;
+    auto colorOpt = Converter::OptConvert<Color>(ts.color);
+    if (colorOpt.has_value()) {
+        style.textColor = colorOpt.value();
+        style.textColorSetByUser = true;
+    }
+    if (ts.font.tag != INTEROP_TAG_UNDEFINED) {
+        const auto& font = ts.font.value;
+        auto sizeOpt = Converter::OptConvert<Dimension>(font.size);
+        if (sizeOpt.has_value()) {
+            style.fontSize = sizeOpt.value();
+        }
+        auto weightOpt = Converter::OptConvert<FontWeight>(font.weight);
+        if (weightOpt.has_value()) {
+            style.fontWeight = weightOpt.value();
+        }
+    }
+    auto minFontSizeOpt = Converter::OptConvert<Dimension>(ts.minFontSize);
+    if (minFontSizeOpt.has_value()) {
+        style.minFontSize = minFontSizeOpt.value();
+    }
+    auto maxFontSizeOpt = Converter::OptConvert<Dimension>(ts.maxFontSize);
+    if (maxFontSizeOpt.has_value()) {
+        style.maxFontSize = maxFontSizeOpt.value();
+    }
+    auto overflowOpt = Converter::OptConvert<Ace::TextOverflow>(ts.overflow);
+    if (overflowOpt.has_value()) {
+        style.textOverflow = overflowOpt.value();
+    }
+    ContainerPickerModel::SetSelectedTextStyle(frameNode, style);
+}
 } // UIPickerComponentAttributeModifier
 const GENERATED_ArkUIUIPickerComponentModifier* GetUIPickerComponentModifier()
 {
@@ -150,6 +193,7 @@ const GENERATED_ArkUIUIPickerComponentModifier* GetUIPickerComponentModifier()
         UIPickerComponentAttributeModifier::SetSelectionIndicatorImpl,
         UIPickerComponentAttributeModifier::SetItemHeightImpl,
         UIPickerComponentAttributeModifier::SetDisplayedItemCountImpl,
+        UIPickerComponentAttributeModifier::SetSelectedTextStyleImpl,
     };
     return &ArkUIUIPickerComponentModifierImpl;
 }

@@ -20,11 +20,11 @@ import { ArkThemeScopeManager } from '#arktheme'
 import { SerializerBase, DeserializerBase, nullptr, KPointer, KInt, KBoolean, KStringPtr, RuntimeType, MaterializedBase, toPeerPtr, NativeBuffer, CallbackResource, InteropNativeModule, Tags, KSerializerBuffer, KUint8ArrayPtr } from '@koalaui/interop'
 import { LengthMetricsProxy, LengthMetricsProxy_serializer } from './idlize'
 import { extractors, AttributeModifier, LengthMetrics as arkui_Graphics_LengthMetrics, hookUIPickerComponentAttributeModifier, AttributeUpdater } from '#handwritten'
+import { PickerComponentTextStyle_serializer, ArkCommonMethodPeer, CommonMethod, PickerComponentTextStyle, ArkCommonMethodComponent } from './common'
 import { int32, int64, float32, unsafeCast } from '@koalaui/common'
 import { ComponentBase } from './../ComponentBase'
 import { PeerNode } from './../PeerNode'
 import { ArkUIGeneratedNativeModule } from '#components'
-import { ArkCommonMethodPeer, CommonMethod, ArkCommonMethodComponent } from './common'
 import { CustomBuilder } from './builder'
 import { CallbackKind } from './../framework/peers/CallbackKind'
 import { CallbackTransformer } from './../CallbackTransformer'
@@ -147,6 +147,18 @@ export class ArkUIPickerComponentPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._UIPickerComponentAttribute_setDisplayedItemCount(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setSelectedTextStyleAttribute(value: PickerComponentTextStyle | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            PickerComponentTextStyle_serializer.write(thisSerializer, valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._UIPickerComponentAttribute_setSelectedTextStyle(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
 }
 export interface UIPickerComponentOptions {
     selectedIndex?: int32;
@@ -189,6 +201,9 @@ export interface UIPickerComponentAttribute extends CommonMethod {
     }
     displayedItemCount(value: int32 | undefined): this {
         throw new Error('Unimplemented method displayedItemCount')
+    }
+    selectedTextStyle(value: PickerComponentTextStyle | undefined): this {
+        throw new Error('Unimplemented method selectedTextStyle')
     }
     attributeModifier(value: AttributeModifier<UIPickerComponentAttribute> | AttributeModifier<CommonMethod> | undefined): this {
         throw new Error('Unimplemented method attributeModifier')
@@ -238,6 +253,11 @@ export class ArkUIPickerComponentComponent extends ArkCommonMethodComponent impl
     public displayedItemCount(value: int32 | undefined): this {
         const value_casted = value as (int32 | undefined)
         this.getPeer()?.setDisplayedItemCountAttribute(value_casted)
+        return this
+    }
+    public selectedTextStyle(value: PickerComponentTextStyle | undefined): this {
+        const value_casted = value as (PickerComponentTextStyle | undefined)
+        this.getPeer()?.setSelectedTextStyleAttribute(value_casted)
         return this
     }
     public attributeModifier(value: AttributeModifier<UIPickerComponentAttribute> | AttributeModifier<CommonMethod> | undefined): this {

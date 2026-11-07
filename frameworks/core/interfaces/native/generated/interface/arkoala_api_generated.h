@@ -3717,6 +3717,8 @@ typedef struct Ark_OutlineOptions Ark_OutlineOptions;
 typedef struct Opt_OutlineOptions Opt_OutlineOptions;
 typedef struct Ark_PickerBackgroundStyle Ark_PickerBackgroundStyle;
 typedef struct Opt_PickerBackgroundStyle Opt_PickerBackgroundStyle;
+typedef struct Ark_PickerComponentTextStyle Ark_PickerComponentTextStyle;
+typedef struct Opt_PickerComponentTextStyle Opt_PickerComponentTextStyle;
 typedef struct Ark_PickerDialogButtonStyle Ark_PickerDialogButtonStyle;
 typedef struct Opt_PickerDialogButtonStyle Opt_PickerDialogButtonStyle;
 typedef struct Ark_PickerIndicatorStyle Ark_PickerIndicatorStyle;
@@ -24109,6 +24111,18 @@ typedef struct Opt_PickerBackgroundStyle {
     Ark_Tag tag;
     Ark_PickerBackgroundStyle value;
 } Opt_PickerBackgroundStyle;
+typedef struct Ark_PickerComponentTextStyle {
+    /* kind: Interface */
+    Opt_ResourceColor color;
+    Opt_arkui_component_units_Font font;
+    Opt_Union_F64_ResourceStr minFontSize;
+    Opt_Union_F64_ResourceStr maxFontSize;
+    Opt_TextOverflow overflow;
+} Ark_PickerComponentTextStyle;
+typedef struct Opt_PickerComponentTextStyle {
+    Ark_Tag tag;
+    Ark_PickerComponentTextStyle value;
+} Opt_PickerComponentTextStyle;
 typedef struct Ark_PickerDialogButtonStyle {
     /* kind: Interface */
     Opt_ButtonType type;
@@ -28837,6 +28851,8 @@ typedef struct GENERATED_ArkUIUIPickerComponentModifier {
                           const Opt_LengthMetricsProxy* value);
     void (*setDisplayedItemCount)(Ark_NativePointer node,
                                   const Opt_Int32* value);
+    void (*setSelectedTextStyle)(Ark_NativePointer node,
+                                 const Opt_PickerComponentTextStyle* value);
 } GENERATED_ArkUIUIPickerComponentModifier;
 
 typedef struct GENERATED_ArkUIUnionEffectContainerModifier {

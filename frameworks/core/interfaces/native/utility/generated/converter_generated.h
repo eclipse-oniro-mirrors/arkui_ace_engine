@@ -5666,6 +5666,7 @@ ASSIGN_OPT(Opt_RichEditorTextSpanResult)
 ASSIGN_OPT(Opt_Union_RichEditorImageSpanResult_RichEditorTextSpanResult)
 ASSIGN_OPT(Opt_Union_RichEditorTextSpanResult_RichEditorImageSpanResult)
 ASSIGN_OPT(Opt_RichEditorSpan)
+ASSIGN_OPT(Opt_PickerComponentTextStyle)
 #undef ASSIGN_OPT
 }
 

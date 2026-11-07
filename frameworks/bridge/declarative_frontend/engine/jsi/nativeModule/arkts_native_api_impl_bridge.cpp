@@ -2741,6 +2741,12 @@ void ArkUINativeModule::RegisterContainerPickerAttributes(Local<panda::ObjectRef
     containerPicker->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetContainerPickerItemHeight"),
         panda::FunctionRef::New(
             const_cast<panda::EcmaVM*>(vm), ContainerPickerBridge::ResetContainerPickerItemHeight));
+    containerPicker->Set(vm, panda::StringRef::NewFromUtf8(vm, "setContainerPickerSelectedTextStyle"),
+        panda::FunctionRef::New(
+            const_cast<panda::EcmaVM*>(vm), ContainerPickerBridge::SetContainerPickerSelectedTextStyle));
+    containerPicker->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetContainerPickerSelectedTextStyle"),
+        panda::FunctionRef::New(
+            const_cast<panda::EcmaVM*>(vm), ContainerPickerBridge::ResetContainerPickerSelectedTextStyle));
     containerPicker->Set(vm, panda::StringRef::NewFromUtf8(vm, "setContainerPickerOnChange"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ContainerPickerBridge::SetContainerPickerOnChange));
     containerPicker->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetContainerPickerOnChange"),

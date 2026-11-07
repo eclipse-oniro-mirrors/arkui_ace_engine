@@ -82,6 +82,73 @@ ArkUI_ErrorCode OH_ArkUI_PickerIndicatorStyle_ConfigureDivider(
     style->endMargin = divider->endMargin;
     return ARKUI_ERROR_CODE_NO_ERROR;
 }
+
+ArkUI_PickerComponentTextStyle* OH_ArkUI_PickerComponentTextStyle_Create(void)
+{
+    return new ArkUI_PickerComponentTextStyle();
+}
+
+void OH_ArkUI_PickerComponentTextStyle_Dispose(ArkUI_PickerComponentTextStyle* style)
+{
+    if (style != nullptr) {
+        delete style;
+        style = nullptr;
+    }
+}
+
+ArkUI_ErrorCode OH_ArkUI_PickerComponentTextStyle_SetColor(
+    ArkUI_PickerComponentTextStyle* style, uint32_t color)
+{
+    CHECK_NULL_RETURN(style, ARKUI_ERROR_CODE_PARAM_INVALID);
+    style->hasColor = true;
+    style->color = color;
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_PickerComponentTextStyle_SetFontSize(
+    ArkUI_PickerComponentTextStyle* style, float fontSize)
+{
+    CHECK_NULL_RETURN(style, ARKUI_ERROR_CODE_PARAM_INVALID);
+    style->hasFontSize = true;
+    style->fontSize = fontSize;
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_PickerComponentTextStyle_SetFontWeight(
+    ArkUI_PickerComponentTextStyle* style, ArkUI_FontWeight fontWeight)
+{
+    CHECK_NULL_RETURN(style, ARKUI_ERROR_CODE_PARAM_INVALID);
+    style->hasFontWeight = true;
+    style->fontWeight = static_cast<ArkUI_Int32>(fontWeight);
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_PickerComponentTextStyle_SetMinFontSize(
+    ArkUI_PickerComponentTextStyle* style, float minFontSize)
+{
+    CHECK_NULL_RETURN(style, ARKUI_ERROR_CODE_PARAM_INVALID);
+    style->hasMinFontSize = true;
+    style->minFontSize = minFontSize;
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_PickerComponentTextStyle_SetMaxFontSize(
+    ArkUI_PickerComponentTextStyle* style, float maxFontSize)
+{
+    CHECK_NULL_RETURN(style, ARKUI_ERROR_CODE_PARAM_INVALID);
+    style->hasMaxFontSize = true;
+    style->maxFontSize = maxFontSize;
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_PickerComponentTextStyle_SetOverflow(
+    ArkUI_PickerComponentTextStyle* style, ArkUI_TextOverflow overflow)
+{
+    CHECK_NULL_RETURN(style, ARKUI_ERROR_CODE_PARAM_INVALID);
+    style->hasOverflow = true;
+    style->overflow = static_cast<ArkUI_Int32>(overflow);
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
 #ifdef __cplusplus
 }
 #endif

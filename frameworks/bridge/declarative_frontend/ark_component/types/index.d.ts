@@ -2087,6 +2087,13 @@ declare interface PickerTextStyle {
   color?: ResourceColor;
   font?: Font;
 }
+declare interface PickerComponentTextStyle {
+  color?: ResourceColor;
+  font?: Font;
+  minFontSize?: number | ResourceStr;
+  maxFontSize?: number | ResourceStr;
+  overflow?: TextOverflow;
+}
 declare type PluginComponentAttribute = any;
 declare type RemoteWindowAttribute = any;
 declare enum RenderExitReason {

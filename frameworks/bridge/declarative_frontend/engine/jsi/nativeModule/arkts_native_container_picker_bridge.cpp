@@ -419,6 +419,91 @@ ArkUINativeModuleValue ContainerPickerBridge::ResetContainerPickerItemHeight(Ark
     return panda::JSValueRef::Undefined(vm);
 }
 
+static bool ParseDimensionArg(EcmaVM* vm, const Local<JSValueRef>& arg, ArkUI_Float32& out)
+{
+    CalcDimension dim;
+    RefPtr<ResourceObject> resObj;
+    if (!arg->IsNull() && !arg->IsUndefined() &&
+        ArkTSUtils::ParseJsLengthMetrics(vm, arg, dim, resObj) &&
+        dim.IsValid() && !dim.IsNegative()) {
+        out = static_cast<ArkUI_Float32>(dim.Value());
+        return true;
+    }
+    return false;
+}
+
+static ArkUI_PickerComponentTextStyle ParsePickerTextStyleArgs(
+    EcmaVM* vm, const Local<JSValueRef>& colorArg, const Local<JSValueRef>& fontSizeArg,
+    const Local<JSValueRef>& fontWeightArg, const Local<JSValueRef>& minFontSizeArg,
+    const Local<JSValueRef>& maxFontSizeArg, const Local<JSValueRef>& overflowArg)
+{
+    ArkUI_PickerComponentTextStyle textStyle = {};
+    auto nodeInfo = ArkTSUtils::MakeNativeNodeInfo(nullptr);
+    Color textColor;
+    RefPtr<ResourceObject> colorResObj;
+    if (!colorArg->IsNull() && !colorArg->IsUndefined() &&
+        ArkTSUtils::ParseJsColorAlpha(vm, colorArg, textColor, colorResObj, nodeInfo)) {
+        textStyle.hasColor = true;
+        textStyle.color = textColor.GetValue();
+    }
+    if (ParseDimensionArg(vm, fontSizeArg, textStyle.fontSize)) {
+        textStyle.hasFontSize = true;
+    }
+    if (fontWeightArg->IsNumber()) {
+        textStyle.hasFontWeight = true;
+        textStyle.fontWeight = fontWeightArg->ToNumber(vm)->Value();
+    }
+    if (ParseDimensionArg(vm, minFontSizeArg, textStyle.minFontSize)) {
+        textStyle.hasMinFontSize = true;
+    }
+    if (ParseDimensionArg(vm, maxFontSizeArg, textStyle.maxFontSize)) {
+        textStyle.hasMaxFontSize = true;
+    }
+    if (!overflowArg->IsNull() && !overflowArg->IsUndefined() && overflowArg->IsNumber()) {
+        textStyle.hasOverflow = true;
+        textStyle.overflow = overflowArg->ToNumber(vm)->Value();
+    }
+    return textStyle;
+}
+
+ArkUINativeModuleValue ContainerPickerBridge::SetContainerPickerSelectedTextStyle(
+    ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
+    Local<JSValueRef> nodeArg = runtimeCallInfo->GetCallArgRef(NUM_0);
+    auto nativeNode = nodePtr(nodeArg->ToNativePointer(vm)->Value());
+    CHECK_NULL_RETURN(nativeNode, panda::NativePointerRef::New(vm, nullptr));
+    auto nodeModifiers = GetArkUINodeModifiers();
+    CHECK_NULL_RETURN(nodeModifiers, panda::NativePointerRef::New(vm, nullptr));
+    auto containerPickerModifier = nodeModifiers->getContainerPickerModifier();
+    CHECK_NULL_RETURN(containerPickerModifier, panda::NativePointerRef::New(vm, nullptr));
+
+    ArkUI_PickerComponentTextStyle textStyle = ParsePickerTextStyleArgs(
+        vm, runtimeCallInfo->GetCallArgRef(NUM_1), runtimeCallInfo->GetCallArgRef(NUM_2),
+        runtimeCallInfo->GetCallArgRef(NUM_3), runtimeCallInfo->GetCallArgRef(NUM_4),
+        runtimeCallInfo->GetCallArgRef(NUM_5), runtimeCallInfo->GetCallArgRef(NUM_6));
+
+    containerPickerModifier->setContainerPickerSelectedTextStyle(nativeNode, &textStyle);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue ContainerPickerBridge::ResetContainerPickerSelectedTextStyle(
+    ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
+    Local<JSValueRef> nodeArg = runtimeCallInfo->GetCallArgRef(NUM_0);
+    auto nativeNode = nodePtr(nodeArg->ToNativePointer(vm)->Value());
+    CHECK_NULL_RETURN(nativeNode, panda::NativePointerRef::New(vm, nullptr));
+    auto nodeModifiers = GetArkUINodeModifiers();
+    CHECK_NULL_RETURN(nodeModifiers, panda::NativePointerRef::New(vm, nullptr));
+    auto containerPickerModifier = nodeModifiers->getContainerPickerModifier();
+    CHECK_NULL_RETURN(containerPickerModifier, panda::NativePointerRef::New(vm, nullptr));
+    containerPickerModifier->resetContainerPickerSelectedTextStyle(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
 ArkUINativeModuleValue ContainerPickerBridge::SetContainerPickerOnChange(ArkUIRuntimeCallInfo* runtimeCallInfo)
 {
     EcmaVM* vm = runtimeCallInfo->GetVM();

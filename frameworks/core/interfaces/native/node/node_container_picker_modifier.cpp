@@ -343,6 +343,75 @@ void ResetContainerPickerItemHeight(ArkUINodeHandle node)
     ContainerPickerModel::SetItemHeight(frameNode, std::nullopt);
 }
 
+void SetContainerPickerSelectedTextStyle(ArkUINodeHandle node,
+    const struct ArkUI_PickerComponentTextStyle* textStyle)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    CHECK_NULL_VOID(textStyle);
+    PickerTextStyle style;
+    if (textStyle->hasColor) {
+        style.textColor = Color(textStyle->color);
+        style.textColorSetByUser = true;
+    }
+    if (textStyle->hasFontSize) {
+        style.fontSize = Dimension(textStyle->fontSize, DimensionUnit::FP);
+    }
+    if (textStyle->hasFontWeight) {
+        style.fontWeight = static_cast<FontWeight>(textStyle->fontWeight);
+    }
+    if (textStyle->hasMinFontSize) {
+        style.minFontSize = Dimension(textStyle->minFontSize, DimensionUnit::FP);
+    }
+    if (textStyle->hasMaxFontSize) {
+        style.maxFontSize = Dimension(textStyle->maxFontSize, DimensionUnit::FP);
+    }
+    if (textStyle->hasOverflow) {
+        style.textOverflow = static_cast<TextOverflow>(textStyle->overflow);
+    }
+    ContainerPickerModel::SetSelectedTextStyle(frameNode, style);
+}
+
+void ResetContainerPickerSelectedTextStyle(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    ContainerPickerModel::ResetSelectedTextStyle(frameNode);
+}
+
+ArkUI_PickerComponentTextStyle GetContainerPickerSelectedTextStyle(ArkUINodeHandle node)
+{
+    ArkUI_PickerComponentTextStyle result = {};
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_RETURN(frameNode, result);
+    PickerTextStyle style = ContainerPickerModel::GetSelectedTextStyle(frameNode);
+    if (style.textColor.has_value()) {
+        result.hasColor = true;
+        result.color = style.textColor.value().GetValue();
+    }
+    if (style.fontSize.has_value()) {
+        result.hasFontSize = true;
+        result.fontSize = static_cast<ArkUI_Float32>(style.fontSize.value().Value());
+    }
+    if (style.fontWeight.has_value()) {
+        result.hasFontWeight = true;
+        result.fontWeight = static_cast<ArkUI_Int32>(style.fontWeight.value());
+    }
+    if (style.minFontSize.has_value()) {
+        result.hasMinFontSize = true;
+        result.minFontSize = static_cast<ArkUI_Float32>(style.minFontSize.value().Value());
+    }
+    if (style.maxFontSize.has_value()) {
+        result.hasMaxFontSize = true;
+        result.maxFontSize = static_cast<ArkUI_Float32>(style.maxFontSize.value().Value());
+    }
+    if (style.textOverflow.has_value()) {
+        result.hasOverflow = true;
+        result.overflow = static_cast<ArkUI_Int32>(style.textOverflow.value());
+    }
+    return result;
+}
+
 int32_t GetContainerPickerSelectedIndex(ArkUINodeHandle node)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -434,6 +503,9 @@ const ArkUIContainerPickerModifier* GetContainerPickerModifier()
         .resetContainerPickerDisplayedItemCount = ResetContainerPickerDisplayedItemCount,
         .setContainerPickerItemHeight = SetContainerPickerItemHeight,
         .resetContainerPickerItemHeight = ResetContainerPickerItemHeight,
+        .setContainerPickerSelectedTextStyle = SetContainerPickerSelectedTextStyle,
+        .resetContainerPickerSelectedTextStyle = ResetContainerPickerSelectedTextStyle,
+        .getContainerPickerSelectedTextStyle = GetContainerPickerSelectedTextStyle,
         .getContainerPickerSelectedIndex = GetContainerPickerSelectedIndex,
         .getContainerPickerEnableHapticFeedback = GetContainerPickerEnableHapticFeedback,
         .getContainerPickerCanLoop = GetContainerPickerCanLoop,

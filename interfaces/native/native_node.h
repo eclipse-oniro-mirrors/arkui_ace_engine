@@ -10309,6 +10309,32 @@ typedef enum {
     NODE_PICKER_ITEM_HEIGHT = 1018005,
 
     /**
+     * @brief Text style of the selected item in the picker component. This attribute can be set, reset, and
+     * obtained as required through APIs.
+     *
+     * **Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:**
+     * <ul>
+     * <li>.object: text style of the selected item. The parameter type is {@link ArkUI_PickerComponentTextStyle}.
+     * Use {@link OH_ArkUI_PickerComponentTextStyle_Create} to create the instance, set properties through
+     * {@link OH_ArkUI_PickerComponentTextStyle_SetColor}, {@link OH_ArkUI_PickerComponentTextStyle_SetFontSize},
+     * {@link OH_ArkUI_PickerComponentTextStyle_SetFontWeight}, {@link OH_ArkUI_PickerComponentTextStyle_SetMinFontSize},
+     * {@link OH_ArkUI_PickerComponentTextStyle_SetMaxFontSize}, and {@link OH_ArkUI_PickerComponentTextStyle_SetOverflow},
+     * and then pass the pointer to **.object**. After the setting is complete, call
+     * {@link OH_ArkUI_PickerComponentTextStyle_Dispose} to dispose of the instance. When not set, the system default
+     * style is used.</li>
+     * </ul>
+     *
+     * **Format of the return value {@link ArkUI_AttributeItem}:**
+     * <ul>
+     * <li>.object: text style of the selected item. The parameter type is {@link ArkUI_PickerComponentTextStyle}.</li>
+     * </ul>
+     *
+     * @ingroup Picker
+     * @since 26.1.0
+     */
+    NODE_PICKER_SELECTED_TEXT_STYLE = 1018007,
+
+    /**
      * @brief Sets the digital crown sensitivity of the ArcList component. This attribute can be set, reset, and obtained as
      * required through APIs.
      *

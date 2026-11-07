@@ -21,6 +21,7 @@
 #include "frameworks/base/log/ace_scoring_log.h"
 #include "frameworks/bridge/declarative_frontend/jsview/js_view_abstract.h"
 #include "frameworks/bridge/declarative_frontend/jsview/js_view_common_def.h"
+#include "frameworks/core/components/common/properties/text_style.h"
 #include "frameworks/core/components_ng/pattern/container_picker/container_picker_model.h"
 #include "frameworks/core/components_ng/pattern/container_picker/container_picker_theme.h"
 #include "frameworks/core/components_ng/pattern/container_picker/container_picker_utils.h"
@@ -176,6 +177,103 @@ void JSContainerPicker::SetSelectionIndicator(const JSCallbackInfo& info)
     NG::ContainerPickerModel::SetIndicatorStyle(indicatorStyle);
 }
 
+namespace {
+std::string ConvertWeightNumToString(int32_t weightNum)
+{
+    static const std::string weightNames[] = {
+        "lighter", "normal", "regular", "medium", "bold", "bolder"
+    };
+    constexpr int32_t weightNamesSize =
+        static_cast<int32_t>(sizeof(weightNames) / sizeof(weightNames[0]));
+    if (weightNum >= 0 && weightNum < weightNamesSize) {
+        return weightNames[weightNum];
+    }
+    return "";
+}
+
+void ParsePickerTextColor(const JSRef<JSObject>& jsObj, NG::PickerTextStyle& textStyle)
+{
+    auto colorVal = jsObj->GetProperty("color");
+    if (colorVal->IsUndefined() || colorVal->IsNull()) {
+        return;
+    }
+    Color color;
+    RefPtr<ResourceObject> resObj;
+    if (JSViewAbstract::ParseJsColor(colorVal, color, resObj)) {
+        textStyle.textColor = color;
+        textStyle.textColorSetByUser = true;
+    }
+}
+
+void ParsePickerFontStyle(const JSRef<JSObject>& jsObj, NG::PickerTextStyle& textStyle)
+{
+    auto fontVal = jsObj->GetProperty("font");
+    if (!fontVal->IsObject()) {
+        return;
+    }
+    JSRef<JSObject> fontObj = JSRef<JSObject>::Cast(fontVal);
+    auto sizeVal = fontObj->GetProperty("size");
+    if (!sizeVal->IsUndefined() && !sizeVal->IsNull()) {
+        CalcDimension dim;
+        RefPtr<ResourceObject> resObj;
+        if (JSViewAbstract::ParseLengthMetricsToPositiveDimension(sizeVal, dim, resObj)) {
+            textStyle.fontSize = Dimension(dim);
+        }
+    }
+    auto weightVal = fontObj->GetProperty("weight");
+    if (weightVal->IsUndefined() || weightVal->IsNull()) {
+        return;
+    }
+    std::string weightStr;
+    if (weightVal->IsString()) {
+        weightStr = weightVal->ToString();
+    } else if (weightVal->IsNumber()) {
+        weightStr = ConvertWeightNumToString(weightVal->ToNumber<int32_t>());
+    }
+    if (!weightStr.empty()) {
+        textStyle.fontWeight = StringUtils::ParseFontWeight(weightStr).second;
+    }
+}
+} // namespace
+
+void JSContainerPicker::SetSelectedTextStyle(const JSCallbackInfo& info)
+{
+    if (info.Length() < 1 || info[0]->IsNull() || info[0]->IsUndefined()) {
+        NG::ContainerPickerModel::ResetSelectedTextStyle();
+        return;
+    }
+    if (!info[0]->IsObject()) {
+        NG::ContainerPickerModel::ResetSelectedTextStyle();
+        return;
+    }
+    JSRef<JSObject> jsObj = JSRef<JSObject>::Cast(info[0]);
+    NG::PickerTextStyle textStyle;
+    ParsePickerTextColor(jsObj, textStyle);
+    ParsePickerFontStyle(jsObj, textStyle);
+    auto minFontSizeVal = jsObj->GetProperty("minFontSize");
+    if (!minFontSizeVal->IsUndefined() && !minFontSizeVal->IsNull()) {
+        CalcDimension minDim;
+        if (JSViewAbstract::ParseJsDimension(minFontSizeVal, minDim, DimensionUnit::FP)) {
+            textStyle.minFontSize = Dimension(minDim);
+        }
+    }
+    auto maxFontSizeVal = jsObj->GetProperty("maxFontSize");
+    if (!maxFontSizeVal->IsUndefined() && !maxFontSizeVal->IsNull()) {
+        CalcDimension maxDim;
+        if (JSViewAbstract::ParseJsDimension(maxFontSizeVal, maxDim, DimensionUnit::FP)) {
+            textStyle.maxFontSize = Dimension(maxDim);
+        }
+    }
+    auto overflowVal = jsObj->GetProperty("overflow");
+    if (!overflowVal->IsUndefined() && !overflowVal->IsNull()) {
+        int32_t overflow = 0;
+        if (JSViewAbstract::ParseJsInt32(overflowVal, overflow)) {
+            textStyle.textOverflow = static_cast<Ace::TextOverflow>(overflow);
+        }
+    }
+    NG::ContainerPickerModel::SetSelectedTextStyle(textStyle);
+}
+
 void JSContainerPicker::SetDivider(const JSRef<JSObject>& paramObj, NG::PickerIndicatorStyle& indicatorStyle)
 {
     auto pickerTheme = GetTheme<NG::ContainerPickerTheme>();
@@ -283,6 +381,7 @@ void JSContainerPicker::JSBind(BindingTarget globalObj)
     JSClass<JSContainerPicker>::StaticMethod("canLoop", &JSContainerPicker::SetCanLoop);
     JSClass<JSContainerPicker>::StaticMethod("enableHapticFeedback", &JSContainerPicker::SetEnableHapticFeedback);
     JSClass<JSContainerPicker>::StaticMethod("selectionIndicator", &JSContainerPicker::SetSelectionIndicator);
+    JSClass<JSContainerPicker>::StaticMethod("selectedTextStyle", &JSContainerPicker::SetSelectedTextStyle);
     JSClass<JSContainerPicker>::StaticMethod("displayedItemCount", &JSContainerPicker::SetDisplayedItemCount);
     JSClass<JSContainerPicker>::StaticMethod("itemHeight", &JSContainerPicker::SetItemHeight);
     JSClass<JSContainerPicker>::StaticMethod("onChange", &JSContainerPicker::OnChange);

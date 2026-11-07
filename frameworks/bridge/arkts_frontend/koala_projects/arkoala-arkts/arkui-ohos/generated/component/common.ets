@@ -24,7 +24,7 @@ import { CallbackTransformer } from './../CallbackTransformer'
 import { unifiedDataChannel_UnifiedData_serializer } from './../framework/ohos.data.unifiedDataChannel'
 import { default as unifiedDataChannel } from '@ohos.data.unifiedDataChannel'
 import { VoidCallback, Position_serializer, DirectionalEdgesT_F64_serializer, Position, DirectionalEdgesT, ConstraintSizeOptions_serializer, ConstraintSizeOptions, ResourceColor, Resource as arkui_component_units_Resource, Coordinate2D_serializer, Coordinate2D, SizeOptions, SizeOptions_serializer, ChainWeightOptions_serializer, Padding_serializer, LocalizedPadding_serializer, BorderOptions_serializer, EdgeStyles_serializer, EdgeWidths_serializer, LocalizedEdgeWidths_serializer, EdgeColors_serializer, LocalizedEdgeColors_serializer, OutlineOptions_serializer, EdgeOutlineStyles_serializer, EdgeOutlineWidths_serializer, OutlineRadiuses_serializer, Edges_serializer, LocalizedEdges_serializer, LocalizedPosition_serializer, AccessibilityActionOptions_serializer, AccessibilityNextFocusParams, AccessibilityNextFocusParams_serializer, BorderRadiuses_serializer, LocalizedBorderRadiuses_serializer, AccessibilityOptions_serializer, Length, ChainWeightOptions, Padding, LocalizedPadding, Margin, LocalizedMargin, ColorMetrics as arkui_component_units_ColorMetrics, ResourceStr, BorderOptions, EdgeStyles, EdgeWidths, LocalizedEdgeWidths, EdgeColors, LocalizedEdgeColors, OutlineOptions, EdgeOutlineStyles, Dimension, EdgeOutlineWidths, OutlineRadiuses, Area, Edges, LocalizedEdges, LocalizedPosition, AccessibilityActionOptions, BorderRadiuses, LocalizedBorderRadiuses, AccessibilityOptions, ScrollBarMargin_serializer, ScrollBarMargin, Bias, Font as arkui_component_units_Font, EdgeWidth, Bias_serializer, Area_serializer, arkui_component_units_Font_serializer, AccessibilityCustomAction, AccessibilityCustomAction_serializer } from './units'
-import { KeyType, KeySource, Color as arkui_component_enums_Color, TouchType, InteractionHand, HitTestMode, ImageSize, Alignment, BorderStyle, ColoringStrategy, HoverEffect, Visibility, ItemAlign, LocalizedAlignment, Direction, ShadowClipMode, ObscuredReasons, RenderFit, FocusDrawLevel, ImageRepeat, RenderStrategy, Axis, ResponseType, FunctionKey, ModifierKey, GradientDirection, Curve, SharedTransitionEffectType, ArrowPointPosition, TipsAnchorType, Placement, BarState, UIMaterialAnimationMode, LineCapStyle, LineJoinStyle, CrownSensitivity, EdgeEffect, TextDecorationType, TextDecorationStyle, ResponseRegionSupportedTool, PlayMode, VerticalAlign, HorizontalAlign, FontWeight, FontStyle, GestureCollectIntervention, CrownAction, ClickEffectLevel, NestedScrollMode, PixelRoundCalcPolicy, ScrollSource, IlluminatedType, GestureShortcut, InputEventInterceptAction, AccessibilityHoverType, AxisAction, AxisType, AxisModel, MouseButton, MouseAction, EdgeLightPosition } from './enums'
+import { KeyType, KeySource, Color as arkui_component_enums_Color, TouchType, InteractionHand, HitTestMode, ImageSize, Alignment, BorderStyle, ColoringStrategy, HoverEffect, Visibility, ItemAlign, LocalizedAlignment, Direction, ShadowClipMode, ObscuredReasons, RenderFit, FocusDrawLevel, ImageRepeat, RenderStrategy, Axis, ResponseType, FunctionKey, ModifierKey, GradientDirection, Curve, SharedTransitionEffectType, ArrowPointPosition, TipsAnchorType, Placement, BarState, UIMaterialAnimationMode, LineCapStyle, LineJoinStyle, CrownSensitivity, EdgeEffect, TextDecorationType, TextDecorationStyle, ResponseRegionSupportedTool, PlayMode, VerticalAlign, HorizontalAlign, FontWeight, FontStyle, GestureCollectIntervention, CrownAction, ClickEffectLevel, NestedScrollMode, PixelRoundCalcPolicy, ScrollSource, IlluminatedType, GestureShortcut, InputEventInterceptAction, AccessibilityHoverType, AxisAction, AxisType, AxisModel, MouseButton, MouseAction, EdgeLightPosition, TextOverflow } from './enums'
 import { IntentionCode } from '@ohos.multimodalInput.intentionCode'
 import { global_resource_Resource_serializer } from './../framework/resource'
 import { Resource as global_resource_Resource } from 'global.resource'
@@ -8437,6 +8437,13 @@ export interface ForegroundEffectOptions {
 export interface PickerTextStyle {
     color?: ResourceColor;
     font?: arkui_component_units_Font;
+}
+export interface PickerComponentTextStyle {
+    color?: ResourceColor;
+    font?: arkui_component_units_Font;
+    minFontSize?: double | ResourceStr;
+    maxFontSize?: double | ResourceStr;
+    overflow?: TextOverflow;
 }
 export interface PickerDialogButtonStyle {
     type?: ButtonType;
@@ -24689,6 +24696,179 @@ export class PickerTextStyle_serializer {
         }
         const fontTmpResult: arkui_component_units_Font | undefined = fontTmpBuf
         let value: PickerTextStyle = ({color: colorTmpResult, font: fontTmpResult} as PickerTextStyle)
+        return value
+    }
+}
+export class PickerComponentTextStyle_serializer {
+    public static write(buffer: SerializerBase, value: PickerComponentTextStyle): void {
+        let valueSerializer: SerializerBase = buffer
+        const valueHolderForColor = value.color
+        if (valueHolderForColor !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForColorTmpValue = valueHolderForColor!
+            if (valueHolderForColorTmpValue instanceof arkui_component_enums_Color) {
+                valueSerializer.writeInt8((0).toByte())
+                const valueHolderForColorTmpValueForIdx0 = valueHolderForColorTmpValue as arkui_component_enums_Color
+                valueSerializer.writeInt32((valueHolderForColorTmpValueForIdx0.getOrdinal()) % (12))
+            } else if (valueHolderForColorTmpValue instanceof int32) {
+                valueSerializer.writeInt8((1).toByte())
+                const valueHolderForColorTmpValueForIdx1 = valueHolderForColorTmpValue as int32
+                valueSerializer.writeInt32(valueHolderForColorTmpValueForIdx1)
+            } else if (valueHolderForColorTmpValue instanceof string) {
+                valueSerializer.writeInt8((2).toByte())
+                const valueHolderForColorTmpValueForIdx2 = valueHolderForColorTmpValue as string
+                valueSerializer.writeString(valueHolderForColorTmpValueForIdx2)
+            } else if (valueHolderForColorTmpValue instanceof arkui_component_units_Resource) {
+                valueSerializer.writeInt8((3).toByte())
+                const valueHolderForColorTmpValueForIdx3 = valueHolderForColorTmpValue as arkui_component_units_Resource
+                global_resource_Resource_serializer.write(valueSerializer, valueHolderForColorTmpValueForIdx3)
+            }
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        const valueHolderForFont = value.font
+        if (valueHolderForFont !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForFontTmpValue = valueHolderForFont!
+            arkui_component_units_Font_serializer.write(valueSerializer, valueHolderForFontTmpValue)
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        const valueHolderForMinFontSize = value.minFontSize
+        if (valueHolderForMinFontSize !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForMinFontSizeTmpValue = valueHolderForMinFontSize!
+            if (valueHolderForMinFontSizeTmpValue instanceof double) {
+                valueSerializer.writeInt8((0).toByte())
+                const valueHolderForMinFontSizeTmpValueForIdx0 = valueHolderForMinFontSizeTmpValue as double
+                valueSerializer.writeFloat64(valueHolderForMinFontSizeTmpValueForIdx0)
+            } else if (valueHolderForMinFontSizeTmpValue instanceof string) {
+                valueSerializer.writeInt8((1).toByte())
+                valueSerializer.writeInt8((0).toByte())
+                const valueHolderForMinFontSizeTmpValueForIdx1ForIdx0 = valueHolderForMinFontSizeTmpValue as string
+                valueSerializer.writeString(valueHolderForMinFontSizeTmpValueForIdx1ForIdx0)
+            } else if (valueHolderForMinFontSizeTmpValue instanceof arkui_component_units_Resource) {
+                valueSerializer.writeInt8((1).toByte())
+                valueSerializer.writeInt8((1).toByte())
+                const valueHolderForMinFontSizeTmpValueForIdx1ForIdx1 = valueHolderForMinFontSizeTmpValue as arkui_component_units_Resource
+                global_resource_Resource_serializer.write(valueSerializer, valueHolderForMinFontSizeTmpValueForIdx1ForIdx1)
+            }
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        const valueHolderForMaxFontSize = value.maxFontSize
+        if (valueHolderForMaxFontSize !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForMaxFontSizeTmpValue = valueHolderForMaxFontSize!
+            if (valueHolderForMaxFontSizeTmpValue instanceof double) {
+                valueSerializer.writeInt8((0).toByte())
+                const valueHolderForMaxFontSizeTmpValueForIdx0 = valueHolderForMaxFontSizeTmpValue as double
+                valueSerializer.writeFloat64(valueHolderForMaxFontSizeTmpValueForIdx0)
+            } else if (valueHolderForMaxFontSizeTmpValue instanceof string) {
+                valueSerializer.writeInt8((1).toByte())
+                valueSerializer.writeInt8((0).toByte())
+                const valueHolderForMaxFontSizeTmpValueForIdx1ForIdx0 = valueHolderForMaxFontSizeTmpValue as string
+                valueSerializer.writeString(valueHolderForMaxFontSizeTmpValueForIdx1ForIdx0)
+            } else if (valueHolderForMaxFontSizeTmpValue instanceof arkui_component_units_Resource) {
+                valueSerializer.writeInt8((1).toByte())
+                valueSerializer.writeInt8((1).toByte())
+                const valueHolderForMaxFontSizeTmpValueForIdx1ForIdx1 = valueHolderForMaxFontSizeTmpValue as arkui_component_units_Resource
+                global_resource_Resource_serializer.write(valueSerializer, valueHolderForMaxFontSizeTmpValueForIdx1ForIdx1)
+            }
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        const valueHolderForOverflow = value.overflow
+        if (valueHolderForOverflow !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForOverflowTmpValue = (valueHolderForOverflow as TextOverflow)
+            valueSerializer.writeInt32(valueHolderForOverflowTmpValue.valueOf())
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+    }
+    public static read(buffer: DeserializerBase): PickerComponentTextStyle {
+        let valueDeserializer: DeserializerBase = buffer
+        const colorTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let colorTmpBuf: ResourceColor | undefined = undefined
+        if ((colorTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            const colorTmpBufOptUnionSelector: int32 = valueDeserializer.readInt8()
+            let colorTmpBufOpt: arkui_component_enums_Color | int32 | string | arkui_component_units_Resource | undefined
+            if (colorTmpBufOptUnionSelector == (0).toByte()) {
+                colorTmpBufOpt = arkui_component_enums_Color.values()[valueDeserializer.readInt32()]
+            } else if (colorTmpBufOptUnionSelector == (1).toByte()) {
+                colorTmpBufOpt = valueDeserializer.readInt32()
+            } else if (colorTmpBufOptUnionSelector == (2).toByte()) {
+                colorTmpBufOpt = (valueDeserializer.readString() as string)
+            } else if (colorTmpBufOptUnionSelector == (3).toByte()) {
+                colorTmpBufOpt = global_resource_Resource_serializer.read(valueDeserializer)
+            } else {
+                throw new Error('One of the branches for colorTmpBufOpt has to be chosen through deserialisation.')
+            }
+            colorTmpBuf = (colorTmpBufOpt as arkui_component_enums_Color | int32 | string | arkui_component_units_Resource)
+        }
+        const colorTmpResult: ResourceColor | undefined = colorTmpBuf
+        const fontTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let fontTmpBuf: arkui_component_units_Font | undefined = undefined
+        if ((fontTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            fontTmpBuf = arkui_component_units_Font_serializer.read(valueDeserializer)
+        }
+        const fontTmpResult: arkui_component_units_Font | undefined = fontTmpBuf
+        const minFontSizeTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let minFontSizeTmpBuf: double | string | arkui_component_units_Resource | undefined = undefined
+        if ((minFontSizeTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            const minFontSizeTmpBufOptUnionSelector: int32 = valueDeserializer.readInt8()
+            let minFontSizeTmpBufOpt: double | string | arkui_component_units_Resource | undefined
+            if (minFontSizeTmpBufOptUnionSelector == (0).toByte()) {
+                minFontSizeTmpBufOpt = valueDeserializer.readFloat64()
+            } else if (minFontSizeTmpBufOptUnionSelector == (1).toByte()) {
+                const minFontSizeTmpBufOptBufUUnionSelector: int32 = valueDeserializer.readInt8()
+                let minFontSizeTmpBufOptBufU: string | arkui_component_units_Resource | undefined
+                if (minFontSizeTmpBufOptBufUUnionSelector == (0).toByte()) {
+                    minFontSizeTmpBufOptBufU = (valueDeserializer.readString() as string)
+                } else if (minFontSizeTmpBufOptBufUUnionSelector == (1).toByte()) {
+                    minFontSizeTmpBufOptBufU = global_resource_Resource_serializer.read(valueDeserializer)
+                } else {
+                    throw new Error('One of the branches for minFontSizeTmpBufOptBufU has to be chosen through deserialisation.')
+                }
+                minFontSizeTmpBufOpt = (minFontSizeTmpBufOptBufU as string | arkui_component_units_Resource)
+            } else {
+                throw new Error('One of the branches for minFontSizeTmpBufOpt has to be chosen through deserialisation.')
+            }
+            minFontSizeTmpBuf = (minFontSizeTmpBufOpt as double | string | arkui_component_units_Resource)
+        }
+        const minFontSizeTmpResult: double | string | arkui_component_units_Resource | undefined = minFontSizeTmpBuf
+        const maxFontSizeTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let maxFontSizeTmpBuf: double | string | arkui_component_units_Resource | undefined = undefined
+        if ((maxFontSizeTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            const maxFontSizeTmpBufOptUnionSelector: int32 = valueDeserializer.readInt8()
+            let maxFontSizeTmpBufOpt: double | string | arkui_component_units_Resource | undefined
+            if (maxFontSizeTmpBufOptUnionSelector == (0).toByte()) {
+                maxFontSizeTmpBufOpt = valueDeserializer.readFloat64()
+            } else if (maxFontSizeTmpBufOptUnionSelector == (1).toByte()) {
+                const maxFontSizeTmpBufOptBufUUnionSelector: int32 = valueDeserializer.readInt8()
+                let maxFontSizeTmpBufOptBufU: string | arkui_component_units_Resource | undefined
+                if (maxFontSizeTmpBufOptBufUUnionSelector == (0).toByte()) {
+                    maxFontSizeTmpBufOptBufU = (valueDeserializer.readString() as string)
+                } else if (maxFontSizeTmpBufOptBufUUnionSelector == (1).toByte()) {
+                    maxFontSizeTmpBufOptBufU = global_resource_Resource_serializer.read(valueDeserializer)
+                } else {
+                    throw new Error('One of the branches for maxFontSizeTmpBufOptBufU has to be chosen through deserialisation.')
+                }
+                maxFontSizeTmpBufOpt = (maxFontSizeTmpBufOptBufU as string | arkui_component_units_Resource)
+            } else {
+                throw new Error('One of the branches for maxFontSizeTmpBufOpt has to be chosen through deserialisation.')
+            }
+            maxFontSizeTmpBuf = (maxFontSizeTmpBufOpt as double | string | arkui_component_units_Resource)
+        }
+        const maxFontSizeTmpResult: double | string | arkui_component_units_Resource | undefined = maxFontSizeTmpBuf
+        const overflowTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let overflowTmpBuf: TextOverflow | undefined = undefined
+        if ((overflowTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            overflowTmpBuf = TextOverflow.fromValue(valueDeserializer.readInt32())
+        }
+        const overflowTmpResult: TextOverflow | undefined = overflowTmpBuf
+        let value: PickerComponentTextStyle = ({color: colorTmpResult, font: fontTmpResult, minFontSize: minFontSizeTmpResult, maxFontSize: maxFontSizeTmpResult, overflow: overflowTmpResult} as PickerComponentTextStyle)
         return value
     }
 }
