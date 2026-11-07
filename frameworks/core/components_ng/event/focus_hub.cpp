@@ -616,6 +616,12 @@ void FocusHub::LostFocusToViewRoot()
     curFocusView->SetIsViewRootScopeFocused(true);
     auto focusedChild = viewRootScope->lastWeakFocusNode_.Upgrade();
     CHECK_NULL_VOID(focusedChild);
+    if (focusManager->GetIsSwitchingFocus().value_or(false)) {
+        TAG_LOGW(AceLogTag::ACE_FOCUS, "LostFocusToViewRoot guard no-op, already switching. "
+            "viewRoot:%{public}s/" SEC_PLD(%{public}d) " s:%{public}d",
+            viewRootScope->GetFrameName().c_str(), SEC_PARAM(viewRootScope->GetFrameId()),
+            focusManager->GetStartReason().value_or(SwitchingStartReason::DEFAULT));
+    }
     FocusManager::FocusGuard guard(viewRootScope, SwitchingStartReason::LOST_FOCUS_TO_VIEW_ROOT);
     focusedChild->LostFocus(BlurReason::CLEAR_FOCUS);
 }
