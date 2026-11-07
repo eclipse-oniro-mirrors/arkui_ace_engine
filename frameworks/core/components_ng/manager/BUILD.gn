@@ -62,6 +62,7 @@ build_component_ng("manager_ng") {
     "page_scene/search_scene_context_collector.cpp",
     "page_scene/search_scene_matcher.cpp",
     "page_scene/search_scene_snapshot.cpp",
+    "page_scene/split_scene_recognizer.cpp",
     "post_event/post_event_manager.cpp",
     "recoverable/recoverable_manager.cpp",
     "recoverable/recoverable_view.cpp",
