@@ -15,9 +15,16 @@
 
 #include "base/input_manager/input_manager.h"
 
+#include "accesstoken_kit.h"
 #include "input_manager.h"
+#include "ipc_skeleton.h"
+#include "saf_gui_fence.h"
 
+#include "base/json/json_util.h"
+#include "base/log/log_wrapper.h"
 #include "base/utils/utils.h"
+#include "core/common/container.h"
+#include "core/components_ng/base/node_sensitive_input.h"
 
 namespace OHOS::Ace {
 
@@ -36,6 +43,21 @@ std::shared_ptr<MMI::PointerEvent> InputManager::CreatePointerEvent(
         return nullptr;
     }
     return std::make_shared<MMI::PointerEvent>(*pointerEvent);
+}
+
+bool InputManager::IsAgentEvent(const std::shared_ptr<MMI::PointerEvent>& pointerEvent)
+{
+    return pointerEvent && pointerEvent->HasFlag(MMI::InputEvent::EVENT_FLAG_CONTROLLER);
+}
+
+bool InputManager::HasControlComponentPermission()
+{
+    static const bool permissionGranted = []() {
+        const auto tokenId = static_cast<Security::AccessToken::AccessTokenID>(IPCSkeleton::GetSelfTokenID());
+        return Security::AccessToken::AccessTokenKit::VerifyAccessToken(
+            tokenId, "ohos.permission.CONTROL_COMPONENT") == Security::AccessToken::PERMISSION_GRANTED;
+    }();
+    return permissionGranted;
 }
 
 KeyboardType ConvertKeyboardType(int32_t type)
@@ -97,6 +119,38 @@ bool InputManager::IsKeyboardConnected()
     }
     return std::any_of(deviceIds.begin(), deviceIds.end(),
         [](int32_t id) { return GetKeyboardType(id) == KeyboardType::ALPHABETICKEYBOARD; });
+}
+
+void InputManager::ReportAgentInputDecision(const NG::AgentInputResult& decision)
+{
+    OHOS::Security::SAF::ComponentClickResult result;
+    result.compId = decision.compId;
+    result.allowed = decision.allowed;
+    // SAF forwards reason unchanged; carry the component metadata as JSON.
+    auto metadata = JsonUtil::Create(true);
+    // Keep the opaque uint64 session ID exact in JSON.
+    metadata->Put("sessionId", std::to_string(decision.sessionId).c_str());
+    metadata->Put("compId", decision.compId.c_str());
+    metadata->Put("tag", decision.tag.c_str());
+    result.reason = metadata->ToString();
+    auto container = Container::GetContainer(decision.instanceId);
+    CHECK_NULL_VOID(container);
+    auto executor = container->GetTaskExecutor();
+    CHECK_NULL_VOID(executor);
+    const auto callingUid = decision.callingUid;
+    const bool posted = executor->PostTask(
+        [callingUid, result]() {
+            // SAF names the routing argument sessionId; pass the injector UID as agreed.
+            auto ret = OHOS::Security::SAF::SafGuiFence::ReportComponentClickDecision(callingUid, result);
+            if (ret != 0) {
+                TAG_LOGW(AceLogTag::ACE_INPUTTRACKING,
+                    "report agent input decision failed, error=%{public}d", ret);
+            }
+        },
+        TaskExecutor::TaskType::BACKGROUND, "ArkUIReportAgentInputDecision");
+    if (!posted) {
+        TAG_LOGW(AceLogTag::ACE_INPUTTRACKING, "post agent input decision task failed");
+    }
 }
 
 } // namespace OHOS::Ace

@@ -1043,6 +1043,10 @@ export class AxisEventTransfer {
 }
 
 export class TouchEventHandwritten implements TouchEvent {
+    private inputOwner?: Object = undefined
+    public retainInputOwner(owner: Object): void {
+        this.inputOwner = owner
+    }
     public ptr: KPointer
     public getModifierKeyState?: ModifierKeyStateGetter | undefined
     public type: TouchType

@@ -2757,6 +2757,17 @@ ArkUINativeModuleValue CommonBridge::ResetHitTestBehavior(ArkUIRuntimeCallInfo *
     return panda::JSValueRef::Undefined(vm);
 }
 
+ArkUINativeModuleValue CommonBridge::SetAgentControlMode(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
+    auto nativeNode = nodePtr(runtimeCallInfo->GetCallArgRef(0)->ToNativePointer(vm)->Value());
+    auto value = runtimeCallInfo->GetCallArgRef(1);
+    GetArkUINodeModifiers()->getCommonModifier()->setAgentControlMode(
+        nativeNode, value->IsNumber() ? value->Int32Value(vm) : -1);
+    return panda::JSValueRef::Undefined(vm);
+}
+
 ArkUINativeModuleValue CommonBridge::SetZIndex(ArkUIRuntimeCallInfo *runtimeCallInfo)
 {
     EcmaVM *vm = runtimeCallInfo->GetVM();

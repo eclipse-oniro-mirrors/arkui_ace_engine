@@ -223,6 +223,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _CommonMethod_setHitTestBehavior(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
+    native static _CommonMethod_setAgentControlMode(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
     native static _CommonMethod_setOnChildTouchTest(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _CommonMethod_setLayoutWeight(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
@@ -6089,6 +6091,12 @@ export class ArkUIGeneratedNativeModule {
     native static _NodeContentExtender_addFrameNode(content: KPointer, node: KPointer): KInt
     @ani.unsafe.Direct
     native static _NodeContentExtender_removeFrameNode(content: KPointer, node: KPointer): boolean
+    @ani.unsafe.Direct
+    native static _NodeSensitiveInputEventFactory_fromTouch(event: KPointer, node: KPointer): KPointer
+    @ani.unsafe.Direct
+    native static _NodeSensitiveInputEventFactory_fromMouse(event: KPointer, node: KPointer): KPointer
+    @ani.unsafe.Direct
+    native static _NodeSensitiveInputEventFactory_fromKey(event: KPointer, node: KPointer): KPointer
     @ani.unsafe.Direct
     native static _NumericTextTransition_construct(thisArray: KSerializerBuffer, thisLength: KInt): KPointer
     @ani.unsafe.Direct

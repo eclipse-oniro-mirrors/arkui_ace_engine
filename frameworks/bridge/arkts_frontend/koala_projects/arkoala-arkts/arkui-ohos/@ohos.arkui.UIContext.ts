@@ -76,6 +76,7 @@ import { ArkUIGeneratedNativeModule } from '#components';
 import { GlobalScopeUicontextFontScale, GlobalScopeUicontextTextMenu } from "#generated"
 import { deserializeAndCallCallback } from 'arkui/framework/peers/CallbackDeserializeCall';
 import { RawInputEventType, SmartGestureAction, OperateIntention } from 'arkui/component/enums';
+import { TouchEvent, MouseEvent, TouchEventHandwritten, RawInputEventWrapper } from 'arkui/component/common';
 
 export enum GestureActionPhase {
     WILL_START = 0,
@@ -1742,6 +1743,63 @@ export declare type NodeRenderStateChangeCallback = (state: NodeRenderState, nod
 // Global gesture listener callback type
 export declare type GestureListenerCallback = (triggerInfo: GestureTriggerInfo) => void;
 
+export enum NodeSensitiveInputEventType {
+    TOUCH = 0,
+    MOUSE = 1,
+    KEY = 2
+}
+
+export interface NodeSensitiveInputInfo {
+    isAgent: boolean;
+    type: NodeSensitiveInputEventType;
+    touchEvent?: TouchEvent;
+    mouseEvent?: MouseEvent;
+    keyEvent?: KeyEvent;
+}
+
+export type NodeSensitiveInputCallback = (info: NodeSensitiveInputInfo, node?: FrameNode) => void;
+
+class NodeSensitiveInputDispatcher {
+    private instanceId: int32;
+    private callback: NodeSensitiveInputCallback;
+
+    constructor(instanceId: int32, callback: NodeSensitiveInputCallback) {
+        this.instanceId = instanceId;
+        this.callback = callback;
+    }
+
+    public dispatchInput(isAgent: boolean, type: int32, owner: RawInputEventWrapper, rawNode: int64): void {
+        const info: NodeSensitiveInputInfo = {
+            isAgent: isAgent, type: NodeSensitiveInputEventType.fromValue(type)
+        };
+        if (type === NodeSensitiveInputEventType.TOUCH) {
+            const touch = owner.asTouchEvent();
+            if (touch instanceof TouchEventHandwritten) {
+                touch.retainInputOwner(owner);
+            }
+            if (touch) {
+                info.touchEvent = touch;
+            }
+        } else if (type === NodeSensitiveInputEventType.MOUSE) {
+            const mouse = owner.asMouseEvent();
+            if (mouse) {
+                info.mouseEvent = mouse;
+            }
+        } else {
+            const key = owner.asKeyEvent();
+            if (key) {
+                info.keyEvent = key;
+            }
+        }
+        const peer = FrameNodeExtender.createByRawPtr(rawNode);
+        let node = FrameNodeUtils.searchNodeInRegisterProxy(peer);
+        if (!node) {
+            node = FrameNodeUtils.createFrameNode(UIContextUtil.getOrCreateUIContextById(this.instanceId), peer);
+        }
+        this.callback(info, node ?? undefined);
+    }
+}
+
 export class UIObserver {
     private instanceId_: number = 100000;
     private observerImpl: uiObserver.UIObserver | null = null;
@@ -1754,6 +1812,17 @@ export class UIObserver {
     private createUIObserver(id: number): uiObserver.UIObserver | null {
         this.observerImpl = uiObserver.createUIObserver(id);
         return this.observerImpl;
+    }
+
+    public onNodeSensitiveInput(nodeIdentity: NodeIdentity, callback: NodeSensitiveInputCallback): void {
+        const dispatcher = new NodeSensitiveInputDispatcher(this.instanceId_.toInt(), callback);
+        this.observerImpl?.onNodeSensitiveInput(nodeIdentity instanceof String ? -1 : nodeIdentity as int,
+            nodeIdentity instanceof String ? nodeIdentity as string : '', callback, dispatcher);
+    }
+
+    public offNodeSensitiveInput(nodeIdentity: NodeIdentity, callback?: NodeSensitiveInputCallback): void {
+        this.observerImpl?.offNodeSensitiveInput(nodeIdentity instanceof String ? -1 : nodeIdentity as int,
+            nodeIdentity instanceof String ? nodeIdentity as string : '', callback);
     }
 
     public on(type: string, callback: ((param: object) => void)): void {

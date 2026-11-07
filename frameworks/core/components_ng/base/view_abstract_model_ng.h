@@ -1556,6 +1556,8 @@ public:
         ViewAbstract::SetHitTestMode(hitTestMode);
     }
 
+    void SetAgentControlMode(const std::optional<NG::AgentControlMode>& mode) override;
+
     void SetOnTouchTestFunc(NG::OnChildTouchTestFunc&& onChildTouchTest) override
     {
         ViewAbstract::SetOnTouchTestFunc(std::move(onChildTouchTest));

@@ -56,6 +56,7 @@
 #include "adapter/ohos/osal/view_data_wrap_ohos.h"
 #include "adapter/ohos/osal/window_utils.h"
 #include "base/i18n/localization.h"
+#include "base/input_manager/input_manager.h"
 #include "base/log/event_report.h"
 #include "base/log/jank_frame_report.h"
 #include "base/memory/referenced.h"
@@ -572,6 +573,8 @@ bool AceContainer::IsKeyboard()
 void AceContainer::Initialize()
 {
     ContainerScope scope(instanceId_);
+    // Cache the application permission before any input is dispatched.
+    InputManager::HasControlComponentPermission();
     // For DECLARATIVE_JS frontend use UI as JS Thread, so InitializeFrontend after UI thread created.
     // For STATIC_HYBRID_DYNAMIC and DYNAMIC_HYBRID_STATIC frontend, also initialize after AttachView
     if (type_ != FrontendType::DECLARATIVE_JS && type_ != FrontendType::DECLARATIVE_CJ &&

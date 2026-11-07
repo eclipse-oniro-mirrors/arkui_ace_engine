@@ -28,6 +28,7 @@ template("napi_observer_static") {
       "gesture/gesture_observer.cpp",
       "gesture/gesture_observer_listener.cpp",
       "js_ui_observer.cpp",
+      "node_sensitive_input_observer_listener.cpp",
       "render/render_layout_observer_listener.cpp",
       "ui_observer.cpp",
       "ui_observer_listener.cpp",
@@ -38,10 +39,10 @@ template("napi_observer_static") {
       deps += [ "${crossplatform_plugin_root}/libs/napi:napi_$platform" ]
     } else {
       external_deps += [
+        "ets_runtime:libark_jsruntime",
+        "libuv:uv",
         "napi:ace_napi",
         "node:node_header_notice",
-        "libuv:uv",
-        "ets_runtime:libark_jsruntime",
       ]
     }
     if (use_hilog) {

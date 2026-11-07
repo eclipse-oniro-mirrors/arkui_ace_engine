@@ -101,6 +101,7 @@
 #include "core/common/stylus/stylus_detector_mgr.h"
 #include "core/common/text_field_manager.h"
 #include "core/common/thp_extra_manager.h"
+#include "core/components_ng/base/node_sensitive_input.h"
 #include "core/components_ng/base/node_render_status_monitor.h"
 #include "core/components_ng/base/simplified_inspector.h"
 #include "core/components_ng/base/ui_node_gc.h"
@@ -5292,6 +5293,26 @@ void PipelineContext::UpdateLastMoveEvent(const MouseEvent& event)
     lastSourceType_ = event.sourceType;
 }
 
+namespace {
+MouseEvent PrepareAgentMouseDispatch(const MouseEvent& event, const RefPtr<FrameNode>& node,
+    const RefPtr<EventManager>& manager, float viewScale)
+{
+    MouseEvent dispatchEvent(event);
+    if (event.isAgent && !event.isStylusMouseMode && event.action == MouseAction::PRESS && node &&
+        (event.button == MouseButton::LEFT_BUTTON || event.button == MouseButton::RIGHT_BUTTON)) {
+        TouchRestrict restrict { TouchRestrict::NONE };
+        restrict.sourceType = event.sourceType;
+        restrict.sourceTool = event.sourceTool;
+        restrict.hitTestType = SourceType::MOUSE;
+        restrict.mouseAction = event.action;
+        restrict.inputEventType = InputEventType::MOUSE_BUTTON;
+        manager->MouseTest(event.CreateScaleEvent(viewScale), node, restrict);
+        manager->PrepareAgentMousePress(dispatchEvent);
+    }
+    return dispatchEvent;
+}
+} // namespace
+
 void PipelineContext::OnMouseEvent(const MouseEvent& event, const RefPtr<FrameNode>& node)
 {
     CHECK_RUN_ON(UI);
@@ -5342,22 +5363,29 @@ void PipelineContext::OnMouseEvent(const MouseEvent& event, const RefPtr<FrameNo
         lastMouseTime_ = GetTimeFromExternalTimer();
         CompensateMouseMoveEvent(event, node);
     }
-    NotifyDragMouseEvent(event);
-    DispatchMouseToTouchEvent(event, node);
+    auto dispatchEvent = PrepareAgentMouseDispatch(event, node, eventManager_, viewScale_);
+    NotifyDragMouseEvent(dispatchEvent);
+    DispatchMouseToTouchEvent(dispatchEvent, node);
+    FinishOnMouseEvent(event, dispatchEvent, node);
+}
+
+void PipelineContext::FinishOnMouseEvent(
+    const MouseEvent& event, const MouseEvent& dispatchEvent, const RefPtr<FrameNode>& node)
+{
     if (event.action == MouseAction::MOVE) {
         if (isMousePassThrough_ || event.passThrough) {
-            DispatchMouseEvent(event, node);
+            DispatchMouseEvent(dispatchEvent, node);
             if (postEventManager_) {
                 postEventManager_->SetPassThroughResult(eventManager_->GetPassThroughResult());
             }
             return;
         }
-        mouseEvents_[node].emplace_back(event);
+        mouseEvents_[node].emplace_back(dispatchEvent);
         hasIdleTasks_ = true;
         RequestFrame();
         return;
     }
-    DispatchMouseEvent(event, node);
+    DispatchMouseEvent(dispatchEvent, node);
     if (postEventManager_) {
         postEventManager_->SetPassThroughResult(eventManager_->GetPassThroughResult());
     }

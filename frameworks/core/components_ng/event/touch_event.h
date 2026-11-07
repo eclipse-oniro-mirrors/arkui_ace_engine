@@ -134,6 +134,8 @@ public:
     bool HandleEvent(const TouchEvent& point) override;
     bool HandleInteractionEvent(const TouchEvent& point) override;
 
+    static TouchEventInfo CreateInputEventInfo(const TouchEvent& event, const RefPtr<FrameNode>& node);
+
     void SetFrameNodeCommonOnTouchEvent(TouchEventFunc&& callback)
     {
         if (commonTouchEventCallback_) {

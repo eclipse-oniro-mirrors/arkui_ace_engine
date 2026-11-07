@@ -1064,6 +1064,10 @@ public:
     void SetHitTestMode(HitTestMode mode);
     HitTestMode GetHitTestMode() const override;
 
+    void SetAgentControlMode(const std::optional<AgentControlMode>& mode);
+    bool HasAgentControlMode() const;
+    AgentControlMode GetAgentControlMode() const;
+
     TouchResult GetOnChildTouchTestRet(const std::vector<TouchTestInfo>& touchInfo);
     OnChildTouchTestFunc GetOnTouchTestFunc();
     void CollectTouchInfos(
@@ -1991,6 +1995,7 @@ private:
     bool isPrivacySensitive_ = false;
     // Only ordinary bindMenu sets this preference; no value means no ordinary menu binding.
     std::optional<bool> inspectorMenuShowInSubWindow_;
+    std::optional<AgentControlMode> agentControlMode_;
 
     // for container, this flag controls only the last child in touch area is consuming event.
     bool exclusiveEventForChild_ = false;

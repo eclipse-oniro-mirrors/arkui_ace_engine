@@ -389,6 +389,16 @@ class UIObserver {
             this.ohos_observer.off(...args);
         });
     }
+    onNodeSensitiveInput(...args) {
+        withInstanceId(this.instanceId_, () => {
+            this.ohos_observer.on('nodeSensitiveInput', ...args);
+        });
+    }
+    offNodeSensitiveInput(...args) {
+        withInstanceId(this.instanceId_, () => {
+            this.ohos_observer.off('nodeSensitiveInput', ...args);
+        });
+    }
     addGlobalGestureListener(...args) {
         withInstanceId(this.instanceId_, () => {
             this.ohos_observer?.addGlobalGestureListener(...args);

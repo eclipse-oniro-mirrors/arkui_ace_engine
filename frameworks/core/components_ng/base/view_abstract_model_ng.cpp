@@ -107,6 +107,11 @@ NG::OffsetF UpdateMenuPostion(const NG::OffsetF& menuPosition, const MenuParam& 
     return menuPosition;
 }
 
+void ViewAbstractModelNG::SetAgentControlMode(const std::optional<NG::AgentControlMode>& mode)
+{
+    ViewAbstract::SetAgentControlMode(mode);
+}
+
 void ViewAbstractModelNG::BindMenuGesture(
     std::vector<NG::OptionParam>&& params, std::function<void()>&& buildFunc, const MenuParam& menuParam)
 {

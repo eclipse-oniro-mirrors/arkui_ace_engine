@@ -3696,6 +3696,13 @@ void ViewAbstract::SetHitTestMode(HitTestMode hitTestMode)
     gestureHub->SetHitTestMode(hitTestMode);
 }
 
+void ViewAbstract::SetAgentControlMode(const std::optional<AgentControlMode>& mode)
+{
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    frameNode->SetAgentControlMode(mode);
+}
+
 void ViewAbstract::SetOnTouchTestFunc(NG::OnChildTouchTestFunc&& onChildTouchTest)
 {
     auto gestureHub = ViewStackProcessor::GetInstance()->GetMainFrameNodeGestureEventHub();
@@ -8477,6 +8484,12 @@ void ViewAbstract::SetHitTestMode(FrameNode* frameNode, HitTestMode hitTestMode)
     auto gestureHub = frameNode->GetOrCreateGestureEventHub();
     CHECK_NULL_VOID(gestureHub);
     gestureHub->SetHitTestMode(hitTestMode);
+}
+
+void ViewAbstract::SetAgentControlMode(FrameNode* frameNode, const std::optional<AgentControlMode>& mode)
+{
+    CHECK_NULL_VOID(frameNode);
+    frameNode->SetAgentControlMode(mode);
 }
 
 void ViewAbstract::SetOpacity(FrameNode* frameNode, double opacity)

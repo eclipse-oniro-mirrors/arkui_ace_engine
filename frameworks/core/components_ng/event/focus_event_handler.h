@@ -22,6 +22,7 @@
 #include "core/gestures/gesture_event.h"
 namespace OHOS::Ace::NG {
 struct FocusAxisEvent;
+struct NodeSensitiveKeyDispatch;
 
 #define ACE_DEFINE_FOCUS_EVENT(func, type, name)                               \
 public:                                                                        \
@@ -65,6 +66,7 @@ struct FocusEvent {
 
     FocusIntension intension;
     const NonPointerEvent& event;
+    mutable std::shared_ptr<NodeSensitiveKeyDispatch> sensitiveInput;
     static FocusIntension GetFocusIntension(const NonPointerEvent& event);
     static FocusIntension GetFocusIntensionFromKey(KeyIntention keyIntention);
 };
@@ -147,10 +149,14 @@ protected:
     RefPtr<FocusCallbackEvents> focusCallbackEvents_;
 
 private:
+    std::vector<RefPtr<FrameNode>> CollectSensitiveKeyNodes(const FocusEvent& event);
+    void PrepareSensitiveKeyDispatch(const FocusEvent& event);
+    bool RejectAgentKeyEvent(const FocusEvent& event);
     bool OnFocusEventScope(const FocusEvent& event);
     bool OnFocusEventNode(const FocusEvent& focusEvent);
 
     bool HandleKeyEvent(const KeyEvent& event, FocusIntension intension);
+    bool HandleKeyEventInternal(const KeyEvent& event, FocusIntension intension);
     bool OnKeyPreIme(KeyEventInfo& info, const KeyEvent& keyEvent);
     bool OnKeyEventNodeInternal(const KeyEvent& keyEvent);
     bool OnKeyEventNodeUser(KeyEventInfo& info, const KeyEvent& keyEvent);

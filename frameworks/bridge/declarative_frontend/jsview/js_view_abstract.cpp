@@ -14,6 +14,7 @@
  */
 
 #include "bridge/declarative_frontend/jsview/js_view_abstract.h"
+#include "core/components_ng/event/event_constants.h"
 
 #include <algorithm>
 #include <array>
@@ -10519,6 +10520,7 @@ void JSViewAbstract::JSBind(BindingTarget globalObj)
         "onVisibleAreaApproximateChange", &JSViewAbstract::JsOnVisibleAreaApproximateChange);
     JSClass<JSViewAbstract>::StaticMethod("smartGestureShortcut", &JSViewAbstract::JsSmartGestureShortcut);
     JSClass<JSViewAbstract>::StaticMethod("hitTestBehavior", &JSViewAbstract::JsHitTestBehavior);
+    JSClass<JSViewAbstract>::StaticMethod("agentControlMode", &JSViewAbstract::JsAgentControlMode);
     JSClass<JSViewAbstract>::StaticMethod("onChildTouchTest", &JSViewAbstract::JsOnChildTouchTest);
     JSClass<JSViewAbstract>::StaticMethod("keyboardShortcut", &JSViewAbstract::JsKeyboardShortcut);
     JSClass<JSViewAbstract>::StaticMethod("obscured", &JSViewAbstract::JsObscured);
@@ -12330,6 +12332,21 @@ void JSViewAbstract::JsHitTestBehavior(const JSCallbackInfo& info)
     NG::HitTestMode hitTestModeNG = NG::HitTestMode::HTMDEFAULT;
     hitTestModeNG = static_cast<NG::HitTestMode>(info[0]->ToNumber<int32_t>());
     ViewAbstractModel::GetInstance()->SetHitTestMode(hitTestModeNG);
+}
+
+void JSViewAbstract::JsAgentControlMode(const JSCallbackInfo& info)
+{
+    if (info.Length() != 1 || !info[0]->IsNumber()) {
+        ViewAbstractModel::GetInstance()->SetAgentControlMode(std::nullopt);
+        return;
+    }
+    const auto value = info[0]->ToNumber<int32_t>();
+    if (value < static_cast<int32_t>(NG::AgentControlMode::ALLOW) ||
+        value > static_cast<int32_t>(NG::AgentControlMode::DENY)) {
+        ViewAbstractModel::GetInstance()->SetAgentControlMode(std::nullopt);
+        return;
+    }
+    ViewAbstractModel::GetInstance()->SetAgentControlMode(static_cast<NG::AgentControlMode>(value));
 }
 
 void JSViewAbstract::JsOnChildTouchTest(const JSCallbackInfo& info)

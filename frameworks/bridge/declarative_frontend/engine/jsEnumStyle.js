@@ -2010,6 +2010,12 @@ let GridRowDirection;
   GridRowDirection[GridRowDirection.RowReverse = 1] = 'RowReverse';
 })(GridRowDirection || (GridRowDirection = {}));
 
+let AgentControlMode;
+(function (AgentControlMode) {
+  AgentControlMode[AgentControlMode.ALLOW = 0] = 'ALLOW';
+  AgentControlMode[AgentControlMode.DENY = 1] = 'DENY';
+})(AgentControlMode || (AgentControlMode = {}));
+
 let HitTestMode;
 (function (HitTestMode) {
   HitTestMode[HitTestMode.Default = 0] = 'Default';

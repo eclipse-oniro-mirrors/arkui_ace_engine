@@ -35,6 +35,33 @@ constexpr int32_t DIGIT_Y_REVERSE = 24;
 constexpr int32_t DEFAULT_MOUSE_PROCESS_TOUCH_ID = 0;
 constexpr int64_t US_TO_MS = 1000;
 
+template<typename EventT>
+void ConvertAgentIdentity(MMI::InputEvent& source, EventT& event)
+{
+    event.isAgent = source.IsFlag(OHOS::MMI::InputEvent::EVENT_FLAG_CONTROLLER);
+    event.agentWindowId = source.GetAgentWindowId();
+    const auto injectorInfo = source.GetInjectorInfo();
+    event.callingUid = event.isAgent && injectorInfo.has_value() ? injectorInfo->uid : -1;
+    // Controller injection carries the opaque SAF session in optionalData; zero is also valid.
+    event.hasSafSessionId = event.isAgent && injectorInfo.has_value();
+    event.safSessionId = event.hasSafSessionId ? injectorInfo->optionalData : 0;
+}
+
+void ConvertKeyEventAction(const std::shared_ptr<MMI::KeyEvent>& keyEvent, KeyEvent& event)
+{
+    if (keyEvent->GetKeyAction() == OHOS::MMI::KeyEvent::KEY_ACTION_UP) {
+        event.action = KeyAction::UP;
+    } else if (keyEvent->GetKeyAction() == OHOS::MMI::KeyEvent::KEY_ACTION_DOWN) {
+        event.action = KeyAction::DOWN;
+    } else if (event.isAgent &&
+               (event.code == KeyCode::KEY_ENTER || event.code == KeyCode::KEY_NUMPAD_ENTER) &&
+               keyEvent->GetKeyAction() == OHOS::MMI::KeyEvent::KEY_ACTION_CANCEL) {
+        event.action = KeyAction::CANCEL;
+    } else {
+        event.action = KeyAction::UNKNOWN;
+    }
+}
+
 // Force value for mouse to touch event conversion
 constexpr float MOUSE_TO_TOUCH_FORCE = 3.0f;
 
@@ -467,6 +494,7 @@ TouchEvent ConvertTouchEvent(const std::shared_ptr<MMI::PointerEvent>& pointerEv
     int32_t orgAction = pointerEvent->GetPointerAction();
     SetTouchEventType(orgAction, event);
     event.isPrivacyMode = pointerEvent->HasFlag(OHOS::MMI::InputEvent::EVENT_FLAG_PRIVACY_MODE);
+    ConvertAgentIdentity(*pointerEvent, event);
     event.isScreenLocked = pointerEvent->HasFlag(OHOS::MMI::InputEvent::EVENT_FLAG_SCREEN_LOCKED);
     UpdateTouchEvent(pointerEvent, event);
     if (event.sourceType == SourceType::TOUCH && event.sourceTool == SourceTool::PEN) {
@@ -592,6 +620,7 @@ void ConvertMouseEvent(
     int32_t orgDevice = pointerEvent->GetSourceType();
     GetEventDevice(orgDevice, events);
     events.isPrivacyMode = pointerEvent->HasFlag(OHOS::MMI::InputEvent::EVENT_FLAG_PRIVACY_MODE);
+    ConvertAgentIdentity(*pointerEvent, events);
     events.isScreenLocked = pointerEvent->HasFlag(OHOS::MMI::InputEvent::EVENT_FLAG_SCREEN_LOCKED);
     events.isStylusMouseMode = pointerEvent->HasFlag(OHOS::MMI::InputEvent::EVENT_FLAG_STYLUS_MOUSE_MODE);
     events.targetDisplayId = pointerEvent->GetTargetDisplayId();
@@ -870,19 +899,14 @@ void ConvertKeyEvent(const std::shared_ptr<MMI::KeyEvent>& keyEvent, KeyEvent& e
 {
     CHECK_NULL_VOID(keyEvent);
     event.rawKeyEvent = keyEvent;
+    ConvertAgentIdentity(*keyEvent, event);
     event.code = static_cast<KeyCode>(keyEvent->GetKeyCode());
     event.numLock = keyEvent->GetFunctionKey(MMI::KeyEvent::NUM_LOCK_FUNCTION_KEY);
     event.enableCapsLock = keyEvent->GetFunctionKey(MMI::KeyEvent::CAPS_LOCK_FUNCTION_KEY);
     event.scrollLock = keyEvent->GetFunctionKey(MMI::KeyEvent::SCROLL_LOCK_FUNCTION_KEY);
     event.keyIntention = static_cast<KeyIntention>(keyEvent->GetKeyIntention());
     event.targetDisplayId = keyEvent->GetTargetDisplayId();
-    if (keyEvent->GetKeyAction() == OHOS::MMI::KeyEvent::KEY_ACTION_UP) {
-        event.action = KeyAction::UP;
-    } else if (keyEvent->GetKeyAction() == OHOS::MMI::KeyEvent::KEY_ACTION_DOWN) {
-        event.action = KeyAction::DOWN;
-    } else {
-        event.action = KeyAction::UNKNOWN;
-    }
+    ConvertKeyEventAction(keyEvent, event);
     auto keyItems = keyEvent->GetKeyItems();
     for (auto item = keyItems.rbegin(); item != keyItems.rend(); item++) {
         if (item->GetKeyCode() == keyEvent->GetKeyCode()) {

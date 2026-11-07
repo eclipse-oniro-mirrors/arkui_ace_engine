@@ -5431,6 +5431,7 @@
       "OHOS::Ace::TokenColors::GetSystemColorResIdByIndex(int)";
       "OHOS::Ace::TouchEventInfo::ConvertToTouchEvent() const";
       "OHOS::Ace::TouchEventInfo::GetHistory() const";
+      "OHOS::Ace::TouchEventInfo::IsAgent() const";
       "OHOS::Ace::TouchEventTarget::GetAttachedNode() const";
       "OHOS::Ace::TouchLocationInfo::GetSize() const";
       "OHOS::Ace::TouchLocationInfo::GetTouchDeviceId() const";
@@ -6354,6 +6355,17 @@
       OHOS::Ace::NG::TokenThemeStorage::GetTheme*;
       OHOS::Ace::NG::TokenThemeStorage::ObtainSystemTheme*;
       OHOS::Ace::NG::PanRecognizer::SetEscapeModeForPan*;
+      OHOS::Ace::NG::CreateNodeSensitiveTouchInfo*;
+      OHOS::Ace::NG::CreateNodeSensitiveMouseInfo*;
+      OHOS::Ace::NG::CreateNodeSensitiveKeyInfo*;
+      OHOS::Ace::NG::CreateNodeSensitiveInputPeer*;
+      OHOS::Ace::Framework::ArkTSNativeRawInputEventWrapper::CreateSensitiveInputEvent*;
+      OHOS::Ace::NG::UIObserverHandler::SetNodeSensitiveInputHandleFunc*;
+      OHOS::Ace::TouchLocationInfo::GetCurrentLocalLocation*;
+      OHOS::Ace::MouseInfo::GetCurrentLocalLocation*;
+      OHOS::Ace::KeyEvent::HasKey*;
+      OHOS::Ace::KeyEvent::IsKey*;
+      OHOS::Ace::KeyEvent::ToString*;
     };
   local:
     *;
