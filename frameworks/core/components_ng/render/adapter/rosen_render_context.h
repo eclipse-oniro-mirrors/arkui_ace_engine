@@ -292,6 +292,7 @@ public:
     void OnShadowClipModeUpdate(ShadowClipMode clipMode) override;
     void OnBackBlendModeUpdate(BlendMode blendMode) override;
     void OnBackBlendApplyTypeUpdate(BlendApplyType applyType) override;
+    void OnVibrancyModeUpdate(const VibrancyMode& mode) override;
     void UpdateBorderWidthF(const BorderWidthPropertyF& value) override;
 
     void UpdateMaterialInteractionEffect(float scaleX, float scaleY, float offsetX, float offsetY) override;

@@ -854,6 +854,7 @@ public:
     void UpdateSheetCloseIcon();
     void UpdateSheetBackgroundColor();
     void UpdateSheetBackgroundBlurStyle();
+    void UpdateTitleBarVibrancy(const SheetStyle& sheetStyle);
 
     Color GetMaskBackgroundColor() const
     {

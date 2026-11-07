@@ -72,6 +72,7 @@ public:
     static void ParseAdaptToHandedness(const JSRef<JSVal>& value, NG::SheetStyle& sheetStyle);
     static void ParseSheetScrollBarState(const JSRef<JSVal>& value, NG::SheetStyle& sheetStyle);
     static void ParseSheetCloseButtonMaterial(const JSRef<JSVal>& value, NG::SheetStyle& sheetStyle);
+    static void ParseSheetTitleBarVibrancyMode(const JSRef<JSVal>& value, NG::SheetStyle& sheetStyle);
 
 private:
     static void ParseMenuOutlineColorObject(const JSRef<JSVal>& outlineColorValue, NG::MenuParam& menuParam,

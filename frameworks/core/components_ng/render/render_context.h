@@ -638,6 +638,7 @@ public:
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(BdImage, BorderSourceFromImage, bool);
 
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP_GET(BackgroundColor, Color);
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP_GET(VibrancyMode, VibrancyMode);
 public:
     void UpdateBackgroundColor(const Color& value)
     {
@@ -650,6 +651,7 @@ public:
         propBackgroundColor_ = value;
         OnBackgroundColorUpdate(value);
     }
+    void UpdateVibrancyMode(const VibrancyMode& mode);
     ACE_DEFINE_PROPERTY_ITEM_FUNC_WITHOUT_GROUP(Opacity, double);
     ACE_DEFINE_PROPERTY_ITEM_FUNC_WITHOUT_GROUP(RenderGroup, bool);
     ACE_DEFINE_PROPERTY_ITEM_FUNC_WITHOUT_GROUP(ExcludeFromRenderGroup, bool);
@@ -1132,6 +1134,7 @@ protected:
     virtual void OnShadowClipModeUpdate(ShadowClipMode clipMode) {}
     virtual void OnBackBlendModeUpdate(BlendMode blendMode) {}
     virtual void OnBackBlendApplyTypeUpdate(BlendApplyType blendApplyType) {}
+    virtual void OnVibrancyModeUpdate(const VibrancyMode& mode) {}
 
     virtual void OnOverlayTextUpdate(const OverlayOptions& overlay) {}
     virtual void OnMotionPathUpdate(const MotionPathOption& motionPath) {}

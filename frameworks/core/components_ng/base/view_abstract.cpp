@@ -10141,6 +10141,18 @@ void ViewAbstract::ResetBlender(FrameNode* frameNode)
     renderContext->ResetBlender();
 }
 
+void ViewAbstract::SetVibrancyMode(FrameNode* frameNode, VibrancyMode mode)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto renderContext = frameNode->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    // only EXQUISITE level devices take effect
+    if (SystemProperties::GetUiMaterialLevel() != UiMaterialLevel::EXQUISITE) {
+        return;
+    }
+    renderContext->UpdateVibrancyMode(mode);
+}
+
 void ViewAbstract::SetDragPreviewOptions(FrameNode* frameNode, const DragPreviewOption& previewOption)
 {
     CHECK_NULL_VOID(frameNode);
