@@ -99,6 +99,13 @@ foreach(module, component_modules) {
     configs = [ "$ace_root:ace_coverage_config" ]
     deps = []
     if (is_ohos) {
+      # Most components expose only DynamicModule factories. Keep the remaining
+      # direct-link and dlsym consumers in module-specific export lists.
+      version_script = "$ace_root/build/libarkui_component.map"
+      if (module == "waterflow" || module == "indexer" ||
+          module == "xcomponent") {
+        version_script = "$ace_root/build/libarkui_${sub_name}.map"
+      }
       deps += [ "$ace_root/frameworks/core/components_ng/pattern/${module_path}:ace_core_components_${module}_pattern_ng_ohos" ]
     } else if (use_mingw_win) {
       deps += [ "$ace_root/frameworks/core/components_ng/pattern/${module_path}:ace_core_components_${module}_pattern_ng_windows" ]

@@ -186,6 +186,7 @@ ohos_shared_library("libace_compatible") {
 ohos_shared_library("libace_compatible_components") {
   deps = [ ":libace_compatible" ]
   if (is_ohos) {
+    version_script = "libace_compatible_components.map"
     deps += [ "$ace_root/frameworks/compatible:ace_compatible_source_ohos" ]
   } else if (use_mingw_win) {
     deps += [ "$ace_root/frameworks/compatible:ace_compatible_source_windows" ]
