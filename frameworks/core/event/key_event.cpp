@@ -15,6 +15,7 @@
 
 #include "core/event/key_event.h"
 
+#include <algorithm>
 #include <sstream>
 
 namespace OHOS::Ace {
@@ -29,6 +30,15 @@ bool KeyEvent::HasKey(KeyCode expectCode) const
         ++curPressedCode;
     }
     return false;
+}
+
+bool KeyEvent::IsExactlyKey(const std::vector<KeyCode>& expectCodes) const
+{
+    auto pressedKeysCnt = pressedCodes.size();
+    if (std::find(pressedCodes.begin(), pressedCodes.end(), KeyCode::KEY_FN) != pressedCodes.end()) {
+        --pressedKeysCnt;
+    }
+    return (expectCodes.size() != pressedKeysCnt) ? false : IsKey(expectCodes);
 }
 
 bool KeyEvent::IsKey(const std::vector<KeyCode>& expectCodes) const

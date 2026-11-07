@@ -67,14 +67,7 @@ struct KeyEvent final : public NonPointerEvent {
 
     ACE_FORCE_EXPORT bool HasKey(KeyCode expectCode) const;
 
-    bool IsExactlyKey(const std::vector<KeyCode>& expectCodes) const
-    {
-        auto pressedKeysCnt = pressedCodes.size();
-        if (std::find(pressedCodes.begin(), pressedCodes.end(), KeyCode::KEY_FN) != pressedCodes.end()) {
-            --pressedKeysCnt;
-        }
-        return (expectCodes.size() != pressedKeysCnt) ? false : IsKey(expectCodes);
-    }
+    ACE_FORCE_EXPORT bool IsExactlyKey(const std::vector<KeyCode>& expectCodes) const;
 
     ACE_FORCE_EXPORT bool IsKey(const std::vector<KeyCode>& expectCodes) const;
 
