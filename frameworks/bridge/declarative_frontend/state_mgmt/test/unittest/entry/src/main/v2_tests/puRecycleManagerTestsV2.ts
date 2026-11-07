@@ -30,7 +30,7 @@ declare class RecycleManager {
     constructor();
     updateNodeId(oldElmtId: number, newElmtId: number): void;
     proxyNodeId(oldElmtId: number): number;
-    pushRecycleNode(name: string, node: any): void;
+    pushRecycleNode(name: string, node: ViewPU, memOptStrategy?: number, cachedCount?: number): void;
     popRecycleNode(name: string): any;
     purgeAllCachedRecycleNode(): void;
     setActive(active: boolean): void;

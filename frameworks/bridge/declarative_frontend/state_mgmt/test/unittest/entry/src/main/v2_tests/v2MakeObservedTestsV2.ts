@@ -18,7 +18,7 @@ declare type MakeObservedRaw = object | number | string | boolean | bigint | nul
 
 declare class RefInfo {
   static obj2ref: WeakMap<object, object>;
-  static readonly MAKE_OBSERVED_PROXY: string;
+  static readonly MAKE_OBSERVED_PROXY: symbol;
 
   static get(target: MakeObservedRaw): object;
 }

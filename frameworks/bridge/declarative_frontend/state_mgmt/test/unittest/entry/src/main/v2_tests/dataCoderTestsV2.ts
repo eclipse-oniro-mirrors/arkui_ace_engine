@@ -18,10 +18,10 @@ import { eq, neq, gt, lt, ITestFile } from '../lib/testRunner';
 // Declare DataCoder to avoid 'Cannot find name DataCoder' errors
 declare class DataCoder {
   static readonly FORMAT_TAG: string;
-  static stringify<T>(value: T, forceLegacyFormat?: boolean): string;
+  static stringify<T>(value: T, forceLegacyFormat?: boolean, ignoreReadOnlyProperties?: boolean): string;
   static parse<T extends object>(text: string): T | T[];
   static restoreTo<T extends object, S extends object>(
-    target: T | T[], source: T | T[], defaultSubCreator?: any
+    target: T | T[], source: T | T[], defaultSubCreator?: any, ignoreReadOnlyProperties?: boolean
   ): T | T[];
 }
 

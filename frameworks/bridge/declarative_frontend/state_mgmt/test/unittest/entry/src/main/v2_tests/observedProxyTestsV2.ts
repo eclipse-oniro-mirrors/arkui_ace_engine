@@ -18,7 +18,7 @@ declare type MakeObservedRaw = object | number | string | boolean | bigint | nul
 
 declare class RefInfo {
   static obj2ref: WeakMap<object, object>;
-  static readonly MAKE_OBSERVED_PROXY: string;
+  static readonly MAKE_OBSERVED_PROXY: symbol;
   static get(target: MakeObservedRaw): object;
 }
 
@@ -28,9 +28,9 @@ declare class ObserveV2 {
   static readonly SYMBOL_PROXY_GET_TARGET: symbol;
   static readonly SYMBOL_MAKE_OBSERVED: symbol;
   static readonly OB_LENGTH: string;
-  getObserve(): ObserveV2;
+  static getObserve(): ObserveV2;
   addRef(target: object, attrName: string): void;
-  fireChange(target: object, attrName: string, excludeSet?: Set<number>, keepMeta?: boolean): void;
+  fireChange(target: object, attrName: string, excludeElmtIds?: Set<number>, ignoreOnProfiler?: boolean): void;
 }
 
 interface SimpleObject {

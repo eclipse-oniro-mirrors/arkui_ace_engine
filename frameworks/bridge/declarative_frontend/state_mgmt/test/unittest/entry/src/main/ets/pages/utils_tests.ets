@@ -16,7 +16,7 @@
 import { TestRunner } from '../../lib/testRunner'
 import { PageController } from '../../lib/pageController'
 import { UtilsTests } from '../../common_tests/utilsTests'
-import router from '@system.router'
+import { router } from '@kit.ArkUI'
 
 @Entry
 @ComponentV2

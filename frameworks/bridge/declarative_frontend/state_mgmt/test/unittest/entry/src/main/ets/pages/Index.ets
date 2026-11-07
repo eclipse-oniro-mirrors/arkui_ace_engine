@@ -15,7 +15,7 @@
 
 import { TestStats } from '../../lib/testStats'
 import { PageController } from '../../lib/pageController'
-import router from '@system.router'
+import { router } from '@kit.ArkUI'
 
 @Entry
 @Component
@@ -25,7 +25,7 @@ struct Parent {
 
   reportFinal = (): void => {
     this.finalResult = TestStats.isAllPassed() ? 'PASSED' : 'FAILED';
-    this.finalResultsString = TestStats.getFinalReport();
+    this.finalResultsString = TestStats.getFinalReport(false, true);
     if (TestStats.isAllPassed()) {
       console.log(TestStats.getFinalReport(true));
     } else {
