@@ -3943,6 +3943,9 @@ struct ArkUICommonModifier {
     ArkUI_Bool (*getLinearGradientBlur)(ArkUINodeHandle node, OH_ArkUI_LinearGradientBlurOptions* options);
     void (*setShadowClipMode)(ArkUINodeHandle node, ArkUI_Int32 clipMode);
     void (*resetShadowClipMode)(ArkUINodeHandle node);
+    ArkUI_Int32 (*registerApplicationShortcut)(const std::string& value, uint8_t keys,
+        std::function<void(ArkUI_Int32)>&& callback);
+    void (*unregisterApplicationShortcut)(ArkUI_Int32 registrationId);
 };
 
 struct ArkUICommonShapeModifier {
@@ -11012,9 +11015,6 @@ struct ArkUIFullNodeAPI {
     const ArkUISnapshotAPI* (*getSnapshotAPI)();
     const ArkUIMultiThreadManagerAPI* (*getMultiThreadManagerAPI)();
     const ArkUIRuntimeInit* (*getRuntimeInit)();
-    ArkUI_Int32 (*registerApplicationShortcut)(const std::string& value, uint8_t keys,
-        std::function<void(ArkUI_Int32)>&& callback);
-    void (*unregisterApplicationShortcut)(ArkUI_Int32 registrationId);
 };
 
 struct ArkUIAnyAPI {

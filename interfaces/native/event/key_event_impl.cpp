@@ -826,9 +826,11 @@ ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Register(const OH_ArkUI_KeyboardSho
     const auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
     CHECK_NULL_RETURN_WITH_MESSAGE(impl, ARKUI_ERROR_CODE_INTERNAL_ERROR,
         __FUNCTION__, "Native implementation is unavailable");
-    CHECK_NULL_RETURN_WITH_MESSAGE(impl->registerApplicationShortcut, ARKUI_ERROR_CODE_INTERNAL_ERROR,
+    const auto* modifiers = impl->getNodeModifiers ? impl->getNodeModifiers() : nullptr;
+    const auto* common = modifiers && modifiers->getCommonModifier ? modifiers->getCommonModifier() : nullptr;
+    CHECK_NULL_RETURN_WITH_MESSAGE(common && common->registerApplicationShortcut, ARKUI_ERROR_CODE_INTERNAL_ERROR,
         __FUNCTION__, "Application shortcut registration is unavailable");
-    const auto id = impl->registerApplicationShortcut(
+    const auto id = common->registerApplicationShortcut(
         value, static_cast<uint8_t>(modifierKeys), [callback, userData](int32_t instanceId) {
             OH_ArkUI_ApplicationShortcutCallbackInfo info { { instanceId } };
             callback(&info, userData);
@@ -848,9 +850,11 @@ ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Unregister(int32_t registrationId)
     const auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
     CHECK_NULL_RETURN_WITH_MESSAGE(impl, ARKUI_ERROR_CODE_INTERNAL_ERROR,
         __FUNCTION__, "Native implementation is unavailable");
-    CHECK_NULL_RETURN_WITH_MESSAGE(impl->unregisterApplicationShortcut, ARKUI_ERROR_CODE_INTERNAL_ERROR,
+    const auto* modifiers = impl->getNodeModifiers ? impl->getNodeModifiers() : nullptr;
+    const auto* common = modifiers && modifiers->getCommonModifier ? modifiers->getCommonModifier() : nullptr;
+    CHECK_NULL_RETURN_WITH_MESSAGE(common && common->unregisterApplicationShortcut, ARKUI_ERROR_CODE_INTERNAL_ERROR,
         __FUNCTION__, "Application shortcut unregistration is unavailable");
-    impl->unregisterApplicationShortcut(registrationId);
+    common->unregisterApplicationShortcut(registrationId);
     return ARKUI_ERROR_CODE_NO_ERROR;
 }
 
