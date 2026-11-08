@@ -36,7 +36,7 @@
 #include "syntax/for_each_module.h"
 #include "syntax/parallelize_ui_module.h"
 #include "drag_and_drop/native_drag_drop_global.h"
-#if defined(ENABLE_DRAG_FRAMEWORK) && defined(PIXEL_MAP_SUPPORTED)
+#if defined(ENABLE_DRAG_FRAMEWORK)
 #include "dragController/drag_controller_module.h"
 #endif
 #include "styled_string/styled_string_module.h"
@@ -1040,7 +1040,7 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             nullptr,
             reinterpret_cast<void*>(OHOS::Ace::Ani::SetBackgroundImagePixelMap)
         },
-#if defined(ENABLE_DRAG_FRAMEWORK) && defined(PIXEL_MAP_SUPPORTED)
+#if defined(ENABLE_DRAG_FRAMEWORK)
         ani_native_function {
             "_DragController_executeDragWithCallback",
             nullptr,
@@ -1485,7 +1485,7 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             nullptr,
             reinterpret_cast<void*>(OHOS::Ace::Ani::ExtractorFromPtrToDataLoadParams)
         },
-#if defined(ENABLE_DRAG_FRAMEWORK) && defined(PIXEL_MAP_SUPPORTED)
+#if defined(ENABLE_DRAG_FRAMEWORK)
         ani_native_function {
             "_Extractors_fromPtrToDragSpringLoadingContext",
             nullptr,
