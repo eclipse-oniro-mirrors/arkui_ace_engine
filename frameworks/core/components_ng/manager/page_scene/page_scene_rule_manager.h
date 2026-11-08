@@ -33,6 +33,7 @@
 #include "core/components_ng/manager/page_scene/search_scene_click_matcher.h"
 #include "core/components_ng/manager/page_scene/search_scene_matcher.h"
 #include "core/components_ng/manager/page_scene/search_scene_snapshot.h"
+#include "core/components_ng/manager/page_scene/split_scene_recognizer.h"
 
 namespace OHOS::Ace {
 class JsonValue;
@@ -62,23 +63,34 @@ struct PageSceneNodeInfo {
 };
 
 struct PageSceneRule {
+    // Common (TEXT_EDITOR/SPLIT): identity and enablement. SEARCH uses SearchSceneRule.
     std::string ruleId;
     std::string sceneType;
     bool enabled = true;
+    // TEXT_EDITOR only: scope; SPLIT applies its own visibility and window geometry checks.
     bool onlyVisible = true;
     bool rectCulling = false;
     bool includeWeb = false;
     bool includeUIExtension = false;
+    // Common: node identity and geometry output selection.
     bool includeNodeIds = true;
     bool includeNodeTypes = true;
     bool includeRect = true;
-    bool includeFocusable = true;
-    bool includeText = false;
-    bool reportOnRegister = true;
-    bool deduplicate = true;
-    int32_t minReportIntervalMs = 500;
+    bool includeFocusable = true; // TEXT_EDITOR only; SPLIT ignores this report option.
+    bool includeText = false; // TEXT_EDITOR only; SPLIT ignores this report option.
+    bool reportOnRegister = true;      // Common: whether to report the registration's first detection.
+    bool deduplicate = true;           // TEXT_EDITOR only; SPLIT ignores this policy field.
+    int32_t minReportIntervalMs = 500; // Common: minimum report interval in milliseconds.
+    // TEXT_EDITOR only: selector.nodeTypes and condition.threshold (COUNT_GTE).
     int32_t threshold = 2;
     std::set<std::string> nodeTypes;
+    // SPLIT only: custom.selectors, Navigation support, and custom.geometry constraints.
+    std::vector<std::string> compNames;
+    bool allowNavigation = true;
+    double heightRatioGt = 0.8f;
+    double widthRatioLte = 0.5f;
+    double totalWidthRatioGt = 0.8f;
+    bool nonOverlapping = true;
 };
 
 struct PageSceneRuleSet {
@@ -129,13 +141,18 @@ struct PageSceneMatchResult {
     bool matched = false;
     int32_t matchedCount = 0;
     int32_t minReportIntervalMs = 500;
-    bool deduplicate = true;
+    bool deduplicate = true; // TEXT_EDITOR only; SPLIT uses fixed state-change reporting.
     std::vector<int32_t> nodeIds;
     std::string sceneJson;
+    std::optional<std::string> currentPageName;
+    PageSceneRule reportRule;
+    std::vector<PageSceneNodeInfo> matchedNodes;
+    std::string splitType;
 };
 
 struct PageSceneReportState {
     std::vector<int32_t> lastReportedNodeIds;
+    std::string lastSplitType;
     std::chrono::steady_clock::time_point lastReportTime;
 };
 
@@ -160,9 +177,28 @@ private:
     bool IsOpacityVisible(const RefPtr<FrameNode>& node) const;
 };
 
+struct CompiledSplitRuleSet {
+    // CompileSplitRuleSet retains only SPLIT rules, including disabled entries.
+    PageSceneRuleSet ruleSet;
+    // ruleSet.rawJson retains registration identity for reportOnRegister/deduplication resets.
+    std::vector<SplitSceneRuleSpec> splitSpecs;
+    std::set<std::string> customTags;
+    std::set<std::string> navigationDisabledTags;
+    bool trackNavigation = false;
+};
+
+struct CompiledSplitRegistration {
+    int32_t processId;
+    std::shared_ptr<const CompiledSplitRuleSet> rules;
+};
+
 class PageSceneRuleManager {
 public:
     ~PageSceneRuleManager();
+
+    static DumpStartNodeSet CollectSplitStartNodes(const RefPtr<FrameNode>& rootNode,
+        const RefPtr<FrameNode>& containerModalNode, const RefPtr<FrameNode>& lastPageNode,
+        const RefPtr<OverlayManager>& overlayManager);
 
     int32_t RegisterRuleSet(int32_t processId, const std::string& ruleJson);
     int32_t UnregisterRuleSet(int32_t processId, const std::string& ruleSetId);
@@ -176,6 +212,16 @@ public:
         const DumpStartNodeSet& startNodes, const std::string& pageName, bool forceReportUnmatched);
     bool ShouldReport(int32_t processId, const PageSceneMatchResult& result);
     bool IsTextInputNodeType(const std::string& nodeType) const;
+
+    bool UpdateSplitRegistration(int32_t processId, const std::string& ruleJson);
+    std::optional<CompiledSplitRegistration> GetCompiledSplitRegistration() const;
+    std::shared_ptr<const CompiledSplitRuleSet> CompileSplitRuleSet(const std::string& ruleJson) const;
+    std::vector<PageSceneMatchResult> DetectCompiledSplitChanges(
+        const CompiledSplitRegistration& registration, SplitSceneBatch& snapshot, const std::string& pageName);
+    std::unique_ptr<JsonValue> BuildSplitSceneJson(const PageSceneMatchResult& result) const;
+    std::string QueryCompiledSplitPageScenes(const CompiledSplitRuleSet& compiled,
+        const std::vector<SplitSceneCandidate>& candidates, const RectF& windowRect, const std::string& pageName,
+        bool includeSplit = true);
 
     // Search scene: per-process dual ruleSet storage (pid -> ruleSetId -> ruleSet).
     int32_t RegisterSearchRuleSet(int32_t processId, const std::string& ruleJson);
@@ -218,6 +264,7 @@ private:
     void PrunePendingClickCandidatesLocked(int64_t nowMs);
     std::optional<PageSceneRuleSet> ParseRuleSet(const std::string& ruleJson) const;
     std::optional<PageSceneRule> ParseRule(const std::unique_ptr<JsonValue>& ruleJson) const;
+    bool ShouldReportSplitLocked(int32_t processId, const PageSceneMatchResult& result);
     std::optional<SearchRuleSet> ParseSearchRuleSet(const std::string& ruleJson) const;
     std::optional<SearchSceneRule> ParseSearchRule(
         const std::unique_ptr<JsonValue>& ruleJson, std::set<std::string>& ruleIds) const;
@@ -225,6 +272,17 @@ private:
         const std::string& pageName, const std::vector<PageSceneNodeInfo>& nodes, bool matched,
         const std::string& eventName) const;
 
+    const PageSceneMatchResult* GetPreviousSplitResultLocked(const std::string& key) const;
+    void ProcessSplitResultLocked(
+        int32_t processId, PageSceneMatchResult result, std::vector<PageSceneMatchResult>& changes);
+    void AppendSplitExitLocked(int32_t processId, const PageSceneMatchResult& previous, const std::string& pageName,
+        std::vector<PageSceneMatchResult>& changes);
+    void UpdateSplitMatchStateLocked(
+        int32_t processId, PageSceneMatchResult result, bool changed, std::vector<PageSceneMatchResult>& changes);
+    void ClearSplitRegistrationLocked();
+    std::optional<CompiledSplitRegistration> splitRegistration_;
+    std::unordered_map<std::string, PageSceneMatchResult> splitReportStates_;
+    std::unordered_map<std::string, PageSceneReportState> splitReportPolicyStates_;
     mutable std::mutex mutex_;
     std::unordered_map<int32_t, PageSceneRuleSet> registeredRuleSets_;
     std::unordered_map<int32_t, std::unordered_map<std::string, SearchRuleSet>> searchRuleSets_;

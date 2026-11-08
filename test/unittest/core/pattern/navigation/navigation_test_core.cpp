@@ -566,7 +566,7 @@ HWTEST_F(NavigationPatternTestCore, ContentChangeNavigationCustomPopInteractiveT
         MockPipelineContext::GetCurrent()->taskScheduler_->FlushAfterRenderTask();
         EXPECT_EQ(types, success ? std::vector<uint32_t> { OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_END } :
             std::vector<uint32_t> {});
-        manager->OnContentChangeNodeDestroyed(navigation->GetId());
+        manager->OnContentChangeNodeDestroyed(navigation->GetId(), navigation->GetTag(), nullptr);
         EXPECT_EQ(types.size(), success ? 1U : 0U);
         EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(subscription));
         EXPECT_FALSE(manager->IsTransitioning());

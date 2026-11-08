@@ -23,6 +23,8 @@
 #include "base/utils/macros.h"
 #include "interfaces/inner_api/ui_session/param_config.h"
 
+#include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <set>
@@ -31,7 +33,9 @@
 
 namespace OHOS::Ace::NG {
 class FrameNode;
+class PipelineContext;
 class PageTranslateNode;
+struct DeferredPageSceneQuery;
 #ifndef IS_RELEASE_VERSION
 class ContentChangeDumpManager;
 #endif
@@ -78,7 +82,9 @@ public:
     void OnContentChangeStart(const RefPtr<FrameNode>& keyNode, ChangeType type, bool reportCapi);
     void ReportCapiPageStartEvent(const RefPtr<FrameNode>& node);
     void OnContentChangeInterrupted(const RefPtr<FrameNode>& keyNode, ChangeType type, bool reportCapiEnd = true);
-    void OnContentChangeNodeDestroyed(int32_t nodeId);
+    // Identity-only signature: the detach path also runs from ~FrameNode, where the node
+    // must not be re-claimed into a RefPtr. Context is the caller's non-owning pipeline.
+    void OnContentChangeNodeDestroyed(int32_t nodeId, const std::string& tag, PipelineContext* context);
     void OnScrollChangeStart(const RefPtr<FrameNode>& keyNode, bool reportCapi = true);
     void OnScrollChangeEnd(const RefPtr<FrameNode>& keyNode, uint32_t type = NONE);
     void OnScrollChangeEnd(const RefPtr<FrameNode>& keyNode, uint32_t type, bool reportCapi);
@@ -95,6 +101,7 @@ public:
     void OnTransitionRemoved(int32_t nodeId);
     bool IsScrolling() const;
     bool IsTransitioning() const;
+    bool IsContentChanging() const;
     void OnTextChangeEnd(const RectF& rect, const RectF& rootRect);
     void OnVsyncStart();
     void OnVsyncEnd(const RectF& rootRect);
@@ -137,10 +144,39 @@ public:
     // ruleSet is registered (NeedPageSceneDetect fast-returns).
     void NotifyPageSceneContentChanged(bool flushNow);
     void FlushPageSceneNodeChanged();
+    void DeferPageSceneQuery(int32_t processId, std::function<bool()>&& run, std::function<void()>&& cancel);
+    void FlushPageSceneQueries();
+    void CancelPageSceneQuery(int32_t processId);
+    size_t GetPendingPageSceneQueryCount() const;
+
+    // UI-thread-only, weak candidate index. Disabled path does no tree/geometry work.
+    void ConfigurePageSceneSplitTracking(const std::set<std::string>& tags, bool trackNavigation);
+    void SetPageSceneSplitDetector(std::function<void()>&& detector);
+    void SeedPageSceneSplitNodes(const std::vector<RefPtr<FrameNode>>& roots);
+    void NotifyPageSceneSplitNodeChanged(const RefPtr<FrameNode>& node, bool attached = false);
+    void RemovePageSceneSplitNode(int32_t nodeId);
+    std::vector<RefPtr<FrameNode>> GetPageSceneSplitNodes();
+    std::vector<RefPtr<FrameNode>> GetPageSceneSplitNodes(const std::set<std::string>& tags);
+    bool IsPageSceneSplitNodeRelevant(const FrameNode* node) const;
+    bool NeedsPageSceneSplitNodeUpdate(bool attached) const;
+    void MarkPageSceneSplitDirty();
+    void FlushPageSceneSplitDetection();
+    bool IsPageSceneSplitTracking() const;
+    static bool HasPageSceneSplitTracking();
+    static bool IsPageSceneSplitWindowSupported(const PipelineContext* pipeline);
+    uint64_t GetPageSceneSplitSeedVisits() const;
+
+    // Node-side split notifications moved from FrameNode; callers pass the node as a RefPtr.
+    // Only the manager bound to the node's context consumes the notification.
+    void NotifyPageSceneSplitChanged(const RefPtr<FrameNode>& node, bool attached = false);
 
 private:
+    static bool IsPageSceneSplitInSubwindow();
+    struct SplitTrackingState;
     class CapiImpl;
     std::unique_ptr<CapiImpl> capiImpl_;
+    std::unique_ptr<SplitTrackingState> splitTracking_;
+    std::map<int32_t, std::shared_ptr<DeferredPageSceneQuery>> pageSceneQueries_;
 
     static RefPtr<FrameNode> GetSwiperContentChangeNode(const RefPtr<FrameNode>& node, bool hasTabsAncestor);
     void OnScrollChangeStartInner(const RefPtr<FrameNode>& node);
@@ -188,7 +224,6 @@ private:
     void ReportSwiperEvent(const RefPtr<FrameNode>& node, bool hasTabsAncestor);
     void StartTextAABBCollecting();
     void StopTextAABBCollecting(const RectF& rootRect);
-    bool IsContentChanging() const;
     bool NeedPageSceneDetect() const;
     bool NeedContentChangeReportOrPageSceneDetect() const;
     void ReportImageEvent();

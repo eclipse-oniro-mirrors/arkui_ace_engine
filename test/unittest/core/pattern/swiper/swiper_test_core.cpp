@@ -515,7 +515,7 @@ HWTEST_F(SwiperTestCore, CapiAutoPlayPropertyChangeDropsStartBeforeLayout, TestS
     manager->OnSwiperChangeStart(node, false);
     node->GetPaintProperty<SwiperPaintProperty>()->UpdateAutoPlay(true);
     pattern->OnModifyDone();
-    manager->OnContentChangeNodeDestroyed(node->GetId());
+    manager->OnContentChangeNodeDestroyed(node->GetId(), node->GetTag(), nullptr);
     manager->OnVsyncEnd(RectF());
     EXPECT_EQ(events, (std::vector<uint32_t> { OH_ARKUI_NATIVEMODULE_EVENT_SWIPER_START }));
     manager->UnregisterCapiContentChangeEvent(id);
