@@ -226,9 +226,9 @@ template("ace_osal_ohos_source_set") {
       external_deps += [ "multimedia_image:image" ]
     }
     sources += [
+      "agent_input_reporter.cpp",
       "background_task_helper_ohos.cpp",
       "device_config.cpp",
-      "agent_input_reporter.cpp",
       "display_manager_ohos.cpp",
       "file_uri_helper_ohos.cpp",
       "image_packer_ohos.cpp",
