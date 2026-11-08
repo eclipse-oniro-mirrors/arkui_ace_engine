@@ -1741,6 +1741,10 @@ protected:
 private:
     void NotifyVisibleChange(VisibleType preVisibility, VisibleType currentVisibility, bool notifyPageScene);
 
+    // Forwards node-side split changes to the ContentChangeManager bound to this
+    // node's context; no-op unless split tracking is installed. Logic lives in the manager.
+    void NotifyPageSceneSplitChanged(bool attached = false);
+
     // Preserve the static fast path; virtual-base downcasts require type information.
     template<typename T, typename O>
     static auto CastComponentPtr(O* ptr, int) -> decltype(static_cast<T*>(ptr))

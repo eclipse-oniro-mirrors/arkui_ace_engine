@@ -14,6 +14,7 @@
  */
 
 #include "content_change_manager_impl.h"
+#include "page_scene_split_state.h"
 
 #include <algorithm>
 #include <atomic>
@@ -645,10 +646,21 @@ void ContentChangeManager::OnContentChangeInterrupted(
     }
 }
 
-void ContentChangeManager::OnContentChangeNodeDestroyed(int32_t nodeId)
+void ContentChangeManager::OnContentChangeNodeDestroyed(
+    int32_t nodeId, const std::string& tag, PipelineContext* context)
 {
 #ifndef CROSS_PLATFORM
     OnContentChangeNodeDestroyedInner(nodeId);
+    // Merged from the FrameNode detach path: keep the split index and dirty
+    // state in sync when a tracked node leaves the main tree or is destroyed.
+    // Identity-only input: the detach path also runs from ~FrameNode, so the
+    // node itself must not be re-claimed into a RefPtr here.
+    if (IsPageSceneSplitWindowSupported(context)) {
+        if (tag == V2::NAVBAR_ETS_TAG || tag == V2::NAVDESTINATION_VIEW_ETS_TAG) {
+            MarkPageSceneSplitDirty();
+        }
+        RemovePageSceneSplitNode(nodeId);
+    }
 #endif
     capiImpl_->CompleteCapiContentChangeEventsOnNodeDestroyed(nodeId);
 }
