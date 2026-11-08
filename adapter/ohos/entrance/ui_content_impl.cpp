@@ -15,12 +15,15 @@
 
 #include "adapter/ohos/entrance/ui_content_impl.h"
 #include "adapter/ohos/entrance/ui_session/ui_session_manager_ohos.h"
+#include "adapter/ohos/entrance/ui_session/page_scene_split_adapter.h"
+#include "interfaces/inner_api/ui_session/ui_session_split_rule.h"
 #include "core/accessibility/accessibility_manager.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 #include "base/resource/shared_image_manager.h"
 
 #include <map>
 
+#include <algorithm>
 #include <atomic>
 #include <cinttypes>
 #include <cmath>
@@ -637,6 +640,7 @@ bool HandlePageSceneRuleRemoval(int32_t processId, const std::unique_ptr<JsonVal
     }
     return true;
 }
+
 
 } // namespace
 
@@ -3268,8 +3272,7 @@ void UIContentImpl::Background()
     }
     Platform::AceContainer::OnHide(instanceId_);
 
-    // Search presence: app background reports one false for every PRESENT page
-    //.
+    // Search presence: app background reports one false for every PRESENT page.
     if (pageSceneMatcher_) {
         auto exitEvents = pageSceneMatcher_->ExitAllSearchPresence();
         for (const auto& [pid, event] : exitEvents) {
@@ -6953,7 +6956,7 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
             auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
             if (!pipeline) {
                 if (isGetResult) {
-                    UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
+                    PageSceneSplitAdapter::CompletePageSceneQuery(processId, ruleJson);
                 }
                 return;
             }
@@ -6961,7 +6964,7 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
         }
         if (!taskExecutor) {
             if (isGetResult) {
-                UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
+                PageSceneSplitAdapter::CompletePageSceneQuery(processId, ruleJson);
             }
             return;
         }
@@ -6970,16 +6973,28 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
                 auto pageSceneMatcher = weakPageSceneMatcher.lock();
                 if (!pageSceneMatcher) {
                     if (isGetResult) {
-                        UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
+                        PageSceneSplitAdapter::CompletePageSceneQuery(processId, ruleJson);
                     }
                     return;
                 }
                 if (ruleJson.empty()) {
                     // Search removals carry their registration generation separately.
                     pageSceneMatcher->ClearProcess(processId, false);
+                    auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
+                    if (pipeline) {
+                        auto session = static_cast<UiSessionManagerOhos*>(UiSessionManager::GetInstance());
+                        auto content = pipeline->GetContentChangeManager();
+                        if (content && !session->HasPendingSplitPageSceneQuery(processId)) {
+                            content->CancelPageSceneQuery(processId);
+                        }
+                    }
                     return;
                 }
                 auto searchRoot = JsonUtil::ParseJsonString(ruleJson);
+                if (!isGetResult &&
+                    PageSceneSplitAdapter::HandleConfigurationChanged(processId, searchRoot, pageSceneMatcher)) {
+                    return;
+                }
                 bool isSearchRule = searchRoot && searchRoot->IsObject() &&
                     (!searchRoot->GetValue("version") || searchRoot->GetValue("version")->IsNull());
                 if (!isGetResult &&
@@ -6990,7 +7005,7 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
                 if (!pipeline) {
                     LOGW("PageSceneDetect pipeline is null, processId=%{public}d", processId);
                     if (isGetResult) {
-                        UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
+                        PageSceneSplitAdapter::CompletePageSceneQuery(processId, ruleJson);
                     }
                     return;
                 }
@@ -7066,6 +7081,11 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
                     }
                     return;
                 }
+                if (isGetResult && searchRoot && PageSceneSplit::ContainsSplitRule(searchRoot->GetJsonObject())) {
+                    PageSceneSplitAdapter::QuerySplitPageScenes(processId, ruleJson,
+                        searchRoot->GetString("_splitQueryGeneration"), pageSceneMatcher, pipeline);
+                    return;
+                }
                 auto startNodes = pipeline->GetDumpStartNodes();
                 auto result = pageSceneMatcher->MatchPageScene(
                     processId, ruleJson, startNodes, pipeline->GetCurrentPageName(), isGetResult);
@@ -7100,7 +7120,7 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
             },
             TaskExecutor::TaskType::UI, "UiSessionPageSceneDetect");
         if (!posted && isGetResult) {
-            UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
+            PageSceneSplitAdapter::CompletePageSceneQuery(processId, ruleJson);
         }
     };
     UiSessionManager::GetInstance()->SavePageSceneDetectFunction(pageSceneDetectCallback);
@@ -7882,8 +7902,8 @@ int32_t UIContentImpl::HandleWebPageSceneGet(const WeakPtr<TaskExecutor>& weakTa
         TraverseWebForPageScene(processId, ruleJson, isGetResult);
     });
     if (!posted && isGetResult) {
-        // Task dropped (no usable task executor): the session side has already inserted
-        // the pid into pendingPageSceneGets_ before invoking this callback, so close out
+        // Task dropped (no usable task executor): the session side has already marked
+        // the query pending before invoking this callback, so close out
         // any previous round and report an empty result synchronously to clear it —
         // otherwise subsequent Gets for the same pid would be rejected with
         // LAST_UNFINISH forever ("get unavailable afterwards").

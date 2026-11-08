@@ -20,7 +20,6 @@
 #include <cmath>
 #include <cstdlib>
 
-#include "interfaces/inner_api/ui_session/ui_session_split_rule.h"
 #include "base/geometry/ng/rect_t.h"
 #include "base/json/json_util.h"
 #include "base/log/log_wrapper.h"
@@ -285,6 +284,26 @@ std::unique_ptr<JsonValue> GetObjectValue(const std::unique_ptr<JsonValue>& json
         return nullptr;
     }
     return value;
+}
+
+// Mirrors PageSceneSplit::ContainsSplitRule for JsonUtil roots so this
+// translation unit stays free of cJSON includes and their build dependency.
+bool ContainsSplitSceneRule(const std::unique_ptr<JsonValue>& root)
+{
+    if (!root || !root->IsObject()) {
+        return false;
+    }
+    auto rules = root->GetValue("rules");
+    if (!rules || !rules->IsArray()) {
+        return false;
+    }
+    for (int32_t index = 0; index < rules->GetArraySize(); ++index) {
+        auto item = rules->GetArrayItem(index);
+        if (item && item->GetString("sceneType") == SPLIT_SCENE) {
+            return true;
+        }
+    }
+    return false;
 }
 
 std::string NormalizeNodeType(const std::string& tag)
@@ -1102,7 +1121,7 @@ std::optional<PageSceneRuleSet> PageSceneRuleManager::ParseRuleSet(const std::st
         LOGW("Parse page scene rule failed, invalid json");
         return std::nullopt;
     }
-    const bool hasSplit = PageSceneSplit::ContainsSplitRule(root->GetJsonObject());
+    const bool hasSplit = ContainsSplitSceneRule(root);
     PageSceneRuleSet ruleSet;
     ruleSet.rawJson = ruleJson;
     ruleSet.version = root->GetInt("version", 0);

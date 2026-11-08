@@ -69,6 +69,11 @@ public:
         return ptr_.get();
     }
 
+    const std::shared_ptr<T>& GetStdSharedPtr() const
+    {
+        return ptr_;
+    }
+
     bool operator==(std::nullptr_t) const
     {
         return ptr_ == nullptr;

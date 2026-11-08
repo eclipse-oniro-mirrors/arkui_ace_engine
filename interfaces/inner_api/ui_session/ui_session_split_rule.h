@@ -281,22 +281,27 @@ inline bool ReadRuleSetItemType(const cJSON* item, std::set<std::string>& ids, s
            ReadString(item, "sceneType", sceneType);
 }
 
+inline bool AppendSplitRule(const cJSON* item, PageSceneSplitRuleSet& result)
+{
+    auto rule = ParseRule(item);
+    if (!rule) {
+        return false;
+    }
+    result.rules.emplace_back(std::move(*rule));
+    return true;
+}
+
 inline bool ReadRuleSetItem(const cJSON* item, std::set<std::string>& ids, PageSceneSplitRuleSet& result)
 {
     std::string sceneType;
     if (!ReadRuleSetItemType(item, ids, sceneType)) {
         return false;
     }
-    if (sceneType == "SPLIT") {
-        auto rule = ParseRule(item);
-        if (!rule) {
-            return false;
-        }
-        result.rules.emplace_back(std::move(*rule));
+    if (sceneType != "SPLIT") {
+        // Other scene types retain their own validation and are not collected as SPLIT rules.
         return true;
     }
-    // Other scene types retain their own validation and are not collected as SPLIT rules.
-    return true;
+    return AppendSplitRule(item, result);
 }
 
 inline bool ReadRuleSetHeader(const cJSON* root, PageSceneSplitRuleSet& result, const cJSON*& rules)
