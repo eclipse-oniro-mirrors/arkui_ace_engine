@@ -22,6 +22,7 @@
 
 #include "interfaces/inner_api/ui_session/ui_content_stub_impl.h"
 #include "interfaces/inner_api/ui_session/ui_content_proxy.h"
+#include "interfaces/inner_api/ui_session/ui_report_proxy.h"
 #include "interfaces/inner_api/ui_session/ui_report_stub.h"
 #include "interfaces/inner_api/ui_session/ui_session_json_util.h"
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
@@ -2545,6 +2546,113 @@ HWTEST_F(UIContentStubTest, UIContentStubTestQueryPostTimeout004, TestSize.Level
     EXPECT_FALSE(report->lazyForEachQueryCallback_);
 }
 
+HWTEST_F(UIContentStubTest, UIContentStubTestSplitEventsIsolation, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    std::vector<std::string> order;
+    std::string a;
+    std::string b;
+    ASSERT_TRUE(report->RegisterPageSceneEventCallback("a", [&](const std::string& json) {
+        order.emplace_back("a");
+        a = json;
+    }));
+    ASSERT_TRUE(report->RegisterPageSceneEventCallback("b", [&](const std::string& json) {
+        order.emplace_back("b");
+        b = json;
+    }));
+    report->ReportPageSceneEvent(R"({"events":[
+        {"ruleSetId":"b", "ruleId":"b1", "sceneType":"SPLIT", "eventName":"SPLIT", "matched":true},
+        {"ruleSetId":"a", "ruleId":"a1", "sceneType":"SPLIT", "eventName":"SPLIT_EXIT", "matched":false},
+        {"ruleSetId":"b", "ruleId":"b2", "sceneType":"SPLIT", "eventName":"SPLIT", "matched":true}]})",
+        false);
+    ASSERT_EQ(order, std::vector<std::string>({ "b", "a" }));
+    auto rootA = InspectorJsonUtil::ParseJsonString(a);
+    auto rootB = InspectorJsonUtil::ParseJsonString(b);
+    auto eventsA = rootA->GetValue("events");
+    auto eventsB = rootB->GetValue("events");
+    ASSERT_EQ(eventsA->GetArraySize(), 1);
+    ASSERT_EQ(eventsB->GetArraySize(), 2);
+    EXPECT_EQ(eventsA->GetArrayItem(0)->GetString("ruleId"), "a1");
+    EXPECT_EQ(eventsA->GetArrayItem(0)->GetValue("matched")->ToString(), "false");
+    EXPECT_EQ(eventsB->GetArrayItem(0)->GetString("ruleId"), "b1");
+    EXPECT_EQ(eventsB->GetArrayItem(1)->GetString("ruleId"), "b2");
+}
+
+HWTEST_F(UIContentStubTest, UIContentStubTestSplitCallbackReentrantUnregister, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    int calls = 0;
+    ASSERT_TRUE(report->RegisterPageSceneEventCallback("a", [&](const std::string&) {
+        ++calls;
+        report->UnregisterPageSceneEventCallback("a");
+    }));
+    const std::string json = R"({"events":[{"ruleSetId":"a", "eventName":"SPLIT", "matched":true}]})";
+    report->ReportPageSceneEvent(json, false);
+    report->ReportPageSceneEvent(json, false);
+    EXPECT_EQ(calls, 1);
+    EXPECT_TRUE(report->RegisterPageSceneEventCallback("a", [&](const std::string&) { ++calls; }));
+    EXPECT_FALSE(report->TryRegisterPageSceneEventCallback("a", [&](const std::string&) { calls += 100; }));
+    report->ReportPageSceneEvent(json, false);
+    EXPECT_EQ(calls, 2);
+}
+
+HWTEST_F(UIContentStubTest, UIContentStubTestSplitQueryIsIndependentFromSubscription, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    int queryCalls = 0;
+    int subscriptionCalls = 0;
+    std::string received;
+    ASSERT_TRUE(report->RegisterPageSceneEventCallback("mixed", [&](const std::string&) { ++subscriptionCalls; }));
+    report->RegisterGetPageSceneCallback([&](const std::string& json) {
+        ++queryCalls;
+        received = json;
+    });
+    const std::string json = R"({"events":[
+        {"ruleSetId":"mixed", "ruleId":"split", "sceneType":"SPLIT", "matched":false},
+        {"ruleSetId":"mixed", "ruleId":"text", "sceneType":"TEXT_EDITOR", "matched":true}]})";
+    report->ReportPageSceneEvent(json, true);
+    EXPECT_EQ(queryCalls, 1);
+    EXPECT_EQ(received, json);
+    EXPECT_EQ(subscriptionCalls, 0);
+    report->UnregisterGetPageSceneCallback();
+    report->ReportPageSceneEvent(json, true);
+    EXPECT_EQ(queryCalls, 1);
+    report->ReportPageSceneEvent(json, false);
+    EXPECT_EQ(subscriptionCalls, 1);
+}
+
+HWTEST_F(UIContentStubTest, UIContentStubTestSplitReportFailureDoesNotRetry, TestSize.Level1)
+{
+    class FailingRemote final : public IRemoteObject {
+    public:
+        int32_t SendRequest(uint32_t code, MessageParcel& data, MessageParcel&, MessageOption& option) override
+        {
+            ++calls;
+            token = data.ReadInterfaceToken();
+            payload = data.ReadString();
+            isGet = data.ReadBool();
+            flags = option.GetFlags();
+            return -1;
+        }
+        int calls = 0;
+        int flags = 0;
+        bool isGet = true;
+        std::u16string token;
+        std::string payload;
+    };
+    sptr<FailingRemote> remote = std::make_shared<FailingRemote>();
+    UiReportProxy proxy(remote);
+    const std::string payload = R"({"events":[{"ruleSetId":"a", "eventName":"SPLIT", "matched":true}]})";
+    MessageParcel::SetDefaultPayloadStorage(true);
+    proxy.ReportPageSceneEvent(payload, false);
+    MessageParcel::SetDefaultPayloadStorage(false);
+    EXPECT_EQ(remote->calls, 1);
+    EXPECT_EQ(remote->payload, payload);
+    EXPECT_FALSE(remote->isGet);
+    EXPECT_NE(remote->flags & MessageOption::TF_ASYNC, 0);
+    EXPECT_EQ(remote->token, ReportService::GetDescriptor());
+}
+
 namespace {
 constexpr size_t INVALID_PAGE_SCENE_ID_LENGTH = 129;
 constexpr char VALID_PROXY_SPLIT_RULE[] =
@@ -2730,8 +2838,7 @@ HWTEST_F(PageSceneProxyValidationTest, LegacyRegistrationKeepsReceiverValidation
         R"({"version":1,"ruleSetId":"unknown","rules":[{"sceneType":"SPILT"}]})",
         R"({"version":1,"ruleSetId":"empty","rules":[]})",
         R"({"version":1,"ruleSetId":"web","sourceConfig":{"web":true},"rules":[]})",
-        R"({"ruleSetId":"search.id","rules":[{"pageType":"Router"}]})"
-    };
+        R"({"ruleSetId":"search.id","rules":[{"pageType":"Router"}]})" };
     for (const auto& request : requests) {
         EXPECT_EQ(proxy->RegisterPageSceneRules(request, [](const std::string&) {}), LAST_UNFINISH);
         EXPECT_EQ(remote->payload, request);
@@ -2793,6 +2900,57 @@ HWTEST_F(PageSceneProxyValidationTest, InvalidSelectorTagsNeverSendOrRegisterCal
     EXPECT_TRUE(report->pageSceneEventCallbacks_.empty());
     EXPECT_FALSE(report->getPageSceneCallback_);
     EXPECT_EQ(proxy->RegisterPageSceneRules(VALID_PROXY_CUSTOM_RULE, [](const std::string&) {}), NO_ERROR);
+}
+
+class RemoteStubLifetimeTest : public testing::Test {};
+
+HWTEST_F(RemoteStubLifetimeTest, UnownedStubReturnsNoLocalInterface, TestSize.Level1)
+{
+    UiReportStub stackStub;
+    EXPECT_EQ(stackStub.QueryLocalInterface(ReportService::GetDescriptor()), nullptr);
+    auto uniqueStub = std::make_unique<UiReportStub>();
+    EXPECT_EQ(uniqueStub->QueryLocalInterface(ReportService::GetDescriptor()), nullptr);
+}
+
+HWTEST_F(RemoteStubLifetimeTest, LocalInterfaceRetainsSharedOwner, TestSize.Level1)
+{
+    std::weak_ptr<UiReportStub> weak;
+    sptr<IRemoteBroker> local;
+    {
+        auto stub = std::make_shared<UiReportStub>();
+        weak = stub;
+        local = stub->QueryLocalInterface(ReportService::GetDescriptor());
+        ASSERT_NE(local, nullptr);
+        EXPECT_EQ(local.GetRefPtr(), static_cast<ReportService*>(stub.get()));
+    }
+    EXPECT_FALSE(weak.expired());
+    local = {};
+    EXPECT_TRUE(weak.expired());
+}
+
+HWTEST_F(RemoteStubLifetimeTest, LocalInterfaceRetainsRawSptrOwner, TestSize.Level1)
+{
+    std::weak_ptr<UiReportStub> weak;
+    sptr<ReportService> service;
+    {
+        sptr<UiReportStub> stub = new UiReportStub();
+        weak = stub.GetStdSharedPtr();
+        service = iface_cast<ReportService>(stub);
+        ASSERT_NE(service, nullptr);
+        EXPECT_EQ(service.GetRefPtr(), static_cast<ReportService*>(stub.GetRefPtr()));
+    }
+    EXPECT_FALSE(weak.expired());
+    service = {};
+    EXPECT_TRUE(weak.expired());
+}
+
+HWTEST_F(RemoteStubLifetimeTest, DescriptorMismatchDoesNotRetainOwner, TestSize.Level1)
+{
+    auto stub = std::make_shared<UiReportStub>();
+    const auto owners = stub.use_count();
+    auto local = stub->QueryLocalInterface(u"unrelated.interface");
+    EXPECT_EQ(local, nullptr);
+    EXPECT_EQ(stub.use_count(), owners);
 }
 
 } // namespace OHOS::Ace::NG

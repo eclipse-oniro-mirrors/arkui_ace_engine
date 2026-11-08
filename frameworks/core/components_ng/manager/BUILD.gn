@@ -15,12 +15,6 @@ import(
     "//foundation/arkui/ace_engine/frameworks/core/components_ng/components.gni")
 
 build_component_ng("manager_ng") {
-  if (is_arkui_x) {
-    deps = [ "//third_party/cJSON:cjson_static" ]
-  } else {
-    external_deps = [ "cJSON:cjson" ]
-  }
-
   sources = [
     "avoid_info/avoid_info_manager.cpp",
     "display_sync/ui_display_sync.cpp",
