@@ -28,6 +28,7 @@
 #include "base/geometry/dimension.h"
 #include "base/geometry/ng/offset_t.h"
 #include "base/geometry/ng/size_t.h"
+#include "base/log/dump_log.h"
 #include "base/memory/ace_type.h"
 #include "core/accessibility/accessibility_manager.h"
 #include "core/common/multi_thread_build_manager.h"
@@ -937,5 +938,268 @@ HWTEST_F(CheckBoxGroupPatternTestNG, UpdateGroupManager001, TestSize.Level1)
 
     pattern->UpdateGroupManager();
     EXPECT_NE(pattern->groupManager_.Upgrade(), nullptr);
+}
+
+/**
+ * @tc.name: CheckBoxGroupPatternDumpInfo001
+ * @tc.desc: Test DumpInfo when eventHub is null (no host attached).
+ * @tc.type: FUNC
+ */
+HWTEST_F(CheckBoxGroupPatternTestNG, CheckBoxGroupPatternDumpInfo001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a CheckBoxGroupPattern without attaching to a frameNode.
+     */
+    auto pattern = AceType::MakeRefPtr<CheckBoxGroupPattern>();
+    ASSERT_NE(pattern, nullptr);
+    DumpLog::GetInstance().description_.clear();
+
+    /**
+     * @tc.steps: step2. Call DumpInfo.
+     * @tc.expected: DumpInfo returns early because GetHost returns null so eventHub is null.
+     */
+    pattern->DumpInfo();
+    EXPECT_TRUE(DumpLog::GetInstance().description_.empty());
+}
+
+/**
+ * @tc.name: CheckBoxGroupPatternDumpInfo002
+ * @tc.desc: Test DumpInfo when paintProperty is null.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CheckBoxGroupPatternTestNG, CheckBoxGroupPatternDumpInfo002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a frameNode and get pattern.
+     */
+    auto frameNode = FrameNode::CreateFrameNode(
+        V2::CHECKBOXGROUP_ETS_TAG, 1, AceType::MakeRefPtr<CheckBoxGroupPattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<CheckBoxGroupPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    /**
+     * @tc.steps: step2. Set paintProperty to nullptr and clear DumpLog.
+     */
+    frameNode->paintProperty_ = nullptr;
+    DumpLog::GetInstance().description_.clear();
+
+    /**
+     * @tc.steps: step3. Call DumpInfo.
+     * @tc.expected: GroupName is added then DumpInfo returns early because paintProperty is null.
+     */
+    pattern->DumpInfo();
+    EXPECT_EQ(DumpLog::GetInstance().description_.size(), 1);
+    EXPECT_EQ(DumpLog::GetInstance().description_.back(), "GroupName: \n");
+}
+
+/**
+ * @tc.name: CheckBoxGroupPatternDumpInfo003
+ * @tc.desc: Test DumpInfo when all optional properties are not set (all if conditions false).
+ * @tc.type: FUNC
+ */
+HWTEST_F(CheckBoxGroupPatternTestNG, CheckBoxGroupPatternDumpInfo003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a frameNode with an empty CheckBoxGroupPaintProperty.
+     */
+    auto frameNode = FrameNode::CreateFrameNode(
+        V2::CHECKBOXGROUP_ETS_TAG, 2, AceType::MakeRefPtr<CheckBoxGroupPattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<CheckBoxGroupPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto paintProperty = AceType::MakeRefPtr<CheckBoxGroupPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    frameNode->paintProperty_ = paintProperty;
+    DumpLog::GetInstance().description_.clear();
+
+    /**
+     * @tc.steps: step2. Call DumpInfo.
+     * @tc.expected: Only GroupName and SelectStatus are added, all if branches are false.
+     */
+    pattern->DumpInfo();
+    EXPECT_EQ(DumpLog::GetInstance().description_.size(), 2);
+    EXPECT_EQ(DumpLog::GetInstance().description_.back(), "SelectStatus: NONE\n");
+}
+
+/**
+ * @tc.name: CheckBoxGroupPatternDumpInfo004
+ * @tc.desc: Test DumpInfo when HasCheckBoxGroupSelectedStyle is true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CheckBoxGroupPatternTestNG, CheckBoxGroupPatternDumpInfo004, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a frameNode with CheckBoxGroupSelectedStyle set to CIRCULAR.
+     */
+    auto frameNode = FrameNode::CreateFrameNode(
+        V2::CHECKBOXGROUP_ETS_TAG, 3, AceType::MakeRefPtr<CheckBoxGroupPattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<CheckBoxGroupPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto paintProperty = AceType::MakeRefPtr<CheckBoxGroupPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    paintProperty->UpdateCheckBoxGroupSelectedStyle(CheckBoxStyle::CIRCULAR_STYLE);
+    frameNode->paintProperty_ = paintProperty;
+    DumpLog::GetInstance().description_.clear();
+
+    /**
+     * @tc.steps: step2. Call DumpInfo.
+     * @tc.expected: Shape description is added.
+     */
+    pattern->DumpInfo();
+    bool found = false;
+    for (const auto& desc : DumpLog::GetInstance().description_) {
+        if (desc == "Shape: CIRCULAR\n") {
+            found = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(found);
+}
+
+/**
+ * @tc.name: CheckBoxGroupPatternDumpInfo005
+ * @tc.desc: Test DumpInfo when HasCheckBoxGroupSelectedColor is true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CheckBoxGroupPatternTestNG, CheckBoxGroupPatternDumpInfo005, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a frameNode with CheckBoxGroupSelectedColor set to BLACK.
+     */
+    auto frameNode = FrameNode::CreateFrameNode(
+        V2::CHECKBOXGROUP_ETS_TAG, 4, AceType::MakeRefPtr<CheckBoxGroupPattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<CheckBoxGroupPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto paintProperty = AceType::MakeRefPtr<CheckBoxGroupPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    paintProperty->UpdateCheckBoxGroupSelectedColor(Color::BLACK);
+    frameNode->paintProperty_ = paintProperty;
+    DumpLog::GetInstance().description_.clear();
+
+    /**
+     * @tc.steps: step2. Call DumpInfo.
+     * @tc.expected: SelectedColor description is added as the last entry.
+     */
+    pattern->DumpInfo();
+    EXPECT_EQ(DumpLog::GetInstance().description_.back(), "SelectedColor: #FF000000\n");
+}
+
+/**
+ * @tc.name: CheckBoxGroupPatternDumpInfo006
+ * @tc.desc: Test DumpInfo when HasCheckBoxGroupUnSelectedColor is true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CheckBoxGroupPatternTestNG, CheckBoxGroupPatternDumpInfo006, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a frameNode with CheckBoxGroupUnSelectedColor set to BLACK.
+     */
+    auto frameNode = FrameNode::CreateFrameNode(
+        V2::CHECKBOXGROUP_ETS_TAG, 5, AceType::MakeRefPtr<CheckBoxGroupPattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<CheckBoxGroupPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto paintProperty = AceType::MakeRefPtr<CheckBoxGroupPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    paintProperty->UpdateCheckBoxGroupUnSelectedColor(Color::BLACK);
+    frameNode->paintProperty_ = paintProperty;
+    DumpLog::GetInstance().description_.clear();
+
+    /**
+     * @tc.steps: step2. Call DumpInfo.
+     * @tc.expected: UnSelectedColor description is added as the last entry.
+     */
+    pattern->DumpInfo();
+    EXPECT_EQ(DumpLog::GetInstance().description_.back(), "UnSelectedColor: #FF000000\n");
+}
+
+/**
+ * @tc.name: CheckBoxGroupPatternDumpInfo007
+ * @tc.desc: Test DumpInfo when HasCheckBoxGroupCheckMarkSize is true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CheckBoxGroupPatternTestNG, CheckBoxGroupPatternDumpInfo007, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a frameNode with CheckBoxGroupCheckMarkSize set.
+     */
+    auto frameNode = FrameNode::CreateFrameNode(
+        V2::CHECKBOXGROUP_ETS_TAG, 6, AceType::MakeRefPtr<CheckBoxGroupPattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<CheckBoxGroupPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto paintProperty = AceType::MakeRefPtr<CheckBoxGroupPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    paintProperty->UpdateCheckBoxGroupCheckMarkSize(10.0_vp);
+    frameNode->paintProperty_ = paintProperty;
+    DumpLog::GetInstance().description_.clear();
+
+    /**
+     * @tc.steps: step2. Call DumpInfo.
+     * @tc.expected: MarkSize description is added as the last entry.
+     */
+    pattern->DumpInfo();
+    EXPECT_EQ(DumpLog::GetInstance().description_.back(), "MarkSize: 10.00vp\n");
+}
+
+/**
+ * @tc.name: CheckBoxGroupPatternDumpInfo008
+ * @tc.desc: Test DumpInfo when HasCheckBoxGroupCheckMarkWidth is true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CheckBoxGroupPatternTestNG, CheckBoxGroupPatternDumpInfo008, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a frameNode with CheckBoxGroupCheckMarkWidth set.
+     */
+    auto frameNode = FrameNode::CreateFrameNode(
+        V2::CHECKBOXGROUP_ETS_TAG, 7, AceType::MakeRefPtr<CheckBoxGroupPattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<CheckBoxGroupPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto paintProperty = AceType::MakeRefPtr<CheckBoxGroupPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    paintProperty->UpdateCheckBoxGroupCheckMarkWidth(10.0_vp);
+    frameNode->paintProperty_ = paintProperty;
+    DumpLog::GetInstance().description_.clear();
+
+    /**
+     * @tc.steps: step2. Call DumpInfo.
+     * @tc.expected: MarkWidth description is added as the last entry.
+     */
+    pattern->DumpInfo();
+    EXPECT_EQ(DumpLog::GetInstance().description_.back(), "MarkWidth: 10.00vp\n");
+}
+
+/**
+ * @tc.name: CheckBoxGroupPatternDumpInfo009
+ * @tc.desc: Test DumpInfo when HasCheckBoxGroupCheckMarkColor is true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CheckBoxGroupPatternTestNG, CheckBoxGroupPatternDumpInfo009, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a frameNode with CheckBoxGroupCheckMarkColor set to BLUE.
+     */
+    auto frameNode = FrameNode::CreateFrameNode(
+        V2::CHECKBOXGROUP_ETS_TAG, 8, AceType::MakeRefPtr<CheckBoxGroupPattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<CheckBoxGroupPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto paintProperty = AceType::MakeRefPtr<CheckBoxGroupPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    paintProperty->UpdateCheckBoxGroupCheckMarkColor(Color::BLUE);
+    frameNode->paintProperty_ = paintProperty;
+    DumpLog::GetInstance().description_.clear();
+
+    /**
+     * @tc.steps: step2. Call DumpInfo.
+     * @tc.expected: MarkColor description is added as the last entry.
+     */
+    pattern->DumpInfo();
+    EXPECT_EQ(DumpLog::GetInstance().description_.back(), "MarkColor: #FF0000FF\n");
 }
 } // namespace OHOS::Ace::NG
