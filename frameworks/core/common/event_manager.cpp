@@ -15,6 +15,9 @@
 
 #include "core/common/event_manager.h"
 
+#include <type_traits>
+#include <unordered_set>
+
 #include "base/log/log_wrapper_without_instance.h"
 #include "base/mousestyle/mouse_style.h"
 #include "base/input_manager/input_manager.h"
@@ -24,6 +27,9 @@
 #include "core/common/reporter/reporter.h"
 #include "core/common/xcollie/xcollieInterface.h"
 #include "core/components/text_overlay/text_overlay_manager.h"
+#include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/base/node_sensitive_input.h"
+#include "core/components_ng/event/event_constants.h"
 #include "core/components_ng/event/error_reporter/general_interaction_error_reporter.h"
 #include "core/components_ng/gestures/recognizers/gestures_extra_handler.h"
 #include "core/components_ng/gestures/recognizers/recognizer_group.h"
@@ -59,6 +65,145 @@ constexpr int32_t MIN_PARAM_SIZE = 1;
 constexpr int32_t COUNT_PARAM_SIZE = 3;
 constexpr int32_t EVENT_HANDLE = 100000;
 constexpr int32_t POST_ONCE = 1;
+
+void CollectAgentInputNodes(const RefPtr<TouchEventTarget>& target, std::vector<RefPtr<NG::FrameNode>>& nodes,
+    std::unordered_set<const TouchEventTarget*>& visited)
+{
+    CHECK_NULL_VOID(target);
+    if (!visited.emplace(AceType::RawPtr(target)).second) {
+        return;
+    }
+    auto group = AceType::DynamicCast<NG::RecognizerGroup>(target);
+    if (group) {
+        for (const auto& child : group->GetGroupRecognizer()) {
+            CollectAgentInputNodes(child, nodes, visited);
+        }
+    }
+    auto recognizer = AceType::DynamicCast<NG::NGGestureRecognizer>(target);
+    if (recognizer) {
+        for (const auto& bridge : recognizer->GetBridgeObj()) {
+            CollectAgentInputNodes(bridge.Upgrade(), nodes, visited);
+        }
+    }
+    auto node = target->GetAttachedNode().Upgrade();
+    if (node) {
+        nodes.emplace_back(node);
+    }
+}
+
+void CollectAgentInputNodes(const RefPtr<MouseEventTarget>& target, std::vector<RefPtr<NG::FrameNode>>& nodes,
+    std::unordered_set<const TouchEventTarget*>&)
+{
+    CHECK_NULL_VOID(target);
+    auto node = target->GetAttachedNode().Upgrade();
+    if (node) {
+        nodes.emplace_back(node);
+    }
+}
+
+// Read policies from the existing targets without changing their dispatch order.
+void FreezeAgentNode(NG::AgentGestureState& state, const RefPtr<NG::FrameNode>& node)
+{
+    CHECK_NULL_VOID(node);
+    if (state.nodes.count(node->GetId())) {
+        return;
+    }
+    auto compId = node->GetInspectorId().value_or("");
+    if (compId.empty()) {
+        compId = std::to_string(node->GetId());
+    }
+    state.nodes.emplace(node->GetId(), NG::NodeSnapshot {
+        node, std::move(compId),
+        !InputManager::HasControlComponentPermission() ||
+            node->GetAgentControlMode() == NG::AgentControlMode::ALLOW,
+        node->HasAgentControlMode() });
+}
+
+void FreezeAgentTargets(const TouchTestResult& targets, NG::AgentGestureState& state,
+    const RefPtr<NG::FrameNode>& hitNode)
+{
+    if (hitNode && state.initialNodeId == -1) {
+        state.initialNodeId = hitNode->GetId();
+    }
+    std::vector<RefPtr<NG::FrameNode>> nodes;
+    std::unordered_set<const TouchEventTarget*> visited;
+    for (const auto& target : targets) {
+        CollectAgentInputNodes(target, nodes, visited);
+    }
+    for (const auto& node : nodes) {
+        FreezeAgentNode(state, node);
+    }
+}
+
+void FreezeAgentTargets(const MouseTestResult& targets, NG::AgentGestureState& state,
+    const RefPtr<NG::FrameNode>& hitNode)
+{
+    RefPtr<NG::FrameNode> first = hitNode;
+    FreezeAgentNode(state, hitNode);
+    for (const auto& target : targets) {
+        auto node = target ? target->GetAttachedNode().Upgrade() : nullptr;
+        if (!first) {
+            first = node;
+        }
+        FreezeAgentNode(state, node);
+    }
+    if (first && state.initialNodeId == -1) {
+        state.initialNodeId = first->GetId();
+    }
+}
+
+bool TryDeliverAgentNode(NG::AgentGestureState& state, int32_t nodeId)
+{
+    auto it = state.nodes.find(nodeId);
+    if (it == state.nodes.end()) {
+        return false;
+    }
+    if (state.hasSession && it->second.hasControlMode && state.enteredNodes.emplace(nodeId).second) {
+        auto node = it->second.node.Upgrade();
+        NG::AgentInputResult result;
+        result.sessionId = state.sessionId;
+        result.callingUid = state.callingUid;
+        result.instanceId = state.instanceId;
+        result.nodeId = nodeId;
+        result.compId = it->second.compId;
+        result.tag = node ? node->GetTag() : "";
+        result.allowed = it->second.allowed;
+        InputManager::ReportAgentInputDecision(result);
+    }
+    return it->second.allowed;
+}
+
+template<typename EventType>
+void NotifyAgentInputAttempt(const EventType& event, const RefPtr<NG::FrameNode>& node)
+{
+    CHECK_NULL_VOID(node);
+    NG::NodeSensitiveInputInfo info;
+    info.isAgent = event.isAgent;
+    if constexpr (std::is_same_v<EventType, TouchEvent>) {
+        info.type = NG::NodeSensitiveInputEventType::TOUCH;
+        info.touchEvent = &event;
+    } else {
+        info.type = NG::NodeSensitiveInputEventType::MOUSE;
+        info.mouseEvent = &event;
+    }
+    NG::NotifyNodeSensitiveInput(node, info);
+}
+
+bool IsMouseDerivedTouchEvent(const TouchEvent& event)
+{
+    return event.sourceType == SourceType::MOUSE;
+}
+
+bool IsAgentControlSourceTool(SourceTool tool)
+{
+    return tool == SourceTool::UNKNOWN || tool == SourceTool::FINGER || tool == SourceTool::MOUSE;
+}
+
+bool EventManager::IsAgentTouchInScope(const TouchEvent& event)
+{
+    return event.isAgent && !event.isStylusMouseMode && IsAgentControlSourceTool(event.sourceTool) &&
+        IsAgentControlSourceTool(event.primitiveSourceTool);
+}
 
 namespace {
 const std::string& GetInputLogNodeTag(const std::string& tag)
@@ -217,7 +362,9 @@ void EventManager::TouchTest(const TouchEvent& touchPoint, const RefPtr<NG::Fram
     }
 #endif
     // For root node, the parent local point is the same as global point.
+    touchRestrict.sensitiveInputHitNode.Reset();
     frameNode->TouchTest(point, point, point, touchRestrict, hitTestResult, touchPoint.id, responseLinkResult);
+    touchInputHitNodes_[touchPoint.id] = touchRestrict.sensitiveInputHitNode;
     NotifyHitTestFrameNodeListener(touchPoint);
     hitTestRecordInfo_ = std::nullopt;
     if (touchPoint.type == TouchType::DOWN && coastingAxisEventGenerator_) {
@@ -288,11 +435,15 @@ void EventManager::TouchTestResultsClear(int32_t eventHandleId)
 {
     if (postEventRefereeWithStrategyNG_.empty()) {
         touchTestResults_.clear();
+        agentTouchStates_.clear();
+        touchInputHitNodes_.clear();
         return;
     }
     auto referee = postEventRefereeWithStrategyNG_[eventHandleId / EVENT_HANDLE];
     for (auto it = touchTestResults_.begin(); it != touchTestResults_.end();) {
         if (postEventRefereeWithStrategyNG_[it->first / EVENT_HANDLE] == referee) {
+            agentTouchStates_.erase(it->first);
+            touchInputHitNodes_.erase(it->first);
             it = touchTestResults_.erase(it);
         } else {
             ++it;
@@ -1396,13 +1547,57 @@ bool EventManager::DispatchTouchEvent(const TouchEvent& event, bool sendOnTouch)
     NotifyTouchToInteractionObserver(
         instanceId_, point, iter != touchTestResults_.end() ? &iter->second : nullptr);
     if (iter == touchTestResults_.end()) {
+        agentTouchStates_.erase(point.id);
+        touchInputHitNodes_.erase(point.id);
         CheckUpEvent(event);
         lastDownFingerNumber_ = static_cast<int32_t>(downFingerIds_.size());
         return false;
     }
+    if (IsAgentTouchInScope(point)) {
+        if (IsMouseDerivedTouchEvent(point)) {
+            // Derived from an agent mouse press: the mouse state owns the decisions.
+        } else if (point.type == TouchType::DOWN) {
+            agentTouchStates_[point.id] = std::make_shared<NG::AgentGestureState>();
+            auto& st = *agentTouchStates_[point.id];
+            st.hasSession = point.hasSafSessionId;
+            st.sessionId = point.safSessionId;
+            st.callingUid = point.callingUid;
+            st.instanceId = instanceId_;
+            FreezeAgentTargets(iter->second, st, nullptr);
+        } else if (!agentTouchStates_.count(point.id)) {
+            return true; // Orphan MOVE/UP without a DOWN state.
+        } else if (point.type == TouchType::UP || point.type == TouchType::CANCEL) {
+            agentTouchStates_[point.id]->enteredNodes.clear(); // Report once more on UP.
+        }
+    }
+    if (!IsMouseDerivedTouchEvent(point)) {
+        auto hit = touchInputHitNodes_.find(point.id);
+        NotifyAgentInputAttempt(point, hit != touchInputHitNodes_.end() ? hit->second.Upgrade() : nullptr);
+    }
     ACE_SCOPED_TRACE_COMMERCIAL("DispatchTouchEvent id:%d, pointX=%f pointY=%f type=%d",
         point.id, point.x, point.y, (int)point.type);
     lastTouchEvent_ = event;
+    return DispatchPreparedTouchEvent(event, point, iter->second, sendOnTouch);
+}
+
+bool EventManager::IsAgentTouchAllowed(const TouchEvent& event, int32_t nodeId)
+{
+    if (!IsAgentTouchInScope(event)) {
+        return true;
+    }
+    if (IsMouseDerivedTouchEvent(event)) {
+        // Mouse-derived touches consult the owning mouse state of the press.
+        const auto mouseId = event.id - event.originalId;
+        auto it = agentMouseStates_.find({ mouseId, MouseButton::LEFT_BUTTON });
+        return it != agentMouseStates_.end() && TryDeliverAgentNode(*it->second, nodeId);
+    }
+    auto it = agentTouchStates_.find(event.id);
+    return it != agentTouchStates_.end() && TryDeliverAgentNode(*it->second, nodeId);
+}
+
+bool EventManager::DispatchPreparedTouchEvent(
+    const TouchEvent& event, TouchEvent& point, const TouchTestResult& targets, bool sendOnTouch)
+{
     auto currentReferee = refereeNG_;
     int32_t eventHandleId = event.eventHandleId;
     if (eventHandleId / EVENT_HANDLE > 0) {
@@ -1410,12 +1605,13 @@ bool EventManager::DispatchTouchEvent(const TouchEvent& event, bool sendOnTouch)
         CHECK_NULL_RETURN(currentReferee, false);
     }
     if (point.type == TouchType::DOWN) {
-        ProcessTouchEventDownPhase(point, iter->second, currentReferee, event.id);
+        ProcessTouchEventDownPhase(point, targets, currentReferee, event.id);
     }
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING
     NG::Reporter::GetInstance().HandleInputEventInspectorReporting(point);
 #endif
     if (!DispatchTouchEventToPipelines(point, sendOnTouch)) {
+        EraseAgentTouchState(point);
         return true;
     }
     NotifyDragTouchEventListener(point);
@@ -1423,7 +1619,16 @@ bool EventManager::DispatchTouchEvent(const TouchEvent& event, bool sendOnTouch)
     auto item = touchTestResults_.find(event.id);
     passThroughResult_ = (item != touchTestResults_.end() && !item->second.empty());
     UpdateInfoWhenFinishDispatch(point, sendOnTouch);
+    EraseAgentTouchState(point);
     return true;
+}
+
+void EventManager::EraseAgentTouchState(const TouchEvent& point)
+{
+    if (point.type == TouchType::UP || point.type == TouchType::CANCEL) {
+        agentTouchStates_.erase(point.id);
+        touchInputHitNodes_.erase(point.id);
+    }
 }
 
 void EventManager::UpdateInfoWhenFinishDispatch(const TouchEvent& point, bool sendOnTouch)
@@ -1563,6 +1768,11 @@ void EventManager::DispatchTouchEventInOldPipeline(const TouchEvent& point, bool
     const auto iter = touchTestResults_.find(point.id);
     if (dispatchSuccess && !Container::IsCurrentUseNewPipeline()) {
         for (const auto& entry : iter->second) {
+            auto node = entry->GetAttachedNode().Upgrade();
+            if (!AceType::InstanceOf<NG::NGGestureRecognizer>(entry) && IsAgentTouchInScope(point) &&
+                (!node || !IsAgentTouchAllowed(point, node->GetId()))) {
+                break;
+            }
             if (!entry->HandleMultiContainerEvent(point)) {
                 break;
             }
@@ -1581,6 +1791,8 @@ void EventManager::ClearTouchTestTargetForPenStylus(TouchEvent& touchEvent)
     currentReferee->CleanGestureScope(touchEvent.id);
     referee_->CleanGestureScope(touchEvent.id);
     touchTestResults_.erase(touchEvent.id);
+    agentTouchStates_.erase(touchEvent.id);
+    touchInputHitNodes_.erase(touchEvent.id);
     if (!escapeRecognizers_.empty()) {
         SweepEscapeRecognizers();
     }
@@ -1690,31 +1902,46 @@ void EventManager::DispatchTouchEventToTouchTestResult(const TouchEvent& touchEv
 {
     bool isTriggeredInteractionEvent = false;
     bool isStopTouchEvent = false;
+    bool isStopGestureEvent = false;
+    const bool controlled = IsAgentTouchInScope(touchEvent);
     for (const auto& entry : touchTestResult) {
+        auto recognizer = AceType::DynamicCast<NG::NGGestureRecognizer>(entry);
         if (touchEvent.passThrough) {
             entry->SetIsPostEventResult(true);
         }
-        auto recognizer = AceType::DynamicCast<NG::NGGestureRecognizer>(entry);
         if (recognizer) {
-            entry->HandleMultiContainerEvent(touchEvent);
+            if (isStopGestureEvent) {
+                continue;
+            }
+            const bool propagate = entry->HandleMultiContainerEvent(touchEvent);
+            isStopGestureEvent = controlled && !propagate;
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING
             eventTree_.AddGestureProcedure(reinterpret_cast<uintptr_t>(AceType::RawPtr(recognizer)), touchEvent, "",
                 NG::TransRefereeState(recognizer->GetRefereeState()),
                 NG::TransGestureDisposal(recognizer->GetGestureDisposal()));
 #endif
+            continue;
         }
-        if (!recognizer && !isStopTouchEvent && sendOnTouch) {
+        if (!sendOnTouch || (controlled && isStopTouchEvent)) {
+            continue;
+        }
+        auto node = entry->GetAttachedNode().Upgrade();
+        if (controlled && (!node || !IsAgentTouchAllowed(touchEvent, node->GetId()))) {
+            isStopTouchEvent = true;
+            continue;
+        }
+        if (!isStopTouchEvent) {
             isStopTouchEvent = !entry->HandleMultiContainerEvent(touchEvent);
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING
             eventTree_.AddGestureProcedure(reinterpret_cast<uintptr_t>(AceType::RawPtr(entry)), "",
                 std::string("Handle").append(GestureSnapshot::TransTouchType(touchEvent.type)), "", "");
 #endif
         }
-        if (!recognizer && sendOnTouch && !isTriggeredInteractionEvent) {
+        if (!isTriggeredInteractionEvent) {
             isTriggeredInteractionEvent |= entry->HandleInteractionEvent(touchEvent);
         }
     }
-    if (!escapeRecognizers_.empty()) {
+    if (!isStopGestureEvent && !escapeRecognizers_.empty()) {
         HandleEscapeRecognizer(touchEvent);
     }
 }
@@ -1728,7 +1955,9 @@ void EventManager::HandleEscapeRecognizer(const TouchEvent& touchEvent)
         if (recognizer->IsFingerEscaped(touchEvent.id)) {
             continue;
         }
-        recognizer->HandleMultiContainerEvent(touchEvent);
+        if (!recognizer->HandleMultiContainerEvent(touchEvent) && IsAgentTouchInScope(touchEvent)) {
+            break;
+        }
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING
         if (touchEvent.type == TouchType::DOWN || touchEvent.type == TouchType::UP ||
             touchEvent.type == TouchType::CANCEL) {
@@ -2159,6 +2388,7 @@ void EventManager::MouseTest(
     const NG::PointF point { event.x, event.y };
     TouchTestResult testResult;
 
+    touchRestrict.sensitiveInputHitNode.Reset();
     if (AceApplicationInfo::GetInstance().GreatOrEqualTargetAPIVersion(PlatformVersion::VERSION_TWELVE)) {
         if (event.pullAction == MouseAction::PULL_MOVE) {
             UpdateHoverNode(event, testResult);
@@ -2190,6 +2420,12 @@ void EventManager::MouseTest(
         SetResponseLinkRecognizers(testResult, responseLinkResult, event.passThrough);
     }
     UpdateHoverNode(event, testResult);
+    if (auto hit = touchRestrict.sensitiveInputHitNode.Upgrade()) {
+        mouseInputHitNodes_[event.id] = hit;
+    } else if (event.action != MouseAction::MOVE || event.button == MouseButton::NONE_BUTTON ||
+        !AceApplicationInfo::GetInstance().GreatOrEqualTargetAPIVersion(PlatformVersion::VERSION_TWELVE)) {
+        mouseInputHitNodes_.erase(event.id);
+    }
     LogPrintMouseTest();
 }
 
@@ -2287,11 +2523,63 @@ bool EventManager::DispatchMouseEventNG(const MouseEvent& event)
     return DispatchMouseEventInLessAPI13(event);
 }
 
-bool EventManager::DispatchMouseEventInGreatOrEqualAPI13(const MouseEvent& event)
+bool EventManager::PrepareAgentMousePressGate(const MouseEvent& event, const PressMouseInfo& key)
 {
+    if (!agentMouseStates_.count(key)) {
+        PrepareAgentMousePress(event);
+    }
+    auto stIt = agentMouseStates_.find(key);
+    if (stIt == agentMouseStates_.end()) {
+        return false; // No state could be built: swallow the press.
+    }
+    // Press-time decision: a denied initial node swallows the whole round.
+    return TryDeliverAgentNode(*stIt->second, stIt->second->initialNodeId);
+}
+
+void EventManager::PruneAgentMouseEntered(const MouseEvent& event, const PressMouseInfo& key)
+{
+    // Re-entry reporting: drop departed nodes so they report again on return.
+    auto stIt = agentMouseStates_.find(key);
+    if (stIt == agentMouseStates_.end()) {
+        return;
+    }
+    std::unordered_set<int32_t> engaged;
+    for (const auto& target : currMouseTestResultsMap_[event.id]) {
+        if (auto node = target ? target->GetAttachedNode().Upgrade() : nullptr) {
+            engaged.insert(node->GetId());
+        }
+    }
+    for (auto it = stIt->second->enteredNodes.begin(); it != stIt->second->enteredNodes.end();) {
+        it = engaged.count(*it) ? std::next(it) : stIt->second->enteredNodes.erase(it);
+    }
+}
+
+void EventManager::RepeatAgentMouseReport(const PressMouseInfo& key)
+{
+    if (agentMouseStates_.count(key)) {
+        agentMouseStates_[key]->enteredNodes.clear(); // Report once more on RELEASE.
+    }
+}
+
+void EventManager::FinishAgentMouseGesture(const MouseEvent& event, const PressMouseInfo& key)
+{
+    agentMouseStates_.erase(key);
+    mouseInputHitNodes_.erase(event.id);
+}
+
+bool EventManager::DispatchMouseEventInGreatOrEqualAPI13(const MouseEvent& sourceEvent)
+{
+    auto event = sourceEvent;
+    const bool agentControlled = IsAgentMouseInScope(event);
     MouseTestResult handledResults;
     bool isStopPropagation = false;
     PressMouseInfo key{ event.id, event.button };
+    if (event.action == MouseAction::PRESS && agentControlled &&
+        !PrepareAgentMousePressGate(event, key)) {
+        return true; // No state, or the initial node is denied: swallow the round.
+    }
+    auto hit = mouseInputHitNodes_.find(event.id);
+    NotifyAgentInputAttempt(event, hit != mouseInputHitNodes_.end() ? hit->second.Upgrade() : nullptr);
     if (event.button != MouseButton::NONE_BUTTON) {
         if (auto mouseTargetIter = pressMouseTestResultsMap_.find(key);
             mouseTargetIter != pressMouseTestResultsMap_.end()) {
@@ -2301,28 +2589,115 @@ bool EventManager::DispatchMouseEventInGreatOrEqualAPI13(const MouseEvent& event
             pressMouseTestResultsMap_[key] = currMouseTestResultsMap_[event.id];
         }
     }
+    if (event.action == MouseAction::MOVE) {
+        PruneAgentMouseEntered(event, key);
+    }
+    if (event.action == MouseAction::RELEASE || event.action == MouseAction::CANCEL) {
+        RepeatAgentMouseReport(key);
+    }
     auto result = DispatchMouseEventToCurResults(event, handledResults, isStopPropagation);
     if (event.action == MouseAction::RELEASE || event.action == MouseAction::CANCEL) {
+        FinishAgentMouseGesture(event, key);
         DoSingleMouseActionRelease(key);
     }
-    return result;
+    return result || (agentControlled && isStopPropagation);
 }
 
-bool EventManager::DispatchMouseEventInLessAPI13(const MouseEvent& event)
+void EventManager::PrepareAgentMousePress(const MouseEvent& event)
 {
+    if (!IsAgentMouseInScope(event) || event.action != MouseAction::PRESS) {
+        return;
+    }
+    PressMouseInfo key { event.id, event.button };
+    agentMouseStates_[key] = std::make_shared<NG::AgentGestureState>();
+    auto& st = *agentMouseStates_[key];
+    st.hasSession = event.hasSafSessionId;
+    st.sessionId = event.safSessionId;
+    st.callingUid = event.callingUid;
+    st.instanceId = instanceId_;
+    auto hit = mouseInputHitNodes_.find(event.id);
+    FreezeAgentTargets(currMouseTestResultsMap_[event.id], st,
+        hit != mouseInputHitNodes_.end() ? hit->second.Upgrade() : nullptr);
+}
+
+bool EventManager::IsAgentMouseInScope(const MouseEvent& event) const
+{
+    if (!event.isAgent || event.isStylusMouseMode || !IsAgentControlSourceTool(event.sourceTool)) {
+        return false;
+    }
+    if (event.button == MouseButton::LEFT_BUTTON || event.button == MouseButton::RIGHT_BUTTON) {
+        return true;
+    }
+    if (event.action != MouseAction::CANCEL &&
+        (event.button != MouseButton::NONE_BUTTON || event.action != MouseAction::MOVE)) {
+        return false;
+    }
+    return std::any_of(agentMouseStates_.begin(), agentMouseStates_.end(),
+        [&event](const auto& item) { return item.first.id == event.id; });
+}
+
+bool EventManager::IsAgentMouseAllowed(const MouseEvent& event, const RefPtr<NG::FrameNode>& node)
+{
+    if (!IsAgentMouseInScope(event)) {
+        return true;
+    }
+    CHECK_NULL_RETURN(node, false);
+    PressMouseInfo key { event.id, event.button };
+    auto stIt = agentMouseStates_.find(key);
+    if (stIt == agentMouseStates_.end() && event.button == MouseButton::NONE_BUTTON) {
+        stIt = std::find_if(agentMouseStates_.begin(), agentMouseStates_.end(),
+            [&event](const auto& item) { return item.first.id == event.id; });
+    }
+    if (stIt == agentMouseStates_.end()) {
+        // Unpressed hover/move retains its existing behavior. Never deliver an orphan Agent release.
+        return event.action != MouseAction::RELEASE && event.action != MouseAction::CANCEL;
+    }
+    auto& st = *stIt->second;
+    if (st.initialNodeId != -1 && node->GetId() != st.initialNodeId) {
+        auto init = st.nodes.find(st.initialNodeId);
+        const bool initialDenied = init != st.nodes.end() &&
+            (!init->second.node.Upgrade() || !init->second.allowed);
+        if (initialDenied) {
+            return false; // A rejected press cannot resume on a different target.
+        }
+    }
+    FreezeAgentNode(st, node); // First-engagement freeze.
+    return TryDeliverAgentNode(st, node->GetId());
+}
+
+bool EventManager::DispatchMouseEventInLessAPI13(const MouseEvent& sourceEvent)
+{
+    auto event = sourceEvent;
+    const bool agentControlled = IsAgentMouseInScope(event);
     MouseTestResult handledResults;
     bool isStopPropagation = false;
+    PressMouseInfo key{ event.id, event.button };
+    if (event.action == MouseAction::PRESS && agentControlled &&
+        !PrepareAgentMousePressGate(event, key)) {
+        return true; // No state, or the initial node is denied: swallow the round.
+    }
+    auto hit = mouseInputHitNodes_.find(event.id);
+    NotifyAgentInputAttempt(event, hit != mouseInputHitNodes_.end() ? hit->second.Upgrade() : nullptr);
     if (event.button == MouseButton::LEFT_BUTTON) {
         DispatchMouseEventToPressResults(event, pressMouseTestResults_, handledResults, isStopPropagation);
         if (event.action == MouseAction::PRESS) {
             pressMouseTestResults_ = currMouseTestResultsMap_[event.id];
         }
     }
-    auto result = DispatchMouseEventToCurResultsInLessAPI13(event, handledResults, isStopPropagation);
-    if (event.action == MouseAction::RELEASE) {
-        DoMouseActionRelease();
+    if (event.action == MouseAction::MOVE) {
+        PruneAgentMouseEntered(event, key);
     }
-    return result;
+    if (event.action == MouseAction::RELEASE || event.action == MouseAction::CANCEL) {
+        RepeatAgentMouseReport(key);
+    }
+    auto result = DispatchMouseEventToCurResultsInLessAPI13(event, handledResults, isStopPropagation);
+    if (event.action == MouseAction::RELEASE || (agentControlled && event.action == MouseAction::CANCEL)) {
+        pressMouseTestResults_.clear();
+    }
+    if (event.action == MouseAction::RELEASE || event.action == MouseAction::CANCEL) {
+        FinishAgentMouseGesture(event, key);
+    }
+    return result || (agentControlled && isStopPropagation);
 }
 
 void EventManager::DispatchMouseEventToPressResults(const MouseEvent& event, const MouseTestResult& targetResults,
@@ -2332,6 +2707,11 @@ void EventManager::DispatchMouseEventToPressResults(const MouseEvent& event, con
     for (const auto& mouseTarget : targetPressResults) {
         if (!mouseTarget) {
             continue;
+        }
+        auto node = mouseTarget->GetAttachedNode().Upgrade();
+        if (!IsAgentMouseAllowed(event, node)) {
+            isStopPropagation = true;
+            return;
         }
         handledResults.emplace_back(mouseTarget);
         if (mouseTarget->HandleMouseEvent(event)) {
@@ -2350,9 +2730,13 @@ bool EventManager::DispatchMouseEventToCurResults(
             continue;
         }
         if (!isStopPropagation) {
-            auto ret = std::find(handledResults.begin(), handledResults.end(), mouseTarget) == handledResults.end();
             // if pressMouseTestResults doesn't have any isStopPropagation, use default handledResults.
-            if (ret && mouseTarget->HandleMouseEvent(event)) {
+            if (std::find(handledResults.begin(), handledResults.end(), mouseTarget) != handledResults.end()) {
+                continue;
+            }
+            auto node = mouseTarget->GetAttachedNode().Upgrade();
+            if (!IsAgentMouseAllowed(event, node) ||
+                mouseTarget->HandleMouseEvent(event)) {
                 isStopPropagation = true;
                 return true;
             }
@@ -2364,7 +2748,9 @@ bool EventManager::DispatchMouseEventToCurResults(
             std::find(mouseTargetIter->second.begin(), mouseTargetIter->second.end(), mouseTarget) ==
             mouseTargetIter->second.end()) || mouseTargetIter == pressMouseTestResultsMap_.end()) {
             // if pressMouseTestResults has isStopPropagation, use pressMouseTestResults as handledResults.
-            if (mouseTarget->HandleMouseEvent(event)) {
+            auto node = mouseTarget->GetAttachedNode().Upgrade();
+            if (!IsAgentMouseAllowed(event, node) ||
+                mouseTarget->HandleMouseEvent(event)) {
                 isStopPropagation = true;
                 return true;
             }
@@ -2382,9 +2768,13 @@ bool EventManager::DispatchMouseEventToCurResultsInLessAPI13(
             continue;
         }
         if (!isStopPropagation) {
-            auto ret = std::find(handledResults.begin(), handledResults.end(), mouseTarget) == handledResults.end();
             // if pressMouseTestResults doesn't have any isStopPropagation, use default handledResults.
-            if (ret && mouseTarget->HandleMouseEvent(event)) {
+            if (std::find(handledResults.begin(), handledResults.end(), mouseTarget) != handledResults.end()) {
+                continue;
+            }
+            auto node = mouseTarget->GetAttachedNode().Upgrade();
+            if (!IsAgentMouseAllowed(event, node) ||
+                mouseTarget->HandleMouseEvent(event)) {
                 return true;
             }
             continue;
@@ -2392,7 +2782,9 @@ bool EventManager::DispatchMouseEventToCurResultsInLessAPI13(
         if (std::find(pressMouseTestResults_.begin(), pressMouseTestResults_.end(), mouseTarget) ==
             pressMouseTestResults_.end()) {
             // if pressMouseTestResults has isStopPropagation, use pressMouseTestResults as handledResults.
-            if (mouseTarget->HandleMouseEvent(event)) {
+            auto node = mouseTarget->GetAttachedNode().Upgrade();
+            if (!IsAgentMouseAllowed(event, node) ||
+                mouseTarget->HandleMouseEvent(event)) {
                 return true;
             }
         }
@@ -2403,11 +2795,15 @@ bool EventManager::DispatchMouseEventToCurResultsInLessAPI13(
 void EventManager::DoMouseActionRelease()
 {
     pressMouseTestResults_.clear();
+    agentMouseStates_.clear();
+    mouseInputHitNodes_.clear();
 }
 
 void EventManager::DoSingleMouseActionRelease(const PressMouseInfo& pressMouseInfo)
 {
     pressMouseTestResultsMap_.erase(pressMouseInfo);
+    agentMouseStates_.erase(pressMouseInfo);
+    mouseInputHitNodes_.erase(pressMouseInfo.id);
 }
 
 void HandleMouseHoverAnimation(const MouseAction& action,
@@ -2666,6 +3062,10 @@ void EventManager::ClearResults()
     postEventTouchTestResults_.clear();
     mouseTestResults_.clear();
     axisTouchTestResults_.clear();
+    agentTouchStates_.clear();
+    agentMouseStates_.clear();
+    touchInputHitNodes_.clear();
+    mouseInputHitNodes_.clear();
 }
 
 EventManager::EventManager()

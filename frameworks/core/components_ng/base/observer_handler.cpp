@@ -19,6 +19,10 @@
 
 #include "core/common/frontend.h"
 #include "core/common/container.h"
+#include "core/components_ng/base/node_sensitive_input.h"
+#include "core/components_ng/event/touch_event.h"
+#include "core/event/key_event.h"
+#include "core/event/mouse_event.h"
 #include "core/components_ng/pattern/navigation/navigation_pattern.h"
 #include "core/components_ng/pattern/navigation/navigation_stack.h"
 #include "core/components_ng/pattern/navrouter/navdestination_pattern.h"
@@ -160,6 +164,71 @@ UIObserverHandler& UIObserverHandler::GetInstance()
 {
     static UIObserverHandler instance;
     return instance;
+}
+
+namespace {
+EventTarget GetNodeSensitiveTarget(const RefPtr<FrameNode>& node)
+{
+    auto hub = node ? node->GetEventHub<NG::EventHub>() : nullptr;
+    return hub ? hub->CreateGetEventTargetImpl()().value_or(EventTarget()) : EventTarget();
+}
+
+} // namespace
+
+TouchEventInfo CreateNodeSensitiveTouchInfo(const TouchEvent& event, FrameNode* frameNode)
+{
+    auto node = AceType::Claim(frameNode);
+    auto info = TouchEventActuator::CreateInputEventInfo(event, node);
+    info.SetTarget(GetNodeSensitiveTarget(node));
+    return info;
+}
+
+MouseInfo CreateNodeSensitiveMouseInfo(const MouseEvent& event, FrameNode* frameNode)
+{
+    auto node = AceType::Claim(frameNode);
+    MouseEventTarget target("nodeSensitiveInput", node ? node->GetId() : -1);
+    target.AttachFrameNode(node);
+    auto info = target.CreateMouseInfo(event);
+    info.SetTarget(GetNodeSensitiveTarget(node));
+    return info;
+}
+
+KeyEventInfo CreateNodeSensitiveKeyInfo(const KeyEvent& event, FrameNode* frameNode)
+{
+    auto node = AceType::Claim(frameNode);
+    auto info = KeyEventInfo(event);
+    if (event.HasKey(KeyCode::KEY_META_LEFT) || event.HasKey(KeyCode::KEY_META_RIGHT)) {
+        info.SetMetaKey(1);
+    }
+    info.SetTarget(GetNodeSensitiveTarget(node));
+    return info;
+}
+
+void NotifyNodeSensitiveInput(const RefPtr<FrameNode>& node, const NodeSensitiveInputInfo& info)
+{
+    UIObserverHandler::GetInstance().NotifyNodeSensitiveInput(node, info);
+}
+
+void UIObserverHandler::NotifyNodeSensitiveInput(const RefPtr<FrameNode>& node, const NodeSensitiveInputInfo& info)
+{
+    auto callbackForAni = nodeSensitiveInputHandleFuncForAni_;
+    if (callbackForAni) {
+        callbackForAni(node, info);
+    }
+    auto callback = nodeSensitiveInputHandleFunc_;
+    if (callback) {
+        callback(node, info);
+    }
+}
+
+void UIObserverHandler::SetNodeSensitiveInputHandleFunc(NodeSensitiveInputHandleFunc&& func)
+{
+    nodeSensitiveInputHandleFunc_ = std::move(func);
+}
+
+void UIObserverHandler::SetNodeSensitiveInputHandleFuncForAni(NodeSensitiveInputHandleFunc&& func)
+{
+    nodeSensitiveInputHandleFuncForAni_ = std::move(func);
 }
 
 void UIObserverHandler::NotifyNavigationStateChange(const WeakPtr<AceType>& weakPattern, NavDestinationState state)

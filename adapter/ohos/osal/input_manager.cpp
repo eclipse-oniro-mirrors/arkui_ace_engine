@@ -15,7 +15,9 @@
 
 #include "base/input_manager/input_manager.h"
 
+#include "accesstoken_kit.h"
 #include "input_manager.h"
+#include "ipc_skeleton.h"
 
 #include "base/utils/utils.h"
 
@@ -36,6 +38,21 @@ std::shared_ptr<MMI::PointerEvent> InputManager::CreatePointerEvent(
         return nullptr;
     }
     return std::make_shared<MMI::PointerEvent>(*pointerEvent);
+}
+
+bool InputManager::IsAgentEvent(const std::shared_ptr<MMI::PointerEvent>& pointerEvent)
+{
+    return pointerEvent && pointerEvent->HasFlag(MMI::InputEvent::EVENT_FLAG_CONTROLLER);
+}
+
+bool InputManager::HasControlComponentPermission()
+{
+    static const bool permissionGranted = []() {
+        const auto tokenId = static_cast<Security::AccessToken::AccessTokenID>(IPCSkeleton::GetSelfTokenID());
+        return Security::AccessToken::AccessTokenKit::VerifyAccessToken(
+            tokenId, "ohos.permission.CONTROL_COMPONENT") == Security::AccessToken::PERMISSION_GRANTED;
+    }();
+    return permissionGranted;
 }
 
 KeyboardType ConvertKeyboardType(int32_t type)

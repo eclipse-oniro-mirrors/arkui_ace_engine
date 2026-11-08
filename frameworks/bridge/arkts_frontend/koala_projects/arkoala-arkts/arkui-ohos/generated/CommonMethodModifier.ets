@@ -24,7 +24,7 @@ import { int32, int64 } from '@koalaui/common'
 import { ModifierState } from './CommonModifier'
 import { Length, Resource as arkui_component_units_Resource, SizeOptions, ConstraintSizeOptions, ChainWeightOptions, Padding, LocalizedPadding, Margin, LocalizedMargin, ResourceColor, ColorMetrics as arkui_component_units_ColorMetrics, ResourceStr, Position, BorderOptions, EdgeStyles, EdgeWidths, LocalizedEdgeWidths, EdgeColors, LocalizedEdgeColors, OutlineOptions, EdgeOutlineStyles, Dimension, EdgeOutlineWidths, OutlineRadiuses, VoidCallback, Area, Edges, LocalizedEdges, LocalizedPosition, AccessibilityActionOptions, BorderRadiuses, LocalizedBorderRadiuses, AccessibilityOptions, AccessibilityCustomAction, AccessibilityNextFocusParams } from './component/units'
 import { Resource as global_resource_Resource } from 'global.resource'
-import { HitTestMode, Color as arkui_component_enums_Color, ImageSize, Alignment, BorderStyle, ColoringStrategy, HoverEffect, Visibility, ItemAlign, LocalizedAlignment, Direction, ShadowClipMode, ObscuredReasons, RenderFit, FocusDrawLevel, ImageRepeat, RenderStrategy, Axis, ResponseType, FunctionKey, ModifierKey } from './component/enums'
+import { HitTestMode, Color as arkui_component_enums_Color, ImageSize, Alignment, BorderStyle, ColoringStrategy, HoverEffect, Visibility, ItemAlign, LocalizedAlignment, Direction, ShadowClipMode, ObscuredReasons, RenderFit, FocusDrawLevel, ImageRepeat, RenderStrategy, Axis, ResponseType, FunctionKey, ModifierKey, AgentControlMode } from './component/enums'
 import { LengthMetrics as arkui_Graphics_LengthMetrics, ColorMetrics as arkui_Graphics_ColorMetrics } from 'arkui.Graphics'
 import { default as image } from '@ohos.multimedia.image'
 import { ResizableOptions } from './component/image'
@@ -52,6 +52,7 @@ export class CommonMethodModifier implements CommonMethod {
         this._instanceId = instanceId
     }
     isUpdater: () => boolean = () => false
+    public _agentControlMode_0_0value?: AgentControlMode | undefined
     public _width_0_0value?: Length | LayoutPolicy | undefined
     public _height_0_0value?: Length | LayoutPolicy | undefined
     public _drawModifier_0_0value?: DrawModifier | undefined
@@ -356,6 +357,25 @@ export class CommonMethodModifier implements CommonMethod {
         this._state.addRef()
         const peer = node as ArkCommonMethodPeer;
         const flagArray = this._flagArray;
+        if (flagArray[231] != 0) {
+            switch (flagArray[231]) {
+              case 1: {
+                peer.setAgentControlModeAttribute(
+                  (this._agentControlMode_0_0value as AgentControlMode | undefined)
+                );
+                flagArray[231] = 2;
+                break;
+              }
+              case 3: {
+                flagArray[231] = 2;
+                break;
+              }
+              default: {
+                flagArray[231] = 0;
+                peer.setAgentControlModeAttribute((undefined as AgentControlMode | undefined));
+              }
+            }
+        }
         this.applyModifierPatch0(peer, flagArray);
         this.applyModifierPatch1(peer, flagArray);
         this.applyModifierPatch2(peer, flagArray);
@@ -4311,6 +4331,20 @@ export class CommonMethodModifier implements CommonMethod {
     mergeModifier(modifier: CommonMethodModifier): void {
         this._state = modifier._state;
         const flagArray = modifier._flagArray;
+        if (flagArray[231] != 0) {
+            switch (flagArray[231]) {
+              case 1:
+              case 3: {
+                this.agentControlMode(
+                  (modifier._agentControlMode_0_0value as AgentControlMode | undefined)
+                );
+                break;
+              }
+              default: {
+                this.agentControlMode((undefined as AgentControlMode | undefined));
+              }
+            }
+        }
         this.mergeModifier0(modifier, flagArray);
         this.mergeModifier1(modifier, flagArray);
         this.mergeModifier2(modifier, flagArray);
@@ -9501,6 +9535,16 @@ export class CommonMethodModifier implements CommonMethod {
             this._state.fireChange()
         } else {
             this._flagArray[227] = 3
+        }
+        return this
+    }
+    agentControlMode(value: AgentControlMode | undefined): this {
+        if (((this._flagArray[231]) == (0)) || (true)) {
+            this._flagArray[231] = 1
+            this._agentControlMode_0_0value = value
+            this._state.fireChange()
+        } else {
+            this._flagArray[231] = 3
         }
         return this
     }

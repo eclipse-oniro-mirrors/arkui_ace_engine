@@ -89,6 +89,8 @@ import { Size } from '@ohos.arkui.node'
         }
 
         public native on(type: string, callback: object) : void;
+        public native onNodeSensitiveInput(id: int, key: string, callback: object, dispatcher: object): void;
+        public native offNodeSensitiveInput(id: int, key: string, callback?: object): void;
         public native off(type: string, callback?: object) : void;
 
         public native on(type: string, options: NavDestinationSwitchObserverOptions, callback: object): void;

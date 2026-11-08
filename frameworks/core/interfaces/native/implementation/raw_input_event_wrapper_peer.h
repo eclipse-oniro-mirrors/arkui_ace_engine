@@ -16,6 +16,17 @@
 #pragma once
 
 #include "arkoala_api_generated.h"
+#include <memory>
+
+namespace OHOS::Ace {
+class TouchEventInfo;
+class MouseInfo;
+class KeyEventInfo;
+}
+
+namespace OHOS::Ace::NG::Converter {
+class ConvContext;
+}
 
 namespace OHOS::Ace::NG::GeneratedModifier {
 
@@ -30,6 +41,10 @@ struct RawInputEventUnion {
 
 struct RawInputEventWrapperPeer {
     RawInputEventUnion event;
+    std::shared_ptr<TouchEventInfo> touchInfo;
+    std::shared_ptr<MouseInfo> mouseInfo;
+    std::shared_ptr<KeyEventInfo> keyInfo;
+    std::shared_ptr<Converter::ConvContext> context;
 };
 
 Ark_RawInputEventWrapper CreateRawInputEventWrapperPeer(const RawInputEventUnion* event);

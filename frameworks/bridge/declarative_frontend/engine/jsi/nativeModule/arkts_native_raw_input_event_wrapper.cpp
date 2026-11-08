@@ -16,6 +16,7 @@
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_raw_input_event_wrapper.h"
 
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_frame_node_bridge.h"
+#include "core/components_ng/base/node_sensitive_input.h"
 
 namespace OHOS::Ace::Framework {
 namespace {
@@ -211,6 +212,25 @@ MouseInfo CreateMonitorMouseInfo(const MouseEvent& event)
     return info;
 }
 } // namespace
+
+NG::ArkUINativeModuleValue ArkTSNativeRawInputEventWrapper::CreateSensitiveInputEvent(
+    const RawInputEventWrapper& wrapper, EcmaVM* vm, const RefPtr<NG::FrameNode>& node)
+{
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    if (auto* event = wrapper.GetTouchEvent()) {
+        return NG::FrameNodeBridge::CreateTouchEventInfo(
+            vm, new TouchEventInfo(NG::CreateNodeSensitiveTouchInfo(*event, AceType::RawPtr(node))));
+    }
+    if (auto* event = wrapper.GetMouseEvent()) {
+        return NG::FrameNodeBridge::CreateMouseInfo(
+            vm, new MouseInfo(NG::CreateNodeSensitiveMouseInfo(*event, AceType::RawPtr(node))));
+    }
+    if (auto* event = wrapper.GetKeyEvent()) {
+        return NG::FrameNodeBridge::CreateKeyEventInfoObj(
+            vm, new KeyEventInfo(NG::CreateNodeSensitiveKeyInfo(*event, AceType::RawPtr(node))));
+    }
+    return panda::JSValueRef::Undefined(vm);
+}
 
 NG::ArkUINativeModuleValue ArkTSNativeRawInputEventWrapper::Create(const RawInputEventWrapper& wrapper, EcmaVM* vm)
 {

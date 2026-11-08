@@ -193,6 +193,22 @@ bool TouchEventActuator::ShouldResponse()
     return true;
 }
 
+TouchEventInfo TouchEventActuator::CreateInputEventInfo(const TouchEvent& event, const RefPtr<FrameNode>& node)
+{
+    TouchEventActuator actuator;
+    actuator.AttachFrameNode(node);
+    auto info = actuator.CreateTouchEventInfo(event);
+    info.AddChangedTouchLocationInfo(actuator.CreateChangedTouchInfo(event, event));
+    for (const auto& point : event.pointers) {
+        info.AddTouchLocationInfo(actuator.CreateTouchItemInfo(point, event, event.type));
+    }
+    for (const auto& history : event.history) {
+        info.AddHistoryLocationInfo(actuator.CreateHistoryTouchItemInfo(history, event));
+        info.AddHistoryPointerEvent(history.GetTouchEventPointerEvent());
+    }
+    return info;
+}
+
 TouchEventInfo TouchEventActuator::CreateTouchEventInfo(const TouchEvent& lastPoint)
 {
     TouchEventInfo eventInfo("touchEvent");

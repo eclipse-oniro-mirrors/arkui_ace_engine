@@ -4268,6 +4268,21 @@ bool FrameNode::IsAtomicNode() const
     return pattern_->IsAtomicNode();
 }
 
+void FrameNode::SetAgentControlMode(const std::optional<AgentControlMode>& mode)
+{
+    agentControlMode_ = mode;
+}
+
+bool FrameNode::HasAgentControlMode() const
+{
+    return agentControlMode_.has_value();
+}
+
+AgentControlMode FrameNode::GetAgentControlMode() const
+{
+    return agentControlMode_.value_or(AgentControlMode::ALLOW);
+}
+
 HitTestMode FrameNode::GetHitTestMode() const
 {
     auto gestureHub = eventHub_ ? eventHub_->GetGestureEventHub() : nullptr;
@@ -4684,6 +4699,9 @@ HitTestResult FrameNode::TouchTest(const PointF& globalPoint, const PointF& pare
         (isDispatch || (InResponseRegionList(revertPoint, responseRegionList)))) {
         pattern_->OnTouchTestHit(touchRestrict.hitTestType);
         consumed = true;
+        if (!touchRestrict.sensitiveInputHitNode.Upgrade()) {
+            touchRestrict.sensitiveInputHitNode = WeakClaim(this);
+        }
         if (touchRestrict.hitTestType == SourceType::TOUCH) {
             auto gestureHub = GetOrCreateGestureEventHub();
             if (gestureHub) {

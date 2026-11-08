@@ -467,6 +467,7 @@ public:
     virtual void SetInspectorLabel(const std::string& inspectorLabel) {};
     virtual void SetHoverEffect(HoverEffectType hoverEffect) = 0;
     virtual void SetHitTestMode(NG::HitTestMode hitTestMode) = 0;
+    virtual void SetAgentControlMode(const std::optional<NG::AgentControlMode>& mode) = 0;
     virtual void SetOnTouchTestFunc(NG::OnChildTouchTestFunc&& onChildTouchTest) = 0;
     virtual void SetKeyboardShortcut(const std::string& value, const std::vector<ModifierKey>& keys,
         std::function<void()>&& onKeyboardShortcutAction) = 0;
