@@ -57,6 +57,11 @@ export enum PixelMapFormat {
     YCRCB_P010 = 5,
 }
 
+export enum DisplayMode {
+    IMAGE_AND_VIDEO = 0,
+    VIDEO_ONLY = 1,
+}
+
 export class MovingPhotoViewController {
     peer?: (Finalizable | undefined) = undefined;
 
@@ -75,7 +80,11 @@ export class MovingPhotoViewController {
     }
     
     public startPlayback(): void {
-        MovingPhotoNative.startPlayback(this.peer!.ptr);
+        MovingPhotoNative.startPlayback(this.peer!.ptr, undefined);
+    }
+
+    public startPlayback(mode: DisplayMode): void {
+        MovingPhotoNative.startPlayback(this.peer!.ptr, mode);
     }
 
     public stopPlayback(): void {
@@ -108,6 +117,10 @@ export class MovingPhotoViewController {
 
     public enableAutoPlay(enabled: boolean): void {
         MovingPhotoNative.enableAutoPlay(this.peer!.ptr, enabled);
+    }
+
+    public setDisplayMode(mode: DisplayMode, callback: MovingPhotoViewEventCallback): void {
+        MovingPhotoNative.setDisplayMode(this.peer!.ptr, mode, callback);
     }
 }
 
@@ -279,7 +292,8 @@ export class MovingPhotoNative {
 
     native static createMovingPhotoController(): KPointer;
     native static getFinalizer(): KPointer;
-    native static startPlayback(controller: KPointer): KPointer;
+    native static startPlayback(controller: KPointer, mode: DisplayMode | undefined): KPointer;
+    native static setDisplayMode(controller: KPointer, mode: DisplayMode, callback: MovingPhotoViewEventCallback): KPointer;
     native static stopPlayback(controller: KPointer): KPointer;
     native static refreshMovingPhoto(controller: KPointer): KPointer;
     native static pausePlayback(controller: KPointer): KPointer;

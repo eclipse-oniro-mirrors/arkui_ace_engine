@@ -39,6 +39,9 @@ public:
     using SetPlaybackPeriodFucImpl = std::function<void(int64_t, int64_t)>;
     using EnableAutoPlayImpl = std::function<void(bool)>;
     using NotifyTransitionImpl = std::function<void()>;
+    using PrepareImpl = std::function<bool(std::function<void()>)>;
+    using StartPlayImpl = std::function<void(bool)>;
+    using JumpToCoverImpl = std::function<bool(std::function<void()>)>;
 
     void SetStartPlaybackImpl(StartPlaybackImpl&& startPlaybackImpl)
     {
@@ -161,6 +164,44 @@ public:
         }
     }
 
+    void SetPrepareImpl(PrepareImpl&& prepareImpl)
+    {
+        prepareImpl_ = std::move(prepareImpl);
+    }
+ 
+    bool Prepare(std::function<void()> callback)
+    {
+        if (prepareImpl_) {
+            return prepareImpl_(std::move(callback));
+        }
+        return false;
+    }
+ 
+    void SetStartPlayAfterPrepareImpl(StartPlayImpl&& startPlayImpl)
+    {
+        startPlayImpl_ = std::move(startPlayImpl);
+    }
+ 
+    void StartPlay(bool prepareMode)
+    {
+        if (startPlayImpl_) {
+            startPlayImpl_(prepareMode);
+        }
+    }
+
+    void SetJumpToCoverImpl(JumpToCoverImpl&& jumpToCoverImpl)
+    {
+        jumpToCoverImpl_ = std::move(jumpToCoverImpl);
+    }
+ 
+    bool JumpToCover(std::function<void()> callback)
+    {
+        if (jumpToCoverImpl_) {
+            return jumpToCoverImpl_(callback);
+        }
+        return false;
+    }
+
 private:
     StartPlaybackImpl startPlaybackImpl_;
     StopPlaybackImpl stopPlaybackImpl_;
@@ -172,6 +213,9 @@ private:
     SetPlaybackPeriodFucImpl setPlaybackPeriodFucImpl_;
     EnableAutoPlayImpl enableAutoPlayImpl_;
     NotifyTransitionImpl notifyTransitionImpl_;
+    PrepareImpl prepareImpl_;
+    StartPlayImpl startPlayImpl_;
+    JumpToCoverImpl jumpToCoverImpl_;
 };
 
 } // namespace OHOS::Ace::NG

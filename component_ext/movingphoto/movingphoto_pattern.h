@@ -167,6 +167,9 @@ public:
     void SetMovingPhotoController(const RefPtr<MovingPhotoController>& movingPhotoController);
 
     RefPtr<MovingPhotoController> GetMovingPhotoController();
+    void Prepare();
+    void StartPlay(bool prepareMode);
+    void JumpToCover();
 
 protected:
     int32_t instanceId_;
@@ -259,7 +262,7 @@ private:
     void Start();
     void Pause();
     void Stop();
-    void Seek(int32_t position);
+    void Seek(int32_t position, SeekMode mode = SeekMode::SEEK_PREVIOUS_SYNC);
 
     void PreparedToPlay();
     void SelectPlaybackMode(PlaybackMode mode);
@@ -289,6 +292,9 @@ private:
     void SetPlaybackPeriodImpl(const SingleTaskExecutor& uiTaskExecutor);
     void SetEnableAutoPlayImpl(const SingleTaskExecutor& uiTaskExecutor);
     void SetNotifyTransitionImpl(const SingleTaskExecutor& uiTaskExecutor);
+    void SetPrepareImpl(const SingleTaskExecutor& uiTaskExecutor);
+    void SetStartPlayAfterPrepareImpl(const SingleTaskExecutor& uiTaskExecutor);
+    void SetJumpToCoverImpl(const SingleTaskExecutor& uiTaskExecutor);
     void NotifyTransition();
     void EightyToHundredAnimation();
     void AddTempNode(const RefPtr<FrameNode>& imageNode, const RefPtr<FrameNode>& movingPhotoNode);
@@ -322,6 +328,16 @@ private:
     void HandleAnalyzerPlayEvent(bool canPlay);
     bool IsRefreshMovingPhotoReturn(bool status);
 
+    void DoPrepare();
+    void ShowVideoFrame();
+    void HideVideoFrame();
+    void OnMediaPlayerSeekDone();
+    void FirePendingSeekCallback();
+    std::function<void()> StartRenderFrameEventCallback(WeakPtr<MovingPhotoPattern>& movingPhotoPattern,
+        SingleTaskExecutor& uiTaskExecutor);
+    std::function<void(uint32_t)> SeekDoneEventCallback(WeakPtr<MovingPhotoPattern>& movingPhotoPattern,
+        SingleTaskExecutor& uiTaskExecutor);
+
     RefPtr<LongPressEvent> longPressEvent_;
     RefPtr<TouchEventImpl> touchEvent_;
     RefPtr<MovingPhotoController> controller_;
@@ -354,6 +370,11 @@ private:
     bool cameraPostprocessingEnabled_ = false;
     bool isGestureTriggeredLongPress_ = false;
     bool handleImageError_ = false;
+
+    bool isPrepareMode_ = false;
+    bool isPendingPrepare_ = false;
+    std::function<void()> pendingSeekCallback_;
+
     PlaybackStatus currentPlayStatus_ = PlaybackStatus::NONE;
     PlaybackMode autoAndRepeatLevel_ = PlaybackMode::NONE;
     PlaybackMode historyAutoAndRepeatLevel_ = PlaybackMode::NONE;
