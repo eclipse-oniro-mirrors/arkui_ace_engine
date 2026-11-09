@@ -1774,7 +1774,7 @@ void EventManager::SweepEscapeRecognizers()
 }
 
 void EventManager::DispatchTouchCancelToRecognizer(
-    TouchEventTarget* touchEventTarget, const std::vector<std::pair<int32_t, TouchTestResult::iterator>>& items)
+    TouchEventTarget* touchEventTarget, const std::vector<std::pair<int32_t, TouchTestResult::value_type>>& items)
 {
     TouchEvent touchEvent;
     for (auto& item : items) {
@@ -1793,7 +1793,7 @@ void EventManager::DispatchTouchCancelToRecognizer(
         eventTree_.AddGestureProcedure(reinterpret_cast<uintptr_t>(touchEventTarget), "",
             std::string("Handle").append(GestureSnapshot::TransTouchType(touchEvent.type)), "", "");
 #endif
-        touchTestResults_[item.first].erase(item.second);
+        touchTestResults_[item.first].remove(item.second);
         if (touchTestResults_[item.first].empty()) {
             touchTestResults_.erase(item.first);
         }

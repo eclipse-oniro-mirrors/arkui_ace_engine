@@ -1132,14 +1132,14 @@ HWTEST_F(EventManagerTestNg, DispatchTouchCancelToRecognizer, TestSize.Level1)
     const uint8_t targetCnt = 2; // defines 2 touch target;
     const uint8_t fingerCnt = 2; // defines 2 fingers;
     RefPtr<TouchEventActuator> targetRefs[targetCnt];
-    using TouchRecoginerTarget = std::vector<std::pair<int32_t, TouchTestResult::iterator>>;
+    using TouchRecoginerTarget = std::vector<std::pair<int32_t, TouchTestResult::value_type>>;
     TouchRecoginerTarget items[targetCnt];
     int32_t fingers[fingerCnt] = { 0, 1 };
     for (int32_t i = 0; i < targetCnt; ++i) {
         targetRefs[i] = AceType::MakeRefPtr<TouchEventActuator>();
         for (auto& finger : fingers) {
             touchTestResult[finger].emplace_front(targetRefs[i]);
-            items[i].emplace_back(finger, touchTestResult[finger].begin());
+            items[i].emplace_back(finger, *touchTestResult[finger].begin());
         }
     }
     eventManager->lastTouchEvent_.sourceType = SourceType::TOUCH;
@@ -1163,7 +1163,7 @@ HWTEST_F(EventManagerTestNg, DispatchTouchCancelToRecognizer_ItemsEmpty, TestSiz
     auto eventManager = AceType::MakeRefPtr<EventManager>();
     auto& touchTestResult = eventManager->touchTestResults_;
     RefPtr<TouchEventActuator> target = AceType::MakeRefPtr<TouchEventActuator>();
-    using TouchRecognizerTarget = std::vector<std::pair<int32_t, TouchTestResult::iterator>>;
+    using TouchRecognizerTarget = std::vector<std::pair<int32_t, TouchTestResult::value_type>>;
 
     TouchTestResult resultList;
     resultList.push_back(target);
