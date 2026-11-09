@@ -89,8 +89,9 @@ const char* getArkAnyAPIFuncName = "GENERATED_GetArkAnyAPI";
 extern "C" const OH_AnyAPI* GENERATED_GetArkAnyAPI(int kind, int version);
 #endif
 const OH_AnyAPI* GetAnyImpl(int kind, int version, std::string* result) {
-    if (kind > API_KIND_MAX) {
-        INTEROP_FATAL("Try to get api with kind more than expected: kind=%d, max=%d", kind, API_KIND_MAX);
+    // NOTE: lower-bound check added manually; generator source (libarkts.tgz) needs the same fix.
+    if (kind < 0 || kind > API_KIND_MAX) {
+        INTEROP_FATAL("Try to get api with kind out of range: kind=%d, max=%d", kind, API_KIND_MAX);
     }
     if (!impls[kind]) {
         static const GroupLogger* logger = GetDefaultLogger();

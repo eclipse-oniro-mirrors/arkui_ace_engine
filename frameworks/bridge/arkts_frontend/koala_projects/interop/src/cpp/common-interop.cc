@@ -388,8 +388,8 @@ void impl_CopyArray(KNativePointer data, KLong length, KByte* array) {
 KOALA_INTEROP_V3(CopyArray, KNativePointer, KLong, KByte*)
 
 static const int API_KIND_MAX = 100;
-static Callback_Caller_t g_callbackCaller[API_KIND_MAX] = { 0 };
-static Callback_Caller_Sync_t g_callbackCallerSync[API_KIND_MAX] = { 0 };
+static Callback_Caller_t g_callbackCaller[API_KIND_MAX + 1] = { 0 };
+static Callback_Caller_Sync_t g_callbackCallerSync[API_KIND_MAX + 1] = { 0 };
 
 #define CHECK_VALID_API_KIND(apiKind)                                                   \
     if ((apiKind) < 0 || (apiKind) > API_KIND_MAX)                                          \
