@@ -14,7 +14,9 @@
  */
 
 #include "content_change_manager_impl.h"
+#ifndef CROSS_PLATFORM
 #include "page_scene_split_state.h"
+#endif
 
 #include <algorithm>
 #include <atomic>
