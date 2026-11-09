@@ -24,12 +24,14 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <fcntl.h>
 #include <functional>
 #include <iomanip>
 #include <fstream>
 #include <limits>
 #include <sstream>
 #include <sys/time.h>
+#include <unistd.h>
 
 #include "ipc_skeleton.h"
 #include "iremote_object.h"
@@ -47,6 +49,8 @@ namespace OHOS::Ace {
 namespace {
 const bool REGISTER_RESULT = SystemAbility::MakeAndRegisterAbility(&UiSaService::GetInstance());
 const std::string UI_SA_PATH = "/data/service/el1/public/ui_sa/";
+constexpr int32_t MAX_UNIQUE_FILE_SUFFIX = 100;
+constexpr int32_t FILE_SUFFIX_WIDTH = 2;
 constexpr char WEB_INTERFACE_REQUEST_DOM_TREE[] = "RequestArkWebDomTree";
 constexpr char WEB_INTERFACE_REQUEST_DOM_TREE_VIEWPORT[] = "RequestArkWebDomTreeViewport";
 constexpr size_t BITS_UINT32 = sizeof(uint32_t) * 8;
@@ -356,9 +360,35 @@ bool ReadTextFile(const std::string& filePath, std::string& content)
     return true;
 }
 
+std::string ReserveUniqueFilePath(const std::string& fileNamePrefix)
+{
+    const auto baseName = UI_SA_PATH + fileNamePrefix + "_" + GetCurrentTimestampStr();
+    for (int32_t suffix = 0; suffix <= MAX_UNIQUE_FILE_SUFFIX; ++suffix) {
+        std::ostringstream nameStream;
+        nameStream << baseName;
+        if (suffix > 0) {
+            nameStream << "_" << std::setw(FILE_SUFFIX_WIDTH) << std::setfill('0') << suffix;
+        }
+        nameStream << ".json";
+        auto filePath = nameStream.str();
+        const int32_t fd = open(filePath.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0644);
+        if (fd >= 0) {
+            close(fd);
+            return filePath;
+        }
+        if (errno != EEXIST) {
+            LOGW("%{public}s create file failed, errno=%{public}d, filePath=%{public}s", fileNamePrefix.c_str(),
+                errno, filePath.c_str());
+            return "";
+        }
+    }
+    LOGW("%{public}s no free file name suffix", fileNamePrefix.c_str());
+    return "";
+}
+
 void WriteTextFile(const std::string& tag, const std::string& fileNamePrefix, const std::string& content)
 {
-    auto filePath = UI_SA_PATH + fileNamePrefix + "_" + GetCurrentTimestampStr() + ".json";
+    auto filePath = ReserveUniqueFilePath(fileNamePrefix);
     std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
     if (!ostream || !ostream->is_open()) {
         LOGW("%{public}s filePath is invalid", tag.c_str());
@@ -801,14 +831,14 @@ void UiSaService::HandleInspectorTree(
     const auto start = now();
     const std::string api = visible ? "GetVisibleInspectorTree" : "GetInspectorTree";
     auto count = std::make_shared<std::atomic<int32_t>>(0);
-    const auto filePath = UI_SA_PATH + "arkui_tree_" + GetCurrentTimestampStr() + ".json";
-    auto callback = [toFile, filePath, start, now, api, caseId, count](std::string data, int32_t part, bool last) {
+    auto callback = [toFile, start, now, api, caseId, count](std::string data, int32_t part, bool last) {
         const auto calls = ++*count;
         LOGI("[InspectorTree] caseId=%{public}s api=%{public}s bytes=%{public}zu part=%{public}d "
              "lastPart=%{public}d callbackCount=%{public}d startMs=%{public}" PRId64 " endMs=%{public}" PRId64,
             caseId.c_str(), api.c_str(), data.size(), part, last, calls, static_cast<int64_t>(start),
             static_cast<int64_t>(now()));
         if (toFile && last) {
+            const auto filePath = ReserveUniqueFilePath("arkui_tree");
             std::ofstream output(filePath, std::ios::binary | std::ios::trunc);
             output.write(data.data(), static_cast<std::streamsize>(data.size()));
             LOGI("[InspectorTree] fileSaved=%{public}d dataFile=%{public}s", output.good(), filePath.c_str());
@@ -927,7 +957,7 @@ void UiSaService::HandleRegisterContentChangeCallback(sptr<IUiContentService> se
         LOGI("[ContentChangeManager] callback type=%{public}s(%{public}d), tree: %{public}s",
             GetContentChangeTypeName(type), static_cast<int32_t>(type), simpleTree.substr(0, 200).c_str());
         if (toFile && simpleTree.length()) {
-            auto filePath = UI_SA_PATH + "arkui_simpleTree_" + GetCurrentTimestampStr() + ".json";
+            auto filePath = ReserveUniqueFilePath("arkui_simpleTree");
             std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
             if (ostream && ostream->is_open()) {
                 ostream->write(simpleTree.c_str(), simpleTree.length());
@@ -1028,7 +1058,7 @@ void UiSaService::HandleGetWebInfoByRequest(sptr<IUiContentService> service, std
             LOGI("[GetWebInfoByRequest] finishCallback result.length=%{public}zu", result.length());
             LOGI("[GetWebInfoByRequest] finishCallback code=%{public}d", code);
             if (request == WEB_INTERFACE_REQUEST_DOM_TREE) {
-                auto filePath = UI_SA_PATH + "arkweb_tree_" + GetCurrentTimestampStr() + ".json";
+                auto filePath = ReserveUniqueFilePath("arkweb_tree");
                 std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
                 CHECK_NULL_VOID(ostream);
                 if (!ostream->is_open()) {
@@ -1039,7 +1069,7 @@ void UiSaService::HandleGetWebInfoByRequest(sptr<IUiContentService> service, std
                 LOGI("[GetWebInfoByRequest] arkWeb tree is saved to %{public}s", filePath.c_str());
             }
             if (request == WEB_INTERFACE_REQUEST_DOM_TREE_VIEWPORT) {
-                auto filePath = UI_SA_PATH + "arkweb_tree_viewport_" + GetCurrentTimestampStr() + ".json";
+                auto filePath = ReserveUniqueFilePath("arkweb_tree_viewport");
                 std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
                 CHECK_NULL_VOID(ostream);
                 if (!ostream->is_open()) {
@@ -1411,7 +1441,7 @@ void UiSaService::HandleGetNavigationContent(
         auto navigationContentCallback = [toFile](const std::string& data) {
             LOGI("[GetNavigationContent] data = %{public}s", data.substr(0, 200).c_str());
             if (toFile) {
-                auto filePath = UI_SA_PATH + "navigation_content_" + GetCurrentTimestampStr() + ".json";
+                auto filePath = ReserveUniqueFilePath("navigation_content");
                 std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
                 CHECK_NULL_VOID(ostream);
                 if (!ostream->is_open()) {
@@ -1448,7 +1478,7 @@ void UiSaService::HandleGetLazyForEachData(
         auto lazyForEachDataCallback = [toFile](const std::string& data) {
             LOGI("[GetLazyForEachData] data = %{public}s", data.substr(0, 200).c_str());
             if (toFile) {
-                auto filePath = UI_SA_PATH + "lazy_foreach_data_" + GetCurrentTimestampStr() + ".json";
+                auto filePath = ReserveUniqueFilePath("lazy_foreach_data");
                 std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
                 CHECK_NULL_VOID(ostream);
                 if (!ostream->is_open()) {
@@ -1494,7 +1524,7 @@ void UiSaService::HandleGetNodesInRect(
         auto nodesInRectCallback = [toFile](const std::string& data) {
             LOGI("[GetNodesInRect] data = %{public}s", data.substr(0, 200).c_str());
             if (toFile) {
-                auto filePath = UI_SA_PATH + "nodes_in_rect_" + GetCurrentTimestampStr() + ".json";
+                auto filePath = ReserveUniqueFilePath("nodes_in_rect");
                 std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
                 CHECK_NULL_VOID(ostream);
                 if (!ostream->is_open()) {
