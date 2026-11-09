@@ -516,6 +516,7 @@ export class TextMenuItemId implements MaterializedBase {
     public static readonly askAI: TextMenuItemId = TextMenuItemId.getAskAI()
     public static readonly autoFill: TextMenuItemId = TextMenuItemId.getAutoFill()
     public static readonly passwordVault: TextMenuItemId = TextMenuItemId.getPasswordVault()
+    public static readonly TRANSLATE_INPUT: TextMenuItemId = TextMenuItemId.getTRANSLATE_INPUT()
     constructor(tag: MaterializedBaseTag, peerPtr: KPointer) {
         this.peer = new Finalizable(peerPtr, TextMenuItemId.getFinalizer())
     }
@@ -586,6 +587,9 @@ export class TextMenuItemId implements MaterializedBase {
     }
     private static getPasswordVault(): TextMenuItemId {
         return TextMenuItemId.getPasswordVault_serialize()
+    }
+    private static getTRANSLATE_INPUT(): TextMenuItemId {
+        return TextMenuItemId.getTRANSLATE_INPUT_serialize()
     }
     private static of_serialize(id: ResourceStr): TextMenuItemId {
         const thisSerializer: SerializerBase = SerializerBase.hold()
@@ -690,6 +694,11 @@ export class TextMenuItemId implements MaterializedBase {
     }
     private static getPasswordVault_serialize(): TextMenuItemId {
         const retval = ArkUIGeneratedNativeModule._TextMenuItemId_getPasswordVault()
+        const obj: TextMenuItemId = TextMenuItemIdInternal.fromPtr(retval)
+        return obj
+    }
+    private static getTRANSLATE_INPUT_serialize(): TextMenuItemId {
+        const retval = ArkUIGeneratedNativeModule._TextMenuItemId_getTRANSLATE_INPUT()
         const obj: TextMenuItemId = TextMenuItemIdInternal.fromPtr(retval)
         return obj
     }

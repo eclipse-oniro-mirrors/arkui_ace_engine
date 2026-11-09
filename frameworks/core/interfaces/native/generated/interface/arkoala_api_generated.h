@@ -33088,6 +33088,7 @@ typedef struct GENERATED_ArkUITextMenuItemIdAccessor {
     Ark_TextMenuItemId (*getAskAI)();
     Ark_TextMenuItemId (*getAutoFill)();
     Ark_TextMenuItemId (*getPasswordVault)();
+    Ark_TextMenuItemId (*getTRANSLATE_INPUT)();
 } GENERATED_ArkUITextMenuItemIdAccessor;
 
 typedef struct GENERATED_ArkUITextShadowStyleAccessor {
