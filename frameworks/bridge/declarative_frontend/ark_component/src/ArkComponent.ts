@@ -2729,6 +2729,43 @@ class SafeAreaPaddingModifier extends ModifierWithKey<ArkPadding> {
   }
 }
 
+function isSafeAreaInsetEdgeEqual(
+  stage: SafeAreaInsetEdgeConfig | undefined, value: SafeAreaInsetEdgeConfig | undefined): boolean {
+  if (stage === value) {
+    return true;
+  }
+  if (stage === undefined || value === undefined) {
+    return false;
+  }
+  return isBaseOrResourceEqual(stage.content, value.content) &&
+    isBaseOrResourceEqual(stage.spacing, value.spacing) &&
+    isBaseOrResourceEqual(stage.alignment, value.alignment);
+}
+
+class SafeAreaInsetModifier extends ModifierWithKey<SafeAreaInsetOptions | undefined> {
+  constructor(value: SafeAreaInsetOptions | undefined) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('safeAreaInset');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().common.resetSafeAreaInset(node);
+    } else {
+      getUINativeModule().common.setSafeAreaInset(node, this.value);
+    }
+  }
+
+  checkObjectDiff(): boolean {
+    if (this.stageValue === undefined || this.value === undefined) {
+      return this.stageValue !== this.value;
+    }
+    return !isSafeAreaInsetEdgeEqual(this.stageValue.top, this.value.top) ||
+      !isSafeAreaInsetEdgeEqual(this.stageValue.end, this.value.end) ||
+      !isSafeAreaInsetEdgeEqual(this.stageValue.bottom, this.value.bottom) ||
+      !isSafeAreaInsetEdgeEqual(this.stageValue.start, this.value.start);
+  }
+}
+
 class IgnoreLayoutSafeAreaCommonModifier extends ModifierWithKey<ArkSafeAreaExpandOpts | undefined> {
   constructor(value: ArkSafeAreaExpandOpts | undefined) {
     super(value);
@@ -4774,6 +4811,15 @@ class ArkComponent {
       modifierWithKey(this._modifiersWithKeys, SafeAreaPaddingModifier.identity, SafeAreaPaddingModifier, arkValue);
     } else {
       modifierWithKey(this._modifiersWithKeys, SafeAreaPaddingModifier.identity, SafeAreaPaddingModifier, undefined);
+    }
+    return this;
+  }
+
+  safeAreaInset(options?: SafeAreaInsetOptions): this {
+    if (options === null || options === undefined || !isObject(options)) {
+      modifierWithKey(this._modifiersWithKeys, SafeAreaInsetModifier.identity, SafeAreaInsetModifier, undefined);
+    } else {
+      modifierWithKey(this._modifiersWithKeys, SafeAreaInsetModifier.identity, SafeAreaInsetModifier, options);
     }
     return this;
   }

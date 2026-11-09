@@ -92,6 +92,7 @@
 #include "core/common/dynamic_module_helper.h"
 #include "core/common/resource/resource_manager.h"
 #include "core/components_ng/base/view_abstract.h"
+#include "core/components_ng/property/safe_area_inset_property.h"
 #include "core/components/theme/resource_adapter.h"
 #include "core/common/resource/resource_parse_utils.h"
 #include "core/components/common/properties/depth_option.h"

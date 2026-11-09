@@ -19,7 +19,8 @@
 
 #include "core/common/container.h"
 #include "core/components_ng/base/view_abstract.h"
-#include "core/components_ng/property/measure_property.h"
+#include "core/components_ng/base/safe_area_inset_view.h"
+#include "core/components_ng/property/safe_area_inset_property.h"
 #include "core/components_ng/syntax/static/detached_free_root_proxy_node.h"
 
 namespace OHOS::Ace::NG {
@@ -61,7 +62,7 @@ void SetSafeAreaInsetStatic(ArkUINodeHandle node, const ArkUIAniSafeAreaInsetEdg
     // A null host disposes temporary detached roots if building the snapshot failed.
     auto frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
-    ViewAbstract::SetSafeAreaInset(frameNode, options, contents);
+    SafeAreaInsetView::SetSafeAreaInset(frameNode, options, contents);
 }
 
 } // namespace OHOS::Ace::NG

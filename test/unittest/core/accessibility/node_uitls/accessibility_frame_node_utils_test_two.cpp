@@ -316,4 +316,65 @@ HWTEST_F(AccessibilityFrameNodeUtilsTest, GetLastestPageNodes002, TestSize.Level
     AccessibilityFrameNodeUtils::GetLastestPageNodes(frameNode, pageNodes);
     EXPECT_TRUE(pageNodes.empty());
 }
+/**
+ * @tc.name: OrdinaryChildrenNoSnapshot001
+ * @tc.desc: An ordinary search keeps the original children reference instead of taking a strong snapshot.
+ * @tc.type: FUNC
+ */
+HWTEST_F(AccessibilityFrameNodeUtilsTest, OrdinaryChildrenNoSnapshot001, TestSize.Level1)
+{
+    auto root = FrameNode::CreateFrameNode(TEST_TAG_CUSTOM,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>(), true);
+    auto child = FrameNode::CreateFrameNode("ordinaryChild",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>(), true);
+    root->AddChild(child);
+    const auto references = child->RefCount();
+    bool visited = false;
+    auto result = AccessibilityFrameNodeUtils::GetFramenodeByCondition(root,
+        [&](const RefPtr<FrameNode>& node) {
+            EXPECT_EQ(node, child);
+            // FindFrameNodeByCondition holds one DynamicCast reference, but no copied children list.
+            EXPECT_EQ(child->RefCount(), references + 1);
+            visited = true;
+            return true;
+        });
+    EXPECT_TRUE(visited);
+    EXPECT_EQ(result, child);
+}
+
+/**
+ * @tc.name: InsetChildrenOrderAndReset001
+ * @tc.desc: Inset content follows ordinary children, the carrier stays hidden, and removal drops its content.
+ * @tc.type: FUNC
+ */
+HWTEST_F(AccessibilityFrameNodeUtilsTest, InsetChildrenOrderAndReset001, TestSize.Level1)
+{
+    auto makeNode = []() {
+        return FrameNode::CreateFrameNode(TEST_TAG_CUSTOM,
+            ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>(), true);
+    };
+    auto root = makeNode();
+    auto first = makeNode();
+    auto second = makeNode();
+    auto carrier = makeNode();
+    auto content = makeNode();
+    root->AddChild(first);
+    root->AddChild(second);
+    carrier->AddChild(content);
+    root->SetSafeAreaInsetNode(carrier);
+    std::vector<int32_t> visited;
+    auto collect = [&visited](const RefPtr<FrameNode>& node) {
+        visited.emplace_back(node->GetId());
+        return false;
+    };
+    AccessibilityFrameNodeUtils::GetFramenodeByCondition(root, collect);
+    EXPECT_EQ(visited, (std::vector<int32_t> { first->GetId(), second->GetId(), content->GetId() }));
+    EXPECT_EQ(AccessibilityFrameNodeUtils::GetFramenodeByAccessibilityId(root, content->GetAccessibilityId()), content);
+    root->SetSafeAreaInsetNode(nullptr);
+    visited.clear();
+    AccessibilityFrameNodeUtils::GetFramenodeByCondition(root, collect);
+    EXPECT_EQ(visited, (std::vector<int32_t> { first->GetId(), second->GetId() }));
+    EXPECT_EQ(AccessibilityFrameNodeUtils::GetFramenodeByAccessibilityId(root, content->GetAccessibilityId()), nullptr);
+}
+
 } // namespace OHOS::Ace::NG

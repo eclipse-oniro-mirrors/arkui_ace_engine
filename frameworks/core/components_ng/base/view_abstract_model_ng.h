@@ -29,6 +29,7 @@ class CalcDimensionRect;
 class BorderImage;
 }
 namespace OHOS::Ace::NG {
+struct SafeAreaInsetOptions;
 constexpr int32_t MAT4_ZERO = 0;
 constexpr int32_t MAT4_ONE = 1;
 constexpr int32_t MAT4_TWO = 2;
@@ -349,7 +350,10 @@ public:
         const std::optional<CalcDimension>& left, const std::optional<CalcDimension>& right) override;
 
     static void SetSafeAreaInset(const SafeAreaInsetOptions& options, SafeAreaInsetBuilderArray&& builders);
+    static void SetSafeAreaInset(FrameNode* frameNode, const SafeAreaInsetOptions& options,
+        SafeAreaInsetBuilderArray&& builders);
     static void ResetSafeAreaInset();
+    static void ResetSafeAreaInset(FrameNode* frameNode);
 
     void SetMargin(const CalcDimension& value) override
     {

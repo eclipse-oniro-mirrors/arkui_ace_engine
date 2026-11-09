@@ -333,6 +333,29 @@ bool NeedUpdateChildrenOfAccessibilityElementInfo(const RefPtr<NG::UINode>& node
     return !IsDynamicComponent(node);
 }
 
+// Preserve the ordinary children reference unless an inset subtree must be appended.
+// The caller owns the scratch list; no list nodes are allocated for ordinary trees.
+const std::list<RefPtr<NG::UINode>>& GetAccessibilityChildren(
+    const RefPtr<NG::UINode>& uiNode, std::list<RefPtr<NG::UINode>>& insetChildren)
+{
+    const auto& children = uiNode->GetChildren(true);
+    auto frameNode = AceType::DynamicCast<NG::FrameNode>(uiNode);
+    auto insetNode = frameNode ? frameNode->GetSafeAreaInsetNode() : nullptr;
+    if (!insetNode) {
+        return children;
+    }
+    insetChildren = children;
+    const auto& content = insetNode->GetChildren(true);
+    insetChildren.insert(insetChildren.end(), content.begin(), content.end());
+    return insetChildren;
+}
+
+bool HasSafeAreaInsetNode(const RefPtr<NG::UINode>& node)
+{
+    auto frameNode = AceType::DynamicCast<NG::FrameNode>(node);
+    return frameNode && frameNode->GetSafeAreaInsetNode();
+}
+
 bool CheckChildIsAccessibilityFocus(const RefPtr<NG::UINode> &uiNode, RefPtr<NG::FrameNode> &focusFrameNode)
 {
     CHECK_NULL_RETURN(uiNode, false);
@@ -348,6 +371,11 @@ bool CheckChildIsAccessibilityFocus(const RefPtr<NG::UINode> &uiNode, RefPtr<NG:
         }
     }
     auto children = uiNode->GetChildren(true);
+    auto insetNode = nowFrameNode ? nowFrameNode->GetSafeAreaInsetNode() : nullptr;
+    if (insetNode) {
+        const auto& content = insetNode->GetChildren(true);
+        children.insert(children.end(), content.begin(), content.end());
+    }
     for (const auto& child : children) {
         if (CheckChildIsAccessibilityFocus(child, focusFrameNode)) {
             return true;
@@ -812,8 +840,10 @@ void FindText(const RefPtr<NG::UINode>& node, const std::string& text, std::list
         }
     }
 
-    if (!node->GetChildren(true).empty()) {
-        for (const auto& child : node->GetChildren(true)) {
+    if (!node->GetChildren(true).empty() || HasSafeAreaInsetNode(node)) {
+        std::list<RefPtr<NG::UINode>> insetChildren;
+        const auto& children = GetAccessibilityChildren(node, insetChildren);
+        for (const auto& child : children) {
             FindText(child, text, nodeList);
         }
     }
@@ -856,7 +886,8 @@ RefPtr<NG::FrameNode> GetFramenodeByCondition(const RefPtr<NG::FrameNode>& root,
                 return frameNodeResult;
             }
         } else {
-            const auto& children = current->GetChildren(true);
+            std::list<RefPtr<NG::UINode>> insetChildren;
+            const auto& children = GetAccessibilityChildren(current, insetChildren);
             if (FindFrameNodeByCondition(children, nodes, frameNodeResult, condition)) {
                 return frameNodeResult;
             }
@@ -1034,7 +1065,9 @@ void GetFrameNodeChildren(
         return;
     }
 
-    for (const auto& frameChild : uiNode->GetChildren(true)) {
+    std::list<RefPtr<NG::UINode>> insetChildren;
+    const auto& frameChildren = GetAccessibilityChildren(uiNode, insetChildren);
+    for (const auto& frameChild : frameChildren) {
         GetFrameNodeChildren(frameChild, children, commonProperty);
     }
 }
@@ -1138,6 +1171,11 @@ int64_t GetParentId(const RefPtr<NG::UINode>& uiNode)
     while (parent) {
         auto parentFrameNode = AceType::DynamicCast<NG::FrameNode>(parent.GetRawPtr());
         if (parentFrameNode) {
+            auto owner = AceType::DynamicCast<NG::FrameNode>(parent->GetParent());
+            if (owner && owner->GetSafeAreaInsetNode() == parentFrameNode) {
+                parent = owner;
+                continue;
+            }
             if ((parent->GetTag() == V2::PAGE_ETS_TAG) || (parent->GetTag() == V2::STAGE_ETS_TAG) ||
                 parentFrameNode->CheckAccessibilityLevelNo()) {
                 parent = parent->GetParent();
@@ -1555,7 +1593,9 @@ void GetFrameNodeChildren(
         return;
     }
 
-    for (const auto& frameChild : uiNode->GetChildren(true)) {
+    std::list<RefPtr<NG::UINode>> insetChildren;
+    const auto& frameChildren = GetAccessibilityChildren(uiNode, insetChildren);
+    for (const auto& frameChild : frameChildren) {
         GetFrameNodeChildren(frameChild, childrenIdInfo, commonProperty);
     }
 }
@@ -1877,7 +1917,9 @@ void UpdateChildrenOfAccessibilityElementInfo(
     }
     if (!IsExtensionComponent(node) || IsUIExtensionShowPlaceholder(node)) {
         std::vector<std::pair<int64_t, int32_t>> childrenIdInfo;
-        for (const auto& item : node->GetChildren(true)) {
+        std::list<RefPtr<NG::UINode>> insetChildren;
+        const auto& children = GetAccessibilityChildren(node, insetChildren);
+        for (const auto& item : children) {
             GetFrameNodeChildren(item, childrenIdInfo, commonProperty);
         }
 
@@ -2335,7 +2377,9 @@ void GetChildrenFromFrameNode(
             GetFrameNodeChildren(virtualNode, frameNodeChildren, commonProperty);
         }
     } else {
-        for (const auto& item : node->GetChildren(true)) {
+        std::list<RefPtr<NG::UINode>> insetChildren;
+        const auto& children = GetAccessibilityChildren(node, insetChildren);
+        for (const auto& item : children) {
             GetFrameNodeChildren(item, frameNodeChildren, commonProperty);
         }
 
@@ -2597,7 +2641,9 @@ void AddFocusableNode(std::list<RefPtr<NG::FrameNode>>& nodeList, const RefPtr<N
         CommonProperty commonProperty;
         commonProperty.pageNodes.clear(); // empty means search all page
         commonProperty.pagePaths.clear();
-        for (const auto& child : node->GetChildren(true)) {
+        std::list<RefPtr<NG::UINode>> insetChildren;
+        const auto& uiChildren = GetAccessibilityChildren(node, insetChildren);
+        for (const auto& child : uiChildren) {
             GetFrameNodeChildren(child, children, commonProperty);
         }
 
@@ -10653,8 +10699,10 @@ void JsAccessibilityManager::FindText(const RefPtr<NG::UINode>& node,
             }
         }
     }
-    if (!node->GetChildren(true).empty()) {
-        for (const auto& child : node->GetChildren(true)) {
+    if (!node->GetChildren(true).empty() || HasSafeAreaInsetNode(node)) {
+        std::list<RefPtr<NG::UINode>> insetChildren;
+        const auto& children = GetAccessibilityChildren(node, insetChildren);
+        for (const auto& child : children) {
             FindText(child, infos, context, commonProperty, searchParam);
         }
     }
@@ -10694,8 +10742,10 @@ void JsAccessibilityManager::FindTextByTextHint(const RefPtr<NG::UINode>& node,
             }
         }
     }
-    if (!node->GetChildren(true).empty()) {
-        for (const auto& child : node->GetChildren(true)) {
+    if (!node->GetChildren(true).empty() || HasSafeAreaInsetNode(node)) {
+        std::list<RefPtr<NG::UINode>> insetChildren;
+        const auto& children = GetAccessibilityChildren(node, insetChildren);
+        for (const auto& child : children) {
             FindTextByTextHint(child, infos, context, commonProperty, searchParam);
         }
     }
@@ -14168,7 +14218,9 @@ void JsAccessibilityManager::SearchDefaultFocusFromRoot(std::list<Accessibility:
             UpdateAccessibilityElementInfo(frameNode, commonProperty, nodeInfo, ngPipeline);
             infos.emplace_back(nodeInfo);
         }
-        for (const auto& child : current->GetChildren(true)) {
+        std::list<RefPtr<NG::UINode>> insetChildren;
+        const auto& children = GetAccessibilityChildren(current, insetChildren);
+        for (const auto& child : children) {
             nodes.emplace_back(child);
         }
     }

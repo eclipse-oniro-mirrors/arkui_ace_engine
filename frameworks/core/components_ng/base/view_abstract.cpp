@@ -14,8 +14,11 @@
  */
 
 #include "core/components_ng/base/view_abstract.h"
+#include "core/components_ng/property/safe_area_inset_property.h"
 
 #include <cstdint>
+
+#include "core/components_ng/base/safe_area_inset_view.h"
 #include <functional>
 #include <unordered_map>
 
@@ -1555,7 +1558,9 @@ void ViewAbstract::ResetSafeAreaPadding()
     ACE_RESET_LAYOUT_PROPERTY(LayoutProperty, SafeAreaPadding);
 }
 
-void ViewAbstract::SetSafeAreaInset(
+namespace SafeAreaInsetView {
+
+void SetSafeAreaInset(
     FrameNode* frameNode, const SafeAreaInsetOptions& options, const SafeAreaInsetContentArray& contents)
 {
     CHECK_NULL_VOID(frameNode);
@@ -1622,8 +1627,8 @@ void ViewAbstract::SetSafeAreaInset(
         return;
     }
 
-    const bool optionsChanged = !layoutProperty->GetSafeAreaInset().has_value() ||
-        layoutProperty->GetSafeAreaInset().value() != effectiveOptions;
+    const auto* currentOptions = layoutProperty->GetSafeAreaInsetState().GetSafeAreaInset();
+    const bool optionsChanged = !currentOptions || *currentOptions != effectiveOptions;
     layoutProperty->UpdateSafeAreaInset(effectiveOptions);
     if (frameNode->GetSafeAreaInsetNode() != insetContainer) {
         frameNode->SetSafeAreaInsetNode(insetContainer);
@@ -1636,13 +1641,13 @@ void ViewAbstract::SetSafeAreaInset(
     }
 }
 
-void ViewAbstract::ResetSafeAreaInset(FrameNode* frameNode)
+void ResetSafeAreaInset(FrameNode* frameNode)
 {
     CHECK_NULL_VOID(frameNode);
     auto layoutProperty = frameNode->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
-    if (!frameNode->GetSafeAreaInsetNode() && !layoutProperty->GetSafeAreaInset().has_value() &&
-        !layoutProperty->GetSafeAreaInsetContribution().HasValue()) {
+    if (!frameNode->GetSafeAreaInsetNode() && !layoutProperty->GetSafeAreaInsetState().GetSafeAreaInset() &&
+        !layoutProperty->GetSafeAreaInsetState().GetSafeAreaInsetContribution().HasValue()) {
         return;
     }
     frameNode->UnRegisterLpxAttribute(LpxAttribute::LPX_SAFE_AREA_INSET_SPACING);
@@ -1651,6 +1656,8 @@ void ViewAbstract::ResetSafeAreaInset(FrameNode* frameNode)
     frameNode->ResetSafeAreaPadding();
     frameNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
+
+} // namespace SafeAreaInsetView
 
 void ViewAbstract::SetSafeAreaPadding(FrameNode* frameNode, const CalcLength& value)
 {

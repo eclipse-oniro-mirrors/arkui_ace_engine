@@ -3194,6 +3194,10 @@ void ArkUINativeModule::RegisterCommonAttributes(Local<panda::ObjectRef> object,
         panda::FunctionRef::New(const_cast<panda::EcmaVM *>(vm), CommonBridge::SetSafeAreaPadding));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetSafeAreaPadding"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM *>(vm), CommonBridge::ResetSafeAreaPadding));
+    common->Set(vm, panda::StringRef::NewFromUtf8(vm, "setSafeAreaInset"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM *>(vm), CommonBridge::SetSafeAreaInset));
+    common->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetSafeAreaInset"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM *>(vm), CommonBridge::ResetSafeAreaInset));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "setMarkAnchor"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM *>(vm), CommonBridge::SetMarkAnchor));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetMarkAnchor"),
