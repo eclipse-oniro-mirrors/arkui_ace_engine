@@ -62,6 +62,22 @@ using namespace testing::ext;
 
 namespace OHOS::Ace::NG {
 namespace {
+class TranslateInputMenuFlagsGuard {
+public:
+    TranslateInputMenuFlagsGuard()
+        : flags_(AceApplicationInfo::GetInstance().GetTextMenuInfo().disableFlags)
+    {
+        AceApplicationInfo::GetInstance().SetTextMenuDisableFlags(DISABLE_NORMAL_FLAG);
+    }
+    ~TranslateInputMenuFlagsGuard()
+    {
+        AceApplicationInfo::GetInstance().SetTextMenuDisableFlags(DISABLE_NORMAL_FLAG);
+        AceApplicationInfo::GetInstance().AddTextMenuDisableFlag(flags_);
+    }
+private:
+    SystemServiceMenuDisableFlag flags_;
+};
+
 const std::string TEST_TAG = "Test";
 constexpr int32_t NODE_ID = 143;
 constexpr int32_t NODE_ID2 = 153;
@@ -8653,5 +8669,141 @@ HWTEST_F(SelectOverlayTestNg, UpdateMenuColors004, TestSize.Level1)
     ASSERT_NE(symbolLayoutProperty, nullptr);
     ASSERT_TRUE(symbolLayoutProperty->GetSymbolColorList().has_value());
     EXPECT_EQ(symbolLayoutProperty->GetSymbolColorList()->front(), selectTheme->GetMenuIconColor());
+}
+
+/**
+ * @tc.name: TranslateInputIdentityAndRefresh
+ * @tc.desc: Verify the literal label, stable IDs and menu refresh detection.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectOverlayTestNg, TranslateInputIdentityAndRefresh, TestSize.Level1)
+{
+    auto theme = AceType::MakeRefPtr<TextOverlayTheme>();
+    EXPECT_EQ(theme->GetTranslateInput(), "快捷翻译");
+    EXPECT_EQ(static_cast<int32_t>(NativeMenuId::ID_CAMERA_INPUT), 5);
+    EXPECT_EQ(static_cast<int32_t>(NativeMenuId::ID_PASSWORD_VAULT), 17);
+    EXPECT_EQ(SelectOverlayNode::ConvertToIntMenuId(OH_DEFAULT_TRANSLATE_INPUT),
+        static_cast<int32_t>(NativeMenuId::ID_TRANSLATE_INPUT));
+    EXPECT_EQ(SelectOverlayNode::ConvertToStrMenuId(static_cast<int32_t>(NativeMenuId::ID_TRANSLATE_INPUT)),
+        OH_DEFAULT_TRANSLATE_INPUT);
+
+    SelectMenuInfo previous;
+    SelectMenuInfo current;
+    EXPECT_FALSE(previous.IsIconChanged(current));
+    current.showTranslateInput = true;
+    EXPECT_TRUE(previous.IsIconChanged(current));
+    EXPECT_TRUE(current.IsIconChanged(previous));
+    EXPECT_NE(current.ToString().find("showTranslateInput"), std::string::npos);
+}
+
+/**
+ * @tc.name: TranslateInputSystemMenuFiltering
+ * @tc.desc: Verify menu customization parameters and disable flags.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectOverlayTestNg, TranslateInputSystemMenuFiltering, TestSize.Level1)
+{
+    TranslateInputMenuFlagsGuard guard;
+    auto theme = AceType::MakeRefPtr<TextOverlayTheme>();
+    PrepareThemeManagerForNodeTest(theme);
+    auto info = std::make_shared<SelectOverlayInfo>();
+    auto countTranslateInput = [&info]() {
+        size_t count = 0;
+        for (const auto& item : SelectOverlayNode::GetSystemMenuItemParams(info)) {
+            if (item.menuOptionsParam.id == OH_DEFAULT_TRANSLATE_INPUT) {
+                EXPECT_EQ(item.menuOptionsParam.content, "快捷翻译");
+                ++count;
+            }
+        }
+        return count;
+    };
+    EXPECT_EQ(countTranslateInput(), 0);
+    info->menuInfo.showTranslateInput = true;
+    EXPECT_EQ(countTranslateInput(), 1);
+    AceApplicationInfo::GetInstance().AddTextMenuDisableFlag(DISABLE_TRANSLATE_INPUT_FLAG);
+    EXPECT_EQ(countTranslateInput(), 0);
+    AceApplicationInfo::GetInstance().SetTextMenuDisableFlags(DISABLE_NORMAL_FLAG);
+    AceApplicationInfo::GetInstance().AddTextMenuDisableFlag(DISABLE_ALL_FLAG);
+    EXPECT_EQ(countTranslateInput(), 0);
+}
+
+/**
+ * @tc.name: TranslateInputToolbarAndOverflow
+ * @tc.desc: Verify narrow toolbar fallback, overflow callback and toolbar placement.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectOverlayTestNg, TranslateInputToolbarAndOverflow, TestSize.Level1)
+{
+    TranslateInputMenuFlagsGuard guard;
+    auto theme = AceType::MakeRefPtr<TextOverlayTheme>();
+    PrepareThemeManagerForNodeTest(theme);
+    auto info = std::make_shared<SelectOverlayInfo>(CreateDefaultNodeTestInfo());
+    info->menuInfo.showTranslateInput = true;
+    int32_t translateInputCount = 0;
+    int32_t cameraCount = 0;
+    info->menuCallback.onTranslateInput = [&translateInputCount]() { ++translateInputCount; };
+    info->menuCallback.onCameraInput = [&cameraCount]() { ++cameraCount; };
+    auto node = AceType::DynamicCast<SelectOverlayNode>(SelectOverlayNode::CreateSelectOverlayNode(info));
+    ASSERT_NE(node, nullptr);
+    for (auto& shown : node->isShowInDefaultMenu_) {
+        shown = true;
+    }
+    constexpr size_t translateInputIndex = 12;
+    node->isShowInDefaultMenu_[translateInputIndex] = false;
+    node->isDefaultBtnOverMaxWidth_ = false;
+    float allocatedSize = 0.0f;
+    node->ShowTranslateInput(-1.0f, allocatedSize, info, theme->GetTranslateInput());
+    EXPECT_TRUE(node->isDefaultBtnOverMaxWidth_);
+    EXPECT_FALSE(node->isShowInDefaultMenu_[translateInputIndex]);
+
+    std::vector<std::string> ids;
+    auto params = node->GetDefaultOptionsParams(info, ids);
+    ASSERT_EQ(params.size(), 1);
+    ASSERT_EQ(ids.size(), 1);
+    EXPECT_EQ(ids.front(), OH_DEFAULT_TRANSLATE_INPUT);
+    EXPECT_EQ(params.front().value, "快捷翻译");
+    ASSERT_TRUE(params.front().action);
+    params.front().action();
+    EXPECT_EQ(translateInputCount, 1);
+    EXPECT_EQ(cameraCount, 0);
+
+    node->isDefaultBtnOverMaxWidth_ = false;
+    node->selectMenuInner_ = FrameNode::CreateFrameNode("Row",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<LinearLayoutPattern>(false));
+    node->ShowTranslateInput(10000.0f, allocatedSize, info, theme->GetTranslateInput());
+    EXPECT_TRUE(node->isShowInDefaultMenu_[translateInputIndex]);
+    EXPECT_EQ(node->selectMenuInner_->GetChildren().size(), 1);
+    ids.clear();
+    EXPECT_TRUE(node->GetDefaultOptionsParams(info, ids).empty());
+}
+
+/**
+ * @tc.name: TranslateInputCustomMenuCallback
+ * @tc.desc: Verify custom menu IDs retain the system label and independent callback.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectOverlayTestNg, TranslateInputCustomMenuCallback, TestSize.Level1)
+{
+    TranslateInputMenuFlagsGuard guard;
+    PrepareThemeManagerForNodeTest(AceType::MakeRefPtr<TextOverlayTheme>());
+    auto info = std::make_shared<SelectOverlayInfo>(CreateDefaultNodeTestInfo());
+    info->menuInfo.showTranslateInput = true;
+    int32_t count = 0;
+    info->menuCallback.onTranslateInput = [&count]() { ++count; };
+    auto node = AceType::DynamicCast<SelectOverlayNode>(SelectOverlayNode::CreateSelectOverlayNode(info));
+    ASSERT_NE(node, nullptr);
+    std::vector<MenuOptionsParam> items {
+        MenuOptionsParam { .id = OH_DEFAULT_TRANSLATE_INPUT, .content = "custom label" }
+    };
+    std::vector<OptionParam> params;
+    std::vector<std::string> ids;
+    node->AddCreateMenuExtensionMenuParams(items, info, 0, params, ids);
+    ASSERT_EQ(params.size(), 1);
+    ASSERT_EQ(ids.size(), 1);
+    EXPECT_EQ(ids.front(), OH_DEFAULT_TRANSLATE_INPUT);
+    EXPECT_EQ(params.front().value, "快捷翻译");
+    ASSERT_TRUE(params.front().action);
+    params.front().action();
+    EXPECT_EQ(count, 1);
 }
 } // namespace OHOS::Ace::NG

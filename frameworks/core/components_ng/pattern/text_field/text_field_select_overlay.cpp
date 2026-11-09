@@ -338,6 +338,7 @@ void TextFieldSelectOverlay::OnUpdateMenuInfo(SelectMenuInfo& menuInfo, SelectOv
     bool isInPasswordMode = pattern->IsInPasswordMode();
     FillMenuShowCameraInput(menuInfo, isSelected, pattern->IsCameraInputSupported(),
         isInPasswordMode, pattern->HasCustomKeyboard());
+    FillMenuShowTranslateInput(menuInfo, isSelected, isInPasswordMode, pattern->HasCustomKeyboard());
     auto manager = SelectContentOverlayManager::GetOverlayManager();
     CHECK_NULL_VOID(manager);
     FillMenuVisibility(menuInfo, hasText, menuInfo.showCameraInput, pattern->IsShowAutoFill(),
@@ -508,6 +509,9 @@ void TextFieldSelectOverlay::OnMenuItemAction(OptionMenuActionId id, OptionMenuT
             return;
         case OptionMenuActionId::CAMERA_INPUT:
             pattern->HandleOnCameraInput();
+            return;
+        case OptionMenuActionId::TRANSLATE_INPUT:
+            pattern->HandleOnTranslateInput();
             return;
         case OptionMenuActionId::AI_WRITE:
             pattern->HandleOnAIWrite();

@@ -20,6 +20,7 @@
 #include "base/utils/system_properties.h"
 #include "core/common/ace_engine.h"
 #include "core/common/ai/text_translation_adapter.h"
+#include "core/common/ime/text_input_keyboard_utils.h"
 #include "core/common/share/text_share_adapter.h"
 #include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include "core/components/select/select_theme.h"
@@ -1588,6 +1589,13 @@ void BaseTextSelectOverlay::FillMenuShowCameraInput(SelectMenuInfo& menuInfo, bo
     menuInfo.showCameraInput = !isSelected && isSupportCameraInput && !hasCustomKeyboard;
 }
 
+void BaseTextSelectOverlay::FillMenuShowTranslateInput(SelectMenuInfo& menuInfo, bool isSelected,
+    bool isContentRestricted, bool hasCustomKeyboard)
+{
+    menuInfo.showTranslateInput = !isSelected && !isContentRestricted && !hasCustomKeyboard &&
+        TextSystemMenu::IsShowTranslateInput() && IsCurrentInputMethodDefaultIme();
+}
+
 void BaseTextSelectOverlay::FillMenuVisibility(SelectMenuInfo& menuInfo, bool hasText, bool showCameraInput,
     bool isShowAutoFill, bool isSelectionMenuHidden, SelectOverlayDirtyFlag dirtyFlag)
 {
@@ -1596,7 +1604,8 @@ void BaseTextSelectOverlay::FillMenuVisibility(SelectMenuInfo& menuInfo, bool ha
     if (IsUsingMouse()) {
         menuInfo.menuIsShow = !isSelectionMenuHidden || manager->IsOpen();
     } else {
-        menuInfo.menuIsShow = (hasText || IsShowPaste() || showCameraInput || isShowAutoFill)
+        menuInfo.menuIsShow =
+            (hasText || IsShowPaste() || showCameraInput || menuInfo.showTranslateInput || isShowAutoFill)
             && !isSelectionMenuHidden && IsShowMenu();
     }
     menuInfo.menuDisable = isSelectionMenuHidden;

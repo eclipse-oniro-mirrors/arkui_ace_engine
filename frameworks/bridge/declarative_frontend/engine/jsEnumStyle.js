@@ -2689,6 +2689,10 @@ class TextMenuItemId {
     return new TextMenuItemId('OH_DEFAULT_CAMERA_INPUT');
   }
 
+  static get TRANSLATE_INPUT() {
+    return new TextMenuItemId('OH_DEFAULT_TRANSLATE_INPUT');
+  }
+
   static get AI_WRITER() {
     return new TextMenuItemId('OH_DEFAULT_AI_WRITE');
   }

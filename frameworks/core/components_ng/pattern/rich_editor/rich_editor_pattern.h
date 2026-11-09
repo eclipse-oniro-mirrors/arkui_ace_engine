@@ -829,6 +829,7 @@ public:
     TextSpanType GetEditorType() const;
     std::string GetPlaceHolder() const;
     void HandleOnCameraInput() override;
+    void HandleOnTranslateInput();
     void HandleOnAIWrite();
     void GetAIWriteInfo(AIWriteInfo& info);
     void HandleAIWriteResult(int32_t start, int32_t end, std::vector<uint8_t>& buffer);

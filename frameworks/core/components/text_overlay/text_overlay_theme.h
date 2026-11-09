@@ -365,6 +365,11 @@ public:
         return cameraInput_;
     }
 
+    const std::string& GetTranslateInput() const
+    {
+        return translateInput_;
+    }
+
     const std::string& GetAIWrite() const
     {
         return aiWrite_;
@@ -678,6 +683,7 @@ private:
     Dimension previewMenuPadding_;
     double alphaDisabled_ = 0.0;
     std::string cameraInput_;
+    std::string translateInput_ = "快捷翻译";
     std::string aiWrite_;
     std::string copyLabelInfo_;
     std::string pasteLabelInfo_;

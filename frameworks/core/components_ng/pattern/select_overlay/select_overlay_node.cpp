@@ -89,6 +89,7 @@ constexpr int32_t OPTION_INDEX_AI_WRITE = 8;
 constexpr int32_t OPTION_INDEX_AI_MENU = 9;
 constexpr int32_t OPTION_INDEX_ASK_CELIA = 10;
 constexpr int32_t OPTION_INDEX_AUTO_FILL = 11;
+constexpr int32_t OPTION_INDEX_TRANSLATE_INPUT = 12;
 constexpr int32_t ANIMATION_DURATION1 = 350;
 constexpr int32_t ANIMATION_DURATION2 = 150;
 constexpr int32_t ANIMATION_DURATION3 = 100;
@@ -955,6 +956,7 @@ static constexpr LinearMapNode<MenuItemEnabledMapFunc> IS_MENUITEM_ENABLED_MAP[]
     { OH_DEFAULT_SELECT_ALL, +[](const SelectMenuInfo& info){ return info.showCopyAll; } },
     { OH_DEFAULT_SHARE, +[](const SelectMenuInfo& info){ return info.showShare; } },
     { OH_DEFAULT_TRANSLATE, +[](const SelectMenuInfo& info){ return info.showTranslate; } },
+    { OH_DEFAULT_TRANSLATE_INPUT, +[](const SelectMenuInfo& info){ return info.showTranslateInput; } },
 };
 static_assert(IsSorted(IS_MENUITEM_ENABLED_MAP), "IS_MENUITEM_ENABLED_MAP array must be sorted to work properly");
 static_assert(IsSortedWithDetailedLog<IS_MENUITEM_ENABLED_MAP>(),
@@ -998,6 +1000,8 @@ static constexpr LinearMapNode<SymbolIdMapFunc> GET_SYMBOL_ID_MAP[] = {
         +[](const RefPtr<OHOS::Ace::TextOverlayTheme>& theme) { return theme->GetShareSymbolId(); } },
     { OH_DEFAULT_TRANSLATE,
         +[](const RefPtr<OHOS::Ace::TextOverlayTheme>& theme) { return theme->GetTranslateSymbolId(); } },
+    { OH_DEFAULT_TRANSLATE_INPUT,
+        +[](const RefPtr<OHOS::Ace::TextOverlayTheme>& theme) { return theme->GetTranslateSymbolId(); } },
 };
 static_assert(IsSorted(GET_SYMBOL_ID_MAP), "GET_SYMBOL_ID_MAP array must be sorted to work properly");
 static_assert(IsSortedWithDetailedLog<GET_SYMBOL_ID_MAP>(),
@@ -1031,6 +1035,8 @@ static constexpr LinearMapNode<GetItemContentLabelFunc> GET_ITEM_CONTENT_LABEL_M
         +[](const RefPtr<OHOS::Ace::TextOverlayTheme>& theme) -> std::string { return theme->GetShareLabel(); } },
     { OH_DEFAULT_TRANSLATE,
         +[](const RefPtr<OHOS::Ace::TextOverlayTheme>& theme) -> std::string { return theme->GetTranslateLabel(); } },
+    { OH_DEFAULT_TRANSLATE_INPUT,
+        +[](const RefPtr<OHOS::Ace::TextOverlayTheme>& theme) -> std::string { return theme->GetTranslateInput(); } },
 };
 static_assert(IsSorted(GET_ITEM_CONTENT_LABEL_MAP), "GET_ITEM_CONTENT_LABEL_MAP array must be sorted to work properly");
 static_assert(IsSortedWithDetailedLog<GET_ITEM_CONTENT_LABEL_MAP>(),
@@ -1780,6 +1786,10 @@ void GetOptionsParamsHasSymbol(
         params.back().symbolId = theme->GetAskCeliaSymbolId();
         params.back().isAskCeliaOption = true;
     }
+    if (info->menuInfo.showTranslateInput && TextSystemMenu::IsShowTranslateInput()) {
+        params.emplace_back(theme->GetTranslateInput(), GetMenuCallbackWithContainerId(
+            info->menuCallback.onTranslateInput), "", info->menuInfo.showTranslateInput, theme->GetTranslateSymbolId());
+    }
 }
 
 std::vector<OptionParam> GetOptionsParams(const std::shared_ptr<SelectOverlayInfo>& info)
@@ -1807,6 +1817,7 @@ std::unordered_map<std::string, std::function<void()>> GetSystemCallback(
         { OH_DEFAULT_SEARCH, info->menuCallback.onSearch },
         { OH_DEFAULT_SHARE, info->menuCallback.onShare },
         { OH_DEFAULT_CAMERA_INPUT, info->menuCallback.onCameraInput },
+        { OH_DEFAULT_TRANSLATE_INPUT, info->menuCallback.onTranslateInput },
         { OH_DEFAULT_AI_WRITE, info->menuCallback.onAIWrite },
         { OH_DEFAULT_AI_MENU_PHONE, ConvertToVoidFunction(
             info->menuCallback.onAIMenuOption, OH_DEFAULT_AI_MENU_PHONE) },
@@ -1849,7 +1860,7 @@ std::string GetSystemIconPath(const std::string& id, const std::string& iconPath
     if (id == OH_DEFAULT_AUTO_FILL) {
         return iconTheme->GetIconPath(InternalResource::ResourceId::IC_AUTO_FILL_SVG);
     }
-    if (id == OH_DEFAULT_TRANSLATE) {
+    if (id == OH_DEFAULT_TRANSLATE || id == OH_DEFAULT_TRANSLATE_INPUT) {
         return iconTheme->GetIconPath(InternalResource::ResourceId::IC_TRANSLATE_SVG);
     }
     if (id == OH_DEFAULT_SEARCH) {
@@ -3872,6 +3883,14 @@ void SelectOverlayNode::GetFlexibleOptionsParams(const std::shared_ptr<SelectOve
         params.back().isAskCeliaOption = true;
         paramIds.emplace_back(OH_DEFAULT_ASK_CELIA);
     }
+    if (!isShowInDefaultMenu_[OPTION_INDEX_TRANSLATE_INPUT] && info->menuInfo.showTranslateInput &&
+        TextSystemMenu::IsShowTranslateInput()) {
+        auto iconPath = iconTheme ? iconTheme->GetIconPath(InternalResource::ResourceId::IC_TRANSLATE_SVG) : "";
+        auto label = textOverlayTheme ? textOverlayTheme->GetTranslateInput() : "";
+        params.emplace_back(label, iconPath, GetMenuCallbackWithContainerId(info->menuCallback.onTranslateInput),
+            GetSymbolFunc(OH_DEFAULT_TRANSLATE_INPUT));
+        paramIds.emplace_back(OH_DEFAULT_TRANSLATE_INPUT);
+    }
 }
 
 void SelectOverlayNode::addMenuOptionItemsParams(
@@ -4375,6 +4394,7 @@ bool SelectOverlayNode::AddSystemDefaultOptions(float maxWidth, float& allocated
     ShowAIWrite(maxWidth, allocatedSize, info, theme->GetAIWrite());
     ShowAIMenuOptions(maxWidth, allocatedSize, info, theme->GetAiMenuOptionName(info->menuInfo.aiMenuOptionType));
     ShowAskCelia(maxWidth, allocatedSize, info, theme->GetAskCelia());
+    ShowTranslateInput(maxWidth, allocatedSize, info, theme->GetTranslateInput());
     if (isDefaultBtnOverMaxWidth_) {
         isDefaultBtnOverMaxWidth_ = false;
         return true;
@@ -4652,6 +4672,28 @@ void SelectOverlayNode::ShowCamera(
     }
 }
 
+void SelectOverlayNode::ShowTranslateInput(
+    float maxWidth, float& allocatedSize, std::shared_ptr<SelectOverlayInfo>& info, const std::string& label)
+{
+    if (info->menuInfo.showTranslateInput && TextSystemMenu::IsShowTranslateInput()) {
+        CHECK_EQUAL_VOID(isDefaultBtnOverMaxWidth_, true);
+        float buttonWidth = 0.0f;
+        ButtonBasicInfo buttonBasicInfo = { .data = label, .buttonType = SelectOverlayMenuButtonType::NORMAL };
+        auto button = BuildButton(info, info->menuCallback.onTranslateInput, GetId(), buttonWidth, buttonBasicInfo);
+        CHECK_NULL_VOID(button);
+        if (GreatOrEqual(maxWidth - allocatedSize, buttonWidth)) {
+            button->MountToParent(selectMenuInner_);
+            allocatedSize += buttonWidth;
+            isShowInDefaultMenu_[OPTION_INDEX_TRANSLATE_INPUT] = true;
+        } else {
+            button.Reset();
+            isDefaultBtnOverMaxWidth_ = true;
+        }
+    } else {
+        isShowInDefaultMenu_[OPTION_INDEX_TRANSLATE_INPUT] = true;
+    }
+}
+
 void SelectOverlayNode::ShowAIMenuOptions(
     float maxWidth, float& allocatedSize, std::shared_ptr<SelectOverlayInfo>& info, const std::string& label)
 {
@@ -4841,6 +4883,8 @@ const std::vector<MenuItemParam> SelectOverlayNode::GetSystemMenuItemParams(
 
     AddMenuItemParamIf(menuInfo.isAskCeliaEnabled && TextSystemMenu::IsShowAskCelia(), OH_DEFAULT_ASK_CELIA,
         theme->GetAskCelia(), systemItemParams);
+    AddMenuItemParamIf(menuInfo.showTranslateInput && TextSystemMenu::IsShowTranslateInput(),
+        OH_DEFAULT_TRANSLATE_INPUT, theme->GetTranslateInput(), systemItemParams);
     return systemItemParams;
 }
 
@@ -5780,6 +5824,7 @@ int32_t SelectOverlayNode::ConvertToIntMenuId(const std::string& menuId)
         { OH_DEFAULT_SELECT_ALL, NativeMenuId::ID_SELECT_ALL },
         { OH_DEFAULT_COLLABORATION_SERVICE, NativeMenuId::ID_COLLABORATION_SERVICE },
         { OH_DEFAULT_CAMERA_INPUT, NativeMenuId::ID_CAMERA_INPUT },
+        { OH_DEFAULT_TRANSLATE_INPUT, NativeMenuId::ID_TRANSLATE_INPUT },
         { OH_DEFAULT_AI_WRITE, NativeMenuId::ID_AI_WRITE },
         { OH_DEFAULT_TRANSLATE, NativeMenuId::ID_TRANSLATE },
         { OH_DEFAULT_SEARCH, NativeMenuId::ID_SEARCH },
@@ -5809,6 +5854,7 @@ std::string SelectOverlayNode::ConvertToStrMenuId(int32_t menuId)
         { NativeMenuId::ID_SELECT_ALL, OH_DEFAULT_SELECT_ALL },
         { NativeMenuId::ID_COLLABORATION_SERVICE, OH_DEFAULT_COLLABORATION_SERVICE },
         { NativeMenuId::ID_CAMERA_INPUT, OH_DEFAULT_CAMERA_INPUT },
+        { NativeMenuId::ID_TRANSLATE_INPUT, OH_DEFAULT_TRANSLATE_INPUT },
         { NativeMenuId::ID_AI_WRITE, OH_DEFAULT_AI_WRITE },
         { NativeMenuId::ID_TRANSLATE, OH_DEFAULT_TRANSLATE },
         { NativeMenuId::ID_SEARCH, OH_DEFAULT_SEARCH },
@@ -5823,7 +5869,7 @@ std::string SelectOverlayNode::ConvertToStrMenuId(int32_t menuId)
         { NativeMenuId::ID_PASSWORD_VAULT, OH_DEFAULT_PASSWORD_VAULT },
     };
     auto nativeMenuIdStart = static_cast<int32_t>(NativeMenuId::ID_CUT);
-    auto nativeMenuIdEnd = static_cast<int32_t>(NativeMenuId::ID_PASSWORD_VAULT);
+    auto nativeMenuIdEnd = static_cast<int32_t>(NativeMenuId::ID_TRANSLATE_INPUT);
     if (menuId < nativeMenuIdStart || menuId > nativeMenuIdEnd) {
         return std::to_string(menuId);
     }

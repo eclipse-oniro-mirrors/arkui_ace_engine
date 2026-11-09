@@ -2579,6 +2579,21 @@ void TextFieldPattern::HandleOnCameraInput()
     });
 }
 
+void TextFieldPattern::HandleOnTranslateInput()
+{
+#if defined(ENABLE_STANDARD_INPUT)
+    auto inputMethod = MiscServices::InputMethodController::GetInstance();
+    if (inputMethod) {
+        TAG_LOGI(AceLogTag::ACE_TEXT_FIELD, "HandleOnTranslateInput");
+        inputMethod->RequestSystemInputCapability(MiscServices::InputCapabilityType::TRANSLATION);
+    } else {
+        TAG_LOGI(AceLogTag::ACE_TEXT_FIELD, "HandleOnTranslateInput, IMC is null");
+    }
+#endif
+    CloseSelectOverlay(true);
+    StartTwinkling();
+}
+
 void TextFieldPattern::SetVoiceKBShown(bool voiceKbShown)
 {
     if (voiceKbShown_ == voiceKbShown) {

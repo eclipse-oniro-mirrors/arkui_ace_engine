@@ -1104,6 +1104,7 @@
       "OHOS::Ace::NG::ArkTSUtils::SetSymbolModifier(std::__h::vector<OHOS::Ace::SelectParam, std::__h::allocator<OHOS::Ace::SelectParam>>&, unsigned long, panda::Local<panda::JSValueRef> const&)";
       "OHOS::Ace::NG::BaseTextSelectOverlay::AddAvoidKeyboardCallback(bool)";
       "OHOS::Ace::NG::BaseTextSelectOverlay::AddTaskAfterShowOverlay(std::__h::function<void ()>&&)";
+      "OHOS::Ace::NG::BaseTextSelectOverlay::FillMenuShowTranslateInput(OHOS::Ace::NG::SelectMenuInfo&, bool, bool, bool)";
       "OHOS::Ace::NG::BaseTextSelectOverlay::ApplySelectAreaWithKeyboard(OHOS::Ace::NG::RectT<float>&)";
       "OHOS::Ace::NG::BaseTextSelectOverlay::CalcHandleLevelMode(OHOS::Ace::NG::RectT<float> const&, OHOS::Ace::NG::RectT<float> const&)";
       "OHOS::Ace::NG::BaseTextSelectOverlay::CalculateClippedRect(OHOS::Ace::NG::RectT<float>&)";

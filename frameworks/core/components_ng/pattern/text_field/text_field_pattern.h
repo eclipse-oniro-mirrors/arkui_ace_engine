@@ -1187,6 +1187,7 @@ public:
     void HandleOnTextMethodInput(
         int32_t type, const std::string& typeName, const std::function<void()>& successCallback);
     void HandleOnCameraInput();
+    void HandleOnTranslateInput();
     void HandleOnVoiceInput();
     void AttachAndStartInputType(int32_t type);
     void HandleOnAIWrite();
