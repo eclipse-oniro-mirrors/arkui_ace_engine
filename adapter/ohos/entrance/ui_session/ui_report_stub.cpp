@@ -445,6 +445,7 @@ int32_t UiReportStub::OnRemoteRequest(uint32_t code, MessageParcel& data, Messag
             if (requestId == 0 || !data.ReadString(resultJson)) {
                 return FAILED;
             }
+            UiSessionCommandResultTraceEnd(requestId);
             ReportCommandResult(requestId, resultJson);
             break;
         }

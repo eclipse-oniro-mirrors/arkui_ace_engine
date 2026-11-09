@@ -6594,6 +6594,7 @@ void SendCommandCallbackInner(const WeakPtr<TaskExecutor>& taskExecutor)
         taskExecutor->PostTask(
             [keyEvent]() {
                 auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
+                AceAsyncTraceEnd(0, "SendCommand.Request.Legacy.Global");
                 CHECK_NULL_VOID(pipeline);
                 pipeline->OnNonPointerEvent(keyEvent);
             },
@@ -6678,6 +6679,7 @@ NG::CommandResult ExecuteKeyCodeWithResult(
     const std::unique_ptr<JsonValue>& json, const RefPtr<NG::PipelineContext>& pipeline)
 {
     if (!IsKeyCodeNumber(json)) {
+        AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Global");
         return NG::CommandResult::Error(NG::CommandErrorType::INVALID_PARAM);
     }
     KeyEvent keyEvent;
@@ -6685,6 +6687,7 @@ NG::CommandResult ExecuteKeyCodeWithResult(
     keyEvent.action = KeyAction::DOWN;
     keyEvent.code = static_cast<KeyCode>(json->GetInt("cmd"));
     keyEvent.pressedCodes = { keyEvent.code };
+    AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Global");
     return pipeline->OnNonPointerEvent(keyEvent)
         ? NG::CommandResult::Success() : NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL);
 }
@@ -6694,11 +6697,13 @@ void ExecuteGlobalCommandWithResult(
 {
     auto json = JsonUtil::ParseJsonString(command);
     if (!json || !json->IsValid() || !json->IsObject()) {
+        AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Global");
         finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::INVALID_PARAM)));
         return;
     }
     auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
     if (!pipeline) {
+        AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Global");
         finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
         return;
     }
@@ -6710,14 +6715,17 @@ void ExecuteRelaxedCommandWithResult(
 {
     auto batch = UiSessionBatchCommand::Parse(command);
     if (batch.status != BatchParseStatus::NOT_BATCH) {
+        AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Global");
         finishCallback(UiSessionBatchCommand::ExecuteWithResult(batch, ResolveBatchTextTargetWithResult));
         return;
     }
     auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
     if (!pipeline) {
+        AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Global");
         finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
         return;
     }
+    AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Global");
     pipeline->ProcessCommandWithResult(command, [finishCallback](const NG::CommandResult& result) {
         finishCallback(SerializeCommandResult(result));
     });
@@ -6726,6 +6734,7 @@ void ExecuteRelaxedCommandWithResult(
 void ExecuteNodeCommandWithResult(
     int32_t id, const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback)
 {
+    AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Node");
     auto node = AceType::DynamicCast<NG::FrameNode>(ElementRegister::GetInstance()->GetUINodeById(id));
     if (!node) {
         finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::NODE_NOT_FOUND)));
@@ -6778,7 +6787,12 @@ BatchDispatchCallbacks CreateBatchDispatchCallbacks(const RefPtr<TaskExecutor>& 
     BatchDispatchCallbacks callbacks;
     if (taskExecutor) {
         callbacks.postTask = [taskExecutor](std::function<void()>&& task) {
-            return taskExecutor->PostTask(std::move(task), TaskExecutor::TaskType::UI, "UiSessionBatchSendCommand");
+            return taskExecutor->PostTask(
+                [task = std::move(task)]() {
+                    AceAsyncTraceEnd(0, "SendCommand.Request.Legacy.Global");
+                    task();
+                },
+                TaskExecutor::TaskType::UI, "UiSessionBatchSendCommand");
         };
     }
     callbacks.resolveTarget = ResolveBatchTextTarget;
@@ -6799,6 +6813,7 @@ void UIContentImpl::RelaxedCommandCallbackInner(const WeakPtr<TaskExecutor>& tas
         taskExecutor->PostTask(
             [command]() {
                 auto pipelineContext = NG::PipelineContext::GetCurrentContextSafely();
+                AceAsyncTraceEnd(0, "SendCommand.Request.Legacy.Global");
                 if (pipelineContext == nullptr) {
                     TAG_LOGE(
                         AceLogTag::ACE_UIEVENT, "Failed to process relaxed command because pipelineContext is nullptr");
@@ -7441,6 +7456,7 @@ void UIContentImpl::InitSendCommandFunctionsCallbacks(const WeakPtr<TaskExecutor
         CHECK_NULL_VOID(taskExecutor);
         taskExecutor->PostTask(
             [id, command]() {
+                AceAsyncTraceEnd(0, "SendCommand.Request.Legacy.Node");
                 auto node = AceType::DynamicCast<NG::FrameNode>(ElementRegister::GetInstance()->GetUINodeById(id));
                 if (!node) {
                     LOGI("UiSessionSendCommandPattern: Node is null for id: %{public}d", id);

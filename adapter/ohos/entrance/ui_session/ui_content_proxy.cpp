@@ -675,6 +675,7 @@ int32_t UIContentServiceProxy::HighlightSpecifiedContent(int32_t id, const std::
 
 int32_t UIContentServiceProxy::SendCommand(int32_t id, const std::string& command)
 {
+    UiSessionCommandRequestTraceBegin("Legacy.Node");
     MessageParcel data;
     MessageParcel reply;
     MessageOption option;
@@ -722,6 +723,7 @@ int32_t UIContentServiceProxy::SendCommandSync(int32_t id, const std::string& co
 
 int32_t UIContentServiceProxy::SendCommand(const std::string command)
 {
+    UiSessionCommandRequestTraceBegin("Legacy.Global");
     MessageParcel data;
     MessageParcel reply;
     MessageOption option(MessageOption::TF_ASYNC);
@@ -750,6 +752,7 @@ int32_t UIContentServiceProxy::SendCommand(const std::string command)
 int32_t UIContentServiceProxy::SendCommand(
     int32_t id, const std::string& command, const SendCommandFinishCallback& finishCallback)
 {
+    UiSessionCommandRequestTraceBegin("Callback.Node");
     return SendCommandWithFinishCallback(
         SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK, &id, command, finishCallback);
 }
@@ -757,6 +760,7 @@ int32_t UIContentServiceProxy::SendCommand(
 int32_t UIContentServiceProxy::SendCommand(
     const std::string command, const SendCommandFinishCallback& finishCallback)
 {
+    UiSessionCommandRequestTraceBegin("Callback.Global");
     return SendCommandWithFinishCallback(
         SEND_COMMAND_WITH_FINISH_CALLBACK, nullptr, command, finishCallback);
 }
