@@ -925,6 +925,19 @@ public:
         CHECK_NULL_VOID(pipeline);
         auto taskExecutor = container->GetTaskExecutor();
         CHECK_NULL_VOID(taskExecutor);
+        taskExecutor->PostTask(
+            [instanceId = instanceId_, avoidArea, type] {
+            ContainerScope scope(instanceId);
+            auto container = Platform::AceContainer::GetContainer(instanceId);
+            CHECK_NULL_VOID(container);
+            auto pipeline = container->GetPipelineContext();
+            CHECK_NULL_VOID(pipeline);
+            auto context = AceType::DynamicCast<NG::PipelineContext>(pipeline);
+            CHECK_NULL_VOID(context);
+            auto dynamicComponentManager = context->GetDynamicComponentSafeManager();
+            dynamicComponentManager->UpdateAllDCAvoidArea(instanceId, avoidArea, type);
+            },
+            TaskExecutor::TaskType::UI, "ArkUIUpdateAllDCAvoidArea");
         if (type == Rosen::AvoidAreaType::TYPE_SYSTEM) {
             systemSafeArea_ = ConvertAvoidArea(avoidArea);
         } else if (type == Rosen::AvoidAreaType::TYPE_NAVIGATION_INDICATOR) {
@@ -4260,7 +4273,8 @@ void KeyboardAvoid(OHOS::Rosen::WindowSizeChangeReason reason, int32_t instanceI
     auto rect = info->rect_;
     Rect keyboardRect = Rect(rect.posX_, rect.posY_, rect.width_, rect.height_);
     SetKeyboardInfo(pipelineContext, keyboardRect.Height());
-    if (DynamicKeyboardAvoid(reason, instanceId, pipelineContext, info, rsTransaction, avoidAreas)) {
+    if (DynamicKeyboardAvoid(reason, instanceId, pipelineContext, info,
+        rsTransaction, avoidAreas)) {
         return;
     }
     if (UIExtensionKeyboardAvoid(pipelineContext, instanceId, keyboardRect, info)) {
