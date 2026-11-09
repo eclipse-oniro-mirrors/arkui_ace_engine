@@ -175,8 +175,10 @@ private:
     struct SplitTrackingState;
     class CapiImpl;
     std::unique_ptr<CapiImpl> capiImpl_;
+#ifndef CROSS_PLATFORM
     std::unique_ptr<SplitTrackingState> splitTracking_;
     std::map<int32_t, std::shared_ptr<DeferredPageSceneQuery>> pageSceneQueries_;
+#endif
 
     static RefPtr<FrameNode> GetSwiperContentChangeNode(const RefPtr<FrameNode>& node, bool hasTabsAncestor);
     void OnScrollChangeStartInner(const RefPtr<FrameNode>& node);
