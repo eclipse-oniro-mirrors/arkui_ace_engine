@@ -154,6 +154,9 @@ int32_t UIContentServiceProxy::Connect(const EventCallback& eventCallback,
         LOGW("connect write interface token failed");
         return FAILED;
     }
+    if (report_ != nullptr) {
+        LOGW("connect again");
+    }
     report_ = new (std::nothrow) UiReportStub();
     if (report_ == nullptr) {
         LOGW("connect failed,create reportStub failed");
@@ -164,13 +167,13 @@ int32_t UIContentServiceProxy::Connect(const EventCallback& eventCallback,
         LOGW("write reportStub failed");
         return FAILED;
     }
+    report_->SetEventHandler(eventHandler);
     int32_t sendRequestErrorCode = Remote()->SendRequest(UI_CONTENT_CONNECT, data, reply, option);
     if (sendRequestErrorCode != ERR_NONE) {
         LOGW("connect send request failed, errorCode is %{public}d", sendRequestErrorCode);
         return REPLY_ERROR;
     }
     isConnected_ = true;
-    report_->SetEventHandler(eventHandler);
     return NO_ERROR;
 }
 
