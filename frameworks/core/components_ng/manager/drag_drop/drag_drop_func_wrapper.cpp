@@ -1594,10 +1594,9 @@ void DragDropFuncWrapper::GetThumbnailPixelMapAsync(const RefPtr<GestureEventHub
         if (pixelMap != nullptr) {
             auto taskScheduler = Container::CurrentTaskExecutor();
             CHECK_NULL_VOID(taskScheduler);
-            auto gestureHub = weakGestureHub.Upgrade();
-            CHECK_NULL_VOID(gestureHub);
             taskScheduler->PostTask(
-                [gestureHub, pixelMap]() {
+                [weakGestureHub, pixelMap]() {
+                    auto gestureHub = weakGestureHub.Upgrade();
                     CHECK_NULL_VOID(gestureHub);
                     gestureHub->SetPixelMap(pixelMap);
                     TAG_LOGI(AceLogTag::ACE_DRAG, "Set thumbnail pixelMap async success.");
