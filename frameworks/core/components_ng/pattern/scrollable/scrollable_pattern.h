@@ -1263,7 +1263,7 @@ protected:
     // Explicit value of enableScrollWithMouse set by the developer.
     // nullopt means not explicitly set: the direction-aware default applies.
     std::optional<bool> isAllowMouse_;
-    bool isAllowKeyboard_ = true;
+    bool isAllowKeyboard_ = false;
 
     void CheckScrollBarOff();
 

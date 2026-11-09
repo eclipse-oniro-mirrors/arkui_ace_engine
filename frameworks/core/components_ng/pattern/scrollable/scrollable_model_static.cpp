@@ -429,7 +429,7 @@ void ScrollableModelStatic::ResetEnableScrollWithKeyboard(FrameNode* frameNode)
     CHECK_NULL_VOID(frameNode);
     auto pattern = frameNode->GetPattern<ScrollablePattern>();
     CHECK_NULL_VOID(pattern);
-    pattern->SetIsAllowKeyboard(true);
+    pattern->SetIsAllowKeyboard(false);
 }
 
 void ScrollableModelStatic::SetAutoAdjustScrollBarMargin(FrameNode* frameNode, std::optional<bool> autoAdjust)
