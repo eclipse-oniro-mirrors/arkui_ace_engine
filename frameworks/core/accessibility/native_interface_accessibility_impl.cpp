@@ -94,7 +94,7 @@ bool ArkUI_AccessibilityElementInfoList::CopyAccessibilityElementInfo(
 {
     std::lock_guard<std::mutex> lock(mutex_);
     if (elementInfos_.empty()) {
-        return false;
+        return true;
     }
 
     std::copy(elementInfos_.begin(), elementInfos_.end(), std::back_inserter(infos));
