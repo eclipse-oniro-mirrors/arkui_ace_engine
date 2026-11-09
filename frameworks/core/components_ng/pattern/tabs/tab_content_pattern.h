@@ -460,6 +460,24 @@ public:
         }
     }
 
+    RefPtr<TabBarPattern> GetTabBarPattern() const
+    {
+        auto host = GetHost();
+        CHECK_NULL_RETURN(host, nullptr);
+        auto parentNode = host->GetAncestorNodeOfFrame(false);
+        CHECK_NULL_RETURN(parentNode, nullptr);
+        auto grandParentNode = parentNode->GetAncestorNodeOfFrame(false);
+        CHECK_NULL_RETURN(grandParentNode, nullptr);
+        if (grandParentNode->GetTag() != TABS_ETS_TAG_PATTERN) {
+            return nullptr;
+        }
+        auto tabsNode = AceType::DynamicCast<TabsNode>(grandParentNode);
+        CHECK_NULL_RETURN(tabsNode, nullptr);
+        auto tabBar = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
+        CHECK_NULL_RETURN(tabBar, nullptr);
+        return tabBar->GetPattern<TabBarPattern>();
+    }
+
     void OnColorModeChange(uint32_t colorMode) override
     {
         CHECK_NULL_VOID(SystemProperties::ConfigChangePerform());
@@ -487,12 +505,12 @@ public:
         }
         if (!layout->HasIconSelectedColorSetByUser() || !layout->GetIconSelectedColorSetByUserValue()) {
             auto currentIconStyle = GetIconStyle();
-            currentIconStyle.selectedColor = theme->GetBottomTabTextOn();
+            currentIconStyle.selectedColor = theme->GetBottomTabIconOn();
             SetIconStyle(currentIconStyle);
         }
         if (!layout->HasIconUnselectedColorSetByUser() || !layout->GetIconUnselectedColorSetByUserValue()) {
             auto currentIconStyle = GetIconStyle();
-            currentIconStyle.unselectedColor = theme->GetBottomTabTextOff();
+            currentIconStyle.unselectedColor = theme->GetBottomTabIconOff();
             SetIconStyle(currentIconStyle);
         }
         auto tabContentNode = AceType::DynamicCast<TabContentNode>(host);
@@ -524,12 +542,12 @@ public:
         }
         if (!layout->HasIconSelectedColorSetByUser() || !layout->GetIconSelectedColorSetByUserValue()) {
             auto currentIconStyle = GetIconStyle();
-            currentIconStyle.selectedColor = theme->GetBottomTabTextOn();
+            currentIconStyle.selectedColor = theme->GetBottomTabIconOn();
             SetIconStyle(currentIconStyle);
         }
         if (!layout->HasIconUnselectedColorSetByUser() || !layout->GetIconUnselectedColorSetByUserValue()) {
             auto currentIconStyle = GetIconStyle();
-            currentIconStyle.unselectedColor = theme->GetBottomTabTextOff();
+            currentIconStyle.unselectedColor = theme->GetBottomTabIconOff();
             SetIconStyle(currentIconStyle);
         }
         auto tabContentNode = AceType::DynamicCast<TabContentNode>(host);

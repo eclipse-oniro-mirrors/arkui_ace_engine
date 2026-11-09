@@ -54,7 +54,6 @@ public:
         CHECK_NULL_RETURN(tabTheme, FocusPattern());
         FocusPaintParam focusPaintParam;
         focusPaintParam.SetPaintWidth(tabTheme->GetActiveIndicatorWidth());
-        focusPaintParam.SetPaintColor(focusTheme->GetColor());
         FocusPattern focus = { FocusType::SCOPE, true, FocusStyleType::CUSTOM_REGION, focusPaintParam };
 
         auto tabBar = host->GetAncestorNodeOfFrame(false);

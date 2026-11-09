@@ -2674,7 +2674,7 @@ HWTEST_F(TabsTestNg, TabBarItemFocusPatternNewMaterial002, TestSize.Level1)
     EXPECT_EQ(focusPattern.GetFocusType(), FocusType::SCOPE);
     const auto& paintParams = focusPattern.GetFocusPaintParams();
     ASSERT_TRUE(paintParams != nullptr);
-    EXPECT_TRUE(paintParams->HasPaintColor());
+    EXPECT_FALSE(paintParams->HasPaintColor());
     EXPECT_TRUE(paintParams->HasPaintWidth());
 }
 

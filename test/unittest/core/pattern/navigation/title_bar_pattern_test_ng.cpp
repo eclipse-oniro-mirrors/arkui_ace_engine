@@ -33,6 +33,7 @@
 #include "core/components_ng/pattern/navigation/navigation_title_util.h"
 #include "core/components_ng/pattern/navigation/title_bar_node.h"
 #include "core/components_ng/pattern/navigation/title_bar_pattern.h"
+#include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
 #include "core/components_ng/pattern/scroll/scroll_pattern.h"
 #include "core/components_ng/pattern/text/text_pattern.h"
 #include "core/components_ng/pattern/menu/menu_pattern.h"
@@ -2043,5 +2044,70 @@ HWTEST_F(TitleBarPatternTestNg, PrasePaddingEnd001, TestSize.Level1)
     result = layoutAlgorithm->PrasePaddingEnd(titleBarNode, avoidWidth2);
     EXPECT_TRUE(result);
     EXPECT_EQ(avoidWidth2, 100.0f);
+}
+
+/**
+ * @tc.name: OnThemeScopeUpdateMenuNull001
+ * @tc.desc: Test OnThemeScopeUpdate when menu node is null (early return path)
+ * @tc.type: FUNC
+ */
+HWTEST_F(TitleBarPatternTestNg, OnThemeScopeUpdateMenuNull001, TestSize.Level1)
+{
+    auto titleBarNode = TitleBarNode::GetOrCreateTitleBarNode(V2::TITLE_BAR_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<TitleBarPattern>(); });
+    ASSERT_NE(titleBarNode, nullptr);
+    auto titleBarPattern = titleBarNode->GetPattern<TitleBarPattern>();
+    ASSERT_NE(titleBarPattern, nullptr);
+
+    auto result = titleBarPattern->OnThemeScopeUpdate(0);
+    EXPECT_FALSE(result);
+}
+
+/**
+ * @tc.name: OnThemeScopeUpdateMenuTagMismatch001
+ * @tc.desc: Test OnThemeScopeUpdate when menu node tag does not match NAVIGATION_MENU_ETS_TAG
+ * @tc.type: FUNC
+ */
+HWTEST_F(TitleBarPatternTestNg, OnThemeScopeUpdateMenuTagMismatch001, TestSize.Level1)
+{
+    auto titleBarNode = TitleBarNode::GetOrCreateTitleBarNode(V2::TITLE_BAR_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<TitleBarPattern>(); });
+    ASSERT_NE(titleBarNode, nullptr);
+    auto titleBarPattern = titleBarNode->GetPattern<TitleBarPattern>();
+    ASSERT_NE(titleBarPattern, nullptr);
+
+    auto fakeMenu = FrameNode::CreateFrameNode("FakeMenu", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<LinearLayoutPattern>(false));
+    ASSERT_NE(fakeMenu, nullptr);
+    titleBarNode->SetMenu(fakeMenu);
+
+    auto result = titleBarPattern->OnThemeScopeUpdate(0);
+    EXPECT_FALSE(result);
+}
+
+/**
+ * @tc.name: OnThemeScopeUpdateWithMenuItem001
+ * @tc.desc: Test OnThemeScopeUpdate with menu item children to verify focus color refresh path
+ * @tc.type: FUNC
+ */
+HWTEST_F(TitleBarPatternTestNg, OnThemeScopeUpdateWithMenuItem001, TestSize.Level1)
+{
+    auto titleBarNode = TitleBarNode::GetOrCreateTitleBarNode(V2::TITLE_BAR_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<TitleBarPattern>(); });
+    ASSERT_NE(titleBarNode, nullptr);
+    auto titleBarPattern = titleBarNode->GetPattern<TitleBarPattern>();
+    ASSERT_NE(titleBarPattern, nullptr);
+
+    auto menuNode = FrameNode::CreateFrameNode(V2::NAVIGATION_MENU_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<LinearLayoutPattern>(false));
+    ASSERT_NE(menuNode, nullptr);
+    auto menuItem = FrameNode::CreateFrameNode(V2::MENU_ITEM_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<LinearLayoutPattern>(false));
+    ASSERT_NE(menuItem, nullptr);
+    menuNode->AddChild(menuItem);
+    titleBarNode->SetMenu(menuNode);
+
+    auto result = titleBarPattern->OnThemeScopeUpdate(0);
+    EXPECT_FALSE(result);
 }
 } // namespace OHOS::Ace::NG

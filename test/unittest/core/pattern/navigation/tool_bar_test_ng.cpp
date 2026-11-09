@@ -1868,4 +1868,69 @@ HWTEST_F(ToolBarTestNg, UpdateBackgroundStyleMultiThread, TestSize.Level1)
     MultiThreadBuildManager::isUIThread_ = isUIThread;
     MultiThreadBuildManager::SetIsThreadSafeNodeScope(false);
 }
+
+/**
+ * @tc.name: NavToolbarOnThemeScopeUpdateHostNull001
+ * @tc.desc: Test NavToolbarPattern::OnThemeScopeUpdate when host is not NavToolbarNode (early return)
+ * @tc.type: FUNC
+ */
+HWTEST_F(ToolBarTestNg, NavToolbarOnThemeScopeUpdateHostNull001, TestSize.Level1)
+{
+    auto frameNode = FrameNode::CreateFrameNode("BackButton", ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavToolbarPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    auto navToolbarPattern = frameNode->GetPattern<NavToolbarPattern>();
+    ASSERT_NE(navToolbarPattern, nullptr);
+
+    auto result = navToolbarPattern->OnThemeScopeUpdate(0);
+    EXPECT_FALSE(result);
+}
+
+/**
+ * @tc.name: NavToolbarOnThemeScopeUpdateNoChildren001
+ * @tc.desc: Test NavToolbarPattern::OnThemeScopeUpdate when toolbar container has no children
+ * @tc.type: FUNC
+ */
+HWTEST_F(ToolBarTestNg, NavToolbarOnThemeScopeUpdateNoChildren001, TestSize.Level1)
+{
+    auto toolbarNode = NavToolbarNode::GetOrCreateToolbarNode(V2::TOOL_BAR_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<NavToolbarPattern>(); });
+    ASSERT_NE(toolbarNode, nullptr);
+    auto navToolbarPattern = toolbarNode->GetPattern<NavToolbarPattern>();
+    ASSERT_NE(navToolbarPattern, nullptr);
+
+    auto container = FrameNode::CreateFrameNode(V2::TOOL_BAR_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<LinearLayoutPattern>(false));
+    ASSERT_NE(container, nullptr);
+    toolbarNode->SetToolbarContainerNode(container);
+
+    auto result = navToolbarPattern->OnThemeScopeUpdate(0);
+    EXPECT_FALSE(result);
+}
+
+/**
+ * @tc.name: NavToolbarOnThemeScopeUpdateWithChildren001
+ * @tc.desc: Test NavToolbarPattern::OnThemeScopeUpdate with toolbar item children to verify paint color update
+ * @tc.type: FUNC
+ */
+HWTEST_F(ToolBarTestNg, NavToolbarOnThemeScopeUpdateWithChildren001, TestSize.Level1)
+{
+    auto toolbarNode = NavToolbarNode::GetOrCreateToolbarNode(V2::TOOL_BAR_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<NavToolbarPattern>(); });
+    ASSERT_NE(toolbarNode, nullptr);
+    auto navToolbarPattern = toolbarNode->GetPattern<NavToolbarPattern>();
+    ASSERT_NE(navToolbarPattern, nullptr);
+
+    auto container = FrameNode::CreateFrameNode(V2::TOOL_BAR_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<LinearLayoutPattern>(false));
+    ASSERT_NE(container, nullptr);
+    auto buttonChild = FrameNode::CreateFrameNode(V2::TOOL_BAR_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<LinearLayoutPattern>(false));
+    ASSERT_NE(buttonChild, nullptr);
+    container->AddChild(buttonChild);
+    toolbarNode->SetToolbarContainerNode(container);
+
+    auto result = navToolbarPattern->OnThemeScopeUpdate(0);
+    EXPECT_FALSE(result);
+}
 } // namespace OHOS::Ace::NG
