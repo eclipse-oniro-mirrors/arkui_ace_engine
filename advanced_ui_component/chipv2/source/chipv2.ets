@@ -1226,16 +1226,18 @@ export struct ChipV2 {
   }
 
   private getChipResponseRegion(): Rectangle | undefined {
-    // Large-font scaling (e.g. care mode) can stretch the chip beyond the themed or
-    // user-specified height, so prefer the measured height once layout has happened.
-    const chipHeight = this.actualChipHeight > 0 ? this.actualChipHeight : this.getChipHeight();
-    if (chipHeight < HOT_SPOT_MIN_HEIGHT) {
-      return {
-        x: 0,
-        y: (chipHeight - HOT_SPOT_MIN_HEIGHT) / 2,
-        width: '100%',
-        height: HOT_SPOT_MIN_HEIGHT
-      };
+    if (deviceInfo.sdkApiVersion >= 26) {
+      // Large-font scaling (e.g. care mode) can stretch the chip beyond the themed or
+      // user-specified height, so prefer the measured height once layout has happened.
+      const chipHeight = this.actualChipHeight > 0 ? this.actualChipHeight : this.getChipHeight();
+      if (chipHeight < HOT_SPOT_MIN_HEIGHT) {
+        return {
+          x: 0,
+          y: (chipHeight - HOT_SPOT_MIN_HEIGHT) / 2,
+          width: '100%',
+          height: HOT_SPOT_MIN_HEIGHT
+        };
+      }
     }
     return undefined;
   }
