@@ -35,7 +35,7 @@ void WaterFlowSections::ChangeData(
 
     if (start < sections_.size()) {
         auto it = sections_.begin() + static_cast<int32_t>(start);
-        sections_.erase(it, it + static_cast<int32_t>(deleteCount));
+        it = sections_.erase(it, it + static_cast<int32_t>(deleteCount));
         sections_.insert(it, newSections.begin(), newSections.end());
     } else {
         sections_.insert(sections_.end(), newSections.begin(), newSections.end());
