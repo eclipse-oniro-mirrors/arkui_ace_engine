@@ -26,11 +26,15 @@ class LifeCycleObserver;
 // NOTICE: NOT multi-thread safe
 class ACE_FORCE_EXPORT LifeCycleObservable {
 public:
-    void Subscrible(LifeCycleObserver* observer)
+    LifeCycleObservable() = default;
+    LifeCycleObservable(const LifeCycleObservable&) = delete;
+    LifeCycleObservable& operator=(const LifeCycleObservable&) = delete;
+
+    void Subscribe(LifeCycleObserver* observer)
     {
         observers_.insert(observer);
     }
-    void Unsubscrible(LifeCycleObserver* observer)
+    void Unsubscribe(LifeCycleObserver* observer)
     {
         observers_.erase(observer);
     }
@@ -45,12 +49,15 @@ class ACE_FORCE_EXPORT LifeCycleObserver final {
 public:
     LifeCycleObserver(LifeCycleObservable* observable) : observable_(observable)
     {
-        observable_->Subscrible(this);
+        observable_->Subscribe(this);
     }
+    LifeCycleObserver(const LifeCycleObserver&) = delete;
+    LifeCycleObserver& operator=(const LifeCycleObserver&) = delete;
+
     ~LifeCycleObserver()
     {
         if (observable_) {
-            observable_->Unsubscrible(this);
+            observable_->Unsubscribe(this);
         }
     }
     void Notify()
@@ -60,7 +67,7 @@ public:
     template<typename T = LifeCycleObservable>
     T* Get() const
     {
-        return reinterpret_cast<T*>(observable_);
+        return static_cast<T*>(observable_);
     }
 private:
     LifeCycleObservable* observable_;
