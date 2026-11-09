@@ -575,6 +575,48 @@ std::vector<std::string> SplitAllByString(const std::string &src, const std::str
     return result;
 }
 
+// Validate ByRect params: x, y, width, height must all be present as numbers
+// and width > 0, height > 0.
+bool IsValidRectParams(const std::string& json)
+{
+    if (json.empty()) {
+        return false;
+    }
+    auto root = JsonUtil::ParseJsonString(json);
+    if (!root || !root->IsValid()) {
+        return false;
+    }
+    auto xVal = root->GetValue("x");
+    auto yVal = root->GetValue("y");
+    auto wVal = root->GetValue("width");
+    auto hVal = root->GetValue("height");
+    if (!xVal || !yVal || !wVal || !hVal) {
+        return false;
+    }
+    if (!xVal->IsNumber() || !yVal->IsNumber() ||
+        !wVal->IsNumber() || !hVal->IsNumber()) {
+        return false;
+    }
+    return wVal->GetDouble() > 0 && hVal->GetDouble() > 0;
+}
+ 
+// Validate ByPoint params: pointX, pointY must both be present as numbers.
+bool IsValidPointParams(const std::string& json)
+{
+    if (json.empty()) {
+        return false;
+    }
+    auto root = JsonUtil::ParseJsonString(json);
+    if (!root || !root->IsValid()) {
+        return false;
+    }
+    auto pxVal = root->GetValue("pointX");
+    auto pyVal = root->GetValue("pointY");
+    if (!pxVal || !pyVal) {
+        return false;
+    }
+    return pxVal->IsNumber() && pyVal->IsNumber();
+}
 } // namespace
 
 namespace SameLayerSurface {
@@ -11378,7 +11420,51 @@ void WebPattern::GetWebInfoByRequest(uint32_t windowId, int32_t webId, const std
             }, static_cast<int32_t>(OHOS::NWeb::NWebDomExtractionMode::VIEWPORT_ONLY));
         return;
     }
-    return;
+    if (HandleNativeDomTreeRequest(windowId, webId, request, finishCallback)) {
+        return;
+    }
+    TAG_LOGE(AceLogTag::ACE_WEB, "WebPattern GetWebInfoByRequest unknown request:%{public}s WebId:%{public}d",
+        request.c_str(), webId);
+    finishCallback(windowId, webId, request, "", WebRequestErrorCode::INVALID_REQUEST);
+}
+
+bool WebPattern::HandleNativeDomTreeRequest(uint32_t windowId, int32_t webId, const std::string& request,
+    const std::function<void(int32_t, int32_t, const std::string&, const std::string&, WebRequestErrorCode)>& finishCallback)
+{
+    std::string rectJson;
+    auto colonPos = request.find(':');
+    if (colonPos != std::string::npos) {
+        rectJson = request.substr(colonPos + 1);
+    }
+    bool isByNative = request == WEB_INTERFACE_REQUEST_DOM_TREE_BY_NATIVE;
+    bool isByRect = request.rfind(WEB_INTERFACE_REQUEST_DOM_TREE_BY_RECT, 0) == 0;
+    bool isByPoint = request.rfind(WEB_INTERFACE_REQUEST_DOM_TREE_BY_POINT, 0) == 0;
+    if (!isByNative && !isByRect && !isByPoint) {
+        return false;
+    }
+    if ((isByRect && !IsValidRectParams(rectJson)) || (isByPoint && !IsValidPointParams(rectJson))) {
+        TAG_LOGE(AceLogTag::ACE_WEB,
+            "WebPattern NativeDomTree invalid params, request:%{public}s returning empty", request.c_str());
+        finishCallback(windowId, webId, request, "[]", WebRequestErrorCode::INVALID_REQUEST);
+        return true;
+    }
+    TAG_LOGI(AceLogTag::ACE_WEB, "WebPattern NativeDomTree dispatch WebId:%{public}d request:%{public}s",
+        webId, request.c_str());
+    auto offset = GetCoordinatePoint().value_or(OffsetF());
+    auto startTime = GetCurrentTimestamp();
+    auto nativeCallback = [weak = AceType::WeakClaim(this), windowId, webId, request, finishCallback, startTime](
+        const std::string& result) {
+        auto pattern = weak.Upgrade();
+        auto code = result.empty() ? WebRequestErrorCode::INVALID_REQUEST : WebRequestErrorCode::OK;
+        auto elapsedMs = GetCurrentTimestamp() - startTime;
+        TAG_LOGI(AceLogTag::ACE_WEB,
+            "WebPattern NativeDomTree callback WebId:%{public}d request:%{public}s elapsed:%{public}lldms "
+            "resultSize:%{public}zu code:%{public}d",
+            webId, request.c_str(), static_cast<long long>(elapsedMs), result.size(), static_cast<int32_t>(code));
+        finishCallback(windowId, webId, request, result, code);
+    };
+    delegate_->RequestNativeDomTree(nativeCallback, offset, rectJson);
+    return true;
 }
 
 void WebPattern::SendTranslateResult(std::vector<std::string> results, std::vector<int32_t> ids)

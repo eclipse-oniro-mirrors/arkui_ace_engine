@@ -17,6 +17,7 @@
 
 #include "base/json/json_util.h"
 #include "core/components/web/resource/web_delegate.h"
+#include "core/components/web/resource/web_string_value_callback_impl.h"
 #include "core/components/web/resource/web_page_scene_manager.h"
 
 using namespace testing;
@@ -111,6 +112,49 @@ HWTEST_F(WebDelegateJsScriptTest, ParseControlsJson_PendingResponse, TestSize.Le
     std::string resultJson = R"({"errorCode": 3, "controls": []})";
     auto controls = WebPageSceneManager::GetInstance().ParseControlsJson(resultJson);
     EXPECT_TRUE(controls.empty());
+}
+
+/**
+ * @tc.name: WebStringValueCallbackImpl_OnReceiveValue_NullCallback_001
+ * @tc.desc: Test OnReceiveValue with null callback returns early without crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebDelegateJsScriptTest, WebStringValueCallbackImpl_OnReceiveValue_NullCallback_001, TestSize.Level1)
+{
+    auto callbackImpl = std::make_shared<WebStringValueCallbackImpl>();
+    ASSERT_NE(callbackImpl, nullptr);
+    callbackImpl->OnReceiveValue("test_value");
+    SUCCEED();
+}
+
+/**
+ * @tc.name: WebStringValueCallbackImpl_OnReceiveValue_WithCallback_001
+ * @tc.desc: Test OnReceiveValue with valid callback invokes callback with value.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebDelegateJsScriptTest, WebStringValueCallbackImpl_OnReceiveValue_WithCallback_001, TestSize.Level1)
+{
+    auto callbackImpl = std::make_shared<WebStringValueCallbackImpl>();
+    ASSERT_NE(callbackImpl, nullptr);
+    std::string capturedValue;
+    callbackImpl->SetCallBack([&capturedValue](const std::string& value) { capturedValue = value; });
+    callbackImpl->OnReceiveValue("expected_result");
+    EXPECT_EQ(capturedValue, "expected_result");
+}
+
+/**
+ * @tc.name: WebStringValueCallbackImpl_SetCallBack_001
+ * @tc.desc: Test SetCallBack stores callback for later invocation.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebDelegateJsScriptTest, WebStringValueCallbackImpl_SetCallBack_001, TestSize.Level1)
+{
+    auto callbackImpl = std::make_shared<WebStringValueCallbackImpl>();
+    ASSERT_NE(callbackImpl, nullptr);
+    bool invoked = false;
+    callbackImpl->SetCallBack([&invoked](const std::string&) { invoked = true; });
+    callbackImpl->OnReceiveValue("trigger");
+    EXPECT_TRUE(invoked);
 }
 
 } // namespace OHOS::Ace

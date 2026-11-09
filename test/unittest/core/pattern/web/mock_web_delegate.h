@@ -19,6 +19,8 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include "core/components_ng/pattern/web/web_pattern.h"
+
 namespace OHOS::NWeb {
 class NWebAccessibilityNodeInfo;
 class NWebAgentManager;
@@ -34,6 +36,21 @@ void SetMockSerializeWebState(const std::vector<uint8_t>& result);
 void ResetMockSerializeWebState();
 void SetMockRestoreWebState(bool result);
 void ResetMockRestoreWebState();
+
+// Test-only knobs to capture WebDelegate::RequestNativeDomTree calls.
+// SetMockRequestNativeDomTreeCallback installs a callback invoked on every
+// RequestNativeDomTree call with (offset, rectJson); the captured values can
+// be read via GetMockRequestNativeDomTreeLastOffset/...LastRectJson. Reset
+// via ResetMockRequestNativeDomTree.
+struct MockRequestNativeDomTreeCall {
+    bool called = false;
+    NG::OffsetF offset;
+    std::string rectJson;
+};
+void SetMockRequestNativeDomTreeCallback(std::function<void(const NG::OffsetF&, const std::string&)> cb);
+const MockRequestNativeDomTreeCall& GetMockRequestNativeDomTreeLastCall();
+void ResetMockRequestNativeDomTree();
+void SetMockRequestNativeDomTreeResult(const std::string& result);
 } // namespace OHOS::Ace
 
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_WEB_MOCK_WEB_DELEGATE_H

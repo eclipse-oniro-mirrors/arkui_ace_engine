@@ -20,6 +20,7 @@
 
 #include "core/components/web/web_event.h"
 #include "core/components/web/resource/web_delegate.h"
+#include "core/components/web/resource/web_string_value_callback_impl.h"
 #include "core/components_ng/pattern/web/web_pattern.h"
 #include "core/components_ng/pattern/web/web_util.h"
 #include "arkweb_utils.h"
@@ -38,6 +39,10 @@ static std::vector<uint8_t> g_serializeWebStateResult;
 static bool g_restoreWebStateResult = false;
 std::shared_ptr<NWeb::NWebAccessibilityNodeInfo> g_customAccessibilityNode = nullptr;
 std::shared_ptr<NWeb::NWebAgentManager> g_nwebAgentManager = nullptr;
+// Mock state for WebDelegate::RequestNativeDomTree.
+MockRequestNativeDomTreeCall g_mockRequestNativeDomTreeCall;
+std::function<void(const NG::OffsetF&, const std::string&)> g_mockRequestNativeDomTreeCb;
+std::string g_mockRequestNativeDomTreeResult = R"([{"tag":"div"}])";
 std::map<std::string, std::string> htmlElementToSurfaceMap = { { "existhtmlElementId", "existSurfaceId" },
     { "existhtmlElementIdOther", "existSurfaceIdOther" } };
 std::map<std::string, std::string> surfaceToHtmlElementMap = { { "existSurfaceId", "existhtmlElementId" },
@@ -1483,6 +1488,26 @@ void ResetMockRestoreWebState()
 {
     g_restoreWebStateResult = false;
 }
+void SetMockRequestNativeDomTreeCallback(std::function<void(const NG::OffsetF&, const std::string&)> cb)
+{
+    g_mockRequestNativeDomTreeCb = std::move(cb);
+}
+const MockRequestNativeDomTreeCall& GetMockRequestNativeDomTreeLastCall()
+{
+    return g_mockRequestNativeDomTreeCall;
+}
+void ResetMockRequestNativeDomTree()
+{
+    g_mockRequestNativeDomTreeCall.called = false;
+    g_mockRequestNativeDomTreeCall.offset = NG::OffsetF();
+    g_mockRequestNativeDomTreeCall.rectJson = "";
+    g_mockRequestNativeDomTreeCb = nullptr;
+    g_mockRequestNativeDomTreeResult = R"([{"tag":"div"}])";
+}
+void SetMockRequestNativeDomTreeResult(const std::string& result)
+{
+    g_mockRequestNativeDomTreeResult = result;
+}
 int WebDelegate::SendCommandActionToNWeb(const std::shared_ptr<OHOS::NWeb::NWebCommandAction>& simulatedAction)
 {
     return -1;
@@ -1616,6 +1641,27 @@ void WebDelegate::UnregisterFreeMultiWindowListener() {}
 void WebDelegate::RequestWebDomJsonString(const std::function<void(const std::string)>&& callback) {}
 void WebDelegate::RequestWebDomJsonStringWithOptions(
     const std::function<void(const std::string)>&& callback, int32_t mode) {}
+
+void WebDelegate::RequestNativeDomTree(
+    std::function<void(const std::string&)>&& callback, const NG::OffsetF& offset, const std::string& rectJson)
+{
+    g_mockRequestNativeDomTreeCall.called = true;
+    g_mockRequestNativeDomTreeCall.offset = offset;
+    g_mockRequestNativeDomTreeCall.rectJson = rectJson;
+    if (g_mockRequestNativeDomTreeCb) {
+        g_mockRequestNativeDomTreeCb(offset, rectJson);
+    }
+    if (callback) {
+        callback(g_mockRequestNativeDomTreeResult);
+    }
+}
+void WebDelegate::RequestNativeDomTreeInner(const WeakPtr<WebDelegate>& weak,
+    std::function<void(const std::string&)>&& callback, const NG::OffsetF& offset, const std::string& rectJson) {}
+std::string WebDelegate::BuildNativeDomCommand(const NG::OffsetF& offset, const std::string& rectJson)
+{
+    return "";
+}
+
 void WebDelegate::UpdateFullScreenVideoOverlayEnable(bool) {}
 void WebDelegate::OnFullScreenVideoOverlayEnter(const char*) {}
 void WebDelegate::OnVideoStatusChanged(const int action, const std::map<std::string, std::string>& param) {}
@@ -1644,4 +1690,12 @@ int32_t WebDelegate::GetHostNodeId() { return -1; }
 void FullScreenVideoOverlayHandlerOhos::SetVideoSurface(std::string surfaceId) {}
 
 void FullScreenVideoOverlayHandlerOhos::RequestMediaControl(int32_t action, std::string param) {}
+
+void WebStringValueCallbackImpl::OnReceiveValue(const std::string& value)
+{
+    auto callback = std::move(callback_);
+    if (callback) {
+        callback(value);
+    }
+}
 } // namespace OHOS::Ace

@@ -21,6 +21,7 @@
 #include <cerrno>
 #include <cctype>
 #include <cinttypes>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
@@ -30,6 +31,7 @@
 #include <fstream>
 #include <limits>
 #include <sstream>
+#include <string>
 #include <sys/time.h>
 #include <unistd.h>
 
@@ -53,6 +55,9 @@ constexpr int32_t MAX_UNIQUE_FILE_SUFFIX = 100;
 constexpr int32_t FILE_SUFFIX_WIDTH = 2;
 constexpr char WEB_INTERFACE_REQUEST_DOM_TREE[] = "RequestArkWebDomTree";
 constexpr char WEB_INTERFACE_REQUEST_DOM_TREE_VIEWPORT[] = "RequestArkWebDomTreeViewport";
+constexpr char WEB_INTERFACE_REQUEST_DOM_TREE_BY_NATIVE[] = "RequestArkWebDomTreeByNative";
+constexpr char WEB_INTERFACE_REQUEST_DOM_TREE_BY_RECT[] = "RequestArkWebDomTreeByRect";
+constexpr char WEB_INTERFACE_REQUEST_DOM_TREE_BY_POINT[] = "RequestArkWebDomTreeByPoint";
 constexpr size_t BITS_UINT32 = sizeof(uint32_t) * 8;
 constexpr int32_t PARAMS_OFFSET = 1;
 constexpr size_t MAX_INSPECTOR_CASE_ID_LENGTH = 64;
@@ -75,6 +80,17 @@ constexpr uint8_t NIBBLE_BITS = 4;
 constexpr uint8_t LOW_NIBBLE_MASK = 0x0F;
 constexpr int32_t START_WEB_VIEW_TRANSLATE = 2;
 constexpr int32_t GET_WEB_INFO_BY_REQUEST_PARAMS = 3;
+constexpr int32_t GET_WEB_INFO_BY_RECT_PARAMS = 7;
+constexpr int32_t GET_WEB_INFO_BY_POINT_PARAMS = 5;
+constexpr size_t WEB_ID_PARAM_INDEX = 1;
+constexpr size_t REQUEST_PARAM_INDEX = 2;
+constexpr size_t RECT_X_PARAM_INDEX = 3;
+constexpr size_t RECT_Y_PARAM_INDEX = 4;
+constexpr size_t RECT_WIDTH_PARAM_INDEX = 5;
+constexpr size_t RECT_HEIGHT_PARAM_INDEX = 6;
+constexpr size_t POINT_X_PARAM_INDEX = 3;
+constexpr size_t POINT_Y_PARAM_INDEX = 4;
+constexpr int32_t DOMTREE_LOG_PREVIEW_LENGTH = 200;
 constexpr int32_t EXE_APP_AI_FUNCTION_PARAMS = 3;
 constexpr int32_t GET_STATE_MGMT_INFO_PARAMS = 4;
 constexpr int32_t GET_SPECIFIED_CONTENT_OFFSETS_PARAMS = 3;
@@ -1047,42 +1063,100 @@ void UiSaService::HandleGetImagesById(sptr<IUiContentService> service, std::vect
 
 void UiSaService::HandleGetWebInfoByRequest(sptr<IUiContentService> service, std::vector<std::string> params)
 {
-    if (params.size() >= GET_WEB_INFO_BY_REQUEST_PARAMS) {
-        int32_t webId = std::atoi(params[1].c_str());
-        std::string request = params[2];
-        auto finishCallback = [](int32_t winId, int32_t webId, const std::string& request, const std::string& result,
-            WebRequestErrorCode code) {
-            LOGI("[GetWebInfoByRequest] finishCallback winId=%{public}d, webId=%{public}d", winId, webId);
-            LOGI("[GetWebInfoByRequest] finishCallback request=%{public}s", request.c_str());
-            LOGI("[GetWebInfoByRequest] finishCallback result=%{public}s", result.substr(0, 200).c_str());
-            LOGI("[GetWebInfoByRequest] finishCallback result.length=%{public}zu", result.length());
-            LOGI("[GetWebInfoByRequest] finishCallback code=%{public}d", code);
-            if (request == WEB_INTERFACE_REQUEST_DOM_TREE) {
-                auto filePath = ReserveUniqueFilePath("arkweb_tree");
-                std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
-                CHECK_NULL_VOID(ostream);
-                if (!ostream->is_open()) {
-                    LOGW("[GetWebInfoByRequest] filePath is invalid");
-                    return;
-                }
-                ostream->write(result.c_str(), result.length());
-                LOGI("[GetWebInfoByRequest] arkWeb tree is saved to %{public}s", filePath.c_str());
-            }
-            if (request == WEB_INTERFACE_REQUEST_DOM_TREE_VIEWPORT) {
-                auto filePath = ReserveUniqueFilePath("arkweb_tree_viewport");
-                std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
-                CHECK_NULL_VOID(ostream);
-                if (!ostream->is_open()) {
-                    LOGW("[GetWebInfoByRequest] filePath is invalid");
-                    return;
-                }
-                ostream->write(result.c_str(), result.length());
-                LOGI("[GetWebInfoByRequest] arkWeb tree is saved to %{public}s", filePath.c_str());
-            }
-        };
-        service->GetWebInfoByRequest(webId, request, finishCallback);
-        LOGI("[GetWebInfoByRequest] call GetWebInfoById");
+    if (params.size() < GET_WEB_INFO_BY_REQUEST_PARAMS) {
+        return;
     }
+    int32_t webId = std::atoi(params[WEB_ID_PARAM_INDEX].c_str());
+    std::string request = BuildWebInfoRequestFromParams(params);
+    auto finishCallback = [this](int32_t winId, int32_t webId, const std::string& request,
+        const std::string& result, WebRequestErrorCode code) {
+        LOGI("[GetWebInfoByRequest] finishCallback winId=%{public}d, webId=%{public}d", winId, webId);
+        SaveWebInfoResultToFile(request, result, code);
+    };
+    service->GetWebInfoByRequest(webId, request, finishCallback);
+    LOGI("[GetWebInfoByRequest] call GetWebInfoById");
+}
+
+std::string UiSaService::BuildWebInfoRequestFromParams(const std::vector<std::string>& params)
+{
+    auto safeNumber = [](const std::string& s) -> std::string {
+        char* end = nullptr;
+        double val = std::strtod(s.c_str(), &end);
+        if (end == s.c_str() || !std::isfinite(val)) {
+            return "0";
+        }
+        while (*end != '\0') {
+            if (!std::isspace(static_cast<unsigned char>(*end))) {
+                return "0";
+            }
+            ++end;
+        }
+        return std::to_string(val);
+    };
+    std::string request = params[REQUEST_PARAM_INDEX];
+    if (params.size() >= GET_WEB_INFO_BY_RECT_PARAMS && request == WEB_INTERFACE_REQUEST_DOM_TREE_BY_RECT) {
+        request += ":{\"x\":" + safeNumber(params[RECT_X_PARAM_INDEX]) +
+            ",\"y\":" + safeNumber(params[RECT_Y_PARAM_INDEX]) +
+            ",\"width\":" + safeNumber(params[RECT_WIDTH_PARAM_INDEX]) +
+            ",\"height\":" + safeNumber(params[RECT_HEIGHT_PARAM_INDEX]) + "}";
+    } else if (params.size() >= GET_WEB_INFO_BY_POINT_PARAMS &&
+        request == WEB_INTERFACE_REQUEST_DOM_TREE_BY_POINT) {
+        request += ":{\"pointX\":" + safeNumber(params[POINT_X_PARAM_INDEX]) +
+            ",\"pointY\":" + safeNumber(params[POINT_Y_PARAM_INDEX]) + "}";
+    }
+    return request;
+}
+
+void UiSaService::SaveWebInfoResultToFile(const std::string& request, const std::string& result,
+    WebRequestErrorCode code)
+{
+    LOGI("[GetWebInfoByRequest] finishCallback request=%{public}s", request.c_str());
+    LOGI("[GetWebInfoByRequest] finishCallback result=%{public}s",
+        result.substr(0, DOMTREE_LOG_PREVIEW_LENGTH).c_str());
+    LOGI("[GetWebInfoByRequest] finishCallback result.length=%{public}zu", result.length());
+    LOGI("[GetWebInfoByRequest] finishCallback code=%{public}d", code);
+    auto fileNamePrefix = GetWebInfoDumpFileName(request);
+    if (fileNamePrefix.empty()) {
+        LOGW("[GetWebInfoByRequest] unknown request, skip saving file");
+        return;
+    }
+    auto filePath = ReserveUniqueFilePath(fileNamePrefix);
+    if (filePath.empty()) {
+        LOGW("[GetWebInfoByRequest] filePath is invalid");
+        return;
+    }
+    std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
+    CHECK_NULL_VOID(ostream);
+    if (!ostream->is_open()) {
+        LOGW("[GetWebInfoByRequest] filePath is invalid");
+        return;
+    }
+    ostream->write(result.c_str(), result.length());
+    if (!ostream->good()) {
+        LOGW("[GetWebInfoByRequest] failed to write to %{public}s", filePath.c_str());
+        return;
+    }
+    LOGI("[GetWebInfoByRequest] arkWeb tree is saved to %{public}s", filePath.c_str());
+}
+
+std::string UiSaService::GetWebInfoDumpFileName(const std::string& request)
+{
+    if (request == WEB_INTERFACE_REQUEST_DOM_TREE) {
+        return "arkweb_tree";
+    }
+    if (request == WEB_INTERFACE_REQUEST_DOM_TREE_VIEWPORT) {
+        return "arkweb_tree_viewport";
+    }
+    if (request == WEB_INTERFACE_REQUEST_DOM_TREE_BY_NATIVE) {
+        return "arkweb_native_tree";
+    }
+    if (request.rfind(WEB_INTERFACE_REQUEST_DOM_TREE_BY_RECT, 0) == 0) {
+        return "arkweb_rect_tree";
+    }
+    if (request.rfind(WEB_INTERFACE_REQUEST_DOM_TREE_BY_POINT, 0) == 0) {
+        return "arkweb_point_tree";
+    }
+    return "";
 }
 
 void UiSaService::HandleRegisterComponentChangeEventCallback(
