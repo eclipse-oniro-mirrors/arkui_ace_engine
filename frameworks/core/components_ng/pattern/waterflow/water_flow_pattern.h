@@ -435,6 +435,9 @@ private:
     void AppendSnapItemGeometry(
         const RefPtr<LayoutWrapper>& item, int32_t index, float leadingPadding, float totalOffset);
     void UpdateSnapGeometryAfterLayout(bool isLayoutValid);
+    // layoutDirection changed: drop anchors sampled on the previous axis and rebase origins
+    // onto the current content offset.
+    void ResetSnapGeometry();
     void CheckSpringAfterContentShrink();
     // Total offset including a sliding-window delta that is applied at the next layout.
     double GetItemSnapCurrentOffset() const override;
@@ -442,6 +445,8 @@ private:
     // Coordinate origins sampled with snapItemGeometryCache_ during the last layout.
     float snapGeometryEstimatedOffset_ = 0.0f;
     float snapGeometryStableOffset_ = 0.0f;
+    // Direction last seen by OnModifyDone. A later change drops snap geometry sampled on the old axis.
+    std::optional<FlexDirection> snapLayoutDirection_;
     // Last synchronized sliding-window total height; an unsynced window cannot estimate it.
     std::optional<float> snapTotalHeight_;
 

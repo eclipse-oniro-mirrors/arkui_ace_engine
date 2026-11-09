@@ -1317,6 +1317,11 @@ protected:
 
     virtual bool ScrollByArrowKey(KeyCode code, float delta);
     bool HandleArrowKeyScroll(const KeyEvent& keyEventInfo);
+    // predictedItemSnapTarget_ is private. Subclasses drop a stale takeover target through this.
+    void ClearPredictedItemSnapTarget()
+    {
+        predictedItemSnapTarget_.reset();
+    }
 
 private:
     void GetEventDumpInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
