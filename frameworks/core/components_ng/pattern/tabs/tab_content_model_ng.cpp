@@ -583,7 +583,6 @@ void TabContentModelNG::AddBottomStyleTabBarItem(const RefPtr<UINode>& tabConten
     bool isTopFloating = tabLayoutProperty->GetBarLayoutStyleValue(TabBarLayoutStyle::BOTTOM) ==
         TabBarLayoutStyle::TOP;
     if (isTopFloating) {
-        linearLayoutProperty->UpdateFlexDirection(FlexDirection::ROW);
         linearLayoutProperty->UpdateSpace(0.0_vp);
         linearLayoutProperty->UpdateCrossAxisAlign(FlexAlign::CENTER);
         linearLayoutProperty->SetIsVertical(false);
@@ -719,16 +718,20 @@ void TabContentModelNG::AddBottomStyleTabBarItem(const RefPtr<UINode>& tabConten
         layoutProperty->UpdatePadding(topPadding);
     } else if (tabBarStyle == TabBarStyle::SUBTABBATSTYLE || tabBarStyle == TabBarStyle::BOTTOMTABBATSTYLE) {
         layoutProperty->UpdatePadding(padding);
-        auto accessibilityProperty = columnNode->GetAccessibilityProperty<AccessibilityProperty>();
-        accessibilityProperty->SetAccessibilityGroup(true);
-        auto id = tabContentPattern->GetId();
-        columnNode->UpdateInspectorId(id);
     } else {
         auto tabBarItemPadding = tabTheme->GetSubTabItemPadding();
         auto subTabItemHorizontalPadding_ = tabTheme->GetSubTabItemHorizontalPadding();
         layoutProperty->UpdatePadding({ CalcLength(subTabItemHorizontalPadding_),
             CalcLength(subTabItemHorizontalPadding_), CalcLength(tabBarItemPadding),
             CalcLength(tabBarItemPadding), {}, {} });
+    }
+
+    if (tabBarStyle == TabBarStyle::SUBTABBATSTYLE || tabBarStyle == TabBarStyle::BOTTOMTABBATSTYLE) {
+        layoutProperty->UpdatePadding(padding);
+        auto accessibilityProperty = columnNode->GetAccessibilityProperty<AccessibilityProperty>();
+        accessibilityProperty->SetAccessibilityGroup(true);
+        auto id = tabContentPattern->GetId();
+        columnNode->UpdateInspectorId(id);
     }
 
     bool isFrameNode = tabBarStyle == TabBarStyle::SUBTABBATSTYLE && tabContentPattern->HasSubTabBarStyleNode();
@@ -846,7 +849,7 @@ void TabContentModelNG::AddBottomStyleTabBarItem(const RefPtr<UINode>& tabConten
         textLayoutProperty->UpdateFontSize(tabTheme->GetBottomTabTextSize());
     }
     if (isTopFloating) {
-        textLayoutProperty->UpdateFontSize(tabTheme->GetTopTabTextSize());
+        textLayoutProperty->UpdateFontSize(tabTheme->GetSubTitleM());
         textLayoutProperty->UpdateFontWeight(FontWeight::MEDIUM);
     } else if (tabBarStyle == TabBarStyle::BOTTOMTABBATSTYLE) {
         textLayoutProperty->UpdateFontWeight(FontWeight::MEDIUM);

@@ -99,12 +99,12 @@ const RefPtr<Curve> FOLLOW_HAND_ANIMATION_CURVE = AceType::MakeRefPtr<Interpolat
 constexpr int32_t FOLLOW_HAND_ANIMATION_PART2_DELAY = 150;
 
 // Display mode switch animation constants.
-// Per spec: sidebar/divider translate uses spring stiffness 228 / damping 24;
+// Per spec: sidebar/divider translate uses spring stiffness 228 / damping 30;
 // floatingTabbar scale+opacity uses spring stiffness 228 / damping 20;
 // the bottom→sidebar floatingTabbar phase-1 (scale 100%→95%/105%) is a 200ms tween.
 // Spring velocity/mass follow the existing InterpolatingSpring convention (0.0, 1.0).
 const RefPtr<InterpolatingSpring> DISPLAY_MODE_TRANSLATE_CURVE =
-    AceType::MakeRefPtr<InterpolatingSpring>(0.0f, 1.0f, 228.0f, 24.0f);
+    AceType::MakeRefPtr<InterpolatingSpring>(0.0f, 1.0f, 228.0f, 30.0f);
 const RefPtr<InterpolatingSpring> DISPLAY_MODE_FLOATING_CURVE =
     AceType::MakeRefPtr<InterpolatingSpring>(0.0f, 1.0f, 228.0f, 20.0f);
 constexpr int32_t DISPLAY_MODE_FLOATING_PHASE2_DELAY = 200; // ms — phase2 starts after this delay, overlapping phase1
@@ -694,6 +694,15 @@ void TabsPattern::SetCurrentBarDisplayMode(TabBarDisplayMode mode)
     if (controller) {
         controller->SetBarDisplayMode(mode);
     }
+
+    auto context = tabsNode->GetContext();
+    CHECK_NULL_VOID(context);
+    auto weakThis = WeakClaim(this);
+    context->AddAfterLayoutTask([weakThis, mode]() {
+        auto pattern = weakThis.Upgrade();
+        CHECK_NULL_VOID(pattern);
+        pattern->UpdateCollapseButtonForDisplayMode(mode);
+    });
 }
 
 void TabsPattern::FireBarDisplayModeChangeEvent(TabBarDisplayMode mode)
@@ -2218,6 +2227,12 @@ void TabsPattern::UpdateSideBarIfNeeded()
             host->RemoveChild(collapseButtonNode_);
             host->MarkNeedSyncRenderTree();
             collapseButtonNode_ = nullptr;
+            if (sideBarNode_) {
+                auto sideBarPattern = sideBarNode_->GetPattern<TabsSideBarPattern>();
+                if (sideBarPattern) {
+                    sideBarPattern->ClearCollapseButtonState();
+                }
+            }
         }
         // Keep sideBarTabBarItemId on each TabContentNode so that GetOrCreateTabItemNode
         // can reuse existing tab item nodes on the next bottom->sidebar switch.
@@ -2576,6 +2591,30 @@ void TabsPattern::UpdateCollapseButtonIfNeeded()
         host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
         collapseButtonNode_ = nullptr;
         sideBarPattern->ClearCollapseButtonState();
+    }
+}
+
+void TabsPattern::UpdateCollapseButtonForDisplayMode(TabBarDisplayMode mode)
+{
+    auto host = AceType::DynamicCast<TabsNode>(GetHost());
+    CHECK_NULL_VOID(host);
+    if (mode != TabBarDisplayMode::SIDEBAR) {
+        if (collapseButtonNode_) {
+            host->RemoveChild(collapseButtonNode_);
+            host->MarkNeedSyncRenderTree();
+            host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+            collapseButtonNode_ = nullptr;
+            if (sideBarNode_) {
+                auto sideBarPattern = sideBarNode_->GetPattern<TabsSideBarPattern>();
+                if (sideBarPattern) {
+                    sideBarPattern->ClearCollapseButtonState();
+                }
+            }
+        }
+    } else {
+        if (showSidebarControlButton_ && !collapseButtonNode_) {
+            UpdateCollapseButtonIfNeeded();
+        }
     }
 }
 
