@@ -985,4 +985,104 @@ HWTEST_F(DynamicPatternTestNgTwo, DynamicPatternTest021, TestSize.Level1)
     auto selectedFrontend = SelectFrontendForEaWorkerForTdd(container);
     EXPECT_EQ(selectedFrontend, subFrontend);
 }
+
+/**
+ * @tc.name: DynamicComponentSafeManagerTest005
+ * @tc.desc: Test UpdateAllDCAvoidArea with empty aliveDynamics and TYPE_SYSTEM
+ * @tc.type: FUNC
+ */
+HWTEST_F(DynamicPatternTestNgTwo, DynamicComponentSafeManagerTest005, TestSize.Level1)
+{
+#ifdef WINDOW_SCENE_SUPPORTED
+    auto safeManager = AceType::MakeRefPtr<DynamicComponentSafeManager>();
+    ASSERT_NE(safeManager, nullptr);
+    OHOS::Rosen::AvoidArea avoidArea;
+    avoidArea.topRect_ = { 0, 0, 50, 50 };
+    safeManager->UpdateAllDCAvoidArea(1, avoidArea, OHOS::Rosen::AvoidAreaType::TYPE_SYSTEM);
+    EXPECT_EQ(safeManager->GetAvoidArea().size(), 1);
+#endif
+}
+
+/**
+ * @tc.name: DynamicComponentSafeManagerTest006
+ * @tc.desc: Test UpdateAllDCAvoidArea with TYPE_NAVIGATION_INDICATOR
+ * @tc.type: FUNC
+ */
+HWTEST_F(DynamicPatternTestNgTwo, DynamicComponentSafeManagerTest006, TestSize.Level1)
+{
+#ifdef WINDOW_SCENE_SUPPORTED
+    auto safeManager = AceType::MakeRefPtr<DynamicComponentSafeManager>();
+    ASSERT_NE(safeManager, nullptr);
+    OHOS::Rosen::AvoidArea avoidArea;
+    avoidArea.bottomRect_ = { 0, 0, 100, 20 };
+    safeManager->UpdateAllDCAvoidArea(1, avoidArea, OHOS::Rosen::AvoidAreaType::TYPE_NAVIGATION_INDICATOR);
+    auto result = safeManager->GetAvoidArea();
+    EXPECT_EQ(result.size(), 1);
+    EXPECT_EQ(result.count(OHOS::Rosen::AvoidAreaType::TYPE_NAVIGATION_INDICATOR), 1);
+#endif
+}
+
+/**
+ * @tc.name: DynamicComponentSafeManagerTest007
+ * @tc.desc: Test UpdateAllDCAvoidArea with TYPE_CUTOUT
+ * @tc.type: FUNC
+ */
+HWTEST_F(DynamicPatternTestNgTwo, DynamicComponentSafeManagerTest007, TestSize.Level1)
+{
+#ifdef WINDOW_SCENE_SUPPORTED
+    auto safeManager = AceType::MakeRefPtr<DynamicComponentSafeManager>();
+    ASSERT_NE(safeManager, nullptr);
+    OHOS::Rosen::AvoidArea avoidArea;
+    avoidArea.topRect_ = { 0, 0, 10, 10 };
+    safeManager->UpdateAllDCAvoidArea(1, avoidArea, OHOS::Rosen::AvoidAreaType::TYPE_CUTOUT);
+    auto result = safeManager->GetAvoidArea();
+    EXPECT_EQ(result.size(), 1);
+    EXPECT_EQ(result.count(OHOS::Rosen::AvoidAreaType::TYPE_CUTOUT), 1);
+#endif
+}
+
+/**
+ * @tc.name: DynamicComponentSafeManagerTest008
+ * @tc.desc: Test UpdateAllDCAvoidArea consecutive calls keep latest avoid area
+ * @tc.type: FUNC
+ */
+HWTEST_F(DynamicPatternTestNgTwo, DynamicComponentSafeManagerTest008, TestSize.Level1)
+{
+#ifdef WINDOW_SCENE_SUPPORTED
+    auto safeManager = AceType::MakeRefPtr<DynamicComponentSafeManager>();
+    ASSERT_NE(safeManager, nullptr);
+    OHOS::Rosen::AvoidArea firstArea;
+    firstArea.topRect_ = { 0, 0, 100, 100 };
+    safeManager->UpdateAllDCAvoidArea(1, firstArea, OHOS::Rosen::AvoidAreaType::TYPE_SYSTEM);
+    OHOS::Rosen::AvoidArea secondArea;
+    secondArea.topRect_ = { 0, 0, 200, 200 };
+    safeManager->UpdateAllDCAvoidArea(1, secondArea, OHOS::Rosen::AvoidAreaType::TYPE_SYSTEM);
+    EXPECT_EQ(safeManager->GetAvoidArea().size(), 1);
+#endif
+}
+
+/**
+ * @tc.name: DynamicComponentSafeManagerTest009
+ * @tc.desc: Test UpdateAllDCAvoidArea with multiple dynamic patterns and TYPE_FLOAT_NAVIGATION
+ * @tc.type: FUNC
+ */
+HWTEST_F(DynamicPatternTestNgTwo, DynamicComponentSafeManagerTest009, TestSize.Level1)
+{
+#ifdef WINDOW_SCENE_SUPPORTED
+    auto safeManager = AceType::MakeRefPtr<DynamicComponentSafeManager>();
+    ASSERT_NE(safeManager, nullptr);
+    auto nodeIdOne = ElementRegister::GetInstance()->MakeUniqueId();
+    auto nodeOne = FrameNode::GetOrCreateFrameNode(DYNAMIC_COMPONENT_ETS_TAG, nodeIdOne,
+        []() { return AceType::MakeRefPtr<DynamicPattern>(); });
+    safeManager->aliveDynamics_.try_emplace(nodeIdOne, nodeOne->GetPattern<DynamicPattern>());
+    auto nodeIdTwo = ElementRegister::GetInstance()->MakeUniqueId();
+    auto nodeTwo = FrameNode::GetOrCreateFrameNode(DYNAMIC_COMPONENT_ETS_TAG, nodeIdTwo,
+        []() { return AceType::MakeRefPtr<DynamicPattern>(); });
+    safeManager->aliveDynamics_.try_emplace(nodeIdTwo, nodeTwo->GetPattern<DynamicPattern>());
+    OHOS::Rosen::AvoidArea avoidArea;
+    avoidArea.topRect_ = { 0, 0, 30, 30 };
+    safeManager->UpdateAllDCAvoidArea(1, avoidArea, OHOS::Rosen::AvoidAreaType::TYPE_FLOAT_NAVIGATION);
+    EXPECT_EQ(safeManager->GetAvoidArea().size(), 1);
+#endif
+}
 } // namespace OHOS::Ace::NG
