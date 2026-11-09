@@ -2020,6 +2020,11 @@ bool ParallelStageManager::CleanPageStackInVirtualStackBasedSplit(const RefPtr<P
     RebuildRouterColumnNodesIfNeeded();
     stagePattern->SetHomePage(GetHomePage());
     stageNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    auto currentVisiblePages = GetRouterVisiblePages();
+    if (preVisiblePages.primary != currentVisiblePages.primary ||
+        preVisiblePages.detail != currentVisiblePages.detail) {
+        ReportPageTransitionEnd(remainingTopPage);
+    }
     return true;
 }
 

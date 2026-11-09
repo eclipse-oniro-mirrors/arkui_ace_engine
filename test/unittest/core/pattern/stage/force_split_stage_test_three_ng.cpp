@@ -19,6 +19,7 @@
 #include <unordered_set>
 
 #include "gtest/gtest.h"
+#include "interfaces/native/ui_info_collection.h"
 
 #define private public
 #define protected public
@@ -28,6 +29,7 @@
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 #include "base/memory/referenced.h"
+#include "base/json/json_util.h"
 #include "base/utils/system_properties.h"
 #include "core/common/ace_application_info.h"
 #include "core/components/navigation_bar/navigation_bar_theme.h"
@@ -35,6 +37,7 @@
 #include "core/components_ng/event/event_hub.h"
 #include "core/components_ng/layout/layout_wrapper.h"
 #include "core/components_ng/manager/force_split/force_split_manager.h"
+#include "core/components_ng/manager/content_change_manager/content_change_manager.h"
 #include "core/components_ng/pattern/stage/page_info.h"
 #include "core/components_ng/pattern/stage/page_pattern.h"
 
@@ -2358,6 +2361,54 @@ HWTEST_F(ParallelStageTestThreeNg, SplitRouterAnimationAllowedTest001, TestSize.
     oldAnimationId = stageManager->animationId_;
     EXPECT_TRUE(stageManager->StartSplitPopAnimation(popPre, popNew));
     EXPECT_EQ(stageManager->animationId_, oldAnimationId + 1);
+}
+
+namespace {
+struct RouterClearEvents {
+    std::vector<uint32_t> types;
+    std::vector<std::string> targets;
+
+    static void Receive(uint32_t type, uint64_t timestamp, const char* json, uint32_t size, void* cookie)
+    {
+        auto& events = *static_cast<RouterClearEvents*>(cookie);
+        events.types.push_back(type);
+        auto payload = JsonUtil::ParseJsonString(std::string(json, size));
+        events.targets.push_back(payload->GetValue("targetNode")->GetString("id"));
+    }
+};
+} // namespace
+
+/**
+ * @tc.name: ClearInvisibleHistoryDoesNotReport
+ * @tc.desc: Removing only invisible history in stack or split mode must not report a page change.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ParallelStageTestThreeNg, ClearInvisibleHistoryDoesNotReport, TestSize.Level1)
+{
+    auto pipeline = MockPipelineContext::GetCurrent();
+    auto manager = pipeline->GetContentChangeManager();
+    ASSERT_NE(manager, nullptr);
+    GetForceSplitManager()->behaviorMode_ = ForceSplitBehaviorMode::DISPLACE;
+    for (auto mode : { PageMode::STACK, PageMode::SPLIT }) {
+        RefPtr<FrameNode> stageNode;
+        RefPtr<ParallelStagePattern> stagePattern;
+        auto stageManager = CreateParallelStageManager(stageNode, stagePattern);
+        stagePattern->mode_ = mode;
+        auto history = CreateRouterPage("history");
+        auto current = CreateRouterPage("current");
+        MountRouterPage(stageNode, history);
+        MountRouterPage(stageNode, current);
+        stageManager->InvalidateRouterColumnNodes();
+        RouterClearEvents events;
+        auto id = manager->RegisterCapiContentChangeEvent(true, OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_PAGE, 0,
+            &events, RouterClearEvents::Receive, nullptr);
+        EXPECT_NE(id, 0U);
+        EXPECT_TRUE(stageManager->CleanPageStack());
+        pipeline->taskScheduler_->FlushAfterLayoutTask();
+        EXPECT_EQ(stageManager->CollectRouterStackPages(), (std::vector<RefPtr<FrameNode>> { current }));
+        EXPECT_TRUE(events.types.empty());
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+    }
 }
 
 } // namespace OHOS::Ace::NG
