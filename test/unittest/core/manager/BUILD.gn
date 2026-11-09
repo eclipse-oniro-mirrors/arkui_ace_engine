@@ -445,6 +445,9 @@ ace_unittest("page_scene_rule_manager_test_ng") {
   external_deps = [ "cJSON:cjson_static" ]
   module_name = "TextSet-Text"
   type = "new"
+  if (defined(is_host_product) && is_host_product) {
+    type = "host_components"
+  }
   sources = [
     "$ace_root/frameworks/core/components_ng/dump_utils/dump_util.cpp",
     "$ace_root/frameworks/core/components_ng/manager/page_scene/page_scene_rule_manager.cpp",
