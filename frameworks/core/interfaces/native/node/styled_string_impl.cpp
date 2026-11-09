@@ -383,7 +383,9 @@ RefPtr<SpanBase> ParseBackgroundColorStyle(const ArkUISpanStyle& style, int32_t 
         CalcDimension(backgroundColorStyle.bottomLeftRadius, DimensionUnit::VP) };
     textBackgroundStyle.backgroundRadius->multiValued = true;
     textBackgroundStyle.borderWidth = CalcDimension(backgroundColorStyle.borderWidth, DimensionUnit::VP);
-    textBackgroundStyle.borderColor = Color(backgroundColorStyle.borderColor);
+    if (backgroundColorStyle.hasBorderColor) {
+        textBackgroundStyle.borderColor = Color(backgroundColorStyle.borderColor);
+    }
     return AceType::MakeRefPtr<BackgroundColorSpan>(textBackgroundStyle, start, start + length);
 }
 
@@ -1134,6 +1136,7 @@ void ApplyBackgroundColorStyle(ArkUISpanStyle& style, const RefPtr<SpanBase>& sp
     }
     backgroundColorStyle.borderWidth = backgroundStyle.borderWidth.value_or(Dimension()).ConvertToVp();
     backgroundColorStyle.borderColor = backgroundStyle.borderColor.value_or(Color(0x00000000)).GetValue();
+    backgroundColorStyle.hasBorderColor = backgroundStyle.borderColor.has_value();
     style.backgroundColorStyle = backgroundColorStyle;
 }
 

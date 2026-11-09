@@ -135,6 +135,13 @@ std::unique_ptr<JsonValue> ConvertFontVariationsToJson(const FONT_VARIATIONS_LIS
     }
     return jsonFontVariations;
 }
+
+void EnsureBackgroundStyle(const RefPtr<SpanItem>& span)
+{
+    if (!span->backgroundStyle.has_value()) {
+        span->backgroundStyle = TextBackgroundStyle();
+    }
+}
 } // namespace
 
 std::string SpanItem::GetFont() const
@@ -1695,31 +1702,27 @@ RefPtr<SpanItem> SpanItem::DecodeTlv(std::vector<uint8_t>& buff, int32_t& cursor
                 TLV_SPAN_TEXT_LINE_STYLE_COLORSHADERSTYLE, Color);
 
             case TLV_SPAN_BACKGROUND_BACKGROUNDCOLOR: {
-                if (!sameSpan->backgroundStyle.has_value()) {
-                    sameSpan->backgroundStyle = TextBackgroundStyle();
-                }
+                EnsureBackgroundStyle(sameSpan);
                 sameSpan->backgroundStyle->backgroundColor = TLVUtil::ReadColor(buff, cursor);
                 break;
             }
             case TLV_SPAN_BACKGROUND_BACKGROUNDRADIUS: {
+                EnsureBackgroundStyle(sameSpan);
                 sameSpan->backgroundStyle->backgroundRadius = TLVUtil::ReadBorderRadiusProperty(buff, cursor);
                 break;
             }
             case TLV_SPAN_BACKGROUND_BORDERWIDTH: {
-                if (!sameSpan->backgroundStyle.has_value()) {
-                    sameSpan->backgroundStyle = TextBackgroundStyle();
-                }
+                EnsureBackgroundStyle(sameSpan);
                 sameSpan->backgroundStyle->borderWidth = TLVUtil::ReadDimension(buff, cursor);
                 break;
             }
             case TLV_SPAN_BACKGROUND_BORDERCOLOR: {
-                if (!sameSpan->backgroundStyle.has_value()) {
-                    sameSpan->backgroundStyle = TextBackgroundStyle();
-                }
+                EnsureBackgroundStyle(sameSpan);
                 sameSpan->backgroundStyle->borderColor = TLVUtil::ReadColor(buff, cursor);
                 break;
             }
             case TLV_SPAN_BACKGROUND_GROUPID: {
+                EnsureBackgroundStyle(sameSpan);
                 sameSpan->backgroundStyle->groupId = TLVUtil::ReadInt32(buff, cursor);
                 break;
             }

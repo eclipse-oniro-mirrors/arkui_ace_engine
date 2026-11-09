@@ -3094,6 +3094,7 @@ struct ArkUIBackgroundColorStyle {
     float bottomRightRadius;
     float borderWidth = 0.0f;
     ArkUI_Uint32 borderColor = 0x00000000;
+    bool hasBorderColor = false;
 };
 
 struct ArkUIUrlStyle {

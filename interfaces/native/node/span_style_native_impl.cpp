@@ -291,6 +291,7 @@ ArkUIBackgroundColorStyle ConvertToOriginBackgroundColorStyle(const OH_ArkUI_Bac
     backgroundColorStyle.bottomRightRadius = style.bottomRightRadius;
     backgroundColorStyle.borderWidth = style.borderWidth;
     backgroundColorStyle.borderColor = style.borderColor;
+    backgroundColorStyle.hasBorderColor = style.hasBorderColor;
     return backgroundColorStyle;
 }
 
@@ -591,6 +592,7 @@ OH_ArkUI_BackgroundColorStyle ConvertToCBackgroundColorStyle(const ArkUIBackgrou
     backgroundColorStyle.bottomRightRadius = style.bottomRightRadius;
     backgroundColorStyle.borderWidth = style.borderWidth;
     backgroundColorStyle.borderColor = style.borderColor;
+    backgroundColorStyle.hasBorderColor = style.hasBorderColor;
     return backgroundColorStyle;
 }
 
@@ -1158,6 +1160,7 @@ ArkUI_ErrorCode OH_ArkUI_SpanStyle_SetBackgroundColorStyle(
     spanStyle->backgroundColorStyle.bottomRightRadius = backgroundColorStyle->bottomRightRadius;
     spanStyle->backgroundColorStyle.borderWidth = backgroundColorStyle->borderWidth;
     spanStyle->backgroundColorStyle.borderColor = backgroundColorStyle->borderColor;
+    spanStyle->backgroundColorStyle.hasBorderColor = backgroundColorStyle->hasBorderColor;
     return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
 }
 
@@ -1174,6 +1177,7 @@ ArkUI_ErrorCode OH_ArkUI_SpanStyle_GetBackgroundColorStyle(
     backgroundColorStyle->bottomRightRadius = spanStyle->backgroundColorStyle.bottomRightRadius;
     backgroundColorStyle->borderWidth = spanStyle->backgroundColorStyle.borderWidth;
     backgroundColorStyle->borderColor = spanStyle->backgroundColorStyle.borderColor;
+    backgroundColorStyle->hasBorderColor = spanStyle->backgroundColorStyle.hasBorderColor;
     return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
 }
 
@@ -2156,6 +2160,7 @@ ArkUI_ErrorCode OH_ArkUI_BackgroundColorStyle_SetBorderColor(
 {
     CHECK_NULL_RETURN(style, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
     style->borderColor = borderColor;
+    style->hasBorderColor = true;
     return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
 }
 
