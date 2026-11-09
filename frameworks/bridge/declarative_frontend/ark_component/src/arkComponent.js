@@ -9969,6 +9969,10 @@ class ArkWebComponent extends ArkComponent {
     modifierWithKey(this._modifiersWithKeys, WebFlingSpeedLimitModifier.identity, WebFlingSpeedLimitModifier, value);
     return this;
   }
+  visitedLinkPersistEnabled(enabled) {
+    modifierWithKey(this._modifiersWithKeys, VisitedLinkPersistEnabledModifier.identity, VisitedLinkPersistEnabledModifier, enabled);
+    return this;
+  }
   rotateRenderEffect(effect) {
     modifierWithKey(this._modifiersWithKeys, WebRotateRenderEffectModifier.identity, WebRotateRenderEffectModifier, effect);
     return this;
@@ -10308,6 +10312,7 @@ class WebOnZoomChangeModifier extends ModifierWithKey {
     }
 }
 WebOnZoomChangeModifier.identity = Symbol('webOnZoomChangeModifier');
+
 
 class WebOnRequestSelectedModifier extends ModifierWithKey {
     constructor(value) {
@@ -11793,6 +11798,22 @@ class WebFlingSpeedLimitModifier extends ModifierWithKey {
   }
 }
 WebFlingSpeedLimitModifier.identity = Symbol('webFlingSpeedLimit');
+
+class VisitedLinkPersistEnabledModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  static identity = undefined;
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().web.resetVisitedLinkPersistEnabled(node);
+    } else {
+      getUINativeModule().web.setVisitedLinkPersistEnabled(node, this.value);
+    }
+  }
+}
+VisitedLinkPersistEnabledModifier.identity = Symbol('visitedLinkPersistEnabled');
+
 
 class WebBackToTopModifier extends ModifierWithKey {
   constructor(value) {

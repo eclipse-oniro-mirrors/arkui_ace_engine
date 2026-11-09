@@ -4305,6 +4305,7 @@ void WebDelegate::UpdateDomStorageEnabled(const bool& isDomStorageAccessEnabled)
         },
         TaskExecutor::TaskType::PLATFORM, "ArkUIWebUpdateDomStorageEnabled");
 }
+
 void WebDelegate::UpdateGeolocationEnabled(const bool& isGeolocationAccessEnabled)
 {
     auto context = context_.Upgrade();
@@ -7396,6 +7397,24 @@ void WebDelegate::OnZoomChange(double oldZoomFactor, double newZoomFactor)
 #endif
         },
         TaskExecutor::TaskType::JS, "ArkUIWebZoomChange");
+}
+
+void WebDelegate::UpdateVisitedLinkPersistEnabled(const bool& enabled)
+{
+    auto context = context_.Upgrade();
+    if (!context) {
+        return;
+    }
+    context->GetTaskExecutor()->PostTask(
+        [weak = WeakClaim(this), enabled]() {
+            auto delegate = weak.Upgrade();
+            if (delegate && delegate->nweb_) {
+                std::shared_ptr<OHOS::NWeb::NWebPreference> setting = delegate->nweb_->GetPreference();
+                CHECK_NULL_VOID(setting);
+                setting->PutVisitedLinkPersistEnabled(enabled);
+            }
+        },
+        TaskExecutor::TaskType::PLATFORM, "ArkUIWebUpdateVisitedLinkPersistEnabled");
 }
 
 void WebDelegate::OnScroll(double xOffset, double yOffset)

@@ -27,6 +27,7 @@ namespace {
 constexpr bool DEFAULT_JS_ACCESS_ENABLED = true;
 constexpr bool DEFAULT_FILE_ACCESS_ENABLED = false;
 constexpr bool DEFAULT_DOM_STORAGE_ACCESS_ENABLED = false;
+constexpr bool DEFAULT_VISITED_LINK_PERSIST_ENABLED = false;
 constexpr MixedModeContent DEFAULT_MIXED_MODE = MixedModeContent::MIXED_CONTENT_NEVER_ALLOW;
 constexpr int32_t DEFAULT_ZOOM_ACCESS_ENABLED = true;
 constexpr bool DEFAULT_ZOOM_CONTROL_ACCESS = false;
@@ -2764,6 +2765,20 @@ void ResetFlingSpeedLimit(ArkUINodeHandle node)
     WebModelNG::SetFlingSpeedLimit(frameNode, DEFAULT_FLING_SPEED_LIMIT);
 }
 
+void SetVisitedLinkPersistEnabled(ArkUINodeHandle node, ArkUI_Bool value)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetVisitedLinkPersistEnabled(frameNode, value);
+}
+
+void ResetVisitedLinkPersistEnabled(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetVisitedLinkPersistEnabled(frameNode, DEFAULT_VISITED_LINK_PERSIST_ENABLED);
+}
+
 void SetBackToTop(ArkUINodeHandle node, ArkUI_Bool value)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -3199,6 +3214,8 @@ const ArkUIWebModifier* GetWebModifier()
         .resetEnableFullscreenVideoOverlay = ResetEnableFullscreenVideoOverlay,
         .setOnZoomChangeCallBack = SetOnZoomChangeCallBack,
         .resetOnZoomChangeCallBack = ResetOnZoomChangeCallBack,
+        .setVisitedLinkPersistEnabled = SetVisitedLinkPersistEnabled,
+        .resetVisitedLinkPersistEnabled = ResetVisitedLinkPersistEnabled,
         .setCaretColor = SetWebCaretColor,
         .resetCaretColor = ResetWebCaretColor,
     };
@@ -3478,6 +3495,8 @@ const CJUIWebModifier* GetCJUIWebModifier()
         .resetEnableFullscreenVideoOverlay = ResetEnableFullscreenVideoOverlay,
         .setOnZoomChangeCallBack = SetOnZoomChangeCallBack,
         .resetOnZoomChangeCallBack = ResetOnZoomChangeCallBack,
+        .setVisitedLinkPersistEnabled = SetVisitedLinkPersistEnabled,
+        .resetVisitedLinkPersistEnabled = ResetVisitedLinkPersistEnabled,
         .setCaretColor = SetWebCaretColor,
         .resetCaretColor = ResetWebCaretColor,
     };

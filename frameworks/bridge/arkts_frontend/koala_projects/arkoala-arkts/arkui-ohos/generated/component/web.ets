@@ -3462,6 +3462,18 @@ export class ArkWebPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._WebAttribute_setFlingSpeedLimit(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setVisitedLinkPersistEnabledAttribute(value: boolean | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            thisSerializer.writeBoolean(valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._WebAttribute_setVisitedLinkPersistEnabled(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setRegisterNativeEmbedRuleAttribute(tag: string | undefined, type: string | undefined): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (tag !== undefined) {
@@ -4607,6 +4619,9 @@ export interface WebAttribute extends CommonMethod {
     flingSpeedLimit(value: double | undefined): this {
         throw new Error('Unimplemented method flingSpeedLimit')
     }
+    visitedLinkPersistEnabled(value: boolean | undefined): this {
+        throw new Error('Unimplemented method visitedLinkPersistEnabled')
+    }
     registerNativeEmbedRule(tag: string | undefined, type: string | undefined): this {
         throw new Error('Unimplemented method registerNativeEmbedRule')
     }
@@ -5506,6 +5521,11 @@ export class ArkWebComponent extends ArkCommonMethodComponent implements WebAttr
     public flingSpeedLimit(value: double | undefined): this {
         const value_casted = value as (double | undefined)
         this.getPeer()?.setFlingSpeedLimitAttribute(value_casted)
+        return this
+    }
+    public visitedLinkPersistEnabled(value: boolean | undefined): this {
+        const value_casted = value as (boolean | undefined)
+        this.getPeer()?.setVisitedLinkPersistEnabledAttribute(value_casted)
         return this
     }
     public registerNativeEmbedRule(tag: string | undefined, type: string | undefined): this {

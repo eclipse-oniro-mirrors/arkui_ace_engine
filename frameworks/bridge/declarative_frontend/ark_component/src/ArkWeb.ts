@@ -1689,6 +1689,20 @@ class WebFlingSpeedLimitModifier extends ModifierWithKey<number> {
   }
 }
 
+class WebVisitedLinkPersistEnabledModifier extends ModifierWithKey<boolean> {
+  constructor(value: boolean) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('webVisitedLinkPersistEnabled');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().web.resetVisitedLinkPersistEnabled(node);
+    } else {
+      getUINativeModule().web.setVisitedLinkPersistEnabled(node, this.value);
+    }
+  }
+}
+
 class WebBackToTopModifier extends ModifierWithKey<boolean> {
   constructor(value: boolean) {
     super(value);
@@ -2462,6 +2476,10 @@ class ArkWebComponent extends ArkComponent implements WebAttribute {
   }
   flingSpeedLimit(value: number): this {
     modifierWithKey(this._modifiersWithKeys, WebFlingSpeedLimitModifier.identity, WebFlingSpeedLimitModifier, value);
+    return this;
+  }
+  visitedLinkPersistEnabled(enabled: boolean): this {
+    modifierWithKey(this._modifiersWithKeys, WebVisitedLinkPersistEnabledModifier.identity, WebVisitedLinkPersistEnabledModifier, enabled);
     return this;
   }
   rotateRenderEffect(effect: WebRotateEffect): this {

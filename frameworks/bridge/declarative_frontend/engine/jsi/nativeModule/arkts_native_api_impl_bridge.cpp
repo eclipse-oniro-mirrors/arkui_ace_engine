@@ -2258,6 +2258,10 @@ void ArkUINativeModule::RegisterWebAttributes(Local<panda::ObjectRef> object, Ec
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetOnZoomChange));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetOnZoomChange"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetOnZoomChange));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setVisitedLinkPersistEnabled"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetVisitedLinkPersistEnabled));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetVisitedLinkPersistEnabled"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetVisitedLinkPersistEnabled));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setOnContextMenuHide"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetOnContextMenuHide));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetOnContextMenuHide"),

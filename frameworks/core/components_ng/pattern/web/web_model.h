@@ -112,6 +112,7 @@ public:
     virtual void SetResourceLoadId(std::function<void(const BaseEventInfo* info)>&& jsCallback) = 0;
     virtual void SetScaleChangeId(std::function<void(const BaseEventInfo* info)>&& jsCallback) = 0;
     virtual void SetZoomChangeId(std::function<void(const BaseEventInfo* info)>&& jsCallback) = 0;
+    virtual void SetVisitedLinkPersistEnabled(bool enabled) = 0;
     virtual void SetScrollId(std::function<void(const BaseEventInfo* info)>&& jsCallback) = 0;
     virtual void SetPermissionRequestEventId(std::function<void(const BaseEventInfo* info)>&& jsCallback) = 0;
     virtual void SetBackgroundColor(Color backgroundColor) = 0;
