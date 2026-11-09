@@ -514,6 +514,66 @@ HWTEST_F(WaterFlowScrollSnapTestNg, RowLogicalAnchors, TestSize.Level1)
 }
 
 /**
+ * @tc.name: LayoutDirectionChangeDropsStaleColumnAnchors
+ * @tc.desc: Switching COLUMN to ROW drops snap geometry from the old axis. Items keep the width
+ *           set at creation (100%), so the row main size is the viewport. Stale column starts are
+ *           not anchors, and a short fling stays on the first row start.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, LayoutDirectionChangeDropsStaleColumnAnchors, TestSize.Level1)
+{
+    CreateDirectionalItems(FlexDirection::COLUMN);
+    ASSERT_EQ(pattern_->GetAxis(), Axis::VERTICAL);
+    const auto columnStarts = pattern_->BuildItemSnapCandidates(ScrollSnapAlign::START);
+    ASSERT_GE(columnStarts.size(), MIN_SNAP_CANDIDATE_COUNT);
+
+    WaterFlowModelNG::SetLayoutDirection(AceType::RawPtr(frameNode_), FlexDirection::ROW);
+    pattern_->OnModifyDone();
+    EXPECT_EQ(pattern_->GetAxis(), Axis::HORIZONTAL);
+    EXPECT_TRUE(pattern_->BuildItemSnapCandidates(ScrollSnapAlign::START).empty());
+
+    FlushUITasks();
+    EXPECT_EQ(pattern_->GetAxis(), Axis::HORIZONTAL);
+    const auto rowStarts = pattern_->BuildItemSnapCandidates(ScrollSnapAlign::START);
+    // One 300px item fills the viewport on each row. Item 2 starts at the viewport end and is not
+    // recorded, so the column anchors {100, 2} and {170, 3} are absent.
+    ASSERT_FALSE(rowStarts.empty());
+    EXPECT_FLOAT_EQ(rowStarts.front().offset, 0.0f);
+    EXPECT_EQ(rowStarts.front().index, 0);
+    const float totalOffset = pattern_->GetTotalOffset();
+    const auto firstRect = GetChildRect(frameNode_, 0);
+    EXPECT_NEAR(firstRect.Width(), 300.0f, 0.5f);
+    for (const auto& candidate : rowStarts) {
+        EXPECT_GE(pattern_->layoutInfo_->GetCrossIndex(candidate.index), 0);
+        const auto rect = GetChildRect(frameNode_, candidate.index);
+        EXPECT_NEAR(candidate.offset, rect.GetX() + totalOffset, 0.5f);
+        if (!NearEqual(rect.GetX(), rect.GetY())) {
+            EXPECT_FALSE(NearEqual(candidate.offset, rect.GetY() + totalOffset));
+        }
+        EXPECT_FALSE(NearEqual(candidate.offset, 100.0f));
+        EXPECT_FALSE(NearEqual(candidate.offset, 170.0f));
+    }
+    // Direction was already applied before this layout. Another modify-done must keep the new anchors.
+    pattern_->OnModifyDone();
+    const auto keptStarts = pattern_->BuildItemSnapCandidates(ScrollSnapAlign::START);
+    ASSERT_EQ(keptStarts.size(), rowStarts.size());
+    for (size_t i = 0; i < rowStarts.size(); ++i) {
+        EXPECT_FLOAT_EQ(keptStarts[i].offset, rowStarts[i].offset);
+        EXPECT_EQ(keptStarts[i].index, rowStarts[i].index);
+    }
+
+    // Half of the 300px row item is 150, so a 51px fling returns to the first start instead of
+    // the old column anchor at 100.
+    DragStart(frameNode_, Offset());
+    DragUpdate(-51.0f);
+    DragEnd(-0.1f);
+    FinishSnapAnimation();
+    EXPECT_NEAR(pattern_->GetTotalOffset(), 0.0f, 0.5f);
+    EXPECT_NEAR(GetChildRect(frameNode_, 0).GetX(), 0.0f, 0.5f);
+    EXPECT_NEAR(GetChildRect(frameNode_, 0).GetY(), 0.0f, 0.5f);
+}
+
+/**
  * @tc.name: RowRtlLogicalAnchors
  * @tc.desc: AC-1.2: RTL rows map mirrored physical positions to the same logical anchors.
  * @tc.type: FUNC

@@ -116,8 +116,9 @@ void WaterFlowPattern::UpdateSnapItemGeometryCache()
     const int32_t start = std::max(0, layoutInfo_->startIndex_ - cacheCount);
     const int32_t end = std::min(itemCount - 1, layoutInfo_->endIndex_ + cacheCount);
     for (int32_t index = start; index <= end; ++index) {
-        // Sliding-window prediction caches hold sizes of unlaid items; only lane members are real geometry.
-        if (layoutInfo_->Mode() == LayoutMode::SLIDING_WINDOW && layoutInfo_->GetCrossIndex(index) < 0) {
+        // Children left in the tree after a direction change still carry the previous axis rect
+        // until this layout records them. Prediction caches and unlaid cache nodes are not anchors.
+        if (layoutInfo_->GetCrossIndex(index) < 0) {
             continue;
         }
         // Cached items are read without building or adding them to the render tree.
@@ -144,6 +145,16 @@ void WaterFlowPattern::AppendSnapItemGeometry(
         startPos = GetMainContentSize() - startPos - size;
     }
     snapItemGeometryCache_.push_back({ startPos + totalOffset, size, index });
+}
+
+void WaterFlowPattern::ResetSnapGeometry()
+{
+    snapItemGeometryCache_.clear();
+    snapTotalHeight_.reset();
+    ClearPredictedItemSnapTarget();
+    const float offset = static_cast<float>(GetTotalOffset());
+    snapGeometryEstimatedOffset_ = offset;
+    snapGeometryStableOffset_ = offset;
 }
 
 void WaterFlowPattern::UpdateSnapGeometryAfterLayout(bool isLayoutValid)
@@ -574,6 +585,11 @@ void WaterFlowPattern::OnModifyDone()
     Pattern::OnModifyDone();
     auto layoutProperty = GetLayoutProperty<WaterFlowLayoutProperty>();
     CHECK_NULL_VOID(layoutProperty);
+    const auto direction = layoutProperty->GetWaterflowDirection().value_or(FlexDirection::COLUMN);
+    if (snapLayoutDirection_.has_value() && snapLayoutDirection_.value() != direction) {
+        ResetSnapGeometry();
+    }
+    snapLayoutDirection_ = direction;
     // SetAxis for scroll event
     SetAxis(layoutProperty->GetAxis());
     if (!GetScrollableEvent()) {
