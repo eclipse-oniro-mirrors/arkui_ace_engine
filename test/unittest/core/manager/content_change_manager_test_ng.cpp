@@ -6337,4 +6337,84 @@ HWTEST_F(ContentChangeManagerTestNg, PageSceneSplit_OuterAncestorChangesKeepDirt
     EXPECT_EQ(manager->GetPageSceneSplitNodes(), (std::vector<RefPtr<FrameNode>> { pane }));
 }
 
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneQuery_SurvivesSubscriptionTrackingDisabled, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    auto pane = FrameNode::CreateFrameNode("Column", QUERY_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    manager->ConfigurePageSceneSplitTracking({ "Column" }, false);
+    manager->SeedPageSceneSplitNodes({ pane });
+    bool stable = false;
+    int completed = 0;
+    int cancelled = 0;
+    manager->DeferPageSceneQuery(QUERY_PROCESS_ID, [&]() {
+        if (!stable) {
+            return false;
+        }
+        ++completed;
+        return true;
+    }, [&]() { ++cancelled; });
+    manager->ConfigurePageSceneSplitTracking({}, false);
+    EXPECT_FALSE(manager->IsPageSceneSplitTracking());
+    EXPECT_TRUE(manager->NeedPageSceneDetect());
+    manager->FlushPageSceneQueries();
+    EXPECT_EQ(manager->GetPendingPageSceneQueryCount(), SINGLE_BUCKET_NODE);
+    EXPECT_EQ(completed, 0);
+    EXPECT_EQ(cancelled, 0);
+    stable = true;
+    manager->FlushPageSceneQueries();
+    manager->FlushPageSceneQueries();
+    EXPECT_EQ(completed, 1);
+    EXPECT_EQ(cancelled, 0);
+    EXPECT_EQ(manager->GetPendingPageSceneQueryCount(), 0u);
+    EXPECT_FALSE(manager->IsPageSceneSplitTracking());
+}
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneQuery_SuccessKeepsReentrantNextQuery, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    int oldCancelled = 0;
+    int nextCompleted = 0;
+    int nextCancelled = 0;
+    manager->DeferPageSceneQuery(QUERY_PROCESS_ID, [&]() {
+        manager->DeferPageSceneQuery(QUERY_PROCESS_ID, [&]() {
+            ++nextCompleted;
+            return true;
+        }, [&]() { ++nextCancelled; });
+        return true;
+    }, [&]() { ++oldCancelled; });
+    manager->FlushPageSceneQueries();
+    EXPECT_EQ(oldCancelled, 0);
+    EXPECT_EQ(nextCompleted, 0);
+    EXPECT_EQ(manager->GetPendingPageSceneQueryCount(), SINGLE_BUCKET_NODE);
+    manager->FlushPageSceneQueries();
+    EXPECT_EQ(nextCompleted, 1);
+    EXPECT_EQ(oldCancelled, 0);
+    EXPECT_EQ(nextCancelled, 0);
+    EXPECT_EQ(manager->GetPendingPageSceneQueryCount(), 0u);
+}
+
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneSplit_InstalledSnapshotDetectsUntilCleared, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    EXPECT_FALSE(manager->NeedPageSceneDetect());
+    auto pane = FrameNode::CreateFrameNode("Column", QUERY_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    manager->ConfigurePageSceneSplitTracking({ "Column" }, false);
+    manager->SeedPageSceneSplitNodes({ pane });
+    int detections = 0;
+    manager->SetPageSceneSplitDetector([&detections]() { ++detections; });
+    EXPECT_TRUE(manager->NeedPageSceneDetect());
+    manager->OnVsyncEndInner({});
+    EXPECT_EQ(detections, 1);
+    manager->MarkPageSceneSplitDirty();
+    manager->OnVsyncEndInner({});
+    constexpr int EXPECTED_DETECTIONS = 2;
+    EXPECT_EQ(detections, EXPECTED_DETECTIONS);
+    manager->ConfigurePageSceneSplitTracking({}, false);
+    EXPECT_FALSE(manager->NeedPageSceneDetect());
+    manager->OnVsyncEndInner({});
+    EXPECT_EQ(detections, EXPECTED_DETECTIONS);
+}
+
 } // namespace OHOS::Ace::NG

@@ -44,6 +44,7 @@
 #include "core/components_ng/pattern/text_field/text_field_pattern.h"
 #include "core/components_ng/pattern/pattern.h"
 #include "core/components_v2/inspector/inspector_constants.h"
+#include "interfaces/inner_api/ui_session/ui_session_split_rule.h"
 #include "test/mock/frameworks/core/components_ng/render/mock_render_context.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
@@ -239,6 +240,21 @@ RefPtr<FrameNode> CreatePageRoot()
     return CreateTestNode(V2::PAGE_ETS_TAG, TEST_ROOT_ID, RectF(ROOT_X, ROOT_Y, ROOT_WIDTH, ROOT_HEIGHT));
 }
 
+class TraversalCountingPage : public FrameNode {
+    DECLARE_ACE_TYPE(TraversalCountingPage, FrameNode);
+
+public:
+    TraversalCountingPage() : FrameNode(V2::PAGE_ETS_TAG, TEST_ROOT_ID, AceType::MakeRefPtr<Pattern>()) {}
+
+    const std::list<RefPtr<UINode>>& GetChildren(bool notDetach = false) const override
+    {
+        ++childReads;
+        return FrameNode::GetChildren(notDetach);
+    }
+
+    mutable uint32_t childReads = 0;
+};
+
 DumpStartNodeSet BuildStartNodes(const RefPtr<FrameNode>& root)
 {
     DumpStartNodeSet set;
@@ -355,6 +371,40 @@ void PageSceneRuleManagerTestNg::SetUpTestCase()
 void PageSceneRuleManagerTestNg::TearDownTestCase()
 {
     MockPipelineContext::TearDown();
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_SplitRootsDoNotWalkPage001
+ * @tc.desc: Repeated SPLIT root collection retains overlays without recursively enumerating the page.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_SplitRootsDoNotWalkPage001, TestSize.Level1)
+{
+    auto root = CreateTestNode(V2::ROOT_ETS_TAG, TEST_PIPELINE_ROOT_ID, RectF(ROOT_X, ROOT_Y, ROOT_WIDTH, ROOT_HEIGHT));
+    auto page = AceType::MakeRefPtr<TraversalCountingPage>();
+    page->InitializePatternAndContext();
+    page->GetLayoutProperty()->UpdateVisibility(VisibleType::VISIBLE);
+    page->SetActive(true);
+    auto dialog = CreateTestNode(V2::DIALOG_ETS_TAG, TEST_DIALOG_ID, RectF(ROOT_X, ROOT_Y, ROOT_WIDTH, ROOT_HEIGHT));
+    AddChild(root, page);
+    AddChild(root, dialog);
+    AddChild(
+        page, CreateTextInputNode(TEST_TEXT_INPUT_ID, RectF(FIRST_NODE_X, FIRST_NODE_Y, INPUT_WIDTH, INPUT_HEIGHT)));
+
+    page->childReads = 0;
+    auto legacy = DumpUtil::CollectInspectorStartNodes(root, nullptr, page, nullptr);
+    EXPECT_GT(page->childReads, 0U);
+    ASSERT_EQ(legacy.pageStartNodes.size(), 1U);
+    page->childReads = 0;
+    for (int index = 0; index < 2; ++index) {
+        auto roots = PageSceneRuleManager::CollectSplitStartNodes(root, nullptr, page, nullptr);
+        ASSERT_EQ(roots.pageStartNodes.size(), 1U);
+        EXPECT_EQ(roots.pageStartNodes.front(), page);
+        ASSERT_EQ(roots.overlayNodes.size(), 1U);
+        EXPECT_EQ(roots.overlayNodes.front(), dialog);
+    }
+    EXPECT_EQ(page->childReads, 0U);
+    EXPECT_TRUE(PageSceneRuleManager::CollectSplitStartNodes(root, nullptr, nullptr, nullptr).pageStartNodes.empty());
 }
 
 /**
@@ -2753,6 +2803,1004 @@ HWTEST_F(PageSceneRuleManagerTestNg, SearchReview_SubtreeUsesOneVisibilityPass, 
     for (const auto& context : contexts) {
         EXPECT_EQ(context->reads, 1);
     }
+}
+
+namespace {
+
+std::vector<PageSceneMatchResult> DetectRegisteredSplitChanges(PageSceneRuleManager& manager, int32_t processId,
+    const std::vector<SplitSceneCandidate>& candidates, const RectF& window, const std::string& pageName)
+{
+    auto registration = manager.GetCompiledSplitRegistration();
+    if (!registration || registration->processId != processId) {
+        return {};
+    }
+    SplitSceneBatch snapshot(candidates, window);
+    return manager.DetectCompiledSplitChanges(*registration, snapshot, pageName);
+}
+
+std::string BuildStrictSplitRuleJson()
+{
+    return R"({"version":1, "ruleSetId":"split_rules", "rules":[{
+        "ruleId":"split_1", "sceneType":"SPLIT", "navigation":false,
+        "custom":{"selectors":[{"compName":"Column"}], "geometry":{
+            "heightRatioGt":0.8, "widthRatioLte":0.5, "totalWidthRatioGt":0.8, "nonOverlapping":true}}
+    }]})";
+}
+std::string ReplaceSplitField(std::string json, const std::string& from, const std::string& to)
+{
+    auto position = json.find(from);
+    if (position != std::string::npos) {
+        json.replace(position, from.size(), to);
+    }
+    return json;
+}
+} // namespace
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitRule_CustomFieldsRequired, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto json = BuildStrictSplitRuleJson();
+    auto parsed = manager.ParseRuleSet(json);
+    ASSERT_TRUE(parsed.has_value());
+    ASSERT_EQ(parsed->rules.size(), 1u);
+    EXPECT_EQ(parsed->rules.front().compNames, std::vector<std::string>({ "Column" }));
+    EXPECT_DOUBLE_EQ(parsed->rules.front().widthRatioLte, 0.5);
+    for (const auto& field : { "heightRatioGt", "widthRatioLte", "totalWidthRatioGt", "nonOverlapping" }) {
+        auto renamed = ReplaceSplitField(json, std::string("\"") + field + "\"", "\"unknown\"");
+        EXPECT_FALSE(PageSceneSplit::ParseRuleSet(renamed).has_value()) << field;
+    }
+    EXPECT_FALSE(PageSceneSplit::ParseRuleSet(ReplaceSplitField(json, "\"custom\"", "\"legacy\"")).has_value());
+    EXPECT_FALSE(PageSceneSplit::ParseRuleSet(ReplaceSplitField(json, "\"selectors\"", "\"legacy\"")).has_value());
+    EXPECT_FALSE(PageSceneSplit::ParseRuleSet(ReplaceSplitField(json, "\"compName\":\"Column\"", "\"compName\":123")));
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitRule_ConfigurableGeometry, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto json = ReplaceSplitField(BuildStrictSplitRuleJson(), "\"nonOverlapping\":true", "\"nonOverlapping\":false");
+    json = ReplaceSplitField(json, "\"heightRatioGt\":0.8", "\"heightRatioGt\":0.4");
+    json = ReplaceSplitField(json, "\"totalWidthRatioGt\":0.8", "\"totalWidthRatioGt\":0.7");
+    auto parsed = manager.ParseRuleSet(json);
+    ASSERT_TRUE(parsed.has_value());
+    EXPECT_FALSE(parsed->rules.front().nonOverlapping);
+    EXPECT_DOUBLE_EQ(parsed->rules.front().heightRatioGt, 0.4);
+    EXPECT_DOUBLE_EQ(parsed->rules.front().totalWidthRatioGt, 0.7);
+    for (const std::string field : { "\"heightRatioGt\":0.4", "\"widthRatioLte\":0.5", "\"totalWidthRatioGt\":0.7" }) {
+        const auto name = field.substr(0, field.find(':'));
+        for (const auto& invalid : { "0", "-0.1", "1.1", "true", "\"0.5\"", "null", "1e999" }) {
+            EXPECT_FALSE(PageSceneSplit::ParseRuleSet(ReplaceSplitField(json, field, name + ":" + invalid)))
+                << field << " " << invalid;
+        }
+    }
+    EXPECT_TRUE(manager.ParseRuleSet(ReplaceSplitField(json, "\"widthRatioLte\":0.5", "\"widthRatioLte\":1")));
+    EXPECT_TRUE(manager.ParseRuleSet(ReplaceSplitField(json, "\"widthRatioLte\":0.5", "\"widthRatioLte\":1e-100")));
+    EXPECT_FALSE(
+        PageSceneSplit::ParseRuleSet(ReplaceSplitField(json, "\"nonOverlapping\":false", "\"nonOverlapping\":0")));
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitRule_AtomicValidationAndLegacyCompatibility, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto json = BuildStrictSplitRuleJson();
+    EXPECT_TRUE(manager.ParseRuleSet(BuildRuleJson()));
+    EXPECT_FALSE(PageSceneSplit::ParseRuleSet(ReplaceSplitField(json, "\"version\":1", "\"version\":1.5")));
+    EXPECT_FALSE(PageSceneSplit::ParseRuleSet(ReplaceSplitField(json, "\"version\":1", "\"version\":true")));
+    EXPECT_FALSE(PageSceneSplit::ParseRuleSet(ReplaceSplitField(json, "\"navigation\":false", "\"navigation\":null")));
+    EXPECT_FALSE(PageSceneSplit::ParseRuleSet(
+        ReplaceSplitField(json, "\"navigation\":false", "\"enabled\":123, \"navigation\":false")));
+    EXPECT_TRUE(
+        PageSceneSplit::ParseRuleSet(ReplaceSplitField(json, "\"version\":1", "\"unknown\":{}, \"version\":1")));
+    EXPECT_TRUE(PageSceneSplit::ParseRuleSet(R"({"version":1, "ruleSetId":"nav", "rules":[
+        {"ruleId":"nav_rule", "sceneType":"SPLIT", "navigation":true}]})"));
+    EXPECT_FALSE(PageSceneSplit::ParseRuleSet(R"({"version":1, "ruleSetId":"nav", "rules":[
+        {"ruleId":"nav_rule", "sceneType":"SPLIT", "navigation":true, "custom":null}]})"));
+    EXPECT_TRUE(PageSceneSplit::ParseRuleSet(R"({"version":1, "ruleSetId":"nav", "rules":[
+        {"ruleId":"nav_rule", "sceneType":"SPLIT"}, {"ruleId":"other", "sceneType":"FUTURE_SCENE"}]})"));
+    EXPECT_TRUE(PageSceneSplit::ParseRuleSet(R"({"version":1, "ruleSetId":"nav", "rules":[
+        {"ruleId":"nav_rule", "sceneType":"SPLIT"}, {"ruleId":"bad", "sceneType":"TEXT_EDITOR"}]})"));
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitRule_ExtensibleSceneTypesKeepSplitOrder, TestSize.Level1)
+{
+    const auto parsed = PageSceneSplit::ParseRuleSet(R"({"version":1, "ruleSetId":"mixed", "rules":[
+        {"ruleId":"future", "sceneType":"FUTURE_SCENE", "custom":null, "navigation":123},
+        {"ruleId":"first", "sceneType":"SPLIT"},
+        {"ruleId":"search", "sceneType":"SEARCH"},
+        {"ruleId":"second", "sceneType":"SPLIT"},
+        {"ruleId":"text", "sceneType":"TEXT_EDITOR"}]})");
+    ASSERT_TRUE(parsed.has_value());
+    ASSERT_EQ(parsed->rules.size(), 2u);
+    EXPECT_EQ(parsed->rules[0].ruleId, "first");
+    EXPECT_EQ(parsed->rules[1].ruleId, "second");
+    EXPECT_FALSE(PageSceneSplit::ParseRuleSet(R"({"version":1, "ruleSetId":"future", "rules":[
+        {"ruleId":"future", "sceneType":"FUTURE_SCENE"}]})"));
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitRule_ExtensibleSceneTypesKeepCommonValidation, TestSize.Level1)
+{
+    const std::string prefix = R"({"version":1, "ruleSetId":"mixed", "rules":[
+        {"ruleId":"split", "sceneType":"SPLIT"}, )";
+    const std::vector<std::string> invalidItems = {
+        R"({"ruleId":"future"})", R"({"ruleId":"future", "sceneType":""})",
+        R"({"ruleId":"future", "sceneType":123})", R"({"ruleId":"future", "sceneType":null})",
+        R"({"ruleId":"", "sceneType":"FUTURE_SCENE"})", R"({"sceneType":"FUTURE_SCENE"})",
+        R"({"ruleId":123, "sceneType":"FUTURE_SCENE"})",
+        R"({"ruleId":"bad id", "sceneType":"FUTURE_SCENE"})",
+        R"({"ruleId":"split", "sceneType":"FUTURE_SCENE"})", "null"
+    };
+    for (const auto& item : invalidItems) {
+        EXPECT_FALSE(PageSceneSplit::ParseRuleSet(prefix + item + "]}")) << item;
+    }
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitRule_CapacityAndDuplicateIdentifiers, TestSize.Level1)
+{
+    for (int count : { 10, 11 }) {
+        std::string json = R"({"version":1, "ruleSetId":"rs", "rules":[)";
+        for (int i = 0; i < count; ++i) {
+            if (i) {
+                json += ", ";
+            }
+            json += "{\"ruleId\":\"r" + std::to_string(i) + "\", \"sceneType\":\"SPLIT\"}";
+        }
+        json += "]}";
+        EXPECT_EQ(PageSceneSplit::ParseRuleSet(json).has_value(), count == 10);
+    }
+    EXPECT_FALSE(PageSceneSplit::ParseRuleSet(R"({"version":1, "ruleSetId":"rs", "rules":[
+        {"ruleId":"same", "sceneType":"SPLIT"}, {"ruleId":"same", "sceneType":"SPLIT"}]})"));
+    auto json = BuildStrictSplitRuleJson();
+    EXPECT_FALSE(PageSceneSplit::ParseRuleSet(ReplaceSplitField(
+        json, "[{\"compName\":\"Column\"}]", "[{\"compName\":\"Column\"}, {\"compName\":\"Column\"}]")));
+    EXPECT_FALSE(PageSceneSplit::ParseRuleSet(ReplaceSplitField(json, "[{\"compName\":\"Column\"}]", "[]")));
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_StateTransitionsAndOriginalFields, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto json = BuildStrictSplitRuleJson();
+    SplitSceneCandidate left;
+    left.nodeId = 1;
+    left.compName = "Column";
+    left.rect = RectF(0, 0, 450, 950);
+    left.focusable = true;
+    SplitSceneCandidate right;
+    right.nodeId = 2;
+    right.compName = "Column";
+    right.rect = RectF(550, 0, 450, 950);
+    RectF window(0, 0, 1000, 1000);
+    ASSERT_TRUE(manager.UpdateSplitRegistration(1001, json));
+    auto changes = DetectRegisteredSplitChanges(manager, 1001, { left, right }, window, "Home");
+    ASSERT_EQ(changes.size(), 1u);
+    EXPECT_EQ(changes[0].eventName, "SPLIT");
+    auto root = manager.BuildSplitSceneJson(changes[0]);
+    EXPECT_TRUE(root->GetBool("matched"));
+    EXPECT_EQ(root->GetInt("matchedCount"), 2);
+    EXPECT_EQ(root->GetString("currentPageName"), "Home");
+    EXPECT_EQ(root->GetString("splitType"), "Custom");
+    EXPECT_FALSE(root->Contains("source"));
+    auto nodes = root->GetValue("nodes");
+    ASSERT_EQ(nodes->GetArraySize(), 2);
+    EXPECT_EQ(nodes->GetArrayItem(0)->GetString("nodeType"), "Column");
+    EXPECT_FALSE(nodes->GetArrayItem(0)->Contains("focusable"));
+    EXPECT_FALSE(nodes->GetArrayItem(0)->Contains("text"));
+    EXPECT_TRUE(nodes->GetArrayItem(0)->Contains("rect"));
+    EXPECT_TRUE(DetectRegisteredSplitChanges(manager, 1001, { left, right }, window, "Home").empty());
+    auto exits = DetectRegisteredSplitChanges(manager, 1001, { left }, window, "Home");
+    ASSERT_EQ(exits.size(), 1u);
+    EXPECT_EQ(exits[0].eventName, "SPLIT_EXIT");
+    EXPECT_FALSE(exits[0].matched);
+    root = manager.BuildSplitSceneJson(exits[0]);
+    EXPECT_EQ(root->GetInt("matchedCount"), 0);
+    EXPECT_EQ(root->GetValue("nodes")->GetArraySize(), 0);
+    EXPECT_TRUE(DetectRegisteredSplitChanges(manager, 1001, { left }, window, "Home").empty());
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_RouteAndUnregister, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto json = BuildStrictSplitRuleJson();
+    SplitSceneCandidate left;
+    left.nodeId = 1;
+    left.compName = "Column";
+    left.rect = RectF(0, 0, 450, 950);
+    SplitSceneCandidate right;
+    right.nodeId = 2;
+    right.compName = "Column";
+    right.rect = RectF(550, 0, 450, 950);
+    RectF window(0, 0, 1000, 1000);
+    ASSERT_TRUE(manager.UpdateSplitRegistration(1001, json));
+    ASSERT_EQ(DetectRegisteredSplitChanges(manager, 1001, { left, right }, window, "A").size(), 1u);
+    auto route = DetectRegisteredSplitChanges(manager, 1001, { left, right }, window, "B");
+    ASSERT_EQ(route.size(), 2u);
+    EXPECT_EQ(route[0].pageName, "A");
+    EXPECT_FALSE(route[0].matched);
+    auto exitJson = manager.BuildSplitSceneJson(route[0]);
+    EXPECT_EQ(exitJson->GetString("currentPageName"), "B");
+    EXPECT_EQ(exitJson->GetString("pageName"), "A");
+    EXPECT_EQ(route[1].pageName, "B");
+    EXPECT_TRUE(route[1].matched);
+    EXPECT_TRUE(DetectRegisteredSplitChanges(manager, 1001, { left, right }, window, "B").empty());
+    EXPECT_TRUE(manager.UpdateSplitRegistration(1001, ""));
+    EXPECT_TRUE(manager.splitReportStates_.empty());
+    EXPECT_TRUE(!manager.GetCompiledSplitRegistration());
+
+    EXPECT_TRUE(!manager.splitRegistration_);
+    EXPECT_TRUE(manager.UpdateSplitRegistration(1001, json));
+    EXPECT_EQ(DetectRegisteredSplitChanges(manager, 1001, { left, right }, window, "B").size(), 1u);
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_PreviousOwnerCannotClearCurrentRegistration, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    const auto first = BuildStrictSplitRuleJson();
+    const auto second = ReplaceSplitField(first, "split_rules", "second_rules");
+    const std::vector<SplitSceneCandidate> candidates {
+        { 1, "Column", RectF(0, 0, 450, 950) }, { 2, "Column", RectF(550, 0, 450, 950) }
+    };
+    const RectF window(0, 0, 1000, 1000);
+    ASSERT_TRUE(manager.UpdateSplitRegistration(1001, first));
+    ASSERT_EQ(DetectRegisteredSplitChanges(manager, 1001, candidates, window, "Home").size(), 1u);
+    ASSERT_TRUE(manager.UpdateSplitRegistration(1002, second));
+    auto current = manager.GetCompiledSplitRegistration();
+    ASSERT_TRUE(current.has_value());
+    EXPECT_EQ(current->processId, 1002);
+    EXPECT_EQ(current->rules->ruleSet.ruleSetId, "second_rules");
+    ASSERT_EQ(DetectRegisteredSplitChanges(manager, 1002, candidates, window, "Home").size(), 1u);
+    EXPECT_TRUE(manager.UpdateSplitRegistration(1001, ""));
+    ASSERT_TRUE(manager.GetCompiledSplitRegistration().has_value());
+    EXPECT_EQ(manager.GetCompiledSplitRegistration()->rules, current->rules);
+    EXPECT_TRUE(DetectRegisteredSplitChanges(manager, 1002, candidates, window, "Home").empty());
+    EXPECT_TRUE(DetectRegisteredSplitChanges(manager, 1001, candidates, window, "Home").empty());
+    EXPECT_EQ(DetectRegisteredSplitChanges(manager, 1002, {}, window, "Home").size(), 1u);
+    EXPECT_TRUE(manager.UpdateSplitRegistration(1002, ""));
+    EXPECT_FALSE(manager.GetCompiledSplitRegistration().has_value());
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_TrackingRespectsSourcesAndEnabledRules, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto json = BuildStrictSplitRuleJson();
+    const std::set<std::string> names { "Column" };
+    auto compiled = manager.CompileSplitRuleSet(json);
+    ASSERT_NE(compiled, nullptr);
+    EXPECT_EQ(compiled->customTags, names);
+    EXPECT_EQ(compiled->navigationDisabledTags, names);
+    EXPECT_FALSE(compiled->trackNavigation);
+    compiled = manager.CompileSplitRuleSet(ReplaceSplitField(json, "\"navigation\":false", "\"navigation\":true"));
+    ASSERT_NE(compiled, nullptr);
+    EXPECT_TRUE(compiled->trackNavigation);
+    EXPECT_EQ(compiled->customTags, names);
+    EXPECT_TRUE(compiled->navigationDisabledTags.empty());
+    auto disabled = ReplaceSplitField(json, "\"sceneType\":\"SPLIT\"", "\"sceneType\":\"SPLIT\", \"enabled\":false");
+    compiled = manager.CompileSplitRuleSet(disabled);
+    ASSERT_NE(compiled, nullptr);
+    EXPECT_TRUE(compiled->customTags.empty());
+    EXPECT_TRUE(compiled->navigationDisabledTags.empty());
+    EXPECT_FALSE(compiled->trackNavigation);
+    auto sourceDisabled = ReplaceSplitField(json, "\"version\":1", "\"version\":1, \"sourceConfig\":{\"arkui\":false}");
+    compiled = manager.CompileSplitRuleSet(sourceDisabled);
+    ASSERT_NE(compiled, nullptr);
+    EXPECT_TRUE(compiled->customTags.empty());
+    EXPECT_TRUE(compiled->navigationDisabledTags.empty());
+    EXPECT_FALSE(compiled->trackNavigation);
+    EXPECT_EQ(manager.CompileSplitRuleSet("invalid"), nullptr);
+    EXPECT_EQ(manager.CompileSplitRuleSet(BuildRuleJson()), nullptr);
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_OriginalReportOptionsPreserved, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto json = ReplaceSplitField(BuildStrictSplitRuleJson(), "\"navigation\":false",
+        R"("navigation":false, "report":{"includeNodeIds":false, "includeNodeTypes":false,
+        "includeRect":false, "includeFocusable":false})");
+    SplitSceneCandidate left;
+    left.nodeId = 1;
+    left.compName = "Column";
+    left.rect = RectF(0, 0, 450, 950);
+    SplitSceneCandidate right;
+    right.nodeId = 2;
+    right.compName = "Column";
+    right.rect = RectF(550, 0, 450, 950);
+    ASSERT_TRUE(manager.UpdateSplitRegistration(TEST_PROCESS_ID, json));
+    auto events =
+        DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, { left, right }, RectF(0, 0, 1000, 1000), "Home");
+    ASSERT_EQ(events.size(), 1u);
+    auto result = manager.BuildSplitSceneJson(events[0]);
+    EXPECT_EQ(result->GetInt("matchedCount"), 2);
+    auto nodes = result->GetValue("nodes");
+    ASSERT_EQ(nodes->GetArraySize(), 2);
+    for (int index = 0; index < nodes->GetArraySize(); ++index) {
+        auto node = nodes->GetArrayItem(index);
+        for (const auto* key : { "nodeId", "nodeType", "rect", "focusable", "text" }) {
+            EXPECT_FALSE(node->Contains(key));
+        }
+    }
+    EXPECT_TRUE(result->GetBool("matched"));
+    EXPECT_EQ(result->GetString("currentPageName"), "Home");
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_ReRegistrationRestartsReportState, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto first = ReplaceSplitField(
+        BuildStrictSplitRuleJson(), "\"version\":1", "\"version\":1, \"_splitRegistrationGeneration\":\"1\"");
+    auto replacement = ReplaceSplitField(first, "Generation\":\"1\"", "Generation\":\"3\"");
+    SplitSceneCandidate left;
+    left.nodeId = 1;
+    left.compName = "Column";
+    left.rect = RectF(0, 0, 450, 950);
+    SplitSceneCandidate right;
+    right.nodeId = 2;
+    right.compName = "Column";
+    right.rect = RectF(550, 0, 450, 950);
+    RectF window(0, 0, 1000, 1000);
+    ASSERT_TRUE(manager.UpdateSplitRegistration(1001, first));
+    ASSERT_EQ(DetectRegisteredSplitChanges(manager, 1001, { left, right }, window, "Home").size(), 1u);
+    // A distinct registration starts fresh report state even when its rule content is unchanged.
+    ASSERT_TRUE(manager.UpdateSplitRegistration(1001, replacement));
+    auto events = DetectRegisteredSplitChanges(manager, 1001, { left, right }, window, "Home");
+    ASSERT_EQ(events.size(), 1u);
+    EXPECT_TRUE(events[0].matched);
+    EXPECT_EQ(events[0].eventName, "SPLIT");
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_ReRegistrationDoesNotResetLegacyState, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto legacyJson = BuildRuleJson(false, false, true, 0);
+    auto legacyRoot = JsonUtil::ParseJsonString(legacyJson);
+    auto mixedRoot = JsonUtil::ParseJsonString(BuildStrictSplitRuleJson());
+    mixedRoot->Put("_splitRegistrationGeneration", "1");
+    mixedRoot->GetValue("rules")->Put(legacyRoot->GetValue("rules")->GetArrayItem(0));
+    auto mixedJson = mixedRoot->ToString();
+    ASSERT_TRUE(manager.ParseRuleSet(mixedJson));
+    auto root = CreatePageRoot();
+    AddChild(root, CreateTextInputNode(99401, RectF(10, 10, 100, 20)));
+    AddChild(root, CreateTextInputNode(99402, RectF(10, 40, 100, 20)));
+    auto mixed = manager.MatchPageScene(1001, mixedJson, BuildStartNodes(root), "Home", false);
+    auto legacy = manager.MatchPageScene(1001, legacyJson, BuildStartNodes(root), "Home", false);
+    ASSERT_TRUE(mixed && mixed->matched);
+    ASSERT_TRUE(legacy && legacy->matched);
+    ASSERT_TRUE(manager.UpdateSplitRegistration(1001, mixedJson));
+    EXPECT_TRUE(manager.ShouldReport(1001, *mixed));
+    EXPECT_TRUE(manager.ShouldReport(1001, *legacy));
+    mixedRoot->Replace("_splitRegistrationGeneration", "3");
+    ASSERT_TRUE(manager.UpdateSplitRegistration(1001, mixedRoot->ToString()));
+    EXPECT_FALSE(manager.ShouldReport(1001, *mixed));
+    EXPECT_FALSE(manager.ShouldReport(1001, *legacy));
+}
+
+namespace {
+constexpr int32_t LEFT_SPLIT_NODE_ID = 99501;
+constexpr int32_t RIGHT_SPLIT_NODE_ID = 99502;
+constexpr float SPLIT_COLUMN_WIDTH = 450.0f;
+constexpr float SPLIT_COLUMN_HEIGHT = 950.0f;
+constexpr float RIGHT_SPLIT_COLUMN_OFFSET = 550.0f;
+constexpr int32_t MIXED_TEXT_INPUT_COUNT = 3;
+constexpr int32_t MIXED_TEXT_INPUT_FIRST_ID = 99601;
+constexpr float MIXED_TEXT_INPUT_ORIGIN = 10.0f;
+constexpr float MIXED_TEXT_INPUT_SPACING = 30.0f;
+constexpr float MIXED_TEXT_INPUT_WIDTH = 100.0f;
+constexpr float MIXED_TEXT_INPUT_HEIGHT = 20.0f;
+
+std::vector<SplitSceneCandidate> CreateSplitColumns()
+{
+    SplitSceneCandidate left;
+    left.nodeId = LEFT_SPLIT_NODE_ID;
+    left.compName = "Column";
+    left.rect = RectF(0, 0, SPLIT_COLUMN_WIDTH, SPLIT_COLUMN_HEIGHT);
+    auto right = left;
+    right.nodeId = RIGHT_SPLIT_NODE_ID;
+    right.rect = RectF(RIGHT_SPLIT_COLUMN_OFFSET, 0, SPLIT_COLUMN_WIDTH, SPLIT_COLUMN_HEIGHT);
+    return { left, right };
+}
+
+std::string BuildMixedSplitRules(bool reportFirstOnRegister = true)
+{
+    auto mixed = JsonUtil::ParseJsonString(BuildStrictSplitRuleJson());
+    auto text = JsonUtil::ParseJsonString(BuildRuleJson(false, false, true, 0));
+    auto first = text->GetValue("rules")->GetArrayItem(0);
+    first->Replace("ruleId", "text_first");
+    first->GetValue("policy")->Replace("reportOnRegister", reportFirstOnRegister);
+    auto second = JsonUtil::ParseJsonString(first->ToString());
+    second->Replace("ruleId", "text_second");
+    second->GetValue("condition")->Replace("threshold", MIXED_TEXT_INPUT_COUNT);
+    second->GetValue("policy")->Replace("reportOnRegister", true);
+    mixed->GetValue("rules")->Put(first);
+    mixed->GetValue("rules")->Put(second);
+    return mixed->ToString();
+}
+
+std::vector<PageSceneMatchResult> MatchLegacyTextRequests(PageSceneRuleManager& manager, const std::string& json,
+    const DumpStartNodeSet& roots, const std::string& pageName, bool query)
+{
+    auto source = JsonUtil::ParseJsonString(json);
+    auto rules = source->GetValue("rules");
+    std::vector<PageSceneMatchResult> results;
+    for (int index = 0; index < rules->GetArraySize(); ++index) {
+        auto rule = rules->GetArrayItem(index);
+        if (rule->GetString("sceneType") != "TEXT_EDITOR") {
+            continue;
+        }
+        auto request = JsonUtil::ParseJsonString(json);
+        auto selected = JsonUtil::CreateArray(true);
+        selected->Put(rule);
+        request->Replace("rules", selected);
+        auto result = manager.MatchPageScene(TEST_PROCESS_ID, request->ToString(), roots, pageName, query);
+        if (result) {
+            results.push_back(*result);
+        }
+    }
+    return results;
+}
+
+RefPtr<FrameNode> CreateThreeInputsPage()
+{
+    auto root = CreatePageRoot();
+    for (int i = 0; i < MIXED_TEXT_INPUT_COUNT; ++i) {
+        auto rect = RectF(MIXED_TEXT_INPUT_ORIGIN, MIXED_TEXT_INPUT_ORIGIN + i * MIXED_TEXT_INPUT_SPACING,
+            MIXED_TEXT_INPUT_WIDTH, MIXED_TEXT_INPUT_HEIGHT);
+        AddChild(root, CreateTextInputNode(MIXED_TEXT_INPUT_FIRST_ID + i, rect));
+    }
+    return root;
+}
+} // namespace
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_MixedTextRulesReportAndExitIndependently, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto json = BuildMixedSplitRules();
+    auto root = CreateThreeInputsPage();
+    ASSERT_TRUE(manager.UpdateSplitRegistration(1001, json));
+    auto results = MatchLegacyTextRequests(manager, json, BuildStartNodes(root), "Home", false);
+    ASSERT_EQ(results.size(), 2u);
+    EXPECT_EQ(results[0].ruleId, "text_first");
+    EXPECT_EQ(results[1].ruleId, "text_second");
+    for (const auto& result : results) {
+        EXPECT_TRUE(result.matched);
+        EXPECT_TRUE(manager.ShouldReport(1001, result));
+    }
+    root->RemoveChild(root->GetLastChild());
+    results = MatchLegacyTextRequests(manager, json, BuildStartNodes(root), "Home", false);
+    ASSERT_EQ(results.size(), 2u);
+    EXPECT_TRUE(results[0].matched);
+    // Legacy TEXT_EDITOR deduplication includes node IDs, so the remaining
+    // matching rule reports its new node set instead of emitting an exit.
+    EXPECT_EQ(results[0].eventName, "TEXT_EDITOR");
+    EXPECT_TRUE(manager.ShouldReport(1001, results[0]));
+    EXPECT_FALSE(manager.ShouldReport(1001, results[0]));
+    EXPECT_FALSE(results[1].matched);
+    EXPECT_EQ(results[1].eventName, "TEXT_EDITOR_EXIT");
+    EXPECT_TRUE(manager.ShouldReport(1001, results[1]));
+    EXPECT_FALSE(manager.ShouldReport(1001, results[1]));
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_MixedTextFirstTriggeredResultIsNotSuppressed, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto json = BuildMixedSplitRules(false);
+    auto root = CreateThreeInputsPage();
+    ASSERT_TRUE(manager.UpdateSplitRegistration(1001, json));
+    auto results = MatchLegacyTextRequests(manager, json, BuildStartNodes(root), "Home", false);
+    ASSERT_EQ(results.size(), 2u);
+    EXPECT_TRUE(manager.ShouldReport(1001, results[0]));
+    EXPECT_TRUE(manager.ShouldReport(1001, results[1]));
+    EXPECT_FALSE(manager.ShouldReport(1001, results[0]));
+    EXPECT_FALSE(manager.ShouldReport(1001, results[1]));
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_QueryDoesNotConsumeRegistrationPolicy, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto json = ReplaceSplitField(BuildStrictSplitRuleJson(), "\"navigation\":false",
+        R"("navigation":false, "policy":{"reportOnRegister":false})");
+    auto candidates = CreateSplitColumns();
+    RectF window(0, 0, 1000, 1000);
+    ASSERT_TRUE(manager.UpdateSplitRegistration(1001, json));
+    auto compiled = manager.CompileSplitRuleSet(json);
+    ASSERT_NE(compiled, nullptr);
+    auto query = JsonUtil::ParseJsonString(manager.QueryCompiledSplitPageScenes(*compiled, candidates, window, "Home"));
+    auto events = query->GetValue("events");
+    ASSERT_EQ(events->GetArraySize(), 1);
+    EXPECT_TRUE(events->GetArrayItem(0)->GetBool("matched"));
+    EXPECT_TRUE(manager.splitReportStates_.empty());
+    EXPECT_TRUE(manager.splitReportPolicyStates_.empty());
+    // The reportOnRegister=false policy is ignored: the registration's first detection reports.
+    EXPECT_EQ(DetectRegisteredSplitChanges(manager, 1001, candidates, window, "Home").size(), 1u);
+    EXPECT_TRUE(DetectRegisteredSplitChanges(manager, 1001, candidates, window, "Home").empty());
+    ASSERT_TRUE(manager.UpdateSplitRegistration(1001, ""));
+    EXPECT_TRUE(manager.splitReportPolicyStates_.empty());
+    ASSERT_TRUE(manager.UpdateSplitRegistration(1001, json));
+    EXPECT_EQ(DetectRegisteredSplitChanges(manager, 1001, candidates, window, "Home").size(), 1u);
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_IgnoresDeduplicatePolicy, TestSize.Level1)
+{
+    const std::vector<std::string> values = { "true", "false", "null", "0", R"("ignored")", "{}", "[]" };
+    constexpr float WINDOW_SIZE = RIGHT_SPLIT_COLUMN_OFFSET + SPLIT_COLUMN_WIDTH;
+    auto candidates = CreateSplitColumns();
+    RectF window(0, 0, WINDOW_SIZE, WINDOW_SIZE);
+    for (const auto& value : values) {
+        SCOPED_TRACE(value);
+        PageSceneRuleManager manager;
+        auto policy = R"("navigation":false, "policy":{"deduplicate":)" + value + R"(, "minReportIntervalMs":0})";
+        auto json = ReplaceSplitField(BuildStrictSplitRuleJson(), "\"navigation\":false", policy);
+        ASSERT_TRUE(manager.UpdateSplitRegistration(TEST_PROCESS_ID, json));
+        ASSERT_EQ(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, "Home").size(), 1u);
+        EXPECT_TRUE(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, "Home").empty());
+        ASSERT_EQ(manager.splitReportPolicyStates_.size(), 1u);
+        // No interval throttling: identical results stay silent purely by content deduplication.
+        EXPECT_TRUE(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, "Home").empty());
+        EXPECT_EQ(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, {}, window, "Home").size(), 1u);
+        EXPECT_TRUE(manager.splitReportPolicyStates_.empty());
+        EXPECT_EQ(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, "Home").size(), 1u);
+    }
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_QueryContainsOnlySplitResults, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto json = BuildMixedSplitRules();
+    constexpr float WINDOW_SIZE = RIGHT_SPLIT_COLUMN_OFFSET + SPLIT_COLUMN_WIDTH;
+    RectF window(0, 0, WINDOW_SIZE, WINDOW_SIZE);
+    auto compiled = manager.CompileSplitRuleSet(json);
+    ASSERT_NE(compiled, nullptr);
+    auto result = JsonUtil::ParseJsonString(manager.QueryCompiledSplitPageScenes(*compiled, {}, window, "Home"));
+    auto events = result->GetValue("events");
+    ASSERT_EQ(events->GetArraySize(), ONE_MATCHED_NODE);
+    EXPECT_EQ(events->GetArrayItem(0)->GetString("ruleId"), "split_1");
+    EXPECT_FALSE(events->GetArrayItem(0)->GetBool("matched"));
+    EXPECT_EQ(events->GetArrayItem(0)->GetString("eventName"), "SPLIT_EXIT");
+    EXPECT_TRUE(!manager.GetCompiledSplitRegistration());
+    EXPECT_TRUE(manager.splitReportStates_.empty());
+    EXPECT_TRUE(manager.reportStates_.empty());
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_MissingRootsPreserveLegacySubscriptionBehavior, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto json = BuildMixedSplitRules();
+    EXPECT_FALSE(manager.MatchPageScene(TEST_PROCESS_ID, json, {}, "Home", false));
+    EXPECT_FALSE(manager.MatchPageScene(TEST_PROCESS_ID, json, {}, "Home", true));
+    auto compiled = manager.CompileSplitRuleSet(json);
+    ASSERT_NE(compiled, nullptr);
+    auto result = JsonUtil::ParseJsonString(manager.QueryCompiledSplitPageScenes(*compiled, {}, {}, "Home"));
+    auto events = result->GetValue("events");
+    ASSERT_EQ(events->GetArraySize(), ONE_MATCHED_NODE);
+    EXPECT_FALSE(events->GetArrayItem(0)->GetBool("matched"));
+}
+
+namespace {
+constexpr int32_t COMPILED_RULE_PROCESS = 99611;
+constexpr double ORIGINAL_WIDTH_LIMIT = 0.5;
+constexpr double UPDATED_WIDTH_LIMIT = 1.0;
+} // namespace
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_CompiledSnapshotReusesUnchangedRules, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto json = BuildStrictSplitRuleJson();
+    ASSERT_TRUE(manager.UpdateSplitRegistration(COMPILED_RULE_PROCESS, json));
+    auto original = manager.GetCompiledSplitRegistration()->rules;
+    ASSERT_TRUE(manager.UpdateSplitRegistration(COMPILED_RULE_PROCESS, json));
+    auto reused = manager.GetCompiledSplitRegistration()->rules;
+    EXPECT_EQ(original, reused);
+    auto updated = ReplaceSplitField(json, "\"widthRatioLte\":0.5", "\"widthRatioLte\":1.0");
+    ASSERT_TRUE(manager.UpdateSplitRegistration(COMPILED_RULE_PROCESS, updated));
+    auto replacement = manager.GetCompiledSplitRegistration()->rules;
+    EXPECT_NE(original, replacement);
+    EXPECT_DOUBLE_EQ(original->splitSpecs.front().widthRatioLte, ORIGINAL_WIDTH_LIMIT);
+    EXPECT_DOUBLE_EQ(replacement->splitSpecs.front().widthRatioLte, UPDATED_WIDTH_LIMIT);
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_CompiledSnapshotSurvivesUnregister, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto json = BuildStrictSplitRuleJson();
+    ASSERT_TRUE(manager.UpdateSplitRegistration(COMPILED_RULE_PROCESS, json));
+    auto snapshot = manager.GetCompiledSplitRegistration()->rules;
+    ASSERT_TRUE(manager.UpdateSplitRegistration(COMPILED_RULE_PROCESS, ""));
+
+    EXPECT_TRUE(!manager.GetCompiledSplitRegistration());
+    EXPECT_EQ(snapshot->ruleSet.rawJson, json);
+    EXPECT_FALSE(manager.UpdateSplitRegistration(COMPILED_RULE_PROCESS, "invalid"));
+    EXPECT_TRUE(!manager.GetCompiledSplitRegistration());
+}
+
+namespace {
+constexpr size_t MIXED_TEXT_RULE_COUNT = 2;
+const std::set<std::string> SPLIT_ONLY_TRACKED_TAGS { "Column" };
+
+std::string BuildDisabledMixedSplitRules()
+{
+    return ReplaceSplitField(
+        BuildMixedSplitRules(), "\"sceneType\":\"SPLIT\"", "\"sceneType\":\"SPLIT\",\"enabled\":false");
+}
+} // namespace
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_DisabledMixedRulesDoNotTrackCandidates, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    const auto json = BuildDisabledMixedSplitRules();
+    auto compiled = manager.CompileSplitRuleSet(json);
+    ASSERT_NE(compiled, nullptr);
+    EXPECT_TRUE(compiled->customTags.empty());
+    EXPECT_FALSE(compiled->trackNavigation);
+    ASSERT_EQ(compiled->ruleSet.rules.size(), static_cast<size_t>(ONE_MATCHED_NODE));
+    EXPECT_EQ(compiled->ruleSet.rules.front().sceneType, "SPLIT");
+    ASSERT_TRUE(manager.UpdateSplitRegistration(COMPILED_RULE_PROCESS, json));
+    auto root = CreateThreeInputsPage();
+    auto results = MatchLegacyTextRequests(manager, json, BuildStartNodes(root), "Home", false);
+    ASSERT_EQ(results.size(), MIXED_TEXT_RULE_COUNT);
+    for (const auto& result : results) {
+        EXPECT_TRUE(result.matched);
+        EXPECT_TRUE(manager.ShouldReport(COMPILED_RULE_PROCESS, result));
+    }
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_MixedRulesTrackOnlyEnabledSplitTypes, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto compiled = manager.CompileSplitRuleSet(BuildMixedSplitRules());
+    ASSERT_NE(compiled, nullptr);
+    EXPECT_EQ(compiled->customTags, SPLIT_ONLY_TRACKED_TAGS);
+    ASSERT_EQ(compiled->ruleSet.rules.size(), static_cast<size_t>(ONE_MATCHED_NODE));
+    EXPECT_EQ(compiled->ruleSet.rules.front().sceneType, "SPLIT");
+    const auto disabledSource =
+        ReplaceSplitField(BuildMixedSplitRules(), "\"version\":1", "\"version\":1,\"sourceConfig\":{\"arkui\":false}");
+    auto disabled = manager.CompileSplitRuleSet(disabledSource);
+    ASSERT_NE(disabled, nullptr);
+    EXPECT_TRUE(disabled->customTags.empty());
+    EXPECT_FALSE(disabled->trackNavigation);
+    EXPECT_EQ(disabled->ruleSet.rules.front().sceneType, "SPLIT");
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_DisabledQueryLeavesTextOnLegacyPath, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto root = CreateThreeInputsPage();
+    const auto rules = BuildDisabledMixedSplitRules();
+    auto compiled = manager.CompileSplitRuleSet(rules);
+    ASSERT_NE(compiled, nullptr);
+    auto json = manager.QueryCompiledSplitPageScenes(*compiled, {}, {}, "Home");
+    auto response = JsonUtil::ParseJsonString(json);
+    EXPECT_EQ(response->GetValue("events")->GetArraySize(), 0);
+    auto text = manager.MatchPageScene(COMPILED_RULE_PROCESS, rules, BuildStartNodes(root), "Home", true);
+    ASSERT_TRUE(text);
+    EXPECT_EQ(text->sceneType, "TEXT_EDITOR");
+    EXPECT_FALSE(JsonUtil::ParseJsonString(text->sceneJson)->Contains("events"));
+    EXPECT_TRUE(!manager.GetCompiledSplitRegistration());
+    EXPECT_TRUE(manager.reportStates_.empty());
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_DetectionDoesNotConsumeLegacyTextReportState, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto json = BuildMixedSplitRules(false);
+    ASSERT_TRUE(manager.UpdateSplitRegistration(TEST_PROCESS_ID, json));
+    constexpr float WINDOW_SIZE = RIGHT_SPLIT_COLUMN_OFFSET + SPLIT_COLUMN_WIDTH;
+    RectF window(0, 0, WINDOW_SIZE, WINDOW_SIZE);
+    DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, CreateSplitColumns(), window, TEST_PAGE_NAME);
+    EXPECT_TRUE(manager.reportStates_.empty());
+    auto text = MatchLegacyTextRequests(manager, json, BuildStartNodes(CreateThreeInputsPage()), TEST_PAGE_NAME, false);
+    ASSERT_EQ(text.size(), TWO_MATCHED_NODES);
+    EXPECT_TRUE(manager.ShouldReport(TEST_PROCESS_ID, text.front()));
+    EXPECT_FALSE(manager.ShouldReport(TEST_PROCESS_ID, text.front()));
+    EXPECT_FALSE(JsonUtil::ParseJsonString(text.front().sceneJson)->Contains("events"));
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_LegacyClearPreservesSplitReportPolicy, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto json = BuildStrictSplitRuleJson();
+    ASSERT_TRUE(manager.UpdateSplitRegistration(TEST_PROCESS_ID, json));
+    constexpr float WINDOW_SIZE = RIGHT_SPLIT_COLUMN_OFFSET + SPLIT_COLUMN_WIDTH;
+    RectF window(0, 0, WINDOW_SIZE, WINDOW_SIZE);
+    auto candidates = CreateSplitColumns();
+    ASSERT_EQ(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, TEST_PAGE_NAME).size(),
+        static_cast<size_t>(ONE_MATCHED_NODE));
+    manager.ClearProcess(TEST_PROCESS_ID, false);
+    EXPECT_EQ(manager.splitReportPolicyStates_.size(), static_cast<size_t>(ONE_MATCHED_NODE));
+    EXPECT_TRUE(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, TEST_PAGE_NAME).empty());
+    EXPECT_EQ(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, {}, window, TEST_PAGE_NAME).size(),
+        static_cast<size_t>(ONE_MATCHED_NODE));
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_EmptyInitialPageKeepsFirstRealTextReport, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto json = BuildMixedSplitRules(false);
+    EXPECT_TRUE(MatchLegacyTextRequests(manager, json, {}, TEST_PAGE_NAME, false).empty());
+    auto results =
+        MatchLegacyTextRequests(manager, json, BuildStartNodes(CreateThreeInputsPage()), TEST_PAGE_NAME, false);
+    ASSERT_EQ(results.size(), TWO_MATCHED_NODES);
+    EXPECT_TRUE(manager.ShouldReport(TEST_PROCESS_ID, results.front()));
+    EXPECT_TRUE(manager.ShouldReport(TEST_PROCESS_ID, results.back()));
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_ReplacementPreservesLegacyTextReportState, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto json = JsonUtil::ParseJsonString(BuildMixedSplitRules());
+    json->Put("_splitRegistrationGeneration", "old");
+    ASSERT_TRUE(manager.UpdateSplitRegistration(TEST_PROCESS_ID, json->ToString()));
+    auto results = MatchLegacyTextRequests(
+        manager, json->ToString(), BuildStartNodes(CreateThreeInputsPage()), TEST_PAGE_NAME, false);
+    ASSERT_EQ(results.size(), TWO_MATCHED_NODES);
+    EXPECT_TRUE(manager.ShouldReport(TEST_PROCESS_ID, results.front()));
+    EXPECT_TRUE(manager.ShouldReport(SECOND_PROCESS_ID, results.front()));
+    json->Replace("_splitRegistrationGeneration", "new");
+    ASSERT_TRUE(manager.UpdateSplitRegistration(TEST_PROCESS_ID, json->ToString()));
+    EXPECT_FALSE(manager.ShouldReport(TEST_PROCESS_ID, results.front()));
+    EXPECT_FALSE(manager.ShouldReport(SECOND_PROCESS_ID, results.front()));
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_SubwindowDoesNotGateLegacyTextQuery, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    const auto rules = BuildMixedSplitRules();
+    auto compiled = manager.CompileSplitRuleSet(rules);
+    ASSERT_NE(compiled, nullptr);
+    auto json = manager.QueryCompiledSplitPageScenes(*compiled, {}, {}, TEST_PAGE_NAME, false);
+    EXPECT_EQ(JsonUtil::ParseJsonString(json)->GetValue("events")->GetArraySize(), 0);
+    auto text =
+        manager.MatchPageScene(TEST_PROCESS_ID, rules, BuildStartNodes(CreateThreeInputsPage()), TEST_PAGE_NAME, true);
+    ASSERT_TRUE(text);
+    EXPECT_EQ(text->ruleId, "text_first");
+    EXPECT_FALSE(JsonUtil::ParseJsonString(text->sceneJson)->Contains("events"));
+    EXPECT_TRUE(manager.reportStates_.empty());
+    EXPECT_TRUE(manager.splitReportStates_.empty());
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_MultiRuleQueryPreservesOrderAndSingleRegistration, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    const auto json = BuildStrictSplitRuleJson();
+    ASSERT_TRUE(manager.UpdateSplitRegistration(TEST_PROCESS_ID, json));
+    const auto registration = manager.GetCompiledSplitRegistration();
+    ASSERT_TRUE(registration.has_value());
+    const auto candidates = CreateSplitColumns();
+    constexpr float WINDOW_SIZE = RIGHT_SPLIT_COLUMN_OFFSET + SPLIT_COLUMN_WIDTH;
+    const RectF window(0, 0, WINDOW_SIZE, WINDOW_SIZE);
+    ASSERT_EQ(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, "Home").size(), 1u);
+
+    auto query = JsonUtil::ParseJsonString(json);
+    auto rules = JsonUtil::CreateArray(true);
+    for (const auto* id : { "second", "first" }) {
+        auto root = JsonUtil::ParseJsonString(json);
+        auto rule = root->GetValue("rules")->GetArrayItem(0);
+        rule->Replace("ruleId", id);
+        rules->Put(rule);
+    }
+    query->Replace("rules", rules);
+    const auto queryJson = query->ToString();
+    EXPECT_FALSE(manager.UpdateSplitRegistration(TEST_PROCESS_ID, queryJson));
+    ASSERT_EQ(manager.GetCompiledSplitRegistration()->rules, registration->rules);
+    auto compiled = manager.CompileSplitRuleSet(queryJson);
+    ASSERT_NE(compiled, nullptr);
+    auto result = JsonUtil::ParseJsonString(
+        manager.QueryCompiledSplitPageScenes(*compiled, candidates, window, "Home"));
+    auto events = result->GetValue("events");
+    ASSERT_EQ(events->GetArraySize(), 2);
+    EXPECT_EQ(events->GetArrayItem(0)->GetString("ruleId"), "second");
+    EXPECT_EQ(events->GetArrayItem(1)->GetString("ruleId"), "first");
+    EXPECT_TRUE(events->GetArrayItem(0)->GetBool("matched"));
+    EXPECT_TRUE(events->GetArrayItem(1)->GetBool("matched"));
+    EXPECT_TRUE(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, "Home").empty());
+    EXPECT_EQ(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, {}, window, "Home").size(), 1u);
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_QueryPreservesPublicFieldsAndIgnoresTextReportOptions, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto root = JsonUtil::ParseJsonString(BuildStrictSplitRuleJson());
+    auto report = JsonUtil::Create(true);
+    report->Put("includeFocusable", true);
+    report->Put("includeText", true);
+    root->GetValue("rules")->GetArrayItem(0)->Put("report", report);
+    auto compiled = manager.CompileSplitRuleSet(root->ToString());
+    ASSERT_NE(compiled, nullptr);
+    constexpr float WINDOW_SIZE = RIGHT_SPLIT_COLUMN_OFFSET + SPLIT_COLUMN_WIDTH;
+    const RectF window(0, 0, WINDOW_SIZE, WINDOW_SIZE);
+    auto candidates = CreateSplitColumns();
+    auto json = JsonUtil::ParseJsonString(manager.QueryCompiledSplitPageScenes(*compiled, candidates, window, "Home"));
+    auto event = json->GetValue("events")->GetArrayItem(0);
+    EXPECT_EQ(event->GetString("eventName"), "SPLIT");
+    EXPECT_EQ(event->GetString("splitType"), "Custom");
+    EXPECT_FALSE(event->Contains("source"));
+    auto node = event->GetValue("nodes")->GetArrayItem(0);
+    EXPECT_TRUE(node->Contains("nodeId"));
+    EXPECT_TRUE(node->Contains("nodeType"));
+    EXPECT_TRUE(node->Contains("rect"));
+    EXPECT_FALSE(node->Contains("focusable"));
+    EXPECT_FALSE(node->Contains("text"));
+    json = JsonUtil::ParseJsonString(manager.QueryCompiledSplitPageScenes(*compiled, {}, window, "Home"));
+    event = json->GetValue("events")->GetArrayItem(0);
+    EXPECT_FALSE(event->GetBool("matched"));
+    EXPECT_EQ(event->GetString("splitType"), "None");
+    EXPECT_FALSE(event->Contains("source"));
+    EXPECT_TRUE(manager.splitReportPolicyStates_.empty());
+}
+
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_SourceChangeExitsBeforeEnteringSamePage, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    const auto json = ReplaceSplitField(BuildStrictSplitRuleJson(), "\"navigation\":false", "\"navigation\":true");
+    ASSERT_TRUE(manager.UpdateSplitRegistration(TEST_PROCESS_ID, json));
+    constexpr float WINDOW_SIZE = RIGHT_SPLIT_COLUMN_OFFSET + SPLIT_COLUMN_WIDTH;
+    const RectF window(0, 0, WINDOW_SIZE, WINDOW_SIZE);
+    constexpr int32_t NAVIGATION_NODE_ID = RIGHT_SPLIT_NODE_ID + 1;
+    SplitSceneCandidate navigation;
+    navigation.nodeId = NAVIGATION_NODE_ID;
+    navigation.compName = "Navigation";
+    navigation.rect = window;
+    navigation.navigation = true;
+    navigation.navigationSplit = true;
+    auto candidates = CreateSplitColumns();
+    candidates.insert(candidates.begin(), navigation);
+    auto initial = DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, TEST_PAGE_NAME);
+    ASSERT_EQ(initial.size(), static_cast<size_t>(ONE_MATCHED_NODE));
+    EXPECT_EQ(initial.front().splitType, "Navigation");
+    candidates.front().navBarVisible = false;
+    auto changed = DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, TEST_PAGE_NAME);
+    ASSERT_EQ(changed.size(), static_cast<size_t>(TWO_MATCHED_NODES));
+    EXPECT_EQ(changed.front().eventName, "SPLIT_EXIT");
+    EXPECT_FALSE(changed.front().matched);
+    EXPECT_TRUE(changed.front().nodeIds.empty());
+    EXPECT_EQ(changed.back().eventName, "SPLIT");
+    EXPECT_EQ(changed.back().splitType, "Custom");
+    EXPECT_EQ(changed.back().nodeIds, (std::vector<int32_t> { LEFT_SPLIT_NODE_ID, RIGHT_SPLIT_NODE_ID }));
+    EXPECT_EQ(changed.front().pageName, changed.back().pageName);
+    EXPECT_TRUE(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, TEST_PAGE_NAME).empty());
+    candidates.front().navBarVisible = true;
+    auto restored = DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, TEST_PAGE_NAME);
+    ASSERT_EQ(restored.size(), static_cast<size_t>(TWO_MATCHED_NODES));
+    EXPECT_EQ(restored.front().eventName, "SPLIT_EXIT");
+    EXPECT_EQ(restored.back().splitType, "Navigation");
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_InvalidReplacementPreservesRegisteredResult, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    const auto json = BuildStrictSplitRuleJson();
+    ASSERT_TRUE(manager.UpdateSplitRegistration(TEST_PROCESS_ID, json));
+    constexpr float WINDOW_SIZE = RIGHT_SPLIT_COLUMN_OFFSET + SPLIT_COLUMN_WIDTH;
+    const RectF window(0, 0, WINDOW_SIZE, WINDOW_SIZE);
+    const auto candidates = CreateSplitColumns();
+    ASSERT_EQ(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, TEST_PAGE_NAME).size(),
+        static_cast<size_t>(ONE_MATCHED_NODE));
+    EXPECT_FALSE(manager.UpdateSplitRegistration(TEST_PROCESS_ID, "invalid"));
+    EXPECT_TRUE(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, TEST_PAGE_NAME).empty());
+    auto exit = DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, {}, window, TEST_PAGE_NAME);
+    ASSERT_EQ(exit.size(), static_cast<size_t>(ONE_MATCHED_NODE));
+    EXPECT_EQ(exit.front().eventName, "SPLIT_EXIT");
+    EXPECT_EQ(exit.front().ruleSetId, "split_rules");
+    EXPECT_FALSE(exit.front().matched);
+    EXPECT_TRUE(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, {}, window, TEST_PAGE_NAME).empty());
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitRule_SelectorsAcceptBuiltInFrameNodeTags, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    for (const auto* tag :
+        { V2::COLUMN_ETS_TAG, V2::ROW_ETS_TAG, V2::STACK_ETS_TAG, V2::FLEX_ETS_TAG, V2::NAVIGATION_VIEW_ETS_TAG,
+            V2::LIST_ETS_TAG, V2::TEXT_ETS_TAG, V2::ROW_SPLIT_ETS_TAG, V2::COLUMN_SPLIT_ETS_TAG, V2::SEARCH_ETS_TAG }) {
+        const auto json = ReplaceSplitField(BuildStrictSplitRuleJson(), "\"Column\"", "\"" + std::string(tag) + "\"");
+        auto parsed = manager.ParseRuleSet(json);
+        ASSERT_TRUE(parsed.has_value()) << tag;
+        ASSERT_FALSE(parsed->rules.front().compNames.empty());
+        EXPECT_EQ(parsed->rules.front().compNames.front(), tag);
+    }
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitRule_SelectorsRejectUnknownAndSyntaxTags, TestSize.Level1)
+{
+    for (const auto* tag : { "", "column", "COLUMN", " Column", "Column ", "width", "sceneType", "MyPane", "ForEach",
+             "LazyForEach", "Repeat", "Span", "SymbolSpan", "ContainerSpan" }) {
+        const auto json = ReplaceSplitField(BuildStrictSplitRuleJson(), "\"Column\"", "\"" + std::string(tag) + "\"");
+        EXPECT_FALSE(PageSceneSplit::ParseRuleSet(json).has_value()) << tag;
+    }
+}
+
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_NewRegistrationRestartsAfterClearingSnapshot, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    const auto initial = BuildStrictSplitRuleJson();
+    const auto next = ReplaceSplitField(initial, "\"version\":1",
+        "\"version\":1,\"_splitRegistrationGeneration\":\"next\"");
+    constexpr float WINDOW_SIZE = RIGHT_SPLIT_COLUMN_OFFSET + SPLIT_COLUMN_WIDTH;
+    const RectF window(0, 0, WINDOW_SIZE, WINDOW_SIZE);
+    const auto candidates = CreateSplitColumns();
+    ASSERT_TRUE(manager.UpdateSplitRegistration(TEST_PROCESS_ID, initial));
+    ASSERT_EQ(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, TEST_PAGE_NAME).size(),
+        static_cast<size_t>(ONE_MATCHED_NODE));
+    ASSERT_TRUE(manager.UpdateSplitRegistration(TEST_PROCESS_ID, ""));
+    EXPECT_TRUE(!manager.GetCompiledSplitRegistration());
+    EXPECT_TRUE(manager.splitReportStates_.empty());
+    ASSERT_TRUE(manager.UpdateSplitRegistration(TEST_PROCESS_ID, next));
+    auto events = DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, TEST_PAGE_NAME);
+    ASSERT_EQ(events.size(), static_cast<size_t>(ONE_MATCHED_NODE));
+    EXPECT_TRUE(events.front().matched);
+    EXPECT_EQ(events.front().splitType, "Custom");
+    EXPECT_TRUE(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, TEST_PAGE_NAME).empty());
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_CurrentRegistrationReplacesPreviousSnapshot, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    const auto previous = ReplaceSplitField(BuildStrictSplitRuleJson(), "\"version\":1",
+        "\"version\":1,\"_splitRegistrationGeneration\":\"old\"");
+    auto current = ReplaceSplitField(previous, "\"old\"", "\"new\"");
+    current = ReplaceSplitField(current, "\"Column\"", "\"Row\"");
+    constexpr float WINDOW_SIZE = RIGHT_SPLIT_COLUMN_OFFSET + SPLIT_COLUMN_WIDTH;
+    const RectF window(0, 0, WINDOW_SIZE, WINDOW_SIZE);
+    const auto candidates = CreateSplitColumns();
+    ASSERT_TRUE(manager.UpdateSplitRegistration(TEST_PROCESS_ID, previous));
+    EXPECT_EQ(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, TEST_PAGE_NAME).size(),
+        static_cast<size_t>(ONE_MATCHED_NODE));
+    ASSERT_TRUE(manager.UpdateSplitRegistration(TEST_PROCESS_ID, current));
+    EXPECT_TRUE(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, TEST_PAGE_NAME).empty());
+    auto currentCandidates = candidates;
+    for (auto& node : currentCandidates) {
+        node.compName = "Row";
+    }
+    auto events = DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, currentCandidates, window, TEST_PAGE_NAME);
+    ASSERT_EQ(events.size(), static_cast<size_t>(ONE_MATCHED_NODE));
+    EXPECT_TRUE(events.front().matched);
+    EXPECT_EQ(events.front().splitType, "Custom");
+    EXPECT_EQ(manager.GetCompiledSplitRegistration()->rules->ruleSet.rawJson, current);
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_NewRegistrationIgnoresReportOnRegisterPolicy, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    const auto delayed = ReplaceSplitField(BuildStrictSplitRuleJson(), "\"navigation\":false",
+        "\"navigation\":false,\"policy\":{\"reportOnRegister\":false}");
+    constexpr float WINDOW_SIZE = RIGHT_SPLIT_COLUMN_OFFSET + SPLIT_COLUMN_WIDTH;
+    const RectF window(0, 0, WINDOW_SIZE, WINDOW_SIZE);
+    const auto candidates = CreateSplitColumns();
+    ASSERT_TRUE(manager.UpdateSplitRegistration(TEST_PROCESS_ID, delayed));
+    // reportOnRegister=false is ignored: the first detection after each registration reports.
+    EXPECT_EQ(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, TEST_PAGE_NAME).size(),
+        static_cast<size_t>(ONE_MATCHED_NODE));
+    EXPECT_TRUE(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, TEST_PAGE_NAME).empty());
+    ASSERT_TRUE(manager.UpdateSplitRegistration(TEST_PROCESS_ID, ""));
+    ASSERT_TRUE(manager.UpdateSplitRegistration(TEST_PROCESS_ID, delayed));
+    EXPECT_EQ(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, TEST_PAGE_NAME).size(),
+        static_cast<size_t>(ONE_MATCHED_NODE));
+    EXPECT_TRUE(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, TEST_PAGE_NAME).empty());
+    // Re-registering the identical rule set is idempotent: report states are kept.
+    ASSERT_TRUE(manager.UpdateSplitRegistration(TEST_PROCESS_ID, delayed));
+    EXPECT_TRUE(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, TEST_PAGE_NAME).empty());
+}
+
+HWTEST_F(PageSceneRuleManagerTestNg, SplitScene_NodeIdChangeReportsImmediatelyWithoutInterval, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    // A huge minReportIntervalMs proves the policy input is ignored: a node id change
+    // reports at once instead of being throttled until the interval elapses.
+    const auto json = ReplaceSplitField(BuildStrictSplitRuleJson(), "\"navigation\":false",
+        R"("navigation":false, "policy":{"minReportIntervalMs":600000})");
+    constexpr float WINDOW_SIZE = RIGHT_SPLIT_COLUMN_OFFSET + SPLIT_COLUMN_WIDTH;
+    const RectF window(0, 0, WINDOW_SIZE, WINDOW_SIZE);
+    const auto candidates = CreateSplitColumns();
+    ASSERT_TRUE(manager.UpdateSplitRegistration(TEST_PROCESS_ID, json));
+    EXPECT_EQ(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, TEST_PAGE_NAME).size(),
+        static_cast<size_t>(ONE_MATCHED_NODE));
+    EXPECT_TRUE(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, candidates, window, TEST_PAGE_NAME).empty());
+    auto shifted = candidates;
+    for (auto& node : shifted) {
+        node.nodeId += 10;
+    }
+    auto events = DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, shifted, window, TEST_PAGE_NAME);
+    ASSERT_EQ(events.size(), static_cast<size_t>(TWO_MATCHED_NODES));
+    EXPECT_EQ(events.front().eventName, "SPLIT_EXIT");
+    EXPECT_EQ(events.back().eventName, "SPLIT");
+    EXPECT_EQ(events.back().splitType, "Custom");
+    EXPECT_EQ(events.back().nodeIds, (std::vector<int32_t> { LEFT_SPLIT_NODE_ID + 10, RIGHT_SPLIT_NODE_ID + 10 }));
+    EXPECT_TRUE(DetectRegisteredSplitChanges(manager, TEST_PROCESS_ID, shifted, window, TEST_PAGE_NAME).empty());
 }
 
 } // namespace OHOS::Ace::NG
