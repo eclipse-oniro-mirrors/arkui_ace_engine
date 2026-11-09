@@ -438,6 +438,10 @@ RefPtr<FocusManager> FocusManager::GetFocusManager(RefPtr<FrameNode>& node)
 void FocusManager::FocusSwitchingStart(const RefPtr<FocusHub>& focusHub,
     SwitchingStartReason reason)
 {
+    TAG_LOGI(AceLogTag::ACE_FOCUS, "FocusSwitch start, %{public}s/" SEC_PLD(%{public}d)
+        " onFocus, s:%{public}d",
+        focusHub ? focusHub->GetFrameName().c_str() : "NULL",
+        SEC_PARAM(focusHub ? focusHub->GetFrameId() : -1), reason);
     isSwitchingFocus_ = true;
     switchingFocus_ = focusHub;
     startReason_ = reason;

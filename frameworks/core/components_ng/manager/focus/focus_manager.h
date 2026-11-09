@@ -314,6 +314,10 @@ public:
     {
         return isSwitchingFocus_;
     }
+    std::optional<SwitchingStartReason> GetStartReason() const
+    {
+        return startReason_;
+    }
     void UpdateSwitchingEndReason(SwitchingEndReason reason)
     {
         if (isSwitchingFocus_.value_or(false)) {
