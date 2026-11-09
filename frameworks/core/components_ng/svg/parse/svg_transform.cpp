@@ -72,16 +72,16 @@ double NGSvgTransform::ObjectBoundingBoxTransform(double srcLength, const SvgLen
     return length;
 }
 
-bool CreateFromTranslate(const std::vector<std::string>& paramVec, Matrix4& matrix,
+bool CreateFromTranslate(const std::vector<double>& paramVec, Matrix4& matrix,
     const SvgLengthScaleRule& lengthRule)
 {
-    double tx = 0.0f;
-    double ty = 0.0f;
+    double tx = 0.0;
+    double ty = 0.0;
     if (paramVec.size() == PARAM_COUNT1) {
-        tx = StringToDouble(paramVec[NUM0]);
+        tx = paramVec[NUM0];
     } else if (paramVec.size() == PARAM_COUNT2) {
-        tx = StringToDouble(paramVec[NUM0]);
-        ty = StringToDouble(paramVec[NUM1]);
+        tx = paramVec[NUM0];
+        ty = paramVec[NUM1];
     } else {
         return false;
     }
@@ -91,17 +91,17 @@ bool CreateFromTranslate(const std::vector<std::string>& paramVec, Matrix4& matr
     return true;
 }
 
-bool CreateFromScale(const std::vector<std::string>& paramVec, Matrix4& matrix,
+bool CreateFromScale(const std::vector<double>& paramVec, Matrix4& matrix,
     const SvgLengthScaleRule& lengthRule)
 {
-    double sx = 0.0f;
-    double sy = 0.0f;
+    double sx = 0.0;
+    double sy = 0.0;
     if (paramVec.size() == PARAM_COUNT1) {
-        sx = StringToDouble(paramVec[NUM0]);
+        sx = paramVec[NUM0];
         sy = sx;
     } else if (paramVec.size() == PARAM_COUNT2) {
-        sx = StringToDouble(paramVec[NUM0]);
-        sy = StringToDouble(paramVec[NUM1]);
+        sx = paramVec[NUM0];
+        sy = paramVec[NUM1];
     } else {
         return false;
     }
@@ -111,62 +111,62 @@ bool CreateFromScale(const std::vector<std::string>& paramVec, Matrix4& matrix,
     return true;
 }
 
-bool CreateFromRotate(const std::vector<std::string>& paramVec, Matrix4& matrix,
+bool CreateFromRotate(const std::vector<double>& paramVec, Matrix4& matrix,
     const SvgLengthScaleRule& lengthRule)
 {
     if ((paramVec.size() != PARAM_COUNT1) && (paramVec.size() != PARAM_COUNT3)) {
         return false;
     }
-    double rotateAngle = StringToDouble(paramVec[NUM0]);
+    double rotateAngle = paramVec[NUM0];
     matrix = Matrix4::CreateRotate(rotateAngle, 0, 0, 1);
     return true;
 }
 
-bool CreateFromSkewx(const std::vector<std::string>& paramVec, Matrix4& matrix,
+bool CreateFromSkewx(const std::vector<double>& paramVec, Matrix4& matrix,
     const SvgLengthScaleRule& lengthRule)
 {
     if (paramVec.size() != PARAM_COUNT1) {
         return false;
     }
-    double skewAngleAxisX = StringToDouble(paramVec[NUM0]);
-    double skewAngleAxisY = 0.0f;
+    double skewAngleAxisX = paramVec[NUM0];
+    double skewAngleAxisY = 0.0;
     matrix = Matrix4::CreateSkew(skewAngleAxisX, skewAngleAxisY);
     return true;
 }
 
-bool CreateFromSkewy(const std::vector<std::string>& paramVec, Matrix4& matrix,
+bool CreateFromSkewy(const std::vector<double>& paramVec, Matrix4& matrix,
     const SvgLengthScaleRule& lengthRule)
 {
     if (paramVec.size() != PARAM_COUNT1) {
         return false;
     }
-    double skewAngleAxisX = 0.0f;
-    double skewAngleAxisY = StringToDouble(paramVec[NUM0]);
+    double skewAngleAxisX = 0.0;
+    double skewAngleAxisY = paramVec[NUM0];
     matrix = Matrix4::CreateSkew(skewAngleAxisX, skewAngleAxisY);
     return true;
 }
 
-bool CreateFromMatrix(const std::vector<std::string>& paramVec, Matrix4& matrix,
+bool CreateFromMatrix(const std::vector<double>& paramVec, Matrix4& matrix,
     const SvgLengthScaleRule& lengthRule)
 {
     if (paramVec.size() != TRANSFORM_MATRIX_PARA_AMOUNT) {
         return false;
     }
-    double a = StringToDouble(paramVec[NUM0]);
-    double b = StringToDouble(paramVec[NUM1]);
-    double c = StringToDouble(paramVec[NUM2]);
-    double d = StringToDouble(paramVec[NUM3]);
-    double e = StringToDouble(paramVec[NUM4]);
-    double f = StringToDouble(paramVec[NUM5]);
+    double a = paramVec[NUM0];
+    double b = paramVec[NUM1];
+    double c = paramVec[NUM2];
+    double d = paramVec[NUM3];
+    double e = paramVec[NUM4];
+    double f = paramVec[NUM5];
     matrix = Matrix4::CreateMatrix2D(a, b, c, d, e, f);
     return true;
 }
 
-using TransformMatrixCreator = bool (*)(const std::vector<std::string>& paramVec, Matrix4& matrix,
+using TransformMatrixCreator = bool (*)(const std::vector<double>& paramVec, Matrix4& matrix,
     const SvgLengthScaleRule& lengthRule);
 
 bool NGSvgTransform::UpdateSingleTransform(
-    const std::string& funcType, const std::vector<std::string>& paramVec, Matrix4& matrix,
+    const std::string& funcType, const std::vector<double>& paramVec, Matrix4& matrix,
     const SvgLengthScaleRule& lengthRule)
 {
     static const LinearMapNode<TransformMatrixCreator> matrix4Creator[] = {
@@ -184,10 +184,10 @@ bool NGSvgTransform::UpdateSingleTransform(
     return matrix4Creator[index].value(paramVec, matrix, lengthRule);
 }
 
-void UpdateTransformPivot(const std::string& funcType, const std::vector<std::string>& paramVec, Offset& finalPivot)
+void UpdateTransformPivot(const std::string& funcType, const std::vector<double>& paramVec, Offset& finalPivot)
 {
     if ((funcType == TRANSFORM_ROTATE) && (paramVec.size() == PARAM_COUNT3)) {
-        Offset localPivot = Offset(StringToDouble(paramVec[NUM1]), StringToDouble(paramVec[NUM2]));
+        Offset localPivot = Offset(paramVec[NUM1], paramVec[NUM2]);
         finalPivot += localPivot;
     }
 }
@@ -212,16 +212,16 @@ Matrix4 NGSvgTransform::CreateMatrix4(const std::vector<NG::TransformInfo>& tran
     return retMatrix;
 }
 
-bool NGSvgTransform::CreateTranslate(const std::vector<std::string>& paramVec, RSMatrix& matrix)
+bool NGSvgTransform::CreateTranslate(const std::vector<double>& paramVec, RSMatrix& matrix)
 {
     if (paramVec.size() > PARAM_COUNT2 || paramVec.size() == 0) {
         return false;
     }
-    double tx = 0.0f;
-    double ty = 0.0f;
-    tx = StringToDouble(paramVec[NUM0]);
+    double tx = 0.0;
+    double ty = 0.0;
+    tx = paramVec[NUM0];
     if (paramVec.size() > PARAM_COUNT1) {
-        ty = StringToDouble(paramVec[NUM1]);
+        ty = paramVec[NUM1];
     }
     matrix.Translate(tx, ty);
     return true;

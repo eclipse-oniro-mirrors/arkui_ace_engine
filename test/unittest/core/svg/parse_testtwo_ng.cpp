@@ -2187,18 +2187,18 @@ HWTEST_F(ParseTestTwoNg, SvgTransform001, TestSize.Level1)
     // NG::NGSvgTransform::ApplyTransformPivot
     std::vector<NG::TransformInfo> transformVec;
     NG::TransformInfo info;
-    std::vector<std::string> paramVec;
+    std::vector<double> paramVec;
     info.funcType = "asd";
-    paramVec.emplace_back("213");
-    paramVec.emplace_back("21333");
+    paramVec.emplace_back(213.0);
+    paramVec.emplace_back(21333.0);
     info.paramVec = paramVec;
     transformVec.emplace_back(info);
 
     NG::TransformInfo info1;
-    std::vector<std::string> paramVec1;
+    std::vector<double> paramVec1;
     info1.funcType = "asd";
-    paramVec1.emplace_back("213");
-    paramVec1.emplace_back("21333");
+    paramVec1.emplace_back(213.0);
+    paramVec1.emplace_back(21333.0);
     info1.paramVec = paramVec1;
     transformVec.emplace_back(info1);
 
@@ -2223,22 +2223,22 @@ HWTEST_F(ParseTestTwoNg, SvgTransform002, TestSize.Level1)
     // NG::NGSvgTransform::ApplyTransformPivot
     std::vector<NG::TransformInfo> transformVec;
     NG::TransformInfo info;
-    std::vector<std::string> paramVec;
+    std::vector<double> paramVec;
     info.funcType = "matrix";
-    paramVec.emplace_back("213");
-    paramVec.emplace_back("21333");
+    paramVec.emplace_back(213.0);
+    paramVec.emplace_back(21333.0);
     info.paramVec = paramVec;
     transformVec.emplace_back(info);
 
     NG::TransformInfo info1;
-    std::vector<std::string> paramVec1;
+    std::vector<double> paramVec1;
     info1.funcType = "matrix";
-    paramVec1.emplace_back("213");
-    paramVec1.emplace_back("21333");
-    paramVec1.emplace_back("215333");
-    paramVec1.emplace_back("213733");
-    paramVec1.emplace_back("213363");
-    paramVec1.emplace_back("217333");
+    paramVec1.emplace_back(213.0);
+    paramVec1.emplace_back(21333.0);
+    paramVec1.emplace_back(215333.0);
+    paramVec1.emplace_back(213733.0);
+    paramVec1.emplace_back(213363.0);
+    paramVec1.emplace_back(217333.0);
     info1.paramVec = paramVec1;
     transformVec.emplace_back(info1);
 
@@ -2263,30 +2263,30 @@ HWTEST_F(ParseTestTwoNg, SvgTransform003, TestSize.Level1)
     // NG::NGSvgTransform::ApplyTransformPivot
     std::vector<NG::TransformInfo> transformVec;
     NG::TransformInfo info;
-    std::vector<std::string> paramVec;
+    std::vector<double> paramVec;
     info.funcType = "rotate";
-    paramVec.emplace_back("21333");
+    paramVec.emplace_back(21333.0);
     info.paramVec = paramVec;
     transformVec.emplace_back(info);
 
     NG::TransformInfo info1;
-    std::vector<std::string> paramVec1;
+    std::vector<double> paramVec1;
     info1.funcType = "rotate";
-    paramVec1.emplace_back("213");
-    paramVec1.emplace_back("21333");
-    paramVec1.emplace_back("215333");
-    paramVec1.emplace_back("213733");
-    paramVec1.emplace_back("213363");
-    paramVec1.emplace_back("217333");
+    paramVec1.emplace_back(213.0);
+    paramVec1.emplace_back(21333.0);
+    paramVec1.emplace_back(215333.0);
+    paramVec1.emplace_back(213733.0);
+    paramVec1.emplace_back(213363.0);
+    paramVec1.emplace_back(217333.0);
     info1.paramVec = paramVec1;
     transformVec.emplace_back(info1);
 
     NG::TransformInfo info2;
-    std::vector<std::string> paramVec2;
+    std::vector<double> paramVec2;
     info2.funcType = "rotate";
-    paramVec2.emplace_back("213");
-    paramVec2.emplace_back("21333");
-    paramVec2.emplace_back("215333");
+    paramVec2.emplace_back(213.0);
+    paramVec2.emplace_back(21333.0);
+    paramVec2.emplace_back(215333.0);
     info2.paramVec = paramVec2;
     transformVec.emplace_back(info2);
 
@@ -2311,26 +2311,26 @@ HWTEST_F(ParseTestTwoNg, SvgTransform004, TestSize.Level1)
     // NG::NGSvgTransform::ApplyTransformPivot
     std::vector<NG::TransformInfo> transformVec;
     NG::TransformInfo info;
-    std::vector<std::string> paramVec;
+    std::vector<double> paramVec;
     info.funcType = "scale";
-    paramVec.emplace_back("213");
+    paramVec.emplace_back(213.0);
     info.paramVec = paramVec;
     transformVec.emplace_back(info);
 
     NG::TransformInfo info1;
-    std::vector<std::string> paramVec1;
+    std::vector<double> paramVec1;
     info1.funcType = "scale";
-    paramVec1.emplace_back("213");
-    paramVec1.emplace_back("21333");
+    paramVec1.emplace_back(213.0);
+    paramVec1.emplace_back(21333.0);
     info1.paramVec = paramVec1;
     transformVec.emplace_back(info1);
 
     NG::TransformInfo info2;
-    std::vector<std::string> paramVec2;
+    std::vector<double> paramVec2;
     info2.funcType = "scale";
-    paramVec2.emplace_back("213");
-    paramVec2.emplace_back("21333");
-    paramVec2.emplace_back("215333");
+    paramVec2.emplace_back(213.0);
+    paramVec2.emplace_back(21333.0);
+    paramVec2.emplace_back(215333.0);
     info2.paramVec = paramVec2;
     transformVec.emplace_back(info2);
 
@@ -2355,21 +2355,21 @@ HWTEST_F(ParseTestTwoNg, SvgTransform005, TestSize.Level1)
     // NG::NGSvgTransform::ApplyTransformPivot
     std::vector<NG::TransformInfo> transformVec;
     NG::TransformInfo info;
-    std::vector<std::string> paramVec;
+    std::vector<double> paramVec;
     info.funcType = "skewX";
-    paramVec.emplace_back("21333");
+    paramVec.emplace_back(21333.0);
     info.paramVec = paramVec;
     transformVec.emplace_back(info);
 
     NG::TransformInfo info1;
-    std::vector<std::string> paramVec1;
+    std::vector<double> paramVec1;
     info1.funcType = "skewX";
-    paramVec1.emplace_back("213");
-    paramVec1.emplace_back("21333");
-    paramVec1.emplace_back("215333");
-    paramVec1.emplace_back("213733");
-    paramVec1.emplace_back("213363");
-    paramVec1.emplace_back("217333");
+    paramVec1.emplace_back(213.0);
+    paramVec1.emplace_back(21333.0);
+    paramVec1.emplace_back(215333.0);
+    paramVec1.emplace_back(213733.0);
+    paramVec1.emplace_back(213363.0);
+    paramVec1.emplace_back(217333.0);
     info1.paramVec = paramVec1;
     transformVec.emplace_back(info1);
 
@@ -2394,21 +2394,21 @@ HWTEST_F(ParseTestTwoNg, SvgTransform006, TestSize.Level1)
     // NG::NGSvgTransform::ApplyTransformPivot
     std::vector<NG::TransformInfo> transformVec;
     NG::TransformInfo info;
-    std::vector<std::string> paramVec;
+    std::vector<double> paramVec;
     info.funcType = "skewY";
-    paramVec.emplace_back("21333");
+    paramVec.emplace_back(21333.0);
     info.paramVec = paramVec;
     transformVec.emplace_back(info);
 
     NG::TransformInfo info1;
-    std::vector<std::string> paramVec1;
+    std::vector<double> paramVec1;
     info1.funcType = "skewY";
-    paramVec1.emplace_back("213");
-    paramVec1.emplace_back("21333");
-    paramVec1.emplace_back("215333");
-    paramVec1.emplace_back("213733");
-    paramVec1.emplace_back("213363");
-    paramVec1.emplace_back("217333");
+    paramVec1.emplace_back(213.0);
+    paramVec1.emplace_back(21333.0);
+    paramVec1.emplace_back(215333.0);
+    paramVec1.emplace_back(213733.0);
+    paramVec1.emplace_back(213363.0);
+    paramVec1.emplace_back(217333.0);
     info1.paramVec = paramVec1;
     transformVec.emplace_back(info1);
 
@@ -2433,30 +2433,30 @@ HWTEST_F(ParseTestTwoNg, SvgTransform007, TestSize.Level1)
     // NG::NGSvgTransform::ApplyTransformPivot
     std::vector<NG::TransformInfo> transformVec;
     NG::TransformInfo info;
-    std::vector<std::string> paramVec;
+    std::vector<double> paramVec;
     info.funcType = "translate";
-    paramVec.emplace_back("21333");
+    paramVec.emplace_back(21333.0);
     info.paramVec = paramVec;
     transformVec.emplace_back(info);
 
     NG::TransformInfo info1;
-    std::vector<std::string> paramVec1;
+    std::vector<double> paramVec1;
     info1.funcType = "translate";
-    paramVec1.emplace_back("213");
-    paramVec1.emplace_back("21333");
-    paramVec1.emplace_back("215333");
-    paramVec1.emplace_back("213733");
-    paramVec1.emplace_back("213363");
-    paramVec1.emplace_back("217333");
+    paramVec1.emplace_back(213.0);
+    paramVec1.emplace_back(21333.0);
+    paramVec1.emplace_back(215333.0);
+    paramVec1.emplace_back(213733.0);
+    paramVec1.emplace_back(213363.0);
+    paramVec1.emplace_back(217333.0);
     info1.paramVec = paramVec1;
     transformVec.emplace_back(info1);
 
     NG::TransformInfo info2;
-    std::vector<std::string> paramVec2;
+    std::vector<double> paramVec2;
     info2.funcType = "translate";
-    paramVec2.emplace_back("213");
-    paramVec2.emplace_back("21333");
-    paramVec2.emplace_back("215333");
+    paramVec2.emplace_back(213.0);
+    paramVec2.emplace_back(21333.0);
+    paramVec2.emplace_back(215333.0);
     info2.paramVec = paramVec2;
     transformVec.emplace_back(info2);
 
@@ -2478,24 +2478,24 @@ HWTEST_F(ParseTestTwoNg, SvgTransform007, TestSize.Level1)
  */
 HWTEST_F(ParseTestTwoNg, SvgTransform008, TestSize.Level1)
 {
-    std::vector<std::string> paramVec;
+    std::vector<double> paramVec;
     RSMatrix matrix;
 
     auto result = NGSvgTransform::CreateTranslate(paramVec, matrix);
     EXPECT_FALSE(result);
-    paramVec.emplace_back("2153353");
+    paramVec.emplace_back(2153353.0);
     result = NGSvgTransform::CreateTranslate(paramVec, matrix);
     EXPECT_TRUE(result);
 
-    paramVec.emplace_back("21533333");
+    paramVec.emplace_back(21533333.0);
     result = NGSvgTransform::CreateTranslate(paramVec, matrix);
     EXPECT_TRUE(result);
 
-    paramVec.emplace_back("21536633");
+    paramVec.emplace_back(21536633.0);
     result = NGSvgTransform::CreateTranslate(paramVec, matrix);
     EXPECT_FALSE(result);
 
-    paramVec.emplace_back("2153600633");
+    paramVec.emplace_back(2153600633.0);
     result = NGSvgTransform::CreateTranslate(paramVec, matrix);
     EXPECT_FALSE(result);
 }
@@ -2513,7 +2513,7 @@ HWTEST_F(ParseTestTwoNg, SvgTransform009, TestSize.Level1)
     SvgCoordinateSystemContext context(containerRect, viewPort);
     auto rule = svgNode->BuildContentScaleRule(context, OHOS::Ace::NG::SvgLengthScaleUnit::USER_SPACE_ON_USE);
     EXPECT_EQ(rule.GetLengthScaleUnit(), OHOS::Ace::NG::SvgLengthScaleUnit::USER_SPACE_ON_USE);
-    std::vector<std::string> paramVec;
+    std::vector<double> paramVec;
     Matrix4 matrix;
 
     std::string funcType = "asd";
@@ -2526,12 +2526,12 @@ HWTEST_F(ParseTestTwoNg, SvgTransform009, TestSize.Level1)
 
     funcType = "matrix";
     paramVec.clear();
-    paramVec.emplace_back("1");
-    paramVec.emplace_back("2");
-    paramVec.emplace_back("3");
-    paramVec.emplace_back("4");
-    paramVec.emplace_back("5");
-    paramVec.emplace_back("6");
+    paramVec.emplace_back(1.0);
+    paramVec.emplace_back(2.0);
+    paramVec.emplace_back(3.0);
+    paramVec.emplace_back(4.0);
+    paramVec.emplace_back(5.0);
+    paramVec.emplace_back(6.0);
     result = NGSvgTransform::UpdateSingleTransform(funcType, paramVec, matrix, rule);
     EXPECT_TRUE(result);
 
@@ -2542,7 +2542,7 @@ HWTEST_F(ParseTestTwoNg, SvgTransform009, TestSize.Level1)
 
     funcType = "rotate";
     paramVec.clear();
-    paramVec.emplace_back("1");
+    paramVec.emplace_back(1.0);
     result = NGSvgTransform::UpdateSingleTransform(funcType, paramVec, matrix, rule);
     EXPECT_TRUE(result);
 
@@ -2553,14 +2553,14 @@ HWTEST_F(ParseTestTwoNg, SvgTransform009, TestSize.Level1)
 
     funcType = "scale";
     paramVec.clear();
-    paramVec.emplace_back("1");
+    paramVec.emplace_back(1.0);
     result = NGSvgTransform::UpdateSingleTransform(funcType, paramVec, matrix, rule);
     EXPECT_TRUE(result);
 
     funcType = "scale";
     paramVec.clear();
-    paramVec.emplace_back("1");
-    paramVec.emplace_back("2");
+    paramVec.emplace_back(1.0);
+    paramVec.emplace_back(2.0);
     result = NGSvgTransform::UpdateSingleTransform(funcType, paramVec, matrix, rule);
     EXPECT_TRUE(result);
 }
@@ -2578,7 +2578,7 @@ HWTEST_F(ParseTestTwoNg, SvgTransform010, TestSize.Level1)
     SvgCoordinateSystemContext context(containerRect, viewPort);
     auto rule = svgNode->BuildContentScaleRule(context, OHOS::Ace::NG::SvgLengthScaleUnit::USER_SPACE_ON_USE);
     EXPECT_EQ(rule.GetLengthScaleUnit(), OHOS::Ace::NG::SvgLengthScaleUnit::USER_SPACE_ON_USE);
-    std::vector<std::string> paramVec;
+    std::vector<double> paramVec;
     Matrix4 matrix;
     std::string funcType = "asd";
 
@@ -2589,7 +2589,7 @@ HWTEST_F(ParseTestTwoNg, SvgTransform010, TestSize.Level1)
 
     funcType = "skewX";
     paramVec.clear();
-    paramVec.emplace_back("1");
+    paramVec.emplace_back(1.0);
     result = NGSvgTransform::UpdateSingleTransform(funcType, paramVec, matrix, rule);
     EXPECT_TRUE(result);
 
@@ -2600,7 +2600,7 @@ HWTEST_F(ParseTestTwoNg, SvgTransform010, TestSize.Level1)
 
     funcType = "skewY";
     paramVec.clear();
-    paramVec.emplace_back("1");
+    paramVec.emplace_back(1.0);
     result = NGSvgTransform::UpdateSingleTransform(funcType, paramVec, matrix, rule);
     EXPECT_TRUE(result);
 
@@ -2611,14 +2611,14 @@ HWTEST_F(ParseTestTwoNg, SvgTransform010, TestSize.Level1)
 
     funcType = "translate";
     paramVec.clear();
-    paramVec.emplace_back("1");
+    paramVec.emplace_back(1.0);
     result = NGSvgTransform::UpdateSingleTransform(funcType, paramVec, matrix, rule);
     EXPECT_TRUE(result);
 
     funcType = "translate";
     paramVec.clear();
-    paramVec.emplace_back("1");
-    paramVec.emplace_back("2");
+    paramVec.emplace_back(1.0);
+    paramVec.emplace_back(2.0);
     result = NGSvgTransform::UpdateSingleTransform(funcType, paramVec, matrix, rule);
     EXPECT_TRUE(result);
 }

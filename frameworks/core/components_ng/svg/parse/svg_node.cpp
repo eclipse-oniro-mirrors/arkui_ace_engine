@@ -432,6 +432,7 @@ void SvgNode::ProcessSvgStyle(RefPtr<SvgNode> svgNode, const SvgBaseAttribute& a
         svgNode->hrefClipPath_ = svgAttributes.clipState.GetHref();
         svgNode->opacity_ = OpacityDoubleToUint8(svgAttributes.opacity);
         svgNode->transform_ = svgAttributes.transform;
+        svgNode->transformMatrixCached_ = false;
         svgNode->hrefMaskId_ = ParseIdFromUrl(svgAttributes.maskId);
         svgNode->hrefFilterId_ = ParseIdFromUrl(svgAttributes.filterId);
     }
@@ -714,8 +715,16 @@ void SvgNode::OnMask(RSCanvas& canvas, const SvgCoordinateSystemContext& svgCoor
 
 void SvgNode::OnTransform(RSCanvas& canvas, const Size& viewPort)
 {
-    auto matrix = (animateTransform_.empty()) ? SvgTransform::CreateMatrix4(transform_)
-                                              : SvgTransform::CreateMatrixFromMap(animateTransform_);
+    Matrix4 matrix;
+    if (!animateTransform_.empty()) {
+        matrix = SvgTransform::CreateMatrixFromMap(animateTransform_);
+    } else {
+        if (!transformMatrixCached_) {
+            cachedTransformMatrix_ = SvgTransform::CreateMatrix4(transform_);
+            transformMatrixCached_ = true;
+        }
+        matrix = cachedTransformMatrix_;
+    }
     canvas.ConcatMatrix(RosenSvgPainter::ToDrawingMatrix(matrix));
 }
 

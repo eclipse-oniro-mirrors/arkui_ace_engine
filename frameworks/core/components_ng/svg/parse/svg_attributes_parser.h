@@ -139,7 +139,7 @@ struct SvgAttributes {
 
 struct TransformInfo {
     std::string funcType;
-    std::vector<std::string> paramVec;
+    std::vector<double> paramVec;
 };
 
 enum SvgRuleType {

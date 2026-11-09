@@ -212,7 +212,7 @@ HWTEST_F(SvgTransformTestNg, ParseTransformTestRect, TestSize.Level1)
     NG::TransformInfo element;
     element = attributes.transformVec[0];
     EXPECT_EQ(element.funcType, "rotate");
-    EXPECT_EQ(element.paramVec[0], "34.56");
+    EXPECT_DOUBLE_EQ(element.paramVec[0], 34.56);
 }
 
 /**
@@ -250,8 +250,8 @@ HWTEST_F(SvgTransformTestNg, ParseTransformTestScale, TestSize.Level1)
     NG::TransformInfo element;
     element = attributes.transformVec[0];
     EXPECT_EQ(element.funcType, "scale");
-    EXPECT_EQ(element.paramVec[0], "0.8");
-    EXPECT_EQ(element.paramVec[1], "0.8");
+    EXPECT_DOUBLE_EQ(element.paramVec[0], 0.8);
+    EXPECT_DOUBLE_EQ(element.paramVec[1], 0.8);
 }
 
 /**
@@ -289,12 +289,12 @@ HWTEST_F(SvgTransformTestNg, ParseTransformTestSkew, TestSize.Level1)
     NG::TransformInfo element;
     element = attributes.transformVec[0];
     EXPECT_EQ(element.funcType, "skewX");
-    EXPECT_EQ(element.paramVec[0], "34.56");
+    EXPECT_DOUBLE_EQ(element.paramVec[0], 34.56);
 
     NG::TransformInfo element2;
     element2 = attributes.transformVec[1];
     EXPECT_EQ(element2.funcType, "skewY");
-    EXPECT_EQ(element2.paramVec[0], "98.76");
+    EXPECT_DOUBLE_EQ(element2.paramVec[0], 98.76);
 }
 
 /**
@@ -333,7 +333,7 @@ HWTEST_F(SvgTransformTestNg, ParseTransformTestTranslate, TestSize.Level1)
     NG::TransformInfo element;
     element = attributes.transformVec[0];
     EXPECT_EQ(element.funcType, "translate");
-    EXPECT_EQ(element.paramVec[0], "34.56");
+    EXPECT_DOUBLE_EQ(element.paramVec[0], 34.56);
 }
 
 /**
@@ -371,12 +371,12 @@ HWTEST_F(SvgTransformTestNg, ParseTransformTestMatrix, TestSize.Level1)
     NG::TransformInfo element;
     element = attributes.transformVec[0];
     EXPECT_EQ(element.funcType, "matrix");
-    EXPECT_EQ(element.paramVec[0], "1");
-    EXPECT_EQ(element.paramVec[1], "0");
-    EXPECT_EQ(element.paramVec[2], "0.577");
-    EXPECT_EQ(element.paramVec[3], "1");
-    EXPECT_EQ(element.paramVec[4], "0");
-    EXPECT_EQ(element.paramVec[5], "0");
+    EXPECT_DOUBLE_EQ(element.paramVec[0], 1.0);
+    EXPECT_DOUBLE_EQ(element.paramVec[1], 0.0);
+    EXPECT_DOUBLE_EQ(element.paramVec[2], 0.577);
+    EXPECT_DOUBLE_EQ(element.paramVec[3], 1.0);
+    EXPECT_DOUBLE_EQ(element.paramVec[4], 0.0);
+    EXPECT_DOUBLE_EQ(element.paramVec[5], 0.0);
 }
 
 /**
@@ -649,8 +649,8 @@ HWTEST_F(SvgTransformTestNg, ApplyTransformTest002, TestSize.Level1)
     Testing::TestingPath rSPath;
     RSRoundRect roundRect = RSRoundRect(RSRect(0.0, 0.0, 1.0, 1.0), 0.0, 0.0);
     rSPath.AddRoundRect(roundRect);
-    std::vector<std::string> paramVec;
-    paramVec.push_back("100");
+    std::vector<double> paramVec;
+    paramVec.push_back(100.0);
     NG::TransformInfo transformInfo { "translate", paramVec };
     svgNode->attributes_.transformVec.push_back(transformInfo);
     svgNode->ApplyTransform(rSPath, rule);
