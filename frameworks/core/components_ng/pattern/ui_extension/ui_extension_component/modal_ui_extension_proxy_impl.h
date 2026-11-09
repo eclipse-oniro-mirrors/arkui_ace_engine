@@ -16,16 +16,17 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_UI_EXTENSION_MODAL_UI_EXTENSION_PROXY_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_UI_EXTENSION_MODAL_UI_EXTENSION_PROXY_H
 
+#include "base/memory/ace_type.h"
 #include "interfaces/inner_api/ace/modal_ui_extension_proxy.h"
 
-#include "core/components_ng/pattern/ui_extension/ui_extension_component/ui_extension_proxy.h"
-
 namespace OHOS::Ace::NG {
+class UIExtensionProxy;
+
 class ACE_FORCE_EXPORT ModalUIExtensionProxyImpl : public ModalUIExtensionProxy {
 
 public:
     explicit ModalUIExtensionProxyImpl(const RefPtr<UIExtensionProxy>& innerProxy);
-    ~ModalUIExtensionProxyImpl() override = default;
+    ~ModalUIExtensionProxyImpl() override;
     void SendData(const AAFwk::WantParams& params) override;
     int32_t SendDataSync(const AAFwk::WantParams& params, AAFwk::WantParams& reply);
     const RefPtr<UIExtensionProxy>& GetInnerProxy() const { return innerProxy_; }
