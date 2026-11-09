@@ -653,19 +653,28 @@ void WindowScene::OnActivation()
             host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
         } else if (showingInRecents &&
             self->session_->GetSessionState() == Rosen::SessionState::STATE_DISCONNECT && self->snapshotWindow_) {
-            self->RemoveChild(host, self->snapshotWindow_, self->snapshotWindowName_);
-            self->snapshotWindow_.Reset();
-            self->session_->SetNeedSnapshot(true);
-            self->SetSubSessionVisible();
-            if (self->session_->IsPrelaunch()) {
-                TAG_LOGI(AceLogTag::ACE_WINDOW_SCENE, "OnActivation CreateBlankWindow");
-                self->CreateBlankWindow(self->startingWindow_);
-                self->isPrelaunch_.store(true, std::memory_order_release);
+            if (self->session_->GetTryUseSnapshot() && self->session_->HasPersistentSnapshot()) {
+                TAG_LOGI(AceLogTag::ACE_WINDOW_SCENE,
+                    "OnActivation tryUseSnapshot id: %{public}d, keep snapshot window",
+                    self->session_->GetPersistentId());
+                self->session_->SetNeedSnapshot(true);
+                self->SetSubSessionVisible();
+                host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
             } else {
-                self->CreateStartingWindow();
+                self->RemoveChild(host, self->snapshotWindow_, self->snapshotWindowName_);
+                self->snapshotWindow_.Reset();
+                self->session_->SetNeedSnapshot(true);
+                self->SetSubSessionVisible();
+                if (self->session_->IsPrelaunch()) {
+                    TAG_LOGI(AceLogTag::ACE_WINDOW_SCENE, "OnActivation CreateBlankWindow");
+                    self->CreateBlankWindow(self->startingWindow_);
+                    self->isPrelaunch_.store(true, std::memory_order_release);
+                } else {
+                    self->CreateStartingWindow();
+                }
+                self->AddChild(host, self->startingWindow_, self->startingWindowName_);
+                host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
             }
-            self->AddChild(host, self->startingWindow_, self->startingWindowName_);
-            host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
         } else if (self->startingWindow_ &&
             self->session_->GetSessionState() != Rosen::SessionState::STATE_DISCONNECT) {
             auto surfaceNode = self->session_->GetSurfaceNode();

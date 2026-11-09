@@ -246,7 +246,10 @@ void WindowPattern::OnAttachToFrameNode()
     CHECK_EQUAL_VOID(CheckAndAddStartingWindowForPrelaunch(), true);
     if (state == Rosen::SessionState::STATE_DISCONNECT) {
         CHECK_EQUAL_VOID(HasStartingPage(), false);
-        if (session_->GetShowRecent() && session_->HasPersistentSnapshot()) {
+        if ((session_->GetShowRecent() || session_->GetTryUseSnapshot()) && session_->HasPersistentSnapshot()) {
+            TAG_LOGI(AceLogTag::ACE_WINDOW_SCENE,
+                "OnAttachToFrameNode id: %{public}d, keep snapshot window",
+                session_->GetPersistentId());
             CreateSnapshotWindow();
             AddChild(host, snapshotWindow_, snapshotWindowName_);
             return;
