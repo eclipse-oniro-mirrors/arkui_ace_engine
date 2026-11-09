@@ -487,4 +487,11 @@ void PixelMapOhos::SetMemoryName(std::string pixelMapName) const
     LOGD("PixelMapOhos::SetMemoryName, %{private}s", pixelMapName.c_str());
     pixmap_->SetMemoryName(pixelMapName);
 }
+
+bool PixelMapOhos::ReadPixel(int32_t x, int32_t y, uint32_t& pixel) const
+{
+    CHECK_NULL_RETURN(pixmap_, false);
+    uint32_t errCode = pixmap_->ReadPixel({x, y}, pixel);
+    return errCode == 0;
+}
 } // namespace OHOS::Ace

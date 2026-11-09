@@ -319,6 +319,33 @@ void PixelMapImage::NotifyDrawCompletion(const RefPtr<PixelMap>& pixmap, const R
         .dstRectInfo = dstRect.ToString() });
 }
 
+std::string PixelMapImage::PixelSamplingDump() const
+{
+    if (pixelMap_ == nullptr) {
+        return "pixelMap is nullptr";
+    }
+    std::stringstream oss;
+    int32_t w = pixelMap_->GetWidth();
+    int32_t h = pixelMap_->GetHeight();
+    oss << "[ Width:" << w << " Height:" << h;
+    oss << " pixels:" << std::hex << std::uppercase;
+    uint32_t pixel;
+
+    int32_t widthStep = std::max((w / 2) - 1, 1);
+    int32_t heightStep = std::max((h / 2) - 1, 1);
+
+    for (int32_t i = 1; i < w; i += widthStep) {
+        for (int32_t j = 1; j < h; j += heightStep) {
+            if (pixelMap_->ReadPixel(i, j, pixel)) {
+                oss << " ARGB-0x" << pixel;
+            }
+        }
+    }
+    oss << ']';
+
+    return oss.str();
+}
+
 void PixelMapImage::DrawToRSCanvas(
     RSCanvas& canvas, const RSRect& srcRect, const RSRect& dstRect, const BorderRadiusArray& radiusXY)
 {

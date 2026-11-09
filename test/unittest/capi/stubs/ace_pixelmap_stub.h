@@ -164,6 +164,11 @@ public:
     {
     }
 
+    bool ReadPixel(int32_t x, int32_t y, uint32_t& pixel) const override
+    {
+        return false;
+    }
+
     uint32_t GetUniqueId() override
     {
         return 0;

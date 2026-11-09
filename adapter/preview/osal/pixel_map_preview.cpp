@@ -137,4 +137,9 @@ uint32_t PixelMapPreview::WritePixels(const WritePixelsOptions& opts)
 }
 
 void PixelMapPreview::SetMemoryName(std::string pixelMapName) const {}
+
+bool PixelMapPreview::ReadPixel(int32_t x, int32_t y, uint32_t& pixel) const
+{
+    return false;
+}
 } // namespace OHOS::Ace
