@@ -33,9 +33,33 @@ Ignore format (relative paths from source directory):
 
 import argparse
 import difflib
+import hashlib
 import json
+import os
+import tempfile
 import shutil
 from pathlib import Path
+
+
+
+def copy_if_different(src, dst):
+    if dst.is_file() and src.read_bytes() == dst.read_bytes():
+        return False
+    shutil.copy2(src, dst)
+    return True
+
+
+def write_content_signature(stamp, files):
+    digest = hashlib.sha256()
+    for file in sorted(set(files), key=str):
+        digest.update(str(file).encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(file.read_bytes() if file.is_file() else b"<missing>")
+    content = digest.hexdigest() + "\n"
+    destination = Path(stamp)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if not destination.is_file() or destination.read_text() != content:
+        destination.write_text(content, encoding="utf-8")
 
 
 def load_config(config_path):
@@ -119,6 +143,7 @@ def copy_generated_files(src_dir, dst_dir, ignore_list):
 
     copied_count = 0
     skipped_count = 0
+    failed = False
 
     # Walk all files recursively
     for src_file in sorted(src_path.rglob('*')):
@@ -138,16 +163,17 @@ def copy_generated_files(src_dir, dst_dir, ignore_list):
 
         try:
             dst_file.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src_file, dst_file)
+            copy_if_different(src_file, dst_file)
             print(f"  Copied: {rel_path_str}")
             copied_count += 1
         except Exception as e:
             print(f"  Error copying {rel_path_str}: {e}")
+            failed = True
 
     print()
     print(f"Summary: {copied_count} copied, {skipped_count} skipped (ignored)")
 
-    return True
+    return not failed
 
 def log_file_diff(src, dst):
     """Print unified diff between src (from) and dst (to) files."""
@@ -202,7 +228,7 @@ def copy_native_files(out_dir, config_dir, native_list):
             log_file_diff(src, dst)
 
         dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, dst)
+        copy_if_different(src, dst)
         print(f"  Copied native: {entry['from']} -> {entry['to']}")
         copied += 1
 
@@ -255,6 +281,46 @@ def generate_gitignore(dst_dir, ignore_list):
         raise
 
 
+def write_deployment_depfile(path, target, args, ignore_list, native_list):
+    dependencies = {Path(__file__).absolute()}
+    if args.config:
+        dependencies.add(Path(args.config).absolute())
+    managed = Path(args.source) / "sig/arkoala-arkts/arkui/generated"
+    for file in managed.rglob("*"):
+        if file.is_dir():
+            dependencies.add(file.absolute())
+        elif file.is_file() and file.relative_to(managed).as_posix() not in ignore_list:
+            dependencies.add(file.absolute())
+            dependencies.add((Path(args.destination) / file.relative_to(managed)).absolute())
+    dependencies.add(managed.absolute())
+    if args.config:
+        for entry in native_list:
+            source = Path(args.source) / entry["from"]
+            # Missing optional native mappings keep their existing skip policy.
+            if source.is_file():
+                dependencies.add(source.absolute())
+                dependencies.add((Path(args.config).parent / entry["to"]).absolute())
+
+    def escape(value):
+        if "\n" in value or "\r" in value:
+            raise ValueError("A dependency path contains a newline")
+        return (value.replace("\\", "\\\\").replace("$", "$$")
+                .replace(" ", "\\ ").replace("\t", "\\\t")
+                .replace("#", "\\#").replace(":", "\\:"))
+
+    destination = Path(path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(dir=destination.parent, prefix=".deploy-deps-")
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            stream.write(escape(target) + ": " + " ".join(
+                escape(os.path.relpath(file)) for file in sorted(dependencies)) + "\n")
+        os.replace(temporary, destination)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Deploy Modifier.ets files from generator output to koala_projects',
@@ -282,6 +348,8 @@ def main():
         help='Path to stamp file to create on successful completion'
     )
 
+    parser.add_argument('--native-stamp')
+    parser.add_argument('--depfile')
     args = parser.parse_args()
 
     print("=" * 60)
@@ -311,8 +379,13 @@ def main():
     generate_gitignore(args.destination, ignore_list)
 
     if success:
-        Path(args.stamp).parent.mkdir(parents=True, exist_ok=True)
-        Path(args.stamp).touch()
+        native_files = [Path(args.config).parent / entry['to'] for entry in native_list] if args.config else []
+        managed_files = [file for file in Path(args.destination).rglob('*') if file.is_file()]
+        if args.depfile:
+            write_deployment_depfile(args.depfile, args.stamp, args, ignore_list, native_list)
+        write_content_signature(args.stamp, managed_files + native_files)
+        if args.native_stamp:
+            write_content_signature(args.native_stamp, native_files)
         print("\nDeployment completed successfully!")
         return 0
     else:
