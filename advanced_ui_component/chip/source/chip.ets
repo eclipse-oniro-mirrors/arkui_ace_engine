@@ -1193,7 +1193,7 @@ export struct ChipComponent {
     this.smListener.off("change")
     this.mdListener.off("change")
     this.lgListener.off("change")
-    if (this.callbackId) {
+    if (this.callbackId !== undefined) {
       this.getUIContext()
       ?.getHostContext()
       ?.getApplicationContext()

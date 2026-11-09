@@ -3696,6 +3696,13 @@ void ViewAbstract::SetHitTestMode(HitTestMode hitTestMode)
     gestureHub->SetHitTestMode(hitTestMode);
 }
 
+void ViewAbstract::SetAgentControlMode(const std::optional<AgentControlMode>& mode)
+{
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    frameNode->SetAgentControlMode(mode);
+}
+
 void ViewAbstract::SetOnTouchTestFunc(NG::OnChildTouchTestFunc&& onChildTouchTest)
 {
     auto gestureHub = ViewStackProcessor::GetInstance()->GetMainFrameNodeGestureEventHub();
@@ -8479,6 +8486,12 @@ void ViewAbstract::SetHitTestMode(FrameNode* frameNode, HitTestMode hitTestMode)
     gestureHub->SetHitTestMode(hitTestMode);
 }
 
+void ViewAbstract::SetAgentControlMode(FrameNode* frameNode, const std::optional<AgentControlMode>& mode)
+{
+    CHECK_NULL_VOID(frameNode);
+    frameNode->SetAgentControlMode(mode);
+}
+
 void ViewAbstract::SetOpacity(FrameNode* frameNode, double opacity)
 {
     CHECK_NULL_VOID(frameNode);
@@ -10139,6 +10152,18 @@ void ViewAbstract::ResetBlender(FrameNode* frameNode)
     auto renderContext = frameNode->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
     renderContext->ResetBlender();
+}
+
+void ViewAbstract::SetVibrancyMode(FrameNode* frameNode, VibrancyMode mode)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto renderContext = frameNode->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    // only EXQUISITE level devices take effect
+    if (SystemProperties::GetUiMaterialLevel() != UiMaterialLevel::EXQUISITE) {
+        return;
+    }
+    renderContext->UpdateVibrancyMode(mode);
 }
 
 void ViewAbstract::SetDragPreviewOptions(FrameNode* frameNode, const DragPreviewOption& previewOption)

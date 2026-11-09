@@ -312,7 +312,7 @@ HWTEST_F(TextFieldPatternTestThree, ReceivePreviewTextStyle_ApiVersion26_003, Te
     pattern_->ReceivePreviewTextStyle("underline");
     auto styling = pattern_->GetPreviewStyling();
     EXPECT_EQ(styling.underlineShape, PreviewTextStyle::UNDERLINE);
-    EXPECT_TRUE(styling.underlineColor.has_value());
+    EXPECT_FALSE(styling.underlineColor.has_value());
 
     MockContainer::Current()->SetApiTargetVersion(backupApiVersion);
 }
@@ -337,8 +337,7 @@ HWTEST_F(TextFieldPatternTestThree, ReceivePreviewTextStyle_ApiVersion26_FlagSet
     pattern_->ReceivePreviewTextStyle("underline");
     auto styling = pattern_->GetPreviewStyling();
     EXPECT_EQ(styling.underlineShape, PreviewTextStyle::UNDERLINE);
-    EXPECT_TRUE(styling.underlineColor.has_value());
-    EXPECT_EQ(styling.underlineColor.value(), Color::BLUE.GetValue());
+    EXPECT_FALSE(styling.underlineColor.has_value());
 
     MockContainer::Current()->SetApiTargetVersion(backupApiVersion);
 }
@@ -362,7 +361,7 @@ HWTEST_F(TextFieldPatternTestThree, ReceivePreviewTextStyle_ApiVersionLow_004, T
     pattern_->ReceivePreviewTextStyle("underline");
     auto styling = pattern_->GetPreviewStyling();
     EXPECT_EQ(styling.underlineShape, PreviewTextStyle::UNDERLINE);
-    EXPECT_TRUE(styling.underlineColor.has_value());
+    EXPECT_FALSE(styling.underlineColor.has_value());
 
     MockContainer::Current()->SetApiTargetVersion(backupApiVersion);
 }

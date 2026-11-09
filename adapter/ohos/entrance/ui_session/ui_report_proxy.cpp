@@ -579,8 +579,7 @@ void UiReportProxy::SendContentChange(ChangeType type, const std::string& simple
         LOGW("SendContentChange write type failed");
         return;
     }
-    if (!messageData.WriteString(simpleTree)) {
-        LOGW("SendContentChange write simple tree failed");
+    if (!UiSessionIpcUtil::WriteLargeString(messageData, SEND_CONTENT_CHANGE, simpleTree, "SendContentChange")) {
         return;
     }
     int32_t sendRequestErrorCode = Remote()->SendRequest(SEND_CONTENT_CHANGE, messageData, reply, option);

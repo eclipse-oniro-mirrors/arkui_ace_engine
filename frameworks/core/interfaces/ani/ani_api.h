@@ -34,7 +34,7 @@
 extern "C" {
 #endif
 
-#define ARKUI_ANI_API_VERSION 102
+#define ARKUI_ANI_API_VERSION 103
 #define EXTRA_INFO_MAX_LENGTH 1024
 #define ARKUI_ANI_MODIFIER_FUNCTION_NAME "GetArkUIAniModifiers"
 const float DEFAULT_SNAPSHOT_SCALE = 1.f;
@@ -725,6 +725,9 @@ struct ArkUIAniCommonModifier {
         std::shared_ptr<OHOS::Ace::ModalUIExtensionProxy>& proxy, const OHOS::AAFwk::WantParams& params);
     ani_long (*interopProxyNodeConstruct)(ArkUI_Int32 id);
     void (*setSafeAreaInset)(ArkUINodeHandle node, const ArkUIAniSafeAreaInsetEdge* edges, int32_t count);
+    int32_t (*registerApplicationShortcut)(const std::string& value, uint8_t modifiers,
+        std::function<void(int32_t)>&& callback);
+    void (*unregisterApplicationShortcut)(int32_t registrationId);
 };
 struct  ArkUICustomNodeInfo {
     std::function<void()> onPageShowFunc;

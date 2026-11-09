@@ -35,9 +35,9 @@ export enum ToolbarV2ItemPlacement {
   TRAILING = 2,
 }
 
-export enum BarBackgroundVisibility {
-  VISIBLE = 0,
-  HIDDEN = 1,
+export enum ToolbarV2MaterialStyle {
+  NONE = 0,
+  DEFAULT = 1,
 }
 
 // “更多”栏图标
@@ -72,6 +72,7 @@ const DEFAULT_ITEM_SPACE: number = 0;
 const GROUP_SPACE_MIN: number = 8;
 const GROUP_SPACE_MAX: number = 20;
 const DEFAULT_GROUP_SPACE: number = 12;
+const DEFAULT_ZONE_GAP: number = 24;
 const DISPLAY_PRIORITY_MIN: number = 0;
 const DISPLAY_PRIORITY_MAX: number = 10;
 const DEFAULT_ITEM_CROSS_AXIS: number = 48;
@@ -79,6 +80,11 @@ const DEFAULT_MAIN_AXIS_PADDING: number = 4;
 const GROUP_MAIN_AXIS_PADDING: number = 12;
 const DEFAULT_STYLE_STATE_EFFECT: boolean = true;
 const GROUP_DIVIDER_LENGTH: number = 18;
+const DISPLAY_PRIORITY_DEFAULT: number = 1;
+const ADV_FIT_EPSILON: number = 0.5;
+const OVERFLOW_MENU_ITEM_HEIGHT: number = 48;
+const OVERFLOW_MENU_PADDING_VERTICAL: number = 4;
+const DEFAULT_OVERFLOW_MENU_RADIUS: number = 16;
 
 interface MenuController {
   value: ResourceStr;
@@ -395,6 +401,11 @@ export class AdvancedToolbarV2Item extends ToolBarV2Item {
   onTitleConfigsChange(monitor: IMonitor): void {
     this.onStructureChange?.();
   }
+
+  @Monitor('displayPriority')
+  onDisplayPriorityChange(monitor: IMonitor): void {
+    this.onStructureChange?.();
+  }
 }
 
 export interface AdvancedToolbarV2ItemOptions extends ToolBarV2ItemOptions {
@@ -477,13 +488,13 @@ export class ToolbarV2StyleConfigs {
   @Trace
   public padding?: ToolbarV2PaddingOptions;
   @Trace
-  public backgroundVisibility?: BarBackgroundVisibility;
-  @Trace
   public backgroundColor?: ColorMetrics;
   @Trace
   public backgroundBlurStyle?: BlurStyle;
   @Trace
   public systemBackgroundMaterial?: uiMaterial.Material;
+  @Trace
+  public systemMaterialStyle?: ToolbarV2MaterialStyle = ToolbarV2MaterialStyle.NONE;
   @Trace
   public groupSpace?: LengthMetrics;
   @Trace
@@ -501,10 +512,10 @@ export class ToolbarV2StyleConfigs {
 
   constructor(init?: ToolbarV2StyleOptions) {
     this.padding = init?.padding;
-    this.backgroundVisibility = init?.backgroundVisibility;
     this.backgroundColor = init?.backgroundColor;
     this.backgroundBlurStyle = init?.backgroundBlurStyle;
     this.systemBackgroundMaterial = init?.systemBackgroundMaterial;
+    this.systemMaterialStyle = init?.systemMaterialStyle ?? ToolbarV2MaterialStyle.NONE;
     this.groupSpace = init?.groupSpace;
     this.itemSize = init?.itemSize;
     this.fontSize = init?.fontSize;
@@ -517,10 +528,10 @@ export class ToolbarV2StyleConfigs {
 
 export interface ToolbarV2StyleOptions {
   padding?: ToolbarV2PaddingOptions;
-  backgroundVisibility?: BarBackgroundVisibility;
   backgroundColor?: ColorMetrics;
   backgroundBlurStyle?: BlurStyle;
   systemBackgroundMaterial?: uiMaterial.Material;
+  systemMaterialStyle?: ToolbarV2MaterialStyle;
   groupSpace?: LengthMetrics;
   itemSize?: Size;
   fontSize?: LengthMetrics;
@@ -621,6 +632,19 @@ class ToolBarV2Theme {
   public fontSecondaryColor: ResourceColor = $r('sys.color.font_secondary');
 }
 
+interface AdvPriorityEntry {
+  item: AdvancedToolbarV2Item;
+  index: number;
+  priority: number;
+}
+
+interface AdvZoneMetrics {
+  leading: number;
+  main: number;
+  trailing: number;
+  titleTextWidth: number;
+}
+
 @ComponentV2
 export struct ToolBarV2 {
   @Require @Param
@@ -659,6 +683,19 @@ export struct ToolBarV2 {
   itemContentBuilder?: CustomBuilder;
   @Local
   advEntries: Array<AdvancedToolbarV2Item | ToolbarV2ItemGroup> = [];
+  @Local
+  advHiddenItems: AdvancedToolbarV2Item[] = [];
+  @Local
+  advVisibilityRevision: number = 0;
+  @Local
+  advTitleRenderWidth: number = 0;
+  @Local
+  advMainFlowOffset: number = 0;
+  @Local
+  advMainClamped: boolean = false;
+  private advTitleNaturalWidth: number = 0;
+  private advIsComputingVisibility: boolean = false;
+  private advTitleSignature: string = '';
   private advItemOriginalIndex: Map<AdvancedToolbarV2Item, number> = new Map();
   private itemCardTextMaxLine: number = 1;
   private itemDialogId?: number = undefined;
@@ -673,6 +710,7 @@ export struct ToolBarV2 {
     })
   })
   private moreText: Resource = $r('sys.string.ohos_toolbar_more');
+
 
   @Computed
   get menus(): MenuController[] {
@@ -984,7 +1022,7 @@ export struct ToolBarV2 {
         .accessibilityGroup(true)
         .accessibilityText(this.getAdvAccessibilityText(item))
         .accessibilityDescription(this.getAdvAccessibilityDescription(item))
-        .accessibilityLevel(item.accessibilityLevel)
+        .accessibilityLevel(this.getAdvAccessibilityLevel(item))
         .enabled(this.getEffectiveItemState(item) !== ToolBarV2ItemState.DISABLE)
         .opacity(this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE ? 0.4 : 1)
         .id(item.id)
@@ -1015,7 +1053,7 @@ export struct ToolBarV2 {
         .accessibilityGroup(true)
         .accessibilityText(this.getAdvAccessibilityText(item))
         .accessibilityDescription(this.getAdvAccessibilityDescription(item))
-        .accessibilityLevel(item.accessibilityLevel)
+        .accessibilityLevel(this.getAdvAccessibilityLevel(item))
         .enabled(this.getEffectiveItemState(item) !== ToolBarV2ItemState.DISABLE)
         .opacity(this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE ? 0.4 : 1)
         .id(item.id)
@@ -1113,7 +1151,7 @@ export struct ToolBarV2 {
       .accessibilityGroup(true)
       .accessibilityText(this.getAdvAccessibilityText(item))
       .accessibilityDescription(this.getAdvAccessibilityDescription(item))
-      .accessibilityLevel(item.accessibilityLevel)
+      .accessibilityLevel(this.getAdvAccessibilityLevel(item))
       .enabled(this.getEffectiveItemState(item) !== ToolBarV2ItemState.DISABLE)
       .opacity(this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE ? 0.4 : 1)
       .padding(0)
@@ -1127,11 +1165,17 @@ export struct ToolBarV2 {
       Column() {
         Column({ space: this.getEffectiveGroupSpace(group) }) {
           ForEach(group.items, (item: AdvancedToolbarV2Item, index: number) => {
-            this.renderAdvItem(item, true);
-            if (item.isShowSeparator === true) {
-              Divider()
-                .width(GROUP_DIVIDER_LENGTH)
-                .color($r('sys.color.comp_divider'))
+            if (this.shouldRenderAdvItem(item)) {
+              if (this.isAdvOverflowTriggerActive(item)) {
+                this.renderOverflowButtonItem(item, true);
+              } else {
+                this.renderAdvItem(item, true);
+              }
+              if (item.isShowSeparator === true) {
+                Divider()
+                  .width(GROUP_DIVIDER_LENGTH)
+                  .color($r('sys.color.comp_divider'))
+              }
             }
           }, (item: AdvancedToolbarV2Item, index: number) => this.getGroupItemKey(item, index))
         }
@@ -1139,6 +1183,8 @@ export struct ToolBarV2 {
       .width(this.toLengthString(this.getEffectiveCrossAxisLength()))
       .alignItems(HorizontalAlign.Center)
       .backgroundColor(this.getEffectiveGroupBg(group))
+      .backgroundBlurStyle(this.getEffectiveBackgroundBlurStyle())
+      .systemMaterial(this.resolveGroupMaterial())
       .borderRadius(this.getEffectiveGroupBorderRadius(group))
       .borderWidth(this.getEffectiveGroupBorderWidth(group))
       .borderColor(this.getEffectiveGroupBorderColor(group))
@@ -1148,12 +1194,18 @@ export struct ToolBarV2 {
       Row() {
         Row({ space: this.getEffectiveGroupSpace(group) }) {
           ForEach(group.items, (item: AdvancedToolbarV2Item, index: number) => {
-            this.renderAdvItem(item, true);
-            if (item.isShowSeparator === true) {
-              Divider()
-                .height(GROUP_DIVIDER_LENGTH)
-                .vertical(true)
-                .color($r('sys.color.comp_divider'))
+            if (this.shouldRenderAdvItem(item)) {
+              if (this.isAdvOverflowTriggerActive(item)) {
+                this.renderOverflowButtonItem(item, true);
+              } else {
+                this.renderAdvItem(item, true);
+              }
+              if (item.isShowSeparator === true) {
+                Divider()
+                  .height(GROUP_DIVIDER_LENGTH)
+                  .vertical(true)
+                  .color($r('sys.color.comp_divider'))
+              }
             }
           }, (item: AdvancedToolbarV2Item, index: number) => this.getGroupItemKey(item, index))
         }
@@ -1161,6 +1213,8 @@ export struct ToolBarV2 {
       .height(this.toLengthString(this.getEffectiveCrossAxisLength()))
       .alignItems(VerticalAlign.Center)
       .backgroundColor(this.getEffectiveGroupBg(group))
+      .backgroundBlurStyle(this.getEffectiveBackgroundBlurStyle())
+      .systemMaterial(this.resolveGroupMaterial())
       .borderRadius(this.getEffectiveGroupBorderRadius(group))
       .borderWidth(this.getEffectiveGroupBorderWidth(group))
       .borderColor(this.getEffectiveGroupBorderColor(group))
@@ -1178,6 +1232,8 @@ export struct ToolBarV2 {
       .width(this.toLengthString(this.getEffectiveCrossAxisLength()))
       .alignItems(HorizontalAlign.Center)
       .backgroundColor(this.getDefaultItemBg())
+      .backgroundBlurStyle(this.getEffectiveBackgroundBlurStyle())
+      .systemMaterial(this.resolveItemMaterial())
       .borderRadius(this.getEffectiveBorderRadius())
       .borderWidth(this.getEffectiveBorderWidth())
       .borderColor(this.getEffectiveBorderColor())
@@ -1190,6 +1246,113 @@ export struct ToolBarV2 {
       .height(this.toLengthString(this.getEffectiveCrossAxisLength()))
       .alignItems(VerticalAlign.Center)
       .backgroundColor(this.getDefaultItemBg())
+      .backgroundBlurStyle(this.getEffectiveBackgroundBlurStyle())
+      .systemMaterial(this.resolveItemMaterial())
+      .borderRadius(this.getEffectiveBorderRadius())
+      .borderWidth(this.getEffectiveBorderWidth())
+      .borderColor(this.getEffectiveBorderColor())
+      .padding(this.getEffectivePadding())
+      .clip(true)
+    }
+  }
+
+  @Builder
+  renderOverflowButtonItem(item: AdvancedToolbarV2Item, inGroup: boolean = false): void {
+    Button({ type: ButtonType.Normal, stateEffect: false }) {
+      Button({ type: ButtonType.Normal, stateEffect: false }) {
+        Column() {
+          if (item.icon instanceof ToolBarV2SymbolGlyph) {
+            SymbolGlyph()
+              .fontSize(IMAGE_SIZE)
+              .symbolEffect(new SymbolEffect(), false)
+              .attributeModifier(
+                this.isItemActivated(item) ? item.icon.activated ?? item.icon.normal : item.icon.normal)
+              .fontColor([this.getEffectiveItemIconColor(item)])
+          } else if (item.icon !== undefined && Util.isSymbolResource((item.icon as ToolBarV2ItemImage).src)) {
+            SymbolGlyph((item.icon as ToolBarV2ItemImage).src as Resource)
+              .fontSize(IMAGE_SIZE)
+              .fontColor([this.getEffectiveItemIconColor(item)])
+          } else if (item.icon !== undefined) {
+            Image((item.icon as ToolBarV2ItemImage).src)
+              .width(IMAGE_SIZE)
+              .height(IMAGE_SIZE)
+              .fillColor(this.getEffectiveItemIconColor(item))
+              .objectFit(ImageFit.Contain)
+              .draggable(false)
+          } else {
+            SymbolGlyph($r('sys.symbol.dot_grid_2x2'))
+              .fontSize(IMAGE_SIZE)
+              .fontColor([this.getEffectiveItemIconColor(item)])
+          }
+        }
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+        .padding({
+          top: LengthMetrics.vp(ITEM_PADDING),
+          bottom: LengthMetrics.vp(ITEM_PADDING),
+        })
+      }
+      .width(this.getEffectiveItemInnerWidth(item, inGroup).value)
+      .height(this.getEffectiveItemInnerHeight(item, inGroup).value)
+      .padding({
+        start: LengthMetrics.vp(ITEM_PADDING),
+        end: LengthMetrics.vp(ITEM_PADDING),
+      })
+      .borderRadius(this.getEffectiveItemBorderRadius(inGroup, item))
+      .backgroundColor(this.getEffectiveItemInnerDisplayBg(item))
+    }
+    .width(this.getEffectiveItemWidth(item, inGroup).value)
+    .height(this.getEffectiveItemHeight(item, inGroup).value)
+    .hoverEffect(HoverEffect.None)
+    .borderRadius(this.getEffectiveItemBorderRadius(false, item))
+    .backgroundColor(this.getEffectiveItemDisplayBg(item, inGroup))
+    .onHover((isHover: boolean) => {
+      this.setItemHovered(item, isHover);
+    })
+    .stateStyles({
+      pressed: {
+        .backgroundColor(this.getEffectiveItemPressedBg(item, inGroup))
+      }
+    })
+    .bindMenu(this.overflowMenuBuilder, {
+      placement: this.getEffectiveDirection() === Axis.Vertical ? Placement.Right : Placement.Bottom,
+      scrollBar: BarState.Off,
+    })
+    .accessibilityGroup(true)
+    .accessibilityText(this.getAdvAccessibilityText(item))
+    .accessibilityDescription(this.getAdvAccessibilityDescription(item))
+    .accessibilityLevel(this.getAdvAccessibilityLevel(item))
+    .enabled(this.getEffectiveItemState(item) !== ToolBarV2ItemState.DISABLE)
+    .opacity(this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE ? 0.4 : 1)
+    .padding(0)
+    .id(item.id)
+  }
+
+  @Builder
+  renderAdvOverflowItem(item: AdvancedToolbarV2Item): void {
+    if (this.getEffectiveDirection() === Axis.Vertical) {
+      Column() {
+        this.renderOverflowButtonItem(item, true);
+      }
+      .width(this.toLengthString(this.getEffectiveCrossAxisLength()))
+      .alignItems(HorizontalAlign.Center)
+      .backgroundColor(this.getDefaultItemBg())
+      .backgroundBlurStyle(this.getEffectiveBackgroundBlurStyle())
+      .systemMaterial(this.resolveItemMaterial())
+      .borderRadius(this.getEffectiveBorderRadius())
+      .borderWidth(this.getEffectiveBorderWidth())
+      .borderColor(this.getEffectiveBorderColor())
+      .padding(this.getEffectivePadding())
+      .clip(true)
+    } else {
+      Row() {
+        this.renderOverflowButtonItem(item, true);
+      }
+      .height(this.toLengthString(this.getEffectiveCrossAxisLength()))
+      .alignItems(VerticalAlign.Center)
+      .backgroundColor(this.getDefaultItemBg())
+      .backgroundBlurStyle(this.getEffectiveBackgroundBlurStyle())
+      .systemMaterial(this.resolveItemMaterial())
       .borderRadius(this.getEffectiveBorderRadius())
       .borderWidth(this.getEffectiveBorderWidth())
       .borderColor(this.getEffectiveBorderColor())
@@ -1201,21 +1364,76 @@ export struct ToolBarV2 {
   @Builder
   renderAdvItemOrGroup(item: AdvancedToolbarV2Item | ToolbarV2ItemGroup): void {
     if (this.isToolbarItemGroup(item)) {
-      this.renderAdvItemGroup(item as ToolbarV2ItemGroup);
-    } else {
+      if (this.hasVisibleGroupChild(item as ToolbarV2ItemGroup)) {
+        this.renderAdvItemGroup(item as ToolbarV2ItemGroup);
+      }
+    } else if (this.isAdvOverflowTriggerActive(item as AdvancedToolbarV2Item)) {
+      if (this.hasAdvOverflowItems()) {
+        this.renderAdvOverflowItem(item as AdvancedToolbarV2Item);
+      }
+    } else if (this.shouldRenderAdvItem(item as AdvancedToolbarV2Item)) {
       this.renderAdvSingleItem(item as AdvancedToolbarV2Item);
     }
   }
 
   @Builder
+  overflowMenuBuilder(): void {
+    Menu() {
+      this.renderAdvOverflowMenuItems();
+    }
+    .font(this.getOverflowMenuFont())
+    .fontColor(this.getOverflowMenuFontColor())
+    .radius(this.getOverflowMenuRadius())
+    .padding({
+      start: LengthMetrics.vp(0),
+      end: LengthMetrics.vp(0),
+      top: LengthMetrics.vp(OVERFLOW_MENU_PADDING_VERTICAL),
+      bottom: LengthMetrics.vp(OVERFLOW_MENU_PADDING_VERTICAL),
+    })
+    .menuItemDivider(this.getOverflowMenuItemDivider())
+    .menuItemGroupDivider(this.getOverflowMenuGroupDivider())
+  }
+
+  @Builder
+  renderAdvOverflowMenuItems(): void {
+    ForEach(this.getAdvOverflowMenuItems(), (item: AdvancedToolbarV2Item) => {
+      MenuItem({
+        content: this.getOverflowMenuItemLabel(item),
+        startIcon: this.getOverflowMenuItemIcon(item),
+      })
+        .height(OVERFLOW_MENU_ITEM_HEIGHT)
+        .enabled(this.getEffectiveItemState(item) !== ToolBarV2ItemState.DISABLE)
+        .onClick(() => {
+          if (this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE) {
+            return;
+          }
+          item.action && item.action(this.computeFlatIndex(item));
+        })
+    }, (item: AdvancedToolbarV2Item) => this.getOverflowMenuItemKey(item))
+  }
+
+  @Builder
   renderAdvTitle(): void {
-    if (this.advTitleConfigs && (this.advTitleConfigs.visible ?? true)) {
+    if (this.hasAdvTitle()) {
       Column() {
-        Text(this.advTitleConfigs.content)
-          .fontSize(this.getEffectiveTitleFontSize())
-          .fontColor(this.advTitleConfigs.style?.fontColor?.color ?? this.theme.fontPrimaryColor)
-          .fontWeight(this.getEffectiveTitleFontWeight())
-          .constraintSize({ minWidth: this.getEffectiveTitleMinLength() })
+        if (this.getEffectiveDirection() === Axis.Vertical) {
+          Text(this.advTitleConfigs?.content)
+            .fontSize(this.getEffectiveTitleFontSize())
+            .fontColor(this.advTitleConfigs?.style?.fontColor?.color ?? this.theme.fontPrimaryColor)
+            .fontWeight(this.getEffectiveTitleFontWeight())
+            .constraintSize({ minWidth: this.getEffectiveTitleMinLength() })
+        } else {
+          Text(this.advTitleConfigs?.content)
+            .fontSize(this.getEffectiveTitleFontSize())
+            .fontColor(this.advTitleConfigs?.style?.fontColor?.color ?? this.theme.fontPrimaryColor)
+            .fontWeight(this.getEffectiveTitleFontWeight())
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .constraintSize(this.getAdvTitleConstraintSize())
+            .onSizeChange((_oldValue: SizeOptions, newValue: SizeOptions) => {
+              this.onAdvTitleSizeChange(newValue);
+            })
+        }
       }
       .justifyContent(FlexAlign.Center)
       .alignItems(HorizontalAlign.Center)
@@ -1225,6 +1443,7 @@ export struct ToolBarV2 {
         top: LengthMetrics.vp(ITEM_PADDING),
         bottom: LengthMetrics.vp(ITEM_PADDING),
       })
+      .flexShrink(0)
     }
   }
 
@@ -1239,16 +1458,14 @@ export struct ToolBarV2 {
           (item: AdvancedToolbarV2Item | ToolbarV2ItemGroup, index: number) => {
             this.renderAdvItemOrGroup(item);
           }, (item: AdvancedToolbarV2Item | ToolbarV2ItemGroup, index: number) =>
-          `toolbar_${placement}_${this.getEntryKey(item, index)}`)
+          `toolbar_${placement}_${this.getEntryKey(item, index)}_${this.advVisibilityRevision}`)
       }
       .width('100%')
       .height('100%')
-      .justifyContent(
-        placement === ToolbarV2ItemPlacement.LEADING ? FlexAlign.Start
-          : placement === ToolbarV2ItemPlacement.MAIN ? FlexAlign.Center
-          : FlexAlign.End
-      )
+      .justifyContent(this.getAdvZoneJustifyContent(placement))
+      .padding(this.getAdvZonePadding(placement))
       .alignItems(HorizontalAlign.Center)
+      .hitTestBehavior(HitTestMode.None)
     } else {
       Row({ space: this.getEffectiveSpacing().value }) {
         if ((this.advTitleConfigs?.placement ?? ToolbarV2ItemPlacement.LEADING) === placement) {
@@ -1258,16 +1475,14 @@ export struct ToolBarV2 {
           (item: AdvancedToolbarV2Item | ToolbarV2ItemGroup, index: number) => {
             this.renderAdvItemOrGroup(item);
           }, (item: AdvancedToolbarV2Item | ToolbarV2ItemGroup, index: number) =>
-          `toolbar_${placement}_${this.getEntryKey(item, index)}`)
+          `toolbar_${placement}_${this.getEntryKey(item, index)}_${this.advVisibilityRevision}`)
       }
       .width('100%')
       .height('100%')
-      .justifyContent(
-        placement === ToolbarV2ItemPlacement.LEADING ? FlexAlign.Start
-          : placement === ToolbarV2ItemPlacement.MAIN ? FlexAlign.Center
-          : FlexAlign.End
-      )
+      .justifyContent(this.getAdvZoneJustifyContent(placement))
+      .padding(this.getAdvZonePadding(placement))
       .alignItems(VerticalAlign.Center)
+      .hitTestBehavior(HitTestMode.None)
     }
   }
 
@@ -1295,11 +1510,15 @@ export struct ToolBarV2 {
   }
 
   private getAdvAccessibilityText(item: AdvancedToolbarV2Item): string | undefined {
-    return item.accessibilityText as ESObject as string;
+    return item.accessibilityText as ESObject as string ?? item.content?.text as ESObject as string;
   }
 
   private getAdvAccessibilityDescription(item: AdvancedToolbarV2Item): string | undefined {
-    return item.accessibilityDescription as ESObject as string;
+    return item.accessibilityDescription as ESObject as string ?? '';
+  }
+
+  private getAdvAccessibilityLevel(item: AdvancedToolbarV2Item): string {
+    return item.accessibilityLevel ?? 'auto';
   }
 
   private getFontSizeScale(): number {
@@ -1516,7 +1735,36 @@ export struct ToolBarV2 {
 
   private rebuildAdvState(): void {
     this.advTitleConfigs = undefined;
+    this.advTitleRenderWidth = 0;
+    this.advMainFlowOffset = 0;
+    this.advMainClamped = false;
+    this.advHiddenItems = [];
     this.buildAdvEntries();
+    const signature = this.getAdvTitleSignature();
+    if (signature !== this.advTitleSignature) {
+      this.advTitleSignature = signature;
+      this.advTitleNaturalWidth = 0;
+    }
+    this.computeAdvVisibility();
+  }
+
+  private getAdvTitleSignature(): string {
+    const configs = this.advTitleConfigs;
+    if (configs === undefined) {
+      return '';
+    }
+    const content = configs.content;
+    let contentKey = '';
+    if (typeof content === 'string') {
+      contentKey = content;
+    } else if (content !== undefined && content !== null) {
+      const resource = content as Resource;
+      contentKey = `${resource.id}_${resource.type ?? ''}`;
+    }
+    const style = configs.style;
+    const fontSize = style?.fontSize;
+    return `${contentKey}|${fontSize?.value ?? ''}_${fontSize?.unit ?? ''}|` +
+      `${style?.fontWeight ?? ''}|${style?.minLength?.value ?? ''}`;
   }
 
   private computeFlatIndex(target: AdvancedToolbarV2Item): number {
@@ -1549,6 +1797,15 @@ export struct ToolBarV2 {
 
   private getEffectiveMainAxisLength(): LengthMetrics {
     return this.advancedToolBarModifier?.mainAxisLengthValue ?? LengthMetrics.percent(1);
+  }
+
+  // 主轴预算：固定长度时直接使用配置值，不依赖 onSizeChange 是否首帧回调；百分比时等待实测
+  private getAdvMainAxisBudget(): number {
+    const configured: LengthMetrics = this.getEffectiveMainAxisLength();
+    if (configured.unit !== LengthUnit.PERCENT) {
+      return Math.max(0, Util.lengthMetricsToVp(configured));
+    }
+    return Math.max(0, this.advMainAxisSize);
   }
 
   private getEffectiveCrossAxisLength(): LengthMetrics {
@@ -1624,6 +1881,9 @@ export struct ToolBarV2 {
   }
 
   private getEffectiveGroupBg(group?: ToolbarV2ItemGroup): ResourceColor {
+    if (this.getEffectiveSystemBackgroundMaterial()) {
+      return Color.Transparent;
+    }
     if (group?.style?.backgroundColor) {
       return group.style.backgroundColor.color;
     }
@@ -1634,20 +1894,38 @@ export struct ToolBarV2 {
     return $r('sys.color.comp_background_primary');
   }
 
-  private getEffectiveBackgroundColor(): ResourceColor {
-    return Color.Transparent;
-  }
-
   private getEffectiveBackgroundBlurStyle(): BlurStyle {
+    if (this.getEffectiveSystemBackgroundMaterial()) {
+      return BlurStyle.NONE;
+    }
     return this.advancedToolBarModifier?.styleConfigsValue?.backgroundBlurStyle ?? BlurStyle.NONE;
   }
 
   private getEffectiveSystemBackgroundMaterial(): uiMaterial.Material | undefined {
-    return this.advancedToolBarModifier?.styleConfigsValue?.systemBackgroundMaterial;
+    const info = uiMaterial.getMaterialInfo();
+    if (info.state !== uiMaterial.MaterialState.ENABLE) {
+      return undefined;
+    }
+    const userMaterial = this.advancedToolBarModifier?.styleConfigsValue?.systemBackgroundMaterial;
+    if (userMaterial) {
+      return userMaterial;
+    }
+    const stylePreset = this.advancedToolBarModifier?.styleConfigsValue?.systemMaterialStyle;
+    if (stylePreset === ToolbarV2MaterialStyle.DEFAULT) {
+      return new uiMaterial.ImmersiveMaterial({
+        style: uiMaterial.ImmersiveStyle.THIN,
+        interactive: true,
+      });
+    }
+    return undefined;
   }
 
-  private getEffectiveBackgroundVisibility(): BarBackgroundVisibility {
-    return this.advancedToolBarModifier?.styleConfigsValue?.backgroundVisibility ?? BarBackgroundVisibility.VISIBLE;
+  private resolveItemMaterial(): uiMaterial.Material | undefined {
+    return this.getEffectiveSystemBackgroundMaterial();
+  }
+
+  private resolveGroupMaterial(): uiMaterial.Material | undefined {
+    return this.getEffectiveSystemBackgroundMaterial();
   }
 
   private getEffectiveItemHoverBg(item: AdvancedToolbarV2Item): ResourceColor {
@@ -1742,6 +2020,10 @@ export struct ToolBarV2 {
     if (!this.getEffectiveStyleStateEffect()) {
       return Color.Transparent;
     }
+    if (this.getEffectiveSystemBackgroundMaterial() &&
+      uiMaterial.getGlobalMaterialLevel() !== uiMaterial.MaterialLevel.SMOOTH) {
+      return Color.Transparent;
+    }
     if (inGroup) {
       const groupEffect = this.getGroupStateEffectByItem(item);
       if (groupEffect === false) {
@@ -1775,6 +2057,9 @@ export struct ToolBarV2 {
   }
 
   private getDefaultItemBg(): ResourceColor {
+    if (this.getEffectiveSystemBackgroundMaterial()) {
+      return Color.Transparent;
+    }
     const style = this.advancedToolBarModifier?.styleConfigsValue;
     if (style?.backgroundColor) {
       return style.backgroundColor.color;
@@ -1970,10 +2255,548 @@ export struct ToolBarV2 {
     return item.id ?? `group_item_${index}`;
   }
 
-  private computeAdvVisibility(): void {
-    if (this.advIsMeasuring) {
+  private normalizeDisplayPriority(item: AdvancedToolbarV2Item): number {
+    const raw: number | undefined | null = item.displayPriority;
+    if (raw === undefined || raw === null) {
+      return DISPLAY_PRIORITY_DEFAULT;
+    }
+    if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < DISPLAY_PRIORITY_MIN) {
+      return DISPLAY_PRIORITY_DEFAULT;
+    }
+    if (raw > DISPLAY_PRIORITY_MAX) {
+      return DISPLAY_PRIORITY_MAX;
+    }
+    return raw;
+  }
+
+  private collectAdvPriorityEntries(): Array<AdvPriorityEntry> {
+    const entries: Array<AdvPriorityEntry> = [];
+    for (let i = 0; i < this.toolBarList.length; i++) {
+      const raw = this.toolBarList[i];
+      if (!(raw instanceof AdvancedToolbarV2Item)) {
+        continue;
+      }
+      const item = raw as AdvancedToolbarV2Item;
+      if (item.titleConfigs !== undefined || item.isShowOverflowMenu === true || item.builder) {
+        continue;
+      }
+      const priority = this.normalizeDisplayPriority(item);
+      if (priority >= DISPLAY_PRIORITY_MAX) {
+        continue;
+      }
+      entries.push({ item: item, index: i, priority: priority });
+    }
+    return entries;
+  }
+
+  private getAdvFoldOrder(entries: Array<AdvPriorityEntry>): Array<AdvPriorityEntry> {
+    const forcedHidden: Array<AdvPriorityEntry> = [];
+    const foldables: Array<AdvPriorityEntry> = [];
+    for (let i = 0; i < entries.length; i++) {
+      if (entries[i].priority <= DISPLAY_PRIORITY_MIN) {
+        forcedHidden.push(entries[i]);
+      } else {
+        foldables.push(entries[i]);
+      }
+    }
+    foldables.sort((a: AdvPriorityEntry, b: AdvPriorityEntry) => {
+      if (a.priority !== b.priority) {
+        return a.priority - b.priority;
+      }
+      // 同优先级：后声明先收
+      return b.index - a.index;
+    });
+    return forcedHidden.concat(foldables);
+  }
+
+  private isAdvOverflowTrigger(item: AdvancedToolbarV2Item): boolean {
+    return item.isShowOverflowMenu === true;
+  }
+
+  private isAdvOverflowTriggerActive(item: AdvancedToolbarV2Item): boolean {
+    // 竖向同样会收纳 item，溢出按钮需要保留并弹出菜单（Placement.Right）
+    return this.isAdvOverflowTrigger(item);
+  }
+
+  private hasAdvOverflowItems(): boolean {
+    return this.advHiddenItems.length > 0;
+  }
+
+  private shouldRenderAdvItem(item: AdvancedToolbarV2Item): boolean {
+    // 溢出按钮只在收纳集合非空时显示
+    if (this.isAdvOverflowTriggerActive(item) && !this.hasAdvOverflowItems()) {
+      return false;
+    }
+    return !this.advHiddenItems.includes(item);
+  }
+
+  private hasVisibleGroupChild(group: ToolbarV2ItemGroup): boolean {
+    for (let i = 0; i < group.items.length; i++) {
+      const item = group.items[i];
+      if (this.isAdvOverflowTriggerActive(item)) {
+        if (this.hasAdvOverflowItems()) {
+          return true;
+        }
+      } else if (this.shouldRenderAdvItem(item)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private hasAdvTitle(): boolean {
+    return this.getEffectiveDirection() === Axis.Horizontal &&
+      this.advTitleConfigs !== undefined && (this.advTitleConfigs.visible ?? true);
+  }
+
+  private getEffectiveTitlePlacement(): ToolbarV2ItemPlacement {
+    return this.advTitleConfigs?.placement ?? ToolbarV2ItemPlacement.LEADING;
+  }
+
+  private getAdvTitleMaxWidth(): number | undefined {
+    if (this.advTitleRenderWidth <= 0) {
+      return undefined;
+    }
+    return this.advTitleRenderWidth;
+  }
+
+  private getAdvTitleConstraintSize(): ConstraintSizeOptions {
+    const size: ConstraintSizeOptions = { minWidth: this.getEffectiveTitleMinLength() };
+    const maxWidth = this.getAdvTitleMaxWidth();
+    if (maxWidth !== undefined) {
+      size.maxWidth = maxWidth;
+    }
+    return size;
+  }
+
+  private onAdvTitleSizeChange(newValue: SizeOptions): void {
+    if (this.getEffectiveDirection() === Axis.Vertical) {
       return;
     }
+    const width = Number(newValue.width) || 0;
+    if (width <= 0 || this.advTitleNaturalWidth > 0) {
+      return;
+    }
+    if (this.advTitleRenderWidth > 0 && width >= this.advTitleRenderWidth - 1) {
+      // 被 maxWidth 截断，量到的不是自然宽度
+      return;
+    }
+    this.advTitleNaturalWidth = width;
+    this.computeAdvVisibility();
+  }
+
+  private getAdvItemMainSize(item: AdvancedToolbarV2Item): number {
+    return Util.lengthMetricsToVp(this.getEffectiveDirection() === Axis.Vertical
+      ? this.getEffectiveItemHeight(item)
+      : this.getEffectiveItemWidth(item));
+  }
+
+  private getAdvItemWrapperPadding(): number {
+    const padding = this.getEffectivePadding();
+    if (this.getEffectiveDirection() === Axis.Vertical) {
+      return this.paddingEdgeVp(padding.top) + this.paddingEdgeVp(padding.bottom);
+    }
+    return this.paddingEdgeVp(padding.left) + this.paddingEdgeVp(padding.right);
+  }
+
+  private getAdvGroupWrapperPadding(group: ToolbarV2ItemGroup): number {
+    const padding = this.getEffectiveGroupPadding(group);
+    if (this.getEffectiveDirection() === Axis.Vertical) {
+      return this.paddingEdgeVp(padding.top) + this.paddingEdgeVp(padding.bottom);
+    }
+    return this.paddingEdgeVp(padding.left) + this.paddingEdgeVp(padding.right);
+  }
+
+  private computeAdvSingleUnitWidth(item: AdvancedToolbarV2Item): number {
+    return this.getAdvItemMainSize(item) + this.getAdvItemWrapperPadding();
+  }
+
+  private computeAdvGroupUnitWidth(group: ToolbarV2ItemGroup, hidden: Set<AdvancedToolbarV2Item>): number {
+    let childCount = 0;
+    let width = 0;
+    for (let i = 0; i < group.items.length; i++) {
+      const child = group.items[i];
+      if (hidden.has(child)) {
+        continue;
+      }
+      if (this.isAdvOverflowTrigger(child) && hidden.size === 0) {
+        continue;
+      }
+      width += this.getAdvItemMainSize(child);
+      childCount++;
+    }
+    if (childCount === 0) {
+      return 0;
+    }
+    width += this.getEffectiveGroupSpace(group) * (childCount - 1);
+    width += this.getAdvGroupWrapperPadding(group);
+    return width;
+  }
+
+  private sumAdvUnitWidth(units: Array<number>, spacing: number): number {
+    if (units.length === 0) {
+      return 0;
+    }
+    let total = 0;
+    for (let i = 0; i < units.length; i++) {
+      total += units[i];
+    }
+    return total + spacing * (units.length - 1);
+  }
+
+  private computeAdvZoneWidths(hidden: Set<AdvancedToolbarV2Item>, titleTextWidth: number): AdvZoneMetrics {
+    const spacing = Util.lengthMetricsToVp(this.getEffectiveSpacing());
+    const titlePlacement = this.getEffectiveTitlePlacement();
+    const overflowVisible = hidden.size > 0;
+    const leadingUnits: Array<number> = [];
+    const mainUnits: Array<number> = [];
+    const trailingUnits: Array<number> = [];
+    if (this.hasAdvTitle()) {
+      const titleUnit = titleTextWidth + 2 * ITEM_PADDING;
+      if (titlePlacement === ToolbarV2ItemPlacement.TRAILING) {
+        trailingUnits.push(titleUnit);
+      } else if (titlePlacement === ToolbarV2ItemPlacement.MAIN) {
+        mainUnits.push(titleUnit);
+      } else {
+        leadingUnits.push(titleUnit);
+      }
+    }
+    for (let i = 0; i < this.advEntries.length; i++) {
+      const entry = this.advEntries[i];
+      const placement = this.getEffectivePlacement((entry as ToolbarV2ItemGroup).placement);
+      let unitWidth = 0;
+      if (this.isToolbarItemGroup(entry)) {
+        unitWidth = this.computeAdvGroupUnitWidth(entry as ToolbarV2ItemGroup, hidden);
+      } else {
+        const item = entry as AdvancedToolbarV2Item;
+        if (hidden.has(item)) {
+          unitWidth = 0;
+        } else if (this.isAdvOverflowTrigger(item)) {
+          unitWidth = overflowVisible ? this.computeAdvSingleUnitWidth(item) : 0;
+        } else {
+          unitWidth = this.computeAdvSingleUnitWidth(item);
+        }
+      }
+      if (unitWidth <= 0) {
+        continue;
+      }
+      if (placement === ToolbarV2ItemPlacement.LEADING) {
+        leadingUnits.push(unitWidth);
+      } else if (placement === ToolbarV2ItemPlacement.TRAILING) {
+        trailingUnits.push(unitWidth);
+      } else {
+        mainUnits.push(unitWidth);
+      }
+    }
+    const metrics: AdvZoneMetrics = {
+      leading: this.sumAdvUnitWidth(leadingUnits, spacing),
+      main: this.sumAdvUnitWidth(mainUnits, spacing),
+      trailing: this.sumAdvUnitWidth(trailingUnits, spacing),
+      titleTextWidth: titleTextWidth,
+    };
+    return metrics;
+  }
+
+  private computeAdvGapCount(metrics: AdvZoneMetrics): number {
+    let count = 0;
+    if (metrics.leading > 0) {
+      count++;
+    }
+    if (metrics.main > 0) {
+      count++;
+    }
+    if (metrics.trailing > 0) {
+      count++;
+    }
+    return count > 0 ? count - 1 : 0;
+  }
+
+  private computeAdvIsFeasible(metrics: AdvZoneMetrics, budget: number): boolean {
+    const total = metrics.leading + metrics.main + metrics.trailing +
+      this.computeAdvGapCount(metrics) * DEFAULT_ZONE_GAP;
+    return total <= budget + ADV_FIT_EPSILON;
+  }
+
+  private computeAdvMainOffset(metrics: AdvZoneMetrics, budget: number): number {
+    if (metrics.main <= 0) {
+      return 0;
+    }
+    const centered = (budget - metrics.main) / 2;
+    let lower = 0;
+    let upper = budget - metrics.main;
+    if (metrics.leading > 0) {
+      lower = metrics.leading + DEFAULT_ZONE_GAP;
+    }
+    if (metrics.trailing > 0) {
+      upper = budget - metrics.trailing - DEFAULT_ZONE_GAP - metrics.main;
+    }
+    if (lower > upper) {
+      // 两侧最小间隔无法同时满足：保持头部最小间隔，剩余交给收纳流程
+      return Math.max(0, lower);
+    }
+    return Math.min(Math.max(centered, lower), upper);
+  }
+
+  private isAdvMainOffsetClamped(metrics: AdvZoneMetrics, budget: number, offset: number): boolean {
+    if (metrics.main <= 0) {
+      return false;
+    }
+    return Math.abs(offset - (budget - metrics.main) / 2) > ADV_FIT_EPSILON;
+  }
+
+
+
+  private isAdvHiddenItemsEqual(a: AdvancedToolbarV2Item[], b: AdvancedToolbarV2Item[]): boolean {
+    if (a.length !== b.length) {
+      return false;
+    }
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private applyAdvVisibilityState(hiddenItems: AdvancedToolbarV2Item[], titleWidth: number,
+    mainOffset: number, mainClamped: boolean): void {
+    let hiddenChanged = false;
+    if (this.advMainClamped !== mainClamped) {
+      this.advMainClamped = mainClamped;
+    }
+    if (!this.isAdvHiddenItemsEqual(this.advHiddenItems, hiddenItems)) {
+      this.advHiddenItems = hiddenItems;
+      hiddenChanged = true;
+    }
+    if (this.advTitleRenderWidth !== titleWidth) {
+      this.advTitleRenderWidth = titleWidth;
+    }
+    if (this.advMainFlowOffset !== mainOffset) {
+      this.advMainFlowOffset = mainOffset;
+    }
+    if (hiddenChanged) {
+      this.advVisibilityRevision++;
+    }
+  }
+
+  private commitAdvVisibility(ordered: Array<AdvPriorityEntry>, hidden: Set<AdvancedToolbarV2Item>,
+    metrics: AdvZoneMetrics, titleWidth: number): void {
+    const finalHidden: AdvancedToolbarV2Item[] = [];
+    for (let i = 0; i < ordered.length; i++) {
+      if (hidden.has(ordered[i].item)) {
+        finalHidden.push(ordered[i].item);
+      }
+    }
+    const budget = this.getAdvMainAxisBudget();
+    const mainOffset = this.computeAdvMainOffset(metrics, budget);
+    const mainClamped = this.isAdvMainOffsetClamped(metrics, budget, mainOffset);
+    this.applyAdvVisibilityState(finalHidden, titleWidth, mainOffset, mainClamped);
+  }
+
+
+  private computeAdvVisibility(): void {
+    if (this.advIsMeasuring || this.advIsComputingVisibility) {
+      return;
+    }
+    const budget = this.getAdvMainAxisBudget();
+    if (budget <= 0) {
+      return;
+    }
+    this.advIsComputingVisibility = true;
+    try {
+      const ordered = this.getAdvFoldOrder(this.collectAdvPriorityEntries());
+      const hidden: Set<AdvancedToolbarV2Item> = new Set();
+      for (let i = 0; i < ordered.length; i++) {
+        if (ordered[i].priority <= DISPLAY_PRIORITY_MIN) {
+          hidden.add(ordered[i].item);
+        }
+      }
+      let titleTextWidth = 0;
+      let metrics = this.computeAdvZoneWidths(hidden, 0);
+      if (this.hasAdvTitle()) {
+        // 标题优先：先把标题压到剩余空间，只有标题到 minLength 还放不下时才收纳 item
+        const minLength = this.getEffectiveTitleMinLength();
+        const base = this.computeAdvZoneWidths(hidden, 0);
+        const otherWidth = base.leading + base.main + base.trailing +
+          this.computeAdvGapCount(base) * DEFAULT_ZONE_GAP;
+        const available = Math.max(0, budget - otherWidth);
+        const natural = this.advTitleNaturalWidth > 0 ? this.advTitleNaturalWidth : available;
+        titleTextWidth = Math.max(minLength, Math.min(natural, available));
+        metrics = this.computeAdvZoneWidths(hidden, titleTextWidth);
+      }
+      let cursor = 0;
+      while (!this.computeAdvIsFeasible(metrics, budget)) {
+        while (cursor < ordered.length &&
+          (ordered[cursor].priority <= DISPLAY_PRIORITY_MIN || hidden.has(ordered[cursor].item))) {
+          cursor++;
+        }
+        if (cursor >= ordered.length) {
+          break;
+        }
+        hidden.add(ordered[cursor].item);
+        cursor++;
+        metrics = this.computeAdvZoneWidths(hidden, titleTextWidth);
+      }
+      this.commitAdvVisibility(ordered, hidden, metrics, titleTextWidth);
+    } finally {
+      this.advIsComputingVisibility = false;
+    }
+  }
+
+  private getAdvZoneJustifyContent(placement: ToolbarV2ItemPlacement): FlexAlign {
+    if (placement === ToolbarV2ItemPlacement.LEADING) {
+      return FlexAlign.Start;
+    }
+    if (placement === ToolbarV2ItemPlacement.TRAILING) {
+      return FlexAlign.End;
+    }
+    return this.advMainClamped ? FlexAlign.Start : FlexAlign.Center;
+  }
+
+  private getAdvZonePadding(placement: ToolbarV2ItemPlacement): LocalizedPadding {
+    const padding: LocalizedPadding = {};
+    if (placement === ToolbarV2ItemPlacement.MAIN && this.advMainClamped && this.advMainFlowOffset > 0) {
+      if (this.getEffectiveDirection() === Axis.Vertical) {
+        padding.top = LengthMetrics.vp(this.advMainFlowOffset);
+      } else {
+        padding.start = LengthMetrics.vp(this.advMainFlowOffset);
+      }
+    }
+    return padding;
+  }
+
+  private getOverflowMenuStyle(): ToolbarV2OverflowMenuStyle | undefined {
+    const style = this.advancedToolBarModifier?.overflowMenuStyleValue;
+    if (!style || typeof style !== 'object') {
+      return undefined;
+    }
+    return style;
+  }
+
+  private getOverflowMenuFont(): Font {
+    const font = this.getOverflowMenuStyle()?.font;
+    if (font && typeof font === 'object') {
+      const keys: string[] = Object.keys(font);
+      if (keys.length > 0) {
+        return font;
+      }
+    }
+    return { weight: FontWeight.Medium };
+  }
+
+  private getOverflowMenuFontColor(): ResourceColor {
+    const colorMetrics = this.getOverflowMenuStyle()?.fontColor;
+    if (!colorMetrics || typeof colorMetrics !== 'object') {
+      return $r('sys.color.font_primary');
+    }
+    const color = (colorMetrics as ColorMetrics).color;
+    if (color === undefined || color === null) {
+      return $r('sys.color.font_primary');
+    }
+    return color;
+  }
+
+  private getOverflowMenuRadius(): Dimension | BorderRadiuses {
+    const radius = this.getOverflowMenuStyle()?.radius;
+    if (radius === undefined || radius === null) {
+      return DEFAULT_OVERFLOW_MENU_RADIUS;
+    }
+    if (typeof radius === 'number') {
+      return radius >= 0 ? radius as Dimension : DEFAULT_OVERFLOW_MENU_RADIUS;
+    }
+    if (typeof radius === 'string') {
+      return radius as Dimension;
+    }
+    if (typeof radius === 'object') {
+      return radius as BorderRadiuses;
+    }
+    return DEFAULT_OVERFLOW_MENU_RADIUS;
+  }
+
+  private isValidDivider(divider: DividerStyleOptions | undefined): boolean {
+    if (!divider || typeof divider !== 'object') {
+      return false;
+    }
+    const strokeWidth = divider.strokeWidth;
+    if (strokeWidth !== undefined && strokeWidth !== null &&
+      typeof strokeWidth !== 'number' && typeof strokeWidth !== 'string' && typeof strokeWidth !== 'object') {
+      return false;
+    }
+    const startMargin = divider.startMargin;
+    if (startMargin !== undefined && startMargin !== null &&
+      typeof startMargin !== 'number' && typeof startMargin !== 'string' && typeof startMargin !== 'object') {
+      return false;
+    }
+    const endMargin = divider.endMargin;
+    if (endMargin !== undefined && endMargin !== null &&
+      typeof endMargin !== 'number' && typeof endMargin !== 'string' && typeof endMargin !== 'object') {
+      return false;
+    }
+    return true;
+  }
+
+  private getOverflowMenuItemDivider(): DividerStyleOptions | undefined {
+    const divider = this.getOverflowMenuStyle()?.menuItemDivider;
+    if (this.isValidDivider(divider)) {
+      return divider;
+    }
+    return {
+      strokeWidth: LengthMetrics.vp(0.5),
+      startMargin: LengthMetrics.vp(0),
+      endMargin: LengthMetrics.vp(0),
+      color: $r('sys.color.comp_divider'),
+    };
+  }
+
+  private getOverflowMenuGroupDivider(): DividerStyleOptions | undefined {
+    const divider = this.getOverflowMenuStyle()?.menuItemGroupDivider;
+    return this.isValidDivider(divider) ? divider : undefined;
+  }
+
+  private getAdvOverflowMenuItems(): AdvancedToolbarV2Item[] {
+    const result: AdvancedToolbarV2Item[] = [];
+    const seen: Set<AdvancedToolbarV2Item> = new Set();
+    for (let i = 0; i < this.advHiddenItems.length; i++) {
+      const item = this.advHiddenItems[i];
+      if (!seen.has(item)) {
+        seen.add(item);
+        result.push(item);
+      }
+    }
+    result.sort((a: AdvancedToolbarV2Item, b: AdvancedToolbarV2Item) => {
+      const priorityA = this.normalizeDisplayPriority(a);
+      const priorityB = this.normalizeDisplayPriority(b);
+      if (priorityA !== priorityB) {
+        return priorityB - priorityA;
+      }
+      return this.computeFlatIndex(a) - this.computeFlatIndex(b);
+    });
+    return result;
+  }
+
+  private getOverflowMenuItemLabel(item: AdvancedToolbarV2Item): ResourceStr {
+    const text: ResourceStr | undefined = item.content?.text;
+    if (text !== undefined && text !== null) {
+      return text;
+    }
+    return '';
+  }
+
+  private getOverflowMenuItemIcon(item: AdvancedToolbarV2Item): ResourceStr | undefined {
+    const icon = item.icon;
+    if (!icon || icon instanceof ToolBarV2SymbolGlyph) {
+      return undefined;
+    }
+    return (icon as ToolBarV2ItemImage).src;
+  }
+
+  private getOverflowMenuItemKey(item: AdvancedToolbarV2Item): string {
+    // 菜单项用声明序号做稳定 key（id 允许重复，不能单独当 key）
+    const index = this.computeFlatIndex(item);
+    if (index >= 0) {
+      return `overflow_item_${index}`;
+    }
+    return `overflow_item_${item.id ?? 'unknown'}`;
   }
 
   private onAdvContentMainAxisSizeChange(newValue: SizeOptions): void {

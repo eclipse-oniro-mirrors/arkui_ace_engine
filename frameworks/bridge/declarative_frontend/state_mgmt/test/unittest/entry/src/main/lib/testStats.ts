@@ -42,7 +42,7 @@ export class TestStats {
   }
   // Gets final results as a one string.
   // addMarker true adds _ut to the beginning of lines to be easily seen in DevEco
-  static getFinalReport(addMarker? :boolean): string {
+  static getFinalReport(addMarker? :boolean, failedOnly? :boolean): string {
 
     let runCount = 0
     let passedCount = 0
@@ -66,7 +66,9 @@ export class TestStats {
         lines.push(`${paddedName} FAILED ${info}`)
       } else {
         passedCount++
-        lines.push(`${paddedName} PASSED ${info}`)
+        if (!failedOnly) {
+          lines.push(`${paddedName} PASSED ${info}`)
+        }
       }
     }
     lines.push(`Summary:`)

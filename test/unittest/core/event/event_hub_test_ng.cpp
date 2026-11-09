@@ -1973,6 +1973,48 @@ HWTEST_F(EventHubTestNg, EventHubTest046, TestSize.Level1)
 }
  
 /**
+ * @tc.name: SetDefaultOnDragStartWithoutHost
+ * @tc.desc: Preserve default drag callbacks before host attachment and allow clearing after host expiration.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventHubTestNg, SetDefaultOnDragStartWithoutHost, TestSize.Level1)
+{
+    auto eventHub = AceType::MakeRefPtr<EventHub>();
+    int32_t callbackCount = 0;
+    auto onDragStart = [&callbackCount](const RefPtr<OHOS::Ace::DragEvent>&, const std::string&) -> DragDropInfo {
+        ++callbackCount;
+        return {};
+    };
+    eventHub->SetDefaultOnDragStart(onDragStart);
+    ASSERT_TRUE(eventHub->HasDefaultOnDragStart());
+    eventHub->GetDefaultOnDragStart()(nullptr, "");
+    EXPECT_EQ(callbackCount, 1);
+
+    auto frameNode = FrameNode::CreateFrameNode(V2::IMAGE_ETS_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    eventHub->AttachHost(frameNode);
+    ASSERT_TRUE(eventHub->HasDefaultOnDragStart());
+    eventHub->GetDefaultOnDragStart()(nullptr, "");
+    EXPECT_EQ(callbackCount, 2);
+    eventHub->SetDefaultOnDragStart(nullptr);
+    EXPECT_FALSE(eventHub->HasDefaultOnDragStart());
+    eventHub->SetDefaultOnDragStart(onDragStart);
+    ASSERT_TRUE(eventHub->HasDefaultOnDragStart());
+    eventHub->GetDefaultOnDragStart()(nullptr, "");
+    EXPECT_EQ(callbackCount, 3);
+
+    frameNode.Reset();
+    ASSERT_EQ(eventHub->GetFrameNode(), nullptr);
+    eventHub->SetDefaultOnDragStart(nullptr);
+    EXPECT_FALSE(eventHub->HasDefaultOnDragStart());
+    eventHub->SetDefaultOnDragStart(onDragStart);
+    ASSERT_TRUE(eventHub->HasDefaultOnDragStart());
+    eventHub->GetDefaultOnDragStart()(nullptr, "");
+    EXPECT_EQ(callbackCount, 4);
+    eventHub->SetDefaultOnDragStart(nullptr);
+    EXPECT_FALSE(eventHub->HasDefaultOnDragStart());
+}
+
+/**
  * @tc.name: EventHubTest047
  * @tc.desc: Test DragDropCallbackSet GetOrCreate methods
  * @tc.type: FUNC

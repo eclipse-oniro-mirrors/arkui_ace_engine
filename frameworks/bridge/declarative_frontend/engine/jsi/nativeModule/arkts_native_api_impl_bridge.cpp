@@ -2964,6 +2964,8 @@ void ArkUINativeModule::RegisterCommonAttributes(Local<panda::ObjectRef> object,
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::SetHitTestBehavior));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetHitTestBehavior"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::ResetHitTestBehavior));
+    common->Set(vm, panda::StringRef::NewFromUtf8(vm, "setAgentControlMode"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::SetAgentControlMode));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "setZIndex"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::SetZIndex));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetZIndex"),

@@ -16,6 +16,7 @@
 #include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
 
 #include <cmath>
+#include <set>
 
 #include "base/log/dump_log.h"
 #include "base/utils/utils.h"
@@ -23,6 +24,7 @@
 #include "core/animation/curves.h"
 #include "core/components/scroll/scroll_controller_base.h"
 #include "core/components_ng/manager/content_change_manager/content_change_manager.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_shell_mount.h"
 #include "core/components_ng/event/focus_hub.h"
 #include "core/components_ng/pattern/scroll/inner/scroll_bar.h"
 #include "core/components_ng/pattern/scroll/inner/scroll_bar_overlay_modifier.h"
@@ -51,7 +53,421 @@
 
 namespace OHOS::Ace::NG {
 
-WaterFlowPattern::~WaterFlowPattern() = default;
+WaterFlowPattern::~WaterFlowPattern()
+{
+    ResetScrollPlaceholder();
+}
+
+void WaterFlowPattern::SetScrollPlaceholder(ScrollPlaceholderProvider&& provider)
+{
+    // Provider replacement bumps the host fact implicitly: pending real-build tasks
+    // carry the host node id and are cancelled below, already-created real nodes
+    // stay under the normal component management, and unfilled placeholder slots
+    // rebuild through the existing path. WaterFlow prediction only ever defers
+    // builds the lazy path would have deferred as well.
+    scrollPlaceholderProvider_ = std::move(provider);
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    if (!scrollPlaceholderProvider_) {
+        ResetScrollPlaceholder();
+        return;
+    }
+    auto* context = host->GetContext();
+    if (context) {
+        const auto& manager = context->GetOrCreateScrollPlaceholderManager();
+        if (manager) {
+            // Selector replacement invalidates in-flight placeholder work of this
+            // host; the new provider's decisions start from a clean queue.
+            manager->CancelHostRealBuilds(host->GetId(), ScrollPlaceholderCancelReason::RE_REGISTER);
+        }
+    }
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+}
+
+void WaterFlowPattern::ResetScrollPlaceholder()
+{
+    scrollPlaceholderProvider_ = nullptr;
+    // Host reset/destroy: retire every mounted placeholder shell (unmount +
+    // content back to the pool); unfilled slots rebuild through the existing path.
+    for (auto& [index, info] : scrollPlaceholderItems_) {
+        RetireScrollPlaceholderShell(info.shell, info.templateId);
+    }
+    scrollPlaceholderItems_.clear();
+    for (auto& [shell, templateId] : retiringPlaceholderShells_) {
+        // Shells of committed items awaiting the layout-round reconcile are mounted
+        // too; the reset must retire them, not just forget them.
+        RetireScrollPlaceholderShell(shell, templateId);
+    }
+    retiringPlaceholderShells_.clear();
+    SweepOrphanPlaceholderShells();
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* context = host->GetContext();
+    CHECK_NULL_VOID(context);
+    const auto& manager = context->GetOrCreateScrollPlaceholderManager();
+    CHECK_NULL_VOID(manager);
+    // Pending placeholder real-builds of this host turn stale immediately; the
+    // manager never calls back into a detached pattern.
+    manager->CancelHostRealBuilds(host->GetId(), ScrollPlaceholderCancelReason::HOST_RESET);
+}
+
+bool WaterFlowPattern::OnScrollCallback(float offset, int32_t source)
+{
+    lastScrollCallbackNs_ = GetSysTimestamp();
+    return ScrollablePattern::OnScrollCallback(offset, source);
+}
+
+// Two-stage budget decision for one not-yet-built index: the provider callback
+// crosses into ArkTS (VM entry + object marshalling), so it must only run under
+// real budget pressure. Stage 1 predicts with the empty-templateId
+// component-aggregate estimate — no JS. Light load / no vsync anchor keeps the
+// synchronous build path without the provider ever being consulted. Stage 2,
+// under pressure only, asks the item provider (nullopt keeps the synchronous
+// path) and the template-specific estimate may flip the decision back to
+// BUILD_REAL_NOW. Returns the provider options when the index should defer.
+std::optional<ScrollPlaceholderOptions> WaterFlowPattern::PredictScrollPlaceholderDefer(
+    const RefPtr<ScrollPlaceholderManager>& manager, const RefPtr<FrameNode>& host, int32_t index)
+{
+    // Placeholder deferral is a scroll-time feature. The initial viewport (no
+    // scroll event yet) and a settled water flow must always build real items:
+    // deferring there mounts invisible shells the real-build queue can never
+    // deliver on (the startup frame is the one frame that is guaranteed to be
+    // over budget).
+    constexpr int64_t SCROLL_ACTIVE_WINDOW_NS = 200000000; // 200ms, covers fling frame gaps
+    int64_t nowNs = GetSysTimestamp();
+    if (lastScrollCallbackNs_ <= 0 || nowNs - lastScrollCallbackNs_ > SCROLL_ACTIVE_WINDOW_NS) {
+        return std::nullopt;
+    }
+    ScrollPlaceholderPredictParams params;
+    params.componentType = ScrollPlaceholderComponentType::WATER_FLOW;
+    params.hostNodeId = host->GetId();
+    params.index = index;
+    params.cacheBuild = false;
+    auto deadline = manager->GetVsyncDerivedFrameDeadlineNs();
+    if (manager->Predict(params, deadline).decision != ScrollPlaceholderDecision::USE_PLACEHOLDER) {
+        return std::nullopt;
+    }
+    auto options = scrollPlaceholderProvider_(index);
+    if (!options.has_value()) {
+        return std::nullopt;
+    }
+    params.templateId = options->id;
+    if (manager->Predict(params, deadline).decision != ScrollPlaceholderDecision::USE_PLACEHOLDER) {
+        return std::nullopt;
+    }
+    return options;
+}
+
+RefPtr<FrameNode> WaterFlowPattern::CreateScrollPlaceholderShell(int32_t index)
+{
+    // Component call-site decision: called from the WaterFlow layout child
+    // acquisition for a not-yet-built visible index. Predicts with the remaining
+    // frame budget before the real builder would run; on USE_PLACEHOLDER mounts a
+    // placeholder shell on the WaterFlow host and defers the real build into the
+    // pipeline framed queue. Returns null to keep the existing acquisition.
+    CHECK_NULL_RETURN(scrollPlaceholderProvider_, nullptr);
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, nullptr);
+    // Section/footer exclusion (interface contract): the footer children occupy
+    // the child indices [0, footerIndex_] and never enter the placeholder
+    // selection — no provider call, no shell, the existing path as-is.
+    if (layoutInfo_ && index <= layoutInfo_->footerIndex_) {
+        return nullptr;
+    }
+    if (scrollPlaceholderItems_.find(index) != scrollPlaceholderItems_.end()) {
+        // Safety: never stack a second placeholder on the same index.
+        return scrollPlaceholderItems_[index].shell;
+    }
+    if (index < 0 || index >= host->GetTotalChildCount()) {
+        return nullptr;
+    }
+    // Deferral-blind built-probe (UINode window walk, no FrameProxy): once a
+    // deferral for this index is recorded, the index acquisition itself resolves
+    // to the shell, so the plain GetChildByIndex here would mistake our own shell
+    // for a real child.
+    if (host->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(index))) {
+        // The real child at this index is already built (a committed real-build or
+        // a normal-path rebuild): never place a placeholder over it.
+        return nullptr;
+    }
+    auto* context = host->GetContext();
+    CHECK_NULL_RETURN(context, nullptr);
+    const auto& manager = context->GetOrCreateScrollPlaceholderManager();
+    CHECK_NULL_RETURN(manager, nullptr);
+    auto options = PredictScrollPlaceholderDefer(manager, host, index);
+    CHECK_NULL_RETURN(options.has_value(), nullptr);
+
+    // The shell carries a plain WaterFlowItemPattern so it measures like a real
+    // flow item of this host: the suggested size (or the content estimate)
+    // resolves against the column cross-size constraint at measure.
+    auto shell = scroll_placeholder_mount::CreatePlaceholderShellNode(
+        *options, manager, AceType::MakeRefPtr<WaterFlowItemPattern>());
+    CHECK_NULL_RETURN(shell, nullptr);
+    scroll_placeholder_mount::MountPlaceholderShellOnHost(host, shell);
+    ACE_SCOPED_TRACE("ScrollPlaceholder::Defer hostId:%d index:%d", host->GetId(), index);
+
+    ScrollPlaceholderItemInfo info;
+    info.shell = shell;
+    info.templateId = options->id;
+    if (!info.templateId.empty()) {
+        auto snapshot = manager->LookupTemplateForCreate(info.templateId);
+        info.templateGen = snapshot.has_value() ? snapshot->generation : 0;
+    }
+    scrollPlaceholderItems_[index] = info;
+    mountedPlaceholderShells_[shell] = info.templateId;
+    // Acquisition substitution table: FrameProxy::GetFrameNodeByIndex resolves
+    // this index to the shell until the real build commits and clears it.
+    manager->RecordDeferral(host->GetId(), index, shell);
+    ScrollPlaceholderPredictParams params;
+    params.componentType = ScrollPlaceholderComponentType::WATER_FLOW;
+    params.templateId = options->id;
+    params.hostNodeId = host->GetId();
+    params.index = index;
+    params.cacheBuild = false;
+    EnqueueScrollPlaceholderRealBuild(manager, params, info.templateGen);
+    return shell;
+}
+
+void WaterFlowPattern::EnqueueScrollPlaceholderRealBuild(
+    const RefPtr<ScrollPlaceholderManager>& manager,
+    const ScrollPlaceholderPredictParams& params, uint64_t templateGen)
+{
+    auto weak = WeakClaim(this);
+    manager->EnqueueRealBuild(params, templateGen,
+        [weak, index = params.index]() -> bool {
+            auto pattern = weak.Upgrade();
+            CHECK_NULL_RETURN(pattern, false);
+            return pattern->CommitScrollPlaceholderRealBuild(index);
+        },
+        ScrollPlaceholderRealBuildPriority::VISIBLE);
+}
+
+void WaterFlowPattern::PrepareScrollPlaceholderForAcquisition(int32_t index)
+{
+    // Decision-side pre-check for the FrameProxy acquisition substitution: predicts
+    // with the remaining frame budget and, on defer, mounts the shell and records
+    // the deferral. The wrapper substitution is deliberately NOT done here — the
+    // normal acquisition right after this call flows through GetOrCreateChildByIndex
+    // -> FrameProxy::GetFrameNodeByIndex, which resolves the deferral so the shell
+    // picks up the same skip-flag inheritance and activation as a real item.
+    CreateScrollPlaceholderShell(index);
+}
+
+bool WaterFlowPattern::HasScrollPlaceholderItem(int32_t index) const
+{
+    return scrollPlaceholderItems_.find(index) != scrollPlaceholderItems_.end();
+}
+
+namespace {
+// Placeholder commit/sweep visibility margin: covers typical cachedCount prefetch
+// bands without consulting each component's cached-count plumbing. A deferred build
+// whose index fell outside the window is dropped — the index falls back to the normal
+// acquisition and re-defers on demand if the user scrolls back.
+constexpr int32_t SCROLL_PH_RANGE_MARGIN = 10;
+
+bool InScrollPhVisibleRange(int32_t start, int32_t end, int32_t index)
+{
+    if (start < 0 || end < 0 || index < 0) {
+        return true; // range unknown (pre-first-layout): fail open
+    }
+    return index >= start - SCROLL_PH_RANGE_MARGIN && index <= end + SCROLL_PH_RANGE_MARGIN;
+}
+} // namespace
+
+bool WaterFlowPattern::CommitScrollPlaceholderRealBuild(int32_t index)
+{
+    // Framed real-build closure (UI thread, pipeline OnIdle flush). The real item
+    // is produced by the existing build-style acquisition — the syntax layer path
+    // is untouched — and enters the tree there; the replacement completes with
+    // the next local remeasure (WaterFlow's existing item-size anchor rules),
+    // after which the shell is retired (ReconcileScrollPlaceholderItems).
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, false);
+    auto iter = scrollPlaceholderItems_.find(index);
+    if (iter == scrollPlaceholderItems_.end()) {
+        return false;
+    }
+    auto* context = host->GetContext();
+    const auto& manager = context ? context->GetOrCreateScrollPlaceholderManager() : nullptr;
+    // Drop the acquisition deferral FIRST: the real acquisition below must resolve
+    // through FrameProxy's normal path, not back into this shell.
+    if (manager) {
+        manager->ClearDeferral(host->GetId(), index);
+    }
+    if (index < 0 || index >= host->GetTotalChildCount()) {
+        // Data shrank below this index: drop the placeholder, never mount.
+        RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
+        scrollPlaceholderItems_.erase(iter);
+        return false;
+    }
+
+    // Visibility guard: a storm can leave a task queued for an index the viewport has
+    // long left behind (the queue itself has no scroll-position cleanup). Committing
+    // it would mount a full off-screen item and force a host re-measure for content
+    // the user may never revisit; retire the shell — the index re-defers through the
+    // normal path if the user scrolls back.
+    const int32_t visStart = layoutInfo_ ? layoutInfo_->startIndex_ : -1;
+    const int32_t visEnd = layoutInfo_ ? layoutInfo_->endIndex_ : -1;
+    if (!InScrollPhVisibleRange(visStart, visEnd, index)) {
+        RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
+        scrollPlaceholderItems_.erase(iter);
+        return false;
+    }
+    // A real child already present at the index (built through the normal path
+    // after a data change): keep it, retire the placeholder. Deferral-blind probe —
+    // plain GetChildByIndex would still see this index's own shell without the
+    // clear above, and any other deferred index must not resolve here either.
+    if (host->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(index))) {
+        RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
+        scrollPlaceholderItems_.erase(iter);
+        return false;
+    }
+    ACE_SCOPED_TRACE("ScrollPlaceholder::BuildReal hostId:%d index:%d", host->GetId(), index);
+    // Take the entry out FIRST: the acquisition below re-enters
+    // CreateScrollPlaceholderShell, whose dedup check must not resolve to our own shell.
+    ScrollPlaceholderItemInfo info = iter->second;
+    scrollPlaceholderItems_.erase(iter);
+    auto realWrapper = host->GetOrCreateChildByIndex(static_cast<uint32_t>(index), true);
+    if (!realWrapper) {
+        // The queue task is consumed either way: retire the orphan shell so future
+        // acquisitions take the normal path instead of hitting the shell forever.
+        RetireScrollPlaceholderShell(info.shell, info.templateId);
+        return false;
+    }
+    // Transaction: the real node is in the tree; the remeasure re-lays the item
+    // range (anchors follow the existing item-size change rules). The shell stays
+    // mounted until that layout completes, then the reconcile retires it (content
+    // back to the pool, shell unmounted outside the transaction).
+    retiringPlaceholderShells_.emplace_back(info.shell, info.templateId);
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+    return true;
+}
+
+void WaterFlowPattern::RetireScrollPlaceholderShell(const RefPtr<FrameNode>& shell, const std::string& templateId)
+{
+    CHECK_NULL_VOID(shell);
+    mountedPlaceholderShells_.erase(shell);
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* context = host->GetContext();
+    const auto& manager = context ? context->GetOrCreateScrollPlaceholderManager() : nullptr;
+    // Retirement funnel for every path (commit drops, reconcile drops, the retiring
+    // list and the orphan sweep): drop any deferral still pointing at this shell so
+    // the index resolves through the normal acquisition again.
+    if (manager) {
+        manager->RemoveDeferralsByShell(host->GetId(), shell);
+    }
+    // Return the template content subtree to the per-template instance pool —
+    // the expensive part (builder/clone) — and drop the cheap shell.
+    bool contentPooled = false;
+    if (!templateId.empty() && shell->GetChildren().size() == 1) {
+        if (manager) {
+            auto content = shell->GetChildren().front();
+            shell->RemoveChild(content);
+            manager->CacheTemplateInstance(templateId, content);
+            contentPooled = true;
+        }
+    }
+    if (!templateId.empty() && !contentPooled && !shell->GetChildren().empty()) {
+        // Content existed but missed the pool (unexpected child count or no manager):
+        // it degrades to the re-clone cost path; log to make pool anomalies visible.
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder content dropped without pooling: children=%{public}d, templateId=%{public}s",
+            static_cast<int32_t>(shell->GetChildren().size()), templateId.c_str());
+    }
+    host->RemoveChild(shell);
+    shell->DetachFromMainTree();
+}
+
+void WaterFlowPattern::SweepScrollPlaceholderOutOfRange(int32_t start, int32_t end)
+{
+    // Scroll-driven hygiene for the framed real-build queue: a fast fling can defer
+    // more items than the viewport will ever revisit. Queued tasks whose index left
+    // the window (plus margin) can no longer render near the user — drop the task and
+    // retire the shell so the index falls back to the normal acquisition. Without
+    // this the backlog drains for minutes, building items the user has long passed.
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* context = host->GetContext();
+    const auto& manager = context ? context->GetOrCreateScrollPlaceholderManager() : nullptr;
+    CHECK_NULL_VOID(manager);
+    manager->SetHostVisibleRange(host->GetId(), start, end);
+    for (auto iter = scrollPlaceholderItems_.begin(); iter != scrollPlaceholderItems_.end();) {
+        const int32_t index = iter->first;
+        if (InScrollPhVisibleRange(start, end, index)) {
+            ++iter;
+            continue;
+        }
+        manager->CancelRealBuildTask(host->GetId(), index, ScrollPlaceholderCancelReason::OUT_OF_RANGE);
+        RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
+        iter = scrollPlaceholderItems_.erase(iter);
+    }
+}
+void WaterFlowPattern::ReconcileScrollPlaceholderItems()
+{
+    // Layout-round reconcile: placeholders whose index already holds a real
+    // child (normal-path rebuild after data change) or fell out of range are
+    // dropped; shells of committed items are retired after the replacement
+    // layout finished (removed outside the transaction, per the commit ordering).
+    // The orphan sweep at the end also runs with both tables empty: an empty
+    // table with a mounted shell is exactly the residual it exists to catch.
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    int32_t totalCount = host->GetTotalChildCount();
+    for (auto iter = scrollPlaceholderItems_.begin(); iter != scrollPlaceholderItems_.end();) {
+        if (iter->second.shell) {
+            scroll_placeholder_mount::LogScrollPlaceholderShellState(host, iter->first, iter->second.shell);
+        }
+        bool drop = iter->first >= totalCount ||
+            (host->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(iter->first)) != nullptr);
+        if (drop) {
+            RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
+            iter = scrollPlaceholderItems_.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
+    for (auto& [shell, templateId] : retiringPlaceholderShells_) {
+        RetireScrollPlaceholderShell(shell, templateId);
+    }
+    retiringPlaceholderShells_.clear();
+    SweepOrphanPlaceholderShells();
+}
+
+void WaterFlowPattern::SweepOrphanPlaceholderShells()
+{
+    // Shells carry a zero frame count, so index-based cleanup (data shrink child
+    // removal, syntax rebuilds) never touches them: every retirement goes through
+    // the two tables. This sweep closes the residual path — a shell still mounted
+    // on the host (per the mounted-shell registry) that neither table tracks (a
+    // missed erase/retire somewhere) is retired here, with the template id from the
+    // registry so the content still finds its way back to the instance pool.
+    if (mountedPlaceholderShells_.empty()) {
+        return;
+    }
+    std::set<const FrameNode*> tracked;
+    for (const auto& [index, info] : scrollPlaceholderItems_) {
+        if (info.shell) {
+            tracked.insert(AceType::RawPtr(info.shell));
+        }
+    }
+    for (const auto& [shell, templateId] : retiringPlaceholderShells_) {
+        if (shell) {
+            tracked.insert(AceType::RawPtr(shell));
+        }
+    }
+    std::vector<std::pair<RefPtr<FrameNode>, std::string>> orphans;
+    for (const auto& [shell, templateId] : mountedPlaceholderShells_) {
+        if (shell && tracked.find(AceType::RawPtr(shell)) == tracked.end()) {
+            orphans.emplace_back(shell, templateId);
+        }
+    }
+    for (auto& [shell, templateId] : orphans) {
+        TAG_LOGD(AceLogTag::ACE_SCROLL, "ScrollPlaceholder orphan shell swept: shellId=%{public}d",
+            shell->GetId());
+        RetireScrollPlaceholderShell(shell, templateId);
+    }
+}
 
 void WaterFlowPattern::OnDetachFromMainTree()
 {
@@ -649,6 +1065,7 @@ void WaterFlowPattern::TriggerPostLayoutEvents()
     auto onJsFrameNodeScrollIndex = eventHub->GetJSFrameNodeOnWaterFlowScrollIndex();
     FireOnScrollIndex(indexChanged, onScrollIndex);
     FireOnScrollIndex(indexChanged, onJsFrameNodeScrollIndex);
+    SweepScrollPlaceholderOutOfRange(layoutInfo_->reportStartIndex_, layoutInfo_->reportEndIndex_);
     if (indexChanged) {
         host->OnAccessibilityEvent(
             AccessibilityEventType::SCROLLING_EVENT, layoutInfo_->reportStartIndex_, layoutInfo_->reportEndIndex_);
@@ -767,6 +1184,9 @@ bool WaterFlowPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dir
     if (config.skipMeasure && config.skipLayout) {
         return false;
     }
+    // Scroll placeholder layout-round reconcile: retire shells whose replacement
+    // layout finished and drop placeholders overtaken by real children.
+    ReconcileScrollPlaceholderItems();
 
     const bool snapLayoutValid = layoutInfo_->isDataValid_ && !layoutInfo_->measureInNextFrame_;
     auto scrollable = GetScrollable();

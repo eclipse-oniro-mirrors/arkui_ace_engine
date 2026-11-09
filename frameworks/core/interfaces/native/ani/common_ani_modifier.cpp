@@ -28,6 +28,8 @@
 #include "base/log/dump_log.h"
 #include "base/memory/ace_type.h"
 #include "core/common/container.h"
+#include "core/common/ace_application_info.h"
+#include "core/common/application_shortcut.h"
 #include "core/common/multi_thread_build_manager.h"
 #include "core/common/thread_checker.h"
 #include "core/components_ng/base/extension_handler.h"
@@ -1338,6 +1340,21 @@ int32_t GetBuilderNodeParentViewId(ani_long nodePtr)
     return NUM_NEG_1;
 }
 
+int32_t RegisterApplicationShortcutInStatic(const std::string& value, uint8_t modifiers,
+    std::function<void(int32_t)>&& callback)
+{
+    return ApplicationShortcutManager::GetInstance().RegisterApplicationShortcut(value, modifiers,
+        [callback = std::move(callback)](int32_t instanceId) {
+            ContainerScope scope(instanceId);
+            callback(instanceId);
+        });
+}
+
+void UnregisterApplicationShortcutInStatic(int32_t registrationId)
+{
+    ApplicationShortcutManager::GetInstance().UnregisterApplicationShortcut(registrationId);
+}
+
 const ArkUIAniCommonModifier* GetCommonAniModifier()
 {
     static const ArkUIAniCommonModifier impl = {
@@ -1440,6 +1457,8 @@ const ArkUIAniCommonModifier* GetCommonAniModifier()
         .modalUIExtensionProxySend = OHOS::Ace::NG::ModalUIExtensionProxySendInStatic,
         .interopProxyNodeConstruct = OHOS::Ace::NG::InteropProxyNodeConstruct,
         .setSafeAreaInset = OHOS::Ace::NG::SetSafeAreaInsetStatic,
+        .registerApplicationShortcut = OHOS::Ace::NG::RegisterApplicationShortcutInStatic,
+        .unregisterApplicationShortcut = OHOS::Ace::NG::UnregisterApplicationShortcutInStatic,
     };
     return &impl;
 }

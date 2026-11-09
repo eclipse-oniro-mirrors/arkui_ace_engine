@@ -14,6 +14,7 @@
  */
 
 #include <atomic>
+#include <cstring>
 #include <functional>
 #include <thread>
 
@@ -436,7 +437,7 @@ HWTEST_F(AccessibilityProviderTestNg, AccessibilityProviderTest001, TestSize.Lev
     g_providerMockResult.Reset();
     ArkUI_AccessibilityProvider accessibilityProvider;
     int32_t ret;
-    ArkUI_AccessibilityProviderCallbacks callBacks;
+    ArkUI_AccessibilityProviderCallbacks callBacks {};
     // callback null
     ret = accessibilityProvider.AccessibilityProviderRegisterCallback(nullptr);
     EXPECT_EQ(ret, ARKUI_ACCESSIBILITY_NATIVE_RESULT_BAD_PARAMETER);
@@ -1027,7 +1028,7 @@ HWTEST_F(AccessibilityProviderTestNg, AccessibilityProviderTest010, TestSize.Lev
 {
     ArkUI_AccessibilityProvider accessibilityProvider;
     int32_t ret = 0;
-    ArkUI_AccessibilityProviderCallbacksWithInstance callBacks;
+    ArkUI_AccessibilityProviderCallbacksWithInstance callBacks {};
     // callback null
     ret = accessibilityProvider.AccessibilityProviderRegisterCallback(nullptr);
     EXPECT_EQ(ret, ARKUI_ACCESSIBILITY_NATIVE_RESULT_BAD_PARAMETER);
@@ -1118,6 +1119,81 @@ HWTEST_F(AccessibilityProviderTestNg, AccessibilityProviderTest011, TestSize.Lev
     EXPECT_EQ(g_providerMockResult.mode_, mode);
     EXPECT_EQ(g_providerMockResult.requestId_, requestId);
     EXPECT_EQ(g_providerMockResult.instanceId_, INSTANCE_ID);
+}
+
+/**
+ * @tc.name: CallbackSnapshotSurvivesReregistration
+ * @tc.desc: A callback can re-register without changing its in-flight instance id or deadlocking.
+ * @tc.type: FUNC
+ */
+HWTEST_F(AccessibilityProviderTestNg, CallbackSnapshotSurvivesReregistration, TestSize.Level1)
+{
+    static ArkUI_AccessibilityProvider* currentProvider = nullptr;
+    ArkUI_AccessibilityProvider provider;
+    currentProvider = &provider;
+    ArkUI_AccessibilityProviderCallbacksWithInstance callbacks {};
+    BuildMockCallBackWithInstance(callbacks);
+    callbacks.clearFocusedFocusAccessibilityNode = [](const char* instanceId) -> int32_t {
+        EXPECT_STREQ(instanceId, "first-instance");
+        ArkUI_AccessibilityProviderCallbacksWithInstance replacement {};
+        BuildMockCallBackWithInstance(replacement);
+        replacement.clearFocusedFocusAccessibilityNode = [](const char* id) -> int32_t {
+            return std::strcmp(id, "second-instance") == 0 ? 0 : -1;
+        };
+        EXPECT_EQ(currentProvider->AccessibilityProviderRegisterCallbackWithInstance("second-instance", &replacement),
+            ARKUI_ACCESSIBILITY_NATIVE_RESULT_SUCCESSFUL);
+        // The original string must remain alive and unchanged until this callback returns.
+        return std::strcmp(instanceId, "first-instance") == 0 ? 0 : -1;
+    };
+    ASSERT_EQ(provider.AccessibilityProviderRegisterCallbackWithInstance("first-instance", &callbacks),
+        ARKUI_ACCESSIBILITY_NATIVE_RESULT_SUCCESSFUL);
+    EXPECT_EQ(provider.ClearFocusedAccessibilityNode(), 0);
+    EXPECT_EQ(provider.ClearFocusedAccessibilityNode(), 0);
+    currentProvider = nullptr;
+}
+
+/**
+ * @tc.name: ConcurrentCallbackRegistration
+ * @tc.desc: Queries always observe a handler and instance id from the same registration.
+ * @tc.type: FUNC
+ */
+HWTEST_F(AccessibilityProviderTestNg, ConcurrentCallbackRegistration, TestSize.Level1)
+{
+    ArkUI_AccessibilityProvider provider;
+    ArkUI_AccessibilityProviderCallbacksWithInstance first {};
+    BuildMockCallBackWithInstance(first);
+    auto second = first;
+    first.clearFocusedFocusAccessibilityNode = [](const char* id) -> int32_t {
+        return std::strcmp(id, "first-instance") == 0 ? 0 : -1;
+    };
+    second.clearFocusedFocusAccessibilityNode = [](const char* id) -> int32_t {
+        return std::strcmp(id, "second-instance-with-a-longer-name") == 0 ? 0 : -1;
+    };
+    ASSERT_EQ(provider.AccessibilityProviderRegisterCallbackWithInstance("first-instance", &first), 0);
+    std::atomic<bool> start { false };
+    std::atomic<int32_t> failures { 0 };
+    std::thread writer([&] {
+        while (!start.load()) {}
+        for (int32_t i = 0; i < 10000; ++i) {
+            provider.AccessibilityProviderRegisterCallbackWithInstance("second-instance-with-a-longer-name", &second);
+            provider.AccessibilityProviderRegisterCallbackWithInstance("first-instance", &first);
+        }
+    });
+    auto query = [&] {
+        while (!start.load()) {}
+        for (int32_t i = 0; i < 20000; ++i) {
+            if (provider.ClearFocusedAccessibilityNode() != 0) {
+                ++failures;
+            }
+        }
+    };
+    std::thread firstReader(query);
+    std::thread secondReader(query);
+    start.store(true);
+    writer.join();
+    firstReader.join();
+    secondReader.join();
+    EXPECT_EQ(failures.load(), 0);
 }
 
 class ThirdProviderPasswordExportTest : public testing::TestWithParam<bool> {

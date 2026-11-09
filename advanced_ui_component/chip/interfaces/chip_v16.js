@@ -1222,8 +1222,8 @@ export class ChipComponent extends ViewPU {
     this.smListener.off('change');
     this.mdListener.off('change');
     this.lgListener.off('change');
-    if (this.environmentCallbackID) {
-      this.getUIContext()?.getHostContext()?.getApplicationContext().off('environment', this.environmentCallbackID);
+    if (this.environmentCallbackID !== undefined) {
+      this.getUIContext()?.getHostContext()?.getApplicationContext()?.off('environment', this.environmentCallbackID);
       this.environmentCallbackID = void 0;
     }
   }
@@ -1786,18 +1786,16 @@ export class ChipComponent extends ViewPU {
     return this.parseLength(height) ?? HOT_SPOT_MIN_HEIGHT;
   }
   getChipResponseRegion() {
-    if (deviceInfo.sdkApiVersion >= 26) {
-      // Large-font scaling (e.g. care mode) can stretch the chip beyond the themed or
-      // user-specified height, so prefer the measured height once layout has happened.
-      const chipHeight = this.actualChipHeight > 0 ? this.actualChipHeight : this.getChipHeight();
-      if (chipHeight < HOT_SPOT_MIN_HEIGHT) {
-        return {
-          x: 0,
-          y: (chipHeight - HOT_SPOT_MIN_HEIGHT) / 2,
-          width: '100%',
-          height: HOT_SPOT_MIN_HEIGHT,
-        };
-      }
+    // Large-font scaling (e.g. care mode) can stretch the chip beyond the themed or
+    // user-specified height, so prefer the measured height once layout has happened.
+    const chipHeight = this.actualChipHeight > 0 ? this.actualChipHeight : this.getChipHeight();
+    if (chipHeight < HOT_SPOT_MIN_HEIGHT) {
+      return {
+        x: 0,
+        y: (chipHeight - HOT_SPOT_MIN_HEIGHT) / 2,
+        width: '100%',
+        height: HOT_SPOT_MIN_HEIGHT,
+      };
     }
     return undefined;
   }

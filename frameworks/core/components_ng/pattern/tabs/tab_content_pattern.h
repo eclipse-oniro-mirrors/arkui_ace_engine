@@ -93,7 +93,7 @@ public:
             auto tabLayoutProperty = AceType::DynamicCast<TabsLayoutProperty>(
                 grandParentNode->GetLayoutProperty());
             CHECK_NULL_VOID(tabLayoutProperty);
-            if (tabLayoutProperty->GetSafeAreaPaddingProperty()) {
+            if (tabLayoutProperty->HasSafeAreaPaddingSource()) {
                 host->GetLayoutProperty()->UpdateSafeAreaExpandOpts({
                     .type = SAFE_AREA_TYPE_SYSTEM,
                     .edges = SAFE_AREA_EDGE_TOP + SAFE_AREA_EDGE_BOTTOM });

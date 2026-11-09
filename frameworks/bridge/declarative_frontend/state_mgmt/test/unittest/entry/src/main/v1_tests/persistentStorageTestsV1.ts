@@ -22,10 +22,10 @@ declare class Utils {
 }
 
 declare interface IStorage {
-  get<T>(key: string): T | undefined;
-  set<T>(key: string, val: T): void;
-  has(key: string): boolean;
-  delete(key: string): void;
+  get<T>(key: string, areaMode?: number): T | undefined;
+  set<T>(key: string, val: T, areaMode?: number): void;
+  has<T>(key: string, areaMode?: number): boolean;
+  delete(key: string, areaMode?: number): void;
   clear(): void;
 }
 
@@ -35,7 +35,7 @@ declare class AppStorage {
 }
 
 declare interface IPropertySubscriber {
-  id__?: number;
+  id__(): number;
 }
 
 declare class SubscribedAbstractProperty<T> {

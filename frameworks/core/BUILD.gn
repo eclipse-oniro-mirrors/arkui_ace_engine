@@ -146,6 +146,7 @@ template("ace_core_source_set") {
 
       # common
       "common/ace_application_info.cpp",
+      "common/application_shortcut.cpp",
       "common/ace_engine.cpp",
       "common/ace_engine_ext.cpp",
       "common/agingadapation/aging_adapation_dialog_util.cpp",
@@ -791,6 +792,7 @@ template("ace_core_ng_source_set") {
 
       # common
       "common/ace_application_info.cpp",
+      "common/application_shortcut.cpp",
       "common/ace_engine.cpp",
       "common/ace_engine_ext.cpp",
       "common/agingadapation/aging_adapation_dialog_util.cpp",

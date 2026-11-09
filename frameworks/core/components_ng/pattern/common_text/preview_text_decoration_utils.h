@@ -32,6 +32,12 @@ struct PreviewDecorationParams {
     PreviewTextStyle underlineStyle = PreviewTextStyle::NORMAL;
     bool isLast = false;
     RSColor color;
+    // Horizontal offset of this segment's left edge within the whole preview-text underline
+    // (0 for the first segment, sum of preceding segments' (right - left) for later ones).
+    // Used to align the dash/wavy phase across consecutive segments so that a multi-line or
+    // multi-rect underline renders as one continuous decoration instead of restarting the
+    // pattern at each segment boundary.
+    float startOffset = 0.0f;
 };
 
 void DrawPreviewTextUnderline(RSCanvas& canvas, const PreviewDecorationParams& params);

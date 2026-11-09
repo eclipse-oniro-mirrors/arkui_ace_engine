@@ -2746,4 +2746,20 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest014, TestSize.Leve
     EXPECT_EQ(pattern->lastSentBrandColorStr_, "#FF0000FF");
 #endif
 }
+
+/**
+ * @tc.name: UIExtensionBrandColorTest015
+ * @tc.desc: Test SetLastSentBrandColorStr updates both brandColorStr_ and lastSentBrandColorStr_
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest015, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetLastSentBrandColorStr("#FF0000FF");
+    EXPECT_EQ(pattern->brandColorStr_, "#FF0000FF");
+    EXPECT_EQ(pattern->lastSentBrandColorStr_, "#FF0000FF");
+#endif
+}
 } // namespace OHOS::Ace::NG

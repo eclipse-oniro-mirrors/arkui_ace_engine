@@ -28,6 +28,7 @@
 #include "base/memory/ace_type.h"
 #include "base/memory/referenced.h"
 #include "core/components_ng/manager/content_change_manager/content_change_manager_impl.h"
+#include "core/components_ng/manager/content_change_manager/page_scene_split_state.h"
 #include "core/pipeline/base/element_register.h"
 #include "core/components_ng/pattern/swiper/swiper_pattern.h"
 #include "core/components_ng/pattern/swiper/swiper_model_ng.h"
@@ -2467,8 +2468,8 @@ HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerStartEventTest003, Test
         return value && value->GetString("$type") == node->GetTag() && value->GetInt("$ID") == node->GetId() &&
                value->GetString("endReason") == "destroyed";
     }))).Times(1);
-    contentChangeMgr->OnContentChangeNodeDestroyed(node->GetId());
-    contentChangeMgr->OnContentChangeNodeDestroyed(node->GetId());
+    contentChangeMgr->OnContentChangeNodeDestroyed(node->GetId(), node->GetTag(), nullptr);
+    contentChangeMgr->OnContentChangeNodeDestroyed(node->GetId(), node->GetTag(), nullptr);
     EXPECT_TRUE(contentChangeMgr->activeContentChanges_.empty());
     EXPECT_TRUE(contentChangeMgr->scrollingNodes_.empty());
     Mock::VerifyAndClearExpectations(mockUiSessionManager);
@@ -2587,7 +2588,7 @@ HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerStartEventTest006, Test
 
     EXPECT_CALL(*mockUiSessionManager,
         ReportContentChangeEvent(ChangeType::SWIPER, HasSubstr("\"endReason\":\"destroyed\""))).Times(1);
-    contentChangeMgr->OnContentChangeNodeDestroyed(swiperNode->GetId());
+    contentChangeMgr->OnContentChangeNodeDestroyed(swiperNode->GetId(), swiperNode->GetTag(), nullptr);
     EXPECT_TRUE(contentChangeMgr->activeContentChanges_.empty());
     EXPECT_TRUE(contentChangeMgr->pendingSwiperChanges_.empty());
     EXPECT_TRUE(contentChangeMgr->changedSwiperNodes_.empty());
@@ -2613,7 +2614,7 @@ HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerStartEventTest006, Test
         return value && value->GetInt("$ID") == tabsNode->GetId() &&
                value->GetString("endReason") == "destroyed";
     }))).Times(1);
-    contentChangeMgr->OnContentChangeNodeDestroyed(tabsSwiperNode->GetId());
+    contentChangeMgr->OnContentChangeNodeDestroyed(tabsSwiperNode->GetId(), tabsSwiperNode->GetTag(), nullptr);
     EXPECT_TRUE(contentChangeMgr->activeContentChanges_.empty());
     EXPECT_TRUE(contentChangeMgr->pendingSwiperChanges_.empty());
     EXPECT_TRUE(contentChangeMgr->changedSwiperNodes_.empty());
@@ -2734,7 +2735,7 @@ HWTEST_F(ContentChangeManagerTestNg, DestroyedTabsClearsDeferredEnd, TestSize.Le
         EXPECT_CALL(*mockUiSessionManager,
             ReportContentChangeEvent(ChangeType::TABS, HasSubstr("\"endReason\":\"destroyed\"")))
             .Times(reportStartEvent ? 1 : 0);
-        contentChangeMgr->OnContentChangeNodeDestroyed(tabs->GetId());
+        contentChangeMgr->OnContentChangeNodeDestroyed(tabs->GetId(), tabs->GetTag(), nullptr);
         EXPECT_TRUE(contentChangeMgr->activeContentChanges_.empty());
         EXPECT_TRUE(contentChangeMgr->pendingSwiperChanges_.empty());
         EXPECT_TRUE(contentChangeMgr->changedSwiperNodes_.empty());
@@ -3043,7 +3044,7 @@ HWTEST_F(ContentChangeManagerTestNg, CapiOverlayReportsEveryCallAcrossRegistrati
     ASSERT_NE(id, 0U);
     manager->ReportCapiOverlayEvent(popup, false, "popup");
     manager->ReportCapiOverlayEvent(popup, true, "popup");
-    manager->OnContentChangeNodeDestroyed(popup->GetId());
+    manager->OnContentChangeNodeDestroyed(popup->GetId(), popup->GetTag(), nullptr);
     manager->ReportCapiOverlayEvent(popup, false, "popup");
     manager->ReportCapiOverlayEvent(popup, false, "popup");
     EXPECT_EQ(state.types, (std::vector<uint32_t> { OVERLAY_HIDE, OVERLAY_SHOW, OVERLAY_HIDE, OVERLAY_HIDE }));
@@ -3098,10 +3099,10 @@ HWTEST_F(ContentChangeManagerTestNg, CapiDestroyedActiveNodesReportEndOnce, Test
     manager->OnContentChangeStart(page, ChangeType::PAGE);
     manager->OnScrollChangeStart(scroll);
     manager->OnContentChangeStart(scroll, ChangeType::SCROLL);
-    manager->OnContentChangeNodeDestroyed(page->GetId());
-    manager->OnContentChangeNodeDestroyed(scroll->GetId());
-    manager->OnContentChangeNodeDestroyed(page->GetId());
-    manager->OnContentChangeNodeDestroyed(scroll->GetId());
+    manager->OnContentChangeNodeDestroyed(page->GetId(), page->GetTag(), nullptr);
+    manager->OnContentChangeNodeDestroyed(scroll->GetId(), scroll->GetTag(), nullptr);
+    manager->OnContentChangeNodeDestroyed(page->GetId(), page->GetTag(), nullptr);
+    manager->OnContentChangeNodeDestroyed(scroll->GetId(), scroll->GetTag(), nullptr);
     EXPECT_EQ(state.types, (std::vector<uint32_t> { PAGE_START, SCROLL_START, PAGE_END, SCROLL_END }));
     EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
 }
@@ -3126,8 +3127,8 @@ HWTEST_F(ContentChangeManagerTestNg, CapiDetachWithoutStartPreservesNormalPendin
     auto swiper = FrameNode::CreateFrameNode("Swiper", SWIPER_NODE_ID, AceType::MakeRefPtr<Pattern>(), true);
     manager->OnScrollChangeStart(scroll);
     manager->OnSwiperChangeEnd(swiper, false);
-    manager->OnContentChangeNodeDestroyed(scroll->GetId());
-    manager->OnContentChangeNodeDestroyed(swiper->GetId());
+    manager->OnContentChangeNodeDestroyed(scroll->GetId(), scroll->GetTag(), nullptr);
+    manager->OnContentChangeNodeDestroyed(swiper->GetId(), swiper->GetTag(), nullptr);
     manager->capiImpl_->FlushCapiSwiperEndEvents();
     EXPECT_EQ(state.types, (std::vector<uint32_t> { SWIPER_END }));
     EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
@@ -3163,7 +3164,7 @@ HWTEST_F(ContentChangeManagerTestNg, CapiSwiperFlushCanRevokeLaterEvent, TestSiz
             }
             state.onEvent = nullptr;
             if (destroy) {
-                manager->OnContentChangeNodeDestroyed(second->GetId());
+                manager->OnContentChangeNodeDestroyed(second->GetId(), second->GetTag(), nullptr);
             } else {
                 manager->OnSwiperChangeCancel(second, false);
             }
@@ -3440,7 +3441,7 @@ HWTEST_F(ContentChangeManagerTestNg, CapiScrollSourceSurvivesSubscriptionGap, Te
     manager->OnScrollChangeEnd(node);
     EXPECT_TRUE(manager->capiImpl_->capiScrollSources_.empty());
     manager->MarkCapiScrollToEventSource(node->GetId());
-    manager->OnContentChangeNodeDestroyed(node->GetId());
+    manager->OnContentChangeNodeDestroyed(node->GetId(), node->GetTag(), nullptr);
     EXPECT_TRUE(manager->capiImpl_->capiScrollSources_.empty());
 }
 
@@ -3462,8 +3463,8 @@ HWTEST_F(ContentChangeManagerTestNg, DetachedSwiperWithoutStartClearsPending, Te
         V2::SWIPER_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<SwiperPattern>());
     manager->OnSwiperChangeEnd(released, false);
     manager->OnSwiperChangeEnd(retained, false);
-    manager->OnContentChangeNodeDestroyed(released->GetId());
-    manager->OnContentChangeNodeDestroyed(retained->GetId());
+    manager->OnContentChangeNodeDestroyed(released->GetId(), released->GetTag(), nullptr);
+    manager->OnContentChangeNodeDestroyed(retained->GetId(), retained->GetTag(), nullptr);
     WeakPtr<FrameNode> weak = released;
     released.Reset();
     ASSERT_TRUE(weak.Invalid());
@@ -3658,7 +3659,7 @@ HWTEST_F(ContentChangeManagerTestNg, CapiCancelTerminatesAllSubscriptions, TestS
         manager->OnSwiperChangeStart(swiper, false);
         manager->OnSwiperChangeEnd(swiper, false);
         manager->OnSwiperChangeCancel(swiper, false);
-        manager->OnContentChangeNodeDestroyed(swiper->GetId());
+        manager->OnContentChangeNodeDestroyed(swiper->GetId(), swiper->GetTag(), nullptr);
         manager->OnVsyncEnd(RectF());
         EXPECT_EQ(a.types, start ? (std::vector<uint32_t> { SWIPER_START, SWIPER_CANCEL }) : std::vector<uint32_t>());
         EXPECT_TRUE(b.types.empty());
@@ -3706,8 +3707,8 @@ HWTEST_F(ContentChangeManagerTestNg, CapiScrollDetachKeepsSubscriptionPairing, T
     auto lateId = manager->RegisterCapiContentChangeEvent(
         true, SCROLL_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &late },
         CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
-    manager->OnContentChangeNodeDestroyed(first->GetId());
-    manager->OnContentChangeNodeDestroyed(first->GetId());
+    manager->OnContentChangeNodeDestroyed(first->GetId(), first->GetTag(), nullptr);
+    manager->OnContentChangeNodeDestroyed(first->GetId(), first->GetTag(), nullptr);
     EXPECT_EQ(a.types, (std::vector<uint32_t> { SCROLL_START, SCROLL_START, SCROLL_END }));
     EXPECT_EQ(b.types, (std::vector<uint32_t> { SCROLL_END }));
     EXPECT_TRUE(late.types.empty());
@@ -3746,8 +3747,8 @@ HWTEST_F(ContentChangeManagerTestNg, CapiTabsDetachPreservesNormalPendingForFals
     swiper->MountToParent(tabs);
     manager->OnSwiperChangeStart(swiper, true);
     manager->OnSwiperChangeEnd(swiper, true);
-    manager->OnContentChangeNodeDestroyed(tabs->GetId());
-    manager->OnContentChangeNodeDestroyed(swiper->GetId());
+    manager->OnContentChangeNodeDestroyed(tabs->GetId(), tabs->GetTag(), nullptr);
+    manager->OnContentChangeNodeDestroyed(swiper->GetId(), swiper->GetTag(), nullptr);
     EXPECT_EQ(a.types, (std::vector<uint32_t> { TABS_START, TABS_END }));
     EXPECT_EQ(b.types, (std::vector<uint32_t> { TABS_END }));
     manager->capiImpl_->FlushCapiSwiperEndEvents();
@@ -4073,13 +4074,15 @@ HWTEST_F(ContentChangeManagerTestNg, CapiDestroyedPageUsesCachedMetadataWithoutR
     page.Reset();
     EXPECT_EQ(weakPage.Upgrade(), nullptr);
     EXPECT_EQ(weakChild.Upgrade(), nullptr);
-    manager->OnContentChangeNodeDestroyed(PAGE_NODE_ID);
+    // The original nodes are gone; deliver the destruction notification with a
+    // same-ID node, matching the real path where the node is already detached.
+    manager->OnContentChangeNodeDestroyed(PAGE_NODE_ID, "page", nullptr);
     EXPECT_EQ(state.types, (std::vector<uint32_t> { PAGE_START, PAGE_END }));
     auto json = JsonUtil::ParseJsonString(state.json);
     EXPECT_EQ(json->GetInt("eventType"), PAGE_END);
     EXPECT_EQ(json->GetValue("targetNode")->GetString("id"), std::to_string(PAGE_NODE_ID));
     EXPECT_TRUE(json->GetValue("subtree")->IsNull());
-    manager->OnContentChangeNodeDestroyed(PAGE_NODE_ID);
+    manager->OnContentChangeNodeDestroyed(PAGE_NODE_ID, "page", nullptr);
     EXPECT_EQ(state.types.size(), PAIRED_EVENT_COUNT);
     EXPECT_TRUE(manager->capiImpl_->capiSubscriptions_.at(id)->starts.empty());
     EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
@@ -4110,7 +4113,7 @@ HWTEST_F(ContentChangeManagerTestNg, CapiStartAndDestroyedEndDoNotTraverseChildr
     manager->OnContentChangeStart(page, ChangeType::PAGE);
     EXPECT_EQ(probe->reads, 0U);
     EXPECT_TRUE(JsonUtil::ParseJsonString(state.json)->GetValue("subtree")->IsNull());
-    manager->OnContentChangeNodeDestroyed(page->GetId());
+    manager->OnContentChangeNodeDestroyed(page->GetId(), page->GetTag(), nullptr);
     EXPECT_EQ(probe->reads, 0U);
     EXPECT_TRUE(JsonUtil::ParseJsonString(state.json)->GetValue("subtree")->IsNull());
     manager->OnContentChangeStart(page, ChangeType::PAGE);
@@ -4455,7 +4458,7 @@ HWTEST_F(ContentChangeManagerTestNg, CapiNormalPageEndUsesFreshTreeAndReleasesCa
     auto json = JsonUtil::ParseJsonString(state.json);
     EXPECT_EQ(json->GetValue("subtree")->GetValue("children")->GetArraySize(), 1);
     EXPECT_TRUE(cache.expired());
-    manager->OnContentChangeNodeDestroyed(PAGE_NODE_ID);
+    manager->OnContentChangeNodeDestroyed(page->GetId(), page->GetTag(), nullptr);
     EXPECT_EQ(state.types, (std::vector<uint32_t> { PAGE_START, PAGE_END }));
     EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
 }
@@ -4485,12 +4488,13 @@ HWTEST_F(ContentChangeManagerTestNg, CapiDestroyedTabsUsesCachedLogicalTarget, T
     WeakPtr<FrameNode> weakTabs = tabs;
     tabs.Reset();
     EXPECT_EQ(weakTabs.Upgrade(), nullptr);
-    manager->OnContentChangeNodeDestroyed(TABS_NODE_ID);
+    // The original Tabs node is gone; deliver with a same-ID node as the real detach path does.
+    manager->OnContentChangeNodeDestroyed(TABS_NODE_ID, "Tabs", nullptr);
     EXPECT_EQ(state.types, (std::vector<uint32_t> { TABS_START, TABS_END }));
     auto json = JsonUtil::ParseJsonString(state.json);
     EXPECT_EQ(json->GetValue("targetNode")->GetString("id"), std::to_string(TABS_NODE_ID));
     EXPECT_EQ(json->GetValue("targetNode")->GetString("type"), "Tabs");
-    manager->OnContentChangeNodeDestroyed(SWIPER_NODE_ID);
+    manager->OnContentChangeNodeDestroyed(swiper->GetId(), swiper->GetTag(), nullptr);
     manager->capiImpl_->FlushCapiSwiperEndEvents();
     EXPECT_EQ(state.types.size(), PAIRED_EVENT_COUNT);
     EXPECT_TRUE(manager->capiImpl_->capiSubscriptions_.at(id)->starts.empty());
@@ -4519,14 +4523,14 @@ HWTEST_F(ContentChangeManagerTestNg, CapiCachedDestroyEndPreservesReentrantStart
     state.onEvent = [&](uint32_t type) {
         if (type == PAGE_END) {
             state.onEvent = nullptr;
-            manager->OnContentChangeNodeDestroyed(NODE_NODE_ID);
+            manager->OnContentChangeNodeDestroyed(node->GetId(), node->GetTag(), nullptr);
             manager->OnContentChangeStart(node, ChangeType::SCROLL);
         }
     };
-    manager->OnContentChangeNodeDestroyed(NODE_NODE_ID);
+    manager->OnContentChangeNodeDestroyed(node->GetId(), node->GetTag(), nullptr);
     EXPECT_EQ(state.types, (std::vector<uint32_t> { PAGE_START, SCROLL_START, PAGE_END, SCROLL_END, SCROLL_START }));
     EXPECT_TRUE(manager->capiImpl_->HasCapiContentChangeStart(NODE_NODE_ID, SCROLL_START));
-    manager->OnContentChangeNodeDestroyed(NODE_NODE_ID);
+    manager->OnContentChangeNodeDestroyed(node->GetId(), node->GetTag(), nullptr);
     EXPECT_EQ(state.types.back(), SCROLL_END);
     EXPECT_EQ(state.types.size(), TOTAL_EVENT_COUNT);
     EXPECT_TRUE(manager->capiImpl_->capiSubscriptions_.at(id)->starts.empty());
@@ -4556,7 +4560,7 @@ HWTEST_F(ContentChangeManagerTestNg, CapiCachedDestroyEndSkipsUnregisteredReceiv
     manager->OnContentChangeStart(node, ChangeType::PAGE);
     manager->OnContentChangeStart(node, ChangeType::SCROLL);
     first.removeId = secondId;
-    manager->OnContentChangeNodeDestroyed(NODE_NODE_ID);
+    manager->OnContentChangeNodeDestroyed(node->GetId(), node->GetTag(), nullptr);
     EXPECT_EQ(first.types, (std::vector<uint32_t> { PAGE_START, SCROLL_START, PAGE_END, SCROLL_END }));
     EXPECT_EQ(second.types, (std::vector<uint32_t> { PAGE_START, SCROLL_START }));
     EXPECT_EQ(second.releases, 1);
@@ -4603,7 +4607,7 @@ HWTEST_F(ContentChangeManagerTestNg, CapiCachedEndReleasedOnCancelUnregisterAndI
     cache = manager->capiImpl_->capiSubscriptions_.at(third)->starts.at({ SWIPER_NODE_ID, SWIPER_START });
     manager->InvalidateCapiContentChangeSubscriptions();
     EXPECT_TRUE(cache.expired());
-    manager->OnContentChangeNodeDestroyed(SWIPER_NODE_ID);
+    manager->OnContentChangeNodeDestroyed(swiper->GetId(), swiper->GetTag(), nullptr);
     EXPECT_EQ(state.types,
         (std::vector<uint32_t> { SWIPER_START, SWIPER_START, SWIPER_CANCEL, SWIPER_CANCEL, SWIPER_START,
         SWIPER_START, SWIPER_START }));
@@ -4803,10 +4807,10 @@ HWTEST_F(ContentChangeManagerTestNg, StrictPairingScrollRemovalCompletesBeforeDe
         manager->OnScrollChangeStart(node);
         manager->OnContentChangeStart(node, ChangeType::SCROLL);
         if (destroyFirst) {
-            manager->OnContentChangeNodeDestroyed(node->GetId());
+            manager->OnContentChangeNodeDestroyed(node->GetId(), node->GetTag(), nullptr);
         }
         pattern->ContentChangeByDetaching(AceType::RawPtr(pipeline));
-        manager->OnContentChangeNodeDestroyed(node->GetId());
+        manager->OnContentChangeNodeDestroyed(node->GetId(), node->GetTag(), nullptr);
         pattern->ContentChangeReport(node);
         EXPECT_EQ(state.types, (std::vector<uint32_t> { SCROLL_START, SCROLL_END }));
     }
@@ -4871,7 +4875,7 @@ HWTEST_F(ContentChangeManagerTestNg, StrictPairingPendingDestroyCannotConsumeNew
         V2::SWIPER_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<SwiperPattern>());
     manager->OnSwiperChangeStart(swiper, false);
     manager->OnSwiperChangeEnd(swiper, false);
-    manager->OnContentChangeNodeDestroyed(swiper->GetId());
+    manager->OnContentChangeNodeDestroyed(swiper->GetId(), swiper->GetTag(), nullptr);
     manager->OnSwiperChangeStart(swiper, false);
     manager->capiImpl_->FlushCapiSwiperEndEvents();
     EXPECT_EQ(state.types, (std::vector<uint32_t> { SWIPER_START, SWIPER_END, SWIPER_START }));
@@ -5282,7 +5286,7 @@ HWTEST_F(ContentChangeManagerTestNg, CapiAutoPlayDropsPendingEndAndRecoversWhenD
     manager->OnSwiperChangeCancel(node, false);
     manager->CompleteCapiSwiperChangeWithoutMove(node, false);
     manager->OnSwiperChangeInterrupted(node, false);
-    manager->OnContentChangeNodeDestroyed(node->GetId());
+    manager->OnContentChangeNodeDestroyed(node->GetId(), node->GetTag(), nullptr);
     manager->OnVsyncEnd(RectF());
     EXPECT_EQ(a.types, (std::vector<uint32_t> { SWIPER_START }));
     EXPECT_TRUE(b.types.empty());
@@ -5424,16 +5428,17 @@ HWTEST_F(ContentChangeManagerTestNg, EndOnlyDetachCompletesActivityOnce, TestSiz
             swiper->MountToParent(tabs);
         }
         manager->OnScrollRemoved(scroll->GetId());
-        manager->OnContentChangeNodeDestroyed(swiper->GetId());
+        manager->OnContentChangeNodeDestroyed(swiper->GetId(), swiper->GetTag(), nullptr);
         EXPECT_TRUE(state.types.empty());
         manager->OnContentChangeStart(scroll, ChangeType::SCROLL);
         manager->OnSwiperChangeStart(swiper, isTabs);
         EXPECT_TRUE(state.types.empty());
         manager->OnSwiperChangeInterrupted(swiper, isTabs);
         manager->OnScrollRemoved(scroll->GetId());
-        manager->OnContentChangeNodeDestroyed(isTabs ? tabs->GetId() : swiper->GetId());
-        manager->OnContentChangeNodeDestroyed(scroll->GetId());
-        manager->OnContentChangeNodeDestroyed(swiper->GetId());
+        manager->OnContentChangeNodeDestroyed((isTabs ? tabs : swiper)->GetId(),
+            (isTabs ? tabs : swiper)->GetTag(), nullptr);
+        manager->OnContentChangeNodeDestroyed(scroll->GetId(), scroll->GetTag(), nullptr);
+        manager->OnContentChangeNodeDestroyed(swiper->GetId(), swiper->GetTag(), nullptr);
         manager->OnVsyncEnd(RectF());
         EXPECT_EQ(state.types, (std::vector<uint32_t> { SCROLL_END, isTabs ? TABS_END : SWIPER_END }));
         EXPECT_TRUE(manager->capiImpl_->capiSubscriptions_.at(id)->starts.empty());
@@ -5459,7 +5464,7 @@ HWTEST_F(ContentChangeManagerTestNg, CanceledPageDoesNotCompleteOnDestroy, TestS
             "Navigation", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
         manager->OnContentChangeStart(page, ChangeType::PAGE);
         manager->OnContentChangeInterrupted(page, ChangeType::PAGE, false);
-        manager->OnContentChangeNodeDestroyed(page->GetId());
+        manager->OnContentChangeNodeDestroyed(page->GetId(), page->GetTag(), nullptr);
         EXPECT_EQ(state.types, withStart ? (std::vector<uint32_t> { PAGE_START }) : std::vector<uint32_t>());
         state.types.clear();
         manager->OnContentChangeStart(page, ChangeType::PAGE);
@@ -5658,7 +5663,7 @@ HWTEST_F(ContentChangeManagerTestNg, CachedPageEndConsumesOnlyOutstandingActivit
         manager->OnContentChangeStart(page, ChangeType::PAGE);
         manager->ReportCapiPageEndEventFromCache(nodeId);
         manager->ReportCapiPageEndEventFromCache(nodeId);
-        manager->OnContentChangeNodeDestroyed(nodeId);
+        manager->OnContentChangeNodeDestroyed(page->GetId(), page->GetTag(), nullptr);
         EXPECT_EQ(state.types, withStart ? (std::vector<uint32_t> { PAGE_START, PAGE_END }) :
             (std::vector<uint32_t> { PAGE_END }));
         auto json = JsonUtil::ParseJsonString(state.json);
@@ -5708,6 +5713,628 @@ HWTEST_F(ContentChangeManagerTestNg, OverlayHideSnapshotUsesCurrentSubscriptions
     EXPECT_EQ(json->GetString("overlayType"), "overlay");
     EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(lateId));
     EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(pageId));
+}
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneSplit_WeakIndexAndZeroRescan, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    auto root = FrameNode::CreateFrameNode("Row", 99001, AceType::MakeRefPtr<Pattern>());
+    auto probe = AceType::MakeRefPtr<CapiTreeReadProbe>(99002);
+    auto child = FrameNode::CreateFrameNode("Column", 99003, AceType::MakeRefPtr<Pattern>());
+    root->AddChild(probe);
+    probe->AddChild(child);
+    manager->SeedPageSceneSplitNodes({ root });
+    EXPECT_EQ(manager->GetPageSceneSplitSeedVisits(), 0u);
+    manager->ConfigurePageSceneSplitTracking({ "Column" }, false);
+    manager->SeedPageSceneSplitNodes({ root });
+    auto visits = manager->GetPageSceneSplitSeedVisits();
+    auto reads = probe->reads;
+    ASSERT_EQ(manager->GetPageSceneSplitNodes().size(), 1u);
+    manager->SeedPageSceneSplitNodes({ root });
+    manager->GetPageSceneSplitNodes();
+    EXPECT_EQ(manager->GetPageSceneSplitSeedVisits(), visits);
+    EXPECT_EQ(probe->reads, reads);
+    auto added = FrameNode::CreateFrameNode("Column", 99004, AceType::MakeRefPtr<Pattern>());
+    probe->AddChild(added);
+    manager->NotifyPageSceneSplitNodeChanged(added, true);
+    EXPECT_EQ(manager->GetPageSceneSplitNodes().size(), 2u);
+    manager->RemovePageSceneSplitNode(child->GetId());
+    EXPECT_EQ(manager->GetPageSceneSplitNodes().size(), 1u);
+    manager->ConfigurePageSceneSplitTracking({}, false);
+    EXPECT_TRUE(manager->GetPageSceneSplitNodes().empty());
+    EXPECT_FALSE(manager->IsPageSceneSplitTracking());
+}
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneSplit_StableGateAndIrrelevantNodes, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    auto root = FrameNode::CreateFrameNode("Row", 99101, AceType::MakeRefPtr<Pattern>());
+    auto child = FrameNode::CreateFrameNode("Column", 99102, AceType::MakeRefPtr<Pattern>());
+    auto other = FrameNode::CreateFrameNode("Text", 99103, AceType::MakeRefPtr<Pattern>());
+    root->AddChild(child);
+    root->AddChild(other);
+    manager->ConfigurePageSceneSplitTracking({ "Column" }, false);
+    manager->SeedPageSceneSplitNodes({ root });
+    int calls = 0;
+    manager->SetPageSceneSplitDetector([&calls]() { ++calls; });
+    manager->scrollingNodes_.insert(100);
+    manager->FlushPageSceneSplitDetection();
+    EXPECT_EQ(calls, 0);
+    manager->scrollingNodes_.clear();
+    manager->FlushPageSceneSplitDetection();
+    EXPECT_EQ(calls, 1);
+    manager->NotifyPageSceneSplitNodeChanged(other);
+    manager->FlushPageSceneSplitDetection();
+    EXPECT_EQ(calls, 1);
+    manager->NotifyPageSceneSplitNodeChanged(root);
+    manager->FlushPageSceneSplitDetection();
+    EXPECT_EQ(calls, 2);
+    manager->FlushPageSceneSplitDetection();
+    EXPECT_EQ(calls, 2);
+}
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneSplit_PageReplacementReleasesCandidates, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    auto first = FrameNode::CreateFrameNode("Column", 99201, AceType::MakeRefPtr<Pattern>());
+    auto second = FrameNode::CreateFrameNode("Column", 99202, AceType::MakeRefPtr<Pattern>());
+    manager->ConfigurePageSceneSplitTracking({ "Column" }, false);
+    manager->SeedPageSceneSplitNodes({ first });
+    auto oldVisits = manager->GetPageSceneSplitSeedVisits();
+    manager->SeedPageSceneSplitNodes({ second });
+    auto nodes = manager->GetPageSceneSplitNodes();
+    ASSERT_EQ(nodes.size(), 1u);
+    EXPECT_EQ(nodes[0]->GetId(), second->GetId());
+    EXPECT_GT(manager->GetPageSceneSplitSeedVisits(), oldVisits);
+    nodes.clear();
+    WeakPtr<FrameNode> weak = second;
+    second.Reset();
+    EXPECT_TRUE(weak.Upgrade() == nullptr);
+    EXPECT_TRUE(manager->GetPageSceneSplitNodes().empty());
+}
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneSplit_DetectorCanUnregisterItself, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    manager->ConfigurePageSceneSplitTracking({ "Column" }, false);
+    int calls = 0;
+    manager->SetPageSceneSplitDetector([&]() {
+        ++calls;
+        manager->ConfigurePageSceneSplitTracking({}, false);
+    });
+    manager->FlushPageSceneSplitDetection();
+    EXPECT_EQ(calls, 1);
+    EXPECT_FALSE(manager->IsPageSceneSplitTracking());
+    manager->MarkPageSceneSplitDirty();
+    manager->FlushPageSceneSplitDetection();
+    EXPECT_EQ(calls, 1);
+    manager->ConfigurePageSceneSplitTracking({ "Column" }, false);
+    manager->SetPageSceneSplitDetector([&]() { ++calls; });
+    manager->FlushPageSceneSplitDetection();
+    EXPECT_EQ(calls, 2);
+}
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneSplit_RemovedCandidateReleasesAncestorTracking, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    auto root = FrameNode::CreateFrameNode("Row", 99301, AceType::MakeRefPtr<Pattern>());
+    auto child = FrameNode::CreateFrameNode("Column", 99302, AceType::MakeRefPtr<Pattern>());
+    root->AddChild(child);
+    manager->ConfigurePageSceneSplitTracking({ "Column" }, false);
+    manager->SeedPageSceneSplitNodes({ root });
+    int calls = 0;
+    manager->SetPageSceneSplitDetector([&]() { ++calls; });
+    manager->FlushPageSceneSplitDetection();
+    manager->RemovePageSceneSplitNode(child->GetId());
+    manager->FlushPageSceneSplitDetection();
+    EXPECT_EQ(calls, 2);
+    manager->NotifyPageSceneSplitNodeChanged(root);
+    manager->FlushPageSceneSplitDetection();
+    EXPECT_EQ(calls, 2);
+    EXPECT_TRUE(manager->GetPageSceneSplitNodes().empty());
+}
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneSplit_NavBarAndHomeInvalidateNavigation, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    auto root = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, 99501, AceType::MakeRefPtr<Pattern>());
+    auto nav = FrameNode::CreateFrameNode(V2::NAVIGATION_VIEW_ETS_TAG, 99502, AceType::MakeRefPtr<Pattern>());
+    auto bar = FrameNode::CreateFrameNode(V2::NAVBAR_ETS_TAG, 99503, AceType::MakeRefPtr<Pattern>());
+    auto home = FrameNode::CreateFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, 99504, AceType::MakeRefPtr<Pattern>());
+    auto unrelated = FrameNode::CreateFrameNode(V2::NAVBAR_ETS_TAG, 99505, AceType::MakeRefPtr<Pattern>());
+    root->AddChild(nav);
+    root->AddChild(unrelated);
+    nav->AddChild(bar);
+    nav->AddChild(home);
+    manager->ConfigurePageSceneSplitTracking({}, true);
+    manager->SeedPageSceneSplitNodes({ root });
+    auto visits = manager->GetPageSceneSplitSeedVisits();
+    int calls = 0;
+    manager->SetPageSceneSplitDetector([&calls]() { ++calls; });
+    manager->FlushPageSceneSplitDetection();
+    ASSERT_EQ(calls, 1);
+    for (const auto& dependency : { bar, home }) {
+        dependency->GetLayoutProperty()->UpdateVisibility(VisibleType::INVISIBLE);
+        manager->NotifyPageSceneSplitNodeChanged(dependency);
+        manager->FlushPageSceneSplitDetection();
+    }
+    EXPECT_EQ(calls, 3);
+    manager->NotifyPageSceneSplitNodeChanged(unrelated);
+    manager->FlushPageSceneSplitDetection();
+    EXPECT_EQ(calls, 3);
+    EXPECT_EQ(manager->GetPageSceneSplitSeedVisits(), visits);
+    ASSERT_EQ(manager->GetPageSceneSplitNodes().size(), 1u);
+    EXPECT_EQ(manager->GetPageSceneSplitNodes()[0], nav);
+}
+
+namespace {
+constexpr int32_t BUCKET_ROOT_ID = 99621;
+constexpr int32_t BUCKET_COLUMN_ID = 99622;
+constexpr int32_t BUCKET_TEXT_ID = 99623;
+constexpr size_t SINGLE_BUCKET_NODE = 1;
+} // namespace
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneSplit_TagRemovalDoesNotRescan, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    auto root = FrameNode::CreateFrameNode("Row", BUCKET_ROOT_ID, AceType::MakeRefPtr<Pattern>());
+    auto column = FrameNode::CreateFrameNode("Column", BUCKET_COLUMN_ID, AceType::MakeRefPtr<Pattern>());
+    auto text = FrameNode::CreateFrameNode("Text", BUCKET_TEXT_ID, AceType::MakeRefPtr<Pattern>());
+    root->AddChild(column);
+    root->AddChild(text);
+    manager->ConfigurePageSceneSplitTracking({ "Column", "Text" }, false);
+    manager->SeedPageSceneSplitNodes({ root });
+    const auto visits = manager->GetPageSceneSplitSeedVisits();
+    EXPECT_EQ(manager->GetPageSceneSplitNodes({ "Column" }).size(), SINGLE_BUCKET_NODE);
+    manager->ConfigurePageSceneSplitTracking({ "Column" }, false);
+    manager->SeedPageSceneSplitNodes({ root });
+    EXPECT_EQ(manager->GetPageSceneSplitSeedVisits(), visits);
+    EXPECT_TRUE(manager->GetPageSceneSplitNodes({ "Text" }).empty());
+    auto nodes = manager->GetPageSceneSplitNodes();
+    ASSERT_EQ(nodes.size(), SINGLE_BUCKET_NODE);
+    EXPECT_EQ(nodes.front(), column);
+}
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneSplit_NewTagDiscoversExistingHiddenNode, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    auto root = FrameNode::CreateFrameNode("Row", BUCKET_ROOT_ID, AceType::MakeRefPtr<Pattern>());
+    auto text = FrameNode::CreateFrameNode("Text", BUCKET_TEXT_ID, AceType::MakeRefPtr<Pattern>());
+    text->GetLayoutProperty()->UpdateVisibility(VisibleType::INVISIBLE);
+    root->AddChild(text);
+    manager->ConfigurePageSceneSplitTracking({ "Column" }, false);
+    manager->SeedPageSceneSplitNodes({ root });
+    manager->ConfigurePageSceneSplitTracking({ "Column", "Text" }, false);
+    manager->SeedPageSceneSplitNodes({ root });
+    const auto visits = manager->GetPageSceneSplitSeedVisits();
+    EXPECT_EQ(manager->GetPageSceneSplitNodes({ "Text" }).size(), SINGLE_BUCKET_NODE);
+    text->GetLayoutProperty()->UpdateVisibility(VisibleType::VISIBLE);
+    manager->NotifyPageSceneSplitNodeChanged(text);
+    manager->SeedPageSceneSplitNodes({ root });
+    EXPECT_EQ(manager->GetPageSceneSplitSeedVisits(), visits);
+    auto nodes = manager->GetPageSceneSplitNodes({ "Text" });
+    ASSERT_EQ(nodes.size(), SINGLE_BUCKET_NODE);
+    EXPECT_EQ(nodes.front(), text);
+}
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneSplit_TagDoesNotExcludeWebOrUIExtension, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    auto root = FrameNode::CreateFrameNode("Row", BUCKET_ROOT_ID, AceType::MakeRefPtr<Pattern>());
+    auto web = FrameNode::CreateFrameNode(V2::WEB_ETS_TAG, BUCKET_TEXT_ID, AceType::MakeRefPtr<Pattern>());
+    auto extension = FrameNode::CreateFrameNode(V2::UI_EXTENSION_COMPONENT_ETS_TAG, BUCKET_COLUMN_ID,
+        AceType::MakeRefPtr<Pattern>());
+    auto webColumn = FrameNode::CreateFrameNode("Column", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>());
+    auto extensionColumn = FrameNode::CreateFrameNode("Column", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>());
+    auto boundary = FrameNode::CreateFrameNode(V2::UI_EXTENSION_SURFACE_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    auto boundaryColumn = FrameNode::CreateFrameNode("Column", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>());
+    boundary->SetWindowBoundary();
+    web->AddChild(webColumn);
+    extension->AddChild(extensionColumn);
+    boundary->AddChild(boundaryColumn);
+    root->AddChild(web);
+    root->AddChild(extension);
+    root->AddChild(boundary);
+    manager->ConfigurePageSceneSplitTracking(
+        { "Column", V2::WEB_ETS_TAG, V2::UI_EXTENSION_COMPONENT_ETS_TAG }, false);
+    manager->SeedPageSceneSplitNodes({ root });
+    EXPECT_EQ(manager->GetPageSceneSplitNodes({ V2::WEB_ETS_TAG }),
+        (std::vector<RefPtr<FrameNode>> { web }));
+    EXPECT_EQ(manager->GetPageSceneSplitNodes({ V2::UI_EXTENSION_COMPONENT_ETS_TAG }),
+        (std::vector<RefPtr<FrameNode>> { extension }));
+    EXPECT_EQ(manager->GetPageSceneSplitNodes({ "Column" }).size(), 2u);
+}
+
+namespace {
+constexpr int32_t QUERY_PROCESS_ID = 21001;
+constexpr int32_t NEXT_QUERY_PROCESS_ID = 21002;
+constexpr int32_t QUERY_NODE_ID = 21003;
+} // namespace
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneQuery_RunsWithoutSubscription, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    int completed = 0;
+    int cancelled = 0;
+    manager->DeferPageSceneQuery(
+        QUERY_PROCESS_ID,
+        [&]() {
+            ++completed;
+            return true;
+        },
+        [&]() { ++cancelled; });
+    EXPECT_TRUE(manager->NeedPageSceneDetect());
+    manager->OnVsyncEndInner({});
+    EXPECT_EQ(completed, 1);
+    EXPECT_EQ(cancelled, 0);
+    EXPECT_EQ(manager->GetPendingPageSceneQueryCount(), 0u);
+    EXPECT_FALSE(manager->IsPageSceneSplitTracking());
+    EXPECT_EQ(manager->GetPageSceneSplitSeedVisits(), 0u);
+}
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneQuery_WaitsForStableLayout, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    bool stable = false;
+    int completed = 0;
+    manager->DeferPageSceneQuery(
+        QUERY_PROCESS_ID,
+        [&]() {
+            if (!stable) {
+                return false;
+            }
+            ++completed;
+            return true;
+        },
+        []() {});
+    manager->OnVsyncEndInner({});
+    EXPECT_EQ(completed, 0);
+    EXPECT_EQ(manager->GetPendingPageSceneQueryCount(), 1u);
+    stable = true;
+    manager->OnVsyncEndInner({});
+    manager->OnVsyncEndInner({});
+    EXPECT_EQ(completed, 1);
+    EXPECT_EQ(manager->GetPendingPageSceneQueryCount(), 0u);
+}
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneQuery_TracksNewMotionWithoutSubscription, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    auto node = FrameNode::CreateFrameNode("Scroll", QUERY_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    manager->DeferPageSceneQuery(
+        QUERY_PROCESS_ID, [&]() { return !manager->IsContentChanging(); }, []() {});
+    manager->OnScrollChangeStartInner(node);
+    EXPECT_TRUE(manager->IsScrolling());
+    manager->OnVsyncEndInner({});
+    EXPECT_EQ(manager->GetPendingPageSceneQueryCount(), 1u);
+    manager->OnScrollRemovedInner(QUERY_NODE_ID);
+    manager->OnVsyncEndInner({});
+    EXPECT_EQ(manager->GetPendingPageSceneQueryCount(), 0u);
+}
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneQuery_CancelsOnlyRequestedProcess, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    int cancelled = 0;
+    int completed = 0;
+    manager->DeferPageSceneQuery(
+        QUERY_PROCESS_ID, []() { return false; }, [&]() { ++cancelled; });
+    manager->DeferPageSceneQuery(
+        NEXT_QUERY_PROCESS_ID,
+        [&]() {
+            ++completed;
+            return true;
+        },
+        []() {});
+    manager->CancelPageSceneQuery(QUERY_PROCESS_ID);
+    EXPECT_EQ(cancelled, 1);
+    EXPECT_EQ(manager->GetPendingPageSceneQueryCount(), 1u);
+    manager->FlushPageSceneQueries();
+    EXPECT_EQ(completed, 1);
+    EXPECT_EQ(cancelled, 1);
+}
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneQuery_DestroyCancelsPendingWork, TestSize.Level1)
+{
+    int cancelled = 0;
+    {
+        auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+        manager->DeferPageSceneQuery(
+            QUERY_PROCESS_ID, []() { return false; }, [&]() { ++cancelled; });
+    }
+    EXPECT_EQ(cancelled, 1);
+}
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneQuery_ReentrantReplacementSurvivesFlush, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    int cancelled = 0;
+    int completed = 0;
+    manager->DeferPageSceneQuery(
+        QUERY_PROCESS_ID,
+        [&]() {
+            manager->DeferPageSceneQuery(
+                QUERY_PROCESS_ID,
+                [&]() {
+                    ++completed;
+                    return true;
+                },
+                []() {});
+            return false;
+        },
+        [&]() { ++cancelled; });
+    manager->FlushPageSceneQueries();
+    EXPECT_EQ(cancelled, 1);
+    EXPECT_EQ(manager->GetPendingPageSceneQueryCount(), 1u);
+    manager->FlushPageSceneQueries();
+    EXPECT_EQ(completed, 1);
+    EXPECT_EQ(manager->GetPendingPageSceneQueryCount(), 0u);
+}
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneQuery_DoesNotRecoverUntrackedScrollStart, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    auto pattern = AceType::MakeRefPtr<ScrollPattern>();
+    auto scroll = FrameNode::CreateFrameNode("Scroll", QUERY_NODE_ID, pattern);
+    ASSERT_FALSE(manager->NeedContentChangeReportOrPageSceneDetect());
+    pattern->SetIsScrolling(true);
+    manager->OnScrollChangeStartInner(scroll);
+    EXPECT_FALSE(manager->IsScrolling());
+    manager->DeferPageSceneQuery(
+        QUERY_PROCESS_ID, [&]() { return !manager->IsContentChanging(); }, []() {});
+    manager->OnVsyncEndInner({});
+    EXPECT_EQ(manager->GetPendingPageSceneQueryCount(), 0u);
+    EXPECT_TRUE(pattern->IsScrolling());
+    EXPECT_EQ(manager->GetPageSceneSplitSeedVisits(), 0u);
+}
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneQuery_WaitsForPreviouslyTrackedScroll, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    auto scroll = FrameNode::CreateFrameNode("Scroll", QUERY_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    manager->ConfigurePageSceneSplitTracking({ "Column" }, false);
+    manager->OnScrollChangeStartInner(scroll);
+    ASSERT_TRUE(manager->IsScrolling());
+    int cancelled = 0;
+    manager->DeferPageSceneQuery(
+        QUERY_PROCESS_ID, [&]() { return !manager->IsContentChanging(); }, [&]() { ++cancelled; });
+    manager->OnVsyncEndInner({});
+    EXPECT_EQ(manager->GetPendingPageSceneQueryCount(), 1u);
+    manager->OnScrollRemovedInner(QUERY_NODE_ID);
+    manager->OnVsyncEndInner({});
+    EXPECT_EQ(manager->GetPendingPageSceneQueryCount(), 0u);
+    EXPECT_EQ(cancelled, 0);
+}
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneSplit_OverlayRootsDoNotRescanRetainedPage, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    auto page = FrameNode::CreateFrameNode("Row", 99701, AceType::MakeRefPtr<Pattern>());
+    auto probe = AceType::MakeRefPtr<CapiTreeReadProbe>(99702);
+    auto pane = FrameNode::CreateFrameNode("Column", 99703, AceType::MakeRefPtr<Pattern>());
+    auto overlay = FrameNode::CreateFrameNode("Stack", 99704, AceType::MakeRefPtr<Pattern>());
+    auto overlayPane = FrameNode::CreateFrameNode("Column", 99705, AceType::MakeRefPtr<Pattern>());
+    page->AddChild(probe);
+    probe->AddChild(pane);
+    overlay->AddChild(overlayPane);
+    manager->ConfigurePageSceneSplitTracking({ "Column" }, false);
+    manager->SeedPageSceneSplitNodes({ page });
+    const auto visits = manager->GetPageSceneSplitSeedVisits();
+    const auto reads = probe->reads;
+    manager->SeedPageSceneSplitNodes({ page, overlay });
+    EXPECT_EQ(manager->GetPageSceneSplitNodes().size(), 2u);
+    EXPECT_EQ(manager->GetPageSceneSplitSeedVisits(), visits + 2);
+    EXPECT_EQ(probe->reads, reads);
+    int calls = 0;
+    manager->SetPageSceneSplitDetector([&calls]() { ++calls; });
+    manager->FlushPageSceneSplitDetection();
+    manager->SeedPageSceneSplitNodes({ page });
+    manager->FlushPageSceneSplitDetection();
+    EXPECT_EQ(calls, 2);
+    auto nodes = manager->GetPageSceneSplitNodes();
+    ASSERT_EQ(nodes.size(), 1u);
+    EXPECT_EQ(nodes.front(), pane);
+    EXPECT_EQ(manager->GetPageSceneSplitSeedVisits(), visits + 2);
+    EXPECT_EQ(probe->reads, reads);
+    EXPECT_FALSE(manager->IsPageSceneSplitNodeRelevant(AceType::RawPtr(overlay)));
+    manager->SeedPageSceneSplitNodes({});
+    EXPECT_TRUE(manager->GetPageSceneSplitNodes().empty());
+    EXPECT_FALSE(manager->IsPageSceneSplitNodeRelevant(AceType::RawPtr(page)));
+}
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneSplit_NewRootAndNewTagSeedTheRequiredSubtrees, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    auto page = FrameNode::CreateFrameNode("Row", 99711, AceType::MakeRefPtr<Pattern>());
+    auto column = FrameNode::CreateFrameNode("Column", 99712, AceType::MakeRefPtr<Pattern>());
+    auto text = FrameNode::CreateFrameNode("Text", 99713, AceType::MakeRefPtr<Pattern>());
+    auto overlay = FrameNode::CreateFrameNode("Column", 99714, AceType::MakeRefPtr<Pattern>());
+    page->AddChild(column);
+    page->AddChild(text);
+    manager->ConfigurePageSceneSplitTracking({ "Column" }, false);
+    manager->SeedPageSceneSplitNodes({ page });
+    const auto visits = manager->GetPageSceneSplitSeedVisits();
+    manager->ConfigurePageSceneSplitTracking({ "Column", "Text" }, false);
+    manager->SeedPageSceneSplitNodes({ page, overlay });
+    EXPECT_EQ(manager->GetPageSceneSplitNodes().size(), 3u);
+    EXPECT_EQ(manager->GetPageSceneSplitNodes({ "Column" }).size(), 2u);
+    EXPECT_EQ(manager->GetPageSceneSplitNodes({ "Text" }).size(), 1u);
+    EXPECT_EQ(manager->GetPageSceneSplitSeedVisits(), visits + 4);
+    manager->SeedPageSceneSplitNodes({ overlay, page });
+    EXPECT_EQ(manager->GetPageSceneSplitSeedVisits(), visits + 4);
+}
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneSplit_ReplacedRootIdentityPrunesOldSubtree, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    auto oldRoot = FrameNode::CreateFrameNode("Row", 99721, AceType::MakeRefPtr<Pattern>());
+    auto oldPane = FrameNode::CreateFrameNode("Column", 99722, AceType::MakeRefPtr<Pattern>());
+    oldRoot->AddChild(oldPane);
+    manager->ConfigurePageSceneSplitTracking({ "Column" }, false);
+    manager->SeedPageSceneSplitNodes({ oldRoot });
+    auto newRoot = FrameNode::CreateFrameNode("Row", 99721, AceType::MakeRefPtr<Pattern>());
+    auto newPane = FrameNode::CreateFrameNode("Column", 99723, AceType::MakeRefPtr<Pattern>());
+    newRoot->AddChild(newPane);
+    manager->SeedPageSceneSplitNodes({ newRoot });
+    auto nodes = manager->GetPageSceneSplitNodes();
+    ASSERT_EQ(nodes.size(), 1u);
+    EXPECT_EQ(nodes.front(), newPane);
+    EXPECT_FALSE(manager->splitTracking_->IsInsidePageSceneSplitRoots(oldPane));
+    WeakPtr<FrameNode> weak = oldRoot;
+    oldRoot.Reset();
+    EXPECT_EQ(weak.Upgrade(), nullptr);
+}
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneSplit_SubpipelineSharingManagerCannotDirtyParent, TestSize.Level1)
+{
+    auto parent = MockPipelineContext::GetCurrent();
+    auto manager = parent->GetContentChangeManager();
+    ASSERT_NE(manager, nullptr);
+    auto pane = FrameNode::CreateFrameNode("Column", 99731, AceType::MakeRefPtr<Pattern>());
+    pane->AttachContext(AceType::RawPtr(parent));
+    manager->ConfigurePageSceneSplitTracking({ "Column" }, false);
+    manager->SeedPageSceneSplitNodes({ pane });
+    int calls = 0;
+    manager->SetPageSceneSplitDetector([&calls]() { ++calls; });
+    manager->FlushPageSceneSplitDetection();
+    ASSERT_EQ(calls, 1);
+
+    auto child = AceType::MakeRefPtr<MockPipelineContext>();
+    child->SetIsSubPipeline(true);
+    // The Pipeline mock's SetParentPipeline is empty; reproduce production ownership explicitly.
+    child->contentChangeMgr_ = manager;
+    auto childPane = FrameNode::CreateFrameNode("Column", 99732, AceType::MakeRefPtr<Pattern>());
+    childPane->AttachContext(AceType::RawPtr(child));
+    ASSERT_EQ(child->GetContentChangeManager(), manager);
+    EXPECT_FALSE(ContentChangeManager::IsPageSceneSplitWindowSupported(AceType::RawPtr(child)));
+    manager->NotifyPageSceneSplitNodeChanged(childPane, true);
+    // CheckThreadSafe is always false in the Pipeline mock. Exercise the shared
+    // manager's notification entry with the node's actual context on both paths.
+    manager->NotifyPageSceneSplitNodeChanged(childPane);
+    EXPECT_FALSE(manager->splitTracking_->dirty);
+    manager->FlushPageSceneSplitDetection();
+    EXPECT_EQ(calls, 1);
+    auto nodes = manager->GetPageSceneSplitNodes();
+    ASSERT_EQ(nodes.size(), 1u);
+    EXPECT_EQ(nodes.front(), pane);
+
+    manager->NotifyPageSceneSplitNodeChanged(pane);
+    manager->FlushPageSceneSplitDetection();
+    EXPECT_EQ(calls, 2);
+    manager->ConfigurePageSceneSplitTracking({}, false);
+}
+
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneSplit_InactiveHiddenAncestorRetainsWeakCandidates, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    auto root = FrameNode::CreateFrameNode("Row", BUCKET_ROOT_ID, AceType::MakeRefPtr<Pattern>());
+    auto pane = FrameNode::CreateFrameNode("Column", BUCKET_COLUMN_ID, AceType::MakeRefPtr<Pattern>());
+    root->AddChild(pane);
+    root->SetActive(false);
+    root->GetLayoutProperty()->UpdateVisibility(VisibleType::INVISIBLE);
+    manager->ConfigurePageSceneSplitTracking({ "Column" }, false);
+    manager->SeedPageSceneSplitNodes({ root });
+    const auto visits = manager->GetPageSceneSplitSeedVisits();
+    ASSERT_EQ(manager->GetPageSceneSplitNodes().size(), SINGLE_BUCKET_NODE);
+    int detections = 0;
+    manager->SetPageSceneSplitDetector([&detections]() { ++detections; });
+    manager->FlushPageSceneSplitDetection();
+    root->SetActive(true);
+    root->GetLayoutProperty()->UpdateVisibility(VisibleType::VISIBLE);
+    manager->NotifyPageSceneSplitNodeChanged(root);
+    manager->FlushPageSceneSplitDetection();
+    manager->SeedPageSceneSplitNodes({ root });
+    EXPECT_EQ(manager->GetPageSceneSplitSeedVisits(), visits);
+    EXPECT_EQ(manager->GetPageSceneSplitNodes().front(), pane);
+    constexpr int EXPECTED_DETECTIONS = 2;
+    EXPECT_EQ(detections, EXPECTED_DETECTIONS);
+    manager->ConfigurePageSceneSplitTracking({}, false);
+    EXPECT_FALSE(manager->IsPageSceneSplitTracking());
+    EXPECT_TRUE(manager->GetPageSceneSplitNodes().empty());
+}
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneSplit_RootScopeExcludesAncestors, TestSize.Level1)
+{
+    const auto createNode = [](const char* tag) {
+        return FrameNode::CreateFrameNode(tag, ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<Pattern>());
+    };
+    auto navigation = createNode("Navigation");
+    auto wrapper = createNode("Column");
+    auto page = createNode("Page");
+    auto row = createNode("Row");
+    auto left = createNode("Column");
+    auto right = createNode("Column");
+    navigation->AddChild(wrapper);
+    wrapper->AddChild(page);
+    page->AddChild(left);
+    page->AddChild(row);
+    row->AddChild(right);
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    manager->ConfigurePageSceneSplitTracking({ "Column" }, true);
+    manager->SeedPageSceneSplitNodes({ page });
+    EXPECT_EQ(manager->GetPageSceneSplitNodes(), (std::vector<RefPtr<FrameNode>> { left, right }));
+    EXPECT_TRUE(manager->GetPageSceneSplitNodes({ "Navigation" }).empty());
+    const auto visits = manager->GetPageSceneSplitSeedVisits();
+    manager->NotifyPageSceneSplitNodeChanged(wrapper, true);
+    manager->NotifyPageSceneSplitNodeChanged(navigation, true);
+    manager->SeedPageSceneSplitNodes({ page });
+    EXPECT_EQ(manager->GetPageSceneSplitNodes(), (std::vector<RefPtr<FrameNode>> { left, right }));
+    EXPECT_EQ(manager->GetPageSceneSplitSeedVisits(), visits);
+    manager->ConfigurePageSceneSplitTracking({ "Column", "Row" }, true);
+    manager->SeedPageSceneSplitNodes({ page });
+    EXPECT_EQ(manager->GetPageSceneSplitNodes({ "Row" }), (std::vector<RefPtr<FrameNode>> { row }));
+    manager->SeedPageSceneSplitNodes({ row });
+    EXPECT_EQ(manager->GetPageSceneSplitNodes({ "Column" }), (std::vector<RefPtr<FrameNode>> { right }));
+    EXPECT_EQ(manager->GetPageSceneSplitNodes({ "Row" }), (std::vector<RefPtr<FrameNode>> { row }));
+    EXPECT_TRUE(manager->GetPageSceneSplitNodes({ "Navigation" }).empty());
+}
+
+HWTEST_F(ContentChangeManagerTestNg, PageSceneSplit_OuterAncestorChangesKeepDirtyDependency, TestSize.Level1)
+{
+    constexpr float TRANSPARENT_OPACITY = 0.0f;
+    constexpr float OPAQUE_OPACITY = 1.0f;
+    constexpr float ANCESTOR_OFFSET = 20.0f;
+    auto ancestor = FrameNode::CreateFrameNode("Stack", BUCKET_ROOT_ID, AceType::MakeRefPtr<Pattern>());
+    auto page = FrameNode::CreateFrameNode("Page", BUCKET_TEXT_ID, AceType::MakeRefPtr<Pattern>());
+    auto pane = FrameNode::CreateFrameNode("Column", BUCKET_COLUMN_ID, AceType::MakeRefPtr<Pattern>());
+    ancestor->AddChild(page);
+    page->AddChild(pane);
+    ancestor->SetActive(true);
+    auto manager = AceType::MakeRefPtr<ContentChangeManager>();
+    manager->ConfigurePageSceneSplitTracking({ "Column" }, false);
+    manager->SeedPageSceneSplitNodes({ page });
+    const auto visits = manager->GetPageSceneSplitSeedVisits();
+    EXPECT_TRUE(manager->IsPageSceneSplitNodeRelevant(AceType::RawPtr(ancestor)));
+    int detections = 0;
+    int expectedDetections = 0;
+    manager->SetPageSceneSplitDetector([&detections]() { ++detections; });
+    const auto expectDetection = [&manager, &ancestor, &detections, &expectedDetections]() {
+        manager->NotifyPageSceneSplitNodeChanged(ancestor);
+        manager->FlushPageSceneSplitDetection();
+        EXPECT_EQ(detections, ++expectedDetections);
+    };
+    expectDetection();
+    ancestor->SetActive(false);
+    expectDetection();
+    ancestor->GetLayoutProperty()->UpdateVisibility(VisibleType::INVISIBLE);
+    expectDetection();
+    ancestor->GetRenderContext()->UpdateOpacity(TRANSPARENT_OPACITY);
+    expectDetection();
+    ancestor->GetGeometryNode()->SetFrameOffset(OffsetF(ANCESTOR_OFFSET, ANCESTOR_OFFSET));
+    expectDetection();
+    ancestor->SetActive(true);
+    ancestor->GetLayoutProperty()->UpdateVisibility(VisibleType::VISIBLE);
+    ancestor->GetRenderContext()->UpdateOpacity(OPAQUE_OPACITY);
+    expectDetection();
+    manager->SeedPageSceneSplitNodes({ page });
+    EXPECT_EQ(manager->GetPageSceneSplitSeedVisits(), visits);
+    EXPECT_EQ(manager->GetPageSceneSplitNodes(), (std::vector<RefPtr<FrameNode>> { pane }));
 }
 
 } // namespace OHOS::Ace::NG

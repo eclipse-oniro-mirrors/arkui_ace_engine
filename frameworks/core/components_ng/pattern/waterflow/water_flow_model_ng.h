@@ -68,6 +68,7 @@ public:
     void SetScrollBarColor(const std::optional<Color>& scrollBarColor) override;
     void SetScrollBarWidth(const std::string& value) override;
     void SetSyncLoad(bool syncLoad) override;
+    void SetScrollPlaceholder(ScrollPlaceholderProvider&& provider) override;
     void ParseResObjScrollBarColor(const RefPtr<ResourceObject>& resObj) override;
 
     RefPtr<WaterFlowSections> GetOrCreateWaterFlowSections() override;
@@ -143,6 +144,7 @@ public:
     static void SetFooter(FrameNode* frameNode, std::function<void()>&& footer);
     static void SetSyncLoad(FrameNode* frameNode, bool syncLoad);
     static bool GetSyncLoad(FrameNode* frameNode);
+    static void SetScrollPlaceholder(FrameNode* frameNode, ScrollPlaceholderProvider&& provider);
     void ParseResObjFriction(const RefPtr<ResourceObject>& resObj) override;
     void ParseResObjRowsGap(const RefPtr<ResourceObject>& resObj) override;
     void ParseResObjColumnsGap(const RefPtr<ResourceObject>& resObj) override;

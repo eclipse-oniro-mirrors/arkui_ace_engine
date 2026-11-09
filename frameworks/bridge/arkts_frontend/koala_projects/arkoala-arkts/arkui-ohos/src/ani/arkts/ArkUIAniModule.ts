@@ -426,6 +426,9 @@ export class ArkUIAniModule {
     native static _DestroyWindowFreeContainer(instanceId: KInt): void
 
     // for UIContext
+    native static _RegisterApplicationShortcut(value: string, modifiers: KInt,
+        callback: (instanceId: KInt) => void): KInt
+    native static _UnregisterApplicationShortcut(registrationId: KInt): void
     native static _GetCallingScopeUIContext(): KInt
     native static _GetLastFocusedUIContext(): KInt
     native static _GetLastForegroundUIContext(): KInt

@@ -3632,6 +3632,14 @@
         "name": "OH_ArkUI_RenderNodeUtils_InsertChildAfter"
     },
     {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_RenderNodeUtils_AddChildWithPolicy"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_RenderNodeUtils_InsertChildAfterWithPolicy"
+    },
+    {
         "first_introduced": "20",
         "name": "OH_ArkUI_RenderNodeUtils_RemoveChild"
     },
@@ -7081,19 +7089,19 @@
         "name": "OH_ArkUI_Accessibility_UnregisterAccessibilityHoverEventHandler"
     },
     {
-        "first_introduced": "26.0.0",
+        "first_introduced": "26.0.1",
         "name": "OH_ArkUI_NativeModule_LineSpacingOptions_Create"
     },
     {
-        "first_introduced": "26.0.0",
+        "first_introduced": "26.0.1",
         "name": "OH_ArkUI_NativeModule_LineSpacingOptions_Destroy"
     },
     {
-        "first_introduced": "26.0.0",
+        "first_introduced": "26.0.1",
         "name": "OH_ArkUI_NativeModule_LineSpacingOptions_SetOnlyBetweenLines"
     },
     {
-        "first_introduced": "26.0.0",
+        "first_introduced": "26.0.1",
         "name": "OH_ArkUI_NativeModule_LineSpacingOptions_GetOnlyBetweenLines"
     },
     {
@@ -7703,5 +7711,49 @@
     {
         "first_introduced": "26.1.0",
         "name": "OH_ArkUI_PickerComponentTextStyle_SetOverflow"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_ApplicationShortcut_Register"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_ApplicationShortcut_Unregister"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_Create"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_Destroy"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_SetType"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_GetType"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_SetCharacter"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_GetCharacter"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_SetFunctionKey"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_GetFunctionKey"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_ApplicationShortcutCallbackInfo_GetUIContext"
     }
 ]

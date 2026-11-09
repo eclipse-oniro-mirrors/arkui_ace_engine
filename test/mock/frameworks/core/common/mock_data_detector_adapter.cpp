@@ -22,6 +22,12 @@ void DataDetectorAdapter::SetTextDetectTypes(const std::string& types)
 }
 bool DataDetectorAdapter::ParseOriText(const std::unique_ptr<JsonValue>& entityJson, std::u16string& text)
 {
+    if (entityJson && !entityJson->IsNull() && !entityJson->GetValue("bundleName")->IsNull()) {
+        aiDetectInitialized_ = true;
+        textForAI_ = text;
+        lastTextForAI_ = textForAI_;
+        return true;
+    }
     return false;
 }
 void DataDetectorAdapter::ParseAIResult(const TextDataDetectResult& result, int32_t startPos) {}

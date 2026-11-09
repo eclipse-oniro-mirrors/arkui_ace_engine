@@ -104,7 +104,8 @@ RefPtr<SelectOverlayNode> CreateSelectOverlayNodeForNodeTest(SelectOverlayMode m
     return AceType::DynamicCast<SelectOverlayNode>(SelectOverlayNode::CreateSelectOverlayNode(info, mode));
 }
 
-RefPtr<MockThemeManager> PrepareThemeManagerForNodeTest(const RefPtr<TextOverlayTheme>& textOverlayTheme,
+RefPtr<MockThemeManager> PrepareThemeManagerForNodeTest(
+    const RefPtr<TextOverlayTheme>& textOverlayTheme,
     const RefPtr<SelectTheme>& selectTheme = AceType::MakeRefPtr<SelectTheme>(),
     const RefPtr<IconTheme>& iconTheme = AceType::MakeRefPtr<IconTheme>())
 {
@@ -7313,21 +7314,23 @@ HWTEST_F(SelectOverlayTestNg, SelectOverlayNode_IsShowTranslateOnTargetAPIVersio
 
 /**
  * @tc.name: SelectOverlayNode_GetMenuUiMaterial001
- * @tc.desc: Test GetMenuUiMaterial creates immersive material and updates color mode.
+ * @tc.desc: Test GetMenuUiMaterial creates independent immersive materials for each color mode.
  * @tc.type: FUNC
  */
 HWTEST_F(SelectOverlayTestNg, SelectOverlayNode_GetMenuUiMaterial001, TestSize.Level1)
 {
-    auto& darkMaterial = SelectOverlayNode::GetMenuUiMaterial(ColorMode::DARK);
+    auto darkMaterial = SelectOverlayNode::GetMenuUiMaterial(ColorMode::DARK);
     ASSERT_NE(darkMaterial, nullptr);
     EXPECT_EQ(darkMaterial->GetType(), static_cast<int32_t>(MaterialType::IMMERSIVE));
     ASSERT_NE(darkMaterial->GetImmersiveOptions(), nullptr);
     EXPECT_EQ(darkMaterial->GetImmersiveOptions()->colorMode, ColorMode::DARK);
 
-    auto& lightMaterial = SelectOverlayNode::GetMenuUiMaterial(ColorMode::LIGHT);
+    auto lightMaterial = SelectOverlayNode::GetMenuUiMaterial(ColorMode::LIGHT);
     ASSERT_NE(lightMaterial, nullptr);
     ASSERT_NE(lightMaterial->GetImmersiveOptions(), nullptr);
     EXPECT_EQ(lightMaterial->GetImmersiveOptions()->colorMode, ColorMode::LIGHT);
+    EXPECT_NE(darkMaterial, lightMaterial);
+    EXPECT_EQ(darkMaterial->GetImmersiveOptions()->colorMode, ColorMode::DARK);
 }
 
 /**

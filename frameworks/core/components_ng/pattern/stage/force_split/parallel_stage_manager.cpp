@@ -312,7 +312,9 @@ bool ParallelStageManager::PushPage(const RefPtr<FrameNode>& node, bool needHide
     auto newTopPattern = node->GetPattern<ParallelPagePattern>();
     CHECK_NULL_RETURN(newTopPattern, false);
     newTopPattern->InitOnTouchEvent();
-    if (!stagePattern->GetIsSplit() && !isTopFullScreenPageChanged_) {
+    bool needOperationInSplitMode = needOperationInSplitModeWithFullScreen_;
+    needOperationInSplitModeWithFullScreen_ = false;
+    if (!stagePattern->GetIsSplit() && !needOperationInSplitMode) {
         bool result = StageManager::PushPage(node, needHideLast, needTransition, std::move(pushIntentPageCallback));
         InvalidateRouterColumnNodes();
         auto homePage = GetHomePage();
@@ -654,6 +656,61 @@ bool ParallelStageManager::PopPageInSplitMode(bool needShowNext, bool needTransi
         }
     }
     return true;
+}
+
+void ParallelStageManager::ResetPageLevelDisplaceHomeTypes(
+    const RefPtr<FrameNode>& homePage)
+{
+    CHECK_NULL_VOID(stageNode_);
+    CHECK_NULL_VOID(homePage);
+    auto context = stageNode_->GetContext();
+    CHECK_NULL_VOID(context);
+    auto forceSplitMgr = context->GetForceSplitManager();
+    CHECK_NULL_VOID(forceSplitMgr);
+    if (!forceSplitMgr->IsPageLevelSplitEnabled() ||
+        forceSplitMgr->GetBehaviorMode() != ForceSplitBehaviorMode::DISPLACE) {
+        return;
+    }
+ 
+    for (const auto& child : stageNode_->GetChildren()) {
+        auto page = AceType::DynamicCast<FrameNode>(child);
+        if (!page || page == homePage) {
+            continue;
+        }
+        auto pattern = page->GetPattern<ParallelPagePattern>();
+        if (!pattern || pattern->GetPageType() != RouterPageType::HOME_PAGE) {
+            continue;
+        }
+        // Preserve column ownership; only the active home identity changes.
+        pattern->SetPageType(RouterPageType::DETAIL_PAGE);
+        TAG_LOGI(AceLogTag::ACE_ROUTER,
+            "pageLevelSplit demoteHome, old:%{public}d, new:%{public}d, column:%{public}d",
+            page->GetId(), homePage->GetId(), static_cast<int32_t>(pattern->GetColumnType()));
+    }
+}
+ 
+void ParallelStageManager::ResetPageLevelNavigationHomes(const RefPtr<FrameNode> &homePage)
+{
+    CHECK_NULL_VOID(stageNode_);
+    auto context = stageNode_->GetContext();
+    CHECK_NULL_VOID(context);
+    auto forceSplitMgr = context->GetForceSplitManager();
+    CHECK_NULL_VOID(forceSplitMgr);
+    if (!forceSplitMgr->IsPageLevelSplitEnabled() ||
+        forceSplitMgr->GetBehaviorMode() != ForceSplitBehaviorMode::NAVIGATION) {
+        return;
+    }
+ 
+    for (const auto &child : stageNode_->GetChildren()) {
+        auto page = AceType::DynamicCast<FrameNode>(child);
+        if (!page || page == homePage) {
+            continue;
+        }
+        auto pattern = page->GetPattern<ParallelPagePattern>();
+        if (pattern && pattern->GetPageType() == RouterPageType::HOME_PAGE) {
+            pattern->SetPageType(RouterPageType::DETAIL_PAGE);
+        }
+    }
 }
 
 bool ParallelStageManager::GetPageNumberExcludeRelatedOrPlaceHolderPage(int32_t& pageNumber)
@@ -1123,10 +1180,20 @@ bool ParallelStageManager::OnHomePageDetected(
     CHECK_NULL_RETURN(homePage, false);
     auto homePattern = homePage->GetPattern<ParallelPagePattern>();
     CHECK_NULL_RETURN(homePattern, false);
+
+    // Save the old visible result before changing page type and column ownership.
+    RouterVisiblePages preVisiblePages;
+    if (isVirtualStackBasedSplit) {
+        preVisiblePages = GetRouterVisiblePages();
+    }
+    ResetPageLevelNavigationHomes(homePage);
+    ResetPageLevelDisplaceHomeTypes(homePage);
     homePattern->SetPageType(RouterPageType::HOME_PAGE);
     if (isVirtualStackBasedSplit) {
-        auto preVisiblePages = GetRouterVisiblePages();
         homePattern->SetColumnType(ForceSplitPageColumnType::PRIMARY);
+
+        // PageType and ColumnType participate in column calculation.
+        InvalidateRouterColumnNodes();
         UpdateRouterSplitPlaceholder();
         auto curHomePage = GetHomePage();
         stagePattern->SetHomePage(curHomePage);
@@ -1599,7 +1666,19 @@ bool ParallelStageManager::IsSplitMode() const
     CHECK_NULL_RETURN(stageNode_, false);
     auto stagePattern = stageNode_->GetPattern<ParallelStagePattern>();
     CHECK_NULL_RETURN(stagePattern, false);
-    return stagePattern->GetIsSplit();
+    if (!stagePattern->GetIsSplit()) {
+        return false;
+    }
+    // page-level split switch on: current top page is not in split mode
+    auto context = stageNode_->GetContext();
+    if (!context) {
+        return true;
+    }
+    auto forceSplitMgr = context->GetForceSplitManager();
+    if (!forceSplitMgr) {
+        return true;
+    }
+    return !forceSplitMgr->IsTopPageSplitDisabled();
 }
 
 RefPtr<FrameNode> ParallelStageManager::GetRelatedOrPlaceHolderPage()
@@ -1762,7 +1841,6 @@ bool ParallelStageManager::PushPageInVirtualStackBasedSplit(
     }
     RebuildRouterColumnNodesIfNeeded();
     auto newVisiblePages = GetRouterVisiblePages();
-
     // then build the total child. Build will trigger page create and onAboutToAppear
     newPageNode->Build(nullptr);
 

@@ -841,7 +841,7 @@ void TabsLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
     }
 
     UpdateFloatingBarTransform(layoutWrapper);
-    tabsPattern->ClampTabBarTransformOffset();
+    ClampFloatingBarOffset(layoutWrapper);
 }
 
 void TabsLayoutAlgorithm::UpdateFloatingBarTransform(LayoutWrapper* layoutWrapper) const
@@ -870,17 +870,20 @@ void TabsLayoutAlgorithm::UpdateFloatingBarTransform(LayoutWrapper* layoutWrappe
 
     std::optional<Dimension> offsetX;
     std::optional<Dimension> offsetY;
+    bool isLocalizedOffsetX = false;
     if (isFloatingTopBar_) {
         auto style = layoutProperty->GetBarTopFloatingStyle();
         if (style.has_value()) {
             offsetX = style->offsetX;
             offsetY = style->offsetY;
+            isLocalizedOffsetX = style->isLocalizedOffsetX;
         }
     } else {
         auto style = layoutProperty->GetBarFloatingStyle();
         if (style.has_value()) {
             offsetX = style->offsetX;
             offsetY = style->offsetY;
+            isLocalizedOffsetX = style->isLocalizedOffsetX;
         }
     }
     auto tabsFrameSize = geometryNode->GetFrameSize();
@@ -891,6 +894,9 @@ void TabsLayoutAlgorithm::UpdateFloatingBarTransform(LayoutWrapper* layoutWrappe
     if (offsetX.has_value() && offsetX->NormalizeToPx(scaleProperty.vpScale, scaleProperty.fpScale,
         scaleProperty.lpxScale, tabsFrameSize.Width(), result)) {
         translateX = static_cast<float>(result);
+        if (isLocalizedOffsetX && layoutProperty->GetNonAutoLayoutDirection() == TextDirection::RTL) {
+            translateX = -translateX;
+        }
     }
     if (offsetY.has_value() && offsetY->NormalizeToPx(scaleProperty.vpScale, scaleProperty.fpScale,
         scaleProperty.lpxScale, tabsFrameSize.Height(), result)) {
@@ -899,6 +905,148 @@ void TabsLayoutAlgorithm::UpdateFloatingBarTransform(LayoutWrapper* layoutWrappe
     renderContext->UpdateTransformTranslate({translateX, translateY, 0.0f});
     float scale = isFloatingTopBar_ ? 1.0f : tabsPattern->GetBaseFloatingScale();
     renderContext->UpdateTransformScale({scale, scale});
+}
+
+TabsLayoutAlgorithm::FloatingBarSafeBoundary
+TabsLayoutAlgorithm::GetFloatingBarSafeBoundary(LayoutWrapper* layoutWrapper) const
+{
+    FloatingBarSafeBoundary boundary;
+    CHECK_NULL_RETURN(layoutWrapper, boundary);
+    auto host = layoutWrapper->GetHostNode();
+    CHECK_NULL_RETURN(host, boundary);
+    auto pipeline = host->GetContext();
+    CHECK_NULL_RETURN(pipeline, boundary);
+    auto layoutProperty = layoutWrapper->GetLayoutProperty();
+    CHECK_NULL_RETURN(layoutProperty, boundary);
+    auto geometryNode = layoutWrapper->GetGeometryNode();
+    CHECK_NULL_RETURN(geometryNode, boundary);
+    // 1. Developer-set safeAreaPadding (already in Tabs local coordinates).
+    auto innerSafePadding = layoutProperty->GetOrCreateSafeAreaPadding();
+    boundary.left = innerSafePadding.left.value_or(0.0f);
+    boundary.right = innerSafePadding.right.value_or(0.0f);
+    boundary.top = innerSafePadding.top.value_or(0.0f);
+    boundary.bottom = innerSafePadding.bottom.value_or(0.0f);
+    // 2. Tabs global frame rect (accumulate ancestor frame offsets).
+    OffsetF tabsGlobalOffset = geometryNode->GetFrameRect().GetOffset();
+    auto parent = host->GetAncestorNodeOfFrame(false);
+    while (parent) {
+        auto parentGeo = parent->GetGeometryNode();
+        if (parentGeo) {
+            tabsGlobalOffset += parentGeo->GetFrameRect().GetOffset();
+        }
+        parent = parent->GetAncestorNodeOfFrame(false);
+    }
+    float tabsGlobalLeft = tabsGlobalOffset.GetX();
+    float tabsGlobalTop = tabsGlobalOffset.GetY();
+    float tabsGlobalRight = tabsGlobalLeft + geometryNode->GetFrameSize().Width();
+    float tabsGlobalBottom = tabsGlobalTop + geometryNode->GetFrameSize().Height();
+    // 3. Container-modal title-bar avoidance.
+    int32_t titleHeight = 0;
+    if (pipeline->GetContainerCustomTitleVisible() || pipeline->GetContainerControlButtonVisible()) {
+        titleHeight = pipeline->GetContainerModalTitleHeight();
+    }
+    if (titleHeight > 0 && LessNotEqual(tabsGlobalTop, static_cast<float>(titleHeight))) {
+        boundary.top += static_cast<float>(titleHeight) - tabsGlobalTop;
+    }
+    // 4. expandSafeArea: mirror ExpandHelper (layout_wrapper.cpp). Inset::IsOverlapped
+    //    is inlined (IsValid() && start <= pos <= end) because ace_kit is not linked.
+    ApplyExpandSafeArea(boundary, layoutProperty, pipeline,
+        tabsGlobalLeft, tabsGlobalTop, tabsGlobalRight, tabsGlobalBottom);
+    boundary.left = std::max(0.0f, boundary.left);
+    boundary.right = std::max(0.0f, boundary.right);
+    boundary.top = std::max(0.0f, boundary.top);
+    boundary.bottom = std::max(0.0f, boundary.bottom);
+    return boundary;
+}
+
+void TabsLayoutAlgorithm::ApplyExpandSafeArea(FloatingBarSafeBoundary& boundary,
+    const RefPtr<LayoutProperty>& layoutProperty, PipelineContext* pipeline,
+    float tabsGlobalLeft, float tabsGlobalTop,
+    float tabsGlobalRight, float tabsGlobalBottom) const
+{
+    const auto& opts = layoutProperty->GetSafeAreaExpandOpts();
+    if (!opts || !opts->Expansive()) {
+        return;
+    }
+    auto safeArea = pipeline->GetSafeArea();
+    // TOP: expand = frame.Top() - safeArea.top_.start
+    if ((opts->edges & SAFE_AREA_EDGE_TOP) && safeArea.top_.IsValid() &&
+        GreatOrEqual(tabsGlobalTop, static_cast<float>(safeArea.top_.start)) &&
+        LessOrEqual(tabsGlobalTop, static_cast<float>(safeArea.top_.end))) {
+        boundary.expandTop = tabsGlobalTop - static_cast<float>(safeArea.top_.start);
+        boundary.top += static_cast<float>(safeArea.top_.Length());
+    }
+    // BOTTOM: expand = safeArea.bottom_.end - frame.Bottom()
+    if ((opts->edges & SAFE_AREA_EDGE_BOTTOM) && safeArea.bottom_.IsValid() &&
+        GreatOrEqual(tabsGlobalBottom, static_cast<float>(safeArea.bottom_.start)) &&
+        LessOrEqual(tabsGlobalBottom, static_cast<float>(safeArea.bottom_.end))) {
+        boundary.expandBottom = static_cast<float>(safeArea.bottom_.end) - tabsGlobalBottom;
+        boundary.bottom += static_cast<float>(safeArea.bottom_.Length());
+    }
+    // START: expand = frame.Left() - safeArea.left_.start
+    if ((opts->edges & SAFE_AREA_EDGE_START) && safeArea.left_.IsValid() &&
+        GreatOrEqual(tabsGlobalLeft, static_cast<float>(safeArea.left_.start)) &&
+        LessOrEqual(tabsGlobalLeft, static_cast<float>(safeArea.left_.end))) {
+        boundary.expandLeft = tabsGlobalLeft - static_cast<float>(safeArea.left_.start);
+        boundary.left += static_cast<float>(safeArea.left_.Length());
+    }
+    // END: expand = safeArea.right_.end - frame.Right()
+    if ((opts->edges & SAFE_AREA_EDGE_END) && safeArea.right_.IsValid() &&
+        GreatOrEqual(tabsGlobalRight, static_cast<float>(safeArea.right_.start)) &&
+        LessOrEqual(tabsGlobalRight, static_cast<float>(safeArea.right_.end))) {
+        boundary.expandRight = static_cast<float>(safeArea.right_.end) - tabsGlobalRight;
+        boundary.right += static_cast<float>(safeArea.right_.Length());
+    }
+}
+
+void TabsLayoutAlgorithm::ClampFloatingBarOffset(LayoutWrapper* layoutWrapper) const
+{
+    if (!isFloatingBar_ && !isFloatingTopBar_) {
+        return;
+    }
+    auto host = layoutWrapper->GetHostNode();
+    CHECK_NULL_VOID(host);
+    auto tabsNode = AceType::DynamicCast<TabsNode>(host);
+    CHECK_NULL_VOID(tabsNode);
+    auto tabBar = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
+    CHECK_NULL_VOID(tabBar);
+    auto renderContext = tabBar->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    if (!renderContext->HasTransformTranslate()) {
+        return;
+    }
+    auto translate = renderContext->GetTransformTranslate().value();
+    float offsetX = translate.x.ConvertToPx();
+    float offsetY = translate.y.ConvertToPx();
+    auto tabBarGeo = tabBar->GetGeometryNode();
+    auto tabsGeo = layoutWrapper->GetGeometryNode();
+    CHECK_NULL_VOID(tabBarGeo);
+    CHECK_NULL_VOID(tabsGeo);
+    float barLeft = tabBarGeo->GetFrameOffset().GetX();
+    float barTop = tabBarGeo->GetFrameOffset().GetY();
+    float barWidth = tabBarGeo->GetFrameSize().Width();
+    float barHeight = tabBarGeo->GetFrameSize().Height();
+    float tabsWidth = tabsGeo->GetFrameSize().Width();
+    float tabsHeight = tabsGeo->GetFrameSize().Height();
+
+    auto boundary = GetFloatingBarSafeBoundary(layoutWrapper);
+
+    float postTabsWidth = tabsWidth + boundary.expandLeft + boundary.expandRight;
+    float postTabsHeight = tabsHeight + boundary.expandTop + boundary.expandBottom;
+
+    float minOffsetX = std::max(-barLeft, boundary.left - barLeft);
+    float maxOffsetX = std::min(postTabsWidth - barLeft - barWidth,
+                                postTabsWidth - boundary.right - barLeft - barWidth);
+    float minOffsetY = std::max(-barTop, boundary.top - barTop);
+    float maxOffsetY = std::min(postTabsHeight - barTop - barHeight,
+                                postTabsHeight - boundary.bottom - barTop - barHeight);
+
+    float clampedX = std::clamp(offsetX, minOffsetX, std::max(minOffsetX, maxOffsetX));
+    float clampedY = std::clamp(offsetY, minOffsetY, std::max(minOffsetY, maxOffsetY));
+
+    if (!NearEqual(clampedX, offsetX) || !NearEqual(clampedY, offsetY)) {
+        renderContext->UpdateTransformTranslate({clampedX, clampedY, 0.0f});
+    }
 }
 
 void TabsLayoutAlgorithm::LayoutSidebarForAnimation(LayoutWrapper* layoutWrapper,
@@ -1015,16 +1163,13 @@ void TabsLayoutAlgorithm::UpdateTopBarMargin(LayoutWrapper* layoutWrapper, Offse
     CHECK_NULL_VOID(tabBarGeo);
     auto tabBarSize = tabBarGeo->GetMarginFrameSize();
 
-    auto innerSafePadding = layoutProperty->GetOrCreateSafeAreaPadding();
-    float safeLeft = innerSafePadding.left.value_or(0.0f);
-    float safeRight = innerSafePadding.right.value_or(0.0f);
-    float safeTop = innerSafePadding.top.value_or(0.0f);
-    float safeBottom = innerSafePadding.bottom.value_or(0.0f);
-
-    float minX = safeLeft;
-    float maxX = tabsFrameSize.Width() - tabBarSize.Width() - safeRight;
-    float minY = safeTop;
-    float maxY = tabsFrameSize.Height() - tabBarSize.Height() - safeBottom;
+    auto boundary = GetFloatingBarSafeBoundary(layoutWrapper);
+    float effectiveTabsWidth = tabsFrameSize.Width() + boundary.expandLeft + boundary.expandRight;
+    float effectiveTabsHeight = tabsFrameSize.Height() + boundary.expandTop + boundary.expandBottom;
+    float minX = boundary.left;
+    float maxX = effectiveTabsWidth - tabBarSize.Width() - boundary.right;
+    float minY = boundary.top + barTopMargin;
+    float maxY = effectiveTabsHeight - tabBarSize.Height() - boundary.bottom;
     if (LessNotEqual(maxX, minX)) {
         maxX = minX;
     }

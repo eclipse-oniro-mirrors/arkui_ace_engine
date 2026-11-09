@@ -874,7 +874,7 @@ public:
     Rect GetUIExtensionHostWindowRect() override
     {
         CHECK_NULL_RETURN(IsUIExtensionWindow(), Rect());
-        auto hostWindowId = uiWindow_->GetRealParentId();
+        auto hostWindowId = uiWindow_->GetHostWindowId();
         auto rect = uiWindow_->GetHostWindowRect(hostWindowId);
         return Rect(rect.posX_, rect.posY_, rect.width_, rect.height_);
     }

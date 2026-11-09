@@ -433,6 +433,14 @@ EffectEdge ScrollableModelNG::GetEffectEdge(FrameNode* frameNode)
     return pattern->GetEffectEdge();
 }
 
+int32_t ScrollableModelNG::GetScrollState(FrameNode* frameNode)
+{
+    CHECK_NULL_RETURN(frameNode, -1);
+    const auto& pattern = frameNode->GetPattern<ScrollablePattern>();
+    CHECK_NULL_RETURN(pattern, -1);
+    return static_cast<int32_t>(pattern->GetScrollStateForQuery());
+}
+
 void ScrollableModelNG::SetOnReachEnd(FrameNode* frameNode, OnReachEvent&& onReachEnd)
 {
     CHECK_NULL_VOID(frameNode);

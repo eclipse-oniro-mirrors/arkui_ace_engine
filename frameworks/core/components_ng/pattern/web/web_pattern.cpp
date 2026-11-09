@@ -16,14 +16,21 @@
 #include "core/components_ng/pattern/web/web_pattern.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 
+#include "napi/native_api.h"
+
 #include <securec.h>
 #include <algorithm>
 #include <cctype>
+#include <cinttypes>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
 
+#include <atomic>
+#include <mutex>
+#include <set>
 #include <string>
 #include <string_view>
 #include <sstream>
@@ -131,6 +138,7 @@
 #include "web_statusbar_click.h"
 #include "web_pattern.h"
 #include "nweb_handler.h"
+#include "nweb_color_chooser.h"
 #include "web_util.h"
 #include "nweb_hisysevent.h"
 #include "core/interfaces/native/node/menu_item_modifier.h"
@@ -139,6 +147,90 @@
 #endif
 
 namespace OHOS::Ace::NG {
+// Session state shared between the HDS ColorPicker TS callbacks and the
+// WebPattern that opened the picker.
+//
+// Lifetime design — aligned with the existing Web choosers (date/time
+// picker, file chooser, select menu): the callback is STRONGLY owned by the
+// session (their lambdas / result wrappers), the pattern is only WEAKLY
+// referenced, and WebPattern keeps NO member copy:
+// - The TS callbacks (napi_create_function data) carry an OPAQUE SESSION ID,
+//   never a raw pointer, so a callback fired after the session is gone can
+//   never dereference freed memory.
+// - Sessions live in a process-wide registry (map id -> shared_ptr), guarded
+//   by a mutex. A callback looks up its id while holding the lock and copies
+//   the shared_ptr, keeping the session alive for its whole body even if
+//   another thread concurrently erases the entry. A lookup miss means the
+//   session is stale (closed/pattern destroyed) — the callback returns.
+// - Ids are monotonically increasing and never reused (no ABA).
+// - Removal follows one invariant: ERASE = CANCEL. Every created id is
+//   erased exactly once — by the onClose callback, by the open-failure
+//   path, by the next OpenHdsColorPicker (purges leftovers of the previous
+//   picker), or by ~WebPattern — and each erase Cancels the session's
+//   NWeb callback first so the chooser can never hang. No path leaks.
+struct HdsColorPickerSession {
+    WeakPtr<WebPattern> weakPattern;
+    std::shared_ptr<OHOS::NWeb::NWebColorChooserCallback> callback;
+};
+
+namespace {
+std::mutex g_hdsColorPickerSessionMutex;
+std::atomic<uint64_t> g_hdsColorPickerNextSessionId { 1 };
+std::unordered_map<uint64_t, std::shared_ptr<HdsColorPickerSession>>& HdsColorPickerSessionMap()
+{
+    static std::unordered_map<uint64_t, std::shared_ptr<HdsColorPickerSession>> map;
+    return map;
+}
+
+uint64_t CreateHdsColorPickerSession(const WeakPtr<WebPattern>& weakPattern,
+    const std::shared_ptr<OHOS::NWeb::NWebColorChooserCallback>& callback)
+{
+    auto session = std::make_shared<HdsColorPickerSession>();
+    session->weakPattern = weakPattern;
+    session->callback = callback;
+    uint64_t id = g_hdsColorPickerNextSessionId.fetch_add(1);
+    std::lock_guard<std::mutex> lock(g_hdsColorPickerSessionMutex);
+    HdsColorPickerSessionMap()[id] = session;
+    return id;
+}
+
+// Returns a copy of the shared_ptr (keeps the session alive for the caller's
+// whole callback body) or nullptr when the id is stale.
+std::shared_ptr<HdsColorPickerSession> FindHdsColorPickerSession(uint64_t id)
+{
+    std::lock_guard<std::mutex> lock(g_hdsColorPickerSessionMutex);
+    auto& map = HdsColorPickerSessionMap();
+    auto it = map.find(id);
+    return it == map.end() ? nullptr : it->second;
+}
+
+// ERASE = CANCEL: Cancels the session's NWeb callback (so a discarded
+// chooser never hangs) and removes the session from the registry.
+void EraseHdsColorPickerSession(uint64_t id)
+{
+    std::shared_ptr<HdsColorPickerSession> session;
+    {
+        std::lock_guard<std::mutex> lock(g_hdsColorPickerSessionMutex);
+        auto& map = HdsColorPickerSessionMap();
+        auto it = map.find(id);
+        if (it == map.end()) {
+            return;
+        }
+        session = it->second;
+        map.erase(it);
+    }
+    if (session->callback) {
+        session->callback->Cancel();
+    }
+}
+
+void EraseHdsColorPickerSessions(const std::set<uint64_t>& ids)
+{
+    for (uint64_t id : ids) {
+        EraseHdsColorPickerSession(id);
+    }
+}
+} // namespace
 namespace {
 constexpr std::string_view IMAGE_POINTER_CONTEXT_MENU_PATH = "etc/webview/ohos_nweb/context-menu.svg";
 constexpr std::string_view IMAGE_POINTER_ALIAS_PATH = "etc/webview/ohos_nweb/alias.svg";
@@ -761,6 +853,15 @@ WebPattern::~WebPattern()
 {
     TAG_LOGI(AceLogTag::ACE_WEB, "NWEB ~WebPattern start");
     ACE_SCOPED_TRACE("WebPattern::~WebPattern, web id = %d", GetWebId());
+    // Purge any remaining HDS picker sessions created by this pattern.
+    // Normally onClose or the next open already erased them; leftovers (HDS
+    // close never delivered, pattern destroyed mid-picker) go here. A late
+    // TS callback afterwards fails the registry lookup and returns safely —
+    // its data is an id, not a pointer. No leak on any path.
+    if (!hdsColorPickerSessionIds_.empty()) {
+        EraseHdsColorPickerSessions(hdsColorPickerSessionIds_);
+        hdsColorPickerSessionIds_.clear();
+    }
     CleanupWebPatternResource();
     UninitTouchEventListener();
     if (setWebDetachCallback_) {
@@ -12312,6 +12413,342 @@ void WebPattern::RemoveOfflineWebWindowStateChangedCallbackIfNeed(const RefPtr<P
         pipeline->RemoveWindowStateChangedCallback(nodeId);
         offlineWebPipelineContext_ = AceType::WeakClaim(AceType::RawPtr(context));
     }
+}
+
+void WebPattern::OnColorChooserPopup(const std::string& color,
+    const std::vector<OHOS::NWeb::NWebColorSuggestion>& suggestions,
+    std::shared_ptr<OHOS::NWeb::NWebColorChooserCallback> callback)
+{
+    // Single-popup enforcement: purging the previous session CANCELS its
+    // callback (erase = cancel invariant), so a second popup cannot leave
+    // the first chooser hanging.
+    if (!hdsColorPickerSessionIds_.empty()) {
+        EraseHdsColorPickerSessions(hdsColorPickerSessionIds_);
+        hdsColorPickerSessionIds_.clear();
+    }
+    // Call the HDS ColorPicker directly via NAPI on the app's own ArkTS
+    // runtime. If HDS is unavailable (no HSP / no wrapper abc), this fails
+    // gracefully and cancels the callback below — no popup, no hang.
+    bool callbackHandled = false;
+    if (!OpenHdsColorPicker(color, callback, callbackHandled)) {
+        // No path available — cancel so the chooser doesn't hang.
+        if (!callbackHandled && callback) {
+            callback->Cancel();
+        }
+    }
+}
+
+void WebPattern::OnColorChooserClose()
+{
+    TAG_LOGI(AceLogTag::ACE_WEB, "WebPattern::OnColorChooserClose");
+    // Erase = cancel: ends any live session and Cancels its NWeb callback.
+    if (!hdsColorPickerSessionIds_.empty()) {
+        EraseHdsColorPickerSessions(hdsColorPickerSessionIds_);
+        hdsColorPickerSessionIds_.clear();
+    }
+    CloseHdsColorPicker();
+}
+
+bool WebPattern::OpenHdsColorPicker(const std::string& color,
+    std::shared_ptr<OHOS::NWeb::NWebColorChooserCallback> callback, bool& callbackHandled)
+{
+    TAG_LOGI(AceLogTag::ACE_WEB, "WebPattern::OpenHdsColorPicker color:%{public}s", color.c_str());
+    // Close any previously open HDS picker UI. NOTE: do NOT call
+    // CancelHdsColorPicker here — the caller (OnColorChooserPopup) has
+    // purged the previous sessions; CancelHdsColorPicker would only close
+    // the UI, which we do right below anyway.
+    CloseHdsColorPicker();
+    // Purge any leftover sessions from a PREVIOUS picker of this pattern.
+    // Normally onClose already erased them; leftovers (open-failure, HDS
+    // close never delivered) are removed here so nothing accumulates.
+    if (!hdsColorPickerSessionIds_.empty()) {
+        EraseHdsColorPickerSessions(hdsColorPickerSessionIds_);
+        hdsColorPickerSessionIds_.clear();
+    }
+
+    auto env = CreateEnv();
+    if (!env) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "OpenHdsColorPicker: no ark runtime");
+        return false;
+    }
+
+    // The real UIContext from the app's frontend — HdsColorPicker's
+    // openColorPicker(uiContext, ...) requires it to attach its UI.
+    auto engine = EngineHelper::GetCurrentEngine();
+    napi_value uiContext = engine ? engine->GetContextValue() : nullptr;
+    if (!uiContext) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "OpenHdsColorPicker: no UIContext");
+        return false;
+    }
+
+    napi_handle_scope scope = nullptr;
+    if (napi_open_handle_scope(env, &scope) != napi_ok || !scope) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "OpenHdsColorPicker: open scope failed");
+        return false;
+    }
+    // Session created lazily; its registry id is erased by the open-failure
+    // path so every created id is removed exactly once.
+    uint64_t sessionId = 0;
+    auto failGracefully = [this, env, scope, &sessionId, &callbackHandled]() {
+        if (sessionId != 0) {
+            EraseHdsColorPickerSession(sessionId);
+            hdsColorPickerSessionIds_.erase(sessionId);
+            sessionId = 0;
+            callbackHandled = true;
+        }
+        napi_close_handle_scope(env, scope);
+    };
+
+    // 1. Load the TS wrapper (hds_color_picker_wrapper.ets, compiled to abc)
+    //    into the app VM, then call its global entry. The wrapper owns the
+    //    HDS ColorPickerController — C++ only sees __openHdsColorPicker__ /
+    //    __closeHdsColorPicker__, never the HDS module itself.
+    constexpr char HDS_WRAPPER_ABC_PATH[] = "/system/etc/abc/arkui/hds_color_picker_wrapper.abc";
+    napi_status status = napi_generic_failure;
+    {
+        napi_value global = nullptr;
+        napi_get_global(env, &global);
+        napi_value openFn = nullptr;
+        if (global) {
+            napi_get_named_property(env, global, "__openHdsColorPicker__", &openFn);
+        }
+        napi_valuetype openFnType = napi_undefined;
+        if (openFn) {
+            napi_typeof(env, openFn, &openFnType);
+        }
+        if (openFnType != napi_function) {
+            // Wrapper not loaded yet — execute its abc once (idempotent:
+            // globalThis assignment), then re-fetch the entry.
+            auto engine = EngineHelper::GetCurrentEngine();
+            if (!engine) {
+                TAG_LOGW(AceLogTag::ACE_WEB, "OpenHdsColorPicker: no engine for wrapper load");
+                failGracefully();
+                return false;
+            }
+            std::ifstream readFile(HDS_WRAPPER_ABC_PATH, std::ifstream::binary);
+            if (!readFile.is_open()) {
+                TAG_LOGW(AceLogTag::ACE_WEB, "OpenHdsColorPicker: wrapper abc not found: %{public}s",
+                    HDS_WRAPPER_ABC_PATH);
+                failGracefully();
+                return false;
+            }
+            readFile.seekg(0, std::ios::end);
+            auto fileSize = readFile.tellg();
+            if (fileSize <= 0 || fileSize > INT32_MAX) {
+                TAG_LOGW(AceLogTag::ACE_WEB, "OpenHdsColorPicker: invalid wrapper abc size");
+                failGracefully();
+                return false;
+            }
+            int32_t binarySize = static_cast<int32_t>(fileSize);
+            readFile.seekg(0, std::ios::beg);
+            std::vector<uint8_t> buffer(binarySize);
+            if (!readFile.read(reinterpret_cast<char*>(buffer.data()), binarySize)) {
+                TAG_LOGW(AceLogTag::ACE_WEB, "OpenHdsColorPicker: read wrapper abc failed");
+                failGracefully();
+                return false;
+            }
+            if (!engine->ExecuteJs(buffer.data(), binarySize)) {
+                TAG_LOGW(AceLogTag::ACE_WEB, "OpenHdsColorPicker: execute wrapper abc failed");
+                failGracefully();
+                return false;
+            }
+            TAG_LOGI(AceLogTag::ACE_WEB, "OpenHdsColorPicker: wrapper abc loaded");
+            if (global) {
+                napi_get_named_property(env, global, "__openHdsColorPicker__", &openFn);
+                openFnType = napi_undefined;
+                if (openFn) {
+                    napi_typeof(env, openFn, &openFnType);
+                }
+            }
+        }
+        if (openFnType != napi_function) {
+            TAG_LOGW(AceLogTag::ACE_WEB, "OpenHdsColorPicker: __openHdsColorPicker__ unavailable");
+            failGracefully();
+            return false;
+        }
+
+    // 2. Session-bound callbacks bridging back to NWeb: onSelected ->
+    //    session->callback->Continue("#rrggbb"); onClose -> erase (which
+    //    Cancels the callback) and end the session. The functions' data is the OPAQUE session id
+    //    (not a pointer), so a late callback can never touch freed memory;
+    //    it just fails the registry lookup and returns.
+    sessionId = CreateHdsColorPickerSession(WeakClaim(this), callback);
+    hdsColorPickerSessionIds_.insert(sessionId);
+
+    napi_value onSelectedFn = nullptr;
+    napi_create_function(env, "onSelected", NAPI_AUTO_LENGTH,
+        &WebPattern::OnHdsColorSelected,
+        reinterpret_cast<void*>(static_cast<uintptr_t>(sessionId)), &onSelectedFn);
+    napi_value onCloseFn = nullptr;
+    napi_create_function(env, "onClose", NAPI_AUTO_LENGTH,
+        &WebPattern::OnHdsColorPickerClose,
+        reinterpret_cast<void*>(static_cast<uintptr_t>(sessionId)), &onCloseFn);
+
+    // 3. Call __openHdsColorPicker__(uiContext, initialColor, onSelected, onClose).
+    // HDS expects "#AARRGGBB" ('#000000' → '#FF000000'); NWeb delivers
+    // "#rrggbb" here. Promote to "#FF" + rrgbb so openColorPicker accepts
+    // the initial color.
+    napi_value jsColor = nullptr;
+    std::string colorHex;
+    if (color.size() == 7 && color[0] == '#') {
+        colorHex = "#FF" + color.substr(1);
+    } else if (color.size() == 9 && color[0] == '#') {
+        colorHex = color;
+    } else {
+        colorHex = "#FF000000";
+    }
+    napi_create_string_utf8(env, colorHex.c_str(), colorHex.size(), &jsColor);
+    napi_value args[4] = { uiContext, jsColor, onSelectedFn, onCloseFn };
+    napi_value result = nullptr;
+    status = napi_call_function(env, global, openFn, 4, args, &result);
+    if (status != napi_ok) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "OpenHdsColorPicker: call __openHdsColorPicker__ failed, status:%{public}d",
+            static_cast<int>(status));
+        failGracefully();
+        return false;
+    }
+    }
+    TAG_LOGI(AceLogTag::ACE_WEB, "OpenHdsColorPicker: __openHdsColorPicker__ called");
+    hdsColorPickerOpen_.store(true);
+    napi_close_handle_scope(env, scope);
+    return true;
+}
+
+void WebPattern::CloseHdsColorPicker()
+{
+    if (!hdsColorPickerOpen_.load()) {
+        return;
+    }
+    auto env = CreateEnv();
+    if (!env) {
+        return;
+    }
+    napi_handle_scope scope = nullptr;
+    if (napi_open_handle_scope(env, &scope) != napi_ok || !scope) {
+        return;
+    }
+    napi_value global = nullptr;
+    napi_get_global(env, &global);
+    napi_value closeFn = nullptr;
+    if (global) {
+        napi_get_named_property(env, global, "__closeHdsColorPicker__", &closeFn);
+    }
+    napi_valuetype closeFnType = napi_undefined;
+    if (closeFn) {
+        napi_typeof(env, closeFn, &closeFnType);
+    }
+    if (closeFnType == napi_function) {
+        napi_value closeResult = nullptr;
+        napi_call_function(env, global, closeFn, 0, nullptr, &closeResult);
+        TAG_LOGI(AceLogTag::ACE_WEB, "CloseHdsColorPicker: __closeHdsColorPicker__ called");
+    } else {
+        TAG_LOGW(AceLogTag::ACE_WEB, "CloseHdsColorPicker: __closeHdsColorPicker__ unavailable");
+    }
+    hdsColorPickerOpen_.store(false);
+    napi_close_handle_scope(env, scope);
+}
+
+void WebPattern::CancelHdsColorPicker()
+{
+    CloseHdsColorPicker();
+    // Erase = cancel: ends any live session and Cancels its NWeb callback.
+    if (!hdsColorPickerSessionIds_.empty()) {
+        EraseHdsColorPickerSessions(hdsColorPickerSessionIds_);
+        hdsColorPickerSessionIds_.clear();
+    }
+}
+
+napi_value WebPattern::OnHdsColorSelected(napi_env env, napi_callback_info info)
+{
+    void* data = nullptr;
+    napi_get_cb_info(env, info, nullptr, nullptr, nullptr, &data);
+    // |data| is an opaque session id, never a pointer — a session that was
+    // closed/removed simply fails the lookup below and returns safely.
+    uint64_t sessionId = reinterpret_cast<uintptr_t>(data);
+    if (sessionId == 0) {
+        return nullptr;
+    }
+    // Copy of the shared_ptr keeps the session alive for this whole callback
+    // body, even if onClose/concurrent removal erases the registry entry.
+    auto session = FindHdsColorPickerSession(sessionId);
+    if (!session) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "OnHdsColorSelected: stale session %{public}" PRIu64 ", drop late color",
+            sessionId);
+        return nullptr;
+    }
+    auto pattern = session->weakPattern.Upgrade();
+    if (!pattern) {
+        // Session outlived its pattern (should not happen — dtor erases the
+        // ids); clean up so the id is not left in the registry.
+        EraseHdsColorPickerSession(sessionId);
+        TAG_LOGW(AceLogTag::ACE_WEB, "OnHdsColorSelected: pattern gone");
+        return nullptr;
+    }
+    size_t argc = 1;
+    napi_value argv[1] = { nullptr };
+    napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
+    if (argc < 1 || !argv[0]) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "OnHdsColorSelected: no color argument");
+        return nullptr;
+    }
+    size_t len = 0;
+    napi_get_value_string_utf8(env, argv[0], nullptr, 0, &len);
+    if (len == 0 || len > 16) { // "#AARRGGBB" at most
+        TAG_LOGW(AceLogTag::ACE_WEB, "OnHdsColorSelected: invalid color length %{public}zu", len);
+        return nullptr;
+    }
+    std::string chosen(len, '\0');
+    napi_get_value_string_utf8(env, argv[0], chosen.data(), len + 1, &len);
+    // HDS returns "#AARRGGBB"; the NWeb callback expects "#rrggbb" with
+    // the leading '#'. Strip the alpha channel and keep/re-add the '#'.
+    std::string rgb = chosen;
+    if (rgb.size() == 9 && rgb[0] == '#') {
+        rgb = "#" + rgb.substr(3);
+    } else if (rgb.size() == 8) { // "AARRGGBB" without '#'
+        rgb = "#" + rgb.substr(2);
+    }
+    TAG_LOGI(AceLogTag::ACE_WEB, "OnHdsColorSelected: chosen=%{public}s rgb=%{public}s hasCallback=%{public}d",
+        chosen.c_str(), rgb.c_str(), session->callback ? 1 : 0);
+    if (session->callback) {
+        // Continue is an intermediate update (real-time write-back for each
+        // selection) and may fire multiple times per session — do NOT end
+        // the session here. It ends in OnHdsColorPickerClose (onClose from
+        // HDS), whose erase cancels this callback.
+        session->callback->Continue(rgb);
+    } else {
+        TAG_LOGW(AceLogTag::ACE_WEB, "OnHdsColorSelected: no callback, color dropped");
+    }
+    return nullptr;
+}
+
+napi_value WebPattern::OnHdsColorPickerClose(napi_env env, napi_callback_info info)
+{
+    void* data = nullptr;
+    napi_get_cb_info(env, info, nullptr, nullptr, nullptr, &data);
+    uint64_t sessionId = reinterpret_cast<uintptr_t>(data);
+    if (sessionId == 0) {
+        return nullptr;
+    }
+    TAG_LOGI(AceLogTag::ACE_WEB, "WebPattern::OnHdsColorPickerClose session:%{public}" PRIu64, sessionId);
+    auto session = FindHdsColorPickerSession(sessionId);
+    if (!session) {
+        // Stale close (session already removed by open-failure/next-open
+        // purge/dtor). Nothing to cancel — safe to return.
+        TAG_LOGW(AceLogTag::ACE_WEB, "OnHdsColorPickerClose: stale session, ignore");
+        return nullptr;
+    }
+    auto pattern = session->weakPattern.Upgrade();
+    // End the session: erase CANCELS the NWeb callback (erase = cancel),
+    // and a late onColorSelected (close-during-choose) then fails the
+    // lookup and returns harmlessly. Any in-flight onColorSelected that
+    // already holds a shared_ptr copy is unaffected (shared ownership).
+    EraseHdsColorPickerSession(sessionId);
+    if (pattern) {
+        // HDS closed itself; clear the open flag so a later
+        // CloseHdsColorPicker does not call __closeHdsColorPicker__ again.
+        pattern->hdsColorPickerOpen_.store(false);
+    }
+    return nullptr;
 }
 
 } // namespace OHOS::Ace::NG

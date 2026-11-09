@@ -649,6 +649,16 @@ class HitTestBehaviorModifier extends ModifierWithKey<number> {
   }
 }
 
+class AgentControlModeModifier extends ModifierWithKey<number> {
+  constructor(value: number) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('agentControlMode');
+  applyPeer(node: KNode, reset: boolean): void {
+    getUINativeModule().common.setAgentControlMode(node, reset ? undefined : this.value);
+  }
+}
+
 class ZIndexModifier extends ModifierWithKey<number> {
   constructor(value: number) {
     super(value);
@@ -4679,6 +4689,16 @@ class ArkComponent {
       modifierWithKey(this._modifiersWithKeys, HitTestBehaviorModifier.identity, HitTestBehaviorModifier, value);
     } else {
       modifierWithKey(this._modifiersWithKeys, HitTestBehaviorModifier.identity, HitTestBehaviorModifier, undefined);
+    }
+    return this;
+  }
+
+
+  agentControlMode(value: number | undefined): this {
+    if (typeof value === 'number') {
+      modifierWithKey(this._modifiersWithKeys, AgentControlModeModifier.identity, AgentControlModeModifier, value);
+    } else {
+      modifierWithKey(this._modifiersWithKeys, AgentControlModeModifier.identity, AgentControlModeModifier, undefined);
     }
     return this;
   }

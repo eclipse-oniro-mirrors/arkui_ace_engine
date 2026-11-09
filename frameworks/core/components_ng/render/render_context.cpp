@@ -640,4 +640,15 @@ bool RenderContext::DoTextureExport(uint64_t /* surfaceId */)
 {
     return false;
 }
+
+void RenderContext::UpdateVibrancyMode(const VibrancyMode& mode)
+{
+    if (mode != VibrancyMode::AUTO) {
+        if (propVibrancyMode_.has_value() && NearEqual(propVibrancyMode_.value(), mode)) {
+            return;
+        }
+    }
+    propVibrancyMode_ = mode;
+    OnVibrancyModeUpdate(mode);
+}
 } // namespace OHOS::Ace::NG

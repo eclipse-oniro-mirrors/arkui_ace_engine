@@ -23,9 +23,26 @@
 #include "adapter/ohos/entrance/ui_session/include/ui_session_log.h"
 #include "adapter/ohos/entrance/ui_session/ui_translate_request_util.h"
 #include "interfaces/inner_api/ui_session/ui_session_json_util.h"
+#include "interfaces/inner_api/ui_session/ui_session_split_rule.h"
 
 namespace OHOS::Ace {
 namespace {
+constexpr size_t SPLIT_REGISTRATION_RULE_COUNT = 1;
+
+bool IsValidSplitPageSceneRequest(const std::string& request, bool isQuery = false)
+{
+    // Discover explicit SPLIT declarations without imposing new validation on legacy requests.
+    const char* parseEnd = nullptr;
+    PageSceneSplit::JsonPtr root(cJSON_ParseWithOpts(request.c_str(), &parseEnd, false), cJSON_Delete);
+    if (!PageSceneSplit::ContainsSplitRule(root.get())) {
+        return true;
+    }
+    // Reuse the tree and reject trailing data only for explicitly declared SPLIT requests.
+    const auto parsed = PageSceneSplit::ParseRuleSet(root.get(), parseEnd);
+    // Registration accepts one SPLIT rule; one-shot queries may evaluate multiple rules.
+    return parsed && (isQuery || parsed->rules.size() == SPLIT_REGISTRATION_RULE_COUNT);
+}
+
 // Extract the ruleSetId used to register and route the event callback.
 std::string ExtractPageSceneRuleSetId(const std::string& ruleJson)
 {
@@ -197,6 +214,10 @@ int32_t UIContentServiceProxy::RegisterPageSceneRules(
         LOGW("RegisterPageSceneRules ruleSetId is empty or invalid");
         return PARAM_INVALID;
     }
+    if (!IsValidSplitPageSceneRequest(ruleJson)) {
+        LOGW("RegisterPageSceneRules invalid SPLIT params");
+        return PARAM_INVALID;
+    }
     if (!report_->TryRegisterPageSceneEventCallback(ruleSetId, eventCallback)) {
         LOGW("RegisterPageSceneRules callback already registered");
         return PARAM_INVALID;
@@ -248,6 +269,10 @@ int32_t UIContentServiceProxy::GetPageScene(
     if (report_ == nullptr) {
         LOGW("GetPageScene reportStub is nullptr");
         return FAILED;
+    }
+    if (!IsValidSplitPageSceneRequest(ruleJsonOrRuleSetId, true)) {
+        LOGW("GetPageScene invalid SPLIT params");
+        return PARAM_INVALID;
     }
     MessageParcel data;
     MessageParcel reply;

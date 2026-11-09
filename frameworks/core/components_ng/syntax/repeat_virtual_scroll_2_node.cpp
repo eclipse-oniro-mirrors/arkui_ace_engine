@@ -1258,6 +1258,11 @@ void RepeatVirtualScroll2Node::DumpInfo()
                                         .append(std::to_string(totalCount_).c_str()));
     DumpLog::GetInstance().AddDesc(std::string("cachedItems:")
                                         .append(caches_.GetL2ItemsDump().c_str()));
+    // Memory optimization (auto cache clear) enablement — reflects the effective strategy
+    // resolved from node -> app-level metadata (LazyForEachUtils::GetRepeatMemOptStrategy)
+    // -> system (SystemProperties::GetSyntaxMemOptStrategy).
+    DumpLog::GetInstance().AddDesc(std::string("RepeatMemOpt: ").append(
+        GetMemOptStrategy() == RepeatMemOptStrategy::ENABLE_AUTO_CACHE_OPTIMIZATION ? "enabled" : "disabled"));
 }
 
 void RepeatVirtualScroll2Node::DumpSimplifyInfo(std::shared_ptr<JsonValue>& json)

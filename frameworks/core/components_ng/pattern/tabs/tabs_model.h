@@ -139,6 +139,7 @@ struct BarFloatingStyleParameters {
     std::optional<Dimension> offsetX;
     std::optional<Dimension> offsetY;
     std::optional<Dimension> maxWidth;
+    bool isLocalizedOffsetX = false;
 
     RefPtr<ResourceObject> smallBarWidthObject;
     RefPtr<ResourceObject> mediumBarWidthObject;
@@ -158,7 +159,8 @@ struct BarFloatingStyleParameters {
                (barBottomMargin == parameters.barBottomMargin) && (maskColor == parameters.maskColor) &&
                (maskHeight == parameters.maskHeight) && (adaptToHandedness == parameters.adaptToHandedness) &&
                (systemMaterial == parameters.systemMaterial) && (offsetX == parameters.offsetX) &&
-               (offsetY == parameters.offsetY) && (maxWidth == parameters.maxWidth);
+               (offsetY == parameters.offsetY) && (maxWidth == parameters.maxWidth) &&
+               (isLocalizedOffsetX == parameters.isLocalizedOffsetX);
     }
 };
 
@@ -171,6 +173,7 @@ struct BarTopFloatingStyleParameters {
     std::optional<Dimension> offsetX;
     std::optional<Dimension> offsetY;
     std::optional<Dimension> maxWidth;
+    bool isLocalizedOffsetX = false;
 
     RefPtr<ResourceObject> barWidthObject;
     RefPtr<ResourceObject> barSideMarginObject;
@@ -187,7 +190,7 @@ struct BarTopFloatingStyleParameters {
                (barTopMargin == parameters.barTopMargin) && (maskColor == parameters.maskColor) &&
                (maskHeight == parameters.maskHeight) &&
                (offsetX == parameters.offsetX) && (offsetY == parameters.offsetY) &&
-               (maxWidth == parameters.maxWidth);
+               (maxWidth == parameters.maxWidth) && (isLocalizedOffsetX == parameters.isLocalizedOffsetX);
     }
 };
 

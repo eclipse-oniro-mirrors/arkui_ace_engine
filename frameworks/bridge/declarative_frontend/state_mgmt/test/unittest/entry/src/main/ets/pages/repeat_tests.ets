@@ -18,7 +18,7 @@ import { RepeatNonVirtualScrollTest1 } from '../../repeat_tests/repeatNonVirtual
 import { RepeatVirtualScrollTest1 } from '../../repeat_tests/repeatVirtualScrollTests'
 import { TestRunner } from '../../lib/testRunner'
 import { PageController } from '../../lib/pageController'
-import router from '@system.router'
+import { router } from '@kit.ArkUI'
 
 @Entry
 @Component

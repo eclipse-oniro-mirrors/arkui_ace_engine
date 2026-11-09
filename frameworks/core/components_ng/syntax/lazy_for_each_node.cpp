@@ -1065,6 +1065,10 @@ void LazyForEachNode::DumpInfo()
     if (builder_) {
         builder_->DumpInfo();
     }
+    // Memory optimization (auto cache clear) enablement — reflects the effective strategy
+    // resolved from node -> builder -> app-level (LazyForEachUtils) -> default.
+    DumpLog::GetInstance().AddDesc(std::string("MemOpt: ").append(
+        GetMemOptStrategy() == LazyForEachMemOptStrategy::ENABLE_AUTO_CACHE_OPTIMIZATION ? "enabled" : "disabled"));
 }
 
 void LazyForEachNode::UpdateThemeScopeUpdate(int32_t themeScopeId)

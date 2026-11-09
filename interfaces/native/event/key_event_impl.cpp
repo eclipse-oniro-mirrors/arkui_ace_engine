@@ -14,17 +14,30 @@
  */
 
 #include <cstring>
+#include <new>
 
 #include "securec.h"
 
+#include "base/log/log_wrapper.h"
+
 #include "interfaces/native/native_key_event.h"
+#include "interfaces/inner_api/ace/node_module_inner.h"
 #include "interfaces/native/node/event_converter.h"
 #include "interfaces/native/node/node_model.h"
 #include "interfaces/native/node/config_manager.h"
 #include "interfaces/native/event/ui_input_event_impl.h"
-#include "frameworks/core/common/ace_application_info.h"
 #include "frameworks/core/interfaces/arkoala/arkoala_api.h"
 #include "interfaces/native/native_error_message_macros.h"
+
+struct OH_ArkUI_KeyboardShortcutKey {
+    int32_t type = OH_ARKUI_KEYBOARD_SHORTCUT_KEY_TYPE_CHARACTER;
+    char character = '\0';
+    int32_t functionKey = OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_ESC;
+};
+
+struct OH_ArkUI_ApplicationShortcutCallbackInfo {
+    mutable ArkUI_Context context;
+};
 
 #ifdef __cplusplus
 extern "C" {
@@ -694,6 +707,157 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetScrollLockOn(ArkUI_UIInputEvent* event, boo
     keyEvent->isScrollLockOn = isOn;
     RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_NO_ERROR, ARKUI_ERROR_CODE_NO_ERROR);
 }
+OH_ArkUI_KeyboardShortcutKey* OH_ArkUI_KeyboardShortcutKey_Create(void)
+{
+    return new (std::nothrow) OH_ArkUI_KeyboardShortcutKey;
+}
+
+void OH_ArkUI_KeyboardShortcutKey_Destroy(OH_ArkUI_KeyboardShortcutKey** key)
+{
+    if (key) {
+        delete *key;
+        *key = nullptr;
+    }
+}
+
+void OH_ArkUI_KeyboardShortcutKey_SetType(OH_ArkUI_KeyboardShortcutKey* key, OH_ArkUI_KeyboardShortcutKeyType type)
+{
+    if (key) {
+        key->type = type;
+    }
+}
+
+OH_ArkUI_KeyboardShortcutKeyType OH_ArkUI_KeyboardShortcutKey_GetType(const OH_ArkUI_KeyboardShortcutKey* key)
+{
+    return key && key->type == OH_ARKUI_KEYBOARD_SHORTCUT_KEY_TYPE_FUNCTION_KEY ?
+        OH_ARKUI_KEYBOARD_SHORTCUT_KEY_TYPE_FUNCTION_KEY : OH_ARKUI_KEYBOARD_SHORTCUT_KEY_TYPE_CHARACTER;
+}
+
+void OH_ArkUI_KeyboardShortcutKey_SetCharacter(OH_ArkUI_KeyboardShortcutKey* key, char character)
+{
+    if (key && key->type == OH_ARKUI_KEYBOARD_SHORTCUT_KEY_TYPE_CHARACTER) {
+        key->character = character;
+    }
+}
+
+char OH_ArkUI_KeyboardShortcutKey_GetCharacter(const OH_ArkUI_KeyboardShortcutKey* key)
+{
+    return key ? key->character : '\0';
+}
+
+void OH_ArkUI_KeyboardShortcutKey_SetFunctionKey(
+    OH_ArkUI_KeyboardShortcutKey* key, OH_ArkUI_KeyboardShortcutFunctionKey functionKey)
+{
+    if (key && key->type == OH_ARKUI_KEYBOARD_SHORTCUT_KEY_TYPE_FUNCTION_KEY) {
+        key->functionKey = functionKey;
+    }
+}
+
+OH_ArkUI_KeyboardShortcutFunctionKey OH_ArkUI_KeyboardShortcutKey_GetFunctionKey(
+    const OH_ArkUI_KeyboardShortcutKey* key)
+{
+    return key && static_cast<uint32_t>(key->functionKey) <= OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_SPACE ?
+        static_cast<OH_ArkUI_KeyboardShortcutFunctionKey>(key->functionKey) :
+        OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_ESC;
+}
+
+ArkUI_ContextHandle OH_ArkUI_ApplicationShortcutCallbackInfo_GetUIContext(
+    const OH_ArkUI_ApplicationShortcutCallbackInfo* info)
+{
+    return info && info->context.id >= 0 ? &info->context : nullptr;
+}
+
+static void CheckApplicationShortcutUIThread(const char* apiName)
+{
+    const auto* impl = OHOS::Ace::NodeModel::GetFullImplForAnyThread();
+    const auto* manager = impl && impl->getMultiThreadManagerAPI ? impl->getMultiThreadManagerAPI() : nullptr;
+    if (manager && manager->checkOnUIThread && !manager->checkOnUIThread()) {
+        LOGF_ABORT("%{public}s must be called on the UI thread", apiName);
+    }
+}
+
+static const char* ParseApplicationShortcutKey(
+    const OH_ArkUI_KeyboardShortcutKey* key, uint32_t modifierKeys, std::string& value)
+{
+    constexpr uint32_t supportedKeys = OH_ARKUI_KEYBOARD_SHORTCUT_MODIFIER_CTRL |
+        OH_ARKUI_KEYBOARD_SHORTCUT_MODIFIER_SHIFT | OH_ARKUI_KEYBOARD_SHORTCUT_MODIFIER_ALT;
+    if ((modifierKeys & ~supportedKeys) != 0) {
+        return "Unsupported modifier keys";
+    }
+    if (key->type == OH_ARKUI_KEYBOARD_SHORTCUT_KEY_TYPE_CHARACTER) {
+        // The public char parameter represents a single printable keyboard character.
+        if (key->character < ' ' || key->character > '~' || modifierKeys == 0) {
+            return "Invalid character or missing modifier";
+        }
+        value.assign(1, key->character);
+    } else if (key->type == OH_ARKUI_KEYBOARD_SHORTCUT_KEY_TYPE_FUNCTION_KEY) {
+        // Adapt only the function-key names already handled by ConvertInputCodeToString.
+        static const char* const existingFunctionKeys[] = {
+            "ESC", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
+            "TAB", "DPAD_UP", "DPAD_DOWN", "DPAD_LEFT", "DPAD_RIGHT"
+        };
+        if (key->functionKey >= 0 && key->functionKey <= OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_DPAD_RIGHT) {
+            value = existingFunctionKeys[key->functionKey];
+        } else if (key->functionKey == OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_SPACE) {
+            value = " ";
+        } else {
+            return "Unsupported function key";
+        }
+    } else {
+        return "Invalid shortcut key type";
+    }
+    return nullptr;
+}
+
+ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Register(const OH_ArkUI_KeyboardShortcutKey* key, uint32_t modifierKeys,
+    void* userData, OH_ArkUI_ApplicationShortcutCallback callback, int32_t* registrationId)
+{
+    CheckApplicationShortcutUIThread(__FUNCTION__);
+    CHECK_NULL_RETURN_WITH_MESSAGE(registrationId, ARKUI_ERROR_CODE_PARAM_INVALID,
+        __FUNCTION__, "Registration ID output is null");
+    CHECK_NULL_RETURN_WITH_MESSAGE(key, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Shortcut key is null");
+    CHECK_NULL_RETURN_WITH_MESSAGE(callback, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Callback is null");
+    std::string value;
+    const auto* error = ParseApplicationShortcutKey(key, modifierKeys, value);
+    if (error) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, error);
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    const auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
+    CHECK_NULL_RETURN_WITH_MESSAGE(impl, ARKUI_ERROR_CODE_INTERNAL_ERROR,
+        __FUNCTION__, "Native implementation is unavailable");
+    const auto* modifiers = impl->getNodeModifiers ? impl->getNodeModifiers() : nullptr;
+    const auto* common = modifiers && modifiers->getCommonModifier ? modifiers->getCommonModifier() : nullptr;
+    CHECK_NULL_RETURN_WITH_MESSAGE(common && common->registerApplicationShortcut, ARKUI_ERROR_CODE_INTERNAL_ERROR,
+        __FUNCTION__, "Application shortcut registration is unavailable");
+    const auto id = common->registerApplicationShortcut(
+        value, static_cast<uint8_t>(modifierKeys), [callback, userData](int32_t instanceId) {
+            OH_ArkUI_ApplicationShortcutCallbackInfo info { { instanceId } };
+            callback(&info, userData);
+        });
+    if (id == 0) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_INTERNAL_ERROR, __FUNCTION__,
+            "Application shortcut registration failed");
+        return ARKUI_ERROR_CODE_INTERNAL_ERROR;
+    }
+    *registrationId = id;
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Unregister(int32_t registrationId)
+{
+    CheckApplicationShortcutUIThread(__FUNCTION__);
+    const auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
+    CHECK_NULL_RETURN_WITH_MESSAGE(impl, ARKUI_ERROR_CODE_INTERNAL_ERROR,
+        __FUNCTION__, "Native implementation is unavailable");
+    const auto* modifiers = impl->getNodeModifiers ? impl->getNodeModifiers() : nullptr;
+    const auto* common = modifiers && modifiers->getCommonModifier ? modifiers->getCommonModifier() : nullptr;
+    CHECK_NULL_RETURN_WITH_MESSAGE(common && common->unregisterApplicationShortcut, ARKUI_ERROR_CODE_INTERNAL_ERROR,
+        __FUNCTION__, "Application shortcut unregistration is unavailable");
+    common->unregisterApplicationShortcut(registrationId);
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
 #ifdef __cplusplus
 };
 #endif

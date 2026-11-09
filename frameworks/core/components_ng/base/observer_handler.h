@@ -35,6 +35,8 @@ class ClickInfo;
 } // namespace OHOS::Ace
 
 namespace OHOS::Ace::NG {
+struct NodeSensitiveInputInfo;
+
 enum class NavDestinationState {
     NONE = -1,
     ON_SHOWN = 0,
@@ -251,6 +253,11 @@ public:
     void NotifySwiperContentUpdate(const SwiperContentInfo& info);
     bool IsSwiperContentObserverEmpty();
     void NotifyWinSizeLayoutBreakpointChangeFunc(int32_t instanceId, const WindowSizeBreakpoint& info);
+    using NodeSensitiveInputHandleFunc =
+        std::function<void(const RefPtr<FrameNode>&, const NodeSensitiveInputInfo&)>;
+    void NotifyNodeSensitiveInput(const RefPtr<FrameNode>& node, const NodeSensitiveInputInfo& info);
+    void SetNodeSensitiveInputHandleFunc(NodeSensitiveInputHandleFunc&& func);
+    void SetNodeSensitiveInputHandleFuncForAni(NodeSensitiveInputHandleFunc&& func);
     using NavigationHandleFunc = void (*)(const NavDestinationInfo& info);
     using ScrollEventHandleFunc = void (*)(const std::string&, int32_t, ScrollEventType, float, Ace::Axis);
     using ScrollEventHandleFuncForAni = std::function<void(const ScrollEventInfo& info)>;
@@ -429,6 +436,8 @@ private:
     SwiperContentUpdateHandleFunc swiperContentUpdateHandleFunc_ = nullptr;
     SwiperContentUpdateHandleFuncForAni swiperContentUpdateHandleFuncForAni_ = nullptr;
     SwiperContentObservrEmptyFunc swiperContentObservrEmptyFunc_ = nullptr;
+    NodeSensitiveInputHandleFunc nodeSensitiveInputHandleFunc_ = nullptr;
+    NodeSensitiveInputHandleFunc nodeSensitiveInputHandleFuncForAni_ = nullptr;
 
     BeforePanStartHandleFuncForAni beforePanStartHandleFuncForAni_ = nullptr;
     AfterPanStartHandleFuncForAni afterPanStartHandleFuncForAni_ = nullptr;

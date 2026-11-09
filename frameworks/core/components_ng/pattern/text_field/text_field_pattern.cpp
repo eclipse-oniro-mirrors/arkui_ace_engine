@@ -11725,16 +11725,8 @@ void TextFieldPattern::ReceivePreviewTextStyle(const std::string& style)
 {
     auto paintProperty = GetPaintProperty<TextFieldPaintProperty>();
     CHECK_NULL_VOID(paintProperty);
-    auto frameNode = GetHost();
-    CHECK_NULL_VOID(frameNode);
-    auto previewDecorationColor = paintProperty->GetCursorColorValue(GetPreviewDecorationColor());
-    if (frameNode->GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY_SIX) &&
-        !paintProperty->HasCaretColorFlagByUser()) {
-        previewDecorationColor = GetPreviewDecorationColor();
-    }
     if (!style.empty()) {
         PreviewTextStyling previewTextStyling;
-        previewTextStyling.underlineColor = previewDecorationColor.GetValue();
         if (style == PREVIEW_STYLE_UNDERLINE) {
             previewTextStyling.underlineShape = PreviewTextStyle::UNDERLINE;
         }

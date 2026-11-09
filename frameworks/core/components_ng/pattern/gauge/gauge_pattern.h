@@ -148,6 +148,7 @@ public:
 
     void OnModifyDone() override;
     void OnSensitiveStyleChange(bool isSensitive) override;
+    void OnLanguageConfigurationUpdate() override;
 
     void SetBuilderFunc(GaugeMakeCallback&& makeFunc)
     {

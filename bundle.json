@@ -97,6 +97,7 @@
                 "player_framework",
                 "audio_framework",
                 "access_token",
+                "asset",
                 "input",
                 "motion",
                 "webview",

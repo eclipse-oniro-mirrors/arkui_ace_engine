@@ -2184,6 +2184,58 @@ HWTEST_F(TabPatternTestNg, ShouldHide001, TestSize.Level1)
 }
 
 /**
+ * @tc.name: HandleDividerDragUpdate001
+ * @tc.desc: Test HandleDividerDragUpdate with sidebar on left (LTR + START), positive offset widens sidebar
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabPatternTestNg, HandleDividerDragUpdate001, TestSize.Level1)
+{
+    auto model = CreateTabs();
+    CreateTabContents();
+    GetTabs();
+    CreateTabsDone(model);
+    ASSERT_NE(pattern_, nullptr);
+    // sidebar on left: LTR + START, offset not negated
+    layoutProperty_->UpdateSidebarPosition(BarPosition::START);
+    layoutProperty_->UpdateLayoutDirection(TextDirection::LTR);
+    pattern_->isInDividerDrag_ = true;
+    pattern_->preSideBarWidthPx_ = 100.0f;
+    pattern_->minSideBarWidth_ = 0.0f;
+    pattern_->maxSideBarWidth_ = 300.0f;
+    pattern_->realSideBarWidthPx_ = 100.0f;
+    // drag right by 50px -> width grows to 150px
+    pattern_->HandleDividerDragUpdate(50.0f);
+    ASSERT_TRUE(pattern_->GetRealSideBarWidthPx().has_value());
+    EXPECT_FLOAT_EQ(pattern_->GetRealSideBarWidthPx().value(), 150.0f);
+}
+
+/**
+ * @tc.name: HandleDividerDragUpdate002
+ * @tc.desc: Test HandleDividerDragUpdate with sidebar on right (LTR + END), offset negated
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabPatternTestNg, HandleDividerDragUpdate002, TestSize.Level1)
+{
+    auto model = CreateTabs();
+    CreateTabContents();
+    GetTabs();
+    CreateTabsDone(model);
+    ASSERT_NE(pattern_, nullptr);
+    // sidebar on right: LTR + END, offset is negated
+    layoutProperty_->UpdateSidebarPosition(BarPosition::END);
+    layoutProperty_->UpdateLayoutDirection(TextDirection::LTR);
+    pattern_->isInDividerDrag_ = true;
+    pattern_->preSideBarWidthPx_ = 100.0f;
+    pattern_->minSideBarWidth_ = 0.0f;
+    pattern_->maxSideBarWidth_ = 300.0f;
+    pattern_->realSideBarWidthPx_ = 100.0f;
+    // drag right by 50px, but negated to -50px -> width shrinks to 50px
+    pattern_->HandleDividerDragUpdate(50.0f);
+    ASSERT_TRUE(pattern_->GetRealSideBarWidthPx().has_value());
+    EXPECT_FLOAT_EQ(pattern_->GetRealSideBarWidthPx().value(), 50.0f);
+}
+
+/**
  * @tc.name: ResetDisplayModeSwitchTransforms001
  * @tc.desc: Test tabBarDivider opacity is 0.0 when divider is set but isNull=true
  * @tc.type: FUNC

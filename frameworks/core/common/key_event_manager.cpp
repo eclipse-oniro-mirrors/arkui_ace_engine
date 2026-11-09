@@ -18,6 +18,7 @@
 
 #include "base/input_manager/input_manager.h"
 #include "base/ressched/ressched_report.h"
+#include "core/common/application_shortcut.h"
 #include "core/common/container.h"
 #include "core/common/event_manager.h"
 #include "core/components_ng/base/frame_node.h"
@@ -522,7 +523,7 @@ bool KeyEventManager::DispatchKeyboardShortcut(const KeyEvent& event)
     if (event.action != KeyAction::DOWN) {
         return false;
     }
-    if (keyboardShortcutNode_.empty() || IsSystemKeyboardShortcut(event)) {
+    if (IsSystemKeyboardShortcut(event)) {
         return false;
     }
     for (auto& node : keyboardShortcutNode_) {
@@ -542,6 +543,10 @@ bool KeyEventManager::DispatchKeyboardShortcut(const KeyEvent& event)
         if (TriggerKeyboardShortcut(event, keyboardShortcuts, node, eventHub)) {
             return true;
         }
+    }
+    auto& shortcutManager = ApplicationShortcutManager::GetInstance();
+    if (shortcutManager.TryTriggerApplicationShortcut(event, GetInstanceId())) {
+        return true;
     }
     return false;
 }

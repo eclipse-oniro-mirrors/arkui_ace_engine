@@ -214,7 +214,9 @@ void OverlayManagerMenuTestNg::SetUpTestCase()
 }
 void OverlayManagerMenuTestNg::TearDownTestCase()
 {
-    MockPipelineContext::GetCurrent()->themeManager_ = nullptr;
+    if (auto* mockPipeCtx = MockPipelineContext::GetCurrent().GetRawPtr()) {
+        mockPipeCtx->themeManager_ = nullptr;
+    }
     MockPipelineContext::TearDown();
 }
 

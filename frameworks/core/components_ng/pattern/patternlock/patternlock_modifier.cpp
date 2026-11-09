@@ -568,7 +568,18 @@ void PatternLockModifier::SetWrongColor(const Color& wrongColor)
 void PatternLockModifier::SetCorrectColor(const Color& correctColor)
 {
     CHECK_NULL_VOID(correctColor_);
+    if (correctColor_->Get() == correctColor) {
+        return;
+    }
     correctColor_->Set(correctColor);
+    // correctColor_ is only consumed as the animation target of pointAnimateColor_ in
+    // StartChallengeResultAnimate (CORRECT branch). Once that animation settles, onDraw
+    // draws chosen points with pointAnimateColor_ instead of correctColor_ directly, so a
+    // later correctColor_ change (e.g. theme switch driven by UpdateContentModifier) would
+    // not be reflected unless pointAnimateColor_ is synced here in the CORRECT steady state.
+    if (challengeResult_.has_value() && challengeResult_.value() == NG::PatternLockChallengeResult::CORRECT) {
+        pointAnimateColor_->Set(LinearColor(correctColor));
+    }
 }
 
 void PatternLockModifier::SetPathStrokeWidth(float pathStrokeWidth)

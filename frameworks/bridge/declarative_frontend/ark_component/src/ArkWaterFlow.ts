@@ -259,6 +259,20 @@ class WaterFlowSyncLoadModifier extends ModifierWithKey<boolean> {
   }
 }
 
+class WaterFlowScrollPlaceholderModifier extends ModifierWithKey<PlaceholderProvider | undefined> {
+  constructor(value: PlaceholderProvider | undefined) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('waterFlowScrollPlaceholder');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().waterFlow.resetScrollPlaceholder(node);
+    } else {
+      getUINativeModule().waterFlow.setScrollPlaceholder(node, this.value);
+    }
+  }
+}
+
 class WaterFlowFlingSpeedLimitModifier extends ModifierWithKey<number> {
   constructor(value: number) {
     super(value);
@@ -491,6 +505,11 @@ class ArkWaterFlowComponent extends ArkScrollable<WaterFlowAttribute> implements
   }
   syncLoad(value: boolean): this {
     modifierWithKey(this._modifiersWithKeys, WaterFlowSyncLoadModifier.identity, WaterFlowSyncLoadModifier, value);
+    return this;
+  }
+  scrollPlaceholder(provider: PlaceholderProvider | undefined): this {
+    modifierWithKey(this._modifiersWithKeys, WaterFlowScrollPlaceholderModifier.identity,
+      WaterFlowScrollPlaceholderModifier, provider);
     return this;
   }
   scrollSnapStrategy(strategy?: ScrollSnapAlign | ScrollSnapOffsetProvider): this {

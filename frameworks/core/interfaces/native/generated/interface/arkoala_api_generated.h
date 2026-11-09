@@ -4019,6 +4019,14 @@ typedef struct Opt_AdaptiveColor {
     Ark_Tag tag;
     Ark_AdaptiveColor value;
 } Opt_AdaptiveColor;
+typedef enum Ark_AgentControlMode {
+    ARK_AGENT_CONTROL_MODE_ALLOW = 0,
+    ARK_AGENT_CONTROL_MODE_DENY = 1,
+} Ark_AgentControlMode;
+typedef struct Opt_AgentControlMode {
+    Ark_Tag tag;
+    Ark_AgentControlMode value;
+} Opt_AgentControlMode;
 typedef enum Ark_AISessionResultType {
     ARK_AISESSION_RESULT_TYPE_SUCCESS = 0,
     ARK_AISESSION_RESULT_TYPE_FAILURE = 1,
@@ -8126,6 +8134,9 @@ typedef struct Opt_WebCaptureMode {
     Ark_Tag tag;
     Ark_WebCaptureMode value;
 } Opt_WebCaptureMode;
+typedef enum Ark_WebContextMenuItemId {
+    ARK_WEB_CONTEXT_MENU_ITEM_ID_MENU_COPY_LINK = 11,
+} Ark_WebContextMenuItemId;
 typedef enum Ark_WebDarkMode {
     ARK_WEB_DARK_MODE_OFF = 0,
     ARK_WEB_DARK_MODE_ON = 1,
@@ -24310,6 +24321,7 @@ typedef struct Ark_SheetOptions {
     Opt_EdgeLightMode edgeLightMode;
     Opt_BlurSnapshotOptions blurSnapshot;
     Opt_SheetTitleBarHoverMode titleBarHoverMode;
+    Opt_HandednessFollowMode adaptToHandedness;
 } Ark_SheetOptions;
 typedef struct Opt_SheetOptions {
     Ark_Tag tag;
@@ -25381,6 +25393,8 @@ typedef struct GENERATED_ArkUICommonMethodModifier {
                               const Opt_ConstraintSizeOptions* value);
     void (*setHitTestBehavior)(Ark_NativePointer node,
                                const Opt_HitTestMode* value);
+    void (*setAgentControlMode)(Ark_NativePointer node,
+                                const Opt_AgentControlMode* value);
     void (*setOnChildTouchTest)(Ark_NativePointer node,
                                 const Opt_Callback_Array_TouchTestInfo_TouchResult* value);
     void (*setLayoutWeight)(Ark_NativePointer node,

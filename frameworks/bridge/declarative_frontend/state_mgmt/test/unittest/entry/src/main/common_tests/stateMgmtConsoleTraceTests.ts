@@ -21,6 +21,7 @@ declare class stateMgmtConsole {
   static errorLogFlag: Set<string>;
   static limitLog(msg: string): number | undefined;
   static applicationError(...args: Object[]): void;
+  static applicationWarn(...args: Object[]): void;
   static frequentApplicationError(msg: string): void;
   static frequentWarn(msg: string): void;
   static frequentError(msg: string): void;

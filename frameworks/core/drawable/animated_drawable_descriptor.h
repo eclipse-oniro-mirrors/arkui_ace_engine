@@ -65,6 +65,7 @@ public:
 
     std::vector<RefPtr<PixelMap>> GetPixelMapList() const
     {
+        std::shared_lock<std::shared_mutex> lock(callMutx_);
         return pixelMapList_;
     }
 

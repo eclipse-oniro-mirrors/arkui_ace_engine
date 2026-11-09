@@ -50,7 +50,6 @@
 #include "core/components_ng/event/gesture_event_hub.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_controller_ng.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_resolution_config.h"
-#include "core/components_ng/property/accessibility_property.h"
 #include "core/event/axis_event.h"
 #ifdef NG_BUILD
 #include "bridge/declarative_frontend/ng/declarative_frontend_ng.h"
@@ -72,7 +71,6 @@
 #endif
 
 #include "core/components_ng/event/input_event.h"
-#include "core/components_ng/export_texture_info/export_texture_info.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_accessibility_child_tree_callback.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_accessibility_session_adapter.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_event_hub.h"
@@ -90,27 +88,6 @@ std::atomic<bool> XComponentPattern::compensationAngleFlag_{false};
 std::mutex XComponentPattern::angleMtx_;
 std::string XComponentPattern::compensationAngleFromFeatureManager_ = "";
 namespace {
-
-constexpr uint32_t XCOMPONENT_EXTRA_FLAG_ENABLE_SOLID_COLOR = 0x01;
-constexpr std::string_view BUFFER_USAGE_XCOMPONENT = "xcomponent";
-#ifdef ENABLE_ROSEN_BACKEND
-constexpr char X_COMPONENT_COMPENSATION_ANGLE[] = "xcomponentCompensationAngle";
-const int32_t ROTATION_0 = 0;
-const int32_t ROTATION_90 = 90;
-const int32_t ROTATION_180 = 180;
-const int32_t ROTATION_270 = 270;
-constexpr char UNKNOWN[] = "0";
-constexpr char FULL[] = "1";
-constexpr char MAIN[] = "2";
-constexpr char SUB[] = "3";
-constexpr char COORDINATION[] = "4";
-constexpr char ANGLE_KEY[] = "logic_device";
-#endif
-
-#if defined(RENDER_EXTRACT_SUPPORTED) && defined(IOS_PLATFORM)
-const int TEXTURETYPE_XCOMPONENT = 1;
-#endif
-
 void SendStatisticEvent(RefPtr<FrameNode> frameNode, StatisticEventType type)
 {
     CHECK_NULL_VOID(frameNode);
@@ -134,6 +111,27 @@ void SendStatisticEvent(RefPtr<FrameNode> frameNode, std::list<StatisticEventTyp
     }
     types.clear();
 }
+
+constexpr uint32_t XCOMPONENT_EXTRA_FLAG_ENABLE_SOLID_COLOR = 0x01;
+constexpr std::string_view BUFFER_USAGE_XCOMPONENT = "xcomponent";
+#ifdef ENABLE_ROSEN_BACKEND
+constexpr char X_COMPONENT_COMPENSATION_ANGLE[] = "xcomponentCompensationAngle";
+constexpr char UNKNOWN[] = "0";
+constexpr char FULL[] = "1";
+constexpr char MAIN[] = "2";
+constexpr char SUB[] = "3";
+constexpr char COORDINATION[] = "4";
+constexpr char ANGLE_KEY[] = "logic_device";
+const int32_t ROTATION_0 = 0;
+const int32_t ROTATION_90 = 90;
+const int32_t ROTATION_180 = 180;
+const int32_t ROTATION_270 = 270;
+#endif
+
+#if defined(RENDER_EXTRACT_SUPPORTED) && defined(IOS_PLATFORM)
+const int TEXTURETYPE_XCOMPONENT = 1;
+#endif
+
 } // namespace
 
 XComponentPattern::XComponentPattern(const std::optional<std::string>& id, XComponentType type,
@@ -415,19 +413,16 @@ void XComponentPattern::OnDetachFromMainTree()
         }
     }
     displaySync_->NotifyXComponentExpectedFrameRate(GetId(), 0);
-    uint64_t uniqueId = 0;
-    std::string surfaceName;
-    if (renderSurface_) {
-        uniqueId = renderSurface_->GetUniqueIdNum();
-        surfaceName = renderSurface_->GetPSurfaceName();
-    }
+    CHECK_NULL_VOID(renderSurface_);
     auto customNode = host->GetParentCustomNode();
-    std::string viewName = customNode ? customNode->GetJSViewName() : "";
+    CHECK_NULL_VOID(customNode);
     auto pipelineContext = host->GetContextRefPtr();
     auto bundleName = pipelineContext ? pipelineContext->GetBundleName() : "";
 #ifndef CROSS_PLATFORM
-    PerfMonitor::GetPerfMonitor()->ReportComponentDetach(uniqueId, surfaceName, viewName, bundleName, getpid());
+    PerfMonitor::GetPerfMonitor()->ReportComponentDetach(renderSurface_->GetUniqueIdNum(),
+        renderSurface_->GetPSurfaceName(), customNode->GetJSViewName(), bundleName.c_str(), getpid());
 #endif
+    CHECK_NULL_VOID(pipelineContext);
     host->UnregisterNodeChangeListener();
 }
 
@@ -440,10 +435,10 @@ std::string FoldDisplayModeToString(FoldDisplayMode foldDisplayMode)
         case FoldDisplayMode::MAIN: return MAIN;
         case FoldDisplayMode::SUB: return SUB;
         case FoldDisplayMode::COORDINATION: return COORDINATION;
-        default: return "0";
+        default: return UNKNOWN;
     }
 }
- 
+
 Rosen::ScreenRotation RotationIntToScreenRotation(int32_t rotation)
 {
     switch (rotation) {
@@ -479,7 +474,7 @@ std::string XComponentPattern::GetCompensationAngleFromFeatureManager()
     compensationAngleFlag_.store(true, std::memory_order_release);
     return compensationAngleFromFeatureManager_;
 }
- 
+
 std::unique_ptr<JsonValue> GetXComponentCompensationAngle(const std::string& angleConfigJson)
 {
     std::string tempAngleConfigJson = angleConfigJson;
@@ -488,7 +483,7 @@ std::unique_ptr<JsonValue> GetXComponentCompensationAngle(const std::string& ang
         tempAngleConfigJson = compensationAngleFromFeatureManager;
     }
     if (tempAngleConfigJson.empty()) {
-        LOGE("UIContent set compensation angle empty");
+        LOGD("UIContent set compensation angle empty");
         return nullptr;
     }
     auto jsonConfig = JsonUtil::ParseJsonString(tempAngleConfigJson);
@@ -508,7 +503,7 @@ std::unique_ptr<JsonValue> GetXComponentCompensationAngle(const std::string& ang
     }
     return JsonUtil::ParseJsonString(result);
 }
- 
+
 void XComponentPattern::SetCompensationAngleToRS(const RefPtr<RenderContext>& renderContext,
     FoldDisplayMode foldDisplayMode, const std::string& xcomponentId)
 {
@@ -1192,9 +1187,9 @@ void XComponentPattern::InitializeAccessibility()
         "InitializeAccessibility accessibilityId: %{public}" PRId64 "", accessibilityId);
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
-    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
-    CHECK_NULL_VOID(mainAccessibilityManager);
-    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
+    auto pipelineAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_VOID(pipelineAccessibilityManager);
+    auto accessibilityManager = pipelineAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
     accessibilityChildTreeCallback_ = std::make_shared<XComponentAccessibilityChildTreeCallback>(
         WeakClaim(this), host->GetAccessibilityId());
@@ -1214,9 +1209,9 @@ void XComponentPattern::UninitializeAccessibility(FrameNode* frameNode)
     auto pipeline = frameNode->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
     auto host = GetHost();
-    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
-    CHECK_NULL_VOID(mainAccessibilityManager);
-    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
+    auto pipelineAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_VOID(pipelineAccessibilityManager);
+    auto accessibilityManager = pipelineAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
     if (accessibilityManager->IsRegister() && accessibilityChildTreeCallback_) {
         OnAccessibilityChildTreeDeregister(frameNode);
@@ -1227,7 +1222,7 @@ void XComponentPattern::UninitializeAccessibility(FrameNode* frameNode)
 
 ArkUI_AccessibilityProvider* XComponentPattern::GetNativeProvider()
 {
-    if(useNodeHandleAccessibilityProvider_) {
+    if (useNodeHandleAccessibilityProvider_) {
         return arkuiAccessibilityProvider_;
     }
     auto pair = GetNativeXComponent();
@@ -1242,9 +1237,9 @@ bool XComponentPattern::OnAccessibilityChildTreeRegister(uint32_t windowId, int3
     CHECK_NULL_RETURN(host, false);
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_RETURN(pipeline, false);
-    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
-    CHECK_NULL_RETURN(mainAccessibilityManager, false);
-    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
+    auto pipelineAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_RETURN(pipelineAccessibilityManager, false);
+    auto accessibilityManager = pipelineAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_RETURN(accessibilityManager, false);
     if (accessibilityProvider_ == nullptr) {
         accessibilityProvider_ =
@@ -1291,9 +1286,9 @@ bool XComponentPattern::OnAccessibilityChildTreeDeregister(FrameNode* frameNode)
         pipeline = frameNode->GetContextRefPtr();
     }
     CHECK_NULL_RETURN(pipeline, false);
-    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
-    CHECK_NULL_RETURN(mainAccessibilityManager, false);
-    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(nodeForAM);
+    auto pipelineAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_RETURN(pipelineAccessibilityManager, false);
+    auto accessibilityManager = pipelineAccessibilityManager->GetAccessibilityManagerForNode(nodeForAM);
     CHECK_NULL_RETURN(accessibilityManager, false);
     auto nativeProvider = GetNativeProvider();
     CHECK_NULL_RETURN(nativeProvider, false);
@@ -1341,9 +1336,9 @@ void XComponentPattern::HandleRegisterAccessibilityEvent(bool isRegister)
     CHECK_NULL_VOID(host);
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
-    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
-    CHECK_NULL_VOID(mainAccessibilityManager);
-    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
+    auto pipelineAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_VOID(pipelineAccessibilityManager);
+    auto accessibilityManager = pipelineAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
     if (!isRegister) {
         accessibilityChildTreeCallback_->OnDeregister();
@@ -1571,19 +1566,21 @@ void XComponentPattern::InitMouseHoverEvent(const RefPtr<InputEventHub>& inputHu
 void XComponentPattern::ReportChangeEvent(const TouchEventInfo& info, const Offset& screenOffset,
     const TouchLocationInfo& touchInfo)
 {
+    auto type = touchInfo.GetTouchType();
     if (info.GetSourceDevice() != SourceType::TOUCH) {
         return;
     }
-    auto type = touchInfo.GetTouchType();
     if ((type != TouchType::DOWN) && (type != TouchType::UP)) {
         return;
     }
     std::unique_ptr<JsonValue> json = JsonUtil::Create(true);
     auto host = GetHost();
-    CHECK_NULL_VOID(host);
+    if (!host) {
+        return;
+    }
     json->Put("id", host->GetId());
-    json->Put("fingerId", touchInfo.GetFingerId());
     const auto timeStamp = info.GetTimeStamp().time_since_epoch().count();
+    json->Put("fingerId", touchInfo.GetFingerId());
     json->Put("timeStamp", static_cast<double>(timeStamp));
     json->Put("offset", screenOffset.ToString().c_str());
     json->Put("eventId", touchInfo.GetTouchEventId());
@@ -2515,7 +2512,7 @@ void XComponentPattern::StartImageAnalyzer(void* config, OnAnalyzedCallback& onA
 
     auto host = GetHost();
     CHECK_NULL_VOID(host);
-    auto* context = host->GetContext();
+    auto context = host->GetContext();
     CHECK_NULL_VOID(context);
     auto uiTaskExecutor = SingleTaskExecutor::Make(context->GetTaskExecutor(), TaskExecutor::TaskType::UI);
     uiTaskExecutor.PostTask(
@@ -2816,6 +2813,11 @@ void XComponentPattern::SetSurfaceIsOpaque(bool isOpaque)
         CHECK_NULL_VOID(renderSurface_);
         renderSurface_->SetSurfaceBufferOpaque(isOpaque);
     }
+}
+
+void XComponentPattern::DumpSimplifyInfo(std::shared_ptr<JsonValue>& json)
+{
+    json->Put("$SurfaceId", surfaceId_.c_str());
 }
 
 void XComponentPattern::AddExtraInfoWithParamConfig(

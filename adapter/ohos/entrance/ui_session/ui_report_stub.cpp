@@ -41,9 +41,10 @@ constexpr char SEND_COMMAND_CALLBACK_TIMEOUT_PREFIX[] = "SendCommandCallbackTime
 constexpr int32_t SPECIFIED_CONTENT_OFFSETS_LOOP_UPPERBOUND = 1024000;
 constexpr char PAGE_SCENE_RULE_SET_ID[] = "ruleSetId";
 constexpr char PAGE_SCENE_HITS[] = "hits";
+constexpr char PAGE_SCENE_EVENTS[] = "events";
 constexpr char PAGE_SCENE_EXITS[] = "exits";
 
-// Legacy events carry a top-level ruleSetId; search events use hits/exits.
+// Legacy events carry a top-level ruleSetId; search uses hits/exits and SPLIT uses events.
 // Dispatch once per referenced ruleSet, filtering search evidence before delivery.
 std::vector<std::string> ExtractPageSceneRuleSetIds(const std::string& sceneJson)
 {
@@ -63,7 +64,7 @@ std::vector<std::string> ExtractPageSceneRuleSetIds(const std::string& sceneJson
         }
     };
     addRuleSetId(cJSON_GetObjectItem(root, PAGE_SCENE_RULE_SET_ID));
-    for (const auto* key : { PAGE_SCENE_HITS, PAGE_SCENE_EXITS }) {
+    for (const auto* key : { PAGE_SCENE_HITS, PAGE_SCENE_EXITS, PAGE_SCENE_EVENTS }) {
         auto array = cJSON_GetObjectItem(root, key);
         if (!cJSON_IsArray(array)) {
             continue;
@@ -94,7 +95,7 @@ std::string FilterPageSceneEvent(const std::string& sceneJson, const std::string
         return "";
     }
     bool filtered = false;
-    for (const auto* key : { PAGE_SCENE_HITS, PAGE_SCENE_EXITS }) {
+    for (const auto* key : { PAGE_SCENE_HITS, PAGE_SCENE_EXITS, PAGE_SCENE_EVENTS }) {
         auto array = cJSON_GetObjectItem(root, key);
         if (array == nullptr) {
             continue;
@@ -355,7 +356,10 @@ int32_t UiReportStub::OnRemoteRequest(uint32_t code, MessageParcel& data, Messag
         }
         case SEND_CONTENT_CHANGE: {
             ChangeType type = static_cast<ChangeType>(data.ReadInt32());
-            std::string simpleTree = data.ReadString();
+            std::string simpleTree;
+            if (!UiSessionIpcUtil::ReadLargeString(data, simpleTree, "SendContentChange")) {
+                break;
+            }
             SendContentChange(type, simpleTree);
             break;
         }

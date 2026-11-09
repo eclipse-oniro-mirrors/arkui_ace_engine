@@ -429,9 +429,71 @@ bool ForceSplitManager::CanPushPageToPrimary() const
     return !pagePairs_.empty();
 }
 
+bool ForceSplitManager::IsPageSplitDisabled(const std::string& pageName) const
+{
+    if (!enablePageLevelSplit_) {
+        // page-level split control off: keep original ForceSplit behavior
+        return false;
+    }
+    auto it = pageSplitOptions_.find(pageName);
+    if (it != pageSplitOptions_.end()) {
+        // explicit option: split(true) keeps split layout, split(false) means no split
+        TAG_LOGI(AceLogTag::ACE_NAVIGATION,
+            "pageLevelSplit policy page:%{public}s, source:explicit, split:%{public}d, inherit:%{public}d",
+            pageName.c_str(), it->second, enableInheritSplitStrategy_);
+        return !it->second;
+    }
+    if (!enableInheritSplitStrategy_) {
+        // no explicit option and inherit off: default no split when page-level control is on
+        TAG_LOGI(AceLogTag::ACE_NAVIGATION,
+            "pageLevelSplit policy page:%{public}s, source:default, split:0, inherit:0", pageName.c_str());
+        return true;
+    }
+    // no explicit option and inherit on: follow the upstream page's split state
+    return IsUpstreamPageSplitDisabled(pageName);
+}
+
+int32_t ForceSplitManager::GetLastPageStackIndex(const std::string& pageName) const
+{
+    for (int32_t index = static_cast<int32_t>(pageStack_.size()) - 1; index >= 0; --index) {
+        if (pageStack_[index] == pageName) {
+            return index;
+        }
+    }
+    return -1;
+}
+
+bool ForceSplitManager::IsUpstreamPageSplitDisabled(const std::string& pageName) const
+{
+    // Walk upstream by stack position from the last occurrence of pageName.
+    // The nearest upstream page carrying an explicit option decides the result;
+    // upstream pages without an explicit option keep following their own upstream.
+    // When no upstream carries an explicit option, the base default(no split) applies.
+    // Position-based walking also guarantees termination when a page name repeats in the stack.
+    int32_t index = GetLastPageStackIndex(pageName);
+    for (int32_t upstream = index - 1; upstream >= 0; --upstream) {
+        auto it = pageSplitOptions_.find(pageStack_[upstream]);
+        if (it != pageSplitOptions_.end()) {
+            if (enablePageLevelSplit_) {
+                TAG_LOGI(AceLogTag::ACE_NAVIGATION,
+                    "pageLevelSplit policy page:%{public}s, source:upstream, index:%{public}d, "
+                    "upstream:%{public}s, upstreamIndex:%{public}d, split:%{public}d", pageName.c_str(), index,
+                    pageStack_[upstream].c_str(), upstream, it->second);
+            }
+            return !it->second;
+        }
+    }
+    if (enablePageLevelSplit_) {
+        TAG_LOGI(AceLogTag::ACE_NAVIGATION,
+            "pageLevelSplit policy page:%{public}s, source:noUpstreamOption, index:%{public}d, "
+            "stackSize:%{public}zu, split:0", pageName.c_str(), index, pageStack_.size());
+    }
+    return true;
+}
+
 bool ForceSplitManager::IsTransitionShouldMovePageToPrimary(const std::string& from, const std::string& to) const
 {
-    if (IsFullScreenPage(from) || IsFullScreenPage(to)) {
+    if (!enablePageLevelSplit_ && (IsFullScreenPage(from) || IsFullScreenPage(to))) {
         return false;
     }
     if (behaviorMode_ == ForceSplitBehaviorMode::DISPLACE) {

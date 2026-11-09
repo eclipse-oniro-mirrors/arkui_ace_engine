@@ -137,11 +137,15 @@ void GetShadowInfoArray(
 {
     for (auto& pixelMap : dragAction->pixelMapList) {
         double scale = 1.0;
-        if (Referenced::RawPtr(pixelMap)) {
-            scale = GetPixelMapScale(pixelMap, dragAction->previewOption.isScaleEnabled, false);
-            auto pixelMapScale = dragAction->windowScale * scale;
-            pixelMap->Scale(pixelMapScale, pixelMapScale, AceAntiAliasingOption::HIGH);
+        if (!Referenced::RawPtr(pixelMap)) {
+            TAG_LOGW(AceLogTag::ACE_DRAG, "pixelMap is null, skip this shadow info");
+            continue;
         }
+
+        scale = GetPixelMapScale(pixelMap, dragAction->previewOption.isScaleEnabled, false);
+        auto pixelMapScale = dragAction->windowScale * scale;
+        pixelMap->Scale(pixelMapScale, pixelMapScale, AceAntiAliasingOption::HIGH);
+
         int32_t width = pixelMap->GetWidth();
         int32_t height = pixelMap->GetHeight();
         double x = dragAction->touchPointX;
@@ -1097,14 +1101,14 @@ bool DragDropFuncWrapper::IsSelectedItemNode(const RefPtr<UINode>& uiNode)
 {
     auto frameNode = AceType::DynamicCast<FrameNode>(uiNode);
     CHECK_NULL_RETURN(frameNode, false);
-    auto gestureHub = frameNode->GetOrCreateGestureEventHub();
-    CHECK_NULL_RETURN(gestureHub, false);
-    auto eventHub = frameNode->GetEventHub<EventHub>();
-    CHECK_NULL_RETURN(eventHub, false);
-    auto dragPreview = frameNode->GetDragPreviewOption();
-    if (!dragPreview.isMultiSelectionEnabled) {
+    auto* dragPreview = frameNode->GetDragPreviewOptionIfExist();
+    if (!dragPreview || !dragPreview->isMultiSelectionEnabled) {
         return false;
     }
+    auto eventHub = frameNode->GetEventHubOnly<EventHub>();
+    CHECK_NULL_RETURN(eventHub, false);
+    auto gestureHub = eventHub->GetGestureEventHub();
+    CHECK_NULL_RETURN(gestureHub, false);
     bool isAllowedDrag = gestureHub->IsAllowedDrag(eventHub);
     if (!isAllowedDrag) {
         return false;

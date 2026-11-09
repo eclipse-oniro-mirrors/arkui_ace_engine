@@ -86,6 +86,7 @@ private:
     void HandleTransformScale();
     void HandleDragEndAnimation();
     void HandleScrollCallback();
+    void TriggerSwapOnContainerScroll();
     void HandleSwapAnimation(int32_t from, int32_t to);
     void SetNearbyNodeScale(RefPtr<FrameNode> node, float scale);
     ScaleResult ScaleAxisNearItem(int32_t index, const RectF& rect, const OffsetF& delta, Axis axis);
@@ -133,6 +134,7 @@ private:
     Shadow prevShadow_;
     int32_t prevZIndex_ = 0;
     ListItemDragState dragState_ = ListItemDragState::IDLE;
+    bool isMouseDrag_ = false;
 };
 } // namespace OHOS::Ace::NG
 

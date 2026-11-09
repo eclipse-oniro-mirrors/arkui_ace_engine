@@ -415,6 +415,12 @@ public:
     void OnFullScreenOverlayEnter(const char* mediaInfo) override;
     void OnVideoStatusChanged(const int action, const std::map<std::string, std::string> &param) override;
     void OnInputMethodAttached() override;
+
+    void OnColorChooserPopup(const std::string& color,
+        const std::vector<NWeb::NWebColorSuggestion>& suggestions,
+        std::shared_ptr<NWeb::NWebColorChooserCallback> callback) override;
+    void OnColorChooserClose() override;
+
 private:
     std::weak_ptr<OHOS::NWeb::NWeb> webviewWeak_;
     WeakPtr<WebDelegate> webDelegate_;

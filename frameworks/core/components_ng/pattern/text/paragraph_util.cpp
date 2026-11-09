@@ -276,7 +276,11 @@ void ParagraphUtil::ConstructParagraphSpanGroup(std::list<RefPtr<SpanItem>>& spa
         ++it;
     }
     if (!spans.empty()) {
-        auto maxlines = spans.front()->textLineStyle->GetMaxLines().value_or(UINT32_MAX);
+        auto spanItem = spans.front();
+        CHECK_NULL_VOID(spanItem);
+        const auto& textLineStyle = spanItem->textLineStyle;
+        CHECK_NULL_VOID(textLineStyle);
+        auto maxlines = textLineStyle->GetMaxLines().value_or(UINT32_MAX);
         spanStringHasMaxLines |= maxlines != UINT32_MAX;
         spanGroupVec.emplace_back(std::move(spans));
     }

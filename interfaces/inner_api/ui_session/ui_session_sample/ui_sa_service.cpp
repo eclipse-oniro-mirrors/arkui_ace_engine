@@ -794,8 +794,9 @@ void UiSaService::HandleInspectorTree(
     auto callback = [toFile, filePath, start, now, api, caseId, count](std::string data, int32_t part, bool last) {
         const auto calls = ++*count;
         LOGI("[InspectorTree] caseId=%{public}s api=%{public}s bytes=%{public}zu part=%{public}d "
-            "lastPart=%{public}d callbackCount=%{public}d startMs=%{public}" PRId64 " endMs=%{public}" PRId64,
-            caseId.c_str(), api.c_str(), data.size(), part, last, calls, start, now());
+             "lastPart=%{public}d callbackCount=%{public}d startMs=%{public}" PRId64 " endMs=%{public}" PRId64,
+            caseId.c_str(), api.c_str(), data.size(), part, last, calls, static_cast<int64_t>(start),
+            static_cast<int64_t>(now()));
         if (toFile && last) {
             std::ofstream output(filePath, std::ios::binary | std::ios::trunc);
             output.write(data.data(), static_cast<std::streamsize>(data.size()));
@@ -810,7 +811,7 @@ void UiSaService::HandleInspectorTree(
     const auto result = visible ? service->GetVisibleInspectorTree(callback, config, timeout) :
         service->GetInspectorTree(callback, config, timeout);
     LOGI("[InspectorTree] caseId=%{public}s api=%{public}s returnCode=%{public}d startMs=%{public}" PRId64,
-        caseId.c_str(), api.c_str(), result, start);
+        caseId.c_str(), api.c_str(), result, static_cast<int64_t>(start));
 }
 
 void UiSaService::HandleGetCurrentPageName(sptr<IUiContentService> service, std::vector<std::string> params)

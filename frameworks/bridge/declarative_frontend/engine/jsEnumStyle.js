@@ -2010,6 +2010,12 @@ let GridRowDirection;
   GridRowDirection[GridRowDirection.RowReverse = 1] = 'RowReverse';
 })(GridRowDirection || (GridRowDirection = {}));
 
+let AgentControlMode;
+(function (AgentControlMode) {
+  AgentControlMode[AgentControlMode.ALLOW = 0] = 'ALLOW';
+  AgentControlMode[AgentControlMode.DENY = 1] = 'DENY';
+})(AgentControlMode || (AgentControlMode = {}));
+
 let HitTestMode;
 (function (HitTestMode) {
   HitTestMode[HitTestMode.Default = 0] = 'Default';
@@ -2179,6 +2185,14 @@ let SheetTitleBarBackgroundBlur;
   SheetTitleBarBackgroundBlur[SheetTitleBarBackgroundBlur.NONE = 0] = 'NONE';
   SheetTitleBarBackgroundBlur[SheetTitleBarBackgroundBlur.GRADIENT = 1] = 'GRADIENT';
 })(SheetTitleBarBackgroundBlur || (SheetTitleBarBackgroundBlur = {}));
+
+let VibrancyMode;
+(function (VibrancyMode) {
+  VibrancyMode[VibrancyMode.DISABLED = 0] = 'DISABLED';
+  VibrancyMode[VibrancyMode.AUTO = 1] = 'AUTO';
+  VibrancyMode[VibrancyMode.BRIGHTEN = 2] = 'BRIGHTEN';
+  VibrancyMode[VibrancyMode.DARKEN = 3] = 'DARKEN';
+})(VibrancyMode || (VibrancyMode = {}));
 
 let FunctionKey;
 (function (FunctionKey) {

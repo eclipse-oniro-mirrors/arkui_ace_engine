@@ -4897,5 +4897,91 @@ HWTEST_F(PipelineContextTestNg, GetNavDestinationJSViewName003, TestSize.Level1)
     auto result = context_->GetNavDestinationJSViewName(pageInfo);
     EXPECT_EQ(result, "");
 }
+
+/**
+ * @tc.name: GetDumpStartNodesWithoutPage
+ * @tc.desc: Missing stage manager, missing stage and empty stage all fall back to the same instance root.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, GetDumpStartNodesWithoutPage, TestSize.Level1)
+{
+    auto root = FrameNode::CreateFrameNode(
+        V2::ROOT_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    auto stage = FrameNode::CreateFrameNode(
+        V2::STAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<StagePattern>());
+    root->SetActive(true);
+    auto savedRoot = context_->rootNode_;
+    auto savedStage = context_->stageManager_;
+    context_->rootNode_ = root;
+    const std::vector<RefPtr<StageManager>> managers {
+        nullptr, AceType::MakeRefPtr<StageManager>(nullptr), AceType::MakeRefPtr<StageManager>(stage) };
+    for (const auto& manager : managers) {
+        context_->stageManager_ = manager;
+        auto nodes = context_->GetDumpStartNodes();
+        EXPECT_EQ(nodes.pageStartNodes, (std::vector<RefPtr<FrameNode>> { root }));
+    }
+    context_->rootNode_ = nullptr;
+    EXPECT_TRUE(context_->GetDumpStartNodes().pageStartNodes.empty());
+    context_->rootNode_ = savedRoot;
+    context_->stageManager_ = savedStage;
+}
+
+/**
+ * @tc.name: GetDumpStartNodesNavigationWithoutPage
+ * @tc.desc: Build root/stack/navigation without stage/page; select the destination, then fall back after removal.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, GetDumpStartNodesNavigationWithoutPage, TestSize.Level1)
+{
+    auto root = FrameNode::CreateFrameNode(
+        V2::ROOT_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    auto stack = FrameNode::CreateFrameNode(
+        V2::STACK_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    auto navigation = NavigationGroupNode::GetOrCreateGroupNode(V2::NAVIGATION_VIEW_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<NavigationPattern>(); });
+    auto destination = NavDestinationGroupNode::GetOrCreateGroupNode(V2::NAVDESTINATION_VIEW_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    auto navigationStack = AceType::MakeRefPtr<NavigationStack>();
+    navigationStack->SetNavPathList({ { "destination", destination } });
+    navigation->GetPattern<NavigationPattern>()->SetNavigationStack(navigationStack);
+    navigation->SetNavBarNode(nullptr);
+    root->SetActive(true);
+    stack->SetActive(true);
+    navigation->SetActive(true);
+    destination->SetActive(true);
+    root->AddChild(stack);
+    stack->AddChild(navigation);
+    auto savedRoot = context_->rootNode_;
+    auto savedStage = context_->stageManager_;
+    context_->rootNode_ = root;
+    context_->stageManager_ = AceType::MakeRefPtr<StageManager>(nullptr);
+    auto nodes = context_->GetDumpStartNodes();
+    EXPECT_EQ(nodes.pageStartNodes, (std::vector<RefPtr<FrameNode>> { destination }));
+    stack->RemoveChild(navigation);
+    EXPECT_EQ(context_->GetDumpStartNodes().pageStartNodes, (std::vector<RefPtr<FrameNode>> { root }));
+    context_->rootNode_ = savedRoot;
+    context_->stageManager_ = savedStage;
+}
+
+/**
+ * @tc.name: GetDumpStartNodesKeepsLastPage
+ * @tc.desc: With a stage containing two pages, keep the last page as the traversal root.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, GetDumpStartNodesKeepsLastPage, TestSize.Level1)
+{
+    auto stage = FrameNode::CreateFrameNode(
+        V2::STAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<StagePattern>());
+    auto firstPage = FrameNode::CreateFrameNode(
+        V2::PAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    auto lastPage = FrameNode::CreateFrameNode(
+        V2::PAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    stage->AddChild(firstPage);
+    stage->AddChild(lastPage);
+    auto savedStage = context_->stageManager_;
+    context_->stageManager_ = AceType::MakeRefPtr<StageManager>(stage);
+    EXPECT_EQ(context_->GetDumpStartNodes().pageStartNodes, (std::vector<RefPtr<FrameNode>> { lastPage }));
+    context_->stageManager_ = savedStage;
+}
 } // namespace NG
 } // namespace OHOS::Ace

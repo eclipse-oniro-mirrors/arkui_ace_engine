@@ -35,6 +35,11 @@ enum class MenuBindingType {
 
 namespace OHOS::Ace::NG {
 
+enum class AgentControlMode : int32_t {
+    ALLOW = 0,
+    DENY = 1,
+};
+
 enum class HitTestMode {
     /**
      *  Both self and children respond to the hit test for touch events,

@@ -14,9 +14,11 @@
  */
 
 #include <dlfcn.h>
+#include <mutex>
 #include "view_data_wrap_ohos.h"
 
 namespace OHOS::Ace {
+namespace {
 #ifdef APP_USE_ARM
 constexpr char LIB_HINT2_TYPE_Z_SO_NAME[] = "/system/lib/platformsdk/libhint2type.z.so";
 #elif defined(APP_USE_X86_64)
@@ -29,6 +31,58 @@ constexpr char MERGE_HINT_2_TYPE_AND_MSDP_TYPE[] = "MergeHint2TypeAndMsdpType";
 using Hint2Type = int (*) (std::vector<std::string>, std::vector<int>&, std::vector<std::string>&);
 using MergeHint2TypeAndMsdpType = int (*) (const std::vector<std::string>&, const std::vector<std::string>&,
     std::vector<int>&, std::vector<std::string>&);
+
+class Hint2TypeLoader {
+public:
+    static Hint2TypeLoader& GetInstance()
+    {
+        // Keep the loader and library alive until process exit so cached functions remain valid.
+        static auto* loader = new Hint2TypeLoader();
+        return *loader;
+    }
+
+    Hint2Type GetHint2Type()
+    {
+        return LoadSymbol(hint2Type_, HINT_2_TYPE);
+    }
+
+    MergeHint2TypeAndMsdpType GetMergeHint2TypeAndMsdpType()
+    {
+        return LoadSymbol(mergeHint2TypeAndMsdpType_, MERGE_HINT_2_TYPE_AND_MSDP_TYPE);
+    }
+
+private:
+    Hint2TypeLoader() = default;
+
+    template<typename T>
+    T LoadSymbol(T& function, const char* symbol)
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (function != nullptr) {
+            return function;
+        }
+        if (handle_ == nullptr) {
+            handle_ = dlopen(LIB_HINT2_TYPE_Z_SO_NAME, RTLD_LAZY);
+            if (handle_ == nullptr) {
+                LOGE("Failed to open libhint2type library %{public}s, reason: %{public}s",
+                    LIB_HINT2_TYPE_Z_SO_NAME, dlerror());
+                return nullptr;
+            }
+        }
+        // Cache only successful lookups; retry failures independently for each symbol.
+        function = reinterpret_cast<T>(dlsym(handle_, symbol));
+        if (function == nullptr) {
+            LOGE("Failed to get symbol %{public}s in %{public}s", symbol, LIB_HINT2_TYPE_Z_SO_NAME);
+        }
+        return function;
+    }
+
+    std::mutex mutex_;
+    void* handle_ = nullptr;
+    Hint2Type hint2Type_ = nullptr;
+    MergeHint2TypeAndMsdpType mergeHint2TypeAndMsdpType_ = nullptr;
+};
+} // namespace
 
 RefPtr<PageNodeInfoWrap> PageNodeInfoWrap::CreatePageNodeInfoWrap()
 {
@@ -69,49 +123,28 @@ AbilityBase::AutoFillType ViewDataWrap::ViewDataToType(const AbilityBase::ViewDa
 bool ViewDataWrap::LoadHint2Type(const std::vector<std::string>& placeHolder, std::vector<int>& intType,
                                  std::vector<std::string>& metadata)
 {
-    void* handle = dlopen(LIB_HINT2_TYPE_Z_SO_NAME, RTLD_LAZY);
-    if (handle == nullptr) {
-        LOGE("Failed to open libhint2type library %{public}s, reason: %{public}sn",
-            LIB_HINT2_TYPE_Z_SO_NAME, dlerror());
-        return false;
-    }
-    Hint2Type hintFun = reinterpret_cast<Hint2Type>(dlsym(handle, HINT_2_TYPE));
+    auto hintFun = Hint2TypeLoader::GetInstance().GetHint2Type();
     if (hintFun == nullptr) {
-        dlclose(handle);
-        LOGE("Failed to get symbol %{public}s in %{public}s", HINT_2_TYPE, LIB_HINT2_TYPE_Z_SO_NAME);
         return false;
     }
     if (hintFun(placeHolder, intType, metadata)) {
         LOGE("Failed to Hint 2 intType");
-        dlclose(handle);
         return false;
     }
-    dlclose(handle);
     return true;
 }
 
 bool ViewDataWrap::LoadMergeHint2TypeAndMsdpType(const std::vector<std::string>& placeHolder,
     const std::vector<std::string>& msdpType, std::vector<int>& intType, std::vector<std::string>& metadata)
 {
-    void* handle = dlopen(LIB_HINT2_TYPE_Z_SO_NAME, RTLD_LAZY);
-    if (handle == nullptr) {
-        LOGE("Failed to open libhint2type library %{public}s, reason: %{public}sn",
-            LIB_HINT2_TYPE_Z_SO_NAME, dlerror());
-        return false;
-    }
-    auto mergeHintFun = reinterpret_cast<MergeHint2TypeAndMsdpType>(dlsym(handle, MERGE_HINT_2_TYPE_AND_MSDP_TYPE));
+    auto mergeHintFun = Hint2TypeLoader::GetInstance().GetMergeHint2TypeAndMsdpType();
     if (mergeHintFun == nullptr) {
-        dlclose(handle);
-        LOGE("Failed to get symbol %{public}s in %{public}s", MERGE_HINT_2_TYPE_AND_MSDP_TYPE,
-            LIB_HINT2_TYPE_Z_SO_NAME);
         return false;
     }
     if (mergeHintFun(placeHolder, msdpType, intType, metadata)) {
         LOGE("Failed to call MergeHint2TypeAndMsdpType");
-        dlclose(handle);
         return false;
     }
-    dlclose(handle);
     return true;
 }
 

@@ -27,6 +27,7 @@
 #include "test/unittest/core/pattern/test_ng.h"
 
 #include "base/geometry/offset.h"
+#include "base/i18n/localization.h"
 #include "base/log/log_wrapper.h"
 #include "core/components/progress/progress_theme.h"
 #include "core/components/theme/theme.h"
@@ -2027,5 +2028,28 @@ HWTEST_F(GaugePatternTestNg, GaugeIsMatchParentTest001, TestSize.Level1)
      */
     EXPECT_TRUE(gaugePattern->IsEnableMatchParent());
     EXPECT_TRUE(gaugePattern->IsEnableFix());
+}
+
+/**
+ * @tc.name: GaugeAccessibilityGetTextTest001
+ * @tc.desc: Test GaugeAccessibilityProperty GetText in non-Chinese (NumberFormat) and Chinese (to_string) locales.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GaugePatternTestNg, GaugeAccessibilityGetTextTest001, TestSize.Level1)
+{
+    Create(75.0f, MIN, MAX);
+    ASSERT_NE(accessibilityProperty_, nullptr);
+    ASSERT_NE(paintProperty_, nullptr);
+
+    // non-"zh" (languageTag_ empty => "Chinese") => NumberFormat path
+    Localization::GetInstance()->SetLocaleImpl("", "", "", "", "");
+    EXPECT_EQ(accessibilityProperty_->GetText(), "75.000000");
+
+    // "zh" => to_string path
+    Localization::GetInstance()->SetLocaleImpl("zh", "", "", "", "");
+    EXPECT_EQ(accessibilityProperty_->GetText(), "75.000000");
+
+    // restore
+    Localization::GetInstance()->SetLocaleImpl("", "", "", "", "");
 }
 } // namespace OHOS::Ace::NG

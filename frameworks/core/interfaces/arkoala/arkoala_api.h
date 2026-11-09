@@ -50,10 +50,10 @@ class SymbolEffectOptions;
 extern "C" {
 #endif
 
-#define ARKUI_FULL_API_VERSION 145
+#define ARKUI_FULL_API_VERSION 146
 // When changing ARKUI_BASIC_API_VERSION, ARKUI_FULL_API_VERSION must be
 // increased as well.
-#define ARKUI_NODE_API_VERSION 145
+#define ARKUI_NODE_API_VERSION 146
 
 #define ARKUI_BASIC_API_VERSION 8
 #define ARKUI_EXTENDED_API_VERSION 8
@@ -3958,6 +3958,10 @@ struct ArkUICommonModifier {
     ArkUI_Bool (*getLinearGradientBlur)(ArkUINodeHandle node, OH_ArkUI_LinearGradientBlurOptions* options);
     void (*setShadowClipMode)(ArkUINodeHandle node, ArkUI_Int32 clipMode);
     void (*resetShadowClipMode)(ArkUINodeHandle node);
+    void (*setAgentControlMode)(ArkUINodeHandle node, ArkUI_Int32 value);
+    ArkUI_Int32 (*registerApplicationShortcut)(const std::string& value, uint8_t keys,
+        std::function<void(ArkUI_Int32)>&& callback);
+    void (*unregisterApplicationShortcut)(ArkUI_Int32 registrationId);
 };
 
 struct ArkUICommonShapeModifier {
@@ -5567,6 +5571,7 @@ struct ArkUIScrollableModifier {
     void (*setEnableScrollWithKeyboard)(ArkUINodeHandle node, ArkUI_Bool value);
     void (*resetEnableScrollWithKeyboard)(ArkUINodeHandle node);
     ArkUI_Int32 (*getEnableScrollWithKeyboard)(ArkUINodeHandle node);
+    ArkUI_Int32 (*getScrollState)(ArkUINodeHandle node);
 };
 
 struct ArkUIScrollModifier {
@@ -5713,7 +5718,6 @@ struct ArkUIScrollerModifier {
     void (*getCurrentOffset)(ArkUINodeHandle node, ArkUI_Float32* out);
     void (*scrollTo)(ArkUINodeHandle node, ArkUI_Float32* xOffsetArray, ArkUI_Float32* yOffsetArray,
         ArkUI_Bool animation, const struct ArkUIScrollerAnimationType* animationType);
-    ArkUI_Int32 (*getScrollState)(ArkUINodeHandle node);
 };
 
 struct ArkUITabsModifier {
@@ -10456,6 +10460,10 @@ struct ArkUINDKRenderNodeModifier {
     ArkUI_Int32 (*adoptChildWithPolicy)(ArkUINodeHandle node, ArkUINodeHandle child, ArkUI_Int32 policy);
     ArkUI_Int32 (*setAdoptedChildOverlayPositionCompensation)(ArkUINodeHandle adoptedChild,
         ArkUI_Float32 offsetX, ArkUI_Float32 offsetY, ArkUIMatrix4Handle transform);
+    ArkUI_Int32 (*addChildWithPolicy)(ArkUIRenderNodeHandle node, ArkUIRenderNodeHandle child,
+        ArkUI_Int32 policy);
+    ArkUI_Int32 (*insertChildAfterWithPolicy)(ArkUIRenderNodeHandle node, ArkUIRenderNodeHandle child,
+        ArkUIRenderNodeHandle sibling, ArkUI_Int32 policy);
 };
 
 struct ArkUIDynamicLayoutModifier {

@@ -652,6 +652,8 @@ public:
 
     const RefPtr<DragDropRelatedConfigurations>& GetOrCreateDragDropRelatedConfigurations();
 
+    const DragPreviewOption* GetDragPreviewOptionIfExist() const;
+
     void CreateEventHubInner();
 
     const RefPtr<FocusHub>& GetFocusHub() const;
@@ -1061,6 +1063,10 @@ public:
 
     void SetHitTestMode(HitTestMode mode);
     HitTestMode GetHitTestMode() const override;
+
+    void SetAgentControlMode(const std::optional<AgentControlMode>& mode);
+    bool HasAgentControlMode() const;
+    AgentControlMode GetAgentControlMode() const;
 
     TouchResult GetOnChildTouchTestRet(const std::vector<TouchTestInfo>& touchInfo);
     OnChildTouchTestFunc GetOnTouchTestFunc();
@@ -1735,6 +1741,10 @@ protected:
 private:
     void NotifyVisibleChange(VisibleType preVisibility, VisibleType currentVisibility, bool notifyPageScene);
 
+    // Forwards node-side split changes to the ContentChangeManager bound to this
+    // node's context; no-op unless split tracking is installed. Logic lives in the manager.
+    void NotifyPageSceneSplitChanged(bool attached = false);
+
     // Preserve the static fast path; virtual-base downcasts require type information.
     template<typename T, typename O>
     static auto CastComponentPtr(O* ptr, int) -> decltype(static_cast<T*>(ptr))
@@ -1989,6 +1999,7 @@ private:
     bool isPrivacySensitive_ = false;
     // Only ordinary bindMenu sets this preference; no value means no ordinary menu binding.
     std::optional<bool> inspectorMenuShowInSubWindow_;
+    std::optional<AgentControlMode> agentControlMode_;
 
     // for container, this flag controls only the last child in touch area is consuming event.
     bool exclusiveEventForChild_ = false;

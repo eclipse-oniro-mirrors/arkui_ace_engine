@@ -30,6 +30,7 @@ struct AxisEvent;
 // Forward declarations
 namespace NG {
 class NGGestureRecognizer;
+class FrameNode;
 } // namespace NG
 
 enum class MouseAction : int32_t {
@@ -83,6 +84,7 @@ struct TouchRestrict final {
     // use to dump event tree
     NG::EventTreeType touchTestType = NG::EventTreeType::TOUCH;
     bool isCoastingAxisEvent = false;
+    WeakPtr<NG::FrameNode> sensitiveInputHitNode;
 };
 
 class TouchCallBackInfo : public BaseEventInfo {

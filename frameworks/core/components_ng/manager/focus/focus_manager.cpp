@@ -493,6 +493,12 @@ void FocusManager::FocusSwitchingEnd(SwitchingEndReason reason)
     // While switching window, focus may move by steps.(WindowFocus/FlushFocus)
     // Merge all steps together as a single movement.
     if (!isSwitchingFocus_.value_or(false)) {
+        auto lastHub = currentFocus_.Upgrade();
+        TAG_LOGI(AceLogTag::ACE_FOCUS, "FocusSwitch end skipped, not switching. "
+            "cur:%{public}s/" SEC_PLD(%{public}d) " e:%{public}d has_value:%{public}d",
+            lastHub ? lastHub->GetFrameName().c_str() : "NULL",
+            SEC_PARAM(lastHub ? lastHub->GetFrameId() : -1),
+            reason, isSwitchingFocus_.has_value());
         return;
     }
     if (!isSwitchingWindow_) {
@@ -514,6 +520,9 @@ void FocusManager::FocusSwitchingEnd(SwitchingEndReason reason)
         PaintFocusState();
         ArrangeModalFocusViewStack();
     } else {
+        TAG_LOGI(AceLogTag::ACE_FOCUS, "FocusSwitch end deferred, switching window. "
+            "s:%{public}d e:%{public}d",
+            startReason_.value_or(SwitchingStartReason::DEFAULT), reason);
         isSwitchingFocus_ = false;
         endReason_ = reason;
     }
@@ -549,6 +558,11 @@ void FocusManager::FocusGuard::CreateFocusGuard(const RefPtr<FocusHub>& focusHub
 {
     CHECK_NULL_VOID(focusManager);
     if (focusManager->isSwitchingFocus_.value_or(false)) {
+        TAG_LOGD(AceLogTag::ACE_FOCUS, "FocusGuard create skipped, already switching. "
+            "hub:%{public}s/" SEC_PLD(%{public}d) " reason:%{public}d s:%{public}d",
+            focusHub ? focusHub->GetFrameName().c_str() : "NULL",
+            SEC_PARAM(focusHub ? focusHub->GetFrameId() : -1),
+            reason, focusManager->startReason_.value_or(SwitchingStartReason::DEFAULT));
         return;
     }
     focusManager->FocusSwitchingStart(focusHub, reason);
@@ -565,6 +579,12 @@ FocusManager::FocusGuard::FocusGuard(const RefPtr<FocusHub>& focusHub,
     }
 
     auto mng = hub ? hub->GetFocusManager() : GetCurrentFocusManager();
+    if (!mng) {
+        TAG_LOGW(AceLogTag::ACE_FOCUS, "FocusGuard create failed, no focusManager. "
+            "hub:%{public}s/" SEC_PLD(%{public}d) " reason:%{public}d",
+            hub ? hub->GetFrameName().c_str() : "NULL",
+            SEC_PARAM(hub ? hub->GetFrameId() : -1), reason);
+    }
     CreateFocusGuard(hub, mng, reason);
 }
 

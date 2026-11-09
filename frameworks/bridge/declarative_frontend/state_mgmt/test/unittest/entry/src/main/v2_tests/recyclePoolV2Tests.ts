@@ -20,11 +20,16 @@ declare class ViewV2 {
 }
 
 declare class RecyclePoolV2 {
-  pushRecycleV2Component(reuseId: string, reuseComp: ViewV2): void;
+  pushRecycleV2Component(reuseId: string, reuseComp: ViewV2, memOptStrategy?: number, cachedCount?: number): void;
   popRecycleV2Component(reuseId: string): ViewV2 | undefined;
   updateRecycleIdMapping(recycledElementId: number, newElmtId: number): void;
   getRecycleIdMapping(recycledElementId: number): number;
+  setRequestProgressiveReleaseCallback(callback: () => void): void;
+  prepareCleanCacheToTargetProgressive(reuseId: string, targetSize: number): number;
   purgeAllCachedRecycleElmtIds(): void;
+  purgeAllCleanableRecycleElmtIds(): void;
+  preparePurgeAllCleanableRecycleElmtIdsProgressive(): number;
+  releaseCachedNodesProgressive(remainingTimeMs: number): boolean;
 }
 
 declare class RecycledIdRegistry {

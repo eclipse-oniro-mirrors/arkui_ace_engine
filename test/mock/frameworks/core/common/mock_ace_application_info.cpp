@@ -24,7 +24,11 @@ class MockAceApplicationInfo : public AceApplicationInfo {
     }
     void ChangeLocale(const std::string& language, const std::string& countryOrRegion) override {}
 
-    void SetDebug(bool isDebugVersion, bool needDebugBreakpoint) override {}
+    void SetDebug(bool isDebugVersion, bool needDebugBreakpoint) override
+    {
+        isDebugVersion_ = isDebugVersion;
+        needDebugBreakpoint_ = needDebugBreakpoint;
+    }
 
     bool GetBundleInfo(const std::string& packageName, AceBundleInfo& bundleInfo) override
     {

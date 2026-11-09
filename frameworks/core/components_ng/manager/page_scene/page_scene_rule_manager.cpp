@@ -46,6 +46,7 @@ constexpr int32_t PAGE_SCENE_NO_ERROR = 0;
 constexpr int32_t PAGE_SCENE_PARAM_INVALID = 4;
 constexpr int32_t PAGE_SCENE_LAST_UNFINISH = 5;
 const char TEXT_EDITOR_SCENE[] = "TEXT_EDITOR";
+const char SPLIT_SCENE[] = "SPLIT";
 const char EXIT_EVENT_SUFFIX[] = "_EXIT";
 const char COUNT_GTE_OPERATOR[] = "COUNT_GTE";
 const char SOURCE_ARKUI[] = "ARKUI";
@@ -285,6 +286,26 @@ std::unique_ptr<JsonValue> GetObjectValue(const std::unique_ptr<JsonValue>& json
     return value;
 }
 
+// Mirrors PageSceneSplit::ContainsSplitRule for JsonUtil roots so this
+// translation unit stays free of cJSON includes and their build dependency.
+bool ContainsSplitSceneRule(const std::unique_ptr<JsonValue>& root)
+{
+    if (!root || !root->IsObject()) {
+        return false;
+    }
+    auto rules = root->GetValue("rules");
+    if (!rules || !rules->IsArray()) {
+        return false;
+    }
+    for (int32_t index = 0; index < rules->GetArraySize(); ++index) {
+        auto item = rules->GetArrayItem(index);
+        if (item && item->GetString("sceneType") == SPLIT_SCENE) {
+            return true;
+        }
+    }
+    return false;
+}
+
 std::string NormalizeNodeType(const std::string& tag)
 {
     if (tag == V2::TEXTINPUT_ETS_TAG) {
@@ -512,6 +533,19 @@ std::optional<PageSceneNodeInfo> PageSceneInputCountTracker::BuildNodeInfo(
     info.rect.width = rect.Width();
     info.rect.height = rect.Height();
     return info;
+}
+
+DumpStartNodeSet PageSceneRuleManager::CollectSplitStartNodes(const RefPtr<FrameNode>& rootNode,
+    const RefPtr<FrameNode>& containerModalNode, const RefPtr<FrameNode>& lastPageNode,
+    const RefPtr<OverlayManager>& overlayManager)
+{
+    // Overlay discovery skips Stage subtrees. Passing no page avoids the
+    // Inspector's recursive FindTopNavDestination walk on every stable frame.
+    auto roots = DumpUtil::CollectInspectorStartNodes(rootNode, containerModalNode, nullptr, overlayManager);
+    if (lastPageNode) {
+        roots.pageStartNodes.emplace_back(lastPageNode);
+    }
+    return roots;
 }
 
 PageSceneRuleManager::~PageSceneRuleManager()
@@ -1016,6 +1050,9 @@ std::optional<PageSceneMatchResult> PageSceneRuleManager::MatchPageScene(
 bool PageSceneRuleManager::ShouldReport(int32_t processId, const PageSceneMatchResult& result)
 {
     std::lock_guard<std::mutex> lock(mutex_);
+    if (result.sceneType == SPLIT_SCENE) {
+        return ShouldReportSplitLocked(processId, result);
+    }
     auto key = std::to_string(processId) + ":" + result.ruleSetId + ":" + result.ruleId + ":" + SOURCE_ARKUI;
     auto iter = reportStates_.find(key);
     if (!result.matched) {
@@ -1036,7 +1073,37 @@ bool PageSceneRuleManager::ShouldReport(int32_t processId, const PageSceneMatchR
             return false;
         }
     }
-    reportStates_[key] = { result.nodeIds, now };
+    reportStates_[key] = { result.nodeIds, result.splitType, now };
+    return true;
+}
+
+namespace {
+// Split state compares the matched node id set order-insensitively: candidate
+// ordering must not affect the report/dedup result.
+bool SameSplitNodeIds(const std::vector<int32_t>& lhs, const std::vector<int32_t>& rhs)
+{
+    return lhs.size() == rhs.size() && std::is_permutation(lhs.begin(), lhs.end(), rhs.begin(), rhs.end());
+}
+} // namespace
+
+bool PageSceneRuleManager::ShouldReportSplitLocked(int32_t processId, const PageSceneMatchResult& result)
+{
+    // Split ignores policy input: report every state change immediately, dedup identical results.
+    auto& states = splitReportPolicyStates_;
+    auto key = std::to_string(processId) + ":" + result.ruleSetId + ":" + result.ruleId + ":" + SOURCE_ARKUI;
+    auto iter = states.find(key);
+    if (!result.matched) {
+        if (iter == states.end()) {
+            return false;
+        }
+        states.erase(iter);
+        return true;
+    }
+    if (iter != states.end() && SameSplitNodeIds(iter->second.lastReportedNodeIds, result.nodeIds) &&
+        iter->second.lastSplitType == result.splitType) {
+        return false;
+    }
+    states[key] = { result.nodeIds, result.splitType, {} };
     return true;
 }
 
@@ -1054,14 +1121,15 @@ std::optional<PageSceneRuleSet> PageSceneRuleManager::ParseRuleSet(const std::st
         LOGW("Parse page scene rule failed, invalid json");
         return std::nullopt;
     }
+    const bool hasSplit = ContainsSplitSceneRule(root);
     PageSceneRuleSet ruleSet;
     ruleSet.rawJson = ruleJson;
     ruleSet.version = root->GetInt("version", 0);
-    if (ruleSet.version != PAGE_SCENE_RULE_VERSION) {
+    if (!hasSplit && ruleSet.version != PAGE_SCENE_RULE_VERSION) {
         return std::nullopt;
     }
     ruleSet.ruleSetId = root->GetString("ruleSetId");
-    if (!IsValidId(ruleSet.ruleSetId)) {
+    if (!hasSplit && !IsValidId(ruleSet.ruleSetId)) {
         return std::nullopt;
     }
 
@@ -1099,19 +1167,59 @@ std::optional<PageSceneRuleSet> PageSceneRuleManager::ParseRuleSet(const std::st
     return ruleSet;
 }
 
+namespace {
+PageSceneRule ReadValidatedSplitRule(const std::unique_ptr<JsonValue>& json)
+{
+    // Only decode Proxy-validated SPLIT data. Do not repeat tag/range/type/duplicate checks here.
+    // Split ignores the policy input: registration reports immediately and every state change
+    // reports without interval throttling, so reportOnRegister/minReportIntervalMs keep defaults.
+    PageSceneRule rule;
+    rule.ruleId = json->GetString("ruleId");
+    rule.sceneType = SPLIT_SCENE;
+    rule.enabled = json->GetBool("enabled", true);
+    rule.allowNavigation = json->GetBool("navigation", true);
+    auto custom = json->GetValue("custom");
+    if (custom && custom->IsObject()) {
+        auto selectors = custom->GetValue("selectors");
+        if (selectors && selectors->IsArray()) {
+            for (int32_t index = 0; index < selectors->GetArraySize(); ++index) {
+                rule.compNames.emplace_back(selectors->GetArrayItem(index)->GetString("compName"));
+            }
+        }
+        auto geometry = custom->GetValue("geometry");
+        if (geometry && geometry->IsObject()) {
+            rule.heightRatioGt = geometry->GetDouble("heightRatioGt", 0.0);
+            rule.widthRatioLte = geometry->GetDouble("widthRatioLte", 0.0);
+            rule.totalWidthRatioGt = geometry->GetDouble("totalWidthRatioGt", 0.0);
+            rule.nonOverlapping = geometry->GetBool("nonOverlapping", true);
+        }
+    }
+    auto report = json->GetValue("report");
+    if (report && report->IsObject()) {
+        rule.includeNodeIds = report->GetBool("includeNodeIds", true);
+        rule.includeNodeTypes = report->GetBool("includeNodeTypes", true);
+        rule.includeRect = report->GetBool("includeRect", true);
+    }
+    return rule;
+}
+} // namespace
+
 std::optional<PageSceneRule> PageSceneRuleManager::ParseRule(const std::unique_ptr<JsonValue>& ruleJson) const
 {
     if (!ruleJson || !ruleJson->IsObject()) {
         return std::nullopt;
     }
+    if (ruleJson->GetString("sceneType") == SPLIT_SCENE) {
+        return ReadValidatedSplitRule(ruleJson);
+    }
     PageSceneRule rule;
     rule.ruleId = ruleJson->GetString("ruleId");
     rule.sceneType = ruleJson->GetString("sceneType");
-    rule.enabled = ruleJson->GetBool("enabled", true);
     if (!IsValidId(rule.ruleId) || rule.sceneType != TEXT_EDITOR_SCENE) {
         return std::nullopt;
     }
 
+    rule.enabled = ruleJson->GetBool("enabled", true);
     auto scope = GetObjectValue(ruleJson, "scope");
     if (scope) {
         rule.onlyVisible = scope->GetBool("onlyVisible", true);
@@ -1225,6 +1333,139 @@ std::optional<SearchSceneRule> PageSceneRuleManager::ParseSearchRule(
     return rule;
 }
 
+namespace {
+std::unique_ptr<JsonValue> BuildSplitSceneNodes(const PageSceneRule& rule, const std::vector<PageSceneNodeInfo>& nodes)
+{
+    auto array = JsonUtil::CreateArray(true);
+    for (const auto& node : nodes) {
+        auto json = JsonUtil::Create(true);
+        if (rule.includeNodeIds) {
+            json->Put("nodeId", node.nodeId);
+        }
+        if (rule.includeNodeTypes) {
+            json->Put("nodeType", node.nodeType.c_str());
+        }
+        if (rule.includeRect) {
+            json->Put("rect", BuildRectJson(node.rect));
+        }
+        array->Put(json);
+    }
+    return array;
+}
+
+void AddCompiledRule(const PageSceneRule& rule, CompiledSplitRuleSet& compiled)
+{
+    auto& spec = compiled.splitSpecs.emplace_back();
+    spec.compNames = rule.compNames;
+    spec.allowNavigation = rule.allowNavigation;
+    spec.heightRatioGt = rule.heightRatioGt;
+    spec.widthRatioLte = rule.widthRatioLte;
+    spec.totalWidthRatioGt = rule.totalWidthRatioGt;
+    spec.nonOverlapping = rule.nonOverlapping;
+    if (!compiled.ruleSet.arkuiEnabled) {
+        return;
+    }
+    if (!rule.enabled) {
+        return;
+    }
+    compiled.customTags.insert(rule.compNames.begin(), rule.compNames.end());
+    if (rule.allowNavigation) {
+        compiled.trackNavigation = true;
+    } else {
+        compiled.navigationDisabledTags.insert(rule.compNames.begin(), rule.compNames.end());
+    }
+}
+
+PageSceneMatchResult BuildSplitMatchResult(const CompiledSplitRuleSet& compiled, size_t index,
+    const SplitSceneMatchState& match, const std::string& pageName)
+{
+    const auto& rule = compiled.ruleSet.rules[index];
+    PageSceneMatchResult result;
+    result.ruleSetId = compiled.ruleSet.ruleSetId;
+    result.ruleId = rule.ruleId;
+    result.sceneType = rule.sceneType;
+    result.eventName = BuildPageSceneEventName(rule.sceneType, match.matched, false);
+    result.pageName = pageName;
+    result.currentPageName = pageName;
+    result.matched = match.matched;
+    result.nodeIds = match.matchedNodeIds;
+    result.matchedCount = static_cast<int32_t>(result.nodeIds.size());
+    result.reportRule = rule;
+    result.splitType = match.matched ? match.splitType : "None";
+    return result;
+}
+
+std::vector<PageSceneMatchResult> MatchCompiledSplitRules(
+    const CompiledSplitRuleSet& compiled, SplitSceneBatch& snapshot, const std::string& pageName)
+{
+    std::vector<PageSceneMatchResult> results;
+    if (!compiled.ruleSet.arkuiEnabled) {
+        return results;
+    }
+    for (size_t index = 0; index < compiled.ruleSet.rules.size(); ++index) {
+        if (!compiled.ruleSet.rules[index].enabled) {
+            continue;
+        }
+        auto match = snapshot.Recognize(compiled.splitSpecs[index]);
+        results.emplace_back(BuildSplitMatchResult(compiled, index, match, pageName));
+    }
+    return results;
+}
+
+using SplitCandidateIndex = std::unordered_map<int32_t, size_t>;
+
+void PopulateSplitNodes(PageSceneMatchResult& result, const SplitCandidateIndex& index, SplitSceneBatch& snapshot)
+{
+    for (auto nodeId : result.nodeIds) {
+        auto found = index.find(nodeId);
+        if (found == index.end()) {
+            continue;
+        }
+        const auto& candidate = snapshot.GetCandidates()[found->second];
+        const auto& rect = snapshot.GetClippedRect(found->second);
+        PageSceneNodeInfo info;
+        info.nodeId = nodeId;
+        info.nodeType = candidate.compName;
+        info.rect = { rect.Left(), rect.Top(), rect.Width(), rect.Height() };
+        result.matchedNodes.emplace_back(std::move(info));
+    }
+}
+
+void PopulateSplitResults(std::vector<PageSceneMatchResult>& results, SplitSceneBatch& snapshot)
+{
+    if (results.empty()) {
+        return;
+    }
+    SplitCandidateIndex index;
+    const auto& candidates = snapshot.GetCandidates();
+    for (size_t position = 0; position < candidates.size(); ++position) {
+        index.emplace(candidates[position].nodeId, position);
+    }
+    for (auto& result : results) {
+        PopulateSplitNodes(result, index, snapshot);
+    }
+}
+
+std::string SplitStateKey(int32_t processId, const PageSceneMatchResult& result)
+{
+    return std::to_string(processId) + ":" + result.ruleSetId + ":" + result.ruleId;
+}
+
+bool HasSplitSceneChanged(const PageSceneMatchResult* previous, const PageSceneMatchResult& current)
+{
+    // Every state change triggers the callback: splitType switch, matched node id set change, or page change.
+    // The id set is compared order-insensitively: candidate ordering must not affect the result.
+    return !previous || previous->pageName != current.pageName || previous->splitType != current.splitType ||
+           !SameSplitNodeIds(previous->nodeIds, current.nodeIds);
+}
+
+bool NeedsSplitExit(const PageSceneMatchResult* previous, const PageSceneMatchResult& current, bool changed)
+{
+    return previous && (!current.matched || changed);
+}
+
+} // namespace
+
 std::string PageSceneRuleManager::BuildSceneJson(const PageSceneRuleSet& ruleSet, const PageSceneRule& rule,
     const std::string& pageName, const std::vector<PageSceneNodeInfo>& nodes, bool matched,
     const std::string& eventName) const
@@ -1269,6 +1510,166 @@ std::string PageSceneRuleManager::BuildSceneJson(const PageSceneRuleSet& ruleSet
     }
     root->Put("nodes", nodesJson);
     return root->ToString();
+}
+
+std::shared_ptr<const CompiledSplitRuleSet> PageSceneRuleManager::CompileSplitRuleSet(const std::string& json) const
+{
+    auto rules = ParseRuleSet(json);
+    if (!rules) {
+        return nullptr;
+    }
+    auto compiled = std::make_shared<CompiledSplitRuleSet>();
+    compiled->ruleSet = std::move(*rules);
+    auto& splitRules = compiled->ruleSet.rules;
+    auto splitEnd = std::remove_if(splitRules.begin(), splitRules.end(),
+        [](const auto& rule) { return rule.sceneType != SPLIT_SCENE; });
+    splitRules.erase(splitEnd, splitRules.end());
+    if (splitRules.empty()) {
+        return nullptr;
+    }
+    for (const auto& rule : compiled->ruleSet.rules) {
+        AddCompiledRule(rule, *compiled);
+    }
+    return compiled;
+}
+
+std::unique_ptr<JsonValue> PageSceneRuleManager::BuildSplitSceneJson(const PageSceneMatchResult& result) const
+{
+    auto root = JsonUtil::Create(true);
+    root->Put("ruleSetId", result.ruleSetId.c_str());
+    root->Put("ruleId", result.ruleId.c_str());
+    root->Put("sceneType", result.sceneType.c_str());
+    root->Put("eventName", result.eventName.c_str());
+    root->Put("currentPageName", result.currentPageName.value_or(result.pageName).c_str());
+    root->Put("matched", result.matched);
+    root->Put("matchedCount", static_cast<int32_t>(result.matchedNodes.size()));
+    root->Put("nodes", BuildSplitSceneNodes(result.reportRule, result.matchedNodes));
+    root->Put("pageName", result.pageName.c_str());
+    root->Put("splitType", result.splitType.c_str());
+    return root;
+}
+
+std::string PageSceneRuleManager::QueryCompiledSplitPageScenes(const CompiledSplitRuleSet& compiled,
+    const std::vector<SplitSceneCandidate>& candidates, const RectF& windowRect, const std::string& pageName,
+    bool includeSplit)
+{
+    auto root = JsonUtil::Create(true);
+    auto events = JsonUtil::CreateArray(true);
+    SplitSceneBatch snapshot(candidates, windowRect);
+    auto results = includeSplit ? MatchCompiledSplitRules(compiled, snapshot, pageName)
+                                : std::vector<PageSceneMatchResult>();
+    PopulateSplitResults(results, snapshot);
+    for (const auto& result : results) {
+        events->Put(BuildSplitSceneJson(result));
+    }
+    root->Put("events", events);
+    return root->ToString();
+}
+
+void PageSceneRuleManager::ClearSplitRegistrationLocked()
+{
+    splitRegistration_.reset();
+    splitReportStates_.clear();
+    splitReportPolicyStates_.clear();
+}
+
+bool PageSceneRuleManager::UpdateSplitRegistration(int32_t processId, const std::string& ruleJson)
+{
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (ruleJson.empty()) {
+            // A delayed cleanup for the previous owner must not remove the current registration.
+            if (splitRegistration_ && splitRegistration_->processId == processId) {
+                ClearSplitRegistrationLocked();
+            }
+            return true;
+        }
+        if (splitRegistration_ && splitRegistration_->processId == processId &&
+            splitRegistration_->rules->ruleSet.rawJson == ruleJson) {
+            return true;
+        }
+    }
+    // The adapter resolves the current registration; queries keep their separate multi-rule compilation path.
+    auto compiled = CompileSplitRuleSet(ruleJson);
+    if (!compiled || compiled->ruleSet.rules.size() != 1) {
+        return false;
+    }
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (splitRegistration_ && splitRegistration_->processId == processId &&
+        splitRegistration_->rules->ruleSet.rawJson == ruleJson) {
+        return true;
+    }
+    ClearSplitRegistrationLocked();
+    splitRegistration_ = CompiledSplitRegistration { processId, std::move(compiled) };
+    return true;
+}
+
+std::optional<CompiledSplitRegistration> PageSceneRuleManager::GetCompiledSplitRegistration() const
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    return splitRegistration_;
+}
+
+void PageSceneRuleManager::AppendSplitExitLocked(int32_t processId, const PageSceneMatchResult& previous,
+    const std::string& pageName, std::vector<PageSceneMatchResult>& changes)
+{
+    auto exit = previous;
+    exit.currentPageName = pageName;
+    exit.matched = false;
+    exit.eventName = "SPLIT_EXIT";
+    exit.splitType = "None";
+    exit.nodeIds.clear();
+    exit.matchedNodes.clear();
+    exit.matchedCount = 0;
+    ShouldReportSplitLocked(processId, exit);
+    changes.emplace_back(std::move(exit));
+}
+
+void PageSceneRuleManager::UpdateSplitMatchStateLocked(
+    int32_t processId, PageSceneMatchResult result, bool changed, std::vector<PageSceneMatchResult>& changes)
+{
+    const auto key = SplitStateKey(processId, result);
+    if (!result.matched) {
+        splitReportStates_.erase(key);
+        return;
+    }
+    if (changed && ShouldReportSplitLocked(processId, result)) {
+        changes.emplace_back(result);
+    }
+    splitReportStates_[key] = std::move(result);
+}
+
+const PageSceneMatchResult* PageSceneRuleManager::GetPreviousSplitResultLocked(const std::string& key) const
+{
+    auto previous = splitReportStates_.find(key);
+    return previous == splitReportStates_.end() ? nullptr : &previous->second;
+}
+
+void PageSceneRuleManager::ProcessSplitResultLocked(
+    int32_t processId, PageSceneMatchResult result, std::vector<PageSceneMatchResult>& changes)
+{
+    const auto key = SplitStateKey(processId, result);
+    const auto* previousResult = GetPreviousSplitResultLocked(key);
+    const auto changed = HasSplitSceneChanged(previousResult, result);
+    if (NeedsSplitExit(previousResult, result, changed)) {
+        AppendSplitExitLocked(processId, *previousResult, result.pageName, changes);
+    }
+    UpdateSplitMatchStateLocked(processId, std::move(result), changed, changes);
+}
+
+std::vector<PageSceneMatchResult> PageSceneRuleManager::DetectCompiledSplitChanges(
+    const CompiledSplitRegistration& registration, SplitSceneBatch& snapshot, const std::string& pageName)
+{
+    std::vector<PageSceneMatchResult> changes;
+    auto results = MatchCompiledSplitRules(*registration.rules, snapshot, pageName);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (auto& result : results) {
+            ProcessSplitResultLocked(registration.processId, std::move(result), changes);
+        }
+    }
+    PopulateSplitResults(changes, snapshot);
+    return changes;
 }
 
 } // namespace OHOS::Ace::NG

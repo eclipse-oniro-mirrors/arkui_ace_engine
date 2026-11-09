@@ -1460,6 +1460,11 @@ void ViewAbstractModelImpl::SetHitTestMode(NG::HitTestMode hitTestMode)
     }
 }
 
+void ViewAbstractModelImpl::SetAgentControlMode(const std::optional<NG::AgentControlMode>& mode)
+{
+    // Agent input control is supported by the NG pipeline only.
+}
+
 void ViewAbstractModelImpl::BindPopup(const RefPtr<PopupParam>& param, const RefPtr<AceType>& customNode)
 {
     ViewStackProcessor::GetInstance()->GetCoverageComponent();

@@ -140,7 +140,7 @@ public:
     {
         return scopeId_;
     }
-    static RefPtr<UiMaterial>& GetMenuUiMaterial(ColorMode colorMode = ColorMode::COLOR_MODE_UNDEFINED);
+    static RefPtr<UiMaterial> GetMenuUiMaterial(ColorMode colorMode = ColorMode::COLOR_MODE_UNDEFINED);
     static void UpdateNewMaterialProperties(const RefPtr<FrameNode>& frameNode, ColorMode colorMode);
 
 private:

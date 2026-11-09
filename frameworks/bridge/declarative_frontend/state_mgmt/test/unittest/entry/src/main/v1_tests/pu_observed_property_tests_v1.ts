@@ -28,7 +28,7 @@ declare class ObservedPropertyAbstractPU<T> {
   notifyTrackedObjectPropertyHasChanged(propertyName: string, isSync?: boolean): void;
   getRenderingElmtId(): number;
   recordTrackObjectPropertyDependencyForElmtId(elmtId: number, propertyName: string): void;
-  removeSubscriber(subscriber?: IPropertySubscriber): void;
+  removeSubscriber(subscriber: IPropertySubscriber, id?: number): void;
   aboutToBeDeleted(): void;
   checkIsSupportedValue(value: T): boolean;
   getUnmonitored(): T;
@@ -40,10 +40,10 @@ declare class ObservedPropertyAbstractPU<T> {
 declare class ObservedObject<T> {
   static IsObservedObject(value: any): boolean;
   static createNew<T>(value: T, owner?: IPropertySubscriber): T;
-  static addOwningProperty(obj: any, owner: IPropertySubscriber): void;
-  static removeOwningProperty(obj: any, owner: IPropertySubscriber): void;
-  static unregisterPropertyReadCb(obj: any): void;
-  static registerPropertyReadCb(obj: any, cb: Function, context: any): void;
+  static addOwningProperty(obj: any, owner: IPropertySubscriber): boolean;
+  static removeOwningProperty(obj: any, owner: IPropertySubscriber): boolean;
+  static unregisterPropertyReadCb(obj: any): boolean;
+  static registerPropertyReadCb(obj: any, cb: Function, context: any): boolean;
 }
 
 declare class SubscribableAbstract {
@@ -54,7 +54,7 @@ declare class SubscribableAbstract {
 declare class TrackedObject {
   static needsPropertyReadCb(value: any): boolean;
   static notifyObjectValueAssignment(oldValue: any, newValue: any,
-    notifyFunc: Function, notifyTrackFunc: Function, context: any): void;
+    notifyFunc: Function, notifyTrackFunc: Function, context: any): boolean;
 }
 
 declare class ObservedPropertyPU<T> extends ObservedPropertyAbstractPU<T> {

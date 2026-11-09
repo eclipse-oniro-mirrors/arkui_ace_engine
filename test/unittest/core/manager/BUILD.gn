@@ -442,12 +442,15 @@ ohos_unittest("content_change_manager_translate_test_ng") {
 }
 
 ace_unittest("page_scene_rule_manager_test_ng") {
+  external_deps = [ "cJSON:cjson_static" ]
   module_name = "TextSet-Text"
   type = "new"
   sources = [
     "$ace_root/frameworks/core/components_ng/dump_utils/dump_util.cpp",
     "$ace_root/frameworks/core/components_ng/manager/page_scene/page_scene_rule_manager.cpp",
     "page_scene_rule_manager_test_ng.cpp",
+    "$ace_root/frameworks/core/components_ng/manager/page_scene/split_scene_recognizer.cpp",
+    "split_scene_recognizer_test.cpp",
   ]
 }
 

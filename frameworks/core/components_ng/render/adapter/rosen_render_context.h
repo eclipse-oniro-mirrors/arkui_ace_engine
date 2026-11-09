@@ -292,6 +292,7 @@ public:
     void OnShadowClipModeUpdate(ShadowClipMode clipMode) override;
     void OnBackBlendModeUpdate(BlendMode blendMode) override;
     void OnBackBlendApplyTypeUpdate(BlendApplyType applyType) override;
+    void OnVibrancyModeUpdate(const VibrancyMode& mode) override;
     void UpdateBorderWidthF(const BorderWidthPropertyF& value) override;
 
     void UpdateMaterialInteractionEffect(float scaleX, float scaleY, float offsetX, float offsetY) override;
@@ -389,6 +390,7 @@ public:
     void SetUnionSpacing(float spacing) override;
 
     RectF GetPaintRectWithTransform() override;
+    bool HasRenderNode() const override;
 
     static RectF GetPaintRectWithTransform(
         const std::shared_ptr<Rosen::RSNode>& rsNode, const RectF& paintRect);

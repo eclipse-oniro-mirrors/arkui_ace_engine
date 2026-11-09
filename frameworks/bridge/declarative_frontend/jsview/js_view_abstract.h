@@ -652,6 +652,7 @@ public:
 
     static void JsObscured(const JSCallbackInfo& info);
     static void JsPrivacySensitive(const JSCallbackInfo& info);
+    static void JsAgentControlMode(const JSCallbackInfo& info);
 
     static void JsAccessibilityGroup(const JSCallbackInfo& info);
     static void JsAccessibilityText(const JSCallbackInfo& info);

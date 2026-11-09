@@ -96,6 +96,12 @@ public:
         RefPtr<FrameNode> shell;
         std::string templateId;
         uint64_t templateGen = 0;
+        // Fast-scroll freeze state: true while the last layout round's fill loops no
+        // longer covered this index and the shell's render output is suppressed
+        // (opacity 0) — its frame geometry froze the moment the loops stopped
+        // re-acquiring it. Cleared — and the render output restored — as soon as a
+        // later layout round covers the index again.
+        bool frozenHidden = false;
     };
     // Decision + acquire + mount + framed enqueue at the child build call point.
     // Returns the mounted shell when this index is deferred to a placeholder,
@@ -115,9 +121,19 @@ public:
     // then requests the local remeasure that completes the replacement.
     bool CommitScrollPlaceholderRealBuild(int32_t index);
     // Layout-round reconcile: drops placeholders whose index already holds a real
-    // child or fell out of range, and retires shells whose real item was committed
-    // (removed from the host and the template content returned to the pool).
-    void ReconcileScrollPlaceholderItems();
+    // child or fell out of the layout window, and retires shells whose real item
+    // was committed (removed from the host and the template content returned to
+    // the pool). layoutStart/layoutEnd describe the just-finished layout round's
+    // itemPosition_ window (-1/-1 when empty: range unknown, fail open). A shell
+    // whose index this round's fill loops no longer covered is visually
+    // suppressed (SyncScrollPlaceholderShellCoverage) — see the freeze note there.
+    void ReconcileScrollPlaceholderItems(int32_t layoutStart, int32_t layoutEnd);
+    // Frame-cadence companion of ReconcileScrollPlaceholderItems: runs from the
+    // manager post-flush hook after every FlushRealBuild iteration, retiring
+    // pending shells whose index the visible window or a real child already
+    // left, so a load-heavy decay (measure breaks stretching the layout
+    // rounds) can not paint stale shell geometry over freshly committed rows.
+    void SweepStaleScrollPlaceholderShells();
     // Defensive sweep: retires mounted shells that neither placeholder table tracks
     // anymore, so a bookkeeping miss can never leave a shell on the tree (index-based
     // cleanup can not see shells by design — zero frame count).
@@ -816,6 +832,20 @@ private:
     std::optional<ScrollPlaceholderOptions> PredictScrollPlaceholderDefer(
         const RefPtr<ScrollPlaceholderManager>& manager, const RefPtr<FrameNode>& host, int32_t index);
     void RetireScrollPlaceholderShell(const RefPtr<FrameNode>& shell, const std::string& templateId);
+    // Coverage-driven visual suppression for one pending shell, run per layout
+    // round from ReconcileScrollPlaceholderItems: List applies scroll offsets by
+    // re-laying every item the round's fill loops cover (the Layout loop walks
+    // itemPosition_ only), so once a fast scroll leaves an index outside that
+    // coverage the shell's geometry freezes at its last host-space position —
+    // an on-screen stale position that the zero-frame-count shell keeps painting
+    // (index-space recycling never reaches it) until its retirement (flush
+    // cadence) catches up. Suppress the render output for the frozen window
+    // (opacity 0) and restore it the moment a later round covers the index again
+    // (the same round re-positions it, so no frame ever paints stale geometry).
+    void SyncScrollPlaceholderShellCoverage(int32_t index, ScrollPlaceholderItemInfo& info);
+    // Drops queued real-build tasks (and their mounted shells) for indices outside the
+    // visible window; reports the window to the manager for flush-time banding.
+    void SweepScrollPlaceholderOutOfRange(int32_t start, int32_t end);
     // Submits the deferred real-build closure for a placeholder item into the
     // framed UI-thread queue (flushed by the pipeline).
     void EnqueueScrollPlaceholderRealBuild(const RefPtr<ScrollPlaceholderManager>& manager,

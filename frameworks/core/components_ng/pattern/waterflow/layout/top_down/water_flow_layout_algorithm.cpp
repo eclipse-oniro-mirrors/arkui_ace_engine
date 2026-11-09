@@ -491,7 +491,8 @@ void WaterFlowLayoutAlgorithm::FillViewport(float mainSize, LayoutWrapper* layou
         }
         position = GetItemPosition(++currentIndex);
         fill = true;
-        if (!syncLoad_ && layoutWrapper->ReachResponseDeadline()) {
+        if (!syncLoad_ && layoutWrapper->ReachResponseDeadline() &&
+            !WaterFlowLayoutUtils::IsScrollPlaceholderEnabled(layoutWrapper)) {
             layoutInfo_->measureInNextFrame_ = true;
             break;
         }

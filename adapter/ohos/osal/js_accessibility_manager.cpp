@@ -9330,7 +9330,6 @@ void JsAccessibilityManager::JsInteractionOperation::SetBelongTreeId(const int32
 {
     auto jsAccessibilityManager = GetHandler().Upgrade();
     CHECK_NULL_VOID(jsAccessibilityManager);
-    jsAccessibilityManager->treeId_ = treeId;
     auto context = jsAccessibilityManager->GetPipelineContext().Upgrade();
     CHECK_NULL_VOID(context);
     auto instanceId = context->GetInstanceId();
@@ -9340,6 +9339,7 @@ void JsAccessibilityManager::JsInteractionOperation::SetBelongTreeId(const int32
             CHECK_NULL_VOID(jsAccessibilityManager);
             ContainerScope scope(instanceId);
             ACE_SCOPED_TRACE("SetBelongTreeId");
+            jsAccessibilityManager->treeId_ = treeId;
             jsAccessibilityManager->SendCacheAccessibilityEvent(instanceId);
             jsAccessibilityManager->NotifyChildTreeOnRegister(treeId);
             jsAccessibilityManager->ReleaseUIExtCacheEvent();
@@ -14648,7 +14648,43 @@ void JsAccessibilityManager::CmpInteractionOperation::GetCursorPosition(
     const int64_t elementId, const int32_t requestId,
     Accessibility::AccessibilityElementOperatorCallback& callback)
 {
-    callback.SetCursorPositionResult(0, requestId);
+    int64_t splitElementId = AccessibilityElementInfo::UNDEFINED_ACCESSIBILITY_ID;
+    int32_t splitTreeId = AccessibilityElementInfo::UNDEFINED_TREE_ID;
+    AccessibilitySystemAbilityClient::GetTreeIdAndElementIdBySplitElementId(elementId, splitElementId, splitTreeId);
+    auto subAM = GetHandler().Upgrade();
+    CHECK_NULL_VOID_WITH_ACTION(subAM, SetCursorPositionResult(callback, 0, requestId));
+    auto context = subAM->GetPipelineContext().Upgrade();
+    CHECK_NULL_VOID_WITH_ACTION(context, SetCursorPositionResult(callback, 0, requestId));
+    auto taskExecutor = context->GetTaskExecutor();
+    CHECK_NULL_VOID_WITH_ACTION(taskExecutor, SetCursorPositionResult(callback, 0, requestId));
+    if (!taskExecutor->PostTask(
+        [weak = GetHandler(), root = exportedRoot_, splitElementId, requestId, &callback] {
+            auto subAM = weak.Upgrade();
+            CHECK_NULL_VOID_WITH_ACTION(subAM, SetCursorPositionResult(callback, 0, requestId));
+            auto pipeline = AceType::DynamicCast<NG::PipelineContext>(subAM->GetPipelineContext().Upgrade());
+            CHECK_NULL_VOID_WITH_ACTION(pipeline, SetCursorPositionResult(callback, 0, requestId));
+            ContainerScope scope(pipeline->GetInstanceId());
+            // Match the main-tree query timing so pending caret updates are applied first.
+            pipeline->AddAfterRenderTask([weak, root, splitElementId, requestId, &callback] {
+                auto subAM = weak.Upgrade();
+                CHECK_NULL_VOID_WITH_ACTION(subAM, SetCursorPositionResult(callback, 0, requestId));
+                auto context = subAM->GetPipelineContext().Upgrade();
+                CHECK_NULL_VOID_WITH_ACTION(context, SetCursorPositionResult(callback, 0, requestId));
+                ContainerScope scope(context->GetInstanceId());
+                auto exportedRoot = root.Upgrade();
+                CHECK_NULL_VOID_WITH_ACTION(exportedRoot, SetCursorPositionResult(callback, 0, requestId));
+                auto frameNode = NG::AccessibilityFrameNodeUtils::GetFramenodeByAccessibilityId(
+                    exportedRoot, splitElementId);
+                CHECK_NULL_VOID_WITH_ACTION(frameNode, SetCursorPositionResult(callback, 0, requestId));
+                auto property = frameNode->GetAccessibilityProperty<NG::AccessibilityProperty>();
+                CHECK_NULL_VOID_WITH_ACTION(property, SetCursorPositionResult(callback, 0, requestId));
+                auto cursorPosition = property->ActActionGetIndex();
+                SetCursorPositionResult(callback, cursorPosition, requestId);
+            });
+            pipeline->RequestFrame();
+        }, TaskExecutor::TaskType::UI, "ArkUICmpGetCursorPosition")) {
+        SetCursorPositionResult(callback, 0, requestId);
+    }
 }
 
 void JsAccessibilityManager::CmpInteractionOperation::SetChildTreeIdAndWinId(

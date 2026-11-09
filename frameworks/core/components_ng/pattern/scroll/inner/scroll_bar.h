@@ -52,6 +52,7 @@ constexpr Color PRESSED_BLEND_COLOR = Color(0x19000000);
 using DragFRCSceneCallback = std::function<void(double velocity, NG::SceneStatus sceneStatus)>;
 using ScrollBarPositionCallback = std::function<bool(double, int32_t source, bool isMouseWheelScroll)>;
 using GetOverScrollOffsetCallback = std::function<OverScrollOffset(double contentDelta)>;
+using TouchStateCallback = std::function<void(bool isPressed)>;
 
 enum class BarDirection {
     BAR_NONE = 0,
@@ -542,6 +543,11 @@ public:
         getAvoidScrollBarMargin_ = std::move(func);
     }
 
+    void SetTouchStateCallback(TouchStateCallback&& callback)
+    {
+        touchStateCallback_ = std::move(callback);
+    }
+
 protected:
     void InitTheme();
     virtual void SetBarRegion(const Offset& offset, const Size& size, const RefPtr<PipelineContext>& context = nullptr);
@@ -751,6 +757,10 @@ private:
         float& startRadius, float& endRadius, float& padding, const RefPtr<PipelineContext>& context = nullptr);
     void CalcFlingVelocity(float offset);
     bool DragEndOverScroll();
+    void HandleTouchEvent(const TouchEventInfo& info);
+    void HandleTouchDown(const TouchEventInfo& info, const TouchLocationInfo& touch);
+    void HandleTouchUp(const TouchLocationInfo& touch);
+    void NotifyTouchState(bool isPressed);
     DisplayMode displayMode_ = DisplayMode::AUTO;
     ShapeMode shapeMode_ = ShapeMode::RECT;
     PositionMode positionMode_ = PositionMode::RIGHT;
@@ -866,6 +876,7 @@ private:
     // pair.first: Padding + SafeAreaPadding + ContentStartOffset
     // pair.second: ContentEndOffset + SafeAreaPadding + Padding
     std::function<std::pair<double, double>()> getAvoidScrollBarMargin_;
+    TouchStateCallback touchStateCallback_;
 };
 
 } // namespace OHOS::Ace::NG

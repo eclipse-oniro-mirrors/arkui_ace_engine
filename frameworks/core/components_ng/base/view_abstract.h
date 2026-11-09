@@ -82,6 +82,7 @@ class ResponseRegion;
 class UiMaterial;
 struct ImmersiveOptions;
 struct ImmersiveMaterialConfig;
+enum class VibrancyMode : int8_t;
 }
 
 namespace OHOS::Ace::NG {
@@ -509,6 +510,7 @@ public:
     static void SetMouseResponseRegion(const std::vector<DimensionRect> &mouseResponseRegion);
     static void SetTouchable(bool touchable);
     static void SetHitTestMode(HitTestMode hitTestMode);
+    static void SetAgentControlMode(const std::optional<AgentControlMode>& mode);
     static void SetOnTouchTestFunc(NG::OnChildTouchTestFunc&& onChildTouchTest);
     static void SetOnTouchTestFunc(FrameNode* frameNode, NG::OnChildTouchTestFunc&& onChildTouchTest);
     static void SetOnFocusAxisEvent(OnFocusAxisEventFunc&& onFocusAxisCallback);
@@ -793,6 +795,7 @@ public:
     static void SetTransformMatrix(FrameNode* frameNode, const Matrix4& matrix);
     static void SetTransform3DMatrix(FrameNode* frameNode, const Matrix4& matrix);
     static void SetHitTestMode(FrameNode* frameNode, HitTestMode hitTestMode);
+    static void SetAgentControlMode(FrameNode* frameNode, const std::optional<AgentControlMode>& mode);
     static void SetOpacity(FrameNode* frameNode, double opacity);
     static void SetOpacity(FrameNode* frameNode, double opacity, const RefPtr<ResourceObject>& resObj);
     static void UpdateBackgroundBlurStyle(
@@ -976,6 +979,7 @@ public:
     static void SetBlendApplyType(FrameNode* frameNode, BlendApplyType blendApplyType);
     static void SetBlender(FrameNode* frameNode, const OHOS::Rosen::Blender* blender);
     static void ResetBlender(FrameNode* frameNode);
+    static void SetVibrancyMode(FrameNode* frameNode, VibrancyMode mode);
     static void SetMonopolizeEvents(FrameNode* frameNode, bool monopolizeEvents);
     static void SetDraggable(FrameNode* frameNode, bool draggable);
     static void SetHoverEffect(FrameNode* frameNode, HoverEffectType hoverEffect);

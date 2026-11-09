@@ -14,6 +14,10 @@
  */
 
 #include "adapter/ohos/entrance/ui_session/ui_session_manager_ohos.h"
+
+#include <iterator>
+
+#include "interfaces/inner_api/ui_session/ui_session_split_rule.h"
 #include "adapter/ohos/entrance/ui_session/include/ui_session_log.h"
 #include "adapter/ohos/entrance/ui_session/include/ui_session_trace.h"
 #include "core/components/web/resource/web_page_scene_manager.h"
@@ -60,6 +64,9 @@ constexpr char PAGE_SCENE_SEARCH_TAG[] = "Search";
 constexpr char PAGE_SCENE_RICH_EDITOR_TAG[] = "RichEditor";
 constexpr char GESTURE_TYPE_KEY[] = "GestureType";
 constexpr char CLICK_GESTURE_TYPE[] = "Click";
+constexpr char SPLIT_CONFIG_CHANGED[] = R"({"_splitBatch":true})";
+
+std::string SelectPageSceneRules(const std::string& json, const std::string& sceneType);
 
 bool IsValidPageSceneId(const std::string& id)
 {
@@ -641,6 +648,26 @@ void UiSessionManagerOhos::ReportSelectTextEvent(const std::string& data)
     }
 }
 
+bool UiSessionManagerOhos::OwnsSplitPageSceneRegistrationLocked(int32_t processId) const
+{
+    return splitPageSceneRegistration_ && splitPageSceneRegistration_->ownerPid == processId;
+}
+
+const UiSessionManagerOhos::SplitPageSceneRuleSetInfo* UiSessionManagerOhos::FindOwnedSplitRuleSetLocked(
+    int32_t processId) const
+{
+    if (!OwnsSplitPageSceneRegistrationLocked(processId)) {
+        return nullptr;
+    }
+    return &splitPageSceneRegistration_->ruleSet;
+}
+
+bool UiSessionManagerOhos::HasSplitPageSceneRuleSet(int32_t processId, const std::string& ruleSetId)
+{
+    std::lock_guard<std::mutex> lock(pageSceneMutex_);
+    return ConflictsWithSplitRegistrationLocked(processId, ruleSetId);
+}
+
 void UiSessionManagerOhos::SaveReportProxy(sptr<IRemoteObject> reportProxy, int32_t processId)
 {
     // add death callback
@@ -678,23 +705,26 @@ void UiSessionManagerOhos::SaveReportProxy(sptr<IRemoteObject> reportProxy, int3
                 ResetPageTranslate(-1);
             }
         }
-        std::vector<std::string> searchRemovals;
+        std::vector<std::string> pageSceneRemovals;
         {
             std::lock_guard<std::mutex> lock(pageSceneMutex_);
             pageSceneRuleSets_.erase(processId);
+            if (OwnsSplitPageSceneRegistrationLocked(processId)) {
+                splitPageSceneRegistration_.reset();
+                pageSceneRemovals.emplace_back(SPLIT_CONFIG_CHANGED);
+            }
             auto searchIter = searchPageSceneRuleSets_.find(processId);
             if (searchIter != searchPageSceneRuleSets_.end()) {
                 for (const auto& [id, ruleSet] : searchIter->second) {
-                    searchRemovals.emplace_back(BuildPageSceneRuleRemoval(id, true, ruleSet.generation));
+                    pageSceneRemovals.emplace_back(BuildPageSceneRuleRemoval(id, true, ruleSet.generation));
                 }
             }
             searchPageSceneRuleSets_.erase(processId);
             ErasePendingPageSceneRulesLocked(processId);
-            pageSceneRuleRegistered_.store(!searchPageSceneRuleSets_.empty() ||
-                HasRegisteredPageSceneRuleLocked(PAGE_SCENE_TEXT_EDITOR_SCENE));
-            pendingPageSceneGets_.erase(processId);
+            pageSceneRuleRegistered_.store(splitPageSceneRegistration_.has_value() ||
+                !searchPageSceneRuleSets_.empty() || HasRegisteredPageSceneRuleLocked(PAGE_SCENE_TEXT_EDITOR_SCENE));
         }
-        for (const auto& removal : searchRemovals) {
+        for (const auto& removal : pageSceneRemovals) {
             TriggerPageSceneDetect(processId, removal, false);
         }
         TriggerPageSceneDetect(processId, "", false);
@@ -722,6 +752,7 @@ int32_t UiSessionManagerOhos::RegisterWebPageSceneRules(int32_t processId, const
         std::lock_guard<std::mutex> lock(webPageSceneMutex_);
         webPageSceneFunc = webPageSceneFunction_;
     }
+    // Preserve legacy semantics: a missing callback returns FAILED without rolling back native text rules.
     if (!webPageSceneFunc) {
         return FAILED;
     }
@@ -729,15 +760,17 @@ int32_t UiSessionManagerOhos::RegisterWebPageSceneRules(int32_t processId, const
     if (webRet != NO_ERROR) {
         LOGW("RegisterPageSceneRules web-side failed ret=%{public}d, rollback processId=%{public}d",
             webRet, processId);
-        bool hasSearchRules = false;
+        bool hasRemainingRules = false;
         {
             std::lock_guard<std::mutex> lock(pageSceneMutex_);
             pageSceneRuleSets_.erase(processId);
-            pageSceneRuleRegistered_.store(
-                !searchPageSceneRuleSets_.empty() || HasRegisteredPageSceneRuleLocked(PAGE_SCENE_TEXT_EDITOR_SCENE));
-            hasSearchRules = searchPageSceneRuleSets_.find(processId) != searchPageSceneRuleSets_.end();
+            // Web failure removes only the legacy text registration; a committed SPLIT remains active.
+            pageSceneRuleRegistered_.store(splitPageSceneRegistration_.has_value() ||
+                                           !searchPageSceneRuleSets_.empty() ||
+                                           HasRegisteredPageSceneRuleLocked(PAGE_SCENE_TEXT_EDITOR_SCENE));
+            hasRemainingRules = HasProcessPageSceneRulesLocked(processId);
         }
-        if (!hasSearchRules) {
+        if (!hasRemainingRules) {
             EraseProcessId("pageScene", processId);
         }
     }
@@ -763,6 +796,9 @@ int32_t UiSessionManagerOhos::RegisterPageSceneRules(int32_t processId, const st
         LOGW("RegisterPageSceneRules report object is null, process id:%{public}d", processId);
         return NOT_CONNECTED;
     }
+    if (PageSceneSplit::ContainsSplitRule(ruleJson)) {
+        return RegisterSplitPageSceneRules(processId, ruleJson);
+    }
     auto ruleSetInfo = ExtractPageSceneRuleSetInfo(ruleJson);
     if (ruleSetInfo.ruleSetId.empty()) {
         LOGW("RegisterPageSceneRules invalid rule json, process id:%{public}d", processId);
@@ -773,6 +809,9 @@ int32_t UiSessionManagerOhos::RegisterPageSceneRules(int32_t processId, const st
         if (pageSceneRuleSets_.find(processId) != pageSceneRuleSets_.end()) {
             LOGW("RegisterPageSceneRules duplicated, process id:%{public}d", processId);
             return LAST_UNFINISH;
+        }
+        if (ConflictsWithSplitRegistrationLocked(processId, ruleSetInfo.ruleSetId)) {
+            return PARAM_INVALID;
         }
         pageSceneRuleSets_[processId] = ruleSetInfo;
         pageSceneRuleRegistered_.store(true);
@@ -787,6 +826,33 @@ int32_t UiSessionManagerOhos::RegisterPageSceneRules(int32_t processId, const st
         return RegisterWebPageSceneRules(processId, ruleJson);
     }
     return NO_ERROR;
+}
+
+int32_t UiSessionManagerOhos::RegisterSplitPageSceneRules(int32_t processId, const std::string& ruleJson)
+{
+    PageSceneRegistrationPlan plan;
+    PrepareConnectedRegistration(ruleJson, plan);
+    {
+        std::shared_lock<std::shared_mutex> reportLock(reportObjectMutex_);
+        auto connection = reportObjectMap_.find(processId);
+        if (connection == reportObjectMap_.end() || !connection->second) {
+            return NOT_CONNECTED;
+        }
+        std::lock_guard<std::mutex> lock(pageSceneMutex_);
+        if (splitPageSceneRegistration_ || !CanRegisterSplitRuleSetLocked(processId, plan.splitRules.ruleSetId)) {
+            return PARAM_INVALID;
+        }
+        if (plan.legacyRules && pageSceneRuleSets_.count(processId) != 0) {
+            return LAST_UNFINISH;
+        }
+        StampPageSceneRegistrationLocked(plan);
+        if (plan.legacyRules) {
+            pageSceneRuleSets_.emplace(processId, *plan.legacyRules);
+        }
+        splitPageSceneRegistration_ = SplitPageSceneRegistration { processId, plan.splitRules };
+        pageSceneRuleRegistered_.store(true);
+    }
+    return CompletePageSceneRegistration(processId, plan);
 }
 
 bool UiSessionManagerOhos::IsSearchPageSceneRuleJson(const std::string& ruleJson) const
@@ -959,10 +1025,12 @@ int32_t UiSessionManagerOhos::UnregisterSearchPageSceneRules(int32_t processId, 
         }
         if (removed) {
             ErasePendingSearchPageSceneRulesLocked(processId, ruleSetId);
-            pageSceneRuleRegistered_.store(!searchPageSceneRuleSets_.empty() ||
-                HasRegisteredPageSceneRuleLocked(PAGE_SCENE_TEXT_EDITOR_SCENE));
-            hasRemainingRules = pageSceneRuleSets_.find(processId) != pageSceneRuleSets_.end() ||
-                searchPageSceneRuleSets_.find(processId) != searchPageSceneRuleSets_.end();
+            pageSceneRuleRegistered_.store(splitPageSceneRegistration_.has_value() ||
+                                           !searchPageSceneRuleSets_.empty() ||
+                                           HasRegisteredPageSceneRuleLocked(PAGE_SCENE_TEXT_EDITOR_SCENE));
+            hasRemainingRules = OwnsSplitPageSceneRegistrationLocked(processId) ||
+                                pageSceneRuleSets_.find(processId) != pageSceneRuleSets_.end() ||
+                                searchPageSceneRuleSets_.find(processId) != searchPageSceneRuleSets_.end();
         }
     }
     if (!removed) {
@@ -981,6 +1049,9 @@ int32_t UiSessionManagerOhos::UnregisterPageSceneRules(int32_t processId, const 
 {
     if (ruleSetId.empty()) {
         return PARAM_INVALID;
+    }
+    if (HasSplitPageSceneRuleSet(processId, ruleSetId)) {
+        return UnregisterSplitPageSceneRules(processId, ruleSetId);
     }
     bool isSearchRuleSet = false;
     {
@@ -1001,13 +1072,14 @@ int32_t UiSessionManagerOhos::UnregisterPageSceneRules(int32_t processId, const 
         }
         pageSceneRuleSets_.erase(iter);
         ErasePendingLegacyPageSceneRulesLocked(processId);
-        pageSceneRuleRegistered_.store(
+        pageSceneRuleRegistered_.store(splitPageSceneRegistration_.has_value() ||
             !searchPageSceneRuleSets_.empty() || HasRegisteredPageSceneRuleLocked(PAGE_SCENE_TEXT_EDITOR_SCENE));
         if (!pageSceneRuleRegistered_.load()) {
             pendingPageSceneDetectRules_.clear();
         }
-        pendingPageSceneGets_.erase(processId);
-        hasSearchRules = searchPageSceneRuleSets_.find(processId) != searchPageSceneRuleSets_.end();
+        CompleteLegacyPageSceneQueryLocked(processId);
+        hasSearchRules = OwnsSplitPageSceneRegistrationLocked(processId) ||
+            searchPageSceneRuleSets_.find(processId) != searchPageSceneRuleSets_.end();
     }
     if (hasSearchRules) {
         TriggerPageSceneDetect(processId, BuildPageSceneRuleRemoval(ruleSetId, false), false);
@@ -1027,14 +1099,63 @@ int32_t UiSessionManagerOhos::UnregisterPageSceneRules(int32_t processId, const 
     return NO_ERROR;
 }
 
-int32_t UiSessionManagerOhos::ExtractRuleJsonAndWebEnabled(int32_t processId,
-    const std::string& ruleJsonOrRuleSetId, std::string& ruleJson, bool& webEnabled)
+void UiSessionManagerOhos::SetTextQueryRule(const PageSceneRuleSetInfo& rules, std::string& json, bool& webEnabled)
 {
-    std::lock_guard<std::mutex> lock(pageSceneMutex_);
-    if (pendingPageSceneGets_.find(processId) != pendingPageSceneGets_.end()) {
-        LOGW("GetPageScene duplicated, process id:%{public}d", processId);
-        return LAST_UNFINISH;
+    webEnabled = rules.webEnabled;
+    auto candidates = GetPageSceneRuleJsons(rules, PAGE_SCENE_TEXT_EDITOR_SCENE, false, "");
+    if (!candidates.empty()) {
+        json = candidates.front();
     }
+}
+
+bool UiSessionManagerOhos::ExtractRegisteredTextQueryLocked(
+    int32_t pid, const std::string& id, std::string& json, bool& webEnabled)
+{
+    auto found = pageSceneRuleSets_.find(pid);
+    if (found == pageSceneRuleSets_.end() || found->second.ruleSetId != id) {
+        return false;
+    }
+    SetTextQueryRule(found->second, json, webEnabled);
+    return true;
+}
+
+void UiSessionManagerOhos::PrepareSplitQueryLocked(int32_t processId, PageSceneQueryPlan& plan)
+{
+    plan.splitJson = SelectPageSceneRules(plan.splitJson, "SPLIT");
+    const bool legacyPending = !plan.legacyJson.empty() || plan.webEnabled;
+    auto root = PageSceneSplit::Parse(plan.splitJson);
+    auto generation = std::to_string(++nextSplitQueryGeneration_);
+    cJSON_DeleteItemFromObjectCaseSensitive(root.get(), "_splitQueryGeneration");
+    cJSON_AddStringToObject(root.get(), "_splitQueryGeneration", generation.c_str());
+    plan.splitJson = PrintJsonUnformatted(root.get());
+    pageSceneQueries_[processId] = { legacyPending, std::move(generation) };
+}
+
+bool UiSessionManagerOhos::TryExtractSplitQueryLocked(int32_t processId, const std::string& ruleJsonOrRuleSetId,
+    std::string& ruleJson, bool& webEnabled, std::string& splitRuleJson)
+{
+    PageSceneQueryPlan plan;
+    plan.splitJson = FindRegisteredSplitQueryLocked(processId, ruleJsonOrRuleSetId);
+    if (plan.splitJson.empty() && PageSceneSplit::ContainsSplitRule(ruleJsonOrRuleSetId)) {
+        plan.splitJson = ruleJsonOrRuleSetId;
+    }
+    if (plan.splitJson.empty()) {
+        return false;
+    }
+    if (!ExtractRegisteredTextQueryLocked(processId, ruleJsonOrRuleSetId, plan.legacyJson, plan.webEnabled)) {
+        const auto legacyJson = SelectPageSceneRules(ruleJsonOrRuleSetId, PAGE_SCENE_TEXT_EDITOR_SCENE);
+        SetTextQueryRule(ExtractPageSceneRuleSetInfo(legacyJson), plan.legacyJson, plan.webEnabled);
+    }
+    PrepareSplitQueryLocked(processId, plan);
+    ruleJson = std::move(plan.legacyJson);
+    webEnabled = plan.webEnabled;
+    splitRuleJson = std::move(plan.splitJson);
+    return true;
+}
+
+int32_t UiSessionManagerOhos::ResolveLegacyRuleLocked(
+    int32_t processId, const std::string& ruleJsonOrRuleSetId, std::string& ruleJson, bool& webEnabled)
+{
     auto iter = pageSceneRuleSets_.find(processId);
     if (iter != pageSceneRuleSets_.end() && iter->second.ruleSetId == ruleJsonOrRuleSetId) {
         webEnabled = iter->second.webEnabled;
@@ -1052,7 +1173,7 @@ int32_t UiSessionManagerOhos::ExtractRuleJsonAndWebEnabled(int32_t processId,
                 // Search rules use ArkUI detection and do not use the legacy Web rule schema.
                 webEnabled = false;
                 ruleJson = setIter->second.ruleJson;
-                pendingPageSceneGets_.insert(processId);
+                pageSceneQueries_[processId].legacyPending = true;
                 return NO_ERROR;
             }
         }
@@ -1066,8 +1187,52 @@ int32_t UiSessionManagerOhos::ExtractRuleJsonAndWebEnabled(int32_t processId,
     if (ruleJson.empty() && !webEnabled) {
         return PARAM_INVALID;
     }
-    pendingPageSceneGets_.insert(processId);
+    pageSceneQueries_[processId].legacyPending = true;
     return NO_ERROR;
+}
+
+int32_t UiSessionManagerOhos::ExtractRuleJsonAndWebEnabled(int32_t processId,
+    const std::string& ruleJsonOrRuleSetId, std::string& ruleJson, bool& webEnabled, std::string* splitRuleJson)
+{
+    std::lock_guard<std::mutex> lock(pageSceneMutex_);
+    if (pageSceneQueries_.count(processId) != 0) {
+        LOGW("GetPageScene duplicated, process id:%{public}d", processId);
+        return LAST_UNFINISH;
+    }
+    if (splitRuleJson) {
+        if (TryExtractSplitQueryLocked(processId, ruleJsonOrRuleSetId, ruleJson, webEnabled, *splitRuleJson)) {
+            return NO_ERROR;
+        }
+        splitRuleJson->clear();
+    }
+    return ResolveLegacyRuleLocked(processId, ruleJsonOrRuleSetId, ruleJson, webEnabled);
+}
+
+bool UiSessionManagerOhos::IsSplitPageSceneQueryCurrent(int32_t processId, const std::string& generation)
+{
+    std::lock_guard<std::mutex> lock(pageSceneMutex_);
+    auto current = pageSceneQueries_.find(processId);
+    return !generation.empty() && current != pageSceneQueries_.end() && current->second.splitGeneration == generation;
+}
+
+bool UiSessionManagerOhos::HasPendingSplitPageSceneQuery(int32_t processId)
+{
+    std::lock_guard<std::mutex> lock(pageSceneMutex_);
+    auto current = pageSceneQueries_.find(processId);
+    return current != pageSceneQueries_.end() && !current->second.splitGeneration.empty();
+}
+
+void UiSessionManagerOhos::CancelSplitPageSceneQuery(int32_t processId, const std::string& generation)
+{
+    std::lock_guard<std::mutex> lock(pageSceneMutex_);
+    auto current = pageSceneQueries_.find(processId);
+    if (current == pageSceneQueries_.end() || current->second.splitGeneration != generation) {
+        return;
+    }
+    current->second.splitGeneration.clear();
+    if (!current->second.legacyPending) {
+        pageSceneQueries_.erase(current);
+    }
 }
 
 int32_t UiSessionManagerOhos::GetPageScene(int32_t processId, const std::string& ruleJsonOrRuleSetId)
@@ -1077,13 +1242,19 @@ int32_t UiSessionManagerOhos::GetPageScene(int32_t processId, const std::string&
         return PARAM_INVALID;
     }
     std::string ruleJson;
+    std::string splitRuleJson;
     bool webEnabled = false;
-    int32_t ret = ExtractRuleJsonAndWebEnabled(processId, ruleJsonOrRuleSetId, ruleJson, webEnabled);
+    int32_t ret =
+        ExtractRuleJsonAndWebEnabled(processId, ruleJsonOrRuleSetId, ruleJson, webEnabled, &splitRuleJson);
     if (ret != NO_ERROR) {
         return ret;
     }
     if (!ruleJson.empty()) {
         TriggerPageSceneDetect(processId, ruleJson, true);
+    }
+    // Schedule SPLIT independently so Web failures cannot prevent its result.
+    if (!splitRuleJson.empty()) {
+        TriggerPageSceneDetect(processId, splitRuleJson, true);
     }
     // Web side: traverse via callback so WebDelegate can handle
     // temporary registration + cleanup (isTemporary) via GetPageSceneForWeb.
@@ -1099,7 +1270,7 @@ int32_t UiSessionManagerOhos::GetPageScene(int32_t processId, const std::string&
                 LOGW("GetPageScene web-side failed ret=%{public}d, processId=%{public}d", webRet, processId);
                 {
                     std::lock_guard<std::mutex> lock(pageSceneMutex_);
-                    pendingPageSceneGets_.erase(processId);
+                    CompleteLegacyPageSceneQueryLocked(processId);
                 }
                 return webRet;
             }
@@ -1137,15 +1308,59 @@ void UiSessionManagerOhos::ReportPageSceneEvent(int32_t processId, const std::st
     }
 }
 
+void UiSessionManagerOhos::ReportSplitPageSceneQueryResult(
+    int32_t processId, const std::string& sceneJson, const std::string& generation)
+{
+    if (generation.empty()) {
+        return;
+    }
+    sptr<IRemoteObject> reportObject;
+    {
+        // Capture the recipient with the query request's ownership under the existing lock order.
+        std::shared_lock<std::shared_mutex> reportLock(reportObjectMutex_);
+        std::lock_guard<std::mutex> sceneLock(pageSceneMutex_);
+        auto query = pageSceneQueries_.find(processId);
+        if (query == pageSceneQueries_.end() || query->second.splitGeneration != generation) {
+            return;
+        }
+        auto report = reportObjectMap_.find(processId);
+        if (report != reportObjectMap_.end()) {
+            reportObject = report->second;
+        }
+    }
+    // No state lock is held across IPC; finish only the query captured above.
+    auto reportService = iface_cast<ReportService>(reportObject);
+    if (reportService != nullptr) {
+        reportService->ReportPageSceneEvent(sceneJson, true);
+    } else {
+        LOGW("ReportSplitPageSceneQueryResult failed, process id:%{public}d", processId);
+    }
+    // A cancelled/replaced query must not complete another request after the send attempt.
+    CancelSplitPageSceneQuery(processId, generation);
+}
+
 void UiSessionManagerOhos::CompleteGetPageScene(int32_t processId)
 {
     std::lock_guard<std::mutex> lock(pageSceneMutex_);
-    pendingPageSceneGets_.erase(processId);
+    CompleteLegacyPageSceneQueryLocked(processId);
+}
+
+void UiSessionManagerOhos::CompleteLegacyPageSceneQueryLocked(int32_t processId)
+{
+    auto query = pageSceneQueries_.find(processId);
+    if (query == pageSceneQueries_.end()) {
+        return;
+    }
+    query->second.legacyPending = false;
+    if (query->second.splitGeneration.empty()) {
+        pageSceneQueries_.erase(query);
+    }
 }
 
 void UiSessionManagerOhos::NotifyPageSceneNodeChanged(const std::string& nodeTag, bool isAttach)
 {
-    if (!IsPageSceneInputControlNode(nodeTag)) {
+    (void)isAttach;
+    if (!pageSceneRuleRegistered_.load() || !IsPageSceneInputControlNode(nodeTag)) {
         return;
     }
     auto ruleJsons = GetPageSceneRuleJsonsForNodeChange(nodeTag, PAGE_SCENE_TEXT_EDITOR_SCENE);
@@ -1186,6 +1401,9 @@ void UiSessionManagerOhos::NotifyPageSceneNodeStateChanged(
 void UiSessionManagerOhos::NotifyPageSceneContentChanged()
 {
     std::lock_guard<std::mutex> lock(pageSceneMutex_);
+    if (splitPageSceneRegistration_) {
+        pendingSplitPageSceneProcesses_.insert(splitPageSceneRegistration_->ownerPid);
+    }
     for (const auto& [pid, ruleSetInfo] : pageSceneRuleSets_) {
         auto ruleJsons = GetPageSceneRuleJsons(ruleSetInfo, PAGE_SCENE_TEXT_EDITOR_SCENE, false, "");
         for (const auto& ruleJson : ruleJsons) {
@@ -1204,14 +1422,15 @@ void UiSessionManagerOhos::FlushPageSceneNodeChanged()
     std::vector<std::pair<int32_t, std::string>> ruleJsons;
     {
         std::lock_guard<std::mutex> lock(pageSceneMutex_);
-        if (pendingPageSceneDetectRules_.empty() && pendingSearchPageSceneDetectRules_.empty()) {
-            return;
-        }
         ruleJsons.assign(pendingPageSceneDetectRules_.begin(), pendingPageSceneDetectRules_.end());
         pendingPageSceneDetectRules_.clear();
         ruleJsons.insert(ruleJsons.end(),
             pendingSearchPageSceneDetectRules_.begin(), pendingSearchPageSceneDetectRules_.end());
         pendingSearchPageSceneDetectRules_.clear();
+        for (auto pid : pendingSplitPageSceneProcesses_) {
+            ruleJsons.emplace_back(pid, SPLIT_CONFIG_CHANGED);
+        }
+        pendingSplitPageSceneProcesses_.clear();
     }
     for (const auto& [pid, ruleJson] : ruleJsons) {
         TriggerPageSceneDetect(pid, ruleJson, false);
@@ -1231,6 +1450,8 @@ void UiSessionManagerOhos::SavePageSceneDetectFunction(PageSceneDetectFunction&&
 
 void UiSessionManagerOhos::ErasePendingPageSceneRulesLocked(int32_t processId)
 {
+    pendingSplitPageSceneProcesses_.erase(processId);
+    pageSceneQueries_.erase(processId);
     for (auto iter = pendingPageSceneDetectRules_.begin(); iter != pendingPageSceneDetectRules_.end();) {
         if (iter->first == processId) {
             iter = pendingPageSceneDetectRules_.erase(iter);
@@ -1281,7 +1502,13 @@ void UiSessionManagerOhos::TriggerPageSceneDetect(int32_t processId, const std::
     if (!pageSceneDetectFunction) {
         LOGW("TriggerPageSceneDetect callback is null, process id:%{public}d", processId);
         if (isGetResult) {
-            CompleteGetPageScene(processId);
+            auto root = PageSceneSplit::Parse(ruleJson);
+            const auto generation = GetJsonString(root.get(), "_splitQueryGeneration");
+            if (generation.empty()) {
+                CompleteGetPageScene(processId);
+            } else {
+                CancelSplitPageSceneQuery(processId, generation);
+            }
         }
         return;
     }
@@ -2812,4 +3039,173 @@ void UiSessionManagerOhos::ReportNodesInRectQueryResult(const std::string& data)
     }
     processIter->second.clear();
 }
+
+std::vector<std::string> UiSessionManagerOhos::GetSplitPageSceneRulesForDetection(int32_t processId)
+{
+    std::lock_guard<std::mutex> lock(pageSceneMutex_);
+    const auto* entry = FindOwnedSplitRuleSetLocked(processId);
+    return entry ? std::vector<std::string> { entry->ruleJson } : std::vector<std::string> {};
+}
+
+bool UiSessionManagerOhos::CanRegisterSplitRuleSetLocked(int32_t processId, const std::string& ruleSetId) const
+{
+    // Only the new SPLIT entry uses this common limit. Legacy validators remain unchanged.
+    std::set<std::string> ids;
+    auto legacy = pageSceneRuleSets_.find(processId);
+    if (legacy != pageSceneRuleSets_.end()) {
+        ids.insert(legacy->second.ruleSetId);
+    }
+    auto search = searchPageSceneRuleSets_.find(processId);
+    if (search != searchPageSceneRuleSets_.end()) {
+        std::transform(search->second.begin(), search->second.end(), std::inserter(ids, ids.end()),
+            [](const auto& entry) { return entry.first; });
+    }
+    return ids.count(ruleSetId) == 0 && ids.size() < PageSceneSplit::MAX_RULE_SETS;
+}
+
+namespace {
+std::string SelectPageSceneRules(const std::string& json, const std::string& sceneType)
+{
+    auto root = PageSceneSplit::Parse(json);
+    auto rules = cJSON_GetObjectItemCaseSensitive(root.get(), "rules");
+    for (int index = cJSON_GetArraySize(rules) - 1; index >= 0; --index) {
+        if (GetJsonString(cJSON_GetArrayItem(rules, index), "sceneType") != sceneType) {
+            cJSON_DeleteItemFromArray(rules, index);
+        }
+    }
+    // An empty native selection can still carry the original Web request.
+    return PrintJsonUnformatted(root.get());
+}
+} // namespace
+
+void UiSessionManagerOhos::PrepareConnectedRegistration(const std::string& json, PageSceneRegistrationPlan& plan) const
+{
+    // Proxy validated the request schema, selectors and per-request rule count before IPC.
+    // The receiver only extracts values; ownership/capacity checks remain under pageSceneMutex_.
+    auto root = PageSceneSplit::Parse(json);
+    plan.splitRules = SplitPageSceneRuleSetInfo { GetJsonString(root.get(), "ruleSetId"),
+        SelectPageSceneRules(json, "SPLIT") };
+    PrepareLegacyRegistration(json, plan);
+}
+
+void UiSessionManagerOhos::PrepareLegacyRegistration(const std::string& json, PageSceneRegistrationPlan& plan) const
+{
+    auto rules = ExtractPageSceneRuleSetInfo(SelectPageSceneRules(json, PAGE_SCENE_TEXT_EDITOR_SCENE));
+    if (rules.rules.empty() && !rules.webEnabled) {
+        return;
+    }
+    // Preserve Web-only requests and legacy per-rule filtering. Web validates its own payload.
+    rules.ruleSetId = plan.splitRules.ruleSetId;
+    plan.legacyRules = std::move(rules);
+}
+
+bool UiSessionManagerOhos::ConflictsWithSplitRegistrationLocked(int32_t pid, const std::string& id) const
+{
+    const auto* entry = FindOwnedSplitRuleSetLocked(pid);
+    return entry && entry->ruleSetId == id;
+}
+
+void UiSessionManagerOhos::StampPageSceneRegistrationLocked(PageSceneRegistrationPlan& plan)
+{
+    const auto generation = std::to_string(++nextSplitRegistrationId_);
+    auto& entry = plan.splitRules;
+    // Used only to reset reportOnRegister/deduplication state for a distinct registration.
+    auto root = PageSceneSplit::Parse(entry.ruleJson);
+    cJSON_DeleteItemFromObjectCaseSensitive(root.get(), "_splitRegistrationGeneration");
+    cJSON_AddStringToObject(root.get(), "_splitRegistrationGeneration", generation.c_str());
+    entry.ruleJson = PrintJsonUnformatted(root.get());
+}
+
+int32_t UiSessionManagerOhos::CompletePageSceneRegistration(
+    int32_t processId, const PageSceneRegistrationPlan& plan)
+{
+    SaveProcessId("pageScene", processId);
+    if (plan.legacyRules) {
+        for (const auto& request : GetPageSceneRuleJsons(*plan.legacyRules, PAGE_SCENE_TEXT_EDITOR_SCENE, true, "")) {
+            TriggerPageSceneDetect(processId, request, false);
+        }
+    }
+    TriggerPageSceneDetect(processId, SPLIT_CONFIG_CHANGED, false);
+    if (!plan.legacyRules || !plan.legacyRules->webEnabled) {
+        return NO_ERROR;
+    }
+    return RegisterWebPageSceneRules(processId, plan.legacyRules->ruleJson);
+}
+
+bool UiSessionManagerOhos::RemoveSplitRuleSetLocked(int32_t processId, const std::string& id)
+{
+    const auto* entry = FindOwnedSplitRuleSetLocked(processId);
+    if (!entry) {
+        return false;
+    }
+    if (entry->ruleSetId != id) {
+        return false;
+    }
+    splitPageSceneRegistration_.reset();
+    pendingSplitPageSceneProcesses_.erase(processId);
+    return true;
+}
+
+bool UiSessionManagerOhos::HasProcessPageSceneRulesLocked(int32_t processId) const
+{
+    return OwnsSplitPageSceneRegistrationLocked(processId) || pageSceneRuleSets_.count(processId) ||
+           searchPageSceneRuleSets_.count(processId);
+}
+
+int32_t UiSessionManagerOhos::UnregisterSplitPageSceneRules(int32_t processId, const std::string& ruleSetId)
+{
+    bool hasRules = false;
+    bool removedText = false;
+    bool textWebEnabled = false;
+    {
+        std::lock_guard<std::mutex> lock(pageSceneMutex_);
+        if (!RemoveSplitRuleSetLocked(processId, ruleSetId)) {
+            return PARAM_INVALID;
+        }
+        auto text = pageSceneRuleSets_.find(processId);
+        // The same ruleSetId identifies both parts of a mixed registration. Keep independent text rule sets.
+        if (text != pageSceneRuleSets_.end() && text->second.ruleSetId == ruleSetId) {
+            textWebEnabled = text->second.webEnabled;
+            pageSceneRuleSets_.erase(text);
+            ErasePendingLegacyPageSceneRulesLocked(processId);
+            CompleteLegacyPageSceneQueryLocked(processId);
+            removedText = true;
+        }
+        RefreshPageSceneRegistrationLocked();
+        hasRules = HasProcessPageSceneRulesLocked(processId);
+    }
+    if (!hasRules) {
+        EraseProcessId("pageScene", processId);
+    }
+    if (removedText) {
+        WebPageSceneFunction webPageSceneFunc;
+        {
+            std::lock_guard<std::mutex> lock(webPageSceneMutex_);
+            webPageSceneFunc = webPageSceneFunction_;
+        }
+        if (textWebEnabled && webPageSceneFunc) {
+            webPageSceneFunc(WebPageSceneOp::UnregisterRules, processId, "", false);
+        }
+        TriggerPageSceneDetect(processId, BuildPageSceneRuleRemoval(ruleSetId, false), false);
+    }
+    TriggerPageSceneDetect(processId, SPLIT_CONFIG_CHANGED, false);
+    return NO_ERROR;
+}
+
+void UiSessionManagerOhos::RefreshPageSceneRegistrationLocked()
+{
+    pageSceneRuleRegistered_.store(splitPageSceneRegistration_.has_value() || !searchPageSceneRuleSets_.empty() ||
+                                   HasRegisteredPageSceneRuleLocked(PAGE_SCENE_TEXT_EDITOR_SCENE));
+}
+
+std::string UiSessionManagerOhos::FindRegisteredSplitQueryLocked(int32_t pid, const std::string& id) const
+{
+    const auto* entry = FindOwnedSplitRuleSetLocked(pid);
+    if (!entry) {
+        return {};
+    }
+    return entry->ruleSetId == id ? entry->ruleJson : "";
+}
+
+
 } // namespace OHOS::Ace

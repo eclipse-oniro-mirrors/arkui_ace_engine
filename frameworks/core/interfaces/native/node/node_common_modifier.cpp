@@ -13,8 +13,10 @@
  * limitations under the License.
  */
 #include "core/interfaces/native/node/node_common_modifier.h"
+#include "core/components_ng/event/event_constants.h"
 
 #include "base/log/log_wrapper.h"
+#include "core/common/application_shortcut.h"
 #include "core/common/container.h"
 
 #include "interfaces/native/node/native_type_visual_impl.h"
@@ -2148,6 +2150,17 @@ void ResetHitTestBehavior(ArkUINodeHandle node)
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
     ViewAbstract::SetHitTestMode(frameNode, NG::HitTestMode::HTMDEFAULT);
+}
+
+void SetAgentControlMode(ArkUINodeHandle node, ArkUI_Int32 value)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    if (value < static_cast<int32_t>(AgentControlMode::ALLOW) || value > static_cast<int32_t>(AgentControlMode::DENY)) {
+        frameNode->SetAgentControlMode(std::nullopt);
+        return;
+    }
+    ViewAbstract::SetAgentControlMode(frameNode, static_cast<AgentControlMode>(value));
 }
 
 void SetZIndex(ArkUINodeHandle node, ArkUI_Int32 value)
@@ -11549,6 +11562,17 @@ namespace {
 OHOS::Ace::TouchEventInfo globalEventInfo("global");
 }
 
+ArkUI_Int32 RegisterApplicationShortcut(const std::string& value, uint8_t keys,
+    std::function<void(ArkUI_Int32)>&& callback)
+{
+    return ApplicationShortcutManager::GetInstance().RegisterApplicationShortcut(value, keys, std::move(callback));
+}
+
+void UnregisterApplicationShortcut(ArkUI_Int32 registrationId)
+{
+    ApplicationShortcutManager::GetInstance().UnregisterApplicationShortcut(registrationId);
+}
+
 const ArkUICommonModifier* GetCommonModifier()
 {
     CHECK_INITIALIZED_FIELDS_BEGIN(); // don't move this line
@@ -12126,6 +12150,9 @@ const ArkUICommonModifier* GetCommonModifier()
         .getLinearGradientBlur = GetLinearGradientBlur,
         .setShadowClipMode = SetShadowClipMode,
         .resetShadowClipMode = ResetShadowClipMode,
+        .setAgentControlMode = SetAgentControlMode,
+        .registerApplicationShortcut = RegisterApplicationShortcut,
+        .unregisterApplicationShortcut = UnregisterApplicationShortcut,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
 

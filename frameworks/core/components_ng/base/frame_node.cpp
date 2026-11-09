@@ -217,6 +217,7 @@ constexpr int32_t MIN_OPINC_AREA = 10000;
 } // namespace
 namespace OHOS::Ace::NG {
 namespace {
+
 void ClearAccessibilityFocus(
     const RefPtr<AccessibilityProperty>& accessibilityProperty, const RefPtr<RenderContext>& renderContext)
 {
@@ -1211,6 +1212,11 @@ void FrameNode::DumpCommonInfo()
     DumpLog::GetInstance().AddDesc(std::string("FrameRect: ").append(geometryNode_->GetFrameRect().ToString()));
     DumpLog::GetInstance().AddDesc(
         std::string("PaintRect without transform: ").append(renderContext_->GetPaintRectWithoutTransform().ToString()));
+    // DebugLine memory trace: emit when a source line is bound via .debugLine().
+    auto debugLine = GetDebugLine();
+    if (!debugLine.empty()) {
+        DumpLog::GetInstance().AddDesc(std::string("DebugLine: ").append(debugLine));
+    }
     if (renderContext_->GetBackgroundColor()->ColorToString().compare("#00000000") != 0) {
         DumpLog::GetInstance().AddDesc(
             std::string("BackgroundColor: ").append(renderContext_->GetBackgroundColor()->ColorToString()));
@@ -2221,6 +2227,13 @@ void FrameNode::UpdateGeometryTransition()
     }
 }
 
+const DragPreviewOption* FrameNode::GetDragPreviewOptionIfExist() const
+{
+    return dragDropRelatedConfigurations_
+        ? dragDropRelatedConfigurations_->GetDragPreviewOptionIfExist()
+        : nullptr;
+}
+
 void FrameNode::TriggerRsProfilerNodeMountCallbackIfExist()
 {
 #if !defined(PREVIEW) && !defined(ACE_UNITTEST) && defined(OHOS_PLATFORM)
@@ -2264,6 +2277,7 @@ void FrameNode::OnAttachToMainTree(bool recursive)
         layoutProperty_->UpdatePropertyChangeFlag(PROPERTY_UPDATE_MEASURE_SELF);
     }
     UINode::OnAttachToMainTree(recursive);
+    NotifyPageSceneSplitChanged(true);
     if (safeAreaInsetNode_ && !safeAreaInsetNode_->IsOnMainTree()) {
         safeAreaInsetNode_->AttachToMainTree(recursive, GetContext());
     }
@@ -2539,8 +2553,27 @@ void FrameNode::NotifyVisibleChange(
     }
 }
 
+void FrameNode::NotifyPageSceneSplitChanged(bool attached)
+{
+#ifndef CROSS_PLATFORM
+    if (!ContentChangeManager::HasPageSceneSplitTracking()) {
+        return;
+    }
+    auto context = GetContext();
+    if (!context || !context->CheckThreadSafe() ||
+        !ContentChangeManager::IsPageSceneSplitWindowSupported(context)) {
+        return;
+    }
+    auto manager = context->GetContentChangeManager();
+    if (manager) {
+        manager->NotifyPageSceneSplitChanged(AceType::Claim(this), attached);
+    }
+#endif
+}
+
 void FrameNode::NotifyPageSceneVisibilityChanged()
 {
+    NotifyPageSceneSplitChanged();
 #if !defined(PREVIEW) && !defined(ACE_UNITTEST) && defined(OHOS_PLATFORM) && defined(WEB_SUPPORTED)
     if (!IsOnMainTree()) {
         return;
@@ -2552,6 +2585,7 @@ void FrameNode::NotifyPageSceneVisibilityChanged()
 
 void FrameNode::NotifyPageSceneActiveChanged()
 {
+    NotifyPageSceneSplitChanged();
 #if !defined(PREVIEW) && !defined(ACE_UNITTEST) && defined(OHOS_PLATFORM) && defined(WEB_SUPPORTED)
     if (!IsOnMainTree()) {
         return;
@@ -2574,6 +2608,7 @@ void FrameNode::NotifyPageSceneFocusabilityChanged()
 
 void FrameNode::NotifyPageSceneOpacityChanged()
 {
+    NotifyPageSceneSplitChanged();
 #if !defined(PREVIEW) && !defined(ACE_UNITTEST) && defined(OHOS_PLATFORM) && defined(WEB_SUPPORTED)
     if (!IsOnMainTree()) {
         return;
@@ -2597,7 +2632,8 @@ void FrameNode::OnDetachFromMainTree(bool recursive, PipelineContext* context)
     if (context) {
         auto contentChangeMgr = context->GetContentChangeManager();
         if (contentChangeMgr) {
-            contentChangeMgr->OnContentChangeNodeDestroyed(GetId());
+            // This path also runs from ~FrameNode: never claim the node into a RefPtr here.
+            contentChangeMgr->OnContentChangeNodeDestroyed(GetId(), GetTag(), context);
         }
     }
     if (safeAreaInsetNode_ && safeAreaInsetNode_->IsOnMainTree()) {
@@ -4081,6 +4117,7 @@ void FrameNode::MarkNeedRender(bool isRenderBoundary)
 {
     // This function has a mirror function (XxxMultiThread) and needs to be modified synchronously.
     FREE_NODE_CHECK(this, MarkNeedRender, isRenderBoundary);
+    NotifyPageSceneSplitChanged();
     auto context = GetContext();
     CHECK_NULL_VOID(context);
     // If it has dirtyLayoutBox, need to mark dirty after layout done.
@@ -4254,6 +4291,21 @@ bool FrameNode::IsAtomicNode() const
         return kitNode_->GetPattern()->IsAtomicNode();
     }
     return pattern_->IsAtomicNode();
+}
+
+void FrameNode::SetAgentControlMode(const std::optional<AgentControlMode>& mode)
+{
+    agentControlMode_ = mode;
+}
+
+bool FrameNode::HasAgentControlMode() const
+{
+    return agentControlMode_.has_value();
+}
+
+AgentControlMode FrameNode::GetAgentControlMode() const
+{
+    return agentControlMode_.value_or(AgentControlMode::ALLOW);
 }
 
 HitTestMode FrameNode::GetHitTestMode() const
@@ -4672,6 +4724,9 @@ HitTestResult FrameNode::TouchTest(const PointF& globalPoint, const PointF& pare
         (isDispatch || (InResponseRegionList(revertPoint, responseRegionList)))) {
         pattern_->OnTouchTestHit(touchRestrict.hitTestType);
         consumed = true;
+        if (!touchRestrict.sensitiveInputHitNode.Upgrade()) {
+            touchRestrict.sensitiveInputHitNode = WeakClaim(this);
+        }
         if (touchRestrict.hitTestType == SourceType::TOUCH) {
             auto gestureHub = GetOrCreateGestureEventHub();
             if (gestureHub) {
@@ -7005,6 +7060,10 @@ void FrameNode::Layout()
     bool needSyncRsNode = false;
     DirtySwapConfig config;
     bool willSyncGeoProperties = OnLayoutFinish(needSyncRsNode, config);
+    if (tag_ == V2::NAVIGATION_VIEW_ETS_TAG || config.frameSizeChange || config.frameOffsetChange ||
+        config.contentSizeChange || config.contentOffsetChange) {
+        NotifyPageSceneSplitChanged();
+    }
     needSyncRsNode |= AvoidKeyboard(isFocusOnPage);
     if (GetIsGeometryTransitionIn()) {
         renderContext_->SetFrameWithoutAnimation(renderContext_->GetPaintRectWithoutTransform());
@@ -8368,6 +8427,9 @@ const CacheVisibleRectResult& FrameNode::GetCacheVisibleRect(uint64_t timestamp,
 {
     RefPtr<FrameNode> parentUi = GetCoordinateAncestorNodeOfFrame(true);
     auto rectToParent = GetPaintRectWithTransform();
+    if (!renderContext_->HasRenderNode()) {
+        rectToParent = renderContext_->GetPaintRectWithoutTransform();
+    }
     auto scale = GetTransformScale();
     auto innerScale = scale;
     if (renderContext_->HasTransformMatrix()) {
@@ -8811,6 +8873,7 @@ void FrameNode::OnNodeTransformInfoUpdate(bool changed)
     if (!changed) {
         return;
     }
+    NotifyPageSceneSplitChanged();
     AddFrameNodeChangeInfoFlag(FRAME_NODE_CHANGE_TRANSFORM_CHANGE);
     if (AnimationUtils::IsImplicitAnimationOpen()) {
         AddFrameNodeChangeInfoFlag(FRAME_NODE_CHANGE_START_ANIMATION);
@@ -9052,6 +9115,11 @@ void FrameNode::DumpCommonInfo(std::unique_ptr<JsonValue>& json)
 {
     json->Put("FrameRect", geometryNode_->GetFrameRect().ToString().c_str());
     json->Put("PaintRect without transform", renderContext_->GetPaintRectWithoutTransform().ToString().c_str());
+    // DebugLine memory trace: emit when a source line is bound via .debugLine().
+    auto debugLine = GetDebugLine();
+    if (!debugLine.empty()) {
+        json->Put("DebugLine", debugLine.c_str());
+    }
     if (renderContext_->GetBackgroundColor()->ColorToString().compare("#00000000") != 0) {
         json->Put("BackgroundColor", renderContext_->GetBackgroundColor()->ColorToString().c_str());
     }

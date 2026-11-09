@@ -59,8 +59,9 @@ Ark_NativePointer ConstructImpl(Ark_Int32 id,
 }
 } // XComponentModifier
 namespace XComponentInterfaceModifier {
-void SetXComponentOptionsImpl(Ark_NativePointer node,
-                              const Ark_Union_XComponentParameters_XComponentOptions_NativeXComponentParameters* params)
+void SetXComponentOptionsImpl(
+    Ark_NativePointer node,
+    const Ark_Union_XComponentParameters_XComponentOptions_NativeXComponentParameters* params)
 {
     auto frameNode = reinterpret_cast<FrameNode *>(node);
     CHECK_NULL_VOID(frameNode);

@@ -1401,6 +1401,34 @@ void TabsPattern::DumpInfo()
 {
     DumpLog::GetInstance().AddDesc(std::string("isBindonContentDidScroll: ")
             .append((onContentDidScroll_ && *onContentDidScroll_) ? "true" : "false"));
+    // animationDuration: the user-set tab-switch animation duration (ms). Read-only — do NOT call
+    // UpdateAnimationDuration() here (it mutates animationDuration_ + SwiperPaintProperty and triggers
+    // dirty when unset; DumpInfo must be an observe-only path). value_or(0) shows 0 when not explicitly
+    // set (the effective default 300 is resolved at runtime, not in the dump).
+    auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
+    CHECK_NULL_VOID(tabsNode);
+    auto tabBarNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
+    CHECK_NULL_VOID(tabBarNode);
+    auto tabBarPattern = tabBarNode->GetPattern<TabBarPattern>();
+    CHECK_NULL_VOID(tabBarPattern);
+    DumpLog::GetInstance().AddDesc(
+        std::string("animationDuration: ").append(
+            std::to_string(tabBarPattern->GetAnimationDuration().value_or(0))));
+    // animationMode reflects TabAnimateMode. NO_ANIMATION here means the animateMode disables the
+    // tab-switch animation (distinct from the AnimationCurve.NO_ANIMATION enum, which does not apply
+    // to TabsController::ChangeIndex). Matches the inspector JSON 'animationMode' field.
+    static auto animateModeStr = [](TabAnimateMode mode) -> const char* {
+        switch (mode) {
+            case TabAnimateMode::CONTENT_FIRST: return "AnimationMode.CONTENT_FIRST";
+            case TabAnimateMode::ACTION_FIRST: return "AnimationMode.ACTION_FIRST";
+            case TabAnimateMode::NO_ANIMATION: return "AnimationMode.NO_ANIMATION";
+            case TabAnimateMode::CONTENT_FIRST_WITH_JUMP: return "AnimationMode.CONTENT_FIRST_WITH_JUMP";
+            case TabAnimateMode::ACTION_FIRST_WITH_JUMP: return "AnimationMode.ACTION_FIRST_WITH_JUMP";
+            default: return "AnimationMode.UNKNOWN";
+        }
+    };
+    DumpLog::GetInstance().AddDesc(
+        std::string("animationMode: ").append(animateModeStr(GetAnimateMode())));
 }
 
 RefPtr<LayoutAlgorithm> TabsPattern::CreateLayoutAlgorithm()
@@ -1963,62 +1991,6 @@ void TabsPattern::ResetSystemMaterial()
     UnregisterColorPicker();
 }
 
-void TabsPattern::ClampTabBarTransformOffset()
-{
-    if (!isFloatingBar_ && !isFloatingTopBar_) {
-        return;
-    }
-    auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
-    CHECK_NULL_VOID(tabsNode);
-    auto tabBar = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
-    CHECK_NULL_VOID(tabBar);
-    auto renderContext = tabBar->GetRenderContext();
-    CHECK_NULL_VOID(renderContext);
-    if (!renderContext->HasTransformTranslate()) {
-        return;
-    }
-    auto translate = renderContext->GetTransformTranslate().value();
-    float offsetX = translate.x.ConvertToPx();
-    float offsetY = translate.y.ConvertToPx();
-    auto tabBarGeo = tabBar->GetGeometryNode();
-    auto tabsGeo = tabsNode->GetGeometryNode();
-    if (!tabBarGeo || !tabsGeo) {
-        return;
-    }
-    float barLeft = tabBarGeo->GetFrameOffset().GetX();
-    float barTop = tabBarGeo->GetFrameOffset().GetY();
-    float barWidth = tabBarGeo->GetFrameSize().Width();
-    float barHeight = tabBarGeo->GetFrameSize().Height();
-    float tabsWidth = tabsGeo->GetFrameSize().Width();
-    float tabsHeight = tabsGeo->GetFrameSize().Height();
-
-    // Keep the floating bar inside the Tabs container, further constrained by the
-    // component-level safe area (safeAreaPadding + safeAreaInset). The system safe
-    // area is already handled by the Tabs host via SafeAreaExpandOpts.
-    float minOffsetX = -barLeft;
-    float maxOffsetX = tabsWidth - barLeft - barWidth;
-    float minOffsetY = -barTop;
-    float maxOffsetY = tabsHeight - barTop - barHeight;
-
-    auto layoutProperty = tabsNode->GetLayoutProperty();
-    if (layoutProperty) {
-        auto innerSafePadding = layoutProperty->GetOrCreateSafeAreaPadding();
-        float safeLeft = innerSafePadding.left.value_or(0.0f);
-        float safeRight = innerSafePadding.right.value_or(0.0f);
-        float safeTop = innerSafePadding.top.value_or(0.0f);
-        float safeBottom = innerSafePadding.bottom.value_or(0.0f);
-        minOffsetX = std::max(minOffsetX, safeLeft - barLeft);
-        maxOffsetX = std::min(maxOffsetX, tabsWidth - safeRight - barLeft - barWidth);
-        minOffsetY = std::max(minOffsetY, safeTop - barTop);
-        maxOffsetY = std::min(maxOffsetY, tabsHeight - safeBottom - barTop - barHeight);
-    }
-
-    float clampedX = std::clamp(offsetX, minOffsetX, std::max(minOffsetX, maxOffsetX));
-    float clampedY = std::clamp(offsetY, minOffsetY, std::max(minOffsetY, maxOffsetY));
-    if (!NearEqual(clampedX, offsetX) || !NearEqual(clampedY, offsetY)) {
-        renderContext->UpdateTransformTranslate({clampedX, clampedY, 0.0f});
-    }
-}
 
 void TabsPattern::SetFloatingScaleEnabled(bool isFloatingScaleEnabled)
 {
@@ -3019,6 +2991,20 @@ void TabsPattern::HandleDividerDragUpdate(float xOffset)
     }
     auto host = GetHost();
     CHECK_NULL_VOID(host);
+    // When the sidebar is on the right (sidebarPosition == END, adjusted for RTL),
+    // dragging the divider leftwards (xOffset < 0) should widen the sidebar, and
+    // dragging rightwards should narrow it — the opposite of the left-sidebar case.
+    // Negate xOffset so the same width-update formula works for both sides.
+    auto layoutProperty = host->GetLayoutProperty<TabsLayoutProperty>();
+    if (layoutProperty) {
+        bool isRTL = layoutProperty->GetNonAutoLayoutDirection() == TextDirection::RTL;
+        auto sideBarPos = layoutProperty->GetSidebarPositionValue(BarPosition::START);
+        bool sideBarOnLeft = (!isRTL && sideBarPos == BarPosition::START) ||
+                             (isRTL && sideBarPos == BarPosition::END);
+        if (!sideBarOnLeft) {
+            xOffset = -xOffset;
+        }
+    }
     auto newWidth = preSideBarWidthPx_ + xOffset;
     newWidth = std::max(minSideBarWidth_, std::min(newWidth, maxSideBarWidth_));
     if (realSideBarWidthPx_.has_value() && NearEqual(realSideBarWidthPx_.value(), newWidth)) {

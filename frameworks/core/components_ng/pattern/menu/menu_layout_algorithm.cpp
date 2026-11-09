@@ -3795,14 +3795,7 @@ void MenuLayoutAlgorithm::InitCanExpandCurrentWindow(bool isContextMenu,
     CHECK_NULL_VOID(container);
     targetInUIExtension_ = container->IsUIExtensionWindow();
     if (targetInUIExtension_) {
-        Rect rect;
-        if (containerId >= MIN_SUBCONTAINER_ID) {
-            auto subwindow = SubwindowManager::GetInstance()->GetSubwindowById(containerId);
-            CHECK_NULL_VOID(subwindow);
-            rect = subwindow->GetUIExtensionHostWindowRect();
-        } else {
-            rect = container->GetUIExtensionHostWindowRect();
-        }
+        auto rect = container->GetUIExtensionHostWindowRect();
         UIExtensionHostWindowRect_ = RectF(rect.Left(), rect.Top(), rect.Width(), rect.Height());
         TAG_LOGI(AceLogTag::ACE_MENU, "GetUIExtensionHostWindowRect : %{public}s",
             UIExtensionHostWindowRect_.ToString().c_str());

@@ -28,7 +28,7 @@ interface IMonitor {
 declare enum MonitorType {
   MONITOR_DECORATOR = '@Monitor',
   SYNC_MONITOR_DECORATOR = '@SyncMonitor',
-  MONITOR_WITH_OPTIONS_DECORATOR = '@MonitorWithOptions',
+  MONITOR_WITH_OPTIONS_DECORATOR = '@Monitor(options)',
   ADD_MONITOR_API = 'AddMonitor API'
 }
 
@@ -36,8 +36,9 @@ declare class MonitorPathHelper {
   static hasWildcardEnding(path: string): boolean;
   static isWildcardSubPath(path: string): boolean;
   static pathBeforeWildcard(path: string): string;
-  static isValidForSyncMonitor(path: string): boolean;
-  static isValidForMonitor(path: string): boolean;
+  static isValid(path: string, wildcardEnabled: boolean): boolean;
+  static isValidWildcardPath(path: string): boolean;
+  static isValidNoWildcardPath(path: string): boolean;
 }
 
 declare class MonitorValueV2<T> {
@@ -46,8 +47,8 @@ declare class MonitorValueV2<T> {
   now?: T;
   path: string;
   props: string[];
+  id: number;
   private dirty;
-  constructor(path: string);
   setNotFound(isInit: boolean): boolean;
   setValue(isInit: boolean, newValue: T): boolean;
   reset(): void;
@@ -87,6 +88,7 @@ declare class MonitorV2 {
 
   getTarget(): Object;
   isSync(): boolean;
+  isWildcardEnabled(): boolean;
   addPath(path: string, lsv?: boolean): MonitorValueV2<unknown> | undefined;
   removePath(path: string): boolean;
   isSyncMonitorDecorator(): boolean;
@@ -297,7 +299,7 @@ export class MonitorPathHelperTests implements ITestFile {
 
   private testValidForMonitorNormalPath(): void {
     const testPath: string = "a.b";
-    const result: boolean = MonitorPathHelper.isValidForMonitor(testPath);
+    const result: boolean = MonitorPathHelper.isValid(testPath, false);
     const expectedResult: boolean = true;
     const errorMessage: string = "Check for wildcard ending";
     eq(result, expectedResult, errorMessage);
@@ -305,7 +307,7 @@ export class MonitorPathHelperTests implements ITestFile {
 
   private testValidForMonitorWithWildcardEnding(): void {
     const testPath: string = "a.b.*";
-    const result: boolean = MonitorPathHelper.isValidForMonitor(testPath);
+    const result: boolean = MonitorPathHelper.isValid(testPath, false);
     const expectedResult: boolean = false;
     const errorMessage: string = "Check for wildcard ending";
     eq(result, expectedResult, errorMessage);
@@ -313,7 +315,7 @@ export class MonitorPathHelperTests implements ITestFile {
 
   private testValidForMonitorSingleWildcard(): void {
     const testPath: string = "*";
-    const result: boolean = MonitorPathHelper.isValidForMonitor(testPath);
+    const result: boolean = MonitorPathHelper.isValid(testPath, false);
     const expectedResult: boolean = false;
     const errorMessage: string = "Single wildcard not valid";
     eq(result, expectedResult, errorMessage);
@@ -321,7 +323,7 @@ export class MonitorPathHelperTests implements ITestFile {
 
   private testValidForMonitorWildcardInMiddle(): void {
     const testPath: string = "a.*.b";
-    const result: boolean = MonitorPathHelper.isValidForMonitor(testPath);
+    const result: boolean = MonitorPathHelper.isValid(testPath, false);
     const expectedResult: boolean = false;
     const errorMessage: string = "Wildcard in middle not valid";
     eq(result, expectedResult, errorMessage);
@@ -329,7 +331,7 @@ export class MonitorPathHelperTests implements ITestFile {
 
   private testValidForMonitorEmptyPath(): void {
     const testPath: string = "";
-    const result: boolean = MonitorPathHelper.isValidForMonitor(testPath);
+    const result: boolean = MonitorPathHelper.isValid(testPath, false);
     const expectedResult: boolean = true;
     const errorMessage: string = "Empty path is valid";
     eq(result, expectedResult, errorMessage);
@@ -415,7 +417,7 @@ export class MonitorPathHelperTests implements ITestFile {
 
   private testValidForSyncMonitorNoWildcards(): void {
     const testPath: string = "a.b.c";
-    const result: boolean = MonitorPathHelper.isValidForSyncMonitor(testPath);
+    const result: boolean = MonitorPathHelper.isValid(testPath, true);
     const expectedResult: boolean = true;
     const errorMessage: string = "Path with no wildcards is valid";
     eq(result, expectedResult, errorMessage);
@@ -423,7 +425,7 @@ export class MonitorPathHelperTests implements ITestFile {
 
   private testValidForSyncMonitorEndingWildcard(): void {
     const testPath: string = "a.b.*";
-    const result: boolean = MonitorPathHelper.isValidForSyncMonitor(testPath);
+    const result: boolean = MonitorPathHelper.isValid(testPath, true);
     const expectedResult: boolean = true;
     const errorMessage: string = "Path with ending wildcard is valid";
     eq(result, expectedResult, errorMessage);
@@ -431,7 +433,7 @@ export class MonitorPathHelperTests implements ITestFile {
 
   private testValidForSyncMonitorMiddleWildcard(): void {
     const testPath: string = "a.*.b";
-    const result: boolean = MonitorPathHelper.isValidForSyncMonitor(testPath);
+    const result: boolean = MonitorPathHelper.isValid(testPath, true);
     const expectedResult: boolean = false;
     const errorMessage: string = "Wildcard in middle is invalid";
     eq(result, expectedResult, errorMessage);
@@ -439,7 +441,7 @@ export class MonitorPathHelperTests implements ITestFile {
 
   private testValidForSyncMonitorMultipleWildcards(): void {
     const testPath: string = "*.*";
-    const result: boolean = MonitorPathHelper.isValidForSyncMonitor(testPath);
+    const result: boolean = MonitorPathHelper.isValid(testPath, true);
     const expectedResult: boolean = false;
     const errorMessage: string = "Multiple wildcards are invalid";
     eq(result, expectedResult, errorMessage);
@@ -447,7 +449,7 @@ export class MonitorPathHelperTests implements ITestFile {
 
   private testValidForSyncMonitorSingleWildcard(): void {
     const testPath: string = "*";
-    const result: boolean = MonitorPathHelper.isValidForSyncMonitor(testPath);
+    const result: boolean = MonitorPathHelper.isValid(testPath, true);
     const expectedResult: boolean = false;
     const errorMessage: string = "Single wildcard with no dots is not valid";
     eq(result, expectedResult, errorMessage);
@@ -455,7 +457,7 @@ export class MonitorPathHelperTests implements ITestFile {
 
   private testValidForSyncMonitorEmptyPath(): void {
     const testPath: string = "";
-    const result: boolean = MonitorPathHelper.isValidForSyncMonitor(testPath);
+    const result: boolean = MonitorPathHelper.isValid(testPath, true);
     const expectedResult: boolean = true;
     const errorMessage: string = "Empty path is valid";
     eq(result, expectedResult, errorMessage);
@@ -485,7 +487,7 @@ export class MonitorPathHelperTests implements ITestFile {
 
   private testEdgeCaseEmptyStringValidation(): void {
     const testPath: string = "";
-    const result: boolean = MonitorPathHelper.isValidForSyncMonitor(testPath);
+    const result: boolean = MonitorPathHelper.isValid(testPath, true);
     const expectedResult: boolean = true;
     const errorMessage: string = "Empty string has no wildcards";
     eq(result, expectedResult, errorMessage);
@@ -499,7 +501,7 @@ export class MonitorPathHelperTests implements ITestFile {
 
   private testComplexPathDeepWithoutWildcards(): void {
     const testPath: string = "root.module.component.prop";
-    const result: boolean = MonitorPathHelper.isValidForMonitor(testPath);
+    const result: boolean = MonitorPathHelper.isValid(testPath, false);
     const expectedResult: boolean = true;
     const errorMessage: string = "Deep path without wildcards";
     eq(result, expectedResult, errorMessage);
@@ -507,7 +509,7 @@ export class MonitorPathHelperTests implements ITestFile {
 
   private testComplexPathSyncWithWildcard(): void {
     const testPath: string = "root.module.*";
-    const result: boolean = MonitorPathHelper.isValidForSyncMonitor(testPath);
+    const result: boolean = MonitorPathHelper.isValid(testPath, true);
     const expectedResult: boolean = true;
     const errorMessage: string = "Valid sync monitor with wildcard ending";
     eq(result, expectedResult, errorMessage);
@@ -1444,13 +1446,13 @@ export class SyncMonitorTestsV2 implements ITestFile {
     // Create test instance
     let testClass = new TestClass();
 
-    // Create monitor with data items wildcard
     let monitor = new MonitorV2(
       testClass,
       'data.items.*',
       (m: IMonitor) => {
         // Callback handler
       },
+      MonitorType.SYNC_MONITOR_DECORATOR,
       true,
       true
     );
@@ -1495,6 +1497,7 @@ export class SyncMonitorTestsV2 implements ITestFile {
       (m: IMonitor) => {
         // Callback handler
       },
+      MonitorType.SYNC_MONITOR_DECORATOR,
       true,
       true
     );
@@ -1555,6 +1558,7 @@ export class SyncMonitorTestsV2 implements ITestFile {
       (m: IMonitor) => {
         // Callback handler
       },
+      MonitorType.SYNC_MONITOR_DECORATOR,
       true,
       true
     );
@@ -1604,6 +1608,7 @@ export class SyncMonitorTestsV2 implements ITestFile {
       (m: IMonitor) => {
         // Callback handler
       },
+      MonitorType.SYNC_MONITOR_DECORATOR,
       true,
       true
     );
@@ -1643,6 +1648,7 @@ export class SyncMonitorTestsV2 implements ITestFile {
       (m: IMonitor) => {
         // Callback handler
       },
+      MonitorType.SYNC_MONITOR_DECORATOR,
       true,
       true
     );
@@ -1692,6 +1698,7 @@ export class SyncMonitorTestsV2 implements ITestFile {
       (m: IMonitor) => {
         // Callback handler
       },
+      MonitorType.SYNC_MONITOR_DECORATOR,
       true,
       true
     );
@@ -1745,6 +1752,7 @@ export class SyncMonitorTestsV2 implements ITestFile {
       (m: IMonitor) => {
         // Callback handler
       },
+      MonitorType.SYNC_MONITOR_DECORATOR,
       true,
       true
     );
@@ -1842,6 +1850,7 @@ export class SyncMonitorTestsV2 implements ITestFile {
       (m: IMonitor) => {
         callbackInvoked = true;
       },
+      MonitorType.SYNC_MONITOR_DECORATOR,
       true,
       true
     );
@@ -1880,6 +1889,7 @@ export class SyncMonitorTestsV2 implements ITestFile {
       (m: IMonitor) => {
         // Callback handler
       },
+      MonitorType.SYNC_MONITOR_DECORATOR,
       true,
       true
     );
@@ -1933,6 +1943,7 @@ export class SyncMonitorTestsV2 implements ITestFile {
       (m: IMonitor) => {
         // Callback handler
       },
+      MonitorType.SYNC_MONITOR_DECORATOR,
       true,
       true
     );

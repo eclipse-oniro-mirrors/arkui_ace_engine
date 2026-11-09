@@ -17,11 +17,13 @@ ace_unittest("event_manager_test_ng") {
   module_name = "Component-Snapshot"
   type = "new"
   sources = [
-    "$ace_root/test/mock/frameworks/base/mousestyle/mock_mouse_style.cpp",
     "$ace_root/frameworks/core/event/resample_algo.cpp",
+    "$ace_root/test/mock/adapter/ohos/osal/mock_input_manager.cpp",
+    "$ace_root/test/mock/frameworks/base/mousestyle/mock_mouse_style.cpp",
     "$ace_root/test/mock/frameworks/core/common/mock_watch_dog.cpp",
     "$ace_root/test/mock/frameworks/core/common/mock_window.cpp",
     "event_dump_test_ng.cpp",
+    "event_manager_agent_test_ng.cpp",
     "event_manager_dispatch_mouse_hover_event_ng.cpp",
     "event_manager_pen_test_ng.cpp",
     "event_manager_test_ng.cpp",
@@ -36,13 +38,13 @@ ace_unittest("event_manager_test_ng") {
   if (!ace_enable_full_test_suite) {
     sources = []
     sources = [
-      "event_test_min.cpp",
       "event_test_core.cpp",
+      "event_test_min.cpp",
     ]
   } else {
     sources += [
-      "event_test_min.cpp",
       "event_test_core.cpp",
+      "event_test_min.cpp",
     ]
   }
 }
@@ -80,13 +82,13 @@ ace_unittest("drag_event_test_ng") {
   if (!ace_enable_full_test_suite) {
     sources = []
     sources = [
-      "event_test_min.cpp",
       "event_test_core.cpp",
+      "event_test_min.cpp",
     ]
   } else {
     sources += [
-      "event_test_min.cpp",
       "event_test_core.cpp",
+      "event_test_min.cpp",
     ]
   }
 }
@@ -143,13 +145,13 @@ ace_unittest("focus_hub_test_ng") {
   if (!ace_enable_full_test_suite) {
     sources = []
     sources = [
-      "event_test_min.cpp",
       "event_test_core.cpp",
+      "event_test_min.cpp",
     ]
   } else {
     sources += [
-      "event_test_min.cpp",
       "event_test_core.cpp",
+      "event_test_min.cpp",
     ]
   }
 }
@@ -171,13 +173,13 @@ ace_unittest("gesture_event_hub_test_ng") {
   if (!ace_enable_full_test_suite) {
     sources = []
     sources = [
-      "event_test_min.cpp",
       "event_test_core.cpp",
+      "event_test_min.cpp",
     ]
   } else {
     sources += [
-      "event_test_min.cpp",
       "event_test_core.cpp",
+      "event_test_min.cpp",
     ]
   }
 }

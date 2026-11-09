@@ -113,7 +113,7 @@ public:
         return nodeId_;
     }
 
-    ZeroPrefixType GetPrefixHour()
+    ZeroPrefixType GetPrefixHour() const
     {
         auto textClockLayoutProperty = GetLayoutProperty<TextClockLayoutProperty>();
         CHECK_NULL_RETURN(textClockLayoutProperty, prefixHour_);
@@ -159,7 +159,7 @@ private:
     void RequestUpdateForNextSecond();
     void FireChangeEvent() const;
     std::string GetCurrentFormatDateTime();
-    std::string GetFormattedDateTime();
+    void LogCurrentTime(const std::string& currentTime, bool isTimeChange);
     std::string ParseDateTime(const std::string& dateTimeValue, int32_t week, int32_t month, int32_t hour);
     void RegistVisibleAreaChangeCallback();
     void OnVisibleAreaChange(bool visible);
@@ -179,6 +179,7 @@ private:
     std::string AddZeroPrefix(const std::string& strTimeValue);
     std::string RemoveZeroPrefix(const std::string& strTimeValue);
     std::string GetFormat() const;
+    std::string GetDefaultFormat() const;
     float GetHoursWest() const;
     RefPtr<FrameNode> GetTextNode();
     void FireBuilder();

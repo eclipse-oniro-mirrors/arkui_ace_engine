@@ -645,7 +645,7 @@ int32_t ConvertBlurStyle(int32_t originBlurStyle)
     return originBlurStyle;
 }
 
-void openCustomDialogWithNewPipeline(std::function<void(int32_t)>&& callback, DialogProperties dialogProperties)
+void openCustomDialogWithNewPipeline(std::function<void(int32_t)>&& callback, const DialogProperties& dialogProperties)
 {
     TAG_LOGI(AceLogTag::ACE_OVERLAY, "Dialog IsCurrentUseNewPipeline.");
     auto task = [callback = std::move(callback), dialogProperties](
@@ -968,7 +968,7 @@ ArkUI_Int32 OpenCustomDialog(ArkUIDialogHandle handle, void (*callback)(ArkUI_In
     auto promptDialogAttr = ParseDialogPropertiesFromProps(dialogProperties);
     if (SystemProperties::GetExtSurfaceEnabled() || !ContainerIsService()) {
         if (Container::IsCurrentUseNewPipeline()) {
-            openCustomDialogWithNewPipeline(std::move(callback), std::move(dialogProperties));
+            openCustomDialogWithNewPipeline(std::move(callback), dialogProperties);
         } else {
             LOGW("not support old pipeline");
         }

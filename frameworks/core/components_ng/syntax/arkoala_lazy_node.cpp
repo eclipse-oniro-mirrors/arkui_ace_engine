@@ -856,6 +856,11 @@ void ArkoalaLazyNode::DumpInfo()
 {
     if (isRepeat_) {
         DumpLog::GetInstance().AddDesc("VirtualScroll: true");
+        // Repeat memory optimization (auto cache clear) enablement.
+        DumpLog::GetInstance().AddDesc(std::string("RepeatMemOpt: ").append(
+            repeatMemoryOptimizationStrategy_ == RepeatMemoryOptimizationStrategy::ENABLE_AUTO_CACHE_OPTIMIZATION
+                ? "enabled"
+                : "disabled"));
     }
 }
 

@@ -22,6 +22,7 @@
 
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/inspector_occlusion_region.h"
+#include "core/components_ng/pattern/blank/blank_paint_property.h"
 #include "core/components_ng/render/render_context.h"
 #include "core/components_v2/inspector/inspector_constants.h"
 
@@ -30,6 +31,7 @@ namespace {
 constexpr size_t MAX_SNAPSHOTS = 4096;
 constexpr size_t MAX_DOMAINS = 16;
 constexpr size_t MAX_DEPTH = 128;
+constexpr double MAX_COLOR_ALPHA = 255.0;
 
 bool IsFiniteOpacity(double opacity)
 {
@@ -38,18 +40,18 @@ bool IsFiniteOpacity(double opacity)
 
 bool IsExternalOrScrollable(const std::string& tag)
 {
+    // External composition only; in-app scroll containers resolve their content to window coordinates.
     return tag == V2::WEB_ETS_TAG || tag == V2::XCOMPONENT_ETS_TAG || tag == V2::VIDEO_ETS_TAG ||
            tag == V2::FORM_ETS_TAG || tag == V2::PLUGIN_ETS_TAG || tag == V2::EMBEDDED_COMPONENT_ETS_TAG ||
            tag == V2::UI_EXTENSION_COMPONENT_TAG || tag == V2::UI_EXTENSION_SURFACE_TAG ||
-           tag == V2::UI_EXTENSION_COMPONENT_ETS_TAG || tag == V2::SCROLL_ETS_TAG || tag == V2::LIST_ETS_TAG ||
-           tag == V2::GRID_ETS_TAG || tag == V2::WATERFLOW_ETS_TAG;
+           tag == V2::UI_EXTENSION_COMPONENT_ETS_TAG;
 }
 
 bool HasUnsupportedGeometry(const RefPtr<RenderContext>& context)
 {
+    // Axis-aligned translate/scale are already baked into GetTransformRectRelativeToWindow().
     return !context || context->GetTransformMatrix().has_value() || context->GetTransform3DMatrix().has_value() ||
-           context->GetTransformScale().has_value() || context->GetTransformRotate().has_value() ||
-           context->GetTransformRotateAngle().has_value() || context->GetTransformTranslate().has_value() ||
+           context->GetTransformRotate().has_value() || context->GetTransformRotateAngle().has_value() ||
            context->GetClipShape().has_value() || context->GetClipMask().has_value() ||
            context->GetBorderRadius().has_value() || context->GetProgressMask().has_value();
 }
@@ -64,6 +66,25 @@ bool HasUnsupportedPaint(const RefPtr<RenderContext>& context)
            context->GetGradient() || context->GetOverlay() || context->GetMotion() || context->GetUnionEffect() ||
            context->GetEdgeLight() || context->GetPointLight() || context->GetTransitionAppearing() ||
            context->GetTransitionDisappearing();
+}
+
+void ApplyBlankColorEvidence(const RefPtr<FrameNode>& node, bool trusted, bool supportedPaint,
+    double inheritedOpacity, const RectF& evidenceRect, OcclusionPaintSnapshot& snapshot)
+{
+    if (snapshot.finalOpacity > 0.0 || node->GetTag() != V2::BLANK_ETS_TAG) {
+        return;
+    }
+    auto blankProperty = node->GetPaintProperty<BlankPaintProperty>();
+    if (!blankProperty || !blankProperty->HasColor()) {
+        return;
+    }
+    const auto alpha = blankProperty->GetColorValue().GetAlpha();
+    if (alpha == 0) {
+        return;
+    }
+    snapshot.finalOpacity = inheritedOpacity * static_cast<double>(alpha) / MAX_COLOR_ALPHA;
+    snapshot.evidenceTrusted = trusted && supportedPaint && IsFiniteOpacity(snapshot.finalOpacity) &&
+                               snapshot.finalOpacity > 0.0 && !evidenceRect.IsEmpty();
 }
 
 bool CollectSnapshots(const RefPtr<FrameNode>& node, int32_t domainId, double parentOpacity,
@@ -112,10 +133,12 @@ bool CollectSnapshots(const RefPtr<FrameNode>& node, int32_t domainId, double pa
                                 node->GetChildren().empty() &&
                                 (node->GetTag() == V2::BLANK_ETS_TAG || context->GetClipEdge().value_or(false));
     if (auto background = context->GetBackgroundColor(); background && background->GetAlpha() > 0) {
-        snapshot.finalOpacity = inheritedOpacity * static_cast<double>(background->GetAlpha()) / 255.0;
+        snapshot.finalOpacity = inheritedOpacity * static_cast<double>(background->GetAlpha()) / MAX_COLOR_ALPHA;
         snapshot.evidenceTrusted = trusted && supportedPaint && IsFiniteOpacity(snapshot.finalOpacity) &&
                                    snapshot.finalOpacity > 0.0 && !evidenceRect.IsEmpty();
     }
+    // Blank paints through BlankPaintProperty, not through RenderContext background color.
+    ApplyBlankColorEvidence(node, trusted, supportedPaint, inheritedOpacity, evidenceRect, snapshot);
     snapshots.emplace_back(snapshot);
 
     if (context->GetClipEdge().value_or(false)) {
@@ -123,8 +146,9 @@ bool CollectSnapshots(const RefPtr<FrameNode>& node, int32_t domainId, double pa
     }
     for (const auto& weakChild : node->GetFrameChildren()) {
         auto child = weakChild.Upgrade();
+        // An ancestor's unsupported paint disqualifies that node only, not its descendants.
         if (!CollectSnapshots(
-                child, domainId, inheritedOpacity, effectiveClip, trusted && supportedPaint, depth + 1, snapshots)) {
+            child, domainId, inheritedOpacity, effectiveClip, trusted, depth + 1, snapshots)) {
             return false;
         }
     }
