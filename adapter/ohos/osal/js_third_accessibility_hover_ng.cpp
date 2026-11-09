@@ -509,6 +509,29 @@ void AccessibilityHoverManagerForThirdNG::HandleNativeHoverForThird(const Access
     hoverForThirdState_.idle = false;
 }
 
+namespace {
+// Deepest node of a hover path, or INVALID_NODE_ID when the path is empty.
+int64_t HoveringIdOf(const std::vector<int64_t>& nodesHovering)
+{
+    return nodesHovering.empty() ? INVALID_NODE_ID : nodesHovering.back();
+}
+
+// Sends EXIT for the previous hover endpoint and ENTER for the new one whenever they differ.
+// Extracted from HandleAccessibilityHoverForThirdInner to keep it within the complexity gate.
+void SendHoverEnterExitForThird(
+    const std::shared_ptr<JsThirdProviderInteractionOperation>& jsThirdProviderOperator,
+    int64_t lastHoveringId, int64_t currentHoveringId)
+{
+    if (lastHoveringId != INVALID_NODE_ID && lastHoveringId != currentHoveringId) {
+        jsThirdProviderOperator->SendAccessibilityAsyncEventForThird(lastHoveringId,
+            Accessibility::EventType::TYPE_VIEW_HOVER_EXIT_EVENT);
+    }
+    if ((currentHoveringId != INVALID_NODE_ID) && (currentHoveringId != lastHoveringId)) {
+        jsThirdProviderOperator->CheckAndSendHoverEnterByReadableRules(currentHoveringId);
+    }
+}
+} // namespace
+
 void AccessibilityHoverManagerForThirdNG::HandleAccessibilityHoverForThirdInner(
     const AccessibilityHoverForThirdConfig& config)
 {
@@ -554,17 +577,10 @@ void AccessibilityHoverManagerForThirdNG::HandleAccessibilityHoverForThirdInner(
         }
     }
     // Transfer hover to the native pipeline when the hit endpoint is a bindId mount.
-    TransferHoverToExportedSubtreeIfNeeded(
-        currentNodesHovering.empty() ? INVALID_NODE_ID : currentNodesHovering.back(), config);
+    TransferHoverToExportedSubtreeIfNeeded(HoveringIdOf(currentNodesHovering), config);
 
-    int64_t lastHoveringId = INVALID_NODE_ID;
-    if (!lastNodesHovering.empty()) {
-        lastHoveringId = lastNodesHovering.back();
-    }
-    int64_t currentHoveringId = INVALID_NODE_ID;
-    if (!currentNodesHovering.empty()) {
-        currentHoveringId = currentNodesHovering.back();
-    }
+    int64_t lastHoveringId = HoveringIdOf(lastNodesHovering);
+    int64_t currentHoveringId = HoveringIdOf(currentNodesHovering);
     auto jsThirdProviderOperator = GetJsThirdProviderInteractionOperation(
         config.hostElementId).lock();
     if (jsThirdProviderOperator == nullptr) {
@@ -573,13 +589,7 @@ void AccessibilityHoverManagerForThirdNG::HandleAccessibilityHoverForThirdInner(
         ResetHoverForThirdState();
         return;
     }
-    if (lastHoveringId != INVALID_NODE_ID && lastHoveringId != currentHoveringId) {
-        jsThirdProviderOperator->SendAccessibilityAsyncEventForThird(lastHoveringId,
-            Accessibility::EventType::TYPE_VIEW_HOVER_EXIT_EVENT);
-    }
-    if ((currentHoveringId != INVALID_NODE_ID) && (currentHoveringId != lastHoveringId)) {
-        jsThirdProviderOperator->CheckAndSendHoverEnterByReadableRules(currentHoveringId);
-    }
+    SendHoverEnterExitForThird(jsThirdProviderOperator, lastHoveringId, currentHoveringId);
     hoverForThirdState_.hostElementId = config.hostElementId;
     hoverForThirdState_.nodesHovering = std::move(currentNodesHovering);
     hoverForThirdState_.time = config.time;
@@ -1131,16 +1141,34 @@ void DumpHandleAction(
 void DumpFocusSearchForThird(const DumpInfoArgument& argument,
     const std::shared_ptr<JsThirdProviderInteractionOperation>& jsThirdProviderOperator)
 {
-    AccessibilityElementInfo source;
-    source.SetAccessibilityId(argument.nodeId);
+    CHECK_NULL_VOID(jsThirdProviderOperator);
+    int64_t splitElementId = AccessibilityElementInfo::UNDEFINED_ACCESSIBILITY_ID;
+    int32_t splitTreeId = AccessibilityElementInfo::UNDEFINED_TREE_ID;
+    AccessibilitySystemAbilityClient::GetTreeIdAndElementIdBySplitElementId(
+        argument.nodeId, splitElementId, splitTreeId);
+    // Same routing guard as the operator path and IsDumpTreeForThird: a foreign tree id must not
+    // be silently resolved against this tree's element id space.
+    if (splitTreeId > 0 && splitTreeId != jsThirdProviderOperator->GetBelongTreeId()) {
+        TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+            "Third accessibility focus: tree mismatch, requested=%{public}d registered=%{public}d",
+            splitTreeId, jsThirdProviderOperator->GetBelongTreeId());
+        DumpLog::GetInstance().Print("Error: --third-focus-search tree mismatch, requested=" +
+            std::to_string(splitTreeId) + ", registered=" +
+            std::to_string(jsThirdProviderOperator->GetBelongTreeId()));
+        return;
+    }
     AccessibilityFocusMoveParam param {};
     param.direction = static_cast<FocusMoveDirection>(argument.focusDirection);
     param.type = static_cast<FocusRuleType>(argument.focusMoveRule);
     param.condition = static_cast<DetailCondition>(argument.focusCondition);
     param.parentId = -1;
-    // These search directions reply synchronously; detect-focusable is deliberately excluded.
-    MockDumpOperatorCallBack callback;
-    jsThirdProviderOperator->FocusMoveSearchWithCondition(source, param, 0, callback);
+    // Synchronous search: the result is produced inside this frame without any operator callback,
+    // so nothing can outlive this dump call.
+    AccessibilityElementInfo targetInfo;
+    auto result = jsThirdProviderOperator->SearchFocusMoveWithConditionSync(splitElementId, param, targetInfo);
+    std::list<AccessibilityElementInfo> infos;
+    infos.emplace_back(targetInfo);
+    AccessibilityManagerHidumper::DumpFocusSearchResult(infos, result);
 }
 
 void DumpTreeWithDiagnosticsForThird(int64_t rootId,

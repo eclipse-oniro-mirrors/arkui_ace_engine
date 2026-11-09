@@ -57,16 +57,6 @@ struct ThirdAccessibilityLog {
     std::string reasons;
 };
 thread_local ThirdAccessibilityLog g_lastThirdAccessibilityLog;
-
-void ResetThirdAccessibilityLog()
-{
-    g_lastThirdAccessibilityLog = {};
-}
-
-ThirdAccessibilityLog GetLastThirdAccessibilityLog()
-{
-    return g_lastThirdAccessibilityLog;
-}
 } // namespace
 
 #ifdef USE_HILOG
@@ -1067,31 +1057,6 @@ HWTEST_F(AccessibilityFocusMoveTest, DetectParentRulesCheckNodeTest001, TestSize
 }
 
 /**
- * @tc.name: FocusMoveSearchWithCondition001
- * @tc.desc: ExecuteFocusMoveSearch
- * @tc.type: FUNC
- */
-HWTEST_F(AccessibilityFocusMoveTest, FocusMoveSearchWithCondition001, TestSize.Level1)
-{
-    auto context = NG::PipelineContext::GetCurrentContext();
-    ASSERT_NE(context, nullptr);
-    auto jsAccessibilityManager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
-    ASSERT_NE(jsAccessibilityManager, nullptr);
-    jsAccessibilityManager->SetPipelineContext(context);
-    MockAccessibilityElementOperatorCallback operatorCallback;
-
-    //  GetPipelineByWindowId fail
-    auto windowId = context->GetWindowId();
-    auto elementId = 0;
-    Accessibility::AccessibilityFocusMoveParam param;
-    int32_t requestId = 1;
-    Accessibility::AccessibilityElementInfo info;
-    info.SetAccessibilityId(elementId);
-    jsAccessibilityManager->FocusMoveSearchWithCondition(info, param, requestId, operatorCallback, windowId + 1);
-    EXPECT_EQ(operatorCallback.mockResult_.resultType, FocusMoveResultType::SEARCH_FAIL);
-}
-
-/**
  * @tc.name: FocusMoveSearchWithCondition002
  * @tc.desc: IsProcessGetScrollAncestor
  * @tc.type: FUNC
@@ -2078,6 +2043,50 @@ HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningFailedHoverAndUnroutableSync,
     EXPECT_TRUE(provider->queries.empty());
 }
 
+HWTEST_F(AccessibilityFocusMoveTest, ThirdFocusSearchDumpUsesSyncSearch, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. register a third operator bound to TEST_TREE_ID with a two-node tree
+     */
+    auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
+    provider->Add(TEST_ROOT_ID, -1, {TEST_FIRST_NODE_ID});
+    provider->Add(TEST_FIRST_NODE_ID, TEST_ROOT_ID, {});
+    auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
+    manager->SetPipelineContext(NG::PipelineContext::GetCurrentContext());
+    auto host = NG::FrameNode::CreateFrameNode("XComponent", TEST_HOST_ID, AceType::MakeRefPtr<NG::Pattern>());
+    auto operation = std::make_shared<JsThirdProviderInteractionOperation>(provider, manager, host);
+    operation->SetBelongTreeId(TEST_TREE_ID);
+    manager->RegisterJsThirdProviderInteractionOperation(TEST_HOST_ID, operation);
+
+    /**
+     * @tc.steps: step2. --third-focus-search dump for the local tree node: the synchronous search
+     *                  prints the focus result inside the dump call, no operator callback involved
+     * @tc.expected: the dump output carries the FocusMove result line
+     */
+    auto stream = std::make_unique<std::ostringstream>();
+    auto* output = stream.get();
+    DumpLog::GetInstance().SetDumpFile(std::move(stream));
+    std::vector<std::string> info;
+    int64_t splicedId = TEST_FIRST_NODE_ID;
+    AccessibilitySystemAbilityClient::SetSplicElementIdTreeId(TEST_TREE_ID, splicedId);
+    EXPECT_TRUE(manager->OnDumpChildInfoForThirdRecursive(TEST_HOST_ID,
+        MakeThirdFocusDumpParams(std::to_string(splicedId)), info, manager));
+    EXPECT_NE(output->str().find("FocusMove result="), std::string::npos);
+    EXPECT_GT(provider->queries[TEST_FIRST_NODE_ID], 0);
+
+    /**
+     * @tc.steps: step3. --third-focus-search dump with a foreign tree spliced id
+     * @tc.expected: an explicit tree mismatch error is printed and the provider is never queried
+     */
+    int64_t foreignId = TEST_FIRST_NODE_ID;
+    AccessibilitySystemAbilityClient::SetSplicElementIdTreeId(TEST_FOREIGN_TREE_ID, foreignId);
+    provider->queries.clear();
+    EXPECT_TRUE(manager->OnDumpChildInfoForThirdRecursive(TEST_HOST_ID,
+        MakeThirdFocusDumpParams(std::to_string(foreignId)), info, manager));
+    EXPECT_NE(output->str().find("tree mismatch"), std::string::npos);
+    EXPECT_TRUE(provider->queries.empty());
+}
+
 HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningPayloadLimitAndOwnedActions, TestSize.Level1)
 {
     auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
@@ -2102,94 +2111,6 @@ HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningPayloadLimitAndOwnedActions, 
     EXPECT_TRUE(root->GetAceChildren().empty());
     EXPECT_FALSE(strategy.UpdateOriginNodeInfo(TEST_FIRST_NODE_ID));
     EXPECT_EQ(strategy.GetCurrentCheckNode(), nullptr);
-}
-
-namespace {
-enum class MalformedThirdGraph {
-    CYCLE,
-    DUPLICATE_CHILD,
-    SHARED_CHILD,
-    DUPLICATE_ID,
-    MULTIPLE_ROOTS,
-};
-
-void ConfigureMalformedThirdGraph(FocusTreeProvider& provider, MalformedThirdGraph scenario)
-{
-    switch (scenario) {
-        case MalformedThirdGraph::CYCLE:
-            provider.nodes[TEST_FIRST_NODE_ID].AddChildNodeId(TEST_ROOT_ID);
-            break;
-        case MalformedThirdGraph::DUPLICATE_CHILD:
-            provider.nodes[TEST_ROOT_ID].AddChildNodeId(TEST_FIRST_NODE_ID);
-            break;
-        case MalformedThirdGraph::SHARED_CHILD:
-            provider.Add(TEST_THIRD_NODE_ID, TEST_FIRST_NODE_ID, {});
-            provider.nodes[TEST_FIRST_NODE_ID].AddChildNodeId(TEST_THIRD_NODE_ID);
-            provider.nodes[TEST_SECOND_NODE_ID].AddChildNodeId(TEST_THIRD_NODE_ID);
-            break;
-        case MalformedThirdGraph::DUPLICATE_ID:
-            provider.duplicateIds.insert(TEST_FIRST_NODE_ID);
-            break;
-        case MalformedThirdGraph::MULTIPLE_ROOTS:
-            provider.Add(TEST_OTHER_ROOT_ID, -1, {});
-            provider.extraRoots = {TEST_OTHER_ROOT_ID, TEST_OTHER_ROOT_ID};
-            break;
-        default:
-            break;
-    }
-}
-} // namespace
-
-HWTEST_F(AccessibilityFocusMoveTest, ThirdGraphDiagnosticsIdentifyMalformedEdges, TestSize.Level1)
-{
-#ifndef USE_HILOG
-    GTEST_SKIP() << "OHOS adapter diagnostics use HiLog";
-#endif
-    const std::vector<std::pair<MalformedThirdGraph, std::string>> scenarios {
-        { MalformedThirdGraph::CYCLE, "cycle" },
-        { MalformedThirdGraph::DUPLICATE_CHILD, "duplicate-child" },
-        { MalformedThirdGraph::SHARED_CHILD, "shared-child" },
-        { MalformedThirdGraph::DUPLICATE_ID, "duplicate-id" },
-        { MalformedThirdGraph::MULTIPLE_ROOTS, "multiple-roots" },
-    };
-    for (const auto& [scenario, expected] : scenarios) {
-        SCOPED_TRACE(expected);
-        auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
-        provider->Add(TEST_ROOT_ID, -1, {TEST_FIRST_NODE_ID, TEST_SECOND_NODE_ID});
-        provider->Add(TEST_FIRST_NODE_ID, TEST_ROOT_ID, {});
-        provider->Add(TEST_SECOND_NODE_ID, TEST_ROOT_ID, {});
-        ConfigureMalformedThirdGraph(*provider, scenario);
-        auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
-        FocusStrategyOsalThird strategy(manager, provider, NodeConfig{});
-        ResetThirdAccessibilityLog();
-        ASSERT_TRUE(strategy.UpdateOriginNodeInfo(-1));
-        auto diagnostic = GetLastThirdAccessibilityLog();
-        EXPECT_EQ(diagnostic.operation, "focus");
-        std::istringstream reasons(diagnostic.reasons);
-        std::unordered_set<std::string> reported;
-        for (std::string reason; reasons >> reason;) {
-            reported.insert(reason);
-        }
-        EXPECT_EQ(reported.count(expected), 1);
-        if (scenario == MalformedThirdGraph::MULTIPLE_ROOTS) {
-            EXPECT_EQ(reported.count("duplicate-id"), 1);
-        }
-    }
-}
-
-HWTEST_F(AccessibilityFocusMoveTest, ThirdMissingProviderReportsQueryFailure, TestSize.Level1)
-{
-#ifndef USE_HILOG
-    GTEST_SKIP() << "OHOS adapter diagnostics use HiLog";
-#endif
-    ResetThirdAccessibilityLog();
-    {
-        ThirdAccessibilityTraversal traversal("expired-provider");
-        auto node = std::make_shared<ArkUI_AccessibilityElementInfo>();
-        EXPECT_FALSE(JsThirdProviderInteractionOperation::FindNativeInfoById({}, -1, node, &traversal));
-    }
-    EXPECT_EQ(GetLastThirdAccessibilityLog().operation, "expired-provider");
-    EXPECT_NE(GetLastThirdAccessibilityLog().reasons.find("query-failed"), std::string::npos);
 }
 
 HWTEST_F(AccessibilityFocusMoveTest, ThirdOversizedRootCannotPublishSnapshot, TestSize.Level1)

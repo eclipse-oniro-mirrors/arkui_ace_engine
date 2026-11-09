@@ -1225,12 +1225,21 @@ void DelegateDetectFocusableToSubtree(const RefPtr<JsAccessibilityManager>& jsAc
             AccessibilityFocusMoveParam subtreeParam = param;
             subtreeParam.SetParentId(-1);
             WeakPtr<JsAccessibilityManager> weakSubAM = subAM;
-            context->GetTaskExecutor()->PostTask(
-                [weakSubAM, root = binding->exportedRoot, elementInfo = info, subtreeParam,
-                requestId, &callback] {
+            // The callback may be a caller-stack object (e.g. the hidumper focus-search dump, which
+            // already runs on the UI thread); run inline on the target thread so the reply never
+            // outlives the caller's frame. Cross-thread IPC entries keep the posted behavior,
+            // where the callback is a long-lived AccessibilityElementOperatorImpl member.
+            auto runCmpDetect = [weakSubAM, root = binding->exportedRoot, elementInfo = info,
+                subtreeParam, requestId, &callback] {
                     RunCmpDetectFocusableOnUI(
                         weakSubAM, root, elementInfo, subtreeParam, requestId, callback);
-                }, TaskExecutor::TaskType::UI, "ArkUICmpDetectFocusable");
+                };
+            if (context->GetTaskExecutor()->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
+                runCmpDetect();
+                return;
+            }
+            context->GetTaskExecutor()->PostTask(std::move(runCmpDetect),
+                TaskExecutor::TaskType::UI, "ArkUICmpDetectFocusable");
             return;
         }
     }
@@ -1284,15 +1293,26 @@ void JsThirdProviderInteractionOperation::FocusMoveSearchWithCondition(
             ReplyFocusMoveNotSupport(callback, requestId);
             return;
         }
-        executor->PostTask([weak = jsAccessibilityManager_, host = host_, info, param, requestId, &callback] {
-            auto manager = weak.Upgrade();
-            auto owner = host.Upgrade();
-            if (!manager || !owner) {
-                ReplyFocusMoveNotSupport(callback, requestId);
-                return;
-            }
-            DelegateDetectFocusableToSubtree(manager, owner->GetId(), info, param, requestId, callback);
-        }, TaskExecutor::TaskType::UI, "ArkUICmpResolveFocusableOwner");
+        // The callback may be a caller-stack object (e.g. the hidumper focus-search dump, which
+        // already runs on the UI thread); run inline on the UI thread so the reply never outlives
+        // the caller's frame. Cross-thread IPC entries keep the posted behavior, where the
+        // callback is a long-lived AccessibilityElementOperatorImpl member.
+        auto resolveDetectOwner = [weak = jsAccessibilityManager_, host = host_, info, param,
+            requestId, &callback] {
+                auto manager = weak.Upgrade();
+                auto owner = host.Upgrade();
+                if (!manager || !owner) {
+                    ReplyFocusMoveNotSupport(callback, requestId);
+                    return;
+                }
+                DelegateDetectFocusableToSubtree(manager, owner->GetId(), info, param, requestId, callback);
+            };
+        if (executor->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
+            resolveDetectOwner();
+            return;
+        }
+        executor->PostTask(std::move(resolveDetectOwner), TaskExecutor::TaskType::UI,
+            "ArkUICmpResolveFocusableOwner");
         return;
     }
     auto result = strategy.ExecuteFocusMoveSearch(splitElementId, param, nodeInfo);
