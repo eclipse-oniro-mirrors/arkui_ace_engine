@@ -742,7 +742,10 @@ void UiSessionManagerOhos::SaveReportProxy(sptr<IRemoteObject> reportProxy, int3
     // Listen for remote SA death through this proxy and clean up local report registrations.
     reportProxy->AddDeathRecipient(uiReportProxyRecipient);
     std::unique_lock<std::shared_mutex> reportLock(reportObjectMutex_);
+    const bool overwritten = reportObjectMap_.find(processId) != reportObjectMap_.end();
     reportObjectMap_[processId] = reportProxy;
+    LOGI("SaveReportProxy %{public}s reportProxy, processId:%{public}d",
+        overwritten ? "overwrote" : "saved new", processId);
 }
 
 int32_t UiSessionManagerOhos::RegisterWebPageSceneRules(int32_t processId, const std::string& ruleJson)
