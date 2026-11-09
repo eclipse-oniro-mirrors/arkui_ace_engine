@@ -19,6 +19,7 @@
 #include <atomic>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <vector>
 
 #include "accessibility_config.h"
@@ -114,6 +115,7 @@ public:
 private:
     void HandleAccessibilityHoverForThirdInner(
         const AccessibilityHoverForThirdConfig& config);
+    void DrainPendingHoverForThird(AccessibilityHoverForThirdConfig config);
     void SendHoverExitForThird();
     void HandleNativeHoverForThird(const AccessibilityHoverForThirdConfig& config);
     // CMP mixed-rendering: if hit node is a bindId mount node within an exported subtree, transfer hover to native.
@@ -176,6 +178,9 @@ private:
         const std::shared_ptr<JsThirdProviderInteractionOperation>& jsThirdProviderOperator);
 
     AccessibilityHoverForThirdState hoverForThirdState_;
+    std::mutex hoverTaskMutex_;
+    std::optional<AccessibilityHoverForThirdConfig> pendingHover_;
+    WeakPtr<NG::PipelineContext> pendingHoverContext_;
     WeakPtr<NG::FrameNode> nativeHoverRoot_;
     WeakPtr<NG::PipelineContext> nativeHoverContext_;
     NG::PointF nativeHoverPoint_;

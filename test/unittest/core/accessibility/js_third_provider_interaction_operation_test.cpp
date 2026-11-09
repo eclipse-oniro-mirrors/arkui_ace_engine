@@ -43,6 +43,8 @@ namespace OHOS::Ace {
 int32_t g_mockErrorCode = -1;
 std::string TEST_CONTENT_STR = "testForFindByText";
 
+// This callback has a different layout from the shared test callback. Keep its symbols local.
+namespace {
 class MockAccessibilityElementOperatorCallback : public Accessibility::AccessibilityElementOperatorCallback {
 public:
     ~MockAccessibilityElementOperatorCallback() = default;
@@ -132,6 +134,7 @@ public:
     bool mockFocusable_ = false;
     int32_t mockCursorPosition_ = 0;
 };
+} // namespace
 } // namespace OHOS::Ace
 
 namespace OHOS::Ace::NG {
@@ -1322,6 +1325,60 @@ HWTEST_F(JsThirdProviderInteractionOperationTest, JsThirdProviderInteractionOper
     EXPECT_EQ(operatorCallback.mockInfos_.front().GetAccessibilityId(), MAX_TEST_ELEMENT_COUNT - 1);
     EXPECT_EQ(operatorCallback.mockInfos_.front().GetChildTreeId(),
         Accessibility::AccessibilityElementInfo::UNDEFINED_TREE_ID);
+}
+
+/**
+ * @tc.name: FocusMoveSearchWithConditionDetectRepliesInline
+ * @tc.desc: detect-focusable search from an in-process UI-thread caller replies synchronously in
+ *           the caller's frame and never defers through a posted task, so a stack-scoped callback
+ *           (e.g. the hidumper focus-search dump) is always answered before it is destroyed
+ * @tc.type: FUNC
+ */
+HWTEST_F(JsThirdProviderInteractionOperationTest, FocusMoveSearchWithConditionDetectRepliesInline,
+    TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. construct an operation without any CMP subtree binding
+     */
+    auto ohAccessibilityProvider = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
+    auto frameNode = FrameNode::CreateFrameNode("framenode", 1, AceType::MakeRefPtr<Pattern>(), true);
+    auto jsAccessibilityManager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    auto context = NG::PipelineContext::GetCurrentContext();
+    jsAccessibilityManager->SetPipelineContext(context);
+    // std::make_shared (not AceType::MakeRefPtr): SendThirdAccessibilityProvider takes
+    // std::weak_ptr<ThirdAccessibilityManager>, RefPtr cannot convert to it implicitly.
+    auto jsInteractionOperation = std::make_shared<Framework::JsThirdProviderInteractionOperation>(
+        ohAccessibilityProvider, jsAccessibilityManager, frameNode);
+    jsInteractionOperation->SetBelongTreeId(0);
+    ohAccessibilityProvider->SendThirdAccessibilityProvider(jsInteractionOperation);
+
+    /**
+     * @tc.steps: step2. swap in a delay-run executor: any posted task is dropped without running,
+     *            so a reply can only be produced by an inline same-thread execution
+     */
+    auto pipelineContext = MockContainer::Current()->pipelineContext_;
+    auto savedExecutor = pipelineContext->taskExecutor_;
+    pipelineContext->taskExecutor_ = AceType::MakeRefPtr<MockTaskExecutor>(true);
+
+    /**
+     * @tc.steps: step3. DETECT_FOCUSABLE search from the current (UI) thread
+     * @tc.expected: the NOT_SUPPORT reply arrives in-frame; with the old posted-only flow the
+     *               reply would be dropped together with the task and the callback stays untouched
+     */
+    Accessibility::AccessibilityElementInfo info;
+    info.SetAccessibilityId(0);
+    Accessibility::AccessibilityFocusMoveParam param;
+    param.direction = Accessibility::FocusMoveDirection::DETECT_FOCUSABLE_IN_FOCUS_MOVE;
+    int32_t requestId = 1;
+    MockAccessibilityElementOperatorCallback operatorCallback;
+
+    jsInteractionOperation->FocusMoveSearchWithCondition(info, param, requestId, operatorCallback);
+
+    pipelineContext->taskExecutor_ = savedExecutor;
+
+    EXPECT_EQ(operatorCallback.mockResult_.resultType, Accessibility::FocusMoveResultType::NOT_SUPPORT);
+    EXPECT_EQ(operatorCallback.mockRequestId, requestId);
+    EXPECT_TRUE(operatorCallback.mockInfos_.empty());
 }
 
 HWTEST_F(JsThirdProviderInteractionOperationTest, RemovedMountNoLongerHandsFocusToChildTree, TestSize.Level1)
