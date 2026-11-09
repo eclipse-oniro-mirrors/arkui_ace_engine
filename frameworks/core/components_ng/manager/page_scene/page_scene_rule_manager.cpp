@@ -27,12 +27,15 @@
 #include "base/utils/utf_helper.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/ui_node.h"
+#include "core/components_ng/dump_utils/dump_util.h"
 #include "core/components_ng/event/focus_hub.h"
+#include "core/components_ng/pattern/custom/custom_node_base.h"
 #include "core/components_ng/pattern/rich_editor/bridge/rich_editor_custom_modifier.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_layout_property.h"
 #include "core/components_ng/pattern/text_field/text_field_pattern.h"
 #include "core/components_ng/pattern/text_field/text_field_layout_property.h"
 #include "core/components_ng/pattern/text_field/text_field_type_utils.h"
+#include "core/components_ng/property/accessibility_property.h"
 #include "core/components_v2/inspector/inspector_constants.h"
 #include "core/interfaces/native/node/node_text_input_modifier.h"
 #include "core/interfaces/native/node/rich_editor_modifier.h"
@@ -42,11 +45,17 @@ namespace {
 constexpr int32_t DEFAULT_MIN_REPORT_INTERVAL_MS = 500;
 constexpr int32_t MAX_ID_LENGTH = 128;
 constexpr int32_t PAGE_SCENE_RULE_VERSION = 1;
+constexpr int32_t MAX_RESPONSE_RULES_PER_RULE_SET = 10;
+constexpr int32_t MAX_RESPONSE_REGIONS_PER_RULE = 5;
+constexpr int32_t MAX_RESPONSE_RULE_SETS_PER_PROCESS = 2;
 constexpr int32_t PAGE_SCENE_NO_ERROR = 0;
 constexpr int32_t PAGE_SCENE_PARAM_INVALID = 4;
 constexpr int32_t PAGE_SCENE_LAST_UNFINISH = 5;
 const char TEXT_EDITOR_SCENE[] = "TEXT_EDITOR";
 const char SPLIT_SCENE[] = "SPLIT";
+const char RESPONSE_SCENE[] = "RESPONSE";
+const char ROUTER_PAGE_TYPE[] = "Router";
+const char NAVIGATION_PAGE_TYPE[] = "Navigation";
 const char EXIT_EVENT_SUFFIX[] = "_EXIT";
 const char COUNT_GTE_OPERATOR[] = "COUNT_GTE";
 const char SOURCE_ARKUI[] = "ARKUI";
@@ -555,8 +564,7 @@ PageSceneRuleManager::~PageSceneRuleManager()
 
 int32_t PageSceneRuleManager::RegisterRuleSet(int32_t processId, const std::string& ruleJson)
 {
-    // Search scene ruleJson (frozen schema) carries no "version" field; the legacy
-    // TEXT_EDITOR ruleJson requires version == 1. Route by presence of "version".
+    // Search ruleJson (frozen schema) has no "version"; legacy TEXT_EDITOR requires version == 1.
     auto root = JsonUtil::ParseJsonString(ruleJson);
     auto version = (root && root->IsObject()) ? root->GetValue("version") : nullptr;
     if (!version || version->IsNull()) {
@@ -684,6 +692,69 @@ bool PageSceneRuleManager::HasRegisteredSearchRule(int32_t processId) const
     std::lock_guard<std::mutex> lock(mutex_);
     auto iter = searchRuleSets_.find(processId);
     return iter != searchRuleSets_.end() && !iter->second.empty();
+}
+
+int32_t PageSceneRuleManager::RegisterResponseRuleSet(int32_t processId, const std::string& ruleJson)
+{
+    auto ruleSet = ParseResponseRuleSet(ruleJson);
+    if (!ruleSet.has_value()) {
+        return PAGE_SCENE_PARAM_INVALID;
+    }
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto processIter = responseRuleSets_.find(processId);
+    if (processIter == responseRuleSets_.end()) {
+        responseRuleSets_[processId][ruleSet->ruleSetId] = ruleSet.value();
+        return PAGE_SCENE_NO_ERROR;
+    }
+    if (processIter->second.find(ruleSet->ruleSetId) != processIter->second.end()) {
+        // Duplicate ruleSetId registration is rejected (AC-1.4).
+        return PAGE_SCENE_PARAM_INVALID;
+    }
+    if (static_cast<int32_t>(processIter->second.size()) >= MAX_RESPONSE_RULE_SETS_PER_PROCESS) {
+        // A third RESPONSE ruleSet for the same process is rejected (AC-10.1).
+        return PAGE_SCENE_PARAM_INVALID;
+    }
+    processIter->second[ruleSet->ruleSetId] = ruleSet.value();
+    return PAGE_SCENE_NO_ERROR;
+}
+
+int32_t PageSceneRuleManager::UnregisterResponseRuleSet(int32_t processId, const std::string& ruleSetId)
+{
+    if (ruleSetId.empty()) {
+        return PAGE_SCENE_PARAM_INVALID;
+    }
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto processIter = responseRuleSets_.find(processId);
+    if (processIter == responseRuleSets_.end()) {
+        return PAGE_SCENE_PARAM_INVALID;
+    }
+    auto setIter = processIter->second.find(ruleSetId);
+    if (setIter == processIter->second.end()) {
+        return PAGE_SCENE_PARAM_INVALID;
+    }
+    processIter->second.erase(setIter);
+    if (processIter->second.empty()) {
+        responseRuleSets_.erase(processIter);
+    }
+    return PAGE_SCENE_NO_ERROR;
+}
+
+std::vector<std::pair<int32_t, std::string>> PageSceneRuleManager::GetActiveResponseRuleJsons() const
+{
+    std::vector<std::pair<int32_t, std::string>> result;
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (const auto& [processId, ruleSets] : responseRuleSets_) {
+        for (const auto& [ruleSetId, ruleSet] : ruleSets) {
+            result.emplace_back(processId, ruleSet.rawJson);
+        }
+    }
+    return result;
+}
+
+bool PageSceneRuleManager::HasRegisteredResponseRules() const
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    return !responseRuleSets_.empty();
 }
 
 std::vector<SearchMatchEvidence> PageSceneRuleManager::MatchSearchScene(
@@ -945,10 +1016,13 @@ int32_t PageSceneRuleManager::BeginGetPageScene(
     if (pendingGetProcesses_.find(processId) != pendingGetProcesses_.end()) {
         return PAGE_SCENE_LAST_UNFINISH;
     }
+    bool found = false;
     auto registeredIter = registeredRuleSets_.find(processId);
     if (registeredIter != registeredRuleSets_.end() && registeredIter->second.ruleSetId == ruleJsonOrRuleSetId) {
         ruleJson = registeredIter->second.rawJson;
-    } else {
+        found = true;
+    }
+    if (!found) {
         auto ruleSet = ParseRuleSet(ruleJsonOrRuleSetId);
         if (!ruleSet.has_value()) {
             return PAGE_SCENE_PARAM_INVALID;
@@ -969,6 +1043,7 @@ void PageSceneRuleManager::ClearProcess(int32_t processId, bool clearSearchRules
 {
     std::lock_guard<std::mutex> lock(mutex_);
     registeredRuleSets_.erase(processId);
+    responseRuleSets_.erase(processId);
     if (clearSearchRules) {
         searchRuleSets_.erase(processId);
         std::lock_guard<std::mutex> presenceLock(presenceStateMutex_);
@@ -1274,6 +1349,93 @@ std::optional<PageSceneRule> PageSceneRuleManager::ParseRule(const std::unique_p
     return rule;
 }
 
+std::optional<PageSceneRuleSet> PageSceneRuleManager::ParseResponseRuleSet(const std::string& ruleJson) const
+{
+    auto root = JsonUtil::ParseJsonString(ruleJson);
+    if (!root || !root->IsObject()) {
+        LOGW("Parse response rule failed, invalid json");
+        return std::nullopt;
+    }
+    PageSceneRuleSet ruleSet;
+    ruleSet.rawJson = ruleJson;
+    ruleSet.version = root->GetInt("version", 0);
+    if (ruleSet.version != PAGE_SCENE_RULE_VERSION) {
+        return std::nullopt;
+    }
+    ruleSet.ruleSetId = root->GetString("ruleSetId");
+    if (!IsValidId(ruleSet.ruleSetId)) {
+        return std::nullopt;
+    }
+    auto rules = root->GetValue("rules");
+    if (!rules || !rules->IsArray() || rules->GetArraySize() <= 0 ||
+        rules->GetArraySize() > MAX_RESPONSE_RULES_PER_RULE_SET) {
+        return std::nullopt;
+    }
+    std::set<std::string> ruleIds;
+    for (int32_t index = 0; index < rules->GetArraySize(); ++index) {
+        auto rule = ParseResponseRule(rules->GetArrayItem(index));
+        // A single invalid rule rejects the whole ruleSet so that the caller's
+        // existing subscriptions are never partially overwritten (AC-1.3/AC-1.5).
+        if (!rule.has_value() || !ruleIds.insert(rule->ruleId).second) {
+            return std::nullopt;
+        }
+        ruleSet.rules.emplace_back(rule.value());
+    }
+    return ruleSet;
+}
+
+std::optional<PageSceneRule> PageSceneRuleManager::ParseResponseRule(
+    const std::unique_ptr<JsonValue>& ruleJson) const
+{
+    if (!ruleJson || !ruleJson->IsObject()) {
+        return std::nullopt;
+    }
+    PageSceneRule rule;
+    rule.ruleId = ruleJson->GetString("ruleId");
+    rule.sceneType = ruleJson->GetString("sceneType");
+    rule.enabled = ruleJson->GetBool("enabled", true);
+    if (!IsValidId(rule.ruleId) || rule.sceneType != RESPONSE_SCENE) {
+        return std::nullopt;
+    }
+
+    auto report = GetObjectValue(ruleJson, "report");
+    if (report) {
+        rule.includeText = report->GetBool("includeText", false);
+        rule.includeAccessibility = report->GetBool("includeAccessibility", false);
+    }
+
+    auto pageValue = ruleJson->GetValue("page");
+    if (!ParseResponsePage(pageValue, rule)) {
+        return std::nullopt;
+    }
+
+    auto customControlsValue = ruleJson->GetValue("customControls");
+    if (customControlsValue && !customControlsValue->IsNull()) {
+        if (!ParseResponseStringArray(customControlsValue, rule.customControls)) {
+            return std::nullopt;
+        }
+    }
+
+    auto inspectorIdsValue = ruleJson->GetValue("inspectorIds");
+    if (inspectorIdsValue && !inspectorIdsValue->IsNull()) {
+        if (!ParseResponseStringArray(inspectorIdsValue, rule.inspectorIds)) {
+            return std::nullopt;
+        }
+    }
+
+    auto regionsValue = ruleJson->GetValue("regions");
+    if (regionsValue && !regionsValue->IsNull()) {
+        if (!ParseResponseRegions(regionsValue, rule.regions)) {
+            return std::nullopt;
+        }
+    }
+
+    if (!HasValidResponseCondition(rule)) {
+        return std::nullopt;
+    }
+    return rule;
+}
+
 std::optional<SearchRuleSet> PageSceneRuleManager::ParseSearchRuleSet(const std::string& ruleJson) const
 {
     auto root = JsonUtil::ParseJsonString(ruleJson);
@@ -1465,6 +1627,73 @@ bool NeedsSplitExit(const PageSceneMatchResult* previous, const PageSceneMatchRe
 }
 
 } // namespace
+
+bool PageSceneRuleManager::HasValidResponseCondition(const PageSceneRule& rule) const
+{
+    const bool hasPageCondition = !rule.page.pageName.empty();
+    const bool hasCustomCondition = !rule.customControls.empty();
+    const bool hasIdCondition = !rule.inspectorIds.empty();
+    const bool hasRegionCondition = !rule.regions.empty();
+    return (hasPageCondition || hasCustomCondition) && (hasIdCondition || hasRegionCondition);
+}
+
+bool PageSceneRuleManager::ParseResponsePage(
+    const std::unique_ptr<JsonValue>& pageValue, PageSceneRule& rule) const
+{
+    if (!pageValue || pageValue->IsNull()) {
+        return true;
+    }
+    if (!pageValue->IsObject()) {
+        return false;
+    }
+    rule.page.pageType = pageValue->GetString("pageType");
+    rule.page.pageName = pageValue->GetString("pageName");
+    return (rule.page.pageType == ROUTER_PAGE_TYPE || rule.page.pageType == NAVIGATION_PAGE_TYPE) &&
+        !rule.page.pageName.empty();
+}
+
+bool PageSceneRuleManager::ParseResponseStringArray(
+    const std::unique_ptr<JsonValue>& arrayValue, std::vector<std::string>& output) const
+{
+    if (!arrayValue || !arrayValue->IsArray()) {
+        return false;
+    }
+    for (int32_t index = 0; index < arrayValue->GetArraySize(); ++index) {
+        auto item = arrayValue->GetArrayItem(index);
+        if (!item || !item->IsString() || item->GetString().empty()) {
+            return false;
+        }
+        output.emplace_back(item->GetString());
+    }
+    return true;
+}
+
+bool PageSceneRuleManager::ParseResponseRegions(
+    const std::unique_ptr<JsonValue>& regionsValue, std::vector<PageSceneRectInfo>& regions) const
+{
+    if (!regionsValue || !regionsValue->IsArray() || regionsValue->GetArraySize() > MAX_RESPONSE_REGIONS_PER_RULE) {
+        return false;
+    }
+    for (int32_t index = 0; index < regionsValue->GetArraySize(); ++index) {
+        auto item = regionsValue->GetArrayItem(index);
+        if (!item || !item->IsObject()) {
+            return false;
+        }
+        PageSceneRectInfo region;
+        region.x = static_cast<float>(item->GetDouble("x", 0.0));
+        region.y = static_cast<float>(item->GetDouble("y", 0.0));
+        region.width = static_cast<float>(item->GetDouble("width", 0.0));
+        region.height = static_cast<float>(item->GetDouble("height", 0.0));
+        if (region.width <= 0.0f || region.height <= 0.0f) {
+            return false;
+        }
+        regions.emplace_back(region);
+    }
+    if (IsRegionOverlap(regions)) {
+        return false;
+    }
+    return true;
+}
 
 std::string PageSceneRuleManager::BuildSceneJson(const PageSceneRuleSet& ruleSet, const PageSceneRule& rule,
     const std::string& pageName, const std::vector<PageSceneNodeInfo>& nodes, bool matched,
@@ -1670,6 +1899,356 @@ std::vector<PageSceneMatchResult> PageSceneRuleManager::DetectCompiledSplitChang
     }
     PopulateSplitResults(changes, snapshot);
     return changes;
+}
+
+std::optional<PageSceneResponseMatch> PageSceneRuleManager::MatchPageSceneResponse(
+    int32_t processId, const std::string& ruleJson, const RefPtr<FrameNode>& responseNode,
+    const DumpStartNodeSet& startNodes, const std::string& routerPageName, const std::string& navDestinationName)
+{
+    CHECK_NULL_RETURN(responseNode, std::nullopt);
+    auto ruleSet = ParseResponseRuleSet(ruleJson);
+    if (!ruleSet.has_value()) {
+        return std::nullopt;
+    }
+    PageSceneResponseMatch match;
+    match.ruleSetId = ruleSet->ruleSetId;
+    for (const auto& rule : ruleSet->rules) {
+        if (!rule.enabled || rule.sceneType != RESPONSE_SCENE) {
+            continue;
+        }
+        auto hit = MatchResponseRule(rule, responseNode, startNodes, routerPageName, navDestinationName);
+        if (hit.has_value()) {
+            match.hits.emplace_back(std::move(hit.value()));
+        }
+    }
+    if (match.hits.empty()) {
+        return std::nullopt;
+    }
+    match.matched = true;
+    match.sceneJson = BuildResponseSceneJson(ruleSet.value(), match.hits);
+    return match;
+}
+
+std::optional<PageSceneResponseHit> PageSceneRuleManager::MatchResponseRule(const PageSceneRule& rule,
+    const RefPtr<FrameNode>& responseNode, const DumpStartNodeSet& startNodes,
+    const std::string& routerPageName, const std::string& navDestinationName) const
+{
+    bool pageMatched = MatchResponsePage(rule, routerPageName, navDestinationName);
+    std::vector<std::string> matchedCustomControls;
+    bool customMatched = MatchResponseCustom(rule, responseNode, matchedCustomControls);
+    // Page and custom-control conditions are ORed; both can be absent only if the
+    // whole rule is rejected at parse time.
+    if (!pageMatched && !customMatched) {
+        return std::nullopt;
+    }
+
+    std::string inspectorId;
+    bool idMatched = MatchResponseInspectorId(rule, responseNode, inspectorId);
+    // Visible rect is the region-match fallback and the reported rect for a hit.
+    auto visibleRect = ComputeResponseVisibleRect(responseNode, startNodes);
+    bool regionMatched = false;
+    if (!idMatched && visibleRect.has_value()) {
+        regionMatched = MatchResponseRegion(rule, visibleRect.value());
+    }
+    if (!idMatched && !regionMatched) {
+        return std::nullopt;
+    }
+
+    PageSceneResponseHit hit;
+    hit.ruleId = rule.ruleId;
+    if (pageMatched) {
+        hit.pageName = rule.page.pageType == ROUTER_PAGE_TYPE ? routerPageName : navDestinationName;
+    }
+    if (customMatched) {
+        hit.customControls = matchedCustomControls;
+    }
+    if (idMatched) {
+        hit.inspectorId = inspectorId;
+    }
+    hit.nodeType = responseNode->GetTag();
+    if (visibleRect.has_value()) {
+        hit.hasValidRect = true;
+        hit.rect.x = visibleRect->GetX();
+        hit.rect.y = visibleRect->GetY();
+        hit.rect.width = visibleRect->Width();
+        hit.rect.height = visibleRect->Height();
+    }
+    AppendResponseTreeFields(rule, responseNode, hit);
+    return hit;
+}
+
+bool PageSceneRuleManager::MatchResponsePage(const PageSceneRule& rule,
+    const std::string& routerPageName, const std::string& navDestinationName) const
+{
+    if (rule.page.pageName.empty()) {
+        return false;
+    }
+    return (rule.page.pageType == ROUTER_PAGE_TYPE && rule.page.pageName == routerPageName) ||
+           (rule.page.pageType == NAVIGATION_PAGE_TYPE && rule.page.pageName == navDestinationName);
+}
+
+bool PageSceneRuleManager::MatchResponseCustom(const PageSceneRule& rule,
+    const RefPtr<FrameNode>& responseNode, std::vector<std::string>& matchedCustomControls) const
+{
+    if (rule.customControls.empty()) {
+        return false;
+    }
+    matchedCustomControls = CollectMatchedCustomControls(responseNode, rule.customControls);
+    return !matchedCustomControls.empty();
+}
+
+void PageSceneRuleManager::AppendResponseTreeFields(const PageSceneRule& rule,
+    const RefPtr<FrameNode>& responseNode, PageSceneResponseHit& hit) const
+{
+    if (rule.includeText) {
+        auto textTree = BuildResponseTreeNode(responseNode, true, false);
+        if (textTree) {
+            hit.textTree = textTree->ToString();
+        }
+    }
+    if (rule.includeAccessibility) {
+        auto accessibilityTree = BuildResponseTreeNode(responseNode, false, true);
+        if (accessibilityTree) {
+            hit.accessibilityTree = accessibilityTree->ToString();
+        }
+    }
+}
+
+bool PageSceneRuleManager::MatchResponseInspectorId(
+    const PageSceneRule& rule, const RefPtr<FrameNode>& responseNode, std::string& inspectorId) const
+{
+    if (rule.inspectorIds.empty()) {
+        return false;
+    }
+    auto nodeInspectorId = responseNode->GetInspectorId();
+    if (!nodeInspectorId.has_value()) {
+        return false;
+    }
+    inspectorId = nodeInspectorId.value();
+    return std::find(rule.inspectorIds.begin(), rule.inspectorIds.end(), inspectorId) != rule.inspectorIds.end();
+}
+
+bool PageSceneRuleManager::MatchResponseRegion(const PageSceneRule& rule, const RectF& visibleRect) const
+{
+    for (const auto& region : rule.regions) {
+        RectF regionRect(region.x, region.y, region.width, region.height);
+        if (regionRect.IsInnerIntersectWith(visibleRect)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool PageSceneRuleManager::ShouldReport(int32_t processId, const PageSceneResponseMatch& result)
+{
+    // Response operations are consumed at most once by the observer's stable gate
+    // (one pending candidate per operation token), so no extra throttle is needed.
+    return true;
+}
+
+std::string PageSceneRuleManager::BuildResponseSceneJson(
+    const PageSceneRuleSet& ruleSet, const std::vector<PageSceneResponseHit>& hits) const
+{
+    auto root = JsonUtil::Create(true);
+    root->Put("ruleSetId", ruleSet.ruleSetId.c_str());
+    root->Put("sceneType", RESPONSE_SCENE);
+    root->Put("eventName", RESPONSE_SCENE);
+    root->Put("matched", true);
+    auto hitsJson = JsonUtil::CreateArray(true);
+    for (const auto& hit : hits) {
+        auto hitJson = JsonUtil::Create(true);
+        hitJson->Put("ruleId", hit.ruleId.c_str());
+        if (!hit.pageName.empty()) {
+            hitJson->Put("page", hit.pageName.c_str());
+        }
+        if (!hit.customControls.empty()) {
+            auto controlsJson = JsonUtil::CreateArray(true);
+            for (const auto& controlName : hit.customControls) {
+                controlsJson->Put("", controlName.c_str());
+            }
+            hitJson->Put("customControls", controlsJson);
+        }
+        if (!hit.inspectorId.empty()) {
+            hitJson->Put("inspectorId", hit.inspectorId.c_str());
+        }
+        if (!hit.nodeType.empty()) {
+            hitJson->Put("type", hit.nodeType.c_str());
+        }
+        if (hit.hasValidRect) {
+            hitJson->Put("rect", BuildRectJson(hit.rect));
+        }
+        if (!hit.textTree.empty()) {
+            hitJson->Put("textTree", hit.textTree.c_str());
+        }
+        if (!hit.accessibilityTree.empty()) {
+            hitJson->Put("accessibilityTree", hit.accessibilityTree.c_str());
+        }
+        hitsJson->Put(hitJson);
+    }
+    root->Put("hits", hitsJson);
+    return root->ToString();
+}
+
+std::optional<RectF> PageSceneRuleManager::ComputeResponseVisibleRect(
+    const RefPtr<FrameNode>& node, const DumpStartNodeSet& startNodes) const
+{
+    CHECK_NULL_RETURN(node, std::nullopt);
+    // C: component rect after its own and ancestors' transforms. The OnlyVisible
+    // variant returns an invalid rect when the node or an ancestor is not visible/active.
+    auto componentRect = node->GetTransformRectRelativeToWindowOnlyVisible(true);
+    if (componentRect.IsEmpty()) {
+        return std::nullopt;
+    }
+    CHECK_NULL_RETURN(startNodes.dumpBeginNode, std::nullopt);
+    // W: the window/root effective visible bounds.
+    auto viewportRect = startNodes.dumpBeginNode->GetTransformRectRelativeToWindow(true);
+    if (viewportRect.IsEmpty() || !componentRect.IsInnerIntersectWith(viewportRect)) {
+        return std::nullopt;
+    }
+    RectF visibleRect = componentRect.IntersectRectT(viewportRect);
+    // K1..Kn: only ancestors with an actually enabled clip edge participate in the
+    // intersection; a plain layout Rect of an unclipped ancestor is not a clip boundary.
+    auto ancestor = node->GetAncestorNodeOfFrame(true);
+    while (ancestor) {
+        auto renderContext = ancestor->GetRenderContext();
+        if (renderContext && renderContext->GetClipEdge().value_or(false)) {
+            auto clipRect = ancestor->GetTransformRectRelativeToWindow(true);
+            if (clipRect.IsEmpty() || !visibleRect.IsInnerIntersectWith(clipRect)) {
+                return std::nullopt;
+            }
+            visibleRect = visibleRect.IntersectRectT(clipRect);
+        }
+        ancestor = ancestor->GetAncestorNodeOfFrame(true);
+    }
+    if (visibleRect.IsEmpty()) {
+        return std::nullopt;
+    }
+    return visibleRect;
+}
+
+std::vector<std::string> PageSceneRuleManager::CollectMatchedCustomControls(
+    const RefPtr<FrameNode>& node, const std::vector<std::string>& customControls) const
+{
+    std::vector<std::string> matched;
+    std::set<std::string> matchedNames;
+    if (!node || customControls.empty()) {
+        return matched;
+    }
+    RefPtr<UINode> current = node;
+    while (current) {
+        auto customNode = AceType::DynamicCast<CustomNodeBase>(current);
+        if (customNode) {
+            CollectMatchedCustomControlsFromNode(customNode, customControls, matchedNames, matched);
+        }
+        current = current->GetParent();
+    }
+    return matched;
+}
+
+void PageSceneRuleManager::CollectMatchedCustomControlsFromNode(const RefPtr<CustomNodeBase>& customNode,
+    const std::vector<std::string>& customControls, std::set<std::string>& matchedNames,
+    std::vector<std::string>& matched) const
+{
+    auto viewName = customNode->GetJSViewName();
+    if (viewName.empty() || matchedNames.find(viewName) != matchedNames.end()) {
+        return;
+    }
+    for (const auto& controlName : customControls) {
+        if (IsCustomControlNameMatched(viewName, controlName)) {
+            matchedNames.insert(viewName);
+            matched.emplace_back(viewName);
+            break;
+        }
+    }
+}
+
+bool PageSceneRuleManager::IsCustomControlNameMatched(const std::string& viewName, const std::string& controlName) const
+{
+    const bool exactMatch = viewName == controlName;
+    const bool prefixMatch = controlName.size() > 1 && controlName.back() == '*' &&
+        viewName.compare(0, controlName.size() - 1, controlName, 0, controlName.size() - 1) == 0;
+    return exactMatch || prefixMatch;
+}
+
+std::unique_ptr<JsonValue> PageSceneRuleManager::BuildResponseTreeNode(
+    const RefPtr<UINode>& node, bool includeText, bool includeAccessibility) const
+{
+    CHECK_NULL_RETURN(node, nullptr);
+    auto frameNode = AceType::DynamicCast<FrameNode>(node);
+    CHECK_NULL_RETURN(frameNode, nullptr);
+    auto nodeJson = JsonUtil::Create(true);
+    auto inspectorId = frameNode->GetInspectorId();
+    if (inspectorId.has_value() && !inspectorId.value().empty()) {
+        nodeJson->Put("id", inspectorId.value().c_str());
+    }
+    auto tag = frameNode->GetTag();
+    if (!tag.empty()) {
+        nodeJson->Put("type", tag.c_str());
+    }
+    auto accessibilityProperty = frameNode->GetAccessibilityProperty<AccessibilityProperty>();
+    if (includeText && accessibilityProperty) {
+        auto text = accessibilityProperty->GetText();
+        if (!text.empty()) {
+            nodeJson->Put("text", text.c_str());
+        }
+    }
+    if (includeAccessibility && accessibilityProperty) {
+        auto accessibilityText = accessibilityProperty->GetAccessibilityText();
+        if (!accessibilityText.empty()) {
+            nodeJson->Put("accessibility", accessibilityText.c_str());
+        }
+    }
+    AppendResponseTreeChildren(nodeJson, frameNode, includeText, includeAccessibility);
+    return nodeJson;
+}
+
+void PageSceneRuleManager::AppendResponseTreeChildren(
+    std::unique_ptr<JsonValue>& nodeJson, const RefPtr<UINode>& node, bool includeText,
+    bool includeAccessibility) const
+{
+    CHECK_NULL_VOID(node);
+    CHECK_NULL_VOID(nodeJson);
+    std::unique_ptr<JsonValue> childrenJson;
+    for (const auto& child : node->GetChildrenForInspector(true)) {
+        AppendResponseTreeChild(nodeJson, childrenJson, child, includeText, includeAccessibility);
+    }
+    if (childrenJson) {
+        nodeJson->Put("children", childrenJson);
+    }
+}
+
+void PageSceneRuleManager::AppendResponseTreeChild(std::unique_ptr<JsonValue>& nodeJson,
+    std::unique_ptr<JsonValue>& childrenJson, const RefPtr<UINode>& child, bool includeText,
+    bool includeAccessibility) const
+{
+    auto childFrameNode = AceType::DynamicCast<FrameNode>(child);
+    if (childFrameNode) {
+        auto childJson = BuildResponseTreeNode(childFrameNode, includeText, includeAccessibility);
+        if (childJson) {
+            if (!childrenJson) {
+                childrenJson = JsonUtil::CreateArray(true);
+            }
+            childrenJson->Put(childJson);
+        }
+        return;
+    }
+    // Non-FrameNode wrappers (for example custom span containers) are flattened
+    // into the parent instead of producing an intermediate tree node.
+    AppendResponseTreeChildren(nodeJson, child, includeText, includeAccessibility);
+}
+
+bool PageSceneRuleManager::IsRegionOverlap(const std::vector<PageSceneRectInfo>& regions) const
+{
+    for (size_t first = 0; first < regions.size(); ++first) {
+        for (size_t second = first + 1; second < regions.size(); ++second) {
+            RectF firstRect(regions[first].x, regions[first].y, regions[first].width, regions[first].height);
+            RectF secondRect(regions[second].x, regions[second].y, regions[second].width, regions[second].height);
+            if (firstRect.IsInnerIntersectWith(secondRect)) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 } // namespace OHOS::Ace::NG

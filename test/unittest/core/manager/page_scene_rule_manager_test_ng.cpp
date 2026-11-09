@@ -15,6 +15,11 @@
 
 #include "gtest/gtest.h"
 
+#include <atomic>
+#include <map>
+#include <mutex>
+#include <unordered_map>
+
 #include "base/json/json_util.h"
 #include "base/memory/ace_type.h"
 #include "base/utils/time_util.h"
@@ -23,6 +28,7 @@
 #define private public
 #define protected public
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/manager/page_scene/developer_response_observer.h"
 #include "core/components_ng/manager/page_scene/page_scene_rule_manager.h"
 #undef private
 #undef protected
@@ -68,6 +74,7 @@ constexpr int32_t TEST_ATOMIC_ROOT_ID = 2013;
 constexpr int32_t TEST_STAGE_WRAPPER_ID = 2014;
 constexpr int32_t TEST_MENU_BAR_ID = 2015;
 constexpr int32_t TEST_MENU_INPUT_ID = 2016;
+constexpr int32_t TEST_RESPONSE_NODE_ID = 2017;
 constexpr int32_t MATCH_THRESHOLD = 2;
 constexpr int32_t INVALID_THRESHOLD = 0;
 constexpr int32_t DEFAULT_MIN_REPORT_INTERVAL_MS = 500;
@@ -361,6 +368,7 @@ HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_RegisterRuleSet001, Te
     EXPECT_EQ(manager.RegisterRuleSet(TEST_PROCESS_ID, "invalid json"), PAGE_SCENE_PARAM_INVALID);
     EXPECT_EQ(manager.RegisterRuleSet(TEST_PROCESS_ID, EMPTY_RULES_JSON), PAGE_SCENE_PARAM_INVALID);
     EXPECT_EQ(manager.RegisterRuleSet(TEST_PROCESS_ID, BuildRuleJson()), PAGE_SCENE_NO_ERROR);
+    // A legacy ruleSet is single-per-process; a second registration is rejected.
     EXPECT_EQ(manager.RegisterRuleSet(TEST_PROCESS_ID, BuildRuleJson()), PAGE_SCENE_LAST_UNFINISH);
 
     EXPECT_EQ(manager.RegisterRuleSet(SECOND_PROCESS_ID, BuildRuleJson(false, true)), PAGE_SCENE_NO_ERROR);
@@ -374,6 +382,42 @@ HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_RegisterRuleSet001, Te
     EXPECT_EQ(manager.RegisterRuleSet(
         SECOND_PROCESS_ID, BuildInvalidRuleJson("TEXT_EDITOR", "COUNT_GTE", INVALID_THRESHOLD)),
         PAGE_SCENE_PARAM_INVALID);
+}
+
+/**
+ * @tc.name: PageSceneResponseObserver_DeactivateClearsPendingOperations
+ * @tc.desc: Verify disabling RESPONSE observation clears active touch operations and settled
+ *           candidates so a later registration cannot report stale interactions.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneResponseObserver_DeactivateClearsPendingOperations, TestSize.Level1)
+{
+    auto observer = PageSceneResponseObserver::GetInstance();
+    observer->SetActive(false);
+    observer->SetActive(true);
+
+    auto node = CreateTestNode(V2::BUTTON_ETS_TAG, TEST_RESPONSE_NODE_ID,
+        RectF(FIRST_NODE_X, FIRST_NODE_Y, INPUT_WIDTH, INPUT_HEIGHT));
+    ASSERT_NE(node, nullptr);
+
+    DeveloperResponseCandidate candidate;
+    candidate.node = AceType::WeakClaim(AceType::RawPtr(node));
+    candidate.operationToken = "touch_response_test";
+    candidate.callbackType = DeveloperResponseCallbackType::TOUCH;
+    candidate.touchType = TouchType::DOWN;
+    observer->OnDeveloperResponse(candidate);
+    EXPECT_EQ(observer->ops_.size(), 1U);
+
+    candidate.touchType = TouchType::UP;
+    observer->OnDeveloperResponse(candidate);
+    EXPECT_TRUE(observer->ops_.empty());
+    ASSERT_EQ(observer->pendingOps_.size(), 1U);
+    ASSERT_EQ(observer->nodeOpIndex_.size(), 1U);
+
+    observer->SetActive(false);
+    EXPECT_TRUE(observer->ops_.empty());
+    EXPECT_TRUE(observer->pendingOps_.empty());
+    EXPECT_TRUE(observer->nodeOpIndex_.empty());
 }
 
 /**

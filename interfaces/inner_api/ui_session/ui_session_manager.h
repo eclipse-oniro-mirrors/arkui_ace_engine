@@ -346,6 +346,11 @@ public:
     virtual void ReportNavigationQueryResult(const std::string& data) {};
     virtual void ReportLazyForEachQueryResult(const std::string& data) {};
     virtual void ReportNodesInRectQueryResult(const std::string& data) {};
+    // Full rule-set JSONs of all registered PageScene rule sets for RESPONSE matching; keep slot order.
+    virtual std::vector<std::pair<int32_t, std::string>> GetActivePageSceneRuleJsons()
+    {
+        return {};
+    };
 
     virtual void SaveForSendCommandWithResultFunction(NotifySendCommandWithResultFunction&& function) {};
     virtual void NotifySendCommandPatternWithResult(

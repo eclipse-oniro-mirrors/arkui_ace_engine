@@ -89,6 +89,7 @@ build_component_ng("manager_ng") {
   if (!is_arkui_x) {
     sources += [
       "content_change_manager/content_change_manager.cpp",
+      "page_scene/developer_response_observer.cpp",
       "page_scene/page_scene_query_state.cpp",
     ]
   }

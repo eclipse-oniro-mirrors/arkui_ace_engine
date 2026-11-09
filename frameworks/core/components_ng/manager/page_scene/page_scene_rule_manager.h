@@ -42,6 +42,7 @@ class JsonValue;
 namespace OHOS::Ace::NG {
 class FrameNode;
 class UINode;
+class CustomNodeBase;
 
 struct PageSceneRectInfo {
     float x = 0.0f;
@@ -91,6 +92,15 @@ struct PageSceneRule {
     double widthRatioLte = 0.5f;
     double totalWidthRatioGt = 0.8f;
     bool nonOverlapping = true;
+    // RESPONSE scene fields.
+    struct PageCondition {
+        std::string pageType;
+        std::string pageName;
+    } page;
+    std::vector<std::string> customControls;
+    std::vector<std::string> inspectorIds;
+    std::vector<PageSceneRectInfo> regions;
+    bool includeAccessibility = false;
 };
 
 struct PageSceneRuleSet {
@@ -148,6 +158,27 @@ struct PageSceneMatchResult {
     PageSceneRule reportRule;
     std::vector<PageSceneNodeInfo> matchedNodes;
     std::string splitType;
+};
+
+// A per-rule hit produced when a RESPONSE rule matches one developer response.
+struct PageSceneResponseHit {
+    std::string ruleId;
+    std::string pageName;
+    std::vector<std::string> customControls;
+    std::string inspectorId;
+    std::string nodeType;
+    PageSceneRectInfo rect;
+    bool hasValidRect = false;
+    std::string textTree;
+    std::string accessibilityTree;
+};
+
+// The matching result of one response operation against one RESPONSE ruleSet.
+struct PageSceneResponseMatch {
+    std::string ruleSetId;
+    bool matched = false;
+    std::vector<PageSceneResponseHit> hits;
+    std::string sceneJson;
 };
 
 struct PageSceneReportState {
@@ -259,6 +290,17 @@ public:
     void SetIsContentStableFunction(IsContentStableFunction&& func);
     std::vector<SearchClickMatchResult> FlushPendingSearchClicksIfStable(const SearchClickPageContext& page);
 
+    // RESPONSE scene (key region identification): per-process dual ruleSet
+    // storage (pid -> ruleSetId -> ruleSet), mirroring the search scene model.
+    int32_t RegisterResponseRuleSet(int32_t processId, const std::string& ruleJson);
+    int32_t UnregisterResponseRuleSet(int32_t processId, const std::string& ruleSetId);
+    std::vector<std::pair<int32_t, std::string>> GetActiveResponseRuleJsons() const;
+    bool HasRegisteredResponseRules() const;
+    std::optional<PageSceneResponseMatch> MatchPageSceneResponse(int32_t processId, const std::string& ruleJson,
+        const RefPtr<FrameNode>& responseNode, const DumpStartNodeSet& startNodes,
+        const std::string& routerPageName, const std::string& navDestinationName);
+    bool ShouldReport(int32_t processId, const PageSceneResponseMatch& result);
+
 private:
     void StopSearchClickObservationIfIdleLocked();
     void PrunePendingClickCandidatesLocked(int64_t nowMs);
@@ -271,6 +313,43 @@ private:
     std::string BuildSceneJson(const PageSceneRuleSet& ruleSet, const PageSceneRule& rule,
         const std::string& pageName, const std::vector<PageSceneNodeInfo>& nodes, bool matched,
         const std::string& eventName) const;
+    std::optional<PageSceneRuleSet> ParseResponseRuleSet(const std::string& ruleJson) const;
+    std::optional<PageSceneRule> ParseResponseRule(const std::unique_ptr<JsonValue>& ruleJson) const;
+    bool ParseResponsePage(const std::unique_ptr<JsonValue>& pageValue, PageSceneRule& rule) const;
+    bool ParseResponseStringArray(
+        const std::unique_ptr<JsonValue>& arrayValue, std::vector<std::string>& output) const;
+    bool ParseResponseRegions(
+        const std::unique_ptr<JsonValue>& regionsValue, std::vector<PageSceneRectInfo>& regions) const;
+    std::string BuildResponseSceneJson(const PageSceneRuleSet& ruleSet,
+        const std::vector<PageSceneResponseHit>& hits) const;
+    std::optional<RectF> ComputeResponseVisibleRect(
+        const RefPtr<FrameNode>& node, const DumpStartNodeSet& startNodes) const;
+    std::optional<PageSceneResponseHit> MatchResponseRule(const PageSceneRule& rule,
+        const RefPtr<FrameNode>& responseNode, const DumpStartNodeSet& startNodes,
+        const std::string& routerPageName, const std::string& navDestinationName) const;
+    bool MatchResponseInspectorId(
+        const PageSceneRule& rule, const RefPtr<FrameNode>& responseNode, std::string& inspectorId) const;
+    bool MatchResponseRegion(const PageSceneRule& rule, const RectF& visibleRect) const;
+    bool MatchResponsePage(const PageSceneRule& rule, const std::string& routerPageName,
+        const std::string& navDestinationName) const;
+    bool MatchResponseCustom(const PageSceneRule& rule, const RefPtr<FrameNode>& responseNode,
+        std::vector<std::string>& matchedCustomControls) const;
+    bool HasValidResponseCondition(const PageSceneRule& rule) const;
+    void AppendResponseTreeFields(const PageSceneRule& rule, const RefPtr<FrameNode>& responseNode,
+        PageSceneResponseHit& hit) const;
+    std::vector<std::string> CollectMatchedCustomControls(
+        const RefPtr<FrameNode>& node, const std::vector<std::string>& customControls) const;
+    bool IsCustomControlNameMatched(const std::string& viewName, const std::string& controlName) const;
+    void CollectMatchedCustomControlsFromNode(const RefPtr<CustomNodeBase>& customNode,
+        const std::vector<std::string>& customControls, std::set<std::string>& matchedNames,
+        std::vector<std::string>& matched) const;
+    std::unique_ptr<JsonValue> BuildResponseTreeNode(const RefPtr<UINode>& node,
+        bool includeText, bool includeAccessibility) const;
+    void AppendResponseTreeChildren(std::unique_ptr<JsonValue>& nodeJson, const RefPtr<UINode>& node,
+        bool includeText, bool includeAccessibility) const;
+    void AppendResponseTreeChild(std::unique_ptr<JsonValue>& nodeJson, std::unique_ptr<JsonValue>& childrenJson,
+        const RefPtr<UINode>& child, bool includeText, bool includeAccessibility) const;
+    bool IsRegionOverlap(const std::vector<PageSceneRectInfo>& regions) const;
 
     const PageSceneMatchResult* GetPreviousSplitResultLocked(const std::string& key) const;
     void ProcessSplitResultLocked(
@@ -286,6 +365,7 @@ private:
     mutable std::mutex mutex_;
     std::unordered_map<int32_t, PageSceneRuleSet> registeredRuleSets_;
     std::unordered_map<int32_t, std::unordered_map<std::string, SearchRuleSet>> searchRuleSets_;
+    std::unordered_map<int32_t, std::unordered_map<std::string, PageSceneRuleSet>> responseRuleSets_;
     SearchPresenceStateMachine presenceStateMachine_;
     mutable std::mutex presenceStateMutex_;
     uint32_t searchClickObserverId_ = 0;
