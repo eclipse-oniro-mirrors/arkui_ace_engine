@@ -4638,6 +4638,12 @@ let PageFlipMode;
   PageFlipMode[PageFlipMode.SINGLE = 1] = 'SINGLE';
 })(PageFlipMode || (PageFlipMode = {}));
 
+let SidebarSectionTitleStyle;
+(function (SidebarSectionTitleStyle) {
+  SidebarSectionTitleStyle[SidebarSectionTitleStyle.STANDARD = 0] = 'STANDARD';
+  SidebarSectionTitleStyle[SidebarSectionTitleStyle.EMPHASIZED = 1] = 'EMPHASIZED';
+})(SidebarSectionTitleStyle || (SidebarSectionTitleStyle = {}));
+
 let CheckBoxStyle;
 (function (CheckBoxStyle) {
   CheckBoxStyle.CIRCULAR_STYLE = 0;

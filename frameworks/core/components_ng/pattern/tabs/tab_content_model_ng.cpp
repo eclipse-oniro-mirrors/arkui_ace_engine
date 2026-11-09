@@ -2073,6 +2073,58 @@ void TabContentModelNG::SetDefaultVisibility(FrameNode* node, const NG::TabConte
     pattern->SetDefaultVisibility(defaultVisibility);
 }
 
+void TabContentModelNG::SetSidebarSection(FrameNode* node, const SidebarSection& section)
+{
+    CHECK_NULL_VOID(node);
+    auto pattern = node->GetPattern<TabContentPattern>();
+    CHECK_NULL_VOID(pattern);
+    // Validate titleStyle: out-of-range values fall back to default (STANDARD = 0).
+    auto validatedSection = section;
+    if (static_cast<int32_t>(validatedSection.titleStyle) < 0 ||
+        static_cast<int32_t>(validatedSection.titleStyle) >
+            static_cast<int32_t>(SidebarSectionTitleStyle::EMPHASIZED)) {
+        validatedSection.titleStyle = SidebarSectionTitleStyle::STANDARD;
+    }
+    pattern->SetSidebarSection(validatedSection);
+    if (validatedSection.resourceTitleObject) {
+        CreateSidebarSectionTitleWithResourceObj(node, validatedSection.resourceTitleObject);
+    } else {
+        pattern->RemoveResObj("tabContent.sidebarSectionTitle");
+    }
+}
+
+void TabContentModelNG::CreateSidebarSectionTitleWithResourceObj(
+    FrameNode* frameNode, const RefPtr<ResourceObject>& resObj)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<TabContentPattern>();
+    CHECK_NULL_VOID(pattern);
+    const std::string key = "tabContent.sidebarSectionTitle";
+    pattern->RemoveResObj(key);
+    CHECK_NULL_VOID(resObj);
+
+    auto&& updateFunc = [weak = AceType::WeakClaim(frameNode)](const RefPtr<ResourceObject>& resObj) {
+        auto node = weak.Upgrade();
+        CHECK_NULL_VOID(node);
+        auto pattern = node->GetPattern<TabContentPattern>();
+        CHECK_NULL_VOID(pattern);
+        auto section = pattern->GetSidebarSection();
+        if (!section.has_value()) {
+            return;
+        }
+        std::string result;
+        ResourceParseUtils::ParseResString(resObj, result);
+        section->title = result;
+        pattern->SetSidebarSection(section.value());
+        auto tabBarNode = AceType::DynamicCast<FrameNode>(node->GetParent());
+        CHECK_NULL_VOID(tabBarNode);
+        auto sideBarPattern = tabBarNode->GetPattern<TabsSideBarTabListPattern>();
+        CHECK_NULL_VOID(sideBarPattern);
+        sideBarPattern->RebuildSections();
+    };
+    pattern->AddResObj(key, resObj, std::move(updateFunc));
+}
+
 void TabContentModelNG::SetTabBarBuilder(FrameNode* node, TabBarBuilderFunc&& builder)
 {
     CHECK_NULL_VOID(node);
