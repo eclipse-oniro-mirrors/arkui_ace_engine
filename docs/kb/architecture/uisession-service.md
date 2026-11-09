@@ -182,7 +182,7 @@ UISession 是框架内部 IPC 通道，没有独立 SDK API。IPC 接口通过 `
 ### 如何补充 ui_session_sample 验证手段
 
 1. 在 `ui_sa_service.h` 声明 `HandleXxx`，在 `DUMP_MAP` 注册命令名到 handler。命令名应与 innerAPI 能力名一致。
-2. handler 内只做参数解析、调用 `IUiContentService`、打印结构化结果。callback 类接口输出固定 tag、result、id、version、长度和结束标识，不打印正文；需要落盘时沿用 `-tofile` 模式写到 `/data/service/el1/public/ui_sa/`。
+2. handler 内只做参数解析、调用 `IUiContentService`、打印结构化结果。callback 类接口输出固定 tag、result、id、version、长度和结束标识，不打印正文；需要落盘时沿用 `-tofile` 模式写到 `/data/service/el1/public/ui_sa/`。落盘统一走 `ui_sa_service.cpp` 中的 `ReserveUniqueFilePath`（`WriteTextFile` 及各内联落盘点都已改用它）：文件名格式为 `<前缀>_<毫秒时间戳>.json`，首个文件直接用该名字，同名时依次追加 `_01`、`_02`… 两位补零后缀，并用 `O_EXCL` 预占文件名，因此同一毫秒内的多次上报（例如一个事件命中两条 PageScene 规则、或多个回调并发落盘）各自落到独立文件，不会覆盖已有文件。新增能力不要再用 `std::ofstream` 直接按时间戳拼同名文件。
 3. 需要依赖 callback timeout、watchdog 或死亡监听的能力，验证前必须先执行 `Connect`。`HandleConnect` 会把 sample 的 `eventHandler_` 传给 `IUiContentService::Connect`，后续 timeout 任务才能投递。
 4. 验证脚本应覆盖正常请求、非法参数、批量输入、回调完成、超时清理、remote death 或 End/Reset 清理等分支；页面类能力还要在目标 ArkUI 应用处于前台焦点后执行。
 5. 构建目标统一使用 `//foundation/arkui/ace_engine/interfaces/inner_api/ui_session:ui_session_example`。临时推送验证时同步推 `libui_sa.z.so`、`16666.json`、`ui_sa.cfg`，并确认 `hidumper -ls | grep 16666` 能看到 sample SA。
@@ -191,7 +191,7 @@ UISession 是框架内部 IPC 通道，没有独立 SDK API。IPC 接口通过 `
 
 1. 文档中列出 sample 命令、参数格式、预期日志 tag 和失败返回。
 2. 真机验证至少包含一次 `Connect`、一次目标能力调用和一次恢复/取消路径。
-3. 若命令会生成文件，验证 `/data/service/el1/public/ui_sa/` 的权限和文件名规则。
+3. 若命令会生成文件，验证 `/data/service/el1/public/ui_sa/` 的权限和文件名规则（首个文件用原文件名，同名文件带 `_01`/`_02` 后缀；同一毫秒内连续触发多次时应得到多个文件，而不是只剩最后一个）。
 4. 若能力涉及翻译、文本或截图等敏感数据，sample 日志不得输出完整业务正文。
 
 ## 相关主题
