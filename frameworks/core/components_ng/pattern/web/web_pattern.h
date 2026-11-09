@@ -1921,7 +1921,7 @@ private:
     ScrollbarLayoutPolicy scrollbarLayoutPolicy_ = ScrollbarLayoutPolicy::CONTENT;
     bool scrollbarLayoutPolicyChanged_ = false;
     bool isLanguageRtl_ = false;
-    bool isEscKeyDownConsumed_ = false;
+    bool isEscKeyDownConsumed_ = true;
 
     // HDS ColorPicker open state. The picker controller itself is owned by
     // the TS wrapper's module-scope variable; C++ only tracks open/closed.

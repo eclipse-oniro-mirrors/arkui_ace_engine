@@ -1699,7 +1699,7 @@ HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_001, TestSize.Level1)
 /**
  * @tc.name: IsShouldTriggerBack_002
  * @tc.desc: IsShouldTriggerBack with ESC DOWN not consumed and ESC UP not used, back should be triggered and
- *           the consumed state is not latched on the UP (it is reset by HandleKeyEvent on the next ESC DOWN).
+ *           the consumed state is latched to true on the UP (it is reset by HandleKeyEvent on the next ESC DOWN).
  * @tc.type: FUNC
  */
 HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_002, TestSize.Level1)
@@ -1713,16 +1713,16 @@ HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_002, TestSize.Level1)
 
     EXPECT_FALSE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::DOWN), false));
     EXPECT_TRUE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::UP), false));
-    // The UP branch no longer latches isEscKeyDownConsumed_ to true; the consumed state stays as it was
-    // set by the preceding DOWN (here, false because the DOWN was not consumed).
-    EXPECT_FALSE(webPattern->isEscKeyDownConsumed_);
+    // The UP branch latches isEscKeyDownConsumed_ to true; so that a second UP within the same key press
+    // cycle cannot trigger back again.
+    EXPECT_TRUE(webPattern->isEscKeyDownConsumed_);
 #endif
 }
 
 /**
  * @tc.name: IsShouldTriggerBack_003
  * @tc.desc: IsShouldTriggerBack with ESC UP used by the web page, back should not be triggered and the
- *           consumed state is not latched on the UP.
+ *           consumed state is latched to true on the UP.
  * @tc.type: FUNC
  */
 HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_003, TestSize.Level1)
@@ -1735,8 +1735,8 @@ HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_003, TestSize.Level1)
     webPattern->isEscKeyDownConsumed_ = false;
 
     EXPECT_FALSE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::UP), true));
-    // The UP branch no longer latches isEscKeyDownConsumed_ to true.
-    EXPECT_FALSE(webPattern->isEscKeyDownConsumed_);
+    // The UP branch latches isEscKeyDownConsumed_ to true.
+    EXPECT_TRUE(webPattern->isEscKeyDownConsumed_);
 #endif
 }
 
@@ -1781,8 +1781,8 @@ HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_005, TestSize.Level1)
 
     // The following ESC UP is not blocked and back should be triggered.
     EXPECT_TRUE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::UP), false));
-    // The UP branch no longer latches isEscKeyDownConsumed_ to true.
-    EXPECT_FALSE(webPattern->isEscKeyDownConsumed_);
+    // The UP branch latches isEscKeyDownConsumed_ to true.
+    EXPECT_TRUE(webPattern->isEscKeyDownConsumed_);
 #endif
 }
 
@@ -1815,9 +1815,9 @@ HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_006, TestSize.Level1)
 
 /**
  * @tc.name: IsShouldTriggerBack_007
- * @tc.desc: IsShouldTriggerBack with consecutive ESC UP without an intervening ESC DOWN. The UP branch no
- *           longer latches isEscKeyDownConsumed_ to true, so without an ESC DOWN to reset the consumed state
- *           the second ESC UP still triggers back. In a real key sequence an ESC DOWN always precedes the UP
+ * @tc.desc: IsShouldTriggerBack with consecutive ESC UP without an intervening ESC DOWN. The UP branch latches
+ *           isEscKeyDownConsumed_ to true, so the first ESC UP triggers back and the second ESC UP cannot trigger
+ *           back again within the same key press cycle. In a real key sequence an ESC DOWN always precedes the UP
  *           and resets the consumed state, keeping back triggered at most once per key press cycle.
  * @tc.type: FUNC
  */
@@ -1831,10 +1831,10 @@ HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_007, TestSize.Level1)
     webPattern->isEscKeyDownConsumed_ = false;
 
     EXPECT_TRUE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::UP), false));
-    // The UP branch no longer latches isEscKeyDownConsumed_ to true.
-    EXPECT_FALSE(webPattern->isEscKeyDownConsumed_);
-    // Without an intervening ESC DOWN to reset the consumed state, the second ESC UP still triggers back.
-    EXPECT_TRUE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::UP), false));
+    // The UP branch latches isEscKeyDownConsumed_ to true.
+    EXPECT_TRUE(webPattern->isEscKeyDownConsumed_);
+    // Without an intervening ESC DOWN to reset the consumed state, the second ESC UP cannot trigger back.
+    EXPECT_FALSE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::UP), false));
 #endif
 }
 
