@@ -582,7 +582,14 @@ public:
 
     FocusPattern GetFocusPattern() const override;
     FocusPattern GetFocusPatternMultiThread() const;
-    void PerformAction(TextInputAction action, bool forceCloseKeyboard = false) override;
+    void PerformAction(TextInputAction action, bool forceCloseKeyboard = false,
+        bool platformWillInsertNewline = false) override;
+#if defined(IOS_PLATFORM)
+    void UpdateFloatingCursor(FloatingCursorState state, double x, double y) override;
+    Rect GetCaretWindowRect() override;
+    int32_t GetIndexAfterLineMove(int32_t fromIndex, bool isUp, int32_t lines) override;
+    int32_t GetCaretIndexAtPoint(double x, double y) override;
+#endif
     void UpdateEditingValue(const std::shared_ptr<TextEditingValue>& value, bool needFireChangeEvent = true) override;
     void UpdateInputFilterErrorText(const std::u16string& errorText) override;
     void UpdateInputFilterErrorText(const std::string& errorText) override;

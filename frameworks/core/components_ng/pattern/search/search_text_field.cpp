@@ -46,7 +46,7 @@ bool SearchTextFieldPattern::HasStateStyle(UIState state) const
     return eventHub->HasStateStyle(state);
 }
 
-void SearchTextFieldPattern::PerformAction(TextInputAction action, bool forceCloseKeyboard)
+void SearchTextFieldPattern::PerformAction(TextInputAction action, bool forceCloseKeyboard, bool platformWillInsertNewline)
 {
     if (!HasFocus()) {
         TAG_LOGW(AceLogTag::ACE_TEXT_FIELD, "Not Trigger OnSubmit because field blur");
