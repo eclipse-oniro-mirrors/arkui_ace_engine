@@ -1530,7 +1530,7 @@ void SetEnableEditModeChangeEvent(ArkUINodeHandle node, void* event)
     auto* frameNode = GetFrameNode(node);
     CHECK_NULL_VOID(frameNode);
     auto enableEditModeChangeEvent = reinterpret_cast<std::function<void(bool)>*>(event);
-    GridModelNG::SetEnableEditModeChangeEvent(frameNode, std::move(*enableEditModeChangeEvent));
+    GridModelNG::SetEnableEditModeBindingEvent(frameNode, std::move(*enableEditModeChangeEvent));
 }
 
 void SetDirection(ArkUINodeHandle node, ArkUI_Int32 direction)
