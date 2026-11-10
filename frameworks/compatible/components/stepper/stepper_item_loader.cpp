@@ -59,8 +59,8 @@ void StepperItemLoader::UpdateDomConfig(const RefPtr<Framework::DOMNode>& node, 
     CHECK_NULL_VOID(config);
     auto domStepperItem = AceType::DynamicCast<Framework::DOMStepperItem>(node);
     if (domStepperItem) {
+        domStepperItem->SetLabel(*reinterpret_cast<StepperLabels*>(config));
     }
-    domStepperItem->SetLabel(*reinterpret_cast<StepperLabels*>(config));
 }
 
 const void* StepperItemLoader::GetCustomModifier(const std::string& tag)

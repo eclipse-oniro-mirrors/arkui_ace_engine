@@ -2158,10 +2158,9 @@ void NavigationGroupNode::OnAttachToMainTree(bool recursive)
     GroupNode::OnAttachToMainTree(recursive);
 
     auto pattern = AceType::DynamicCast<NavigationPattern>(GetPattern());
-    if (pattern) {
-        pattern->AttachNavigationStackToParent();
-        pattern->AttachToManager();
-    }
+    CHECK_NULL_VOID(pattern);
+    pattern->AttachNavigationStackToParent();
+    pattern->AttachToManager();
     RefPtr<UINode> parentCustomNode;
     bool findParentNode = false;
     auto curNode = GetParent();
@@ -2602,7 +2601,8 @@ void NavigationGroupNode::PreNodeFinishCallback(const RefPtr<FrameNode>& preNode
     }
     if (preNode->GetTag() == V2::NAVDESTINATION_VIEW_ETS_TAG) {
         auto preDestination = AceType::DynamicCast<NavDestinationGroupNode>(preNode);
-        if (preDestination && preDestination->NeedRemoveInPush()) {
+        CHECK_NULL_VOID(preDestination);
+        if (preDestination->NeedRemoveInPush()) {
             hideNodes_.emplace_back(std::make_pair(preDestination, true));
         }
         preDestination->SystemTransitionPushFinish(false, preDestination->GetAnimationId());
