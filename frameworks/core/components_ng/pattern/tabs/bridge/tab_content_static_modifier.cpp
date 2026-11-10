@@ -370,27 +370,6 @@ void SetOnWillHideImpl(Ark_NativePointer node,
     auto onWillHide = GetSyncInvoker(*optValue);
     TabContentModelStatic::SetOnWillHide(frameNode, std::move(onWillHide));
 }
-void SetSidebarSectionImpl(Ark_NativePointer node, const Opt_SidebarSection* value)
-{
-    auto frameNode = reinterpret_cast<FrameNode *>(node);
-    CHECK_NULL_VOID(frameNode);
-    auto optValue = Converter::GetOptPtr(value);
-    if (!optValue) {
-        return;
-    }
-    const auto& section = optValue.value();
-    SidebarSection sidebarSection;
-    sidebarSection.title = Converter::OptConvert<std::string>(section.title).value_or("");
-    auto orderOpt = Converter::GetOptPtr(&section.order);
-    if (orderOpt) {
-        sidebarSection.order = static_cast<int32_t>(orderOpt.value());
-    }
-    auto titleStyleOpt = Converter::GetOptPtr(&section.titleStyle);
-    if (titleStyleOpt) {
-        sidebarSection.titleStyle = static_cast<SidebarSectionTitleStyle>(titleStyleOpt.value());
-    }
-    TabContentModelNG::SetSidebarSection(frameNode, sidebarSection);
-}
 void SetTabBarVisibilityImpl(Ark_NativePointer node,
                              Ark_TabVisibility visibility,
                              const Opt_TabBarDisplayMode* displayMode)
@@ -418,7 +397,6 @@ const GENERATED_ArkUITabContentModifier* GetTabContentModifier()
         TabContentAttributeModifier::SetTabBarImpl,
         TabContentAttributeModifier::SetOnWillShowImpl,
         TabContentAttributeModifier::SetOnWillHideImpl,
-        TabContentAttributeModifier::SetSidebarSectionImpl,
         TabContentAttributeModifier::SetTabBarVisibilityImpl,
     };
     return &ArkUITabContentModifierImpl;

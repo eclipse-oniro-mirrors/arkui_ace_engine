@@ -16,16 +16,11 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_TABS_TABS_SIDE_BAR_TAB_LIST_PATTERN_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_TABS_TABS_SIDE_BAR_TAB_LIST_PATTERN_H
 
-#include <map>
-#include <set>
-#include <string>
-
 #include "base/memory/referenced.h"
 #include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/pattern/swiper/swiper_pattern.h"
 #include "core/components_ng/pattern/tabs/tabs_side_bar_tab_list_layout_algorithm.h"
 #include "core/components_ng/pattern/tabs/tab_bar_pattern.h"
-#include "core/components_ng/pattern/tabs/tab_content_model.h"
 
 namespace OHOS::Ace::NG {
 
@@ -80,7 +75,6 @@ public:
     void AddOrUpdateTabListItem(const RefPtr<FrameNode>& tabContentNode, int32_t position, bool update);
     void ApplyDefaultVisibility();
     void RefreshAllTabItemColors();
-    void RebuildSections();
 
     // Returns true if the search filter hides the tab at tabIndex.
     // If no search is active, returns false.
@@ -132,62 +126,15 @@ private:
     void AddOrUpdateTabItemWithIconAndText(
         const TabBarParam& tabBarParam, const RefPtr<FrameNode>& tabItemNode, const RefPtr<FrameNode>& swiperNode,
         const RefPtr<TabContentPattern>& tabContentPattern, int32_t position, int32_t myIndex);
-    struct SectionInfo {
-        std::string title;
-        std::optional<int32_t> order;
-        SidebarSectionTitleStyle titleStyle = SidebarSectionTitleStyle::STANDARD;
-        int32_t firstVisibleTabIndex = -1;
-        std::vector<int32_t> tabIndices;
-    };
-    void BuildSectionGroups(std::vector<SectionInfo>& sections, std::vector<int32_t>& unsectionedIndices);
-    void SortSections(std::vector<SectionInfo>& sections);
-    RefPtr<FrameNode> CreateOrUpdateSectionHeader(const std::string& title, int32_t sectionId,
-        SidebarSectionTitleStyle titleStyle = SidebarSectionTitleStyle::STANDARD);
-    void ApplySectionLayout(const std::vector<SectionInfo>& sections,
-        const std::vector<int32_t>& unsectionedIndices);
-    // Play expand/collapse animation after section layout rebuild.
-    // collapsedTabIndices: tab items that just became GONE (collapse) — animate from old pos to header pos, fade out.
-    // expandedTabIndices: tab items that just became VISIBLE (expand) — animate from header pos to new pos, fade in.
-    // pushedTabOldOffsets: tab items that remained visible but moved — animate from old offset to new offset.
-    // sectionHeaderOffsets: per-section-title Y offset of the header (relative to column) used as animation
-    // origin/target.
-    void PlaySectionExpandCollapseAnimation(const std::map<int32_t, float>& oldTabOffsets,
-        const std::set<int32_t>& animatedTabIndices, const std::string& triggeredSectionTitle,
-        bool isCollapse, const std::map<std::string, float>& oldHeaderOffsets);
-    // Play arrow morph animation (vertex moves up↔down) on section header.
-    // progress 0.0 = arrow up (^), 1.0 = arrow down (v).
-    void PlayArrowAnimation(const RefPtr<FrameNode>& arrowNode, bool isCollapse);
-    void UpdateArrowPoints(const RefPtr<FrameNode>& arrowNode, float progress);
-    bool IsTabVisible(int32_t tabIndex) const;
-    RefPtr<FrameNode> FindTabItemNodeBySwiperIndex(int32_t swiperIndex) const;
-    // Find a section header node in columnNode by matching its text child's content to title.
-    // Returns nullptr if not found. The header structure is: children[0]=text, children[1]=arrow.
-    RefPtr<FrameNode> FindSectionHeaderByTitle(const std::string& title) const;
-    // Get the title text from a section header node's text child. Returns empty string on failure.
-    std::string GetSectionHeaderTitle(const RefPtr<FrameNode>& headerNode) const;
-    // Toggle collapse state and play arrow + section expand/collapse animation for a section.
-    void HandleSectionHeaderClick(const std::string& title);
-    // Check if a node at nodeY is positioned below any of the animated tab items.
-    bool IsNodeBelowAnimatedSection(float nodeY, const std::set<int32_t>& animatedTabIndices) const;
-    // Find the swiper index corresponding to a tab item frame node. Returns -1 if not found.
-    int32_t FindSwiperIndexForTabItem(const RefPtr<FrameNode>& tabItemNode) const;
 
     WeakPtr<FrameNode> tabsNode_ = nullptr;
     RefPtr<FrameNode> columnNode_ = nullptr;
     RefPtr<SwiperController> swiperController_ = nullptr;
     int32_t currentIndex_ = -1;
-    std::map<int32_t, RefPtr<UINode>> builderNode_;
+    std::map<int32_t, RefPtr<UINode>> builderNode_; // Key is id of TabContent, value is id of builder of TabBar.
+    // Active search state (set by ApplySearchFilter, consumed by ApplyDefaultVisibility)
     std::function<bool(int32_t, const std::string& text)> activeSearchFilter_;
     std::u16string activeSearchText_;
-    // Section header collapse state: key = section title hash, value = collapsed
-    std::map<std::string, bool> sectionCollapsedState_;
-    // Tracks the section title whose collapse/expand was just toggled, to drive the animation.
-    // Cleared after the animation is scheduled. Empty means no animation (e.g. initial build).
-    std::string pendingAnimationSection_;
-    // True if the pending animation is a collapse (hide tabs), false if expand (show tabs).
-    bool pendingAnimationIsCollapse_ = false;
-    // True while a section expand/collapse animation is running — ignore click events.
-    bool sectionAnimationRunning_ = false;
 };
 
 } // namespace OHOS::Ace::NG

@@ -373,16 +373,6 @@ public:
         return defaultVisibility_;
     }
 
-    void SetSidebarSection(const OHOS::Ace::SidebarSection& section)
-    {
-        sidebarSection_ = section;
-    }
-
-    const std::optional<OHOS::Ace::SidebarSection>& GetSidebarSection() const
-    {
-        return sidebarSection_;
-    }
-
     const BottomTabBarStyle& GetBottomTabBarStyle() const
     {
         return bottomTabBarStyle_;
@@ -652,7 +642,6 @@ private:
     bool isDrawableIndicator_ = false;
     TabContentDefaultVisibility defaultVisibility_;
     TabContentDefaultVisibility lastAppliedVisibility_;
-    std::optional<OHOS::Ace::SidebarSection> sidebarSection_;
 
     bool firstTimeLayout_ = true;
     bool secondTimeLayout_ = false;

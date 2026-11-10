@@ -66,11 +66,6 @@ class LazyArkTabContentComponent extends ArkComponent {
       this.lazyComponent.tabBarVisibility(visibility, displayMode);
       return this;
     }
-
-    sidebarSection(value: SidebarSection): this {
-      this.lazyComponent.sidebarSection(value);
-      return this;
-    }
   }
 
 class TabContentModifier extends LazyArkTabContentComponent implements AttributeModifier<TabContentAttribute> {
