@@ -16381,6 +16381,12 @@ const ArkUI_AttributeItem* GetImageSpanResizable(ArkUI_NodeHandle node)
     CHECK_NULL_RETURN(node, nullptr);
     auto* fullImpl = GetFullImpl();
     CHECK_NULL_RETURN(fullImpl, nullptr);
+    g_attributeItem.object =
+        fullImpl->getNodeModifiers()->getImageModifier()->getResizableLattice(node->uiNodeHandle);
+    if (g_attributeItem.object) {
+        g_attributeItem.size = 0;
+        return &g_attributeItem;
+    }
     ArkUI_Float32 values[NUM_4] = { 0 };
     ArkUI_Int32 units[NUM_4] = { 0 };
     fullImpl->getNodeModifiers()->getImageSpanModifier()->getImageSpanResizableSlice(
@@ -16839,12 +16845,6 @@ void ResetResizable(ArkUI_NodeHandle node)
 const ArkUI_AttributeItem* GetResizable(ArkUI_NodeHandle node)
 {
     auto fullImpl = GetFullImpl();
-    g_attributeItem.object =
-        fullImpl->getNodeModifiers()->getImageModifier()->getResizableLattice(node->uiNodeHandle);
-    if (g_attributeItem.object) {
-        g_attributeItem.size = 0;
-        return &g_attributeItem;
-    }
     std::array<float, NUM_4> resizableArray;
     fullImpl->getNodeModifiers()->getImageModifier()->getImageResizable(
         node->uiNodeHandle, &resizableArray[0], NUM_4);
