@@ -26,7 +26,6 @@
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
 #include "core/components_ng/pattern/swiper/swiper_pattern.h"
 #include "core/components_ng/pattern/tabs/tab_content_model_ng.h"
-#include "core/components_ng/pattern/tabs/tab_content_node.h"
 #include "core/components_ng/pattern/tabs/tab_content_pattern.h"
 #include "core/components_ng/pattern/tabs/tab_content_layout_property.h"
 #include "core/components_ng/pattern/tabs/tabs_declaration.h"
@@ -51,12 +50,7 @@ RefPtr<Theme> GetSidebarTabListTddTheme(ThemeType type)
     return AceType::MakeRefPtr<DialogTheme>();
 }
 
-// Build a sidebar tab list tree: host > column > tabItem > row > (icon, text).
-// Also wires a TabsNode > Swiper > TabContentNode association so that
-// FindTabItemNodeBySwiperIndex can resolve tabItemNode: the tabItemNode's
-// FrameNode id is set to the TabContentNode's sideBarTabBarItemId, and the
-// pattern's tabsNode_ is set. Callers needing a TabsLayoutProperty (e.g. to
-// set boardColor / barLayoutStyle) can use the exposed tabsLayoutProperty.
+// Build a sidebar tab list tree: host > column > tabItem > row > (icon, text)
 struct SidebarTabListTree {
     RefPtr<FrameNode> hostNode;
     RefPtr<FrameNode> columnNode;
@@ -65,33 +59,9 @@ struct SidebarTabListTree {
     RefPtr<FrameNode> iconNode;
     RefPtr<FrameNode> textNode;
     RefPtr<TabsSideBarTabListPattern> pattern;
-    RefPtr tabsNode;
-    RefPtr swiperNode;
-    RefPtr tabContentNode;
-    RefPtr tabsLayoutProperty;
 
     void Build()
     {
-        // TabsNode + Swiper + one real TabContentNode (required by
-        // FindTabItemNodeBySwiperIndex's DynamicCast<TabContentNode>).
-        tabsNode = AceType::MakeRefPtr<TabsNode>(
-            V2::TABS_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
-            AceType::MakeRefPtr<TabsPattern>(), false);
-        tabsNode->InitializePatternAndContext();
-        ElementRegister::GetInstance()->AddUINode(tabsNode);
-        tabsLayoutProperty = tabsNode->GetLayoutProperty<TabsLayoutProperty>();
-        swiperNode = FrameNode::GetOrCreateFrameNode(
-            V2::SWIPER_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
-            []() { return AceType::MakeRefPtr<SwiperPattern>(); });
-        swiperNode->MountToParent(tabsNode);
-        tabContentNode = TabContentNode::GetOrCreateTabContentNode(
-            V2::TAB_CONTENT_ITEM_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
-            []() -> RefPtr<Pattern> {
-                auto shallowBuilder = AceType::MakeRefPtr<ShallowBuilder>(nullptr);
-                return AceType::MakeRefPtr<TabContentPattern>(shallowBuilder);
-            });
-        tabContentNode->MountToParent(swiperNode);
-
         pattern = AceType::MakeRefPtr<TabsSideBarTabListPattern>();
         hostNode = FrameNode::CreateFrameNode(
             "SideBarTabList", ElementRegister::GetInstance()->MakeUniqueId(), pattern);
@@ -99,11 +69,9 @@ struct SidebarTabListTree {
             V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
             AceType::MakeRefPtr<LinearLayoutPattern>(false));
         columnNode->MountToParent(hostNode);
-        // tabItemNode id MUST equal the TabContentNode's sideBarTabBarItemId so
-        // FindTabItemNodeBySwiperIndex's id match succeeds.
-        tabItemNode = FrameNode::GetOrCreateFrameNode(
-            "TabsSideBarTabItem", tabContentNode->GetSideBarTabBarItemId(),
-            []() { return AceType::MakeRefPtr<LinearLayoutPattern>(false); });
+        tabItemNode = FrameNode::CreateFrameNode(
+            "TabsSideBarTabItem", ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<LinearLayoutPattern>(false));
         tabItemNode->MountToParent(columnNode);
         rowNode = FrameNode::CreateFrameNode(
             V2::ROW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
@@ -118,7 +86,6 @@ struct SidebarTabListTree {
             AceType::MakeRefPtr<TextPattern>());
         textNode->MountToParent(rowNode);
         pattern->SetColumnNode(columnNode);
-        pattern->SetTabsNode(tabsNode);
     }
 };
 
@@ -539,7 +506,10 @@ HWTEST_F(TabsSidebarTabListTddTestNg, UpdateTabItemStyleSelectedWithBoardColor00
 {
     SidebarTabListTree tree;
     tree.Build();
-    tree.tabsLayoutProperty->UpdateSidebarSelectedBoardColor(Color::RED);
+    SidebarTabsTree tabsTree;
+    tabsTree.Build(1);
+    tree.pattern->SetTabsNode(tabsTree.tabsNode);
+    tabsTree.tabsLayoutProperty->UpdateSidebarSelectedBoardColor(Color::RED);
     tree.pattern->InitCurrentIndex(0);
     tree.pattern->UpdateTabItemStyle(0, true);
     auto renderContext = tree.tabItemNode->GetRenderContext();
@@ -577,7 +547,6 @@ HWTEST_F(TabsSidebarTabListTddTestNg, UpdateTextColorAndIconColorSelectedNoTabsN
 {
     SidebarTabListTree tree;
     tree.Build();
-    tree.pattern->SetTabsNode(nullptr);
     auto shallowBuilder = AceType::MakeRefPtr<ShallowBuilder>(nullptr);
     auto tabContentPattern = AceType::MakeRefPtr<TabContentPattern>(shallowBuilder);
     tree.pattern->UpdateTextColorAndIconColor(
@@ -598,7 +567,6 @@ HWTEST_F(TabsSidebarTabListTddTestNg, UpdateTextColorAndIconColorUnselectedNoTab
 {
     SidebarTabListTree tree;
     tree.Build();
-    tree.pattern->SetTabsNode(nullptr);
     auto shallowBuilder = AceType::MakeRefPtr<ShallowBuilder>(nullptr);
     auto tabContentPattern = AceType::MakeRefPtr<TabContentPattern>(shallowBuilder);
     tree.pattern->UpdateTextColorAndIconColor(
@@ -747,8 +715,10 @@ HWTEST_F(TabsSidebarTabListTddTestNg, ApplyDefaultVisibilitySidebarStyleHidden00
     vis.isNull = false;
     vis.visibility = TabVisibility::HIDDEN;
     vis.displayMode = TabBarDisplayMode::SIDEBAR;
-    tree.tabContentNode->GetPattern<TabContentPattern>()->SetDefaultVisibility(vis);
-    tree.tabsLayoutProperty->UpdateBarLayoutStyle(TabBarLayoutStyle::SIDEBAR);
+    SidebarTabsTree tabsTree;
+    tabsTree.Build(1, { vis });
+    tree.pattern->SetTabsNode(tabsTree.tabsNode);
+    tabsTree.tabsLayoutProperty->UpdateBarLayoutStyle(TabBarLayoutStyle::SIDEBAR);
     tree.pattern->ApplyDefaultVisibility();
     auto property = tree.tabItemNode->GetLayoutProperty();
     ASSERT_NE(property, nullptr);
@@ -768,8 +738,10 @@ HWTEST_F(TabsSidebarTabListTddTestNg, ApplyDefaultVisibilitySidebarStyleVisible0
     vis.isNull = false;
     vis.visibility = TabVisibility::VISIBLE;
     vis.displayMode = TabBarDisplayMode::SIDEBAR;
-    tree.tabContentNode->GetPattern<TabContentPattern>()->SetDefaultVisibility(vis);
-    tree.tabsLayoutProperty->UpdateBarLayoutStyle(TabBarLayoutStyle::SIDEBAR);
+    SidebarTabsTree tabsTree;
+    tabsTree.Build(1, { vis });
+    tree.pattern->SetTabsNode(tabsTree.tabsNode);
+    tabsTree.tabsLayoutProperty->UpdateBarLayoutStyle(TabBarLayoutStyle::SIDEBAR);
     tree.pattern->ApplyDefaultVisibility();
     auto property = tree.tabItemNode->GetLayoutProperty();
     ASSERT_NE(property, nullptr);
@@ -787,8 +759,10 @@ HWTEST_F(TabsSidebarTabListTddTestNg, ApplyDefaultVisibilityWithSearchFilter001,
     tree.Build();
     TabContentDefaultVisibility vis;
     vis.isNull = true;
-    tree.tabContentNode->GetPattern<TabContentPattern>()->SetDefaultVisibility(vis);
-    tree.tabsLayoutProperty->UpdateBarLayoutStyle(TabBarLayoutStyle::SIDEBAR);
+    SidebarTabsTree tabsTree;
+    tabsTree.Build(1, { vis });
+    tree.pattern->SetTabsNode(tabsTree.tabsNode);
+    tabsTree.tabsLayoutProperty->UpdateBarLayoutStyle(TabBarLayoutStyle::SIDEBAR);
     // Set a search filter that hides all items
     tree.pattern->activeSearchText_ = u"xyz";
     tree.pattern->activeSearchFilter_ = [](int32_t, const std::string&) { return false; };
