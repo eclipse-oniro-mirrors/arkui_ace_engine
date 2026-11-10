@@ -534,7 +534,6 @@ void WaterFlowPattern::SweepOrphanPlaceholderShells()
 
 void WaterFlowPattern::OnDetachFromMainTree()
 {
-    edgeViewportRegistered_ = false;
     parentContext_.Reset();
     edgeState_.InvalidateGenerations();
     // The last animation callback can clear the shared request before its final
@@ -543,9 +542,10 @@ void WaterFlowPattern::OnDetachFromMainTree()
     // thread-safe nodes to the multi-thread detach path of the base class.
     auto host = GetHost();
     auto pipeline = host ? host->GetContext() : nullptr;
-    if (pipeline && edgeState_.enabled) {
+    if (pipeline && edgeViewportRegistered_) {
         pipeline->GetScrollViewportCoordinator()->Unregister(host->GetId());
     }
+    edgeViewportRegistered_ = false;
     if ((fastScrollState_ || targetIndex_ || legacyScrollTarget_) && !(host && host->IsThreadSafeNode())) {
         StopAnimate();
     }
@@ -2118,14 +2118,29 @@ void WaterFlowPattern::SetEdge(bool isHeader, const RefPtr<UINode>& content, uin
     }
     auto host = GetHost();
     CHECK_NULL_VOID(host);
-    EnableEdgeSlots();
+    if (!edgeState_.enabled && !content && (isHeader || !footer_.Upgrade())) {
+        return;
+    }
+    if (content) {
+        EnableEdgeSlots();
+    }
     auto& slot = isHeader ? edgeState_.header : footer_;
     HeaderFooterUtils::RemoveHeaderFooter(host, slot);
     if (content) {
         HeaderFooterUtils::ReplaceHeaderFooter(host, slot, CreateWaterFlowEdge(content), 0);
     }
-    SyncEdgeSlots();
+    if (edgeState_.enabled) {
+        SyncEdgeSlots();
+    } else {
+        // An initial footer(undefined) still takes over and clears the constructor footer,
+        // without enabling edge layout or reparenting the legacy subtree first.
+        layoutInfo_->ResetFooter();
+        layoutInfo_->footerHeight_ = 0.0f;
+    }
     UpdateParentLazyRequest();
+    if (!edgeState_.header.Upgrade() && !footer_.Upgrade()) {
+        SetEdgeGeometry(edgeOrigin_, edgeTotalSize_);
+    }
     ResetLayoutInfo();
     host->ChildrenUpdatedFrom(0);
     host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
@@ -2133,6 +2148,9 @@ void WaterFlowPattern::SetEdge(bool isHeader, const RefPtr<UINode>& content, uin
 
 void WaterFlowPattern::SyncEdgeSlots()
 {
+    if (!edgeState_.enabled) {
+        return;
+    }
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     // Reinsert only when necessary. Header/footer are excluded from Sections and FlowItem indices.
@@ -2160,14 +2178,11 @@ void WaterFlowPattern::SetSticky(StickyStyle style)
 {
     auto host = GetHost();
     CHECK_NULL_VOID(host);
-    if (!edgeState_.enabled) {
-        EnableEdgeSlots();
-        SyncEdgeSlots();
-        UpdateParentLazyRequest();
-        ResetLayoutInfo();
-        host->ChildrenUpdatedFrom(0);
-    }
+    // Attributes may arrive before an asynchronous builder; retain the style without opting in.
     edgeState_.sticky = style;
+    if (!edgeState_.enabled) {
+        return;
+    }
     SetEdgeGeometry(edgeOrigin_, edgeTotalSize_);
     UpdateEdgePositions();
     MarkDirtyNodeSelf();
@@ -2175,6 +2190,9 @@ void WaterFlowPattern::SetSticky(StickyStyle style)
 
 void WaterFlowPattern::UpdateParentLazyRequest()
 {
+    if (!edgeState_.enabled) {
+        return;
+    }
     auto props = GetLayoutProperty<WaterFlowLayoutProperty>();
     CHECK_NULL_VOID(props);
     bool expanded = true;
@@ -2182,7 +2200,8 @@ void WaterFlowPattern::UpdateParentLazyRequest()
     if (constraint && constraint->selfIdealSize && constraint->selfIdealSize->Height()) {
         expanded = false;
     }
-    parentContext_.Update(GetHost(), edgeState_.enabled && expanded &&
+    const bool hasEdges = edgeState_.header.Upgrade() || footer_.Upgrade();
+    parentContext_.Update(GetHost(), hasEdges && expanded &&
         props->GetWaterflowDirectionValue(FlexDirection::COLUMN) == FlexDirection::COLUMN);
 }
 
@@ -2194,6 +2213,9 @@ void WaterFlowPattern::OnAttachToMainTree()
 
 void WaterFlowPattern::SetEdgeGeometry(const OffsetF& origin, float totalSize)
 {
+    if (!edgeState_.enabled) {
+        return;
+    }
     edgeOrigin_ = origin;
     edgeTotalSize_ = totalSize;
     auto host = GetHost();
@@ -2201,7 +2223,9 @@ void WaterFlowPattern::SetEdgeGeometry(const OffsetF& origin, float totalSize)
     auto pipeline = host->GetContext();
     CHECK_NULL_VOID(pipeline);
     if (edgeState_.sticky == StickyStyle::NONE || (!edgeState_.header.Upgrade() && !footer_.Upgrade())) {
-        pipeline->GetScrollViewportCoordinator()->Unregister(host->GetId());
+        if (edgeViewportRegistered_) {
+            pipeline->GetScrollViewportCoordinator()->Unregister(host->GetId());
+        }
         edgeViewportRegistered_ = false;
         return;
     }
@@ -2218,13 +2242,13 @@ void WaterFlowPattern::SetEdgeGeometry(const OffsetF& origin, float totalSize)
 
 void WaterFlowPattern::OnDetachFromFrameNode(FrameNode* frameNode)
 {
-    edgeViewportRegistered_ = false;
     parentContext_.Reset();
     edgeState_.InvalidateGenerations();
     auto pipeline = frameNode ? frameNode->GetContext() : nullptr;
-    if (pipeline && edgeState_.enabled) {
+    if (pipeline && edgeViewportRegistered_) {
         pipeline->GetScrollViewportCoordinator()->Unregister(frameNode->GetId());
     }
+    edgeViewportRegistered_ = false;
     ScrollablePattern::OnDetachFromFrameNode(frameNode);
 }
 
@@ -2292,6 +2316,10 @@ void WaterFlowPattern::AddFooter(const RefPtr<NG::UINode>& footer)
             HeaderFooterUtils::ReplaceHeaderFooter(host, footer_, CreateWaterFlowEdge(footer), 0);
         }
         SyncEdgeSlots();
+        UpdateParentLazyRequest();
+        if (!edgeState_.header.Upgrade() && !footer_.Upgrade()) {
+            SetEdgeGeometry(edgeOrigin_, edgeTotalSize_);
+        }
         ResetLayoutInfo();
         host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
         return;

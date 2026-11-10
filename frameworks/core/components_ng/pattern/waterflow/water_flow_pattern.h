@@ -44,6 +44,8 @@ enum class StickyStyle : uint32_t;
 struct WaterFlowEdgeState {
     WaterFlowEdgeState();
 
+    // Only a committed, non-null header/footer enables edge layout. Keep the index mode after clear;
+    // sticky configuration and initial empty resets must not opt legacy instances into this mode.
     bool enabled = false;
     bool footerControlled = false;
     WeakPtr<UINode> header;
@@ -61,7 +63,7 @@ struct WaterFlowEdgeState {
 
     bool IsCurrent(bool isHeader, uint64_t generation) const
     {
-        return generation == (isHeader ? headerGeneration : footerGeneration);
+        return generation != 0 && generation == (isHeader ? headerGeneration : footerGeneration);
     }
 
     void InvalidateGenerations()
