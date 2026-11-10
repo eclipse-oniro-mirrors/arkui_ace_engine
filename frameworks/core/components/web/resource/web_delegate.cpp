@@ -7399,7 +7399,7 @@ void WebDelegate::OnZoomChange(double oldZoomFactor, double newZoomFactor)
         TaskExecutor::TaskType::JS, "ArkUIWebZoomChange");
 }
 
-void WebDelegate::UpdateVisitedLinkPersistEnabled(bool enabled)
+void WebDelegate::UpdateVisitedLinkPersistEnabled(const bool& enabled)
 {
     auto context = context_.Upgrade();
     if (!context) {

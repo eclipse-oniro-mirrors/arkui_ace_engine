@@ -696,7 +696,7 @@ void WebDelegate::UpdateLoadsImagesAutomatically(const bool& isImageAccessEnable
 void WebDelegate::UpdateMixedContentMode(const MixedModeContent& mixedMode) {}
 void WebDelegate::UpdateSupportZoom(const bool& isZoomAccessEnabled) {}
 void WebDelegate::UpdateDomStorageEnabled(const bool& isDomStorageAccessEnabled) {}
-void WebDelegate::UpdateVisitedLinkPersistEnabled(bool enabled) {}
+void WebDelegate::UpdateVisitedLinkPersistEnabled(const bool& enabled) {}
 void WebDelegate::UpdateGeolocationEnabled(const bool& isGeolocationAccessEnabled) {}
 void WebDelegate::UpdateCacheMode(const WebCacheMode& mode) {}
 void WebDelegate::UpdateOptimizeParserBudgetEnabled(const bool enable) {}
