@@ -33,7 +33,10 @@ inline RefPtr<FrameNode> CreateDividerFrameNode(int32_t nodeId)
     CHECK_NULL_RETURN(arkUINodeHandle, nullptr);
     auto frameNode = reinterpret_cast<FrameNode*>(arkUINodeHandle);
     CHECK_NULL_RETURN(frameNode, nullptr);
-    return Referenced::Claim<FrameNode>(frameNode);
+    auto dividerNode = Referenced::Claim<FrameNode>(frameNode);
+    CHECK_NULL_RETURN(dividerNode, nullptr);
+    dividerNode->DecRefCount();
+    return dividerNode;
 }
 
 } // namespace OHOS::Ace::NG
