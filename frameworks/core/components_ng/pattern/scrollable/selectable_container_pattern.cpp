@@ -394,7 +394,8 @@ void SelectableContainerPattern::SelectWithScroll()
         });
         selectMotion_->AddListener([weakScroll = AceType::WeakClaim(this)](double offset) {
             auto pattern = weakScroll.Upgrade();
-            CHECK_NULL_VOID(pattern);
+            // Animator dispatches motion updates before checking completion.
+            CHECK_NULL_VOID(pattern && pattern->mousePressed_);
             offset = pattern->GetOffsetWithLimit(offset);
             pattern->UpdateCurrentOffset(offset, SCROLL_FROM_AXIS);
             pattern->UpdateMouseStart(offset);
