@@ -18,6 +18,7 @@
 
 #include "core/components_ng/pattern/text/text_layout_property.h"
 #include "core/components_ng/pattern/text_field/text_field_model.h"
+#include "core/components_ng/pattern/text_field/text_content_type.h"
 #include "core/common/ime/text_input_type.h"
 #include "core/image/image_source_info.h"
 
@@ -62,6 +63,13 @@ public:
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(HidePasswordSourceInfo, ImageSourceInfo, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(TypeChanged, bool, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(SelectionMenuHidden, bool, PROPERTY_UPDATE_MEASURE);
+
+    // auto fill properties
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(EnableAutoFill, bool, PROPERTY_UPDATE_MEASURE);
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(TextContentType, TextContentType, PROPERTY_UPDATE_MEASURE);
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(TextContentTypeChanged, bool, PROPERTY_UPDATE_MEASURE);
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(PasswordRules, std::string, PROPERTY_UPDATE_MEASURE);
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(EnableAutoFillAnimation, bool, PROPERTY_UPDATE_MEASURE);
 
     // placeholder
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(Placeholder, std::u16string, PROPERTY_UPDATE_MEASURE);

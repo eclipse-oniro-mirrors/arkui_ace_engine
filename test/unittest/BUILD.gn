@@ -1777,6 +1777,7 @@ ohos_static_library("ace_components_pattern") {
     "$ace_root/frameworks/core/components_ng/pattern/text_field/text_field_paint_method.cpp",
     "$ace_root/frameworks/core/components_ng/pattern/text_field/text_field_paint_property.cpp",
     "$ace_root/frameworks/core/components_ng/pattern/text_field/text_field_pattern.cpp",
+    "$ace_root/frameworks/core/components_ng/pattern/text_field/text_content_type.cpp",
     "$ace_root/frameworks/core/components_ng/pattern/text_field/text_field_pattern_multi_thread.cpp",
     "$ace_root/frameworks/core/components_ng/pattern/text_field/text_field_select_overlay.cpp",
     "$ace_root/frameworks/core/components_ng/pattern/text_field/text_field_type_utils.cpp",

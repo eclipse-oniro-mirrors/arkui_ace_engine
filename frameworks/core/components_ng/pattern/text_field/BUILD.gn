@@ -32,6 +32,7 @@ build_component_ng("text_field_pattern_ng") {
     "text_field_paint_method.cpp",
     "text_field_paint_property.cpp",
     "text_field_pattern.cpp",
+    "text_content_type.cpp",
     "text_field_pattern_multi_thread.cpp",
     "text_field_select_overlay.cpp",
     "text_input_ai_checker.cpp",

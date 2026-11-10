@@ -26,6 +26,7 @@
 #include "core/components_ng/pattern/common_text/counter_decorator.h"
 #include "core/components/text_field/textfield_theme.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_foreground_modifier.h"
+#include "core/common/autofill/auto_fill_trigger_state_holder.h"
 
 #include <chrono>
 #include <cstddef>
@@ -128,6 +129,7 @@
 #include "base/view_data/ace_auto_fill_type.h"
 #include "core/common/ime/text_input_filter.h"
 #include "core/common/ime/text_input_obscure_utils.h"
+#include "core/components_ng/pattern/text_field/text_content_type.h"
 #include "core/components_ng/pattern/text_field/text_input_response_area.h"
 #include "core/components/text_field/textfield_theme.h"
 
@@ -713,6 +715,7 @@ void RichEditorPattern::ReportTextChange()
     auto inspectorId = host->GetInspectorId().value_or("");
     TextChangeEventInfo info = { inspectorId, uniqueId, currentContent };
     UIObserverHandler::GetInstance().NotifyTextChangeEvent(info);
+    AutoFillValueChanged();
     ReportEditorEvent(std::string(EDITOR_TEXT_CHANGE_EVENT));
 }
 
@@ -928,6 +931,7 @@ void RichEditorPattern::OnModifyDone()
     InitMargin();
     ProcessCounter();
     InitPasswordMode();
+    SyncAutoFillNodeInfo();
 }
 
 void RichEditorPattern::InitPasswordMode()
@@ -4616,6 +4620,7 @@ void RichEditorPattern::HandleSingleClickEvent(OHOS::Ace::GestureEvent& info)
     CHECK_NULL_VOID(!IsClickEventOnlyForMenuToggle(info) && !HandleUrlSpanClickEvent(info));
 
     bool isMouseClick = info.GetSourceDevice() == SourceType::MOUSE;
+    shouldSkipAutoFillOnFocus_ = true;
     auto localOffset = info.GetLocalLocation();
     IF_TRUE(isMouseClick, AdjustMouseLocalOffset(localOffset));
  
@@ -4672,7 +4677,10 @@ void RichEditorPattern::HandleFocusByClick(
     RICH_EDITOR_SCOPE(requestFocusBySingleClick_);
     if (focusHub->RequestFocusImmediately()) {
         IF_TRUE(textSelector_.SelectNothing(), StartTwinkling());
-        RequestKeyboard(false, true, true, sourceDevice);
+        bool suppressKeyboard = DoProcessAutoFill(RichEditorAutoFillReason::SINGLE_CLICK, sourceDevice);
+        IF_TRUE(!suppressKeyboard, RequestKeyboard(false, true, true, sourceDevice));
+    } else {
+        DoProcessAutoFill(RichEditorAutoFillReason::SINGLE_CLICK, sourceDevice);
     }
     lastReportSelectionText_ = "";
 }
@@ -5049,6 +5057,7 @@ void RichEditorPattern::HandleBlurEventReset()
     StopTwinkling();
     cancelButtonTouched_ = false;
     focusIndex_ = FocuseIndex::TEXT;
+    SetAutoFillRequestSuccessOnFocus(false);
 }
 
 bool RichEditorPattern::IsCloseKeyboard()
@@ -5158,7 +5167,9 @@ void RichEditorPattern::HandleFocusEvent(FocusReason focusReason)
         needShowSoftKeyboard = false;
     }
 
-    IF_TRUE(!requestFocusBySingleClick_, RequestKeyboard(false, true, needShowSoftKeyboard));
+    bool suppressKeyboard = ProcessAutoFillOnFocus();
+    IF_TRUE(!suppressKeyboard && !requestFocusBySingleClick_, RequestKeyboard(false, true, needShowSoftKeyboard));
+    shouldSkipAutoFillOnFocus_ = false;
     HandleOnEditChanged(true);
 }
 
@@ -10827,13 +10838,122 @@ void RichEditorPattern::InsertValueByPaste(const std::u16string& pasteStr)
 void RichEditorPattern::NotifyFillRequestSuccess(RefPtr<ViewDataWrap> viewDataWrap,
     RefPtr<PageNodeInfoWrap> nodeWrap, AceAutoFillType autoFillType, AceAutoFillTriggerType triggerType)
 {
-    TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "NotifyFillRequestSuccess, autoFillType:%{public}d, triggerType:%{public}d",
-        static_cast<int32_t>(autoFillType), static_cast<int32_t>(triggerType));
-    bool isInsertValue = triggerType == AceAutoFillTriggerType::PASTE_REQUEST ||
-        triggerType == AceAutoFillTriggerType::MANUAL_REQUEST;
-    CHECK_NULL_VOID(GetHost() && viewDataWrap && nodeWrap && isInsertValue);
-    InsertValueByOperationType(UtfUtils::Str8ToStr16(nodeWrap->GetValue()),
-        triggerType == AceAutoFillTriggerType::MANUAL_REQUEST ? OperationType::AUTO_FILL : OperationType::SAFE_PASTE);
+#ifdef ENABLE_AUTO_FILL_CONTROLLER
+    CHECK_NULL_VOID(GetHost() && viewDataWrap && nodeWrap);
+    SetFillRequestFinish(true);
+    auto fillData = UtfUtils::Str8ToStr16(nodeWrap->GetValue());
+    if (triggerType == AceAutoFillTriggerType::PASTE_REQUEST) {
+        HandleOnAutoFillSecurePaste(fillData);
+        return;
+    }
+    if (triggerType == AceAutoFillTriggerType::MANUAL_REQUEST) {
+        InsertValueByOperationType(fillData, OperationType::AUTO_FILL);
+        return;
+    }
+    HandleAutoRequestFill(fillData, nodeWrap, viewDataWrap->GetOtherAccount());
+#endif
+}
+
+void RichEditorPattern::HandleOnAutoFillSecurePaste(const std::u16string& fillData)
+{
+    InsertValueByOperationType(fillData, OperationType::SAFE_PASTE);
+}
+
+void RichEditorPattern::HandleAutoRequestFill(const std::u16string& fillData, const RefPtr<PageNodeInfoWrap>& nodeWrap,
+    bool fromOtherAccount)
+{
+    auto focusHub = GetFocusHub();
+    if (focusHub && nodeWrap->GetIsFocus() && !HasFocus()) {
+        shouldSkipAutoFillOnFocus_ = true;
+        focusHub->RequestFocusImmediately();
+    }
+    auto fillValue = nodeWrap->GetValue();
+    auto autoFillType = GetAutoFillType();
+    // New password generation and other-account data must not pollute the baseline for future comparisons
+    if (autoFillType != AceAutoFillType::ACE_NEW_PASSWORD && !fromOtherAccount) {
+        lastAutoFillTextValue_ = fillValue;
+    }
+    if (GetTextValue() == fillValue) {
+        return;
+    }
+    InsertValueByOperationType(fillData, OperationType::AUTO_FILL);
+}
+
+void RichEditorPattern::NotifyFillRequestFailed(int32_t errCode, const std::string& fillContent, bool isPopup)
+{
+#ifdef ENABLE_AUTO_FILL_CONTROLLER
+    SetFillRequestFinish(true);
+    if (GetAutoFillType() == AceAutoFillType::ACE_UNSPECIFIED) {
+        return;
+    }
+#if defined(ENABLE_STANDARD_INPUT)
+    if (errCode == AceAutoFillError::ACE_AUTO_FILL_CANCEL) {
+        if (!fillContent.empty() && IsTriggerAutoFillPassword()) {
+            auto jsonObject = JsonUtil::ParseJsonString(fillContent);
+            CHECK_NULL_VOID(jsonObject);
+            auto host = GetHost();
+            CHECK_NULL_VOID(host);
+            auto context = host->GetContext();
+            CHECK_NULL_VOID(context);
+            auto textFieldManager = DynamicCast<TextFieldManagerNG>(context->GetTextFieldManager());
+            CHECK_NULL_VOID(textFieldManager);
+            textFieldManager->ParseFillContentJsonValue(jsonObject);
+        }
+    }
+#endif
+    if (!isPopup || (isPopup && errCode == AceAutoFillError::ACE_AUTO_FILL_CANCEL)) {
+        // Skip !isEditing_ guard from RequestKeyboardToEdit — autofill suppression leaves isEditing_=true
+        // with keyboard hidden. Still require HasFocus() to avoid requesting keyboard on a blurred component.
+        if (HasFocus()) {
+            RequestKeyboard(false, true, true);
+            HandleOnEditChanged(true);
+        }
+    }
+#endif
+}
+
+void RichEditorPattern::AutoFillValueChanged()
+{
+#ifdef ENABLE_AUTO_FILL_CONTROLLER
+    if (IsFillRequestFinish()) {
+        return;
+    }
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto autoFillType = GetAutoFillType();
+    auto container = Container::Current();
+    CHECK_NULL_VOID(container);
+    bool isValidType = (autoFillType >= AceAutoFillType::ACE_PASSWORD &&
+        autoFillType <= AceAutoFillType::END) || autoFillType == AceAutoFillType::ACE_USER_NAME;
+    if (isValidType && CheckAutoFill(AceAutoFillTriggerType::AUTO_REQUEST)) {
+        container->UpdatePopupUIExtension(host, autoFillSessionId_);
+    }
+#endif
+}
+
+bool RichEditorPattern::CheckAutoSave()
+{
+    auto enabled = IsAutoFillEnabled();
+    auto textValue = GetTextValue();
+    auto autoFillType = GetAutoFillType();
+    if (!enabled) {
+        return false;
+    }
+    if (textValue.empty()) {
+        return false;
+    }
+    if (IsAutoFillUserName(autoFillType)) {
+        if (!lastAutoFillTextValue_.empty() && textValue != lastAutoFillTextValue_) {
+            return true;
+        }
+    }
+    if (AceAutoFillType::ACE_UNSPECIFIED < autoFillType && autoFillType <= AceAutoFillType::END &&
+        !IsAutoFillUserName(autoFillType)) {
+        if (textValue != lastAutoFillTextValue_) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void RichEditorPattern::DumpViewDataPageNode(RefPtr<ViewDataWrap> viewDataWrap, bool needsRecordData)
@@ -10851,7 +10971,27 @@ void RichEditorPattern::DumpViewDataPageNode(RefPtr<ViewDataWrap> viewDataWrap, 
     pageNodeRect.SetOffset(offsetToWindow);
     info->SetPageNodeRect(pageNodeRect);
     info->SetIsFocus(HasFocus());
+    FillAutoFillPageNodeInfo(info);
+    if (needsRecordData) {
+        lastAutoFillTextValue_ = info->GetValue();
+    }
     viewDataWrap->AddPageNodeInfoWrap(info);
+}
+
+void RichEditorPattern::FillAutoFillPageNodeInfo(const RefPtr<PageNodeInfoWrap>& info)
+{
+    CHECK_NULL_VOID(info);
+    CHECK_NULL_VOID(IsAutoFillEnabled());
+    auto layoutProperty = GetLayoutProperty<RichEditorLayoutProperty>();
+    CHECK_NULL_VOID(layoutProperty);
+    auto contentType = layoutProperty->GetTextContentTypeValue(TextContentType::UNSPECIFIED);
+    auto autoFillType = TextContentTypeToAceAutoFillType(contentType);
+    auto passwordRules = layoutProperty->GetPasswordRulesValue("");
+    auto textValue = GetTextValue();
+    info->SetAutoFillType(autoFillType);
+    info->SetEnableAutoFill(true);
+    info->SetPasswordRules(passwordRules);
+    info->SetValue(textValue);
 }
 
 void RichEditorPattern::HandleOnPaste()
@@ -10893,19 +11033,21 @@ void RichEditorPattern::HandleOnPaste()
 #endif
 }
 
-bool RichEditorPattern::ProcessAutoFill(AceAutoFillTriggerType triggerType)
+std::pair<bool, bool> RichEditorPattern::ProcessAutoFill(bool isNewPassWord,
+    AceAutoFillTriggerType triggerType)
 {
 #ifdef ENABLE_AUTO_FILL_CONTROLLER
+    CHECK_NULL_RETURN(CheckAutoFill(triggerType), std::make_pair(false, false));
     if (auto focusHub = GetFocusHub(); focusHub && !HasFocus()) {
         focusHub->RequestFocusImmediately();
         isOnlyRequestFocus_ = true;
     }
     auto host = GetHost();
-    CHECK_NULL_RETURN(host, false);
+    CHECK_NULL_RETURN(host, std::make_pair(false, false));
     auto container = Container::Current();
     if (container == nullptr) {
         TAG_LOGW(AceLogTag::ACE_AUTO_FILL, "Get current container is nullptr.");
-        return false;
+        return std::make_pair(false, false);
     }
     auto onUIExtNodeDestroy = [weak = WeakPtr<FrameNode>(host)]() {
         TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "onUIExtNodeDestroy called.");
@@ -10928,31 +11070,287 @@ bool RichEditorPattern::ProcessAutoFill(AceAutoFillTriggerType triggerType)
         pagePattern->SetIsModalCovered(true);
     };
     bool isPopup = false;
-    uint32_t autoFillSessionId = 0;
-    auto resultCode = container->RequestAutoFill(host, AceAutoFillType::ACE_UNSPECIFIED, false, isPopup, autoFillSessionId, true,
-        onUIExtNodeDestroy, onUIExtNodeBindingCompleted, triggerType);
-    TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "ProcessAutoFill, result = %{public}d", resultCode);
-    return resultCode == AceAutoFillError::ACE_AUTO_FILL_SUCCESS;
+    autoFillSessionId_ = 0;
+    auto autoFillType = GetAutoFillType();
+    auto resultCode = container->RequestAutoFill(host, autoFillType, isNewPassWord, isPopup,
+        autoFillSessionId_, true, onUIExtNodeDestroy, onUIExtNodeBindingCompleted, triggerType);
+    if (resultCode != AceAutoFillError::ACE_AUTO_FILL_PREVIOUS_REQUEST_NOT_FINISHED) {
+        SetAutoFillTriggeredStateByType(autoFillType);
+        SetFillRequestFinish(false);
+    }
+    return std::make_pair(resultCode == AceAutoFillError::ACE_AUTO_FILL_SUCCESS, isPopup);
 #else
-    return false;
+    return std::make_pair(false, false);
 #endif
 }
 
 void RichEditorPattern::ProcessAutoFillOnPaste()
 {
     TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "ProcessAutoFillOnPaste");
-    ProcessAutoFill(AceAutoFillTriggerType::PASTE_REQUEST);
+    ProcessAutoFill(false, AceAutoFillTriggerType::PASTE_REQUEST);
 }
 
 void RichEditorPattern::HandleOnPasswordVault()
 {
     TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "HandleOnPasswordVault");
-    ProcessAutoFill(AceAutoFillTriggerType::MANUAL_REQUEST);
+    ProcessAutoFill(false, AceAutoFillTriggerType::MANUAL_REQUEST);
+}
+
+bool RichEditorPattern::IsModalCovered()
+{
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, false);
+    auto pageNode = host->GetPageNode();
+    CHECK_NULL_RETURN(pageNode, false);
+    auto pagePattern = pageNode->GetPattern<PagePattern>();
+    CHECK_NULL_RETURN(pagePattern, false);
+    bool covered = pagePattern->GetIsModalCovered();
+    return covered;
+}
+
+bool RichEditorPattern::ProcessAutoFillAndKeyboard(RichEditorAutoFillReason autoFillReason, SourceType sourceType)
+{
+#ifdef ENABLE_AUTO_FILL_CONTROLLER
+    auto [isSuccess, isPopup] = ProcessAutoFill(false, AceAutoFillTriggerType::AUTO_REQUEST);
+    if (!isPopup && isSuccess) {
+        if (autoFillReason == RichEditorAutoFillReason::EDITOR_FOCUS) {
+            SetAutoFillRequestSuccessOnFocus(true);
+        }
+        return true;
+    }
+    if (!isPopup && autoFillReason == RichEditorAutoFillReason::SINGLE_CLICK &&
+        IsAutoFillRequestSuccessOnFocus()) {
+        SetAutoFillRequestSuccessOnFocus(false);
+        return true;
+    }
+    return false;
+#else
+    return false;
+#endif
+}
+
+bool RichEditorPattern::DoProcessAutoFill(RichEditorAutoFillReason autoFillReason, SourceType sourceType)
+{
+#ifdef ENABLE_AUTO_FILL_CONTROLLER
+    if (!IsAutoFillEnabled()) {
+        return false;
+    }
+    return ProcessAutoFillAndKeyboard(autoFillReason, sourceType);
+#else
+    return false;
+#endif
+}
+
+bool RichEditorPattern::ProcessAutoFillOnFocus()
+{
+#ifdef ENABLE_AUTO_FILL_CONTROLLER
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, false);
+    CHECK_NULL_RETURN(needToRequestKeyboardOnFocus_ && !shouldSkipAutoFillOnFocus_, false);
+    if (!IsModalCovered() && IsTriggerAutoFillPassword()) {
+        return DoProcessAutoFill(RichEditorAutoFillReason::EDITOR_FOCUS);
+    }
+#endif
+    return false;
 }
 
 bool RichEditorPattern::IsShowAutoFill()
 {
     return SystemProperties::IsAutoFillSupport();
+}
+
+bool RichEditorPattern::IsAutoFillEnabled() const
+{
+    auto layoutProperty = GetLayoutProperty<RichEditorLayoutProperty>();
+    return layoutProperty && layoutProperty->GetEnableAutoFillValue(false);
+}
+
+AceAutoFillType RichEditorPattern::GetAutoFillType()
+{
+    auto layoutProperty = GetLayoutProperty<RichEditorLayoutProperty>();
+    CHECK_NULL_RETURN(layoutProperty, AceAutoFillType::ACE_UNSPECIFIED);
+    // Level 1: contentType
+    auto aceContentType = TextContentTypeToAceAutoFillType(
+        layoutProperty->GetTextContentTypeValue(TextContentType::UNSPECIFIED));
+    if (aceContentType != AceAutoFillType::ACE_UNSPECIFIED) {
+        return aceContentType;
+    }
+    // Level 2: inputType
+    auto aceInputType = ConvertToAceAutoFillType(
+        layoutProperty->GetTextInputTypeValue(TextInputType::UNSPECIFIED));
+    if (aceInputType != AceAutoFillType::ACE_UNSPECIFIED) {
+        return aceInputType;
+    }
+    // Level 3: UNSPECIFIED
+    return AceAutoFillType::ACE_UNSPECIFIED;
+}
+
+bool RichEditorPattern::IsAutoFillPasswordType(const AceAutoFillType& autoFillType)
+{
+    return autoFillType == AceAutoFillType::ACE_USER_NAME ||
+           autoFillType == AceAutoFillType::ACE_PASSWORD ||
+           autoFillType == AceAutoFillType::ACE_NEW_PASSWORD;
+}
+
+bool RichEditorPattern::HasAutoFillPasswordNode()
+{
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, false);
+    auto pipeline = host->GetContext();
+    CHECK_NULL_RETURN(pipeline, false);
+    auto textFieldManager = DynamicCast<TextFieldManagerNG>(pipeline->GetTextFieldManager());
+    CHECK_NULL_RETURN(textFieldManager, false);
+    auto nodeId = host->GetId();
+    auto autoFillContainerNode = firstAutoFillContainerNode_.Upgrade();
+    CHECK_NULL_RETURN(autoFillContainerNode, false);
+    auto autoFillContainerNodeId = autoFillContainerNode->GetId();
+    return textFieldManager->HasAutoFillPasswordNodeInContainer(autoFillContainerNodeId, nodeId);
+}
+
+bool RichEditorPattern::IsAutoFillUserName(const AceAutoFillType& autoFillType)
+{
+    auto isUserName =
+        autoFillType == AceAutoFillType::ACE_USER_NAME || autoFillType == AceAutoFillType::ACE_UNSPECIFIED;
+    return isUserName && HasAutoFillPasswordNode();
+}
+
+bool RichEditorPattern::IsTriggerAutoFillPassword()
+{
+    auto autoFillType = GetAutoFillType();
+    if (autoFillType == AceAutoFillType::ACE_USER_NAME) {
+        return HasAutoFillPasswordNode();
+    }
+    return autoFillType == AceAutoFillType::ACE_PASSWORD ||
+           autoFillType == AceAutoFillType::ACE_NEW_PASSWORD;
+}
+
+bool RichEditorPattern::CheckAutoFill(AceAutoFillTriggerType triggerType)
+{
+    if (triggerType == AceAutoFillTriggerType::MANUAL_REQUEST ||
+        triggerType == AceAutoFillTriggerType::PASTE_REQUEST) {
+        return true;
+    }
+    if (!IsAutoFillEnabled()) {
+        return false;
+    }
+    auto autoFillType = GetAutoFillType();
+    auto isTriggerPassword = IsTriggerAutoFillPassword();
+    if (autoFillType == AceAutoFillType::ACE_UNSPECIFIED && !isTriggerPassword) {
+        return false;
+    }
+    if (isTriggerPassword) {
+        auto container = Container::Current();
+        CHECK_NULL_RETURN(container, true);
+        auto tempAutoFillType = IsAutoFillUserName(autoFillType)
+            ? AceAutoFillType::ACE_USER_NAME : autoFillType;
+        if (!container->IsNeedToCreatePopupWindow(tempAutoFillType)) {
+            return GetAutoFillTriggeredStateByType(autoFillType);
+        }
+    }
+    return true;
+}
+
+void RichEditorPattern::SetAutoFillTriggeredStateByType(const AceAutoFillType& autoFillType)
+{
+    auto autoFillContainerNode = firstAutoFillContainerNode_.Upgrade();
+    CHECK_NULL_VOID(autoFillContainerNode);
+    auto stateHolder = autoFillContainerNode->GetPattern<AutoFillTriggerStateHolder>();
+    CHECK_NULL_VOID(stateHolder);
+    if (IsAutoFillUserName(autoFillType) || autoFillType == AceAutoFillType::ACE_PASSWORD) {
+        stateHolder->SetAutoFillPasswordTriggered(true);
+    } else if (autoFillType == AceAutoFillType::ACE_NEW_PASSWORD) {
+        stateHolder->SetAutoFillNewPasswordTriggered(true);
+    }
+}
+
+bool RichEditorPattern::GetAutoFillTriggeredStateByType(const AceAutoFillType& autoFillType)
+{
+    auto autoFillContainerNode = firstAutoFillContainerNode_.Upgrade();
+    CHECK_NULL_RETURN(autoFillContainerNode, false);
+    auto stateHolder = autoFillContainerNode->GetPattern<AutoFillTriggerStateHolder>();
+    CHECK_NULL_RETURN(stateHolder, false);
+    if (IsAutoFillUserName(autoFillType) || autoFillType == AceAutoFillType::ACE_PASSWORD) {
+        return !stateHolder->IsAutoFillPasswordTriggered();
+    }
+    if (autoFillType == AceAutoFillType::ACE_NEW_PASSWORD) {
+        return !stateHolder->IsAutoFillNewPasswordTriggered();
+    }
+    return false;
+}
+
+TextFieldInfo RichEditorPattern::GenerateTextFieldInfo()
+{
+    TextFieldInfo textFieldInfo;
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, textFieldInfo);
+    textFieldInfo.nodeId = host->GetId();
+    auto autoFillContainerNode = firstAutoFillContainerNode_.Upgrade();
+    CHECK_NULL_RETURN(autoFillContainerNode, textFieldInfo);
+    textFieldInfo.autoFillContainerNodeId = autoFillContainerNode->GetId();
+    auto layoutProperty = GetLayoutProperty<RichEditorLayoutProperty>();
+    CHECK_NULL_RETURN(layoutProperty, textFieldInfo);
+    textFieldInfo.enableAutoFill = IsAutoFillEnabled();
+    textFieldInfo.inputType = layoutProperty->GetTextInputTypeValue(TextInputType::UNSPECIFIED);
+    textFieldInfo.contentType = layoutProperty->GetTextContentTypeValue(TextContentType::UNSPECIFIED);
+    textFieldInfo.autoFillType = GetAutoFillType();
+    return textFieldInfo;
+}
+
+void RichEditorPattern::AddAutoFillNodeInfo()
+{
+    CHECK_NULL_VOID(IsAutoFillEnabled());
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto autoFillContainerNode = host->GetFirstAutoFillContainerNode();
+    CHECK_NULL_VOID(autoFillContainerNode);
+    firstAutoFillContainerNode_ = WeakClaim(RawPtr(autoFillContainerNode));
+    auto pipeline = host->GetContext();
+    CHECK_NULL_VOID(pipeline);
+    auto textFieldManager = DynamicCast<TextFieldManagerNG>(pipeline->GetTextFieldManager());
+    CHECK_NULL_VOID(textFieldManager);
+    auto textFieldInfo = GenerateTextFieldInfo();
+    textFieldManager->AddTextFieldInfo(textFieldInfo);
+}
+
+void RichEditorPattern::RemoveAutoFillNodeInfo()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto pipeline = host->GetContext();
+    CHECK_NULL_VOID(pipeline);
+    auto textFieldManager = DynamicCast<TextFieldManagerNG>(pipeline->GetTextFieldManager());
+    CHECK_NULL_VOID(textFieldManager);
+    auto nodeId = host->GetId();
+    auto autoFillContainerNode = firstAutoFillContainerNode_.Upgrade();
+    CHECK_NULL_VOID(autoFillContainerNode);
+    auto autoFillContainerNodeId = autoFillContainerNode->GetId();
+    textFieldManager->RemoveTextFieldInfo(autoFillContainerNodeId, nodeId);
+}
+
+void RichEditorPattern::UpdateAutoFillNodeInfo()
+{
+    auto autoFillContainerNode = firstAutoFillContainerNode_.Upgrade();
+    CHECK_NULL_VOID(autoFillContainerNode);
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto pipeline = host->GetContext();
+    CHECK_NULL_VOID(pipeline);
+    auto textFieldManager = DynamicCast<TextFieldManagerNG>(pipeline->GetTextFieldManager());
+    CHECK_NULL_VOID(textFieldManager);
+    auto textFieldInfo = GenerateTextFieldInfo();
+    textFieldManager->UpdateTextFieldInfo(textFieldInfo);
+}
+
+void RichEditorPattern::SyncAutoFillNodeInfo()
+{
+    if (!IsAutoFillEnabled()) {
+        return;
+    }
+    if (firstAutoFillContainerNode_.Upgrade()) {
+        UpdateAutoFillNodeInfo();
+    } else {
+        AddAutoFillNodeInfo();
+    }
 }
 
 std::function<void(std::vector<std::vector<uint8_t>>&, const std::string&, bool&, bool&)>
@@ -15992,12 +16390,14 @@ void RichEditorPattern::SetLongPressFlags()
 void RichEditorPattern::OnAttachToMainTree()
 {
     TextPattern::OnAttachToMainTree();
+    AddAutoFillNodeInfo();
 }
 
 void RichEditorPattern::OnDetachFromMainTree()
 {
     auto host = GetHost();
     THREAD_SAFE_NODE_CHECK(host, OnDetachFromMainTree);
+    RemoveAutoFillNodeInfo();
     TextPattern::OnDetachFromMainTree();
 }
 

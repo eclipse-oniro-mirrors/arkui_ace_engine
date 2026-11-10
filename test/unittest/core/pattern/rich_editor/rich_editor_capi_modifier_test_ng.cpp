@@ -206,4 +206,111 @@ HWTEST_F(RichEditorCapiModifierTestNg, RichEditorEnableSkipPreviewLongPressTest,
     EXPECT_FALSE(pattern->editingLongPress_);
     EXPECT_TRUE(pattern->previewLongPress_);
 }
+
+/**
+ * @tc.name: RichEditorEnableAutoFillTest
+ * @tc.desc: Check the functionality of Set/Get/Reset EnableAutoFill
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCapiModifierTestNg, RichEditorEnableAutoFillTest, TestSize.Level1)
+{
+    auto frameNode = RichEditorModelStatic::CreateFrameNode(0);
+    ASSERT_NE(frameNode, nullptr);
+    auto layoutProperty = frameNode->GetLayoutProperty<RichEditorLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    auto* rawNode = AceType::RawPtr(frameNode);
+
+    // default: enableAutoFill is false when not set
+    EXPECT_FALSE(RichEditorModelNG::GetEnableAutoFill(rawNode));
+
+    RichEditorModelNG::SetEnableAutoFill(rawNode, true);
+    EXPECT_TRUE(RichEditorModelNG::GetEnableAutoFill(rawNode));
+    EXPECT_TRUE(layoutProperty->GetEnableAutoFill().value_or(false));
+
+    RichEditorModelNG::ResetEnableAutoFill(rawNode);
+    EXPECT_FALSE(RichEditorModelNG::GetEnableAutoFill(rawNode));
+    EXPECT_FALSE(layoutProperty->GetEnableAutoFill().value_or(true));
+}
+
+/**
+ * @tc.name: RichEditorContentTypeTest
+ * @tc.desc: Check the functionality of Set/Get/Reset ContentType and changed-flag branches
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCapiModifierTestNg, RichEditorContentTypeTest, TestSize.Level1)
+{
+    auto frameNode = RichEditorModelStatic::CreateFrameNode(0);
+    ASSERT_NE(frameNode, nullptr);
+    auto layoutProperty = frameNode->GetLayoutProperty<RichEditorLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    auto* rawNode = AceType::RawPtr(frameNode);
+
+    // Branch: no existing contentType -> changed flag not set
+    RichEditorModelNG::SetContentType(rawNode, TextContentType::USER_NAME);
+    EXPECT_EQ(RichEditorModelNG::GetContentType(rawNode), TextContentType::USER_NAME);
+    EXPECT_FALSE(layoutProperty->GetTextContentTypeChangedValue(false));
+
+    // Branch: existing value equals new value -> changed flag not set
+    RichEditorModelNG::SetContentType(rawNode, TextContentType::USER_NAME);
+    EXPECT_FALSE(layoutProperty->GetTextContentTypeChangedValue(false));
+
+    // Branch: existing value differs -> changed flag set
+    RichEditorModelNG::SetContentType(rawNode, TextContentType::NEW_PASSWORD);
+    EXPECT_EQ(RichEditorModelNG::GetContentType(rawNode), TextContentType::NEW_PASSWORD);
+    EXPECT_TRUE(layoutProperty->GetTextContentTypeChangedValue(false));
+
+    RichEditorModelNG::ResetContentType(rawNode);
+    EXPECT_EQ(RichEditorModelNG::GetContentType(rawNode), TextContentType::UNSPECIFIED);
+}
+
+/**
+ * @tc.name: RichEditorPasswordRulesTest
+ * @tc.desc: Check the functionality of Set/Get/Reset PasswordRules
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCapiModifierTestNg, RichEditorPasswordRulesTest, TestSize.Level1)
+{
+    auto frameNode = RichEditorModelStatic::CreateFrameNode(0);
+    ASSERT_NE(frameNode, nullptr);
+    auto layoutProperty = frameNode->GetLayoutProperty<RichEditorLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    auto* rawNode = AceType::RawPtr(frameNode);
+
+    // default: passwordRules is empty when not set
+    EXPECT_TRUE(RichEditorModelNG::GetPasswordRules(rawNode).empty());
+
+    const std::string testRules = "minLength:8;maxLength:20";
+    RichEditorModelNG::SetPasswordRules(rawNode, testRules);
+    EXPECT_EQ(RichEditorModelNG::GetPasswordRules(rawNode), testRules);
+    EXPECT_EQ(layoutProperty->GetPasswordRules().value_or(""), testRules);
+
+    RichEditorModelNG::ResetPasswordRules(rawNode);
+    EXPECT_TRUE(RichEditorModelNG::GetPasswordRules(rawNode).empty());
+    EXPECT_TRUE(layoutProperty->GetPasswordRules().value_or("nonempty").empty());
+}
+
+/**
+ * @tc.name: RichEditorEnableAutoFillAnimationTest
+ * @tc.desc: Check the functionality of Set/Get/Reset EnableAutoFillAnimation
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCapiModifierTestNg, RichEditorEnableAutoFillAnimationTest, TestSize.Level1)
+{
+    auto frameNode = RichEditorModelStatic::CreateFrameNode(0);
+    ASSERT_NE(frameNode, nullptr);
+    auto layoutProperty = frameNode->GetLayoutProperty<RichEditorLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    auto* rawNode = AceType::RawPtr(frameNode);
+
+    // default: enableAutoFillAnimation is true when not set
+    EXPECT_TRUE(RichEditorModelNG::GetEnableAutoFillAnimation(rawNode));
+
+    RichEditorModelNG::SetEnableAutoFillAnimation(rawNode, false);
+    EXPECT_FALSE(RichEditorModelNG::GetEnableAutoFillAnimation(rawNode));
+    EXPECT_FALSE(layoutProperty->GetEnableAutoFillAnimation().value_or(true));
+
+    RichEditorModelNG::ResetEnableAutoFillAnimation(rawNode);
+    EXPECT_TRUE(RichEditorModelNG::GetEnableAutoFillAnimation(rawNode));
+    EXPECT_TRUE(layoutProperty->GetEnableAutoFillAnimation().value_or(false));
+}
 } // namespace OHOS::Ace::NG

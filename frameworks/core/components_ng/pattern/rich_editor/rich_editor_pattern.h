@@ -48,6 +48,7 @@
 #include "core/components_ng/pattern/text_field/password_icon_host.h"
 #include "core/components/text_field/textfield_theme.h"
 #include "core/components_ng/pattern/rich_editor/span_string_mode_switcher.h"
+#include "core/common/text_field_manager_ng.h"
 
 #include "core/components_ng/pattern/text_field/clean_node_host.h"
 
@@ -216,6 +217,12 @@ enum class OperationType {
     SAFE_PASTE,
     AUTO_FILL,
     UNDO
+};
+
+enum class RichEditorAutoFillReason {
+    UNKNOWN = 0,
+    SINGLE_CLICK,
+    EDITOR_FOCUS,
 };
 
 const std::unordered_map<OperationType, TextChangeReason> OPERATION_REASON_MAP = {
@@ -1073,10 +1080,41 @@ public:
         RefPtr<PageNodeInfoWrap> nodeWrap, AceAutoFillType autoFillType,
         AceAutoFillTriggerType triggerType = AceAutoFillTriggerType::AUTO_REQUEST) override;
     void DumpViewDataPageNode(RefPtr<ViewDataWrap> viewDataWrap, bool needsRecordData = false) override;
-    bool ProcessAutoFill(AceAutoFillTriggerType triggerType = AceAutoFillTriggerType::AUTO_REQUEST);
+    bool CheckAutoSave() override;
+    void FillAutoFillPageNodeInfo(const RefPtr<PageNodeInfoWrap>& info);
+    std::pair<bool, bool> ProcessAutoFill(bool isNewPassWord = false,
+        AceAutoFillTriggerType triggerType = AceAutoFillTriggerType::AUTO_REQUEST);
+    bool CheckAutoFill(AceAutoFillTriggerType triggerType);
+    void SetAutoFillTriggeredStateByType(const AceAutoFillType& autoFillType);
+    bool GetAutoFillTriggeredStateByType(const AceAutoFillType& autoFillType);
     void ProcessAutoFillOnPaste();
     void HandleOnPasswordVault();
     bool IsShowAutoFill();
+    bool IsAutoFillEnabled() const;
+    AceAutoFillType GetAutoFillType();
+    void SetFillRequestFinish(bool success) { isFillRequestFinish_ = success; }
+    bool IsFillRequestFinish() { return isFillRequestFinish_; }
+    bool IsAutoFillPasswordType(const AceAutoFillType& autoFillType);
+    bool IsAutoFillUserName(const AceAutoFillType& autoFillType);
+    bool HasAutoFillPasswordNode();
+    bool IsTriggerAutoFillPassword();
+    bool ProcessAutoFillOnFocus();
+    bool DoProcessAutoFill(RichEditorAutoFillReason autoFillReason, SourceType sourceType = SourceType::NONE);
+    bool ProcessAutoFillAndKeyboard(RichEditorAutoFillReason autoFillReason, SourceType sourceType = SourceType::NONE);
+    void SetAutoFillRequestSuccessOnFocus(bool success) { autoFillRequestSuccessOnFocus_ = success; }
+    bool IsAutoFillRequestSuccessOnFocus() const { return autoFillRequestSuccessOnFocus_; }
+    bool IsModalCovered();
+    void AutoFillValueChanged();
+    void NotifyFillRequestFailed(int32_t errCode, const std::string& fillContent = "", bool isPopup = false) override;
+    TextFieldInfo GenerateTextFieldInfo();
+    void AddAutoFillNodeInfo();
+    void RemoveAutoFillNodeInfo();
+    void UpdateAutoFillNodeInfo();
+    void SyncAutoFillNodeInfo();
+
+    void HandleAutoRequestFill(const std::u16string& fillData, const RefPtr<PageNodeInfoWrap>& nodeWrap,
+        bool fromOtherAccount);
+    void HandleOnAutoFillSecurePaste(const std::u16string& fillData);
     bool IsInterceptInput(const bool shouldCommitInput, const OperationType operationType);
 
     // local/global coordinate conversion with render transform.
@@ -1638,6 +1676,15 @@ private:
     bool isCursorAlwaysDisplayed_ = false;
     bool isClickOnAISpan_ = false;
     bool isOnlyRequestFocus_ = false;
+
+    // Autofill request lifecycle
+    std::string lastAutoFillTextValue_;
+    bool isFillRequestFinish_ = true;
+    uint32_t autoFillSessionId_ = 0;
+    bool autoFillRequestSuccessOnFocus_ = false;
+    bool shouldSkipAutoFillOnFocus_ = false;
+    WeakPtr<FrameNode> firstAutoFillContainerNode_;
+
     int32_t moveLength_ = 0;
     int32_t insertValueLength_ = 0;
     int32_t lastCaretPosition_ = 0;

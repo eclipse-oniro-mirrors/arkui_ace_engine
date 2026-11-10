@@ -9609,6 +9609,19 @@ struct ArkUIRichEditorModifier {
     void (*setRichEditorUnderlineColor)(ArkUINodeHandle node, const ArkUI_Uint32* colors, ArkUI_Uint32 size);
     const ArkUI_Uint32* (*getRichEditorUnderlineColor)(ArkUINodeHandle node, ArkUI_Uint32* size);
     void (*resetRichEditorUnderlineColor)(ArkUINodeHandle node);
+    // autofill properties (appended at end, backward compatible)
+    void (*setRichEditorEnableAutoFill)(ArkUINodeHandle node, ArkUI_Uint32 enableAutoFill);
+    ArkUI_Int32 (*getRichEditorEnableAutoFill)(ArkUINodeHandle node);
+    void (*resetRichEditorEnableAutoFill)(ArkUINodeHandle node);
+    void (*setRichEditorContentType)(ArkUINodeHandle node, ArkUI_Uint32 contentType);
+    ArkUI_Int32 (*getRichEditorContentType)(ArkUINodeHandle node);
+    void (*resetRichEditorContentType)(ArkUINodeHandle node);
+    void (*setRichEditorPasswordRules)(ArkUINodeHandle node, ArkUI_CharPtr passwordRules);
+    ArkUI_CharPtr (*getRichEditorPasswordRules)(ArkUINodeHandle node);
+    void (*resetRichEditorPasswordRules)(ArkUINodeHandle node);
+    void (*setRichEditorEnableFillAnimation)(ArkUINodeHandle node, ArkUI_Uint32 enableFillAnimation);
+    ArkUI_Int32 (*getRichEditorEnableFillAnimation)(ArkUINodeHandle node);
+    void (*resetRichEditorEnableFillAnimation)(ArkUINodeHandle node);
 };
 
 struct ArkUIRichEditorControllerModifier {

@@ -18,6 +18,12 @@
 
 #include <cstdint>
 
+#include "core/common/ime/text_input_type.h"
+
+namespace OHOS::Ace {
+enum class AceAutoFillType;
+} // namespace OHOS::Ace
+
 namespace OHOS::Ace::NG {
 enum class TextContentType {
     BEGIN = -1,
@@ -64,5 +70,7 @@ enum class TextContentType {
     END = LICENSE_CHASSIS_NUMBER,
 };
 TextContentType CastToTextContentType(int32_t value);
+AceAutoFillType TextContentTypeToAceAutoFillType(const TextContentType& type);
+AceAutoFillType ConvertToAceAutoFillType(TextInputType type);
 }; // namespace OHOS::Ace::NG
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_TEXT_FIELD_PATTERN_TEXT_CONTENT_TYPE_H
