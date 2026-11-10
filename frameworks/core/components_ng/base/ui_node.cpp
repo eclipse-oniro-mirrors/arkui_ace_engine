@@ -1166,6 +1166,7 @@ void UINode::DetachFromMainTree(bool recursive, bool needCheckThreadSafeNodeTree
         return;
     }
     onMainTree_ = false;
+    useOffscreenProcess_ = false;
     if (nodeStatus_ == NodeStatus::BUILDER_NODE_ON_MAINTREE) {
         nodeStatus_ = NodeStatus::BUILDER_NODE_OFF_MAINTREE;
     }
