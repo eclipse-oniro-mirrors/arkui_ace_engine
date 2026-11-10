@@ -75,6 +75,7 @@
 #include "core/components_ng/manager/force_split/force_split_manager.h"
 #include "core/components_ng/manager/form_visible/form_visible_manager.h"
 #include "core/components_ng/manager/page_scene/page_scene_rule_manager.h"
+#include "core/components_ng/manager/page_scene/developer_response_observer.h"
 #include "core/components_ng/manager/page_scene/search_scene_context_collector.h"
 #include "core/components_ng/manager/uisession_query/component_tree_query.h"
 #include "core/components_ng/base/frame_node.h"
@@ -7139,6 +7140,29 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
         }
     };
     UiSessionManager::GetInstance()->SavePageSceneDetectFunction(pageSceneDetectCallback);
+    UiSessionManager::PageSceneResponseObserverFunction responseObserverFunc;
+    responseObserverFunc.registerRuleSet = [](int32_t processId, const std::string& ruleJson) {
+        return NG::PageSceneResponseObserver::GetInstance()->RegisterRuleSet(processId, ruleJson);
+    };
+    responseObserverFunc.unregisterRuleSet = [](int32_t processId, const std::string& ruleSetId) {
+        return NG::PageSceneResponseObserver::GetInstance()->UnregisterRuleSet(processId, ruleSetId);
+    };
+    responseObserverFunc.clearProcess = [](int32_t processId) {
+        NG::PageSceneResponseObserver::GetInstance()->ClearProcess(processId);
+    };
+    responseObserverFunc.setActive = [](bool active) {
+        NG::PageSceneResponseObserver::GetInstance()->SetActive(active);
+    };
+    responseObserverFunc.hasRegisteredRules = []() {
+        return NG::PageSceneResponseObserver::GetInstance()->HasRegisteredRules();
+    };
+    responseObserverFunc.getActiveRuleJsons = []() {
+        return NG::PageSceneResponseObserver::GetInstance()->GetActiveRuleJsons();
+    };
+    responseObserverFunc.onContentStable = []() {
+        NG::PageSceneResponseObserver::GetInstance()->OnContentStable();
+    };
+    UiSessionManager::GetInstance()->SavePageSceneResponseObserverFunction(std::move(responseObserverFunc));
 }
 
 void UIContentImpl::SaveArkUIPageTranslateFunctions(const WeakPtr<TaskExecutor>& taskExecutor)

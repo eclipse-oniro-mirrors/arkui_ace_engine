@@ -130,6 +130,7 @@ public:
     void CopyClickEvent(const RefPtr<ClickEventActuator>& clickEventActuator);
     
 private:
+    void PublishClick(GestureEvent& info);
     WeakPtr<GestureEventHub> gestureEventHub_;
     std::list<RefPtr<ClickEvent>> clickEvents_;
     RefPtr<ClickEvent> clickAfterEvents_;

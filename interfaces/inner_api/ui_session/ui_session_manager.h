@@ -82,6 +82,17 @@ public:
     };
     using WebPageSceneFunction = std::function<int32_t(WebPageSceneOp op, int32_t processId,
         const std::string& ruleJson, bool isGetResult)>;
+    // Runtime-injected callbacks to the NG PageSceneResponseObserver. libace_entrance binds
+    // these after loading; ui_session holds only the function pointers (no libace link dep).
+    struct PageSceneResponseObserverFunction {
+        std::function<int32_t(int32_t processId, const std::string& ruleJson)> registerRuleSet;
+        std::function<int32_t(int32_t processId, const std::string& ruleSetId)> unregisterRuleSet;
+        std::function<void(int32_t processId)> clearProcess;
+        std::function<void(bool active)> setActive;
+        std::function<bool()> hasRegisteredRules;
+        std::function<std::vector<std::pair<int32_t, std::string>>()> getActiveRuleJsons;
+        std::function<void()> onContentStable;
+    };
 
     enum class PageSceneNodeStateChange : uint8_t {
         VISIBILITY,
@@ -454,6 +465,8 @@ protected:
 public:
     // Append after existing virtual declarations to preserve their slot order.
     virtual void SaveRelaxedCommandWithResultFunction(SendCommandWithResultFunction&& function) {};
+    // Runtime-injected RESPONSE observer callbacks; appended last to keep existing slot order.
+    virtual void SavePageSceneResponseObserverFunction(PageSceneResponseObserverFunction&& function) {};
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_INTERFACE_UI_SESSION_MANAGER_H

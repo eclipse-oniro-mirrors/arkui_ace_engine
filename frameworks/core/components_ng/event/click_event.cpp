@@ -20,11 +20,13 @@
 #endif
 #include "core/accessibility/accessibility_utils.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/event/developer_response_publisher.h"
 #include "core/components_ng/event/gesture_event_hub.h"
 #include "core/components_ng/gestures/recognizers/click_recognizer.h"
 #include "core/gestures/click_info.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include <algorithm>
+#include <string>
 
 namespace OHOS::Ace::NG {
 
@@ -108,8 +110,26 @@ GestureEventFunc ClickEventActuator::GetClickEvent()
         if (actuator->onAccessibilityEventFunc_) {
             actuator->onAccessibilityEventFunc_(AccessibilityEventType::CLICK);
         }
+        actuator->PublishClick(info);
     };
     return callback;
+}
+
+void ClickEventActuator::PublishClick(GestureEvent& info)
+{
+    auto gestureHub = gestureEventHub_.Upgrade();
+    CHECK_NULL_VOID(gestureHub);
+    auto frameNode = gestureHub->GetFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    std::string token;
+    if (info.GetClickPointerEvent()) {
+        token = "touch_" + std::to_string(info.GetPointerEventId());
+    }
+    DeveloperResponseCandidate candidate;
+    candidate.node = AceType::WeakClaim(AceType::RawPtr(frameNode));
+    candidate.operationToken = token;
+    candidate.callbackType = DeveloperResponseCallbackType::CLICK;
+    DeveloperResponsePublisher::GetInstance()->PublishClick(candidate);
 }
 
 void ClickEvent::operator()(GestureEvent& info) const
