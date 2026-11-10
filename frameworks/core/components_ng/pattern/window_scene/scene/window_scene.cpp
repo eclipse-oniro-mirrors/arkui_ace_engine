@@ -635,6 +635,7 @@ void WindowScene::OnActivation()
         self->session_->SetShowRecent(false);
         auto host = self->GetHost();
         CHECK_NULL_VOID(host);
+
         if (self->destroyed_) {
             self->destroyed_ = false;
             self->RemoveChild(host, self->startingWindow_, self->startingWindowName_);
@@ -661,19 +662,7 @@ void WindowScene::OnActivation()
                 self->SetSubSessionVisible();
                 host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
             } else {
-                self->RemoveChild(host, self->snapshotWindow_, self->snapshotWindowName_);
-                self->snapshotWindow_.Reset();
-                self->session_->SetNeedSnapshot(true);
-                self->SetSubSessionVisible();
-                if (self->session_->IsPrelaunch()) {
-                    TAG_LOGI(AceLogTag::ACE_WINDOW_SCENE, "OnActivation CreateBlankWindow");
-                    self->CreateBlankWindow(self->startingWindow_);
-                    self->isPrelaunch_.store(true, std::memory_order_release);
-                } else {
-                    self->CreateStartingWindow();
-                }
-                self->AddChild(host, self->startingWindow_, self->startingWindowName_);
-                host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+                self->ReplaceSnapshotWithStartingWindow();
             }
         } else if (self->startingWindow_ &&
             self->session_->GetSessionState() != Rosen::SessionState::STATE_DISCONNECT) {
@@ -693,6 +682,25 @@ void WindowScene::OnActivation()
     auto pipelineContext = PipelineContext::GetCurrentContext();
     CHECK_NULL_VOID(pipelineContext);
     pipelineContext->PostAsyncEvent(std::move(uiTask), "ArkUIWindowSceneActivation", TaskExecutor::TaskType::UI);
+}
+
+void WindowScene::ReplaceSnapshotWithStartingWindow()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    RemoveChild(host, snapshotWindow_, snapshotWindowName_);
+    snapshotWindow_.Reset();
+    session_->SetNeedSnapshot(true);
+    SetSubSessionVisible();
+    if (session_->IsPrelaunch()) {
+        TAG_LOGI(AceLogTag::ACE_WINDOW_SCENE, "OnActivation CreateBlankWindow");
+        CreateBlankWindow(startingWindow_);
+        isPrelaunch_.store(true, std::memory_order_release);
+    } else {
+        CreateStartingWindow();
+    }
+    AddChild(host, startingWindow_, startingWindowName_);
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 
 void WindowScene::DisposeSnapshotAndBlankWindow()
