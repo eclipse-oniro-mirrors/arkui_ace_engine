@@ -7498,4 +7498,63 @@ HWTEST_F(WebSelectOverlayTest, OnHandleGlobalTouchEvent_002, TestSize.Level1)
     EXPECT_TRUE(overlay.IsShowHandle());
 #endif
 }
+/**
+ * @tc.name: TranslateInputRequiresCapabilityAndSingleCaret
+ * @tc.desc: Old kernels and selected text cannot expose translation input.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebSelectOverlayTest, TranslateInputRequiresCapabilityAndSingleCaret, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto nodeId = ViewStackProcessor::GetInstance()->ClaimNodeId();
+    auto node = FrameNode::GetOrCreateFrameNode(
+        V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    auto pattern = node->GetPattern<WebPattern>();
+    pattern->OnModifyDone();
+    ASSERT_NE(pattern->delegate_, nullptr);
+    WebSelectOverlay overlay(pattern);
+    auto params = std::make_shared<NWebQuickMenuParamsSelectImpl>();
+    auto callback = std::make_shared<NWebQuickMenuCallbackMock>();
+    SelectOverlayInfo info;
+    info.isSingleHandle = true;
+    auto oldFlags = g_editStateFlags;
+    g_editStateFlags = 0;
+    overlay.SetMenuOptions(info, params, callback);
+    EXPECT_FALSE(info.menuInfo.showTranslateInput);
+    g_editStateFlags = NWebQuickMenuParams::QM_EF_CAN_TRANSLATE_INPUT;
+    info.isSingleHandle = false;
+    overlay.SetMenuOptions(info, params, callback);
+    EXPECT_FALSE(info.menuInfo.showTranslateInput);
+    g_editStateFlags = oldFlags;
+#endif
+}
+
+/**
+ * @tc.name: TranslateInputRejectsUnadvertisedAction
+ * @tc.desc: An action without a visible entry never invokes the native callback.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebSelectOverlayTest, TranslateInputRejectsUnadvertisedAction, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    class RecordingCallback final : public NWebQuickMenuCallback {
+    public:
+        void Continue(int32_t, MenuEventFlags) override { ++calls; }
+        void Cancel() override {}
+        int32_t calls = 0;
+    };
+    auto nodeId = ViewStackProcessor::GetInstance()->ClaimNodeId();
+    auto node = FrameNode::GetOrCreateFrameNode(
+        V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    auto pattern = node->GetPattern<WebPattern>();
+    pattern->OnModifyDone();
+    WebSelectOverlay overlay(pattern);
+    auto callback = std::make_shared<RecordingCallback>();
+    overlay.quickMenuCallback_ = callback;
+    overlay.webSelectInfo_.isSingleHandle = true;
+    overlay.webSelectInfo_.menuInfo.showTranslateInput = false;
+    overlay.OnMenuItemAction(OptionMenuActionId::TRANSLATE_INPUT, OptionMenuType::TOUCH_MENU);
+    EXPECT_EQ(callback->calls, 0);
+#endif
+}
 } // namespace OHOS::Ace::NG

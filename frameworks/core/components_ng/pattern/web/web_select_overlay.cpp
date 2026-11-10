@@ -23,6 +23,7 @@
 #include "base/utils/utils.h"
 #include "arkweb_utils.h"
 #include "core/common/share/text_share_adapter.h"
+#include "core/common/ime/text_input_keyboard_utils.h"
 #include "core/components_ng/manager/select_content_overlay/select_content_overlay_manager.h"
 #include "core/components_ng/manager/select_overlay/select_overlay_manager.h"
 #include "core/components_ng/pattern/web/web_pattern.h"
@@ -399,6 +400,8 @@ void WebSelectOverlay::SetMenuOptions(SelectOverlayInfo& selectInfo,
         selectInfo.menuInfo.showCopyAll = true;
     }
     selectInfo.menuInfo.showAutoFill = IsShowMenuOfAutoFill(flags, selectInfo);
+    selectInfo.menuInfo.showTranslateInput = selectInfo.isSingleHandle &&
+        (flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_TRANSLATE_INPUT) && CanShowTranslateInput();
 
     auto value = GetSelectedText();
     auto queryWord = std::regex_replace(value, std::regex("^\\s+|\\s+$"), "");
@@ -931,6 +934,26 @@ bool WebSelectOverlay::IsTouchHandleValid(std::shared_ptr<OHOS::NWeb::NWebTouchH
     return (handle != nullptr) && (handle->IsEnable());
 }
 
+bool WebSelectOverlay::CanShowTranslateInput() const
+{
+    return TextSystemMenu::IsShowTranslateInput() && IsTranslateInputSupported() && IsCurrentInputMethodDefaultIme();
+}
+
+void WebSelectOverlay::HandleOnTranslateInput()
+{
+    auto pattern = GetPattern<WebPattern>();
+    CHECK_NULL_VOID(pattern);
+    bool canRequest = quickMenuCallback_ && webSelectInfo_.isSingleHandle &&
+        webSelectInfo_.menuInfo.showTranslateInput && CanShowTranslateInput();
+    // Consume before invoking the callback, including failed capability rechecks.
+    webSelectInfo_.menuInfo.showTranslateInput = false;
+    if (canRequest) {
+        quickMenuCallback_->Continue(OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_TRANSLATE_INPUT,
+            OHOS::NWeb::MenuEventFlags::EF_LEFT_MOUSE_BUTTON);
+    }
+    pattern->CloseSelectOverlay();
+}
+
 void WebSelectOverlay::OnMenuItemAction(OptionMenuActionId id, OptionMenuType type)
 {
     TAG_LOGI(AceLogTag::ACE_WEB, "OnMenuItemAction menu option id %{public}d", id);
@@ -964,6 +987,9 @@ void WebSelectOverlay::OnMenuItemAction(OptionMenuActionId id, OptionMenuType ty
             quickMenuCallback_->Continue(OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_SELECT_ALL,
                 OHOS::NWeb::MenuEventFlags::EF_LEFT_MOUSE_BUTTON);
             isSelectAll_ = true;
+            break;
+        case OptionMenuActionId::TRANSLATE_INPUT:
+            HandleOnTranslateInput();
             break;
         case OptionMenuActionId::TRANSLATE:
             HandleOnTranslate();
