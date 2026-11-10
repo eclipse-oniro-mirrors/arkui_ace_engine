@@ -1105,6 +1105,7 @@ void SetVisitedLinkPersistEnabledImpl(Ark_NativePointer node,
 #ifdef WEB_SUPPORTED
     auto frameNode = reinterpret_cast<FrameNode *>(node);
     CHECK_NULL_VOID(frameNode);
+    CHECK_NULL_VOID(value);
     auto convValue = Converter::OptConvert<bool>(*value);
     if (!convValue) {
         // Implement Reset value

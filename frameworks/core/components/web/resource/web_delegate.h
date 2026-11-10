@@ -1469,7 +1469,7 @@ public:
     void OnResourceLoad(const std::string& url);
     void OnScaleChange(float oldScaleFactor, float newScaleFactor);
     void OnZoomChange(double oldZoomFactor, double newZoomFactor);
-    void UpdateVisitedLinkPersistEnabled(const bool& enabled);
+    void UpdateVisitedLinkPersistEnabled(bool enabled);
     void OnScroll(double xOffset, double yOffset);
     bool LoadDataWithRichText();
     void OnSearchResultReceive(int activeMatchOrdinal, int numberOfMatches, bool isDoneCounting);
