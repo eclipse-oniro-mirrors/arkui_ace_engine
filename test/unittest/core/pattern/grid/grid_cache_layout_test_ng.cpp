@@ -14,12 +14,64 @@
  */
 
 #include "grid_test_ng.h"
+#include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
+#include "core/components_ng/syntax/lazy_for_each_model_ng.h"
+#include "test/unittest/core/syntax/mock_lazy_for_each_builder.h"
 #include "test/mock/frameworks/core/components_ng/render/mock_render_context.h"
 
 #include "core/components_ng/pattern/grid/grid_item_layout_property.h"
 #include "test/mock/frameworks/core/animation/mock_animation_manager.h"
 
 namespace OHOS::Ace::NG {
+
+namespace {
+constexpr float ITEM_PADDING = 5.0f;
+constexpr float CHILD_WIDTH = 40.0f;
+constexpr float CHILD_HEIGHT = 30.0f;
+
+// LazyForEach builder whose GridItems carry a padded subtree: each item is a GridItem
+// with 5px padding containing a fixed-size 40x30 child, so a missing subtree layout of
+// a cache item is observable through the child's frame rect (before the layout it stays
+// at the (0, 0) origin of the GridItem).
+class GridMockLazyWithChild : public Framework::MockLazyForEachBuilder {
+public:
+    GridMockLazyWithChild(int32_t itemCnt, std::function<float(int32_t)>&& getHeight)
+        : itemCnt_(itemCnt), getHeight_(getHeight)
+    {}
+
+protected:
+    int32_t OnGetTotalCount() override
+    {
+        return itemCnt_;
+    }
+
+    std::pair<std::string, RefPtr<NG::UINode>> OnGetChildByIndex(
+        int32_t index, std::unordered_map<std::string, NG::LazyForEachCacheChild>& expiringItems) override
+    {
+        GridItemModelNG itemModel;
+        itemModel.Create(GridItemStyle::NONE);
+        ViewAbstract::SetWidth(CalcLength(FILL_LENGTH));
+        ViewAbstract::SetHeight(CalcLength(getHeight_(index)));
+        ViewAbstract::SetPadding(CalcLength(ITEM_PADDING));
+        // pin the content to the padding corner (the in-item default is Alignment::CENTER)
+        ViewAbstract::SetAlign(Alignment::TOP_LEFT);
+        // fixed-size child nested inside the padded GridItem
+        auto child = FrameNode::CreateFrameNode(
+            V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+        ViewStackProcessor::GetInstance()->Push(child);
+        ViewAbstract::SetWidth(CalcLength(CHILD_WIDTH));
+        ViewAbstract::SetHeight(CalcLength(CHILD_HEIGHT));
+        ViewStackProcessor::GetInstance()->Pop();
+        auto node = ViewStackProcessor::GetInstance()->Finish();
+        node->nodeId_ = index;
+        return { std::to_string(index), node };
+    }
+
+private:
+    int32_t itemCnt_ = 0;
+    const std::function<float(int32_t)> getHeight_;
+};
+} // namespace
 
 class GridCacheLayoutTestNg : public GridTestNg {
 public:
@@ -1421,6 +1473,665 @@ HWTEST_F(GridCacheLayoutTestNg, OverScrollAtTopLargeDataScrollTo001, TestSize.Le
         ASSERT_TRUE(item);
         EXPECT_TRUE(item->IsActive());
     }
+}
+
+// The sync-cache-in-layout strategy is implemented by GridScrollLayoutAlgorithm and
+// GridScrollWithOptionsLayoutAlgorithm; in the TEST_IRREGULAR_GRID build the
+// GridIrregularLayoutAlgorithm takes over (gridIrregularLayoutEnable_ + layout options
+// set) and still fills its cache through the asynchronous preload task, so the sync
+// tests that rely on SetLayoutOptions are excluded from that build.
+#ifndef TEST_IRREGULAR_GRID
+/**
+ * @tc.name: SyncCacheLayout001
+ * @tc.desc: Test sync-cache-in-layout: cache items are built in the same frame instead of
+ *           being preloaded asynchronously on idle
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncCacheLayout001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Same setup as Cache004, but hold the sync-cache-in-layout reference
+     *             on the pattern (as an attached Repeat with allowReuseInAnimation=false
+     *             does via ToggleParentSyncCacheLayout)
+     * @tc.expected: the cache item below the view is built, measured and deactivated within
+     *               the same frame, without running the idle preload task
+     */
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr");
+    model.SetCachedCount(1);
+    model.SetLayoutOptions({});
+    CreateItemsInLazyForEach(50, [](uint32_t idx) { return 50.0f; });
+    pattern_->AddSyncCacheLayoutChild();
+    CreateDone();
+
+    EXPECT_EQ(pattern_->info_.endIndex_, 23);
+    auto item = GetItem(24, true);
+    ASSERT_TRUE(item) << "Cache item should be built synchronously during Layout";
+    EXPECT_FALSE(item->IsActive());
+    FlushUITasks();
+    EXPECT_EQ(item->GetGeometryNode()->GetFrameRect().ToString(), "RectT (0.00, 400.00) - [80.00 x 50.00]");
+
+    /**
+     * @tc.steps: step2. Release the reference: cache filling falls back to the asynchronous
+     *             preload strategy
+     * @tc.expected: after scrolling two rows, the new cache row (items 30-32) is not built
+     *               until OnIdle runs
+     */
+    pattern_->RemoveSyncCacheLayoutChild();
+    pattern_->UpdateCurrentOffset(-100.0f, SCROLL_FROM_UPDATE);
+    FlushUITasks();
+    auto nextCacheItem = GetItem(30, true);
+    EXPECT_FALSE(nextCacheItem) << "Without the sync strategy the cache item is deferred to the idle task";
+    PipelineContext::GetCurrentContext()->OnIdle(INT64_MAX);
+    EXPECT_TRUE(GetItem(30, true));
+}
+
+/**
+ * @tc.name: SyncCacheLayout002
+ * @tc.desc: Test GridScrollWithOptionsLayoutAlgorithm::GenerateSyncCacheItemConstraint with
+ *           irregular indexes: a sync-built cache item spanning two columns is measured
+ *           with the full cross size in the same frame
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncCacheLayout002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Every item spans both columns of a two-column grid (irregular
+     *             1x2), so each line holds exactly one item; hold the sync-cache-in-layout
+     *             reference on the pattern
+     * @tc.expected: the cache item below the view is built synchronously and its width is
+     *               the full grid width (span from the layout options), not the single
+     *               column size
+     */
+    GridLayoutOptions option;
+    option.regularSize.rows = 1;
+    option.regularSize.columns = 1;
+    for (int32_t i = 0; i < 20; ++i) {
+        option.irregularIndexes.insert(i);
+    }
+    auto onGetIrregularSizeByIndex = [](int32_t index) {
+        GridItemSize gridItemSize { 1, 2 };
+        return gridItemSize;
+    };
+    option.getSizeByIndex = std::move(onGetIrregularSizeByIndex);
+
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(1);
+    model.SetLayoutOptions(option);
+    CreateItemsInLazyForEach(20, [](uint32_t idx) { return 50.0f; });
+    pattern_->AddSyncCacheLayoutChild();
+    CreateDone();
+
+    // one item per line, 8 lines visible in the 400px viewport
+    EXPECT_EQ(pattern_->info_.endIndex_, 7);
+    auto item = GetItem(8, true);
+    ASSERT_TRUE(item) << "Irregular cache item should be built synchronously during Layout";
+    EXPECT_FALSE(item->IsActive());
+    FlushUITasks();
+    EXPECT_EQ(item->GetGeometryNode()->GetFrameRect().ToString(), "RectT (0.00, 400.00) - [240.00 x 50.00]");
+}
+
+/**
+ * @tc.name: SyncCacheLayout003
+ * @tc.desc: Test the early-return branch of SyncLayoutCacheItems: with the grid cache
+ *           feature disabled it returns even while the pattern holds the sync-cache
+ *           reference, so no cache item is built in-frame and the asynchronous preload
+ *           stays suppressed
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncCacheLayout003, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr");
+    model.SetCachedCount(1);
+    model.SetLayoutOptions({});
+    CreateItemsInLazyForEach(50, [](uint32_t idx) { return 50.0f; });
+    pattern_->AddSyncCacheLayoutChild();
+    SystemProperties::gridCacheEnabled_ = false;
+    CreateDone();
+    SystemProperties::gridCacheEnabled_ = true;
+
+    // viewport is laid out, but the cache item is neither built nor preloaded
+    EXPECT_EQ(pattern_->info_.endIndex_, 23);
+    EXPECT_FALSE(GetItem(24, true));
+}
+
+/**
+ * @tc.name: SyncCacheLayout005
+ * @tc.desc: A multi-row item straddling the visible/cache boundary keeps its active
+ *           state: the sync-cache deactivation skips items that also cover a visible
+ *           row (they are recorded in every covered gridMatrix_ row), because the
+ *           SetActiveChildRange fallback is skipped for grids with multi-line items
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncCacheLayout005, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Single column of 100px items in the 400px viewport; item 3
+     *             spans 2 rows, so it covers the last visible line 3 and the cache
+     *             line 4; hold the sync-cache-in-layout reference
+     * @tc.expected: item 3 stays active (one of its rows is visible) while the regular
+     *               cache item below (item 4) is deactivated
+     */
+    GridLayoutOptions option;
+    option.regularSize = GridItemSize { 1, 1 };
+    option.irregularIndexes.insert(3);
+    option.getSizeByIndex = [](int32_t index) {
+        return index == 3 ? GridItemSize { 2, 1 } : GridItemSize { 1, 1 };
+    };
+
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr");
+    model.SetCachedCount(2);
+    model.SetLayoutOptions(option);
+    CreateFixedHeightItems(10, ITEM_MAIN_SIZE);
+    pattern_->AddSyncCacheLayoutChild();
+    CreateDone();
+    FlushUITasks();
+
+    EXPECT_EQ(pattern_->info_.startIndex_, 0);
+    // item 3 starts on the last visible line; the fill may account its span through
+    // line 3 or line 4, both keep line 3 visible
+    EXPECT_GE(pattern_->info_.endIndex_, 3);
+    EXPECT_LE(pattern_->info_.endIndex_, 4);
+    auto spanningItem = GetItem(3, true);
+    ASSERT_TRUE(spanningItem) << "spanning item built with the viewport";
+    EXPECT_TRUE(spanningItem->IsActive()) << "multi-row item covering a visible row must stay active";
+    EXPECT_EQ(GetChildY(frameNode_, 3), 300.0f);
+    auto cacheItem = GetItem(4, true);
+    ASSERT_TRUE(cacheItem);
+    EXPECT_FALSE(cacheItem->IsActive());
+}
+
+/**
+ * @tc.name: SyncCacheLayout006
+ * @tc.desc: Horizontal counterpart of SyncCacheLayout005: a multi-column item spanning
+ *           the last visible column line and the cache line keeps its active state
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncCacheLayout006, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Rows-template-only grid (main axis horizontal), 4 cross lines of
+     *             100px, viewport width 240px; items 0-7 fill the first two main lines,
+     *             then item 8 spans 2 main lines (lines 2-3), so it covers the last
+     *             visible line 2 and the first cache line 3
+     * @tc.expected: item 8 stays active while the first regular item on a pure cache
+     *               line (item 12, line 3) is deactivated
+     */
+    GridLayoutOptions option;
+    option.regularSize = GridItemSize { 1, 1 };
+    option.irregularIndexes.insert(8);
+    option.getSizeByIndex = [](int32_t index) {
+        return index == 8 ? GridItemSize { 1, 2 } : GridItemSize { 1, 1 };
+    };
+
+    GridModelNG model = CreateGrid();
+    model.SetRowsTemplate("1fr 1fr 1fr 1fr");
+    model.SetCachedCount(2);
+    model.SetLayoutOptions(option);
+    CreateFixedItems(13);
+    pattern_->AddSyncCacheLayoutChild();
+    CreateDone();
+    FlushUITasks();
+
+    auto spanningItem = GetItem(8, true);
+    ASSERT_TRUE(spanningItem) << "spanning item built with the viewport";
+    EXPECT_TRUE(spanningItem->IsActive()) << "multi-column item covering a visible line must stay active";
+    EXPECT_EQ(GetChildX(frameNode_, 8), 200.0f);
+    auto cacheItem = GetItem(12, true);
+    ASSERT_TRUE(cacheItem);
+    EXPECT_FALSE(cacheItem->IsActive());
+}
+#endif // !TEST_IRREGULAR_GRID
+
+/**
+ * @tc.name: SyncCacheLayout004
+ * @tc.desc: Test the front fill of GridScrollLayoutAlgorithm::SyncLayoutCacheItems (no
+ *           layout options set, so the base GridScrollLayoutAlgorithm and its
+ *           GenerateSyncCacheItemConstraint run): after a jump the never-built head cache
+ *           line above the viewport is built and positioned in the same frame
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncCacheLayout004, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Plain scrollable grid without layout options, sync strategy held;
+     *             100 items in 3 columns of 50px, 8 visible lines
+     * @tc.expected: initial layout builds the viewport (0-23) plus the tail cache line
+     *               (24-26) in-frame
+     */
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr");
+    model.SetCachedCount(1);
+    CreateItemsInLazyForEach(100, [](uint32_t idx) { return 50.0f; });
+    pattern_->AddSyncCacheLayoutChild();
+    CreateDone();
+
+    EXPECT_EQ(pattern_->info_.startIndex_, 0);
+    EXPECT_EQ(pattern_->info_.endIndex_, 23);
+    EXPECT_TRUE(GetItem(24, true));
+
+    /**
+     * @tc.steps: step2. Jump down by 1000px (20 lines) with the sync strategy still held
+     * @tc.expected: the head cache line above the viewport (line 19, items 57-59, never
+     *               built before) is built, measured, positioned and deactivated in the
+     *               same frame by the front fill; the async strategy would defer it to the
+     *               idle preload task
+     */
+    pattern_->UpdateCurrentOffset(-1000.0f, SCROLL_FROM_UPDATE);
+    FlushUITasks();
+
+    EXPECT_EQ(pattern_->info_.startIndex_, 60);
+    EXPECT_EQ(pattern_->info_.endIndex_, 83);
+    EXPECT_TRUE(GetItem(60, true)->IsActive());
+    auto headCache = GetItem(57, true);
+    ASSERT_TRUE(headCache) << "Head cache line should be built synchronously during Layout";
+    EXPECT_FALSE(headCache->IsActive());
+    EXPECT_EQ(headCache->GetGeometryNode()->GetFrameRect().ToString(), "RectT (0.00, -50.00) - [80.00 x 50.00]");
+}
+
+/**
+ * @tc.name: SyncCacheLayout007
+ * @tc.desc: The front fill only measures the head cache items; the sync-cache pass also
+ *           lays out their subtrees in the same frame, so a fresh head cache item with a
+ *           padded fixed-size child positions the child at the padding offset
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncCacheLayout007, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Same jump as SyncCacheLayout004, but every item carries a
+     *             padded subtree (GridMockLazyWithChild): GridItem with 5px padding
+     *             containing a fixed 40x30 child
+     * @tc.expected: after the jump the head cache item's child is positioned at the
+     *               padding offset (5, 5) within the GridItem in the same frame;
+     *               without the subtree layout its frame rect would stay at (0, 0)
+     */
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr");
+    model.SetCachedCount(1);
+    model.SetLayoutOptions({});
+    ViewStackProcessor::GetInstance()->StartGetAccessRecordingFor(GetElmtId());
+    LazyForEachModelNG lazyForEachModelNG;
+    RefPtr<LazyForEachActuator> mockLazy =
+        AceType::MakeRefPtr<GridMockLazyWithChild>(100, [](int32_t) { return 50.0f; });
+    lazyForEachModelNG.Create(mockLazy);
+    pattern_->AddSyncCacheLayoutChild();
+    CreateDone();
+
+    pattern_->UpdateCurrentOffset(-1000.0f, SCROLL_FROM_UPDATE);
+    FlushUITasks();
+
+    EXPECT_EQ(pattern_->info_.startIndex_, 60);
+    auto headCache = GetItem(57, true);
+    ASSERT_TRUE(headCache) << "Head cache line should be built synchronously during Layout";
+    EXPECT_FALSE(headCache->IsActive());
+    EXPECT_EQ(headCache->GetGeometryNode()->GetFrameRect().ToString(), "RectT (0.00, -50.00) - [80.00 x 50.00]");
+    auto child = AceType::DynamicCast<FrameNode>(headCache->GetChildAtIndex(0));
+    ASSERT_NE(child, nullptr);
+    EXPECT_EQ(child->GetGeometryNode()->GetFrameRect().ToString(),
+        "RectT (5.00, 5.00) - [40.00 x 30.00]") << "head cache subtree laid out in-frame";
+}
+
+/**
+ * @tc.name: SyncCacheLayout008
+ * @tc.desc: A recorded tail cache line whose nodes were recycled by a far jump is
+ *           rebuilt in-frame by the sync-cache fill after jumping back: the complete
+ *           recorded line branch (RebuildRecordedLineItems) creates the missing nodes
+ *           without waiting for the idle preload task
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncCacheLayout008, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. 100 items in 3 columns of 50px, cachedCount 1, sync strategy
+     *             held: the initial frame builds the viewport (0-23) and the tail cache
+     *             line 8 (items 24-26), whose placement is recorded in gridMatrix_
+     */
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr");
+    model.SetCachedCount(1);
+    model.SetLayoutOptions({});
+    CreateItemsInLazyForEach(100, [](uint32_t idx) { return 50.0f; });
+    pattern_->AddSyncCacheLayoutChild();
+    CreateDone();
+
+    EXPECT_EQ(pattern_->info_.endIndex_, 23);
+    ASSERT_TRUE(GetItem(24, true));
+    EXPECT_FALSE(GetItem(24, true)->IsActive());
+
+    /**
+     * @tc.steps: step2. Jump to the end and let the builder's idle pass run: the tail
+     *             cache nodes are recycled while their matrix records survive
+     */
+    ScrollToIndex(99, false, ScrollAlign::END);
+    // line 33 bottom-aligned in an 8-line viewport: first visible line is 26
+    EXPECT_EQ(pattern_->info_.startIndex_, 78);
+    PipelineContext::GetCurrentContext()->OnIdle(INT64_MAX);
+    EXPECT_FALSE(GetItem(24, true)) << "recorded tail line node recycled by the jump";
+
+    /**
+     * @tc.steps: step3. Jump back to the top: line 8 is still complete in gridMatrix_
+     *             but its nodes are gone; the recorded-line branch rebuilds them in the
+     *             same frame
+     * @tc.expected: items 24-26 exist, are positioned at the recorded line and stay
+     *               inactive, without any pending idle preload task
+     */
+    ScrollToIndex(23, false, ScrollAlign::END);
+    EXPECT_EQ(pattern_->info_.startIndex_, 0);
+    auto rebuilt = GetItem(24, true);
+    ASSERT_TRUE(rebuilt) << "recorded tail cache line rebuilt in-frame after jumping back";
+    EXPECT_FALSE(rebuilt->IsActive());
+    FlushUITasks();
+    EXPECT_EQ(rebuilt->GetGeometryNode()->GetFrameRect().ToString(), "RectT (0.00, 400.00) - [80.00 x 50.00]");
+    EXPECT_TRUE(GetItem(25, true));
+    EXPECT_TRUE(pattern_->preloadItemList_.empty());
+}
+
+/**
+ * @tc.name: SyncCacheLayoutIrregular001
+ * @tc.desc: [GridIrregularLayoutAlgorithm] sync-cache-in-layout: with the irregular
+ *           layout algorithm selected (system property + layout options), the cache
+ *           items on both sides of the viewport are built, laid out and deactivated in
+ *           the same frame instead of being preloaded asynchronously on idle
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncCacheLayoutIrregular001, TestSize.Level1)
+{
+    // select the GridIrregularLayoutAlgorithm explicitly (same condition as
+    // production), so this runs in both grid test builds
+    const bool savedFlag = SystemProperties::gridIrregularLayoutEnable_;
+    SystemProperties::gridIrregularLayoutEnable_ = true;
+
+    /**
+     * @tc.steps: step1. Two columns; every third item (0, 3, 6, ...) spans the full
+     *             line, the rest are 1x1; hold the sync-cache-in-layout reference
+     * @tc.expected: the tail cache items below the viewport are built, measured and
+     *               deactivated in the same frame and the async preload list stays empty
+     */
+    GridLayoutOptions option;
+    option.regularSize = GridItemSize { 1, 1 };
+    for (int32_t i = 0; i < 30; i += 3) {
+        option.irregularIndexes.insert(i);
+    }
+    option.getSizeByIndex = [](int32_t index) { return GridItemSize { 1, 2 }; };
+
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(2);
+    model.SetLayoutOptions(option);
+    CreateItemsInLazyForEach(30, [](uint32_t idx) { return 50.0f; });
+    pattern_->AddSyncCacheLayoutChild();
+    CreateDone();
+
+    const auto& info = pattern_->info_;
+    EXPECT_EQ(info.startIndex_, 0);
+    EXPECT_TRUE(pattern_->preloadItemList_.empty());
+    const int32_t tailIdx = info.endIndex_ + 1;
+    ASSERT_LT(tailIdx, 30);
+    auto tailCache = GetItem(tailIdx, true);
+    ASSERT_TRUE(tailCache) << "irregular tail cache built synchronously during Layout";
+    EXPECT_FALSE(tailCache->IsActive());
+    EXPECT_EQ(GetChildHeight(frameNode_, tailIdx), 50.0f);
+
+    /**
+     * @tc.steps: step2. Scroll down: the new tail cache items are built in-frame on the
+     *             irregular path as well
+     */
+    pattern_->UpdateCurrentOffset(-100.0f, SCROLL_FROM_UPDATE);
+    FlushUITasks();
+    const int32_t newTailIdx = info.endIndex_ + 1;
+    ASSERT_LT(newTailIdx, 30);
+    EXPECT_TRUE(GetItem(newTailIdx, true));
+    EXPECT_FALSE(GetItem(newTailIdx, true)->IsActive());
+    EXPECT_TRUE(pattern_->preloadItemList_.empty());
+
+    /**
+     * @tc.steps: step3. Jump back up: the head cache items above the viewport are
+     *             laid out and deactivated in-frame
+     */
+    ScrollToIndex(4, false, ScrollAlign::START);
+    EXPECT_GT(info.startIndex_, 0);
+    const int32_t headIdx = info.startIndex_ - 1;
+    ASSERT_GE(headIdx, 0);
+    auto headCache = GetItem(headIdx, true);
+    ASSERT_NE(headCache, nullptr) << "irregular head cache kept in-frame";
+    EXPECT_FALSE(headCache->IsActive());
+
+    SystemProperties::gridIrregularLayoutEnable_ = savedFlag;
+}
+
+/**
+ * @tc.name: SyncCacheLayoutIrregular002
+ * @tc.desc: [GridIrregularLayoutAlgorithm] the sync cache window is index-based; when the
+ *           starting row is backtracked to a straddling item's top row, head cache line
+ *           items outside the index window are skipped by the layout loop instead of
+ *           being built and laid out
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncCacheLayoutIrregular002, TestSize.Level1)
+{
+    // select the GridIrregularLayoutAlgorithm explicitly (same condition as production)
+    const bool savedFlag = SystemProperties::gridIrregularLayoutEnable_;
+    SystemProperties::gridIrregularLayoutEnable_ = true;
+
+    /**
+     * @tc.steps: step1. Two columns, items of 100px, viewport 240x400 (4 lines), item 21
+     *             spans 3 main lines at (10, 1), so the matrix around the jump target is
+     *             line 9:  [18][19]
+     *             line 10: [20][21]  (21 spans lines 10-12, col 1)
+     *             line 11: [22][-21]
+     *             cachedCount = 1 -> cacheCnt = 2
+     * @tc.expected: initial layout fills lines 0-3 (items 0-7)
+     */
+    GridLayoutOptions option;
+    option.regularSize = GridItemSize { 1, 1 };
+    option.irregularIndexes.insert(21);
+    option.getSizeByIndex = [](int32_t index) {
+        return index == 21 ? GridItemSize { 3, 1 } : GridItemSize { 1, 1 };
+    };
+
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(1);
+    model.SetLayoutOptions(option);
+    CreateItemsInLazyForEach(30, [](uint32_t idx) { return 100.0f; });
+    pattern_->AddSyncCacheLayoutChild();
+    CreateDone();
+
+    /**
+     * @tc.steps: step2. Jump to item 22 (line 11) with ScrollAlign::START: the covered tile
+     *             of item 21 backtracks the starting row to line 10 (startIndex_ = 21), so
+     *             the head cache index window is {19, 20} while the head cache line 9 also
+     *             holds item 18
+     * @tc.expected: item 18 stays unbuilt (outside the index window, only inside the
+     *               row-based cache range), while the in-window items are built, laid out
+     *               and deactivated in the same frame
+     */
+    ScrollToIndex(22, false, ScrollAlign::START);
+
+    const auto& info = pattern_->info_;
+    EXPECT_EQ(info.startMainLineIndex_, 10);
+    EXPECT_EQ(info.startIndex_, 21);
+    EXPECT_EQ(info.endIndex_, 27);
+    EXPECT_TRUE(pattern_->preloadItemList_.empty());
+    EXPECT_FALSE(GetItem(18, true)) << "out-of-window head cache item must not be built";
+    auto headCache = GetItem(19, true);
+    ASSERT_TRUE(headCache) << "in-window head cache item built synchronously during Layout";
+    EXPECT_FALSE(headCache->IsActive());
+    EXPECT_EQ(GetChildY(frameNode_, 19), -200.0f);
+    ASSERT_TRUE(GetItem(20, true));
+    EXPECT_EQ(GetChildY(frameNode_, 20), -100.0f);
+    EXPECT_TRUE(GetItem(21, true)->IsActive());
+    EXPECT_EQ(GetChildY(frameNode_, 21), -100.0f);
+    EXPECT_TRUE(GetItem(22, true)->IsActive());
+    EXPECT_EQ(GetChildY(frameNode_, 22), 0.0f);
+
+    SystemProperties::gridIrregularLayoutEnable_ = savedFlag;
+}
+
+/**
+ * @tc.name: ShowCacheIrregular001
+ * @tc.desc: [GridIrregularLayoutAlgorithm] with showCachedItems = true and a
+ *           sync-cache-layout child attached (the adjustments are isolated to the feature)
+ *           the shown preload window is index-based (SyncPreloadItems): when the starting
+ *           row is backtracked to a straddling item's top row, head cache line items
+ *           outside the index window are neither built by the preload nor laid out by the
+ *           layout loop, while the in-window cache items stay attached, active and
+ *           positioned
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, ShowCacheIrregular001, TestSize.Level1)
+{
+    // select the GridIrregularLayoutAlgorithm explicitly (same condition as production)
+    const bool savedFlag = SystemProperties::gridIrregularLayoutEnable_;
+    SystemProperties::gridIrregularLayoutEnable_ = true;
+
+    /**
+     * @tc.steps: step1. Two columns, items of 100px, viewport 240x400 (4 lines), item 21
+     *             spans 3 main lines at (10, 1), so the matrix around the jump target is
+     *             line 9:  [18][19]
+     *             line 10: [20][21]  (21 spans lines 10-12, col 1)
+     *             line 11: [22][-21]
+     *             showCache = true, cachedCount = 1 -> cacheCnt = 2, sync-cache-layout
+     *             child attached
+     * @tc.expected: initial layout fills lines 0-3 (items 0-7)
+     */
+    GridLayoutOptions option;
+    option.regularSize = GridItemSize { 1, 1 };
+    option.irregularIndexes.insert(21);
+    option.getSizeByIndex = [](int32_t index) {
+        return index == 21 ? GridItemSize { 3, 1 } : GridItemSize { 1, 1 };
+    };
+
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(1, true);
+    model.SetLayoutOptions(option);
+    CreateItemsInLazyForEach(30, [](uint32_t idx) { return 100.0f; });
+    pattern_->AddSyncCacheLayoutChild();
+    CreateDone();
+
+    /**
+     * @tc.steps: step2. Jump to item 22 (line 11) with ScrollAlign::START: the covered tile
+     *             of item 21 backtracks the starting row to line 10 (startIndex_ = 21), so
+     *             the head cache index window is {19, 20} while the head cache line 9 also
+     *             holds item 18
+     * @tc.expected: item 18 stays unbuilt (outside the index window, only inside the
+     *               row-based cache range), while the in-window cache items are attached,
+     *               active and positioned in the same frame
+     */
+    ScrollToIndex(22, false, ScrollAlign::START);
+
+    const auto& info = pattern_->info_;
+    EXPECT_EQ(info.startMainLineIndex_, 10);
+    EXPECT_EQ(info.startIndex_, 21);
+    EXPECT_EQ(info.endIndex_, 27);
+    EXPECT_TRUE(pattern_->preloadItemList_.empty());
+    EXPECT_FALSE(GetItem(18, true)) << "out-of-window head cache item must not be built";
+    auto headCache = GetItem(19, true);
+    ASSERT_TRUE(headCache) << "in-window head cache item built by the shown preload";
+    EXPECT_TRUE(headCache->IsActive());
+    EXPECT_EQ(GetChildY(frameNode_, 19), -200.0f);
+    ASSERT_TRUE(GetItem(20, true));
+    EXPECT_TRUE(GetItem(20, true)->IsActive());
+    EXPECT_EQ(GetChildY(frameNode_, 20), -100.0f);
+    EXPECT_TRUE(GetItem(21, true)->IsActive());
+    EXPECT_EQ(GetChildY(frameNode_, 21), -100.0f);
+    EXPECT_TRUE(GetItem(22, true)->IsActive());
+    EXPECT_EQ(GetChildY(frameNode_, 22), 0.0f);
+
+    /**
+     * @tc.steps: step3. Check the tail side of the shown window ({28, 29} below the
+     *             viewport on line 15)
+     * @tc.expected: both tail cache items are built, active and laid out at line 15
+     */
+    ASSERT_TRUE(GetItem(28, true));
+    EXPECT_TRUE(GetItem(28, true)->IsActive());
+    EXPECT_EQ(GetChildY(frameNode_, 28), 400.0f);
+    ASSERT_TRUE(GetItem(29, true));
+    EXPECT_TRUE(GetItem(29, true)->IsActive());
+    EXPECT_EQ(GetChildY(frameNode_, 29), 400.0f);
+
+    SystemProperties::gridIrregularLayoutEnable_ = savedFlag;
+}
+
+/**
+ * @tc.name: IrregularStartLineBacktrack001
+ * @tc.desc: [GridIrregularLayoutAlgorithm] with a sync-cache-layout child attached (the
+ *           adjustment is isolated to the feature) and cachedCount = 0, when the starting
+ *           line is backtracked to a straddling item's top row (which lies above the
+ *           display top), the straddler's row-mates on that line are outside
+ *           [startIndex_, endIndex_] and are no longer laid out by the layout loop even
+ *           though their line is walked as a viewport line
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, IrregularStartLineBacktrack001, TestSize.Level1)
+{
+    // select the GridIrregularLayoutAlgorithm explicitly (same condition as production)
+    const bool savedFlag = SystemProperties::gridIrregularLayoutEnable_;
+    SystemProperties::gridIrregularLayoutEnable_ = true;
+
+    /**
+     * @tc.steps: step1. Two columns, items of 100px, viewport 240x400 (4 lines), item 21
+     *             spans 3 main lines at (10, 1), so the matrix around the jump target is
+     *             line 9:  [18][19]
+     *             line 10: [20][21]  (21 spans lines 10-12, col 1)
+     *             line 11: [22][-21]
+     *             cachedCount = 0 with a sync-cache-layout child attached (sync strategy,
+     *             empty cache window)
+     * @tc.expected: initial layout fills lines 0-3 (items 0-7)
+     */
+    GridLayoutOptions option;
+    option.regularSize = GridItemSize { 1, 1 };
+    option.irregularIndexes.insert(21);
+    option.getSizeByIndex = [](int32_t index) {
+        return index == 21 ? GridItemSize { 3, 1 } : GridItemSize { 1, 1 };
+    };
+
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(0);
+    model.SetLayoutOptions(option);
+    CreateItemsInLazyForEach(30, [](uint32_t idx) { return 100.0f; });
+    pattern_->AddSyncCacheLayoutChild();
+    CreateDone();
+
+    /**
+     * @tc.steps: step2. Jump to item 22 (line 11) with ScrollAlign::START: the covered tile
+     *             of item 21 backtracks the starting line to line 10 above the display top
+     *             (startIndex_ = 21), so line 10 is walked as a viewport line although item
+     *             20 on it is outside the empty index window
+     * @tc.expected: item 20 is measured by the jump solve (the height of line 10 needs it)
+     *               but never laid out — a freshly built node keeps the zero offset — and
+     *               is deactivated by the controller in the same frame; the viewport items
+     *               and the straddler crossing the display top are laid out normally
+     */
+    ScrollToIndex(22, false, ScrollAlign::START);
+
+    const auto& info = pattern_->info_;
+    EXPECT_EQ(info.startMainLineIndex_, 10);
+    EXPECT_EQ(info.startIndex_, 21);
+    EXPECT_EQ(info.endIndex_, 27);
+    EXPECT_TRUE(pattern_->preloadItemList_.empty());
+    // no cache line items exist with cachedCount = 0: lines 9 and 15 stay unbuilt
+    EXPECT_FALSE(GetItem(19, true));
+    EXPECT_FALSE(GetItem(28, true));
+    // measured for the line 10 height, but outside [startIndex_, endIndex_]: never laid
+    // out, so the freshly built node keeps the zero offset
+    ASSERT_TRUE(GetItem(20, true));
+    EXPECT_EQ(GetChildY(frameNode_, 20), 0.0f);
+    EXPECT_FALSE(GetItem(20, true)->IsActive());
+    // the straddler crossing the display top and the viewport items are laid out normally
+    EXPECT_TRUE(GetItem(21, true)->IsActive());
+    EXPECT_EQ(GetChildY(frameNode_, 21), -100.0f);
+    EXPECT_TRUE(GetItem(22, true)->IsActive());
+    EXPECT_EQ(GetChildY(frameNode_, 22), 0.0f);
+    EXPECT_EQ(GetChildY(frameNode_, 27), 300.0f);
+
+    SystemProperties::gridIrregularLayoutEnable_ = savedFlag;
 }
 
 /**

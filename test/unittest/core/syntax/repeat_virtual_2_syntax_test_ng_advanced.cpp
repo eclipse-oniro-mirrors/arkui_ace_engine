@@ -633,7 +633,7 @@ HWTEST_F(RepeatVirtual2AdvancedTestNg, RepeatVirtual2SetIsLoopTest030, TestSize.
 
 /**
  * @tc.name: RepeatVirtual2FireOnUpdateDirtyTest031
- * @tc.desc: Test fireOnUpdateDirty callback testing
+ * @tc.desc: Test FireOnUpdateDirty callback testing
  * @tc.type: FUNC
  */
 HWTEST_F(RepeatVirtual2AdvancedTestNg, RepeatVirtual2FireOnUpdateDirtyTest031, TestSize.Level1)
@@ -644,7 +644,7 @@ HWTEST_F(RepeatVirtual2AdvancedTestNg, RepeatVirtual2FireOnUpdateDirtyTest031, T
         g_onMoveFromTo, g_onPurge, g_onPurgeAll, g_onUpdateDirty);
 
     ASSERT_NE(node, nullptr);
-    node->fireOnUpdateDirty();
+    node->FireOnUpdateDirty();
 }
 
 /**

@@ -47,6 +47,12 @@ declare class RepeatNative {
   static isImplicitAnimationOpen(): boolean;
   static isChildInAnimation(fromIndex: number): boolean;
   static getActiveRange(): ActiveRangeInfo;
+  // RepeatOptions.allowReuseInAnimation (creation-time option), forwarded once at
+  // initial render only when explicitly set: whether node reuse is allowed while an
+  // implicit animation is running; false switches a direct Grid / WaterFlow parent to
+  // the sync-cache-in-layout strategy. Not called for an unset option - the C++ side
+  // keeps its tri-state unset (defaults: false for a List parent, true otherwise).
+  static setAllowReuseInAnimation(value: boolean): void;
 }
 
 // Repeat.virtualScroll maps to C++ RepeatVirtualScrollNode 
@@ -119,6 +125,12 @@ declare class RepeatVirtualScroll2Native {
   static isImplicitAnimationOpen(): boolean;
   static isChildInAnimation(repeatElmtId: number, rid: number): boolean;
   static isChildOnMainTree(repeatElmtId: number, rid: number): boolean;
+  // RepeatOptions.allowReuseInAnimation (creation-time option), forwarded once at
+  // initial render only when explicitly set: whether node reuse is allowed while an
+  // implicit animation is running; false switches a direct Grid / WaterFlow parent to
+  // the sync-cache-in-layout strategy. Not called for an unset option - the C++ side
+  // keeps its tri-state unset (defaults: false for a List parent, true otherwise).
+  static setAllowReuseInAnimation(repeatElmtId: number, value: boolean): void;
 }
 
 // framework internal typing of the native "RepeatController" global class instance

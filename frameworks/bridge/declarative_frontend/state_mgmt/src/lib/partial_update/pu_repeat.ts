@@ -162,6 +162,12 @@ interface __RepeatConfig<T> {
     // controller from RepeatOptions (creation-time binding, immutable on the component
     // side; one controller controls one Repeat, last-bind-wins on the controller side)
     controller?: RepeatController;
+    // from RepeatOptions.allowReuseInAnimation (creation-time option): whether node
+    // reuse is allowed while an implicit animation is running; explicitly false makes
+    // a direct Grid / WaterFlow parent run the sync-cache-in-layout strategy.
+    // undefined = not specified, nothing is forwarded to C++ (defaults: false when the
+    // parent container is a List, true otherwise)
+    allowReuseInAnimation?: boolean;
     reusable?: boolean;
     memOptStrategy?: RepeatMemOptStrategy;
 };
@@ -195,6 +201,11 @@ class __Repeat<T> implements RepeatAPI<T> {
         // and is immutable afterwards (spec R-8). Re-render only calls updateArr(), so a
         // changed options.controller in the re-render call is ignored.
         this.config.controller = options?.controller;
+
+        // RepeatOptions.allowReuseInAnimation is likewise read here only (creation-time
+        // option): undefined keeps the native tri-state unset, i.e. each container's
+        // default (false for a List parent, true otherwise).
+        this.config.allowReuseInAnimation = options?.allowReuseInAnimation;
 
         this.config.totalCountSpecified = false;
         this.config.totalCount = this.config.arr.length;

@@ -36,7 +36,8 @@ export function RepeatImplForOptions<T>(
     /** @memo */
     style: ((attributes: RepeatAttribute<T>) => void) | undefined,
     arr: RepeatArray<T>,
-    controller?: RepeatController
+    controller?: RepeatController,
+    allowReuseInAnimation?: boolean
 ): void {
     const repeat = remember(() => {
         return new RepeatAttributeImpl<T>();
@@ -47,6 +48,12 @@ export function RepeatImplForOptions<T>(
     // so later re-renders with a different controller keep the first binding.
     if (controller !== undefined && repeat.controller_ === undefined) {
         repeat.controller_ = controller;
+    }
+    // RepeatOptions.allowReuseInAnimation is likewise a creation-time option: the
+    // attribute impl is remembered per callsite, so a changed value on re-render keeps
+    // the first binding.
+    if (allowReuseInAnimation !== undefined && repeat.allowReuseInAnimation_ === undefined) {
+        repeat.allowReuseInAnimation_ = allowReuseInAnimation;
     }
     if (!repeat.itemGenFuncs_.get(REPEAT_EACH_FUNC_TYPE)) {
         throw new Error('Repeat item builder function unspecified. Usage error!');
@@ -188,6 +195,10 @@ export class RepeatAttributeImpl<T> implements RepeatAttribute<T> {
 
     // controller bound through RepeatOptions.controller, set once (first-bind-wins)
     controller_?: RepeatController = undefined;
+
+    // from RepeatOptions.allowReuseInAnimation, set once (first-bind-wins),
+    // forwarded to the native node once at creation, see repeat.ets
+    public allowReuseInAnimation_?: boolean = undefined;
 
     useTemplate_: boolean = false; // whether use template function
 
@@ -345,12 +356,18 @@ function virtualRender<T>(
     // last-bind-wins) and cleans its cache on clearCache(). Only the virtualScroll
     // branch binds: nonVirtualRender keeps no prebuilt cache, so there is nothing
     // for the controller to clean.
-    const onNodeCreated = attributes.controller_ !== undefined
-        ? (node: LazyNodePeer): void => {
-            initRepeatReusePool(node);
-            attributes.controller_!.__bindNode__Internal(node);
+    // RepeatOptions.allowReuseInAnimation is forwarded here as well: explicitly
+    // false makes the direct Grid / WaterFlow parent of this node run the
+    // sync-cache-in-layout strategy; undefined keeps the native tri-state unset
+    // (defaults: false for a List parent, true otherwise).
+    const onNodeCreated = (node: LazyNodePeer): void => {
+        initRepeatReusePool(node);
+        const allowReuseInAnimation = attributes.allowReuseInAnimation_;
+        if (allowReuseInAnimation !== undefined) {
+            node.setAllowReuseInAnimation(allowReuseInAnimation);
         }
-        : initRepeatReusePool;
+        attributes.controller_?.__bindNode__Internal(node);
+    };
     const updateRepeatActiveRange = (
         node: LazyNodePeer,
         activeIndices: int32[],
@@ -429,7 +446,7 @@ function nonVirtualRender<T>(
         const oldIndex = attributes.key2Index_.get(rawKey);
         let keyWithCount = rawKey;
 
-        if (oldIndex && !indexInActiveRange(oldIndex!) && indexInActiveRange(i) &&
+        if (oldIndex !== undefined && !indexInActiveRange(oldIndex!) && indexInActiveRange(i) &&
             ArkUIAniModule._ForEach_IsImplicitAnimationOpen()) {
                 // the key is new in active range
                 const val = attributes.reuseCount_.has(rawKey)? attributes.reuseCount_.get(rawKey): 0;
@@ -456,6 +473,16 @@ function nonVirtualRender<T>(
 
     const env = getCurrentEnv();
     NodeAttach(() => ForEachNodePeer.create(true), (node: ForEachNodePeer) => {
+        // RepeatOptions.allowReuseInAnimation is forwarded here as well (the
+        // full-load branch creates a ForEachNodePeer instead of the virtual
+        // branch's LazyNodePeer): explicitly false makes the direct Grid /
+        // WaterFlow parent of this node run the sync-cache-in-layout strategy;
+        // undefined keeps the native tri-state unset (defaults: false for a List
+        // parent, true otherwise).
+        const allowReuseInAnimation = attributes.allowReuseInAnimation_;
+        if (allowReuseInAnimation !== undefined) {
+            node.setAllowReuseInAnimation(allowReuseInAnimation);
+        }
         wrapBuilder(env, () => {
             for (let i = 0; i < arr.length; i++) {
                 const e: T = arr[i];

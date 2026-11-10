@@ -215,6 +215,16 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             reinterpret_cast<void*>(OHOS::Ace::Ani::RepeatIsImplicitAnimationOpen)
         },
         ani_native_function {
+            "_Repeat_SetAllowReuseInAnimation",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::RepeatSetAllowReuseInAnimation)
+        },
+        ani_native_function {
+            "_Repeat_HasCustomComponent",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::RepeatHasCustomComponent)
+        },
+        ani_native_function {
             "_BuilderProxyNode_Construct",
             "i:l",
             reinterpret_cast<void*>(OHOS::Ace::Ani::BuilderProxyNodeConstruct)

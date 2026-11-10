@@ -15,12 +15,20 @@
 
 #include "core/components_ng/pattern/waterflow/layout/top_down/water_flow_layout_algorithm.h"
 
+#include <limits>
+
 #include "base/utils/feature_param.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_observer.h"
 #include "core/components_ng/pattern/waterflow/layout/water_flow_layout_utils.h"
 #include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
 #include "core/components_ng/property/measure_utils.h"
 #include "core/components_ng/property/templates_parser.h"
+
+namespace {
+// Deadline for the sync-cache-in-layout strategy: a non-expiring value keeps MeasureToTarget
+// on the cache build path (items not attached to the render tree) without aborting mid-way.
+constexpr int64_t SYNC_CACHE_LAYOUT_DEADLINE = std::numeric_limits<int64_t>::max();
+} // namespace
 
 namespace OHOS::Ace::NG {
 
@@ -195,7 +203,8 @@ void WaterFlowLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     }
     if (layoutProperty->GetShowCachedItemsValue(false)) {
         SyncPreloadItems(layoutWrapper, layoutInfo_, cacheCnt);
-    } else {
+    } else if (!IsSyncCacheLayoutEnabled(layoutWrapper)) {
+        // Sync-cache-in-layout strategy handles cache items inside Layout; skip async preload.
         PreloadItems(layoutWrapper, layoutInfo_, cacheCnt);
     }
 
@@ -313,6 +322,10 @@ void WaterFlowLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
     if (!layoutProperty->HasCachedCount()) {
         layoutInfo_->UpdateDefaultCachedCount();
     }
+    // Resolve the strategy once per Layout: DeactivateSyncCacheItem below runs per item
+    // inside the positioning loop and used to re-resolve it there (host -> pattern -> flag).
+    const bool syncCacheLayout = !showCache && IsSyncCacheLayoutEnabled(layoutWrapper);
+    SyncLayoutCacheItemsIfNeeded(layoutWrapper, syncCacheLayout, cachedCount);
 
     auto firstIndex = layoutInfo_->endIndex_;
     auto crossSize = size.CrossSize(axis_);
@@ -347,6 +360,8 @@ void WaterFlowLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
             }
             wrapper->GetGeometryNode()->SetMarginFrameOffset(currentOffset);
 
+            DeactivateSyncCacheItem(wrapper, isCache, syncCacheLayout);
+
             if (CheckNeedLayout(wrapper, isCache)) {
                 wrapper->Layout();
             } else {
@@ -375,6 +390,27 @@ void WaterFlowLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
 
     ClearUnlayoutedItems(layoutWrapper);
     isLayouted_ = true;
+}
+
+// Sync-cache-in-layout strategy: build / measure cache items before the positioning
+// loop so they are placed in the same frame (List-style synchronous cache layout).
+void WaterFlowLayoutAlgorithm::SyncLayoutCacheItemsIfNeeded(
+    LayoutWrapper* layoutWrapper, bool syncCacheLayout, int32_t cachedCount)
+{
+    if (!syncCacheLayout || layoutInfo_->measureInNextFrame_) {
+        return;
+    }
+    SyncLayoutCacheItems(layoutWrapper, cachedCount);
+}
+
+// Sync-cache-in-layout: deactivate cache items explicitly in the same frame,
+// mirroring List's per-item SetActive(show) during cached item layout.
+void WaterFlowLayoutAlgorithm::DeactivateSyncCacheItem(
+    const RefPtr<LayoutWrapper>& wrapper, bool isCache, bool syncCacheLayout)
+{
+    if (isCache && syncCacheLayout) {
+        wrapper->SetActive(false);
+    }
 }
 
 void WaterFlowLayoutAlgorithm::LayoutFooter(LayoutWrapper* layoutWrapper, const OffsetF& childFrameOffset, bool reverse)
@@ -422,6 +458,17 @@ void WaterFlowLayoutAlgorithm::MeasureLazyLayoutItem(const RefPtr<LayoutWrapper>
         ReferenceEdge::START, axis_, std::nullopt, true);
     item->Measure(WaterFlowLayoutUtils::CreateChildConstraint(
         { crossSize, mainSize_, axis_ }, ref, layoutProperty, item));
+}
+
+void WaterFlowLayoutAlgorithm::MeasureItemByColumnCount(const RefPtr<LayoutWrapper>& item, float crossSize,
+    float startMainPos, float mainSize, const RefPtr<WaterFlowLayoutProperty>& layoutProperty) const
+{
+    if (itemsCrossSize_.size() > 1) {
+        item->Measure(WaterFlowLayoutUtils::CreateChildConstraint(
+            { crossSize, mainSize_, axis_ }, layoutProperty, item));
+    } else {
+        MeasureLazyLayoutItem(item, crossSize, startMainPos, mainSize, layoutProperty);
+    }
 }
 
 void WaterFlowLayoutAlgorithm::FillViewport(float mainSize, LayoutWrapper* layoutWrapper)
@@ -619,6 +666,136 @@ void WaterFlowLayoutAlgorithm::SyncPreloadItem(LayoutWrapper* host, int32_t item
         layoutInfo_->targetIndex_ = itemIdx;
         MeasureToTarget(host, lastItem, std::nullopt);
         layoutInfo_->targetIndex_.reset();
+    }
+}
+
+void WaterFlowLayoutAlgorithm::SyncLayoutCacheItems(LayoutWrapper* layoutWrapper, int32_t cachedCount)
+{
+    if (cachedCount <= 0 || layoutInfo_->startIndex_ > layoutInfo_->endIndex_) {
+        return;
+    }
+    SyncTailCacheItems(layoutWrapper, cachedCount);
+    SyncHeadCacheItems(layoutWrapper, cachedCount);
+}
+
+// Sync-cache-in-layout, tail half: measure forward from the first tail item whose node
+// or record is missing up to the cache bound (MeasureTailToCacheBound), laying out the
+// recorded items before it on the way (LayoutRecordedTailItems).
+void WaterFlowLayoutAlgorithm::SyncTailCacheItems(LayoutWrapper* layoutWrapper, int32_t cachedCount)
+{
+    const int32_t itemCnt = layoutInfo_->ItemCnt(layoutInfo_->GetChildrenCount());
+    const int32_t endBound = std::min(itemCnt - 1, layoutInfo_->endIndex_ + cachedCount);
+    const int32_t firstUnknown = LayoutRecordedTailItems(layoutWrapper, endBound);
+    if (firstUnknown <= endBound) {
+        // firstUnknown - 1 always holds a valid record: the scan starts at endIndex_ + 1
+        // (endIndex_ itself is recorded by the viewport fill) and only advances past indices
+        // whose record and node were both verified, so MeasureToTarget always chains the
+        // tail from a recorded anchor and the column keys stay contiguous.
+        MeasureTailToCacheBound(layoutWrapper, firstUnknown - 1, endBound);
+    }
+}
+
+// Lays out tail items up to [endBound] whose position record and node both exist, and
+// returns the first tail index missing either of them.
+int32_t WaterFlowLayoutAlgorithm::LayoutRecordedTailItems(LayoutWrapper* layoutWrapper, int32_t endBound)
+{
+    int32_t firstUnknown = layoutInfo_->endIndex_ + 1;
+    while (firstUnknown <= endBound) {
+        // An item is skipped only when BOTH its position record and its node exist; either
+        // one missing means the tail chain must be re-measured starting here:
+        // 1. Record missing (GetCrossIndex == -1): an insert / delete above resets the
+        //    records from the change index down (Reset -> ClearCacheAfterIndex), so the tail
+        //    records are erased even though the shifted old nodes still exist. Skipping the
+        //    fill then leaves the tail unpositioned, and anchoring MeasureToTarget past the
+        //    last record chains from GetCrossIndexForNextItem's fallback (each column's
+        //    highest-key end), leaving gapped keys and mis-anchored records in the column
+        //    maps — mis-positioned / overlapping items that persist after they scroll into
+        //    view, because the viewport fill derives positions from the same records.
+        // 2. Node missing: cache-built nodes live in the LazyForEach builder's expiringItem_
+        //    and can be evicted by its PreBuild pass (e.g. while off-screen inside a Swiper
+        //    page). items_[0]/itemInfos_ positions outlive the actual nodes, so probe the
+        //    node as well — GeneratePreloadList (async strategy) also filters by node
+        //    existence.
+        if (layoutInfo_->GetCrossIndex(firstUnknown) == -1) {
+            break;
+        }
+        auto tailWrapper = layoutWrapper->GetChildByIndex(GetChildIndexWithFooter(firstUnknown), true);
+        if (!tailWrapper) {
+            break;
+        }
+        // Record and node both exist: the re-measure chain (MeasureTailToCacheBound) is
+        // skipped, but the subtree still needs the in-frame layout. A fast scroll away
+        // and back (jump / MeasureToTarget with no deadline) re-measures tail items on
+        // the main fill path,
+        // which never lays items out, and the positioning loop only syncs geometry for
+        // clean-flag cache items (CheckNeedLayout gates on !isCache) — without this
+        // Layout the tail preload items keep stale subtree layouts. No re-measure here:
+        // re-running the cache branch would re-apply the lazy-child offset adjustment
+        // to the scroll offset.
+        tailWrapper->Layout();
+        tailWrapper->SetActive(false);
+        ++firstUnknown;
+    }
+    return firstUnknown;
+}
+
+// Sync-cache-in-layout: measures the unknown tail from the last verified anchor up to the
+// cache bound, then re-activates the anchor when it is a visible item. The non-expiring
+// deadline keeps builds on the cache path (not attached to the render tree) and lets
+// MeasureToTarget measure, layout and deactivate each item.
+void WaterFlowLayoutAlgorithm::MeasureTailToCacheBound(
+    LayoutWrapper* layoutWrapper, int32_t anchorIdx, int32_t endBound)
+{
+    const auto savedTarget = layoutInfo_->targetIndex_;
+    layoutInfo_->targetIndex_ = endBound;
+    MeasureToTarget(layoutWrapper, anchorIdx, SYNC_CACHE_LAYOUT_DEADLINE);
+    layoutInfo_->targetIndex_ = savedTarget;
+    // The cache branch inside MeasureToTarget deactivates every item it measures,
+    // the anchor included. When the scan broke at the first tail index the anchor
+    // is endIndex_, a visible item, and nothing restores it afterwards: the
+    // positioning loop fetches without reactivation and the syntax node skips an
+    // unchanged active range (same range, no implicit animation). Re-activate it
+    // here; a deeper anchor is a cache item and stays deactivated as intended.
+    if (anchorIdx <= layoutInfo_->endIndex_) {
+        auto anchorWrapper = layoutWrapper->GetChildByIndex(GetChildIndexWithFooter(anchorIdx));
+        if (anchorWrapper) {
+            anchorWrapper->SetActive(true);
+        }
+    }
+}
+
+// Sync-cache-in-layout, head half: fill the cache range before startIndex_.
+void WaterFlowLayoutAlgorithm::SyncHeadCacheItems(LayoutWrapper* layoutWrapper, int32_t cachedCount)
+{
+    // Head: build items whose position is already recorded and measure on first build.
+    // Positions of never-measured head items are unknown in TOP_DOWN and stay pending,
+    // same as the async preload strategy. The subtree layout runs for existing nodes as
+    // well: after an insert above the preload area the jump / MeasureToTarget re-measures
+    // the head items on the main fill path, which never lays items out, and the
+    // positioning loop only syncs geometry for clean-flag cache items (CheckNeedLayout
+    // gates on !isCache) — without this Layout the head preload items keep stale subtree
+    // layouts. The measure stays conditional: re-measuring an already-measured lazy child
+    // would re-apply its offset adjustment to the scroll offset.
+    auto layoutProperty = AceType::DynamicCast<WaterFlowLayoutProperty>(layoutWrapper->GetLayoutProperty());
+    const int32_t startBound = std::max(0, layoutInfo_->startIndex_ - cachedCount);
+    for (int32_t idx = layoutInfo_->startIndex_ - 1; idx >= startBound; --idx) {
+        if (layoutInfo_->GetCrossIndex(idx) == -1) {
+            continue;
+        }
+        const int32_t childIdx = GetChildIndexWithFooter(idx);
+        const bool needMeasure = !layoutWrapper->GetChildByIndex(childIdx, true);
+        auto wrapper = WaterFlowLayoutUtils::GetWaterFlowItem(layoutWrapper, childIdx, false, true);
+        CHECK_NULL_CONTINUE(wrapper);
+        if (needMeasure) {
+            auto position = GetItemPosition(idx);
+            auto itemCrossSize = itemsCrossSize_.find(position.crossIndex);
+            if (itemCrossSize != itemsCrossSize_.end()) {
+                MeasureItemByColumnCount(
+                    wrapper, itemCrossSize->second, position.startMainPos, mainSize_, layoutProperty);
+            }
+        }
+        wrapper->Layout();
+        wrapper->SetActive(false);
     }
 }
 

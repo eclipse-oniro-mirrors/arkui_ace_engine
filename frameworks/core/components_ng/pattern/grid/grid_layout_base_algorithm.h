@@ -67,6 +67,24 @@ public:
         safeAreaPad_ = safeAreaPad;
     }
 
+    /**
+     * @brief Whether this Grid instance runs the sync-cache-in-layout strategy
+     * (List-style cache layout).
+     *
+     * Per-instance switch: enabled while the host GridPattern holds at least one
+     * reference from an attached Repeat-family node (RepeatNode /
+     * RepeatVirtualScroll2Node / ArkoalaLazyNode in Repeat mode) whose
+     * isAllowReuseInAnimation_ is explicitly false — see
+     * GridPattern::AddSyncCacheLayoutChild /
+     * LazyForEachUtils::ToggleParentSyncCacheLayout. When enabled, cache-range items
+     * of scrollable Grids are built, measured, positioned and deactivated
+     * synchronously inside the current-frame Layout task when showCache is false,
+     * instead of being preloaded asynchronously in the predict phase.
+     *
+     * @param layoutWrapper layout wrapper of the Grid being laid out.
+     */
+    bool IsSyncCacheLayoutEnabled(LayoutWrapper* layoutWrapper) const;
+
     bool IsContentClipSafeArea() const
     {
         return contentClipMode_ == ContentClipMode::SAFE_AREA;

@@ -21,6 +21,7 @@
 #include "core/components_ng/pattern/waterflow/layout/water_flow_layout_algorithm_base.h"
 #include "core/components_ng/pattern/waterflow/layout/water_flow_layout_info_base.h"
 #include "core/components_ng/pattern/waterflow/water_flow_content_modifier.h"
+#include <algorithm>
 
 namespace OHOS::Ace::NG {
 class WaterFlowAccessibilityProperty;
@@ -271,6 +272,29 @@ public:
     }
 
     int32_t GetFirstIndex() const override;
+
+    /**
+     * @brief Sync-cache-in-layout per-instance switch, driven by attached Repeat-family
+     * nodes (RepeatNode / RepeatVirtualScroll2Node / ArkoalaLazyNode / ArkoalaForEachNode
+     * in Repeat mode) whose isAllowReuseInAnimation_ is explicitly false. Each qualifying node holds
+     * one reference from attach to detach; while any reference is held, the
+     * scrollable WaterFlow builds, measures, positions and deactivates cache-range
+     * items synchronously in the current-frame Layout instead of the async predict
+     * preload. See LazyForEachUtils::ToggleParentSyncCacheLayout.
+     */
+    void AddSyncCacheLayoutChild()
+    {
+        ++syncCacheLayoutChildCount_;
+    }
+    void RemoveSyncCacheLayoutChild()
+    {
+        syncCacheLayoutChildCount_ = std::max(syncCacheLayoutChildCount_ - 1, 0);
+    }
+    bool IsSyncCacheLayoutEnabled() const
+    {
+        return syncCacheLayoutChildCount_ > 0;
+    }
+
 private:
     void DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
     void DumpAdvanceFunctionalProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
@@ -381,6 +405,9 @@ private:
     bool legacyScrollFinishing_ = false;
     bool legacyScrollRetried_ = false;
     bool pendingMisalignmentCheck_ = false;
+
+    // number of attached Repeat-family nodes holding the sync-cache-in-layout mode
+    int32_t syncCacheLayoutChildCount_ = 0;
 };
 } // namespace OHOS::Ace::NG
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_WATERFLOW_WATER_FLOW_PATTERN_H

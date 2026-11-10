@@ -17,9 +17,20 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_SYNTAX_LAZY_FOR_EACH_UTILS_H
 
 #include "base/utils/macros.h"
+#include <optional>
 #include <string>
 
+namespace OHOS::Ace {
+template<typename T>
+class RefPtr;
+template<typename T>
+class WeakPtr;
+} // namespace OHOS::Ace
+
 namespace OHOS::Ace::NG {
+
+class FrameNode;
+class UINode;
 
 enum class LazyForEachMemOptStrategy;
 enum class RepeatMemOptStrategy;
@@ -49,6 +60,27 @@ public:
     static ReusableMemOptStrategy GetReusableMemOptStrategy();
 
     static void ParseMetaData(const std::string& name, const std::string & value);
+
+    /**
+     * Sync-cache-in-layout strategy toggle for Repeat-family nodes
+     * (RepeatNode / RepeatVirtualScroll2Node / ArkoalaLazyNode / ArkoalaForEachNode).
+     *
+     * enable == true (node attached to main tree): when isRepeat is true
+     * (ArkoalaLazyNode / ArkoalaForEachNode qualify only in Repeat mode),
+     * allowReuseInAnimation is
+     * explicitly false and the direct parent is a Grid or WaterFlow, hold one
+     * per-instance reference on the parent pattern
+     * (GridPattern / WaterFlowPattern::AddSyncCacheLayoutChild) so that container
+     * runs the sync-cache-in-layout strategy; host records the parent frame node
+     * for the matching disable call. Each qualifying node holds its own reference,
+     * so a container with several Repeat children stays enabled until all of them
+     * detach.
+     * enable == false (node detached from main tree): release the reference
+     * recorded in host and restore the container's default async preload
+     * algorithm.
+     */
+    static void ToggleParentSyncCacheLayout(const RefPtr<UINode>& node, bool enable,
+        const std::optional<bool>& allowReuseInAnimation, bool isRepeat, WeakPtr<FrameNode>& host);
 
 private:
     static bool enableCustomComponentFreeze_;

@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+#include <unordered_set>
+
 #include "core/components_ng/pattern/grid/grid_scroll/grid_scroll_layout_algorithm.h"
 
 #include "base/log/event_report.h"
@@ -162,7 +164,11 @@ void GridScrollLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
         // start so the window matches cache.first (which is calculated from the same anchor).
         AddCacheItemsInFront(info_.GetEffectiveStartIndex(), layoutWrapper, cache.first, predictBuildList_);
         if (!predictBuildList_.empty()) {
-            PreloadItems(layoutWrapper);
+            // Sync-cache-in-layout strategy: skip posting the idle predict task; the deferred
+            // items are built and measured synchronously during Layout instead.
+            if (!IsSyncCacheLayoutEnabled(layoutWrapper)) {
+                PreloadItems(layoutWrapper);
+            }
             predictBuildList_.clear();
         }
     }
@@ -314,6 +320,32 @@ void GridScrollLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
     int32_t cacheStart = 0;
     int32_t cacheEnd = 0; // number of cache items at tail
     const bool showCached = props->GetShowCachedItemsValue(false);
+    // Resolve the strategy once per Layout: the item loop below used to re-check it per
+    // item, walking host -> pattern -> flag every time.
+    const bool syncCacheLayout = !showCached && IsSyncCacheLayoutEnabled(layoutWrapper);
+    if (syncCacheLayout) {
+        SyncLayoutCacheItems(layoutWrapper);
+    }
+
+    // Items covering at least one visible row. A multi-line (main-axis span > 1)
+    // item is recorded in every gridMatrix_ row it covers, so the loop below
+    // visits it once per row. Such an item must stay active while any of its rows
+    // is visible, even though another of its rows is a cache row (the
+    // SetActiveChildRange fallback at the end of Layout is skipped when
+    // hasMultiLineItem_, so nothing else restores its active state).
+    std::unordered_set<int32_t> itemsWithVisibleRow;
+    if (syncCacheLayout) {
+        for (int32_t i = info_.startMainLineIndex_; i <= info_.endMainLineIndex_; ++i) {
+            const auto& visibleLine = info_.gridMatrix_.find(i);
+            if (visibleLine == info_.gridMatrix_.end()) {
+                continue;
+            }
+            for (auto visibleIter = visibleLine->second.begin(); visibleIter != visibleLine->second.end();
+                 ++visibleIter) {
+                itemsWithVisibleRow.insert(visibleIter->second);
+            }
+        }
+    }
 
     const int32_t start = info_.startMainLineIndex_ - cacheCount;
     const int32_t end = info_.endMainLineIndex_ + cacheCount;
@@ -383,6 +415,14 @@ void GridScrollLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
             }
             offset += OffsetF(padding.left.value_or(0.0f), 0.0f);
             wrapper->GetGeometryNode()->SetMarginFrameOffset(offset + translate);
+            if (isCache && syncCacheLayout &&
+                itemsWithVisibleRow.find(itemIdex) == itemsWithVisibleRow.end()) {
+                // Sync-cache-in-layout: deactivate cache items explicitly in the same frame,
+                // mirroring List's per-item SetActive(show) during cached item layout.
+                // Multi-line items straddling the visible/cache boundary are skipped:
+                // they are still visible through their visible row.
+                wrapper->SetActive(false);
+            }
             const bool forceLayout = info_.hasMultiLineItem_ || expandSafeArea_ ||
                                      wrapper->CheckNeedForceMeasureAndLayout() || wrapper->IsIgnoreOptsValid();
             if (!isCache && forceLayout) {
@@ -2279,6 +2319,50 @@ void GridScrollLayoutAlgorithm::FillCacheLineAtEnd(float mainSize, float crossSi
     }
 }
 
+// Sync-cache-in-layout rework of Step 1: resolves the wrapper of the cache item at
+// currentIndex, building and measuring it in the current frame's Layout when
+// syncCacheBuild_ is set, instead of deferring it to an idle predict task. When the item
+// cannot be built now, records the remaining cells of the line from startCross on in
+// predictBuildList_ and seeds the missing line height; returns null so the caller fails
+// the fill with -1.0f. The recorded list is consumed by the idle predict task in async
+// mode only; in sync mode it is dropped right after the fill (Measure and
+// SyncLayoutCacheItems both clear it), so those cells are simply retried by the next
+// frame's fill.
+RefPtr<LayoutWrapper> GridScrollLayoutAlgorithm::GetSyncCacheItemOrDeferRest(
+    LayoutWrapper* layoutWrapper, int32_t currentIndex, int32_t startCross, int32_t currentLine)
+{
+    auto itemWrapper = layoutWrapper->GetChildByIndex(currentIndex, true);
+    if (GridUtils::CheckNeedCacheLayout(itemWrapper)) {
+        // Sync-cache-in-layout: build and measure the cache item in the current
+        // frame's Layout instead of deferring it to an idle predict task.
+        itemWrapper = syncCacheBuild_ ? BuildSyncCacheItem(layoutWrapper, currentIndex) : nullptr;
+    }
+    if (!itemWrapper) {
+        for (int32_t i = startCross; i < info_.crossCount_ && currentIndex < cacheEnd_; i++) {
+            predictBuildList_.emplace_back(currentIndex++);
+        }
+        if (GreatOrEqual(cellAveLength_, 0.0f) &&
+            info_.lineHeightMap_.find(currentLine) == info_.lineHeightMap_.end()) {
+            info_.lineHeightMap_[currentLine] = cellAveLength_;
+        }
+    }
+    return itemWrapper;
+}
+
+void GridScrollLayoutAlgorithm::RebuildRecordedLineItems(
+    LayoutWrapper* layoutWrapper, const std::map<int32_t, int32_t>& lineItems)
+{
+    for (const auto& elem : lineItems) {
+        auto itemWrapper = layoutWrapper->GetChildByIndex(elem.second, true);
+        if (GridUtils::CheckNeedCacheLayout(itemWrapper)) {
+            itemWrapper = BuildSyncCacheItem(layoutWrapper, elem.second);
+        }
+        if (itemWrapper) {
+            LargeItemLineHeight(itemWrapper);
+        }
+    }
+}
+
 float GridScrollLayoutAlgorithm::FillNewCacheLineBackward(
     float crossSize, float mainSize, LayoutWrapper* layoutWrapper, int32_t currentLine)
 {
@@ -2308,17 +2392,8 @@ float GridScrollLayoutAlgorithm::FillNewCacheLineBackward(
             for (int32_t i = static_cast<int32_t>(line->second.size()); i < info_.crossCount_; i++) {
                 // Step1. Get wrapper of [GridItem]
                 CHECK_NULL_RETURN(currentIndex < childrenCount, -1.0f);
-                auto itemWrapper = layoutWrapper->GetChildByIndex(currentIndex, true);
-                if (GridUtils::CheckNeedCacheLayout(itemWrapper)) {
-                    for (int32_t y = i; y < info_.crossCount_ && currentIndex < cacheEnd_; y++) {
-                        predictBuildList_.emplace_back(currentIndex++);
-                    }
-                    if (GreatOrEqual(cellAveLength_, 0.0f) &&
-                        info_.lineHeightMap_.find(currentLine) == info_.lineHeightMap_.end()) {
-                        info_.lineHeightMap_[currentLine] = cellAveLength_;
-                    }
-                    return -1.0f;
-                }
+                auto itemWrapper = GetSyncCacheItemOrDeferRest(layoutWrapper, currentIndex, i, currentLine);
+                CHECK_NULL_RETURN(itemWrapper, -1.0f);
                 // Step2. Measure child
                 auto frameSize = info_.axis_ == Axis::VERTICAL ? SizeF(crossSize, mainSize)
                                                                : SizeF(mainSize, crossSize);
@@ -2336,6 +2411,18 @@ float GridScrollLayoutAlgorithm::FillNewCacheLineBackward(
                 info_.endIndex_ = currentIndex;
                 currentIndex++;
             }
+        }
+        // Complete recorded line: the fill used to trust the matrix records and never touch
+        // the items. After a scrollToIndex jump or a fast multi-line swipe the recorded tail
+        // lines are still in gridMatrix_, but their nodes may have been recycled
+        // (RecycleItemsOutOfBoundary on the large delta) or never built (the recording pass
+        // deferred them) — this branch then walked the line without creating any node and
+        // the tail preload area stayed empty. In sync-build mode, rebuild the missing nodes
+        // in-frame like the partial branch above; LargeItemLineHeight also restores a
+        // missing line height through the NonNegative(cellAveLength_) return below, so the
+        // fill loop continues instead of aborting at the -1 fallback.
+        if (syncCacheBuild_) {
+            RebuildRecordedLineItems(layoutWrapper, line->second);
         }
         CompleteItemCrossPosition(layoutWrapper, line->second);
         for (const auto& elem : line->second) {
@@ -2360,6 +2447,11 @@ float GridScrollLayoutAlgorithm::FillNewCacheLineBackward(
         // Step1. Get wrapper of [GridItem]
         auto itemWrapper = layoutWrapper->GetChildByIndex(currentIndex, true);
         if (GridUtils::CheckNeedCacheLayout(itemWrapper)) {
+            // Sync-cache-in-layout: build and measure the cache item in the current frame's
+            // Layout instead of deferring it to an idle predict task.
+            itemWrapper = syncCacheBuild_ ? BuildSyncCacheItem(layoutWrapper, currentIndex) : nullptr;
+        }
+        if (!itemWrapper) {
             for (int32_t x = i; x < info_.crossCount_ && currentIndex < childrenCount; x++) {
                 predictBuildList_.emplace_back(currentIndex++);
             }
@@ -2584,6 +2676,93 @@ void GridScrollLayoutAlgorithm::CreateCachedChildConstraint(
 {
     auto gridLayoutProperty = DynamicCast<GridLayoutProperty>(layoutWrapper->GetLayoutProperty());
     cachedChildConstraint_ = CreateChildConstraint(mainSize, crossSize, gridLayoutProperty, 0, 1);
+}
+
+void GridScrollLayoutAlgorithm::SyncLayoutCacheItems(LayoutWrapper* layoutWrapper)
+{
+    CHECK_NULL_VOID(layoutWrapper);
+    auto gridLayoutProperty = DynamicCast<GridLayoutProperty>(layoutWrapper->GetLayoutProperty());
+    CHECK_NULL_VOID(gridLayoutProperty);
+    if (!SystemProperties::GetGridCacheEnabled() || measureInNextFrame_) {
+        return;
+    }
+    const float mainSize = GetMainAxisSize(frameSize_, info_.axis_);
+    const float crossSize = GetCrossAxisSize(frameSize_, info_.axis_);
+    CreateCachedChildConstraint(layoutWrapper, mainSize, crossSize);
+    // Tail: re-run the cache fill with sync-build mode, so items deferred by Measure are
+    // built, measured, deactivated and placed into gridMatrix_ in the current frame.
+    syncCacheBuild_ = true;
+    FillCacheLineAtEnd(mainSize, crossSize, layoutWrapper);
+    syncCacheBuild_ = false;
+    // Cells the sync fill still could not build were deferred into predictBuildList_;
+    // in sync mode nothing consumes the list, so drop it — the next frame's fill retries.
+    predictBuildList_.clear();
+    // Front: record and measure the cache lines above the start line, mirroring SyncPreload's
+    // head fill. The main positioning loop derives every cache item's position from gridMatrix_ /
+    // lineHeightMap_ records and skips lines without records. After a data-change reset (e.g.
+    // items inserted above the preload area) the whole matrix is cleared and only re-recorded
+    // from the anchor line down, so head lines must be re-recorded here — FillNewLineForward
+    // rebuilds them with post-insert indices and measures their items; without it, existing
+    // head items keep stale offsets (never repositioned) and freshly built ones stay at (0,0)
+    // without ever passing through SyncGeometry.
+    // FillNewLineForward mutates the layout range; TempLayoutRange (the same guard SyncPreload
+    // uses) restores startIndex_ / startMainLineIndex_ / endIndex_ / endMainLineIndex_ on scope
+    // exit, keeping the viewport range untouched.
+    moveToEndLineIndex_ = -1;
+    TempLayoutRange scope(info_);
+    const int32_t cacheLineCnt = gridLayoutProperty->GetCachedCountValue(info_.defCachedCount_);
+    for (int32_t i = 0; i < cacheLineCnt; ++i) {
+        if (measureInNextFrame_) {
+            break;
+        }
+        FillNewLineForward(crossSize, mainSize, layoutWrapper);
+        // FillNewLineForward only measures the head items; the main positioning
+        // loop runs just SyncGeometry for cache items. Lay out the subtree of the
+        // line just filled — same as the tail path's BuildSyncCacheItem — so a
+        // changed size repositions the GridItem's children in the same frame.
+        // startMainLineIndex_ still points at the filled line here;
+        // TempLayoutRange restores it on scope exit.
+        auto headLine = info_.gridMatrix_.find(info_.startMainLineIndex_);
+        if (headLine == info_.gridMatrix_.end()) {
+            continue;
+        }
+        for (auto headIter = headLine->second.begin(); headIter != headLine->second.end(); ++headIter) {
+            auto itemWrapper = GetGridItem(layoutWrapper, headIter->second);
+            CHECK_NULL_CONTINUE(itemWrapper);
+            itemWrapper->Layout();
+        }
+    }
+}
+
+LayoutConstraintF GridScrollLayoutAlgorithm::GenerateSyncCacheItemConstraint(
+    const GridItemLayoutProperty& itemProperty, LayoutWrapper* /*layoutWrapper*/, int32_t /*itemIndex*/)
+{
+    // Base algorithm: the cross span comes from GridItemLayoutProperty, the same source as
+    // the base PredictBuildItem on the async predict path.
+    return GenerateCacheItemConstraint(
+        itemProperty, info_.axis_, GridPredictLayoutParam { cachedChildConstraint_, itemsCrossSize_, crossGap_ });
+}
+
+RefPtr<LayoutWrapper> GridScrollLayoutAlgorithm::BuildSyncCacheItem(
+    LayoutWrapper* layoutWrapper, int32_t itemIndex)
+{
+    // Cache build: not attached to the render tree, built through the lazy isCache path.
+    auto itemWrapper = GetGridItem(layoutWrapper, itemIndex, false, true);
+    CHECK_NULL_RETURN(itemWrapper, nullptr);
+    auto itemProperty = DynamicCast<GridItemLayoutProperty>(itemWrapper->GetLayoutProperty());
+    CHECK_NULL_RETURN(itemProperty, nullptr);
+    itemWrapper->SetActive(false);
+    // Measure with the same span-adjusted constraint the predict path uses (see
+    // PredictBuildItem / GenerateCacheItemConstraint). The span source is algorithm-specific,
+    // so resolve it through the virtual hook (WithOptions reads it from GridLayoutOptions).
+    // ProcessOffscreenNode cannot be used here: it defers via AddAfterLayoutTask while the
+    // pipeline is layouting.
+    auto constraint = GenerateSyncCacheItemConstraint(*itemProperty, layoutWrapper, itemIndex);
+    itemWrapper->Measure(constraint);
+    // Re-lay the subtree so a changed size repositions the item's children; the main
+    // positioning loop afterwards sets the frame offset and syncs geometry.
+    itemWrapper->Layout();
+    return itemWrapper;
 }
 
 void GridScrollLayoutAlgorithm::UpdateMainLineOnReload(int32_t startIdx)

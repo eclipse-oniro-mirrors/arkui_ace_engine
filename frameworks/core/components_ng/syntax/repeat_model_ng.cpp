@@ -130,4 +130,12 @@ std::pair<int32_t, int32_t> RepeatModelNG::GetActiveRange()
     CHECK_NULL_RETURN(node, std::make_pair(-1, -1));
     return node->GetActiveRange();
 }
+
+void RepeatModelNG::SetAllowReuseInAnimation(std::optional<bool> allowReuseInAnimation)
+{
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto repeatNode = AceType::DynamicCast<RepeatNode>(stack->GetMainElementNode());
+    CHECK_NULL_VOID(repeatNode);
+    repeatNode->SetAllowReuseInAnimation(allowReuseInAnimation);
+}
 } // namespace OHOS::Ace::NG

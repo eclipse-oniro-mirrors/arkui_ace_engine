@@ -33,7 +33,14 @@ namespace {
 constexpr int64_t CACHE_TASK_DELAY_TIME = 2000000000;
 constexpr int32_t MEMORY_LEVEL_LOW = 1;
 constexpr int32_t MEMORY_LEVEL_CRITICAL = 2;
+
+// whether index is inside the active (visible) range [start, end],
+// including the loop case where the range wraps over the array boundary
+bool IsIndexInActiveRange(int32_t index, int32_t start, int32_t end)
+{
+    return ((start <= index) && (index <= end)) || ((end < start) && (index <= end || start <= index));
 }
+} // namespace
 
 namespace OHOS::Ace::NG {
 
@@ -263,6 +270,31 @@ ActiveRangeType RepeatVirtualScroll2Node::CheckActiveRange(
     return {nStart, nEnd};
 }
 
+void RepeatVirtualScroll2Node::SetFrameNodeInactive(
+    const RefPtr<FrameNode>& frameNode, bool removeFromTree, const std::optional<IndexType>& oldIndex)
+{
+    CHECK_NULL_VOID(frameNode);
+    if (AnimationUtils::IsImplicitAnimationOpen() && removeFromTree && oldIndex.has_value() &&
+        IsIndexInActiveRange(oldIndex.value(), prevVisibleRangeStart_, prevVisibleRangeEnd_)) {
+        // node goes off the render tree while an implicit animation is running and
+        // was visible at its old index under the previous active range: keep it
+        // active until its transition out has finished, SetInActiveAfterTransitionOut
+        // then applies SetActive(false)
+        frameNode->NeedSetInActiveAfterTransitionOut(true);
+        return;
+    }
+    frameNode->SetActive(false);
+}
+
+// Cancel a deferred SetActive(false) (see SetFrameNodeInactive) when the node returns to
+// the render tree (scroll back into view or reuse): the transition-out that armed it may
+// still finish later and would deactivate a node that is visible again.
+void RepeatVirtualScroll2Node::CancelPendingInactiveAfterTransitionOut(const RefPtr<UINode>& node)
+{
+    CHECK_NULL_VOID(node);
+    node->NeedSetInActiveAfterTransitionOut(false);
+}
+
 bool RepeatVirtualScroll2Node::RebuildL1(int32_t start, int32_t end, int32_t nStart, int32_t nEnd)
 {
     return caches_.RebuildL1(
@@ -277,23 +309,29 @@ bool RepeatVirtualScroll2Node::RebuildL1(int32_t start, int32_t end, int32_t nSt
             if (!frameNode) {
                 return false;
             }
-            if (((start <= index) && (index <= end)) ||
-                ((end < start) && (index <= end || start <= index))) {
+            // check first whether the node stays in L1: only a node about to be removed
+            // from the render tree (OnRemoveFromParent below) may defer SetActive(false)
+            const bool remainInL1 = repeatNode->CheckNode4IndexInL1(index, nStart, nEnd, cacheItem);
+            if (IsIndexInActiveRange(index, start, end)) {
                     TAG_LOGD(AceLogTag::ACE_REPEAT,
                         "in range: index %{public}d -> child nodeId %{public}d: SetActive(true)",
                         index, frameNode->GetId());
+                    // reactivation cancels a pending deferred SetActive(false): the
+                    // transition-out that armed it may still finish later and would
+                    // deactivate a node that is visible again
+                    frameNode->NeedSetInActiveAfterTransitionOut(false);
                     frameNode->SetActive(true);
                     cacheItem->isActive_ = true;
             } else {
                 TAG_LOGD(AceLogTag::ACE_REPEAT,
                     "out of range: index %{public}d -> child nodeId %{public}d: SetActive(false)",
                     index, frameNode->GetId());
-                AnimationUtils::IsImplicitAnimationOpen() ?
-                    frameNode->NeedSetInActiveAfterTransitionOut(true) : frameNode->SetActive(false);
+                repeatNode->SetFrameNodeInactive(
+                    frameNode, !remainInL1, repeatNode->caches_.GetPrevL1Index4Node(node));
                 cacheItem->isActive_ = false;
             }
 
-            if (repeatNode->CheckNode4IndexInL1(index, nStart, nEnd, cacheItem)) {
+            if (remainInL1) {
                 // keep in Repeat L1
                 TAG_LOGD(AceLogTag::ACE_REPEAT,
                     "in L1: index %{public}d, node %{public}s with child id %{public}d: SetActive(True)",
@@ -333,8 +371,8 @@ bool RepeatVirtualScroll2Node::ProcessActiveL2Nodes()
         // 2. Repeat.rerender
         auto frameNode = AceType::DynamicCast<FrameNode>(cacheItem->node_->GetFrameChildByIndex(0, true));
         if (frameNode && cacheItem->isActive_) {
-            AnimationUtils::IsImplicitAnimationOpen() ?
-                frameNode->NeedSetInActiveAfterTransitionOut(true) : frameNode->SetActive(false);
+            // the node is removed from the render tree below (OnRemoveFromParent)
+            SetFrameNodeInactive(frameNode, true, caches_.GetPrevL1Index4RID(rid));
             cacheItem->isActive_ = false;
             needSync = true;
             TAG_LOGD(AceLogTag::ACE_REPEAT,
@@ -415,6 +453,14 @@ void RepeatVirtualScroll2Node::DoSetActiveChildRange(
         // re-assemble children_
         PostIdleTask();
     }
+}
+
+// ModelNG calls this at the start of a Repeat.rerender, before UpdateTotalCount /
+// UpdateL1Rid4Index: UpdateTotalCount may run a DoSetActiveChildRange (totalCount 0)
+// that needs to look up the pre-rerender L1 index of a node.
+void RepeatVirtualScroll2Node::RecordPrevL1Rid4Index()
+{
+    caches_.RecordPrevL1Rid4Index();
 }
 
 // TS calls this function at the end of rerender to update caches.l1Rid4Index_
@@ -540,6 +586,8 @@ RefPtr<UINode> RepeatVirtualScroll2Node::GetFrameChildByIndexImpl(
     }
 
     if (addToRenderTree && !isCache) {
+        // back on the render tree (scroll back into view or reuse)
+        CancelPendingInactiveAfterTransitionOut(cacheItem4Index->node_);
         cacheItem4Index->node_->SetActive(true);
         cacheItem4Index->isActive_ = true;
     }
@@ -548,24 +596,7 @@ RefPtr<UINode> RepeatVirtualScroll2Node::GetFrameChildByIndexImpl(
         return cacheItem4Index->node_->GetFrameChildByIndex(0, needBuild);
     }
 
-    // put to render tree
-    cacheItem4Index->isOnRenderTree_ = true;
-
-    if (cacheItem4Index->node_->GetDepth() != GetDepth() + 1) {
-        cacheItem4Index->node_->SetDepth(GetDepth() + 1);
-    }
-    // attach to repeat node and pass context to it.
-    cacheItem4Index->node_->SetParent(WeakClaim(this));
-    if (IsOnMainTree()) {
-        cacheItem4Index->node_->AttachToMainTree(false, GetContext());
-        // node attached to main tree should not be in disappearing children
-        RemoveDisappearingChild(cacheItem4Index->node_);
-    }
-
-    MarkNeedSyncRenderTree();
-    children_.clear();
-    // re-assemble children_
-    PostIdleTask();
+    AttachChildToRenderTree(cacheItem4Index);
 
     auto childNode = cacheItem4Index->node_->GetFrameChildByIndex(0, needBuild);
     if (onMoveEvent_) {
@@ -573,6 +604,30 @@ RefPtr<UINode> RepeatVirtualScroll2Node::GetFrameChildByIndexImpl(
     }
 
     return childNode;
+}
+
+// Puts the cache item's node back on the render tree: fixes depth / parent, attaches it to
+// the main tree (dropping it from disappearing children) and schedules the children
+// re-assembly.
+void RepeatVirtualScroll2Node::AttachChildToRenderTree(RepeatVirtualScroll2Caches::CacheItem& cacheItem)
+{
+    cacheItem->isOnRenderTree_ = true;
+
+    if (cacheItem->node_->GetDepth() != GetDepth() + 1) {
+        cacheItem->node_->SetDepth(GetDepth() + 1);
+    }
+    // attach to repeat node and pass context to it.
+    cacheItem->node_->SetParent(WeakClaim(this));
+    if (IsOnMainTree()) {
+        cacheItem->node_->AttachToMainTree(false, GetContext());
+        // node attached to main tree should not be in disappearing children
+        RemoveDisappearingChild(cacheItem->node_);
+    }
+
+    MarkNeedSyncRenderTree();
+    children_.clear();
+    // re-assemble children_
+    PostIdleTask();
 }
 
 void RepeatVirtualScroll2Node::updateFrameChildIndexRecord(uint32_t index)
@@ -794,6 +849,10 @@ void RepeatVirtualScroll2Node::PostIdleTask()
         node->RestoreCache(deadline, canUseLongPredictTask);
         TAG_LOGD(AceLogTag::ACE_REPEAT, "idle task calls Purge");
         node->Purge();
+        // The pre-rerender mapping was only consumed by this frame's DoSetActiveChildRange;
+        // drop it now that the frame has settled, so later range updates never read stale
+        // indices (a recycled node may be re-registered under a new rid).
+        node->caches_.ClearPrevL1Rid4Index();
         if (node->GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_EIGHTEEN)) {
             node->FreezeSpareNode();
         }
@@ -984,7 +1043,7 @@ RefPtr<FrameNode> RepeatVirtualScroll2Node::GetFrameNode(int32_t index)
     return AceType::DynamicCast<FrameNode>(GetFrameChildByIndex(index, false, false));
 }
 
-void RepeatVirtualScroll2Node::fireOnUpdateDirty()
+void RepeatVirtualScroll2Node::FireOnUpdateDirty()
 {
     NG::ScopedViewStackProcessor scopedViewStackProcessor;
     onUpdateDirty_();
@@ -992,6 +1051,11 @@ void RepeatVirtualScroll2Node::fireOnUpdateDirty()
 
 bool RepeatVirtualScroll2Node::IsAllowAnimation()
 {
+    // RepeatOptions.allowReuseInAnimation explicitly set (highest priority):
+    // animation is allowed iff reuse during animation is disallowed
+    if (isAllowReuseInAnimation_.has_value()) {
+        return !isAllowReuseInAnimation_.value();
+    }
     auto parent = GetParentFrameNode();
     if (!parent) {
         TAG_LOGI(AceLogTag::ACE_REPEAT,
@@ -1000,6 +1064,38 @@ bool RepeatVirtualScroll2Node::IsAllowAnimation()
     }
     return parent->GetTag() == V2::LIST_ETS_TAG &&
         !LazyForEachUtils::IsIdInRepeatAnimationAllowReuseSet(parent->GetInspectorIdValue(""));
+}
+
+void RepeatVirtualScroll2Node::OnAttachToMainTree(bool recursive)
+{
+    ForEachBaseNode::OnAttachToMainTree(recursive);
+    LazyForEachUtils::ToggleParentSyncCacheLayout(
+        Claim(this), true, isAllowReuseInAnimation_, true, syncCacheHost_);
+}
+
+void RepeatVirtualScroll2Node::OnDetachFromMainTree(bool recursive, PipelineContext* context)
+{
+    LazyForEachUtils::ToggleParentSyncCacheLayout(
+        Claim(this), false, isAllowReuseInAnimation_, true, syncCacheHost_);
+    ForEachBaseNode::OnDetachFromMainTree(recursive, context);
+}
+
+void RepeatVirtualScroll2Node::SetAllowReuseInAnimation(std::optional<bool> allow)
+{
+    if (isAllowReuseInAnimation_ == allow) {
+        return;
+    }
+    // The option can arrive after the node is already attached: native create()
+    // pushes and mounts the node synchronously, TS sets the option right afterwards,
+    // so the attach-time toggle above may have run with the previous value (unset).
+    // Re-run the toggle for the transition while attached: release the reference
+    // held for the old value, register for the new one when it now qualifies.
+    if (IsOnMainTree()) {
+        LazyForEachUtils::ToggleParentSyncCacheLayout(
+            Claim(this), false, isAllowReuseInAnimation_, true, syncCacheHost_);
+        LazyForEachUtils::ToggleParentSyncCacheLayout(Claim(this), true, allow, true, syncCacheHost_);
+    }
+    isAllowReuseInAnimation_ = allow;
 }
 
 bool RepeatVirtualScroll2Node::IsChildInAnimation(uint32_t rid)

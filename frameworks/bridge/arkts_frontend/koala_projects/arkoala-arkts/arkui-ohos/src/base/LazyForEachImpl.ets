@@ -23,7 +23,7 @@ import { InternalListener } from './DataChangeListener'
 import { setNeedCreate } from '../ArkComponentRoot'
 import { IDataSource } from '../component/lazyForEach'
 import { OnMoveHandler, ItemDragEventHandler, LazyForEachOps, LazyForEachOptions } from '#generated'
-import { LazyNodePeer, LazyItemNode, NodeHolder, resgisterDetachedRootPtrNeedDestroyImmediately, unresgisterDetachedRootPtrNeedDestroyImmediately } from './SyntaxNodeBase'
+import { LazyNodePeer, LazyItemNode, NodeHolder, registerDetachedRootPtrNeedDestroyImmediately, unregisterDetachedRootPtrNeedDestroyImmediately } from './SyntaxNodeBase'
 import { CustomComponent } from '../component/customComponent'
 import { ObserveSingleton } from '../stateManagement/base/observeSingleton'
 import { ExtendableComponent } from '../component/extendableComponent'
@@ -230,7 +230,7 @@ class LazyItemPool implements Disposable {
         const lazyItemRoot = state.value
         const ptr = (lazyItemRoot as LazyItemNode).getPeerPtr()
         if (this._isRepeat && this._parent instanceof LazyNodePeer && ptr !== nullptr) {
-            unresgisterDetachedRootPtrNeedDestroyImmediately(ptr)
+            unregisterDetachedRootPtrNeedDestroyImmediately(ptr)
         }
         this.markForbidRecycle((lazyItemRoot as IncrementalNode).firstChild, true)
         scheduleCallback(() => {
@@ -279,7 +279,7 @@ class LazyItemPool implements Disposable {
         globalLazyItems.set(node, 0)
         const ptr = node.value.getPeerPtr()
         if (this._isRepeat && this._parent instanceof LazyNodePeer && ptr !== nullptr) {
-            resgisterDetachedRootPtrNeedDestroyImmediately(ptr)
+            registerDetachedRootPtrNeedDestroyImmediately(ptr)
         }
         return ptr
     }
@@ -292,6 +292,14 @@ class LazyItemPool implements Disposable {
         this._activeItems.forEach((node, index) => {
             if (criteria(index)) { // dispose items outside the active range
                 console.log(`LazyItemPool.pruneBy(): node will be disposed for index ${index}`)
+                // fallback cleanup: a disposed item never goes through releaseItemByIndex,
+                // drop its registration here so no stale pointer stays in the set
+                if (this._isRepeat && this._parent instanceof LazyNodePeer) {
+                    const ptr = (node.value as LazyItemNode).getPeerPtr()
+                    if (ptr !== nullptr) {
+                        unregisterDetachedRootPtrNeedDestroyImmediately(ptr)
+                    }
+                }
                 node.dispose()
                 this._activeItems.delete(index)
                 globalLazyItems.delete(node)

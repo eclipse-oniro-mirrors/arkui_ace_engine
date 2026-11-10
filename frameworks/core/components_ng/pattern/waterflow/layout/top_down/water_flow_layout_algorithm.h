@@ -44,6 +44,17 @@ private:
     void FillViewport(float mainSize, LayoutWrapper* layoutWrapper);
     void MeasureLazyLayoutItem(const RefPtr<LayoutWrapper>& item, float crossSize, float startMainPos, float mainSize,
         const RefPtr<WaterFlowLayoutProperty>& layoutProperty) const;
+    // Measures one item with the constraint chosen by the column count: multiple columns
+    // use the plain viewport constraint, a single column uses the lazy layout constraint.
+    void MeasureItemByColumnCount(const RefPtr<LayoutWrapper>& item, float crossSize, float startMainPos,
+        float mainSize, const RefPtr<WaterFlowLayoutProperty>& layoutProperty) const;
+    // Sync-cache-in-layout: runs SyncLayoutCacheItems before the positioning loop when the
+    // cached items are not shown and the layout is not deferred to the next frame.
+    // [syncCacheLayout] is the strategy resolved once by the Layout caller.
+    void SyncLayoutCacheItemsIfNeeded(LayoutWrapper* layoutWrapper, bool syncCacheLayout, int32_t cachedCount);
+    // Sync-cache-in-layout: deactivates a cache-range item in the same frame.
+    // [syncCacheLayout] is the strategy resolved once by the Layout caller.
+    void DeactivateSyncCacheItem(const RefPtr<LayoutWrapper>& wrapper, bool isCache, bool syncCacheLayout);
     void ModifyCurrentOffsetWhenReachEnd(float mainSize, LayoutWrapper* layoutWrapper);
     float ComputeCrossPosition(int32_t crossIndex) const;
     bool GetCrossOffset(int32_t crossIndex, float crossSize, bool isRtl, float& crossOffset) const;
@@ -56,6 +67,32 @@ private:
     void LayoutFooter(LayoutWrapper* layoutWrapper, const OffsetF& childFrameOffset, bool reverse);
 
     void SyncPreloadItem(LayoutWrapper* host, int32_t itemIdx) override;
+
+    /**
+     * @brief Sync-cache-in-layout strategy: build, measure and deactivate cache-range items
+     *        synchronously inside the current-frame Layout when showCache is false.
+     *
+     *        Tail items without a recorded position are measured forward up to the cache
+     *        bound via MeasureToTarget (cache build path: not attached to the render tree);
+     *        head items with a recorded position are built and measured on demand. The main
+     *        positioning loop then layouts them like any other item in the cache range.
+     */
+    void SyncLayoutCacheItems(LayoutWrapper* layoutWrapper, int32_t cachedCount);
+
+    // Sync-cache-in-layout, tail half of SyncLayoutCacheItems: lay out recorded tail items
+    // (LayoutRecordedTailItems), then measure the unknown tail from the last verified
+    // anchor up to the cache bound (MeasureTailToCacheBound).
+    void SyncTailCacheItems(LayoutWrapper* layoutWrapper, int32_t cachedCount);
+    // Sync-cache-in-layout: lays out tail items up to [endBound] whose position record and
+    // node both exist; returns the first tail index missing either of them.
+    int32_t LayoutRecordedTailItems(LayoutWrapper* layoutWrapper, int32_t endBound);
+    // Sync-cache-in-layout: measures the unknown tail from the anchor up to [endBound] via
+    // MeasureToTarget on the cache build path (not attached to the render tree), then
+    // re-activates the anchor when it is a visible item.
+    void MeasureTailToCacheBound(LayoutWrapper* layoutWrapper, int32_t anchorIdx, int32_t endBound);
+    // Sync-cache-in-layout, head half of SyncLayoutCacheItems: build, measure and lay out
+    // head items whose position is already recorded, down to the cache bound.
+    void SyncHeadCacheItems(LayoutWrapper* layoutWrapper, int32_t cachedCount);
 
     /**
      * @brief Handle end-of-content detection and adjust endIndex for zero-height trailing items

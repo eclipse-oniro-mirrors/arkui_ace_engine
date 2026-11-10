@@ -29,6 +29,34 @@ constexpr int64_t CACHE_TASK_DELAY_TIME = 2000000000; // 2 seconds in nanosecond
 constexpr int32_t MEMORY_LEVEL_LOW = 1;
 constexpr int32_t MEMORY_LEVEL_CRITICAL = 2;
 constexpr int32_t MEMORY_LEVEL_NORMAL = 0;
+// Constants for the consolidated RepeatNode / caches / model tests
+constexpr int32_t TEST_INDEX_1 = 0;
+constexpr int32_t TEST_INDEX_2 = 1;
+constexpr int32_t TEST_INDEX_3 = 2;
+constexpr int32_t TEST_INDEX_5 = 5;
+constexpr uint32_t TEST_RID_1 = 100;
+constexpr uint32_t TEST_RID_2 = 200;
+constexpr int32_t TEST_NODE_ID = 1;
+constexpr int32_t TEST_REPEAT_NODE_ID = 100;
+constexpr int32_t TEST_REPEAT_NODE_ID_2 = 200;
+constexpr int32_t TEST_LIST_PARENT_ID = 9201;
+constexpr int32_t TEST_GRID_PARENT_ID = 9202;
+constexpr int32_t TEST_WATERFLOW_PARENT_ID = 9203;
+constexpr int32_t TEST_COLUMN_PARENT_ID = 9204;
+constexpr uint32_t TEST_ARR_LEN = 100;
+constexpr uint32_t TEST_TOTAL_COUNT = 100;
+constexpr int32_t TEST_REPEAT_ELMT_ID = 1000;
+constexpr int32_t TEST_REPEAT_ELMT_ID_2 = 2000;
+constexpr int32_t INVALID_REPEAT_ELMT_ID = -1;
+const std::string TEST_INSPECTOR_ID = "repeat_sync_cache_test_id";
+
+std::unique_ptr<RepeatVirtualScroll2Caches> CreateCachesWithMockCallback()
+{
+    auto onGetRid4Index = [](IndexType index, bool, bool) -> std::pair<RIDType, uint32_t> {
+        return { TEST_RID_1, OnGetRid4IndexResult::NO_NODE };
+    };
+    return std::make_unique<RepeatVirtualScroll2Caches>(onGetRid4Index);
+}
 } // namespace
 
 /**
@@ -2153,6 +2181,1059 @@ HWTEST_F(RepeatVirtual2TestNg, RepeatControllerPattern004, TestSize.Level1)
     }
     EXPECT_EQ(weakNode.Upgrade(), node2);
     EXPECT_NE(weakNode.Upgrade(), node1);
+}
+
+/**
+ * @tc.name: RepeatVirtualScroll2NodeSetAllowReuseInAnimation001
+ * @tc.desc: SetAllowReuseInAnimation stores the tri-state value
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatVirtualScroll2NodeSetAllowReuseInAnimation001, TestSize.Level1)
+{
+    auto repeatNode = CreateRepeatVirtualNode(10, 10);
+    EXPECT_FALSE(repeatNode->isAllowReuseInAnimation_.has_value());
+    repeatNode->SetAllowReuseInAnimation(false);
+    ASSERT_TRUE(repeatNode->isAllowReuseInAnimation_.has_value());
+    EXPECT_FALSE(repeatNode->isAllowReuseInAnimation_.value());
+    repeatNode->SetAllowReuseInAnimation(true);
+    ASSERT_TRUE(repeatNode->isAllowReuseInAnimation_.has_value());
+    EXPECT_TRUE(repeatNode->isAllowReuseInAnimation_.value());
+    repeatNode->SetAllowReuseInAnimation(std::nullopt);
+    EXPECT_FALSE(repeatNode->isAllowReuseInAnimation_.has_value());
+}
+
+/**
+ * @tc.name: RepeatVirtualScroll2NodeIsAllowAnimationPriority001
+ * @tc.desc: Explicitly set allowReuseInAnimation has priority over the List/Grid parent default
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatVirtualScroll2NodeIsAllowAnimationPriority001, TestSize.Level1)
+{
+    auto gridNode = CreateNode(V2::GRID_ETS_TAG);
+    auto repeatNode = CreateRepeatVirtualNode(10, 10);
+    gridNode->AddChild(repeatNode);
+    // default: Grid parent -> false
+    EXPECT_FALSE(repeatNode->IsAllowAnimation());
+    // explicitly disallow reuse in animation -> animation allowed
+    repeatNode->SetAllowReuseInAnimation(false);
+    EXPECT_TRUE(repeatNode->IsAllowAnimation());
+    // explicitly allow reuse in animation -> animation disallowed
+    repeatNode->SetAllowReuseInAnimation(true);
+    EXPECT_FALSE(repeatNode->IsAllowAnimation());
+    repeatNode->SetAllowReuseInAnimation(std::nullopt);
+    EXPECT_FALSE(repeatNode->IsAllowAnimation());
+
+    auto listNode = CreateNode(V2::LIST_ETS_TAG);
+    auto listRepeatNode = CreateRepeatVirtualNode(10, 10);
+    listNode->AddChild(listRepeatNode);
+    // default: List parent -> true
+    EXPECT_TRUE(listRepeatNode->IsAllowAnimation());
+    // explicitly disallow reuse in animation: same result as the List default
+    listRepeatNode->SetAllowReuseInAnimation(false);
+    EXPECT_TRUE(listRepeatNode->IsAllowAnimation());
+    // explicitly allow reuse in animation overrides the List default
+    listRepeatNode->SetAllowReuseInAnimation(true);
+    EXPECT_FALSE(listRepeatNode->IsAllowAnimation());
+}
+
+/**
+ * @tc.name: RepeatVirtualScroll2NodeIsAllowAnimationPriority002
+ * @tc.desc: Explicitly set allowReuseInAnimation has priority over the allowReuse id set
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatVirtualScroll2NodeIsAllowAnimationPriority002, TestSize.Level1)
+{
+    const std::string inspectorId = "rvscroll2_allow_reuse_id";
+    LazyForEachUtils::SetIdsForRepeatAnimationAllowReuse(inspectorId);
+    auto listNode = CreateNode(V2::LIST_ETS_TAG);
+    listNode->UpdateInspectorId(inspectorId);
+    auto repeatNode = CreateRepeatVirtualNode(10, 10);
+    listNode->AddChild(repeatNode);
+    // default: List parent whose id is in the allowReuse set -> false
+    EXPECT_FALSE(repeatNode->IsAllowAnimation());
+    // explicitly disallow reuse in animation has the highest priority
+    repeatNode->SetAllowReuseInAnimation(false);
+    EXPECT_TRUE(repeatNode->IsAllowAnimation());
+    repeatNode->SetAllowReuseInAnimation(true);
+    EXPECT_FALSE(repeatNode->IsAllowAnimation());
+    LazyForEachUtils::SetIdsForRepeatAnimationAllowReuse("");
+}
+
+/**
+ * @tc.name: RepeatVirtualScroll2NodeOnAttachSyncCache001
+ * @tc.desc: Attach/detach holds and releases the sync-cache reference on a Grid parent
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatVirtualScroll2NodeOnAttachSyncCache001, TestSize.Level1)
+{
+    auto gridNode = FrameNode::CreateFrameNode(V2::GRID_ETS_TAG, 9001, AceType::MakeRefPtr<GridPattern>());
+    auto gridPattern = gridNode->GetPattern<GridPattern>();
+    ASSERT_NE(gridPattern, nullptr);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    auto repeatNode = CreateRepeatVirtualNode(10, 10);
+    repeatNode->SetAllowReuseInAnimation(false);
+    gridNode->AddChild(repeatNode);
+    repeatNode->OnAttachToMainTree(false);
+    EXPECT_TRUE(gridPattern->IsSyncCacheLayoutEnabled());
+    repeatNode->OnDetachFromMainTree(false, nullptr);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+}
+
+/**
+ * @tc.name: RepeatVirtualScroll2NodeOnAttachSyncCache002
+ * @tc.desc: Attach/detach holds and releases the sync-cache reference on a WaterFlow parent
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatVirtualScroll2NodeOnAttachSyncCache002, TestSize.Level1)
+{
+    auto waterFlowNode =
+        FrameNode::CreateFrameNode(V2::WATERFLOW_ETS_TAG, 9002, AceType::MakeRefPtr<WaterFlowPattern>());
+    auto waterFlowPattern = waterFlowNode->GetPattern<WaterFlowPattern>();
+    ASSERT_NE(waterFlowPattern, nullptr);
+    EXPECT_FALSE(waterFlowPattern->IsSyncCacheLayoutEnabled());
+    auto repeatNode = CreateRepeatVirtualNode(10, 10);
+    repeatNode->SetAllowReuseInAnimation(false);
+    waterFlowNode->AddChild(repeatNode);
+    repeatNode->OnAttachToMainTree(false);
+    EXPECT_TRUE(waterFlowPattern->IsSyncCacheLayoutEnabled());
+    repeatNode->OnDetachFromMainTree(false, nullptr);
+    EXPECT_FALSE(waterFlowPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+}
+
+/**
+ * @tc.name: RepeatVirtualScroll2NodeOnAttachSyncCache003
+ * @tc.desc: Attach does not hold the sync-cache reference when the option is unset or true
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatVirtualScroll2NodeOnAttachSyncCache003, TestSize.Level1)
+{
+    auto gridNode = FrameNode::CreateFrameNode(V2::GRID_ETS_TAG, 9003, AceType::MakeRefPtr<GridPattern>());
+    auto gridPattern = gridNode->GetPattern<GridPattern>();
+    ASSERT_NE(gridPattern, nullptr);
+    auto repeatNode = CreateRepeatVirtualNode(10, 10);
+    gridNode->AddChild(repeatNode);
+
+    // unset option keeps the container default
+    repeatNode->SetAllowReuseInAnimation(std::nullopt);
+    repeatNode->OnAttachToMainTree(false);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+    repeatNode->OnDetachFromMainTree(false, nullptr);
+
+    // explicitly true keeps the container default
+    repeatNode->SetAllowReuseInAnimation(true);
+    repeatNode->OnAttachToMainTree(false);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+    repeatNode->OnDetachFromMainTree(false, nullptr);
+}
+
+/**
+ * @tc.name: RepeatVirtualScroll2NodeSetFrameNodeInactive001
+ * @tc.desc: SetFrameNodeInactive applies SetActive(false) immediately while no implicit
+ *           animation is open, independent of removeFromTree and oldIndex
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatVirtualScroll2NodeSetFrameNodeInactive001, TestSize.Level1)
+{
+    auto repeatNode = CreateRepeatVirtualNode(10, 10);
+    // the deferral branch reads the previously recorded visible range members
+    // (prevVisibleRangeStart_/prevVisibleRangeEnd_), not the active range ones
+    repeatNode->prevVisibleRangeStart_ = 0;
+    repeatNode->prevVisibleRangeEnd_ = 3;
+    // null frame node: no crash
+    repeatNode->SetFrameNodeInactive(nullptr, true, std::optional<IndexType>(0));
+
+    auto frameNode = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, 9100, AceType::MakeRefPtr<Pattern>());
+    // removeFromTree && oldIndex unset
+    frameNode->isActive_ = true;
+    repeatNode->SetFrameNodeInactive(frameNode, true, std::nullopt);
+    EXPECT_FALSE(frameNode->IsActive());
+    EXPECT_FALSE(frameNode->needSetInActiveAfterTransitionOut_);
+
+    // removeFromTree && oldIndex outside the active range
+    frameNode->isActive_ = true;
+    repeatNode->SetFrameNodeInactive(frameNode, true, std::optional<IndexType>(5));
+    EXPECT_FALSE(frameNode->IsActive());
+
+    // removeFromTree && oldIndex inside the active range: the deferral branch needs an open
+    // implicit animation (IsImplicitAnimationOpen is a constant false in the test build),
+    // so SetActive(false) is applied immediately here as well
+    frameNode->isActive_ = true;
+    repeatNode->SetFrameNodeInactive(frameNode, true, std::optional<IndexType>(2));
+    EXPECT_FALSE(frameNode->IsActive());
+    EXPECT_FALSE(frameNode->needSetInActiveAfterTransitionOut_);
+
+    // keep in tree: inactive immediately as well
+    frameNode->isActive_ = true;
+    repeatNode->SetFrameNodeInactive(frameNode, false, std::optional<IndexType>(1));
+    EXPECT_FALSE(frameNode->IsActive());
+}
+
+/**
+ * @tc.name: RepeatVirtualScroll2NodeSetFrameNodeInactive002
+ * @tc.desc: SetFrameNodeInactive evaluates a loop-wrapped active range
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatVirtualScroll2NodeSetFrameNodeInactive002, TestSize.Level1)
+{
+    auto repeatNode = CreateRepeatVirtualNode(10, 10);
+    auto frameNode = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, 9101, AceType::MakeRefPtr<Pattern>());
+    // loop-wrapped visible range [8, 1]: index 0 (index <= end) and index 9 (start <= index)
+    // are inside, index 5 is outside; with no implicit animation open all go inactive immediately
+    repeatNode->prevVisibleRangeStart_ = 8;
+    repeatNode->prevVisibleRangeEnd_ = 1;
+    frameNode->isActive_ = true;
+    repeatNode->SetFrameNodeInactive(frameNode, true, std::optional<IndexType>(0));
+    EXPECT_FALSE(frameNode->IsActive());
+    frameNode->isActive_ = true;
+    repeatNode->SetFrameNodeInactive(frameNode, true, std::optional<IndexType>(9));
+    EXPECT_FALSE(frameNode->IsActive());
+    frameNode->isActive_ = true;
+    repeatNode->SetFrameNodeInactive(frameNode, true, std::optional<IndexType>(5));
+    EXPECT_FALSE(frameNode->IsActive());
+    EXPECT_FALSE(frameNode->needSetInActiveAfterTransitionOut_);
+}
+
+/**
+ * @tc.name: RepeatVirtualScroll2NodeProcessActiveL2Nodes001
+ * @tc.desc: ProcessActiveL2Nodes skips idle spare items and deactivates active spare items
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatVirtualScroll2NodeProcessActiveL2Nodes001, TestSize.Level1)
+{
+    auto repeatNode = CreateRepeatVirtualNode(10, 10);
+    repeatNode->children_.clear();
+    RefPtr<UINode> uiNode = AceType::MakeRefPtr<FrameNode>("node", 9110, AceType::MakeRefPtr<Pattern>());
+    auto cacheItem = RepeatVirtualScroll2CacheItem::MakeCacheItem(uiNode, false);
+    repeatNode->caches_.cacheItem4Rid_[100] = cacheItem;
+
+    // spare item neither active nor on the render tree: skipped entirely
+    EXPECT_FALSE(repeatNode->ProcessActiveL2Nodes());
+
+    // spare item active: the cache item's node (a FrameNode) receives SetActive(false) via
+    // GetFrameChildByIndex(0) which returns the FrameNode itself, item leaves the render tree
+    auto frameNode = AceType::DynamicCast<FrameNode>(uiNode);
+    frameNode->isActive_ = true;
+    cacheItem->isActive_ = true;
+    cacheItem->isOnRenderTree_ = true;
+    EXPECT_TRUE(repeatNode->ProcessActiveL2Nodes());
+    EXPECT_FALSE(frameNode->IsActive());
+    EXPECT_FALSE(cacheItem->isActive_);
+    EXPECT_FALSE(cacheItem->isOnRenderTree_);
+}
+
+/**
+ * @tc.name: RepeatVirtualScroll2NodeProcessActiveL2Nodes002
+ * @tc.desc: ProcessActiveL2Nodes removes an on-render-tree spare item without touching SetActive
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatVirtualScroll2NodeProcessActiveL2Nodes002, TestSize.Level1)
+{
+    auto repeatNode = CreateRepeatVirtualNode(10, 10);
+    repeatNode->children_.clear();
+    RefPtr<UINode> uiNode = AceType::MakeRefPtr<FrameNode>("node", 9120, AceType::MakeRefPtr<Pattern>());
+    auto childNode = AceType::MakeRefPtr<FrameNode>("child", 9121, AceType::MakeRefPtr<Pattern>());
+    uiNode->AddChild(childNode);
+    auto cacheItem = RepeatVirtualScroll2CacheItem::MakeCacheItem(uiNode, false);
+    repeatNode->caches_.cacheItem4Rid_[101] = cacheItem;
+
+    // spare item on the render tree but not active: no SetActive(false) on the child,
+    // the node still leaves the render tree
+    childNode->isActive_ = true;
+    cacheItem->isOnRenderTree_ = true;
+    EXPECT_TRUE(repeatNode->ProcessActiveL2Nodes());
+    EXPECT_TRUE(childNode->IsActive());
+    EXPECT_FALSE(cacheItem->isActive_);
+    EXPECT_FALSE(cacheItem->isOnRenderTree_);
+}
+
+/**
+ * @tc.name: RepeatVirtualScroll2NodeRebuildL1PrevIndex001
+ * @tc.desc: RebuildL1 resolves the pre-rerender index of an out-of-range node via
+ *           GetPrevL1Index4Node and applies SetActive(false) without transition-out deferral
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatVirtualScroll2NodeRebuildL1PrevIndex001, TestSize.Level1)
+{
+    auto repeatNode = CreateRepeatVirtualNode(10, 10);
+    repeatNode->children_.clear();
+    std::map<int32_t, uint32_t> l1Map;
+    // cache item nodes are FrameNodes; GetFrameChildByIndex(0) returns the FrameNode itself
+    std::vector<RefPtr<FrameNode>> frameNodes;
+    for (int32_t i = 0; i < 4; ++i) {
+        auto frameNode = AceType::MakeRefPtr<FrameNode>("node", 9130 + i, AceType::MakeRefPtr<Pattern>());
+        frameNodes.push_back(frameNode);
+        RefPtr<UINode> uiNode = frameNode;
+        repeatNode->caches_.cacheItem4Rid_[i + 1] = RepeatVirtualScroll2CacheItem::MakeCacheItem(uiNode, true);
+        l1Map[i] = i + 1;
+    }
+    // update, then record the mapping into prevL1Rid4Index_, so GetPrevL1Index4Node
+    // resolves the pre-rerender index of each node
+    repeatNode->caches_.UpdateL1Rid4Index(l1Map);
+    repeatNode->caches_.RecordPrevL1Rid4Index();
+    // nodes falling out of the range below were active before
+    frameNodes[2]->isActive_ = true;
+    frameNodes[3]->isActive_ = true;
+
+    repeatNode->DoSetActiveChildRange(0, 1, 0, 0);
+
+    // in-range node becomes active
+    EXPECT_TRUE(frameNodes[0]->IsActive());
+    // out-of-range nodes: SetFrameNodeInactive applied SetActive(false) immediately
+    // (no implicit animation open in the test build), no transition-out deferral
+    EXPECT_FALSE(frameNodes[2]->IsActive());
+    EXPECT_FALSE(frameNodes[3]->IsActive());
+    EXPECT_FALSE(frameNodes[2]->needSetInActiveAfterTransitionOut_);
+    EXPECT_FALSE(frameNodes[3]->needSetInActiveAfterTransitionOut_);
+    // only the two in-range items stay in L1
+    EXPECT_EQ(repeatNode->caches_.l1Rid4Index_.size(), static_cast<size_t>(2));
+}
+
+/**
+ * @tc.name: RepeatVirtualScroll2NodeRebuildL1CancelDeferredDeactivation001
+ * @tc.desc: Reactivation through RebuildL1 cancels a pending deferred SetActive(false)
+ *           (NeedSetInActiveAfterTransitionOut) armed by an unfinished transition-out
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatVirtualScroll2NodeRebuildL1CancelDeferredDeactivation001, TestSize.Level1)
+{
+    auto repeatNode = CreateRepeatVirtualNode(10, 10);
+    repeatNode->children_.clear();
+    std::map<int32_t, uint32_t> l1Map;
+    std::vector<RefPtr<FrameNode>> frameNodes;
+    for (int32_t i = 0; i < 4; ++i) {
+        auto frameNode = AceType::MakeRefPtr<FrameNode>("node", 9170 + i, AceType::MakeRefPtr<Pattern>());
+        frameNodes.push_back(frameNode);
+        RefPtr<UINode> uiNode = frameNode;
+        repeatNode->caches_.cacheItem4Rid_[i + 1] = RepeatVirtualScroll2CacheItem::MakeCacheItem(uiNode, true);
+        l1Map[i] = i + 1;
+    }
+    repeatNode->caches_.UpdateL1Rid4Index(l1Map);
+    repeatNode->caches_.RecordPrevL1Rid4Index();
+
+    // node 0 scrolls back into the active range while a deferred deactivation is still
+    // pending (armed by an earlier SetFrameNodeInactive during an implicit animation;
+    // IsImplicitAnimationOpen is a constant false in the test build, so arm the flag
+    // directly the way SetInActiveAfterTransitionOut's producer would)
+    frameNodes[0]->isActive_ = false;
+    frameNodes[0]->NeedSetInActiveAfterTransitionOut(true);
+    EXPECT_TRUE(frameNodes[0]->needSetInActiveAfterTransitionOut_);
+
+    repeatNode->DoSetActiveChildRange(0, 1, 0, 0);
+
+    // reactivation applies SetActive(true) and cancels the pending flag
+    EXPECT_TRUE(frameNodes[0]->IsActive());
+    EXPECT_FALSE(frameNodes[0]->needSetInActiveAfterTransitionOut_);
+}
+
+/**
+ * @tc.name: RepeatVirtualScroll2NodeGetFrameChildCancelDeferredDeactivation001
+ * @tc.desc: GetFrameChildByIndex with addToRenderTree cancels a pending deferred
+ *           SetActive(false) on the reused node
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatVirtualScroll2NodeGetFrameChildCancelDeferredDeactivation001, TestSize.Level1)
+{
+    auto repeatNode = CreateRepeatVirtualNode(10, 10);
+    repeatNode->children_.clear();
+    // cache item nodes are FrameNodes; GetFrameChildByIndex(0) returns the FrameNode itself
+    auto frameNode = AceType::MakeRefPtr<FrameNode>("node", 9180, AceType::MakeRefPtr<Pattern>());
+    frameNode->isActive_ = false;
+    RefPtr<UINode> uiNode = frameNode;
+    constexpr uint32_t TEST_RID = 5;
+    repeatNode->caches_.cacheItem4Rid_[TEST_RID] = RepeatVirtualScroll2CacheItem::MakeCacheItem(uiNode, true);
+    repeatNode->caches_.l1Rid4Index_[0] = TEST_RID;
+
+    // a deferred deactivation is pending when the node is fetched back onto the render tree
+    frameNode->NeedSetInActiveAfterTransitionOut(true);
+    EXPECT_TRUE(frameNode->needSetInActiveAfterTransitionOut_);
+
+    auto child = repeatNode->GetFrameChildByIndex(0, true, false, true);
+    ASSERT_NE(child, nullptr);
+    EXPECT_TRUE(frameNode->IsActive());
+    EXPECT_FALSE(frameNode->needSetInActiveAfterTransitionOut_);
+
+    // isCache fetch keeps the deferred flag untouched: the node is not going back on the
+    // render tree
+    frameNode->NeedSetInActiveAfterTransitionOut(true);
+    auto cacheChild = repeatNode->GetFrameChildByIndex(0, true, true, true);
+    ASSERT_NE(cacheChild, nullptr);
+    EXPECT_TRUE(frameNode->needSetInActiveAfterTransitionOut_);
+}
+
+/**
+ * @tc.name: RepeatVirtualScroll2NodeSetAllowReuseInAnimationAttached001
+ * @tc.desc: SetAllowReuseInAnimation re-runs the parent sync-cache toggle when the option
+ *           arrives while the node is already attached, releases the reference on value
+ *           change and ignores same-value repeats
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatVirtualScroll2NodeSetAllowReuseInAnimationAttached001, TestSize.Level1)
+{
+    auto gridNode = FrameNode::CreateFrameNode(V2::GRID_ETS_TAG, 9210, AceType::MakeRefPtr<GridPattern>());
+    auto gridPattern = gridNode->GetPattern<GridPattern>();
+    ASSERT_NE(gridPattern, nullptr);
+    auto repeatNode = CreateRepeatVirtualNode(10, 10);
+    gridNode->AddChild(repeatNode);
+
+    // attach with the option still unset: container keeps its default, no reference held
+    repeatNode->AttachToMainTree(false);
+    EXPECT_TRUE(repeatNode->IsOnMainTree());
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+
+    // the option arrives after attach (native create() mounts the node synchronously,
+    // TS sets the option right afterwards): the re-toggle registers the reference
+    repeatNode->SetAllowReuseInAnimation(false);
+    EXPECT_TRUE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_FALSE(repeatNode->syncCacheHost_.Invalid());
+
+    // same value again: early return, the single reference is kept
+    repeatNode->SetAllowReuseInAnimation(false);
+    EXPECT_TRUE(gridPattern->IsSyncCacheLayoutEnabled());
+
+    // switching to true while attached releases the reference
+    repeatNode->SetAllowReuseInAnimation(true);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+
+    // and back to false re-registers it
+    repeatNode->SetAllowReuseInAnimation(false);
+    EXPECT_TRUE(gridPattern->IsSyncCacheLayoutEnabled());
+
+    // detach releases the reference and clears the host
+    repeatNode->DetachFromMainTree(false, false);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+
+    // changing the option while detached does not touch the parent
+    repeatNode->SetAllowReuseInAnimation(true);
+    repeatNode->SetAllowReuseInAnimation(false);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+}
+
+/**
+ * @tc.name: GetPrevL1Index4RIDTest035
+ * @tc.desc: GetPrevL1Index4RID resolves the pre-rerender index recorded by RecordPrevL1Rid4Index
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, GetPrevL1Index4RIDTest035, TestSize.Level1)
+{
+    auto caches = CreateCachesWithMockCallback();
+    // no rerender happened yet: prev mapping empty
+    EXPECT_FALSE(caches->GetPrevL1Index4RID(TEST_RID_1).has_value());
+
+    // first rerender: prev still holds nothing
+    std::map<int32_t, uint32_t> first;
+    first[TEST_INDEX_1] = TEST_RID_1;
+    first[TEST_INDEX_2] = TEST_RID_2;
+    caches->UpdateL1Rid4Index(first);
+    EXPECT_FALSE(caches->GetPrevL1Index4RID(TEST_RID_1).has_value());
+
+    // second rerender: record the current mapping into prev, then replace it —
+    // prev now holds the mapping of the first rerender
+    caches->RecordPrevL1Rid4Index();
+    std::map<int32_t, uint32_t> second;
+    second[TEST_INDEX_5] = TEST_RID_2;
+    caches->UpdateL1Rid4Index(second);
+    auto index4Rid1 = caches->GetPrevL1Index4RID(TEST_RID_1);
+    ASSERT_TRUE(index4Rid1.has_value());
+    EXPECT_EQ(index4Rid1.value(), TEST_INDEX_1);
+    auto index4Rid2 = caches->GetPrevL1Index4RID(TEST_RID_2);
+    ASSERT_TRUE(index4Rid2.has_value());
+    EXPECT_EQ(index4Rid2.value(), TEST_INDEX_2);
+    // rid never seen in a previous mapping
+    EXPECT_FALSE(caches->GetPrevL1Index4RID(TEST_RID_2 + 1).has_value());
+}
+
+/**
+ * @tc.name: GetPrevL1Index4NodeTest036
+ * @tc.desc: GetPrevL1Index4Node matches a cached node through the prev mapping
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, GetPrevL1Index4NodeTest036, TestSize.Level1)
+{
+    auto caches = CreateCachesWithMockCallback();
+    RefPtr<UINode> nullNode;
+    EXPECT_FALSE(caches->GetPrevL1Index4Node(nullNode).has_value());
+
+    RefPtr<UINode> node = FrameNode::CreateFrameNode("test", TEST_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    RefPtr<UINode> otherNode = FrameNode::CreateFrameNode("test", TEST_NODE_ID + 1, AceType::MakeRefPtr<Pattern>());
+    caches->cacheItem4Rid_[TEST_RID_1] = RepeatVirtualScroll2CacheItem::MakeCacheItem(node, false);
+    caches->cacheItem4Rid_[TEST_RID_2] = RepeatVirtualScroll2CacheItem::MakeCacheItem(otherNode, false);
+
+    std::map<int32_t, uint32_t> first;
+    first[TEST_INDEX_1] = TEST_RID_1;
+    caches->UpdateL1Rid4Index(first);
+    caches->RecordPrevL1Rid4Index();
+    std::map<int32_t, uint32_t> second;
+    second[TEST_INDEX_2] = TEST_RID_2;
+    caches->UpdateL1Rid4Index(second);
+    // prev == { TEST_INDEX_1 : TEST_RID_1 }: node resolves, otherNode's rid is only in the current mapping
+    auto index4Node = caches->GetPrevL1Index4Node(node);
+    ASSERT_TRUE(index4Node.has_value());
+    EXPECT_EQ(index4Node.value(), TEST_INDEX_1);
+    EXPECT_FALSE(caches->GetPrevL1Index4Node(otherNode).has_value());
+
+    // node not registered in the cache at all
+    auto unknownNode = FrameNode::CreateFrameNode("test", TEST_NODE_ID + 2, AceType::MakeRefPtr<Pattern>());
+    EXPECT_FALSE(caches->GetPrevL1Index4Node(unknownNode).has_value());
+}
+
+/**
+ * @tc.name: ClearPrevL1Rid4IndexTest037
+ * @tc.desc: ClearPrevL1Rid4Index drops the recorded pre-rerender mapping
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, ClearPrevL1Rid4IndexTest037, TestSize.Level1)
+{
+    auto caches = CreateCachesWithMockCallback();
+    RefPtr<UINode> node = FrameNode::CreateFrameNode("test", TEST_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    caches->cacheItem4Rid_[TEST_RID_1] = RepeatVirtualScroll2CacheItem::MakeCacheItem(node, false);
+    std::map<int32_t, uint32_t> first;
+    first[TEST_INDEX_1] = TEST_RID_1;
+    caches->UpdateL1Rid4Index(first);
+    caches->RecordPrevL1Rid4Index();
+    std::map<int32_t, uint32_t> second;
+    second[TEST_INDEX_3] = TEST_RID_1;
+    caches->UpdateL1Rid4Index(second);
+    ASSERT_TRUE(caches->GetPrevL1Index4RID(TEST_RID_1).has_value());
+    ASSERT_TRUE(caches->GetPrevL1Index4Node(node).has_value());
+
+    caches->ClearPrevL1Rid4Index();
+    EXPECT_TRUE(caches->prevL1Rid4Index_.empty());
+    EXPECT_FALSE(caches->GetPrevL1Index4RID(TEST_RID_1).has_value());
+    EXPECT_FALSE(caches->GetPrevL1Index4Node(node).has_value());
+    // the current mapping is untouched
+    EXPECT_EQ(caches->l1Rid4Index_.size(), static_cast<size_t>(1));
+}
+
+/**
+ * @tc.name: UpdateL1Rid4IndexModelNG038
+ * @tc.desc: ModelNG::UpdateL1Rid4Index fires onUpdateDirty and records the pre-rerender
+ *           mapping before replacing it, so a same-frame DoSetActiveChildRange (e.g. the
+ *           one UpdateTotalCount(0) runs) can still resolve the old L1 indices
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, UpdateL1Rid4IndexModelNG038, TestSize.Level1)
+{
+    auto repeatNode = CreateRepeatVirtualNode(6, 6);
+    int32_t dirtyCount = 0;
+    repeatNode->onUpdateDirty_ = [&dirtyCount]() { ++dirtyCount; };
+    // ensure a clean starting state: prevL1Rid4Index_ may be non-empty from
+    // earlier tests sharing the same node via ElementRegister
+    repeatNode->caches_.ClearPrevL1Rid4Index();
+    // L1 mapping as left by the previous rerender
+    std::map<int32_t, uint32_t> oldMap = { { 0, 1 }, { 1, 2 } };
+    repeatNode->caches_.UpdateL1Rid4Index(oldMap);
+    EXPECT_TRUE(repeatNode->caches_.prevL1Rid4Index_.empty());
+
+    std::map<int32_t, uint32_t> newMap = { { 2, 3 }, { 3, 4 } };
+    RepeatVirtualScroll2ModelNG repeatModel;
+    repeatModel.UpdateL1Rid4Index(repeatNode->GetId(), 4, 10, 0, newMap);
+
+    // onUpdateDirty fired exactly once, before the mapping was replaced
+    EXPECT_EQ(dirtyCount, 1);
+    // the pre-rerender mapping holds the old L1 indices and survives the replacement
+    auto prevIndex = repeatNode->caches_.GetPrevL1Index4RID(1);
+    ASSERT_TRUE(prevIndex.has_value());
+    EXPECT_EQ(prevIndex.value(), 0);
+    // the new mapping is installed, counts are updated
+    EXPECT_EQ(repeatNode->caches_.l1Rid4Index_, newMap);
+    EXPECT_EQ(repeatNode->totalCount_, 10u);
+    EXPECT_EQ(repeatNode->arrLen_, 4u);
+}
+
+/**
+ * @tc.name: RepeatNodeSetAllowReuseInAnimationTest045
+ * @tc.desc: SetAllowReuseInAnimation stores the tri-state value
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatNodeSetAllowReuseInAnimationTest045, TestSize.Level1)
+{
+    auto repeatNode = RepeatNode::GetOrCreateRepeatNode(TEST_REPEAT_NODE_ID);
+    EXPECT_FALSE(repeatNode->isAllowReuseInAnimation_.has_value());
+    repeatNode->SetAllowReuseInAnimation(false);
+    ASSERT_TRUE(repeatNode->isAllowReuseInAnimation_.has_value());
+    EXPECT_FALSE(repeatNode->isAllowReuseInAnimation_.value());
+    repeatNode->SetAllowReuseInAnimation(true);
+    ASSERT_TRUE(repeatNode->isAllowReuseInAnimation_.has_value());
+    EXPECT_TRUE(repeatNode->isAllowReuseInAnimation_.value());
+    repeatNode->SetAllowReuseInAnimation(std::nullopt);
+    EXPECT_FALSE(repeatNode->isAllowReuseInAnimation_.has_value());
+}
+
+/**
+ * @tc.name: RepeatNodeIsAllowAnimationTest046
+ * @tc.desc: Explicitly set allowReuseInAnimation has priority over the non-List parent default
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatNodeIsAllowAnimationTest046, TestSize.Level1)
+{
+    auto repeatNode = RepeatNode::GetOrCreateRepeatNode(TEST_REPEAT_NODE_ID_2);
+    repeatNode->SetAllowReuseInAnimation(std::nullopt);
+    auto parentNode = FrameNode::CreateFrameNode(
+        V2::COLUMN_ETS_TAG, TEST_COLUMN_PARENT_ID, AceType::MakeRefPtr<Pattern>());
+    repeatNode->SetParent(parentNode);
+    // default: parent is not List -> false
+    EXPECT_FALSE(repeatNode->IsAllowAnimation());
+    // explicitly disallow reuse in animation -> animation allowed
+    repeatNode->SetAllowReuseInAnimation(false);
+    EXPECT_TRUE(repeatNode->IsAllowAnimation());
+    // explicitly allow reuse in animation -> animation disallowed
+    repeatNode->SetAllowReuseInAnimation(true);
+    EXPECT_FALSE(repeatNode->IsAllowAnimation());
+}
+
+/**
+ * @tc.name: RepeatNodeIsAllowAnimationTest047
+ * @tc.desc: Explicitly set allowReuseInAnimation has priority over the List parent default
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatNodeIsAllowAnimationTest047, TestSize.Level1)
+{
+    auto repeatNode = RepeatNode::GetOrCreateRepeatNode(TEST_REPEAT_NODE_ID_2);
+    repeatNode->SetAllowReuseInAnimation(std::nullopt);
+    auto listNode = FrameNode::CreateFrameNode(
+        V2::LIST_ETS_TAG, TEST_LIST_PARENT_ID, AceType::MakeRefPtr<Pattern>());
+    repeatNode->SetParent(listNode);
+    // default: parent is List -> true
+    EXPECT_TRUE(repeatNode->IsAllowAnimation());
+    // explicitly disallow reuse in animation: same result as the List default
+    repeatNode->SetAllowReuseInAnimation(false);
+    EXPECT_TRUE(repeatNode->IsAllowAnimation());
+    // explicitly allow reuse in animation overrides the List default
+    repeatNode->SetAllowReuseInAnimation(true);
+    EXPECT_FALSE(repeatNode->IsAllowAnimation());
+}
+
+/**
+ * @tc.name: RepeatNodeIsAllowAnimationTest048
+ * @tc.desc: Explicitly set allowReuseInAnimation has priority over the allowReuse id set
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatNodeIsAllowAnimationTest048, TestSize.Level1)
+{
+    LazyForEachUtils::SetIdsForRepeatAnimationAllowReuse(TEST_INSPECTOR_ID);
+    auto listNode = FrameNode::CreateFrameNode(
+        V2::LIST_ETS_TAG, TEST_LIST_PARENT_ID, AceType::MakeRefPtr<Pattern>());
+    listNode->UpdateInspectorId(TEST_INSPECTOR_ID);
+    auto repeatNode = RepeatNode::GetOrCreateRepeatNode(TEST_REPEAT_NODE_ID_2);
+    repeatNode->SetAllowReuseInAnimation(std::nullopt);
+    repeatNode->SetParent(listNode);
+    // default: List parent whose id is in the allowReuse set -> false
+    EXPECT_FALSE(repeatNode->IsAllowAnimation());
+    // explicitly disallow reuse in animation has the highest priority
+    repeatNode->SetAllowReuseInAnimation(false);
+    EXPECT_TRUE(repeatNode->IsAllowAnimation());
+    LazyForEachUtils::SetIdsForRepeatAnimationAllowReuse("");
+}
+
+/**
+ * @tc.name: RepeatNodeOnAttachSyncCacheGridTest049
+ * @tc.desc: Attach/detach holds and releases the sync-cache reference on a Grid parent
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatNodeOnAttachSyncCacheGridTest049, TestSize.Level1)
+{
+    auto gridNode = FrameNode::CreateFrameNode(
+        V2::GRID_ETS_TAG, TEST_GRID_PARENT_ID, AceType::MakeRefPtr<GridPattern>());
+    auto gridPattern = gridNode->GetPattern<GridPattern>();
+    ASSERT_NE(gridPattern, nullptr);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    auto repeatNode = RepeatNode::GetOrCreateRepeatNode(TEST_REPEAT_NODE_ID);
+    repeatNode->SetAllowReuseInAnimation(false);
+    gridNode->AddChild(repeatNode);
+    repeatNode->OnAttachToMainTree(false);
+    EXPECT_TRUE(gridPattern->IsSyncCacheLayoutEnabled());
+    repeatNode->OnDetachFromMainTree(false, nullptr);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+}
+
+/**
+ * @tc.name: RepeatNodeOnAttachSyncCacheWaterFlowTest050
+ * @tc.desc: Attach/detach holds and releases the sync-cache reference on a WaterFlow parent
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatNodeOnAttachSyncCacheWaterFlowTest050, TestSize.Level1)
+{
+    auto waterFlowNode = FrameNode::CreateFrameNode(
+        V2::WATERFLOW_ETS_TAG, TEST_WATERFLOW_PARENT_ID, AceType::MakeRefPtr<WaterFlowPattern>());
+    auto waterFlowPattern = waterFlowNode->GetPattern<WaterFlowPattern>();
+    ASSERT_NE(waterFlowPattern, nullptr);
+    EXPECT_FALSE(waterFlowPattern->IsSyncCacheLayoutEnabled());
+    auto repeatNode = RepeatNode::GetOrCreateRepeatNode(TEST_REPEAT_NODE_ID);
+    repeatNode->SetAllowReuseInAnimation(false);
+    waterFlowNode->AddChild(repeatNode);
+    repeatNode->OnAttachToMainTree(false);
+    EXPECT_TRUE(waterFlowPattern->IsSyncCacheLayoutEnabled());
+    repeatNode->OnDetachFromMainTree(false, nullptr);
+    EXPECT_FALSE(waterFlowPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+}
+
+/**
+ * @tc.name: RepeatNodeOnAttachSyncCacheNotQualifiedTest051
+ * @tc.desc: Attach does not hold the sync-cache reference when the option is unset or true
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatNodeOnAttachSyncCacheNotQualifiedTest051, TestSize.Level1)
+{
+    auto gridNode = FrameNode::CreateFrameNode(
+        V2::GRID_ETS_TAG, TEST_GRID_PARENT_ID, AceType::MakeRefPtr<GridPattern>());
+    auto gridPattern = gridNode->GetPattern<GridPattern>();
+    ASSERT_NE(gridPattern, nullptr);
+    auto repeatNode = RepeatNode::GetOrCreateRepeatNode(TEST_REPEAT_NODE_ID);
+    gridNode->AddChild(repeatNode);
+
+    // unset option keeps the container default
+    repeatNode->SetAllowReuseInAnimation(std::nullopt);
+    repeatNode->OnAttachToMainTree(false);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+    repeatNode->OnDetachFromMainTree(false, nullptr);
+
+    // explicitly true keeps the container default
+    repeatNode->SetAllowReuseInAnimation(true);
+    repeatNode->OnAttachToMainTree(false);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+    repeatNode->OnDetachFromMainTree(false, nullptr);
+}
+
+/**
+ * @tc.name: RepeatNodeSetAllowReuseInAnimationAttached001
+ * @tc.desc: SetAllowReuseInAnimation re-runs the parent sync-cache toggle when the option
+ *           arrives while the node is already attached, releases the reference on value
+ *           change and ignores same-value repeats
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatNodeSetAllowReuseInAnimationAttached001, TestSize.Level1)
+{
+    auto gridNode = FrameNode::CreateFrameNode(
+        V2::GRID_ETS_TAG, TEST_GRID_PARENT_ID, AceType::MakeRefPtr<GridPattern>());
+    auto gridPattern = gridNode->GetPattern<GridPattern>();
+    ASSERT_NE(gridPattern, nullptr);
+    auto repeatNode = RepeatNode::GetOrCreateRepeatNode(TEST_REPEAT_NODE_ID);
+    gridNode->AddChild(repeatNode);
+
+    // attach with the option still unset: container keeps its default, no reference held
+    repeatNode->AttachToMainTree(false);
+    EXPECT_TRUE(repeatNode->IsOnMainTree());
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+
+    // the option arrives after attach: the re-toggle registers the reference
+    repeatNode->SetAllowReuseInAnimation(false);
+    EXPECT_TRUE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_FALSE(repeatNode->syncCacheHost_.Invalid());
+
+    // same value again: early return, the single reference is kept
+    repeatNode->SetAllowReuseInAnimation(false);
+    EXPECT_TRUE(gridPattern->IsSyncCacheLayoutEnabled());
+
+    // switching to true while attached releases the reference, back to false re-registers
+    repeatNode->SetAllowReuseInAnimation(true);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    repeatNode->SetAllowReuseInAnimation(false);
+    EXPECT_TRUE(gridPattern->IsSyncCacheLayoutEnabled());
+
+    // detach releases the reference; changing the option afterwards does not touch the parent
+    repeatNode->DetachFromMainTree(false, false);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+    repeatNode->SetAllowReuseInAnimation(true);
+    repeatNode->SetAllowReuseInAnimation(false);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+}
+
+/**
+ * @tc.name: RepeatNodeOnAttachSyncCacheNonContainerParentTest052
+ * @tc.desc: Attach does not hold the sync-cache reference when the parent is not Grid/WaterFlow
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatNodeOnAttachSyncCacheNonContainerParentTest052, TestSize.Level1)
+{
+    auto parentNode = FrameNode::CreateFrameNode(
+        V2::COLUMN_ETS_TAG, TEST_COLUMN_PARENT_ID, AceType::MakeRefPtr<Pattern>());
+    auto repeatNode = RepeatNode::GetOrCreateRepeatNode(TEST_REPEAT_NODE_ID);
+    repeatNode->SetAllowReuseInAnimation(false);
+    parentNode->AddChild(repeatNode);
+    repeatNode->OnAttachToMainTree(false);
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+    repeatNode->OnDetachFromMainTree(false, nullptr);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: RepeatNodeOnAttachSyncCacheIdempotentTest053
+ * @tc.desc: Repeated attach holds only one sync-cache reference
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatNodeOnAttachSyncCacheIdempotentTest053, TestSize.Level1)
+{
+    auto gridNode = FrameNode::CreateFrameNode(
+        V2::GRID_ETS_TAG, TEST_GRID_PARENT_ID, AceType::MakeRefPtr<GridPattern>());
+    auto gridPattern = gridNode->GetPattern<GridPattern>();
+    ASSERT_NE(gridPattern, nullptr);
+    auto repeatNode = RepeatNode::GetOrCreateRepeatNode(TEST_REPEAT_NODE_ID);
+    repeatNode->SetAllowReuseInAnimation(false);
+    gridNode->AddChild(repeatNode);
+    repeatNode->OnAttachToMainTree(false);
+    repeatNode->OnAttachToMainTree(false);
+    EXPECT_TRUE(gridPattern->IsSyncCacheLayoutEnabled());
+    // a single detach fully releases the reference -> only one reference was held
+    repeatNode->OnDetachFromMainTree(false, nullptr);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+}
+
+/**
+ * @tc.name: LazyForEachUtilsToggleParentSyncCacheLayoutDisableTest054
+ * @tc.desc: Disable branch: empty host no-op, Grid/WaterFlow host releases, other host resets
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, LazyForEachUtilsToggleParentSyncCacheLayoutDisableTest054, TestSize.Level1)
+{
+    auto repeatNode = RepeatNode::GetOrCreateRepeatNode(TEST_REPEAT_NODE_ID);
+
+    // empty host: nothing to release
+    WeakPtr<FrameNode> emptyHost;
+    LazyForEachUtils::ToggleParentSyncCacheLayout(repeatNode, false, std::optional<bool>(false), true, emptyHost);
+    EXPECT_TRUE(emptyHost.Invalid());
+
+    // Grid host: one disable releases one reference (one attach = one host record)
+    auto gridNode = FrameNode::CreateFrameNode(
+        V2::GRID_ETS_TAG, TEST_GRID_PARENT_ID, AceType::MakeRefPtr<GridPattern>());
+    auto gridPattern = gridNode->GetPattern<GridPattern>();
+    ASSERT_NE(gridPattern, nullptr);
+    gridPattern->AddSyncCacheLayoutChild();
+    WeakPtr<FrameNode> gridHost = gridNode;
+    LazyForEachUtils::ToggleParentSyncCacheLayout(repeatNode, false, std::optional<bool>(false), true, gridHost);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(gridHost.Invalid());
+    // second disable on already-reset host is a no-op (clamped at zero)
+    LazyForEachUtils::ToggleParentSyncCacheLayout(repeatNode, false, std::optional<bool>(false), true, gridHost);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+
+    // WaterFlow host: releases the reference
+    auto waterFlowNode = FrameNode::CreateFrameNode(
+        V2::WATERFLOW_ETS_TAG, TEST_WATERFLOW_PARENT_ID, AceType::MakeRefPtr<WaterFlowPattern>());
+    auto waterFlowPattern = waterFlowNode->GetPattern<WaterFlowPattern>();
+    ASSERT_NE(waterFlowPattern, nullptr);
+    waterFlowPattern->AddSyncCacheLayoutChild();
+    WeakPtr<FrameNode> waterFlowHost = waterFlowNode;
+    LazyForEachUtils::ToggleParentSyncCacheLayout(repeatNode, false, std::optional<bool>(false), true, waterFlowHost);
+    EXPECT_FALSE(waterFlowPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(waterFlowHost.Invalid());
+
+    // host without Grid/WaterFlow pattern: host is reset, no crash
+    auto columnNode = FrameNode::CreateFrameNode(
+        V2::COLUMN_ETS_TAG, TEST_COLUMN_PARENT_ID, AceType::MakeRefPtr<Pattern>());
+    WeakPtr<FrameNode> columnHost = columnNode;
+    LazyForEachUtils::ToggleParentSyncCacheLayout(repeatNode, false, std::optional<bool>(false), true, columnHost);
+    EXPECT_TRUE(columnHost.Invalid());
+}
+
+/**
+ * @tc.name: LazyForEachUtilsToggleParentSyncCacheLayoutEnableTest055
+ * @tc.desc: Enable branch: qualified node holds exactly one reference and records the host
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, LazyForEachUtilsToggleParentSyncCacheLayoutEnableTest055, TestSize.Level1)
+{
+    auto repeatNode = RepeatNode::GetOrCreateRepeatNode(TEST_REPEAT_NODE_ID);
+    auto gridNode = FrameNode::CreateFrameNode(
+        V2::GRID_ETS_TAG, TEST_GRID_PARENT_ID, AceType::MakeRefPtr<GridPattern>());
+    auto gridPattern = gridNode->GetPattern<GridPattern>();
+    ASSERT_NE(gridPattern, nullptr);
+    gridNode->AddChild(repeatNode);
+
+    WeakPtr<FrameNode> host;
+    LazyForEachUtils::ToggleParentSyncCacheLayout(repeatNode, true, std::optional<bool>(false), true, host);
+    EXPECT_TRUE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_FALSE(host.Invalid());
+
+    // already holding a reference: repeated enable does not add a second one
+    LazyForEachUtils::ToggleParentSyncCacheLayout(repeatNode, true, std::optional<bool>(false), true, host);
+    EXPECT_TRUE(gridPattern->IsSyncCacheLayoutEnabled());
+    LazyForEachUtils::ToggleParentSyncCacheLayout(repeatNode, false, std::optional<bool>(false), true, host);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(host.Invalid());
+}
+
+/**
+ * @tc.name: LazyForEachUtilsToggleParentSyncCacheLayoutDisqualifyTest056
+ * @tc.desc: Enable branch: null node / not repeat / unset / true / non-FrameNode parent never adds
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, LazyForEachUtilsToggleParentSyncCacheLayoutDisqualifyTest056, TestSize.Level1)
+{
+    auto gridNode = FrameNode::CreateFrameNode(
+        V2::GRID_ETS_TAG, TEST_GRID_PARENT_ID, AceType::MakeRefPtr<GridPattern>());
+    auto gridPattern = gridNode->GetPattern<GridPattern>();
+    ASSERT_NE(gridPattern, nullptr);
+    auto repeatNode = RepeatNode::GetOrCreateRepeatNode(TEST_REPEAT_NODE_ID);
+    gridNode->AddChild(repeatNode);
+
+    WeakPtr<FrameNode> host;
+    // null node
+    LazyForEachUtils::ToggleParentSyncCacheLayout(nullptr, true, std::optional<bool>(false), true, host);
+    // not in Repeat mode
+    LazyForEachUtils::ToggleParentSyncCacheLayout(repeatNode, true, std::optional<bool>(false), false, host);
+    // option unset
+    LazyForEachUtils::ToggleParentSyncCacheLayout(repeatNode, true, std::optional<bool> {}, true, host);
+    // option explicitly true
+    LazyForEachUtils::ToggleParentSyncCacheLayout(repeatNode, true, std::optional<bool>(true), true, host);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(host.Invalid());
+
+    // direct parent is not a FrameNode
+    auto syntaxParent = RepeatNode::GetOrCreateRepeatNode(TEST_REPEAT_NODE_ID_2);
+    syntaxParent->AddChild(repeatNode);
+    LazyForEachUtils::ToggleParentSyncCacheLayout(repeatNode, true, std::optional<bool>(false), true, host);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(host.Invalid());
+}
+
+/**
+ * @tc.name: RepeatSyntaxSetAllowReuseInAnimationTest022
+ * @tc.desc: SetAllowReuseInAnimation forwards the tri-state value to the RepeatNode on the stack
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatSyntaxSetAllowReuseInAnimationTest022, TestSize.Level1)
+{
+    RepeatModelNG repeatModel;
+    repeatModel.StartRender();
+    auto repeatNode = AceType::DynamicCast<RepeatNode>(ViewStackProcessor::GetInstance()->GetMainElementNode());
+    ASSERT_NE(repeatNode, nullptr);
+    EXPECT_FALSE(repeatNode->isAllowReuseInAnimation_.has_value());
+    repeatModel.SetAllowReuseInAnimation(false);
+    ASSERT_TRUE(repeatNode->isAllowReuseInAnimation_.has_value());
+    EXPECT_FALSE(repeatNode->isAllowReuseInAnimation_.value());
+    repeatModel.SetAllowReuseInAnimation(std::nullopt);
+    EXPECT_FALSE(repeatNode->isAllowReuseInAnimation_.has_value());
+    std::list<int32_t> removedElmtIds;
+    repeatModel.FinishRender(removedElmtIds);
+}
+
+/**
+ * @tc.name: RepeatSyntaxSetAllowReuseInAnimationTest023
+ * @tc.desc: SetAllowReuseInAnimation is a no-op when the stack main element is not a RepeatNode
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatSyntaxSetAllowReuseInAnimationTest023, TestSize.Level1)
+{
+    // create a RepeatNode that is NOT on the ViewStackProcessor
+    auto repeatNode = RepeatNode::GetOrCreateRepeatNode(TEST_REPEAT_NODE_ID);
+    ASSERT_NE(repeatNode, nullptr);
+    repeatNode->SetAllowReuseInAnimation(std::nullopt);
+    EXPECT_FALSE(repeatNode->isAllowReuseInAnimation_.has_value());
+    // stack main element is not a RepeatNode: the call is a silent no-op
+    RepeatModelNG repeatModel;
+    repeatModel.SetAllowReuseInAnimation(false);
+    // the RepeatNode's state must remain unchanged
+    EXPECT_FALSE(repeatNode->isAllowReuseInAnimation_.has_value());
+}
+
+/**
+ * @tc.name: RepeatVirtualScroll2SyntaxSetAllowReuseInAnimationTest023
+ * @tc.desc: SetAllowReuseInAnimation falls back to the ElementRegister lookup by elmt id
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatVirtualScroll2SyntaxSetAllowReuseInAnimationTest023, TestSize.Level1)
+{
+    constexpr int32_t testMemOptStrategy = 0;
+    auto onGetRid4Index = [](int32_t index, bool inAnimation, bool forceCreateNewChild) -> std::pair<uint32_t, uint32_t>
+    {
+        return { static_cast<uint32_t>(index), 0 };
+    };
+    auto onRecycleItems = [](int32_t start, int32_t end) {};
+    auto onActiveRange = [](int32_t start, int32_t end, int32_t cacheStart,
+        int32_t cacheEnd, bool isCache, bool isImmediate) {};
+    auto onMoveFromTo = [](int32_t from, int32_t to) {};
+    auto onPurge = []() {};
+    auto onPurgeAll = []() {};
+    auto onUpdateDirty = []() {};
+    auto repeatNode = RepeatVirtualScroll2Node::GetOrCreateRepeatNode(TEST_REPEAT_ELMT_ID_2, TEST_ARR_LEN,
+        TEST_TOTAL_COUNT, testMemOptStrategy, onGetRid4Index, onRecycleItems, onActiveRange, onMoveFromTo, onPurge,
+        onPurgeAll, onUpdateDirty);
+    ASSERT_NE(repeatNode, nullptr);
+    EXPECT_FALSE(repeatNode->isAllowReuseInAnimation_.has_value());
+    // stack main element is not a RepeatVirtualScroll2Node: fall back to the elmt id
+    auto columnNode =
+        FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, TEST_REPEAT_ELMT_ID, AceType::MakeRefPtr<Pattern>());
+    ViewStackProcessor::GetInstance()->Push(columnNode);
+    RepeatVirtualScroll2ModelNG model;
+    model.SetAllowReuseInAnimation(TEST_REPEAT_ELMT_ID_2, false);
+    ASSERT_TRUE(repeatNode->isAllowReuseInAnimation_.has_value());
+    EXPECT_FALSE(repeatNode->isAllowReuseInAnimation_.value());
+    model.SetAllowReuseInAnimation(TEST_REPEAT_ELMT_ID_2, std::nullopt);
+    EXPECT_FALSE(repeatNode->isAllowReuseInAnimation_.has_value());
+    ViewStackProcessor::GetInstance()->Pop();
+}
+
+/**
+ * @tc.name: RepeatVirtualScroll2SyntaxSetAllowReuseInAnimationTest024
+ * @tc.desc: SetAllowReuseInAnimation prefers the stack main element over the elmt id
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatVirtualScroll2SyntaxSetAllowReuseInAnimationTest024, TestSize.Level1)
+{
+    constexpr int32_t testMemOptStrategy = 0;
+    auto onGetRid4Index = [](int32_t index, bool inAnimation, bool forceCreateNewChild) -> std::pair<uint32_t, uint32_t>
+    {
+        return { static_cast<uint32_t>(index), 0 };
+    };
+    auto onRecycleItems = [](int32_t start, int32_t end) {};
+    auto onActiveRange = [](int32_t start, int32_t end, int32_t cacheStart,
+        int32_t cacheEnd, bool isCache, bool isImmediate) {};
+    auto onMoveFromTo = [](int32_t from, int32_t to) {};
+    auto onPurge = []() {};
+    auto onPurgeAll = []() {};
+    auto onUpdateDirty = []() {};
+    auto repeatNode = RepeatVirtualScroll2Node::GetOrCreateRepeatNode(TEST_REPEAT_ELMT_ID_2, TEST_ARR_LEN,
+        TEST_TOTAL_COUNT, testMemOptStrategy, onGetRid4Index, onRecycleItems, onActiveRange, onMoveFromTo, onPurge,
+        onPurgeAll, onUpdateDirty);
+    ASSERT_NE(repeatNode, nullptr);
+    repeatNode->SetAllowReuseInAnimation(std::nullopt);
+    // stack main element is the node itself: the elmt id is ignored
+    ViewStackProcessor::GetInstance()->Push(repeatNode);
+    RepeatVirtualScroll2ModelNG model;
+    model.SetAllowReuseInAnimation(INVALID_REPEAT_ELMT_ID, true);
+    ASSERT_TRUE(repeatNode->isAllowReuseInAnimation_.has_value());
+    EXPECT_TRUE(repeatNode->isAllowReuseInAnimation_.value());
+    ViewStackProcessor::GetInstance()->Pop();
+    repeatNode->SetAllowReuseInAnimation(std::nullopt);
+}
+
+/**
+ * @tc.name: RepeatVirtualScroll2SyntaxSetAllowReuseInAnimationTest025
+ * @tc.desc: SetAllowReuseInAnimation is a no-op when neither the stack nor the elmt id
+ *           resolves to a RepeatVirtualScroll2Node
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatVirtualScroll2SyntaxSetAllowReuseInAnimationTest025, TestSize.Level1)
+{
+    // stack main element is a plain Column, not a RepeatVirtualScroll2Node
+    auto columnNode =
+        FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, TEST_REPEAT_ELMT_ID, AceType::MakeRefPtr<Pattern>());
+    ViewStackProcessor::GetInstance()->Push(columnNode);
+    // INVALID_REPEAT_ELMT_ID does not resolve to any registered node
+    RepeatVirtualScroll2ModelNG model;
+    model.SetAllowReuseInAnimation(INVALID_REPEAT_ELMT_ID, false);
+    // verify the stack main element is still the Column (unchanged)
+    auto stackMain = ViewStackProcessor::GetInstance()->GetMainElementNode();
+    ASSERT_NE(stackMain, nullptr);
+    EXPECT_EQ(stackMain->GetId(), columnNode->GetId());
+    // verify no RepeatVirtualScroll2Node was affected: none registered under INVALID_REPEAT_ELMT_ID
+    auto notFound =
+        ElementRegister::GetInstance()->GetSpecificItemById<RepeatVirtualScroll2Node>(INVALID_REPEAT_ELMT_ID);
+    EXPECT_EQ(notFound, nullptr);
+    ViewStackProcessor::GetInstance()->Pop();
 }
 
 } // namespace OHOS::Ace::NG
