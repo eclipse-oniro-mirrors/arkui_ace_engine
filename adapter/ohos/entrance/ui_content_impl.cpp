@@ -4562,7 +4562,6 @@ void UIContentImpl::UpdateViewportConfigWithAnimation(const ViewportConfig& conf
                 if (originalReason != OHOS::Rosen::WindowSizeChangeReason::PAGE_ROTATION) {
                     // Page rotation has most of the same logic as regular rotation,
                     // but page rotation does not trigger rotation animations.
-                    LOGI("StartWindowAnimation with reason: %{public}d", reason);
                     pipelineContext->StartWindowAnimation();
                 }
                 // SCENE_WITH_ANIMATION does not require refreshing all nodes
@@ -4960,7 +4959,6 @@ void UIContentImpl::NotifyRotationAnimationEnd()
         [container]() {
             auto pipelineContext = container->GetPipelineContext();
             if (pipelineContext) {
-                LOGI("StopWindowAnimation: %{public}d", pipelineContext->GetInstanceId());
                 pipelineContext->StopWindowAnimation();
             }
         },
