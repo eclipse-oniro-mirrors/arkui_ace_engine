@@ -32,6 +32,7 @@
 #include "test/mock/interfaces/inner_api/ui_session/mock_ui_session_manager.h"
 
 #include "accesstoken_kit.h"
+#include "ipc_skeleton.h"
 
 #include <functional>
 #include <memory>
@@ -71,6 +72,11 @@ constexpr int64_t TRANSLATE_SECOND_VERSION = 2;
 constexpr int64_t TRANSLATE_THIRD_VERSION = 3;
 constexpr int64_t TRANSLATE_LARGE_VERSION = 3000000000;
 
+constexpr uint32_t UI_SA_UID = 16666;
+constexpr uint32_t MSDP_UID = 6699;
+constexpr uint32_t APP_CONTROLLER_SERVICE_UID = 7101;
+constexpr uint32_t UNTRUSTED_CALLER_UID = 1000;
+
 struct TranslateScopeTestData {
     int32_t scope;
     bool expected;
@@ -104,7 +110,18 @@ void PrepareValidUiSessionParcel(MessageParcel& data)
 }
 } // namespace
 
-class UIContentStubTest : public testing::Test {};
+class UIContentStubTest : public testing::Test {
+public:
+    void SetUp() override
+    {
+        IPCSkeleton::mockCallingUid_ = UI_SA_UID;
+    }
+
+    void TearDown() override
+    {
+        IPCSkeleton::mockCallingUid_ = 0;
+    }
+};
 
 /**
  * @tc.name: UIContentStubTest001
@@ -2951,6 +2968,98 @@ HWTEST_F(RemoteStubLifetimeTest, DescriptorMismatchDoesNotRetainOwner, TestSize.
     auto local = stub->QueryLocalInterface(u"unrelated.interface");
     EXPECT_EQ(local, nullptr);
     EXPECT_EQ(stub.use_count(), owners);
+}
+
+class UIContentStubCallerWhitelistTest : public testing::Test {
+public:
+    void SetUp() override
+    {
+        Security::AccessToken::AccessTokenKit::mockTokenTypeFlag_ =
+            Security::AccessToken::ATokenTypeEnum::TOKEN_NATIVE;
+        IPCSkeleton::mockCallingUid_ = UI_SA_UID;
+    }
+
+    void TearDown() override
+    {
+        Security::AccessToken::AccessTokenKit::mockTokenTypeFlag_ =
+            Security::AccessToken::ATokenTypeEnum::TOKEN_INVALID;
+        IPCSkeleton::mockCallingUid_ = UI_SA_UID;
+    }
+
+    static int32_t Dispatch(const sptr<UIContentServiceStubImpl>& stub, uint32_t code)
+    {
+        MessageParcel data = MessageParcel();
+        MessageParcel reply = MessageParcel();
+        MessageOption option = MessageOption();
+        data.WriteInterfaceToken(u"ohos.ace.UIContentService");
+        return stub->OnRemoteRequest(code, data, reply, option);
+    }
+};
+
+/**
+ * @tc.name: UIContentStubCallerWhitelistTest001
+ * @tc.desc: The three whitelisted SA uids are accepted.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubCallerWhitelistTest, UIContentStubCallerWhitelistTest001, TestSize.Level1)
+{
+    EXPECT_TRUE(UiContentStub::IsTrustedCallerUid(UI_SA_UID));
+    EXPECT_TRUE(UiContentStub::IsTrustedCallerUid(MSDP_UID));
+    EXPECT_TRUE(UiContentStub::IsTrustedCallerUid(APP_CONTROLLER_SERVICE_UID));
+}
+
+/**
+ * @tc.name: UIContentStubCallerWhitelistTest002
+ * @tc.desc: Uids outside the whitelist are rejected.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubCallerWhitelistTest, UIContentStubCallerWhitelistTest002, TestSize.Level1)
+{
+    EXPECT_FALSE(UiContentStub::IsTrustedCallerUid(0));
+    EXPECT_FALSE(UiContentStub::IsTrustedCallerUid(UNTRUSTED_CALLER_UID));
+    EXPECT_FALSE(UiContentStub::IsTrustedCallerUid(5523));
+    EXPECT_FALSE(UiContentStub::IsTrustedCallerUid(UI_SA_UID + 1));
+}
+
+/**
+ * @tc.name: UIContentStubCallerWhitelistTest003
+ * @tc.desc: A whitelisted caller uid may query and connect.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubCallerWhitelistTest, UIContentStubCallerWhitelistTest003, TestSize.Level1)
+{
+    auto stub = std::make_shared<UIContentServiceStubImpl>();
+    EXPECT_EQ(Dispatch(stub, IUiContentService::UI_CONTENT_SERVICE_GET_TREE), NO_ERROR);
+    EXPECT_EQ(Dispatch(stub, IUiContentService::GET_VISIBLE_TREE), NO_ERROR);
+}
+
+/**
+ * @tc.name: UIContentStubCallerWhitelistTest004
+ * @tc.desc: A caller uid outside the whitelist cannot query or connect.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubCallerWhitelistTest, UIContentStubCallerWhitelistTest004, TestSize.Level1)
+{
+    IPCSkeleton::mockCallingUid_ = UNTRUSTED_CALLER_UID;
+    auto stub = std::make_shared<UIContentServiceStubImpl>();
+    EXPECT_EQ(Dispatch(stub, IUiContentService::UI_CONTENT_SERVICE_GET_TREE), -1);
+    EXPECT_EQ(Dispatch(stub, IUiContentService::UI_CONTENT_CONNECT), -1);
+    EXPECT_EQ(Dispatch(stub, IUiContentService::GET_VISIBLE_TREE), -1);
+}
+
+/**
+ * @tc.name: UIContentStubCallerWhitelistTest005
+ * @tc.desc: Only native SA tokens may pass, application and shell tokens are rejected.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubCallerWhitelistTest, UIContentStubCallerWhitelistTest005, TestSize.Level1)
+{
+    using namespace Security::AccessToken;
+    auto stub = std::make_shared<UIContentServiceStubImpl>();
+    for (auto token : { ATokenTypeEnum::TOKEN_HAP, ATokenTypeEnum::TOKEN_SHELL, ATokenTypeEnum::TOKEN_INVALID }) {
+        AccessTokenKit::mockTokenTypeFlag_ = token;
+        EXPECT_EQ(Dispatch(stub, IUiContentService::UI_CONTENT_SERVICE_GET_TREE), -1);
+    }
 }
 
 } // namespace OHOS::Ace::NG

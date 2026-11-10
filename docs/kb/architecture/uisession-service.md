@@ -1,7 +1,7 @@
 # UISession Service Context
 
-> 文档版本：v1.2
-> 更新时间：2026-10-20
+> 文档版本：v1.3
+> 更新时间：2026-11-10
 > 来源：`docs/context_registry.json` 主题 `UISessionService`
 
 ## 定位
@@ -9,6 +9,14 @@
 UISession 是 ArkUI 在应用进程内提供给系统 SA、调试工具和 AI 能力的内部 UI 会话通道，负责将跨进程请求转换为 Pipeline、组件树、Web、翻译和内容变化检测的内部操作。它不是面向应用的公共组件或 Public API，而是框架内部 IPC 通道和状态管理中心。
 
 本 KB 只提供稳定的源码、SDK、测试和 Spec 路由。具体事件传递细节、门控逻辑、翻译流程和并发保护应回到当前源码、测试与相关 Spec 核实。
+
+### 调用方白名单
+
+`UiContentStub::IsTrustedCaller` 在 `OnRemoteRequest` 入口校验调用方：token 类型必须是 `TOKEN_NATIVE`，且 `IPCSkeleton::GetCallingUid()` 必须在白名单 uid 内（`ui_sa` 16666、`msdp` 6699、`ai_app_controller_service` 7101，对应各自 cfg 的 `uid` 账户）。WMS 只负责把 `IUiContentService` remote 交给请求方，proxy 发出去就收不回，所以只能在应用进程侧的接收端收口；binder 不暴露 calling SA id。
+
+写法对齐 ability_runtime：`services/appmgr/src/app_mgr_service.cpp` 的 `IsTrustedAttributionCaller()` 就是“uid 常量 + `GetCallingUid()` 判定”，这里把三个 uid 与常量表都收在 `IsTrustedCallerUid()` 函数内查表匹配。应用进程是 normal APL，`GetNativeTokenInfo`/`GetHapTokenInfo` 会被 accesstoken 以 `Perm denied` 拒绝，所以这里不查 token 详情、也不读 passwd。非白名单调用方返回 -1，打印 `ui_session caller rejected`（uid、pid）。uid 常量必须与产品 passwd 一致，新增调用方要同时改 `ui_content_stub.cpp` 白名单和 `ui_content_stub_test.cpp` 的契约常量。
+
+已知边界：uid 判定覆盖“同一 uid 的所有进程”；`GetCallingUid()` 可被 `IPCSkeleton::SetCallingIdentity` 影响，这一层是纵深防御，需要不可伪造的强校验时应放到有权限的系统进程。
 
 ### Report 对象与死亡监听方向
 
@@ -51,7 +59,8 @@ SA 侧 `UIContentServiceProxy::Connect` 创建本地 `UiReportStub`，通过 IPC
 | IPC 接口定义 | `interfaces/inner_api/ui_session/ui_content_service_interface.h` | IUiContentService + ReportService IPC 事务码 |
 | Manager 抽象接口 | `interfaces/inner_api/ui_session/ui_session_manager.h` | UISession Meyers singleton，虚方法 + Save*Function + atomic 计数器 |
 | Manager OHOS 实现 | `adapter/ohos/entrance/ui_session/ui_session_manager_ohos.h/.cpp` | IPC 路由、reportObjectMap_、并发门控、SA 死亡清理 |
-| IPC Stub | `adapter/ohos/entrance/ui_session/ui_content_stub.cpp` | OnRemoteRequest 分发，IsSACalling + interface token 校验 |
+| 调用方白名单 | `adapter/ohos/entrance/ui_session/ui_content_stub.cpp` | `IsTrustedCaller`：token 类型 + uid 白名单（16666 / 6699 / 7101），失败返回 -1 |
+| IPC Stub | `adapter/ohos/entrance/ui_session/ui_content_stub.cpp` | OnRemoteRequest 分发，调用方白名单 + interface token 校验 |
 | Stub 实现 | `adapter/ohos/entrance/ui_session/ui_content_stub_impl.cpp` | 委托转发至 UiSessionManager::GetInstance() |
 | IPC Proxy | `adapter/ohos/entrance/ui_session/ui_content_proxy.cpp` | SendPageTranslateRequest、SyncRequestGuard、HitTest 分包 |
 | Report Stub | `adapter/ohos/entrance/ui_session/ui_report_stub.cpp` | PageTranslate callback 注册、超时、watchdog |
@@ -114,7 +123,7 @@ UISession 是框架内部 IPC 通道，没有独立 SDK API。IPC 接口通过 `
 
 | 关注点 | 断点位置 | 说明 |
 |--------|----------|------|
-| IPC 入口 | `ui_content_stub.cpp` OnRemoteRequest | 检查 code、SA token、interface token |
+| IPC 入口 | `ui_content_stub.cpp` OnRemoteRequest | 检查 code、调用方白名单、interface token |
 | 连接链路 | `ui_content_stub.cpp` ConnectInner + `ui_session_manager_ohos.cpp` SaveReportProxy | 连接与 Report 注册 |
 | 事件注册 | `ui_content_stub_impl.cpp` | 各类事件注册回调 |
 | 组件事件过滤 | `ui_session_manager_ohos.cpp` | mask 过滤与广播上报 |
@@ -130,6 +139,7 @@ UISession 是框架内部 IPC 通道，没有独立 SDK API。IPC 接口通过 `
 | 问题 | 定位路径 | 说明 |
 |------|----------|------|
 | 事件上报 SA 未收到 | `ui_session_manager_ohos.cpp` | 检查 ReportService 非空 + 注册计数 > 0 + mask 命中 |
+| 非白名单 SA 请求被拒 | `ui_content_stub.cpp` | 查 LOGW `ui_session caller rejected` 的 uid/pid；核对 uid 与产品 passwd 中 `ui_sa`/`msdp`/`ai_app_controller_service` 的编号一致 |
 | 页面场景回调串集 / 重复注册后无事件 | `ui_report_stub.cpp`、`ui_content_proxy.cpp` | 检查按 ruleSetId 过滤 hits/exits；检查失败注册是否覆盖或删除已有回调。回归用例应验证回调所属数据和原注册仍有效，不能用合并 JSON 原样分发的断言代替隔离验证 |
 | InspectorTree 无结果 | `ui_session_manager_ohos.cpp` | 检查 processMap_ / inspectorFunction_ / webTaskNums_ |
 | 翻译请求 PARAM_INVALID | `ui_session_manager_ohos.cpp` | 检查 scope 格式和 IsTranslateScopeValid |
