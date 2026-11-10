@@ -708,8 +708,6 @@ ArkUINativeModuleValue WebBridge::SetVisitedLinkPersistEnabled(ArkUIRuntimeCallI
     CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
     Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(CALL_ARG_0);
     Local<JSValueRef> secondArg = runtimeCallInfo->GetCallArgRef(CALL_ARG_1);
-    CHECK_NULL_RETURN(firstArg, panda::JSValueRef::Undefined(vm));
-    CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
     auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
     if (secondArg->IsBoolean()) {
         bool enable = secondArg->ToBoolean(vm)->Value();
@@ -725,8 +723,6 @@ ArkUINativeModuleValue WebBridge::ResetVisitedLinkPersistEnabled(ArkUIRuntimeCal
     EcmaVM* vm = runtimeCallInfo->GetVM();
     CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
     Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(CALL_ARG_0);
-    CHECK_NULL_RETURN(firstArg, panda::JSValueRef::Undefined(vm));
-    CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
     auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
     GetArkUINodeModifiers()->getWebModifier()->resetVisitedLinkPersistEnabled(nativeNode);
     return panda::JSValueRef::Undefined(vm);
