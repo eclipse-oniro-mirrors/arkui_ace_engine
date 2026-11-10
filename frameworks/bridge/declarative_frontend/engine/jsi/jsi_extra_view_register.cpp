@@ -38,7 +38,6 @@ bool RegisterExtraViewByName(BindingTarget globalObj, const std::string& moduleN
 {
     auto func = extraBindFuncs.find(moduleName);
     if (func == extraBindFuncs.end()) {
-        LOGW("JS module not exist in extra, name: %{public}s", moduleName.c_str());
         return false;
     }
     (*func).second(globalObj);
