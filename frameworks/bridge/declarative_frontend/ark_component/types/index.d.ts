@@ -1623,6 +1623,15 @@ declare interface TabsBreakpointType<T> {
   md?: T;
   lg?: T;
 }
+declare enum SidebarSectionTitleStyle {
+  STANDARD = 0,
+  EMPHASIZED = 1,
+}
+declare interface SidebarSection {
+  title: ResourceStr;
+  order?: number;
+  titleStyle?: SidebarSectionTitleStyle;
+}
 declare enum NestedScrollMode {
   SELF_ONLY,
   SELF_FIRST,

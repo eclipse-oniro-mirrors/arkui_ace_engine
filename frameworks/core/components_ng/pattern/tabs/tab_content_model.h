@@ -133,6 +133,18 @@ struct TabBarBadgeParam {
     RefPtr<ResourceObject> resourceBadgeValueObject;
 };
 
+enum class SidebarSectionTitleStyle : int32_t {
+    STANDARD = 0,
+    EMPHASIZED = 1,
+};
+
+struct SidebarSection {
+    std::string title;
+    std::optional<int32_t> order;
+    SidebarSectionTitleStyle titleStyle = SidebarSectionTitleStyle::STANDARD;
+    RefPtr<ResourceObject> resourceTitleObject;
+};
+
 enum class TabContentJsType {
     INDICATOR_COLOR,
     FONT_SIZE,

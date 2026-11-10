@@ -16,7 +16,10 @@ import(
 
 build_component_ng("tabs_pattern_ng") {
   is_component_model = true
-  component_ng_deps = [ "badge" ]
+  component_ng_deps = [
+    "badge",
+    "shape",
+  ]
 
   sources = [
     "tab_bar_accessibility_property.cpp",
@@ -58,9 +61,9 @@ build_component_ng("tabs_pattern_ng") {
     ark_sources += [
       "bridge/tab_content_static_modifier.cpp",
       "bridge/tab_content_transition_proxy_accessor.cpp",
-      "bridge/tabs_static_modifier.cpp",
       "bridge/tabs_controller_accessor.cpp",
       "bridge/tabs_extender_accessor.cpp",
+      "bridge/tabs_static_modifier.cpp",
     ]
   }
 }

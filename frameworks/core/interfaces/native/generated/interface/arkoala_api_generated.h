@@ -2737,6 +2737,8 @@ typedef struct Ark_SelectionContainerMenuOptions Ark_SelectionContainerMenuOptio
 typedef struct Opt_SelectionContainerMenuOptions Opt_SelectionContainerMenuOptions;
 typedef struct Ark_SelectionOptions Ark_SelectionOptions;
 typedef struct Opt_SelectionOptions Opt_SelectionOptions;
+typedef struct Ark_SidebarSection Ark_SidebarSection;
+typedef struct Opt_SidebarSection Opt_SidebarSection;
 typedef struct Ark_SizeTLengthMetrics Ark_SizeTLengthMetrics;
 typedef struct Opt_SizeTLengthMetrics Opt_SizeTLengthMetrics;
 typedef struct Ark_SlideRange Ark_SlideRange;
@@ -7296,6 +7298,14 @@ typedef struct Opt_SideBarPosition {
     Ark_Tag tag;
     Ark_SideBarPosition value;
 } Opt_SideBarPosition;
+typedef enum Ark_SidebarSectionTitleStyle {
+    ARK_SIDEBAR_SECTION_TITLE_STYLE_STANDARD = 0,
+    ARK_SIDEBAR_SECTION_TITLE_STYLE_EMPHASIZED = 1,
+} Ark_SidebarSectionTitleStyle;
+typedef struct Opt_SidebarSectionTitleStyle {
+    Ark_Tag tag;
+    Ark_SidebarSectionTitleStyle value;
+} Opt_SidebarSectionTitleStyle;
 typedef enum Ark_SlideEffect {
     ARK_SLIDE_EFFECT_LEFT = 0,
     ARK_SLIDE_EFFECT_RIGHT = 1,
@@ -18226,6 +18236,16 @@ typedef struct Opt_SelectionOptions {
     Ark_Tag tag;
     Ark_SelectionOptions value;
 } Opt_SelectionOptions;
+typedef struct Ark_SidebarSection {
+    /* kind: Interface */
+    Ark_ResourceStr title;
+    Opt_Int32 order;
+    Opt_SidebarSectionTitleStyle titleStyle;
+} Ark_SidebarSection;
+typedef struct Opt_SidebarSection {
+    Ark_Tag tag;
+    Ark_SidebarSection value;
+} Opt_SidebarSection;
 typedef struct Ark_SizeTLengthMetrics {
     /* kind: Interface */
     Ark_LengthMetricsProxy width;
@@ -28030,6 +28050,8 @@ typedef struct GENERATED_ArkUITabContentModifier {
                           const Opt_VoidCallback* value);
     void (*setOnWillHide)(Ark_NativePointer node,
                           const Opt_VoidCallback* value);
+    void (*setSidebarSection)(Ark_NativePointer node,
+                              const Opt_SidebarSection* value);
     void (*setTabBarVisibility)(Ark_NativePointer node,
                                 Ark_TabVisibility visibility,
                                 const Opt_TabBarDisplayMode* displayMode);
