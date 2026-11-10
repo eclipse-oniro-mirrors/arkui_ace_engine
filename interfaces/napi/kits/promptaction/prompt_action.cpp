@@ -639,6 +639,7 @@ void CloseToast(napi_env env, int32_t toastId, NG::ToastShowMode showMode)
         std::string errorMessage =
             "UI execution context not found." + AceEngine::GetEnhancedContextBNotFoundMessage(reason, instanceId);
         NapiThrow(env, errorMessage, ERROR_CODE_INTERNAL_ERROR);
+        return;
     }
     if (showMode == NG::ToastShowMode::DEFAULT) {
         delegate->CloseToast(toastId, std::move(toastCloseCallback));
