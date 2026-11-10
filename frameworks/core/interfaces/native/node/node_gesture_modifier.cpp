@@ -806,8 +806,8 @@ void clearGestures(ArkUINodeHandle node)
     gestureHub->ClearModifierGesture();
 }
 
-// <fingerid, iterator of touchTestResults in eventManager>
-using TouchRecognizerTarget = std::vector<std::pair<int32_t, TouchTestResult::iterator>>;
+// <fingerid, touchTestResults value in eventManager>
+using TouchRecognizerTarget = std::vector<std::pair<int32_t, TouchTestResult::value_type>>;
 using TouchRecognizerMap = std::map<TouchEventTarget*, TouchRecognizerTarget>;
 
 bool IsFingerCollectedByTarget(TouchRecognizerTarget& target, int32_t fingerId)
@@ -834,12 +834,12 @@ void CollectTouchEventTarget(
         }
         auto targetNode = target->GetAttachedNode().Upgrade();
         if (targetNode && targetNode == borderNode) {
-            dict[targetPtr].emplace_back(fingerId, iter);
+            dict[targetPtr].emplace_back(fingerId, target);
             return;
         }
         while (targetNode) {
             if (targetNode == borderNode) {
-                dict[targetPtr].emplace_back(fingerId, iter);
+                dict[targetPtr].emplace_back(fingerId, target);
                 break;
             }
             targetNode = targetNode->GetParentFrameNode();

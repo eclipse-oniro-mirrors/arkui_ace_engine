@@ -143,7 +143,7 @@ public:
     void PrepareAgentMousePress(const MouseEvent& event);
     bool DispatchTouchEvent(const AxisEvent& event, bool sendOnTouch = true);
     void DispatchTouchCancelToRecognizer(
-        TouchEventTarget* touchEventTarget, const std::vector<std::pair<int32_t, TouchTestResult::iterator>>& items);
+        TouchEventTarget* touchEventTarget, const std::vector<std::pair<int32_t, TouchTestResult::value_type>>& items);
     void RegisterEscapeRecognizer(const RefPtr<NG::NGGestureRecognizer>& recognizer);
     bool PostEventDispatchTouchEvent(const TouchEvent& point);
     void FlushTouchEventsBegin(const std::list<TouchEvent>& touchEvents);
