@@ -14,6 +14,7 @@
  */
 
 #include "image_base.h"
+#include <thread>
 
 #include "base/image/image_defines.h"
 #include "core/components_ng/render/adapter/pixelmap_image.h"
