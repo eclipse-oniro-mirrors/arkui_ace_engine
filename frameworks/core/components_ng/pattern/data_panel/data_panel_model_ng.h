@@ -73,6 +73,7 @@ public:
     static void SetValueColorsSetByUser(FrameNode* frameNode, bool value);
     static void SetTrackBackgroundSetByUser(FrameNode* frameNode, bool value);
     static void SetStrokeWidthSetByUser(FrameNode* frameNode, bool value);
+    static uint32_t GetDataPanelType(FrameNode* frameNode);
 };
 } // namespace OHOS::Ace::NG
 

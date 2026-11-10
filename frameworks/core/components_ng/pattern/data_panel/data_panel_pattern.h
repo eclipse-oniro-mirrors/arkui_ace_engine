@@ -86,6 +86,10 @@ public:
     void UpdateStrokeWidth(const CalcDimension& strokeWidth, bool isFirstLoad = false);
     void OnColorModeChange(uint32_t colorMode) override;
     void OnColorConfigurationUpdate() override;
+    size_t GetDataPanelType() const
+    {
+        return dataPanelModifier_ ? dataPanelModifier_->GetDataPanelType() : 0;
+    }
 
 private:
     void OnAttachToFrameNode() override;

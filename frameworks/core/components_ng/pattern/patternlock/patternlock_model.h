@@ -60,10 +60,6 @@ public:
     virtual void SetSkipUnselectedPoint(bool isSkipUnselectedPoint);
     virtual void CreateWithResourceObj(
         PatternLockResourceType PatternLockResourceType, const RefPtr<ResourceObject>& resObj);
-
-private:
-    static std::unique_ptr<PatternLockModel> instance_;
-    static std::mutex mutex_;
 };
 
 } // namespace OHOS::Ace

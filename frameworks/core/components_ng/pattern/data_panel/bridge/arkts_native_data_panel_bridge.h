@@ -35,8 +35,6 @@ public:
     static ArkUINativeModuleValue ResetDataPanelStrokeWidth(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue SetDataPanelBorderRadius(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue SetContentModifierBuilder(ArkUIRuntimeCallInfo* runtimeCallInfo);
-private:
-    static uint32_t dataPanelType_;
 };
 } // namespace OHOS::Ace::NG
 

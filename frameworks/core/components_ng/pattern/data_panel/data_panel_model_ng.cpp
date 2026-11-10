@@ -225,6 +225,14 @@ void DataPanelModelNG::SetBuilderFunc(FrameNode* frameNode, NG::DataPanelMakeCal
     pattern->SetBuilderFunc(std::move(makeFunc));
 }
 
+uint32_t DataPanelModelNG::GetDataPanelType(FrameNode* frameNode)
+{
+    CHECK_NULL_RETURN(frameNode, static_cast<uint32_t>(DataPanelType::CIRCLE));
+    auto pattern = frameNode->GetPattern<DataPanelPattern>();
+    CHECK_NULL_RETURN(pattern, static_cast<uint32_t>(DataPanelType::CIRCLE));
+    return static_cast<uint32_t>(pattern->GetDataPanelType());
+}
+
 void HandleTrackBackgroundColor(
     const RefPtr<ResourceObject>& resObj, const RefPtr<DataPanelPattern>& pattern, const std::string& key)
 {
