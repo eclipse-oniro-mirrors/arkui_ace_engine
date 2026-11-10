@@ -65,7 +65,7 @@ public:
             return nullptr;
         }
         if (!radioModifier_) {
-            radioModifier_ = AceType::MakeRefPtr<RadioModifier>();
+            radioModifier_ = AceType::MakeRefPtr<RadioModifier>(GetHost());
         }
         radioModifier_->SetUseContentModifier(UseContentModifier());
         auto paintMethod = MakeRefPtr<RadioPaintMethod>(radioModifier_);
@@ -206,6 +206,7 @@ public:
 
     void UpdateRadioComponentColor(const Color& color, const RadioColorType radioColorType);
     void OnColorConfigurationUpdate() override;
+    bool OnThemeScopeUpdate(int32_t themeScopeId) override;
     void OnColorModeChange(uint32_t colorMode) override;
     void SetUncheckedBorderColorByJSRadioTheme(bool flag)
     {

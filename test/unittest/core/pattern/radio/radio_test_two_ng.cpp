@@ -91,6 +91,14 @@ void RadioTwoTestNg::SetUpTestSuite()
         radioTheme->defaultHeight_ = DEFAULT_HEIGHT_DIMENSION;
         return radioTheme;
     });
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly([](ThemeType, int32_t) -> RefPtr<Theme> {
+        auto radioTheme = AceType::MakeRefPtr<RadioTheme>();
+        radioTheme->hotZoneHorizontalPadding_ = HORIZONTAL_PADDING;
+        radioTheme->hotZoneVerticalPadding_ = VERTICAL_PADDING;
+        radioTheme->defaultWidth_ = DEFAULT_WIDTH_DIMENSION;
+        radioTheme->defaultHeight_ = DEFAULT_HEIGHT_DIMENSION;
+        return radioTheme;
+    });
     MockPipelineContext::GetCurrent()->SetThemeManager(themeManager);
     MockContainer::SetUp();
 }
@@ -116,7 +124,10 @@ HWTEST_F(RadioTwoTestNg, RadioPaintMethodTest001, TestSize.Level1)
     auto radioPaintProperty = AceType::MakeRefPtr<RadioPaintProperty>();
     ASSERT_NE(radioPaintProperty, nullptr);
     PaintWrapper paintWrapper(nullptr, geometryNode, radioPaintProperty);
-    auto radioModifier = AceType::MakeRefPtr<RadioModifier>();
+    RadioModelNG radioModelNG;
+    radioModelNG.Create(NAME, GROUP_NAME, INDICATOR_TYPE_TICK);
+    auto modifierHost = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    auto radioModifier = AceType::MakeRefPtr<RadioModifier>(modifierHost);
     RadioPaintMethod radioPaintMethod(radioModifier);
     Testing::MockCanvas canvas;
     EXPECT_CALL(canvas, AttachBrush(_)).WillRepeatedly(ReturnRef(canvas));
@@ -141,7 +152,10 @@ HWTEST_F(RadioTwoTestNg, RadioPaintMethodTest002, TestSize.Level1)
     auto radioPaintProperty = AceType::MakeRefPtr<RadioPaintProperty>();
     ASSERT_NE(radioPaintProperty, nullptr);
     PaintWrapper paintWrapper(nullptr, geometryNode, radioPaintProperty);
-    auto radioModifier = AceType::MakeRefPtr<RadioModifier>();
+    RadioModelNG radioModelNG;
+    radioModelNG.Create(NAME, GROUP_NAME, INDICATOR_TYPE_TICK);
+    auto modifierHost = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    auto radioModifier = AceType::MakeRefPtr<RadioModifier>(modifierHost);
     RadioPaintMethod radioPaintMethod(radioModifier);
     Testing::MockCanvas canvas;
     EXPECT_CALL(canvas, AttachBrush(_)).WillRepeatedly(ReturnRef(canvas));
@@ -168,7 +182,10 @@ HWTEST_F(RadioTwoTestNg, RadioPaintMethodTest003, TestSize.Level1)
     auto radioPaintProperty = AceType::MakeRefPtr<RadioPaintProperty>();
     ASSERT_NE(radioPaintProperty, nullptr);
     PaintWrapper paintWrapper(nullptr, geometryNode, radioPaintProperty);
-    auto radioModifier = AceType::MakeRefPtr<RadioModifier>();
+    RadioModelNG radioModelNG;
+    radioModelNG.Create(NAME, GROUP_NAME, INDICATOR_TYPE_TICK);
+    auto modifierHost = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    auto radioModifier = AceType::MakeRefPtr<RadioModifier>(modifierHost);
     RadioPaintMethod radioPaintMethod(radioModifier);
     Testing::MockCanvas canvas;
     EXPECT_CALL(canvas, AttachBrush(_)).WillRepeatedly(ReturnRef(canvas));
@@ -197,7 +214,10 @@ HWTEST_F(RadioTwoTestNg, RadioPaintMethodTest004, TestSize.Level1)
     auto radioPaintProperty = AceType::MakeRefPtr<RadioPaintProperty>();
     ASSERT_NE(radioPaintProperty, nullptr);
     PaintWrapper paintWrapper(nullptr, geometryNode, radioPaintProperty);
-    auto radioModifier = AceType::MakeRefPtr<RadioModifier>();
+    RadioModelNG radioModelNG;
+    radioModelNG.Create(NAME, GROUP_NAME, INDICATOR_TYPE_TICK);
+    auto modifierHost = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    auto radioModifier = AceType::MakeRefPtr<RadioModifier>(modifierHost);
     RadioPaintMethod radioPaintMethod(radioModifier);
     Testing::MockCanvas canvas;
     EXPECT_CALL(canvas, AttachBrush(_)).WillRepeatedly(ReturnRef(canvas));
@@ -223,7 +243,10 @@ HWTEST_F(RadioTwoTestNg, RadioPaintMethodTest005, TestSize.Level1)
 {
     auto frameNode =
         FrameNode::GetOrCreateFrameNode(V2::RADIO_ETS_TAG, 0, []() { return AceType::MakeRefPtr<RadioPattern>(); });
-    auto radioModifier = AceType::MakeRefPtr<RadioModifier>();
+    RadioModelNG radioModelNG;
+    radioModelNG.Create(NAME, GROUP_NAME, INDICATOR_TYPE_TICK);
+    auto modifierHost = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    auto radioModifier = AceType::MakeRefPtr<RadioModifier>(modifierHost);
     radioModifier->hoverColor_ = Color::RED;
     radioModifier->clickEffectColor_ = Color::BLUE;
     radioModifier->touchHoverType_ = TouchHoverAnimationType::HOVER;
@@ -260,7 +283,10 @@ HWTEST_F(RadioTwoTestNg, RadioPaintMethodTest006, TestSize.Level1)
 {
     auto frameNode =
         FrameNode::GetOrCreateFrameNode(V2::RADIO_ETS_TAG, 0, []() { return AceType::MakeRefPtr<RadioPattern>(); });
-    auto radioModifier = AceType::MakeRefPtr<RadioModifier>();
+    RadioModelNG radioModelNG;
+    radioModelNG.Create(NAME, GROUP_NAME, INDICATOR_TYPE_TICK);
+    auto modifierHost = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    auto radioModifier = AceType::MakeRefPtr<RadioModifier>(modifierHost);
     radioModifier->isOnAnimationFlag_->Set(true);
     radioModifier->UpdateIsOnAnimatableProperty(true, frameNode);
     EXPECT_EQ(radioModifier->pointScale_->Get(), 0.5);
@@ -287,7 +313,10 @@ HWTEST_F(RadioTwoTestNg, RadioPaintMethodTest007, TestSize.Level1)
     auto radioPaintProperty = AceType::MakeRefPtr<RadioPaintProperty>();
     ASSERT_NE(radioPaintProperty, nullptr);
     PaintWrapper paintWrapper(frameNode->GetRenderContext(), geometryNode, radioPaintProperty);
-    auto radioModifier = AceType::MakeRefPtr<RadioModifier>();
+    RadioModelNG radioModelNG;
+    radioModelNG.Create(NAME, GROUP_NAME, INDICATOR_TYPE_TICK);
+    auto modifierHost = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    auto radioModifier = AceType::MakeRefPtr<RadioModifier>(modifierHost);
     RadioPaintMethod radioPaintMethod(radioModifier);
 
     radioPaintMethod.radioModifier_->SetIsCheck(true);
@@ -323,7 +352,10 @@ HWTEST_F(RadioTwoTestNg, RadioPaintMethodTest008, TestSize.Level1)
     auto radioPaintProperty = AceType::MakeRefPtr<RadioPaintProperty>();
     ASSERT_NE(radioPaintProperty, nullptr);
     PaintWrapper paintWrapper(nullptr, geometryNode, radioPaintProperty);
-    auto radioModifier = AceType::MakeRefPtr<RadioModifier>();
+    RadioModelNG radioModelNG;
+    radioModelNG.Create(NAME, GROUP_NAME, INDICATOR_TYPE_TICK);
+    auto modifierHost = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    auto radioModifier = AceType::MakeRefPtr<RadioModifier>(modifierHost);
     RadioPaintMethod radioPaintMethod(radioModifier);
     Testing::MockCanvas canvas;
     EXPECT_CALL(canvas, AttachBrush(_)).WillRepeatedly(ReturnRef(canvas));
@@ -355,7 +387,10 @@ HWTEST_F(RadioTwoTestNg, RadioPaintMethodTest009, TestSize.Level1)
     auto radioPaintProperty = AceType::MakeRefPtr<RadioPaintProperty>();
     ASSERT_NE(radioPaintProperty, nullptr);
     PaintWrapper paintWrapper(nullptr, geometryNode, radioPaintProperty);
-    auto radioModifier = AceType::MakeRefPtr<RadioModifier>();
+    RadioModelNG radioModelNG;
+    radioModelNG.Create(NAME, GROUP_NAME, INDICATOR_TYPE_TICK);
+    auto modifierHost = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    auto radioModifier = AceType::MakeRefPtr<RadioModifier>(modifierHost);
     RadioPaintMethod radioPaintMethod(radioModifier);
     Testing::MockCanvas canvas;
     EXPECT_CALL(canvas, AttachBrush(_)).WillRepeatedly(ReturnRef(canvas));
@@ -382,7 +417,10 @@ HWTEST_F(RadioTwoTestNg, RadioPaintMethodTest010, TestSize.Level1)
     int32_t settingApiVersion = 12;
     int32_t backupApiVersion = MockContainer::Current()->GetApiTargetVersion();
     MockContainer::Current()->SetApiTargetVersion(settingApiVersion);
-    auto radioModifier = AceType::MakeRefPtr<RadioModifier>();
+    RadioModelNG radioModelNG;
+    radioModelNG.Create(NAME, GROUP_NAME, INDICATOR_TYPE_TICK);
+    auto modifierHost = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    auto radioModifier = AceType::MakeRefPtr<RadioModifier>(modifierHost);
     radioModifier->isOnAnimationFlag_->Set(true);
     radioModifier->UpdateIndicatorAnimation(true, frameNode);
     EXPECT_EQ(radioModifier->opacityScale_->Get(), 1);
@@ -411,7 +449,10 @@ HWTEST_F(RadioTwoTestNg, RadioPaintMethodTest011, TestSize.Level1)
     auto radioPaintProperty = AceType::MakeRefPtr<RadioPaintProperty>();
     ASSERT_NE(radioPaintProperty, nullptr);
     PaintWrapper paintWrapper(nullptr, geometryNode, radioPaintProperty);
-    auto radioModifier = AceType::MakeRefPtr<RadioModifier>();
+    RadioModelNG radioModelNG;
+    radioModelNG.Create(NAME, GROUP_NAME, INDICATOR_TYPE_TICK);
+    auto modifierHost = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    auto radioModifier = AceType::MakeRefPtr<RadioModifier>(modifierHost);
     RadioPaintMethod radioPaintMethod(radioModifier);
     Testing::MockCanvas canvas;
     EXPECT_CALL(canvas, AttachBrush(_)).WillRepeatedly(ReturnRef(canvas));
@@ -445,7 +486,10 @@ HWTEST_F(RadioTwoTestNg, RadioPaintMethodTest012, TestSize.Level1)
     auto radioPaintProperty = AceType::MakeRefPtr<RadioPaintProperty>();
     ASSERT_NE(radioPaintProperty, nullptr);
     PaintWrapper paintWrapper(nullptr, geometryNode, radioPaintProperty);
-    auto radioModifier = AceType::MakeRefPtr<RadioModifier>();
+    RadioModelNG radioModelNG;
+    radioModelNG.Create(NAME, GROUP_NAME, INDICATOR_TYPE_TICK);
+    auto modifierHost = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    auto radioModifier = AceType::MakeRefPtr<RadioModifier>(modifierHost);
     RadioPaintMethod radioPaintMethod(radioModifier);
     Testing::MockCanvas canvas;
     EXPECT_CALL(canvas, AttachBrush(_)).WillRepeatedly(ReturnRef(canvas));
@@ -927,7 +971,7 @@ HWTEST_F(RadioTwoTestNg, RadioPatternTest038, TestSize.Level1)
     auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
     ASSERT_NE(frameNode, nullptr);
     frameNode->MarkModifyDone();
-    auto radioModifier = AceType::MakeRefPtr<RadioModifier>();
+    auto radioModifier = AceType::MakeRefPtr<RadioModifier>(frameNode);
     RadioPaintMethod radioPaintMethod(radioModifier);
     auto pattern = frameNode->GetPattern<RadioPattern>();
     ASSERT_NE(pattern, nullptr);
@@ -950,7 +994,7 @@ HWTEST_F(RadioTwoTestNg, RadioPatternTest039, TestSize.Level1)
     auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
     ASSERT_NE(frameNode, nullptr);
     frameNode->MarkModifyDone();
-    auto radioModifier = AceType::MakeRefPtr<RadioModifier>();
+    auto radioModifier = AceType::MakeRefPtr<RadioModifier>(frameNode);
     RadioPaintMethod radioPaintMethod(radioModifier);
     auto pattern = frameNode->GetPattern<RadioPattern>();
     ASSERT_NE(pattern, nullptr);
@@ -993,7 +1037,7 @@ HWTEST_F(RadioTwoTestNg, RadioPatternTest040, TestSize.Level1)
     auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
     ASSERT_NE(frameNode, nullptr);
     frameNode->MarkModifyDone();
-    auto radioModifier = AceType::MakeRefPtr<RadioModifier>();
+    auto radioModifier = AceType::MakeRefPtr<RadioModifier>(frameNode);
     RadioPaintMethod radioPaintMethod(radioModifier);
     auto pattern = frameNode->GetPattern<RadioPattern>();
     ASSERT_NE(pattern, nullptr);
@@ -1036,7 +1080,7 @@ HWTEST_F(RadioTwoTestNg, RadioPatternTest041, TestSize.Level1)
     auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
     ASSERT_NE(frameNode, nullptr);
     frameNode->MarkModifyDone();
-    auto radioModifier = AceType::MakeRefPtr<RadioModifier>();
+    auto radioModifier = AceType::MakeRefPtr<RadioModifier>(frameNode);
     RadioPaintMethod radioPaintMethod(radioModifier);
     auto pattern = frameNode->GetPattern<RadioPattern>();
     ASSERT_NE(pattern, nullptr);
@@ -1142,6 +1186,11 @@ HWTEST_F(RadioTwoTestNg, RadioPatternTest052, TestSize.Level1)
 
     auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
     EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly([](ThemeType type) -> RefPtr<Theme> {
+        auto radioTheme = AceType::MakeRefPtr<RadioTheme>();
+        radioTheme->showCircleDial_ = true;
+        return radioTheme;
+    });
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly([](ThemeType, int32_t) -> RefPtr<Theme> {
         auto radioTheme = AceType::MakeRefPtr<RadioTheme>();
         radioTheme->showCircleDial_ = true;
         return radioTheme;
@@ -1261,6 +1310,7 @@ HWTEST_F(RadioTwoTestNg, MeasureContentTest002, TestSize.Level1)
     radioTheme->defaultPaddingSize_ = Dimension(TEST_HORIZONPADDING);
     radioTheme->hotZoneHorizontalPadding_ = Dimension(TEST_HORIZONPADDING);
     EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(radioTheme));
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(radioTheme));
 
     RadioLayoutAlgorithm radioLayoutAlgorithm;
     LayoutConstraintF contentConstraint;
@@ -1313,6 +1363,7 @@ HWTEST_F(RadioTwoTestNg, MeasureContentTest003, TestSize.Level1)
     radioTheme->defaultPaddingSize_ = Dimension(TEST_HORIZONPADDING);
     radioTheme->hotZoneHorizontalPadding_ = Dimension(TEST_HORIZONPADDING);
     EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(radioTheme));
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(radioTheme));
 
     RadioLayoutAlgorithm radioLayoutAlgorithm;
     LayoutConstraintF contentConstraint;
@@ -1365,6 +1416,7 @@ HWTEST_F(RadioTwoTestNg, MeasureContentTest004, TestSize.Level1)
     radioTheme->defaultPaddingSize_ = Dimension(TEST_HORIZONPADDING);
     radioTheme->hotZoneHorizontalPadding_ = Dimension(TEST_HORIZONPADDING);
     EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(radioTheme));
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(radioTheme));
 
     RadioLayoutAlgorithm radioLayoutAlgorithm;
     LayoutConstraintF contentConstraint;
@@ -1417,6 +1469,7 @@ HWTEST_F(RadioTwoTestNg, MeasureContentTest005, TestSize.Level1)
     radioTheme->defaultPaddingSize_ = Dimension(TEST_HORIZONPADDING);
     radioTheme->hotZoneHorizontalPadding_ = Dimension(TEST_HORIZONPADDING);
     EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(radioTheme));
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(radioTheme));
 
     RadioLayoutAlgorithm radioLayoutAlgorithm;
     LayoutConstraintF contentConstraint;

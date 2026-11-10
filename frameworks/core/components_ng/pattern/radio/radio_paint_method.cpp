@@ -43,11 +43,10 @@ constexpr float DEFAULT_INTERPOLATINGSPRING_DAMPING = 46.0f;
 constexpr int32_t DEFAULT_INDICATOR_ANIMATION_DURATION = 150;
 } // namespace
 
-RadioModifier::RadioModifier()
+RadioModifier::RadioModifier(const RefPtr<FrameNode>& host)
 {
-    auto pipeline = PipelineBase::GetCurrentContext();
-    CHECK_NULL_VOID(pipeline);
-    auto radioTheme = pipeline->GetTheme<RadioTheme>();
+    CHECK_NULL_VOID(host);
+    auto radioTheme = host->GetTheme<RadioTheme>(true);
     CHECK_NULL_VOID(radioTheme);
     pointColor_ = AceType::MakeRefPtr<AnimatablePropertyColor>(LinearColor(radioTheme->GetPointColor()));
     AttachProperty(pointColor_);
@@ -86,14 +85,14 @@ RadioModifier::RadioModifier()
     AttachProperty(ringPointScale_);
     AttachProperty(animateTouchHoverColor_);
 
-    InitializeParam();
+    InitializeParam(host);
 }
 
-void RadioModifier::InitializeParam()
+void RadioModifier::InitializeParam(const RefPtr<FrameNode>& host)
 {
-    auto pipeline = PipelineBase::GetCurrentContext();
-    CHECK_NULL_VOID(pipeline);
-    auto radioTheme = pipeline->GetTheme<RadioTheme>();
+    CHECK_NULL_VOID(host);
+    auto radioTheme = host->GetTheme<RadioTheme>(true);
+    CHECK_NULL_VOID(radioTheme);
     shadowWidth_ = radioTheme->GetShadowWidth().ConvertToPx();
     borderWidth_ = radioTheme->GetBorderWidth().ConvertToPx();
     inactivePointColor_ = radioTheme->GetInactivePointColor();
@@ -339,10 +338,6 @@ void RadioModifier::PaintUnselectedIndicator(
     pen.SetWidth(borderWidth_);
     brush.SetAntiAlias(true);
     auto alphaCalculate = static_cast<float>(DISABLED_ALPHA) / ENABLED_ALPHA;
-    auto pipeline = PipelineBase::GetCurrentContext();
-    CHECK_NULL_VOID(pipeline);
-    auto radioTheme = pipeline->GetTheme<RadioTheme>();
-    CHECK_NULL_VOID(radioTheme);
     if (!enabled_->Get()) {
         brush.SetColor(ToRSColor(inactivePointColor_.BlendOpacity(alphaCalculate)));
         pen.SetColor(ToRSColor(inactiveColor_->Get().BlendOpacity(alphaCalculate)));
@@ -480,16 +475,15 @@ void RadioPaintMethod::UpdateContentModifier(PaintWrapper* paintWrapper)
     CHECK_NULL_VOID(renderContext);
     auto host = renderContext->GetHost();
     CHECK_NULL_VOID(host);
-    auto pipeline = host->GetContextRefPtr();
-    CHECK_NULL_VOID(pipeline);
-    auto radioTheme = pipeline->GetTheme<RadioTheme>();
+    auto radioTheme = host->GetTheme<RadioTheme>(true);
+    CHECK_NULL_VOID(radioTheme);
     activeColor_ = paintProperty->GetRadioCheckedBackgroundColor().value_or(Color(radioTheme->GetActiveColor()));
     inactiveColor_ = paintProperty->GetRadioUncheckedBorderColor().value_or(Color(radioTheme->GetInactiveColor()));
     pointColor_ = paintProperty->GetRadioIndicatorColor().value_or(Color(radioTheme->GetPointColor()));
 
     auto size = paintWrapper->GetContentSize();
     auto offset = paintWrapper->GetContentOffset();
-    radioModifier_->InitializeParam();
+    radioModifier_->InitializeParam(host);
     radioModifier_->SetPointColor(pointColor_);
     radioModifier_->SetactiveColor(activeColor_);
     radioModifier_->SetinactiveColor(inactiveColor_);

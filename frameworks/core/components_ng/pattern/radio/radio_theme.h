@@ -25,6 +25,9 @@ class JSRadioTheme {
 public:
     static void ApplyTheme()
     {
+        if (Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY_SIX)) {
+            return;
+        }
         // check whether we have Theme for id or not
         auto themeColors = JSThemeUtils::GetThemeColors();
         if (!themeColors) {
