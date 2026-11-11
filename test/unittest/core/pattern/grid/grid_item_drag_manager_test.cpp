@@ -653,10 +653,10 @@ HWTEST_F(GridItemDragManagerTestNg, HandleOnItemDragEndResetsState001, TestSize.
  */
 HWTEST_F(GridItemDragManagerTestNg, HandleOnItemDragEnd_001, TestSize.Level1)
 {
-    constexpr int32_t DRAG_ITEM_COUNT = 20;
-    constexpr float DRAG_SCROLL_DISTANCE = 70.0f;
-    constexpr float CENTER_ANCHOR = 50.0f;
-    auto manager = CreateDragManagerWithForEachAndChildren(DRAG_ITEM_COUNT);
+    constexpr int32_t dragItemCount = 20;
+    constexpr float dragScrollDistance = 70.0f;
+    constexpr float centerAnchor = 50.0f;
+    auto manager = CreateDragManagerWithForEachAndChildren(dragItemCount);
     ASSERT_NE(manager, nullptr);
     auto forEach = manager->forEachNode_.Upgrade();
     ASSERT_NE(forEach, nullptr);
@@ -676,8 +676,8 @@ HWTEST_F(GridItemDragManagerTestNg, HandleOnItemDragEnd_001, TestSize.Level1)
     ASSERT_TRUE(manager->scrolling_);
     ASSERT_TRUE(pattern_->AnimateRunning());
     FlushUITasks();
-    UpdateCurrentOffset(static_cast<float>(pattern_->GetTotalOffset()) - DRAG_SCROLL_DISTANCE, SCROLL_FROM_AXIS);
-    ASSERT_DOUBLE_EQ(pattern_->GetTotalOffset(), DRAG_SCROLL_DISTANCE);
+    UpdateCurrentOffset(static_cast<float>(pattern_->GetTotalOffset()) - dragScrollDistance, SCROLL_FROM_AXIS);
+    ASSERT_DOUBLE_EQ(pattern_->GetTotalOffset(), dragScrollDistance);
 
     // Simulate a reorder so the end handler delivers the onMove callback.
     manager->fromIndex_ = 1;
@@ -696,7 +696,7 @@ HWTEST_F(GridItemDragManagerTestNg, HandleOnItemDragEnd_001, TestSize.Level1)
     EXPECT_EQ(*moveCount, 1);
     EXPECT_FALSE(manager->scrolling_);
     EXPECT_EQ(scrollable->state_, Scrollable::AnimationState::SNAP);
-    EXPECT_FLOAT_EQ(scrollable->GetFinalPosition(), -CENTER_ANCHOR);
+    EXPECT_FLOAT_EQ(scrollable->GetFinalPosition(), -centerAnchor);
 }
 
 // ============================================================

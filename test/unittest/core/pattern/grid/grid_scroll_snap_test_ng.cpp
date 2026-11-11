@@ -65,8 +65,8 @@ class GridScrollSnapTestNg : public GridTestNg {};
  */
 HWTEST_F(GridScrollSnapTestNg, SelectWithScroll_001, TestSize.Level1)
 {
-    constexpr float EDGE_DISTANCE = 30.0f;
-    constexpr float CENTER_ANCHOR = 50.0f;
+    constexpr float edgeDistance = 30.0f;
+    constexpr float centerAnchor = 50.0f;
     GridModelNG model = CreateGrid();
     model.SetColumnsTemplate("1fr 1fr");
     model.SetMultiSelectable(true);
@@ -81,7 +81,7 @@ HWTEST_F(GridScrollSnapTestNg, SelectWithScroll_001, TestSize.Level1)
     event.SetGlobalLocation(start);
     event.SetRawGlobalLocation(start);
     pattern_->HandleDragStart(event);
-    const Offset edge(start.GetX(), HEIGHT + EDGE_DISTANCE);
+    const Offset edge(start.GetX(), HEIGHT + edgeDistance);
     event.SetLocalLocation(edge);
     event.SetGlobalLocation(edge);
     event.SetRawGlobalLocation(edge);
@@ -100,7 +100,7 @@ HWTEST_F(GridScrollSnapTestNg, SelectWithScroll_001, TestSize.Level1)
     ASSERT_NE(scrollable, nullptr);
     scrollable->HandleTouchUp();
     ASSERT_EQ(scrollable->state_, Scrollable::AnimationState::SNAP);
-    EXPECT_FLOAT_EQ(scrollable->GetFinalPosition(), -CENTER_ANCHOR);
+    EXPECT_FLOAT_EQ(scrollable->GetFinalPosition(), -centerAnchor);
     pattern_->HandleDragEnd();
 
     // Animator notifies the motion listener before it checks IsCompleted().
@@ -117,14 +117,14 @@ HWTEST_F(GridScrollSnapTestNg, SelectWithScroll_001, TestSize.Level1)
  */
 HWTEST_F(GridScrollSnapTestNg, HandleOnDragStatusCallback_001, TestSize.Level1)
 {
-    constexpr int32_t DRAG_ITEM_COUNT = 20;
-    constexpr float DRAG_SCROLL_DISTANCE = 70.0f;
-    constexpr float CENTER_ANCHOR = 50.0f;
+    constexpr int32_t dragItemCount = 20;
+    constexpr float dragScrollDistance = 70.0f;
+    constexpr float centerAnchor = 50.0f;
     MockPipelineContext::GetCurrent()->SetMinPlatformVersion(11);
     GridModelNG model = CreateGrid();
     model.SetColumnsTemplate("1fr 1fr");
     model.SetScrollSnapStrategy(MakeStrategy(ScrollSnapAlign::CENTER));
-    CreateGridItems(DRAG_ITEM_COUNT, ITEM_MAIN_SIZE, ITEM_MAIN_SIZE);
+    CreateGridItems(dragItemCount, ITEM_MAIN_SIZE, ITEM_MAIN_SIZE);
     CreateDone();
 
     auto drag = AceType::MakeRefPtr<NotifyDragEvent>();
@@ -134,8 +134,8 @@ HWTEST_F(GridScrollSnapTestNg, HandleOnDragStatusCallback_001, TestSize.Level1)
     pattern_->HandleOnDragStatusCallback(DragEventType::MOVE, drag);
     ASSERT_TRUE(pattern_->AnimateRunning());
     FlushUITasks();
-    UpdateCurrentOffset(static_cast<float>(pattern_->GetTotalOffset()) - DRAG_SCROLL_DISTANCE, SCROLL_FROM_AXIS);
-    ASSERT_DOUBLE_EQ(pattern_->GetTotalOffset(), DRAG_SCROLL_DISTANCE);
+    UpdateCurrentOffset(static_cast<float>(pattern_->GetTotalOffset()) - dragScrollDistance, SCROLL_FROM_AXIS);
+    ASSERT_DOUBLE_EQ(pattern_->GetTotalOffset(), dragScrollDistance);
 
     auto scrollable = pattern_->GetScrollable();
     ASSERT_NE(scrollable, nullptr);
@@ -147,7 +147,7 @@ HWTEST_F(GridScrollSnapTestNg, HandleOnDragStatusCallback_001, TestSize.Level1)
     pattern_->HandleOnDragStatusCallback(DragEventType::DROP, drag);
     FlushUITasks();
     EXPECT_EQ(scrollable->state_, Scrollable::AnimationState::SNAP);
-    EXPECT_FLOAT_EQ(scrollable->GetFinalPosition(), -CENTER_ANCHOR);
+    EXPECT_FLOAT_EQ(scrollable->GetFinalPosition(), -centerAnchor);
 }
 
 /**
