@@ -48,10 +48,7 @@
 #include "core/pipeline/base/render_node.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "core/components_ng/relaxed_interaction/relaxed_interaction_types.h"
-#ifdef RELAXED_INTERACTION_SUPPORT
-#include "core/pipeline_ng/pipeline_context.h"
 #include "core/components_ng/relaxed_interaction/relaxed_interaction_manager.h"
-#endif
 
 namespace OHOS::Ace {
 constexpr int32_t DUMP_DOUBLE_NUMBER = 2;

@@ -54,9 +54,7 @@ class SelectOverlayManager;
 class SmartGestureManager;
 class ResponseCtrl;
 class ActiveRecognizerManager;
-#ifdef RELAXED_INTERACTION_SUPPORT
 class RelaxedInteractionManager;
-#endif
 class TouchDelegate : public AceType {
     DECLARE_ACE_TYPE(TouchDelegate, AceType);
 public:
@@ -634,9 +632,7 @@ private:
     RefPtr<CoastingAxisEventGenerator> coastingAxisEventGenerator_;
     NG::EventTreeRecord eventTree_;
     NG::EventTreeRecord postEventTree_;
-#ifdef ENABLE_INSPECTOR_EVENT_REPORTING
     NG::EventTouchInfoRecord eventTouchInfo_;
-#endif
     RefPtr<NG::ResponseCtrl> responseCtrl_;
     TimeStamp lastEventTime_;
     int64_t lastTouchEventEndTimestamp_ = 0;
@@ -677,9 +673,7 @@ private:
     std::unique_ptr<RectCallbackListImpl> rectCallbackListImpl_;
     std::function<void(uint64_t sensorTime, uint64_t receiveTime, uint64_t dispatchTime, int32_t eventType)>
         touchTimingCallback_;
-#ifdef RELAXED_INTERACTION_SUPPORT
     RefPtr<NG::RelaxedInteractionManager> relaxedInteractionManager_;
-#endif
 };
 
 } // namespace OHOS::Ace
