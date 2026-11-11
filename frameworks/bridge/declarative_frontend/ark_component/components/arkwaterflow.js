@@ -428,6 +428,9 @@ class WaterFlowHeaderModifier extends ModifierWithKey {
       getUINativeModule().waterFlow.setHeader(node, this.value);
     }
   }
+  checkObjectDiff() {
+    return this.stageValue !== this.value;
+  }
 }
 WaterFlowHeaderModifier.identity = Symbol('waterFlowHeader');
 
@@ -441,6 +444,9 @@ class WaterFlowFooterModifier extends ModifierWithKey {
     } else {
       getUINativeModule().waterFlow.setFooter(node, this.value);
     }
+  }
+  checkObjectDiff() {
+    return this.stageValue !== this.value;
   }
 }
 WaterFlowFooterModifier.identity = Symbol('waterFlowFooter');

@@ -47,8 +47,6 @@ enum class LazyLayoutMeasureMode {
 };
 
 struct ACE_FORCE_EXPORT LazyLayoutUtils {
-    // Scroll preserves direct-child consumption for legacy LazyLayoutPattern nodes.
-    static AdjustOffset ConsumeNestedLazyAdjustOffset(const RefPtr<UINode>& node, bool allowNestedLazy = true);
     static bool IsAllowedIntermediateNode(const RefPtr<UINode>& node);
     static bool IsVerticalScrollableParent(const RefPtr<UINode>& node);
     static bool IsScrollableParent(const RefPtr<UINode>& node, Axis axis);
@@ -76,6 +74,8 @@ struct ACE_FORCE_EXPORT LazyLayoutUtils {
         const std::vector<std::string>& extraAllowedTags = {});
     // Find the first LazyLayoutPattern through a proxy chain whose FrameNodes were explicitly marked as
     // participating in lazy layout. Ordinary wrapper/content FrameNodes are traversal boundaries.
+    // Resolve sticky sections without publishing or consuming a lazy-layout request.
+    static RefPtr<Pattern> GetStickyHeaderPattern(const RefPtr<UINode>& node);
     static RefPtr<LazyLayoutPattern> GetLazyLayoutPattern(const RefPtr<UINode>& node);
 
     // Called after Measure: unchanged geometry and GONE are valid; deferred/pre-make measurement is not.

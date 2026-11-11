@@ -29,17 +29,22 @@
 
 namespace OHOS::Ace::NG {
 
-// New attributes reserve at most two FrameNode slots ahead of the data children.
+// New attributes follow visual order: header, data, footer.
 // The constructor footer retains its historical mapping until an edge attribute is used.
 struct WaterFlowChildIndexMap {
     bool hasHeader = false;
     bool hasFooter = false;
+    int32_t rawCount = 0;
 
     int32_t EdgeCount() const { return static_cast<int32_t>(hasHeader) + static_cast<int32_t>(hasFooter); }
-    int32_t HeaderIndex() const { return hasHeader ? static_cast<int32_t>(hasFooter) : -1; }
-    int32_t FooterIndex() const { return hasFooter ? 0 : -1; }
-    int32_t DataToNode(int32_t index) const { return index + EdgeCount(); }
-    int32_t NodeToData(int32_t index) const { return index < EdgeCount() ? -1 : index - EdgeCount(); }
+    int32_t HeaderIndex() const { return hasHeader ? 0 : -1; }
+    int32_t FooterIndex() const { return hasFooter ? rawCount - 1 : -1; }
+    int32_t DataToNode(int32_t index) const { return index + static_cast<int32_t>(hasHeader); }
+    int32_t NodeToData(int32_t index) const
+    {
+        return index < static_cast<int32_t>(hasHeader) || index >= rawCount - static_cast<int32_t>(hasFooter)
+            ? -1 : index - static_cast<int32_t>(hasHeader);
+    }
     int32_t DataCount(int32_t rawCount) const { return std::max(0, rawCount - EdgeCount()); }
 };
 
@@ -247,22 +252,15 @@ public:
 
     float GetViewStartBound(bool ignoreFixOffset = false) const
     {
-        return (parentDriven_ ? parentViewStart_ : 0.0f) - (ignoreFixOffset ? 0.0f : startFixOffset_);
+        return 0.0f - (ignoreFixOffset ? 0.0f : startFixOffset_);
     }
 
     float GetViewEndBound(float mainSize, bool ignoreFixOffset = false) const
     {
-        return (parentDriven_ ? parentViewEnd_ : mainSize) + expandHeight_ + (ignoreFixOffset ? 0.0f : endFixOffset_);
+        return mainSize + expandHeight_ + (ignoreFixOffset ? 0.0f : endFixOffset_);
     }
 
     // Only the new edge-attribute path uses this mapping; legacy segmented footer stays unchanged.
-    bool parentDriven_ = false;
-    float parentViewStart_ = 0.0f;
-    float parentViewEnd_ = 0.0f;
-    float parentMainSize_ = 0.0f;
-    std::optional<int64_t> parentDeadline_;
-    float parentAdjustStart_ = 0.0f;
-    float parentAdjustEnd_ = 0.0f;
     bool edgeSlots_ = false;
     WaterFlowChildIndexMap edgeIndexMap_;
     float headerHeight_ = 0.0f;

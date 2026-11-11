@@ -45,7 +45,13 @@ void UpdateChildConstraint(Axis axis, const OptionalSizeF& selfIdealSize, Layout
 
 AdjustOffset GetLazyChildAdjustOffset(const RefPtr<LayoutWrapper>& itemWrapper)
 {
-    return LazyLayoutUtils::ConsumeNestedLazyAdjustOffset(itemWrapper ? itemWrapper->GetHostNode() : nullptr, false);
+    AdjustOffset offset {};
+    CHECK_NULL_RETURN(itemWrapper, offset);
+    auto frameNode = itemWrapper->GetHostNode();
+    CHECK_NULL_RETURN(frameNode, offset);
+    auto pattern = frameNode->GetPattern<LazyLayoutPattern>();
+    CHECK_NULL_RETURN(pattern, offset);
+    return pattern->GetAndResetAdjustOffset();
 }
 
 void UpdateLazyChildConstraint(LayoutConstraintF& childLayoutConstraint, float viewPortLength, float referencePos,

@@ -37,7 +37,7 @@ public:
     {
         return std::nullopt;
     }
-    virtual bool HasStickyHeader() const
+    bool HasStickyHeader() const override
     {
         return false;
     }
@@ -54,7 +54,7 @@ public:
     LayoutWrapper* SwapPremeasureWrapper(LayoutWrapper* wrapper);
 
     // LazyColumnLayout publishes handoff gaps, defers mid-layout invalidation, and clears the state on detach.
-    void PublishNextStickyHeaderGap(const std::optional<float>& gap);
+    void PublishNextStickyHeaderGap(const std::optional<float>& gap) override;
 
     const std::optional<float>& GetNextStickyHeaderGap() const
     {

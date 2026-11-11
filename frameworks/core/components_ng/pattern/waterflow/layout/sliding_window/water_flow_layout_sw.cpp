@@ -48,8 +48,6 @@ void WaterFlowLayoutSW::Measure(LayoutWrapper* wrapper)
     auto [size, matchChildren, originalWidth] = WaterFlowLayoutUtils::PreMeasureSelf(wrapper_, axis_);
     syncLoad_ = props_->GetSyncLoad().value_or(true) || matchChildren ||
                 !NearZero(info_->delta_) || info_->targetIndex_.has_value() || fastScrollState_;
-    PrepareParentLayout(wrapper, info_, size, matchChildren);
-    cacheDeadline_ = info_->parentDeadline_;
     MeasureEdges(wrapper, info_, size);
     Init(size, originalWidth);
     CalculateContentClipFixOffset(wrapper_, info_);
@@ -81,17 +79,11 @@ void WaterFlowLayoutSW::Measure(LayoutWrapper* wrapper)
     }
 
     MeasureItems();
-    if (matchChildren && !info_->parentDriven_) {
+    if (matchChildren) {
         PostMeasureSelf(size.CrossSize(axis_));
     }
 
     info_->Sync(itemCnt_, mainLen_, mainGaps_);
-    if (FinishParentLayout(wrapper, info_, size)) {
-        measuredStartIndex_ = info_->StartIndex();
-        measuredEndIndex_ = info_->EndIndex();
-        isLayouted_ = false;
-        return;
-    }
 
     if (fastScrollState_ && !fastScrollState_->cancelled && !fastScrollState_->targetOffset &&
         !info_->measureInNextFrame_) {
@@ -389,7 +381,7 @@ void WaterFlowLayoutSW::Layout(LayoutWrapper* wrapper)
         LayoutEdges(wrapper, info_, info_->EndPos() - info_->Offset() + info_->BotMargin());
     } else if (info_->itemEnd_) {
         LayoutFooter(paddingOffset, reverse);
-    } else if (info_->footerIndex_ == 0) {
+    } else if (info_->footerIndex_ >= 0) {
         DeactivateFooter();
     }
 
@@ -399,7 +391,7 @@ void WaterFlowLayoutSW::Layout(LayoutWrapper* wrapper)
 
 void WaterFlowLayoutSW::DeactivateFooter() const
 {
-    if (info_->footerIndex_ != 0) {
+    if (info_->footerIndex_ < 0) {
         return;
     }
     auto child = wrapper_->GetChildByIndex(0);
@@ -603,11 +595,7 @@ void WaterFlowLayoutSW::MeasureOnOffset(float delta)
     forward ? ClearBack(info_->GetViewEndBound(mainLen_)) : ClearFront();
 
     ApplyDelta(delta);
-    if (info_->parentDriven_) {
-        FillFront(info_->GetViewStartBound(), info_->StartIndex() - 1, 0);
-    } else {
-        AdjustOverScroll();
-    }
+    AdjustOverScroll();
     // clear items that moved out of viewport
     forward ? ClearFront() : ClearBack(info_->GetViewEndBound(mainLen_));
 }
@@ -945,7 +933,7 @@ void WaterFlowLayoutSW::ClearFront()
         }
         const float itemEndPos = lane->startPos + itemLen;
         const bool inView =
-            (NearZero(info_->startFixOffset_) && !info_->parentDriven_) ? Positive(itemEndPos)
+            NearZero(info_->startFixOffset_) ? Positive(itemEndPos)
                 : GreatNotEqual(itemEndPos, startBound);
         if (inView) {
             break;
@@ -982,7 +970,7 @@ void WaterFlowLayoutSW::MeasureOnJump(int32_t jumpIdx, ScrollAlign align)
 {
     if (jumpIdx == LAST_ITEM) {
         jumpIdx = itemCnt_ - 1;
-    } else if (jumpIdx == itemCnt_ && info_->footerIndex_ == 0) {
+    } else if (jumpIdx == itemCnt_ && info_->footerIndex_ >= 0) {
         // jump to footer
         info_->delta_ = -Infinity<float>();
     }
@@ -1084,7 +1072,7 @@ void WaterFlowLayoutSW::AdjustOverScroll()
     float maxEnd = info_->EndPos();
     float minStart = info_->StartPos();
 
-    if (LessOrEqual(maxEnd, info_->GetViewEndBound(mainLen_, true)) && info_->footerIndex_ == 0) {
+    if (LessOrEqual(maxEnd, info_->GetViewEndBound(mainLen_, true)) && info_->footerIndex_ >= 0) {
         info_->footerHeight_ = info_->edgeSlots_ ? info_->edgeFooterHeight_
             : WaterFlowLayoutUtils::MeasureFooter(wrapper_, axis_);
         maxEnd += info_->footerHeight_;
@@ -1217,7 +1205,7 @@ void WaterFlowLayoutSW::LayoutSection(
 
 void WaterFlowLayoutSW::LayoutFooter(const OffsetF& paddingOffset, bool reverse)
 {
-    if (info_->footerIndex_ != 0) {
+    if (info_->footerIndex_ < 0) {
         return;
     }
     float mainPos = info_->EndPos();

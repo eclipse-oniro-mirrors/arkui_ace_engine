@@ -75,7 +75,6 @@ void WaterFlowSegmentedLayout::Measure(LayoutWrapper* wrapper)
     pattern->GetRepeatCountInfo(host, info_->repeatDifference_, info_->firstRepeatCount_, info_->childrenCount_);
     info_->axis_ = axis_ = props_->GetAxis();
     auto [idealSize, matchChildren, originalWidth] = WaterFlowLayoutUtils::PreMeasureSelf(wrapper_, axis_);
-    PrepareParentLayout(wrapper, info_, idealSize, matchChildren);
     MeasureEdges(wrapper, info_, idealSize);
     sections_ = pattern->GetSections();
     const bool emptyEdges = info_->edgeSlots_ && info_->SegmentedItemCount() == 0 &&
@@ -104,16 +103,10 @@ void WaterFlowSegmentedLayout::Measure(LayoutWrapper* wrapper)
 
     PerformMeasurement();
 
-    if (matchChildren && !info_->parentDriven_) {
+    if (matchChildren) {
         PostMeasureSelf(idealSize);
     }
     info_->lastMainSize_ = mainSize_;
-    if (FinishParentLayout(wrapper, info_, idealSize)) {
-        measuredStartIndex_ = info_->StartIndex();
-        measuredEndIndex_ = info_->EndIndex();
-        isLayouted_ = false;
-        return;
-    }
 
     const int32_t cacheCnt = props_->GetCachedCountValue(info_->defCachedCount_);
     wrapper_->SetCacheCount(cacheCnt);
@@ -572,9 +565,6 @@ void WaterFlowSegmentedLayout::Fill(int32_t startIdx)
 {
     const float viewEndBound = info_->GetViewEndBound(mainSize_);
     for (int32_t i = startIdx; i < info_->SegmentedItemCount(); ++i) {
-        if (info_->parentDeadline_ && GetSysTimestamp() > *info_->parentDeadline_) {
-            break;
-        }
         auto position = WaterFlowLayoutUtils::GetItemPosition(info_, i, mainGaps_[info_->GetSegment(i)]);
         if (GreatOrEqual(position.startMainPos + info_->currentOffset_, viewEndBound)) {
             break;

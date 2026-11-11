@@ -782,7 +782,7 @@ void LazyColumnLayoutAlgorithm::UpdateSiblingHandoffGap(
 {
     CHECK_NULL_VOID(layoutWrapper);
     CHECK_NULL_VOID(wrapper);
-    auto currentPattern = LazyLayoutUtils::GetLazyLayoutPattern(wrapper->GetHostNode());
+    auto currentPattern = LazyLayoutUtils::GetStickyHeaderPattern(wrapper->GetHostNode());
     // The last section has no next sibling: clear its own outbound gap.
     if (currentPattern && itemIndex >= totalItemCount_ - 1) {
         currentPattern->PublishNextStickyHeaderGap(std::nullopt);
@@ -793,7 +793,7 @@ void LazyColumnLayoutAlgorithm::UpdateSiblingHandoffGap(
     // Cache-only lookup: a never-built previous item cannot hold stale state, so don't build one on this hot path.
     auto previousWrapper = layoutWrapper->GetChildByIndex(GetRawIndexForItem(itemIndex - 1), true);
     CHECK_NULL_VOID(previousWrapper);
-    auto previousPattern = LazyLayoutUtils::GetLazyLayoutPattern(previousWrapper->GetHostNode());
+    auto previousPattern = LazyLayoutUtils::GetStickyHeaderPattern(previousWrapper->GetHostNode());
     CHECK_NULL_VOID(previousPattern);
     const bool currentHasStickyHeader = currentPattern && currentPattern->HasStickyHeader();
     const bool previousHasStickyHeader = previousPattern->HasStickyHeader();

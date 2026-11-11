@@ -425,56 +425,6 @@ void WaterFlowLayoutBase::ClearUnlayoutedItems(LayoutWrapper* layoutWrapper)
     }
 }
 
-void WaterFlowLayoutBase::PrepareParentLayout(LayoutWrapper* wrapper,
-    const RefPtr<WaterFlowLayoutInfoBase>& info, SizeF& size, bool matchChildren)
-{
-    auto property = wrapper->GetLayoutProperty();
-    auto constraint = property->GetContentLayoutConstraint();
-    auto reference = constraint ? constraint->viewPosRef : std::nullopt;
-    const bool enabled = info->edgeSlots_ && matchChildren && property->GetNeedLazyLayout() &&
-        reference.has_value() && reference->axis == Axis::VERTICAL &&
-        !GreaterOrEqualToInfinity(reference->viewPosEnd - reference->viewPosStart);
-    if (enabled != info->parentDriven_) {
-        info->Reset();
-        info->UpdateOffset(-info->Offset());
-        info->parentAdjustStart_ = 0.0f;
-        info->parentAdjustEnd_ = 0.0f;
-        if (enabled) {
-            info->jumpIndex_ = WaterFlowLayoutInfoBase::EMPTY_JUMP_INDEX;
-            info->startIndex_ = 0;
-            info->endIndex_ = -1;
-        }
-    }
-    info->parentDriven_ = enabled;
-    info->parentDeadline_ = enabled ? reference->deadline : std::nullopt;
-    if (!enabled) {
-        return;
-    }
-    auto range = LazyLayoutUtils::CalculateViewRange(*reference, info->parentMainSize_);
-    info->parentViewStart_ = range.start;
-    info->parentViewEnd_ = range.end;
-    // Even a new offscreen host needs a bounded sample to establish its estimated extent.
-    size.SetHeight(std::max(range.end, 1.0f));
-    info->parentViewEnd_ = size.Height();
-    canOverScrollStart_ = true;
-    canOverScrollEnd_ = true;
-}
-
-bool WaterFlowLayoutBase::FinishParentLayout(
-    LayoutWrapper* wrapper, const RefPtr<WaterFlowLayoutInfoBase>& info, SizeF size)
-{
-    if (!info->parentDriven_) {
-        return false;
-    }
-    const float extent = std::max(info->EstimateTotalHeight(), info->headerHeight_ + info->edgeFooterHeight_) +
-        info->contentStartOffset_ + info->contentEndOffset_;
-    info->parentMainSize_ = extent;
-    size.SetHeight(extent);
-    AddPaddingToSize(wrapper->GetLayoutProperty()->CreatePaddingAndBorder(), size);
-    wrapper->GetGeometryNode()->SetFrameSize(size);
-    return true;
-}
-
 void WaterFlowLayoutBase::MeasureEdges(
     LayoutWrapper* wrapper, const RefPtr<WaterFlowLayoutInfoBase>& info, const SizeF& size)
 {
@@ -507,16 +457,7 @@ void WaterFlowLayoutBase::MeasureEdges(
     info->footerHeight_ = info->edgeFooterHeight_;
     if (!NearEqual(headerHeight, info->headerHeight_)) {
         // Cached item positions are body-local and must be invalidated when the prefix changes.
-        if (info->parentDriven_ && Positive(info->parentViewStart_)) {
-            info->parentAdjustStart_ += HeaderFooterUtils::CalcHeaderResizeAdjust(
-                headerHeight - info->headerHeight_, info->parentViewStart_ - info->headerHeight_, info->headerHeight_);
-        }
         info->Reset();
-        if (info->parentDriven_) {
-            info->jumpIndex_ = WaterFlowLayoutInfoBase::EMPTY_JUMP_INDEX;
-            info->startIndex_ = 0;
-            info->endIndex_ = -1;
-        }
         info->headerHeight_ = headerHeight;
     }
     if (pattern->GetSections() && info->segmentTails_.empty()) {
@@ -567,7 +508,7 @@ void WaterFlowLayoutBase::LayoutEdges(
     const float crossSize = wrapper->GetGeometryNode()->GetPaddingSize().Width();
     HeaderFooterUtils::LayoutEdge(wrapper, info->edgeIndexMap_.HeaderIndex(), origin, false, false, crossSize);
     bodyEnd = std::max(bodyEnd, info->headerHeight_);
-    if (info->parentDriven_ && info->EndIndex() < info->ItemCnt(info->GetChildrenCount()) - 1) {
+    if (info->EndIndex() < info->ItemCnt(info->GetChildrenCount()) - 1) {
         // The footer follows the estimated full body, not the tail of the currently measured window.
         bodyEnd = std::max(bodyEnd, info->EstimateTotalHeight() - info->edgeFooterHeight_);
     }

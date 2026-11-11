@@ -19,12 +19,14 @@
 #include "base/geometry/dimension.h"
 #include "core/common/container_scope.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
 #include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "core/components_ng/pattern/scrollable/scrollable_model_static.h"
 #include "core/components_ng/pattern/waterflow/bridge/waterflow/water_flow_sections_accessor_peer_impl.h"
 #include "core/components_ng/pattern/waterflow/water_flow_model_ng.h"
 #include "core/components_ng/pattern/waterflow/water_flow_model_static.h"
-#include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
+#include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
+#include "core/interfaces/native/ani/frame_node_peer_impl.h"
 #include "core/interfaces/native/implementation/water_flow_scroller_peer_impl.h"
 #include "core/interfaces/native/utility/callback_helper.h"
 #include "core/interfaces/native/utility/converter.h"
@@ -454,6 +456,38 @@ void SetFooterImpl(Ark_NativePointer node, const Opt_CustomNodeBuilder* builder)
     SetEdgeBuilder(node, builder, false);
 }
 
+void SetEdgeContent(Ark_NativePointer node,
+    const Opt_Union_CustomNodeBuilder_ComponentContentBase* value, bool header)
+{
+    auto frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto content = Converter::GetOptPtr(value);
+    if (!content) {
+        SetEdgeBuilder(node, nullptr, header);
+        return;
+    }
+    if (content->selector == 0) {
+        auto builder = Converter::ArkValue<Opt_CustomNodeBuilder>(content->value0);
+        SetEdgeBuilder(node, &builder, header);
+    } else if (content->selector == 1) {
+        auto peer = reinterpret_cast<FrameNodePeer*>(content->value1);
+        CHECK_NULL_VOID(peer);
+        auto pattern = frameNode->GetPattern<WaterFlowPattern>();
+        CHECK_NULL_VOID(pattern);
+        pattern->SetEdgeContent(header, FrameNodePeer::GetFrameNodeByPeer(peer));
+    }
+}
+
+void SetHeaderContentImpl(Ark_NativePointer node, const Opt_Union_CustomNodeBuilder_ComponentContentBase* value)
+{
+    SetEdgeContent(node, value, true);
+}
+
+void SetFooterContentImpl(Ark_NativePointer node, const Opt_Union_CustomNodeBuilder_ComponentContentBase* value)
+{
+    SetEdgeContent(node, value, false);
+}
+
 void SetStickyImpl(Ark_NativePointer node, const Opt_StickyStyle* value)
 {
     auto frameNode = reinterpret_cast<FrameNode*>(node);
@@ -476,7 +510,16 @@ namespace {
 // SDK preview builds can still use the table generated before the edge attributes.
 template<typename Modifier>
 constexpr auto SetEdgeModifiersIfSupported(Modifier& modifier, int)
-    -> decltype(modifier.setHeader, void())
+    -> decltype(modifier.setHeader = WaterFlowAttributeModifier::SetHeaderContentImpl, void())
+{
+    modifier.setHeader = WaterFlowAttributeModifier::SetHeaderContentImpl;
+    modifier.setFooter = WaterFlowAttributeModifier::SetFooterContentImpl;
+    modifier.setSticky = WaterFlowAttributeModifier::SetStickyImpl;
+}
+
+template<typename Modifier>
+constexpr auto SetEdgeModifiersIfSupported(Modifier& modifier, long)
+    -> decltype(modifier.setHeader = WaterFlowAttributeModifier::SetHeaderImpl, void())
 {
     modifier.setHeader = WaterFlowAttributeModifier::SetHeaderImpl;
     modifier.setFooter = WaterFlowAttributeModifier::SetFooterImpl;
@@ -484,7 +527,7 @@ constexpr auto SetEdgeModifiersIfSupported(Modifier& modifier, int)
 }
 
 template<typename Modifier>
-constexpr void SetEdgeModifiersIfSupported(Modifier&, long)
+constexpr void SetEdgeModifiersIfSupported(Modifier&, ...)
 {}
 } // namespace
 

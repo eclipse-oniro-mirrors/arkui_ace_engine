@@ -32,7 +32,6 @@
 #include "core/components_ng/base/frame_scene_status.h"
 #include "core/components_ng/event/scrollable_event.h"
 #include "core/components_ng/manager/content_change_manager/content_change_manager.h"
-#include "core/components_ng/pattern/lazy_layout/lazy_layout_offset.h"
 #include "core/components_ng/pattern/scroll_bar/proxy/scroll_bar_proxy.h"
 #include "core/components_ng/pattern/scrollable/nestable_scroll_container.h"
 #include "core/components_ng/pattern/scrollable/scrollable.h"
@@ -347,12 +346,6 @@ public:
     virtual RefPtr<ScrollBarOverlayModifier> CreateOverlayModifier();
     void CreateScrollBarOverlayModifier();
     virtual void AdjustOffset(float& delta, int32_t source) {}
-
-    // Expanded scrollable children publish incremental compensation to their layout parent once.
-    virtual OHOS::Ace::NG::AdjustOffset ConsumeParentAdjustOffset()
-    {
-        return {};
-    }
 
     float GetScrollableDistance() const
     {

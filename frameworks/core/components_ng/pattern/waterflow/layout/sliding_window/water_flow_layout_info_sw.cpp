@@ -931,12 +931,8 @@ float WaterFlowLayoutInfoSW::EstimateTotalHeight() const
     if (knowTotalHeight_ && repeatDifference_ == 0) {
         return maxHeight_;
     }
-    float height = parentDriven_ ? endPos_ + edgeFooterHeight_ :
-        std::max(-totalOffset_, 0.0f) + (endPos_ - startPos_);
+    float height = std::max(-totalOffset_, 0.0f) + (endPos_ - startPos_);
     if (itemEnd_ && repeatDifference_ == 0) {
-        if (parentDriven_) {
-            return height + BotMargin();
-        }
         float bottomOverScroll = std::max(BottomFinalPos(lastMainSize_), 0.0f);
         return height - bottomOverScroll + BotMargin() + footerHeight_;
     }
@@ -1260,7 +1256,7 @@ void WaterFlowLayoutInfoSW::HandleItemEnd(int32_t itemCnt, float mainSize)
     // Check if endIdx is already the last item
     if (endIndex_ >= itemCnt - 1) {
         itemEnd_ = true;
-        if (footerIndex_ == 0) {
+        if (footerIndex_ >= 0) {
             itemEnd_ &= LessOrEqualCustomPrecision(endPos_, GetViewEndBound(mainSize, true), 0.1f);
         }
         if (NearZero(endFixOffset_)) {
@@ -1284,7 +1280,7 @@ void WaterFlowLayoutInfoSW::HandleItemEnd(int32_t itemCnt, float mainSize)
 
     // Set itemEnd_ based on whether all remaining items are zero-height
     itemEnd_ = (zeroHeightCount > 0 && endIndex_ + zeroHeightCount >= itemCnt - 1);
-    if (itemEnd_ && footerIndex_ == 0) {
+    if (itemEnd_ && footerIndex_ >= 0) {
         itemEnd_ &= LessOrEqualCustomPrecision(endPos_, GetViewEndBound(mainSize, true), 0.1f);
     }
 

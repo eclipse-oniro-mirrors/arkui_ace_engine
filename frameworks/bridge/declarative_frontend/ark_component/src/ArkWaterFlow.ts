@@ -438,9 +438,9 @@ interface WaterFlowParam {
   footer?: CustomBuilder;
 }
 
-class WaterFlowHeaderModifier extends ModifierWithKey<CustomBuilder | undefined> {
+class WaterFlowHeaderModifier extends ModifierWithKey<CustomBuilder | ComponentContent | undefined> {
   static identity: Symbol = Symbol('waterFlowHeader');
-  constructor(value: CustomBuilder | undefined) {
+  constructor(value: CustomBuilder | ComponentContent | undefined) {
     super(value);
   }
   applyPeer(node: KNode, reset: boolean): void {
@@ -450,11 +450,14 @@ class WaterFlowHeaderModifier extends ModifierWithKey<CustomBuilder | undefined>
       getUINativeModule().waterFlow.setHeader(node, this.value);
     }
   }
+  checkObjectDiff(): boolean {
+    return this.stageValue !== this.value;
+  }
 }
 
-class WaterFlowFooterModifier extends ModifierWithKey<CustomBuilder | undefined> {
+class WaterFlowFooterModifier extends ModifierWithKey<CustomBuilder | ComponentContent | undefined> {
   static identity: Symbol = Symbol('waterFlowFooter');
-  constructor(value: CustomBuilder | undefined) {
+  constructor(value: CustomBuilder | ComponentContent | undefined) {
     super(value);
   }
   applyPeer(node: KNode, reset: boolean): void {
@@ -463,6 +466,9 @@ class WaterFlowFooterModifier extends ModifierWithKey<CustomBuilder | undefined>
     } else {
       getUINativeModule().waterFlow.setFooter(node, this.value);
     }
+  }
+  checkObjectDiff(): boolean {
+    return this.stageValue !== this.value;
   }
 }
 
@@ -484,11 +490,11 @@ class ArkWaterFlowComponent extends ArkScrollable<WaterFlowAttribute> implements
   constructor(nativePtr: KNode, classType?: ModifierType) {
     super(nativePtr, classType);
   }
-  header(value: CustomBuilder | undefined): this {
+  header(value: CustomBuilder | ComponentContent | undefined): this {
     modifierWithKey(this._modifiersWithKeys, WaterFlowHeaderModifier.identity, WaterFlowHeaderModifier, value);
     return this;
   }
-  footer(value: CustomBuilder | undefined): this {
+  footer(value: CustomBuilder | ComponentContent | undefined): this {
     modifierWithKey(this._modifiersWithKeys, WaterFlowFooterModifier.identity, WaterFlowFooterModifier, value);
     return this;
   }

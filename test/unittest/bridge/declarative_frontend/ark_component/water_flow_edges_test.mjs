@@ -43,6 +43,22 @@ function load() {
   return { calls, context };
 }
 
+for (const method of ['header', 'footer']) {
+  test(`${method}: ComponentContent diff uses object identity`, () => {
+    const { context } = load();
+    const component = new context.ArkWaterFlowComponent('node');
+    const content = { builderNode_: {} };
+    component[method](content);
+    const [modifier] = component._modifiersWithKeys.values();
+    modifier.stageValue = content;
+    assert.equal(modifier.checkObjectDiff(), false);
+    modifier.value = { builderNode_: {} };
+    assert.equal(modifier.checkObjectDiff(), true);
+    modifier.value = undefined;
+    assert.equal(modifier.checkObjectDiff(), true);
+  });
+}
+
 for (const method of ['header', 'footer', 'sticky']) {
   // Node 24 runs the real TypeScript proxy without adding a test-only compiler dependency.
   test(`${method}: lazy proxy preserves chaining and undefined`, {

@@ -19,7 +19,6 @@
 #include <cstddef>
 #include <memory>
 #include <optional>
-#include <set>
 
 #include "base/geometry/dimension.h"
 #include "base/geometry/ng/rect_t.h"
@@ -318,7 +317,6 @@ public:
     void UpdateMarkAnchorStart(const Dimension& markAnchorStart);
     void SetNeedLazyLayout(bool value);
     bool GetNeedLazyLayout() const;
-    void SetLazyLayoutRequest(int32_t owner, bool enabled);
 
     void ConstraintViewPosRef(ViewPosReference& viewPosRef);
 
@@ -431,7 +429,6 @@ private:
     bool needPositionLocalizedEdges_ = false;
     bool needOffsetLocalizedEdges_ = false;
     bool needLazyLayout_ = false;
-    std::unique_ptr<std::set<int32_t>> lazyLayoutRequests_;
     bool isUserSetVisibility_ = false;
 
     bool isUserSetBackgroundColor_ = false;

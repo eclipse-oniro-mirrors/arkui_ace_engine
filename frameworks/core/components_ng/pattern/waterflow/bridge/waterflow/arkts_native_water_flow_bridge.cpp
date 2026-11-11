@@ -699,9 +699,14 @@ ArkUINativeModuleValue SetWaterFlowEdge(ArkUIRuntimeCallInfo* info, bool header,
     CHECK_NULL_RETURN(host, panda::JSValueRef::Undefined(vm));
     auto pattern = host->GetPattern<WaterFlowPattern>();
     CHECK_NULL_RETURN(pattern, panda::JSValueRef::Undefined(vm));
+    auto value = info->GetCallArgRef(1);
+    if (!reset && !value.IsEmpty() && value->IsObject(vm) && !value->IsFunction(vm)) {
+        auto content = SetWaterFlowBuilderNode(vm, value->ToObject(vm));
+        pattern->SetEdgeContent(header, content);
+        return panda::JSValueRef::Undefined(vm);
+    }
     const auto generation = WaterFlowModelNG::BeginEdgeUpdate(host, header);
     auto keepAlive = AceType::Claim(host);
-    auto value = info->GetCallArgRef(1);
     RefPtr<UINode> content;
     if (!reset && !value.IsEmpty() && value->IsFunction(vm)) {
         auto stack = ViewStackProcessor::GetInstance();

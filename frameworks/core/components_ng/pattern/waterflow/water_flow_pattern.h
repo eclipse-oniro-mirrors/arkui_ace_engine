@@ -49,6 +49,8 @@ struct WaterFlowEdgeState {
     bool enabled = false;
     bool footerControlled = false;
     WeakPtr<UINode> header;
+    WeakPtr<UINode> headerContent;
+    WeakPtr<UINode> footerContent;
     uint64_t headerGeneration = 0;
     uint64_t footerGeneration = 0;
     StickyStyle sticky;
@@ -68,22 +70,13 @@ struct WaterFlowEdgeState {
 
     void InvalidateGenerations()
     {
+        headerContent.Reset();
+        footerContent.Reset();
         ++headerGeneration;
         ++footerGeneration;
     }
 };
 
-// Request ownership stays local to WaterFlow; qualification is implemented out of line.
-class WaterFlowParentContext {
-public:
-    ~WaterFlowParentContext();
-    void Reset();
-    bool Update(const RefPtr<FrameNode>& host, bool enabled);
-
-private:
-    int32_t owner_ = -1;
-    std::vector<WeakPtr<LayoutProperty>> requestPath_;
-};
 struct WaterFlowFastScrollState;
 
 class ACE_EXPORT WaterFlowPattern : public ScrollablePattern {
@@ -223,28 +216,19 @@ public:
     uint64_t BeginEdgeUpdate(bool isHeader);
     void SetEdge(bool isHeader, const RefPtr<UINode>& edge, uint64_t generation);
     void SetSticky(StickyStyle style);
+    bool HasStickyHeader() const override;
+    void PublishNextStickyHeaderGap(const std::optional<float>& gap) override;
+    void NotifyStickyHeaderChange();
+    void SetEdgeContent(bool isHeader, const RefPtr<UINode>& content);
+    bool IsValidEdgeContent(bool isHeader, const RefPtr<UINode>& content) const;
     // Save natural layout geometry and register one weak viewport callback until detach.
     void SetEdgeGeometry(const OffsetF& origin, float totalSize);
     void UpdateEdgePositions();
-    // Own intermediate lazy requests only while attached and eligible for parent-driven layout.
-    void UpdateParentLazyRequest();
-    void OnAttachToMainTree() override;
-    // Qualify the type to avoid ScrollablePattern::AdjustOffset name hiding; consume exactly once.
-    OHOS::Ace::NG::AdjustOffset ConsumeParentAdjustOffset() override
-    {
-        OHOS::Ace::NG::AdjustOffset offset;
-        if (layoutInfo_->parentDriven_) {
-            offset = { layoutInfo_->parentAdjustStart_, layoutInfo_->parentAdjustEnd_ };
-        }
-        layoutInfo_->parentAdjustStart_ = 0.0f;
-        layoutInfo_->parentAdjustEnd_ = 0.0f;
-        return offset;
-    }
     void OnDetachFromFrameNode(FrameNode* frameNode) override;
     const WaterFlowEdgeState& GetEdgeState() const { return edgeState_; }
     WaterFlowChildIndexMap GetEdgeIndexMap() const;
     int32_t GetDataCount() const;
-    // Keep edge wrappers before data nodes without including them in FlowItem/Sections indices.
+    // Keep header first and footer last without including either in FlowItem/Sections indices.
     void SyncEdgeSlots();
     void AddFooter(const RefPtr<NG::UINode>& footer);
 
@@ -544,8 +528,9 @@ private:
     double prevOffset_ = 0.0;
     SizeF lastSize_;
     std::pair<int32_t, int32_t> itemRange_ = { -1, -1 };
-    WaterFlowParentContext parentContext_;
     WaterFlowEdgeState edgeState_;
+    std::optional<float> nextStickyHeaderGap_;
+    bool lastNotifiedHasStickyHeader_ = false;
     OffsetF edgeOrigin_;
     float edgeTotalSize_ = 0.0f;
     bool edgeViewportRegistered_ = false;

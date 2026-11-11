@@ -27,31 +27,6 @@ static bool IsLazyLayoutScrollableContainer(const std::string& tag)
     return tag == V2::SCROLL_ETS_TAG || tag == V2::WATERFLOW_ETS_TAG || tag == V2::LIST_ETS_TAG;
 }
 
-AdjustOffset LazyLayoutUtils::ConsumeNestedLazyAdjustOffset(const RefPtr<UINode>& node, bool allowNestedLazy)
-{
-    auto child = node;
-    while (child) {
-        auto frame = AceType::DynamicCast<FrameNode>(child);
-        if (frame) {
-            auto lazy = frame->GetPattern<LazyLayoutPattern>();
-            if (!allowNestedLazy && child == node && lazy) {
-                return lazy->GetAndResetAdjustOffset();
-            }
-            if (!frame->GetLayoutProperty()->GetNeedLazyLayout()) {
-                return {};
-            }
-            if (auto scrollable = frame->GetPattern<ScrollablePattern>()) {
-                return scrollable->ConsumeParentAdjustOffset();
-            }
-            if (lazy) {
-                return allowNestedLazy ? lazy->GetAndResetAdjustOffset() : AdjustOffset {};
-            }
-        }
-        child = child->GetFirstChild();
-    }
-    return {};
-}
-
 bool LazyLayoutUtils::IsAllowedIntermediateNode(const RefPtr<UINode>& node)
 {
     CHECK_NULL_RETURN(node, false);
@@ -234,6 +209,26 @@ std::optional<ViewPosReference> LazyLayoutUtils::GetViewPosReference(
     CHECK_NULL_RETURN(viewPosRefOpt, std::nullopt);
     layoutProperty->ConstraintViewPosRef(viewPosRefOpt.value());
     return viewPosRefOpt;
+}
+
+RefPtr<Pattern> LazyLayoutUtils::GetStickyHeaderPattern(const RefPtr<UINode>& node)
+{
+    auto child = node;
+    while (child) {
+        auto frame = AceType::DynamicCast<FrameNode>(child);
+        if (frame) {
+            auto pattern = frame->GetPattern();
+            if (AceType::DynamicCast<LazyLayoutPattern>(pattern) || frame->GetTag() == V2::WATERFLOW_ETS_TAG) {
+                return pattern;
+            }
+            auto property = frame->GetLayoutProperty();
+            if (!IsAllowedIntermediateNode(frame) && (!property || !property->GetNeedLazyLayout())) {
+                return nullptr;
+            }
+        }
+        child = child->GetFirstChild();
+    }
+    return nullptr;
 }
 
 RefPtr<LazyLayoutPattern> LazyLayoutUtils::GetLazyLayoutPattern(const RefPtr<UINode>& node)
