@@ -1546,9 +1546,9 @@ HWTEST_F(RichEditorEventTestNg, FireOnIMEInputCompleteReentrancy001, TestSize.Le
     // execute safely on the first call.
     bool called = false;
     eventHub->SetOnIMEInputComplete([&](const RichEditorAbstractSpanResult&) {
-        called = true;
         // Dynamically set onIMEInputComplete_ to null during execution (self-destructive)
         eventHub->SetOnIMEInputComplete(nullptr);
+        called = true;
     });
     ASSERT_TRUE(static_cast<bool>(eventHub->onIMEInputComplete_));
 
@@ -1583,8 +1583,8 @@ HWTEST_F(RichEditorEventTestNg, FireOnReadyReentrancy001, TestSize.Level1)
     ASSERT_NE(eventHub, nullptr);
     bool called = false;
     eventHub->SetOnReady([&]() {
-        called = true;
         eventHub->SetOnReady(nullptr);
+        called = true;
     });
     ASSERT_TRUE(static_cast<bool>(eventHub->onReady_));
     eventHub->FireOnReady();
@@ -1606,8 +1606,8 @@ HWTEST_F(RichEditorEventTestNg, FireAboutToIMEInputReentrancy001, TestSize.Level
     ASSERT_NE(eventHub, nullptr);
     bool called = false;
     eventHub->SetAboutToIMEInput([&](const RichEditorInsertValue&) {
-        called = true;
         eventHub->SetAboutToIMEInput(nullptr);
+        called = true;
         return true;
     });
     ASSERT_TRUE(static_cast<bool>(eventHub->aboutToIMEInput_));
@@ -1631,8 +1631,8 @@ HWTEST_F(RichEditorEventTestNg, FireOnDidIMEInputReentrancy001, TestSize.Level1)
     ASSERT_NE(eventHub, nullptr);
     bool called = false;
     eventHub->SetOnDidIMEInput([&](const TextRange&) {
-        called = true;
         eventHub->SetOnDidIMEInput(nullptr);
+        called = true;
     });
     ASSERT_TRUE(static_cast<bool>(eventHub->onDidIMEInput_));
     TextRange range { 0, 5 };
@@ -1655,8 +1655,8 @@ HWTEST_F(RichEditorEventTestNg, FireAboutToDeleteReentrancy001, TestSize.Level1)
     ASSERT_NE(eventHub, nullptr);
     bool called = false;
     eventHub->SetAboutToDelete([&](const RichEditorDeleteValue&) {
-        called = true;
         eventHub->SetAboutToDelete(nullptr);
+        called = true;
         return true;
     });
     ASSERT_TRUE(static_cast<bool>(eventHub->aboutToDelete_));
@@ -1680,8 +1680,8 @@ HWTEST_F(RichEditorEventTestNg, FireOnDeleteCompleteReentrancy001, TestSize.Leve
     ASSERT_NE(eventHub, nullptr);
     bool called = false;
     eventHub->SetOnDeleteComplete([&]() {
-        called = true;
         eventHub->SetOnDeleteComplete(nullptr);
+        called = true;
     });
     ASSERT_TRUE(static_cast<bool>(eventHub->onDeleteComplete_));
     eventHub->FireOnDeleteComplete();
@@ -1703,8 +1703,8 @@ HWTEST_F(RichEditorEventTestNg, FireOnWillChangeReentrancy001, TestSize.Level1)
     ASSERT_NE(eventHub, nullptr);
     bool called = false;
     eventHub->SetOnWillChange([&](const RichEditorChangeValue&) {
-        called = true;
         eventHub->SetOnWillChange(nullptr);
+        called = true;
         return true;
     });
     ASSERT_TRUE(static_cast<bool>(eventHub->onWillChange_));
@@ -1728,8 +1728,8 @@ HWTEST_F(RichEditorEventTestNg, FireOnDidChangeReentrancy001, TestSize.Level1)
     ASSERT_NE(eventHub, nullptr);
     bool called = false;
     eventHub->SetOnDidChange([&](const RichEditorChangeValue&) {
-        called = true;
         eventHub->SetOnDidChange(nullptr);
+        called = true;
     });
     ASSERT_TRUE(static_cast<bool>(eventHub->onDidChange_));
     RichEditorChangeValue changeValue;
@@ -1752,8 +1752,8 @@ HWTEST_F(RichEditorEventTestNg, FireOnScrollChangeReentrancy001, TestSize.Level1
     ASSERT_NE(eventHub, nullptr);
     bool called = false;
     eventHub->SetOnScrollChangeEvent([&](float, float) {
-        called = true;
         eventHub->SetOnScrollChangeEvent(nullptr);
+        called = true;
     });
     ASSERT_TRUE(static_cast<bool>(eventHub->onScrollChangeEvent_));
     eventHub->FireOnScrollChangeEvent(TEST_OFFSET_X, TEST_OFFSET_Y);
@@ -1775,8 +1775,8 @@ HWTEST_F(RichEditorEventTestNg, FireOnContentSizeChangeReentrancy001, TestSize.L
     ASSERT_NE(eventHub, nullptr);
     bool called = false;
     eventHub->SetOnContentSizeChange([&](float, float) {
-        called = true;
         eventHub->SetOnContentSizeChange(nullptr);
+        called = true;
     });
     ASSERT_TRUE(static_cast<bool>(eventHub->onContentSizeChangeEvent_));
     eventHub->FireOnContentSizeChange(TEST_WIDTH, TEST_HEIGHT);
@@ -1798,8 +1798,8 @@ HWTEST_F(RichEditorEventTestNg, FireOnCutReentrancy001, TestSize.Level1)
     ASSERT_NE(eventHub, nullptr);
     bool called = false;
     eventHub->SetOnCut([&](NG::TextCommonEvent&) {
-        called = true;
         eventHub->SetOnCut(nullptr);
+        called = true;
     });
     ASSERT_TRUE(static_cast<bool>(eventHub->onCut_));
     TextCommonEvent event;
@@ -1822,8 +1822,8 @@ HWTEST_F(RichEditorEventTestNg, FireOnCopyReentrancy001, TestSize.Level1)
     ASSERT_NE(eventHub, nullptr);
     bool called = false;
     eventHub->SetOnCopy([&](NG::TextCommonEvent&) {
-        called = true;
         eventHub->SetOnCopy(nullptr);
+        called = true;
     });
     ASSERT_TRUE(static_cast<bool>(eventHub->onCopy_));
     TextCommonEvent event;
@@ -1846,8 +1846,8 @@ HWTEST_F(RichEditorEventTestNg, FireOnShareReentrancy001, TestSize.Level1)
     ASSERT_NE(eventHub, nullptr);
     bool called = false;
     eventHub->SetOnShare([&](NG::TextCommonEvent&) {
-        called = true;
         eventHub->SetOnShare(nullptr);
+        called = true;
     });
     ASSERT_TRUE(static_cast<bool>(eventHub->onShare_));
     TextCommonEvent event;
@@ -1870,8 +1870,8 @@ HWTEST_F(RichEditorEventTestNg, FireOnStyledStringWillChangeReentrancy001, TestS
     ASSERT_NE(eventHub, nullptr);
     bool called = false;
     eventHub->SetOnStyledStringWillChange([&](const StyledStringChangeValue&) {
-        called = true;
         eventHub->SetOnStyledStringWillChange(nullptr);
+        called = true;
         return true;
     });
     ASSERT_TRUE(static_cast<bool>(eventHub->onStyledStringWillChange_));
@@ -1895,8 +1895,8 @@ HWTEST_F(RichEditorEventTestNg, FireOnStyledStringDidChangeReentrancy001, TestSi
     ASSERT_NE(eventHub, nullptr);
     bool called = false;
     eventHub->SetOnStyledStringDidChange([&](const StyledStringChangeValue&) {
-        called = true;
         eventHub->SetOnStyledStringDidChange(nullptr);
+        called = true;
     });
     ASSERT_TRUE(static_cast<bool>(eventHub->onStyledStringDidChange_));
     StyledStringChangeValue info;
@@ -1919,8 +1919,8 @@ HWTEST_F(RichEditorEventTestNg, FireOnSelectReentrancy001, TestSize.Level1)
     ASSERT_NE(eventHub, nullptr);
     bool called = false;
     eventHub->SetOnSelect([&](const BaseEventInfo*) {
-        called = true;
         eventHub->SetOnSelect(nullptr);
+        called = true;
     });
     ASSERT_TRUE(static_cast<bool>(eventHub->onSelect_));
     RichEditorInsertValue selectInfo;
@@ -1943,8 +1943,8 @@ HWTEST_F(RichEditorEventTestNg, FireOnSelectionChangeReentrancy001, TestSize.Lev
     ASSERT_NE(eventHub, nullptr);
     bool called = false;
     eventHub->SetOnSelectionChange([&](const BaseEventInfo*) {
-        called = true;
         eventHub->SetOnSelectionChange(nullptr);
+        called = true;
     });
     ASSERT_TRUE(static_cast<bool>(eventHub->OnSelectionChange_));
     RichEditorInsertValue selectInfo;
@@ -1967,8 +1967,8 @@ HWTEST_F(RichEditorEventTestNg, FireOnPasteReentrancy001, TestSize.Level1)
     ASSERT_NE(eventHub, nullptr);
     bool called = false;
     eventHub->SetOnPaste([&](NG::TextCommonEvent&) {
-        called = true;
         eventHub->SetOnPaste(nullptr);
+        called = true;
     });
     ASSERT_TRUE(static_cast<bool>(eventHub->onPaste_));
     TextCommonEvent event;
@@ -1991,8 +1991,8 @@ HWTEST_F(RichEditorEventTestNg, FireOnSubmitReentrancy001, TestSize.Level1)
     ASSERT_NE(eventHub, nullptr);
     bool called = false;
     eventHub->SetOnSubmit([&](int32_t, NG::TextFieldCommonEvent&) {
-        called = true;
         eventHub->SetOnSubmit(nullptr);
+        called = true;
     });
     ASSERT_TRUE(static_cast<bool>(eventHub->onSubmit_));
     TextFieldCommonEvent event;
@@ -2015,8 +2015,8 @@ HWTEST_F(RichEditorEventTestNg, FireOnWillAttachIMEReantrancy001, TestSize.Level
     ASSERT_NE(eventHub, nullptr);
     bool called = false;
     eventHub->SetOnWillAttachIME([&](IMEClient&) {
-        called = true;
         eventHub->SetOnWillAttachIME(nullptr);
+        called = true;
     });
     ASSERT_TRUE(static_cast<bool>(eventHub->onWillAttachIME_));
     IMEClient imeClient;
@@ -2039,8 +2039,8 @@ HWTEST_F(RichEditorEventTestNg, FireOnInputFilterErrorReentrancy001, TestSize.Le
     ASSERT_NE(eventHub, nullptr);
     bool called = false;
     eventHub->SetOnInputFilterError([&](const std::u16string&) {
-        called = true;
         eventHub->SetOnInputFilterError(nullptr);
+        called = true;
     });
     ASSERT_TRUE(static_cast<bool>(eventHub->onInputFilterError_));
     eventHub->FireOnInputFilterError(u"test");
@@ -2062,8 +2062,8 @@ HWTEST_F(RichEditorEventTestNg, FireOnSecurityStateChangedReentrancy001, TestSiz
     ASSERT_NE(eventHub, nullptr);
     bool called = false;
     eventHub->SetOnSecurityStateChange([&](bool) {
-        called = true;
         eventHub->SetOnSecurityStateChange(nullptr);
+        called = true;
     });
     ASSERT_TRUE(static_cast<bool>(eventHub->onSecurityStateChanged_));
     eventHub->FireOnSecurityStateChanged(true);
