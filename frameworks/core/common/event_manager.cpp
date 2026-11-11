@@ -290,6 +290,21 @@ std::list<FingerInfo> BuildTouchFingerList(const TouchEvent& touchEvent, const W
     return fingerList;
 }
 
+static bool IsEscapeRecognizerInGestureTree(const RefPtr<NG::NGGestureRecognizer>& recognizer,
+    const std::set<NG::NGGestureRecognizer*>& gestureRoots)
+{
+    CHECK_NULL_RETURN(recognizer, false);
+    auto parent = recognizer->GetGestureGroup().Upgrade();
+    while (parent) {
+        auto group = AceType::DynamicCast<NG::RecognizerGroup>(parent);
+        if (group && gestureRoots.find(AceType::RawPtr(group)) != gestureRoots.end()) {
+            return true;
+        }
+        parent = parent->GetGestureGroup().Upgrade();
+    }
+    return false;
+}
+
 void EventManager::TouchTest(const TouchEvent& touchPoint, const RefPtr<RenderNode>& renderNode,
     TouchRestrict& touchRestrict, const Offset& offset, float viewScale, bool needAppend)
 {
@@ -1939,17 +1954,35 @@ void EventManager::DispatchTouchEventToTouchTestResult(const TouchEvent& touchEv
         }
     }
     if (!isStopGestureEvent && !escapeRecognizers_.empty()) {
-        HandleEscapeRecognizer(touchEvent);
+        HandleEscapeRecognizer(touchEvent, false);
     }
 }
 
-void EventManager::HandleEscapeRecognizer(const TouchEvent& touchEvent)
+void EventManager::HandleEscapeRecognizer(const TouchEvent& touchEvent, bool isPost)
 {
+    if (escapeRecognizers_.empty()) {
+        return;
+    }
+    const auto& resultsMap = isPost ? postEventTouchTestResults_ : touchTestResults_;
+    const auto iter = resultsMap.find(touchEvent.id);
+    if (iter == resultsMap.end()) {
+        return;
+    }
+    std::set<NG::NGGestureRecognizer*> gestureRoots;
+    for (const auto& entry : iter->second) {
+        auto recognizer = AceType::DynamicCast<NG::NGGestureRecognizer>(entry);
+        if (recognizer) {
+            gestureRoots.insert(AceType::RawPtr(recognizer));
+        }
+    }
     for (const auto& recognizer : escapeRecognizers_) {
         if (!recognizer) {
             continue;
         }
         if (recognizer->IsFingerEscaped(touchEvent.id)) {
+            continue;
+        }
+        if (!IsEscapeRecognizerInGestureTree(recognizer, gestureRoots)) {
             continue;
         }
         if (!recognizer->HandleMultiContainerEvent(touchEvent) && IsAgentTouchInScope(touchEvent)) {
@@ -2036,6 +2069,18 @@ void EventManager::ProcessPostEventDownPhase(const TouchEvent& point, const Touc
 #endif
 }
 
+void EventManager::ProcessPostEventFinishPhase(const TouchEvent& point)
+{
+    if (point.type != TouchType::UP && point.type != TouchType::CANCEL) {
+        return;
+    }
+    postEventRefereeNG_->CleanGestureScope(point.id);
+    postEventTouchTestResults_.erase(point.id);
+    if (postEventTouchTestResults_.empty()) {
+        postEventRefereeNG_->CleanRedundanceScope();
+    }
+}
+
 bool EventManager::PostEventDispatchTouchEvent(const TouchEvent& event)
 {
     ContainerScope scope(instanceId_);
@@ -2080,13 +2125,10 @@ bool EventManager::PostEventDispatchTouchEvent(const TouchEvent& event)
             }
         }
     }
-    if (point.type == TouchType::UP || point.type == TouchType::CANCEL) {
-        postEventRefereeNG_->CleanGestureScope(point.id);
-        postEventTouchTestResults_.erase(point.id);
-        if (postEventTouchTestResults_.empty()) {
-            postEventRefereeNG_->CleanRedundanceScope();
-        }
+    if (!escapeRecognizers_.empty()) {
+        HandleEscapeRecognizer(point, true);
     }
+    ProcessPostEventFinishPhase(point);
     return true;
 }
 
