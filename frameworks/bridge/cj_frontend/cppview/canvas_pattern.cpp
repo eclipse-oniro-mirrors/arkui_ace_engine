@@ -23,6 +23,9 @@ NativeCanvasPattern::NativeCanvasPattern() : FFIData() {}
 NativeCanvasPattern::~NativeCanvasPattern()
 {
     LOGI("Native Canvas Pattern Destroyed: %{public}" PRId64, GetID());
+    if (canvasRenderWeak_ != nullptr) {
+        canvasRenderWeak_->RemovePattern(GetId());
+    }
 }
 
 void NativeCanvasPattern::SetTransform(int64_t matrixId)

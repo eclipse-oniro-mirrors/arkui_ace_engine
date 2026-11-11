@@ -69,7 +69,6 @@ CJOffscreenRenderingContext::CJOffscreenRenderingContext(double width, double he
 {
     renderingContext2DModel_ = CreateOffscreenCanvasRenderingContextModel();
     CHECK_NULL_VOID(renderingContext2DModel_);
-    id_ = offscreenPatternCount_;
 
     double density = this->GetDensity();
     this->SetHeight(height * density);
@@ -79,8 +78,12 @@ CJOffscreenRenderingContext::CJOffscreenRenderingContext(double width, double he
     CHECK_NULL_VOID(renderingContext);
     auto offscreenPattern = renderingContext->CreateOffscreenPattern(round(width * density), round(height * density));
     this->SetOffscreenPattern(offscreenPattern);
-    std::lock_guard<std::mutex> lock(mutex_);
-    offscreenPatternMap_[offscreenPatternCount_++] = offscreenPattern;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        id_ = offscreenPatternCount_;
+        offscreenPatternMap_[id_] = offscreenPattern;
+        ++offscreenPatternCount_;
+    }
 
     if ((static_cast<CanvasUnit>(unit) == CanvasUnit::PX)) {
         this->SetUnit(CanvasUnit::PX);
@@ -91,13 +94,16 @@ CJOffscreenRenderingContext::CJOffscreenRenderingContext(double width, double he
 
 CJOffscreenRenderingContext::CJOffscreenRenderingContext()
 {
-    id_ = offscreenPatternCount_;
     renderingContext2DModel_ = CreateOffscreenCanvasRenderingContextModel();
 }
 
 CJOffscreenRenderingContext::~CJOffscreenRenderingContext()
 {
     LOGI("Native OffscreeCanvasRenderer Destroyed: %{public}" PRId64, GetID());
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        offscreenPatternMap_.erase(id_);
+    }
 }
 
 int64_t CJOffscreenRenderingContext::CJTransferToImageBitmap()

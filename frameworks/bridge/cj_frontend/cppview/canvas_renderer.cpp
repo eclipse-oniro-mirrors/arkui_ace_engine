@@ -35,6 +35,7 @@ using namespace OHOS;
 
 namespace OHOS::Ace::Framework {
 std::unordered_map<int32_t, std::shared_ptr<Pattern>> NativeCanvasRenderer::pattern_;
+std::mutex NativeCanvasRenderer::patternMutex_;
 unsigned int NativeCanvasRenderer::patternCount_ = 0;
 namespace {
 const int EVEN_CHECK = 2;
@@ -518,8 +519,9 @@ void NativeCanvasRenderer::SetTransform(TransformParam param)
 
 void NativeCanvasRenderer::SetTransform(unsigned int id, const TransformParam& transform)
 {
-    if (id >= 0 && id <= patternCount_) {
-        renderingContext2DModel_->SetTransform(pattern_[id], transform);
+    auto pattern = GetPatternPtr(static_cast<int32_t>(id));
+    if (pattern != nullptr) {
+        renderingContext2DModel_->SetTransform(pattern, transform);
     }
 }
 
@@ -747,24 +749,36 @@ int64_t NativeCanvasRenderer::CreatePattern(int64_t bitMapId, const std::string&
     pattern->SetPixelMap(pixelMap);
 #endif
 
-    pattern_[patternCount_] = pattern;
+    int32_t patternId = 0;
+    {
+        std::lock_guard<std::mutex> lock(patternMutex_);
+        patternId = static_cast<int32_t>(patternCount_);
+        pattern_[patternId] = pattern;
+        ++patternCount_;
+    }
     auto nativeCanvasPattern = FFIData::Create<NativeCanvasPattern>();
     if (nativeCanvasPattern == nullptr) {
+        std::lock_guard<std::mutex> lock(patternMutex_);
+        pattern_.erase(patternId);
         return FFI_ERROR_CODE;
     }
     nativeCanvasPattern->SetCanvasRenderer(this);
-    nativeCanvasPattern->SetId(patternCount_);
+    nativeCanvasPattern->SetId(patternId);
     nativeCanvasPattern->SetUnit(GetUnit());
-    patternCount_++;
     return nativeCanvasPattern->GetID();
 }
 
 std::shared_ptr<Pattern> NativeCanvasRenderer::GetPatternPtr(int32_t id)
 {
-    if (id < 0 || id >= static_cast<int32_t>(pattern_.size())) {
-        return std::shared_ptr<Pattern>();
-    }
-    return pattern_[id];
+    std::lock_guard<std::mutex> lock(patternMutex_);
+    auto itor = pattern_.find(id);
+    return itor == pattern_.end() ? std::shared_ptr<Pattern>() : itor->second;
+}
+
+void NativeCanvasRenderer::RemovePattern(int32_t id)
+{
+    std::lock_guard<std::mutex> lock(patternMutex_);
+    pattern_.erase(id);
 }
 
 int64_t NativeCanvasRenderer::GetTransform()
