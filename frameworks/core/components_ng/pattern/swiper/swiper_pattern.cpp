@@ -37,6 +37,7 @@
 #include "core/animation/curve.h"
 #include "core/animation/curves.h"
 #include "core/animation/spring_curve.h"
+#include "core/common/container.h"
 #include "core/common/container_scope.h"
 #include "core/common/premake_scope.h"
 #ifndef CROSS_PLATFORM
@@ -996,11 +997,7 @@ void SwiperPattern::CreateCaptureCallback(int32_t targetIndex, int32_t captureId
     auto callback = [weak = WeakClaim(this), captureId, targetIndex, hostInstanceId = GetHostInstanceId()](
                         std::shared_ptr<Media::PixelMap> pixelMap) {
         ContainerScope scope(hostInstanceId);
-        auto swiper = weak.Upgrade();
-        CHECK_NULL_VOID(swiper);
-        auto piplineContext = swiper->GetContext();
-        CHECK_NULL_VOID(piplineContext);
-        auto taskExecutor = piplineContext->GetTaskExecutor();
+        auto taskExecutor = Container::CurrentTaskExecutorSafelyWithCheck();
         CHECK_NULL_VOID(taskExecutor);
         taskExecutor->PostTask(
             [weak, pixelMap, captureId, targetIndex]() mutable {
