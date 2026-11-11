@@ -717,6 +717,15 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_ComposedStickyInsets, TestSize.Level1)
     MoveHost(-200.0f);
     pattern_->SetEdgeGeometry(OffsetF(), 1000.0f);
     pattern_->SetSticky(StickyStyle::BOTH);
+    // Ordinary layout discards the lazy reference and uses the scroll parent's own offsets.
+    ASSERT_FALSE(layoutProperty_->GetLayoutConstraint()->viewPosRef.has_value());
+    EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), 210.0f);
+    EXPECT_FLOAT_EQ(GetChildRect(frameNode_, pattern_->GetEdgeIndexMap().FooterIndex()).Top(), 445.0f);
+    // An already established lazy context may supply cumulative insets; edges never enable it.
+    layoutProperty_->SetNeedLazyLayout(true);
+    layoutProperty_->UpdateLayoutConstraint(constraint);
+    ASSERT_TRUE(layoutProperty_->GetLayoutConstraint()->viewPosRef.has_value());
+    pattern_->UpdateEdgePositions();
     EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), 260.0f);
     EXPECT_FLOAT_EQ(GetChildRect(frameNode_, pattern_->GetEdgeIndexMap().FooterIndex()).Top(), 420.0f);
     constraint.viewPosRef->stickyInsetStart = 80.0f;
