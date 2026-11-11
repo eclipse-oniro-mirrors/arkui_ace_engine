@@ -1248,7 +1248,10 @@ float WaterFlowLayoutInfoSW::CalcMaxHeight(int itemCnt)
         footerHeight = footerHeight_;
     }
     const float contentEnd = EndPos() + footerHeight + BotMargin();
-    return std::max(-totalOffset_ + contentEnd, maxHeight_);
+    // Edge changes can rebuild the first lane before the pattern calibrates totalOffset_.
+    // Use the current lane origin when measuring the expanded content height.
+    const float offset = edgeSlots_ && StartIndex() == 0 ? StartPos() - TopMargin() : totalOffset_;
+    return std::max(-offset + contentEnd, maxHeight_);
 }
 
 void WaterFlowLayoutInfoSW::HandleItemEnd(int32_t itemCnt, float mainSize)
