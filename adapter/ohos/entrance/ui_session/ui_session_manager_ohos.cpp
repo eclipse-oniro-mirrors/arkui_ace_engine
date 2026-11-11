@@ -54,10 +54,17 @@ constexpr char PAGE_SCENE_INCLUDE_UNFOCUSABLE_TEXT_INPUT[] = "includeUnfocusable
 constexpr char PAGE_SCENE_CONDITION[] = "condition";
 constexpr char PAGE_SCENE_OPERATOR[] = "operator";
 constexpr char PAGE_SCENE_THRESHOLD[] = "threshold";
+constexpr char PAGE_SCENE_COUNT_GTE_OPERATOR[] = "COUNT_GTE";
 constexpr char PAGE_SCENE_POLICY[] = "policy";
 constexpr char PAGE_SCENE_REPORT_ON_REGISTER[] = "reportOnRegister";
 constexpr char PAGE_SCENE_TEXT_EDITOR_SCENE[] = "TEXT_EDITOR";
-constexpr char PAGE_SCENE_COUNT_GTE_OPERATOR[] = "COUNT_GTE";
+constexpr char PAGE_SCENE_RESPONSE_SCENE[] = "RESPONSE";
+constexpr char PAGE_SCENE_PAGE[] = "page";
+constexpr char PAGE_SCENE_PAGE_TYPE[] = "pageType";
+constexpr char PAGE_SCENE_PAGE_NAME[] = "pageName";
+constexpr char PAGE_SCENE_CUSTOM_CONTROLS[] = "customControls";
+constexpr char PAGE_SCENE_ROUTER_PAGE_TYPE[] = "Router";
+constexpr char PAGE_SCENE_NAVIGATION_PAGE_TYPE[] = "Navigation";
 constexpr char PAGE_SCENE_TEXT_INPUT_TAG[] = "TextInput";
 constexpr char PAGE_SCENE_TEXT_AREA_TAG[] = "TextArea";
 constexpr char PAGE_SCENE_SEARCH_TAG[] = "Search";
@@ -119,7 +126,34 @@ int32_t GetJsonInt(const JsonObject* object, const char* key, int32_t defaultVal
 
 bool IsSupportedArkuiPageScene(const std::string& sceneType)
 {
-    return sceneType == PAGE_SCENE_TEXT_EDITOR_SCENE;
+    return sceneType == PAGE_SCENE_TEXT_EDITOR_SCENE || sceneType == PAGE_SCENE_RESPONSE_SCENE;
+}
+
+bool HasResponsePageSceneCondition(const JsonObject* ruleJsonValue)
+{
+    if (ruleJsonValue == nullptr) {
+        return false;
+    }
+    auto page = cJSON_GetObjectItem(ruleJsonValue, PAGE_SCENE_PAGE);
+    if (cJSON_IsObject(page)) {
+        auto pageType = GetJsonString(page, PAGE_SCENE_PAGE_TYPE);
+        auto pageName = GetJsonString(page, PAGE_SCENE_PAGE_NAME);
+        if ((pageType == PAGE_SCENE_ROUTER_PAGE_TYPE || pageType == PAGE_SCENE_NAVIGATION_PAGE_TYPE) &&
+            !pageName.empty()) {
+            return true;
+        }
+    }
+    auto customControls = cJSON_GetObjectItem(ruleJsonValue, PAGE_SCENE_CUSTOM_CONTROLS);
+    if (cJSON_IsArray(customControls)) {
+        auto size = cJSON_GetArraySize(customControls);
+        for (int32_t index = 0; index < size; ++index) {
+            auto item = cJSON_GetArrayItem(customControls, index);
+            if (cJSON_IsString(item) && item->valuestring != nullptr && strlen(item->valuestring) > 0) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 std::set<std::string> ExtractTextInputNodeTypes(const JsonObject* ruleJsonValue)
@@ -160,8 +194,13 @@ bool HasCountGreaterThanOrEqualCondition(const JsonObject* ruleJsonValue)
 bool IsSupportedArkuiPageSceneRule(const std::string& ruleId, const std::string& sceneType,
     const std::set<std::string>& nodeTypes, const JsonObject* ruleJsonValue)
 {
-    return IsValidPageSceneId(ruleId) && IsSupportedArkuiPageScene(sceneType) &&
-           !nodeTypes.empty() && HasCountGreaterThanOrEqualCondition(ruleJsonValue);
+    if (!IsValidPageSceneId(ruleId) || !IsSupportedArkuiPageScene(sceneType)) {
+        return false;
+    }
+    if (sceneType == PAGE_SCENE_RESPONSE_SCENE) {
+        return HasResponsePageSceneCondition(ruleJsonValue);
+    }
+    return !nodeTypes.empty() && HasCountGreaterThanOrEqualCondition(ruleJsonValue);
 }
 
 std::string PrintJsonUnformatted(const JsonObject* object)
@@ -237,8 +276,6 @@ constexpr int32_t MAX_SEARCH_KEYWORDS_PER_RULE = 5;
 constexpr int32_t MAX_SEARCH_KEYWORD_UTF8_BYTES = 20;
 constexpr int32_t MAX_SEARCH_COMPONENT_TYPES = 5;
 constexpr int32_t MAX_SEARCH_INSPECTOR_IDS = 10;
-constexpr char PAGE_SCENE_PAGE_TYPE[] = "pageType";
-constexpr char PAGE_SCENE_PAGE_NAME[] = "pageName";
 constexpr char PAGE_SCENE_REGIONS[] = "regions";
 constexpr char PAGE_SCENE_KEYWORDS[] = "keywords";
 constexpr char PAGE_SCENE_COMPONENTS[] = "components";
@@ -723,6 +760,13 @@ void UiSessionManagerOhos::SaveReportProxy(sptr<IRemoteObject> reportProxy, int3
             ErasePendingPageSceneRulesLocked(processId);
             pageSceneRuleRegistered_.store(splitPageSceneRegistration_.has_value() ||
                 !searchPageSceneRuleSets_.empty() || HasRegisteredPageSceneRuleLocked(PAGE_SCENE_TEXT_EDITOR_SCENE));
+            if (responseObserverFunction_.clearProcess) {
+                responseObserverFunction_.clearProcess(processId);
+            }
+        }
+        // Refresh the global toggle from the surviving registrations after this process was cleaned.
+        if (responseObserverFunction_.setActive && responseObserverFunction_.hasRegisteredRules) {
+            responseObserverFunction_.setActive(responseObserverFunction_.hasRegisteredRules());
         }
         for (const auto& removal : pageSceneRemovals) {
             TriggerPageSceneDetect(processId, removal, false);
@@ -782,8 +826,7 @@ int32_t UiSessionManagerOhos::RegisterWebPageSceneRules(int32_t processId, const
 
 int32_t UiSessionManagerOhos::RegisterPageSceneRules(int32_t processId, const std::string& ruleJson)
 {
-    // Search scene ruleJson (frozen schema) carries no "version" field; the legacy
-    // TEXT_EDITOR ruleJson requires version == 1. Route by presence of "version".
+    // Search ruleJson (frozen schema) carries no "version"; legacy TEXT_EDITOR requires version == 1.
     if (IsSearchPageSceneRuleJson(ruleJson)) {
         return RegisterSearchPageSceneRules(processId, ruleJson);
     }
@@ -802,15 +845,19 @@ int32_t UiSessionManagerOhos::RegisterPageSceneRules(int32_t processId, const st
     if (PageSceneSplit::ContainsSplitRule(ruleJson)) {
         return RegisterSplitPageSceneRules(processId, ruleJson);
     }
+    // RESPONSE scene (key region): register in the NG manager, report via the RESPONSE envelope.
     auto ruleSetInfo = ExtractPageSceneRuleSetInfo(ruleJson);
     if (ruleSetInfo.ruleSetId.empty()) {
         LOGW("RegisterPageSceneRules invalid rule json, process id:%{public}d", processId);
         return PARAM_INVALID;
     }
+    if (HasPageSceneRule(ruleSetInfo, PAGE_SCENE_RESPONSE_SCENE, false, "")) {
+        return RegisterResponsePageSceneRules(processId, ruleJson);
+    }
     {
         std::lock_guard<std::mutex> lock(pageSceneMutex_);
         if (pageSceneRuleSets_.find(processId) != pageSceneRuleSets_.end()) {
-            LOGW("RegisterPageSceneRules duplicated, process id:%{public}d", processId);
+            LOGW("RegisterPageSceneRules duplicated registration, process id:%{public}d", processId);
             return LAST_UNFINISH;
         }
         if (ConflictsWithSplitRegistrationLocked(processId, ruleSetInfo.ruleSetId)) {
@@ -827,6 +874,24 @@ int32_t UiSessionManagerOhos::RegisterPageSceneRules(int32_t processId, const st
     }
     if (webEnabled) {
         return RegisterWebPageSceneRules(processId, ruleJson);
+    }
+    return NO_ERROR;
+}
+
+int32_t UiSessionManagerOhos::RegisterResponsePageSceneRules(int32_t processId, const std::string& ruleJson)
+{
+    if (!responseObserverFunction_.registerRuleSet) {
+        LOGW("RegisterPageSceneRules response observer is null, process id:%{public}d", processId);
+        return NOT_CONNECTED;
+    }
+    int32_t observerRet = responseObserverFunction_.registerRuleSet(processId, ruleJson);
+    if (observerRet != NO_ERROR) {
+        LOGW("RegisterPageSceneRules invalid response rule json, process id:%{public}d", processId);
+        return observerRet;
+    }
+    SaveProcessId("pageScene", processId);
+    if (responseObserverFunction_.setActive) {
+        responseObserverFunction_.setActive(true);
     }
     return NO_ERROR;
 }
@@ -1056,24 +1121,51 @@ int32_t UiSessionManagerOhos::UnregisterPageSceneRules(int32_t processId, const 
     if (HasSplitPageSceneRuleSet(processId, ruleSetId)) {
         return UnregisterSplitPageSceneRules(processId, ruleSetId);
     }
+    // RESPONSE ruleSets live in the NG manager; the adapter mirrors TEXT_EDITOR/search only.
+    int32_t responseRet = responseObserverFunction_.unregisterRuleSet
+        ? responseObserverFunction_.unregisterRuleSet(processId, ruleSetId) : NO_ERROR;
     bool isSearchRuleSet = false;
+    bool isLegacyRuleSet = false;
+    bool hasSearchRules = false;
     {
         std::lock_guard<std::mutex> lock(pageSceneMutex_);
         auto processIter = searchPageSceneRuleSets_.find(processId);
         isSearchRuleSet = processIter != searchPageSceneRuleSets_.end() &&
             processIter->second.find(ruleSetId) != processIter->second.end();
+        auto legacyIter = pageSceneRuleSets_.find(processId);
+        isLegacyRuleSet = legacyIter != pageSceneRuleSets_.end() && legacyIter->second.ruleSetId == ruleSetId;
+        hasSearchRules = processIter != searchPageSceneRuleSets_.end();
     }
     if (isSearchRuleSet) {
         return UnregisterSearchPageSceneRules(processId, ruleSetId);
     }
-    bool hasSearchRules = false;
+    if (isLegacyRuleSet) {
+        UnregisterLegacyPageSceneRules(processId, ruleSetId, hasSearchRules);
+    } else if (responseRet != NO_ERROR) {
+        return PARAM_INVALID;
+    }
+    // Refresh the toggle from surviving RESPONSE registrations after this unregister.
+    if (responseObserverFunction_.setActive && responseObserverFunction_.hasRegisteredRules) {
+        responseObserverFunction_.setActive(responseObserverFunction_.hasRegisteredRules());
+    }
+    // Web side: unregister rules via callback (decoupled from singleton)
+    WebPageSceneFunction webPageSceneFunc;
+    {
+        std::lock_guard<std::mutex> lock(webPageSceneMutex_);
+        webPageSceneFunc = webPageSceneFunction_;
+    }
+    if (webPageSceneFunc) {
+        webPageSceneFunc(WebPageSceneOp::UnregisterRules, processId, "", false);
+    }
+    return NO_ERROR;
+}
+
+void UiSessionManagerOhos::UnregisterLegacyPageSceneRules(int32_t processId, const std::string& ruleSetId,
+    bool hasSearchRules)
+{
     {
         std::lock_guard<std::mutex> lock(pageSceneMutex_);
-        auto iter = pageSceneRuleSets_.find(processId);
-        if (iter == pageSceneRuleSets_.end() || iter->second.ruleSetId != ruleSetId) {
-            return PARAM_INVALID;
-        }
-        pageSceneRuleSets_.erase(iter);
+        pageSceneRuleSets_.erase(processId);
         ErasePendingLegacyPageSceneRulesLocked(processId);
         pageSceneRuleRegistered_.store(splitPageSceneRegistration_.has_value() ||
             !searchPageSceneRuleSets_.empty() || HasRegisteredPageSceneRuleLocked(PAGE_SCENE_TEXT_EDITOR_SCENE));
@@ -1090,16 +1182,6 @@ int32_t UiSessionManagerOhos::UnregisterPageSceneRules(int32_t processId, const 
         EraseProcessId("pageScene", processId);
         TriggerPageSceneDetect(processId, "", false);
     }
-    // Web side: unregister rules via callback (decoupled from singleton)
-    WebPageSceneFunction webPageSceneFunc;
-    {
-        std::lock_guard<std::mutex> lock(webPageSceneMutex_);
-        webPageSceneFunc = webPageSceneFunction_;
-    }
-    if (webPageSceneFunc) {
-        webPageSceneFunc(WebPageSceneOp::UnregisterRules, processId, "", false);
-    }
-    return NO_ERROR;
 }
 
 void UiSessionManagerOhos::SetTextQueryRule(const PageSceneRuleSetInfo& rules, std::string& json, bool& webEnabled)
@@ -1284,7 +1366,17 @@ int32_t UiSessionManagerOhos::GetPageScene(int32_t processId, const std::string&
 
 bool UiSessionManagerOhos::GetPageSceneRulesRegistered()
 {
-    return pageSceneRuleRegistered_.load();
+    // RESPONSE rules live in the NG manager; keep the detect pipeline active for them too.
+    return pageSceneRuleRegistered_.load() ||
+        (responseObserverFunction_.hasRegisteredRules && responseObserverFunction_.hasRegisteredRules());
+}
+
+std::vector<std::pair<int32_t, std::string>> UiSessionManagerOhos::GetActivePageSceneRuleJsons()
+{
+    if (responseObserverFunction_.getActiveRuleJsons) {
+        return responseObserverFunction_.getActiveRuleJsons();
+    }
+    return {};
 }
 
 void UiSessionManagerOhos::ReportPageSceneEvent(int32_t processId, const std::string& sceneJson, bool isGetResult)
@@ -1425,11 +1517,15 @@ void UiSessionManagerOhos::FlushPageSceneNodeChanged()
     std::vector<std::pair<int32_t, std::string>> ruleJsons;
     {
         std::lock_guard<std::mutex> lock(pageSceneMutex_);
-        ruleJsons.assign(pendingPageSceneDetectRules_.begin(), pendingPageSceneDetectRules_.end());
-        pendingPageSceneDetectRules_.clear();
-        ruleJsons.insert(ruleJsons.end(),
-            pendingSearchPageSceneDetectRules_.begin(), pendingSearchPageSceneDetectRules_.end());
-        pendingSearchPageSceneDetectRules_.clear();
+        if (!pendingPageSceneDetectRules_.empty()) {
+            ruleJsons.assign(pendingPageSceneDetectRules_.begin(), pendingPageSceneDetectRules_.end());
+            pendingPageSceneDetectRules_.clear();
+        }
+        if (!pendingSearchPageSceneDetectRules_.empty()) {
+            ruleJsons.insert(ruleJsons.end(),
+                pendingSearchPageSceneDetectRules_.begin(), pendingSearchPageSceneDetectRules_.end());
+            pendingSearchPageSceneDetectRules_.clear();
+        }
         for (auto pid : pendingSplitPageSceneProcesses_) {
             ruleJsons.emplace_back(pid, SPLIT_CONFIG_CHANGED);
         }
@@ -1437,6 +1533,10 @@ void UiSessionManagerOhos::FlushPageSceneNodeChanged()
     }
     for (const auto& [pid, ruleJson] : ruleJsons) {
         TriggerPageSceneDetect(pid, ruleJson, false);
+    }
+    // Stable point reached; consume settled RESPONSE operations once even with no TEXT_EDITOR rules.
+    if (responseObserverFunction_.onContentStable) {
+        responseObserverFunction_.onContentStable();
     }
 }
 
@@ -1449,6 +1549,11 @@ void UiSessionManagerOhos::SavePageSceneDetectFunction(PageSceneDetectFunction&&
 {
     std::lock_guard<std::mutex> lock(pageSceneDetectFunctionMutex_);
     pageSceneDetectFunction_ = std::move(function);
+}
+
+void UiSessionManagerOhos::SavePageSceneResponseObserverFunction(PageSceneResponseObserverFunction&& function)
+{
+    responseObserverFunction_ = std::move(function);
 }
 
 void UiSessionManagerOhos::ErasePendingPageSceneRulesLocked(int32_t processId)
@@ -1623,11 +1728,6 @@ UiSessionManagerOhos::PageSceneRuleSetInfo UiSessionManagerOhos::ExtractPageScen
     }
     cJSON_Delete(root);
     return ruleSetInfo;
-}
-
-std::string UiSessionManagerOhos::ExtractPageSceneRuleSetId(const std::string& ruleJson) const
-{
-    return ExtractPageSceneRuleSetInfo(ruleJson).ruleSetId;
 }
 
 bool UiSessionManagerOhos::IsPageSceneRuleMatched(const PageSceneRuleInfo& rule, const std::string& sceneType,

@@ -18,6 +18,9 @@
 #include <algorithm>
 #include <atomic>
 #include <cinttypes>
+#include <cstring>
+#include <map>
+#include <string>
 
 #include "cJSON.h"
 
@@ -43,6 +46,10 @@ constexpr char PAGE_SCENE_RULE_SET_ID[] = "ruleSetId";
 constexpr char PAGE_SCENE_HITS[] = "hits";
 constexpr char PAGE_SCENE_EVENTS[] = "events";
 constexpr char PAGE_SCENE_EXITS[] = "exits";
+constexpr char PAGE_SCENE_EVENT_TYPE[] = "eventType";
+constexpr char PAGE_SCENE_RESPONSE_EVENT_TYPE[] = "RESPONSE_EVENT";
+constexpr char PAGE_SCENE_RULE_SETS[] = "ruleSets";
+constexpr char PAGE_SCENE_SCENE[] = "scene";
 
 // Legacy events carry a top-level ruleSetId; search uses hits/exits and SPLIT uses events.
 // Dispatch once per referenced ruleSet, filtering search evidence before delivery.
@@ -131,7 +138,6 @@ std::string FilterPageSceneEvent(const std::string& sceneJson, const std::string
     return result;
 }
 
-
 inline int32_t NormalizeTimeout(int32_t timeout, int32_t defaultTimeout)
 {
     return timeout > 0 ? timeout : defaultTimeout;
@@ -193,6 +199,53 @@ void AddArkWebImagesByIds(OHOS::MessageParcel& data,
         }
         webImages.emplace(webId, std::move(imagesInOneWeb));
     }
+}
+
+bool ParseEnvelopeRuleSet(const cJSON* ruleSet, std::string& ruleSetId, std::string& scene)
+{
+    if (!cJSON_IsObject(ruleSet)) {
+        return false;
+    }
+    auto ruleSetIdItem = cJSON_GetObjectItem(ruleSet, PAGE_SCENE_RULE_SET_ID);
+    auto sceneItem = cJSON_GetObjectItem(ruleSet, PAGE_SCENE_SCENE);
+    if (!cJSON_IsString(ruleSetIdItem) || ruleSetIdItem->valuestring == nullptr ||
+        !cJSON_IsString(sceneItem) || sceneItem->valuestring == nullptr) {
+        return false;
+    }
+    ruleSetId = ruleSetIdItem->valuestring;
+    scene = sceneItem->valuestring;
+    return true;
+}
+
+void CollectEnvelopeRuleSets(const cJSON* root, bool& isEnvelope,
+    std::map<std::string, std::string>& sceneByRuleSetId)
+{
+    auto eventType = cJSON_GetObjectItem(root, PAGE_SCENE_EVENT_TYPE);
+    auto ruleSets = cJSON_GetObjectItem(root, PAGE_SCENE_RULE_SETS);
+    if (!cJSON_IsString(eventType) || eventType->valuestring == nullptr ||
+        strcmp(eventType->valuestring, PAGE_SCENE_RESPONSE_EVENT_TYPE) != 0 || !cJSON_IsArray(ruleSets)) {
+        return;
+    }
+    isEnvelope = true;
+    auto ruleSetSize = cJSON_GetArraySize(ruleSets);
+    for (int32_t index = 0; index < ruleSetSize; ++index) {
+        std::string ruleSetId;
+        std::string scene;
+        if (ParseEnvelopeRuleSet(cJSON_GetArrayItem(ruleSets, index), ruleSetId, scene)) {
+            sceneByRuleSetId[ruleSetId] = scene;
+        }
+    }
+}
+
+std::map<std::string, std::string> ParseResponseEnvelope(const std::string& sceneJson, bool& isEnvelope)
+{
+    std::map<std::string, std::string> sceneByRuleSetId;
+    auto root = cJSON_Parse(sceneJson.c_str());
+    if (cJSON_IsObject(root)) {
+        CollectEnvelopeRuleSets(root, isEnvelope, sceneByRuleSetId);
+    }
+    cJSON_Delete(root);
+    return sceneByRuleSetId;
 }
 
 } // namespace
@@ -1511,8 +1564,14 @@ void UiReportStub::ReportPageSceneEvent(const std::string& sceneJson, bool isGet
         }
         return;
     }
-    // Snapshot callbacks, then filter and invoke outside the lock. Each callback
-    // receives only its own ruleSet's hits/exits; shared event metadata is preserved.
+    // RESPONSE envelope: dispatch per ruleSetId so a missing callback never blocks others.
+    bool isEnvelope = false;
+    auto sceneByRuleSetId = ParseResponseEnvelope(sceneJson, isEnvelope);
+    if (isEnvelope) {
+        DispatchEnvelopeCallbacks(sceneByRuleSetId);
+        return;
+    }
+    // Search/legacy events: snapshot callbacks, then filter and invoke outside the lock.
     auto ruleSetIds = ExtractPageSceneRuleSetIds(sceneJson);
     std::vector<std::pair<std::string, PageSceneEventCallback>> callbackSnapshot;
     {
@@ -1530,6 +1589,23 @@ void UiReportStub::ReportPageSceneEvent(const std::string& sceneJson, bool isGet
             if (!filteredJson.empty()) {
                 callback(filteredJson);
             }
+        }
+    }
+}
+
+void UiReportStub::DispatchEnvelopeCallbacks(const std::map<std::string, std::string>& sceneByRuleSetId)
+{
+    for (const auto& [ruleSetId, scene] : sceneByRuleSetId) {
+        PageSceneEventCallback pageSceneEventCallback;
+        {
+            std::lock_guard<std::mutex> lock(pageSceneCallbackMutex_);
+            auto callbackIter = pageSceneEventCallbacks_.find(ruleSetId);
+            if (callbackIter != pageSceneEventCallbacks_.end()) {
+                pageSceneEventCallback = callbackIter->second;
+            }
+        }
+        if (pageSceneEventCallback) {
+            pageSceneEventCallback(scene);
         }
     }
 }

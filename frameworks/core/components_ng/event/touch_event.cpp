@@ -22,9 +22,11 @@
 #include "base/utils/time_util.h"
 #include "core/common/event_manager.h"
 #include "core/common/reporter/reporter.h"
+#include "core/components_ng/event/developer_response_publisher.h"
 #include "core/components_ng/manager/event/json_child_report.h"
 #include "core/components_ng/manager/page_scene/search_scene_click_matcher.h"
 #include "core/pipeline_ng/pipeline_context.h"
+#include <string>
 
 namespace OHOS::Ace::NG {
 
@@ -426,6 +428,27 @@ void TouchEventActuator::TriggerCallBacks(TouchEventInfo& event)
         auto commonTouchEventCallback = commonTouchEventCallback_;
         (*commonTouchEventCallback)(event);
     }
+    PublishDeveloperResponse(event);
+}
+
+void TouchEventActuator::PublishDeveloperResponse(TouchEventInfo& event)
+{
+    const auto& changedTouches = event.GetChangedTouches();
+    if (changedTouches.empty()) {
+        return;
+    }
+    auto touchType = changedTouches.front().GetTouchType();
+    if (touchType != TouchType::DOWN && touchType != TouchType::UP && touchType != TouchType::CANCEL) {
+        return;
+    }
+    auto frameNode = GetAttachedNode().Upgrade();
+    CHECK_NULL_VOID(frameNode);
+    DeveloperResponseCandidate candidate;
+    candidate.node = AceType::WeakClaim(AceType::RawPtr(frameNode));
+    candidate.operationToken = "touch_" + std::to_string(event.GetTouchEventId());
+    candidate.callbackType = DeveloperResponseCallbackType::TOUCH;
+    candidate.touchType = touchType;
+    DeveloperResponsePublisher::GetInstance()->PublishTouch(candidate);
 }
 
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING

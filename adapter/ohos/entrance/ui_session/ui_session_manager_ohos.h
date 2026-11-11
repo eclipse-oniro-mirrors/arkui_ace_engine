@@ -169,6 +169,7 @@ public:
     int32_t UnregisterPageSceneRules(int32_t processId, const std::string& ruleSetId) override;
     int32_t GetPageScene(int32_t processId, const std::string& ruleJsonOrRuleSetId) override;
     bool GetPageSceneRulesRegistered() override;
+    std::vector<std::pair<int32_t, std::string>> GetActivePageSceneRuleJsons() override;
     void ReportPageSceneEvent(int32_t processId, const std::string& sceneJson, bool isGetResult) override;
     void CompleteGetPageScene(int32_t processId) override;
     void NotifyPageSceneNodeChanged(const std::string& nodeTag, bool isAttach) override;
@@ -179,6 +180,7 @@ public:
     void FlushPendingSearchClicksIfStable() override;
     void SavePageSceneDetectFunction(PageSceneDetectFunction&& function) override;
     void SaveWebPageSceneFunction(WebPageSceneFunction&& function) override;
+    void SavePageSceneResponseObserverFunction(PageSceneResponseObserverFunction&& function) override;
     bool IsWebSourceEnabled(const std::string& ruleJson);
     void SaveComponentTreeQueryFunction(ComponentTreeQueryFunction&& function) override;
     void ComponentTreeQuery(const ComponentTreeQueryRequest& request) override;
@@ -270,9 +272,6 @@ private:
     };
 
     PageSceneRuleSetInfo ExtractPageSceneRuleSetInfo(const std::string& ruleJson) const;
-    std::string ExtractPageSceneRuleSetId(const std::string& ruleJson) const;
-    int32_t ExtractRuleJsonAndWebEnabled(int32_t processId, const std::string& ruleJsonOrRuleSetId,
-        std::string& ruleJson, bool& webEnabled, std::string* splitRuleJson = nullptr);
     bool IsSearchPageSceneRuleJson(const std::string& ruleJson) const;
     std::string ExtractSearchPageSceneRuleSetId(const std::string& ruleJson) const;
     int32_t RegisterSearchPageSceneRules(int32_t processId, const std::string& ruleJson);
@@ -301,6 +300,10 @@ private:
     void ErasePendingLegacyPageSceneRulesLocked(int32_t processId);
     void ErasePendingSearchPageSceneRulesLocked(int32_t processId, const std::string& ruleSetId);
     void TriggerPageSceneDetect(int32_t processId, const std::string& ruleJson, bool isGetResult);
+    int32_t ExtractRuleJsonAndWebEnabled(int32_t processId, const std::string& ruleJsonOrRuleSetId,
+        std::string& ruleJson, bool& webEnabled, std::string* splitRuleJson = nullptr);
+    int32_t RegisterResponsePageSceneRules(int32_t processId, const std::string& ruleJson);
+    void UnregisterLegacyPageSceneRules(int32_t processId, const std::string& ruleSetId, bool hasSearchRules);
     struct PageSceneQueryPlan {
         std::string legacyJson;
         std::string splitJson;
@@ -340,6 +343,7 @@ private:
     std::set<std::pair<int32_t, std::string>> pendingPageSceneDetectRules_;
     std::set<std::pair<int32_t, std::string>> pendingSearchPageSceneDetectRules_;
     SendCommandWithResultFunction relaxedCommandWithResultFunction_;
+    PageSceneResponseObserverFunction responseObserverFunction_;
 };
 
 } // namespace OHOS::Ace

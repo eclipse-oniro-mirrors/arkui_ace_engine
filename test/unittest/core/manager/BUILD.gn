@@ -453,6 +453,7 @@ ace_unittest("page_scene_rule_manager_test_ng") {
     "$ace_root/frameworks/core/components_ng/manager/page_scene/developer_response_observer.cpp",
     "$ace_root/frameworks/core/components_ng/manager/page_scene/page_scene_rule_manager.cpp",
     "page_scene_rule_manager_test_ng.cpp",
+    "page_scene_rule_response_test_ng.cpp",
     "$ace_root/frameworks/core/components_ng/manager/page_scene/split_scene_recognizer.cpp",
     "split_scene_recognizer_test.cpp",
   ]
