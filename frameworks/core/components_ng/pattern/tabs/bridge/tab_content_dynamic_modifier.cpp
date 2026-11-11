@@ -318,6 +318,23 @@ void SetTabBarBadgeImpl(ArkUINodeHandle node, void* badgeParamRawPtr)
     (void)node;
     (void)badgeParamRawPtr;
 }
+
+void SetSidebarSectionImpl(
+    ArkUINodeHandle node, ArkUI_CharPtr title, ArkUI_Bool hasOrder, ArkUI_Int32 order,
+    ArkUI_Int32 titleStyle, ArkUI_VoidPtr resObjRawPtr)
+{
+    (void)node;
+    (void)title;
+    (void)hasOrder;
+    (void)order;
+    (void)titleStyle;
+    (void)resObjRawPtr;
+}
+
+void ResetSidebarSectionImpl(ArkUINodeHandle node)
+{
+    (void)node;
+}
 #endif
 } // namespace
 
@@ -648,6 +665,34 @@ void SetTabBarBadge(ArkUINodeHandle node, void* badgeParamRawPtr)
     TabContentModelNG::SetTabBarBadge(frameNode, *param);
 }
 
+void SetSidebarSection(ArkUINodeHandle node, ArkUI_CharPtr title, ArkUI_Bool hasOrder, ArkUI_Int32 order,
+    ArkUI_Int32 titleStyle, ArkUI_VoidPtr resObjRawPtr)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    SidebarSection section;
+    if (title != nullptr) {
+        section.title = std::string(title);
+    }
+    if (hasOrder) {
+        section.order = order;
+    }
+    section.titleStyle = static_cast<SidebarSectionTitleStyle>(titleStyle);
+    auto* resObj = reinterpret_cast<ResourceObject*>(resObjRawPtr);
+    section.resourceTitleObject = resObj ? AceType::Claim(resObj) : nullptr;
+    TabContentModelNG::SetSidebarSection(frameNode, section);
+}
+
+void ResetSidebarSection(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    SidebarSection section;
+    section.title = "";
+    section.order = std::nullopt;
+    TabContentModelNG::SetSidebarSection(frameNode, section);
+}
+
 namespace NodeModifier {
 const ArkUITabContentModifier* GetTabContentDynamicModifier()
 {
@@ -689,6 +734,8 @@ const ArkUITabContentModifier* GetTabContentDynamicModifier()
             .setTabBarVisibility = SetTabBarVisibility,
             .resetTabBarVisibility = ResetTabBarVisibility,
             .setTabBarBadge = SetTabBarBadge,
+            .setSidebarSection = SetSidebarSection,
+            .resetSidebarSection = ResetSidebarSection,
         };
         CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
         return &modifier;
@@ -730,6 +777,8 @@ const ArkUITabContentModifier* GetTabContentDynamicModifier()
         .setTabBarVisibility = SetTabBarVisibilityImpl,
         .resetTabBarVisibility = ResetTabBarVisibilityImpl,
         .setTabBarBadge = SetTabBarBadgeImpl,
+        .setSidebarSection = SetSidebarSectionImpl,
+        .resetSidebarSection = ResetSidebarSectionImpl,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;

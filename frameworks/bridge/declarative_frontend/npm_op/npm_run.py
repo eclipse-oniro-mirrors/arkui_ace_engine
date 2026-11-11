@@ -36,6 +36,22 @@ def main(argv):
     # Determine the npm script to run. Currently only build_release supported.
     print(f"[NPM_OP INFO] Running npm script '{cmd}', changing directory to {project_path}.")
     os.chdir(project_path)
+
+    # Ensure node_modules exists before running any npm script.
+    # The npm_install_op stamp file may be stale (newer than package.json)
+    # when node_modules is cleared externally (e.g. git clean), causing ninja
+    # to skip npm_install_modifier. Without this check, tsc (which lives in
+    # node_modules/.bin) would be missing and the build fails with
+    # "sh: tsc: command not found".
+    node_modules_path = os.path.join(project_path, "node_modules")
+    if not os.path.isdir(node_modules_path):
+        print("[NPM_OP INFO] node_modules missing, running npm install before build.")
+        try:
+            subprocess.check_call(["npm", "install"], cwd=project_path)
+        except subprocess.CalledProcessError as e:
+            print(f"[NPM_OP Error] npm install failed with exit code {e.returncode}.")
+            sys.exit(e.returncode)
+
     try:
         subprocess.check_call(["npm", "run", cmd])
     except subprocess.CalledProcessError as e:

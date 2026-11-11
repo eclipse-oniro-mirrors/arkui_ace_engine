@@ -5923,6 +5923,9 @@ struct ArkUITabContentModifier {
         ArkUINodeHandle node, ArkUI_Int32 visibility, ArkUI_Int32 displayMode, ArkUI_Bool hasDisplayMode);
     void (*resetTabBarVisibility)(ArkUINodeHandle node);
     void (*setTabBarBadge)(ArkUINodeHandle node, void* badgeParamRawPtr);
+    void (*setSidebarSection)(ArkUINodeHandle node, ArkUI_CharPtr title, ArkUI_Bool hasOrder, ArkUI_Int32 order,
+        ArkUI_Int32 titleStyle, ArkUI_VoidPtr resObjRawPtr);
+    void (*resetSidebarSection)(ArkUINodeHandle node);
 };
 
 struct ArkUITabsControllerModifier {
