@@ -3763,7 +3763,7 @@ void DeliverRecoverableStorageSection(const RecoverableRestoreCallBack& callback
 // RecoverableStorage restore delivery (design ADR-3): covers BOTH arrival paths — the
 // default recovery (ShouldDefaultRecoverState) and HandleCreateAsRecovery — because
 // every recovery restore funnels through RestoreRouterStack.
-void DeliverRecoverableSectionIfPresent(const RefPtr<JsonValue>& jsonContentInfo,
+void DeliverRecoverableSectionIfPresent(const std::unique_ptr<JsonValue>& jsonContentInfo,
     ContentInfoType type, const RecoverableRestoreCallBack& callback)
 {
     if (!IsRecoverableContentInfoType(type)) {
@@ -3778,7 +3778,7 @@ void DeliverRecoverableSectionIfPresent(const RefPtr<JsonValue>& jsonContentInfo
 // Restores the RESOURCESCHEDULE_RECOVERY extras (named routers and full paths).
 // Returns false when a payload is structurally invalid, in which case the caller
 // must abort with UIContentErrorCode::WRONG_PAGE_ROUTER.
-bool RestoreResourceScheduleInfos(const RefPtr<JsonValue>& jsonContentInfo,
+bool RestoreResourceScheduleInfos(const std::unique_ptr<JsonValue>& jsonContentInfo,
     const RefPtr<NG::PageRouterManager>& pageRouterManager)
 {
     auto namedRouterInfo = jsonContentInfo->GetValue("namedRouterInfo");
@@ -3843,7 +3843,7 @@ std::pair<RouterRecoverRecord, UIContentErrorCode> FrontendDelegateDeclarative::
 }
 
 std::pair<RouterRecoverRecord, UIContentErrorCode> FrontendDelegateDeclarative::RestoreLegacyRouterStack(
-    const RefPtr<JsonValue>& routerStack)
+    const std::unique_ptr<JsonValue>& routerStack)
 {
     std::lock_guard<std::mutex> lock(mutex_);
     if (!routerStack->IsValid() || !routerStack->IsArray()) {
