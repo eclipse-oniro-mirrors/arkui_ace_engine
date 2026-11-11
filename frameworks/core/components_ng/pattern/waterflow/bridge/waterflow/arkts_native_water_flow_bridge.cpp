@@ -483,7 +483,7 @@ RefPtr<NG::UINode> SetWaterFlowBuilderNode(EcmaVM* vm, const Local<ObjectRef>& f
     if (builderNodeParam->IsObject(vm)) {
         auto builderNodeObject = builderNodeParam->ToObject(vm);
         auto nodePtr = ArkTSUtils::GetProperty(vm, builderNodeObject, "nodePtr_");
-        if (!(nodePtr.IsEmpty() || nodePtr->IsNull() || nodePtr->IsUndefined())) {
+        if (IsNativePointerArg(vm, nodePtr)) {
             auto* node = nodePtr->ToNativePointer(vm)->Value();
             auto* myUINode = reinterpret_cast<NG::UINode*>(node);
             if (!myUINode) {

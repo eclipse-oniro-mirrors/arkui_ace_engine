@@ -4714,7 +4714,6 @@
       "OHOS::Ace::NG::LayoutProperty::ResetFlexShrink()";
       "OHOS::Ace::NG::LayoutProperty::ResetSafeAreaPadding()";
       "OHOS::Ace::NG::LayoutProperty::SetNeedLazyLayout(bool)";
-      "OHOS::Ace::NG::LayoutProperty::SetLazyLayoutRequest(int, bool)";
       "OHOS::Ace::NG::LayoutProperty::SetUsingPosition(bool)";
       "OHOS::Ace::NG::LayoutProperty::UpdateFlexBasis(OHOS::Ace::Dimension const&)";
       "OHOS::Ace::NG::LayoutProperty::UpdateFlexGrow(float)";
@@ -4726,7 +4725,6 @@
       "OHOS::Ace::NG::LayoutProperty::UpdateSafeAreaExpandOpts(OHOS::Ace::NG::SafeAreaExpandOpts const&)";
       "OHOS::Ace::NG::LayoutProperty::UpdateSafeAreaPadding(OHOS::Ace::NG::PaddingPropertyT<OHOS::Ace::NG::CalcLength> const&)";
       "OHOS::Ace::NG::LazyLayoutUtils::CalculateEstimateSampleCount(int, int)";
-      "OHOS::Ace::NG::LazyLayoutUtils::ConsumeNestedLazyAdjustOffset(OHOS::Ace::RefPtr<OHOS::Ace::NG::UINode> const&, bool)";
       "OHOS::Ace::NG::PipelineContext::GetScrollViewportCoordinator()";
       "OHOS::Ace::NG::LazyLayoutUtils::CreateEstimateViewPosReference(OHOS::Ace::Axis)";
       "OHOS::Ace::NG::LazyLayoutUtils::EstimateTotalMainSize(float, int, float)";
