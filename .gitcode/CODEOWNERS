@@ -392,6 +392,8 @@ frameworks/base/utils/ @arkui_framework_xnode
 frameworks/base/utils/layout_break_point.h @arkuilayout1
 frameworks/base/utils/utf_helper.cpp @huawei_g_five
 frameworks/base/utils/utf_helper.h @huawei_g_five
+frameworks/base/utils/measure_util.cpp @huawei_g_five
+frameworks/base/utils/measure_util.h @huawei_g_five
 frameworks/base/view_data/ @huawei_g_five
 frameworks/base/want/want_wrap.h @arkui_navigation
 frameworks/base/window/drag_window.h @ArkUI_Event
@@ -3612,6 +3614,7 @@ test/mock/ohos_mock/ @arkui_framework_xnode
 test/unittest/adapter/ @arkui_framework_xnode
 test/unittest/adapter/ohos/capability/html_to_spanstring_test.cpp @huawei_g_five
 test/unittest/bridge/common/media_query @arkuilayout1
+test/unittest/base/measure_util_test.cpp @huawei_g_five
 test/unittest/core/accessibility/ @ArkUI_ability_group
 test/unittest/core/animation/ @arkuicodepulse
 test/unittest/core/base/ @arkui_framework_xnode
