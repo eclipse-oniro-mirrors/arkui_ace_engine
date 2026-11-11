@@ -1141,7 +1141,7 @@ void PreparePasteButtonLayoutProperty(RefPtr<OHOS::Ace::NG::SecurityComponentLay
     buttonLayoutProperty->UpdateBackgroundRightPadding(padding.Right());
     std::string buttonContent;
     PasteButtonModelNG::GetInstance()->GetTextResource(descriptionId, buttonContent);
-    buttonWidth = MeasureUtil::MeasureTextWidth(textStyle, buttonContent);
+    buttonWidth = MeasureUtil::MeasureTextWidthWithFontFamily(textStyle, buttonContent);
     buttonWidth = buttonWidth + padding.Left().ConvertToPx() + padding.Right().ConvertToPx();
     if (GreatOrEqual(fontScale, AGING_MIN_SCALE)) {
         buttonLayoutProperty->UpdateBackgroundTopPadding(MENU_BUTTON_SPACING);
@@ -1255,7 +1255,7 @@ bool PrepareButtonTextProp(
         textLayoutProperty->UpdateTextColor(
             textStyle.GetTextColor().BlendOpacity(textOverlayTheme->GetAlphaDisabled()));
     }
-    auto textSize = MeasureUtil::MeasureTextSize(textStyle, data);
+    auto textSize = MeasureUtil::MeasureTextSizeWithFontFamily(textStyle, data);
     buttonWidth = std::max(static_cast<float>(textSize.Width()), 0.0f);
     if (buttonType == SelectOverlayMenuButtonType::AIBUTTON) {
         UpdateAIMenuGradientColor(textLayoutProperty, textOverlayTheme,
@@ -1436,7 +1436,7 @@ RefPtr<FrameNode> BuildButton(const MenuOptionsParam& menuOption, int32_t overla
     textLayoutProperty->UpdateMaxLines(1);
     text->MarkModifyDone();
     // Calculate the width of entension option include button padding.
-    contentWidth = static_cast<float>(MeasureUtil::MeasureTextWidth(textStyle, data));
+    contentWidth = static_cast<float>(MeasureUtil::MeasureTextWidthWithFontFamily(textStyle, data));
     bool isAging = GreatOrEqual(pipeline->GetFontScale(), AGING_MIN_SCALE);
     const auto& padding = textOverlayTheme->GetMenuButtonPadding();
     auto left = CalcLength(padding.Left().ConvertToPx());
@@ -2090,7 +2090,7 @@ RefPtr<FrameNode> CreateMenuTextNode(const std::string& value, const RefPtr<Fram
         TextStyle textStyle;
         textStyle.SetFontSize(theme->GetMenuFontSize());
         textStyle.SetFontWeight(FontWeight::REGULAR);
-        auto textSize = MeasureUtil::MeasureTextSize(textStyle, value);
+        auto textSize = MeasureUtil::MeasureTextSizeWithFontFamily(textStyle, value);
         UpdateAIMenuGradientColor(textProperty, textOverlayTheme,
             static_cast<float>(textSize.Width()), static_cast<float>(textSize.Height()));
     }

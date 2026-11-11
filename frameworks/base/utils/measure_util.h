@@ -56,6 +56,8 @@ public:
     static Size MeasureTextSize(const MeasureContext& context);
     static double MeasureTextWidth(const TextStyle& textStyle, const std::string& text);
     static Size MeasureTextSize(const TextStyle& textStyle, const std::string& text);
+    static Size MeasureTextSizeWithFontFamily(const TextStyle& textStyle, const std::string& text);
+    static double MeasureTextWidthWithFontFamily(const TextStyle& textStyle, const std::string& text);
 };
 } // namespace OHOS::Ace
 

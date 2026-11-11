@@ -34,6 +34,7 @@
 #include "core/components_ng/pattern/text/text_pattern.h"
 #include "core/common/font_manager.h"
 #include "test/mock/frameworks/core/common/mock_font_manager.h"
+#include "core/common/font_loader.h"
 
 namespace OHOS::Ace::NG {
 namespace {

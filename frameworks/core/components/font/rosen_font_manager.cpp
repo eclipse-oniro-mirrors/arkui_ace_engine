@@ -14,6 +14,7 @@
  */
 
 #include "core/components/font/rosen_font_manager.h"
+#include "base/utils/utils.h"
 
 #include "core/components/font/rosen_font_collection.h"
 

@@ -16,6 +16,7 @@
 #include "core/components/text_span/render_text_span.h"
 
 #include "core/common/font_manager.h"
+#include "core/pipeline/pipeline_base.h"
 
 namespace OHOS::Ace {
 

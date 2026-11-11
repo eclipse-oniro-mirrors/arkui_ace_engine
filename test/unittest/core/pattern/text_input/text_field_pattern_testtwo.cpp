@@ -14,6 +14,7 @@
  */
 
 #include "text_input_base.h"
+#include "core/common/font_loader.h"
 
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "test/mock/frameworks/core/common/mock_resource_adapter_v2.h"

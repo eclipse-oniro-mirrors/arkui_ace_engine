@@ -14,6 +14,7 @@
  */
 
 #include "cj_font_ffi.h"
+#include "core/pipeline/pipeline_base.h"
 
 using namespace OHOS::Ace;
 using namespace OHOS::Ace::Framework;

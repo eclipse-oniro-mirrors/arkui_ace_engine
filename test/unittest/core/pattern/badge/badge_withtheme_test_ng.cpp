@@ -19,6 +19,7 @@
 #define protected public
 #include "test/mock/frameworks/core/common/mock_container.h"
 #include "test/mock/frameworks/core/common/mock_font_manager.h"
+#include "core/common/font_loader.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 #include "test/unittest/core/pattern/test_ng.h"
 #undef private

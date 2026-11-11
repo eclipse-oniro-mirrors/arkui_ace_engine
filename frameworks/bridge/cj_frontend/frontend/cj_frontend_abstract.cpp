@@ -24,6 +24,7 @@
 #include "bridge/cj_frontend/runtime/cj_runtime_delegate.h"
 #include "bridge/common/accessibility/accessibility_node_manager.h"
 #include "core/common/font_manager.h"
+#include "core/pipeline/pipeline_base.h"
 #include "bridge/cj_frontend/interfaces/cj_ffi/cj_layout_inspector_ffi.h"
 #include "core/common/layout_inspector.h"
 #include "core/components/dialog/dialog_theme.h"

@@ -14,6 +14,7 @@
  */
 
 #include "test/mock/frameworks/core/common/mock_font_manager.h"
+#include "core/common/font_loader.h"
 #include "core/common/font_change_observer.h"
 #include "core/common/font_manager.h"
 

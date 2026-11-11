@@ -14,7 +14,7 @@
  */
 
 #include "adapter/ohos/entrance/mmi_event_convertor.h"
-
+#include "core/components_ng/base/frame_node.h"
 
 #include "adapter/ohos/entrance/ace_application_info.h"
 #include "adapter/ohos/entrance/ace_extra_input_data.h"

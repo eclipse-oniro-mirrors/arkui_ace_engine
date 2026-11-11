@@ -886,6 +886,7 @@
       "OHOS::Ace::Matrix4::operator=(OHOS::Ace::Matrix4 const&)";
       "OHOS::Ace::MeasureUtil::MeasureTextSize(OHOS::Ace::MeasureContext const&)";
       "OHOS::Ace::MeasureUtil::MeasureTextSize(OHOS::Ace::TextStyle const&, std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
+      "OHOS::Ace::MeasureUtil::MeasureTextSizeWithFontFamily(OHOS::Ace::TextStyle const&, std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
       "OHOS::Ace::MemoryMonitor::GetInstance()";
       "OHOS::Ace::MemoryMonitor::isEnable_";
       "OHOS::Ace::MouseStyle::CreateMouseStyle()";

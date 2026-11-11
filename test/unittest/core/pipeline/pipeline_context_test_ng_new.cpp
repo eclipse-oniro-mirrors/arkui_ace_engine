@@ -14,6 +14,7 @@
  */
 
 #include "test/unittest/core/pipeline/pipeline_context_test_ng.h"
+#include "core/common/font_loader.h"
 #include "iremote_object.h"
 #include "core/event/resample_algo.h"
 

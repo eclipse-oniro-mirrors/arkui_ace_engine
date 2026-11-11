@@ -14,6 +14,7 @@
  */
 
 #include "core/common/font_manager.h"
+#include "base/utils/system_properties.h"
 #ifdef ENABLE_ROSEN_BACKEND
 #include "core/components/font/rosen_font_manager.h"
 #endif

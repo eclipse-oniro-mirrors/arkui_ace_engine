@@ -36,7 +36,15 @@ double MeasureUtil::MeasureTextWidth(const TextStyle& textStyle, const std::stri
 {
     return TEXT_SIZE_WIDTH;
 }
+double MeasureUtil::MeasureTextWidthWithFontFamily(const TextStyle& textStyle, const std::string& text)
+{
+    return TEXT_SIZE_WIDTH;
+}
 Size MeasureUtil::MeasureTextSize(const TextStyle& textStyle, const std::string& text)
+{
+    return Size(TEXT_SIZE_WIDTH, TEXT_SIZE_HEIGHT);
+}
+Size MeasureUtil::MeasureTextSizeWithFontFamily(const TextStyle& textStyle, const std::string& text)
 {
     return Size(TEXT_SIZE_WIDTH, TEXT_SIZE_HEIGHT);
 }
