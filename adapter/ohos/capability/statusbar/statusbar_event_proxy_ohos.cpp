@@ -20,18 +20,11 @@
 #include "frameworks/core/common/container.h"
 
 namespace OHOS::Ace {
-std::unique_ptr<StatusBarEventProxy> StatusBarEventProxy::instance_;
-std::mutex StatusBarEventProxy::mutex_;
 
 StatusBarEventProxy* StatusBarEventProxy::GetInstance()
 {
-    if (!instance_) {
-        std::scoped_lock lock(mutex_);
-        if (!instance_) {
-            instance_ = std::make_unique<StatusBarEventProxyOhos>();
-        }
-    }
-    return instance_.get();
+    static StatusBarEventProxyOhos instance;
+    return &instance;
 }
 
 using OHOS::EventFwk::CommonEventManager;
