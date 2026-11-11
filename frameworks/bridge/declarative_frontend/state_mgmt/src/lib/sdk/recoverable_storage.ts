@@ -124,59 +124,89 @@ class RecoverableStorageImpl extends StorageHelper {
   ): T {
     // Entry errors throw 140124 (Owner final v5): missing/invalid parameters,
     // unsupported types, invalid keys (empty string or length >= 1024).
+    const instanceId: number = this.throwIfConnectEntryInvalid(options);
+    const key: string = this.getValidatedConnectKey(options.type, options.key);
+    const partition: Map<string, RecoverableEntry> = this.getOrCreatePartition(instanceId);
+    const existing: T | undefined = this.getExistingValue<T>(partition, key, options.type);
+    if (existing !== undefined) {
+      return existing;
+    }
+    return this.resolveNewValue<T, S>(instanceId, key, options.type, partition,
+      options.defaultCreator, options.defaultSubCreator, options.notifyOnError);
+  }
+
+  // Entry validation for connect: throws 140124 on missing options, unsupported type,
+  // invalid fields (ADR-10 hardening) or missing component; returns the window-level
+  // instanceId on success.
+  private throwIfConnectEntryInvalid<T extends object, S extends object>(
+    options: RecoverableConnectOptions<T, S>): number
+  {
     if (options === null || options === undefined) {
       throw new BusinessError(RECOVERABLE_STORAGE_UNSUPPORTED_TYPE,
         RecoverableStorageImpl.MISSING_COMPONENT_MESSAGE_);
     }
-    const type: TypeConstructorWithArgs<T> = options.type;
-    this.throwIfTypeIsNotSupported(type);
-
-    // Runtime hardening (ADR-10): field-level validation catching as-any/JS callers
-    // bypassing compile-time generics. Silent rejection, never throws.
+    this.throwIfTypeIsNotSupported(options.type);
     this.throwIfConnectOptionsInvalid(options);
-
     const instanceId: number = this.getInstanceIdFromComponent(options.component);
     if (instanceId === RecoverableStorageImpl.INVALID_INSTANCE_ID) {
       throw new BusinessError(RECOVERABLE_STORAGE_UNSUPPORTED_TYPE,
         RecoverableStorageImpl.MISSING_COMPONENT_MESSAGE_);
     }
+    return instanceId;
+  }
 
-    const key: string | undefined = this.getConnectedKey(type, options.key);
-    if (key === undefined || !this.isKeyValid(key)) {
+  // Resolves and validates the connect key; throws 140124 when the key is an empty
+  // string or its length is not less than 1024.
+  private getValidatedConnectKey<T extends object>(
+    type: TypeConstructorWithArgs<T>, key: string | undefined): string
+  {
+    const resolved: string | undefined = this.getConnectedKey(type, key);
+    if (resolved === undefined || !this.isKeyValid(resolved)) {
       throw new BusinessError(RECOVERABLE_STORAGE_UNSUPPORTED_TYPE,
         RecoverableStorageImpl.INVALID_KEY_MESSAGE_);
     }
+    return resolved;
+  }
 
-    const partition: Map<string, RecoverableEntry> = this.getOrCreatePartition(instanceId);
-
-    // INV-1: same instanceId+key has at most one entry; same type returns the existing
-    // reference. Mismatched type is silently rejected (never returns a wrong-typed value).
-    const existing: RecoverableEntry = partition.get(key);
-    if (existing) {
-      if (this.getTypeName(type) !== existing.typeName) {
-        throw new BusinessError(RECOVERABLE_STORAGE_UNSUPPORTED_TYPE,
-          `The type mismatches when use the key '${key}' in storage`);
-      }
-      return existing.value as T;
+  // INV-1: same instanceId+key has at most one entry; same type returns the existing
+  // reference. Mismatched type throws (never returns a wrong-typed value).
+  private getExistingValue<T extends object>(
+    partition: Map<string, RecoverableEntry>, key: string,
+    type: TypeConstructorWithArgs<T>): T | undefined
+  {
+    const existing: RecoverableEntry | undefined = partition.get(key);
+    if (existing === undefined) {
+      return undefined;
     }
+    if (this.getTypeName(type) !== existing.typeName) {
+      throw new BusinessError(RECOVERABLE_STORAGE_UNSUPPORTED_TYPE,
+        `The type mismatches when use the key '${key}' in storage`);
+    }
+    return existing.value as T;
+  }
 
-    // STATE-2 one-shot consumption: restored value wins over default creator; any failure
-    // notifies (AC-12) and falls back to the default-creator path (INV-5).
-    const defaultCreator: StorageDefaultCreator<T> | undefined = options.defaultCreator;
+  // STATE-2 one-shot consumption: restored value wins over default creator; any failure
+  // notifies (AC-12) and falls back to the default-creator path (INV-5).
+  private resolveNewValue<T extends object, S extends object>(
+    instanceId: number, key: string, type: TypeConstructorWithArgs<T>,
+    partition: Map<string, RecoverableEntry>, defaultCreator: StorageDefaultCreator<T>,
+    defaultSubCreator: StorageDefaultCreator<S> | undefined,
+    notifyOnError: NotifyOnErrorCallback | undefined): T
+  {
     // Guard (hardening 2026-11-03): 'defaultSubCreator' is the container element factory
     // (PersistenceV2 CollectionType overload semantics). On a non-container root it corrupts
     // restore (DataCoder.restorePropValue ctor-mismatch branch replaces the root with the
     // factory product, losing the whole restored section) — ignore it with a warning log,
     // never throws.
-    let defaultSubCreator: StorageDefaultCreator<S> | undefined = options.defaultSubCreator;
-    if (defaultSubCreator !== undefined && !RecoverableStorageImpl.isContainerType_(type)) {
+    let subCreator: StorageDefaultCreator<S> | undefined = defaultSubCreator;
+    if (subCreator !== undefined && !RecoverableStorageImpl.isContainerType_(type)) {
       stateMgmtConsole.applicationWarn(`RecoverableStorage: 'defaultSubCreator' is only ` +
         `effective for container types (Array/Map/Set) as the element factory; ` +
         `it is ignored for type '${this.getTypeName(type)}'.`);
-      defaultSubCreator = undefined;
+      subCreator = undefined;
     }
     let value: T | undefined = this.consumeRestored<T, S>(instanceId, key, type,
-      defaultCreator, defaultSubCreator, options.notifyOnError);
+      defaultCreator, subCreator, notifyOnError);
     if (value === undefined) {
       if (typeof defaultCreator !== 'function') {
         throw new BusinessError(RECOVERABLE_STORAGE_UNSUPPORTED_TYPE,
@@ -189,8 +219,7 @@ class RecoverableStorageImpl extends StorageHelper {
           `The type mismatches when use the key '${key}' in storage`);
       }
     }
-
-    partition.set(key, { value, typeName: this.getTypeName(type), notifyOnError: options.notifyOnError });
+    partition.set(key, { value, typeName: this.getTypeName(type), notifyOnError: notifyOnError });
     return value;
   }
 

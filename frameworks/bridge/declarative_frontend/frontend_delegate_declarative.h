@@ -140,6 +140,8 @@ public:
     // restore
     std::pair<RouterRecoverRecord, UIContentErrorCode> RestoreRouterStack(
         const std::string& contentInfo, ContentInfoType type) override;
+    std::pair<RouterRecoverRecord, UIContentErrorCode> RestoreLegacyRouterStack(
+        const RefPtr<JsonValue>& routerStack);
     std::string GetContentInfo(ContentInfoType type) override;
     void SetRecoverableSnapshotCallBack(RecoverableSnapshotCallBack&& recoverableSnapshotCallBack);
     void SetRecoverableRestoreCallBack(RecoverableRestoreCallBack&& recoverableRestoreCallBack);
