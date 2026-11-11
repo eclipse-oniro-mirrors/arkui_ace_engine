@@ -483,21 +483,23 @@ std::unique_ptr<JsonValue> GetXComponentCompensationAngle(const std::string& ang
         tempAngleConfigJson = compensationAngleFromFeatureManager;
     }
     if (tempAngleConfigJson.empty()) {
-        LOGD("UIContent set compensation angle empty");
+        TAG_LOGD(AceLogTag::ACE_XCOMPONENT, "UIContent set compensation angle empty");
         return nullptr;
     }
     auto jsonConfig = JsonUtil::ParseJsonString(tempAngleConfigJson);
     if (jsonConfig == nullptr) {
-        LOGE("UIContent set compensasion angle %{public}s is invalid", tempAngleConfigJson.c_str());
+        TAG_LOGE(AceLogTag::ACE_XCOMPONENT,
+            "UIContent set compensasion angle %{public}s is invalid", tempAngleConfigJson.c_str());
         return nullptr;
     }
     auto angleConfig = jsonConfig->GetObject(X_COMPONENT_COMPENSATION_ANGLE);
     if (angleConfig == nullptr) {
-        LOGE("UIContent can not get angle info from %{public}s", tempAngleConfigJson.c_str());
+        TAG_LOGE(AceLogTag::ACE_XCOMPONENT,
+            "UIContent can not get angle info from %{public}s", tempAngleConfigJson.c_str());
         return nullptr;
     }
     auto result = angleConfig->ToString();
-    LOGI("get angle info: %{public}s", result.c_str());
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "get angle info: %{public}s", result.c_str());
     if (result.empty()) {
         return nullptr;
     }
