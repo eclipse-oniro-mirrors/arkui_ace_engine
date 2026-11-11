@@ -216,7 +216,7 @@ class JSON2 {
     const result: any = {};
 
     Object.keys(value).forEach(key => {
-      const baseKey = key.replace(new RegExp('^' + V2_STATE_PREFIX), '');
+      const baseKey = key.startsWith(V2_STATE_PREFIX) ? key.substring(V2_STATE_PREFIX.length) : key;
       if (DataCoder.shouldSkipReadOnlyProperty(ignoreReadOnlyProperties, value, baseKey)) {
         return;
       }

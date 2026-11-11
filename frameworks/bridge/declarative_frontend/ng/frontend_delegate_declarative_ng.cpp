@@ -116,6 +116,12 @@ void FrontendDelegateDeclarativeNG::SetRecoverableSnapshotCallBack(
     recoverableSnapshotCallBack_ = recoverableSnapshotCallBack;
 }
 
+void FrontendDelegateDeclarativeNG::SetRecoverableRestoreCallBack(
+    RecoverableRestoreCallBack&& recoverableRestoreCallBack)
+{
+    recoverableRestoreCallBack_ = recoverableRestoreCallBack;
+}
+
 void FrontendDelegateDeclarativeNG::SetOnRemoteTerminatedCallBack(
     OnRemoteTerminatedCallBack&& onRemoteTerminatedCallBack)
 {
@@ -1510,19 +1516,17 @@ bool IsRecoverableContentInfoType(ContentInfoType type)
     return type == ContentInfoType::APP_RECOVERY || type == ContentInfoType::RESOURCESCHEDULE_RECOVERY;
 }
 
-std::string GetRecoverableStorageSection(
-    const RefPtr<TaskExecutor>& taskExecutor, const RecoverableSnapshotCallBack& callback)
+std::string GetRecoverableStorageSection(const RecoverableSnapshotCallBack& callback)
 {
     std::string section;
     if (!callback) {
         return section;
     }
+    // Direct JSI call — no PostSyncTask to the JS message loop: on the APP_FREEZE
+    // save path this runs on a worker thread while the JS main loop is blocked;
+    // PostSyncTask (0ms = no timeout) would deadlock the save chain.
     int32_t instanceId = Container::CurrentId();
-    if (taskExecutor) {
-        taskExecutor->PostSyncTask([&callback, &section, instanceId] {
-            callback(instanceId, section);
-            }, TaskExecutor::TaskType::JS, "ArkUIRecoverableStorageSnapshot");
-    }
+    callback(instanceId, section);
     return section;
 }
 
@@ -1550,7 +1554,7 @@ std::string FrontendDelegateDeclarativeNG::GetContentInfo(ContentInfoType type)
     // RecoverableStorage snapshot section: appended for both recovery contentInfo types
     // (APP_RECOVERY = 2 / RESOURCESCHEDULE_RECOVERY = 3), never for CONTINUATION.
     if (IsRecoverableContentInfoType(type)) {
-        auto recoverableSection = GetRecoverableStorageSection(taskExecutor_, recoverableSnapshotCallBack_);
+        auto recoverableSection = GetRecoverableStorageSection(recoverableSnapshotCallBack_);
         if (!recoverableSection.empty()) {
             jsonContentInfo->Put("recoverableStorage", recoverableSection.c_str());
         }

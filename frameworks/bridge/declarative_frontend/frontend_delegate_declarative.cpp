@@ -3731,35 +3731,33 @@ bool IsRecoverableContentInfoType(ContentInfoType type)
     return type == ContentInfoType::APP_RECOVERY || type == ContentInfoType::RESOURCESCHEDULE_RECOVERY;
 }
 
-std::string GetRecoverableStorageSection(
-    const RefPtr<TaskExecutor>& taskExecutor, const RecoverableSnapshotCallBack& callback)
+std::string GetRecoverableStorageSection(const RecoverableSnapshotCallBack& callback)
 {
     std::string section;
     if (!callback) {
         return section;
     }
+    // Direct JSI call (func->Call) — no PostSyncTask to the JS message loop: on the
+    // APP_FREEZE save path this runs on a worker thread while the JS main loop is
+    // blocked; PostSyncTask (0ms = no timeout) would deadlock the save chain.
     int32_t instanceId = Container::CurrentId();
-    if (taskExecutor) {
-        taskExecutor->PostSyncTask([&callback, &section, instanceId] {
-            callback(instanceId, section);
-            }, TaskExecutor::TaskType::JS, "ArkUIRecoverableStorageSnapshot");
-    }
+    callback(instanceId, section);
     return section;
 }
 
-void DeliverRecoverableStorageSection(
-    const RefPtr<TaskExecutor>& taskExecutor, const RecoverableRestoreCallBack& callback,
-    const std::string& section)
+void DeliverRecoverableStorageSection(const RecoverableRestoreCallBack& callback, const std::string& section)
 {
     if (!callback || section.empty()) {
         return;
     }
+    // Deliver to the consuming window's runtime instanceId (Container::CurrentId).
+    // After restart the window container ids are reassigned by launch order while the
+    // id embedded in the section JSON is the pre-kill original — they only align when
+    // cards are tapped in original creation order. CurrentId() is the id the restored
+    // window will connect with (the TS side maps the section's own single instance
+    // key onto this id; see setRestoredData in recoverable_storage.ts).
     int32_t instanceId = Container::CurrentId();
-    if (taskExecutor) {
-        taskExecutor->PostSyncTask([&callback, &section, instanceId] {
-            callback(instanceId, section);
-            }, TaskExecutor::TaskType::JS, "ArkUIRecoverableStorageRestore");
-    }
+    callback(instanceId, section);
 }
 
 } // anonymous namespace
@@ -3779,7 +3777,7 @@ std::pair<RouterRecoverRecord, UIContentErrorCode> FrontendDelegateDeclarative::
     if (IsRecoverableContentInfoType(type)) {
         auto recoverableSection = jsonContentInfo->GetValue("recoverableStorage");
         if (recoverableSection && recoverableSection->IsValid() && recoverableSection->IsString()) {
-            DeliverRecoverableStorageSection(taskExecutor_, recoverableRestoreCallBack_,
+            DeliverRecoverableStorageSection(recoverableRestoreCallBack_,
                 recoverableSection->GetString());
         }
     }
@@ -3901,7 +3899,7 @@ std::string FrontendDelegateDeclarative::GetContentInfo(ContentInfoType type)
     // RecoverableStorage snapshot section: appended for both recovery contentInfo types
     // (APP_RECOVERY = 2 / RESOURCESCHEDULE_RECOVERY = 3), never for CONTINUATION.
     if (IsRecoverableContentInfoType(type)) {
-        auto recoverableSection = GetRecoverableStorageSection(taskExecutor_, recoverableSnapshotCallBack_);
+        auto recoverableSection = GetRecoverableStorageSection(recoverableSnapshotCallBack_);
         if (!recoverableSection.empty()) {
             jsonContentInfo->Put("recoverableStorage", recoverableSection.c_str());
         }

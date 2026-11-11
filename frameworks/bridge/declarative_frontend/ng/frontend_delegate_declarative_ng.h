@@ -87,6 +87,7 @@ public:
     void SetOnCompleteContinuationCallBack(OnCompleteContinuationCallBack&& onCompleteContinuationCallBack);
     void SetOnSaveDataCallBack(OnSaveDataCallBack&& onSaveDataCallBack);
     void SetRecoverableSnapshotCallBack(RecoverableSnapshotCallBack&& recoverableSnapshotCallBack);
+    void SetRecoverableRestoreCallBack(RecoverableRestoreCallBack&& recoverableRestoreCallBack);
     void SetOnRemoteTerminatedCallBack(OnRemoteTerminatedCallBack&& onRemoteTerminatedCallBack);
     void SetOnRestoreDataCallBack(OnRestoreDataCallBack&& onRestoreDataCallBack);
     void SetDestroyApplicationCallback(DestroyApplicationCallback&& destroyApplicationCallback);
@@ -381,6 +382,7 @@ private:
     OnCompleteContinuationCallBack onCompleteContinuationCallBack_;
     OnSaveDataCallBack onSaveDataCallBack_;
     RecoverableSnapshotCallBack recoverableSnapshotCallBack_;
+    RecoverableRestoreCallBack recoverableRestoreCallBack_;
     OnRemoteTerminatedCallBack onRemoteTerminatedCallBack_;
     OnRestoreDataCallBack onRestoreDataCallBack_;
     DestroyApplicationCallback destroyApplication_;

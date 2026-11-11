@@ -86,7 +86,7 @@ class RecoverableStorageImpl extends StorageHelper {
   // DEFAULT_RECOVERY_MAX_RESTORE_SIZE (spec F-E5): ability_recovery.cpp:44 enforces this on
   // the whole serialized payload; the TS side pre-checks per instance to avoid whole-payload
   // rejection (ADR-7).
-  private static readonly SERIALIZATION_BUDGET_BYTES_: number = 200 * 1024;
+  private static readonly SERIALIZATION_BUDGET_BYTES_: number = 150 * 1024;
 
   // same unsupported-type family as PersistenceV2Impl.NOT_SUPPORT_TYPES_ (v2_persistence.ts:290)
   private static readonly NOT_SUPPORT_TYPES_: Array<Function> =
@@ -305,7 +305,14 @@ class RecoverableStorageImpl extends StorageHelper {
         parsed.instances === null || typeof parsed.instances !== 'object') {
         throw new Error('invalid recoverableStorage section structure');
       }
-      const values = parsed.instances[String(instanceId)] as Record<string, unknown>;
+      const instanceKeys: string[] = Object.keys(parsed.instances);
+      if (instanceKeys.length === 0) {
+        return;
+      }
+      // The id embedded in the section JSON is the pre-kill original instanceId; the
+      // caller passes the consuming window's (reassigned) id — map the section's own
+      // single instance key onto the passed id (launch-order realignment).
+      const values = parsed.instances[instanceKeys[0]] as Record<string, unknown>;
       if (values === null || typeof values !== 'object') {
         // section valid but nothing for this instance: nothing to inject
         return;
