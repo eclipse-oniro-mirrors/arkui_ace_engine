@@ -531,9 +531,10 @@ private:
     bool DispatchTouchEventToPipelines(TouchEvent& point, bool sendOnTouch);
     void DispatchTouchEventToTouchTestResult(const TouchEvent& touchEvent, TouchTestResult touchTestResult,
         bool sendOnTouch);
-    void HandleEscapeRecognizer(const TouchEvent& touchEvent);
+    void HandleEscapeRecognizer(const TouchEvent& touchEvent, bool isPost);
     void SweepEscapeRecognizers();
     void ProcessPostEventDownPhase(const TouchEvent& point, const TouchTestResult& targets);
+    void ProcessPostEventFinishPhase(const TouchEvent& point);
     void ProcessTouchEventDownPhase(const TouchEvent& point, const TouchTestResult& targets,
         const RefPtr<NG::GestureReferee>& currentReferee, int32_t touchId);
     void SetResponseLinkRecognizers(
