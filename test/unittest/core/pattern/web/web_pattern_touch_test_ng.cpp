@@ -20,15 +20,17 @@
 #include "gtest/gtest.h"
 #include "test/mock/frameworks/core/common/mock_udmf.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
-#include "test/unittest/core/pattern/web/mock_web_delegate.h"
 
 #include "base/memory/ace_type.h"
 
 #define private public
+#define protected public
 #include "core/common/ai/image_analyzer_manager.h"
 #include "core/components/web/resource/web_delegate.h"
 #include "core/components_ng/pattern/web/web_pattern.h"
 #include "core/components_ng/property/safe_area_insets.h"
+#include "test/unittest/core/pattern/web/mock_web_delegate.h"
+#undef protected
 #undef private
 
 #include "core/common/udmf/unified_data.h"

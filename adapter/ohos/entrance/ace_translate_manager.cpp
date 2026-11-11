@@ -168,10 +168,22 @@ void UiTranslateManagerImpl::GetWebInfoByRequest(uint32_t windowId, int32_t webI
                 UiSessionManager::GetInstance()->SendWebInfoByRequest(windowId, webId, request, result, errorCode);
             };
         pattern->GetWebInfoByRequest(windowId, webId, request, finishCallback);
-    } else {
-        UiSessionManager::GetInstance()->SendWebInfoByRequest(
-            windowId, webId, request, "", WebRequestErrorCode::INVALID_WEB_ID);
+        return;
     }
+    std::string availableWebIds;
+    for (const auto& listener : listenerMap_) {
+        if (!GetWebPattern(listener.second.translateNode)) {
+            continue;
+        }
+        if (!availableWebIds.empty()) {
+            availableWebIds += ",";
+        }
+        availableWebIds += std::to_string(listener.first);
+    }
+    LOGI("GetWebInfoByRequest webId:%{public}d not found, available webIds: [%{public}s]",
+        webId, availableWebIds.c_str());
+    UiSessionManager::GetInstance()->SendWebInfoByRequest(
+        windowId, webId, request, "", WebRequestErrorCode::INVALID_WEB_ID);
 #else
     LOGW("GetWebInfoByRequest not supportted on this platform.");
 #endif

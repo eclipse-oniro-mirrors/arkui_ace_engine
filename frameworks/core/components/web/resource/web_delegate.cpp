@@ -18,6 +18,7 @@
 
 #include <cctype>
 #include <cfloat>
+#include <cmath>
 #include <iomanip>
 #include <mutex>
 #include <optional>
@@ -69,6 +70,7 @@
 #include "web_configuration_observer.h"
 #include "web_javascript_execute_callback.h"
 #include "web_javascript_result_callback.h"
+#include "web_string_value_callback_impl.h"
 
 #include "core/components_ng/base/ui_node.h"
 #include "frameworks/base/utils/system_properties.h"
@@ -11608,4 +11610,69 @@ void WebDelegate::OnColorChooserClose()
     webPattern->OnColorChooserClose();
 }
 
+std::string WebDelegate::BuildNativeDomCommand(const NG::OffsetF& offset, const std::string& rectJson)
+{
+    auto formatOffset = [](float val) -> std::string {
+        if (!std::isfinite(val)) {
+            return "0";
+        }
+        return std::to_string(val);
+    };
+    std::string command = R"({"method":"getExtractorDom","params":{"outputFormat":"ace","offsetX":)";
+    command += formatOffset(offset.GetX());
+    command += R"(,"offsetY":)";
+    command += formatOffset(offset.GetY());
+    if (!rectJson.empty()) {
+        auto start = rectJson.find('{');
+        auto end = rectJson.rfind('}');
+        if (start != std::string::npos && end != std::string::npos && end > start) {
+            auto inner = rectJson.substr(start + 1, end - start - 1);
+            inner.erase(0, inner.find_first_not_of(" \t\n\r"));
+            inner.erase(inner.find_last_not_of(" \t\n\r") + 1);
+            if (!inner.empty()) {
+                command += ",";
+                command += inner;
+            }
+        }
+    }
+    command += "}}";
+    return command;
+}
+
+void WebDelegate::RequestNativeDomTreeInner(const WeakPtr<WebDelegate>& weak,
+    std::function<void(const std::string&)>&& callback, const NG::OffsetF& offset, const std::string& rectJson)
+{
+    auto delegate = weak.Upgrade();
+    if (!delegate || !delegate->nweb_) {
+        if (callback) {
+            callback("");
+        }
+        return;
+    }
+    auto callbackImpl = std::make_shared<WebStringValueCallbackImpl>(weak);
+    if (callbackImpl && callback) {
+        callbackImpl->SetCallBack([func = std::move(callback)](const std::string& result) { func(result); });
+    }
+    auto command = BuildNativeDomCommand(offset, rectJson);
+    TAG_LOGI(AceLogTag::ACE_WEB, "WebDelegate RequestNativeDomTree WebId:%{public}d command:%{public}s",
+        delegate->GetWebId(), command.c_str());
+    delegate->nweb_->ExecuteAIPageCommand(command, callbackImpl);
+}
+
+void WebDelegate::RequestNativeDomTree(
+    std::function<void(const std::string&)>&& callback, const NG::OffsetF& offset, const std::string& rectJson)
+{
+    auto context = context_.Upgrade();
+    if (!context) {
+        if (callback) {
+            callback("");
+        }
+        return;
+    }
+    context->GetTaskExecutor()->PostTask(
+        [weak = WeakClaim(this), callback = std::move(callback), offset, rectJson]() mutable {
+            WebDelegate::RequestNativeDomTreeInner(weak, std::move(callback), offset, rectJson);
+        },
+        TaskExecutor::TaskType::PLATFORM, "ArkUIWebRequestNativeDomTree");
+}
 } // namespace OHOS::Ace

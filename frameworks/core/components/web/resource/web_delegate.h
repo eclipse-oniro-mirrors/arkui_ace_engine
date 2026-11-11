@@ -1187,6 +1187,7 @@ private:
 
 class WebDelegate : public WebResource {
     DECLARE_ACE_TYPE(WebDelegate, WebResource);
+    friend class WebStringValueCallbackImpl;
 
 public:
     using CreatedCallback = std::function<void()>;
@@ -1848,6 +1849,9 @@ public:
     void ExecuteGetPageSceneMatch(int32_t processId, const WebPageSceneRuleSet& ruleSet);
     void ExecuteAllRuleSetMatch();
 
+    void RequestNativeDomTree(std::function<void(const std::string&)>&& callback,
+        const NG::OffsetF& offset, const std::string& rectJson = std::string());
+
 private:
     void ExecuteAllRuleSetMatchInternal();
     static void ExecutePageSceneQuery(const WeakPtr<WebDelegate>& delegateWeak,
@@ -1884,6 +1888,10 @@ private:
     void SendAccessibilityPageChangeEvent(const RefPtr<NG::FrameNode>& webNode,
         const RefPtr<AccessibilityManager>& accessibilityManager);
     void HandleNativeEmbedLifecycle(std::shared_ptr<NWeb::NWebNativeEmbedDataInfo> dataInfo);
+
+    static std::string BuildNativeDomCommand(const NG::OffsetF& offset, const std::string& rectJson);
+    static void RequestNativeDomTreeInner(const WeakPtr<WebDelegate>& weak,
+        std::function<void(const std::string&)>&& callback, const NG::OffsetF& offset, const std::string& rectJson);
 
 #ifdef OHOS_STANDARD_SYSTEM
     sptr<OHOS::Rosen::Window> CreateWindow();

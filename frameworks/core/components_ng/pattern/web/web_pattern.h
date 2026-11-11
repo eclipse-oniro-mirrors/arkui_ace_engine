@@ -1200,6 +1200,15 @@ public:
                 const std::string&, // request
                 const std::string&, // result
                 WebRequestErrorCode)>& finishCallback);
+    bool HandleNativeDomTreeRequest(
+        uint32_t windowId,
+        int32_t webId,
+        const std::string& request,
+        const std::function<
+            void(int32_t, int32_t, // window id , web id
+                const std::string&, // request
+                const std::string&, // result
+                WebRequestErrorCode)>& finishCallback);
 
     // PageScene Rule-Based Perception
     void ExecuteReportOnRegisterMatch(int32_t processId);
