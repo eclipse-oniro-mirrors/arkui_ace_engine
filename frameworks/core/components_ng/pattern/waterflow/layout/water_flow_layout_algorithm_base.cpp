@@ -508,7 +508,7 @@ void WaterFlowLayoutBase::LayoutEdges(
     const float crossSize = wrapper->GetGeometryNode()->GetPaddingSize().Width();
     HeaderFooterUtils::LayoutEdge(wrapper, info->edgeIndexMap_.HeaderIndex(), origin, false, false, crossSize);
     bodyEnd = std::max(bodyEnd, info->headerHeight_);
-    if (info->EndIndex() < info->ItemCnt(info->GetChildrenCount()) - 1) {
+    if (info->isDataValid_ && info->EndIndex() < info->ItemCnt(info->GetChildrenCount()) - 1) {
         // The footer follows the estimated full body, not the tail of the currently measured window.
         bodyEnd = std::max(bodyEnd, info->EstimateTotalHeight() - info->edgeFooterHeight_);
     }
