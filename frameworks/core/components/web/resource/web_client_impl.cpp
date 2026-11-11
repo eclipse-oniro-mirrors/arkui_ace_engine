@@ -1885,6 +1885,24 @@ void WebClientImpl::OnInputMethodAttached()
     delegate->OnInputMethodAttached();
 }
 
+bool WebClientImpl::OnGetWindowBounds(int32_t& x, int32_t& y,
+                                      uint32_t& w, uint32_t& h, std::string& state)
+{
+    auto delegate = webDelegate_.Upgrade();
+    CHECK_NULL_RETURN(delegate, false);
+    ContainerScope scope(delegate->GetInstanceId());
+    return delegate->OnGetWindowBounds(x, y, w, h, state);
+}
+
+bool WebClientImpl::OnSetWindowBounds(int32_t x, int32_t y,
+                                      uint32_t w, uint32_t h, const std::string& state)
+{
+    auto delegate = webDelegate_.Upgrade();
+    CHECK_NULL_RETURN(delegate, false);
+    ContainerScope scope(delegate->GetInstanceId());
+    return delegate->OnSetWindowBounds(x, y, w, h, state);
+}
+
 void WebClientImpl::OnColorChooserPopup(const std::string& color,
     const std::vector<NWeb::NWebColorSuggestion>& suggestions,
     std::shared_ptr<NWeb::NWebColorChooserCallback> callback)

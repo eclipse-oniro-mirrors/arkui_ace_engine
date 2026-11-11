@@ -1533,6 +1533,10 @@ public:
     void OnNativeEmbedMouseEvent(std::shared_ptr<NWeb::NWebNativeEmbedMouseEvent> event);
     void OnNativeEmbedObjectParamChange(std::shared_ptr<NWeb::NWebNativeEmbedParamDataInfo> paramDataInfo);
     void SetNGWebPattern(const RefPtr<NG::WebPattern>& webPattern);
+    bool OnGetWindowBounds(int32_t& x, int32_t& y,
+                           uint32_t& w, uint32_t& h, std::string& state);
+    bool OnSetWindowBounds(int32_t x, int32_t y,
+                           uint32_t w, uint32_t h, const std::string& state);
     bool RequestFocus(OHOS::NWeb::NWebFocusSource source = OHOS::NWeb::NWebFocusSource::FOCUS_SOURCE_DEFAULT);
     bool IsCurrentFocus();
     void SetDrawSize(const Size& drawSize);

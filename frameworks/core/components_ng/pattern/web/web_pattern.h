@@ -1243,6 +1243,11 @@ public:
     // session is removed fails the registry lookup and returns safely.
     static napi_value OnHdsColorSelected(napi_env env, napi_callback_info info);
     static napi_value OnHdsColorPickerClose(napi_env env, napi_callback_info info);
+
+    bool HandleWindowRectGet(int32_t& x, int32_t& y, uint32_t& w, uint32_t& h);
+    bool HandleWindowRectSet(int32_t x, int32_t y, uint32_t w, uint32_t h);
+    bool HandleWindowStateGet(std::string& state);
+    bool HandleWindowStateSet(const std::string& state);
 protected:
     void ModifyWebSrc(const std::string& webSrc)
     {
@@ -1828,6 +1833,7 @@ private:
     int32_t treeId_ = 0;
     int32_t instanceId_ = -1;
     uint32_t windowId_ = 0;
+    std::string windowState_ = "normal";
     int64_t focusedAccessibilityId_ = -1;
     std::vector<RefPtr<PageNodeInfoWrap>> pageNodeInfo_;
     bool isEditableOnContextMenu_ = false;

@@ -8397,6 +8397,40 @@ void WebDelegate::SetNGWebPattern(const RefPtr<NG::WebPattern>& webPattern)
     webPattern_ = webPattern;
 }
 
+bool WebDelegate::OnGetWindowBounds(int32_t& x, int32_t& y,
+                                    uint32_t& w, uint32_t& h, std::string& state)
+{
+    auto webPattern = webPattern_.Upgrade();
+    CHECK_NULL_RETURN(webPattern, false);
+    if (!webPattern->HandleWindowRectGet(x, y, w, h)) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "[getWindowBounds] HandleWindowRectGet failed");
+        return false;
+    }
+    return webPattern->HandleWindowStateGet(state);
+}
+
+bool WebDelegate::OnSetWindowBounds(int32_t x, int32_t y,
+                                    uint32_t w, uint32_t h, const std::string& state)
+{
+    auto webPattern = webPattern_.Upgrade();
+    CHECK_NULL_RETURN(webPattern, false);
+    const bool hasBounds = (x != 0 || y != 0 || w != 0 || h != 0);
+    if (hasBounds && state != "normal") {
+        TAG_LOGW(AceLogTag::ACE_WEB, "[setWindowBounds] bounds not allowed in state:%{public}s", state.c_str());
+        return false;
+    }
+    if (hasBounds && !webPattern->HandleWindowRectSet(x, y, w, h)) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "[setWindowBounds] HandleWindowRectSet failed, x:%{public}d, y:%{public}d, w:%{public}d, h:%{public}d",
+            x, y, w, h);
+        return false;
+    }
+    if (!state.empty() && !webPattern->HandleWindowStateSet(state)) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "[setWindowBounds] HandleWindowStateSet failed, state:%{public}s", state.c_str());
+        return false;
+    }
+    return true;
+}
+
 void WebDelegate::SetDrawSize(const Size& drawSize)
 {
     drawSize_ = drawSize;

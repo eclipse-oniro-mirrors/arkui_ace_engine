@@ -43,6 +43,9 @@
 #include "image_source.h"
 #include "input_method_controller.h"
 #include "parameters.h"
+#include "wm/window.h"
+
+#include "adapter/ohos/entrance/ace_container.h"
 
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
 #include "auto_fill_type.h"
@@ -12758,6 +12761,96 @@ napi_value WebPattern::OnHdsColorPickerClose(napi_env env, napi_callback_info in
         pattern->hdsColorPickerOpen_.store(false);
     }
     return nullptr;
+}
+
+bool WebPattern::HandleWindowRectGet(int32_t& x, int32_t& y, uint32_t& w, uint32_t& h)
+{
+    auto window = Platform::AceContainer::GetUIWindow(instanceId_);
+    if (!window) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "[getWindowBounds] window is null");
+        return false;
+    }
+    OHOS::Rosen::Rect rect = window->GetRect();
+    x = rect.posX_;
+    y = rect.posY_;
+    w = rect.width_;
+    h = rect.height_;
+    return true;
+}
+
+bool WebPattern::HandleWindowRectSet(int32_t x, int32_t y, uint32_t w, uint32_t h)
+{
+    auto window = Platform::AceContainer::GetUIWindow(instanceId_);
+    if (!window) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "[setWindowBounds] window is null");
+        return false;
+    }
+    if (window->GetWindowMode() != Rosen::WindowMode::WINDOW_MODE_FLOATING) {
+        window->Recover();
+        windowState_ = "normal";
+    }
+    OHOS::Rosen::WMError moveRet = window->MoveTo(x, y);
+    if (moveRet != OHOS::Rosen::WMError::WM_OK) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "[setWindowBounds] MoveTo failed, ret:%{public}d", static_cast<int>(moveRet));
+        return false;
+    }
+    std::string errMsg;
+    auto ret = window->Resize(w, h, errMsg);
+    if (ret != OHOS::Rosen::WMError::WM_OK) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "[setWindowBounds] Resize failed, ret:%{public}d, msg:%{public}s, mode:%{public}d",
+            static_cast<int>(ret), errMsg.c_str(), static_cast<int>(window->GetWindowMode()));
+    }
+    return ret == OHOS::Rosen::WMError::WM_OK;
+}
+
+bool WebPattern::HandleWindowStateGet(std::string& state)
+{
+    auto window = Platform::AceContainer::GetUIWindow(instanceId_);
+    if (!window) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "[getWindowBounds] state get failed, window is null");
+        return false;
+    }
+    if (window->IsFullScreen()) {
+        state = "fullscreen";
+        return true;
+    }
+    // Rosen::Window 仅暴露 IsFullScreen()，不暴露 minimized/maximized 状态，
+    // 回读以最近一次设置意图为准；若此前设置的 fullscreen 已被系统退出则回落 normal。
+    state = (windowState_ == "fullscreen") ? std::string("normal") : windowState_;
+    return true;
+}
+
+bool WebPattern::HandleWindowStateSet(const std::string& state)
+{
+    auto window = Platform::AceContainer::GetUIWindow(instanceId_);
+    if (!window) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "[setWindowBounds] window is null");
+        return false;
+    }
+    OHOS::Rosen::WMError ret = OHOS::Rosen::WMError::WM_DO_NOTHING;
+    if (state == "normal") {
+        if (windowState_ == "minimized") {
+            ret = window->Restore();
+        } else {
+            ret = window->IsFullScreen() ? window->SetFullScreen(false) : window->Recover();
+        }
+    } else if (state == "minimized") {
+        ret = window->Minimize();
+    } else if (state == "maximized") {
+        ret = window->Maximize();
+    } else if (state == "fullscreen") {
+        ret = window->SetFullScreen(true);
+    } else {
+        TAG_LOGW(AceLogTag::ACE_WEB, "[setWindowBounds] invalid state:%{public}s", state.c_str());
+        return false;
+    }
+    if (ret == OHOS::Rosen::WMError::WM_OK || ret == OHOS::Rosen::WMError::WM_ERROR_REPEAT_OPERATION) {
+        windowState_ = state;
+        return true;
+    }
+    TAG_LOGW(AceLogTag::ACE_WEB, "[setWindowBounds] state:%{public}s failed, ret:%{public}d",
+        state.c_str(), static_cast<int>(ret));
+    return false;
 }
 
 } // namespace OHOS::Ace::NG
