@@ -48,7 +48,7 @@ FuncType GetOrCreateFunc()
         }
         if (errCode == ErrCode::SYMBOL_NOT_FOUND) {
             extraModuleManager.UnloadModule(OS_CONTENT_MODULE_NAME);
-            LOGE("Failed to load symbol: %{public}s from nodule %{public}s",
+            LOGE("Failed to load symbol: %{public}s from module %{public}s",
                 FuncName, OS_CONTENT_MODULE_NAME);
         } else {
             LOGE("Failed to load module: %{public}s", OS_CONTENT_MODULE_NAME);
