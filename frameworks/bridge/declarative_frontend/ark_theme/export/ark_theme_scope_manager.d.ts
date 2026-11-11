@@ -26,6 +26,7 @@ declare class ArkThemeScopeManager {
     onComponentCreateExit(elmtId: number): void;
     onViewPUCreate(ownerComponent: ViewPuInternal): void;
     onViewPUDelete(ownerComponent: ViewPuInternal): void;
+    onUINodeDelete(elmtId: number): void;
     onIfElseBranchUpdateEnter(): void;
     onIfElseBranchUpdateExit(removedElmtIds: number[]): void;
 }

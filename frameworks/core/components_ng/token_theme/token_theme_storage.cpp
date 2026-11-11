@@ -148,6 +148,7 @@ void TokenThemeStorage::CacheClear()
 {
     std::lock_guard<std::mutex> lock(themeCacheMutex_);
     themeCache_.clear();
+    themeColorSetByUser_.clear();
 }
 
 void TokenThemeStorage::ResetThemeColor(int32_t themeId, RefPtr<TokenTheme>& theme, RefPtr<TokenTheme>& defaultTheme,
@@ -221,6 +222,7 @@ void TokenThemeStorage::CacheRemove(int32_t themeId)
 {
     std::lock_guard<std::mutex> lock(themeCacheMutex_);
     themeCache_.erase(themeId);
+    themeColorSetByUser_.erase(themeId);
 }
 
 RefPtr<TokenTheme> TokenThemeStorage::ObtainSystemTheme(ColorMode themeColorMode)

@@ -298,6 +298,14 @@ class ArkThemeScopeManager {
     }
 
     /**
+     * Remove a deleted UI node from its theme scope, including built-in components.
+     */
+    onUINodeDelete(elmtId: number) {
+        const scope = this.themeScopes?.find(item => item.isComponentInScope(elmtId));
+        scope?.removeComponentFromScope(elmtId);
+    }
+
+    /**
      * Start for IfElse branch update
      */
     onIfElseBranchUpdateEnter() {
