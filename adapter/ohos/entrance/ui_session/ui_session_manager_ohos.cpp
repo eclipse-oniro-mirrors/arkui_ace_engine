@@ -443,7 +443,7 @@ struct PageTranslateRequestInfo {
 
 bool HasScope(int32_t scope, int32_t target)
 {
-    return (scope & target) != 0;
+    return (static_cast<uint32_t>(scope) & static_cast<uint32_t>(target)) != 0;
 }
 
 PageTranslateRequestInfo ParsePageTranslateRequest(const std::string& request)

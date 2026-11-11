@@ -30,7 +30,7 @@ namespace OHOS::Ace {
 namespace {
 bool HasScope(int32_t scope, int32_t target)
 {
-    return (scope & target) != 0;
+    return (static_cast<uint32_t>(scope) & static_cast<uint32_t>(target)) != 0;
 }
 
 inline constexpr int32_t ARKWEB_TRANSLATE_SCOPE = static_cast<int32_t>(TranslateContentScope::ARKWEB_ONLY);
