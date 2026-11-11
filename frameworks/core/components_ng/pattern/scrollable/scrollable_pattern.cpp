@@ -1898,6 +1898,9 @@ bool ScrollablePattern::HandleEdgeEffect(float offset, int32_t source, const Siz
         if ((isAtTop && Positive(offset)) || (isAtBottom && Negative(offset))) {
             animateOverScrollStart_ = false;
             animateOverScrollEnd_ = false;
+            // The accessibility SCROLL_END is still fired for frames rejected at edge,
+            // so the user attribution must be recorded before this early return.
+            MarkUserScrollSource(source);
             return false;
         }
     }

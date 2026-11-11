@@ -429,6 +429,41 @@ HWTEST_F(ScrollAccessibilityTestNg, ScrollA11ySourceUserSwipe001, TestSize.Level
 }
 
 /**
+ * @tc.name: ScrollA11ySourceUserAxisEdge001
+ * @tc.desc: Verify SCROLL_END extraEventInfo["scrollSource"]=="user" when mouse wheel
+ *           (SCROLL_FROM_AXIS) keeps scrolling while Scroll already stays at edge,
+ *           where no offset is applied by UpdateCurrentOffset.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollAccessibilityTestNg, ScrollA11ySourceUserAxisEdge001, TestSize.Level1)
+{
+    AceApplicationInfo::GetInstance().SetAccessibilityEnabled(true);
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    auto pipeline = MockPipelineContext::GetCurrent();
+    auto scrollable = pattern_->GetScrollable();
+    ASSERT_NE(scrollable, nullptr);
+    EXPECT_TRUE(pattern_->IsAtTop());
+
+    /**
+     * @tc.steps: step1. Wheel scroll towards the top edge while already at top:
+     *           the axis animator starts, an axis frame is rejected at edge,
+     *           then the axis scrolling finishes.
+     * @tc.expected: SCROLL_END event with scrollSource="user" is fired.
+     */
+    auto captured = CaptureSendAccessibilityEventInfo(pipeline);
+    scrollable->ProcessAxisUpdateEvent(ITEM_MAIN_SIZE);
+    scrollable->HandleScroll(ITEM_MAIN_SIZE, SCROLL_FROM_AXIS, NestedState::GESTURE);
+    EXPECT_EQ(pattern_->GetAccessibilityScrollSource(), "user");
+    scrollable->ProcessScrollMotionStop(SCROLL_FROM_AXIS);
+    FlushUITasks();
+    EXPECT_EQ(captured->type, AccessibilityEventType::SCROLL_END);
+    EXPECT_EQ(captured->extraEventInfo["scrollSource"], "user");
+    EXPECT_TRUE(pattern_->GetAccessibilityScrollSource().empty());
+}
+
+/**
  * @tc.name: ScrollA11ySourceApiFling001
  * @tc.desc: Verify SCROLL_END extraEventInfo["scrollSource"]=="api" for Fling in Scroll.
  * @tc.type: FUNC
