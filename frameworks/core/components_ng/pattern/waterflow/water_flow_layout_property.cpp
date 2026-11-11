@@ -56,6 +56,25 @@ void WaterFlowLayoutProperty::ResetScrollSnapStrategy()
     snapOffset_ = nullptr;
 }
 
+std::string WaterFlowLayoutProperty::GetScrollSnapStrategyString() const
+{
+    auto strategy = GetScrollSnapStrategy().value_or(ScrollSnapStrategy());
+    // Provider closures cannot be serialized; dump the configured form only.
+    if (strategy.hasProvider) {
+        return "ScrollSnapOffsetProvider";
+    }
+    switch (strategy.align) {
+        case ScrollSnapAlign::START:
+            return "ScrollSnapAlign.START";
+        case ScrollSnapAlign::CENTER:
+            return "ScrollSnapAlign.CENTER";
+        case ScrollSnapAlign::END:
+            return "ScrollSnapAlign.END";
+        default:
+            return "ScrollSnapAlign.NONE";
+    }
+}
+
 void WaterFlowLayoutProperty::ResetWaterflowLayoutInfoAndMeasure() const
 {
     auto host = GetHost();
@@ -124,6 +143,7 @@ void WaterFlowLayoutProperty::ToJsonValue(std::unique_ptr<JsonValue>& json, cons
     }
     json->PutExtAttr("enableScrollInteraction", propScrollEnabled_.value_or(true), filter);
     json->PutExtAttr("syncLoad", propSyncLoad_.value_or(true), filter);
+    json->PutExtAttr("scrollSnapStrategy", GetScrollSnapStrategyString().c_str(), filter);
     if (!propItemFillPolicy_.has_value()) {
         return;
     }

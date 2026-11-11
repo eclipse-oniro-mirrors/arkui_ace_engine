@@ -23,6 +23,7 @@
 #include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "core/components_ng/pattern/scrollable/scroll_snap_utils.h"
 #include "core/components_ng/pattern/waterflow/water_flow_model_static.h"
+#include "interfaces/inner_api/ui_session/param_config.h"
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "test/mock/frameworks/core/animation/mock_animation_manager.h"
 #include "test/mock/frameworks/core/components_ng/pattern/mock_nestable_scroll_container.h"
@@ -1742,5 +1743,52 @@ HWTEST_F(WaterFlowScrollSnapTestNg, ProgrammaticIndexExtraOffsetDoesNotAddSnap, 
     ScrollToIndex(2, false, ScrollAlign::START, 37.0f);
     FinishSnapAnimation();
     EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), 137.0f);
+}
+
+/**
+ * @tc.name: ScrollSnapStrategyDump001
+ * @tc.desc: Feat-20260806915269: the configured snap strategy is visible in the inspector
+ *           attribute tree (ToJsonValue) and the pattern advance dumps (JSON + text) in all
+ *           three forms: unset (NONE), built-in align, custom provider.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, ScrollSnapStrategyDump001, TestSize.Level1)
+{
+    CreateUnequalItems();
+
+    // Unset: the default form is dumped like List's scrollSnapAlign.
+    auto json = JsonUtil::Create(true);
+    layoutProperty_->ToJsonValue(json, filter);
+    EXPECT_EQ(json->GetString("scrollSnapStrategy"), "ScrollSnapAlign.NONE");
+
+    // Built-in align form.
+    SetStrategy(MakeAlign(ScrollSnapAlign::CENTER));
+    json = JsonUtil::Create(true);
+    layoutProperty_->ToJsonValue(json, filter);
+    EXPECT_EQ(json->GetString("scrollSnapStrategy"), "ScrollSnapAlign.CENTER");
+
+    // Custom provider form: closures are not serializable, only the form is dumped.
+    SetStrategy(MakeProvider([](double) { return 50.0; }));
+    json = JsonUtil::Create(true);
+    layoutProperty_->ToJsonValue(json, filter);
+    EXPECT_EQ(json->GetString("scrollSnapStrategy"), "ScrollSnapOffsetProvider");
+
+    // Pattern advance JSON dump mirrors the same value.
+    ParamConfig config;
+    config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+    config.functionalProperties = true;
+    auto advanceJson = JsonUtil::Create(true);
+    pattern_->DumpAdvanceInfo(advanceJson, config);
+    EXPECT_EQ(advanceJson->GetString("ScrollSnapStrategy"), "ScrollSnapOffsetProvider");
+
+    // Reset returns to the default; the text dump follows suit.
+    WaterFlowModelNG::ResetScrollSnapStrategy(AceType::RawPtr(frameNode_));
+    DumpLog::GetInstance().description_.clear();
+    pattern_->DumpAdvanceInfo();
+    std::string allDesc;
+    for (const auto& line : DumpLog::GetInstance().description_) {
+        allDesc += line;
+    }
+    EXPECT_NE(allDesc.find("ScrollSnapStrategy: ScrollSnapAlign.NONE\n"), std::string::npos);
 }
 } // namespace OHOS::Ace::NG
