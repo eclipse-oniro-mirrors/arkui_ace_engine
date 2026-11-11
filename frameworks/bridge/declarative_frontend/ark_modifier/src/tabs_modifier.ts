@@ -308,6 +308,11 @@ class LazyArkTabsComponent extends ArkComponent {
     this.lazyComponent.sidebarDivider(value);
     return this;
   }
+
+  expandSafeArea(types?: Array<SafeAreaType>, edges?: Array<SafeAreaEdge>): this {
+    this.lazyComponent.expandSafeArea(types, edges);
+    return this;
+  }
 }
 
 class TabsModifier extends LazyArkTabsComponent implements AttributeModifier<TabsAttribute> {

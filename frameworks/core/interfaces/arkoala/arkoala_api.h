@@ -5861,6 +5861,7 @@ struct ArkUITabsModifier {
     void (*setSidebarDividerColorByUser)(ArkUINodeHandle node, ArkUI_Bool colorByUser);
     void (*resetSidebarDivider)(ArkUINodeHandle node);
     void (*createWithSidebarResourceObj)(ArkUINodeHandle node, void* paramRawPtr);
+    void (*markUserSetSafeAreaOpts)(ArkUINodeHandle node);
 };
 
 struct ArkUIStepperItemModifier {

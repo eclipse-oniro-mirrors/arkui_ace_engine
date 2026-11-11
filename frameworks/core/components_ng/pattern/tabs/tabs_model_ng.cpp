@@ -2908,4 +2908,14 @@ void TabsModelNG::SetSidebarDividerColorByUser(FrameNode* frameNode, bool isByUs
     CHECK_NULL_VOID(frameNode);
     ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, SidebarDividerColorSetByUser, isByUser, frameNode);
 }
+
+void TabsModelNG::MarkUserSetSafeAreaOpts(FrameNode* frameNode)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto tabsNode = AceType::DynamicCast<TabsNode>(frameNode);
+    CHECK_NULL_VOID(tabsNode);
+    auto tabPattern = tabsNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(tabPattern);
+    tabPattern->MarkUserSetSafeAreaOpts();
+}
 } // namespace OHOS::Ace::NG

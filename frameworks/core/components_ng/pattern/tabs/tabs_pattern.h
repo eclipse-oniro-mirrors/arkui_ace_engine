@@ -178,6 +178,11 @@ public:
     TabBarDisplayMode GetActiveBarDisplayMode() const;
     void SetCurrentBarDisplayMode(TabBarDisplayMode mode);
 
+    void MarkUserSetSafeAreaOpts()
+    {
+        isUserSetSafeAreaOpts_ = true;
+    }
+
     void FireBarDisplayModeChangeEvent(TabBarDisplayMode mode);
 
     void StartDisplayModeSwitchAnimation(TabBarDisplayMode fromMode, TabBarDisplayMode toMode);
@@ -640,6 +645,8 @@ private:
     std::shared_ptr<AnimationUtils::Animation> sidebarTranslateAnim_;
     std::shared_ptr<AnimationUtils::Animation> tabBarEnterExitAnim_;
     bool tabBarClickIntercept_ = false;
+
+    bool isUserSetSafeAreaOpts_ = false;
 };
 
 } // namespace OHOS::Ace::NG

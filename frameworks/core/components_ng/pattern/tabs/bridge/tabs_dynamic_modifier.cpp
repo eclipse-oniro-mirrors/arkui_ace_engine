@@ -1009,6 +1009,8 @@ void SetSidebarDividerColorByUserImpl(ArkUINodeHandle node, ArkUI_Bool isByUser)
 void ResetSidebarDividerImpl(ArkUINodeHandle node) {}
 
 void CreateWithSidebarResourceObjImpl(ArkUINodeHandle node, void* paramRawPtr) {}
+
+void MarkUserSetSafeAreaOptsImpl(ArkUINodeHandle node) {}
 #endif
 
 void CreateWithSidebarResourceObj(ArkUINodeHandle node, void* paramRawPtr);
@@ -2435,6 +2437,13 @@ void CreateWithSidebarResourceObj(ArkUINodeHandle node, void* paramRawPtr)
     TabsModelNG::CreateWithSidebarResourceObj(frameNode, param->jsResourceType, resObj);
 }
 
+void MarkUserSetSafeAreaOpts(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabsModelNG::MarkUserSetSafeAreaOpts(frameNode);
+}
+
 namespace NodeModifier {
 const ArkUITabsModifier* GetTabsModifier()
 {
@@ -2589,6 +2598,7 @@ const ArkUITabsModifier* GetTabsModifier()
             .setSidebarDividerColorByUser = SetSidebarDividerColorByUser,
             .resetSidebarDivider = ResetSidebarDivider,
             .createWithSidebarResourceObj = CreateWithSidebarResourceObj,
+            .markUserSetSafeAreaOpts = MarkUserSetSafeAreaOpts,
         };
         CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
         return &modifier;
@@ -2743,6 +2753,7 @@ const ArkUITabsModifier* GetTabsModifier()
         .setSidebarDividerColorByUser = SetSidebarDividerColorByUserImpl,
         .resetSidebarDivider = ResetSidebarDividerImpl,
         .createWithSidebarResourceObj = CreateWithSidebarResourceObjImpl,
+        .markUserSetSafeAreaOpts = MarkUserSetSafeAreaOptsImpl,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;
