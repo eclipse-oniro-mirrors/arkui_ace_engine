@@ -5706,6 +5706,31 @@ struct ArkUIScrollerModifier {
         ArkUI_Bool animation, const struct ArkUIScrollerAnimationType* animationType);
 };
 
+// SidebarSection entry passed across the C API boundary.
+struct ArkUISidebarSection {
+    ArkUI_CharPtr title;
+    ArkUI_Bool hasOrder;
+    ArkUI_Int32 order;
+    ArkUI_Int32 titleStyle;
+    void* titleResourceObject;
+};
+
+// TabViewCustomization passed across the C API boundary as flat arrays.
+// visibilityKeys/visibilityValues: parallel arrays of length visibilityCount.
+// sectionKeys/sectionValues: parallel arrays of length sectionCount.
+// orderKeys/orderValues: parallel arrays of length orderCount.
+struct ArkUITabViewCustomization {
+    const ArkUI_Int32* visibilityKeys;
+    const ArkUI_Int32* visibilityValues;
+    ArkUI_Int32 visibilityCount;
+    const ArkUI_Int32* sectionKeys;
+    const ArkUISidebarSection* sectionValues;
+    ArkUI_Int32 sectionCount;
+    const ArkUI_Int32* orderKeys;
+    const ArkUI_Int32* orderValues;
+    ArkUI_Int32 orderCount;
+};
+
 struct ArkUITabsModifier {
     void (*createTabs)(ArkUI_Int32 barPosition, ArkUI_Int32 index, ArkUINodeHandle tabsController, ArkUINodeHandle tabController);
     void (*popTabs)();
@@ -5862,6 +5887,8 @@ struct ArkUITabsModifier {
     void (*resetSidebarDivider)(ArkUINodeHandle node);
     void (*createWithSidebarResourceObj)(ArkUINodeHandle node, void* paramRawPtr);
     void (*markUserSetSafeAreaOpts)(ArkUINodeHandle node);
+    void (*setTabViewCustomization)(ArkUINodeHandle node, const ArkUITabViewCustomization* customization);
+    void (*resetTabViewCustomization)(ArkUINodeHandle node);
 };
 
 struct ArkUIStepperItemModifier {

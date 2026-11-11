@@ -677,7 +677,12 @@ void SetSidebarSection(ArkUINodeHandle node, ArkUI_CharPtr title, ArkUI_Bool has
     if (hasOrder) {
         section.order = order;
     }
-    section.titleStyle = static_cast<SidebarSectionTitleStyle>(titleStyle);
+    if (titleStyle == static_cast<ArkUI_Int32>(SidebarSectionTitleStyle::STANDARD) ||
+        titleStyle == static_cast<ArkUI_Int32>(SidebarSectionTitleStyle::EMPHASIZED)) {
+        section.titleStyle = static_cast<SidebarSectionTitleStyle>(titleStyle);
+    } else {
+        section.titleStyle = SidebarSectionTitleStyle::STANDARD;
+    }
     auto* resObj = reinterpret_cast<ResourceObject*>(resObjRawPtr);
     section.resourceTitleObject = resObj ? AceType::Claim(resObj) : nullptr;
     TabContentModelNG::SetSidebarSection(frameNode, section);

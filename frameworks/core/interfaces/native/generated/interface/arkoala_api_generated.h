@@ -1863,6 +1863,12 @@ typedef struct Map_AxisModel_F64 Map_AxisModel_F64;
 typedef struct Opt_Map_AxisModel_F64 Opt_Map_AxisModel_F64;
 typedef struct Map_F64_SliderStepItemAccessibility Map_F64_SliderStepItemAccessibility;
 typedef struct Opt_Map_F64_SliderStepItemAccessibility Opt_Map_F64_SliderStepItemAccessibility;
+typedef struct Map_I32_I32 Map_I32_I32;
+typedef struct Opt_Map_I32_I32 Opt_Map_I32_I32;
+typedef struct Map_I32_SidebarSection Map_I32_SidebarSection;
+typedef struct Opt_Map_I32_SidebarSection Opt_Map_I32_SidebarSection;
+typedef struct Map_I32_TabVisibility Map_I32_TabVisibility;
+typedef struct Opt_Map_I32_TabVisibility Opt_Map_I32_TabVisibility;
 typedef struct Map_I32_text_RunMetrics Map_I32_text_RunMetrics;
 typedef struct Opt_Map_I32_text_RunMetrics Opt_Map_I32_text_RunMetrics;
 typedef struct Map_SourceTool_F64 Map_SourceTool_F64;
@@ -2783,6 +2789,8 @@ typedef struct Ark_TabContentAnimatedTransition Ark_TabContentAnimatedTransition
 typedef struct Opt_TabContentAnimatedTransition Opt_TabContentAnimatedTransition;
 typedef struct Ark_TabsBreakpointType_TabBarDisplayMode Ark_TabsBreakpointType_TabBarDisplayMode;
 typedef struct Opt_TabsBreakpointType_TabBarDisplayMode Opt_TabsBreakpointType_TabBarDisplayMode;
+typedef struct Ark_TabViewCustomization Ark_TabViewCustomization;
+typedef struct Opt_TabViewCustomization Opt_TabViewCustomization;
 typedef struct Ark_TargetInfo Ark_TargetInfo;
 typedef struct Opt_TargetInfo Opt_TargetInfo;
 typedef struct Ark_TerminationInfo Ark_TerminationInfo;
@@ -13845,6 +13853,36 @@ typedef struct Opt_Map_F64_SliderStepItemAccessibility {
     Ark_Tag tag;
     Map_F64_SliderStepItemAccessibility value;
 } Opt_Map_F64_SliderStepItemAccessibility;
+typedef struct Map_I32_I32 {
+    /* kind: ContainerType */
+    Ark_Int32 size;
+    Ark_Int32* keys;
+    Ark_Int32* values;
+} Map_I32_I32;
+typedef struct Opt_Map_I32_I32 {
+    Ark_Tag tag;
+    Map_I32_I32 value;
+} Opt_Map_I32_I32;
+typedef struct Map_I32_SidebarSection {
+    /* kind: ContainerType */
+    Ark_Int32 size;
+    Ark_Int32* keys;
+    Ark_SidebarSection* values;
+} Map_I32_SidebarSection;
+typedef struct Opt_Map_I32_SidebarSection {
+    Ark_Tag tag;
+    Map_I32_SidebarSection value;
+} Opt_Map_I32_SidebarSection;
+typedef struct Map_I32_TabVisibility {
+    /* kind: ContainerType */
+    Ark_Int32 size;
+    Ark_Int32* keys;
+    Ark_TabVisibility* values;
+} Map_I32_TabVisibility;
+typedef struct Opt_Map_I32_TabVisibility {
+    Ark_Tag tag;
+    Map_I32_TabVisibility value;
+} Opt_Map_I32_TabVisibility;
 typedef struct Map_I32_text_RunMetrics {
     /* kind: ContainerType */
     Ark_Int32 size;
@@ -18480,6 +18518,16 @@ typedef struct Opt_TabsBreakpointType_TabBarDisplayMode {
     Ark_Tag tag;
     Ark_TabsBreakpointType_TabBarDisplayMode value;
 } Opt_TabsBreakpointType_TabBarDisplayMode;
+typedef struct Ark_TabViewCustomization {
+    /* kind: Interface */
+    Opt_Map_I32_TabVisibility visibilityMap;
+    Opt_Map_I32_SidebarSection sectionMap;
+    Opt_Map_I32_I32 orderMap;
+} Ark_TabViewCustomization;
+typedef struct Opt_TabViewCustomization {
+    Ark_Tag tag;
+    Ark_TabViewCustomization value;
+} Opt_TabViewCustomization;
 typedef struct Ark_TargetInfo {
     /* kind: Interface */
     Ark_Union_String_I32 id;
@@ -28166,6 +28214,8 @@ typedef struct GENERATED_ArkUITabsModifier {
                                 const Opt_ComponentContentBase* value);
     void (*setShowSidebarControlButton)(Ark_NativePointer node,
                                         const Opt_Boolean* value);
+    void (*setTabViewCustomization)(Ark_NativePointer node,
+                                    const Opt_TabViewCustomization* value);
     void (*setBarMode)(Ark_NativePointer node,
                        const Opt_BarMode* value,
                        const Opt_ScrollableBarModeOptions* options);

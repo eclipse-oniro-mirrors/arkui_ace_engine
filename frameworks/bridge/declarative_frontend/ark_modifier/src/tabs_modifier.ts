@@ -294,6 +294,11 @@ class LazyArkTabsComponent extends ArkComponent {
     return this;
   }
 
+  tabViewCustomization(value: Optional<TabViewCustomization>): this {
+    this.lazyComponent.tabViewCustomization(value);
+    return this;
+  }
+
   sidebarBackgroundColor(value: Optional<ResourceColor>): this {
     this.lazyComponent.sidebarBackgroundColor(value);
     return this;

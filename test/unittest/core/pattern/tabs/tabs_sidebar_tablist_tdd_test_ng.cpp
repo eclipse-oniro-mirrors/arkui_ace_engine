@@ -732,14 +732,14 @@ HWTEST_F(TabsSidebarTabListTddTestNg, UpdateTextColorAndIconColorUnselectedSideb
     EXPECT_EQ(textLayoutProp->GetTextColor().value(), Color::FromRGB(0, 255, 255));
 }
 
-// ===================== ApplyDefaultVisibility =====================
+// ===================== RefreshSidebarTabVisibilityAndLayout (Level 1) =====================
 
 /**
- * @tc.name: ApplyDefaultVisibilitySidebarStyleHidden001
- * @tc.desc: ApplyDefaultVisibility with SIDEBAR style and HIDDEN visibility sets GONE
+ * @tc.name: RefreshSidebarTabVisibilityAndLayoutLevel1Hidden001
+ * @tc.desc: Level 1 path with SIDEBAR style and HIDDEN visibility sets GONE
  * @tc.type: FUNC
  */
-HWTEST_F(TabsSidebarTabListTddTestNg, ApplyDefaultVisibilitySidebarStyleHidden001, TestSize.Level1)
+HWTEST_F(TabsSidebarTabListTddTestNg, RefreshSidebarTabVisibilityAndLayoutLevel1Hidden001, TestSize.Level1)
 {
     SidebarTabListTree tree;
     tree.Build();
@@ -749,18 +749,18 @@ HWTEST_F(TabsSidebarTabListTddTestNg, ApplyDefaultVisibilitySidebarStyleHidden00
     vis.displayMode = TabBarDisplayMode::SIDEBAR;
     tree.tabContentNode->GetPattern<TabContentPattern>()->SetDefaultVisibility(vis);
     tree.tabsLayoutProperty->UpdateBarLayoutStyle(TabBarLayoutStyle::SIDEBAR);
-    tree.pattern->ApplyDefaultVisibility();
+    tree.pattern->RefreshSidebarTabVisibilityAndLayout();
     auto property = tree.tabItemNode->GetLayoutProperty();
     ASSERT_NE(property, nullptr);
     EXPECT_EQ(property->GetVisibilityValue(VisibleType::VISIBLE), VisibleType::GONE);
 }
 
 /**
- * @tc.name: ApplyDefaultVisibilitySidebarStyleVisible001
- * @tc.desc: ApplyDefaultVisibility with SIDEBAR style and VISIBLE visibility sets VISIBLE
+ * @tc.name: RefreshSidebarTabVisibilityAndLayoutLevel1Visible001
+ * @tc.desc: Level 1 path with SIDEBAR style and VISIBLE visibility sets VISIBLE
  * @tc.type: FUNC
  */
-HWTEST_F(TabsSidebarTabListTddTestNg, ApplyDefaultVisibilitySidebarStyleVisible001, TestSize.Level1)
+HWTEST_F(TabsSidebarTabListTddTestNg, RefreshSidebarTabVisibilityAndLayoutLevel1Visible001, TestSize.Level1)
 {
     SidebarTabListTree tree;
     tree.Build();
@@ -770,18 +770,18 @@ HWTEST_F(TabsSidebarTabListTddTestNg, ApplyDefaultVisibilitySidebarStyleVisible0
     vis.displayMode = TabBarDisplayMode::SIDEBAR;
     tree.tabContentNode->GetPattern<TabContentPattern>()->SetDefaultVisibility(vis);
     tree.tabsLayoutProperty->UpdateBarLayoutStyle(TabBarLayoutStyle::SIDEBAR);
-    tree.pattern->ApplyDefaultVisibility();
+    tree.pattern->RefreshSidebarTabVisibilityAndLayout();
     auto property = tree.tabItemNode->GetLayoutProperty();
     ASSERT_NE(property, nullptr);
     EXPECT_EQ(property->GetVisibilityValue(VisibleType::GONE), VisibleType::VISIBLE);
 }
 
 /**
- * @tc.name: ApplyDefaultVisibilityWithSearchFilter001
- * @tc.desc: ApplyDefaultVisibility with search filter set hides non-matching items
+ * @tc.name: RefreshSidebarTabVisibilityAndLayoutLevel1WithSearchFilter001
+ * @tc.desc: Level 1 path with search filter set hides non-matching items
  * @tc.type: FUNC
  */
-HWTEST_F(TabsSidebarTabListTddTestNg, ApplyDefaultVisibilityWithSearchFilter001, TestSize.Level1)
+HWTEST_F(TabsSidebarTabListTddTestNg, RefreshSidebarTabVisibilityAndLayoutLevel1WithSearchFilter001, TestSize.Level1)
 {
     SidebarTabListTree tree;
     tree.Build();
@@ -792,7 +792,7 @@ HWTEST_F(TabsSidebarTabListTddTestNg, ApplyDefaultVisibilityWithSearchFilter001,
     // Set a search filter that hides all items
     tree.pattern->activeSearchText_ = u"xyz";
     tree.pattern->activeSearchFilter_ = [](int32_t, const std::string&) { return false; };
-    tree.pattern->ApplyDefaultVisibility();
+    tree.pattern->RefreshSidebarTabVisibilityAndLayout();
     auto property = tree.tabItemNode->GetLayoutProperty();
     ASSERT_NE(property, nullptr);
     EXPECT_EQ(property->GetVisibilityValue(VisibleType::VISIBLE), VisibleType::GONE);

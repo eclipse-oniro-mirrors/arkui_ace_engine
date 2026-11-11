@@ -318,6 +318,10 @@ function loadComponent(): ComponentObj | undefined {
         modifierWithKey(this._modifiersWithKeys, TabMinContentWidthModifier.identity, TabMinContentWidthModifier, value);
         return this;
       }
+      tabViewCustomization(value: Optional<TabViewCustomization>): TabsAttribute {
+        modifierWithKey(this._modifiersWithKeys, TabsTabViewCustomizationModifier.identity, TabsTabViewCustomizationModifier, value);
+        return this;
+      }
       sidebarBackgroundColor(value: Optional<ResourceColor>): TabsAttribute {
         modifierWithKey(this._modifiersWithKeys, TabSidebarBackgroundColorModifier.identity, TabSidebarBackgroundColorModifier, value);
         return this;
@@ -1452,6 +1456,21 @@ function loadComponent(): ComponentObj | undefined {
           this.stageValue?.endMargin === this.value?.endMargin);
       }
     }
+
+    class TabsTabViewCustomizationModifier extends ModifierWithKey<Optional<TabViewCustomization>> {
+      constructor(value: Optional<TabViewCustomization>) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('tabViewCustomization');
+
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().tabs.resetTabViewCustomization(node);
+        } else {
+          getUINativeModule().tabs.setTabViewCustomization(node, this.value);
+        }
+      }
+    }
         loadComponent.componentObj = { 'component': ArkTabsComponent };
   }
   return loadComponent.componentObj;
@@ -1702,6 +1721,10 @@ class JSTabs extends JSContainerBase {
 
   static minContentWidth(value: any): void {
     getUINativeModule().tabs.setTabMinContentWidth(true, value);
+  }
+
+  static tabViewCustomization(value: any): void {
+    getUINativeModule().tabs.setTabViewCustomization(true, value);
   }
 
   static sidebarBackgroundColor(value: any): void {

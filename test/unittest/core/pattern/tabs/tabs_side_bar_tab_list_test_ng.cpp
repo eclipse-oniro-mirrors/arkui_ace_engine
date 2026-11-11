@@ -783,10 +783,10 @@ HWTEST_F(TabsSideBarTabListTestNg, RebuildSections001, TestSize.Level1)
     auto childrenAfter = tree.columnNode->GetChildren();
     size_t childCountAfter = childrenAfter.size();
 
-    // No new "TabsSideBarSectionHeader" nodes should exist
+    // No new "TabsSidebarSectionHeader" nodes should exist
     bool hasSectionHeader = false;
     for (const auto& child : childrenAfter) {
-        if (child && child->GetTag() == "TabsSideBarSectionHeader") {
+        if (child && child->GetTag() == "TabsSidebarSectionHeader") {
             hasSectionHeader = true;
             break;
         }
@@ -835,7 +835,7 @@ HWTEST_F(TabsSideBarTabListTestNg, RebuildSections002, TestSize.Level1)
     int32_t sectionHeaderCount = 0;
     RefPtr<FrameNode> foundHeader = nullptr;
     for (const auto& child : tree.columnNode->GetChildren()) {
-        if (child && child->GetTag() == "TabsSideBarSectionHeader") {
+        if (child && child->GetTag() == "TabsSidebarSectionHeader") {
             ++sectionHeaderCount;
             foundHeader = AceType::DynamicCast<FrameNode>(child);
         }
@@ -881,7 +881,7 @@ HWTEST_F(TabsSideBarTabListTestNg, RebuildSections003, TestSize.Level1)
 
     bool hasSectionHeader = false;
     for (const auto& child : tree.columnNode->GetChildren()) {
-        if (child && child->GetTag() == "TabsSideBarSectionHeader") {
+        if (child && child->GetTag() == "TabsSidebarSectionHeader") {
             hasSectionHeader = true;
             break;
         }

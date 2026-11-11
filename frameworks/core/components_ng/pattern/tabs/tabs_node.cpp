@@ -221,6 +221,56 @@ void TabsNode::SidebarInfoToJsonValue(std::unique_ptr<JsonValue>& json, const In
     } else {
         json->PutExtAttr("sidebarSelectedBoardColor", "null", filter);
     }
+
+    TabViewCustomizationToJsonValue(json, filter);
+}
+
+void TabsNode::TabViewCustomizationToJsonValue(
+    std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const
+{
+    auto tabsPattern = GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(tabsPattern);
+    const auto& customization = tabsPattern->GetAppliedTabViewCustomization();
+    if (!customization.has_value()) {
+        json->PutExtAttr("tabViewCustomization", "null", filter);
+        return;
+    }
+    auto customizationJson = JsonUtil::Create(true);
+    // visibilityMap: tabIndex -> "TabVisibility.VISIBLE"/"TabVisibility.HIDDEN"
+    if (!customization->visibilityMap.empty()) {
+        auto visibilityJson = JsonUtil::Create(true);
+        for (const auto& [tabIndex, visibility] : customization->visibilityMap) {
+            visibilityJson->Put(std::to_string(tabIndex).c_str(),
+                visibility == TabVisibility::HIDDEN ? "TabVisibility.HIDDEN" : "TabVisibility.VISIBLE");
+        }
+        customizationJson->Put("visibilityMap", visibilityJson);
+    }
+    // sectionMap: tabIndex -> { title, order, titleStyle }
+    if (!customization->sectionMap.empty()) {
+        auto sectionJson = JsonUtil::Create(true);
+        for (const auto& [tabIndex, section] : customization->sectionMap) {
+            auto entryJson = JsonUtil::Create(true);
+            entryJson->Put("title", section.title.c_str());
+            if (section.order.has_value()) {
+                entryJson->Put("order", std::to_string(section.order.value()).c_str());
+            }
+            entryJson->Put("titleStyle",
+                section.titleStyle == SidebarSectionTitleStyle::EMPHASIZED
+                    ? "SidebarSectionTitleStyle.EMPHASIZED"
+                    : "SidebarSectionTitleStyle.STANDARD");
+            sectionJson->Put(std::to_string(tabIndex).c_str(), entryJson);
+        }
+        customizationJson->Put("sectionMap", sectionJson);
+    }
+    // orderMap: tabIndex -> display priority
+    if (!customization->orderMap.empty()) {
+        auto orderJson = JsonUtil::Create(true);
+        for (const auto& [tabIndex, order] : customization->orderMap) {
+            orderJson->Put(std::to_string(tabIndex).c_str(), order);
+        }
+        customizationJson->Put("orderMap", orderJson);
+    }
+    json->PutExtAttr("tabViewCustomization", customizationJson, filter);
 }
 
 bool TabsNode::Scrollable() const

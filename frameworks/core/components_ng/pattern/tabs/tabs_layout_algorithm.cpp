@@ -120,13 +120,18 @@ void TabsLayoutAlgorithm::UpdateSideBarAndSideBarDividerVisibility(LayoutWrapper
     if (!isVisible) {
         return;
     }
-    // When sidebar becomes visible, apply per-item defaultVisibility filtering
-    CHECK_NULL_VOID(sideBarPattern);
-    auto tabListNode = sideBarPattern->GetTabListNode();
-    CHECK_NULL_VOID(tabListNode);
-    auto tabListPattern = tabListNode->GetPattern<TabsSideBarTabListPattern>();
+    // When sidebar becomes visible, apply visibility + section grouping +
+    // customization. RefreshSidebarTabVisibilityAndLayout() does three-way dispatch:
+    //   - Has tabViewCustomization → ApplyTabViewCustomization (Level 3)
+    //   - No customization, has sections → RebuildSections (Level 1/2)
+    //   - No customization, no sections → direct visibility update (Level 1)
+    auto sidebarPattern = sideBar->GetPattern<TabsSideBarPattern>();
+    CHECK_NULL_VOID(sidebarPattern);
+    auto sidebarTabList = sidebarPattern->GetTabListNode();
+    CHECK_NULL_VOID(sidebarTabList);
+    auto tabListPattern = sidebarTabList->GetPattern<TabsSideBarTabListPattern>();
     CHECK_NULL_VOID(tabListPattern);
-    tabListPattern->ApplyDefaultVisibility();
+    tabListPattern->RefreshSidebarTabVisibilityAndLayout();
 }
 
 void TabsLayoutAlgorithm::UpdateTabBarAndDividerVisibility(LayoutWrapper* layoutWrapper, bool isVisible)

@@ -14,6 +14,7 @@
  */
 
 #include "base/utils/string_utils.h"
+#include "core/common/container.h"
 #include "core/components/common/properties/color.h"
 #include "core/components_ng/pattern/tabs/tab_content_model_ng.h"
 #include "core/components_ng/pattern/tabs/tab_content_model_static.h"
@@ -66,6 +67,27 @@ void SetTabBarCustomBuilder(FrameNode* frameNode, const CustomNodeBuilder& arkBu
             TabContentModelStatic::AddTabBarItem(contentNode, DEFAULT_NODE_SLOT, true);
         },
         arkNode);
+}
+
+// Extract ResourceObject from Ark_ResourceStr (union of String + Resource).
+// selector 0 = string literal, selector 1 = Ark_Resource.
+RefPtr<ResourceObject> GetResourceObjectFromResourceStr(const Ark_ResourceStr& resStr)
+{
+    if (resStr.selector != SELECTOR_ID_1) {
+        return nullptr;
+    }
+    Converter::ResourceConverter converter(resStr.value1);
+    auto symbolId = converter.ToSymbol();
+    if (!symbolId.has_value() || symbolId.value() > INT32_MAX) {
+        return nullptr;
+    }
+    auto resourceId = static_cast<int32_t>(symbolId.value());
+    std::vector<ResourceObjectParams> resObjParamsList;
+    auto type = Converter::OptConvert<int32_t>(resStr.value1.type).value_or(0);
+    auto bundleName = Converter::Convert<std::string>(resStr.value1.bundleName);
+    auto moduleName = Converter::Convert<std::string>(resStr.value1.moduleName);
+    return AceType::MakeRefPtr<ResourceObject>(
+        resourceId, type, resObjParamsList, bundleName, moduleName, Container::CurrentIdSafely());
 }
 } // namespace
 
@@ -381,6 +403,7 @@ void SetSidebarSectionImpl(Ark_NativePointer node, const Opt_SidebarSection* val
     const auto& section = optValue.value();
     SidebarSection sidebarSection;
     sidebarSection.title = Converter::OptConvert<std::string>(section.title).value_or("");
+    sidebarSection.resourceTitleObject = GetResourceObjectFromResourceStr(section.title);
     auto orderOpt = Converter::GetOptPtr(&section.order);
     if (orderOpt) {
         sidebarSection.order = static_cast<int32_t>(orderOpt.value());

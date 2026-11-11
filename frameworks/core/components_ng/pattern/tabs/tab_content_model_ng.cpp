@@ -637,16 +637,6 @@ void TabContentModelNG::AddBottomStyleTabBarItem(const RefPtr<UINode>& tabConten
         columnFocusHub->SetFocusDependence(FocusDependence::SELF);
     }
 
-    // Apply defaultVisibility for this single bottom tab bar item
-    const auto& defaultVisibility = tabContentPattern->GetDefaultVisibility();
-    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
-    auto columnProperty = columnNode->GetLayoutProperty();
-    if (tabsPattern && columnProperty) {
-        auto activeDisplayMode = tabsPattern->GetActiveBarDisplayMode();
-        bool shouldHide = defaultVisibility.ShouldHide(activeDisplayMode);
-        columnProperty->UpdateVisibility(shouldHide ? VisibleType::GONE : VisibleType::VISIBLE);
-    }
-
     // Create tab bar with content.
     if (tabBarParam.HasContent()) {
         ScopedViewStackProcessor builderViewStackProcessor;
@@ -2119,11 +2109,33 @@ void TabContentModelNG::CreateSidebarSectionTitleWithResourceObj(
         ResourceParseUtils::ParseResString(resObj, result);
         section->title = result;
         pattern->SetSidebarSection(section.value());
-        auto tabBarNode = AceType::DynamicCast<FrameNode>(node->GetParent());
-        CHECK_NULL_VOID(tabBarNode);
-        auto sideBarPattern = tabBarNode->GetPattern<TabsSideBarTabListPattern>();
+        // Navigate: TabContent node → Swiper node → Tabs node.
+        // node->GetParent() returns the Swiper, NOT the sidebar tab list node.
+        auto swiperNode = AceType::DynamicCast<FrameNode>(node->GetParent());
+        CHECK_NULL_VOID(swiperNode);
+        auto tabsNode = AceType::DynamicCast<TabsNode>(swiperNode->GetParent());
+        CHECK_NULL_VOID(tabsNode);
+        auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+        CHECK_NULL_VOID(tabsPattern);
+        // If a customization sectionMap overrides this tab's section, the
+        // customization path owns the title — skip RebuildSections here.
+        int32_t tabIndex = swiperNode->GetChildIndex(node);
+        if (tabIndex >= 0) {
+            const auto& cust = tabsPattern->GetAppliedTabViewCustomization();
+            if (cust.has_value() && cust.value().sectionMap.count(tabIndex) > 0) {
+                return;
+            }
+        }
+        // Traverse down: Tabs → SideBar node → tab list node → tab list pattern.
+        auto sideBarNode = tabsPattern->GetSideBarNode();
+        CHECK_NULL_VOID(sideBarNode);
+        auto sideBarPattern = sideBarNode->GetPattern<TabsSideBarPattern>();
         CHECK_NULL_VOID(sideBarPattern);
-        sideBarPattern->RebuildSections();
+        auto tabListNode = sideBarPattern->GetTabListNode();
+        CHECK_NULL_VOID(tabListNode);
+        auto tabListPattern = tabListNode->GetPattern<TabsSideBarTabListPattern>();
+        CHECK_NULL_VOID(tabListPattern);
+        tabListPattern->RebuildSections();
     };
     pattern->AddResObj(key, resObj, std::move(updateFunc));
 }

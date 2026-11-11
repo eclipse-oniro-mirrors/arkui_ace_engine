@@ -4285,9 +4285,14 @@ void TabBarPattern::ApplyDefaultVisibility()
     }
 
     auto tabContentNum = swiperNode->TotalChildCount();
-    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
-    auto activeDisplayMode = tabsPattern ? tabsPattern->GetActiveBarDisplayMode()
-                                         : TabBarDisplayMode::BOTTOMTABBAR;
+    // This function only handles bottom/top tab bar visibility.
+    // The caller has already resolved the mode — barStyle tells us which:
+    // SIDEBAR already returned above, so here it's either TOP or BOTTOM.
+    // No need to query GetActiveBarDisplayMode() — the caller's context
+    // already implies the mode (sidebar→bottom switch, layout visibility, etc.).
+    auto activeDisplayMode = (barStyle == TabBarLayoutStyle::TOP)
+        ? TabBarDisplayMode::TOP_TABBAR
+        : TabBarDisplayMode::BOTTOMTABBAR;
     auto isHiddenByDefaultVisibility = [activeDisplayMode](
         const RefPtr<FrameNode>& tabContentNode) -> bool {
         CHECK_NULL_RETURN(tabContentNode, false);
