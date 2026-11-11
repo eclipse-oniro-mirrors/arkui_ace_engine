@@ -48,8 +48,8 @@ interface RecoverableConnectOptions<T extends object, S extends object> {
   type: TypeConstructorWithArgs<T>;
   // (Optional) Storage key; defaults to the type constructor name.
   key?: string;
-  // (Optional) Default creator, used on first connect and as restore fallback.
-  defaultCreator?: StorageDefaultCreator<T>;
+  // (Mandatory) Default creator, used on first connect and as restore fallback.
+  defaultCreator: StorageDefaultCreator<T>;
   // (Optional) Default sub creator for nested @Type members (collection rebuild).
   defaultSubCreator?: StorageDefaultCreator<S>;
   // (Optional) Serialization/deserialization error callback (UI thread).
@@ -83,6 +83,8 @@ class RecoverableStorageImpl extends StorageHelper {
     'The key must be a string when provided.';
   private static readonly INVALID_CALLBACK_MESSAGE_: string =
     'The parameter must be a function when provided.';
+  private static readonly INVALID_KEY_MESSAGE_: string =
+    'The key is invalid: it cannot be an empty string and its length must be shorter than 1024.';
   // DEFAULT_RECOVERY_MAX_RESTORE_SIZE (spec F-E5): ability_recovery.cpp:44 enforces this on
   // the whole serialized payload; the TS side pre-checks per instance to avoid whole-payload
   // rejection (ADR-7).
@@ -119,9 +121,9 @@ class RecoverableStorageImpl extends StorageHelper {
 
   public connect<T extends object, S extends object>(
     options: RecoverableConnectOptions<T, S>
-  ): T | undefined {
-    // Never-throw policy (Owner final decision): every failure path returns undefined,
-    // logs an error, and optionally notifies via notifyOnError.
+  ): T {
+    // Entry errors throw 140124 (Owner final v5): missing/invalid parameters,
+    // unsupported types, invalid keys (empty string or length >= 1024).
     if (options === null || options === undefined) {
       throw new BusinessError(RECOVERABLE_STORAGE_UNSUPPORTED_TYPE,
         RecoverableStorageImpl.MISSING_COMPONENT_MESSAGE_);
@@ -141,7 +143,8 @@ class RecoverableStorageImpl extends StorageHelper {
 
     const key: string | undefined = this.getConnectedKey(type, options.key);
     if (key === undefined || !this.isKeyValid(key)) {
-      return undefined;
+      throw new BusinessError(RECOVERABLE_STORAGE_UNSUPPORTED_TYPE,
+        RecoverableStorageImpl.INVALID_KEY_MESSAGE_);
     }
 
     const partition: Map<string, RecoverableEntry> = this.getOrCreatePartition(instanceId);
@@ -541,7 +544,7 @@ class RecoverableStorageImpl extends StorageHelper {
 class RecoverableStorage {
   public static connect<T extends object, S extends object>(
     options: RecoverableConnectOptions<T, S>
-  ): T | undefined {
+  ): T {
     return RecoverableStorageImpl.instance().connect<T, S>(options);
   }
 

@@ -454,7 +454,8 @@ UIUtils.uiUtilsImpl_ = UIUtilsImpl.instance();
  *
  * - Declare a recoverable state variable inside a custom component (component: this).
  * - Only object types (T extends object) are supported; connect entry errors throw
- *   BusinessError(140124). Serialization/deserialization I/O errors are reported via
+ *   BusinessError(140124) — including invalid keys (empty string or length >= 1024).
+ *   Serialization/deserialization I/O errors are reported via
  *   the per-connect notifyOnError callback (three-field payload: reason/keys/message).
  */
 class RecoverableStorage {
@@ -465,8 +466,8 @@ class RecoverableStorage {
    * @template T - The original object.
    * @template S - The collection item object.
    * @param { RecoverableConnectOptions<T, S> } options - The connection options bag
-   *   (component/type required; key/defaultCreator/defaultSubCreator/notifyOnError optional).
-   * @returns { T | undefined } The restored value, or the default-created value, or undefined.
+   *   (component/type/defaultCreator required; key/defaultSubCreator/notifyOnError optional).
+   * @returns { T } The restored value, or the default-created value.
    */
   static connect(options) {
     return RecoverableStorage.recoverableStorageImpl_.connect(options);
