@@ -154,6 +154,7 @@ public:
     static ArkUINativeModuleValue ResetTabSidebarBackgroundBlurStyle(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue SetTabSidebarDivider(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue ResetTabSidebarDivider(ArkUIRuntimeCallInfo* runtimeCallInfo);
+    static ArkUINativeModuleValue MarkUserSetSafeAreaOpts(ArkUIRuntimeCallInfo* runtimeCallInfo);
 
 private:
     static void ParseCustomContentTransition(

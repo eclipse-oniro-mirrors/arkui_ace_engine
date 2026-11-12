@@ -296,7 +296,7 @@ void TabsBridge::RegisterTabsAttributes(panda::Local<panda::ObjectRef> object, p
         "resetTabMinContentWidth", "setTabSidebarBackgroundColor", "resetTabSidebarBackgroundColor",
         "setTabSidebarBackgroundBlurStyle", "resetTabSidebarBackgroundBlurStyle", "setTabSidebarDivider",
         "resetTabSidebarDivider", "setSidebarFooter", "resetSidebarFooter",
-        "setSidebarBottomBar", "resetSidebarBottomBar"
+        "setSidebarBottomBar", "resetSidebarBottomBar", "markUserSetSafeAreaOpts",
     };
     Local<JSValueRef> functionValues[] = {
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::Create),
@@ -429,6 +429,7 @@ void TabsBridge::RegisterTabsAttributes(panda::Local<panda::ObjectRef> object, p
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::ResetSidebarFooter),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::SetSidebarBottomBar),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::ResetSidebarBottomBar),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::MarkUserSetSafeAreaOpts),
     };
     auto tabs = panda::ObjectRef::NewWithNamedProperties(vm, ArraySize(functionNames), functionNames, functionValues);
     object->Set(vm, panda::StringRef::NewFromUtf8(vm, "tabs"), tabs);
@@ -3953,6 +3954,17 @@ ArkUINativeModuleValue TabsBridge::ResetTabSidebarDivider(ArkUIRuntimeCallInfo* 
     CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
     auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
     GetArkUINodeModifiers()->getTabsModifier()->resetSidebarDivider(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue TabsBridge::MarkUserSetSafeAreaOpts(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(TABS_ARG_INDEX_0);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    GetArkUINodeModifiers()->getTabsModifier()->markUserSetSafeAreaOpts(nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }
 } // namespace OHOS::Ace::NG

@@ -229,6 +229,7 @@ public:
     static void SetSidebarBackgroundBlurStyle(FrameNode* frameNode, const std::optional<BlurStyle>& blurStyle);
     static void SetSidebarDivider(FrameNode* frameNode, const TabsItemDivider& divider);
     static void SetSidebarDividerColorByUser(FrameNode* frameNode, bool isByUser);
+    static void MarkUserSetSafeAreaOpts(FrameNode* frameNode);
     static void CreateWithResourceObj(
         FrameNode* frameNode, TabJsResType colorType, const RefPtr<ResourceObject>& resObj);
     static void CreateWithSidebarResourceObj(

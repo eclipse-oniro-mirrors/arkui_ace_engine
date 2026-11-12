@@ -330,6 +330,11 @@ function loadComponent(): ComponentObj | undefined {
         modifierWithKey(this._modifiersWithKeys, TabSidebarDividerModifier.identity, TabSidebarDividerModifier, value);
         return this;
       }
+      expandSafeArea(types?: Array<SafeAreaType>, edges?: Array<SafeAreaEdge>): TabsAttribute {
+        super.expandSafeArea(types, edges);
+        getUINativeModule().tabs.markUserSetSafeAreaOpts(this.nativePtr);
+        return this;
+      }
     }
 
     class TabBarFloatingStyleModifier extends ModifierWithKey<barFloatingStyleOptions> {
@@ -1709,6 +1714,11 @@ class JSTabs extends JSContainerBase {
 
   static sidebarDivider(value: any): void {
     getUINativeModule().tabs.setTabSidebarDivider(true, value);
+  }
+
+  static expandSafeArea(types?: Array<SafeAreaType>, edges?: Array<SafeAreaEdge>): void {
+    JSViewAbstract.expandSafeArea(types, edges);
+    getUINativeModule().tabs.markUserSetSafeAreaOpts(true);
   }
 
   static attributeModifier(modifier: any): void {

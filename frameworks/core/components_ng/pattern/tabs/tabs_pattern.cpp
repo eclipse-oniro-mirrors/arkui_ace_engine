@@ -664,14 +664,15 @@ void TabsPattern::SetCurrentBarDisplayMode(TabBarDisplayMode mode)
     currentBarDisplayMode_ = mode;
     auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
     CHECK_NULL_VOID(tabsNode);
-    // Adjust safe-area expansion on the host based on the actual
-    // display mode. Only SIDEBAR mode needs expansion into
-    // both top (status bar) and bottom (navigation bar) safe areas so that
-    // sidebar children (divider, header/bottom bar, mask nodes) can render
-    // into the safe areas — consistent with Navigation.
+    // Adjust safe-area expansion on the host based on the actual display mode.
+    // Only SIDEBAR mode needs expansion into both top (status bar) and bottom
+    // (navigation bar) safe areas so that sidebar children (divider, header/bottom
+    // bar, mask nodes) can render into the safe areas — consistent with Navigation.
     // BOTTOMTABBAR restores the bottom-only defaults from OnAttachToFrameNode.
+    // If the developer has explicitly set expandSafeArea, do NOT overwrite their
+    // value — defer to the developer's setting.
     auto property = tabsNode->GetLayoutProperty();
-    if (property) {
+    if (property && !isUserSetSafeAreaOpts_) {
         if (mode == TabBarDisplayMode::SIDEBAR) {
             property->UpdateSafeAreaExpandOpts(
                 { .type = SAFE_AREA_TYPE_SYSTEM, .edges = SAFE_AREA_EDGE_TOP + SAFE_AREA_EDGE_BOTTOM });
