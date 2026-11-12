@@ -2548,6 +2548,37 @@ HWTEST_F(CalendarDialogPatternTestNg, CalendarDialogPattern_ModifyDone_ArrowSyst
 }
 
 /**
+ * @tc.name: CalendarDialogPattern_UpdateImage_HasFillColor_001
+ * @tc.desc: UpdateImage must set fillColor from theme on ImageSourceInfo to prevent
+ *           SVG double-load memory degradation during OnModifyDone.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarDialogPatternTestNg, CalendarDialogPattern_UpdateImage_HasFillColor_001, TestSize.Level1)
+{
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    auto tree = BuildModifyDoneTestTree(AceType::RawPtr(pipeline),
+        static_cast<int32_t>(PlatformVersion::VERSION_TWENTY_SIX));
+    ASSERT_NE(tree.dialogNode, nullptr);
+    ASSERT_NE(tree.pattern, nullptr);
+    ASSERT_NE(tree.titleNode, nullptr);
+    ASSERT_NE(tree.lastYearArrowImageLayout, nullptr);
+
+    auto lastYearButton = AceType::DynamicCast<FrameNode>(tree.titleNode->GetChildAtIndex(0));
+    ASSERT_NE(lastYearButton, nullptr);
+
+    tree.pattern->UpdateImage(lastYearButton,
+        InternalResource::ResourceId::IC_PUBLIC_DOUBLE_ARROW_LEFT_SVG);
+
+    auto imageInfo = tree.lastYearArrowImageLayout->GetImageSourceInfo();
+    ASSERT_TRUE(imageInfo.has_value());
+    auto theme = tree.dialogNode->GetTheme<CalendarTheme>(true);
+    ASSERT_NE(theme, nullptr);
+    EXPECT_TRUE(imageInfo->GetFillColor().has_value());
+    EXPECT_EQ(imageInfo->GetFillColor(), theme->GetEntryArrowColor());
+}
+
+/**
  * @tc.name: CalendarDialogPatternTest040
  * @tc.desc: HandleTabKeyEvent with <=1 children should return false to avoid divide-by-zero
  * @tc.type: FUNC
