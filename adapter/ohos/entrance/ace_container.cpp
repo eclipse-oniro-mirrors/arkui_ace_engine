@@ -1932,13 +1932,11 @@ public:
         auto viewDataWrap = ViewDataWrap::CreateViewDataWrap(viewData);
         CHECK_NULL_VOID(viewDataWrap);
         if (!isNative_) {
-            auto node = node_.Upgrade();
-            CHECK_NULL_VOID(node);
             taskExecutor->PostTask(
-                [viewDataWrap, node, autoFillType = autoFillType_, triggerType = triggerType_]() {
-                    if (node) {
-                        node->NotifyFillRequestSuccess(viewDataWrap, nullptr, autoFillType, triggerType);
-                    }
+                [viewDataWrap, weakNode = node_, autoFillType = autoFillType_, triggerType = triggerType_]() {
+                    auto node = weakNode.Upgrade();
+                    CHECK_NULL_VOID(node);
+                    node->NotifyFillRequestSuccess(viewDataWrap, nullptr, autoFillType, triggerType);
                 },
                 TaskExecutor::TaskType::UI, "ArkUINotifyWebFillRequestSuccess");
             return;
@@ -1949,7 +1947,10 @@ public:
             return;
         }
         taskExecutor->PostTask(
-            [viewDataWrap, pipelineContext, autoFillType = autoFillType_, triggerType = triggerType_, node]() {
+            [viewDataWrap, pipelineContext, autoFillType = autoFillType_, triggerType = triggerType_,
+                weakNode = node_]() {
+                auto node = weakNode.Upgrade();
+                CHECK_NULL_VOID(node);
                 if (pipelineContext) {
                     pipelineContext->NotifyFillRequestSuccess(autoFillType, viewDataWrap, triggerType, node);
                 }
@@ -1968,7 +1969,9 @@ public:
         auto taskExecutor = pipelineContext->GetTaskExecutor();
         CHECK_NULL_VOID(taskExecutor);
         taskExecutor->PostTask(
-            [errCode, pipelineContext, node, fillContent, isPopup]() {
+            [errCode, pipelineContext, weakNode = node_, fillContent, isPopup]() {
+                auto node = weakNode.Upgrade();
+                CHECK_NULL_VOID(node);
                 if (pipelineContext) {
                     pipelineContext->NotifyFillRequestFailed(node, errCode, fillContent, isPopup);
                 }
