@@ -798,6 +798,16 @@ private:
     WeakPtr<PipelineBase> context_;
 };
 
+typedef struct SecurityHitTestInfoTag {
+    int32_t id;
+    double x;
+    double y;
+    bool from_overlay;
+    int32_t callingUid;
+    uint64_t sessionId;
+    std::string response;
+}SecurityHitTestInfo;
+
 class GestureEventResultOhos : public GestureEventResult {
     DECLARE_ACE_TYPE(GestureEventResultOhos, GestureEventResult);
 
@@ -1571,6 +1581,8 @@ public:
     bool OnNestedScroll(float& x, float& y, float& xVelocity, float& yVelocity, bool& isAvailable);
     bool OnNestedScrollV2(float& x, float& y);
     bool OnNestedFling(float& xVelocity, float& yVelocity);
+    void GetElementInfoForSecurityHitTest(SecurityHitTestInfo& secInfo);
+    void OnTouchForSecurityHitTest(std::shared_ptr<SecurityHitTestInfo> state);
 #if defined(ENABLE_ROSEN_BACKEND)
     void SetSurface(const sptr<Surface>& surface);
     void SetPopupSurface(const RefPtr<NG::RenderSurface>& popupSurface);

@@ -37,6 +37,16 @@ const std::string STATUS_FALSE = "false";
 static bool g_serializeWebStateConfigurable = false;
 static std::vector<uint8_t> g_serializeWebStateResult;
 static bool g_restoreWebStateResult = false;
+// Recording for WebDelegate::GetElementInfoForSecurityHitTest so tests can verify the values the
+// WebPattern passed to the delegate. Empty/not-recorded by default.
+static bool g_securityHitTestInfoRecorded = false;
+static int32_t g_securityHitTestId = 0;
+static double g_securityHitTestX = 0.0;
+static double g_securityHitTestY = 0.0;
+static bool g_securityHitTestFromOverlay = false;
+static int32_t g_securityHitTestCallingUid = -1;
+static uint64_t g_securityHitTestSessionId = 0;
+static std::string g_securityHitTestResponse = "";
 std::shared_ptr<NWeb::NWebAccessibilityNodeInfo> g_customAccessibilityNode = nullptr;
 std::shared_ptr<NWeb::NWebAgentManager> g_nwebAgentManager = nullptr;
 // Mock state for WebDelegate::RequestNativeDomTree.
@@ -769,6 +779,18 @@ void WebDelegate::OnOnlineRenderToForeground() {}
 void WebDelegate::SetShouldFrameSubmissionBeforeDraw(bool should) {}
 void WebDelegate::NotifyMemoryLevel(int32_t level) {}
 void WebDelegate::SetIsOfflineWebComponent() {}
+void WebDelegate::GetElementInfoForSecurityHitTest(SecurityHitTestInfo& secInfo)
+{
+    g_securityHitTestInfoRecorded = true;
+    g_securityHitTestId = secInfo.id;
+    g_securityHitTestX = secInfo.x;
+    g_securityHitTestY = secInfo.y;
+    g_securityHitTestFromOverlay = secInfo.from_overlay;
+    g_securityHitTestCallingUid = secInfo.callingUid;
+    g_securityHitTestSessionId = secInfo.sessionId;
+    g_securityHitTestResponse = secInfo.response;
+}
+void WebDelegate::OnTouchForSecurityHitTest(std::shared_ptr<SecurityHitTestInfo> state) {}
 void WebDelegate::SetAudioMuted(bool muted) {}
 void WebDelegate::Zoom(float factor) {}
 bool WebDelegate::ZoomIn()
@@ -1487,6 +1509,32 @@ void SetMockRestoreWebState(bool result)
 void ResetMockRestoreWebState()
 {
     g_restoreWebStateResult = false;
+}
+void ResetMockSecurityHitTestInfo()
+{
+    g_securityHitTestInfoRecorded = false;
+    g_securityHitTestId = 0;
+    g_securityHitTestX = 0.0;
+    g_securityHitTestY = 0.0;
+    g_securityHitTestFromOverlay = false;
+    g_securityHitTestCallingUid = -1;
+    g_securityHitTestSessionId = 0;
+    g_securityHitTestResponse = "";
+}
+bool GetRecordedSecurityHitTestInfo(int32_t& id, double& x, double& y, bool& fromOverlay,
+    int32_t& callingUid, uint64_t& sessionId, std::string& response)
+{
+    if (!g_securityHitTestInfoRecorded) {
+        return false;
+    }
+    id = g_securityHitTestId;
+    x = g_securityHitTestX;
+    y = g_securityHitTestY;
+    fromOverlay = g_securityHitTestFromOverlay;
+    callingUid = g_securityHitTestCallingUid;
+    sessionId = g_securityHitTestSessionId;
+    response = g_securityHitTestResponse;
+    return true;
 }
 void SetMockRequestNativeDomTreeCallback(std::function<void(const NG::OffsetF&, const std::string&)> cb)
 {
