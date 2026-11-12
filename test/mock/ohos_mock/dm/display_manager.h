@@ -18,6 +18,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <string>
 #include <vector>
 
 #include "refbase.h"
@@ -63,7 +64,7 @@ public:
 
 class DisplayManager {
 public:
-class IDisplayListener : public RefBase {
+    class IDisplayListener : public RefBase {
     public:
         virtual ~IDisplayListener() = default;
         virtual void OnCreate(DisplayId displayId) = 0;
@@ -71,7 +72,7 @@ class IDisplayListener : public RefBase {
         virtual void OnChange(DisplayId displayId) = 0;
     };
 
-class IDisplayAttributeListener : public RefBase {
+    class IDisplayAttributeListener : public RefBase {
     public:
         virtual ~IDisplayAttributeListener() = default;
         virtual void OnAttributeChange(DisplayId displayId, const std::vector<std::string>& attributes) = 0;
