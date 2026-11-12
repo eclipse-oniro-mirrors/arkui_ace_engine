@@ -568,10 +568,6 @@ class RecoverableStorageImpl extends StorageHelper {
     };
 }
 
-// Public facade lives in engine/jsStateManagement.js (same pattern as AppStorageV2 /
-// PersistenceV2): the engine module wraps RecoverableStorageImpl.instance() and is the
-// binding target of `import { RecoverableStorage } from '@ohos.arkui.StateManagement'`.
-
 // Exact UTF-8 byte length of a JS string (ASCII-identical, surrogate-aware).
 // Used by the snapshot byte budget (INV-3); no reliance on platform encoders.
 function rsUtf8ByteLength(s: string): number {
