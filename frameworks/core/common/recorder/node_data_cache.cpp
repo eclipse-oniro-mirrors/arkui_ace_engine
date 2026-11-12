@@ -71,12 +71,14 @@ NodeDataCache::NodeDataCache()
 
 void NodeDataCache::OnPageReady()
 {
+    std::unique_lock<std::shared_mutex> pageLock(pageUrlMutex_);
     prePageUrl_ = pageUrl_;
     pageUrl_ = GetCurrentPageUrl();
 }
 
 void NodeDataCache::OnPageShow(const std::string& pageUrl)
 {
+    std::unique_lock<std::shared_mutex> pageLock(pageUrlMutex_);
     prePageUrl_ = pageUrl_;
     pageUrl_ = pageUrl;
 }
@@ -84,11 +86,12 @@ void NodeDataCache::OnPageShow(const std::string& pageUrl)
 void NodeDataCache::OnBeforePagePop(bool destroy)
 {
     std::unique_lock<std::shared_mutex> configLock(configMutex_);
-    if (destroy) {
-        Clear(prePageUrl_);
-    } else {
-        Clear(pageUrl_);
+    std::string pageUrl;
+    {
+        std::shared_lock<std::shared_mutex> pageLock(pageUrlMutex_);
+        pageUrl = destroy ? prePageUrl_ : pageUrl_;
     }
+    Clear(pageUrl);
     shouldCollectFull_ = false;
 }
 
@@ -219,6 +222,7 @@ void NodeDataCache::Reset()
 {
     std::unique_lock<std::shared_mutex> lock(cacheMutex_);
     container_->clear();
+    std::unique_lock<std::shared_mutex> pageLock(pageUrlMutex_);
     pageUrl_ = "";
     prePageUrl_ = "";
 }
