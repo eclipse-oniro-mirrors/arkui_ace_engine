@@ -105,6 +105,7 @@
 #include "core/components_ng/manager/privacy_sensitive/privacy_sensitive_manager.h"
 #include "core/components_ng/pattern/corner_mark/corner_mark.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
+#include "core/components_ng/pattern/overlay/overlay_container_pattern.h"
 #include "core/components_ng/pattern/page_translate/page_translate_node.h"
 #include "core/components_ng/pattern/stage/page_pattern.h"
 #include "core/components_ng/property/accessibility_property.h"
@@ -8428,7 +8429,8 @@ const CacheVisibleRectResult& FrameNode::GetCacheVisibleRect(uint64_t timestamp,
 {
     RefPtr<FrameNode> parentUi = GetCoordinateAncestorNodeOfFrame(true);
     auto rectToParent = GetPaintRectWithTransform();
-    if (!renderContext_->HasRenderNode()) {
+    auto overlayContainerPattern = AceType::DynamicCast<OverlayContainerPattern>(pattern_);
+    if (overlayContainerPattern && !renderContext_->HasRenderNode()) {
         rectToParent = renderContext_->GetPaintRectWithoutTransform();
     }
     auto scale = GetTransformScale();

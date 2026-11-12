@@ -16,6 +16,7 @@
 #include "test/unittest/core/base/frame_node_test_ng.h"
 
 #include "core/common/recorder/exposure_processor.h"
+#include "core/components_ng/pattern/overlay/overlay_container_pattern.h"
 #include "core/event/touch_event.h"
 
 using namespace testing;
@@ -438,18 +439,20 @@ HWTEST_F(FrameNodeTestNg, GetGlobalPositionOnDisplay001, TestSize.Level1)
 
 /**
  * @tc.name: GetCacheVisibleRectTest002
- * @tc.desc: Test GetCacheVisibleRect falls back to GetPaintRectWithoutTransform when rsNode_ is null.
+ * @tc.desc: Test GetCacheVisibleRect falls back to GetPaintRectWithoutTransform when rsNode_ is null
+ *           and the node pattern is OverlayContainerPattern.
  * @tc.type: FUNC
  */
 HWTEST_F(FrameNodeTestNg, GetCacheVisibleRectTest002, TestSize.Level1)
 {
     /**
-     * @tc.steps: step1. create frameNode whose render context has no render node (rsNode_ null).
+     * @tc.steps: step1. create frameNode whose render context has no render node (rsNode_ null)
+     *           and whose pattern is OverlayContainerPattern.
      * @tc.steps:    GetPaintRectWithTransform returns empty as RosenRenderContext does when rsNode_ is null,
      * @tc.steps:    GetPaintRectWithoutTransform returns the layout paintRect_.
      */
     RectF paintRect(10.0f, 20.0f, 100.0f, 50.0f);
-    auto frameNode = FrameNode::CreateFrameNode("test", 1, AceType::MakeRefPtr<Pattern>(), true);
+    auto frameNode = FrameNode::CreateFrameNode("test", 1, AceType::MakeRefPtr<OverlayContainerPattern>(), true);
     frameNode->renderContext_ =
         AceType::MakeRefPtr<MockRsNodeStateRenderContext>(false, RectF(), paintRect);
     /**
@@ -479,6 +482,34 @@ HWTEST_F(FrameNodeTestNg, GetCacheVisibleRectTest003, TestSize.Level1)
     auto frameNode = FrameNode::CreateFrameNode("test", 2, AceType::MakeRefPtr<Pattern>(), true);
     frameNode->renderContext_ =
         AceType::MakeRefPtr<MockRsNodeStateRenderContext>(true, withTransformRect, withoutTransformRect);
+    /**
+     * @tc.steps: step2. call GetCacheVisibleRect.
+     * @tc.expected: visibleRect equals GetPaintRectWithTransform, fallback not triggered.
+     */
+    auto result = frameNode->GetCacheVisibleRect(0, false);
+    EXPECT_EQ(result.visibleRect, withTransformRect);
+    EXPECT_NE(result.visibleRect, withoutTransformRect);
+}
+
+/**
+ * @tc.name: GetCacheVisibleRectTest004
+ * @tc.desc: Test GetCacheVisibleRect does not fall back to GetPaintRectWithoutTransform when rsNode_ is null
+ *           but the node pattern is not OverlayContainerPattern.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeTestNg, GetCacheVisibleRectTest004, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. create frameNode whose render context has no render node (rsNode_ null)
+     *           and whose pattern is the base Pattern (not OverlayContainerPattern).
+     * @tc.steps:    GetPaintRectWithTransform returns a transformed rect,
+     * @tc.steps:    GetPaintRectWithoutTransform returns a different layout rect.
+     */
+    RectF withTransformRect(5.0f, 6.0f, 80.0f, 40.0f);
+    RectF withoutTransformRect(10.0f, 20.0f, 100.0f, 50.0f);
+    auto frameNode = FrameNode::CreateFrameNode("test", 3, AceType::MakeRefPtr<Pattern>(), true);
+    frameNode->renderContext_ =
+        AceType::MakeRefPtr<MockRsNodeStateRenderContext>(false, withTransformRect, withoutTransformRect);
     /**
      * @tc.steps: step2. call GetCacheVisibleRect.
      * @tc.expected: visibleRect equals GetPaintRectWithTransform, fallback not triggered.
