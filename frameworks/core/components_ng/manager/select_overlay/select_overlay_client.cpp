@@ -252,7 +252,7 @@ void SelectOverlayClient::StartListeningScrollableParent(const RefPtr<FrameNode>
     auto context = host->GetContext();
     CHECK_NULL_VOID(context);
     if (scrollableParentInfo_.parentIds.empty()) {
-        auto parent = host->GetParent();
+        auto parent = host->GetParent(true);
         while (parent && parent->GetTag() != V2::PAGE_ETS_TAG) {
             auto parentNode = AceType::DynamicCast<FrameNode>(parent);
             if (parentNode) {
@@ -262,7 +262,7 @@ void SelectOverlayClient::StartListeningScrollableParent(const RefPtr<FrameNode>
                     RegisterParentScrollCallback(parentNode->GetId(), host->GetId());
                 }
             }
-            parent = parent->GetParent();
+            parent = parent->GetParent(true);
         }
         scrollableParentInfo_.hasParent = !scrollableParentInfo_.parentIds.empty();
         TAG_LOGI(AceLogTag::ACE_SELECT_OVERLAY, "find scrollable parent %{public}d", scrollableParentInfo_.hasParent);

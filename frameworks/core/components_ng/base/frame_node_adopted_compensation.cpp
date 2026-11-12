@@ -24,6 +24,7 @@
 #include "base/utils/utils.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/frame_node_adopted_render_adapter.h"
+#include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -78,6 +79,17 @@ bool IsUnsupportedTransform(const Matrix4& matrix, bool checkScale)
     }
     return false;
 }
+
+bool HasNonTranslationChange(const Matrix4& oldTransform, const Matrix4& newTransform)
+{
+    auto oldNonTranslation = oldTransform;
+    auto newNonTranslation = newTransform;
+    oldNonTranslation.Set(TRANSLATION_X_ROW, TRANSLATION_COLUMN, 0.0);
+    oldNonTranslation.Set(TRANSLATION_Y_ROW, TRANSLATION_COLUMN, 0.0);
+    newNonTranslation.Set(TRANSLATION_X_ROW, TRANSLATION_COLUMN, 0.0);
+    newNonTranslation.Set(TRANSLATION_Y_ROW, TRANSLATION_COLUMN, 0.0);
+    return !(oldNonTranslation == newNonTranslation);
+}
 } // namespace
 
 bool FrameNodeAdoptedCompensation::UseAdoptedCompensation(const FrameNode* frameNode)
@@ -118,8 +130,26 @@ void FrameNodeAdoptedCompensation::SetAdoptedCompensation(
     if (!compensationInfo) {
         compensationInfo = std::make_unique<FrameNode::AdoptedCompensationInfo>();
     }
+    const auto offsetChanged = !(compensationInfo->offset == offset);
+    const auto transformChanged = !(compensationInfo->transform == transform);
+    if (!offsetChanged && !transformChanged) {
+        return;
+    }
+    const auto nonTranslationChanged =
+        transformChanged && HasNonTranslationChange(compensationInfo->transform, transform);
     compensationInfo->offset = offset;
     compensationInfo->transform = transform;
+    if (!HasAdoptedCompensation(frameNode)) {
+        return;
+    }
+
+    frameNode->AddFrameNodeChangeInfoFlag(FRAME_NODE_CHANGE_GEOMETRY_CHANGE);
+    if (nonTranslationChanged) {
+        frameNode->AddFrameNodeChangeInfoFlag(FRAME_NODE_CHANGE_TRANSFORM_CHANGE);
+    }
+    auto pipeline = frameNode->GetContext();
+    CHECK_NULL_VOID(pipeline);
+    pipeline->RequestFrame();
 }
 
 OffsetF FrameNodeAdoptedCompensation::GetAdoptedCompensationOffset(const FrameNode* frameNode)

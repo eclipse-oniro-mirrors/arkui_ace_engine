@@ -4264,6 +4264,46 @@ HWTEST_F(FrameNodeTestNg, FrameNodeAdoptedCompensation005, TestSize.Level1)
 }
 
 /**
+ * @tc.name: FrameNodeAdoptedCompensation007
+ * @tc.desc: Test compensation changes publish the frame-node flags required to refresh overlays.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeTestNg, FrameNodeAdoptedCompensation007, TestSize.Level1)
+{
+    auto parent = FrameNode::CreateFrameNode(
+        "adoptParent", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    auto child = FrameNode::CreateFrameNode(
+        "adoptedChild", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(parent, nullptr);
+    ASSERT_NE(child, nullptr);
+    parent->AdoptChild(child);
+    FrameNodeAdoptedCompensation::SetUseAdoptedCompensation(child.GetRawPtr(), true);
+
+    auto translation = Matrix4::CreateTranslate(10.0, 20.0, 0.0);
+    FrameNodeAdoptedCompensation::SetAdoptedCompensation(
+        child.GetRawPtr(), OffsetF(10.0f, 20.0f), translation);
+    EXPECT_EQ(child->GetChangeInfoFlag(), FRAME_NODE_CHANGE_GEOMETRY_CHANGE);
+
+    child->ClearChangeInfoFlag();
+    FrameNodeAdoptedCompensation::SetAdoptedCompensation(
+        child.GetRawPtr(), OffsetF(10.0f, 20.0f), translation);
+    EXPECT_EQ(child->GetChangeInfoFlag(), FRAME_NODE_CHANGE_INFO_NONE);
+
+    child->ClearChangeInfoFlag();
+    auto updatedTranslation = Matrix4::CreateTranslate(10.0, 21.0, 0.0);
+    FrameNodeAdoptedCompensation::SetAdoptedCompensation(
+        child.GetRawPtr(), OffsetF(10.0f, 21.0f), updatedTranslation);
+    EXPECT_EQ(child->GetChangeInfoFlag(), FRAME_NODE_CHANGE_GEOMETRY_CHANGE);
+
+    child->ClearChangeInfoFlag();
+    auto scale = translation * Matrix4::CreateScale(2.0, 3.0, 1.0);
+    FrameNodeAdoptedCompensation::SetAdoptedCompensation(
+        child.GetRawPtr(), OffsetF(10.0f, 20.0f), scale);
+    EXPECT_EQ(child->GetChangeInfoFlag(),
+        FRAME_NODE_CHANGE_GEOMETRY_CHANGE | FRAME_NODE_CHANGE_TRANSFORM_CHANGE);
+}
+
+/**
  * @tc.name: FrameNodeAdoptedCompensation006
  * @tc.desc: Test geometry helpers are no-ops without active adopted compensation and scale has a safe fallback.
  * @tc.type: FUNC
