@@ -2019,7 +2019,12 @@ std::pair<double, double> ScrollablePattern::GetAutoAdjustAvoidOffset()
         std::swap(result.first, result.second);
     }
     CalcPaddingAvoidDistByMainAxis(layoutProperty->GetPaddingProperty(), result, isRtl);
-    CalcPaddingAvoidDistByMainAxis(layoutProperty->GetSafeAreaPaddingProperty(), result, isRtl);
+    if (layoutProperty->HasSafeAreaInset()) {
+        CalcEffectiveSafeAreaAvoidDistByMainAxis(
+            layoutProperty->GetOrCreateSafeAreaPadding(), result);
+    } else {
+        CalcPaddingAvoidDistByMainAxis(layoutProperty->GetSafeAreaPaddingProperty(), result, isRtl);
+    }
     CalcBorderWidthAvoidDistByMainAxis(layoutProperty->GetBorderWidthProperty(), result, isRtl);
     return result;
 }
@@ -2044,6 +2049,18 @@ void ScrollablePattern::CalcPaddingAvoidDistByMainAxis(
     } else {
         offset.first += property->top.value_or(CalcLength()).GetDimension().ConvertToPx();
         offset.second += property->bottom.value_or(CalcLength()).GetDimension().ConvertToPx();
+    }
+}
+
+void ScrollablePattern::CalcEffectiveSafeAreaAvoidDistByMainAxis(
+    const PaddingPropertyF& effectiveSafeAreaPadding, std::pair<double, double>& offset)
+{
+    if (axis_ == Axis::HORIZONTAL) {
+        offset.first += effectiveSafeAreaPadding.left.value_or(0.0f);
+        offset.second += effectiveSafeAreaPadding.right.value_or(0.0f);
+    } else {
+        offset.first += effectiveSafeAreaPadding.top.value_or(0.0f);
+        offset.second += effectiveSafeAreaPadding.bottom.value_or(0.0f);
     }
 }
 
