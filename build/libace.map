@@ -1918,6 +1918,7 @@
       "OHOS::Ace::NG::ScrollPattern::TriggerScrollBarDisplay()";
       "OHOS::Ace::NG::TextPattern::GetContentModifier()";
       "OHOS::Ace::NG::ScrollPattern::TriggerModifyDone()";
+      "OHOS::Ace::NG::ScrollPattern::UpdateAnimateOverScroll(int, bool, bool)";
       "OHOS::Ace::NG::ScrollPlaceholderManager::NotifyRealBuildEnd(OHOS::Ace::NG::ScrollPlaceholderPredictParams const&, long long)";
       "OHOS::Ace::NG::ScrollPlaceholderManager::NotifyRealBuildEnd(OHOS::Ace::NG::ScrollPlaceholderPredictParams const&, long)";
       "OHOS::Ace::NG::ScrollPlaceholderManager::NotifyRealBuildStart(OHOS::Ace::NG::ScrollPlaceholderPredictParams const&)";
@@ -2394,6 +2395,7 @@
       "OHOS::Ace::NG::ScrollablePattern::StopScrollableAndAnimate()";
       "OHOS::Ace::NG::ScrollablePattern::SuggestOpIncGroup(bool)";
       "OHOS::Ace::NG::ScrollablePattern::ToJsonValue(std::__h::unique_ptr<OHOS::Ace::JsonValue, std::__h::default_delete<OHOS::Ace::JsonValue>>&, OHOS::Ace::NG::InspectorFilter const&) const";
+      "OHOS::Ace::NG::ScrollablePattern::UpdateAnimateOverScroll(int, bool, bool)";
       "OHOS::Ace::NG::ScrollablePattern::UpdateFadingEdge(OHOS::Ace::RefPtr<OHOS::Ace::NG::ScrollablePaintMethod> const&)";
       "OHOS::Ace::NG::ScrollablePattern::UpdateScrollBarRegion(float, float, OHOS::Ace::Size, OHOS::Ace::Offset)";
       "OHOS::Ace::NG::ScrollablePattern::GetGestureHub()";

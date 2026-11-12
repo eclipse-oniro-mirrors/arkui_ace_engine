@@ -835,6 +835,14 @@ bool ScrollPattern::UpdateCurrentOffset(float delta, int32_t source)
     return true;
 }
 
+void ScrollPattern::UpdateAnimateOverScroll(int32_t source, bool isAtTop, bool isAtBottom)
+{
+    animateOverScrollStart_ =
+        (source == SCROLL_FROM_ANIMATION_CONTROLLER) && isAtTop && !NearZero(currentOffset_);
+    animateOverScrollEnd_ = (source == SCROLL_FROM_ANIMATION_CONTROLLER) && isAtBottom &&
+                            !NearEqual(currentOffset_, -scrollableDistance_);
+}
+
 void ScrollPattern::OnAnimateStop()
 {
     if (!GetIsDragging() || GetScrollAbort()) {
