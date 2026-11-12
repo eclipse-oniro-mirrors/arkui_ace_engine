@@ -177,6 +177,32 @@ public:
         return dialogSupportSplit_;
     }
 
+    void SetLastTouchedColumnType(ForceSplitPageColumnType columnType)
+    {
+        lastTouchedColumnType_ = columnType;
+    }
+
+    ForceSplitPageColumnType GetLastTouchedColumnType() const
+    {
+        return lastTouchedColumnType_;
+    }
+
+    // Marks that a Navigation-internal split already recorded the fine-grained touched column for the
+    // current touch. The Navigation hit-test listener fires before the page-level touch callback in the
+    // same dispatch round; the page callback consumes this flag and skips its coarse whole-page record,
+    // otherwise it would overwrite the Navigation column with the page-level one.
+    void MarkNavigationColumnRecorded()
+    {
+        navigationColumnRecorded_ = true;
+    }
+
+    bool ConsumeNavigationColumnRecorded()
+    {
+        bool recorded = navigationColumnRecorded_;
+        navigationColumnRecorded_ = false;
+        return recorded;
+    }
+
     void SetWideSplitRatio(const std::optional<float> ratio)
     {
         wideSplitRatio_ = ratio;
@@ -280,6 +306,8 @@ private:
     bool isForceSplitEnable_ = false;
     bool isRouter_ = false;
     bool dialogSupportSplit_ = true;
+    ForceSplitPageColumnType lastTouchedColumnType_ = ForceSplitPageColumnType::NONE;
+    bool navigationColumnRecorded_ = false;
     std::unordered_set<std::string> fullScreenPages_;
     std::string homePageName_;
     std::string relatedPageName_;

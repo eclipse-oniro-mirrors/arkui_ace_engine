@@ -80,6 +80,14 @@ private:
     OffsetF ComputeChildPosition(
         const SizeF& childSize, const RefPtr<DialogLayoutProperty>& prop, const SizeF& slefSize,
         const RefPtr<DialogPattern>& dialogPattern);
+    // Guard-clause helpers for ComputeChildPosition: each one checks its own preconditions
+    // (force split mode, handedness) with early returns so the main function stays flat.
+    void NarrowConstraintToSplitColumn(const RefPtr<PipelineContext>& pipelineContext,
+        const RefPtr<DialogLayoutProperty>& prop, std::optional<LayoutConstraintF>& layoutConstraint);
+    void ComputeTopLeftPoint(OffsetF& topLeftPoint, const SizeF& childSize, SizeF maxSize,
+        const RefPtr<DialogLayoutProperty>& prop, const RefPtr<DialogPattern>& dialogPattern);
+    void ShiftTopLeftToSplitColumn(OffsetF& topLeftPoint, const RefPtr<PipelineContext>& pipelineContext,
+        const RefPtr<DialogLayoutProperty>& prop);
     bool SetAlignmentSwitch(SizeF& maxSize, const SizeF& childSize, OffsetF& topLeftPoint);
     bool SetAlignmentSwitchLessThanAPITwelve(const SizeF& maxSize, const SizeF& childSize, OffsetF& topLeftPoint);
     bool IsAlignmentByWholeScreen();

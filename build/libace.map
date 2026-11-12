@@ -5089,6 +5089,7 @@
       "OHOS::Ace::NG::StageManager::FirePageShow(OHOS::Ace::RefPtr<OHOS::Ace::NG::UINode> const&, OHOS::Ace::PageTransitionType, bool)";
       "OHOS::Ace::NG::StageManager::PerformanceCheck(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, long long, std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>>)";
       "OHOS::Ace::NG::StageManager::PerformanceCheck(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, long, std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>>)";
+      "OHOS::Ace::NG::ParallelStageManager::GetPageColumnType(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&) const";
       "OHOS::Ace::NG::UIExtensionStatic::CreateFrameNode(int, OHOS::Ace::NG::SessionType)";
       "OHOS::Ace::NG::UIExtensionStatic::SetOnDrawReady(OHOS::Ace::NG::FrameNode*, std::__h::function<void ()>&&)";
       "OHOS::Ace::NG::UIExtensionStatic::SetOnError(OHOS::Ace::NG::FrameNode*, std::__h::function<void (int, std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&, std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)>&&)";

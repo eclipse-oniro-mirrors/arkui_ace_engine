@@ -24,6 +24,7 @@
 #include "base/memory/ace_type.h"
 #include "base/memory/referenced.h"
 #include "core/common/autofill/auto_fill_trigger_state_holder.h"
+#include "core/common/force_split/force_split_constants.h"
 #include "core/components/dialog/dialog_properties.h"
 #include "core/components/dialog/dialog_theme.h"
 #include "core/components/common/properties/text_style.h"
@@ -268,6 +269,16 @@ public:
     bool IsUIExtensionSubWindow() const
     {
         return isUIExtensionSubWindow_;
+    }
+
+    std::optional<ForceSplitPageColumnType> GetCachedSplitColumnType() const
+    {
+        return cachedSplitColumnType_;
+    }
+
+    void SetCachedSplitColumnType(ForceSplitPageColumnType columnType)
+    {
+        cachedSplitColumnType_ = columnType;
     }
 
     RectF GetHostWindowRect() const
@@ -620,6 +631,7 @@ private:
     std::function<void()> onWillDisappearCallback_ = nullptr;
     std::unordered_map<DialogContentNode, RefPtr<FrameNode>> contentNodeMap_;
     bool isUIExtensionSubWindow_ = false;
+    std::optional<ForceSplitPageColumnType> cachedSplitColumnType_;
     bool isDialogDisposed_ = false;
     bool refreshOnWindowShow_ = false;
     RectF hostWindowRect_;

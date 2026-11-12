@@ -92,6 +92,13 @@ void ParallelPagePattern::InitOnTouchEvent()
         if (!stageManager->IsSplitMode()) {
             return;
         }
+        auto forceSplitMgr = AceType::DynamicCast<ForceSplitManager>(pipeline->GetForceSplitManager());
+        if (forceSplitMgr && !forceSplitMgr->ConsumeNavigationColumnRecorded()) {
+            auto touchedColumn = stageManager->GetPageColumnType(host);
+            TAG_LOGD(AceLogTag::ACE_ROUTER, "page touched, record column type: %{public}d, pageId: %{public}d",
+                static_cast<int32_t>(touchedColumn), host->GetId());
+            forceSplitMgr->SetLastTouchedColumnType(touchedColumn);
+        }
         if (IsVirtualStackBasedSplit(pipeline)) {
             stageManager->SetTouchedPrimaryColumnPage(
                 stageManager->GetTopPrimaryColumnPage() == host ? host : nullptr);

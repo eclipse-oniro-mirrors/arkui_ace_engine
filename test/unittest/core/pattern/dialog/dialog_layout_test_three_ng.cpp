@@ -31,6 +31,7 @@
 #include "core/components/dialog/dialog_theme.h"
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/layout/layout_wrapper_node.h"
+#include "core/components_ng/manager/force_split/force_split_manager.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 #include "core/components_ng/pattern/dialog/custom_dialog/custom_dialog_controller_model_ng.h"
 #include "core/components_ng/pattern/dialog/dialog_event_hub.h"
@@ -55,6 +56,27 @@ namespace {
 const InspectorFilter filter;
 const std::string SHEET_TITLE = "sheet item";
 const std::string INTERNAL_SOURCE = "$r('app.media.icon')";
+// Force split geometry mirrors ParallelStageLayoutAlgorithm: splittable = root - divider(1.0),
+// secondary = floor(splittable * ratio), primary = splittable - secondary.
+constexpr float SPLIT_RATIO = 0.5f;
+constexpr float SPLIT_DIVIDER_WIDTH = 1.0f;
+constexpr float ROOT_WIDTH = 720.0f;
+constexpr float ROOT_HEIGHT = 1000.0f;
+constexpr float SPLITTABLE_WIDTH = ROOT_WIDTH - SPLIT_DIVIDER_WIDTH; // 719.0f
+constexpr float SECONDARY_WIDTH = 359.0f; // floor(719 * 0.5)
+constexpr float PRIMARY_WIDTH = SPLITTABLE_WIDTH - SECONDARY_WIDTH; // 360.0f
+constexpr float SECONDARY_START_X = PRIMARY_WIDTH + SPLIT_DIVIDER_WIDTH; // 361.0f
+constexpr float SELF_WIDTH = 600.0f;
+constexpr float SELF_HEIGHT = 1000.0f;
+constexpr float CHILD_WIDTH = 200.0f;
+constexpr float CHILD_HEIGHT = 300.0f;
+// Handedness cases (migrated from dialog_layout_test_five_ng.cpp) measure a smaller dialog.
+constexpr float ANCHOR_CHILD_HEIGHT = 100.0f;
+constexpr float KEYBOARD_HEIGHT = 600.0f;
+constexpr float KEYBOARD_TOP = ROOT_HEIGHT - KEYBOARD_HEIGHT; // 400.0f
+constexpr double LANDSCAPE_WIDTH_RATIO = 0.75;
+const Dimension DIMENSION_RADIUS(10.0, DimensionUnit::PX);
+const Dimension DIMENSION_WIDTH(2.0, DimensionUnit::PX);
 } // namespace
 
 class DialogLayoutThreeTestNg : public testing::Test {
@@ -1072,5 +1094,801 @@ HWTEST_F(DialogLayoutThreeTestNg, ComputeInnerLayoutSizeParam008, TestSize.Level
     prop->UpdateWidth(Dimension(50.0, DimensionUnit::PERCENT));
     EXPECT_TRUE(algo.ComputeInnerLayoutSizeParam(innerLayout, prop));
     EXPECT_EQ(innerLayout.maxSize.Width(), 600.0f);
+}
+
+namespace {
+// Returns the host node as the third element: ElementRegister only keeps a weak reference to it,
+// so the returned property's GetHost() resolves only while a RefPtr to the node is alive. Without
+// it the host dies with the helper's local RefPtr, GetDialogPattern(prop) returns null, and the
+// split column resolution never caches its decision on the pattern.
+std::tuple<RefPtr<DialogLayoutProperty>, RefPtr<DialogPattern>, RefPtr<FrameNode>> CreateSplitDialogProp()
+{
+    auto dialogPattern = AceType::MakeRefPtr<DialogPattern>(nullptr, nullptr);
+    auto dialog = FrameNode::CreateFrameNode(
+        V2::DIALOG_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), dialogPattern);
+    if (!dialog) {
+        return { nullptr, nullptr, nullptr };
+    }
+    auto prop = AceType::DynamicCast<DialogLayoutProperty>(dialog->GetLayoutProperty());
+    return { prop, dialogPattern, dialog };
+}
+
+void InitSplitLayoutConstraint(const RefPtr<DialogLayoutProperty>& prop)
+{
+    LayoutConstraintF constraint;
+    constraint.maxSize = SizeF(ROOT_WIDTH, ROOT_HEIGHT);
+    constraint.percentReference = SizeF(ROOT_WIDTH, ROOT_HEIGHT);
+    prop->UpdateLayoutConstraint(constraint);
+}
+
+RefPtr<ForceSplitManager> GetOrCreateForceSplitManager()
+{
+    auto pipeline = MockPipelineContext::GetCurrent();
+    CHECK_NULL_RETURN(pipeline, nullptr);
+    if (!pipeline->GetForceSplitManager()) {
+        pipeline->forceSplitMgr_ = AceType::MakeRefPtr<ForceSplitManager>();
+    }
+    return pipeline->GetForceSplitManager();
+}
+} // namespace
+
+/**
+ * @tc.name: NarrowConstraintToSplitColumnNoHost001
+ * @tc.desc: Test NarrowConstraintToSplitColumn when prop has no host, resolution falls back to NONE
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutThreeTestNg, NarrowConstraintToSplitColumnNoHost001, TestSize.Level1)
+{
+    DialogLayoutAlgorithm algo;
+    algo.needAdaptForceSplitMode_ = true;
+    algo.forceSplitRatio_ = SPLIT_RATIO;
+    auto forceSplitMgr = GetOrCreateForceSplitManager();
+    ASSERT_NE(forceSplitMgr, nullptr);
+    forceSplitMgr->SetLastTouchedColumnType(ForceSplitPageColumnType::SECONDARY);
+    // Standalone property without host: GetDialogPattern returns null, touched column is not consumed.
+    auto prop = AceType::MakeRefPtr<DialogLayoutProperty>();
+    ASSERT_NE(prop, nullptr);
+    std::optional<LayoutConstraintF> layoutConstraint = LayoutConstraintF();
+    layoutConstraint->maxSize = SizeF(ROOT_WIDTH, ROOT_HEIGHT);
+    layoutConstraint->percentReference = SizeF(ROOT_WIDTH, ROOT_HEIGHT);
+    algo.NarrowConstraintToSplitColumn(MockPipelineContext::GetCurrentContext(), prop, layoutConstraint);
+    EXPECT_FLOAT_EQ(layoutConstraint->maxSize.Width(), SECONDARY_WIDTH);
+    EXPECT_FLOAT_EQ(layoutConstraint->percentReference.Width(), SECONDARY_WIDTH);
+}
+
+/**
+ * @tc.name: NarrowConstraintToSplitColumnManagerNull001
+ * @tc.desc: Test NarrowConstraintToSplitColumn when pipeline has no ForceSplitManager
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutThreeTestNg, NarrowConstraintToSplitColumnManagerNull001, TestSize.Level1)
+{
+    DialogLayoutAlgorithm algo;
+    algo.needAdaptForceSplitMode_ = true;
+    algo.forceSplitRatio_ = SPLIT_RATIO;
+    auto [prop, dialogPattern, dialogNode] = CreateSplitDialogProp();
+    ASSERT_NE(prop, nullptr);
+    ASSERT_NE(dialogPattern, nullptr);
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    ASSERT_NE(GetOrCreateForceSplitManager(), nullptr);
+    // Temporarily remove the manager so the resolution path has no touched column record.
+    auto savedManager = pipeline->forceSplitMgr_;
+    pipeline->forceSplitMgr_ = nullptr;
+    std::optional<LayoutConstraintF> layoutConstraint = LayoutConstraintF();
+    layoutConstraint->maxSize = SizeF(ROOT_WIDTH, ROOT_HEIGHT);
+    algo.NarrowConstraintToSplitColumn(MockPipelineContext::GetCurrentContext(), prop, layoutConstraint);
+    pipeline->forceSplitMgr_ = savedManager;
+    // No manager means NONE, which is cached on the pattern by the first resolution.
+    EXPECT_FLOAT_EQ(layoutConstraint->maxSize.Width(), SECONDARY_WIDTH);
+    EXPECT_FLOAT_EQ(layoutConstraint->percentReference.Width(), SECONDARY_WIDTH);
+    EXPECT_TRUE(dialogPattern->GetCachedSplitColumnType().has_value());
+    EXPECT_EQ(dialogPattern->GetCachedSplitColumnType().value(), ForceSplitPageColumnType::NONE);
+}
+
+/**
+ * @tc.name: NarrowConstraintToSplitColumnTouchedPrimary001
+ * @tc.desc: Test NarrowConstraintToSplitColumn with last touched primary column
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutThreeTestNg, NarrowConstraintToSplitColumnTouchedPrimary001, TestSize.Level1)
+{
+    DialogLayoutAlgorithm algo;
+    algo.needAdaptForceSplitMode_ = true;
+    algo.forceSplitRatio_ = SPLIT_RATIO;
+    auto [prop, dialogPattern, dialogNode] = CreateSplitDialogProp();
+    ASSERT_NE(prop, nullptr);
+    ASSERT_NE(dialogPattern, nullptr);
+    auto forceSplitMgr = GetOrCreateForceSplitManager();
+    ASSERT_NE(forceSplitMgr, nullptr);
+    forceSplitMgr->SetLastTouchedColumnType(ForceSplitPageColumnType::PRIMARY);
+    std::optional<LayoutConstraintF> layoutConstraint = LayoutConstraintF();
+    layoutConstraint->maxSize = SizeF(ROOT_WIDTH, ROOT_HEIGHT);
+    algo.NarrowConstraintToSplitColumn(MockPipelineContext::GetCurrentContext(), prop, layoutConstraint);
+    EXPECT_FLOAT_EQ(layoutConstraint->maxSize.Width(), PRIMARY_WIDTH);
+    EXPECT_FLOAT_EQ(layoutConstraint->percentReference.Width(), PRIMARY_WIDTH);
+    EXPECT_EQ(dialogPattern->GetCachedSplitColumnType().value(), ForceSplitPageColumnType::PRIMARY);
+}
+
+/**
+ * @tc.name: NarrowConstraintToSplitColumnCachePriority001
+ * @tc.desc: Test NarrowConstraintToSplitColumn cache wins over last touched primary column
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutThreeTestNg, NarrowConstraintToSplitColumnCachePriority001, TestSize.Level1)
+{
+    DialogLayoutAlgorithm algo;
+    algo.needAdaptForceSplitMode_ = true;
+    algo.forceSplitRatio_ = SPLIT_RATIO;
+    auto [prop, dialogPattern, dialogNode] = CreateSplitDialogProp();
+    ASSERT_NE(prop, nullptr);
+    ASSERT_NE(dialogPattern, nullptr);
+    dialogPattern->SetCachedSplitColumnType(ForceSplitPageColumnType::SECONDARY);
+    auto forceSplitMgr = GetOrCreateForceSplitManager();
+    ASSERT_NE(forceSplitMgr, nullptr);
+    forceSplitMgr->SetLastTouchedColumnType(ForceSplitPageColumnType::PRIMARY);
+    std::optional<LayoutConstraintF> layoutConstraint = LayoutConstraintF();
+    layoutConstraint->maxSize = SizeF(ROOT_WIDTH, ROOT_HEIGHT);
+    algo.NarrowConstraintToSplitColumn(MockPipelineContext::GetCurrentContext(), prop, layoutConstraint);
+    // Cached decision is resolved once per dialog lifecycle and wins over the touched column.
+    EXPECT_FLOAT_EQ(layoutConstraint->maxSize.Width(), SECONDARY_WIDTH);
+    EXPECT_EQ(dialogPattern->GetCachedSplitColumnType().value(), ForceSplitPageColumnType::SECONDARY);
+}
+
+/**
+ * @tc.name: NarrowConstraintToSplitColumnRatioBoundary001
+ * @tc.desc: Test NarrowConstraintToSplitColumn ratio boundary clamps
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutThreeTestNg, NarrowConstraintToSplitColumnRatioBoundary001, TestSize.Level1)
+{
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    auto forceSplitMgr = GetOrCreateForceSplitManager();
+    ASSERT_NE(forceSplitMgr, nullptr);
+    forceSplitMgr->SetLastTouchedColumnType(ForceSplitPageColumnType::NONE);
+    DialogLayoutAlgorithm algo;
+    algo.needAdaptForceSplitMode_ = true;
+    auto [prop, dialogPattern, dialogNode] = CreateSplitDialogProp();
+    ASSERT_NE(prop, nullptr);
+    ASSERT_NE(dialogPattern, nullptr);
+    // ratio 1.0: secondary column covers the whole splittable width.
+    algo.forceSplitRatio_ = 1.0f;
+    std::optional<LayoutConstraintF> layoutConstraint = LayoutConstraintF();
+    layoutConstraint->maxSize = SizeF(ROOT_WIDTH, ROOT_HEIGHT);
+    algo.NarrowConstraintToSplitColumn(MockPipelineContext::GetCurrentContext(), prop, layoutConstraint);
+    EXPECT_FLOAT_EQ(layoutConstraint->maxSize.Width(), SPLITTABLE_WIDTH);
+    // ratio 0.0: secondary width is floored to zero.
+    algo.forceSplitRatio_ = 0.0f;
+    std::optional<LayoutConstraintF> zeroConstraint = LayoutConstraintF();
+    zeroConstraint->maxSize = SizeF(ROOT_WIDTH, ROOT_HEIGHT);
+    algo.NarrowConstraintToSplitColumn(MockPipelineContext::GetCurrentContext(), prop, zeroConstraint);
+    EXPECT_FLOAT_EQ(zeroConstraint->maxSize.Width(), 0.0f);
+    // tiny root width: both column widths clamp to zero instead of going negative.
+    auto savedRootWidth = pipeline->rootWidth_;
+    pipeline->rootWidth_ = 0.0f;
+    DialogLayoutAlgorithm tinyAlgo;
+    tinyAlgo.needAdaptForceSplitMode_ = true;
+    tinyAlgo.forceSplitRatio_ = SPLIT_RATIO;
+    auto [tinyProp, tinyPattern, tinyNode] = CreateSplitDialogProp();
+    ASSERT_NE(tinyProp, nullptr);
+    std::optional<LayoutConstraintF> tinyConstraint = LayoutConstraintF();
+    tinyConstraint->maxSize = SizeF(ROOT_WIDTH, ROOT_HEIGHT);
+    tinyAlgo.NarrowConstraintToSplitColumn(MockPipelineContext::GetCurrentContext(), tinyProp, tinyConstraint);
+    pipeline->rootWidth_ = savedRootWidth;
+    EXPECT_FLOAT_EQ(tinyConstraint->maxSize.Width(), 0.0f);
+}
+
+/**
+ * @tc.name: ShiftTopLeftToSplitColumnTouchedPrimary001
+ * @tc.desc: Test ShiftTopLeftToSplitColumn with last touched primary column keeps position
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutThreeTestNg, ShiftTopLeftToSplitColumnTouchedPrimary001, TestSize.Level1)
+{
+    DialogLayoutAlgorithm algo;
+    algo.needAdaptForceSplitMode_ = true;
+    algo.forceSplitRatio_ = SPLIT_RATIO;
+    auto [prop, dialogPattern, dialogNode] = CreateSplitDialogProp();
+    ASSERT_NE(prop, nullptr);
+    ASSERT_NE(dialogPattern, nullptr);
+    auto forceSplitMgr = GetOrCreateForceSplitManager();
+    ASSERT_NE(forceSplitMgr, nullptr);
+    forceSplitMgr->SetLastTouchedColumnType(ForceSplitPageColumnType::PRIMARY);
+    OffsetF topLeftPoint(10.0f, 20.0f);
+    algo.ShiftTopLeftToSplitColumn(topLeftPoint, MockPipelineContext::GetCurrentContext(), prop);
+    // Dialog on the primary column is not shifted.
+    EXPECT_FLOAT_EQ(topLeftPoint.GetX(), 10.0f);
+    EXPECT_FLOAT_EQ(topLeftPoint.GetY(), 20.0f);
+}
+
+/**
+ * @tc.name: ShiftTopLeftToSplitColumnNoHost001
+ * @tc.desc: Test ShiftTopLeftToSplitColumn when prop has no host shifts by secondary start
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutThreeTestNg, ShiftTopLeftToSplitColumnNoHost001, TestSize.Level1)
+{
+    DialogLayoutAlgorithm algo;
+    algo.needAdaptForceSplitMode_ = true;
+    algo.forceSplitRatio_ = SPLIT_RATIO;
+    auto forceSplitMgr = GetOrCreateForceSplitManager();
+    ASSERT_NE(forceSplitMgr, nullptr);
+    forceSplitMgr->SetLastTouchedColumnType(ForceSplitPageColumnType::SECONDARY);
+    // Standalone property without host: null dialog pattern resolves to NONE, treated as secondary.
+    auto prop = AceType::MakeRefPtr<DialogLayoutProperty>();
+    ASSERT_NE(prop, nullptr);
+    OffsetF topLeftPoint(10.0f, 20.0f);
+    algo.ShiftTopLeftToSplitColumn(topLeftPoint, MockPipelineContext::GetCurrentContext(), prop);
+    EXPECT_FLOAT_EQ(topLeftPoint.GetX(), 10.0f + SECONDARY_START_X);
+    EXPECT_FLOAT_EQ(topLeftPoint.GetY(), 20.0f);
+}
+
+/**
+ * @tc.name: ComputeChildPositionNullTheme001
+ * @tc.desc: Test ComputeChildPosition with null dialogTheme returns zero offset
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutThreeTestNg, ComputeChildPositionNullTheme001, TestSize.Level1)
+{
+    DialogLayoutAlgorithm algo;
+    algo.dialogTheme_ = nullptr;
+    auto [prop, dialogPattern, dialogNode] = CreateSplitDialogProp();
+    ASSERT_NE(prop, nullptr);
+    InitSplitLayoutConstraint(prop);
+    auto childOffset = algo.ComputeChildPosition(
+        SizeF(CHILD_WIDTH, CHILD_HEIGHT), prop, SizeF(SELF_WIDTH, ROOT_HEIGHT), dialogPattern);
+    EXPECT_FLOAT_EQ(childOffset.GetX(), 0.0f);
+    EXPECT_FLOAT_EQ(childOffset.GetY(), 0.0f);
+}
+
+/**
+ * @tc.name: ComputeChildPositionKeyboardAvoidNone001
+ * @tc.desc: Test ComputeChildPosition keyboardAvoidMode NONE skips keyboard avoidance
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutThreeTestNg, ComputeChildPositionKeyboardAvoidNone001, TestSize.Level1)
+{
+    auto container = Container::Current();
+    ASSERT_NE(container, nullptr);
+    container->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_ELEVEN));
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    // Keyboard inset is idempotent across cases, do not assert the change return value.
+    pipeline->GetSafeAreaManager()->UpdateKeyboardSafeArea(KEYBOARD_HEIGHT, ROOT_HEIGHT);
+    DialogLayoutAlgorithm algo;
+    algo.dialogTheme_ = AceType::MakeRefPtr<DialogTheme>();
+    ASSERT_NE(algo.dialogTheme_, nullptr);
+    algo.keyboardAvoidMode_ = KeyboardAvoidMode::NONE;
+    algo.alignment_ = DialogAlignment::BOTTOM;
+    auto [prop, dialogPattern, dialogNode] = CreateSplitDialogProp();
+    ASSERT_NE(prop, nullptr);
+    InitSplitLayoutConstraint(prop);
+    auto childOffset = algo.ComputeChildPosition(
+        SizeF(CHILD_WIDTH, CHILD_HEIGHT), prop, SizeF(SELF_WIDTH, ROOT_HEIGHT), dialogPattern);
+    // NONE mode: dialog bottom overlaps the keyboard but the offset stays at the aligned position.
+    // X is centered inside the prop layout constraint (ROOT_WIDTH), matching ComputeChildPosition.
+    EXPECT_FLOAT_EQ(childOffset.GetX(), (ROOT_WIDTH - CHILD_WIDTH) / 2.0f);
+    EXPECT_FLOAT_EQ(childOffset.GetY(), ROOT_HEIGHT - CHILD_HEIGHT);
+}
+
+/**
+ * @tc.name: ComputeChildPositionKeyboardExpandOpts001
+ * @tc.desc: Test ComputeChildPosition with KEYBOARD safe area expand opts disables avoidance
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutThreeTestNg, ComputeChildPositionKeyboardExpandOpts001, TestSize.Level1)
+{
+    auto container = Container::Current();
+    ASSERT_NE(container, nullptr);
+    container->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_ELEVEN));
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    // Keyboard inset is idempotent across cases, do not assert the change return value.
+    pipeline->GetSafeAreaManager()->UpdateKeyboardSafeArea(KEYBOARD_HEIGHT, ROOT_HEIGHT);
+    DialogLayoutAlgorithm algo;
+    algo.dialogTheme_ = AceType::MakeRefPtr<DialogTheme>();
+    ASSERT_NE(algo.dialogTheme_, nullptr);
+    algo.keyboardAvoidMode_ = KeyboardAvoidMode::DEFAULT;
+    algo.alignment_ = DialogAlignment::BOTTOM;
+    auto [prop, dialogPattern, dialogNode] = CreateSplitDialogProp();
+    ASSERT_NE(prop, nullptr);
+    InitSplitLayoutConstraint(prop);
+    SafeAreaExpandOpts opts;
+    opts.type = SAFE_AREA_TYPE_KEYBOARD;
+    prop->UpdateSafeAreaExpandOpts(opts);
+    auto childOffset = algo.ComputeChildPosition(
+        SizeF(CHILD_WIDTH, CHILD_HEIGHT), prop, SizeF(SELF_WIDTH, ROOT_HEIGHT), dialogPattern);
+    // Dialog expands into the keyboard area, so no keyboard avoidance is applied.
+    // X is centered inside the prop layout constraint (ROOT_WIDTH), matching ComputeChildPosition.
+    EXPECT_FLOAT_EQ(childOffset.GetX(), (ROOT_WIDTH - CHILD_WIDTH) / 2.0f);
+    EXPECT_FLOAT_EQ(childOffset.GetY(), ROOT_HEIGHT - CHILD_HEIGHT);
+}
+
+/**
+ * @tc.name: ComputeChildPositionKeyboardAvoid001
+ * @tc.desc: Test ComputeChildPosition with DEFAULT mode moves the dialog above the keyboard
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutThreeTestNg, ComputeChildPositionKeyboardAvoid001, TestSize.Level1)
+{
+    auto container = Container::Current();
+    ASSERT_NE(container, nullptr);
+    container->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_ELEVEN));
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    // Keyboard inset is idempotent across cases, do not assert the change return value.
+    pipeline->GetSafeAreaManager()->UpdateKeyboardSafeArea(KEYBOARD_HEIGHT, ROOT_HEIGHT);
+    DialogLayoutAlgorithm algo;
+    algo.dialogTheme_ = AceType::MakeRefPtr<DialogTheme>();
+    ASSERT_NE(algo.dialogTheme_, nullptr);
+    algo.keyboardAvoidMode_ = KeyboardAvoidMode::DEFAULT;
+    algo.alignment_ = DialogAlignment::BOTTOM;
+    auto [prop, dialogPattern, dialogNode] = CreateSplitDialogProp();
+    ASSERT_NE(prop, nullptr);
+    InitSplitLayoutConstraint(prop);
+    auto childOffset = algo.ComputeChildPosition(
+        SizeF(CHILD_WIDTH, CHILD_HEIGHT), prop, SizeF(SELF_WIDTH, ROOT_HEIGHT), dialogPattern);
+    // DEFAULT mode: dialog bottom is lifted to the keyboard top minus the bottom padding.
+    float paddingBottomPx = static_cast<float>(
+        MockPipelineContext::GetCurrentContext()->NormalizeToPx(algo.dialogTheme_->GetDefaultDialogMarginBottom()));
+    float expectedY = (ROOT_HEIGHT - CHILD_HEIGHT) - (ROOT_HEIGHT - (KEYBOARD_TOP - paddingBottomPx));
+    // X is centered inside the prop layout constraint (ROOT_WIDTH), matching ComputeChildPosition.
+    EXPECT_FLOAT_EQ(childOffset.GetX(), (ROOT_WIDTH - CHILD_WIDTH) / 2.0f);
+    EXPECT_FLOAT_EQ(childOffset.GetY(), expectedY);
+    EXPECT_LT(childOffset.GetY(), ROOT_HEIGHT - CHILD_HEIGHT);
+}
+
+/**
+ * @tc.name: ComputeChildPositionForceSplitShift001
+ * @tc.desc: Test ComputeChildPosition in force split mode narrows constraint and shifts to secondary
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutThreeTestNg, ComputeChildPositionForceSplitShift001, TestSize.Level1)
+{
+    DialogLayoutAlgorithm algo;
+    algo.dialogTheme_ = AceType::MakeRefPtr<DialogTheme>();
+    ASSERT_NE(algo.dialogTheme_, nullptr);
+    algo.needAdaptForceSplitMode_ = true;
+    algo.forceSplitRatio_ = SPLIT_RATIO;
+    algo.alignment_ = DialogAlignment::CENTER;
+    algo.keyboardAvoidMode_ = KeyboardAvoidMode::NONE;
+    auto [prop, dialogPattern, dialogNode] = CreateSplitDialogProp();
+    ASSERT_NE(prop, nullptr);
+    ASSERT_NE(dialogPattern, nullptr);
+    InitSplitLayoutConstraint(prop);
+    auto forceSplitMgr = GetOrCreateForceSplitManager();
+    ASSERT_NE(forceSplitMgr, nullptr);
+    forceSplitMgr->SetLastTouchedColumnType(ForceSplitPageColumnType::SECONDARY);
+    auto childOffset = algo.ComputeChildPosition(
+        SizeF(CHILD_WIDTH, CHILD_HEIGHT), prop, SizeF(ROOT_WIDTH, ROOT_HEIGHT), dialogPattern);
+    // Constraint is narrowed to the real secondary column width and cached on the pattern.
+    EXPECT_FLOAT_EQ(algo.wrapperSize_.Width(), SECONDARY_WIDTH);
+    EXPECT_EQ(dialogPattern->GetCachedSplitColumnType().value(), ForceSplitPageColumnType::SECONDARY);
+    // Center alignment inside the secondary column, then shifted to the secondary column start.
+    float expectedX = (SECONDARY_WIDTH - CHILD_WIDTH) / 2.0f + SECONDARY_START_X;
+    float expectedY = (ROOT_HEIGHT - CHILD_HEIGHT) / 2.0f;
+    EXPECT_FLOAT_EQ(childOffset.GetX(), expectedX);
+    EXPECT_FLOAT_EQ(childOffset.GetY(), expectedY);
+}
+
+/**
+ * @tc.name: MeasureForceSplitConstraint001
+ * @tc.desc: Test Measure in force split mode narrows constraint to the touched secondary column
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutThreeTestNg, MeasureForceSplitConstraint001, TestSize.Level1)
+{
+    SetDialogTheme();
+    auto pipeline = PipelineBase::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+    // ComputeInnerLayoutParam picks its sizing branch from the pipeline min platform version and
+    // earlier cases raise it to VERSION_TWELVE without restoring it. Pin it below VERSION_TWELVE
+    // so the child constraint asserted here (grid sizing: min height 0, min width == max width)
+    // is deterministic regardless of test order.
+    auto savedMinPlatformVersion = pipeline->minPlatformVersion_;
+    pipeline->minPlatformVersion_ = static_cast<int32_t>(PlatformVersion::VERSION_ELEVEN);
+    pipeline->SetIsCurrentInForceSplitMode(true);
+    auto forceSplitMgr = GetOrCreateForceSplitManager();
+    ASSERT_NE(forceSplitMgr, nullptr);
+    forceSplitMgr->SetLastTouchedColumnType(ForceSplitPageColumnType::SECONDARY);
+    auto childNode = FrameNode::CreateFrameNode(V2::BLANK_ETS_TAG, 101, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(childNode, nullptr);
+    auto childLayoutWrapper = AceType::MakeRefPtr<LayoutWrapperNode>(
+        childNode, childNode->GetGeometryNode(), childNode->GetLayoutProperty());
+    ASSERT_NE(childLayoutWrapper, nullptr);
+    DialogProperties param { .type = DialogType::ACTION_SHEET,
+        .title = "dialog test",
+        .content = "dialog content test",
+        .sheetsInfo = sheetItems,
+        .buttons = btnItems,
+        .width = -24,
+        .backgroundColor = Color::TRANSPARENT };
+    NG::BorderRadiusProperty borderRadius;
+    borderRadius.SetRadius(DIMENSION_RADIUS);
+    param.borderRadius = borderRadius;
+    NG::BorderWidthProperty borderWidth;
+    borderWidth.SetBorderWidth(DIMENSION_WIDTH);
+    param.borderWidth = borderWidth;
+    NG::BorderColorProperty borderColor;
+    borderColor.SetColor(Color::BLACK);
+    param.borderColor = borderColor;
+    auto dialog = DialogView::CreateDialogNode(param, nullptr);
+    ASSERT_NE(dialog, nullptr);
+    auto dialogPattern = dialog->GetPattern<DialogPattern>();
+    ASSERT_NE(dialogPattern, nullptr);
+    LayoutConstraintF layoutConstraint;
+    layoutConstraint.parentIdealSize = { ROOT_WIDTH, ROOT_HEIGHT };
+    layoutConstraint.maxSize = SizeF(ROOT_WIDTH, ROOT_HEIGHT);
+    auto layoutWrapper =
+        AceType::MakeRefPtr<LayoutWrapperNode>(dialog, dialog->GetGeometryNode(), dialog->GetLayoutProperty());
+    layoutWrapper->GetLayoutProperty()->UpdateLayoutConstraint(layoutConstraint);
+    layoutWrapper->GetLayoutProperty()->UpdateContentConstraint();
+    layoutWrapper->AppendChild(childLayoutWrapper);
+    DialogLayoutAlgorithm dialogLayoutAlgorithm;
+    dialogLayoutAlgorithm.Measure(layoutWrapper.rawPtr_);
+    // Measure adapts to force split mode and caches the touched secondary column on the pattern.
+    EXPECT_TRUE(dialogLayoutAlgorithm.needAdaptForceSplitMode_);
+    EXPECT_FLOAT_EQ(dialogLayoutAlgorithm.forceSplitRatio_, SPLIT_RATIO);
+    EXPECT_EQ(dialogPattern->GetCachedSplitColumnType().value(), ForceSplitPageColumnType::SECONDARY);
+    // Child constraint is bounded by the secondary column width. The grid sizing applied by
+    // ComputeInnerLayoutParam after the force split narrowing sets the standard dialog width as
+    // both min and max width (min height 0), so the 1px clamp written before it does not survive.
+    const auto& childConstraint = childLayoutWrapper->GetLayoutProperty()->GetLayoutConstraint();
+    ASSERT_TRUE(childConstraint.has_value());
+    EXPECT_FLOAT_EQ(childConstraint->minSize.Height(), 0.0f);
+    EXPECT_FLOAT_EQ(childConstraint->minSize.Width(), childConstraint->maxSize.Width());
+    EXPECT_LE(childConstraint->maxSize.Width(), SECONDARY_WIDTH);
+    pipeline->SetIsCurrentInForceSplitMode(false);
+    forceSplitMgr->SetLastTouchedColumnType(ForceSplitPageColumnType::NONE);
+    pipeline->minPlatformVersion_ = savedMinPlatformVersion;
+}
+
+/**
+ * @tc.name: ComputeInnerLayoutSizeParamAgingForceSplit001
+ * @tc.desc: Test ComputeInnerLayoutSizeParam aging width follows force split column width
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutThreeTestNg, ComputeInnerLayoutSizeParamAgingForceSplit001, TestSize.Level1)
+{
+    auto pipeline = PipelineBase::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+    pipeline->minPlatformVersion_ = static_cast<int32_t>(PlatformVersion::VERSION_TWELVE);
+    SystemProperties::orientation_ = DeviceOrientation::LANDSCAPE;
+    DialogLayoutAlgorithm algo;
+    algo.gridCount_ = -1;
+    algo.dialogTheme_ = AceType::MakeRefPtr<DialogTheme>();
+    ASSERT_NE(algo.dialogTheme_, nullptr);
+    algo.isSuitableForElderly_ = true;
+    algo.needAdaptForceSplitMode_ = true;
+    auto [prop, dialogPattern, dialogNode] = CreateSplitDialogProp();
+    ASSERT_NE(prop, nullptr);
+    LayoutConstraintF innerLayout;
+    innerLayout.maxSize = SizeF(SECONDARY_WIDTH, ROOT_HEIGHT);
+    EXPECT_TRUE(algo.ComputeInnerLayoutSizeParam(innerLayout, prop));
+    // Force split mode: aging width ratio is applied on the narrowed column width.
+    EXPECT_FLOAT_EQ(innerLayout.maxSize.Width(), LANDSCAPE_WIDTH_RATIO * SECONDARY_WIDTH);
+    // Force split off: aging width ratio is applied on the full root width.
+    algo.needAdaptForceSplitMode_ = false;
+    LayoutConstraintF fullLayout;
+    fullLayout.maxSize = SizeF(SECONDARY_WIDTH, ROOT_HEIGHT);
+    EXPECT_TRUE(algo.ComputeInnerLayoutSizeParam(fullLayout, prop));
+    EXPECT_FLOAT_EQ(fullLayout.maxSize.Width(), LANDSCAPE_WIDTH_RATIO * ROOT_WIDTH);
+    SystemProperties::orientation_ = DeviceOrientation::PORTRAIT;
+}
+
+// The suite below is migrated from dialog_layout_test_five_ng.cpp so all force split
+// dialog layout TDD cases live in a single translation unit.
+
+class DialogLayoutFiveTestNg : public testing::Test {
+public:
+    static void SetUpTestCase();
+    static void TearDownTestCase();
+    void SetUp() override;
+
+    RefPtr<DialogTheme> dialogTheme_ = AceType::MakeRefPtr<DialogTheme>();
+};
+
+void DialogLayoutFiveTestNg::SetUpTestCase()
+{
+    MockPipelineContext::SetUp();
+    MockContainer::SetUp();
+    MockContainer::Current()->taskExecutor_ = AceType::MakeRefPtr<MockTaskExecutor>();
+    MockContainer::Current()->pipelineContext_ = MockPipelineContext::GetCurrentContext();
+    MockContainer::Current()->pipelineContext_->taskExecutor_ = MockContainer::Current()->taskExecutor_;
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    MockPipelineContext::GetCurrent()->SetThemeManager(themeManager);
+    MockPipelineContext::GetCurrent()->rootWidth_ = ROOT_WIDTH;
+    MockPipelineContext::GetCurrent()->rootHeight_ = ROOT_HEIGHT;
+}
+
+void DialogLayoutFiveTestNg::TearDownTestCase()
+{
+    MockPipelineContext::TearDown();
+    MockContainer::TearDown();
+}
+
+void DialogLayoutFiveTestNg::SetUp()
+{
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    if (!pipeline->GetForceSplitManager()) {
+        pipeline->forceSplitMgr_ = AceType::MakeRefPtr<ForceSplitManager>();
+    }
+    auto forceSplitMgr = pipeline->GetForceSplitManager();
+    ASSERT_NE(forceSplitMgr, nullptr);
+    // Reset per-test force split state so cases do not affect each other.
+    forceSplitMgr->SetLastTouchedColumnType(ForceSplitPageColumnType::NONE);
+    forceSplitMgr->MarkNavigationColumnRecorded();
+    forceSplitMgr->ConsumeNavigationColumnRecorded();
+}
+
+namespace {
+// Third element keeps the host node alive for the same reason as CreateSplitDialogProp above.
+std::tuple<RefPtr<DialogLayoutProperty>, RefPtr<DialogPattern>, RefPtr<FrameNode>> CreateDialogProp(
+    const RefPtr<DialogTheme>& theme)
+{
+    auto dialogPattern = AceType::MakeRefPtr<DialogPattern>(theme, nullptr);
+    auto dialog = FrameNode::CreateFrameNode(V2::DIALOG_ETS_TAG, 1, dialogPattern);
+    if (!dialog) {
+        return { nullptr, nullptr, nullptr };
+    }
+    auto prop = AceType::DynamicCast<DialogLayoutProperty>(dialog->GetLayoutProperty());
+    return { prop, dialogPattern, dialog };
+}
+} // namespace
+
+/**
+ * @tc.name: SetLastTouchedColumnType001
+ * @tc.desc: Test ForceSplitManager last touched column type default and set/get roundtrip
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutFiveTestNg, SetLastTouchedColumnType001, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ForceSplitManager>();
+    ASSERT_NE(manager, nullptr);
+    EXPECT_EQ(manager->GetLastTouchedColumnType(), ForceSplitPageColumnType::NONE);
+    manager->SetLastTouchedColumnType(ForceSplitPageColumnType::PRIMARY);
+    EXPECT_EQ(manager->GetLastTouchedColumnType(), ForceSplitPageColumnType::PRIMARY);
+    manager->SetLastTouchedColumnType(ForceSplitPageColumnType::SECONDARY);
+    EXPECT_EQ(manager->GetLastTouchedColumnType(), ForceSplitPageColumnType::SECONDARY);
+}
+
+/**
+ * @tc.name: MarkNavigationColumnRecorded001
+ * @tc.desc: Test ForceSplitManager navigation column recorded flag mark/consume lifecycle
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutFiveTestNg, MarkNavigationColumnRecorded001, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ForceSplitManager>();
+    ASSERT_NE(manager, nullptr);
+    EXPECT_FALSE(manager->ConsumeNavigationColumnRecorded());
+    manager->MarkNavigationColumnRecorded();
+    EXPECT_TRUE(manager->ConsumeNavigationColumnRecorded());
+    EXPECT_FALSE(manager->ConsumeNavigationColumnRecorded());
+}
+
+/**
+ * @tc.name: GetCachedSplitColumnType001
+ * @tc.desc: Test DialogPattern cached split column type default and set/get roundtrip
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutFiveTestNg, GetCachedSplitColumnType001, TestSize.Level1)
+{
+    auto dialogPattern = AceType::MakeRefPtr<DialogPattern>(dialogTheme_, nullptr);
+    ASSERT_NE(dialogPattern, nullptr);
+    EXPECT_FALSE(dialogPattern->GetCachedSplitColumnType().has_value());
+    dialogPattern->SetCachedSplitColumnType(ForceSplitPageColumnType::PRIMARY);
+    EXPECT_EQ(dialogPattern->GetCachedSplitColumnType().value(), ForceSplitPageColumnType::PRIMARY);
+    dialogPattern->SetCachedSplitColumnType(ForceSplitPageColumnType::SECONDARY);
+    EXPECT_EQ(dialogPattern->GetCachedSplitColumnType().value(), ForceSplitPageColumnType::SECONDARY);
+}
+
+/**
+ * @tc.name: NarrowConstraintToSplitColumn001
+ * @tc.desc: Test NarrowConstraintToSplitColumn guard branch when force split mode is off
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutFiveTestNg, NarrowConstraintToSplitColumn001, TestSize.Level1)
+{
+    DialogLayoutAlgorithm algo;
+    algo.needAdaptForceSplitMode_ = false;
+    auto [prop, dialogPattern, dialogNode] = CreateDialogProp(dialogTheme_);
+    ASSERT_NE(prop, nullptr);
+    ASSERT_NE(dialogPattern, nullptr);
+    std::optional<LayoutConstraintF> layoutConstraint = LayoutConstraintF();
+    layoutConstraint->maxSize = SizeF(ROOT_WIDTH, ROOT_HEIGHT);
+    layoutConstraint->percentReference = SizeF(ROOT_WIDTH, ROOT_HEIGHT);
+    algo.NarrowConstraintToSplitColumn(MockPipelineContext::GetCurrentContext(), prop, layoutConstraint);
+    EXPECT_FLOAT_EQ(layoutConstraint->maxSize.Width(), ROOT_WIDTH);
+    EXPECT_FLOAT_EQ(layoutConstraint->percentReference.Width(), ROOT_WIDTH);
+    EXPECT_FALSE(dialogPattern->GetCachedSplitColumnType().has_value());
+}
+
+/**
+ * @tc.name: NarrowConstraintToSplitColumn002
+ * @tc.desc: Test NarrowConstraintToSplitColumn without cache and touched column, resolves secondary column
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutFiveTestNg, NarrowConstraintToSplitColumn002, TestSize.Level1)
+{
+    DialogLayoutAlgorithm algo;
+    algo.needAdaptForceSplitMode_ = true;
+    algo.forceSplitRatio_ = SPLIT_RATIO;
+    auto [prop, dialogPattern, dialogNode] = CreateDialogProp(dialogTheme_);
+    ASSERT_NE(prop, nullptr);
+    ASSERT_NE(dialogPattern, nullptr);
+    std::optional<LayoutConstraintF> layoutConstraint = LayoutConstraintF();
+    layoutConstraint->maxSize = SizeF(ROOT_WIDTH, ROOT_HEIGHT);
+    algo.NarrowConstraintToSplitColumn(MockPipelineContext::GetCurrentContext(), prop, layoutConstraint);
+    EXPECT_FLOAT_EQ(layoutConstraint->maxSize.Width(), SECONDARY_WIDTH);
+    EXPECT_FLOAT_EQ(layoutConstraint->percentReference.Width(), SECONDARY_WIDTH);
+    EXPECT_EQ(dialogPattern->GetCachedSplitColumnType().value(), ForceSplitPageColumnType::NONE);
+}
+
+/**
+ * @tc.name: NarrowConstraintToSplitColumn003
+ * @tc.desc: Test NarrowConstraintToSplitColumn with cached primary column, resolves primary width
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutFiveTestNg, NarrowConstraintToSplitColumn003, TestSize.Level1)
+{
+    DialogLayoutAlgorithm algo;
+    algo.needAdaptForceSplitMode_ = true;
+    algo.forceSplitRatio_ = SPLIT_RATIO;
+    auto [prop, dialogPattern, dialogNode] = CreateDialogProp(dialogTheme_);
+    ASSERT_NE(prop, nullptr);
+    ASSERT_NE(dialogPattern, nullptr);
+    dialogPattern->SetCachedSplitColumnType(ForceSplitPageColumnType::PRIMARY);
+    std::optional<LayoutConstraintF> layoutConstraint = LayoutConstraintF();
+    layoutConstraint->maxSize = SizeF(ROOT_WIDTH, ROOT_HEIGHT);
+    algo.NarrowConstraintToSplitColumn(MockPipelineContext::GetCurrentContext(), prop, layoutConstraint);
+    EXPECT_FLOAT_EQ(layoutConstraint->maxSize.Width(), PRIMARY_WIDTH);
+    EXPECT_FLOAT_EQ(layoutConstraint->percentReference.Width(), PRIMARY_WIDTH);
+    EXPECT_EQ(dialogPattern->GetCachedSplitColumnType().value(), ForceSplitPageColumnType::PRIMARY);
+}
+
+/**
+ * @tc.name: NarrowConstraintToSplitColumn004
+ * @tc.desc: Test NarrowConstraintToSplitColumn with last touched secondary column from force split manager
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutFiveTestNg, NarrowConstraintToSplitColumn004, TestSize.Level2)
+{
+    DialogLayoutAlgorithm algo;
+    algo.needAdaptForceSplitMode_ = true;
+    algo.forceSplitRatio_ = SPLIT_RATIO;
+    auto [prop, dialogPattern, dialogNode] = CreateDialogProp(dialogTheme_);
+    ASSERT_NE(prop, nullptr);
+    ASSERT_NE(dialogPattern, nullptr);
+    auto forceSplitMgr = MockPipelineContext::GetCurrent()->GetForceSplitManager();
+    ASSERT_NE(forceSplitMgr, nullptr);
+    forceSplitMgr->SetLastTouchedColumnType(ForceSplitPageColumnType::SECONDARY);
+    std::optional<LayoutConstraintF> layoutConstraint = LayoutConstraintF();
+    layoutConstraint->maxSize = SizeF(ROOT_WIDTH, ROOT_HEIGHT);
+    algo.NarrowConstraintToSplitColumn(MockPipelineContext::GetCurrentContext(), prop, layoutConstraint);
+    EXPECT_FLOAT_EQ(layoutConstraint->maxSize.Width(), SECONDARY_WIDTH);
+    EXPECT_EQ(dialogPattern->GetCachedSplitColumnType().value(), ForceSplitPageColumnType::SECONDARY);
+}
+
+/**
+ * @tc.name: ShiftTopLeftToSplitColumn001
+ * @tc.desc: Test ShiftTopLeftToSplitColumn guard branch when force split mode is off
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutFiveTestNg, ShiftTopLeftToSplitColumn001, TestSize.Level1)
+{
+    DialogLayoutAlgorithm algo;
+    algo.needAdaptForceSplitMode_ = false;
+    auto [prop, dialogPattern, dialogNode] = CreateDialogProp(dialogTheme_);
+    ASSERT_NE(prop, nullptr);
+    ASSERT_NE(dialogPattern, nullptr);
+    OffsetF topLeftPoint(10.0f, 20.0f);
+    algo.ShiftTopLeftToSplitColumn(topLeftPoint, MockPipelineContext::GetCurrentContext(), prop);
+    EXPECT_FLOAT_EQ(topLeftPoint.GetX(), 10.0f);
+    EXPECT_FLOAT_EQ(topLeftPoint.GetY(), 20.0f);
+}
+
+/**
+ * @tc.name: ShiftTopLeftToSplitColumn002
+ * @tc.desc: Test ShiftTopLeftToSplitColumn with cached primary column, keeps position unchanged
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutFiveTestNg, ShiftTopLeftToSplitColumn002, TestSize.Level1)
+{
+    DialogLayoutAlgorithm algo;
+    algo.needAdaptForceSplitMode_ = true;
+    algo.forceSplitRatio_ = SPLIT_RATIO;
+    auto [prop, dialogPattern, dialogNode] = CreateDialogProp(dialogTheme_);
+    ASSERT_NE(prop, nullptr);
+    ASSERT_NE(dialogPattern, nullptr);
+    dialogPattern->SetCachedSplitColumnType(ForceSplitPageColumnType::PRIMARY);
+    OffsetF topLeftPoint(10.0f, 20.0f);
+    algo.ShiftTopLeftToSplitColumn(topLeftPoint, MockPipelineContext::GetCurrentContext(), prop);
+    EXPECT_FLOAT_EQ(topLeftPoint.GetX(), 10.0f);
+    EXPECT_FLOAT_EQ(topLeftPoint.GetY(), 20.0f);
+}
+
+/**
+ * @tc.name: ShiftTopLeftToSplitColumn003
+ * @tc.desc: Test ShiftTopLeftToSplitColumn with secondary column, shifts to secondary start x
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutFiveTestNg, ShiftTopLeftToSplitColumn003, TestSize.Level1)
+{
+    DialogLayoutAlgorithm algo;
+    algo.needAdaptForceSplitMode_ = true;
+    algo.forceSplitRatio_ = SPLIT_RATIO;
+    auto [prop, dialogPattern, dialogNode] = CreateDialogProp(dialogTheme_);
+    ASSERT_NE(prop, nullptr);
+    ASSERT_NE(dialogPattern, nullptr);
+    OffsetF topLeftPoint(10.0f, 20.0f);
+    algo.ShiftTopLeftToSplitColumn(topLeftPoint, MockPipelineContext::GetCurrentContext(), prop);
+    EXPECT_FLOAT_EQ(topLeftPoint.GetX(), 10.0f + SECONDARY_START_X);
+    EXPECT_FLOAT_EQ(topLeftPoint.GetY(), 20.0f);
+}
+
+/**
+ * @tc.name: ComputeTopLeftPoint001
+ * @tc.desc: Test ComputeTopLeftPoint when handedness is inactive, falls back to alignment center
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutFiveTestNg, ComputeTopLeftPoint001, TestSize.Level1)
+{
+    DialogLayoutAlgorithm algo;
+    algo.handednessMode_ = HandednessFollowMode::NONE;
+    algo.alignment_ = DialogAlignment::CENTER;
+    OffsetF topLeftPoint;
+    algo.ComputeTopLeftPoint(
+        topLeftPoint, SizeF(CHILD_WIDTH, ANCHOR_CHILD_HEIGHT), SizeF(SELF_WIDTH, SELF_HEIGHT), nullptr, nullptr);
+    EXPECT_FLOAT_EQ(topLeftPoint.GetX(), (SELF_WIDTH - CHILD_WIDTH) / 2.0f);
+    EXPECT_FLOAT_EQ(topLeftPoint.GetY(), (SELF_HEIGHT - ANCHOR_CHILD_HEIGHT) / 2.0f);
+}
+
+/**
+ * @tc.name: ComputeTopLeftPoint002
+ * @tc.desc: Test ComputeTopLeftPoint with active handedness but null dialog pattern, falls back to alignment
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutFiveTestNg, ComputeTopLeftPoint002, TestSize.Level2)
+{
+    DialogLayoutAlgorithm algo;
+    algo.dialogTheme_ = dialogTheme_;
+    algo.handednessMode_ = HandednessFollowMode::FOLLOW_ANCHOR;
+    algo.alignment_ = DialogAlignment::CENTER;
+    auto [prop, dialogPattern, dialogNode] = CreateDialogProp(dialogTheme_);
+    ASSERT_NE(prop, nullptr);
+    OffsetF topLeftPoint;
+    algo.ComputeTopLeftPoint(
+        topLeftPoint, SizeF(CHILD_WIDTH, ANCHOR_CHILD_HEIGHT), SizeF(SELF_WIDTH, SELF_HEIGHT), prop, nullptr);
+    EXPECT_FLOAT_EQ(topLeftPoint.GetX(), (SELF_WIDTH - CHILD_WIDTH) / 2.0f);
+    EXPECT_FLOAT_EQ(topLeftPoint.GetY(), (SELF_HEIGHT - ANCHOR_CHILD_HEIGHT) / 2.0f);
+}
+
+/**
+ * @tc.name: ComputeTopLeftPoint003
+ * @tc.desc: Test ComputeTopLeftPoint with active handedness and cached anchor, applies handedness layout
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutFiveTestNg, ComputeTopLeftPoint003, TestSize.Level1)
+{
+    DialogLayoutAlgorithm algo;
+    algo.dialogTheme_ = dialogTheme_;
+    algo.handednessMode_ = HandednessFollowMode::FOLLOW_ANCHOR;
+    auto [prop, dialogPattern, dialogNode] = CreateDialogProp(dialogTheme_);
+    ASSERT_NE(prop, nullptr);
+    ASSERT_NE(dialogPattern, nullptr);
+    // Cached anchor avoids the HandednessManager query in unit test environment.
+    dialogPattern->MarkHandednessLayoutCaptured();
+    dialogPattern->SetCachedAnchorPos(OffsetF(300.0f, 200.0f));
+    dialogPattern->SetNeedRefreshAnchorPos(false);
+    OffsetF topLeftPoint;
+    algo.ComputeTopLeftPoint(
+        topLeftPoint, SizeF(CHILD_WIDTH, ANCHOR_CHILD_HEIGHT), SizeF(SELF_WIDTH, SELF_HEIGHT), prop, dialogPattern);
+    EXPECT_TRUE(dialogPattern->IsHandednessLayoutCaptured());
+    // Handedness anchor layout: target = anchor - child / 2, clamped to safe area bounds.
+    EXPECT_NEAR(topLeftPoint.GetX(), 300.0f - CHILD_WIDTH / 2.0f, 16.0f);
+    EXPECT_NEAR(topLeftPoint.GetY(), 200.0f - ANCHOR_CHILD_HEIGHT / 2.0f, 16.0f);
 }
 } // namespace OHOS::Ace::NG
