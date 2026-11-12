@@ -333,11 +333,16 @@ void WaterFlowLayoutSW::Layout(LayoutWrapper* wrapper)
         TAG_LOGW(AceLogTag::ACE_WATERFLOW, "Lanes not initialized, can't perform layout");
         return;
     }
+    // A reload/jump may change the first lane before Pattern calibrates totalOffset_.
+    // Normalize both the edge origin and body boundary with the current measured offset.
+    const float edgeOffset = info_->edgeSlots_ && info_->StartIndex() == 0 &&
+        props_->GetWaterflowDirectionValue(FlexDirection::COLUMN) == FlexDirection::COLUMN
+        ? info_->StartPos() - info_->TopMargin() : info_->Offset();
     if (info_->targetIndex_) {
         // New edge slots keep their geometry during target-position measurement. Only the legacy
         // footer is deactivated here to avoid a one-frame flash before normal footer cleanup.
         if (info_->edgeSlots_) {
-            LayoutEdges(wrapper, info_, info_->EndPos() - info_->Offset() + info_->BotMargin());
+            LayoutEdges(wrapper, info_, info_->EndPos() - edgeOffset + info_->BotMargin(), edgeOffset);
         } else {
             DeactivateFooter();
         }
@@ -378,7 +383,7 @@ void WaterFlowLayoutSW::Layout(LayoutWrapper* wrapper)
         nodeIdx(activeStartIndex), nodeIdx(activeEndIndex), cacheCount, cacheCount, showCache);
 
     if (info_->edgeSlots_) {
-        LayoutEdges(wrapper, info_, info_->EndPos() - info_->Offset() + info_->BotMargin());
+        LayoutEdges(wrapper, info_, info_->EndPos() - edgeOffset + info_->BotMargin(), edgeOffset);
     } else if (info_->itemEnd_) {
         LayoutFooter(paddingOffset, reverse);
     } else if (info_->footerIndex_ >= 0) {

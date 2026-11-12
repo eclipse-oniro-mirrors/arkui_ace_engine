@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_SCROLLABLE_SCROLL_VIEWPORT_COORDINATOR_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_SCROLLABLE_SCROLL_VIEWPORT_COORDINATOR_H
 
+#include <algorithm>
 #include <functional>
 #include <map>
 #include <vector>
@@ -31,7 +32,7 @@ public:
     {
         CHECK_NULL_VOID(node);
         CHECK_NULL_VOID(update);
-        targets_.insert_or_assign(node->GetId(), Target { node, std::move(update) });
+        targets_.insert_or_assign(node->GetId(), Target { node, std::move(update), ++generation_ });
     }
 
     void Unregister(int32_t id)
@@ -46,18 +47,32 @@ public:
         }
         flushing_ = true;
         // Callbacks may update the registry; finish collecting the snapshot before invoking them.
-        std::vector<std::function<void()>> updates;
+        std::vector<std::pair<int32_t, Target>> updates;
         for (auto iter = targets_.begin(); iter != targets_.end();) {
             auto node = iter->second.node.Upgrade();
             if (!node || node->GetContext() != pipeline) {
                 iter = targets_.erase(iter);
                 continue;
             }
-            updates.emplace_back(iter->second.update);
+            updates.emplace_back(node->GetDepth(), iter->second);
             ++iter;
         }
+        // An ancestor can move an edge containing another target. Refresh it before descendants
+        // consume its geometry, regardless of creation order. AddChild updates depth on reparenting.
+        std::stable_sort(updates.begin(), updates.end(), [](const auto& left, const auto& right) {
+            return left.first < right.first;
+        });
         for (const auto& update : updates) {
-            update();
+            const auto& target = update.second;
+            auto node = target.node.Upgrade();
+            if (!node || node->GetContext() != pipeline) {
+                continue;
+            }
+            auto current = targets_.find(node->GetId());
+            if (current == targets_.end() || current->second.generation != target.generation) {
+                continue;
+            }
+            target.update();
         }
         flushing_ = false;
     }
@@ -66,8 +81,10 @@ private:
     struct Target {
         WeakPtr<FrameNode> node;
         std::function<void()> update;
+        uint64_t generation;
     };
     std::map<int32_t, Target> targets_;
+    uint64_t generation_ = 0;
     bool flushing_ = false;
 };
 } // namespace OHOS::Ace::NG

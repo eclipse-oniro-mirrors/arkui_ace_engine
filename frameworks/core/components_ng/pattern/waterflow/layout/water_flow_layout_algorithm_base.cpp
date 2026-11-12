@@ -466,7 +466,8 @@ void WaterFlowLayoutBase::MeasureEdges(
 }
 
 void WaterFlowLayoutBase::LayoutEdges(
-    LayoutWrapper* wrapper, const RefPtr<WaterFlowLayoutInfoBase>& info, float bodyEnd)
+    LayoutWrapper* wrapper, const RefPtr<WaterFlowLayoutInfoBase>& info, float bodyEnd,
+    std::optional<float> layoutOffset)
 {
     if (!info->edgeSlots_) {
         return;
@@ -504,17 +505,19 @@ void WaterFlowLayoutBase::LayoutEdges(
         }
         return;
     }
-    OffsetF origin(padding.left.value_or(0.0f), padding.top.value_or(0.0f) + info->Offset());
+    OffsetF origin(padding.left.value_or(0.0f), padding.top.value_or(0.0f) + layoutOffset.value_or(info->Offset()));
     const float crossSize = wrapper->GetGeometryNode()->GetPaddingSize().Width();
     HeaderFooterUtils::LayoutEdge(wrapper, info->edgeIndexMap_.HeaderIndex(), origin, false, false, crossSize);
     bodyEnd = std::max(bodyEnd, info->headerHeight_);
+    const float measuredTotalSize = bodyEnd + info->edgeFooterHeight_;
     if (info->isDataValid_ && info->EndIndex() < info->ItemCnt(info->GetChildrenCount()) - 1) {
         // The footer follows the estimated full body, not the tail of the currently measured window.
         bodyEnd = std::max(bodyEnd, info->EstimateTotalHeight() - info->edgeFooterHeight_);
     }
     HeaderFooterUtils::LayoutEdge(wrapper, info->edgeIndexMap_.FooterIndex(), origin + OffsetF(0.0f, bodyEnd),
         false, false, crossSize);
-    pattern->SetEdgeGeometry(origin, bodyEnd + info->edgeFooterHeight_);
+    // Estimates preserve the natural layout, but cannot prove a boundary for visible sticky edges.
+    pattern->SetEdgeGeometry(origin, bodyEnd + info->edgeFooterHeight_, measuredTotalSize);
 }
 
 void WaterFlowLayoutBase::CalcContentOffset(

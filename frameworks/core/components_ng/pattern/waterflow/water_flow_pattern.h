@@ -222,7 +222,7 @@ public:
     void SetEdgeContent(bool isHeader, const RefPtr<UINode>& content);
     bool IsValidEdgeContent(bool isHeader, const RefPtr<UINode>& content) const;
     // Save natural layout geometry and register one weak viewport callback until detach.
-    void SetEdgeGeometry(const OffsetF& origin, float totalSize);
+    void SetEdgeGeometry(const OffsetF& origin, float totalSize, std::optional<float> measuredTotalSize = std::nullopt);
     void UpdateEdgePositions();
     void OnDetachFromFrameNode(FrameNode* frameNode) override;
     const WaterFlowEdgeState& GetEdgeState() const { return edgeState_; }
@@ -533,6 +533,7 @@ private:
     bool lastNotifiedHasStickyHeader_ = false;
     OffsetF edgeOrigin_;
     float edgeTotalSize_ = 0.0f;
+    float edgeMeasuredTotalSize_ = 0.0f;
     bool edgeViewportRegistered_ = false;
     WeakPtr<UINode> footer_;
     // for keepVisiableContentPosition mode temporarily.

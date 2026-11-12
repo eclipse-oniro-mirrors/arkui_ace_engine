@@ -31,6 +31,7 @@
 #include "core/components_ng/pattern/scroll/scroll_pattern.h"
 #include "core/components_ng/pattern/scrollable/scroll_viewport_coordinator.h"
 #include "core/components_ng/pattern/swiper/swiper_pattern.h"
+#include "core/components_ng/syntax/lazy_for_each_node.h"
 #include "core/components_ng/pattern/waterflow/layout/sliding_window/water_flow_layout_sw.h"
 #include "core/components_ng/pattern/waterflow/layout/top_down/water_flow_segmented_layout.h"
 
@@ -632,6 +633,238 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_CoordinatorMutationAndReentry, TestSize
     EXPECT_EQ(*calls, 1);
     coordinator->Flush(pipeline);
     EXPECT_EQ(*calls, 2);
+}
+
+/**
+ * @tc.name: WFHF_UnknownTailBoundary
+ * @tc.desc: Unmeasured short items must not let estimated length move sticky edges past the actual content.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowHeaderFooterTest, WFHF_UnknownTailBoundary, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateItemWithHeight(1000.0f);
+    for (int32_t i = 0; i < 99; ++i) {
+        CreateItemWithHeight(1.0f);
+    }
+    SetEdges();
+    CreateDone();
+    ASSERT_LT(pattern_->GetEndIndex(), 99);
+    const auto naturalSize = pattern_->edgeTotalSize_;
+    auto parent = ParentScroll(2000.0f);
+    pattern_->SetSticky(StickyStyle::BOTH);
+    auto pipeline = frameNode_->GetContext();
+    ASSERT_NE(pipeline, nullptr);
+    pipeline->GetScrollViewportCoordinator()->Flush(pipeline);
+    const auto footerIndex = pattern_->GetEdgeIndexMap().FooterIndex();
+    // The fixture knows the complete data heights; the layout has only measured the first window.
+    EXPECT_LE(GetChildRect(frameNode_, footerIndex).Bottom(), 50.0f + 1000.0f + 99.0f + 40.0f);
+    EXPECT_FLOAT_EQ(pattern_->edgeTotalSize_, naturalSize);
+    EXPECT_LT(pattern_->GetEndIndex(), 99);
+
+    pattern_->ScrollToIndex(99, false, ScrollAlign::END);
+    FlushUITasks();
+    // FlushUITasks also measures the synthetic Scroll; restore this test's large viewport.
+    parent->GetGeometryNode()->SetFrameSize(SizeF(WATER_FLOW_WIDTH, 2000.0f));
+    parent->GetRenderContext()->UpdatePaintRect(parent->GetGeometryNode()->GetFrameRect());
+    pipeline->GetScrollViewportCoordinator()->Flush(pipeline);
+    EXPECT_EQ(pattern_->GetEndIndex(), 99);
+    EXPECT_FLOAT_EQ(GetChildRect(frameNode_, footerIndex).Top(),
+        GetChildRect(frameNode_, pattern_->GetEdgeIndexMap().DataToNode(99)).Bottom());
+    const auto finalSize = pattern_->edgeTotalSize_;
+    pattern_->SetSticky(StickyStyle::NONE);
+    EXPECT_FLOAT_EQ(pattern_->edgeTotalSize_, finalSize);
+}
+
+/**
+ * @tc.name: WFHF_CoordinatorNestedMovement
+ * @tc.desc: A child created before its parent observes the parent's new edge position in the same flush.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowHeaderFooterTest, WFHF_CoordinatorNestedMovement, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateWaterFlowItems(20);
+    SetEdges();
+    CreateDone();
+    auto parent = ParentScroll(300.0f);
+    // ViewStack IDs and ElementRegister IDs use different counters in this fixture.
+    auto movingEdge = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, frameNode_->GetId() + 100000,
+        AceType::MakeRefPtr<LinearLayoutPattern>(true));
+    parent->RemoveChild(frameNode_);
+    parent->AddChild(movingEdge);
+    movingEdge->AddChild(frameNode_);
+    ASSERT_LT(frameNode_->GetId(), movingEdge->GetId());
+    MoveHost(-200.0f);
+    pattern_->SetEdgeGeometry(OffsetF(), 1000.0f);
+    pattern_->SetSticky(StickyStyle::BOTH);
+    auto pipeline = frameNode_->GetContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto coordinator = pipeline->GetScrollViewportCoordinator();
+    coordinator->Register(movingEdge, [weak = WeakPtr<FrameNode>(movingEdge)]() {
+        auto node = weak.Upgrade();
+        ASSERT_NE(node, nullptr);
+        node->GetGeometryNode()->SetFrameOffset(OffsetF(0.0f, 100.0f));
+        node->GetRenderContext()->UpdatePaintRect(node->GetGeometryNode()->GetFrameRect());
+    });
+    coordinator->Flush(pipeline);
+    EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), 100.0f);
+    EXPECT_FLOAT_EQ(GetChildRect(frameNode_, pattern_->GetEdgeIndexMap().FooterIndex()).Top(), 360.0f);
+
+    // Reattach under a different moving ancestor; registration order and old depths must not persist.
+    pattern_->OnDetachFromFrameNode(AceType::RawPtr(frameNode_));
+    coordinator->Unregister(movingEdge->GetId());
+    movingEdge->RemoveChild(frameNode_);
+    auto replacement = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, frameNode_->GetId() + 100001,
+        AceType::MakeRefPtr<LinearLayoutPattern>(true));
+    parent->AddChild(replacement);
+    replacement->AddChild(frameNode_);
+    pattern_->SetEdgeGeometry(OffsetF(), 1000.0f);
+    coordinator->Register(replacement, [weak = WeakPtr<FrameNode>(replacement)]() {
+        auto node = weak.Upgrade();
+        ASSERT_NE(node, nullptr);
+        node->GetGeometryNode()->SetFrameOffset(OffsetF(0.0f, 50.0f));
+        node->GetRenderContext()->UpdatePaintRect(node->GetGeometryNode()->GetFrameRect());
+    });
+    coordinator->Flush(pipeline);
+    EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), 150.0f);
+    EXPECT_FLOAT_EQ(GetChildRect(frameNode_, pattern_->GetEdgeIndexMap().FooterIndex()).Top(), 410.0f);
+    coordinator->Unregister(replacement->GetId());
+}
+
+/**
+ * @tc.name: WFHF_UnknownTailLazyChanges
+ * @tc.desc: Sticky uses the measured window across scroll/resize/reload without building the unknown tail.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowHeaderFooterTest, WFHF_UnknownTailLazyChanges, TestSize.Level1)
+{
+    CreateWaterFlow();
+    auto built = std::make_shared<int32_t>(0);
+    auto lazy = CreateItemsInLazyForEach(1000, [built](int32_t index) {
+        ++*built;
+        return 70.0f + (index % 3) * 130.0f;
+    });
+    SetEdges();
+    CreateDone();
+    ASSERT_LT(*built, 1000);
+    auto lazyNode = AceType::DynamicCast<LazyForEachNode>(frameNode_->GetChildAtIndex(1));
+    ASSERT_NE(lazyNode, nullptr);
+    auto parent = ParentScroll(300.0f);
+    auto pipeline = frameNode_->GetContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto refresh = [this, parent, pipeline](float offset) {
+        parent->GetGeometryNode()->SetFrameSize(SizeF(WATER_FLOW_WIDTH, 300.0f));
+        parent->GetRenderContext()->UpdatePaintRect(parent->GetGeometryNode()->GetFrameRect());
+        MoveHost(offset);
+        pipeline->GetScrollViewportCoordinator()->Flush(pipeline);
+    };
+    const auto before = *built;
+    const auto naturalSize = pattern_->edgeTotalSize_;
+    pattern_->SetSticky(StickyStyle::BOTH);
+    refresh(-200.0f);
+    EXPECT_EQ(*built, before);
+    EXPECT_FLOAT_EQ(pattern_->edgeTotalSize_, naturalSize);
+    for (int32_t i = 0; i < 6; ++i) {
+        UpdateCurrentOffset(-150.0f);
+        refresh(-200.0f);
+        EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), 200.0f);
+        EXPECT_FLOAT_EQ(GetChildRect(frameNode_, pattern_->GetEdgeIndexMap().FooterIndex()).Top(), 460.0f);
+        EXPECT_LT(*built, 1000);
+    }
+    pattern_->SetEdge(true, Edge(80.0f), pattern_->BeginEdgeUpdate(true));
+    FlushUITasks();
+    refresh(-200.0f);
+    EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), 200.0f);
+    EXPECT_FLOAT_EQ(GetChildRect(frameNode_, pattern_->GetEdgeIndexMap().FooterIndex()).Top(), 460.0f);
+
+    lazy->SetTotalCount(3);
+    lazyNode->OnDataReloaded();
+    pattern_->ScrollToIndex(0, false, ScrollAlign::START);
+    FlushUITasks();
+    refresh(0.0f);
+    EXPECT_FLOAT_EQ(pattern_->edgeTotalSize_, 80.0f + 70.0f + 200.0f + 330.0f + 40.0f);
+    pattern_->SetSticky(StickyStyle::NONE);
+    EXPECT_FLOAT_EQ(GetChildRect(frameNode_, pattern_->GetEdgeIndexMap().FooterIndex()).Top(), 680.0f);
+
+    lazy->SetTotalCount(0);
+    lazyNode->OnDataReloaded();
+    FlushUITasks();
+    refresh(0.0f);
+    EXPECT_EQ(pattern_->GetDataCount(), 0);
+    EXPECT_FLOAT_EQ(GetChildRect(frameNode_, pattern_->GetEdgeIndexMap().FooterIndex()).Top(), 80.0f);
+    EXPECT_FLOAT_EQ(pattern_->edgeTotalSize_, 120.0f);
+}
+
+/**
+ * @tc.name: WFHF_CoordinatorThreeLevels
+ * @tc.desc: Reverse IDs and depth changes preserve a parent-before-descendant refresh snapshot.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowHeaderFooterTest, WFHF_CoordinatorThreeLevels, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateDone();
+    auto middle = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, frameNode_->GetId() + 100000,
+        AceType::MakeRefPtr<LinearLayoutPattern>(true));
+    auto ancestor = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, frameNode_->GetId() + 100001,
+        AceType::MakeRefPtr<LinearLayoutPattern>(true));
+    ancestor->AddChild(middle);
+    middle->AddChild(frameNode_);
+    auto coordinator = AceType::MakeRefPtr<ScrollViewportCoordinator>();
+    auto calls = std::make_shared<std::vector<int32_t>>();
+    coordinator->Register(frameNode_, [calls]() { calls->push_back(3); });
+    coordinator->Register(middle, [calls]() { calls->push_back(2); });
+    coordinator->Register(ancestor, [calls]() { calls->push_back(1); });
+    auto pipeline = frameNode_->GetContext();
+    ASSERT_NE(pipeline, nullptr);
+    coordinator->Flush(pipeline);
+    EXPECT_EQ(*calls, (std::vector<int32_t> { 1, 2, 3 }));
+    calls->clear();
+    middle->RemoveChild(frameNode_);
+    ancestor->RemoveChild(middle);
+    ancestor->AddChild(frameNode_);
+    frameNode_->AddChild(middle);
+    coordinator->Flush(pipeline);
+    EXPECT_EQ(*calls, (std::vector<int32_t> { 1, 3, 2 }));
+    calls->clear();
+    coordinator->Unregister(frameNode_->GetId());
+    coordinator->Flush(pipeline);
+    EXPECT_EQ(*calls, (std::vector<int32_t> { 1, 2 }));
+}
+
+/**
+ * @tc.name: WFHF_CoordinatorInvalidatedSnapshot
+ * @tc.desc: A parent removing or replacing a descendant registration must invalidate its collected callback.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowHeaderFooterTest, WFHF_CoordinatorInvalidatedSnapshot, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateDone();
+    auto parent = ParentScroll(300.0f);
+    auto coordinator = AceType::MakeRefPtr<ScrollViewportCoordinator>();
+    auto* raw = AceType::RawPtr(coordinator);
+    auto calls = std::make_shared<std::vector<int32_t>>();
+    auto replaced = std::make_shared<bool>(false);
+    coordinator->Register(frameNode_, [calls]() { calls->push_back(2); });
+    coordinator->Register(parent, [raw, calls, replaced, weak = WeakPtr<FrameNode>(frameNode_)]() {
+        calls->push_back(1);
+        if (*replaced) {
+            return;
+        }
+        *replaced = true;
+        auto child = weak.Upgrade();
+        ASSERT_NE(child, nullptr);
+        raw->Unregister(child->GetId());
+        raw->Register(child, [calls]() { calls->push_back(3); });
+    });
+    auto pipeline = frameNode_->GetContext();
+    ASSERT_NE(pipeline, nullptr);
+    coordinator->Flush(pipeline);
+    EXPECT_EQ(*calls, (std::vector<int32_t> { 1 }));
+    coordinator->Flush(pipeline);
+    EXPECT_EQ(*calls, (std::vector<int32_t> { 1, 1, 3 }));
 }
 
 /**

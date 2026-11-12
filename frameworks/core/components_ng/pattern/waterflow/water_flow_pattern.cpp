@@ -2135,7 +2135,7 @@ void WaterFlowPattern::SetEdge(bool isHeader, const RefPtr<UINode>& content, uin
         layoutInfo_->footerHeight_ = 0.0f;
     }
     if (!edgeState_.header.Upgrade() && !footer_.Upgrade()) {
-        SetEdgeGeometry(edgeOrigin_, edgeTotalSize_);
+        SetEdgeGeometry(edgeOrigin_, edgeTotalSize_, edgeMeasuredTotalSize_);
     }
     ResetLayoutInfo();
     NotifyStickyHeaderChange();
@@ -2184,7 +2184,7 @@ void WaterFlowPattern::PublishNextStickyHeaderGap(const std::optional<float>& ga
     }
     nextStickyHeaderGap_ = gap;
     // The existing Pipeline callback consumes the geometry after parent layout; no extra measure request.
-    SetEdgeGeometry(edgeOrigin_, edgeTotalSize_);
+    SetEdgeGeometry(edgeOrigin_, edgeTotalSize_, edgeMeasuredTotalSize_);
 }
 
 void WaterFlowPattern::NotifyStickyHeaderChange()
@@ -2222,18 +2222,19 @@ void WaterFlowPattern::SetSticky(StickyStyle style)
     if (!edgeState_.enabled) {
         return;
     }
-    SetEdgeGeometry(edgeOrigin_, edgeTotalSize_);
+    SetEdgeGeometry(edgeOrigin_, edgeTotalSize_, edgeMeasuredTotalSize_);
     UpdateEdgePositions();
     MarkDirtyNodeSelf();
 }
 
-void WaterFlowPattern::SetEdgeGeometry(const OffsetF& origin, float totalSize)
+void WaterFlowPattern::SetEdgeGeometry(const OffsetF& origin, float totalSize, std::optional<float> measuredTotalSize)
 {
     if (!edgeState_.enabled) {
         return;
     }
     edgeOrigin_ = origin;
     edgeTotalSize_ = totalSize;
+    edgeMeasuredTotalSize_ = measuredTotalSize.value_or(totalSize);
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto pipeline = host->GetContext();
@@ -2282,7 +2283,7 @@ void WaterFlowPattern::UpdateEdgePositions()
         return;
     }
     HeaderFooterStickyMetrics metrics;
-    metrics.totalMainSize = edgeTotalSize_;
+    metrics.totalMainSize = edgeMeasuredTotalSize_;
     metrics.nextStickyHeaderGap = HasStickyHeader() ? nextStickyHeaderGap_ : std::nullopt;
     metrics.headerMainSize = layoutInfo_->headerHeight_;
     metrics.footerMainSize = layoutInfo_->edgeFooterHeight_;
@@ -2293,7 +2294,7 @@ void WaterFlowPattern::UpdateEdgePositions()
         const bool sticky = canPin && (header ? HeaderFooterUtils::IsHeaderSticky(edgeState_.sticky)
                                              : HeaderFooterUtils::IsFooterSticky(edgeState_.sticky));
         float y = header ? 0.0f : std::max(metrics.headerMainSize,
-            metrics.totalMainSize - metrics.footerMainSize);
+            edgeTotalSize_ - metrics.footerMainSize);
         if (sticky) {
             y = header ? HeaderFooterUtils::CalcStickyHeaderPos(metrics)
                        : HeaderFooterUtils::CalcStickyFooterPos(metrics);
@@ -2342,7 +2343,7 @@ void WaterFlowPattern::AddFooter(const RefPtr<NG::UINode>& footer)
         }
         SyncEdgeSlots();
         if (!edgeState_.header.Upgrade() && !footer_.Upgrade()) {
-            SetEdgeGeometry(edgeOrigin_, edgeTotalSize_);
+            SetEdgeGeometry(edgeOrigin_, edgeTotalSize_, edgeMeasuredTotalSize_);
         }
         ResetLayoutInfo();
         host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
