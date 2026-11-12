@@ -27,22 +27,45 @@
 #include "adapter/ohos/entrance/ui_session/ui_translate_request_util.h"
 
 namespace OHOS::Ace {
-bool UiContentStub::IsSACalling() const
+bool UiContentStub::IsTrustedCallerUid(uint32_t uid)
+{
+    constexpr uint32_t UI_SA_UID = 16666;
+    constexpr uint32_t MSDP_UID = 6699;
+    constexpr uint32_t AI_APP_CONTROLLER_SERVICE_UID = 7101;
+    constexpr uint32_t trustedCallerUids[] = {
+        UI_SA_UID,
+        MSDP_UID,
+        AI_APP_CONTROLLER_SERVICE_UID,
+    };
+    for (auto trustedUid : trustedCallerUids) {
+        if (trustedUid == uid) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool UiContentStub::IsTrustedCaller() const
 {
     using namespace Security::AccessToken;
     const auto tokenId = IPCSkeleton::GetCallingTokenID();
-    const auto flag = AccessTokenKit::GetTokenTypeFlag(tokenId);
-    if (flag == ATokenTypeEnum::TOKEN_NATIVE) {
-        LOGD("SA called, tokenId:%{private}u, flag:%{public}u", tokenId, flag);
-        return true;
+    if (AccessTokenKit::GetTokenTypeFlag(tokenId) != ATokenTypeEnum::TOKEN_NATIVE) {
+        LOGW("Not SA called, tokenId:%{private}u", tokenId);
+        return false;
     }
-    LOGW("Not SA called, tokenId:%{private}u, flag:%{public}u", tokenId, flag);
-    return false;
+    const auto uid = IPCSkeleton::GetCallingUid();
+    if (!IsTrustedCallerUid(uid)) {
+        LOGW("ui_session caller rejected, uid:%{public}d, pid:%{public}d",
+            static_cast<int32_t>(uid), static_cast<int32_t>(IPCSkeleton::GetCallingRealPid()));
+        return false;
+    }
+    LOGD("SA called, tokenId:%{private}u, uid:%{public}d", tokenId, static_cast<int32_t>(uid));
+    return true;
 }
 
 int32_t UiContentStub::OnRemoteRequest(uint32_t code, MessageParcel& data, MessageParcel& reply, MessageOption& option)
 {
-    if (!IsSACalling()) {
+    if (!IsTrustedCaller()) {
         return -1;
     }
     if (data.ReadInterfaceToken() != GetDescriptor()) {

@@ -25,4 +25,11 @@ uint32_t IPCSkeleton::GetCallingRealPid()
 {
     return 0;
 }
+
+uint32_t IPCSkeleton::mockCallingUid_ = 0;
+
+uint32_t IPCSkeleton::GetCallingUid()
+{
+    return mockCallingUid_;
+}
 }

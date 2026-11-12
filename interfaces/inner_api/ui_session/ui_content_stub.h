@@ -88,7 +88,8 @@ private:
     int32_t GetLazyForEachDataByPointInner(MessageParcel& data, MessageParcel& reply, MessageOption& option);
     int32_t GetNodesInRectInner(MessageParcel& data, MessageParcel& reply, MessageOption& option);
 
-    bool IsSACalling() const;
+    bool IsTrustedCaller() const;
+    static bool IsTrustedCallerUid(uint32_t uid);
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_INTERFACE_UI_CONTENT_STUB_H
