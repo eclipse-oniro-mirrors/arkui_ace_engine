@@ -3021,6 +3021,8 @@ HWTEST_F(RosenRenderContextTest, GetPointWithTransformGRectRefresh001, TestSize.
     auto rosenRenderContext = InitRosenRenderContext(frameNode);
     ASSERT_NE(rosenRenderContext, nullptr);
     ASSERT_NE(rosenRenderContext->rsNode_, nullptr);
+    bool backupContainerDeleteFlag = SystemProperties::containerDeleteFlag_;
+    SystemProperties::containerDeleteFlag_ = false;
     // Non-square paint rect so that GetPaintRectWithTransform (with-degree) and
     // GetPaintRectWithTransformWithoutDegree produce different gRect values when rotation != 0.
     rosenRenderContext->paintRect_ = RectF(0.0f, 0.0f, 200.0f, 100.0f);
@@ -3048,6 +3050,7 @@ HWTEST_F(RosenRenderContextTest, GetPointWithTransformGRectRefresh001, TestSize.
     rosenRenderContext->GetPointWithTransform(point2);
     EXPECT_TRUE(NearEqual(point1.GetX(), point2.GetX(), 0.001));
     EXPECT_TRUE(NearEqual(point1.GetY(), point2.GetY(), 0.001));
+    SystemProperties::containerDeleteFlag_ = backupContainerDeleteFlag;
 }
 
 /**
@@ -3062,6 +3065,8 @@ HWTEST_F(RosenRenderContextTest, GetPointWithTransformWithRotation002, TestSize.
     auto rosenRenderContext = InitRosenRenderContext(frameNode);
     ASSERT_NE(rosenRenderContext, nullptr);
     ASSERT_NE(rosenRenderContext->rsNode_, nullptr);
+    bool backupContainerDeleteFlag = SystemProperties::containerDeleteFlag_;
+    SystemProperties::containerDeleteFlag_ = false;
     rosenRenderContext->paintRect_ = RectF(0.0f, 0.0f, 200.0f, 100.0f);
     rosenRenderContext->GetRSNode()->SetRotation(90.0f);
 
@@ -3074,6 +3079,7 @@ HWTEST_F(RosenRenderContextTest, GetPointWithTransformWithRotation002, TestSize.
     // The point must be transformed by the 90-degree rotation; it cannot stay identical.
     EXPECT_FALSE(NearEqual(point.GetX(), original.GetX(), 0.001) &&
                  NearEqual(point.GetY(), original.GetY(), 0.001));
+    SystemProperties::containerDeleteFlag_ = backupContainerDeleteFlag;
 }
 
 /**
@@ -3088,6 +3094,8 @@ HWTEST_F(RosenRenderContextTest, GetPointWithTransformGRectRefresh003, TestSize.
     auto rosenRenderContext = InitRosenRenderContext(frameNode);
     ASSERT_NE(rosenRenderContext, nullptr);
     ASSERT_NE(rosenRenderContext->rsNode_, nullptr);
+    bool backupContainerDeleteFlag = SystemProperties::containerDeleteFlag_;
+    SystemProperties::containerDeleteFlag_ = false;
     rosenRenderContext->paintRect_ = RectF(0.0f, 0.0f, 200.0f, 100.0f);
     rosenRenderContext->GetRSNode()->SetRotation(45.0f);
 
@@ -3108,5 +3116,6 @@ HWTEST_F(RosenRenderContextTest, GetPointWithTransformGRectRefresh003, TestSize.
 
     EXPECT_TRUE(NearEqual(point1.GetX(), point2.GetX(), 0.001));
     EXPECT_TRUE(NearEqual(point1.GetY(), point2.GetY(), 0.001));
+    SystemProperties::containerDeleteFlag_ = backupContainerDeleteFlag;
 }
 } // namespace OHOS::Ace::NG
