@@ -313,7 +313,7 @@ def write_deployment_depfile(path, target, args, ignore_list, native_list):
     descriptor, temporary = tempfile.mkstemp(dir=destination.parent, prefix=".deploy-deps-")
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
-            stream.write(escape(target) + ": " + " ".join(
+            stream.write(escape(os.path.relpath(target)) + ": " + " ".join(
                 escape(os.path.relpath(file)) for file in sorted(dependencies)) + "\n")
         os.replace(temporary, destination)
     finally:
