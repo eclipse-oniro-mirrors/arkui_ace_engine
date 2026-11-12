@@ -77,6 +77,31 @@ class LazyArkImageAnimatorComponent extends ArkComponent {
     this.lazyComponent.monitorInvisibleArea(value);
     return this;
   }
+
+  onStart(event: () => void): this {
+    this.lazyComponent.onStart(event);
+    return this;
+  }
+
+  onPause(event: () => void): this {
+    this.lazyComponent.onPause(event);
+    return this;
+  }
+
+  onRepeat(event: () => void): this {
+    this.lazyComponent.onRepeat(event);
+    return this;
+  }
+
+  onCancel(event: () => void): this {
+    this.lazyComponent.onCancel(event);
+    return this;
+  }
+
+  onFinish(event: () => void): this {
+    this.lazyComponent.onFinish(event);
+    return this;
+  }
 }
 
 class ImageAnimatorModifier extends LazyArkImageAnimatorComponent implements AttributeModifier<ImageAnimatorAttribute> {
