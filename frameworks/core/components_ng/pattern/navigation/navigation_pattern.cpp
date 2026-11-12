@@ -86,7 +86,6 @@ constexpr int32_t MEMORY_LEVEL_LOW = 1;
 constexpr int32_t MEMORY_LEVEL_CRITICAL = 2;
 constexpr int32_t MEMORY_LEVEL_BACKGROUND_LOW = 5;
 constexpr int32_t MEMORY_LEVEL_BACKGROUND_CRITICAL = 6;
-constexpr int32_t START_ANIMATION_INVALID_ANIMATIONS = 2;
 
 namespace {
 // Offset from the stack end to the destination immediately below the top.
@@ -4575,10 +4574,7 @@ bool NavigationPattern::TriggerCustomAnimation(RefPtr<NavDestinationGroupNode> p
         isFinishInteractiveAnimation_ = false;
         navigationManager->FinishInteractiveAnimation();
         OnStartOneTransitionAnimation();
-        int32_t errorCode = proxy->StartAnimation();
-        if (errorCode == START_ANIMATION_INVALID_ANIMATIONS) {
-            proxy->FireFinishCallback();
-        }
+        proxy->StartAnimation();
     } else {
 #ifndef CROSS_PLATFORM
         PerfMonitor::GetPerfMonitor()->Start(PerfConstants::ABILITY_OR_PAGE_SWITCH, PerfActionType::LAST_UP, "");
