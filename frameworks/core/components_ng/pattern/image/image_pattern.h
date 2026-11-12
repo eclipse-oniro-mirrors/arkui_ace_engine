@@ -223,7 +223,7 @@ public:
 
     bool GetDefaultAutoResize();
     ImageInterpolation GetDefaultInterpolation();
-    void InitOnKeyEvent();
+void InitOnKeyEvent();
 
     void SetIsComponentSnapshotNode(bool isComponentSnapshotNode);
     void SetRenderedImageInfo(const RenderedImageInfo& renderedImageInfo);
@@ -269,7 +269,7 @@ protected:
     RefPtr<ImageContentModifier> contentMod_;
 
 private:
-    void DumpAdvanceSourceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+void DumpAdvanceSourceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
 
     class ObscuredImage : public CanvasImage {
         void DrawToRSCanvas(
@@ -300,7 +300,7 @@ private:
     bool CheckImagePrivacyForCopyOption();
     void UpdateOffsetForImageAnalyzerOverlay();
     void SetFrameOffsetForOverlayNode();
-
+    
     void OnLanguageConfigurationUpdate() override;
 
     /**
@@ -327,7 +327,7 @@ private:
     void PrepareAnimation(const RefPtr<CanvasImage>& image);
     void SetRedrawCallback(const RefPtr<CanvasImage>& image);
     void SetOnFinishCallback(const RefPtr<CanvasImage>& image);
-    void RegisterVisibleAreaChange(bool isCalcClip = true);
+void RegisterVisibleAreaChange(bool isCalcClip = true);
     void RegisterVisibleAreaChangeMultiThread(bool isCalcClip);
     void TriggerVisibleAreaChangeForChild(const RefPtr<UINode>& node, bool visible, double ratio);
 
@@ -380,7 +380,7 @@ private:
     void InitDefaultValue();
     void ClearAltData();
     void UpdateSvgSmoothEdgeValue();
-    void OnKeyEvent(const KeyEvent& event);
+        void OnKeyEvent(const KeyEvent& event);
     void InitFromThemeIfNeed();
     void LoadAltErrorImage(const ImageSourceInfo& altErrorImageSourceInfo);
     void ReportCompleteLoadEvent(const RefPtr<FrameNode>& host);
@@ -392,6 +392,7 @@ private:
     void PostNavDestRecycleTask();
     void CancelNavDestRecycleTask();
     void ExecuteNavDestRecycle();
+    static bool IsVisibleOnRenderTree(const RefPtr<FrameNode>& host);
 
 private:
     RefPtr<DrawableDescriptor> drawable_;
@@ -463,7 +464,7 @@ private:
     bool isMeasured_ = false;
     bool loadFailed_ = false;
     bool isLoadAlt_ = false;
-    bool decodeCacheActive_ = true;
+bool decodeCacheActive_ = true;
     ImageType imageType_ = ImageType::BASE;
     ContentTransitionType contentTransitionType_ = ContentTransitionType::IDENTITY;
     std::shared_ptr<CancelableCallback<void()>> navDestRecycleCallback_;
