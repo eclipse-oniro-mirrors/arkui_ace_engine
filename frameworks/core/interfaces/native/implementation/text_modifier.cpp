@@ -1092,7 +1092,7 @@ void SetBindSelectionMenuImpl(Ark_NativePointer node,
     }
     std::optional<SelectionMenuType> menuType;
     CHECK_NULL_VOID(options);
-    if (!options) {
+    if (options) {
         Converter::AssignCast(menuType, options->value.menuType.value);
     }
     CallbackHelper(*optContent).BuildAsync([frameNode, spanType = optSpanType.value(), convResponseType,
