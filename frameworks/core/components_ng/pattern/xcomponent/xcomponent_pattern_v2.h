@@ -99,7 +99,7 @@ private:
     void XComponentSizeChange(const RectF& surfaceRect);
     void OnSurfaceChanged(const RectF& surfaceRect);
     std::shared_ptr<Rosen::RSUIContext> GetRSUIContext(const RefPtr<FrameNode>& frameNode);
-    void FlushImplicitTransaction(const RefPtr<FrameNode>& frameNode);
+    void FlushRemoveChild();
     std::shared_ptr<Rosen::RSTransactionHandler> GetRSTransactionHandler(const RefPtr<FrameNode>& frameNode);
 
     void OnSurfaceShow();

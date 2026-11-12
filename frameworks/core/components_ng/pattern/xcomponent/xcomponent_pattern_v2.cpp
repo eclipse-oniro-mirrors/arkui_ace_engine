@@ -375,18 +375,9 @@ void XComponentPatternV2::DisposeSurface()
         surfaceHolder_->nativeWindow_ = nullptr;
     }
     nativeWindow_ = nullptr;
-    auto host = GetHost();
-    CHECK_NULL_VOID(host);
-    auto renderContext = host->GetRenderContext();
-    CHECK_NULL_VOID(renderContext);
-    // for surface type
-    CHECK_NULL_VOID(renderContextForSurface_);
-    renderContext->RemoveChild(renderContextForSurface_);
+    FlushRemoveChild();
     renderContextForSurface_ = nullptr;
     handlingSurfaceRenderContext_ = renderContextForSurface_;
-#ifdef ENABLE_ROSEN_BACKEND
-    FlushImplicitTransaction(host);
-#endif
 }
 
 std::shared_ptr<Rosen::RSTransactionHandler> XComponentPatternV2::GetRSTransactionHandler(
@@ -419,16 +410,33 @@ std::shared_ptr<Rosen::RSUIContext> XComponentPatternV2::GetRSUIContext(const Re
     return nullptr;
 }
 
-void XComponentPatternV2::FlushImplicitTransaction(const RefPtr<FrameNode>& frameNode)
+void XComponentPatternV2::FlushRemoveChild()
 {
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto renderContext = host->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    // for surface type
+    CHECK_NULL_VOID(renderContextForSurface_);
+
 #ifdef ENABLE_ROSEN_BACKEND
-    if (!SystemProperties::GetMultiInstanceEnabled()) {
+    auto rsUIContext = GetRSUIContext(host);
+    auto transactionHandler = rsUIContext ? rsUIContext->GetRSTransaction() : nullptr;
+    if (transactionHandler) {
+        transactionHandler->Begin();
+    }
+#endif
+
+    renderContext->RemoveChild(renderContextForSurface_);
+
+#ifdef ENABLE_ROSEN_BACKEND
+    if (transactionHandler) {
+        transactionHandler->Commit();
+    } else if (!SystemProperties::GetMultiInstanceEnabled()) {
         auto transactionProxy = Rosen::RSTransactionProxy::GetInstance();
         if (transactionProxy != nullptr) {
             transactionProxy->FlushImplicitTransaction();
         }
-    } else if (auto transactionHandler = GetRSTransactionHandler(frameNode)) {
-        transactionHandler->FlushImplicitTransaction();
     }
 #endif
 }
