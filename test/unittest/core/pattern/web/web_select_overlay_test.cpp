@@ -7563,7 +7563,12 @@ namespace {
 class TranslateInputOverlay final : public WebSelectOverlay {
 public:
     explicit TranslateInputOverlay(const WeakPtr<TextBase>& textBase) : WebSelectOverlay(textBase) {}
-    bool CanShowTranslateInput() const override { return supported_; }
+    bool CanShowTranslateInput() const override
+    {
+        ++eligibilityQueries_;
+        return supported_;
+    }
+    mutable int32_t eligibilityQueries_ = 0;
     bool supported_ = true;
 };
 
@@ -7639,20 +7644,21 @@ HWTEST_F(WebTranslateInputActionTest, ContinueUsesTranslationCommandAndConsumesE
 }
 
 /**
- * @tc.name: CapabilityLossConsumesEntryWithoutContinue
- * @tc.desc: Losing IME eligibility after displaying the entry rejects the click and retry.
+ * @tc.name: ClickReusesMenuEligibilityWithoutQuery
+ * @tc.desc: Clicking an advertised entry reuses menu eligibility and delegates final validation to IMF.
  * @tc.type: FUNC
  */
-HWTEST_F(WebTranslateInputActionTest, CapabilityLossConsumesEntryWithoutContinue, TestSize.Level1)
+HWTEST_F(WebTranslateInputActionTest, ClickReusesMenuEligibilityWithoutQuery, TestSize.Level1)
 {
 #ifdef OHOS_STANDARD_SYSTEM
     overlay_->supported_ = false;
     overlay_->OnMenuItemAction(OptionMenuActionId::TRANSLATE_INPUT, OptionMenuType::TOUCH_MENU);
-    EXPECT_EQ(callback_->calls_, 0);
+    EXPECT_EQ(callback_->calls_, 1);
+    EXPECT_EQ(overlay_->eligibilityQueries_, 0);
     EXPECT_FALSE(overlay_->webSelectInfo_.menuInfo.showTranslateInput);
-    overlay_->supported_ = true;
     overlay_->OnMenuItemAction(OptionMenuActionId::TRANSLATE_INPUT, OptionMenuType::TOUCH_MENU);
-    EXPECT_EQ(callback_->calls_, 0);
+    EXPECT_EQ(callback_->calls_, 1);
+    EXPECT_EQ(overlay_->eligibilityQueries_, 0);
 #endif
 }
 

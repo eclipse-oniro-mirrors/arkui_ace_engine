@@ -24,7 +24,6 @@ namespace OHOS::Ace {
 
 ACE_FORCE_EXPORT void NotifyInputMethodConfigChange(TextInputAction action, TextInputType keyboard);
 ACE_FORCE_EXPORT bool IsCurrentInputMethodDefaultIme();
-ACE_FORCE_EXPORT bool IsTranslateInputSupported();
 
 } // namespace OHOS::Ace
 

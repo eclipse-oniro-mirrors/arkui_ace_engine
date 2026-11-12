@@ -34,6 +34,10 @@
 #include "core/event/event_info_convertor.h"
 #include "nweb_handler.h"
 
+#if defined(ENABLE_STANDARD_INPUT)
+#include "input_method_controller.h"
+#endif
+
 namespace OHOS::Ace::NG {
 constexpr Dimension SELECT_HANDLE_DEFAULT_HEIGHT = 16.0_vp;
 constexpr float SELECT_MENE_HEIGHT = 140.0f;
@@ -41,6 +45,17 @@ constexpr int32_t HALF = 2;
 static constexpr std::string_view ASK_CELIA_TAG = "askCelia";
 
 namespace {
+bool IsTranslateInputSupported()
+{
+#if defined(ENABLE_STANDARD_INPUT)
+    auto inputMethod = MiscServices::InputMethodController::GetInstance();
+    CHECK_NULL_RETURN(inputMethod, false);
+    return inputMethod->IsInputTypeSupported(MiscServices::InputType::TRANSLATION_INPUT);
+#else
+    return false;
+#endif
+}
+
 struct InitStrategyTools {
     RefPtr<PipelineContext> pipeline = nullptr;
     RefPtr<TextOverlayTheme> theme = nullptr;
@@ -944,8 +959,8 @@ void WebSelectOverlay::HandleOnTranslateInput()
     auto pattern = GetPattern<WebPattern>();
     CHECK_NULL_VOID(pattern);
     bool canRequest = quickMenuCallback_ && webSelectInfo_.isSingleHandle &&
-        webSelectInfo_.menuInfo.showTranslateInput && CanShowTranslateInput();
-    // Consume before invoking the callback, including failed capability rechecks.
+        webSelectInfo_.menuInfo.showTranslateInput;
+    // Reuse the eligibility established for this menu; IMF validates the request.
     webSelectInfo_.menuInfo.showTranslateInput = false;
     if (canRequest) {
         quickMenuCallback_->Continue(OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_TRANSLATE_INPUT,
