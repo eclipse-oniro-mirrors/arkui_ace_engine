@@ -73,7 +73,7 @@ public:
             theme->passwordVaultSymbolId_ = themeConstants->GetSymbolByName("sys.symbol.key_horizontal");
             theme->pasteSymbolId_ = themeConstants->GetSymbolByName("sys.symbol.plus_square_dashed_on_square");
             theme->cameraInputSymbolId_ = themeConstants->GetSymbolByName("sys.symbol.auto_camera");
-            theme->aiWriteSymbolId_ = themeConstants->GetSymbolByName("sys.symbol.edit_badge_star");
+            theme->aiWriteSymbolId_ = themeConstants->GetSymbolByName("sys.symbol.AI_pencil");
             theme->searchSymbolId_ = themeConstants->GetSymbolByName("sys.symbol.magnifyingglass");
             theme->translateSymbolId_ = themeConstants->GetSymbolByName("sys.symbol.translate_c2e");
             theme->shareSymbolId_ = themeConstants->GetSymbolByName("sys.symbol.share");
