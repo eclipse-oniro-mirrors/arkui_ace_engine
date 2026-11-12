@@ -226,6 +226,19 @@ void FfiOHOSAceFrameworkListSetEdgeEffectWithOption(int32_t edgeEffect, bool opt
     ListModel::GetInstance()->SetEdgeEffect(LIST_EDGE_EFFECT[edgeEffect], options);
 }
 
+void FfiOHOSAceFrameworkListSetEdgeEffectWithOptions(int32_t edgeEffect, bool alwaysEnabled, int32_t effectEdge)
+{
+    if (!Utils::CheckParamsValid(edgeEffect, LIST_EDGE_EFFECT.size())) {
+        LOGE("invalid value for edgeEffect");
+        return;
+    }
+    if (effectEdge < static_cast<int32_t>(EffectEdge::START) || effectEdge > static_cast<int32_t>(EffectEdge::END)) {
+        effectEdge = static_cast<int32_t>(EffectEdge::ALL);
+    }
+    ListModel::GetInstance()->SetEdgeEffect(
+        LIST_EDGE_EFFECT[edgeEffect], alwaysEnabled, static_cast<EffectEdge>(effectEdge));
+}
+
 void FfiOHOSAceFrameworkListSetChainAnimation(bool flag)
 {
     ListModel::GetInstance()->SetChainAnimation(flag);
@@ -570,7 +583,7 @@ void FfiOHOSAceFrameworkListScrollerScrollToItemInGroup(
         return;
     }
     if (!Utils::CheckParamsValid(align, SCROLL_ALIGN_LIST.size())) {
-        LOGE("bindContextMenu error, invalid value for ScrollAlign");
+        LOGE("scrollToItemInGroup error, invalid value for ScrollAlign");
         return;
     }
     self_->ScrollToItemInGroup(index, indexInGroup, smooth, SCROLL_ALIGN_LIST[align]);
@@ -618,5 +631,122 @@ void FfiOHOSAceFrameworkListScrollerCloseAllSwipeActions(int64_t selfId)
     if (self_ != nullptr) {
         self_->CloseAllSwipeActions();
     }
+}
+
+namespace {
+constexpr int32_t ERR_LIST_CONTROLLER_NOT_BOUND = 100004;
+}
+
+CJListRectResult FfiOHOSAceFrameworkListScrollerGetItemRectInGroupV2(
+    int64_t selfId, int32_t index, int32_t indexInGroup)
+{
+    CJListRectResult result = { 0.0, 0.0, 0.0, 0.0, 0 };
+    auto self_ = FFIData::GetData<NativeListScroller>(selfId);
+    if (self_ == nullptr) {
+        LOGE("invalid listScrollerID");
+        return result;
+    }
+    if (!self_->GetController()) {
+        LOGE("listController is nullptr");
+        result.errorCode = ERR_LIST_CONTROLLER_NOT_BOUND;
+        return result;
+    }
+    auto rectResult = self_->GetItemRectInGroup(index, indexInGroup);
+    result.x = rectResult.Left();
+    result.y = rectResult.Top();
+    result.width = rectResult.Width();
+    result.height = rectResult.Height();
+    result.errorCode = 0;
+    return result;
+}
+
+int32_t FfiOHOSAceFrameworkListScrollerScrollToItemInGroupV2(
+    int64_t selfId, int32_t index, int32_t indexInGroup, bool smooth, int32_t align)
+{
+    auto self_ = FFIData::GetData<NativeListScroller>(selfId);
+    if (self_ == nullptr) {
+        LOGE("invalid listScrollerID");
+        return 0;
+    }
+    if (!self_->GetController()) {
+        LOGE("listController is nullptr");
+        return ERR_LIST_CONTROLLER_NOT_BOUND;
+    }
+    if (index < 0) {
+        return 0;
+    }
+    if (indexInGroup < 0) {
+        return 0;
+    }
+    if (!Utils::CheckParamsValid(align, SCROLL_ALIGN_LIST.size())) {
+        LOGE("scrollToItemInGroup error, invalid value for ScrollAlign");
+        return 0;
+    }
+    self_->ScrollToItemInGroup(index, indexInGroup, smooth, SCROLL_ALIGN_LIST[align]);
+    return 0;
+}
+
+CJListVisibleContentResult FfiOHOSAceFrameworkListScrollerGetVisibleListContentInfoV2(
+    int64_t selfId, double x, double y)
+{
+    Dimension xOffset = Dimension { x, DimensionUnit::VP };
+    Dimension yOffset = Dimension { y, DimensionUnit::VP };
+    auto self_ = FFIData::GetData<NativeListScroller>(selfId);
+    CJListVisibleContentResult listContentInfo = { -1, -1, -1, 0 };
+    if (self_ == nullptr) {
+        LOGE("invalid listScrollerID");
+        return listContentInfo;
+    }
+    if (!self_->GetController()) {
+        LOGE("listController is nullptr");
+        listContentInfo.errorCode = ERR_LIST_CONTROLLER_NOT_BOUND;
+        return listContentInfo;
+    }
+    auto container = Container::Current();
+    if (container) {
+        auto context = container->GetPipelineContext();
+        if (context) {
+            auto deltaX = context->NormalizeToPx(xOffset);
+            auto deltaY = context->NormalizeToPx(yOffset);
+            auto itemGroup = self_->GetVisibleListContentInfo(deltaX, deltaY);
+            listContentInfo.index = itemGroup.index;
+            if (itemGroup.area != -1) {
+                listContentInfo.itemGroupArea = itemGroup.area;
+            }
+            if (itemGroup.indexInGroup != -1) {
+                listContentInfo.itemIndexInGroup = itemGroup.indexInGroup;
+            }
+            listContentInfo.errorCode = 0;
+        }
+    }
+    return listContentInfo;
+}
+int32_t FfiOHOSAceFrameworkListScrollerCloseAllSwipeActionsWithCallbackV2(int64_t selfId, void (*onFinishCallback)())
+{
+    auto self_ = FFIData::GetData<NativeListScroller>(selfId);
+    if (self_ == nullptr) {
+        LOGE("invalid listScrollerID");
+        return 0;
+    }
+    if (!self_->GetController()) {
+        LOGE("listController is nullptr");
+        return ERR_LIST_CONTROLLER_NOT_BOUND;
+    }
+    self_->CloseAllSwipeActionsWithCallback(CJLambda::Create(onFinishCallback));
+    return 0;
+}
+int32_t FfiOHOSAceFrameworkListScrollerCloseAllSwipeActionsV2(int64_t selfId)
+{
+    auto self_ = FFIData::GetData<NativeListScroller>(selfId);
+    if (self_ == nullptr) {
+        LOGE("invalid listScrollerID");
+        return 0;
+    }
+    if (!self_->GetController()) {
+        LOGE("listController is nullptr");
+        return ERR_LIST_CONTROLLER_NOT_BOUND;
+    }
+    self_->CloseAllSwipeActions();
+    return 0;
 }
 }

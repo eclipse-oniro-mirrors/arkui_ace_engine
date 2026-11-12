@@ -183,6 +183,30 @@ void FfiOHOSAceFrameworkCheckBoxGroupSetMark(
     }
 }
 
+void FfiOHOSAceFrameworkCheckBoxGroupSetMarkV2(CJCheckBoxGroupMarkOptions options)
+{
+    if (options.hasStrokeColor) {
+        GetCheckBoxGroupModel()->SetCheckMarkColor(Color(options.strokeColor));
+    }
+    Dimension sizeValue(options.size, static_cast<DimensionUnit>(options.sizeUnit));
+    CalcDimension sizeVal = CalcDimension(sizeValue);
+    if ((sizeVal.Unit() != DimensionUnit::PERCENT) && (sizeVal.ConvertToVp() >= 0)) {
+        GetCheckBoxGroupModel()->SetCheckMarkSize(sizeValue);
+    } else {
+        GetCheckBoxGroupModel()->SetCheckMarkSize(
+            Dimension(CHECK_BOX_GROUP_MARK_SIZE_INVALID_VALUE, DimensionUnit::VP));
+    }
+
+    Dimension widthValue(options.strokeWidth, static_cast<DimensionUnit>(options.strokeWidthUnit));
+    CalcDimension widthVal = CalcDimension(widthValue);
+    if ((widthVal.Unit() != DimensionUnit::PERCENT) && (widthVal.ConvertToVp() >= 0)) {
+        GetCheckBoxGroupModel()->SetCheckMarkWidth(widthValue);
+    } else {
+        GetCheckBoxGroupModel()->SetCheckMarkWidth(
+            Dimension(CHECK_BOX_GROUP_MARK_WIDTH_INVALID_VALUE, DimensionUnit::VP));
+    }
+}
+
 void FfiOHOSAceFrameworkCheckBoxGroupSetCheckboxShape(int32_t value)
 {
     CheckBoxStyle curCheckBoxGroupStyle = static_cast<CheckBoxStyle>(value);

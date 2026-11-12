@@ -29,6 +29,15 @@ struct FFiCheckboxGroupResult {
     const char** nameBuffer;
 };
 
+struct CJCheckBoxGroupMarkOptions {
+    uint32_t strokeColor;
+    bool hasStrokeColor;
+    double size;
+    int32_t sizeUnit;
+    double strokeWidth;
+    int32_t strokeWidthUnit;
+};
+
 CJ_EXPORT void FfiOHOSAceFrameworkCheckBoxGroupCreate(const char* name);
 CJ_EXPORT void FfiOHOSAceFrameworkCheckBoxGroupSelectAll(bool value);
 CJ_EXPORT void FfiOHOSAceFrameworkCheckBoxGroupSetSelectedColor(uint32_t color);
@@ -45,6 +54,8 @@ CJ_EXPORT void FfiCheckBoxGroupSetResponseRegionArray(VectorStringPtr vecContent
 CJ_EXPORT void FfiOHOSAceFrameworkCheckBoxGroupSetUnSelectedColor(uint32_t value);
 CJ_EXPORT void FfiOHOSAceFrameworkCheckBoxGroupSetMark(
     uint32_t strokeColor, double size, int32_t sizeUnit, double strokeWidth, int32_t strokeWidthUnit);
+
+CJ_EXPORT void FfiOHOSAceFrameworkCheckBoxGroupSetMarkV2(CJCheckBoxGroupMarkOptions options);
 CJ_EXPORT void FfiOHOSAceFrameworkCheckBoxGroupSetCheckboxShape(int32_t value);
 }
 
