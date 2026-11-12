@@ -32,6 +32,8 @@
 #include "jsview/js_view_abstract.h"
 #include "core/components_ng/pattern/app_bar/app_bar_view.h"
 #include "core/components_ng/manager/navigation/navigation_manager.h"
+#include "core/common/container.h"
+#include "interfaces/inner_api/ace/constants.h"
 
 namespace OHOS::Ace::Framework {
 namespace {
@@ -3722,6 +3724,86 @@ RefPtr<PipelineBase> FrontendDelegateDeclarative::GetPipelineContext()
     return pipelineContextHolder_.Get();
 }
 
+
+namespace {
+// ===== RecoverableStorage bridge helpers (local, per-TU — no shared header to avoid fan-out) =====
+
+bool IsRecoverableContentInfoType(ContentInfoType type)
+{
+    return type == ContentInfoType::APP_RECOVERY || type == ContentInfoType::RESOURCESCHEDULE_RECOVERY;
+}
+
+std::string GetRecoverableStorageSection(const RecoverableSnapshotCallBack& callback)
+{
+    std::string section;
+    if (!callback) {
+        return section;
+    }
+    // Direct JSI call (func->Call) — no PostSyncTask to the JS message loop: on the
+    // APP_FREEZE save path this runs on a worker thread while the JS main loop is
+    // blocked; PostSyncTask (0ms = no timeout) would deadlock the save chain.
+    int32_t instanceId = Container::CurrentId();
+    callback(instanceId, section);
+    return section;
+}
+
+void DeliverRecoverableStorageSection(const RecoverableRestoreCallBack& callback, const std::string& section)
+{
+    if (!callback || section.empty()) {
+        return;
+    }
+    // Deliver to the consuming window's runtime instanceId (Container::CurrentId).
+    // After restart the window container ids are reassigned by launch order while the
+    // id embedded in the section JSON is the pre-kill original — they only align when
+    // cards are tapped in original creation order. CurrentId() is the id the restored
+    // window will connect with (the TS side maps the section's own single instance
+    // key onto this id; see setRestoredData in recoverable_storage.ts).
+    int32_t instanceId = Container::CurrentId();
+    callback(instanceId, section);
+}
+
+// RecoverableStorage restore delivery (design ADR-3): covers BOTH arrival paths — the
+// default recovery (ShouldDefaultRecoverState) and HandleCreateAsRecovery — because
+// every recovery restore funnels through RestoreRouterStack.
+void DeliverRecoverableSectionIfPresent(const std::unique_ptr<JsonValue>& jsonContentInfo,
+    ContentInfoType type, const RecoverableRestoreCallBack& callback)
+{
+    if (!IsRecoverableContentInfoType(type)) {
+        return;
+    }
+    auto recoverableSection = jsonContentInfo->GetValue("recoverableStorage");
+    if (recoverableSection && recoverableSection->IsValid() && recoverableSection->IsString()) {
+        DeliverRecoverableStorageSection(callback, recoverableSection->GetString());
+    }
+}
+
+// Restores the RESOURCESCHEDULE_RECOVERY extras (named routers and full paths).
+// Returns false when a payload is structurally invalid, in which case the caller
+// must abort with UIContentErrorCode::WRONG_PAGE_ROUTER.
+bool RestoreResourceScheduleInfos(const std::unique_ptr<JsonValue>& jsonContentInfo,
+    const RefPtr<NG::PageRouterManager>& pageRouterManager)
+{
+    auto namedRouterInfo = jsonContentInfo->GetValue("namedRouterInfo");
+    if (namedRouterInfo && namedRouterInfo->IsValid()) {
+        if (!namedRouterInfo->IsArray()) {
+            LOGD("restore named router info is invalid");
+            return false;
+        }
+        pageRouterManager->RestoreNamedRouterInfo(std::move(namedRouterInfo));
+    }
+    auto fullPathInfo = jsonContentInfo->GetValue("fullPathInfo");
+    if (fullPathInfo && fullPathInfo->IsValid()) {
+        if (!fullPathInfo->IsArray()) {
+            LOGD("restore full path info is invalid");
+            return false;
+        }
+        pageRouterManager->RestoreFullPathInfo(std::move(fullPathInfo));
+    }
+    return true;
+}
+
+} // anonymous namespace
+
 std::pair<RouterRecoverRecord, UIContentErrorCode> FrontendDelegateDeclarative::RestoreRouterStack(
     const std::string& contentInfo, ContentInfoType type)
 {
@@ -3731,6 +3813,7 @@ std::pair<RouterRecoverRecord, UIContentErrorCode> FrontendDelegateDeclarative::
         LOGW("restore contentInfo is invalid");
         return std::make_pair(RouterRecoverRecord(), UIContentErrorCode::WRONG_PAGE_ROUTER);
     }
+    DeliverRecoverableSectionIfPresent(jsonContentInfo, type, recoverableRestoreCallBack_);
     if (type == ContentInfoType::CONTINUATION || type == ContentInfoType::APP_RECOVERY) {
         // restore node info
         auto jsonNodeInfo = jsonContentInfo->GetValue("nodeInfo");
@@ -3743,50 +3826,14 @@ std::pair<RouterRecoverRecord, UIContentErrorCode> FrontendDelegateDeclarative::
     // restore stack info
     auto routerStack = jsonContentInfo->GetValue("stackInfo");
     if (!Container::IsCurrentUseNewPipeline()) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (!routerStack->IsValid() || !routerStack->IsArray()) {
-            LOGW("restore router stack is invalid");
-            return std::make_pair(RouterRecoverRecord(), UIContentErrorCode::WRONG_PAGE_ROUTER);
-        }
-        int32_t stackSize = routerStack->GetArraySize();
-        if (stackSize < 1) {
-            LOGW("restore stack size: %{public}d is invalid", stackSize);
-            return std::make_pair(RouterRecoverRecord(), UIContentErrorCode::WRONG_PAGE_ROUTER);
-        }
-        for (int32_t index = 0; index < stackSize - 1; ++index) {
-            std::string url = routerStack->GetArrayItem(index)->ToString();
-            // remove 2 useless character, as "XXX" to XXX
-            PageInfo pageInfo;
-            pageInfo.pageId = GenerateNextPageId();
-            pageInfo.url = url.substr(1, url.size() - USELESS_CHARACTER_SIZE);
-            pageInfo.isRestore = true;
-            pageRouteStack_.emplace_back(pageInfo);
-        }
-        std::string startUrl = routerStack->GetArrayItem(stackSize - 1)->ToString();
-        // remove 5 useless character, as "XXX.js" to XXX
-        return std::make_pair(RouterRecoverRecord(startUrl.substr(1, startUrl.size() - 5), "", false),
-            UIContentErrorCode::NO_ERRORS);
+        return RestoreLegacyRouterStack(routerStack);
     }
 
     CHECK_NULL_RETURN(pageRouterManager_,
         std::make_pair(RouterRecoverRecord(), UIContentErrorCode::NULL_PAGE_ROUTER));
-    if (type == ContentInfoType::RESOURCESCHEDULE_RECOVERY) {
-        auto namedRouterInfo = jsonContentInfo->GetValue("namedRouterInfo");
-        if (namedRouterInfo && namedRouterInfo->IsValid()) {
-            if (!namedRouterInfo->IsArray()) {
-                LOGD("restore named router info is invalid");
-                return std::make_pair(RouterRecoverRecord(), UIContentErrorCode::WRONG_PAGE_ROUTER);
-            }
-            pageRouterManager_->RestoreNamedRouterInfo(std::move(namedRouterInfo));
-        }
-        auto fullPathInfo = jsonContentInfo->GetValue("fullPathInfo");
-        if (fullPathInfo && fullPathInfo->IsValid()) {
-            if (!fullPathInfo->IsArray()) {
-                LOGD("restore full path info is invalid");
-                return std::make_pair(RouterRecoverRecord(), UIContentErrorCode::WRONG_PAGE_ROUTER);
-            }
-            pageRouterManager_->RestoreFullPathInfo(std::move(fullPathInfo));
-        }
+    if (type == ContentInfoType::RESOURCESCHEDULE_RECOVERY &&
+        !RestoreResourceScheduleInfos(jsonContentInfo, pageRouterManager_)) {
+        return std::make_pair(RouterRecoverRecord(), UIContentErrorCode::WRONG_PAGE_ROUTER);
     }
     // restore navigation info
     auto pipelineContextNG = AceType::DynamicCast<NG::PipelineContext>(pipelineContextHolder_.Get());
@@ -3795,6 +3842,46 @@ std::pair<RouterRecoverRecord, UIContentErrorCode> FrontendDelegateDeclarative::
         pipelineContextNG->GetNavigationManager()->StorageNavigationRecoveryInfo(std::move(navigationRecoveryInfo));
     }
     return pageRouterManager_->RestoreRouterStack(std::move(routerStack), type);
+}
+
+std::pair<RouterRecoverRecord, UIContentErrorCode> FrontendDelegateDeclarative::RestoreLegacyRouterStack(
+    const std::unique_ptr<JsonValue>& routerStack)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!routerStack->IsValid() || !routerStack->IsArray()) {
+        LOGW("restore router stack is invalid");
+        return std::make_pair(RouterRecoverRecord(), UIContentErrorCode::WRONG_PAGE_ROUTER);
+    }
+    int32_t stackSize = routerStack->GetArraySize();
+    if (stackSize < 1) {
+        LOGW("restore stack size: %{public}d is invalid", stackSize);
+        return std::make_pair(RouterRecoverRecord(), UIContentErrorCode::WRONG_PAGE_ROUTER);
+    }
+    for (int32_t index = 0; index < stackSize - 1; ++index) {
+        std::string url = routerStack->GetArrayItem(index)->ToString();
+        // remove 2 useless character, as "XXX" to XXX
+        PageInfo pageInfo;
+        pageInfo.pageId = GenerateNextPageId();
+        pageInfo.url = url.substr(1, url.size() - USELESS_CHARACTER_SIZE);
+        pageInfo.isRestore = true;
+        pageRouteStack_.emplace_back(pageInfo);
+    }
+    std::string startUrl = routerStack->GetArrayItem(stackSize - 1)->ToString();
+    // remove 5 useless character, as "XXX.js" to XXX
+    return std::make_pair(RouterRecoverRecord(startUrl.substr(1, startUrl.size() - 5), "", false),
+        UIContentErrorCode::NO_ERRORS);
+}
+
+void FrontendDelegateDeclarative::SetRecoverableSnapshotCallBack(
+    RecoverableSnapshotCallBack&& recoverableSnapshotCallBack)
+{
+    recoverableSnapshotCallBack_ = recoverableSnapshotCallBack;
+}
+
+void FrontendDelegateDeclarative::SetRecoverableRestoreCallBack(
+    RecoverableRestoreCallBack&& recoverableRestoreCallBack)
+{
+    recoverableRestoreCallBack_ = recoverableRestoreCallBack;
 }
 
 std::string FrontendDelegateDeclarative::GetContentInfo(ContentInfoType type)
@@ -3832,6 +3919,15 @@ std::string FrontendDelegateDeclarative::GetContentInfo(ContentInfoType type)
         auto pipelineContext = pipelineContextHolder_.Get();
         CHECK_NULL_RETURN(pipelineContext, jsonContentInfo->ToString());
         jsonContentInfo->Put("nodeInfo", pipelineContext->GetStoredNodeInfo());
+    }
+
+    // RecoverableStorage snapshot section: appended for both recovery contentInfo types
+    // (APP_RECOVERY = 2 / RESOURCESCHEDULE_RECOVERY = 3), never for CONTINUATION.
+    if (IsRecoverableContentInfoType(type)) {
+        auto recoverableSection = GetRecoverableStorageSection(recoverableSnapshotCallBack_);
+        if (!recoverableSection.empty()) {
+            jsonContentInfo->Put("recoverableStorage", recoverableSection.c_str());
+        }
     }
 
     return jsonContentInfo->ToString();

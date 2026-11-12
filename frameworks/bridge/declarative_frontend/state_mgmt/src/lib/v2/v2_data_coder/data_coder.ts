@@ -18,19 +18,26 @@ function nullOrUndef(value: unknown): boolean {
   return value === null || value === undefined;
 }
 
+// Read-only skip policy for stringify/restoreTo:
+// - boolean: legacy getter-only semantics (skip props with a getter and no setter anywhere
+//   on the prototype chain) — PersistenceV2 opt-in behavior, unchanged;
+// - predicate: caller-defined read-only detection, e.g. RecoverableStorage also skips
+//   @Computed accessors and non-writable data properties (ADR-14).
+type ReadOnlyPropertyFilter = boolean | ((target: object, prop: string) => boolean);
+
 class DataCoder {
   // Tag to detect payload format
   public static readonly FORMAT_TAG = 'JSON2';
 
   // Track visited target objects to prevent recursion in restoreObject()
-  private static visitedTargets_ = new Set<string>();
+  private static visitedTargets_ = new Set<object>();
   // Track visited source objects to restore shared references
   private static visitedSources_ = new Map<object, object>();
 
   /**
    * Serialize an object to a JSON2
    */
-  public static stringify<T>(value: T, forceLegacyFormat: boolean = false, ignoreReadOnlyProperties: boolean = false): string {
+  public static stringify<T>(value: T, forceLegacyFormat: boolean = false, ignoreReadOnlyProperties: ReadOnlyPropertyFilter = false): string {
     if (forceLegacyFormat) {
       return JSONCoder.stringify(value);
     }
@@ -80,12 +87,24 @@ class DataCoder {
     return hasGetter && !hasSetter;
   }
 
+  // Resolve the read-only skip decision for one property. A boolean keeps the legacy
+  // getter-only semantics; a predicate delegates read-only detection to the caller.
+  static shouldSkipReadOnlyProperty(filter: ReadOnlyPropertyFilter, target: object, prop: string): boolean {
+    if (filter === false || filter === undefined) {
+      return false;
+    }
+    if (typeof filter === 'function') {
+      return filter(target, prop);
+    }
+    return DataCoder.isReadOnlyGetter(target, prop);
+  }
+
   /**
    * Restore the state of 'source' object into 'target' object(s), restore aliased prop names
    */
   public static restoreTo<T extends object, S extends object>(
     target: T | T[], source: T | T[], defaultSubCreator?: StorageDefaultCreator<S>,
-    ignoreReadOnlyProperties: boolean = false
+    ignoreReadOnlyProperties: ReadOnlyPropertyFilter = false
   ): T | T[] {
     const origTarget = ObserveV2.IsMakeObserved(target)
       ? UIUtilsImpl.instance().getTarget(target)
@@ -157,111 +176,135 @@ class DataCoder {
 
   // Recursively restore object 'source' into 'target' considering TransformOptions
   // opts = { alias?, factory?, disabled? }
-  private static restoreObject(target: any, source: any, opts: TransformOptions<any>, ignoreReadOnlyProperties: boolean = false): void {
-    // meta = { [prop]: { alias, factory, disabled } }
-    const meta = Meta.gets(target) as Record<string, TransformOptions<any>>;
+  private static restoreObject(target: any, source: any, opts: TransformOptions<any>,
+    ignoreReadOnlyProperties: ReadOnlyPropertyFilter = false): void {
+    if (!this.trackVisited_(target, source)) {
+      return;
+    }
+    if (source instanceof Array) {
+      this.restoreArray_(target, source, opts, ignoreReadOnlyProperties);
+    } else if (source instanceof Set) {
+      this.restoreSet_(target, source, opts, ignoreReadOnlyProperties);
+    } else if (source instanceof Map) {
+      this.restoreMap_(target, source, opts, ignoreReadOnlyProperties);
+    } else if (source instanceof SendableArray) {
+      this.restoreSendableArray_(target, source, opts, ignoreReadOnlyProperties);
+    } else if (source instanceof SendableMap) {
+      this.restoreSendableMap_(target, source, opts, ignoreReadOnlyProperties);
+    } else if (source instanceof SendableSet) {
+      this.restoreSendableSet_(target, source, opts, ignoreReadOnlyProperties);
+    } else if (source && typeof source === 'object') {
+      this.restorePlainProperties_(target, source, ignoreReadOnlyProperties);
+    }
+  }
 
-    // reversed map of meta = { [alias]: prop }
-    const alias2prop = new Map<string, string>(
-      Object.entries(meta).map(([prop, opts]) => [opts.alias ?? prop, prop])
-    );
-
-    // clone or copy an array/map/set item value
-    const cloneOrCopy = (value: any): any => {
-      if (typeof value !== 'object') {
-        return value;
-      }
-
-      if (this.visitedSources_.has(value)) {
-        return this.visitedSources_.get(value);
-      }
-
-      if (opts?.factory === undefined) {
-        this.visitedSources_.set(value, value);
-        return value;
-      }
-
-      const clazz = opts.factory(value);
-      const newValue = clazz ? new clazz() : value;
-
-      // we don't allow collections directly nested inside other collections
-      this.throwIfCollection(newValue);
-
-      this.restoreObject(newValue, value, opts, ignoreReadOnlyProperties);
-      return newValue;
-    };
-
-    // track visited targets (objects) to prevent recursion
+  // Track visited targets to prevent recursion; returns false when target was already visited.
+  private static trackVisited_(target: unknown, source: unknown): boolean {
     if (typeof target === 'object' && target != null) {
       if (this.visitedTargets_.has(target)) {
-        return;
+        return false;
       }
       this.visitedTargets_.add(target);
     }
-
-    // track visited sources (objects) to restore shared references
     if (typeof source === 'object' && source != null) {
       if (!this.visitedSources_.has(source)) {
-        this.visitedSources_.set(source, target);
+        this.visitedSources_.set(source, target as object);
       }
     }
+    return true;
+  }
 
-    if (source instanceof Array) {
-      this.throwIfNotInstanceOf(target, Array);
-      target.length = source.length;
-      source.forEach((item, idx) => { target[idx] = cloneOrCopy(item); });
-      return;
+  // Clone or copy an array/map/set item value (factory rebuild when present).
+  private static cloneOrCopy_(value: unknown, opts: TransformOptions<unknown>,
+    ignoreReadOnlyProperties: ReadOnlyPropertyFilter): unknown {
+    if (typeof value !== 'object') {
+      return value;
     }
-
-    if (source instanceof Set) {
-      this.throwIfNotInstanceOf(target, Set);
-      target.clear();
-      source.forEach(item => { target.add(cloneOrCopy(item)); });
-      return;
+    if (this.visitedSources_.has(value)) {
+      return this.visitedSources_.get(value);
     }
-
-    if (source instanceof Map) {
-      this.throwIfNotInstanceOf(target, Map);
-      target.clear();
-      source.forEach((item, key) => { target.set(key, cloneOrCopy(item)); });
-      return;
+    if (opts?.factory === undefined) {
+      this.visitedSources_.set(value, value);
+      return value;
     }
+    const clazz = opts.factory(value);
+    const newValue = clazz ? new clazz() : value;
+    // we don't allow collections directly nested inside other collections
+    this.throwIfCollection(newValue);
+    this.restoreObject(newValue, value, opts as TransformOptions<any>, ignoreReadOnlyProperties);
+    return newValue;
+  }
 
-    // collections.Array
-    if (source instanceof SendableArray) {
-      this.throwIfNotInstanceOf(target, SendableArray);
-      const items = [...source].map(cloneOrCopy);
-      target.splice(0, target.length, ...items);
-      return;
+  private static restoreArray_(target: unknown[], source: unknown[], opts: TransformOptions<unknown>,
+    ignoreReadOnlyProperties: ReadOnlyPropertyFilter): void {
+    this.throwIfNotInstanceOf(target, Array);
+    target.length = source.length;
+    source.forEach((item, idx) => {
+      target[idx] = this.cloneOrCopy_(item, opts, ignoreReadOnlyProperties);
+    });
+  }
+
+  private static restoreSet_(target: Set<unknown>, source: Set<unknown>, opts: TransformOptions<unknown>,
+    ignoreReadOnlyProperties: ReadOnlyPropertyFilter): void {
+    this.throwIfNotInstanceOf(target, Set);
+    target.clear();
+    source.forEach(item => {
+      target.add(this.cloneOrCopy_(item, opts, ignoreReadOnlyProperties));
+    });
+  }
+
+  private static restoreMap_(target: Map<unknown, unknown>, source: Map<unknown, unknown>,
+    opts: TransformOptions<unknown>, ignoreReadOnlyProperties: ReadOnlyPropertyFilter): void {
+    this.throwIfNotInstanceOf(target, Map);
+    target.clear();
+    source.forEach((item, key) => {
+      target.set(key, this.cloneOrCopy_(item, opts, ignoreReadOnlyProperties));
+    });
+  }
+
+  private static restoreSendableArray_(target: any, source: SendableArray<any>,
+    opts: TransformOptions<any>, ignoreReadOnlyProperties: ReadOnlyPropertyFilter): void {
+    this.throwIfNotInstanceOf(target, SendableArray);
+    const items = [...source].map(item => this.cloneOrCopy_(item, opts, ignoreReadOnlyProperties));
+    target.splice(0, target.length, ...items);
+  }
+
+  private static restoreSendableMap_(target: any, source: SendableMap<any, any>,
+    opts: TransformOptions<any>, ignoreReadOnlyProperties: ReadOnlyPropertyFilter): void {
+    this.throwIfNotInstanceOf(target, SendableMap);
+    target.clear();
+    for (let [key, item] of source) {
+      target.set(key, this.cloneOrCopy_(item, opts, ignoreReadOnlyProperties));
     }
+  }
 
-    // collections.Map
-    if (source instanceof SendableMap) {
-      this.throwIfNotInstanceOf(target, SendableMap);
-      target.clear();
-      for (let [key, item] of source) { target.set(key, cloneOrCopy(item)); }
-      return;
+  private static restoreSendableSet_(target: any, source: SendableSet<any>,
+    opts: TransformOptions<any>, ignoreReadOnlyProperties: ReadOnlyPropertyFilter): void {
+    this.throwIfNotInstanceOf(target, SendableSet);
+    target.clear();
+    for (let item of source) {
+      target.add(this.cloneOrCopy_(item, opts, ignoreReadOnlyProperties));
     }
+  }
 
-    // collections.Set
-    if (source instanceof SendableSet) {
-      this.throwIfNotInstanceOf(target, SendableSet);
-      target.clear();
-      for (let item of source) { target.add(cloneOrCopy(item)); }
-      return;
-    }
-
-    // restore target properties from source (incl. undefined)
-    if (source && typeof source === 'object') {
-      for (const [key, val] of Object.entries(source)) {
-        const targetProp = alias2prop.get(key) ?? key;
-        if (ignoreReadOnlyProperties === true && DataCoder.isReadOnlyGetter(target, targetProp)) {
-          continue;
-        }
-        const sourceProp = meta[targetProp]?.alias ?? targetProp;
-        const propOptions = meta[targetProp] || {};
-        this.restorePropValue(target, targetProp, source, sourceProp, propOptions, ignoreReadOnlyProperties);
+  // Restore target properties from source (incl. undefined) for plain objects.
+  private static restorePlainProperties_(target: Record<string, unknown>, source: Record<string, unknown>,
+    ignoreReadOnlyProperties: ReadOnlyPropertyFilter): void {
+    // meta = { [prop]: { alias, factory, disabled } }
+    const meta = Meta.gets(target) as Record<string, TransformOptions<unknown>>;
+    // reversed map of meta = { [alias]: prop }
+    const alias2prop = new Map<string, string>(
+      Object.entries(meta).map(([prop, propOpts]) => [propOpts.alias ?? prop, prop])
+    );
+    for (const [key] of Object.entries(source)) {
+      const targetProp = alias2prop.get(key) ?? key;
+      if (DataCoder.shouldSkipReadOnlyProperty(ignoreReadOnlyProperties, target, targetProp)) {
+        continue;
       }
+      const sourceProp = meta[targetProp]?.alias ?? targetProp;
+      const propOptions = meta[targetProp] || {};
+      this.restorePropValue(target, targetProp, source, sourceProp,
+        propOptions as TransformOptions<any>, ignoreReadOnlyProperties);
     }
   }
 
@@ -269,9 +312,9 @@ class DataCoder {
   // opts = { alias, factory, disabled }
   private static restorePropValue(
     target: any, targetProp: string, source: any, sourceProp: string, opts: TransformOptions<any> = {},
-    ignoreReadOnlyProperties: boolean = false
+    ignoreReadOnlyProperties: ReadOnlyPropertyFilter = false
   ): void {
-    if (ignoreReadOnlyProperties === true && DataCoder.isReadOnlyGetter(target, targetProp)) {
+    if (DataCoder.shouldSkipReadOnlyProperty(ignoreReadOnlyProperties, target, targetProp)) {
       return;
     }
     const srcVal = source[sourceProp];

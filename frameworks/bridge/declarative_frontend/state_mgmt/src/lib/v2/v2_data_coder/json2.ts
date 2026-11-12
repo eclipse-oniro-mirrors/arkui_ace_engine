@@ -17,14 +17,15 @@ class JSON2 {
   /**
    * JSON-like stringify with refs, cycles, and special types (Map, Set, Date, etc.)
    */
-  static stringify<T>(value: T, ignoreReadOnlyProperties: boolean = false): string {
+  static stringify<T>(value: T, ignoreReadOnlyProperties: ReadOnlyPropertyFilter = false): string {
     // visited objects along with their assigned refIDs
     const visited = new Map<object, string>();
 
     const serialize = (value: unknown, isRoot: boolean = true): string => {
       const root = isRoot ? value : undefined;
       return JSON.stringify(value, function(key: string, value: unknown) {
-        return replace.call(this, key, value, root);
+        return JSON2.replaceValue_(this, key, value, root,
+          visited, serialize, serializeSendable, ignoreReadOnlyProperties);
       });
     };
 
@@ -35,63 +36,116 @@ class JSON2 {
       return (JSON as any).stringifySendable(value);
     };
 
-    const replace = function (key: string, val: any, root: any): any {
-      // don't trust JSON replacer's arg 'val' (it turns Date objects into strings)
-      const value = this[key];
-
-      if (value === null) { throw new TypeError('Cannot read property __proto__ of null'); }
-      if (typeof value === 'string') { return `st????${value}`; }
-      if (typeof value === 'bigint') { return `bi????${value.toString()}`; }
-      if (typeof value === 'undefined') { return `re????`; }
-      if (typeof value !== 'object') {
-        return value;
-      }
-
-      let refId = visited.get(value);
-      if (refId) {
-        return `re${refId}`;
-      }
-
-      refId = visited.size.toString(32).padStart(4, '0');
-      visited.set(value, refId);
-
-      if (value instanceof Boolean) { return `Bo${refId}${value.toString()}`; }
-      if (value instanceof Date) { return `Da${refId}${value.toISOString()}`; }
-      if (value instanceof Number) { return `Nu${refId}${value.toString()}`; }
-      if (value instanceof String) { return `St${refId}${value}`; }
-      if (value instanceof Set) { return `Se${refId}${serialize([...value])}`; }
-      if (value instanceof SendableArray) { return `SA${refId}${serializeSendable([...value])}`; }
-      if (value instanceof SendableMap) { return `SM${refId}${serializeSendable([...value])}`; }
-      if (value instanceof SendableSet) { return `SS${refId}${serializeSendable([...value])}`; }
-      if (globalThis.isSendable(value)) { return `SO${refId}${serializeSendable(value)}`; }
-
-      if (value instanceof Array) {
-        // serialize each item separately, then put them back together
-        const items = value.map(item => JSON.parse(serialize(item, false)));
-        // and stringify
-        return `Ar${refId}${JSON.stringify(items)}`;
-      }
-
-      if (value instanceof Map) {
-        // serialize each item separately, keep keys unchanged
-        const items = [...value].map(([key, val]) => [key, serialize(val, false)]);
-        // and stringify
-        return `Ma${refId}${JSON.stringify(items)}`;
-      }
-
-      // replace property names with their aliases if any, skip disabled ones
-      const aliased = JSON2.toAliasedObject(value, ignoreReadOnlyProperties);
-
-      // skip root to prevent recursion
-      if (root === value) {
-        return aliased;
-      }
-
-      return `Ob${refId}${serialize(aliased)}`;
-    }
-
     // wrap value to ensure the root is always a regular object
     return serialize({ $: value });
+  }
+
+  // Type-dispatch replacement for JSON.stringify replacer (extracted from stringify).
+  // 'obj' is the replacer's this-context (the object currently being traversed).
+  private static replaceValue_(obj: Record<string, unknown>, key: string, val: unknown, root: unknown,
+    visited: Map<object, string>,
+    serialize: (v: unknown, isRoot?: boolean) => string,
+    serializeSendable: (v: unknown) => string,
+    ignoreReadOnlyProperties: ReadOnlyPropertyFilter): unknown {
+    // don't trust JSON replacer's arg 'val' (it turns Date objects into strings)
+    const value = obj[key];
+
+    if (value === null) {
+      throw new TypeError('Cannot read property __proto__ of null');
+    }
+    if (typeof value !== 'object') {
+      return JSON2.encodePrimitive_(value);
+    }
+
+    let refId = visited.get(value);
+    if (refId) {
+      return `re${refId}`;
+    }
+
+    refId = visited.size.toString(32).padStart(4, '0');
+    visited.set(value, refId);
+
+    const special = JSON2.trySpecialType_(value, refId, serialize, serializeSendable);
+    if (special !== null) {
+      return special;
+    }
+
+    if (value instanceof Array) {
+      return JSON2.encodeArray_(value, refId, serialize);
+    }
+    if (value instanceof Map) {
+      return JSON2.encodeMap_(value, refId, serialize);
+    }
+
+    // replace property names with their aliases if any, skip disabled ones
+    const aliased = JSON2.toAliasedObject(value, ignoreReadOnlyProperties);
+    // skip root to prevent recursion
+    if (root === value) {
+      return aliased;
+    }
+    return `Ob${refId}${serialize(aliased)}`;
+  }
+
+  // Serialize an Array: each item separately, then reassemble.
+  private static encodeArray_(value: unknown[], refId: string,
+    serialize: (v: unknown, isRoot?: boolean) => string): string {
+    const items = value.map(item => JSON.parse(serialize(item, false)));
+    return `Ar${refId}${JSON.stringify(items)}`;
+  }
+
+  // Serialize a Map: each value separately (keys unchanged), then reassemble.
+  private static encodeMap_(value: Map<unknown, unknown>, refId: string,
+    serialize: (v: unknown, isRoot?: boolean) => string): string {
+    const items = [...value].map(([key, val]) => [key, serialize(val, false)]);
+    return `Ma${refId}${JSON.stringify(items)}`;
+  }
+
+  // Encode a non-object primitive (string/bigint/undefined tagged, others as-is).
+  private static encodePrimitive_(value: unknown): unknown {
+    if (typeof value === 'string') {
+      return `st????${value}`;
+    }
+    if (typeof value === 'bigint') {
+      return `bi????${value.toString()}`;
+    }
+    if (typeof value === 'undefined') {
+      return `re????`;
+    }
+    return value;
+  }
+
+  // Try to encode a special (non-plain-object) type; returns null when not matched.
+  private static trySpecialType_(value: object, refId: string,
+    serialize: (v: unknown, isRoot?: boolean) => string,
+    serializeSendable: (v: unknown) => string): string | null {
+    if (value instanceof Boolean) {
+      return `Bo${refId}${value.toString()}`;
+    }
+    if (value instanceof Date) {
+      return `Da${refId}${value.toISOString()}`;
+    }
+    if (value instanceof Number) {
+      return `Nu${refId}${value.toString()}`;
+    }
+    if (value instanceof String) {
+      return `St${refId}${value}`;
+    }
+    if (value instanceof Set) {
+      return `Se${refId}${serialize([...value])}`;
+    }
+    if (value instanceof SendableArray) {
+      return `SA${refId}${serializeSendable([...value])}`;
+    }
+    if (value instanceof SendableMap) {
+      return `SM${refId}${serializeSendable([...value])}`;
+    }
+    if (value instanceof SendableSet) {
+      return `SS${refId}${serializeSendable([...value])}`;
+    }
+    if (globalThis.isSendable(value)) {
+      return `SO${refId}${serializeSendable(value)}`;
+    }
+    return null;
   }
 
   /**
@@ -145,10 +199,10 @@ class JSON2 {
           obj[key] = payload;
         }
 
-      })
+      });
 
       return obj;
-    }
+    };
 
     // parse main structure, gathering objects
     let root = JSON2.parseStructure(text, objects);
@@ -157,17 +211,19 @@ class JSON2 {
   }
 
   // Convert object properties to their aliased names according to Meta, skip disabled ones
-  static toAliasedObject<T extends object>(value: T, ignoreReadOnlyProperties: boolean = false): T {
+  static toAliasedObject<T extends object>(value: T, ignoreReadOnlyProperties: ReadOnlyPropertyFilter = false): T {
     const meta: any = Meta.gets(value);
     const result: any = {};
 
     Object.keys(value).forEach(key => {
-      const baseKey = key.replace(new RegExp('^' + V2_STATE_PREFIX), '');
-      if (ignoreReadOnlyProperties === true && DataCoder.isReadOnlyGetter(value, baseKey)) {
+      const baseKey = key.startsWith(V2_STATE_PREFIX) ? key.substring(V2_STATE_PREFIX.length) : key;
+      if (DataCoder.shouldSkipReadOnlyProperty(ignoreReadOnlyProperties, value, baseKey)) {
         return;
       }
       const options = meta?.[baseKey];
-      if (options?.disabled) { return; }
+      if (options?.disabled) {
+        return;
+      }
       result[options?.alias || baseKey] = (value as Record<string, unknown>)[baseKey];
     });
     return result;
@@ -176,44 +232,74 @@ class JSON2 {
   // Parse JSON string with special types, gathering objects and their refIDs
   static parseStructure(text: string, objects: Map<string, object>): unknown {
     const parse = (str: string): any =>
-      JSON.parse(str, reviver)
+      JSON.parse(str, reviver);
 
-    const parseMap = (str: string): Map<string|number, string> =>
-      new Map(JSON.parse(str).map(([key, val]: [string|number, string]) => [key, parse(val)]))
+    const parseMap = (str: string): Map<string | number, string> =>
+      new Map(JSON.parse(str).map(([key, val]: [string | number, string]) => [key, parse(val)]));
 
     const parseSendable = (str: string): any =>
       // reviver is not supported by parseSendable()
-      (JSON as any)?.parseSendable(str)?? ''
+      (JSON as any)?.parseSendable(str) ?? '';
 
     const reviver = function(key: string, value: unknown): any {
       const { type, refId, payload } = JSON2.parseTRP(value as string);
-
-      let result = value;
-      if (type === 'Da') { result = new Date(payload); }
-      if (type === 'Bo') { result = new Boolean(parse(payload)); }
-      if (type === 'Nu') { result = new Number(payload); }
-      if (type === 'St') { result = new String(payload); }
-      if (type === 'Ar') { result = parse(payload); }
-      if (type === 'Ma') { result = parseMap(payload); }
-      if (type === 'Se') { result = new Set(parse(payload)); }
-      if (type === 'SO') { result = parseSendable(payload); }
-      if (type === 'SA') { result = new SendableArray(...parseSendable(payload)); }
-      if (type === 'SM') { result = new SendableMap(parseSendable(payload)); }
-      if (type === 'SS') { result = new SendableSet(parseSendable(payload)); }
-      if (type === 'Ob') { result = parse(payload); }
-      if (type === 'bi') { result = BigInt(payload); }
-
-      // don't process 're' (references) and 'st' (plain strings) here
-      // we return them as-is, and process them after parsing the full structure
-
+      const result = JSON2.decodeTypedValue_(value, type, payload, parse, parseMap, parseSendable);
       if (typeof result === 'object') {
         objects.set(refId!, result);
       }
-
       return result;
-    }
+    };
 
     return parse(text);
+  }
+
+  // Decode a typed value from its <typetag, payload>; returns original value when no tag matches.
+  private static decodeTypedValue_(value: unknown, type: string | undefined, payload: string | undefined,
+    parse: (str: string) => any,
+    parseMap: (str: string) => Map<string | number, string>,
+    parseSendable: (str: string) => any): unknown {
+    if (type === 'Da') {
+      return new Date(payload!);
+    }
+    if (type === 'Bo') {
+      return new Boolean(parse(payload!));
+    }
+    if (type === 'Nu') {
+      return new Number(parse(payload!));
+    }
+    if (type === 'St') {
+      return new String(payload);
+    }
+    if (type === 'Ar') {
+      return parse(payload!);
+    }
+    if (type === 'Ma') {
+      return parseMap(payload!);
+    }
+    if (type === 'Se') {
+      return new Set(parse(payload!));
+    }
+    if (type === 'SO') {
+      return parseSendable(payload!);
+    }
+    if (type === 'SA') {
+      return new SendableArray(...parseSendable(payload!));
+    }
+    if (type === 'SM') {
+      return new SendableMap(parseSendable(payload!));
+    }
+    if (type === 'SS') {
+      return new SendableSet(parseSendable(payload!));
+    }
+    if (type === 'Ob') {
+      return parse(payload!);
+    }
+    if (type === 'bi') {
+      return BigInt(payload!);
+    }
+    // don't process 're' (references) and 'st' (plain strings) here
+    // we return them as-is, and process them after parsing the full structure
+    return value;
   }
 
   // Parse <typetag, refId, payload> from string
@@ -228,7 +314,7 @@ class JSON2 {
   }
 
   // Iterate any collection, callback(value, key)
-  static forEach(col: object, callback: (val: unknown, key: string|number) => void): void {
+  static forEach(col: object, callback: (val: unknown, key: string | number) => void): void {
     if (col instanceof Array) {
       for (const [key, val] of col.entries()) {
         callback(val, key);

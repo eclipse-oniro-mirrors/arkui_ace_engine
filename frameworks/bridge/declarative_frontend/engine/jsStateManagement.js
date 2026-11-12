@@ -442,6 +442,61 @@ class UIUtils {
 
 UIUtils.uiUtilsImpl_ = UIUtilsImpl.instance();
 
+/**
+ * RecoverableStorage
+ *
+ * The RecoverableStorage provides automatic save and restore of state variables across
+ * system kill (RESOURCE_CONTROL / PERFORMANCE_CONTROL) and abnormal exits
+ * (JS_ERROR / APP_FREEZE). Variables are saved on save occasions (background save /
+ * error save) and restored on the next system-initiated launch of the same instance.
+ *
+ * Usage Scenarios:
+ *
+ * - Declare a recoverable state variable inside a custom component (component: this).
+ * - Only object types (T extends object) are supported; connect entry errors throw
+ *   BusinessError(140124) — including invalid keys (empty string or length >= 1024).
+ *   Serialization/deserialization I/O errors are reported via
+ *   the per-connect notifyOnError callback (three-field payload: reason/keys/message).
+ */
+class RecoverableStorage {
+  /**
+   * Connects (or re-connects) a recoverable state variable for the current window
+   * instance (identified by the window-level instance id of options.component).
+   *
+   * @template T - The original object.
+   * @template S - The collection item object.
+   * @param { RecoverableConnectOptions<T, S> } options - The connection options bag
+   *   (component/type/defaultCreator required; key/defaultSubCreator/notifyOnError optional).
+   * @returns { T } The restored value, or the default-created value.
+   */
+  static connect(options) {
+    return RecoverableStorage.recoverableStorageImpl_.connect(options);
+  }
+
+  /**
+   * Returns the array of keys registered by the current instance.
+   *
+   * @param { BaseCustomComponent } component - Custom component instance (this).
+   * @returns { Array<string> } All keys registered by the current instance.
+   */
+  static keys(component) {
+    return RecoverableStorage.recoverableStorageImpl_.keys(component);
+  }
+
+  /**
+   * Unregisters the recoverable state variable of the specified key from the current
+   * instance. Unregistering a key that does not exist only reports a warning.
+   *
+   * @param { BaseCustomComponent } component - Custom component instance (this).
+   * @param { string | { new(...args: any): T } } keyOrType - Key or class type removing.
+   */
+  static remove(component, keyOrType) {
+    RecoverableStorage.recoverableStorageImpl_.remove(component, keyOrType);
+  }
+}
+
+RecoverableStorage.recoverableStorageImpl_ = RecoverableStorageImpl.instance();
+
 export default {
   AppStorageV2,
   PersistenceV2,
@@ -455,5 +510,6 @@ export default {
   ComponentDisappear,
   CustomComponentLifecycleState,
   ComponentActive,
-  ComponentInactive
+  ComponentInactive,
+  RecoverableStorage
 };
