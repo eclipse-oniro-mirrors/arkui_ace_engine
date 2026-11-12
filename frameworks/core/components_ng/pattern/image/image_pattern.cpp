@@ -517,9 +517,19 @@ void ImagePattern::ReportPerfData(const RefPtr<NG::FrameNode>& host, int32_t sta
 
 void ImagePattern::ReportCompleteLoadEvent(const RefPtr<FrameNode>& host)
 {
+    if (host->GetId() == INVALID_ID) {
+        return;
+    }
     auto pipeline = host->GetContext();
     if (pipeline) {
-        ImagePerf::GetPerfMonitor()->CompleteLoadComponent(host->GetId());
+        bool isVisible = false;
+        auto renderContext = host->GetRenderContext();
+        if (renderContext && renderContext->IsOnRenderTree()) {
+            isVisible = true;
+        } else if (host->IsPendingOnMainRenderTree()) {
+            isVisible = true;
+        }
+        ImagePerf::GetPerfMonitor()->CompleteLoadComponent(host->GetId(), isVisible);
     }
 }
 
@@ -1258,14 +1268,20 @@ void ImagePattern::LoadImage(const ImageSourceInfo& src, bool needLayout)
     if (onProgressCallback_) {
         loadingCtx_->SetOnProgressCallback(std::move(onProgressCallback_));
     }
+    
+    if (host->GetId() != INVALID_ID && src.GetSrcType() != SrcType::UNSUPPORTED) {
+        bool isVisible = false;
+        auto renderContext = host->GetRenderContext();
+        if (renderContext && renderContext->IsOnRenderTree()) {
+            isVisible = true;
+        } else if (host->IsPendingOnMainRenderTree()) {
+            isVisible = true;
+        }
+        ImagePerf::GetPerfMonitor()->AddLoadComponent(
+            host->GetId(), static_cast<int32_t>(src.GetSrcType()), isVisible);
+    }
     if (!needLayout) {
         loadingCtx_->FinishMeasure();
-    } else {
-        CHECK_NULL_VOID(host);
-        auto pipeline = host->GetContext();
-        if (pipeline && host->GetId() != INVALID_ID && src.IsValid()) {
-            ImagePerf::GetPerfMonitor()->AddLoadComponent(host->GetId());
-        }
     }
     ClearReloadFlagsAfterLoad();
     ImagePerf::GetPerfMonitor()->StartRecordImageLoadStat(imageDfxConfig_.GetAccessibilityId());
@@ -1874,6 +1890,12 @@ void ImagePattern::OnAttachToMainRenderTree()
         TAG_LOGD(AceLogTag::ACE_IMAGE, "OnAttachToMainRenderTree reload ImageData: %{public}s-%{private}s",
             imageDfxConfig_.ToStringWithoutSrc().c_str(), imageDfxConfig_.GetImageSrc().c_str());
         LoadImageDataIfNeed();
+    }
+        auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto pipeline = host->GetContext();
+    if (pipeline && host->GetId() != INVALID_ID) {
+        ImagePerf::GetPerfMonitor()->AttachComponent(host->GetId());
     }
 }
 

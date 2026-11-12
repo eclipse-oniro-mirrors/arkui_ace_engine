@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Huawei Device Co., Ltd.
+ * Copyright (c) 2025 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -13,20 +13,22 @@
  * limitations under the License.
  */
 
-#ifndef FOUNDATION_ACE_ADAPTER_OHOS_OSAL_IMAGE_PACKER_PREVIEW_H
-#define FOUNDATION_ACE_ADAPTER_OHOS_OSAL_IMAGE_PACKER_PREVIEW_H
+#ifndef FOUNDATION_ACE_ADAPTER_PREVIEW_OSAL_IMAGE_PERF_PREVIEW_H
+#define FOUNDATION_ACE_ADAPTER_PREVIEW_OSAL_IMAGE_PERF_PREVIEW_H
 
-#include "base/image/image_packer.h"
+#include "base/image/image_perf.h"
 
 namespace OHOS::Ace {
-class ImagePackerPreview : public ImagePacker {
-    DECLARE_ACE_TYPE(ImagePackerPreview, ImagePacker);
+
+class ImagePerfPreview : public ImagePerf {
 public:
-    uint32_t StartPacking(uint8_t* data, uint32_t maxSize, const PackOption& option) override;
-    uint32_t StartPacking(const std::string& filePath, const PackOption& option) override;
-    uint32_t AddImage(PixelMap& pixelMap) override;
-    uint32_t FinalizePacking(int64_t& packedSize) override;
+    void StartRecordImageLoadStat(int64_t id) override;
+    void EndRecordImageLoadStat(
+        int64_t id, const std::string& imageType, std::pair<int32_t, int32_t> size, int32_t state) override;
+    void AddLoadComponent(int32_t nodeId, int32_t sourceType = 0, bool isVisible = false) override;
+    void DeleteLoadComponent(int32_t nodeId) override;
+    void CompleteLoadComponent(int32_t nodeId, bool isVisible = false) override;
+    void AttachComponent(int32_t nodeId) override;
 };
 } // namespace OHOS::Ace
-
-#endif // FOUNDATION_ACE_ADAPTER_OHOS_OSAL_IMAGE_PACKER_PREVIEW_H
+#endif // FOUNDATION_ACE_ADAPTER_PREVIEW_OSAL_IMAGE_PERF_PREVIEW_H
