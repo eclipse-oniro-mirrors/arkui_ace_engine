@@ -62,6 +62,7 @@ ArcListPattern::ArcListPattern()
 
 void ArcListPattern::OnModifyDone()
 {
+    CheckLocalized();
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     if (!GetScrollableEvent()) {
