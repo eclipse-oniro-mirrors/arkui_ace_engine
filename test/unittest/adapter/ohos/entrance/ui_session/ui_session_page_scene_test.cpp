@@ -46,6 +46,8 @@ constexpr size_t SINGLE_QUERY_COUNT = 1;
 constexpr int32_t FIRST_TEXT_RULE_INDEX = 1;
 constexpr int32_t SPLIT_RULE_INDEX = 0;
 constexpr int32_t MAX_COMMON_RULES = 10;
+// Key-region geometry of the RESPONSE test ruleSet.
+constexpr int32_t RESPONSE_TEST_REGION_SIDE = 10;
 const std::string MIXED_ID = "mixed";
 const std::string SECOND_ID = "second";
 const std::string INPUT_RULE = "input";
@@ -116,6 +118,76 @@ std::string MakeSearchRule(const std::string& id)
         "pageType":"Router","pageName":"Home","regions":[{"x":0,"y":0,"width":100,"height":100}],
         "keywords":["search"]}]})");
     root->Replace("ruleSetId", id.c_str());
+    return root->ToString();
+}
+
+// RESPONSE (key region) ruleSet with one rule; an empty ruleId is the AC-1.12 negative case.
+std::string MakeResponseRule(const std::string& ruleSetId, const std::string& ruleId)
+{
+    auto rule = JsonUtil::Create(true);
+    rule->Put("ruleId", ruleId.c_str());
+    rule->Put("sceneType", "RESPONSE");
+    auto page = JsonUtil::Create(true);
+    page->Put("pageType", "Router");
+    page->Put("pageName", "pages/Index");
+    rule->Put("page", page);
+    auto inspectorIds = JsonUtil::CreateArray(true);
+    inspectorIds->Put("", "payButton");
+    rule->Put("inspectorIds", inspectorIds);
+    auto region = JsonUtil::Create(true);
+    region->Put("x", 0);
+    region->Put("y", 0);
+    region->Put("width", RESPONSE_TEST_REGION_SIDE);
+    region->Put("height", RESPONSE_TEST_REGION_SIDE);
+    auto regions = JsonUtil::CreateArray(true);
+    regions->Put(region);
+    rule->Put("regions", regions);
+    auto rules = JsonUtil::CreateArray(true);
+    rules->Put(rule);
+    auto sourceConfig = JsonUtil::Create(true);
+    sourceConfig->Put("arkui", true);
+    sourceConfig->Put("web", false);
+    auto root = JsonUtil::Create(true);
+    root->Put("version", 1);
+    root->Put("ruleSetId", ruleSetId.c_str());
+    root->Put("sourceConfig", sourceConfig);
+    root->Put("rules", rules);
+    return root->ToString();
+}
+
+// A ruleSet that mixes a valid TEXT_EDITOR rule with an invalid RESPONSE rule.
+std::string MakeMixedInvalidResponseRule()
+{
+    auto textRule = JsonUtil::Create(true);
+    textRule->Put("ruleId", "input");
+    textRule->Put("sceneType", "TEXT_EDITOR");
+    auto nodeTypes = JsonUtil::CreateArray(true);
+    nodeTypes->Put("", "TextInput");
+    auto selector = JsonUtil::Create(true);
+    selector->Put("nodeTypes", nodeTypes);
+    textRule->Put("selector", selector);
+    auto condition = JsonUtil::Create(true);
+    condition->Put("operator", "COUNT_GTE");
+    condition->Put("threshold", 1);
+    textRule->Put("condition", condition);
+    auto responseRule = JsonUtil::Create(true);
+    responseRule->Put("ruleId", "");
+    responseRule->Put("sceneType", "RESPONSE");
+    auto page = JsonUtil::Create(true);
+    page->Put("pageType", "Router");
+    page->Put("pageName", "pages/Index");
+    responseRule->Put("page", page);
+    auto rules = JsonUtil::CreateArray(true);
+    rules->Put(textRule);
+    rules->Put(responseRule);
+    auto sourceConfig = JsonUtil::Create(true);
+    sourceConfig->Put("arkui", true);
+    sourceConfig->Put("web", false);
+    auto root = JsonUtil::Create(true);
+    root->Put("version", 1);
+    root->Put("ruleSetId", "mixed_invalid_response");
+    root->Put("sourceConfig", sourceConfig);
+    root->Put("rules", rules);
     return root->ToString();
 }
 
@@ -1452,6 +1524,48 @@ HWTEST_F(UiSessionPageSceneTest, InvalidSelectorTagsRejectRegistrationAndQueryWi
     EXPECT_TRUE(detections_.empty());
     EXPECT_TRUE(queries_.empty());
     EXPECT_EQ(RequestThroughProxy(CALLER_PID, MakeSplitOnlyRule()), NO_ERROR);
+}
+
+HWTEST_F(UiSessionPageSceneTest, EmptyResponseRuleIdRejectsWholeRuleSet, TestSize.Level1)
+{
+    // AC-1.12: an empty ruleId must fail the whole registration with PARAM_INVALID instead of
+    // being dropped from the rule list and silently registered on the legacy TEXT_EDITOR path.
+    EXPECT_EQ(manager_.RegisterPageSceneRules(CALLER_PID, MakeResponseRule("resp_empty_id", "")), PARAM_INVALID);
+    EXPECT_TRUE(manager_.pageSceneRuleSets_.empty());
+    EXPECT_TRUE(detections_.empty());
+
+    // The rejected registration leaves no state behind: a valid RESPONSE ruleSet still reaches
+    // the RESPONSE observer (NOT_CONNECTED here because this fixture injects no observer).
+    EXPECT_EQ(manager_.RegisterPageSceneRules(CALLER_PID, MakeResponseRule("resp_valid", "r_valid")),
+        NOT_CONNECTED);
+    EXPECT_TRUE(manager_.pageSceneRuleSets_.empty());
+}
+
+HWTEST_F(UiSessionPageSceneTest, EmptyResponseRuleIdRejectsMixedRuleSet, TestSize.Level1)
+{
+    // One invalid RESPONSE rule rejects the whole ruleSet even when another scene's rule is valid.
+    EXPECT_EQ(manager_.RegisterPageSceneRules(CALLER_PID, MakeMixedInvalidResponseRule()), PARAM_INVALID);
+    EXPECT_TRUE(manager_.pageSceneRuleSets_.empty());
+    EXPECT_TRUE(detections_.empty());
+}
+
+HWTEST_F(UiSessionPageSceneTest, ValidResponseRuleRoutesToResponseObserver, TestSize.Level1)
+{
+    std::vector<std::string> registered;
+    bool active = false;
+    UiSessionManager::PageSceneResponseObserverFunction responseFunc;
+    responseFunc.registerRuleSet = [&registered](int32_t, const std::string& json) {
+        registered.emplace_back(json);
+        return NO_ERROR;
+    };
+    responseFunc.setActive = [&active](bool value) { active = value; };
+    manager_.SavePageSceneResponseObserverFunction(std::move(responseFunc));
+
+    EXPECT_EQ(manager_.RegisterPageSceneRules(CALLER_PID, MakeResponseRule("resp_valid_route", "r_route")), NO_ERROR);
+    ASSERT_EQ(registered.size(), 1U);
+    EXPECT_TRUE(active);
+    // RESPONSE ruleSets live in the NG manager, never in the legacy TEXT_EDITOR map.
+    EXPECT_TRUE(manager_.pageSceneRuleSets_.empty());
 }
 
 } // namespace OHOS::Ace

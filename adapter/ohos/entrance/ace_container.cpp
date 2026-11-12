@@ -90,6 +90,7 @@
 #include "core/components_ng/render/adapter/rosen_render_context.h"
 #include "core/components_ng/render/adapter/rosen_window.h"
 #include "core/components_ng/manager/force_split/force_split_manager.h"
+#include "core/components_ng/manager/page_scene/developer_response_observer.h"
 #include "core/components_ng/token_theme/token_theme_storage.h"
 #include "core/event/crown_event.h"
 #include "frameworks/core/common/dynamic_module_helper.h"
@@ -1070,6 +1071,10 @@ void AceContainer::OnHide(int32_t instanceId)
         auto pipelineBase = container->GetPipelineContext();
         CHECK_NULL_VOID(pipelineBase);
         pipelineBase->OnHide();
+        // A previously reported RESPONSE scene leaves the screen together with the window.
+        // Run the stable-point sweep here so the exit event (AC-9.10) does not depend on a
+        // frame being produced while the window is hidden.
+        NG::PageSceneResponseObserver::GetInstance()->OnContentStable();
     };
 
     // stege model needn't post task when already run on UI

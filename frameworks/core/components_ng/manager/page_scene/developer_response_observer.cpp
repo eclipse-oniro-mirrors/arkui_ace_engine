@@ -29,6 +29,8 @@
 namespace OHOS::Ace::NG {
 namespace {
 constexpr char RESPONSE_EVENT_TYPE[] = "RESPONSE_EVENT";
+constexpr char RESPONSE_SCENE_TYPE[] = "RESPONSE";
+constexpr char RESPONSE_EXIT_EVENT[] = "RESPONSE_EXIT";
 constexpr char PAGE_SCENE_RULE_SETS[] = "ruleSets";
 constexpr char PAGE_SCENE_RULE_SET_ID[] = "ruleSetId";
 constexpr char PAGE_SCENE_SCENE[] = "scene";
@@ -90,17 +92,18 @@ void PageSceneResponseObserver::AppendSettledCandidate(const DeveloperResponseCa
 void PageSceneResponseObserver::OnContentStable()
 {
     std::vector<DeveloperResponseCandidate> candidates;
-    if (!CollectSettledCandidates(candidates)) {
-        return;
+    // The stable gate also runs when no candidate settled: a scene that was reported
+    // earlier may have left the screen and still owes one exit event.
+    if (CollectSettledCandidates(candidates) && !candidates.empty()) {
+        auto ruleJsons = UiSessionManager::GetInstance()->GetActivePageSceneRuleJsons();
+        if (!ruleJsons.empty()) {
+            std::map<int32_t, std::vector<std::pair<std::string, std::string>>> payloadsByPid;
+            std::map<int32_t, RefPtr<TaskExecutor>> executorByPid;
+            MatchSettledCandidates(candidates, ruleJsons, payloadsByPid, executorByPid);
+            DispatchResponseReports(payloadsByPid, executorByPid);
+        }
     }
-    auto ruleJsons = UiSessionManager::GetInstance()->GetActivePageSceneRuleJsons();
-    if (ruleJsons.empty()) {
-        return;
-    }
-    std::map<int32_t, std::vector<std::pair<std::string, std::string>>> payloadsByPid;
-    std::map<int32_t, RefPtr<TaskExecutor>> executorByPid;
-    MatchSettledCandidates(candidates, ruleJsons, payloadsByPid, executorByPid);
-    DispatchResponseReports(payloadsByPid, executorByPid);
+    DispatchResponseExits();
 }
 
 bool PageSceneResponseObserver::CollectSettledCandidates(std::vector<DeveloperResponseCandidate>& candidates)
@@ -174,6 +177,78 @@ void PageSceneResponseObserver::DispatchResponseReports(
                 UiSessionManager::GetInstance()->ReportPageSceneEvent(pid, payload, false);
             },
             TaskExecutor::TaskType::BACKGROUND, "UiSessionPageSceneReport");
+    }
+}
+
+namespace {
+// One RESPONSE_EVENT envelope carrying the exit scene of every ruleSet that left.
+std::string BuildResponseExitPayload(const std::map<std::string, std::vector<std::string>>& ruleSets)
+{
+    auto envelope = JsonUtil::Create(true);
+    envelope->Put("eventType", RESPONSE_EVENT_TYPE);
+    auto ruleSetsJson = JsonUtil::CreateArray(true);
+    for (const auto& [ruleSetId, ruleIds] : ruleSets) {
+        auto sceneJson = JsonUtil::Create(true);
+        sceneJson->Put("ruleSetId", ruleSetId.c_str());
+        sceneJson->Put("sceneType", RESPONSE_SCENE_TYPE);
+        sceneJson->Put("eventName", RESPONSE_EXIT_EVENT);
+        sceneJson->Put("matched", false);
+        auto exitsJson = JsonUtil::CreateArray(true);
+        for (const auto& ruleId : ruleIds) {
+            auto exitJson = JsonUtil::Create(true);
+            exitJson->Put("ruleId", ruleId.c_str());
+            exitsJson->Put(exitJson);
+        }
+        // "exits" (not "hits") keeps an exit unambiguous for consumers that count hits.
+        sceneJson->Put("exits", exitsJson);
+        auto ruleSetJson = JsonUtil::Create(true);
+        ruleSetJson->Put(PAGE_SCENE_RULE_SET_ID, ruleSetId.c_str());
+        ruleSetJson->Put(PAGE_SCENE_SCENE, sceneJson->ToString().c_str());
+        ruleSetsJson->Put(ruleSetJson);
+    }
+    envelope->Put(PAGE_SCENE_RULE_SETS, ruleSetsJson);
+    return envelope->ToString();
+}
+} // namespace
+
+void PageSceneResponseObserver::DispatchResponseExits()
+{
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (!active_) {
+            return;
+        }
+    }
+    auto exits = ruleManager_.CollectResponseExits();
+    if (exits.empty()) {
+        return;
+    }
+    // pid -> ruleSetId -> ruleIds; keep the owning pipeline to post on its executor.
+    std::map<int32_t, std::map<std::string, std::vector<std::string>>> ruleIdsByPid;
+    std::map<int32_t, RefPtr<TaskExecutor>> executorByPid;
+    for (const auto& exit : exits) {
+        ruleIdsByPid[exit.processId][exit.ruleSetId].emplace_back(exit.ruleId);
+        if (executorByPid.find(exit.processId) != executorByPid.end()) {
+            continue;
+        }
+        auto pipeline = exit.pipeline.Upgrade();
+        if (pipeline) {
+            executorByPid[exit.processId] = pipeline->GetTaskExecutor();
+        }
+    }
+    for (const auto& entry : ruleIdsByPid) {
+        const int32_t pid = entry.first;
+        const auto& ruleSets = entry.second;
+        auto executorIter = executorByPid.find(pid);
+        if (executorIter == executorByPid.end() || !executorIter->second) {
+            continue;
+        }
+        auto payload = BuildResponseExitPayload(ruleSets);
+        executorIter->second->PostTask(
+            [pid, payload]() {
+                UiSessionManager::GetInstance()->ReportPageSceneEvent(pid, payload, false);
+            },
+            TaskExecutor::TaskType::BACKGROUND, "UiSessionPageSceneExitReport");
     }
 }
 

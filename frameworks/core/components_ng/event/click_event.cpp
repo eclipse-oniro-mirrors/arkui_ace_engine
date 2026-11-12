@@ -117,6 +117,11 @@ GestureEventFunc ClickEventActuator::GetClickEvent()
 
 void ClickEventActuator::PublishClick(GestureEvent& info)
 {
+    // A click produced only by a component-internal listener is not a developer response:
+    // the RESPONSE scene reports operations whose developer callback actually exists.
+    if (!HasDeveloperClickCallback()) {
+        return;
+    }
     auto gestureHub = gestureEventHub_.Upgrade();
     CHECK_NULL_VOID(gestureHub);
     auto frameNode = gestureHub->GetFrameNode();
