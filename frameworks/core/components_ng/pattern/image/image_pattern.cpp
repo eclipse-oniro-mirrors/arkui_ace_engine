@@ -522,15 +522,18 @@ void ImagePattern::ReportCompleteLoadEvent(const RefPtr<FrameNode>& host)
     }
     auto pipeline = host->GetContext();
     if (pipeline) {
-        bool isVisible = false;
-        auto renderContext = host->GetRenderContext();
-        if (renderContext && renderContext->IsOnRenderTree()) {
-            isVisible = true;
-        } else if (host->IsPendingOnMainRenderTree()) {
-            isVisible = true;
-        }
+        bool isVisible = IsVisibleOnRenderTree(host);
         ImagePerf::GetPerfMonitor()->CompleteLoadComponent(host->GetId(), isVisible);
     }
+}
+
+bool ImagePattern::IsVisibleOnRenderTree(const RefPtr<FrameNode>& host)
+{
+    auto renderContext = host->GetRenderContext();
+    if (renderContext && renderContext->IsOnRenderTree()) {
+        return true;
+    }
+    return host->IsPendingOnMainRenderTree();
 }
 
  void ImagePattern::ReportImageSuccessInfo(const RefPtr<FrameNode>& host)
@@ -1269,14 +1272,10 @@ void ImagePattern::LoadImage(const ImageSourceInfo& src, bool needLayout)
         loadingCtx_->SetOnProgressCallback(std::move(onProgressCallback_));
     }
     
-    if (host->GetId() != INVALID_ID && src.GetSrcType() != SrcType::UNSUPPORTED) {
-        bool isVisible = false;
-        auto renderContext = host->GetRenderContext();
-        if (renderContext && renderContext->IsOnRenderTree()) {
-            isVisible = true;
-        } else if (host->IsPendingOnMainRenderTree()) {
-            isVisible = true;
-        }
+    CHECK_NULL_VOID(host);
+    auto pipeline = host->GetContext();
+    if (pipeline && host->GetId() != INVALID_ID && src.IsValid() && src.GetSrcType() != SrcType::UNSUPPORTED) {
+        bool isVisible = IsVisibleOnRenderTree(host);
         ImagePerf::GetPerfMonitor()->AddLoadComponent(
             host->GetId(), static_cast<int32_t>(src.GetSrcType()), isVisible);
     }
@@ -1891,7 +1890,7 @@ void ImagePattern::OnAttachToMainRenderTree()
             imageDfxConfig_.ToStringWithoutSrc().c_str(), imageDfxConfig_.GetImageSrc().c_str());
         LoadImageDataIfNeed();
     }
-        auto host = GetHost();
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto pipeline = host->GetContext();
     if (pipeline && host->GetId() != INVALID_ID) {
