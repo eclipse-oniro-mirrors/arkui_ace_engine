@@ -45,9 +45,9 @@ public:
     int32_t RegisterScrollEventCallback(const EventCallback& eventCallback) override;
     int32_t RegisterLifeCycleEventCallback(const EventCallback& eventCallback) override;
     int32_t RegisterSelectTextEventCallback(const EventCallback& eventCallback) override;
-    int32_t SendCommand(int32_t id, const std::string& command) override;
-    int32_t SendCommandSync(int32_t id, const std::string& command) override;
-    int32_t SendCommand(const std::string command) override;
+    int32_t SendCommand(int32_t id, const std::string& command, SecurityAuthInfo securityAuth = {}) override;
+    int32_t SendCommandSync(int32_t id, const std::string& command, SecurityAuthInfo securityAuth = {}) override;
+    int32_t SendCommand(const std::string command, SecurityAuthInfo securityAuth = {}) override;
     int32_t UnregisterClickEventCallback() override;
     int32_t UnregisterSearchEventCallback() override;
     int32_t UnregisterTextChangeEventCallback() override;
@@ -125,9 +125,11 @@ public:
         const std::function<void(const std::string&)>& eventCallback,
         int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS) override;
     int32_t SendCommand(
-        int32_t id, const std::string& command, const SendCommandFinishCallback& finishCallback) override;
+        int32_t id, const std::string& command, const SendCommandFinishCallback& finishCallback,
+        SecurityAuthInfo securityAuth = {}) override;
     int32_t SendCommand(
-        const std::string command, const SendCommandFinishCallback& finishCallback) override;
+        const std::string command, const SendCommandFinishCallback& finishCallback,
+        SecurityAuthInfo securityAuth = {}) override;
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_INTERFACE_UI_CONTENT_STUB_IMPL_H

@@ -450,12 +450,27 @@ int32_t UiContentStub::RegisterSelectTextEventCallbackInner(
     return NO_ERROR;
 }
 
+namespace {
+// Read the trailing SecurityAuthInfo fields. Old proxies do not append them;
+// ReadBool/ReadUint64 then leave the legacy defaults in place.
+SecurityAuthInfo ReadSecurityAuthInfo(MessageParcel& data)
+{
+    SecurityAuthInfo securityAuth;
+    securityAuth.needSecurityAuth = data.ReadBool();
+    uint64_t tokenId = 0;
+    if (data.ReadUint64(tokenId)) {
+        securityAuth.tokenId = tokenId;
+    }
+    return securityAuth;
+}
+} // namespace
+
 int32_t UiContentStub::SendCommandInner(
     MessageParcel& data, MessageParcel& reply, MessageOption& option)
 {
     int32_t id = data.ReadInt32();
     std::string command = data.ReadString();
-    reply.WriteInt32(SendCommand(id, command));
+    reply.WriteInt32(SendCommand(id, command, ReadSecurityAuthInfo(data)));
     return NO_ERROR;
 }
 
@@ -464,7 +479,7 @@ int32_t UiContentStub::SendCommandInnerSync(
 {
     int32_t id = data.ReadInt32();
     std::string command = data.ReadString();
-    int32_t result = SendCommandSync(id, command);
+    int32_t result = SendCommandSync(id, command, ReadSecurityAuthInfo(data));
     if (!reply.WriteInt32(result)) {
         LOGE("SendCommandInnerSync write reply failed");
         return FAILED;
@@ -475,7 +490,7 @@ int32_t UiContentStub::SendCommandInnerSync(
 int32_t UiContentStub::SendCommandKeyCodeInner(MessageParcel& data, MessageParcel& reply, MessageOption& option)
 {
     std::string command = data.ReadString();
-    reply.WriteInt32(SendCommand(command));
+    reply.WriteInt32(SendCommand(command, ReadSecurityAuthInfo(data)));
     return NO_ERROR;
 }
 
@@ -492,9 +507,10 @@ int32_t UiContentStub::SendCommandWithFinishCallbackInner(
     if (!data.ReadString(command)) {
         return FAILED;
     }
+    SecurityAuthInfo securityAuth = ReadSecurityAuthInfo(data);
     int32_t processId = IPCSkeleton::GetCallingRealPid();
     auto callback = UiSessionManager::GetInstance()->MakeCommandResultCallback(processId, requestId);
-    return callback ? SendCommand(id, command, callback) : FAILED;
+    return callback ? SendCommand(id, command, callback, securityAuth) : FAILED;
 }
 
 int32_t UiContentStub::SendCommandKeyCodeWithFinishCallbackInner(
@@ -509,9 +525,10 @@ int32_t UiContentStub::SendCommandKeyCodeWithFinishCallbackInner(
     if (!data.ReadString(command)) {
         return FAILED;
     }
+    SecurityAuthInfo securityAuth = ReadSecurityAuthInfo(data);
     int32_t processId = IPCSkeleton::GetCallingRealPid();
     auto callback = UiSessionManager::GetInstance()->MakeCommandResultCallback(processId, requestId);
-    return callback ? SendCommand(command, callback) : FAILED;
+    return callback ? SendCommand(command, callback, securityAuth) : FAILED;
 }
 
 int32_t UiContentStub::UnregisterClickEventCallbackInner(

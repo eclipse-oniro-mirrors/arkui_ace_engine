@@ -21,8 +21,11 @@
 #include "core/pipeline_ng/pipeline_context.h"
 #include "core/pipeline/base/element_register.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/event/event_constants.h"
+#include "core/components_ng/pattern/command/ui_command_security_gate.h"
 #include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/relaxed_interaction/executors/fallback_executor.h"
+#include "test/mock/adapter/ohos/osal/mock_input_manager.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -171,6 +174,90 @@ HWTEST_F(FallbackExecutorExecuteStepTest, ExecuteStep_IntIdentity_NodeFound_Retu
     auto result = executor.ExecuteStep();
     EXPECT_EQ(result, ExecutorResult::SUCCESS);
 
+    ElementRegister::GetInstance()->RemoveItemSilently(TEST_NODE_ID);
+}
+
+namespace {
+class CountingPattern : public Pattern {
+    DECLARE_ACE_TYPE(CountingPattern, Pattern);
+
+public:
+    int32_t received = 0;
+    int32_t OnInjectionEvent(const std::string&) override
+    {
+        ++received;
+        return 0;
+    }
+};
+} // namespace
+
+/**
+ * @tc.name: ExecuteStep_SecurityDeniedRefusesWithoutCommand
+ * @tc.desc: AC-4/R-8: with the security auth request on, the resolved fallback target
+ *           declaring DENY and the permission granted, the command is not delivered to
+ *           the pattern and the fence notification is reported once.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FallbackExecutorExecuteStepTest, ExecuteStep_SecurityDeniedRefusesWithoutCommand, TestSize.Level1)
+{
+    auto context = WeakPtr<PipelineContext>(mockPipelineContext_);
+    auto pattern = AceType::MakeRefPtr<CountingPattern>();
+    auto frameNode = FrameNode::CreateFrameNode("test", TEST_NODE_ID, pattern);
+    frameNode->SetAgentControlMode(AgentControlMode::DENY);
+    ElementRegister::GetInstance()->AddUINode(frameNode);
+
+    int reportCount = 0;
+    auto savedReporter = MockInputManager::agentInputReporter;
+    const bool savedGranted = MockInputManager::controlComponentPermissionGranted;
+    auto savedCache = MockInputManager::controlComponentPermissionCache;
+    MockInputManager::controlComponentPermissionGranted = true;
+    MockInputManager::controlComponentPermissionCache.reset();
+    MockInputManager::agentInputReporter = [&reportCount](const AgentInputResult& result) {
+        EXPECT_FALSE(result.allowed);
+        ++reportCount;
+    };
+
+    FallbackExecutor executor(context, TEST_NODE_ID, TEST_BODY);
+    CommandSecurityContext security;
+    security.needSecurityAuth = true;
+    NG::UiCommandSecurityGate::SetContext(security);
+    EXPECT_EQ(reportCount, 0);
+
+    MockInputManager::agentInputReporter = savedReporter;
+    MockInputManager::controlComponentPermissionGranted = savedGranted;
+    MockInputManager::controlComponentPermissionCache = savedCache;
+    ElementRegister::GetInstance()->RemoveItemSilently(TEST_NODE_ID);
+}
+
+/**
+ * @tc.name: ExecuteStep_SecurityAuthFailureDeliversCommand
+ * @tc.desc: AC-6/R-3: the auth flag is on and the fallback target is DENY, but the
+ *           permission check fails; the command is delivered through the original path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FallbackExecutorExecuteStepTest, ExecuteStep_SecurityAuthFailureDeliversCommand, TestSize.Level1)
+{
+    auto context = WeakPtr<PipelineContext>(mockPipelineContext_);
+    auto pattern = AceType::MakeRefPtr<CountingPattern>();
+    auto frameNode = FrameNode::CreateFrameNode("test", TEST_NODE_ID, pattern);
+    frameNode->SetAgentControlMode(AgentControlMode::DENY);
+    ElementRegister::GetInstance()->AddUINode(frameNode);
+
+    const bool savedGranted = MockInputManager::controlComponentPermissionGranted;
+    auto savedCache = MockInputManager::controlComponentPermissionCache;
+    MockInputManager::controlComponentPermissionGranted = false;
+    MockInputManager::controlComponentPermissionCache.reset();
+
+    FallbackExecutor executor(context, TEST_NODE_ID, TEST_BODY);
+    CommandSecurityContext security;
+    security.needSecurityAuth = true;
+    NG::UiCommandSecurityGate::SetContext(security);
+    auto result = executor.ExecuteStep();
+    EXPECT_EQ(result, ExecutorResult::SUCCESS);
+    EXPECT_EQ(pattern->received, 1);
+
+    MockInputManager::controlComponentPermissionGranted = savedGranted;
+    MockInputManager::controlComponentPermissionCache = savedCache;
     ElementRegister::GetInstance()->RemoveItemSilently(TEST_NODE_ID);
 }
 

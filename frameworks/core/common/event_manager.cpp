@@ -4220,9 +4220,13 @@ void EventManager::ProcessCommandWithResult(const std::string& command, std::fun
     }
     auto result = relaxedInteractionManager->ProcessCommand(command,
         [finishCallback](NG::ExecutionState state) {
-            finishCallback(state == NG::ExecutionState::SUCCESS
-                ? NG::CommandResult::Success()
-                : NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL));
+            if (state == NG::ExecutionState::SUCCESS) {
+                finishCallback(NG::CommandResult::Success());
+            } else if (state == NG::ExecutionState::SECURITY_DENIED) {
+                finishCallback(NG::CommandResult::Error(NG::CommandErrorType::SECURITY_DENIED));
+            } else {
+                finishCallback(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL));
+            }
         });
     if (result == NG::ProcessResult::SUCCESS) {
         requestFrameCallback();

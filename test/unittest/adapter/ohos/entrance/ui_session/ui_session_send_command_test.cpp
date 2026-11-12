@@ -60,6 +60,7 @@ namespace {
 constexpr int32_t COMMAND_NODE_ID = 42;
 constexpr int EXPECTED_REQUEST_SENDS = 2;
 constexpr int EXPECTED_FINISH_CALLBACKS = 2;
+constexpr int32_t MOCK_SYNC_REPLY_VALUE = 7;
 constexpr int32_t COMMAND_TIMEOUT_MS = 5000;
 constexpr int32_t BEFORE_COMMAND_TIMEOUT_MS = COMMAND_TIMEOUT_MS - 1;
 constexpr int CONCURRENT_WORKERS = 8;
@@ -162,7 +163,7 @@ TEST_F(SendCommandTest, OverloadsSharePendingAndLegacyParcelIsUnchanged)
     int count = 0;
     EXPECT_EQ(proxy->SendCommand(COMMAND_NODE_ID, R"({"cmd":"click"})", [&count](const std::string&) { ++count; }),
         NO_ERROR);
-    EXPECT_EQ(proxy->SendCommand("{}", [](const std::string&) {}), LAST_UNFINISH);
+    EXPECT_EQ(proxy->SendCommand("{}", SendCommandFinishCallback([](const std::string&) {})), LAST_UNFINISH);
     EXPECT_EQ(proxy->SendCommand(COMMAND_NODE_ID, R"({"cmd":"click"})"), NO_ERROR);
     EXPECT_EQ(sends, EXPECTED_REQUEST_SENDS);
     EXPECT_EQ(count, 0);
@@ -181,8 +182,8 @@ TEST_F(SendCommandTest, EmptyCallbackAndSendFailureDoNotRemainPending)
 {
     int count = 0;
     auto callback = [&count](const std::string&) { ++count; };
-    EXPECT_EQ(proxy->SendCommand(1, "{}", {}), PARAM_INVALID);
-    EXPECT_EQ(proxy->SendCommand("{}", {}), PARAM_INVALID);
+    EXPECT_EQ(proxy->SendCommand(1, "{}", SendCommandFinishCallback()), PARAM_INVALID);
+    EXPECT_EQ(proxy->SendCommand("{}", SendCommandFinishCallback()), PARAM_INVALID);
     uint64_t invalidId = 1;
     EXPECT_FALSE(report->RegisterSendCommandFinishCallback({}, invalidId));
     EXPECT_EQ(invalidId, 0u);
@@ -226,8 +227,8 @@ TEST_F(SendCommandTest, RequestTraceIncludesRejectedAttemptsBeforeValidation)
         ADD_FAILURE() << "Rejected command must not send IPC";
         return NO_ERROR;
     };
-    EXPECT_EQ(proxy->SendCommand(COMMAND_NODE_ID, "{}", {}), PARAM_INVALID);
-    EXPECT_EQ(proxy->SendCommand("{}", {}), PARAM_INVALID);
+    EXPECT_EQ(proxy->SendCommand(COMMAND_NODE_ID, "{}", SendCommandFinishCallback()), PARAM_INVALID);
+    EXPECT_EQ(proxy->SendCommand("{}", SendCommandFinishCallback()), PARAM_INVALID);
     const std::vector<std::string> expected = { "Callback.Node", "Callback.Global" };
     EXPECT_EQ(commandRequestTraceEvents, expected);
     EXPECT_FALSE(report->sendCommandFinishCallback_);
@@ -240,7 +241,7 @@ TEST_F(SendCommandTest, TimeoutOccursAtFiveSecondsAndLateResultsAreIsolated)
     ASSERT_EQ(proxy->SendCommand("{}", [&oldCount](const std::string&) { ++oldCount; }), NO_ERROR);
     auto oldId = report->sendCommandRequestId_;
     handler->AdvanceTime(BEFORE_COMMAND_TIMEOUT_MS);
-    EXPECT_EQ(proxy->SendCommand("{}", [](const std::string&) {}), LAST_UNFINISH);
+    EXPECT_EQ(proxy->SendCommand("{}", SendCommandFinishCallback([](const std::string&) {})), LAST_UNFINISH);
     handler->AdvanceTime(1);
     ASSERT_EQ(proxy->SendCommand("{}", [&newCount](const std::string&) { ++newCount; }), NO_ERROR);
     auto newId = report->sendCommandRequestId_;
@@ -257,7 +258,7 @@ TEST_F(SendCommandTest, CallbackCanReenterAndItsNewTimeoutIsPreserved)
 {
     int next = FAILED;
     auto callback = [this, &next](const std::string&) {
-        next = proxy->SendCommand("{}", [](const std::string&) {});
+        next = proxy->SendCommand("{}", SendCommandFinishCallback([](const std::string&) {}));
     };
     ASSERT_EQ(proxy->SendCommand("{}", callback), NO_ERROR);
     auto first = report->sendCommandRequestId_;
@@ -268,6 +269,36 @@ TEST_F(SendCommandTest, CallbackCanReenterAndItsNewTimeoutIsPreserved)
     EXPECT_EQ(report->sendCommandRequestId_, second);
     handler->AdvanceTime(COMMAND_TIMEOUT_MS);
     EXPECT_FALSE(report->sendCommandFinishCallback_);
+}
+
+TEST_F(SendCommandTest, SecurityDeniedResultReleasesPendingSlotForNextRequest)
+{
+    constexpr const char* deniedJson = R"({"result":"FAILED","errorType":"SECURITY_DENIED","errorMessage":""})";
+    const SecurityAuthInfo authRequest { true, 0x1234ULL };
+    int deniedCount = 0;
+    auto deniedCallback = [&deniedCount, &deniedJson](const std::string& resultJson) {
+        EXPECT_EQ(resultJson, deniedJson);
+        ++deniedCount;
+    };
+    // The refused command completes exactly once with the SECURITY_DENIED result.
+    ASSERT_EQ(proxy->SendCommand("{}", deniedCallback, authRequest), NO_ERROR);
+    auto firstId = report->sendCommandRequestId_;
+    report->ReportCommandResult(firstId, deniedJson);
+    report->ReportCommandResult(firstId, deniedJson);
+    EXPECT_EQ(deniedCount, 1);
+    EXPECT_FALSE(report->sendCommandFinishCallback_);
+    // The pending slot is released: the next request is accepted and completes normally.
+    int nextCount = 0;
+    auto nextCallback = [&nextCount](const std::string&) { ++nextCount; };
+    ASSERT_EQ(proxy->SendCommand("{}", nextCallback, authRequest), NO_ERROR);
+    auto secondId = report->sendCommandRequestId_;
+    EXPECT_NE(firstId, secondId);
+    report->ReportCommandResult(secondId, R"({"result":"SUCCESS"})");
+    EXPECT_EQ(nextCount, 1);
+    // Late duplicate results for the finished request do not affect the new one.
+    report->ReportCommandResult(firstId, deniedJson);
+    EXPECT_EQ(deniedCount, 1);
+    EXPECT_EQ(nextCount, 1);
 }
 
 TEST_F(SendCommandTest, DeathNotificationReleasesProxyAndPendingCallback)
@@ -286,6 +317,78 @@ TEST_F(SendCommandTest, DeathNotificationReleasesProxyAndPendingCallback)
     EXPECT_TRUE(weakLifetime.expired());
     handler->AdvanceTime(COMMAND_TIMEOUT_MS);
     EXPECT_EQ(count, 0);
+}
+
+TEST_F(SendCommandTest, SecurityAuthFlagIsAppendedToEveryEntryParcel)
+{
+    constexpr const char* command = R"({"cmd":"click"})";
+    constexpr uint64_t tokenId = 0x1234567890ABCDEFULL;
+    const SecurityAuthInfo authRequest { true, tokenId };
+    std::map<uint32_t, std::pair<bool, uint64_t>> observed;
+    remote->send = [&](uint32_t code, MessageParcel& data, MessageParcel& reply, MessageOption&) {
+        EXPECT_EQ(data.ReadInterfaceToken(), IUiContentService::GetDescriptor());
+        bool flag = false;
+        if (code == IUiContentService::SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK ||
+            code == IUiContentService::SEND_COMMAND_WITH_FINISH_CALLBACK) {
+            uint64_t requestId = 0;
+            EXPECT_TRUE(data.ReadUint64(requestId));
+            if (code == IUiContentService::SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK) {
+                EXPECT_EQ(data.ReadInt32(), COMMAND_NODE_ID);
+            }
+        } else if (code == IUiContentService::SENDCOMMAND_EVENT ||
+            code == IUiContentService::SENDCOMMAND_SYNC_EVENT) {
+            EXPECT_EQ(data.ReadInt32(), COMMAND_NODE_ID);
+        }
+        EXPECT_EQ(data.ReadString(), command);
+        flag = data.ReadBool();
+        uint64_t observedTokenId = UINT64_MAX;
+        data.ReadUint64(observedTokenId);
+        observed[code] = { flag, observedTokenId };
+        if (code == IUiContentService::SENDCOMMAND_SYNC_EVENT) {
+            reply.WriteInt32(MOCK_SYNC_REPLY_VALUE);
+        }
+        return 0;
+    };
+    int finishCount = 0;
+    auto finish = [&finishCount](const std::string&) { ++finishCount; };
+
+    EXPECT_EQ(proxy->SendCommand(COMMAND_NODE_ID, command, authRequest), NO_ERROR);
+    EXPECT_EQ(proxy->SendCommandSync(COMMAND_NODE_ID, command, authRequest), MOCK_SYNC_REPLY_VALUE);
+    EXPECT_EQ(proxy->SendCommand(command, authRequest), NO_ERROR);
+    EXPECT_EQ(proxy->SendCommand(COMMAND_NODE_ID, command, finish, authRequest), NO_ERROR);
+    report->ReportCommandResult(report->sendCommandRequestId_, R"({"result":"SUCCESS"})");
+    EXPECT_EQ(proxy->SendCommand(command, finish, authRequest), NO_ERROR);
+    report->ReportCommandResult(report->sendCommandRequestId_, R"({"result":"SUCCESS"})");
+
+    EXPECT_EQ(observed.size(), 5u);
+    for (const auto& [code, fields] : observed) {
+        EXPECT_TRUE(fields.first) << "code " << code;
+        EXPECT_EQ(fields.second, tokenId) << "code " << code;
+    }
+    EXPECT_EQ(finishCount, EXPECTED_FINISH_CALLBACKS);
+    remote->send = {};
+}
+
+TEST_F(SendCommandTest, LegacyCallWithoutSecurityAuthKeepsDefaultValues)
+{
+    constexpr const char* command = R"({"cmd":"click"})";
+    std::map<uint32_t, std::pair<bool, uint64_t>> legacy;
+    remote->send = [&](uint32_t code, MessageParcel& data, MessageParcel&, MessageOption&) {
+        EXPECT_EQ(data.ReadInterfaceToken(), IUiContentService::GetDescriptor());
+        if (code == IUiContentService::SENDCOMMAND_EVENT) {
+            EXPECT_EQ(data.ReadInt32(), COMMAND_NODE_ID);
+        }
+        EXPECT_EQ(data.ReadString(), command);
+        bool legacyFlag = data.ReadBool();
+        uint64_t legacyTokenId = UINT64_MAX;
+        data.ReadUint64(legacyTokenId);
+        legacy[code] = { legacyFlag, legacyTokenId };
+        return 0;
+    };
+    EXPECT_EQ(proxy->SendCommand(COMMAND_NODE_ID, command), NO_ERROR);
+    EXPECT_EQ(legacy[IUiContentService::SENDCOMMAND_EVENT].first, false);
+    EXPECT_EQ(legacy[IUiContentService::SENDCOMMAND_EVENT].second, UINT64_MAX);
+    remote->send = {};
 }
 
 TEST_F(SendCommandTest, NewConnectionAfterProxyReleaseIgnoresPreviousRequest)
@@ -575,7 +678,8 @@ TEST(CommandResultTest, JsonContractAndUtf8Boundaries)
 {
     EXPECT_EQ(SerializeCommandResult(NG::CommandResult::Success()), R"({"result":"SUCCESS"})");
     for (auto type : { NG::CommandErrorType::NODE_NOT_FOUND, NG::CommandErrorType::INVALID_COMMAND,
-        NG::CommandErrorType::INVALID_PARAM, NG::CommandErrorType::EXECUTE_FAIL }) {
+        NG::CommandErrorType::INVALID_PARAM, NG::CommandErrorType::EXECUTE_FAIL,
+        NG::CommandErrorType::SECURITY_DENIED }) {
         for (auto length : { 0, 127, 128, 129 }) {
             auto json = SerializeCommandResult(NG::CommandResult::Error(type, std::string(length, 'a')));
             auto root = cJSON_Parse(json.c_str());
@@ -661,6 +765,44 @@ TEST(CommandResultTest, BatchInvalidEnvelopeExecutesNothingAndAllSuccessIsAggreg
         return target;
     });
     EXPECT_EQ(json, "{\"result\":\"SUCCESS\",\"results\":[{\"nodeId\":7,\"result\":\"SUCCESS\"}]}");
+}
+
+TEST(CommandResultTest, SecurityDeniedKeepsClassificationAndBatchItemIsSkipped)
+{
+    EXPECT_EQ(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::SECURITY_DENIED)),
+        R"({"result":"FAILED","errorType":"SECURITY_DENIED","errorMessage":""})");
+    // The refusal must not be degraded into EXECUTE_FAIL by long/invalid messages.
+    auto json = SerializeCommandResult(
+        NG::CommandResult::Error(NG::CommandErrorType::SECURITY_DENIED, std::string(200, 'a')));
+    EXPECT_NE(json.find("SECURITY_DENIED"), std::string::npos);
+
+    // A refused batch item keeps the classification, produces no execution and
+    // does not stop the remaining items.
+    const auto parsed = UiSessionBatchCommand::Parse(R"({"cmd":"batch", "commands":{
+        "1":{"cmd":"setText", "params":{"value":"a"}},
+        "2":{"cmd":"setText", "params":{"value":"b"}}}})");
+    std::vector<int> executed;
+    json = UiSessionBatchCommand::ExecuteWithResult(parsed, [&executed](int32_t nodeId) -> BatchResolvedTarget {
+        if (nodeId == 2) { return { .status = BatchTargetStatus::SECURITY_DENIED }; }
+        BatchResolvedTarget target;
+        target.status = BatchTargetStatus::READY;
+        target.execute = [&executed, nodeId](const std::string&) {
+            executed.push_back(nodeId);
+            return true;
+        };
+        return target;
+    });
+    EXPECT_EQ(executed, (std::vector<int> { 1 }));
+    auto root = cJSON_Parse(json.c_str());
+    ASSERT_NE(root, nullptr);
+    EXPECT_STREQ(cJSON_GetObjectItemCaseSensitive(root, "result")->valuestring, "FAILED");
+    auto results = cJSON_GetObjectItemCaseSensitive(root, "results");
+    ASSERT_EQ(cJSON_GetArraySize(results), 2);
+    EXPECT_STREQ(cJSON_GetObjectItemCaseSensitive(cJSON_GetArrayItem(results, 0), "result")->valuestring,
+        "SUCCESS");
+    EXPECT_STREQ(cJSON_GetObjectItemCaseSensitive(cJSON_GetArrayItem(results, 1), "errorType")->valuestring,
+        "SECURITY_DENIED");
+    cJSON_Delete(root);
 }
 } // namespace
 } // namespace OHOS::Ace

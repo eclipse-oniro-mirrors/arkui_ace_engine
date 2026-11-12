@@ -41,6 +41,11 @@ public:
         if (payloadStorage_) { payload_.emplace_back(value); }
         return true;
     }
+    bool WriteBool(bool value)
+    {
+        if (payloadStorage_) { payload_.emplace_back(value); }
+        return true;
+    }
     bool ReadUint64(uint64_t& value)
     {
         if (payloadStorage_) { return ReadPayload(value); }
@@ -226,7 +231,9 @@ public:
 
     bool ReadBool()
     {
-        return false;
+        bool value = false;
+        if (payloadStorage_) { ReadPayload(value); }
+        return value;
     }
 
 private:
@@ -239,7 +246,7 @@ private:
     }
     inline static thread_local bool defaultPayloadStorage_ = false;
     bool payloadStorage_ = defaultPayloadStorage_;
-    std::deque<std::variant<uint64_t, int32_t, std::string>> payload_;
+    std::deque<std::variant<uint64_t, int32_t, std::string, bool>> payload_;
 public:
     bool needCloseFd_ = false;
     std::u16string interfaceToken_;

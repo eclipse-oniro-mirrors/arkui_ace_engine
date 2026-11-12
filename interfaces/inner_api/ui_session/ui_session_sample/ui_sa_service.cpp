@@ -879,8 +879,67 @@ void UiSaService::HandleGetCurrentPageName(sptr<IUiContentService> service, std:
     service->GetCurrentPageName(getPageNameCallback);
 }
 
+namespace {
+// Optional trailing struct-form argument: "{needSecurityAuth,tokenId}", e.g. "{true,234}".
+// Fields may be omitted: "{true}" keeps the default tokenId, "{}" keeps both defaults.
+// The token is consumed only when fully valid, so JSON command payloads such as
+// "{"cmd":"click"}" are never mistaken for a security auth struct.
+constexpr size_t AUTH_ARG_MIN_LENGTH = 2;   // shortest struct token: "{}"
+constexpr size_t AUTH_ARG_MAX_FIELDS = 2;   // {needSecurityAuth, tokenId}
+constexpr int AUTH_ARG_TOKEN_ID_BASE = 10;  // tokenId is parsed as decimal digits
+SecurityAuthInfo ParseTrailingSecurityAuth(std::vector<std::string>& params)
+{
+    SecurityAuthInfo securityAuth;
+    if (params.empty()) {
+        return securityAuth;
+    }
+    const auto& last = params.back();
+    if (last.size() < AUTH_ARG_MIN_LENGTH || last.front() != '{' || last.back() != '}') {
+        return securityAuth;
+    }
+    const std::string content = last.substr(1, last.size() - 2);
+    std::vector<std::string> fields;
+    if (!content.empty()) {
+        // Scan comma-separated fields; a trailing comma yields a trailing empty field.
+        size_t start = 0;
+        while (start <= content.size()) {
+            const size_t pos = content.find(',', start);
+            if (pos == std::string::npos) {
+                fields.emplace_back(content.substr(start));
+                break;
+            }
+            fields.emplace_back(content.substr(start, pos - start));
+            start = pos + 1;
+        }
+    }
+    if (fields.size() > AUTH_ARG_MAX_FIELDS) {
+        return securityAuth;
+    }
+    bool needSecurityAuth = false;
+    if (!fields.empty() && !fields[0].empty()) {
+        if (fields[0] == "true" || fields[0] == "1") {
+            needSecurityAuth = true;
+        } else if (fields[0] != "false" && fields[0] != "0") {
+            return securityAuth;
+        }
+    }
+    uint64_t tokenId = UINT64_MAX;
+    if (fields.size() == AUTH_ARG_MAX_FIELDS && !fields[1].empty()) {
+        if (fields[1].find_first_not_of("0123456789") != std::string::npos) {
+            return securityAuth;
+        }
+        tokenId = std::strtoull(fields[1].c_str(), nullptr, AUTH_ARG_TOKEN_ID_BASE);
+    }
+    securityAuth.needSecurityAuth = needSecurityAuth;
+    securityAuth.tokenId = tokenId;
+    params.pop_back();
+    return securityAuth;
+}
+} // namespace
+
 void UiSaService::HandleSendCommand(sptr<IUiContentService> service, std::vector<std::string> params)
 {
+    SecurityAuthInfo securityAuth = ParseTrailingSecurityAuth(params);
     if (params.size() == SEND_COMMAND_WITH_NODEID) {
         int32_t id = std::atoi(params[1].c_str());
         std::string command = params[2];
@@ -894,13 +953,13 @@ void UiSaService::HandleSendCommand(sptr<IUiContentService> service, std::vector
             LOGI("[SendCommand] commandFromFile preview=%{private}s, length=%{public}zu",
                 commandFromFile.substr(0, SEND_COMMAND_LOG_PREVIEW_LENGTH).c_str(),
                 commandFromFile.length());
-            service->SendCommand(id, commandFromFile);
+            service->SendCommand(id, commandFromFile, securityAuth);
             return;
         }
-        service->SendCommand(id, command);
+        service->SendCommand(id, command, securityAuth);
     } else if (params.size() == SEND_COMMAND_WITHOUT_NODEID) {
         std::string command = params[1];
-        service->SendCommand(command);
+        service->SendCommand(command, securityAuth);
     }
 }
 
@@ -920,6 +979,7 @@ void UiSaService::HandleSendBatchSetText(sptr<IUiContentService> service, std::v
 void UiSaService::HandleSendCommandWithFinishCallback(
     sptr<IUiContentService> service, std::vector<std::string> params)
 {
+    SecurityAuthInfo securityAuth = ParseTrailingSecurityAuth(params);
     if ((params.size() != SEND_COMMAND_WITH_NODEID && params.size() != SEND_COMMAND_WITHOUT_NODEID) ||
         !EnsureConnected(service)) {
         return;
@@ -940,9 +1000,10 @@ void UiSaService::HandleSendCommandWithFinishCallback(
         }
     }
     int32_t result = params.size() == SEND_COMMAND_WITH_NODEID
-        ? service->SendCommand(std::atoi(params[1].c_str()), command, finishCallback)
-        : service->SendCommand(command, finishCallback);
-    LOGI("[SendCommandWithFinishCallback] request result=%{public}d", result);
+        ? service->SendCommand(std::atoi(params[1].c_str()), command, finishCallback, securityAuth)
+        : service->SendCommand(command, finishCallback, securityAuth);
+    LOGI("[SendCommandWithFinishCallback] request result=%{public}d, needSecurityAuth=%{public}d, tokenId=%{public}llu",
+        result, securityAuth.needSecurityAuth, static_cast<unsigned long long>(securityAuth.tokenId));
 }
 
 void UiSaService::HandleSendBatchSetTextWithFinishCallback(
@@ -959,11 +1020,13 @@ void UiSaService::HandleSendBatchSetTextWithFinishCallback(
 
 void UiSaService::HandleSendCommandSync(sptr<IUiContentService> service, std::vector<std::string> params)
 {
+    SecurityAuthInfo securityAuth = ParseTrailingSecurityAuth(params);
     CHECK_EQUAL_VOID(params.size() == SEND_COMMAND_WITH_NODEID, false);
     int32_t id = std::atoi(params[1].c_str());
     std::string command = params[2];
-    int32_t result = service->SendCommandSync(id, command);
-    LOGI("[SendCommandSync] result = %{public}d", result);
+    int32_t result = service->SendCommandSync(id, command, securityAuth);
+    LOGI("[SendCommandSync] result = %{public}d, needSecurityAuth=%{public}d, tokenId=%{public}llu",
+        result, securityAuth.needSecurityAuth, static_cast<unsigned long long>(securityAuth.tokenId));
 }
 
 void UiSaService::HandleRegisterContentChangeCallback(sptr<IUiContentService> service, std::vector<std::string> params)

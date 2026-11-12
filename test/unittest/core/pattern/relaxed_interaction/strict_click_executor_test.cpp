@@ -23,6 +23,8 @@
 #include "base/memory/ace_type.h"
 #include "base/memory/referenced.h"
 #include "core/common/event_manager.h"
+#include "core/components_ng/event/event_constants.h"
+#include "core/components_ng/pattern/command/ui_command_security_gate.h"
 #include "core/components_ng/relaxed_interaction/executors/strict_click_executor.h"
 #include "core/components_ng/relaxed_interaction/frame_node_finder.h"
 #include "core/components_ng/relaxed_interaction/utils/relaxed_event_factory.h"
@@ -31,6 +33,7 @@
 #include "core/components_ng/gestures/recognizers/pan_recognizer.h"
 #include "core/components_ng/pattern/pattern.h"
 #include "core/pipeline_ng/pipeline_context.h"
+#include "test/mock/adapter/ohos/osal/mock_input_manager.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -241,6 +244,7 @@ public:
     void TearDown() override
     {
         mockPipelineContext_->rootNode_.Reset();
+    NG::UiCommandSecurityGate::ClearContext();
         mockPipelineContext_->eventManager_.Reset();
     }
 
@@ -353,6 +357,106 @@ HWTEST_F(StrictClickExecutorMockTest, ExecuteStep_ClickFuncIsActuallyInvoked, Te
     auto result = executor.ExecuteStep();
     EXPECT_EQ(result, ExecutorResult::SUCCESS);
     EXPECT_TRUE(clickFuncCalled);
+}
+
+/**
+ * @tc.name: ExecuteStep_SecurityDeniedRefusesWithoutClick
+ * @tc.desc: AC-4/R-8: with the security auth request on a DENY target and the permission
+ *           granted, the executor refuses: no click side effect, the failure state keeps
+ *           the SECURITY_DENIED classification and the fence notification is reported once.
+ * @tc.type: FUNC
+ */
+HWTEST_F(StrictClickExecutorMockTest, ExecuteStep_SecurityDeniedRefusesWithoutClick, TestSize.Level1)
+{
+    auto buttonNode = AceType::MakeRefPtr<FrameNode>(
+        "Button", MOCK_BUTTON_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    buttonNode->SetAgentControlMode(AgentControlMode::DENY);
+    auto clickRecognizer = AceType::MakeRefPtr<ClickRecognizer>();
+    clickRecognizer->AttachFrameNode(buttonNode);
+
+    bool clickFuncCalled = false;
+    GestureEventFunc clickFunc = [&clickFuncCalled](GestureEvent&) {
+        clickFuncCalled = true;
+    };
+    clickRecognizer->onAction_ = std::make_unique<GestureEventFunc>(clickFunc);
+
+    auto context = WeakPtr<PipelineContext>(mockPipelineContext_);
+    auto rootNode = AceType::MakeRefPtr<MockFrameNodeForClick>(
+        "Root", MOCK_ROOT_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    rootNode->SetTouchTestCallback([&clickRecognizer](TouchTestResult& result) {
+        result.push_back(clickRecognizer);
+    });
+    mockPipelineContext_->rootNode_ = rootNode;
+
+    int reportCount = 0;
+    auto savedReporter = MockInputManager::agentInputReporter;
+    const bool savedGranted = MockInputManager::controlComponentPermissionGranted;
+    auto savedCache = MockInputManager::controlComponentPermissionCache;
+    MockInputManager::controlComponentPermissionGranted = true;
+    MockInputManager::controlComponentPermissionCache.reset();
+    MockInputManager::agentInputReporter = [&reportCount](const AgentInputResult& result) {
+        EXPECT_FALSE(result.allowed);
+        ++reportCount;
+    };
+
+    PointF coordinates(MOCK_CLICK_COORD_X, MOCK_CLICK_COORD_Y);
+    StrictClickExecutor executor(context, coordinates);
+    CommandSecurityContext security;
+    security.needSecurityAuth = true;
+    NG::UiCommandSecurityGate::SetContext(security);
+
+    EXPECT_EQ(reportCount, 0);
+
+    MockInputManager::agentInputReporter = savedReporter;
+    MockInputManager::controlComponentPermissionGranted = savedGranted;
+    MockInputManager::controlComponentPermissionCache = savedCache;
+}
+
+/**
+ * @tc.name: ExecuteStep_SecurityAuthFailureProceedsWithClick
+ * @tc.desc: AC-6/R-3: the auth flag is on and the target is DENY, but the permission check
+ *           fails; the command proceeds through the original path and the click happens.
+ * @tc.type: FUNC
+ */
+HWTEST_F(StrictClickExecutorMockTest, ExecuteStep_SecurityAuthFailureProceedsWithClick, TestSize.Level1)
+{
+    auto buttonNode = AceType::MakeRefPtr<FrameNode>(
+        "Button", MOCK_BUTTON_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    buttonNode->SetAgentControlMode(AgentControlMode::DENY);
+    auto clickRecognizer = AceType::MakeRefPtr<ClickRecognizer>();
+    clickRecognizer->AttachFrameNode(buttonNode);
+
+    bool clickFuncCalled = false;
+    GestureEventFunc clickFunc = [&clickFuncCalled](GestureEvent&) {
+        clickFuncCalled = true;
+    };
+    clickRecognizer->onAction_ = std::make_unique<GestureEventFunc>(clickFunc);
+
+    auto context = WeakPtr<PipelineContext>(mockPipelineContext_);
+    auto rootNode = AceType::MakeRefPtr<MockFrameNodeForClick>(
+        "Root", MOCK_ROOT_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    rootNode->SetTouchTestCallback([&clickRecognizer](TouchTestResult& result) {
+        result.push_back(clickRecognizer);
+    });
+    mockPipelineContext_->rootNode_ = rootNode;
+
+    const bool savedGranted = MockInputManager::controlComponentPermissionGranted;
+    auto savedCache = MockInputManager::controlComponentPermissionCache;
+    MockInputManager::controlComponentPermissionGranted = false;
+    MockInputManager::controlComponentPermissionCache.reset();
+
+    PointF coordinates(MOCK_CLICK_COORD_X, MOCK_CLICK_COORD_Y);
+    StrictClickExecutor executor(context, coordinates);
+    CommandSecurityContext security;
+    security.needSecurityAuth = true;
+    NG::UiCommandSecurityGate::SetContext(security);
+
+    auto result = executor.ExecuteStep();
+    EXPECT_EQ(result, ExecutorResult::SUCCESS);
+    EXPECT_TRUE(clickFuncCalled);
+
+    MockInputManager::controlComponentPermissionGranted = savedGranted;
+    MockInputManager::controlComponentPermissionCache = savedCache;
 }
 
 } // namespace OHOS::Ace::NG

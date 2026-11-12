@@ -38,6 +38,10 @@ ExecutorResult SimulateTouchExecutor::ExecuteStep()
         return SetFailureState(ExecutionState::TARGET_NOT_FOUND);
     }
 
+    if (IsTargetDeniedAt(coordinates_.GetX(), coordinates_.GetY())) {
+        return SetFailureState(ExecutionState::SECURITY_DENIED);
+    }
+
     // Create touch event
     TouchEvent downEvent = RelaxedEventFactory::CreateTouchEvent(coordinates_, TouchType::DOWN);
     TouchEvent upEvent = RelaxedEventFactory::CreateTouchEvent(coordinates_, TouchType::UP);

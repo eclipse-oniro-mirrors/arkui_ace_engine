@@ -4809,7 +4809,7 @@ bool PipelineContext::OnDumpInfo(const std::vector<std::string>& params) const
         OnDumpInjection(params);
     } else if (params[0] == "-injectionkeycode" && params.size() > PARAM_NUM) {
 #ifndef CROSS_PLATFORM
-        UiSessionManager::GetInstance()->SendCommand(params[1]);
+        UiSessionManager::GetInstance()->SendCommand(params[1], SecurityAuthInfo {});
 #endif
 #endif
     } else if (params[0] == "-forcedark") {
@@ -4869,7 +4869,7 @@ bool PipelineContext::OnDumpInfo(const std::vector<std::string>& params) const
 #ifdef RELAXED_INTERACTION_SUPPORT
     } else if (params[0] == "-relaxedinteractioncmd" && params.size() >= PARAM_NUM) {
 #ifndef CROSS_PLATFORM
-        UiSessionManager::GetInstance()->SendCommand(params[1]);
+        UiSessionManager::GetInstance()->SendCommand(params[1], SecurityAuthInfo {});
 #endif
     } else if (params[0] == "-relaxedinteractionlog") {
         DumpLog::GetInstance().Print(WorkflowDumper::GetInstance().Dump());

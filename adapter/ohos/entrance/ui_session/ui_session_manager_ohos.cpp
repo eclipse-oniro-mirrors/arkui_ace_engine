@@ -2010,7 +2010,8 @@ void UiSessionManagerOhos::NotifyAllWebPattern(bool isRegister)
     }
 }
 
-void UiSessionManagerOhos::NotifySendCommandPattern(int32_t id, const std::string& command)
+void UiSessionManagerOhos::NotifySendCommandPattern(
+    int32_t id, const std::string& command, const SecurityAuthInfo& securityAuth)
 {
     NotifySendCommandFunction notifySendCommandFunction;
     {
@@ -2018,12 +2019,12 @@ void UiSessionManagerOhos::NotifySendCommandPattern(int32_t id, const std::strin
         notifySendCommandFunction = notifySendCommandFunction_;
     }
     if (notifySendCommandFunction) {
-        notifySendCommandFunction(id, command);
+        notifySendCommandFunction(id, command, securityAuth);
     }
 }
 
-void UiSessionManagerOhos::NotifySendCommandPatternWithResult(
-    int32_t id, const std::string& command, const CommandResultCallback& finishCallback)
+void UiSessionManagerOhos::NotifySendCommandPatternWithResult(int32_t id, const std::string& command,
+    const CommandResultCallback& finishCallback, const SecurityAuthInfo& securityAuth)
 {
     NotifySendCommandWithResultFunction notifyFunction;
     {
@@ -2031,7 +2032,7 @@ void UiSessionManagerOhos::NotifySendCommandPatternWithResult(
         notifyFunction = notifySendCommandWithResultFunction_;
     }
     if (notifyFunction) {
-        notifyFunction(id, command, finishCallback);
+        notifyFunction(id, command, finishCallback, securityAuth);
         return;
     }
     if (finishCallback) {
@@ -2039,7 +2040,8 @@ void UiSessionManagerOhos::NotifySendCommandPatternWithResult(
     }
 }
 
-int32_t UiSessionManagerOhos::NotifySendCommandSyncPattern(int32_t id, const std::string& command)
+int32_t UiSessionManagerOhos::NotifySendCommandSyncPattern(
+    int32_t id, const std::string& command, const SecurityAuthInfo& securityAuth)
 {
     NotifySendCommandSyncFunction notifySendCommandSyncFunction;
     {
@@ -2049,7 +2051,7 @@ int32_t UiSessionManagerOhos::NotifySendCommandSyncPattern(int32_t id, const std
     if (!notifySendCommandSyncFunction) {
         return 11; // 11 is the error code for no callback
     }
-    return notifySendCommandSyncFunction(id, command);
+    return notifySendCommandSyncFunction(id, command, securityAuth);
 }
 
 void UiSessionManagerOhos::SaveRegisterForWebFunction(NotifyAllWebFunction&& function)
@@ -2757,7 +2759,7 @@ void UiSessionManagerOhos::SendPixelMap(const std::vector<std::pair<int32_t, std
     processIter->second.clear();
 }
 
-void UiSessionManagerOhos::SendCommand(const std::string& command)
+void UiSessionManagerOhos::SendCommand(const std::string& command, const SecurityAuthInfo& securityAuth)
 {
     auto json = InspectorJsonUtil::ParseJsonString(command);
     if (!json || json->IsNull()) {
@@ -2777,17 +2779,19 @@ void UiSessionManagerOhos::SendCommand(const std::string& command)
         relaxedCommandFunction = relaxedCommandFunction_;
     }
     if (sendCommandFunction && value && value->IsNumber()) {
+        // Keycode injection targets the focused node; run the security gate against
+        // it when the caller requested security auth (see the keycode callback).
         int32_t cmdNumber = value->GetInt();
-        sendCommandFunction(cmdNumber);
+        sendCommandFunction(cmdNumber, securityAuth);
     } else if (relaxedCommandFunction) {
-        relaxedCommandFunction(command);
+        relaxedCommandFunction(command, securityAuth);
     } else {
         LOGW("SendCommand failed");
     }
 }
 
-void UiSessionManagerOhos::SendCommandWithResult(
-    const std::string& command, const CommandResultCallback& finishCallback)
+void UiSessionManagerOhos::SendCommandWithResult(const std::string& command,
+    const CommandResultCallback& finishCallback, const SecurityAuthInfo& securityAuth)
 {
     if (!finishCallback) {
         return;
@@ -2808,7 +2812,7 @@ void UiSessionManagerOhos::SendCommandWithResult(
         }
     }
     if (sendFunction) {
-        sendFunction(command, finishCallback);
+        sendFunction(command, finishCallback, securityAuth);
         return;
     }
     finishCallback(R"({"result":"FAILED","errorType":"EXECUTE_FAIL","errorMessage":""})");

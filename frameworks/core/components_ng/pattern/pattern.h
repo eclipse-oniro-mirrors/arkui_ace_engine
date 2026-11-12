@@ -56,12 +56,8 @@ using GestureEventFunc = std::function<void(GestureEvent& info)>;
 
 namespace OHOS::Ace::NG {
 enum class CommandErrorType : uint8_t {
-    NONE,
-    NODE_NOT_FOUND,
-    INVALID_COMMAND,
-    INVALID_PARAM,
-    EXECUTE_FAIL,
-    NOT_SUPPORTED
+    NONE, NODE_NOT_FOUND, INVALID_COMMAND, INVALID_PARAM, EXECUTE_FAIL,
+    NOT_SUPPORTED, SECURITY_DENIED
 };
 
 struct ACE_FORCE_EXPORT CommandResult {

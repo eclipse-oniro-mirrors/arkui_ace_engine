@@ -49,9 +49,11 @@ public:
         const std::function<void(std::vector<std::pair<float, float>>)>& eventCallback) override;
     virtual int32_t HighlightSpecifiedContent(int32_t id, const std::string& content,
         const std::vector<std::string>& nodeIds, const std::string& configs) override;
-    virtual int32_t SendCommand(int32_t id, const std::string& command) override;
-    virtual int32_t SendCommandSync(int32_t id, const std::string& command) override;
-    virtual int32_t SendCommand(const std::string command) override;
+    virtual int32_t SendCommand(
+        int32_t id, const std::string& command, SecurityAuthInfo securityAuth = {}) override;
+    virtual int32_t SendCommandSync(
+        int32_t id, const std::string& command, SecurityAuthInfo securityAuth = {}) override;
+    virtual int32_t SendCommand(const std::string command, SecurityAuthInfo securityAuth = {}) override;
     virtual int32_t UnregisterClickEventCallback() override;
     virtual int32_t UnregisterSearchEventCallback() override;
     virtual int32_t UnregisterTextChangeEventCallback() override;
@@ -126,13 +128,15 @@ public:
         const std::function<void(const std::string&)>& eventCallback,
         int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS) override;
     int32_t SendCommand(
-        int32_t id, const std::string& command, const SendCommandFinishCallback& finishCallback) override;
+        int32_t id, const std::string& command, const SendCommandFinishCallback& finishCallback,
+        SecurityAuthInfo securityAuth = {}) override;
     int32_t SendCommand(
-        const std::string command, const SendCommandFinishCallback& finishCallback) override;
+        const std::string command, const SendCommandFinishCallback& finishCallback,
+        SecurityAuthInfo securityAuth = {}) override;
 
 private:
-    int32_t SendCommandWithFinishCallback(
-        uint32_t code, const int32_t* id, const std::string& command, const SendCommandFinishCallback& finishCallback);
+    int32_t SendCommandWithFinishCallback(uint32_t code, const int32_t* id, const std::string& command,
+        const SendCommandFinishCallback& finishCallback, const SecurityAuthInfo& securityAuth);
     int32_t SendPageTranslateRequest(uint32_t code, const char* caller, const std::string& request,
         const PageTranslateTextCallback* eventCallback, bool isContinuous);
     int32_t SendPageTranslateControlRequest(uint32_t code, const char* caller, int32_t nodeId = -1);
