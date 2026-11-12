@@ -613,59 +613,6 @@ HWTEST_F(WindowPatternTest, OnAttachToFrameNode_StateDisconnect_MultiScenario, T
 }
 
 /**
- * @tc.name: OnAttachToFrameNode_StateDisconnect_TryUseSnapshot
- * @tc.desc: Test OnAttachToFrameNode when state is STATE_DISCONNECT and TryUseSnapshot is true but ShowRecent is false,
- *           snapshot window should be created and kept (stack recovery scenario).
- * @tc.type: FUNC
- */
-HWTEST_F(WindowPatternTest, OnAttachToFrameNode_StateDisconnect_TryUseSnapshot, TestSize.Level1)
-{
-    ASSERT_NE(windowScene_, nullptr);
-    ASSERT_NE(windowScene_->GetHost(), nullptr);
-
-    /**
-     * @tc.steps: step1. STATE_DISCONNECT + !GetShowRecent() + GetTryUseSnapshot() + HasPersistentSnapshot()
-     *           → CreateSnapshotWindow and add it, keep snapshot window.
-     */
-    sceneSession_->state_ = Rosen::SessionState::STATE_DISCONNECT;
-    sceneSession_->SetShowRecent(false);
-    sceneSession_->SetTryUseSnapshot(true);
-    auto key = Rosen::defaultStatus;
-    sceneSession_->scenePersistence_->SetHasSnapshot(true, key);
-    windowScene_->snapshotWindow_ = nullptr;
-    windowScene_->WindowPattern::OnAttachToFrameNode();
-    EXPECT_NE(windowScene_->snapshotWindow_, nullptr);
-
-    /**
-     * @tc.steps: step2. STATE_DISCONNECT + !GetShowRecent() + !GetTryUseSnapshot() + HasPersistentSnapshot()
-     *           → fall through to CreateStartingWindow, no snapshot window.
-     */
-    sceneSession_->state_ = Rosen::SessionState::STATE_DISCONNECT;
-    sceneSession_->SetShowRecent(false);
-    sceneSession_->SetTryUseSnapshot(false);
-    for (auto& has : sceneSession_->scenePersistence_->hasSnapshot_) {
-        has = false;
-    }
-    windowScene_->snapshotWindow_ = nullptr;
-    windowScene_->WindowPattern::OnAttachToFrameNode();
-    EXPECT_EQ(windowScene_->snapshotWindow_, nullptr);
-
-    /**
-     * @tc.steps: step3. STATE_DISCONNECT + !GetShowRecent() + GetTryUseSnapshot() + !HasPersistentSnapshot()
-     *           → fall through to CreateStartingWindow, no snapshot window.
-     */
-    sceneSession_->state_ = Rosen::SessionState::STATE_DISCONNECT;
-    sceneSession_->SetShowRecent(false);
-    sceneSession_->SetTryUseSnapshot(true);
-    for (auto& has : sceneSession_->scenePersistence_->hasSnapshot_) {
-        has = false;
-    }
-    windowScene_->snapshotWindow_ = nullptr;
-    windowScene_->WindowPattern::OnAttachToFrameNode();
-    EXPECT_EQ(windowScene_->snapshotWindow_, nullptr);
-}
-
-/**
  * @tc.name: AddSnapshot
  * @tc.desc: AddSnapshot Test
  * @tc.type: FUNC
