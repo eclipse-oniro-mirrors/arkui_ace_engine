@@ -17,6 +17,7 @@ import("//foundation/arkui/ace_engine/ace_config.gni")
 
 #构建ANI库
 ohos_shared_library("overlayManager_ani") {
+  shlib_type = "ani"
   deps = [
     "$ace_root/build:libace_compatible",
     "//foundation/arkui/ace_engine/interfaces/ets/ani/utils:ani_utils",
