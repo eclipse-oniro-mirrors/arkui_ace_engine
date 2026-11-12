@@ -1023,6 +1023,8 @@ namespace Converter {
     template<> void AssignCast(std::optional<OHOS::Ace::SymbolEffectType>& dst, const Ark_SymbolEffectStrategy& src);
     template<> void AssignCast(std::optional<OHOS::Rosen::Filter*>& dst, const Ark_uiEffect_Filter& src);
     template<> void AssignCast(std::optional<OHOS::Rosen::Blender*>& dst, const Ark_uiEffect_BrightnessBlender& src);
+    template<> void AssignCast(std::optional<OHOS::Rosen::Blender*>& dst, const Ark_uiEffect_HdrBrightnessBlender& src);
+    template<> void AssignCast(std::optional<OHOS::Rosen::Blender*>& dst, const Ark_uiEffect_BlenderBase& src);
     template<> void AssignCast(std::optional<OHOS::Rosen::VisualEffect*>& dst, const Ark_uiEffect_VisualEffect& src);
     template<> void AssignCast(std::optional<Orientation>& dst, const Ark_window_Orientation& src);
     template<> void AssignCast(std::optional<OverflowMode>& dst, const Ark_MaxLinesMode& src);

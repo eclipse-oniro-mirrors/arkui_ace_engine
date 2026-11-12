@@ -177,6 +177,24 @@ ani_long ExtractorsToUiEffectBrightnessBlenderPtr(ani_env* env, ani_object aniCl
 
     return GetNativePtrFromMethod(env, obj, "getNativePtr");
 }
+ani_long ExtractorsToUiEffectHdrBrightnessBlenderPtr(ani_env* env, ani_object aniClass, ani_object obj)
+{
+    ani_long result = GetPropertyName(env, obj, "brightnessBlenderNativeObj");
+    if (result != 0L) {
+        return result;
+    }
+
+    return GetNativePtrFromMethod(env, obj, "getNativePtr");
+}
+ani_long ExtractorsToUiEffectBlenderBasePtr(ani_env* env, ani_object aniClass, ani_object obj)
+{
+    ani_long result = GetPropertyName(env, obj, "blenderBaseNativeObj");
+    if (result != 0L) {
+        return result;
+    }
+
+    return GetNativePtrFromMethod(env, obj, "getNativePtr");
+}
 ani_long ExtractorsToUiEffectVisualEffectPtr(ani_env* env, ani_object aniClass, ani_object obj)
 {
     ani_long result = GetPropertyName(env, obj, "visualEffectNativeObj");

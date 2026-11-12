@@ -19,7 +19,7 @@
 import { AttributeModifier, DrawModifier, extractors, GestureModifier, GestureType, hookDrawModifier, hookAllowDrop, hookStateStyleImpl, hookGestureModifier, hookCustomPropertyImpl, hookGesture, hookPriorityGesture, hookParallelGesture, hookDragPreviewOptions, hookCommonMethodModifierCustomProperty } from '#handwritten'
 import { AttributeUpdaterFlag } from './AttributeUpdaterFlag'
 import { PeerNode } from './PeerNode'
-import { ArkCommonMethodPeer, LayoutPolicy, Rectangle, ResponseRegion, TouchTestInfo, TouchResult, PixelRoundPolicy, PixelMap, ForegroundEffectOptions, VisualEffect, Filter, BorderImageOption, OutlineStyle, ClickEvent, HoverEvent, Callback as arkui_component_common_Callback, AccessibilityCallback, AccessibilityHoverEvent, AccessibilityTransparentCallback, TouchEvent, MouseEvent, KeyEvent, CrownEvent, FocusAxisEvent, AxisEvent, FocusMovement, AnimateParam, TransitionEffect, MotionBlurOptions, InvertOptions, TranslateOptions, ScaleOptions, RotateOptions, RotateAngleOptions, Matrix4Transit, AlignRuleOption, LocalizedAlignRuleOptions, ClickEffect, DragEvent, DragItemInfo, UniformDataType, PreDragStatus, LinearGradientOptions, SweepGradientOptions, RadialGradientOptions, MotionPathOptions, ShadowOptions, ShadowStyle, ProgressMask, StateStyles, PixelStretchEffectOptions, SpatialEffectParams, AccessibilitySamePageMode, AccessibilityRoleType, AccessibilityFocusCallback, AccessibilityActionInterceptCallback, AccessibilityAction, ReuseOptions, BackgroundBrightnessOptions, GestureRecognizerJudgeBeginCallback, ShouldBuiltInRecognizerParallelWithCallback, ShouldRecognizerParallelWithCallback, SizeChangeCallback, TouchTestDoneCallback, GestureCollectInterceptCallback, SystemUiMaterial, OnNeedSoftkeyboardCallback, CustomProperty, SafeAreaType, SafeAreaEdge, SafeAreaInsetOptions, LayoutSafeAreaType, LayoutSafeAreaEdge, BackgroundOptions, BackgroundImageOptions, BlurStyle, BackgroundBlurStyleOptions, SystemAdaptiveOptions, BackgroundEffectOptions, ForegroundBlurStyleOptions, TransitionFinishCallback, BlurOptions, LinearGradientBlurOptions, EffectType, sharedTransitionOptions, ChainStyle, OnDragEventCallback, DropOptions, SpringLoadingContext, DragSpringLoadingConfiguration, PreviewConfiguration, DragPreviewOptions, DragInteractionOptions, OverlayOptions, BlendMode, BlendApplyType, Blender, GeometryTransitionOptions, TipsMessageType, TipsOptions, PopupOptions, CustomPopupOptions, MenuElement, MenuOptions, Bindable, ContextMenuOptions, ModalTransition, ContentCoverOptions, SheetOptions, VisibleAreaChangeCallback, VisibleAreaEventOptions, AreaChangeCallback, AreaChangeOptions, CommonMethod, GravityCenterOptions, EdgeLightParams, SmartGestureShortcutOptions } from './component/common'
+import { ArkCommonMethodPeer, LayoutPolicy, Rectangle, ResponseRegion, TouchTestInfo, TouchResult, PixelRoundPolicy, PixelMap, ForegroundEffectOptions, VisualEffect, Filter, BorderImageOption, OutlineStyle, ClickEvent, HoverEvent, Callback as arkui_component_common_Callback, AccessibilityCallback, AccessibilityHoverEvent, AccessibilityTransparentCallback, TouchEvent, MouseEvent, KeyEvent, CrownEvent, FocusAxisEvent, AxisEvent, FocusMovement, AnimateParam, TransitionEffect, MotionBlurOptions, InvertOptions, TranslateOptions, ScaleOptions, RotateOptions, RotateAngleOptions, Matrix4Transit, AlignRuleOption, LocalizedAlignRuleOptions, ClickEffect, DragEvent, DragItemInfo, UniformDataType, PreDragStatus, LinearGradientOptions, SweepGradientOptions, RadialGradientOptions, MotionPathOptions, ShadowOptions, ShadowStyle, ProgressMask, StateStyles, PixelStretchEffectOptions, SpatialEffectParams, AccessibilitySamePageMode, AccessibilityRoleType, AccessibilityFocusCallback, AccessibilityActionInterceptCallback, AccessibilityAction, ReuseOptions, BackgroundBrightnessOptions, GestureRecognizerJudgeBeginCallback, ShouldBuiltInRecognizerParallelWithCallback, ShouldRecognizerParallelWithCallback, SizeChangeCallback, TouchTestDoneCallback, GestureCollectInterceptCallback, SystemUiMaterial, OnNeedSoftkeyboardCallback, CustomProperty, SafeAreaType, SafeAreaEdge, SafeAreaInsetOptions, LayoutSafeAreaType, LayoutSafeAreaEdge, BackgroundOptions, BackgroundImageOptions, BlurStyle, BackgroundBlurStyleOptions, SystemAdaptiveOptions, BackgroundEffectOptions, ForegroundBlurStyleOptions, TransitionFinishCallback, BlurOptions, LinearGradientBlurOptions, EffectType, sharedTransitionOptions, ChainStyle, OnDragEventCallback, DropOptions, SpringLoadingContext, DragSpringLoadingConfiguration, PreviewConfiguration, DragPreviewOptions, DragInteractionOptions, OverlayOptions, BlendMode, BlendApplyType, Blender, BlenderBase, GeometryTransitionOptions, TipsMessageType, TipsOptions, PopupOptions, CustomPopupOptions, MenuElement, MenuOptions, Bindable, ContextMenuOptions, ModalTransition, ContentCoverOptions, SheetOptions, VisibleAreaChangeCallback, VisibleAreaEventOptions, AreaChangeCallback, AreaChangeOptions, CommonMethod, GravityCenterOptions, EdgeLightParams, SmartGestureShortcutOptions } from './component/common'
 import { int32, int64 } from '@koalaui/common'
 import { ModifierState } from './CommonModifier'
 import { Length, Resource as arkui_component_units_Resource, SizeOptions, ConstraintSizeOptions, ChainWeightOptions, Padding, LocalizedPadding, Margin, LocalizedMargin, ResourceColor, ColorMetrics as arkui_component_units_ColorMetrics, ResourceStr, Position, BorderOptions, EdgeStyles, EdgeWidths, LocalizedEdgeWidths, EdgeColors, LocalizedEdgeColors, OutlineOptions, EdgeOutlineStyles, Dimension, EdgeOutlineWidths, OutlineRadiuses, VoidCallback, Area, Edges, LocalizedEdges, LocalizedPosition, AccessibilityActionOptions, BorderRadiuses, LocalizedBorderRadiuses, AccessibilityOptions, AccessibilityCustomAction, AccessibilityNextFocusParams } from './component/units'
@@ -294,6 +294,8 @@ export class CommonMethodModifier implements CommonMethod {
     public _blendMode_0_1value?: BlendApplyType | undefined
     public _advancedBlendMode_0_0value?: BlendMode | Blender | undefined
     public _advancedBlendMode_0_1value?: BlendApplyType | undefined
+    public _advancedBlendMode_1_0value?: BlenderBase | undefined
+    public _advancedBlendMode_1_1value?: BlendApplyType | undefined
     public _geometryTransition_0_0value?: string | undefined
     public _geometryTransition_0_1value?: GeometryTransitionOptions | undefined
     public _bindTips_0_0value?: TipsMessageType | undefined
@@ -3717,7 +3719,7 @@ export class CommonMethodModifier implements CommonMethod {
         if (flagArray[195] != 0) {
             switch (flagArray[195]) {
                 case 1: {
-                    peer.setAdvancedBlendModeAttribute((this._advancedBlendMode_0_0value as BlendMode | Blender | undefined), (this._advancedBlendMode_0_1value as BlendApplyType | undefined));
+                    peer.setAdvancedBlendMode0Attribute((this._advancedBlendMode_0_0value as BlendMode | Blender | undefined), (this._advancedBlendMode_0_1value as BlendApplyType | undefined));
                     flagArray[195] = 2;
                     break;
                 }
@@ -3727,7 +3729,7 @@ export class CommonMethodModifier implements CommonMethod {
                 }
                 default: {
                     flagArray[195] = 0;
-                    peer.setAdvancedBlendModeAttribute(undefined, undefined);
+                    peer.setAdvancedBlendMode0Attribute((undefined as BlendMode | Blender | undefined), (undefined as BlendApplyType | undefined));
                 }
             }
         }
@@ -4304,6 +4306,23 @@ export class CommonMethodModifier implements CommonMethod {
                 default: {
                     flagArray[230] = 0;
                     peer.setShadowClipModeAttribute((undefined as ShadowClipMode | undefined));
+                }
+            }
+        }
+        if (flagArray[231] != 0) {
+            switch (flagArray[231]) {
+                case 1: {
+                    peer.setAdvancedBlendMode1Attribute((this._advancedBlendMode_1_0value as BlenderBase | undefined), (this._advancedBlendMode_1_1value as BlendApplyType | undefined));
+                    flagArray[231] = 2;
+                    break;
+                }
+                case 3: {
+                    flagArray[231] = 2;
+                    break;
+                }
+                default: {
+                    flagArray[231] = 0;
+                    peer.setAdvancedBlendMode1Attribute((undefined as BlenderBase | undefined), (undefined as BlendApplyType | undefined));
                 }
             }
         }
@@ -6705,7 +6724,7 @@ export class CommonMethodModifier implements CommonMethod {
                     break;
                 }
                 default: {
-                    this.advancedBlendMode(undefined, undefined);
+                    this.advancedBlendMode((undefined as BlendMode | Blender | undefined), (undefined as BlendApplyType | undefined));
                 }
             }
         }
@@ -7114,6 +7133,18 @@ export class CommonMethodModifier implements CommonMethod {
                 }
                 default: {
                     this.shadowClipMode((undefined as ShadowClipMode | undefined));
+                }
+            }
+        }
+        if (flagArray[231] != 0) {
+            switch (flagArray[231]) {
+                case 1:
+                case 3: {
+                    this.advancedBlendMode((modifier._advancedBlendMode_1_0value as BlenderBase | undefined), (modifier._advancedBlendMode_1_1value as BlendApplyType | undefined));
+                    break;
+                }
+                default: {
+                    this.advancedBlendMode((undefined as BlenderBase | undefined), (undefined as BlendApplyType | undefined));
                 }
             }
         }
@@ -9142,6 +9173,17 @@ export class CommonMethodModifier implements CommonMethod {
             this._state.fireChange()
         } else {
             this._flagArray[195] = 3
+        }
+        return this
+    }
+    advancedBlendMode(effect: BlenderBase | undefined, type?: BlendApplyType): this {
+        if (((this._flagArray[231]) == (0)) || (true) || (true)) {
+            this._flagArray[231] = 1
+            this._advancedBlendMode_1_0value = effect
+            this._advancedBlendMode_1_1value = type
+            this._state.fireChange()
+        } else {
+            this._flagArray[231] = 3
         }
         return this
     }

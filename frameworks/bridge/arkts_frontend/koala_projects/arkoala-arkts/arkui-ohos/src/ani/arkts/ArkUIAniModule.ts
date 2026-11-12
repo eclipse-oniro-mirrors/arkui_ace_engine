@@ -106,6 +106,8 @@ export class ArkUIAniModule {
     native static _Extractors_ToMatrix4TransitPtr(value: matrix4.Matrix4Transit): KPointer;
     native static _Extractors_ToUiEffectFilterPtr(value: uiEffect.Filter): KPointer;
     native static _Extractors_ToUiEffectBrightnessBlenderPtr(value: uiEffect.BrightnessBlender): KPointer;
+    native static _Extractors_ToUiEffectHdrBrightnessBlenderPtr(value: uiEffect.HdrBrightnessBlender): KPointer;
+    native static _Extractors_ToUiEffectBlenderBasePtr(value: uiEffect.BlenderBase): KPointer;
     native static _Extractors_ToUiEffectVisualEffectPtr(value: uiEffect.VisualEffect): KPointer;
     native static _Extractors_ToUiMaterialMaterialPtr(value: uiMaterial.Material): KPointer;
     native static _Extractors_ToDrawContextPtr(value: DrawContext): KPointer;

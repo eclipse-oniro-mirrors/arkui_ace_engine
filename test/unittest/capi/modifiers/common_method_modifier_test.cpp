@@ -2530,4 +2530,249 @@ HWTEST_F(CommonMethodModifierTest, DISABLED_setAnimationTestOnFinishEventValues,
     ASSERT_NE(modifier_->setAnimation, nullptr);
     FAIL() << "Test is not implemented yet";
 }
+
+/*
+ * @tc.name: setAdvancedBlendMode1TestBlenderBaseValue
+ * @tc.desc: setAdvancedBlendMode1 with a BlenderBase peer passes the blender pointer
+ *           without crashing and applies the blend apply type, leaving the back
+ *           blend mode unchanged.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CommonMethodModifierTest, setAdvancedBlendMode1TestBlenderBaseValue, TestSize.Level1)
+{
+    ASSERT_NE(modifier_->setAdvancedBlendMode1, nullptr);
+    ASSERT_NE(render_, nullptr);
+    auto* fakeBlender = reinterpret_cast<OHOS::Rosen::Blender*>(0x1234);
+    auto baseBlender = Converter::ArkValue<Opt_uiEffect_BlenderBase>(
+        reinterpret_cast<Ark_uiEffect_BlenderBase>(fakeBlender));
+    auto optApplyType = Converter::ArkValue<Opt_BlendApplyType>(ARK_BLEND_APPLY_TYPE_OFFSCREEN);
+    modifier_->setAdvancedBlendMode1(node_, &baseBlender, &optApplyType);
+
+    EXPECT_EQ(render_->GetBackBlendApplyType().value_or(BlendApplyType::FAST), BlendApplyType::OFFSCREEN);
+    EXPECT_EQ(render_->GetBackBlendMode().value_or(BlendMode::NONE), BlendMode::NONE);
+}
+
+/*
+ * @tc.name: setAdvancedBlendMode1TestUndefinedValue
+ * @tc.desc: setAdvancedBlendMode1 with undefined effect or null pointers resets the
+ *           blender only; the back blend mode is preserved and the blend apply
+ *           type falls back to FAST.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CommonMethodModifierTest, setAdvancedBlendMode1TestUndefinedValue, TestSize.Level1)
+{
+    ASSERT_NE(modifier_->setAdvancedBlendMode1, nullptr);
+    ASSERT_NE(render_, nullptr);
+
+    auto initEffect = Converter::ArkUnion<Opt_Union_BlendMode_Blender, Ark_BlendMode>(ARK_BLEND_MODE_MULTIPLY);
+    modifier_->setAdvancedBlendMode0(node_, &initEffect, nullptr);
+    EXPECT_EQ(render_->GetBackBlendMode().value_or(BlendMode::NONE), BlendMode::MULTIPLY);
+
+    auto undefinedBase = Converter::ArkValue<Opt_uiEffect_BlenderBase>(Ark_Empty());
+    modifier_->setAdvancedBlendMode1(node_, &undefinedBase, nullptr);
+    EXPECT_EQ(render_->GetBackBlendMode().value_or(BlendMode::NONE), BlendMode::MULTIPLY);
+    EXPECT_EQ(render_->GetBackBlendApplyType().value_or(BlendApplyType::FAST), BlendApplyType::FAST);
+
+    modifier_->setAdvancedBlendMode1(node_, nullptr, nullptr);
+    EXPECT_EQ(render_->GetBackBlendMode().value_or(BlendMode::NONE), BlendMode::MULTIPLY);
+    EXPECT_EQ(render_->GetBackBlendApplyType().value_or(BlendApplyType::FAST), BlendApplyType::FAST);
+}
+
+/*
+ * @tc.name: setAdvancedBlendMode0TestHdrBrightnessBlenderValue
+ * @tc.desc: setAdvancedBlendMode0 with an Ark_Blender union carrying a valid
+ *           HdrBrightnessBlender peer dispatches to the Blender path only:
+ *           the back blend mode is not touched and the blend apply type is set.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CommonMethodModifierTest, setAdvancedBlendMode0TestHdrBrightnessBlenderValue, TestSize.Level1)
+{
+    ASSERT_NE(modifier_->setAdvancedBlendMode0, nullptr);
+    ASSERT_NE(render_, nullptr);
+
+    auto* fakeBlender = reinterpret_cast<OHOS::Rosen::Blender*>(0x1234);
+    auto hdrUnion = Converter::ArkUnion<Ark_Blender, Ark_uiEffect_HdrBrightnessBlender>(
+        reinterpret_cast<Ark_uiEffect_HdrBrightnessBlender>(fakeBlender));
+    auto hdrEffect = Converter::ArkUnion<Opt_Union_BlendMode_Blender, Ark_Blender>(hdrUnion);
+    auto optApplyType = Converter::ArkValue<Opt_BlendApplyType>(ARK_BLEND_APPLY_TYPE_OFFSCREEN);
+    modifier_->setAdvancedBlendMode0(node_, &hdrEffect, &optApplyType);
+
+    EXPECT_EQ(render_->GetBackBlendMode().value_or(BlendMode::NONE), BlendMode::NONE);
+    EXPECT_EQ(render_->GetBackBlendApplyType().value_or(BlendApplyType::FAST), BlendApplyType::OFFSCREEN);
+}
+
+/*
+ * @tc.name: setAdvancedBlendMode0TestHdrBrightnessBlenderNullPeer
+ * @tc.desc: setAdvancedBlendMode0 with an Ark_Blender union carrying a null
+ *           HdrBrightnessBlender peer resets the blender to nullptr and keeps
+ *           the previously set blend mode and the FAST apply type.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CommonMethodModifierTest, setAdvancedBlendMode0TestHdrBrightnessBlenderNullPeer, TestSize.Level1)
+{
+    ASSERT_NE(modifier_->setAdvancedBlendMode0, nullptr);
+    ASSERT_NE(render_, nullptr);
+
+    auto initEffect = Converter::ArkUnion<Opt_Union_BlendMode_Blender, Ark_BlendMode>(ARK_BLEND_MODE_MULTIPLY);
+    modifier_->setAdvancedBlendMode0(node_, &initEffect, nullptr);
+    EXPECT_EQ(render_->GetBackBlendMode().value_or(BlendMode::NONE), BlendMode::MULTIPLY);
+
+    auto nullHdrUnion = Converter::ArkUnion<Ark_Blender, Ark_uiEffect_HdrBrightnessBlender>(
+        static_cast<Ark_uiEffect_HdrBrightnessBlender>(nullptr));
+    auto nullHdrEffect = Converter::ArkUnion<Opt_Union_BlendMode_Blender, Ark_Blender>(nullHdrUnion);
+    modifier_->setAdvancedBlendMode0(node_, &nullHdrEffect, nullptr);
+
+    EXPECT_EQ(render_->GetBackBlendMode().value_or(BlendMode::NONE), BlendMode::MULTIPLY);
+    EXPECT_EQ(render_->GetBackBlendApplyType().value_or(BlendApplyType::FAST), BlendApplyType::FAST);
+}
+
+/*
+ * @tc.name: setAdvancedBlendModeNullNodeTest
+ * @tc.desc: setAdvancedBlendMode0/setAdvancedBlendMode1 with a null node are
+ *           guarded by CHECK_NULL_VOID: no property is updated and no crash occurs.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CommonMethodModifierTest, setAdvancedBlendModeNullNodeTest, TestSize.Level1)
+{
+    ASSERT_NE(modifier_->setAdvancedBlendMode0, nullptr);
+    ASSERT_NE(modifier_->setAdvancedBlendMode1, nullptr);
+    ASSERT_NE(render_, nullptr);
+
+    auto initEffect = Converter::ArkUnion<Opt_Union_BlendMode_Blender, Ark_BlendMode>(ARK_BLEND_MODE_MULTIPLY);
+    modifier_->setAdvancedBlendMode0(node_, &initEffect, nullptr);
+    EXPECT_EQ(render_->GetBackBlendMode().value_or(BlendMode::NONE), BlendMode::MULTIPLY);
+
+    auto* fakeBlender = reinterpret_cast<OHOS::Rosen::Blender*>(0x1234);
+    auto baseBlender = Converter::ArkValue<Opt_uiEffect_BlenderBase>(
+        reinterpret_cast<Ark_uiEffect_BlenderBase>(fakeBlender));
+    auto optApplyType = Converter::ArkValue<Opt_BlendApplyType>(ARK_BLEND_APPLY_TYPE_OFFSCREEN);
+
+    modifier_->setAdvancedBlendMode0(nullptr, &initEffect, nullptr);
+    modifier_->setAdvancedBlendMode1(nullptr, &baseBlender, &optApplyType);
+
+    EXPECT_EQ(render_->GetBackBlendMode().value_or(BlendMode::NONE), BlendMode::MULTIPLY);
+    EXPECT_EQ(render_->GetBackBlendApplyType().value_or(BlendApplyType::FAST), BlendApplyType::FAST);
+}
+
+/*
+ * @tc.name: setAdvancedBlendMode1TestNullPeerValue
+ * @tc.desc: setAdvancedBlendMode1 with a defined Opt_uiEffect_BlenderBase whose
+ *           peer is null: AssignCast yields nullopt end-to-end, so only the
+ *           blender is reset and the blend mode is preserved.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CommonMethodModifierTest, setAdvancedBlendMode1TestNullPeerValue, TestSize.Level1)
+{
+    ASSERT_NE(modifier_->setAdvancedBlendMode1, nullptr);
+    ASSERT_NE(render_, nullptr);
+
+    auto initEffect = Converter::ArkUnion<Opt_Union_BlendMode_Blender, Ark_BlendMode>(ARK_BLEND_MODE_MULTIPLY);
+    modifier_->setAdvancedBlendMode0(node_, &initEffect, nullptr);
+    EXPECT_EQ(render_->GetBackBlendMode().value_or(BlendMode::NONE), BlendMode::MULTIPLY);
+
+    // tag = OBJECT but peer = nullptr -> AssignCast gives nullopt -> SetBlender(nullptr)
+    auto nullPeerBase = Converter::ArkValue<Opt_uiEffect_BlenderBase>(
+        static_cast<Ark_uiEffect_BlenderBase>(nullptr));
+    modifier_->setAdvancedBlendMode1(node_, &nullPeerBase, nullptr);
+
+    EXPECT_EQ(render_->GetBackBlendMode().value_or(BlendMode::NONE), BlendMode::MULTIPLY);
+    EXPECT_EQ(render_->GetBackBlendApplyType().value_or(BlendApplyType::FAST), BlendApplyType::FAST);
+}
+
+/*
+ * @tc.name: setAdvancedBlendMode1TestBlenderBaseValidPeerValue
+ * @tc.desc: setAdvancedBlendMode1 with a valid BlenderBase peer: AssignCast
+ *           yields a non-empty optional holding the peer pointer, so the
+ *           blender path is taken, the blend mode is preserved and the
+ *           blend apply type is applied.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CommonMethodModifierTest, setAdvancedBlendMode1TestBlenderBaseValidPeerValue, TestSize.Level1)
+{
+    ASSERT_NE(modifier_->setAdvancedBlendMode1, nullptr);
+    ASSERT_NE(render_, nullptr);
+
+    auto initEffect = Converter::ArkUnion<Opt_Union_BlendMode_Blender, Ark_BlendMode>(ARK_BLEND_MODE_MULTIPLY);
+    modifier_->setAdvancedBlendMode0(node_, &initEffect, nullptr);
+    EXPECT_EQ(render_->GetBackBlendMode().value_or(BlendMode::NONE), BlendMode::MULTIPLY);
+
+    // non-null peer -> AssignCast gives optional(0x1234) -> SetBlender(peer)
+    auto* fakeBlender = reinterpret_cast<OHOS::Rosen::Blender*>(0x1234);
+    auto baseBlender = Converter::ArkValue<Opt_uiEffect_BlenderBase>(
+        reinterpret_cast<Ark_uiEffect_BlenderBase>(fakeBlender));
+    auto optApplyType = Converter::ArkValue<Opt_BlendApplyType>(ARK_BLEND_APPLY_TYPE_OFFSCREEN);
+    modifier_->setAdvancedBlendMode1(node_, &baseBlender, &optApplyType);
+
+    EXPECT_EQ(render_->GetBackBlendMode().value_or(BlendMode::NONE), BlendMode::MULTIPLY);
+    EXPECT_EQ(render_->GetBackBlendApplyType().value_or(BlendApplyType::FAST), BlendApplyType::OFFSCREEN);
+}
+
+/*
+ * @tc.name: setAdvancedBlendMode0TestUnionEmptyAndBrightnessBlender
+ * @tc.desc: setAdvancedBlendMode0 union dispatch: null/undefined/default outer
+ *           union selectors fall back to SetBlendMode(NONE)+SetBlender(nullptr);
+ *           a default inner Ark_Blender selector does the same, while valid and
+ *           null BrightnessBlender peers take the Blender path and keep the
+ *           blend mode untouched.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CommonMethodModifierTest, setAdvancedBlendMode0TestUnionEmptyAndBrightnessBlender, TestSize.Level1)
+{
+    ASSERT_NE(modifier_->setAdvancedBlendMode0, nullptr);
+    ASSERT_NE(render_, nullptr);
+
+    auto initEffect = Converter::ArkUnion<Opt_Union_BlendMode_Blender, Ark_BlendMode>(ARK_BLEND_MODE_MULTIPLY);
+
+    // null effect pointer -> outer empty visitor -> SetBlendMode(NONE) + SetBlender(nullptr)
+    modifier_->setAdvancedBlendMode0(node_, &initEffect, nullptr);
+    EXPECT_EQ(render_->GetBackBlendMode().value_or(BlendMode::NONE), BlendMode::MULTIPLY);
+    modifier_->setAdvancedBlendMode0(node_, nullptr, nullptr);
+    EXPECT_EQ(render_->GetBackBlendMode().value_or(BlendMode::NONE), BlendMode::NONE);
+
+    // undefined effect tag -> outer empty visitor
+    modifier_->setAdvancedBlendMode0(node_, &initEffect, nullptr);
+    EXPECT_EQ(render_->GetBackBlendMode().value_or(BlendMode::NONE), BlendMode::MULTIPLY);
+    auto undefinedEffect = Converter::ArkUnion<Opt_Union_BlendMode_Blender>(Ark_Empty());
+    modifier_->setAdvancedBlendMode0(node_, &undefinedEffect, nullptr);
+    EXPECT_EQ(render_->GetBackBlendMode().value_or(BlendMode::NONE), BlendMode::NONE);
+
+    // unknown outer selector -> outer empty visitor
+    modifier_->setAdvancedBlendMode0(node_, &initEffect, nullptr);
+    EXPECT_EQ(render_->GetBackBlendMode().value_or(BlendMode::NONE), BlendMode::MULTIPLY);
+    Ark_Union_BlendMode_Blender outerUnion {};
+    outerUnion.selector = -1;
+    Opt_Union_BlendMode_Blender outerDefaultEffect { INTEROP_TAG_OBJECT, outerUnion };
+    modifier_->setAdvancedBlendMode0(node_, &outerDefaultEffect, nullptr);
+    EXPECT_EQ(render_->GetBackBlendMode().value_or(BlendMode::NONE), BlendMode::NONE);
+
+    // unknown inner Ark_Blender selector -> inner empty visitor
+    modifier_->setAdvancedBlendMode0(node_, &initEffect, nullptr);
+    EXPECT_EQ(render_->GetBackBlendMode().value_or(BlendMode::NONE), BlendMode::MULTIPLY);
+    Ark_Blender innerUnion {};
+    innerUnion.selector = -1;
+    Ark_Union_BlendMode_Blender blenderUnion {};
+    blenderUnion.selector = SELECTOR_ID_1;
+    blenderUnion.value1 = innerUnion;
+    Opt_Union_BlendMode_Blender innerDefaultEffect { INTEROP_TAG_OBJECT, blenderUnion };
+    modifier_->setAdvancedBlendMode0(node_, &innerDefaultEffect, nullptr);
+    EXPECT_EQ(render_->GetBackBlendMode().value_or(BlendMode::NONE), BlendMode::NONE);
+
+    // valid BrightnessBlender peer -> Blender path, blend mode untouched
+    auto* fakeBlender = reinterpret_cast<OHOS::Rosen::Blender*>(0x1234);
+    auto brightUnion = Converter::ArkUnion<Ark_Blender, Ark_uiEffect_BrightnessBlender>(
+        reinterpret_cast<Ark_uiEffect_BrightnessBlender>(fakeBlender));
+    auto brightEffect = Converter::ArkUnion<Opt_Union_BlendMode_Blender, Ark_Blender>(brightUnion);
+    auto optApplyType = Converter::ArkValue<Opt_BlendApplyType>(ARK_BLEND_APPLY_TYPE_OFFSCREEN);
+    modifier_->setAdvancedBlendMode0(node_, &brightEffect, &optApplyType);
+    EXPECT_EQ(render_->GetBackBlendMode().value_or(BlendMode::NONE), BlendMode::NONE);
+    EXPECT_EQ(render_->GetBackBlendApplyType().value_or(BlendApplyType::FAST), BlendApplyType::OFFSCREEN);
+
+    // null BrightnessBlender peer -> Blender path with nullptr, blend mode untouched
+    auto nullBrightUnion = Converter::ArkUnion<Ark_Blender, Ark_uiEffect_BrightnessBlender>(
+        static_cast<Ark_uiEffect_BrightnessBlender>(nullptr));
+    auto nullBrightEffect = Converter::ArkUnion<Opt_Union_BlendMode_Blender, Ark_Blender>(nullBrightUnion);
+    modifier_->setAdvancedBlendMode0(node_, &nullBrightEffect, nullptr);
+    EXPECT_EQ(render_->GetBackBlendMode().value_or(BlendMode::NONE), BlendMode::NONE);
+    EXPECT_EQ(render_->GetBackBlendApplyType().value_or(BlendApplyType::FAST), BlendApplyType::FAST);
+}
 } // namespace OHOS::Ace::NG

@@ -33,7 +33,7 @@ import { TextRange_serializer, TextRange } from './textCommon'
 import { StyledString, StyledStringInternal, StyledString_serializer, ImageAttachment, StyleOptions, StyledStringKey, SpanStyle, StyledStringMarshallCallback, StyledStringMarshallingValue, UserDataSpan, StyledStringUnmarshallCallback } from './styledString'
 import { image_PixelMap_serializer } from './../framework/ohos.multimedia.image'
 import { ResizableOptions_serializer, ResizableOptions } from './image'
-import { uiEffect_VisualEffect_serializer, uiEffect_Filter_serializer, uiEffect_HdrBrightnessBlender_serializer, uiEffect_BrightnessBlender_serializer } from './../framework/ohos.graphics.uiEffect'
+import { uiEffect_VisualEffect_serializer, uiEffect_Filter_serializer, uiEffect_HdrBrightnessBlender_serializer, uiEffect_BrightnessBlender_serializer, uiEffect_BlenderBase_serializer } from './../framework/ohos.graphics.uiEffect'
 import { FocusBoxStyle_serializer, FocusBoxStyle, FocusPriority } from './focus'
 import { matrix4_Matrix4Transit_serializer } from './../framework/ohos.matrix4'
 import { CircleShape_serializer, EllipseShape_serializer, PathShape_serializer, RectShape_serializer } from './../framework/ohos.arkui.shape'
@@ -6589,7 +6589,7 @@ export class ArkCommonMethodPeer extends PeerNode {
         ArkUIGeneratedNativeModule._CommonMethod_setBlendMode(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
-    setAdvancedBlendModeAttribute(effect: BlendMode | Blender | undefined, type?: BlendApplyType): void {
+    setAdvancedBlendMode0Attribute(effect: BlendMode | Blender | undefined, type?: BlendApplyType): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (effect !== undefined) {
             thisSerializer.writeInt8(RuntimeType.OBJECT)
@@ -6621,7 +6621,26 @@ export class ArkCommonMethodPeer extends PeerNode {
         } else {
             thisSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
-        ArkUIGeneratedNativeModule._CommonMethod_setAdvancedBlendMode(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        ArkUIGeneratedNativeModule._CommonMethod_setAdvancedBlendMode0(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
+    setAdvancedBlendMode1Attribute(effect: BlenderBase | undefined, type?: BlendApplyType): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (effect !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const effectTmpValue = effect!
+            uiEffect_BlenderBase_serializer.write(thisSerializer, effectTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        if (type !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const typeTmpValue = (type as BlendApplyType)
+            thisSerializer.writeInt32(typeTmpValue.valueOf())
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._CommonMethod_setAdvancedBlendMode1(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
     setGeometryTransitionAttribute(id: string | undefined, options?: GeometryTransitionOptions): void {
@@ -11693,6 +11712,18 @@ export interface CommonMethod {
         }
         throw new Error('Unimplemented method advancedBlendMode')
     }
+    advancedBlendMode(effect: BlenderBase | undefined, type?: BlendApplyType): this {
+        const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
+        if (commonStyle) {
+            (commonStyle as Array<(instance: CommonMethod) => void>).push((instance: CommonMethod): void => instance.advancedBlendMode(effect, type));
+            return this;
+        } else {
+            if (this.__is_CustomComponent__Internal()) {
+                throw new Error('Common method advancedBlendMode can only be set when creating a custom component.')
+            }
+        }
+        throw new Error('Unimplemented method advancedBlendMode')
+    }
     geometryTransition(id: string | undefined, options?: GeometryTransitionOptions): this {
         const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
         if (commonStyle) {
@@ -12050,6 +12081,7 @@ export type VisualEffect = uiEffect.VisualEffect;
 export type Filter = uiEffect.Filter;
 export type SystemUiMaterial = uiMaterial.Material;
 export type Blender = uiEffect.Blender;
+export type BlenderBase = uiEffect.BlenderBase;
 export type PromptActionDialogController = promptAction.DialogController;
 export interface RectResult {
     x: double;
@@ -13701,7 +13733,13 @@ export class ArkCommonMethodComponent extends ComponentBase implements CommonMet
     public advancedBlendMode(effect: BlendMode | Blender | undefined, type?: BlendApplyType): this {
         const effect_casted = effect as (BlendMode | Blender | undefined)
         const type_casted = type as (BlendApplyType | undefined)
-        this.getPeer()?.setAdvancedBlendModeAttribute(effect_casted, type_casted)
+        this.getPeer()?.setAdvancedBlendMode0Attribute(effect_casted, type_casted)
+        return this
+    }
+    public advancedBlendMode(effect: BlenderBase | undefined, type?: BlendApplyType): this {
+        const effect_casted = effect as (BlenderBase | undefined)
+        const type_casted = type as (BlendApplyType | undefined)
+        this.getPeer()?.setAdvancedBlendMode1Attribute(effect_casted, type_casted)
         return this
     }
     public geometryTransition(id: string | undefined, options?: GeometryTransitionOptions): this {

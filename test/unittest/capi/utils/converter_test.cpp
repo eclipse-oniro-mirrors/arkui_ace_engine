@@ -217,4 +217,44 @@ HWTEST_F(ConvertorTest, callbackInvokerKeepsResourceAndInvokesCallbacks, TestSiz
     }
     EXPECT_EQ(g_releaseCount, 2);
 }
+
+/**
+ * @tc.name: blenderBasePeerToBlenderPointerConversionTest
+ * @tc.desc: test AssignCast of the uiEffect.BlenderBase peer to
+ *           std::optional<OHOS::Rosen::Blender*>: null peer gives an empty
+ *           optional, non-null peer is cast to the same pointer value.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ConvertorTest, blenderBasePeerToBlenderPointerConversionTest, TestSize.Level1)
+{
+    Ark_uiEffect_BlenderBase nullBasePeer = nullptr;
+    auto nullBase = Converter::OptConvert<OHOS::Rosen::Blender*>(nullBasePeer);
+    EXPECT_FALSE(nullBase.has_value());
+
+    auto* fakeBlender = reinterpret_cast<OHOS::Rosen::Blender*>(0x1234);
+    Ark_uiEffect_BlenderBase basePeer = reinterpret_cast<Ark_uiEffect_BlenderBase>(fakeBlender);
+    auto base = Converter::OptConvert<OHOS::Rosen::Blender*>(basePeer);
+    EXPECT_TRUE(base.has_value());
+    EXPECT_EQ(base.value(), fakeBlender);
+}
+
+/**
+ * @tc.name: hdrBrightnessBlenderPeerToBlenderPointerConversionTest
+ * @tc.desc: test AssignCast of the uiEffect.HdrBrightnessBlender peer to
+ *           std::optional<OHOS::Rosen::Blender*>: null peer gives an empty
+ *           optional, non-null peer is cast to the same pointer value.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ConvertorTest, hdrBrightnessBlenderPeerToBlenderPointerConversionTest, TestSize.Level1)
+{
+    Ark_uiEffect_HdrBrightnessBlender nullHdrPeer = nullptr;
+    auto nullHdr = Converter::OptConvert<OHOS::Rosen::Blender*>(nullHdrPeer);
+    EXPECT_FALSE(nullHdr.has_value());
+
+    auto* fakeBlender = reinterpret_cast<OHOS::Rosen::Blender*>(0x1234);
+    Ark_uiEffect_HdrBrightnessBlender hdrPeer = reinterpret_cast<Ark_uiEffect_HdrBrightnessBlender>(fakeBlender);
+    auto hdr = Converter::OptConvert<OHOS::Rosen::Blender*>(hdrPeer);
+    EXPECT_TRUE(hdr.has_value());
+    EXPECT_EQ(hdr.value(), fakeBlender);
+}
 } // namespace OHOS::Ace::NG
