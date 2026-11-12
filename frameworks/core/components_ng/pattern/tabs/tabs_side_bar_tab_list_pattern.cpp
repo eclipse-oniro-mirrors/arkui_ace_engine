@@ -823,6 +823,7 @@ void TabsSideBarTabListPattern::AddOrUpdateTabItemWithIconAndText(
     textNode->MarkModifyDone();
     textNode->MarkDirtyNode();
     iconNode->MarkModifyDone();
+    iconNode->MarkDirtyNode();
 }
 
 RefPtr<FrameNode> TabsSideBarTabListPattern::GetOrCreateTabItemNode(int32_t id)
