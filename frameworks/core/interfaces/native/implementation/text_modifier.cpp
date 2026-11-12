@@ -1091,7 +1091,6 @@ void SetBindSelectionMenuImpl(Ark_NativePointer node,
         convMenuParam = NG::SelectMenuParam();
     }
     std::optional<SelectionMenuType> menuType;
-    CHECK_NULL_VOID(options);
     if (options) {
         Converter::AssignCast(menuType, options->value.menuType.value);
     }
