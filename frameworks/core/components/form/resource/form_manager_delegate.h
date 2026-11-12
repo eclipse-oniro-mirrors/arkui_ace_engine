@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_FORM_RESOURCE_FORM_MANAGER_DELEGATE_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_FORM_RESOURCE_FORM_MANAGER_DELEGATE_H
 
+#include <atomic>
 #include <list>
 
 #include "interfaces/inner_api/form_render/include/form_renderer_delegate_impl.h"
@@ -210,7 +211,11 @@ private:
     void CheckWhetherSurfaceChangeFailed();
     void UpdateFormSizeWantCache(float width, float height, float formViewScale, float borderWidth);
     void HandleDueControlForm(bool isDisablePolicy, bool isControl);
-    
+
+    int32_t TryReAddForm();
+    void ScheduleDeathRecoveryTask(int32_t round);
+    void ExecuteDeathRecovery(int32_t round);
+
     inline void SetFormRendererDispatcher(sptr<IFormRendererDispatcher> &rendererDispatcher)
     {
         std::lock_guard<std::mutex> lock(formRenderDispatcherMutex_);
@@ -276,6 +281,8 @@ private:
     sptr<IFormRendererDispatcher> formRendererDispatcher_;
     AppExecFwk::FormJsInfo formJsInfo_;
     std::mutex formRenderDispatcherMutex_;
+    // At most one death recovery chain runs per delegate.
+    std::atomic<bool> deathRecoveryRunning_ { false };
 #endif
 };
 
