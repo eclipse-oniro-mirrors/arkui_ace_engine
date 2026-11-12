@@ -392,46 +392,23 @@ void WebSelectOverlay::SetMenuOptions(SelectOverlayInfo& selectInfo,
     CHECK_NULL_VOID(delegate);
     auto copyOption = delegate->GetCopyOptionMode();
     uint32_t flags = static_cast<uint32_t>(params->GetEditStateFlags());
-    if (!(flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_CUT) ||
-        copyOption == OHOS::NWeb::NWebPreference::CopyOptionMode::NONE) {
-        selectInfo.menuInfo.showCut = false;
-    } else {
-        selectInfo.menuInfo.showCut = true;
-    }
-    if (!(flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_COPY)) {
-        selectInfo.menuInfo.showCopy = false;
-    } else {
-        selectInfo.menuInfo.showCopy = true;
-    }
-    if (!(flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_PASTE)) {
-        selectInfo.menuInfo.showPaste = false;
-    } else {
-        selectInfo.menuInfo.showPaste = true;
-    }
-    if (!(flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_SELECT_ALL)) {
-        selectInfo.menuInfo.showCopyAll = false;
-    } else {
-        selectInfo.menuInfo.showCopyAll = true;
-    }
+    selectInfo.menuInfo.showCut = (flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_CUT) &&
+        copyOption != OHOS::NWeb::NWebPreference::CopyOptionMode::NONE;
+    selectInfo.menuInfo.showCopy = (flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_COPY) != 0;
+    selectInfo.menuInfo.showPaste = (flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_PASTE) != 0;
+    selectInfo.menuInfo.showCopyAll = (flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_SELECT_ALL) != 0;
     selectInfo.menuInfo.showAutoFill = IsShowMenuOfAutoFill(flags, selectInfo);
     selectInfo.menuInfo.showTranslateInput = selectInfo.isSingleHandle &&
         (flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_TRANSLATE_INPUT) && CanShowTranslateInput();
 
     auto value = GetSelectedText();
     auto queryWord = std::regex_replace(value, std::regex("^\\s+|\\s+$"), "");
-    selectInfo.menuInfo.showSearch = false;
-    selectInfo.menuInfo.showTranslate = false;
-    if (!queryWord.empty()) {
-        selectInfo.menuInfo.showSearch = true;
-        selectInfo.menuInfo.showTranslate = true;
-    }
+    selectInfo.menuInfo.showSearch = !queryWord.empty();
+    selectInfo.menuInfo.showTranslate = !queryWord.empty();
     bool canCopyOut = (copyOption != OHOS::NWeb::NWebPreference::CopyOptionMode::NONE) &&
                       (copyOption != OHOS::NWeb::NWebPreference::CopyOptionMode::IN_APP);
-    selectInfo.menuInfo.showAIWrite = false;
-    if (pattern->IsShowAIWrite() && canCopyOut &&
-        (selectInfo.isSingleHandle || (flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_CUT))) {
-        selectInfo.menuInfo.showAIWrite = true;
-    }
+    selectInfo.menuInfo.showAIWrite = pattern->IsShowAIWrite() && canCopyOut &&
+        (selectInfo.isSingleHandle || (flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_CUT));
     selectInfo.menuInfo.showShare = canCopyOut && !queryWord.empty();
     canShowAIMenu_ = canCopyOut && !(flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_CUT) && !queryWord.empty();
     selectInfo.menuInfo.isAskCeliaEnabled = canShowAIMenu_;
