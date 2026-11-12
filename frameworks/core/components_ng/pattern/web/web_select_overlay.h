@@ -119,7 +119,7 @@ public:
     RectF ComputeTouchHandleRect(std::shared_ptr<OHOS::NWeb::NWebTouchHandleState> touchHandle);
     RectF ComputeSelectAreaRect(RectF& selectArea);
     RectF GetViewPortFromHandle();
-    bool CanShowTranslateInput() const;
+    virtual bool CanShowTranslateInput() const;
     void HandleOnTranslateInput();
     void SetMenuOptions(SelectOverlayInfo& selectInfo,
         std::shared_ptr<OHOS::NWeb::NWebQuickMenuParams> params,

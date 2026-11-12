@@ -7557,4 +7557,128 @@ HWTEST_F(WebSelectOverlayTest, TranslateInputRejectsUnadvertisedAction, TestSize
     EXPECT_EQ(callback->calls, 0);
 #endif
 }
+
+namespace {
+#ifdef OHOS_STANDARD_SYSTEM
+class TranslateInputOverlay final : public WebSelectOverlay {
+public:
+    explicit TranslateInputOverlay(const WeakPtr<TextBase>& textBase) : WebSelectOverlay(textBase) {}
+    bool CanShowTranslateInput() const override { return supported_; }
+    bool supported_ = true;
+};
+
+class TranslateInputCallback final : public NWebQuickMenuCallback {
+public:
+    explicit TranslateInputCallback(WebSelectOverlay& overlay) : overlay_(overlay) {}
+    void Continue(int32_t command, MenuEventFlags flags) override
+    {
+        ++calls_;
+        command_ = command;
+        flags_ = flags;
+        visibleInCallback_ = overlay_.webSelectInfo_.menuInfo.showTranslateInput;
+    }
+    void Cancel() override {}
+    int32_t calls_ = 0;
+    int32_t command_ = 0;
+    MenuEventFlags flags_ = MenuEventFlags::EF_NONE;
+    bool visibleInCallback_ = true;
+
+private:
+    WebSelectOverlay& overlay_;
+};
+#endif
+} // namespace
+
+class WebTranslateInputActionTest : public WebSelectOverlayTest {
+protected:
+    void SetUp() override
+    {
+        WebSelectOverlayTest::SetUp();
+#ifdef OHOS_STANDARD_SYSTEM
+        auto nodeId = ViewStackProcessor::GetInstance()->ClaimNodeId();
+        auto node = FrameNode::GetOrCreateFrameNode(
+            V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+        pattern_ = node->GetPattern<WebPattern>();
+        pattern_->OnModifyDone();
+        ASSERT_NE(pattern_->delegate_, nullptr);
+        overlay_ = std::make_unique<TranslateInputOverlay>(pattern_);
+        callback_ = std::make_shared<TranslateInputCallback>(*overlay_);
+        overlay_->quickMenuCallback_ = callback_;
+        overlay_->webSelectInfo_.isSingleHandle = true;
+        overlay_->webSelectInfo_.menuInfo.showTranslateInput = true;
+#endif
+    }
+
+#ifdef OHOS_STANDARD_SYSTEM
+    RefPtr<WebPattern> pattern_;
+    std::unique_ptr<TranslateInputOverlay> overlay_;
+    std::shared_ptr<TranslateInputCallback> callback_;
+#endif
+};
+
+/**
+ * @tc.name: ContinueUsesTranslationCommandAndConsumesEntry
+ * @tc.desc: A supported click dispatches once with the native command and mouse flag.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebTranslateInputActionTest, ContinueUsesTranslationCommandAndConsumesEntry, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    overlay_->OnMenuItemAction(OptionMenuActionId::TRANSLATE_INPUT, OptionMenuType::TOUCH_MENU);
+    EXPECT_EQ(callback_->calls_, 1);
+    EXPECT_EQ(callback_->command_, NWebQuickMenuParams::QM_EF_CAN_TRANSLATE_INPUT);
+    EXPECT_EQ(callback_->flags_, MenuEventFlags::EF_LEFT_MOUSE_BUTTON);
+    EXPECT_FALSE(callback_->visibleInCallback_);
+    EXPECT_FALSE(overlay_->webSelectInfo_.menuInfo.showTranslateInput);
+    overlay_->OnMenuItemAction(OptionMenuActionId::TRANSLATE_INPUT, OptionMenuType::TOUCH_MENU);
+    EXPECT_EQ(callback_->calls_, 1);
+#endif
+}
+
+/**
+ * @tc.name: CapabilityLossConsumesEntryWithoutContinue
+ * @tc.desc: Losing IME eligibility after displaying the entry rejects the click and retry.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebTranslateInputActionTest, CapabilityLossConsumesEntryWithoutContinue, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    overlay_->supported_ = false;
+    overlay_->OnMenuItemAction(OptionMenuActionId::TRANSLATE_INPUT, OptionMenuType::TOUCH_MENU);
+    EXPECT_EQ(callback_->calls_, 0);
+    EXPECT_FALSE(overlay_->webSelectInfo_.menuInfo.showTranslateInput);
+    overlay_->supported_ = true;
+    overlay_->OnMenuItemAction(OptionMenuActionId::TRANSLATE_INPUT, OptionMenuType::TOUCH_MENU);
+    EXPECT_EQ(callback_->calls_, 0);
+#endif
+}
+
+/**
+ * @tc.name: SelectedTextDoesNotContinue
+ * @tc.desc: A selection range cannot use an earlier single-caret entry.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebTranslateInputActionTest, SelectedTextDoesNotContinue, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    overlay_->webSelectInfo_.isSingleHandle = false;
+    overlay_->OnMenuItemAction(OptionMenuActionId::TRANSLATE_INPUT, OptionMenuType::TOUCH_MENU);
+    EXPECT_EQ(callback_->calls_, 0);
+    EXPECT_FALSE(overlay_->webSelectInfo_.menuInfo.showTranslateInput);
+#endif
+}
+
+/**
+ * @tc.name: MissingCallbackDoesNotContinue
+ * @tc.desc: A click without a callback returns safely without dispatching.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebTranslateInputActionTest, MissingCallbackDoesNotContinue, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    overlay_->quickMenuCallback_.reset();
+    overlay_->OnMenuItemAction(OptionMenuActionId::TRANSLATE_INPUT, OptionMenuType::TOUCH_MENU);
+    EXPECT_EQ(callback_->calls_, 0);
+#endif
+}
 } // namespace OHOS::Ace::NG
