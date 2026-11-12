@@ -40,7 +40,7 @@ void ImagePerfPreview::EndRecordImageLoadStat(
         id, imageType.c_str(), size.first, size.second, state);
 }
 
-void ImagePerfPreview::AddLoadComponent(int32_t nodeId, int32_t sourceType = 0, bool isVisible = false)
+void ImagePerfPreview::AddLoadComponent(int32_t nodeId, int32_t sourceType, bool isVisible)
 {
 }
 
