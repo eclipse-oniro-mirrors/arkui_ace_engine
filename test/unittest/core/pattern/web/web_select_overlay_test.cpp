@@ -7596,9 +7596,11 @@ protected:
         WebSelectOverlayTest::SetUp();
 #ifdef OHOS_STANDARD_SYSTEM
         auto nodeId = ViewStackProcessor::GetInstance()->ClaimNodeId();
-        auto node = FrameNode::GetOrCreateFrameNode(
+        node_ = FrameNode::GetOrCreateFrameNode(
             V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
-        pattern_ = node->GetPattern<WebPattern>();
+        ASSERT_NE(node_, nullptr);
+        pattern_ = node_->GetPattern<WebPattern>();
+        ASSERT_NE(pattern_, nullptr);
         pattern_->OnModifyDone();
         ASSERT_NE(pattern_->delegate_, nullptr);
         overlay_ = std::make_unique<TranslateInputOverlay>(pattern_);
@@ -7610,6 +7612,7 @@ protected:
     }
 
 #ifdef OHOS_STANDARD_SYSTEM
+    RefPtr<FrameNode> node_;
     RefPtr<WebPattern> pattern_;
     std::unique_ptr<TranslateInputOverlay> overlay_;
     std::shared_ptr<TranslateInputCallback> callback_;
