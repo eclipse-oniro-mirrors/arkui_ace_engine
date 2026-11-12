@@ -416,6 +416,11 @@ public:
     void OnVideoStatusChanged(const int action, const std::map<std::string, std::string> &param) override;
     void OnInputMethodAttached() override;
 
+    bool OnGetWindowBounds(int32_t& x, int32_t& y,
+                           uint32_t& w, uint32_t& h, std::string& state) override;
+    bool OnSetWindowBounds(int32_t x, int32_t y,
+                           uint32_t w, uint32_t h, const std::string& state) override;
+
     void OnColorChooserPopup(const std::string& color,
         const std::vector<NWeb::NWebColorSuggestion>& suggestions,
         std::shared_ptr<NWeb::NWebColorChooserCallback> callback) override;
