@@ -23,7 +23,6 @@
 #include "base/utils/utils.h"
 #include "arkweb_utils.h"
 #include "core/common/share/text_share_adapter.h"
-#include "core/common/ime/text_input_keyboard_utils.h"
 #include "core/components_ng/manager/select_content_overlay/select_content_overlay_manager.h"
 #include "core/components_ng/manager/select_overlay/select_overlay_manager.h"
 #include "core/components_ng/pattern/web/web_pattern.h"
@@ -951,7 +950,7 @@ bool WebSelectOverlay::IsTouchHandleValid(std::shared_ptr<OHOS::NWeb::NWebTouchH
 
 bool WebSelectOverlay::CanShowTranslateInput() const
 {
-    return TextSystemMenu::IsShowTranslateInput() && IsTranslateInputSupported() && IsCurrentInputMethodDefaultIme();
+    return TextSystemMenu::IsShowTranslateInput() && IsTranslateInputSupported();
 }
 
 void WebSelectOverlay::HandleOnTranslateInput()
