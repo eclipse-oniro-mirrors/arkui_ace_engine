@@ -568,23 +568,9 @@ class RecoverableStorageImpl extends StorageHelper {
     };
 }
 
-// Public facade: static connect entry point per spec.md F-A2 (SDK declaration is delivered
-// by TASK-6 in interface/sdk-js; runtime binding maps RecoverableStorage.* to this facade).
-class RecoverableStorage {
-  public static connect<T extends object, S extends object>(
-    options: RecoverableConnectOptions<T, S>
-  ): T {
-    return RecoverableStorageImpl.instance().connect<T, S>(options);
-  }
-
-  public static keys(component: RecoverableComponent): Array<string> {
-    return RecoverableStorageImpl.instance().keys(component);
-  }
-
-  public static remove<T>(component: RecoverableComponent, keyOrType: string | TypeConstructorWithArgs<T>): void {
-    RecoverableStorageImpl.instance().remove<T>(component, keyOrType);
-  }
-}
+// Public facade lives in engine/jsStateManagement.js (same pattern as AppStorageV2 /
+// PersistenceV2): the engine module wraps RecoverableStorageImpl.instance() and is the
+// binding target of `import { RecoverableStorage } from '@ohos.arkui.StateManagement'`.
 
 // Exact UTF-8 byte length of a JS string (ASCII-identical, surrogate-aware).
 // Used by the snapshot byte budget (INV-3); no reliance on platform encoders.
