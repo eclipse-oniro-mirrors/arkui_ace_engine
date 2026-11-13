@@ -159,6 +159,7 @@ public:
     std::optional<ScrollSnapStrategy> GetScrollSnapStrategy() const;
     void UpdateScrollSnapStrategy(const ScrollSnapStrategy& strategy);
     void ResetScrollSnapStrategy();
+    std::string GetScrollSnapStrategyString() const;
     std::optional<std::string> GetFinalColumnsTemplate(double width);
 
     void UpdateContentClip(std::optional<ContentClip> contentClip) override
