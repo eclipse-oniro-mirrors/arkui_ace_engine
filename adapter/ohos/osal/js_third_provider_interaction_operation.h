@@ -22,6 +22,7 @@
 
 #include "core/accessibility/accessibility_provider.h"
 #include "core/accessibility/third_accessibility_manager.h"
+#include "adapter/ohos/osal/ui_session_accessibility_action.h"
 #include "js_accessibility_manager.h"
 
 namespace OHOS::Ace::NG {
@@ -74,6 +75,8 @@ public:
     void ExecuteAction(const int64_t elementId, const int32_t action,
         const std::map<std::string, std::string>& actionArguments, const int32_t requestId,
         Accessibility::AccessibilityElementOperatorCallback& callback) override;
+    UiSessionAccessibilityResult ExecuteActionForCollectedNode(int64_t providerElementId, int32_t action,
+        const std::map<std::string, std::string>& actionArguments, bool argumentsValid = true);
     void ClearFocus() override;
     void OutsideTouch() override;
     void GetCursorPosition(const int64_t elementId, const int32_t requestId,

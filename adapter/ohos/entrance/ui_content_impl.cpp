@@ -17,6 +17,8 @@
 #include "adapter/ohos/entrance/ui_session/ui_session_manager_ohos.h"
 #include "adapter/ohos/entrance/ui_session/page_scene_split_adapter.h"
 #include "interfaces/inner_api/ui_session/ui_session_split_rule.h"
+#include "adapter/ohos/entrance/ui_session/ui_session_accessibility_command.h"
+#include "adapter/ohos/osal/ui_session_accessibility_action.h"
 #include "core/accessibility/accessibility_manager.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 #include "base/resource/shared_image_manager.h"
@@ -6690,9 +6692,51 @@ NG::CommandResult ExecuteKeyCodeWithResult(
         ? NG::CommandResult::Success() : NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL);
 }
 
+bool TryExecuteGlobalAccessibilityCommand(const std::string& command, NG::CommandResult& result)
+{
+    auto json = JsonUtil::ParseJsonString(command);
+    if (!json || !json->IsValid() || !json->IsObject() ||
+        !(json->Contains("protocol") || json->Contains("action") || json->Contains("elementId"))) {
+        return false;
+    }
+    auto action = Accessibility::ActionType::ACCESSIBILITY_ACTION_INVALID;
+    auto parseResult = UiSessionAccessibilityCommand::ParseAccessibilityActionHeader(*json, action);
+    if (parseResult == UiSessionAccessibilityCommand::ParseResult::INVALID_COMMAND) {
+        result = NG::CommandResult::Error(NG::CommandErrorType::INVALID_COMMAND);
+        return true;
+    }
+    if (parseResult == UiSessionAccessibilityCommand::ParseResult::UNSUPPORTED_ACTION) {
+        result = NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL);
+        return true;
+    }
+    if (action != Accessibility::ActionType::ACCESSIBILITY_ACTION_BACK || json->Contains("elementId")) {
+        result = NG::CommandResult::Error(NG::CommandErrorType::INVALID_COMMAND);
+        return true;
+    }
+    std::map<std::string, std::string> arguments;
+    if (!UiSessionAccessibilityCommand::ParseAccessibilityArguments(*json, action, arguments)) {
+        result = NG::CommandResult::Error(NG::CommandErrorType::INVALID_PARAM);
+        return true;
+    }
+    auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
+    if (!pipeline) {
+        result = NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL);
+        return true;
+    }
+    UIContent* uiContent = UIContent::GetUIContent(pipeline->GetInstanceId());
+    result = (uiContent && uiContent->ProcessBackPressed())
+        ? NG::CommandResult::Success() : NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL);
+    return true;
+}
+
 void ExecuteGlobalCommandWithResult(
     const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback)
 {
+    NG::CommandResult accessibilityResult;
+    if (TryExecuteGlobalAccessibilityCommand(command, accessibilityResult)) {
+        finishCallback(SerializeCommandResult(accessibilityResult));
+        return;
+    }
     auto json = JsonUtil::ParseJsonString(command);
     if (!json || !json->IsValid() || !json->IsObject()) {
         AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Global");
@@ -6711,6 +6755,11 @@ void ExecuteGlobalCommandWithResult(
 void ExecuteRelaxedCommandWithResult(
     const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback)
 {
+    NG::CommandResult accessibilityResult;
+    if (TryExecuteGlobalAccessibilityCommand(command, accessibilityResult)) {
+        finishCallback(SerializeCommandResult(accessibilityResult));
+        return;
+    }
     auto batch = UiSessionBatchCommand::Parse(command);
     if (batch.status != BatchParseStatus::NOT_BATCH) {
         AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Global");
@@ -6729,10 +6778,57 @@ void ExecuteRelaxedCommandWithResult(
     });
 }
 
+NG::CommandResult ExecuteAccessibilityNodeCommand(int32_t id, const JsonValue& json)
+{
+    using NG::CommandErrorType;
+    using NG::CommandResult;
+    auto action = Accessibility::ActionType::ACCESSIBILITY_ACTION_INVALID;
+    auto parseResult = UiSessionAccessibilityCommand::ParseAccessibilityActionHeader(json, action);
+    if (parseResult == UiSessionAccessibilityCommand::ParseResult::INVALID_COMMAND) {
+        return CommandResult::Error(CommandErrorType::INVALID_COMMAND);
+    }
+    if (parseResult == UiSessionAccessibilityCommand::ParseResult::UNSUPPORTED_ACTION) {
+        return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+    }
+    auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
+    auto node = AceType::DynamicCast<NG::FrameNode>(ElementRegister::GetInstance()->GetUINodeById(id));
+    if (!pipeline || !node || !node->IsOnMainTree() || node->GetContextRefPtr() != pipeline) {
+        return CommandResult::Error(CommandErrorType::NODE_NOT_FOUND);
+    }
+    if (IsUiSessionAccessibilityUnsupportedHost(node)) {
+        return CommandResult::Error(CommandErrorType::NOT_SUPPORTED);
+    }
+    std::optional<int64_t> elementId;
+    if (!UiSessionAccessibilityCommand::ParseElementId(json, elementId)) {
+        return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+    }
+    std::map<std::string, std::string> arguments;
+    bool argumentsValid = UiSessionAccessibilityCommand::ParseAccessibilityArguments(json, action, arguments);
+    auto executed = ExecuteUiSessionAccessibilityAction(node, elementId, action, arguments, argumentsValid);
+    switch (executed) {
+        case UiSessionAccessibilityResult::SUCCESS:
+            return CommandResult::Success();
+        case UiSessionAccessibilityResult::NODE_NOT_FOUND:
+            return CommandResult::Error(CommandErrorType::NODE_NOT_FOUND);
+        case UiSessionAccessibilityResult::INVALID_PARAM:
+            return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+        case UiSessionAccessibilityResult::NOT_SUPPORTED:
+            return CommandResult::Error(CommandErrorType::NOT_SUPPORTED);
+        default:
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+    }
+}
+
 void ExecuteNodeCommandWithResult(
     int32_t id, const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback)
 {
     AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Node");
+    auto json = JsonUtil::ParseJsonString(command);
+    if (json && json->IsValid() && json->IsObject() &&
+        (json->Contains("protocol") || json->Contains("action") || json->Contains("elementId"))) {
+        finishCallback(SerializeCommandResult(ExecuteAccessibilityNodeCommand(id, *json)));
+        return;
+    }
     auto node = AceType::DynamicCast<NG::FrameNode>(ElementRegister::GetInstance()->GetUINodeById(id));
     if (!node) {
         finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::NODE_NOT_FOUND)));

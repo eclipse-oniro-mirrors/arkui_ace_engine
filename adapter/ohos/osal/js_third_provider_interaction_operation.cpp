@@ -53,6 +53,7 @@ struct ThirdNodeSnapshot : ArkUI_AccessibilityElementInfo {
     }
     std::vector<std::string> descriptions;
 };
+constexpr int32_t COLLECTED_ACTION_REQUEST_ID = 0;
 
 int32_t TransformThirdCoordinate(int32_t value, float scale, float offset)
 {
@@ -917,6 +918,45 @@ void JsThirdProviderInteractionOperation::ExecuteAction(
 
     // 5. Return result
     SetExecuteActionResult(callback, ret, requestId);
+}
+
+UiSessionAccessibilityResult JsThirdProviderInteractionOperation::ExecuteActionForCollectedNode(
+    int64_t providerElementId, int32_t action,
+    const std::map<std::string, std::string>& actionArguments, bool argumentsValid)
+{
+    auto provider = accessibilityProvider_.Upgrade();
+    CHECK_NULL_RETURN(provider, UiSessionAccessibilityResult::NODE_NOT_FOUND);
+    std::vector<ArkUI_AccessibilityElementInfo> infos;
+    if (provider->FindAccessibilityNodeInfosById(providerElementId,
+        ARKUI_ACCESSIBILITY_NATIVE_SEARCH_MODE_PREFETCH_CURRENT, COLLECTED_ACTION_REQUEST_ID, infos) != 0) {
+        return UiSessionAccessibilityResult::NODE_NOT_FOUND;
+    }
+    const auto target = std::find_if(infos.begin(), infos.end(), [providerElementId](const auto& info) {
+        return info.GetElementId() == providerElementId;
+    });
+    if (target == infos.end()) {
+        return UiSessionAccessibilityResult::NODE_NOT_FOUND;
+    }
+    if (!argumentsValid) {
+        return UiSessionAccessibilityResult::INVALID_PARAM;
+    }
+    if (action == static_cast<int32_t>(Accessibility::ActionType::ACCESSIBILITY_ACTION_INVALID) ||
+        action == static_cast<int32_t>(Accessibility::ActionType::ACCESSIBILITY_ACTION_CUSTOM)) {
+        return UiSessionAccessibilityResult::EXECUTE_FAIL;
+    }
+    const auto& actions = target->GetOperationActions();
+    const bool supported = std::any_of(actions.begin(), actions.end(),
+        [action](const ArkUI_AccessibleAction& declared) {
+            return static_cast<int32_t>(declared.actionType) == action;
+        });
+    if (!supported) {
+        return UiSessionAccessibilityResult::EXECUTE_FAIL;
+    }
+    auto filteredArguments = actionArguments;
+    RemoveKeysForClickAction(action, filteredArguments);
+    return provider->ExecuteAccessibilityAction(
+        providerElementId, action, COLLECTED_ACTION_REQUEST_ID, filteredArguments) == 0
+        ? UiSessionAccessibilityResult::SUCCESS : UiSessionAccessibilityResult::EXECUTE_FAIL;
 }
 
 bool JsThirdProviderInteractionOperation::ExecuteActionFromProvider(

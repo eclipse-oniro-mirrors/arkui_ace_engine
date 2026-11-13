@@ -48,13 +48,21 @@ class AccessibilityEventInfo;
 namespace OHOS::Ace {
 struct ImmersiveOptions;
 struct UiMaterialParam;
+class AccessibilityProvider;
 class NotifyDragEvent;
 class GestureEvent;
 using GestureEventFunc = std::function<void(GestureEvent& info)>;
 }
 
 namespace OHOS::Ace::NG {
-enum class CommandErrorType : uint8_t { NONE, NODE_NOT_FOUND, INVALID_COMMAND, INVALID_PARAM, EXECUTE_FAIL };
+enum class CommandErrorType : uint8_t {
+    NONE,
+    NODE_NOT_FOUND,
+    INVALID_COMMAND,
+    INVALID_PARAM,
+    EXECUTE_FAIL,
+    NOT_SUPPORTED
+};
 
 struct ACE_FORCE_EXPORT CommandResult {
     bool success = false;
@@ -537,6 +545,11 @@ public:
     }
 
     virtual RefPtr<AccessibilitySessionAdapter> GetAccessibilitySessionAdapter()
+    {
+        return nullptr;
+    }
+
+    virtual RefPtr<AccessibilityProvider> GetOrCreateAccessibilityProvider()
     {
         return nullptr;
     }

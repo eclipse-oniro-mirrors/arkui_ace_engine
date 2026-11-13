@@ -24,6 +24,7 @@
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 #include "adapter/ohos/osal/js_accessibility_manager.h"
+#include "adapter/ohos/osal/ui_session_accessibility_action.h"
 
 using namespace OHOS::Accessibility;
 using namespace testing;
@@ -1134,4 +1135,80 @@ HWTEST_F(JsAccessibilityManagerTestFour, UpdateAccessibilityVisibleSelectReader0
 
     GTEST_LOG_(INFO) << "JsAccessibilityManagerTestFour-end UpdateAccessibilityVisibleSelectReader001";
 }
+/**
+ * @tc.name: SendCommandNativeActionClick
+ * @tc.desc: A collected FrameNode executes its accessibility click through the native action path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(JsAccessibilityManagerTestFour, SendCommandNativeActionClick, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    auto node = FrameNode::CreateFrameNode("testNode", 1234601, AceType::MakeRefPtr<Pattern>(), true);
+    ASSERT_NE(node->GetOrCreateGestureEventHub(), nullptr);
+    auto property = node->GetAccessibilityProperty<AccessibilityProperty>();
+    ASSERT_NE(property, nullptr);
+    int32_t clickCount = 0;
+    property->SetActionClick([&clickCount]() { ++clickCount; });
+    auto context = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+
+    EXPECT_TRUE(manager->ExecuteActionForFrameNode(
+        node, Accessibility::ActionType::ACCESSIBILITY_ACTION_CLICK, {}, context));
+    EXPECT_EQ(clickCount, 1);
+    EXPECT_FALSE(manager->ExecuteActionForFrameNode(
+        node, Accessibility::ActionType::ACCESSIBILITY_ACTION_SET_TEXT, {{ "setText", "value" }}, context));
+    EXPECT_EQ(clickCount, 1);
+}
+
+HWTEST_F(JsAccessibilityManagerTestFour, SendCommandNativeCustomAction, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    auto node = FrameNode::CreateFrameNode("testNode", 1234602, AceType::MakeRefPtr<Pattern>(), true);
+    auto property = node->GetAccessibilityProperty<AccessibilityProperty>();
+    ASSERT_NE(property, nullptr);
+    int32_t count = 0;
+    property->SetAccessibilityCustomActions({ { "open", [&count]() { ++count; } } });
+    auto context = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+
+    EXPECT_TRUE(manager->ExecuteActionForFrameNode(
+        node, Accessibility::ActionType::ACCESSIBILITY_ACTION_CUSTOM, { { "customAction", "open" } }, context));
+    EXPECT_EQ(count, 1);
+    EXPECT_FALSE(manager->ExecuteActionForFrameNode(
+        node, Accessibility::ActionType::ACCESSIBILITY_ACTION_CUSTOM, { { "customAction", "missing" } }, context));
+    EXPECT_EQ(count, 1);
+}
+
+HWTEST_F(JsAccessibilityManagerTestFour, SendCommandUnsupportedHostsAndActions, TestSize.Level1)
+{
+    int32_t count = 0;
+    for (const auto& tag : { V2::WEB_ETS_TAG, V2::UI_EXTENSION_COMPONENT_ETS_TAG,
+        V2::EMBEDDED_COMPONENT_ETS_TAG, V2::ISOLATED_COMPONENT_ETS_TAG, V2::FORM_ETS_TAG,
+        V2::DYNAMIC_COMPONENT_ETS_TAG }) {
+        auto host = FrameNode::CreateFrameNode(tag, ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<Pattern>(), true);
+        host->GetAccessibilityProperty<AccessibilityProperty>()->SetActionClick([&count]() { ++count; });
+        EXPECT_TRUE(IsUiSessionAccessibilityUnsupportedHost(host));
+        EXPECT_EQ(ExecuteUiSessionAccessibilityAction(host, std::nullopt,
+            Accessibility::ActionType::ACCESSIBILITY_ACTION_CLICK, {}),
+            UiSessionAccessibilityResult::NOT_SUPPORTED);
+        EXPECT_EQ(ExecuteUiSessionAccessibilityAction(host, 77,
+            Accessibility::ActionType::ACCESSIBILITY_ACTION_CLICK, {}),
+            UiSessionAccessibilityResult::NOT_SUPPORTED);
+    }
+    EXPECT_EQ(count, 0);
+    auto native = FrameNode::CreateFrameNode("testNode", 1234604, AceType::MakeRefPtr<Pattern>(), true);
+    EXPECT_FALSE(IsUiSessionAccessibilityUnsupportedHost(native));
+    for (auto action : { Accessibility::ActionType::ACCESSIBILITY_ACTION_INVALID,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_BACK,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_NEXT_HTML_ITEM,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_PREVIOUS_HTML_ITEM }) {
+        EXPECT_EQ(ExecuteUiSessionAccessibilityAction(native, std::nullopt, action, {}),
+            UiSessionAccessibilityResult::EXECUTE_FAIL);
+    }
+    EXPECT_EQ(ExecuteUiSessionAccessibilityAction(nullptr, std::nullopt,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_CLICK, {}),
+        UiSessionAccessibilityResult::NODE_NOT_FOUND);
+}
+
 } // namespace OHOS::Ace::NG

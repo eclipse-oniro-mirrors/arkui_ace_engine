@@ -14,6 +14,7 @@
  */
 
 #include "js_accessibility_manager.h"
+#include "adapter/ohos/osal/ui_session_accessibility_action.h"
 
 #include "accessibility_system_ability_client.h"
 #include "js_third_provider_interaction_operation.h"
@@ -7962,6 +7963,51 @@ bool JsAccessibilityManager::ExecuteActionNG(int64_t elementId,
     return result;
 }
 
+bool JsAccessibilityManager::ExecuteActionForFrameNode(const RefPtr<NG::FrameNode>& frameNode, ActionType action,
+    const std::map<std::string, std::string>& actionArguments, const RefPtr<NG::PipelineContext>& context)
+{
+    CHECK_NULL_RETURN(frameNode, false);
+    CHECK_NULL_RETURN(context, false);
+    if (GetIsIgnoreAllAction() && action != ActionType::ACCESSIBILITY_ACTION_FOCUS &&
+        action != ActionType::ACCESSIBILITY_ACTION_CLEAR_FOCUS) {
+        return false;
+    }
+    auto enabled = frameNode->GetFocusHub() ? frameNode->GetFocusHub()->IsEnabled() : true;
+    if (!enabled && action != ActionType::ACCESSIBILITY_ACTION_ACCESSIBILITY_FOCUS &&
+        action != ActionType::ACCESSIBILITY_ACTION_CLEAR_ACCESSIBILITY_FOCUS) {
+        return false;
+    }
+    auto target = frameNode;
+    auto pipeline = context;
+    if (ConvertActionTypeToBoolen(action, target, frameNode->GetAccessibilityId(), pipeline, actionArguments)) {
+        return true;
+    }
+    auto property = frameNode->GetAccessibilityProperty<NG::AccessibilityProperty>();
+    CHECK_NULL_RETURN(property, false);
+    switch (action) {
+        case ActionType::ACCESSIBILITY_ACTION_FOCUS:
+        case ActionType::ACCESSIBILITY_ACTION_CLEAR_FOCUS:
+        case ActionType::ACCESSIBILITY_ACTION_CLICK:
+        case ActionType::ACCESSIBILITY_ACTION_LONG_CLICK:
+        case ActionType::ACCESSIBILITY_ACTION_ACCESSIBILITY_FOCUS:
+        case ActionType::ACCESSIBILITY_ACTION_CLEAR_ACCESSIBILITY_FOCUS:
+        case ActionType::ACCESSIBILITY_ACTION_CUSTOM:
+        case ActionType::ACCESSIBILITY_ACTION_SPAN_CLICK:
+        case ActionType::ACCESSIBILITY_ACTION_SET_CURSOR_POSITION:
+            break;
+        default: {
+            property->ResetSupportAction();
+            const auto supported = property->GetSupportAction();
+            if (std::none_of(supported.begin(), supported.end(), [this, action](AceAction declared) {
+                return ConvertAceAction(declared) == action;
+            })) {
+                return false;
+            }
+        }
+    }
+    return ActAccessibilityAction(action, actionArguments, property, frameNode);
+}
+
 bool JsAccessibilityManager::ConvertActionTypeToBoolen(ActionType action, RefPtr<NG::FrameNode>& frameNode,
     int64_t elementId, RefPtr<NG::PipelineContext>& context, const std::map<std::string, std::string>& actionArguments)
 {
@@ -12197,6 +12243,74 @@ void JsAccessibilityManager::SendEventToAccessibilityWithVirtualNode(const Acces
 // ============================================================================
 
 } // namespace OHOS::Ace::Framework
+
+namespace OHOS::Ace {
+bool IsUiSessionAccessibilityUnsupportedHost(const RefPtr<NG::FrameNode>& host)
+{
+    if (!host) {
+        return false;
+    }
+    return host->GetTag() == V2::WEB_ETS_TAG || host->GetTag() == V2::FORM_ETS_TAG ||
+        host->GetTag() == V2::DYNAMIC_COMPONENT_ETS_TAG || Framework::IsExtensionComponent(host);
+}
+
+std::shared_ptr<Framework::JsThirdProviderInteractionOperation> CreateOperationForThirdPattern(
+    const RefPtr<NG::FrameNode>& host, const RefPtr<Framework::JsAccessibilityManager>& manager)
+{
+    CHECK_NULL_RETURN(host, nullptr);
+    auto pattern = host->GetPattern();
+    CHECK_NULL_RETURN(pattern, nullptr);
+    auto provider = pattern->GetOrCreateAccessibilityProvider();
+    CHECK_NULL_RETURN(provider, nullptr);
+    return std::make_shared<Framework::JsThirdProviderInteractionOperation>(provider, manager, host);
+}
+
+UiSessionAccessibilityResult ExecuteUiSessionAccessibilityAction(const RefPtr<NG::FrameNode>& host,
+    const std::optional<int64_t>& elementId, Accessibility::ActionType action,
+    const std::map<std::string, std::string>& arguments, bool argumentsValid)
+{
+    CHECK_NULL_RETURN(host, UiSessionAccessibilityResult::NODE_NOT_FOUND);
+    auto pipeline = host->GetContextRefPtr();
+    CHECK_NULL_RETURN(pipeline, UiSessionAccessibilityResult::NODE_NOT_FOUND);
+    if (IsUiSessionAccessibilityUnsupportedHost(host)) {
+        return UiSessionAccessibilityResult::NOT_SUPPORTED;
+    }
+    using ActionType = Accessibility::ActionType;
+    if (action == ActionType::ACCESSIBILITY_ACTION_INVALID ||
+        action == ActionType::ACCESSIBILITY_ACTION_BACK ||
+        action == ActionType::ACCESSIBILITY_ACTION_NEXT_HTML_ITEM ||
+        action == ActionType::ACCESSIBILITY_ACTION_PREVIOUS_HTML_ITEM) {
+        return UiSessionAccessibilityResult::EXECUTE_FAIL;
+    }
+    if (elementId) {
+        auto manager = AceType::DynamicCast<Framework::JsAccessibilityManager>(pipeline->GetAccessibilityManager());
+        if (manager) {
+            auto nodeManager = AceType::DynamicCast<Framework::JsAccessibilityManager>(
+                manager->GetAccessibilityManagerForNode(host));
+            manager = nodeManager ? nodeManager : manager;
+        }
+        auto operation = manager ? manager->GetJsThirdProviderInteractionOperation(
+            host->GetAccessibilityId()).lock() : nullptr;
+        if (!operation) {
+            operation = CreateOperationForThirdPattern(host, manager);
+        }
+        if (!operation) {
+            return UiSessionAccessibilityResult::NODE_NOT_FOUND;
+        }
+        return operation->ExecuteActionForCollectedNode(
+            *elementId, static_cast<int32_t>(action), arguments, argumentsValid);
+    }
+    if (!argumentsValid) {
+        return UiSessionAccessibilityResult::INVALID_PARAM;
+    }
+    auto manager = AceType::DynamicCast<Framework::JsAccessibilityManager>(pipeline->GetAccessibilityManager());
+    if (!manager) {
+        return UiSessionAccessibilityResult::EXECUTE_FAIL;
+    }
+    return manager->ExecuteActionForFrameNode(host, action, arguments, pipeline)
+        ? UiSessionAccessibilityResult::SUCCESS : UiSessionAccessibilityResult::EXECUTE_FAIL;
+}
+} // namespace OHOS::Ace
 
 namespace OHOS::Ace::CmpAccessibility {
 bool CmpAccessibilityRegistry::BindExportTree(NG::FrameNode* owner, int64_t bindId, NG::FrameNode* exportedRoot)

@@ -2227,6 +2227,38 @@ HWTEST_F(UIContentStubTest, SendCommandWithFinishCallback_002, TestSize.Level1)
     EXPECT_EQ(reportCount, 2);
 }
 
+HWTEST_F(UIContentStubTest, SendCommandAccessibilityEnvelopeForwarded, TestSize.Level1)
+{
+    sptr<UIContentServiceStubImpl> stub = std::make_shared<UIContentServiceStubImpl>();
+    auto manager = static_cast<OHOS::Ace::MockUiSessionManager*>(UiSessionManager::GetInstance());
+    ASSERT_NE(manager, nullptr);
+    constexpr uint64_t requestId = 0x123456789ABDULL;
+    constexpr int32_t hostId = 84;
+    const std::string command = R"({"protocol":"arkui.accessibility","version":1,"elementId":"77",)"
+        R"("action":"ACTION_CLICK","arguments":{}})";
+    const std::string resultJson = R"({"result":"SUCCESS"})";
+    int reportCount = 0;
+    EXPECT_CALL(*manager, NotifySendCommandPatternWithResult(hostId, command, _))
+        .WillOnce(Invoke([&](int32_t, const std::string&, const UiSessionManager::CommandResultCallback& callback) {
+            callback(resultJson);
+        }));
+    EXPECT_CALL(*manager, MakeCommandResultCallback(_, requestId))
+        .WillOnce(Return([&](const std::string& json) { EXPECT_EQ(json, resultJson); ++reportCount; }));
+
+    MessageParcel data;
+    MessageParcel reply;
+    MessageOption option;
+    data.EnablePayloadStorage();
+    PrepareValidUiSessionParcel(data);
+    ASSERT_TRUE(data.WriteUint64(requestId));
+    ASSERT_TRUE(data.WriteInt32(hostId));
+    ASSERT_TRUE(data.WriteString(command));
+    EXPECT_EQ(stub->OnRemoteRequest(IUiContentService::SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK, data, reply, option),
+        NO_ERROR);
+    EXPECT_EQ(reportCount, 1);
+    Mock::VerifyAndClearExpectations(manager);
+}
+
 HWTEST_F(UIContentStubTest, SearchReview_ClickFlushDoesNotDetectPages, TestSize.Level1)
 {
     class SearchClickSession : public UiSessionManager {
