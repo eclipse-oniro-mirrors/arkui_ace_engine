@@ -15,6 +15,10 @@
 
 #include "core/components_ng/pattern/grid/grid_layout_base_algorithm.h"
 
+#include <set>
+
+#include "base/log/log_wrapper.h"
+#include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_observer.h"
 #include "core/components_ng/pattern/grid/grid_item_model_ng.h"
 #include "core/components_ng/pattern/grid/grid_item_layout_property.h"
@@ -22,6 +26,7 @@
 #include "core/components_ng/pattern/grid/grid_layout_property.h"
 #include "core/components_ng/pattern/grid/grid_pattern.h"
 #include "core/components_ng/pattern/scrollable/scrollable_paint_property.h"
+#include "core/components_ng/pattern/scrollable/scrollable_utils.h"
 #include "core/components_ng/pattern/grid/grid_layout_base_algorithm.h"
 #include "core/components_ng/property/measure_utils.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -359,5 +364,77 @@ RefPtr<LayoutWrapper> GridLayoutBaseAlgorithm::GetGridItem(
         index, addToRenderTree, isCache, allowPlaceholderSubstitution);
     buildScope.SetAcquiredWrapper(wrapper);
     return wrapper;
+}
+
+void GridLayoutBaseAlgorithm::UpdateGridDecodeCacheWindow(LayoutWrapper* layoutWrapper, int32_t cacheCount)
+{
+    CHECK_NULL_VOID(layoutWrapper);
+    if (!ScrollableUtils::IsLowMemoryDeviceRuntime()) {
+        return;
+    }
+    auto host = layoutWrapper->GetHostNode();
+    CHECK_NULL_VOID(host);
+    auto props = host->GetLayoutProperty<GridLayoutProperty>();
+    CHECK_NULL_VOID(props);
+    if (props->GetShowCachedItemsValue(false)) {
+        return;
+    }
+    if (cacheCount <= 0 || info_.gridMatrix_.empty()) {
+        return;
+    }
+    const int32_t decodeWindow = ScrollableUtils::CalcDecodeWindowCount(cacheCount);
+    if (decodeWindow <= 0) {
+        return;
+    }
+    const int32_t startLine = info_.startMainLineIndex_;
+    const int32_t endLine = info_.endMainLineIndex_;
+    TAG_LOGD(AceLogTag::ACE_GRID,
+        "decode window: cacheCount=%{public}d, window=%{public}d, visible=[%{public}d,%{public}d], "
+        "decode=[%{public}d,%{public}d], cache=[%{public}d,%{public}d]",
+        cacheCount, decodeWindow, startLine, endLine,
+        startLine - decodeWindow, endLine + decodeWindow,
+        startLine - cacheCount, endLine + cacheCount);
+    auto decodeItems = CollectDecodeItems(startLine - decodeWindow, endLine + decodeWindow);
+    ApplyItemDecodeState(layoutWrapper, startLine - cacheCount, endLine + cacheCount, decodeItems);
+}
+
+std::set<int32_t> GridLayoutBaseAlgorithm::CollectDecodeItems(int32_t decodeStartLine, int32_t decodeEndLine) const
+{
+    std::set<int32_t> decodeItems;
+    for (auto lineIt = info_.gridMatrix_.lower_bound(decodeStartLine);
+         lineIt != info_.gridMatrix_.end() && lineIt->first <= decodeEndLine; ++lineIt) {
+        for (const auto& entry : lineIt->second) {
+            int32_t itemIdx = entry.second;
+            decodeItems.insert(itemIdx < 0 ? -itemIdx : itemIdx);
+        }
+    }
+    return decodeItems;
+}
+
+void GridLayoutBaseAlgorithm::ApplyItemDecodeState(
+    LayoutWrapper* layoutWrapper, int32_t cacheStartLine, int32_t cacheEndLine, const std::set<int32_t>& decodeItems)
+{
+    std::set<int32_t> processed;
+    std::set<int32_t> processedNodeIds;
+    for (auto lineIt = info_.gridMatrix_.lower_bound(cacheStartLine);
+         lineIt != info_.gridMatrix_.end() && lineIt->first <= cacheEndLine; ++lineIt) {
+        for (const auto& entry : lineIt->second) {
+            int32_t itemIdx = entry.second;
+            itemIdx = itemIdx < 0 ? -itemIdx : itemIdx;
+            if (processed.count(itemIdx) > 0) {
+                continue;
+            }
+            processed.insert(itemIdx);
+            bool active = decodeItems.count(itemIdx) > 0;
+            auto wrapper = GetGridItem(layoutWrapper, itemIdx, false, true);
+            CHECK_NULL_CONTINUE(wrapper);
+            auto itemFrameNode = wrapper->GetHostNode();
+            CHECK_NULL_CONTINUE(itemFrameNode);
+            if (!processedNodeIds.insert(itemFrameNode->GetId()).second) {
+                continue;
+            }
+            ScrollableUtils::UpdateCachedItemDecodeState(itemFrameNode, active);
+        }
+    }
 }
 } // namespace OHOS::Ace::NG

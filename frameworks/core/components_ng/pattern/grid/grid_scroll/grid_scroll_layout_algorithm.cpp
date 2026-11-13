@@ -464,6 +464,7 @@ void GridScrollLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
             return;
         }
     }
+    UpdateGridDecodeCacheWindow(layoutWrapper, cacheCount);
     UpdateOverlay(layoutWrapper);
     isLayouted_ = true;
     layoutWrapper->GetHostNode()->ChildrenUpdatedFrom(-1);

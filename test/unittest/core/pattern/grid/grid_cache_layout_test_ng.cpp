@@ -18,6 +18,7 @@
 
 #include "core/components_ng/pattern/grid/grid_item_layout_property.h"
 #include "core/components_ng/pattern/grid/grid_scroll/grid_scroll_layout_algorithm.h"
+#include "core/components_ng/pattern/scrollable/scrollable_utils.h"
 #include "test/mock/frameworks/core/animation/mock_animation_manager.h"
 
 namespace OHOS::Ace::NG {
@@ -1802,5 +1803,85 @@ HWTEST_F(GridCacheLayoutTestNg, SyncPreloadColumnChange, TestSize.Level1)
             EXPECT_FLOAT_EQ(GetChildY(frameNode_, index), index * ITEM_MAIN_SIZE);
         }
     }
+}
+
+/**
+ * @tc.name: UpdateGridDecodeCacheWindow001
+ * @tc.desc: Test UpdateGridDecodeCacheWindow guard conditions do not crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, UpdateGridDecodeCacheWindow001, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(5);
+    CreateFixedItems(20);
+    CreateDone();
+    auto layoutAlgorithm = AceType::DynamicCast<GridScrollLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    auto wrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    layoutAlgorithm->UpdateGridDecodeCacheWindow(AceType::RawPtr(wrapper), 5); // 5 : cacheCount
+}
+
+/**
+ * @tc.name: UpdateGridDecodeCacheWindow002
+ * @tc.desc: Test UpdateGridDecodeCacheWindow with showCachedItems=true skips gracefully.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, UpdateGridDecodeCacheWindow002, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(5, true); // 5 : cacheCount, true : showCachedItems
+    CreateFixedItems(20);
+    CreateDone();
+    auto layoutAlgorithm = AceType::DynamicCast<GridScrollLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    auto wrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    layoutAlgorithm->UpdateGridDecodeCacheWindow(AceType::RawPtr(wrapper), 5); // 5 : cacheCount
+}
+
+/**
+ * @tc.name: UpdateGridDecodeCacheWindow003
+ * @tc.desc: Test UpdateGridDecodeCacheWindow with cacheCount=0 skips gracefully.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, UpdateGridDecodeCacheWindow003, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(0);
+    CreateFixedItems(20);
+    CreateDone();
+    auto layoutAlgorithm = AceType::DynamicCast<GridScrollLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    auto wrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    layoutAlgorithm->UpdateGridDecodeCacheWindow(AceType::RawPtr(wrapper), 0);
+}
+
+/**
+ * @tc.name: UpdateGridDecodeCacheWindow004
+ * @tc.desc: Test UpdateGridDecodeCacheWindow does not crash after scrolling.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, UpdateGridDecodeCacheWindow004, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(5);
+    CreateFixedItems(30);
+    CreateDone();
+    for (int32_t i = 0; i < 5; ++i) {
+        pattern_->ScrollBy(ITEM_MAIN_SIZE);
+        FlushUITasks();
+    }
+    auto layoutAlgorithm = AceType::DynamicCast<GridScrollLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    auto wrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    layoutAlgorithm->UpdateGridDecodeCacheWindow(AceType::RawPtr(wrapper), 5); // 5 : cacheCount
 }
 } // namespace OHOS::Ace::NG
