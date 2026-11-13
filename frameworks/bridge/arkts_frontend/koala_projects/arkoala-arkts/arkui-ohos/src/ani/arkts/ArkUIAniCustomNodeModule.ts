@@ -14,7 +14,7 @@
  */
 import { Measurable, Layoutable, Position, ConstraintSizeOptions, MeasureResult, DirectionalEdgesT,  Length, Padding, Margin, EdgeWidths, GeometryInfo, SizeResult } from '#generated'
 import { int64, int32 } from '@koalaui/common'
-import { KPointer, KInt } from '@koalaui/interop'
+import { KPointer } from '@koalaui/interop'
 import { ArkCustomComponent } from 'arkui/ArkCustomComponent'
 
 export class ArkUIAniCustomNodeModule {
@@ -33,6 +33,10 @@ export class ArkUIAniCustomNodeModule {
     native static _CustomNode_CallDefaultLayout(ptr: KPointer): void
 
     native static _CustomNode_EnvFunction(ptr: KPointer, envFunc: (instanceId: int32) => void): void
+
+    // JSON single-parameter bridge: same payload format as the dynamic setAsyncLoadConfig,
+    // parsing shared in CustomNodeBase::ParseAsyncLoadConfigJson.
+    native static _CustomNode_SetAsyncLoadConfig(ptr: KPointer, config: string): void
 }
 
 export class MeasurableLayoutableInner implements Measurable, Layoutable {
