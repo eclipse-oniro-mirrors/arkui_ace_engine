@@ -60,8 +60,6 @@ constexpr double FORM_CLICK_OPEN_LIMIT_DISTANCE = 20.0;
 constexpr uint32_t DELAY_TIME_FOR_FORM_SUBCONTAINER_CACHE = 30000;
 constexpr uint32_t DELAY_TIME_FOR_FORM_SNAPSHOT_3S = 3000;
 constexpr uint32_t DELAY_TIME_FOR_FORM_SNAPSHOT_EXTRA = 200;
-// FormComponent want param; keep in sync with the key in form_renderer.cpp.
-constexpr char FORM_ENABLE_SNAPSHOT_ON_DETACH[] = "ohos.extra.param.key.form_enable_snapshot_on_detach";
 constexpr uint32_t DELAY_TIME_FOR_DELETE_IMAGE_NODE = 200;
 constexpr uint32_t DELAY_TIME_FOR_RESET_MANUALLY_CLICK_FLAG = 3000;
 constexpr uint32_t DELAY_TIME_FOR_RM_IMG_WHEN_UPDATING_SIZE = 60;
@@ -942,7 +940,7 @@ void FormPattern::GetWantParam(RequestFormInfo& info)
         return;
     }
     auto want = wantWrap->GetWant();
-    enableSnapshotOnDetach_ = want.GetBoolParam(FORM_ENABLE_SNAPSHOT_ON_DETACH, false);
+    enableSnapshotOnDetach_ = want.GetBoolParam(OHOS::AppExecFwk::Constants::FORM_ENABLE_SNAPSHOT_ON_DETACH, false);
     float width = static_cast<float>(info.width.Value());
     float height = static_cast<float>(info.height.Value());
     float layoutWidth = GetNumberFromParams(want, OHOS::AppExecFwk::Constants::PARAM_LAYOUT_WIDTH_KEY, width);

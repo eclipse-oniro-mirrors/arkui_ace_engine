@@ -33,8 +33,6 @@ constexpr char FORM_RENDERER_PROCESS_ON_ADD_SURFACE[] = "ohos.extra.param.key.pr
 constexpr char CONNECT_TO_RENDER[] = "ohos.connect.to.render";
 constexpr char TRANSPARENT_COLOR[] = "#00FFFFFF";
 constexpr int32_t DOUBLE = 2;
-// Keep in sync with the key in form_pattern.cpp.
-constexpr char FORM_ENABLE_SNAPSHOT_ON_DETACH[] = "ohos.extra.param.key.form_enable_snapshot_on_detach";
 // Delay before moving the shared surface so the old host can mount its snapshot first.
 constexpr int64_t SURFACE_HANDOVER_DELAY_TIME = 50;
 } // namespace
@@ -653,7 +651,7 @@ int32_t FormRenderer::AttachForm(const OHOS::AAFwk::Want& want, const OHOS::AppE
     // immediate and the delayed path must supersede an earlier pending one.
     ++surfaceHandoverGeneration_;
     // Delay only when the incoming host opted in; otherwise hand over at once.
-    bool delayHandover = want.GetBoolParam(FORM_ENABLE_SNAPSHOT_ON_DETACH, false);
+    bool delayHandover = want.GetBoolParam(OHOS::AppExecFwk::Constants::FORM_ENABLE_SNAPSHOT_ON_DETACH, false);
     auto handler = eventHandler_.lock();
     if (!delayHandover || !handler) {
         return CompleteSurfaceHandover(want, formJsInfo);
