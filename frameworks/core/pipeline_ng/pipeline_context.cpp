@@ -3954,6 +3954,16 @@ void PipelineContext::OnTouchEvent(const TouchEvent& point, bool isSubPipe)
     OnTouchEvent(point, rootNode_, isSubPipe);
 }
 
+void PipelineContext::SetTouchPadEventEnabled(bool enabled)
+{
+    if (touchPadRawEventEnableCallback_) {
+        touchPadRawEventEnableCallback_(enabled);
+    }
+    if (!enabled && eventManager_) {
+        eventManager_->ClearTouchPadEvents();
+    }
+}
+
 void PipelineContext::OnMouseEvent(const MouseEvent& event)
 {
     OnMouseEvent(event, rootNode_);

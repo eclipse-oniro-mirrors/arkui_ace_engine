@@ -561,6 +561,10 @@ public:
     {
         getViewScaleCallback_ = callback;
     }
+    void SetTouchPadRawEventEnableCallback(std::function<void(bool)>&& callback)
+    {
+        touchPadRawEventEnableCallback_ = std::move(callback);
+    }
 
     using OnPageShowCallBack = std::function<void()>;
     void SetOnPageShow(OnPageShowCallBack&& onPageShowCallBack)
@@ -1840,6 +1844,7 @@ protected:
     int32_t dvsyncTimeUseCount_ = 0;
     // add for arkola frontend loops, called at the tail of vsync
     std::function<void()> asyncEventsHookListener_;
+    std::function<void(bool)> touchPadRawEventEnableCallback_;
 
 private:
     void DumpFrontend() const;
