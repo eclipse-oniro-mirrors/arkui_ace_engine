@@ -64,6 +64,7 @@ class ClickEventImpl implements ClickEvent {
     public getModifierKeyState?: ModifierKeyStateGetter;
     public deviceId?: int32;
     public targetDisplayId?: int32;
+    public axisPinch?: double;
     constructor() { };
     getCurrentLocalPosition(): Coordinate2D {
         return { x: 0.0, y: 0.0 };

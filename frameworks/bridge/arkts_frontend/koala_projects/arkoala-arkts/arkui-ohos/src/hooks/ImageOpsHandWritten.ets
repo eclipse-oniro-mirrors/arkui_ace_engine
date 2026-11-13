@@ -15,7 +15,7 @@
 
 import { SerializerBase, runtimeType, RuntimeType, pointer } from "@koalaui/interop"
 import { ArkUIGeneratedNativeModule } from "#components"
-import { ArkImageComponent, ResourceStr, ImageContent, ImageAIOptions, ArkImagePeer, ImageErrorCallback, ImageError } from "#generated"
+import { ArkImageComponent, ResourceStr, ImageContent, ImageAIOptions, ArkImagePeer, ImageErrorCallback, ImageError, RequestDownloadInfo } from "#generated"
 import { default as image } from "@ohos.multimedia.image"
 import { BusinessError } from '#external'
 import { Resource } from "global.resource"
@@ -33,6 +33,7 @@ class ImageErrorImpl implements ImageError {
     componentHeight: int32;
     message: string = "";
     error?: BusinessError;
+    downloadInfo?: RequestDownloadInfo;
     constructor() { }
 }
 

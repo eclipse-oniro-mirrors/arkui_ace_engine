@@ -705,6 +705,15 @@ export class ArkSanitizedColorsImpl implements Colors {
     public interactiveActive: ResourceColor = _r(125831022, 10001, '', '');
     public interactiveSelect: ResourceColor = _r(125831023, 10001, '', '');
     public interactiveClick: ResourceColor = _r(125831024, 10001, '', '');
+    private primaryValue: ResourceColor | undefined = undefined;
+    public get primary(): ResourceColor | undefined { return this.primaryValue; }
+    public set primary(value: ResourceColor | undefined) { this.primaryValue = value; }
+    private onPrimaryValue: ResourceColor | undefined = undefined;
+    public get onPrimary(): ResourceColor | undefined { return this.onPrimaryValue; }
+    public set onPrimary(value: ResourceColor | undefined) { this.onPrimaryValue = value; }
+    private containerValue: ResourceColor | undefined = undefined;
+    public get container(): ResourceColor | undefined { return this.containerValue; }
+    public set container(value: ResourceColor | undefined) { this.containerValue = value; }
 
     constructor(colors: Colors) {
         ArkColorsImpl.assign(this, colors);
