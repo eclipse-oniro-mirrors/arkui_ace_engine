@@ -675,6 +675,10 @@ export function hookGetImageData(peerPtr: CanvasRenderer, sx: number, sy: number
     const resObj: ImageData = new ImageData(width_cast, height_cast, data, LengthMetricsUnit.PX)
     return resObj
 }
+export function hookGetPixelMap(peerPtr: CanvasRenderer,
+    sx: number, sy: number, sw: number, sh: number): image.PixelMap | undefined {
+    return ArkUIAniModule._CanvasRenderer_GetPixelMap(peerPtr.peer!.ptr, sx, sy, sw, sh)
+}
 export function parseImageData(value: number | string, density: number): number {
     let ret_val: number
     if (value instanceof string) {

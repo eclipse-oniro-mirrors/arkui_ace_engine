@@ -1098,6 +1098,10 @@
                 "hookName": "hookGetImageData",
                 "replaceImplementation": true
             },
+            "getPixelMap": {
+                "hookName": "hookGetPixelMap",
+                "replaceImplementation": true
+            },
             "putImageData": {
                 "hookName": "hookPutImageData",
                 "replaceImplementation": true
