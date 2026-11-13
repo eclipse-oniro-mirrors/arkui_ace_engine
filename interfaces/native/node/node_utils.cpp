@@ -564,8 +564,22 @@ int32_t OH_ArkUI_NativeModule_AdoptChildWithPolicy(
     ArkUI_NodeHandle node, ArkUI_NodeHandle child, OH_ArkUI_AdoptPolicy policy)
 {
     CHECK_UI_THREAD("OH_ArkUI_NativeModule_AdoptChildWithPolicy");
-    CHECK_NULL_RETURN_WITH_MESSAGE(node && child, ARKUI_ERROR_CODE_PARAM_INVALID,
-        __FUNCTION__, "Parent node or child node parameter is null");
+    CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_NODE_CAN_NOT_ADOPT_TO,
+        __FUNCTION__, "Parent node parameter is null");
+    CHECK_NODE_DISPOSED(node, "Parent node has been disposed");
+    if (!OHOS::Ace::NodeModel::CheckIsCNode(node)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_NODE_CAN_NOT_ADOPT_TO,
+            __FUNCTION__, "Parent node is not a C node");
+        return ARKUI_ERROR_CODE_NODE_CAN_NOT_ADOPT_TO;
+    }
+    CHECK_NULL_RETURN_WITH_MESSAGE(child, ARKUI_ERROR_CODE_NODE_CAN_NOT_BE_ADOPTED,
+        __FUNCTION__, "Child node parameter is null");
+    CHECK_NODE_DISPOSED(child, "Child node has been disposed");
+    if (!OHOS::Ace::NodeModel::CheckIsCNode(child)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_NODE_CAN_NOT_BE_ADOPTED,
+            __FUNCTION__, "Child node is not a C node");
+        return ARKUI_ERROR_CODE_NODE_CAN_NOT_BE_ADOPTED;
+    }
     if (policy != OH_ARKUI_NATIVE_MODULE_ADOPT_POLICY_OVERLAY_POSITION_FOLLOWS_ADOPT_PARENT_CHAIN) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Adopt policy is invalid");
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -573,18 +587,6 @@ int32_t OH_ArkUI_NativeModule_AdoptChildWithPolicy(
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN_WITH_MESSAGE(impl, ARKUI_ERROR_CODE_CAPI_INIT_ERROR,
         __FUNCTION__, "Native module not initialized");
-    CHECK_NODE_DISPOSED(node, "Parent node has been disposed");
-    if (!OHOS::Ace::NodeModel::CheckIsCNode(node)) {
-        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_NODE_CAN_NOT_ADOPT_TO,
-            __FUNCTION__, "Parent node is not a C node");
-        return ARKUI_ERROR_CODE_NODE_CAN_NOT_ADOPT_TO;
-    }
-    CHECK_NODE_DISPOSED(child, "Child node has been disposed");
-    if (!OHOS::Ace::NodeModel::CheckIsCNode(child)) {
-        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_NODE_CAN_NOT_BE_ADOPTED,
-            __FUNCTION__, "Child node is not a C node");
-        return ARKUI_ERROR_CODE_NODE_CAN_NOT_BE_ADOPTED;
-    }
     auto result = impl->getNodeModifiers()->getNDKRenderNodeModifier()->adoptChildWithPolicy(
         node->uiNodeHandle, child->uiNodeHandle, policy);
     if (result != ARKUI_ERROR_CODE_NO_ERROR) {
@@ -597,8 +599,8 @@ int32_t OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation(ArkUI_N
     const ArkUI_PointF* compensationOffset, const ArkUI_Matrix4* compensationTransform)
 {
     CHECK_UI_THREAD("OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation");
-    CHECK_NULL_RETURN_WITH_MESSAGE(adoptedChild && compensationOffset && compensationTransform &&
-        compensationTransform->matrix, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__,
+    CHECK_NULL_RETURN_WITH_MESSAGE(adoptedChild && compensationOffset && compensationTransform,
+        ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__,
         "Adopted child, compensation offset, or compensation transform parameter is invalid");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN_WITH_MESSAGE(impl, ARKUI_ERROR_CODE_CAPI_INIT_ERROR,
