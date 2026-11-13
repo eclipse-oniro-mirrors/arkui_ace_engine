@@ -38,7 +38,7 @@ constexpr int64_t US_TO_MS = 1000;
 template<typename EventT>
 void ConvertAgentIdentity(MMI::InputEvent& source, EventT& event)
 {
-    event.isAgent = source.IsFlag(OHOS::MMI::InputEvent::EVENT_FLAG_CONTROLLER);
+    event.isAgent = source.HasFlag(OHOS::MMI::InputEvent::EVENT_FLAG_PENDING_CHECK);
     event.agentWindowId = source.GetAgentWindowId();
     const auto injectorInfo = source.GetInjectorInfo();
     event.callingUid = event.isAgent && injectorInfo.has_value() ? injectorInfo->uid : -1;
