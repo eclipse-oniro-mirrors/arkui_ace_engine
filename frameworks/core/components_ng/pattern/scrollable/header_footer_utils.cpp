@@ -13,12 +13,13 @@
  * limitations under the License.
  */
 
-#include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
+#include "core/components_ng/pattern/scrollable/header_footer_utils.h"
 
 #include "base/utils/utils.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/layout/layout_wrapper.h"
-#include "core/components_ng/pattern/lazy_layout/lazy_layout_pattern.h"
+#include "core/components_ng/pattern/pattern.h"
+#include "core/components_ng/pattern/sticky_header_pattern.h"
 #include "core/components_ng/property/accessibility_property.h"
 #include "core/components_ng/property/measure_utils.h"
 #include "core/components_ng/render/render_context.h"
@@ -162,7 +163,7 @@ std::optional<float> HeaderFooterUtils::GetNextStickyHeaderGap(LayoutWrapper* la
     CHECK_NULL_RETURN(layoutWrapper, std::nullopt);
     auto host = layoutWrapper->GetHostNode();
     CHECK_NULL_RETURN(host, std::nullopt);
-    auto pattern = host->GetPattern<LazyLayoutPattern>();
+    auto pattern = host->GetPattern<StickyHeaderPattern>();
     CHECK_NULL_RETURN(pattern, std::nullopt);
     return pattern->GetNextStickyHeaderGap();
 }

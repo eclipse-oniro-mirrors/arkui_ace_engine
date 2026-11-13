@@ -16,7 +16,7 @@
 #include "core/components_ng/pattern/waterflow/layout/water_flow_layout_algorithm_base.h"
 
 #include "core/components_ng/pattern/scrollable/scrollable_paint_property.h"
-#include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
+#include "core/components_ng/pattern/scrollable/header_footer_utils.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
 #include "core/components_ng/pattern/scrollable/scrollable_utils.h"
 #include "core/components_ng/pattern/waterflow/layout/water_flow_layout_utils.h"

@@ -17,7 +17,7 @@
 
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_pattern.h"
-#include "core/components_ng/pattern/lazy_layout/sticky_header_pattern.h"
+#include "core/components_ng/pattern/sticky_header_pattern.h"
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
 #include "core/components_v2/inspector/inspector_constants.h"
 

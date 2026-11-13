@@ -25,7 +25,7 @@
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_pattern.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
 #include "core/components_ng/pattern/lazy_layout/prepared_layout_geometry.h"
-#include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
+#include "core/components_ng/pattern/scrollable/header_footer_utils.h"
 #include "core/components_ng/pattern/lazy_column_layout/lazy_column_layout_pattern.h"
 #include "core/components_ng/property/measure_utils.h"
 
@@ -778,22 +778,24 @@ LayoutConstraintF LazyColumnLayoutAlgorithm::GetLazyLayoutConstraint(float refer
 }
 
 void LazyColumnLayoutAlgorithm::UpdateSiblingHandoffGap(
-    LayoutWrapper* layoutWrapper, const RefPtr<LayoutWrapper>& wrapper, int32_t itemIndex) const
+    LayoutWrapper* layoutWrapper, const RefPtr<LayoutWrapper>& wrapper, int32_t itemIndex, bool layoutOnly) const
 {
     CHECK_NULL_VOID(layoutWrapper);
     CHECK_NULL_VOID(wrapper);
     auto currentPattern = LazyLayoutUtils::GetStickyHeaderPattern(wrapper->GetHostNode());
+    // Cache-only lookup: a never-built previous item cannot hold stale state, so don't build one on this hot path.
+    auto previousWrapper = itemIndex > 0
+        ? layoutWrapper->GetChildByIndex(GetRawIndexForItem(itemIndex - 1), true) : nullptr;
+    auto previousPattern = previousWrapper
+        ? LazyLayoutUtils::GetStickyHeaderPattern(previousWrapper->GetHostNode()) : nullptr;
+    if (layoutOnly && !(currentPattern && currentPattern->RequiresStickyHandoffInLayout()) &&
+        !(previousPattern && previousPattern->RequiresStickyHandoffInLayout())) {
+        return;
+    }
     // The last section has no next sibling: clear its own outbound gap.
     if (currentPattern && itemIndex >= totalItemCount_ - 1) {
         currentPattern->PublishNextStickyHeaderGap(std::nullopt);
     }
-    if (itemIndex <= 0) {
-        return;
-    }
-    // Cache-only lookup: a never-built previous item cannot hold stale state, so don't build one on this hot path.
-    auto previousWrapper = layoutWrapper->GetChildByIndex(GetRawIndexForItem(itemIndex - 1), true);
-    CHECK_NULL_VOID(previousWrapper);
-    auto previousPattern = LazyLayoutUtils::GetStickyHeaderPattern(previousWrapper->GetHostNode());
     CHECK_NULL_VOID(previousPattern);
     const bool currentHasStickyHeader = currentPattern && currentPattern->HasStickyHeader();
     const bool previousHasStickyHeader = previousPattern->HasStickyHeader();
@@ -1391,7 +1393,7 @@ void LazyColumnLayoutAlgorithm::LayoutItems(
         if (!wrapper) {
             continue;
         }
-        UpdateSiblingHandoffGap(layoutWrapper, wrapper, iter->first);
+        UpdateSiblingHandoffGap(layoutWrapper, wrapper, iter->first, true);
         SetItemOffset(wrapper, iter->second, crossSize, paddingOffset);
         if (wrapper->CheckNeedForceMeasureAndLayout()) {
             wrapper->Layout();
@@ -1432,7 +1434,7 @@ void LazyColumnLayoutAlgorithm::LayoutCachedItemsForward(
         if (!wrapper) {
             break;
         }
-        UpdateSiblingHandoffGap(layoutWrapper, wrapper, iter->first);
+        UpdateSiblingHandoffGap(layoutWrapper, wrapper, iter->first, true);
         SetItemOffset(wrapper, iter->second, crossSize, paddingOffset);
         SyncGeometry(wrapper);
         if (hadDirty || CheckNeedMeasure(wrapper)) {
@@ -1478,7 +1480,7 @@ void LazyColumnLayoutAlgorithm::LayoutCachedItemsBackward(
         if (!wrapper) {
             break;
         }
-        UpdateSiblingHandoffGap(layoutWrapper, wrapper, rIter->first);
+        UpdateSiblingHandoffGap(layoutWrapper, wrapper, rIter->first, true);
         SetItemOffset(wrapper, rIter->second, crossSize, paddingOffset);
         SyncGeometry(wrapper);
         if (hadDirty || CheckNeedMeasure(wrapper)) {

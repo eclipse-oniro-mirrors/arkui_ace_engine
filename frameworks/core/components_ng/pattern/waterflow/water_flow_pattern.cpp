@@ -20,11 +20,11 @@
 #include <limits>
 #include <set>
 
-#include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
+#include "core/components_ng/pattern/scrollable/header_footer_utils.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_pattern.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
-#include "core/components_ng/pattern/scrollable/scroll_viewport_coordinator.h"
+#include "core/components_ng/base/scroll_viewport_coordinator.h"
 
 #include "base/log/dump_log.h"
 #include "base/utils/utils.h"

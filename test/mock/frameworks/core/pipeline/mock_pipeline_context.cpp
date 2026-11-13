@@ -17,7 +17,7 @@
 
 #include <gmock/gmock.h>
 
-#include "core/components_ng/pattern/scrollable/scroll_viewport_coordinator.h"
+#include "core/components_ng/base/scroll_viewport_coordinator.h"
 #include "core/common/thp_extra_manager.h"
 #include "mock_pipeline_context.h"
 

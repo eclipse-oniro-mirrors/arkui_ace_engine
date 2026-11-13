@@ -18,7 +18,7 @@
 #include "test/unittest/core/pattern/lazy_layout/lazy_edge_test_helper.h"
 #include "test/unittest/core/syntax/mock_lazy_for_each_builder.h"
 
-#include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
+#include "core/components_ng/pattern/scrollable/header_footer_utils.h"
 #include "core/components_ng/pattern/list/list_model_ng.h"
 #include "core/components_ng/pattern/lazy_waterflow_layout/lazy_water_flow_layout_algorithm.h"
 #include "core/components_ng/pattern/lazy_waterflow_layout/lazy_water_flow_layout_info.h"

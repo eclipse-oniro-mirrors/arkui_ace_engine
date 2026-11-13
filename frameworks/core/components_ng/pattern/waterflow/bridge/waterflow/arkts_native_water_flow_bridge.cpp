@@ -29,7 +29,7 @@
 #include "core/components_ng/pattern/scrollable/scrollable_controller.h"
 #include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "core/components_ng/pattern/waterflow/water_flow_model_ng.h"
-#include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
+#include "core/components_ng/pattern/scrollable/header_footer_utils.h"
 #include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
 #include "core/components_ng/pattern/waterflow/water_flow_sections.h"
 #include "core/pipeline_ng/pipeline_context.h"

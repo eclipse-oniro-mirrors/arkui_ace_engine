@@ -25,7 +25,7 @@
 #include <utility>
 #include <vector>
 
-#include "core/components_ng/pattern/lazy_layout/sticky_header_pattern.h"
+#include "core/components_ng/pattern/sticky_header_pattern.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_manager.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_types.h"
 #include "core/components_ng/pattern/pattern.h"
@@ -224,6 +224,14 @@ public:
     void SetSticky(StickyStyle style);
     bool HasStickyHeader() const override;
     void PublishNextStickyHeaderGap(const std::optional<float>& gap) override;
+    const std::optional<float>& GetNextStickyHeaderGap() const override
+    {
+        return edgeState_.nextStickyHeaderGap;
+    }
+    bool RequiresStickyHandoffInLayout() const override
+    {
+        return edgeState_.enabled;
+    }
     void NotifyStickyHeaderChange();
     void SetEdgeContent(bool isHeader, const RefPtr<UINode>& content);
     bool IsValidEdgeContent(bool isHeader, const RefPtr<UINode>& content) const;

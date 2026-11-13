@@ -18,7 +18,7 @@
 
 #include "core/components/common/layout/constants.h"
 #include "core/components_ng/layout/layout_property.h"
-#include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
+#include "core/components_ng/pattern/scrollable/header_footer_utils.h"
 #include "core/components_ng/property/property.h"
 
 namespace OHOS::Ace::NG {

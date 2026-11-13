@@ -23,7 +23,7 @@
 #include "core/components_ng/base/frame_node.h"
 #include "core/components/common/properties/alignment.h"
 #include "core/components_ng/layout/utils.h"
-#include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
+#include "core/components_ng/pattern/scrollable/header_footer_utils.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
 #include "core/components_ng/pattern/lazy_layout/prepared_layout_geometry.h"
 #include "core/components_ng/pattern/lazy_grid_layout/lazy_grid_layout_pattern.h"

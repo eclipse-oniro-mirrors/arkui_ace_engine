@@ -19,7 +19,7 @@
 #include "base/geometry/dimension.h"
 #include "core/common/container_scope.h"
 #include "core/components_ng/base/frame_node.h"
-#include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
+#include "core/components_ng/pattern/scrollable/header_footer_utils.h"
 #include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "core/components_ng/pattern/scrollable/scrollable_model_static.h"
 #include "core/components_ng/pattern/waterflow/bridge/waterflow/water_flow_sections_accessor_peer_impl.h"

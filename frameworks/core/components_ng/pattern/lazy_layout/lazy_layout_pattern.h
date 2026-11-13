@@ -20,7 +20,7 @@
 #include <optional>
 
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_offset.h"
-#include "core/components_ng/pattern/lazy_layout/sticky_header_pattern.h"
+#include "core/components_ng/pattern/sticky_header_pattern.h"
 #include "core/components_ng/pattern/pattern.h"
 
 namespace OHOS::Ace::NG {
@@ -57,7 +57,7 @@ public:
     // LazyColumnLayout publishes handoff gaps, defers mid-layout invalidation, and clears the state on detach.
     void PublishNextStickyHeaderGap(const std::optional<float>& gap) override;
 
-    const std::optional<float>& GetNextStickyHeaderGap() const
+    const std::optional<float>& GetNextStickyHeaderGap() const override
     {
         return nextStickyHeaderGap_;
     }

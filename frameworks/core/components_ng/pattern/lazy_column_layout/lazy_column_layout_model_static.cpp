@@ -18,7 +18,7 @@
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/pattern/lazy_column_layout/lazy_column_layout_pattern.h"
 #include "core/components_ng/pattern/lazy_column_layout/lazy_column_layout_property.h"
-#include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
+#include "core/components_ng/pattern/scrollable/header_footer_utils.h"
 #include "core/components_v2/inspector/inspector_constants.h"
 
 namespace OHOS::Ace::NG {

@@ -13,8 +13,8 @@
  * limitations under the License.
  */
 
-#ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_LAZY_LAYOUT_STICKY_HEADER_PATTERN_H
-#define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_LAZY_LAYOUT_STICKY_HEADER_PATTERN_H
+#ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_STICKY_HEADER_PATTERN_H
+#define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_STICKY_HEADER_PATTERN_H
 
 #include <optional>
 
@@ -29,7 +29,13 @@ class StickyHeaderPattern : public virtual AceType {
 public:
     virtual bool HasStickyHeader() const = 0;
     virtual void PublishNextStickyHeaderGap(const std::optional<float>& gap) = 0;
+    virtual const std::optional<float>& GetNextStickyHeaderGap() const = 0;
+    // Existing lazy sections publish during measurement; ordinary sections may also need layout-only refreshes.
+    virtual bool RequiresStickyHandoffInLayout() const
+    {
+        return false;
+    }
 };
 } // namespace OHOS::Ace::NG
 
-#endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_LAZY_LAYOUT_STICKY_HEADER_PATTERN_H
+#endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_STICKY_HEADER_PATTERN_H
