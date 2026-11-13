@@ -392,7 +392,7 @@ void ArktsDynamicUIContentImpl::CommonInitializeAceApplicationInfo()
         AceApplicationInfo::GetInstance().SetProcessName(context->GetBundleName());
         AceApplicationInfo::GetInstance().SetPackageName(context->GetBundleName());
         AceApplicationInfo::GetInstance().SetDataFileDirPath(context->GetFilesDir());
-        AceApplicationInfo::GetInstance().SetUid(IPCSkeleton::GetCallingUid());
+        AceApplicationInfo::GetInstance().SetUid(IPCSkeleton::GetCallingAppUid());
         AceApplicationInfo::GetInstance().SetPid(IPCSkeleton::GetCallingRealPid());
         CapabilityRegistry::Register();
         ImageFileCache::GetInstance().SetImageCacheFilePath(context->GetCacheDir());
