@@ -64,6 +64,8 @@ public:
 
     int32_t GetContentFrameIndex(SafeAreaInsetEdge edge) const;
 
+    static size_t GetEdgeCount();
+
     bool Empty() const;
 
 private:

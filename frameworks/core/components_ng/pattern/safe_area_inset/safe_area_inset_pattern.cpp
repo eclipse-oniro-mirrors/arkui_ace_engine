@@ -68,6 +68,11 @@ RefPtr<LayoutAlgorithm> SafeAreaInsetPattern::CreateLayoutAlgorithm()
     return MakeRefPtr<SafeAreaInsetLayoutAlgorithm>();
 }
 
+size_t SafeAreaInsetPattern::GetEdgeCount()
+{
+    return SAFE_AREA_INSET_EDGE_COUNT;
+}
+
 RefPtr<UINode> SafeAreaInsetPattern::GetEdgeContent(SafeAreaInsetEdge edge) const
 {
     // contents_ in the header spells the edge count to avoid including the
