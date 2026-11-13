@@ -157,7 +157,9 @@ void WaterFlowLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     pattern->GetRepeatCountInfo(
         host, layoutInfo_->repeatDifference_, layoutInfo_->firstRepeatCount_, layoutInfo_->childrenCount_);
 
-    MeasureEdges(layoutWrapper, layoutInfo_, idealSize);
+    if (layoutInfo_->edgeSlots_) {
+        MeasureEdges(layoutWrapper, layoutInfo_, idealSize);
+    }
     InitialItemsCrossSize(layoutProperty, idealSize, layoutInfo_->GetChildrenCount(), originalWidth);
     mainSize_ = GetMainAxisSize(idealSize, axis);
     CalcContentOffset(layoutWrapper, layoutInfo_, mainSize_);
@@ -414,7 +416,7 @@ FlowItemPosition WaterFlowLayoutAlgorithm::GetItemPosition(int32_t index)
     }
     auto itemIndex = layoutInfo_->GetCrossIndexForNextItem(layoutInfo_->GetSegment(index));
     if (itemIndex.lastItemIndex < 0) {
-        return { itemIndex.crossIndex, layoutInfo_->headerHeight_ };
+        return { itemIndex.crossIndex, layoutInfo_->edgeSlots_ ? layoutInfo_->headerHeight_ : 0.0f };
     }
     auto mainHeight = layoutInfo_->GetMainHeight(itemIndex.crossIndex, itemIndex.lastItemIndex);
     return { itemIndex.crossIndex, mainHeight + mainGap_ };
@@ -440,7 +442,8 @@ void WaterFlowLayoutAlgorithm::FillViewport(float mainSize, LayoutWrapper* layou
     bool fill = false;
     while ((LessNotEqual(position.startMainPos + layoutInfo_->currentOffset_, viewEndBound) ||
            layoutInfo_->jumpIndex_ != WaterFlowLayoutInfoBase::EMPTY_JUMP_INDEX) &&
-           (currentIndex < layoutInfo_->ItemCnt(layoutInfo_->GetChildrenCount()))) {
+           (layoutInfo_->edgeSlots_ ? currentIndex < layoutInfo_->ItemCnt(layoutInfo_->GetChildrenCount())
+                                   : GetChildIndexWithFooter(currentIndex) < layoutInfo_->GetChildrenCount())) {
         auto itemWrapper = WaterFlowLayoutUtils::GetWaterFlowItem(layoutWrapper, GetChildIndexWithFooter(currentIndex));
         if (!itemWrapper) {
             break;
@@ -689,9 +692,10 @@ void WaterFlowLayoutAlgorithm::ReMeasureItems(LayoutWrapper* layoutWrapper)
 
 void WaterFlowLayoutAlgorithm::HandleItemEnd(int32_t currentIndex)
 {
-    int32_t childrenCount = layoutInfo_->ItemCnt(layoutInfo_->GetChildrenCount());
+    int32_t childrenCount = layoutInfo_->edgeSlots_ ? layoutInfo_->ItemCnt(layoutInfo_->GetChildrenCount())
+                                                  : layoutInfo_->GetChildrenCount();
     // Check if startIndex has reached or exceeded total count
-    if (currentIndex >= childrenCount) {
+    if ((layoutInfo_->edgeSlots_ ? currentIndex : GetChildIndexWithFooter(currentIndex)) >= childrenCount) {
         layoutInfo_->itemEnd_ = true;
         return;
     }

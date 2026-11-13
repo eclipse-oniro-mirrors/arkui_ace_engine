@@ -48,17 +48,22 @@ void WaterFlowLayoutSW::Measure(LayoutWrapper* wrapper)
     auto [size, matchChildren, originalWidth] = WaterFlowLayoutUtils::PreMeasureSelf(wrapper_, axis_);
     syncLoad_ = props_->GetSyncLoad().value_or(true) || matchChildren ||
                 !NearZero(info_->delta_) || info_->targetIndex_.has_value() || fastScrollState_;
-    MeasureEdges(wrapper, info_, size);
+    if (info_->edgeSlots_) {
+        MeasureEdges(wrapper, info_, size);
+    }
     Init(size, originalWidth);
     CalculateContentClipFixOffset(wrapper_, info_);
 
     if (info_->edgeSlots_ && itemCnt_ == 0 && (!sections_ || sections_->GetSectionInfo().empty())) {
-        info_->SyncEmptyEdges(mainLen_);
         if (matchChildren) {
-            size.SetHeight(info_->maxHeight_);
+            const auto& constraint = props_->GetLayoutConstraint().value();
+            mainLen_ = std::clamp(info_->headerHeight_ + info_->edgeFooterHeight_,
+                constraint.minSize.MainSize(axis_), constraint.maxSize.MainSize(axis_));
+            size.SetMainSize(mainLen_, axis_);
             AddPaddingToSize(props_->CreatePaddingAndBorder(), size);
             wrapper_->GetGeometryNode()->SetFrameSize(size);
         }
+        info_->SyncEmptyEdges(mainLen_);
         return;
     }
     if (!IsSectionValid(info_, itemCnt_) || !CheckData()) {
@@ -316,16 +321,15 @@ void WaterFlowLayoutSW::ApplyFastScrollWindow()
 
 void WaterFlowLayoutSW::Layout(LayoutWrapper* wrapper)
 {
-    if (!info_->isDataValid_) {
-        LayoutEdges(wrapper, info_, info_->headerHeight_);
-        return;
-    }
-    if (info_->edgeSlots_ && itemCnt_ == 0) {
+    if (info_->edgeSlots_ && (!info_->isDataValid_ || itemCnt_ == 0)) {
         LayoutEdges(wrapper, info_, info_->headerHeight_);
         return;
     }
     if (info_->lanes_.empty()) {
         TAG_LOGW(AceLogTag::ACE_WATERFLOW, "Lanes not initialized, can't perform layout");
+        return;
+    }
+    if (!info_->isDataValid_) {
         return;
     }
     // A reload/jump may change the first lane before Pattern calibrates totalOffset_.
@@ -381,7 +385,7 @@ void WaterFlowLayoutSW::Layout(LayoutWrapper* wrapper)
         LayoutEdges(wrapper, info_, info_->EndPos() - edgeOffset + info_->BotMargin(), edgeOffset);
     } else if (info_->itemEnd_) {
         LayoutFooter(paddingOffset, reverse);
-    } else if (info_->footerIndex_ >= 0) {
+    } else if (info_->footerIndex_ == 0) {
         DeactivateFooter();
     }
 
@@ -391,7 +395,7 @@ void WaterFlowLayoutSW::Layout(LayoutWrapper* wrapper)
 
 void WaterFlowLayoutSW::DeactivateFooter() const
 {
-    if (info_->footerIndex_ < 0) {
+    if (info_->footerIndex_ != 0) {
         return;
     }
     auto child = wrapper_->GetChildByIndex(0);
@@ -933,8 +937,7 @@ void WaterFlowLayoutSW::ClearFront()
         }
         const float itemEndPos = lane->startPos + itemLen;
         const bool inView =
-            NearZero(info_->startFixOffset_) ? Positive(itemEndPos)
-                : GreatNotEqual(itemEndPos, startBound);
+            NearZero(info_->startFixOffset_) ? Positive(itemEndPos) : GreatNotEqual(itemEndPos, startBound);
         if (inView) {
             break;
         }
@@ -971,7 +974,7 @@ void WaterFlowLayoutSW::MeasureOnJump(int32_t jumpIdx, ScrollAlign align)
     const bool toContentEnd = jumpIdx == LAST_ITEM && info_->edgeSlots_;
     if (jumpIdx == LAST_ITEM) {
         jumpIdx = itemCnt_ - 1;
-    } else if (jumpIdx == itemCnt_ && info_->footerIndex_ >= 0) {
+    } else if (jumpIdx == itemCnt_ && (info_->edgeSlots_ ? info_->footerIndex_ >= 0 : info_->footerIndex_ == 0)) {
         // jump to footer
         info_->delta_ = -Infinity<float>();
     }
@@ -1076,7 +1079,8 @@ void WaterFlowLayoutSW::AdjustOverScroll()
     float maxEnd = info_->EndPos();
     float minStart = info_->StartPos();
 
-    if (LessOrEqual(maxEnd, info_->GetViewEndBound(mainLen_, true)) && info_->footerIndex_ >= 0) {
+    const bool hasFooter = info_->edgeSlots_ ? info_->footerIndex_ >= 0 : info_->footerIndex_ == 0;
+    if (LessOrEqual(maxEnd, info_->GetViewEndBound(mainLen_, true)) && hasFooter) {
         info_->footerHeight_ = info_->edgeSlots_ ? info_->edgeFooterHeight_
             : WaterFlowLayoutUtils::MeasureFooter(wrapper_, axis_);
         maxEnd += info_->footerHeight_;
@@ -1209,7 +1213,7 @@ void WaterFlowLayoutSW::LayoutSection(
 
 void WaterFlowLayoutSW::LayoutFooter(const OffsetF& paddingOffset, bool reverse)
 {
-    if (info_->footerIndex_ < 0) {
+    if (info_->footerIndex_ != 0) {
         return;
     }
     float mainPos = info_->EndPos();

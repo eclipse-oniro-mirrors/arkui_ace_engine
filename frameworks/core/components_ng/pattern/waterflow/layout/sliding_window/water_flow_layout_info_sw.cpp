@@ -22,10 +22,21 @@
 namespace OHOS::Ace::NG {
 void WaterFlowLayoutInfoSW::SyncEmptyEdges(float mainSize)
 {
-    // A section reset can leave the old lane origin and jump behind. An empty
-    // body has its natural origin after the header, just like the first layout.
+    if (!edgeSlots_) {
+        return;
+    }
+    const float contentHeight = headerHeight_ + edgeFooterHeight_;
+    const float minOffset = std::min(contentStartOffset_, mainSize - contentHeight - contentEndOffset_);
+    float offset = totalOffset_ + delta_;
+    if (jumpIndex_ == LAST_ITEM) {
+        offset = minOffset;
+    } else if (jumpIndex_ >= 0) {
+        offset = contentStartOffset_;
+    }
+    offset += extraOffset_.value_or(0.0f);
+    // Discard stale body records, but preserve scrolling within the remaining edges.
     Reset();
-    totalOffset_ = contentStartOffset_;
+    totalOffset_ = std::clamp(offset, minOffset, contentStartOffset_);
     startPos_ = TopMargin() + totalOffset_;
     endPos_ = startPos_;
     storedOffset_ = startPos_;
@@ -40,11 +51,12 @@ void WaterFlowLayoutInfoSW::SyncEmptyEdges(float mainSize)
     synced_ = true;
     knowTotalHeight_ = true;
     lastMainSize_ = mainSize;
-    itemStart_ = true;
+    prevItemStart_ = itemStart_;
+    itemStart_ = GreatOrEqual(totalOffset_, contentStartOffset_);
     itemEnd_ = true;
-    offsetEnd_ = true;
+    offsetEnd_ = LessOrEqual(totalOffset_, minOffset);
     isDataValid_ = true;
-    maxHeight_ = headerHeight_ + edgeFooterHeight_;
+    maxHeight_ = contentHeight;
 }
 
 void WaterFlowLayoutInfoSW::Sync(int32_t itemCnt, float mainSize, const std::vector<float>& mainGap)
@@ -958,7 +970,8 @@ float WaterFlowLayoutInfoSW::EstimateTotalHeight() const
     if (knowTotalHeight_ && repeatDifference_ == 0) {
         return maxHeight_;
     }
-    float height = std::max(-totalOffset_, 0.0f) + (endPos_ - startPos_);
+    float height = std::max(-totalOffset_, 0.0f) // to eliminate top overScroll
+                   + (endPos_ - startPos_);
     if (itemEnd_ && repeatDifference_ == 0) {
         float bottomOverScroll = std::max(BottomFinalPos(lastMainSize_), 0.0f);
         return height - bottomOverScroll + BotMargin() + footerHeight_;
@@ -1283,10 +1296,11 @@ float WaterFlowLayoutInfoSW::CalcMaxHeight(int itemCnt)
 
 void WaterFlowLayoutInfoSW::HandleItemEnd(int32_t itemCnt, float mainSize)
 {
+    const bool hasFooter = edgeSlots_ ? footerIndex_ >= 0 : footerIndex_ == 0;
     // Check if endIdx is already the last item
     if (endIndex_ >= itemCnt - 1) {
         itemEnd_ = true;
-        if (footerIndex_ >= 0) {
+        if (hasFooter) {
             itemEnd_ &= LessOrEqualCustomPrecision(endPos_, GetViewEndBound(mainSize, true), 0.1f);
         }
         if (NearZero(endFixOffset_)) {
@@ -1310,7 +1324,7 @@ void WaterFlowLayoutInfoSW::HandleItemEnd(int32_t itemCnt, float mainSize)
 
     // Set itemEnd_ based on whether all remaining items are zero-height
     itemEnd_ = (zeroHeightCount > 0 && endIndex_ + zeroHeightCount >= itemCnt - 1);
-    if (itemEnd_ && footerIndex_ >= 0) {
+    if (itemEnd_ && hasFooter) {
         itemEnd_ &= LessOrEqualCustomPrecision(endPos_, GetViewEndBound(mainSize, true), 0.1f);
     }
 

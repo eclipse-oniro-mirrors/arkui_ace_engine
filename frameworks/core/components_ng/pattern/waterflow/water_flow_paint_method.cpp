@@ -81,7 +81,6 @@ void WaterFlowPaintMethod::UpdateContentModifier(PaintWrapper* paintWrapper)
         }
         return;
     }
-    renderContext->ResetContentClip();
     contentModifier_->SetClip(clip);
 }
 

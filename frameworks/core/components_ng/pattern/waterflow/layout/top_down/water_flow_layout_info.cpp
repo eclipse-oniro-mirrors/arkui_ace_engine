@@ -512,7 +512,8 @@ void WaterFlowLayoutInfo::Sync(float mainSize, bool canOverScrollStart, bool can
     maxHeight_ = GetMaxMainHeight() + (edgeSlots_ ? edgeFooterHeight_ : 0.0f);
 
     itemStart_ = GreatOrEqual(currentOffset_, contentStartOffset_);
-    itemEnd_ = reportEndIndex_ >= 0 && reportEndIndex_ == SegmentedItemCount() - 1;
+    itemEnd_ = (edgeSlots_ && SegmentedItemCount() == 0) ||
+        (reportEndIndex_ >= 0 && reportEndIndex_ == SegmentedItemCount() - 1);
     offsetEnd_ = itemEnd_ && GreatOrEqual(mainSize - currentOffset_, maxHeight_ + contentEndOffset_);
     // adjust offset when it can't overScroll at bottom
     if (offsetEnd_ && LessNotEqual(currentOffset_, contentStartOffset_) && !canOverScrollEnd) {
