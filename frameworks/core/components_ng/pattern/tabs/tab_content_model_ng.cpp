@@ -405,15 +405,19 @@ void TabContentModelNG::Create(std::function<void()>&& deepRenderFunc)
     };
     ACE_LAYOUT_SCOPED_TRACE("Create[%s][self:%d]", TAB_CONTENT_ITEM_ETS_TAG, nodeId);
     ACE_UINODE_TRACE(nodeId);
+    auto* elementRegister = ElementRegister::GetInstance();
+    auto existingNode = elementRegister ? elementRegister->GetUINodeById(nodeId) : nullptr;
     auto frameNode = TabContentNode::GetOrCreateTabContentNode(TAB_CONTENT_ITEM_ETS_TAG, nodeId,
         [shallowBuilder = AceType::MakeRefPtr<ShallowBuilder>(std::move(deepRender))]() {
             return AceType::MakeRefPtr<TabContentPattern>(shallowBuilder);
         });
     stack->Push(frameNode);
-    auto tabTheme = frameNode->GetTheme<TabTheme>(true);
-    CHECK_NULL_VOID(tabTheme);
-    SetTabBar(tabTheme->GetDefaultTabBarName(), "", std::nullopt, nullptr, true); // Set default tab bar.
-    ACE_UPDATE_LAYOUT_PROPERTY(TabContentLayoutProperty, Text, tabTheme->GetDefaultTabBarName());
+    if (!existingNode) {
+        auto tabTheme = frameNode->GetTheme<TabTheme>(true);
+        CHECK_NULL_VOID(tabTheme);
+        SetTabBar(tabTheme->GetDefaultTabBarName(), "", std::nullopt, nullptr, true); // Set default tab bar.
+        ACE_UPDATE_LAYOUT_PROPERTY(TabContentLayoutProperty, Text, tabTheme->GetDefaultTabBarName());
+    }
     if (SystemProperties::ConfigChangePerform()) {
         auto tabsLayoutProperty = frameNode->GetLayoutProperty<TabContentLayoutProperty>();
         CHECK_NULL_VOID(tabsLayoutProperty);
@@ -431,13 +435,17 @@ void TabContentModelNG::Create()
     int32_t nodeId = stack->ClaimNodeId();
     ACE_LAYOUT_SCOPED_TRACE("Create[%s][self:%d]", TAB_CONTENT_ITEM_ETS_TAG, nodeId);
     ACE_UINODE_TRACE(nodeId);
+    auto* elementRegister = ElementRegister::GetInstance();
+    auto existingNode = elementRegister ? elementRegister->GetUINodeById(nodeId) : nullptr;
     auto frameNode = TabContentNode::GetOrCreateTabContentNode(
         TAB_CONTENT_ITEM_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<TabContentPattern>(nullptr); });
     stack->Push(frameNode);
-    auto tabTheme = frameNode->GetTheme<TabTheme>(true);
-    CHECK_NULL_VOID(tabTheme);
-    SetTabBar(tabTheme->GetDefaultTabBarName(), "", std::nullopt, nullptr, true); // Set default tab bar.
-    ACE_UPDATE_LAYOUT_PROPERTY(TabContentLayoutProperty, Text, tabTheme->GetDefaultTabBarName());
+    if (!existingNode) {
+        auto tabTheme = frameNode->GetTheme<TabTheme>(true);
+        CHECK_NULL_VOID(tabTheme);
+        SetTabBar(tabTheme->GetDefaultTabBarName(), "", std::nullopt, nullptr, true); // Set default tab bar.
+        ACE_UPDATE_LAYOUT_PROPERTY(TabContentLayoutProperty, Text, tabTheme->GetDefaultTabBarName());
+    }
 }
 
 RefPtr<FrameNode> TabContentModelNG::CreateFrameNode(int32_t nodeId)
