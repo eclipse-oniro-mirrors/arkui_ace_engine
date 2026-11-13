@@ -59,7 +59,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<ContainerPickerLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propCanLoop_ = CloneCanLoop();
         value->propEnableHapticFeedback_ = CloneEnableHapticFeedback();
         value->propDisplayedItemCount_ = CloneDisplayedItemCount();

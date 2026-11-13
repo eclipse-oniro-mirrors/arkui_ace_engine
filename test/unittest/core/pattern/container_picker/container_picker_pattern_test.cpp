@@ -404,7 +404,7 @@ HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_CreateChildrenCl
     containerPickerNode->AddChild(textNode);
     containerPickerNode->AddChild(symbolNode);
 
-    RefPtr<UINode> pickerUiNode = AceType::DynamicCast<UINode>(containerPickerNode);
+    RefPtr<UINode> pickerUiNode = containerPickerNode;
     ASSERT_NE(pickerUiNode, nullptr);
     EXPECT_FALSE(pickerUiNode->GetInteractionEventBindingInfo().builtInEventRegistered);
 

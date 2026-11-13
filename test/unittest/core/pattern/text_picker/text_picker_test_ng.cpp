@@ -936,7 +936,7 @@ HWTEST_F(TextPickerTestNg, TextPickerModelTest003, TestSize.Level0)
      */
     auto theme = MockPipelineContext::GetCurrent()->GetTheme<PickerTheme>();
     TextPickerModelNG::GetInstance()->Create(theme, TEXT);
-    auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
     ASSERT_NE(frameNode, nullptr);
     frameNode->MarkModifyDone();
     auto textPickerLayoutProperty = frameNode->GetLayoutProperty<TextPickerLayoutProperty>();
@@ -1081,7 +1081,7 @@ HWTEST_F(TextPickerTestNg, TextPickerModelTest007, TestSize.Level0)
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     AceApplicationInfo::GetInstance().isRightToLeft_ = true;
     columnPattern->FlushCurrentOptions(false, false);

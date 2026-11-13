@@ -76,7 +76,7 @@ void SvgPattern::OnPatternEffect(RSCanvas& canvas, RSBrush& brush,
     auto containerSize = svgCoordinateSystemContext.GetContainerRect().GetSize();
     TransformForCurrentOBB(*patternCanvas, patternContentRule, containerSize, Offset(0.0, 0.0));
     for (auto& child : children_) {
-        auto node = DynamicCast<SvgNode>(child);
+        auto node = child;
         if (node) {
             node->Draw(*patternCanvas, patternContentRule);
         }

@@ -2077,7 +2077,7 @@ HWTEST_F(ContainerPickerLayoutAlgorithmTest, SetLazyLoadWithLazyNode, TestSize.L
     auto lazyForEachNode = LazyForEachNode::CreateLazyForEachNode(20, nullptr);
     ASSERT_NE(lazyForEachNode, nullptr);
 
-    auto targetNode = AceType::DynamicCast<UINode>(lazyForEachNode);
+    auto targetNode = lazyForEachNode;
     ASSERT_NE(targetNode, nullptr);
     lazyForEachNode->MountToParent(frameNode_);
 

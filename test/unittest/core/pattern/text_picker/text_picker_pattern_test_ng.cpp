@@ -603,7 +603,7 @@ HWTEST_F(TextPickerPatternTestNg, TextPickerPatternTest005, TestSize.Level1)
     frameNode->MarkModifyDone();
     auto columnNode = AceType::DynamicCast<FrameNode>(frameNode->GetLastChild()->GetLastChild()->GetLastChild());
     ASSERT_NE(columnNode, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(columnNode)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = columnNode->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     /**
      * test method HandleChangeCallback

@@ -236,7 +236,7 @@ HWTEST_F(TextPickerColumnTestOneNg, CreateItemTouchEventListener001, TestSize.Le
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     auto testImpl = columnPattern->CreateItemTouchEventListener();
     ASSERT_NE(testImpl, nullptr);
@@ -270,7 +270,7 @@ HWTEST_F(TextPickerColumnTestOneNg, CreateItemTouchEventListener002, TestSize.Le
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     auto testImpl = columnPattern->CreateItemTouchEventListener();
     ASSERT_NE(testImpl, nullptr);
@@ -304,7 +304,7 @@ HWTEST_F(TextPickerColumnTestOneNg, CreateItemTouchEventListener003, TestSize.Le
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     auto testImpl = columnPattern->CreateItemTouchEventListener();
     ASSERT_NE(testImpl, nullptr);
@@ -341,7 +341,7 @@ HWTEST_F(TextPickerColumnTestOneNg, CreateItemTouchEventListener004, TestSize.Le
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     columnPattern->stopHaptic_ = false;
     auto testImpl = columnPattern->CreateItemTouchEventListener();
@@ -381,7 +381,7 @@ HWTEST_F(TextPickerColumnTestOneNg, CreateMouseHoverEventListener001, TestSize.L
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     auto testImpl = columnPattern->CreateMouseHoverEventListener(nullptr);
     ASSERT_NE(testImpl, nullptr);
@@ -412,7 +412,7 @@ HWTEST_F(TextPickerColumnTestOneNg, ParseTouchListener001, TestSize.Level1)
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     columnPattern->ParseTouchListener();
     auto testImpl = columnPattern->touchListener_;
@@ -455,7 +455,7 @@ HWTEST_F(TextPickerColumnTestOneNg, ParseTouchListener002, TestSize.Level1)
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     columnPattern->ParseTouchListener();
     auto testImpl = columnPattern->touchListener_;
@@ -497,7 +497,7 @@ HWTEST_F(TextPickerColumnTestOneNg, ParseTouchListener003, TestSize.Level1)
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     columnPattern->ParseTouchListener();
     auto testImpl = columnPattern->touchListener_;
@@ -531,7 +531,7 @@ HWTEST_F(TextPickerColumnTestOneNg, FlushCurrentOptions001, TestSize.Level1)
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     columnPattern->FlushCurrentOptions(false, true, false, true);
     EXPECT_TRUE(columnPattern->animationProperties_.size() != 0);
@@ -560,7 +560,7 @@ HWTEST_F(TextPickerColumnTestOneNg, SetCanLoop001, TestSize.Level1)
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     columnPattern->isLoop_ = true;
     columnPattern->isTossStatus_ = true;
@@ -591,7 +591,7 @@ HWTEST_F(TextPickerColumnTestOneNg, SpringCurveTailMoveProcess001, TestSize.Leve
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     auto testToss = columnPattern->GetToss();
     testToss->isTossPlaying_ = true;
@@ -629,7 +629,7 @@ HWTEST_F(TextPickerColumnTestOneNg, SpringCurveTailEndProcess001, TestSize.Level
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     columnPattern->SpringCurveTailEndProcess(false, false);
     EXPECT_TRUE(columnPattern->GetToss()->isTossPlaying_ == false);
@@ -661,7 +661,7 @@ HWTEST_F(TextPickerColumnTestOneNg, OnAroundButtonClick001, TestSize.Level1)
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     columnPattern->clickBreak_ = true;
     columnPattern->OnAroundButtonClick(nullptr);
@@ -691,7 +691,7 @@ HWTEST_F(TextPickerColumnTestOneNg, OnAroundButtonClick002, TestSize.Level1)
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     auto childNode = AceType::DynamicCast<FrameNode>(child->GetChildAtIndex(0));
     auto childSize = static_cast<int32_t>(child->GetChildren().size());
@@ -740,7 +740,7 @@ HWTEST_F(TextPickerColumnTestOneNg, OnAroundButtonClick003, TestSize.Level1)
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     auto childSize = static_cast<int32_t>(child->GetChildren().size());
     auto middleIndex = columnPattern->GetShowOptionCount() / HALF_NUMBER;
@@ -777,7 +777,7 @@ HWTEST_F(TextPickerColumnTestOneNg, OnAroundButtonClick004, TestSize.Level1)
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     auto childSize = static_cast<int32_t>(child->GetChildren().size());
     auto middleIndex = columnPattern->GetShowOptionCount() / HALF_NUMBER;
@@ -814,7 +814,7 @@ HWTEST_F(TextPickerColumnTestOneNg, OnAroundButtonClickFinish001, TestSize.Level
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     columnPattern->clickScrollSteps_ = 0;
     uint32_t prevIndex = columnPattern->GetCurrentIndex();
@@ -850,7 +850,7 @@ HWTEST_F(TextPickerColumnTestOneNg, OnAroundButtonClickFinish002, TestSize.Level
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     columnPattern->clickScrollSteps_ = 1;
     columnPattern->OnAroundButtonClickFinish(true, 2);
@@ -884,7 +884,7 @@ HWTEST_F(TextPickerColumnTestOneNg, OnAroundButtonClickFinish003, TestSize.Level
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     columnPattern->clickScrollSteps_ = 2;
     uint32_t prevIndex = columnPattern->GetCurrentIndex();
@@ -918,7 +918,7 @@ HWTEST_F(TextPickerColumnTestOneNg, OnAroundButtonClickFinish004, TestSize.Level
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     columnPattern->clickScrollSteps_ = 0;
     columnPattern->SetCurrentIndex(4);
@@ -952,7 +952,7 @@ HWTEST_F(TextPickerColumnTestOneNg, GetDragDeltaLessThanJumpInterval001, TestSiz
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
 
     auto midIndex = columnPattern->GetShowOptionCount() / HALF_NUMBER;
@@ -985,7 +985,7 @@ HWTEST_F(TextPickerColumnTestOneNg, InnerHandleScroll001, TestSize.Level1)
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     RangeContent tstContent = { "test", "test" };
     columnPattern->options_.push_back(tstContent);
@@ -1023,7 +1023,7 @@ HWTEST_F(TextPickerColumnTestOneNg, CanMove001, TestSize.Level1)
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     columnPattern->GetParentLayout()->UpdateCanLoop(true);
     columnPattern->CanMove(true);
@@ -1050,7 +1050,7 @@ HWTEST_F(TextPickerColumnTestOneNg, UpdateColumnChildPosition001, TestSize.Level
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     auto layout = columnPattern->GetParentLayout();
     ASSERT_NE(layout, nullptr);
@@ -1090,7 +1090,7 @@ HWTEST_F(TextPickerColumnTestOneNg, GetShiftDistanceForLandscape001, TestSize.Le
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     auto layout = columnPattern->GetParentLayout();
     ASSERT_NE(layout, nullptr);
@@ -1125,7 +1125,7 @@ HWTEST_F(TextPickerColumnTestOneNg, GetUpCandidateDistance001, TestSize.Level1)
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     int32_t tstIndex = 100;
     int32_t tstNextIndex = 0;
@@ -1164,7 +1164,7 @@ HWTEST_F(TextPickerColumnTestOneNg, GetSelectedDistance001, TestSize.Level1)
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     int32_t tstIndex = 0;
     int32_t tstNextIndex = 0;
@@ -1196,7 +1196,7 @@ HWTEST_F(TextPickerColumnTestOneNg, GetShiftDistance001, TestSize.Level1)
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     /**
      * @tc.steps: step1. optionProperties_ is empty and Call GetShiftDistance
@@ -1229,7 +1229,7 @@ HWTEST_F(TextPickerColumnTestOneNg, HandleDragEnd001, TestSize.Level1)
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     auto layout = columnPattern->GetParentLayout();
     ASSERT_NE(layout, nullptr);
@@ -1239,7 +1239,7 @@ HWTEST_F(TextPickerColumnTestOneNg, HandleDragEnd001, TestSize.Level1)
     tstToss->timeEnd_ = 100.0f;
     auto tstWeak = AceType::WeakClaim(Referenced::RawPtr(tstToss));
     auto tstRef = tstWeak.Upgrade();
-    auto tstColumn = AceType::DynamicCast<TextPickerColumnPattern>(tstRef->column_.Upgrade());
+    auto tstColumn = tstRef->column_.Upgrade();
     EXPECT_TRUE(tstColumn != nullptr);
     tstColumn->mainVelocity_ = 10000.0f;
     columnPattern->HandleDragEnd();
@@ -1266,7 +1266,7 @@ HWTEST_F(TextPickerColumnTestOneNg, HandleDragMove001, TestSize.Level1)
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     GestureEvent event;
     FingerInfo tstFinger;
@@ -1315,7 +1315,7 @@ HWTEST_F(TextPickerColumnTestOneNg, HandleDragStart001, TestSize.Level1)
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     auto layout = columnPattern->GetParentLayout();
     ASSERT_NE(layout, nullptr);
@@ -1346,7 +1346,7 @@ HWTEST_F(TextPickerColumnTestOneNg, InitPanEvent001, TestSize.Level1)
     ASSERT_NE(frameNode, nullptr);
     frameNode->MarkModifyDone();
     auto columnNode = AceType::DynamicCast<FrameNode>(frameNode->GetLastChild()->GetLastChild()->GetLastChild());
-    auto columnPattern = AceType::DynamicCast<FrameNode>(columnNode)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = columnNode->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     auto pickerNodeLayout = frameNode->GetLayoutProperty<TextPickerLayoutProperty>();
     ASSERT_NE(pickerNodeLayout, nullptr);
@@ -1390,7 +1390,7 @@ HWTEST_F(TextPickerColumnTestOneNg, SetCanLoop002, TestSize.Level1)
 
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     columnPattern->isLoop_ = true;
     columnPattern->isTossStatus_ = true;
@@ -1417,7 +1417,7 @@ HWTEST_F(TextPickerColumnTestOneNg, UpdateColumnChildPosition002, TestSize.Level
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
 
     columnPattern->yLast_ = 0;
@@ -1475,7 +1475,7 @@ HWTEST_F(TextPickerColumnTestOneNg, SpringCurveTailEndProcess002, TestSize.Level
 
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
 
     auto toss = columnPattern->GetToss();
@@ -1511,7 +1511,7 @@ HWTEST_F(TextPickerColumnTestOneNg, GetShiftDistance002, TestSize.Level1)
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
 
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
 
     int32_t index = 1;
@@ -1547,7 +1547,7 @@ HWTEST_F(TextPickerColumnTestOneNg, HandleDragEnd002, TestSize.Level1)
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     columnPattern->HandleDragEnd();
 
@@ -1581,7 +1581,7 @@ HWTEST_F(TextPickerColumnTestOneNg, HandleDragEnd003, TestSize.Level1)
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
 
     /**
@@ -1593,7 +1593,7 @@ HWTEST_F(TextPickerColumnTestOneNg, HandleDragEnd003, TestSize.Level1)
     toss->timeEnd_ = 10.0f;
     auto weak = AceType::WeakClaim(Referenced::RawPtr(toss));
     auto ref = weak.Upgrade();
-    auto column = AceType::DynamicCast<TextPickerColumnPattern>(ref->column_.Upgrade());
+    auto column = ref->column_.Upgrade();
     ASSERT_NE(column, nullptr);
     column->mainVelocity_ = 0.0f;
 
@@ -1632,7 +1632,7 @@ HWTEST_F(TextPickerColumnTestOneNg, HandleDragEnd004, TestSize.Level1)
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
 
     /**
@@ -1679,7 +1679,7 @@ HWTEST_F(TextPickerColumnTestOneNg, TextPickerColumnSetDisableTextStyleAnimation
     ASSERT_NE(textPickerPattern, nullptr);
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
 
     /**

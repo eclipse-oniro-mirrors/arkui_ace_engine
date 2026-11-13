@@ -579,7 +579,7 @@ HWTEST_F(ParseTestTwoNg, ParsePolygonTest003, TestSize.Level1)
  */
 HWTEST_F(ParseTestTwoNg, ParsePolygonTest004, TestSize.Level1)
 {
-    auto polygon = AceType::DynamicCast<SvgPolygon>(AceType::MakeRefPtr<SvgPolygon>(true));
+    auto polygon = AceType::MakeRefPtr<SvgPolygon>(true);
     EXPECT_NE(polygon, nullptr);
     std::vector<RSPoint> points;
     RSPoint point1;
@@ -604,7 +604,7 @@ HWTEST_F(ParseTestTwoNg, ParsePolygonTest004, TestSize.Level1)
  */
 HWTEST_F(ParseTestTwoNg, ParsePolygonTest005, TestSize.Level1)
 {
-    auto polygon = AceType::DynamicCast<SvgPolygon>(AceType::MakeRefPtr<SvgPolygon>(true));
+    auto polygon = AceType::MakeRefPtr<SvgPolygon>(true);
     EXPECT_NE(polygon, nullptr);
     auto svgContext = AceType::MakeRefPtr<SvgContext>();
     svgContext->SetUsrConfigVersion(SVG_FEATURE_SUPPORT_TWO);
@@ -633,7 +633,7 @@ HWTEST_F(ParseTestTwoNg, ParsePolygonTest006, TestSize.Level1)
 {
     int32_t backupApiVersion = MockContainer::Current()->GetApiTargetVersion();
     MockContainer::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWELVE));
-    auto polygon = AceType::DynamicCast<SvgPolygon>(AceType::MakeRefPtr<SvgPolygon>(true));
+    auto polygon = AceType::MakeRefPtr<SvgPolygon>(true);
     EXPECT_NE(polygon, nullptr);
 
     Size size;
@@ -659,7 +659,7 @@ HWTEST_F(ParseTestTwoNg, ParsePolygonTest006, TestSize.Level1)
  */
 HWTEST_F(ParseTestTwoNg, ParsePolygonTest007, TestSize.Level1)
 {
-    auto polygon = AceType::DynamicCast<SvgPolygon>(AceType::MakeRefPtr<SvgPolygon>(true));
+    auto polygon = AceType::MakeRefPtr<SvgPolygon>(true);
     EXPECT_NE(polygon, nullptr);
     SvgLengthScaleRule rule;
     RSRecordingPath path;
@@ -690,7 +690,7 @@ HWTEST_F(ParseTestTwoNg, ParsePolygonTest007, TestSize.Level1)
  */
 HWTEST_F(ParseTestTwoNg, SvgGTest001, TestSize.Level1)
 {
-    auto svgG = AceType::DynamicCast<SvgG>(AceType::MakeRefPtr<SvgG>());
+    auto svgG = AceType::MakeRefPtr<SvgG>();
     EXPECT_NE(svgG, nullptr);
     auto svgG1 = SvgG::Create();
     EXPECT_NE(svgG1, nullptr);
@@ -714,7 +714,7 @@ HWTEST_F(ParseTestTwoNg, SvgGTest001, TestSize.Level1)
  */
 HWTEST_F(ParseTestTwoNg, SvgPath001, TestSize.Level1)
 {
-    auto svgPath = AceType::DynamicCast<SvgPath>(AceType::MakeRefPtr<SvgPath>());
+    auto svgPath = AceType::MakeRefPtr<SvgPath>();
     EXPECT_NE(svgPath, nullptr);
     SvgLengthScaleRule rule;
     rule.lengthScaleUnit_ = SvgLengthScaleUnit::OBJECT_BOUNDING_BOX;
@@ -739,7 +739,7 @@ HWTEST_F(ParseTestTwoNg, SvgPath001, TestSize.Level1)
  */
 HWTEST_F(ParseTestTwoNg, SvgPath002, TestSize.Level1)
 {
-    auto svgPath = AceType::DynamicCast<SvgPath>(AceType::MakeRefPtr<SvgPath>());
+    auto svgPath = AceType::MakeRefPtr<SvgPath>();
     EXPECT_NE(svgPath, nullptr);
     SvgLengthScaleRule rule;
     auto result = svgPath->AsPath(rule);

@@ -253,7 +253,7 @@ void CalendarPickerLayoutAlgorithmTest::GetCalendarPickerLayoutAlgorithm()
     CreateContentChildNode();
     CreateButtonChildNode();
 
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(layoutWrapper_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = layoutWrapper_->GetLayoutAlgorithm();
     ASSERT_NE(layoutAlgorithmWrapper, nullptr);
     calendarPickerLayoutAlgorithm_ =
         AceType::DynamicCast<CalendarPickerLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());

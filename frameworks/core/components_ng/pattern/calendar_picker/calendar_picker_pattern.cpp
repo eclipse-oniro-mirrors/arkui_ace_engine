@@ -574,7 +574,7 @@ void CalendarPickerPattern::ShowDialog()
         pattern->SetDialogShow(false);
     };
     dialogCancelEvent["cancelId"] = cancelId;
-    calendarData_.entryNode = AceType::DynamicCast<FrameNode>(host);
+    calendarData_.entryNode = host;
     calendarData_.markToday = isMarkToday_;
     DialogProperties properties;
     InitDialogProperties(properties);

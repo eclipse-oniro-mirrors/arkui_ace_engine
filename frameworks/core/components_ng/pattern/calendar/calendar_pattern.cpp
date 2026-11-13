@@ -69,7 +69,7 @@ void CalendarPattern::OnModifyDone()
     Pattern::OnModifyDone();
     auto host = GetHost();
     CHECK_NULL_VOID(host);
-    auto hostNode = DynamicCast<FrameNode>(host);
+    auto hostNode = host;
     CHECK_NULL_VOID(hostNode);
     auto hostLayoutProperty = hostNode->GetLayoutProperty();
     CHECK_NULL_VOID(hostLayoutProperty);
@@ -203,7 +203,7 @@ void CalendarPattern::InitSwiperChangeDoneEvent()
 {
     auto host = GetHost();
     CHECK_NULL_VOID(host);
-    auto hostNode = DynamicCast<FrameNode>(host);
+    auto hostNode = host;
     CHECK_NULL_VOID(hostNode);
     auto hostLayoutProperty = hostNode->GetLayoutProperty();
     CHECK_NULL_VOID(hostLayoutProperty);

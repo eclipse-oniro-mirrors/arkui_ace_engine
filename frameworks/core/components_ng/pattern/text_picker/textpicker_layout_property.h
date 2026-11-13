@@ -77,7 +77,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<TextPickerLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propDefaultPickerItemHeight_ = CloneDefaultPickerItemHeight();
         value->propGradientHeight_ = CloneGradientHeight();
         value->propSelected_ = CloneSelected();

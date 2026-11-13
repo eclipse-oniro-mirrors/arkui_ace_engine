@@ -1220,7 +1220,7 @@ HWTEST_F(TextPickerColumnExtendTestNg, InnerHandleScrollTest001, TestSize.Level1
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     columnPattern->GetParentLayout()->UpdateCanLoop(true);
     RangeContent tstContentOne = { "test1", "test1" };
@@ -1306,7 +1306,7 @@ HWTEST_F(TextPickerColumnExtendTestNg, OnAttachToMainTreeMultiThread001, TestSiz
     frameNode->MarkModifyDone();
     auto columnNode = AceType::DynamicCast<FrameNode>(frameNode->GetLastChild()->GetLastChild()->GetLastChild());
     ASSERT_NE(columnNode, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(columnNode)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = columnNode->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
 
     columnPattern->OnAttachToMainTreeMultiThread();
