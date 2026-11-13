@@ -2786,6 +2786,66 @@ HWTEST_F(PageSceneProxyValidationTest, CustomGeometryIsValidatedBeforeSending, T
     EXPECT_EQ(remote->payload, VALID_PROXY_CUSTOM_RULE);
 }
 
+HWTEST_F(PageSceneProxyValidationTest, CustomGeometryRatioLowerBoundIsRejected, TestSize.Level1)
+{
+    // heightRatioGt < 0.5 -> PARAM_INVALID
+    std::string invalidHeight = VALID_PROXY_CUSTOM_RULE;
+    auto pos = invalidHeight.find("heightRatioGt\":0.8");
+    ASSERT_NE(pos, std::string::npos);
+    invalidHeight.replace(pos, 17, "heightRatioGt\":0.4");
+    EXPECT_EQ(proxy->RegisterPageSceneRules(invalidHeight, [](const std::string&) {}), PARAM_INVALID);
+    EXPECT_EQ(remote->calls, 0);
+
+    // widthRatioLte < 0.2 -> PARAM_INVALID
+    std::string invalidWidth = VALID_PROXY_CUSTOM_RULE;
+    pos = invalidWidth.find("widthRatioLte\":0.5");
+    ASSERT_NE(pos, std::string::npos);
+    invalidWidth.replace(pos, 17, "widthRatioLte\":0.1");
+    EXPECT_EQ(proxy->RegisterPageSceneRules(invalidWidth, [](const std::string&) {}), PARAM_INVALID);
+    EXPECT_EQ(remote->calls, 0);
+
+    // totalWidthRatioGt < 0.5 -> PARAM_INVALID
+    std::string invalidTotal = VALID_PROXY_CUSTOM_RULE;
+    pos = invalidTotal.find("totalWidthRatioGt\":0.8");
+    ASSERT_NE(pos, std::string::npos);
+    invalidTotal.replace(pos, 22, "totalWidthRatioGt\":0.4");
+    EXPECT_EQ(proxy->RegisterPageSceneRules(invalidTotal, [](const std::string&) {}), PARAM_INVALID);
+    EXPECT_EQ(remote->calls, 0);
+}
+
+HWTEST_F(PageSceneProxyValidationTest, CustomGeometryRatioLowerBoundEqualIsValid, TestSize.Level1)
+{
+    // Each sub-test uses a distinct ruleSetId to avoid the proxy single-registration gate.
+    // heightRatioGt = 0.8 (lower bound) -> NO_ERROR
+    std::string minHeight = VALID_PROXY_CUSTOM_RULE;
+    auto pos = minHeight.find("heightRatioGt\":0.8");
+    ASSERT_NE(pos, std::string::npos);
+    minHeight.replace(pos, 17, "heightRatioGt\":0.8");
+    minHeight.replace(minHeight.find("\"split_rules\""), 13, "\"lower_h\"");
+    EXPECT_EQ(proxy->RegisterPageSceneRules(minHeight, [](const std::string&) {}), NO_ERROR);
+    EXPECT_EQ(remote->calls, 1);
+    remote->calls = 0;
+
+    // widthRatioLte = 0.2 (lower bound) -> NO_ERROR
+    std::string minWidth = VALID_PROXY_CUSTOM_RULE;
+    pos = minWidth.find("widthRatioLte\":0.5");
+    ASSERT_NE(pos, std::string::npos);
+    minWidth.replace(pos, 17, "widthRatioLte\":0.2");
+    minWidth.replace(minWidth.find("\"split_rules\""), 13, "\"lower_w\"");
+    EXPECT_EQ(proxy->RegisterPageSceneRules(minWidth, [](const std::string&) {}), NO_ERROR);
+    EXPECT_EQ(remote->calls, 1);
+    remote->calls = 0;
+
+    // totalWidthRatioGt = 0.8 (lower bound) -> NO_ERROR
+    std::string minTotal = VALID_PROXY_CUSTOM_RULE;
+    pos = minTotal.find("totalWidthRatioGt\":0.8");
+    ASSERT_NE(pos, std::string::npos);
+    minTotal.replace(pos, 22, "totalWidthRatioGt\":0.8");
+    minTotal.replace(minTotal.find("\"split_rules\""), 13, "\"lower_t\"");
+    EXPECT_EQ(proxy->RegisterPageSceneRules(minTotal, [](const std::string&) {}), NO_ERROR);
+    EXPECT_EQ(remote->calls, 1);
+}
+
 HWTEST_F(PageSceneProxyValidationTest, LegacyIdsKeepReceiverValidation, TestSize.Level1)
 {
     remote->result = PARAM_INVALID;
