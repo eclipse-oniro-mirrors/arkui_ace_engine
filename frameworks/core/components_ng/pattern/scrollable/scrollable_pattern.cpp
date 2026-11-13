@@ -77,6 +77,7 @@
 #include "core/components_ng/syntax/lazy_for_each_node.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_2_node.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_node.h"
+#include "core/components_ng/property/safe_area_inset_property.h"
 #include "core/event/mouse_event.h"
 #include "core/gestures/drag_event.h"
 #include "core/interfaces/native/node/sheet_modifier.h"
@@ -2029,7 +2030,7 @@ std::pair<double, double> ScrollablePattern::GetAutoAdjustAvoidOffset()
         std::swap(result.first, result.second);
     }
     CalcPaddingAvoidDistByMainAxis(layoutProperty->GetPaddingProperty(), result, isRtl);
-    if (layoutProperty->HasSafeAreaInset()) {
+    if (layoutProperty->GetSafeAreaInsetState().HasSafeAreaInset()) {
         CalcEffectiveSafeAreaAvoidDistByMainAxis(
             layoutProperty->GetOrCreateSafeAreaPadding(), result);
     } else {

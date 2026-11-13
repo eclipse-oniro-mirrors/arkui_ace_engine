@@ -251,5 +251,6 @@ group("core_layout_unittest") {
     "box:box_layout_algorithm_test_ng",
     "safe_area:ignore_layout_safe_area_test_ng",
     "safe_area:safeArea_test_expandSafeArea_ng",
+    "safe_area:safe_area_inset_test_ng",
   ]
 }

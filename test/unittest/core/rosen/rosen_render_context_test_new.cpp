@@ -30,8 +30,10 @@
 
 #include "core/components_ng/pattern/stage/page_pattern.h"
 #include "core/components_ng/pattern/safe_area_inset/safe_area_inset_pattern.h"
+#include "core/components_ng/property/safe_area_inset_property.h"
 #include "core/components_ng/base/mount_policy.h"
 #include "core/components_ng/base/view_abstract.h"
+#include "core/components_ng/base/safe_area_inset_view.h"
 #include "core/components_ng/event/gesture_event_hub.h"
 #include "core/components_ng/pattern/button/button_pattern.h"
 #include "core/common/event_manager.h"
@@ -167,7 +169,7 @@ public:
 
     void Install(const SafeAreaInsetOptions& options, const SafeAreaInsetContentArray& contents)
     {
-        ViewAbstract::SetSafeAreaInset(AceType::RawPtr(host_), options, contents);
+        SafeAreaInsetView::SetSafeAreaInset(AceType::RawPtr(host_), options, contents);
         auto container = host_->GetSafeAreaInsetNode();
         ASSERT_NE(container, nullptr);
         container->renderContext_ = InitRosenRenderContext(container);
@@ -294,7 +296,7 @@ HWTEST_F(SafeAreaInsetRosenTest, DirectContentPositionAndClick001, TestSize.Leve
         Tap(30.0f + rect.Left() + 5.0f, 40.0f + rect.Top() + 5.0f);
         EXPECT_EQ(clicks, 1);
         EXPECT_EQ(touches, (std::vector<TouchType> { TouchType::DOWN, TouchType::MOVE, TouchType::UP }));
-        ViewAbstract::ResetSafeAreaInset(AceType::RawPtr(host_));
+        SafeAreaInsetView::ResetSafeAreaInset(AceType::RawPtr(host_));
     }
 }
 
@@ -415,7 +417,7 @@ HWTEST_F(SafeAreaInsetRosenTest, DirectContentMoveReplaceReset001, TestSize.Leve
     container->RebuildRenderContextTree();
     Tap(185.0f, 235.0f);
     EXPECT_EQ(replacementClicks, 2);
-    ViewAbstract::ResetSafeAreaInset(AceType::RawPtr(host_));
+    SafeAreaInsetView::ResetSafeAreaInset(AceType::RawPtr(host_));
     host_->RebuildRenderContextTree();
     Tap(185.0f, 235.0f);
     EXPECT_EQ(replacementClicks, 2);
@@ -438,15 +440,28 @@ HWTEST_F(SafeAreaInsetRosenTest, DirectContentSingleMixedMount001, TestSize.Leve
     Install(options, contents);
     auto container = host_->GetSafeAreaInsetNode();
     auto context = AceType::DynamicCast<RosenRenderContext>(container->GetRenderContext());
-    for (auto policy : { MountPolicy::SINGLE_IF_RENDER_NODE, MountPolicy::MIXED }) {
-        container->SetMountPolicy(policy);
-        container->MarkNeedSyncRenderTree(true);
-        container->RebuildRenderContextTree();
-        EXPECT_EQ(context->GetRSNode()->GetChildren().size(), 1);
-        auto targets = context->BuildMixedTargetRSNodes(AceType::RawPtr(container));
-        ASSERT_EQ(targets.size(), 1);
-        EXPECT_EQ(targets.front(), AceType::DynamicCast<RosenRenderContext>(button->GetRenderContext())->GetRSNode());
-    }
+    auto buttonRSNode = AceType::DynamicCast<RosenRenderContext>(button->GetRenderContext())->GetRSNode();
+
+    // Single mode: the direct content stays a direct RS child of the container, and the
+    // mixed target list covers only mixed children plus dedicated slots, not ordinary ones.
+    container->SetMountPolicy(MountPolicy::SINGLE_IF_RENDER_NODE);
+    container->MarkNeedSyncRenderTree(true);
+    container->RebuildRenderContextTree();
+    EXPECT_EQ(context->GetRSNode()->GetChildren().size(), 1);
+    auto singleTargets = context->BuildMixedTargetRSNodes(AceType::RawPtr(container));
+    EXPECT_EQ(std::find(singleTargets.begin(), singleTargets.end(), buttonRSNode), singleTargets.end());
+
+    // Mixed mode: mirror the real mount-policy switch (SwitchSingleToMixedMountPolicy):
+    // reset the mixed list, apply the policy, then sync existing children before rebuild.
+    context->ResetMixedRenderChildren();
+    container->SetMountPolicy(MountPolicy::MIXED);
+    context->SyncMixedFrameChildren(container->MergeChildrenWithDisappearingChildren());
+    container->MarkNeedSyncRenderTree(true);
+    container->RebuildRenderContextTree();
+    EXPECT_EQ(context->GetRSNode()->GetChildren().size(), 1);
+    auto mixedTargets = context->BuildMixedTargetRSNodes(AceType::RawPtr(container));
+    ASSERT_EQ(mixedTargets.size(), 1);
+    EXPECT_EQ(mixedTargets.front(), buttonRSNode);
 }
 
 /**

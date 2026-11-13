@@ -1223,4 +1223,56 @@ HWTEST_F(FocusHubTestNg, HandleEvent002, TestSize.Level1)
     keyEvent.pressedCodes.emplace_back(KeyCode::KEY_TAB);
     EXPECT_FALSE(focusHub->HandleEvent(keyEvent));
 }
+/**
+ * @tc.name: OnFocusScopeInsetGuardIsolation001
+ * @tc.desc: Only a current carrier still owned by this scope may bypass ordinary scope recovery.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FocusHubTestNg, OnFocusScopeInsetGuardIsolation001, TestSize.Level1)
+{
+    struct Scenario {
+        bool hasCarrier;
+        bool tracksCarrier;
+        bool stillOwned;
+        bool current;
+        bool preservesTracking;
+    };
+    const Scenario scenarios[] = {
+        { false, false, false, true, false }, // ordinary stale tracking, no inset anywhere
+        { true, false, true, true, false },   // unrelated tracked node despite an inset owner
+        { true, true, false, true, false },   // carrier has been reparented
+        { true, true, true, false, false },   // carrier is no longer focused
+        { true, true, true, true, true },     // the intended safeAreaInset case
+    };
+    for (const auto& scenario : scenarios) {
+        SCOPED_TRACE(testing::Message() << scenario.hasCarrier << scenario.tracksCarrier
+            << scenario.stillOwned << scenario.current);
+        auto makeNode = []() {
+            return FrameNodeOnTree::CreateFrameNode(V2::ROW_ETS_TAG,
+                ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+        };
+        auto owner = makeNode();
+        auto carrier = makeNode();
+        auto other = makeNode();
+        auto hub = owner->GetOrCreateFocusHub();
+        hub->focusType_ = FocusType::SCOPE;
+        hub->focusDepend_ = FocusDependence::AUTO;
+        if (scenario.hasCarrier) {
+            owner->SetSafeAreaInsetNode(carrier);
+        }
+        if (!scenario.stillOwned) {
+            carrier->SetParent(other);
+        }
+        auto tracked = scenario.tracksCarrier ? carrier->GetOrCreateFocusHub() : other->GetOrCreateFocusHub();
+        tracked->currentFocus_ = scenario.current;
+        hub->lastWeakFocusNode_ = AceType::WeakClaim(AceType::RawPtr(tracked));
+        hub->OnFocusScope(false);
+        if (scenario.preservesTracking) {
+            EXPECT_EQ(hub->lastWeakFocusNode_.Upgrade(), tracked);
+        } else {
+            EXPECT_EQ(hub->lastWeakFocusNode_.Upgrade(), nullptr);
+        }
+    }
+}
+
 } // namespace OHOS::Ace::NG

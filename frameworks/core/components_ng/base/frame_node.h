@@ -1035,10 +1035,7 @@ public:
 
     void SetSafeAreaInsetNode(const RefPtr<FrameNode>& safeAreaInsetNode);
 
-    RefPtr<FrameNode> GetSafeAreaInsetNode() const
-    {
-        return safeAreaInsetNode_;
-    }
+    RefPtr<FrameNode> GetSafeAreaInsetNode() const;
 
     RefPtr<FrameNode> FindChildByPosition(float x, float y);
     // some developer use translate to make Grid drag animation, using old function can't find accurate child.

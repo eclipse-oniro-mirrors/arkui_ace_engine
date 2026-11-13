@@ -365,6 +365,22 @@ declare interface DragEvent {
   enableInternalDropAnimation(configuration: string): void;
 }
 type CustomBuilder = () => void;
+declare enum SafeAreaInsetAlignment {
+  START = 0,
+  CENTER = 1,
+  END = 2
+}
+declare interface SafeAreaInsetEdgeConfig {
+  content: CustomBuilder;
+  spacing?: LengthMetrics;
+  alignment?: SafeAreaInsetAlignment;
+}
+declare interface SafeAreaInsetOptions {
+  top?: SafeAreaInsetEdgeConfig;
+  end?: SafeAreaInsetEdgeConfig;
+  bottom?: SafeAreaInsetEdgeConfig;
+  start?: SafeAreaInsetEdgeConfig;
+}
 declare interface DragItemInfo {
   pixelMap?: PixelMap;
   builder?: CustomBuilder;

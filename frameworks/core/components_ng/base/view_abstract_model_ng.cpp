@@ -31,6 +31,7 @@
 #include "core/components_ng/base/modifier.h"
 #include "core/components_ng/base/ui_node.h"
 #include "core/components_ng/base/view_abstract.h"
+#include "core/components_ng/base/safe_area_inset_view.h"
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/event/focus_hub.h"
 #include "core/components_ng/event/gesture_event_hub.h"
@@ -69,6 +70,9 @@
 #include "core/components/common/properties/placement.h"
 namespace OHOS::Ace::NG {
 namespace {
+// SafeAreaInsetBuilderArray in view_abstract_model.h spells the edge count to
+// avoid including the full safeAreaInset option definitions from the header.
+static_assert(std::tuple_size<SafeAreaInsetBuilderArray>::value == SAFE_AREA_INSET_EDGE_COUNT);
 constexpr int32_t LONG_PRESS_DURATION = 800;
 constexpr int32_t HOVER_IMAGE_LONG_PRESS_DURATION = 250;
 constexpr int32_t HOVER_IMAGE_INTERRUPT_DURATION = 500;
@@ -2265,6 +2269,13 @@ void ViewAbstractModelNG::SetSafeAreaInset(
     }
     auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
     CHECK_NULL_VOID(frameNode);
+    SetSafeAreaInset(frameNode, options, std::move(builders));
+}
+
+void ViewAbstractModelNG::SetSafeAreaInset(
+    FrameNode* frameNode, const SafeAreaInsetOptions& options, SafeAreaInsetBuilderArray&& builders)
+{
+    CHECK_NULL_VOID(frameNode);
     auto effectiveOptions = options;
     SafeAreaInsetContentArray contents;
     for (size_t index = 0; index < SAFE_AREA_INSET_EDGE_COUNT; ++index) {
@@ -2284,10 +2295,10 @@ void ViewAbstractModelNG::SetSafeAreaInset(
         }
     }
     if (effectiveOptions.Empty()) {
-        ViewAbstract::ResetSafeAreaInset(frameNode);
+        SafeAreaInsetView::ResetSafeAreaInset(frameNode);
         return;
     }
-    ViewAbstract::SetSafeAreaInset(frameNode, effectiveOptions, contents);
+    SafeAreaInsetView::SetSafeAreaInset(frameNode, effectiveOptions, contents);
 }
 
 void ViewAbstractModelNG::ResetSafeAreaInset()
@@ -2297,7 +2308,13 @@ void ViewAbstractModelNG::ResetSafeAreaInset()
     }
     auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
     CHECK_NULL_VOID(frameNode);
-    ViewAbstract::ResetSafeAreaInset(frameNode);
+    ResetSafeAreaInset(frameNode);
+}
+
+void ViewAbstractModelNG::ResetSafeAreaInset(FrameNode* frameNode)
+{
+    CHECK_NULL_VOID(frameNode);
+    SafeAreaInsetView::ResetSafeAreaInset(frameNode);
 }
 
 void ViewAbstractModelNG::SetAccessibilityCustomActions(

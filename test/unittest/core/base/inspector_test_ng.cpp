@@ -36,7 +36,9 @@
 #include "core/common/ace_application_info.h"
 #include "core/components_ng/base/inspector.h"
 #include "core/components_ng/base/view_abstract.h"
+#include "core/components_ng/base/safe_area_inset_view.h"
 #include "core/components_ng/pattern/safe_area_inset/safe_area_inset_pattern.h"
+#include "core/components_ng/property/safe_area_inset_property.h"
 #include "core/components_ng/base/inspector_filter.h"
 #include "core/components_ng/base/inspector_tree_provider_registry.h"
 #include "core/components_ng/base/simplified_inspector.h"
@@ -2959,7 +2961,7 @@ HWTEST_F(InspectorTestNg, SafeAreaInsetInspectorLookup001, TestSize.Level0)
     options.edges[0] = SafeAreaInsetEdgeOptions {};
     SafeAreaInsetContentArray contents;
     contents[0] = content;
-    ViewAbstract::SetSafeAreaInset(AceType::RawPtr(host), options, contents);
+    SafeAreaInsetView::SetSafeAreaInset(AceType::RawPtr(host), options, contents);
     for (bool notDetach : { false, true }) {
         host->queries.clear();
         EXPECT_EQ(Inspector::GetInspectorByKey(host, "inset-observed", notDetach), content);
@@ -2972,10 +2974,10 @@ HWTEST_F(InspectorTestNg, SafeAreaInsetInspectorLookup001, TestSize.Level0)
         ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
     replacement->UpdateInspectorId("inset-replacement");
     contents[0] = replacement;
-    ViewAbstract::SetSafeAreaInset(AceType::RawPtr(host), options, contents);
+    SafeAreaInsetView::SetSafeAreaInset(AceType::RawPtr(host), options, contents);
     EXPECT_EQ(Inspector::GetInspectorByKey(host, "inset-observed"), nullptr);
     EXPECT_EQ(Inspector::GetInspectorByKey(host, "inset-replacement"), replacement);
-    ViewAbstract::ResetSafeAreaInset(AceType::RawPtr(host));
+    SafeAreaInsetView::ResetSafeAreaInset(AceType::RawPtr(host));
     EXPECT_EQ(Inspector::GetInspectorByKey(host, "inset-replacement"), nullptr);
 }
 
@@ -3000,7 +3002,7 @@ HWTEST_F(InspectorTestNg, SafeAreaInsetInspectorTree001, TestSize.Level0)
     options.edges[2] = SafeAreaInsetEdgeOptions {};
     SafeAreaInsetContentArray contents;
     contents[2] = content;
-    ViewAbstract::SetSafeAreaInset(AceType::RawPtr(host), options, contents);
+    SafeAreaInsetView::SetSafeAreaInset(AceType::RawPtr(host), options, contents);
     auto carrier = host->GetSafeAreaInsetNode();
     ASSERT_NE(carrier, nullptr);
     InspectorTreeMap nodes;
@@ -3013,7 +3015,7 @@ HWTEST_F(InspectorTestNg, SafeAreaInsetInspectorTree001, TestSize.Level0)
     EXPECT_EQ(nodes.count(business->GetId()), 1);
     EXPECT_EQ(nodes.count(carrier->GetId()), 0);
     EXPECT_EQ(nodes.size(), 2);
-    ViewAbstract::ResetSafeAreaInset(AceType::RawPtr(host));
+    SafeAreaInsetView::ResetSafeAreaInset(AceType::RawPtr(host));
     nodes.clear();
     Inspector::GetInspectorChildrenInfo(host, nodes, 0, 1);
     EXPECT_EQ(nodes.count(content->GetId()), 0);
@@ -3047,12 +3049,12 @@ HWTEST_F(InspectorTestNg, SafeAreaInsetInspectorJson001, TestSize.Level0)
     options.edges[1] = SafeAreaInsetEdgeOptions {};
     SafeAreaInsetContentArray contents;
     contents[1] = content;
-    ViewAbstract::SetSafeAreaInset(AceType::RawPtr(host), options, contents);
+    SafeAreaInsetView::SetSafeAreaInset(AceType::RawPtr(host), options, contents);
     auto previousStage = context->stageManager_;
     context->stageManager_ = AceType::MakeRefPtr<StageManager>(stage);
     const auto normal = Inspector::GetInspector(false);
     const auto layout = Inspector::GetInspector(true);
-    ViewAbstract::ResetSafeAreaInset(AceType::RawPtr(host));
+    SafeAreaInsetView::ResetSafeAreaInset(AceType::RawPtr(host));
     const auto cleared = Inspector::GetInspector(false);
     context->stageManager_ = previousStage;
     for (const auto& text : { normal, layout }) {
@@ -3091,7 +3093,7 @@ HWTEST_F(InspectorTestNg, SafeAreaInsetInspectorFourEdges001, TestSize.Level0)
     nested->UpdateInspectorId("inspector-nested");
     nested->MountToParent(custom);
     custom->MountToParent(contents[3]);
-    ViewAbstract::SetSafeAreaInset(AceType::RawPtr(host), options, contents);
+    SafeAreaInsetView::SetSafeAreaInset(AceType::RawPtr(host), options, contents);
     auto carrier = host->GetSafeAreaInsetNode();
     ASSERT_NE(carrier, nullptr);
     InspectorTreeMap nodes;
@@ -3106,7 +3108,7 @@ HWTEST_F(InspectorTestNg, SafeAreaInsetInspectorFourEdges001, TestSize.Level0)
     }
     EXPECT_EQ(Inspector::GetInspectorByKey(host, "inspector-nested", true), nested);
     EXPECT_EQ(host->GetChildren().size(), 1);
-    ViewAbstract::ResetSafeAreaInset(AceType::RawPtr(host));
+    SafeAreaInsetView::ResetSafeAreaInset(AceType::RawPtr(host));
     EXPECT_EQ(Inspector::GetInspectorByKey(host, "inspector-nested"), nullptr);
     nodes.clear();
     Inspector::GetInspectorChildrenInfo(host, nodes, 0, 1);

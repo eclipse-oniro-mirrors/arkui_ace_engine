@@ -19,11 +19,25 @@
 #include <array>
 
 #include "core/components_ng/pattern/pattern.h"
-#include "core/components_ng/property/measure_property.h"
+
+namespace OHOS::Ace {
+class JsonValue;
+}
 
 namespace OHOS::Ace::NG {
 
 inline constexpr char SAFE_AREA_INSET_CONTAINER_TAG[] = "SafeAreaInsetContainer";
+
+enum class SafeAreaInsetEdge : int32_t;
+
+// Builds the retained per-edge configuration shared by Inspector (owner side)
+// and DFX dumps (carrier side); returns null when nothing is retained.
+std::unique_ptr<JsonValue> BuildSafeAreaInsetConfig(const FrameNode* owner);
+
+// Builds the safeAreaInset dump info for a node: container/carrier references,
+// retained configuration and settled contribution fields; null when not
+// applicable. Both dump channels route through this single implementation.
+std::unique_ptr<JsonValue> BuildSafeAreaInsetDumpInfo(const FrameNode* node);
 
 class ACE_EXPORT SafeAreaInsetPattern final : public Pattern {
     DECLARE_ACE_TYPE(SafeAreaInsetPattern, Pattern);
@@ -41,24 +55,25 @@ public:
 
     FocusPattern GetFocusPattern() const override
     {
-        return { FocusType::SCOPE, false };
+        return { FocusType::SCOPE, true };
     }
 
     bool SetEdgeContent(SafeAreaInsetEdge edge, const RefPtr<UINode>& content);
 
-    RefPtr<UINode> GetEdgeContent(SafeAreaInsetEdge edge) const
-    {
-        return contents_[SafeAreaInsetOptions::ToIndex(edge)];
-    }
+    RefPtr<UINode> GetEdgeContent(SafeAreaInsetEdge edge) const;
 
     int32_t GetContentFrameIndex(SafeAreaInsetEdge edge) const;
+
+    static size_t GetEdgeCount();
 
     bool Empty() const;
 
 private:
     int32_t GetEdgeMountSlot(SafeAreaInsetEdge edge) const;
 
-    std::array<RefPtr<UINode>, SAFE_AREA_INSET_EDGE_COUNT> contents_;
+    // Element count is the SafeAreaInset edge count (TOP, END, BOTTOM, START);
+    // kept in sync with SAFE_AREA_INSET_EDGE_COUNT by a static_assert in the cpp.
+    std::array<RefPtr<UINode>, 4> contents_;
 };
 
 } // namespace OHOS::Ace::NG

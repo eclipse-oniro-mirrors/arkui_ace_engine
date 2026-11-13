@@ -85,6 +85,7 @@ declare class ArkComponent implements CommonMethod<CommonAttribute> {
     layoutWeight(value: number | string): this;
     padding(value: Padding | Length): this;
     safeAreaPadding(value: Padding | LengthMetrics | LocalizedPadding): this;
+    safeAreaInset(options?: SafeAreaInsetOptions): this;
     margin(value: Margin | Length): this;
     background(content: CustomBuilder | ResourceColor, options?: BackgroundOptions): this;
     backgroundColor(value: ResourceColor): this;

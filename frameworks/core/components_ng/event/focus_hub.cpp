@@ -1766,6 +1766,19 @@ void FocusHub::OnFocusScope(bool currentHasFocused)
 
     std::list<RefPtr<FocusHub>> focusNodes;
     auto itLastFocusNode = FlushChildrenFocusHub(focusNodes);
+    // Only preserve a focused safeAreaInset carrier still owned by this scope.
+    // Other missing/stale focus entries must follow the original scope search.
+    if (itLastFocusNode == focusNodes.end()) {
+        auto owner = GetFrameNode();
+        auto carrier = owner ? owner->GetSafeAreaInsetNode() : nullptr;
+        if (carrier && carrier->GetParent() == owner) {
+            auto trackedLast = lastWeakFocusNode_.Upgrade();
+            if (trackedLast && trackedLast->IsCurrentFocus() && trackedLast->GetFrameNode() == carrier) {
+                OnFocusNode(currentHasFocused);
+                return;
+            }
+        }
+    }
     bool isAnyChildFocusable = focusNodes.empty() ? false : std::any_of(focusNodes.begin(), focusNodes.end(),
         [](const RefPtr<FocusHub>& focusNode) { return focusNode->IsFocusable(); });
 
