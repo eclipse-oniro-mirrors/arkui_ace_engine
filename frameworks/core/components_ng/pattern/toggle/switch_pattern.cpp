@@ -1558,7 +1558,7 @@ void SwitchPattern::ApplyDragFrameNodeSystemMaterial()
     dragFrameMaterialParam.refractParams[0] = -0.008f + t * (-0.01f - (-0.008f));
     dragFrameMaterialParam.refractParams[1] = 0.15f + t * (0.13f - 0.15f);
     float dipScale = static_cast<float>(pipeline->GetDipScale());
-    auto filter = RosenEffectConverter::ConvertToFrostedGlassFilter(dragFrameMaterialParam, dipScale);
+    auto filter = RosenEffectConverter::ConvertToFrostedGlassFilter(dragFrameMaterialParam, dipScale, nullptr);
     if (filter) {
         auto renderContext = dragFrameNode_->GetRenderContext();
         if (renderContext) {

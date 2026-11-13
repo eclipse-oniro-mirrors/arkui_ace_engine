@@ -18,7 +18,7 @@
 namespace OHOS::Ace::NG {
 
 std::shared_ptr<Rosen::RSNGFilterBase> RosenEffectConverter::ConvertToFrostedGlassFilter(
-    const FrostedGlassParam& param, float oneVpValue)
+    const FrostedGlassParam& param, float oneVpValue, const ExtraGlassParam* extraParam)
 {
     return nullptr;
 }

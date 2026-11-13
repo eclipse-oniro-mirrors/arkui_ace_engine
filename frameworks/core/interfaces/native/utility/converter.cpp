@@ -4627,6 +4627,12 @@ void AssignCast(std::optional<ImmersiveOptions>& dst, const Ark_ImmersiveOptions
     if (lightEffectOptions.has_value()) {
         immersiveOptions.lightEffectOptions = lightEffectOptions;
     }
+    auto colorBlendMode = Converter::OptConvert<int32_t>(src.colorBlendMode);
+    if (colorBlendMode.has_value() &&
+        colorBlendMode.value() >= static_cast<int32_t>(MaterialColorBlendMode::LINEAR_MIX) &&
+        colorBlendMode.value() <= static_cast<int32_t>(MaterialColorBlendMode::TINTED_GLASS)) {
+        immersiveOptions.colorBlendMode = static_cast<MaterialColorBlendMode>(colorBlendMode.value());
+    }
 
     dst = immersiveOptions;
 }

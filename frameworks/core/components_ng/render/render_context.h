@@ -65,6 +65,7 @@ struct FrostedGlassParam;
 enum class MaterialType;
 enum class UiMaterialFilterQuality;
 class RenderEdgeLightModifier;
+struct ExtraGlassParam;
 }
 
 namespace OHOS::Ace::Kit {
@@ -375,7 +376,7 @@ public:
 
     void SetSystemMaterial(const RefPtr<UiMaterial>& material);
     virtual std::shared_ptr<Rosen::RSNGFilterBase> CreateFrostedGlassFilter(
-        const FrostedGlassParam& param, float dipScale)
+        const FrostedGlassParam& param, float dipScale, const ExtraGlassParam* extraParam)
     {
         return nullptr;
     }
