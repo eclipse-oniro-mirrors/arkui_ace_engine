@@ -380,6 +380,7 @@ let ImmersiveStrategy;
   ImmersiveStrategy[ImmersiveStrategy.AVOID_WINDOW_CONTROLS = 6] = 'AVOID_WINDOW_CONTROLS';
   ImmersiveStrategy[ImmersiveStrategy.BIND_SHEET_EXPAND_SAFE_AREA = 7] = 'BIND_SHEET_EXPAND_SAFE_AREA';
   ImmersiveStrategy[ImmersiveStrategy.NAVIGATION_EXPAND_SAFE_AREA = 8] = 'NAVIGATION_EXPAND_SAFE_AREA';
+  ImmersiveStrategy[ImmersiveStrategy.TABS_EXPAND_SAFE_AREA = 9] = 'TABS_EXPAND_SAFE_AREA';
 })(ImmersiveStrategy || (ImmersiveStrategy = {}));
 
 let VerticalAlign;
@@ -1272,6 +1273,12 @@ let BarStyle;
   BarStyle[BarStyle.STACK = 1] = 'STACK';
   BarStyle[BarStyle.SAFE_AREA_PADDING = 2] = 'SAFE_AREA_PADDING';
 })(BarStyle || (BarStyle = {}));
+let BarOverlapMode;
+(function (BarOverlapMode) {
+  BarOverlapMode[BarOverlapMode.STANDARD = 0] = 'STANDARD';
+  BarOverlapMode[BarOverlapMode.STACK = 1] = 'STACK';
+  BarOverlapMode[BarOverlapMode.SAFE_AREA_PADDING = 2] = 'SAFE_AREA_PADDING';
+})(BarOverlapMode || (BarOverlapMode = {}));
 let NavigationMode;
 (function (NavigationMode) {
   NavigationMode[NavigationMode.Stack = 0] = 'Stack';

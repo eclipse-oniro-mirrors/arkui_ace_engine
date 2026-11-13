@@ -47,6 +47,7 @@
 #include "interfaces/inner_api/ace/ai/image_analyzer.h"
 #include "ui/base/macros.h"
 #include "ui/view/components/tabs/tabs_data.h"
+#include "core/components_ng/pattern/tabs/tabs_model.h"
 
 #include "ace_engine_types.h"
 #include "arkoala_api_generated.h"
@@ -1185,6 +1186,17 @@ ACE_FORCE_EXPORT void AssignCast(std::optional<TabBarMode>& dst, const Ark_BarMo
         case ARK_BAR_MODE_SCROLLABLE: dst = TabBarMode::SCROLLABLE; break;
         case ARK_BAR_MODE_FIXED: dst = TabBarMode::FIXED; break;
         default: LOGE("Unexpected enum value in Ark_BarMode: %{public}d", src);
+    }
+}
+
+template<>
+ACE_FORCE_EXPORT void AssignCast(std::optional<BarOverlapMode>& dst, const Ark_BarOverlapMode& src)
+{
+    switch (src) {
+        case ARK_BAR_OVERLAP_MODE_STANDARD: dst = BarOverlapMode::STANDARD; break;
+        case ARK_BAR_OVERLAP_MODE_STACK: dst = BarOverlapMode::STACK; break;
+        case ARK_BAR_OVERLAP_MODE_SAFE_AREA_PADDING: dst = BarOverlapMode::SAFE_AREA_PADDING; break;
+        default: LOGE("Unexpected enum value in Ark_BarOverlapMode: %{public}d", src);
     }
 }
 

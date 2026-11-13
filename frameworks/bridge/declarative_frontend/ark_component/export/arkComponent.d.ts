@@ -2039,7 +2039,7 @@ declare class ArkTabsComponent extends ArkComponent implements TabsAttribute {
     onContentDidScroll(handler: OnTabsContentDidScrollCallback | undefined): TabsAttribute;
     fadingEdge(value: boolean): TabsAttribute;
     divider(value: DividerStyle | null): TabsAttribute;
-    barOverlap(value: boolean): TabsAttribute;
+    barOverlap(value: BarOverlapMode | boolean): TabsAttribute;
     barBackgroundColor(value: ResourceColor): TabsAttribute;
     sidebarSelectedIconColor(value: ResourceColor): TabsAttribute;
     sidebarSelectedTextColor(value: ResourceColor): TabsAttribute;

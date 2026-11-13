@@ -509,6 +509,17 @@ void TabsModelNG::SetBarOverlap(bool barOverlap)
     SetBarBackgroundBlurStyle(option);
 }
 
+void TabsModelNG::SetBarOverlapMode(BarOverlapMode barOverlapMode)
+{
+    ACE_UPDATE_LAYOUT_PROPERTY(TabsLayoutProperty, BarOverlapMode, barOverlapMode);
+
+    BlurStyleOption option;
+    if (barOverlapMode == BarOverlapMode::STACK || barOverlapMode == BarOverlapMode::SAFE_AREA_PADDING) {
+        option.blurStyle = BlurStyle::COMPONENT_THICK;
+    }
+    SetBarBackgroundBlurStyle(option);
+}
+
 void TabsModelNG::SetOnChange(std::function<void(const BaseEventInfo*)>&& onChange)
 {
     auto tabsNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
@@ -1108,6 +1119,26 @@ void TabsModelNG::SetBarOverlap(FrameNode* frameNode, bool barOverlap)
     if (barOverlap) {
         option.blurStyle = BlurStyle::COMPONENT_THICK;
     }
+    SetBarBackgroundBlurStyle(frameNode, option);
+}
+
+void TabsModelNG::SetBarOverlapMode(FrameNode* frameNode, BarOverlapMode barOverlapMode)
+{
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, BarOverlapMode, barOverlapMode, frameNode);
+
+    BlurStyleOption option;
+    if (barOverlapMode == BarOverlapMode::STACK || barOverlapMode == BarOverlapMode::SAFE_AREA_PADDING) {
+        option.blurStyle = BlurStyle::COMPONENT_THICK;
+    }
+    SetBarBackgroundBlurStyle(frameNode, option);
+}
+
+void TabsModelNG::ResetBarOverlapMode(FrameNode* frameNode)
+{
+    CHECK_NULL_VOID(frameNode);
+    ACE_RESET_NODE_LAYOUT_PROPERTY_WITH_FLAG(TabsLayoutProperty, BarOverlapMode,
+        PROPERTY_UPDATE_MEASURE, frameNode);
+    BlurStyleOption option;
     SetBarBackgroundBlurStyle(frameNode, option);
 }
 

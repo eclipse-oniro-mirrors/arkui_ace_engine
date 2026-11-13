@@ -900,6 +900,7 @@ enum class ImmersiveStrategy : int32_t {
     AVOID_WINDOW_CONTROLS = 6,
     BIND_SHEET_EXPAND_SAFE_AREA = 7,
     NAVIGATION_EXPAND_SAFE_AREA = 8,
+    TABS_EXPAND_SAFE_AREA = 9,
 };
 
 enum class SwipeActionState : uint32_t {

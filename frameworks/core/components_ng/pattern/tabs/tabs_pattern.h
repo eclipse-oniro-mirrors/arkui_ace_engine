@@ -71,6 +71,7 @@ public:
     }
 
     RefPtr<LayoutAlgorithm> CreateLayoutAlgorithm() override;
+    BarOverlapMode GetComputedBarOverlapMode() const { return computedBarOverlapMode_; }
 
     FocusPattern GetFocusPattern() const override
     {
@@ -518,6 +519,8 @@ private:
     void InitAccessibilityZIndex();
 
     void InitFloatingBar();
+    void ApplyStrategyBarOverlapBlurStyle();
+
     void UpdateBgMaskNode();
     void UpdateTopBgMaskNode();
     GradientColor CreatePercentGradientColor(float percent, Color color);
@@ -676,6 +679,8 @@ private:
     float preSideBarWidthPx_ = 0.0f;
     float minSideBarWidth_ = -1.0f;
     float maxSideBarWidth_ = -1.0f;
+    bool strategyEnabled_ = false;
+    BarOverlapMode computedBarOverlapMode_ = BarOverlapMode::STANDARD;
 
     // Display mode switch animation state.
     // sidebar translate + tabbar scale/opacity run as independent animations; a counter

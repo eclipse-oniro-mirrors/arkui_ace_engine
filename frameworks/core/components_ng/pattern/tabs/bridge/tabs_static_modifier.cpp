@@ -711,6 +711,17 @@ void SetBarOverlapImpl(Ark_NativePointer node,
     }
     TabsModelStatic::SetBarOverlap(frameNode, *convValue);
 }
+void SetBarOverlap1Impl(Ark_NativePointer node,
+                        const Opt_BarOverlapMode* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    if (!value || value->tag == InteropTag::INTEROP_TAG_UNDEFINED) {
+        TabsModelStatic::SetBarOverlapMode(frameNode, BarOverlapMode::STANDARD);
+        return;
+    }
+    TabsModelStatic::SetBarOverlapMode(frameNode, static_cast<BarOverlapMode>(value->value));
+}
 void SetBarBackgroundColorImpl(Ark_NativePointer node,
                                const Opt_ResourceColor* value)
 {
@@ -1381,6 +1392,7 @@ const GENERATED_ArkUITabsModifier* GetTabsModifier()
         TabsAttributeModifier::SetDividerImpl,
         TabsAttributeModifier::SetNestedScrollImpl,
         TabsAttributeModifier::SetBarOverlapImpl,
+        TabsAttributeModifier::SetBarOverlap1Impl,
         TabsAttributeModifier::SetBarBackgroundColorImpl,
         TabsAttributeModifier::SetBarGridAlignImpl,
         TabsAttributeModifier::SetCustomContentTransitionImpl,

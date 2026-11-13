@@ -17,6 +17,7 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_TABS_TABS_MODEL_H
 
 #include <mutex>
+#include <optional>
 
 #include "base/geometry/dimension.h"
 #include "base/memory/referenced.h"
@@ -40,6 +41,12 @@ namespace OHOS::Ace {
 enum class TabsCacheMode {
     CACHE_BOTH_SIDE = 0,
     CACHE_LATEST_SWITCHED
+};
+
+enum class BarOverlapMode {
+    STANDARD = 0,
+    STACK = 1,
+    SAFE_AREA_PADDING = 2,
 };
 
 enum class TabJsResType {
@@ -230,6 +237,7 @@ public:
     virtual void SetDividerColorByUser(bool isByUser) = 0;
     virtual void SetFadingEdge(bool fadingEdge) = 0;
     virtual void SetBarOverlap(bool barOverlap) = 0;
+    virtual void SetBarOverlapMode(BarOverlapMode barOverlapMode) {}
     virtual void SetOnChangeEvent(std::function<void(const BaseEventInfo*)>&& onChangeEvent) = 0;
     virtual void SetBarBackgroundColor(const Color& backgroundColor) = 0;
     virtual void SetBarBackgroundColorByUser(bool isByUser) = 0;

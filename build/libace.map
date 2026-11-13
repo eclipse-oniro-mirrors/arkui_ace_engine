@@ -4963,6 +4963,7 @@
       "OHOS::Ace::NG::PipelineContext::GetRootRect()";
       "OHOS::Ace::NG::PipelineContext::GetTaihangOptimizer() const";
       "OHOS::Ace::NG::PipelineContext::HasOnAreaChangeNode(int)";
+      "OHOS::Ace::NG::PipelineContext::IsImmersiveStrategySet(OHOS::Ace::ImmersiveStrategy) const";
       "OHOS::Ace::NG::PipelineContext::IsTransPageEnabled() const";
       "OHOS::Ace::NG::PipelineContext::RegisterFoldDisplayModeChangedCallback(std::__h::function<void (OHOS::Ace::FoldDisplayMode)>&&)";
       "OHOS::Ace::NG::PipelineContext::RegisterFoldStatusChangedCallback(std::__h::function<void (OHOS::Ace::FoldStatus)>&&)";

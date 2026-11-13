@@ -1620,18 +1620,32 @@ ArkUINativeModuleValue TabsBridge::SetBarOverlap(ArkUIRuntimeCallInfo* runtimeCa
     ArkUINodeHandle nativeNode = nullptr;
     CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
     if (ArkTSUtils::IsJsView(firstArg, vm)) {
-        bool overlap = false;
-        if (!overlapArg.IsNull() && !overlapArg->IsUndefined()) {
+        if (overlapArg->IsUndefined()) {
+            GetArkUINodeModifiers()->getTabsModifier()->resetBarOverlap(nativeNode);
+            GetArkUINodeModifiers()->getTabsModifier()->resetBarOverlapMode(nativeNode);
+        } else if (overlapArg->IsNumber()) {
+            int32_t mode = overlapArg->Int32Value(vm);
+            GetArkUINodeModifiers()->getTabsModifier()->resetBarOverlap(nativeNode);
+            GetArkUINodeModifiers()->getTabsModifier()->setBarOverlapMode(nativeNode, mode);
+        } else {
+            bool overlap = false;
             RefPtr<ResourceObject> resObj;
             ParseJsBoolForSwiper(vm, overlapArg, overlap, resObj);
+            GetArkUINodeModifiers()->getTabsModifier()->resetBarOverlapMode(nativeNode);
+            GetArkUINodeModifiers()->getTabsModifier()->setBarOverlap(nativeNode, overlap);
         }
-        GetArkUINodeModifiers()->getTabsModifier()->setBarOverlap(nativeNode, overlap);
         return panda::JSValueRef::Undefined(vm);
     }
     if (overlapArg->IsUndefined()) {
         GetArkUINodeModifiers()->getTabsModifier()->resetBarOverlap(nativeNode);
+        GetArkUINodeModifiers()->getTabsModifier()->resetBarOverlapMode(nativeNode);
+    } else if (overlapArg->IsNumber()) {
+        int32_t mode = overlapArg->Int32Value(vm);
+        GetArkUINodeModifiers()->getTabsModifier()->resetBarOverlap(nativeNode);
+        GetArkUINodeModifiers()->getTabsModifier()->setBarOverlapMode(nativeNode, mode);
     } else {
         bool overlap = overlapArg->ToBoolean(vm)->Value();
+        GetArkUINodeModifiers()->getTabsModifier()->resetBarOverlapMode(nativeNode);
         GetArkUINodeModifiers()->getTabsModifier()->setBarOverlap(nativeNode, overlap);
     }
     return panda::JSValueRef::Undefined(vm);
@@ -1645,6 +1659,7 @@ ArkUINativeModuleValue TabsBridge::ResetBarOverlap(ArkUIRuntimeCallInfo* runtime
     CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
     auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
     GetArkUINodeModifiers()->getTabsModifier()->resetBarOverlap(nativeNode);
+    GetArkUINodeModifiers()->getTabsModifier()->resetBarOverlapMode(nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }
 ArkUINativeModuleValue TabsBridge::SetIsVertical(ArkUIRuntimeCallInfo* runtimeCallInfo)
