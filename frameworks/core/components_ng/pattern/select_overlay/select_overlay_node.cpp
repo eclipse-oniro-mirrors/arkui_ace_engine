@@ -2285,7 +2285,7 @@ void SetSubMenuItemBuildCallback(const RefPtr<FrameNode>& menuItem, RefPtr<Frame
     if (!param.subMenuItems.empty()) {
         auto subMenuBuildCallback = [ param, isUsingMouse,
             weakMenuItem = AceType::WeakClaim(menuItem.GetRawPtr())]() mutable -> RefPtr<UINode> {
-            auto menuItem = AceType::DynamicCast<FrameNode>(weakMenuItem.Upgrade());
+            auto menuItem = weakMenuItem.Upgrade();
             auto themeScopId = menuItem ? menuItem->GetThemeScopeId() : 0;
             auto targetNodeId = ElementRegister::GetInstance()->MakeUniqueId();
             return CreateInnerMenuWithItems(param.subMenuItems, targetNodeId, isUsingMouse, true, themeScopId);

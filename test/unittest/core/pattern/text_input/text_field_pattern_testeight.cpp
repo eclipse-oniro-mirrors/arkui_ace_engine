@@ -282,8 +282,7 @@ HWTEST_F(TextFieldPatternTestEight, SetAccessibilityUnitAction001, TestSize.Leve
     ASSERT_NE(pattern, nullptr);
 
     auto groupNode = ViewStackProcessor::GetInstance()->Finish();
-    pattern_->unitNode_ =  AceType::DynamicCast<NG::UINode>(
-        AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>()));
+    pattern_->unitNode_ =  AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>());
     pattern_->responseArea_ = AceType::MakeRefPtr<CleanNodeResponseArea>(pattern_);
     pattern_->SetAccessibilityUnitAction();
 }
@@ -1408,8 +1407,7 @@ HWTEST_F(TextFieldPatternTestEight, RequestCustomKeyboard001, TestSize.Level0)
     auto taskExecutor = AceType::MakeRefPtr<MockTaskExecutor>();
     pattern_->connection_ = AceType::MakeRefPtr<MockTextInputConnection>(client, taskExecutor);
     pattern_->imeShown_ = true;
-    pattern_->customKeyboard_ = AceType::DynamicCast<NG::UINode>(
-        AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>()));
+    pattern_->customKeyboard_ = AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>());
     pattern_->customKeyboardBuilder_ = nullptr;
     pattern_->selectController_->caretInfo_.rect.height_ = 1;
     pattern_->selectController_->caretInfo_.rect.y_ = 2;

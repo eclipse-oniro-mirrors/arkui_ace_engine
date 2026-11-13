@@ -1206,7 +1206,7 @@ void SpanItem::FontRegisterCallback(const RefPtr<FrameNode>& frameNode, const Te
         auto pattern = frameNode->GetPattern<TextPattern>();
         CHECK_NULL_VOID(pattern);
         pattern->ClearParagraphCache();
-        auto modifier = DynamicCast<TextContentModifier>(pattern->GetContentModifier());
+        auto modifier = pattern->GetContentModifier();
         CHECK_NULL_VOID(modifier);
         modifier->SetFontReady(true);
         auto layoutProperty = frameNode->GetLayoutProperty();
@@ -1228,7 +1228,7 @@ void SpanItem::FontRegisterCallback(const RefPtr<FrameNode>& frameNode, const Te
             auto pattern = frameNode->GetPattern<TextPattern>();
             CHECK_NULL_VOID(pattern);
             pattern->SetIsCustomFont(true);
-            auto modifier = DynamicCast<TextContentModifier>(pattern->GetContentModifier());
+            auto modifier = pattern->GetContentModifier();
             CHECK_NULL_VOID(modifier);
             modifier->SetIsCustomFont(true);
         }

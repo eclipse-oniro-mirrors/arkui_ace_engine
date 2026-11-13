@@ -756,7 +756,7 @@ void SelectContentOverlayManager::MountNodeToCaller(const RefPtr<FrameNode>& ove
     ownerFrameNode->SetOverlayNode(overlayNode);
     overlayNode->SetParent(AceType::WeakClaim(AceType::RawPtr(ownerFrameNode)));
     overlayNode->SetActive(true);
-    auto overlayProperty = AceType::DynamicCast<LayoutProperty>(overlayNode->GetLayoutProperty());
+    auto overlayProperty = overlayNode->GetLayoutProperty();
     CHECK_NULL_VOID(overlayProperty);
     overlayProperty->SetIsOverlayNode(true);
     overlayProperty->UpdateAlignment(Alignment::CENTER);
@@ -839,7 +839,7 @@ bool SelectContentOverlayManager::CloseInternal(int32_t id, bool animation, Clos
     auto menuNode = menuNode_.Upgrade();
     auto handleNode = handleNode_.Upgrade();
     auto owner = selectOverlayHolder_->GetOwner();
-    if (owner && IsMenuShow() && IsMenuAccessibilityFocused(AceType::DynamicCast<UINode>(menuNode))) {
+    if (owner && IsMenuShow() && IsMenuAccessibilityFocused(menuNode)) {
         auto ownerTag = owner->GetTag();
         if (ownerTag != V2::RICH_EDITOR_ETS_TAG ||
             (reason != CloseReason::CLOSE_REASON_SELECT_ALL && reason != CloseReason::CLOSE_REASON_BY_RECREATE)) {

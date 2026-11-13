@@ -411,7 +411,7 @@ HWTEST_F(TextFieldTestNgThree, DumpAdvanceInfo001, TestSize.Level1)
     auto textFieldPattern = frameNode->GetPattern<TextFieldPattern>();
     ASSERT_NE(textFieldPattern, nullptr);
     textFieldPattern->customKeyboard_ =
-        AceType::DynamicCast<NG::UINode>(AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>()));
+        AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>());
     ASSERT_NE(textFieldPattern->customKeyboard_, nullptr);
     textFieldPattern->customKeyboardBuilder_ = []() {};
     textFieldPattern->DumpAdvanceInfo();
@@ -1012,9 +1012,9 @@ HWTEST_F(TextFieldTestNgThree, SetUnitNode005, TestSize.Level1)
         AceType::MakeRefPtr<PasswordResponseArea>(textFieldPattern, textFieldPattern->GetTextObscured());
     ASSERT_NE(textFieldPattern->responseArea_, nullptr);
     textFieldPattern->unitNode_ =
-        AceType::DynamicCast<NG::UINode>(AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>()));
+        AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>());
     RefPtr<NG::UINode> unitNode =
-        AceType::DynamicCast<NG::UINode>(AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>()));
+        AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>());
     textFieldPattern->SetUnitNode(unitNode);
     EXPECT_EQ(textFieldPattern->responseArea_, 1);
 }
@@ -1035,7 +1035,7 @@ HWTEST_F(TextFieldTestNgThree, SetUnitNode006, TestSize.Level1)
     ASSERT_NE(textFieldPattern->responseArea_, nullptr);
     textFieldPattern->unitNode_ = nullptr;
     RefPtr<NG::UINode> unitNode =
-        AceType::DynamicCast<NG::UINode>(AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>()));
+        AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>());
     textFieldPattern->SetUnitNode(unitNode);
     EXPECT_EQ(textFieldPattern->responseArea_, 1);
 }

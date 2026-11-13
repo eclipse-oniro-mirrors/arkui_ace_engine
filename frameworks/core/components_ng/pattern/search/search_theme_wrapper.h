@@ -33,7 +33,7 @@ public:
         RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto themeWrapper = AceType::MakeRefPtr<SearchThemeWrapper>();
-            auto theme = AceType::DynamicCast<SearchTheme>(themeWrapper);
+            RefPtr<SearchTheme> theme = themeWrapper;
             if (!themeConstants) {
                 return themeWrapper;
             }

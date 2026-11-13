@@ -601,7 +601,7 @@ void MagnifierController::CreateMagnifierChildNode()
     ViewAbstract::SetWidth(AceType::RawPtr(childNode), CalcLength(magnifierNodeWidth_));
     ViewAbstract::SetHeight(AceType::RawPtr(childNode), CalcLength(magnifierNodeHeight_));
     ViewAbstract::SetOpacity(AceType::RawPtr(childNode), 0.0);
-    auto layoutProperty = AceType::DynamicCast<LayoutProperty>(childNode->GetLayoutProperty());
+    auto layoutProperty = childNode->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
     layoutProperty->UpdateVisibility(VisibleType::VISIBLE);
     childNode->ForceSyncGeometryNode();

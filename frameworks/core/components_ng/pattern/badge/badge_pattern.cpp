@@ -47,7 +47,7 @@ void BadgePattern::OnModifyDone()
     if (lastFrameNode) {
         needCreateText = lastFrameNode->GetId() != textNodeId_;
     } else {
-        auto lastUINode = AceType::DynamicCast<UINode>(frameNode->GetChildren().back());
+        auto lastUINode = frameNode->GetChildren().back();
         CHECK_NULL_VOID(lastUINode);
         needCreateText = true;
     }

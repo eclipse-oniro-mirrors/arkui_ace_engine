@@ -43,7 +43,7 @@ void DOMBadge::ResetInitializedStyle()
 void DOMBadge::PrepareSpecializedComponent()
 {
     auto declaration = AceType::DynamicCast<BadgeDeclaration>(declaration_);
-    badgeChild_->SetDeclaration(AceType::DynamicCast<BadgeDeclaration>(declaration));
+    badgeChild_->SetDeclaration(declaration);
     if (!boxComponent_ || !declaration) {
         return;
     }

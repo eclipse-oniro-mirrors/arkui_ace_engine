@@ -722,7 +722,7 @@ ArkUINativeModuleValue DataPanelBridge::SetContentModifierBuilder(ArkUIRuntimeCa
             ContainerScope scope(containerId);
             CHECK_NULL_RETURN(Container::Current(), nullptr);
             CHECK_NULL_RETURN(Container::Current()->GetFrontend(), nullptr);
-            auto frameNodeFromWeak = AceType::DynamicCast<FrameNode>(weakFrameNode.Upgrade());
+            auto frameNodeFromWeak = weakFrameNode.Upgrade();
             CHECK_NULL_RETURN(frameNodeFromWeak, nullptr);
             auto context = NapiValueToLocalValue(Container::Current()->GetFrontend()->GetContextValue());
             auto obj = panda::ObjectRef::New(vm);

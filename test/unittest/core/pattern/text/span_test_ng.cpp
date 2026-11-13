@@ -688,7 +688,7 @@ HWTEST_F(SpanTestNg, ImageSpanSetPixelMap001, TestSize.Level1)
      */
     auto node = ImageSpanNode::GetOrCreateSpanNode(V2::IMAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
         []() { return AceType::MakeRefPtr<ImagePattern>(); });
-    auto frameNode = AceType::DynamicCast<FrameNode>(node);
+    RefPtr<FrameNode> frameNode = node;
 
     /**
      * @tc.steps: step2. Call SetPixelMap function
@@ -718,7 +718,7 @@ HWTEST_F(SpanTestNg, ImageSpanSetPixelMap002, TestSize.Level1)
      */
     auto node = ImageSpanNode::GetOrCreateSpanNode(V2::IMAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
         []() { return AceType::MakeRefPtr<ImagePattern>(); });
-    auto frameNode = AceType::DynamicCast<FrameNode>(node);
+    RefPtr<FrameNode> frameNode = node;
 
     /**
      * @tc.steps: step2. Call SetPixelMap function
@@ -1408,7 +1408,7 @@ HWTEST_F(SpanTestNg, SpanOnClick002, TestSize.Level1)
 {
     auto node = ImageSpanNode::GetOrCreateSpanNode(V2::IMAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
         []() { return AceType::MakeRefPtr<ImagePattern>(); });
-    auto frameNode = AceType::DynamicCast<FrameNode>(node);
+    RefPtr<FrameNode> frameNode = node;
     ASSERT_NE(frameNode, nullptr);
     auto imageSpanItem = AceType::MakeRefPtr<ImageSpanItem>();
     imageSpanItem->nodeId_ = frameNode->GetId();
@@ -1430,7 +1430,7 @@ HWTEST_F(SpanTestNg, SpanOnClick003, TestSize.Level1)
     ASSERT_NE(pattern, nullptr);
     auto host = pattern->GetHost();
     ASSERT_NE(host, nullptr);
-    auto customSpanNode = AceType::DynamicCast<CustomSpanNode>(node);
+    auto customSpanNode = node;
     ASSERT_NE(customSpanNode, nullptr);
     auto customSpan = customSpanNode->GetSpanItem();
     customSpan->placeholderSpanNodeId = customSpanNode->GetId();
@@ -1465,7 +1465,7 @@ HWTEST_F(SpanTestNg, SpanOnLongPress002, TestSize.Level1)
 {
     auto node = ImageSpanNode::GetOrCreateSpanNode(V2::IMAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
         []() { return AceType::MakeRefPtr<ImagePattern>(); });
-    auto frameNode = AceType::DynamicCast<FrameNode>(node);
+    RefPtr<FrameNode> frameNode = node;
     ASSERT_NE(frameNode, nullptr);
     auto imageSpanItem = AceType::MakeRefPtr<ImageSpanItem>();
     imageSpanItem->nodeId_ = frameNode->GetId();
@@ -1483,7 +1483,7 @@ HWTEST_F(SpanTestNg, SpanOnLongPress002, TestSize.Level1)
 HWTEST_F(SpanTestNg, SpanOnLongPress003, TestSize.Level1)
 {
     auto node = CustomSpanNode::GetOrCreateSpanNode(V2::CUSTOM_SPAN_NODE_ETS_TAG, 1);
-    auto customSpanNode = AceType::DynamicCast<CustomSpanNode>(node);
+    auto customSpanNode = node;
     ASSERT_NE(customSpanNode, nullptr);
     auto customSpan = customSpanNode->GetSpanItem();
     customSpan->placeholderSpanNodeId = customSpanNode->GetId();
@@ -1969,7 +1969,7 @@ HWTEST_F(SpanTestNg, SpanClickEvent002, TestSize.Level1)
 {
     auto node = ImageSpanNode::GetOrCreateSpanNode(V2::IMAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
         []() { return AceType::MakeRefPtr<ImagePattern>(); });
-    auto frameNode = AceType::DynamicCast<FrameNode>(node);
+    RefPtr<FrameNode> frameNode = node;
     ASSERT_NE(frameNode, nullptr);
     auto imageSpanItem = AceType::MakeRefPtr<ImageSpanItem>();
     imageSpanItem->nodeId_ = frameNode->GetId();
@@ -1987,7 +1987,7 @@ HWTEST_F(SpanTestNg, SpanClickEvent002, TestSize.Level1)
 HWTEST_F(SpanTestNg, SpanClickEvent003, TestSize.Level1)
 {
     auto node = CustomSpanNode::GetOrCreateSpanNode(V2::CUSTOM_SPAN_NODE_ETS_TAG, SPAN_NODE_ID);
-    auto customSpanNode = AceType::DynamicCast<CustomSpanNode>(node);
+    auto customSpanNode = node;
     ASSERT_NE(customSpanNode, nullptr);
     auto customSpan = customSpanNode->GetSpanItem();
     customSpan->placeholderSpanNodeId = customSpanNode->GetId();
@@ -2022,7 +2022,7 @@ HWTEST_F(SpanTestNg, SpanLongPressEvent002, TestSize.Level1)
 {
     auto node = ImageSpanNode::GetOrCreateSpanNode(V2::IMAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
         []() { return AceType::MakeRefPtr<ImagePattern>(); });
-    auto frameNode = AceType::DynamicCast<FrameNode>(node);
+    RefPtr<FrameNode> frameNode = node;
     ASSERT_NE(frameNode, nullptr);
     auto imageSpanItem = AceType::MakeRefPtr<ImageSpanItem>();
     imageSpanItem->nodeId_ = frameNode->GetId();
@@ -2040,7 +2040,7 @@ HWTEST_F(SpanTestNg, SpanLongPressEvent002, TestSize.Level1)
 HWTEST_F(SpanTestNg, SpanLongPressEvent003, TestSize.Level1)
 {
     auto node = CustomSpanNode::GetOrCreateSpanNode(V2::CUSTOM_SPAN_NODE_ETS_TAG, 1);
-    auto customSpanNode = AceType::DynamicCast<CustomSpanNode>(node);
+    auto customSpanNode = node;
     ASSERT_NE(customSpanNode, nullptr);
     auto customSpan = customSpanNode->GetSpanItem();
     customSpan->placeholderSpanNodeId = customSpanNode->GetId();

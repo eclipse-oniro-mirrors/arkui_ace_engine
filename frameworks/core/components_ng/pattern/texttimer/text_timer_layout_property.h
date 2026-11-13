@@ -37,7 +37,7 @@ public:
     {
         auto value = MakeRefPtr<TextTimerLayoutProperty>();
         TextLayoutProperty::Clone(value);
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propFormat_ = CloneFormat();
         value->propIsCountDown_ = CloneIsCountDown();
         value->propInputCount_ = CloneInputCount();
