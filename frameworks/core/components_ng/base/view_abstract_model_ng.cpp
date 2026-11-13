@@ -15,7 +15,6 @@
 
 #include "core/components_ng/base/view_abstract_model_ng.h"
 #include "core/accessibility/accessibility_manager.h"
-#include "core/components_ng/property/safe_area_inset_property.h"
 
 #include "base/geometry/dimension_offset.h"
 #include "base/geometry/ng/vector.h"
