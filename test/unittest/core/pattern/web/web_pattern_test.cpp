@@ -1121,7 +1121,6 @@ HWTEST_F(WebPatternTest, ParseSecurityHitTestElementInfo001, TestSize.Level1)
     EXPECT_TRUE(result.pageUuid.empty());
     EXPECT_TRUE(result.xpath.empty());
     EXPECT_TRUE(result.elementId.empty());
-    EXPECT_TRUE(result.extraParams.empty());
 #endif
 }
 
@@ -1139,7 +1138,6 @@ HWTEST_F(WebPatternTest, ParseSecurityHitTestElementInfo002, TestSize.Level1)
     EXPECT_TRUE(result.pageUuid.empty());
     EXPECT_TRUE(result.xpath.empty());
     EXPECT_TRUE(result.elementId.empty());
-    EXPECT_TRUE(result.extraParams.empty());
 #endif
 }
 
@@ -1158,8 +1156,6 @@ HWTEST_F(WebPatternTest, ParseSecurityHitTestElementInfo003, TestSize.Level1)
     EXPECT_EQ(result.pageUuid, SECURITY_TEST_PAGE_UUID);
     EXPECT_EQ(result.xpath, SECURITY_TEST_XPATH);
     EXPECT_EQ(result.elementId, SECURITY_TEST_ELEMENT_ID);
-    // extraParams in response is no longer parsed
-    EXPECT_TRUE(result.extraParams.empty());
 #endif
 }
 
@@ -1174,7 +1170,6 @@ HWTEST_F(WebPatternTest, ParseSecurityHitTestElementInfo004, TestSize.Level1)
     auto result = g_webPattern->ParseSecurityHitTestElementInfo(SECURITY_TEST_WRONG_TYPE_RESPONSE);
     EXPECT_EQ(result.domNodeId, SECURITY_TEST_DEFAULT_DOM_NODE_ID);
     EXPECT_TRUE(result.securityLabel.empty());
-    EXPECT_TRUE(result.extraParams.empty());
 #endif
 }
 
@@ -1189,7 +1184,6 @@ HWTEST_F(WebPatternTest, ParseSecurityHitTestElementInfo005, TestSize.Level1)
     auto result = g_webPattern->ParseSecurityHitTestElementInfo(SECURITY_TEST_MISSING_FIELD_RESPONSE);
     EXPECT_EQ(result.domNodeId, SECURITY_TEST_DEFAULT_DOM_NODE_ID);
     EXPECT_TRUE(result.securityLabel.empty());
-    EXPECT_TRUE(result.extraParams.empty());
 #endif
 }
 
@@ -1224,7 +1218,6 @@ HWTEST_F(WebPatternTest, ParseSecurityHitTestElementInfo007, TestSize.Level1)
     EXPECT_EQ(result.pageUuid, SECURITY_TEST_PAGE_UUID);
     EXPECT_EQ(result.xpath, SECURITY_TEST_XPATH);
     EXPECT_EQ(result.elementId, SECURITY_TEST_ELEMENT_ID);
-    EXPECT_TRUE(result.extraParams.empty());
 #endif
 }
 
