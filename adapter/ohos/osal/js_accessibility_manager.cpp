@@ -3190,6 +3190,7 @@ JsAccessibilityManager::~JsAccessibilityManager()
     UnsubscribeStateObserver(AccessibilityStateEventType::EVENT_ACCESSIBILITY_STATE_CHANGED);
     UnsubscribeStateObserver(AccessibilityStateEventType::EVENT_SCREEN_READER_STATE_CHANGED);
     UnsubscribeStateObserver(AccessibilityStateEventType::EVENT_CONFIG_EVENT_CHANGED);
+    UnsubscribeStateObserver(AccessibilityStateEventType::EVENT_SELECT_READER_STATE_CHANGED);
 
     DeregisterInteractionOperation();
 }
@@ -3306,6 +3307,16 @@ void JsAccessibilityManager::InitializeCallback()
     SubscribeStateObserver(AccessibilityStateEventType::EVENT_ACCESSIBILITY_STATE_CHANGED);
     SubscribeStateObserver(AccessibilityStateEventType::EVENT_SCREEN_READER_STATE_CHANGED);
     SubscribeStateObserver(AccessibilityStateEventType::EVENT_CONFIG_EVENT_CHANGED);
+    SubscribeStateObserver(AccessibilityStateEventType::EVENT_SELECT_READER_STATE_CHANGED);
+    // Seed select reader state after subscribing so no flip is missed: a flip before seeding is
+    // covered by the query result, a flip after subscribing is covered by the observer. Seeding
+    // moves the only client query off interaction paths; on failure keep the lazy query fallback
+    // in IsSelectReaderEnabled so the cache is not locked to a wrong value.
+    bool isSelectReaderEnabled = false;
+    if (client->IsSelectReaderEnabled(isSelectReaderEnabled) == RET_OK) {
+        isSelectReaderEnabled_ = isSelectReaderEnabled;
+        isSelectReaderEnabledInitialized_ = true;
+    }
 
     auto container = Platform::AceContainer::GetContainer(pipelineContext->GetInstanceId());
     if (container != nullptr && container->IsDynamicRender()) {
@@ -9731,6 +9742,9 @@ void JsAccessibilityManager::JsAccessibilityStateObserver::OnStateChanged(const 
                 jsAccessibilityManager->isScreenReaderEnabled_ = state;
                 AceApplicationInfo::GetInstance().SetAccessibilityScreenReadEnabled(state);
                 jsAccessibilityManager->NotifyScreenReaderObserverStateChange(state);
+            } else if (eventType == AccessibilityStateEventType::EVENT_SELECT_READER_STATE_CHANGED) {
+                jsAccessibilityManager->isSelectReaderEnabledInitialized_ = true;
+                jsAccessibilityManager->isSelectReaderEnabled_ = state;
             } else if (eventType == AccessibilityStateEventType::EVENT_CONFIG_EVENT_CHANGED) {
                 std::vector<uint32_t> needEvents;
                 auto client = AccessibilitySystemAbilityClient::GetInstance();
