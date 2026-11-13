@@ -1256,6 +1256,7 @@ private:
     std::vector<uint32_t> eventWhiteList_;
 
     AccessibilityParentRectInfo uecRectInfo_;
+    mutable std::mutex uecRectInfoMutex_;
     NG::PageEventController pageController_;
     NG::HoverTransparentCallbackController hoverTransparentCallbackController_;
 
