@@ -1557,6 +1557,36 @@ HWTEST_F(WaterFlowHeaderFooterRegressionTest, WFHF_EmptyTallEdgesScroll, TestSiz
 }
 
 /**
+ * @tc.name: WFHF_EmptySectionsTallEdgesScroll
+ * @tc.desc: Explicit empty sections preserve the edge-only scroll range across remeasurement.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowHeaderFooterRegressionTest, WFHF_EmptySectionsTallEdgesScroll, TestSize.Level1)
+{
+    CreateWaterFlow();
+    SetEdges(600.0f, 600.0f);
+    ASSERT_TRUE(pattern_->GetOrCreateWaterFlowSections()->GetSectionInfo().empty());
+    CreateDone();
+    EXPECT_FALSE(pattern_->IsAtBottom());
+    EXPECT_TRUE(pattern_->IsScrollable());
+    pattern_->ScrollBy(200.0f);
+    FlushUITasks();
+    EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), -200.0f);
+    EXPECT_FLOAT_EQ(GetChildRect(frameNode_, pattern_->GetEdgeIndexMap().FooterIndex()).Bottom(), 1000.0f);
+    frameNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+    FlushUITasks();
+    EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), -200.0f);
+    pattern_->ScrollBy(10000.0f);
+    FlushUITasks();
+    EXPECT_TRUE(pattern_->IsAtBottom());
+    EXPECT_FLOAT_EQ(GetChildRect(frameNode_, pattern_->GetEdgeIndexMap().FooterIndex()).Bottom(), WATER_FLOW_HEIGHT);
+    pattern_->ScrollBy(-10000.0f);
+    FlushUITasks();
+    EXPECT_TRUE(pattern_->IsAtTop());
+    EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), 0.0f);
+}
+
+/**
  * @tc.name: WFHF_EmptyRowWrapKeepsCrossSize
  * @tc.desc: Hidden edges in Row layout must not overwrite the fixed cross-axis size.
  * @tc.type: FUNC
