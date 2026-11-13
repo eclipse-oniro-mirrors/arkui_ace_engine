@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_TABS_TAB_CONTENT_MODEL_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_TABS_TAB_CONTENT_MODEL_H
 
+#include <map>
 #include <mutex>
 
 #include "base/geometry/dimension.h"
@@ -143,6 +144,34 @@ struct SidebarSection {
     std::optional<int32_t> order;
     SidebarSectionTitleStyle titleStyle = SidebarSectionTitleStyle::STANDARD;
     RefPtr<ResourceObject> resourceTitleObject;
+    bool operator==(const SidebarSection& other) const
+    {
+        return title == other.title && order == other.order &&
+               titleStyle == other.titleStyle;
+    }
+};
+
+// Centralized customization for the sidebar tab bar.
+// All keys are original TabContent indexes (0-based, declaration order).
+// Each field is independent: only configured entries override per-tab properties; others fall back.
+struct TabViewCustomization {
+    // Key: original TabContent index. Value: overrides tabBarVisibility under Sidebar only.
+    std::map<int32_t, NG::TabVisibility> visibilityMap;
+    // Key: original TabContent index. Value: overrides sidebarSection.
+    std::map<int32_t, SidebarSection> sectionMap;
+    // Key: original TabContent index. Value: display priority (>= 0; smaller = earlier).
+    std::map<int32_t, int32_t> orderMap;
+
+    bool operator==(const TabViewCustomization& other) const
+    {
+        return visibilityMap == other.visibilityMap && sectionMap == other.sectionMap &&
+               orderMap == other.orderMap;
+    }
+
+    bool operator!=(const TabViewCustomization& other) const
+    {
+        return !(*this == other);
+    }
 };
 
 enum class TabContentJsType {

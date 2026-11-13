@@ -32,6 +32,7 @@
 #include "core/common/recorder/node_data_cache.h"
 #endif
 #include "core/common/visual_effect/transparency_utils.h"
+#include "core/common/resource/resource_parse_utils.h"
 #include "core/components/common/layout/constants.h"
 #include "core/components/tab_bar/tabs_event.h"
 #include "core/components_ng/base/observer_handler.h"
@@ -587,8 +588,14 @@ void TabsPattern::OnModifyDone()
     InitFloatingBar();
     OnUpdateShowDivider();
 
+    // UpdateSideBarIfNeeded calls ApplyTabViewCustomizationIfNeeded internally,
+    // which diffs tabViewCustomization_ against appliedTabViewCustomization_,
+    // applies changes to the sidebar tab list, and marks dirty if needed.
     UpdateSideBarIfNeeded();
-
+    // Register/remove ResObj callback for resource-backed customization section
+    // titles. Done in OnModifyDone so the customization is already applied
+    // (appliedTabViewCustomization_ is synced) and all tab content nodes exist.
+    RegisterCustomizationSectionResObj();
     if (onChangeEvent_) {
         return;
     }
@@ -2196,6 +2203,106 @@ RefPtr<FrameNode> TabsPattern::CreateSideBarDividerNode()
     return dividerNode;
 }
 
+void TabsPattern::ApplyTabViewCustomizationIfNeeded(bool forceApply)
+{
+    // Diff tabViewCustomization_ (incoming from ModelNG) against
+    // appliedTabViewCustomization_ (currently applied). If changed (or forceApply),
+    // sync appliedTabViewCustomization_ and re-apply to the sidebar tab list.
+    bool changed = false;
+    if (tabViewCustomization_.has_value() != appliedTabViewCustomization_.has_value()) {
+        changed = true;
+    } else if (tabViewCustomization_.has_value() &&
+               appliedTabViewCustomization_.has_value() &&
+               !(tabViewCustomization_.value() == appliedTabViewCustomization_.value())) {
+        changed = true;
+    }
+    if (!changed && !forceApply) {
+        return;
+    }
+    // Sync appliedTabViewCustomization_ with incoming (always, so forceApply
+    // on a no-change case still keeps the two in sync).
+    appliedTabViewCustomization_ = tabViewCustomization_;
+    if (!sideBarNode_) {
+        return;
+    }
+    auto sidebarPattern = sideBarNode_->GetPattern<TabsSideBarPattern>();
+    CHECK_NULL_VOID(sidebarPattern);
+    auto sidebarTabList = sidebarPattern->GetTabListNode();
+    CHECK_NULL_VOID(sidebarTabList);
+    auto tabListPattern = sidebarTabList->GetPattern<TabsSideBarTabListPattern>();
+    CHECK_NULL_VOID(tabListPattern);
+    // Sync the customization to the tab list pattern before refreshing, so that
+    // RefreshSidebarTabVisibilityAndLayout() sees the latest value on first
+    // application (its own cached tabViewCustomization_ would be nullopt until
+    // ApplyTabViewCustomization runs). The three-way dispatcher then delegates:
+    //   - Has tabViewCustomization → ApplyTabViewCustomization (Level 3)
+    //   - No customization, has sections → RebuildSections (Level 1/2)
+    //   - No customization, no sections → UpdateDirectVisibility (Level 1)
+    tabListPattern->SetTabViewCustomization(appliedTabViewCustomization_);
+    tabListPattern->RefreshSidebarTabVisibilityAndLayout();
+    // Mark the host dirty so the layout pipeline picks up structural changes
+    // (reordering, section headers, visibility) from the customization apply.
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+}
+
+void TabsPattern::RegisterCustomizationSectionResObj()
+{
+    static const std::string resKey = "tabs.customizationSectionTitle";
+    // Check if any section in the incoming customization has a valid resourceTitleObject.
+    bool hasResObj = false;
+    if (tabViewCustomization_.has_value()) {
+        for (const auto& [tabIndex, section] : tabViewCustomization_.value().sectionMap) {
+            if (section.resourceTitleObject) {
+                hasResObj = true;
+                break;
+            }
+        }
+    }
+    if (!hasResObj) {
+        // No resource-backed section titles — remove any previously registered callback.
+        RemoveResObj(resKey);
+        return;
+    }
+    // Register a single ResObj callback with an empty ResourceObject.
+    // We only leverage the resource reload mechanism as a notification trigger;
+    // the callback re-parses all section titles from their individual resourceTitleObjects.
+    WeakPtr<TabsPattern> weakThis = AceType::WeakClaim(this);
+    auto updateFunc = [weakThis](const RefPtr<ResourceObject>&) {
+        auto pattern = weakThis.Upgrade();
+        CHECK_NULL_VOID(pattern);
+        if (!pattern->tabViewCustomization_.has_value()) {
+            return;
+        }
+        // Re-parse all section titles that carry a resourceTitleObject.
+        auto& secMap = pattern->tabViewCustomization_.value().sectionMap;
+        for (auto& [tabIndex, section] : secMap) {
+            if (section.resourceTitleObject) {
+                std::string result;
+                ResourceParseUtils::ParseResString(section.resourceTitleObject, result);
+                section.title = result;
+            }
+        }
+        // Sync to applied so the next refresh sees updated titles.
+        pattern->appliedTabViewCustomization_ = pattern->tabViewCustomization_;
+        // Trigger refresh on the sidebar tab list pattern.
+        auto host = AceType::DynamicCast<TabsNode>(pattern->GetHost());
+        CHECK_NULL_VOID(host);
+        auto sideBarNode = pattern->GetSideBarNode();
+        CHECK_NULL_VOID(sideBarNode);
+        auto sideBarPattern = sideBarNode->GetPattern<TabsSideBarPattern>();
+        CHECK_NULL_VOID(sideBarPattern);
+        auto sidebarTabList = sideBarPattern->GetTabListNode();
+        CHECK_NULL_VOID(sidebarTabList);
+        auto tabListPattern = sidebarTabList->GetPattern<TabsSideBarTabListPattern>();
+        CHECK_NULL_VOID(tabListPattern);
+        tabListPattern->SetTabViewCustomization(pattern->appliedTabViewCustomization_);
+        tabListPattern->RefreshSidebarTabVisibilityAndLayout();
+    };
+    AddResObj(resKey, MakeRefPtr<ResourceObject>(), std::move(updateFunc));
+}
+
 void TabsPattern::UpdateSideBarIfNeeded()
 {
     auto host = AceType::DynamicCast<TabsNode>(GetHost());
@@ -2215,6 +2322,12 @@ void TabsPattern::UpdateSideBarIfNeeded()
         // barStyle unchanged, but sidebar properties (header/searchable) may have changed
         if (sideBarNode_) {
             SyncPropertiesToSideBar();
+            // Re-apply tab view customization if it changed.
+            // ApplyTabViewCustomizationIfNeeded diffs tabViewCustomization_ against
+            // appliedTabViewCustomization_ and re-applies if changed (handles Level 3).
+            // If customization didn't change, no refresh is needed — visibility/section
+            // changes are handled by TabContentPattern::OnModifyDone → RefreshSideBarTabView.
+            ApplyTabViewCustomizationIfNeeded();
         }
         return;
     }
@@ -2278,13 +2391,20 @@ void TabsPattern::UpdateSideBarIfNeeded()
     // Use newStyle (not currentBarDisplayMode_) because during a mode switch
     // currentBarDisplayMode_ may still hold the old value.
     CHECK_NULL_VOID(sideBarNode_);
-    auto sidebarPattern = sideBarNode_->GetPattern<TabsSideBarPattern>();
-    CHECK_NULL_VOID(sidebarPattern);
-    auto sidebarTabList = sidebarPattern->GetTabListNode();
-    CHECK_NULL_VOID(sidebarTabList);
-    auto tabListPattern = sidebarTabList->GetPattern<TabsSideBarTabListPattern>();
-    CHECK_NULL_VOID(tabListPattern);
-    tabListPattern->ApplyDefaultVisibility();
+    // [Level 1/2/3] Entering sidebar mode — force apply visibility + section
+    // grouping + customization regardless of diff. ApplyTabViewCustomizationIfNeeded(true)
+    // syncs appliedTabViewCustomization_ and calls ApplyTabViewCustomization on the
+    // tab list pattern, which handles all three levels:
+    //   Level 3 (has customization) → orderMap + sectionMap + visibilityMap
+    //   Level 1/2 (no customization) → defaultVisibility + sidebarSection + search filter
+    ApplyTabViewCustomizationIfNeeded(true);
+}
+
+void TabsPattern::RefreshSideBarTabView()
+{
+    // Force apply: a tab's visibility/section property changed, requiring full
+    // rebuild of sidebar visibility + grouping regardless of customization diff.
+    ApplyTabViewCustomizationIfNeeded(true);
 }
 
 void TabsPattern::AddTabContentNode(const RefPtr<TabContentNode>& tabContentNode)

@@ -1322,6 +1322,26 @@ void TabsModelNG::SetOnCustomAnimation(FrameNode* frameNode, TabsCustomAnimation
     swiperPattern->SetTabsCustomContentTransition(std::move(onCustomAnimation));
 }
 
+void TabsModelNG::SetTabViewCustomization(FrameNode* frameNode, const TabViewCustomization& customization)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(pattern);
+    // Store as incoming customization. The diff check and sidebar rebuild
+    // are deferred to TabsPattern::OnModifyDone, where all properties are
+    // fully resolved.
+    pattern->SetTabViewCustomization(customization);
+}
+
+void TabsModelNG::ResetTabViewCustomization(FrameNode* frameNode)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(pattern);
+    // Store the reset as incoming. Diff and rebuild happen in OnModifyDone.
+    pattern->ResetTabViewCustomization();
+}
+
 void TabsModelNG::SetClipEdge(FrameNode* frameNode, bool clipEdge)
 {
     auto tabsNode = AceType::DynamicCast<TabsNode>(frameNode);

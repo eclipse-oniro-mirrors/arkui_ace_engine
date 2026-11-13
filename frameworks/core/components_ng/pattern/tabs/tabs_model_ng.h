@@ -25,6 +25,7 @@
 #include "core/components_ng/pattern/swiper/swiper_layout_property.h"
 #include "core/components_ng/pattern/tabs/tab_bar_layout_property.h"
 #include "core/components_ng/pattern/tabs/tab_bar_paint_property.h"
+#include "core/components_ng/pattern/tabs/tab_content_model.h"
 #include "core/components_ng/pattern/tabs/tabs_model.h"
 #include "core/components_ng/pattern/tabs/tabs_node.h"
 
@@ -237,6 +238,9 @@ public:
     static void SetOnCustomAnimation(FrameNode* frameNode, TabsCustomAnimationEvent&& onCustomAnimation);
 
     static void InitTabBarChildNodes(RefPtr<TabsNode> tabsNode);
+
+    static void SetTabViewCustomization(FrameNode* frameNode, const TabViewCustomization& customization);
+    static void ResetTabViewCustomization(FrameNode* frameNode);
 
 private:
     static void InitTabsNode(RefPtr<TabsNode> tabsNode, const RefPtr<SwiperController>& swiperController);

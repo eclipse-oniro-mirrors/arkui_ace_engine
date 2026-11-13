@@ -635,6 +635,24 @@ public:
     void OnModifyDone() override;
 
 private:
+    // Updates a FrameNode's layout visibility and marks it dirty for re-measure.
+    void UpdateNodeVisibility(const RefPtr<FrameNode>& node, bool shouldHide);
+
+    // Bottom/top tab bar path — only visibility matters, sections are irrelevant.
+    void HandleBottomTopTabBar(const RefPtr<TabContentNode>& tabContentNode, bool visibilityChanged, bool shouldHide);
+
+    // Sidebar path — applies TabViewCustomization overrides and refreshes the
+    // sidebar on section change or section-emptied visibility change.
+    // Returns true if handled (caller should return); false to fall through to
+    // a direct tab item visibility update.
+    bool HandleSideBarCustomization(const RefPtr<TabsPattern>& tabsPattern, const RefPtr<TabContentNode>& tabContentNode,
+        const RefPtr<TabsNode>& tabsNode, bool visibilityChanged, bool sectionChanged);
+
+    // Directly updates this tab's sidebar tabItemNode visibility, consulting the
+    // active search filter when the default visibility says "visible".
+    void UpdateSideBarTabItem(const RefPtr<TabsPattern>& tabsPattern, const RefPtr<TabContentNode>& tabContentNode,
+        const RefPtr<TabsNode>& tabsNode, bool shouldHide);
+
     RefPtr<ShallowBuilder> shallowBuilder_;
     TabBarParam tabBarParam_;
     IndicatorStyle indicatorStyle_;
@@ -653,6 +671,7 @@ private:
     TabContentDefaultVisibility defaultVisibility_;
     TabContentDefaultVisibility lastAppliedVisibility_;
     std::optional<OHOS::Ace::SidebarSection> sidebarSection_;
+    std::optional<OHOS::Ace::SidebarSection> lastAppliedSidebarSection_;
 
     bool firstTimeLayout_ = true;
     bool secondTimeLayout_ = false;

@@ -1011,6 +1011,10 @@ void ResetSidebarDividerImpl(ArkUINodeHandle node) {}
 void CreateWithSidebarResourceObjImpl(ArkUINodeHandle node, void* paramRawPtr) {}
 
 void MarkUserSetSafeAreaOptsImpl(ArkUINodeHandle node) {}
+
+void SetTabViewCustomizationImpl(ArkUINodeHandle node, const ArkUITabViewCustomization* customization) {}
+
+void ResetTabViewCustomizationImpl(ArkUINodeHandle node) {}
 #endif
 
 void CreateWithSidebarResourceObj(ArkUINodeHandle node, void* paramRawPtr);
@@ -2444,6 +2448,80 @@ void MarkUserSetSafeAreaOpts(ArkUINodeHandle node)
     TabsModelNG::MarkUserSetSafeAreaOpts(frameNode);
 }
 
+void SetTabViewCustomization(ArkUINodeHandle node, const ArkUITabViewCustomization* customization)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    CHECK_NULL_VOID(customization);
+    TabViewCustomization result;
+    for (ArkUI_Int32 i = 0; i < customization->visibilityCount; i++) {
+        int32_t key = customization->visibilityKeys[i];
+        if (key < 0) {
+            TAG_LOGW(AceLogTag::ACE_TABS,
+                "SetTabViewCustomization visibilityMap skip invalid key:%{public}d (must be >= 0)", key);
+            continue;
+        }
+        int32_t visVal = customization->visibilityValues[i];
+        if (visVal != static_cast<int32_t>(TabVisibility::VISIBLE) &&
+            visVal != static_cast<int32_t>(TabVisibility::HIDDEN)) {
+            TAG_LOGW(AceLogTag::ACE_TABS,
+                "SetTabViewCustomization visibilityMap key:%{public}d skip invalid value:%{public}d "
+                "(must be 0=VISIBLE or 1=HIDDEN)", key, visVal);
+            continue;
+        }
+        result.visibilityMap[key] = static_cast<TabVisibility>(visVal);
+    }
+    for (ArkUI_Int32 i = 0; i < customization->sectionCount; i++) {
+        int32_t key = customization->sectionKeys[i];
+        if (key < 0) {
+            TAG_LOGW(AceLogTag::ACE_TABS,
+                "SetTabViewCustomization sectionMap skip invalid key:%{public}d (must be >= 0)", key);
+            continue;
+        }
+        SidebarSection section;
+        if (customization->sectionValues[i].title != nullptr) {
+            section.title = std::string(customization->sectionValues[i].title);
+        }
+        if (customization->sectionValues[i].hasOrder) {
+            section.order = customization->sectionValues[i].order;
+        }
+        auto titleStyleVal = customization->sectionValues[i].titleStyle;
+        if (titleStyleVal == static_cast<ArkUI_Int32>(SidebarSectionTitleStyle::STANDARD) ||
+            titleStyleVal == static_cast<ArkUI_Int32>(SidebarSectionTitleStyle::EMPHASIZED)) {
+            section.titleStyle = static_cast<SidebarSectionTitleStyle>(titleStyleVal);
+        } else {
+            section.titleStyle = SidebarSectionTitleStyle::STANDARD;
+        }
+        section.resourceTitleObject =
+            AceType::Claim(static_cast<ResourceObject*>(customization->sectionValues[i].titleResourceObject));
+        result.sectionMap[key] = std::move(section);
+    }
+    for (ArkUI_Int32 i = 0; i < customization->orderCount; i++) {
+        int32_t key = customization->orderKeys[i];
+        if (key < 0) {
+            TAG_LOGW(AceLogTag::ACE_TABS,
+                "SetTabViewCustomization orderMap skip invalid key:%{public}d (must be >= 0)", key);
+            continue;
+        }
+        int32_t val = customization->orderValues[i];
+        if (val < 0) {
+            TAG_LOGW(AceLogTag::ACE_TABS,
+                "SetTabViewCustomization orderMap key:%{public}d skip invalid value:%{public}d (must be >= 0)",
+                key, val);
+            continue;
+        }
+        result.orderMap[key] = val;
+    }
+    TabsModelNG::SetTabViewCustomization(frameNode, result);
+}
+
+void ResetTabViewCustomization(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabsModelNG::ResetTabViewCustomization(frameNode);
+}
+
 namespace NodeModifier {
 const ArkUITabsModifier* GetTabsModifier()
 {
@@ -2599,6 +2677,8 @@ const ArkUITabsModifier* GetTabsModifier()
             .resetSidebarDivider = ResetSidebarDivider,
             .createWithSidebarResourceObj = CreateWithSidebarResourceObj,
             .markUserSetSafeAreaOpts = MarkUserSetSafeAreaOpts,
+            .setTabViewCustomization = SetTabViewCustomization,
+            .resetTabViewCustomization = ResetTabViewCustomization,
         };
         CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
         return &modifier;
@@ -2754,6 +2834,8 @@ const ArkUITabsModifier* GetTabsModifier()
         .resetSidebarDivider = ResetSidebarDividerImpl,
         .createWithSidebarResourceObj = CreateWithSidebarResourceObjImpl,
         .markUserSetSafeAreaOpts = MarkUserSetSafeAreaOptsImpl,
+        .setTabViewCustomization = SetTabViewCustomizationImpl,
+        .resetTabViewCustomization = ResetTabViewCustomizationImpl,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;

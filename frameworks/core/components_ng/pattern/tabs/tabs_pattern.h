@@ -26,6 +26,7 @@
 #include "core/components_ng/pattern/swiper/swiper_event_hub.h"
 #include "core/components_ng/pattern/swiper/swiper_model.h"
 #include "core/components_ng/pattern/tabs/tab_bar_pattern.h"
+#include "core/components_ng/pattern/tabs/tab_content_model.h"
 #include "core/components_ng/pattern/tabs/tabs_layout_algorithm.h"
 #include "core/components_ng/pattern/tabs/tabs_layout_property.h"
 #include "core/components_ng/event/gesture_event_hub.h"
@@ -442,6 +443,48 @@ public:
         return tabBarClickIntercept_;
     }
 
+    // Centralized sidebar tab view customization.
+    // SetTabViewCustomization stores the customization from ModelNG without
+    // applying it. The actual diff check against appliedTabViewCustomization_
+    // and application happen in OnModifyDone, where all properties are resolved.
+    void SetTabViewCustomization(const TabViewCustomization& customization)
+    {
+        tabViewCustomization_ = customization;
+    }
+
+    void ResetTabViewCustomization()
+    {
+        tabViewCustomization_.reset();
+    }
+
+    const std::optional<TabViewCustomization>& GetAppliedTabViewCustomization() const
+    {
+        return appliedTabViewCustomization_;
+    }
+
+    // Refresh the sidebar tab list with the current customization.
+    // Called from TabContentPattern::OnModifyDone when a single tab's
+    // visibility/section property changes and the sidebar is active.
+    void RefreshSideBarTabView();
+
+    // Diff tabViewCustomization_ (incoming from ModelNG) against
+    // appliedTabViewCustomization_ (currently applied). If changed (or forceApply
+    // is true), sync appliedTabViewCustomization_, re-apply to the sidebar tab
+    // list, and mark the host dirty for layout.
+    // forceApply=true: always apply regardless of diff (e.g. sidebar becoming
+    // visible, entering sidebar mode, property-change full rebuild).
+    // forceApply=false: only apply if customization actually changed.
+    void ApplyTabViewCustomizationIfNeeded(bool forceApply = false);
+
+    // Register/Remove a ResObj callback for customization sectionMap
+    // resource-backed section titles. Called from OnModifyDone after the
+    // customization has been applied.
+    //   - any section has valid resourceTitleObject → register a single
+    //     ResObj callback (with an empty ResourceObject as notification trigger)
+    //     that re-parses all section titles and refreshes the sidebar tab list.
+    //   - no resourceTitleObject → remove the callback to avoid stale triggers.
+    void RegisterCustomizationSectionResObj();
+
 private:
     void OnAttachToFrameNode() override;
     void OnAfterModifyDone() override;
@@ -647,6 +690,12 @@ private:
     bool tabBarClickIntercept_ = false;
 
     bool isUserSetSafeAreaOpts_ = false;
+
+    // Centralized customization for the sidebar tab bar.
+    // tabViewCustomization_: the latest customization set from ModelNG, not yet applied.
+    // appliedTabViewCustomization_: the currently-applied customization.
+    std::optional<TabViewCustomization> tabViewCustomization_;
+    std::optional<TabViewCustomization> appliedTabViewCustomization_;
 };
 
 } // namespace OHOS::Ace::NG

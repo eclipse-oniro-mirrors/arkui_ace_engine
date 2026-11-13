@@ -1632,6 +1632,11 @@ declare interface SidebarSection {
   order?: number;
   titleStyle?: SidebarSectionTitleStyle;
 }
+declare interface TabViewCustomization {
+  visibilityMap?: Map<number, TabVisibility>;
+  sectionMap?: Map<number, SidebarSection>;
+  orderMap?: Map<number, number>;
+}
 declare enum NestedScrollMode {
   SELF_ONLY,
   SELF_FIRST,

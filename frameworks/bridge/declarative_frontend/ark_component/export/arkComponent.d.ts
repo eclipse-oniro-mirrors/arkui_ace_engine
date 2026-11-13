@@ -2071,6 +2071,7 @@ declare class ArkTabsComponent extends ArkComponent implements TabsAttribute {
     sidebarBackgroundColor(value: Optional<ResourceColor>): TabsAttribute;
     sidebarBackgroundBlurStyle(value: Optional<BlurStyle>): TabsAttribute;
     sidebarDivider(value: Optional<DividerStyle>): TabsAttribute;
+    tabViewCustomization(value: Optional<TabViewCustomization>): TabsAttribute;
 }
 declare class ArkTabContentComponent extends ArkComponent implements TabContentAttribute {
     constructor(nativePtr: KNode, classType?: ModifierType);
@@ -2080,7 +2081,7 @@ declare class ArkTabContentComponent extends ArkComponent implements TabContentA
     width(value: Length): this;
     height(value: Length): this;
     tabBarVisibility(visibility: TabVisibility, displayMode?: TabBarDisplayMode): this;
-    sidebarSection(value: SidebarSection): this;
+    sidebarSection(section: Optional<SidebarSection>): this;
 }
 declare class ArkUIExtensionComponentComponent extends ArkComponent implements UIExtensionComponentAttribute {
     constructor(nativePtr: KNode, classType?: ModifierType);

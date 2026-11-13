@@ -330,7 +330,11 @@ interface SidebarSection {
     order?: number;
     titleStyle?: SidebarSectionTitleStyle;
 }
-
+interface TabViewCustomization {
+    visibilityMap?: Map<number, TabVisibility>;
+    sectionMap?: Map<number, SidebarSection>;
+    orderMap?: Map<number, number>
+};
 declare class Indicator {
     left(value: LengthMetrics | undefined): this;
     top(value: LengthMetrics | undefined): this;

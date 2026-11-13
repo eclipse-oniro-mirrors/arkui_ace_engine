@@ -16,10 +16,15 @@
 #include "core/components_ng/pattern/tabs/tabs_side_bar_tab_list_pattern.h"
 
 #include <algorithm>
+#include <climits>
+#include <map>
+#include <optional>
+#include <set>
+#include <string>
+#include <vector>
 
 #include "base/utils/utils.h"
 #include "base/utils/utf_helper.h"
-#include "base/log/log_wrapper.h"
 #include "core/animation/spring_curve.h"
 #include "core/animation/curves.h"
 #include "core/components/common/properties/animation_option.h"
@@ -53,6 +58,7 @@ constexpr float SIDEBAR_TAB_MAX_FONT_SCALE = 2.0f;
 constexpr float SIDEBAR_TAB_FONT_SCALE_THRESHOLD_LEVEL8 = 1.75f;
 constexpr float SIDEBAR_TAB_FONT_SCALE_THRESHOLD_LEVEL10 = 2.0f;
 const Dimension SIDEBAR_TAB_ITEM_FOCUS_WIDTH = 2.0_vp;
+constexpr char TABS_SIDE_BAR_SECTION_HEADER_TAG[] = "TabsSidebarSectionHeader";
 
 // Get vertical margin for text node based on font scale.
 // Default: padding_level4, >=1.75: padding_level8, >=2.0: padding_level10
@@ -296,7 +302,7 @@ RefPtr<FrameNode> TabsSideBarTabListPattern::FindTabItemNodeBySwiperIndex(int32_
     auto columnNode = GetTabItemContainerNode();
     CHECK_NULL_RETURN(columnNode, nullptr);
     for (const auto& child : columnNode->GetChildren()) {
-        if (!child || child->GetTag() == "TabsSideBarSectionHeader") {
+        if (!child || child->GetTag() == TABS_SIDE_BAR_SECTION_HEADER_TAG) {
             continue;
         }
         auto frameNode = AceType::DynamicCast<FrameNode>(child);
@@ -327,7 +333,7 @@ RefPtr<FrameNode> TabsSideBarTabListPattern::FindSectionHeaderByTitle(const std:
     auto columnNode = GetTabItemContainerNode();
     CHECK_NULL_RETURN(columnNode, nullptr);
     for (const auto& child : columnNode->GetChildren()) {
-        if (!child || child->GetTag() != "TabsSideBarSectionHeader") {
+        if (!child || child->GetTag() != TABS_SIDE_BAR_SECTION_HEADER_TAG) {
             continue;
         }
         auto headerFrame = AceType::DynamicCast<FrameNode>(child);
@@ -434,55 +440,14 @@ void TabsSideBarTabListPattern::ApplySearchFilter(
     activeSearchFilter_ = searchFilter;
     activeSearchText_ = searchText;
 
-    // When search is active, rebuild sections as a flat list (no section headers,
-    // no collapse state) so filtered tabs — including those under collapsed sections —
-    // are shown. When search is cleared, restore the normal section layout.
-    // If no sections are configured at all, fall back to direct visibility update.
-    bool hasAnySection = false;
-    auto tabsNode = AceType::DynamicCast<TabsNode>(tabsNode_.Upgrade());
-    if (tabsNode) {
-        auto swiperNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabs());
-        if (swiperNode) {
-            for (int32_t i = 0; i < swiperNode->TotalChildCount(); ++i) {
-                auto tabContentNode = AceType::DynamicCast<FrameNode>(swiperNode->GetChildByIndex(i));
-                if (!tabContentNode) {
-                    continue;
-                }
-                auto tabContentPattern = tabContentNode->GetPattern<TabContentPattern>();
-                if (!tabContentPattern) {
-                    continue;
-                }
-                if (tabContentPattern->GetSidebarSection().has_value() &&
-                    !tabContentPattern->GetSidebarSection().value().title.empty()) {
-                    hasAnySection = true;
-                    break;
-                }
-            }
-        }
-    }
-    if (hasAnySection) {
-        RebuildSections();
-    } else {
-        auto host = AceType::DynamicCast<FrameNode>(GetHost());
-        CHECK_NULL_VOID(host);
-        auto swiperNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabs());
-        CHECK_NULL_VOID(swiperNode);
-        auto tabContentNum = swiperNode->TotalChildCount();
-        for (int32_t tabIndex = 0; tabIndex < tabContentNum; ++tabIndex) {
-            auto itemNode = FindTabItemNodeBySwiperIndex(tabIndex);
-            CHECK_NULL_CONTINUE(itemNode);
-            auto property = itemNode->GetLayoutProperty();
-            CHECK_NULL_CONTINUE(property);
-            if (IsHiddenByDefaultVisibility(tabIndex)) {
-                property->UpdateVisibility(VisibleType::GONE);
-                continue;
-            }
-            bool isVisible = !IsHiddenBySearchFilter(tabIndex);
-            property->UpdateVisibility(isVisible ? VisibleType::VISIBLE : VisibleType::GONE);
-        }
-        host->MarkNeedSyncRenderTree();
-        host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
-    }
+    // Re-apply visibility + section grouping via the unified dispatcher:
+    // - Level 3 (customization): ApplyTabViewCustomization handles search mode —
+    //   when searchText is non-empty, clears section grouping and uses original
+    //   swiper order, while visibility (tabBarVisibility + visibilityMap + search
+    //   filter) is applied via ComputeVisibilityMap.
+    // - Level 1/2: UpdateDirectVisibility / RebuildSections re-evaluate search
+    //   filter via IsHiddenBySearchFilter.
+    RefreshSidebarTabVisibilityAndLayout();
 }
 
 void TabsSideBarTabListPattern::AddOrUpdateTabItemWithContent(
@@ -902,41 +867,6 @@ bool TabsSideBarTabListPattern::IsHiddenBySearchFilter(int32_t tabIndex) const
     return tabTextLower.find(searchTextLower) == std::u16string::npos;
 }
 
-void TabsSideBarTabListPattern::ApplyDefaultVisibility()
-{
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
-    CHECK_NULL_VOID(host);
-    auto tabsNode = AceType::DynamicCast<TabsNode>(tabsNode_.Upgrade());
-    CHECK_NULL_VOID(tabsNode);
-    auto tabsProperty = tabsNode->GetLayoutProperty<TabsLayoutProperty>();
-    CHECK_NULL_VOID(tabsProperty);
-    // The sidebar does not display in Bottom/Top style, so there is no need to update the visibility of the internal tab.
-    auto barLayoutStyle = tabsProperty->GetBarLayoutStyleValue(TabBarLayoutStyle::BOTTOM);
-    if (barLayoutStyle == TabBarLayoutStyle::BOTTOM || barLayoutStyle == TabBarLayoutStyle::TOP) {
-        return;
-    }
-
-    auto swiperNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabs());
-    CHECK_NULL_VOID(swiperNode);
-    auto tabContentNum = swiperNode->TotalChildCount();
-    for (int32_t tabIndex = 0; tabIndex < tabContentNum; ++tabIndex) {
-        auto itemNode = FindTabItemNodeBySwiperIndex(tabIndex);
-        CHECK_NULL_CONTINUE(itemNode);
-        auto property = itemNode->GetLayoutProperty();
-        CHECK_NULL_CONTINUE(property);
-        // Check defaultVisibility
-        if (IsHiddenByDefaultVisibility(tabIndex)) {
-            property->UpdateVisibility(VisibleType::GONE);
-            continue;
-        }
-        // defaultVisibility says visible — check search filter
-        bool isVisible = !IsHiddenBySearchFilter(tabIndex);
-        property->UpdateVisibility(isVisible ? VisibleType::VISIBLE : VisibleType::GONE);
-    }
-    host->MarkNeedSyncRenderTree();
-    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
-}
-
 void TabsSideBarTabListPattern::AddOrUpdateTabListItem(
     const RefPtr<FrameNode>& tabContent, int32_t position, bool update)
 {
@@ -1027,15 +957,6 @@ void TabsSideBarTabListPattern::AddOrUpdateTabListItem(
     }
 
     tabItemContainerNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF_AND_PARENT);
-
-    // Apply defaultVisibility for this single tab item
-    auto tabItemProperty = tabItemNode->GetLayoutProperty();
-    CHECK_NULL_VOID(tabItemProperty);
-    bool shouldHide = tabContentPattern->GetDefaultVisibility().ShouldHide(TabBarDisplayMode::SIDEBAR);
-    tabItemProperty->UpdateVisibility(shouldHide ? VisibleType::GONE : VisibleType::VISIBLE);
-
-    // Rebuild sections if any tab has sidebar section configured
-    RebuildSections();
 }
 
 bool TabsSideBarTabListPattern::IsTabVisible(int32_t tabIndex) const
@@ -1143,7 +1064,7 @@ RefPtr<FrameNode> TabsSideBarTabListPattern::CreateOrUpdateSectionHeader(
     auto tabTheme = tabsNode->GetTheme<TabTheme>(true);
     CHECK_NULL_RETURN(tabTheme, nullptr);
     // Use a fixed tag for section header nodes
-    auto headerNode = FrameNode::GetOrCreateFrameNode("TabsSideBarSectionHeader", sectionId,
+    auto headerNode = FrameNode::GetOrCreateFrameNode(TABS_SIDE_BAR_SECTION_HEADER_TAG, sectionId,
         []() { return AceType::MakeRefPtr<LinearLayoutPattern>(false); });
     CHECK_NULL_RETURN(headerNode, nullptr);
     auto layoutProperty = headerNode->GetLayoutProperty<LinearLayoutProperty>();
@@ -1261,7 +1182,7 @@ void TabsSideBarTabListPattern::ApplySectionLayout(
             if (!geometry) {
                 continue;
             }
-            if (child->GetTag() == "TabsSideBarSectionHeader") {
+            if (child->GetTag() == TABS_SIDE_BAR_SECTION_HEADER_TAG) {
                 auto title = GetSectionHeaderTitle(frameNode);
                 if (!title.empty()) {
                     oldHeaderOffsets[title] = geometry->GetMarginFrameOffset().GetY();
@@ -1278,7 +1199,7 @@ void TabsSideBarTabListPattern::ApplySectionLayout(
     // Remove all existing section header nodes
     auto children = columnNode->GetChildren();
     for (const auto& child : children) {
-        if (child && child->GetTag() == "TabsSideBarSectionHeader") {
+        if (child && child->GetTag() == TABS_SIDE_BAR_SECTION_HEADER_TAG) {
             columnNode->RemoveChild(child);
         }
     }
@@ -1286,7 +1207,7 @@ void TabsSideBarTabListPattern::ApplySectionLayout(
     // Map: swiper index -> tab item node
     std::map<int32_t, RefPtr<UINode>> tabItemNodes;
     for (const auto& child : columnNode->GetChildren()) {
-        if (!child || child->GetTag() == "TabsSideBarSectionHeader") {
+        if (!child || child->GetTag() == TABS_SIDE_BAR_SECTION_HEADER_TAG) {
             continue;
         }
         auto frameNode = AceType::DynamicCast<FrameNode>(child);
@@ -1627,7 +1548,7 @@ void TabsSideBarTabListPattern::PlaySectionExpandCollapseAnimation(
 
     // Also animate pushed (still-visible, non-animated) tab items from old → new position.
     for (const auto& child : columnNode->GetChildren()) {
-        if (!child || child->GetTag() == "TabsSideBarSectionHeader") {
+        if (!child || child->GetTag() == TABS_SIDE_BAR_SECTION_HEADER_TAG) {
             continue;
         }
         auto frameNode = AceType::DynamicCast<FrameNode>(child);
@@ -1679,7 +1600,7 @@ void TabsSideBarTabListPattern::PlaySectionExpandCollapseAnimation(
     // Animate section headers that were pushed (moved) by the expand/collapse.
     // The triggered section's own header stays in place — only headers below it move.
     for (const auto& child : columnNode->GetChildren()) {
-        if (!child || child->GetTag() != "TabsSideBarSectionHeader") {
+        if (!child || child->GetTag() != TABS_SIDE_BAR_SECTION_HEADER_TAG) {
             continue;
         }
         auto headerFrame = AceType::DynamicCast<FrameNode>(child);
@@ -1851,6 +1772,72 @@ void TabsSideBarTabListPattern::PlaySectionExpandCollapseAnimation(
         nullptr, pipeline);
 }
 
+void TabsSideBarTabListPattern::RefreshSidebarTabVisibilityAndLayout()
+{
+    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    CHECK_NULL_VOID(host);
+    auto tabsNode = AceType::DynamicCast<TabsNode>(tabsNode_.Upgrade());
+    CHECK_NULL_VOID(tabsNode);
+    auto tabsProperty = tabsNode->GetLayoutProperty<TabsLayoutProperty>();
+    CHECK_NULL_VOID(tabsProperty);
+    auto barLayoutStyle = tabsProperty->GetBarLayoutStyleValue(TabBarLayoutStyle::BOTTOM);
+    if (barLayoutStyle == TabBarLayoutStyle::BOTTOM || barLayoutStyle == TabBarLayoutStyle::TOP) {
+        return;
+    }
+    auto swiperNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabs());
+    CHECK_NULL_VOID(swiperNode);
+    if (swiperNode->TotalChildCount() == 0) {
+        return;
+    }
+    // Level 3: customization active → unified path handles visibility + order + sections
+    if (tabViewCustomization_.has_value()) {
+        ApplyTabViewCustomization(tabViewCustomization_);
+        return;
+    }
+    // Level 1/2: no customization → check if any section is configured
+    bool hasAnySection = false;
+    for (int32_t i = 0; i < swiperNode->TotalChildCount(); ++i) {
+        auto tabContentNode = AceType::DynamicCast<FrameNode>(swiperNode->GetChildByIndex(i));
+        CHECK_NULL_CONTINUE(tabContentNode);
+        auto tabContentPattern = tabContentNode->GetPattern<TabContentPattern>();
+        CHECK_NULL_CONTINUE(tabContentPattern);
+        if (tabContentPattern->GetSidebarSection().has_value() &&
+            !tabContentPattern->GetSidebarSection().value().title.empty()) {
+            hasAnySection = true;
+            break;
+        }
+    }
+    if (hasAnySection) {
+        // Level 2: rebuild section groups + per-tab visibility
+        RebuildSections();
+        return;
+    }
+    // Level 1: no sections — only update visibility, skip node reorder
+    UpdateDirectVisibility(swiperNode);
+}
+
+void TabsSideBarTabListPattern::UpdateDirectVisibility(const RefPtr<FrameNode>& swiperNode)
+{
+    CHECK_NULL_VOID(swiperNode);
+    auto tabContentNum = swiperNode->TotalChildCount();
+    for (int32_t tabIndex = 0; tabIndex < tabContentNum; ++tabIndex) {
+        auto itemNode = FindTabItemNodeBySwiperIndex(tabIndex);
+        CHECK_NULL_CONTINUE(itemNode);
+        auto property = itemNode->GetLayoutProperty();
+        CHECK_NULL_CONTINUE(property);
+        if (IsHiddenByDefaultVisibility(tabIndex)) {
+            property->UpdateVisibility(VisibleType::GONE);
+            continue;
+        }
+        bool isVisible = !IsHiddenBySearchFilter(tabIndex);
+        property->UpdateVisibility(isVisible ? VisibleType::VISIBLE : VisibleType::GONE);
+    }
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    host->MarkNeedSyncRenderTree();
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+}
+
 void TabsSideBarTabListPattern::RebuildSections()
 {
     auto host = AceType::DynamicCast<FrameNode>(GetHost());
@@ -1867,6 +1854,12 @@ void TabsSideBarTabListPattern::RebuildSections()
     auto swiperNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabs());
     CHECK_NULL_VOID(swiperNode);
     if (swiperNode->TotalChildCount() == 0) {
+        return;
+    }
+    // If tabViewCustomization is active, delegate to the merged sort path
+    // so collapse/expand toggles respect the customized order and sections.
+    if (tabViewCustomization_.has_value()) {
+        ApplyTabViewCustomization(tabViewCustomization_);
         return;
     }
     // Check if any tab has a sidebar section configured
@@ -1900,5 +1893,633 @@ void TabsSideBarTabListPattern::RebuildSections()
         SortSections(sections);
     }
     ApplySectionLayout(sections, unsectionedIndices);
+}
+
+// Merged sort implementation
+std::vector<int32_t> TabsSideBarTabListPattern::BuildSortedOrder(
+    int32_t tabCount, const std::optional<TabViewCustomization>& customization) const
+{
+    // No customization → no orderMap, original swiper order is the result
+    if (!customization.has_value()) {
+        std::vector<int32_t> sortedOrder;
+        sortedOrder.reserve(static_cast<size_t>(tabCount));
+        for (int32_t i = 0; i < tabCount; ++i) {
+            sortedOrder.push_back(i);
+        }
+        return sortedOrder;
+    }
+
+    // Parse orderMap with normalization rules, then sort
+    //  - key and value truncated to integer (already int32_t from C++ map)
+    //  - key < 0 or value < 0: ignore that entry
+    //  - duplicate keys: last one wins (std::map insertion handles this)
+    //  - configured (has priority) sorted first ascending by value
+    //  - unconfigured follow in original order
+    //  - ties (same priority or both unconfigured) keep original swiper order
+
+    // Build a normalized priority map: swiperIndex -> priority
+    std::map<int32_t, int32_t> priorityMap;
+    for (const auto& [key, rawVal] : customization.value().orderMap) {
+        if (key < 0 || rawVal < 0) {
+            continue;
+        }
+        // Truncation already done (int32_t), just store (last wins via map assignment)
+        priorityMap[key] = rawVal;
+    }
+
+    // Build list of (index, hasPriority, priority) for stable sort
+    struct OrderEntry {
+        int32_t index = 0;
+        bool hasPriority = false;
+        int32_t priority = 0;
+    };
+    std::vector<OrderEntry> entries;
+    entries.reserve(static_cast<size_t>(tabCount));
+    for (int32_t i = 0; i < tabCount; ++i) {
+        OrderEntry entry;
+        entry.index = i;
+        auto it = priorityMap.find(i);
+        if (it != priorityMap.end()) {
+            entry.hasPriority = true;
+            entry.priority = it->second;
+        }
+        entries.push_back(entry);
+    }
+
+    // Stable sort: configured first (ascending priority), unconfigured after,
+    // ties broken by index (stable_sort preserves relative order for equal elements)
+    std::stable_sort(entries.begin(), entries.end(),
+        [](const OrderEntry& a, const OrderEntry& b) {
+            if (a.hasPriority && b.hasPriority) {
+                if (a.priority != b.priority) {
+                    return a.priority < b.priority;
+                }
+                return a.index < b.index;
+            }
+            if (a.hasPriority && !b.hasPriority) {
+                return true;
+            }
+            if (!a.hasPriority && b.hasPriority) {
+                return false;
+            }
+            // Both unconfigured: preserve original order
+            return a.index < b.index;
+        });
+
+    std::vector<int32_t> sortedOrder;
+    sortedOrder.reserve(entries.size());
+    for (const auto& e : entries) {
+        sortedOrder.push_back(e.index);
+    }
+    return sortedOrder;
+}
+
+bool TabsSideBarTabListPattern::IsTabVisibleWithCustomization(
+    int32_t tabIndex, const std::optional<TabViewCustomization>& customization) const
+{
+    // visibilityMap override takes precedence
+    if (customization.has_value()) {
+        const auto& visMap = customization.value().visibilityMap;
+        auto it = visMap.find(tabIndex);
+        if (it != visMap.end()) {
+            if (it->second == TabVisibility::HIDDEN) {
+                return false;
+            }
+            // VISIBLE — but still check search filter
+            return !IsHiddenBySearchFilter(tabIndex);
+        }
+    }
+    // Fall back to original defaultVisibility + search filter
+    if (IsHiddenByDefaultVisibility(tabIndex)) {
+        return false;
+    }
+    return !IsHiddenBySearchFilter(tabIndex);
+}
+
+std::map<int32_t, bool> TabsSideBarTabListPattern::ComputeVisibilityMap(
+    int32_t tabCount, const std::optional<TabViewCustomization>& customization) const
+{
+    // Precompute visibility for all tabs. Sort/group logic does NOT use this.
+    std::map<int32_t, bool> visibility;
+    for (int32_t i = 0; i < tabCount; ++i) {
+        visibility[i] = IsTabVisibleWithCustomization(i, customization);
+    }
+    return visibility;
+}
+
+std::optional<std::string> TabsSideBarTabListPattern::GetEffectiveSectionTitle(
+    int32_t tabIndex, const std::optional<TabViewCustomization>& customization) const
+{
+    // sectionMap override takes precedence
+    if (customization.has_value()) {
+        const auto& secMap = customization.value().sectionMap;
+        auto it = secMap.find(tabIndex);
+        if (it != secMap.end()) {
+            // Empty title => unsectioned (not in any group)
+            if (it->second.title.empty()) {
+                return std::nullopt;
+            }
+            return it->second.title;
+        }
+    }
+    // Fall back to original TabContent sidebarSection
+    auto tabsNode = AceType::DynamicCast<TabsNode>(tabsNode_.Upgrade());
+    CHECK_NULL_RETURN(tabsNode, std::nullopt);
+    auto swiperNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabs());
+    CHECK_NULL_RETURN(swiperNode, std::nullopt);
+    auto tabContentNode = AceType::DynamicCast<FrameNode>(swiperNode->GetChildByIndex(tabIndex));
+    CHECK_NULL_RETURN(tabContentNode, std::nullopt);
+    auto tabContentPattern = tabContentNode->GetPattern<TabContentPattern>();
+    CHECK_NULL_RETURN(tabContentPattern, std::nullopt);
+    const auto& section = tabContentPattern->GetSidebarSection();
+    if (!section.has_value() || section.value().title.empty()) {
+        return std::nullopt;
+    }
+    return section.value().title;
+}
+
+std::optional<int32_t> TabsSideBarTabListPattern::GetEffectiveSectionOrder(
+    int32_t tabIndex, const std::optional<TabViewCustomization>& customization) const
+{
+    // sectionMap override takes precedence.
+    // When sectionMap configures an empty title for this index, the tab is explicitly
+    // unsectioned — its order is irrelevant and must not be returned as a section order.
+    if (customization.has_value()) {
+        const auto& secMap = customization.value().sectionMap;
+        auto it = secMap.find(tabIndex);
+        if (it != secMap.end()) {
+            if (it->second.title.empty()) {
+                return std::nullopt;
+            }
+            return it->second.order;
+        }
+    }
+    // Fall back to original TabContent sidebarSection order
+    auto tabsNode = AceType::DynamicCast<TabsNode>(tabsNode_.Upgrade());
+    CHECK_NULL_RETURN(tabsNode, std::nullopt);
+    auto swiperNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabs());
+    CHECK_NULL_RETURN(swiperNode, std::nullopt);
+    auto tabContentNode = AceType::DynamicCast<FrameNode>(swiperNode->GetChildByIndex(tabIndex));
+    CHECK_NULL_RETURN(tabContentNode, std::nullopt);
+    auto tabContentPattern = tabContentNode->GetPattern<TabContentPattern>();
+    CHECK_NULL_RETURN(tabContentPattern, std::nullopt);
+    const auto& section = tabContentPattern->GetSidebarSection();
+    if (!section.has_value() || section.value().title.empty()) {
+        return std::nullopt;
+    }
+    return section.value().order;
+}
+
+SidebarSectionTitleStyle TabsSideBarTabListPattern::GetEffectiveSectionTitleStyle(
+    int32_t tabIndex, const std::optional<TabViewCustomization>& customization) const
+{
+    // sectionMap override takes precedence.
+    if (customization.has_value()) {
+        const auto& secMap = customization.value().sectionMap;
+        auto it = secMap.find(tabIndex);
+        if (it != secMap.end()) {
+            return it->second.titleStyle;
+        }
+    }
+    // Fall back to original TabContent sidebarSection titleStyle
+    auto tabsNode = AceType::DynamicCast<TabsNode>(tabsNode_.Upgrade());
+    CHECK_NULL_RETURN(tabsNode, SidebarSectionTitleStyle::STANDARD);
+    auto swiperNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabs());
+    CHECK_NULL_RETURN(swiperNode, SidebarSectionTitleStyle::STANDARD);
+    auto tabContentNode = AceType::DynamicCast<FrameNode>(swiperNode->GetChildByIndex(tabIndex));
+    CHECK_NULL_RETURN(tabContentNode, SidebarSectionTitleStyle::STANDARD);
+    auto tabContentPattern = tabContentNode->GetPattern<TabContentPattern>();
+    CHECK_NULL_RETURN(tabContentPattern, SidebarSectionTitleStyle::STANDARD);
+    const auto& section = tabContentPattern->GetSidebarSection();
+    if (section.has_value()) {
+        return section.value().titleStyle;
+    }
+    return SidebarSectionTitleStyle::STANDARD;
+}
+
+std::vector<int32_t> TabsSideBarTabListPattern::GroupAndSortSections(
+    const std::vector<int32_t>& sortedOrder, const std::optional<TabViewCustomization>& customization,
+    bool& hasSection) const
+{
+    hasSection = false;
+    // Build a position map: swiperIndex -> position in sortedOrder (for stable ordering)
+    std::map<int32_t, int32_t> sortedPos;
+    for (int32_t i = 0; i < static_cast<int32_t>(sortedOrder.size()); ++i) {
+        sortedPos[sortedOrder[i]] = i;
+    }
+
+    // Step 3: Group by effective section title
+    // unsectionedIndices: tabs with no section (in sortedOrder order)
+    // sectionGroups: map<title, {order, tabIndices}> (tabIndices in sortedOrder order)
+    std::vector<int32_t> unsectioned;
+    struct GroupInfo {
+        std::string title;
+        std::optional<int32_t> order;
+        std::vector<int32_t> tabIndices; // in sortedOrder order
+        int32_t firstSortedPos = INT32_MAX; // position in sortedOrder of first tab
+    };
+    std::map<std::string, GroupInfo> groupMap;
+    std::vector<std::string> groupOrder; // preserve first-seen order for stable iteration
+
+    for (int32_t swiperIdx : sortedOrder) {
+        auto titleOpt = GetEffectiveSectionTitle(swiperIdx, customization);
+        if (!titleOpt.has_value()) {
+            unsectioned.push_back(swiperIdx);
+            continue;
+        }
+        const std::string& title = titleOpt.value();
+        hasSection = true;
+        auto it = groupMap.find(title);
+        if (it == groupMap.end()) {
+            GroupInfo info;
+            info.title = title;
+            // Section order comes from the first tab that defines it
+            info.order = GetEffectiveSectionOrder(swiperIdx, customization);
+            info.tabIndices.push_back(swiperIdx);
+            info.firstSortedPos = sortedPos[swiperIdx];
+            groupMap[title] = std::move(info);
+            groupOrder.push_back(title);
+        } else {
+            it->second.tabIndices.push_back(swiperIdx);
+            // firstSortedPos already set from first tab
+        }
+    }
+
+    // unsectioned is already in sortedOrder order (we iterated sortedOrder)
+    // tabIndices within each group are also in sortedOrder order
+
+    // Step 4: unsectioned first (already in sortedOrder order), sectioned after
+    // Step 5: Inter-section sort
+    //   - sections with order come first (ascending by order)
+    //   - sections without order follow
+    //   - ties (same order or both no order) broken by first tab's sortedOrder position
+    std::vector<GroupInfo> groups;
+    groups.reserve(groupOrder.size());
+    for (const auto& title : groupOrder) {
+        groups.push_back(groupMap[title]);
+    }
+    std::stable_sort(groups.begin(), groups.end(),
+        [](const GroupInfo& a, const GroupInfo& b) {
+            if (a.order.has_value() && b.order.has_value()) {
+                if (a.order.value() != b.order.value()) {
+                    return a.order.value() < b.order.value();
+                }
+                return a.firstSortedPos < b.firstSortedPos;
+            }
+            if (a.order.has_value() && !b.order.has_value()) {
+                return true;
+            }
+            if (!a.order.has_value() && b.order.has_value()) {
+                return false;
+            }
+            return a.firstSortedPos < b.firstSortedPos;
+        });
+
+    // Build final ordered list
+    std::vector<int32_t> result;
+    result.reserve(sortedOrder.size());
+    // Unsectioned first
+    for (int32_t idx : unsectioned) {
+        result.push_back(idx);
+    }
+    // Then each section group
+    for (const auto& group : groups) {
+        for (int32_t idx : group.tabIndices) {
+            result.push_back(idx);
+        }
+    }
+    return result;
+}
+
+std::map<int32_t, RefPtr<UINode>> TabsSideBarTabListPattern::BuildTabItemNodeMap(
+    const RefPtr<FrameNode>& swiperNode, int32_t tabCount) const
+{
+    std::map<int32_t, RefPtr<UINode>> tabItemNodes;
+    auto columnNode = GetTabItemContainerNode();
+    CHECK_NULL_RETURN(columnNode, tabItemNodes);
+    for (const auto& child : columnNode->GetChildren()) {
+        if (!child || child->GetTag() == TABS_SIDE_BAR_SECTION_HEADER_TAG) {
+            continue;
+        }
+        auto frameNode = AceType::DynamicCast<FrameNode>(child);
+        if (!frameNode) {
+            continue;
+        }
+        for (int32_t i = 0; i < tabCount; ++i) {
+            auto tabContentNode = AceType::DynamicCast<TabContentNode>(swiperNode->GetChildByIndex(i));
+            if (tabContentNode && tabContentNode->GetSideBarTabBarItemId() == frameNode->GetId()) {
+                tabItemNodes[i] = child;
+                break;
+            }
+        }
+    }
+    return tabItemNodes;
+}
+
+void TabsSideBarTabListPattern::RemoveSectionHeaders(const RefPtr<UINode>& columnNode) const
+{
+    CHECK_NULL_VOID(columnNode);
+    auto children = columnNode->GetChildren();
+    for (const auto& child : children) {
+        if (child && child->GetTag() == TABS_SIDE_BAR_SECTION_HEADER_TAG) {
+            columnNode->RemoveChild(child);
+        }
+    }
+}
+
+void TabsSideBarTabListPattern::MoveOrMountTabItem(const RefPtr<UINode>& columnNode,
+    const RefPtr<UINode>& node, int32_t slot, int32_t tabIndex, bool visible)
+{
+    CHECK_NULL_VOID(columnNode);
+    CHECK_NULL_VOID(node);
+    if (node->GetParent() == columnNode) {
+        node->MovePosition(slot);
+    } else {
+        node->MountToParent(columnNode, slot);
+    }
+    auto frameNode = AceType::DynamicCast<FrameNode>(node);
+    if (frameNode) {
+        auto prop = frameNode->GetLayoutProperty();
+        if (prop) {
+            prop->UpdateVisibility(visible ? VisibleType::VISIBLE : VisibleType::GONE);
+        }
+    }
+}
+
+void TabsSideBarTabListPattern::ReorderWithoutSections(const RefPtr<UINode>& columnNode,
+    const std::vector<int32_t>& finalOrder,
+    const std::map<int32_t, RefPtr<UINode>>& tabItemNodes,
+    const std::map<int32_t, bool>& visibilityMap)
+{
+    CHECK_NULL_VOID(columnNode);
+    RemoveSectionHeaders(columnNode);
+    for (int32_t slot = 0; slot < static_cast<int32_t>(finalOrder.size()); ++slot) {
+        int32_t idx = finalOrder[slot];
+        auto it = tabItemNodes.find(idx);
+        if (it == tabItemNodes.end()) {
+            continue;
+        }
+        bool visible = true;
+        auto visIt = visibilityMap.find(idx);
+        if (visIt != visibilityMap.end()) {
+            visible = visIt->second;
+        }
+        MoveOrMountTabItem(columnNode, it->second, slot, idx, visible);
+        // Clear residual transform/opacity from previous collapse/expand animations.
+        // Without this, tabs that were translated/faded during a collapse animation
+        // would retain those visual offsets in the new layout, causing blank gaps.
+        ClearResidualTransform(it->second);
+    }
+    columnNode->MarkNeedSyncRenderTree();
+    columnNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+}
+
+int32_t TabsSideBarTabListPattern::InsertSectionHeader(
+    const RefPtr<UINode>& columnNode, const std::string& title, int32_t slot,
+    SidebarSectionTitleStyle titleStyle)
+{
+    CHECK_NULL_RETURN(columnNode, slot);
+    auto headerNode = CreateOrUpdateSectionHeader(title, ElementRegister::GetInstance()->MakeUniqueId(), titleStyle);
+    CHECK_NULL_RETURN(headerNode, slot);
+    headerNode->MountToParent(columnNode, slot);
+    auto gestureHub = headerNode->GetOrCreateGestureEventHub();
+    CHECK_NULL_RETURN(gestureHub, slot + 1);
+    auto clickEvent = [weakPattern = WeakClaim(this), sectionTitle = title](const GestureEvent& info) {
+        auto pattern = weakPattern.Upgrade();
+        CHECK_NULL_VOID(pattern);
+        pattern->HandleSectionHeaderClick(sectionTitle);
+    };
+    gestureHub->AddClickEvent(AceType::MakeRefPtr<ClickEvent>(std::move(clickEvent)));
+    return slot + 1;
+}
+
+bool TabsSideBarTabListPattern::ComputeEffectiveVisibility(
+    int32_t tabIndex, bool baseVisible, const std::string& currentSection, bool inSection) const
+{
+    if (!inSection) {
+        return baseVisible;
+    }
+    auto collapsedIt = sectionCollapsedState_.find(currentSection);
+    bool collapsed = (collapsedIt != sectionCollapsedState_.end()) ? collapsedIt->second : false;
+    return collapsed ? false : baseVisible;
+}
+
+void TabsSideBarTabListPattern::CaptureOldOffsetsForAnimation(const RefPtr<UINode>& columnNode,
+    std::map<int32_t, float>& oldTabOffsets,
+    std::map<std::string, float>& oldHeaderOffsets) const
+{
+    auto tabsNode = AceType::DynamicCast<TabsNode>(tabsNode_.Upgrade());
+    CHECK_NULL_VOID(tabsNode);
+    auto swiperNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabs());
+    CHECK_NULL_VOID(swiperNode);
+    for (const auto& child : columnNode->GetChildren()) {
+        auto frameNode = AceType::DynamicCast<FrameNode>(child);
+        CHECK_NULL_CONTINUE(frameNode);
+        auto geometry = frameNode->GetGeometryNode();
+        CHECK_NULL_CONTINUE(geometry);
+        float offsetY = geometry->GetMarginFrameOffset().GetY();
+        if (child->GetTag() == TABS_SIDE_BAR_SECTION_HEADER_TAG) {
+            auto textChild = AceType::DynamicCast<FrameNode>(frameNode->GetChildren().front());
+            CHECK_NULL_CONTINUE(textChild);
+            auto textProp = textChild->GetLayoutProperty<TextLayoutProperty>();
+            if (textProp && textProp->HasContent()) {
+                auto hdrTitle = UtfUtils::Str16ToStr8(textProp->GetContentValue(u""));
+                oldHeaderOffsets[hdrTitle] = offsetY;
+            }
+            continue;
+        }
+        for (int32_t i = 0; i < swiperNode->TotalChildCount(); ++i) {
+            auto tabContentNode = AceType::DynamicCast<TabContentNode>(swiperNode->GetChildByIndex(i));
+            CHECK_NULL_CONTINUE(tabContentNode);
+            if (tabContentNode->GetSideBarTabBarItemId() == frameNode->GetId()) {
+                oldTabOffsets[i] = offsetY;
+                break;
+            }
+        }
+    }
+}
+
+std::set<std::string> TabsSideBarTabListPattern::ComputeSectionsWithVisibleTab(
+    const std::vector<int32_t>& finalOrder,
+    const std::map<int32_t, bool>& visibilityMap,
+    const std::optional<TabViewCustomization>& customization) const
+{
+    std::set<std::string> result;
+    for (int32_t idx : finalOrder) {
+        auto titleOpt = GetEffectiveSectionTitle(idx, customization);
+        if (!titleOpt.has_value()) {
+            continue;
+        }
+        bool baseVisible = true;
+        auto visIt = visibilityMap.find(idx);
+        if (visIt != visibilityMap.end()) {
+            baseVisible = visIt->second;
+        }
+        // A collapsed section still counts — the tabs exist, just hidden by collapse.
+        // Only tabs hidden by visibility rules (defaultVisibility/visibilityMap/search)
+        // make the section empty.
+        if (baseVisible) {
+            result.insert(titleOpt.value());
+        }
+    }
+    return result;
+}
+
+void TabsSideBarTabListPattern::ClearResidualTransform(const RefPtr<UINode>& node)
+{
+    auto frameNode = AceType::DynamicCast<FrameNode>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto renderContext = frameNode->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    renderContext->UpdateTransformTranslate(TranslateOptions(0.0f, 0.0f, 0.0f));
+    renderContext->UpdateOpacity(1.0f);
+}
+
+void TabsSideBarTabListPattern::ScheduleSectionAnimation(const std::vector<int32_t>& finalOrder,
+    const std::optional<TabViewCustomization>& customization,
+    std::map<int32_t, float>& oldTabOffsets,
+    std::map<std::string, float>& oldHeaderOffsets)
+{
+    std::string triggeredSection = pendingAnimationSection_;
+    bool isCollapse = pendingAnimationIsCollapse_;
+    pendingAnimationSection_.clear();
+    // Collect the tab indices belonging to the triggered section for animation.
+    std::set<int32_t> animatedTabIndices;
+    for (int32_t idx : finalOrder) {
+        auto titleOpt = GetEffectiveSectionTitle(idx, customization);
+        if (titleOpt.has_value() && titleOpt.value() == triggeredSection) {
+            animatedTabIndices.insert(idx);
+        }
+    }
+    auto pipeline = PipelineContext::GetCurrentContext();
+    CHECK_NULL_VOID(pipeline);
+    pipeline->AddAfterLayoutTask(
+        [weak = WeakClaim(this), oldTabOffsets = std::move(oldTabOffsets),
+         animatedTabIndices = std::move(animatedTabIndices),
+         triggeredSection = std::move(triggeredSection), isCollapse,
+         oldHeaderOffsets = std::move(oldHeaderOffsets)]() {
+            auto pattern = weak.Upgrade();
+            CHECK_NULL_VOID(pattern);
+            pattern->PlaySectionExpandCollapseAnimation(
+                oldTabOffsets, animatedTabIndices, triggeredSection, isCollapse, oldHeaderOffsets);
+        });
+}
+
+void TabsSideBarTabListPattern::ReorderWithSections(const RefPtr<UINode>& columnNode,
+    const std::vector<int32_t>& finalOrder,
+    const std::map<int32_t, RefPtr<UINode>>& tabItemNodes,
+    const std::map<int32_t, bool>& visibilityMap,
+    const std::optional<TabViewCustomization>& customization)
+{
+    CHECK_NULL_VOID(columnNode);
+    bool hasPendingAnimation = !pendingAnimationSection_.empty();
+    std::map<int32_t, float> oldTabOffsets;
+    std::map<std::string, float> oldHeaderOffsets;
+    if (hasPendingAnimation) {
+        CaptureOldOffsetsForAnimation(columnNode, oldTabOffsets, oldHeaderOffsets);
+    }
+
+    RemoveSectionHeaders(columnNode);
+
+    auto sectionsWithVisibleTab = ComputeSectionsWithVisibleTab(finalOrder, visibilityMap, customization);
+
+    int32_t insertSlot = 0;
+    std::string currentSection;
+    bool inSection = false;
+    for (int32_t idx : finalOrder) {
+        auto titleOpt = GetEffectiveSectionTitle(idx, customization);
+        if (!titleOpt.has_value()) {
+            inSection = false;
+            currentSection.clear();
+        } else if (!inSection || currentSection != titleOpt.value()) {
+            currentSection = titleOpt.value();
+            inSection = true;
+            if (sectionsWithVisibleTab.count(currentSection) > 0) {
+                // Section has no visible tabs — skip header
+                auto titleStyle = GetEffectiveSectionTitleStyle(idx, customization);
+                insertSlot = InsertSectionHeader(columnNode, currentSection, insertSlot, titleStyle);
+            }
+        }
+        auto it = tabItemNodes.find(idx);
+        if (it == tabItemNodes.end()) {
+            continue;
+        }
+        bool baseVisible = true;
+        auto visIt = visibilityMap.find(idx);
+        if (visIt != visibilityMap.end()) {
+            baseVisible = visIt->second;
+        }
+        bool tabVisible = ComputeEffectiveVisibility(idx, baseVisible, currentSection, inSection);
+        bool keepVisibleForCollapseAnim = hasPendingAnimation && pendingAnimationIsCollapse_ &&
+            inSection && pendingAnimationSection_ == currentSection;
+        if (keepVisibleForCollapseAnim && baseVisible) {
+            tabVisible = true;
+        }
+        MoveOrMountTabItem(columnNode, it->second, insertSlot, idx, tabVisible);
+        if (!hasPendingAnimation) {
+            ClearResidualTransform(it->second);
+        }
+        insertSlot++;
+    }
+    columnNode->MarkNeedSyncRenderTree();
+    columnNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+
+    if (hasPendingAnimation) {
+        ScheduleSectionAnimation(finalOrder, customization, oldTabOffsets, oldHeaderOffsets);
+    }
+}
+
+void TabsSideBarTabListPattern::ApplyTabViewCustomization(
+    const std::optional<TabViewCustomization>& customization)
+{
+    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    CHECK_NULL_VOID(host);
+    auto tabsNode = AceType::DynamicCast<TabsNode>(tabsNode_.Upgrade());
+    CHECK_NULL_VOID(tabsNode);
+    auto tabsProperty = tabsNode->GetLayoutProperty<TabsLayoutProperty>();
+    CHECK_NULL_VOID(tabsProperty);
+    // Only apply in sidebar mode
+    auto barLayoutStyle = tabsProperty->GetBarLayoutStyleValue(TabBarLayoutStyle::BOTTOM);
+    if (barLayoutStyle == TabBarLayoutStyle::BOTTOM || barLayoutStyle == TabBarLayoutStyle::TOP) {
+        return;
+    }
+    auto swiperNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabs());
+    CHECK_NULL_VOID(swiperNode);
+    int32_t tabCount = swiperNode->TotalChildCount();
+    if (tabCount == 0) {
+        return;
+    }
+
+    // Cache customization for incremental rebuilds (e.g. section collapse toggle)
+    tabViewCustomization_ = customization;
+
+    // Compute visibility, sort order, and section grouping
+    auto visibilityMap = ComputeVisibilityMap(tabCount, customization);
+
+    // Search mode: when search keyword is non-empty, clear grouping and use original
+    // swiper order. Visibility (tabBarVisibility + visibilityMap + search filter) is
+    // still respected via visibilityMap computed above.
+    bool hasAnySection = false;
+    std::vector<int32_t> finalOrder;
+    if (!activeSearchText_.empty()) {
+        finalOrder.reserve(static_cast<size_t>(tabCount));
+        for (int32_t i = 0; i < tabCount; ++i) {
+            finalOrder.push_back(i);
+        }
+    } else {
+        auto sortedOrder = BuildSortedOrder(tabCount, customization);
+        finalOrder = GroupAndSortSections(sortedOrder, customization, hasAnySection);
+    }
+
+    // Build swiper-index -> tab item node map
+    auto columnNode = GetTabItemContainerNode();
+    CHECK_NULL_VOID(columnNode);
+    auto tabItemNodes = BuildTabItemNodeMap(swiperNode, tabCount);
+
+    if (!hasAnySection) {
+        ReorderWithoutSections(columnNode, finalOrder, tabItemNodes, visibilityMap);
+        return;
+    }
+    ReorderWithSections(columnNode, finalOrder, tabItemNodes, visibilityMap, customization);
 }
 } // namespace OHOS::Ace::NG

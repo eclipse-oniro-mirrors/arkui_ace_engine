@@ -296,7 +296,8 @@ void TabsBridge::RegisterTabsAttributes(panda::Local<panda::ObjectRef> object, p
         "resetTabMinContentWidth", "setTabSidebarBackgroundColor", "resetTabSidebarBackgroundColor",
         "setTabSidebarBackgroundBlurStyle", "resetTabSidebarBackgroundBlurStyle", "setTabSidebarDivider",
         "resetTabSidebarDivider", "setSidebarFooter", "resetSidebarFooter",
-        "setSidebarBottomBar", "resetSidebarBottomBar", "markUserSetSafeAreaOpts",
+        "setSidebarBottomBar", "resetSidebarBottomBar", "markUserSetSafeAreaOpts", "setTabViewCustomization",
+        "resetTabViewCustomization"
     };
     Local<JSValueRef> functionValues[] = {
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::Create),
@@ -430,6 +431,8 @@ void TabsBridge::RegisterTabsAttributes(panda::Local<panda::ObjectRef> object, p
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::SetSidebarBottomBar),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::ResetSidebarBottomBar),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::MarkUserSetSafeAreaOpts),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::SetTabViewCustomization),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::ResetTabViewCustomization),
     };
     auto tabs = panda::ObjectRef::NewWithNamedProperties(vm, ArraySize(functionNames), functionNames, functionValues);
     object->Set(vm, panda::StringRef::NewFromUtf8(vm, "tabs"), tabs);
@@ -3965,6 +3968,227 @@ ArkUINativeModuleValue TabsBridge::MarkUserSetSafeAreaOpts(ArkUIRuntimeCallInfo*
     ArkUINodeHandle nativeNode = nullptr;
     CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
     GetArkUINodeModifiers()->getTabsModifier()->markUserSetSafeAreaOpts(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+namespace {
+// Parses a JS Map<number, T> into a key vector and (caller-handled) value extraction.
+// Returns the map size; keys are written to outKeys. Returns 0 if not a Map or empty.
+// Non-number keys are written as -1 (sentinel); callers should filter keys < 0.
+int32_t GetMapKeysAndSize(EcmaVM* vm, const Local<JSValueRef>& mapArg, std::vector<int32_t>& outKeys)
+{
+    outKeys.clear();
+    if (mapArg.IsNull() || mapArg->IsUndefined() || !mapArg->IsMap(vm)) {
+        return 0;
+    }
+    Local<panda::MapRef> mapRef(mapArg);
+    int32_t size = mapRef->GetSize(vm);
+    outKeys.reserve(size);
+    for (int32_t i = 0; i < size; i++) {
+        auto key = mapRef->GetKey(vm, i);
+        if (key->IsNumber()) {
+            outKeys.push_back(key->Int32Value(vm));
+        } else {
+            outKeys.push_back(-1);
+        }
+    }
+    return size;
+}
+
+// Parse visibilityMap: Map<number, TabVisibility>.
+// Validates keys (>= 0) and values (0=VISIBLE or 1=HIDDEN).
+// Invalid entries are skipped with a warning log.
+void ParseVisibilityMap(EcmaVM* vm, const Local<JSValueRef>& mapArg,
+    std::vector<int32_t>& outKeys, std::vector<int32_t>& outValues)
+{
+    std::vector<int32_t> rawKeys;
+    int32_t rawSize = GetMapKeysAndSize(vm, mapArg, rawKeys);
+    if (rawSize <= 0) {
+        return;
+    }
+    Local<panda::MapRef> mapRef(mapArg);
+    outKeys.reserve(rawSize);
+    outValues.reserve(rawSize);
+    for (int32_t i = 0; i < rawSize; i++) {
+        if (rawKeys[i] < 0) {
+            TAG_LOGW(AceLogTag::ACE_TABS,
+                "ParseTabViewCustomization visibilityMap skip invalid key (not a number)");
+            continue;
+        }
+        auto val = mapRef->GetValue(vm, i);
+        if (!val->IsNumber()) {
+            TAG_LOGW(AceLogTag::ACE_TABS,
+                "ParseTabViewCustomization visibilityMap key:%{public}d value is not a number, skip", rawKeys[i]);
+            continue;
+        }
+        int32_t visVal = val->Int32Value(vm);
+        if (visVal != static_cast<int32_t>(TabVisibility::VISIBLE) &&
+            visVal != static_cast<int32_t>(TabVisibility::HIDDEN)) {
+            TAG_LOGW(AceLogTag::ACE_TABS,
+                "ParseTabViewCustomization visibilityMap key:%{public}d skip invalid value:%{public}d "
+                "(must be 0=VISIBLE or 1=HIDDEN)", rawKeys[i], visVal);
+            continue;
+        }
+        outKeys.push_back(rawKeys[i]);
+        outValues.push_back(visVal);
+    }
+}
+
+// Parse sectionMap: Map<number, SidebarSection>.
+// Validates keys (>= 0). secTitleStorage/secResStorage keep strings/resource objects alive
+// for the duration of the modifier call (raw void* in outValues points into secResStorage).
+// Invalid entries are skipped with a warning log.
+void ParseSectionMap(EcmaVM* vm, const Local<JSValueRef>& mapArg,
+    std::vector<int32_t>& outKeys, std::vector<ArkUISidebarSection>& outValues,
+    std::vector<std::string>& secTitleStorage, std::vector<RefPtr<ResourceObject>>& secResStorage)
+{
+    std::vector<int32_t> rawKeys;
+    int32_t rawSize = GetMapKeysAndSize(vm, mapArg, rawKeys);
+    if (rawSize <= 0) {
+        return;
+    }
+    Local<panda::MapRef> mapRef(mapArg);
+    outKeys.reserve(rawSize);
+    outValues.reserve(rawSize);
+    secTitleStorage.reserve(rawSize);
+    secResStorage.reserve(rawSize);
+    for (int32_t i = 0; i < rawSize; i++) {
+        if (rawKeys[i] < 0) {
+            TAG_LOGW(AceLogTag::ACE_TABS,
+                "ParseTabViewCustomization sectionMap skip invalid key (not a number)");
+            continue;
+        }
+        outKeys.push_back(rawKeys[i]);
+        auto val = mapRef->GetValue(vm, i);
+        ArkUISidebarSection sec { nullptr, false, 0, 0, nullptr };
+        if (val.IsNull() || val->IsUndefined() || !val->IsObject(vm)) {
+            secTitleStorage.emplace_back();
+            sec.title = secTitleStorage.back().c_str();
+            secResStorage.emplace_back(nullptr);
+            outValues.push_back(sec);
+            continue;
+        }
+        auto secObj = val->ToObject(vm);
+        Local<JSValueRef> titleVal = ArkTSUtils::GetProperty(vm, secObj, "title");
+        std::string title;
+        RefPtr<ResourceObject> resTitleObj = nullptr;
+        if (!titleVal.IsNull() && !titleVal->IsUndefined()) {
+            ArkTSUtils::ParseJsString(vm, titleVal, title, resTitleObj);
+        }
+        secTitleStorage.push_back(std::move(title));
+        sec.title = secTitleStorage.back().c_str();
+        secResStorage.push_back(resTitleObj);
+        sec.titleResourceObject = resTitleObj ? AceType::RawPtr(secResStorage.back()) : nullptr;
+        Local<JSValueRef> orderVal = ArkTSUtils::GetProperty(vm, secObj, "order");
+        if (!orderVal.IsNull() && !orderVal->IsUndefined() && orderVal->IsNumber()) {
+            double orderDouble = orderVal->ToNumber(vm)->Value();
+            if (orderDouble >= 0 && orderDouble <= static_cast<double>(0x7FFFFFFF)) {
+                sec.hasOrder = true;
+                sec.order = static_cast<ArkUI_Int32>(orderDouble);
+            } else {
+                TAG_LOGW(AceLogTag::ACE_TABS,
+                    "ParseTabViewCustomization sectionMap skip invalid order:%{public}f "
+                    "(must be >= 0 and <= INT32_MAX)", orderDouble);
+            }
+        }
+        // Parse "titleStyle" - optional enum, 0=STANDARD, 1=EMPHASIZED
+        Local<JSValueRef> titleStyleVal = ArkTSUtils::GetProperty(vm, secObj, "titleStyle");
+        if (!titleStyleVal.IsNull() && !titleStyleVal->IsUndefined() && titleStyleVal->IsNumber()) {
+            sec.titleStyle = static_cast<ArkUI_Int32>(titleStyleVal->ToNumber(vm)->Value());
+        }
+        outValues.push_back(sec);
+    }
+}
+
+// Parse orderMap: Map<number, number>.
+// Validates keys (>= 0) and values (>= 0, <= INT32_MAX, checked via double to avoid truncation).
+// Invalid entries are skipped with a warning log.
+void ParseOrderMap(EcmaVM* vm, const Local<JSValueRef>& mapArg,
+    std::vector<int32_t>& outKeys, std::vector<int32_t>& outValues)
+{
+    std::vector<int32_t> rawKeys;
+    int32_t rawSize = GetMapKeysAndSize(vm, mapArg, rawKeys);
+    if (rawSize <= 0) {
+        return;
+    }
+    Local<panda::MapRef> mapRef(mapArg);
+    outKeys.reserve(rawSize);
+    outValues.reserve(rawSize);
+    for (int32_t i = 0; i < rawSize; i++) {
+        if (rawKeys[i] < 0) {
+            TAG_LOGW(AceLogTag::ACE_TABS,
+                "ParseTabViewCustomization orderMap skip invalid key (not a number)");
+            continue;
+        }
+        auto val = mapRef->GetValue(vm, i);
+        if (!val->IsNumber()) {
+            TAG_LOGW(AceLogTag::ACE_TABS,
+                "ParseTabViewCustomization orderMap key:%{public}d value is not a number, skip", rawKeys[i]);
+            continue;
+        }
+        double doubleVal = val->ToNumber(vm)->Value();
+        if (doubleVal < 0 || doubleVal > static_cast<double>(0x7FFFFFFF)) {
+            TAG_LOGW(AceLogTag::ACE_TABS,
+                "ParseTabViewCustomization orderMap key:%{public}d skip invalid value:%{public}f "
+                "(must be >= 0 and <= INT32_MAX)", rawKeys[i], doubleVal);
+            continue;
+        }
+        outKeys.push_back(rawKeys[i]);
+        outValues.push_back(static_cast<int32_t>(doubleVal));
+    }
+}
+} // namespace
+
+ArkUINativeModuleValue TabsBridge::SetTabViewCustomization(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(TABS_ARG_INDEX_0);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> valueArg = runtimeCallInfo->GetCallArgRef(TABS_ARG_INDEX_1);
+    if (valueArg.IsNull() || valueArg->IsUndefined() || !valueArg->IsObject(vm)) {
+        GetArkUINodeModifiers()->getTabsModifier()->resetTabViewCustomization(nativeNode);
+        return panda::JSValueRef::Undefined(vm);
+    }
+    auto obj = valueArg->ToObject(vm);
+
+    // visibilityMap: Map<number, TabVisibility>
+    std::vector<int32_t> visKeys;
+    std::vector<int32_t> visValues;
+    ParseVisibilityMap(vm, ArkTSUtils::GetProperty(vm, obj, "visibilityMap"), visKeys, visValues);
+
+    // sectionMap: Map<number, SidebarSection>
+    // secTitleStorage/secResStorage keep strings and ResourceObjects alive for the modifier call.
+    std::vector<int32_t> secKeys;
+    std::vector<ArkUISidebarSection> secValues;
+    std::vector<std::string> secTitleStorage;
+    std::vector<RefPtr<ResourceObject>> secResStorage;
+    ParseSectionMap(vm, ArkTSUtils::GetProperty(vm, obj, "sectionMap"),
+        secKeys, secValues, secTitleStorage, secResStorage);
+
+    // orderMap: Map<number, number>
+    std::vector<int32_t> orderKeys;
+    std::vector<int32_t> orderValues;
+    ParseOrderMap(vm, ArkTSUtils::GetProperty(vm, obj, "orderMap"), orderKeys, orderValues);
+
+    ArkUITabViewCustomization customization {
+        visKeys.data(), visValues.data(), static_cast<ArkUI_Int32>(visKeys.size()),
+        secKeys.data(), secValues.data(), static_cast<ArkUI_Int32>(secKeys.size()),
+        orderKeys.data(), orderValues.data(), static_cast<ArkUI_Int32>(orderKeys.size()),
+    };
+    GetArkUINodeModifiers()->getTabsModifier()->setTabViewCustomization(nativeNode, &customization);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue TabsBridge::ResetTabViewCustomization(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(TABS_ARG_INDEX_0);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    GetArkUINodeModifiers()->getTabsModifier()->resetTabViewCustomization(nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }
 } // namespace OHOS::Ace::NG
