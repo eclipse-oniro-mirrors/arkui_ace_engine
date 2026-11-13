@@ -16,7 +16,6 @@
 const __ArcList__ = requireInternal('arkui.ArcList');
 const ModifierMap = requireNapi('arkui.modifier').ModifierMap;
 const ModifierUtils = requireNapi('arkui.modifier').ModifierUtils;
-const LengthUnit = requireNapi('arkui.node').LengthUnit;
 const ArkThemeScopeManager = requireNapi('arkui.arktheme').ArkThemeScopeManager;
 
 class ArcListChildrenMainSizeModifier extends ModifierWithKey {
@@ -57,8 +56,7 @@ class ArcListScrollBarWidthModifier extends ModifierWithKey {
             getUINativeModule().list.resetListScrollBarWidth(node);
         }
         else {
-            // Keep the historical behavior: ArcList scrollBarWidth is always interpreted as VP.
-            let width = `${this.value.value}vp`;
+            let width = __ArcList__.formatScrollBarWidth(this.value);
             getUINativeModule().list.setListScrollBarWidth(node, width);
         }
     }
@@ -197,8 +195,7 @@ class ArcList extends List {
 
     static scrollBarWidth(value) {
         if (value) {
-            // Keep the historical behavior: ArcList scrollBarWidth is always interpreted as VP.
-            value = `${value.value}vp`;
+            value = __ArcList__.formatScrollBarWidth(value);
         }
         List.scrollBarWidth(value);
     }
