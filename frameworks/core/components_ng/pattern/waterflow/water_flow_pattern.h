@@ -25,7 +25,6 @@
 #include <utility>
 #include <vector>
 
-#include "core/components_ng/pattern/lazy_layout/lazy_layout_offset.h"
 #include "core/components_ng/pattern/lazy_layout/sticky_header_pattern.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_manager.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_types.h"

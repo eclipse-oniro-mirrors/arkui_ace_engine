@@ -22,12 +22,12 @@
 
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_offset.h"
-#include "core/components_ng/pattern/lazy_layout/sticky_header_pattern.h"
 #include "core/components_ng/property/layout_constraint.h"
 
 namespace OHOS::Ace::NG {
 
 class LazyLayoutPattern;
+class StickyHeaderPattern;
 
 // Ancestor WaterFlow + whether the path crosses a FlowItem (a path through FlowItem makes the WaterFlow's
 // lane count irrelevant to the lazy contract).
