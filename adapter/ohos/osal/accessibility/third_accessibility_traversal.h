@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <limits>
 #include <list>
+#include <map>
 #include <utility>
 #include <string>
 #include <unordered_set>
@@ -52,7 +53,36 @@ public:
         CYCLE = 1 << 11,
         DUPLICATE_CHILD = 1 << 12,
         SHARED_CHILD = 1 << 13,
+        // Focus-tree assembly findings (reported by the ThirdFocusTree assembler).
+        // parentId missing, repaired from the unique claimer.
+        MISSING_PARENT = 1 << 14,
+        // Declared parent unclaimed, adopted in receive order.
+        UNCLAIMED_CHILD = 1 << 15,
+        // Both missing-declaration forms merged in one answer.
+        MIXED_SOURCES = 1 << 16,
+        // parentId disagrees with childNodeIds, child side kept.
+        PARENT_CONFLICT = 1 << 17,
+        // Multiple claimers, self-declared parent kept.
+        MULTI_PARENT_SELF = 1 << 18,
+        // Multiple claimers, first claimer kept.
+        MULTI_PARENT_FIRST = 1 << 19,
+        // Self/invalid parent declaration ignored.
+        SELF_PARENT = 1 << 20,
+        // Isolated node dropped.
+        ORPHAN_NODE = 1 << 21,
+        // Referenced record missing, fetched per node.
+        LIST_HOLE = 1 << 22,
+        // No root marker in a non-empty answer.
+        NO_ROOT = 1 << 23,
+        // Node would close a cycle, dropped.
+        WOULD_CYCLE = 1 << 24,
+        // Node unreachable from the root, dropped.
+        UNREACHABLE = 1 << 25,
     };
+
+    // Each issue type logs at most this many immediate ERROR lines; further occurrences
+    // only feed the per-issue counters reused by the destructor summary line.
+    static constexpr size_t MAX_ANOMALY_LOGS_PER_ISSUE = 5;
 
     explicit ThirdAccessibilityTraversal(const char* operation) : operation_(operation) {}
     ~ThirdAccessibilityTraversal()
@@ -68,11 +98,19 @@ public:
             { DEPTH_LIMIT, "depth-limit" }, { PAYLOAD_LIMIT, "payload-limit" },
             { DUPLICATE_ID, "duplicate-id" }, { CYCLE, "cycle" },
             { DUPLICATE_CHILD, "duplicate-child" }, { SHARED_CHILD, "shared-child" },
+            { MISSING_PARENT, "missing-parent" }, { UNCLAIMED_CHILD, "unclaimed-child" },
+            { MIXED_SOURCES, "mixed-sources" }, { PARENT_CONFLICT, "parent-conflict" },
+            { MULTI_PARENT_SELF, "multi-parent-self" }, { MULTI_PARENT_FIRST, "multi-parent-first" },
+            { SELF_PARENT, "self-parent" }, { ORPHAN_NODE, "orphan-node" },
+            { LIST_HOLE, "list-hole" }, { NO_ROOT, "no-root" },
+            { WOULD_CYCLE, "would-cycle" }, { UNREACHABLE, "unreachable" },
         };
         std::string reasons;
         for (const auto& [issue, name] : names) {
             if (issues_ & issue) {
-                reasons += std::string(name) + " ";
+                const auto count = issueCounts_.find(issue);
+                reasons += std::string(name) + "=" +
+                    std::to_string(count == issueCounts_.end() ? 0 : count->second) + " ";
             }
         }
         if (issues_ & MULTIPLE_ROOTS) {
@@ -94,6 +132,36 @@ public:
             firstBadId_ = id;
         }
         issues_ |= issue;
+        ++issueCounts_[issue];
+    }
+
+    // Reports an assembly anomaly at the point of detection: one immediate rate-limited ERROR
+    // line plus the per-issue counter reused by the destructor summary. Normal paths never call
+    // this, so a healthy answer still produces zero logs.
+    void ReportAnomaly(Issue issue, int64_t id, const char* scenario)
+    {
+        Record(issue, id);
+        size_t& logged = anomalyLogs_[issue];
+        if (logged < MAX_ANOMALY_LOGS_PER_ISSUE) {
+            ++logged;
+            TAG_LOGE(AceLogTag::ACE_ACCESSIBILITY,
+                "Third accessibility %{public}s: %{public}s, id=%{public}lld", operation_,
+                scenario != nullptr ? scenario : "", static_cast<long long>(id));
+        }
+    }
+
+    // Immediate rate-limited ERROR line for an issue that Visit or ConsumeBytes already
+    // counted: logs the detection point without a second count, so the summary line keeps
+    // one count per occurrence.
+    void LogAnomaly(Issue issue, int64_t id, const char* scenario)
+    {
+        size_t& logged = anomalyLogs_[issue];
+        if (logged < MAX_ANOMALY_LOGS_PER_ISSUE) {
+            ++logged;
+            TAG_LOGE(AceLogTag::ACE_ACCESSIBILITY,
+                "Third-party %{public}s: %{public}s, id=%{public}lld", operation_,
+                scenario != nullptr ? scenario : "", static_cast<long long>(id));
+        }
     }
 
     bool Visit(int64_t id, size_t depth)
@@ -142,6 +210,8 @@ public:
 
     bool Exhausted() const { return (issues_ & LIMIT_EXCEEDED) != 0; }
     bool HasIssues() const { return issues_ != 0; }
+    bool HasIssue(Issue issue) const { return (issues_ & issue) != 0; }
+    bool EdgeBudgetBlown() const { return edges_ > MAX_EDGES; }
 
 private:
     const char* operation_;
@@ -150,6 +220,8 @@ private:
     size_t bytes_ = 0;
     uint32_t issues_ = 0;
     int64_t firstBadId_ = -1;
+    std::map<uint32_t, size_t> issueCounts_;
+    std::map<uint32_t, size_t> anomalyLogs_;
 };
 } // namespace OHOS::Ace::Framework
 #endif
