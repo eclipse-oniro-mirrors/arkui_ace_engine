@@ -23,9 +23,11 @@
 #include "adapter/ohos/entrance/picker/picker_haptic_factory.h"
 #include "base/log/dump_log.h"
 #include "core/animation/spring_curve.h"
+#include "core/animation/evaluator.h"
 #include "core/common/resource/resource_object.h"
 #include "core/common/resource/resource_parse_utils.h"
 #include "core/components_ng/pattern/container_picker/container_picker_paint_method.h"
+#include "core/components_ng/pattern/container_picker/container_picker_text_style.h"
 #include "core/components_ng/pattern/container_picker/container_picker_theme.h"
 #include "core/components_ng/pattern/text/text_layout_property.h"
 #include "core/components_ng/syntax/arkoala_lazy_node.h"
@@ -56,6 +58,8 @@ constexpr int32_t DELTA_INDEX_1 = 1;
 constexpr int32_t DELTA_INDEX_2 = 2;
 constexpr int32_t DELTA_INDEX_3 = 3;
 constexpr uint32_t CUSTOM_SPRING_ANIMATION_DURATION = 1000;
+constexpr double FONT_SIZE_PERCENT = 1.0;
+constexpr double FONT_WEIGHT_THRESHOLD = 0.5;
 } // namespace
 
 ContainerPickerPattern::~ContainerPickerPattern() = default;
@@ -185,6 +189,7 @@ bool ContainerPickerPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper
     FireChangeEvent();
     PostIdleTask(GetHost());
     SetDefaultTextStyle(false);
+    SetSelectedTextStyle(false);
     HandleTargetIndex();
 
     if (isNeedPlayInertialAnimation_) {
@@ -277,6 +282,10 @@ void ContainerPickerPattern::GetLayoutProperties(const RefPtr<ContainerPickerLay
     CHECK_NULL_VOID(algo);
     layoutConstraint_ = algo->GetLayoutConstraint();
     itemPosition_ = std::move(algo->GetItemPosition());
+    // Layout has applied the scroll offset into itemPosition_, so reset the accumulated delta
+    // to avoid double-counting in proximity calculation.
+    mainDeltaSum_ = 0.0f;
+    SetSelectedTextStyle(false);
     currentOffset_ -= algo->GetCurrentOffset();
     offScreenItemsIndex_ = algo->GetOffScreenItems();
     contentMainSize_ = algo->GetContentMainSize();
@@ -430,6 +439,8 @@ void ContainerPickerPattern::FireChangeEvent()
         auto pickerEventHub = GetEventHub<ContainerPickerEventHub>();
         CHECK_NULL_VOID(pickerEventHub);
         pickerEventHub->FireChangeEvent(selectedIndex_);
+        distancePercent_ = 0.0;
+        SetSelectedTextStyle(false);
     }
 }
 
@@ -454,6 +465,7 @@ void ContainerPickerPattern::FireAnimationEndEvent()
     host->OnAccessibilityEvent(AccessibilityEventType::TEXT_CHANGE);
     FireScrollStopEvent();
     ForceResetWithoutAnimation();
+    SetSelectedTextStyle(false);
 }
 
 void ContainerPickerPattern::UpdateClipEdge()
@@ -551,6 +563,359 @@ void ContainerPickerPattern::UpdateDefaultTextStyle(RefPtr<FrameNode> node, Colo
             UpdateDefaultTextStyle(childNode, defaultColor);
         }
     }
+}
+
+RefPtr<FrameNode> ContainerPickerPattern::FindTextNode(const RefPtr<FrameNode>& node)
+{
+    CHECK_NULL_RETURN(node, nullptr);
+    if (node->GetTag() == V2::TEXT_ETS_TAG) {
+        return node;
+    }
+    for (const auto& child : node->GetChildren()) {
+        if (!child) {
+            continue;
+        }
+        auto found = FindTextNode(DynamicCast<FrameNode>(child));
+        if (found) {
+            return found;
+        }
+    }
+    return nullptr;
+}
+
+Dimension ContainerPickerPattern::LinearFontSize(
+    const Dimension& startFontSize, const Dimension& endFontSize, double percent)
+{
+    Dimension start = startFontSize;
+    Dimension end = endFontSize;
+    if (start.Unit() == DimensionUnit::LPX) {
+        start = Dimension(start.ConvertToPx());
+    }
+    if (end.Unit() == DimensionUnit::LPX) {
+        end = Dimension(end.ConvertToPx());
+    }
+    if (percent > FONT_SIZE_PERCENT) {
+        return start + (end - start);
+    }
+    return start + (end - start) * percent;
+}
+
+void ContainerPickerPattern::ApplyTextStyleToItem(const RefPtr<FrameNode>& node, bool isSelected)
+{
+    CHECK_NULL_VOID(node);
+    auto textNode = FindTextNode(node);
+    CHECK_NULL_VOID(textNode);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    CHECK_NULL_VOID(textLayoutProperty);
+    if (isSelected && HasSelectedTextStyle()) {
+        if (selectedTextStyle_.fontSize.has_value() && selectedTextStyle_.fontSize->IsValid()) {
+            textLayoutProperty->UpdateFontSize(selectedTextStyle_.fontSize.value());
+            isModified_ = true;
+        }
+        if (selectedTextStyle_.textColor.has_value()) {
+            textLayoutProperty->UpdateTextColor(selectedTextStyle_.textColor.value());
+            isModified_ = true;
+        }
+        if (selectedTextStyle_.fontWeight.has_value()) {
+            textLayoutProperty->UpdateFontWeight(selectedTextStyle_.fontWeight.value());
+            isModified_ = true;
+        }
+    }
+    if (isModified_) {
+        textNode->MarkModifyDone();
+        textNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    }
+}
+
+void ContainerPickerPattern::AddAnimationTextProperties(
+    int32_t currentIndex, const RefPtr<TextLayoutProperty>& textLayoutProperty)
+{
+    CHECK_NULL_VOID(textLayoutProperty);
+    TextProperties properties;
+    if (textLayoutProperty->HasFontSize()) {
+        properties.fontSize = textLayoutProperty->GetFontSize().value();
+    } else {
+        properties.fontSize = Dimension(DEFAULT_FONT_SIZE, DimensionUnit::FP);
+    }
+    if (textLayoutProperty->HasTextColor()) {
+        properties.currentColor = textLayoutProperty->GetTextColor().value();
+    }
+    if (textLayoutProperty->HasFontWeight()) {
+        properties.fontWeight = textLayoutProperty->GetFontWeight().value();
+    }
+    if (currentIndex > 0 && static_cast<size_t>(currentIndex) <= animationProperties_.size()) {
+        properties.upFontSize = animationProperties_[currentIndex - 1].fontSize;
+        properties.upColor = animationProperties_[currentIndex - 1].currentColor;
+        properties.upFontWeight = animationProperties_[currentIndex - 1].fontWeight;
+        animationProperties_[currentIndex - 1].downFontSize = properties.fontSize;
+        animationProperties_[currentIndex - 1].downColor = properties.currentColor;
+        animationProperties_[currentIndex - 1].downFontWeight = properties.fontWeight;
+    }
+    animationProperties_.emplace_back(properties);
+}
+
+void ContainerPickerPattern::UpdatePickerTextProperties(int32_t dataIndex, int32_t animIdx,
+    int32_t showCount, const RefPtr<TextLayoutProperty>& textLayoutProperty,
+    const Color& defaultColor, const Dimension& defaultSize)
+{
+    CHECK_NULL_VOID(textLayoutProperty);
+    bool isCenter = (dataIndex == selectedIndex_);
+    if (isCenter && HasSelectedTextStyle()) {
+        if (selectedTextStyle_.fontSize.has_value() && selectedTextStyle_.fontSize->IsValid()) {
+            textLayoutProperty->UpdateFontSize(selectedTextStyle_.fontSize.value());
+        }
+        if (selectedTextStyle_.textColor.has_value()) {
+            textLayoutProperty->UpdateTextColor(selectedTextStyle_.textColor.value());
+        }
+        if (selectedTextStyle_.fontWeight.has_value()) {
+            textLayoutProperty->UpdateFontWeight(selectedTextStyle_.fontWeight.value());
+        }
+        if (selectedTextStyle_.minFontSize.has_value()) {
+            textLayoutProperty->UpdateAdaptMinFontSize(selectedTextStyle_.minFontSize.value());
+        }
+        if (selectedTextStyle_.maxFontSize.has_value()) {
+            textLayoutProperty->UpdateAdaptMaxFontSize(selectedTextStyle_.maxFontSize.value());
+        }
+        if (selectedTextStyle_.textOverflow.has_value()) {
+            textLayoutProperty->UpdateTextOverflow(selectedTextStyle_.textOverflow.value());
+        }
+    } else if (HasSelectedTextStyle()) {
+        textLayoutProperty->UpdateFontSize(defaultSize);
+        textLayoutProperty->UpdateTextColor(defaultColor);
+        textLayoutProperty->ResetAdaptMinFontSize();
+        textLayoutProperty->ResetAdaptMaxFontSize();
+        textLayoutProperty->ResetTextOverflow();
+    }
+    AddAnimationTextProperties(animIdx, textLayoutProperty);
+}
+
+void ContainerPickerPattern::UpdateSingleItemTextLinear(
+    const ContainerPickerUtils::PositionMap::value_type& item,
+    const RefPtr<FrameNode>& host, const Color& defaultColor, const Dimension& defaultSize,
+    const Dimension& selectedSize, const Color& selectedColor,
+    float containerCenter, float threshold, const RefPtr<LinearEvaluator<Color>>& evaluator)
+{
+    auto index = ContainerPickerUtils::GetLoopIndex(item.first, totalItemCount_);
+    auto child = DynamicCast<FrameNode>(host->GetOrCreateChildByIndex(index));
+    auto textNode = FindTextNode(child);
+    if (!textNode) {
+        return;
+    }
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    if (!textLayoutProperty) {
+        return;
+    }
+    float itemCenter = (item.second.startPos + item.second.endPos) / 2.0f
+        - static_cast<float>(mainDeltaSum_);
+    float distance = std::abs(itemCenter - containerCenter);
+    double t = 1.0 - static_cast<double>(distance) / static_cast<double>(threshold);
+    if (t < 0.0) {
+        t = 0.0;
+    } else if (t > 1.0) {
+        t = 1.0;
+    }
+    Dimension itemSize = defaultSize;
+    Color itemColor = defaultColor;
+    auto it = originalItemStyle_.find(index);
+    if (it != originalItemStyle_.end()) {
+        itemSize = it->second.fontSize;
+        itemColor = it->second.currentColor;
+    }
+    Dimension updateSize = LinearFontSize(itemSize, selectedSize, t);
+    textLayoutProperty->UpdateFontSize(updateSize);
+    Color updateColor = evaluator->Evaluate(itemColor, selectedColor, static_cast<float>(t));
+    textLayoutProperty->UpdateTextColor(updateColor);
+    textLayoutProperty->UpdateAlignment(Alignment::CENTER);
+    UpdateTextNodeFontColor(textNode, updateColor);
+}
+
+void ContainerPickerPattern::UpdateTextPropertiesLinear(bool isDown, double scale)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    if (!HasSelectedTextStyle() || itemPosition_.empty()) {
+        return;
+    }
+    auto theme = host->GetTheme<ContainerPickerTheme>(true);
+    Color defaultColor = theme ? theme->GetFontColor() : Color::BLACK;
+    Dimension defaultSize(DEFAULT_FONT_SIZE, DimensionUnit::FP);
+    Dimension selectedSize = selectedTextStyle_.fontSize.value_or(defaultSize);
+    Color selectedColor = selectedTextStyle_.textColor.value_or(defaultColor);
+    float containerCenter = height_ / 2.0f + topPadding_;
+    float threshold = pickerItemHeight_ > 0 ? pickerItemHeight_ : 1.0f;
+    auto colorEvaluator = AceType::MakeRefPtr<LinearEvaluator<Color>>();
+    for (const auto& item : itemPosition_) {
+        UpdateSingleItemTextLinear(item, host, defaultColor, defaultSize,
+            selectedSize, selectedColor, containerCenter, threshold, colorEvaluator);
+    }
+}
+
+void ContainerPickerPattern::TextPropertiesLinearAnimation(
+    const RefPtr<TextLayoutProperty>& textLayoutProperty, int32_t index, int32_t showCount,
+    bool isDown, double scale)
+{
+    CHECK_NULL_VOID(textLayoutProperty);
+    if (index < 0 || static_cast<uint32_t>(index) >= animationProperties_.size()) {
+        return;
+    }
+    Dimension startFontSize = animationProperties_[index].fontSize;
+    Color startColor = animationProperties_[index].currentColor;
+    if ((!index && isDown) || ((index == showCount - 1) && !isDown)) {
+        textLayoutProperty->UpdateFontSize(startFontSize);
+        textLayoutProperty->UpdateTextColor(startColor);
+        return;
+    }
+    Dimension endFontSize;
+    Color endColor;
+    if (!isDown) {
+        endFontSize = animationProperties_[index].downFontSize;
+        endColor = animationProperties_[index].downColor;
+        if (scale >= FONT_WEIGHT_THRESHOLD) {
+            textLayoutProperty->UpdateFontWeight(animationProperties_[index].downFontWeight);
+        }
+    } else {
+        endFontSize = animationProperties_[index].upFontSize;
+        endColor = animationProperties_[index].upColor;
+        if (scale >= FONT_WEIGHT_THRESHOLD) {
+            textLayoutProperty->UpdateFontWeight(animationProperties_[index].upFontWeight);
+        }
+    }
+    Dimension updateSize = LinearFontSize(startFontSize, endFontSize, distancePercent_);
+    textLayoutProperty->UpdateFontSize(updateSize);
+    auto colorEvaluator = AceType::MakeRefPtr<LinearEvaluator<Color>>();
+    Color updateColor = colorEvaluator->Evaluate(startColor, endColor, static_cast<float>(distancePercent_));
+    textLayoutProperty->UpdateTextColor(updateColor);
+    if (scale < FONT_WEIGHT_THRESHOLD) {
+        textLayoutProperty->UpdateFontWeight(animationProperties_[index].fontWeight);
+    }
+}
+
+void ContainerPickerPattern::FlushAnimationTextProperties(bool isDown)
+{
+    if (animationProperties_.empty()) {
+        return;
+    }
+    if (isDown) {
+        if (animationProperties_.size() > 1) {
+            animationProperties_.erase(animationProperties_.begin());
+        }
+    } else {
+        TextProperties properties;
+        if (!animationProperties_.empty()) {
+            properties.fontSize = animationProperties_.front().fontSize;
+            properties.currentColor = animationProperties_.front().currentColor;
+        }
+        animationProperties_.insert(animationProperties_.begin(), properties);
+    }
+}
+
+void ContainerPickerPattern::UpdateScrollTextAnimation(double delta)
+{
+    if (!HasSelectedTextStyle() || pickerItemHeight_ <= 0) {
+        return;
+    }
+    double shift = static_cast<double>(pickerItemHeight_);
+    // Use accumulated drag delta so the interpolation covers a full item span (0 -> 1 -> 0).
+    double remainder = std::fmod(std::abs(static_cast<double>(mainDeltaSum_)), shift);
+    distancePercent_ = remainder / shift;
+    bool isDown = LessNotEqual(delta, 0.0);
+    UpdateTextPropertiesLinear(isDown, distancePercent_);
+}
+
+void ContainerPickerPattern::CacheOriginalItemStyle(int32_t index,
+    const RefPtr<TextLayoutProperty>& textLayoutProperty, const Dimension& defaultSize, const Color& defaultColor)
+{
+    if (originalItemStyle_.find(index) != originalItemStyle_.end()) {
+        return;
+    }
+    TextProperties orig;
+    orig.fontSize = textLayoutProperty->HasFontSize()
+        ? textLayoutProperty->GetFontSize().value() : defaultSize;
+    orig.currentColor = textLayoutProperty->HasTextColor()
+        ? textLayoutProperty->GetTextColor().value() : defaultColor;
+    if (textLayoutProperty->HasFontWeight()) {
+        orig.fontWeight = textLayoutProperty->GetFontWeight().value();
+    }
+    originalItemStyle_[index] = orig;
+}
+
+void ContainerPickerPattern::ApplyCenterItemSelectedStyle(
+    const RefPtr<TextLayoutProperty>& textLayoutProperty, Color& applyColor)
+{
+    if (selectedTextStyle_.fontSize.has_value() && selectedTextStyle_.fontSize->IsValid()) {
+        textLayoutProperty->UpdateFontSize(selectedTextStyle_.fontSize.value());
+    }
+    if (selectedTextStyle_.textColor.has_value()) {
+        textLayoutProperty->UpdateTextColor(selectedTextStyle_.textColor.value());
+        applyColor = selectedTextStyle_.textColor.value();
+    }
+    if (selectedTextStyle_.fontWeight.has_value()) {
+        textLayoutProperty->UpdateFontWeight(selectedTextStyle_.fontWeight.value());
+    }
+    if (selectedTextStyle_.minFontSize.has_value()) {
+        textLayoutProperty->UpdateAdaptMinFontSize(selectedTextStyle_.minFontSize.value());
+    }
+    if (selectedTextStyle_.maxFontSize.has_value()) {
+        textLayoutProperty->UpdateAdaptMaxFontSize(selectedTextStyle_.maxFontSize.value());
+    }
+    if (selectedTextStyle_.textOverflow.has_value()) {
+        textLayoutProperty->UpdateTextOverflow(selectedTextStyle_.textOverflow.value());
+    }
+    textLayoutProperty->UpdateAlignment(Alignment::CENTER);
+}
+
+void ContainerPickerPattern::RestoreItemOriginalStyle(int32_t index,
+    const RefPtr<TextLayoutProperty>& textLayoutProperty, Color& applyColor)
+{
+    auto it = originalItemStyle_.find(index);
+    if (it == originalItemStyle_.end()) {
+        return;
+    }
+    textLayoutProperty->UpdateFontSize(it->second.fontSize);
+    textLayoutProperty->UpdateTextColor(it->second.currentColor);
+    textLayoutProperty->UpdateFontWeight(it->second.fontWeight);
+    textLayoutProperty->ResetAdaptMinFontSize();
+    textLayoutProperty->ResetAdaptMaxFontSize();
+    textLayoutProperty->ResetTextOverflow();
+    applyColor = it->second.currentColor;
+}
+
+void ContainerPickerPattern::SetSelectedTextStyle(bool isUpdateTextStyle)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto theme = host->GetTheme<ContainerPickerTheme>(true);
+    Color defaultColor = theme ? theme->GetFontColor() : Color::BLACK;
+    Dimension defaultSize(DEFAULT_FONT_SIZE, DimensionUnit::FP);
+    animationProperties_.clear();
+    int32_t idx = 0;
+    for (const auto& item : itemPosition_) {
+        auto index = ContainerPickerUtils::GetLoopIndex(item.first, totalItemCount_);
+        auto child = DynamicCast<FrameNode>(host->GetOrCreateChildByIndex(index));
+        auto textNode = FindTextNode(child);
+        auto textLayoutProperty = textNode ? textNode->GetLayoutProperty<TextLayoutProperty>() : nullptr;
+        if (!textLayoutProperty) {
+            idx++;
+            continue;
+        }
+        CacheOriginalItemStyle(index, textLayoutProperty, defaultSize, defaultColor);
+        bool isCenter = (index == selectedIndex_);
+        Color applyColor = textLayoutProperty->HasTextColor()
+            ? textLayoutProperty->GetTextColor().value() : defaultColor;
+        if (isCenter && HasSelectedTextStyle()) {
+            ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+        } else {
+            RestoreItemOriginalStyle(index, textLayoutProperty, applyColor);
+        }
+        AddAnimationTextProperties(idx, textLayoutProperty);
+        UpdateTextNodeFontColor(textNode, applyColor);
+        idx++;
+    }
+}
+
+void ContainerPickerPattern::SyncSelectedTextStyleWithTheme()
+{
+    SetSelectedTextStyle(false);
 }
 
 void ContainerPickerPattern::SwipeTo(int32_t targetIndex)
@@ -909,6 +1274,7 @@ void ContainerPickerPattern::HandleDragUpdate(const GestureEvent& info)
 
     HandleScroll(mainDelta, SCROLL_FROM_UPDATE, NestedState::GESTURE, velocity);
     UpdateColumnChildPosition(offsetY);
+    UpdateScrollTextAnimation(static_cast<double>(mainDelta));
     dragEndTime_ = GetCurrentTime();
 }
 
@@ -917,6 +1283,7 @@ void ContainerPickerPattern::HandleDragEnd(double dragVelocity, float mainDelta)
     StopHapticController();
     UpdateDragFRCSceneInfo(dragVelocity, SceneStatus::END);
     isDragging_ = false;
+    SetSelectedTextStyle(false);
 
     if (CheckDragOutOfBoundary()) {
         // spring back
@@ -1274,8 +1641,10 @@ void ContainerPickerPattern::CreateScrollProperty()
         }
         pattern->currentDelta_ = value - pattern->lastAnimationScroll_;
         pattern->lastAnimationScroll_ = value;
+        pattern->mainDeltaSum_ += pattern->currentDelta_;
         pattern->PickerMarkDirty();
         pattern->UpdateColumnChildPosition(value);
+        pattern->UpdateScrollTextAnimation(static_cast<double>(pattern->currentDelta_));
     };
     scrollProperty_ = AceType::MakeRefPtr<NodeAnimatablePropertyFloat>(0.0, std::move(propertyCallback));
     renderContext->AttachNodeAnimatableProperty(scrollProperty_);
@@ -1497,6 +1866,8 @@ bool ContainerPickerPattern::InnerHandleScroll(bool isDown)
 void ContainerPickerPattern::OnColorConfigurationUpdate()
 {
     SetDefaultTextStyle(true);
+    originalItemStyle_.clear();
+    SetSelectedTextStyle(true);
 
     if (SystemProperties::ConfigChangePerform()) {
         // Proactively trigger PickerIndicatorStyle drawing.

@@ -3238,6 +3238,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _UIPickerComponentAttribute_setDisplayedItemCount(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
+    native static _UIPickerComponentAttribute_setSelectedTextStyle(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
     native static _UnionEffectContainer_construct(id: KInt, flags: KInt): KPointer
     @ani.unsafe.Direct
     native static _UnionEffectContainerInterface_setUnionEffectContainerOptions(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void

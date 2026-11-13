@@ -7681,6 +7681,38 @@
         "name": "OH_ArkUI_NativeModule_CustomDialog_SetAdaptToHandedness"
     },
     {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_PickerComponentTextStyle_Create"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_PickerComponentTextStyle_Dispose"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_PickerComponentTextStyle_SetColor"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_PickerComponentTextStyle_SetFontSize"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_PickerComponentTextStyle_SetFontWeight"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_PickerComponentTextStyle_SetMinFontSize"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_PickerComponentTextStyle_SetMaxFontSize"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_PickerComponentTextStyle_SetOverflow"
+    },
+    {
         "first_introduced": "26.2.0",
         "name": "OH_ArkUI_ApplicationShortcut_Register"
     },

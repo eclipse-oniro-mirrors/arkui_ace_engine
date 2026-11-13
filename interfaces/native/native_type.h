@@ -1834,6 +1834,83 @@ typedef enum {
 } ArkUI_ErrorCode;
 
 /**
+ * @brief Sets the font color for the text style of the picker component.
+ *
+ * @param style Pointer to the {@link ArkUI_PickerComponentTextStyle} instance.
+ * @param color Font color, in 0xARGB format. For example, <b>0xFF182431</b>.
+ * @return Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *     Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if the **style** parameter is a null pointer.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_PickerComponentTextStyle_SetColor(
+    ArkUI_PickerComponentTextStyle* style, uint32_t color);
+
+/**
+ * @brief Sets the font size for the text style of the picker component.
+ *
+ * @param style Pointer to the {@link ArkUI_PickerComponentTextStyle} instance.
+ * @param fontSize Font size, in fp.
+ * @return Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *     Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if the **style** parameter is a null pointer.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_PickerComponentTextStyle_SetFontSize(
+    ArkUI_PickerComponentTextStyle* style, float fontSize);
+
+/**
+ * @brief Sets the font weight for the text style of the picker component.
+ *
+ * @param style Pointer to the {@link ArkUI_PickerComponentTextStyle} instance.
+ * @param fontWeight Font weight. The value is an enumerated value of {@link ArkUI_FontWeight}.
+ * @return Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *     Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if the **style** parameter is a null pointer.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_PickerComponentTextStyle_SetFontWeight(
+    ArkUI_PickerComponentTextStyle* style, ArkUI_FontWeight fontWeight);
+
+/**
+ * @brief Sets the minimum font size for the text style of the picker component. Used with
+ * **maxFontSize** to enable font scaling. When both **minFontSize** and **maxFontSize** are set,
+ * **fontSize** is ignored.
+ *
+ * @param style Pointer to the {@link ArkUI_PickerComponentTextStyle} instance.
+ * @param minFontSize Minimum font size, in fp.
+ * @return Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *     Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if the **style** parameter is a null pointer.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_PickerComponentTextStyle_SetMinFontSize(
+    ArkUI_PickerComponentTextStyle* style, float minFontSize);
+
+/**
+ * @brief Sets the maximum font size for the text style of the picker component. Used with
+ * **minFontSize** to enable font scaling. When both **minFontSize** and **maxFontSize** are set,
+ * **fontSize** is ignored.
+ *
+ * @param style Pointer to the {@link ArkUI_PickerComponentTextStyle} instance.
+ * @param maxFontSize Maximum font size, in fp.
+ * @return Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *     Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if the **style** parameter is a null pointer.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_PickerComponentTextStyle_SetMaxFontSize(
+    ArkUI_PickerComponentTextStyle* style, float maxFontSize);
+
+/**
+ * @brief Sets the text overflow behavior for the text style of the picker component. This property has no
+ * effect when set to <b>ARKUI_TEXT_OVERFLOW_MARQUEE</b>.
+ *
+ * @param style Pointer to the {@link ArkUI_PickerComponentTextStyle} instance.
+ * @param overflow Text overflow behavior. The value is an enumerated value of {@link ArkUI_TextOverflow}.
+ * @return Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *     Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if the **style** parameter is a null pointer.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_PickerComponentTextStyle_SetOverflow(
+    ArkUI_PickerComponentTextStyle* style, ArkUI_TextOverflow overflow);
+
+/**
  * @brief defines the enumerated value of the extended security zone.
  *
  * @since 12

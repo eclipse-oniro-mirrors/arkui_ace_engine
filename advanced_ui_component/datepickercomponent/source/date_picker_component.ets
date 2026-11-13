@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { LengthMetrics } from '@ohos.arkui.node';
+import { LengthMetrics, LengthUnit } from '@ohos.arkui.node';
 import { Callback } from '@ohos.base';
 import { intl } from '@kit.LocalizationKit';
 import i18n from '@ohos.i18n';
@@ -70,6 +70,9 @@ export class DatePickerComponentOptions {
   public displayMode?: DisplayMode;
   public dateOptions?: DateOptions;
   public timeOptions?: TimeOptions;
+  public selectedTextStyle?: PickerComponentTextStyle;
+  public itemTextStyle?: PickerComponentTextStyle;
+  public selectionIndicator?: PickerIndicatorStyle;
 }
 
 class DatePickerConstant {
@@ -102,6 +105,9 @@ interface PeriodTranslation {
 @Component
 export struct DatePickerComponent {
   @Prop @Watch('onOptionsChange') options: DatePickerComponentOptions;
+  @Prop selectionIndicator?: PickerIndicatorStyle;
+  @Prop selectedTextStyle?: PickerComponentTextStyle;
+  @Prop itemTextStyle?: PickerComponentTextStyle;
   @State displayMode: DisplayMode = DisplayMode.DATE;
   @State selectedYear: number = 0;
   @State selectedMonth: number = 0;
@@ -1157,6 +1163,25 @@ private formatHour(hour24: number): string {
   }
   
   private onOptionsChange(): void {
+    // Save range snapshot before processing
+    const oldDisplayMode = this.displayMode;
+    const oldDateMode = this.dateMode;
+    const oldLunar = this.lunar;
+    const oldStartYear = this.startYear;
+    const oldEndYear = this.endYear;
+    const oldStartMonth = this.startMonth;
+    const oldEndMonth = this.endMonth;
+    const oldStartDay = this.startDay;
+    const oldEndDay = this.endDay;
+    const oldTimeFormat = this.timeFormat;
+    const oldUseMilitaryTime = this.useMilitaryTime;
+    const oldStartHour = this.startHour;
+    const oldEndHour = this.endHour;
+    const oldStartMinute = this.startMinute;
+    const oldEndMinute = this.endMinute;
+    const oldStartSecond = this.startSecond;
+    const oldEndSecond = this.endSecond;
+
     // Restore defaults for undefined/null values
     if (this.options.displayMode !== undefined && this.options.displayMode !== null) {
       this.displayMode = this.options.displayMode;
@@ -1202,7 +1227,43 @@ private formatHour(hour24: number): string {
       this.selectedPeriod = this.selectedHour < 12 ? 0 : 1;
     }
     
-    this.initArrays();
+    const newSelectedTextStyle = this.options.selectedTextStyle;
+    const newItemTextStyle = this.options.itemTextStyle;
+    const newSelectionIndicator = this.options.selectionIndicator;
+    if (newSelectedTextStyle !== undefined &&
+        !this.deepEqual(newSelectedTextStyle as Object, this.selectedTextStyle as Object)) {
+      this.selectedTextStyle = newSelectedTextStyle;
+    }
+    if (newItemTextStyle !== undefined &&
+        !this.deepEqual(newItemTextStyle as Object, this.itemTextStyle as Object)) {
+      this.itemTextStyle = newItemTextStyle;
+    }
+    if (newSelectionIndicator !== undefined &&
+        !this.deepEqual(newSelectionIndicator as Object, this.selectionIndicator as Object)) {
+      this.selectionIndicator = newSelectionIndicator;
+    }
+    
+    // Only rebuild arrays when range/mode actually changed (not just selected)
+    const rangeChanged = oldDisplayMode !== this.displayMode ||
+      oldDateMode !== this.dateMode ||
+      oldLunar !== this.lunar ||
+      oldStartYear !== this.startYear ||
+      oldEndYear !== this.endYear ||
+      oldStartMonth !== this.startMonth ||
+      oldEndMonth !== this.endMonth ||
+      oldStartDay !== this.startDay ||
+      oldEndDay !== this.endDay ||
+      oldTimeFormat !== this.timeFormat ||
+      oldUseMilitaryTime !== this.useMilitaryTime ||
+      oldStartHour !== this.startHour ||
+      oldEndHour !== this.endHour ||
+      oldStartMinute !== this.startMinute ||
+      oldEndMinute !== this.endMinute ||
+      oldStartSecond !== this.startSecond ||
+      oldEndSecond !== this.endSecond;
+    if (rangeChanged) {
+      this.initArrays();
+    }
   }
   
   private updateDateOptions(dateOptions: DateOptions): void {
@@ -2398,7 +2459,7 @@ private formatHour(hour24: number): string {
     }
   }
   
-  private getFirstPickerIndicator(radius: number = 20): PickerIndicatorStyle {
+  private getFirstPickerIndicator(radius: number = 12): PickerIndicatorStyle {
     if (this.isRTL()) {
       return {
         type: PickerIndicatorType.BACKGROUND,
@@ -2433,7 +2494,7 @@ private formatHour(hour24: number): string {
     };
   }
   
-  private getLastPickerIndicator(radius: number = 20): PickerIndicatorStyle {
+  private getLastPickerIndicator(radius: number = 12): PickerIndicatorStyle {
     if (this.isRTL()) {
       return {
         type: PickerIndicatorType.BACKGROUND,
@@ -2459,10 +2520,204 @@ private formatHour(hour24: number): string {
   private getAdjustedRadius(): number {
     const minColumnWidth = Math.min(this.firstColumnWidth, this.lastColumnWidth);
     if (minColumnWidth <= 0) {
-      return 20;
+      return 12;
     }
-    const calculatedRadius = Math.min(minColumnWidth / 2, 20);
+    const calculatedRadius = Math.min(minColumnWidth / 2, 12);
     return Math.max(calculatedRadius, 0);
+  }
+
+  private deepEqual(a: Object | undefined, b: Object | undefined): boolean {
+    if (a === b) {
+      return true;
+    }
+    if (!a || !b) {
+      return false;
+    }
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    if (keysA.length !== keysB.length) {
+      return false;
+    }
+    for (const key of keysA) {
+      const valA = (a as Record<string, Object>)[key];
+      const valB = (b as Record<string, Object>)[key];
+      if (valA === valB) {
+        continue;
+      }
+      if (typeof valA === 'object' && typeof valB === 'object' && valA && valB) {
+        if (!this.deepEqual(valA, valB)) {
+          return false;
+        }
+      } else {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private lengthMetricsToPx(lm: LengthMetrics): number {
+    if (lm.unit === LengthUnit.PX) {
+      return lm.value;
+    } else if (lm.unit === LengthUnit.VP) {
+      return vp2px(lm.value);
+    } else if (lm.unit === LengthUnit.FP) {
+      return fp2px(lm.value);
+    } else if (lm.unit === LengthUnit.LPX) {
+      return lpx2px(lm.value);
+    }
+    return lm.value;
+  }
+
+  private getColumnWidthPercent(overallIndex: number): number {
+    const dateCount = this.displayMode === DisplayMode.TIME ? 0 : this.getDateColumnCount();
+    if (this.displayMode === DisplayMode.DATE) {
+      return parseFloat(this.getDateColumnWidth(overallIndex));
+    } else if (this.displayMode === DisplayMode.TIME) {
+      return parseFloat(this.getTimeColumnWidth(overallIndex));
+    } else {
+      if (overallIndex < dateCount) {
+        return parseFloat(this.getDateColumnWidth(overallIndex));
+      } else {
+        return parseFloat(this.getTimeColumnWidth(overallIndex - dateCount));
+      }
+    }
+  }
+
+  private getTotalWidthPx(): number {
+    if (this.firstColumnWidth <= 0) {
+      return 0;
+    }
+    const firstPercent = this.getColumnWidthPercent(0);
+    if (firstPercent <= 0) {
+      return 0;
+    }
+    return this.firstColumnWidth * 100 / firstPercent;
+  }
+
+  private getColumnWidthPx(columnIndex: number): number {
+    const totalWidth = this.getTotalWidthPx();
+    if (totalWidth <= 0) {
+      return 0;
+    }
+    return totalWidth * this.getColumnWidthPercent(columnIndex) / 100;
+  }
+
+  private getPrecedingWidthPx(columnIndex: number): number {
+    let preceding = 0;
+    for (let i = 0; i < columnIndex; i++) {
+      preceding += this.getColumnWidthPx(i);
+    }
+    return preceding;
+  }
+
+  private getFollowingWidthPx(columnIndex: number): number {
+    const totalColumns = this.getColumnCount();
+    let following = 0;
+    for (let i = columnIndex + 1; i < totalColumns; i++) {
+      following += this.getColumnWidthPx(i);
+    }
+    return following;
+  }
+
+  private getTimeStartIndex(): number {
+    return this.displayMode === DisplayMode.DATE_TIME ? this.getDateColumnCount() : 0;
+  }
+
+  private adjustSelectionIndicatorForPosition(columnIndex: number): PickerIndicatorStyle {
+    const totalColumns = this.getColumnCount();
+    const position: 'first' | 'middle' | 'last' =
+      columnIndex === 0 ? 'first' :
+      columnIndex === totalColumns - 1 ? 'last' : 'middle';
+    if (!this.selectionIndicator) {
+      if (position === 'first') {
+        return this.getFirstPickerIndicator(this.getAdjustedRadius());
+      } else if (position === 'last') {
+        return this.getLastPickerIndicator(this.getAdjustedRadius());
+      }
+      return this.getMiddlePickerIndicator();
+    }
+    const indicator = this.selectionIndicator;
+    const userBR = indicator.borderRadius;
+    const defaultRadius = this.getAdjustedRadius();
+    let tl: number = defaultRadius;
+    let tr: number = defaultRadius;
+    let bl: number = defaultRadius;
+    let br: number = defaultRadius;
+    if (userBR) {
+      const lm = userBR as LengthMetrics;
+      const lr = userBR as LocalizedBorderRadiuses;
+      const rb = userBR as BorderRadiuses;
+      if (lm.value !== undefined) {
+        tl = tr = bl = br = lm.value;
+      } else if (lr.topStart !== undefined) {
+        if (this.isRTL()) {
+          tl = (lr.topEnd as LengthMetrics).value;
+          tr = (lr.topStart as LengthMetrics).value;
+          bl = (lr.bottomEnd as LengthMetrics).value;
+          br = (lr.bottomStart as LengthMetrics).value;
+        } else {
+          tl = (lr.topStart as LengthMetrics).value;
+          tr = (lr.topEnd as LengthMetrics).value;
+          bl = (lr.bottomStart as LengthMetrics).value;
+          br = (lr.bottomEnd as LengthMetrics).value;
+        }
+      } else if (rb.topLeft !== undefined) {
+        tl = rb.topLeft as number;
+        tr = rb.topRight as number;
+        bl = rb.bottomLeft as number;
+        br = rb.bottomRight as number;
+      }
+    }
+    if (position === 'middle') {
+      tl = tr = bl = br = 0;
+    } else if (position === 'first') {
+      if (this.isRTL()) { tl = 0; bl = 0; } else { tr = 0; br = 0; }
+    } else {
+      if (this.isRTL()) { tr = 0; br = 0; } else { tl = 0; bl = 0; }
+    }
+    let adjustedStartMargin: LengthMetrics | undefined = indicator.startMargin;
+    let adjustedEndMargin: LengthMetrics | undefined = indicator.endMargin;
+    let adjustedStrokeWidth: LengthMetrics | undefined = indicator.strokeWidth;
+    const totalWidthPx = this.getTotalWidthPx();
+    const currentColumnWidthPx = totalWidthPx > 0 ? this.getColumnWidthPx(columnIndex) : 0;
+    if (totalWidthPx > 0 && currentColumnWidthPx > 0) {
+      const safetyMargin = 2;
+      const safeColumnWidth = Math.max(0, currentColumnWidthPx - safetyMargin);
+      const precedingWidthPx = this.getPrecedingWidthPx(columnIndex);
+      const followingWidthPx = this.getFollowingWidthPx(columnIndex);
+      let remainingStart = 0;
+      let remainingEnd = 0;
+      if (indicator.startMargin) {
+        const userStartPx = this.lengthMetricsToPx(indicator.startMargin);
+        remainingStart = Math.max(0, userStartPx - precedingWidthPx);
+      }
+      if (indicator.endMargin) {
+        const userEndPx = this.lengthMetricsToPx(indicator.endMargin);
+        remainingEnd = Math.max(0, userEndPx - followingWidthPx);
+      }
+      if (remainingStart + remainingEnd >= currentColumnWidthPx) {
+        adjustedStrokeWidth = LengthMetrics.px(0);
+        adjustedStartMargin = undefined;
+        adjustedEndMargin = undefined;
+      } else {
+        const cappedStart = Math.min(remainingStart, safeColumnWidth);
+        adjustedStartMargin = cappedStart > 0 ? LengthMetrics.px(cappedStart) : undefined;
+        const cappedEnd = Math.min(remainingEnd, safeColumnWidth);
+        adjustedEndMargin = cappedEnd > 0 ? LengthMetrics.px(cappedEnd) : undefined;
+      }
+    } else {
+      adjustedStartMargin = undefined;
+      adjustedEndMargin = undefined;
+    }
+    return {
+      type: indicator.type,
+      borderRadius: { topLeft: tl, topRight: tr, bottomLeft: bl, bottomRight: br } as BorderRadiuses,
+      strokeWidth: adjustedStrokeWidth,
+      dividerColor: indicator.dividerColor,
+      startMargin: adjustedStartMargin,
+      endMargin: adjustedEndMargin,
+      backgroundColor: indicator.backgroundColor
+    } as PickerIndicatorStyle;
   }
   
   build() {
@@ -2473,15 +2728,20 @@ private formatHour(hour24: number): string {
             ForEach(this.yearArray, (item: string) => {
               Text(item)
                 .maxLines(1)
-                .fontSize(this.getFontSize())
-                .textOverflow({ overflow: TextOverflow.Clip })
+                .fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize())
+                .fontColor(this.itemTextStyle?.color)
+                .fontWeight(this.itemTextStyle?.font?.weight)
+                .minFontSize(this.itemTextStyle?.minFontSize)
+                .maxFontSize(this.itemTextStyle?.maxFontSize)
+                .textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip })
             })
           }
           .width(this.getDateColumnWidth(0))
           .height(200)
+          .selectedTextStyle(this.selectedTextStyle)
           .canLoop(this.yearColumnCanLoop)
           .enableHapticFeedback(this.dateHapticFeedback)
-          .selectionIndicator(this.getFirstPickerIndicator(this.getAdjustedRadius()))
+          .selectionIndicator(this.adjustSelectionIndicatorForPosition(0))
           .onChange((selectedIndex: number) => {
             this.onYearChange(selectedIndex);
           })
@@ -2499,15 +2759,20 @@ private formatHour(hour24: number): string {
             ForEach(this.monthArray, (item: string) => {
               Text(item)
                 .maxLines(1)
-                .fontSize(this.getFontSize())
-                .textOverflow({ overflow: TextOverflow.Clip })
+                .fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize())
+                .fontColor(this.itemTextStyle?.color)
+                .fontWeight(this.itemTextStyle?.font?.weight)
+                .minFontSize(this.itemTextStyle?.minFontSize)
+                .maxFontSize(this.itemTextStyle?.maxFontSize)
+                .textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip })
             })
           }
           .width(this.getDateColumnWidth(1))
           .height(200)
+          .selectedTextStyle(this.selectedTextStyle)
           .canLoop(this.monthColumnCanLoop)
           .enableHapticFeedback(this.dateHapticFeedback)
-          .selectionIndicator(this.getMiddlePickerIndicator())
+          .selectionIndicator(this.adjustSelectionIndicatorForPosition(1))
           .onChange((selectedIndex: number) => {
             this.onMonthChange(selectedIndex);
           })
@@ -2519,15 +2784,20 @@ private formatHour(hour24: number): string {
             ForEach(this.dayArray, (item: string) => {
               Text(item)
                 .maxLines(1)
-                .fontSize(this.getFontSize())
-                .textOverflow({ overflow: TextOverflow.Clip })
+                .fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize())
+                .fontColor(this.itemTextStyle?.color)
+                .fontWeight(this.itemTextStyle?.font?.weight)
+                .minFontSize(this.itemTextStyle?.minFontSize)
+                .maxFontSize(this.itemTextStyle?.maxFontSize)
+                .textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip })
             })
           }
           .width(this.getDateColumnWidth(2))
           .height(200)
+          .selectedTextStyle(this.selectedTextStyle)
           .canLoop(this.dayColumnCanLoop)
           .enableHapticFeedback(this.dateHapticFeedback)
-          .selectionIndicator(this.displayMode === DisplayMode.DATE_TIME ? this.getMiddlePickerIndicator() : this.getLastPickerIndicator(this.getAdjustedRadius()))
+          .selectionIndicator(this.adjustSelectionIndicatorForPosition(2))
           .onChange((selectedIndex: number) => {
             this.onDayChange(selectedIndex);
           })
@@ -2547,15 +2817,20 @@ private formatHour(hour24: number): string {
             ForEach(this.yearArray, (item: string) => {
               Text(item)
                 .maxLines(1)
-                .fontSize(this.getFontSize())
-                .textOverflow({ overflow: TextOverflow.Clip })
+                .fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize())
+                .fontColor(this.itemTextStyle?.color)
+                .fontWeight(this.itemTextStyle?.font?.weight)
+                .minFontSize(this.itemTextStyle?.minFontSize)
+                .maxFontSize(this.itemTextStyle?.maxFontSize)
+                .textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip })
             })
           }
           .width(this.getDateColumnWidth(0))
           .height(200)
+          .selectedTextStyle(this.selectedTextStyle)
           .canLoop(this.yearColumnCanLoop)
           .enableHapticFeedback(this.dateHapticFeedback)
-          .selectionIndicator(this.getFirstPickerIndicator(this.getAdjustedRadius()))
+          .selectionIndicator(this.adjustSelectionIndicatorForPosition(0))
           .onChange((selectedIndex: number) => {
             this.onYearChange(selectedIndex);
           })
@@ -2573,15 +2848,20 @@ private formatHour(hour24: number): string {
             ForEach(this.monthArray, (item: string) => {
               Text(item)
                 .maxLines(1)
-                .fontSize(this.getFontSize())
-                .textOverflow({ overflow: TextOverflow.Clip })
+                .fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize())
+                .fontColor(this.itemTextStyle?.color)
+                .fontWeight(this.itemTextStyle?.font?.weight)
+                .minFontSize(this.itemTextStyle?.minFontSize)
+                .maxFontSize(this.itemTextStyle?.maxFontSize)
+                .textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip })
             })
           }
           .width(this.getDateColumnWidth(1))
           .height(200)
+          .selectedTextStyle(this.selectedTextStyle)
           .canLoop(this.monthColumnCanLoop)
           .enableHapticFeedback(this.dateHapticFeedback)
-          .selectionIndicator(this.displayMode === DisplayMode.DATE_TIME ? this.getMiddlePickerIndicator() : this.getLastPickerIndicator(this.getAdjustedRadius()))
+          .selectionIndicator(this.adjustSelectionIndicatorForPosition(1))
           .onChange((selectedIndex: number) => {
             this.onMonthChange(selectedIndex);
           })
@@ -2602,15 +2882,20 @@ private formatHour(hour24: number): string {
             ForEach(this.monthArray, (item: string) => {
               Text(item)
                 .maxLines(1)
-                .fontSize(this.getFontSize())
-                .textOverflow({ overflow: TextOverflow.Clip })
+                .fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize())
+                .fontColor(this.itemTextStyle?.color)
+                .fontWeight(this.itemTextStyle?.font?.weight)
+                .minFontSize(this.itemTextStyle?.minFontSize)
+                .maxFontSize(this.itemTextStyle?.maxFontSize)
+                .textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip })
             })
           }
           .width(this.getDateColumnWidth(0))
           .height(200)
+          .selectedTextStyle(this.selectedTextStyle)
           .canLoop(this.monthColumnCanLoop)
           .enableHapticFeedback(this.dateHapticFeedback)
-          .selectionIndicator(this.getFirstPickerIndicator(this.getAdjustedRadius()))
+          .selectionIndicator(this.adjustSelectionIndicatorForPosition(0))
           .onChange((selectedIndex: number) => {
             this.onMonthChange(selectedIndex);
           })
@@ -2627,15 +2912,20 @@ private formatHour(hour24: number): string {
             ForEach(this.dayArray, (item: string) => {
               Text(item)
                 .maxLines(1)
-                .fontSize(this.getFontSize())
-                .textOverflow({ overflow: TextOverflow.Clip })
+                .fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize())
+                .fontColor(this.itemTextStyle?.color)
+                .fontWeight(this.itemTextStyle?.font?.weight)
+                .minFontSize(this.itemTextStyle?.minFontSize)
+                .maxFontSize(this.itemTextStyle?.maxFontSize)
+                .textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip })
             })
           }
           .width(this.getDateColumnWidth(1))
           .height(200)
+          .selectedTextStyle(this.selectedTextStyle)
           .canLoop(this.dayColumnCanLoop)
           .enableHapticFeedback(this.dateHapticFeedback)
-          .selectionIndicator(this.displayMode === DisplayMode.DATE_TIME ? this.getMiddlePickerIndicator() : this.getLastPickerIndicator(this.getAdjustedRadius()))
+          .selectionIndicator(this.adjustSelectionIndicatorForPosition(1))
           .onChange((selectedIndex: number) => {
             this.onDayChange(selectedIndex);
           })
@@ -2661,15 +2951,20 @@ private formatHour(hour24: number): string {
               ForEach(this.hourArray, (item: string) => {
                 Text(item)
                 .maxLines(1)
-                .fontSize(this.getFontSize())
-                .textOverflow({ overflow: TextOverflow.Clip })
+                .fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize())
+                .fontColor(this.itemTextStyle?.color)
+                .fontWeight(this.itemTextStyle?.font?.weight)
+                .minFontSize(this.itemTextStyle?.minFontSize)
+                .maxFontSize(this.itemTextStyle?.maxFontSize)
+                .textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip })
               })
             }
             .width(this.getTimeColumnWidth(0))
             .height(200)
+            .selectedTextStyle(this.selectedTextStyle)
             .canLoop(this.hourColumnCanLoop)
             .enableHapticFeedback(this.timeHapticFeedback)
-            .selectionIndicator(this.displayMode === DisplayMode.DATE_TIME ? this.getMiddlePickerIndicator() : this.getFirstPickerIndicator(this.getAdjustedRadius()))
+            .selectionIndicator(this.adjustSelectionIndicatorForPosition(this.getTimeStartIndex()))
             .onChange((selectedIndex: number) => {
               this.onHourChange(selectedIndex);
             })
@@ -2691,15 +2986,20 @@ private formatHour(hour24: number): string {
               ForEach(this.minuteArray, (item: string) => {
                 Text(item)
                 .maxLines(1)
-                .fontSize(this.getFontSize())
-                .textOverflow({ overflow: TextOverflow.Clip })
+                .fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize())
+                .fontColor(this.itemTextStyle?.color)
+                .fontWeight(this.itemTextStyle?.font?.weight)
+                .minFontSize(this.itemTextStyle?.minFontSize)
+                .maxFontSize(this.itemTextStyle?.maxFontSize)
+                .textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip })
               })
             }
             .width(this.getTimeColumnWidth(1))
             .height(200)
+            .selectedTextStyle(this.selectedTextStyle)
             .canLoop(this.minuteColumnCanLoop)
             .enableHapticFeedback(this.timeHapticFeedback)
-            .selectionIndicator(this.getLastPickerIndicator(this.getAdjustedRadius()))
+            .selectionIndicator(this.adjustSelectionIndicatorForPosition(this.getTimeStartIndex() + 1))
             .onChange((selectedIndex: number) => {
               this.onMinuteChange(selectedIndex);
             })
@@ -2724,15 +3024,20 @@ private formatHour(hour24: number): string {
               ForEach(this.periodArray, (item: string) => {
                 Text(item)
                 .maxLines(1)
-                .fontSize(this.getFontSize())
-                .textOverflow({ overflow: TextOverflow.Clip })
+                .fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize())
+                .fontColor(this.itemTextStyle?.color)
+                .fontWeight(this.itemTextStyle?.font?.weight)
+                .minFontSize(this.itemTextStyle?.minFontSize)
+                .maxFontSize(this.itemTextStyle?.maxFontSize)
+                .textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip })
               })
             }
             .width(this.getTimeColumnWidth(0))
             .height(200)
+            .selectedTextStyle(this.selectedTextStyle)
             .canLoop(false)
             .enableHapticFeedback(this.timeHapticFeedback)
-            .selectionIndicator(this.displayMode === DisplayMode.DATE_TIME ? this.getMiddlePickerIndicator() : this.getFirstPickerIndicator(this.getAdjustedRadius()))
+            .selectionIndicator(this.adjustSelectionIndicatorForPosition(this.getTimeStartIndex()))
             .onChange((selectedIndex: number) => {
               this.onPeriodChange(selectedIndex);
             })
@@ -2752,15 +3057,20 @@ private formatHour(hour24: number): string {
               ForEach(this.hourArray, (item: string) => {
                 Text(item)
                 .maxLines(1)
-                .fontSize(this.getFontSize())
-                .textOverflow({ overflow: TextOverflow.Clip })
+                .fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize())
+                .fontColor(this.itemTextStyle?.color)
+                .fontWeight(this.itemTextStyle?.font?.weight)
+                .minFontSize(this.itemTextStyle?.minFontSize)
+                .maxFontSize(this.itemTextStyle?.maxFontSize)
+                .textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip })
               })
             }
             .width(this.getTimeColumnWidth(1))
             .height(200)
+            .selectedTextStyle(this.selectedTextStyle)
             .canLoop(this.hourColumnCanLoop)
             .enableHapticFeedback(this.timeHapticFeedback)
-            .selectionIndicator(this.getMiddlePickerIndicator())
+            .selectionIndicator(this.adjustSelectionIndicatorForPosition(this.getTimeStartIndex() + 1))
             .onChange((selectedIndex: number) => {
               this.onHourChange(selectedIndex);
             })
@@ -2773,15 +3083,20 @@ private formatHour(hour24: number): string {
               ForEach(this.minuteArray, (item: string) => {
                 Text(item)
                 .maxLines(1)
-                .fontSize(this.getFontSize())
-                .textOverflow({ overflow: TextOverflow.Clip })
+                .fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize())
+                .fontColor(this.itemTextStyle?.color)
+                .fontWeight(this.itemTextStyle?.font?.weight)
+                .minFontSize(this.itemTextStyle?.minFontSize)
+                .maxFontSize(this.itemTextStyle?.maxFontSize)
+                .textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip })
               })
             }
             .width(this.getTimeColumnWidth(2))
             .height(200)
+            .selectedTextStyle(this.selectedTextStyle)
             .canLoop(this.minuteColumnCanLoop)
             .enableHapticFeedback(this.timeHapticFeedback)
-            .selectionIndicator(this.getLastPickerIndicator(this.getAdjustedRadius()))
+            .selectionIndicator(this.adjustSelectionIndicatorForPosition(this.getTimeStartIndex() + 2))
             .onChange((selectedIndex: number) => {
               this.onMinuteChange(selectedIndex);
             })
@@ -2807,15 +3122,20 @@ private formatHour(hour24: number): string {
               ForEach(this.hourArray, (item: string) => {
                 Text(item)
                 .maxLines(1)
-                .fontSize(this.getFontSize())
-                .textOverflow({ overflow: TextOverflow.Clip })
+                .fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize())
+                .fontColor(this.itemTextStyle?.color)
+                .fontWeight(this.itemTextStyle?.font?.weight)
+                .minFontSize(this.itemTextStyle?.minFontSize)
+                .maxFontSize(this.itemTextStyle?.maxFontSize)
+                .textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip })
               })
             }
             .width(this.getTimeColumnWidth(0))
             .height(200)
+            .selectedTextStyle(this.selectedTextStyle)
             .canLoop(this.hourColumnCanLoop)
             .enableHapticFeedback(this.timeHapticFeedback)
-            .selectionIndicator(this.displayMode === DisplayMode.DATE_TIME ? this.getMiddlePickerIndicator() : this.getFirstPickerIndicator(this.getAdjustedRadius()))
+            .selectionIndicator(this.adjustSelectionIndicatorForPosition(this.getTimeStartIndex()))
             .onChange((selectedIndex: number) => {
               this.onHourChange(selectedIndex);
             })
@@ -2837,15 +3157,20 @@ private formatHour(hour24: number): string {
               ForEach(this.minuteArray, (item: string) => {
                 Text(item)
                 .maxLines(1)
-                .fontSize(this.getFontSize())
-                .textOverflow({ overflow: TextOverflow.Clip })
+                .fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize())
+                .fontColor(this.itemTextStyle?.color)
+                .fontWeight(this.itemTextStyle?.font?.weight)
+                .minFontSize(this.itemTextStyle?.minFontSize)
+                .maxFontSize(this.itemTextStyle?.maxFontSize)
+                .textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip })
               })
             }
             .width(this.getTimeColumnWidth(1))
             .height(200)
+            .selectedTextStyle(this.selectedTextStyle)
             .canLoop(this.minuteColumnCanLoop)
             .enableHapticFeedback(this.timeHapticFeedback)
-            .selectionIndicator(this.getMiddlePickerIndicator())
+            .selectionIndicator(this.adjustSelectionIndicatorForPosition(this.getTimeStartIndex() + 1))
             .onChange((selectedIndex: number) => {
               this.onMinuteChange(selectedIndex);
             })
@@ -2863,15 +3188,20 @@ private formatHour(hour24: number): string {
               ForEach(this.secondArray, (item: string) => {
                 Text(item)
                 .maxLines(1)
-                .fontSize(this.getFontSize())
-                .textOverflow({ overflow: TextOverflow.Clip })
+                .fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize())
+                .fontColor(this.itemTextStyle?.color)
+                .fontWeight(this.itemTextStyle?.font?.weight)
+                .minFontSize(this.itemTextStyle?.minFontSize)
+                .maxFontSize(this.itemTextStyle?.maxFontSize)
+                .textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip })
               })
             }
             .width(this.getTimeColumnWidth(2))
             .height(200)
+            .selectedTextStyle(this.selectedTextStyle)
             .canLoop(this.secondColumnCanLoop)
             .enableHapticFeedback(this.timeHapticFeedback)
-            .selectionIndicator(this.getLastPickerIndicator(this.getAdjustedRadius()))
+            .selectionIndicator(this.adjustSelectionIndicatorForPosition(this.getTimeStartIndex() + 2))
             .onChange((selectedIndex: number) => {
               this.onSecondChange(selectedIndex);
             })
@@ -2894,15 +3224,20 @@ private formatHour(hour24: number): string {
               ForEach(this.periodArray, (item: string) => {
                 Text(item)
                 .maxLines(1)
-                .fontSize(this.getFontSize())
-                .textOverflow({ overflow: TextOverflow.Clip })
+                .fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize())
+                .fontColor(this.itemTextStyle?.color)
+                .fontWeight(this.itemTextStyle?.font?.weight)
+                .minFontSize(this.itemTextStyle?.minFontSize)
+                .maxFontSize(this.itemTextStyle?.maxFontSize)
+                .textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip })
               })
             }
             .width(this.getTimeColumnWidth(0))
             .height(200)
+            .selectedTextStyle(this.selectedTextStyle)
             .canLoop(false)
             .enableHapticFeedback(this.timeHapticFeedback)
-            .selectionIndicator(this.displayMode === DisplayMode.DATE_TIME ? this.getMiddlePickerIndicator() : this.getFirstPickerIndicator(this.getAdjustedRadius()))
+            .selectionIndicator(this.adjustSelectionIndicatorForPosition(this.getTimeStartIndex()))
             .onChange((selectedIndex: number) => {
               this.onPeriodChange(selectedIndex);
             })
@@ -2923,15 +3258,20 @@ private formatHour(hour24: number): string {
               ForEach(this.hourArray, (item: string) => {
                 Text(item)
                 .maxLines(1)
-                .fontSize(this.getFontSize())
-                .textOverflow({ overflow: TextOverflow.Clip })
+                .fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize())
+                .fontColor(this.itemTextStyle?.color)
+                .fontWeight(this.itemTextStyle?.font?.weight)
+                .minFontSize(this.itemTextStyle?.minFontSize)
+                .maxFontSize(this.itemTextStyle?.maxFontSize)
+                .textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip })
               })
             }
             .width(this.getTimeColumnWidth(1))
             .height(200)
+            .selectedTextStyle(this.selectedTextStyle)
             .canLoop(this.hourColumnCanLoop)
             .enableHapticFeedback(this.timeHapticFeedback)
-            .selectionIndicator(this.getMiddlePickerIndicator())
+            .selectionIndicator(this.adjustSelectionIndicatorForPosition(this.getTimeStartIndex() + 1))
             .onChange((selectedIndex: number) => {
               this.onHourChange(selectedIndex);
             })
@@ -2944,15 +3284,20 @@ private formatHour(hour24: number): string {
               ForEach(this.minuteArray, (item: string) => {
                 Text(item)
                 .maxLines(1)
-                .fontSize(this.getFontSize())
-                .textOverflow({ overflow: TextOverflow.Clip })
+                .fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize())
+                .fontColor(this.itemTextStyle?.color)
+                .fontWeight(this.itemTextStyle?.font?.weight)
+                .minFontSize(this.itemTextStyle?.minFontSize)
+                .maxFontSize(this.itemTextStyle?.maxFontSize)
+                .textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip })
               })
             }
             .width(this.getTimeColumnWidth(2))
             .height(200)
+            .selectedTextStyle(this.selectedTextStyle)
             .canLoop(this.minuteColumnCanLoop)
             .enableHapticFeedback(this.timeHapticFeedback)
-            .selectionIndicator(this.getMiddlePickerIndicator())
+            .selectionIndicator(this.adjustSelectionIndicatorForPosition(this.getTimeStartIndex() + 2))
             .onChange((selectedIndex: number) => {
               this.onMinuteChange(selectedIndex);
             })
@@ -2970,15 +3315,20 @@ private formatHour(hour24: number): string {
               ForEach(this.secondArray, (item: string) => {
                 Text(item)
                 .maxLines(1)
-                .fontSize(this.getFontSize())
-                .textOverflow({ overflow: TextOverflow.Clip })
+                .fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize())
+                .fontColor(this.itemTextStyle?.color)
+                .fontWeight(this.itemTextStyle?.font?.weight)
+                .minFontSize(this.itemTextStyle?.minFontSize)
+                .maxFontSize(this.itemTextStyle?.maxFontSize)
+                .textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip })
               })
             }
             .width(this.getTimeColumnWidth(3))
             .height(200)
+            .selectedTextStyle(this.selectedTextStyle)
             .canLoop(this.secondColumnCanLoop)
             .enableHapticFeedback(this.timeHapticFeedback)
-            .selectionIndicator(this.getLastPickerIndicator(this.getAdjustedRadius()))
+            .selectionIndicator(this.adjustSelectionIndicatorForPosition(this.getTimeStartIndex() + 3))
             .onChange((selectedIndex: number) => {
               this.onSecondChange(selectedIndex);
             })

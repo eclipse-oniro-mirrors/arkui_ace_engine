@@ -1424,6 +1424,21 @@ struct ArkUI_PickerIndicatorStyle {
     ArkUI_Float32 endMargin;
 };
 
+struct ArkUI_PickerComponentTextStyle {
+    ArkUI_Bool hasColor;
+    ArkUI_Uint32 color;
+    ArkUI_Bool hasFontSize;
+    ArkUI_Float32 fontSize;
+    ArkUI_Bool hasFontWeight;
+    ArkUI_Int32 fontWeight;
+    ArkUI_Bool hasMinFontSize;
+    ArkUI_Float32 minFontSize;
+    ArkUI_Bool hasMaxFontSize;
+    ArkUI_Float32 maxFontSize;
+    ArkUI_Bool hasOverflow;
+    ArkUI_Int32 overflow;
+};
+
 struct OH_ArkUI_FontWeightConfigs {
     bool enableVariableFontWeight;
     bool enableDeviceFontWeightCategory;
@@ -5981,6 +5996,10 @@ struct ArkUIContainerPickerModifier {
     void (*resetContainerPickerDisplayedItemCount)(ArkUINodeHandle node);
     void (*setContainerPickerItemHeight)(ArkUINodeHandle node, ArkUI_Float32 itemHeight);
     void (*resetContainerPickerItemHeight)(ArkUINodeHandle node);
+    void (*setContainerPickerSelectedTextStyle)(
+        ArkUINodeHandle node, const struct ArkUI_PickerComponentTextStyle* textStyle);
+    void (*resetContainerPickerSelectedTextStyle)(ArkUINodeHandle node);
+    ArkUI_PickerComponentTextStyle (*getContainerPickerSelectedTextStyle)(ArkUINodeHandle node);
     int32_t (*getContainerPickerSelectedIndex)(ArkUINodeHandle node);
     ArkUI_Bool (*getContainerPickerEnableHapticFeedback)(ArkUINodeHandle node);
     ArkUI_Bool (*getContainerPickerCanLoop)(ArkUINodeHandle node);

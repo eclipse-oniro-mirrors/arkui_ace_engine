@@ -14078,6 +14078,10 @@ class ArkContainerPickerComponent extends ArkComponent {
     modifierWithKey(this._modifiersWithKeys, ContainerPickerItemHeightModifier.identity, ContainerPickerItemHeightModifier, height);
     return this;
   }
+  selectedTextStyle(style) {
+    modifierWithKey(this._modifiersWithKeys, ContainerPickerSelectedTextStyleModifier.identity, ContainerPickerSelectedTextStyleModifier, style);
+    return this;
+  }
 
 }
 
@@ -14211,6 +14215,27 @@ class ContainerPickerItemHeightModifier extends ModifierWithKey {
   }
 }
 ContainerPickerItemHeightModifier.identity = Symbol('containerPickerItemHeight');
+
+class ContainerPickerSelectedTextStyleModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().containerPicker.resetContainerPickerSelectedTextStyle(node);
+    } else {
+      const style = this.value;
+      const color = style === null || style === void 0 ? void 0 : style.color;
+      const fontSize = style === null || style === void 0 ? void 0 : (style.font === null || style.font === void 0 ? void 0 : style.font.size);
+      const fontWeight = style === null || style === void 0 ? void 0 : (style.font === null || style.font === void 0 ? void 0 : style.font.weight);
+      const minFontSize = style === null || style === void 0 ? void 0 : style.minFontSize;
+      const maxFontSize = style === null || style === void 0 ? void 0 : style.maxFontSize;
+      const overflow = style === null || style === void 0 ? void 0 : style.overflow;
+      getUINativeModule().containerPicker.setContainerPickerSelectedTextStyle(node, color, fontSize, fontWeight, minFontSize, maxFontSize, overflow);
+    }
+  }
+}
+ContainerPickerSelectedTextStyleModifier.identity = Symbol('containerPickerSelectedTextStyle');
 // @ts-ignore
 if (globalThis.UIPickerComponent !== undefined) {
   globalThis.UIPickerComponent.attributeModifier = function (modifier) {
