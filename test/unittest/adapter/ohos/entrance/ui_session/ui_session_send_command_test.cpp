@@ -15,6 +15,7 @@
 
 #include <atomic>
 #include <functional>
+#include <map>
 #include <memory>
 #include <string>
 #include <thread>
@@ -97,6 +98,47 @@ public:
     sptr<UiReportStub> report;
     std::shared_ptr<AppExecFwk::EventHandler> handler;
 };
+
+TEST(CommandResultTest, UnsupportedHostErrorIsSerialized)
+{
+    auto json = JsonUtil::ParseJsonString(SerializeCommandResult(
+        NG::CommandResult::Error(NG::CommandErrorType::NOT_SUPPORTED)));
+    ASSERT_TRUE(json && json->IsObject());
+    EXPECT_EQ(json->GetString("result"), "FAILED");
+    EXPECT_EQ(json->GetString("errorType"), "NOT_SUPPORTED");
+    EXPECT_TRUE(json->Contains("errorMessage"));
+}
+
+TEST_F(SendCommandTest, AccessibilityActionEnvelopeAndProviderIdRoundTrip)
+{
+    const std::vector<std::pair<int32_t, std::string>> commands = {
+        { COMMAND_NODE_ID,
+            R"({"protocol":"arkui.accessibility","version":1,"action":"ACTION_CLICK","arguments":{}})" },
+        { 84,
+            R"({"protocol":"arkui.accessibility","version":1,"elementId":"77",)"
+            R"("action":"ACTION_CLICK","arguments":{}})" },
+    };
+    for (const auto& entry : commands) {
+        uint64_t requestId = 0;
+        remote->send = [&entry, &requestId](uint32_t code, MessageParcel& data,
+                           MessageParcel&, MessageOption& option) {
+            EXPECT_EQ(code, IUiContentService::SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK);
+            EXPECT_EQ(option.GetFlags(), MessageOption::TF_SYNC);
+            EXPECT_EQ(data.ReadInterfaceToken(), IUiContentService::GetDescriptor());
+            EXPECT_TRUE(data.ReadUint64(requestId));
+            EXPECT_NE(requestId, 0u);
+            EXPECT_EQ(data.ReadInt32(), entry.first);
+            EXPECT_EQ(data.ReadString(), entry.second);
+            return 0;
+        };
+        std::string actualResult;
+        ASSERT_EQ(proxy->SendCommand(entry.first, entry.second,
+            [&actualResult](const std::string& result) { actualResult = result; }), NO_ERROR);
+        EXPECT_TRUE(actualResult.empty());
+        report->ReportCommandResult(requestId, R"({"result":"SUCCESS"})");
+        EXPECT_EQ(actualResult, R"({"result":"SUCCESS"})");
+    }
+}
 
 TEST_F(SendCommandTest, OverloadsSharePendingAndLegacyParcelIsUnchanged)
 {

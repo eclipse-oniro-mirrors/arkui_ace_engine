@@ -217,6 +217,8 @@ public:
     bool ExecuteActionFromRoot(int64_t elementId, const std::map<std::string, std::string>& actionArguments,
         Accessibility::ActionType action, const RefPtr<PipelineBase>& context,
         const RefPtr<NG::FrameNode>& exportedRoot);
+    bool ExecuteActionForFrameNode(const RefPtr<NG::FrameNode>& frameNode, Accessibility::ActionType action,
+        const std::map<std::string, std::string>& actionArguments, const RefPtr<NG::PipelineContext>& context);
     // Condition-aware focus move search scoped to the exported subtree (result envelope per AAMS).
     void FocusMoveSearchWithConditionFromRoot(const AccessibilityElementInfo& info,
         const Accessibility::AccessibilityFocusMoveParam& param, const int32_t requestId,

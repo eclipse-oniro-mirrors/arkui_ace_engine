@@ -65,6 +65,14 @@ ArkUI_AccessibilityProvider* CustomPattern::GetNativeAccessibilityProvider()
     return arkuiAccessibilityProvider_.get();
 }
 
+RefPtr<AccessibilityProvider> CustomPattern::GetOrCreateAccessibilityProvider()
+{
+    if (accessibilityProvider_ == nullptr) {
+        accessibilityProvider_ = AceType::MakeRefPtr<CustomAccessibilityProvider>(WeakClaim(this));
+    }
+    return accessibilityProvider_;
+}
+
 void CustomPattern::InitializeAccessibility(PipelineContext* context)
 {
     if (accessibilityChildTreeCallback_) {
@@ -124,10 +132,7 @@ bool CustomPattern::OnAccessibilityChildTreeRegister(uint32_t windowId, int32_t 
         windowId = pipeline->GetRealHostWindowId();
     }
 
-    if (accessibilityProvider_ == nullptr) {
-        accessibilityProvider_ = AceType::MakeRefPtr<CustomAccessibilityProvider>(WeakClaim(this));
-    }
-
+    GetOrCreateAccessibilityProvider();
     auto nativeProvider = GetNativeAccessibilityProvider();
     CHECK_NULL_RETURN(nativeProvider, false);
     if (!nativeProvider->IsRegister()) {

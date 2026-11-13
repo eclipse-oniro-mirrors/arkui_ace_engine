@@ -34,6 +34,7 @@ std::string SerializeCommandResult(const NG::CommandResult& result)
         case NG::CommandErrorType::NODE_NOT_FOUND: type = "NODE_NOT_FOUND"; break;
         case NG::CommandErrorType::INVALID_COMMAND: type = "INVALID_COMMAND"; break;
         case NG::CommandErrorType::INVALID_PARAM: type = "INVALID_PARAM"; break;
+        case NG::CommandErrorType::NOT_SUPPORTED: type = "NOT_SUPPORTED"; break;
         default: break;
     }
     auto message = result.errorMessage;

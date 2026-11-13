@@ -28,6 +28,7 @@ group("unittest") {
     if (is_host_product) {
       deps += [
         "adapter/ohos/entrance/ui_session:ui_content_stub_unittest",
+        "adapter/ohos/entrance/ui_session:ui_session_accessibility_command_test",
         "base:base_unittest",
         "bridge/common/media_query:media_query_test_ng",
         "capi/utils/interaction_observer:capi_interaction_observer_test",

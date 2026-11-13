@@ -1231,6 +1231,14 @@ ArkUI_AccessibilityProvider* XComponentPattern::GetNativeProvider()
     return nativeXComponentImpl->GetAccessbilityProvider().get();
 }
 
+RefPtr<AccessibilityProvider> XComponentPattern::GetOrCreateAccessibilityProvider()
+{
+    if (accessibilityProvider_ == nullptr) {
+        accessibilityProvider_ = AceType::MakeRefPtr<XComponentAccessibilityProvider>(WeakClaim(this));
+    }
+    return accessibilityProvider_;
+}
+
 bool XComponentPattern::OnAccessibilityChildTreeRegister(uint32_t windowId, int32_t treeId)
 {
     auto host = GetHost();
@@ -1241,11 +1249,7 @@ bool XComponentPattern::OnAccessibilityChildTreeRegister(uint32_t windowId, int3
     CHECK_NULL_RETURN(pipelineAccessibilityManager, false);
     auto accessibilityManager = pipelineAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_RETURN(accessibilityManager, false);
-    if (accessibilityProvider_ == nullptr) {
-        accessibilityProvider_ =
-            AceType::MakeRefPtr<XComponentAccessibilityProvider>(WeakClaim(this));
-    }
-
+    GetOrCreateAccessibilityProvider();
     auto nativeProvider = GetNativeProvider();
     CHECK_NULL_RETURN(nativeProvider, false);
     if (!nativeProvider->IsRegister()) {
