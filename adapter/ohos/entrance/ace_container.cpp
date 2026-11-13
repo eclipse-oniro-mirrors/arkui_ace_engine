@@ -3696,18 +3696,42 @@ void AceContainer::ProcessThemeUpdate(const ParsedConfig& parsedConfig, Configur
 {
     if (!parsedConfig.themeTag.empty()) {
         std::unique_ptr<JsonValue> json = JsonUtil::ParseJsonString(parsedConfig.themeTag);
-        int fontUpdate = json->GetInt("fonts");
-        configurationChange.fontUpdate = configurationChange.fontUpdate || fontUpdate;
-        int iconUpdate = json->GetInt("icons");
-        configurationChange.iconUpdate = iconUpdate;
-        int skinUpdate = json->GetInt("skin");
-        if (!skinUpdate && lastThemeHasSkin_) {
-            configurationChange.skinUpdate = true;
+        uint32_t currentFonts = json->GetUInt("fonts");
+        uint32_t currentIcons = json->GetUInt("icons");
+        uint32_t currentSkin = json->GetUInt("skin");
+        bool isFirst = lastThemeFonts_ == 0 && lastThemeIcons_ == 0 && lastThemeSkin_ == 0;
+        if (isFirst) {
+            if (!parsedConfig.themeSkin.empty()) {
+                configurationChange.skinUpdate = true;
+            }
+            if (!parsedConfig.themeIcon.empty()) {
+                configurationChange.iconUpdate = true;
+            }
+            if (!parsedConfig.fontId.empty()) {
+                configurationChange.fontUpdate = true;
+            }
         } else {
-            configurationChange.skinUpdate = skinUpdate;
+            if (currentFonts != lastThemeFonts_) {
+                configurationChange.fontUpdate = true;
+            }
+            if (currentIcons != lastThemeIcons_) {
+                configurationChange.iconUpdate = true;
+            }
+            if (currentSkin != lastThemeSkin_) {
+                configurationChange.skinUpdate = true;
+            }
         }
-        lastThemeHasSkin_ = skinUpdate;
-        if ((isDynamicRender_ || isFormRender_) && fontUpdate) {
+        TAG_LOGD(AceLogTag::ACE_THEME,
+            "ProcessThemeUpdate fonts %{public}u(last %{public}u) icons %{public}u(last %{public}u) "
+            "skin %{public}u(last %{public}u), fontUpdate %{public}d iconUpdate %{public}d "
+            "skinUpdate %{public}d, isFirst %{public}d",
+            currentFonts, lastThemeFonts_, currentIcons, lastThemeIcons_, currentSkin, lastThemeSkin_,
+            configurationChange.fontUpdate, configurationChange.iconUpdate, configurationChange.skinUpdate,
+            isFirst);
+        lastThemeFonts_ = currentFonts;
+        lastThemeIcons_ = currentIcons;
+        lastThemeSkin_ = currentSkin;
+        if ((isDynamicRender_ || isFormRender_) && configurationChange.fontUpdate) {
             CheckAndSetFontFamily();
         }
     }

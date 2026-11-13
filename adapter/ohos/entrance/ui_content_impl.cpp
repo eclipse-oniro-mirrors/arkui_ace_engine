@@ -3788,6 +3788,8 @@ void BuildParsedConfig(Platform::ParsedConfig& parsedConfig,
     parsedConfig.mcc = config->GetItem(OHOS::AAFwk::GlobalConfigurationKey::SYSTEM_MCC);
     parsedConfig.mnc = config->GetItem(OHOS::AAFwk::GlobalConfigurationKey::SYSTEM_MNC);
     parsedConfig.fontId = config->GetItem(OHOS::AAFwk::GlobalConfigurationKey::SYSTEM_FONT_ID);
+    parsedConfig.themeSkin = config->GetItem(OHOS::AAFwk::GlobalConfigurationKey::THEME_SKIN);
+    parsedConfig.themeIcon = config->GetItem(OHOS::AAFwk::GlobalConfigurationKey::THEME_ICON);
     // Process system language and preferred language
     auto isPreferredLanguage = config->GetItem(OHOS::AppExecFwk::GlobalConfigurationKey::IS_PREFERRED_LANGUAGE);
     if (isPreferredLanguage == IS_PREFERRED_LANGUAGE) {
