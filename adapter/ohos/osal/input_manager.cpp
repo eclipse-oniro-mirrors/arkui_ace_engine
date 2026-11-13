@@ -42,7 +42,7 @@ std::shared_ptr<MMI::PointerEvent> InputManager::CreatePointerEvent(
 
 bool InputManager::IsAgentEvent(const std::shared_ptr<MMI::PointerEvent>& pointerEvent)
 {
-    return pointerEvent && pointerEvent->HasFlag(MMI::InputEvent::EVENT_FLAG_CONTROLLER);
+    return pointerEvent && pointerEvent->HasFlag(MMI::InputEvent::EVENT_FLAG_PENDING_CHECK);
 }
 
 bool InputManager::HasControlComponentPermission()
