@@ -4734,6 +4734,17 @@
       "OHOS::Ace::NG::LazyLayoutUtils::FindWaterFlowAncestorInfo(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&)";
       "OHOS::Ace::NG::LazyLayoutUtils::GetLazyLayoutPattern(OHOS::Ace::RefPtr<OHOS::Ace::NG::UINode> const&)";
       "OHOS::Ace::NG::LazyLayoutUtils::GetStickyHeaderPattern(OHOS::Ace::RefPtr<OHOS::Ace::NG::UINode> const&)";
+      "OHOS::Ace::NG::StickyHeaderPattern::EdgeState::EdgeState()";
+      "OHOS::Ace::NG::StickyHeaderPattern::BeginEdgeUpdate(bool)";
+      "OHOS::Ace::NG::StickyHeaderPattern::IsValidEdgeContent(bool, OHOS::Ace::RefPtr<OHOS::Ace::NG::UINode> const&) const";
+      "OHOS::Ace::NG::StickyHeaderPattern::SetSticky(OHOS::Ace::NG::StickyStyle)";
+      "OHOS::Ace::NG::StickyHeaderPattern::PublishNextStickyHeaderGap(std::__h::optional<float> const&)";
+      "OHOS::Ace::NG::StickyHeaderPattern::NotifyStickyHeaderChange()";
+      "OHOS::Ace::NG::StickyHeaderPattern::SetEdgeGeometry(OHOS::Ace::NG::OffsetT<float> const&, float, std::__h::optional<float>)";
+      "OHOS::Ace::NG::StickyHeaderPattern::UpdateStickyEdgePositions(float, float)";
+      "OHOS::Ace::NG::StickyHeaderPattern::DetachStickyEdges(OHOS::Ace::NG::FrameNode*)";
+      "vtable for OHOS::Ace::NG::StickyHeaderPattern";
+      "VTT for OHOS::Ace::NG::StickyHeaderPattern";
       "OHOS::Ace::NG::LazyLayoutUtils::GetViewPosReference(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, std::__h::vector<std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>>, std::__h::allocator<std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>>>> const&)";
       "OHOS::Ace::NG::LazyLayoutPattern::AfterMountToParent()";
       OHOS::Ace::NG::LazyLayoutPattern::GetPreparedGeometry*;

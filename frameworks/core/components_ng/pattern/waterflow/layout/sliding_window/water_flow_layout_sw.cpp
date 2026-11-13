@@ -332,15 +332,15 @@ void WaterFlowLayoutSW::Layout(LayoutWrapper* wrapper)
     if (!info_->isDataValid_) {
         return;
     }
-    // A reload/jump may change the first lane before Pattern calibrates totalOffset_.
-    // Normalize both the edge origin and body boundary with the current measured offset.
-    const float edgeOffset = info_->edgeSlots_ && info_->StartIndex() == 0 &&
-        props_->GetWaterflowDirectionValue(FlexDirection::COLUMN) == FlexDirection::COLUMN
-        ? info_->StartPos() - info_->TopMargin() : info_->Offset();
     if (info_->targetIndex_) {
         // New edge slots keep their geometry during target-position measurement. Only the legacy
         // footer is deactivated here to avoid a one-frame flash before normal footer cleanup.
         if (info_->edgeSlots_) {
+            // A reload/jump may change the first lane before Pattern calibrates totalOffset_.
+            // Normalize both the edge origin and body boundary with the current measured offset.
+            const float edgeOffset = info_->StartIndex() == 0 &&
+                props_->GetWaterflowDirectionValue(FlexDirection::COLUMN) == FlexDirection::COLUMN
+                ? info_->StartPos() - info_->TopMargin() : info_->Offset();
             LayoutEdges(wrapper, info_, info_->EndPos() - edgeOffset + info_->BotMargin(), edgeOffset);
         } else {
             DeactivateFooter();
@@ -351,6 +351,14 @@ void WaterFlowLayoutSW::Layout(LayoutWrapper* wrapper)
     if (!GetHasMeasured()) {
         TAG_LOGW(AceLogTag::ACE_WATERFLOW, "Layout called before Measure, skip layout");
         return;
+    }
+
+    float edgeOffset = 0.0f;
+    if (info_->edgeSlots_) {
+        // Preserve the measured origin before EndCacheUpdate switches back to synchronized positions.
+        edgeOffset = info_->StartIndex() == 0 &&
+            props_->GetWaterflowDirectionValue(FlexDirection::COLUMN) == FlexDirection::COLUMN
+            ? info_->StartPos() - info_->TopMargin() : info_->Offset();
     }
 
     const int32_t cacheCount = props_->GetCachedCountValue(info_->defCachedCount_);

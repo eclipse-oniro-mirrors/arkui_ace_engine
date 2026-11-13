@@ -39,57 +39,12 @@ class WaterFlowAccessibilityProperty;
 class WaterFlowEventHub;
 class WaterFlowLayoutProperty;
 class WaterFlowSections;
-enum class StickyStyle : uint32_t;
-
-struct WaterFlowEdgeState {
-    WaterFlowEdgeState();
-
-    // Only a committed, non-null header/footer enables edge layout. Keep the index mode after clear;
-    // sticky configuration and initial empty resets must not opt legacy instances into this mode.
-    bool enabled = false;
-    bool footerControlled = false;
-    WeakPtr<UINode> header;
-    WeakPtr<UINode> headerContent;
-    WeakPtr<UINode> footerContent;
-    uint64_t headerGeneration = 0;
-    uint64_t footerGeneration = 0;
-    StickyStyle sticky;
-    std::optional<float> nextStickyHeaderGap;
-    bool lastNotifiedHasStickyHeader = false;
-    OffsetF origin;
-    float totalSize = 0.0f;
-    float measuredTotalSize = 0.0f;
-    bool viewportRegistered = false;
-
-    uint64_t BeginUpdate(bool isHeader)
-    {
-        if (!isHeader) {
-            footerControlled = true;
-        }
-        return isHeader ? ++headerGeneration : ++footerGeneration;
-    }
-
-    bool IsCurrent(bool isHeader, uint64_t generation) const
-    {
-        return generation != 0 && generation == (isHeader ? headerGeneration : footerGeneration);
-    }
-
-    void InvalidateGenerations()
-    {
-        headerContent.Reset();
-        footerContent.Reset();
-        ++headerGeneration;
-        ++footerGeneration;
-    }
-};
-
 struct WaterFlowFastScrollState;
 
 class ACE_EXPORT WaterFlowPattern : public ScrollablePattern, public StickyHeaderPattern {
     DECLARE_ACE_TYPE(WaterFlowPattern, ScrollablePattern, StickyHeaderPattern);
 
 public:
-    WaterFlowPattern();
     ~WaterFlowPattern() override;
 
     // FEAT scroll placeholder: the per-item provider, enable flag and host
@@ -218,31 +173,11 @@ public:
 
     bool UpdateStartIndex(int32_t index);
 
-    // Reserve a per-edge token; only the latest builder result may replace the live subtree.
-    uint64_t BeginEdgeUpdate(bool isHeader);
     void SetEdge(bool isHeader, const RefPtr<UINode>& edge, uint64_t generation);
-    void SetSticky(StickyStyle style);
-    bool HasStickyHeader() const override;
-    void PublishNextStickyHeaderGap(const std::optional<float>& gap) override;
-    const std::optional<float>& GetNextStickyHeaderGap() const override
-    {
-        return edgeState_.nextStickyHeaderGap;
-    }
-    bool RequiresStickyHandoffInLayout() const override
-    {
-        return edgeState_.enabled;
-    }
-    void NotifyStickyHeaderChange();
     void SetEdgeContent(bool isHeader, const RefPtr<UINode>& content);
-    bool IsValidEdgeContent(bool isHeader, const RefPtr<UINode>& content) const;
-    // Save natural layout geometry and register one weak viewport callback until detach.
-    void SetEdgeGeometry(const OffsetF& origin, float totalSize, std::optional<float> measuredTotalSize = std::nullopt);
-    void UpdateEdgePositions();
+    bool HasStickyHeader() const override;
+    void UpdateEdgePositions() override;
     void OnDetachFromFrameNode(FrameNode* frameNode) override;
-    const WaterFlowEdgeState& GetEdgeState() const
-    {
-        return edgeState_;
-    }
     WaterFlowChildIndexMap GetEdgeIndexMap() const;
     int32_t GetDataCount() const;
     // Keep header first and footer last without including either in FlowItem/Sections indices.
@@ -459,6 +394,10 @@ private:
     SizeF GetContentSize() const;
     void MarkDirtyNodeSelf();
     void EnableEdgeSlots();
+    RefPtr<UINode> GetStickyFooter() const override
+    {
+        return footer_.Upgrade();
+    }
     // align to the very top via precise index jump when a backToTop animation settles short of the top
     void CheckBackToTopFallback();
     void OnScrollEndCallback() override;
@@ -545,7 +484,6 @@ private:
     double prevOffset_ = 0.0;
     SizeF lastSize_;
     std::pair<int32_t, int32_t> itemRange_ = { -1, -1 };
-    WaterFlowEdgeState edgeState_;
     WeakPtr<UINode> footer_;
     // for keepVisiableContentPosition mode temporarily.
     bool keepContentPosition_ = true;
