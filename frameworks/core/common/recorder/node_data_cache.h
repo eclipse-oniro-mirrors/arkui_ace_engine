@@ -106,6 +106,8 @@ private:
 
     std::shared_mutex cacheMutex_;
 
+    mutable std::shared_mutex pageUrlMutex_;
+
     std::string pageUrl_;
 
     std::string prePageUrl_;
