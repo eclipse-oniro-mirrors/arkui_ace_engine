@@ -282,7 +282,7 @@ bool RepeatNode::IsChildInAnimation(uint32_t fromIndex)
     auto node = AceType::DynamicCast<FrameNode>(child->GetFrameChildByIndex(0, false, true));
     CHECK_NULL_RETURN(node, false);
     auto renderContext = AceType::DynamicCast<RosenRenderContext>(
-        AceType::DynamicCast<FrameNode>(node)->GetRenderContext());
+        node->GetRenderContext());
     CHECK_NULL_RETURN(renderContext, false);
     auto rsNode = renderContext->GetRSNode();
     CHECK_NULL_RETURN(rsNode, false);

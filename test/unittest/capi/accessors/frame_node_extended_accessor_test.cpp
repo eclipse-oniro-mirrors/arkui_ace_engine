@@ -124,7 +124,7 @@ HWTEST_F(FrameNodeAccessorTest, DISABLED_appendChildTest, TestSize.Level1)
     accessor_->appendChild(peer_, childPeer);
     childList = peer_->node->GetChildren();
     EXPECT_EQ(childList.size(), CHILD_COUNT_1);
-    auto childUINodeRef = AceType::DynamicCast<UINode>(childPeer->node);
+    RefPtr<UINode> childUINodeRef = childPeer->node;
     EXPECT_EQ(childPeer->node->GetParentFrameNode(), peer_->node);
     EXPECT_EQ(childList.back(), childUINodeRef);
     DestroyPeer(childPeer);
@@ -139,16 +139,16 @@ HWTEST_F(FrameNodeAccessorTest, DISABLED_insertChildAfterTestVariant1, TestSize.
 {
     ASSERT_NE(accessor_->insertChildAfter, nullptr);
     ASSERT_NE(accessor_->appendChild, nullptr);
-    auto currentUINodeRef = AceType::DynamicCast<UINode>(peer_->node);
+    RefPtr<UINode> currentUINodeRef = peer_->node;
 
     auto childPeer1 = CreatePeer();
-    auto childUINodeRef1 = AceType::DynamicCast<UINode>(childPeer1->node);
+    RefPtr<UINode> childUINodeRef1 = childPeer1->node;
 
     auto childPeer2 = CreatePeer();
-    auto childUINodeRef2 = AceType::DynamicCast<UINode>(childPeer2->node);
+    RefPtr<UINode> childUINodeRef2 = childPeer2->node;
 
     auto childPeer3 = CreatePeer();
-    auto childUINodeRef3 = AceType::DynamicCast<UINode>(childPeer3->node);
+    RefPtr<UINode> childUINodeRef3 = childPeer3->node;
 
     accessor_->appendChild(peer_, childPeer1);
     accessor_->appendChild(peer_, childPeer2);
@@ -176,16 +176,16 @@ HWTEST_F(FrameNodeAccessorTest, DISABLED_insertChildAfterTestVariant2, TestSize.
 {
     ASSERT_NE(accessor_->insertChildAfter, nullptr);
     ASSERT_NE(accessor_->appendChild, nullptr);
-    auto currentUINodeRef = AceType::DynamicCast<UINode>(peer_->node);
+    RefPtr<UINode> currentUINodeRef = peer_->node;
 
     auto childPeer1 = CreatePeer();
-    auto childUINodeRef1 = AceType::DynamicCast<UINode>(childPeer1->node);
+    RefPtr<UINode> childUINodeRef1 = childPeer1->node;
 
     auto childPeer2 = CreatePeer();
-    auto childUINodeRef2 = AceType::DynamicCast<UINode>(childPeer2->node);
+    RefPtr<UINode> childUINodeRef2 = childPeer2->node;
 
     auto childPeer3 = CreatePeer();
-    auto childUINodeRef3 = AceType::DynamicCast<UINode>(childPeer3->node);
+    RefPtr<UINode> childUINodeRef3 = childPeer3->node;
 
     accessor_->appendChild(peer_, childPeer1);
     auto childList = peer_->node->GetChildren();
@@ -213,15 +213,15 @@ HWTEST_F(FrameNodeAccessorTest, DISABLED_insertChildAfterTestVariant3, TestSize.
 {
     ASSERT_NE(accessor_->insertChildAfter, nullptr);
     ASSERT_NE(accessor_->appendChild, nullptr);
-    auto currentUINodeRef = AceType::DynamicCast<UINode>(peer_->node);
+    RefPtr<UINode> currentUINodeRef = peer_->node;
 
     auto childPeer1 = CreatePeer();
-    auto childUINodeRef1 = AceType::DynamicCast<UINode>(childPeer1->node);
+    RefPtr<UINode> childUINodeRef1 = childPeer1->node;
 
     auto childPeer2 = CreatePeer();
 
     auto childPeer3 = CreatePeer();
-    auto childUINodeRef3 = AceType::DynamicCast<UINode>(childPeer3->node);
+    RefPtr<UINode> childUINodeRef3 = childPeer3->node;
 
     accessor_->appendChild(peer_, childPeer1);
     accessor_->appendChild(childPeer2, childPeer3);
@@ -247,16 +247,16 @@ HWTEST_F(FrameNodeAccessorTest, DISABLED_removeChildTestVariant1, TestSize.Level
 {
     ASSERT_NE(accessor_->removeChild, nullptr);
     ASSERT_NE(accessor_->appendChild, nullptr);
-    auto currentUINodeRef = AceType::DynamicCast<UINode>(peer_->node);
+    RefPtr<UINode> currentUINodeRef = peer_->node;
 
     auto childPeer1 = CreatePeer();
-    auto childUINodeRef1 = AceType::DynamicCast<UINode>(childPeer1->node);
+    RefPtr<UINode> childUINodeRef1 = childPeer1->node;
 
     auto childPeer2 = CreatePeer();
-    auto childUINodeRef2 = AceType::DynamicCast<UINode>(childPeer2->node);
+    RefPtr<UINode> childUINodeRef2 = childPeer2->node;
 
     auto childPeer3 = CreatePeer();
-    auto childUINodeRef3 = AceType::DynamicCast<UINode>(childPeer3->node);
+    RefPtr<UINode> childUINodeRef3 = childPeer3->node;
 
     accessor_->appendChild(peer_, childPeer1);
     accessor_->appendChild(peer_, childPeer2);
@@ -286,16 +286,16 @@ HWTEST_F(FrameNodeAccessorTest, DISABLED_removeChildTestVariant2, TestSize.Level
 {
     ASSERT_NE(accessor_->removeChild, nullptr);
     ASSERT_NE(accessor_->appendChild, nullptr);
-    auto currentUINodeRef = AceType::DynamicCast<UINode>(peer_->node);
+    RefPtr<UINode> currentUINodeRef = peer_->node;
 
     auto childPeer1 = CreatePeer();
-    auto childUINodeRef1 = AceType::DynamicCast<UINode>(childPeer1->node);
+    RefPtr<UINode> childUINodeRef1 = childPeer1->node;
 
     auto childPeer2 = CreatePeer();
-    auto childUINodeRef2 = AceType::DynamicCast<UINode>(childPeer2->node);
+    RefPtr<UINode> childUINodeRef2 = childPeer2->node;
 
     auto childPeer3 = CreatePeer();
-    auto childUINodeRef3 = AceType::DynamicCast<UINode>(childPeer3->node);
+    RefPtr<UINode> childUINodeRef3 = childPeer3->node;
 
     accessor_->appendChild(peer_, childPeer1);
     accessor_->appendChild(peer_, childPeer3);
@@ -325,16 +325,16 @@ HWTEST_F(FrameNodeAccessorTest, DISABLED_clearChildrenTest, TestSize.Level1)
     ASSERT_NE(accessor_->clearChildren, nullptr);
     ASSERT_NE(accessor_->appendChild, nullptr);
     accessor_->clearChildren(peer_);
-    auto currentUINodeRef = AceType::DynamicCast<UINode>(peer_->node);
+    RefPtr<UINode> currentUINodeRef = peer_->node;
 
     auto childPeer1 = CreatePeer();
-    auto childUINodeRef1 = AceType::DynamicCast<UINode>(childPeer1->node);
+    RefPtr<UINode> childUINodeRef1 = childPeer1->node;
 
     auto childPeer2 = CreatePeer();
-    auto childUINodeRef2 = AceType::DynamicCast<UINode>(childPeer2->node);
+    RefPtr<UINode> childUINodeRef2 = childPeer2->node;
 
     auto childPeer3 = CreatePeer();
-    auto childUINodeRef3 = AceType::DynamicCast<UINode>(childPeer3->node);
+    RefPtr<UINode> childUINodeRef3 = childPeer3->node;
 
     accessor_->appendChild(peer_, childPeer1);
     accessor_->appendChild(peer_, childPeer2);
@@ -358,13 +358,13 @@ HWTEST_F(FrameNodeAccessorTest, DISABLED_getChildTest, TestSize.Level1)
 {
     ASSERT_NE(accessor_->getChild, nullptr);
     ASSERT_NE(accessor_->appendChild, nullptr);
-    auto currentUINodeRef = AceType::DynamicCast<UINode>(peer_->node);
+    RefPtr<UINode> currentUINodeRef = peer_->node;
 
     auto childPeer1 = CreatePeer();
-    auto childUINodeRef1 = AceType::DynamicCast<UINode>(childPeer1->node);
+    RefPtr<UINode> childUINodeRef1 = childPeer1->node;
 
     auto childPeer2 = CreatePeer();
-    auto childUINodeRef2 = AceType::DynamicCast<UINode>(childPeer2->node);
+    RefPtr<UINode> childUINodeRef2 = childPeer2->node;
 
     accessor_->appendChild(peer_, childPeer1);
     accessor_->appendChild(peer_, childPeer2);
@@ -399,13 +399,13 @@ HWTEST_F(FrameNodeAccessorTest, DISABLED_getFirstChildTest, TestSize.Level1)
 {
     ASSERT_NE(accessor_->getFirstChild, nullptr);
     ASSERT_NE(accessor_->appendChild, nullptr);
-    auto currentUINodeRef = AceType::DynamicCast<UINode>(peer_->node);
+    RefPtr<UINode> currentUINodeRef = peer_->node;
 
     auto childPeer1 = CreatePeer();
-    auto childUINodeRef1 = AceType::DynamicCast<UINode>(childPeer1->node);
+    RefPtr<UINode> childUINodeRef1 = childPeer1->node;
 
     auto childPeer2 = CreatePeer();
-    auto childUINodeRef2 = AceType::DynamicCast<UINode>(childPeer2->node);
+    RefPtr<UINode> childUINodeRef2 = childPeer2->node;
 
     accessor_->appendChild(peer_, childPeer1);
     accessor_->appendChild(peer_, childPeer2);
@@ -429,16 +429,16 @@ HWTEST_F(FrameNodeAccessorTest, DISABLED_getNextSiblingTestVariant1, TestSize.Le
 {
     ASSERT_NE(accessor_->getNextSibling, nullptr);
     ASSERT_NE(accessor_->appendChild, nullptr);
-    auto currentUINodeRef = AceType::DynamicCast<UINode>(peer_->node);
+    RefPtr<UINode> currentUINodeRef = peer_->node;
 
     auto rootPeer = CreatePeer();
-    auto rootUINodeRef = AceType::DynamicCast<UINode>(rootPeer->node);
+    RefPtr<UINode> rootUINodeRef = rootPeer->node;
 
     auto nextPeer = CreatePeer();
-    auto nextUINodeRef = AceType::DynamicCast<UINode>(nextPeer->node);
+    RefPtr<UINode> nextUINodeRef = nextPeer->node;
 
     auto prevPeer = CreatePeer();
-    auto prevUINodeRef = AceType::DynamicCast<UINode>(prevPeer->node);
+    RefPtr<UINode> prevUINodeRef = prevPeer->node;
 
     accessor_->appendChild(rootPeer, prevPeer);
     accessor_->appendChild(rootPeer, peer_);
@@ -462,16 +462,16 @@ HWTEST_F(FrameNodeAccessorTest, DISABLED_getNextSiblingTestVariant2, TestSize.Le
 {
     ASSERT_NE(accessor_->getNextSibling, nullptr);
     ASSERT_NE(accessor_->appendChild, nullptr);
-    auto currentUINodeRef = AceType::DynamicCast<UINode>(peer_->node);
+    RefPtr<UINode> currentUINodeRef = peer_->node;
 
     auto rootPeer = CreatePeer();
-    auto rootUINodeRef = AceType::DynamicCast<UINode>(rootPeer->node);
+    RefPtr<UINode> rootUINodeRef = rootPeer->node;
 
     auto nextPeer = CreatePeer();
-    auto nextUINodeRef = AceType::DynamicCast<UINode>(nextPeer->node);
+    RefPtr<UINode> nextUINodeRef = nextPeer->node;
 
     auto prevPeer = CreatePeer();
-    auto prevUINodeRef = AceType::DynamicCast<UINode>(prevPeer->node);
+    RefPtr<UINode> prevUINodeRef = prevPeer->node;
 
     accessor_->appendChild(rootPeer, prevPeer);
     accessor_->appendChild(rootPeer, nextPeer);
@@ -496,16 +496,16 @@ HWTEST_F(FrameNodeAccessorTest, DISABLED_getPreviousSiblingTestVariant1, TestSiz
 {
     ASSERT_NE(accessor_->getPreviousSibling, nullptr);
     ASSERT_NE(accessor_->appendChild, nullptr);
-    auto currentUINodeRef = AceType::DynamicCast<UINode>(peer_->node);
+    RefPtr<UINode> currentUINodeRef = peer_->node;
 
     auto rootPeer = CreatePeer();
-    auto rootUINodeRef = AceType::DynamicCast<UINode>(rootPeer->node);
+    RefPtr<UINode> rootUINodeRef = rootPeer->node;
 
     auto nextPeer = CreatePeer();
-    auto nextUINodeRef = AceType::DynamicCast<UINode>(nextPeer->node);
+    RefPtr<UINode> nextUINodeRef = nextPeer->node;
 
     auto prevPeer = CreatePeer();
-    auto prevUINodeRef = AceType::DynamicCast<UINode>(prevPeer->node);
+    RefPtr<UINode> prevUINodeRef = prevPeer->node;
 
     accessor_->appendChild(rootPeer, prevPeer);
     accessor_->appendChild(rootPeer, peer_);
@@ -529,16 +529,16 @@ HWTEST_F(FrameNodeAccessorTest, DISABLED_getPreviousSiblingTestVariant2, TestSiz
 {
     ASSERT_NE(accessor_->getPreviousSibling, nullptr);
     ASSERT_NE(accessor_->appendChild, nullptr);
-    auto currentUINodeRef = AceType::DynamicCast<UINode>(peer_->node);
+    RefPtr<UINode> currentUINodeRef = peer_->node;
 
     auto rootPeer = CreatePeer();
-    auto rootUINodeRef = AceType::DynamicCast<UINode>(rootPeer->node);
+    RefPtr<UINode> rootUINodeRef = rootPeer->node;
 
     auto nextPeer = CreatePeer();
-    auto nextUINodeRef = AceType::DynamicCast<UINode>(nextPeer->node);
+    RefPtr<UINode> nextUINodeRef = nextPeer->node;
 
     auto prevPeer = CreatePeer();
-    auto prevUINodeRef = AceType::DynamicCast<UINode>(prevPeer->node);
+    RefPtr<UINode> prevUINodeRef = prevPeer->node;
 
     accessor_->appendChild(rootPeer, peer_);
     accessor_->appendChild(rootPeer, prevPeer);
@@ -562,16 +562,16 @@ HWTEST_F(FrameNodeAccessorTest, DISABLED_getChildrenCountTest, TestSize.Level1)
     ASSERT_NE(accessor_->appendChild, nullptr);
     auto modeAllExpand = Converter::ArkValue<Ark_Number>(MODE_0);
     EXPECT_EQ(accessor_->getChildrenCount(peer_, &modeAllExpand), CHILD_COUNT_0);
-    auto currentUINodeRef = AceType::DynamicCast<UINode>(peer_->node);
+    RefPtr<UINode> currentUINodeRef = peer_->node;
 
     auto childPeer1 = CreatePeer();
-    auto childUINodeRef1 = AceType::DynamicCast<UINode>(childPeer1->node);
+    RefPtr<UINode> childUINodeRef1 = childPeer1->node;
 
     auto childPeer2 = CreatePeer();
-    auto childUINodeRef2 = AceType::DynamicCast<UINode>(childPeer2->node);
+    RefPtr<UINode> childUINodeRef2 = childPeer2->node;
 
     auto childPeer3 = CreatePeer();
-    auto childUINodeRef3 = AceType::DynamicCast<UINode>(childPeer3->node);
+    RefPtr<UINode> childUINodeRef3 = childPeer3->node;
 
     accessor_->appendChild(peer_, childPeer1);
     accessor_->appendChild(peer_, childPeer2);
@@ -602,13 +602,13 @@ HWTEST_F(FrameNodeAccessorTest, DISABLED_getParentTest, TestSize.Level1)
     invalidPeer->node = nullptr;
     EXPECT_EQ(accessor_->getParent(invalidPeer), nullptr);
 
-    auto currentUINodeRef = AceType::DynamicCast<UINode>(peer_->node);
+    RefPtr<UINode> currentUINodeRef = peer_->node;
 
     auto rootPeer = CreatePeer();
-    auto rootUINodeRef = AceType::DynamicCast<UINode>(rootPeer->node);
+    RefPtr<UINode> rootUINodeRef = rootPeer->node;
 
     auto otherPeer = CreatePeer();
-    auto otherUINodeRef = AceType::DynamicCast<UINode>(otherPeer->node);
+    RefPtr<UINode> otherUINodeRef = otherPeer->node;
 
     accessor_->appendChild(rootPeer, peer_);
     accessor_->appendChild(rootPeer, otherPeer);
@@ -629,13 +629,13 @@ HWTEST_F(FrameNodeAccessorTest, DISABLED_disposeTest, TestSize.Level1)
     ASSERT_NE(accessor_->getParent, nullptr);
     ASSERT_NE(accessor_->dispose, nullptr);
 
-    auto currentUINodeRef = AceType::DynamicCast<UINode>(peer_->node);
+    RefPtr<UINode> currentUINodeRef = peer_->node;
 
     auto rootPeer = CreatePeer();
-    auto rootUINodeRef = AceType::DynamicCast<UINode>(rootPeer->node);
+    RefPtr<UINode> rootUINodeRef = rootPeer->node;
 
     auto otherPeer = CreatePeer();
-    auto otherUINodeRef = AceType::DynamicCast<UINode>(otherPeer->node);
+    RefPtr<UINode> otherUINodeRef = otherPeer->node;
 
     accessor_->appendChild(rootPeer, peer_);
     accessor_->appendChild(rootPeer, otherPeer);
