@@ -34,6 +34,7 @@
 #include "core/components_ng/syntax/lazy_for_each_node.h"
 #include "core/components_ng/pattern/waterflow/layout/sliding_window/water_flow_layout_sw.h"
 #include "core/components_ng/pattern/waterflow/layout/top_down/water_flow_segmented_layout.h"
+#include "core/components_ng/pattern/waterflow/layout/top_down/water_flow_layout_algorithm.h"
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -1524,5 +1525,75 @@ HWTEST_F(WaterFlowHeaderFooterRegressionTest, WFHF_MixedLazyHandoffRefreshesBoth
         EXPECT_FALSE(pattern_->GetNextStickyHeaderGap().has_value());
         parent->RemoveChild(frameNode_);
     }
+}
+
+/**
+ * @tc.name: WFHF_EmptyTallEdgesScroll
+ * @tc.desc: Empty data does not prevent scrolling when header and footer exceed the viewport.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowHeaderFooterRegressionTest, WFHF_EmptyTallEdgesScroll, TestSize.Level1)
+{
+    CreateWaterFlow();
+    SetEdges(600.0f, 600.0f);
+    CreateDone();
+    EXPECT_FALSE(pattern_->IsAtBottom());
+    EXPECT_TRUE(pattern_->IsScrollable());
+    pattern_->ScrollBy(200.0f);
+    FlushUITasks();
+    EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), -200.0f);
+    EXPECT_FLOAT_EQ(GetChildRect(frameNode_, pattern_->GetEdgeIndexMap().FooterIndex()).Bottom(), 1000.0f);
+    frameNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+    FlushUITasks();
+    EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), -200.0f);
+    pattern_->ScrollBy(10000.0f);
+    FlushUITasks();
+    EXPECT_TRUE(pattern_->IsAtBottom());
+    EXPECT_FLOAT_EQ(GetChildRect(frameNode_, pattern_->GetEdgeIndexMap().FooterIndex()).Bottom(), WATER_FLOW_HEIGHT);
+    pattern_->ScrollBy(-10000.0f);
+    FlushUITasks();
+    EXPECT_TRUE(pattern_->IsAtTop());
+    EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), 0.0f);
+}
+
+/**
+ * @tc.name: WFHF_EmptyRowWrapKeepsCrossSize
+ * @tc.desc: Hidden edges in Row layout must not overwrite the fixed cross-axis size.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowHeaderFooterRegressionTest, WFHF_EmptyRowWrapKeepsCrossSize, TestSize.Level1)
+{
+    CreateWaterFlow();
+    SetEdges();
+    CreateDone();
+    WaterFlowModelNG::SetLayoutDirection(AceType::RawPtr(frameNode_), FlexDirection::ROW);
+    layoutProperty_->ClearUserDefinedIdealSize(true, false);
+    ViewAbstract::UpdateLayoutPolicyProperty(AceType::RawPtr(frameNode_), LayoutCalPolicy::FIX_AT_IDEAL_SIZE, true);
+    frameNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    FlushUITasks();
+    EXPECT_FLOAT_EQ(frameNode_->GetGeometryNode()->GetFrameSize().Height(), WATER_FLOW_HEIGHT);
+    EXPECT_TRUE(std::isfinite(frameNode_->GetGeometryNode()->GetFrameSize().Width()));
+}
+
+/**
+ * @tc.name: WFHF_LegacyZeroTailEndState
+ * @tc.desc: The edge data-count correction must preserve legacy footer end-state behavior.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowHeaderFooterRegressionTest, WFHF_LegacyZeroTailEndState, TestSize.Level1)
+{
+    auto info = AceType::MakeRefPtr<WaterFlowLayoutInfo>();
+    info->footerIndex_ = 0;
+    info->childrenCount_ = 4;
+    info->items_.resize(1);
+    info->items_[0][0] = { { 0, { 0.0f, 400.0f } }, { 1, { 400.0f, 400.0f } }, { 2, { 800.0f, 0.0f } } };
+    WaterFlowLayoutAlgorithm algorithm(info);
+    algorithm.HandleItemEnd(2);
+    EXPECT_FALSE(info->itemEnd_);
+    info->edgeSlots_ = true;
+    info->edgeIndexMap_ = { false, true, 4 };
+    info->footerIndex_ = 3;
+    algorithm.HandleItemEnd(2);
+    EXPECT_TRUE(info->itemEnd_);
 }
 } // namespace OHOS::Ace::NG
