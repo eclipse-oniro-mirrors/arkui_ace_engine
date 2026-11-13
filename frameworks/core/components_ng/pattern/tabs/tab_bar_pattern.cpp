@@ -1530,6 +1530,7 @@ bool TabBarPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty,
         }
     }
     UpdateGradientRegions(!swiperPattern->IsUseCustomAnimation());
+    AdjustEllipseBadgePosition();
     if (!swiperPattern->IsUseCustomAnimation() && isTouchingSwiper_ &&
         layoutProperty->GetTabBarModeValue(TabBarMode::FIXED) == TabBarMode::SCROLLABLE) {
         ApplyTurnPageRateToIndicator(turnPageRate_);
@@ -4317,5 +4318,27 @@ void TabBarPattern::ApplyDefaultVisibility()
     }
     host->MarkNeedSyncRenderTree();
     host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+}
+
+void TabBarPattern::AdjustEllipseBadgePosition()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    for (const auto& child : host->GetChildren()) {
+        auto column = AceType::DynamicCast<FrameNode>(child);
+        if (!column || column->GetChildren().empty()) {
+            continue;
+        }
+        auto badgeNode = AceType::DynamicCast<FrameNode>(column->GetChildren().front());
+        if (!badgeNode || badgeNode->GetTag() != BADGE_ETS_TAG) {
+            continue;
+        }
+        auto badgeLayoutProp = badgeNode->GetLayoutProperty<BadgeLayoutProperty>();
+        auto isPositionXy = badgeLayoutProp ? badgeLayoutProp->GetIsPositionXy() : std::nullopt;
+        if (!isPositionXy.has_value() || !isPositionXy.value()) {
+            continue;
+        }
+        TabContentModelNG::ScheduleEllipsePositionAdjustment(badgeNode);
+    }
 }
 } // namespace OHOS::Ace::NG

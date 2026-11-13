@@ -145,7 +145,7 @@ float TabContentModelNG::CalculateEllipseRtlPositionX(const RefPtr<FrameNode>& b
     }
     return eightVpPx - circleWidth;
 }
-// Schedule a post-render task to adjust ellipse badge position.
+// Schedule an after-layout task to adjust ellipse badge position.
 // The badge node wraps the contentChild (icon+text column); badge frame width = content width.
 // positionX positions the badge circle (text child) relative to the badge frame's left edge.
 // LTR: circle LEFT edge = content RIGHT edge - 8vp  →  positionX = badgeWidth - 8vp
@@ -155,7 +155,7 @@ void TabContentModelNG::ScheduleEllipsePositionAdjustment(const RefPtr<FrameNode
 {
     auto pipeline = PipelineContext::GetCurrentContext();
     CHECK_NULL_VOID(pipeline);
-    pipeline->AddAfterRenderTask([weakBadge = WeakPtr<FrameNode>(badgeNode)]() {
+    pipeline->AddAfterLayoutTask([weakBadge = WeakPtr<FrameNode>(badgeNode)]() {
         auto badgeNode = weakBadge.Upgrade();
         CHECK_NULL_VOID(badgeNode);
         auto badgeGeometry = badgeNode->GetGeometryNode();
