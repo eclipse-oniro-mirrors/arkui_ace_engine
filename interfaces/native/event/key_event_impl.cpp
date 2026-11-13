@@ -756,7 +756,7 @@ void OH_ArkUI_KeyboardShortcutKey_SetFunctionKey(
 OH_ArkUI_KeyboardShortcutFunctionKey OH_ArkUI_KeyboardShortcutKey_GetFunctionKey(
     const OH_ArkUI_KeyboardShortcutKey* key)
 {
-    return key && static_cast<uint32_t>(key->functionKey) <= OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_SPACE ?
+    return key && static_cast<uint32_t>(key->functionKey) <= OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_BACKSPACE ?
         static_cast<OH_ArkUI_KeyboardShortcutFunctionKey>(key->functionKey) :
         OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_ESC;
 }
@@ -767,7 +767,7 @@ ArkUI_ContextHandle OH_ArkUI_ApplicationShortcutCallbackInfo_GetUIContext(
     return info && info->context.id >= 0 ? &info->context : nullptr;
 }
 
-static void CheckApplicationShortcutUIThread(const char* apiName)
+static void CheckShortcutUIThread(const char* apiName)
 {
     const auto* impl = OHOS::Ace::NodeModel::GetFullImplForAnyThread();
     const auto* manager = impl && impl->getMultiThreadManagerAPI ? impl->getMultiThreadManagerAPI() : nullptr;
@@ -794,12 +794,15 @@ static const char* ParseApplicationShortcutKey(
         // Adapt only the function-key names already handled by ConvertInputCodeToString.
         static const char* const existingFunctionKeys[] = {
             "ESC", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
-            "TAB", "DPAD_UP", "DPAD_DOWN", "DPAD_LEFT", "DPAD_RIGHT"
+            "TAB", "DPAD_UP", "DPAD_DOWN", "DPAD_LEFT", "DPAD_RIGHT",
+            "CAPS_LOCK", nullptr,  // Index 19 is reserved for the removed PRINT_SCREEN key.
+            "SCROLL_LOCK", "PAUSE_BREAK", "NUM_LOCK", "INSERT", "DELETE",
+            "HOME", "END", "PAGE_UP", "PAGE_DOWN", "ENTER", "BACKSPACE"
         };
-        if (key->functionKey >= 0 && key->functionKey <= OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_DPAD_RIGHT) {
+        if (key->functionKey >= 0 &&
+            key->functionKey <= OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_BACKSPACE &&
+            existingFunctionKeys[key->functionKey] != nullptr) {
             value = existingFunctionKeys[key->functionKey];
-        } else if (key->functionKey == OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_SPACE) {
-            value = " ";
         } else {
             return "Unsupported function key";
         }
@@ -812,7 +815,7 @@ static const char* ParseApplicationShortcutKey(
 ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Register(const OH_ArkUI_KeyboardShortcutKey* key, uint32_t modifierKeys,
     void* userData, OH_ArkUI_ApplicationShortcutCallback callback, int32_t* registrationId)
 {
-    CheckApplicationShortcutUIThread(__FUNCTION__);
+    CheckShortcutUIThread(__FUNCTION__);
     CHECK_NULL_RETURN_WITH_MESSAGE(registrationId, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Registration ID output is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(key, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Shortcut key is null");
@@ -846,7 +849,7 @@ ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Register(const OH_ArkUI_KeyboardSho
 
 ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Unregister(int32_t registrationId)
 {
-    CheckApplicationShortcutUIThread(__FUNCTION__);
+    CheckShortcutUIThread(__FUNCTION__);
     const auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
     CHECK_NULL_RETURN_WITH_MESSAGE(impl, ARKUI_ERROR_CODE_INTERNAL_ERROR,
         __FUNCTION__, "Native implementation is unavailable");
@@ -855,6 +858,59 @@ ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Unregister(int32_t registrationId)
     CHECK_NULL_RETURN_WITH_MESSAGE(common && common->unregisterApplicationShortcut, ARKUI_ERROR_CODE_INTERNAL_ERROR,
         __FUNCTION__, "Application shortcut unregistration is unavailable");
     common->unregisterApplicationShortcut(registrationId);
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_NodeKeyboardShortcut_Register(ArkUI_NodeHandle node, const OH_ArkUI_KeyboardShortcutKey* key,
+    uint32_t modifierKeys, void* userData, OH_ArkUI_KeyboardShortcutCallback callback)
+{
+    CheckShortcutUIThread(__FUNCTION__);
+    CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
+    CHECK_NULL_RETURN_WITH_MESSAGE(key, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Shortcut key is null");
+    std::string value;
+    const auto* error = ParseApplicationShortcutKey(key, modifierKeys, value);
+    if (error) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, error);
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    const auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
+    CHECK_NULL_RETURN_WITH_MESSAGE(impl, ARKUI_ERROR_CODE_INTERNAL_ERROR,
+        __FUNCTION__, "Native implementation is unavailable");
+    const auto* modifiers = impl->getNodeModifiers ? impl->getNodeModifiers() : nullptr;
+    const auto* common = modifiers && modifiers->getCommonModifier ? modifiers->getCommonModifier() : nullptr;
+    CHECK_NULL_RETURN_WITH_MESSAGE(common && common->registerNodeKeyboardShortcut, ARKUI_ERROR_CODE_INTERNAL_ERROR,
+        __FUNCTION__, "Component shortcut registration is unavailable");
+    std::function<void()> action;
+    if (callback) {
+        action = [callback, userData]() { callback(userData); };
+    }
+    common->registerNodeKeyboardShortcut(
+        node->uiNodeHandle, value, static_cast<uint8_t>(modifierKeys), std::move(action));
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_NodeKeyboardShortcut_Unregister(
+    ArkUI_NodeHandle node, const OH_ArkUI_KeyboardShortcutKey* key, uint32_t modifierKeys)
+{
+    CheckShortcutUIThread(__FUNCTION__);
+    CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
+    CHECK_NULL_RETURN_WITH_MESSAGE(key, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Shortcut key is null");
+    std::string value;
+    const auto* error = ParseApplicationShortcutKey(key, modifierKeys, value);
+    if (error) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, error);
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    const auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
+    CHECK_NULL_RETURN_WITH_MESSAGE(impl, ARKUI_ERROR_CODE_INTERNAL_ERROR,
+        __FUNCTION__, "Native implementation is unavailable");
+    const auto* modifiers = impl->getNodeModifiers ? impl->getNodeModifiers() : nullptr;
+    const auto* common = modifiers && modifiers->getCommonModifier ? modifiers->getCommonModifier() : nullptr;
+    CHECK_NULL_RETURN_WITH_MESSAGE(common && common->unregisterNodeKeyboardShortcut, ARKUI_ERROR_CODE_INTERNAL_ERROR,
+        __FUNCTION__, "Component shortcut unregistration is unavailable");
+    common->unregisterNodeKeyboardShortcut(node->uiNodeHandle, value, static_cast<uint8_t>(modifierKeys));
     return ARKUI_ERROR_CODE_NO_ERROR;
 }
 

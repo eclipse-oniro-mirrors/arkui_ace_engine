@@ -273,6 +273,7 @@ public:
     bool IsCurrentStateOn(UIState state);
     void SetKeyboardShortcut(
         const std::string& value, uint8_t keys, const std::function<void()>& onKeyboardShortcutAction);
+    void RemoveKeyboardShortcut(const std::string& value, uint8_t keys);
     void ClearSingleKeyboardShortcut();
     void ClearSingleKeyboardShortcutAll();
     bool HasKeyboardShortcut() const;

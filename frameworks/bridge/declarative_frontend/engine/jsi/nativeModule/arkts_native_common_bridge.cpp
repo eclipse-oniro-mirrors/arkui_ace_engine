@@ -46,6 +46,7 @@
 #include "core/common/resource/resource_parse_utils.h"
 #include "core/components/theme/resource_adapter.h"
 #include "core/components/progress/progress_theme.h"
+#include "core/event/function_key.h"
 #include "core/event/focus_axis_event.h"
 #include "frameworks/bridge/declarative_frontend/engine/functions/js_accessibility_function.h"
 #include "frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/arkts_utils.h"

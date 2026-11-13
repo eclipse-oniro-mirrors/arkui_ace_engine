@@ -984,6 +984,8 @@ public:
     static void SetEnableClickSoundEffect(FrameNode* frameNode, bool enabled);
     static void SetKeyboardShortcut(FrameNode* frameNode, const std::string& value,
         const std::vector<ModifierKey>& keys, std::function<void()>&& onKeyboardShortcutAction);
+    static void RemoveKeyboardShortcut(FrameNode* frameNode, const std::string& value,
+        const std::vector<ModifierKey>& keys);
 
     static void SetOnAppear(FrameNode* frameNode, std::function<void()> &&onAppear);
     static void SetOnDisappear(FrameNode* frameNode, std::function<void()> &&onDisappear);

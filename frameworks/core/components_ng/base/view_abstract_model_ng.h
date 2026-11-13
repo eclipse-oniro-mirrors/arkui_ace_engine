@@ -2014,6 +2014,12 @@ public:
         ViewAbstract::SetKeyboardShortcut(frameNode, value, keys, std::move(onKeyboardShortcutAction));
     }
 
+    static void RemoveKeyboardShortcut(FrameNode* frameNode, const std::string& value,
+        const std::vector<ModifierKey>& keys)
+    {
+        ViewAbstract::RemoveKeyboardShortcut(frameNode, value, keys);
+    }
+
     static void ClearWidthOrHeight(FrameNode* frameNode, bool isWidth)
     {
         ViewAbstract::ClearWidthOrHeight(frameNode, isWidth);

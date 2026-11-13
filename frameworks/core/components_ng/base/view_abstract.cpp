@@ -10442,6 +10442,20 @@ void ViewAbstract::SetKeyboardShortcut(FrameNode* frameNode, const std::string& 
     eventManager->AddKeyboardShortcutNode(WeakPtr<NG::FrameNode>(frameNodeRef));
 }
 
+void ViewAbstract::RemoveKeyboardShortcut(FrameNode* frameNode, const std::string& value,
+    const std::vector<ModifierKey>& keys)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pipeline = frameNode->GetContext();
+    CHECK_NULL_VOID(pipeline);
+    auto eventManager = pipeline->GetEventManager();
+    CHECK_NULL_VOID(eventManager);
+    auto eventHub = frameNode->GetEventHub<EventHub>();
+    CHECK_NULL_VOID(eventHub);
+    auto key = eventManager->GetKeyboardShortcutKeys(keys);
+    eventHub->RemoveKeyboardShortcut(value, key);
+}
+
 void ViewAbstract::SetOnAppear(FrameNode* frameNode, std::function<void()> &&onAppear)
 {
     CHECK_NULL_VOID(frameNode);
