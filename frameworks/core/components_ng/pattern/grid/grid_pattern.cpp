@@ -2812,9 +2812,9 @@ float GridPattern::GetSnapAnchor(ScrollSnapAlign align, float itemStartContent, 
         return itemStartContent + itemMainSize / 2.0f - viewportMainSize / 2.0f;
     }
     if (align == ScrollSnapAlign::END) {
-        return itemStartContent + itemMainSize - viewportMainSize;
+        return itemStartContent + itemMainSize - viewportMainSize + info_.contentEndOffset_;
     }
-    return itemStartContent;
+    return itemStartContent - info_.contentStartOffset_;
 }
 
 // Main-axis geometry of one materialized child; false when the child or its measurement is
@@ -2975,14 +2975,13 @@ float GridPattern::ToLogicalMainStart(float physicalStart, float itemMainSize, A
 
 float GridPattern::GetItemSnapMinOffset() const
 {
-    // With contentStartOffset the snap lower bound is the first-item alignment position: the
-    // snap never rests inside the leading gap (AC-2.4, aligned with the List snap spec).
-    return info_.contentStartOffset_;
+    // GetTotalOffset uses the first item's origin, so the leading inset is a negative offset.
+    return -info_.contentStartOffset_;
 }
 
 float GridPattern::GetItemSnapMaxOffset() const
 {
-    auto maxOffset = GetTotalHeight() - GetMainContentSize();
+    auto maxOffset = GetTotalHeight() - info_.contentStartOffset_ - GetMainContentSize();
     // Lazy content height can be underestimated before the end is reached; never clamp below the
     // current position so that snap targets stay reachable.
     return std::max(maxOffset, static_cast<float>(GetTotalOffset()));
