@@ -458,10 +458,6 @@ public:
     virtual void OnRecycle() {}
     virtual void OnReuse() {}
 
-    // Geometry-only section handoff; independent of lazy layout eligibility.
-    virtual bool HasStickyHeader() const { return false; }
-    virtual void PublishNextStickyHeaderGap(const std::optional<float>&) {}
-
     virtual void OnAttachToMainTree() {}
     virtual void OnAttachToBuilderNode(NodeStatus nodeStatus) {}
 

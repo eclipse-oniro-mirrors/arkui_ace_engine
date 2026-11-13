@@ -116,6 +116,59 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_FlowAndIndices, TestSize.Level1)
 }
 
 /**
+ * @tc.name: WFHF_DeviceScrollEdgeIncludesFooter
+ * @tc.desc: Bottom targets the footer while an explicit last index targets the last FlowItem.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowHeaderFooterTest, WFHF_DeviceScrollEdgeIncludesFooter, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateWaterFlowItems(20);
+    SetEdges(60.0f, 40.0f);
+    CreateDone();
+    ScrollToIndex(19, false, ScrollAlign::END);
+    auto map = pattern_->GetEdgeIndexMap();
+    EXPECT_FLOAT_EQ(GetChildRect(frameNode_, map.DataToNode(19)).Bottom(), WATER_FLOW_HEIGHT);
+    pattern_->ScrollToEdge(ScrollEdgeType::SCROLL_BOTTOM, false);
+    FlushUITasks();
+    EXPECT_FLOAT_EQ(GetChildRect(frameNode_, map.FooterIndex()).Bottom(), WATER_FLOW_HEIGHT);
+    EXPECT_EQ(pattern_->GetDataCount(), 20);
+    EXPECT_EQ(pattern_->GetEndIndex(), 19);
+}
+
+/**
+ * @tc.name: WFHF_DeviceClearScrolledSections
+ * @tc.desc: Clearing scrolled sections restores the same edge positions as initially empty data.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowHeaderFooterTest, WFHF_DeviceClearScrolledSections, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateWaterFlowItems(20);
+    SetEdges(60.0f, 40.0f);
+    auto sections = pattern_->GetOrCreateWaterFlowSections();
+    WaterFlowSections::Section section;
+    section.itemsCount = 20;
+    section.crossCount = 1;
+    sections->ChangeData(0, 0, { section });
+    CreateDone();
+    ScrollToIndex(19, false, ScrollAlign::END);
+    EXPECT_GT(pattern_->GetTotalOffset(), 0.0f);
+    for (int32_t index = 19; index >= 0; --index) {
+        frameNode_->RemoveChildAtIndex(pattern_->GetEdgeIndexMap().DataToNode(index));
+    }
+    sections->ChangeData(0, 1, {});
+    frameNode_->ChildrenUpdatedFrom(0);
+    frameNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    MockPipelineContext::GetCurrent()->FlushBuildFinishCallbacks();
+    FlushUITasks();
+    EXPECT_EQ(pattern_->GetDataCount(), 0);
+    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), 0.0f);
+    EXPECT_FLOAT_EQ(GetChildRect(frameNode_, pattern_->GetEdgeIndexMap().HeaderIndex()).Top(), 0.0f);
+    EXPECT_FLOAT_EQ(GetChildRect(frameNode_, pattern_->GetEdgeIndexMap().FooterIndex()).Top(), 60.0f);
+}
+
+/**
  * @tc.name: WFHF_Empty
  * @tc.desc: Edges have a natural position without FlowItems.
  * @tc.type: FUNC
@@ -223,7 +276,7 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_StickyOnlyKeepsLegacyFooter, TestSize.L
         EXPECT_FALSE(pattern_->GetEdgeState().enabled);
         EXPECT_FALSE(pattern_->GetEdgeState().footerControlled);
         EXPECT_FALSE(pattern_->layoutInfo_->edgeSlots_);
-        EXPECT_FALSE(pattern_->edgeViewportRegistered_);
+        EXPECT_FALSE(pattern_->edgeState_.viewportRegistered);
         EXPECT_EQ(legacy->GetParent(), frameNode_);
         EXPECT_EQ(frameNode_->GetChildAtIndex(0), legacy);
         EXPECT_EQ(pattern_->GetChildrenCount(), 3);
@@ -255,7 +308,7 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_EmptyEdgeUpdatesKeepLegacyMode, TestSiz
     FlushUITasks();
     EXPECT_FALSE(pattern_->GetEdgeState().enabled);
     EXPECT_FALSE(pattern_->layoutInfo_->edgeSlots_);
-    EXPECT_FALSE(pattern_->edgeViewportRegistered_);
+    EXPECT_FALSE(pattern_->edgeState_.viewportRegistered);
     EXPECT_FALSE(layoutProperty_->GetNeedLazyLayout());
     EXPECT_EQ(pattern_->GetChildrenCount(), 2);
     EXPECT_EQ(GetChildRect(frameNode_, 0), originalRect);
@@ -340,7 +393,7 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_StickyKeepsPendingBuilder, TestSize.Lev
     pattern_->SetSticky(StickyStyle::HEADER);
     EXPECT_FALSE(pattern_->GetEdgeState().enabled);
     EXPECT_FALSE(pattern_->layoutInfo_->edgeSlots_);
-    EXPECT_FALSE(pattern_->edgeViewportRegistered_);
+    EXPECT_FALSE(pattern_->edgeState_.viewportRegistered);
     pattern_->SetEdge(true, Edge(50.0f), generation);
     CreateDone();
     ASSERT_NE(Header(), nullptr);
@@ -485,7 +538,7 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_ParentOnlyMove, TestSize.Level1)
     EXPECT_FLOAT_EQ(GetChildRect(frameNode_, pattern_->GetEdgeIndexMap().FooterIndex()).Top(), 510.0f);
     EXPECT_EQ(Header()->GetRenderContext()->GetZIndexValue(-1), HeaderFooterUtils::STICKY_HEADER_Z_INDEX);
     pattern_->SetSticky(StickyStyle::NONE);
-    EXPECT_FALSE(pattern_->edgeViewportRegistered_);
+    EXPECT_FALSE(pattern_->edgeState_.viewportRegistered);
     EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), 0.0f);
     EXPECT_FLOAT_EQ(GetChildRect(frameNode_, pattern_->GetEdgeIndexMap().FooterIndex()).Top(), 960.0f);
     EXPECT_EQ(Header()->GetRenderContext()->GetZIndexValue(-1), 0);
@@ -650,7 +703,7 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_UnknownTailBoundary, TestSize.Level1)
     SetEdges();
     CreateDone();
     ASSERT_LT(pattern_->GetEndIndex(), 99);
-    const auto naturalSize = pattern_->edgeTotalSize_;
+    const auto naturalSize = pattern_->edgeState_.totalSize;
     auto parent = ParentScroll(2000.0f);
     pattern_->SetSticky(StickyStyle::BOTH);
     auto pipeline = frameNode_->GetContext();
@@ -659,7 +712,7 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_UnknownTailBoundary, TestSize.Level1)
     const auto footerIndex = pattern_->GetEdgeIndexMap().FooterIndex();
     // The fixture knows the complete data heights; the layout has only measured the first window.
     EXPECT_LE(GetChildRect(frameNode_, footerIndex).Bottom(), 50.0f + 1000.0f + 99.0f + 40.0f);
-    EXPECT_FLOAT_EQ(pattern_->edgeTotalSize_, naturalSize);
+    EXPECT_FLOAT_EQ(pattern_->edgeState_.totalSize, naturalSize);
     EXPECT_LT(pattern_->GetEndIndex(), 99);
 
     pattern_->ScrollToIndex(99, false, ScrollAlign::END);
@@ -671,9 +724,9 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_UnknownTailBoundary, TestSize.Level1)
     EXPECT_EQ(pattern_->GetEndIndex(), 99);
     EXPECT_FLOAT_EQ(GetChildRect(frameNode_, footerIndex).Top(),
         GetChildRect(frameNode_, pattern_->GetEdgeIndexMap().DataToNode(99)).Bottom());
-    const auto finalSize = pattern_->edgeTotalSize_;
+    const auto finalSize = pattern_->edgeState_.totalSize;
     pattern_->SetSticky(StickyStyle::NONE);
-    EXPECT_FLOAT_EQ(pattern_->edgeTotalSize_, finalSize);
+    EXPECT_FLOAT_EQ(pattern_->edgeState_.totalSize, finalSize);
 }
 
 /**
@@ -760,11 +813,11 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_UnknownTailLazyChanges, TestSize.Level1
         pipeline->GetScrollViewportCoordinator()->Flush(pipeline);
     };
     const auto before = *built;
-    const auto naturalSize = pattern_->edgeTotalSize_;
+    const auto naturalSize = pattern_->edgeState_.totalSize;
     pattern_->SetSticky(StickyStyle::BOTH);
     refresh(-200.0f);
     EXPECT_EQ(*built, before);
-    EXPECT_FLOAT_EQ(pattern_->edgeTotalSize_, naturalSize);
+    EXPECT_FLOAT_EQ(pattern_->edgeState_.totalSize, naturalSize);
     for (int32_t i = 0; i < 6; ++i) {
         UpdateCurrentOffset(-150.0f);
         refresh(-200.0f);
@@ -783,7 +836,7 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_UnknownTailLazyChanges, TestSize.Level1
     pattern_->ScrollToIndex(0, false, ScrollAlign::START);
     FlushUITasks();
     refresh(0.0f);
-    EXPECT_FLOAT_EQ(pattern_->edgeTotalSize_, 80.0f + 70.0f + 200.0f + 330.0f + 40.0f);
+    EXPECT_FLOAT_EQ(pattern_->edgeState_.totalSize, 80.0f + 70.0f + 200.0f + 330.0f + 40.0f);
     pattern_->SetSticky(StickyStyle::NONE);
     EXPECT_FLOAT_EQ(GetChildRect(frameNode_, pattern_->GetEdgeIndexMap().FooterIndex()).Top(), 680.0f);
 
@@ -793,7 +846,7 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_UnknownTailLazyChanges, TestSize.Level1
     refresh(0.0f);
     EXPECT_EQ(pattern_->GetDataCount(), 0);
     EXPECT_FLOAT_EQ(GetChildRect(frameNode_, pattern_->GetEdgeIndexMap().FooterIndex()).Top(), 80.0f);
-    EXPECT_FLOAT_EQ(pattern_->edgeTotalSize_, 120.0f);
+    EXPECT_FLOAT_EQ(pattern_->edgeState_.totalSize, 120.0f);
 }
 
 /**
@@ -1042,7 +1095,7 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_StickyOnlyKeepsLegacyParentLayout, Test
     frameNode_->MarkModifyDone();
     FlushUITasks(parent);
     EXPECT_FALSE(pattern_->GetEdgeState().enabled);
-    EXPECT_FALSE(pattern_->edgeViewportRegistered_);
+    EXPECT_FALSE(pattern_->edgeState_.viewportRegistered);
     EXPECT_FALSE(layoutProperty_->GetNeedLazyLayout());
     EXPECT_EQ(frameNode_->GetGeometryNode()->GetFrameSize(), originalSize);
     EXPECT_EQ(GetChildRect(frameNode_, 0), originalRect);
@@ -1068,13 +1121,13 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_ClearedEdgesPreserveLazyMode, TestSize.
     parent->MarkModifyDone();
     MountToStageNode(parent);
     FlushUITasks(parent);
-    ASSERT_TRUE(pattern_->edgeViewportRegistered_);
+    ASSERT_TRUE(pattern_->edgeState_.viewportRegistered);
 
     pattern_->SetEdge(true, nullptr, pattern_->BeginEdgeUpdate(true));
     EXPECT_FALSE(layoutProperty_->GetNeedLazyLayout());
     pattern_->SetEdge(false, nullptr, pattern_->BeginEdgeUpdate(false));
     EXPECT_FALSE(layoutProperty_->GetNeedLazyLayout());
-    EXPECT_FALSE(pattern_->edgeViewportRegistered_);
+    EXPECT_FALSE(pattern_->edgeState_.viewportRegistered);
     FlushUITasks(parent);
     EXPECT_EQ(pattern_->GetDataCount(), 20);
     EXPECT_FALSE(pattern_->hasFooter());
@@ -1085,7 +1138,7 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_ClearedEdgesPreserveLazyMode, TestSize.
     SetEdges(60.0f, 30.0f);
     EXPECT_FALSE(layoutProperty_->GetNeedLazyLayout());
     FlushUITasks(parent);
-    EXPECT_TRUE(pattern_->edgeViewportRegistered_);
+    EXPECT_TRUE(pattern_->edgeState_.viewportRegistered);
     EXPECT_EQ(pattern_->GetEdgeState().sticky, StickyStyle::BOTH);
     EXPECT_EQ(pattern_->GetDataCount(), 20);
     ASSERT_NE(Header(), nullptr);
@@ -1115,7 +1168,7 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_LegacyFooterRemovalPreservesLazyMode, T
     parent->MarkModifyDone();
     MountToStageNode(parent);
     FlushUITasks(parent);
-    ASSERT_TRUE(pattern_->edgeViewportRegistered_);
+    ASSERT_TRUE(pattern_->edgeState_.viewportRegistered);
     ASSERT_FALSE(pattern_->GetEdgeState().footerControlled);
 
     pattern_->SetEdge(true, nullptr, pattern_->BeginEdgeUpdate(true));
@@ -1123,7 +1176,7 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_LegacyFooterRemovalPreservesLazyMode, T
     EXPECT_TRUE(pattern_->hasFooter());
     pattern_->AddFooter(nullptr);
     EXPECT_FALSE(layoutProperty_->GetNeedLazyLayout());
-    EXPECT_FALSE(pattern_->edgeViewportRegistered_);
+    EXPECT_FALSE(pattern_->edgeState_.viewportRegistered);
     FlushUITasks(parent);
     EXPECT_FALSE(pattern_->hasFooter());
     EXPECT_EQ(Header(), nullptr);
@@ -1251,6 +1304,22 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_ExistingLazyFlagPreserved, TestSize.Lev
 }
 
 /**
+ * @tc.name: WFHF_StickyCapabilityIgnoresTags
+ * @tc.desc: Sticky handoff depends on the pattern capability, not a node's display tag.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowHeaderFooterTest, WFHF_StickyCapabilityIgnoresTags, TestSize.Level1)
+{
+    auto fake = FrameNode::CreateFrameNode(V2::WATERFLOW_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    EXPECT_EQ(LazyLayoutUtils::GetStickyHeaderPattern(fake), nullptr);
+    auto actual = FrameNode::CreateFrameNode("StickySection",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<WaterFlowPattern>());
+    EXPECT_NE(LazyLayoutUtils::GetStickyHeaderPattern(actual), nullptr);
+    EXPECT_EQ(LazyLayoutUtils::GetLazyLayoutPattern(actual), nullptr);
+}
+
+/**
  * @tc.name: WFHF_HeaderHandoffGeometry
  * @tc.desc: A sibling gap extends the header boundary only, and is reset on disable or detach.
  * @tc.type: FUNC
@@ -1266,7 +1335,10 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_HeaderHandoffGeometry, TestSize.Level1)
     pattern_->SetEdgeGeometry(OffsetF(), 1000.0f);
     pattern_->SetSticky(StickyStyle::BOTH);
     EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), 910.0f);
-    RefPtr<Pattern> section = pattern_;
+    RefPtr<Pattern> base = pattern_;
+    auto section = AceType::DynamicCast<StickyHeaderPattern>(base);
+    ASSERT_NE(section, nullptr);
+    EXPECT_EQ(AceType::DynamicCast<WaterFlowPattern>(section), pattern_);
     EXPECT_TRUE(section->HasStickyHeader());
     section->PublishNextStickyHeaderGap(20.0f);
     pattern_->UpdateEdgePositions();
@@ -1280,7 +1352,7 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_HeaderHandoffGeometry, TestSize.Level1)
     EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), 910.0f);
     section->PublishNextStickyHeaderGap(20.0f);
     pattern_->OnDetachFromMainTree();
-    EXPECT_FALSE(pattern_->nextStickyHeaderGap_.has_value());
+    EXPECT_FALSE(pattern_->edgeState_.nextStickyHeaderGap.has_value());
 }
 /**
  * @tc.name: WFHF_LazyColumnPublishesHandoff
@@ -1306,17 +1378,27 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_LazyColumnPublishesHandoff, TestSize.Le
     auto second = parent->GetOrCreateChildByIndex(1);
     ASSERT_NE(first, nullptr);
     ASSERT_NE(second, nullptr);
-    LazyColumnLayoutAlgorithm algorithm(AceType::MakeRefPtr<LazyColumnLayoutInfo>());
+    auto info = AceType::MakeRefPtr<LazyColumnLayoutInfo>();
+    LazyColumnLayoutAlgorithm algorithm(info);
     algorithm.totalItemCount_ = 2;
     algorithm.space_ = 12.0f;
     algorithm.UpdateSiblingHandoffGap(AceType::RawPtr(parent), second, 1);
-    ASSERT_TRUE(pattern_->nextStickyHeaderGap_.has_value());
-    EXPECT_FLOAT_EQ(pattern_->nextStickyHeaderGap_.value(), 12.0f);
-    EXPECT_FALSE(siblingPattern->nextStickyHeaderGap_.has_value());
+    ASSERT_TRUE(pattern_->edgeState_.nextStickyHeaderGap.has_value());
+    EXPECT_FLOAT_EQ(pattern_->edgeState_.nextStickyHeaderGap.value(), 12.0f);
+    EXPECT_FALSE(siblingPattern->edgeState_.nextStickyHeaderGap.has_value());
     EXPECT_FALSE(layoutProperty_->GetNeedLazyLayout());
     EXPECT_FALSE(sibling->GetLayoutProperty()->GetNeedLazyLayout());
+    info->posMap_ = { { 0, { 0.0f, 500.0f } }, { 1, { 512.0f, 1012.0f } } };
+    info->endIndex_ = 0;
+    algorithm.cacheEndPos_ = 1200.0f;
     siblingPattern->SetSticky(StickyStyle::NONE);
-    algorithm.UpdateSiblingHandoffGap(AceType::RawPtr(parent), second, 1);
-    EXPECT_FALSE(pattern_->nextStickyHeaderGap_.has_value());
+    algorithm.LayoutCachedItemsForward(AceType::RawPtr(parent), WATER_FLOW_WIDTH, OffsetF());
+    EXPECT_FALSE(pattern_->edgeState_.nextStickyHeaderGap.has_value());
+    siblingPattern->SetSticky(StickyStyle::HEADER);
+    info->startIndex_ = 2;
+    algorithm.cacheStartPos_ = 500.0f;
+    algorithm.LayoutCachedItemsBackward(AceType::RawPtr(parent), WATER_FLOW_WIDTH, OffsetF());
+    ASSERT_TRUE(pattern_->edgeState_.nextStickyHeaderGap.has_value());
+    EXPECT_FLOAT_EQ(pattern_->edgeState_.nextStickyHeaderGap.value(), 12.0f);
 }
 } // namespace OHOS::Ace::NG

@@ -52,6 +52,8 @@ public:
         synced_ = false;
     }
 
+    void SyncEmptyEdges(float mainSize);
+
     float CalibrateOffset() override;
 
     int32_t GetCrossIndex(int32_t itemIndex) const override;

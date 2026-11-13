@@ -18,6 +18,7 @@
 #include "core/components_ng/pattern/scroll/inner/scroll_bar.h"
 #include "core/components_ng/pattern/scroll/scroll_edge_effect.h"
 #include "core/components_ng/pattern/waterflow/water_flow_content_modifier.h"
+#include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
 #include "core/components_ng/render/paint_wrapper.h"
 #include "core/components_ng/render/render_context.h"
 
@@ -67,6 +68,20 @@ void WaterFlowPaintMethod::UpdateContentModifier(PaintWrapper* paintWrapper)
     bool clip = !renderContext || renderContext->GetClipEdge().value_or(true);
     contentModifier_->SetClipOffset(paddingOffset);
     contentModifier_->SetClipSize(frameSize);
+    auto host = renderContext->GetHost();
+    auto pattern = host ? host->GetPattern<WaterFlowPattern>() : nullptr;
+    if (pattern && pattern->GetEdgeState().enabled) {
+        // Removing a native clip also clears it on the render server. An empty
+        // canvas recording can otherwise leave the previous edge clip behind.
+        contentModifier_->SetClip(false);
+        if (clip) {
+            renderContext->SetContentClip(RectF(paddingOffset, frameSize));
+        } else {
+            renderContext->ResetContentClip();
+        }
+        return;
+    }
+    renderContext->ResetContentClip();
     contentModifier_->SetClip(clip);
 }
 

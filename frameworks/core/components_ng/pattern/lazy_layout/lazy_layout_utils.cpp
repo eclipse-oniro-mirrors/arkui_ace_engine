@@ -211,14 +211,14 @@ std::optional<ViewPosReference> LazyLayoutUtils::GetViewPosReference(
     return viewPosRefOpt;
 }
 
-RefPtr<Pattern> LazyLayoutUtils::GetStickyHeaderPattern(const RefPtr<UINode>& node)
+RefPtr<StickyHeaderPattern> LazyLayoutUtils::GetStickyHeaderPattern(const RefPtr<UINode>& node)
 {
     auto child = node;
     while (child) {
         auto frame = AceType::DynamicCast<FrameNode>(child);
         if (frame) {
-            auto pattern = frame->GetPattern();
-            if (AceType::DynamicCast<LazyLayoutPattern>(pattern) || frame->GetTag() == V2::WATERFLOW_ETS_TAG) {
+            auto pattern = frame->GetPattern<StickyHeaderPattern>();
+            if (pattern) {
                 return pattern;
             }
             auto property = frame->GetLayoutProperty();

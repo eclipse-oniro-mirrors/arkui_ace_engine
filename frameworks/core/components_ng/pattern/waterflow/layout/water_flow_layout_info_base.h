@@ -36,16 +36,33 @@ struct WaterFlowChildIndexMap {
     bool hasFooter = false;
     int32_t rawCount = 0;
 
-    int32_t EdgeCount() const { return static_cast<int32_t>(hasHeader) + static_cast<int32_t>(hasFooter); }
-    int32_t HeaderIndex() const { return hasHeader ? 0 : -1; }
-    int32_t FooterIndex() const { return hasFooter ? rawCount - 1 : -1; }
-    int32_t DataToNode(int32_t index) const { return index + static_cast<int32_t>(hasHeader); }
+    int32_t EdgeCount() const
+    {
+        return (hasHeader ? 1 : 0) + (hasFooter ? 1 : 0);
+    }
+    int32_t HeaderIndex() const
+    {
+        return hasHeader ? 0 : -1;
+    }
+    int32_t FooterIndex() const
+    {
+        return hasFooter ? rawCount - 1 : -1;
+    }
+    int32_t DataToNode(int32_t index) const
+    {
+        return hasHeader ? index + 1 : index;
+    }
     int32_t NodeToData(int32_t index) const
     {
-        return index < static_cast<int32_t>(hasHeader) || index >= rawCount - static_cast<int32_t>(hasFooter)
-            ? -1 : index - static_cast<int32_t>(hasHeader);
+        if (index < 0 || index >= rawCount || index == HeaderIndex() || index == FooterIndex()) {
+            return -1;
+        }
+        return hasHeader ? index - 1 : index;
     }
-    int32_t DataCount(int32_t rawCount) const { return std::max(0, rawCount - EdgeCount()); }
+    int32_t DataCount(int32_t rawCount) const
+    {
+        return std::max(0, rawCount - EdgeCount());
+    }
 };
 
 class WaterFlowLayoutInfoBase : public AceType {

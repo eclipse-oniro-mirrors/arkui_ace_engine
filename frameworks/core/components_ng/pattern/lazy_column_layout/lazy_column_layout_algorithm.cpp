@@ -1391,6 +1391,7 @@ void LazyColumnLayoutAlgorithm::LayoutItems(
         if (!wrapper) {
             continue;
         }
+        UpdateSiblingHandoffGap(layoutWrapper, wrapper, iter->first);
         SetItemOffset(wrapper, iter->second, crossSize, paddingOffset);
         if (wrapper->CheckNeedForceMeasureAndLayout()) {
             wrapper->Layout();
@@ -1431,6 +1432,7 @@ void LazyColumnLayoutAlgorithm::LayoutCachedItemsForward(
         if (!wrapper) {
             break;
         }
+        UpdateSiblingHandoffGap(layoutWrapper, wrapper, iter->first);
         SetItemOffset(wrapper, iter->second, crossSize, paddingOffset);
         SyncGeometry(wrapper);
         if (hadDirty || CheckNeedMeasure(wrapper)) {
@@ -1476,6 +1478,7 @@ void LazyColumnLayoutAlgorithm::LayoutCachedItemsBackward(
         if (!wrapper) {
             break;
         }
+        UpdateSiblingHandoffGap(layoutWrapper, wrapper, rIter->first);
         SetItemOffset(wrapper, rIter->second, crossSize, paddingOffset);
         SyncGeometry(wrapper);
         if (hadDirty || CheckNeedMeasure(wrapper)) {

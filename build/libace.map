@@ -4458,10 +4458,13 @@
       "OHOS::Ace::MaterialUtils::IsMaterialDisabled()";
       "OHOS::Ace::MaterialUtils::IsMaterialEnabled()";
       "OHOS::Ace::MaterialUtils::PreProcessMaterial(OHOS::Ace::UiMaterial const*)";
+      "OHOS::Ace::Matrix4::Count() const";
       "OHOS::Ace::Matrix4::CreateFactorSkew(double, double)";
       "OHOS::Ace::Matrix4::CreateRotate(double, double, double, double)";
+      "OHOS::Ace::Matrix4::Determinant() const";
       "OHOS::Ace::Matrix4::Get(int, int) const";
       "OHOS::Ace::Matrix4::Invert(OHOS::Ace::Matrix4 const&)";
+      "OHOS::Ace::Matrix4::MapScalars(double const*, double*) const";
       "OHOS::Ace::Matrix4::Matrix4(double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double)";
       "OHOS::Ace::Matrix4::Set(int, int, double)";
       "OHOS::Ace::Matrix4::operator*(OHOS::Ace::Point const&)";
@@ -4730,6 +4733,7 @@
       "OHOS::Ace::NG::LazyLayoutUtils::EstimateTotalMainSize(float, int, float)";
       "OHOS::Ace::NG::LazyLayoutUtils::FindWaterFlowAncestorInfo(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&)";
       "OHOS::Ace::NG::LazyLayoutUtils::GetLazyLayoutPattern(OHOS::Ace::RefPtr<OHOS::Ace::NG::UINode> const&)";
+      "OHOS::Ace::NG::LazyLayoutUtils::GetStickyHeaderPattern(OHOS::Ace::RefPtr<OHOS::Ace::NG::UINode> const&)";
       "OHOS::Ace::NG::LazyLayoutUtils::GetViewPosReference(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, std::__h::vector<std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>>, std::__h::allocator<std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>>>> const&)";
       "OHOS::Ace::NG::LazyLayoutPattern::AfterMountToParent()";
       OHOS::Ace::NG::LazyLayoutPattern::GetPreparedGeometry*;
@@ -4741,6 +4745,7 @@
       "OHOS::Ace::NG::LazyLayoutPattern::OnAttachToFrameNode()";
       "OHOS::Ace::NG::LazyLayoutPattern::OnDetachFromMainTree()";
       "OHOS::Ace::NG::LazyLayoutPattern::PublishNextStickyHeaderGap(std::__h::optional<float> const&)";
+      "non-virtual thunk to OHOS::Ace::NG::LazyLayoutPattern::PublishNextStickyHeaderGap(std::__h::optional<float> const&)";
       "OHOS::Ace::NG::LazyLayoutUtils::HasDirectWaterFlowAncestor(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&)";
       "OHOS::Ace::NG::LazyLayoutUtils::IsAllowedIntermediateNode(OHOS::Ace::RefPtr<OHOS::Ace::NG::UINode> const&)";
       "OHOS::Ace::NG::LazyLayoutUtils::IsChildMeasureComplete(OHOS::Ace::RefPtr<OHOS::Ace::NG::LayoutWrapper> const&)";

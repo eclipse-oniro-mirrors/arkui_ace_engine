@@ -20,6 +20,33 @@
 #include <numeric>
 
 namespace OHOS::Ace::NG {
+void WaterFlowLayoutInfoSW::SyncEmptyEdges(float mainSize)
+{
+    // A section reset can leave the old lane origin and jump behind. An empty
+    // body has its natural origin after the header, just like the first layout.
+    Reset();
+    totalOffset_ = contentStartOffset_;
+    startPos_ = TopMargin() + totalOffset_;
+    endPos_ = startPos_;
+    storedOffset_ = startPos_;
+    startIndex_ = 0;
+    endIndex_ = -1;
+    delta_ = 0.0f;
+    jumpIndex_ = WaterFlowLayoutInfoBase::EMPTY_JUMP_INDEX;
+    extraOffset_.reset();
+    targetIndex_.reset();
+    targetPreparation_.reset();
+    targetPreparationCleanup_.reset();
+    synced_ = true;
+    knowTotalHeight_ = true;
+    lastMainSize_ = mainSize;
+    itemStart_ = true;
+    itemEnd_ = true;
+    offsetEnd_ = true;
+    isDataValid_ = true;
+    maxHeight_ = headerHeight_ + edgeFooterHeight_;
+}
+
 void WaterFlowLayoutInfoSW::Sync(int32_t itemCnt, float mainSize, const std::vector<float>& mainGap)
 {
     if (lanes_.empty()) {

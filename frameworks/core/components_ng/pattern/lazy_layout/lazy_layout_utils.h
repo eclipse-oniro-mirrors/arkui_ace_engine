@@ -22,6 +22,7 @@
 
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_offset.h"
+#include "core/components_ng/pattern/lazy_layout/sticky_header_pattern.h"
 #include "core/components_ng/property/layout_constraint.h"
 
 namespace OHOS::Ace::NG {
@@ -75,7 +76,7 @@ struct ACE_FORCE_EXPORT LazyLayoutUtils {
     // Find the first LazyLayoutPattern through a proxy chain whose FrameNodes were explicitly marked as
     // participating in lazy layout. Ordinary wrapper/content FrameNodes are traversal boundaries.
     // Resolve sticky sections without publishing or consuming a lazy-layout request.
-    static RefPtr<Pattern> GetStickyHeaderPattern(const RefPtr<UINode>& node);
+    static RefPtr<StickyHeaderPattern> GetStickyHeaderPattern(const RefPtr<UINode>& node);
     static RefPtr<LazyLayoutPattern> GetLazyLayoutPattern(const RefPtr<UINode>& node);
 
     // Called after Measure: unchanged geometry and GONE are valid; deferred/pre-make measurement is not.

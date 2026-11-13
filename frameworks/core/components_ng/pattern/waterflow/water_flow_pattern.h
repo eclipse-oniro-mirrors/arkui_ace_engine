@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_offset.h"
+#include "core/components_ng/pattern/lazy_layout/sticky_header_pattern.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_manager.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_types.h"
 #include "core/components_ng/pattern/pattern.h"
@@ -54,6 +55,12 @@ struct WaterFlowEdgeState {
     uint64_t headerGeneration = 0;
     uint64_t footerGeneration = 0;
     StickyStyle sticky;
+    std::optional<float> nextStickyHeaderGap;
+    bool lastNotifiedHasStickyHeader = false;
+    OffsetF origin;
+    float totalSize = 0.0f;
+    float measuredTotalSize = 0.0f;
+    bool viewportRegistered = false;
 
     uint64_t BeginUpdate(bool isHeader)
     {
@@ -79,8 +86,8 @@ struct WaterFlowEdgeState {
 
 struct WaterFlowFastScrollState;
 
-class ACE_EXPORT WaterFlowPattern : public ScrollablePattern {
-    DECLARE_ACE_TYPE(WaterFlowPattern, ScrollablePattern);
+class ACE_EXPORT WaterFlowPattern : public ScrollablePattern, public StickyHeaderPattern {
+    DECLARE_ACE_TYPE(WaterFlowPattern, ScrollablePattern, StickyHeaderPattern);
 
 public:
     WaterFlowPattern();
@@ -225,7 +232,10 @@ public:
     void SetEdgeGeometry(const OffsetF& origin, float totalSize, std::optional<float> measuredTotalSize = std::nullopt);
     void UpdateEdgePositions();
     void OnDetachFromFrameNode(FrameNode* frameNode) override;
-    const WaterFlowEdgeState& GetEdgeState() const { return edgeState_; }
+    const WaterFlowEdgeState& GetEdgeState() const
+    {
+        return edgeState_;
+    }
     WaterFlowChildIndexMap GetEdgeIndexMap() const;
     int32_t GetDataCount() const;
     // Keep header first and footer last without including either in FlowItem/Sections indices.
@@ -529,12 +539,6 @@ private:
     SizeF lastSize_;
     std::pair<int32_t, int32_t> itemRange_ = { -1, -1 };
     WaterFlowEdgeState edgeState_;
-    std::optional<float> nextStickyHeaderGap_;
-    bool lastNotifiedHasStickyHeader_ = false;
-    OffsetF edgeOrigin_;
-    float edgeTotalSize_ = 0.0f;
-    float edgeMeasuredTotalSize_ = 0.0f;
-    bool edgeViewportRegistered_ = false;
     WeakPtr<UINode> footer_;
     // for keepVisiableContentPosition mode temporarily.
     bool keepContentPosition_ = true;

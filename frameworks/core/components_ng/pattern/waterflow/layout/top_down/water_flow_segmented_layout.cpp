@@ -473,6 +473,9 @@ void WaterFlowSegmentedLayout::MeasureOnJump(int32_t jumpIdx)
     }
     if (info_->jumpIndex_ == LAST_ITEM) {
         auto maxHeight = info_->GetMaxMainHeight() - info_->BotMargin();
+        if (info_->edgeSlots_) {
+            maxHeight += info_->BotMargin() + info_->edgeFooterHeight_;
+        }
         info_->currentOffset_ = SolveJumpOffset({ 0, maxHeight, 0 }) + postJumpOffset_.value_or(0.0f);
     } else {
         info_->currentOffset_ = SolveJumpOffset(item) + postJumpOffset_.value_or(0.0f);

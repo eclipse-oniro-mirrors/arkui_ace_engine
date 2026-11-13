@@ -488,18 +488,18 @@ void WaterFlowPattern::SweepOrphanPlaceholderShells()
 void WaterFlowPattern::OnDetachFromMainTree()
 {
     edgeState_.InvalidateGenerations();
-    nextStickyHeaderGap_.reset();
-    lastNotifiedHasStickyHeader_ = false;
+    edgeState_.nextStickyHeaderGap.reset();
+    edgeState_.lastNotifiedHasStickyHeader = false;
     // The last animation callback can clear the shared request before its final
     // layout consumes our state. Cancel that state at UI-tree detach as well.
     // Do not move animation cleanup into the potentially off-thread destructor, and leave
     // thread-safe nodes to the multi-thread detach path of the base class.
     auto host = GetHost();
     auto pipeline = host ? host->GetContext() : nullptr;
-    if (pipeline && edgeViewportRegistered_) {
+    if (pipeline && edgeState_.viewportRegistered) {
         pipeline->GetScrollViewportCoordinator()->Unregister(host->GetId());
     }
-    edgeViewportRegistered_ = false;
+    edgeState_.viewportRegistered = false;
     if ((fastScrollState_ || targetIndex_ || legacyScrollTarget_) && !(host && host->IsThreadSafeNode())) {
         StopAnimate();
     }
@@ -1350,8 +1350,8 @@ bool WaterFlowPattern::UpdateStartIndex(int32_t index)
     if (!edgeState_.enabled && layoutInfo_->footerIndex_ == 0 && layoutInfo_->jumpIndex_ == childCount - 1) {
         SetScrollAlign(ScrollAlign::END);
     }
-    if (layoutInfo_->Mode() == LayoutMode::TOP_DOWN) {
-        // distinguish scrollToLastIndex and scrollToEdge in top-down mode.
+    if (layoutInfo_->Mode() == LayoutMode::TOP_DOWN || edgeState_.enabled) {
+        // Preserve the edge sentinel: an explicit data index must not include the footer.
         layoutInfo_->jumpIndex_ = index;
     }
     host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
@@ -2135,7 +2135,7 @@ void WaterFlowPattern::SetEdge(bool isHeader, const RefPtr<UINode>& content, uin
         layoutInfo_->footerHeight_ = 0.0f;
     }
     if (!edgeState_.header.Upgrade() && !footer_.Upgrade()) {
-        SetEdgeGeometry(edgeOrigin_, edgeTotalSize_, edgeMeasuredTotalSize_);
+        SetEdgeGeometry(edgeState_.origin, edgeState_.totalSize, edgeState_.measuredTotalSize);
     }
     ResetLayoutInfo();
     NotifyStickyHeaderChange();
@@ -2179,24 +2179,24 @@ bool WaterFlowPattern::HasStickyHeader() const
 
 void WaterFlowPattern::PublishNextStickyHeaderGap(const std::optional<float>& gap)
 {
-    if (nextStickyHeaderGap_ == gap) {
+    if (edgeState_.nextStickyHeaderGap == gap) {
         return;
     }
-    nextStickyHeaderGap_ = gap;
+    edgeState_.nextStickyHeaderGap = gap;
     // The existing Pipeline callback consumes the geometry after parent layout; no extra measure request.
-    SetEdgeGeometry(edgeOrigin_, edgeTotalSize_, edgeMeasuredTotalSize_);
+    SetEdgeGeometry(edgeState_.origin, edgeState_.totalSize, edgeState_.measuredTotalSize);
 }
 
 void WaterFlowPattern::NotifyStickyHeaderChange()
 {
     const bool hasStickyHeader = HasStickyHeader();
     if (!hasStickyHeader) {
-        nextStickyHeaderGap_.reset();
+        edgeState_.nextStickyHeaderGap.reset();
     }
-    if (lastNotifiedHasStickyHeader_ == hasStickyHeader) {
+    if (edgeState_.lastNotifiedHasStickyHeader == hasStickyHeader) {
         return;
     }
-    lastNotifiedHasStickyHeader_ = hasStickyHeader;
+    edgeState_.lastNotifiedHasStickyHeader = hasStickyHeader;
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto parent = host->GetParentFrameNode();
@@ -2222,7 +2222,7 @@ void WaterFlowPattern::SetSticky(StickyStyle style)
     if (!edgeState_.enabled) {
         return;
     }
-    SetEdgeGeometry(edgeOrigin_, edgeTotalSize_, edgeMeasuredTotalSize_);
+    SetEdgeGeometry(edgeState_.origin, edgeState_.totalSize, edgeState_.measuredTotalSize);
     UpdateEdgePositions();
     MarkDirtyNodeSelf();
 }
@@ -2232,21 +2232,21 @@ void WaterFlowPattern::SetEdgeGeometry(const OffsetF& origin, float totalSize, s
     if (!edgeState_.enabled) {
         return;
     }
-    edgeOrigin_ = origin;
-    edgeTotalSize_ = totalSize;
-    edgeMeasuredTotalSize_ = measuredTotalSize.value_or(totalSize);
+    edgeState_.origin = origin;
+    edgeState_.totalSize = totalSize;
+    edgeState_.measuredTotalSize = measuredTotalSize.value_or(totalSize);
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto pipeline = host->GetContext();
     CHECK_NULL_VOID(pipeline);
     if (edgeState_.sticky == StickyStyle::NONE || (!edgeState_.header.Upgrade() && !footer_.Upgrade())) {
-        if (edgeViewportRegistered_) {
+        if (edgeState_.viewportRegistered) {
             pipeline->GetScrollViewportCoordinator()->Unregister(host->GetId());
         }
-        edgeViewportRegistered_ = false;
+        edgeState_.viewportRegistered = false;
         return;
     }
-    if (edgeViewportRegistered_) {
+    if (edgeState_.viewportRegistered) {
         return;
     }
     pipeline->GetScrollViewportCoordinator()->Register(host, [weak = WeakClaim(this)]() {
@@ -2254,19 +2254,19 @@ void WaterFlowPattern::SetEdgeGeometry(const OffsetF& origin, float totalSize, s
         CHECK_NULL_VOID(pattern);
         pattern->UpdateEdgePositions();
     });
-    edgeViewportRegistered_ = true;
+    edgeState_.viewportRegistered = true;
 }
 
 void WaterFlowPattern::OnDetachFromFrameNode(FrameNode* frameNode)
 {
     edgeState_.InvalidateGenerations();
-    nextStickyHeaderGap_.reset();
-    lastNotifiedHasStickyHeader_ = false;
+    edgeState_.nextStickyHeaderGap.reset();
+    edgeState_.lastNotifiedHasStickyHeader = false;
     auto pipeline = frameNode ? frameNode->GetContext() : nullptr;
-    if (pipeline && edgeViewportRegistered_) {
+    if (pipeline && edgeState_.viewportRegistered) {
         pipeline->GetScrollViewportCoordinator()->Unregister(frameNode->GetId());
     }
-    edgeViewportRegistered_ = false;
+    edgeState_.viewportRegistered = false;
     ScrollablePattern::OnDetachFromFrameNode(frameNode);
 }
 
@@ -2283,23 +2283,24 @@ void WaterFlowPattern::UpdateEdgePositions()
         return;
     }
     HeaderFooterStickyMetrics metrics;
-    metrics.totalMainSize = edgeMeasuredTotalSize_;
-    metrics.nextStickyHeaderGap = HasStickyHeader() ? nextStickyHeaderGap_ : std::nullopt;
+    metrics.totalMainSize = edgeState_.measuredTotalSize;
+    metrics.nextStickyHeaderGap = HasStickyHeader() ? edgeState_.nextStickyHeaderGap : std::nullopt;
     metrics.headerMainSize = layoutInfo_->headerHeight_;
     metrics.footerMainSize = layoutInfo_->edgeFooterHeight_;
-    const bool canPin = edgeState_.sticky != StickyStyle::NONE && ResolveStickyViewport(host, edgeOrigin_, metrics);
+    const bool canPin =
+        edgeState_.sticky != StickyStyle::NONE && ResolveStickyViewport(host, edgeState_.origin, metrics);
     auto place = [this, canPin, &metrics](const RefPtr<UINode>& edge, bool header) {
         auto node = AceType::DynamicCast<FrameNode>(edge);
         CHECK_NULL_VOID(node);
         const bool sticky = canPin && (header ? HeaderFooterUtils::IsHeaderSticky(edgeState_.sticky)
                                              : HeaderFooterUtils::IsFooterSticky(edgeState_.sticky));
         float y = header ? 0.0f : std::max(metrics.headerMainSize,
-            edgeTotalSize_ - metrics.footerMainSize);
+            edgeState_.totalSize - metrics.footerMainSize);
         if (sticky) {
             y = header ? HeaderFooterUtils::CalcStickyHeaderPos(metrics)
                        : HeaderFooterUtils::CalcStickyFooterPos(metrics);
         }
-        const auto offset = edgeOrigin_ + OffsetF(0.0f, y);
+        const auto offset = edgeState_.origin + OffsetF(0.0f, y);
         const bool moved = node->GetGeometryNode()->GetMarginFrameOffset() != offset;
         if (moved) {
             node->GetGeometryNode()->SetMarginFrameOffset(offset);
@@ -2343,7 +2344,7 @@ void WaterFlowPattern::AddFooter(const RefPtr<NG::UINode>& footer)
         }
         SyncEdgeSlots();
         if (!edgeState_.header.Upgrade() && !footer_.Upgrade()) {
-            SetEdgeGeometry(edgeOrigin_, edgeTotalSize_, edgeMeasuredTotalSize_);
+            SetEdgeGeometry(edgeState_.origin, edgeState_.totalSize, edgeState_.measuredTotalSize);
         }
         ResetLayoutInfo();
         host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);

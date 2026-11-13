@@ -53,12 +53,7 @@ void WaterFlowLayoutSW::Measure(LayoutWrapper* wrapper)
     CalculateContentClipFixOffset(wrapper_, info_);
 
     if (info_->edgeSlots_ && itemCnt_ == 0 && (!sections_ || sections_->GetSectionInfo().empty())) {
-        info_->lastMainSize_ = mainLen_;
-        info_->itemStart_ = true;
-        info_->itemEnd_ = true;
-        info_->offsetEnd_ = true;
-        info_->isDataValid_ = true;
-        info_->maxHeight_ = info_->headerHeight_ + info_->edgeFooterHeight_;
+        info_->SyncEmptyEdges(mainLen_);
         if (matchChildren) {
             size.SetHeight(info_->maxHeight_);
             AddPaddingToSize(props_->CreatePaddingAndBorder(), size);
@@ -973,6 +968,7 @@ ScrollAlign WaterFlowLayoutSW::ParseAutoAlign(int32_t jumpIdx, bool inView)
 
 void WaterFlowLayoutSW::MeasureOnJump(int32_t jumpIdx, ScrollAlign align)
 {
+    const bool toContentEnd = jumpIdx == LAST_ITEM && info_->edgeSlots_;
     if (jumpIdx == LAST_ITEM) {
         jumpIdx = itemCnt_ - 1;
     } else if (jumpIdx == itemCnt_ && info_->footerIndex_ >= 0) {
@@ -999,6 +995,9 @@ void WaterFlowLayoutSW::MeasureOnJump(int32_t jumpIdx, ScrollAlign align)
         info_->needFixOffsetCache_ = true;
     }
     Jump(jumpIdx, align, noSkip);
+    if (toContentEnd && align == ScrollAlign::END) {
+        info_->delta_ -= info_->edgeFooterHeight_ + info_->BotMargin();
+    }
     if (info_->extraOffset_) {
         info_->delta_ += *info_->extraOffset_;
     }
