@@ -22,6 +22,8 @@ class MessageParcel;
 namespace Media {
 class PixelMap {
 public:
+    bool Marshalling(MessageParcel&) const { return true; }
+
     static PixelMap* Unmarshalling(MessageParcel& data)
     {
         return nullptr;

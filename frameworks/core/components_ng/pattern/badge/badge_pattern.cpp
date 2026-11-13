@@ -15,6 +15,7 @@
 
 #include "core/components_ng/pattern/badge/badge_pattern.h"
 
+#include "base/i18n/localization.h"
 #include "base/log/dump_log.h"
 #include "core/components/badge/badge_theme.h"
 #include "core/components/common/layout/grid_container_info.h"
@@ -23,6 +24,13 @@
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
 
 namespace OHOS::Ace::NG {
+
+std::string BadgePattern::FormatBadgeCount(int32_t count)
+{
+    return Localization::GetInstance()->GetLanguage() != "zh"
+        ? Localization::GetInstance()->NumberFormat(count)
+        : std::to_string(count);
+}
 
 void BadgePattern::OnModifyDone()
 {
@@ -66,9 +74,9 @@ void BadgePattern::OnModifyDone()
             const int32_t maxCountNum = 99;
             auto badgeMaxCount = layoutProperty->GetBadgeMaxCount().value_or(maxCountNum);
             auto maxCount = badgeMaxCount;
-            auto content = std::to_string(badgeCount.value());
+            auto content = FormatBadgeCount(badgeCount.value());
             if (badgeCount.value() > maxCount) {
-                content = std::to_string(maxCount) + "+";
+                content = FormatBadgeCount(maxCount) + "+";
             }
             textLayoutProperty->UpdateContent(content);
             TAG_LOGD(AceLogTag::ACE_BADGE, "BadgeContent: %{public}s", content.c_str());
@@ -119,6 +127,7 @@ void BadgePattern::OnModifyDone()
 
     textLayoutProperty->UpdateMaxLines(1);
     textLayoutProperty->UpdateTextAlign(TextAlign::CENTER);
+    textLayoutProperty->UpdateTextContentAlign(TextContentAlign::CENTER);
 
     BorderWidthProperty borderWidth;
     borderWidth.SetBorderWidth(width);
@@ -573,5 +582,12 @@ bool BadgePattern::OnThemeScopeUpdate(int32_t themeScopeId)
     }
     host->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
     return true;
+}
+
+void BadgePattern::OnLanguageConfigurationUpdate()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 } // namespace OHOS::Ace::NG

@@ -19,6 +19,7 @@ test_sources = [
   "divider_base_test_ng.h",
   "divider_new_test_ng.cpp",
   "divider_branch_coverage_test_ng.cpp",
+  "divider_initial_color_test_ng.cpp",
   "old_cases/divider_test_ng.cpp",
   "divider_test_core.cpp",
 ]

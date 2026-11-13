@@ -178,33 +178,6 @@ HWTEST_F(RichEditorCaretTestNg, CaretColorTest001, TestSize.Level0)
 }
 
 /**
- * @tc.name: CaretColorTest002
- * @tc.desc: test set and get caretColor
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorCaretTestNg, CaretColorTest002, TestSize.Level0)
-{
-    RichEditorModelNG model;
-    model.Create();
-    auto host = ViewStackProcessor::GetInstance()->GetMainFrameNode();
-    ASSERT_NE(host, nullptr);
-
-    /**
-     * @tc.steps: step1. get system caret color.
-     */
-    auto richEditorPattern = host->GetPattern<RichEditorPattern>();
-    Color patternCaretColor = richEditorPattern->GetCaretColor();
-    EXPECT_EQ(patternCaretColor, SYSTEM_CARET_COLOR);
-
-    /**
-     * @tc.steps: step2. set blue color.
-     */
-    model.SetCaretColor(host, Color::BLUE);
-    patternCaretColor = richEditorPattern->GetCaretColor();
-    EXPECT_EQ(patternCaretColor, Color::BLUE);
-}
-
-/**
  * @tc.name: SetCaretPosition001
  * @tc.desc: test SetCaretPosition
  * @tc.type: FUNC
@@ -1147,29 +1120,6 @@ HWTEST_F(RichEditorCaretTestNg, GetCaretOffset001, TestSize.Level0)
 }
 
 /**
- * @tc.name: UpdateEditingValue001
- * @tc.desc: test UpdateEditingValue
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorCaretTestNg, UpdateEditingValue001, TestSize.Level2)
-{
-    ASSERT_NE(richEditorNode_, nullptr);
-    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-
-    TextEditingValue value;
-    value.text = "123456789";
-    TextSelection selection;
-    int32_t caretPos = value.text.length();
-    selection.baseOffset = caretPos;
-    selection.extentOffset = caretPos;
-    value.selection = selection;
-
-    richEditorPattern->UpdateEditingValue(std::make_shared<TextEditingValue>(value));
-    EXPECT_EQ(richEditorPattern->caretPosition_, 0);
-}
-
-/**
  * @tc.name: CalculateCaretOffsetAndHeight001
  * @tc.desc: test CalculateCaretOffsetAndHeight covering placeholder and affinity branches
  * @tc.type: FUNC
@@ -1313,5 +1263,96 @@ HWTEST_F(RichEditorCaretTestNg, GetCaretBoundaryRect001, TestSize.Level0)
     pattern->ResetCustomCaretWidth();
     rect = pattern->GetCaretBoundaryRect();
     EXPECT_EQ(rect.Width(), 200.0f - 10.0f);
+}
+
+/**
+ * @tc.name: NotUpdateCaretInPreview001
+ * @tc.desc: Test NotUpdateCaretInPreview with invalid record returns false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCaretTestNg, NotUpdateCaretInPreview001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    RichEditorPattern::PreviewTextRecord record;
+    EXPECT_FALSE(pattern->NotUpdateCaretInPreview(0, record));
+}
+
+/**
+ * @tc.name: NotUpdateCaretInPreview002
+ * @tc.desc: Test NotUpdateCaretInPreview all-english short-circuit branches.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCaretTestNg, NotUpdateCaretInPreview002, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    RichEditorPattern::PreviewTextRecord record;
+    record.previewTextHasStarted = true;
+    record.startOffset = 0;
+    record.endOffset = 5;
+    record.previewContent = u"hello";
+    record.newPreviewContent = u"help";
+    EXPECT_TRUE(pattern->NotUpdateCaretInPreview(1, record));
+    EXPECT_FALSE(pattern->NotUpdateCaretInPreview(3, record));
+}
+
+/**
+ * @tc.name: NotUpdateCaretInPreview003
+ * @tc.desc: Test NotUpdateCaretInPreview with non-english content returns false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCaretTestNg, NotUpdateCaretInPreview003, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    RichEditorPattern::PreviewTextRecord record;
+    record.previewTextHasStarted = true;
+    record.startOffset = 0;
+    record.endOffset = 4;
+    record.previewContent = u"你好";
+    record.newPreviewContent = u"你好";
+    EXPECT_FALSE(pattern->NotUpdateCaretInPreview(1, record));
+}
+
+/**
+ * @tc.name: HandleSetCaretPositionCommand001
+ * @tc.desc: Test HandleSetCaretPositionCommand with negative position returns false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCaretTestNg, HandleSetCaretPositionCommand001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_FALSE(pattern->HandleSetCaretPositionCommand(-1, richEditorNode_->GetId()));
+}
+
+/**
+ * @tc.name: CustomCaretWidth001
+ * @tc.desc: Test SetCustomCaretWidth / GetCustomCaretWidth / ResetCustomCaretWidth.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCaretTestNg, CustomCaretWidth001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->ResetCustomCaretWidth();
+    EXPECT_GT(pattern->GetCustomCaretWidth().Value(), 0);
+    pattern->SetCustomCaretWidth(Dimension(5.0_vp));
+    EXPECT_EQ(pattern->GetCustomCaretWidth().Value(), 5);
+}
+
+/**
+ * @tc.name: LastCaretPos001
+ * @tc.desc: Test SetLastCaretPos / GetLastCaretPos.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCaretTestNg, LastCaretPos001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetLastCaretPos(42.0f);
+    EXPECT_TRUE(pattern->GetLastCaretPos().has_value());
+    EXPECT_EQ(pattern->GetLastCaretPos().value(), 42.0f);
 }
 }

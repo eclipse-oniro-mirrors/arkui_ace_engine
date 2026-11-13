@@ -116,6 +116,7 @@ class UINodeRegisterProxy {
                 stateMgmtConsole.debug(`elmtIds ${elmtId} cannot find its owning ViewPU, maybe this ViewPu has already been aboutToBeDeleted. Internal error!`);
             }
 
+            ViewBuildNodeBase.__onUINodeDelete__Internal(elmtId);
             ObserveV2.getObserve().clearBinding(elmtId);
             delete ObserveV2.getObserve().id2cmp_[elmtId];
         })

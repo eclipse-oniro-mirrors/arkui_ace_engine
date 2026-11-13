@@ -69,6 +69,11 @@ struct MouseEvent final : public PointerEvent {
     std::vector<MouseEvent> history;
     WeakPtr<NG::FrameNode> node;
     bool isInjected = false;
+    bool isAgent = false;
+    int32_t agentWindowId = -1;
+    int32_t callingUid = -1;
+    bool hasSafSessionId = false;
+    uint64_t safSessionId = 0;
     bool isPrivacyMode = false;
     bool isStylusMouseMode = false;
     bool isScreenLocked = false;
@@ -220,13 +225,7 @@ public:
     {
         return localLocation_;
     }
-    Offset GetCurrentLocalLocation() const
-    {
-        if (currentLocalLocationGetter_) {
-            return currentLocalLocationGetter_();
-        }
-        return localLocation_;
-    }
+    ACE_FORCE_EXPORT Offset GetCurrentLocalLocation() const;
     MouseInfo& SetCurrentLocalLocationGetter(CurrentLocalLocationGetter&& currentLocalLocationGetter)
     {
         currentLocalLocationGetter_ = std::move(currentLocalLocationGetter);
@@ -487,6 +486,7 @@ public:
     }
 
     bool HandleMouseEvent(const MouseEvent& event);
+    MouseInfo CreateMouseInfo(const MouseEvent& event) const;
 
     bool DispatchEvent(const TouchEvent& point) override
     {

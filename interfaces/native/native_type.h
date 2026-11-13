@@ -6804,6 +6804,58 @@ ArkUI_ErrorCode OH_ArkUI_TextEditorTextStyle_GetTextBackgroundRadius(OH_ArkUI_Te
     float* topLeft, float* topRight, float* bottomLeft, float* bottomRight);
 
 /**
+ * @brief Set the border width of the text background in the text style.
+ *
+ * @param style <b>TextEditor</b> text style.
+ * @param borderWidth border width of the text background, in vp.
+ * @return Returns the result code.
+ *         Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_TextEditorTextStyle_SetTextBackgroundBorderWidth(
+    OH_ArkUI_TextEditorTextStyle* style, float borderWidth);
+
+/**
+ * @brief Get the border width of the text background in the text style.
+ *
+ * @param style <b>TextEditor</b> text style.
+ * @param borderWidth border width of the text background, in vp.
+ * @return Returns the result code.
+ *         Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_TextEditorTextStyle_GetTextBackgroundBorderWidth(
+    OH_ArkUI_TextEditorTextStyle* style, float* borderWidth);
+
+/**
+ * @brief Set the border color of the text background in the text style.
+ *
+ * @param style <b>TextEditor</b> text style.
+ * @param borderColor border color of the text background, in 0xARGB format.
+ * @return Returns the result code.
+ *         Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_TextEditorTextStyle_SetTextBackgroundBorderColor(
+    OH_ArkUI_TextEditorTextStyle* style, uint32_t borderColor);
+
+/**
+ * @brief Get the border color of the text background in the text style.
+ *
+ * @param style <b>TextEditor</b> text style.
+ * @param borderColor border color of the text background, in 0xARGB format.
+ * @return Returns the result code.
+ *         Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_TextEditorTextStyle_GetTextBackgroundBorderColor(
+    OH_ArkUI_TextEditorTextStyle* style, uint32_t* borderColor);
+
+/**
  * @brief Set the preset typing style with styled string controller.
  *
  * @param controller <b>TextEditor</b> styled string controller.
@@ -7137,6 +7189,21 @@ typedef enum {
 } OH_ArkUI_NodeMountPolicy;
 
 /**
+ * @brief Enumerates the policy for adopting a child node.
+ *
+ * @since 26.2.0
+ */
+typedef enum {
+    /**
+     * The window position of the adopted node's overlays follows the FrameNode adopt-parent chain and applies the
+     * developer-provided compensation at each adoption boundary.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVE_MODULE_ADOPT_POLICY_OVERLAY_POSITION_FOLLOWS_ADOPT_PARENT_CHAIN = 0,
+} OH_ArkUI_AdoptPolicy;
+
+/**
  * @brief Enumerates the ArcDirection.
  *
  * @since 26.1.0
@@ -7165,7 +7232,7 @@ typedef enum {
 /**
  * @brief Defines the line spacing options for text.
  *
- * @since 26.0.0
+ * @since 26.0.1
  */
 typedef struct OH_ArkUI_NativeModule_LineSpacingOptions OH_ArkUI_NativeModule_LineSpacingOptions;
 
@@ -7173,7 +7240,7 @@ typedef struct OH_ArkUI_NativeModule_LineSpacingOptions OH_ArkUI_NativeModule_Li
  * @brief Creates an <b>OH_ArkUI_NativeModule_LineSpacingOptions</b> object.
  *
  * @return Returns the pointer to the <b>OH_ArkUI_NativeModule_LineSpacingOptions</b> object.
- * @since 26.0.0
+ * @since 26.0.1
  */
 OH_ArkUI_NativeModule_LineSpacingOptions* OH_ArkUI_NativeModule_LineSpacingOptions_Create();
 
@@ -7181,7 +7248,7 @@ OH_ArkUI_NativeModule_LineSpacingOptions* OH_ArkUI_NativeModule_LineSpacingOptio
  * @brief Destroys an <b>OH_ArkUI_NativeModule_LineSpacingOptions</b> object.
  *
  * @param options Pointer to the <b>OH_ArkUI_NativeModule_LineSpacingOptions</b> object.
- * @since 26.0.0
+ * @since 26.0.1
  */
 void OH_ArkUI_NativeModule_LineSpacingOptions_Destroy(OH_ArkUI_NativeModule_LineSpacingOptions* options);
 
@@ -7192,7 +7259,7 @@ void OH_ArkUI_NativeModule_LineSpacingOptions_Destroy(OH_ArkUI_NativeModule_Line
  * @param onlyBetweenLines Whether line spacing only takes effect between lines.
  * @return Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
  *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.
- * @since 26.0.0
+ * @since 26.0.1
  */
 ArkUI_ErrorCode OH_ArkUI_NativeModule_LineSpacingOptions_SetOnlyBetweenLines(
     OH_ArkUI_NativeModule_LineSpacingOptions* options, bool onlyBetweenLines);
@@ -7204,7 +7271,7 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_LineSpacingOptions_SetOnlyBetweenLines(
  * @param onlyBetweenLines Pointer to the boolean value to receive the flag.
  * @return Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
  *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.
- * @since 26.0.0
+ * @since 26.0.1
  */
 ArkUI_ErrorCode OH_ArkUI_NativeModule_LineSpacingOptions_GetOnlyBetweenLines(
     const OH_ArkUI_NativeModule_LineSpacingOptions* options, bool* onlyBetweenLines);

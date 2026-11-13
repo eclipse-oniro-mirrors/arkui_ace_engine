@@ -750,6 +750,84 @@ HWTEST_F(ScrollEffectTestNg, ContentClip001, TestSize.Level1)
 }
 
 /**
+ * @tc.name: ContentClipImmersiveStrategyDefaultSafeArea001
+ * @tc.desc: AC-1.1 - an enabled SCROLL_EXPAND_SAFE_AREA promotes the unset Scroll
+ *           default to SAFE_AREA on the query surface and installs the content clip.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollEffectTestNg, ContentClipImmersiveStrategyDefaultSafeArea001, TestSize.Level1)
+{
+    ImmersiveStrategyScope scope({ ImmersiveStrategy::SCROLL_EXPAND_SAFE_AREA });
+    ScrollModelNG model = CreateScroll();
+    CreateContent(2000.f);
+    CreateScrollDone();
+
+    // AC-1.1 query surface: clipContent was never set, the strategy promoted it.
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::SAFE_AREA);
+
+    // ADR-4: the DEFAULT branch takes the SAFE_AREA content-clip path, so the clip
+    // is installed and ClipToBounds is turned off (same driver as ContentClip001).
+    auto ctx = AceType::DynamicCast<MockRenderContext>(frameNode_->GetRenderContext());
+    ASSERT_TRUE(ctx);
+    EXPECT_CALL(*ctx, SetClipToBounds(false)).Times(AtLeast(1));
+    EXPECT_CALL(*ctx, SetContentClip(_)).Times(AtLeast(1));
+    paintProperty_->UpdateContentClip({ ContentClipMode::DEFAULT, nullptr });
+    FlushUITasks();
+}
+
+/**
+ * @tc.name: ContentClipImmersiveStrategyDisabledKeepsBuiltInDefault001
+ * @tc.desc: AC-3.1 - with no strategy applied the Scroll keeps its built-in BOUNDARY
+ *           default and an absent clipContent installs no content clip.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollEffectTestNg, ContentClipImmersiveStrategyDisabledKeepsBuiltInDefault001, TestSize.Level1)
+{
+    ScrollModelNG model = CreateScroll();
+    CreateContent(2000.f);
+    CreateScrollDone();
+
+    // AC-3.1: Scroll keeps its built-in BOUNDARY default when nothing is applied.
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::BOUNDARY);
+}
+
+/**
+ * @tc.name: ContentClipImmersiveStrategyExplicitBoundaryWins001
+ * @tc.desc: AC-2.1 - an explicit clipContent is never overridden by the enabled strategy.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollEffectTestNg, ContentClipImmersiveStrategyExplicitBoundaryWins001, TestSize.Level1)
+{
+    ImmersiveStrategyScope scope({ ImmersiveStrategy::SCROLL_EXPAND_SAFE_AREA });
+    ScrollModelNG model = CreateScroll();
+    CreateContent(2000.f);
+    CreateScrollDone();
+
+    paintProperty_->UpdateContentClip({ ContentClipMode::BOUNDARY, nullptr });
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::BOUNDARY);
+    auto ctx = AceType::DynamicCast<MockRenderContext>(frameNode_->GetRenderContext());
+    ASSERT_TRUE(ctx);
+    EXPECT_CALL(*ctx, SetContentClip(ClipRectEq(frameNode_->GetGeometryNode()->GetFrameRect()))).Times(1);
+    FlushUITasks();
+}
+
+/**
+ * @tc.name: ContentClipImmersiveStrategyOtherComponentIsolated001
+ * @tc.desc: AC-1.3 - a strategy for another component type never touches the Scroll.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollEffectTestNg, ContentClipImmersiveStrategyOtherComponentIsolated001, TestSize.Level1)
+{
+    ImmersiveStrategyScope scope({ ImmersiveStrategy::WATER_FLOW_EXPAND_SAFE_AREA });
+    ScrollModelNG model = CreateScroll();
+    CreateContent(2000.f);
+    CreateScrollDone();
+
+    // AC-1.3: a WaterFlow strategy leaves the Scroll default untouched.
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::BOUNDARY);
+}
+
+/**
  * @tc.name: FadingEdge001
  * @tc.desc: Test FadingEdge property
  * @tc.type: FUNC

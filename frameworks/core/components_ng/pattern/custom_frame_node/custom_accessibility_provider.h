@@ -16,6 +16,8 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_CUSTOM_FRAME_NODE_CUSTOM_ACCESSIBILITY_PROVIDER_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_CUSTOM_FRAME_NODE_CUSTOM_ACCESSIBILITY_PROVIDER_H
 
+#include <mutex>
+
 #include "core/accessibility/accessibility_provider.h"
 
 namespace OHOS::Ace::NG {
@@ -53,12 +55,14 @@ public:
         const std::weak_ptr<ThirdAccessibilityManager>& thirdAccessibilityManager) override;
     std::weak_ptr<ThirdAccessibilityManager> GetThirdAccessibilityManager() override
     {
+        std::lock_guard<std::mutex> lock(thirdAccessibilityManagerMutex_);
         return thirdAccessibilityManager_;
     }
 
 private:
     WeakPtr<CustomPattern> weakPattern_;
     std::weak_ptr<ThirdAccessibilityManager> thirdAccessibilityManager_;
+    std::mutex thirdAccessibilityManagerMutex_;
 };
 } // namespace OHOS::Ace::NG
 

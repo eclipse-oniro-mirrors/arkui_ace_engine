@@ -1855,4 +1855,192 @@ HWTEST_F(SecurityUIExtensionComponentTestNg, TransferringCaller001, TestSize.Lev
 #endif
 }
 
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest001
+ * @tc.desc: Test NotifyBrandColorChangeToUEA with null sessionWrapper
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sessionWrapper_ = nullptr;
+    pattern->NotifyBrandColorChangeToUEA(200, "");
+    EXPECT_EQ(pattern->sessionWrapper_, nullptr);
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest002
+ * @tc.desc: Test NotifyBrandColorChangeToUEA skipped when state is not FOREGROUND
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    ValidSessionWrapper(pattern);
+    Color testColor(0xFF00FF00);
+    pattern->NotifyBrandColorChangeToUEA(200, testColor.ToString());
+    EXPECT_EQ(pattern->lastSentBrandColorStr_, "");
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest003
+ * @tc.desc: Test NotifyBrandColorChangeToUEA sends when state is FOREGROUND and isUeaConnecting_ is true
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest003, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    ValidSessionWrapper(pattern);
+    pattern->state_ = SecurityUIExtensionPattern::AbilityState::FOREGROUND;
+    pattern->isUeaConnecting_ = true;
+    Color testColor(0xFF00FF00);
+    pattern->NotifyBrandColorChangeToUEA(200, testColor.ToString());
+    EXPECT_EQ(pattern->lastSentBrandColorStr_, testColor.ToString());
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest004
+ * @tc.desc: Test NotifyBrandColorChangeToUEA skips transparent brand color
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest004, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    ValidSessionWrapper(pattern);
+    pattern->state_ = SecurityUIExtensionPattern::AbilityState::FOREGROUND;
+    pattern->isUeaConnecting_ = true;
+    pattern->NotifyBrandColorChangeToUEA(200, "#00EEEEEE");
+    EXPECT_TRUE(pattern->lastSentBrandColorStr_.empty());
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest005
+ * @tc.desc: Test NotifyBrandColorChangeToUEA skips unchanged brand color
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest005, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    ValidSessionWrapper(pattern);
+    pattern->state_ = SecurityUIExtensionPattern::AbilityState::FOREGROUND;
+    pattern->isUeaConnecting_ = true;
+    pattern->lastSentBrandColorStr_ = "#FF00FF00";
+    pattern->NotifyBrandColorChangeToUEA(200, "#FF00FF00");
+    EXPECT_EQ(pattern->lastSentBrandColorStr_, "#FF00FF00");
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest006
+ * @tc.desc: Test OnThemeScopeUpdate returns true even with no theme
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest006, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    ValidSessionWrapper(pattern);
+    auto result = pattern->OnThemeScopeUpdate(888);
+    EXPECT_TRUE(result);
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest007
+ * @tc.desc: Test OnThemeScopeUpdate with null sessionWrapper still returns true
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest007, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sessionWrapper_ = nullptr;
+    auto result = pattern->OnThemeScopeUpdate(888);
+    EXPECT_TRUE(result);
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest008
+ * @tc.desc: Test brandColorStr_ defaults to DEFAULT_BRAND_COLOR_STR
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest008, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_TRUE(pattern->brandColorStr_.empty());
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest009
+ * @tc.desc: Test isUeaConnecting_ defaults to false
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest009, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_FALSE(pattern->isUeaConnecting_);
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest010
+ * @tc.desc: Test NotifyForeground re-sends brandColorStr_ when entering foreground
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest010, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    ValidSessionWrapper(pattern);
+    pattern->isUeaConnecting_ = true;
+    pattern->brandColorStr_ = "#FF00FF00";
+    pattern->NotifyForeground();
+    EXPECT_EQ(pattern->state_, SecurityUIExtensionPattern::AbilityState::FOREGROUND);
+    EXPECT_EQ(pattern->lastSentBrandColorStr_, "#FF00FF00");
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest011
+ * @tc.desc: Test NotifyForeground does not re-send when already FOREGROUND
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest011, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    ValidSessionWrapper(pattern);
+    pattern->state_ = SecurityUIExtensionPattern::AbilityState::FOREGROUND;
+    pattern->isUeaConnecting_ = true;
+    pattern->brandColorStr_ = "#FF00FF00";
+    pattern->lastSentBrandColorStr_ = "#FF00FF00";
+    pattern->NotifyForeground();
+    EXPECT_EQ(pattern->lastSentBrandColorStr_, "#FF00FF00");
+#endif
+}
+
 } //namespace OHOS::Ace::NG

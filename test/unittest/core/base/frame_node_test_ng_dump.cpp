@@ -432,4 +432,93 @@ HWTEST_F(FrameNodeTestNg, FrameNodeGeometryNodeToJsonValue, TestSize.Level1)
     EXPECT_EQ(json->GetString("width"), "10.00vp");
     EXPECT_EQ(json->GetString("height"), "10.00vp");
 }
+
+/**
+ * @tc.name: FrameNodeDumpDebugLineJson001
+ * @tc.desc: Test DumpCommonInfo JSON outputs DebugLine when a non-empty line is bound.
+ *           Covers AC-1.1, R-1, R-4.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeTestNg, FrameNodeDumpDebugLineJson001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. create frameNode and bind a debugline.
+     */
+    auto frameNode = FrameNode::CreateFrameNode("test", 1, AceType::MakeRefPtr<Pattern>(), true);
+    ASSERT_NE(frameNode, nullptr);
+    frameNode->SetDebugLine("example.ets:42");
+
+    /**
+     * @tc.steps: step2. dump common info into JSON.
+     * @tc.expected: step2. DebugLine field equals the bound source line.
+     */
+    std::unique_ptr<JsonValue> json = JsonUtil::Create(true);
+    ASSERT_NE(json, nullptr);
+    frameNode->DumpCommonInfo(json);
+    EXPECT_TRUE(json->Contains("DebugLine"));
+    EXPECT_EQ(json->GetString("DebugLine"), "example.ets:42");
+}
+
+/**
+ * @tc.name: FrameNodeDumpDebugLineJson002
+ * @tc.desc: Test DumpCommonInfo JSON omits DebugLine when the bound line is empty.
+ *           Covers Anti-Fake (non-empty check), R-1 boundary.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeTestNg, FrameNodeDumpDebugLineJson002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. bind an empty debugline.
+     */
+    auto frameNode = FrameNode::CreateFrameNode("test", 1, AceType::MakeRefPtr<Pattern>(), true);
+    ASSERT_NE(frameNode, nullptr);
+    frameNode->SetDebugLine("");
+
+    /**
+     * @tc.steps: step2. dump common info into JSON.
+     * @tc.expected: step2. DebugLine field is omitted (empty-line guard).
+     */
+    std::unique_ptr<JsonValue> json = JsonUtil::Create(true);
+    ASSERT_NE(json, nullptr);
+    frameNode->DumpCommonInfo(json);
+    EXPECT_FALSE(json->Contains("DebugLine"));
+}
+
+/**
+ * @tc.name: FrameNodeDumpDebugLineText001
+ * @tc.desc: Test text DumpCommonInfo outputs DebugLine when bound, omits when empty (gate removed).
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeTestNg, FrameNodeDumpDebugLineText001, TestSize.Level1)
+{
+    auto frameNode = FrameNode::CreateFrameNode("test", 1, AceType::MakeRefPtr<Pattern>(), true);
+    ASSERT_NE(frameNode, nullptr);
+
+    auto findDebugLine = []() -> bool {
+        for (const auto& desc : DumpLog::GetInstance().description_) {
+            if (desc.find("DebugLine: example.ets:77") != std::string::npos) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    /**
+     * @tc.steps: step1. bound line: DebugLine desc present.
+     */
+    frameNode->SetDebugLine("example.ets:77");
+    DumpLog::GetInstance().description_.clear();
+    frameNode->DumpCommonInfo();
+    EXPECT_TRUE(findDebugLine());
+
+    /**
+     * @tc.steps: step2. empty line: no DebugLine desc.
+     */
+    frameNode->SetDebugLine("");
+    DumpLog::GetInstance().description_.clear();
+    frameNode->DumpCommonInfo();
+    EXPECT_FALSE(findDebugLine());
+
+    DumpLog::GetInstance().description_.clear();
+}
 } // namespace OHOS::Ace::NG

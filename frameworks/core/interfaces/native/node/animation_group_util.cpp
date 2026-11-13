@@ -181,7 +181,10 @@ ArkUI_ErrorCode BuildAnimationGroupView(ArkUIAnimationGroupHandle group, Animati
     if (group->onFinish) {
         auto onFinish = group->onFinish;
         auto userData = group->userData;
-        out.onFinish = [onFinish, userData]() { onFinish(userData); };
+        out.onFinish = [onFinish, userData]() {
+            LOG_CALLBACK("OH_ArkUI_NativeModule_AnimationGroup_RegisterOnFinishCallback", onFinish);
+            onFinish(userData);
+        };
     } else {
         out.onFinish = nullptr;
     }

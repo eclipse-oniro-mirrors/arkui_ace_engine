@@ -97,6 +97,11 @@ public:
         return isTopFullScreenPageChanged_;
     }
 
+    void SetNeedOperationInSplitModeWithFullScreen(bool needOperationInSplitMode)
+    {
+        needOperationInSplitMode_ = needOperationInSplitMode;
+    }
+
     bool IsTopFullScreenPage() const override
     {
         return isTopFullScreenPage_;
@@ -159,7 +164,8 @@ private:
     void OnModeChange();
     void OnWindowStateChange(bool show);
     RefPtr<FrameNode> GetHomePage() const;
-
+    void ResetPageLevelDisplaceHomeTypes(const RefPtr<FrameNode>& homePage);
+    void ResetPageLevelNavigationHomes(const RefPtr<FrameNode>& homePage);
     void FirePageHideOnPushPage(RouterPageType newPageType, const RefPtr<FrameNode>& lastPage,
         const RefPtr<FrameNode>& topRelatedOrPhPage, const RefPtr<FrameNode>& preHomePage,
         PageTransitionType hideTransitionType, bool newPageIsFullScreenPage);
@@ -280,6 +286,7 @@ private:
     bool needClearSecondaryPage_ = false;
     bool isTopFullScreenPage_ = false;
     bool isTopFullScreenPageChanged_ = false;
+    bool needOperationInSplitModeWithFullScreen_ = false;
     mutable std::vector<WeakPtr<FrameNode>> primaryNodes_;
     mutable std::vector<WeakPtr<FrameNode>> secondaryNodes_;
     mutable bool routerColumnNodesDirty_ = true;

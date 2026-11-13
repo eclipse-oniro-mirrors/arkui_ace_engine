@@ -20,6 +20,7 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "base/geometry/calc_dimension.h"
@@ -34,6 +35,10 @@ class HoverInfo;
 namespace NG {
 class FrameNode;
 class RoundRect;
+
+// Focus index for internal tab navigation between text, cancel button, and unit/voice areas.
+// Shared between TextFieldPattern and RichEditorPattern via CleanNodeHostBase CRTP.
+enum class FocuseIndex { TEXT = 0, CANCEL, UNIT, VOICE };
 
 // Abstract host interface for CleanNodeResponseArea to decouple from concrete pattern types.
 // Enables both TextFieldPattern and RichEditorPattern to reuse CleanNodeResponseArea.
@@ -243,6 +248,44 @@ public:
         auto layoutProperty = static_cast<const Derived*>(this)->template GetLayoutProperty<LayoutPropertyT>();
         CHECK_NULL_RETURN(layoutProperty, false);
         return layoutProperty->HasMinFontScale();
+    }
+
+    // --- Tab focus navigation (shared between TextField and RichEditor) ---
+    // Derived must provide: GetFocusIndex(), GetFocusForwardMap(), GetFocusBackwardMap(),
+    //                       HandleSwithFocus(FocuseIndex), HasFocus().
+    bool HandleOnTabImpl(bool backward)
+    {
+        auto* self = static_cast<Derived*>(this);
+        return backward ? HandleFocusBackwardImpl(self->GetFocusIndex())
+                        : HandleFocusForwardImpl(self->GetFocusIndex());
+    }
+
+    bool HandleFocusForwardImpl(FocuseIndex index)
+    {
+        auto* self = static_cast<Derived*>(this);
+        if (!self->HasFocus()) {
+            return false;
+        }
+        const auto& fwdMap = self->GetFocusForwardMap();
+        auto next = fwdMap.find(index);
+        if (next == fwdMap.end()) {
+            return false;
+        }
+        return self->HandleSwithFocus(next->second) || HandleFocusForwardImpl(next->second);
+    }
+
+    bool HandleFocusBackwardImpl(FocuseIndex index)
+    {
+        auto* self = static_cast<Derived*>(this);
+        if (!self->HasFocus()) {
+            return false;
+        }
+        const auto& bwdMap = self->GetFocusBackwardMap();
+        auto next = bwdMap.find(index);
+        if (next == bwdMap.end()) {
+            return false;
+        }
+        return self->HandleSwithFocus(next->second) || HandleFocusBackwardImpl(next->second);
     }
 
     // Overlay modifier bridge: set/clear hover color and rects. Default impl delegates to

@@ -16,12 +16,18 @@
 #include "core/components_ng/pattern/ui_extension/ui_extension_config.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "core/components_ng/base/ui_tree_collector.h"
+#include "core/components_ng/base/inspector_occlusion_collector.h"
 #include "core/accessibility/accessibility_manager.h"
 #include "core/accessibility/accessibility_manager_ng.h"
 
 #include <cmath>
+#include <cstdlib>
 #include <unistd.h>
+#include <unordered_set>
+#include "base/log/log_wrapper_without_instance.h"
 #include "base/resource/data_provider_manager.h"
+#include "core/components_ng/base/inspector_tree_request_context.h"
+#include "base/json/json_util_internal.h"
 #include "base/subwindow/subwindow_manager.h"
 #include "core/common/draw_delegate.h"
 #include "core/common/event_manager.h"
@@ -35,7 +41,9 @@
 #include "core/components_ng/manager/form_visible/form_visible_manager.h"
 #include "core/components_ng/manager/force_split/force_split_manager.h"
 #include "core/components_ng/manager/frame_rate/frame_rate_manager.h"
+#include "core/components_ng/manager/handedness/handedness_manager.h"
 #include "core/components_ng/manager/full_screen/full_screen_manager.h"
+#include "core/components_ng/manager/material/material_processor.h"
 #include "core/components_ng/manager/memory/memory_manager.h"
 #include "core/components_ng/manager/post_event/post_event_manager.h"
 #include "core/components_ng/manager/privacy_sensitive/privacy_sensitive_manager.h"
@@ -44,6 +52,7 @@
 #include "core/components_ng/manager/shared_overlay/shared_overlay_manager.h"
 #include "core/components_ng/manager/toolbar/toolbar_manager.h"
 #include "core/event/key_event.h"
+#include "core/components_ng/relaxed_interaction/relaxed_interaction_types.h"
 
 #ifdef ENABLE_ROSEN_BACKEND
 #include "render_service_client/core/transaction/rs_transaction.h"
@@ -92,6 +101,7 @@
 #include "core/common/stylus/stylus_detector_mgr.h"
 #include "core/common/text_field_manager.h"
 #include "core/common/thp_extra_manager.h"
+#include "core/components_ng/base/node_sensitive_input.h"
 #include "core/components_ng/base/node_render_status_monitor.h"
 #include "core/components_ng/base/simplified_inspector.h"
 #include "core/components_ng/base/ui_node_gc.h"
@@ -101,7 +111,6 @@
 #include "core/components_ng/manager/select_overlay/select_overlay_manager.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_manager.h"
-#include "core/components_ng/manager/material/material_processor.h"
 #ifdef SMART_GESTURE_SUPPORTED
 #include "core/components_ng/manager/smart_gesture/smart_gesture_manager.h"
 #endif
@@ -110,7 +119,10 @@
 #include "core/components_ng/pattern/container_modal/container_modal_view_factory.h"
 #include "core/components_ng/pattern/container_modal/enhance/container_modal_pattern_enhance.h"
 #include "core/components_ng/pattern/navigation/nav_bar_node.h"
+#include "core/components_ng/pattern/navigation/navdestination_node_base.h"
 #include "core/components_ng/pattern/navigation/navigation_pattern.h"
+#include "core/components_ng/pattern/navigation/navigation_title_util.h"
+#include "core/components_ng/pattern/navigation/title_bar_node.h"
 #include "core/components_ng/pattern/overlay/overlay_manager.h"
 #include "core/components_ng/pattern/root/root_pattern.h"
 #include "core/components_ng/pattern/select_overlay/magnifier_controller.h"
@@ -169,6 +181,8 @@ constexpr size_t DUMP_PARAM_WITH_WEB_OFFSET = 3;
 constexpr size_t DUMP_PARAM_WITH_UI_EXTENSION_OFFSET = 4;
 constexpr size_t DUMP_PARAM_RECT_CULLING_OFFSET = 5;
 constexpr size_t DUMP_PARAM_MIN_OPACITY_OFFSET = 6;
+constexpr size_t DUMP_PARAM_WITH_RESPONSE_REGION_OFFSET = DUMP_PARAM_MIN_OPACITY_OFFSET + 1;
+constexpr size_t DUMP_PARAM_WITH_CUSTOM_CONTENT_OFFSET = DUMP_PARAM_WITH_RESPONSE_REGION_OFFSET + 1;
 constexpr size_t SIMPLIFYTREE_WITH_PARAMCONFIG =
     DUMP_PARAM_DEFAULT_START_INDEX + DUMP_PARAM_WITH_WEB_OFFSET + 1;
 constexpr size_t SIMPLIFYTREE_WITH_EXTENDED_PARAMCONFIG =
@@ -183,6 +197,16 @@ constexpr char PID_FLAG[] = "pidflag";
 namespace OHOS::Ace::NG {
 namespace {
 constexpr Dimension CARET_AVOID_OFFSET = 24.0_vp;
+
+bool InterruptRelaxedInteractionByMouse(const MouseEvent& event, const RefPtr<EventManager>& eventManager)
+{
+    if (!event.isInjected && (event.action == MouseAction::PRESS || event.action == MouseAction::PULL_DOWN) &&
+        eventManager) {
+        eventManager->ClearRelaxedInteraction(ExecutionState::INTERRUPTED_BY_USER);
+        return true;
+    }
+    return false;
+}
 
 void ShouldAddToHistory(std::vector<TouchEvent>& history, const TouchEvent& event, const TouchEvent& movePoint)
 {
@@ -289,6 +313,17 @@ ParamConfig ParseDumpParamConfig(const std::vector<std::string>& params, size_t 
         params[minOpacityIndex] != PID_FLAG) {
         config.minOpacity = ParseMinOpacityParam(params[minOpacityIndex]);
     }
+    // PID_FLAG terminates the configuration in UIExtension dump requests.
+    const auto responseRegionIndex = startIndex + DUMP_PARAM_WITH_RESPONSE_REGION_OFFSET;
+    const auto xComponentIndex = startIndex + DUMP_PARAM_WITH_CUSTOM_CONTENT_OFFSET;
+    const auto configEnd = std::find(params.begin() + startIndex, params.end(), PID_FLAG);
+    const auto configSize = static_cast<size_t>(std::distance(params.begin(), configEnd));
+    if (configSize > responseRegionIndex) {
+        config.withResponseRegion = ParseBoolParam(params[responseRegionIndex]);
+    }
+    if (configSize > xComponentIndex) {
+        config.withCustomContent = ParseBoolParam(params[xComponentIndex]);
+    }
     return config;
 }
 
@@ -330,16 +365,51 @@ void AddJsonChild(
 constexpr uint32_t AI_CALL_NODE_INVALID = 3;
 constexpr uint32_t AI_CALL_NODE_AMBIGUOUS = 5;
 
-std::vector<RefPtr<NG::FrameNode>> CollectCandidateNavDestinationNodes(const std::list<RefPtr<NG::FrameNode>>& navNodes)
+bool IsNavDestinationCandidate(const RefPtr<NG::FrameNode>& node)
 {
-    std::vector<RefPtr<NG::FrameNode>> result;
-    for (const auto& node : navNodes) {
-        CHECK_NULL_CONTINUE(node);
-        if (node->GetTag() == V2::NAVDESTINATION_VIEW_ETS_TAG) {
-            result.emplace_back(node);
+    return node && node->GetTag() == V2::NAVDESTINATION_VIEW_ETS_TAG;
+}
+
+void CollectVisibleNavDestinations(const RefPtr<NG::UINode>& node, std::vector<RefPtr<NG::FrameNode>>& result)
+{
+    CHECK_NULL_VOID(node);
+    auto frameNode = AceType::DynamicCast<NG::FrameNode>(node);
+    if (frameNode) {
+        if (!frameNode->IsVisibleAndActive()) {
+            return;
+        }
+        if (IsNavDestinationCandidate(frameNode)) {
+            result.emplace_back(frameNode);
         }
     }
-    return result;
+    for (const auto& child : node->GetChildren()) {
+        CHECK_NULL_CONTINUE(child);
+        CollectVisibleNavDestinations(child, result);
+    }
+}
+
+std::unique_ptr<JsonValue> BuildCandidateNodeData(const RefPtr<NG::FrameNode>& node)
+{
+    auto nodeJson = JsonUtil::Create(true);
+    CHECK_NULL_RETURN(nodeJson, nullptr);
+    nodeJson->Put("nodeId", node->GetId());
+    auto rect = node->GetTransformRectRelativeToWindow();
+    auto rectJson = JsonUtil::Create(true);
+    CHECK_NULL_RETURN(rectJson, nullptr);
+    rectJson->Put("left", static_cast<double>(rect.Left()));
+    rectJson->Put("top", static_cast<double>(rect.Top()));
+    rectJson->Put("width", static_cast<double>(rect.Width()));
+    rectJson->Put("height", static_cast<double>(rect.Height()));
+    nodeJson->PutRef("rect", std::move(rectJson));
+    std::string title;
+    auto navDestination = AceType::DynamicCast<NG::NavDestinationNodeBase>(node);
+    if (navDestination) {
+        auto titleBarNode = AceType::DynamicCast<NG::TitleBarNode>(navDestination->GetTitleBarNode());
+        title = NG::NavigationTitleUtil::GetTitleString(titleBarNode, navDestination->GetPrevTitleIsCustomValue(false));
+    }
+    nodeJson->Put("title", title.c_str());
+    nodeJson->Put("aiCallerBound", node->HasAICallerHelper());
+    return nodeJson;
 }
 
 std::string BuildExeAppAIFunctionAmbiguousData(
@@ -350,13 +420,19 @@ std::string BuildExeAppAIFunctionAmbiguousData(
     root->Put("funcName", funcName.c_str());
     auto candidateNodeIds = JsonUtil::CreateArray();
     CHECK_NULL_RETURN(candidateNodeIds, root->ToString());
+    auto candidateNodesJson = JsonUtil::CreateArray();
+    CHECK_NULL_RETURN(candidateNodesJson, root->ToString());
     for (const auto& node : candidateNodes) {
         CHECK_NULL_CONTINUE(node);
         auto nodeId = JsonUtil::ParseJsonString(std::to_string(node->GetId()));
         CHECK_NULL_CONTINUE(nodeId);
         candidateNodeIds->PutRef(std::move(nodeId));
+        auto nodeJson = BuildCandidateNodeData(node);
+        CHECK_NULL_CONTINUE(nodeJson);
+        candidateNodesJson->PutRef(std::move(nodeJson));
     }
     root->PutRef("candidateNodeIds", std::move(candidateNodeIds));
+    root->PutRef("candidateNodes", std::move(candidateNodesJson));
     return root->ToString();
 }
 
@@ -380,6 +456,8 @@ inline bool ConvertFromMouseAxis(const TouchEvent& event)
     return event.primitiveSourceTool == SourceTool::MOUSE &&
         event.convertInfo.first == UIInputEventType::AXIS;
 }
+
+PipelineContext::~PipelineContext() = default;
 
 PipelineContext::PipelineContext(std::shared_ptr<Window> window, RefPtr<TaskExecutor> taskExecutor,
     RefPtr<AssetManager> assetManager, RefPtr<PlatformResRegister> platformResRegister,
@@ -414,10 +492,10 @@ PipelineContext::PipelineContext(std::shared_ptr<Window> window, RefPtr<TaskExec
     touchOptimizer_ = std::make_unique<ResSchedTouchOptimizer>();
     clickOptimizer_ = std::make_shared<ResSchedClickOptimizer>();
     clickOptimizer_->Init();
-    contentChangeMgr_ = MakeRefPtr<ContentChangeManager>(taskExecutor_);
     taihangOptimizer_ = std::make_shared<TaihangOptimizer>();
     taihangOptimizer_->Init();
 #endif
+    contentChangeMgr_ = MakeRefPtr<ContentChangeManager>(taskExecutor_);
     dynamicComponentSafeManager_ = AceType::MakeRefPtr<DynamicComponentSafeManager>();
     // Snapshot the thread's isolated state at pipeline creation time.
     // This determines the pipeline's IsolatedThread identity for its entire lifecycle.
@@ -456,11 +534,11 @@ PipelineContext::PipelineContext(std::shared_ptr<Window> window, RefPtr<TaskExec
 #ifndef CROSS_PLATFORM
     touchOptimizer_ = std::make_unique<ResSchedTouchOptimizer>();
     clickOptimizer_ = std::make_shared<ResSchedClickOptimizer>();
-    contentChangeMgr_ = MakeRefPtr<ContentChangeManager>(taskExecutor_);
     clickOptimizer_->Init();
     taihangOptimizer_ = std::make_shared<TaihangOptimizer>();
     taihangOptimizer_->Init();
 #endif
+    contentChangeMgr_ = MakeRefPtr<ContentChangeManager>(taskExecutor_);
     dynamicComponentSafeManager_ = AceType::MakeRefPtr<DynamicComponentSafeManager>();
     // Snapshot the thread's isolated state at pipeline creation time.
     isIsolatedThread_ = ContainerScope::IsIsolatedThread();
@@ -492,11 +570,11 @@ PipelineContext::PipelineContext()
 #ifndef CROSS_PLATFORM
     touchOptimizer_ = std::make_unique<ResSchedTouchOptimizer>();
     clickOptimizer_ = std::make_shared<ResSchedClickOptimizer>();
-    contentChangeMgr_ = MakeRefPtr<ContentChangeManager>(taskExecutor_);
     clickOptimizer_->Init();
     taihangOptimizer_ = std::make_shared<TaihangOptimizer>();
     taihangOptimizer_->Init();
 #endif
+    contentChangeMgr_ = MakeRefPtr<ContentChangeManager>(taskExecutor_);
     dynamicComponentSafeManager_ = AceType::MakeRefPtr<DynamicComponentSafeManager>();
     // Snapshot the thread's isolated state at pipeline creation time.
     isIsolatedThread_ = ContainerScope::IsIsolatedThread();
@@ -1433,11 +1511,9 @@ void PipelineContext::FlushVsync(uint64_t nanoTimestamp, uint64_t frameCount, in
         frameMetrics.actualStartTime, frameMetrics.totalDuration, frameMetrics.vsyncTimestamp,
         frameMetrics.animationDuration);
     // First vsync may come before rootNode_ is created.
-#ifndef CROSS_PLATFORM
     if (contentChangeMgr_ && rootNode_) {
         contentChangeMgr_->OnVsyncEnd(rootNode_->GetRectWithRender());
     }
-#endif
 }
 
 void PipelineContext::UpdateDrawLayoutChildObserver(
@@ -1886,15 +1962,15 @@ void PipelineContext::FlushRequestFocus()
             auto unfocusableParentFocusNode = focusNodeHub->GetUnfocusableParentFocusNode().Upgrade();
             if (unfocusableParentFocusNode) {
                 TAG_LOGI(AceLogTag::ACE_FOCUS,
-                    "Request focus by id on node: %{public}s/%{public}d return false, unfocusable node: "
-                    "%{public}s/%{public}d, focusable = %{public}d, shown = %{public}d, enabled = %{public}d",
+                    "Req focus by id on node: %{public}s/%{public}d return false, unfocusable: "
+                    "%{public}s/%{public}d, focusable=%{public}d, shown=%{public}d, enabled=%{public}d",
                     requestFocusNode->GetTag().c_str(), requestFocusNode->GetId(),
                     unfocusableParentFocusNode->GetFrameName().c_str(), unfocusableParentFocusNode->GetFrameId(),
                     unfocusableParentFocusNode->GetFocusable(), unfocusableParentFocusNode->IsShow(),
                     unfocusableParentFocusNode->IsEnabled());
                 unfocusableParentFocusNode = nullptr;
             } else {
-                TAG_LOGI(AceLogTag::ACE_FOCUS, "Request focus by id on node: %{public}s/%{public}d return false",
+                TAG_LOGI(AceLogTag::ACE_FOCUS, "Req focus by id on node: %{public}s/%{public}d return false",
                     requestFocusNode->GetTag().c_str(), requestFocusNode->GetId());
             }
         }
@@ -2650,6 +2726,9 @@ void PipelineContext::StartWindowSizeChangeAnimate(int32_t width, int32_t height
             safeAreaManager_->UpdateKeyboardOffset(0.0);
             FlushSafeArea(width, height, safeAvoidArea);
             SetRootRect(width, height, 0.0);
+            if (textFieldManager_) {
+                DynamicCast<TextFieldManagerNG>(textFieldManager_)->AvoidKeyBoardInNavigation();
+            }
             FlushUITasks();
             if (textFieldManager_) {
                 DynamicCast<TextFieldManagerNG>(textFieldManager_)->ScrollTextFieldToSafeArea();
@@ -3259,7 +3338,7 @@ void PipelineContext::AvoidanceLogic(float keyboardHeight, const std::shared_ptr
         auto bottomLen = safeAreaManager_->GetNavSafeArea().bottom_.IsValid()
                              ? safeAreaManager_->GetNavSafeArea().bottom_.Length()
                              : 0;
-        if (manager->IsScrollableChild() && rootHeight_ - positionY - safeHeight - bottomLen < 0) {
+        if (manager && manager->IsScrollableChild() && rootHeight_ - positionY - safeHeight - bottomLen < 0) {
             safeHeight = rootHeight_ - positionY - bottomLen;
         }
         if (NearZero(keyboardHeight) || LessOrEqual(positionY + safeHeight, rootHeight_ - keyboardHeight)) {
@@ -3888,9 +3967,15 @@ void PipelineContext::OnAxisEvent(const AxisEvent& event)
 void PipelineContext::OnTouchEvent(const TouchEvent& point, const RefPtr<FrameNode>& node, bool isSubPipe)
 {
     CHECK_RUN_ON(UI);
+    if (!point.isInjected && !point.isGenerate && eventManager_) {
+        eventManager_->ClearRelaxedInteraction(ExecutionState::INTERRUPTED_BY_USER);
+        if (IsDestroyed()) {
+            return;
+        }
+    }
     ACE_BENCH_MARK_TRACE("OnTouchEvent_start type:%d", static_cast<int32_t>(point.type));
 
-    TAG_LOGD(AceLogTag::ACE_INPUTKEYFLOW, "OnTouchEvent type:%{public}d, isGenerate:%{public}d",
+    TAG_LOGD_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW, "OnTouchEvent type:%{public}d, isGenerate:%{public}d",
         static_cast<int32_t>(point.type), point.isGenerate);
     if (ConvertFromMouseAxis(point) && !point.isGenerate && compatibleManager_.NotifyNewEvent(point)) {
         if (!eventManager_->touchDelegatesMap_.empty()) {
@@ -3958,13 +4043,13 @@ void PipelineContext::OnTouchEvent(const TouchEvent& point, const RefPtr<FrameNo
         scalePoint.type != TouchType::HOVER_MOVE) {
         eventManager_->GetEventTreeRecord(EventTreeType::TOUCH).AddTouchPoint(scalePoint);
 #ifdef IS_RELEASE_VERSION
-        TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW,
+        TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW,
             "ITK Id:%{public}d, fId:%{public}d, T:%{public}d, I=%{public}d, "
             "M=%{public}d",
             scalePoint.touchEventId, scalePoint.id, (int)scalePoint.type, scalePoint.isInjected,
             scalePoint.isPrivacyMode);
 #else
-        TAG_LOGD(AceLogTag::ACE_INPUTKEYFLOW,
+        TAG_LOGD_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW,
             "ITK Id:%{public}d, fId:%{public}d, x=%{public}.3f, y=%{public}.3f T=%{public}d, "
             "I=%{public}d",
             scalePoint.touchEventId, scalePoint.id, scalePoint.x, scalePoint.y, (int)scalePoint.type,
@@ -4736,11 +4821,43 @@ bool PipelineContext::OnDumpInfo(const std::vector<std::string>& params) const
         DumpLog::GetInstance().OutPutDefault();
 #ifndef CROSS_PLATFORM
     } else if (params[0] == "-allInfoWithParamConfigTotal" && params.size() >= SIMPLIFYTREE_WITH_PARAMCONFIG) {
-        auto root = JsonUtil::CreateSharedPtrJson(true);
-        GetAppInfo(root);
         auto config = ParseDumpParamConfig(params);
-        rootNode_->DumpSimplifyTreeWithParamConfig(0, root, params[1] == "1", config);
-        DumpLog::GetInstance().Print(root->ToString());
+        auto snapshot = inspectorWindowSnapshot_ ? inspectorWindowSnapshot_() :
+            std::make_optional(InspectorWindowSnapshot {});
+        InspectorTreeRequestContext context(config, snapshot.value_or(InspectorWindowSnapshot {}));
+        config.inspectorContext = &context;
+        std::shared_ptr<JsonValue> root;
+        {
+            JsonWriteErrorScope errors;
+            root = JsonUtil::CreateSharedPtrJson(true);
+            if (!root || !root->IsObject() || !rootNode_ || !snapshot) {
+                context.ReportError(InspectorTreeError::COLLECTION_FAILED);
+            } else {
+                GetAppInfo(root);
+                auto appInfo = root->GetObject("appInfo");
+                appInfo->Put("WindowTitle", context.window.windowTitle.c_str());
+                appInfo->Put("PID", context.window.pid);
+                rootNode_->DumpSimplifyTreeWithParamConfig(0, root, params[1] == "1", config);
+                if (!context.ShouldStop()) {
+                    context.FinalizeNativeTree(root);
+                }
+            }
+            if (errors.HasError()) {
+                context.ReportError(InspectorTreeError::COLLECTION_FAILED);
+            }
+        }
+        JsonWriteErrorScope errors;
+        root = context.FinalizeResult(std::move(root));
+        if (!root || errors.HasError()) {
+            return true;
+        }
+        char* data = nullptr;
+        size_t size = 0;
+        constexpr size_t MAX_REPORT_BYTES = 100 * 1024 * 1024;
+        if (WriteJsonBounded(*root, false, MAX_REPORT_BYTES, &data, &size) == JsonWriteResult::SUCCESS) {
+            DumpLog::GetInstance().Print(std::string(data, size));
+        }
+        std::free(data);
 #endif
 #ifndef IS_RELEASE_VERSION
 #ifndef CROSS_PLATFORM
@@ -5176,9 +5293,32 @@ void PipelineContext::UpdateLastMoveEvent(const MouseEvent& event)
     lastSourceType_ = event.sourceType;
 }
 
+namespace {
+MouseEvent PrepareAgentMouseDispatch(const MouseEvent& event, const RefPtr<FrameNode>& node,
+    const RefPtr<EventManager>& manager, float viewScale)
+{
+    MouseEvent dispatchEvent(event);
+    if (event.isAgent && !event.isStylusMouseMode && event.action == MouseAction::PRESS && node &&
+        (event.button == MouseButton::LEFT_BUTTON || event.button == MouseButton::RIGHT_BUTTON)) {
+        TouchRestrict restrict { TouchRestrict::NONE };
+        restrict.sourceType = event.sourceType;
+        restrict.sourceTool = event.sourceTool;
+        restrict.hitTestType = SourceType::MOUSE;
+        restrict.mouseAction = event.action;
+        restrict.inputEventType = InputEventType::MOUSE_BUTTON;
+        manager->MouseTest(event.CreateScaleEvent(viewScale), node, restrict);
+        manager->PrepareAgentMousePress(dispatchEvent);
+    }
+    return dispatchEvent;
+}
+} // namespace
+
 void PipelineContext::OnMouseEvent(const MouseEvent& event, const RefPtr<FrameNode>& node)
 {
     CHECK_RUN_ON(UI);
+    if (InterruptRelaxedInteractionByMouse(event, eventManager_) && IsDestroyed()) {
+        return;
+    }
     ACE_BENCH_MARK_TRACE("OnMouseEvent_start type:%d button:%d", static_cast<int32_t>(event.action),
         static_cast<int32_t>(event.button));
 
@@ -5194,11 +5334,11 @@ void PipelineContext::OnMouseEvent(const MouseEvent& event, const RefPtr<FrameNo
     lastMouseEvent_->node = node;
     if (event.action == MouseAction::PRESS || event.action == MouseAction::RELEASE) {
 #ifdef IS_RELEASE_VERSION
-        TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW,
+        TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW,
             "InputTracking id:%{public}d, mouseId:%{public}d, type=%{public}d, button=%{public}d, inject=%{public}d",
             event.touchEventId, event.id, (int)event.action, (int)event.button, event.isInjected);
 #else
-        TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW,
+        TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW,
             "InputTracking id:%{public}d, mouseId:%{public}d, x=%{public}.3f, y=%{public}.3f, z=%{public}.3f, "
             "type=%{public}d, button=%{public}d"
             "inject=%{public}d",
@@ -5223,22 +5363,29 @@ void PipelineContext::OnMouseEvent(const MouseEvent& event, const RefPtr<FrameNo
         lastMouseTime_ = GetTimeFromExternalTimer();
         CompensateMouseMoveEvent(event, node);
     }
-    NotifyDragMouseEvent(event);
-    DispatchMouseToTouchEvent(event, node);
+    auto dispatchEvent = PrepareAgentMouseDispatch(event, node, eventManager_, viewScale_);
+    NotifyDragMouseEvent(dispatchEvent);
+    DispatchMouseToTouchEvent(dispatchEvent, node);
+    FinishOnMouseEvent(event, dispatchEvent, node);
+}
+
+void PipelineContext::FinishOnMouseEvent(
+    const MouseEvent& event, const MouseEvent& dispatchEvent, const RefPtr<FrameNode>& node)
+{
     if (event.action == MouseAction::MOVE) {
         if (isMousePassThrough_ || event.passThrough) {
-            DispatchMouseEvent(event, node);
+            DispatchMouseEvent(dispatchEvent, node);
             if (postEventManager_) {
                 postEventManager_->SetPassThroughResult(eventManager_->GetPassThroughResult());
             }
             return;
         }
-        mouseEvents_[node].emplace_back(event);
+        mouseEvents_[node].emplace_back(dispatchEvent);
         hasIdleTasks_ = true;
         RequestFrame();
         return;
     }
-    DispatchMouseEvent(event, node);
+    DispatchMouseEvent(dispatchEvent, node);
     if (postEventManager_) {
         postEventManager_->SetPassThroughResult(eventManager_->GetPassThroughResult());
     }
@@ -5501,6 +5648,12 @@ void PipelineContext::ReDispatch(KeyEvent& keyEvent)
 
 bool PipelineContext::OnNonPointerEvent(const NonPointerEvent& event)
 {
+    if (!event.isInjected && eventManager_) {
+        eventManager_->ClearRelaxedInteraction(ExecutionState::INTERRUPTED_BY_USER);
+        if (IsDestroyed()) {
+            return false;
+        }
+    }
     ContainerScope scope(instanceId_);
     return eventManager_->OnNonPointerEvent(event);
 }
@@ -5517,7 +5670,7 @@ bool PipelineContext::RequestFocus(const std::string& targetNodeId, bool isSyncR
 
     auto focusManager = focusHub->GetFocusManager();
     if (focusManager && focusManager->IsModalFocusViewStackValid()) {
-        TAG_LOGI(AceLogTag::ACE_FOCUS, "ModalFocusViewStack is not empty, intercept focus request.");
+        TAG_LOGI(AceLogTag::ACE_FOCUS, "ModalFocusViewStack not empty, intercept focus request.");
         return false;
     }
 
@@ -5587,10 +5740,16 @@ MouseEvent ConvertAxisToMouse(const AxisEvent& event)
 
 void PipelineContext::OnAxisEvent(const AxisEvent& event, const RefPtr<FrameNode>& node)
 {
+    if (!event.isInjected && eventManager_) {
+        eventManager_->ClearRelaxedInteraction(ExecutionState::INTERRUPTED_BY_USER);
+        if (IsDestroyed()) {
+            return;
+        }
+    }
     ACE_BENCH_MARK_TRACE("OnAxisEvent_start type:%d", event.action);
     eventManager_->NotifyAxisEvent(event);
     if (!axisEventChecker_.IsAxisEventSequenceCorrect(event)) {
-        TAG_LOGW(AceLogTag::ACE_INPUTKEYFLOW,
+        TAG_LOGW_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW,
             "AxisEvent error occurred, the currentAction is %{public}d, the preAction is %{public}d", event.action,
             axisEventChecker_.GetPreAction());
     }
@@ -5999,6 +6158,7 @@ void PipelineContext::SetAppBgColor(const Color& color)
 
 void PipelineContext::SetAppTitle(const std::string& title)
 {
+    inspectorAppTitle_ = title;
     if (windowModal_ != WindowModal::CONTAINER_MODAL) {
         return;
     }
@@ -6078,6 +6238,12 @@ void PipelineContext::Destroy()
     CHECK_RUN_ON(UI);
     CloseUITreeRequests(*this);
     SetDestroyed();
+    if (eventManager_) {
+        eventManager_->ClearRelaxedInteraction(ExecutionState::TARGET_NOT_FOUND);
+    }
+    if (contentChangeMgr_) {
+        contentChangeMgr_->InvalidateCapiContentChangeSubscriptions();
+    }
     if (rootNode_) {
         rootNode_->DetachFromMainTree();
     }
@@ -6632,10 +6798,47 @@ void PipelineContext::RegisterMaterialNode(const RefPtr<FrameNode>& node)
     materialProcessor_->Register(node);
 }
 
+void PipelineContext::RegisterPageContextNode(const RefPtr<FrameNode>& node)
+{
+    CHECK_NULL_VOID(materialProcessor_);
+    materialProcessor_->RegisterPageContextNode(node);
+}
+
 void PipelineContext::UnregisterMaterialNode(int32_t nodeId)
 {
     CHECK_NULL_VOID(materialProcessor_);
     materialProcessor_->Unregister(nodeId);
+}
+
+void PipelineContext::UnregisterPageContextNode(int32_t nodeId)
+{
+    CHECK_NULL_VOID(materialProcessor_);
+    materialProcessor_->UnregisterPageContextNode(nodeId);
+}
+
+void PipelineContext::ReportPageContextStats(int32_t targetContainerId, PageLogContainerType type, int32_t tabIndex)
+{
+    CHECK_NULL_VOID(materialProcessor_);
+    materialProcessor_->ReportPageContextStats(targetContainerId, type, tabIndex);
+}
+
+void PipelineContext::AddTaskOverlayNodeMaterialArea(const RefPtr<FrameNode>& targetNode, const std::string& source)
+{
+    CHECK_NULL_VOID(targetNode);
+    auto wk = WeakPtr<FrameNode>(targetNode);
+    AddAfterLayoutTask([wk, source]() {
+        auto node = wk.Upgrade();
+        CHECK_NULL_VOID(node);
+        auto pipeline = node->GetContext();
+        CHECK_NULL_VOID(pipeline);
+        pipeline->ReportOverlayNodeMaterialArea(node, source);
+    });
+}
+
+void PipelineContext::ReportOverlayNodeMaterialArea(const RefPtr<FrameNode>& host, const std::string& source)
+{
+    CHECK_NULL_VOID(materialProcessor_);
+    materialProcessor_->ReportOverlayNodeMaterialArea(host, source);
 }
 
 void PipelineContext::AddAfterRenderTask(std::function<void()>&& task)
@@ -7448,8 +7651,9 @@ void PipelineContext::GetOverlayInfo(bool hasOverlay, std::shared_ptr<JsonValue>
 
 DumpStartNodeSet PipelineContext::GetDumpStartNodes() const
 {
+    auto lastPage = stageManager_ ? stageManager_->GetLastPage() : nullptr;
     return DumpUtil::CollectInspectorStartNodes(
-        rootNode_, GetContainerModalNode(), stageManager_ ? stageManager_->GetLastPage() : rootNode_, overlayManager_);
+        rootNode_, GetContainerModalNode(), lastPage ? lastPage : rootNode_, overlayManager_);
 }
 
 bool PipelineContext::ProcessOverlayChildrenDumpInfo(const RefPtr<FrameNode>& rootNode,
@@ -7469,9 +7673,7 @@ bool PipelineContext::ProcessOverlayChildrenDumpInfo(const RefPtr<FrameNode>& ro
                 continue;
             }
             auto eachOverlayContent = JsonUtil::CreateSharedPtrJson();
-#ifndef CROSS_PLATFORM
             child->DumpSimplifyTreeWithParamConfig(0, eachOverlayContent, true, config, nullptr, rootNodeFinalOpacity);
-#endif
             if (config.collectionState && config.collectionState->GetError()) {
                 return hasOverlay;
             }
@@ -7560,9 +7762,18 @@ void PipelineContext::GetOverlayInspector(std::shared_ptr<JsonValue>& root, RefP
     for (auto& containerId : subContainerIds) {
         auto container = Container::GetContainer(containerId);
         CHECK_NULL_VOID(container);
-#ifndef CROSS_PLATFORM
-        container->DumpSimplifyTreeWithParamConfig(root, config, true);
-#endif
+        if (auto* context = config.inspectorContext) {
+            auto pipeline = AceType::DynamicCast<PipelineContext>(container->GetPipelineContext());
+            CHECK_NULL_CONTINUE(pipeline);
+            auto snapshot = pipeline->inspectorWindowSnapshot_ ? pipeline->inspectorWindowSnapshot_() : std::nullopt;
+            context->CollectWithWindowPrivacy(
+                snapshot, [&]() { container->DumpSimplifyTreeWithParamConfig(root, config, true); });
+            if (context->ShouldStop()) {
+                return;
+            }
+        } else {
+            container->DumpSimplifyTreeWithParamConfig(root, config, true);
+        }
     }
 }
 
@@ -7596,9 +7807,7 @@ void PipelineContext::DumpSimplifyTreeJsonFromTopNavNode(std::shared_ptr<JsonVal
             }
         }
         auto navNodeJson = JsonUtil::CreateSharedPtrJson();
-#ifndef CROSS_PLATFORM
         navNode->DumpSimplifyTreeWithParamConfig(0, navNodeJson, true, config, nullptr, navNodeParentFinalOpacity);
-#endif
         if (!navNodeJson->Contains("$type")) {
             continue;
         }
@@ -7650,10 +7859,8 @@ void PipelineContext::DumpVisibleInspectorTree(std::shared_ptr<JsonValue>& rootJ
                 LessNotEqual(titleRowParentFinalOpacity * GetNodeOpacityValue(titleRow), config.minOpacity);
         }
         if (titleRow && !titleRowBelowMinOpacity) {
-#ifndef CROSS_PLATFORM
             titleRow->DumpSimplifyTreeWithParamConfig(
                 0, containerModalTitleJson, true, config, nullptr, titleRowParentFinalOpacity);
-#endif
         }
         pseudoRootJson = JsonUtil::CreateSharedPtrJson();
         // ContainerModal uses the inner stack as its main dump root. Keep the
@@ -7692,10 +7899,8 @@ void PipelineContext::DumpVisibleInspectorTree(std::shared_ptr<JsonValue>& rootJ
                         config.minOpacity);
             }
             if (atomicServiceMenuBar && !atomicServiceMenuBarBelowMinOpacity) {
-#ifndef CROSS_PLATFORM
                 atomicServiceMenuBar->DumpSimplifyTreeWithParamConfig(
                     0, atomicMenuBarJson, true, config, nullptr, menuBarParentFinalOpacity);
-#endif
                 if (HasDumpedJsonContent(atomicMenuBarJson)) {
                     AddJsonChild(atomicRootJson, atomicMenuBarJson, config);
                 }
@@ -7717,26 +7922,72 @@ void PipelineContext::DumpVisibleInspectorTree(std::shared_ptr<JsonValue>& rootJ
     }
 }
 
+void PipelineContext::SetInspectorWindowSnapshotCallback(
+    std::function<std::optional<InspectorWindowSnapshot>()>&& callback)
+{
+    inspectorWindowSnapshot_ = std::move(callback);
+}
+
 void PipelineContext::GetInspectorTree(bool onlyNeedVisible, ParamConfig config)
 {
     CHECK_NULL_VOID(taskExecutor_);
-    CHECK_NULL_VOID(rootNode_);
-    auto root = JsonUtil::CreateSharedPtrJson(true);
-    GetAppInfo(root);
-    auto cb = [root]() {
-        auto json = root->ToString();
+    auto snapshot = inspectorWindowSnapshot_ ? inspectorWindowSnapshot_() :
+        std::make_optional(InspectorWindowSnapshot {});
+    InspectorTreeRequestContext context(config, snapshot.value_or(InspectorWindowSnapshot {}));
+    config.inspectorContext = &context;
+    std::shared_ptr<JsonValue> root;
+    {
+        JsonWriteErrorScope errors;
+        root = JsonUtil::CreateSharedPtrJson(true);
+        if (!root || !root->IsObject() || !rootNode_ || !snapshot) {
+            context.ReportError(InspectorTreeError::COLLECTION_FAILED);
+        } else {
+            GetAppInfo(root);
+            auto appInfo = root->GetObject("appInfo");
+            appInfo->Put("WindowTitle", context.window.windowTitle.c_str());
+            appInfo->Put("PID", context.window.pid);
+            ACE_SCOPED_TRACE("GetInspectorTree[onlyNeedVisible:%d][config.interactionInfo:%d]"
+                             "[config.accessibilityInfo:%d][config.cacheNodes:%d][config.withWeb:%d]"
+                             "[config.rectCulling:%d][config.minOpacity:%f]",
+                onlyNeedVisible, config.interactionInfo, config.accessibilityInfo, config.cacheNodes, config.withWeb,
+                config.rectCulling, config.minOpacity);
+            CollectInspectorTreeInto(root, onlyNeedVisible, config);
+            if (!context.ShouldStop()) {
+                context.FinalizeNativeTree(root);
+            }
+        }
+        if (errors.HasError()) {
+            context.ReportError(InspectorTreeError::COLLECTION_FAILED);
+        }
+    }
+    {
+        JsonWriteErrorScope errors;
+        root = context.FinalizeResult(std::move(root));
+        if (!root || errors.HasError()) {
+            return;
+        }
+    }
+    auto cb = [root = std::move(root)]() {
+        constexpr size_t MAX_REPORT_BYTES = 100 * 1024 * 1024;
+        JsonWriteErrorScope errors;
+        char* data = nullptr;
+        size_t size = 0;
+        if (WriteJsonBounded(*root, false, MAX_REPORT_BYTES, &data, &size) != JsonWriteResult::SUCCESS) {
+            return;
+        }
         auto res = JsonUtil::Create(true);
-        res->Put("0", json.c_str());
+        res->Put("0", data);
+        std::free(data);
+        if (errors.HasError() ||
+            WriteJsonBounded(*res, false, MAX_REPORT_BYTES, &data, &size) != JsonWriteResult::SUCCESS) {
+            return;
+        }
+        std::string result(data, size);
+        std::free(data);
 #ifndef CROSS_PLATFORM
-        UiSessionManager::GetInstance()->ReportInspectorTreeValue(res->ToString());
+        UiSessionManager::GetInstance()->ReportInspectorTreeValue(result);
 #endif
     };
-    ACE_SCOPED_TRACE("GetInspectorTree[onlyNeedVisible:%d][config.interactionInfo:%d]"
-                     "[config.accessibilityInfo:%d][config.cacheNodes:%d][config.withWeb:%d]"
-                     "[config.rectCulling:%d][config.minOpacity:%f]",
-        onlyNeedVisible, config.interactionInfo, config.accessibilityInfo, config.cacheNodes, config.withWeb,
-        config.rectCulling, config.minOpacity);
-    CollectInspectorTreeInto(root, onlyNeedVisible, config);
     taskExecutor_->PostTask(cb, TaskExecutor::TaskType::BACKGROUND,
         onlyNeedVisible ? "ArkUIGetVisibleInspectorTree" : "ArkUIGetInspectorTree");
 }
@@ -7746,6 +7997,31 @@ UITreeRequestState& PipelineContext::GetUITreeRequestState()
     return *uiTreeRequestState_;
 }
 
+#ifndef CROSS_PLATFORM
+namespace {
+// Keeps an occluded node whose subtree still holds a retained node, so no descendant is lost.
+bool MarkOcclusionKeepIds(const RefPtr<FrameNode>& node, const InspectorOcclusionCollector::Decisions& decisions,
+    std::unordered_set<int32_t>& keepIds)
+{
+    if (!node) {
+        return false;
+    }
+    auto found = decisions.find(node->GetId());
+    bool keep = found == decisions.end() || found->second != OcclusionDecision::OCCLUDED;
+    for (const auto& weakChild : node->GetFrameChildren()) {
+        auto child = weakChild.Upgrade();
+        if (MarkOcclusionKeepIds(child, decisions, keepIds)) {
+            keep = true;
+        }
+    }
+    if (keep) {
+        keepIds.insert(node->GetId());
+    }
+    return keep;
+}
+} // namespace
+#endif
+
 void PipelineContext::CollectInspectorTreeInto(
     std::shared_ptr<JsonValue>& root, bool onlyNeedVisible, ParamConfig config)
 {
@@ -7753,11 +8029,20 @@ void PipelineContext::CollectInspectorTreeInto(
         return;
     }
     if (onlyNeedVisible) {
+#ifndef CROSS_PLATFORM
+        if (config.filterOccludedNodes && config.collectionState && !config.collectionState->occlusionEnabled) {
+            auto& state = *config.collectionState;
+            state.occlusionDecisions = InspectorOcclusionCollector::Collect(
+                rootNode_, static_cast<double>(config.occlusionOpacityThreshold), GetInstanceId());
+            if (!state.occlusionDecisions.empty()) {
+                MarkOcclusionKeepIds(rootNode_, state.occlusionDecisions, state.occlusionKeepIds);
+            }
+            state.occlusionEnabled = true;
+        }
+#endif
         DumpVisibleInspectorTree(root, config);
     } else {
-#ifndef CROSS_PLATFORM
         rootNode_->DumpSimplifyTreeWithParamConfig(0, root, false, config);
-#endif
     }
 }
 
@@ -8444,10 +8729,9 @@ bool PipelineContext::CheckSourceTypeChange(SourceType currentSourceType)
 std::pair<uint32_t, std::string> PipelineContext::ExeAppAIFunctionCallback(const std::string& funcName,
     const std::string& params, const sptr<IRemoteObject>& remoteObj, int32_t nodeId)
 {
-    std::list<RefPtr<NG::FrameNode>> navNodes;
     CHECK_NULL_RETURN(rootNode_, std::make_pair(AI_CALL_NODE_INVALID, ""));
-    rootNode_->FindTopNavDestination(navNodes);
-    auto candidateNodes = CollectCandidateNavDestinationNodes(navNodes);
+    std::vector<RefPtr<NG::FrameNode>> candidateNodes;
+    CollectVisibleNavDestinations(rootNode_, candidateNodes);
     CHECK_NULL_RETURN(!candidateNodes.empty(), std::make_pair(AI_CALL_NODE_INVALID, ""));
     if (nodeId != -1) {
         for (const auto& node : candidateNodes) {
@@ -8466,19 +8750,31 @@ std::pair<uint32_t, std::string> PipelineContext::ExeAppAIFunctionCallback(const
 
 void PipelineContext::OnDumpBindAICaller(const std::vector<std::string>& params) const
 {
-    std::list<RefPtr<NG::FrameNode>> navNodes;
+    if (params.size() < PARAM_NUM) {
+        return;
+    }
     CHECK_NULL_VOID(rootNode_);
-    rootNode_->FindTopNavDestination(navNodes);
-    CHECK_NULL_VOID(!navNodes.empty());
-    auto topNavNode = navNodes.back();
-    CHECK_NULL_VOID(topNavNode);
-    if (params.size() > 1) {
-        if (params[1] == "-bind") {
-            auto myAICaller = std::make_shared<TestAICaller>();
-            topNavNode->SetAICallerHelper(myAICaller);
-        } else if (params[1] == "-unbind") {
-            topNavNode->SetAICallerHelper(nullptr);
+    std::vector<RefPtr<NG::FrameNode>> candidateNodes;
+    CollectVisibleNavDestinations(rootNode_, candidateNodes);
+    CHECK_NULL_VOID(!candidateNodes.empty());
+    auto targetNode = candidateNodes.back();
+    if (params.size() > PARAM_NUM) {
+        auto nodeId = StringUtils::StringToInt(params[PARAM_NUM], -1);
+        targetNode = nullptr;
+        for (const auto& node : candidateNodes) {
+            CHECK_NULL_CONTINUE(node);
+            if (node->GetId() == nodeId) {
+                targetNode = node;
+                break;
+            }
         }
+    }
+    CHECK_NULL_VOID(targetNode);
+    if (params[1] == "-bind") {
+        auto myAICaller = std::make_shared<TestAICaller>();
+        targetNode->SetAICallerHelper(myAICaller);
+    } else if (params[1] == "-unbind") {
+        targetNode->SetAICallerHelper(nullptr);
     }
 }
 
@@ -8575,7 +8871,7 @@ void PipelineContext::GetStateMgmtInfo(const std::string& componentName, const s
     std::vector<int32_t> matchNodeIds;
     rootNode_->GetNodeListByComponentName(0, matchNodeIds, componentName, onlyVisible);
     if (matchNodeIds.empty()) {
-        LOGE("GetStateMgmtInfo can't find componentName: %s", componentName.c_str());
+        LOGD("GetStateMgmtInfo can't find componentName: %s", componentName.c_str());
         return;
     }
     auto frontend = weakFrontend_.Upgrade();
@@ -8715,6 +9011,7 @@ void PipelineContext::InitManagers()
     frameRateManager_ = MakeRefPtr<FrameRateManager>();
     privacySensitiveManager_ = MakeRefPtr<PrivacySensitiveManager>();
     forceSplitMgr_ = MakeRefPtr<ForceSplitManager>();
+    handednessManager_ = MakeRefPtr<HandednessManager>(WeakClaim(this));
     recoverableMgr_ = MakeRefPtr<RecoverableManager>();
     formVisibleMgr_ = MakeRefPtr<FormVisibleManager>();
     formEventMgr_ = MakeRefPtr<FormEventManager>();
@@ -8723,6 +9020,11 @@ void PipelineContext::InitManagers()
     environmentManager_ = MakeRefPtr<EnvironmentManager>();
     recycleManager_ = std::make_unique<RecycleManager>();
     privacySensitiveManager_ = MakeRefPtr<PrivacySensitiveManager>();
+}
+
+const RefPtr<HandednessManager>& PipelineContext::GetHandednessManager() const
+{
+    return handednessManager_;
 }
 
 const RefPtr<ScrollPlaceholderManager>& PipelineContext::GetOrCreateScrollPlaceholderManager()
@@ -8739,6 +9041,17 @@ const RefPtr<ScrollPlaceholderManager>& PipelineContext::GetOrCreateScrollPlaceh
 const RefPtr<ForceSplitManager>& PipelineContext::GetForceSplitManager() const
 {
     return forceSplitMgr_;
+}
+
+void PipelineContext::SetTransPageEnabled(bool enabled)
+{
+    CHECK_NULL_VOID(forceSplitMgr_);
+    forceSplitMgr_->SetTransPageEnabled(enabled);
+}
+
+bool PipelineContext::IsTransPageEnabled() const
+{
+    return forceSplitMgr_ ? forceSplitMgr_->IsTransPageEnabled() : true;
 }
 
 const RefPtr<RecoverableManager>& PipelineContext::GetRecoverableManager() const
@@ -8789,6 +9102,31 @@ void PipelineContext::ProcessCommand(const std::string& command)
 #ifdef RELAXED_INTERACTION_SUPPORT
     CHECK_NULL_VOID(eventManager_);
     eventManager_->ProcessCommand(command, [this]() { RequestFrame(); });
+#endif
+}
+
+ProcessResult PipelineContext::ProcessCommand(const std::string& command,
+    const std::function<void(ExecutionState)>& completion)
+{
+#ifdef RELAXED_INTERACTION_SUPPORT
+    CHECK_NULL_RETURN(eventManager_, ProcessResult::NO_VALID_CMD);
+    return eventManager_->ProcessCommand(command, [this]() { RequestFrame(); }, completion);
+#else
+    return ProcessResult::NO_VALID_CMD;
+#endif
+}
+
+void PipelineContext::ProcessCommandWithResult(
+    const std::string& command, const std::function<void(const CommandResult&)>& finish)
+{
+#ifdef RELAXED_INTERACTION_SUPPORT
+    if (!eventManager_) {
+        finish(CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+        return;
+    }
+    eventManager_->ProcessCommandWithResult(command, [this]() { RequestFrame(); }, finish);
+#else
+    finish(CommandResult::Error(CommandErrorType::INVALID_COMMAND));
 #endif
 }
 

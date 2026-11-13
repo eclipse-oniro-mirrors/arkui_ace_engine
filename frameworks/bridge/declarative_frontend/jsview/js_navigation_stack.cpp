@@ -589,6 +589,7 @@ bool JSNavigationStack::CreateNodeByIndex(int32_t index, const WeakPtr<NG::UINod
         return true;
     }
     node = targetNode;
+    CHECK_NULL_RETURN(desNode, true);
     auto pattern = AceType::DynamicCast<NG::NavDestinationPattern>(desNode->GetPattern());
     if (pattern) {
         pattern->SetName(name);
@@ -727,6 +728,7 @@ std::string JSNavigationStack::GetNameByIndex(int32_t index)
 
 JSRef<JSVal> JSNavigationStack::GetParamByIndex(int32_t index) const
 {
+    JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(executionContext_, JSRef<JSVal>::Make());
     if (dataSourceObj_->IsEmpty()) {
         return JSRef<JSVal>::Make();
     }
@@ -742,6 +744,7 @@ JSRef<JSVal> JSNavigationStack::GetParamByIndex(int32_t index) const
 
 JSRef<JSVal> JSNavigationStack::GetOnPopByIndex(int32_t index) const
 {
+    JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(executionContext_, JSRef<JSVal>::Make());
     if (dataSourceObj_->IsEmpty()) {
         return JSRef<JSVal>::Make();
     }
@@ -1064,6 +1067,7 @@ void JSNavigationStack::UpdateOnStateChangedCallback(JSRef<JSObject> obj, std::f
 
 void JSNavigationStack::PreloadNodeBefore()
 {
+    JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(executionContext_);
     if (preloadItem_.has_value()) {
         return;
     }
@@ -1151,6 +1155,7 @@ void JSNavigationStack::AddPreloadItem(const std::string& name, const std::strin
 
 RefPtr<NG::UINode> JSNavigationStack::GetFromPreloadItem(const std::string& name, const std::string& paramString)
 {
+    JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(executionContext_, nullptr);
     if (!preloadItem_.has_value()) {
         return nullptr;
     }
@@ -1186,6 +1191,7 @@ void JSNavigationStack::RemovePreloadItem()
 
 void JSNavigationStack::PreloadItemOnDestroy()
 {
+    JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(executionContext_);
     if (dataSourceObj_->IsEmpty()) {
         return;
     }
@@ -1687,46 +1693,6 @@ JSRef<JSObject> JSNavigationStack::CreatePathInfoWithNecessaryProperty(
     pathInfo->SetPropertyObject("param", jsPathInfo->GetParam());
     pathInfo->SetPropertyObject("onPop", jsPathInfo->GetOnPop());
     return pathInfo;
-}
-
-std::string JSNavigationStack::GetStringifyParamByIndex(int32_t index) const
-{
-    auto env = GetNapiEnv();
-    if (!env) {
-        return JS_STRINGIFIED_UNDEFINED;
-    }
-    ScopeRAII scope(env);
-    if (!scope) {
-        return JS_STRINGIFIED_UNDEFINED;
-    }
-    if (dataSourceObj_->IsEmpty()) {
-        return JS_STRINGIFIED_UNDEFINED;
-    }
-    napi_value navPathStack = JsConverter::ConvertJsValToNapiValue(dataSourceObj_);
-    napi_value getParamByIndex;
-    napi_get_named_property(env, navPathStack, "getParamByIndex", &getParamByIndex);
-    napi_value napiIndex;
-    napi_create_int32(env, index, &napiIndex);
-    napi_value param;
-    napi_call_function(env, navPathStack, getParamByIndex, 1, &napiIndex, &param);
-
-    napi_value globalValue;
-    napi_get_global(env, &globalValue);
-    napi_value jsonClass;
-    napi_get_named_property(env, globalValue, "JSON", &jsonClass);
-    napi_value stringifyFunc;
-    napi_get_named_property(env, jsonClass, "stringify", &stringifyFunc);
-    napi_value stringifyParam;
-    if (napi_call_function(env, jsonClass, stringifyFunc, 1, &param, &stringifyParam) != napi_ok) {
-        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "Can not stringify current param!");
-        napi_get_and_clear_last_exception(env, &stringifyParam);
-        return JS_STRINGIFIED_UNDEFINED;
-    }
-    size_t len = 0;
-    napi_get_value_string_utf8(env, stringifyParam, nullptr, 0, &len);
-    std::unique_ptr<char[]> paramChar = std::make_unique<char[]>(len + 1);
-    napi_get_value_string_utf8(env, stringifyParam, paramChar.get(), len + 1, &len);
-    return paramChar.get();
 }
 
 std::string JSNavigationStack::GetSerializedParamSafely(int32_t index) const
@@ -2281,6 +2247,7 @@ bool JSNavigationStack::CreateNodeFromRecovery(int32_t index, const WeakPtr<NG::
 
 std::string JSNavigationStack::GetComponentInfo(int32_t index)
 {
+    JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(executionContext_, "");
     if (dataSourceObj_->IsEmpty()) {
         return "";
     }

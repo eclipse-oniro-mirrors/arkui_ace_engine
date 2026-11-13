@@ -24,6 +24,7 @@
 #include "core/components_ng/pattern/rich_editor/rich_editor_foreground_modifier.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_event_hub.h"
 #include "core/components_ng/pattern/rich_editor/style_manager.h"
+#include "core/components_ng/pattern/common_text/counter_constants.h"
 #include "core/components_ng/pattern/common_text/counter_foreground_modifier.h"
 #include "core/components_ng/pattern/common_text/counter_decorator.h"
 #include "core/components_ng/layout/layout_wrapper_node.h"
@@ -95,7 +96,9 @@ HWTEST_F(RichEditorCounterCoreTestNg, ICounterHostInterface001, TestSize.Level0)
 
 /**
  * @tc.name: GetAllResponseArea001
- * @tc.desc: GetAllResponseArea returns vector with cleanNodeResponseArea_ null and non-null
+ * @tc.desc: GetAllResponseArea always returns a 2-element vector ordered as
+ *           {passwordResponseArea_, cleanNodeResponseArea_}; slot indices stay fixed
+ *           regardless of which area is currently initialized.
  * @tc.type: FUNC
  */
 HWTEST_F(RichEditorCounterCoreTestNg, GetAllResponseArea001, TestSize.Level0)
@@ -103,7 +106,9 @@ HWTEST_F(RichEditorCounterCoreTestNg, GetAllResponseArea001, TestSize.Level0)
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
-    // Branch: cleanNodeResponseArea_ not initialized -> size 1, element null
+
+    // Initial state: neither area has been initialized. The vector still reserves both
+    // slots so that downstream layout can rely on a stable index-to-area mapping.
     auto areas = richEditorPattern->GetAllResponseArea();
     EXPECT_EQ(areas.size(), 2);
     // Branch: cleanNodeResponseArea_ set -> size 1, element non-null
@@ -111,7 +116,6 @@ HWTEST_F(RichEditorCounterCoreTestNg, GetAllResponseArea001, TestSize.Level0)
         AceType::MakeRefPtr<CleanNodeResponseArea>(AceType::WeakClaim(AceType::RawPtr(richEditorPattern)));
     areas = richEditorPattern->GetAllResponseArea();
     EXPECT_EQ(areas.size(), 2);
-    EXPECT_NE(areas[0], nullptr);
     richEditorPattern->cleanNodeResponseArea_.Reset();
 }
 
@@ -331,6 +335,133 @@ HWTEST_F(RichEditorCounterCoreTestNg, ProcessInsertValueFilterEmpty001, TestSize
     auto lengthAfter = richEditorPattern->GetTextContentLength();
     // Text should not be inserted since filter emptied it
     EXPECT_EQ(lengthAfter, lengthBefore);
+
+    richEditorPattern->hasActiveFilter_ = false;
+}
+
+/**
+ * @tc.name: ProcessInsertValueFilterEmptyFinishPreview001
+ * @tc.desc: When filter empties insert text, shouldCommitInput=true and previewTextRecord_ is valid,
+ *           FinishTextPreviewInner is invoked and previewTextRecord_ is reset before early return.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, ProcessInsertValueFilterEmptyFinishPreview001, TestSize.Level0)
+{
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+    richEditorPattern->isSpanStringMode_ = true;
+    richEditorPattern->styledString_ = AceType::MakeRefPtr<MutableSpanString>(u"hello");
+    richEditorPattern->styledString_->SetSpanWatcher(AceType::WeakClaim(AceType::RawPtr(richEditorPattern)));
+    richEditorPattern->undoManager_ =
+        std::make_unique<StyledStringUndoManager>(AceType::WeakClaim(AceType::RawPtr(richEditorPattern)));
+
+    // Set up filter that removes all non-digit characters
+    richEditorPattern->hasActiveFilter_ = true;
+    richEditorPattern->filterDirty_ = false;
+    richEditorPattern->filterManager_.SetFilter(u"[0-9]");
+    richEditorPattern->filterErrorHandler_ = [](const std::u16string&) -> bool { return true; };
+    richEditorPattern->maxLength_ = TEST_MAX_LENGTH_10;
+
+    // Set up an in-progress preview text record. startOffset == endOffset == 0 keeps DeleteByRange a
+    // no-op (length 0) inside FinishTextPreviewInner, while previewContent non-empty makes IsValid() true.
+    richEditorPattern->previewTextRecord_.previewContent = u"preview";
+    richEditorPattern->previewTextRecord_.previewTextHasStarted = true;
+    richEditorPattern->previewTextRecord_.startOffset = 0;
+    richEditorPattern->previewTextRecord_.endOffset = 0;
+    EXPECT_TRUE(richEditorPattern->previewTextRecord_.IsValid());
+
+    // "abc" will be filtered to "" by [0-9] filter; shouldCommitInput=true triggers the new
+    // IF_TRUE(shouldCommitInput && previewTextRecord_.IsValid(), FinishTextPreviewInner()) branch.
+    richEditorPattern->ProcessInsertValue(u"abc", OperationType::IME, true);
+
+    // FinishTextPreviewInner ran -> previewTextRecord_ reset.
+    EXPECT_FALSE(richEditorPattern->previewTextRecord_.previewTextHasStarted);
+    EXPECT_FALSE(richEditorPattern->previewTextRecord_.IsValid());
+    EXPECT_TRUE(richEditorPattern->previewTextRecord_.previewContent.empty());
+
+    richEditorPattern->previewTextRecord_.Reset();
+    richEditorPattern->hasActiveFilter_ = false;
+}
+
+/**
+ * @tc.name: ProcessInsertValueFilterEmptySkipFinishPreview001
+ * @tc.desc: When filter empties insert text and shouldCommitInput=true but previewTextRecord_ is NOT
+ *           valid (previewContent empty), FinishTextPreviewInner is NOT invoked; previewTextHasStarted
+ *           stays unchanged so the IsValid() guard (not previewTextHasStarted) gates the call.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, ProcessInsertValueFilterEmptySkipFinishPreview001, TestSize.Level0)
+{
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+    richEditorPattern->isSpanStringMode_ = true;
+    richEditorPattern->styledString_ = AceType::MakeRefPtr<MutableSpanString>(u"hello");
+    richEditorPattern->styledString_->SetSpanWatcher(AceType::WeakClaim(AceType::RawPtr(richEditorPattern)));
+    richEditorPattern->undoManager_ =
+        std::make_unique<StyledStringUndoManager>(AceType::WeakClaim(AceType::RawPtr(richEditorPattern)));
+
+    // Set up filter that removes all non-digit characters
+    richEditorPattern->hasActiveFilter_ = true;
+    richEditorPattern->filterDirty_ = false;
+    richEditorPattern->filterManager_.SetFilter(u"[0-9]");
+    richEditorPattern->filterErrorHandler_ = [](const std::u16string&) -> bool { return true; };
+    richEditorPattern->maxLength_ = TEST_MAX_LENGTH_10;
+
+    // previewTextHasStarted is true but previewContent is empty -> IsValid() returns false.
+    richEditorPattern->previewTextRecord_.previewContent = u"";
+    richEditorPattern->previewTextRecord_.previewTextHasStarted = true;
+    richEditorPattern->previewTextRecord_.startOffset = 0;
+    richEditorPattern->previewTextRecord_.endOffset = 0;
+    EXPECT_FALSE(richEditorPattern->previewTextRecord_.IsValid());
+
+    richEditorPattern->ProcessInsertValue(u"abc", OperationType::IME, true);
+
+    // FinishTextPreviewInner was NOT called: previewTextHasStarted remains true.
+    EXPECT_TRUE(richEditorPattern->previewTextRecord_.previewTextHasStarted);
+    EXPECT_FALSE(richEditorPattern->previewTextRecord_.IsValid());
+
+    richEditorPattern->previewTextRecord_.Reset();
+    richEditorPattern->hasActiveFilter_ = false;
+}
+
+/**
+ * @tc.name: ProcessInsertValueFilterEmptyCommitFalseNoFinishPreview001
+ * @tc.desc: When filter empties insert text and shouldCommitInput=false, FinishTextPreviewInner is NOT
+ *           invoked even with a valid preview (the shouldCommitInput guard short-circuits the call).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, ProcessInsertValueFilterEmptyCommitFalseNoFinishPreview001, TestSize.Level0)
+{
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+    richEditorPattern->isSpanStringMode_ = true;
+    richEditorPattern->styledString_ = AceType::MakeRefPtr<MutableSpanString>(u"hello");
+    richEditorPattern->styledString_->SetSpanWatcher(AceType::WeakClaim(AceType::RawPtr(richEditorPattern)));
+    richEditorPattern->undoManager_ =
+        std::make_unique<StyledStringUndoManager>(AceType::WeakClaim(AceType::RawPtr(richEditorPattern)));
+
+    // Set up filter that removes all non-digit characters
+    richEditorPattern->hasActiveFilter_ = true;
+    richEditorPattern->filterDirty_ = false;
+    richEditorPattern->filterManager_.SetFilter(u"[0-9]");
+    richEditorPattern->filterErrorHandler_ = [](const std::u16string&) -> bool { return true; };
+    richEditorPattern->maxLength_ = TEST_MAX_LENGTH_10;
+
+    // No preview in progress -> IsPreviewTextInputting() is false, so the filter block is entered
+    // even though shouldCommitInput is false.
+    richEditorPattern->previewTextRecord_.Reset();
+    EXPECT_FALSE(richEditorPattern->previewTextRecord_.IsValid());
+
+    auto lengthBefore = richEditorPattern->GetTextContentLength();
+    richEditorPattern->ProcessInsertValue(u"abc", OperationType::IME, false);
+    auto lengthAfter = richEditorPattern->GetTextContentLength();
+
+    // Filtered text was empty -> early return, no insertion, no crash.
+    EXPECT_EQ(lengthAfter, lengthBefore);
+    EXPECT_FALSE(richEditorPattern->previewTextRecord_.IsValid());
 
     richEditorPattern->hasActiveFilter_ = false;
 }
@@ -1004,7 +1135,7 @@ HWTEST_F(RichEditorCounterApiTestNg, PaintMethodForegroundModifier001, TestSize.
  */
 HWTEST_F(RichEditorCounterApiTestNg, SetRichEditorShowCounter001, TestSize.Level0)
 {
-    SystemProperties::SetConfigChangePerform();
+    g_isConfigChangePerform = true;
     auto richEditorNode = FrameNode::GetOrCreateFrameNode(V2::RICH_EDITOR_ETS_TAG,
         ElementRegister::GetInstance()->MakeUniqueId(),
         []() { return AceType::MakeRefPtr<RichEditorPattern>(); });
@@ -1057,7 +1188,7 @@ HWTEST_F(RichEditorCounterApiTestNg, SetRichEditorShowCounter001, TestSize.Level
  */
 HWTEST_F(RichEditorCounterApiTestNg, ResetRichEditorShowCounterConfigChange, TestSize.Level0)
 {
-    SystemProperties::SetConfigChangePerform();
+    g_isConfigChangePerform = true;
     auto richEditorNode = FrameNode::GetOrCreateFrameNode(V2::RICH_EDITOR_ETS_TAG,
         ElementRegister::GetInstance()->MakeUniqueId(),
         []() { return AceType::MakeRefPtr<RichEditorPattern>(); });
@@ -1131,5 +1262,203 @@ HWTEST_F(RichEditorCounterApiTestNg, RichEditorAccessibilityIsShowCount, TestSiz
     } else {
         EXPECT_FALSE(result);
     }
+}
+
+/**
+ * @tc.name: IsShowCounterEnabled001
+ * @tc.desc: Test IsShowCounterEnabled false when not in span string mode.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, IsShowCounterEnabled001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSpanStringMode_ = false;
+    EXPECT_FALSE(pattern->IsShowCounterEnabled());
+}
+
+/**
+ * @tc.name: UpdateShowCountBorderStyle001
+ * @tc.desc: Test UpdateShowCountBorderStyle early return when no maxLength.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, UpdateShowCountBorderStyle001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->maxLength_ = std::nullopt;
+    pattern->UpdateShowCountBorderStyle();
+    EXPECT_FALSE(pattern->showCountBorderStyle_);
+}
+
+/**
+ * @tc.name: HandleDeleteOnCounterScene001
+ * @tc.desc: Test HandleDeleteOnCounterScene early return when no maxLength.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, HandleDeleteOnCounterScene001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->maxLength_ = std::nullopt;
+    pattern->HandleDeleteOnCounterScene();
+    EXPECT_FALSE(pattern->showCountBorderStyle_);
+}
+
+/**
+ * @tc.name: HandleCounterWithLength002
+ * @tc.desc: Test HandleCounterWithLength early return when counter not enabled.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, HandleCounterWithLength002, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSpanStringMode_ = false;
+    pattern->HandleCounterWithLength(1, 10);
+    EXPECT_FALSE(pattern->showCountBorderStyle_);
+}
+
+/**
+ * @tc.name: ProcBorderInBlurEvent001
+ * @tc.desc: Test ProcBorderInBlurEvent early return when counter not enabled.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, ProcBorderInBlurEvent001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSpanStringMode_ = false;
+    pattern->ProcBorderInBlurEvent();
+    EXPECT_FALSE(pattern->showCountBorderStyle_);
+}
+
+/**
+ * @tc.name: HandleCounterBorder001
+ * @tc.desc: Test HandleCounterBorder showCountBorderStyle_ false branch.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, HandleCounterBorder001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->showCountBorderStyle_ = false;
+    pattern->HandleCounterBorder();
+    EXPECT_FALSE(pattern->showCountBorderStyle_);
+}
+
+/**
+ * @tc.name: HandleCounterBorder002
+ * @tc.desc: Test HandleCounterBorder showCountBorderStyle_ true branch.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, HandleCounterBorder002, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->showCountBorderStyle_ = true;
+    pattern->HandleCounterBorder();
+    EXPECT_TRUE(pattern->showCountBorderStyle_);
+}
+
+/**
+ * @tc.name: ProcessCounter001
+ * @tc.desc: Test ProcessCounter when counter not enabled (CleanCounterNode branch).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, ProcessCounter001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSpanStringMode_ = false;
+    pattern->ProcessCounter();
+    EXPECT_FALSE(pattern->showCountBorderStyle_);
+}
+
+/**
+ * @tc.name: CounterAccessors001
+ * @tc.desc: Test counter accessor getters with default layout property.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, CounterAccessors001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetShowCounterStyleValue(true);
+    EXPECT_TRUE(pattern->GetShowCounterStyleValue());
+    pattern->SetShowCounterStyleValue(false);
+    EXPECT_FALSE(pattern->GetShowCounterStyleValue());
+    EXPECT_TRUE(pattern->NeedRestoreMeasureConstraint());
+    EXPECT_EQ(pattern->GetCounterDecorator(), nullptr);
+}
+
+/**
+ * @tc.name: CounterColorAccessors001
+ * @tc.desc: Test HasCounterTextColor / GetCounterTextColor default branches.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, CounterColorAccessors001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_FALSE(pattern->HasCounterTextColor());
+    EXPECT_EQ(pattern->GetCounterTextColor(), Color::BLACK);
+    EXPECT_FALSE(pattern->HasCounterTextOverflowColor());
+    EXPECT_EQ(pattern->GetCounterTextOverflowColor(), Color::RED);
+}
+
+/**
+ * @tc.name: BorderFlagAccessors001
+ * @tc.desc: Test border flag accessors return false by default.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, BorderFlagAccessors001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_FALSE(pattern->HasBorderWidthFlagByUser());
+    EXPECT_FALSE(pattern->HasBorderColorFlagByUser());
+    EXPECT_FALSE(pattern->HasBorderRadiusFlagByUser());
+    EXPECT_FALSE(pattern->HasMarginByUser());
+    EXPECT_FALSE(pattern->HasInnerBorderColor());
+}
+
+/**
+ * @tc.name: CounterTypeAccessors001
+ * @tc.desc: Test GetCounterType / GetShowHighlightBorder defaults.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, CounterTypeAccessors001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_EQ(pattern->GetCounterType(), COUNTER_DEFAULT_MODE);
+    EXPECT_TRUE(pattern->GetShowHighlightBorder());
+}
+
+/**
+ * @tc.name: GetShowCounterValue001
+ * @tc.desc: Test GetShowCounterValue default false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, GetShowCounterValue001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_FALSE(pattern->GetShowCounterValue());
+}
+
+/**
+ * @tc.name: CalcCounterAfterFilterInsertValue001
+ * @tc.desc: Test CalcCounterAfterFilterInsertValue exercises showCountBorderStyle_.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCounterCoreTestNg, CalcCounterAfterFilterInsertValue001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSpanStringMode_ = false;
+    pattern->CalcCounterAfterFilterInsertValue(0, 0, 10);
+    EXPECT_FALSE(pattern->showCountBorderStyle_);
 }
 } // namespace OHOS::Ace::NG

@@ -13,7 +13,11 @@
  * limitations under the License.
  */
 
+#include <atomic>
+#include <functional>
+#include <future>
 #include <limits>
+#include <thread>
 
 #include "gtest/gtest.h"
 
@@ -31,6 +35,7 @@
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/manager/smart_gesture/smart_gesture_invoke_scope.h"
 #include "core/components_ng/manager/smart_gesture/smart_gesture_manager.h"
 #undef private
 #undef protected
@@ -1239,7 +1244,8 @@ HWTEST_F(SmartGestureManagerTestNg, PaintSelectedNode_NullRenderContext, TestSiz
 HWTEST_F(SmartGestureManagerTestNg, PaintSelectedNode_NullAppTheme, TestSize.Level1)
 {
     auto node = CreatePrimaryActionNode();
-    MakeNodeActiveAndVisible(node);
+    // Lay out the node so the "not laid out" early-return guard does not mask the theme check.
+    MakeNodeFullyActiveAndVisible(node);
     manager_->PaintSelectedNode(node);
     EXPECT_EQ(manager_->selectedPaintedNode_.Upgrade(), nullptr);
 }
@@ -1252,7 +1258,8 @@ HWTEST_F(SmartGestureManagerTestNg, PaintSelectedNode_NullAppTheme, TestSize.Lev
 HWTEST_F(SmartGestureManagerTestNg, PaintSelectedNode_FocusHubFallsBack, TestSize.Level1)
 {
     auto node = CreatePrimaryActionNode();
-    MakeNodeActiveAndVisible(node);
+    // Lay out the node so the "not laid out" early-return guard does not mask the focus-hub fallback.
+    MakeNodeFullyActiveAndVisible(node);
     ASSERT_NE(node->GetOrCreateFocusHub(), nullptr);
     auto context = MockPipelineContext::GetCurrent();
     ASSERT_NE(context, nullptr);
@@ -1275,7 +1282,10 @@ HWTEST_F(SmartGestureManagerTestNg, PaintSelectedNode_FocusHubFallsBack, TestSiz
 HWTEST_F(SmartGestureManagerTestNg, PaintSelectedNode_FocusHubPath, TestSize.Level1)
 {
     auto node = CreatePrimaryActionNode();
-    MakeNodeActiveAndVisible(node);
+    // PaintSelectedNode defers when the node has no valid paint rect (not laid out yet),
+    // so the node must be laid out before the paint state can be applied.
+    MakeNodeFullyActiveAndVisible(node);
+    ASSERT_NE(node->GetOrCreateFocusHub(), nullptr);
     auto context = MockPipelineContext::GetCurrent();
     auto mockThemeManager = AceType::MakeRefPtr<MockThemeManager>();
     auto appTheme = AceType::MakeRefPtr<AppTheme>();
@@ -1293,7 +1303,9 @@ HWTEST_F(SmartGestureManagerTestNg, PaintSelectedNode_FocusHubPath, TestSize.Lev
 HWTEST_F(SmartGestureManagerTestNg, PaintSelectedNode_RenderContextDirectPath, TestSize.Level1)
 {
     auto node = CreatePrimaryActionNode();
-    MakeNodeActiveAndVisible(node);
+    // PaintSelectedNode defers when the node has no valid paint rect (not laid out yet),
+    // so the node must be laid out before the paint state can be applied.
+    MakeNodeFullyActiveAndVisible(node);
     node->focusHub_ = nullptr;
     auto context = MockPipelineContext::GetCurrent();
     auto mockThemeManager = AceType::MakeRefPtr<MockThemeManager>();
@@ -2535,6 +2547,446 @@ HWTEST_F(SmartGestureManagerTestNg, ValidateProposal_ReachableTrueBranches, Test
     SmartGestureProposal fullProposal(
         SmartGestureProposalType::SCROLL, SmartGestureOperateIntention::SLIDE_FORWARD, scrollNode, fullConfig);
     EXPECT_TRUE(manager_->ValidateScrollProposal(fullProposal));
+}
+
+/**
+ * @tc.name: SetMonitor_ConcurrentGetMonitorHandle
+ * @tc.desc: SetMonitor from a writer thread does not race GetMonitorHandle copies and invocations on the reader.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SmartGestureManagerTestNg, SetMonitor_ConcurrentGetMonitorHandle, TestSize.Level1)
+{
+    std::atomic<bool> stop(false);
+    std::thread writer([this, &stop]() {
+        bool consumed = false;
+        while (!stop.load(std::memory_order_relaxed)) {
+            manager_->SetMonitor([consumed](const SmartGestureProposal& proposal) {
+                SmartGestureHandlingResolution resolution;
+                resolution.isConsumed = consumed;
+                return resolution;
+            });
+            consumed = !consumed;
+        }
+    });
+
+    SmartGestureProposal proposal(SmartGestureProposalType::NONE_ACTION, SmartGestureOperateIntention::TAP);
+    for (int32_t i = 0; i < 1000; ++i) {
+        auto monitor = manager_->GetMonitorHandle();
+        if (monitor) {
+            (void)monitor(proposal);
+        }
+    }
+
+    stop.store(true);
+    writer.join();
+    manager_->SetMonitor(SmartGestureManager::SmartGestureMonitor());
+    EXPECT_FALSE(manager_->GetMonitorHandle());
+}
+
+/**
+ * @tc.name: HandleTrigger_ConcurrentSetMonitor
+ * @tc.desc: HandleTrigger stays crash-free while another thread swaps and clears the monitor.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SmartGestureManagerTestNg, HandleTrigger_ConcurrentSetMonitor, TestSize.Level1)
+{
+    auto monitorCallback = [](const SmartGestureProposal& proposal) {
+        SmartGestureHandlingResolution resolution;
+        resolution.isConsumed = true;
+        return resolution;
+    };
+    std::atomic<bool> stop(false);
+    std::thread writer([this, &stop, monitorCallback]() {
+        bool setMonitor = true;
+        while (!stop.load(std::memory_order_relaxed)) {
+            if (setMonitor) {
+                manager_->SetMonitor(monitorCallback);
+            } else {
+                manager_->SetMonitor(SmartGestureManager::SmartGestureMonitor());
+            }
+            setMonitor = !setMonitor;
+        }
+    });
+
+    KeyEvent event(KeyCode::KEY_WRIST_TURN, KeyAction::DOWN);
+    for (int32_t i = 0; i < 100; ++i) {
+        manager_->HandleTrigger(SmartGestureTrigger::WRIST_BACK, event);
+    }
+
+    stop.store(true);
+    writer.join();
+    manager_->SetMonitor(SmartGestureManager::SmartGestureMonitor());
+    EXPECT_FALSE(manager_->GetMonitorHandle());
+}
+
+class InvokeScopeMockMonitorState final {
+public:
+    explicit InvokeScopeMockMonitorState(
+        std::atomic<int32_t>* detachCount, std::function<void()> onDetach = nullptr, int32_t envId = 0)
+        : detachCount_(detachCount), onDetach_(std::move(onDetach)), envId_(envId)
+    {}
+
+    int32_t GetEnv() const
+    {
+        return envId_;
+    }
+
+    void Detach()
+    {
+        detachCalls_.fetch_add(1, std::memory_order_relaxed);
+        detachCount_->fetch_add(1, std::memory_order_relaxed);
+        if (onDetach_) {
+            onDetach_();
+        }
+    }
+
+    int32_t GetDetachCount() const
+    {
+        return detachCalls_.load(std::memory_order_relaxed);
+    }
+
+private:
+    std::atomic<int32_t>* detachCount_ = nullptr;
+    std::atomic<int32_t> detachCalls_ { 0 };
+    std::function<void()> onDetach_;
+    int32_t envId_ = 0;
+};
+
+using InvokeScopeTestContext = SmartGestureMonitorRegistryContext<InvokeScopeMockMonitorState>;
+
+/**
+ * @tc.name: InvokeScope_ConcurrentDetachOrDefer
+ * @tc.desc: Every state deferred or detached from multiple threads is detached exactly once.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SmartGestureManagerTestNg, InvokeScope_ConcurrentDetachOrDefer, TestSize.Level1)
+{
+    using InvokeScope = SmartGestureMonitorInvokeScope<InvokeScopeMockMonitorState>;
+    SmartGestureMonitorRegistryContext<InvokeScopeMockMonitorState> context;
+    constexpr int32_t stateCount = 256;
+    constexpr int32_t threadCount = 8;
+    std::atomic<int32_t> detachCount(0);
+    std::vector<std::shared_ptr<InvokeScopeMockMonitorState>> states;
+    states.reserve(stateCount);
+    for (int32_t i = 0; i < stateCount; ++i) {
+        states.emplace_back(std::make_shared<InvokeScopeMockMonitorState>(&detachCount));
+        context.states[i].emplace_back(states.back());
+    }
+
+    auto detachTask = [&context, &states](int32_t i) {
+        for (int32_t stateIndex = i; stateIndex < stateCount; stateIndex += threadCount) {
+            auto state = states[stateIndex];
+            {
+                std::lock_guard<std::mutex> lock(context.mutex);
+                context.states.erase(stateIndex);
+                context.DeferDetachLocked(state);
+            }
+            if (state) {
+                state->Detach();
+            }
+        }
+    };
+    {
+        InvokeScope scope(context, 0);
+        std::vector<std::thread> detachers;
+        detachers.reserve(threadCount);
+        for (int32_t i = 0; i < threadCount; ++i) {
+            detachers.emplace_back(detachTask, i);
+        }
+        for (auto& detacher : detachers) {
+            detacher.join();
+        }
+        EXPECT_EQ(detachCount.load(std::memory_order_relaxed), 0);
+    }
+
+    EXPECT_EQ(detachCount.load(std::memory_order_relaxed), stateCount);
+    for (const auto& state : states) {
+        EXPECT_EQ(state->GetDetachCount(), 1);
+    }
+}
+
+/**
+ * @tc.name: InvokeScope_DetachWithoutInvocation
+ * @tc.desc: Without an active invocation, removed states remain available for immediate lock-free detach.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SmartGestureManagerTestNg, InvokeScope_DetachWithoutInvocation, TestSize.Level1)
+{
+    SmartGestureMonitorRegistryContext<InvokeScopeMockMonitorState> context;
+    std::atomic<int32_t> detachCount(0);
+    auto state = std::make_shared<InvokeScopeMockMonitorState>(&detachCount);
+    decltype(state) nullState;
+    {
+        std::lock_guard<std::mutex> lock(context.mutex);
+        context.DeferDetachLocked(nullState);
+        context.DeferDetachLocked(state);
+    }
+    ASSERT_NE(state, nullptr);
+    state->Detach();
+    EXPECT_EQ(detachCount.load(), 1);
+    decltype(context)::StateList removed = {
+        std::make_shared<InvokeScopeMockMonitorState>(&detachCount), nullptr
+    };
+    {
+        std::lock_guard<std::mutex> lock(context.mutex);
+        context.DeferDetachLocked(removed);
+    }
+    ASSERT_EQ(removed.size(), 2u);
+    ASSERT_NE(removed.front(), nullptr);
+    removed.front()->Detach();
+    EXPECT_EQ(detachCount.load(), 2);
+}
+
+/**
+ * @tc.name: InvokeScope_NestedInvocation
+ * @tc.desc: Self-unregistration during a nested invocation releases only after the outer invocation exits.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SmartGestureManagerTestNg, InvokeScope_NestedInvocation, TestSize.Level1)
+{
+    using InvokeScope = SmartGestureMonitorInvokeScope<InvokeScopeMockMonitorState>;
+    SmartGestureMonitorRegistryContext<InvokeScopeMockMonitorState> context;
+    std::atomic<int32_t> detachCount(0);
+    auto state = std::make_shared<InvokeScopeMockMonitorState>(&detachCount);
+    context.states[0].emplace_back(state);
+    {
+        InvokeScope outer(context, 0);
+        {
+            InvokeScope inner(context, 0);
+            EXPECT_EQ(inner.GetStates(), outer.GetStates());
+            std::lock_guard<std::mutex> lock(context.mutex);
+            context.states.erase(0);
+            context.DeferDetachLocked(state);
+            EXPECT_EQ(state, nullptr);
+        }
+        EXPECT_EQ(detachCount.load(), 0);
+        EXPECT_EQ(outer.GetStates().size(), 1u);
+    }
+    EXPECT_EQ(detachCount.load(), 1);
+}
+
+/**
+ * @tc.name: InvokeScope_ClearSnapshot
+ * @tc.desc: Clearing the registry preserves the ordered snapshot and defers every non-null state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SmartGestureManagerTestNg, InvokeScope_ClearSnapshot, TestSize.Level1)
+{
+    using InvokeScope = SmartGestureMonitorInvokeScope<InvokeScopeMockMonitorState>;
+    SmartGestureMonitorRegistryContext<InvokeScopeMockMonitorState> context;
+    std::atomic<int32_t> detachCount(0);
+    auto first = std::make_shared<InvokeScopeMockMonitorState>(&detachCount);
+    auto second = std::make_shared<InvokeScopeMockMonitorState>(&detachCount);
+    context.states[0] = { first, nullptr, second };
+    decltype(context)::StateList removed;
+    {
+        InvokeScope scope(context, 0);
+        {
+            std::lock_guard<std::mutex> lock(context.mutex);
+            removed = std::move(context.states[0]);
+            context.states.erase(0);
+            context.DeferDetachLocked(removed);
+        }
+        EXPECT_TRUE(removed.empty());
+        ASSERT_EQ(scope.GetStates().size(), 3u);
+        EXPECT_EQ(scope.GetStates().front(), first);
+        EXPECT_EQ(scope.GetStates().back(), second);
+        EXPECT_EQ(detachCount.load(), 0);
+    }
+    EXPECT_EQ(detachCount.load(), 2);
+}
+
+/**
+ * @tc.name: InvokeScope_IndependentContexts
+ * @tc.desc: Registry contexts of the same state type do not share invocation counters or pending queues.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SmartGestureManagerTestNg, InvokeScope_IndependentContexts, TestSize.Level1)
+{
+    using InvokeScope = SmartGestureMonitorInvokeScope<InvokeScopeMockMonitorState>;
+    SmartGestureMonitorRegistryContext<InvokeScopeMockMonitorState> firstContext;
+    SmartGestureMonitorRegistryContext<InvokeScopeMockMonitorState> secondContext;
+    std::atomic<int32_t> detachCount(0);
+    auto state = std::make_shared<InvokeScopeMockMonitorState>(&detachCount);
+    InvokeScope scope(firstContext, 0);
+    EXPECT_TRUE(scope.GetStates().empty());
+    {
+        std::lock_guard<std::mutex> lock(secondContext.mutex);
+        secondContext.DeferDetachLocked(state);
+    }
+    ASSERT_NE(state, nullptr);
+    state->Detach();
+    EXPECT_EQ(detachCount.load(), 1);
+}
+
+/**
+ * @tc.name: InvokeScope_EnvsDoNotSharePendingQueue
+ * @tc.desc: An invocation of one env does not postpone the release of a state owned by another env.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SmartGestureManagerTestNg, InvokeScope_EnvsDoNotSharePendingQueue, TestSize.Level1)
+{
+    using InvokeScope = SmartGestureMonitorInvokeScope<InvokeScopeMockMonitorState>;
+    SmartGestureMonitorRegistryContext<InvokeScopeMockMonitorState> context;
+    constexpr int32_t envA = 1;
+    constexpr int32_t envB = 2;
+    std::atomic<int32_t> detachCount(0);
+    auto stateA = std::make_shared<InvokeScopeMockMonitorState>(&detachCount, nullptr, envA);
+    auto stateB = std::make_shared<InvokeScopeMockMonitorState>(&detachCount, nullptr, envB);
+    context.states[0].emplace_back(stateA);
+    context.states[1].emplace_back(stateB);
+
+    {
+        InvokeScope scopeB(context, 1);
+        {
+            std::lock_guard<std::mutex> lock(context.mutex);
+            context.states.erase(0);
+            context.DeferDetachLocked(stateA);
+        }
+        // env B is invoking, yet env A must not borrow that invocation to postpone its own release.
+        ASSERT_NE(stateA, nullptr);
+        stateA->Detach();
+        EXPECT_EQ(stateA->GetDetachCount(), 1);
+    }
+    EXPECT_EQ(stateB->GetDetachCount(), 0);
+}
+
+/**
+ * @tc.name: InvokeScope_EnvCleanupReleasesPendingStates
+ * @tc.desc: Closing an env releases both its registered states and the states already deferred for release.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SmartGestureManagerTestNg, InvokeScope_EnvCleanupReleasesPendingStates, TestSize.Level1)
+{
+    using InvokeScope = SmartGestureMonitorInvokeScope<InvokeScopeMockMonitorState>;
+    SmartGestureMonitorRegistryContext<InvokeScopeMockMonitorState> context;
+    constexpr int32_t envId = 1;
+    std::atomic<int32_t> detachCount(0);
+    auto pendingState = std::make_shared<InvokeScopeMockMonitorState>(&detachCount, nullptr, envId);
+    auto registeredState = std::make_shared<InvokeScopeMockMonitorState>(&detachCount, nullptr, envId);
+    context.states[0].emplace_back(pendingState);
+    context.states[1].emplace_back(registeredState);
+
+    {
+        InvokeScope scope(context, 0);
+        {
+            std::lock_guard<std::mutex> lock(context.mutex);
+            context.states.erase(0);
+            context.DeferDetachLocked(pendingState);
+        }
+        ASSERT_EQ(pendingState, nullptr);
+        decltype(context)::StateList closing;
+        {
+            std::lock_guard<std::mutex> lock(context.mutex);
+            closing = context.CloseEnvLocked(envId);
+        }
+        EXPECT_EQ(closing.size(), 2u);
+        for (const auto& state : closing) {
+            state->Detach();
+        }
+        EXPECT_EQ(detachCount.load(), 2);
+    }
+    // Neither the deferred state nor the registered state is released twice.
+    EXPECT_EQ(detachCount.load(), 2);
+}
+
+/**
+ * @tc.name: InvokeScope_EnvAddressReuseKeepsGeneration
+ * @tc.desc: An old snapshot cannot decrement a new bookkeeping entry at the same env address.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SmartGestureManagerTestNg, InvokeScope_EnvAddressReuseKeepsGeneration, TestSize.Level1)
+{
+    using InvokeScope = SmartGestureMonitorInvokeScope<InvokeScopeMockMonitorState>;
+    InvokeScopeTestContext context;
+    std::atomic<int32_t> detachCount(0);
+    auto oldState = std::make_shared<InvokeScopeMockMonitorState>(&detachCount);
+    context.states[0].emplace_back(oldState);
+    auto oldScope = std::make_unique<InvokeScope>(context, 0);
+    InvokeScopeTestContext::StateList closing;
+    {
+        std::lock_guard<std::mutex> lock(context.mutex);
+        closing = context.CloseEnvLocked(0);
+    }
+    for (const auto& item : closing) {
+        item->Detach();
+    }
+    auto current = std::make_shared<InvokeScopeMockMonitorState>(&detachCount);
+    context.states[0].emplace_back(current);
+    {
+        InvokeScope newScope(context, 0);
+        ASSERT_EQ(newScope.GetStates().size(), 1u);
+        EXPECT_EQ(newScope.GetStates().front(), current);
+        oldScope.reset();
+        {
+            std::lock_guard<std::mutex> lock(context.mutex);
+            context.states.erase(0);
+            context.DeferDetachLocked(current);
+        }
+        EXPECT_EQ(current, nullptr);
+        EXPECT_EQ(detachCount.load(), 1);
+    }
+    EXPECT_EQ(detachCount.load(), 2);
+}
+
+/**
+ * @tc.name: InvokeScope_EarlyReturn
+ * @tc.desc: An early return drains deferred states and leaves no stale invocation count.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SmartGestureManagerTestNg, InvokeScope_EarlyReturn, TestSize.Level1)
+{
+    using InvokeScope = SmartGestureMonitorInvokeScope<InvokeScopeMockMonitorState>;
+    SmartGestureMonitorRegistryContext<InvokeScopeMockMonitorState> context;
+    std::atomic<int32_t> detachCount(0);
+    context.states[0].emplace_back(std::make_shared<InvokeScopeMockMonitorState>(&detachCount));
+    auto invoke = [&context]() {
+        InvokeScope scope(context, 0);
+        decltype(context.states)::mapped_type removed;
+        std::lock_guard<std::mutex> lock(context.mutex);
+        removed = std::move(context.states[0]);
+        context.states.erase(0);
+        context.DeferDetachLocked(removed);
+        return !scope.GetStates().empty();
+    };
+    EXPECT_TRUE(invoke());
+    EXPECT_EQ(detachCount.load(), 1);
+    auto state = std::make_shared<InvokeScopeMockMonitorState>(&detachCount);
+    {
+        std::lock_guard<std::mutex> lock(context.mutex);
+        context.DeferDetachLocked(state);
+    }
+    ASSERT_NE(state, nullptr);
+    state->Detach();
+    EXPECT_EQ(detachCount.load(), 2);
+}
+
+/**
+ * @tc.name: InvokeScope_DetachReentersRegistry
+ * @tc.desc: Deferred detach runs without the registry lock and can safely reenter the same registry.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SmartGestureManagerTestNg, InvokeScope_DetachReentersRegistry, TestSize.Level1)
+{
+    using InvokeScope = SmartGestureMonitorInvokeScope<InvokeScopeMockMonitorState>;
+    SmartGestureMonitorRegistryContext<InvokeScopeMockMonitorState> context;
+    std::atomic<int32_t> detachCount(0);
+    auto replacement = std::make_shared<InvokeScopeMockMonitorState>(&detachCount);
+    auto state = std::make_shared<InvokeScopeMockMonitorState>(&detachCount, [&context, &replacement]() {
+        std::lock_guard<std::mutex> lock(context.mutex);
+        context.states[0].emplace_back(replacement);
+    });
+    context.states[0].emplace_back(state);
+    {
+        InvokeScope scope(context, 0);
+        std::lock_guard<std::mutex> lock(context.mutex);
+        context.states.erase(0);
+        context.DeferDetachLocked(state);
+    }
+    EXPECT_EQ(detachCount.load(), 1);
+    InvokeScope scope(context, 0);
+    ASSERT_EQ(scope.GetStates().size(), 1u);
+    EXPECT_EQ(scope.GetStates().front(), replacement);
 }
 
 } // namespace OHOS::Ace::NG

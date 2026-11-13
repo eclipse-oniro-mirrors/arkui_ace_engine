@@ -41,6 +41,8 @@
 #include "core/components_ng/pattern/scroll/scroll_pattern.h"
 #include "core/components_ng/pattern/sheet/minimize/sheet_minimize_object.h"
 #include "core/components_ng/pattern/sheet/minimize/sheet_presentation_minimize_layout_algorithm.h"
+#include "core/components_ng/base/geometry_node.h"
+#include "core/components_ng/layout/layout_wrapper_node.h"
 #include "core/components_ng/pattern/stage/stage_pattern.h"
 #include "core/components_ng/pattern/text/text_pattern.h"
 
@@ -84,7 +86,9 @@ void SheetMinimizeTestNG::SetUpTestCase()
  */
 void SheetMinimizeTestNG::TearDownTestCase()
 {
-    MockPipelineContext::GetCurrent()->themeManager_ = nullptr;
+    if (auto* mockPipeCtx = MockPipelineContext::GetCurrent().GetRawPtr()) {
+        mockPipeCtx->themeManager_ = nullptr;
+    }
     MockPipelineContext::TearDown();
     MockContainer::TearDown();
 }
@@ -1777,6 +1781,79 @@ HWTEST_F(SheetMinimizeTestNG, AvoidKeyboard001, TestSize.Level1)
      */
     object->AvoidKeyboard(true);
     object->AvoidKeyboard(false);
+    EXPECT_TRUE(true);
+}
+
+/**
+ * @tc.name: GetSheetMiniShowOffset001
+ * @tc.desc: Test SheetPresentationMinimizeLayoutAlgorithm::GetSheetMiniShowOffset branches.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SheetMinimizeTestNG, GetSheetMiniShowOffset001, TestSize.Level1)
+{
+    SheetPresentationMinimizeLayoutAlgorithm algorithm;
+    // null pattern
+    EXPECT_EQ(algorithm.GetSheetMiniShowOffset(nullptr), OffsetF(0.0f, 0.0f));
+
+    // pattern without host: margin width nullopt
+    auto orphanCallback = [](const std::string&) {};
+    auto orphanPattern = AceType::MakeRefPtr<SheetPresentationPattern>(1, "", std::move(orphanCallback));
+    ASSERT_NE(orphanPattern, nullptr);
+    EXPECT_EQ(algorithm.GetSheetMiniShowOffset(orphanPattern), OffsetF(0.0f, 0.0f));
+
+    auto callback = [](const std::string&) {};
+    auto sheetNode = FrameNode::CreateFrameNode(V2::SHEET_PAGE_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<SheetPresentationPattern>(0, "", std::move(callback)));
+    ASSERT_NE(sheetNode, nullptr);
+    auto sheetPattern = sheetNode->GetPattern<SheetPresentationPattern>();
+    ASSERT_NE(sheetPattern, nullptr);
+
+    // default width breakpoint callback returns WIDTH_SM, margins are valid
+    sheetPattern->SetSheetMiniDefaultShowPosition(SheetMiniDefaultShowPosition::LeftTop);
+    auto leftTop = algorithm.GetSheetMiniShowOffset(sheetPattern);
+    EXPECT_GT(leftTop.GetX(), 0.0f);
+    EXPECT_GT(leftTop.GetY(), 0.0f);
+
+    sheetPattern->SetSheetMiniDefaultShowPosition(SheetMiniDefaultShowPosition::RightTop);
+    auto rightTop = algorithm.GetSheetMiniShowOffset(sheetPattern);
+    EXPECT_FLOAT_EQ(rightTop.GetY(), leftTop.GetY());
+
+    sheetPattern->SetSheetMiniDefaultShowPosition(SheetMiniDefaultShowPosition::LeftBottom);
+    auto leftBottom = algorithm.GetSheetMiniShowOffset(sheetPattern);
+    EXPECT_FLOAT_EQ(leftBottom.GetX(), leftTop.GetX());
+
+    sheetPattern->SetSheetMiniDefaultShowPosition(SheetMiniDefaultShowPosition::RightBottom);
+    auto rightBottom = algorithm.GetSheetMiniShowOffset(sheetPattern);
+    EXPECT_FLOAT_EQ(rightBottom.GetX(), rightTop.GetX());
+
+    // unknown position keeps default offset
+    sheetPattern->SetSheetMiniDefaultShowPosition(static_cast<SheetMiniDefaultShowPosition>(99));
+    EXPECT_EQ(algorithm.GetSheetMiniShowOffset(sheetPattern), OffsetF(0.0f, 0.0f));
+}
+
+/**
+ * @tc.name: MinimizeLayoutAlgorithmMeasure001
+ * @tc.desc: Test Measure/Layout null guards and sheet wrapper pattern guard.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SheetMinimizeTestNG, MinimizeLayoutAlgorithmMeasure001, TestSize.Level1)
+{
+    SheetPresentationMinimizeLayoutAlgorithm algorithm;
+    algorithm.Measure(nullptr);
+    algorithm.MeasureScrollNode(nullptr, LayoutConstraintF());
+    algorithm.Layout(nullptr);
+
+    // layout wrapper with non-sheet layout property: DynamicCast null branches
+    auto hostNode = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(hostNode, nullptr);
+    auto geometryNode = AceType::MakeRefPtr<GeometryNode>();
+    RefPtr<LayoutWrapperNode> layoutWrapper =
+        AceType::MakeRefPtr<LayoutWrapperNode>(hostNode, geometryNode, hostNode->GetLayoutProperty());
+    algorithm.Measure(AceType::RawPtr(layoutWrapper));
+    algorithm.MeasureScrollNode(AceType::RawPtr(layoutWrapper), LayoutConstraintF());
+    algorithm.Layout(AceType::RawPtr(layoutWrapper));
+    algorithm.LayoutScrollNode(AceType::RawPtr(layoutWrapper));
     EXPECT_TRUE(true);
 }
 } // namespace OHOS::Ace::NG

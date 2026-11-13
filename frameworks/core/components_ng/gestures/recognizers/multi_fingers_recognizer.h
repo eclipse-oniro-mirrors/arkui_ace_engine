@@ -115,6 +115,8 @@ public:
 
     void CheckCurrentFingers() const override;
 protected:
+    static void ReleaseTouchEventPayload(TouchEvent& event);
+
     void OnBeginGestureReferee(int32_t touchId, int32_t originalId, bool needUpdateChild = false) override
     {
         touchPoints_[touchId] = {};

@@ -18,6 +18,10 @@
 
 #include <string>
 #include <memory>
+#include <functional>
+#include <map>
+#include <utility>
+#include <vector>
 
 namespace OHOS {
 namespace AppExecFwk {
@@ -35,18 +39,39 @@ public:
     template<typename Task>
     bool PostTask(Task&& task, const std::string& name, int32_t delayTime)
     {
+        if (failPostTask_) { return false; }
+        tasks_[name] = { now_ + delayTime, std::forward<Task>(task) };
         return true;
     }
 
     template<typename Task>
     bool PostTask(Task&& task, const char* name, int32_t delayTime)
     {
-        return true;
+        return PostTask(std::forward<Task>(task), std::string(name), delayTime);
     }
 
-    void RemoveTask(const std::string& name) {}
+    void RemoveTask(const std::string& name) { tasks_.erase(name); }
+    void RemoveTask(const char* name) { tasks_.erase(name); }
 
-    void RemoveTask(const char* name) {}
+    void SetPostTaskFailure(bool fail) { failPostTask_ = fail; }
+    void AdvanceTime(int32_t milliseconds)
+    {
+        now_ += milliseconds;
+        std::vector<std::function<void()>> ready;
+        for (auto iter = tasks_.begin(); iter != tasks_.end();) {
+            if (iter->second.first <= now_) {
+                ready.emplace_back(std::move(iter->second.second));
+                iter = tasks_.erase(iter);
+            } else {
+                ++iter;
+            }
+        }
+        for (auto& task : ready) { task(); }
+    }
+private:
+    int64_t now_ = 0;
+    bool failPostTask_ = false;
+    std::map<std::string, std::pair<int64_t, std::function<void()>>> tasks_;
 };
 
 } // namespace AppExecFwk

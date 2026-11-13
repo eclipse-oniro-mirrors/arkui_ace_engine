@@ -29,6 +29,11 @@ var DynamicRangeMode;
     DynamicRangeMode[DynamicRangeMode["CONSTRAINT"] = 1] = "CONSTRAINT";
     DynamicRangeMode[DynamicRangeMode["STANDARD"] = 2] = "STANDARD";
 })(DynamicRangeMode || (DynamicRangeMode = {}));
+let DisplayMode;
+(function (DisplayMode) {
+    DisplayMode[DisplayMode.IMAGE_AND_VIDEO = 0] = 'IMAGE_AND_VIDEO';
+    DisplayMode[DisplayMode.VIDEO_ONLY = 1] = 'VIDEO_ONLY';
+})(DisplayMode || (DisplayMode = {}));
 
 class MovingPhotoView extends JSViewAbstract {
     static create(value) {
@@ -133,4 +138,5 @@ export default {
     MovingPhotoViewController: __MovingPhotoView__.MovingPhotoViewController,
     PixelMapFormat,
     DynamicRangeMode,
+    DisplayMode,
 };

@@ -19,12 +19,30 @@
 
 #include "adapter/ohos/entrance/ui_session/content_change_config_impl.h"
 #include "adapter/ohos/entrance/ui_session/get_inspector_tree_config_impl.h"
+#include "adapter/ohos/entrance/ui_session/include/ui_session_trace.h"
 #include "adapter/ohos/entrance/ui_session/include/ui_session_log.h"
 #include "adapter/ohos/entrance/ui_session/ui_translate_request_util.h"
 #include "interfaces/inner_api/ui_session/ui_session_json_util.h"
+#include "interfaces/inner_api/ui_session/ui_session_split_rule.h"
 
 namespace OHOS::Ace {
 namespace {
+constexpr size_t SPLIT_REGISTRATION_RULE_COUNT = 1;
+
+bool IsValidSplitPageSceneRequest(const std::string& request, bool isQuery = false)
+{
+    // Discover explicit SPLIT declarations without imposing new validation on legacy requests.
+    const char* parseEnd = nullptr;
+    PageSceneSplit::JsonPtr root(cJSON_ParseWithOpts(request.c_str(), &parseEnd, false), cJSON_Delete);
+    if (!PageSceneSplit::ContainsSplitRule(root.get())) {
+        return true;
+    }
+    // Reuse the tree and reject trailing data only for explicitly declared SPLIT requests.
+    const auto parsed = PageSceneSplit::ParseRuleSet(root.get(), parseEnd);
+    // Registration accepts one SPLIT rule; one-shot queries may evaluate multiple rules.
+    return parsed && (isQuery || parsed->rules.size() == SPLIT_REGISTRATION_RULE_COUNT);
+}
+
 // Extract the ruleSetId used to register and route the event callback.
 std::string ExtractPageSceneRuleSetId(const std::string& ruleJson)
 {
@@ -153,6 +171,9 @@ int32_t UIContentServiceProxy::Connect(const EventCallback& eventCallback,
         LOGW("connect write interface token failed");
         return FAILED;
     }
+    if (report_ != nullptr) {
+        LOGW("connect again");
+    }
     report_ = new (std::nothrow) UiReportStub();
     if (report_ == nullptr) {
         LOGW("connect failed,create reportStub failed");
@@ -163,13 +184,13 @@ int32_t UIContentServiceProxy::Connect(const EventCallback& eventCallback,
         LOGW("write reportStub failed");
         return FAILED;
     }
+    report_->SetEventHandler(eventHandler);
     int32_t sendRequestErrorCode = Remote()->SendRequest(UI_CONTENT_CONNECT, data, reply, option);
     if (sendRequestErrorCode != ERR_NONE) {
         LOGW("connect send request failed, errorCode is %{public}d", sendRequestErrorCode);
         return REPLY_ERROR;
     }
     isConnected_ = true;
-    report_->SetEventHandler(eventHandler);
     return NO_ERROR;
 }
 
@@ -194,6 +215,10 @@ int32_t UIContentServiceProxy::RegisterPageSceneRules(
     auto ruleSetId = ExtractPageSceneRuleSetId(ruleJson);
     if (ruleSetId.empty()) {
         LOGW("RegisterPageSceneRules ruleSetId is empty or invalid");
+        return PARAM_INVALID;
+    }
+    if (!IsValidSplitPageSceneRequest(ruleJson)) {
+        LOGW("RegisterPageSceneRules invalid SPLIT params");
         return PARAM_INVALID;
     }
     if (!report_->TryRegisterPageSceneEventCallback(ruleSetId, eventCallback)) {
@@ -248,6 +273,10 @@ int32_t UIContentServiceProxy::GetPageScene(
         LOGW("GetPageScene reportStub is nullptr");
         return FAILED;
     }
+    if (!IsValidSplitPageSceneRequest(ruleJsonOrRuleSetId, true)) {
+        LOGW("GetPageScene invalid SPLIT params");
+        return PARAM_INVALID;
+    }
     MessageParcel data;
     MessageParcel reply;
     MessageOption option;
@@ -298,11 +327,7 @@ int32_t UIContentServiceProxy::SendComponentTreeQueryRequest(uint32_t code, cons
         LOGW("%{public}s write parcel failed", caller);
         return FAILED;
     }
-    bool isLazyForEach = code == IUiContentService::GET_LAZY_FOREACH_DATA_BY_POINT;
-    bool registerSuccess = isLazyForEach
-        ? report_->RegisterLazyForEachQueryCallback(eventCallback)
-        : report_->RegisterNavigationQueryCallback(eventCallback);
-    if (!registerSuccess) {
+    if (!RegisterQueryCallback(code, eventCallback)) {
         LOGW("%{public}s register callback failed, previous request unfinished", caller);
         return LAST_UNFINISH;
     }
@@ -311,20 +336,47 @@ int32_t UIContentServiceProxy::SendComponentTreeQueryRequest(uint32_t code, cons
     int32_t sendRequestErrorCode = Remote()->SendRequest(code, data, reply, option);
     if (sendRequestErrorCode != ERR_NONE) {
         LOGW("%{public}s send request failed, errorCode is %{public}d", caller, sendRequestErrorCode);
-        if (isLazyForEach) {
-            report_->UnregisterLazyForEachQueryCallback();
-        } else {
-            report_->UnregisterNavigationQueryCallback();
-        }
+        UnregisterQueryCallback(code);
         return REPLY_ERROR;
     }
-    bool postSuccess = isLazyForEach
-        ? report_->PostLazyForEachQueryCallbackRemoveTask(timeout)
-        : report_->PostNavigationQueryCallbackRemoveTask(timeout);
-    if (!postSuccess) {
+    if (!PostQueryTimeoutTask(code, timeout)) {
         return FAILED;
     }
     return reply.ReadInt32();
+}
+
+bool UIContentServiceProxy::RegisterQueryCallback(uint32_t code,
+    const std::function<void(const std::string&)>& eventCallback)
+{
+    if (code == IUiContentService::GET_LAZY_FOREACH_DATA_BY_POINT) {
+        return report_->RegisterLazyForEachQueryCallback(eventCallback);
+    }
+    if (code == IUiContentService::GET_NODES_IN_RECT) {
+        return report_->RegisterNodesInRectQueryCallback(eventCallback);
+    }
+    return report_->RegisterNavigationQueryCallback(eventCallback);
+}
+
+void UIContentServiceProxy::UnregisterQueryCallback(uint32_t code)
+{
+    if (code == IUiContentService::GET_LAZY_FOREACH_DATA_BY_POINT) {
+        report_->UnregisterLazyForEachQueryCallback();
+    } else if (code == IUiContentService::GET_NODES_IN_RECT) {
+        report_->UnregisterNodesInRectQueryCallback();
+    } else {
+        report_->UnregisterNavigationQueryCallback();
+    }
+}
+
+bool UIContentServiceProxy::PostQueryTimeoutTask(uint32_t code, int32_t timeout)
+{
+    if (code == IUiContentService::GET_LAZY_FOREACH_DATA_BY_POINT) {
+        return report_->PostLazyForEachQueryCallbackRemoveTask(timeout);
+    }
+    if (code == IUiContentService::GET_NODES_IN_RECT) {
+        return report_->PostNodesInRectQueryCallbackRemoveTask(timeout);
+    }
+    return report_->PostNavigationQueryCallbackRemoveTask(timeout);
 }
 
 int32_t UIContentServiceProxy::GetNavigationContentByPoint(float x, float y, const std::string& pattern,
@@ -344,6 +396,17 @@ int32_t UIContentServiceProxy::GetLazyForEachDataByPoint(float x, float y,
     return SendComponentTreeQueryRequest(GET_LAZY_FOREACH_DATA_BY_POINT, "GetLazyForEachDataByPoint",
         eventCallback, [x, y](MessageParcel& data) {
             return data.WriteFloat(x) && data.WriteFloat(y);
+        }, timeout);
+}
+
+int32_t UIContentServiceProxy::GetNodesInRect(float x1, float y1, float x2, float y2,
+    const std::function<void(const std::string&)>& eventCallback,
+    int32_t timeout)
+{
+    return SendComponentTreeQueryRequest(GET_NODES_IN_RECT, "GetNodesInRect",
+        eventCallback, [x1, y1, x2, y2](MessageParcel& data) {
+            return data.WriteFloat(x1) && data.WriteFloat(y1) &&
+                data.WriteFloat(x2) && data.WriteFloat(y2);
         }, timeout);
 }
 
@@ -612,6 +675,7 @@ int32_t UIContentServiceProxy::HighlightSpecifiedContent(int32_t id, const std::
 
 int32_t UIContentServiceProxy::SendCommand(int32_t id, const std::string& command)
 {
+    UiSessionCommandRequestTraceBegin("Legacy.Node");
     MessageParcel data;
     MessageParcel reply;
     MessageOption option;
@@ -659,6 +723,7 @@ int32_t UIContentServiceProxy::SendCommandSync(int32_t id, const std::string& co
 
 int32_t UIContentServiceProxy::SendCommand(const std::string command)
 {
+    UiSessionCommandRequestTraceBegin("Legacy.Global");
     MessageParcel data;
     MessageParcel reply;
     MessageOption option(MessageOption::TF_ASYNC);
@@ -679,6 +744,70 @@ int32_t UIContentServiceProxy::SendCommand(const std::string command)
     int32_t sendRequestErrorCode = Remote()->SendRequest(SEND_COMMAND, data, reply, option);
     if (sendRequestErrorCode != ERR_NONE) {
         LOGW("SendCommand send request failed, errorCode is %{public}d", sendRequestErrorCode);
+        return REPLY_ERROR;
+    }
+    return NO_ERROR;
+}
+
+int32_t UIContentServiceProxy::SendCommand(
+    int32_t id, const std::string& command, const SendCommandFinishCallback& finishCallback)
+{
+    UiSessionCommandRequestTraceBegin("Callback.Node");
+    return SendCommandWithFinishCallback(
+        SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK, &id, command, finishCallback);
+}
+
+int32_t UIContentServiceProxy::SendCommand(
+    const std::string command, const SendCommandFinishCallback& finishCallback)
+{
+    UiSessionCommandRequestTraceBegin("Callback.Global");
+    return SendCommandWithFinishCallback(
+        SEND_COMMAND_WITH_FINISH_CALLBACK, nullptr, command, finishCallback);
+}
+
+int32_t UIContentServiceProxy::SendCommandWithFinishCallback(
+    uint32_t code, const int32_t* id, const std::string& command, const SendCommandFinishCallback& finishCallback)
+{
+    if (finishCallback == nullptr) {
+        LOGW("SendCommandWithFinishCallback callback is nullptr");
+        return PARAM_INVALID;
+    }
+    if (report_ == nullptr) {
+        LOGW("SendCommandWithFinishCallback reportStub is nullptr");
+        return FAILED;
+    }
+    auto remote = Remote();
+    if (remote == nullptr) {
+        LOGW("SendCommandWithFinishCallback remote is nullptr");
+        return FAILED;
+    }
+    uint64_t requestId = 0;
+    if (!report_->RegisterSendCommandFinishCallback(finishCallback, requestId)) {
+        return LAST_UNFINISH;
+    }
+    UI_SESSION_SCOPED_TRACE("SendCommand.Send.%llu", static_cast<unsigned long long>(requestId));
+    MessageParcel data;
+    MessageParcel reply;
+    MessageOption option;
+    bool writeSuccess = data.WriteInterfaceToken(GetDescriptor()) && data.WriteUint64(requestId);
+    if (writeSuccess && id != nullptr) {
+        writeSuccess = data.WriteInt32(*id);
+    }
+    writeSuccess = writeSuccess && data.WriteString(command);
+    if (!writeSuccess) {
+        LOGW("SendCommandWithFinishCallback write parcel failed");
+        report_->UnregisterSendCommandFinishCallback(requestId);
+        return FAILED;
+    }
+    if (!report_->PostSendCommandCallbackRemoveTask(requestId)) {
+        LOGW("SendCommandWithFinishCallback post timeout task failed");
+        report_->UnregisterSendCommandFinishCallback(requestId);
+        return FAILED;
+    }
+    int32_t sendRequestErrorCode = remote->SendRequest(code, data, reply, option);
+    if (sendRequestErrorCode != ERR_NONE) {
+        LOGW("SendCommandWithFinishCallback send request failed, errorCode is %{public}d", sendRequestErrorCode);
+        report_->UnregisterSendCommandFinishCallback(requestId);
         return REPLY_ERROR;
     }
     return NO_ERROR;

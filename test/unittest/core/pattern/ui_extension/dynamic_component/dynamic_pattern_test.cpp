@@ -35,6 +35,7 @@
 #include "core/components_ng/property/accessibility_property.h"
 #include "core/event/pointer_event.h"
 
+#include "adapter/ohos/entrance/dynamic_component/uv_task_wrapper_impl.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 using namespace testing;
@@ -1349,5 +1350,31 @@ HWTEST_F(DynamicPatternTestNg, DynamicPatternTest031, TestSize.Level1)
 
     handler.allowCrossProcessNesting_ = false;
     EXPECT_FALSE(handler.IsAllowCrossProcessNesting());
+}
+
+/**
+ * @tc.name: DynamicPatternTest034
+ * @tc.desc: Test UVTaskWrapperImpl PostTaskToWorker null env should not execute the task
+ * @tc.type: FUNC
+ */
+HWTEST_F(DynamicPatternTestNg, DynamicPatternTest034, TestSize.Level1)
+{
+    bool isTaskCalled = false;
+    UVTaskWrapperImpl::PostTaskToWorker(nullptr, [&isTaskCalled]() { isTaskCalled = true; });
+    EXPECT_FALSE(isTaskCalled);
+}
+
+/**
+ * @tc.name: DynamicPatternTest035
+ * @tc.desc: Test UVTaskWrapperImpl PostTaskToWorker invalid env should not execute the task or crash,
+ * napi_send_event returns a non-ok status for an env that is not alive
+ * @tc.type: FUNC
+ */
+HWTEST_F(DynamicPatternTestNg, DynamicPatternTest035, TestSize.Level1)
+{
+    bool isTaskCalled = false;
+    napi_env invalidEnv = reinterpret_cast<napi_env>(0x1000);
+    UVTaskWrapperImpl::PostTaskToWorker(invalidEnv, [&isTaskCalled]() { isTaskCalled = true; });
+    EXPECT_FALSE(isTaskCalled);
 }
 } // namespace OHOS::Ace::NG

@@ -26,6 +26,7 @@
 #include "core/components/theme/blur_style_theme.h"
 #include "core/components/theme/shadow_theme.h"
 #include "core/components_ng/base/inspector.h"
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include "core/components_ng/event/drag_event.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_behavior_reporter/drag_drop_behavior_reporter.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_global_controller.h"
@@ -136,11 +137,15 @@ void GetShadowInfoArray(
 {
     for (auto& pixelMap : dragAction->pixelMapList) {
         double scale = 1.0;
-        if (Referenced::RawPtr(pixelMap)) {
-            scale = GetPixelMapScale(pixelMap, dragAction->previewOption.isScaleEnabled, false);
-            auto pixelMapScale = dragAction->windowScale * scale;
-            pixelMap->Scale(pixelMapScale, pixelMapScale, AceAntiAliasingOption::HIGH);
+        if (!Referenced::RawPtr(pixelMap)) {
+            TAG_LOGW(AceLogTag::ACE_DRAG, "pixelMap is null, skip this shadow info");
+            continue;
         }
+
+        scale = GetPixelMapScale(pixelMap, dragAction->previewOption.isScaleEnabled, false);
+        auto pixelMapScale = dragAction->windowScale * scale;
+        pixelMap->Scale(pixelMapScale, pixelMapScale, AceAntiAliasingOption::HIGH);
+
         int32_t width = pixelMap->GetWidth();
         int32_t height = pixelMap->GetHeight();
         double x = dragAction->touchPointX;
@@ -832,7 +837,10 @@ OffsetF DragDropFuncWrapper::GetPaintRectCenter(const RefPtr<FrameNode>& frameNo
     auto offset = paintRect.GetOffset();
     PointF pointNode(offset.GetX() + paintRect.Width() / 2.0f, offset.GetY() + paintRect.Height() / 2.0f);
     context->GetPointTransformRotate(pointNode);
-    auto parent = frameNode->GetAncestorNodeOfFrame(false);
+    auto parent = frameNode->GetCoordinateAncestorNodeOfFrame(false);
+    if (parent) {
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(frameNode.GetRawPtr(), pointNode);
+    }
     while (parent) {
         if (checkWindowBoundary && parent->IsWindowBoundary()) {
             break;
@@ -843,7 +851,11 @@ OffsetF DragDropFuncWrapper::GetPaintRectCenter(const RefPtr<FrameNode>& frameNo
         pointNode.SetX(offset.GetX() + pointNode.GetX());
         pointNode.SetY(offset.GetY() + pointNode.GetY());
         renderContext->GetPointTransformRotate(pointNode);
-        parent = parent->GetAncestorNodeOfFrame(false);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(false);
+        if (ancestor) {
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(parent.GetRawPtr(), pointNode);
+        }
+        parent = ancestor;
     }
     return OffsetF(pointNode.GetX(), pointNode.GetY());
 }
@@ -914,7 +926,11 @@ RectF DragDropFuncWrapper::GetPaintRectToWindowWithoutRotate(const RefPtr<FrameN
     float width = paintRect.Width();
     float height = paintRect.Height();
     context->GetPointTransformRotate(pointNode);
-    auto parent = frameNode->GetAncestorNodeOfFrame(true);
+    auto parent = frameNode->GetCoordinateAncestorNodeOfFrame(true);
+    if (parent) {
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToCenterAndSize(
+            frameNode.GetRawPtr(), pointNode, width, height);
+    }
     while (parent) {
         auto scale = parent->GetTransformScale();
         width *= scale.x;
@@ -925,7 +941,12 @@ RectF DragDropFuncWrapper::GetPaintRectToWindowWithoutRotate(const RefPtr<FrameN
         pointNode.SetX(offset.GetX() + pointNode.GetX());
         pointNode.SetY(offset.GetY() + pointNode.GetY());
         renderContext->GetPointTransformRotate(pointNode);
-        parent = parent->GetAncestorNodeOfFrame(true);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor) {
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToCenterAndSize(
+                parent.GetRawPtr(), pointNode, width, height);
+        }
+        parent = ancestor;
     }
     auto x = pointNode.GetX() - width * SCALE_HALF;
     auto y = pointNode.GetY() - height * SCALE_HALF;
@@ -952,7 +973,7 @@ void DragDropFuncWrapper::UpdateNodePositionToWindow(const RefPtr<FrameNode>& fr
     CHECK_NULL_VOID(frameNode);
     auto renderContext = frameNode->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
-    RefPtr<FrameNode> parentNode = frameNode->GetAncestorNodeOfFrame(true);
+    RefPtr<FrameNode> parentNode = frameNode->GetCoordinateAncestorNodeOfFrame(true);
     if (parentNode) {
         offset -= parentNode->GetPositionToWindowWithTransform();
     }
@@ -979,7 +1000,7 @@ OffsetF DragDropFuncWrapper::GetFrameNodeOffsetToWindow(const RefPtr<FrameNode>&
     offset -= GetCurrentWindowOffset(targetNode->GetContextRefPtr());
     auto renderContext = targetNode->GetRenderContext();
     CHECK_NULL_RETURN(renderContext, OffsetF());
-    RefPtr<FrameNode> parentNode = targetNode->GetAncestorNodeOfFrame(true);
+    RefPtr<FrameNode> parentNode = targetNode->GetCoordinateAncestorNodeOfFrame(true);
     if (parentNode) {
         offset -= parentNode->GetPositionToWindowWithTransform();
     }
@@ -1080,14 +1101,14 @@ bool DragDropFuncWrapper::IsSelectedItemNode(const RefPtr<UINode>& uiNode)
 {
     auto frameNode = AceType::DynamicCast<FrameNode>(uiNode);
     CHECK_NULL_RETURN(frameNode, false);
-    auto gestureHub = frameNode->GetOrCreateGestureEventHub();
-    CHECK_NULL_RETURN(gestureHub, false);
-    auto eventHub = frameNode->GetEventHub<EventHub>();
-    CHECK_NULL_RETURN(eventHub, false);
-    auto dragPreview = frameNode->GetDragPreviewOption();
-    if (!dragPreview.isMultiSelectionEnabled) {
+    auto* dragPreview = frameNode->GetDragPreviewOptionIfExist();
+    if (!dragPreview || !dragPreview->isMultiSelectionEnabled) {
         return false;
     }
+    auto eventHub = frameNode->GetEventHubOnly<EventHub>();
+    CHECK_NULL_RETURN(eventHub, false);
+    auto gestureHub = eventHub->GetGestureEventHub();
+    CHECK_NULL_RETURN(gestureHub, false);
     bool isAllowedDrag = gestureHub->IsAllowedDrag(eventHub);
     if (!isAllowedDrag) {
         return false;
@@ -1573,10 +1594,9 @@ void DragDropFuncWrapper::GetThumbnailPixelMapAsync(const RefPtr<GestureEventHub
         if (pixelMap != nullptr) {
             auto taskScheduler = Container::CurrentTaskExecutor();
             CHECK_NULL_VOID(taskScheduler);
-            auto gestureHub = weakGestureHub.Upgrade();
-            CHECK_NULL_VOID(gestureHub);
             taskScheduler->PostTask(
-                [gestureHub, pixelMap]() {
+                [weakGestureHub, pixelMap]() {
+                    auto gestureHub = weakGestureHub.Upgrade();
                     CHECK_NULL_VOID(gestureHub);
                     gestureHub->SetPixelMap(pixelMap);
                     TAG_LOGI(AceLogTag::ACE_DRAG, "Set thumbnail pixelMap async success.");

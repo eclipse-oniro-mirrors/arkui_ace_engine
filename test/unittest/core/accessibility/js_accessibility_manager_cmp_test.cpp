@@ -55,6 +55,7 @@
 #include "core/components_ng/pattern/ui_extension/dynamic_component/dynamic_component_manager.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_manager.h"
 #include "core/pipeline_ng/environment_manager.h"
+#include "core/pipeline_ng/ui_task_scheduler.h"
 #include "interfaces/inner_api/ace_kit/src/view/ui_context_impl.h"
 #include "adapter/ohos/osal/js_accessibility_manager.h"
 #include "core/components_ng/base/cmp_accessibility_registry.h"
@@ -603,7 +604,12 @@ public:
         ++mockActionCallbackCount_;
         mockRequestId = requestId;
     }
-    void SetCursorPositionResult(const int32_t cursorPosition, const int32_t requestId) override {}
+    void SetCursorPositionResult(const int32_t cursorPosition, const int32_t requestId) override
+    {
+        mockCursorPosition_ = cursorPosition;
+        ++mockCursorCallbackCount_;
+        mockRequestId = requestId;
+    }
     void SetSearchElementInfoBySpecificPropertyResult(
         const std::list<Accessibility::AccessibilityElementInfo>& infos,
         const std::list<Accessibility::AccessibilityElementInfo>& treeInfos,
@@ -632,6 +638,8 @@ public:
     int32_t mockFocusMoveCallbackCount_ = 0;
     bool mockActionSucceeded_ = false;
     int32_t mockActionCallbackCount_ = 0;
+    int32_t mockCursorPosition_ = -1;
+    int32_t mockCursorCallbackCount_ = 0;
     std::list<Accessibility::AccessibilityElementInfo> mockFocusMoveInfos_;
     Accessibility::FocusMoveResult mockFocusMoveResult_ {};
 };
@@ -749,6 +757,81 @@ public:
     RefPtr<JsAccessibilityManager> subAM_;
     std::shared_ptr<JsAccessibilityManager::CmpInteractionOperation> operation_;
 };
+
+class CmpCursorPositionTest : public CmpExplicitFocusTest {
+public:
+    void SetUp() override
+    {
+        CmpExplicitFocusTest::SetUp();
+        executor_ = AceType::MakeRefPtr<QueuedUITaskExecutor>();
+        context_->SetTaskExecutor(executor_);
+        first_->GetAccessibilityProperty<NG::AccessibilityProperty>()->SetActionGetIndex(
+            [this] { return cursorPosition_; });
+    }
+
+    void FlushUI()
+    {
+        std::vector<TaskExecutor::Task> tasks;
+        tasks.swap(executor_->uiTasks);
+        for (auto& task : tasks) {
+            task();
+        }
+    }
+
+    int64_t SplicedId(const RefPtr<FrameNode>& node)
+    {
+        auto elementId = node->GetAccessibilityId();
+        AccessibilitySystemAbilityClient::SetSplicElementIdTreeId(TREE_ID, elementId);
+        return elementId;
+    }
+
+    int32_t cursorPosition_ = 4;
+    RefPtr<QueuedUITaskExecutor> executor_;
+};
+
+HWTEST_F(CmpCursorPositionTest, ReturnsCurrentPositionFromExportedTree, TestSize.Level1)
+{
+    for (const auto position : { 0, 4, 7 }) {
+        cursorPosition_ = position;
+        MockAmsElementOperatorCallback callback;
+        operation_->GetCursorPosition(SplicedId(first_), 123, callback);
+        EXPECT_EQ(callback.mockCursorCallbackCount_, 0);
+        ASSERT_EQ(executor_->uiTasks.size(), 1u);
+        FlushUI();
+        EXPECT_EQ(callback.mockCursorCallbackCount_, 1);
+        EXPECT_EQ(callback.mockCursorPosition_, position);
+        EXPECT_EQ(callback.mockRequestId, 123);
+    }
+}
+
+HWTEST_F(CmpCursorPositionTest, RejectsNodeOutsideExportedTree, TestSize.Level1)
+{
+    auto outside = CreateNode("outside_exported_tree", 0);
+    context_->rootNode_ = outside;
+    bool queriedOutside = false;
+    outside->GetAccessibilityProperty<NG::AccessibilityProperty>()->SetActionGetIndex([&] {
+        queriedOutside = true;
+        return 9;
+    });
+    MockAmsElementOperatorCallback callback;
+    operation_->GetCursorPosition(SplicedId(outside), 125, callback);
+    FlushUI();
+    EXPECT_FALSE(queriedOutside);
+    EXPECT_EQ(callback.mockCursorCallbackCount_, 1);
+    EXPECT_EQ(callback.mockCursorPosition_, 0);
+    EXPECT_EQ(callback.mockRequestId, 125);
+}
+
+HWTEST_F(CmpCursorPositionTest, HandlesRootDestroyedBeforeQuery, TestSize.Level1)
+{
+    MockAmsElementOperatorCallback callback;
+    operation_->GetCursorPosition(SplicedId(first_), 126, callback);
+    root_.Reset();
+    FlushUI();
+    EXPECT_EQ(callback.mockCursorCallbackCount_, 1);
+    EXPECT_EQ(callback.mockCursorPosition_, 0);
+    EXPECT_EQ(callback.mockRequestId, 126);
+}
 
 class DetachFocusTaskExecutor : public MockTaskExecutor {
 public:

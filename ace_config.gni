@@ -326,6 +326,11 @@ if (defined(global_parts_info) &&
 } else {
   uiservice_xcollie_enable = false
 }
+ 
+if (defined(global_parts_info) &&
+    defined(global_parts_info.msdp_motion)) {
+  ace_common_defines += [ "MSDP_MOTION_EXISTS" ]
+}
 
 if (!defined(global_parts_info) ||
     defined(global_parts_info.graphic_graphic_2d_ext)) {

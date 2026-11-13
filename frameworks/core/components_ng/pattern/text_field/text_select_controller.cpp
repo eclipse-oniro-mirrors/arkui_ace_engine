@@ -495,7 +495,7 @@ void TextSelectController::MoveHandleToContentRect(RectF& handleRect, float boun
     textField->SetTextRect(textRect);
     AdjustHandleAtEdge(handleRect);
     textField->UpdateScrollBarOffset();
-    TAG_LOGI(AceLogTag::ACE_TEXTINPUT, "after move, handleRect.GetX():%{public}f,handleRect.GetY():%{public}f",
+    TAG_LOGD(AceLogTag::ACE_TEXTINPUT, "after move, handleRect.GetX():%{public}f,handleRect.GetY():%{public}f",
         handleRect.GetX(), handleRect.GetY());
 }
 

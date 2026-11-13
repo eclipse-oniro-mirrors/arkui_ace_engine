@@ -60,7 +60,6 @@ constexpr float SWIPE_SPRING_MASS = 1.f;
 constexpr float SWIPE_SPRING_STIFFNESS = 228.f;
 constexpr float SWIPE_SPRING_DAMPING = 30.f;
 constexpr int32_t DELETE_ANIMATION_DURATION = 400;
-constexpr Color ITEM_FILL_COLOR = Color(0x1A0A59f7);
 } // namespace
 
 void ListItemPattern::BeforeCreateLayoutWrapper()
@@ -1271,6 +1270,14 @@ void ListItemPattern::SetAccessibilityAction()
     CHECK_NULL_VOID(host);
     auto listItemAccessibilityProperty = host->GetAccessibilityProperty<AccessibilityProperty>();
     CHECK_NULL_VOID(listItemAccessibilityProperty);
+    SetAccessibilitySelectAction(listItemAccessibilityProperty);
+    SetAccessibilityClearSelectionAction(listItemAccessibilityProperty);
+    SetAccessibilityScrollAction(listItemAccessibilityProperty);
+}
+
+void ListItemPattern::SetAccessibilitySelectAction(
+    const RefPtr<AccessibilityProperty>& listItemAccessibilityProperty)
+{
     listItemAccessibilityProperty->SetActionSelect([weakPtr = WeakClaim(this)]() {
         const auto& pattern = weakPtr.Upgrade();
         CHECK_NULL_VOID(pattern);
@@ -1281,11 +1288,18 @@ void ListItemPattern::SetAccessibilityAction()
         CHECK_NULL_VOID(host);
         auto context = host->GetRenderContext();
         CHECK_NULL_VOID(context);
-        context->OnMouseSelectUpdate(false, ITEM_FILL_COLOR, ITEM_FILL_COLOR);
+        auto theme = host->GetTheme<ListItemTheme>(true);
+        CHECK_NULL_VOID(theme);
+        pattern->itemSelectedColor_ = theme->GetItemSelectedColor();
+        context->OnMouseSelectUpdate(false, pattern->itemSelectedColor_, pattern->itemSelectedColor_);
         pattern->MarkIsSelected(true);
-        context->OnMouseSelectUpdate(true, ITEM_FILL_COLOR, ITEM_FILL_COLOR);
+        context->OnMouseSelectUpdate(true, pattern->itemSelectedColor_, pattern->itemSelectedColor_);
     });
+}
 
+void ListItemPattern::SetAccessibilityClearSelectionAction(
+    const RefPtr<AccessibilityProperty>& listItemAccessibilityProperty)
+{
     listItemAccessibilityProperty->SetActionClearSelection([weakPtr = WeakClaim(this)]() {
         const auto& pattern = weakPtr.Upgrade();
         CHECK_NULL_VOID(pattern);
@@ -1296,10 +1310,17 @@ void ListItemPattern::SetAccessibilityAction()
         CHECK_NULL_VOID(host);
         auto context = host->GetRenderContext();
         CHECK_NULL_VOID(context);
+        auto theme = host->GetTheme<ListItemTheme>(true);
+        CHECK_NULL_VOID(theme);
+        pattern->itemSelectedColor_ = theme->GetItemSelectedColor();
         pattern->MarkIsSelected(false);
-        context->OnMouseSelectUpdate(false, ITEM_FILL_COLOR, ITEM_FILL_COLOR);
+        context->OnMouseSelectUpdate(false, pattern->itemSelectedColor_, pattern->itemSelectedColor_);
     });
-    
+}
+
+void ListItemPattern::SetAccessibilityScrollAction(
+    const RefPtr<AccessibilityProperty>& listItemAccessibilityProperty)
+{
     listItemAccessibilityProperty->SetActionScrollForward([weakPtr = WeakClaim(this)]() {
         const auto& pattern = weakPtr.Upgrade();
         CHECK_NULL_VOID(pattern);
@@ -1516,7 +1537,7 @@ void ListItemPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const Pa
         json->Put("startDeleteAreaDistance", startDeleteAreaDistance_);
         json->Put("endDeleteAreaDistance", endDeleteAreaDistance_);
     }
-    if (!config.IsPublicTree() || config.visualProperties) {
+    if (!config.IsPublicTree()) {
         DumpAdvanceSwipeStateInfo(json);
     }
     if (!config.IsPublicTree() || config.functionalProperties) {
@@ -1534,9 +1555,9 @@ void ListItemPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const Pa
         json->Put("isSelected", isSelected_);
         json->Put("isHover", isHover_);
         json->Put("isPressed", isPressed_);
+        json->Put("isLayouted", isLayouted_);
     }
     if (!config.IsPublicTree()) {
-        json->Put("isLayouted", isLayouted_);
         json->Put("hasStartDeleteArea", hasStartDeleteArea_);
     }
     if (!config.IsPublicTree() || config.visualProperties) {
@@ -1550,7 +1571,7 @@ void ListItemPattern::DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& js
         return;
     }
     if (config.IsPublicTree()) {
-        json->Put("enableOpacity", enableOpacity_.value());
+        json->Put("restoredOpacity", enableOpacity_.value());
     } else {
         json->Put("enableOpacity", enableOpacity_.value() ? "true:" : "false");
     }

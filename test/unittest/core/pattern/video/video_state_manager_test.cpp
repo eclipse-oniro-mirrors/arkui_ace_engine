@@ -25,6 +25,7 @@
 #include "core/components_ng/pattern/video/video_state_manager.h"
 #include "core/components_ng/pattern/video/video_state_machine_pattern.h"
 #include "core/components_ng/pattern/video/video_controller_async.h"
+#include "test/mock/frameworks/base/thread/mock_task_executor.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -1674,6 +1675,49 @@ HWTEST_F(VideoStateManagerTestNg, VideoStateManagerClearPendingCommandWithReason
     EXPECT_TRUE(callbackCalled);
     EXPECT_FALSE(callbackSuccess);
     EXPECT_EQ(callbackReason, "Media player Play() failed");
+}
+
+/**
+ * @tc.name: VideoStateManagerDrainNextSerialBgTaskEmpty001
+ * @tc.desc: Test DrainNextSerialBgTaskOnBg stops draining when the queue is empty.
+ * @tc.type: FUNC
+ */
+HWTEST_F(VideoStateManagerTestNg, VideoStateManagerDrainNextSerialBgTaskEmpty001, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<VideoStateManager>(WeakPtr<VideoStateMachinePattern>());
+    auto taskExecutor = AceType::MakeRefPtr<MockTaskExecutor>(true);
+    auto bgTaskExecutor = SingleTaskExecutor::Make(taskExecutor, TaskExecutor::TaskType::BACKGROUND);
+    manager->isDrainingSerialBgQueue_ = true;
+
+    manager->DrainNextSerialBgTaskOnBg(0, bgTaskExecutor);
+    EXPECT_FALSE(manager->isDrainingSerialBgQueue_);
+    EXPECT_TRUE(manager->serialBgTaskQueue_.empty());
+}
+
+/**
+ * @tc.name: VideoStateManagerDrainNextSerialBgTaskNullTask001
+ * @tc.desc: Test DrainNextSerialBgTaskOnBg skips a null task and runs the next valid task.
+ * @tc.type: FUNC
+ */
+HWTEST_F(VideoStateManagerTestNg, VideoStateManagerDrainNextSerialBgTaskNullTask001, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<VideoStateManager>(WeakPtr<VideoStateMachinePattern>());
+    auto taskExecutor = AceType::MakeRefPtr<MockTaskExecutor>(true);
+    auto bgTaskExecutor = SingleTaskExecutor::Make(taskExecutor, TaskExecutor::TaskType::BACKGROUND);
+    bool taskExecuted = false;
+    manager->serialBgTaskQueue_.push({ "NullTask", nullptr });
+    manager->serialBgTaskQueue_.push({ "ValidTask", [&taskExecuted]() { taskExecuted = true; } });
+    manager->isDrainingSerialBgQueue_ = true;
+
+    manager->DrainNextSerialBgTaskOnBg(0, bgTaskExecutor);
+    EXPECT_TRUE(manager->isDrainingSerialBgQueue_);
+    EXPECT_FALSE(taskExecuted);
+    EXPECT_EQ(manager->serialBgTaskQueue_.size(), 1u);
+
+    manager->DrainNextSerialBgTaskOnBg(0, bgTaskExecutor);
+    EXPECT_FALSE(manager->isDrainingSerialBgQueue_);
+    EXPECT_TRUE(taskExecuted);
+    EXPECT_TRUE(manager->serialBgTaskQueue_.empty());
 }
 
 } // namespace OHOS::Ace::NG

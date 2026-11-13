@@ -114,7 +114,8 @@ class SpanTextBackgroundStyleModifier extends ModifierWithKey<TextBackgroundStyl
       }
       else {
         getUINativeModule().span.setTextBackgroundStyle(node, textBackgroundStyle.color, textBackgroundStyle.radius.topLeft,
-          textBackgroundStyle.radius.topRight, textBackgroundStyle.radius.bottomLeft, textBackgroundStyle.radius.bottomRight);
+          textBackgroundStyle.radius.topRight, textBackgroundStyle.radius.bottomLeft, textBackgroundStyle.radius.bottomRight,
+          textBackgroundStyle.borderColor, textBackgroundStyle.borderWidth);
       }
     }
   }
@@ -882,6 +883,14 @@ class ArkSpanComponent {
 
   shadow(value: ShadowOptions | ShadowStyle): this {
     throw new BusinessError(100201, 'shadow function not supported in attributeModifier scenario.');
+  }
+
+  shadowShape(shape: CircleShape | EllipseShape | PathShape | RectShape | undefined): this {
+    throw new BusinessError(100201, 'shadowShape function not supported in attributeModifier scenario.');
+  }
+
+  shadowClipMode(mode: ShadowClipMode | undefined): this {
+    throw new BusinessError(100201, 'shadowClipMode function not supported in attributeModifier scenario.');
   }
 
   mask(value: CircleAttribute | EllipseAttribute | PathAttribute | RectAttribute | ProgressMask): this {

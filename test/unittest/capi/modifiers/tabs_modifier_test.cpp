@@ -184,6 +184,8 @@ public:
         themeStyle->SetAttr("tab_content_animation_duration", { .value = ANIMATION_DURATION_DEFAULT });
         SetupTheme<TabTheme>();
         AddResource(RES_STRING_REGISTERED_ID, "#FF00FF00");
+        AddMockResourceDataByName(std::get<0>(RES_NAME), Color::FromString(COLOR_RED));
+        AddMockResourceData(static_cast<uint32_t>(std::get<0>(RES_ID)), Color::FromString(COLOR_RED));
     }
 };
 

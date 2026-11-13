@@ -744,4 +744,63 @@ HWTEST_F(WaterFlowModelNGTest, RowsGapOptional001, TestSize.Level1)
     WaterFlowModelNG::SetRowsGap(node, gap);
     EXPECT_FLOAT_EQ(WaterFlowModelNG::GetRowsGap(node), 0.0f);
 }
+
+/**
+ * @tc.name: ScrollToIndexFastScrollMode001
+ * @tc.desc: Test SetScrollToIndex routes only animated sliding-window requests with a fast scroll mode to fast scroll
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowModelNGTest, ScrollToIndexFastScrollMode001, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateWaterFlowItems();
+    CreateDone();
+    auto* node = AceType::RawPtr(frameNode_);
+    WaterFlowModelNG::SetLayoutMode(node, WaterFlowLayoutMode::SLIDING_WINDOW);
+    FlushUITasks();
+    const auto start = static_cast<int32_t>(ScrollAlign::START);
+
+    /**
+     * @tc.steps: step1. Request each enabled fast scroll mode with animation.
+     * @tc.expected: The request keeps the mode and the extra offset unchanged.
+     */
+    for (auto mode : { FastScrollMode::SKIP_MEASURE, FastScrollMode::SKIP_CREATE_AND_MEASURE }) {
+        WaterFlowModelNG::SetScrollToIndex(node, 0, 1, start, 30.0f, static_cast<int32_t>(mode));
+        auto request = pattern_->GetFastScrollRequest();
+        ASSERT_NE(request, nullptr);
+        EXPECT_EQ(request->fastScrollMode, mode);
+        EXPECT_FLOAT_EQ(request->extraOffset, 30.0f);
+    }
+
+    /**
+     * @tc.steps: step2. Disable the mode, or request without animation.
+     * @tc.expected: The original scrollToIndex path is used and no fast scroll request remains.
+     */
+    WaterFlowModelNG::SetScrollToIndex(node, 0, 1, start, 10.0f);
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    WaterFlowModelNG::SetScrollToIndex(node, 0, 0, start, 10.0f, static_cast<int32_t>(FastScrollMode::SKIP_MEASURE));
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    EXPECT_EQ(pattern_->layoutInfo_->extraOffset_, std::optional<float>(-10.0f));
+
+    /**
+     * @tc.steps: step3. Request an enabled mode on a free node, then attach it.
+     * @tc.expected: The deferred task issues the fast scroll request.
+     */
+    frameNode_->isFree_ = true;
+    WaterFlowModelNG::SetScrollToIndexMultiThread(
+        node, 0, 1, start, 30.0f, static_cast<int32_t>(FastScrollMode::SKIP_MEASURE));
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    frameNode_->ExecuteAfterAttachMainTreeTasks();
+    frameNode_->isFree_ = false;
+    EXPECT_TRUE(pattern_->GetFastScrollRequest());
+
+    /**
+     * @tc.steps: step4. Switch to TOP_DOWN and request an enabled mode with animation.
+     * @tc.expected: Fast scroll is not used outside sliding-window mode.
+     */
+    WaterFlowModelNG::SetLayoutMode(node, WaterFlowLayoutMode::TOP_DOWN);
+    WaterFlowModelNG::SetScrollToIndex(node, 0, 1, start, 10.0f, static_cast<int32_t>(FastScrollMode::SKIP_MEASURE));
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    pattern_->StopAnimate();
+}
 } // namespace OHOS::Ace::NG

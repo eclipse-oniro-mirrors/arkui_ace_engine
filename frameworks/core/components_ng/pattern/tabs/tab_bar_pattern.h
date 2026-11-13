@@ -563,6 +563,7 @@ public:
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
     void SetRegionInfo(std::unique_ptr<JsonValue>& json);
+    void SetRegionInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
 
     std::optional<int32_t> GetAnimationDuration()
     {
@@ -769,6 +770,8 @@ private:
     void CloseDialog();
     void InitLongPressAndDragEvent();
     void HandleClick(SourceType type, int32_t index);
+    void DoHandleClick(const RefPtr<FrameNode>& host, int32_t index);
+    bool IsTabBarClickIntercepted(const RefPtr<FrameNode>& host) const;
     void ClickTo(const RefPtr<FrameNode>& host, int32_t index);
     void HandleTouchEvent(TouchType touchType, int32_t index);
     void HandleTouchUpAndClickTo(const TouchLocationInfo& info);
@@ -851,6 +854,7 @@ private:
     {
         return userDefinedTranslateY_;
     }
+    bool GetFloatingBaseOffset() const;
 
     void AddIsFocusActiveUpdateEvent();
     void RemoveIsFocusActiveUpdateEvent();
@@ -984,6 +988,7 @@ private:
 public:
     static RefPtr<FrameNode> GetIconNodeFromColumn(const RefPtr<UINode>& columnNode);
     static RefPtr<FrameNode> GetTextNodeFromColumn(const RefPtr<UINode>& columnNode);
+    void TapToHandle(int32_t index, bool skipInterceptGuard = false);
 };
 } // namespace OHOS::Ace::NG
 

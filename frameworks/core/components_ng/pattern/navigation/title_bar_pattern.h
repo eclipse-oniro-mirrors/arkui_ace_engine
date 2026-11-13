@@ -25,11 +25,9 @@
 #include "core/components_ng/pattern/navigation/title_bar_layout_property.h"
 #include "core/components_ng/pattern/pattern.h"
 
-#ifdef ENABLE_ROSEN_BACKEND
 namespace OHOS::Rosen {
 class BrightnessBlender;
 }
-#endif
 
 namespace OHOS::Ace::NG {
 
@@ -699,9 +697,7 @@ private:
     RefPtr<FrameNode> titleBarEffectNode_;
     bool isScrollEffectEnabled_ = false;
     bool isFlinging_ = false;
-#ifdef ENABLE_ROSEN_BACKEND
     std::shared_ptr<Rosen::BrightnessBlender> titleBarMaskBlender_;
-#endif
 
     RefPtr<UiMaterial> defaultMaterial_ = nullptr;
     bool needUpdateBackButtonEffect_ = false;

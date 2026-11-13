@@ -32,6 +32,7 @@
 #include "core/components_ng/pattern/tabs/tab_content_node.h"
 #include "core/components_ng/pattern/tabs/tabs_node.h"
 #include "core/pipeline_ng/pipeline_context.h"
+#include "core/components_ng/pattern/swiper/swiper_pattern.h"
 
 namespace OHOS::Ace::NG {
 const char TABS_ETS_TAG_PATTERN[] = "Tabs";
@@ -92,7 +93,7 @@ public:
             auto tabLayoutProperty = AceType::DynamicCast<TabsLayoutProperty>(
                 grandParentNode->GetLayoutProperty());
             CHECK_NULL_VOID(tabLayoutProperty);
-            if (tabLayoutProperty->GetSafeAreaPaddingProperty()) {
+            if (tabLayoutProperty->HasSafeAreaPaddingSource()) {
                 host->GetLayoutProperty()->UpdateSafeAreaExpandOpts({
                     .type = SAFE_AREA_TYPE_SYSTEM,
                     .edges = SAFE_AREA_EDGE_TOP + SAFE_AREA_EDGE_BOTTOM });
@@ -161,6 +162,7 @@ public:
 
         if (shallowBuilder_ && !shallowBuilder_->IsExecuteDeepRenderDone()) {
             shallowBuilder_->ExecuteDeepRender();
+
             if (secondTimeLayout_) {
                 auto host = GetHost();
                 CHECK_NULL_VOID(host);
@@ -371,6 +373,16 @@ public:
         return defaultVisibility_;
     }
 
+    void SetSidebarSection(const OHOS::Ace::SidebarSection& section)
+    {
+        sidebarSection_ = section;
+    }
+
+    const std::optional<OHOS::Ace::SidebarSection>& GetSidebarSection() const
+    {
+        return sidebarSection_;
+    }
+
     const BottomTabBarStyle& GetBottomTabBarStyle() const
     {
         return bottomTabBarStyle_;
@@ -458,6 +470,24 @@ public:
         }
     }
 
+    RefPtr<TabBarPattern> GetTabBarPattern() const
+    {
+        auto host = GetHost();
+        CHECK_NULL_RETURN(host, nullptr);
+        auto parentNode = host->GetAncestorNodeOfFrame(false);
+        CHECK_NULL_RETURN(parentNode, nullptr);
+        auto grandParentNode = parentNode->GetAncestorNodeOfFrame(false);
+        CHECK_NULL_RETURN(grandParentNode, nullptr);
+        if (grandParentNode->GetTag() != TABS_ETS_TAG_PATTERN) {
+            return nullptr;
+        }
+        auto tabsNode = AceType::DynamicCast<TabsNode>(grandParentNode);
+        CHECK_NULL_RETURN(tabsNode, nullptr);
+        auto tabBar = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
+        CHECK_NULL_RETURN(tabBar, nullptr);
+        return tabBar->GetPattern<TabBarPattern>();
+    }
+
     void OnColorModeChange(uint32_t colorMode) override
     {
         CHECK_NULL_VOID(SystemProperties::ConfigChangePerform());
@@ -485,12 +515,12 @@ public:
         }
         if (!layout->HasIconSelectedColorSetByUser() || !layout->GetIconSelectedColorSetByUserValue()) {
             auto currentIconStyle = GetIconStyle();
-            currentIconStyle.selectedColor = theme->GetBottomTabTextOn();
+            currentIconStyle.selectedColor = theme->GetBottomTabIconOn();
             SetIconStyle(currentIconStyle);
         }
         if (!layout->HasIconUnselectedColorSetByUser() || !layout->GetIconUnselectedColorSetByUserValue()) {
             auto currentIconStyle = GetIconStyle();
-            currentIconStyle.unselectedColor = theme->GetBottomTabTextOff();
+            currentIconStyle.unselectedColor = theme->GetBottomTabIconOff();
             SetIconStyle(currentIconStyle);
         }
         auto tabContentNode = AceType::DynamicCast<TabContentNode>(host);
@@ -522,12 +552,12 @@ public:
         }
         if (!layout->HasIconSelectedColorSetByUser() || !layout->GetIconSelectedColorSetByUserValue()) {
             auto currentIconStyle = GetIconStyle();
-            currentIconStyle.selectedColor = theme->GetBottomTabTextOn();
+            currentIconStyle.selectedColor = theme->GetBottomTabIconOn();
             SetIconStyle(currentIconStyle);
         }
         if (!layout->HasIconUnselectedColorSetByUser() || !layout->GetIconUnselectedColorSetByUserValue()) {
             auto currentIconStyle = GetIconStyle();
-            currentIconStyle.unselectedColor = theme->GetBottomTabTextOff();
+            currentIconStyle.unselectedColor = theme->GetBottomTabIconOff();
             SetIconStyle(currentIconStyle);
         }
         auto tabContentNode = AceType::DynamicCast<TabContentNode>(host);
@@ -605,6 +635,24 @@ public:
     void OnModifyDone() override;
 
 private:
+    // Updates a FrameNode's layout visibility and marks it dirty for re-measure.
+    void UpdateNodeVisibility(const RefPtr<FrameNode>& node, bool shouldHide);
+
+    // Bottom/top tab bar path — only visibility matters, sections are irrelevant.
+    void HandleBottomTopTabBar(const RefPtr<TabContentNode>& tabContentNode, bool visibilityChanged, bool shouldHide);
+
+    // Sidebar path — applies TabViewCustomization overrides and refreshes the
+    // sidebar on section change or section-emptied visibility change.
+    // Returns true if handled (caller should return); false to fall through to
+    // a direct tab item visibility update.
+    bool HandleSideBarCustomization(const RefPtr<TabsPattern>& tabsPattern, const RefPtr<TabContentNode>& tabContentNode,
+        const RefPtr<TabsNode>& tabsNode, bool visibilityChanged, bool sectionChanged);
+
+    // Directly updates this tab's sidebar tabItemNode visibility, consulting the
+    // active search filter when the default visibility says "visible".
+    void UpdateSideBarTabItem(const RefPtr<TabsPattern>& tabsPattern, const RefPtr<TabContentNode>& tabContentNode,
+        const RefPtr<TabsNode>& tabsNode, bool shouldHide);
+
     RefPtr<ShallowBuilder> shallowBuilder_;
     TabBarParam tabBarParam_;
     IndicatorStyle indicatorStyle_;
@@ -622,6 +670,8 @@ private:
     bool isDrawableIndicator_ = false;
     TabContentDefaultVisibility defaultVisibility_;
     TabContentDefaultVisibility lastAppliedVisibility_;
+    std::optional<OHOS::Ace::SidebarSection> sidebarSection_;
+    std::optional<OHOS::Ace::SidebarSection> lastAppliedSidebarSection_;
 
     bool firstTimeLayout_ = true;
     bool secondTimeLayout_ = false;

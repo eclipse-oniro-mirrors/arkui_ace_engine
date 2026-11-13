@@ -101,6 +101,9 @@ public:
     std::string ToString(bool isNeedTruncated = true) const;
     InternalResource::ResourceId GetResourceId() const;
     SrcType GetSrcType() const;
+
+    const char* GetSrcTypeName() const;
+
     Size GetSourceSize() const;
     const std::string& GetSrc() const;
     const std::optional<Color>& GetFillColor() const;

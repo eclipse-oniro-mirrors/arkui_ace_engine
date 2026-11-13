@@ -20,6 +20,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <refbase.h>
 #include <string>
 #include <unordered_set>
@@ -595,6 +596,16 @@ public:
     {
         return false;
     }
+
+    using BrandColorChangeCallback = std::function<void(
+        int32_t instanceId, const std::optional<uint32_t>& brandColor,
+        const std::optional<int32_t>& colorStrategy)>;
+
+    virtual void RegisterBrandColorChangeListener(const BrandColorChangeCallback& callback) {}
+
+    virtual void UnregisterBrandColorChangeListener() {}
+
+    static bool IsBrandColorValid(const std::string& brandColorStr);
 
     virtual void EnableContainerModalCustomGesture(bool enable) {};
 

@@ -119,6 +119,22 @@ void RepeatVirtualScroll2ModelNG::OnMove(int32_t repeatElmtId, std::function<voi
     repeatNode->SetOnMove(std::move(onMove));
 }
 
+void RepeatVirtualScroll2ModelNG::SetController(int32_t repeatElmtId,
+    const std::function<void(const RefPtr<RepeatVirtualScroll2Node>&)>& bindController)
+{
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto repeatNode = AceType::DynamicCast<RepeatVirtualScroll2Node>(stack->GetMainElementNode());
+    if (repeatNode == nullptr) {
+        repeatNode = ElementRegister::GetInstance()->GetSpecificItemById<RepeatVirtualScroll2Node>(repeatElmtId);
+    }
+    CHECK_NULL_VOID(repeatNode);
+    // First bind wins: on an already bound node the controller is not replaced
+    // (creation-time immutable binding on the component side).
+    if (repeatNode->TryBindController()) {
+        bindController(repeatNode);
+    }
+}
+
 void RepeatVirtualScroll2ModelNG::SetItemDragHandler(int32_t repeatElmtId, std::function<void(int32_t)>&& onLongPress,
     std::function<void(int32_t)>&& onDragStart, std::function<void(int32_t, int32_t)>&& onMoveThrough,
     std::function<void(int32_t)>&& onDrop)

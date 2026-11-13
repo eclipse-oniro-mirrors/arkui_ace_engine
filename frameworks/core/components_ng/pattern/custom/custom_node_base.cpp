@@ -274,7 +274,7 @@ void CustomNodeBase::TryEnableParentCustomNodeMemOpt()
     if (GetReusableMemOptStrategy() == ReusableMemOptStrategy::DEFAULT) {
         return;
     }
-    auto uiNode = AceType::DynamicCast<UINode>(Claim(this));
+    auto uiNode = AceType::DynamicCast<UINode>(AceType::Claim(this));
     CHECK_NULL_VOID(uiNode);
     auto parentCustomNode = uiNode->GetParentCustomNode();
     CHECK_NULL_VOID(parentCustomNode);
@@ -355,12 +355,12 @@ void CustomNodeBase::MarkNeedUpdate()
         return;
     }
     needRebuild_ = true;
-    context->AddDirtyCustomNode(AceType::DynamicCast<UINode>(Claim(this)));
+    context->AddDirtyCustomNode(AceType::DynamicCast<UINode>(AceType::Claim(this)));
 }
 
 void CustomNodeBase::FireRecycleSelf()
 {
-    auto uiNode = AceType::DynamicCast<UINode>(Claim(this));
+    auto uiNode = AceType::DynamicCast<UINode>(AceType::Claim(this));
     uiNode->OnRecycle();
     if (recycleCustomNodeFunc_) {
         recycleInfo_.Recycle(uiNode->GetId());
@@ -372,7 +372,7 @@ void CustomNodeBase::FireRecycleSelf()
 void CustomNodeBase::FireRecycleRenderFunc()
 {
     if (recycleRenderFunc_) {
-        auto node = AceType::DynamicCast<UINode>(Claim(this));
+        auto node = AceType::DynamicCast<UINode>(AceType::Claim(this));
         recycleInfo_.Reuse();
         RecycleManager::Pop(node->GetId());
         {

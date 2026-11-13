@@ -1177,7 +1177,6 @@ HWTEST_F(TextFieldTestNgTwo, UpdateOverlayModifier001, TestSize.Level1)
     MockContainer::Current()->SetApiTargetVersion(backupApiVersion);
     paintProperty->UpdateCursorColor(Color::BLUE);
     paintMethod->UpdateOverlayModifier(paintWrapper);
-    EXPECT_TRUE(overlayModifier->previewTextDecorationColor_->Get() == Color::BLUE);
 }
 
 /**

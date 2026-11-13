@@ -47,8 +47,8 @@ class LayoutWrapperNode;
 
 using LazyBuildFunction = std::function<void(RefPtr<LayoutWrapperNode>)>;
 
-class ACE_EXPORT LayoutWrapperNode : public LayoutWrapper {
-    DECLARE_ACE_TYPE(LayoutWrapperNode, LayoutWrapper);
+class ACE_EXPORT LayoutWrapperNode : public LayoutWrapper, public AceType {
+    DECLARE_ACE_TYPE(LayoutWrapperNode, LayoutWrapper, AceType);
 public:
     LayoutWrapperNode(
         WeakPtr<FrameNode> hostNode, RefPtr<GeometryNode> geometryNode, RefPtr<LayoutProperty> layoutProperty);
@@ -225,6 +225,11 @@ public:
     void SetLongPredictTask() override;
 
 private:
+    AceType* GetLayoutOwner() const override
+    {
+        return const_cast<LayoutWrapperNode*>(this);
+    }
+
     void Build(bool addToRenderTree);
     void LayoutOverlay();
     // Used to save a persist wrapper created by child, ifElse, ForEach, the map stores [index, Wrapper].

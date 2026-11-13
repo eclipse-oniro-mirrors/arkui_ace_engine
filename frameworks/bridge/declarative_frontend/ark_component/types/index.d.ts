@@ -145,6 +145,10 @@ declare enum ShadowStyle {
   OUTLINE_MD = 8,
   COSINE = 9,
 }
+declare enum ShadowClipMode {
+  DEFAULT_SHAPE = 0,
+  BOUNDS_SHAPE,
+}
 declare interface BlurOptions {
   low?: number;
   high?: number;
@@ -1391,6 +1395,11 @@ declare interface ItemDragInfo {
   y: number;
 }
 declare interface EditModeOptions {}
+declare interface PlaceholderOptions {
+  id?: string;
+  size?: SizeOptions;
+}
+declare type PlaceholderProvider = (index: number) => PlaceholderOptions | undefined;
 declare interface Scroller {}
 declare enum FocusWrapMode {
   DEFAULT = 0,
@@ -1447,6 +1456,8 @@ declare enum ImageContent {
 declare interface TextBackgroundStyle {
   color?: ResourceColor;
   radius?: BorderRadiuses;
+  borderColor?: ResourceColor;
+  borderWidth?: Dimension;
 }
 declare type LinearIndicatorStyle = any;
 declare type OnLinearIndicatorChangeCallback = any;
@@ -1611,6 +1622,20 @@ declare interface TabsBreakpointType<T> {
   sm?: T;
   md?: T;
   lg?: T;
+}
+declare enum SidebarSectionTitleStyle {
+  STANDARD = 0,
+  EMPHASIZED = 1,
+}
+declare interface SidebarSection {
+  title: ResourceStr;
+  order?: number;
+  titleStyle?: SidebarSectionTitleStyle;
+}
+declare interface TabViewCustomization {
+  visibilityMap?: Map<number, TabVisibility>;
+  sectionMap?: Map<number, SidebarSection>;
+  orderMap?: Map<number, number>;
 }
 declare enum NestedScrollMode {
   SELF_ONLY,

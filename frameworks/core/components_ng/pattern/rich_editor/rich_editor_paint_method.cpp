@@ -128,10 +128,8 @@ void RichEditorPaintMethod::SetPreviewTextDecoration(PaintWrapper* paintWrapper)
     CHECK_NULL_VOID(richEditorPattern);
     auto overlayMod = DynamicCast<RichEditorOverlayModifier>(GetOverlayModifier(paintWrapper));
     CHECK_NULL_VOID(overlayMod);
-    overlayMod->SetPreviewTextDecorationColor(richEditorPattern->GetPreviewTextDecorationColor());
     overlayMod->SetPreviewTextUnderlineWidth(richEditorPattern->GetPreviewTextUnderlineWidth());
     overlayMod->SetShowPreviewTextDecoration(richEditorPattern->IsPreviewTextInputting());
-    overlayMod->SetPreviewTextStyle(richEditorPattern->GetPreviewTextStyle());
 }
 
 void RichEditorPaintMethod::SetShowUnderlineWidth(PaintWrapper* paintWrapper)

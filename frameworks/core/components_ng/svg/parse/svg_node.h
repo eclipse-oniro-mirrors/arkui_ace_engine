@@ -42,7 +42,7 @@ struct SvgInitStyleProcessInfo {
 // three level inherit class, for example:
 // 1. SvgMask::SvgQuote::SvgNode
 // 2. SvgPath::SvgGraphic::SvgNode
-class SvgNode : public AceType {
+class SvgNode : public virtual AceType {
     DECLARE_ACE_TYPE(SvgNode, AceType);
 
 public:

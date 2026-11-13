@@ -90,6 +90,11 @@ uint64_t ScrollPlaceholderManager::RegisterTemplate(
     return generation;
 }
 
+void ScrollPlaceholderManager::SetProductReleaseNotifier(ScrollPlaceholderProductReleaseNotifier notifier)
+{
+    registry_.SetProductReleaseNotifier(std::move(notifier));
+}
+
 bool ScrollPlaceholderManager::UnregisterTemplate(const std::string& templateId)
 {
     if (destroyed_.load(std::memory_order_relaxed)) {
@@ -247,8 +252,7 @@ size_t ScrollPlaceholderManager::GetHotTemplateCount() const
 size_t ScrollPlaceholderManager::GetPendingCloneCount(const std::string& templateId) const
 {
     std::lock_guard<std::mutex> guard(cloneMutex_);
-    auto it = pendingCloneCount_.find(templateId);
-    return it == pendingCloneCount_.end() ? 0 : it->second;
+    return SumPendingClonesLocked(templateId);
 }
 
 void ScrollPlaceholderManager::ScheduleBackgroundReplenish(const std::string& templateId)
@@ -269,11 +273,11 @@ void ScrollPlaceholderManager::ScheduleBackgroundReplenish(const std::string& te
     size_t toSubmit = 0;
     {
         std::lock_guard<std::mutex> guard(cloneMutex_);
-        size_t held = registry_.GetCachedInstanceCount(templateId) + pendingCloneCount_[templateId];
+        size_t held = registry_.GetCachedInstanceCount(templateId) + SumPendingClonesLocked(templateId);
         size_t spareTarget = SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1;
         if (held < spareTarget) {
             toSubmit = spareTarget - held;
-            pendingCloneCount_[templateId] += static_cast<uint32_t>(toSubmit);
+            pendingCloneCount_[templateId][snapshot->generation] += static_cast<uint32_t>(toSubmit);
         }
     }
     // The RefPtr keeps the manager alive until every submitted task finishes; the task never
@@ -286,7 +290,7 @@ void ScrollPlaceholderManager::ScheduleBackgroundReplenish(const std::string& te
             })) {
             // Executor rejected the task: release the slot booked for it, otherwise the pool
             // would consider it in flight forever.
-            ReleasePendingCloneSlot(templateId);
+            ReleasePendingCloneSlot(templateId, snapshot->generation);
         }
     }
 }
@@ -327,27 +331,50 @@ void ScrollPlaceholderManager::RunBackgroundClone(const std::string& templateId,
             skipReason = "stale generation";
             break;
         }
-        registry_.CacheTemplateInstance(templateId, instance);
+        // Background-thread product: no detached-root owner, so a rejection must not
+        // invoke the (UI-thread-only) release notifier.
+        registry_.CacheTemplateInstance(templateId, instance, /*notifyOnReject=*/false);
     } while (false);
     if (skipReason != nullptr) {
         TAG_LOGD(AceLogTag::ACE_SCROLL,
             "ScrollPlaceholder background clone skipped: reason=%{public}s, templateId=%{public}s, "
             "instanceId=%{public}d", skipReason, templateId.c_str(), instanceId_);
     }
-    ReleasePendingCloneSlot(templateId);
+    ReleasePendingCloneSlot(templateId, generation);
 }
 
-void ScrollPlaceholderManager::ReleasePendingCloneSlot(const std::string& templateId)
+void ScrollPlaceholderManager::ReleasePendingCloneSlot(
+    const std::string& templateId, uint64_t templateGeneration)
 {
     std::lock_guard<std::mutex> guard(cloneMutex_);
     auto it = pendingCloneCount_.find(templateId);
     if (it == pendingCloneCount_.end()) {
         return;
     }
-    it->second = it->second > 0 ? it->second - 1 : 0;
-    if (it->second == 0) {
-        pendingCloneCount_.erase(it);
+    auto generationIt = it->second.find(templateGeneration);
+    if (generationIt == it->second.end()) {
+        return;
     }
+    generationIt->second = generationIt->second > 0 ? generationIt->second - 1 : 0;
+    if (generationIt->second == 0) {
+        it->second.erase(generationIt);
+        if (it->second.empty()) {
+            pendingCloneCount_.erase(it);
+        }
+    }
+}
+
+size_t ScrollPlaceholderManager::SumPendingClonesLocked(const std::string& templateId) const
+{
+    auto it = pendingCloneCount_.find(templateId);
+    if (it == pendingCloneCount_.end()) {
+        return 0;
+    }
+    size_t total = 0;
+    for (const auto& entry : it->second) {
+        total += entry.second;
+    }
+    return total;
 }
 
 void ScrollPlaceholderManager::ResetPendingCloneSlots(const std::string& templateId)
@@ -474,6 +501,10 @@ void ScrollPlaceholderManager::EnqueueRealBuild(const ScrollPlaceholderPredictPa
     pendingTask.priority = priority;
     pendingTask.task = std::move(task);
     pendingRealBuilds_.emplace_back(std::move(pendingTask));
+    // Guarantee a consuming frame exists: the current frame may have already spent
+    // its OnIdle slot, in which case nothing would flush the queue until the next
+    // unrelated frame arrives.
+    RequestFrameIfAlive();
 }
 
 void ScrollPlaceholderManager::FlushRealBuild(int64_t deadlineNs)
@@ -486,28 +517,72 @@ void ScrollPlaceholderManager::FlushRealBuild(int64_t deadlineNs)
     // Visible items first, FIFO inside the same priority band.
     std::stable_sort(pendingRealBuilds_.begin(), pendingRealBuilds_.end(),
         [](const RealBuildTask& lhs, const RealBuildTask& rhs) { return lhs.priority < rhs.priority; });
+    // Re-band against the CURRENT viewport before draining: adapters enqueue with a
+    // static priority constant, so the sort above carries no visibility signal — a
+    // storm backlog would drain in enqueue order, committing items the viewport has
+    // long left behind while the on-screen shells wait behind them. Stable sort keeps
+    // the priority/FIFO order inside each band.
+    std::stable_sort(pendingRealBuilds_.begin(), pendingRealBuilds_.end(),
+        [this](const RealBuildTask& lhs, const RealBuildTask& rhs) {
+            return InHostVisibleRange(lhs.params.hostNodeId, lhs.params.index) &&
+                   !InHostVisibleRange(rhs.params.hostNodeId, rhs.params.index);
+        });
     std::deque<RealBuildTask> requeued;
     bool budgetExhausted = false;
+    size_t forcedCommits = 0;
     while (!pendingRealBuilds_.empty()) {
         RealBuildTask pendingTask = std::move(pendingRealBuilds_.front());
         pendingRealBuilds_.pop_front();
+        // Starvation escape: a task that already survived three flush rounds runs
+        // now, budget aside — the estimate only calibrates after a successful
+        // commit, so without this an over-budget loop can spin forever.
+        bool forced = ++pendingTask.requeueCount >= 3;
         int64_t remaining = deadlineNs - GetSysTimestamp() - FRAMEWORK_SAFETY_MARGIN_NS;
-        if (remaining <= 0) {
+        if (!forced && remaining <= 0) {
+            TAG_LOGD(AceLogTag::ACE_SCROLL,
+                "ScrollPH flush: no budget, remaining=%{public}lldns, requeue task idx=%{public}d",
+                static_cast<long long>(remaining), pendingTask.params.index);
             requeued.push_back(std::move(pendingTask));
             budgetExhausted = true;
             break;
         }
         if (!pendingTask.params.templateId.empty() &&
             registry_.GetCurrentGeneration(pendingTask.params.templateId) != pendingTask.templateGeneration) {
+            TAG_LOGD(AceLogTag::ACE_SCROLL,
+                "ScrollPH flush: drop stale generation idx=%{public}d, templateId='%{public}s'",
+                pendingTask.params.index, pendingTask.params.templateId.c_str());
             realBuildDropped_.fetch_add(1, std::memory_order_relaxed);
             continue;
         }
         int64_t estimate = costModel_.EstimateRealBuildDuration(
             pendingTask.params.componentType, pendingTask.params.templateId);
-        if (estimate > remaining) {
+        if (!forced && estimate > remaining) {
+            TAG_LOGD(AceLogTag::ACE_SCROLL,
+                "ScrollPH flush: estimate %{public}lldns > remaining %{public}lldns, requeue idx=%{public}d",
+                static_cast<long long>(estimate), static_cast<long long>(remaining),
+                pendingTask.params.index);
             requeued.push_back(std::move(pendingTask));
             budgetExhausted = true;
             break;
+        }
+        if (forced) {
+            if (forcedCommits >= MAX_FORCED_COMMITS_PER_FLUSH) {
+                // Bound the synchronous drain: once a storm backlog ages past the escape
+                // threshold wholesale, the forced path would otherwise run to queue
+                // exhaustion in this single invocation — minutes of UI-thread pinning
+                // with no frame in between. Carve the remainder back into the next
+                // frame; progress stays guaranteed (bounded per frame).
+                TAG_LOGI(AceLogTag::ACE_SCROLL,
+                    "ScrollPH flush: forced-commit cap (%{public}zu) reached, defer rest to next frame",
+                    MAX_FORCED_COMMITS_PER_FLUSH);
+                requeued.push_back(std::move(pendingTask));
+                budgetExhausted = true;
+                break;
+            }
+            ++forcedCommits;
+            TAG_LOGI(AceLogTag::ACE_SCROLL,
+                "ScrollPH flush: forced commit after requeues, idx=%{public}d",
+                pendingTask.params.index);
         }
         int64_t start = GetSysTimestamp();
         bool committed = pendingTask.task();
@@ -515,8 +590,12 @@ void ScrollPlaceholderManager::FlushRealBuild(int64_t deadlineNs)
         costModel_.RecordRealBuildDuration(pendingTask.params.componentType, pendingTask.params.templateId, duration);
         if (committed) {
             realBuildExecuted_.fetch_add(1, std::memory_order_relaxed);
+            TAG_LOGD(AceLogTag::ACE_SCROLL, "ScrollPH flush: committed idx=%{public}d, cost=%{public}lldns",
+                pendingTask.params.index, static_cast<long long>(duration));
         } else {
             realBuildDropped_.fetch_add(1, std::memory_order_relaxed);
+            TAG_LOGD(AceLogTag::ACE_SCROLL,
+                "ScrollPH flush: commit returned false, drop idx=%{public}d", pendingTask.params.index);
         }
     }
     if (budgetExhausted) {
@@ -528,6 +607,14 @@ void ScrollPlaceholderManager::FlushRealBuild(int64_t deadlineNs)
         RequestFrameIfAlive();
     }
     pendingRealBuilds_ = std::move(requeued);
+    // Post-flush drain: hosts use this to retire stale placeholder shells at
+    // frame cadence; runs after the iteration above, so cancel/retire paths
+    // touching the (already swapped) task queue are safe.
+    for (auto& [hostNodeId, callback] : postFlushCallbacks_) {
+        if (callback) {
+            callback();
+        }
+    }
 }
 
 bool ScrollPlaceholderManager::HasPendingRealBuild() const
@@ -558,6 +645,50 @@ void ScrollPlaceholderManager::CancelHostRealBuilds(int32_t hostNodeId, ScrollPl
     }
 }
 
+bool ScrollPlaceholderManager::CancelRealBuildTask(int32_t hostNodeId, int32_t index,
+    ScrollPlaceholderCancelReason reason)
+{
+    for (auto iter = pendingRealBuilds_.begin(); iter != pendingRealBuilds_.end(); ++iter) {
+        if (iter->params.hostNodeId == hostNodeId && iter->params.index == index) {
+            pendingRealBuilds_.erase(iter);
+            auto reasonIndex = static_cast<size_t>(reason);
+            if (reasonIndex < CANCEL_REASON_COUNT) {
+                cancelledByReason_[reasonIndex].fetch_add(1, std::memory_order_relaxed);
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+void ScrollPlaceholderManager::SetPostFlushCallback(int32_t hostNodeId, std::function<void()> callback)
+{
+    if (callback) {
+        postFlushCallbacks_[hostNodeId] = std::move(callback);
+    }
+}
+
+void ScrollPlaceholderManager::ClearPostFlushCallback(int32_t hostNodeId)
+{
+    postFlushCallbacks_.erase(hostNodeId);
+}
+
+void ScrollPlaceholderManager::SetHostVisibleRange(int32_t hostNodeId, int32_t start, int32_t end)
+{
+    hostVisibleRanges_[hostNodeId] = { start, end };
+}
+
+bool ScrollPlaceholderManager::InHostVisibleRange(int32_t hostNodeId, int32_t index) const
+{
+    auto iter = hostVisibleRanges_.find(hostNodeId);
+    if (iter == hostVisibleRanges_.end()) {
+        // No window reported yet (pre-first-layout or a host that never scrolled):
+        // fail open so legacy commit behavior is unchanged.
+        return true;
+    }
+    return index >= iter->second.start && index <= iter->second.end;
+}
+
 void ScrollPlaceholderManager::Destroy()
 {
     if (destroyed_.exchange(true, std::memory_order_relaxed)) {
@@ -574,7 +705,7 @@ void ScrollPlaceholderManager::Destroy()
             .fetch_add(dropped, std::memory_order_relaxed);
     }
     registry_.Clear();
-    TAG_LOGI(AceLogTag::ACE_SCROLL,
+    TAG_LOGD(AceLogTag::ACE_SCROLL,
         "ScrollPlaceholderManager destroyed, instanceId=%{public}d, dropped pending tasks=%{public}zu", instanceId_,
         dropped);
 }
@@ -719,7 +850,7 @@ void ScrollPlaceholderManager::CloseObservationFrame(int64_t vsyncTimestampNs)
             static_cast<ScrollPlaceholderComponentType>(i), std::string());
         // One summary per frame and container type: measured average item cost plus what the
         // load prediction would have suggested (build now vs defer to placeholder) this frame.
-        TAG_LOGI(AceLogTag::ACE_SCROLL,
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
             "ScrollPH frame summary: component=%{public}d realBuilt=%{public}u avgCostUs=%{public}" PRId64
             " maxCostUs=%{public}" PRId64 " estimateUs=%{public}" PRId64 " suggestReal=%{public}u "
             "suggestPlaceholder=%{public}u remainingBudgetUs=%{public}" PRId64 " vsync=%{public}" PRId64,

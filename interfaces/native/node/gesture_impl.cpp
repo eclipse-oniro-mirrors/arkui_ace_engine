@@ -14,11 +14,12 @@
  */
 
 #include "node_model.h"
+
+#include "base/log/log_wrapper.h"
 #include "config_manager.h"
 #include "gesture_impl.h"
 #include "interfaces/native/native_error_message_macros.h"
 
-#include "base/log/log_wrapper.h"
 #include "core/gestures/gesture_event.h"
 #include "interfaces/native/event/ui_input_event_impl.h"
 
@@ -1148,8 +1149,10 @@ void HandleGestureEvent(ArkUINodeEvent* event)
         gestureEvent->attachNode = recognizer->attachNode;
     }
     uiEvent->usePXUnit = true;
-    LOG_CALLBACK(extraData->targetReceiver);
-    extraData->targetReceiver(gestureEvent, extraData->extraParam);
+    {
+        LOG_CALLBACK(__FUNCTION__, extraData->targetReceiver);
+        extraData->targetReceiver(gestureEvent, extraData->extraParam);
+    }
     delete uiEvent;
     uiEvent = nullptr;
     gestureEvent->eventData.rawPointerEvent = nullptr;

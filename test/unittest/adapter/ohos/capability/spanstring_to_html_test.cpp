@@ -803,4 +803,16 @@ HWTEST_F(HtmlConvertTestNg, HTMLLineThicknessScaleTest002, TestSize.Level1)
     EXPECT_EQ(IsSpanItemSame(dstSpan->GetSpanItems(), spanString->GetSpanItems()), true);
 }
 
+/**
+ * @tc.name: ImageToHtmlWithoutImageAttribute
+ * @tc.desc: Convert an image without optional image attributes to HTML.
+ * @tc.level: 1
+ */
+HWTEST_F(HtmlConvertTestNg, ImageToHtmlWithoutImageAttribute, TestSize.Level1)
+{
+    auto image = AceType::MakeRefPtr<ImageSpanItem>();
+    image->options.image = "src/icon-1.png";
+    EXPECT_EQ(SpanToHtml::ToHtml(std::list<RefPtr<SpanItem>> { image }), "<div ><img src=\"src/icon-1.png\" ></div>");
+}
+
 } // namespace OHOS::Ace::NG

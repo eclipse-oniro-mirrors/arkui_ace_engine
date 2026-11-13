@@ -19,6 +19,8 @@
 
 namespace OHOS {
 namespace Ace {
+BrokerDelegator<UIServiceProxy> UIServiceProxy::delegator_;
+
 UIServiceProxy::UIServiceProxy(const sptr<IRemoteObject>& remote) : IRemoteProxy<IUIService>(remote) {}
 UIServiceProxy::~UIServiceProxy() {}
 

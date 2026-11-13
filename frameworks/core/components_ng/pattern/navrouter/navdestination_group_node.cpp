@@ -976,15 +976,17 @@ std::string NavDestinationGroupNode::ToDumpString()
 }
 
 int32_t NavDestinationGroupNode::DoTransition(
-    NavigationOperation operation, bool isEnter, bool reportHomeTransition)
+    NavigationOperation operation, bool isEnter, bool reportHomeTransition, bool reportCapiHomeTransition)
 {
     // Set before starting animations: a zero-duration custom transition may finish synchronously.
     needReportHomeTransition_ = reportHomeTransition;
+    needReportCapiHomeTransition_ = reportCapiHomeTransition;
     isPopTransition_ = operation == NavigationOperation::POP;
     auto id = navDestinationTransitionDelegate_ ? DoCustomTransition(operation, isEnter) :
         DoSystemTransition(operation, isEnter);
     if (id == INVALID_ANIMATION_ID) {
         needReportHomeTransition_ = false;
+        needReportCapiHomeTransition_ = false;
     }
     return id;
 }
@@ -1182,7 +1184,7 @@ int32_t NavDestinationGroupNode::DoCustomTransition(NavigationOperation operatio
         return INVALID_ANIMATION_ID;
     }
     int32_t longestAnimationDuration = INT32_MIN;
-    for (auto transition: allTransitions.value()) {
+    for (const auto& transition : allTransitions.value()) {
         if (transition.duration + transition.delay > longestAnimationDuration) {
             longestAnimationDuration = transition.duration + transition.delay;
         }
@@ -1197,9 +1199,24 @@ int32_t NavDestinationGroupNode::DoCustomTransition(NavigationOperation operatio
     pipeline->FlushBuild();
     pipeline->FlushUITasks();
     animationId_ = MakeUniqueAnimationId();
-    bool hasRest = false;
-    for (auto transition: allTransitions.value()) {
-        StartCustomTransitionAnimation(transition, isEnter, hasRest, longestAnimationDuration);
+    auto navigation = AceType::DynamicCast<NavigationGroupNode>(GetNavigationNode());
+    auto navigationPattern = navigation ? navigation->GetPattern<NavigationPattern>() : nullptr;
+    if (navigationPattern) {
+        // Coalesce synchronous completions without changing the component's animation accounting.
+        navigationPattern->FlushCapiPageTransitionEnds(true);
+    }
+    if (allTransitions->empty() && isEnter) {
+        pipeline->AddAfterRenderTask([weak = WeakClaim(this), animationId = animationId_,
+            isPopPage = isPopTransition_]() {
+            auto node = weak.Upgrade();
+            if (node && node->GetAnimationId() == animationId && node->IsOnMainTree() && node->IsVisible()) {
+                node->ReportTransitionEnd(isPopPage);
+            }
+        });
+    }
+    bool hasReset = false;
+    for (auto& transition : allTransitions.value()) {
+        StartCustomTransitionAnimation(transition, isEnter, hasReset, longestAnimationDuration);
     }
     return animationId_;
 }
@@ -1306,9 +1323,8 @@ std::function<void()> NavDestinationGroupNode::BuildTransitionFinishCallback(
                     navDestination->SetJSViewActive(false);
                 }
                 navDestination->SetIsOnAnimation(false);
-                if (needReport && navDestination->needReportHomeTransition_) {
-                    navDestination->needReportHomeTransition_ = false;
-                    navDestination->ContentChangeReport(isPopPage);
+                if (needReport) {
+                    navDestination->ReportTransitionEnd(isPopPage);
                 }
                 return;
             }
@@ -1330,7 +1346,7 @@ std::function<void()> NavDestinationGroupNode::BuildTransitionFinishCallback(
             }
             navDestination->SetIsOnAnimation(false);
             if (needReport) {
-                navDestination->ContentChangeReport(isPopPage);
+                navDestination->ReportTransitionEnd(isPopPage);
             }
         };
     auto navigationNode = AceType::DynamicCast<NavigationGroupNode>(GetNavigationNode());
@@ -1627,20 +1643,35 @@ bool NavDestinationGroupNode::GetCanReused() const
     return canReused_;
 }
 
+void NavDestinationGroupNode::ReportTransitionEnd(bool isPopPage)
+{
+    if (!IsHomeDestination()) {
+        ContentChangeReport(isPopPage);
+        return;
+    }
+    if (!needReportHomeTransition_ && !needReportCapiHomeTransition_) {
+        return;
+    }
+    const bool reportIpc = needReportHomeTransition_;
+    needReportHomeTransition_ = false;
+    needReportCapiHomeTransition_ = false;
+    if (reportIpc) {
+        ContentChangeReport(isPopPage);
+        return;
+    }
+    auto navigation = AceType::DynamicCast<NavigationGroupNode>(GetNavigationNode());
+    CHECK_NULL_VOID(navigation);
+    auto pattern = navigation->GetPattern<NavigationPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->ReportCapiPageTransitionEnd(Claim(this), isPopPage ? navigation->GetId() : GetId());
+}
+
 void NavDestinationGroupNode::ContentChangeReport(bool isPopPage)
 {
-#ifndef CROSS_PLATFORM
-    auto context = GetContext();
-    CHECK_NULL_VOID(context);
-    auto mgr = context->GetContentChangeManager();
-    CHECK_NULL_VOID(mgr);
-    if (isPopPage) {
-        auto navigation = AceType::DynamicCast<NavigationGroupNode>(GetNavigationNode());
-        CHECK_NULL_VOID(navigation);
-        mgr->OnPageTransitionEnd(WeakClaim(this).Upgrade(), navigation->GetId());
-    } else {
-        mgr->OnPageTransitionEnd(WeakClaim(this).Upgrade());
-    }
-#endif
+    auto navigation = AceType::DynamicCast<NavigationGroupNode>(GetNavigationNode());
+    CHECK_NULL_VOID(navigation);
+    auto pattern = navigation->GetPattern<NavigationPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->ContentChangeReport(Claim(this), isPopPage);
 }
 } // namespace OHOS::Ace::NG

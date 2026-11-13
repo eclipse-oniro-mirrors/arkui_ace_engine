@@ -16,7 +16,6 @@
 #include "core/components_ng/pattern/xcomponent/xcomponent_inner_surface_controller.h"
 
 #include "core/components_ng/pattern/xcomponent/xcomponent_pattern.h"
-#include "base/thread/task_executor.h"
 #ifdef ENABLE_ROSEN_BACKEND
 #include "feature/anco_manager/rs_ext_node_operation.h"
 
@@ -47,10 +46,10 @@ int32_t XComponentInnerSurfaceController::SetRenderFitBySurfaceId(
     CHECK_NULL_RETURN(xcPattern, XCOMPONENT_CONTROLLER_INVALID_PARAMETER);
     auto renderContext = xcPattern->GetRenderContextForSurface();
     CHECK_NULL_RETURN(renderContext, XCOMPONENT_CONTROLLER_INVALID_PARAMETER);
-    auto* context = node->GetContext();
-    if (context != nullptr) {
+    auto context = node->GetContextRefPtr();
+    if (context) {
         auto taskExecutor = context->GetTaskExecutor();
-        if (taskExecutor != nullptr && !taskExecutor->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
+        if (taskExecutor && !taskExecutor->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
             TAG_LOGW(AceLogTag::ACE_XCOMPONENT,
                 "SetRenderFitBySurfaceId is not called on UI thread, SurfaceId: %{public}s", surfaceId.c_str());
         }

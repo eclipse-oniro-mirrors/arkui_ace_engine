@@ -792,6 +792,13 @@ void SetTextSelectionClearPolicyImpl(Ark_TextSelectionClearPolicy policy)
     CHECK_NULL_VOID(contentOverlayManager);
     contentOverlayManager->SetTextSelectionClearPolicy(static_cast<NG::TextSelectionClearPolicy>(policyValue));
 }
+void SetTransPageEnabledImpl(const Opt_Boolean* enabled)
+{
+    auto pipeline = NG::PipelineContext::GetCurrentContext();
+    CHECK_NULL_VOID(pipeline);
+    auto enabledVal = Converter::OptConvertPtr<bool>(enabled).value_or(true);
+    pipeline->SetTransPageEnabled(enabledVal);
+}
 } // IUIContextAccessor
 const GENERATED_ArkUIIUIContextAccessor* GetIUIContextAccessor()
 {
@@ -812,6 +819,7 @@ const GENERATED_ArkUIIUIContextAccessor* GetIUIContextAccessor()
         IUIContextAccessor::AddLocalInputEventMonitorImpl,
         IUIContextAccessor::RemoveLocalInputEventMonitorImpl,
         IUIContextAccessor::SetTextSelectionClearPolicyImpl,
+        IUIContextAccessor::SetTransPageEnabledImpl,
     };
     return &IUIContextAccessorImpl;
 }

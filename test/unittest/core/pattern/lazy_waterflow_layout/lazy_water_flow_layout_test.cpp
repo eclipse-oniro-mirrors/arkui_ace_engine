@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "interfaces/inner_api/ui_session/param_config.h"
 #include "lazy_water_flow_layout_test.h"
 
 #include <algorithm>
@@ -2732,6 +2733,92 @@ HWTEST_F(LazyVWaterFlowLayoutCoreTest, ValidateScrollableParent_001, TestSize.Le
     ASSERT_NE(stackNode, nullptr);
     EXPECT_FALSE(LazyLayoutUtils::IsVerticalScrollableParent(stackNode));
     CreateDone();
+}
+
+
+/**
+ * @tc.name: PublicDumpPreservesFlatLayoutFields
+ * @tc.desc: Public filtering preserves legacy field values without a layoutInfo wrapper.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyVWaterFlowLayoutCoreTest, PublicDumpPreservesFlatLayoutFields, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<LazyWaterFlowLayoutPattern>();
+    ASSERT_NE(pattern->layoutInfo_, nullptr);
+    pattern->layoutInfo_->headerMainSize_ = 12.0f;
+    pattern->layoutInfo_->footerMainSize_ = 24.0f;
+    pattern->layoutInfo_->totalMainSize_ = 240.0f;
+    pattern->layoutInfo_->estimateItemSize_ = 60.0f;
+    pattern->layoutInfo_->visibleStartIndex_ = 2;
+    pattern->layoutInfo_->visibleEndIndex_ = 5;
+    auto legacy = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(legacy);
+    ASSERT_TRUE(legacy->Contains("itemStartIndex"));
+    EXPECT_EQ(legacy->GetInt("visibleStartIndex"), 2);
+    EXPECT_EQ(legacy->GetInt("visibleEndIndex"), 5);
+    for (bool visual : { false, true }) {
+        for (bool functional : { false, true }) {
+            ParamConfig config;
+            config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+            config.visualProperties = visual;
+            config.functionalProperties = functional;
+            auto json = JsonUtil::Create();
+            pattern->DumpAdvanceInfo(json, config);
+            EXPECT_FALSE(json->Contains("layoutInfo"));
+            EXPECT_FALSE(json->Contains("itemStartIndex"));
+            EXPECT_EQ(json->Contains("headerMainSize"), visual);
+            EXPECT_EQ(json->Contains("totalMainSize"), visual);
+            EXPECT_FALSE(json->Contains("visibleStartIndex"));
+            EXPECT_FALSE(json->Contains("visibleEndIndex"));
+            EXPECT_EQ(json->Contains("estimatedItemSize"), visual);
+            if (visual) {
+                EXPECT_EQ(json->GetDouble("headerMainSize"), legacy->GetDouble("headerMainSize"));
+                EXPECT_EQ(json->GetDouble("footerMainSize"), legacy->GetDouble("footerMainSize"));
+                EXPECT_DOUBLE_EQ(json->GetDouble("totalMainSize"), 240.0);
+                EXPECT_DOUBLE_EQ(json->GetDouble("estimatedItemSize"), 60.0);
+            } else {
+                EXPECT_EQ(json->ToString(), "{}");
+            }
+        }
+    }
+    auto after = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(after);
+    EXPECT_EQ(after->ToString(), legacy->ToString());
+}
+
+
+/**
+ * @tc.name: LegacyDumpMatchesBaselineSnapshot
+ * @tc.desc: Public reclassification must not change the original diagnostic layout dump.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyVWaterFlowLayoutCoreTest, LegacyDumpMatchesBaselineSnapshot, TestSize.Level1)
+{
+    auto info = AceType::MakeRefPtr<LazyWaterFlowLayoutInfo>();
+    info->startIndex_ = 1;
+    info->endIndex_ = 8;
+    info->visibleStartIndex_ = 2;
+    info->visibleEndIndex_ = 7;
+    info->totalItemCount_ = 10;
+    info->headerMainSize_ = 12.0f;
+    info->footerMainSize_ = 24.0f;
+    info->estimateItemSize_ = 60.0f;
+    info->totalMainSize_ = 600.0f;
+    info->layoutedStartIndex_ = 1;
+    info->layoutedEndIndex_ = 9;
+    info->cachedStartIndex_ = 0;
+    info->cachedEndIndex_ = 9;
+    // Frozen from fdf7d63988ed9fa338051a11c19fadf1f86653dc; compare serialized key order and types.
+    const std::string expected = R"({"itemStartIndex":1,"itemEndIndex":8,"visibleStartIndex":2,)"
+        R"("visibleEndIndex":7,"itemTotalCount":10,"headerMainSize":12,"footerMainSize":24,)"
+        R"("estimatedItemSize":60,"totalMainSize":600,"layoutedStartIndex":1,"layoutedEndIndex":9,)"
+        R"("cachedStartIndex":0,"cachedEndIndex":9})";
+    auto json = JsonUtil::Create();
+    info->DumpAdvanceInfo(json);
+    EXPECT_EQ(json->ToString(), expected);
+    std::unique_ptr<JsonValue> absent;
+    info->DumpAdvanceInfo(absent);
+    EXPECT_EQ(absent, nullptr);
 }
 
 } // namespace OHOS::Ace::NG

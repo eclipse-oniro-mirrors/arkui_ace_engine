@@ -5183,6 +5183,9 @@ bool JsAccessibilityManager::GetDumpInfoArgument(const std::vector<std::string>&
     if (params.size() < 1) {
         return false;
     }
+    if (params.size() > 1 && params[1] == "--third-focus-search") {
+        return AccessibilityHidumper::ParseThirdFocusSearch(params, argument);
+    }
     argument.isDumpSimplify = params[0].compare("-simplify") == 0;
     bool isArgument = DumpInfoParams(params, argument);
     return isArgument;
@@ -5315,6 +5318,10 @@ void JsAccessibilityManager::ChooseDumpEvent(const std::vector<std::string>& par
     DumpInfoArgument& argument, uint32_t windowId, bool hasJson)
 {
     switch (argument.mode) {
+        case DumpMode::THIRD_FOCUS_SEARCH:
+            // Keep the historical command name for both native and third-party nodes.
+            AccessibilityManagerHidumper::DumpFocusSearch(*this, argument, windowId);
+            break;
         case DumpMode::TREE:
             isUseJson_ = hasJson;
             DumpTreeNG(argument.useWindowId, windowId, argument.rootId, argument.isDumpSimplify);
@@ -9163,6 +9170,11 @@ bool JsAccessibilityManager::CheckIsChildElement(
         }
         return true;
     }
+    if (mode == DumpMode::THIRD_FOCUS_SEARCH) {
+        DumpLog::GetInstance().Print("Error: accessibility child tree is not registered: " +
+            std::to_string(splitTreeId));
+        return true;
+    }
     return false;
 }
 
@@ -9318,7 +9330,6 @@ void JsAccessibilityManager::JsInteractionOperation::SetBelongTreeId(const int32
 {
     auto jsAccessibilityManager = GetHandler().Upgrade();
     CHECK_NULL_VOID(jsAccessibilityManager);
-    jsAccessibilityManager->treeId_ = treeId;
     auto context = jsAccessibilityManager->GetPipelineContext().Upgrade();
     CHECK_NULL_VOID(context);
     auto instanceId = context->GetInstanceId();
@@ -9328,6 +9339,7 @@ void JsAccessibilityManager::JsInteractionOperation::SetBelongTreeId(const int32
             CHECK_NULL_VOID(jsAccessibilityManager);
             ContainerScope scope(instanceId);
             ACE_SCOPED_TRACE("SetBelongTreeId");
+            jsAccessibilityManager->treeId_ = treeId;
             jsAccessibilityManager->SendCacheAccessibilityEvent(instanceId);
             jsAccessibilityManager->NotifyChildTreeOnRegister(treeId);
             jsAccessibilityManager->ReleaseUIExtCacheEvent();
@@ -10706,6 +10718,9 @@ void JsAccessibilityManager::TransferThirdProviderHoverEvent(
     config.eventType = eventType;
     config.time = time;
     config.context = ngPipeline;
+    config.nativeHoverHost = hostNode;
+    // Session adapters call here on UI, before the existing background hover task.
+    PrepareNativeHoverResult(config);
     HandleAccessibilityHoverForThird(config);
 }
 
@@ -12309,7 +12324,7 @@ void JsAccessibilityManager::OnCmpTreeDeregistered(NG::FrameNode* owner, int32_t
 int32_t JsAccessibilityManager::GetThirdProviderTreeIdForHost(NG::FrameNode* owner)
 {
     CHECK_NULL_RETURN(owner, AccessibilityElementInfo::UNDEFINED_TREE_ID);
-    auto& weakOp = GetJsThirdProviderInteractionOperation(owner->GetAccessibilityId());
+    auto weakOp = GetJsThirdProviderInteractionOperation(owner->GetAccessibilityId());
     auto op = weakOp.lock();
     if (op) {
         return op->GetBelongTreeId();
@@ -14633,7 +14648,43 @@ void JsAccessibilityManager::CmpInteractionOperation::GetCursorPosition(
     const int64_t elementId, const int32_t requestId,
     Accessibility::AccessibilityElementOperatorCallback& callback)
 {
-    callback.SetCursorPositionResult(0, requestId);
+    int64_t splitElementId = AccessibilityElementInfo::UNDEFINED_ACCESSIBILITY_ID;
+    int32_t splitTreeId = AccessibilityElementInfo::UNDEFINED_TREE_ID;
+    AccessibilitySystemAbilityClient::GetTreeIdAndElementIdBySplitElementId(elementId, splitElementId, splitTreeId);
+    auto subAM = GetHandler().Upgrade();
+    CHECK_NULL_VOID_WITH_ACTION(subAM, SetCursorPositionResult(callback, 0, requestId));
+    auto context = subAM->GetPipelineContext().Upgrade();
+    CHECK_NULL_VOID_WITH_ACTION(context, SetCursorPositionResult(callback, 0, requestId));
+    auto taskExecutor = context->GetTaskExecutor();
+    CHECK_NULL_VOID_WITH_ACTION(taskExecutor, SetCursorPositionResult(callback, 0, requestId));
+    if (!taskExecutor->PostTask(
+        [weak = GetHandler(), root = exportedRoot_, splitElementId, requestId, &callback] {
+            auto subAM = weak.Upgrade();
+            CHECK_NULL_VOID_WITH_ACTION(subAM, SetCursorPositionResult(callback, 0, requestId));
+            auto pipeline = AceType::DynamicCast<NG::PipelineContext>(subAM->GetPipelineContext().Upgrade());
+            CHECK_NULL_VOID_WITH_ACTION(pipeline, SetCursorPositionResult(callback, 0, requestId));
+            ContainerScope scope(pipeline->GetInstanceId());
+            // Match the main-tree query timing so pending caret updates are applied first.
+            pipeline->AddAfterRenderTask([weak, root, splitElementId, requestId, &callback] {
+                auto subAM = weak.Upgrade();
+                CHECK_NULL_VOID_WITH_ACTION(subAM, SetCursorPositionResult(callback, 0, requestId));
+                auto context = subAM->GetPipelineContext().Upgrade();
+                CHECK_NULL_VOID_WITH_ACTION(context, SetCursorPositionResult(callback, 0, requestId));
+                ContainerScope scope(context->GetInstanceId());
+                auto exportedRoot = root.Upgrade();
+                CHECK_NULL_VOID_WITH_ACTION(exportedRoot, SetCursorPositionResult(callback, 0, requestId));
+                auto frameNode = NG::AccessibilityFrameNodeUtils::GetFramenodeByAccessibilityId(
+                    exportedRoot, splitElementId);
+                CHECK_NULL_VOID_WITH_ACTION(frameNode, SetCursorPositionResult(callback, 0, requestId));
+                auto property = frameNode->GetAccessibilityProperty<NG::AccessibilityProperty>();
+                CHECK_NULL_VOID_WITH_ACTION(property, SetCursorPositionResult(callback, 0, requestId));
+                auto cursorPosition = property->ActActionGetIndex();
+                SetCursorPositionResult(callback, cursorPosition, requestId);
+            });
+            pipeline->RequestFrame();
+        }, TaskExecutor::TaskType::UI, "ArkUICmpGetCursorPosition")) {
+        SetCursorPositionResult(callback, 0, requestId);
+    }
 }
 
 void JsAccessibilityManager::CmpInteractionOperation::SetChildTreeIdAndWinId(

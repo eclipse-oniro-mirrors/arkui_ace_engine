@@ -693,13 +693,23 @@ void JSList::SetScrollPlaceholder(const JSCallbackInfo& args)
         if (size->IsObject()) {
             auto sizeObj = JSRef<JSObject>::Cast(size);
             NG::ScrollPlaceholderSizeOption sizeOption;
+            // Same parse-and-validate contract as the size attribute
+            // (JSViewAbstract::JsSize -> JsWidth/JsHeight): bare numbers mean vp,
+            // suffixed strings and resources keep their unit through
+            // ParseJsDimensionVpNG, a value that does not parse leaves the
+            // dimension unset, and a non-positive value is dropped instead of
+            // applied (the width/height invalid-size semantics since API 12).
             auto width = sizeObj->GetProperty("width");
-            if (width->IsNumber()) {
-                sizeOption.width = width->ToNumber<float>();
+            CalcDimension widthDim;
+            if (JSViewAbstract::ParseJsDimensionVpNG(width, widthDim) &&
+                !LessNotEqual(widthDim.Value(), 0.0)) {
+                sizeOption.width = widthDim;
             }
             auto height = sizeObj->GetProperty("height");
-            if (height->IsNumber()) {
-                sizeOption.height = height->ToNumber<float>();
+            CalcDimension heightDim;
+            if (JSViewAbstract::ParseJsDimensionVpNG(height, heightDim) &&
+                !LessNotEqual(heightDim.Value(), 0.0)) {
+                sizeOption.height = heightDim;
             }
             options.size = sizeOption;
         }

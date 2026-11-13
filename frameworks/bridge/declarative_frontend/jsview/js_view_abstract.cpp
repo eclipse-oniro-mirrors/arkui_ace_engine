@@ -14,6 +14,7 @@
  */
 
 #include "bridge/declarative_frontend/jsview/js_view_abstract.h"
+#include "core/components_ng/event/event_constants.h"
 
 #include <algorithm>
 #include <array>
@@ -218,7 +219,7 @@ const char* DEBUG_LINE_INFO_LINE = "$line";
 const char* DEBUG_LINE_INFO_PACKAGE_NAME = "$packageName";
 
 enum class MenuItemType { COPY, PASTE, CUT, SELECT_ALL, AUTO_FILL, PASSWORD_VAULT, UNKNOWN, CAMERA_INPUT,
-    AI_WRITER, TRANSLATE, SHARE, SEARCH, ASK_CELIA, AI_MENU_OPTION };
+    AI_WRITER, TRANSLATE, SHARE, SEARCH, ASK_CELIA, AI_MENU_OPTION, TRANSLATE_INPUT };
 enum class BackgroundType { CUSTOM_BUILDER, COLOR };
 
 const int32_t NUM_0 = 0;
@@ -1956,6 +1957,7 @@ MenuItemType StringToMenuItemType(std::string_view id)
         { "OH_DEFAULT_AUTO_FILL", MenuItemType::AUTO_FILL },
         { "OH_DEFAULT_PASSWORD_VAULT", MenuItemType::PASSWORD_VAULT },
         { "OH_DEFAULT_CAMERA_INPUT", MenuItemType::CAMERA_INPUT },
+        { "OH_DEFAULT_TRANSLATE_INPUT", MenuItemType::TRANSLATE_INPUT },
         { "OH_DEFAULT_AI_WRITE", MenuItemType::AI_WRITER },
         { "OH_DEFAULT_TRANSLATE", MenuItemType::TRANSLATE },
         { "OH_DEFAULT_SHARE", MenuItemType::SHARE },
@@ -2027,6 +2029,7 @@ void UpdateInfoById(NG::MenuOptionsParam& menuOptionsParam, std::string_view id)
             menuOptionsParam.symbolId = theme->GetAIWriteSymbolId();
             break;
         case MenuItemType::TRANSLATE:
+        case MenuItemType::TRANSLATE_INPUT:
             menuOptionsParam.symbolId = theme->GetTranslateSymbolId();
             break;
         case MenuItemType::SHARE:
@@ -5891,53 +5894,55 @@ bool JSViewAbstract::ParseAllBorderRadiuses(JSRef<JSObject>& object, CalcDimensi
 
 void JSViewAbstract::RegisterTextBackgroundStyleResource(TextBackgroundStyle& textBackgroundStyle,
     RefPtr<ResourceObject>& resObjTopLeft, RefPtr<ResourceObject>& resObjTopRight,
-    RefPtr<ResourceObject>& resObjBottomLeft, RefPtr<ResourceObject>& resObjBottomRight)
+    RefPtr<ResourceObject>& resObjBottomLeft, RefPtr<ResourceObject>& resObjBottomRight,
+    RefPtr<ResourceObject>& borderColorResObj, RefPtr<ResourceObject>& borderWidthResObj)
 {
     if (!SystemProperties::ConfigChangePerform()) {
         return;
     }
-    if (resObjTopLeft) {
-        auto&& updateFunc = [](const RefPtr<ResourceObject>& resObjTopLeft,
-            TextBackgroundStyle& textBackgroundStyle) {
+    auto registerRadius = [&textBackgroundStyle](
+        RefPtr<ResourceObject>& resObj, const std::string& key,
+        std::optional<Dimension> NG::BorderRadiusProperty::* member) {
+        if (!resObj) {
+            return;
+        }
+        auto&& updateFunc = [member](const RefPtr<ResourceObject>& resObj,
+            TextBackgroundStyle& style) {
+            if (!style.backgroundRadius.has_value()) {
+                style.backgroundRadius = NG::BorderRadiusProperty();
+            }
             CalcDimension radius;
-            ResourceParseUtils::ParseResDimensionVp(resObjTopLeft, radius);
-            textBackgroundStyle.backgroundRadius->radiusTopLeft = radius;
-            textBackgroundStyle.backgroundRadius->multiValued = true;
+            ResourceParseUtils::ParseResDimensionVp(resObj, radius);
+            style.backgroundRadius.value().*member = radius;
+            style.backgroundRadius->multiValued = true;
         };
-        textBackgroundStyle.AddResource("textBackgroundStyle.radiusTopLeft", resObjTopLeft,
+        textBackgroundStyle.AddResource(key, resObj, std::move(updateFunc));
+    };
+    registerRadius(resObjTopLeft, "textBackgroundStyle.radiusTopLeft", &NG::BorderRadiusProperty::radiusTopLeft);
+    registerRadius(resObjTopRight, "textBackgroundStyle.radiusTopRight", &NG::BorderRadiusProperty::radiusTopRight);
+    registerRadius(resObjBottomLeft, "textBackgroundStyle.radiusBottomLeft",
+        &NG::BorderRadiusProperty::radiusBottomLeft);
+    registerRadius(resObjBottomRight, "textBackgroundStyle.radiusBottomRight",
+        &NG::BorderRadiusProperty::radiusBottomRight);
+    if (borderColorResObj) {
+        auto&& updateFunc = [](const RefPtr<ResourceObject>& borderColorResObj,
+            TextBackgroundStyle& textBackgroundStyle) {
+            Color color;
+            if (ResourceParseUtils::ParseResColor(borderColorResObj, color)) {
+                textBackgroundStyle.borderColor = color;
+            }
+        };
+        textBackgroundStyle.AddResource("textBackgroundStyle.borderColor", borderColorResObj,
             std::move(updateFunc));
     }
-    if (resObjTopRight) {
-        auto&& updateFunc = [](const RefPtr<ResourceObject>& resObjTopRight,
+    if (borderWidthResObj) {
+        auto&& updateFunc = [](const RefPtr<ResourceObject>& borderWidthResObj,
             TextBackgroundStyle& textBackgroundStyle) {
-            CalcDimension radius;
-            ResourceParseUtils::ParseResDimensionVp(resObjTopRight, radius);
-            textBackgroundStyle.backgroundRadius->radiusTopRight = radius;
-            textBackgroundStyle.backgroundRadius->multiValued = true;
+            CalcDimension width;
+            ResourceParseUtils::ParseResDimensionVp(borderWidthResObj, width);
+            textBackgroundStyle.borderWidth = width;
         };
-        textBackgroundStyle.AddResource("textBackgroundStyle.radiusTopRight", resObjTopRight,
-            std::move(updateFunc));
-    }
-    if (resObjBottomLeft) {
-        auto&& updateFunc = [](const RefPtr<ResourceObject>& resObjBottomLeft,
-            TextBackgroundStyle& textBackgroundStyle) {
-            CalcDimension radius;
-            ResourceParseUtils::ParseResDimensionVp(resObjBottomLeft, radius);
-            textBackgroundStyle.backgroundRadius->radiusBottomLeft = radius;
-            textBackgroundStyle.backgroundRadius->multiValued = true;
-        };
-        textBackgroundStyle.AddResource("textBackgroundStyle.radiusBottomLeft", resObjBottomLeft,
-            std::move(updateFunc));
-    }
-    if (resObjBottomRight) {
-        auto&& updateFunc = [](const RefPtr<ResourceObject>& resObjBottomRight,
-            TextBackgroundStyle& textBackgroundStyle) {
-            CalcDimension radius;
-            ResourceParseUtils::ParseResDimensionVp(resObjBottomRight, radius);
-            textBackgroundStyle.backgroundRadius->radiusBottomRight = radius;
-            textBackgroundStyle.backgroundRadius->multiValued = true;
-        };
-        textBackgroundStyle.AddResource("textBackgroundStyle.radiusBottomRight", resObjBottomRight,
+        textBackgroundStyle.AddResource("textBackgroundStyle.borderWidth", borderWidthResObj,
             std::move(updateFunc));
     }
 }
@@ -5970,8 +5975,10 @@ bool JSViewAbstract::ParseAllBorderRadiuses(JSRef<JSObject>& object, CalcDimensi
     GetBorderRadiusResObj("bottomLeft", object, bottomLeft, resObjBottomLeft);
     GetBorderRadiusResObj("bottomRight", object, bottomRight, resObjBottomRight);
 
+    RefPtr<ResourceObject> borderColorResObj;
+    RefPtr<ResourceObject> borderWidthResObj;
     RegisterTextBackgroundStyleResource(textBackgroundStyle, resObjTopLeft, resObjTopRight, resObjBottomLeft,
-        resObjBottomRight);
+        resObjBottomRight, borderColorResObj, borderWidthResObj);
     return false;
 }
 
@@ -9142,6 +9149,31 @@ void JSViewAbstract::JsShadow(const JSCallbackInfo& info)
     ViewAbstractModel::GetInstance()->SetBackShadow(shadows);
 }
 
+void JSViewAbstract::JsShadowShape(const JSCallbackInfo& info)
+{
+    if (info[0]->IsObject()) {
+        JSShapeAbstract* shape = JSRef<JSObject>::Cast(info[0])->Unwrap<JSShapeAbstract>();
+        if (shape != nullptr) {
+            ViewAbstractModel::GetInstance()->SetShadowShape(shape->GetBasicShape());
+            return;
+        }
+    }
+    ViewAbstractModel::GetInstance()->SetShadowShape(nullptr);
+}
+
+void JSViewAbstract::JsShadowClipMode(const JSCallbackInfo& info)
+{
+    ShadowClipMode mode = ShadowClipMode::DEFAULT_SHAPE;
+    if (info[0]->IsNumber()) {
+        auto modeInt = info[0]->ToNumber<int32_t>();
+        if (modeInt >= static_cast<int32_t>(ShadowClipMode::DEFAULT_SHAPE) &&
+            modeInt <= static_cast<int32_t>(ShadowClipMode::BOUNDS_SHAPE)) {
+            mode = static_cast<ShadowClipMode>(modeInt);
+        }
+    }
+    ViewAbstractModel::GetInstance()->SetShadowClipMode(mode);
+}
+
 bool JSViewAbstract::ParseBlendMode(const JSCallbackInfo& info, BlendMode& blendMode, BlendApplyType& blendApplyType)
 {
     if (info.Length() == 0) {
@@ -10389,6 +10421,8 @@ void JSViewAbstract::JSBind(BindingTarget globalObj)
     JSClass<JSViewAbstract>::StaticMethod("gridOffset", &JSViewAbstract::JsGridOffset);
     JSClass<JSViewAbstract>::StaticMethod("useSizeType", &JSViewAbstract::JsUseSizeType);
     JSClass<JSViewAbstract>::StaticMethod("shadow", &JSViewAbstract::JsShadow);
+    JSClass<JSViewAbstract>::StaticMethod("shadowShape", &JSViewAbstract::JsShadowShape);
+    JSClass<JSViewAbstract>::StaticMethod("shadowClipMode", &JSViewAbstract::JsShadowClipMode);
     JSClass<JSViewAbstract>::StaticMethod("blendMode", &JSViewAbstract::JsBlendMode);
     JSClass<JSViewAbstract>::StaticMethod("advancedBlendMode", &JSViewAbstract::JsAdvancedBlendMode);
     JSClass<JSViewAbstract>::StaticMethod("grayscale", &JSViewAbstract::JsGrayScale);
@@ -10488,6 +10522,7 @@ void JSViewAbstract::JSBind(BindingTarget globalObj)
         "onVisibleAreaApproximateChange", &JSViewAbstract::JsOnVisibleAreaApproximateChange);
     JSClass<JSViewAbstract>::StaticMethod("smartGestureShortcut", &JSViewAbstract::JsSmartGestureShortcut);
     JSClass<JSViewAbstract>::StaticMethod("hitTestBehavior", &JSViewAbstract::JsHitTestBehavior);
+    JSClass<JSViewAbstract>::StaticMethod("agentControlMode", &JSViewAbstract::JsAgentControlMode);
     JSClass<JSViewAbstract>::StaticMethod("onChildTouchTest", &JSViewAbstract::JsOnChildTouchTest);
     JSClass<JSViewAbstract>::StaticMethod("keyboardShortcut", &JSViewAbstract::JsKeyboardShortcut);
     JSClass<JSViewAbstract>::StaticMethod("obscured", &JSViewAbstract::JsObscured);
@@ -12299,6 +12334,21 @@ void JSViewAbstract::JsHitTestBehavior(const JSCallbackInfo& info)
     NG::HitTestMode hitTestModeNG = NG::HitTestMode::HTMDEFAULT;
     hitTestModeNG = static_cast<NG::HitTestMode>(info[0]->ToNumber<int32_t>());
     ViewAbstractModel::GetInstance()->SetHitTestMode(hitTestModeNG);
+}
+
+void JSViewAbstract::JsAgentControlMode(const JSCallbackInfo& info)
+{
+    if (info.Length() != 1 || !info[0]->IsNumber()) {
+        ViewAbstractModel::GetInstance()->SetAgentControlMode(std::nullopt);
+        return;
+    }
+    const auto value = info[0]->ToNumber<int32_t>();
+    if (value < static_cast<int32_t>(NG::AgentControlMode::ALLOW) ||
+        value > static_cast<int32_t>(NG::AgentControlMode::DENY)) {
+        ViewAbstractModel::GetInstance()->SetAgentControlMode(std::nullopt);
+        return;
+    }
+    ViewAbstractModel::GetInstance()->SetAgentControlMode(static_cast<NG::AgentControlMode>(value));
 }
 
 void JSViewAbstract::JsOnChildTouchTest(const JSCallbackInfo& info)

@@ -69,6 +69,17 @@
 using namespace testing;
 using namespace testing::ext;
 
+namespace OHOS::Rosen {
+// libwm hides its compiler-generated virtual destructor thunks, so a test-defined ExtensionSession
+// subclass cannot link against the construction vtable unless the key function is defined locally
+// (same as mock_extension_session.cpp in the security/preview test targets).
+ExtensionSession::~ExtensionSession()
+{
+    channelListener_ = nullptr;
+    channelDeath_ = nullptr;
+}
+} // namespace OHOS::Rosen
+
 namespace OHOS::Ace::NG {
 namespace {
     const std::string UI_EXTENSION_COMPONENT_ETS_TAG = "UIExtensionComponent";
@@ -76,6 +87,45 @@ namespace {
     const std::string EMBEDDED_UI("embeddedUI");
     const char UIEXTENSION_HOST_UICONTENT_ALLOW_CROSS_PROCESS_NESTING[] =
         "ohos.ace.uiextension.allowCrossProcessNesting";
+
+    // Records parameters of UpdateRectWithLayoutInfo called by SessionWrapperImpl notify paths.
+    struct UpdateRectWithLayoutInfoRecord {
+        bool called = false;
+        Rosen::WSRect rect;
+        Rosen::SizeChangeReason reason = Rosen::SizeChangeReason::UNDEFINED;
+        std::string updateReason;
+        std::map<Rosen::AvoidAreaType, Rosen::AvoidArea> avoidAreas;
+        bool registerCallback = false;
+
+        void Reset()
+        {
+            called = false;
+            rect = {};
+            reason = Rosen::SizeChangeReason::UNDEFINED;
+            updateReason.clear();
+            avoidAreas.clear();
+            registerCallback = false;
+        }
+    };
+    UpdateRectWithLayoutInfoRecord g_updateRectWithLayoutInfoRecord;
+
+    class UpdateRectSession : public Rosen::ExtensionSession {
+    public:
+        explicit UpdateRectSession(const Rosen::SessionInfo& info) : ExtensionSession(info) {}
+
+        Rosen::WSError UpdateRectWithLayoutInfo(const Rosen::WSRect& rect, Rosen::SizeChangeReason reason,
+            const std::string& updateReason, const std::shared_ptr<Rosen::RSTransaction>& rsTransaction,
+            const std::map<Rosen::AvoidAreaType, Rosen::AvoidArea>& avoidAreas, bool registerCallback) override
+        {
+            g_updateRectWithLayoutInfoRecord.called = true;
+            g_updateRectWithLayoutInfoRecord.rect = rect;
+            g_updateRectWithLayoutInfoRecord.reason = reason;
+            g_updateRectWithLayoutInfoRecord.updateReason = updateReason;
+            g_updateRectWithLayoutInfoRecord.avoidAreas = avoidAreas;
+            g_updateRectWithLayoutInfoRecord.registerCallback = registerCallback;
+            return Rosen::WSError::WS_OK;
+        }
+    };
 } // namespace
 
 #ifdef WINDOW_SCENE_SUPPORTED
@@ -1791,5 +1841,61 @@ HWTEST_F(SessionWrapperImplNewTestNg, SessionWrapperImplNewTestNg047, TestSize.L
     sessionWrapper->foregroundCallback_(OHOS::Rosen::WSError::WS_DO_NOTHING, 100);
     EXPECT_FALSE(isAbilityErrorCodeCallbackInvoked);
     EXPECT_FALSE(isErrorCallbackInvoked);
+}
+
+/**
+ * @tc.name: SessionWrapperImplNewTestNg048
+ * @tc.desc: Test NotifyOriginAvoidArea forwards avoid areas and register-callback flag to session
+ * @tc.type: FUNC
+ */
+HWTEST_F(SessionWrapperImplNewTestNg, SessionWrapperImplNewTestNg048, TestSize.Level1)
+{
+    auto sessionWrapper = GenerateSessionWrapperImpl();
+    Rosen::SessionInfo sessionInfo;
+    sessionWrapper->session_ = new UpdateRectSession(sessionInfo);
+    RectF displayArea(10.5f, 20.4f, 300.6f, 400.2f);
+    sessionWrapper->displayArea_ = displayArea;
+
+    Rosen::AvoidArea systemAvoidArea;
+    systemAvoidArea.topRect_ = { 0, 100, 720, 100 };
+    systemAvoidArea.bottomRect_ = { 0, 800, 720, 100 };
+    auto avoidAreaType = Rosen::AvoidAreaType::TYPE_SYSTEM;
+    auto& record = g_updateRectWithLayoutInfoRecord;
+
+    /**
+     * @tc.steps: step1. NotifyOriginAvoidArea should update session rect with avoid areas
+     * and enable the register callback flag
+     */
+    record.Reset();
+    sessionWrapper->NotifyOriginAvoidArea(systemAvoidArea,
+        static_cast<uint32_t>(avoidAreaType), WindowSizeChangeReason::UNDEFINED);
+    ASSERT_TRUE(record.called);
+    EXPECT_EQ(record.reason, Rosen::SizeChangeReason::AVOID_AREA_CHANGE);
+    EXPECT_EQ(record.updateReason, "NotifyOriginAvoidArea");
+    EXPECT_TRUE(record.registerCallback);
+    EXPECT_EQ(record.rect.posX_, 11);
+    EXPECT_EQ(record.rect.posY_, 20);
+    EXPECT_EQ(record.rect.width_, 301);
+    EXPECT_EQ(record.rect.height_, 400);
+    auto avoidAreaIt = record.avoidAreas.find(avoidAreaType);
+    ASSERT_NE(avoidAreaIt, record.avoidAreas.end());
+    EXPECT_TRUE(avoidAreaIt->second == systemAvoidArea);
+
+    /**
+     * @tc.steps: step2. rotation reasons should skip the avoid area notification
+     */
+    record.Reset();
+    sessionWrapper->NotifyOriginAvoidArea(systemAvoidArea,
+        static_cast<uint32_t>(avoidAreaType), WindowSizeChangeReason::ROTATION);
+    EXPECT_FALSE(record.called);
+
+    /**
+     * @tc.steps: step3. null session should not update rect
+     */
+    record.Reset();
+    sessionWrapper->session_ = nullptr;
+    sessionWrapper->NotifyOriginAvoidArea(systemAvoidArea,
+        static_cast<uint32_t>(avoidAreaType), WindowSizeChangeReason::UNDEFINED);
+    EXPECT_FALSE(record.called);
 }
 } // namespace OHOS::Ace::NG

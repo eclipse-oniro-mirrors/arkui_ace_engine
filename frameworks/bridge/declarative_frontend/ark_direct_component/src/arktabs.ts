@@ -290,6 +290,10 @@ function loadComponent(): ComponentObj | undefined {
         modifierWithKey(this._modifiersWithKeys, TabsSidebarSearchableModifier.identity, TabsSidebarSearchableModifier, value);
         return this;
       }
+      showSidebarControlButton(value: boolean): TabsAttribute {
+        modifierWithKey(this._modifiersWithKeys, ShowSidebarControlButtonModifier.identity, ShowSidebarControlButtonModifier, value);
+        return this;
+      }
       barDisplayModeBreakpoint(value: TabsBreakpointType<TabBarDisplayMode>): TabsAttribute {
         modifierWithKey(this._modifiersWithKeys, TabsBarDisplayModeBreakpointModifier.identity, TabsBarDisplayModeBreakpointModifier, value);
         return this;
@@ -314,6 +318,10 @@ function loadComponent(): ComponentObj | undefined {
         modifierWithKey(this._modifiersWithKeys, TabMinContentWidthModifier.identity, TabMinContentWidthModifier, value);
         return this;
       }
+      tabViewCustomization(value: Optional<TabViewCustomization>): TabsAttribute {
+        modifierWithKey(this._modifiersWithKeys, TabsTabViewCustomizationModifier.identity, TabsTabViewCustomizationModifier, value);
+        return this;
+      }
       sidebarBackgroundColor(value: Optional<ResourceColor>): TabsAttribute {
         modifierWithKey(this._modifiersWithKeys, TabSidebarBackgroundColorModifier.identity, TabSidebarBackgroundColorModifier, value);
         return this;
@@ -324,6 +332,11 @@ function loadComponent(): ComponentObj | undefined {
       }
       sidebarDivider(value: Optional<DividerStyle>): TabsAttribute {
         modifierWithKey(this._modifiersWithKeys, TabSidebarDividerModifier.identity, TabSidebarDividerModifier, value);
+        return this;
+      }
+      expandSafeArea(types?: Array<SafeAreaType>, edges?: Array<SafeAreaEdge>): TabsAttribute {
+        super.expandSafeArea(types, edges);
+        getUINativeModule().tabs.markUserSetSafeAreaOpts(this.nativePtr);
         return this;
       }
     }
@@ -1277,6 +1290,25 @@ function loadComponent(): ComponentObj | undefined {
       }
     }
 
+    class ShowSidebarControlButtonModifier extends ModifierWithKey<boolean> {
+      constructor(value: boolean) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('showSidebarControlButton');
+
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().tabs.resetShowSidebarControlButton(node);
+        } else {
+          getUINativeModule().tabs.setShowSidebarControlButton(node, this.value);
+        }
+      }
+
+      checkObjectDiff(): boolean {
+        return !isBaseOrResourceEqual(this.stageValue, this.value);
+      }
+    }
+
     class TabsBarDisplayModeBreakpointModifier extends ModifierWithKey<TabsBreakpointType<TabBarDisplayMode>> {
       constructor(value: TabsBreakpointType<TabBarDisplayMode>) {
         super(value);
@@ -1422,6 +1454,21 @@ function loadComponent(): ComponentObj | undefined {
           this.stageValue?.color === this.value?.color &&
           this.stageValue?.startMargin === this.value?.startMargin &&
           this.stageValue?.endMargin === this.value?.endMargin);
+      }
+    }
+
+    class TabsTabViewCustomizationModifier extends ModifierWithKey<Optional<TabViewCustomization>> {
+      constructor(value: Optional<TabViewCustomization>) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('tabViewCustomization');
+
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().tabs.resetTabViewCustomization(node);
+        } else {
+          getUINativeModule().tabs.setTabViewCustomization(node, this.value);
+        }
       }
     }
         loadComponent.componentObj = { 'component': ArkTabsComponent };
@@ -1648,6 +1695,10 @@ class JSTabs extends JSContainerBase {
     getUINativeModule().tabs.setSidebarSearchable(true, value);
   }
 
+  static showSidebarControlButton(value: any): void {
+    getUINativeModule().tabs.setShowSidebarControlButton(true, value);
+  }
+
   static barDisplayModeBreakpoint(value: any): void {
     getUINativeModule().tabs.setBarDisplayModeBreakpoint(true, value);
   }
@@ -1672,6 +1723,10 @@ class JSTabs extends JSContainerBase {
     getUINativeModule().tabs.setTabMinContentWidth(true, value);
   }
 
+  static tabViewCustomization(value: any): void {
+    getUINativeModule().tabs.setTabViewCustomization(true, value);
+  }
+
   static sidebarBackgroundColor(value: any): void {
     getUINativeModule().tabs.setTabSidebarBackgroundColor(true, value);
   }
@@ -1682,6 +1737,11 @@ class JSTabs extends JSContainerBase {
 
   static sidebarDivider(value: any): void {
     getUINativeModule().tabs.setTabSidebarDivider(true, value);
+  }
+
+  static expandSafeArea(types?: Array<SafeAreaType>, edges?: Array<SafeAreaEdge>): void {
+    JSViewAbstract.expandSafeArea(types, edges);
+    getUINativeModule().tabs.markUserSetSafeAreaOpts(true);
   }
 
   static attributeModifier(modifier: any): void {

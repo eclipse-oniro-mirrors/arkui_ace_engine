@@ -1863,6 +1863,12 @@ typedef struct Map_AxisModel_F64 Map_AxisModel_F64;
 typedef struct Opt_Map_AxisModel_F64 Opt_Map_AxisModel_F64;
 typedef struct Map_F64_SliderStepItemAccessibility Map_F64_SliderStepItemAccessibility;
 typedef struct Opt_Map_F64_SliderStepItemAccessibility Opt_Map_F64_SliderStepItemAccessibility;
+typedef struct Map_I32_I32 Map_I32_I32;
+typedef struct Opt_Map_I32_I32 Opt_Map_I32_I32;
+typedef struct Map_I32_SidebarSection Map_I32_SidebarSection;
+typedef struct Opt_Map_I32_SidebarSection Opt_Map_I32_SidebarSection;
+typedef struct Map_I32_TabVisibility Map_I32_TabVisibility;
+typedef struct Opt_Map_I32_TabVisibility Opt_Map_I32_TabVisibility;
 typedef struct Map_I32_text_RunMetrics Map_I32_text_RunMetrics;
 typedef struct Opt_Map_I32_text_RunMetrics Opt_Map_I32_text_RunMetrics;
 typedef struct Map_SourceTool_F64 Map_SourceTool_F64;
@@ -2737,6 +2743,8 @@ typedef struct Ark_SelectionContainerMenuOptions Ark_SelectionContainerMenuOptio
 typedef struct Opt_SelectionContainerMenuOptions Opt_SelectionContainerMenuOptions;
 typedef struct Ark_SelectionOptions Ark_SelectionOptions;
 typedef struct Opt_SelectionOptions Opt_SelectionOptions;
+typedef struct Ark_SidebarSection Ark_SidebarSection;
+typedef struct Opt_SidebarSection Opt_SidebarSection;
 typedef struct Ark_SizeTLengthMetrics Ark_SizeTLengthMetrics;
 typedef struct Opt_SizeTLengthMetrics Opt_SizeTLengthMetrics;
 typedef struct Ark_SlideRange Ark_SlideRange;
@@ -2781,6 +2789,8 @@ typedef struct Ark_TabContentAnimatedTransition Ark_TabContentAnimatedTransition
 typedef struct Opt_TabContentAnimatedTransition Opt_TabContentAnimatedTransition;
 typedef struct Ark_TabsBreakpointType_TabBarDisplayMode Ark_TabsBreakpointType_TabBarDisplayMode;
 typedef struct Opt_TabsBreakpointType_TabBarDisplayMode Opt_TabsBreakpointType_TabBarDisplayMode;
+typedef struct Ark_TabViewCustomization Ark_TabViewCustomization;
+typedef struct Opt_TabViewCustomization Opt_TabViewCustomization;
 typedef struct Ark_TargetInfo Ark_TargetInfo;
 typedef struct Opt_TargetInfo Opt_TargetInfo;
 typedef struct Ark_TerminationInfo Ark_TerminationInfo;
@@ -3749,6 +3759,8 @@ typedef struct Ark_TextBackgroundStyle Ark_TextBackgroundStyle;
 typedef struct Opt_TextBackgroundStyle Opt_TextBackgroundStyle;
 typedef struct Ark_TextPickerTextStyle Ark_TextPickerTextStyle;
 typedef struct Opt_TextPickerTextStyle Opt_TextPickerTextStyle;
+typedef struct Ark_TopFloatingTabBarStyle Ark_TopFloatingTabBarStyle;
+typedef struct Opt_TopFloatingTabBarStyle Opt_TopFloatingTabBarStyle;
 typedef struct Ark_TouchEventProxy Ark_TouchEventProxy;
 typedef struct Opt_TouchEventProxy Opt_TouchEventProxy;
 typedef struct Ark_Union_AlertDialogParamWithConfirm_AlertDialogParamWithButtons_AlertDialogParamWithOptions Ark_Union_AlertDialogParamWithConfirm_AlertDialogParamWithButtons_AlertDialogParamWithOptions;
@@ -4015,6 +4027,14 @@ typedef struct Opt_AdaptiveColor {
     Ark_Tag tag;
     Ark_AdaptiveColor value;
 } Opt_AdaptiveColor;
+typedef enum Ark_AgentControlMode {
+    ARK_AGENT_CONTROL_MODE_ALLOW = 0,
+    ARK_AGENT_CONTROL_MODE_DENY = 1,
+} Ark_AgentControlMode;
+typedef struct Opt_AgentControlMode {
+    Ark_Tag tag;
+    Ark_AgentControlMode value;
+} Opt_AgentControlMode;
 typedef enum Ark_AISessionResultType {
     ARK_AISESSION_RESULT_TYPE_SUCCESS = 0,
     ARK_AISESSION_RESULT_TYPE_FAILURE = 1,
@@ -5528,6 +5548,15 @@ typedef struct Opt_GridRowDirection {
     Ark_Tag tag;
     Ark_GridRowDirection value;
 } Opt_GridRowDirection;
+typedef enum Ark_HandednessFollowMode {
+    ARK_HANDEDNESS_FOLLOW_MODE_NONE = 0,
+    ARK_HANDEDNESS_FOLLOW_MODE_FOLLOW_ANCHOR = 1,
+    ARK_HANDEDNESS_FOLLOW_MODE_FOLLOW_GRIP_HAND = 2,
+} Ark_HandednessFollowMode;
+typedef struct Opt_HandednessFollowMode {
+    Ark_Tag tag;
+    Ark_HandednessFollowMode value;
+} Opt_HandednessFollowMode;
 typedef enum Ark_HapticFeedbackMode {
     ARK_HAPTIC_FEEDBACK_MODE_DISABLED = 0,
     ARK_HAPTIC_FEEDBACK_MODE_ENABLED = 1,
@@ -7175,6 +7204,14 @@ typedef struct Opt_SelectStatus {
     Ark_Tag tag;
     Ark_SelectStatus value;
 } Opt_SelectStatus;
+typedef enum Ark_ShadowClipMode {
+    ARK_SHADOW_CLIP_MODE_DEFAULT_SHAPE = 0,
+    ARK_SHADOW_CLIP_MODE_BOUNDS_SHAPE = 1,
+} Ark_ShadowClipMode;
+typedef struct Opt_ShadowClipMode {
+    Ark_Tag tag;
+    Ark_ShadowClipMode value;
+} Opt_ShadowClipMode;
 typedef enum Ark_ShadowStyle {
     ARK_SHADOW_STYLE_OUTER_DEFAULT_XS = 0,
     ARK_SHADOW_STYLE_OUTER_DEFAULT_SM = 1,
@@ -7269,6 +7306,14 @@ typedef struct Opt_SideBarPosition {
     Ark_Tag tag;
     Ark_SideBarPosition value;
 } Opt_SideBarPosition;
+typedef enum Ark_SidebarSectionTitleStyle {
+    ARK_SIDEBAR_SECTION_TITLE_STYLE_STANDARD = 0,
+    ARK_SIDEBAR_SECTION_TITLE_STYLE_EMPHASIZED = 1,
+} Ark_SidebarSectionTitleStyle;
+typedef struct Opt_SidebarSectionTitleStyle {
+    Ark_Tag tag;
+    Ark_SidebarSectionTitleStyle value;
+} Opt_SidebarSectionTitleStyle;
 typedef enum Ark_SlideEffect {
     ARK_SLIDE_EFFECT_LEFT = 0,
     ARK_SLIDE_EFFECT_RIGHT = 1,
@@ -7511,6 +7556,7 @@ typedef struct Opt_SystemProperties {
 typedef enum Ark_TabBarDisplayMode {
     ARK_TAB_BAR_DISPLAY_MODE_BOTTOM_TABBAR = 0,
     ARK_TAB_BAR_DISPLAY_MODE_SIDEBAR = 1,
+    ARK_TAB_BAR_DISPLAY_MODE_TOP_TABBAR = 2,
 } Ark_TabBarDisplayMode;
 typedef struct Opt_TabBarDisplayMode {
     Ark_Tag tag;
@@ -7520,6 +7566,7 @@ typedef enum Ark_TabBarStyle {
     ARK_TAB_BAR_STYLE_BOTTOM = 0,
     ARK_TAB_BAR_STYLE_SIDEBAR = 1,
     ARK_TAB_BAR_STYLE_SIDEBAR_ADAPTABLE = 2,
+    ARK_TAB_BAR_STYLE_TOP = 3,
 } Ark_TabBarStyle;
 typedef struct Opt_TabBarStyle {
     Ark_Tag tag;
@@ -8103,6 +8150,9 @@ typedef struct Opt_WebCaptureMode {
     Ark_Tag tag;
     Ark_WebCaptureMode value;
 } Opt_WebCaptureMode;
+typedef enum Ark_WebContextMenuItemId {
+    ARK_WEB_CONTEXT_MENU_ITEM_ID_MENU_COPY_LINK = 11,
+} Ark_WebContextMenuItemId;
 typedef enum Ark_WebDarkMode {
     ARK_WEB_DARK_MODE_OFF = 0,
     ARK_WEB_DARK_MODE_ON = 1,
@@ -13803,6 +13853,36 @@ typedef struct Opt_Map_F64_SliderStepItemAccessibility {
     Ark_Tag tag;
     Map_F64_SliderStepItemAccessibility value;
 } Opt_Map_F64_SliderStepItemAccessibility;
+typedef struct Map_I32_I32 {
+    /* kind: ContainerType */
+    Ark_Int32 size;
+    Ark_Int32* keys;
+    Ark_Int32* values;
+} Map_I32_I32;
+typedef struct Opt_Map_I32_I32 {
+    Ark_Tag tag;
+    Map_I32_I32 value;
+} Opt_Map_I32_I32;
+typedef struct Map_I32_SidebarSection {
+    /* kind: ContainerType */
+    Ark_Int32 size;
+    Ark_Int32* keys;
+    Ark_SidebarSection* values;
+} Map_I32_SidebarSection;
+typedef struct Opt_Map_I32_SidebarSection {
+    Ark_Tag tag;
+    Map_I32_SidebarSection value;
+} Opt_Map_I32_SidebarSection;
+typedef struct Map_I32_TabVisibility {
+    /* kind: ContainerType */
+    Ark_Int32 size;
+    Ark_Int32* keys;
+    Ark_TabVisibility* values;
+} Map_I32_TabVisibility;
+typedef struct Opt_Map_I32_TabVisibility {
+    Ark_Tag tag;
+    Map_I32_TabVisibility value;
+} Opt_Map_I32_TabVisibility;
 typedef struct Map_I32_text_RunMetrics {
     /* kind: ContainerType */
     Ark_Int32 size;
@@ -17048,6 +17128,7 @@ typedef struct Ark_LazyForEachOptions {
     Opt_LazyForEachCustomComponentFreezeMode customComponentFreezeMode;
     Opt_LazyForEachReleaseStrategy releaseStrategy;
     Opt_LazyForEachMemOptStrategy memoryOptimizationStrategy;
+    Opt_CustomObject controller;
 } Ark_LazyForEachOptions;
 typedef struct Opt_LazyForEachOptions {
     Ark_Tag tag;
@@ -18193,6 +18274,16 @@ typedef struct Opt_SelectionOptions {
     Ark_Tag tag;
     Ark_SelectionOptions value;
 } Opt_SelectionOptions;
+typedef struct Ark_SidebarSection {
+    /* kind: Interface */
+    Ark_ResourceStr title;
+    Opt_Int32 order;
+    Opt_SidebarSectionTitleStyle titleStyle;
+} Ark_SidebarSection;
+typedef struct Opt_SidebarSection {
+    Ark_Tag tag;
+    Ark_SidebarSection value;
+} Opt_SidebarSection;
 typedef struct Ark_SizeTLengthMetrics {
     /* kind: Interface */
     Ark_LengthMetricsProxy width;
@@ -18427,6 +18518,16 @@ typedef struct Opt_TabsBreakpointType_TabBarDisplayMode {
     Ark_Tag tag;
     Ark_TabsBreakpointType_TabBarDisplayMode value;
 } Opt_TabsBreakpointType_TabBarDisplayMode;
+typedef struct Ark_TabViewCustomization {
+    /* kind: Interface */
+    Opt_Map_I32_TabVisibility visibilityMap;
+    Opt_Map_I32_SidebarSection sectionMap;
+    Opt_Map_I32_I32 orderMap;
+} Ark_TabViewCustomization;
+typedef struct Opt_TabViewCustomization {
+    Ark_Tag tag;
+    Ark_TabViewCustomization value;
+} Opt_TabViewCustomization;
 typedef struct Ark_TargetInfo {
     /* kind: Interface */
     Ark_Union_String_I32 id;
@@ -23462,6 +23563,7 @@ typedef struct Ark_ActionSheetOptions {
     Opt_uiMaterial_Material systemMaterial;
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
+    Opt_HandednessFollowMode adaptToHandedness;
 } Ark_ActionSheetOptions;
 typedef struct Opt_ActionSheetOptions {
     Ark_Tag tag;
@@ -23507,6 +23609,7 @@ typedef struct Ark_AlertDialogParamWithButtons {
     Opt_uiMaterial_Material systemMaterial;
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
+    Opt_HandednessFollowMode adaptToHandedness;
     Ark_AlertDialogButtonBaseOptions primaryButton;
     Ark_AlertDialogButtonBaseOptions secondaryButton;
 } Ark_AlertDialogParamWithButtons;
@@ -23554,6 +23657,7 @@ typedef struct Ark_AlertDialogParamWithConfirm {
     Opt_uiMaterial_Material systemMaterial;
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
+    Opt_HandednessFollowMode adaptToHandedness;
     Opt_AlertDialogButtonBaseOptions confirm;
 } Ark_AlertDialogParamWithConfirm;
 typedef struct Opt_AlertDialogParamWithConfirm {
@@ -23600,6 +23704,7 @@ typedef struct Ark_AlertDialogParamWithOptions {
     Opt_uiMaterial_Material systemMaterial;
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
+    Opt_HandednessFollowMode adaptToHandedness;
     Array_AlertDialogButtonOptions buttons;
     Opt_DialogButtonDirection buttonDirection;
 } Ark_AlertDialogParamWithOptions;
@@ -23797,6 +23902,7 @@ typedef struct Ark_CustomDialogControllerOptions {
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
     Opt_ExtendableComponent baseComponent;
+    Opt_HandednessFollowMode adaptToHandedness;
 } Ark_CustomDialogControllerOptions;
 typedef struct Opt_CustomDialogControllerOptions {
     Ark_Tag tag;
@@ -23846,6 +23952,7 @@ typedef struct Ark_CustomDialogControllerOptionsExtender {
     Opt_uiMaterial_Material systemMaterial;
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
+    Opt_HandednessFollowMode adaptToHandedness;
 } Ark_CustomDialogControllerOptionsExtender;
 typedef struct Opt_CustomDialogControllerOptionsExtender {
     Ark_Tag tag;
@@ -23926,6 +24033,8 @@ typedef struct Ark_FloatingTabBarStyle {
     Opt_Length maskHeight;
     Opt_Boolean adaptToHandedness;
     Opt_uiMaterial_ImmersiveMaterial systemMaterial;
+    Opt_Length maxWidth;
+    Opt_Union_Position_Edges_LocalizedEdges offset;
 } Ark_FloatingTabBarStyle;
 typedef struct Opt_FloatingTabBarStyle {
     Ark_Tag tag;
@@ -24266,6 +24375,7 @@ typedef struct Ark_SheetOptions {
     Opt_EdgeLightMode edgeLightMode;
     Opt_BlurSnapshotOptions blurSnapshot;
     Opt_SheetTitleBarHoverMode titleBarHoverMode;
+    Opt_HandednessFollowMode adaptToHandedness;
 } Ark_SheetOptions;
 typedef struct Opt_SheetOptions {
     Ark_Tag tag;
@@ -24310,6 +24420,8 @@ typedef struct Ark_TextBackgroundStyle {
     /* kind: Interface */
     Opt_ResourceColor color;
     Opt_Union_Dimension_BorderRadiuses radius;
+    Opt_Dimension borderWidth;
+    Opt_ResourceColor borderColor;
 } Ark_TextBackgroundStyle;
 typedef struct Opt_TextBackgroundStyle {
     Ark_Tag tag;
@@ -24327,6 +24439,20 @@ typedef struct Opt_TextPickerTextStyle {
     Ark_Tag tag;
     Ark_TextPickerTextStyle value;
 } Opt_TextPickerTextStyle;
+typedef struct Ark_TopFloatingTabBarStyle {
+    /* kind: Interface */
+    Opt_Length barWidth;
+    Opt_Length barSideMargin;
+    Opt_Length barTopMargin;
+    Opt_ResourceColor maskColor;
+    Opt_Length maskHeight;
+    Opt_Length maxWidth;
+    Opt_Union_Position_Edges_LocalizedEdges offset;
+} Ark_TopFloatingTabBarStyle;
+typedef struct Opt_TopFloatingTabBarStyle {
+    Ark_Tag tag;
+    Ark_TopFloatingTabBarStyle value;
+} Opt_TopFloatingTabBarStyle;
 typedef struct Ark_TouchEventProxy {
     /* kind: Interface */
     Ark_EventTarget target;
@@ -24467,6 +24593,7 @@ typedef struct Ark_CalendarDialogOptions {
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
     Opt_CalendarFirstDayOfWeek firstDayOfWeek;
+    Opt_HandednessFollowMode adaptToHandedness;
 } Ark_CalendarDialogOptions;
 typedef struct Opt_CalendarDialogOptions {
     Ark_Tag tag;
@@ -24511,6 +24638,7 @@ typedef struct Ark_DatePickerDialogOptions {
     Opt_uiMaterial_Material systemMaterial;
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
+    Opt_HandednessFollowMode adaptToHandedness;
 } Ark_DatePickerDialogOptions;
 typedef struct Opt_DatePickerDialogOptions {
     Ark_Tag tag;
@@ -24875,6 +25003,7 @@ typedef struct Ark_TextPickerDialogOptionsExt {
     Opt_uiMaterial_Material systemMaterial;
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
+    Opt_HandednessFollowMode adaptToHandedness;
 } Ark_TextPickerDialogOptionsExt;
 typedef struct Opt_TextPickerDialogOptionsExt {
     Ark_Tag tag;
@@ -24916,6 +25045,7 @@ typedef struct Ark_TimePickerDialogOptions {
     Opt_uiMaterial_Material systemMaterial;
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
+    Opt_HandednessFollowMode adaptToHandedness;
 } Ark_TimePickerDialogOptions;
 typedef struct Opt_TimePickerDialogOptions {
     Ark_Tag tag;
@@ -25317,6 +25447,8 @@ typedef struct GENERATED_ArkUICommonMethodModifier {
                               const Opt_ConstraintSizeOptions* value);
     void (*setHitTestBehavior)(Ark_NativePointer node,
                                const Opt_HitTestMode* value);
+    void (*setAgentControlMode)(Ark_NativePointer node,
+                                const Opt_AgentControlMode* value);
     void (*setOnChildTouchTest)(Ark_NativePointer node,
                                 const Opt_Callback_Array_TouchTestInfo_TouchResult* value);
     void (*setLayoutWeight)(Ark_NativePointer node,
@@ -25543,6 +25675,10 @@ typedef struct GENERATED_ArkUICommonMethodModifier {
                           const Opt_MotionPathOptions* value);
     void (*setShadow)(Ark_NativePointer node,
                       const Opt_Union_ShadowOptions_ShadowStyle* value);
+    void (*setShadowShape)(Ark_NativePointer node,
+                           const Opt_Union_CircleShape_EllipseShape_PathShape_RectShape* value);
+    void (*setShadowClipMode)(Ark_NativePointer node,
+                              const Opt_ShadowClipMode* value);
     void (*setEdgeLight)(Ark_NativePointer node,
                          const Opt_EdgeLightParams* value);
     void (*setClip)(Ark_NativePointer node,
@@ -27962,6 +28098,8 @@ typedef struct GENERATED_ArkUITabContentModifier {
                           const Opt_VoidCallback* value);
     void (*setOnWillHide)(Ark_NativePointer node,
                           const Opt_VoidCallback* value);
+    void (*setSidebarSection)(Ark_NativePointer node,
+                              const Opt_SidebarSection* value);
     void (*setTabBarVisibility)(Ark_NativePointer node,
                                 Ark_TabVisibility visibility,
                                 const Opt_TabBarDisplayMode* displayMode);
@@ -28030,6 +28168,8 @@ typedef struct GENERATED_ArkUITabsModifier {
                                   const Opt_OnTabsContentDidScrollCallback* value);
     void (*setBarFloatingStyle)(Ark_NativePointer node,
                                 const Opt_FloatingTabBarStyle* value);
+    void (*setTopBarFloatingStyle)(Ark_NativePointer node,
+                                   const Opt_TopFloatingTabBarStyle* value);
     void (*setBarStyle)(Ark_NativePointer node,
                         const Opt_TabBarStyle* value);
     void (*setSidebarPosition)(Ark_NativePointer node,
@@ -28072,6 +28212,10 @@ typedef struct GENERATED_ArkUITabsModifier {
                              const Opt_ComponentContentBase* value);
     void (*setSidebarBottomBar)(Ark_NativePointer node,
                                 const Opt_ComponentContentBase* value);
+    void (*setShowSidebarControlButton)(Ark_NativePointer node,
+                                        const Opt_Boolean* value);
+    void (*setTabViewCustomization)(Ark_NativePointer node,
+                                    const Opt_TabViewCustomization* value);
     void (*setBarMode)(Ark_NativePointer node,
                        const Opt_BarMode* value,
                        const Opt_ScrollableBarModeOptions* options);
@@ -29196,6 +29340,8 @@ typedef struct GENERATED_ArkUIWebModifier {
                             const Opt_OnZoomChangeCallback* value);
     void (*setFlingSpeedLimit)(Ark_NativePointer node,
                                const Opt_Float64* value);
+    void (*setVisitedLinkPersistEnabled)(Ark_NativePointer node,
+                                         const Opt_Boolean* value);
     void (*setRegisterNativeEmbedRule)(Ark_NativePointer node,
                                        const Opt_String* tag,
                                        const Opt_String* type);
@@ -31065,6 +31211,7 @@ typedef struct GENERATED_ArkUIIUIContextAccessor {
                                                    const InputEventListener* listener);
     void (*removeLocalInputEventMonitor)(Ark_NativePointer monitor);
     void (*setTextSelectionClearPolicy)(Ark_TextSelectionClearPolicy policy);
+    void (*setTransPageEnabled)(const Opt_Boolean* enabled);
 } GENERATED_ArkUIIUIContextAccessor;
 
 typedef struct GENERATED_ArkUIJsGeolocationAccessor {
@@ -31235,6 +31382,7 @@ typedef struct GENERATED_ArkUILazyForEachOpsAccessor {
                           const Opt_ItemDragEventHandler* onMoveDragEventOps);
     void (*SetOptions)(Ark_NativePointer node,
                        const Ark_LazyForEachOptions* options);
+    void (*ClearCache)(Ark_NativePointer node);
 } GENERATED_ArkUILazyForEachOpsAccessor;
 
 typedef struct GENERATED_ArkUILazyWaterFlowLayoutExtenderAccessor {

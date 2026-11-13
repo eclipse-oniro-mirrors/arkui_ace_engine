@@ -452,6 +452,10 @@ void BuildTextPickerDialogExt(const T& options, TextPickerDialog& pickerDialog)
     if (edgeLightMode) {
         pickerDialog.edgeLightMode = edgeLightMode.value();
     }
+    auto adaptToHandedness = Converter::OptConvert<HandednessFollowMode>(options.adaptToHandedness);
+    if (adaptToHandedness) {
+        pickerDialog.adaptToHandedness = adaptToHandedness.value();
+    }
 }
 
 TextPickerDialogEvent BuildTextPickerDialogEvents(const Ark_TextPickerDialogOptions& options)

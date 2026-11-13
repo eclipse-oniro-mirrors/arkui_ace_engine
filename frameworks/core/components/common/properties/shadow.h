@@ -48,6 +48,11 @@ enum class ShadowColorStrategy : char {
     AVERAGE,
     PRIMARY,
 };
+
+enum class ShadowClipMode : int8_t {
+    DEFAULT_SHAPE = 0,
+    BOUNDS_SHAPE,
+};
 // A style class indicates the way to render shadow effect
 class ACE_FORCE_EXPORT Shadow final {
 public:

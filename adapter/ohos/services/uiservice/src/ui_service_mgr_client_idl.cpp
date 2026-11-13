@@ -137,6 +137,20 @@ ErrCode UIServiceMgrClientIdl::ReportStatisticEvents(const AppInfoParcel& appInf
     return doms->ReportStatisticEvents(appInfo, events);
 }
 
+ErrCode UIServiceMgrClientIdl::ReportMaterialStatisticEvents(
+    const AppInfoParcel& appInfo, const std::vector<MaterialStatisticEventInfoParcel>& events)
+{
+    if (remoteObject_ == nullptr) {
+        ErrCode err = Connect();
+        if (err != ERR_OK) {
+            LOGW("%{private}s:fail to connect UIMgrService", __func__);
+            return UI_SERVICE_NOT_CONNECTED;
+        }
+    }
+    sptr<IUIServiceMgrNew> doms = iface_cast<IUIServiceMgrNew>(remoteObject_);
+    return doms->ReportMaterialStatisticEvents(appInfo, events);
+}
+
 /**
  * Connect ui_service manager service.
  *

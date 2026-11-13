@@ -1769,4 +1769,228 @@ HWTEST_F(TextTestSevenNg, GetTailIndentInJson004, TestSize.Level1)
     auto result = textLayoutProperty->GetTailIndentInJson();
     EXPECT_FALSE(result.empty());
 }
+
+/**
+ * @tc.name: SpanItemDecodeTlvTruncated001
+ * @tc.desc: Decoding a truncated SpanItem TLV buffer (no TLV_SPANITEM_END_TAG, stream just ends) should
+ *           terminate normally instead of looping forever, and decoded attributes should be kept.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTestSevenNg, SpanItemDecodeTlvTruncated001, TestSize.Level1)
+{
+    std::vector<uint8_t> buff;
+    TLVUtil::WriteUint8(buff, TLV_SPANITEM_TAG);
+    TLVUtil::WriteInt32(buff, 0);
+    TLVUtil::WriteInt32(buff, 3);
+    TLVUtil::WriteU16String(buff, u"abc");
+    TLVUtil::WriteUint8(buff, TLV_SPAN_FONT_STYLE_FONTSIZE);
+    TLVUtil::WriteDimension(buff, Dimension(15.0f, DimensionUnit::PX));
+    // 截断：缺少 TLV_SPANITEM_END_TAG，流直接结束
+
+    int32_t cursor = 0;
+    auto spanItem = SpanItem::DecodeTlv(buff, cursor);
+    EXPECT_EQ(StringUtils::Str16ToStr8(spanItem->content), "abc");
+    EXPECT_EQ(spanItem->interval.first, 0);
+    EXPECT_EQ(spanItem->interval.second, 3);
+    ASSERT_TRUE(spanItem->fontStyle->GetFontSize().has_value());
+    EXPECT_EQ(spanItem->fontStyle->GetFontSize().value(), Dimension(15.0f, DimensionUnit::PX));
+    EXPECT_EQ(cursor, static_cast<int32_t>(buff.size()));
+}
+
+/**
+ * @tc.name: SpanItemDecodeTlvTruncated002
+ * @tc.desc: Decoding a truncated SpanItem TLV buffer terminated by TLV_END should stop at the
+ *           TLV_END byte instead of looping forever.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTestSevenNg, SpanItemDecodeTlvTruncated002, TestSize.Level1)
+{
+    std::vector<uint8_t> buff;
+    TLVUtil::WriteUint8(buff, TLV_SPANITEM_TAG);
+    TLVUtil::WriteInt32(buff, 0);
+    TLVUtil::WriteInt32(buff, 3);
+    TLVUtil::WriteU16String(buff, u"abc");
+    TLVUtil::WriteUint8(buff, TLV_SPAN_FONT_STYLE_FONTSIZE);
+    TLVUtil::WriteDimension(buff, Dimension(15.0f, DimensionUnit::PX));
+    TLVUtil::WriteUint8(buff, TLV_END);
+    // 截断：以 TLV_END 结尾，缺少 TLV_SPANITEM_END_TAG
+
+    int32_t cursor = 0;
+    auto spanItem = SpanItem::DecodeTlv(buff, cursor);
+    EXPECT_EQ(StringUtils::Str16ToStr8(spanItem->content), "abc");
+    ASSERT_TRUE(spanItem->fontStyle->GetFontSize().has_value());
+    EXPECT_EQ(spanItem->fontStyle->GetFontSize().value(), Dimension(15.0f, DimensionUnit::PX));
+    EXPECT_EQ(cursor, static_cast<int32_t>(buff.size()));
+}
+
+/**
+ * @tc.name: ImageSpanItemDecodeTlvTruncated001
+ * @tc.desc: Decoding a truncated ImageSpanItem TLV buffer (no TLV_SPANITEM_END_TAG) should terminate
+ *           normally and keep the parsed offset option.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTestSevenNg, ImageSpanItemDecodeTlvTruncated001, TestSize.Level1)
+{
+    std::vector<uint8_t> buff;
+    TLVUtil::WriteUint8(buff, TLV_IMAGESPANITEM_TAG);
+    TLVUtil::WriteInt32(buff, 1);
+    TLVUtil::WriteInt32(buff, 4);
+    TLVUtil::WriteU16String(buff, u"abcd");
+    TLVUtil::WriteUint8(buff, TLV_IMAGESPANOPTION_OFFSET_TAG);
+    TLVUtil::WriteInt32(buff, 2);
+    // 截断：缺少 TLV_SPANITEM_END_TAG
+
+    int32_t cursor = 0;
+    auto imageSpanItem = ImageSpanItem::DecodeTlv(buff, cursor);
+    EXPECT_EQ(StringUtils::Str16ToStr8(imageSpanItem->content), "abcd");
+    EXPECT_EQ(imageSpanItem->interval.first, 1);
+    EXPECT_EQ(imageSpanItem->interval.second, 4);
+    ASSERT_TRUE(imageSpanItem->options.offset.has_value());
+    EXPECT_EQ(imageSpanItem->options.offset.value(), 2);
+    EXPECT_EQ(cursor, static_cast<int32_t>(buff.size()));
+}
+
+/**
+ * @tc.name: TLVUtilReadImageSpanSizeTruncated001
+ * @tc.desc: ReadImageSpanSize on a truncated buffer (no TLV_IMAGESPANSIZE_END_TAG) should terminate
+ *           normally and keep the parsed width.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTestSevenNg, TLVUtilReadImageSpanSizeTruncated001, TestSize.Level1)
+{
+    std::vector<uint8_t> buff;
+    TLVUtil::WriteUint8(buff, TLV_IMAGESPANSIZE_TAG);
+    TLVUtil::WriteUint8(buff, TLV_IMAGESPANSIZE_WIDTH_TAG);
+    CalcDimension width = CalcDimension(5.0f, DimensionUnit::PX);
+    TLVUtil::WriteCalcDimension(buff, width);
+    // 截断：缺少 TLV_IMAGESPANSIZE_END_TAG
+
+    int32_t cursor = 0;
+    auto size = TLVUtil::ReadImageSpanSize(buff, cursor);
+    ASSERT_TRUE(size.width.has_value());
+    EXPECT_EQ(size.width.value(), width);
+    EXPECT_EQ(cursor, static_cast<int32_t>(buff.size()));
+}
+
+/**
+ * @tc.name: TLVUtilReadPaddingPropertyTruncated001
+ * @tc.desc: ReadPaddingProperty on a truncated buffer (no TLV_PADDINGPROPERTY_END_TAG) should terminate
+ *           normally and keep the parsed left padding.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTestSevenNg, TLVUtilReadPaddingPropertyTruncated001, TestSize.Level1)
+{
+    std::vector<uint8_t> buff;
+    TLVUtil::WriteUint8(buff, TLV_PADDINGPROPERTY_TAG);
+    TLVUtil::WriteUint8(buff, TLV_PADDINGPROPERTY_LEFT_TAG);
+    CalcLength left = CalcLength(Dimension(5.0f, DimensionUnit::PX));
+    TLVUtil::WriteCalcLength(buff, left);
+    // 截断：缺少 TLV_PADDINGPROPERTY_END_TAG
+
+    int32_t cursor = 0;
+    auto pad = TLVUtil::ReadPaddingProperty(buff, cursor);
+    ASSERT_TRUE(pad.left.has_value());
+    EXPECT_EQ(pad.left.value().GetDimension(), Dimension(5.0f, DimensionUnit::PX));
+    EXPECT_EQ(cursor, static_cast<int32_t>(buff.size()));
+}
+
+/**
+ * @tc.name: TLVUtilReadImageSpanAttributeTruncated001
+ * @tc.desc: ReadImageSpanAttribute on a truncated buffer (no TLV_IMAGESPANATTRIBUTE_END_TAG) should
+ *           terminate normally and keep the parsed size attribute.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTestSevenNg, TLVUtilReadImageSpanAttributeTruncated001, TestSize.Level1)
+{
+    std::vector<uint8_t> buff;
+    TLVUtil::WriteUint8(buff, TLV_IMAGESPANATTRIBUTE_TAG);
+    TLVUtil::WriteUint8(buff, TLV_IMAGESPANATTRIBUTE_SIZE_TAG);
+    TLVUtil::WriteUint8(buff, TLV_IMAGESPANSIZE_TAG);
+    TLVUtil::WriteUint8(buff, TLV_IMAGESPANSIZE_HEIGHT_TAG);
+    CalcDimension height = CalcDimension(8.0f, DimensionUnit::PX);
+    TLVUtil::WriteCalcDimension(buff, height);
+    // 截断：缺少 TLV_IMAGESPANSIZE_END_TAG 与 TLV_IMAGESPANATTRIBUTE_END_TAG
+
+    int32_t cursor = 0;
+    auto attr = TLVUtil::ReadImageSpanAttribute(buff, cursor);
+    ASSERT_TRUE(attr.size.has_value());
+    ASSERT_TRUE(attr.size->height.has_value());
+    EXPECT_EQ(attr.size->height.value(), height);
+    EXPECT_EQ(cursor, static_cast<int32_t>(buff.size()));
+}
+
+/**
+ * @tc.name: TLVUtilReadRadialGradientTruncated001
+ * @tc.desc: ReadRadialGradient on a truncated buffer (no RADIALGRADIENT_END_TAG) should terminate
+ *           normally and keep the parsed centerX.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTestSevenNg, TLVUtilReadRadialGradientTruncated001, TestSize.Level1)
+{
+    std::vector<uint8_t> buff;
+    TLVUtil::WriteUint8(buff, TLV_SPAN_TEXT_LINE_STYLE_RADIALGRADIENT_BEGIN_TAG);
+    TLVUtil::WriteUint8(buff, TLV_SPAN_TEXT_LINE_STYLE_RADIALGRADIENT_CENTERX);
+    TLVUtil::WriteDimension(buff, Dimension(10.0f, DimensionUnit::PX));
+    // 截断：缺少 TLV_SPAN_TEXT_LINE_STYLE_RADIALGRADIENT_END_TAG
+
+    int32_t cursor = 0;
+    auto gradient = TLVUtil::ReadRadialGradient(buff, cursor);
+    ASSERT_TRUE(gradient.has_value());
+    auto radial = gradient->GetRadialGradient();
+    ASSERT_TRUE(radial != nullptr);
+    ASSERT_TRUE(radial->radialCenterX.has_value());
+    EXPECT_EQ(radial->radialCenterX.value(), Dimension(10.0f, DimensionUnit::PX));
+}
+
+/**
+ * @tc.name: TLVUtilReadLinearGradientTruncated001
+ * @tc.desc: ReadLinearGradient on a truncated buffer (no LINEARGRADIENT_END_TAG) should terminate
+ *           normally and keep the parsed angle.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTestSevenNg, TLVUtilReadLinearGradientTruncated001, TestSize.Level1)
+{
+    std::vector<uint8_t> buff;
+    TLVUtil::WriteUint8(buff, TLV_SPAN_TEXT_LINE_STYLE_LINEARGRADIENT_BEGIN_TAG);
+    TLVUtil::WriteUint8(buff, TLV_SPAN_TEXT_LINE_STYLE_LINEARGRADIENT_ANGLE);
+    TLVUtil::WriteDimension(buff, Dimension(30.0f, DimensionUnit::PX));
+    // 截断：缺少 TLV_SPAN_TEXT_LINE_STYLE_LINEARGRADIENT_END_TAG
+
+    int32_t cursor = 0;
+    auto gradient = TLVUtil::ReadLinearGradient(buff, cursor);
+    ASSERT_TRUE(gradient.has_value());
+    auto linear = gradient->GetLinearGradient();
+    ASSERT_TRUE(linear != nullptr);
+    ASSERT_TRUE(linear->angle.has_value());
+    EXPECT_EQ(linear->angle.value(), Dimension(30.0f, DimensionUnit::PX));
+}
+
+/**
+ * @tc.name: SpanStringDecodeTlvTruncated001
+ * @tc.desc: End-to-end: decoding a truncated SpanString TLV stream (SpanItem body cut off) should
+ *           terminate normally and restore the partially parsed span.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTestSevenNg, SpanStringDecodeTlvTruncated001, TestSize.Level1)
+{
+    std::vector<uint8_t> buff;
+    TLVUtil::WriteUint8(buff, TLV_SPAN_STRING_SPANS);
+    TLVUtil::WriteInt32(buff, 1);
+    TLVUtil::WriteInt32(buff, static_cast<int32_t>(SpanItemType::NORMAL));
+    TLVUtil::WriteUint8(buff, TLV_SPANITEM_TAG);
+    TLVUtil::WriteInt32(buff, 0);
+    TLVUtil::WriteInt32(buff, 3);
+    TLVUtil::WriteU16String(buff, u"abc");
+    TLVUtil::WriteUint8(buff, TLV_SPAN_FONT_STYLE_FONTSIZE);
+    TLVUtil::WriteDimension(buff, Dimension(15.0f, DimensionUnit::PX));
+    // 截断：缺少 TLV_SPANITEM_END_TAG、TLV_SPAN_STRING_CONTENT 与 TLV_END
+
+    auto spanStringDe = SpanString::DecodeTlv(buff);
+    EXPECT_EQ(spanStringDe->spans_.size(), 1);
+    auto it = spanStringDe->spans_.begin();
+    ASSERT_NE(it, spanStringDe->spans_.end());
+    EXPECT_EQ(StringUtils::Str16ToStr8((*it)->content), "abc");
+    ASSERT_TRUE((*it)->fontStyle->GetFontSize().has_value());
+    EXPECT_EQ((*it)->fontStyle->GetFontSize().value(), Dimension(15.0f, DimensionUnit::PX));
+}
 } // namespace OHOS::Ace::NG

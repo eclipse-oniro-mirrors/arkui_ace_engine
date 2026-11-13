@@ -443,6 +443,8 @@ protected:
     ACE_FORCE_EXPORT void FillMenuShowCopyAll(SelectMenuInfo& menuInfo, bool hasText, bool isSelectAll);
     ACE_FORCE_EXPORT void FillMenuShowCameraInput(SelectMenuInfo& menuInfo, bool isSelected, bool isCameraSupported,
         bool isInPasswordMode, bool hasCustomKeyboard);
+    ACE_FORCE_EXPORT void FillMenuShowTranslateInput(SelectMenuInfo& menuInfo, bool isSelected,
+        bool isContentRestricted, bool hasCustomKeyboard);
     ACE_FORCE_EXPORT void FillMenuVisibility(SelectMenuInfo& menuInfo, bool hasText, bool showCameraInput,
         bool isShowAutoFill, bool isSelectionMenuHidden, SelectOverlayDirtyFlag dirtyFlag);
     ACE_FORCE_EXPORT void FillMenuShowPaste(SelectMenuInfo& menuInfo);

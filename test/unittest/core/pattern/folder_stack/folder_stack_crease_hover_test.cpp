@@ -41,6 +41,7 @@
 #include "core/common/display_info_utils.h"
 #include "display_manager.h"
 #include "test/unittest/core/pattern/folder_stack/folder_stack_test_ng.h"
+#include "test/mock/adapter/ohos/osal/mock_system_properties.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -533,6 +534,82 @@ HWTEST_F(FolderStackCreaseHoverTest, CreaseHoverAC7d_FoldableMultiThreadRegister
     EXPECT_TRUE(pattern->HasFoldStatusChangedCallbackId());
 
     pattern->OnDetachFromMainTreeMultiThread();
+    EXPECT_FALSE(pattern->HasFoldStatusChangedCallbackId());
+}
+
+/**
+ * @tc.name: CreaseHoverAC7e_PortraitFoldProductTrueRegistersCallback
+ * @tc.desc: AC-7: WHEN IsPortraitFoldProduct()=true AND IsFoldable()=false THEN OnAttachToFrameNode
+ *           still registers foldStatusChange callback (new guard allows portrait fold devices).
+ * @tc.type: FUNC
+ */
+HWTEST_F(FolderStackCreaseHoverTest, CreaseHoverAC7e_PortraitFoldProductTrueRegistersCallback, TestSize.Level0)
+{
+    MockSystemProperties::g_isPortraitFoldProduct = true;
+    auto displayInfo = CreateDisplayInfo(FoldStatus::HALF_FOLD, FoldCreaseDirection::HORIZONTAL, false);
+    MockContainer::Current()->SetDisplayInfo(displayInfo);
+
+    auto frameNode = CreateFolderStackNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<FolderStackPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    EXPECT_TRUE(pattern->HasFoldStatusChangedCallbackId());
+
+    pattern->OnDetachFromFrameNode(frameNode.GetRawPtr());
+    EXPECT_FALSE(pattern->HasFoldStatusChangedCallbackId());
+
+    MockSystemProperties::g_isPortraitFoldProduct = false;
+}
+
+/**
+ * @tc.name: CreaseHoverAC7f_PortraitFoldProductTrueMultiThreadRegistersCallback
+ * @tc.desc: AC-7: WHEN IsPortraitFoldProduct()=true AND IsFoldable()=false THEN
+ *           OnAttachToMainTreeMultiThread still registers callback.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FolderStackCreaseHoverTest, CreaseHoverAC7f_PortraitFoldProductTrueMultiThreadRegistersCallback,
+    TestSize.Level0)
+{
+    MockSystemProperties::g_isPortraitFoldProduct = true;
+    auto displayInfo = CreateDisplayInfo(FoldStatus::HALF_FOLD, FoldCreaseDirection::HORIZONTAL, false);
+    MockContainer::Current()->SetDisplayInfo(displayInfo);
+
+    auto frameNode = CreateFolderStackNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<FolderStackPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    pattern->OnAttachToMainTreeMultiThread();
+
+    EXPECT_TRUE(pattern->HasFoldStatusChangedCallbackId());
+
+    pattern->OnDetachFromMainTreeMultiThread();
+    EXPECT_FALSE(pattern->HasFoldStatusChangedCallbackId());
+
+    MockSystemProperties::g_isPortraitFoldProduct = false;
+}
+
+/**
+ * @tc.name: CreaseHoverAC7g_BothFalseNoCallbackRegistration
+ * @tc.desc: AC-7: WHEN IsPortraitFoldProduct()=false AND IsFoldable()=false THEN no callback registered.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FolderStackCreaseHoverTest, CreaseHoverAC7g_BothFalseNoCallbackRegistration, TestSize.Level0)
+{
+    MockSystemProperties::g_isPortraitFoldProduct = false;
+    auto displayInfo = CreateDisplayInfo(FoldStatus::HALF_FOLD, FoldCreaseDirection::HORIZONTAL, false);
+    MockContainer::Current()->SetDisplayInfo(displayInfo);
+
+    auto frameNode = CreateFolderStackNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<FolderStackPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    pattern->OnAttachToFrameNode();
+    EXPECT_FALSE(pattern->HasFoldStatusChangedCallbackId());
+
+    pattern->OnAttachToMainTreeMultiThread();
     EXPECT_FALSE(pattern->HasFoldStatusChangedCallbackId());
 }
 

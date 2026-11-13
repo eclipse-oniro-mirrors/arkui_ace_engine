@@ -21,9 +21,10 @@
 #include "core/components_ng/pattern/ui_extension/session_wrapper.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_component/ui_extension_pattern.h"
 #include "frameworks/base/utils/delay_task.h"
+#include "interfaces/inner_api/ace/macros.h"
 
 namespace OHOS::Ace::NG {
-class UIExtensionProxy : public AceType {
+class ACE_FORCE_EXPORT UIExtensionProxy : public AceType {
     DECLARE_ACE_TYPE(UIExtensionProxy, AceType);
 
 public:

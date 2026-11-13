@@ -14171,10 +14171,7 @@ HWTEST_F(NativeNodeTest, CheckNodeIsNotUAF003, TestSize.Level1)
         ARKUI_ERROR_CODE_NO_ERROR);
     // 非法枚举整数返回 401
     EXPECT_EQ(OH_ArkUI_NativeModule_SetRuntimeCheckMode(
-        static_cast<OH_ArkUI_NativeModule_RuntimeCheckType>(2), OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG),
-        ARKUI_ERROR_CODE_PARAM_INVALID);
-    EXPECT_EQ(OH_ArkUI_NativeModule_SetRuntimeCheckMode(
-        static_cast<OH_ArkUI_NativeModule_RuntimeCheckType>(-1), OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED),
+        static_cast<OH_ArkUI_NativeModule_RuntimeCheckType>(-1), OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG),
         ARKUI_ERROR_CODE_PARAM_INVALID);
     EXPECT_EQ(OH_ArkUI_NativeModule_SetRuntimeCheckMode(
         OH_ARKUI_NATIVEMODULE_CHECK_TYPE_NODE_DISPOSED, static_cast<OH_ArkUI_NativeModule_RuntimeCheckMode>(3)),

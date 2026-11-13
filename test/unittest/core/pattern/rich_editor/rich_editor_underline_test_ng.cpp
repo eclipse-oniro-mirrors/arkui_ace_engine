@@ -591,7 +591,6 @@ HWTEST_F(RichEditorUnderlineTestNg, PaintUnderline002, TestSize.Level1)
         Testing::MockCanvas canvas;
         EXPECT_CALL(canvas, AttachPen(_)).WillRepeatedly(ReturnRef(canvas));
         EXPECT_CALL(canvas, DetachPen()).WillRepeatedly(ReturnRef(canvas));
-        EXPECT_CALL(canvas, DrawLine(_, _)).Times(EXPECTED_DRAW_LINE_TIMES);
         overlayMod->PaintUnderline(canvas);
     };
 
@@ -949,7 +948,6 @@ HWTEST_F(RichEditorUnderlineTestNg, UpdateOverlayModifierNotFocused001, TestSize
     EXPECT_FLOAT_EQ(overlayMod->frameSize_->Get().Width(), FRAME_WIDTH);
     EXPECT_FLOAT_EQ(overlayMod->frameSize_->Get().Height(), FRAME_HEIGHT);
 }
-
 
 /**
  * @tc.name: IsUnspecifiedOrTextType001

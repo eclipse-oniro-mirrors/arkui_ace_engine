@@ -815,13 +815,13 @@ bool ScrollPattern::UpdateCurrentOffset(float delta, int32_t source)
     }
 #endif
     if (IsCrashTop()) {
-        TAG_LOGI(AceLogTag::ACE_SCROLLABLE, "UpdateCurrentOffset==>[HandleCrashTop();]");
+        TAG_LOGD(AceLogTag::ACE_SCROLLABLE, "UpdateCurrentOffset==>[HandleCrashTop();]");
 #ifdef SUPPORT_DIGITAL_CROWN
         SetReachBoundary(true);
 #endif
         HandleCrashTop();
     } else if (IsCrashBottom()) {
-        TAG_LOGI(AceLogTag::ACE_SCROLLABLE, "UpdateCurrentOffset==>[HandleCrashBottom();]");
+        TAG_LOGD(AceLogTag::ACE_SCROLLABLE, "UpdateCurrentOffset==>[HandleCrashBottom();]");
 #ifdef SUPPORT_DIGITAL_CROWN
         SetReachBoundary(true);
 #endif
@@ -833,6 +833,14 @@ bool ScrollPattern::UpdateCurrentOffset(float delta, int32_t source)
     }
 #endif
     return true;
+}
+
+void ScrollPattern::UpdateAnimateOverScroll(int32_t source, bool isAtTop, bool isAtBottom)
+{
+    animateOverScrollStart_ =
+        (source == SCROLL_FROM_ANIMATION_CONTROLLER) && isAtTop && !NearZero(currentOffset_);
+    animateOverScrollEnd_ = (source == SCROLL_FROM_ANIMATION_CONTROLLER) && isAtBottom &&
+                            !NearEqual(currentOffset_, -scrollableDistance_);
 }
 
 void ScrollPattern::OnAnimateStop()
@@ -883,6 +891,7 @@ void ScrollPattern::ScrollBy(float pixelX, float pixelY, bool smooth, const std:
         AnimateTo(-position, fabs(distance) * UNIT_CONVERT / SCROLL_BY_SPEED, Curves::EASE_OUT, true, false, false);
         return;
     }
+    ScheduleCapiScrollCommand(false);
     JumpToPosition(position);
 }
 
@@ -919,10 +928,11 @@ void ScrollPattern::JumpToPosition(float position, int32_t source)
 
 void ScrollPattern::ScrollTo(float position)
 {
+    ScheduleCapiScrollCommand(true);
     SetAnimateCanOverScroll(GetCanStayOverScroll());
     JumpToPosition(-position - contentStartOffset_, SCROLL_FROM_JUMP);
     SetIsOverScroll(GetCanStayOverScroll());
-    ContentChangeReport(GetHost(), ContentChangeManager::SCROLL_TO);
+    ContentChangeReport(GetHost(), ContentChangeManager::SCROLL_TO, false);
 }
 
 void ScrollPattern::DoJump(float position, int32_t source)
@@ -1579,12 +1589,20 @@ void ScrollPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const Para
     CHECK_NULL_VOID(hub);
     ScrollablePattern::DumpAdvanceInfo(json, config);
     if (!config.IsPublicTree() || config.visualProperties) {
-        json->Put("currentOffset", std::to_string(currentOffset_).c_str());
+        if (config.IsPublicTree()) {
+            json->Put("currentOffset", currentOffset_);
+        } else {
+            json->Put("currentOffset", std::to_string(currentOffset_).c_str());
+        }
     }
     if (!config.IsPublicTree() || config.functionalProperties) {
         DumpAdvanceSnapInfo(json, config);
         auto onScrollEdge = hub->GetScrollEdgeEvent();
-        json->Put("hasOnScrollEdge", onScrollEdge ? "true" : "false");
+        if (config.IsPublicTree()) {
+            json->Put("hasOnScrollEdge", static_cast<bool>(onScrollEdge));
+        } else {
+            json->Put("hasOnScrollEdge", onScrollEdge ? "true" : "false");
+        }
     }
     if (!config.IsPublicTree()) {
         DumpAdvanceHistoryInfo(json);
@@ -1594,9 +1612,31 @@ void ScrollPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const Para
 void ScrollPattern::DumpAdvanceSnapInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
     GetScrollSnapAlignDumpInfo(json);
-    json->Put("snapPagination", GetScrollSnapPagination().c_str());
-    json->Put("enableSnapToStart", enableSnapToSide_.first ? "true" : "false");
-    json->Put("enableSnapToEnd", enableSnapToSide_.second ? "true" : "false");
+    if (config.IsPublicTree()) {
+        auto pagination = JsonUtil::Create();
+        if (IsSnapToInterval()) {
+            pagination->Put("interval", intervalSize_.ToString().c_str());
+        } else {
+            auto offsets = JsonUtil::CreateArray();
+            for (size_t index = 0; index < snapPaginations_.size(); ++index) {
+                offsets->Put(std::to_string(index).c_str(), snapPaginations_[index].ToString().c_str());
+            }
+            pagination->PutRef("offsets", std::move(offsets));
+        }
+        json->PutRef("snapPagination", std::move(pagination));
+    } else {
+        json->Put("snapPagination", GetScrollSnapPagination().c_str());
+    }
+    if (config.IsPublicTree()) {
+        json->Put("enableSnapToStart", static_cast<bool>(enableSnapToSide_.first));
+    } else {
+        json->Put("enableSnapToStart", enableSnapToSide_.first ? "true" : "false");
+    }
+    if (config.IsPublicTree()) {
+        json->Put("enableSnapToEnd", static_cast<bool>(enableSnapToSide_.second));
+    } else {
+        json->Put("enableSnapToEnd", enableSnapToSide_.second ? "true" : "false");
+    }
     GetScrollPagingStatusDumpInfo(json);
     if (!config.IsPublicTree()) {
         std::string snapOffsetsStr = "";
@@ -2110,6 +2150,11 @@ void ScrollPattern::ReportOnItemScrollEvent(const std::string& event)
 void ScrollPattern::FillReportOnItemStopParams(std::unique_ptr<JsonValue>& params)
 {
     params->Put("offset", GetCurrentPosition());
+}
+
+CommandResult ScrollPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return OnInjectionEventByRatioWithResult(command);
 }
 
 int32_t ScrollPattern::OnInjectionEvent(const std::string& command)

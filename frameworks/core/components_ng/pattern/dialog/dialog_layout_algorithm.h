@@ -15,7 +15,9 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_DIALOG_DIALOG_LAYOUT_ALGORITHM_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_DIALOG_DIALOG_LAYOUT_ALGORITHM_H
 
+#include <optional>
 #include <string>
+#include <utility>
 
 #include "base/geometry/ng/offset_t.h"
 #include "base/geometry/ng/rect_t.h"
@@ -27,6 +29,7 @@
 #include "core/components/dialog/dialog_theme.h"
 #include "core/components_ng/layout/layout_algorithm.h"
 #include "core/components_ng/layout/overlay_safe_area_helper.h"
+#include "core/components_ng/manager/handedness/handedness_manager.h"
 #include "core/components_ng/pattern/dialog/dialog_layout_property.h"
 
 namespace OHOS::Ace::NG {
@@ -75,14 +78,15 @@ private:
     int32_t GetDeviceColumns(GridSizeType type, DeviceType deviceType);
 
     OffsetF ComputeChildPosition(
-        const SizeF& childSize, const RefPtr<DialogLayoutProperty>& prop, const SizeF& slefSize);
+        const SizeF& childSize, const RefPtr<DialogLayoutProperty>& prop, const SizeF& slefSize,
+        const RefPtr<DialogPattern>& dialogPattern);
     bool SetAlignmentSwitch(SizeF& maxSize, const SizeF& childSize, OffsetF& topLeftPoint);
     bool SetAlignmentSwitchLessThanAPITwelve(const SizeF& maxSize, const SizeF& childSize, OffsetF& topLeftPoint);
     bool IsAlignmentByWholeScreen();
     void CaculateMaxSize(SizeF& maxSize);
     bool IsDialogTouchingBoundary(OffsetF topLeftPoint, SizeF childSize, SizeF selfSize);
     void MultipleDialog(const RefPtr<DialogLayoutProperty>& dialogProp, const SizeF& childSize, const SizeF& selfSize,
-        const RefPtr<OverlayManager> subOverlayManager);
+        const RefPtr<OverlayManager> subOverlayManager, const RefPtr<DialogPattern>& dialogPattern);
     void ProcessMaskRect(std::optional<DimensionRect> maskRect, const RefPtr<FrameNode>& dialog, bool isMask = false);
     void SetSubWindowHotarea(
         const RefPtr<DialogLayoutProperty>& dialogProp, SizeF childSize, SizeF selfSize, int32_t frameNodeId);
@@ -120,6 +124,10 @@ private:
         const RefPtr<DialogLayoutProperty>& dialogProp, const SizeF& maxSize, OptionalSizeF& realSize);
     void AdjustHoverModeForWaterfall(const RefPtr<FrameNode>& frameNode);
     bool IsDefaultPosition(const RefPtr<DialogLayoutProperty>& dialogProp);
+    bool IsHandednessActive(const RefPtr<DialogLayoutProperty>& dialogProp);
+    std::pair<bool, OffsetF> ComputeHandednessOffset(
+        const SizeF& childSize, const SizeF& selfSize, const RefPtr<DialogLayoutProperty>& dialogProp,
+        const RefPtr<DialogPattern>& dialogPattern);
     void AvoidTitlebarInSubwindow(OffsetF& topLeftPoint, const RefPtr<DialogLayoutProperty>& dialogProp);
     bool NeedAdaptToAgingWidth(const RefPtr<FrameNode>& frameNode);
     // Pre-measure for fixed-style dialog to determine scroll/list layout constraints
@@ -153,6 +161,7 @@ private:
     int32_t subWindowId_ = -1;
     DimensionOffset dialogOffset_;
     DialogAlignment alignment_ = DialogAlignment::DEFAULT;
+    HandednessFollowMode handednessMode_ = HandednessFollowMode::NONE;
     TouchingBoundaryType touchingBoundaryFlag_ = TouchingBoundaryType::NotTouchBoundary;
 
     RefPtr<DialogTheme> dialogTheme_ = nullptr;

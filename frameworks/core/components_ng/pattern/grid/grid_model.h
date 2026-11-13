@@ -25,6 +25,7 @@
 #include "base/memory/ace_type.h"
 #include "core/components/common/layout/constants.h"
 #include "core/components/common/properties/color.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_types.h"
 #include "core/components_ng/pattern/grid/grid_constants.h"
 #include "core/components_ng/pattern/grid/grid_layout_options.h"
 #include "core/components_ng/pattern/grid/grid_properties.h"
@@ -99,6 +100,8 @@ public:
     virtual void SetOnReachStart(std::function<void()>&& onReachStart) = 0;
     virtual void SetOnReachEnd(std::function<void()>&& onReachEnd) = 0;
     virtual void SetSyncLoad(bool syncLoad) {}
+    // FEAT scroll placeholder: a null provider resets the capability (see GridPattern).
+    virtual void SetScrollPlaceholder(NG::ScrollPlaceholderProvider&& provider) {}
     virtual void SetEditModeOptions(NG::EditModeOptions& editModeOptions) {};
     virtual void SetEnableEditMode(bool enableEditMode) {};
     virtual void SetEnableEditModeChangeEvent(std::function<void(bool)>&& changeEvent) {};

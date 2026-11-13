@@ -267,9 +267,9 @@ bool BubbleView::HandleLowEndImmersiveMaterialForBubble(
         CHECK_NULL_RETURN(copiedOptions, false);
         copiedOptions->materialColor = backgroundColor;
         renderContext->UpdateBackgroundColor(Color::TRANSPARENT);
-        ViewAbstract::SetSystemMaterial(AceType::RawPtr(bubbleNode), AceType::RawPtr(copiedMaterial));
+        ViewAbstract::SetSystemMaterialForOverlay(AceType::RawPtr(bubbleNode), AceType::RawPtr(copiedMaterial));
     } else {
-        ViewAbstract::SetSystemMaterial(AceType::RawPtr(bubbleNode), AceType::RawPtr(systemMaterial));
+        ViewAbstract::SetSystemMaterialForOverlay(AceType::RawPtr(bubbleNode), AceType::RawPtr(systemMaterial));
     }
     return true;
 }

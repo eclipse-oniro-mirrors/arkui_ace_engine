@@ -20,18 +20,11 @@
 #include "frameworks/core/common/container.h"
 
 namespace OHOS::Ace {
-std::unique_ptr<TimeEventProxy> TimeEventProxy::instance_;
-std::mutex TimeEventProxy::mutex_;
 
 TimeEventProxy* TimeEventProxy::GetInstance()
 {
-    if (!instance_) {
-        std::scoped_lock lock(mutex_);
-        if (!instance_) {
-            instance_ = std::make_unique<TimeEventProxyOhos>();
-        }
-    }
-    return instance_.get();
+    static TimeEventProxyOhos instance;
+    return &instance;
 }
 
 using OHOS::EventFwk::CommonEventManager;

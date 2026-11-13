@@ -34,6 +34,7 @@ import { memo, memo_stable, memo_skip } from 'arkui.stateManagement.runtime'
 import { ComponentBuilder, Builder } from '@koalaui/builderLambda'
 import { DialogAlignment } from './alertDialog'
 import { default as uiMaterial } from '@ohos.arkui.uiMaterial'
+import { HandednessFollowMode } from '@ohos.arkui.dialog'
 import { TextPickerModifier } from './../TextPickerModifier'
 import { NodeAttach, remember } from '@koalaui/runtime'
 import { ModifierStateManager } from './../CommonModifier'
@@ -478,6 +479,7 @@ export interface TextPickerDialogOptionsExt extends TextPickerOptions {
     systemMaterial?: SystemUiMaterial;
     distortionMode?: DistortionMode;
     edgeLightMode?: EdgeLightMode;
+    adaptToHandedness?: HandednessFollowMode;
 }
 
 export class ArkTextPickerComponent extends ArkCommonMethodComponent implements TextPickerAttribute {
@@ -2941,6 +2943,14 @@ export class TextPickerDialogOptionsExt_serializer {
         } else {
             valueSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
+        const valueHolderForAdaptToHandedness = value.adaptToHandedness
+        if (valueHolderForAdaptToHandedness !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForAdaptToHandednessTmpValue = (valueHolderForAdaptToHandedness as HandednessFollowMode)
+            valueSerializer.writeInt32(valueHolderForAdaptToHandednessTmpValue.valueOf())
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
     }
     public static read(buffer: DeserializerBase): TextPickerDialogOptionsExt {
         let valueDeserializer: DeserializerBase = buffer
@@ -3427,7 +3437,13 @@ export class TextPickerDialogOptionsExt_serializer {
             edgeLightModeTmpBuf = EdgeLightMode.fromValue(valueDeserializer.readInt32())
         }
         const edgeLightModeTmpResult: EdgeLightMode | undefined = edgeLightModeTmpBuf
-        let value: TextPickerDialogOptionsExt = ({range: rangeTmpResult, value: valueTmpResult, selected: selectedTmpResult, columnWidths: columnWidthsTmpResult, defaultPickerItemHeight: defaultPickerItemHeightTmpResult, canLoop: canLoopTmpResult, disappearTextStyle: disappearTextStyleTmpResult, textStyle: textStyleTmpResult, acceptButtonStyle: acceptButtonStyleTmpResult, cancelButtonStyle: cancelButtonStyleTmpResult, selectedTextStyle: selectedTextStyleTmpResult, disableTextStyleAnimation: disableTextStyleAnimationTmpResult, defaultTextStyle: defaultTextStyleTmpResult, onAccept: onAcceptTmpResult, onCancel: onCancelTmpResult, onChange: onChangeTmpResult, onScrollStop: onScrollStopTmpResult, onEnterSelectedArea: onEnterSelectedAreaTmpResult, maskRect: maskRectTmpResult, alignment: alignmentTmpResult, offset: offsetTmpResult, backgroundColor: backgroundColorTmpResult, backgroundBlurStyle: backgroundBlurStyleTmpResult, backgroundBlurStyleOptions: backgroundBlurStyleOptionsTmpResult, backgroundEffect: backgroundEffectTmpResult, onDidAppear: onDidAppearTmpResult, onDidDisappear: onDidDisappearTmpResult, onWillAppear: onWillAppearTmpResult, onWillDisappear: onWillDisappearTmpResult, shadow: shadowTmpResult, enableHoverMode: enableHoverModeTmpResult, hoverModeArea: hoverModeAreaTmpResult, enableHapticFeedback: enableHapticFeedbackTmpResult, selectedBackgroundStyle: selectedBackgroundStyleTmpResult, systemMaterial: systemMaterialTmpResult, distortionMode: distortionModeTmpResult, edgeLightMode: edgeLightModeTmpResult} as TextPickerDialogOptionsExt)
+        const adaptToHandednessTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let adaptToHandednessTmpBuf: HandednessFollowMode | undefined = undefined
+        if ((adaptToHandednessTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            adaptToHandednessTmpBuf = HandednessFollowMode.fromValue(valueDeserializer.readInt32())
+        }
+        const adaptToHandednessTmpResult: HandednessFollowMode | undefined = adaptToHandednessTmpBuf
+        let value: TextPickerDialogOptionsExt = ({range: rangeTmpResult, value: valueTmpResult, selected: selectedTmpResult, columnWidths: columnWidthsTmpResult, defaultPickerItemHeight: defaultPickerItemHeightTmpResult, canLoop: canLoopTmpResult, disappearTextStyle: disappearTextStyleTmpResult, textStyle: textStyleTmpResult, acceptButtonStyle: acceptButtonStyleTmpResult, cancelButtonStyle: cancelButtonStyleTmpResult, selectedTextStyle: selectedTextStyleTmpResult, disableTextStyleAnimation: disableTextStyleAnimationTmpResult, defaultTextStyle: defaultTextStyleTmpResult, onAccept: onAcceptTmpResult, onCancel: onCancelTmpResult, onChange: onChangeTmpResult, onScrollStop: onScrollStopTmpResult, onEnterSelectedArea: onEnterSelectedAreaTmpResult, maskRect: maskRectTmpResult, alignment: alignmentTmpResult, offset: offsetTmpResult, backgroundColor: backgroundColorTmpResult, backgroundBlurStyle: backgroundBlurStyleTmpResult, backgroundBlurStyleOptions: backgroundBlurStyleOptionsTmpResult, backgroundEffect: backgroundEffectTmpResult, onDidAppear: onDidAppearTmpResult, onDidDisappear: onDidDisappearTmpResult, onWillAppear: onWillAppearTmpResult, onWillDisappear: onWillDisappearTmpResult, shadow: shadowTmpResult, enableHoverMode: enableHoverModeTmpResult, hoverModeArea: hoverModeAreaTmpResult, enableHapticFeedback: enableHapticFeedbackTmpResult, selectedBackgroundStyle: selectedBackgroundStyleTmpResult, systemMaterial: systemMaterialTmpResult, distortionMode: distortionModeTmpResult, edgeLightMode: edgeLightModeTmpResult, adaptToHandedness: adaptToHandednessTmpResult} as TextPickerDialogOptionsExt)
         return value
     }
 }

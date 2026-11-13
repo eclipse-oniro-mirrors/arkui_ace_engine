@@ -46,6 +46,16 @@ RefPtr<GestureReferee> GetCurrentGestureReferee(const RefPtr<NGGestureRecognizer
     return eventManager->GetGestureRefereeNG(recognizer);
 }
 
+bool IsAgentTouchDenied(const NGGestureRecognizer& recognizer, const TouchEvent& point)
+{
+    if (!EventManager::IsAgentTouchInScope(point) || AceType::InstanceOf<RecognizerGroup>(&recognizer)) {
+        return false;
+    }
+    auto node = recognizer.GetAttachedNode().Upgrade();
+    auto manager = GetCurrentEventManager();
+    return !node || !manager || !manager->IsAgentTouchAllowed(point, node->GetId());
+}
+
 } // namespace
 
 RefPtr<Gesture> NGGestureRecognizer::CreateGestureFromRecognizer() const
@@ -116,6 +126,12 @@ void NGGestureRecognizer::OnRejectBridgeObj()
 
 bool NGGestureRecognizer::HandleEvent(const TouchEvent& point)
 {
+    if (IsAgentTouchDenied(*this, point)) {
+        if (point.type == TouchType::DOWN) {
+            Adjudicate(Claim(this), GestureDisposal::REJECT);
+        }
+        return false;
+    }
     if (!IsAllowedType(point.sourceTool) && point.type != TouchType::CANCEL) {
         if (point.type == TouchType::DOWN) {
             RemoveUnsupportEvent(point.id);
@@ -144,21 +160,22 @@ bool NGGestureRecognizer::ProcessTouchEvent(const TouchEvent& point)
     if (IsFingerEscaped(point.id)) {
         return true;
     }
+    bool propagate = true;
     switch (point.type) {
         case TouchType::MOVE:
             HandleTouchMoveEvent(point);
-            HandleEventToBridgeObjList(point, bridgeObjList_);
+            propagate = HandleEventToBridgeObjList(point, bridgeObjList_);
             break;
         case TouchType::DOWN:
-            HandleTouchDown(point);
+            propagate = HandleTouchDown(point);
             CheckCurrentFingers();
             break;
         case TouchType::UP:
-            HandleTouchUp(point);
+            propagate = HandleTouchUp(point);
             CheckCurrentFingers();
             break;
         case TouchType::CANCEL:
-            HandleTouchCancel(point);
+            propagate = HandleTouchCancel(point);
             CheckCurrentFingers();
             break;
         default:
@@ -167,10 +184,10 @@ bool NGGestureRecognizer::ProcessTouchEvent(const TouchEvent& point)
     if (point.type == TouchType::DOWN || point.type == TouchType::UP || point.type == TouchType::CANCEL) {
         NotifyManagerStateChange(refereeState_);
     }
-    return true;
+    return propagate;
 }
 
-void NGGestureRecognizer::HandleTouchDown(const TouchEvent& point)
+bool NGGestureRecognizer::HandleTouchDown(const TouchEvent& point)
 {
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING
     DragDropBehaviorReporter::GetInstance().UpdateLongPressDurationStart(GetSysTimestamp());
@@ -183,11 +200,12 @@ void NGGestureRecognizer::HandleTouchDown(const TouchEvent& point)
     auto result = AboutToAddCurrentFingers(point);
     if (result) {
         HandleTouchDownEvent(point);
-        HandleEventToBridgeObjList(point, bridgeObjList_);
+        return HandleEventToBridgeObjList(point, bridgeObjList_);
     }
+    return true;
 }
 
-void NGGestureRecognizer::HandleTouchUp(const TouchEvent& point)
+bool NGGestureRecognizer::HandleTouchUp(const TouchEvent& point)
 {
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING
     DragDropBehaviorReporter::GetInstance().UpdateLongPressDurationStart(0);
@@ -195,12 +213,14 @@ void NGGestureRecognizer::HandleTouchUp(const TouchEvent& point)
     auto result = AboutToMinusCurrentFingers(point.id);
     if (result) {
         HandleTouchUpEvent(point);
-        HandleEventToBridgeObjList(point, bridgeObjList_);
+        const bool propagate = HandleEventToBridgeObjList(point, bridgeObjList_);
         currentFingers_--;
+        return propagate;
     }
+    return true;
 }
 
-void NGGestureRecognizer::HandleTouchCancel(const TouchEvent& point)
+bool NGGestureRecognizer::HandleTouchCancel(const TouchEvent& point)
 {
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING
     DragDropBehaviorReporter::GetInstance().UpdateLongPressDurationStart(0);
@@ -208,9 +228,11 @@ void NGGestureRecognizer::HandleTouchCancel(const TouchEvent& point)
     auto result = AboutToMinusCurrentFingers(point.id);
     if (result) {
         HandleTouchCancelEvent(point);
-        HandleEventToBridgeObjList(point, bridgeObjList_);
+        const bool propagate = HandleEventToBridgeObjList(point, bridgeObjList_);
         currentFingers_--;
+        return propagate;
     }
+    return true;
 }
 
 bool NGGestureRecognizer::HandleEvent(const AxisEvent& event)
@@ -260,29 +282,30 @@ bool NGGestureRecognizer::HandleEvent(const AxisEvent& event)
     return true;
 }
 
-void NGGestureRecognizer::HandleBridgeModeEvent(const TouchEvent& point)
+bool NGGestureRecognizer::HandleBridgeModeEvent(const TouchEvent& point)
 {
-    if (IsFingerEscaped(point.id)) {
-        return;
+    if (IsAgentTouchDenied(*this, point)) {
+        return false;
     }
+    if (IsFingerEscaped(point.id)) {
+        return true;
+    }
+    bool propagate = true;
     switch (point.type) {
         case TouchType::MOVE:
             HandleTouchMoveEvent(point);
-            HandleEventToBridgeObjList(point, bridgeObjList_);
+            propagate = HandleEventToBridgeObjList(point, bridgeObjList_);
             break;
         case TouchType::DOWN: {
             deviceId_ = point.deviceId;
             deviceType_ = point.sourceType;
             deviceTool_ = point.sourceTool;
-            if (deviceType_ == SourceType::MOUSE) {
-                inputEventType_ = InputEventType::MOUSE_BUTTON;
-            } else {
-                inputEventType_ = InputEventType::TOUCH_SCREEN;
-            }
+            inputEventType_ = deviceType_ == SourceType::MOUSE ? InputEventType::MOUSE_BUTTON :
+                InputEventType::TOUCH_SCREEN;
             auto result = AboutToAddCurrentFingers(point);
             if (result) {
                 HandleTouchDownEvent(point);
-                HandleEventToBridgeObjList(point, bridgeObjList_);
+                propagate = HandleEventToBridgeObjList(point, bridgeObjList_);
             }
             break;
         }
@@ -291,7 +314,7 @@ void NGGestureRecognizer::HandleBridgeModeEvent(const TouchEvent& point)
             if (result) {
                 HandleTouchUpEvent(point);
                 currentFingers_--;
-                HandleEventToBridgeObjList(point, bridgeObjList_);
+                propagate = HandleEventToBridgeObjList(point, bridgeObjList_);
             }
             break;
         }
@@ -300,24 +323,26 @@ void NGGestureRecognizer::HandleBridgeModeEvent(const TouchEvent& point)
             if (result) {
                 HandleTouchCancelEvent(point);
                 currentFingers_--;
-                HandleEventToBridgeObjList(point, bridgeObjList_);
+                propagate = HandleEventToBridgeObjList(point, bridgeObjList_);
             }
             break;
         }
         default:
             break;
     }
+    return propagate;
 }
 
-void NGGestureRecognizer::HandleEventToBridgeObjList(
+bool NGGestureRecognizer::HandleEventToBridgeObjList(
     const TouchEvent& point, const std::list<WeakPtr<NGGestureRecognizer>>& bridgeObjList)
 {
     for (const auto& item : bridgeObjList) {
         auto bridgeObj = item.Upgrade();
-        if (bridgeObj) {
-            bridgeObj->HandleBridgeModeEvent(point);
+        if (bridgeObj && !bridgeObj->HandleBridgeModeEvent(point) && EventManager::IsAgentTouchInScope(point)) {
+            return false;
         }
     }
+    return true;
 }
 
 void NGGestureRecognizer::HandleBridgeModeEvent(const AxisEvent& event)

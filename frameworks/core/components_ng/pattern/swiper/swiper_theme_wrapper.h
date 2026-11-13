@@ -16,6 +16,7 @@
 #ifndef FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_SWIPER_SWIPER_THEME_WRAPPER_H
 #define FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_SWIPER_SWIPER_THEME_WRAPPER_H
 
+#include "base/utils/system_properties.h"
 #include "core/components/swiper/swiper_indicator_theme.h"
 #include "core/components_ng/token_theme/token_theme.h"
 
@@ -61,6 +62,11 @@ public:
             smallArrowColor_ = colors->IconPrimary();
             bigArrowColor_ = colors->IconPrimary();
             bigArrowBackgroundColor_ = colors->CompBackgroundSecondary();
+            // TV devices use a dedicated focus-selected color from the base theme
+            // (indicator_color_focused_selected), so skip the token override here.
+            if (SystemProperties::GetDeviceType() != DeviceType::TV) {
+                focusedSelectedColor_ = colors->CompBackgroundEmphasize();
+            }
         }
     }
 

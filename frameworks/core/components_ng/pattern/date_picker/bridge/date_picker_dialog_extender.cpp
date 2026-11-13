@@ -150,6 +150,10 @@ PickerDialogInfo BuildDatePickerDialogInfo(const Ark_DatePickerDialogOptions& op
     if (edgeLightMode) {
         dialogInfo.edgeLightMode = edgeLightMode.value();
     }
+    auto adaptToHandedness = Converter::OptConvert<HandednessFollowMode>(options.adaptToHandedness);
+    if (adaptToHandedness) {
+        dialogInfo.adaptToHandedness = adaptToHandedness.value();
+    }
     return dialogInfo;
 }
 

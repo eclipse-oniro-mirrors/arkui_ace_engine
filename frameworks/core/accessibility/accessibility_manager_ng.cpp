@@ -14,6 +14,10 @@
  */
 
 #include "core/accessibility/accessibility_manager_ng.h"
+
+#include "interfaces/native/native_type.h"
+
+#include "core/accessibility/native_interface_accessibility_impl.h"
 #include "core/common/container.h"
 #include "core/accessibility/accessibility_manager.h"
 
@@ -267,7 +271,8 @@ void AccessibilityManagerNG::HandleAccessibilityHoverEvent(const RefPtr<FrameNod
     auto& hoverState = hoverStateManager_.GetHoverState(root->GetAccessibilityId());
     if (event.pointers.size() > 1 && event.sourceType == SourceType::TOUCH) {
         if (hoverState.source == SourceType::TOUCH) {
-            hoverStateManager_.ResetHoverState(hoverState);
+            HandleHoverEventParam param {point, event.sourceType, AccessibilityHoverEventType::EXIT, event.time};
+            ResetHoverStateWithSessionExit(root, param, hoverState);
             return;
         }
     }
@@ -420,7 +425,7 @@ HandleHoverRet AccessibilityManagerNG::HandleAccessibilityHoverEventInner(
             .lastHoveringId = INVALID_NODE_ID,
             .point = param.point};
         HandleAccessibilityHoverTransparentCallback(false, root, callbackParam, event, hoverState);
-        hoverStateManager_.ResetHoverState(hoverState);
+        ResetHoverStateWithSessionExit(root, param, hoverState);
         return HandleHoverRet::HOVER_HIT;
     }
 
@@ -436,12 +441,12 @@ HandleHoverRet AccessibilityManagerNG::HandleAccessibilityHoverEventInner(
         if (duration < MIN_SOURCE_CHANGE_GAP_MS) {
             return HandleHoverRet::IN_TIME_LIMIT;
         }
-        hoverStateManager_.ResetHoverState(hoverState);
+        ResetHoverStateWithSessionExit(root, param, hoverState);
     }
 
     ACE_SCOPED_TRACE("HandleAccessibilityHoverEventInner");
     if (eventType == AccessibilityHoverEventType::ENTER) {
-        hoverStateManager_.ResetHoverState(hoverState);
+        ResetHoverStateWithSessionExit(root, param, hoverState);
     }
     std::vector<WeakPtr<FrameNode>> currentNodesHovering;
     std::vector<RefPtr<FrameNode>> lastNodesHovering;
@@ -455,11 +460,17 @@ HandleHoverRet AccessibilityManagerNG::HandleAccessibilityHoverEventInner(
     }
     if (eventType != AccessibilityHoverEventType::EXIT) {
         std::unique_ptr<AccessibilityProperty::HoverTestDebugTraceInfo> debugInfo = nullptr;
-        AccessibilityHoverTestPath path = AccessibilityProperty::HoverTest(param.point, root, debugInfo);
+        auto& registry = NativeAccessibilityHoverRegistry::GetInstance();
+        AccessibilityHoverTestPath path = registry.HasRegisteredHosts() ?
+            AccessibilityProperty::HoverTest(param.point, root, debugInfo,
+                [&registry](const RefPtr<FrameNode>& node) {
+                    return registry.HasHandler(node) && AccessibilitySessionAdapter::GetSessionAdapter(node);
+                }) :
+            AccessibilityProperty::HoverTest(param.point, root, debugInfo);
         for (const auto& node: path) {
             auto id = node->GetId();
             if (std::find(lastNodesHoveringId.begin(), lastNodesHoveringId.end(), id) != lastNodesHoveringId.end() ||
-                AccessibilityProperty::IsAccessibilityFocusable(node)) {
+                AccessibilityProperty::IsAccessibilityFocusable(node) || registry.HasHandler(node)) {
                 currentNodesHovering.push_back(node);
             }
         }
@@ -480,8 +491,8 @@ HandleHoverRet AccessibilityManagerNG::HandleAccessibilityHoverEventInner(
     bool transformHover = false;
     if (lastHoveringId != INVALID_NODE_ID && lastHoveringId != currentHoveringId) {
         lastHovering->OnAccessibilityEvent(AccessibilityEventType::HOVER_EXIT_EVENT);
-        auto virtualTrans = NotifyHoverEventToVirtualNode(lastHovering, root, param.point,
-            sourceType, AccessibilityHoverEventType::EXIT, time);
+        auto virtualTrans = !hoverState.sessionNeedsExit && NotifyHoverEventToVirtualNode(lastHovering, root,
+            param.point, sourceType, AccessibilityHoverEventType::EXIT, time);
         if (!virtualTrans) {
             transformHover = NotifyHoverEventToNodeSession(lastHovering, root, param.point,
                 sourceType, AccessibilityHoverEventType::EXIT, time);
@@ -514,6 +525,8 @@ HandleHoverRet AccessibilityManagerNG::HandleAccessibilityHoverEventInner(
         HandleAccessibilityHoverTransparentCallback(transformHover, root, callbackParam, event, hoverState);
     }
 
+    hoverState.sessionNeedsExit = transformHover && currentHovering &&
+        NativeAccessibilityHoverRegistry::GetInstance().HasHandler(currentHovering);
     hoverState.nodesHovering = std::move(currentNodesHovering);
     hoverState.time = time;
     hoverState.source = sourceType;
@@ -523,6 +536,19 @@ HandleHoverRet AccessibilityManagerNG::HandleAccessibilityHoverEventInner(
         return HandleHoverRet::HOVER_HIT;
     }
     return HandleHoverRet::HOVER_FAIL;
+}
+
+void AccessibilityManagerNG::ResetHoverStateWithSessionExit(const RefPtr<FrameNode>& root,
+    const HandleHoverEventParam& param, AccessibilityHoverState& hoverState)
+{
+    if (hoverState.sessionNeedsExit && !hoverState.nodesHovering.empty()) {
+        auto host = hoverState.nodesHovering.back().Upgrade();
+        if (host) {
+            NotifyHoverEventToNodeSession(host, root, param.point, hoverState.source,
+                AccessibilityHoverEventType::EXIT, param.time);
+        }
+    }
+    hoverStateManager_.ResetHoverState(hoverState);
 }
 
 HandleHoverRet AccessibilityManagerNG::HandleAccessibilityHoverEventBySurfaceId(
@@ -559,8 +585,16 @@ bool AccessibilityManagerNG::NotifyHoverEventToNodeSession(const RefPtr<FrameNod
     if ((sourceType == SourceType::MOUSE) && (sessionAdapter->IgnoreTransformMouseEvent())) {
         return false;
     }
-    PointF pointNode(pointRoot);
-    if (AccessibilityManagerNG::ConvertPointFromAncestorToNode(rootNode, node, pointRoot, pointNode)) {
+    PointF sessionPoint(pointRoot);
+    if (NativeAccessibilityHoverRegistry::GetInstance().HasHandler(node) &&
+        rootNode->GetTag() != V2::WINDOW_SCENE_ETS_TAG) {
+        auto renderContext = rootNode->GetRenderContext();
+        CHECK_NULL_RETURN(renderContext, false);
+        renderContext->GetPointWithRevert(sessionPoint);
+        sessionPoint = sessionPoint - renderContext->GetPaintRectWithoutTransform().GetOffset();
+    }
+    PointF pointNode(sessionPoint);
+    if (AccessibilityManagerNG::ConvertPointFromAncestorToNode(rootNode, node, sessionPoint, pointNode)) {
         sessionAdapter->TransferHoverEvent(pointNode, sourceType, eventType, time);
         return true;
     }
@@ -576,6 +610,11 @@ bool AccessibilityManagerNG::NotifyHoverEventToVirtualNode(const RefPtr<FrameNod
     CHECK_NULL_RETURN(eventHub, false);
     if (!eventHub->IsEnabled()) {
         // If the host component is disabled, do not transfer hover event.
+        return false;
+    }
+    // A registered callback delegates this host's hover hit testing to its provider session.
+    if (NativeAccessibilityHoverRegistry::GetInstance().HasHandler(node) &&
+        AccessibilitySessionAdapter::GetSessionAdapter(node)) {
         return false;
     }
     if (sourceType == SourceType::MOUSE) {
@@ -734,5 +773,88 @@ void AccessibilityHoverStateManager::ResetHoverState(AccessibilityHoverState& ho
     hoverState.idle = true;
     hoverState.nodesHovering.clear();
     hoverState.nodeTransparent.clear();
+    hoverState.sessionNeedsExit = false;
+}
+} // namespace OHOS::Ace::NG
+
+namespace OHOS::Ace::NG {
+namespace {
+constexpr char NATIVE_HOVER_DESTROY_TAG[] = "NativeAccessibilityHover";
+} // namespace
+
+NativeAccessibilityHoverRegistry& NativeAccessibilityHoverRegistry::GetInstance()
+{
+    static NativeAccessibilityHoverRegistry instance;
+    return instance;
+}
+
+int32_t NativeAccessibilityHoverRegistry::Register(const RefPtr<FrameNode>& host, void* userData, Handler handler)
+{
+    CHECK_NULL_RETURN(host, ARKUI_ERROR_CODE_PARAM_INVALID);
+    CHECK_NULL_RETURN(handler, ARKUI_ERROR_CODE_PARAM_INVALID);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        entries_[host.GetRawPtr()] = { host, handler, userData, ++generation_ };
+        hasRegisteredHosts_.store(true, std::memory_order_relaxed);
+    }
+    auto rawHost = host.GetRawPtr();
+    host->PushDestroyCallbackWithTag(
+        [rawHost]() {
+            NativeAccessibilityHoverRegistry::GetInstance().Remove(rawHost);
+        },
+        NATIVE_HOVER_DESTROY_TAG);
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+int32_t NativeAccessibilityHoverRegistry::Unregister(const RefPtr<FrameNode>& host)
+{
+    CHECK_NULL_RETURN(host, ARKUI_ERROR_CODE_PARAM_INVALID);
+    Remove(host.GetRawPtr());
+    host->RemoveDestroyCallbackWithTag(NATIVE_HOVER_DESTROY_TAG);
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+void NativeAccessibilityHoverRegistry::Remove(FrameNode* host)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    entries_.erase(host);
+    hasRegisteredHosts_.store(!entries_.empty(), std::memory_order_relaxed);
+}
+
+bool NativeAccessibilityHoverRegistry::HasHandler(const RefPtr<FrameNode>& host)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto entry = entries_.find(host.GetRawPtr());
+    return entry != entries_.end() && entry->second.host.Upgrade() == host;
+}
+
+bool NativeAccessibilityHoverRegistry::IsCurrent(const RefPtr<FrameNode>& host, uint64_t generation)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto entry = entries_.find(host.GetRawPtr());
+    return entry != entries_.end() && entry->second.host.Upgrade() == host &&
+        entry->second.generation == generation;
+}
+
+bool NativeAccessibilityHoverRegistry::Invoke(const RefPtr<FrameNode>& host, int32_t x, int32_t y,
+    ArkUI_AccessibilityElementInfo& info, uint64_t& generation)
+{
+    Entry snapshot;
+    int32_t requestId;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto entry = entries_.find(host.GetRawPtr());
+        if (entry == entries_.end() || entry->second.host.Upgrade() != host) {
+            return false;
+        }
+        snapshot = entry->second;
+        // Keep request IDs non-negative and avoid signed overflow.
+        requestId_ = (requestId_ + 1) & INT32_MAX;
+        requestId = static_cast<int32_t>(requestId_);
+    }
+    generation = snapshot.generation;
+    info.SetElementId(-1);
+    snapshot.handler(snapshot.userData, x, y, requestId, &info);
+    return info.GetElementId() >= 0 && IsCurrent(host, generation);
 }
 } // namespace OHOS::Ace::NG

@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-import router from '@system.router'
+import { router } from '@kit.ArkUI'
 
 /* Handles showing one page after another.
   After the last page callback is called so that caller can show the final report.
@@ -31,14 +31,14 @@ export class PageController {
   static start(testsCompletedCallback : ()=>void) {
     PageController.onComplete = testsCompletedCallback;
     if (this.pages.length > 0) {
-      router.push({ uri: this.pages[0] })
+      router.pushUrl({ url: this.pages[0] })
     }
   }
 
   static notifyPageFinished() {
     this.current++
     if (this.current < this.pages.length) {
-      router.push({ uri: this.pages[this.current] })
+      router.pushUrl({ url: this.pages[this.current] })
     } else {
         this.onComplete()
     }

@@ -182,7 +182,7 @@ bool ParseResultArray(const std::unique_ptr<InspectorJsonValue>& array, std::vec
 
 bool IsTranslateScopeValid(int32_t scope)
 {
-    return scope != 0 && (scope & ~PAGE_ALL_TRANSLATE_SCOPE) == 0;
+    return scope != 0 && (static_cast<uint32_t>(scope) & ~static_cast<uint32_t>(PAGE_ALL_TRANSLATE_SCOPE)) == 0;
 }
 
 bool IsPageTranslateRequestValid(const std::string& request)

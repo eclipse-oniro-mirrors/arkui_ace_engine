@@ -37,10 +37,17 @@ public:
     static bool IsFinitePoint(float x, float y);
     static int32_t CheckRegex(const std::string& pattern);
 
+    // Geometry helpers for region queries, exposed for unit tests.
+    // Strict positive-area intersection: tangent / edge-touching does not count.
+    static bool IsPositiveAreaRectIntersection(const RectF& lhs, const RectF& rhs);
+    // Normalizes any two diagonal corners (x1,y1)-(x2,y2) into a left-top origin rect.
+    static RectF NormalizeRect(float x1, float y1, float x2, float y2);
+
 private:
     static int32_t QueryNavigationContentByPoint(float x, float y, const std::string& pattern,
         std::string& resultJson);
     static int32_t QueryLazyForEachDataByPoint(float x, float y, std::string& resultJson);
+    static int32_t QueryNodesInRect(float x1, float y1, float x2, float y2, std::string& resultJson);
 };
 
 } // namespace OHOS::Ace::NG

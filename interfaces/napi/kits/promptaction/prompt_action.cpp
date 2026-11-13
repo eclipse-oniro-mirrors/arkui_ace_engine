@@ -750,6 +750,7 @@ struct PromptAsyncContext {
     napi_value systemMaterialApi = nullptr;
     napi_value distortionModeApi = nullptr;
     napi_value edgeLightModeApi = nullptr;
+    napi_value adaptToHandednessApi = nullptr;
 };
 
 void DeleteContextAndThrowError(
@@ -1594,6 +1595,7 @@ void GetNapiNamedProperties(napi_env env, napi_value* argv, size_t index,
     napi_get_named_property(env, argv[index], "systemMaterial", &asyncContext->systemMaterialApi);
     napi_get_named_property(env, argv[index], "distortionMode", &asyncContext->distortionModeApi);
     napi_get_named_property(env, argv[index], "edgeLightMode", &asyncContext->edgeLightModeApi);
+    napi_get_named_property(env, argv[index], "adaptToHandedness", &asyncContext->adaptToHandednessApi);
 
     GetNapiNamedBoolProperties(env, asyncContext);
 }
@@ -1750,6 +1752,20 @@ std::optional<EdgeLightMode> GetEdgeLightModeParam(
     return static_cast<EdgeLightMode>(edgeLightMode);
 }
 
+std::optional<NG::HandednessFollowMode> GetAdaptToHandednessParam(
+    napi_env env, const std::shared_ptr<PromptAsyncContext>& asyncContext)
+{
+    int32_t adaptToHandedness;
+    napi_valuetype valueType = napi_undefined;
+    napi_typeof(env, asyncContext->adaptToHandednessApi, &valueType);
+    if (valueType != napi_number) {
+        return std::nullopt;
+    }
+
+    napi_get_value_int32(env, asyncContext->adaptToHandednessApi, &adaptToHandedness);
+    return static_cast<NG::HandednessFollowMode>(adaptToHandedness);
+}
+
 PromptDialogAttr GetDialogLifeCycleCallback(napi_env env, const std::shared_ptr<PromptAsyncContext>& asyncContext)
 {
     auto onDidAppear = [env = asyncContext->env, onDidAppearRef = asyncContext->onDidAppearRef]() {
@@ -1889,6 +1905,7 @@ napi_value JSPromptShowDialog(napi_env env, napi_callback_info info)
             napi_get_named_property(env, argv[0], "systemMaterial", &asyncContext->systemMaterialApi);
             napi_get_named_property(env, argv[0], "distortionMode", &asyncContext->distortionModeApi);
             napi_get_named_property(env, argv[0], "edgeLightMode", &asyncContext->edgeLightModeApi);
+            napi_get_named_property(env, argv[0], "adaptToHandedness", &asyncContext->adaptToHandednessApi);
             napi_get_named_property(env, argv[0], "onDidAppear", &asyncContext->onDidAppear);
             napi_get_named_property(env, argv[0], "onDidDisappear", &asyncContext->onDidDisappear);
             napi_get_named_property(env, argv[0], "onWillAppear", &asyncContext->onWillAppear);
@@ -2080,6 +2097,7 @@ napi_value JSPromptShowDialog(napi_env env, napi_callback_info info)
         .systemMaterial = GetSystemMaterialParam(asyncContext->env, asyncContext),
         .distortionMode = GetDistortionModeParam(env, asyncContext),
         .edgeLightMode = GetEdgeLightModeParam(env, asyncContext),
+        .adaptToHandedness = GetAdaptToHandednessParam(env, asyncContext),
     };
 
 #ifdef OHOS_STANDARD_SYSTEM
@@ -2295,6 +2313,7 @@ napi_value JSPromptShowActionMenu(napi_env env, napi_callback_info info)
             napi_get_named_property(env, argv[0], "systemMaterial", &asyncContext->systemMaterialApi);
             napi_get_named_property(env, argv[0], "distortionMode", &asyncContext->distortionModeApi);
             napi_get_named_property(env, argv[0], "edgeLightMode", &asyncContext->edgeLightModeApi);
+            napi_get_named_property(env, argv[0], "adaptToHandedness", &asyncContext->adaptToHandednessApi);
             GetNapiString(env, asyncContext->titleNApi, asyncContext->titleString, valueType);
             if (!HasProperty(env, argv[0], "buttons")) {
                 DeleteContextAndThrowError(env, asyncContext, "Required input parameters are missing.");
@@ -2419,6 +2438,7 @@ napi_value JSPromptShowActionMenu(napi_env env, napi_callback_info info)
         .systemMaterial = GetSystemMaterialParam(env, asyncContext),
         .distortionMode = GetDistortionModeParam(env, asyncContext),
         .edgeLightMode = GetEdgeLightModeParam(env, asyncContext),
+        .adaptToHandedness = GetAdaptToHandednessParam(env, asyncContext),
     };
 #ifdef OHOS_STANDARD_SYSTEM
     if (SystemProperties::GetExtSurfaceEnabled() || !ContainerIsService()) {
@@ -2765,6 +2785,7 @@ PromptDialogAttr GetPromptActionDialog(napi_env env, const std::shared_ptr<Promp
         .systemMaterial = GetSystemMaterialParam(env, asyncContext),
         .distortionMode = GetDistortionModeParam(env, asyncContext),
         .edgeLightMode = GetEdgeLightModeParam(env, asyncContext),
+        .adaptToHandedness = GetAdaptToHandednessParam(env, asyncContext),
     };
     return promptDialogAttr;
 }
@@ -3052,6 +3073,7 @@ void ParseBaseDialogOptions(napi_env env, napi_value arg, std::shared_ptr<Prompt
     napi_get_named_property(env, arg, "systemMaterial", &asyncContext->systemMaterialApi);
     napi_get_named_property(env, arg, "distortionMode", &asyncContext->distortionModeApi);
     napi_get_named_property(env, arg, "edgeLightMode", &asyncContext->edgeLightModeApi);
+    napi_get_named_property(env, arg, "adaptToHandedness", &asyncContext->adaptToHandednessApi);
 
     ParseBaseDialogOptionsEvent(env, arg, asyncContext);
 }

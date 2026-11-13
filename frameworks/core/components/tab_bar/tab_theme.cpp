@@ -155,39 +155,59 @@ void TabTheme::Builder::ParsePattern2(const RefPtr<TabTheme>& theme, const RefPt
     theme->fontPrimary_ =
         pattern->GetAttr<Color>("font_primary", Color::BLACK);
     theme->sideBarListItemCornerRadius_ =
-        pattern->GetAttr<Dimension>("corner_radius_level6", 12.0_vp);
+        pattern->GetAttr<Dimension>("sidebar_sidemenu_menuitem_radius", 16.0_vp);
     theme->sideBarListItemActivedColor_ =
         pattern->GetAttr<Color>("sidebar_board_actived_color", Color(0x19007DFF));
     theme->sideBarListItemHoverColor_ =
-        pattern->GetAttr<Color>("interactive_hover", Color(0x0c182431));
+        pattern->GetAttr<Color>("sidebar_sidemenu_menuitem_hover", Color(0x0c182431));
     theme->sideBarListItemPressedColor_ =
-        pattern->GetAttr<Color>("interactive_pressed", Color(0x19182431));
+        pattern->GetAttr<Color>("sidebar_sidemenu_menuitem_pressed", Color(0x19182431));
     theme->sideBarListItemFocusColor_ =
-        pattern->GetAttr<Color>("interactive_focus", Color(0x007DFF));
-    theme->sideBarListItemFocusWidth_ =
-        pattern->GetAttr<Dimension>("outline_extra_larger", 2.0_vp);
+        pattern->GetAttr<Color>("sidebar_sidemenu_menuitem_focus", Color(0x007DFF));
     theme->sideBarSelectedIconColor_ =
-        pattern->GetAttr<Color>("dialog_icon_primary", Color(0xff182431));
+        pattern->GetAttr<Color>("sidebar_selected_icon_color", Color(0xff182431));
     theme->sideBarSelectedTextColor_ =
-        pattern->GetAttr<Color>("dialog_font_primary", Color(0xff182431));
+        pattern->GetAttr<Color>("sidebar_selected_text_color", Color(0xff182431));
     theme->sideBarUnselectedIconColor_ =
         pattern->GetAttr<Color>("sidebar_unselected_icon_color", Color(0x99182431));
     theme->sideBarUnselectedTextColor_ =
         pattern->GetAttr<Color>("sidebar_unselected_text_color", Color(0x99182431));
+    theme->sideBarListItemHeight_ =
+        pattern->GetAttr<Dimension>("sidebar_sidemenu_menuitem_height", 56.0_vp);
+    theme->sideBarHeaderMarginBottom_ =
+        pattern->GetAttr<Dimension>("sidebar_searchbar_sidemenu_margin", 8.0_vp);
     theme->sideBarPaddingLevel4_ =
-        pattern->GetAttr<Dimension>("side_bar_padding_level4", 8.0_vp);
+        pattern->GetAttr<Dimension>("sidebar_sidemenu_menuitem_padding_level4", 8.0_vp);
     theme->sideBarPaddingLevel8_ =
-        pattern->GetAttr<Dimension>("side_bar_padding_level8", 16.0_vp);
+        pattern->GetAttr<Dimension>("sidebar_sidemenu_menuitem_padding_level8", 16.0_vp);
     theme->sideBarPaddingLevel10_ =
-        pattern->GetAttr<Dimension>("side_bar_padding_level10", 20.0_vp);
+        pattern->GetAttr<Dimension>("sidebar_sidemenu_menuitem_padding_level10", 20.0_vp);
     theme->sideBarTextFontSize_ =
-        pattern->GetAttr<Dimension>("side_bar_text_font_size", 16.0_fp);
+        pattern->GetAttr<Dimension>("sidebar_sidemenu_menuitem_text_font_size", 16.0_fp);
     theme->sideBarDividerColor_ =
         pattern->GetAttr<Color>("sidebar_divider_color", Color(0x33182431));
     theme->sideBarBackgroundColor_ =
         pattern->GetAttr<Color>("sidebar_background_color", Color(0xfff1f3f5));
-    theme->topTabTextSize_ =
-        pattern->GetAttr<Dimension>("top_tab_text_size", 16.0_fp);
+    theme->subTitleM_ =
+        pattern->GetAttr<Dimension>("tab_Subtitle_M", 16.0_fp);
+    theme->subTitleS_ =
+        pattern->GetAttr<Dimension>("tab_Subtitle_S", 14.0_fp);
+    theme->subTitleL_ =
+        pattern->GetAttr<Dimension>("tab_Subtitle_L", 18.0_fp);
+    theme->fontSecondary_ =
+        pattern->GetAttr<Color>("font_secondary", Color(0x99182431));
+    theme->iconTertiary_ =
+        pattern->GetAttr<Color>("icon_tertiary", Color(0x66182431));
+    theme->sectionHeight_ =
+        pattern->GetAttr<Dimension>("tabs_section_height", 56.0_vp);
+    theme->sectionBottomMargin_ =
+        pattern->GetAttr<Dimension>("tabs_section_bottom_margin", 8.0_vp);
+    theme->cornerRadiusLevel3_ =
+        pattern->GetAttr<Dimension>("corner_radius_level3", 6.0_vp);
+    theme->outlineSmall_ =
+        pattern->GetAttr<Dimension>("outline_small", 1.0_px);
+    theme->compBackgroundTertiary_ =
+        pattern->GetAttr<Color>("comp_background_tertiary", Color(0x0c182431));
 }
 
 } // namespace OHOS::Ace

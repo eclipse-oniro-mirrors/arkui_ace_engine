@@ -82,6 +82,7 @@ class ResponseRegion;
 class UiMaterial;
 struct ImmersiveOptions;
 struct ImmersiveMaterialConfig;
+enum class VibrancyMode : int8_t;
 }
 
 namespace OHOS::Ace::NG {
@@ -509,6 +510,7 @@ public:
     static void SetMouseResponseRegion(const std::vector<DimensionRect> &mouseResponseRegion);
     static void SetTouchable(bool touchable);
     static void SetHitTestMode(HitTestMode hitTestMode);
+    static void SetAgentControlMode(const std::optional<AgentControlMode>& mode);
     static void SetOnTouchTestFunc(NG::OnChildTouchTestFunc&& onChildTouchTest);
     static void SetOnTouchTestFunc(FrameNode* frameNode, NG::OnChildTouchTestFunc&& onChildTouchTest);
     static void SetOnFocusAxisEvent(OnFocusAxisEventFunc&& onFocusAxisCallback);
@@ -615,6 +617,10 @@ public:
     static void SetClipShape(const RefPtr<BasicShape> &basicShape);
     static void SetClipEdge(bool isClip);
     static void SetMask(const RefPtr<BasicShape> &basicShape);
+    static void SetShadowShape(const RefPtr<BasicShape>& basicShape);
+    static void SetShadowClipMode(ShadowClipMode clipMode);
+    static void ResetShadowShape();
+    static void ResetShadowClipMode();
     // overlay
     static void SetOverlay(const NG::OverlayOptions &overlay);
     static void SetOverlayBuilder(std::function<void()>&& buildFunc,
@@ -789,6 +795,7 @@ public:
     static void SetTransformMatrix(FrameNode* frameNode, const Matrix4& matrix);
     static void SetTransform3DMatrix(FrameNode* frameNode, const Matrix4& matrix);
     static void SetHitTestMode(FrameNode* frameNode, HitTestMode hitTestMode);
+    static void SetAgentControlMode(FrameNode* frameNode, const std::optional<AgentControlMode>& mode);
     static void SetOpacity(FrameNode* frameNode, double opacity);
     static void SetOpacity(FrameNode* frameNode, double opacity, const RefPtr<ResourceObject>& resObj);
     static void UpdateBackgroundBlurStyle(
@@ -851,6 +858,10 @@ public:
     static void SetRotateAngle(FrameNode* frameNode, const NG::Vector4F& value);
     static void SetClipEdge(FrameNode* frameNode, bool isClip);
     static void SetClipShape(FrameNode* frameNode, const RefPtr<BasicShape>& basicShape);
+    static void SetShadowShape(FrameNode* frameNode, const RefPtr<BasicShape>& basicShape);
+    static void SetShadowClipMode(FrameNode* frameNode, ShadowClipMode clipMode);
+    static void ResetShadowShape(FrameNode* frameNode);
+    static void ResetShadowClipMode(FrameNode* frameNode);
     static void SetPixelStretchEffect(FrameNode* frameNode, PixStretchEffectOption& option);
     static void SetSpatialEffect(FrameNode* frameNode, const std::optional<SpatialEffectParams>& params);
     static void SetLightUpEffect(FrameNode* frameNode, double radio);
@@ -968,6 +979,7 @@ public:
     static void SetBlendApplyType(FrameNode* frameNode, BlendApplyType blendApplyType);
     static void SetBlender(FrameNode* frameNode, const OHOS::Rosen::Blender* blender);
     static void ResetBlender(FrameNode* frameNode);
+    static void SetVibrancyMode(FrameNode* frameNode, VibrancyMode mode);
     static void SetMonopolizeEvents(FrameNode* frameNode, bool monopolizeEvents);
     static void SetDraggable(FrameNode* frameNode, bool draggable);
     static void SetHoverEffect(FrameNode* frameNode, HoverEffectType hoverEffect);
@@ -1321,6 +1333,7 @@ private:
         const RefPtr<Pattern>& pattern, const RefPtr<RenderContext>& renderContext);
     static void RegisterTransparencyListener(const RefPtr<FrameNode>& frameNode);
     static void HistogramImmersiveOptions(const ImmersiveMaterialConfig& config);
+    static void SetShadowShapeLpxCallback(FrameNode* frameNode, const RefPtr<BasicShape>& basicShape);
 
     static OEMVisualEffectFunc oemVisualEffectFunc;
     static std::mutex visualEffectMutex_;

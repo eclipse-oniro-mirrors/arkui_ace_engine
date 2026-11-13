@@ -38,9 +38,10 @@ import { ArkThemeScopeManager } from '../theme/ArkThemeScopeManager';
 import { transferTypeName } from '../stateManagement/storage/persistenceV2';
 import { ArkCustomComponentRootPeer } from './staticComponents';
 import { ArkUIObjectFinalizationRegisterProxy } from '../base/ArkUIObjectFinalizationRegisterProxy';
-import { ActiveAndInactiveCallbackType, CustomComponentContext, IReusePool } from '../stateManagement/utils';
+import { ActiveAndInactiveCallbackType, CustomComponentContext, IDefaultReusePool, IReusePool } from '../stateManagement/utils';
 import { IVariableOwner } from '../stateManagement/decorator';
 import { GlobalReusePool } from '../stateManagement/tools/globalReusePool';
+import { ReusablePool } from '../ReusablePool';
 import { UIContextUtil } from '../base/UIContextUtil';
 
 // GlobalReuse pool ownership type
@@ -1032,6 +1033,45 @@ export enum LifeCycleEvent {
     ON_DISAPPEAR = 4      // Triggered when component disappears
 }
 
+/**
+ * Handle over a component scope's default reuse pool (the PeerNode legacy
+ * buckets that receive recycled child components when no user-created
+ * GlobalReusePool accepts them). Holds a live reference to the bucket map;
+ * cleaning a bucket disposes its cached instances and drops the bucket so
+ * later recycles start from a fresh one.
+ */
+class DefaultReusePoolHandle implements IDefaultReusePool {
+    // Weakly associated with the peer-owned bucket map: if the owning peer is
+    // gone the handle no-ops instead of keeping the map alive (same weak-
+    // association semantics as the dynamic-side pool handles).
+    private readonly poolMapRef_: WeakRef<Map<string, ReusablePool>>;
+
+    constructor(poolMap: Map<string, ReusablePool>) {
+        this.poolMapRef_ = new WeakRef<Map<string, ReusablePool>>(poolMap);
+    }
+
+    clearCache(reuseId?: string): void {
+        const poolMap = this.poolMapRef_.deref();
+        if (poolMap === undefined) {
+            return;
+        }
+        const buckets = poolMap;
+        const keysToClean: Array<string> = new Array<string>();
+        buckets.forEach((pool: ReusablePool, key: string) => {
+            // undefined (or omitted) clears every bucket; an empty string or
+            // an unknown reuseId matches no bucket and returns safely.
+            if (reuseId === undefined || PeerNode.__reuseIdOfKey__Internal(key) === reuseId) {
+                keysToClean.push(key);
+            }
+        });
+        for (const key of keysToClean) {
+            const pool = buckets.get(key);
+            buckets.delete(key);
+            pool?.dispose();
+        }
+    }
+}
+
 export class CustomComponentContextImpl implements CustomComponentContext {
     @JSONStringifyIgnore private customComponent: IVariableOwner;
 
@@ -1058,6 +1098,25 @@ export class CustomComponentContextImpl implements CustomComponentContext {
         const classKey = CustomComponentContextImpl.shortClassName_(comp);
         const pool = comp.__getReusePoolForClass__Internal(classKey);
         return pool as IReusePool | undefined;
+    }
+
+    /**
+     * Returns the default reuse pool of this component's scope — the buckets
+     * holding this component's recycled children when no user-created
+     * GlobalReusePool accepts them. Returns undefined while nothing has been
+     * recycled into this scope yet (the pool is never created on demand).
+    */
+    getDefaultReusePool(): IDefaultReusePool | undefined {
+        const comp = this.customComponent as Object as ExtendableComponent;
+        const peer = comp.__getPeerNode__Internal();
+        if (peer === undefined) {
+            return undefined;
+        }
+        const poolMap = peer.__getDefaultReusePool__Internal();
+        if (poolMap === undefined) {
+            return undefined;
+        }
+        return new DefaultReusePoolHandle(poolMap);
     }
 
     registerActiveAndInactiveCallback(active?: ActiveAndInactiveCallbackType, inactive?: ActiveAndInactiveCallbackType): void {

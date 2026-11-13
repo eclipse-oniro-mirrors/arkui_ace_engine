@@ -114,7 +114,6 @@ public:
 
 private:
     static XComponentType GetTypeImpl(const RefPtr<FrameNode>& frameNode);
-
     
     static void InnerSetSurfaceRectV1(FrameNode* frameNode, float offsetX, float offsetY,
         float surfaceWidth, float surfaceHeight);

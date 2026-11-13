@@ -602,6 +602,8 @@ public:
     static void JsMotionPath(const JSCallbackInfo& info);
     static void JsMotionBlur(const JSCallbackInfo& info);
     static void JsShadow(const JSCallbackInfo& info);
+    static void JsShadowShape(const JSCallbackInfo& info);
+    static void JsShadowClipMode(const JSCallbackInfo& info);
     static bool ParseBlendMode(const JSCallbackInfo& info, BlendMode& blendMode, BlendApplyType& blendApplyType);
     static void JsBlendMode(const JSCallbackInfo& info);
     static void JsAdvancedBlendMode(const JSCallbackInfo& info);
@@ -650,6 +652,7 @@ public:
 
     static void JsObscured(const JSCallbackInfo& info);
     static void JsPrivacySensitive(const JSCallbackInfo& info);
+    static void JsAgentControlMode(const JSCallbackInfo& info);
 
     static void JsAccessibilityGroup(const JSCallbackInfo& info);
     static void JsAccessibilityText(const JSCallbackInfo& info);
@@ -782,7 +785,8 @@ public:
         RefPtr<ResourceObject>& resObj);
     static void RegisterTextBackgroundStyleResource(TextBackgroundStyle& textBackgroundStyle,
         RefPtr<ResourceObject>& resObjTopLeft, RefPtr<ResourceObject>& resObjTopRight,
-        RefPtr<ResourceObject>& resObjBottomLeft, RefPtr<ResourceObject>& resObjBottomRight);
+        RefPtr<ResourceObject>& resObjBottomLeft, RefPtr<ResourceObject>& resObjBottomRight,
+        RefPtr<ResourceObject>& borderColorResObj, RefPtr<ResourceObject>& borderWidthResObj);
     static bool ParseAllBorderRadiuses(JSRef<JSObject>& object, CalcDimension& topLeft, CalcDimension& topRight,
         CalcDimension& bottomLeft, CalcDimension& bottomRight);
     static bool ParseAllBorderRadiuses(JSRef<JSObject>& object, CalcDimension& topLeft, CalcDimension& topRight,

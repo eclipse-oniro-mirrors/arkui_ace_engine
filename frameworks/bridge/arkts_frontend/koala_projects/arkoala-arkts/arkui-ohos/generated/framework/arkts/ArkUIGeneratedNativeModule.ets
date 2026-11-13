@@ -223,6 +223,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _CommonMethod_setHitTestBehavior(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
+    native static _CommonMethod_setAgentControlMode(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
     native static _CommonMethod_setOnChildTouchTest(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _CommonMethod_setLayoutWeight(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
@@ -448,6 +450,10 @@ export class ArkUIGeneratedNativeModule {
     native static _CommonMethod_setMotionPath(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _CommonMethod_setShadow(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _CommonMethod_setShadowShape(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _CommonMethod_setShadowClipMode(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _CommonMethod_setEdgeLight(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
@@ -2472,6 +2478,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _TabContentAttribute_setOnWillHide(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
+    native static _TabContentAttribute_setSidebarSection(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
     native static _TabContentAttribute_setTabBarVisibility(ptr: KPointer, visibility: KInt, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _Tabs_construct(id: KInt, flags: KInt): KPointer
@@ -2536,6 +2544,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _TabsAttribute_setBarFloatingStyle(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
+    native static _TabsAttribute_setTopBarFloatingStyle(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
     native static _TabsAttribute_setBarStyle(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _TabsAttribute_setSidebarPosition(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
@@ -2577,6 +2587,10 @@ export class ArkUIGeneratedNativeModule {
     native static _TabsAttribute_setSidebarFooter(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _TabsAttribute_setSidebarBottomBar(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _TabsAttribute_setShowSidebarControlButton(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _TabsAttribute_setTabViewCustomization(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _TabsAttribute_setBarMode(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
@@ -3625,6 +3639,8 @@ export class ArkUIGeneratedNativeModule {
     native static _WebAttribute_setOnZoomChange(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _WebAttribute_setFlingSpeedLimit(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _WebAttribute_setVisitedLinkPersistEnabled(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _WebAttribute_setRegisterNativeEmbedRule(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
@@ -5436,6 +5452,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _IUIContext_setTextSelectionClearPolicy(policy: KInt): void
     @ani.unsafe.Direct
+    native static _IUIContext_setTransPageEnabled(thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
     native static _JsGeolocation_construct(): KPointer
     @ani.unsafe.Direct
     native static _JsGeolocation_getFinalizer(): KPointer
@@ -5590,6 +5608,8 @@ export class ArkUIGeneratedNativeModule {
     native static _LazyForEachOps_SyncOnMoveOps(node: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _LazyForEachOps_SetOptions(node: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _LazyForEachOps_ClearCache(node: KPointer): void
     @ani.unsafe.Direct
     native static _LazyWaterFlowLayoutExtender_lazyVWaterFlowLayoutConstructor(id: KInt): KPointer
     @ani.unsafe.Direct
@@ -6077,6 +6097,12 @@ export class ArkUIGeneratedNativeModule {
     native static _NodeContentExtender_addFrameNode(content: KPointer, node: KPointer): KInt
     @ani.unsafe.Direct
     native static _NodeContentExtender_removeFrameNode(content: KPointer, node: KPointer): boolean
+    @ani.unsafe.Direct
+    native static _NodeSensitiveInputEventFactory_fromTouch(event: KPointer, node: KPointer): KPointer
+    @ani.unsafe.Direct
+    native static _NodeSensitiveInputEventFactory_fromMouse(event: KPointer, node: KPointer): KPointer
+    @ani.unsafe.Direct
+    native static _NodeSensitiveInputEventFactory_fromKey(event: KPointer, node: KPointer): KPointer
     @ani.unsafe.Direct
     native static _NumericTextTransition_construct(thisArray: KSerializerBuffer, thisLength: KInt): KPointer
     @ani.unsafe.Direct

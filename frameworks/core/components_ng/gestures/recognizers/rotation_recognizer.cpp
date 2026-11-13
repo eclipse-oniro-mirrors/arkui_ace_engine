@@ -13,11 +13,13 @@
  * limitations under the License.
  */
 
+#include "base/log/log_wrapper_without_instance.h"
 #include "core/components_ng/base/observer_handler.h"
 #include "core/components_ng/gestures/recognizers/rotation_recognizer.h"
 #include "core/components_ng/event/event_constants.h"
 #include "core/common/reporter/reporter.h"
 #include "core/components_ng/manager/event/json_child_report.h"
+#include "core/components_ng/manager/interaction_observer/ui_info_collection_manager.h"
 #include "core/components_ng/manager/event/json_report.h"
 
 #include "core/pipeline_ng/pipeline_context.h"
@@ -57,7 +59,7 @@ void RotationRecognizer::OnAccepted()
     }
     
     auto node = GetAttachedNode().Upgrade();
-    TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW, "ROTATE RACC, T: %{public}s",
+    TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW, "ROTATE RACC, T: %{public}s",
         node ? node->GetTag().c_str() : "null");
     LogStateChange(refereeState_, RefereeState::SUCCEED, StateChangeReason::ROTATION_ANGLE_REACHED);
     lastRefereeState_ = refereeState_;
@@ -318,7 +320,7 @@ void RotationRecognizer::HandleTouchCancelEvent(const TouchEvent& event)
         lastRefereeState_ = RefereeState::READY;
         refereeState_ = RefereeState::READY;
     } else if (refereeState_ == RefereeState::SUCCEED) {
-        TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW,
+        TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW,
             "RotationRecognizer touchPoints size not equal fingers_, not send cancel callback.");
     }
 }
@@ -384,9 +386,9 @@ void RotationRecognizer::SendCallbackMsg(const std::unique_ptr<GestureEventFunc>
     if (gestureInfo_ && gestureInfo_->GetDisposeTag()) {
         return;
     }
+    GestureEvent info;
+    GetGestureEventInfo(info);
     if (callback && *callback) {
-        GestureEvent info;
-        GetGestureEventInfo(info);
         // callback may be overwritten in its invoke so we copy it first
         auto callbackFunction = *callback;
         HandleGestureAccept(info, type, GestureListenerType::ROTATION);
@@ -396,6 +398,8 @@ void RotationRecognizer::SendCallbackMsg(const std::unique_ptr<GestureEventFunc>
         HandleReports(info, type);
 #endif
     }
+    // Always-on delivery for NDK interaction observers.
+    UIInfoCollectionManager::GetInstance().NotifyRotation(GetAttachedNode().Upgrade(), info, type);
 #ifdef GESTURE_DEBUG_BOUNDARY_SUPPORTED
     ReportToGestureDebugManager(type, GestureListenerType::ROTATION);
 #endif

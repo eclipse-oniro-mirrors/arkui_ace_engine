@@ -107,6 +107,11 @@ NG::OffsetF UpdateMenuPostion(const NG::OffsetF& menuPosition, const MenuParam& 
     return menuPosition;
 }
 
+void ViewAbstractModelNG::SetAgentControlMode(const std::optional<NG::AgentControlMode>& mode)
+{
+    ViewAbstract::SetAgentControlMode(mode);
+}
+
 void ViewAbstractModelNG::BindMenuGesture(
     std::vector<NG::OptionParam>&& params, std::function<void()>&& buildFunc, const MenuParam& menuParam)
 {
@@ -280,6 +285,8 @@ void ViewAbstractModelNG::BindMenu(
     CHECK_NULL_VOID(targetNode);
     auto targetId = targetNode->GetId();
     ACE_UPDATE_LAYOUT_PROPERTY(LayoutProperty, IsBindOverlay, true);
+    targetNode->SetInspectorMenuBinding((!params.empty() || buildFunc) ?
+        std::make_optional(menuParam.isShowInSubWindow) : std::nullopt);
     if (CheckMenuIsShow(menuParam, targetId, targetNode)) {
         TAG_LOGI(AceLogTag::ACE_MENU, "hide menu done %{public}d %{public}d.", menuParam.isShowInSubWindow, targetId);
     } else if (menuParam.isShow) {
@@ -2322,5 +2329,15 @@ void ViewAbstractModelNG::ResetAccessibilityCustomActions()
     auto frameNode = NG::ViewStackProcessor::GetInstance()->GetMainFrameNode();
     CHECK_NULL_VOID(frameNode);
     ResetAccessibilityCustomActions(frameNode);
+}
+
+void ViewAbstractModelNG::SetShadowShape(const RefPtr<BasicShape>& basicShape)
+{
+    ViewAbstract::SetShadowShape(basicShape);
+}
+
+void ViewAbstractModelNG::SetShadowClipMode(ShadowClipMode clipMode)
+{
+    ViewAbstract::SetShadowClipMode(clipMode);
 }
 } // namespace OHOS::Ace::NG

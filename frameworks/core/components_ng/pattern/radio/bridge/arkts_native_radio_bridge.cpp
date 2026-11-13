@@ -362,7 +362,10 @@ ArkUINativeModuleValue RadioBridge::SetRadioStyleByJs(ArkUIRuntimeCallInfo* runt
     EcmaVM* vm = runtimeCallInfo->GetVM();
     CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
     Local<JSValueRef> secondArg = runtimeCallInfo->GetCallArgRef(NUM_1);
-    auto theme = GetTheme<RadioTheme>();
+    auto node = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_RETURN(node, panda::JSValueRef::Undefined(vm));
+    auto theme = node->GetTheme<RadioTheme>(true);
+    CHECK_NULL_RETURN(theme, panda::JSValueRef::Undefined(vm));
     if (!secondArg->IsObject(vm)) {
         GetArkUINodeModifiers()->getRadioModifier()->setCheckedBackgroundColorByJs(
             theme->GetActiveColor().GetValue(), false, false);
@@ -390,9 +393,9 @@ ArkUINativeModuleValue RadioBridge::SetRadioStyle(ArkUIRuntimeCallInfo* runtimeC
     if (IsJsView(firstArg, vm)) {
         return SetRadioStyleByJs(runtimeCallInfo);
     }
-    auto pipeline = PipelineBase::GetCurrentContext();
-    CHECK_NULL_RETURN(pipeline, panda::NativePointerRef::New(vm, nullptr));
-    auto radioTheme = pipeline->GetTheme<RadioTheme>();
+    auto* nativeNodePtr = reinterpret_cast<FrameNode*>(nativeNode);
+    CHECK_NULL_RETURN(nativeNodePtr, panda::NativePointerRef::New(vm, nullptr));
+    auto radioTheme = nativeNodePtr->GetTheme<RadioTheme>(true);
     CHECK_NULL_RETURN(radioTheme, panda::NativePointerRef::New(vm, nullptr));
 
     Color checkedBackgroundColorVal;

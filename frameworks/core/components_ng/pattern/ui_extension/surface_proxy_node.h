@@ -21,7 +21,7 @@
 #include "transaction/rs_interfaces.h"
 
 namespace OHOS::Ace::NG {
-class SurfaceProxyNode : public AceType {
+class SurfaceProxyNode : public virtual AceType {
     DECLARE_ACE_TYPE(SurfaceProxyNode, AceType);
 
 public:

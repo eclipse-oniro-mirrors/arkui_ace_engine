@@ -312,6 +312,10 @@ abstract class ViewBuildNodeBase {
     public static setArkThemeScopeManager(mgr: ArkThemeScopeManager): void {
         ViewBuildNodeBase.arkThemeScopeManager = mgr;
     }
+
+    public static __onUINodeDelete__Internal(elmtId: number): void {
+        ViewBuildNodeBase.arkThemeScopeManager?.onUINodeDelete(elmtId);
+    }
     public onWillApplyThemeInternally(): void {
         const theme = ViewBuildNodeBase.arkThemeScopeManager?.getFinalTheme(this);
         if (theme) {

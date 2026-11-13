@@ -766,6 +766,14 @@ panda::Local<panda::ObjectRef> CreateTextBackGroundStyleObject(EcmaVM* vm,
         panda::StringRef::NewFromUtf8(vm, textBackgroundStyle->backgroundColor->ToString().c_str()));
     returnObject->Set(vm, panda::StringRef::NewFromUtf8(vm, "radius"),
         panda::StringRef::NewFromUtf8(vm, textBackgroundStyle->backgroundRadius->ToString().c_str()));
+    if (textBackgroundStyle->borderWidth.has_value()) {
+        returnObject->Set(vm, panda::StringRef::NewFromUtf8(vm, "borderWidth"),
+            panda::StringRef::NewFromUtf8(vm, textBackgroundStyle->borderWidth->ToString().c_str()));
+    }
+    if (textBackgroundStyle->borderColor.has_value()) {
+        returnObject->Set(vm, panda::StringRef::NewFromUtf8(vm, "borderColor"),
+            panda::StringRef::NewFromUtf8(vm, textBackgroundStyle->borderColor->ColorToString().c_str()));
+    }
     return returnObject;
 }
 

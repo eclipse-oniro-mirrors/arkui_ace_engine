@@ -3632,6 +3632,14 @@
         "name": "OH_ArkUI_RenderNodeUtils_InsertChildAfter"
     },
     {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_RenderNodeUtils_AddChildWithPolicy"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_RenderNodeUtils_InsertChildAfterWithPolicy"
+    },
+    {
         "first_introduced": "20",
         "name": "OH_ArkUI_RenderNodeUtils_RemoveChild"
     },
@@ -4478,6 +4486,14 @@
     {
         "first_introduced": "22",
         "name": "OH_ArkUI_NativeModule_AdoptChild"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_AdoptChildWithPolicy"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation"
     },
     {
         "first_introduced": "22",
@@ -5724,6 +5740,22 @@
         "name": "OH_ArkUI_TextEditorTextStyle_GetTextBackgroundRadius"
     },
     {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_TextEditorTextStyle_SetTextBackgroundBorderWidth"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_TextEditorTextStyle_GetTextBackgroundBorderWidth"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_TextEditorTextStyle_SetTextBackgroundBorderColor"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_TextEditorTextStyle_GetTextBackgroundBorderColor"
+    },
+    {
         "first_introduced": "24",
         "name": "OH_ArkUI_TextEditorStyledStringController_SetTypingStyle"
     },
@@ -6370,6 +6402,22 @@
     {
         "first_introduced": "24",
         "name": "OH_ArkUI_BackgroundColorStyle_GetRadius"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_BackgroundColorStyle_SetBorderWidth"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_BackgroundColorStyle_GetBorderWidth"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_BackgroundColorStyle_SetBorderColor"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_BackgroundColorStyle_GetBorderColor"
     },
     {
         "first_introduced": "24",
@@ -7033,19 +7081,27 @@
         "name": "OH_ArkUI_NodeUtils_SetUiDvsyncSwitch"
     },
     {
-        "first_introduced": "26.0.0",
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_Accessibility_RegisterAccessibilityHoverEventHandler"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_Accessibility_UnregisterAccessibilityHoverEventHandler"
+    },
+    {
+        "first_introduced": "26.0.1",
         "name": "OH_ArkUI_NativeModule_LineSpacingOptions_Create"
     },
     {
-        "first_introduced": "26.0.0",
+        "first_introduced": "26.0.1",
         "name": "OH_ArkUI_NativeModule_LineSpacingOptions_Destroy"
     },
     {
-        "first_introduced": "26.0.0",
+        "first_introduced": "26.0.1",
         "name": "OH_ArkUI_NativeModule_LineSpacingOptions_SetOnlyBetweenLines"
     },
     {
-        "first_introduced": "26.0.0",
+        "first_introduced": "26.0.1",
         "name": "OH_ArkUI_NativeModule_LineSpacingOptions_GetOnlyBetweenLines"
     },
     {
@@ -7418,6 +7474,30 @@
     },
     {
         "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_RegisterUIContentChangeEvent"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UnRegisterUIContentChangeEvent"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIContentChangeEventGetType"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIContentChangeEventGetTimestamp"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIContentChangeEventGetContext"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIContentChangeEventGetContentChangeEventJson"
+    },
+    {
+        "first_introduced": "26.2.0",
         "name": "OH_ArkUI_NativeModule_UIJsonWrapperCreate"
     },
     {
@@ -7439,6 +7519,10 @@
     {
         "first_introduced": "26.2.0",
         "name": "OH_ArkUI_NativeModule_UIEventInjectCompositeCommand"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_NativeModule_UIEventInjectRelaxedInteraction"
     },
     {
         "first_introduced": "26.2.0",
@@ -7529,6 +7613,14 @@
         "name": "OH_ArkUI_KeyEvent_SetScrollLockOn"
     },
     {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_NativeModule_RegisterInspectorTreeGetter"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_NativeModule_UnregisterInspectorTreeGetter"
+    },
+    {
         "first_introduced": "26.2.0",
         "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestCreate"
     },
@@ -7558,10 +7650,78 @@
     },
     {
         "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestSetFilterOccludedNodes"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestSetOcclusionOpacityThreshold"
+    },
+    {
+        "first_introduced": "26.2.0",
         "name": "OH_ArkUI_NativeModule_UIAgentGetTreeJson"
     },
     {
         "first_introduced": "26.2.0",
         "name": "OH_ArkUI_NativeModule_UIAgentGetTreeJsonAsync"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIInfoCollectionRegisterInteractionObserver"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIInfoCollectionUnregisterInteractionObserver"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_NativeModule_CustomDialog_SetAdaptToHandednessInOptions"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_NativeModule_CustomDialog_SetAdaptToHandedness"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_ApplicationShortcut_Register"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_ApplicationShortcut_Unregister"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_Create"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_Destroy"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_SetType"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_GetType"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_SetCharacter"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_GetCharacter"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_SetFunctionKey"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyboardShortcutKey_GetFunctionKey"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_ApplicationShortcutCallbackInfo_GetUIContext"
     }
 ]

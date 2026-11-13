@@ -18,10 +18,12 @@ import { default as drawing } from '@ohos.graphics.drawing';
 import image from '@ohos.multimedia.image';
 import webview from '@ohos.web.webview';
 import common from '@ohos.app.ability.common';
+import Want from '@ohos.app.ability.Want';
 import unifiedDataChannel from '@ohos.data.unifiedDataChannel';
 import uniformTypeDescriptor from '@ohos.data.uniformTypeDescriptor';
 import { LocalStorage } from '@ohos.arkui.stateManagement';
 import { DrawContext } from 'arkui.Graphics';
+import { RecordData } from '@ohos.base';
 import { AnimatableArithmetic, Callback, DragItemInfo, ResourceColor, DragPreviewOptions, DragInteractionOptions, ExpectedFrameRateRange } from '#generated';
 import { AsyncCallback } from '#external'
 import { ArkCustomComponent } from 'arkui/ArkCustomComponent';
@@ -50,6 +52,7 @@ import { JavaScriptProxy } from '#generated';
 import { ErrorCallback } from '@ohos.base';
 import { int32 } from '@koalaui/compat';
 import { SaveButtonCallback, PasteButtonCallback } from '#generated';
+import { UIExtensionProxy } from 'arkui/component/uiExtensionComponent';
 import { InputMethodExtraConfig } from '@ohos.inputMethod.ExtraConfig'
 import { default as text } from '@ohos.graphics.text'
 import { StackLayoutAlgorithm } from "arkui/LayoutAlgorithm"
@@ -423,6 +426,9 @@ export class ArkUIAniModule {
     native static _DestroyWindowFreeContainer(instanceId: KInt): void
 
     // for UIContext
+    native static _RegisterApplicationShortcut(value: string, modifiers: KInt,
+        callback: (instanceId: KInt) => void): KInt
+    native static _UnregisterApplicationShortcut(registrationId: KInt): void
     native static _GetCallingScopeUIContext(): KInt
     native static _GetLastFocusedUIContext(): KInt
     native static _GetLastForegroundUIContext(): KInt
@@ -459,6 +465,7 @@ export class ArkUIAniModule {
     native static _Common_isWindowInfoInitialized(instanceId: KInt): boolean
 
     native static _Common_IsEasySplit(instanceId: KInt): boolean
+    native static _Common_IsTransPageEnabled(instanceId: KInt): boolean
 
     // for transfer
     native static _createTouchEventAccessorWithPointer(input: KPointer): KPointer
@@ -572,4 +579,26 @@ export class ArkUIAniModule {
     native static _GestureEventUIObserver_RemoveGlobalGestureListener(type: KInt, callback?: GestureListenerCallback): void
     native static __BuilderNode_GetParentViewId(ptr: KPointer): KInt;
     native static _ArkTSFrameNode_GetId(peer: KPointer): string
+    native static _CreateModalUIExtension(want: Want, options?: Object, callback?: Object): KInt
+    native static _CloseModalUIExtension(sessionId: KInt, instanceId: KInt): void
+    native static _ModalUIExtensionProxySend(proxyPtr: KPointer, data: Object): void
+    native static _ModalUIExtensionProxySendSync(proxyPtr: KPointer, data: Object): Record<string, RecordData>
+    native static _ModalUIExtensionProxyDestroy(proxyPtr: KPointer): void
+    native static _ModalUIExtensionProxyOnAsyncReceiverRegister(proxyPtr: KPointer, callback: Callback<UIExtensionProxy>): void
+    native static _ModalUIExtensionProxyOnSyncReceiverRegister(proxyPtr: KPointer, callback: Callback<UIExtensionProxy>): void
+    native static _ModalUIExtensionProxyOffAsyncReceiverRegister(proxyPtr: KPointer, callback?: Callback<UIExtensionProxy>): void
+    native static _ModalUIExtensionProxyOffSyncReceiverRegister(proxyPtr: KPointer, callback?: Callback<UIExtensionProxy>): void
+
+    // for PlaceholderRegister (scroll placeholder template registry). The
+    // engine face is the ArkUIAniPlaceholderRegisterModifier of libace.
+    // release is the detached-root destroy callback: the engine invokes it with
+    // the raw product pointer whenever the registry drops a product.
+    native static _PlaceholderRegisterRegister(id: string, builder: Object, execution: Object,
+        release: (ptr: KPointer) => void): int32;
+    native static _PlaceholderRegisterUnregister(id: string): void;
+    native static _PlaceholderRegisterIsRegistered(id: string): boolean;
+    // Product hand-off of one isolated execution: the execution closure pops
+    // the built subtree root from its isolated view stack and publishes the
+    // pointer here, so the value never depends on ani primitive return boxing.
+    native static _PlaceholderRegisterPublishProduct(ptr: KPointer): void;
 }

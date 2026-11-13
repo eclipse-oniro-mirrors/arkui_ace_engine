@@ -1631,14 +1631,11 @@ HWTEST_F(CanvasRendererAccessorTest, createPatternTest, TestSize.Level1)
     auto repetition = Converter::ArkValue<Opt_String>(REPEAT_STRING);
     for (const auto& actualW : NUMBER_TEST_PLAN) {
         for (const auto& actualH : NUMBER_TEST_PLAN) {
-            std::shared_ptr<Ace::Pattern> target;
-            TransformParam param;
-            EXPECT_CALL(*renderingModel_, SetTransform(Matcher<std::shared_ptr<Ace::Pattern>>(testing::_), _))
-                .WillOnce(DoAll(SaveArg<0>(&target), SaveArg<1>(&param)));
             bitmapPeer->SetWidth(actualW);
             bitmapPeer->SetHeight(actualH);
 
             Opt_CanvasPattern result = accessor_->createPattern(peer_, arkBitmap, &repetition);
+
             auto pattern = Converter::OptConvert<Ark_CanvasPattern>(result);
             ASSERT_TRUE(pattern.has_value());
             Ark_CanvasPattern patternPeer = pattern.value();
@@ -1646,6 +1643,7 @@ HWTEST_F(CanvasRendererAccessorTest, createPatternTest, TestSize.Level1)
 
             std::optional<Matrix2DPeer*> optMatrix = PeerUtils::CreatePeer<Matrix2DPeer>();
             patternPeer->SetTransform(optMatrix);
+            auto target = patternPeer->GetPattern();
             ASSERT_NE(target, nullptr);
             EXPECT_NEAR(target->GetImageWidth(), actualW, FLT_PRECISION);
             EXPECT_NEAR(target->GetImageHeight(), actualH, FLT_PRECISION);

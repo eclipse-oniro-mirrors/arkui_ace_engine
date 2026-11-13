@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 #include "bridge/declarative_frontend/jsview/js_richeditor.h"
+
+#include "base/log/log_wrapper.h"
 #include "bridge/declarative_frontend/jsview/models/view_abstract_model_impl.h"
 #include "core/common/container.h"
 #include "core/components_ng/base/view_abstract_model_ng.h"
@@ -275,7 +277,9 @@ void SetRichEditorNapiDataDetectorConfigWithEvent(
         auto onResult = reinterpret_cast<void (*)(const char*, int32_t, void*)>(arkUITextDetectConfig->onResult);
         textDetectConfig.onResult = [onResult, arkUITextDetectConfig](const std::string& result) {
             if (onResult) {
-                onResult(result.c_str(), static_cast<int32_t>(result.size()),
+                LOG_CALLBACK("OH_ArkUI_TextDataDetectorConfig_RegisterOnDetectResultUpdateCallback", onResult);
+                onResult(
+                    result.c_str(), static_cast<int32_t>(result.size()),
                     arkUITextDetectConfig->onDetectResultUpdateUserData);
             }
         };
@@ -879,6 +883,7 @@ SelectMenuParam parseMenuParam(ArkUIRichEditorBindMenuParam* menuParam)
         selectMenuParam.onMenuShow = [onMenuShow, userData = menuParam->onMenuShowUserData](
                                          int32_t start, int32_t end) {
             if (onMenuShow) {
+                LOG_CALLBACK("OH_ArkUI_TextEditorSelectionMenuOptions_RegisterOnMenuShowCallback", onMenuShow);
                 onMenuShow(start, end, userData);
             }
         };
@@ -888,6 +893,7 @@ SelectMenuParam parseMenuParam(ArkUIRichEditorBindMenuParam* menuParam)
         selectMenuParam.onMenuHide = [onMenuHide, userData = menuParam->onMenuHideUserData](
                                          int32_t start, int32_t end) {
             if (onMenuHide) {
+                LOG_CALLBACK("OH_ArkUI_TextEditorSelectionMenuOptions_RegisterOnMenuHideCallback", onMenuHide);
                 onMenuHide(start, end, userData);
             }
         };
@@ -897,6 +903,7 @@ SelectMenuParam parseMenuParam(ArkUIRichEditorBindMenuParam* menuParam)
         selectMenuParam.onAppear = [onMenuAppear, userData = menuParam->onMenuAppearUserData](
                                          int32_t start, int32_t end) {
             if (onMenuAppear) {
+                LOG_CALLBACK("OH_ArkUI_TextEditorSelectionMenuOptions_RegisterOnMenuAppearCallback", onMenuAppear);
                 onMenuAppear(start, end, userData);
             }
         };
@@ -905,6 +912,9 @@ SelectMenuParam parseMenuParam(ArkUIRichEditorBindMenuParam* menuParam)
         auto onMenuDisappear = reinterpret_cast<void (*)(void*)>(menuParam->onMenuDisappear);
         selectMenuParam.onDisappear = [onMenuDisappear, userData = menuParam->onMenuDisappearUserData]() {
             if (onMenuDisappear) {
+                LOG_CALLBACK(
+                    "OH_ArkUI_TextEditorSelectionMenuOptions_RegisterOnMenuDisappearCallback",
+                    onMenuDisappear);
                 onMenuDisappear(userData);
             }
         };
@@ -1815,6 +1825,104 @@ void ResetRichEditorPasswordIcon(ArkUINodeHandle node)
     RichEditorModelNG::ResetPasswordIcon(frameNode);
 }
 
+// —— EnableAutoFill ——
+void SetRichEditorEnableAutoFill(ArkUINodeHandle node, ArkUI_Uint32 enableAutoFill)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    RichEditorModelNG::SetEnableAutoFill(frameNode, static_cast<bool>(enableAutoFill));
+}
+
+ArkUI_Int32 GetRichEditorEnableAutoFill(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_RETURN(frameNode, ERROR_UINT_CODE);
+    return static_cast<ArkUI_Int32>(RichEditorModelNG::GetEnableAutoFill(frameNode));
+}
+
+void ResetRichEditorEnableAutoFill(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    RichEditorModelNG::ResetEnableAutoFill(frameNode);
+}
+
+// —— ContentType ——
+void SetRichEditorContentType(ArkUINodeHandle node, ArkUI_Uint32 contentType)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto typeValue = static_cast<int32_t>(contentType);
+    if (typeValue < static_cast<int32_t>(TextContentType::BEGIN) ||
+        typeValue > static_cast<int32_t>(TextContentType::END)) {
+        typeValue = static_cast<int32_t>(TextContentType::UNSPECIFIED);
+        TAG_LOGW(AceLogTag::ACE_RICH_TEXT, "RichEditor content type is invalid");
+    }
+    RichEditorModelNG::SetContentType(frameNode, static_cast<NG::TextContentType>(typeValue));
+}
+
+ArkUI_Int32 GetRichEditorContentType(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_RETURN(frameNode, ERROR_UINT_CODE);
+    return static_cast<ArkUI_Int32>(RichEditorModelNG::GetContentType(frameNode));
+}
+
+void ResetRichEditorContentType(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    RichEditorModelNG::ResetContentType(frameNode);
+}
+
+// —— PasswordRules ——
+void SetRichEditorPasswordRules(ArkUINodeHandle node, ArkUI_CharPtr passwordRules)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    if (!passwordRules) {
+        passwordRules = "";
+    }
+    RichEditorModelNG::SetPasswordRules(frameNode, std::string(passwordRules));
+}
+
+ArkUI_CharPtr GetRichEditorPasswordRules(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_RETURN(frameNode, "");
+    strValue = RichEditorModelNG::GetPasswordRules(frameNode);
+    return strValue.c_str();
+}
+
+void ResetRichEditorPasswordRules(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    RichEditorModelNG::ResetPasswordRules(frameNode);
+}
+
+// —— EnableFillAnimation ——
+void SetRichEditorEnableFillAnimation(ArkUINodeHandle node, ArkUI_Uint32 enableFillAnimation)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    RichEditorModelNG::SetEnableAutoFillAnimation(frameNode, static_cast<bool>(enableFillAnimation));
+}
+
+ArkUI_Int32 GetRichEditorEnableFillAnimation(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_RETURN(frameNode, ERROR_UINT_CODE);
+    return static_cast<ArkUI_Int32>(RichEditorModelNG::GetEnableAutoFillAnimation(frameNode));
+}
+
+void ResetRichEditorEnableFillAnimation(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    RichEditorModelNG::ResetEnableAutoFillAnimation(frameNode);
+}
+
 void SetRichEditorSingleLine(ArkUINodeHandle node, ArkUI_Bool singleLine)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -2134,6 +2242,8 @@ void ParseTextBackgroundStyle(struct OHOS::Ace::UpdateSpanStyle& updateSpanStyle
         CalcDimension(style.textBackgroundBottomRightRadius, DimensionUnit::VP),
         CalcDimension(style.textBackgroundBottomLeftRadius, DimensionUnit::VP) };
     textBackgroundStyle.backgroundRadius->multiValued = true;
+    textBackgroundStyle.borderWidth = CalcDimension(style.textBackgroundBorderWidth, DimensionUnit::VP);
+    textBackgroundStyle.borderColor = Color(style.textBackgroundBorderColor);
     updateSpanStyle.updateTextBackgroundStyle = textBackgroundStyle;
     textStyle.SetTextBackgroundStyle(textBackgroundStyle);
 }
@@ -2246,6 +2356,8 @@ void ParseTextBackgroundStyle(struct ArkUIRichEditorTextStyle& textStyle,
     textStyle.textBackgroundTopRightRadius = radius->radiusTopRight.value_or(Dimension(0)).ConvertToVp();
     textStyle.textBackgroundBottomLeftRadius = radius->radiusBottomLeft.value_or(Dimension(0)).ConvertToVp();
     textStyle.textBackgroundBottomRightRadius = radius->radiusBottomRight.value_or(Dimension(0)).ConvertToVp();
+    textStyle.textBackgroundBorderWidth = textBackgroundStyle.borderWidth.value_or(Dimension(0)).ConvertToVp();
+    textStyle.textBackgroundBorderColor = textBackgroundStyle.borderColor.value_or(Color(0x00000000)).GetValue();
 }
 
 ArkUIRichEditorTextStyle GetRichEditorTypingStyle(ArkUINodeHandle node)
@@ -3053,6 +3165,18 @@ const ArkUIRichEditorModifier* GetRichEditorDynamicModifier()
             .setRichEditorUnderlineColor = nullptr,
             .getRichEditorUnderlineColor = nullptr,
             .resetRichEditorUnderlineColor = nullptr,
+            .setRichEditorEnableAutoFill = nullptr,
+            .getRichEditorEnableAutoFill = nullptr,
+            .resetRichEditorEnableAutoFill = nullptr,
+            .setRichEditorContentType = nullptr,
+            .getRichEditorContentType = nullptr,
+            .resetRichEditorContentType = nullptr,
+            .setRichEditorPasswordRules = nullptr,
+            .getRichEditorPasswordRules = nullptr,
+            .resetRichEditorPasswordRules = nullptr,
+            .setRichEditorEnableFillAnimation = nullptr,
+            .getRichEditorEnableFillAnimation = nullptr,
+            .resetRichEditorEnableFillAnimation = nullptr,
         };
         CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
         return &modifier;
@@ -3281,6 +3405,18 @@ const ArkUIRichEditorModifier* GetRichEditorDynamicModifier()
         .setRichEditorUnderlineColor = SetRichEditorUnderlineColor,
         .getRichEditorUnderlineColor = GetRichEditorUnderlineColor,
         .resetRichEditorUnderlineColor = ResetRichEditorUnderlineColor,
+        .setRichEditorEnableAutoFill = SetRichEditorEnableAutoFill,
+        .getRichEditorEnableAutoFill = GetRichEditorEnableAutoFill,
+        .resetRichEditorEnableAutoFill = ResetRichEditorEnableAutoFill,
+        .setRichEditorContentType = SetRichEditorContentType,
+        .getRichEditorContentType = GetRichEditorContentType,
+        .resetRichEditorContentType = ResetRichEditorContentType,
+        .setRichEditorPasswordRules = SetRichEditorPasswordRules,
+        .getRichEditorPasswordRules = GetRichEditorPasswordRules,
+        .resetRichEditorPasswordRules = ResetRichEditorPasswordRules,
+        .setRichEditorEnableFillAnimation = SetRichEditorEnableFillAnimation,
+        .getRichEditorEnableFillAnimation = GetRichEditorEnableFillAnimation,
+        .resetRichEditorEnableFillAnimation = ResetRichEditorEnableFillAnimation,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;

@@ -14,6 +14,8 @@
  */
 
 #include "foundation/arkui/ace_engine/interfaces/native/native_gesture.h"
+
+#include "base/log/log_wrapper.h"
 #include "core/interfaces/native/node/node_gesture_modifier.h"
 #include "core/interfaces/native/node/node_swiper_modifier.h"
 #include <securec.h>
@@ -804,8 +806,8 @@ void clearGestures(ArkUINodeHandle node)
     gestureHub->ClearModifierGesture();
 }
 
-// <fingerid, iterator of touchTestResults in eventManager>
-using TouchRecognizerTarget = std::vector<std::pair<int32_t, TouchTestResult::iterator>>;
+// <fingerid, touchTestResults value in eventManager>
+using TouchRecognizerTarget = std::vector<std::pair<int32_t, TouchTestResult::value_type>>;
 using TouchRecognizerMap = std::map<TouchEventTarget*, TouchRecognizerTarget>;
 
 bool IsFingerCollectedByTarget(TouchRecognizerTarget& target, int32_t fingerId)
@@ -832,12 +834,12 @@ void CollectTouchEventTarget(
         }
         auto targetNode = target->GetAttachedNode().Upgrade();
         if (targetNode && targetNode == borderNode) {
-            dict[targetPtr].emplace_back(fingerId, iter);
+            dict[targetPtr].emplace_back(fingerId, target);
             return;
         }
         while (targetNode) {
             if (targetNode == borderNode) {
-                dict[targetPtr].emplace_back(fingerId, iter);
+                dict[targetPtr].emplace_back(fingerId, target);
                 break;
             }
             targetNode = targetNode->GetParentFrameNode();
@@ -990,7 +992,14 @@ void setGestureInterrupterToNodeWithUserData(
         interruptInfo.inputEvent = &inputEvent;
         interruptInfo.gestureEvent = &arkUIGestureEvent;
         auto touchRecognizers = CreateTouchRecognizers(AceType::RawPtr(node), info, interruptInfo);
-        auto result = interrupter(&interruptInfo);
+        ArkUI_Int32 result {};
+        {
+            LOG_CALLBACK(userData ?
+                "ArkUI_NativeGestureAPI_2.setGestureInterrupterToNode" :
+                "ArkUI_NativeGestureAPI_1.setGestureInterrupterToNode",
+                interrupter);
+            result = interrupter(&interruptInfo);
+        }
         DestroyTouchRecognizers(touchRecognizers, interruptInfo);
         return static_cast<GestureJudgeResult>(result);
     };
@@ -1024,7 +1033,11 @@ ArkUI_Int32 setInnerGestureParallelTo(ArkUINodeHandle node, void* userData,
         parallelInnerGestureEvent.responseLinkRecognizer = othersArkUIGestureRecognizer;
         parallelInnerGestureEvent.userData = userData;
         parallelInnerGestureEvent.count = count;
-        auto* result = parallelInnerGesture(&parallelInnerGestureEvent);
+        ArkUIGestureRecognizer* result {};
+        {
+            LOG_CALLBACK("ArkUI_NativeGestureAPI_1.setInnerGestureParallelTo", parallelInnerGesture);
+            result = parallelInnerGesture(&parallelInnerGestureEvent);
+        }
         if (!result || !result->recognizer) {
             return nullptr;
         }
@@ -1061,7 +1074,11 @@ ArkUI_Int32 setGestureParallelTo(ArkUINodeHandle node, void* userData,
         parallelGestureEvent.responseLinkRecognizer = othersArkUIGestureRecognizer;
         parallelGestureEvent.userData = userData;
         parallelGestureEvent.count = count;
-        auto* result = parallelGesture(&parallelGestureEvent);
+        ArkUIGestureRecognizer* result {};
+        {
+            LOG_CALLBACK("ArkUI_NativeGestureAPI_3.setGestureParallelTo", parallelGesture);
+            result = parallelGesture(&parallelGestureEvent);
+        }
         if (!result || !result->recognizer) {
             delete[] othersArkUIGestureRecognizer;
             return nullptr;

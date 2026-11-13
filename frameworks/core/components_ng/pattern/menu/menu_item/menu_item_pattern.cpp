@@ -14,6 +14,8 @@
  */
 
 #include "core/components_ng/pattern/menu/menu_item/menu_item_pattern.h"
+
+#include "core/components_ng/pattern/overlay/overlay_content_change_report.h"
 #include "core/accessibility/accessibility_manager.h"
 #include "core/components_ng/pattern/menu/menu_item/menu_item_model_ng.h"
 
@@ -480,14 +482,12 @@ void MenuItemPattern::SetFocusStyle()
     CHECK_NULL_VOID(host);
     auto renderContext = host->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
-    auto&& graphics = renderContext->GetOrCreateGraphics();
-    CHECK_NULL_VOID(graphics);
     if (!selectTheme_->GetoptionApplyFocusedStyle()) {
         return;
     }
 
     Shadow shadow = Shadow::CreateShadow(static_cast<ShadowStyle>(NONE_SHADOW_VALUE));
-    if (!graphics->HasBackShadow() || graphics->GetBackShadowValue() == shadow) {
+    if (!renderContext->HasBackShadow() || renderContext->GetBackShadowValue(Shadow()) == shadow) {
         ShadowStyle shadowStyle = static_cast<ShadowStyle>(selectTheme_->GetOptionFocusedShadow());
         renderContext->UpdateBackShadow(Shadow::CreateShadow(shadowStyle));
         isFocusShadowSet_ = true;
@@ -726,7 +726,7 @@ void MenuItemPattern::ShowSubMenu(ShowSubMenuType type)
         CHECK_NULL_VOID(pipeline);
         auto overlayManager = pipeline->GetOverlayManager();
         CHECK_NULL_VOID(overlayManager);
-        overlayManager->ContentChangeReport(GetMenuWrapper(), true);
+        overlayManager->ContentChangeReport(GetMenuWrapper(), true, false);
         SetDetachedFreeRootProxy(customNode);
         return;
     }
@@ -798,11 +798,17 @@ void MenuItemPattern::ShowSubMenuWithAnimation(const RefPtr<FrameNode>& subMenu)
                 renderContext->UpdateTransformScale(VectorF(MENU_ANIMATION_MAX_SCALE, MENU_ANIMATION_MAX_SCALE));
                 renderContext->UpdateOpacity(MENU_ANIMATION_MAX_OPACITY);
             },
-            animationOption.GetOnFinishEvent(), nullptr, subMenu->GetContextRefPtr());
+            [weak = WeakPtr<FrameNode>(subMenu)]() {
+                ReportCapiSubMenuEvent(weak.Upgrade(), true);
+            }, nullptr, subMenu->GetContextRefPtr());
+    } else {
+        pipeline->AddAfterLayoutTask([weak = WeakPtr<FrameNode>(subMenu)]() {
+            ReportCapiSubMenuEvent(weak.Upgrade(), true);
+        });
     }
     auto overlayManager = pipeline->GetOverlayManager();
     CHECK_NULL_VOID(overlayManager);
-    overlayManager->ContentChangeReport(GetMenuWrapper(), true);
+    overlayManager->ContentChangeReport(GetMenuWrapper(), true, false);
 }
 
 void MenuItemPattern::SendSubMenuOpenToAccessibility(RefPtr<FrameNode>& subMenu, ShowSubMenuType type)
@@ -939,6 +945,9 @@ void MenuItemPattern::ShowSubMenuHelper(const RefPtr<FrameNode>& subMenu)
         menuProps->UpdateMenuOffset(offset);
         menuWrapper->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF_AND_CHILD);
         RegisterWrapperMouseEvent();
+    }
+    if (auto ctx = subMenu->GetContext()) {
+        ctx->AddTaskOverlayNodeMaterialArea(subMenu, "MenuItem ShowSubMenuHelper");
     }
     // select overlay menu no need focus
     if (!isSelectOverlayMenu) {
@@ -1112,7 +1121,9 @@ void MenuItemPattern::ShowEmbeddedExpandMenu(const RefPtr<FrameNode>& expandable
             pattern->SetShowEmbeddedMenuParams(expandableNode);
             menuRenderContext->UpdateSubmenuDistortionParam();
         },
-        nullptr, nullptr, host->GetContextRefPtr());
+        [weak = WeakPtr<FrameNode>(expandableNode)]() {
+            ReportCapiSubMenuEvent(weak.Upgrade(), true);
+        }, nullptr, host->GetContextRefPtr());
 }
 
 void MenuItemPattern::SetShowEmbeddedMenuParams(const RefPtr<FrameNode>& expandableNode)
@@ -1208,7 +1219,9 @@ void MenuItemPattern::HideEmbeddedExpandMenu(const RefPtr<FrameNode>& expandable
         CHECK_NULL_VOID(menuItemPattern);
         menuItemPattern->UpdatePreviewPosition(oldMenuSize, menuGeometryNode->GetFrameSize());
         menuRenderContext->UpdateSubmenuDistortionParam();
-    }, nullptr, nullptr, host->GetContextRefPtr());
+    }, [weak = WeakPtr<FrameNode>(expandableNode)]() {
+        ReportCapiSubMenuEvent(weak.Upgrade(), false);
+    }, nullptr, host->GetContextRefPtr());
 }
 
 void MenuItemPattern::CloseMenu()
@@ -3100,7 +3113,18 @@ void MenuItemPattern::UpdateNextNodeDivider(bool needDivider)
     CHECK_NULL_VOID(host);
     auto parent = host->GetParent();
     CHECK_NULL_VOID(parent);
-    auto nextNode = parent->GetChildAtIndex(index_ + 1);
+    // For array grid menus, index_ is the relative index in listParams and doesn't account
+    // for the grid section and section divider nodes prepended to the column. Use the actual
+    // child index in the parent to find the correct next sibling.
+    auto menu = GetMenu();
+    int32_t nextIndex = index_ + 1;
+    if (menu) {
+        auto menuPattern = menu->GetPattern<MenuPattern>();
+        if (menuPattern && menuPattern->GetIsArrayGridMenu()) {
+            nextIndex = parent->GetChildIndex(host) + 1;
+        }
+    }
+    auto nextNode = parent->GetChildAtIndex(nextIndex);
     if (nextNode) {
         auto pattern = DynamicCast<FrameNode>(nextNode)->GetPattern<MenuItemPattern>();
         CHECK_NULL_VOID(pattern);
@@ -3974,4 +3998,14 @@ void MenuItemPattern::ReportEvent()
         ComponentEventType::COMPONENT_EVENT_MENU);
 #endif
 }
+void MenuItemPattern::DumpInspectorTreeInfo(
+    std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context)
+{
+    Pattern::DumpInspectorTreeInfo(attrs, context);
+    if (!subBuilderFunc_ && !subSelectMenuBuilderFunc_) {
+        return;
+    }
+    attrs->Put("expanded", expandingMode_ == SubMenuExpandingMode::EMBEDDED ? isExpanded_ : isSubMenuShowed_);
+}
+
 } // namespace OHOS::Ace::NG

@@ -29,17 +29,22 @@
 
 namespace OHOS::Ace::NG {
 
-void WaterFlowModelNG::SetScrollToIndexMultiThread(
-    FrameNode* frameNode, int32_t index, int32_t animation, int32_t alignment, std::optional<float> extraOffset)
+void WaterFlowModelNG::SetScrollToIndexMultiThread(FrameNode* frameNode, int32_t index, int32_t animation,
+    int32_t alignment, std::optional<float> extraOffset, int32_t fastScrollMode)
 {
     CHECK_NULL_VOID(frameNode);
     auto pattern = frameNode->GetPattern<WaterFlowPattern>();
     CHECK_NULL_VOID(pattern);
+    const auto mode = static_cast<FastScrollMode>(fastScrollMode);
     frameNode->PostAfterAttachMainTreeTask(
-        [weak = AceType::WeakClaim(AceType::RawPtr(pattern)), index, animation, alignment, extraOffset]() {
+        [weak = AceType::WeakClaim(AceType::RawPtr(pattern)), index, animation, alignment, extraOffset, mode]() {
             auto pattern = weak.Upgrade();
             CHECK_NULL_VOID(pattern);
             pattern->SetAccessibilityScrollSource(AccessibilityScrollSource::API);
+            if (animation && IsFastScrollEnabled(mode)) {
+                pattern->ScrollToIndexFastScroll(index, true, static_cast<ScrollAlign>(alignment), extraOffset, mode);
+                return;
+            }
             pattern->ScrollToIndex(index, animation, static_cast<ScrollAlign>(alignment), extraOffset);
         });
 }

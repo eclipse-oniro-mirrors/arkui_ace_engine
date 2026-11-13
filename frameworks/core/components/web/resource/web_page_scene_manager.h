@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_WEB_RESOURCE_WEB_PAGE_SCENE_MANAGER_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_WEB_RESOURCE_WEB_PAGE_SCENE_MANAGER_H
 
+#include <atomic>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -78,6 +79,48 @@ public:
      * Cleans up pendingGetRules_ and pendingGetProcesses_ for temporary queries.
      */
     void CompleteGetPageScene(int32_t processId);
+
+    /**
+     * Initialize the remaining counter for a GetPageScene query.
+     * Called before dispatching to Web components. Each component decrements
+     * once when done (either via JS callback or blocked Begin), and when
+     * remaining reaches 0, CompleteGetPageScene is called automatically.
+     */
+    void InitGetRemaining(int32_t processId, int32_t count);
+
+    /**
+     * Decrement the remaining counter for a GetPageScene query.
+     * Called by each Web component when all its rule queries are done.
+     * When remaining reaches 0, calls CompleteGetPageScene.
+     */
+    void DecrementGetRemaining(int32_t processId);
+
+    /**
+     * Get the current round's remaining counter instance (round handle).
+     * Callers dispatching async work capture it and pass it to
+     * DecrementRoundRemaining so late callbacks from a superseded round are
+     * ignored instead of consuming the new round's budget.
+     */
+    std::shared_ptr<std::atomic<int32_t>> GetRoundRemaining(int32_t processId);
+
+    /**
+     * Decrement the remaining counter bound to a specific round instance.
+     * If the round has been superseded (counter replaced by a newer round),
+     * the decrement is ignored. When the current round reaches 0, calls
+     * CompleteGetPageScene.
+     */
+    void DecrementRoundRemaining(int32_t processId,
+        const std::shared_ptr<std::atomic<int32_t>>& roundRemaining);
+
+    /**
+     * Answer a GetPageScene round with a single empty result when no Web component can
+     * participate (no Web listener, task post failure, or pipeline unavailable).
+     * Closes out any previous in-flight round first — its counter instance is replaced
+     * so late callbacks from it are discarded by the round validation instead of being
+     * reported again as this round's answer — then completes a zero-counter round whose
+     * fallback emits the single empty result.
+     */
+    void ReportEmptyWebRound(int32_t processId);
 
     /**
      * Update RuleMatchState under lock protection.
@@ -150,6 +193,17 @@ public:
     void ProcessQueryResult(int32_t processId, int32_t webId, int32_t hostNodeId,
         const std::string& selectorJson, const std::string& rawResult, bool isGetResult);
 
+    /**
+     * Round-scoped variant of ProcessQueryResult for Get queries: validates the round
+     * instance before processing and before each report. A late callback from a
+     * superseded round is discarded entirely — it must neither update the current
+     * round's rule state nor report its data (or its empty string) as the current
+     * round's answer.
+     */
+    void ProcessQueryResultForRound(int32_t processId, int32_t webId, int32_t hostNodeId,
+        const std::string& selectorJson, const std::string& rawResult,
+        const std::shared_ptr<std::atomic<int32_t>>& roundRemaining);
+
 private:
     WebPageSceneManager() = default;
     ~WebPageSceneManager() = default;
@@ -194,6 +248,24 @@ private:
         int32_t webId, int32_t hostNodeId, const WebRule& rule, bool matched, int32_t matchedCount,
         const std::vector<PageSceneControlInfo>& controls, const std::string& eventName);
 
+    void DecrementCounterAndComplete(int32_t processId,
+        const std::shared_ptr<std::atomic<int32_t>>& remaining);
+    void OnMatchResultForRound(int32_t processId, const std::string& sceneJson,
+        const std::shared_ptr<std::atomic<int32_t>>& roundRemaining);
+    void CompleteRoundPageScene(int32_t processId,
+        const std::shared_ptr<std::atomic<int32_t>>& roundRemaining);
+    bool IsRoundCurrent(int32_t processId,
+        const std::shared_ptr<std::atomic<int32_t>>& roundRemaining);
+    /**
+     * Report body shared by OnMatchResult and the round-scoped path: logging +
+     * ReportPageSceneEvent only, without touching the round state. The round-scoped
+     * path must not re-mark the reported flag after the synchronous report IPC — a
+     * write there could interleave with a newer round's InitGetRemaining and wrongly
+     * suppress that round's fallback empty report.
+     */
+    void ReportMatchResult(int32_t processId, const std::string& sceneJson, bool isGetResult);
+    void MarkGetReported(int32_t processId);
+
     std::mutex mutex_;
 
     // Rule definitions: processId -> ruleSet (one-to-one)
@@ -202,6 +274,10 @@ private:
     // Temporary Get query storage (separate from registered rules)
     std::map<int32_t, WebPageSceneRuleSet> pendingGetRules_;
     std::set<int32_t> pendingGetProcesses_;
+    std::map<int32_t, std::shared_ptr<std::atomic<int32_t>>> pendingGetRemaining_;
+    // Whether the current round already reported at least one get result; used to emit
+    // a single empty result on round completion if nothing was reported.
+    std::map<int32_t, bool> pendingGetReported_;
 };
 
 } // namespace OHOS::Ace

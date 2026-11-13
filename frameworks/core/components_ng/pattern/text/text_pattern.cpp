@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/components_ng/pattern/text/text_pattern.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 #include "core/components_ng/render/drawing.h"
@@ -38,6 +39,7 @@
 #include "base/utils/utf_helper.h"
 #include "base/utils/utils.h"
 #include "core/common/ace_engine_ext.h"
+#include "core/common/ai/text_ai_utils.h"
 #include "core/common/container.h"
 #include "core/common/container_scope.h"
 #include "core/common/clipboard/clipboard_proxy.h"
@@ -51,6 +53,7 @@
 #include "core/components/common/properties/text_style_parser.h"
 #include "core/components/common/properties/text_style_gradient.h"
 #include "core/components_ng/base/geometry_node.h"
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include "core/components_ng/gestures/recognizers/gesture_recognizer.h"
 #include "core/components_ng/manager/select_content_overlay/selection_container.h"
 #include "core/components_ng/manager/select_overlay/select_overlay_manager.h"
@@ -1735,11 +1738,15 @@ bool TextPattern::ParseCommand(const std::string& command)
         }
         ReportCommandResult(host->GetId(), "Text.onCopyComplete");
     } else {
-        TAG_LOGE(AceLogTag::ACE_TEXT, "OnInjectionEvent unknown cmd : %{public}s, nodeId : %{public}d",
-            cmd.c_str(), host->GetId());
+        TAG_LOGE(AceLogTag::ACE_TEXT, "OnInjectionEvent unknown cmd nodeId : %{public}d", host->GetId());
         return false;
     }
     return true;
+}
+
+CommandResult TextPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "selectText", "copy" });
 }
 
 int32_t TextPattern::OnInjectionEvent(const std::string& command)
@@ -1798,11 +1805,43 @@ bool TextPattern::PrepareAIMenuOptions(
         selectedAiEntityNum++;
         if (selectedAiEntityNum > MAX_SELECTED_AI_ENTITY) {
             break;
-        } else {
-            aiMenuOptions[spanIter->second.type] = spanIter->second;
         }
+        // Skip phone number entity if no phone call app exists (e.g. wifi-only device)
+        if (!CheckPhoneCallAppExist(spanIter->second)) {
+            continue;
+        }
+        aiMenuOptions[spanIter->second.type] = spanIter->second;
     }
     return selectedAiEntityNum == MAX_SELECTED_AI_ENTITY;
+}
+
+bool TextPattern::CheckPhoneCallAppExist(const AISpan& aiSpan)
+{
+    if (aiSpan.type != TextDataDetectType::PHONE_NUMBER) {
+        return true;
+    }
+    auto callPhoneFuncName = TextAiUtils::GetCallPhoneFuncName();
+    if (callPhoneFuncName.empty()) {
+        return false;
+    }
+    auto typeIter = TEXT_DETECT_MAP.find(aiSpan.type);
+    if (typeIter == TEXT_DETECT_MAP.end()) {
+        return true;
+    }
+    if (!selectDetectorAdapter_) {
+        return true;
+    }
+    const auto& menuActions = selectDetectorAdapter_->textDetectResult_.menuOptionAndAction;
+    auto actionIter = menuActions.find(typeIter->second);
+    if (actionIter == menuActions.end() || actionIter->second.empty()) {
+        return false;
+    }
+    for (const auto& [actionName, func] : actionIter->second) {
+        if (actionName == callPhoneFuncName) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void TextPattern::UpdateAIMenuOptions()
@@ -5904,8 +5943,12 @@ void TextPattern::OnVisibleChange(bool isVisible)
             GetDataDetectorAdapter()->aiDetectDelayTask_.Cancel();
         }
     } else {
-        if (CanStartAITask()) {
-            GetDataDetectorAdapter()->StartAITask();
+        if (CanStartAITask() && !GetDataDetectorAdapter()->aiDetectInitialized_) {
+            ParseOriText(textForDisplay_);
+            if (!GetDataDetectorAdapter()->aiDetectInitialized_) {
+                GetDataDetectorAdapter()->textForAI_ = textForDisplay_;
+                GetDataDetectorAdapter()->StartAITask();
+            }
         }
     }
 }
@@ -6096,6 +6139,29 @@ void TextPattern::AddImageToSpanItem(const RefPtr<UINode>& child)
     }
 }
 
+void TextPattern::DumpInspectorTreeInfo(
+    std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context)
+{
+    if (!context.CanExportText(InspectorTextKind::DISPLAY_TEXT, false, IsSetObscured())) {
+        attrs->Put("content", "");
+        return;
+    }
+    // Reuse the component-owned reader while preserving existing UISession attributes.
+    Pattern::DumpInspectorTreeInfo(attrs, context);
+    if (!attrs->Contains("content")) {
+        auto layout = GetLayoutProperty<TextLayoutProperty>();
+        auto content = spans_.empty() && layout ? layout->GetContentValue(u"") :
+            GetContentWithPlaceholderSpaceFillter();
+        attrs->Put("content", StringUtils::Str16ToStr8(content).c_str());
+    }
+}
+
+bool TextPattern::HasInspectorResponseRegion() const
+{
+    auto host = GetHost();
+    return host && (host->GetTag() != V2::TEXT_ETS_TAG || isUserSetResponseRegion_);
+}
+
 void TextPattern::DumpSimplifyInfo(std::shared_ptr<JsonValue>& json)
 {
     auto host = GetHost();
@@ -6183,7 +6249,11 @@ void TextPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamC
     if (!config.IsPublicTree() || config.functionalProperties) {
         // Legacy reports an empty map; public collection reports an installed binding.
         const bool menuState = config.IsPublicTree() ? !selectionMenuMap_.empty() : selectionMenuMap_.empty();
-        json->Put("BindSelectionMenu", std::to_string(menuState).c_str());
+        if (config.IsPublicTree()) {
+            json->Put("BindSelectionMenu", menuState);
+        } else {
+            json->Put("BindSelectionMenu", std::to_string(menuState).c_str());
+        }
     }
     if (!config.IsPublicTree() || config.visualProperties) {
         DumpAdvanceFontInfo(json, config);
@@ -6196,16 +6266,40 @@ void TextPattern::DumpAdvanceParagraphInfo(std::unique_ptr<JsonValue>& json, con
         return;
     }
     auto children = JsonUtil::Create(true);
-    children->Put("DidExceedMaxLines", std::to_string(pManager_->DidExceedMaxLines()).c_str());
-    children->Put("GetTextWidth", std::to_string(pManager_->GetTextWidth()).c_str());
-    children->Put("GetHeight", std::to_string(pManager_->GetHeight()).c_str());
+    if (config.IsPublicTree()) {
+        children->Put("DidExceedMaxLines", pManager_->DidExceedMaxLines());
+    } else {
+        children->Put("DidExceedMaxLines", std::to_string(pManager_->DidExceedMaxLines()).c_str());
+    }
+    if (config.IsPublicTree()) {
+        children->Put("GetTextWidth", pManager_->GetTextWidth());
+    } else {
+        children->Put("GetTextWidth", std::to_string(pManager_->GetTextWidth()).c_str());
+    }
+    if (config.IsPublicTree()) {
+        children->Put("GetHeight", pManager_->GetHeight());
+    } else {
+        children->Put("GetHeight", std::to_string(pManager_->GetHeight()).c_str());
+    }
     if (!config.IsPublicTree()) {
         children->Put("GetMaxWidth", std::to_string(pManager_->GetMaxWidth()).c_str());
         children->Put("GetMaxIntrinsicWidth", std::to_string(pManager_->GetMaxIntrinsicWidth()).c_str());
     }
-    children->Put("GetLineCount", std::to_string(pManager_->GetLineCount()).c_str());
-    children->Put("GetLongestLine", std::to_string(pManager_->GetLongestLine()).c_str());
-    children->Put("GetLongestLineWithIndent", std::to_string(pManager_->GetLongestLineWithIndent()).c_str());
+    if (config.IsPublicTree()) {
+        children->Put("GetLineCount", pManager_->GetLineCount());
+    } else {
+        children->Put("GetLineCount", std::to_string(pManager_->GetLineCount()).c_str());
+    }
+    if (config.IsPublicTree()) {
+        children->Put("GetLongestLine", pManager_->GetLongestLine());
+    } else {
+        children->Put("GetLongestLine", std::to_string(pManager_->GetLongestLine()).c_str());
+    }
+    if (config.IsPublicTree()) {
+        children->Put("GetLongestLineWithIndent", pManager_->GetLongestLineWithIndent());
+    } else {
+        children->Put("GetLongestLineWithIndent", std::to_string(pManager_->GetLongestLineWithIndent()).c_str());
+    }
     json->Put("from TextEngine paragraphs_ info", children);
 }
 
@@ -6217,8 +6311,16 @@ void TextPattern::DumpAdvanceFontInfo(std::unique_ptr<JsonValue>& json, const Pa
     CHECK_NULL_VOID(pipeline);
     auto fontScale = pipeline->GetFontScaleFromEnv(host);
     auto fontWeightScale = pipeline->GetFontWeightScale();
-    json->Put("fontScale", std::to_string(fontScale).c_str());
-    json->Put("fontWeightScale", std::to_string(fontWeightScale).c_str());
+    if (config.IsPublicTree()) {
+        json->Put("fontScale", fontScale);
+    } else {
+        json->Put("fontScale", std::to_string(fontScale).c_str());
+    }
+    if (config.IsPublicTree()) {
+        json->Put("fontWeightScale", fontWeightScale);
+    } else {
+        json->Put("fontWeightScale", std::to_string(fontWeightScale).c_str());
+    }
     auto renderContext = host->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
     if (!config.IsPublicTree() && renderContext->HasForegroundColor()) {
@@ -8287,10 +8389,13 @@ const RefPtr<ScrollablePattern> TextPattern::FindScrollableParentWithRelativeOff
 {
     auto host = GetHost();
     CHECK_NULL_RETURN(host, nullptr);
-    auto parent = host->GetAncestorNodeOfFrame(true);
+    auto parent = host->GetCoordinateAncestorNodeOfFrame(true);
     auto renderContext = host->GetRenderContext();
     CHECK_NULL_RETURN(renderContext, nullptr);
     offset = renderContext->GetPaintRectWithTransform().GetOffset();
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(host.GetRawPtr())) {
+        offset += FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(host.GetRawPtr());
+    }
     while (parent) {
         auto scrollablePattern = parent->GetPattern<ScrollablePattern>();
         if (scrollablePattern && scrollablePattern->IsScrollable()) {
@@ -8299,7 +8404,11 @@ const RefPtr<ScrollablePattern> TextPattern::FindScrollableParentWithRelativeOff
         auto parentRenderContext = parent->GetRenderContext();
         CHECK_NULL_RETURN(parentRenderContext, nullptr);
         offset += parentRenderContext->GetPaintRectWithTransform().GetOffset();
-        parent = parent->GetAncestorNodeOfFrame(true);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            offset += FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(parent.GetRawPtr());
+        }
+        parent = ancestor;
     }
     return nullptr;
 }

@@ -743,6 +743,8 @@ protected:
     void FixPredictSnapOffsetAlignCenter();
 
     void ProcessCacheCount(LayoutWrapper* layoutWrapper, int32_t cacheCount, bool show);
+    void UpdateListDecodeCacheWindow(LayoutWrapper* layoutWrapper, int32_t cacheCount);
+    void UpdateItemDecodeState(LayoutWrapper* layoutWrapper, int32_t idx, bool active);
     virtual int32_t LayoutCachedForward(LayoutWrapper* layoutWrapper, int32_t cacheCount,
         int32_t& cachedCount, int32_t curIndex, std::list<PredictLayoutItem>& predictList, bool show);
     virtual int32_t LayoutCachedBackward(LayoutWrapper* layoutWrapper, int32_t cacheCount,

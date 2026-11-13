@@ -14,6 +14,8 @@
  */
 
 #include "core/components_ng/pattern/ui_extension/ui_extension_component/ui_extension_pattern.h"
+
+#include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/accessibility/accessibility_manager.h"
 
 #include <atomic>
@@ -71,6 +73,7 @@ namespace {
 constexpr char ABILITY_KEY_ASYNC[] = "ability.want.params.KeyAsync";
 constexpr char ABILITY_KEY_IS_MODAL[] = "ability.want.params.IsModal";
 constexpr char ATOMIC_SERVICE_PREFIX[] = "com.atomicservice.";
+constexpr char BRAND_COLOR_KEY[] = "ohos.application.brandColor";
 constexpr char PROHIBIT_NESTING_FAIL_NAME[] = "Prohibit_Nesting_SecurityUIExtensionComponent";
 constexpr char PROHIBIT_NESTING_FAIL_MESSAGE[] =
     "Prohibit nesting uIExtensionExtensionComponent in securityUIAbility";
@@ -307,6 +310,7 @@ void UIExtensionPattern::UpdateSessionInstanceId(int32_t instanceId)
     }
 
     sessionWrapperImpl->UpdateInstanceId(instanceId);
+    NotifyBrandColorChange(instanceId);
 }
 
 void UIExtensionPattern::RegisterEvent(int32_t instanceId)
@@ -677,6 +681,7 @@ void UIExtensionPattern::OnConnect()
     surfaceNode->SetForeground(usage_ == UIExtensionUsage::MODAL);
     auto focusHub = host->GetFocusHub();
     bool isFocusedBeforeCallback = focusHub && focusHub->IsCurrentFocus();
+    isUeaConnecting_ = true;
     FireOnRemoteReadyCallback();
     bool isFocusedAfterCallback = focusHub && focusHub->IsCurrentFocus();
     if ((usage_ == UIExtensionUsage::MODAL) && focusHub && isModalRequestFocus_) {
@@ -865,6 +870,7 @@ void UIExtensionPattern::OnDisconnect(bool isAbnormal)
     host->RemoveChildAtIndex(0);
     host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
     SetCurPlaceholderType(PlaceholderType::NONE);
+    isUeaConnecting_ = false;
 }
 
 void UIExtensionPattern::OnSyncGeometryNode(const DirtySwapConfig& config)
@@ -944,6 +950,7 @@ void UIExtensionPattern::NotifyForeground()
             sessionWrapper_->NotifyDisplayArea(displayArea_);
             displayAreaChanged_ = false;
         }
+        NotifyBrandColorChangeToUEA(instanceId_, brandColorStr_);
     }
 }
 
@@ -962,6 +969,7 @@ void UIExtensionPattern::NotifyDestroy()
         state_ != AbilityState::NONE) {
         UIEXT_LOGI("The state is changing from '%{public}s' to 'DESTRUCTION'.", ToString(state_));
         state_ = AbilityState::DESTRUCTION;
+        isUeaConnecting_ = false;
         sessionWrapper_->NotifyDestroy();
         sessionWrapper_->DestroySession();
     }
@@ -1563,8 +1571,10 @@ void UIExtensionPattern::FireOnRemoteReadyCallback()
         onRemoteReadyCallback_(MakeRefPtr<UIExtensionProxy>(sessionWrapper_, Claim(this)));
     }
     if (onModalRemoteReadyCallback_) {
-        onModalRemoteReadyCallback_(std::make_shared<ModalUIExtensionProxyImpl>(sessionWrapper_));
+        auto innerProxy = MakeRefPtr<UIExtensionProxy>(sessionWrapper_, Claim(this));
+        onModalRemoteReadyCallback_(std::make_shared<ModalUIExtensionProxyImpl>(innerProxy));
     }
+    NotifyBrandColorChangeToUEA(instanceId_, brandColorStr_);
 }
 
 void UIExtensionPattern::SetModalOnDestroy(const std::function<void()>&& callback)
@@ -2091,6 +2101,9 @@ void UIExtensionPattern::DumpInfo()
         eventProxyStr = platformEventProxy_->GetCurEventProxyToString();
     }
     DumpLog::GetInstance().AddDesc(std::string("eventProxy: ").append(eventProxyStr));
+    DumpLog::GetInstance().AddDesc(std::string("brandColorStr: ").append(brandColorStr_)
+        .append(", lastSentBrandColorStr: ").append(lastSentBrandColorStr_).append(", isUeaConnecting: ")
+        .append(std::to_string(isUeaConnecting_)));
 
     auto container = Platform::AceContainer::GetContainer(instanceId_);
     CHECK_NULL_VOID(container);
@@ -2146,6 +2159,9 @@ void UIExtensionPattern::DumpInfo(std::unique_ptr<JsonValue>& json)
         eventProxyStr = platformEventProxy_->GetCurEventProxyToString();
     }
     json->Put("eventProxy: ", eventProxyStr.c_str());
+    json->Put("brandColorStr: ", brandColorStr_.c_str());
+    json->Put("lastSentBrandColorStr: ", lastSentBrandColorStr_.c_str());
+    json->Put("isUeaConnecting: ", std::to_string(isUeaConnecting_).c_str());
 
     auto container = Platform::AceContainer::GetContainer(instanceId_);
     CHECK_NULL_VOID(container);
@@ -2215,7 +2231,12 @@ void UIExtensionPattern::AddExtraInfoWithParamConfig(std::shared_ptr<JsonValue>&
     CHECK_EQUAL_VOID(config.withUIExtension, false);
     CHECK_NULL_VOID(sessionWrapper_);
     auto container = Platform::AceContainer::GetContainer(instanceId_);
-    CHECK_NULL_VOID(container);
+    if (!container) {
+        if (config.inspectorContext) {
+            config.inspectorContext->ReportError(InspectorTreeError::COLLECTION_FAILED);
+        }
+        return;
+    }
     std::vector<std::string> params;
     params.push_back("-allInfoWithParamConfigTotal");
     params.push_back("1");
@@ -2226,6 +2247,8 @@ void UIExtensionPattern::AddExtraInfoWithParamConfig(std::shared_ptr<JsonValue>&
     params.push_back(config.withUIExtension ? "1" : "0");
     params.push_back(config.rectCulling ? "1" : "0");
     params.push_back(std::to_string(config.minOpacity));
+    params.push_back(config.withResponseRegion ? "1" : "0");
+    params.push_back(config.withCustomContent ? "1" : "0");
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     if (!container->IsUIExtensionWindow()) {
@@ -2233,18 +2256,26 @@ void UIExtensionPattern::AddExtraInfoWithParamConfig(std::shared_ptr<JsonValue>&
     }
     params.push_back(std::to_string(getpid()));
 
-    ExecuteDumpTask(json, params, host);
+    ExecuteDumpTask(json, params, host, config.inspectorContext);
 }
 
 void UIExtensionPattern::ExecuteDumpTask(
-    std::shared_ptr<JsonValue>& json, const std::vector<std::string>& params, const RefPtr<FrameNode>& host)
+    std::shared_ptr<JsonValue>& json, const std::vector<std::string>& params, const RefPtr<FrameNode>& host,
+    InspectorTreeRequestContext* request)
 {
     ACE_SCOPED_TRACE("UIExtensionPattern::ExecuteDumpTask");
     const int32_t GET_INSPECTOR_TREE_TIMEOUT_TIME = 900;
-    auto context = host->GetContext();
-    CHECK_NULL_VOID(context);
-    auto taskExecutor = context->GetTaskExecutor();
-    CHECK_NULL_VOID(taskExecutor);
+    const auto fail = [request]() {
+        if (request) {
+            request->ReportError(InspectorTreeError::COLLECTION_FAILED);
+        }
+    };
+    auto context = host ? host->GetContext() : nullptr;
+    auto taskExecutor = context ? context->GetTaskExecutor() : nullptr;
+    if (!taskExecutor) {
+        fail();
+        return;
+    }
 
     // Capture sessionWrapper_ on the calling thread to avoid cross-thread data race
     // when the lambda runs on the background thread.
@@ -2254,6 +2285,7 @@ void UIExtensionPattern::ExecuteDumpTask(
     // with a promise/future pair to run the IPC call (NotifyUieDump) on the background
     // thread and wait for the result with a timeout on the calling thread.
     if (!sessionWrapper) {
+        fail();
         return;
     }
 
@@ -2267,12 +2299,22 @@ void UIExtensionPattern::ExecuteDumpTask(
     }, TaskExecutor::TaskType::BACKGROUND, "UiSessionGetInspectorTree");
     if (!postResult) {
         taskValid->store(false, std::memory_order_release);
+        fail();
         return;
     }
 
     auto result = future.wait_for(std::chrono::milliseconds(GET_INSPECTOR_TREE_TIMEOUT_TIME));
     if (result == std::future_status::timeout) {
         taskValid->store(false, std::memory_order_release);
+        return;
+    }
+    if (request) {
+        auto child = json ? json->GetValue("$child-uec") : nullptr;
+        if (!child) {
+            fail();
+            return;
+        }
+        request->AcceptExtensionTree(*child);
     }
 }
 
@@ -2553,5 +2595,98 @@ void UIExtensionPattern::UpdateWMSUIExtProperty(UIContentBusinessCode code, cons
         return;
     }
     SendBusinessData(code, data, BusinessDataSendType::ASYNC, subSystemId);
+}
+
+void UIExtensionPattern::NotifyBrandColorChangeToUEA(
+    int32_t instanceId, const std::string& brandColorStr)
+{
+    CHECK_NULL_VOID(sessionWrapper_);
+    if (state_ != AbilityState::FOREGROUND || !isUeaConnecting_) {
+        UIEXT_LOGW("NotifyBrandColorChangeToUEA: skip, "
+            "state=%{public}d, isUeaConnecting=%{public}d",
+            static_cast<int32_t>(state_), isUeaConnecting_);
+        return;
+    }
+    if (!brandColorStr.empty()) {
+        auto brandColor = Color::FromString(brandColorStr);
+        if (brandColor.GetAlpha() == 0) {
+            UIEXT_LOGW("NotifyBrandColorChangeToUEA: brandColor is transparent, skip, "
+                "instanceId=%{public}d, brandColorStr=%{public}s",
+                instanceId, brandColorStr.c_str());
+            return;
+        }
+    }
+    if (brandColorStr == lastSentBrandColorStr_) {
+        UIEXT_LOGI("NotifyBrandColorChangeToUEA: brandColorStr not changed, skip, "
+            "instanceId=%{public}d, brandColorStr=%{public}s",
+            instanceId, brandColorStr.c_str());
+        return;
+    }
+    AAFwk::Want want;
+    want.SetParam(BRAND_COLOR_KEY, brandColorStr);
+    UIEXT_LOGI("NotifyBrandColorChangeToUEA: instanceId=%{public}d, "
+        "brandColorStr=%{public}s, sessionId=%{public}d",
+        instanceId, brandColorStr.c_str(), GetSessionId());
+    sessionWrapper_->SendBusinessData(
+        UIContentBusinessCode::NOTIFY_BRAND_COLOR_CHANGE, want,
+        BusinessDataSendType::ASYNC, RSSubsystemId::ABILITY_UIEXT);
+    lastSentBrandColorStr_ = brandColorStr;
+}
+
+void UIExtensionPattern::NotifyBrandColorChange(int32_t instanceId)
+{
+    auto brandColorStr = GetBrandColorStr();
+    NotifyBrandColorChangeToUEA(instanceId, brandColorStr);
+    brandColorStr_ = brandColorStr;
+}
+
+std::string UIExtensionPattern::ResolveBrandColor(int32_t themeScopeId) const
+{
+    auto tokenTheme = TokenThemeStorage::GetInstance()->GetTheme(themeScopeId);
+    if (tokenTheme) {
+        auto themeColors = tokenTheme->Colors();
+        if (!themeColors) {
+            UIEXT_LOGW("ResolveBrandColor: tokenTheme exists but themeColors is null, "
+                "themeScopeId=%{public}d, instanceId=%{public}d",
+                themeScopeId, instanceId_);
+            return DEFAULT_BRAND_COLOR_STR;
+        }
+        Color brandColor = themeColors->Brand();
+        if (brandColor.GetAlpha() != 0) {
+            UIEXT_LOGI("ResolveBrandColor: instanceId=%{public}d, brandColorStr=%{public}s, fromTheme=1",
+                instanceId_, brandColor.ToString().c_str());
+            return brandColor.ToString();
+        }
+        UIEXT_LOGW("ResolveBrandColor: brandColor is invalid, brandColorStr=%{public}s, "
+            "themeScopeId=%{public}d, instanceId=%{public}d",
+            brandColor.ToString().c_str(), themeScopeId, instanceId_);
+        return DEFAULT_BRAND_COLOR_STR;
+    }
+    auto container = Platform::AceContainer::GetContainer(instanceId_);
+    if (container && container->IsUIExtensionWindow()) {
+        auto brandColorInfo = TokenThemeStorage::GetInstance()->GetInstanceBrandColor(instanceId_);
+        if (brandColorInfo.brandColor.has_value()) {
+            UIEXT_LOGI("ResolveBrandColor: instanceId=%{public}d, brandColorStr=%{public}s, fromTheme=0",
+                instanceId_, brandColorInfo.brandColor.value().ToString().c_str());
+            return brandColorInfo.brandColor.value().ToString();
+        }
+    }
+    return DEFAULT_BRAND_COLOR_STR;
+}
+
+std::string UIExtensionPattern::GetBrandColorStr() const
+{
+    auto hostNode = GetHost();
+    int32_t themeScopeId = hostNode ? hostNode->GetThemeScopeId() : 0;
+    return ResolveBrandColor(themeScopeId);
+}
+
+bool UIExtensionPattern::OnThemeScopeUpdate(int32_t themeScopeId)
+{
+    UIEXT_LOGI("OnThemeScopeUpdate: themeScopeId=%{public}d, instanceId=%{public}d, sessionId=%{public}d",
+        themeScopeId, instanceId_, GetSessionId());
+    brandColorStr_ = ResolveBrandColor(themeScopeId);
+    NotifyBrandColorChangeToUEA(instanceId_, brandColorStr_);
+    return true;
 }
 } // namespace OHOS::Ace::NG

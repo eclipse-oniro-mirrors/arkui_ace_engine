@@ -165,6 +165,7 @@ public:
         return true;
     }
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
 
     bool HasSystemMaterial() const;
     bool IsHighGradeMaterial() const;
@@ -242,6 +243,7 @@ private:
     void ApplyBlendMode();
     std::shared_ptr<Rosen::BrightnessBlender> CreateBrightnessBlender();
     void ResetHostMaterialEffects();
+    void ResetHostMaterialEffectsInner();
 
     // Drag animation helpers
     AnimationOption CreateDragAnimationOption() const;

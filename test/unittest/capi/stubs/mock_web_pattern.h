@@ -52,6 +52,7 @@ public:
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, FileAccessEnabled, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, OnLineImageAccessEnabled, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, DomStorageAccessEnabled, bool);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, VisitedLinkPersistEnabled, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, ImageAccessEnabled, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, ZoomAccessEnabled, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, GeolocationAccessEnabled, bool);
@@ -232,6 +233,7 @@ private:
     void OnFileAccessEnabledUpdate(bool) {}
     void OnOnLineImageAccessEnabledUpdate(bool) {}
     void OnDomStorageAccessEnabledUpdate(bool) {}
+    void OnVisitedLinkPersistEnabledUpdate(bool) {}
     void OnWebDebuggingAccessEnabledAndPortUpdate(std::tuple<bool, int32_t> const&) {}
     void OnImageAccessEnabledUpdate(bool) {}
     void OnZoomAccessEnabledUpdate(bool) {}

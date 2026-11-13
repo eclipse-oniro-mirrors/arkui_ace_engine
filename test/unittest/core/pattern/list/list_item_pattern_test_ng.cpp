@@ -27,9 +27,12 @@
 #include "core/components_ng/pattern/list/list_item_layout_property.h"
 #include "core/components_ng/pattern/list/list_item_model_ng.h"
 #include "core/components_ng/pattern/list/list_item_pattern.h"
+#include "core/components_ng/pattern/list/list_item_theme_wrapper.h"
 #include "core/components_ng/pattern/list/list_pattern.h"
 #include "core/components_ng/syntax/shallow_builder.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_2_node.h"
+#include "ui/view/theme/token_colors.h"
+#include "ui/view/theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 using namespace testing;
@@ -1374,5 +1377,55 @@ HWTEST_F(ListItemPatternTestNg, OnThemeScopeUpdate013, TestSize.Level1)
     // Restore
     listItem->apiVersion_ = oriApiVersion;
     layoutProperty->UpdateIsUserSetBackgroundColor(false);
+}
+
+/**
+ * @tc.name: ListItemThemeWrapperApplyTokenTheme001
+ * @tc.desc: Test ListItemThemeWrapper ApplyTokenTheme maps background emphasize and emphasize tertiary tokens.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListItemPatternTestNg, ListItemThemeWrapperApplyTokenTheme001, TestSize.Level1)
+{
+    auto wrapper = AceType::DynamicCast<ListItemThemeWrapper>(
+        ListItemThemeWrapper::WrapperBuilder().BuildWrapper(nullptr));
+    ASSERT_NE(wrapper, nullptr);
+
+    auto tokenColors = AceType::MakeRefPtr<TokenColors>();
+    ASSERT_NE(tokenColors, nullptr);
+    const Color emphasizeTertiary = Color(0xFF123456);
+    const Color backgroundEmphasize = Color::GREEN;
+    tokenColors->SetColor(static_cast<uint32_t>(TokenColors::COMP_EMPHASIZE_TERTIARY), emphasizeTertiary);
+    tokenColors->SetColor(static_cast<uint32_t>(TokenColors::COMP_BACKGROUND_EMPHASIZE), backgroundEmphasize);
+    auto tokenTheme = AceType::MakeRefPtr<TokenTheme>(1);
+    ASSERT_NE(tokenTheme, nullptr);
+    tokenTheme->SetColors(tokenColors);
+    tokenTheme->SetColorMode(ColorMode::LIGHT);
+
+    wrapper->ApplyTokenTheme(*tokenTheme);
+
+    EXPECT_EQ(wrapper->selectedColor_, backgroundEmphasize);
+    EXPECT_EQ(wrapper->selectedColorWithAlpha_, emphasizeTertiary);
+    EXPECT_EQ(wrapper->GetItemSelectedColor(), emphasizeTertiary);
+    EXPECT_EQ(wrapper->GetItemSelectedColor().GetAlpha(), 255);
+}
+
+/**
+ * @tc.name: ListItemThemeWrapperApplyTokenTheme002
+ * @tc.desc: Test ListItemThemeWrapper ApplyTokenTheme keeps selected color when token theme has no colors.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListItemPatternTestNg, ListItemThemeWrapperApplyTokenTheme002, TestSize.Level1)
+{
+    auto wrapper = AceType::DynamicCast<ListItemThemeWrapper>(
+        ListItemThemeWrapper::WrapperBuilder().BuildWrapper(nullptr));
+    ASSERT_NE(wrapper, nullptr);
+    const Color selectedColorBefore = wrapper->GetItemSelectedColor();
+
+    auto tokenTheme = AceType::MakeRefPtr<TokenTheme>(2);
+    ASSERT_NE(tokenTheme, nullptr);
+    tokenTheme->SetColorMode(ColorMode::LIGHT);
+    wrapper->ApplyTokenTheme(*tokenTheme);
+
+    EXPECT_EQ(wrapper->GetItemSelectedColor(), selectedColorBefore);
 }
 } // namespace OHOS::Ace::NG

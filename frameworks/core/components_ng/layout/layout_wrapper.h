@@ -32,6 +32,60 @@
 #include "core/components_ng/property/layout_constraint.h"
 #include "ui/properties/safe_area_insets.h"
 
+namespace OHOS::Ace {
+namespace NG {
+class LayoutWrapper;
+}
+
+// A layout capability borrows the lifetime of its enclosing node or standalone wrapper.
+// RefPtr and WeakPtr retain their original storage and public interfaces.
+template<>
+struct RefPtrTraits<NG::LayoutWrapper> {
+    static AceType* GetOwner(const NG::LayoutWrapper* view);
+
+    template<class T>
+    class LayoutAccess final {
+    public:
+        explicit LayoutAccess(T* view) : guard_(GetOwner(view)), view_(view) {}
+        T* operator->() const
+        {
+            return view_;
+        }
+        LayoutAccess(const LayoutAccess&) = delete;
+        LayoutAccess& operator=(const LayoutAccess&) = delete;
+
+    private:
+        LifeCycleCheckable::PtrHolder<AceType> guard_;
+        T* view_;
+    };
+
+    static LayoutAccess<NG::LayoutWrapper> Access(NG::LayoutWrapper* view)
+    {
+        return LayoutAccess<NG::LayoutWrapper>(view);
+    }
+
+    template<class T>
+    static T* DynamicCast(NG::LayoutWrapper* view)
+    {
+        return TypeInfoHelper::DynamicCast<std::remove_const_t<T>>(view);
+    }
+
+    template<class T>
+    static const T* DynamicCast(const NG::LayoutWrapper* view)
+    {
+        return TypeInfoHelper::DynamicCast<std::remove_const_t<T>>(view);
+    }
+};
+
+template<>
+struct RefPtrTraits<const NG::LayoutWrapper> : RefPtrTraits<NG::LayoutWrapper> {
+    static LayoutAccess<const NG::LayoutWrapper> Access(const NG::LayoutWrapper* view)
+    {
+        return LayoutAccess<const NG::LayoutWrapper>(view);
+    }
+};
+} // namespace OHOS::Ace
+
 namespace OHOS::Ace::NG {
 class FrameNode;
 class UINode;
@@ -130,8 +184,8 @@ enum class IgnoreStrategy {
     AXIS_INSENSITIVE
 };
 
-class ACE_FORCE_EXPORT LayoutWrapper : public virtual AceType {
-    DECLARE_ACE_TYPE(LayoutWrapper, AceType);
+class ACE_FORCE_EXPORT LayoutWrapper : public virtual TypeInfoBase {
+    DECLARE_ACE_TYPE(LayoutWrapper, TypeInfoBase);
 public:
     LayoutWrapper(WeakPtr<FrameNode> hostNode) : hostNode_(std::move(hostNode)) {}
     ~LayoutWrapper() override = default;
@@ -387,6 +441,11 @@ protected:
     bool escapeDelayForIgnore_ = false;
     bool isScrollableAxis_ = false;
 private:
+    friend AceType* RefPtrTraits<LayoutWrapper>::GetOwner(const LayoutWrapper* view);
+
+    // Stable for this capability's lifetime; independent of the optional host FrameNode.
+    virtual AceType* GetLayoutOwner() const = 0;
+
     void AdjustChildren(const RefPtr<FrameNode>& host, const OffsetF& offset, bool parentScrollable);
     void AdjustChild(RefPtr<UINode> node, const OffsetF& offset, bool parentScrollable);
     void AdjustNotExpandNodeInner(RefPtr<FrameNode>& host);
@@ -394,5 +453,12 @@ private:
     ACE_DISALLOW_COPY_AND_MOVE(LayoutWrapper);
 };
 } // namespace OHOS::Ace::NG
+
+namespace OHOS::Ace {
+inline AceType* RefPtrTraits<NG::LayoutWrapper>::GetOwner(const NG::LayoutWrapper* view)
+{
+    return view ? view->GetLayoutOwner() : nullptr;
+}
+} // namespace OHOS::Ace
 
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_LAYOUTS_LAYOUT_WRAPPER_H

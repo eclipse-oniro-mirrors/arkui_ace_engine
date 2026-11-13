@@ -17,6 +17,8 @@
 #define OHOS_IPC_MESSAGE_PARCEL_H
 
 #include <string>
+#include <deque>
+#include <variant>
 #include <vector>
 
 #include "ashmem.h"
@@ -29,6 +31,39 @@ class MessageParcel : public Parcel {
 public:
     MessageParcel() = default;
     ~MessageParcel() = default;
+
+    // Opt-in typed payload storage. Existing tests retain their legacy canned values.
+    static void SetDefaultPayloadStorage(bool enabled) { defaultPayloadStorage_ = enabled; }
+    void EnablePayloadStorage() { payloadStorage_ = true; }
+
+    bool WriteUint64(uint64_t value)
+    {
+        if (payloadStorage_) { payload_.emplace_back(value); }
+        return true;
+    }
+    bool ReadUint64(uint64_t& value)
+    {
+        if (payloadStorage_) { return ReadPayload(value); }
+        value = 0;
+        return true;
+    }
+    uint64_t ReadUint64()
+    {
+        uint64_t value = 0;
+        ReadUint64(value);
+        return value;
+    }
+    bool WriteString(const std::string& value)
+    {
+        if (payloadStorage_) { payload_.emplace_back(value); }
+        return true;
+    }
+    bool ReadString(std::string& value)
+    {
+        if (payloadStorage_) { return ReadPayload(value); }
+        value = "mockString";
+        return true;
+    }
 
     bool WriteRemoteObject(const sptr<IRemoteObject> &object)
     {
@@ -152,23 +187,29 @@ public:
     // mock functions in parcel.h
     int32_t ReadInt32()
     {
-        return 0;
+        int32_t value = 0;
+        ReadInt32(value);
+        return value;
     }
 
     bool ReadInt32(int32_t& value)
     {
+        if (payloadStorage_) { return ReadPayload(value); }
         value = 0;
         return true;
     }
 
     bool WriteInt32(int32_t value)
     {
+        if (payloadStorage_) { payload_.emplace_back(value); }
         return true;
     }
 
     const std::string ReadString()
     {
-        return std::string("mockString");
+        std::string value;
+        ReadString(value);
+        return value;
     }
 
     bool ReadStringVector(std::vector<std::string>* val)
@@ -188,6 +229,18 @@ public:
         return false;
     }
 
+private:
+    template<class T> bool ReadPayload(T& value)
+    {
+        if (payload_.empty() || !std::holds_alternative<T>(payload_.front())) { return false; }
+        value = std::get<T>(payload_.front());
+        payload_.pop_front();
+        return true;
+    }
+    inline static thread_local bool defaultPayloadStorage_ = false;
+    bool payloadStorage_ = defaultPayloadStorage_;
+    std::deque<std::variant<uint64_t, int32_t, std::string>> payload_;
+public:
     bool needCloseFd_ = false;
     std::u16string interfaceToken_;
 };

@@ -25,6 +25,7 @@ namespace OHOS::Ace {
 constexpr const char* ANI_MOVINGPHOTO_NATIVE = "@ohos.multimedia.MovingPhotoView.MovingPhotoNative";
 constexpr const char* ANI_MOVINGPHOTO_DYNAMICRANGEMODE = "@ohos.multimedia.MovingPhotoView.DynamicRangeMode";
 constexpr const char* ANI_MOVINGPHOTO_PIXELMAPFORMAT = "@ohos.multimedia.MovingPhotoView.PixelMapFormat";
+constexpr const char* ANI_MOVINGPHOTO_DISPLAYMODE = "@ohos.multimedia.MovingPhotoView.DisplayMode";
 constexpr const char* ANI_ARKUI_COMPONENT_ENUMS_IMAGEFIT = "arkui.component.enums.ImageFit";
 
 class MovingPhotoAni {
@@ -61,10 +62,10 @@ public:
     static void SetEnableAnalyzer([[maybe_unused]] ani_env *env, [[maybe_unused]] ani_class object,
                                                 ani_long nodeptr, ani_object options);
 
-    static void StartPlayback([[maybe_unused]] ani_env *env, [[maybe_unused]] ani_class object,
-                                                ani_long peer);
+    static void StartPlayback(ani_env *env, [[maybe_unused]] ani_class object,
+                                                 ani_long peer, ani_ref modeRef);
     static void StopPlayback([[maybe_unused]] ani_env *env, [[maybe_unused]] ani_class object,
-                                                ani_long peer);
+                                                 ani_long peer);
     static void PausePlayback([[maybe_unused]] ani_env *env, [[maybe_unused]] ani_class object,
                                                 ani_long peer);
     static void Reset([[maybe_unused]] ani_env *env, [[maybe_unused]] ani_class object,
@@ -78,7 +79,13 @@ public:
     static void SetPlaybackPeriod([[maybe_unused]] ani_env *env, [[maybe_unused]] ani_class object,
                                                 ani_long peer, ani_double startTimeAni, ani_double endTimeAni);
     static void EnableAutoPlay([[maybe_unused]] ani_env *env, [[maybe_unused]] ani_class object,
-                                                ani_long peer, ani_boolean options);
+                                                 ani_long peer, ani_boolean options);
+    static void Prepare([[maybe_unused]] ani_env *env, [[maybe_unused]] ani_class object,
+                                                 ani_long peer, ani_ref callback);
+    static void StartPlayAfterPrepare([[maybe_unused]] ani_env *env, [[maybe_unused]] ani_class object,
+                                                 ani_long peer);
+    static void SetDisplayMode(ani_env *env, [[maybe_unused]] ani_class object,
+                                                 ani_long peer, ani_ref modeRef, ani_ref callback);
 
     static void MovingPhotoControllerConstructor([[maybe_unused]] ani_env *env, [[maybe_unused]] ani_class object);
     static ani_long CreateMovingPhotoController([[maybe_unused]] ani_env *env, [[maybe_unused]] ani_class object);
@@ -90,6 +97,7 @@ private:
     };
     static MovingPhotoFormat ParsePixelMapFormat(ani_env *env, ani_object options);
     static DynamicRangeMode ParseDynamicRangeMode(ani_env *env, ani_object options);
+    static MovingPhotoDisplayMode ParseDisplayMode(ani_env *env, ani_ref modeRef);
     static void SetMovingPhotoUri(ani_env *env, NG::MovingPhotoNode *movingPhotoNode, ani_object obj);
     static OHOS::Ace::NG::MovingPhotoController* GetMovingPhotoController(ani_env* env, ani_ref ref);
 };

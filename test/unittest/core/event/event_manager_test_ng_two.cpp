@@ -47,6 +47,41 @@ class TouchDelegateTest : public TouchDelegate {
         return;
     }
 };
+
+class MockEscapeGestureRecognizer : public NGGestureRecognizer {
+public:
+    MockEscapeGestureRecognizer() = default;
+    ~MockEscapeGestureRecognizer() override = default;
+
+    bool HandleEvent(const TouchEvent& point) override
+    {
+        handledCount_++;
+        return true;
+    }
+
+    void OnAccepted() override {}
+    void OnRejected() override {}
+    void HandleTouchDownEvent(const TouchEvent& event) override {}
+    void HandleTouchUpEvent(const TouchEvent& event) override {}
+    void HandleTouchMoveEvent(const TouchEvent& event) override {}
+    void HandleTouchCancelEvent(const TouchEvent& event) override {}
+    void OnResetStatus() override {}
+
+    bool CheckTouchId(int32_t touchId) override
+    {
+        return false;
+    }
+
+    std::map<int32_t, TouchEvent> GetTouchPoints() override
+    {
+        return {};
+    }
+
+    void CheckCurrentFingers() const override {}
+
+    int32_t handledCount_ = 0;
+};
+
 /**
  * @tc.name: ExecuteTouchTestDoneCallbackTest001
  * @tc.desc: Test ExecuteTouchTestDoneCallbackTest function.
@@ -1495,6 +1530,243 @@ HWTEST_F(EventManagerTestNg, UpdateInfoWhenFinishDispatch003, TestSize.Level1)
     eventManager->UpdateInfoWhenFinishDispatch(event, true);
 
     EXPECT_TRUE(eventManager->escapeRecognizers_.empty());
+}
+
+/**
+ * @tc.name: HandleEscapeRecognizerDispatchWhenInTree001
+ * @tc.desc: HandleEscapeRecognizer dispatches to an escaped recognizer
+ *           whose group root is in touchTestResults_ (non-post).
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, HandleEscapeRecognizerDispatchWhenInTree001, TestSize.Level1)
+{
+    auto eventManager = AceType::MakeRefPtr<EventManager>();
+    ASSERT_NE(eventManager, nullptr);
+    auto mock = AceType::MakeRefPtr<MockEscapeGestureRecognizer>();
+    ASSERT_NE(mock, nullptr);
+    auto group = AceType::MakeRefPtr<SequencedRecognizer>(std::vector<RefPtr<NGGestureRecognizer>>{ mock });
+    ASSERT_NE(group, nullptr);
+    eventManager->escapeRecognizers_.push_back(mock);
+    TouchTestResult result;
+    result.push_back(group);
+    eventManager->touchTestResults_[0] = std::move(result);
+
+    TouchEvent event;
+    event.id = 0;
+    event.type = TouchType::DOWN;
+    eventManager->HandleEscapeRecognizer(event, false);
+    EXPECT_EQ(mock->handledCount_, 1);
+}
+
+/**
+ * @tc.name: HandleEscapeRecognizerSkipWhenNotInTree001
+ * @tc.desc: HandleEscapeRecognizer skips an escaped recognizer
+ *           whose group root is NOT in touchTestResults_.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, HandleEscapeRecognizerSkipWhenNotInTree001, TestSize.Level1)
+{
+    auto eventManager = AceType::MakeRefPtr<EventManager>();
+    ASSERT_NE(eventManager, nullptr);
+    auto mock = AceType::MakeRefPtr<MockEscapeGestureRecognizer>();
+    ASSERT_NE(mock, nullptr);
+    auto groupA = AceType::MakeRefPtr<SequencedRecognizer>(std::vector<RefPtr<NGGestureRecognizer>>{ mock });
+    ASSERT_NE(groupA, nullptr);
+    auto groupB = AceType::MakeRefPtr<SequencedRecognizer>(std::vector<RefPtr<NGGestureRecognizer>>{});
+    ASSERT_NE(groupB, nullptr);
+    eventManager->escapeRecognizers_.push_back(mock);
+    TouchTestResult result;
+    result.push_back(groupB);
+    eventManager->touchTestResults_[0] = std::move(result);
+
+    TouchEvent event;
+    event.id = 0;
+    event.type = TouchType::DOWN;
+    eventManager->HandleEscapeRecognizer(event, false);
+    EXPECT_EQ(mock->handledCount_, 0);
+}
+
+/**
+ * @tc.name: HandleEscapeRecognizerPostDispatchWhenInTree001
+ * @tc.desc: HandleEscapeRecognizer with isPost=true dispatches
+ *           when group root is in postEventTouchTestResults_.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, HandleEscapeRecognizerPostDispatchWhenInTree001, TestSize.Level1)
+{
+    auto eventManager = AceType::MakeRefPtr<EventManager>();
+    ASSERT_NE(eventManager, nullptr);
+    auto mock = AceType::MakeRefPtr<MockEscapeGestureRecognizer>();
+    ASSERT_NE(mock, nullptr);
+    auto group = AceType::MakeRefPtr<SequencedRecognizer>(std::vector<RefPtr<NGGestureRecognizer>>{ mock });
+    ASSERT_NE(group, nullptr);
+    eventManager->escapeRecognizers_.push_back(mock);
+    TouchTestResult result;
+    result.push_back(group);
+    eventManager->postEventTouchTestResults_[0] = std::move(result);
+
+    TouchEvent event;
+    event.id = 0;
+    event.type = TouchType::DOWN;
+    eventManager->HandleEscapeRecognizer(event, true);
+    EXPECT_EQ(mock->handledCount_, 1);
+}
+
+/**
+ * @tc.name: HandleEscapeRecognizerPostSkipWhenNotInPostResult001
+ * @tc.desc: HandleEscapeRecognizer with isPost=true must NOT consult touchTestResults_ even
+ *           when the group root is there.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, HandleEscapeRecognizerPostSkipWhenNotInPostResult001, TestSize.Level1)
+{
+    auto eventManager = AceType::MakeRefPtr<EventManager>();
+    ASSERT_NE(eventManager, nullptr);
+    auto mock = AceType::MakeRefPtr<MockEscapeGestureRecognizer>();
+    ASSERT_NE(mock, nullptr);
+    auto groupA = AceType::MakeRefPtr<SequencedRecognizer>(std::vector<RefPtr<NGGestureRecognizer>>{ mock });
+    ASSERT_NE(groupA, nullptr);
+    auto groupB = AceType::MakeRefPtr<SequencedRecognizer>(std::vector<RefPtr<NGGestureRecognizer>>{});
+    ASSERT_NE(groupB, nullptr);
+    eventManager->escapeRecognizers_.push_back(mock);
+    TouchTestResult postResult;
+    postResult.push_back(groupB);
+    eventManager->postEventTouchTestResults_[0] = std::move(postResult);
+    TouchTestResult nonPostResult;
+    nonPostResult.push_back(groupA);
+    eventManager->touchTestResults_[0] = std::move(nonPostResult);
+
+    TouchEvent event;
+    event.id = 0;
+    event.type = TouchType::DOWN;
+    eventManager->HandleEscapeRecognizer(event, true);
+    EXPECT_EQ(mock->handledCount_, 0);
+}
+
+/**
+ * @tc.name: HandleEscapeRecognizerResultNotFound001
+ * @tc.desc: HandleEscapeRecognizer dispatches nothing when no test result entry exists for the touch id.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, HandleEscapeRecognizerResultNotFound001, TestSize.Level1)
+{
+    auto eventManager = AceType::MakeRefPtr<EventManager>();
+    ASSERT_NE(eventManager, nullptr);
+    auto mock = AceType::MakeRefPtr<MockEscapeGestureRecognizer>();
+    ASSERT_NE(mock, nullptr);
+    auto group = AceType::MakeRefPtr<SequencedRecognizer>(std::vector<RefPtr<NGGestureRecognizer>>{ mock });
+    ASSERT_NE(group, nullptr);
+    eventManager->escapeRecognizers_.push_back(mock);
+
+    TouchEvent event;
+    event.id = 0;
+    event.type = TouchType::DOWN;
+    eventManager->HandleEscapeRecognizer(event, false);
+    EXPECT_EQ(mock->handledCount_, 0);
+}
+
+/**
+ * @tc.name: HandleEscapeRecognizerEmptyResultList001
+ * @tc.desc: HandleEscapeRecognizer builds an empty gesture-root set
+ *           when the result list is empty, so no escape recognizer matches.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, HandleEscapeRecognizerEmptyResultList001, TestSize.Level1)
+{
+    auto eventManager = AceType::MakeRefPtr<EventManager>();
+    ASSERT_NE(eventManager, nullptr);
+    auto mock = AceType::MakeRefPtr<MockEscapeGestureRecognizer>();
+    ASSERT_NE(mock, nullptr);
+    auto group = AceType::MakeRefPtr<SequencedRecognizer>(std::vector<RefPtr<NGGestureRecognizer>>{ mock });
+    ASSERT_NE(group, nullptr);
+    eventManager->escapeRecognizers_.push_back(mock);
+    eventManager->touchTestResults_[0] = TouchTestResult();
+
+    TouchEvent event;
+    event.id = 0;
+    event.type = TouchType::DOWN;
+    eventManager->HandleEscapeRecognizer(event, false);
+    EXPECT_EQ(mock->handledCount_, 0);
+}
+
+/**
+ * @tc.name: HandleEscapeRecognizerFingerEscaped001
+ * @tc.desc: HandleEscapeRecognizer skips an escaped recognizer whose finger is marked escaped.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, HandleEscapeRecognizerFingerEscaped001, TestSize.Level1)
+{
+    auto eventManager = AceType::MakeRefPtr<EventManager>();
+    ASSERT_NE(eventManager, nullptr);
+    auto mock = AceType::MakeRefPtr<MockEscapeGestureRecognizer>();
+    ASSERT_NE(mock, nullptr);
+    auto group = AceType::MakeRefPtr<SequencedRecognizer>(std::vector<RefPtr<NGGestureRecognizer>>{ mock });
+    ASSERT_NE(group, nullptr);
+    mock->SetEscapeMode({ 0 });
+    eventManager->escapeRecognizers_.push_back(mock);
+    TouchTestResult result;
+    result.push_back(group);
+    eventManager->touchTestResults_[0] = std::move(result);
+
+    TouchEvent event;
+    event.id = 0;
+    event.type = TouchType::DOWN;
+    eventManager->HandleEscapeRecognizer(event, false);
+    EXPECT_EQ(mock->handledCount_, 0);
+}
+
+/**
+ * @tc.name: HandleEscapeRecognizerNullAndNested001
+ * @tc.desc: HandleEscapeRecognizer skips null escape recognizers
+ *           and walks the nested GetGestureGroup chain up to the root.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, HandleEscapeRecognizerNullAndNested001, TestSize.Level1)
+{
+    auto eventManager = AceType::MakeRefPtr<EventManager>();
+    ASSERT_NE(eventManager, nullptr);
+    auto mock = AceType::MakeRefPtr<MockEscapeGestureRecognizer>();
+    ASSERT_NE(mock, nullptr);
+    auto inner = AceType::MakeRefPtr<SequencedRecognizer>(std::vector<RefPtr<NGGestureRecognizer>>{ mock });
+    ASSERT_NE(inner, nullptr);
+    auto root = AceType::MakeRefPtr<SequencedRecognizer>(std::vector<RefPtr<NGGestureRecognizer>>{ inner });
+    ASSERT_NE(root, nullptr);
+    eventManager->escapeRecognizers_.push_back(RefPtr<NGGestureRecognizer>());
+    eventManager->escapeRecognizers_.push_back(mock);
+    TouchTestResult result;
+    result.push_back(root);
+    eventManager->touchTestResults_[0] = std::move(result);
+
+    TouchEvent event;
+    event.id = 0;
+    event.type = TouchType::DOWN;
+    eventManager->HandleEscapeRecognizer(event, false);
+    EXPECT_EQ(mock->handledCount_, 1);
+}
+
+/**
+ * @tc.name: HandleEscapeRecognizerNoGestureGroup001
+ * @tc.desc: HandleEscapeRecognizer skips an escaped recognizer that has no gesture group (walk-up exits immediately).
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, HandleEscapeRecognizerNoGestureGroup001, TestSize.Level1)
+{
+    auto eventManager = AceType::MakeRefPtr<EventManager>();
+    ASSERT_NE(eventManager, nullptr);
+    auto mock = AceType::MakeRefPtr<MockEscapeGestureRecognizer>();
+    ASSERT_NE(mock, nullptr);
+    auto group = AceType::MakeRefPtr<SequencedRecognizer>(std::vector<RefPtr<NGGestureRecognizer>>{});
+    ASSERT_NE(group, nullptr);
+    eventManager->escapeRecognizers_.push_back(mock);
+    TouchTestResult result;
+    result.push_back(group);
+    eventManager->touchTestResults_[0] = std::move(result);
+
+    TouchEvent event;
+    event.id = 0;
+    event.type = TouchType::DOWN;
+    eventManager->HandleEscapeRecognizer(event, false);
+    EXPECT_EQ(mock->handledCount_, 0);
 }
 
 /**

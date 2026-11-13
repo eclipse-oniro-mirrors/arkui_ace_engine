@@ -118,13 +118,14 @@ template("ace_osal_ohos_source_set") {
       sources += [ "ime_extra_config_ohos.cpp" ]
     }
 
-    if (defined(config.image_analyzer_support) && config.image_analyzer_support) {
+    if (defined(config.image_analyzer_support) &&
+        config.image_analyzer_support) {
       sources += [
         "image_analyzer_adapter_impl.cpp",
         "image_analyzer_loader.cpp",
         "image_analyzer_manager.cpp",
         "image_analyzer_mgr.cpp",
-        ]
+      ]
     }
 
     external_deps += [
@@ -225,6 +226,7 @@ template("ace_osal_ohos_source_set") {
       external_deps += [ "multimedia_image:image" ]
     }
     sources += [
+      "agent_input_reporter.cpp",
       "background_task_helper_ohos.cpp",
       "device_config.cpp",
       "display_manager_ohos.cpp",
@@ -249,7 +251,9 @@ template("ace_osal_ohos_source_set") {
       "ability_runtime:connect_server_manager",
       "ability_runtime:napi_common",
       "ability_runtime:wantagent_innerkits",
+      "access_token:libaccesstoken_sdk",
       "app_file_service:fileuri_native",
+      "asset:saf_gui_fence",
       "background_task_mgr:bgtaskmgr_innerkits",
       "bundle_framework:appexecfwk_core",
       "graphic_2d:2d_graphics",
@@ -259,6 +263,7 @@ template("ace_osal_ohos_source_set") {
       "hicollie:libhicollie",
       "hisysevent:libhisysevent",
       "hitrace:libhitracechain",
+      "ipc:ipc_core",
       "safwk:system_ability_fwk",
       "samgr:samgr_proxy",
       "window_manager:libdm",

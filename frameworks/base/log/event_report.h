@@ -88,7 +88,8 @@ enum class ComponentExcepType {
 enum class ComponentExcepTypeNG {
     RELATIVE_CONTAINER_LOOP_ERR = 0,
     TEXT_DRAW_CMD_LIST_ERR,
-    SAFE_AREA_TYPE_NODE_ERR
+    SAFE_AREA_TYPE_NODE_ERR,
+    MENU_INVALID_MAX_WIDTH_ERR
 };
 
 // EXCEPTION_API_CHANNEL
@@ -226,6 +227,17 @@ struct FRCSceneFpsInfo {
     int64_t duration_90 = 0;
     int64_t duration_72 = 0;
     int64_t duration_60 = 0;
+};
+
+struct MaterialNodeInfo {
+    int32_t nodeId = 0;
+    std::string tag;
+    int32_t containerId = -1;
+    double width = 0.0;
+    double height = 0.0;
+    double area = 0.0;
+    bool inTitleBar = false;
+    bool inBottomTabBar = false;
 };
 
 class ACE_FORCE_EXPORT EventReport {

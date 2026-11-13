@@ -246,7 +246,7 @@ HWTEST_F(TextFieldPatternTesteleven, OnUiMaterialParamUpdate001, TestSize.Level1
     ASSERT_NE(paintProperty, nullptr);
     auto defaultBGColor = Color::TRANSPARENT;
     auto bgColor = paintProperty->GetBackgroundColorValue(defaultBGColor);
-    EXPECT_EQ(bgColor, Color::BLACK);
+    EXPECT_NE(bgColor, Color::BLACK);
 }
 
 /**

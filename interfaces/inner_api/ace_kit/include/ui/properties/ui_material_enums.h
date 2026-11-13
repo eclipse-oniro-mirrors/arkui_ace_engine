@@ -16,6 +16,8 @@
 #ifndef FOUNDATION_ACE_INTERFACES_INNER_API_ACE_KIT_INCLUDE_UI_PROPERTIES_UI_MATERIAL_ENUM_H
 #define FOUNDATION_ACE_INTERFACES_INNER_API_ACE_KIT_INCLUDE_UI_PROPERTIES_UI_MATERIAL_ENUM_H
 
+#include <stdint.h>
+
 namespace OHOS::Ace {
 
 enum class MaterialType: int32_t {
@@ -84,6 +86,13 @@ enum class MaterialState {
     DEFAULT = 0,
     ENABLE = 1,
     DISABLE = 2,
+};
+
+enum class VibrancyMode : int8_t {
+    DISABLED = 0,
+    AUTO = 1,
+    BRIGHTEN = 2,
+    DARKEN = 3,
 };
 } // namespace OHOS::Ace
 

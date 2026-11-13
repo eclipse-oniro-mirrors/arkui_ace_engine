@@ -15,6 +15,7 @@
 
 #include "core/components_ng/pattern/progress/progress_accessibility_property.h"
 
+#include "base/i18n/localization.h"
 #include "core/components_ng/pattern/progress/progress_pattern.h"
 
 namespace OHOS::Ace::NG {
@@ -37,6 +38,9 @@ std::string ProgressAccessibilityProperty::GetText() const
     CHECK_NULL_RETURN(frameNode, "");
     auto progressPaintProperty = frameNode->GetPaintProperty<NG::ProgressPaintProperty>();
     CHECK_NULL_RETURN(progressPaintProperty, "");
-    return std::to_string(progressPaintProperty->GetValue().value_or(0));
+    auto progressValue = progressPaintProperty->GetValue().value_or(0);
+    return Localization::GetInstance()->GetLanguage() != "zh"
+        ? Localization::GetInstance()->NumberFormat(progressValue)
+        : std::to_string(progressValue);
 }
 } // namespace OHOS::Ace::NG

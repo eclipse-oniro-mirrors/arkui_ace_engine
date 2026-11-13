@@ -119,6 +119,7 @@ public:
 private:
     RefPtr<TaskExecutor> GetTaskExecutor();
     RefPtr<TaskExecutor> GetHostTaskExecutor();
+    SizeF GetHostContentSize() const;
     void AddWorkerUsing(void *worker);
     void DeleteWorkerUsing(void *worker);
     void OnDestroyContent();

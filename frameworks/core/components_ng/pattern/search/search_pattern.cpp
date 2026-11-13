@@ -1507,6 +1507,34 @@ void SearchPattern::AnimateTouchAndHover(RefPtr<RenderContext>& renderContext, f
         nullptr, Claim(context));
 }
 
+CommandResult SearchPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    auto json = JsonUtil::ParseJsonString(command);
+    if (json && json->IsObject() && json->GetString("cmd") == "requestKeyboard") {
+        auto host = GetHost();
+        CHECK_NULL_RETURN(host, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+        auto hub = host->GetEventHub<EventHub>();
+        if (!hub || !hub->IsEnabled()) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        }
+        auto child = AceType::DynamicCast<FrameNode>(host->GetChildAtIndex(0));
+        auto field = child ? child->GetPattern<TextFieldPattern>() : nullptr;
+        return field ? field->OnInjectionEventWithResult(command)
+                     : CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+    }
+    return ConvertLegacyInjectionEventResult(command,
+        { "setSearchText", "MSDP_AutoFill", "addText", "setText", "deleteText", "selectText", "copy", "cut", "clear",
+            "requestKeyboard", "setCaretPosition" },
+        CommandErrorType::INVALID_PARAM, [this](const std::unique_ptr<JsonValue>& /* json */) {
+        auto host = GetHost();
+        auto child = AceType::DynamicCast<FrameNode>(host->GetChildAtIndex(0));
+        if (!child || !child->GetPattern<TextFieldPattern>()) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        }
+        return CommandResult::Success();
+    });
+}
+
 int32_t SearchPattern::OnInjectionEvent(const std::string& command)
 {
     auto host = GetHost();

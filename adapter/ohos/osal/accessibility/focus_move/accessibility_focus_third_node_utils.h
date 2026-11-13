@@ -16,6 +16,8 @@
 #ifndef FOUNDATION_ACE_ADAPTER_OHOS_OSAL_ACCESSIBILITY_FOCUS_MOVE_ACCESSIBILITY_FOCUS_THIRD_NODE_UTILS_H
 #define FOUNDATION_ACE_ADAPTER_OHOS_OSAL_ACCESSIBILITY_FOCUS_MOVE_ACCESSIBILITY_FOCUS_THIRD_NODE_UTILS_H
 
+#include <unordered_map>
+
 #include "adapter/ohos/osal/accessibility/focus_move/accessibility_focus_strategy.h"
 #include "frameworks/core/accessibility/native_interface_accessibility_impl.h"
 
@@ -30,9 +32,14 @@ namespace OHOS::Ace::Framework {
 
 class ThirdRulesCheckNode : public FocusRulesCheckNode {
 public:
+    using ParentMap = std::unordered_map<int64_t, int64_t>;
+    using NodeMap = std::unordered_map<int64_t, std::shared_ptr<ArkUI_AccessibilityElementInfo>>;
+
     ThirdRulesCheckNode(std::shared_ptr<ArkUI_AccessibilityElementInfo> nodeInfo,
         int64_t accessibilityId,
-        const WeakPtr<AccessibilityProvider>& accessibilityProvider);
+        const WeakPtr<AccessibilityProvider>& accessibilityProvider,
+        const std::shared_ptr<ParentMap>& parentMap = nullptr,
+        const std::shared_ptr<NodeMap>& nodeMap = nullptr);
 
     ~ThirdRulesCheckNode() override = default;
 
@@ -66,6 +73,11 @@ public:
 
     bool IsChildTreeContainer() override;
 
+    bool IsAccessibiltyVisible() override
+    {
+        return nodeInfo_ && nodeInfo_->IsVisible();
+    }
+
     bool IsInChildTree() override
     {
         return true;
@@ -82,6 +94,8 @@ private:
     RefPtr<NG::CustomAccessibilityProperty> GetCustomProperty();
     std::shared_ptr<ArkUI_AccessibilityElementInfo> nodeInfo_;
     WeakPtr<AccessibilityProvider> accessibilityProvider_;
+    std::shared_ptr<ParentMap> parentMap_;
+    std::shared_ptr<NodeMap> nodeMap_;
 };
 } // OHOS::Ace::Framework
 #endif // FOUNDATION_ACE_ADAPTER_OHOS_OSAL_ACCESSIBILITY_FOCUS_MOVE_ACCESSIBILITY_FOCUS_THIRD_NODE_UTILS_H

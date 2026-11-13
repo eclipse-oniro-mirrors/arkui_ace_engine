@@ -80,6 +80,16 @@ RefPtr<ResourceObject> GetResourceObjectFromOptResourceColor(const Opt_ResourceC
     return GetResourceObject(opt.value.value3);
 }
 
+// Extract ResourceObject from Ark_ResourceStr (union of String + Resource).
+// selector 0 = string literal, selector 1 = Ark_Resource.
+RefPtr<ResourceObject> GetResourceObjectFromResourceStr(const Ark_ResourceStr& resStr)
+{
+    if (resStr.selector != SELECTOR_ID_1) {
+        return nullptr;
+    }
+    return GetResourceObject(resStr.value1);
+}
+
 std::optional<int32_t> ProcessBindableIndex(FrameNode* frameNode, const Opt_Union_I32_Bindable_I32& value)
 {
     std::optional<int32_t> result;
@@ -100,6 +110,67 @@ std::optional<int32_t> ProcessBindableIndex(FrameNode* frameNode, const Opt_Unio
         },
         [] {});
     return result;
+}
+
+void ParseVisibilityMap(const Ark_TabViewCustomization& arkCust, TabViewCustomization& customization)
+{
+    auto visMapOpt = Converter::GetOptPtr(&arkCust.visibilityMap);
+    if (!visMapOpt) {
+        return;
+    }
+    for (Ark_Int32 i = 0; i < visMapOpt->size; ++i) {
+        if (visMapOpt->keys[i] < 0) {
+            continue;
+        }
+        auto vis = visMapOpt->values[i];
+        if (vis >= ARK_TAB_VISIBILITY_VISIBLE && vis <= ARK_TAB_VISIBILITY_HIDDEN) {
+            customization.visibilityMap[visMapOpt->keys[i]] = static_cast<TabVisibility>(vis);
+        }
+    }
+}
+
+void ParseSectionMap(const Ark_TabViewCustomization& arkCust, TabViewCustomization& customization)
+{
+    auto secMapOpt = Converter::GetOptPtr(&arkCust.sectionMap);
+    if (!secMapOpt) {
+        return;
+    }
+    for (Ark_Int32 i = 0; i < secMapOpt->size; ++i) {
+        if (secMapOpt->keys[i] < 0) {
+            continue;
+        }
+        const auto& arkSec = secMapOpt->values[i];
+        SidebarSection section;
+        section.title = Converter::OptConvert<std::string>(arkSec.title).value_or("");
+        section.resourceTitleObject = GetResourceObjectFromResourceStr(arkSec.title);
+        auto orderOpt = Converter::GetOptPtr(&arkSec.order);
+        if (orderOpt && orderOpt.value() >= 0) {
+            section.order = orderOpt.value();
+        }
+        auto titleStyleOpt = Converter::GetOptPtr(&arkSec.titleStyle);
+        if (titleStyleOpt) {
+            auto styleVal = static_cast<Ark_SidebarSectionTitleStyle>(titleStyleOpt.value());
+            if (styleVal >= ARK_SIDEBAR_SECTION_TITLE_STYLE_STANDARD &&
+                styleVal <= ARK_SIDEBAR_SECTION_TITLE_STYLE_EMPHASIZED) {
+                section.titleStyle = static_cast<SidebarSectionTitleStyle>(styleVal);
+            }
+        }
+        customization.sectionMap[secMapOpt->keys[i]] = std::move(section);
+    }
+}
+
+void ParseOrderMap(const Ark_TabViewCustomization& arkCust, TabViewCustomization& customization)
+{
+    auto orderMapOpt = Converter::GetOptPtr(&arkCust.orderMap);
+    if (!orderMapOpt) {
+        return;
+    }
+    for (Ark_Int32 i = 0; i < orderMapOpt->size; ++i) {
+        if (orderMapOpt->keys[i] < 0 || orderMapOpt->values[i] < 0) {
+            continue;
+        }
+        customization.orderMap[orderMapOpt->keys[i]] = orderMapOpt->values[i];
+    }
 }
 } // namespace
 }
@@ -248,12 +319,41 @@ BarFloatingStyleParameters Convert(const Ark_FloatingTabBarStyle& src)
 }
 
 template<>
+BarTopFloatingStyleParameters Convert(const Ark_TopFloatingTabBarStyle& src)
+{
+    BarTopFloatingStyleParameters dst;
+    dst.barWidth = Converter::OptConvert<Dimension>(src.barWidth);
+    dst.barSideMargin = Converter::OptConvert<Dimension>(src.barSideMargin);
+    dst.barTopMargin = Converter::OptConvert<Dimension>(src.barTopMargin);
+    dst.maskColor = Converter::OptConvert<Color>(src.maskColor);
+    dst.maskHeight = Converter::OptConvert<Dimension>(src.maskHeight);
+    dst.maxWidth = Converter::OptConvert<Dimension>(src.maxWidth);
+    dst.barWidthObject = GetResourceObjectFromOptLength(src.barWidth);
+    dst.barSideMarginObject = GetResourceObjectFromOptLength(src.barSideMargin);
+    dst.barTopMarginObject = GetResourceObjectFromOptLength(src.barTopMargin);
+    dst.maskColorObject = GetResourceObjectFromOptResourceColor(src.maskColor);
+    dst.maskHeightObject = GetResourceObjectFromOptLength(src.maskHeight);
+    dst.maxWidthObject = GetResourceObjectFromOptLength(src.maxWidth);
+    if (src.offset.tag != InteropTag::INTEROP_TAG_UNDEFINED) {
+        const auto& offsetValue = src.offset.value;
+        if (offsetValue.selector == SELECTOR_ID_0) {
+            dst.offsetX = Converter::OptConvert<Dimension>(offsetValue.value0.x);
+            dst.offsetY = Converter::OptConvert<Dimension>(offsetValue.value0.y);
+            dst.offsetXObject = GetResourceObjectFromOptLength(offsetValue.value0.x);
+            dst.offsetYObject = GetResourceObjectFromOptLength(offsetValue.value0.y);
+        }
+    }
+    return dst;
+}
+
+template<>
 void AssignCast(std::optional<TabBarLayoutStyle>& dst, const Ark_TabBarStyle& src)
 {
     switch (src) {
         case ARK_TAB_BAR_STYLE_BOTTOM: dst = TabBarLayoutStyle::BOTTOM; break;
         case ARK_TAB_BAR_STYLE_SIDEBAR: dst = TabBarLayoutStyle::SIDEBAR; break;
         case ARK_TAB_BAR_STYLE_SIDEBAR_ADAPTABLE: dst = TabBarLayoutStyle::SIDEBAR_ADAPTABLE; break;
+        case ARK_TAB_BAR_STYLE_TOP: dst = TabBarLayoutStyle::TOP; break;
         default: LOGE("Unexpected enum value in Ark_TabBarStyle: %{public}d", src);
     }
 }
@@ -777,6 +877,19 @@ void SetBarFloatingStyleImpl(Ark_NativePointer node,
     TabsModelNG::SetBarFloatingStyle(frameNode, parameters);
 }
 
+void SetTopBarFloatingStyleImpl(Ark_NativePointer node, const Opt_TopFloatingTabBarStyle* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    CHECK_NULL_VOID(value);
+    if (value->tag == InteropTag::INTEROP_TAG_UNDEFINED) {
+        TabsModelNG::ResetBarTopFloatingStyle(frameNode);
+        return;
+    }
+    auto parameters = Converter::Convert<BarTopFloatingStyleParameters>(value->value);
+    TabsModelNG::SetBarTopFloatingStyle(frameNode, parameters);
+}
+
 void SetBarModeImpl(Ark_NativePointer node,
                     const Opt_BarMode* value,
                     const Opt_ScrollableBarModeOptions* options)
@@ -1212,6 +1325,36 @@ void SetSidebarBottomBarImpl(Ark_NativePointer node,
         TabsModelNG::SetSidebarBottomBar(frameNode, nullptr);
     }
 }
+void SetShowSideBarControlButtonImpl(Ark_NativePointer node,
+                                     const Opt_Boolean* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto convValue = Converter::OptConvertPtr<bool>(value);
+    if (!convValue) {
+        TabsModelNG::SetShowSidebarControlButton(frameNode, false);
+        return;
+    }
+    TabsModelNG::SetShowSidebarControlButton(frameNode, *convValue);
+}
+
+void SetTabViewCustomizationImpl(Ark_NativePointer node,
+                                 const Opt_TabViewCustomization* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto optValue = Converter::GetOptPtr(value);
+    if (!optValue) {
+        TabsModelNG::ResetTabViewCustomization(frameNode);
+        return;
+    }
+    const auto& arkCust = optValue.value();
+    TabViewCustomization customization;
+    ParseVisibilityMap(arkCust, customization);
+    ParseSectionMap(arkCust, customization);
+    ParseOrderMap(arkCust, customization);
+    TabsModelNG::SetTabViewCustomization(frameNode, customization);
+}
 } // TabsAttributeModifier
 const GENERATED_ArkUITabsModifier* GetTabsModifier()
 {
@@ -1247,6 +1390,7 @@ const GENERATED_ArkUITabsModifier* GetTabsModifier()
         TabsAttributeModifier::SetOnContentWillChangeImpl,
         TabsAttributeModifier::SetOnContentDidScrollImpl,
         TabsAttributeModifier::SetBarFloatingStyleImpl,
+        TabsAttributeModifier::SetTopBarFloatingStyleImpl,
         TabsAttributeModifier::SetBarStyleImpl,
         TabsAttributeModifier::SetSidebarPositionImpl,
         TabsAttributeModifier::SetSidebarHeaderImpl,
@@ -1268,6 +1412,8 @@ const GENERATED_ArkUITabsModifier* GetTabsModifier()
         TabsAttributeModifier::SetSidebarDisplayStyleImpl,
         TabsAttributeModifier::SetSidebarFooterImpl,
         TabsAttributeModifier::SetSidebarBottomBarImpl,
+        TabsAttributeModifier::SetShowSideBarControlButtonImpl,
+        TabsAttributeModifier::SetTabViewCustomizationImpl,
         TabsAttributeModifier::SetBarModeImpl,
         TabsAttributeModifier::SetBarHeight1Impl,
         TabsAttributeModifier::SetBarBackgroundBlurStyle1Impl,

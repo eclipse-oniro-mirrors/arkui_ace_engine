@@ -43,7 +43,6 @@ namespace {
     const auto ACTUAL_FALSE = false;
     const auto EXPECTED_TRUE = "true";
     const auto EXPECTED_FALSE = "false";
-    const auto EXPECTED_CONTEXT_ID = 123;
     const auto EXPECTED_NODE_ID = 555;
     const auto INVALID_REASON_VALUE = -1;
     const auto EXPECTED_SHORTCUTS_SIZE = 3;
@@ -128,6 +127,17 @@ class CommonMethodModifierTest8 : public ModifierTestBase<GENERATED_ArkUICommonM
 public:
     RefPtr<RenderContext> render_;
 
+    void TearDown() override
+    {
+        if (lastBuilderToken_ != -1) {
+            CallbackNodeBinder::Unbind(lastBuilderToken_);
+            lastBuilderToken_ = -1;
+        }
+        ModifierTestBase::TearDown();
+    }
+
+    int32_t lastBuilderToken_ = -1;
+
     void *CreateNodeImpl() override
     {
         return nodeModifiers_->getBlankModifier()->construct(GetId(), 0);
@@ -135,7 +145,10 @@ public:
     CustomNodeBuilder CreateCustomNodeBuilder(RefPtr<FrameNode>& node)
     {
         checkBuilderEvent.reset();
-        static std::optional<RefPtr<UINode>> uiNode = node;
+        if (lastBuilderToken_ != -1) {
+            CallbackNodeBinder::Unbind(lastBuilderToken_);
+        }
+        lastBuilderToken_ = CallbackNodeBinder::Bind(node);
         auto checkCallback = [](
             Ark_VMContext context,
             const Ark_Int32 resourceId,
@@ -145,8 +158,9 @@ public:
                 .resourceId = resourceId,
                 .parentNode = parentNode
             };
-            if (uiNode) {
-                CallbackHelper(continuation).InvokeSync(AceType::RawPtr(uiNode.value()));
+            auto target = CallbackNodeBinder::Upgrade(resourceId);
+            if (target) {
+                CallbackHelper(continuation).InvokeSync(AceType::RawPtr(target));
             }
         };
         auto checkCallbackAsync = [](
@@ -157,12 +171,13 @@ public:
                 .resourceId = resourceId,
                 .parentNode = parentNode
             };
-            if (uiNode) {
-                CallbackHelper(continuation).Invoke(AceType::RawPtr(uiNode.value()));
+            auto target = CallbackNodeBinder::Upgrade(resourceId);
+            if (target) {
+                CallbackHelper(continuation).Invoke(AceType::RawPtr(target));
             }
         };
         CustomNodeBuilder customBuilder =
-            Converter::ArkValue<CustomNodeBuilder>(checkCallbackAsync, checkCallback, EXPECTED_CONTEXT_ID);
+            Converter::ArkValue<CustomNodeBuilder>(checkCallbackAsync, checkCallback, lastBuilderToken_);
         return customBuilder;
     }
     Opt_Callback_DismissContentCoverAction_Void CreateDismissCallback(FrameNode* frameNode)
@@ -296,7 +311,7 @@ HWTEST_F(CommonMethodModifierTest8, setBindContentCover0TestIsShow, TestSize.Lev
     EXPECT_FALSE(checkBuilderEvent.has_value());
     modifier_->setBindContentCover0(node_, &arkShow, &customBuilder, &optModal);
     EXPECT_TRUE(checkBuilderEvent.has_value());
-    EXPECT_EQ(checkBuilderEvent->resourceId, EXPECTED_CONTEXT_ID);
+    EXPECT_EQ(checkBuilderEvent->resourceId, lastBuilderToken_);
 
     arkShow = Converter::ArkUnion<Opt_Union_Boolean_Bindable, Ark_Boolean>(ACTUAL_FALSE);
     checkBuilderEvent.reset();
@@ -325,7 +340,7 @@ HWTEST_F(CommonMethodModifierTest8, DISABLED_setBindContentCover0TestModalTransi
         auto pattern = modal->GetPattern<ModalPresentationPattern>();
         EXPECT_NE(pattern, nullptr);
         EXPECT_TRUE(checkBuilderEvent.has_value());
-        EXPECT_EQ(checkBuilderEvent->resourceId, EXPECTED_CONTEXT_ID);
+        EXPECT_EQ(checkBuilderEvent->resourceId, lastBuilderToken_);
         EXPECT_EQ(pattern->GetType(), expected);
     }
 }
@@ -349,7 +364,7 @@ HWTEST_F(CommonMethodModifierTest8, DISABLED_setBindContentCover1TestIsShow, Tes
     EXPECT_FALSE(checkBuilderEvent.has_value());
     modifier_->setBindContentCover1(node_, &arkShow, &customBuilder, &optOptions);
     EXPECT_TRUE(checkBuilderEvent.has_value());
-    EXPECT_EQ(checkBuilderEvent->resourceId, EXPECTED_CONTEXT_ID);
+    EXPECT_EQ(checkBuilderEvent->resourceId, lastBuilderToken_);
 
     arkShow = Converter::ArkUnion<Opt_Union_Boolean_Bindable, Ark_Boolean>(ACTUAL_FALSE);
     checkBuilderEvent.reset();
@@ -394,7 +409,7 @@ HWTEST_F(CommonMethodModifierTest8, DISABLED_setBindContentCover1TestOnAppear, T
     auto parentNode = reinterpret_cast<FrameNode*>(checkBuilderEvent->parentNode);
     EXPECT_NE(parentNode, nullptr);
     EXPECT_TRUE(checkBuilderEvent.has_value());
-    EXPECT_EQ(checkBuilderEvent->resourceId, EXPECTED_CONTEXT_ID);
+    EXPECT_EQ(checkBuilderEvent->resourceId, lastBuilderToken_);
     EXPECT_EQ(parentNode->GetId(), frameNode->GetId());
     EXPECT_TRUE(checkEventAppear.has_value());
     EXPECT_EQ(checkEventAppear->nodeId, frameNode->GetId());
@@ -441,7 +456,7 @@ HWTEST_F(CommonMethodModifierTest8, DISABLED_setBindContentCover1TestOnDisAppear
     auto parentNode = reinterpret_cast<FrameNode*>(checkBuilderEvent->parentNode);
     EXPECT_NE(parentNode, nullptr);
     EXPECT_TRUE(checkBuilderEvent.has_value());
-    EXPECT_EQ(checkBuilderEvent->resourceId, EXPECTED_CONTEXT_ID);
+    EXPECT_EQ(checkBuilderEvent->resourceId, lastBuilderToken_);
     EXPECT_EQ(parentNode->GetId(), frameNode->GetId());
     EXPECT_TRUE(checkEventDisAppear.has_value());
     EXPECT_EQ(checkEventDisAppear->nodeId, frameNode->GetId());
@@ -481,7 +496,7 @@ HWTEST_F(CommonMethodModifierTest8, DISABLED_setBindContentCover1TestOnWillAppea
     auto parentNode = reinterpret_cast<FrameNode*>(checkBuilderEvent->parentNode);
     EXPECT_NE(parentNode, nullptr);
     EXPECT_TRUE(checkBuilderEvent.has_value());
-    EXPECT_EQ(checkBuilderEvent->resourceId, EXPECTED_CONTEXT_ID);
+    EXPECT_EQ(checkBuilderEvent->resourceId, lastBuilderToken_);
     EXPECT_EQ(parentNode->GetId(), frameNode->GetId());
     EXPECT_TRUE(checkEventWillAppear.has_value());
     EXPECT_EQ(checkEventWillAppear->nodeId, frameNode->GetId());
@@ -528,7 +543,7 @@ HWTEST_F(CommonMethodModifierTest8, DISABLED_setBindContentCover1TestOnWillDisAp
     auto parentNode = reinterpret_cast<FrameNode*>(checkBuilderEvent->parentNode);
     EXPECT_NE(parentNode, nullptr);
     EXPECT_TRUE(checkBuilderEvent.has_value());
-    EXPECT_EQ(checkBuilderEvent->resourceId, EXPECTED_CONTEXT_ID);
+    EXPECT_EQ(checkBuilderEvent->resourceId, lastBuilderToken_);
     EXPECT_EQ(parentNode->GetId(), frameNode->GetId());
     EXPECT_TRUE(checkEventWillDisAppear.has_value());
     EXPECT_EQ(checkEventWillDisAppear->nodeId, frameNode->GetId());

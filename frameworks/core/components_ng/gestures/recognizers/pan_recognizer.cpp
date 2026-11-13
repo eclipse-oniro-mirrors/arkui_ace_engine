@@ -17,6 +17,7 @@
 #include "core/components_ng/base/observer_handler.h"
 #include "core/components_ng/gestures/recognizers/pan_recognizer.h"
 
+#include "base/log/log_wrapper_without_instance.h"
 #include "base/perfmonitor/perf_monitor.h"
 #ifndef CROSS_PLATFORM
 #include "base/ressched/ressched_report.h"
@@ -27,6 +28,7 @@
 #include "core/components_ng/gestures/gesture_referee.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "core/components_ng/manager/event/json_child_report.h"
+#include "core/components_ng/manager/interaction_observer/ui_info_collection_manager.h"
 #include "core/common/reporter/reporter.h"
 #include "core/components_ng/manager/event/json_report.h"
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
@@ -47,6 +49,7 @@ constexpr float DEFAULT_RECYCLE_ANGLE = 180.0f;
 void PanRecognizer::ForceCleanRecognizer()
 {
     MultiFingersRecognizer::ForceCleanRecognizer();
+    ReleaseTouchEventPayload(lastTouchEvent_);
     averageDistance_.Reset();
     touchPointsDistance_.clear();
     localMatrix_.clear();
@@ -171,7 +174,7 @@ void PanRecognizer::OnAccepted()
     }
 
     auto node = GetAttachedNode().Upgrade();
-    TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW,
+    TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW,
         "PAN RACC, T: %{public}s, DIS x %{public}f, y %{public}f",
         node ? node->GetTag().c_str() : "null", averageDistance_.GetX(), averageDistance_.GetY());
     
@@ -470,7 +473,7 @@ void PanRecognizer::HandleTouchUpEvent(const AxisEvent& event)
     time_ = event.time;
 
     DumpVelocityInfo(event.id);
-    TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW,
+    TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW,
         "PanVelocity main axis velocity is %{public}f", panVelocity_.GetMainAxisVelocity());
 
     if ((refereeState_ != RefereeState::SUCCEED) && (refereeState_ != RefereeState::FAIL)) {
@@ -671,7 +674,7 @@ void PanRecognizer::HandleTouchCancelEvent(const TouchEvent& event)
         lastRefereeState_ = RefereeState::READY;
         refereeState_ = RefereeState::READY;
     } else if (refereeState_ == RefereeState::SUCCEED) {
-        TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW,
+        TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW,
             "PanRecognizer touchPoints size not equal fingers_, not send cancel callback.");
     }
 }
@@ -813,6 +816,7 @@ Offset PanRecognizer::GetRawGlobalLocation(int32_t postEventNodeId)
 void PanRecognizer::OnResetStatus()
 {
     MultiFingersRecognizer::OnResetStatus();
+    ReleaseTouchEventPayload(lastTouchEvent_);
     touchPoints_.clear();
     averageDistance_.Reset();
     touchPointsDistance_.clear();
@@ -978,6 +982,10 @@ void PanRecognizer::SendCallbackMsg(const std::unique_ptr<GestureEventFunc>& cal
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING
     HandleReports(info, type);
 #endif
+    // Always-on delivery for NDK interaction observers; the manager drops
+    // notifications without a start/end/cancel semantic.
+    UIInfoCollectionManager::GetInstance().NotifyPan(
+        GetAttachedNode().Upgrade(), info, direction_.type, type);
     if (type == GestureCallbackType::END || type == GestureCallbackType::CANCEL) {
         localMatrix_.clear();
     }

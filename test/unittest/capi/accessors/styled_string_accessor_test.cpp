@@ -1129,9 +1129,7 @@ HWTEST_F(StyledStringAccessorUnionStringTest, marshalling0Test, TestSize.Level1)
     auto onUnmarshalling = [](Ark_VMContext context, const Ark_Int32 resourceId,
         const Opt_StyledString value, const Opt_Array_String error) {
         EXPECT_FALSE(Converter::GetOpt(error).has_value());
-        auto arkPeer = Converter::GetOpt(value);
-        ASSERT_TRUE(arkPeer.has_value());
-        auto peer = arkPeer.value();
+        auto peer = Converter::GetOpt(value).value_or(nullptr);
         ASSERT_TRUE(peer);
         checkSpanString = peer->spanString;
     };

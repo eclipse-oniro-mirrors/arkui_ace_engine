@@ -253,10 +253,17 @@ void TextBackgroundStyle::ToJsonValue(std::unique_ptr<JsonValue>& json, const st
     const NG::InspectorFilter& filter)
 {
     NG::BorderRadiusProperty defaultRadius;
-    TextBackgroundStyle exportStyle = { .backgroundColor = Color::TRANSPARENT, .backgroundRadius = defaultRadius };
+    TextBackgroundStyle exportStyle = {
+        .backgroundColor = Color::TRANSPARENT,
+        .backgroundRadius = defaultRadius,
+        .borderWidth = Dimension(0),
+        .borderColor = Color::TRANSPARENT,
+    };
     if (style.has_value()) {
         exportStyle.backgroundColor = style.value().backgroundColor.value_or(Color::TRANSPARENT);
         exportStyle.backgroundRadius = style.value().backgroundRadius.value_or(defaultRadius);
+        exportStyle.borderWidth = style.value().borderWidth.value_or(Dimension(0));
+        exportStyle.borderColor = style.value().borderColor.value_or(Color::TRANSPARENT);
     }
 
     auto styleJson = JsonUtil::Create(true);

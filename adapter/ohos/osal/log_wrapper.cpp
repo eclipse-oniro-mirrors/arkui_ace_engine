@@ -18,6 +18,7 @@
 #ifdef _GNU_SOURCE
 #include <dlfcn.h>
 #endif
+#include <cstddef>
 #include <mutex>
 #include <sstream>
 
@@ -219,10 +220,53 @@ static void ResetCrashObj(uintptr_t crashObj)
     pfnResetCrashObj(crashObj);
 }
 
+#ifdef _GNU_SOURCE
+namespace {
+constexpr size_t CALLBACK_SYMBOL_CACHE_LIMIT = 256;
+
+std::string ResolveCallbackSymbol(uintptr_t address)
+{
+    Dl_info info {};
+    if (dladdr(reinterpret_cast<const void*>(address), &info) == 0) {
+        return {};
+    }
+    std::string result;
+    if (info.dli_fname) {
+        result.append(" module: ").append(info.dli_fname);
+    }
+    if (info.dli_sname) {
+        result.append(" symbol: ").append(info.dli_sname);
+    }
+    return result;
+}
+
+std::string GetCallbackSymbolInfo(uintptr_t address)
+{
+    // Cached addresses assume that the callback modules remain loaded.
+    thread_local std::unordered_map<uintptr_t, std::string> symbols;
+    auto iter = symbols.find(address);
+    if (iter != symbols.end()) {
+        return iter->second;
+    }
+    auto result = ResolveCallbackSymbol(address);
+    if (!result.empty()) {
+        if (symbols.size() >= CALLBACK_SYMBOL_CACHE_LIMIT) {
+            symbols.clear();
+        }
+        symbols.emplace(address, result);
+    }
+    return result;
+}
+} // namespace
+#endif
+
 CallbackLogger::CallbackLogger(const std::string& funcName, uintptr_t callback)
 {
     std::ostringstream oss;
     oss << "[" << funcName << "] crash occured on callback: " << std::showbase << std::hex << callback;
+#ifdef _GNU_SOURCE
+    oss << GetCallbackSymbolInfo(callback);
+#endif
     msg_ = oss.str();
     lastObjAddr_ = SetCrashObj(msg_.c_str());
 }

@@ -24,6 +24,7 @@
 #include "core/components_ng/layout/layout_wrapper_node.h"
 #include "core/components_ng/pattern/list/list_children_main_size.h"
 #include "core/components_ng/pattern/list/list_item_group_layout_algorithm.h"
+#include "core/components_ng/pattern/lazy_layout/prepared_layout_geometry.h"
 #include "core/components_ng/pattern/list/list_height_offset_calculator.h"
 #include "core/components_ng/pattern/list/list_item_pattern.h"
 #include "core/components_ng/pattern/list/list_position_map.h"
@@ -37,6 +38,100 @@ using namespace testing::ext;
 class ListItemGroupAlgorithmTestNg : public ListTestNg {
 public:
 };
+
+/**
+ * @tc.name: OrdinaryGroupDoesNotAllocateFastScrollState001
+ * @tc.desc: Ordinary setup, geometry queries and cleanup do not allocate FastScroll-only state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListItemGroupAlgorithmTestNg, OrdinaryGroupDoesNotAllocateFastScrollState001, TestSize.Level1)
+{
+    ListItemGroupLayoutAlgorithm algorithm(-1, -1, 0);
+    EXPECT_EQ(algorithm.fastScrollState_, nullptr);
+    algorithm.SetPremeasureOnly(false);
+    algorithm.SetPreparedGeometry(nullptr);
+    algorithm.SetFastScroll(false);
+    EXPECT_FALSE(algorithm.IsPremeasureOnly());
+    EXPECT_FALSE(algorithm.IsPremeasureDisplayed());
+    EXPECT_FALSE(algorithm.IsPremeasureComplete());
+    EXPECT_FALSE(algorithm.GetPreparedGeometry());
+    EXPECT_TRUE(algorithm.TakePremeasuredNodes().empty());
+    EXPECT_EQ(algorithm.fastScrollState_, nullptr);
+    RecordProperty("groupAlgorithmSize", static_cast<int>(sizeof(algorithm)));
+}
+
+/**
+ * @tc.name: FastScrollGroupStateReleasesAndReinitializes001
+ * @tc.desc: Disabling FastScroll releases its geometry and re-enabling starts with clean preparation state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListItemGroupAlgorithmTestNg, FastScrollGroupStateReleasesAndReinitializes001, TestSize.Level1)
+{
+    ListItemGroupLayoutAlgorithm algorithm(-1, -1, 0);
+    auto geometry = std::make_shared<PreparedLayoutGeometry>();
+    std::weak_ptr<const PreparedLayoutGeometry> weak = geometry;
+    algorithm.SetPreparedGeometry(geometry);
+    algorithm.SetFastScroll(true, 1000.0f);
+    algorithm.SetPremeasureOnly(true, true);
+    ASSERT_NE(algorithm.fastScrollState_, nullptr);
+    EXPECT_EQ(algorithm.GetPreparedGeometry(), geometry);
+    EXPECT_EQ(algorithm.fastScrollState_->mainSize, std::optional<float>(1000.0f));
+    EXPECT_TRUE(algorithm.fastScrollState_->mainSizeProvided);
+    EXPECT_TRUE(algorithm.IsPremeasureDisplayed());
+    geometry.reset();
+    algorithm.SetFastScroll(false);
+    EXPECT_EQ(algorithm.fastScrollState_, nullptr);
+    EXPECT_TRUE(weak.expired());
+    algorithm.SetFastScroll(true);
+    EXPECT_FALSE(algorithm.fastScrollState_->mainSize);
+    EXPECT_FALSE(algorithm.fastScrollState_->mainSizeProvided);
+    EXPECT_FALSE(algorithm.IsPremeasureOnly());
+    EXPECT_FALSE(algorithm.IsPremeasureComplete());
+    EXPECT_FALSE(algorithm.GetPreparedGeometry());
+    EXPECT_TRUE(algorithm.TakePremeasuredNodes().empty());
+}
+
+/**
+ * @tc.name: FastScrollPreparedGroupBoundarySeedsUnknownWindow001
+ * @tc.desc: A window touching a prepared boundary uses the measured internal index, not a distant real edge.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListItemGroupAlgorithmTestNg, FastScrollPreparedGroupBoundarySeedsUnknownWindow001, TestSize.Level1)
+{
+    constexpr float groupSize = 10000.0f;
+    constexpr float viewport = 400.0f;
+    auto algorithm = AceType::MakeRefPtr<ListItemGroupLayoutAlgorithm>(0, 0, 0);
+    algorithm->totalItemCount_ = 1000;
+    algorithm->totalMainSize_ = groupSize;
+    algorithm->startPos_ = 7500.0f;
+    algorithm->endPos_ = algorithm->startPos_ + viewport;
+
+    int32_t index = 10;
+    float position = 0.0f;
+    algorithm->SetFastScroll(true, groupSize);
+    EXPECT_FALSE(algorithm->FindFastScrollEdge(index, position, groupSize - 2500.0f, false));
+    auto geometry = std::make_shared<PreparedLayoutGeometry>();
+    geometry->itemCount = 1000;
+    geometry->bodyMainSize = groupSize;
+    geometry->fromEnd = true;
+    geometry->positions[749] = { -2510.0f, -2500.0f };
+    algorithm->SetPreparedGeometry(geometry);
+    algorithm->FindFastScrollAnchor(index, position, true);
+    EXPECT_EQ(index, 749);
+    EXPECT_FLOAT_EQ(position, 7490.0f);
+
+    geometry = std::make_shared<PreparedLayoutGeometry>();
+    geometry->itemCount = 1000;
+    geometry->bodyMainSize = groupSize;
+    geometry->positions[250] = { 2500.0f, 2510.0f };
+    algorithm->SetPreparedGeometry(geometry);
+    algorithm->startPos_ = 2100.0f;
+    algorithm->endPos_ = 2500.0f;
+    algorithm->referencePos_ = groupSize;
+    algorithm->FindFastScrollAnchor(index, position, false);
+    EXPECT_EQ(index, 250);
+    EXPECT_FLOAT_EQ(position, 2510.0f);
+}
 
 /**
  * @tc.name: CheckJumpForwardForBigOffset001

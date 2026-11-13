@@ -325,6 +325,8 @@ public:
     virtual void SetBackShadow(const std::vector<Shadow>& shadows) = 0;
     virtual void SetBlendMode(BlendMode blendMode) = 0;
     virtual void SetBlendApplyType(BlendApplyType blendApplyType) = 0;
+    virtual void SetShadowShape(const RefPtr<BasicShape>& shape) {}
+    virtual void SetShadowClipMode(ShadowClipMode clipMode) {}
     virtual void SetColorBlend(const Color& value) = 0;
     virtual void CreateWithColorBlendResourceObj(const RefPtr<ResourceObject>& resobj) {};
     virtual void SetWindowBlur(float progress, WindowBlurStyle blurStyle) = 0;
@@ -465,6 +467,7 @@ public:
     virtual void SetInspectorLabel(const std::string& inspectorLabel) {};
     virtual void SetHoverEffect(HoverEffectType hoverEffect) = 0;
     virtual void SetHitTestMode(NG::HitTestMode hitTestMode) = 0;
+    virtual void SetAgentControlMode(const std::optional<NG::AgentControlMode>& mode) = 0;
     virtual void SetOnTouchTestFunc(NG::OnChildTouchTestFunc&& onChildTouchTest) = 0;
     virtual void SetKeyboardShortcut(const std::string& value, const std::vector<ModifierKey>& keys,
         std::function<void()>&& onKeyboardShortcutAction) = 0;

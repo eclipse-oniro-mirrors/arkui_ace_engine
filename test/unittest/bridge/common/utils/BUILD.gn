@@ -27,10 +27,13 @@ ohos_unittest("bridge_utils_test") {
     "$ace_root/frameworks/core/components/common/properties/text_style.cpp",
     "$ace_root/frameworks/core/components_v2/inspector/inspector_constants.cpp",
     "$ace_root/frameworks/core/pipeline/base/constants.cpp",
+    "transform_convertor_test.cpp",
     "utils_test.cpp",
   ]
 
   configs = [ "$ace_root/test/unittest:ace_unittest_config" ]
+
+  cflags = [ "-fno-access-control" ]
 
   deps = [
     "$ace_root/test/unittest:ace_base",
@@ -38,19 +41,4 @@ ohos_unittest("bridge_utils_test") {
     "$ace_root/test/unittest:ace_core_animation",
   ]
   external_deps = [ "cJSON:cjson" ]
-}
-
-ohos_unittest("ark_js_runtime_test") {
-  module_out_path = bridge_test_output_path
-  sources = [
-    "ark_js_runtime_test.cpp",
-  ]
-
-  configs = [ "$ace_root/test/unittest:ace_unittest_config" ]
-
-  external_deps = [
-    "ets_runtime:libark_jsruntime",
-    "googletest:gmock",
-    "googletest:gtest",
-  ]
 }

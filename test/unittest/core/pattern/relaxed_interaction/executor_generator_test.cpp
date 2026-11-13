@@ -112,6 +112,15 @@ const std::string VALID_CONTENT_SWITCH_JSON = R"({
     }
 })";
 
+const std::string VALID_KEY_JSON = R"({
+    "cmd": {
+        "type": "key",
+        "action_info": {
+            "code": 2049
+        }
+    }
+})";
+
 const std::string VALID_FALLBACK_JSON = R"({
     "fallback_cmd": {
         "identity": "test_id",
@@ -275,6 +284,16 @@ HWTEST_F(ExecutorGeneratorParseRegularCmdTest, ParseRegularCmd_TapType, TestSize
     // Tap always creates SmartGestureExecutor, may add StrictClickExecutor depending on context
     EXPECT_GE(result.size(), EXPECTED_SINGLE_EXECUTOR_COUNT);
     EXPECT_EQ(result[0]->GetType(), "smart_gesture");
+}
+
+HWTEST_F(ExecutorGeneratorParseRegularCmdTest, ParseInjectionCommand_KeyDoesNotChangeLegacyParser, TestSize.Level1)
+{
+    ExecutorGenerator generator(mockPipelineContext_);
+    auto json = JsonUtil::ParseJsonString(VALID_KEY_JSON);
+    EXPECT_TRUE(generator.ParseCommand(json).empty());
+    auto result = generator.ParseInjectionCommand(json);
+    ASSERT_EQ(result.size(), EXPECTED_SINGLE_EXECUTOR_COUNT);
+    EXPECT_EQ(result[0]->GetType(), KEY);
 }
 
 HWTEST_F(ExecutorGeneratorParseRegularCmdTest, ParseRegularCmd_SlideType, TestSize.Level1)

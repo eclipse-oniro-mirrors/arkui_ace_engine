@@ -17,9 +17,9 @@ import { eq, neq, gt, lt, ITestFile } from '../lib/testRunner';
 
 // 声明环境属性值接口
 declare interface IEnvironmentValue<T> {
-  get(): T;
-  subscribe(callback: (value: T) => void): void;
-  unsubscribe(): void;
+  value: T;
+  update(newValue: T): void;
+  destroy(): void;
 }
 
 // 声明窗口大小布局断点类型
@@ -31,8 +31,8 @@ declare interface WindowSizeLayoutBreakpoint {
 
 // 声明窗口大小VP环境类型
 declare interface WindowSizeVpEnv {
-  width: number;
-  height: number;
+  widthVp: number;
+  heightVp: number;
 }
 
 // 声明窗口大小PX环境类型
@@ -41,20 +41,57 @@ declare interface WindowSizePxEnv {
   height: number;
 }
 
-// 声明窗口避让区域VP环境类型
-declare interface WindowAvoidAreaVpEnv {
+// 声明矩形类型
+declare interface Rect {
   left: number;
   top: number;
-  right: number;
-  bottom: number;
+  width: number;
+  height: number;
+}
+
+// 声明避让区域类型
+declare interface AvoidArea {
+  visible: boolean;
+  leftRect: Rect;
+  topRect: Rect;
+  rightRect: Rect;
+  bottomRect: Rect;
+}
+
+// 声明窗口避让区域VP环境类型
+declare interface WindowAvoidAreaVpEnv {
+  statusBar: AvoidArea;
+  cutout: AvoidArea;
+  keyboard: AvoidArea;
+  navigationIndicator: AvoidArea;
 }
 
 // 声明窗口避让区域PX环境类型
 declare interface WindowAvoidAreaPxEnv {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
+  statusBar: AvoidArea;
+  cutout: AvoidArea;
+  keyboard: AvoidArea;
+  navigationIndicator: AvoidArea;
+}
+
+// 声明窗口焦点环境类型
+declare interface WindowFocusedEnv {
+  isFocused: boolean;
+}
+
+// 声明窗口高亮环境类型
+declare interface WindowHighlightedEnv {
+  isHighlighted: boolean;
+}
+
+// 声明系统密度环境类型
+declare interface SystemDensityEnv {
+  systemDensity: number;
+}
+
+// 声明显示ID环境类型
+declare interface DisplayIdEnv {
+  displayId: number;
 }
 
 // 声明UI上下文类型
@@ -91,6 +128,10 @@ declare interface EnvTypeMap {
   'system.window.size.px': WindowSizePxEnv;
   'system.window.avoidarea': WindowAvoidAreaVpEnv;
   'system.window.avoidarea.px': WindowAvoidAreaPxEnv;
+  'system.window.focused': WindowFocusedEnv;
+  'system.window.highlighted': WindowHighlightedEnv;
+  'system.window.density.system': SystemDensityEnv;
+  'system.window.displayid': DisplayIdEnv;
 }
 
 // 声明源文件中的工厂映射类型
@@ -100,6 +141,42 @@ declare type EnvFactoryMap = {
 
 // 声明源文件中的工厂映射常量
 declare const envFactoryMap: EnvFactoryMap;
+
+// ============================================================================
+// 测试辅助函数：构造避让区域相关数据
+// ============================================================================
+
+function makeRect(left: number = 0, top: number = 0, width: number = 0, height: number = 0): Rect {
+  return { left: left, top: top, width: width, height: height };
+}
+
+function makeAvoidArea(topHeight: number = 0, bottomHeight: number = 0): AvoidArea {
+  return {
+    visible: topHeight > 0 || bottomHeight > 0,
+    leftRect: makeRect(),
+    topRect: makeRect(0, 0, 0, topHeight),
+    rightRect: makeRect(),
+    bottomRect: makeRect(0, 0, 0, bottomHeight)
+  };
+}
+
+function makeAvoidAreaVpEnv(statusBarHeight: number = 0, bottomHeight: number = 0): WindowAvoidAreaVpEnv {
+  return {
+    statusBar: makeAvoidArea(statusBarHeight),
+    cutout: makeAvoidArea(),
+    keyboard: makeAvoidArea(0, bottomHeight),
+    navigationIndicator: makeAvoidArea()
+  };
+}
+
+function makeAvoidAreaPxEnv(statusBarHeight: number = 0, bottomHeight: number = 0): WindowAvoidAreaPxEnv {
+  return {
+    statusBar: makeAvoidArea(statusBarHeight),
+    cutout: makeAvoidArea(),
+    keyboard: makeAvoidArea(0, bottomHeight),
+    navigationIndicator: makeAvoidArea()
+  };
+}
 
 // ============================================================================
 // 3. 测试 Fixture 类
@@ -131,38 +208,23 @@ class MockUIContext {
 
 // 模拟环境值测试类
 class MockEnvironmentValue<T> implements IEnvironmentValue<T> {
-  private value: T;
-  private subscribers: Array<(value: T) => void> = [];
+  value: T;
 
   constructor(value: T) {
     this.value = value;
   }
 
-  public get(): T {
-    return this.value;
+  public update(newValue: T): void {
+    this.value = newValue;
   }
 
-  public set(value: T): void {
-    this.value = value;
-    this.notify();
-  }
-
-  public subscribe(callback: (value: T) => void): void {
-    this.subscribers.push(callback);
-  }
-
-  public unsubscribe(): void {
-    this.subscribers = [];
-  }
-
-  private notify(): void {
-    this.subscribers.forEach(callback => callback(this.value));
+  public destroy(): void {
   }
 }
 
 // 模拟窗口大小布局断点测试类
 class MockWindowSizeLayoutBreakpoint implements IEnvironmentValue<WindowSizeLayoutBreakpoint> {
-  private value: WindowSizeLayoutBreakpoint = {
+  value: WindowSizeLayoutBreakpoint = {
     width: 0,
     height: 0,
     breakpoint: 'md'
@@ -176,47 +238,39 @@ class MockWindowSizeLayoutBreakpoint implements IEnvironmentValue<WindowSizeLayo
     };
   }
 
-  public get(): WindowSizeLayoutBreakpoint {
-    return this.value;
+  public update(newValue: WindowSizeLayoutBreakpoint): void {
+    this.value = newValue;
   }
 
-  public subscribe(callback: (value: WindowSizeLayoutBreakpoint) => void): void {
-    callback(this.value);
-  }
-
-  public unsubscribe(): void {
+  public destroy(): void {
   }
 }
 
 // 模拟窗口大小VP环境测试类
 class MockWindowSizeVpEnv implements IEnvironmentValue<WindowSizeVpEnv> {
-  private value: WindowSizeVpEnv = {
-    width: 0,
-    height: 0
+  value: WindowSizeVpEnv = {
+    widthVp: 0,
+    heightVp: 0
   };
 
   constructor(context: UIContext) {
     this.value = {
-      width: 1080,
-      height: 2340
+      widthVp: 1080,
+      heightVp: 2340
     };
   }
 
-  public get(): WindowSizeVpEnv {
-    return this.value;
+  public update(newValue: WindowSizeVpEnv): void {
+    this.value = newValue;
   }
 
-  public subscribe(callback: (value: WindowSizeVpEnv) => void): void {
-    callback(this.value);
-  }
-
-  public unsubscribe(): void {
+  public destroy(): void {
   }
 }
 
 // 模拟窗口大小PX环境测试类
 class MockWindowSizePxEnv implements IEnvironmentValue<WindowSizePxEnv> {
-  private value: WindowSizePxEnv = {
+  value: WindowSizePxEnv = {
     width: 0,
     height: 0
   };
@@ -228,75 +282,43 @@ class MockWindowSizePxEnv implements IEnvironmentValue<WindowSizePxEnv> {
     };
   }
 
-  public get(): WindowSizePxEnv {
-    return this.value;
+  public update(newValue: WindowSizePxEnv): void {
+    this.value = newValue;
   }
 
-  public subscribe(callback: (value: WindowSizePxEnv) => void): void {
-    callback(this.value);
-  }
-
-  public unsubscribe(): void {
+  public destroy(): void {
   }
 }
 
 // 模拟窗口避让区域VP环境测试类
 class MockWindowAvoidAreaVpEnv implements IEnvironmentValue<WindowAvoidAreaVpEnv> {
-  private value: WindowAvoidAreaVpEnv = {
-    left: 0,
-    top: 0,
-    right: 0,
-    bottom: 0
-  };
+  value: WindowAvoidAreaVpEnv = makeAvoidAreaVpEnv(0);
 
   constructor(context: UIContext) {
-    this.value = {
-      left: 0,
-      top: 100,
-      right: 0,
-      bottom: 0
-    };
+    this.value = makeAvoidAreaVpEnv(100);
   }
 
-  public get(): WindowAvoidAreaVpEnv {
-    return this.value;
+  public update(newValue: WindowAvoidAreaVpEnv): void {
+    this.value = newValue;
   }
 
-  public subscribe(callback: (value: WindowAvoidAreaVpEnv) => void): void {
-    callback(this.value);
-  }
-
-  public unsubscribe(): void {
+  public destroy(): void {
   }
 }
 
 // 模拟窗口避让区域PX环境测试类
 class MockWindowAvoidAreaPxEnv implements IEnvironmentValue<WindowAvoidAreaPxEnv> {
-  private value: WindowAvoidAreaPxEnv = {
-    left: 0,
-    top: 0,
-    right: 0,
-    bottom: 0
-  };
+  value: WindowAvoidAreaPxEnv = makeAvoidAreaPxEnv(0);
 
   constructor(context: UIContext) {
-    this.value = {
-      left: 0,
-      top: 100,
-      right: 0,
-      bottom: 0
-    };
+    this.value = makeAvoidAreaPxEnv(100);
   }
 
-  public get(): WindowAvoidAreaPxEnv {
-    return this.value;
+  public update(newValue: WindowAvoidAreaPxEnv): void {
+    this.value = newValue;
   }
 
-  public subscribe(callback: (value: WindowAvoidAreaPxEnv) => void): void {
-    callback(this.value);
-  }
-
-  public unsubscribe(): void {
+  public destroy(): void {
   }
 }
 
@@ -308,25 +330,15 @@ class AllEnvProperties {
     breakpoint: 'lg'
   };
   windowSizeVp: WindowSizeVpEnv = {
-    width: 1080,
-    height: 2340
+    widthVp: 1080,
+    heightVp: 2340
   };
   windowSizePx: WindowSizePxEnv = {
     width: 1080,
     height: 2340
   };
-  avoidAreaVp: WindowAvoidAreaVpEnv = {
-    left: 0,
-    top: 100,
-    right: 0,
-    bottom: 0
-  };
-  avoidAreaPx: WindowAvoidAreaPxEnv = {
-    left: 0,
-    top: 100,
-    right: 0,
-    bottom: 0
-  };
+  avoidAreaVp: WindowAvoidAreaVpEnv = makeAvoidAreaVpEnv(100);
+  avoidAreaPx: WindowAvoidAreaPxEnv = makeAvoidAreaPxEnv(100);
 }
 
 // 空环境属性测试类
@@ -355,25 +367,15 @@ class SpecialEnvProperties {
     breakpoint: 'sm'
   };
   windowSizeVp: WindowSizeVpEnv = {
-    width: -1,
-    height: -1
+    widthVp: -1,
+    heightVp: -1
   };
   windowSizePx: WindowSizePxEnv = {
     width: Number.MAX_SAFE_INTEGER,
     height: Number.MIN_SAFE_INTEGER
   };
-  avoidAreaVp: WindowAvoidAreaVpEnv = {
-    left: NaN,
-    top: Infinity,
-    right: -Infinity,
-    bottom: 0
-  };
-  avoidAreaPx: WindowAvoidAreaPxEnv = {
-    left: 0,
-    top: 0,
-    right: 0,
-    bottom: 0
-  };
+  avoidAreaVp: WindowAvoidAreaVpEnv = makeAvoidAreaVpEnv(NaN);
+  avoidAreaPx: WindowAvoidAreaPxEnv = makeAvoidAreaPxEnv(0);
 }
 
 // ============================================================================
@@ -591,35 +593,30 @@ export class EnvFactoryTests implements ITestFile {
   public testEnvironmentValueGet(): void {
     // 测试环境值获取
     const mockValue = new MockEnvironmentValue<number>(42);
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, 42, 'Environment value get should return correct value');
   }
 
   public testEnvironmentValueUnsubscribe(): void {
-    // 测试环境值取消订阅
+    // 测试环境值销毁
     const mockValue = new MockEnvironmentValue<number>(42);
-    mockValue.subscribe((value) => {});
-    mockValue.unsubscribe();
-    eq(true, true, 'Unsubscribe should complete without error');
+    mockValue.destroy();
+    eq(true, true, 'Destroy should complete without error');
   }
 
   public testEnvironmentValueSet(): void {
     // 测试环境值设置
     const mockValue = new MockEnvironmentValue<number>(42);
-    mockValue.set(100);
-    const result = mockValue.get();
+    mockValue.update(100);
+    const result = mockValue.value;
     eq(result, 100, 'Environment value set should update value');
   }
 
   public testEnvironmentValueNotify(): void {
-    // 测试环境值通知
+    // 测试环境值更新
     const mockValue = new MockEnvironmentValue<number>(42);
-    let notifiedValue = 0;
-    mockValue.subscribe((value) => {
-      notifiedValue = value;
-    });
-    mockValue.set(100);
-    eq(notifiedValue, 100, 'Notify should update subscribers');
+    mockValue.update(100);
+    eq(mockValue.value, 100, 'Update should change value');
   }
 
   // -------------------------------------------------------------------------
@@ -665,7 +662,7 @@ export class EnvFactoryTests implements ITestFile {
   public testWindowSizeLayoutBreakpointCreation(): void {
     // 测试窗口大小布局断点创建
     const breakpoint = new MockWindowSizeLayoutBreakpoint(this.mockContext);
-    const result = breakpoint.get();
+    const result = breakpoint.value;
     eq(result.width > 0, true, 'Breakpoint width should be positive');
     eq(result.height > 0, true, 'Breakpoint height should be positive');
   }
@@ -673,21 +670,17 @@ export class EnvFactoryTests implements ITestFile {
   public testWindowSizeLayoutBreakpointValues(): void {
     // 测试窗口大小布局断点值
     const breakpoint = new MockWindowSizeLayoutBreakpoint(this.mockContext);
-    const result = breakpoint.get();
+    const result = breakpoint.value;
     eq(result.breakpoint === 'sm' || result.breakpoint === 'md' ||
       result.breakpoint === 'lg' || result.breakpoint === 'xl', true,
       'Breakpoint should be valid');
   }
 
   public testWindowSizeLayoutBreakpointSubscribe(): void {
-    // 测试窗口大小布局断点订阅
+    // 测试窗口大小布局断点更新
     const breakpoint = new MockWindowSizeLayoutBreakpoint(this.mockContext);
-    let callbackCalled = false;
-    breakpoint.subscribe((value) => {
-      callbackCalled = true;
-      eq(value.width > 0, true, 'Callback should receive valid width');
-    });
-    eq(callbackCalled, true, 'Subscribe callback should be called');
+    breakpoint.update({ width: 1920, height: 1080, breakpoint: 'xl' });
+    eq(breakpoint.value.width, 1920, 'Update should change breakpoint width');
   }
 
   // -------------------------------------------------------------------------
@@ -697,28 +690,24 @@ export class EnvFactoryTests implements ITestFile {
   public testWindowSizeVpEnvCreation(): void {
     // 测试窗口大小VP环境创建
     const env = new MockWindowSizeVpEnv(this.mockContext);
-    const result = env.get();
-    eq(result.width > 0, true, 'VP width should be positive');
-    eq(result.height > 0, true, 'VP height should be positive');
+    const result = env.value;
+    eq(result.widthVp > 0, true, 'VP width should be positive');
+    eq(result.heightVp > 0, true, 'VP height should be positive');
   }
 
   public testWindowSizeVpEnvValues(): void {
     // 测试窗口大小VP环境值
     const env = new MockWindowSizeVpEnv(this.mockContext);
-    const result = env.get();
-    eq(typeof result.width, 'number', 'VP width should be number');
-    eq(typeof result.height, 'number', 'VP height should be number');
+    const result = env.value;
+    eq(typeof result.widthVp, 'number', 'VP width should be number');
+    eq(typeof result.heightVp, 'number', 'VP height should be number');
   }
 
   public testWindowSizeVpEnvSubscribe(): void {
-    // 测试窗口大小VP环境订阅
+    // 测试窗口大小VP环境更新
     const env = new MockWindowSizeVpEnv(this.mockContext);
-    let callbackCalled = false;
-    env.subscribe((value) => {
-      callbackCalled = true;
-      eq(value.width > 0, true, 'Callback should receive valid width');
-    });
-    eq(callbackCalled, true, 'Subscribe callback should be called');
+    env.update({ widthVp: 2000, heightVp: 3000 });
+    eq(env.value.widthVp, 2000, 'Update should change widthVp');
   }
 
   // -------------------------------------------------------------------------
@@ -728,7 +717,7 @@ export class EnvFactoryTests implements ITestFile {
   public testWindowSizePxEnvCreation(): void {
     // 测试窗口大小PX环境创建
     const env = new MockWindowSizePxEnv(this.mockContext);
-    const result = env.get();
+    const result = env.value;
     eq(result.width > 0, true, 'PX width should be positive');
     eq(result.height > 0, true, 'PX height should be positive');
   }
@@ -736,20 +725,16 @@ export class EnvFactoryTests implements ITestFile {
   public testWindowSizePxEnvValues(): void {
     // 测试窗口大小PX环境值
     const env = new MockWindowSizePxEnv(this.mockContext);
-    const result = env.get();
+    const result = env.value;
     eq(typeof result.width, 'number', 'PX width should be number');
     eq(typeof result.height, 'number', 'PX height should be number');
   }
 
   public testWindowSizePxEnvSubscribe(): void {
-    // 测试窗口大小PX环境订阅
+    // 测试窗口大小PX环境更新
     const env = new MockWindowSizePxEnv(this.mockContext);
-    let callbackCalled = false;
-    env.subscribe((value) => {
-      callbackCalled = true;
-      eq(value.width > 0, true, 'Callback should receive valid width');
-    });
-    eq(callbackCalled, true, 'Subscribe callback should be called');
+    env.update({ width: 2000, height: 3000 });
+    eq(env.value.width, 2000, 'Update should change width');
   }
 
   // -------------------------------------------------------------------------
@@ -759,32 +744,28 @@ export class EnvFactoryTests implements ITestFile {
   public testWindowAvoidAreaVpEnvCreation(): void {
     // 测试窗口避让区域VP环境创建
     const env = new MockWindowAvoidAreaVpEnv(this.mockContext);
-    const result = env.get();
-    eq(typeof result.left, 'number', 'VP left should be number');
-    eq(typeof result.top, 'number', 'VP top should be number');
-    eq(typeof result.right, 'number', 'VP right should be number');
-    eq(typeof result.bottom, 'number', 'VP bottom should be number');
+    const result = env.value;
+    eq(typeof result.statusBar, 'object', 'VP statusBar should be object');
+    eq(typeof result.cutout, 'object', 'VP cutout should be object');
+    eq(typeof result.keyboard, 'object', 'VP keyboard should be object');
+    eq(typeof result.navigationIndicator, 'object', 'VP navigationIndicator should be object');
   }
 
   public testWindowAvoidAreaVpEnvValues(): void {
     // 测试窗口避让区域VP环境值
     const env = new MockWindowAvoidAreaVpEnv(this.mockContext);
-    const result = env.get();
-    eq(result.left >= 0, true, 'VP left should be non-negative');
-    eq(result.top >= 0, true, 'VP top should be non-negative');
-    eq(result.right >= 0, true, 'VP right should be non-negative');
-    eq(result.bottom >= 0, true, 'VP bottom should be non-negative');
+    const result = env.value;
+    eq(result.statusBar.topRect.height >= 0, true, 'VP statusBar top height should be non-negative');
+    eq(result.keyboard.bottomRect.height >= 0, true, 'VP keyboard bottom height should be non-negative');
+    eq(result.cutout.leftRect.width >= 0, true, 'VP cutout left width should be non-negative');
+    eq(result.navigationIndicator.bottomRect.height >= 0, true, 'VP navigationIndicator bottom height should be non-negative');
   }
 
   public testWindowAvoidAreaVpEnvSubscribe(): void {
-    // 测试窗口避让区域VP环境订阅
+    // 测试窗口避让区域VP环境更新
     const env = new MockWindowAvoidAreaVpEnv(this.mockContext);
-    let callbackCalled = false;
-    env.subscribe((value) => {
-      callbackCalled = true;
-      eq(typeof value.top, 'number', 'Callback should receive valid top');
-    });
-    eq(callbackCalled, true, 'Subscribe callback should be called');
+    env.update(makeAvoidAreaVpEnv(200));
+    eq(env.value.statusBar.topRect.height, 200, 'Update should change statusBar height');
   }
 
   // -------------------------------------------------------------------------
@@ -794,32 +775,28 @@ export class EnvFactoryTests implements ITestFile {
   public testWindowAvoidAreaPxEnvCreation(): void {
     // 测试窗口避让区域PX环境创建
     const env = new MockWindowAvoidAreaPxEnv(this.mockContext);
-    const result = env.get();
-    eq(typeof result.left, 'number', 'PX left should be number');
-    eq(typeof result.top, 'number', 'PX top should be number');
-    eq(typeof result.right, 'number', 'PX right should be number');
-    eq(typeof result.bottom, 'number', 'PX bottom should be number');
+    const result = env.value;
+    eq(typeof result.statusBar, 'object', 'PX statusBar should be object');
+    eq(typeof result.cutout, 'object', 'PX cutout should be object');
+    eq(typeof result.keyboard, 'object', 'PX keyboard should be object');
+    eq(typeof result.navigationIndicator, 'object', 'PX navigationIndicator should be object');
   }
 
   public testWindowAvoidAreaPxEnvValues(): void {
     // 测试窗口避让区域PX环境值
     const env = new MockWindowAvoidAreaPxEnv(this.mockContext);
-    const result = env.get();
-    eq(result.left >= 0, true, 'PX left should be non-negative');
-    eq(result.top >= 0, true, 'PX top should be non-negative');
-    eq(result.right >= 0, true, 'PX right should be non-negative');
-    eq(result.bottom >= 0, true, 'PX bottom should be non-negative');
+    const result = env.value;
+    eq(result.statusBar.topRect.height >= 0, true, 'PX statusBar top height should be non-negative');
+    eq(result.keyboard.bottomRect.height >= 0, true, 'PX keyboard bottom height should be non-negative');
+    eq(result.cutout.leftRect.width >= 0, true, 'PX cutout left width should be non-negative');
+    eq(result.navigationIndicator.bottomRect.height >= 0, true, 'PX navigationIndicator bottom height should be non-negative');
   }
 
   public testWindowAvoidAreaPxEnvSubscribe(): void {
-    // 测试窗口避让区域PX环境订阅
+    // 测试窗口避让区域PX环境更新
     const env = new MockWindowAvoidAreaPxEnv(this.mockContext);
-    let callbackCalled = false;
-    env.subscribe((value) => {
-      callbackCalled = true;
-      eq(typeof value.top, 'number', 'Callback should receive valid top');
-    });
-    eq(callbackCalled, true, 'Subscribe callback should be called');
+    env.update(makeAvoidAreaPxEnv(200));
+    eq(env.value.statusBar.topRect.height, 200, 'Update should change statusBar height');
   }
 
   // =========================================================================
@@ -855,32 +832,32 @@ export class EnvFactoryTests implements ITestFile {
   public testEdgeCaseZeroWidth(): void {
     // 测试零宽度
     const mockValue = new MockEnvironmentValue<WindowSizeVpEnv>({
-      width: 0,
-      height: 100
+      widthVp: 0,
+      heightVp: 100
     });
-    const result = mockValue.get();
-    eq(result.width, 0, 'Zero width should be preserved');
+    const result = mockValue.value;
+    eq(result.widthVp, 0, 'Zero width should be preserved');
   }
 
   public testEdgeCaseZeroHeight(): void {
     // 测试零高度
     const mockValue = new MockEnvironmentValue<WindowSizeVpEnv>({
-      width: 100,
-      height: 0
+      widthVp: 100,
+      heightVp: 0
     });
-    const result = mockValue.get();
-    eq(result.height, 0, 'Zero height should be preserved');
+    const result = mockValue.value;
+    eq(result.heightVp, 0, 'Zero height should be preserved');
   }
 
   public testEdgeCaseNegativeValues(): void {
     // 测试负值
     const mockValue = new MockEnvironmentValue<WindowSizeVpEnv>({
-      width: -100,
-      height: -200
+      widthVp: -100,
+      heightVp: -200
     });
-    const result = mockValue.get();
-    eq(result.width, -100, 'Negative width should be preserved');
-    eq(result.height, -200, 'Negative height should be preserved');
+    const result = mockValue.value;
+    eq(result.widthVp, -100, 'Negative width should be preserved');
+    eq(result.heightVp, -200, 'Negative height should be preserved');
   }
 
   // -------------------------------------------------------------------------
@@ -890,43 +867,43 @@ export class EnvFactoryTests implements ITestFile {
   public testEdgeCaseMaxSafeInteger(): void {
     // 测试最大安全整数
     const mockValue = new MockEnvironmentValue<WindowSizeVpEnv>({
-      width: Number.MAX_SAFE_INTEGER,
-      height: Number.MAX_SAFE_INTEGER
+      widthVp: Number.MAX_SAFE_INTEGER,
+      heightVp: Number.MAX_SAFE_INTEGER
     });
-    const result = mockValue.get();
-    eq(result.width, Number.MAX_SAFE_INTEGER, 'Max safe integer should be preserved');
+    const result = mockValue.value;
+    eq(result.widthVp, Number.MAX_SAFE_INTEGER, 'Max safe integer should be preserved');
   }
 
   public testEdgeCaseMinSafeInteger(): void {
     // 测试最小安全整数
     const mockValue = new MockEnvironmentValue<WindowSizeVpEnv>({
-      width: Number.MIN_SAFE_INTEGER,
-      height: Number.MIN_SAFE_INTEGER
+      widthVp: Number.MIN_SAFE_INTEGER,
+      heightVp: Number.MIN_SAFE_INTEGER
     });
-    const result = mockValue.get();
-    eq(result.width, Number.MIN_SAFE_INTEGER, 'Min safe integer should be preserved');
+    const result = mockValue.value;
+    eq(result.widthVp, Number.MIN_SAFE_INTEGER, 'Min safe integer should be preserved');
   }
 
   public testEdgeCaseInfinity(): void {
     // 测试无穷大
     const mockValue = new MockEnvironmentValue<WindowSizeVpEnv>({
-      width: Infinity,
-      height: -Infinity
+      widthVp: Infinity,
+      heightVp: -Infinity
     });
-    const result = mockValue.get();
-    eq(result.width, Infinity, 'Infinity should be preserved');
-    eq(result.height, -Infinity, 'Negative infinity should be preserved');
+    const result = mockValue.value;
+    eq(result.widthVp, Infinity, 'Infinity should be preserved');
+    eq(result.heightVp, -Infinity, 'Negative infinity should be preserved');
   }
 
   public testEdgeCaseNaN(): void {
     // 测试NaN
     const mockValue = new MockEnvironmentValue<WindowSizeVpEnv>({
-      width: NaN,
-      height: NaN
+      widthVp: NaN,
+      heightVp: NaN
     });
-    const result = mockValue.get();
-    eq(isNaN(result.width), true, 'NaN should be preserved');
-    eq(isNaN(result.height), true, 'NaN should be preserved');
+    const result = mockValue.value;
+    eq(isNaN(result.widthVp), true, 'NaN should be preserved');
+    eq(isNaN(result.heightVp), true, 'NaN should be preserved');
   }
 
   // -------------------------------------------------------------------------
@@ -962,7 +939,7 @@ export class EnvFactoryTests implements ITestFile {
       height: 480,
       breakpoint: 'sm'
     });
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result.breakpoint, 'sm', 'SM breakpoint should be preserved');
   }
 
@@ -973,7 +950,7 @@ export class EnvFactoryTests implements ITestFile {
       height: 1024,
       breakpoint: 'md'
     });
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result.breakpoint, 'md', 'MD breakpoint should be preserved');
   }
 
@@ -984,7 +961,7 @@ export class EnvFactoryTests implements ITestFile {
       height: 1366,
       breakpoint: 'lg'
     });
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result.breakpoint, 'lg', 'LG breakpoint should be preserved');
   }
 
@@ -995,7 +972,7 @@ export class EnvFactoryTests implements ITestFile {
       height: 2560,
       breakpoint: 'xl'
     });
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result.breakpoint, 'xl', 'XL breakpoint should be preserved');
   }
 
@@ -1005,56 +982,36 @@ export class EnvFactoryTests implements ITestFile {
 
   public testEdgeCaseAvoidAreaAllZero(): void {
     // 测试全零避让区域
-    const mockValue = new MockEnvironmentValue<WindowAvoidAreaVpEnv>({
-      left: 0,
-      top: 0,
-      right: 0,
-      bottom: 0
-    });
-    const result = mockValue.get();
-    eq(result.left, 0, 'Zero left should be preserved');
-    eq(result.top, 0, 'Zero top should be preserved');
-    eq(result.right, 0, 'Zero right should be preserved');
-    eq(result.bottom, 0, 'Zero bottom should be preserved');
+    const mockValue = new MockEnvironmentValue<WindowAvoidAreaVpEnv>(makeAvoidAreaVpEnv(0, 0));
+    const result = mockValue.value;
+    eq(result.statusBar.topRect.height, 0, 'Zero statusBar height should be preserved');
+    eq(result.keyboard.bottomRect.height, 0, 'Zero keyboard height should be preserved');
+    eq(result.cutout.leftRect.width, 0, 'Zero cutout width should be preserved');
+    eq(result.navigationIndicator.bottomRect.height, 0, 'Zero navigationIndicator height should be preserved');
   }
 
   public testEdgeCaseAvoidAreaOnlyTop(): void {
     // 测试仅顶部避让区域
-    const mockValue = new MockEnvironmentValue<WindowAvoidAreaVpEnv>({
-      left: 0,
-      top: 100,
-      right: 0,
-      bottom: 0
-    });
-    const result = mockValue.get();
-    eq(result.top, 100, 'Top only should be preserved');
+    const mockValue = new MockEnvironmentValue<WindowAvoidAreaVpEnv>(makeAvoidAreaVpEnv(100, 0));
+    const result = mockValue.value;
+    eq(result.statusBar.topRect.height, 100, 'Top only should be preserved');
   }
 
   public testEdgeCaseAvoidAreaOnlyBottom(): void {
     // 测试仅底部避让区域
-    const mockValue = new MockEnvironmentValue<WindowAvoidAreaVpEnv>({
-      left: 0,
-      top: 0,
-      right: 0,
-      bottom: 50
-    });
-    const result = mockValue.get();
-    eq(result.bottom, 50, 'Bottom only should be preserved');
+    const mockValue = new MockEnvironmentValue<WindowAvoidAreaVpEnv>(makeAvoidAreaVpEnv(0, 50));
+    const result = mockValue.value;
+    eq(result.keyboard.bottomRect.height, 50, 'Bottom only should be preserved');
   }
 
   public testEdgeCaseAvoidAreaAllSides(): void {
     // 测试四周避让区域
-    const mockValue = new MockEnvironmentValue<WindowAvoidAreaVpEnv>({
-      left: 10,
-      top: 20,
-      right: 30,
-      bottom: 40
-    });
-    const result = mockValue.get();
-    eq(result.left, 10, 'Left should be preserved');
-    eq(result.top, 20, 'Top should be preserved');
-    eq(result.right, 30, 'Right should be preserved');
-    eq(result.bottom, 40, 'Bottom should be preserved');
+    const mockValue = new MockEnvironmentValue<WindowAvoidAreaVpEnv>(makeAvoidAreaVpEnv(20, 40));
+    const result = mockValue.value;
+    eq(result.statusBar.topRect.height, 20, 'StatusBar top height should be preserved');
+    eq(result.keyboard.bottomRect.height, 40, 'Keyboard bottom height should be preserved');
+    eq(typeof result.cutout, 'object', 'Cutout should be object');
+    eq(typeof result.navigationIndicator, 'object', 'NavigationIndicator should be object');
   }
 
   // =========================================================================
@@ -1161,14 +1118,14 @@ export class EnvFactoryTests implements ITestFile {
   public testErrorFactoryReturnsNull(): void {
     // 测试工厂返回null
     const mockValue = new MockEnvironmentValue<WindowSizeVpEnv | null>(null);
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, null, 'Factory should handle null return value');
   }
 
   public testErrorFactoryReturnsUndefined(): void {
     // 测试工厂返回undefined
     const mockValue = new MockEnvironmentValue<WindowSizeVpEnv | undefined>(undefined);
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, undefined, 'Factory should handle undefined return value');
   }
 
@@ -1265,35 +1222,34 @@ export class EnvFactoryTests implements ITestFile {
     const iterations = 1000;
     const startTime = Date.now();
     for (let i = 0; i < iterations; i++) {
-      mockValue.get();
+      mockValue.value;
     }
     const duration = Date.now() - startTime;
     eq(duration < 100, true, 'Environment value get should be fast');
   }
 
   public testPerformanceEnvironmentValueSubscribe(): void {
-    // 测试环境值订阅性能
+    // 测试环境值更新性能
     const mockValue = new MockEnvironmentValue<number>(42);
     const iterations = 100;
     const startTime = Date.now();
     for (let i = 0; i < iterations; i++) {
-      mockValue.subscribe((value) => {});
+      mockValue.update(i);
     }
     const duration = Date.now() - startTime;
-    eq(duration < 100, true, 'Environment value subscribe should be fast');
+    eq(duration < 100, true, 'Environment value update should be fast');
   }
 
   public testPerformanceEnvironmentValueNotify(): void {
     // 测试环境值通知性能
     const mockValue = new MockEnvironmentValue<number>(42);
-    const iterations = 10;
-    for (let i = 0; i < iterations; i++) {
-      mockValue.subscribe((value) => {});
-    }
+    const iterations = 100;
     const startTime = Date.now();
-    mockValue.set(100);
+    for (let i = 0; i < iterations; i++) {
+      mockValue.update(i);
+    }
     const duration = Date.now() - startTime;
-    eq(duration < 100, true, 'Environment value notify should be fast');
+    eq(duration < 100, true, 'Environment value update should be fast');
   }
 
   // -------------------------------------------------------------------------
@@ -1375,25 +1331,25 @@ export class EnvFactoryTests implements ITestFile {
     // 测试IEnvironmentValue接口兼容性
     const mockValue = new MockEnvironmentValue<number>(42);
     const envValue: IEnvironmentValue<number> = mockValue;
-    eq(typeof envValue.get, 'function', 'IEnvironmentValue should have get method');
-    eq(typeof envValue.subscribe, 'function', 'IEnvironmentValue should have subscribe method');
-    eq(typeof envValue.unsubscribe, 'function', 'IEnvironmentValue should have unsubscribe method');
+    eq(typeof envValue.value, 'number', 'IEnvironmentValue should have value property');
+    eq(typeof envValue.update, 'function', 'IEnvironmentValue should have update method');
+    eq(typeof envValue.destroy, 'function', 'IEnvironmentValue should have destroy method');
   }
 
   public testCompatibilityWindowSizeTypes(): void {
     // 测试窗口大小类型兼容性
-    const vpEnv: WindowSizeVpEnv = { width: 100, height: 200 };
+    const vpEnv: WindowSizeVpEnv = { widthVp: 100, heightVp: 200 };
     const pxEnv: WindowSizePxEnv = { width: 100, height: 200 };
-    eq(typeof vpEnv.width, 'number', 'VP width should be number');
+    eq(typeof vpEnv.widthVp, 'number', 'VP width should be number');
     eq(typeof pxEnv.width, 'number', 'PX width should be number');
   }
 
   public testCompatibilityAvoidAreaTypes(): void {
     // 测试避让区域类型兼容性
-    const vpEnv: WindowAvoidAreaVpEnv = { left: 0, top: 10, right: 0, bottom: 0 };
-    const pxEnv: WindowAvoidAreaPxEnv = { left: 0, top: 10, right: 0, bottom: 0 };
-    eq(typeof vpEnv.top, 'number', 'VP top should be number');
-    eq(typeof pxEnv.top, 'number', 'PX top should be number');
+    const vpEnv: WindowAvoidAreaVpEnv = makeAvoidAreaVpEnv(10);
+    const pxEnv: WindowAvoidAreaPxEnv = makeAvoidAreaPxEnv(10);
+    eq(typeof vpEnv.statusBar, 'object', 'VP statusBar should be object');
+    eq(typeof pxEnv.statusBar, 'object', 'PX statusBar should be object');
   }
 
   // -------------------------------------------------------------------------
@@ -1459,22 +1415,22 @@ export class EnvFactoryTests implements ITestFile {
   public testCompatibilityLifecycleCreation(): void {
     // 测试生命周期创建
     const mockValue = new MockEnvironmentValue<number>(42);
-    eq(mockValue.get(), 42, 'Environment value should be created correctly');
+    eq(mockValue.value, 42, 'Environment value should be created correctly');
   }
 
   public testCompatibilityLifecycleUpdate(): void {
     // 测试生命周期更新
     const mockValue = new MockEnvironmentValue<number>(42);
-    mockValue.set(100);
-    eq(mockValue.get(), 100, 'Environment value should be updated correctly');
+    mockValue.update(100);
+    eq(mockValue.value, 100, 'Environment value should be updated correctly');
   }
 
   public testCompatibilityLifecycleUnsubscription(): void {
-    // 测试生命周期取消订阅
+    // 测试生命周期销毁
     const mockValue = new MockEnvironmentValue<number>(42);
-    mockValue.subscribe((value) => {});
-    mockValue.unsubscribe();
-    eq(true, true, 'Unsubscription should complete');
+    mockValue.update(100);
+    mockValue.destroy();
+    eq(true, true, 'Destroy should complete');
   }
 
   // -------------------------------------------------------------------------
@@ -1496,25 +1452,20 @@ export class EnvFactoryTests implements ITestFile {
   public testCompatibilityWindowSizeType(): void {
     // 测试窗口大小类型一致性
     const size: WindowSizeVpEnv = {
-      width: 1080,
-      height: 2340
+      widthVp: 1080,
+      heightVp: 2340
     };
-    eq(typeof size.width, 'number', 'Width should be number');
-    eq(typeof size.height, 'number', 'Height should be number');
+    eq(typeof size.widthVp, 'number', 'Width should be number');
+    eq(typeof size.heightVp, 'number', 'Height should be number');
   }
 
   public testCompatibilityAvoidAreaType(): void {
     // 测试避让区域类型一致性
-    const area: WindowAvoidAreaVpEnv = {
-      left: 0,
-      top: 100,
-      right: 0,
-      bottom: 0
-    };
-    eq(typeof area.left, 'number', 'Left should be number');
-    eq(typeof area.top, 'number', 'Top should be number');
-    eq(typeof area.right, 'number', 'Right should be number');
-    eq(typeof area.bottom, 'number', 'Bottom should be number');
+    const area: WindowAvoidAreaVpEnv = makeAvoidAreaVpEnv(100);
+    eq(typeof area.statusBar, 'object', 'StatusBar should be object');
+    eq(typeof area.cutout, 'object', 'Cutout should be object');
+    eq(typeof area.keyboard, 'object', 'Keyboard should be object');
+    eq(typeof area.navigationIndicator, 'object', 'NavigationIndicator should be object');
   }
 
   // -------------------------------------------------------------------------
@@ -1525,7 +1476,7 @@ export class EnvFactoryTests implements ITestFile {
     // 测试严格模式兼容性
     'use strict';
     const mockValue = new MockEnvironmentValue<number>(42);
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, 42, 'Should work in strict mode');
   }
 
@@ -1547,10 +1498,10 @@ export class EnvFactoryTests implements ITestFile {
 
   public testCompatibilityFrozenValue(): void {
     // 测试冻结值兼容性
-    const value = Object.freeze({ width: 100, height: 200 });
+    const value = Object.freeze({ widthVp: 100, heightVp: 200 });
     const mockValue = new MockEnvironmentValue<WindowSizeVpEnv>(value);
-    const result = mockValue.get();
-    eq(result.width, 100, 'Frozen value should be preserved');
+    const result = mockValue.value;
+    eq(result.widthVp, 100, 'Frozen value should be preserved');
   }
 
   // -------------------------------------------------------------------------
@@ -1571,10 +1522,10 @@ export class EnvFactoryTests implements ITestFile {
 
   public testCompatibilitySealedValue(): void {
     // 测试密封值兼容性
-    const value = Object.seal({ width: 100, height: 200 });
+    const value = Object.seal({ widthVp: 100, heightVp: 200 });
     const mockValue = new MockEnvironmentValue<WindowSizeVpEnv>(value);
-    const result = mockValue.get();
-    eq(result.width, 100, 'Sealed value should be preserved');
+    const result = mockValue.value;
+    eq(result.widthVp, 100, 'Sealed value should be preserved');
   }
 
   // =========================================================================
@@ -1591,7 +1542,7 @@ export class EnvFactoryTests implements ITestFile {
     const factory = envFactoryMap['system.arkui.breakpoint'];
     try {
       const envValue = factory(context);
-      const value = envValue.get();
+      const value = envValue.value;
       eq(value.width > 0, true, 'Breakpoint workflow should succeed');
     } catch (e) {
       eq(true, true, 'Breakpoint workflow may throw in test environment');
@@ -1604,8 +1555,8 @@ export class EnvFactoryTests implements ITestFile {
     const factory = envFactoryMap['system.window.size'];
     try {
       const envValue = factory(context);
-      const value = envValue.get();
-      eq(value.width > 0, true, 'Window size VP workflow should succeed');
+      const value = envValue.value;
+      eq(value.widthVp > 0, true, 'Window size VP workflow should succeed');
     } catch (e) {
       eq(true, true, 'Window size VP workflow may throw in test environment');
     }
@@ -1617,7 +1568,7 @@ export class EnvFactoryTests implements ITestFile {
     const factory = envFactoryMap['system.window.size.px'];
     try {
       const envValue = factory(context);
-      const value = envValue.get();
+      const value = envValue.value;
       eq(value.width > 0, true, 'Window size PX workflow should succeed');
     } catch (e) {
       eq(true, true, 'Window size PX workflow may throw in test environment');
@@ -1630,8 +1581,8 @@ export class EnvFactoryTests implements ITestFile {
     const factory = envFactoryMap['system.window.avoidarea'];
     try {
       const envValue = factory(context);
-      const value = envValue.get();
-      eq(typeof value.top, 'number', 'Avoid area VP workflow should succeed');
+      const value = envValue.value;
+      eq(typeof value.statusBar, 'object', 'Avoid area VP workflow should succeed');
     } catch (e) {
       eq(true, true, 'Avoid area VP workflow may throw in test environment');
     }
@@ -1643,8 +1594,8 @@ export class EnvFactoryTests implements ITestFile {
     const factory = envFactoryMap['system.window.avoidarea.px'];
     try {
       const envValue = factory(context);
-      const value = envValue.get();
-      eq(typeof value.top, 'number', 'Avoid area PX workflow should succeed');
+      const value = envValue.value;
+      eq(typeof value.statusBar, 'object', 'Avoid area PX workflow should succeed');
     } catch (e) {
       eq(true, true, 'Avoid area PX workflow may throw in test environment');
     }
@@ -1655,23 +1606,12 @@ export class EnvFactoryTests implements ITestFile {
   // -------------------------------------------------------------------------
 
   public testMultiSubscriptionUpdate(): void {
-    // 测试更新时的多订阅
+    // 测试多次更新
     const mockValue = new MockEnvironmentValue<number>(42);
-    let lastValue1 = 0;
-    let lastValue2 = 0;
-
-    mockValue.subscribe((value) => {
-      lastValue1 = value;
-    });
-
-    mockValue.subscribe((value) => {
-      lastValue2 = value;
-    });
-
-    mockValue.set(100);
-
-    eq(lastValue1, 100, 'First subscription should receive updated value');
-    eq(lastValue2, 100, 'Second subscription should receive updated value');
+    mockValue.update(100);
+    eq(mockValue.value, 100, 'Value should be updated');
+    mockValue.update(200);
+    eq(mockValue.value, 200, 'Value should be updated again');
   }
 
   // -------------------------------------------------------------------------
@@ -1685,7 +1625,7 @@ export class EnvFactoryTests implements ITestFile {
       height: 768,
       breakpoint: 'lg'
     });
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result.width, 1024, 'Nested width should be preserved');
     eq(result.height, 768, 'Nested height should be preserved');
     eq(result.breakpoint, 'lg', 'Nested breakpoint should be preserved');
@@ -1694,27 +1634,20 @@ export class EnvFactoryTests implements ITestFile {
   public testNestedValueWindowSize(): void {
     // 测试嵌套窗口大小值
     const mockValue = new MockEnvironmentValue<WindowSizeVpEnv>({
-      width: 1080,
-      height: 2340
+      widthVp: 1080,
+      heightVp: 2340
     });
-    const result = mockValue.get();
-    eq(result.width, 1080, 'Nested width should be preserved');
-    eq(result.height, 2340, 'Nested height should be preserved');
+    const result = mockValue.value;
+    eq(result.widthVp, 1080, 'Nested width should be preserved');
+    eq(result.heightVp, 2340, 'Nested height should be preserved');
   }
 
   public testNestedValueAvoidArea(): void {
     // 测试嵌套避让区域值
-    const mockValue = new MockEnvironmentValue<WindowAvoidAreaVpEnv>({
-      left: 10,
-      top: 20,
-      right: 30,
-      bottom: 40
-    });
-    const result = mockValue.get();
-    eq(result.left, 10, 'Nested left should be preserved');
-    eq(result.top, 20, 'Nested top should be preserved');
-    eq(result.right, 30, 'Nested right should be preserved');
-    eq(result.bottom, 40, 'Nested bottom should be preserved');
+    const mockValue = new MockEnvironmentValue<WindowAvoidAreaVpEnv>(makeAvoidAreaVpEnv(20, 40));
+    const result = mockValue.value;
+    eq(result.statusBar.topRect.height, 20, 'Nested statusBar height should be preserved');
+    eq(result.keyboard.bottomRect.height, 40, 'Nested keyboard height should be preserved');
   }
 
   // -------------------------------------------------------------------------
@@ -1730,7 +1663,7 @@ export class EnvFactoryTests implements ITestFile {
       { width: 1920, height: 2560, breakpoint: 'xl' }
     ];
     const mockValue = new MockEnvironmentValue<WindowSizeLayoutBreakpoint[]>(breakpoints);
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result.length, 4, 'Array length should be preserved');
     eq(result[0].breakpoint, 'sm', 'First breakpoint should be sm');
     eq(result[3].breakpoint, 'xl', 'Last breakpoint should be xl');
@@ -1739,29 +1672,29 @@ export class EnvFactoryTests implements ITestFile {
   public testArrayValueWindowSizes(): void {
     // 测试窗口大小数组
     const sizes: WindowSizeVpEnv[] = [
-      { width: 1080, height: 2340 },
-      { width: 1920, height: 1080 },
-      { width: 2560, height: 1440 }
+      { widthVp: 1080, heightVp: 2340 },
+      { widthVp: 1920, heightVp: 1080 },
+      { widthVp: 2560, heightVp: 1440 }
     ];
     const mockValue = new MockEnvironmentValue<WindowSizeVpEnv[]>(sizes);
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result.length, 3, 'Array length should be preserved');
-    eq(result[0].width, 1080, 'First width should be 1080');
-    eq(result[2].height, 1440, 'Last height should be 1440');
+    eq(result[0].widthVp, 1080, 'First width should be 1080');
+    eq(result[2].heightVp, 1440, 'Last height should be 1440');
   }
 
   public testArrayValueAvoidAreas(): void {
     // 测试避让区域数组
     const areas: WindowAvoidAreaVpEnv[] = [
-      { left: 0, top: 100, right: 0, bottom: 0 },
-      { left: 0, top: 0, right: 0, bottom: 50 },
-      { left: 10, top: 20, right: 30, bottom: 40 }
+      makeAvoidAreaVpEnv(100),
+      makeAvoidAreaVpEnv(0, 50),
+      makeAvoidAreaVpEnv(20, 40)
     ];
     const mockValue = new MockEnvironmentValue<WindowAvoidAreaVpEnv[]>(areas);
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result.length, 3, 'Array length should be preserved');
-    eq(result[0].top, 100, 'First top should be 100');
-    eq(result[2].bottom, 40, 'Last bottom should be 40');
+    eq(result[0].statusBar.topRect.height, 100, 'First statusBar height should be 100');
+    eq(result[2].keyboard.bottomRect.height, 40, 'Last keyboard height should be 40');
   }
 
   // -------------------------------------------------------------------------
@@ -1772,10 +1705,10 @@ export class EnvFactoryTests implements ITestFile {
     // 测试包含所有属性的复杂对象
     const allProps = new AllEnvProperties();
     eq(allProps.breakpoint.width, 1024, 'Breakpoint width should be set');
-    eq(allProps.windowSizeVp.width, 1080, 'Window size VP width should be set');
+    eq(allProps.windowSizeVp.widthVp, 1080, 'Window size VP width should be set');
     eq(allProps.windowSizePx.width, 1080, 'Window size PX width should be set');
-    eq(allProps.avoidAreaVp.top, 100, 'Avoid area VP top should be set');
-    eq(allProps.avoidAreaPx.top, 100, 'Avoid area PX top should be set');
+    eq(allProps.avoidAreaVp.statusBar.topRect.height, 100, 'Avoid area VP statusBar height should be set');
+    eq(allProps.avoidAreaPx.statusBar.topRect.height, 100, 'Avoid area PX statusBar height should be set');
   }
 
   public testComplexObjectNullProperties(): void {
@@ -1792,9 +1725,9 @@ export class EnvFactoryTests implements ITestFile {
     // 测试包含特殊值的复杂对象
     const specialProps = new SpecialEnvProperties();
     eq(specialProps.breakpoint.width, 0, 'Special breakpoint width should be 0');
-    eq(specialProps.windowSizeVp.width, -1, 'Special window size VP width should be -1');
+    eq(specialProps.windowSizeVp.widthVp, -1, 'Special window size VP width should be -1');
     eq(specialProps.windowSizePx.width, Number.MAX_SAFE_INTEGER, 'Special window size PX width should be MAX_SAFE_INTEGER');
-    eq(isNaN(specialProps.avoidAreaVp.left), true, 'Special avoid area VP left should be NaN');
+    eq(isNaN(specialProps.avoidAreaVp.statusBar.topRect.height), true, 'Special avoid area VP statusBar height should be NaN');
   }
 
   // -------------------------------------------------------------------------
@@ -1802,51 +1735,34 @@ export class EnvFactoryTests implements ITestFile {
   // -------------------------------------------------------------------------
 
   public testUpdateNotifyBreakpoint(): void {
-    // 测试断点更新和通知
+    // 测试断点更新
     const mockValue = new MockEnvironmentValue<WindowSizeLayoutBreakpoint>({
       width: 1024,
       height: 768,
       breakpoint: 'lg'
     });
-    let notifiedValue: WindowSizeLayoutBreakpoint | null = null;
-    mockValue.subscribe((value) => {
-      notifiedValue = value;
-    });
-    mockValue.set({ width: 1920, height: 1080, breakpoint: 'xl' });
-    eq(notifiedValue?.width, 1920, 'Notified width should be updated');
-    eq(notifiedValue?.breakpoint, 'xl', 'Notified breakpoint should be updated');
+    mockValue.update({ width: 1920, height: 1080, breakpoint: 'xl' });
+    eq(mockValue.value.width, 1920, 'Updated width should be updated');
+    eq(mockValue.value.breakpoint, 'xl', 'Updated breakpoint should be updated');
   }
 
   public testUpdateNotifyWindowSize(): void {
-    // 测试窗口大小更新和通知
+    // 测试窗口大小更新
     const mockValue = new MockEnvironmentValue<WindowSizeVpEnv>({
-      width: 1080,
-      height: 2340
+      widthVp: 1080,
+      heightVp: 2340
     });
-    let notifiedValue: WindowSizeVpEnv | null = null;
-    mockValue.subscribe((value) => {
-      notifiedValue = value;
-    });
-    mockValue.set({ width: 1920, height: 1080 });
-    eq(notifiedValue?.width, 1920, 'Notified width should be updated');
-    eq(notifiedValue?.height, 1080, 'Notified height should be updated');
+    mockValue.update({ widthVp: 1920, heightVp: 1080 });
+    eq(mockValue.value.widthVp, 1920, 'Updated width should be updated');
+    eq(mockValue.value.heightVp, 1080, 'Updated height should be updated');
   }
 
   public testUpdateNotifyAvoidArea(): void {
-    // 测试避让区域更新和通知
-    const mockValue = new MockEnvironmentValue<WindowAvoidAreaVpEnv>({
-      left: 0,
-      top: 100,
-      right: 0,
-      bottom: 0
-    });
-    let notifiedValue: WindowAvoidAreaVpEnv | null = null;
-    mockValue.subscribe((value) => {
-      notifiedValue = value;
-    });
-    mockValue.set({ left: 0, top: 0, right: 0, bottom: 50 });
-    eq(notifiedValue?.top, 0, 'Notified top should be updated');
-    eq(notifiedValue?.bottom, 50, 'Notified bottom should be updated');
+    // 测试避让区域更新
+    const mockValue = new MockEnvironmentValue<WindowAvoidAreaVpEnv>(makeAvoidAreaVpEnv(100, 0));
+    mockValue.update(makeAvoidAreaVpEnv(0, 50));
+    eq(mockValue.value.statusBar.topRect.height, 0, 'Updated statusBar height should be 0');
+    eq(mockValue.value.keyboard.bottomRect.height, 50, 'Updated keyboard height should be 50');
   }
 
   // -------------------------------------------------------------------------
@@ -1875,7 +1791,7 @@ export class EnvFactoryTests implements ITestFile {
     try {
       const envValue1 = factory1(context);
       const envValue2 = factory2(context);
-      eq(envValue1 !== envValue2, true, 'Different types should create different instances');
+      eq((envValue1 as Object) !== (envValue2 as Object), true, 'Different types should create different instances');
     } catch (e) {
       eq(true, true, 'Factory may throw in test environment');
     }
@@ -1908,13 +1824,12 @@ export class EnvFactoryTests implements ITestFile {
   // -------------------------------------------------------------------------
 
   public testSubscriptionLifecycleMultipleUnsubscribe(): void {
-    // 测试多次取消订阅
+    // 测试多次销毁
     const mockValue = new MockEnvironmentValue<number>(42);
-    mockValue.subscribe((value) => {});
-    mockValue.unsubscribe();
-    mockValue.unsubscribe();
-    mockValue.unsubscribe();
-    eq(true, true, 'Multiple unsubscribe should not throw error');
+    mockValue.destroy();
+    mockValue.destroy();
+    mockValue.destroy();
+    eq(true, true, 'Multiple destroy should not throw error');
   }
 
   // -------------------------------------------------------------------------
@@ -1928,7 +1843,7 @@ export class EnvFactoryTests implements ITestFile {
       height: 768,
       breakpoint: 'lg'
     });
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(typeof result.width, 'number', 'Width should be number');
     eq(typeof result.height, 'number', 'Height should be number');
     eq(typeof result.breakpoint, 'string', 'Breakpoint should be string');
@@ -1937,33 +1852,28 @@ export class EnvFactoryTests implements ITestFile {
   public testTypeSafetyWindowSize(): void {
     // 测试窗口大小类型安全
     const mockValue = new MockEnvironmentValue<WindowSizeVpEnv>({
-      width: 1080,
-      height: 2340
+      widthVp: 1080,
+      heightVp: 2340
     });
-    const result = mockValue.get();
-    eq(typeof result.width, 'number', 'Width should be number');
-    eq(typeof result.height, 'number', 'Height should be number');
+    const result = mockValue.value;
+    eq(typeof result.widthVp, 'number', 'Width should be number');
+    eq(typeof result.heightVp, 'number', 'Height should be number');
   }
 
   public testTypeSafetyAvoidArea(): void {
     // 测试避让区域类型安全
-    const mockValue = new MockEnvironmentValue<WindowAvoidAreaVpEnv>({
-      left: 0,
-      top: 100,
-      right: 0,
-      bottom: 0
-    });
-    const result = mockValue.get();
-    eq(typeof result.left, 'number', 'Left should be number');
-    eq(typeof result.top, 'number', 'Top should be number');
-    eq(typeof result.right, 'number', 'Right should be number');
-    eq(typeof result.bottom, 'number', 'Bottom should be number');
+    const mockValue = new MockEnvironmentValue<WindowAvoidAreaVpEnv>(makeAvoidAreaVpEnv(100));
+    const result = mockValue.value;
+    eq(typeof result.statusBar, 'object', 'StatusBar should be object');
+    eq(typeof result.cutout, 'object', 'Cutout should be object');
+    eq(typeof result.keyboard, 'object', 'Keyboard should be object');
+    eq(typeof result.navigationIndicator, 'object', 'NavigationIndicator should be object');
   }
 
   public testTypeSafetyUnion(): void {
     // 测试联合类型安全
     const mockValue = new MockEnvironmentValue<WindowSizeVpEnv | null>(null);
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result === null, true, 'Union type should handle null');
   }
 
@@ -1978,7 +1888,7 @@ export class EnvFactoryTests implements ITestFile {
       largeArray.push(i);
     }
     const mockValue = new MockEnvironmentValue<number[]>(largeArray);
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result.length, 1000, 'Large应该被正确管理');
   }
 
@@ -1989,7 +1899,7 @@ export class EnvFactoryTests implements ITestFile {
       largeObject[`key${i}`] = `value${i}`;
     }
     const mockValue = new MockEnvironmentValue<any>(largeObject);
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(Object.keys(result).length, 100, 'Large object should be managed correctly');
   }
 
@@ -1997,9 +1907,9 @@ export class EnvFactoryTests implements ITestFile {
     // 测试内存重用
     const mockValue = new MockEnvironmentValue<number>(42);
     for (let i = 0; i < 1000; i++) {
-      mockValue.set(i);
+      mockValue.update(i);
     }
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, 999, 'Value should be updated correctly after many updates');
   }
 
@@ -2012,7 +1922,7 @@ export class EnvFactoryTests implements ITestFile {
     const mockValue = new MockEnvironmentValue<number>(42);
     const results: number[] = [];
     for (let i = 0; i < 100; i++) {
-      results.push(mockValue.get());
+      results.push(mockValue.value);
     }
     eq(results.length, 100, 'All get operations should succeed');
     eq(results.every(r => r === 42), true, 'All results should be consistent');
@@ -2022,9 +1932,9 @@ export class EnvFactoryTests implements ITestFile {
     // 测试并发多次设置
     const mockValue = new MockEnvironmentValue<number>(0);
     for (let i = 0; i < 100; i++) {
-      mockValue.set(i);
+      mockValue.update(i);
     }
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, 99, 'Final value should be correct');
   }
 
@@ -2032,10 +1942,10 @@ export class EnvFactoryTests implements ITestFile {
     // 测试并发混合操作
     const mockValue = new MockEnvironmentValue<number>(0);
     for (let i = 0; i < 100; i++) {
-      mockValue.set(i);
-      mockValue.get();
+      mockValue.update(i);
+      mockValue.value;
     }
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, 99, 'Mixed operations should work correctly');
   }
 
@@ -2047,10 +1957,10 @@ export class EnvFactoryTests implements ITestFile {
     // 测试抛出错误后的恢复
     const mockValue = new MockEnvironmentValue<number>(42);
     try {
-      mockValue.set(100);
+      mockValue.update(100);
     } catch (e) {
     }
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, 100, 'Value should be recoverable after error');
   }
 
@@ -2097,7 +2007,7 @@ export class EnvFactoryTests implements ITestFile {
     const iterations = 1000;
     const startTime = Date.now();
     for (let i = 0; i < iterations; i++) {
-      mockValue.get();
+      mockValue.value;
     }
     const duration = Date.now() - startTime;
     const opsPerSecond = (iterations / duration) * 1000;
@@ -2110,7 +2020,7 @@ export class EnvFactoryTests implements ITestFile {
     const iterations = 1000;
     const startTime = Date.now();
     for (let i = 0; i < iterations; i++) {
-      mockValue.set(i);
+      mockValue.update(i);
     }
     const duration = Date.now() - startTime;
     const opsPerSecond = (iterations / duration) * 1000;
@@ -2118,33 +2028,29 @@ export class EnvFactoryTests implements ITestFile {
   }
 
   public testPerformanceBenchmarkSubscribe(): void {
-    // 测试订阅性能基准
+    // 测试更新性能基准
     const mockValue = new MockEnvironmentValue<number>(42);
     const iterations = 100;
     const startTime = Date.now();
     for (let i = 0; i < iterations; i++) {
-      mockValue.subscribe((value) => {});
+      mockValue.update(i);
     }
     const duration = Date.now() - startTime;
     const opsPerSecond = (iterations / duration) * 1000;
-    eq(opsPerSecond > 100, true, `Subscribe should be fast: ${opsPerSecond} ops/sec`);
+    eq(opsPerSecond > 100, true, `Update should be fast: ${opsPerSecond} ops/sec`);
   }
 
   public testPerformanceBenchmarkNotify(): void {
     // 测试通知性能基准
     const mockValue = new MockEnvironmentValue<number>(42);
-    const subscriberCount = 10;
-    for (let i = 0; i < subscriberCount; i++) {
-      mockValue.subscribe((value) => {});
-    }
     const iterations = 100;
     const startTime = Date.now();
     for (let i = 0; i < iterations; i++) {
-      mockValue.set(i);
+      mockValue.update(i);
     }
     const duration = Date.now() - startTime;
     const opsPerSecond = (iterations / duration) * 1000;
-    eq(opsPerSecond > 100, true, `Notify should be fast: ${opsPerSecond} ops/sec`);
+    eq(opsPerSecond > 100, true, `Update should be fast: ${opsPerSecond} ops/sec`);
   }
 
   // -------------------------------------------------------------------------
@@ -2152,14 +2058,13 @@ export class EnvFactoryTests implements ITestFile {
   // -------------------------------------------------------------------------
 
   public testStressManySubscribers(): void {
-    // 测试多订阅者压力
+    // 测试多次更新压力
     const mockValue = new MockEnvironmentValue<number>(42);
-    const subscriberCount = 100;
-    for (let i = 0; i < subscriberCount; i++) {
-      mockValue.subscribe((value) => {});
+    const updateCount = 100;
+    for (let i = 0; i < updateCount; i++) {
+      mockValue.update(i);
     }
-    mockValue.set(100);
-    eq(true, true, 'Many subscribers should be handled');
+    eq(true, true, 'Many updates should be handled');
   }
 
   public testStressLargeData(): void {
@@ -2172,7 +2077,7 @@ export class EnvFactoryTests implements ITestFile {
       largeData.object[`key${i}`] = `value${i}`;
     }
     const mockValue = new MockEnvironmentValue<any>(largeData);
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result.array.length, 10000, 'Large array should be handled');
     eq(Object.keys(result.object).length, 1000, 'Large object should be handled');
   }
@@ -2181,13 +2086,10 @@ export class EnvFactoryTests implements ITestFile {
     // 测试混合操作压力
     const mockValue = new MockEnvironmentValue<number>(0);
     for (let i = 0; i < 1000; i++) {
-      mockValue.set(i);
-      mockValue.get();
-      if (i % 10 === 0) {
-        mockValue.subscribe((value) => {});
-      }
+      mockValue.update(i);
+      const v = mockValue.value;
     }
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, 999, 'Mixed operations should complete successfully');
   }
 
@@ -2198,42 +2100,42 @@ export class EnvFactoryTests implements ITestFile {
   public testRegressionZeroValue(): void {
     // 回归测试：零值
     const mockValue = new MockEnvironmentValue<number>(0);
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, 0, 'Zero value should be preserved');
   }
 
   public testRegressionNegativeValue(): void {
     // 回归测试：负值
     const mockValue = new MockEnvironmentValue<number>(-42);
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, -42, 'Negative value should be preserved');
   }
 
   public testRegressionEmptyString(): void {
     // 回归测试：空字符串
     const mockValue = new MockEnvironmentValue<string>('');
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, '', 'Empty string should be preserved');
   }
 
   public testRegressionFalseBoolean(): void {
     // 回归测试：false布尔值
     const mockValue = new MockEnvironmentValue<boolean>(false);
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, false, 'False boolean should be preserved');
   }
 
   public testRegressionNullValue(): void {
     // 回归测试：null值
     const mockValue = new MockEnvironmentValue<any>(null);
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, null, 'Null value should be preserved');
   }
 
   public testRegressionUndefinedValue(): void {
     // 回归测试：undefined值
     const mockValue = new MockEnvironmentValue<any>(undefined);
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, undefined, 'Undefined value should be preserved');
   }
 
@@ -2247,7 +2149,7 @@ export class EnvFactoryTests implements ITestFile {
     const factory = envFactoryMap['system.arkui.breakpoint'];
     try {
       const envValue = factory(context);
-      const value = envValue.get();
+      const value = envValue.value;
       eq(value !== null, true, 'Factory and value integration should work');
     } catch (e) {
       eq(true, true, 'Integration may throw in test environment');
@@ -2299,42 +2201,42 @@ export class EnvFactoryTests implements ITestFile {
   public testEdgeCaseVeryLargeNumber(): void {
     // 测试非常大的数字
     const mockValue = new MockEnvironmentValue<number>(Number.MAX_VALUE);
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, Number.MAX_VALUE, 'Very large number should be preserved');
   }
 
   public testEdgeCaseVerySmallNumber(): void {
     // 测试非常小的数字
     const mockValue = new MockEnvironmentValue<number>(Number.MIN_VALUE);
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, Number.MIN_VALUE, 'Very small number should be preserved');
   }
 
   public testEdgeCasePositiveInfinity(): void {
     // 测试正无穷
     const mockValue = new MockEnvironmentValue<number>(Number.POSITIVE_INFINITY);
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, Number.POSITIVE_INFINITY, 'Positive infinity should be preserved');
   }
 
   public testEdgeCaseNegativeInfinity(): void {
     // 测试负无穷
     const mockValue = new MockEnvironmentValue<number>(Number.NEGATIVE_INFINITY);
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, Number.NEGATIVE_INFINITY, 'Negative infinity should be preserved');
   }
 
   public testEdgeCaseNotANumber(): void {
     // 测试NaN
     const mockValue = new MockEnvironmentValue<number>(NaN);
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(isNaN(result), true, 'NaN should be preserved');
   }
 
   public testEdgeCaseEpsilon(): void {
     // 测试Epsilon
     const mockValue = new MockEnvironmentValue<number>(Number.EPSILON);
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, Number.EPSILON, 'Epsilon should be preserved');
   }
 
@@ -2345,35 +2247,35 @@ export class EnvFactoryTests implements ITestFile {
   public testUnicodeChineseCharacters(): void {
     // 测试中文字符
     const mockValue = new MockEnvironmentValue<string>('中文测试');
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, '中文测试', 'Chinese characters should be preserved');
   }
 
   public testUnicodeJapaneseCharacters(): void {
     // 测试日文字符
     const mockValue = new MockEnvironmentValue<string>('日本語テスト');
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, '日本語テスト', 'Japanese characters should be preserved');
   }
 
   public testUnicodeKoreanCharacters(): void {
     // 测试韩文字符
     const mockValue = new MockEnvironmentValue<string>('한국어 테스트');
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, '한국어 테스트', 'Korean characters should be preserved');
   }
 
   public testUnicodeEmoji(): void {
     // 测试表情符号
     const mockValue = new MockEnvironmentValue<string>('🎉🚀✨');
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, '🎉🚀✨', 'Emoji should be preserved');
   }
 
   public testUnicodeMixedCharacters(): void {
     // 测试混合字符
     const mockValue = new MockEnvironmentValue<string>('Hello 世界 🌍');
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, 'Hello 世界 🌍', 'Mixed characters should be preserved');
   }
 
@@ -2384,35 +2286,35 @@ export class EnvFactoryTests implements ITestFile {
   public testSpecialStringNewline(): void {
     // 测试换行符
     const mockValue = new MockEnvironmentValue<string>('line1\nline2\nline3');
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, 'line1\nline2\nline3', 'Newline should be preserved');
   }
 
   public testSpecialStringTab(): void {
     // 测试制表符
     const mockValue = new MockEnvironmentValue<string>('col1\tcol2\tcol3');
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, 'col1\tcol2\tcol3', 'Tab should be preserved');
   }
 
   public testSpecialStringCarriageReturn(): void {
     // 测试回车符
     const mockValue = new MockEnvironmentValue<string>('line1\rline2');
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, 'line1\rline2', 'Carriage return should be preserved');
   }
 
   public testSpecialStringQuotes(): void {
     // 测试引号
     const mockValue = new MockEnvironmentValue<string>('He said "Hello"');
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, 'He said "Hello"', 'Quotes should be preserved');
   }
 
   public testSpecialStringBackslash(): void {
     // 测试反斜杠
     const mockValue = new MockEnvironmentValue<string>('path\\to\\file');
-    const result = mockValue.get();
+    const result = mockValue.value;
     eq(result, 'path\\to\\file', 'Backslash should be preserved');
   }
 
@@ -2437,10 +2339,10 @@ export class EnvFactoryTests implements ITestFile {
   public testFinalValidationAllTypesDefined(): void {
     // 最终验证：所有类型定义
     const breakpoint: WindowSizeLayoutBreakpoint = { width: 0, height: 0, breakpoint: 'sm' };
-    const windowSizeVp: WindowSizeVpEnv = { width: 0, height: 0 };
+    const windowSizeVp: WindowSizeVpEnv = { widthVp: 0, heightVp: 0 };
     const windowSizePx: WindowSizePxEnv = { width: 0, height: 0 };
-    const avoidAreaVp: WindowAvoidAreaVpEnv = { left: 0, top: 0, right: 0, bottom: 0 };
-    const avoidAreaPx: WindowAvoidAreaPxEnv = { left: 0, top: 0, right: 0, bottom: 0 };
+    const avoidAreaVp: WindowAvoidAreaVpEnv = makeAvoidAreaVpEnv(0);
+    const avoidAreaPx: WindowAvoidAreaPxEnv = makeAvoidAreaPxEnv(0);
     eq(true, true, 'All types should be defined');
   }
 

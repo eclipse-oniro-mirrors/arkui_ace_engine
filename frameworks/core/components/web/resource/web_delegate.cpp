@@ -18,6 +18,7 @@
 
 #include <cctype>
 #include <cfloat>
+#include <cmath>
 #include <iomanip>
 #include <mutex>
 #include <optional>
@@ -69,11 +70,12 @@
 #include "web_configuration_observer.h"
 #include "web_javascript_execute_callback.h"
 #include "web_javascript_result_callback.h"
+#include "web_string_value_callback_impl.h"
 
 #include "core/components_ng/base/ui_node.h"
 #include "frameworks/base/utils/system_properties.h"
 #endif
-
+#include "nweb_value_callback.h"
 #include "core/common/container.h"
 #include "base/include/ark_web_errno.h"
 #include "arkweb_utils.h"
@@ -228,6 +230,30 @@ void HandleVideoStatusCallback(
         callback(value);
     }
 }
+
+class SecurityHitTestCallback : public OHOS::NWeb::NWebStringValueCallback {
+public:
+    explicit SecurityHitTestCallback(WeakPtr<WebDelegate> webDelegate,
+        std::shared_ptr<SecurityHitTestInfo> state)
+        : state_(std::move(state)), webDelegate_(webDelegate) {}
+    ~SecurityHitTestCallback() override = default;
+
+    void OnReceiveValue(const std::string& value) override
+    {
+        if(state_){
+            state_->response = value;
+        }
+        auto delegate = webDelegate_.Upgrade();
+        if (delegate) {
+            TAG_LOGD(AceLogTag::ACE_WEB, "SecurityHitTestCallback OnReceiveValue called");
+            delegate->OnTouchForSecurityHitTest(state_);
+        }
+    }
+private:
+    std::shared_ptr<SecurityHitTestInfo> state_;
+    WeakPtr<WebDelegate> webDelegate_;
+};
+
 } // namespace
 
 #define EGLCONFIG_VERSION 3
@@ -4305,6 +4331,7 @@ void WebDelegate::UpdateDomStorageEnabled(const bool& isDomStorageAccessEnabled)
         },
         TaskExecutor::TaskType::PLATFORM, "ArkUIWebUpdateDomStorageEnabled");
 }
+
 void WebDelegate::UpdateGeolocationEnabled(const bool& isGeolocationAccessEnabled)
 {
     auto context = context_.Upgrade();
@@ -5515,6 +5542,57 @@ void WebDelegate::SetAudioMuted(bool muted)
     if (nweb_) {
         nweb_->SetAudioMuted(muted);
     }
+}
+
+void WebDelegate::GetElementInfoForSecurityHitTest(SecurityHitTestInfo& secInfo)
+{
+    auto context = context_.Upgrade();
+    CHECK_NULL_VOID(context);
+    auto state = std::make_shared<SecurityHitTestInfo>();
+    CHECK_NULL_VOID(state);
+    state->id = secInfo.id;
+    state->x = secInfo.x;
+    state->y = secInfo.y;
+    state->from_overlay = secInfo.from_overlay;
+    state->callingUid = secInfo.callingUid;
+    state->sessionId = secInfo.sessionId;
+    state->response = secInfo.response;
+
+    context->GetTaskExecutor()->PostTask(
+        [weak = WeakClaim(this), x = state->x, y= state->y, state]() {
+            auto delegate = weak.Upgrade();
+            if (!delegate) {
+                return;
+            }
+            auto callback = std::make_shared<SecurityHitTestCallback>(weak, state);
+            if (delegate->nweb_) {
+                delegate->nweb_->GetElementInfoForSecurityHitTest(x, y, callback);
+                TAG_LOGD(AceLogTag::ACE_WEB, "WebDelegate::GetElementInfoForSecurityHitTest called");
+            }
+        },
+        TaskExecutor::TaskType::PLATFORM, "ArkUIWebGetElementInfoForSecurityHitTest");
+}
+
+void WebDelegate::OnTouchForSecurityHitTest(std::shared_ptr<SecurityHitTestInfo> state)
+{
+    auto context = context_.Upgrade();
+    CHECK_NULL_VOID(context);
+    context->GetTaskExecutor()->PostTask(
+        [weak = WeakClaim(this), state]() {
+            auto delegate = weak.Upgrade();
+            CHECK_NULL_VOID(delegate);
+            auto webPattern = delegate->webPattern_.Upgrade();
+            CHECK_NULL_VOID(webPattern);
+            CHECK_NULL_VOID(state);
+            TAG_LOGD(AceLogTag::ACE_WEB, "WebDelegate::OnTouchForSecurityHitTest report");
+            bool allowed = webPattern->ReportDecsionForSecurityHitTest(
+                state->callingUid, state->sessionId, state->response);
+            if (allowed && delegate->nweb_) {
+                TAG_LOGD(AceLogTag::ACE_WEB, "WebDelegate::OnTouchForSecurityHitTest TouchPress");
+                delegate->nweb_->OnTouchPress(state->id, state->x, state->y, state->from_overlay);
+            }
+        },
+        TaskExecutor::TaskType::PLATFORM, "ArkUIWebReportForSecurityHitTest");
 }
 
 void WebDelegate::SetVideoSurface(std::string surfaceId)
@@ -7398,6 +7476,24 @@ void WebDelegate::OnZoomChange(double oldZoomFactor, double newZoomFactor)
         TaskExecutor::TaskType::JS, "ArkUIWebZoomChange");
 }
 
+void WebDelegate::UpdateVisitedLinkPersistEnabled(const bool& enabled)
+{
+    auto context = context_.Upgrade();
+    if (!context) {
+        return;
+    }
+    context->GetTaskExecutor()->PostTask(
+        [weak = WeakClaim(this), enabled]() {
+            auto delegate = weak.Upgrade();
+            if (delegate && delegate->nweb_) {
+                std::shared_ptr<OHOS::NWeb::NWebPreference> setting = delegate->nweb_->GetPreference();
+                CHECK_NULL_VOID(setting);
+                setting->PutVisitedLinkPersistEnabled(enabled);
+            }
+        },
+        TaskExecutor::TaskType::PLATFORM, "ArkUIWebUpdateVisitedLinkPersistEnabled");
+}
+
 void WebDelegate::OnScroll(double xOffset, double yOffset)
 {
     CHECK_NULL_VOID(taskExecutor_);
@@ -8376,6 +8472,40 @@ void WebDelegate::SetComponent(const RefPtr<WebComponent>& component)
 void WebDelegate::SetNGWebPattern(const RefPtr<NG::WebPattern>& webPattern)
 {
     webPattern_ = webPattern;
+}
+
+bool WebDelegate::OnGetWindowBounds(int32_t& x, int32_t& y,
+                                    uint32_t& w, uint32_t& h, std::string& state)
+{
+    auto webPattern = webPattern_.Upgrade();
+    CHECK_NULL_RETURN(webPattern, false);
+    if (!webPattern->HandleWindowRectGet(x, y, w, h)) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "[getWindowBounds] HandleWindowRectGet failed");
+        return false;
+    }
+    return webPattern->HandleWindowStateGet(state);
+}
+
+bool WebDelegate::OnSetWindowBounds(int32_t x, int32_t y,
+                                    uint32_t w, uint32_t h, const std::string& state)
+{
+    auto webPattern = webPattern_.Upgrade();
+    CHECK_NULL_RETURN(webPattern, false);
+    const bool hasBounds = (x != 0 || y != 0 || w != 0 || h != 0);
+    if (hasBounds && state != "normal") {
+        TAG_LOGW(AceLogTag::ACE_WEB, "[setWindowBounds] bounds not allowed in state:%{public}s", state.c_str());
+        return false;
+    }
+    if (hasBounds && !webPattern->HandleWindowRectSet(x, y, w, h)) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "[setWindowBounds] HandleWindowRectSet failed, x:%{public}d, y:%{public}d, w:%{public}d, h:%{public}d",
+            x, y, w, h);
+        return false;
+    }
+    if (!state.empty() && !webPattern->HandleWindowStateSet(state)) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "[setWindowBounds] HandleWindowStateSet failed, state:%{public}s", state.c_str());
+        return false;
+    }
+    return true;
 }
 
 void WebDelegate::SetDrawSize(const Size& drawSize)
@@ -11253,45 +11383,126 @@ void WebDelegate::UpdateTouchEventFeatureDetectionEnabled()
 
 // ===== PageScene Rule-Based Perception Methods =====
 
+namespace {
+// Error payload for QueryPageControls exits that cannot deliver a real result: the
+// page-scene round counting relies on the callback firing exactly once.
+std::string BuildQueryErrorPayload(int32_t errorCode)
+{
+    return "{\"errorCode\":" + std::to_string(errorCode) + ",\"controls\":[]}";
+}
+} // namespace
+
 void WebDelegate::QueryPageControls(const std::string& selectorJson,
     const std::string& ruleId, const std::vector<std::string>& nodeTypes,
     std::function<void(const std::string& resultJson)>&& callback)
 {
+    // Every exit must invoke the callback exactly once (with an error payload on
+    // failure): page-scene round counting relies on it, and a lost callback would
+    // leave the round pending forever ("get unavailable afterwards").
     auto context = context_.Upgrade();
-    CHECK_NULL_VOID(context);
-    context->GetTaskExecutor()->PostTask(
-        [weak = WeakClaim(this), selectorJson, ruleId, nodeTypes, callback = std::move(callback)]() {
-            auto delegate = weak.Upgrade();
-            CHECK_NULL_VOID(delegate);
-            auto agentManager = delegate->GetNWebAgentManager();
-            if (!agentManager) {
-                TAG_LOGE(AceLogTag::ACE_WEB,
-                    "WebDelegate::QueryPageControls: GetNWebAgentManager failed, WebId: %{public}d",
-                    delegate->GetWebId());
-                if (callback) {
-                    callback("{\"errorCode\":" + std::to_string(PAGE_SCENE_QUERY_EMPTY_SCRIPT) +
-                        ",\"controls\":[]}");
-                }
-                return;
-            }
-            auto callbackImpl = std::make_shared<WebJavaScriptExecuteCallBack>(weak);
-            if (callbackImpl && callback) {
-                callbackImpl->SetCallBack([weak, func = std::move(callback)](std::string result) {
-                    auto delegate = weak.Upgrade();
-                    CHECK_NULL_VOID(delegate);
-                    TAG_LOGI(AceLogTag::ACE_WEB,
-                        "WebDelegate::QueryPageControls: JS result received, webId=%{public}d result len=%{public}zu",
-                        delegate->GetWebId(), result.size());
-                    auto context = delegate->context_.Upgrade();
-                    CHECK_NULL_VOID(context);
-                    context->GetTaskExecutor()->PostTask(
-                        [callback = std::move(func), result]() { callback(result); },
-                        TaskExecutor::TaskType::PLATFORM, "ArkUIWebPageSceneQueryCallback");
-                });
-            }
-            agentManager->RequestPageSceneQuery(selectorJson, ruleId, nodeTypes, callbackImpl);
+    if (!context) {
+        TAG_LOGE(AceLogTag::ACE_WEB, "WebDelegate::QueryPageControls: context is null");
+        if (callback) {
+            callback(BuildQueryErrorPayload(PAGE_SCENE_QUERY_EXCEPTION));
+        }
+        return;
+    }
+    auto taskExecutor = context->GetTaskExecutor();
+    if (!taskExecutor) {
+        TAG_LOGE(AceLogTag::ACE_WEB, "WebDelegate::QueryPageControls: task executor is null");
+        if (callback) {
+            callback(BuildQueryErrorPayload(PAGE_SCENE_QUERY_EXCEPTION));
+        }
+        return;
+    }
+    // Keep a copy for the post-failure path: if PostTask fails, the queued task (holding
+    // the moved callback) is destroyed without running, so the failure path must still
+    // fire the callback exactly once.
+    std::function<void(const std::string& resultJson)> failureCallback = callback;
+    bool posted = taskExecutor->PostTask(
+        [weak = WeakClaim(this), selectorJson, ruleId, nodeTypes, callback = std::move(callback)]() mutable {
+            ExecutePageSceneQuery(weak, selectorJson, ruleId, nodeTypes, std::move(callback));
         },
         TaskExecutor::TaskType::PLATFORM, "ArkUIWebPageSceneQuery");
+    if (!posted) {
+        TAG_LOGE(AceLogTag::ACE_WEB, "WebDelegate::QueryPageControls: post query task failed");
+        if (failureCallback) {
+            failureCallback(BuildQueryErrorPayload(PAGE_SCENE_QUERY_EXCEPTION));
+        }
+    }
+}
+
+void WebDelegate::ExecutePageSceneQuery(const WeakPtr<WebDelegate>& delegateWeak,
+    const std::string& selectorJson, const std::string& ruleId,
+    const std::vector<std::string>& nodeTypes,
+    std::function<void(const std::string& resultJson)>&& callback)
+{
+    auto delegate = delegateWeak.Upgrade();
+    if (!delegate) {
+        if (callback) {
+            callback(BuildQueryErrorPayload(PAGE_SCENE_QUERY_EXCEPTION));
+        }
+        return;
+    }
+    auto agentManager = delegate->GetNWebAgentManager();
+    if (!agentManager) {
+        TAG_LOGE(AceLogTag::ACE_WEB,
+            "WebDelegate::QueryPageControls: GetNWebAgentManager failed, WebId: %{public}d",
+            delegate->GetWebId());
+        if (callback) {
+            callback(BuildQueryErrorPayload(PAGE_SCENE_QUERY_EMPTY_SCRIPT));
+        }
+        return;
+    }
+    auto callbackImpl = std::make_shared<WebJavaScriptExecuteCallBack>(delegateWeak);
+    if (callbackImpl && callback) {
+        callbackImpl->SetCallBack(
+            [delegateWeak, func = std::move(callback)](std::string result) {
+                ForwardPageSceneQueryResult(delegateWeak, func, result);
+            });
+    }
+    agentManager->RequestPageSceneQuery(selectorJson, ruleId, nodeTypes, callbackImpl);
+}
+
+void WebDelegate::ForwardPageSceneQueryResult(const WeakPtr<WebDelegate>& delegateWeak,
+    const std::function<void(const std::string& resultJson)>& func, const std::string& result)
+{
+    auto delegate = delegateWeak.Upgrade();
+    if (!delegate) {
+        // Delegate destroyed before the JS result arrived: deliver the result directly
+        // so the pending round still completes.
+        if (func) {
+            func(result);
+        }
+        return;
+    }
+    TAG_LOGI(AceLogTag::ACE_WEB,
+        "WebDelegate::QueryPageControls: JS result received, webId=%{public}d result len=%{public}zu",
+        delegate->GetWebId(), result.size());
+    auto context = delegate->context_.Upgrade();
+    if (!context) {
+        // No context to hop threads: deliver directly so the pending round still completes.
+        if (func) {
+            func(result);
+        }
+        return;
+    }
+    auto taskExecutor = context->GetTaskExecutor();
+    if (!taskExecutor) {
+        if (func) {
+            func(result);
+        }
+        return;
+    }
+    // Keep a copy for the post-failure path (see QueryPageControls): if PostTask fails
+    // the queued task is destroyed without running.
+    std::function<void(const std::string& resultJson)> failureCallback = func;
+    bool posted = taskExecutor->PostTask(
+        [callback = std::move(func), result]() { callback(result); },
+        TaskExecutor::TaskType::PLATFORM, "ArkUIWebPageSceneQueryCallback");
+    if (!posted && failureCallback) {
+        failureCallback(result);
+    }
 }
 
 void WebDelegate::ExecuteReportOnRegisterMatch(int32_t processId)
@@ -11324,32 +11535,35 @@ void WebDelegate::ExecuteReportOnRegisterMatch(int32_t processId)
 }
 
 void WebDelegate::ExecuteGetPageSceneMatch(int32_t processId,
-    const WebPageSceneRuleSet& ruleSet, bool isTemporary)
+    const WebPageSceneRuleSet& ruleSet)
 {
     int32_t enabledCount = 0;
     for (const auto& rule : ruleSet.rules) {
         if (rule.enabled) enabledCount++;
     }
     if (enabledCount == 0) {
-        WebPageSceneManager::GetInstance().OnMatchResult(processId, "", true);
-        if (isTemporary) {
-            WebPageSceneManager::GetInstance().CompleteGetPageScene(processId);
-        }
+        WebPageSceneManager::GetInstance().DecrementGetRemaining(processId);
         return;
     }
-    auto remaining = std::make_shared<std::atomic<int32_t>>(enabledCount);
+    // Bind this round's global counter: a late callback from a superseded round must
+    // not consume the current round's budget (DecrementRoundRemaining validates the
+    // round instance instead of looking up by processId).
+    auto roundRemaining = WebPageSceneManager::GetInstance().GetRoundRemaining(processId);
+    auto localRemaining = std::make_shared<std::atomic<int32_t>>(enabledCount);
     for (const auto& rule : ruleSet.rules) {
         if (!rule.enabled) continue;
         std::string selectorJson = WebPageSceneManager::GetInstance().BuildSelectorJson(
             rule, ruleSet.globalConfig);
         QueryPageControls(selectorJson, rule.ruleId, {},
-            [processId, webId = GetWebId(), hostNodeId = GetHostNodeId(), isTemporary, remaining, selectorJson](
+            [processId, webId = GetWebId(), hostNodeId = GetHostNodeId(), selectorJson, localRemaining, roundRemaining](
                 const std::string& resultJson) {
-                WebPageSceneManager::GetInstance().ProcessQueryResult(
-                    processId, webId, hostNodeId, selectorJson, resultJson, true);
-                int32_t rem = remaining->fetch_sub(1, std::memory_order_acq_rel) - 1;
-                if (rem == 0 && isTemporary) {
-                    WebPageSceneManager::GetInstance().CompleteGetPageScene(processId);
+                // Round-scoped reporting: a late callback from a superseded round is
+                // discarded instead of answering the current round with stale data.
+                WebPageSceneManager::GetInstance().ProcessQueryResultForRound(
+                    processId, webId, hostNodeId, selectorJson, resultJson, roundRemaining);
+                int32_t rem = localRemaining->fetch_sub(1, std::memory_order_acq_rel) - 1;
+                if (rem == 0) {
+                    WebPageSceneManager::GetInstance().DecrementRoundRemaining(processId, roundRemaining);
                 }
             });
     }
@@ -11359,22 +11573,18 @@ void WebDelegate::GetPageSceneForWeb(int32_t processId, const std::string& ruleJ
 {
     std::optional<WebPageSceneRuleSet> ruleSet;
     int32_t ret = WebPageSceneManager::GetInstance().BeginGetPageScene(processId, ruleJsonOrRuleSetId, ruleSet);
-    if (ret != PAGE_SCENE_ERR_OK) {
+    if (ret != PAGE_SCENE_ERR_OK || !ruleSet) {
         TAG_LOGW(AceLogTag::ACE_WEB,
             "GetPageSceneForWeb: BeginGetPageScene failed, ret=%{public}d processId=%{public}d",
             ret, processId);
-        WebPageSceneManager::GetInstance().OnMatchResult(processId, "", true);
+        // Do not report empty synchronously: it would reach the session side before the
+        // other components' pending async results (and would fire once per component).
+        // Just balance the round counter; the round emits a single empty result on
+        // completion if nothing else reported.
+        WebPageSceneManager::GetInstance().DecrementGetRemaining(processId);
         return;
     }
-    bool isTemporary = !WebPageSceneManager::GetInstance().GetPageSceneRules(processId).has_value();
-    if (!ruleSet) {
-        WebPageSceneManager::GetInstance().OnMatchResult(processId, "", true);
-        if (isTemporary) {
-            WebPageSceneManager::GetInstance().CompleteGetPageScene(processId);
-        }
-        return;
-    }
-    ExecuteGetPageSceneMatch(processId, ruleSet.value(), isTemporary);
+    ExecuteGetPageSceneMatch(processId, ruleSet.value());
 }
 
 void WebDelegate::ProcessPageSceneDomReadyResult(const std::string& resultJson,
@@ -11486,5 +11696,92 @@ uint64_t WebDelegate::GetDelegateUIContextToken()
     }
 
     return rsUIContext->GetToken();
+}
+
+void WebDelegate::OnColorChooserPopup(const std::string& color,
+    const std::vector<OHOS::NWeb::NWebColorSuggestion>& suggestions,
+    std::shared_ptr<OHOS::NWeb::NWebColorChooserCallback> callback)
+{
+    auto webPattern = webPattern_.Upgrade();
+    if (!webPattern) {
+        if (callback) {
+            callback->Cancel();
+        }
+        return;
+    }
+    webPattern->OnColorChooserPopup(color, suggestions, callback);
+}
+
+void WebDelegate::OnColorChooserClose()
+{
+    auto webPattern = webPattern_.Upgrade();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->OnColorChooserClose();
+}
+
+std::string WebDelegate::BuildNativeDomCommand(const NG::OffsetF& offset, const std::string& rectJson)
+{
+    auto formatOffset = [](float val) -> std::string {
+        if (!std::isfinite(val)) {
+            return "0";
+        }
+        return std::to_string(val);
+    };
+    std::string command = R"({"method":"getExtractorDom","params":{"outputFormat":"ace","offsetX":)";
+    command += formatOffset(offset.GetX());
+    command += R"(,"offsetY":)";
+    command += formatOffset(offset.GetY());
+    if (!rectJson.empty()) {
+        auto start = rectJson.find('{');
+        auto end = rectJson.rfind('}');
+        if (start != std::string::npos && end != std::string::npos && end > start) {
+            auto inner = rectJson.substr(start + 1, end - start - 1);
+            inner.erase(0, inner.find_first_not_of(" \t\n\r"));
+            inner.erase(inner.find_last_not_of(" \t\n\r") + 1);
+            if (!inner.empty()) {
+                command += ",";
+                command += inner;
+            }
+        }
+    }
+    command += "}}";
+    return command;
+}
+
+void WebDelegate::RequestNativeDomTreeInner(const WeakPtr<WebDelegate>& weak,
+    std::function<void(const std::string&)>&& callback, const NG::OffsetF& offset, const std::string& rectJson)
+{
+    auto delegate = weak.Upgrade();
+    if (!delegate || !delegate->nweb_) {
+        if (callback) {
+            callback("");
+        }
+        return;
+    }
+    auto callbackImpl = std::make_shared<WebStringValueCallbackImpl>(weak);
+    if (callbackImpl && callback) {
+        callbackImpl->SetCallBack([func = std::move(callback)](const std::string& result) { func(result); });
+    }
+    auto command = BuildNativeDomCommand(offset, rectJson);
+    TAG_LOGI(AceLogTag::ACE_WEB, "WebDelegate RequestNativeDomTree WebId:%{public}d command:%{public}s",
+        delegate->GetWebId(), command.c_str());
+    delegate->nweb_->ExecuteAIPageCommand(command, callbackImpl);
+}
+
+void WebDelegate::RequestNativeDomTree(
+    std::function<void(const std::string&)>&& callback, const NG::OffsetF& offset, const std::string& rectJson)
+{
+    auto context = context_.Upgrade();
+    if (!context) {
+        if (callback) {
+            callback("");
+        }
+        return;
+    }
+    context->GetTaskExecutor()->PostTask(
+        [weak = WeakClaim(this), callback = std::move(callback), offset, rectJson]() mutable {
+            WebDelegate::RequestNativeDomTreeInner(weak, std::move(callback), offset, rectJson);
+        },
+        TaskExecutor::TaskType::PLATFORM, "ArkUIWebRequestNativeDomTree");
 }
 } // namespace OHOS::Ace

@@ -1,0 +1,423 @@
+/*
+ * Copyright (c) 2026 Huawei Device Co., Ltd.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include "interfaces/napi/kits/application_shortcut/js_application_shortcut.h"
+
+#include <cmath>
+#include <limits>
+#include <map>
+#include <memory>
+#include <vector>
+
+#include "base/log/log_wrapper.h"
+#include "core/common/application_shortcut.h"
+#include "core/common/container.h"
+#include "core/common/container_scope.h"
+#include "core/common/frontend.h"
+#include "core/components/common/layout/constants.h"
+#include "core/event/key_code.h"
+
+namespace OHOS::Ace::Napi {
+namespace {
+constexpr size_t ARGC_REGISTER = 3;
+constexpr uint32_t MAX_MODIFIER_KEYS = 3;
+constexpr size_t ARGC_UNREGISTER = 1;
+constexpr size_t ARG_INDEX_ZERO = 0;
+constexpr size_t ARG_INDEX_ONE = 1;
+constexpr size_t ARG_INDEX_TWO = 2;
+constexpr size_t STR_BUFFER_SIZE = 1024;
+constexpr const char* PROPERTY_UICONTEXT = "uiContext";
+constexpr const char* CALLBACK_TAG = "ArkUIAppShortcut";
+
+// Accessed only by the owning env thread. Keep references here until they can be
+// released on that thread, even if another thread drops the last dispatch snapshot.
+class ApplicationShortcutEnv final {
+public:
+    explicit ApplicationShortcutEnv(napi_env env) : env_(env) {}
+
+    napi_env GetEnv() const
+    {
+        return env_;
+    }
+
+    int32_t Register(napi_env env, napi_value value, const std::string& key, uint8_t keys)
+    {
+        CollectRetiredCallbacks();
+        auto callback = std::make_shared<ApplicationShortcutCallback>(env, value);
+        if (closing_ || !callback->IsValid()) {
+            callback->Detach();
+            return 0;
+        }
+        auto id = ApplicationShortcutManager::GetInstance().RegisterApplicationShortcut(
+            key, keys, [callback](int32_t instanceId) { callback->Execute(instanceId); });
+        if (id == 0) {
+            callback->Detach();
+            return 0;
+        }
+        callbacks_.emplace(id, std::move(callback));
+        return id;
+    }
+
+    void CollectRetiredCallbacks()
+    {
+        for (auto it = callbacks_.begin(); it != callbacks_.end();) {
+            // The registry and any in-flight snapshot have released this callback.
+            if (it->second.use_count() == 1) {
+                it->second->Detach();
+                it = callbacks_.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
+    void Close()
+    {
+        closing_ = true;
+        std::vector<int32_t> ids;
+        for (const auto& [id, callback] : callbacks_) {
+            // Detach before removing registrations: snapshots may still hold them.
+            callback->Detach();
+            ids.emplace_back(id);
+        }
+        ApplicationShortcutManager::GetInstance().RemoveApplicationShortcutsForCleanup(ids);
+        callbacks_.clear();
+    }
+
+private:
+    napi_env env_ = nullptr;
+    bool closing_ = false;
+    std::map<int32_t, std::shared_ptr<ApplicationShortcutCallback>> callbacks_;
+};
+
+// The cleanup hook drains this registry while env is valid. No NAPI calls are
+// made by C++ destructors, including thread-local or process teardown.
+thread_local std::map<napi_env, std::unique_ptr<ApplicationShortcutEnv>> shortcutEnvs;
+
+void CleanupApplicationShortcutEnv(void* data)
+{
+    auto* state = static_cast<ApplicationShortcutEnv*>(data);
+    auto it = shortcutEnvs.find(state->GetEnv());
+    if (it == shortcutEnvs.end()) {
+        return;
+    }
+    it->second->Close();
+    shortcutEnvs.erase(it);
+}
+
+ApplicationShortcutEnv* GetApplicationShortcutEnv(napi_env env)
+{
+    auto it = shortcutEnvs.find(env);
+    if (it != shortcutEnvs.end()) {
+        return it->second.get();
+    }
+    auto state = std::make_unique<ApplicationShortcutEnv>(env);
+    if (napi_add_env_cleanup_hook(env, CleanupApplicationShortcutEnv, state.get()) != napi_ok) {
+        LOGE("Failed to register application shortcut environment cleanup");
+        return nullptr;
+    }
+    auto* result = state.get();
+    shortcutEnvs.emplace(env, std::move(state));
+    return result;
+}
+} // namespace
+
+ApplicationShortcutCallback::ApplicationShortcutCallback(napi_env env, napi_value callback)
+    : env_(env), callback_(nullptr)
+{
+    if (env != nullptr && callback != nullptr) {
+        napi_create_reference(env, callback, 1, &callback_);
+    }
+}
+
+void ApplicationShortcutCallback::Detach()
+{
+    if (std::this_thread::get_id() != ownerThread_) {
+        LOGE("Application shortcut references must be released on their owning thread");
+        return;
+    }
+    if (callback_ != nullptr && env_ != nullptr) {
+        napi_delete_reference(env_, callback_);
+    }
+    callback_ = nullptr;
+    env_ = nullptr;
+}
+
+bool ApplicationShortcutCallback::IsValid() const
+{
+    return std::this_thread::get_id() == ownerThread_ && env_ != nullptr && callback_ != nullptr;
+}
+
+bool ApplicationShortcutCallback::NapiEqual(napi_env env, napi_value cb)
+{
+    CHECK_NULL_RETURN(IsValid(), false);
+    CHECK_NULL_RETURN(cb, false);
+    napi_value stored = nullptr;
+    napi_get_reference_value(env_, callback_, &stored);
+    if (stored == nullptr) {
+        return false;
+    }
+    bool isEqual = false;
+    napi_strict_equals(env, cb, stored, &isEqual);
+    return isEqual;
+}
+
+void ApplicationShortcutCallback::Execute(int32_t triggerInstanceId)
+{
+    if (!IsValid()) {
+        return;
+    }
+    // UI thread and JS thread are the same in declarative frontends
+    // (ace_container.cpp sets jsRunner_ = uiRunner_ via InitJsThread(false)),
+    // so Execute() is already on the trigger instance's JS thread when invoked
+    // from KeyEventManager::DispatchKeyboardShortcut. We only need to switch
+    // the thread-local container scope so Container::CurrentSafely() returns
+    // the trigger instance and GetContextValue() yields its UIContext.
+    ContainerScope scope(triggerInstanceId);
+    ExecuteInner(triggerInstanceId);
+}
+
+void ApplicationShortcutCallback::ExecuteInner(int32_t triggerInstanceId)
+{
+    CHECK_NULL_VOID(callback_);
+    CHECK_NULL_VOID(env_);
+
+    napi_handle_scope scope = nullptr;
+    napi_open_handle_scope(env_, &scope);
+
+    // 1) Obtain trigger instance UIContext JS object (mirrors UIObserver::GetContextValue)
+    napi_value uiContext = nullptr;
+    auto container = Container::CurrentSafely();
+    if (container != nullptr) {
+        auto frontend = container->GetFrontend();
+        if (frontend != nullptr) {
+            uiContext = frontend->GetContextValue();
+        }
+    }
+
+    // 2) Build ApplicationShortcutCallbackInfo = { uiContext }
+    napi_value infoObj = nullptr;
+    napi_create_object(env_, &infoObj);
+    if (uiContext != nullptr) {
+        napi_set_named_property(env_, infoObj, PROPERTY_UICONTEXT, uiContext);
+    } else {
+        napi_value undefined = nullptr;
+        napi_get_undefined(env_, &undefined);
+        napi_set_named_property(env_, infoObj, PROPERTY_UICONTEXT, undefined);
+    }
+
+    // 3) Invoke JS callback
+    napi_value undefined = nullptr;
+    napi_get_undefined(env_, &undefined);
+    napi_value callback = nullptr;
+    napi_get_reference_value(env_, callback_, &callback);
+    if (callback == nullptr) {
+        napi_close_handle_scope(env_, scope);
+        return;
+    }
+    napi_value result = nullptr;
+    (void)napi_call_function(env_, undefined, callback, 1, &infoObj, &result);
+
+    bool hasPending = false;
+    napi_is_exception_pending(env_, &hasPending);
+    if (hasPending) {
+        napi_value exception = nullptr;
+        napi_get_and_clear_last_exception(env_, &exception);
+        LOGW("%{public}s: JS callback threw an exception", CALLBACK_TAG);
+    }
+
+    napi_close_handle_scope(env_, scope);
+}
+
+
+static bool ParseShortcutValue(napi_env env, napi_value arg, std::string& outValue)
+{
+    CHECK_NULL_RETURN(arg, false);
+    napi_valuetype type = napi_undefined;
+    napi_typeof(env, arg, &type);
+    if (type != napi_string) {
+        return false;
+    }
+    char buffer[STR_BUFFER_SIZE] = { 0 };
+    size_t outSize = 0;
+    napi_get_value_string_utf8(env, arg, buffer, STR_BUFFER_SIZE, &outSize);
+    outValue.assign(buffer, outSize);
+    return true;
+}
+
+static bool ParseModifierKey(napi_env env, napi_value element, uint8_t& bit)
+{
+    napi_valuetype elementType = napi_undefined;
+    napi_typeof(env, element, &elementType);
+    if (elementType != napi_number) {
+        return false;
+    }
+    double value = 0;
+    if (napi_get_value_double(env, element, &value) != napi_ok || !std::isfinite(value) ||
+        std::trunc(value) != value || value < static_cast<int32_t>(ModifierKey::CTRL) ||
+        value > static_cast<int32_t>(ModifierKey::ALT)) {
+        return false;
+    }
+    switch (static_cast<ModifierKey>(static_cast<int32_t>(value))) {
+        case ModifierKey::CTRL:
+            bit = static_cast<uint8_t>(ModifierKeyName::ModifierKeyCtrl);
+            break;
+        case ModifierKey::SHIFT:
+            bit = static_cast<uint8_t>(ModifierKeyName::ModifierKeyShift);
+            break;
+        case ModifierKey::ALT:
+            bit = static_cast<uint8_t>(ModifierKeyName::ModifierKeyAlt);
+            break;
+    }
+    return true;
+}
+
+// Convert ArkTS ModifierKey enum values to the same bits used by component shortcuts.
+static bool ParseModifierKeys(napi_env env, napi_value arg, uint8_t& outKeys)
+{
+    CHECK_NULL_RETURN(arg, false);
+    napi_valuetype type = napi_undefined;
+    napi_typeof(env, arg, &type);
+    if (type != napi_object) {
+        return false;
+    }
+    bool isArray = false;
+    napi_is_array(env, arg, &isArray);
+    if (!isArray) {
+        return false;
+    }
+    uint32_t length = 0;
+    napi_get_array_length(env, arg, &length);
+    if (length > MAX_MODIFIER_KEYS) {
+        return false;
+    }
+    uint8_t keys = 0;
+    for (uint32_t i = 0; i < length; ++i) {
+        napi_value element = nullptr;
+        napi_get_element(env, arg, i, &element);
+        CHECK_NULL_RETURN(element, false);
+        uint8_t bit = 0;
+        if (!ParseModifierKey(env, element, bit)) {
+            return false;
+        }
+        if ((keys & bit) != 0) {
+            return false;
+        }
+        keys |= bit;
+    }
+    outKeys = keys;
+    return true;
+}
+
+static napi_value JSRegisterApplicationShortcut(napi_env env, napi_callback_info info)
+{
+    napi_value result = nullptr;
+    napi_create_int32(env, 0, &result);
+    size_t argc = ARGC_REGISTER;
+    napi_value argv[ARGC_REGISTER] = { nullptr };
+    napi_value thisVar = nullptr;
+    void* data = nullptr;
+    napi_get_cb_info(env, info, &argc, argv, &thisVar, &data);
+    if (argc != ARGC_REGISTER) {
+        LOGE("registerApplicationShortcut requires 3 parameters.");
+        return result;
+    }
+
+    std::string value;
+    if (!ParseShortcutValue(env, argv[ARG_INDEX_ZERO], value)) {
+        LOGE("The first parameter must be a string.");
+        return result;
+    }
+
+    uint8_t keys = 0;
+    if (!ParseModifierKeys(env, argv[ARG_INDEX_ONE], keys)) {
+        LOGE("The second parameter must be an array of ModifierKey.");
+        return result;
+    }
+
+    napi_valuetype callbackType = napi_undefined;
+    napi_typeof(env, argv[ARG_INDEX_TWO], &callbackType);
+    if (callbackType != napi_function) {
+        LOGE("The third parameter must be a function.");
+        return result;
+    }
+
+    auto* state = GetApplicationShortcutEnv(env);
+    CHECK_NULL_RETURN(state, result);
+    const auto registrationId = state->Register(env, argv[ARG_INDEX_TWO], value, keys);
+    if (registrationId == 0) {
+        LOGE("Application shortcut registration failed");
+        return result;
+    }
+    napi_create_int32(env, registrationId, &result);
+    return result;
+}
+
+static napi_value JSUnregisterApplicationShortcut(napi_env env, napi_callback_info info)
+{
+    size_t argc = ARGC_UNREGISTER;
+    napi_value argv[ARGC_UNREGISTER] = { nullptr };
+    napi_value thisVar = nullptr;
+    void* data = nullptr;
+    napi_get_cb_info(env, info, &argc, argv, &thisVar, &data);
+    if (argc != ARGC_UNREGISTER) {
+        NapiThrow(env, "unregisterApplicationShortcut requires 1 parameter.", ERROR_CODE_PARAM_INVALID);
+        return nullptr;
+    }
+
+    double registrationId = 0;
+    if (napi_get_value_double(env, argv[ARG_INDEX_ZERO], &registrationId) != napi_ok ||
+        !std::isfinite(registrationId) || std::trunc(registrationId) != registrationId ||
+        registrationId < std::numeric_limits<int32_t>::min() ||
+        registrationId > std::numeric_limits<int32_t>::max()) {
+        NapiThrow(env, "The first parameter must be an integer registration ID.", ERROR_CODE_PARAM_INVALID);
+        return nullptr;
+    }
+    ApplicationShortcutManager::GetInstance().UnregisterApplicationShortcut(static_cast<int32_t>(registrationId));
+    // Collect only on the owning thread; snapshots retain their normal event semantics.
+    for (const auto& [ownerEnv, state] : shortcutEnvs) {
+        state->CollectRetiredCallbacks();
+    }
+
+    napi_value result = nullptr;
+    napi_get_undefined(env, &result);
+    return result;
+}
+
+static napi_value registerFunc(napi_env env, napi_value exports)
+{
+    napi_property_descriptor desc[] = {
+        DECLARE_NAPI_FUNCTION("registerApplicationShortcut", JSRegisterApplicationShortcut),
+        DECLARE_NAPI_FUNCTION("unregisterApplicationShortcut", JSUnregisterApplicationShortcut),
+    };
+    NAPI_CALL(env, napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc));
+    return exports;
+}
+
+static napi_module applicationShortcutModule = {
+    .nm_version = 1,
+    .nm_flags = 0,
+    .nm_filename = nullptr,
+    .nm_register_func = registerFunc,
+    .nm_modname = "arkui.applicationShortcut",
+    .nm_priv = nullptr,
+    .reserved = { 0 },
+};
+
+extern "C" __attribute__((constructor)) void ApplicationShortcutRegister()
+{
+    napi_module_register(&applicationShortcutModule);
+}
+} // namespace OHOS::Ace::Napi

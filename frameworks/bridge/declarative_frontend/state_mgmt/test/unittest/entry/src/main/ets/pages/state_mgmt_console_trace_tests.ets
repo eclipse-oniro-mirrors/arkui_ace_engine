@@ -16,7 +16,7 @@
 import { TestRunner } from '../../lib/testRunner'
 import { PageController } from '../../lib/pageController'
 import { StateMgmtConsoleTraceTests } from '../../common_tests/stateMgmtConsoleTraceTests'
-import router from '@system.router'
+import { router } from '@kit.ArkUI'
 
 @Entry
 @ComponentV2

@@ -74,19 +74,19 @@ ScrollableParentResult SelectionContainerChild::FindNearestScrollable() const
         selectionContainer = GetSelectionContainerFromNode(node);
     }
     auto containerNode = selectionContainer ? selectionContainer->GetHostNode() : nullptr;
-    auto parent = node->GetAncestorNodeOfFrame(true);
+    auto parent = node->GetCoordinateAncestorNodeOfFrame(true);
     bool passedContainer = false;
     while (parent) {
         if (containerNode && parent == containerNode) {
             passedContainer = true;
-            parent = parent->GetAncestorNodeOfFrame(true);
+            parent = parent->GetCoordinateAncestorNodeOfFrame(true);
             continue;
         }
         auto scrollablePattern = parent->GetPattern<ScrollablePattern>();
         if (scrollablePattern && scrollablePattern->IsScrollable()) {
             return { scrollablePattern, !passedContainer };
         }
-        parent = parent->GetAncestorNodeOfFrame(true);
+        parent = parent->GetCoordinateAncestorNodeOfFrame(true);
     }
     return {};
 }

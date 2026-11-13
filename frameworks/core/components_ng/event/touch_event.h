@@ -134,6 +134,8 @@ public:
     bool HandleEvent(const TouchEvent& point) override;
     bool HandleInteractionEvent(const TouchEvent& point) override;
 
+    static TouchEventInfo CreateInputEventInfo(const TouchEvent& event, const RefPtr<FrameNode>& node);
+
     void SetFrameNodeCommonOnTouchEvent(TouchEventFunc&& callback)
     {
         if (commonTouchEventCallback_) {
@@ -167,6 +169,7 @@ private:
     void PublishSearchClickCandidate(const TouchEvent& point);
     bool ShouldResponse() override;
     void TriggerCallBacks(TouchEventInfo& event);
+    void PublishDeveloperResponse(TouchEventInfo& event);
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING
     void ReportTouchEventToUISession(const TouchEventInfo& event);
 #endif

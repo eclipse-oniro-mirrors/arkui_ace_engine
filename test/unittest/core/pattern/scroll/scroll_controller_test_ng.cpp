@@ -876,4 +876,109 @@ HWTEST_F(ScrollControllerTestNg, GetScrollState012, TestSize.Level1)
     EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
 }
 
+/**
+ * @tc.name: GetScrollState013
+ * @tc.desc: Test zero-delta nested delegation frame does not pollute query state
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState013, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    /**
+     * @tc.steps: step1. Simulate nested delegation: child hands a zero-delta UPDATE frame to parent.
+     * @tc.expected: Query state stays IDLE because no real scroll happened,
+     * while frame-level state keeps original behavior.
+     */
+    pattern_->HandleScroll(0.0f, SCROLL_FROM_UPDATE, NestedState::CHILD_SCROLL, 0.0f);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
+    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::SCROLL);
+}
+
+/**
+ * @tc.name: GetScrollState014
+ * @tc.desc: Test zero-delta frame preserves previous session-level query state
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState014, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    pattern_->SetScrollSource(SCROLL_FROM_UPDATE);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
+    /**
+     * @tc.steps: step1. A zero-delta delegation frame arrives during an active drag session.
+     * @tc.expected: Query state keeps SCROLL, neither polluted nor reset.
+     */
+    pattern_->HandleScroll(0.0f, SCROLL_FROM_UPDATE, NestedState::CHILD_SCROLL, 0.0f);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
+}
+
+/**
+ * @tc.name: GetScrollState015
+ * @tc.desc: Test zero-delta AXIS delegation frame does not pollute query state
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState015, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    /**
+     * @tc.steps: step1. Simulate a zero-delta AXIS frame delegated from child.
+     * @tc.expected: Query state stays IDLE.
+     */
+    pattern_->HandleScroll(0.0f, SCROLL_FROM_AXIS, NestedState::CHILD_SCROLL, 0.0f);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
+}
+
+/**
+ * @tc.name: GetScrollState016
+ * @tc.desc: Test zero-delta CROWN delegation frame does not pollute query state
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState016, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    /**
+     * @tc.steps: step1. Simulate a zero-delta CROWN frame delegated from child on wearables.
+     * @tc.expected: Query state stays IDLE, same as UPDATE/AXIS drag frames.
+     */
+    pattern_->HandleScroll(0.0f, SCROLL_FROM_CROWN, NestedState::CHILD_SCROLL, 0.0f);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
+}
+
+/**
+ * @tc.name: GetScrollState017
+ * @tc.desc: Test getScrollState returns IDLE after a stay over-scroll scrollTo reaches its
+ *           out-of-boundary target
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState017, TestSize.Level1)
+{
+    ScrollModelNG model = CreateScroll();
+    model.SetEdgeEffect(EdgeEffect::SPRING, true);
+    CreateContent();
+    CreateScrollDone();
+
+    /**
+     * @tc.steps: step1. scrollTo an out-of-boundary target with canOverScroll and smooth spring.
+     * @tc.expected: Position rests at the out-of-boundary target and getScrollState turns IDLE
+     * instead of a stale FLING.
+     */
+    pattern_->SetCanStayOverScroll(true);
+    MockAnimationManager::GetInstance().SetTicks(5);
+    ASSERT_TRUE(AnimateTo(Dimension(2600.f), 0, nullptr, true, false));
+    for (int32_t i = 0; i < 100 && !MockAnimationManager::GetInstance().AllFinished(); i++) {
+        MockAnimationManager::GetInstance().Tick();
+        FlushUITasks();
+    }
+    EXPECT_TRUE(Position(-2600.f));
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
+}
+
 } // namespace OHOS::Ace::NG

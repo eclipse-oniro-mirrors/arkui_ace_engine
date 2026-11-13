@@ -1277,11 +1277,11 @@ HWTEST_F(FormTestNg, FormPatternTest005, TestSize.Level1)
     pattern->HandleStaticFormEvent(touchPoint);
 
     pattern->isDynamic_ = false;
-    pattern->shouldResponseClick_ = false;
+    pattern->shouldResponseClick_ = ClickResponseState::REJECT_TIMEOUT;
     pattern->HandleStaticFormEvent(touchPoint);
     ASSERT_EQ(pattern->formLinkInfos_.empty(), false);
 
-    pattern->shouldResponseClick_ = true;
+    pattern->shouldResponseClick_ = ClickResponseState::RESPONSIBLE;
     pattern->HandleStaticFormEvent(touchPoint);
     ASSERT_EQ(pattern->formLinkInfos_.empty(), false);
 }

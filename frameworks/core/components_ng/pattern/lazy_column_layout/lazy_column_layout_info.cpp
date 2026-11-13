@@ -297,8 +297,6 @@ void LazyColumnLayoutInfo::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, con
         json->Put("headerMainSize", headerMainSize_);
         json->Put("footerMainSize", footerMainSize_);
         json->Put("space", space_);
-    }
-    if (!config.IsPublicTree()) {
         json->Put("totalMainSize", totalMainSize_);
     }
 }

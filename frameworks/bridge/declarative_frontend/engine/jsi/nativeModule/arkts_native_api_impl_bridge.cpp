@@ -69,11 +69,15 @@
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_web_bridge.h"
 #endif
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_container_picker_bridge.h"
+#ifdef MODAL_UI_EXTENSION_SUPPORTED
+#include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_modal_ui_extension_bridge.h"
+#endif
 #include "core/components_ng/manager/navigation/navigation_manager.h"
 
 namespace OHOS::Ace::NG {
 namespace {
 
+constexpr int32_t NUM_1 = 1;
 constexpr int32_t NUM_2 = 2;
 
 enum class RawInputEventType : int32_t {
@@ -432,6 +436,29 @@ ArkUINativeModuleValue ArkUINativeModule::EnableEventPassthrough(ArkUIRuntimeCal
                 "enableEventPassthrough: unknown eventType=%{public}d", static_cast<int32_t>(eventType));
             break;
     }
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue ArkUINativeModule::SetTransPageEnabled(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+
+    if (runtimeCallInfo->GetArgsNumber() < NUM_1) {
+        return panda::JSValueRef::Undefined(vm);
+    }
+
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(0);
+    if (firstArg.IsEmpty()) {
+        return panda::JSValueRef::Undefined(vm);
+    }
+    if (!firstArg->IsBoolean() && !firstArg->IsUndefined()) {
+        return panda::JSValueRef::Undefined(vm);
+    }
+    bool enabled = firstArg->IsBoolean() ? firstArg->ToBoolean(vm)->Value() : true;
+    auto context = PipelineContext::GetCurrentContext();
+    CHECK_NULL_RETURN(context, panda::JSValueRef::Undefined(vm));
+    context->SetTransPageEnabled(enabled);
     return panda::JSValueRef::Undefined(vm);
 }
 
@@ -1938,6 +1965,10 @@ void ArkUINativeModule::RegisterListAttributes(Local<panda::ObjectRef> object, E
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ListBridge::ResetListSyncLoad));
     list->Set(vm, panda::StringRef::NewFromUtf8(vm, "setListSyncLoad"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ListBridge::SetListSyncLoad));
+    list->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetListScrollPlaceholder"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ListBridge::ResetListScrollPlaceholder));
+    list->Set(vm, panda::StringRef::NewFromUtf8(vm, "setListScrollPlaceholder"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ListBridge::SetListScrollPlaceholder));
     list->Set(vm, panda::StringRef::NewFromUtf8(vm, "setEditModeOptions"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ListBridge::SetEditModeOptions));
     list->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetEditModeOptions"),
@@ -2227,6 +2258,10 @@ void ArkUINativeModule::RegisterWebAttributes(Local<panda::ObjectRef> object, Ec
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetOnZoomChange));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetOnZoomChange"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetOnZoomChange));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setVisitedLinkPersistEnabled"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetVisitedLinkPersistEnabled));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetVisitedLinkPersistEnabled"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetVisitedLinkPersistEnabled));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setOnContextMenuHide"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetOnContextMenuHide));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetOnContextMenuHide"),
@@ -2788,6 +2823,18 @@ ArkUINativeModuleValue ArkUINativeModule::GetPageRootNode(ArkUIRuntimeCallInfo* 
     return panda::NativePointerRef::New(vm, nodePtr);
 }
 
+#ifdef MODAL_UI_EXTENSION_SUPPORTED
+ArkUINativeModuleValue ArkUINativeModule::CreateModalUIExtension(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    return ModalUIExtensionBridge::CreateModalUIExtension(runtimeCallInfo);
+}
+
+ArkUINativeModuleValue ArkUINativeModule::CloseModalUIExtension(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    return ModalUIExtensionBridge::CloseModalUIExtension(runtimeCallInfo);
+}
+#endif
+
 void ArkUINativeModule::RegisterGlobalMethods(Local<panda::ObjectRef> object, EcmaVM* vm)
 {
     object->Set(vm, panda::StringRef::NewFromUtf8(vm, "getFrameNodeById"),
@@ -2810,6 +2857,8 @@ void ArkUINativeModule::RegisterGlobalMethods(Local<panda::ObjectRef> object, Ec
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), RequireDynamicSyncScene));
     object->Set(vm, panda::StringRef::NewFromUtf8(vm, "enableEventPassthrough"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), EnableEventPassthrough));
+    object->Set(vm, panda::StringRef::NewFromUtf8(vm, "setTransPageEnabled"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), SetTransPageEnabled));
     object->Set(vm, panda::StringRef::NewFromUtf8(vm, "setFrameRateRange"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), SetFrameRateRange));
     object->Set(vm, panda::StringRef::NewFromUtf8(vm, "setMarqueeFrameRateRange"),
@@ -2818,6 +2867,12 @@ void ArkUINativeModule::RegisterGlobalMethods(Local<panda::ObjectRef> object, Ec
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), LoadNativeModule));
     object->Set(vm, panda::StringRef::NewFromUtf8(vm, "getPageRootNode"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), GetPageRootNode));
+#ifdef MODAL_UI_EXTENSION_SUPPORTED
+    object->Set(vm, panda::StringRef::NewFromUtf8(vm, "createModalUIExtension"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CreateModalUIExtension));
+    object->Set(vm, panda::StringRef::NewFromUtf8(vm, "closeModalUIExtension"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CloseModalUIExtension));
+#endif
 }
 
 void ArkUINativeModule::RegisterCommonAttributes(Local<panda::ObjectRef> object, EcmaVM* vm)
@@ -2895,10 +2950,20 @@ void ArkUINativeModule::RegisterCommonAttributes(Local<panda::ObjectRef> object,
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::SetShadow));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetShadow"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::ResetShadow));
+    common->Set(vm, panda::StringRef::NewFromUtf8(vm, "setShadowShape"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::SetShadowShape));
+    common->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetShadowShape"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::ResetShadowShape));
+    common->Set(vm, panda::StringRef::NewFromUtf8(vm, "setShadowClipMode"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::SetShadowClipMode));
+    common->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetShadowClipMode"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::ResetShadowClipMode));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "setHitTestBehavior"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::SetHitTestBehavior));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetHitTestBehavior"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::ResetHitTestBehavior));
+    common->Set(vm, panda::StringRef::NewFromUtf8(vm, "setAgentControlMode"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::SetAgentControlMode));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "setZIndex"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::SetZIndex));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetZIndex"),

@@ -42,6 +42,8 @@
 #include "core/components/common/properties/animation_option.h"
 #include "core/components/common/properties/popup_param.h"
 #include "core/components_ng/base/observer_handler.h"
+#include "core/components_ng/token_theme/brand_color_info.h"
+#include "core/components_ng/token_theme/token_theme_storage.h"
 
 namespace OHOS::Accessibility {
 class AccessibilityElementInfo;
@@ -53,7 +55,9 @@ class RSSyncTransactionHandler;
 } // namespace OHOS::Rosen
 
 namespace OHOS::Ace::NG {
+class ForceSplitManager;
 class PageSceneRuleManager;
+struct ForceSplitParam;
 } // namespace OHOS::Ace::NG
 
 namespace OHOS::Ace {
@@ -108,6 +112,7 @@ public:
     void SetUIExtensionDensityFollowHost(OHOS::Rosen::DpiFollowStrategy dpiFollowStrategy) override;
     void UpdateFontScale(const std::shared_ptr<OHOS::AppExecFwk::Configuration>& config);
     static int32_t GetUIContentWindowID(int32_t instanceId);
+    static bool IsBrandColorValid(const std::string& brandColorStr);
     OHOS::Rosen::Window* GetUIContentWindow() override;
     void ForceRequestFrame() override;
     // UI content event process
@@ -145,7 +150,11 @@ public:
     void UpdateTitleInTargetPos(bool isShow, int32_t height) override;
     void NotifyRotationAnimationEnd() override;
     void RegisterExeAppAIFunction(const WeakPtr<TaskExecutor>& taskExecutor);
-    void PostTraverseWebTask(const WeakPtr<TaskExecutor>& weakTaskExecutor, std::function<void()>&& task);
+    bool PostTraverseWebTask(const WeakPtr<TaskExecutor>& weakTaskExecutor, std::function<void()>&& task);
+    int32_t HandleWebPageSceneRegister(const WeakPtr<TaskExecutor>& weakTaskExecutor, int32_t processId,
+        const std::string& ruleJson);
+    int32_t HandleWebPageSceneGet(const WeakPtr<TaskExecutor>& weakTaskExecutor, int32_t processId,
+        const std::string& ruleJson, bool isGetResult);
     void SaveTraverseWebForPageSceneCallback(const WeakPtr<TaskExecutor>& taskExecutor);
     void SaveGetStateMgmtInfoFunction(const WeakPtr<TaskExecutor>& taskExecutor);
     void SaveGetWebInfoByRequestFunction(const WeakPtr<TaskExecutor>& taskExecutor);
@@ -437,6 +446,7 @@ public:
     void RegisterHighlightSpecifiedContentCallback(const WeakPtr<TaskExecutor>& taskExecutor);
     void RegisterSelectTextCallback(const WeakPtr<TaskExecutor>& taskExecutor);
     void SetupGetImagesByIdCallback(const WeakPtr<TaskExecutor>& taskExecutor);
+    void InitInspectorWindowSnapshotCallback();
     void InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& taskExecutor);
     void InitSendCommandFunctionsCallbacks(const WeakPtr<TaskExecutor>& taskExecutor);
     bool SendUIExtProprty(uint32_t code, const AAFwk::Want& data,
@@ -444,6 +454,9 @@ public:
     bool SendUIExtProprtyByPersistentId(uint32_t code, const AAFwk::Want& data,
         const std::unordered_set<int32_t>& persistentIds, uint8_t subSystemId) override;
     void EnableContainerModalCustomGesture(bool enable) override;
+
+    void RegisterBrandColorChangeListener(const BrandColorChangeCallback& callback) override;
+    void UnregisterBrandColorChangeListener() override;
 
     void AddKeyFrameAnimateEndCallback(const std::function<void()>& callback) override;
     void AddKeyFrameNodeCallback(const std::function<
@@ -628,8 +641,17 @@ protected:
     VMType vmType_ = VMType::NORMAL;
 
 private:
+    static void ApplyForceSplitParams(
+        const RefPtr<NG::ForceSplitManager>& forceSplitMgr, NG::ForceSplitParam& config, bool isRouter);
     void ProcessWindowSizeLayoutBreakPointChange(double density);
     void ApplyFloatNavigationAvoidArea(bool enable);
+    void InitBrandColor();
+    static void UpdateBrandColor(
+        const std::weak_ptr<OHOS::AbilityRuntime::Context>& weakContext, int32_t instanceId);
+    static void NotifyBrandColorChangeToUEC(int32_t instanceId, const std::optional<Color>& brandColor,
+        const std::optional<NG::BrandColorStrategy>& colorStrategy);
+    static void HandleBrandColorChanged(
+        const std::weak_ptr<OHOS::AbilityRuntime::Context>& weakContext, int32_t instanceId);
 };
 
 } // namespace OHOS::Ace

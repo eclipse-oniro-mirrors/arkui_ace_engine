@@ -101,6 +101,14 @@ void RadioTestNg::SetUpTestSuite()
         radioTheme->defaultHeight_ = DEFAULT_HEIGHT_DIMENSION;
         return radioTheme;
     });
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly([](ThemeType, int32_t) -> RefPtr<Theme> {
+        auto radioTheme = AceType::MakeRefPtr<RadioTheme>();
+        radioTheme->hotZoneHorizontalPadding_ = HORIZONTAL_PADDING;
+        radioTheme->hotZoneVerticalPadding_ = VERTICAL_PADDING;
+        radioTheme->defaultWidth_ = DEFAULT_WIDTH_DIMENSION;
+        radioTheme->defaultHeight_ = DEFAULT_HEIGHT_DIMENSION;
+        return radioTheme;
+    });
     MockPipelineContext::GetCurrent()->SetThemeManager(themeManager);
     MockContainer::SetUp();
 }
@@ -962,10 +970,21 @@ HWTEST_F(RadioTestNg, RadioPaintMethodTest013, TestSize.Level0)
         radioTheme->sizeFocusBg_ = FOCUSBGSIZE;
         return radioTheme;
     });
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly([](ThemeType, int32_t) -> RefPtr<Theme> {
+        auto radioTheme = AceType::MakeRefPtr<RadioTheme>();
+        radioTheme->focusedBgUnchecked_ = NORMAL_COLOR;
+        radioTheme->focusedRingUnchecked_ = NORMAL_COLOR;
+        radioTheme->focusedBgColor_ = NORMAL_COLOR;
+        radioTheme->sizeFocusBg_ = FOCUSBGSIZE;
+        return radioTheme;
+    });
     MockPipelineContext::GetCurrent()->SetThemeManager(themeManager);
-    auto radioModifier = AceType::MakeRefPtr<RadioModifier>();
+    RadioModelNG radioModelNG;
+    radioModelNG.Create(NAME, GROUP_NAME, INDICATOR_TYPE_TICK);
+    auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    auto radioModifier = AceType::MakeRefPtr<RadioModifier>(frameNode);
     RadioPaintMethod radioPaintMethod(radioModifier);
-    radioPaintMethod.radioModifier_->InitializeParam();
+    radioPaintMethod.radioModifier_->InitializeParam(frameNode);
     EXPECT_EQ(radioPaintMethod.radioModifier_->focusedBgUnchecked_, NORMAL_COLOR);
     EXPECT_EQ(radioPaintMethod.radioModifier_->focusedRingUnchecked_, NORMAL_COLOR);
     EXPECT_EQ(radioPaintMethod.radioModifier_->focusedBgColor_, NORMAL_COLOR);

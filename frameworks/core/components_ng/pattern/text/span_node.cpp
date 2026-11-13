@@ -135,6 +135,13 @@ std::unique_ptr<JsonValue> ConvertFontVariationsToJson(const FONT_VARIATIONS_LIS
     }
     return jsonFontVariations;
 }
+
+void EnsureBackgroundStyle(const RefPtr<SpanItem>& span)
+{
+    if (!span->backgroundStyle.has_value()) {
+        span->backgroundStyle = TextBackgroundStyle();
+    }
+}
 } // namespace
 
 std::string SpanItem::GetFont() const
@@ -1502,6 +1509,14 @@ bool SpanItem::EncodeTlv(std::vector<uint8_t>& buff)
             TLVUtil::WriteUint8(buff, TLV_SPAN_BACKGROUND_BACKGROUNDRADIUS);
             TLVUtil::WriteBorderRadiusProperty(buff, backgroundStyle->backgroundRadius.value());
         }
+        if (backgroundStyle->borderWidth.has_value()) {
+            TLVUtil::WriteUint8(buff, TLV_SPAN_BACKGROUND_BORDERWIDTH);
+            TLVUtil::WriteDimension(buff, backgroundStyle->borderWidth.value());
+        }
+        if (backgroundStyle->borderColor.has_value()) {
+            TLVUtil::WriteUint8(buff, TLV_SPAN_BACKGROUND_BORDERCOLOR);
+            TLVUtil::WriteColor(buff, backgroundStyle->borderColor.value());
+        }
         TLVUtil::WriteUint8(buff, TLV_SPAN_BACKGROUND_GROUPID);
         TLVUtil::WriteInt32(buff, backgroundStyle->groupId);
     }
@@ -1621,7 +1636,7 @@ RefPtr<SpanItem> SpanItem::DecodeTlv(std::vector<uint8_t>& buff, int32_t& cursor
     sameSpan->content = UtfUtils::Str8DebugToStr16(TLVUtil::ReadString(buff, cursor));
 
     for (uint8_t tag = TLVUtil::ReadUint8(buff, cursor);
-        tag != TLV_SPANITEM_END_TAG; tag = TLVUtil::ReadUint8(buff, cursor)) {
+        tag != TLV_SPANITEM_END_TAG && tag != TLV_END; tag = TLVUtil::ReadUint8(buff, cursor)) {
         switch (tag) {
             READ_TEXT_STYLE_TLV(fontStyle, UpdateFontSize, TLV_SPAN_FONT_STYLE_FONTSIZE, Dimension);
             READ_TEXT_STYLE_TLV(fontStyle, UpdateTextColor, TLV_SPAN_FONT_STYLE_TEXTCOLOR, Color);
@@ -1687,17 +1702,27 @@ RefPtr<SpanItem> SpanItem::DecodeTlv(std::vector<uint8_t>& buff, int32_t& cursor
                 TLV_SPAN_TEXT_LINE_STYLE_COLORSHADERSTYLE, Color);
 
             case TLV_SPAN_BACKGROUND_BACKGROUNDCOLOR: {
-                if (!sameSpan->backgroundStyle.has_value()) {
-                    sameSpan->backgroundStyle = TextBackgroundStyle();
-                }
+                EnsureBackgroundStyle(sameSpan);
                 sameSpan->backgroundStyle->backgroundColor = TLVUtil::ReadColor(buff, cursor);
                 break;
             }
             case TLV_SPAN_BACKGROUND_BACKGROUNDRADIUS: {
+                EnsureBackgroundStyle(sameSpan);
                 sameSpan->backgroundStyle->backgroundRadius = TLVUtil::ReadBorderRadiusProperty(buff, cursor);
                 break;
             }
+            case TLV_SPAN_BACKGROUND_BORDERWIDTH: {
+                EnsureBackgroundStyle(sameSpan);
+                sameSpan->backgroundStyle->borderWidth = TLVUtil::ReadDimension(buff, cursor);
+                break;
+            }
+            case TLV_SPAN_BACKGROUND_BORDERCOLOR: {
+                EnsureBackgroundStyle(sameSpan);
+                sameSpan->backgroundStyle->borderColor = TLVUtil::ReadColor(buff, cursor);
+                break;
+            }
             case TLV_SPAN_BACKGROUND_GROUPID: {
+                EnsureBackgroundStyle(sameSpan);
                 sameSpan->backgroundStyle->groupId = TLVUtil::ReadInt32(buff, cursor);
                 break;
             }
@@ -1822,7 +1847,7 @@ RefPtr<ImageSpanItem> ImageSpanItem::DecodeTlv(std::vector<uint8_t>& buff, int32
     sameSpan->content = UtfUtils::Str8DebugToStr16(TLVUtil::ReadString(buff, cursor));
 
     for (uint8_t tag = TLVUtil::ReadUint8(buff, cursor);
-        tag != TLV_SPANITEM_END_TAG; tag = TLVUtil::ReadUint8(buff, cursor)) {
+        tag != TLV_SPANITEM_END_TAG && tag != TLV_END; tag = TLVUtil::ReadUint8(buff, cursor)) {
         switch (tag) {
             case TLV_IMAGESPANOPTION_OFFSET_TAG: {
                 sameSpan->options.offset = TLVUtil::ReadInt32(buff, cursor);
@@ -2229,7 +2254,8 @@ void BaseSpan::SetTextBackgroundStyle(const TextBackgroundStyle& style)
 {
     textBackgroundStyle_ = style;
     textBackgroundStyle_->groupId = groupId_;
-    SetHasTextBackgroundStyle(style.backgroundColor.has_value() || style.backgroundRadius.has_value());
+    SetHasTextBackgroundStyle(style.backgroundColor.has_value() || style.backgroundRadius.has_value() ||
+        style.borderWidth.has_value() || style.borderColor.has_value());
     MarkTextDirty();
 }
 

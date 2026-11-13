@@ -52,6 +52,11 @@ public:
     using NotifySendCommandFunction = std::function<void(int32_t id, const std::string& command)>;
     using NotifySendCommandSyncFunction = std::function<int32_t(int32_t id, const std::string& command)>;
     using SendCommandFunction = std::function<void(int32_t value)>;
+    using CommandResultCallback = std::function<void(const std::string& resultJson)>;
+    using NotifySendCommandWithResultFunction =
+        std::function<void(int32_t id, const std::string& command, const CommandResultCallback& finishCallback)>;
+    using SendCommandWithResultFunction =
+        std::function<void(const std::string& command, const CommandResultCallback& finishCallback)>;
     using RelaxedCommandFunction = std::function<void(const std::string& command)>;
     using ExeAppAIFunctionFunction = std::function<std::pair<uint32_t, std::string>(
         const std::string&, const std::string&, const sptr<IRemoteObject>&, int32_t)>;
@@ -77,6 +82,17 @@ public:
     };
     using WebPageSceneFunction = std::function<int32_t(WebPageSceneOp op, int32_t processId,
         const std::string& ruleJson, bool isGetResult)>;
+    // Runtime-injected callbacks to the NG PageSceneResponseObserver. libace_entrance binds
+    // these after loading; ui_session holds only the function pointers (no libace link dep).
+    struct PageSceneResponseObserverFunction {
+        std::function<int32_t(int32_t processId, const std::string& ruleJson)> registerRuleSet;
+        std::function<int32_t(int32_t processId, const std::string& ruleSetId)> unregisterRuleSet;
+        std::function<void(int32_t processId)> clearProcess;
+        std::function<void(bool active)> setActive;
+        std::function<bool()> hasRegisteredRules;
+        std::function<std::vector<std::pair<int32_t, std::string>>()> getActiveRuleJsons;
+        std::function<void()> onContentStable;
+    };
 
     enum class PageSceneNodeStateChange : uint8_t {
         VISIBILITY,
@@ -336,11 +352,24 @@ public:
     // the slot order of the existing UiSessionManager methods.
     virtual void NotifyPageSceneNodeStateChanged(
         const std::string& nodeTag, PageSceneNodeStateChange stateChange) {};
-
     virtual void SaveComponentTreeQueryFunction(ComponentTreeQueryFunction&& function) {};
     virtual void ComponentTreeQuery(const ComponentTreeQueryRequest& request) {};
     virtual void ReportNavigationQueryResult(const std::string& data) {};
     virtual void ReportLazyForEachQueryResult(const std::string& data) {};
+    virtual void ReportNodesInRectQueryResult(const std::string& data) {};
+    // Full rule-set JSONs of all registered PageScene rule sets for RESPONSE matching; keep slot order.
+    virtual std::vector<std::pair<int32_t, std::string>> GetActivePageSceneRuleJsons()
+    {
+        return {};
+    };
+
+    virtual void SaveForSendCommandWithResultFunction(NotifySendCommandWithResultFunction&& function) {};
+    virtual void NotifySendCommandPatternWithResult(
+        int32_t id, const std::string& command, const CommandResultCallback& finishCallback) {};
+    virtual void SaveSendCommandWithResultFunction(SendCommandWithResultFunction&& function) {};
+    virtual void SendCommandWithResult(
+        const std::string& command, const CommandResultCallback& finishCallback) {};
+    virtual CommandResultCallback MakeCommandResultCallback(int32_t processId, uint64_t requestId) { return {}; }
 
     // Internal callback, separate from full page-scene detection and its queues.
     void SaveSearchClickFlushFunction(std::function<void()>&& function)
@@ -426,8 +455,18 @@ protected:
     std::mutex webPageSceneMutex_;
     ComponentTreeQueryFunction componentTreeQueryFunction_;
     std::mutex componentTreeQueryFunctionMutex_;
+    NotifySendCommandWithResultFunction notifySendCommandWithResultFunction_;
+    std::mutex notifySendCommandWithResultFunctionMutex_;
+    SendCommandWithResultFunction sendCommandWithResultFunction_;
+    std::mutex sendCommandWithResultFunctionMutex_;
     std::function<void()> searchClickFlushFunction_;
     std::mutex searchClickFlushMutex_;
+
+public:
+    // Append after existing virtual declarations to preserve their slot order.
+    virtual void SaveRelaxedCommandWithResultFunction(SendCommandWithResultFunction&& function) {};
+    // Runtime-injected RESPONSE observer callbacks; appended last to keep existing slot order.
+    virtual void SavePageSceneResponseObserverFunction(PageSceneResponseObserverFunction&& function) {};
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_INTERFACE_UI_SESSION_MANAGER_H

@@ -16,37 +16,51 @@
 #include "ui_sa_service.h"
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <cerrno>
 #include <cctype>
 #include <cinttypes>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <fcntl.h>
 #include <functional>
 #include <iomanip>
 #include <fstream>
 #include <limits>
 #include <sstream>
+#include <string>
 #include <sys/time.h>
+#include <unistd.h>
 
 #include "ipc_skeleton.h"
 #include "iremote_object.h"
 #include "string_ex.h"
 #include "ui_content_proxy.h"
 #include "ui_content_service_interface.h"
+#include "ui_session_json_util.h"
 #include "window_manager.h"
 
 #include "adapter/ohos/entrance/ui_session/include/ui_session_log.h"
+#include "adapter/ohos/entrance/ui_session/include/ui_session_trace.h"
 #include "interfaces/inner_api/ace_kit/include/ui/base/utils/utils.h"
 
 namespace OHOS::Ace {
 namespace {
 const bool REGISTER_RESULT = SystemAbility::MakeAndRegisterAbility(&UiSaService::GetInstance());
 const std::string UI_SA_PATH = "/data/service/el1/public/ui_sa/";
+constexpr int32_t MAX_UNIQUE_FILE_SUFFIX = 100;
+constexpr int32_t FILE_SUFFIX_WIDTH = 2;
 constexpr char WEB_INTERFACE_REQUEST_DOM_TREE[] = "RequestArkWebDomTree";
 constexpr char WEB_INTERFACE_REQUEST_DOM_TREE_VIEWPORT[] = "RequestArkWebDomTreeViewport";
+constexpr char WEB_INTERFACE_REQUEST_DOM_TREE_BY_NATIVE[] = "RequestArkWebDomTreeByNative";
+constexpr char WEB_INTERFACE_REQUEST_DOM_TREE_BY_RECT[] = "RequestArkWebDomTreeByRect";
+constexpr char WEB_INTERFACE_REQUEST_DOM_TREE_BY_POINT[] = "RequestArkWebDomTreeByPoint";
 constexpr size_t BITS_UINT32 = sizeof(uint32_t) * 8;
 constexpr int32_t PARAMS_OFFSET = 1;
+constexpr size_t MAX_INSPECTOR_CASE_ID_LENGTH = 64;
 constexpr size_t GET_VISIBLE_INTERACTION_INFO_INDEX = 1;
 constexpr size_t GET_VISIBLE_ACCESSIBILITY_INFO_INDEX = 2;
 constexpr size_t GET_VISIBLE_CACHE_NODES_INDEX = 3;
@@ -66,15 +80,29 @@ constexpr uint8_t NIBBLE_BITS = 4;
 constexpr uint8_t LOW_NIBBLE_MASK = 0x0F;
 constexpr int32_t START_WEB_VIEW_TRANSLATE = 2;
 constexpr int32_t GET_WEB_INFO_BY_REQUEST_PARAMS = 3;
+constexpr int32_t GET_WEB_INFO_BY_RECT_PARAMS = 7;
+constexpr int32_t GET_WEB_INFO_BY_POINT_PARAMS = 5;
+constexpr size_t WEB_ID_PARAM_INDEX = 1;
+constexpr size_t REQUEST_PARAM_INDEX = 2;
+constexpr size_t RECT_X_PARAM_INDEX = 3;
+constexpr size_t RECT_Y_PARAM_INDEX = 4;
+constexpr size_t RECT_WIDTH_PARAM_INDEX = 5;
+constexpr size_t RECT_HEIGHT_PARAM_INDEX = 6;
+constexpr size_t POINT_X_PARAM_INDEX = 3;
+constexpr size_t POINT_Y_PARAM_INDEX = 4;
+constexpr int32_t DOMTREE_LOG_PREVIEW_LENGTH = 200;
 constexpr int32_t EXE_APP_AI_FUNCTION_PARAMS = 3;
 constexpr int32_t GET_STATE_MGMT_INFO_PARAMS = 4;
 constexpr int32_t GET_SPECIFIED_CONTENT_OFFSETS_PARAMS = 3;
 constexpr int32_t HIGHLIGHT_SPECIFIED_CONTENT_PARAMS = 3;
 constexpr int32_t GET_NAVIGATION_CONTENT_PARAMS = 4;
 constexpr int32_t GET_LAZY_FOREACH_DATA_PARAMS = 3;
+constexpr int32_t GET_NODES_IN_RECT_PARAMS = 5;
 constexpr int32_t PAGE_TRANSLATE_REQUEST_PARAMS = 2;
 constexpr int32_t PAGE_TRANSLATE_RESET_PARAMS = 2;
 constexpr int32_t PARAM_TWO = 2;
+constexpr int32_t PARAM_THREE = 3;
+constexpr int32_t PARAM_FOUR = 4;
 constexpr size_t PAGE_TRANSLATE_EXTRA_DATA_INDEX = 2;
 constexpr int32_t DEFAULT_APP_USER_ID = 100;
 constexpr char DEFAULT_PAGE_TRANSLATE_REQUEST[] = R"({"scope":3})";
@@ -348,9 +376,35 @@ bool ReadTextFile(const std::string& filePath, std::string& content)
     return true;
 }
 
+std::string ReserveUniqueFilePath(const std::string& fileNamePrefix)
+{
+    const auto baseName = UI_SA_PATH + fileNamePrefix + "_" + GetCurrentTimestampStr();
+    for (int32_t suffix = 0; suffix <= MAX_UNIQUE_FILE_SUFFIX; ++suffix) {
+        std::ostringstream nameStream;
+        nameStream << baseName;
+        if (suffix > 0) {
+            nameStream << "_" << std::setw(FILE_SUFFIX_WIDTH) << std::setfill('0') << suffix;
+        }
+        nameStream << ".json";
+        auto filePath = nameStream.str();
+        const int32_t fd = open(filePath.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0644);
+        if (fd >= 0) {
+            close(fd);
+            return filePath;
+        }
+        if (errno != EEXIST) {
+            LOGW("%{public}s create file failed, errno=%{public}d, filePath=%{public}s", fileNamePrefix.c_str(),
+                errno, filePath.c_str());
+            return "";
+        }
+    }
+    LOGW("%{public}s no free file name suffix", fileNamePrefix.c_str());
+    return "";
+}
+
 void WriteTextFile(const std::string& tag, const std::string& fileNamePrefix, const std::string& content)
 {
-    auto filePath = UI_SA_PATH + fileNamePrefix + "_" + GetCurrentTimestampStr() + ".json";
+    auto filePath = ReserveUniqueFilePath(fileNamePrefix);
     std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
     if (!ostream || !ostream->is_open()) {
         LOGW("%{public}s filePath is invalid", tag.c_str());
@@ -528,9 +582,12 @@ std::string BuildBatchSetTextCommand(const std::vector<std::string>& params)
 const std::map<std::string, UiSaService::DumpHandler> UiSaService::DUMP_MAP = {
     { "Connect", &UiSaService::HandleConnect },
     { "GetVisibleInspectorTree", &UiSaService::HandleGetVisibleInspectorTree },
+    { "GetInspectorTree", &UiSaService::HandleGetInspectorTree },
     { "GetCurrentPageName", &UiSaService::HandleGetCurrentPageName },
     { "SendCommand", &UiSaService::HandleSendCommand },
     { "SendBatchSetText", &UiSaService::HandleSendBatchSetText },
+    { "SendCommandWithFinishCallback", &UiSaService::HandleSendCommandWithFinishCallback },
+    { "SendBatchSetTextWithFinishCallback", &UiSaService::HandleSendBatchSetTextWithFinishCallback },
     { "SendCommandSync", &UiSaService::HandleSendCommandSync },
     { "RegisterContentChangeCallback", &UiSaService::HandleRegisterContentChangeCallback },
     { "UnregisterContentChangeCallback", &UiSaService::HandleUnregisterContentChangeCallback },
@@ -560,6 +617,7 @@ const std::map<std::string, UiSaService::DumpHandler> UiSaService::DUMP_MAP = {
     { "HighlightSpecifiedContent", &UiSaService::HandleHighlightSpecifiedContent },
     { "GetNavigationContent", &UiSaService::HandleGetNavigationContent },
     { "GetLazyForEachData", &UiSaService::HandleGetLazyForEachData },
+    { "GetNodesInRect", &UiSaService::HandleGetNodesInRect },
 };
 
 UiSaService::UiSaService() : SystemAbility(UI_SA_ID, true) {}
@@ -648,6 +706,16 @@ int32_t UiSaService::Dump(int32_t fd, const std::vector<std::u16string>& args)
         const auto str = Str16ToStr8(arg);
         params.emplace_back(str);
     }
+    if (!params.empty() && params.front() == "SendCommandTraceDiagnostic") {
+        if (params.size() != PARAM_TWO || (params[1] != "on" && params[1] != "off")) {
+            dprintf(fd, "Usage: SendCommandTraceDiagnostic on|off\n");
+            return ERR_INVALID_DATA;
+        }
+        UiSessionSetCommandTraceDiagnosticEnabled(params[1] == "on");
+        dprintf(fd, "SendCommand trace diagnostic: %s (SA process only). "
+            "Use off and a fresh capture for performance measurements.\n", params[1].c_str());
+        return ERR_NONE;
+    }
     OHOS::Rosen::FocusChangeInfo focusedWindowInfo;
     OHOS::Rosen::WindowManager::GetInstance(DEFAULT_APP_USER_ID).GetFocusWindowInfo(focusedWindowInfo);
     int32_t focusedWindowId = focusedWindowInfo.windowId_;
@@ -687,38 +755,120 @@ void UiSaService::HandleConnect(sptr<IUiContentService> service, std::vector<std
 
 void UiSaService::HandleGetVisibleInspectorTree(sptr<IUiContentService> service, std::vector<std::string> params)
 {
-    bool toFile = params.back() == "-tofile";
-    auto visibleInspectorTreeCallBack = [toFile](const std::string& data, int32_t index, bool isEnd) {
-        LOGI("[GetVisibleInspectorTree] data = %{public}s", data.substr(0, 200).c_str());
-        if (isEnd && toFile) {
-            auto filePath = UI_SA_PATH + "arkui_tree_" + GetCurrentTimestampStr() + ".json";
-            std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
-            CHECK_NULL_VOID(ostream);
-            if (!ostream->is_open()) {
-                LOGW("[GetVisibleInspectorTree] filePath is invalid");
+    HandleInspectorTree(service, params, true);
+}
+
+void UiSaService::HandleGetInspectorTree(sptr<IUiContentService> service, std::vector<std::string> params)
+{
+    HandleInspectorTree(service, params, false);
+}
+
+void UiSaService::HandleInspectorTree(
+    sptr<IUiContentService> service, const std::vector<std::string>& params, bool visible)
+{
+    CHECK_NULL_VOID(service);
+    ParamConfig config;
+    int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS;
+    bool toFile = false;
+    std::string caseId = "manual";
+    // Preserve the historical Visible positional form.
+    if (params.size() >= SIMPLIFYTREE_WITH_PARAMCONFIG && params[1].rfind("--", 0) != 0) {
+        config.interactionInfo = params[GET_VISIBLE_INTERACTION_INFO_INDEX] == "true";
+        config.accessibilityInfo = params[GET_VISIBLE_ACCESSIBILITY_INFO_INDEX] == "true";
+        config.cacheNodes = params[GET_VISIBLE_CACHE_NODES_INDEX] == "true";
+        config.withWeb = params[GET_VISIBLE_WITH_WEB_INDEX] == "true";
+        config.withUIExtension = params[GET_VISIBLE_WITH_UI_EXTENSION_INDEX] == "true";
+        if (params.size() >= SIMPLIFYTREE_WITH_EXTENDED_PARAMCONFIG) {
+            config.rectCulling = params[GET_VISIBLE_RECT_CULLING_INDEX] == "true";
+            config.minOpacity = ParseMinOpacityParam(params[GET_VISIBLE_MIN_OPACITY_INDEX]);
+        }
+    }
+    const std::map<std::string, bool*> flags {
+        { "--interactionInfo", &config.interactionInfo }, { "--accessibilityInfo", &config.accessibilityInfo },
+        { "--cacheNodes", &config.cacheNodes }, { "--withWeb", &config.withWeb },
+        { "--withUIExtension", &config.withUIExtension }, { "--rectCulling", &config.rectCulling },
+        { "--withResponseRegion", &config.withResponseRegion }, { "--withCustomContent", &config.withCustomContent }
+    };
+    for (size_t i = 1; i < params.size(); ++i) {
+        if (params[i] == "-tofile") {
+            toFile = true;
+            continue;
+        }
+        if (params[i].rfind("--", 0) != 0) {
+            continue;
+        }
+        auto separator = params[i].find('=');
+        auto key = params[i].substr(0, separator);
+        std::string value;
+        if (separator != std::string::npos) {
+            value = params[i].substr(separator + 1);
+        } else if (i + 1 < params.size()) {
+            value = params[++i];
+        } else {
+            LOGW("[InspectorTree] missing option value");
+            return;
+        }
+        auto flag = flags.find(key);
+        if (flag != flags.end()) {
+            if (value != "true" && value != "false" && value != "1" && value != "0") {
+                LOGW("[InspectorTree] invalid boolean option");
                 return;
             }
-            ostream->write(data.c_str(), data.length());
-            LOGI("[GetVisibleInspectorTree] tree is saved to %{public}s", filePath.c_str());
+            *flag->second = value == "true" || value == "1";
+        } else if (key == "--minOpacity") {
+            config.minOpacity = ParseMinOpacityParam(value);
+        } else if (key == "--timeout") {
+            char* end = nullptr;
+            errno = 0;
+            auto parsed = std::strtol(value.c_str(), &end, 10);
+            if (errno || end == value.c_str() || *end || parsed < INT32_MIN || parsed > INT32_MAX) {
+                LOGW("[InspectorTree] invalid timeout option");
+                return;
+            }
+            timeout = static_cast<int32_t>(parsed);
+        } else if (key == "--caseId") {
+            if (value.empty() || value.size() > MAX_INSPECTOR_CASE_ID_LENGTH ||
+                !std::all_of(value.begin(), value.end(), [](unsigned char c) {
+                    return std::isalnum(c) || c == '_' || c == '-';
+                })) {
+                LOGW("[InspectorTree] invalid case identifier");
+                return;
+            }
+            caseId = value;
+        } else {
+            LOGW("[InspectorTree] unknown option");
+            return;
+        }
+    }
+    auto now = []() {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
+    };
+    const auto start = now();
+    const std::string api = visible ? "GetVisibleInspectorTree" : "GetInspectorTree";
+    auto count = std::make_shared<std::atomic<int32_t>>(0);
+    auto callback = [toFile, start, now, api, caseId, count](std::string data, int32_t part, bool last) {
+        const auto calls = ++*count;
+        LOGI("[InspectorTree] caseId=%{public}s api=%{public}s bytes=%{public}zu part=%{public}d "
+             "lastPart=%{public}d callbackCount=%{public}d startMs=%{public}" PRId64 " endMs=%{public}" PRId64,
+            caseId.c_str(), api.c_str(), data.size(), part, last, calls, static_cast<int64_t>(start),
+            static_cast<int64_t>(now()));
+        if (toFile && last) {
+            const auto filePath = ReserveUniqueFilePath("arkui_tree");
+            std::ofstream output(filePath, std::ios::binary | std::ios::trunc);
+            output.write(data.data(), static_cast<std::streamsize>(data.size()));
+            LOGI("[InspectorTree] fileSaved=%{public}d dataFile=%{public}s", output.good(), filePath.c_str());
         }
     };
-    if (params.size() >= SIMPLIFYTREE_WITH_EXTENDED_PARAMCONFIG) {
-        service->GetVisibleInspectorTree(visibleInspectorTreeCallBack,
-            { params[GET_VISIBLE_INTERACTION_INFO_INDEX] == "true",
-                params[GET_VISIBLE_ACCESSIBILITY_INFO_INDEX] == "true",
-                params[GET_VISIBLE_CACHE_NODES_INDEX] == "true", params[GET_VISIBLE_WITH_WEB_INDEX] == "true",
-                params[GET_VISIBLE_WITH_UI_EXTENSION_INDEX] == "true",
-                params[GET_VISIBLE_RECT_CULLING_INDEX] == "true",
-                ParseMinOpacityParam(params[GET_VISIBLE_MIN_OPACITY_INDEX]) });
-    } else if (params.size() >= SIMPLIFYTREE_WITH_PARAMCONFIG) {
-        service->GetVisibleInspectorTree(visibleInspectorTreeCallBack,
-            { params[GET_VISIBLE_INTERACTION_INFO_INDEX] == "true",
-                params[GET_VISIBLE_ACCESSIBILITY_INFO_INDEX] == "true",
-                params[GET_VISIBLE_CACHE_NODES_INDEX] == "true", params[GET_VISIBLE_WITH_WEB_INDEX] == "true",
-                params[GET_VISIBLE_WITH_UI_EXTENSION_INDEX] == "true" });
-    } else {
-        service->GetVisibleInspectorTree(visibleInspectorTreeCallBack);
-    }
+    LOGI("[InspectorTree] caseId=%{public}s api=%{public}s config=%{public}d,%{public}d,%{public}d,"
+        "%{public}d,%{public}d,%{public}d,%{public}f,%{public}d,%{public}d timeout=%{public}d",
+        caseId.c_str(), api.c_str(), config.interactionInfo, config.accessibilityInfo, config.cacheNodes,
+        config.withWeb, config.withUIExtension, config.rectCulling, config.minOpacity,
+        config.withResponseRegion, config.withCustomContent, timeout);
+    const auto result = visible ? service->GetVisibleInspectorTree(callback, config, timeout) :
+        service->GetInspectorTree(callback, config, timeout);
+    LOGI("[InspectorTree] caseId=%{public}s api=%{public}s returnCode=%{public}d startMs=%{public}" PRId64,
+        caseId.c_str(), api.c_str(), result, static_cast<int64_t>(start));
 }
 
 void UiSaService::HandleGetCurrentPageName(sptr<IUiContentService> service, std::vector<std::string> params)
@@ -767,6 +917,46 @@ void UiSaService::HandleSendBatchSetText(sptr<IUiContentService> service, std::v
     service->SendCommand(command);
 }
 
+void UiSaService::HandleSendCommandWithFinishCallback(
+    sptr<IUiContentService> service, std::vector<std::string> params)
+{
+    if ((params.size() != SEND_COMMAND_WITH_NODEID && params.size() != SEND_COMMAND_WITHOUT_NODEID) ||
+        !EnsureConnected(service)) {
+        return;
+    }
+    auto finishCallback = [](const std::string& resultJson) {
+        LOGI("[SendCommandWithFinishCallback] finish result=%{public}s", resultJson.c_str());
+        auto result = InspectorJsonUtil::ParseJsonString(resultJson);
+        bool success = result && result->GetString("result") == "SUCCESS";
+        auto results = result ? result->GetValue("results") : nullptr;
+        LOGI("[SendCommandWithFinishCallback] success=%{public}d, items=%{public}d, resultSize=%{public}zu",
+            success, results && results->IsArray() ? results->GetArraySize() : 0, resultJson.size());
+    };
+    auto command = params.back();
+    if (command == "file") {
+        command = ReadPageSceneRuleJson();
+        if (command.empty()) {
+            return;
+        }
+    }
+    int32_t result = params.size() == SEND_COMMAND_WITH_NODEID
+        ? service->SendCommand(std::atoi(params[1].c_str()), command, finishCallback)
+        : service->SendCommand(command, finishCallback);
+    LOGI("[SendCommandWithFinishCallback] request result=%{public}d", result);
+}
+
+void UiSaService::HandleSendBatchSetTextWithFinishCallback(
+    sptr<IUiContentService> service, std::vector<std::string> params)
+{
+    const auto itemCount = params.empty() ? 0 : (params.size() - 1) / BATCH_ARGUMENT_PAIR_SIZE;
+    if (params.size() < MIN_BATCH_SET_TEXT_PARAM_COUNT ||
+        (params.size() - 1) % BATCH_ARGUMENT_PAIR_SIZE != 0 || itemCount > MAX_BATCH_SET_TEXT_COUNT) {
+        LOGW("SendBatchSetTextWithFinishCallback expects 1..50 nodeId/text pairs");
+        return;
+    }
+    HandleSendCommandWithFinishCallback(service, { "SendCommandWithFinishCallback", BuildBatchSetTextCommand(params) });
+}
+
 void UiSaService::HandleSendCommandSync(sptr<IUiContentService> service, std::vector<std::string> params)
 {
     CHECK_EQUAL_VOID(params.size() == SEND_COMMAND_WITH_NODEID, false);
@@ -783,7 +973,7 @@ void UiSaService::HandleRegisterContentChangeCallback(sptr<IUiContentService> se
         LOGI("[ContentChangeManager] callback type=%{public}s(%{public}d), tree: %{public}s",
             GetContentChangeTypeName(type), static_cast<int32_t>(type), simpleTree.substr(0, 200).c_str());
         if (toFile && simpleTree.length()) {
-            auto filePath = UI_SA_PATH + "arkui_simpleTree_" + GetCurrentTimestampStr() + ".json";
+            auto filePath = ReserveUniqueFilePath("arkui_simpleTree");
             std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
             if (ostream && ostream->is_open()) {
                 ostream->write(simpleTree.c_str(), simpleTree.length());
@@ -873,42 +1063,100 @@ void UiSaService::HandleGetImagesById(sptr<IUiContentService> service, std::vect
 
 void UiSaService::HandleGetWebInfoByRequest(sptr<IUiContentService> service, std::vector<std::string> params)
 {
-    if (params.size() >= GET_WEB_INFO_BY_REQUEST_PARAMS) {
-        int32_t webId = std::atoi(params[1].c_str());
-        std::string request = params[2];
-        auto finishCallback = [](int32_t winId, int32_t webId, const std::string& request, const std::string& result,
-            WebRequestErrorCode code) {
-            LOGI("[GetWebInfoByRequest] finishCallback winId=%{public}d, webId=%{public}d", winId, webId);
-            LOGI("[GetWebInfoByRequest] finishCallback request=%{public}s", request.c_str());
-            LOGI("[GetWebInfoByRequest] finishCallback result=%{public}s", result.substr(0, 200).c_str());
-            LOGI("[GetWebInfoByRequest] finishCallback result.length=%{public}zu", result.length());
-            LOGI("[GetWebInfoByRequest] finishCallback code=%{public}d", code);
-            if (request == WEB_INTERFACE_REQUEST_DOM_TREE) {
-                auto filePath = UI_SA_PATH + "arkweb_tree_" + GetCurrentTimestampStr() + ".json";
-                std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
-                CHECK_NULL_VOID(ostream);
-                if (!ostream->is_open()) {
-                    LOGW("[GetWebInfoByRequest] filePath is invalid");
-                    return;
-                }
-                ostream->write(result.c_str(), result.length());
-                LOGI("[GetWebInfoByRequest] arkWeb tree is saved to %{public}s", filePath.c_str());
-            }
-            if (request == WEB_INTERFACE_REQUEST_DOM_TREE_VIEWPORT) {
-                auto filePath = UI_SA_PATH + "arkweb_tree_viewport_" + GetCurrentTimestampStr() + ".json";
-                std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
-                CHECK_NULL_VOID(ostream);
-                if (!ostream->is_open()) {
-                    LOGW("[GetWebInfoByRequest] filePath is invalid");
-                    return;
-                }
-                ostream->write(result.c_str(), result.length());
-                LOGI("[GetWebInfoByRequest] arkWeb tree is saved to %{public}s", filePath.c_str());
-            }
-        };
-        service->GetWebInfoByRequest(webId, request, finishCallback);
-        LOGI("[GetWebInfoByRequest] call GetWebInfoById");
+    if (params.size() < GET_WEB_INFO_BY_REQUEST_PARAMS) {
+        return;
     }
+    int32_t webId = std::atoi(params[WEB_ID_PARAM_INDEX].c_str());
+    std::string request = BuildWebInfoRequestFromParams(params);
+    auto finishCallback = [this](int32_t winId, int32_t webId, const std::string& request,
+        const std::string& result, WebRequestErrorCode code) {
+        LOGI("[GetWebInfoByRequest] finishCallback winId=%{public}d, webId=%{public}d", winId, webId);
+        SaveWebInfoResultToFile(request, result, code);
+    };
+    service->GetWebInfoByRequest(webId, request, finishCallback);
+    LOGI("[GetWebInfoByRequest] call GetWebInfoById");
+}
+
+std::string UiSaService::BuildWebInfoRequestFromParams(const std::vector<std::string>& params)
+{
+    auto safeNumber = [](const std::string& s) -> std::string {
+        char* end = nullptr;
+        double val = std::strtod(s.c_str(), &end);
+        if (end == s.c_str() || !std::isfinite(val)) {
+            return "0";
+        }
+        while (*end != '\0') {
+            if (!std::isspace(static_cast<unsigned char>(*end))) {
+                return "0";
+            }
+            ++end;
+        }
+        return std::to_string(val);
+    };
+    std::string request = params[REQUEST_PARAM_INDEX];
+    if (params.size() >= GET_WEB_INFO_BY_RECT_PARAMS && request == WEB_INTERFACE_REQUEST_DOM_TREE_BY_RECT) {
+        request += ":{\"x\":" + safeNumber(params[RECT_X_PARAM_INDEX]) +
+            ",\"y\":" + safeNumber(params[RECT_Y_PARAM_INDEX]) +
+            ",\"width\":" + safeNumber(params[RECT_WIDTH_PARAM_INDEX]) +
+            ",\"height\":" + safeNumber(params[RECT_HEIGHT_PARAM_INDEX]) + "}";
+    } else if (params.size() >= GET_WEB_INFO_BY_POINT_PARAMS &&
+        request == WEB_INTERFACE_REQUEST_DOM_TREE_BY_POINT) {
+        request += ":{\"pointX\":" + safeNumber(params[POINT_X_PARAM_INDEX]) +
+            ",\"pointY\":" + safeNumber(params[POINT_Y_PARAM_INDEX]) + "}";
+    }
+    return request;
+}
+
+void UiSaService::SaveWebInfoResultToFile(const std::string& request, const std::string& result,
+    WebRequestErrorCode code)
+{
+    LOGI("[GetWebInfoByRequest] finishCallback request=%{public}s", request.c_str());
+    LOGI("[GetWebInfoByRequest] finishCallback result=%{public}s",
+        result.substr(0, DOMTREE_LOG_PREVIEW_LENGTH).c_str());
+    LOGI("[GetWebInfoByRequest] finishCallback result.length=%{public}zu", result.length());
+    LOGI("[GetWebInfoByRequest] finishCallback code=%{public}d", code);
+    auto fileNamePrefix = GetWebInfoDumpFileName(request);
+    if (fileNamePrefix.empty()) {
+        LOGW("[GetWebInfoByRequest] unknown request, skip saving file");
+        return;
+    }
+    auto filePath = ReserveUniqueFilePath(fileNamePrefix);
+    if (filePath.empty()) {
+        LOGW("[GetWebInfoByRequest] filePath is invalid");
+        return;
+    }
+    std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
+    CHECK_NULL_VOID(ostream);
+    if (!ostream->is_open()) {
+        LOGW("[GetWebInfoByRequest] filePath is invalid");
+        return;
+    }
+    ostream->write(result.c_str(), result.length());
+    if (!ostream->good()) {
+        LOGW("[GetWebInfoByRequest] failed to write to %{public}s", filePath.c_str());
+        return;
+    }
+    LOGI("[GetWebInfoByRequest] arkWeb tree is saved to %{public}s", filePath.c_str());
+}
+
+std::string UiSaService::GetWebInfoDumpFileName(const std::string& request)
+{
+    if (request == WEB_INTERFACE_REQUEST_DOM_TREE) {
+        return "arkweb_tree";
+    }
+    if (request == WEB_INTERFACE_REQUEST_DOM_TREE_VIEWPORT) {
+        return "arkweb_tree_viewport";
+    }
+    if (request == WEB_INTERFACE_REQUEST_DOM_TREE_BY_NATIVE) {
+        return "arkweb_native_tree";
+    }
+    if (request.rfind(WEB_INTERFACE_REQUEST_DOM_TREE_BY_RECT, 0) == 0) {
+        return "arkweb_rect_tree";
+    }
+    if (request.rfind(WEB_INTERFACE_REQUEST_DOM_TREE_BY_POINT, 0) == 0) {
+        return "arkweb_point_tree";
+    }
+    return "";
 }
 
 void UiSaService::HandleRegisterComponentChangeEventCallback(
@@ -1267,7 +1515,7 @@ void UiSaService::HandleGetNavigationContent(
         auto navigationContentCallback = [toFile](const std::string& data) {
             LOGI("[GetNavigationContent] data = %{public}s", data.substr(0, 200).c_str());
             if (toFile) {
-                auto filePath = UI_SA_PATH + "navigation_content_" + GetCurrentTimestampStr() + ".json";
+                auto filePath = ReserveUniqueFilePath("navigation_content");
                 std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
                 CHECK_NULL_VOID(ostream);
                 if (!ostream->is_open()) {
@@ -1304,7 +1552,7 @@ void UiSaService::HandleGetLazyForEachData(
         auto lazyForEachDataCallback = [toFile](const std::string& data) {
             LOGI("[GetLazyForEachData] data = %{public}s", data.substr(0, 200).c_str());
             if (toFile) {
-                auto filePath = UI_SA_PATH + "lazy_foreach_data_" + GetCurrentTimestampStr() + ".json";
+                auto filePath = ReserveUniqueFilePath("lazy_foreach_data");
                 std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
                 CHECK_NULL_VOID(ostream);
                 if (!ostream->is_open()) {
@@ -1317,6 +1565,53 @@ void UiSaService::HandleGetLazyForEachData(
         };
         service->GetLazyForEachDataByPoint(x, y, lazyForEachDataCallback);
         LOGI("[GetLazyForEachData] call GetLazyForEachDataByPoint x=%{public}f, y=%{public}f", x, y);
+    }
+}
+
+void UiSaService::HandleGetNodesInRect(
+    sptr<IUiContentService> service, std::vector<std::string> params)
+{
+    if (params.size() >= GET_NODES_IN_RECT_PARAMS) {
+        errno = 0;
+        char* endPtr = nullptr;
+        float x1 = std::strtof(params[1].c_str(), &endPtr);
+        if (endPtr == params[1].c_str() || errno == ERANGE || *endPtr != '\0') {
+            LOGW("[GetNodesInRect] invalid x1 coordinate: %{public}s", params[1].c_str());
+            return;
+        }
+        float y1 = std::strtof(params[PARAM_TWO].c_str(), &endPtr);
+        if (endPtr == params[PARAM_TWO].c_str() || errno == ERANGE || *endPtr != '\0') {
+            LOGW("[GetNodesInRect] invalid y1 coordinate: %{public}s", params[PARAM_TWO].c_str());
+            return;
+        }
+        float x2 = std::strtof(params[PARAM_THREE].c_str(), &endPtr);
+        if (endPtr == params[PARAM_THREE].c_str() || errno == ERANGE || *endPtr != '\0') {
+            LOGW("[GetNodesInRect] invalid x2 coordinate: %{public}s", params[PARAM_THREE].c_str());
+            return;
+        }
+        float y2 = std::strtof(params[PARAM_FOUR].c_str(), &endPtr);
+        if (endPtr == params[PARAM_FOUR].c_str() || errno == ERANGE || *endPtr != '\0') {
+            LOGW("[GetNodesInRect] invalid y2 coordinate: %{public}s", params[PARAM_FOUR].c_str());
+            return;
+        }
+        bool toFile = params.size() > GET_NODES_IN_RECT_PARAMS && params.back() == "-tofile";
+        auto nodesInRectCallback = [toFile](const std::string& data) {
+            LOGI("[GetNodesInRect] data = %{public}s", data.substr(0, 200).c_str());
+            if (toFile) {
+                auto filePath = ReserveUniqueFilePath("nodes_in_rect");
+                std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
+                CHECK_NULL_VOID(ostream);
+                if (!ostream->is_open()) {
+                    LOGW("[GetNodesInRect] filePath is invalid");
+                    return;
+                }
+                ostream->write(data.c_str(), data.length());
+                LOGI("[GetNodesInRect] result is saved to %{public}s", filePath.c_str());
+            }
+        };
+        service->GetNodesInRect(x1, y1, x2, y2, nodesInRectCallback);
+        LOGI("[GetNodesInRect] call GetNodesInRect x1=%{public}f, y1=%{public}f, x2=%{public}f, y2=%{public}f",
+            x1, y1, x2, y2);
     }
 }
 } // namespace OHOS::Ace

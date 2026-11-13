@@ -32,7 +32,7 @@ import { ChangeObservationTestsV2 } from '../../v2_tests/changeObservationTestsV
 import { PageController } from '../../lib/pageController'
 import { TestRunner } from '../../lib/testRunner'
 
-import router from '@system.router'
+import { router } from '@kit.ArkUI'
 
 @Entry
 @ComponentV2

@@ -23,6 +23,44 @@
 #include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
+void WaterFlowLayoutBase::BeginTargetPreparation()
+{
+    const auto info = LayoutInfo();
+    if (!info->targetIndex_ || info->targetPreparation_) {
+        return;
+    }
+    info->targetPreparation_ = WaterFlowLayoutInfoBase::TargetPreparation {
+        *info->targetIndex_, info->startIndex_, info->endIndex_, std::max(info->endIndex_, 0), false };
+}
+
+bool WaterFlowLayoutBase::YieldTargetPreparation(LayoutWrapper* wrapper)
+{
+    const auto info = LayoutInfo();
+    if (!info->targetPreparation_ || !wrapper->ReachResponseDeadline()) {
+        return false;
+    }
+    info->measureInNextFrame_ = true;
+    return true;
+}
+
+void WaterFlowLayoutBase::ReleaseTargetPreparationItems(LayoutWrapper* wrapper)
+{
+    const auto info = LayoutInfo();
+    CHECK_NULL_VOID(info->targetPreparation_);
+    const auto props = DynamicCast<WaterFlowLayoutProperty>(wrapper->GetLayoutProperty());
+    CHECK_NULL_VOID(props);
+    auto& state = *info->targetPreparation_;
+    const int32_t cache = props->GetCachedCountValue(info->defCachedCount_);
+    const auto syntax = ScrollablePattern::FindItemLazySyntax(wrapper->GetHostNode());
+    // Only these lazy roots need prepared route geometry trimmed before animation.
+    // Eager children keep their geometry and must retain the existing path.
+    state.needsRouteCleanup = syntax.arkoala || syntax.repeatV2;
+    state.releaseToggle = syntax.arkoala && !state.releaseToggle;
+    const int32_t footer = info->footerIndex_ + 1;
+    wrapper->SetActiveChildRange(state.startIndex + footer, state.endIndex + footer, cache,
+        cache + (state.releaseToggle ? 1 : 0), props->GetShowCachedItemsValue(false));
+}
+
 namespace {
 std::pair<float, float> GetMainStartEnd(const RectF& rect, Axis axis, bool isReverse, float frameMainSize)
 {

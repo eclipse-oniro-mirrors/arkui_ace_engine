@@ -328,17 +328,18 @@ void SetupRenderFunction(EcmaVM* vm, const Local<panda::JSValueRef>& renderFuncA
     auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
     panda::Local<panda::FunctionRef> renderFuncRef = renderFuncArg;
     std::function<RefPtr<UINode>(int64_t, bool&)> renderFunc =
-        [vm, node = frameNode, func = panda::CopyableGlobal(vm, renderFuncRef),
+        [vm, node = AceType::WeakClaim(frameNode), func = panda::CopyableGlobal(vm, renderFuncRef),
             instanceId = Container::CurrentId()](
             int64_t deadline, bool& isTimeout) -> RefPtr<UINode> {
         panda::LocalScope pandaScope(vm);
         panda::TryCatch trycatch(vm);
         ContainerScope scope(instanceId);
-        PipelineContext::SetCallBackNode(AceType::WeakClaim(node));
+        PipelineContext::SetCallBackNode(node);
         auto result = func->Call(vm, func.ToLocal(), nullptr, 0);
         ArkTSUtils::HandleCallbackJobs(vm, trycatch, result);
-        CHECK_NULL_RETURN(node, nullptr);
-        return AceType::Claim(reinterpret_cast<NG::UINode *>(node));
+        auto frameNode = node.Upgrade();
+        CHECK_NULL_RETURN(frameNode, nullptr);
+        return AceType::Claim(reinterpret_cast<NG::UINode *>(AceType::RawPtr(frameNode)));
     };
     auto nodeModifiers = GetArkUINodeModifiers();
     CHECK_NULL_VOID(nodeModifiers);

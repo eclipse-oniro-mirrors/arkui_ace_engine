@@ -520,4 +520,49 @@ HWTEST_F(PatternLockTestNg, PatternLockModifierTest014, TestSize.Level1)
     EXPECT_EQ(patternlockModifier->GetActiveCircleRadius(0), 28);
 }
 
+/**
+ * @tc.name: PatternLockModifierTest015
+ * @tc.desc: Test SetCorrectColor syncs pointAnimateColor_ in CORRECT steady state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PatternLockTestNg, PatternLockModifierTest015, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create patternlockModifier and enter CORRECT steady state.
+     * Bypass SetChallengeResult to avoid relying on AnimationUtils with a null context;
+     * directly set challengeResult_ (test header exposes private members).
+     */
+    auto patternlockModifier = AceType::MakeRefPtr<PatternLockModifier>(nullptr);
+    patternlockModifier->challengeResult_ = PatternLockChallengeResult::CORRECT;
+    /**
+     * @tc.steps: step2. Update correctColor_ as UpdateContentModifier does on theme switch.
+     * @tc.expected: correctColor_ property is updated.
+     */
+    const Color newCorrectColor = Color(0xFF112233);
+    patternlockModifier->SetCorrectColor(newCorrectColor);
+    EXPECT_EQ(patternlockModifier->correctColor_->Get(), newCorrectColor);
+    /**
+     * @tc.expected: pointAnimateColor_ (the value actually consumed by onDraw in CORRECT
+     * state) is synced so the display reflects the new correctColor.
+     */
+    EXPECT_EQ(patternlockModifier->pointAnimateColor_->Get().ToColor(), newCorrectColor);
+    /**
+     * @tc.steps: step3. Set the same color again.
+     * @tc.expected: setter is a no-op (unchanged).
+     */
+    patternlockModifier->SetCorrectColor(newCorrectColor);
+    EXPECT_EQ(patternlockModifier->correctColor_->Get(), newCorrectColor);
+    EXPECT_EQ(patternlockModifier->pointAnimateColor_->Get().ToColor(), newCorrectColor);
+    /**
+     * @tc.steps: step4. Leave the CORRECT state and update correctColor_ again.
+     * @tc.expected: correctColor_ is updated but pointAnimateColor_ is not touched, because
+     * onDraw no longer draws chosen points with pointAnimateColor_ outside CORRECT state.
+     */
+    patternlockModifier->challengeResult_.reset();
+    auto pointAnimateBefore = patternlockModifier->pointAnimateColor_->Get().ToColor();
+    patternlockModifier->SetCorrectColor(Color(0xFF445566));
+    EXPECT_EQ(patternlockModifier->correctColor_->Get(), Color(0xFF445566));
+    EXPECT_EQ(patternlockModifier->pointAnimateColor_->Get().ToColor(), pointAnimateBefore);
+}
+
 }

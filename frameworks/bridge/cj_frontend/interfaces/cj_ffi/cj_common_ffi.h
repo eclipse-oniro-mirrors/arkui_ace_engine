@@ -272,6 +272,17 @@ struct CJFingerInfo {
     double localY;
 };
 
+// Per-finger extended data, carried as a parallel array of the same length as CJGestureEventV2.fingerList.
+struct CJFingerInfoExtra {
+    double displayX;
+    double displayY;
+    double globalDisplayX;
+    double globalDisplayY;
+    int32_t operatingHand;
+    int32_t sourceType;
+    int32_t sourceTool;
+};
+
 struct CJGestureEventV2 {
     int64_t timestamp;
     CJEventTarget* target;
@@ -297,6 +308,8 @@ struct CJGestureEventV2 {
     float axisVertical;
     int64_t deviceId;
     const OHOS::Ace::BaseEventInfo* baseEventInfoPtr;
+    // Parallel array of CJFingerInfoExtra with the same length as fingerListSize.
+    CJFingerInfoExtra* fingerExtraList = nullptr;
 };
 
 struct CJGestureEvent {
@@ -448,6 +461,9 @@ void TransformNativeTouchLocationInfo(
     CJTouchInfo* sources, const std::list<OHOS::Ace::TouchLocationInfo>& touchLocationInfoList);
 
 void TransformNativeCJFingerInfo(CJFingerInfo* sources, const std::list<OHOS::Ace::FingerInfo>& fingerInfoList);
+
+void TransformNativeCJFingerInfoExtra(
+    CJFingerInfoExtra* sources, const std::list<OHOS::Ace::FingerInfo>& fingerInfoList);
 
 void AssambleCJEventTarget(
     const OHOS::Ace::EventTarget& eventTarget, CJArea& area, CJPosition& position, CJPosition& globalPosition);

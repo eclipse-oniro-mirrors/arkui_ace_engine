@@ -1990,10 +1990,15 @@ HWTEST_F(TabPatternTestNg, UpdateSideBarDividerTest002, TestSize.Level1)
     ASSERT_TRUE(strokeWidth.has_value());
     EXPECT_FLOAT_EQ(strokeWidth.value().Value(), 5.0f);
 
-    // Verify color is updated on DividerRenderProperty
+    // After UpdateSidebarDividerColor, DividerColor is set to TRANSPARENT and the
+    // actual color is applied via RenderContext BackgroundColor so that it fills
+    // the entire safe-area-expanded Bounds.
     auto dividerRenderProp = pattern_->sideBarDividerNode_->GetPaintProperty<DividerRenderProperty>();
     ASSERT_NE(dividerRenderProp, nullptr);
-    EXPECT_EQ(dividerRenderProp->GetDividerColor().value_or(Color::BLACK), Color::RED);
+    EXPECT_EQ(dividerRenderProp->GetDividerColor().value_or(Color::BLACK), Color::TRANSPARENT);
+    auto dividerRenderContext = pattern_->sideBarDividerNode_->GetRenderContext();
+    ASSERT_NE(dividerRenderContext, nullptr);
+    EXPECT_EQ(dividerRenderContext->GetBackgroundColor().value_or(Color::BLACK), Color::RED);
 }
 
 /**
@@ -2176,6 +2181,58 @@ HWTEST_F(TabPatternTestNg, ShouldHide001, TestSize.Level1)
     vis.displayMode = TabBarDisplayMode::BOTTOMTABBAR;
     EXPECT_FALSE(vis.ShouldHide(TabBarDisplayMode::SIDEBAR));
     EXPECT_TRUE(vis.ShouldHide(TabBarDisplayMode::BOTTOMTABBAR));
+}
+
+/**
+ * @tc.name: HandleDividerDragUpdate001
+ * @tc.desc: Test HandleDividerDragUpdate with sidebar on left (LTR + START), positive offset widens sidebar
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabPatternTestNg, HandleDividerDragUpdate001, TestSize.Level1)
+{
+    auto model = CreateTabs();
+    CreateTabContents();
+    GetTabs();
+    CreateTabsDone(model);
+    ASSERT_NE(pattern_, nullptr);
+    // sidebar on left: LTR + START, offset not negated
+    layoutProperty_->UpdateSidebarPosition(BarPosition::START);
+    layoutProperty_->UpdateLayoutDirection(TextDirection::LTR);
+    pattern_->isInDividerDrag_ = true;
+    pattern_->preSideBarWidthPx_ = 100.0f;
+    pattern_->minSideBarWidth_ = 0.0f;
+    pattern_->maxSideBarWidth_ = 300.0f;
+    pattern_->realSideBarWidthPx_ = 100.0f;
+    // drag right by 50px -> width grows to 150px
+    pattern_->HandleDividerDragUpdate(50.0f);
+    ASSERT_TRUE(pattern_->GetRealSideBarWidthPx().has_value());
+    EXPECT_FLOAT_EQ(pattern_->GetRealSideBarWidthPx().value(), 150.0f);
+}
+
+/**
+ * @tc.name: HandleDividerDragUpdate002
+ * @tc.desc: Test HandleDividerDragUpdate with sidebar on right (LTR + END), offset negated
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabPatternTestNg, HandleDividerDragUpdate002, TestSize.Level1)
+{
+    auto model = CreateTabs();
+    CreateTabContents();
+    GetTabs();
+    CreateTabsDone(model);
+    ASSERT_NE(pattern_, nullptr);
+    // sidebar on right: LTR + END, offset is negated
+    layoutProperty_->UpdateSidebarPosition(BarPosition::END);
+    layoutProperty_->UpdateLayoutDirection(TextDirection::LTR);
+    pattern_->isInDividerDrag_ = true;
+    pattern_->preSideBarWidthPx_ = 100.0f;
+    pattern_->minSideBarWidth_ = 0.0f;
+    pattern_->maxSideBarWidth_ = 300.0f;
+    pattern_->realSideBarWidthPx_ = 100.0f;
+    // drag right by 50px, but negated to -50px -> width shrinks to 50px
+    pattern_->HandleDividerDragUpdate(50.0f);
+    ASSERT_TRUE(pattern_->GetRealSideBarWidthPx().has_value());
+    EXPECT_FLOAT_EQ(pattern_->GetRealSideBarWidthPx().value(), 50.0f);
 }
 
 /**

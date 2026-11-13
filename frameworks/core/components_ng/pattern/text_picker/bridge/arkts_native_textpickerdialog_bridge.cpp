@@ -30,6 +30,7 @@
 #include "core/common/dynamic_module_helper.h"
 #include "core/components/common/properties/text_enums.h"
 #include "core/components_ng/base/view_stack_processor.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/pattern/text_picker/bridge/textpicker_parser.h"
 #include "core/components_ng/pattern/text_picker/textpicker_model.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -41,6 +42,8 @@ const std::vector<DistortionMode> DIALOG_DISTORTION_MODE = { DistortionMode::DIS
     DistortionMode::DISTORTION_ENABLED, DistortionMode::DISTORTION_DISABLED };
 const std::vector<EdgeLightMode> DIALOG_EDGELIGHT_MODE = { EdgeLightMode::EDGELIGHT_AUTO,
     EdgeLightMode::EDGELIGHT_ENABLED, EdgeLightMode::EDGELIGHT_DISABLED };
+const std::vector<HandednessFollowMode> DIALOG_HANDEDNESS_FOLLOW_MODE = { HandednessFollowMode::NONE,
+    HandednessFollowMode::FOLLOW_ANCHOR, HandednessFollowMode::FOLLOW_GRIP_HAND };
 const DimensionOffset TEXT_PICKER_OFFSET_DEFAULT_TOP = DimensionOffset(0.0_vp, 40.0_vp);
 const std::vector<DialogAlignment> DIALOG_ALIGNMENT = { DialogAlignment::TOP, DialogAlignment::CENTER,
     DialogAlignment::BOTTOM, DialogAlignment::DEFAULT, DialogAlignment::TOP_START, DialogAlignment::TOP_END,
@@ -74,6 +77,15 @@ void ParsePickerDialogMaterial(
         auto edgeLightModeVal = edgeLightModeValue->ToNumber(vm)->Int32Value(vm);
         if (edgeLightModeVal >= 0 && edgeLightModeVal < static_cast<int32_t>(DIALOG_EDGELIGHT_MODE.size())) {
             pickerDialog.edgeLightMode = DIALOG_EDGELIGHT_MODE[edgeLightModeVal];
+        }
+    }
+
+    auto adaptToHandednessValue = ArkTSUtils::GetProperty(vm, paramObject, "adaptToHandedness");
+    if (adaptToHandednessValue->IsNumber()) {
+        auto adaptToHandednessVal = adaptToHandednessValue->ToNumber(vm)->Int32Value(vm);
+        if (adaptToHandednessVal >= 0 &&
+            adaptToHandednessVal < static_cast<int32_t>(DIALOG_HANDEDNESS_FOLLOW_MODE.size())) {
+            pickerDialog.adaptToHandedness = DIALOG_HANDEDNESS_FOLLOW_MODE[adaptToHandednessVal];
         }
     }
 }

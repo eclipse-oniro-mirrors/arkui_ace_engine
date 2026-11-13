@@ -27,6 +27,7 @@ namespace MockSystemProperties {
 bool g_isSuperFoldDisplayDevice = false;
 bool g_isCompatibleInputTransEnabled = false;
 bool g_isTransformEnabled = false;
+bool g_isPortraitFoldProduct = false;
 }
 namespace {
 constexpr int32_t ORIENTATION_PORTRAIT = 0;
@@ -312,7 +313,7 @@ bool SystemProperties::IsSmallFoldProduct()
 
 bool SystemProperties::IsPortraitFoldProduct()
 {
-    return false;
+    return MockSystemProperties::g_isPortraitFoldProduct;
 }
 
 bool SystemProperties::IsBigFoldProduct()

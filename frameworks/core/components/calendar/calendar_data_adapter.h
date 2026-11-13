@@ -201,7 +201,7 @@ struct ObtainedMonth {
 using PendingRequestQueue = std::queue<CalendarDataRequest>;
 using RequestDataCompleteCallback = std::function<void()>;
 
-class CalendarDataChangeListener : public AceType {
+class CalendarDataChangeListener : public virtual AceType {
     DECLARE_ACE_TYPE(CalendarDataChangeListener, AceType);
 
 public:

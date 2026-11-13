@@ -36,6 +36,13 @@
 #include "core/components_ng/pattern/stack/stack_model_ng.h"
 
 #include "core/components_ng/pattern/list/list_item_group_paint_method.h"
+#include "core/components_ng/pattern/scrollable/scrollable_utils.h"
+#define private public
+#define protected public
+#include "core/components_ng/pattern/image/image_pattern.h"
+#include "core/components_ng/pattern/image/image_model_ng.h"
+#undef protected
+#undef private
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -7141,6 +7148,209 @@ HWTEST_F(ListLayoutTestNg, ListWithLazyVGridLayoutColumnGap001, TestSize.Level1)
 
     auto children = frameNode_->GetChildren();
     ASSERT_GT(children.size(), 0);
+}
+
+/**
+ * TASK-028-02: List 解码窗口接入测试
+ * TASK-028-03: 预测构建、复用、快速反向滚动
+ */
+class ListDecodeWindowTest : public ListTestNg {
+public:
+    void SetUp() override
+    {
+        ListTestNg::SetUp();
+    }
+    void TearDown() override
+    {
+        ListTestNg::TearDown();
+    }
+};
+
+TEST_F(ListDecodeWindowTest, CalcDecodeWindowCount)
+{
+    EXPECT_EQ(ScrollableUtils::CalcDecodeWindowCount(0), 0); // 0 : cachecount
+    EXPECT_EQ(ScrollableUtils::CalcDecodeWindowCount(1), 1); // 1 : cachecount
+    EXPECT_EQ(ScrollableUtils::CalcDecodeWindowCount(2), 1); // 2 : cachecount
+    EXPECT_EQ(ScrollableUtils::CalcDecodeWindowCount(3), 1); // 3 : cachecount
+    EXPECT_EQ(ScrollableUtils::CalcDecodeWindowCount(4), 1); // 4 : cachecount
+    EXPECT_EQ(ScrollableUtils::CalcDecodeWindowCount(5), 1); // 5 : cachecount
+    EXPECT_EQ(ScrollableUtils::CalcDecodeWindowCount(6), 2); // 6 : cachecount, 2 : decodeWindow
+    EXPECT_EQ(ScrollableUtils::CalcDecodeWindowCount(10), 2); // 10 : cachecount, 2 : decodeWindow
+    EXPECT_EQ(ScrollableUtils::CalcDecodeWindowCount(11), 3); // 11 : cachecount, 3 : decodeWindow
+    EXPECT_EQ(ScrollableUtils::CalcDecodeWindowCount(25), 5); // 25 : cachecount, 5 : decodeWindow
+}
+
+TEST_F(ListDecodeWindowTest, IsLowMemoryDevice)
+{
+    EXPECT_TRUE(ScrollableUtils::IsLowMemoryDevice(1)); // 1 : deviceMemoryGiB
+    EXPECT_TRUE(ScrollableUtils::IsLowMemoryDevice(8)); // 8 : deviceMemoryGiB
+    EXPECT_FALSE(ScrollableUtils::IsLowMemoryDevice(9)); // 9 : deviceMemoryGiB
+    EXPECT_FALSE(ScrollableUtils::IsLowMemoryDevice(12)); // 12 : deviceMemoryGiB
+    EXPECT_FALSE(ScrollableUtils::IsLowMemoryDevice(0)); // 0 : deviceMemoryGiB
+}
+
+/**
+ * ImagePattern::SetDecodeCacheActive 分支覆盖
+ */
+namespace {
+RefPtr<FrameNode> CreateImageFrameNode()
+{
+    auto nodeId = ElementRegister::GetInstance()->MakeUniqueId();
+    auto frameNode = FrameNode::CreateFrameNode("Image", nodeId,
+        AceType::MakeRefPtr<ImagePattern>());
+    return frameNode;
+}
+}
+
+TEST_F(ListDecodeWindowTest, SetDecodeCacheActive_Idempotent)
+{
+    auto frameNode = CreateImageFrameNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ImagePattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_TRUE(pattern->decodeCacheActive_);
+    pattern->SetDecodeCacheActive(true);
+    EXPECT_TRUE(pattern->decodeCacheActive_);
+}
+
+TEST_F(ListDecodeWindowTest, SetDecodeCacheActive_Deactivate)
+{
+    auto frameNode = CreateImageFrameNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ImagePattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetDecodeCacheActive(false);
+    EXPECT_FALSE(pattern->decodeCacheActive_);
+    EXPECT_EQ(pattern->loadingCtx_, nullptr);
+    EXPECT_EQ(pattern->image_, nullptr);
+}
+
+TEST_F(ListDecodeWindowTest, SetDecodeCacheActive_Activate)
+{
+    auto frameNode = CreateImageFrameNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ImagePattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetDecodeCacheActive(false);
+    pattern->SetDecodeCacheActive(true);
+    EXPECT_TRUE(pattern->decodeCacheActive_);
+    EXPECT_FALSE(pattern->isRecycledImage_);
+}
+
+TEST_F(ListDecodeWindowTest, SetDecodeCacheActive_ActivateWithStaleCtx)
+{
+    auto frameNode = CreateImageFrameNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ImagePattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->decodeCacheActive_ = false;
+    LoadNotifier notifier(
+        [](const ImageSourceInfo&) {}, [](const ImageSourceInfo&) {},
+        [](const ImageSourceInfo&, const std::string&, const ImageErrorInfo&) {});
+    auto staleCtx = AceType::MakeRefPtr<ImageLoadingContext>(
+        ImageSourceInfo(""), std::move(notifier), false, false, ImageDfxConfig());
+    pattern->loadingCtx_ = staleCtx;
+    pattern->image_ = nullptr;
+    pattern->SetDecodeCacheActive(true);
+    EXPECT_TRUE(pattern->decodeCacheActive_);
+    EXPECT_NE(pattern->loadingCtx_, staleCtx);
+}
+
+/**
+ * LoadImageDataIfNeed 异步守卫
+ */
+TEST_F(ListDecodeWindowTest, LoadImageDataIfNeed_Deactivated_NoOp)
+{
+    auto frameNode = CreateImageFrameNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ImagePattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetDecodeCacheActive(false);
+    auto ctxBefore = pattern->loadingCtx_;
+    pattern->LoadImageDataIfNeed();
+    EXPECT_EQ(pattern->loadingCtx_, ctxBefore);
+}
+
+/**
+ * OnReuse 重置 decodeCacheActive_
+ */
+TEST_F(ListDecodeWindowTest, OnReuse_ResetsDecodeCacheActive)
+{
+    auto frameNode = CreateImageFrameNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ImagePattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->decodeCacheActive_ = false;
+    pattern->OnReuse();
+    EXPECT_TRUE(pattern->decodeCacheActive_);
+}
+
+/**
+ * TraverseImagePatterns 递归遍历
+ */
+TEST_F(ListDecodeWindowTest, TraverseImagePatterns_NestedImages)
+{
+    auto parent = CreateImageFrameNode();
+    ASSERT_NE(parent, nullptr);
+    auto child = CreateImageFrameNode();
+    ASSERT_NE(child, nullptr);
+    parent->AddChild(child);
+    auto parentPattern = parent->GetPattern<ImagePattern>();
+    ASSERT_NE(parentPattern, nullptr);
+    auto childPattern = child->GetPattern<ImagePattern>();
+    ASSERT_NE(childPattern, nullptr);
+    parentPattern->decodeCacheActive_ = true;
+    childPattern->decodeCacheActive_ = true;
+    ScrollableUtils::UpdateCachedItemDecodeState(parent, false);
+    EXPECT_FALSE(parentPattern->decodeCacheActive_);
+    EXPECT_FALSE(childPattern->decodeCacheActive_);
+}
+
+/**
+ * UpdateListDecodeCacheWindow 守卫条件
+ */
+TEST_F(ListDecodeWindowTest, UpdateListDecodeCacheWindow_ShowCachedItems_Skip)
+{
+    ListModelNG model = CreateList();
+    CreateListItems(TOTAL_ITEM_NUMBER);
+    CreateDone();
+    ListModelNG::SetShowCached(AceType::RawPtr(frameNode_), true);
+    auto layoutAlgorithm = AceType::DynamicCast<ListLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    layoutAlgorithm->Measure(AceType::RawPtr(frameNode_));
+    auto wrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    layoutAlgorithm->UpdateListDecodeCacheWindow(AceType::RawPtr(wrapper), 5); // 5 : cacheCount
+}
+
+TEST_F(ListDecodeWindowTest, UpdateListDecodeCacheWindow_CacheCount0_Skip)
+{
+    ListModelNG model = CreateList();
+    CreateListItems(TOTAL_ITEM_NUMBER);
+    CreateDone();
+    auto layoutAlgorithm = AceType::DynamicCast<ListLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    layoutAlgorithm->Measure(AceType::RawPtr(frameNode_));
+    auto wrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    layoutAlgorithm->UpdateListDecodeCacheWindow(AceType::RawPtr(wrapper), 0);
+}
+
+/**
+ * UpdateGroupDecodeCacheWindow groupActive 门控
+ */
+TEST_F(ListDecodeWindowTest, UpdateGroupDecodeCacheWindow_GroupActiveFalse)
+{
+    ListModelNG model = CreateList();
+    ListItemGroupModelNG groupModel = CreateListItemGroup(V2::ListItemGroupStyle::NONE);
+    CreateListItems(GROUP_ITEM_NUMBER);
+    CreateDone();
+    auto layoutAlgorithm = AceType::DynamicCast<ListLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    layoutAlgorithm->Measure(AceType::RawPtr(frameNode_));
+    auto wrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    layoutAlgorithm->UpdateListDecodeCacheWindow(AceType::RawPtr(wrapper), 5); // 5 : cacheCount
 }
 
 } // namespace OHOS::Ace::NG

@@ -28,6 +28,12 @@ enum class PlaybackMode {
     REPEAT
 };
 
+// movingphoto display mode
+enum class MovingPhotoDisplayMode {
+    IMAGE_AND_VIDEO = 0,
+    VIDEO_ONLY = 1
+};
+
 // movingphoto pixelmap format
 enum class MovingPhotoFormat {
     UNKNOWN = 0,

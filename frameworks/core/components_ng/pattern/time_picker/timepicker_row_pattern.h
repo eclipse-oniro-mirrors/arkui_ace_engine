@@ -49,6 +49,8 @@ class ACE_FORCE_EXPORT TimePickerRowPattern : public LinearLayoutPattern {
     DECLARE_ACE_TYPE(TimePickerRowPattern, LinearLayoutPattern);
 
 public:
+    void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context) override;
+
     TimePickerRowPattern() : LinearLayoutPattern(false) {};
 
     ~TimePickerRowPattern() override = default;
@@ -694,6 +696,7 @@ public:
     void UpdateNormalTextStyle(const PickerTextStyle& textStyle);
     void UpdateSelectedTextStyle(const PickerTextStyle& textStyle);
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
 
 private:
     bool ReportTimeChangeEvent(int32_t nodeId, const std::string& timeStr);

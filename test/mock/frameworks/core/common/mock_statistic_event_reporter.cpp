@@ -15,6 +15,8 @@
 
 #include "core/common/statistic_event_reporter.h"
 
+#include "base/log/material_statistic_event_info.h"
+
 namespace OHOS::Ace {
 namespace {
 }
@@ -23,6 +25,8 @@ StatisticEventReporter::StatisticEventReporter() {}
 
 StatisticEventReporter::StatisticEventReporter(int32_t instanceId) {}
 
+StatisticEventReporter::~StatisticEventReporter() = default;
+
 void StatisticEventReporter::SendEvent(StatisticEventType eventName) {}
 
 void StatisticEventReporter::ReportStatisticEvents(const std::map<StatisticEventType, StatisticEventInfo>& events) {}
@@ -30,4 +34,18 @@ void StatisticEventReporter::ReportStatisticEvents(const std::map<StatisticEvent
 void StatisticEventReporter::TryReportStatisticEvents(PipelineBase* pipeline) {}
 
 void StatisticEventReporter::ForceReportStatisticEvents() {}
+
+void StatisticEventReporter::SendMaterialNodeStat(const RichMaterialNodeStatData& data) {}
+
+void StatisticEventReporter::SendOverlayMaterialArea(const RichOverlayMaterialAreaData& data) {}
+
+void StatisticEventReporter::ReportMaterialStatisticEvents(
+    const std::vector<MaterialStatisticEventInfo>& events) {}
+
+std::vector<MaterialStatisticEventInfo> StatisticEventReporter::TryReportMaterialEvents()
+{
+    return {};
+}
+
+void StatisticEventReporter::ForceReportMaterialEvents() {}
 } // namespace OHOS::Ace

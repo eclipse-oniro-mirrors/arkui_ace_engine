@@ -159,7 +159,10 @@ void OverlayDialogTransitionTestNg::SetUpTestCase()
 }
 void OverlayDialogTransitionTestNg::TearDownTestCase()
 {
-    MockPipelineContext::GetCurrent()->themeManager_ = nullptr;
+    auto context = MockPipelineContext::GetCurrent();
+    if (context) {
+        context->themeManager_ = nullptr;
+    }
     MockPipelineContext::TearDown();
     MockContainer::TearDown();
 }

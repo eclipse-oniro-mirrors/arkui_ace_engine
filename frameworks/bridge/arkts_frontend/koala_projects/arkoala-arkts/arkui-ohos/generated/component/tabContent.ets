@@ -594,6 +594,18 @@ export class ArkTabContentPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._TabContentAttribute_setOnWillHide(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setSidebarSectionAttribute(value: SidebarSection | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            SidebarSection_serializer.write(thisSerializer, valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._TabContentAttribute_setSidebarSection(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setTabBarVisibilityAttribute(visibility: TabVisibility, displayMode: TabBarDisplayMode | undefined): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (displayMode !== undefined) {
@@ -661,6 +673,15 @@ export interface TabBarOptions {
     text?: string | arkui_component_units_Resource;
     badge?: TabBarBadgeStyle;
 }
+export enum SidebarSectionTitleStyle {
+    STANDARD = 0,
+    EMPHASIZED = 1
+}
+export interface SidebarSection {
+    title: ResourceStr;
+    order?: int32;
+    titleStyle?: SidebarSectionTitleStyle;
+}
 export interface TabContentAttribute extends CommonMethod {
     setTabContentOptions(): this {
         throw new Error('Unimplemented method setTabContentOptions')
@@ -673,6 +694,9 @@ export interface TabContentAttribute extends CommonMethod {
     }
     onWillHide(value: VoidCallback | undefined): this {
         throw new Error('Unimplemented method onWillHide')
+    }
+    sidebarSection(value: SidebarSection | undefined): this {
+        throw new Error('Unimplemented method sidebarSection')
     }
     tabBarVisibility(visibility: TabVisibility, displayMode: TabBarDisplayMode | undefined): this {
         throw new Error('Unimplemented method tabBarVisibility')
@@ -704,6 +728,11 @@ export class ArkTabContentComponent extends ArkCommonMethodComponent implements 
     public onWillHide(value: VoidCallback | undefined): this {
         const value_casted = value as (VoidCallback | undefined)
         this.getPeer()?.setOnWillHideAttribute(value_casted)
+        return this
+    }
+    public sidebarSection(value: SidebarSection | undefined): this {
+        const value_casted = value as (SidebarSection | undefined)
+        this.getPeer()?.setSidebarSectionAttribute(value_casted)
         return this
     }
     public tabBarVisibility(visibility: TabVisibility, displayMode: TabBarDisplayMode | undefined): this {
@@ -757,6 +786,64 @@ export class TabBarSymbol_serializer {
         let valueDeserializer: DeserializerBase = buffer
         let ptr: KPointer = valueDeserializer.readPointer()
         return TabBarSymbolInternal.fromPtr(ptr)
+    }
+}
+export class SidebarSection_serializer {
+    public static write(buffer: SerializerBase, value: SidebarSection): void {
+        let valueSerializer: SerializerBase = buffer
+        const valueHolderForTitle = value.title
+        if (valueHolderForTitle instanceof string) {
+            valueSerializer.writeInt8((0).toByte())
+            const valueHolderForTitleForIdx0 = valueHolderForTitle as string
+            valueSerializer.writeString(valueHolderForTitleForIdx0)
+        } else if (valueHolderForTitle instanceof arkui_component_units_Resource) {
+            valueSerializer.writeInt8((1).toByte())
+            const valueHolderForTitleForIdx1 = valueHolderForTitle as arkui_component_units_Resource
+            global_resource_Resource_serializer.write(valueSerializer, valueHolderForTitleForIdx1)
+        }
+        const valueHolderForOrder = value.order
+        if (valueHolderForOrder !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForOrderTmpValue = valueHolderForOrder!
+            valueSerializer.writeInt32(valueHolderForOrderTmpValue)
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        const valueHolderForTitleStyle = value.titleStyle
+        if (valueHolderForTitleStyle !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForTitleStyleTmpValue = (valueHolderForTitleStyle as SidebarSectionTitleStyle)
+            valueSerializer.writeInt32(valueHolderForTitleStyleTmpValue.valueOf())
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+    }
+    public static read(buffer: DeserializerBase): SidebarSection {
+        let valueDeserializer: DeserializerBase = buffer
+        const titleTmpBufUnionSelector: int32 = valueDeserializer.readInt8()
+        let titleTmpBuf: string | arkui_component_units_Resource | undefined
+        if (titleTmpBufUnionSelector == (0).toByte()) {
+            titleTmpBuf = (valueDeserializer.readString() as string)
+        } else if (titleTmpBufUnionSelector == (1).toByte()) {
+            titleTmpBuf = global_resource_Resource_serializer.read(valueDeserializer)
+        } else {
+            throw new Error('One of the branches for titleTmpBuf has to be chosen through deserialisation.')
+        }
+        const titleTmpResult: ResourceStr = (titleTmpBuf as string | arkui_component_units_Resource)
+        const orderTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let orderTmpBuf: int32 | undefined = undefined
+        if ((orderTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            orderTmpBuf = valueDeserializer.readInt32()
+        }
+        const orderTmpResult: int32 | undefined = orderTmpBuf
+        const titleStyleTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let titleStyleTmpBuf: SidebarSectionTitleStyle | undefined = undefined
+        if ((titleStyleTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            titleStyleTmpBuf = SidebarSectionTitleStyle.fromValue(valueDeserializer.readInt32())
+        }
+        const titleStyleTmpResult: SidebarSectionTitleStyle | undefined = titleStyleTmpBuf
+        let value: SidebarSection = ({title: titleTmpResult, order: orderTmpResult, titleStyle: titleStyleTmpResult} as SidebarSection)
+        return value
     }
 }
 export class TabBarBadgeStyle_serializer {

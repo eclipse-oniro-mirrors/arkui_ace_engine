@@ -15,9 +15,10 @@
 
 #include <cstdlib>
 #include <memory>
+#include "animate_impl.h"
+#include "config_manager.h"
 #include "node_extened.h"
 #include "node_model.h"
-#include "config_manager.h"
 
 #include "base/error/error_code.h"
 #include "base/log/log_wrapper.h"
@@ -166,10 +167,12 @@ int32_t OH_ArkUI_NodeUtils_GetPositionWithTranslateInScreen(ArkUI_NodeHandle nod
 int32_t OH_ArkUI_RegisterSystemColorModeChangeEvent(
     ArkUI_NodeHandle node, void* userData, void (*onColorModeChange)(ArkUI_SystemColorMode colorMode, void* userData))
 {
+    CHECK_UI_THREAD("OH_ArkUI_RegisterSystemColorModeChangeEvent");
     if (node == nullptr) {
         return OHOS::Ace::ERROR_CODE_PARAM_INVALID;
     }
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     impl->getNodeModifiers()->getFrameNodeModifier()->setSystemColorModeChangeEvent(
         node->uiNodeHandle, userData, reinterpret_cast<void*>(onColorModeChange));
 
@@ -178,10 +181,12 @@ int32_t OH_ArkUI_RegisterSystemColorModeChangeEvent(
 
 void OH_ArkUI_UnregisterSystemColorModeChangeEvent(ArkUI_NodeHandle node)
 {
+    CHECK_UI_THREAD("OH_ArkUI_UnregisterSystemColorModeChangeEvent");
     if (node == nullptr) {
         return;
     }
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     impl->getNodeModifiers()->getFrameNodeModifier()->resetSystemColorModeChangeEvent(node->uiNodeHandle);
 }
 
@@ -555,6 +560,62 @@ int32_t OH_ArkUI_NativeModule_AdoptChild(ArkUI_NodeHandle node, ArkUI_NodeHandle
     return result;
 }
 
+int32_t OH_ArkUI_NativeModule_AdoptChildWithPolicy(
+    ArkUI_NodeHandle node, ArkUI_NodeHandle child, OH_ArkUI_AdoptPolicy policy)
+{
+    CHECK_UI_THREAD("OH_ArkUI_NativeModule_AdoptChildWithPolicy");
+    CHECK_NULL_RETURN_WITH_MESSAGE(node && child, ARKUI_ERROR_CODE_PARAM_INVALID,
+        __FUNCTION__, "Parent node or child node parameter is null");
+    if (policy != OH_ARKUI_NATIVE_MODULE_ADOPT_POLICY_OVERLAY_POSITION_FOLLOWS_ADOPT_PARENT_CHAIN) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Adopt policy is invalid");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
+    CHECK_NULL_RETURN_WITH_MESSAGE(impl, ARKUI_ERROR_CODE_CAPI_INIT_ERROR,
+        __FUNCTION__, "Native module not initialized");
+    CHECK_NODE_DISPOSED(node, "Parent node has been disposed");
+    if (!OHOS::Ace::NodeModel::CheckIsCNode(node)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_NODE_CAN_NOT_ADOPT_TO,
+            __FUNCTION__, "Parent node is not a C node");
+        return ARKUI_ERROR_CODE_NODE_CAN_NOT_ADOPT_TO;
+    }
+    CHECK_NODE_DISPOSED(child, "Child node has been disposed");
+    if (!OHOS::Ace::NodeModel::CheckIsCNode(child)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_NODE_CAN_NOT_BE_ADOPTED,
+            __FUNCTION__, "Child node is not a C node");
+        return ARKUI_ERROR_CODE_NODE_CAN_NOT_BE_ADOPTED;
+    }
+    auto result = impl->getNodeModifiers()->getNDKRenderNodeModifier()->adoptChildWithPolicy(
+        node->uiNodeHandle, child->uiNodeHandle, policy);
+    if (result != ARKUI_ERROR_CODE_NO_ERROR) {
+        SET_ERROR_FUNCTION_NAME(__FUNCTION__);
+    }
+    return result;
+}
+
+int32_t OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation(ArkUI_NodeHandle adoptedChild,
+    const ArkUI_PointF* compensationOffset, const ArkUI_Matrix4* compensationTransform)
+{
+    CHECK_UI_THREAD("OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation");
+    CHECK_NULL_RETURN_WITH_MESSAGE(adoptedChild && compensationOffset && compensationTransform &&
+        compensationTransform->matrix, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__,
+        "Adopted child, compensation offset, or compensation transform parameter is invalid");
+    const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
+    CHECK_NULL_RETURN_WITH_MESSAGE(impl, ARKUI_ERROR_CODE_CAPI_INIT_ERROR,
+        __FUNCTION__, "Native module not initialized");
+    CHECK_NODE_DISPOSED(adoptedChild, "Adopted child node has been disposed");
+    if (!OHOS::Ace::NodeModel::CheckIsCNode(adoptedChild)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Adopted child is not a C node");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    auto result = impl->getNodeModifiers()->getNDKRenderNodeModifier()->setAdoptedChildOverlayPositionCompensation(
+        adoptedChild->uiNodeHandle, compensationOffset->x, compensationOffset->y, compensationTransform->matrix);
+    if (result != ARKUI_ERROR_CODE_NO_ERROR) {
+        SET_ERROR_FUNCTION_NAME(__FUNCTION__);
+    }
+    return result;
+}
+
 int32_t OH_ArkUI_NativeModule_RemoveAdoptedChild(ArkUI_NodeHandle node, ArkUI_NodeHandle child)
 {
     CHECK_UI_THREAD("OH_ArkUI_NativeModule_RemoveAdoptedChild");
@@ -898,6 +959,7 @@ int32_t OH_ArkUI_RunTaskInScope(ArkUI_ContextHandle uiContext, void* userData, v
 int32_t OH_ArkUI_SetForceDarkConfig(
     ArkUI_ContextHandle uiContext, bool forceDark, ArkUI_NodeType nodeType, uint32_t (*colorInvertFunc)(uint32_t color))
 {
+    CHECK_UI_THREAD("OH_ArkUI_SetForceDarkConfig");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN(impl, OHOS::Ace::ERROR_CODE_CAPI_INIT_ERROR);
     int32_t instanceId = OHOS::Ace::INSTANCE_ID_UNDEFINED;

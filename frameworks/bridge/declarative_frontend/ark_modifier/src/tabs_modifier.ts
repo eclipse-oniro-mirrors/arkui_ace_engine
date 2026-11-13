@@ -259,6 +259,11 @@ class LazyArkTabsComponent extends ArkComponent {
     return this;
   }
 
+  showSidebarControlButton(value: boolean): this {
+    this.lazyComponent.showSidebarControlButton(value);
+    return this;
+  }
+
   barDisplayModeBreakpoint(value: TabsBreakpointType<TabBarDisplayMode>): this {
     this.lazyComponent.barDisplayModeBreakpoint(value);
     return this;
@@ -289,6 +294,11 @@ class LazyArkTabsComponent extends ArkComponent {
     return this;
   }
 
+  tabViewCustomization(value: Optional<TabViewCustomization>): this {
+    this.lazyComponent.tabViewCustomization(value);
+    return this;
+  }
+
   sidebarBackgroundColor(value: Optional<ResourceColor>): this {
     this.lazyComponent.sidebarBackgroundColor(value);
     return this;
@@ -301,6 +311,11 @@ class LazyArkTabsComponent extends ArkComponent {
 
   sidebarDivider(value: Optional<DividerStyle>): this {
     this.lazyComponent.sidebarDivider(value);
+    return this;
+  }
+
+  expandSafeArea(types?: Array<SafeAreaType>, edges?: Array<SafeAreaEdge>): this {
+    this.lazyComponent.expandSafeArea(types, edges);
     return this;
   }
 }

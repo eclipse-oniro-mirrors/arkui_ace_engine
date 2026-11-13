@@ -65,43 +65,11 @@ struct KeyEvent final : public NonPointerEvent {
         timeStamp = time;
     }
 
-    bool HasKey(KeyCode expectCode) const
-    {
-        auto curPressedCode = pressedCodes.rbegin();
-        while (curPressedCode != pressedCodes.rend()) {
-            if (expectCode == *curPressedCode) {
-                return true;
-            }
-            ++curPressedCode;
-        }
-        return false;
-    }
+    ACE_FORCE_EXPORT bool HasKey(KeyCode expectCode) const;
 
-    bool IsExactlyKey(const std::vector<KeyCode>& expectCodes) const
-    {
-        auto pressedKeysCnt = pressedCodes.size();
-        if (std::find(pressedCodes.begin(), pressedCodes.end(), KeyCode::KEY_FN) != pressedCodes.end()) {
-            --pressedKeysCnt;
-        }
-        return (expectCodes.size() != pressedKeysCnt) ? false : IsKey(expectCodes);
-    }
+    ACE_FORCE_EXPORT bool IsExactlyKey(const std::vector<KeyCode>& expectCodes) const;
 
-    bool IsKey(const std::vector<KeyCode>& expectCodes) const
-    {
-        if (expectCodes.size() > pressedCodes.size() || pressedCodes.empty()) {
-            return false;
-        }
-        auto curExpectCode = expectCodes.crbegin();
-        auto curPressedCode = pressedCodes.crbegin();
-        while (curExpectCode != expectCodes.crend()) {
-            if (*curExpectCode != *curPressedCode) {
-                return false;
-            }
-            ++curExpectCode;
-            ++curPressedCode;
-        }
-        return true;
-    }
+    ACE_FORCE_EXPORT bool IsKey(const std::vector<KeyCode>& expectCodes) const;
 
     bool IsCtrlWith(KeyCode expectCodes) const
     {
@@ -169,19 +137,13 @@ struct KeyEvent final : public NonPointerEvent {
     uint32_t unicode = 0;
     std::vector<uint8_t> enhanceData;
     std::shared_ptr<MMI::KeyEvent> rawKeyEvent;
+    bool isAgent = false;
+    int32_t agentWindowId = -1;
+    int32_t callingUid = -1;
+    bool hasSafSessionId = false;
+    uint64_t safSessionId = 0;
 
-    std::string ToString() const
-    {
-        std::stringstream ss;
-        ss << "code=" << static_cast<int32_t>(code) << ", ";
-        ss << "action=" << static_cast<int32_t>(action) << ", ";
-        ss << "pressedCodes=[";
-        std::for_each(pressedCodes.begin(), pressedCodes.end(),
-            [&ss](const KeyCode& code) { ss << static_cast<int32_t>(code) << ", "; });
-        ss << "]" << ", ";
-        ss << "isPreIme = " << isPreIme;
-        return ss.str();
-    }
+    ACE_FORCE_EXPORT std::string ToString() const;
     std::string msg = "";
     std::optional<bool> activeMark;
     int32_t targetDisplayId = 0;

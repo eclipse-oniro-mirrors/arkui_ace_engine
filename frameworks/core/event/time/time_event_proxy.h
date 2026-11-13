@@ -52,10 +52,6 @@ protected:
     TimeEventProxy() = default;
 
 private:
-
-    static std::unique_ptr<TimeEventProxy> instance_; /**< The singleton instance of TimeEventProxy. */
-    static std::mutex mutex_;                         /**< Mutex for thread-safe creation of the singleton instance. */
-
     ACE_DISALLOW_COPY_AND_MOVE(TimeEventProxy);
 };
 } // namespace OHOS::Ace

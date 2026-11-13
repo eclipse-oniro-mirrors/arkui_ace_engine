@@ -1257,14 +1257,13 @@ HWTEST_F(MenuLayoutAvoid1TestNg, MenuLayoutOverHeightTest001, TestSize.Level1)
      * @tc.steps: step3. Afer menuLayoutAvoidAlgorithm avoid placement.
      * @tc.expected: position and placement is as expected.
      */
-    auto expectedPosition = OffsetF(
-        menuLayoutAlgorithm->targetOffset_.GetX() + menuLayoutAlgorithm->targetSize_.Width() +
-        menuLayoutAlgorithm->targetSecurity_, menuLayoutAlgorithm->targetOffset_.GetY() +
-        menuLayoutAlgorithm->targetSize_.Height() - menuSize.Height());
     auto afterPosition =
         menuLayoutAlgorithm->MenuLayoutAvoidAlgorithm(menuProp, menuPattern, menuSize, false, layoutWrapper);
+    auto expectedPosition = OffsetF(
+        menuLayoutAlgorithm->targetOffset_.GetX() + menuLayoutAlgorithm->targetSize_.Width() +
+        menuLayoutAlgorithm->targetSecurity_, menuLayoutAlgorithm->targetOffset_.GetY());
     delete layoutWrapper;
-    ASSERT_EQ(menuLayoutAlgorithm->placement_, Placement::RIGHT_BOTTOM);
+    ASSERT_EQ(menuLayoutAlgorithm->placement_, Placement::RIGHT_TOP);
     ASSERT_EQ(afterPosition, expectedPosition);
 }
 

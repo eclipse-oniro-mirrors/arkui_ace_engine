@@ -62,6 +62,7 @@ namespace OHOS::Ace::NG {
 }
 
 namespace OHOS::Ace {
+struct InspectorWindowSnapshot;
 class AIWriteAdapter;
 class RRect;
 #ifndef CROSS_PLATFORM
@@ -100,6 +101,7 @@ class ToolbarManager;
 class UIExtensionManager;
 class AccessibilityManagerNG;
 class ForceSplitManager;
+class HandednessManager;
 class RecoverableManager;
 class FormVisibleManager;
 class FormEventManager;
@@ -108,9 +110,12 @@ class RecycleManager;
 class BackPressHandlerManager;
 class DragDropManager;
 class MaterialProcessor;
+enum class PageLogContainerType : int32_t;
 class DynamicComponentSafeManager;
 class EnvironmentManager;
 enum class FocusActiveReason : int32_t;
+enum class ExecutionState;
+enum class ProcessResult;
 
 enum class MockFlushEventType : int32_t {
     REJECT = -1,
@@ -139,7 +144,7 @@ public:
         RefPtr<AssetManager> assetManager, const RefPtr<Frontend>& frontend, int32_t instanceId);
     PipelineContext();
 
-    ~PipelineContext() override = default;
+    ~PipelineContext() override;
 
     static RefPtr<PipelineContext> GetCurrentContext();
 
@@ -270,7 +275,10 @@ public:
     // if return false, then this event needs platform to handle it.
     bool OnNonPointerEvent(const NonPointerEvent& event) override;
 
+    ProcessResult ProcessCommand(const std::string& command,
+        const std::function<void(ExecutionState)>& completion);
     void ProcessCommand(const std::string& command);
+    void ProcessCommandWithResult(const std::string& command, const std::function<void(const CommandResult&)>& finish);
 
     // ReDispatch KeyEvent from Web process.
     void ReDispatch(KeyEvent& keyEvent);
@@ -894,6 +902,13 @@ public:
 
     const RefPtr<ForceSplitManager>& GetForceSplitManager() const;
 
+    const RefPtr<HandednessManager>& GetHandednessManager() const;
+
+    // Runtime control of the force split transPages behavior. Non-virtual forwarding
+    // helpers keep bridges free of direct force_split_manager.h includes.
+    void SetTransPageEnabled(bool enabled);
+    bool IsTransPageEnabled() const;
+
     const RefPtr<RecoverableManager>& GetRecoverableManager() const;
 
     double CalcPageWidth(double rootWidth) const override;
@@ -1055,6 +1070,8 @@ public:
     void GetComponentOverlayInspector(std::shared_ptr<JsonValue>& root, RefPtr<NG::FrameNode> startNode,
         ParamConfig config, bool isInSubWindow, double parentFinalOpacity = 1.0) const;
 
+    void SetInspectorWindowSnapshotCallback(std::function<std::optional<InspectorWindowSnapshot>()>&& callback);
+    const std::string& GetInspectorAppTitle() const { return inspectorAppTitle_; }
     void GetInspectorTree(bool onlyNeedVisible, ParamConfig config = ParamConfig());
     void CollectInspectorTreeInto(std::shared_ptr<JsonValue>& root, bool onlyNeedVisible, ParamConfig config);
     UITreeRequestState& GetUITreeRequestState();
@@ -1340,6 +1357,13 @@ public:
     void RegisterMaterialNode(const RefPtr<FrameNode>& node);
     void UnregisterMaterialNode(int32_t nodeId);
 
+    void RegisterPageContextNode(const RefPtr<FrameNode>& node);
+    void UnregisterPageContextNode(int32_t nodeId);
+    void ReportPageContextStats(int32_t targetContainerId, PageLogContainerType type, int32_t tabIndex = -1);
+
+    void AddTaskOverlayNodeMaterialArea(const RefPtr<FrameNode>& targetNode, const std::string& source);
+    void ReportOverlayNodeMaterialArea(const RefPtr<FrameNode>& host, const std::string& source = "");
+
 protected:
     void StartWindowSizeChangeAnimate(int32_t width, int32_t height, WindowSizeChangeReason type,
         const std::shared_ptr<Rosen::RSTransaction>& rsTransaction = nullptr,
@@ -1391,6 +1415,8 @@ protected:
     void PostKeyboardAvoidTask();
 
 private:
+    std::function<std::optional<InspectorWindowSnapshot>()> inspectorWindowSnapshot_;
+    std::string inspectorAppTitle_;
     RefPtr<ContainerModalPattern> GetContainerModalPatternForTitleHeight();
 
     void ExecuteSurfaceChangedCallbacks(int32_t newWidth, int32_t newHeight, WindowSizeChangeReason type);
@@ -1466,6 +1492,8 @@ private:
     void CompensateTouchMoveEventBeforeDown(std::list<TouchEvent>& touchEvents);
 
     void DispatchMouseToTouchEvent(const MouseEvent& event, const RefPtr<FrameNode>& node);
+
+    void FinishOnMouseEvent(const MouseEvent& event, const MouseEvent& dispatchEvent, const RefPtr<FrameNode>& node);
 
     void CompensateMouseMoveEvent(const MouseEvent& event, const RefPtr<FrameNode>& node);
 
@@ -1699,6 +1727,7 @@ private:
     std::once_flag scrollPlaceholderOnceFlag_;
     RefPtr<NavigationManager> navigationMgr_;
     RefPtr<ForceSplitManager> forceSplitMgr_;
+    RefPtr<HandednessManager> handednessManager_;
     RefPtr<RecoverableManager> recoverableMgr_;
     RefPtr<FormVisibleManager> formVisibleMgr_;
     RefPtr<FormEventManager> formEventMgr_;

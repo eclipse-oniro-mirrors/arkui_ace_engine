@@ -32,6 +32,10 @@
 
 namespace OHOS::Ace::Framework {
 
+// RecoverableStorage bridge callback types (same aliases as frontend_delegate_declarative.h)
+using RecoverableSnapshotCallBack = std::function<void(int32_t instanceId, std::string& section)>;
+using RecoverableRestoreCallBack = std::function<void(int32_t instanceId, const std::string& section)>;
+
 class FrontendDelegateDeclarativeNG : public FrontendDelegate {
     DECLARE_ACE_TYPE(FrontendDelegateDeclarativeNG, FrontendDelegate);
 
@@ -82,6 +86,8 @@ public:
     void SetOnStartContinuationCallBack(OnStartContinuationCallBack&& onStartContinuationCallBack);
     void SetOnCompleteContinuationCallBack(OnCompleteContinuationCallBack&& onCompleteContinuationCallBack);
     void SetOnSaveDataCallBack(OnSaveDataCallBack&& onSaveDataCallBack);
+    void SetRecoverableSnapshotCallBack(RecoverableSnapshotCallBack&& recoverableSnapshotCallBack);
+    void SetRecoverableRestoreCallBack(RecoverableRestoreCallBack&& recoverableRestoreCallBack);
     void SetOnRemoteTerminatedCallBack(OnRemoteTerminatedCallBack&& onRemoteTerminatedCallBack);
     void SetOnRestoreDataCallBack(OnRestoreDataCallBack&& onRestoreDataCallBack);
     void SetDestroyApplicationCallback(DestroyApplicationCallback&& destroyApplicationCallback);
@@ -375,6 +381,8 @@ private:
     OnStartContinuationCallBack onStartContinuationCallBack_;
     OnCompleteContinuationCallBack onCompleteContinuationCallBack_;
     OnSaveDataCallBack onSaveDataCallBack_;
+    RecoverableSnapshotCallBack recoverableSnapshotCallBack_;
+    RecoverableRestoreCallBack recoverableRestoreCallBack_;
     OnRemoteTerminatedCallBack onRemoteTerminatedCallBack_;
     OnRestoreDataCallBack onRestoreDataCallBack_;
     DestroyApplicationCallback destroyApplication_;

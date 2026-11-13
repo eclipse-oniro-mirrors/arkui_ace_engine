@@ -38,6 +38,11 @@ public:
         return fadeColor_;
     }
 
+    bool HasVisibleEffect() const
+    {
+        return fadePainter_ && Positive(fadePainter_->GetOpacity()) && Positive(fadePainter_->GetScaleFactor());
+    }
+
     void InitialEdgeEffect() override;
     double CalculateOverScroll(double oldPosition, bool isReachMax) override;
     void Paint(RSCanvas& canvas, const SizeF& viewPort, const OffsetF& offset) override;

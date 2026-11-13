@@ -109,8 +109,6 @@ inline constexpr Dimension AUTO_SCROLL_HOT_ZONE_HEIGHT = 58.0_vp;
 inline constexpr Dimension AUTO_SCROLL_HOT_ZONE_WIDTH = 26.0_vp;
 inline constexpr Dimension MOUSE_SCROLL_BAR_REGION_WIDTH = 8.0_vp;
 
-enum class FocuseIndex { TEXT = 0, CANCEL, UNIT, VOICE };
-
 enum class SelectionMode { SELECT, SELECT_ALL, NONE };
 
 enum class DragStatus { DRAGGING, ON_DROP, NONE };
@@ -329,6 +327,8 @@ class ACE_FORCE_EXPORT TextFieldPattern : public ScrollablePattern,
         TextBase, Magnifier, TextGestureSelector, ICounterHost, IPasswordIconHost, PageTranslateNode, ICleanNodeHost);
 
 public:
+    void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context) override;
+
     RefPtr<NG::FrameNode> GetHost() const override { return ScrollablePattern::GetHost(); }
     TextFieldPattern();
     ~TextFieldPattern() override;
@@ -809,6 +809,7 @@ public:
     void HandleExtendAction(int32_t action) override;
     void HandleSelect(CaretMoveIntent direction) override;
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
 
     void HandleSelectExtend(CaretMoveIntent direction) override
     {
@@ -1186,6 +1187,7 @@ public:
     void HandleOnTextMethodInput(
         int32_t type, const std::string& typeName, const std::function<void()>& successCallback);
     void HandleOnCameraInput();
+    void HandleOnTranslateInput();
     void HandleOnVoiceInput();
     void AttachAndStartInputType(int32_t type);
     void HandleOnAIWrite();
@@ -1486,9 +1488,13 @@ public:
     void FocusForwardStopTwinkling();
     bool HandleSwithFocus(FocuseIndex index);
     bool UpdateFocusForward();
-    bool HandleFocusForward(FocuseIndex index);
     bool UpdateFocusBackward();
-    bool HandleFocusBackward(FocuseIndex index);
+    FocuseIndex GetFocusIndex() const
+    {
+        return focusIndex_;
+    }
+    const std::unordered_map<FocuseIndex, FocuseIndex>& GetFocusForwardMap() const;
+    const std::unordered_map<FocuseIndex, FocuseIndex>& GetFocusBackwardMap() const;
 
     bool HandleSpaceEvent();
     bool HandleSpaceKeyClickEvent();
@@ -1700,8 +1706,6 @@ public:
     }
 
     void ReceivePreviewTextStyle(const std::string& style) override;
-
-    PreviewTextStyle GetPreviewTextStyle() const;
 
     RefPtr<UINode> GetCustomKeyboard()
     {

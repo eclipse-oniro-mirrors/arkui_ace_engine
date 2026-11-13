@@ -77,6 +77,7 @@ public:
     virtual void Reset() {}
     virtual void Close() {}
     virtual void QuadTo(float ctrlPtX, float ctrlPtY, float endPtX, float endPtY) {}
+    virtual void RQuadTo(float dx1, float dy1, float dx2, float dy2) {}
     virtual void ArcTo(float x1, float y1, float x2, float y2, float radius) {}
     virtual void ArcTo(float rx, float ry, float angle, TestingPathDirection direction, float endX, float endY) {}
     virtual void ArcTo(float pt1X, float pt1Y, float pt2X, float pt2Y, float startAngle, float sweepAngle) {}

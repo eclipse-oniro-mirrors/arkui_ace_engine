@@ -373,6 +373,10 @@ let ImmersiveStrategy;
 (function (ImmersiveStrategy) {
   ImmersiveStrategy[ImmersiveStrategy.AVOID_CUTOUT = 0] = 'AVOID_CUTOUT';
   ImmersiveStrategy[ImmersiveStrategy.AVOID_FLOAT_NAV = 1] = 'AVOID_FLOAT_NAV';
+  ImmersiveStrategy[ImmersiveStrategy.GRID_EXPAND_SAFE_AREA = 2] = 'GRID_EXPAND_SAFE_AREA';
+  ImmersiveStrategy[ImmersiveStrategy.LIST_EXPAND_SAFE_AREA = 3] = 'LIST_EXPAND_SAFE_AREA';
+  ImmersiveStrategy[ImmersiveStrategy.SCROLL_EXPAND_SAFE_AREA = 4] = 'SCROLL_EXPAND_SAFE_AREA';
+  ImmersiveStrategy[ImmersiveStrategy.WATER_FLOW_EXPAND_SAFE_AREA = 5] = 'WATER_FLOW_EXPAND_SAFE_AREA';
   ImmersiveStrategy[ImmersiveStrategy.AVOID_WINDOW_CONTROLS = 6] = 'AVOID_WINDOW_CONTROLS';
   ImmersiveStrategy[ImmersiveStrategy.BIND_SHEET_EXPAND_SAFE_AREA = 7] = 'BIND_SHEET_EXPAND_SAFE_AREA';
   ImmersiveStrategy[ImmersiveStrategy.NAVIGATION_EXPAND_SAFE_AREA = 8] = 'NAVIGATION_EXPAND_SAFE_AREA';
@@ -1976,6 +1980,12 @@ let ShadowStyle;
   ShadowStyle[ShadowStyle.OUTER_FLOATING_MD = 5] = 'OUTER_FLOATING_MD';
 })(ShadowStyle || (ShadowStyle = {}));
 
+let ShadowClipMode;
+(function (ShadowClipMode) {
+  ShadowClipMode[ShadowClipMode.DEFAULT_SHAPE = 0] = 'DEFAULT_SHAPE';
+  ShadowClipMode[ShadowClipMode.BOUNDS_SHAPE = 1] = 'BOUNDS_SHAPE';
+})(ShadowClipMode || (ShadowClipMode = {}));
+
 let UnionMode;
 (function (UnionMode) {
   UnionMode[UnionMode.SMOOTH_UNION = 0] = 'SMOOTH_UNION';
@@ -1999,6 +2009,12 @@ let GridRowDirection;
   GridRowDirection[GridRowDirection.Row = 0] = 'Row';
   GridRowDirection[GridRowDirection.RowReverse = 1] = 'RowReverse';
 })(GridRowDirection || (GridRowDirection = {}));
+
+let AgentControlMode;
+(function (AgentControlMode) {
+  AgentControlMode[AgentControlMode.ALLOW = 0] = 'ALLOW';
+  AgentControlMode[AgentControlMode.DENY = 1] = 'DENY';
+})(AgentControlMode || (AgentControlMode = {}));
 
 let HitTestMode;
 (function (HitTestMode) {
@@ -2169,6 +2185,14 @@ let SheetTitleBarBackgroundBlur;
   SheetTitleBarBackgroundBlur[SheetTitleBarBackgroundBlur.NONE = 0] = 'NONE';
   SheetTitleBarBackgroundBlur[SheetTitleBarBackgroundBlur.GRADIENT = 1] = 'GRADIENT';
 })(SheetTitleBarBackgroundBlur || (SheetTitleBarBackgroundBlur = {}));
+
+let VibrancyMode;
+(function (VibrancyMode) {
+  VibrancyMode[VibrancyMode.DISABLED = 0] = 'DISABLED';
+  VibrancyMode[VibrancyMode.AUTO = 1] = 'AUTO';
+  VibrancyMode[VibrancyMode.BRIGHTEN = 2] = 'BRIGHTEN';
+  VibrancyMode[VibrancyMode.DARKEN = 3] = 'DARKEN';
+})(VibrancyMode || (VibrancyMode = {}));
 
 let FunctionKey;
 (function (FunctionKey) {
@@ -2663,6 +2687,10 @@ class TextMenuItemId {
 
   static get CAMERA_INPUT() {
     return new TextMenuItemId('OH_DEFAULT_CAMERA_INPUT');
+  }
+
+  static get TRANSLATE_INPUT() {
+    return new TextMenuItemId('OH_DEFAULT_TRANSLATE_INPUT');
   }
 
   static get AI_WRITER() {
@@ -4627,6 +4655,12 @@ let PageFlipMode;
   PageFlipMode[PageFlipMode.CONTINUOUS = 0] = 'CONTINUOUS';
   PageFlipMode[PageFlipMode.SINGLE = 1] = 'SINGLE';
 })(PageFlipMode || (PageFlipMode = {}));
+
+let SidebarSectionTitleStyle;
+(function (SidebarSectionTitleStyle) {
+  SidebarSectionTitleStyle[SidebarSectionTitleStyle.STANDARD = 0] = 'STANDARD';
+  SidebarSectionTitleStyle[SidebarSectionTitleStyle.EMPHASIZED = 1] = 'EMPHASIZED';
+})(SidebarSectionTitleStyle || (SidebarSectionTitleStyle = {}));
 
 let CheckBoxStyle;
 (function (CheckBoxStyle) {

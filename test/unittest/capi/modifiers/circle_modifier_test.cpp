@@ -151,7 +151,7 @@ HWTEST_F(CircleModifierTest, setFillTestColorMetricsAndResetSemantics, TestSize.
     fillResult = GetAttrValue<std::string>(node_, ATTRIBUTE_FILL_NAME);
     EXPECT_THAT(fillResult, Eq(ATTRIBUTE_COLOR_DEFAULT_VALUE));
     foregroundResult = GetAttrValue<std::string>(node_, ATTRIBUTE_FOREGROUND_COLOR_NAME);
-    EXPECT_FALSE(foregroundResult.has_value());
+    EXPECT_THAT(foregroundResult, Eq("#00000001"));
 }
 
 /*

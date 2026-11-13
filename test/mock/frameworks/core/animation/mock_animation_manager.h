@@ -39,6 +39,7 @@ public:
     enum class Version {
         V0 = 0,
         V1 = 1, // introduces bugfixes to animation callback triggers
+        V2 = 2, // requeues retained animations after finished entries were pruned
     };
     static Version GetVersion();
     static void SetVersion(enum Version value);

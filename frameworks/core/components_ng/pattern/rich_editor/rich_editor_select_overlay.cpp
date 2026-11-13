@@ -351,6 +351,9 @@ void RichEditorSelectOverlay::OnUpdateMenuInfo(SelectMenuInfo& menuInfo, SelectO
     bool isShowItem = pattern->copyOption_ != CopyOptions::None &&
         pattern->IsCapabilityAllowed(RichEditorCapability::COPY);
     bool selectionMenuHidden = pattern->GetSelectionMenuHidden();
+    FillMenuShowTranslateInput(menuInfo, !pattern->textSelector_.SelectNothing(),
+        pattern->IsCapabilityDisabled(RichEditorCapability::COPY),
+        pattern->customKeyboardBuilder_ || pattern->customKeyboardNode_);
     menuInfo.showCopy = isShowItem && hasValue && !pattern->textSelector_.SelectNothing();
     menuInfo.showCut = isShowItem && hasValue && !pattern->textSelector_.SelectNothing();
     menuInfo.showPaste = IsShowPaste();
@@ -517,6 +520,9 @@ void RichEditorSelectOverlay::OnMenuItemAction(OptionMenuActionId id, OptionMenu
             return;
         case OptionMenuActionId::CAMERA_INPUT:
             pattern->HandleOnCameraInput();
+            break;
+        case OptionMenuActionId::TRANSLATE_INPUT:
+            pattern->HandleOnTranslateInput();
             break;
         case OptionMenuActionId::AI_WRITE:
             pattern->HandleOnAIWrite();
@@ -705,13 +711,13 @@ void RichEditorSelectOverlay::OnAncestorNodeChanged(FrameNodeChangeInfoFlag flag
     CHECK_NULL_VOID(host);
     FrameNodeChangeInfoFlag changeFlag = flag;
     if (IsAncestorNodeStartScroll(host->GetChangeInfoFlag()) || IsAncestorNodeEndScroll(host->GetChangeInfoFlag())) {
-        auto parent = host->GetAncestorNodeOfFrame(true);
+        auto parent = host->GetCoordinateAncestorNodeOfFrame(true);
         changeFlag = FRAME_NODE_CHANGE_INFO_NONE;
         while (parent) {
             if (parent->GetChangeInfoFlag() != FRAME_NODE_CHANGE_INFO_NONE) {
                 changeFlag = changeFlag | parent->GetChangeInfoFlag();
             }
-            parent = parent->GetAncestorNodeOfFrame(true);
+            parent = parent->GetCoordinateAncestorNodeOfFrame(true);
         }
     }
     BaseTextSelectOverlay::OnAncestorNodeChanged(changeFlag, scrollTriggersEmbed, transformTriggersEmbed);
@@ -983,6 +989,7 @@ void RichEditorSelectOverlay::UpdateMenuInfoForPlainTextInput(SelectMenuInfo& me
     isCameraSupported = inputMethod && inputMethod->IsInputTypeSupported(MiscServices::InputType::CAMERA_INPUT);
 #endif
     FillMenuShowCameraInput(menuInfo, isSelected, isCameraSupported, isContentRestricted, hasCustomKeyboard);
+    FillMenuShowTranslateInput(menuInfo, isSelected, isContentRestricted, hasCustomKeyboard);
     FillMenuVisibility(menuInfo, hasText, menuInfo.showCameraInput, pattern->IsShowAutoFill(),
         isSelectionMenuHidden, dirtyFlag);
     FillMenuShowPaste(menuInfo);

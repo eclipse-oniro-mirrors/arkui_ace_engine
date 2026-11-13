@@ -60,7 +60,7 @@ public:
             hoverColor_ = colors->InteractiveHover();
             pressColor_ = colors->InteractiveClick();
             selectedColor_ = colors->CompBackgroundEmphasize();
-            selectedColorWithAlpha_ = selectedColor_.BlendOpacity(selectedAlpha_);
+            selectedColorWithAlpha_ = colors->CompEmphasizeTertiary();
         }
     }
 

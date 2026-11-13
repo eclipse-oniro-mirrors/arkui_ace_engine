@@ -28,6 +28,7 @@ namespace OHOS::Ace::NG {
 class CustomAccessibilityProperty;
 }
 namespace OHOS::Ace::Framework {
+class ThirdAccessibilityTraversal;
 struct NodeConfig {
     OHOS::Ace::NG::OffsetF offset;
     int32_t pageId = -1;
@@ -122,9 +123,11 @@ public:
     static bool FindNativeInfoById(
         const WeakPtr<AccessibilityProvider>& accessibilityProvider,
         int64_t splitElementId,
-        std::shared_ptr<ArkUI_AccessibilityElementInfo>& nativeInfo);
+        std::shared_ptr<ArkUI_AccessibilityElementInfo>& nativeInfo,
+        ThirdAccessibilityTraversal* traversal = nullptr);
 
     void CheckAndSendHoverEnterByReadableRules(int64_t thirdElementId);
+    bool SendNativeHoverEvent(const ArkUI_AccessibilityElementInfo& info, NG::AccessibilityHoverEventType eventType);
 
     void SetThirdCustomProperty(int64_t elementId, const RefPtr<NG::CustomAccessibilityProperty>& property);
     RefPtr<NG::CustomAccessibilityProperty> GetThirdCustomProperty(int64_t elementId) override;
@@ -137,6 +140,17 @@ public:
         Accessibility::AccessibilityElementInfo& info);
 
 private:
+    friend class ThirdAccessibilityTraversal;
+    struct NodeQueryOptions {
+        int32_t mode = 0;
+        int32_t requestId = 0;
+        bool ignoreHostOffset = false;
+        ThirdAccessibilityTraversal* traversal = nullptr;
+    };
+    bool FindNodeInfosFromProvider(int64_t elementId, const NodeQueryOptions& options,
+        std::list<Accessibility::AccessibilityElementInfo>& infos);
+    bool BuildNativeHoverEvent(const ArkUI_AccessibilityElementInfo& info,
+        NG::AccessibilityHoverEventType eventType, Accessibility::AccessibilityEventInfo& event);
     void GetHostRectTranslateInfo(NodeConfig& config);
     void GetNodeConfig(NodeConfig& nodeConfig);
     void ApplyChildTreeIdAndWinId(Accessibility::AccessibilityElementInfo& info);

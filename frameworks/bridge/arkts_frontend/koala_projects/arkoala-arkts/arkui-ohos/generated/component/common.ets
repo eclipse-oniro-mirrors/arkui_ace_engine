@@ -24,7 +24,7 @@ import { CallbackTransformer } from './../CallbackTransformer'
 import { unifiedDataChannel_UnifiedData_serializer } from './../framework/ohos.data.unifiedDataChannel'
 import { default as unifiedDataChannel } from '@ohos.data.unifiedDataChannel'
 import { VoidCallback, Position_serializer, DirectionalEdgesT_F64_serializer, Position, DirectionalEdgesT, ConstraintSizeOptions_serializer, ConstraintSizeOptions, ResourceColor, Resource as arkui_component_units_Resource, Coordinate2D_serializer, Coordinate2D, SizeOptions, SizeOptions_serializer, ChainWeightOptions_serializer, Padding_serializer, LocalizedPadding_serializer, BorderOptions_serializer, EdgeStyles_serializer, EdgeWidths_serializer, LocalizedEdgeWidths_serializer, EdgeColors_serializer, LocalizedEdgeColors_serializer, OutlineOptions_serializer, EdgeOutlineStyles_serializer, EdgeOutlineWidths_serializer, OutlineRadiuses_serializer, Edges_serializer, LocalizedEdges_serializer, LocalizedPosition_serializer, AccessibilityActionOptions_serializer, AccessibilityNextFocusParams, AccessibilityNextFocusParams_serializer, BorderRadiuses_serializer, LocalizedBorderRadiuses_serializer, AccessibilityOptions_serializer, Length, ChainWeightOptions, Padding, LocalizedPadding, Margin, LocalizedMargin, ColorMetrics as arkui_component_units_ColorMetrics, ResourceStr, BorderOptions, EdgeStyles, EdgeWidths, LocalizedEdgeWidths, EdgeColors, LocalizedEdgeColors, OutlineOptions, EdgeOutlineStyles, Dimension, EdgeOutlineWidths, OutlineRadiuses, Area, Edges, LocalizedEdges, LocalizedPosition, AccessibilityActionOptions, BorderRadiuses, LocalizedBorderRadiuses, AccessibilityOptions, ScrollBarMargin_serializer, ScrollBarMargin, Bias, Font as arkui_component_units_Font, EdgeWidth, Bias_serializer, Area_serializer, arkui_component_units_Font_serializer, AccessibilityCustomAction, AccessibilityCustomAction_serializer } from './units'
-import { KeyType, KeySource, Color as arkui_component_enums_Color, TouchType, InteractionHand, HitTestMode, ImageSize, Alignment, BorderStyle, ColoringStrategy, HoverEffect, Visibility, ItemAlign, LocalizedAlignment, Direction, ObscuredReasons, RenderFit, FocusDrawLevel, ImageRepeat, RenderStrategy, Axis, ResponseType, FunctionKey, ModifierKey, GradientDirection, Curve, SharedTransitionEffectType, ArrowPointPosition, TipsAnchorType, Placement, BarState, UIMaterialAnimationMode, LineCapStyle, LineJoinStyle, CrownSensitivity, EdgeEffect, TextDecorationType, TextDecorationStyle, ResponseRegionSupportedTool, PlayMode, VerticalAlign, HorizontalAlign, FontWeight, FontStyle, GestureCollectIntervention, CrownAction, ClickEffectLevel, NestedScrollMode, PixelRoundCalcPolicy, ScrollSource, IlluminatedType, GestureShortcut, InputEventInterceptAction, AccessibilityHoverType, AxisAction, AxisType, AxisModel, MouseButton, MouseAction, EdgeLightPosition } from './enums'
+import { KeyType, KeySource, Color as arkui_component_enums_Color, TouchType, InteractionHand, HitTestMode, ImageSize, Alignment, BorderStyle, ColoringStrategy, HoverEffect, Visibility, ItemAlign, LocalizedAlignment, Direction, ShadowClipMode, ObscuredReasons, RenderFit, FocusDrawLevel, ImageRepeat, RenderStrategy, Axis, ResponseType, FunctionKey, ModifierKey, GradientDirection, Curve, SharedTransitionEffectType, ArrowPointPosition, TipsAnchorType, Placement, BarState, LineCapStyle, LineJoinStyle, CrownSensitivity, EdgeEffect, TextDecorationType, TextDecorationStyle, ResponseRegionSupportedTool, PlayMode, VerticalAlign, HorizontalAlign, FontWeight, FontStyle, GestureCollectIntervention, CrownAction, ClickEffectLevel, NestedScrollMode, PixelRoundCalcPolicy, ScrollSource, IlluminatedType, GestureShortcut, InputEventInterceptAction, AccessibilityHoverType, AxisAction, AxisType, AxisModel, MouseButton, MouseAction, EdgeLightPosition, AgentControlMode } from './enums'
 import { IntentionCode } from '@ohos.multimodalInput.intentionCode'
 import { global_resource_Resource_serializer } from './../framework/resource'
 import { Resource as global_resource_Resource } from 'global.resource'
@@ -63,6 +63,7 @@ import { BuildOptions } from 'arkui.BuilderNode'
 import { AvoidanceMode } from './select'
 import { LevelMode, default as promptAction } from '@ohos.promptAction'
 import { SymbolGlyphModifier } from 'arkui.SymbolGlyphModifier'
+import { HandednessFollowMode } from '@ohos.arkui.dialog'
 import { CallbackKind } from './../framework/peers/CallbackKind'
 import { memo, memo_stable, memo_skip } from 'arkui.stateManagement.runtime'
 import { ComponentBuilder, Builder } from '@koalaui/builderLambda'
@@ -3504,6 +3505,18 @@ export class ArkCommonMethodPeer extends PeerNode {
         ArkUIGeneratedNativeModule._CommonMethod_setHitTestBehavior(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setAgentControlModeAttribute(value: AgentControlMode | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = (value as AgentControlMode)
+            thisSerializer.writeInt32(valueTmpValue.valueOf())
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._CommonMethod_setAgentControlMode(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setOnChildTouchTestAttribute(value: ((value: Array<TouchTestInfo>) => TouchResult) | undefined): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (value !== undefined) {
@@ -5293,6 +5306,46 @@ export class ArkCommonMethodPeer extends PeerNode {
             thisSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
         ArkUIGeneratedNativeModule._CommonMethod_setShadow(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
+    setShadowShapeAttribute(value: CircleShape | EllipseShape | PathShape | RectShape | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            if (valueTmpValue instanceof CircleShape) {
+                thisSerializer.writeInt8((0).toByte())
+                const valueTmpValueForIdx0 = valueTmpValue as CircleShape
+                CircleShape_serializer.write(thisSerializer, valueTmpValueForIdx0)
+            } else if (valueTmpValue instanceof EllipseShape) {
+                thisSerializer.writeInt8((1).toByte())
+                const valueTmpValueForIdx1 = valueTmpValue as EllipseShape
+                EllipseShape_serializer.write(thisSerializer, valueTmpValueForIdx1)
+            } else if (valueTmpValue instanceof PathShape) {
+                thisSerializer.writeInt8((2).toByte())
+                const valueTmpValueForIdx2 = valueTmpValue as PathShape
+                PathShape_serializer.write(thisSerializer, valueTmpValueForIdx2)
+            } else if (valueTmpValue instanceof RectShape) {
+                thisSerializer.writeInt8((3).toByte())
+                const valueTmpValueForIdx3 = valueTmpValue as RectShape
+                RectShape_serializer.write(thisSerializer, valueTmpValueForIdx3)
+            }
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._CommonMethod_setShadowShape(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
+    setShadowClipModeAttribute(value: ShadowClipMode | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = (value as ShadowClipMode)
+            thisSerializer.writeInt32(valueTmpValue.valueOf())
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._CommonMethod_setShadowClipMode(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
     setClipAttribute(value: boolean | undefined): void {
@@ -8689,6 +8742,7 @@ export interface SheetOptions extends BindOptions {
     edgeLightMode?: EdgeLightMode;
     blurSnapshot?: BlurSnapshotOptions;
     titleBarHoverMode?: SheetTitleBarHoverMode;
+    adaptToHandedness?: HandednessFollowMode;
 }
 export enum SheetTitleBarHoverMode {
     STANDARD = 0,
@@ -9205,6 +9259,18 @@ export interface CommonMethod {
             }
         }
         throw new Error('Unimplemented method hitTestBehavior')
+    }
+    agentControlMode(value: AgentControlMode | undefined): this {
+        const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
+        if (commonStyle) {
+            (commonStyle as Array<(instance: CommonMethod) => void>).push((instance: CommonMethod): void => instance.agentControlMode(value));
+            return this;
+        } else {
+            if (this.__is_CustomComponent__Internal()) {
+                throw new Error('Common method agentControlMode can only be set when creating a custom component.')
+            }
+        }
+        throw new Error('Unimplemented method agentControlMode')
     }
     onChildTouchTest(value: ((value: Array<TouchTestInfo>) => TouchResult) | undefined): this {
         const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
@@ -10644,6 +10710,30 @@ export interface CommonMethod {
             }
         }
         throw new Error('Unimplemented method shadow')
+    }
+    shadowShape(value: CircleShape | EllipseShape | PathShape | RectShape | undefined): this {
+        const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
+        if (commonStyle) {
+            (commonStyle as Array<(instance: CommonMethod) => void>).push((instance: CommonMethod): void => instance.shadowShape(value));
+            return this;
+        } else {
+            if (this.__is_CustomComponent__Internal()) {
+                throw new Error('Common method shadowShape can only be set when creating a custom component.')
+            }
+        }
+        throw new Error('Unimplemented method shadowShape')
+    }
+    shadowClipMode(value: ShadowClipMode | undefined): this {
+        const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
+        if (commonStyle) {
+            (commonStyle as Array<(instance: CommonMethod) => void>).push((instance: CommonMethod): void => instance.shadowClipMode(value));
+            return this;
+        } else {
+            if (this.__is_CustomComponent__Internal()) {
+                throw new Error('Common method shadowClipMode can only be set when creating a custom component.')
+            }
+        }
+        throw new Error('Unimplemented method shadowClipMode')
     }
     clip(value: boolean | undefined): this {
         const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
@@ -12586,6 +12676,11 @@ export class ArkCommonMethodComponent extends ComponentBase implements CommonMet
         this.getPeer()?.setHitTestBehaviorAttribute(value_casted)
         return this
     }
+    public agentControlMode(value: AgentControlMode | undefined): this {
+        const value_casted = value as (AgentControlMode | undefined)
+        this.getPeer()?.setAgentControlModeAttribute(value_casted)
+        return this
+    }
     public onChildTouchTest(value: ((value: Array<TouchTestInfo>) => TouchResult) | undefined): this {
         const value_casted = value as (((value: Array<TouchTestInfo>) => TouchResult) | undefined)
         this.getPeer()?.setOnChildTouchTestAttribute(value_casted)
@@ -13196,6 +13291,16 @@ export class ArkCommonMethodComponent extends ComponentBase implements CommonMet
     public shadow(value: ShadowOptions | ShadowStyle | undefined): this {
         const value_casted = value as (ShadowOptions | ShadowStyle | undefined)
         this.getPeer()?.setShadowAttribute(value_casted)
+        return this
+    }
+    public shadowShape(value: CircleShape | EllipseShape | PathShape | RectShape | undefined): this {
+        const value_casted = value as (CircleShape | EllipseShape | PathShape | RectShape | undefined)
+        this.getPeer()?.setShadowShapeAttribute(value_casted)
+        return this
+    }
+    public shadowClipMode(value: ShadowClipMode | undefined): this {
+        const value_casted = value as (ShadowClipMode | undefined)
+        this.getPeer()?.setShadowClipModeAttribute(value_casted)
         return this
     }
     public clip(value: boolean | undefined): this {
@@ -26254,6 +26359,14 @@ export class SheetOptions_serializer {
         } else {
             valueSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
+        const valueHolderForAdaptToHandedness = value.adaptToHandedness
+        if (valueHolderForAdaptToHandedness !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForAdaptToHandednessTmpValue = (valueHolderForAdaptToHandedness as HandednessFollowMode)
+            valueSerializer.writeInt32(valueHolderForAdaptToHandednessTmpValue.valueOf())
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
     }
     public static read(buffer: DeserializerBase): SheetOptions {
         let valueDeserializer: DeserializerBase = buffer
@@ -27019,7 +27132,13 @@ export class SheetOptions_serializer {
             titleBarHoverModeTmpBuf = SheetTitleBarHoverMode.fromValue(valueDeserializer.readInt32())
         }
         const titleBarHoverModeTmpResult: SheetTitleBarHoverMode | undefined = titleBarHoverModeTmpBuf
-        let value: SheetOptions = ({backgroundColor: backgroundColorTmpResult, onAppear: onAppearTmpResult, onDisappear: onDisappearTmpResult, onWillAppear: onWillAppearTmpResult, onWillDisappear: onWillDisappearTmpResult, height: heightTmpResult, dragBar: dragBarTmpResult, enableFloatingDragBar: enableFloatingDragBarTmpResult, modalTransition: modalTransitionTmpResult, radiusRenderStrategy: radiusRenderStrategyTmpResult, systemMaterial: systemMaterialTmpResult, maskColor: maskColorTmpResult, detents: detentsTmpResult, blurStyle: blurStyleTmpResult, showClose: showCloseTmpResult, preferType: preferTypeTmpResult, title: titleTmpResult, shouldDismiss: shouldDismissTmpResult, onWillDismiss: onWillDismissTmpResult, onWillSpringBackWhenDismiss: onWillSpringBackWhenDismissTmpResult, enableOutsideInteractive: enableOutsideInteractiveTmpResult, width: widthTmpResult, borderWidth: borderWidthTmpResult, borderColor: borderColorTmpResult, borderStyle: borderStyleTmpResult, shadow: shadowTmpResult, onHeightDidChange: onHeightDidChangeTmpResult, mode: modeTmpResult, scrollSizeMode: scrollSizeModeTmpResult, onDetentsDidChange: onDetentsDidChangeTmpResult, onWidthDidChange: onWidthDidChangeTmpResult, onTypeDidChange: onTypeDidChangeTmpResult, uiContext: uiContextTmpResult, keyboardAvoidMode: keyboardAvoidModeTmpResult, enableHoverMode: enableHoverModeTmpResult, hoverModeArea: hoverModeAreaTmpResult, offset: offsetTmpResult, effectEdge: effectEdgeTmpResult, radius: radiusTmpResult, detentSelection: detentSelectionTmpResult, showInSubWindow: showInSubWindowTmpResult, placement: placementTmpResult, placementOnTarget: placementOnTargetTmpResult, edgeLightMode: edgeLightModeTmpResult, blurSnapshot: blurSnapshotTmpResult, titleBarHoverMode: titleBarHoverModeTmpResult} as SheetOptions)
+        const adaptToHandednessTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let adaptToHandednessTmpBuf: HandednessFollowMode | undefined = undefined
+        if ((adaptToHandednessTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            adaptToHandednessTmpBuf = HandednessFollowMode.fromValue(valueDeserializer.readInt32())
+        }
+        const adaptToHandednessTmpResult: HandednessFollowMode | undefined = adaptToHandednessTmpBuf
+        let value: SheetOptions = ({backgroundColor: backgroundColorTmpResult, onAppear: onAppearTmpResult, onDisappear: onDisappearTmpResult, onWillAppear: onWillAppearTmpResult, onWillDisappear: onWillDisappearTmpResult, height: heightTmpResult, dragBar: dragBarTmpResult, enableFloatingDragBar: enableFloatingDragBarTmpResult, modalTransition: modalTransitionTmpResult, radiusRenderStrategy: radiusRenderStrategyTmpResult, systemMaterial: systemMaterialTmpResult, maskColor: maskColorTmpResult, detents: detentsTmpResult, blurStyle: blurStyleTmpResult, showClose: showCloseTmpResult, preferType: preferTypeTmpResult, title: titleTmpResult, shouldDismiss: shouldDismissTmpResult, onWillDismiss: onWillDismissTmpResult, onWillSpringBackWhenDismiss: onWillSpringBackWhenDismissTmpResult, enableOutsideInteractive: enableOutsideInteractiveTmpResult, width: widthTmpResult, borderWidth: borderWidthTmpResult, borderColor: borderColorTmpResult, borderStyle: borderStyleTmpResult, shadow: shadowTmpResult, onHeightDidChange: onHeightDidChangeTmpResult, mode: modeTmpResult, scrollSizeMode: scrollSizeModeTmpResult, onDetentsDidChange: onDetentsDidChangeTmpResult, onWidthDidChange: onWidthDidChangeTmpResult, onTypeDidChange: onTypeDidChangeTmpResult, uiContext: uiContextTmpResult, keyboardAvoidMode: keyboardAvoidModeTmpResult, enableHoverMode: enableHoverModeTmpResult, hoverModeArea: hoverModeAreaTmpResult, offset: offsetTmpResult, effectEdge: effectEdgeTmpResult, radius: radiusTmpResult, detentSelection: detentSelectionTmpResult, showInSubWindow: showInSubWindowTmpResult, placement: placementTmpResult, placementOnTarget: placementOnTargetTmpResult, edgeLightMode: edgeLightModeTmpResult, blurSnapshot: blurSnapshotTmpResult, titleBarHoverMode: titleBarHoverModeTmpResult, adaptToHandedness: adaptToHandednessTmpResult} as SheetOptions)
         return value
     }
 }

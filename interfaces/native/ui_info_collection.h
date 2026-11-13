@@ -73,6 +73,51 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_UIAgentTreeRequestSetCollectVisualProperti
     OH_ArkUI_NativeModule_UIAgentTreeRequest* request, bool enabled);
 ArkUI_ErrorCode OH_ArkUI_NativeModule_UIAgentTreeRequestSetCollectFunctionalProperties(
     OH_ArkUI_NativeModule_UIAgentTreeRequest* request, bool enabled);
+/**
+ * Filters fully occluded nodes out of the returned tree.
+ *
+ * Filtering is disabled by default and can be enabled only for visible-tree requests. Enabling occlusion
+ * filtering may add substantial computational overhead to collection. Disabling this option does not disable
+ * visibility, clipping, off-screen, or fully transparent node filtering.
+ *
+ * The occluder opacity threshold is configured separately by
+ * OH_ArkUI_NativeModule_UIAgentTreeRequestSetOcclusionOpacityThreshold. Changing this option does not change
+ * that threshold.
+ *
+ * @param request [in] The request to configure. It must not be NULL.
+ * @param enabled [in] true to enable occlusion filtering; false to disable it.
+ * @return <ul>
+ *     <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the option is set successfully. Setting false for a full-tree
+ *         request also succeeds.</li>
+ *     <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if request is NULL.</li>
+ *     <li>{@link ARKUI_ERROR_CODE_ATTRIBUTE_OR_EVENT_NOT_SUPPORTED} if enabled is true for a full-tree
+ *         request. The request remains unchanged. Use a visible-tree request to enable this option.</li>
+ *     </ul>
+ * @since 26.2.0
+ */
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIAgentTreeRequestSetFilterOccludedNodes(
+    OH_ArkUI_NativeModule_UIAgentTreeRequest* request, bool enabled);
+/**
+ * Sets the minimum final opacity for a node to participate as an occluder.
+ *
+ * The default value is 1.0. The option is supported only for visible-tree requests. A target node is removed
+ * only when the union of qualifying occluder regions fully covers its effective visible region.
+ *
+ * This threshold does not take effect unless the filter option is enabled by
+ * OH_ArkUI_NativeModule_UIAgentTreeRequestSetFilterOccludedNodes.
+ *
+ * @param request [in] UI tree collection request.
+ * @param threshold [in] The opacity threshold in the range [0.0, 1.0].
+ * @return <ul>
+ *     <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the threshold is set successfully.</li>
+ *     <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if the request is NULL.</li>
+ *     <li>{@link ARKUI_ERROR_CODE_PARAM_OUT_OF_RANGE} if the threshold is outside the valid range.</li>
+ *     <li>{@link ARKUI_ERROR_CODE_ATTRIBUTE_OR_EVENT_NOT_SUPPORTED} if the request is for a full tree.</li>
+ *     </ul>
+ * @since 26.2.0
+ */
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIAgentTreeRequestSetOcclusionOpacityThreshold(
+    OH_ArkUI_NativeModule_UIAgentTreeRequest* request, float threshold);
 
 /** UI thread only. Failure clears a valid output slot; no partial tree is returned. */
 ArkUI_ErrorCode OH_ArkUI_NativeModule_UIAgentGetTreeJson(ArkUI_ContextHandle context,
@@ -247,6 +292,216 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_ImageCollectionTakeItemByNodeId(
  * @since 26.2.0
  */
 void OH_ArkUI_NativeModule_ImageCollectionDestroy(OH_ArkUI_NativeModule_ImageCollection* collection);
+
+/**
+ * @brief Enumerates the observable UI interaction event types.
+ *
+ * The values are bit flags. They are used to build the eventMask passed to
+ * {@link OH_ArkUI_NativeModule_UIInfoCollectionRegisterInteractionObserver}.
+ *
+ * @since 26.2.0
+ */
+typedef enum {
+    /**
+     * @brief No event.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_NONE = 0,
+    /**
+     * @brief Tap gesture.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_TAP = 1 << 0,
+    /**
+     * @brief Click.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_CLICK = 1 << 1,
+    /**
+     * @brief Long press gesture.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_LONG_PRESS = 1 << 2,
+    /**
+     * @brief Pan gesture.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_PAN = 1 << 3,
+    /**
+     * @brief Pinch gesture.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_PINCH = 1 << 4,
+    /**
+     * @brief Rotation gesture.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_ROTATION = 1 << 5,
+    /**
+     * @brief Swipe gesture.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_SWIPE = 1 << 6,
+    /**
+     * @brief Unified drag and drop.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_DRAG = 1 << 7,
+    /**
+     * @brief Raw touch down or up.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_TOUCH = 1 << 8
+} OH_ArkUI_NativeModule_UIInfoCollection_InteractionEventType;
+
+/**
+ * @brief Callback type for receiving a sensed interaction event.
+ *
+ * The callback carries a borrowed {@link OH_ArkUI_NativeModule_UIJsonWrapper} object that holds the
+ * event payload. The object is valid only within the callback invocation; the callback must not
+ * retain or destroy it. All positional coordinates in the payload are relative to the screen
+ * (display), in physical pixels (px). The payload's top-level structure is:
+ *
+ * { "schemaVersion": 1, "type": "<event type>", ... }
+ *
+ * The event-specific fields are as follows:
+ * - Tap or click: id, point, count, fingers.
+ * - Long press: id, point, actualDuration (milliseconds), action ("end").
+ * - Pan: id, point, direction, action ("start" | "end" | "cancel").
+ * - Pinch: id, point (array of [x, y]), fingers, action ("start" | "end" | "cancel"); scale is
+ * present only on "end".
+ * - Rotation: id, point (array of [x, y]), fingers, action ("start" | "end" | "cancel"); angle
+ * (degrees) is present only on "end".
+ * - Swipe: id, downPoint (array of [x, y]), upPoint (array of [x, y]), direction, speed,
+ * actualSpeed.
+ * - Drag: action ("start" | "end"); "start" carries id, point, hostName, actualDuration; "end"
+ * carries point, dropResult ("success" | "fail"), id (target, present only on success), hostName.
+ * - Touch: action ("down" | "up"), fingerId, point; "down" also carries id (hit node ID).
+ *
+ * @param json [in] Borrowed JSON object. Valid only during the callback invocation.
+ * @param userData [in] Custom user data passed during registration. It can be NULL. The framework
+ *     does not own, dereference, or free it.
+ * @since 26.2.0
+ */
+typedef void (*OH_ArkUI_NativeModule_UIInfoCollectionInteractionJsonCallback)(
+    const OH_ArkUI_NativeModule_UIJsonWrapper *json, void *userData);
+
+/**
+ * @brief Registers an observer for UI interaction events.
+ *
+ * The observer receives callbacks only for the event types included in eventMask. Multiple
+ * observers can be registered for the same UI instance. Registering the same callback and userData
+ * pair again creates an additional independent observer with a new registration ID.
+ *
+ * Remember to unregister the callback by {@link OH_ArkUI_NativeModule_UIInfoCollectionUnregisterInteractionObserver}
+ * when it's not used anymore.
+ *
+ * This function must be called on the UI main thread of the UI instance. Calling it from any other
+ * thread is not supported.
+ *
+ * @param uiContext [in] Pointer to a UI instance. It must not be NULL.
+ * @param eventMask [in] Bitmask of {@link OH_ArkUI_NativeModule_UIInfoCollection_InteractionEventType}
+ *     values to observe, combined with the bitwise OR operator. The supported bits are
+ *     OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_TAP through
+ *     OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_TOUCH. Bits outside this range are
+ *     ignored. If no supported bit is set, {@link ARKUI_ERROR_CODE_PARAM_INVALID} is returned.
+ * @param registerID [out] Receives the observer registration ID on success. It must not be NULL,
+ *     requires no initialization, and on failure is set to 0.
+ * @param callback [in] Callback invoked when a matching event occurs. It must not be NULL.
+ * @param userData [in] Custom user data passed to the callback. It can be NULL. The framework does
+ *     not take ownership of it; the caller must keep it valid until the observer is unregistered.
+ * @return <ul>
+ *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
+ *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a required pointer is NULL or eventMask
+ *             contains no supported bit.</li>
+ *         <li>{@link ARKUI_ERROR_CODE_UI_CONTEXT_INVALID} if the UI context is invalid.</li>
+ *         </ul>
+ * @since 26.2.0
+ */
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIInfoCollectionRegisterInteractionObserver(
+    ArkUI_ContextHandle uiContext,
+    uint32_t eventMask,
+    uint32_t *registerID,
+    OH_ArkUI_NativeModule_UIInfoCollectionInteractionJsonCallback callback,
+    void *userData);
+
+/**
+ * @brief Unregisters an interaction observer.
+ *
+ * After this call returns, no new callback is started for the registration: callbacks whose
+ * dispatch had not yet begun are skipped, including observers unregistered from inside another
+ * callback of the same dispatch batch. When this function is called from inside the observer's
+ * own callback, the running invocation completes normally afterwards; in that case keep userData
+ * valid until the callback returns.
+ *
+ * This function must be called on the UI main thread of the UI instance. Calling it from any
+ * other thread is not supported. This function does not block, and is not async-signal-safe.
+ *
+ * @param registerID [in] Registration ID returned by a successful registration.
+ * @return <ul>
+ *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
+ *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if the registration ID is invalid.</li>
+ *         </ul>
+ * @since 26.2.0
+ */
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIInfoCollectionUnregisterInteractionObserver(uint32_t registerID);
+
+typedef struct OH_ArkUI_NativeModule_UIContentChangeEvent OH_ArkUI_NativeModule_UIContentChangeEvent;
+
+typedef enum OH_ArkUI_NativeModule_UIContentChangeEventCategory {
+    OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_PAGE = 1U << 0,
+    OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_SCROLL = 1U << 1,
+    OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_OVERLAY = 1U << 2,
+    OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_ALL = ~0U
+} OH_ArkUI_NativeModule_UIContentChangeEventCategory;
+
+typedef enum OH_ArkUI_NativeModule_UIContentChangeIgnoreType {
+    OH_ARKUI_NATIVEMODULE_CONTENTCHANGE_IGNORE_SCROLLBY = 1U << 0,
+    OH_ARKUI_NATIVEMODULE_CONTENTCHANGE_IGNORE_SCROLLTO = 1U << 1,
+    OH_ARKUI_NATIVEMODULE_CONTENTCHANGE_IGNORE_TOAST = 1U << 2
+} OH_ArkUI_NativeModule_UIContentChangeIgnoreType;
+
+typedef enum OH_ArkUI_NativeModule_UIContentChangeEventType {
+    OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_START = 0,
+    OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_END = 1,
+    OH_ARKUI_NATIVEMODULE_EVENT_SCROLL_START = 2,
+    OH_ARKUI_NATIVEMODULE_EVENT_SCROLL_END = 3,
+    OH_ARKUI_NATIVEMODULE_EVENT_OVERLAY_SHOW = 4,
+    OH_ARKUI_NATIVEMODULE_EVENT_OVERLAY_HIDE = 5,
+    OH_ARKUI_NATIVEMODULE_EVENT_SWIPER_START = 6,
+    OH_ARKUI_NATIVEMODULE_EVENT_SWIPER_END = 7,
+    OH_ARKUI_NATIVEMODULE_EVENT_SWIPER_CANCEL = 8,
+    OH_ARKUI_NATIVEMODULE_EVENT_TABS_START = 9,
+    OH_ARKUI_NATIVEMODULE_EVENT_TABS_END = 10,
+    OH_ARKUI_NATIVEMODULE_EVENT_TABS_CANCEL = 11
+} OH_ArkUI_NativeModule_UIContentChangeEventType;
+
+typedef void (*OH_ArkUI_NativeModule_UIContentChangeEventCallback)(
+    const OH_ArkUI_NativeModule_UIContentChangeEvent* event, void* userData);
+
+ArkUI_ErrorCode OH_ArkUI_NativeModule_RegisterUIContentChangeEvent(
+    ArkUI_ContextHandle uiContext, bool withStart, uint32_t eventMask, uint32_t ignoreMask, void* userData,
+    OH_ArkUI_NativeModule_UIContentChangeEventCallback callback, uint64_t* subscriptionId);
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UnRegisterUIContentChangeEvent(
+    ArkUI_ContextHandle uiContext, uint64_t subscriptionId);
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIContentChangeEventGetType(
+    const OH_ArkUI_NativeModule_UIContentChangeEvent* event, OH_ArkUI_NativeModule_UIContentChangeEventType* type);
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIContentChangeEventGetTimestamp(
+    const OH_ArkUI_NativeModule_UIContentChangeEvent* event, uint64_t* nanoTimestamp);
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIContentChangeEventGetContext(
+    const OH_ArkUI_NativeModule_UIContentChangeEvent* event, ArkUI_ContextHandle* uiContext);
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIContentChangeEventGetContentChangeEventJson(
+    const OH_ArkUI_NativeModule_UIContentChangeEvent* event, const OH_ArkUI_NativeModule_UIJsonWrapper** json);
 
 #ifdef __cplusplus
 }

@@ -1503,4 +1503,28 @@ HWTEST_F(VideoStateMachinePatternTestNg, VideoStateMachinePatternOnStartRenderFr
     EXPECT_TRUE(pattern->isInitialState_);
 }
 
+
+HWTEST_F(VideoStateMachinePatternTestNg, SendCommandStructuredResultBranches, TestSize.Level1)
+{
+    auto frameNode = CreateVideoNode(g_testProperty);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<VideoStateMachinePattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_EQ(pattern->OnInjectionEventWithResult("{").errorType, CommandErrorType::INVALID_PARAM);
+    EXPECT_EQ(pattern->OnInjectionEventWithResult(R"({"cmd":"unsupported"})").errorType,
+        CommandErrorType::INVALID_COMMAND);
+    EXPECT_EQ(pattern->OnInjectionEventWithResult(R"({"cmd":"setVideoPlaybackSpeed","value":"fast"})").errorType,
+        CommandErrorType::INVALID_PARAM);
+    pattern->mediaPlayer_ = nullptr;
+    EXPECT_EQ(pattern->OnInjectionEventWithResult(R"({"cmd":"setVideoPlayerStatus","value":"play"})").errorType,
+        CommandErrorType::EXECUTE_FAIL);
+    auto player = AceType::MakeRefPtr<TestableMockMediaPlayer>();
+    EXPECT_CALL(*player, IsMediaPlayerValid()).WillRepeatedly(Return(true));
+    pattern->mediaPlayer_ = player;
+    EXPECT_TRUE(pattern->OnInjectionEventWithResult(R"({"cmd":"setVideoPlaybackSpeed","value":2.0})").success);
+    EXPECT_DOUBLE_EQ(pattern->GetProgressRate(), 2.0);
+    EXPECT_EQ(pattern->OnInjectionEventWithResult(R"({"cmd":"setVideoPlaybackSpeed","value":2.0})").errorType,
+        CommandErrorType::EXECUTE_FAIL);
+}
+
 } // namespace OHOS::Ace::NG

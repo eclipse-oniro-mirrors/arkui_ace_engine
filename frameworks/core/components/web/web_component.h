@@ -345,6 +345,11 @@ public:
         return declaration_->GetZoomChangeId();
     }
 
+    void SetVisitedLinkPersistEnabled(bool enabled)
+    {
+        visitedLinkPersistEnabled_ = enabled;
+    }
+
     void SetScrollId(const EventMarker& scrollId)
     {
         CHECK_NULL_VOID(declaration_);
@@ -1410,6 +1415,7 @@ private:
     WeakPtr<FocusNode> focusElement_;
     bool isOnLineImageAccessEnabled_ = false;
     bool isDomStorageAccessEnabled_ = false;
+    bool visitedLinkPersistEnabled_ = false;
     bool isImageAccessEnabled_ = true;
     MixedModeContent mixedContentMode_ = MixedModeContent::MIXED_CONTENT_NEVER_ALLOW;
     WebBypassVsyncCondition webBypassVsyncCondition_ = WebBypassVsyncCondition::NONE;

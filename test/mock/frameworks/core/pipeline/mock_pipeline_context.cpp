@@ -54,6 +54,7 @@
 #include "core/components_ng/manager/form_visible/form_visible_manager.h"
 #include "core/components_ng/manager/frame_rate/frame_rate_manager.h"
 #include "core/components_ng/manager/full_screen/full_screen_manager.h"
+#include "core/components_ng/manager/handedness/handedness_manager.h"
 #include "core/components_ng/manager/memory/memory_manager.h"
 #include "core/components_ng/manager/post_event/post_event_manager.h"
 #include "core/components_ng/manager/privacy_sensitive/privacy_sensitive_manager.h"
@@ -356,6 +357,8 @@ PipelineContext::PipelineContext()
         recycleManager_ = std::make_unique<RecycleManager>();
     }
 }
+
+PipelineContext::~PipelineContext() = default;
 
 // Host test binary does not link the real pipeline_context.cpp; provide the same lazy
 // creation so syntax-side observation hooks resolve and exercise the real manager.
@@ -1514,6 +1517,11 @@ const RefPtr<ForceSplitManager>& PipelineContext::GetForceSplitManager() const
     return forceSplitMgr_;
 }
 
+const RefPtr<HandednessManager>& PipelineContext::GetHandednessManager() const
+{
+    return handednessManager_;
+}
+
 const RefPtr<RecoverableManager>& PipelineContext::GetRecoverableManager() const
 {
     return recoverableMgr_;
@@ -1546,6 +1554,7 @@ void PipelineContext::InitManagers()
     toolbarManager_ = MakeRefPtr<ToolbarManager>();
     navigationMgr_ = MakeRefPtr<NavigationManager>();
     forceSplitMgr_ = MakeRefPtr<ForceSplitManager>();
+    handednessManager_ = MakeRefPtr<HandednessManager>(WeakClaim(this));
     recoverableMgr_ = MakeRefPtr<RecoverableManager>();
     formVisibleMgr_ = MakeRefPtr<FormVisibleManager>();
     formEventMgr_ = MakeRefPtr<FormEventManager>();
@@ -2148,7 +2157,10 @@ bool PipelineContext::GetIsRequestVsync()
 
 RectF PipelineContext::GetRootRect()
 {
-    return {};
+    CHECK_NULL_RETURN(rootNode_, RectF());
+    auto geometryNode = rootNode_->GetGeometryNode();
+    CHECK_NULL_RETURN(geometryNode, RectF());
+    return geometryNode->GetFrameRect();
 }
 
 void PipelineContext::SetAreaChangeNodeMinDepth(int32_t depth) {}
@@ -2234,7 +2246,19 @@ void PipelineContext::UnRegisterListenerForTranslate(int32_t nodeId)
 
 void PipelineContext::RegisterMaterialNode(const RefPtr<FrameNode>& node) {}
 
+void PipelineContext::RegisterPageContextNode(const RefPtr<FrameNode>& node) {}
+
 void PipelineContext::UnregisterMaterialNode(int32_t nodeId) {}
+
+void PipelineContext::UnregisterPageContextNode(int32_t nodeId) {}
+
+void PipelineContext::ReportPageContextStats(
+    int32_t targetContainerId, PageLogContainerType type, int32_t tabIndex)
+{}
+
+void PipelineContext::AddTaskOverlayNodeMaterialArea(const RefPtr<FrameNode>& targetNode, const std::string& source) {}
+
+void PipelineContext::ReportOverlayNodeMaterialArea(const RefPtr<FrameNode>& host, const std::string& source) {}
 } // namespace OHOS::Ace::NG
 
 namespace OHOS::Ace {

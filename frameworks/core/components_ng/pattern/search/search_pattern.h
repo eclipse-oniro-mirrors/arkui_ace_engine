@@ -226,6 +226,7 @@ public:
     void UpdateFontSizeResource(const Dimension& value);
     void UpdateBorderResource() override;
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
     void ProcessTextFieldDefaultStyleAndBehaviors();
     void ProcessDividerDefaultStyleAndBehaviors();
     void OnMaterialDisable() override;

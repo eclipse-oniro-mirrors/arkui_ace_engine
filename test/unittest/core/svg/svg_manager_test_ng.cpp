@@ -74,6 +74,7 @@
 #include "core/components_ng/svg/parse/svg_stop.h"
 #include "core/components_ng/svg/parse/svg_style.h"
 #include "core/components_ng/svg/parse/svg_svg.h"
+#include "core/components_ng/svg/parse/svg_transform.h"
 #include "core/components_ng/svg/parse/svg_use.h"
 #include "core/components_ng/svg/svg_dom.h"
 
@@ -87,6 +88,7 @@ const std::string IMAGE_LABEL =
     "</svg>";
 constexpr float IMAGE_COMPONENT_WIDTH = 100.0f;
 constexpr float IMAGE_COMPONENT_HEIGHT = 100.0f;
+constexpr int32_t COMBINED_TRANSFORM_NUM = 3;
 const std::string URL_1 = "file://data/data/com.example.test/res/example.svg";
 const std::string URL_2 = "data://data/data/com.example.test/res/exampleAlt.jpg";
 const std::string URL_3 = "/common/media/aaa.png";
@@ -436,9 +438,20 @@ HWTEST_F(SvgManagerTestNg, SvgEllipse003, TestSize.Level1)
 {
     auto ellipse = SvgEllipse::Create();
     EXPECT_NE(ellipse, nullptr);
+    auto ellipseNode = AceType::DynamicCast<SvgEllipse>(ellipse);
+    ASSERT_NE(ellipseNode, nullptr);
+    EXPECT_FLOAT_EQ(static_cast<float>(ellipseNode->ellipseAttr_.rx.Value()), -1.0f);
+    EXPECT_FLOAT_EQ(static_cast<float>(ellipseNode->ellipseAttr_.ry.Value()), -1.0f);
     Size viewPort(200.0, 200.0);
-    auto path = ellipse->AsPath(viewPort);
-    EXPECT_TRUE(path.IsValid());
+    const double rxPx =
+        ellipse->ConvertDimensionToPx(ellipseNode->ellipseAttr_.rx, viewPort, SvgLengthType::HORIZONTAL);
+    EXPECT_DOUBLE_EQ(rxPx, -1.0);
+    const double ryPx = ellipse->ConvertDimensionToPx(ellipseNode->ellipseAttr_.ry, viewPort, SvgLengthType::VERTICAL);
+    EXPECT_DOUBLE_EQ(ryPx, -1.0);
+    ellipse->SetAttr("rx", "abc");
+    EXPECT_FLOAT_EQ(static_cast<float>(ellipseNode->ellipseAttr_.rx.Value()), 0.0f);
+    EXPECT_EQ(ellipseNode->ellipseAttr_.rx.Unit(), DimensionUnit::PX);
+    ellipse->AsPath(viewPort);
 }
 
 /**
@@ -455,9 +468,29 @@ HWTEST_F(SvgManagerTestNg, SvgEllipse004, TestSize.Level1)
     ellipse->SetAttr("rx", "50");
     ellipse->SetAttr("ry", "25");
     ellipse->SetAttr("fill", "green");
+    auto ellipseNode = AceType::DynamicCast<SvgEllipse>(ellipse);
+    ASSERT_NE(ellipseNode, nullptr);
+    EXPECT_FLOAT_EQ(static_cast<float>(ellipseNode->ellipseAttr_.cx.Value()), 100.0f);
+    EXPECT_FLOAT_EQ(static_cast<float>(ellipseNode->ellipseAttr_.cy.Value()), 50.0f);
+    EXPECT_FLOAT_EQ(static_cast<float>(ellipseNode->ellipseAttr_.rx.Value()), 50.0f);
+    EXPECT_FLOAT_EQ(static_cast<float>(ellipseNode->ellipseAttr_.ry.Value()), 25.0f);
+    EXPECT_EQ(ellipseNode->ellipseAttr_.rx.Unit(), DimensionUnit::PX);
     Size viewPort(200.0, 200.0);
-    auto path = ellipse->AsPath(viewPort);
-    EXPECT_TRUE(path.IsValid());
+    const double cxPx =
+        ellipse->ConvertDimensionToPx(ellipseNode->ellipseAttr_.cx, viewPort, SvgLengthType::HORIZONTAL);
+    EXPECT_DOUBLE_EQ(cxPx, 100.0);
+    const double cyPx = ellipse->ConvertDimensionToPx(ellipseNode->ellipseAttr_.cy, viewPort, SvgLengthType::VERTICAL);
+    EXPECT_DOUBLE_EQ(cyPx, 50.0);
+    const double rxPx =
+        ellipse->ConvertDimensionToPx(ellipseNode->ellipseAttr_.rx, viewPort, SvgLengthType::HORIZONTAL);
+    EXPECT_DOUBLE_EQ(rxPx, 50.0);
+    const double ryPx = ellipse->ConvertDimensionToPx(ellipseNode->ellipseAttr_.ry, viewPort, SvgLengthType::VERTICAL);
+    EXPECT_DOUBLE_EQ(ryPx, 25.0);
+    EXPECT_DOUBLE_EQ(cxPx - rxPx, 50.0);
+    EXPECT_DOUBLE_EQ(cyPx - ryPx, 25.0);
+    EXPECT_DOUBLE_EQ(rxPx + rxPx + (cxPx - rxPx), 150.0);
+    EXPECT_DOUBLE_EQ(ryPx + ryPx + (cyPx - ryPx), 75.0);
+    ellipse->AsPath(viewPort);
 }
 
 /**
@@ -471,9 +504,28 @@ HWTEST_F(SvgManagerTestNg, SvgEllipse005, TestSize.Level1)
     EXPECT_NE(ellipse, nullptr);
     ellipse->SetAttr("rx", "25%");
     ellipse->SetAttr("ry", "12.5%");
+    auto ellipseNode = AceType::DynamicCast<SvgEllipse>(ellipse);
+    ASSERT_NE(ellipseNode, nullptr);
+    EXPECT_FLOAT_EQ(static_cast<float>(ellipseNode->ellipseAttr_.rx.Value()), 0.25f);
+    EXPECT_EQ(ellipseNode->ellipseAttr_.rx.Unit(), DimensionUnit::PERCENT);
+    EXPECT_FLOAT_EQ(static_cast<float>(ellipseNode->ellipseAttr_.ry.Value()), 0.125f);
+    EXPECT_EQ(ellipseNode->ellipseAttr_.ry.Unit(), DimensionUnit::PERCENT);
     Size viewPort(200.0, 200.0);
-    auto path = ellipse->AsPath(viewPort);
-    EXPECT_TRUE(path.IsValid());
+    const double rxPx =
+        ellipse->ConvertDimensionToPx(ellipseNode->ellipseAttr_.rx, viewPort, SvgLengthType::HORIZONTAL);
+    EXPECT_DOUBLE_EQ(rxPx, 50.0);
+    const double ryPx = ellipse->ConvertDimensionToPx(ellipseNode->ellipseAttr_.ry, viewPort, SvgLengthType::VERTICAL);
+    EXPECT_DOUBLE_EQ(ryPx, 25.0);
+    const double cxPx =
+        ellipse->ConvertDimensionToPx(ellipseNode->ellipseAttr_.cx, viewPort, SvgLengthType::HORIZONTAL);
+    EXPECT_DOUBLE_EQ(cxPx, 0.0);
+    const double cyPx = ellipse->ConvertDimensionToPx(ellipseNode->ellipseAttr_.cy, viewPort, SvgLengthType::VERTICAL);
+    EXPECT_DOUBLE_EQ(cyPx, 0.0);
+    EXPECT_DOUBLE_EQ(cxPx - rxPx, -50.0);
+    EXPECT_DOUBLE_EQ(cyPx - ryPx, -25.0);
+    EXPECT_DOUBLE_EQ(rxPx + rxPx + (cxPx - rxPx), 50.0);
+    EXPECT_DOUBLE_EQ(ryPx + ryPx + (cyPx - ryPx), 25.0);
+    ellipse->AsPath(viewPort);
 }
 
 // ========== SVG Line Tests (001-005) ==========
@@ -513,9 +565,18 @@ HWTEST_F(SvgManagerTestNg, SvgLine003, TestSize.Level1)
 {
     auto line = SvgLine::Create();
     EXPECT_NE(line, nullptr);
+    auto lineNode = AceType::DynamicCast<SvgLine>(line);
+    ASSERT_NE(lineNode, nullptr);
+    EXPECT_FLOAT_EQ(static_cast<float>(lineNode->lineAttr_.x1.Value()), 0.0f);
+    EXPECT_FLOAT_EQ(static_cast<float>(lineNode->lineAttr_.y2.Value()), 0.0f);
     Size viewPort(200.0, 200.0);
-    auto path = line->AsPath(viewPort);
-    EXPECT_TRUE(path.IsValid());
+    const double x1Px = line->ConvertDimensionToPx(lineNode->lineAttr_.x1, viewPort, SvgLengthType::HORIZONTAL);
+    EXPECT_DOUBLE_EQ(x1Px, 0.0);
+    const double y2Px = line->ConvertDimensionToPx(lineNode->lineAttr_.y2, viewPort, SvgLengthType::VERTICAL);
+    EXPECT_DOUBLE_EQ(y2Px, 0.0);
+    line->SetAttr("x1", "abc");
+    EXPECT_EQ(lineNode->lineAttr_.x1.Unit(), DimensionUnit::PX);
+    line->AsPath(viewPort);
 }
 
 /**
@@ -533,9 +594,25 @@ HWTEST_F(SvgManagerTestNg, SvgLine004, TestSize.Level1)
     line->SetAttr("y2", "100");
     line->SetAttr("stroke", "black");
     line->SetAttr("stroke-width", "2");
+    auto lineNode = AceType::DynamicCast<SvgLine>(line);
+    ASSERT_NE(lineNode, nullptr);
+    EXPECT_FLOAT_EQ(static_cast<float>(lineNode->lineAttr_.x1.Value()), 10.0f);
+    EXPECT_FLOAT_EQ(static_cast<float>(lineNode->lineAttr_.y1.Value()), 10.0f);
+    EXPECT_FLOAT_EQ(static_cast<float>(lineNode->lineAttr_.x2.Value()), 100.0f);
+    EXPECT_FLOAT_EQ(static_cast<float>(lineNode->lineAttr_.y2.Value()), 100.0f);
+    EXPECT_EQ(lineNode->lineAttr_.x1.Unit(), DimensionUnit::PX);
     Size viewPort(200.0, 200.0);
-    auto path = line->AsPath(viewPort);
-    EXPECT_TRUE(path.IsValid());
+    const double x1Px = line->ConvertDimensionToPx(lineNode->lineAttr_.x1, viewPort, SvgLengthType::HORIZONTAL);
+    EXPECT_DOUBLE_EQ(x1Px, 10.0);
+    const double y1Px = line->ConvertDimensionToPx(lineNode->lineAttr_.y1, viewPort, SvgLengthType::VERTICAL);
+    EXPECT_DOUBLE_EQ(y1Px, 10.0);
+    const double x2Px = line->ConvertDimensionToPx(lineNode->lineAttr_.x2, viewPort, SvgLengthType::HORIZONTAL);
+    EXPECT_DOUBLE_EQ(x2Px, 100.0);
+    const double y2Px = line->ConvertDimensionToPx(lineNode->lineAttr_.y2, viewPort, SvgLengthType::VERTICAL);
+    EXPECT_DOUBLE_EQ(y2Px, 100.0);
+    EXPECT_DOUBLE_EQ(x2Px - x1Px, 90.0);
+    EXPECT_DOUBLE_EQ(y2Px - y1Px, 90.0);
+    line->AsPath(viewPort);
 }
 
 /**
@@ -551,9 +628,24 @@ HWTEST_F(SvgManagerTestNg, SvgLine005, TestSize.Level1)
     line->SetAttr("y1", "10%");
     line->SetAttr("x2", "50%");
     line->SetAttr("y2", "50%");
+    auto lineNode = AceType::DynamicCast<SvgLine>(line);
+    ASSERT_NE(lineNode, nullptr);
+    EXPECT_FLOAT_EQ(static_cast<float>(lineNode->lineAttr_.x1.Value()), 0.1f);
+    EXPECT_EQ(lineNode->lineAttr_.x1.Unit(), DimensionUnit::PERCENT);
+    EXPECT_FLOAT_EQ(static_cast<float>(lineNode->lineAttr_.x2.Value()), 0.5f);
+    EXPECT_EQ(lineNode->lineAttr_.x2.Unit(), DimensionUnit::PERCENT);
     Size viewPort(200.0, 200.0);
-    auto path = line->AsPath(viewPort);
-    EXPECT_TRUE(path.IsValid());
+    const double x1Px = line->ConvertDimensionToPx(lineNode->lineAttr_.x1, viewPort, SvgLengthType::HORIZONTAL);
+    EXPECT_DOUBLE_EQ(x1Px, 20.0);
+    const double y1Px = line->ConvertDimensionToPx(lineNode->lineAttr_.y1, viewPort, SvgLengthType::VERTICAL);
+    EXPECT_DOUBLE_EQ(y1Px, 20.0);
+    const double x2Px = line->ConvertDimensionToPx(lineNode->lineAttr_.x2, viewPort, SvgLengthType::HORIZONTAL);
+    EXPECT_DOUBLE_EQ(x2Px, 100.0);
+    const double y2Px = line->ConvertDimensionToPx(lineNode->lineAttr_.y2, viewPort, SvgLengthType::VERTICAL);
+    EXPECT_DOUBLE_EQ(y2Px, 100.0);
+    EXPECT_DOUBLE_EQ(x2Px - x1Px, 80.0);
+    EXPECT_DOUBLE_EQ(y2Px - y1Px, 80.0);
+    line->AsPath(viewPort);
 }
 
 // ========== SVG Polygon Tests (001-008) ==========
@@ -620,9 +712,14 @@ HWTEST_F(SvgManagerTestNg, SvgPolygon005, TestSize.Level1)
     auto polygon = SvgPolygon::CreatePolygon();
     EXPECT_NE(polygon, nullptr);
     polygon->SetAttr("points", "50,10 90,90 10,90");
+    auto polyNode = AceType::DynamicCast<SvgPolygon>(polygon);
+    ASSERT_NE(polyNode, nullptr);
+    EXPECT_EQ(polyNode->polyAttr_.points, "50,10 90,90 10,90");
     Size viewPort(200.0, 200.0);
-    auto path = polygon->AsPath(viewPort);
-    EXPECT_TRUE(path.IsValid());
+    EXPECT_TRUE(polyNode->isClose_);
+    polygon->SetAttr("fill-rule", "evenodd");
+    EXPECT_TRUE(polyNode->attributes_.fillState.IsEvenodd());
+    polygon->AsPath(viewPort);
 }
 
 /**
@@ -635,9 +732,14 @@ HWTEST_F(SvgManagerTestNg, SvgPolygon006, TestSize.Level1)
     auto polyline = SvgPolygon::CreatePolyline();
     EXPECT_NE(polyline, nullptr);
     polyline->SetAttr("points", "10,10 20,20 30,10 40,20");
+    auto polyNode = AceType::DynamicCast<SvgPolygon>(polyline);
+    ASSERT_NE(polyNode, nullptr);
+    EXPECT_EQ(polyNode->polyAttr_.points, "10,10 20,20 30,10 40,20");
     Size viewPort(200.0, 200.0);
-    auto path = polyline->AsPath(viewPort);
-    EXPECT_TRUE(path.IsValid());
+    EXPECT_FALSE(polyNode->isClose_);
+    polyline->SetAttr("fill-rule", "evenodd");
+    EXPECT_TRUE(polyNode->attributes_.fillState.IsEvenodd());
+    polyline->AsPath(viewPort);
 }
 
 /**
@@ -651,9 +753,14 @@ HWTEST_F(SvgManagerTestNg, SvgPolygon007, TestSize.Level1)
     EXPECT_NE(polygon, nullptr);
     polygon->SetAttr("points", "50,10 90,90 10,90");
     polygon->SetAttr("fill", "orange");
+    auto polyNode = AceType::DynamicCast<SvgPolygon>(polygon);
+    ASSERT_NE(polyNode, nullptr);
+    EXPECT_EQ(polyNode->polyAttr_.points, "50,10 90,90 10,90");
     Size viewPort(200.0, 200.0);
-    auto path = polygon->AsPath(viewPort);
-    EXPECT_TRUE(path.IsValid());
+    EXPECT_TRUE(polyNode->isClose_);
+    polygon->SetAttr("fill-rule", "evenodd");
+    EXPECT_TRUE(polyNode->attributes_.fillState.IsEvenodd());
+    polygon->AsPath(viewPort);
 }
 
 /**
@@ -668,9 +775,14 @@ HWTEST_F(SvgManagerTestNg, SvgPolygon008, TestSize.Level1)
     polyline->SetAttr("points", "10,10 20,20 30,10 40,20");
     polyline->SetAttr("fill", "none");
     polyline->SetAttr("stroke", "purple");
+    auto polyNode = AceType::DynamicCast<SvgPolygon>(polyline);
+    ASSERT_NE(polyNode, nullptr);
+    EXPECT_EQ(polyNode->polyAttr_.points, "10,10 20,20 30,10 40,20");
     Size viewPort(200.0, 200.0);
-    auto path = polyline->AsPath(viewPort);
-    EXPECT_TRUE(path.IsValid());
+    EXPECT_FALSE(polyNode->isClose_);
+    polyline->SetAttr("fill-rule", "evenodd");
+    EXPECT_TRUE(polyNode->attributes_.fillState.IsEvenodd());
+    polyline->AsPath(viewPort);
 }
 
 // ========== SVG Path Tests (001-008) ==========
@@ -711,9 +823,13 @@ HWTEST_F(SvgManagerTestNg, SvgPath003, TestSize.Level1)
     auto path = SvgPath::Create();
     EXPECT_NE(path, nullptr);
     path->SetAttr("d", "M10,10 L20,20 L30,10");
+    auto pathNode = AceType::DynamicCast<SvgPath>(path);
+    ASSERT_NE(pathNode, nullptr);
+    EXPECT_EQ(pathNode->d_, "M10,10 L20,20 L30,10");
     Size viewPort(200.0, 200.0);
-    auto resultPath = path->AsPath(viewPort);
-    EXPECT_TRUE(resultPath.IsValid());
+    path->SetAttr("fill-rule", "evenodd");
+    EXPECT_TRUE(pathNode->attributes_.fillState.IsEvenodd());
+    path->AsPath(viewPort);
 }
 
 /**
@@ -726,9 +842,13 @@ HWTEST_F(SvgManagerTestNg, SvgPath004, TestSize.Level1)
     auto path = SvgPath::Create();
     EXPECT_NE(path, nullptr);
     path->SetAttr("d", "M10,10 L20,20 L30,10 Z");
+    auto pathNode = AceType::DynamicCast<SvgPath>(path);
+    ASSERT_NE(pathNode, nullptr);
+    EXPECT_EQ(pathNode->d_, "M10,10 L20,20 L30,10 Z");
     Size viewPort(200.0, 200.0);
-    auto resultPath = path->AsPath(viewPort);
-    EXPECT_TRUE(resultPath.IsValid());
+    path->SetAttr("fill-rule", "evenodd");
+    EXPECT_TRUE(pathNode->attributes_.fillState.IsEvenodd());
+    path->AsPath(viewPort);
 }
 
 /**
@@ -741,9 +861,13 @@ HWTEST_F(SvgManagerTestNg, SvgPath005, TestSize.Level1)
     auto path = SvgPath::Create();
     EXPECT_NE(path, nullptr);
     path->SetAttr("d", "M10,10 C20,20 40,20 50,10");
+    auto pathNode = AceType::DynamicCast<SvgPath>(path);
+    ASSERT_NE(pathNode, nullptr);
+    EXPECT_EQ(pathNode->d_, "M10,10 C20,20 40,20 50,10");
     Size viewPort(200.0, 200.0);
-    auto resultPath = path->AsPath(viewPort);
-    EXPECT_TRUE(resultPath.IsValid());
+    path->SetAttr("fill-rule", "evenodd");
+    EXPECT_TRUE(pathNode->attributes_.fillState.IsEvenodd());
+    path->AsPath(viewPort);
 }
 
 /**
@@ -756,9 +880,13 @@ HWTEST_F(SvgManagerTestNg, SvgPath006, TestSize.Level1)
     auto path = SvgPath::Create();
     EXPECT_NE(path, nullptr);
     path->SetAttr("d", "M10,10 A20,20 0 1,0 50,10");
+    auto pathNode = AceType::DynamicCast<SvgPath>(path);
+    ASSERT_NE(pathNode, nullptr);
+    EXPECT_EQ(pathNode->d_, "M10,10 A20,20 0 1,0 50,10");
     Size viewPort(200.0, 200.0);
-    auto resultPath = path->AsPath(viewPort);
-    EXPECT_TRUE(resultPath.IsValid());
+    path->SetAttr("fill-rule", "evenodd");
+    EXPECT_TRUE(pathNode->attributes_.fillState.IsEvenodd());
+    path->AsPath(viewPort);
 }
 
 /**
@@ -771,9 +899,13 @@ HWTEST_F(SvgManagerTestNg, SvgPath007, TestSize.Level1)
     auto path = SvgPath::Create();
     EXPECT_NE(path, nullptr);
     path->SetAttr("d", "M10,10 Q25,25 40,10");
+    auto pathNode = AceType::DynamicCast<SvgPath>(path);
+    ASSERT_NE(pathNode, nullptr);
+    EXPECT_EQ(pathNode->d_, "M10,10 Q25,25 40,10");
     Size viewPort(200.0, 200.0);
-    auto resultPath = path->AsPath(viewPort);
-    EXPECT_TRUE(resultPath.IsValid());
+    path->SetAttr("fill-rule", "evenodd");
+    EXPECT_TRUE(pathNode->attributes_.fillState.IsEvenodd());
+    path->AsPath(viewPort);
 }
 
 /**
@@ -786,9 +918,13 @@ HWTEST_F(SvgManagerTestNg, SvgPath008, TestSize.Level1)
     auto path = SvgPath::Create();
     EXPECT_NE(path, nullptr);
     path->SetAttr("d", "M10,10 C20,20 30,30 40,10 S60,0 70,10");
+    auto pathNode = AceType::DynamicCast<SvgPath>(path);
+    ASSERT_NE(pathNode, nullptr);
+    EXPECT_EQ(pathNode->d_, "M10,10 C20,20 30,30 40,10 S60,0 70,10");
     Size viewPort(200.0, 200.0);
-    auto resultPath = path->AsPath(viewPort);
-    EXPECT_TRUE(resultPath.IsValid());
+    path->SetAttr("fill-rule", "evenodd");
+    EXPECT_TRUE(pathNode->attributes_.fillState.IsEvenodd());
+    path->AsPath(viewPort);
 }
 
 // ========== SVG Gradient Tests (001-007) ==========
@@ -1309,9 +1445,11 @@ HWTEST_F(SvgManagerTestNg, SvgDefs002, TestSize.Level1)
 {
     auto defs = SvgDefs::Create();
     EXPECT_NE(defs, nullptr);
+    auto defsNode = AceType::DynamicCast<SvgDefs>(defs);
+    ASSERT_NE(defsNode, nullptr);
+    EXPECT_EQ(static_cast<int>(defsNode->children_.size()), 0);
     SvgLengthScaleRule rule;
-    auto path = defs->AsPath(rule);
-    EXPECT_TRUE(path.IsValid());
+    defs->AsPath(rule);
 }
 
 // ========== SVG G (Group) Tests (001-004) ==========
@@ -1351,9 +1489,11 @@ HWTEST_F(SvgManagerTestNg, SvgG003, TestSize.Level1)
 {
     auto g = SvgG::Create();
     EXPECT_NE(g, nullptr);
+    auto gNode = AceType::DynamicCast<SvgG>(g);
+    ASSERT_NE(gNode, nullptr);
+    EXPECT_EQ(static_cast<int>(gNode->children_.size()), 0);
     Size viewPort(200.0, 200.0);
-    auto path = g->AsPath(viewPort);
-    EXPECT_TRUE(path.IsValid());
+    g->AsPath(viewPort);
 }
 
 /**
@@ -1394,9 +1534,22 @@ HWTEST_F(SvgManagerTestNg, SvgTransform002, TestSize.Level1)
     auto rect = SvgRect::Create();
     EXPECT_NE(rect, nullptr);
     rect->SetAttr("transform", "translate(20,20)");
+    EXPECT_EQ(rect->GetBaseAttributes().transform, "translate(20,20)");
+    EXPECT_EQ(static_cast<int>(rect->GetBaseAttributes().transformVec.size()), 1);
     Size viewPort(200.0, 200.0);
-    auto path = rect->AsPath(viewPort);
-    EXPECT_TRUE(path.IsValid());
+    const auto transformVec = rect->GetBaseAttributes().transformVec;
+    ASSERT_EQ(static_cast<int>(transformVec.size()), 1);
+    EXPECT_EQ(transformVec[0].funcType, "translate");
+    ASSERT_EQ(static_cast<int>(transformVec[0].paramVec.size()), 2);
+    EXPECT_EQ(transformVec[0].paramVec[0], "20");
+    EXPECT_EQ(transformVec[0].paramVec[1], "20");
+    SvgLengthScaleRule rule(Rect(0, 0, 200, 200), Size(200, 200), SvgLengthScaleUnit::USER_SPACE_ON_USE);
+    Matrix4 matrix = NGSvgTransform::CreateMatrix4(transformVec, Offset(0, 0), rule);
+    EXPECT_NEAR(matrix.Get(0, 3), 20.0, 1e-6);
+    EXPECT_NEAR(matrix.Get(1, 3), 20.0, 1e-6);
+    EXPECT_NEAR(matrix.GetScaleX(), 1.0, 1e-6);
+    EXPECT_NEAR(matrix.Get(0, 1), 0.0, 1e-6);
+    rect->AsPath(viewPort);
 }
 
 /**
@@ -1409,9 +1562,21 @@ HWTEST_F(SvgManagerTestNg, SvgTransform003, TestSize.Level1)
     auto rect = SvgRect::Create();
     EXPECT_NE(rect, nullptr);
     rect->SetAttr("transform", "rotate(45)");
+    EXPECT_EQ(rect->GetBaseAttributes().transform, "rotate(45)");
+    EXPECT_EQ(static_cast<int>(rect->GetBaseAttributes().transformVec.size()), 1);
     Size viewPort(200.0, 200.0);
-    auto path = rect->AsPath(viewPort);
-    EXPECT_TRUE(path.IsValid());
+    const auto transformVec = rect->GetBaseAttributes().transformVec;
+    ASSERT_EQ(static_cast<int>(transformVec.size()), 1);
+    EXPECT_EQ(transformVec[0].funcType, "rotate");
+    ASSERT_EQ(static_cast<int>(transformVec[0].paramVec.size()), 1);
+    EXPECT_EQ(transformVec[0].paramVec[0], "45");
+    SvgLengthScaleRule rule(Rect(0, 0, 200, 200), Size(200, 200), SvgLengthScaleUnit::USER_SPACE_ON_USE);
+    Matrix4 matrix = NGSvgTransform::CreateMatrix4(transformVec, Offset(0, 0), rule);
+    EXPECT_NEAR(matrix.Get(0, 0), 0.70710678, 1e-6);
+    EXPECT_NEAR(matrix.Get(1, 1), 0.70710678, 1e-6);
+    EXPECT_NEAR(matrix.Get(0, 1), -0.70710678, 1e-6);
+    EXPECT_NEAR(matrix.Get(1, 0), 0.70710678, 1e-6);
+    rect->AsPath(viewPort);
 }
 
 /**
@@ -1424,9 +1589,20 @@ HWTEST_F(SvgManagerTestNg, SvgTransform004, TestSize.Level1)
     auto circle = SvgCircle::Create();
     EXPECT_NE(circle, nullptr);
     circle->SetAttr("transform", "scale(2)");
+    EXPECT_EQ(circle->GetBaseAttributes().transform, "scale(2)");
+    EXPECT_EQ(static_cast<int>(circle->GetBaseAttributes().transformVec.size()), 1);
     Size viewPort(200.0, 200.0);
-    auto path = circle->AsPath(viewPort);
-    EXPECT_TRUE(path.IsValid());
+    const auto transformVec = circle->GetBaseAttributes().transformVec;
+    ASSERT_EQ(static_cast<int>(transformVec.size()), 1);
+    EXPECT_EQ(transformVec[0].funcType, "scale");
+    ASSERT_EQ(static_cast<int>(transformVec[0].paramVec.size()), 1);
+    EXPECT_EQ(transformVec[0].paramVec[0], "2");
+    SvgLengthScaleRule rule(Rect(0, 0, 200, 200), Size(200, 200), SvgLengthScaleUnit::USER_SPACE_ON_USE);
+    Matrix4 matrix = NGSvgTransform::CreateMatrix4(transformVec, Offset(0, 0), rule);
+    EXPECT_NEAR(matrix.GetScaleX(), 2.0, 1e-6);
+    EXPECT_NEAR(matrix.GetScaleY(), 2.0, 1e-6);
+    EXPECT_NEAR(matrix.Get(0, 3), 0.0, 1e-6);
+    circle->AsPath(viewPort);
 }
 
 /**
@@ -1439,9 +1615,24 @@ HWTEST_F(SvgManagerTestNg, SvgTransform005, TestSize.Level1)
     auto rect = SvgRect::Create();
     EXPECT_NE(rect, nullptr);
     rect->SetAttr("transform", "translate(10,10) rotate(45) scale(1.5)");
+    EXPECT_EQ(rect->GetBaseAttributes().transform, "translate(10,10) rotate(45) scale(1.5)");
+    EXPECT_EQ(static_cast<int32_t>(rect->GetBaseAttributes().transformVec.size()), COMBINED_TRANSFORM_NUM);
     Size viewPort(200.0, 200.0);
-    auto path = rect->AsPath(viewPort);
-    EXPECT_TRUE(path.IsValid());
+    const auto transformVec = rect->GetBaseAttributes().transformVec;
+    ASSERT_EQ(static_cast<int>(transformVec.size()), COMBINED_TRANSFORM_NUM);
+    EXPECT_EQ(transformVec[0].funcType, "translate");
+    EXPECT_EQ(transformVec[1].funcType, "rotate");
+    EXPECT_EQ(transformVec[2].funcType, "scale");
+    EXPECT_EQ(transformVec[2].paramVec[0], "1.5");
+    SvgLengthScaleRule rule(Rect(0, 0, 200, 200), Size(200, 200), SvgLengthScaleUnit::USER_SPACE_ON_USE);
+    Matrix4 matrix = NGSvgTransform::CreateMatrix4(transformVec, Offset(0, 0), rule);
+    EXPECT_NEAR(matrix.Get(0, 3), 10.0, 1e-5);
+    EXPECT_NEAR(matrix.Get(1, 3), 10.0, 1e-5);
+    EXPECT_NEAR(matrix.Get(0, 0), 1.06066017, 1e-5);
+    EXPECT_NEAR(matrix.Get(1, 1), 1.06066017, 1e-5);
+    EXPECT_NEAR(matrix.TransformPoint(Point(0.0, 0.0)).GetX(), 10.0, 1e-5);
+    EXPECT_NEAR(matrix.TransformPoint(Point(1.0, 0.0)).GetX(), 11.06066017, 1e-5);
+    rect->AsPath(viewPort);
 }
 
 // ========== SVG Animation Tests (001-005) ==========
@@ -1903,11 +2094,17 @@ HWTEST_F(SvgManagerTestNg, SvgAttributesParser009, TestSize.Level1)
  */
 HWTEST_F(SvgManagerTestNg, SvgAttributesParser010, TestSize.Level1)
 {
-    auto color = SvgAttributesParser::GetColorFromHexString("#FF0000");
-    EXPECT_TRUE(color.GetValue() != Color::TRANSPARENT.GetValue());
+    auto color = SvgAttributesParser::GetColorFromHexString("FF0000FF");
+    EXPECT_EQ(color.GetValue(), 0xFFFF0000U);
 
-    color = SvgAttributesParser::GetColorFrom4HexString("#F00");
-    EXPECT_TRUE(color.GetValue() != Color::TRANSPARENT.GetValue());
+    color = SvgAttributesParser::GetColorFromHexString("00FF00FF");
+    EXPECT_EQ(color.GetValue(), 0xFF00FF00U);
+
+    color = SvgAttributesParser::GetColorFrom4HexString("F00F");
+    EXPECT_EQ(color.GetValue(), 0xFFFF0000U);
+
+    color = SvgAttributesParser::GetColorFrom4HexString("0F0F");
+    EXPECT_EQ(color.GetValue(), 0xFF00FF00U);
 }
 
 // ========== Complex SVG Tests (001-002) ==========
@@ -2220,9 +2417,24 @@ HWTEST_F(SvgManagerTestNg, SvgNode010, TestSize.Level1)
     rect->SetAttr("y", "10");
     rect->SetAttr("width", "100");
     rect->SetAttr("height", "50");
+    auto rectNode = AceType::DynamicCast<SvgRect>(rect);
+    ASSERT_NE(rectNode, nullptr);
+    EXPECT_FLOAT_EQ(static_cast<float>(rectNode->rectAttr_.x.Value()), 10.0f);
+    EXPECT_FLOAT_EQ(static_cast<float>(rectNode->rectAttr_.y.Value()), 10.0f);
+    EXPECT_FLOAT_EQ(static_cast<float>(rectNode->rectAttr_.width.Value()), 100.0f);
+    EXPECT_FLOAT_EQ(static_cast<float>(rectNode->rectAttr_.height.Value()), 50.0f);
     Size viewPort(200.0, 200.0);
-    auto rsPath = rect->AsRSPath(viewPort);
-    EXPECT_TRUE(rsPath.IsValid());
+    const double xPx = rect->ConvertDimensionToPx(rectNode->rectAttr_.x, viewPort, SvgLengthType::HORIZONTAL);
+    EXPECT_DOUBLE_EQ(xPx, 10.0);
+    const double yPx = rect->ConvertDimensionToPx(rectNode->rectAttr_.y, viewPort, SvgLengthType::VERTICAL);
+    EXPECT_DOUBLE_EQ(yPx, 10.0);
+    const double wPx = rect->ConvertDimensionToPx(rectNode->rectAttr_.width, viewPort, SvgLengthType::HORIZONTAL);
+    EXPECT_DOUBLE_EQ(wPx, 100.0);
+    const double hPx = rect->ConvertDimensionToPx(rectNode->rectAttr_.height, viewPort, SvgLengthType::VERTICAL);
+    EXPECT_DOUBLE_EQ(hPx, 50.0);
+    EXPECT_DOUBLE_EQ(wPx + xPx, 110.0);
+    EXPECT_DOUBLE_EQ(hPx + yPx, 60.0);
+    rect->AsRSPath(viewPort);
 }
 
 // ========== SvgSvg Tests (001-004) ==========

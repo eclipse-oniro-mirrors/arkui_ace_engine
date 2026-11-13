@@ -90,6 +90,7 @@ private:
     void ComputeCenterStyleOffset(LayoutWrapper* layoutWrapper);
     void ComputeCenterOffsetForUECSubwindow(LayoutWrapper* layoutWrapper);
     void ComputeCenterOffsetForNotUECSubwindow(LayoutWrapper* layoutWrapper);
+    float ComputeHandednessOffsetX(LayoutWrapper* layoutWrapper, float defaultCenterX);
     void ComputePopupStyleOffset(LayoutWrapper* layoutWrapper);
     void ComputeWidthAndHeight(LayoutWrapper* layoutWrapper);
     float ComputeMaxHeight(const float parentConstraintHeight, const float parentConstraintWidth,

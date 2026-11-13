@@ -23,6 +23,11 @@
 #include "core/components_ng/layout/box_layout_algorithm.h"
 
 namespace OHOS::Ace::NG {
+CommandResult Pattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return CommandResult::Error(CommandErrorType::INVALID_COMMAND);
+}
+
 bool Pattern::ShouldIncludeDiagnostic(const InspectorDumpOptions& options)
 {
     return options.includeDiagnostic;

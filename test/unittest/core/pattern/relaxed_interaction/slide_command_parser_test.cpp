@@ -89,7 +89,7 @@ HWTEST_F(SlideCommandParserParseTest, Parse_ValidJson_ReturnsTwoExecutors, TestS
     ASSERT_NE(json, nullptr);
 
     auto executors = parser.Parse(json);
-    EXPECT_EQ(executors.size(), 2);
+    ASSERT_EQ(executors.size(), 2);
     ASSERT_NE(executors[0], nullptr);
     EXPECT_EQ(executors[0]->GetType(), "smart_gesture");
     EXPECT_TRUE(executors[0]->IsSingleStep());
@@ -106,7 +106,7 @@ HWTEST_F(SlideCommandParserParseTest, Parse_EmptyJson_ReturnsTwoExecutors, TestS
     ASSERT_NE(json, nullptr);
 
     auto executors = parser.Parse(json);
-    EXPECT_EQ(executors.size(), 2);
+    ASSERT_EQ(executors.size(), 2);
     ASSERT_NE(executors[0], nullptr);
     EXPECT_EQ(executors[0]->GetType(), "smart_gesture");
     ASSERT_NE(executors[1], nullptr);
@@ -120,7 +120,7 @@ HWTEST_F(SlideCommandParserParseTest, Parse_NullJson_ReturnsTwoExecutors, TestSi
     std::unique_ptr<JsonValue> nullJson = nullptr;
 
     auto executors = parser.Parse(nullJson);
-    EXPECT_EQ(executors.size(), 2);
+    ASSERT_EQ(executors.size(), 2);
     ASSERT_NE(executors[0], nullptr);
     EXPECT_EQ(executors[0]->GetType(), "smart_gesture");
     ASSERT_NE(executors[1], nullptr);
@@ -271,8 +271,8 @@ HWTEST_F(SlideCommandParserParseTest, Parse_MultipleCalls_Success, TestSize.Leve
     auto executors1 = parser.Parse(json1);
     auto executors2 = parser.Parse(json2);
 
-    EXPECT_EQ(executors1.size(), 2);
-    EXPECT_EQ(executors2.size(), 2);
+    ASSERT_EQ(executors1.size(), 2);
+    ASSERT_EQ(executors2.size(), 2);
     EXPECT_EQ(executors1[0]->GetType(), "smart_gesture");
     EXPECT_EQ(executors2[0]->GetType(), "smart_gesture");
 }

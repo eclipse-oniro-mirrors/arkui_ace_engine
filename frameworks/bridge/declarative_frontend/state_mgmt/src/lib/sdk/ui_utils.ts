@@ -114,12 +114,12 @@ class UIUtilsImpl {
     }
 
     // Returns the custom component context if the target is a recognized view instance
-    public getCustomComponentContext(target: PUV2ViewBase): PUV2ViewBase | undefined {
+    public getCustomComponentContext(target: PUV2ViewBase): CustomComponentContext | undefined {
       if (!target || typeof target !== 'object') {
         return undefined;
       }
       if (target instanceof ViewPU || target instanceof ViewV2) {
-        return target.__getCustomComponentContext__Internal() as PUV2ViewBase;  // returns the closure
+        return target.__getCustomComponentContext__Internal();  // returns the closure
       }
       return undefined;
     }

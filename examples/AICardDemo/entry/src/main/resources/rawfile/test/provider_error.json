@@ -1,0 +1,18 @@
+{
+  "actions": [
+    {
+      "result": {
+        "index": 0,
+        "status": 17,
+        "isFinal": false,
+        "streamingText": "人工智能卡片组件用于展示智能搜索结果，支持流式打字机渲染、乱"
+      }
+    },
+    {
+      "error": {
+        "code": 999,
+        "message": "mock error"
+      }
+    }
+  ]
+}

@@ -16,6 +16,7 @@
 #include "core/components_ng/pattern/texttimer/text_timer_layout_property.h"
 #include "core/components_ng/pattern/texttimer/text_timer_pattern.h"
 #include "core/pipeline_ng/pipeline_context.h"
+#include "base/utils/string_utils.h"
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -98,5 +99,14 @@ void TextTimerLayoutProperty::ToJsonValue(std::unique_ptr<JsonValue>& json, cons
     // Determines if there are multiple textShadows
     auto jsonShadow = (shadow.size() == 1) ? ConvertShadowToJson(shadow.front()) : ConvertShadowsToJson(shadow);
     json->PutExtAttr("textShadow", jsonShadow, filter);
+    for (const auto& child : host->GetChildren()) {
+        auto textNode = AceType::DynamicCast<FrameNode>(child);
+        CHECK_NULL_CONTINUE(textNode);
+        auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+        CHECK_NULL_CONTINUE(textLayoutProperty);
+        json->PutExtAttr("localizedTime",
+            StringUtils::Str16ToStr8(textLayoutProperty->GetContent().value_or(u"")).c_str(), filter);
+        break;
+    }
 }
 } // namespace OHOS::Ace::NG

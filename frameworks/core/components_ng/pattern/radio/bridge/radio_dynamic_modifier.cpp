@@ -127,12 +127,7 @@ void ResetRadioStyle(ArkUINodeHandle node)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
-
-    auto context = frameNode->GetContext();
-    CHECK_NULL_VOID(context);
-    auto themeManager = context->GetThemeManager();
-    CHECK_NULL_VOID(themeManager);
-    auto theme = themeManager->GetTheme<RadioTheme>();
+    auto theme = frameNode->GetTheme<RadioTheme>(true);
     CHECK_NULL_VOID(theme);
 
     RadioModelNG::SetCheckedBackgroundColor(frameNode, theme->GetActiveColor());
@@ -199,9 +194,7 @@ void ResetRadioSize(ArkUINodeHandle node)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
-    auto pipeline = PipelineBase::GetCurrentContext();
-    CHECK_NULL_VOID(pipeline);
-    auto radioTheme = pipeline->GetTheme<RadioTheme>();
+    auto radioTheme = frameNode->GetTheme<RadioTheme>(true);
     CHECK_NULL_VOID(radioTheme);
     auto defaultWidth = radioTheme->GetDefaultWidth();
     auto horizontalPadding = radioTheme->GetHotZoneHorizontalPadding();

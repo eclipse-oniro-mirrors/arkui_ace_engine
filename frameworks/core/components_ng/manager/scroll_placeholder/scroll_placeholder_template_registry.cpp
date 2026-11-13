@@ -27,27 +27,36 @@ uint64_t ScrollPlaceholderTemplateRegistry::Register(
     if (templateId.empty()) {
         return 0;
     }
-    std::lock_guard<std::mutex> guard(mutex_);
-    uint64_t generation = ++generationIndex_[templateId];
-    auto it = entries_.find(templateId);
-    if (it == entries_.end()) {
-        TemplateEntry entry;
-        entry.templateId = templateId;
-        entry.generation = generation;
-        entry.builder = std::move(builder);
-        it = entries_.emplace(templateId, std::move(entry)).first;
-    } else {
-        // Re-register publishes a new generation atomically: in-flight results of the old
-        // generation become stale, previously cached instances and the copy source are
-        // dropped (the new source is seeded by the registration path on the UI thread).
-        it->second.generation = generation;
-        it->second.builder = std::move(builder);
-        it->second.sourceInstance = nullptr;
-        it->second.cachedInstances.clear();
-        it->second.cachedInstances.shrink_to_fit();
+    std::vector<RefPtr<UINode>> dropped;
+    uint64_t generation = 0;
+    {
+        std::lock_guard<std::mutex> guard(mutex_);
+        generation = ++generationIndex_[templateId];
+        auto it = entries_.find(templateId);
+        if (it == entries_.end()) {
+            TemplateEntry entry;
+            entry.templateId = templateId;
+            entry.generation = generation;
+            entry.builder = std::move(builder);
+            it = entries_.emplace(templateId, std::move(entry)).first;
+        } else {
+            // Re-register publishes a new generation atomically: in-flight results of the old
+            // generation become stale, previously cached instances and the copy source are
+            // dropped (the new source is seeded by the registration path on the UI thread).
+            it->second.generation = generation;
+            it->second.builder = std::move(builder);
+            dropped.emplace_back(std::move(it->second.sourceInstance));
+            dropped.insert(dropped.end(),
+                std::make_move_iterator(it->second.cachedInstances.begin()),
+                std::make_move_iterator(it->second.cachedInstances.end()));
+            it->second.sourceInstance = nullptr;
+            it->second.cachedInstances.clear();
+            it->second.cachedInstances.shrink_to_fit();
+        }
+        TouchLruLocked(it->second);
+        EvictOverCapacityLocked(dropped);
     }
-    TouchLruLocked(it->second);
-    EvictOverCapacityLocked();
+    NotifyProductDropped(dropped);
     return generation;
 }
 
@@ -56,23 +65,33 @@ bool ScrollPlaceholderTemplateRegistry::Unregister(const std::string& templateId
     if (templateId.empty()) {
         return false;
     }
-    std::lock_guard<std::mutex> guard(mutex_);
-    auto it = entries_.find(templateId);
-    if (it == entries_.end()) {
-        return false;
+    std::vector<RefPtr<UINode>> dropped;
+    bool removed = false;
+    {
+        std::lock_guard<std::mutex> guard(mutex_);
+        auto it = entries_.find(templateId);
+        if (it == entries_.end()) {
+            return false;
+        }
+        if (it->second.hot) {
+            lruOrder_.erase(it->second.lruIt);
+        }
+        // Bump the generation index so results already carrying the removed generation are stale
+        // even before any re-register happens.
+        uint64_t latest = generationIndex_[templateId];
+        if (latest < it->second.generation) {
+            latest = it->second.generation;
+        }
+        generationIndex_[templateId] = latest + 1;
+        dropped.emplace_back(std::move(it->second.sourceInstance));
+        dropped.insert(dropped.end(),
+            std::make_move_iterator(it->second.cachedInstances.begin()),
+            std::make_move_iterator(it->second.cachedInstances.end()));
+        entries_.erase(it);
+        removed = true;
     }
-    if (it->second.hot) {
-        lruOrder_.erase(it->second.lruIt);
-    }
-    // Bump the generation index so results already carrying the removed generation are stale
-    // even before any re-register happens.
-    uint64_t latest = generationIndex_[templateId];
-    if (latest < it->second.generation) {
-        latest = it->second.generation;
-    }
-    generationIndex_[templateId] = latest + 1;
-    entries_.erase(it);
-    return true;
+    NotifyProductDropped(dropped);
+    return removed;
 }
 
 bool ScrollPlaceholderTemplateRegistry::IsRegistered(const std::string& templateId) const
@@ -90,14 +109,20 @@ std::optional<ScrollPlaceholderTemplateSnapshot> ScrollPlaceholderTemplateRegist
     if (templateId.empty()) {
         return std::nullopt;
     }
-    std::lock_guard<std::mutex> guard(mutex_);
-    auto it = entries_.find(templateId);
-    if (it == entries_.end()) {
-        return std::nullopt;
+    std::vector<RefPtr<UINode>> dropped;
+    std::optional<ScrollPlaceholderTemplateSnapshot> snapshot;
+    {
+        std::lock_guard<std::mutex> guard(mutex_);
+        auto it = entries_.find(templateId);
+        if (it == entries_.end()) {
+            return std::nullopt;
+        }
+        TouchLruLocked(it->second);
+        EvictOverCapacityLocked(dropped);
+        snapshot = MakeSnapshot(it->second);
     }
-    TouchLruLocked(it->second);
-    EvictOverCapacityLocked();
-    return MakeSnapshot(it->second);
+    NotifyProductDropped(dropped);
+    return snapshot;
 }
 
 std::optional<ScrollPlaceholderTemplateSnapshot> ScrollPlaceholderTemplateRegistry::Peek(
@@ -130,12 +155,19 @@ void ScrollPlaceholderTemplateRegistry::SetTemplateSourceInstance(
     if (templateId.empty() || !instance) {
         return;
     }
-    std::lock_guard<std::mutex> guard(mutex_);
-    auto it = entries_.find(templateId);
-    if (it == entries_.end()) {
-        return;
+    RefPtr<UINode> dropped;
+    {
+        std::lock_guard<std::mutex> guard(mutex_);
+        auto it = entries_.find(templateId);
+        if (it == entries_.end()) {
+            return;
+        }
+        dropped = std::move(it->second.sourceInstance);
+        it->second.sourceInstance = instance;
     }
-    it->second.sourceInstance = instance;
+    if (dropped) {
+        NotifyProductDropped({ dropped });
+    }
 }
 
 RefPtr<UINode> ScrollPlaceholderTemplateRegistry::GetTemplateSourceInstance(
@@ -150,24 +182,30 @@ RefPtr<UINode> ScrollPlaceholderTemplateRegistry::GetTemplateSourceInstance(
 }
 
 void ScrollPlaceholderTemplateRegistry::CacheTemplateInstance(
-    const std::string& templateId, const RefPtr<UINode>& instance)
+    const std::string& templateId, const RefPtr<UINode>& instance, bool notifyOnReject)
 {
     if (templateId.empty() || !instance) {
         return;
     }
-    std::lock_guard<std::mutex> guard(mutex_);
-    auto it = entries_.find(templateId);
-    if (it == entries_.end()) {
-        return;
+    bool rejected = false;
+    {
+        std::lock_guard<std::mutex> guard(mutex_);
+        auto it = entries_.find(templateId);
+        if (it == entries_.end()) {
+            rejected = true;
+        } else if (!it->second.hot ||
+            it->second.cachedInstances.size() >= SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1) {
+            // Cold (LRU-demoted) entries keep only their registration relation; and the pool never
+            // holds more than capacity - 1 spare copies (the resident source takes one slot), so
+            // concurrent background commits cannot overfill it.
+            rejected = true;
+        } else {
+            it->second.cachedInstances.emplace_back(instance);
+        }
     }
-    // Cold (LRU-demoted) entries keep only their registration relation; and the pool never
-    // holds more than capacity - 1 spare copies (the resident source takes one slot), so
-    // concurrent background commits cannot overfill it.
-    if (!it->second.hot ||
-        it->second.cachedInstances.size() >= SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1) {
-        return;
+    if (rejected && notifyOnReject) {
+        NotifyProductDropped({ instance });
     }
-    it->second.cachedInstances.emplace_back(instance);
 }
 
 RefPtr<UINode> ScrollPlaceholderTemplateRegistry::AcquireTemplateInstance(const std::string& templateId)
@@ -231,7 +269,37 @@ void ScrollPlaceholderTemplateRegistry::TouchLruLocked(TemplateEntry& entry)
     entry.hot = true;
 }
 
-void ScrollPlaceholderTemplateRegistry::EvictOverCapacityLocked()
+void ScrollPlaceholderTemplateRegistry::SetProductReleaseNotifier(
+    ScrollPlaceholderProductReleaseNotifier notifier)
+{
+    std::lock_guard<std::mutex> guard(mutex_);
+    productReleaseNotifier_ = std::move(notifier);
+}
+
+void ScrollPlaceholderTemplateRegistry::NotifyProductDropped(
+    const std::vector<RefPtr<UINode>>& dropped) const
+{
+    if (dropped.empty()) {
+        return;
+    }
+    // Read under the lock: the setter may run concurrently on the UI thread while a
+    // background clone path holds the mutex (it never notifies, but shares the lock).
+    ScrollPlaceholderProductReleaseNotifier notifier;
+    {
+        std::lock_guard<std::mutex> guard(mutex_);
+        notifier = productReleaseNotifier_;
+    }
+    if (!notifier) {
+        return;
+    }
+    for (const auto& product : dropped) {
+        if (product) {
+            notifier(product);
+        }
+    }
+}
+
+void ScrollPlaceholderTemplateRegistry::EvictOverCapacityLocked(std::vector<RefPtr<UINode>>& dropped)
 {
     while (lruOrder_.size() > TEMPLATE_INSTANCE_LRU_CAPACITY) {
         auto lastIt = std::prev(lruOrder_.end());
@@ -239,6 +307,10 @@ void ScrollPlaceholderTemplateRegistry::EvictOverCapacityLocked()
         if (entryIt != entries_.end()) {
             // Demote to a cold entry: release the copy source and all unmounted instances,
             // keep the registration relation and generation semantics untouched.
+            dropped.emplace_back(std::move(entryIt->second.sourceInstance));
+            dropped.insert(dropped.end(),
+                std::make_move_iterator(entryIt->second.cachedInstances.begin()),
+                std::make_move_iterator(entryIt->second.cachedInstances.end()));
             entryIt->second.sourceInstance = nullptr;
             entryIt->second.cachedInstances.clear();
             entryIt->second.cachedInstances.shrink_to_fit();

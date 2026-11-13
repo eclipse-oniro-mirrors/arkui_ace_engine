@@ -102,6 +102,7 @@ public:
     void CreateObscuredImage();
     void LoadImageDataIfNeed();
     bool DoRecycleImageData(const std::string& logSuffix, const std::string& traceTag, bool checkNetworkImage = true);
+    void SetDecodeCacheActive(bool active);
     void OnNotifyMemoryLevel(int32_t level) override;
     void OnWindowHide() override;
     void OnVisibleChange(bool isVisible) override;
@@ -462,6 +463,7 @@ private:
     bool isMeasured_ = false;
     bool loadFailed_ = false;
     bool isLoadAlt_ = false;
+    bool decodeCacheActive_ = true;
     ImageType imageType_ = ImageType::BASE;
     ContentTransitionType contentTransitionType_ = ContentTransitionType::IDENTITY;
     std::shared_ptr<CancelableCallback<void()>> navDestRecycleCallback_;

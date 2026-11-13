@@ -15,6 +15,8 @@
 
 #include "core/components/xcomponent/render_xcomponent.h"
 
+#include "base/log/log_wrapper.h"
+
 #include "base/ressched/ressched_report.h"
 namespace OHOS::Ace {
 namespace {
@@ -334,6 +336,7 @@ void RenderXComponent::NativeXComponentInit(
                 auto surface = const_cast<void*>(nXCompImpl->GetSurface());
                 auto callback = nXCompImpl->GetCallback();
                 if (callback && callback->OnSurfaceCreated != nullptr) {
+                    LOG_CALLBACK("OH_NativeXComponent_RegisterCallback:OnSurfaceCreated", callback->OnSurfaceCreated);
                     callback->OnSurfaceCreated(nXComp, surface);
                 }
             } else {
@@ -361,6 +364,7 @@ void RenderXComponent::NativeXComponentChange()
                 auto surface = const_cast<void*>(nXCompImpl->GetSurface());
                 auto callback = nXCompImpl->GetCallback();
                 if (callback && callback->OnSurfaceChanged != nullptr) {
+                    LOG_CALLBACK("OH_NativeXComponent_RegisterCallback:OnSurfaceChanged", callback->OnSurfaceChanged);
                     callback->OnSurfaceChanged(nXComp, surface);
                 }
             } else {
@@ -390,6 +394,9 @@ void RenderXComponent::NativeXComponentDestroy()
                 auto surface = const_cast<void*>(nXCompImpl->GetSurface());
                 auto callback = nXCompImpl->GetCallback();
                 if (callback != nullptr && callback->OnSurfaceDestroyed != nullptr) {
+                    LOG_CALLBACK(
+                        "OH_NativeXComponent_RegisterCallback:OnSurfaceDestroyed",
+                        callback->OnSurfaceDestroyed);
                     callback->OnSurfaceDestroyed(nXComp, surface);
                 }
             } else {
@@ -416,6 +423,9 @@ void RenderXComponent::NativeXComponentDispatchTouchEvent(
                 auto* surface = const_cast<void*>(nXCompImpl->GetSurface());
                 const auto* callback = nXCompImpl->GetCallback();
                 if (callback != nullptr && callback->DispatchTouchEvent != nullptr) {
+                    LOG_CALLBACK(
+                        "OH_NativeXComponent_RegisterCallback:DispatchTouchEvent",
+                        callback->DispatchTouchEvent);
                     callback->DispatchTouchEvent(nXComp, surface);
                 }
             } else {
@@ -439,6 +449,9 @@ void RenderXComponent::HandleMouseHoverEvent(MouseState mouseState)
                 bool isHover = static_cast<int>(mouseState);
                 auto callback = nXCompImpl->GetMouseEventCallback();
                 if (callback != nullptr && callback->DispatchHoverEvent != nullptr) {
+                    LOG_CALLBACK(
+                        "OH_NativeXComponent_RegisterMouseEventCallback:DispatchHoverEvent",
+                        callback->DispatchHoverEvent);
                     callback->DispatchHoverEvent(nXComp, isHover);
                 }
             } else {
@@ -511,6 +524,9 @@ bool RenderXComponent::NativeXComponentDispatchMouseEvent(const OH_NativeXCompon
                 auto surface = const_cast<void*>(nXCompImpl->GetSurface());
                 auto callback = nXCompImpl->GetMouseEventCallback();
                 if (callback != nullptr && callback->DispatchMouseEvent != nullptr) {
+                    LOG_CALLBACK(
+                        "OH_NativeXComponent_RegisterMouseEventCallback:DispatchMouseEvent",
+                        callback->DispatchMouseEvent);
                     callback->DispatchMouseEvent(nXComp, surface);
                 }
             } else {

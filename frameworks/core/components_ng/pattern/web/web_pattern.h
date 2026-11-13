@@ -16,7 +16,9 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_WEB_WEB_PATTERN_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_WEB_WEB_PATTERN_H
 
+#include <atomic>
 #include <optional>
+#include <set>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -72,6 +74,14 @@
 #include "core/event/statusbar/statusbar_click_listener.h"
 #include "core/text/text_emoji_processor.h"
 
+// Forward declarations of opaque napi pointer types (same form as
+// js_native_api_types.h) — avoids pulling the SDK napi headers into this
+// widely-included header. The .cpp includes the real definitions.
+typedef struct napi_env__* napi_env;
+typedef struct napi_value__* napi_value;
+typedef struct napi_ref__* napi_ref;
+typedef struct napi_callback_info__* napi_callback_info;
+
 namespace OHOS::Ace {
 class WebDelegateObserver;
 class ImageAnalyzerManager;
@@ -88,6 +98,8 @@ namespace OHOS::NWeb {
     class NWebDateTimeSuggestion;
     class NWebSelectPopupMenuCallback;
     class NWebDateTimeChooserCallback;
+    struct NWebColorSuggestion;
+    class NWebColorChooserCallback;
     class NWebAccessibilityNodeInfo;
     class NWebMessage;
     class NWebHapValue;
@@ -194,7 +206,16 @@ enum class VideoPlaybackNotificationType {
     ON_VIDEO_SIZE_CHANGED
 };
 
+struct WebSecurityHitTestElementInfo {
+    int32_t domNodeId = -1;
+    std::string securityLabel;
+    std::string pageUuid;
+    std::string xpath;
+    std::string elementId;
+};
+
 using CursorStyleInfo = std::tuple<OHOS::NWeb::CursorType, std::shared_ptr<OHOS::NWeb::NWebCursorInfo>>;
+
 class WebPattern : public NestableScrollContainer,
                    public virtual RecoverableView,
                    public TextBase,
@@ -321,6 +342,7 @@ public:
         RefPtr<PageNodeInfoWrap> nodeWrap, AceAutoFillType autoFillType,
         AceAutoFillTriggerType triggerType = AceAutoFillTriggerType::AUTO_REQUEST) override;
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
     void NotifyFillRequestFailed(int32_t errCode, const std::string& fillContent = "", bool isPopup = false) override;
 
     Color GetDefaultBackgroundColor();
@@ -638,6 +660,7 @@ public:
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, FileAccessEnabled, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, OnLineImageAccessEnabled, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, DomStorageAccessEnabled, bool);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, VisitedLinkPersistEnabled, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, ImageAccessEnabled, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, MixedMode, MixedModeContent);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, ZoomAccessEnabled, bool);
@@ -1118,6 +1141,7 @@ public:
     bool ConvertMouseToTouchByWhiteList(MouseInfo& mouseInfo, TouchEventInfo& touchEventInfo);
     virtual bool IsConvertByWhiteList();
 
+    bool ReportDecsionForSecurityHitTest(int32_t callingUid, uint64_t sessionId, std::string& response);
     void SetAILinkMenuShow(bool isAILinkMenuShow)
     {
         isAILinkMenuShow_ = isAILinkMenuShow;
@@ -1185,6 +1209,15 @@ public:
                 const std::string&, // request
                 const std::string&, // result
                 WebRequestErrorCode)>& finishCallback);
+    bool HandleNativeDomTreeRequest(
+        uint32_t windowId,
+        int32_t webId,
+        const std::string& request,
+        const std::function<
+            void(int32_t, int32_t, // window id , web id
+                const std::string&, // request
+                const std::string&, // result
+                WebRequestErrorCode)>& finishCallback);
 
     // PageScene Rule-Based Perception
     void ExecuteReportOnRegisterMatch(int32_t processId);
@@ -1202,6 +1235,37 @@ public:
     }
     void NotifyOverlayRotation();
     void UpdateScrollbarLayout();
+
+    void OnColorChooserPopup(const std::string& color,
+        const std::vector<OHOS::NWeb::NWebColorSuggestion>& suggestions,
+        std::shared_ptr<OHOS::NWeb::NWebColorChooserCallback> callback);
+    void OnColorChooserClose();
+
+    // HDS ColorPicker direct NAPI call (primary path). Uses the app's own
+    // ArkTS runtime (EngineHelper -> GetNativeEngine) and the real UIContext
+    // (frontend->GetContextValue), so the module resolves against the app's
+    // module registry. Returns false when the picker could not be opened —
+    // the caller then falls back to the JS callback or cancels.
+    bool OpenHdsColorPicker(const std::string& color,
+        std::shared_ptr<OHOS::NWeb::NWebColorChooserCallback> callback, bool& callbackHandled);
+    void CloseHdsColorPicker();
+    void CancelHdsColorPicker();
+    bool IsHdsColorPickerOpen() const
+    {
+        return hdsColorPickerOpen_.load();
+    }
+
+    // Static NAPI callbacks invoked from the HDS ColorPicker TS side.
+    // |data| is the OPAQUE registry id of an HdsColorPickerSession (see
+    // web_pattern.cpp) — never a pointer, so a callback fired after the
+    // session is removed fails the registry lookup and returns safely.
+    static napi_value OnHdsColorSelected(napi_env env, napi_callback_info info);
+    static napi_value OnHdsColorPickerClose(napi_env env, napi_callback_info info);
+
+    bool HandleWindowRectGet(int32_t& x, int32_t& y, uint32_t& w, uint32_t& h);
+    bool HandleWindowRectSet(int32_t x, int32_t y, uint32_t w, uint32_t h);
+    bool HandleWindowStateGet(std::string& state);
+    bool HandleWindowStateSet(const std::string& state);
 protected:
     void ModifyWebSrc(const std::string& webSrc)
     {
@@ -1277,6 +1341,7 @@ private:
     void OnFileAccessEnabledUpdate(bool value);
     void OnOnLineImageAccessEnabledUpdate(bool value);
     void OnDomStorageAccessEnabledUpdate(bool value);
+    void OnVisitedLinkPersistEnabledUpdate(bool value);
     void OnImageAccessEnabledUpdate(bool value);
     void OnMixedModeUpdate(MixedModeContent value);
     void OnZoomAccessEnabledUpdate(bool value);
@@ -1418,6 +1483,7 @@ private:
     void UninitTouchEventListener();
     std::string OnDragFileNameStart(const RefPtr<UnifiedData>& aceUnifiedData, const std::string& fileName);
     void RewriteHtmlImgSrc(std::string& htmlContent, const std::string& fileUri);
+    std::string BuildImageDataUri(const std::string& fullName, const std::string& fileName);
     void AdjustRotationRenderFit(WindowSizeChangeReason type);
     void RecoverToTopLeft();
     bool needRestoreMenuForDrag_ = false;
@@ -1473,6 +1539,9 @@ private:
         SourceTool sourceTool = SourceTool::UNKNOWN;
     };
     static bool ParseTouchInfo(const TouchEventInfo& info, std::list<TouchInfo>& touchInfos);
+    void JudgeSecurityHitTestForValidation(const int32_t& id, const double& x, const double& y,
+        bool fromOverlay, const TouchEventInfo& eventInfo);
+    WebSecurityHitTestElementInfo ParseSecurityHitTestElementInfo(const std::string& responseJson);
     void InitEnhanceSurfaceFlag();
     void UpdateBackgroundColorRightNow(int32_t color);
     void UpdateContentOffset(const RefPtr<LayoutWrapper>& dirty);
@@ -1785,6 +1854,7 @@ private:
     int32_t treeId_ = 0;
     int32_t instanceId_ = -1;
     uint32_t windowId_ = 0;
+    std::string windowState_ = "normal";
     int64_t focusedAccessibilityId_ = -1;
     std::vector<RefPtr<PageNodeInfoWrap>> pageNodeInfo_;
     bool isEditableOnContextMenu_ = false;
@@ -1880,7 +1950,20 @@ private:
     ScrollbarLayoutPolicy scrollbarLayoutPolicy_ = ScrollbarLayoutPolicy::CONTENT;
     bool scrollbarLayoutPolicyChanged_ = false;
     bool isLanguageRtl_ = false;
-    bool isEscKeyDownConsumed_ = false;
+    bool isEscKeyDownConsumed_ = true;
+
+    // HDS ColorPicker open state. The picker controller itself is owned by
+    // the TS wrapper's module-scope variable; C++ only tracks open/closed.
+    std::atomic<bool> hdsColorPickerOpen_ = false;
+    // Registry ids of the HDS sessions this pattern created (session objects
+    // live in a process-wide id-keyed registry, see web_pattern.cpp; TS
+    // callbacks carry the id, never a pointer). The session STRONGLY owns
+    // the NWeb color chooser callback (like the datetime dialog lambdas do)
+    // — WebPattern keeps no member copy. Erasing an id Cancels its callback
+    // (erase = cancel), so every discard path (onClose, open-failure,
+    // re-open purge, OnColorChooserClose, ~WebPattern) cancels exactly once
+    // and nothing leaks.
+    std::set<uint64_t> hdsColorPickerSessionIds_;
 
 protected:
     OnCreateMenuCallback onCreateMenuCallback_;

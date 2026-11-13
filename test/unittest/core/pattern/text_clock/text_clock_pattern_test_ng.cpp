@@ -64,6 +64,12 @@ const Ace::FontStyle ITALIC_FONT_STYLE_VALUE = Ace::FontStyle::ITALIC;
 const Ace::FontWeight FONT_WEIGHT_VALUE = Ace::FontWeight::W100;
 inline const std::string DEFAULT_FORMAT = "aa hh:mm:ss";
 inline const std::string DEFAULT_FORMAT_24H = "HH:mm:ss";
+inline const std::string DEFAULT_FORMAT_HIDE = "aa h:mm:ss";
+inline const std::string DEFAULT_FORMAT_24H_HIDE = "H:mm:ss";
+inline const std::string FORM_FORMAT = "hh:mm";
+inline const std::string FORM_FORMAT_HIDE = "h:mm";
+inline const std::string FORM_FORMAT_24H = "HH:mm";
+inline const std::string FORM_FORMAT_24H_HIDE = "H:mm";
 constexpr int32_t NEW_THEME_SCOPE_ID = 200;
 } // namespace
 
@@ -845,6 +851,84 @@ HWTEST_F(TextClockPatternTestNG, TextClockCheckDateTimeElement001, TestSize.Leve
 }
 
 /**
+ * @tc.name: TextClockCheckDateTimeElement002
+ * @tc.desc: Test CheckDateTimeElement applies LocalizeDigits to numeric elements.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextClockPatternTestNG, TextClockCheckDateTimeElement002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. create textClock frameNode.
+     */
+    TestProperty testProperty;
+    testProperty.format = std::make_optional(CLOCK_FORMAT4);
+    testProperty.hoursWest = std::make_optional(HOURS_WEST);
+    RefPtr<FrameNode> frameNode = CreateTextClockParagraph(testProperty);
+    ASSERT_NE(frameNode, nullptr);
+
+    /**
+     * @tc.steps: step2. get pattern and prepare datetime segments.
+     */
+    auto pattern = frameNode->GetPattern<TextClockPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->ParseInputFormat();
+    std::vector<std::string> curDateTime = { "2025", "03", "25", "08", "35", "07", "007", "AM", "Mon" };
+
+    /**
+     * @tc.steps: step3. numeric elements should be processed by LocalizeDigits.
+     * @tc.expected: result equals LocalizeDigits(input). Mock LocalizeDigits is identity,
+     *               so result equals the input value, proving the conversion path is applied.
+     */
+    auto resY = pattern->CheckDateTimeElement(curDateTime, 'y', 0, false);
+    EXPECT_EQ(resY, Localization::GetInstance()->LocalizeDigits("2025"));
+    auto resH = pattern->CheckDateTimeElement(curDateTime, 'h', 3, false);
+    EXPECT_EQ(resH, Localization::GetInstance()->LocalizeDigits("08"));
+    auto resM = pattern->CheckDateTimeElement(curDateTime, 'm', 4, false);
+    EXPECT_EQ(resM, Localization::GetInstance()->LocalizeDigits("35"));
+    auto resS = pattern->CheckDateTimeElement(curDateTime, 's', 5, false);
+    EXPECT_EQ(resS, Localization::GetInstance()->LocalizeDigits("07"));
+
+    /**
+     * @tc.steps: step4. AM/PM and weekday should NOT be passed through LocalizeDigits.
+     * @tc.expected: returned as-is from curDateTime.
+     */
+    auto resA = pattern->CheckDateTimeElement(curDateTime, 'a', 7, false);
+    EXPECT_EQ(resA, "AM");
+    auto resE = pattern->CheckDateTimeElement(curDateTime, 'E', 8, false);
+    EXPECT_EQ(resE, "Mon");
+}
+
+/**
+ * @tc.name: TextClockCheckDateTimeElementLocalized
+ * @tc.desc: Test CheckDateTimeElement LocalizeDigits in non-Chinese (NumberFormat) and Chinese (skip) locales.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextClockPatternTestNG, TextClockCheckDateTimeElementLocalized, TestSize.Level1)
+{
+    TestProperty testProperty;
+    testProperty.format = std::make_optional(CLOCK_FORMAT4);
+    RefPtr<FrameNode> frameNode = CreateTextClockParagraph(testProperty);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<TextClockPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->ParseInputFormat();
+    std::vector<std::string> curDateTime = { "2025", "03", "25", "08", "35", "07", "007", "AM", "Mon" };
+
+    // non-"zh" (languageTag_ empty => "Chinese") => LocalizeDigits path
+    Localization::GetInstance()->SetLocaleImpl("", "", "", "", "");
+    EXPECT_EQ(pattern->CheckDateTimeElement(curDateTime, 'y', 0, false), "2025");
+    EXPECT_EQ(pattern->CheckDateTimeElement(curDateTime, 'm', 4, false), "35");
+
+    // "zh" => skip LocalizeDigits
+    Localization::GetInstance()->SetLocaleImpl("zh", "", "", "", "");
+    EXPECT_EQ(pattern->CheckDateTimeElement(curDateTime, 'y', 0, false), "2025");
+    EXPECT_EQ(pattern->CheckDateTimeElement(curDateTime, 'm', 4, false), "35");
+
+    // restore
+    Localization::GetInstance()->SetLocaleImpl("", "", "", "", "");
+}
+
+/**
  * @tc.name: TextClockUpdateFontSize001
  * @tc.desc: Test UpdateTextClockFontSize of TextClockPattern.
  * @tc.type: FUNC
@@ -1161,7 +1245,7 @@ HWTEST_F(TextClockPatternTestNG, GetFormatTest001, TestSize.Level1)
      * @tc.expected: Should return DEFAULT_FORMAT (12-hour format)
      */
     auto format = pattern->GetFormat();
-    EXPECT_EQ(format, DEFAULT_FORMAT);
+    EXPECT_EQ(format, DEFAULT_FORMAT_HIDE);
 
     /**
      * @tc.steps: step3. Recover API version info.
@@ -1241,6 +1325,102 @@ HWTEST_F(TextClockPatternTestNG, GetFormatTest003, TestSize.Level1)
      */
     auto format = pattern->GetFormat();
     EXPECT_EQ(format, "HH:mm");
+}
+
+/**
+ * @tc.name: GetDefaultFormatTest001
+ * @tc.desc: Test GetDefaultFormat in non-form (12h/24h, auto/show/hide).
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextClockPatternTestNG, GetDefaultFormatTest001, TestSize.Level1)
+{
+    MockPipelineContext::SetUp();
+    auto pipelineContext = PipelineBase::GetCurrentContext();
+    ASSERT_NE(pipelineContext, nullptr);
+    auto lastPlatformVersion = pipelineContext->GetMinPlatformVersion();
+    auto mockContainer = MockContainer::Current();
+    ASSERT_NE(mockContainer, nullptr);
+    mockContainer->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_EIGHTEEN));
+    pipelineContext->SetMinPlatformVersion(static_cast<int32_t>(PlatformVersion::VERSION_EIGHTEEN));
+
+    TextClockModelNG textClockModel;
+    textClockModel.Create();
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<TextClockPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto layoutProperty = frameNode->GetLayoutProperty<TextClockLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+
+    pattern->isForm_ = false;
+
+    pattern->is24H_ = false;
+    layoutProperty->UpdatePrefixHour(ZeroPrefixType::AUTO);
+    EXPECT_EQ(pattern->GetDefaultFormat(), DEFAULT_FORMAT_HIDE);
+    layoutProperty->UpdatePrefixHour(ZeroPrefixType::SHOW);
+    EXPECT_EQ(pattern->GetDefaultFormat(), DEFAULT_FORMAT);
+    layoutProperty->UpdatePrefixHour(ZeroPrefixType::HIDE);
+    EXPECT_EQ(pattern->GetDefaultFormat(), DEFAULT_FORMAT_HIDE);
+
+    pattern->is24H_ = true;
+    layoutProperty->UpdatePrefixHour(ZeroPrefixType::AUTO);
+    EXPECT_EQ(pattern->GetDefaultFormat(), DEFAULT_FORMAT_24H);
+    layoutProperty->UpdatePrefixHour(ZeroPrefixType::SHOW);
+    EXPECT_EQ(pattern->GetDefaultFormat(), DEFAULT_FORMAT_24H);
+    layoutProperty->UpdatePrefixHour(ZeroPrefixType::HIDE);
+    EXPECT_EQ(pattern->GetDefaultFormat(), DEFAULT_FORMAT_24H_HIDE);
+
+    pipelineContext->SetMinPlatformVersion(lastPlatformVersion);
+    mockContainer->SetApiTargetVersion(lastPlatformVersion);
+    MockPipelineContext::TearDown();
+}
+
+/**
+ * @tc.name: GetDefaultFormatTest002
+ * @tc.desc: Test GetDefaultFormat in form (12h/24h, auto/show/hide).
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextClockPatternTestNG, GetDefaultFormatTest002, TestSize.Level1)
+{
+    MockPipelineContext::SetUp();
+    auto pipelineContext = PipelineBase::GetCurrentContext();
+    ASSERT_NE(pipelineContext, nullptr);
+    auto lastPlatformVersion = pipelineContext->GetMinPlatformVersion();
+    auto mockContainer = MockContainer::Current();
+    ASSERT_NE(mockContainer, nullptr);
+    mockContainer->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_EIGHTEEN));
+    pipelineContext->SetMinPlatformVersion(static_cast<int32_t>(PlatformVersion::VERSION_EIGHTEEN));
+
+    TextClockModelNG textClockModel;
+    textClockModel.Create();
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<TextClockPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto layoutProperty = frameNode->GetLayoutProperty<TextClockLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+
+    pattern->isForm_ = true;
+
+    pattern->is24H_ = false;
+    layoutProperty->UpdatePrefixHour(ZeroPrefixType::AUTO);
+    EXPECT_EQ(pattern->GetDefaultFormat(), FORM_FORMAT_HIDE);
+    layoutProperty->UpdatePrefixHour(ZeroPrefixType::SHOW);
+    EXPECT_EQ(pattern->GetDefaultFormat(), FORM_FORMAT);
+    layoutProperty->UpdatePrefixHour(ZeroPrefixType::HIDE);
+    EXPECT_EQ(pattern->GetDefaultFormat(), FORM_FORMAT_HIDE);
+
+    pattern->is24H_ = true;
+    layoutProperty->UpdatePrefixHour(ZeroPrefixType::AUTO);
+    EXPECT_EQ(pattern->GetDefaultFormat(), FORM_FORMAT_24H);
+    layoutProperty->UpdatePrefixHour(ZeroPrefixType::SHOW);
+    EXPECT_EQ(pattern->GetDefaultFormat(), FORM_FORMAT_24H);
+    layoutProperty->UpdatePrefixHour(ZeroPrefixType::HIDE);
+    EXPECT_EQ(pattern->GetDefaultFormat(), FORM_FORMAT_24H_HIDE);
+
+    pipelineContext->SetMinPlatformVersion(lastPlatformVersion);
+    mockContainer->SetApiTargetVersion(lastPlatformVersion);
+    MockPipelineContext::TearDown();
 }
 
 /**

@@ -90,6 +90,7 @@ public:
     void SetResourceLoadId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
     void SetScaleChangeId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
     void SetZoomChangeId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
+    void SetVisitedLinkPersistEnabled(bool enabled) override;
     void SetScrollId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
     void SetPermissionRequestEventId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
     void SetBackgroundColor(Color backgroundColor) override;

@@ -52,6 +52,9 @@ class ACE_EXPORT MenuItemPattern : public Pattern {
     DECLARE_ACE_TYPE(MenuItemPattern, Pattern);
 
 public:
+    void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context) override;
+
+    bool HasInspectorSelection() const override { return true; }
     MenuItemPattern(bool isOptionPattern = false, int index = -1);
     ~MenuItemPattern() override;
 

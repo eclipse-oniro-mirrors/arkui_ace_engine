@@ -22,6 +22,7 @@
 #include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "core/components_ng/pattern/scrollable/scrollable_model_static.h"
 #include "core/components_ng/pattern/waterflow/bridge/waterflow/water_flow_sections_accessor_peer_impl.h"
+#include "core/components_ng/pattern/waterflow/water_flow_model_ng.h"
 #include "core/components_ng/pattern/waterflow/water_flow_model_static.h"
 #include "core/interfaces/native/implementation/water_flow_scroller_peer_impl.h"
 #include "core/interfaces/native/utility/callback_helper.h"
@@ -32,6 +33,34 @@
 
 namespace OHOS::Ace::NG {
 namespace Converter {
+// The provider size follows the ArkTS Length convention; the unit must survive
+// the conversion into the layout-side option (same contract as List's
+// SetScrollPlaceholderImpl).
+template<>
+inline ScrollPlaceholderOptions Convert(const Ark_PlaceholderOptions& src)
+{
+    ScrollPlaceholderOptions options;
+    options.id = Converter::OptConvert<std::string>(src.id).value_or("");
+    if (src.size.tag != INTEROP_TAG_UNDEFINED) {
+        ScrollPlaceholderSizeOption sizeOption;
+        // Keep the converted Dimension with its unit: "100%" maps to
+        // Dimension(1.0, PERCENT), and Value() would collapse it to 1.0.
+        sizeOption.width = Converter::OptConvert<Dimension>(src.size.value.width);
+        sizeOption.height = Converter::OptConvert<Dimension>(src.size.value.height);
+        options.size = sizeOption;
+    }
+    return options;
+}
+
+template<>
+inline std::optional<ScrollPlaceholderOptions> OptConvert(const Opt_PlaceholderOptions& src)
+{
+    if (src.tag == INTEROP_TAG_UNDEFINED) {
+        return std::nullopt;
+    }
+    return Convert<ScrollPlaceholderOptions>(src.value);
+}
+
 template<>
 void AssignCast(std::optional<WaterFlowLayoutMode>& dst, const Ark_WaterFlowLayoutMode& src)
 {
@@ -354,8 +383,28 @@ void SetScrollPlaceholderImpl(Ark_NativePointer node,
 {
     auto frameNode = reinterpret_cast<FrameNode *>(node);
     CHECK_NULL_VOID(frameNode);
-    //auto convValue = value ? Converter::OptConvert<type>(*value) : std::nullopt;
-    // WaterFlowModelNG::SetSetScrollPlaceholder(frameNode, convValue);
+    auto optValue = Converter::GetOptPtr(value);
+    if (!optValue) {
+        TAG_LOGI(AceLogTag::ACE_SCROLL,
+            "WaterFlow scrollPlaceholder: provider cleared, node=%{public}s, id=%{public}d",
+            frameNode->GetTag().c_str(), frameNode->GetId());
+        WaterFlowModelNG::SetScrollPlaceholder(frameNode, nullptr);
+        return;
+    }
+    TAG_LOGI(AceLogTag::ACE_SCROLL,
+        "WaterFlow scrollPlaceholder: provider set, node=%{public}s, id=%{public}d "
+        "(placeholders appear only while this WaterFlow scrolls under load)",
+        frameNode->GetTag().c_str(), frameNode->GetId());
+    // The provider is a synchronous northbound callback: the continuation is
+    // invoked on the spot, so the invoke converts into a plain optional result.
+    auto provider = [arkCallback = CallbackHelper(*optValue)](
+        int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+        Ark_Int32 arkIndex = Converter::ArkValue<Ark_Int32>(index);
+        auto result = arkCallback.InvokeWithOptConvertResult<ScrollPlaceholderOptions, Opt_PlaceholderOptions,
+            Callback_Opt_PlaceholderOptions_Void>(arkIndex);
+        return result;
+    };
+    WaterFlowModelNG::SetScrollPlaceholder(frameNode, std::move(provider));
 }
 void SetCachedCount1Impl(Ark_NativePointer node,
                          const Opt_Int32* count,

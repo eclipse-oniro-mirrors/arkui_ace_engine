@@ -1068,33 +1068,6 @@ HWTEST_F(TabsFloatingBarLayoutTestNg, CalculateTabBarDisplayModeBottom001, TestS
 }
 
 /**
- * @tc.name: ClampTabBarTransformOffset001
- * @tc.desc: Test ClampTabBarTransformOffset does not crash when not floating
- * @tc.type: FUNC
- */
-HWTEST_F(TabsFloatingBarLayoutTestNg, ClampTabBarTransformOffset001, TestSize.Level1)
-{
-    /**
-     * @tc.steps: step1. Create Tabs without floating bar
-     * @tc.expected: step1. Tabs instance is created, not floating
-     */
-    TabsModelNG model = CreateTabs();
-    CreateTabContents();
-    GetTabs();
-    CreateTabsDone(model);
-
-    ASSERT_NE(pattern_, nullptr);
-
-    /**
-     * @tc.steps: step2. Call ClampTabBarTransformOffset
-     * @tc.expected: step2. No crash, returns early (not floating)
-     */
-    pattern_->ClampTabBarTransformOffset();
-    EXPECT_FALSE(pattern_->IsFloatingBar());
-    EXPECT_FALSE(pattern_->IsFloatingTopBar());
-}
-
-/**
  * @tc.name: TabBarPatternColorInvertColorMode001
  * @tc.desc: Test TabBarPattern SetColorInvertColorMode and GetColorInvertColorMode
  * @tc.type: FUNC

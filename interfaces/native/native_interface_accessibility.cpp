@@ -849,6 +849,20 @@ bool IsSupportedOwnerNodeType(const ArkUI_NodeHandle node)
     return nodeType == -1 || nodeType == ARKUI_NODE_CUSTOM || nodeType == ARKUI_NODE_XCOMPONENT ||
         nodeType == ARKUI_NODE_XCOMPONENT_TEXTURE;
 }
+
+// Hover registration accepts only drawing hosts, including handles whose type is resolved from the tag.
+bool IsSupportedHoverNodeType(const ArkUI_NodeHandle node)
+{
+    if (node == nullptr) {
+        return false;
+    }
+    int32_t nodeType = node->type;
+    if (nodeType == -1) {
+        nodeType = OHOS::Ace::NodeModel::GetNodeTypeByTag(node);
+    }
+    return nodeType == ARKUI_NODE_CUSTOM || nodeType == ARKUI_NODE_XCOMPONENT ||
+        nodeType == ARKUI_NODE_XCOMPONENT_TEXTURE;
+}
 } // namespace
 
 int32_t OH_ArkUI_Accessibility_BindExportTree(
@@ -902,6 +916,48 @@ int32_t OH_ArkUI_Accessibility_UnbindExportTree(
     // Frame node modifier route.
     return impl->getNodeModifiers()->getFrameNodeModifier()->unbindAccessibilityExportTree(
         owner->uiNodeHandle, bindId);
+}
+
+int32_t OH_ArkUI_Accessibility_RegisterAccessibilityHoverEventHandler(ArkUI_NodeHandle node, void* userData,
+    void (*handleAccessibilityHoverEvent)(void*, int32_t, int32_t, int32_t, ArkUI_AccessibilityElementInfo*))
+{
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
+    CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "node is null");
+    CHECK_NULL_RETURN_WITH_MESSAGE(handleAccessibilityHoverEvent, ARKUI_ERROR_CODE_PARAM_ERROR,
+        __FUNCTION__, "handleAccessibilityHoverEvent is null");
+    if (!IsSupportedHoverNodeType(node)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_ATTRIBUTE_OR_EVENT_NOT_SUPPORTED, __FUNCTION__,
+            "node type must be ARKUI_NODE_XCOMPONENT, ARKUI_NODE_CUSTOM or ARKUI_NODE_XCOMPONENT_TEXTURE");
+        return ARKUI_ERROR_CODE_ATTRIBUTE_OR_EVENT_NOT_SUPPORTED;
+    }
+    const auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
+    CHECK_NULL_RETURN_WITH_MESSAGE(impl, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "impl is null");
+    const auto* modifier = impl->getNodeModifiers()->getFrameNodeModifier();
+    CHECK_NULL_RETURN_WITH_MESSAGE(modifier->registerAccessibilityHoverEventHandler,
+        ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "hover handler registration is unavailable");
+    return ReturnAccessibilityResultWithFunctionName(modifier->registerAccessibilityHoverEventHandler(
+        node->uiNodeHandle, userData, handleAccessibilityHoverEvent), ARKUI_ERROR_CODE_NO_ERROR, __FUNCTION__);
+}
+
+int32_t OH_ArkUI_Accessibility_UnregisterAccessibilityHoverEventHandler(ArkUI_NodeHandle node)
+{
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
+    if (node == nullptr) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "node is null");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    if (!IsSupportedHoverNodeType(node)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_ATTRIBUTE_OR_EVENT_NOT_SUPPORTED, __FUNCTION__,
+            "node type must be ARKUI_NODE_XCOMPONENT, ARKUI_NODE_CUSTOM or ARKUI_NODE_XCOMPONENT_TEXTURE");
+        return ARKUI_ERROR_CODE_ATTRIBUTE_OR_EVENT_NOT_SUPPORTED;
+    }
+    const auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
+    CHECK_NULL_RETURN_WITH_MESSAGE(impl, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "impl is null");
+    const auto* modifier = impl->getNodeModifiers()->getFrameNodeModifier();
+    CHECK_NULL_RETURN_WITH_MESSAGE(modifier->unregisterAccessibilityHoverEventHandler,
+        ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "hover handler unregistration is unavailable");
+    return ReturnAccessibilityResultWithFunctionName(modifier->unregisterAccessibilityHoverEventHandler(
+        node->uiNodeHandle), ARKUI_ERROR_CODE_NO_ERROR, __FUNCTION__);
 }
 
 #ifdef __cplusplus

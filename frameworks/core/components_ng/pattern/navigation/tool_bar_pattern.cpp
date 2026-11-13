@@ -20,6 +20,7 @@
 #include "base/i18n/localization.h"
 #include "core/common/agingadapation/aging_adapation_dialog_util.h"
 #include "core/components/button/button_theme.h"
+#include "core/components_ng/pattern/button/button_pattern.h"
 #include "core/components_ng/pattern/text/text_layout_property.h"
 #include "core/components_ng/pattern/navigation/tool_bar_node.h"
 #include "core/interfaces/native/node/node_button_modifier.h"
@@ -329,6 +330,21 @@ void NavToolbarPattern::OnColorConfigurationUpdate()
 bool NavToolbarPattern::OnThemeScopeUpdate(int32_t themeScopeId)
 {
     UpdateBackgroundStyle();
+    auto host = AceType::DynamicCast<NavToolbarNode>(GetHost());
+    CHECK_NULL_RETURN(host, false);
+    auto containerNode = AceType::DynamicCast<FrameNode>(host->GetToolbarContainerNode());
+    CHECK_NULL_RETURN(containerNode, false);
+    auto theme = NavigationGetTheme(themeScopeId);
+    CHECK_NULL_RETURN(theme, false);
+    auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
+    CHECK_NULL_RETURN(buttonModifier, false);
+    for (auto& toolBarItemNode : containerNode->GetChildren()) {
+        auto buttonNode = AceType::DynamicCast<FrameNode>(toolBarItemNode);
+        CHECK_NULL_CONTINUE(buttonNode);
+        auto focusHub = buttonNode->GetFocusHub();
+        CHECK_NULL_CONTINUE(focusHub);
+        focusHub->SetPaintColor(theme->GetToolBarItemFocusColor());
+    }
     return false;
 }
 

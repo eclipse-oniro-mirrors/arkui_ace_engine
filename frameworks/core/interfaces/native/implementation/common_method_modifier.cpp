@@ -38,6 +38,7 @@
 #include "core/components_ng/pattern/checkbox/checkbox_pattern.h"
 #include "core/components_ng/pattern/radio/radio_pattern.h"
 #include "core/components_ng/pattern/toggle/switch_pattern.h"
+#include "core/components_ng/event/event_constants.h"
 #include "core/components_ng/base/view_abstract.h"
 #include "core/components_ng/base/view_abstract_model_ng.h"
 #include "core/components_ng/base/view_abstract_model_static.h"
@@ -3516,6 +3517,18 @@ void SetHoverEffectImpl(Ark_NativePointer node,
         ViewAbstract::SetHoverEffect(frameNode, HoverEffectType::AUTO);
     }
 }
+void SetAgentControlModeImpl(Ark_NativePointer node, const Opt_AgentControlMode* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto mode = Converter::GetOptPtr(value);
+    if (!mode || (*mode != ARK_AGENT_CONTROL_MODE_ALLOW && *mode != ARK_AGENT_CONTROL_MODE_DENY)) {
+        frameNode->SetAgentControlMode(std::nullopt);
+        return;
+    }
+    frameNode->SetAgentControlMode(*mode == ARK_AGENT_CONTROL_MODE_DENY ?
+        AgentControlMode::DENY : AgentControlMode::ALLOW);
+}
 void SetOnMouseImpl(Ark_NativePointer node,
                     const Opt_Callback_MouseEvent_Void* value)
 {
@@ -5014,6 +5027,30 @@ void SetShadowImpl(Ark_NativePointer node,
         return;
     }
     ViewAbstract::SetBackShadow(frameNode, shadow.value());
+}
+void SetShadowShapeImpl(Ark_NativePointer node,
+                        const Opt_Union_CircleShape_EllipseShape_PathShape_RectShape* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto convValue = Converter::OptConvertPtr<RefPtr<BasicShape>>(value);
+    if (convValue.has_value()) {
+        ViewAbstract::SetShadowShape(frameNode, convValue.value());
+    } else {
+        ViewAbstract::SetShadowShape(frameNode, nullptr);
+    }
+}
+void SetShadowClipModeImpl(Ark_NativePointer node,
+                           const Opt_ShadowClipMode* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto convValue = Converter::OptConvertPtr<ShadowClipMode>(value);
+    if (convValue.has_value()) {
+        ViewAbstract::SetShadowClipMode(frameNode, convValue.value());
+    } else {
+        ViewAbstract::ResetShadowClipMode(frameNode);
+    }
 }
 void SetEdgeLightImpl(Ark_NativePointer node,
                       const Opt_EdgeLightParams* value)
@@ -7460,6 +7497,7 @@ const GENERATED_ArkUICommonMethodModifier* GetCommonMethodModifier()
         CommonMethodModifier::SetSizeImpl,
         CommonMethodModifier::SetConstraintSizeImpl,
         CommonMethodModifier::SetHitTestBehaviorImpl,
+        CommonMethodModifier::SetAgentControlModeImpl,
         CommonMethodModifier::SetOnChildTouchTestImpl,
         CommonMethodModifier::SetLayoutWeightImpl,
         CommonMethodModifier::SetChainWeightImpl,
@@ -7573,6 +7611,8 @@ const GENERATED_ArkUICommonMethodModifier* GetCommonMethodModifier()
         CommonMethodModifier::SetRadialGradientImpl,
         CommonMethodModifier::SetMotionPathImpl,
         CommonMethodModifier::SetShadowImpl,
+        CommonMethodModifier::SetShadowShapeImpl,
+        CommonMethodModifier::SetShadowClipModeImpl,
         CommonMethodModifier::SetEdgeLightImpl,
         CommonMethodModifier::SetClipImpl,
         CommonMethodModifier::SetClipShapeImpl,

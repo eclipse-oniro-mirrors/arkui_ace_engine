@@ -17,6 +17,7 @@
 
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/geometry_node.h"
+#include "core/components_ng/pattern/scrollable/scrollable_utils.h"
 #include "core/components_ng/pattern/scrollable/scrollable_paint_property.h"
 #include "core/components_ng/property/measure_utils.h"
 #include "core/components_ng/render/animation_utils.h"
@@ -105,16 +106,17 @@ bool ScrollablePaintMethod::TryContentClip(PaintWrapper* wrapper)
     CHECK_NULL_RETURN(wrapper, false);
     auto props = DynamicCast<ScrollablePaintProperty>(wrapper->GetPaintProperty());
     CHECK_NULL_RETURN(props, false);
+    auto renderContext = wrapper->GetRenderContext();
+    CHECK_NULL_RETURN(renderContext, false);
     auto&& clip = props->GetContentClip();
-    if (clip.has_value()) {
-        auto renderContext = wrapper->GetRenderContext();
+    auto mode = clip.has_value() ? clip->first : ContentClipMode::DEFAULT;
+    if (mode == ContentClipMode::DEFAULT) {
+        mode = ScrollableUtils::ResolveEffectiveDefaultContentClip(
+            renderContext->GetHost(), AceType::RawPtr(props));
+    }
+    if (clip.has_value() || mode == ContentClipMode::SAFE_AREA) {
         renderContext->SetClipToFrame(false);
         renderContext->SetClipToBounds(false);
-
-        auto mode = clip->first;
-        if (mode == ContentClipMode::DEFAULT) {
-            mode = props->GetDefaultContentClip();
-        }
         auto&& geo = wrapper->GetGeometryNode();
         switch (mode) {
             case ContentClipMode::CUSTOM:
@@ -126,21 +128,9 @@ bool ScrollablePaintMethod::TryContentClip(PaintWrapper* wrapper)
                 renderContext->SetContentClip(rect);
                 break;
             }
-            case ContentClipMode::SAFE_AREA: {
-                auto host = renderContext->GetHost();
-                CHECK_NULL_RETURN(host, false);
-                const auto safeAreaPad = safeAreaPad_.value_or(host->GetAccumulatedSafeAreaExpand(true,
-                    { .type = NG::LAYOUT_SAFE_AREA_TYPE_SYSTEM, .edges = NG::LAYOUT_SAFE_AREA_EDGE_ALL },
-                    IgnoreStrategy::AXIS_INSENSITIVE));
-
-                auto size = geo->GetPaddingSize();
-                AddPaddingToSize(safeAreaPad, size);
-
-                auto offset = geo->GetPaddingOffset() - geo->GetFrameOffset();
-                offset -= OffsetF(safeAreaPad.left.value_or(0.0f), safeAreaPad.top.value_or(0.0f));
-                renderContext->SetContentClip(RectF { offset, size });
+            case ContentClipMode::SAFE_AREA:
+                ApplySafeAreaClip(renderContext, wrapper);
                 break;
-            }
             case ContentClipMode::BOUNDARY: {
                 auto rect = geo->GetFrameRect();
                 rect.SetOffset({ 0.0f, 0.0f });
@@ -153,5 +143,20 @@ bool ScrollablePaintMethod::TryContentClip(PaintWrapper* wrapper)
         return true;
     }
     return false;
+}
+
+void ScrollablePaintMethod::ApplySafeAreaClip(const RefPtr<RenderContext>& renderContext, PaintWrapper* wrapper)
+{
+    auto host = renderContext->GetHost();
+    CHECK_NULL_VOID(host);
+    auto&& geo = wrapper->GetGeometryNode();
+    const auto safeAreaPad = safeAreaPad_.value_or(host->GetAccumulatedSafeAreaExpand(true,
+        { .type = NG::LAYOUT_SAFE_AREA_TYPE_SYSTEM, .edges = NG::LAYOUT_SAFE_AREA_EDGE_ALL },
+        IgnoreStrategy::AXIS_INSENSITIVE));
+    auto size = geo->GetPaddingSize();
+    AddPaddingToSize(safeAreaPad, size);
+    auto offset = geo->GetPaddingOffset() - geo->GetFrameOffset();
+    offset -= OffsetF(safeAreaPad.left.value_or(0.0f), safeAreaPad.top.value_or(0.0f));
+    renderContext->SetContentClip(RectF { offset, size });
 }
 } // namespace OHOS::Ace::NG

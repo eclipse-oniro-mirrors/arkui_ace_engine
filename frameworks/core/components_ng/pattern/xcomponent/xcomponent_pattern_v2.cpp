@@ -14,6 +14,8 @@
  */
 
 #include "core/components_ng/pattern/xcomponent/xcomponent_pattern_v2.h"
+
+#include "base/log/log_wrapper.h"
 #include "core/accessibility/accessibility_manager.h"
 
 #include <string_view>
@@ -25,18 +27,18 @@
 #include "core/accessibility/accessibility_session_adapter.h"
 #include "core/common/window.h"
 #include "core/common/statistic_event_reporter.h"
-#include "core/components_ng/pattern/xcomponent/xcomponent_accessibility_child_tree_callback.h"
-#include "core/components_ng/pattern/xcomponent/xcomponent_accessibility_session_adapter.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_ext_surface_callback_client.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_inner_surface_controller.h"
+#include "core/components_ng/pattern/xcomponent/xcomponent_accessibility_child_tree_callback.h"
+#include "core/components_ng/pattern/xcomponent/xcomponent_accessibility_session_adapter.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_surface_config_client.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_utils.h"
 #ifdef ENABLE_ROSEN_BACKEND
+#include "transaction/rs_sync_transaction_controller.h"
+#include "transaction/rs_sync_transaction_handler.h"
 #include "transaction/rs_transaction.h"
 #include "transaction/rs_transaction_handler.h"
 #include "transaction/rs_transaction_proxy.h"
-#include "transaction/rs_sync_transaction_controller.h"
-#include "transaction/rs_sync_transaction_handler.h"
 #include "ui/rs_ui_context.h"
 #include "ui/rs_ui_director.h"
 #endif
@@ -255,6 +257,7 @@ void XComponentPatternV2::OnSurfaceChanged(const RectF& surfaceRect)
     for (const auto& iter : callbackList) {
         auto callback = iter->OnSurfaceChanged;
         if (callback) {
+            LOG_CALLBACK("OH_ArkUI_SurfaceCallback_SetSurfaceChangedEvent", callback);
             callback(surfaceHolder_, surfaceRect.Width(), surfaceRect.Height());
         }
     }
@@ -389,10 +392,10 @@ void XComponentPatternV2::DisposeSurface()
 std::shared_ptr<Rosen::RSTransactionHandler> XComponentPatternV2::GetRSTransactionHandler(
     const RefPtr<FrameNode>& frameNode)
 {
-#ifdef ENABLE_ROSEN_BACKEND
     if (!SystemProperties::GetMultiInstanceEnabled()) {
         return nullptr;
     }
+#ifdef ENABLE_ROSEN_BACKEND
     auto rsUIContext = GetRSUIContext(frameNode);
     CHECK_NULL_RETURN(rsUIContext, nullptr);
     return rsUIContext->GetRSTransaction();
@@ -419,10 +422,13 @@ std::shared_ptr<Rosen::RSUIContext> XComponentPatternV2::GetRSUIContext(const Re
 void XComponentPatternV2::FlushImplicitTransaction(const RefPtr<FrameNode>& frameNode)
 {
 #ifdef ENABLE_ROSEN_BACKEND
-    if (auto transactionHandler = GetRSTransactionHandler(frameNode)) {
+    if (!SystemProperties::GetMultiInstanceEnabled()) {
+        auto transactionProxy = Rosen::RSTransactionProxy::GetInstance();
+        if (transactionProxy != nullptr) {
+            transactionProxy->FlushImplicitTransaction();
+        }
+    } else if (auto transactionHandler = GetRSTransactionHandler(frameNode)) {
         transactionHandler->FlushImplicitTransaction();
-    } else {
-        Rosen::RSTransactionProxy::GetInstance()->FlushImplicitTransaction();
     }
 #endif
 }
@@ -440,6 +446,7 @@ int32_t XComponentPatternV2::HandleSurfaceCreated()
         for (const auto& iter : callbackList) {
             auto callback = iter->OnSurfaceCreated;
             if (callback) {
+                LOG_CALLBACK("OH_ArkUI_SurfaceCallback_SetSurfaceCreatedEvent", callback);
                 callback(surfaceHolder_);
             }
         }
@@ -461,6 +468,7 @@ int32_t XComponentPatternV2::HandleSurfaceDestroyed()
         for (const auto& iter : callbackList) {
             auto callback = iter->OnSurfaceDestroyed;
             if (callback) {
+                LOG_CALLBACK("OH_ArkUI_SurfaceCallback_SetSurfaceDestroyedEvent", callback);
                 callback(surfaceHolder_);
             }
         }
@@ -651,6 +659,7 @@ void XComponentPatternV2::UpdateOnFrameEvent(void(*callback)(void*, uint64_t, ui
         CHECK_NULL_VOID(callback);
         CHECK_NULL_VOID(arkuiNode);
         CHECK_NULL_VOID(displaySyncData);
+        LOG_CALLBACK("OH_ArkUI_XComponent_RegisterOnFrameCallback", callback);
         callback(arkuiNode, displaySyncData->GetTimestamp(), displaySyncData->GetTargetTimestamp());
     });
     TAG_LOGD(AceLogTag::ACE_XCOMPONENT, "Id: %{public}" PRIu64 " RegisterOnFrame",
@@ -689,6 +698,7 @@ void XComponentPatternV2::OnSurfaceShow()
     for (const auto& iter : callbackList) {
         auto callback = iter->onSurfaceShow;
         if (callback) {
+            LOG_CALLBACK("OH_ArkUI_SurfaceCallback_SetSurfaceShowEvent", callback);
             callback(surfaceHolder_);
         }
     }
@@ -703,7 +713,10 @@ void XComponentPatternV2::OnSurfaceHide()
     for (const auto& iter : callbackList) {
         auto callback = iter->onSurfaceHide;
         if (callback) {
-            callback(surfaceHolder_);
+            {
+                LOG_CALLBACK("OH_ArkUI_SurfaceCallback_SetSurfaceHideEvent", callback);
+                callback(surfaceHolder_);
+            }
             hasCallback = true;
         }
     }
@@ -719,9 +732,9 @@ void XComponentPatternV2::ResetAndInitializeNodeHandleAccessibility()
     CHECK_NULL_VOID(host);
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
-    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
-    CHECK_NULL_VOID(mainAccessibilityManager);
-    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
+    auto pipelineAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_VOID(pipelineAccessibilityManager);
+    auto accessibilityManager = pipelineAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
     if (accessibilityChildTreeCallback_) {
         accessibilityManager->DeregisterAccessibilityChildTreeCallback(
@@ -754,6 +767,10 @@ void XComponentPatternV2::ResetAndInitializeNodeHandleAccessibility()
 
 ArkUI_AccessibilityProvider* XComponentPatternV2::CreateAccessibilityProvider()
 {
+    if (ACE_UNLIKELY(SystemProperties::DetectContainerMultiThread() &&
+                     !CheckThread(TaskExecutor::TaskType::UI))) {
+        TAG_LOGW(AceLogTag::ACE_XCOMPONENT, "CreateAccessibilityProvider: CheckThread fail: expected [UI]");
+    }
     if (hasGotNativeXComponent_) {
         return nullptr;
     }
@@ -772,6 +789,10 @@ ArkUI_AccessibilityProvider* XComponentPatternV2::CreateAccessibilityProvider()
 
 void XComponentPatternV2::DisposeAccessibilityProvider(ArkUI_AccessibilityProvider* provider)
 {
+    if (ACE_UNLIKELY(SystemProperties::DetectContainerMultiThread() &&
+                     !CheckThread(TaskExecutor::TaskType::UI))) {
+        TAG_LOGW(AceLogTag::ACE_XCOMPONENT, "DisposeAccessibilityProvider: CheckThread fail: expected [UI]");
+    }
     if (hasGotNativeXComponent_ || (provider != arkuiAccessibilityProvider_)) {
         return;
     }
@@ -788,6 +809,10 @@ std::unordered_map<void*, WeakPtr<FrameNode>> XComponentPatternV2::XComponentAcc
 
 FrameNode* XComponentPatternV2::QueryAccessibilityProviderHost(void* provider, bool& isProviderValied)
 {
+    if (ACE_UNLIKELY(SystemProperties::DetectContainerMultiThread() &&
+                     !CheckThread(TaskExecutor::TaskType::UI))) {
+        TAG_LOGW(AceLogTag::ACE_XCOMPONENT, "QueryAccessibilityProviderHost: CheckThread fail: expected [UI]");
+    }
     auto it = XComponentAccessibilityProviderMap.find(provider);
     if (it == XComponentAccessibilityProviderMap.end()) {
         isProviderValied = false;

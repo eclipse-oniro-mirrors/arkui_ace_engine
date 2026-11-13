@@ -317,6 +317,7 @@ void GridEventHub::FireOnItemDragLeave(const ItemDragInfo& dragInfo, int32_t ite
         CHECK_NULL_VOID(pattern);
         auto insertIndex = pattern->GetChildrenCount();
         MoveItems(itemIndex, insertIndex);
+        host->ChildrenUpdatedFrom(0);
         pattern->ClearDragState();
     }
 

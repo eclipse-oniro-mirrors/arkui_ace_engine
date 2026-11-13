@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "interfaces/inner_api/ui_session/param_config.h"
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "test/mock/frameworks/core/common/mock_container.h"
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
@@ -1940,4 +1941,35 @@ HWTEST_F(TextFieldModifyTest, SetTextFieldText001, TestSize.Level1)
         EXPECT_TRUE(pattern->isTextChangedAtCreation_);
     });
 }
+
+/**
+ * @tc.name: PublicDumpDoesNotAddCursorGeometry
+ * @tc.desc: The public visual dump retains layout values without cursorInfo or source wrappers.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldModifyTest, PublicDumpDoesNotAddCursorGeometry, TestSize.Level1)
+{
+    CreateTextField(DEFAULT_TEXT);
+    ASSERT_NE(pattern_, nullptr);
+    ParamConfig config;
+    config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+    config.visualProperties = true;
+    auto json = JsonUtil::Create();
+    pattern_->DumpAdvanceInfo(json, config);
+    EXPECT_FALSE(json->Contains("cursorInfo"));
+    EXPECT_FALSE(json->Contains("pattern"));
+    EXPECT_EQ(json->GetString("FontColor"), pattern_->GetTextColor());
+    EXPECT_EQ(json->GetString("textRect"), pattern_->textRect_.ToString());
+    EXPECT_EQ(json->GetString("contentRect"), pattern_->contentRect_.ToString());
+    EXPECT_FALSE(json->Contains("CustomKeyboard"));
+
+    config.visualProperties = false;
+    config.functionalProperties = true;
+    auto functional = JsonUtil::Create();
+    pattern_->DumpAdvanceInfo(functional, config);
+    EXPECT_TRUE(functional->Contains("CustomKeyboard"));
+    EXPECT_FALSE(functional->Contains("FontColor"));
+    EXPECT_FALSE(functional->Contains("cursorInfo"));
+}
+
 } // namespace OHOS::Ace::NG

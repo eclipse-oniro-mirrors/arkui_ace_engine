@@ -13,8 +13,11 @@
  * limitations under the License.
  */
 
+#include "test/mock/adapter/ohos/osal/mock_input_manager.h"
+
 #include "base/input_manager/input_manager.h"
 
+#include "core/components_ng/base/node_sensitive_input.h"
 #include "core/event/key_event.h"
 
 namespace OHOS::Ace {
@@ -33,9 +36,31 @@ std::shared_ptr<MMI::PointerEvent> InputManager::CreatePointerEvent(
     return nullptr;
 }
 
+bool InputManager::IsAgentEvent(const std::shared_ptr<MMI::PointerEvent>& pointerEvent)
+{
+    return false;
+}
+
+bool InputManager::HasControlComponentPermission()
+{
+    if (!MockInputManager::controlComponentPermissionCache.has_value()) {
+        ++MockInputManager::controlComponentPermissionCheckCount;
+        MockInputManager::controlComponentPermissionCache = MockInputManager::controlComponentPermissionGranted;
+    }
+    return MockInputManager::controlComponentPermissionCache.value();
+}
+
 bool InputManager::IsKeyboardConnected()
 {
     return true;
+}
+
+void InputManager::ReportAgentInputDecision(const NG::AgentInputResult& result)
+{
+    auto callback = MockInputManager::agentInputReporter;
+    if (callback) {
+        callback(result);
+    }
 }
 
 } // namespace OHOS::Ace

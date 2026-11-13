@@ -57,8 +57,8 @@ class ArcListScrollBarWidthModifier extends ModifierWithKey {
             getUINativeModule().list.resetListScrollBarWidth(node);
         }
         else {
-            let unitStr = LengthUnit[this.value.unit].toLowerCase();
-            let width = `${this.value.value}${unitStr}`;
+            // Keep the historical behavior: ArcList scrollBarWidth is always interpreted as VP.
+            let width = `${this.value.value}vp`;
             getUINativeModule().list.setListScrollBarWidth(node, width);
         }
     }
@@ -197,7 +197,8 @@ class ArcList extends List {
 
     static scrollBarWidth(value) {
         if (value) {
-            value = `${value.value}${LengthUnit[value.unit].toLowerCase()}`;
+            // Keep the historical behavior: ArcList scrollBarWidth is always interpreted as VP.
+            value = `${value.value}vp`;
         }
         List.scrollBarWidth(value);
     }

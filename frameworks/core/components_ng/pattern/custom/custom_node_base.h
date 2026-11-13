@@ -28,6 +28,60 @@
 #include "core/components_ng/pattern/recycle_view/recycle_manager.h"
 #include "core/pipeline/base/element_register.h"
 
+namespace OHOS::Ace {
+namespace NG {
+class CustomNodeBase;
+}
+
+// A custom-node capability shares its owning node's lifetime.
+// RefPtr and WeakPtr retain their original storage and public interfaces.
+template<>
+struct RefPtrTraits<NG::CustomNodeBase> {
+    static NG::UINode* GetOwner(const NG::CustomNodeBase* view);
+
+    template<class T>
+    class CustomAccess final {
+    public:
+        explicit CustomAccess(T* view) : guard_(GetOwner(view)), view_(view) {}
+        T* operator->() const
+        {
+            return view_;
+        }
+        CustomAccess(const CustomAccess&) = delete;
+        CustomAccess& operator=(const CustomAccess&) = delete;
+
+    private:
+        LifeCycleCheckable::PtrHolder<NG::UINode> guard_;
+        T* view_;
+    };
+
+    static CustomAccess<NG::CustomNodeBase> Access(NG::CustomNodeBase* view)
+    {
+        return CustomAccess<NG::CustomNodeBase>(view);
+    }
+
+    template<class T>
+    static T* DynamicCast(NG::CustomNodeBase* view)
+    {
+        return TypeInfoHelper::DynamicCast<std::remove_const_t<T>>(view);
+    }
+
+    template<class T>
+    static const T* DynamicCast(const NG::CustomNodeBase* view)
+    {
+        return TypeInfoHelper::DynamicCast<std::remove_const_t<T>>(view);
+    }
+};
+
+template<>
+struct RefPtrTraits<const NG::CustomNodeBase> : RefPtrTraits<NG::CustomNodeBase> {
+    static CustomAccess<const NG::CustomNodeBase> Access(const NG::CustomNodeBase* view)
+    {
+        return CustomAccess<const NG::CustomNodeBase>(view);
+    }
+};
+} // namespace OHOS::Ace
+
 namespace OHOS::Ace::NG {
 
 enum class ReusableMemOptStrategy {
@@ -41,11 +95,12 @@ enum class StaReusableMemOptStrategy {
     ENABLE_AUTO_CACHE_OPTIMIZATION = 1
 };
 
-class ACE_FORCE_EXPORT CustomNodeBase : public virtual AceType {
-    DECLARE_ACE_TYPE(CustomNodeBase, AceType);
+class ACE_FORCE_EXPORT CustomNodeBase : public virtual TypeInfoBase {
+    DECLARE_ACE_TYPE(CustomNodeBase, TypeInfoBase);
 
 public:
     CustomNodeBase() = default;
+    ACE_DISALLOW_COPY_AND_MOVE(CustomNodeBase);
     ~CustomNodeBase() override;
 
     virtual void SetRenderFunction(const RenderFunction& renderFunction) {};
@@ -178,6 +233,11 @@ protected:
     std::string creatorId_;
 
 private:
+    friend UINode* RefPtrTraits<CustomNodeBase>::GetOwner(const CustomNodeBase* view);
+
+    // Stable owner for the entire capability lifetime.
+    virtual UINode* GetCustomNodeOwner() const = 0;
+
     std::function<void()> updateFunc_;
     std::function<void()> appearFunc_;
     std::function<void()> didBuildFunc_;
@@ -203,5 +263,12 @@ private:
     RecycleNodeInfo recycleInfo_;
 };
 } // namespace OHOS::Ace::NG
+
+namespace OHOS::Ace {
+inline NG::UINode* RefPtrTraits<NG::CustomNodeBase>::GetOwner(const NG::CustomNodeBase* view)
+{
+    return view ? view->GetCustomNodeOwner() : nullptr;
+}
+} // namespace OHOS::Ace
 
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_BASE_CUSTOM_NODE_BASE_H

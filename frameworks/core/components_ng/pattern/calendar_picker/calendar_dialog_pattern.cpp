@@ -1759,6 +1759,11 @@ void CalendarDialogPattern::MarkMonthNodeDirty()
     }
 }
 
+CommandResult CalendarDialogPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "setCalendarPickerDialogTime" });
+}
+
 int32_t CalendarDialogPattern::OnInjectionEvent(const std::string& command)
 {
     auto host = GetHost();

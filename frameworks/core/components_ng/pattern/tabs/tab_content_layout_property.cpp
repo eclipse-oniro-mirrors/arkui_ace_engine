@@ -45,4 +45,24 @@ void TabContentLayoutProperty::BadgeToJsonValue(
     jsonValue->PutExtAttr("badge", jsonBadge->ToString().c_str(), filter);
 }
 
+void TabContentLayoutProperty::SidebarSectionToJsonValue(
+    std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto pattern = host->GetPattern<TabContentPattern>();
+    CHECK_NULL_VOID(pattern);
+    const auto& section = pattern->GetSidebarSection();
+    if (!section.has_value()) {
+        return;
+    }
+    auto sectionJson = JsonUtil::Create(true);
+    sectionJson->Put("title", section->title.c_str());
+    if (section->order.has_value()) {
+        sectionJson->Put("order", section->order.value());
+    }
+    sectionJson->Put("titleStyle", static_cast<int32_t>(section->titleStyle));
+    json->PutExtAttr("sidebarSection", sectionJson->ToString().c_str(), filter);
+}
+
 } // namespace OHOS::Ace::NG

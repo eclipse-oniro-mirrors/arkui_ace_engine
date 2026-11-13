@@ -333,6 +333,7 @@ public:
     const RefPtr<ScrollEdgeEffect>& GetScrollEdgeEffect() const;
     bool CanFadeEffect(float offset, bool isAtTop, bool isAtBottom) const;
     bool HandleEdgeEffect(float offset, int32_t source, const SizeF& size);
+    virtual void UpdateAnimateOverScroll(int32_t source, bool isAtTop, bool isAtBottom);
     void HandleFadeEffect(float offset, int32_t source, const SizeF& size, bool isNotPositiveScrollableDistance);
     virtual void SetEdgeEffectCallback(const RefPtr<ScrollEdgeEffect>& scrollEffect) {}
     bool IsRestrictBoundary();
@@ -520,6 +521,24 @@ public:
     virtual void OnAnimateStop();
     virtual void ScrollTo(float position);
     void SmartGesturePerformScroll(float position);
+    // Preserve the virtual AnimateTo ABI; consume the request before entering callbacks.
+    void AnimateToFromController(float position, float duration, const RefPtr<Curve>& curve,
+        bool smooth, bool canOverScroll)
+    {
+        auto previous = capiScrollToRequest_;
+        capiScrollToRequest_ = true;
+        AnimateTo(position, duration, curve, smooth, canOverScroll);
+        capiScrollToRequest_ = previous;
+    }
+    bool TakeCapiScrollToEventReportRequest()
+    {
+        auto requested = capiScrollToRequest_;
+        capiScrollToRequest_ = false;
+        return requested;
+    }
+    void UpdateCapiScrollEventSource(bool isScrollTo);
+    void ScheduleCapiScrollCommand(bool isScrollTo, bool isScrollBy = false);
+    void MarkCapiScrollByEventSource();
     virtual void AnimateTo(
         float position, float duration, const RefPtr<Curve>& curve, bool smooth, bool canOverScroll = false,
         bool useTotalOffset = true);
@@ -669,6 +688,13 @@ public:
     static ScrollState GetScrollState(int32_t scrollSource);
 
     static ScrollSource ConvertScrollSource(int32_t source);
+
+    struct ItemLazySyntax {
+        bool arkoala = false;
+        bool repeatV2 = false;
+    };
+    // Lazy syntax kinds that directly provide items of host.
+    ACE_FORCE_EXPORT static ItemLazySyntax FindItemLazySyntax(const RefPtr<UINode>& host);
 
     static int32_t ScrollToTarget(
         RefPtr<FrameNode>& scrollable, RefPtr<FrameNode>& target, float targetOffset, ScrollAlign targetAlign);
@@ -963,17 +989,6 @@ public:
         callback(source);
     }
 
-    // True when the scroll was driven by a finger on this container: the drag itself,
-    // the fling that follows it, or a scroll bar drag. Wheel/crown (SCROLL_FROM_AXIS,
-    // SCROLL_FROM_CROWN) and programmatic scrolls (JUMP, LAYOUT, INDEXER, STATUSBAR,
-    // ANIMATION_CONTROLLER) are not, and must not be mistaken for "another finger is
-    // scrolling".
-    static bool IsFingerDrivenScrollSource(int32_t source)
-    {
-        return source == SCROLL_FROM_UPDATE || source == SCROLL_FROM_ANIMATION ||
-            source == SCROLL_FROM_BAR || source == SCROLL_FROM_BAR_FLING;
-    }
-
     void SetIsOverScroll(bool val);
     bool GetIsOverScroll() const;
 
@@ -1158,8 +1173,10 @@ public:
 
     void SetCanOverScroll(bool val);
 
-    void ContentChangeReport(
-        const RefPtr<FrameNode>& keyNode, uint32_t type = ContentChangeManager::NONE);
+    void ContentChangeReport(const RefPtr<FrameNode>& keyNode, uint32_t type = ContentChangeManager::NONE);
+    void ContentChangeReport(const RefPtr<FrameNode>& keyNode, uint32_t type, bool reportCapi);
+    void ContentChangeOnTouchDown();
+    void ContentChangeOnTouchEnd();
 
     ACE_FORCE_EXPORT void ContentChangeOnScrollStart(const RefPtr<FrameNode>& keyNode);
 
@@ -1178,6 +1195,7 @@ protected:
     std::optional<ScrollToIndexTarget> scrollTarget_;
     bool fastScrollSkip_ = false;
     bool startingFastScroll_ = false;
+    uint64_t animationGeneration_ = 0;
     ACE_FORCE_EXPORT void SuggestOpIncGroup(bool flag);
     void OnAttachToFrameNode() override;
     void OnAttachToFrameNodeMultiThread();
@@ -1202,6 +1220,7 @@ protected:
     void FireObserverOnReachEnd();
     void FireObserverOnScrollStart();
     void FireObserverOnScrollStop();
+    void ContentChangeOnScrollUpdate();
     void FireObserverOnDidScroll(float finalOffset);
     void FireObserverOnScrollerAreaChange(float finalOffset);
     float FireObserverOnWillScroll(float offset);
@@ -1245,7 +1264,7 @@ protected:
     // Explicit value of enableScrollWithMouse set by the developer.
     // nullopt means not explicitly set: the direction-aware default applies.
     std::optional<bool> isAllowMouse_;
-    bool isAllowKeyboard_ = true;
+    bool isAllowKeyboard_ = false;
 
     void CheckScrollBarOff();
 
@@ -1257,6 +1276,7 @@ protected:
     std::string ParseCommand(const std::string& command, ScrollOnInjectionEventInfo& scrollOnInjectionEventInfo);
     void ReportScroll(bool isJump, ScrollError error, int32_t reportEventId);
     int32_t OnInjectionEventByRatio(const std::string& command);
+    CommandResult OnInjectionEventByRatioWithResult(const std::string& command);
     ScrollError ScrollByRatio(bool reverse, float ratio);
     void HandleScrollByRatio(bool isScrollByRatio, bool reverse, float ratio, int reportEventId);
     void HandleScrollByOffset(double scrollOffset, int reportEventId);
@@ -1298,6 +1318,11 @@ protected:
 
     virtual bool ScrollByArrowKey(KeyCode code, float delta);
     bool HandleArrowKeyScroll(const KeyEvent& keyEventInfo);
+    // predictedItemSnapTarget_ is private. Subclasses drop a stale takeover target through this.
+    void ClearPredictedItemSnapTarget()
+    {
+        predictedItemSnapTarget_.reset();
+    }
 
 private:
     void GetEventDumpInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
@@ -1312,6 +1337,8 @@ private:
     void DumpAdvanceFunctionalProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
 
 
+    CommandResult ExecuteScrollCommandWithResult(
+        const std::unique_ptr<JsonValue>& json, const std::string& name, int32_t reportId);
     // Pattern owns target selection; Scrollable owns the animation and queued-task generation.
     std::optional<float> predictedItemSnapTarget_;
     float itemSnapReleaseMotionVelocity_ = 0.0f;
@@ -1341,6 +1368,8 @@ private:
     std::pair<double, double> GetAutoAdjustAvoidOffset();
     void CalcPaddingAvoidDistByMainAxis(
         const std::unique_ptr<PaddingProperty>& property, std::pair<double, double>& offset, bool isRtl);
+    void CalcEffectiveSafeAreaAvoidDistByMainAxis(
+        const PaddingPropertyF& effectiveSafeAreaPadding, std::pair<double, double>& offset);
     void CalcBorderWidthAvoidDistByMainAxis(
         const std::unique_ptr<BorderWidthProperty>& property, std::pair<double, double>& offset, bool isRtl);
     bool OnScrollPosition(double& offset, int32_t source);
@@ -1491,6 +1520,15 @@ private:
     // scroller
     RefPtr<Animator> animator_;
     bool scrollAbort_ = false;
+    bool capiScrollDetached_ = false;
+    bool capiScrollStartPending_ = false;
+    bool capiScrollStarted_ = false;
+    bool capiSnapTakeover_ = false;
+    bool capiBlockedCommandStart_ = false;
+    bool capiBlockedCommandEnd_ = false;
+    std::optional<double> capiCommandOffset_;
+    uint32_t capiCommandSource_ = 0;
+    bool capiScrollToRequest_ = false;
     bool isAnimateOverScroll_ = false;
     bool isScrollToOverAnimation_ = false;
     bool isScrollToSafeAreaHelper_ = true;

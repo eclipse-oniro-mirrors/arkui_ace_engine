@@ -117,6 +117,7 @@ public:
     void SetCustomStyleNode(const RefPtr<NG::FrameNode>& customStyleNode) override;
     void SetDefaultVisibility(const NG::TabContentDefaultVisibility& defaultVisibility) override;
     static void SetDefaultVisibility(FrameNode* node, const NG::TabContentDefaultVisibility& defaultVisibility);
+    static void SetSidebarSection(FrameNode* node, const SidebarSection& section);
     static void SetCustomTabBar(FrameNode* node, FrameNode* tabBar);
     static void UpdateDefaultSymbol(RefPtr<TabTheme>& tabTheme, RefPtr<TextLayoutProperty> symbolProperty);
     static void UpdateSymbolEffect(RefPtr<TextLayoutProperty> symbolProperty, bool isActive);
@@ -145,6 +146,7 @@ public:
         const RefPtr<ResourceObject>& resObj);
     static void InitTabText(const RefPtr<TextLayoutProperty>& textLayoutProperty);
     static void UpdateLabelStyle(const LabelStyle& labelStyle, RefPtr<TextLayoutProperty> textLayoutProperty);
+    static void CreateSidebarSectionTitleWithResourceObj(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj);
 
 private:
     static RefPtr<TabContentPattern> GetTabContentPattern(FrameNode* node);

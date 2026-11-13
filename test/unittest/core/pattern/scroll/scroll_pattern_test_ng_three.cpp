@@ -691,6 +691,36 @@ HWTEST_F(ScrollPatternThreeTestNg, EdgeEffectCallbackwithContentOffset, TestSize
 }
 
 /**
+ * @tc.name: UpdateAnimateOverScroll_001
+ * @tc.desc: Test ScrollPattern excludes exact top and bottom edge values from animate over-scroll flags
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPatternThreeTestNg, UpdateAnimateOverScroll_001, TestSize.Level1)
+{
+    auto scrollPattern = AceType::MakeRefPtr<ScrollPattern>();
+    ASSERT_NE(scrollPattern, nullptr);
+
+    scrollPattern->scrollableDistance_ = 10.0;
+    scrollPattern->currentOffset_ = 1.0;
+    scrollPattern->UpdateAnimateOverScroll(SCROLL_FROM_ANIMATION_CONTROLLER, true, false);
+    EXPECT_TRUE(scrollPattern->animateOverScrollStart_);
+    EXPECT_FALSE(scrollPattern->animateOverScrollEnd_);
+
+    scrollPattern->currentOffset_ = 0.0;
+    scrollPattern->UpdateAnimateOverScroll(SCROLL_FROM_ANIMATION_CONTROLLER, true, false);
+    EXPECT_FALSE(scrollPattern->animateOverScrollStart_);
+
+    scrollPattern->currentOffset_ = -11.0;
+    scrollPattern->UpdateAnimateOverScroll(SCROLL_FROM_ANIMATION_CONTROLLER, false, true);
+    EXPECT_FALSE(scrollPattern->animateOverScrollStart_);
+    EXPECT_TRUE(scrollPattern->animateOverScrollEnd_);
+
+    scrollPattern->currentOffset_ = -10.0;
+    scrollPattern->UpdateAnimateOverScroll(SCROLL_FROM_ANIMATION_CONTROLLER, false, true);
+    EXPECT_FALSE(scrollPattern->animateOverScrollEnd_);
+}
+
+/**
  * @tc.name: ScrollEdgeWithContentOffset
  * @tc.desc: Test ScrollEdge with contentOffset
  * @tc.type: FUNC

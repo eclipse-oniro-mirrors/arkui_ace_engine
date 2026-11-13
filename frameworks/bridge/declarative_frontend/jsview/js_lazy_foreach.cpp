@@ -35,6 +35,7 @@
 #include "napi/native_api.h"
 #include "bridge/declarative_frontend/jsview/js_lazy_foreach_actuator.h"
 #include "bridge/declarative_frontend/jsview/js_lazy_foreach_builder.h"
+#include "bridge/declarative_frontend/jsview/js_lazy_foreach_controller.h"
 #ifndef NG_BUILD
 #include "bridge/declarative_frontend/jsview/js_lazy_foreach_component.h"
 #endif
@@ -325,6 +326,22 @@ LazyForEachOptions ParseOptions(const JSRef<JSVal>& optionsVal)
     return options;
 }
 
+// Extracts the LazyForEachController instance from the options object
+// (LazyForEachOptions.controller, @since 26.1.0). Returns nullptr when absent or not a
+// controller instance (safe no-bind).
+RefPtr<JSLazyForEachController> ParseController(const JSRef<JSVal>& optionsVal)
+{
+    if (!optionsVal->IsObject() || optionsVal->IsUndefined()) {
+        return nullptr;
+    }
+    JSRef<JSVal> controllerVal = JSRef<JSObject>::Cast(optionsVal)->GetProperty("controller");
+    if (!controllerVal->IsObject()) {
+        return nullptr;
+    }
+    void* controllerPtr = JSRef<JSObject>::Cast(controllerVal)->Unwrap<JSLazyForEachController>();
+    return Referenced::Claim(reinterpret_cast<JSLazyForEachController*>(controllerPtr));
+}
+
 } // namespace
 
 namespace {
@@ -391,13 +408,26 @@ void JSLazyForEach::Create(const JSCallbackInfo& info)
     actuator->SetUpdateChangedNodeFlag(params.updateChangedNode);
     actuator->SetOptions(ParseOptions(params.options));
 
+    // Bind the LazyForEachController carried by options.controller when the node is created;
+    // the binding is immutable on the node side (first-bind-wins) and one-to-one on the
+    // controller side (last-bind-wins: binding the controller to another LazyForEach
+    // replaces its previous binding).
+    auto controller = ParseController(params.options);
+    auto bindController = [controller]() {
+        CHECK_NULL_VOID(controller);
+        LazyForEachModel::GetInstance()->SetController(
+            [controller](const RefPtr<NG::LazyForEachNode>& node) { controller->BindToNode(node); });
+    };
+
     if (ViewStackModel::GetInstance()->IsPrebuilding()) {
-        auto createFunc = [actuator]() {
+        auto createFunc = [actuator, bindController]() {
             LazyForEachModel::GetInstance()->Create(actuator);
+            bindController();
         };
         return ViewStackModel::GetInstance()->PushPrebuildCompCmd("[JSLazyForEach][create]", createFunc);
     }
     LazyForEachModel::GetInstance()->Create(actuator);
+    bindController();
 }
 
 void JSLazyForEach::Pop()

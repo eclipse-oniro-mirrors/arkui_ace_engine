@@ -112,6 +112,24 @@ auto GetTabBarFrameRect(const RefPtr<FrameNode>& node)
     return geometryNode->GetFrameRect();
 }
 
+double Tabs::GetSideBarWidth()
+{
+    auto tabsNode = GetTabsNode(node_);
+    CHECK_NULL_RETURN(tabsNode, 0.0);
+    auto tabsPattern = tabsNode->GetPattern<NG::TabsPattern>();
+    CHECK_NULL_RETURN(tabsPattern, 0.0);
+    auto sideBarNode = tabsPattern->GetSideBarNode();
+    CHECK_NULL_RETURN(sideBarNode, 0.0);
+    auto sideBarDividerNode = tabsPattern->GetSideBarDividerNode();
+    CHECK_NULL_RETURN(sideBarDividerNode, 0.0);
+    
+    auto sideBarGeometryNode = sideBarNode->GetGeometryNode();
+    CHECK_NULL_RETURN(sideBarGeometryNode, 0.0);
+    auto sideBarDividerGeometryNode = sideBarDividerNode->GetGeometryNode();
+    CHECK_NULL_RETURN(sideBarDividerGeometryNode, 0.0);
+    return sideBarGeometryNode->GetFrameSize().Width() + sideBarDividerGeometryNode->GetFrameSize().Width();
+}
+
 void Tabs::SetBarBackgroundBlurStyle(const BlurStyleOption& styleOption)
 {
     auto tabsNode = GetTabsNode(node_);
@@ -140,6 +158,15 @@ void Tabs::SetBarBackgroundEffect(const EffectOption& effectOption)
     CHECK_NULL_VOID(modifier);
     modifier->setBarBackgroundEffect(reinterpret_cast<ArkUINodeHandle>(Referenced::RawPtr(tabsNode)),
         const_cast<EffectOption*>(&effectOption));
+}
+
+void Tabs::SetKeepTabBarInSideBar(bool keep)
+{
+    auto tabsNode = GetTabsNode(node_);
+    CHECK_NULL_VOID(tabsNode);
+    auto modifier = NG::NodeModifier::GetTabsCustomModifier();
+    CHECK_NULL_VOID(modifier);
+    modifier->setKeepTabBarInSideBar(reinterpret_cast<ArkUINodeHandle>(Referenced::RawPtr(tabsNode)), keep);
 }
 
 uint32_t Tabs::GetAnimationDuration()
@@ -200,12 +227,17 @@ std::size_t Tabs::GetTabBarItemSize()
 
 void Tabs::SetTabBarWidth(const Dimension& tabBarWidth)
 {
+    SetTabBarWidth(tabBarWidth, true);
+}
+
+void Tabs::SetTabBarWidth(const Dimension& tabBarWidth, bool updateForSideBar)
+{
     auto tabsNode = GetTabsNode(node_);
     CHECK_NULL_VOID(tabsNode);
     auto modifier = NG::NodeModifier::GetTabsCustomModifier();
     CHECK_NULL_VOID(modifier);
     modifier->setTabBarWidth(reinterpret_cast<ArkUINodeHandle>(Referenced::RawPtr(tabsNode)),
-        const_cast<Dimension*>(&tabBarWidth));
+        const_cast<Dimension*>(&tabBarWidth), updateForSideBar);
 }
 
 Dimension Tabs::GetTabBarWidth() const
@@ -238,6 +270,11 @@ Dimension Tabs::GetTabBarHeight() const
 
 void Tabs::SetDivider(const TabsItemDivider& divider)
 {
+    SetDivider(divider, true);
+}
+
+void Tabs::SetDivider(const TabsItemDivider& divider, bool updateForSideBar)
+{
     auto tabsNode = GetTabsNode(node_);
     CHECK_NULL_VOID(tabsNode);
 
@@ -249,7 +286,8 @@ void Tabs::SetDivider(const TabsItemDivider& divider)
     aceDivider.isNull = divider.isNull;
     auto modifier = NG::NodeModifier::GetTabsCustomModifier();
     CHECK_NULL_VOID(modifier);
-    modifier->setDivider(reinterpret_cast<ArkUINodeHandle>(Referenced::RawPtr(tabsNode)), &aceDivider);
+    modifier->setDivider(reinterpret_cast<ArkUINodeHandle>(Referenced::RawPtr(tabsNode)),
+        &aceDivider, updateForSideBar);
 }
 
 void Tabs::SetDividerColorByUser(bool isByUser)
@@ -650,5 +688,23 @@ NG::TabBarDisplayMode Tabs::GetBarDisplayMode() const
     CHECK_NULL_RETURN(modifier, NG::TabBarDisplayMode::BOTTOMTABBAR);
     auto mode = modifier->getBarDisplayMode(reinterpret_cast<ArkUINodeHandle>(Referenced::RawPtr(tabsNode)));
     return static_cast<NG::TabBarDisplayMode>(mode);
+}
+
+void Tabs::SetTabBarClickIntercept(bool active)
+{
+    auto tabsNode = GetTabsNode(node_);
+    CHECK_NULL_VOID(tabsNode);
+    auto modifier = NG::NodeModifier::GetTabsCustomModifier();
+    CHECK_NULL_VOID(modifier);
+    modifier->setTabBarClickIntercept(reinterpret_cast<ArkUINodeHandle>(Referenced::RawPtr(tabsNode)), active);
+}
+
+void Tabs::TabBarClick(const int32_t index)
+{
+    auto tabsNode = GetTabsNode(node_);
+    CHECK_NULL_VOID(tabsNode);
+    auto modifier = NG::NodeModifier::GetTabsCustomModifier();
+    CHECK_NULL_VOID(modifier);
+    modifier->tabBarClick(reinterpret_cast<ArkUINodeHandle>(Referenced::RawPtr(tabsNode)), index);
 }
 } // namespace OHOS::Ace::Kit

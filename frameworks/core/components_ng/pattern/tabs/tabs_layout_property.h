@@ -43,8 +43,10 @@ public:
         value->propAxis_ = CloneAxis();
         value->propTabBarMode_ = CloneTabBarMode();
         value->propDivider_ = CloneDivider();
+        value->propDividerForSideBar_ = CloneDividerForSideBar();
         value->propEffectNodeOption_ = CloneEffectNodeOption();
         value->propBarWidth_ = CloneBarWidth();
+        value->propBarWidthForSideBar_ = CloneBarWidthForSideBar();
         value->propBarHeight_ = CloneBarHeight();
         value->propIndex_ = CloneIndex();
         value->propIndexSetByUser_ = CloneIndexSetByUser();
@@ -75,6 +77,7 @@ public:
         value->propSidebarDividerColorSetByUser_ = CloneSidebarDividerColorSetByUser();
         value->propDividerColorSetByUser_ = CloneDividerColorSetByUser();
         value->propBarBackgroundColorSetByUser_ = CloneBarBackgroundColorSetByUser();
+        value->propKeepTabBarInSideBar_ = CloneKeepTabBarInSideBar();
         return value;
     }
 
@@ -85,8 +88,10 @@ public:
         ResetAxis();
         ResetTabBarMode();
         ResetDivider();
+        ResetDividerForSideBar();
         ResetEffectNodeOption();
         ResetBarWidth();
+        ResetBarWidthForSideBar();
         ResetBarHeight();
         ResetIndex();
         ResetIndexSetByUser();
@@ -114,6 +119,7 @@ public:
         ResetSidebarDividerColorSetByUser();
         ResetDividerColorSetByUser();
         ResetBarBackgroundColorSetByUser();
+        ResetKeepTabBarInSideBar();
         ResetBarTopFloatingStyle();
     }
 
@@ -156,6 +162,7 @@ public:
             json->PutExtAttr("divider", divider, filter);
         }
         json->PutExtAttr("barOverlap", propBarOverlap_.value_or(false) ? "true" : "false", filter);
+        json->PutExtAttr("keepTabBarInSideBar", propKeepTabBarInSideBar_.value_or(false) ? "true" : "false", filter);
         if (propCachedMaxCount_.has_value()) {
             auto cacheInfo = JsonUtil::Create(true);
             cacheInfo->Put("count", propCachedMaxCount_.value());
@@ -262,8 +269,10 @@ public:
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(Axis, Axis, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(TabBarMode, TabBarMode, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(Divider, TabsItemDivider, PROPERTY_UPDATE_MEASURE);
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(DividerForSideBar, TabsItemDivider, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(EffectNodeOption, TabsEffectNodeOption, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(BarWidth, Dimension, PROPERTY_UPDATE_MEASURE);
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(BarWidthForSideBar, Dimension, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(BarHeight, Dimension, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(Index, int32_t, PROPERTY_UPDATE_NORMAL);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(IndexSetByUser, int32_t, PROPERTY_UPDATE_MEASURE_SELF_AND_PARENT);
@@ -297,6 +306,7 @@ public:
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(SidebarBackgroundColorSetByUser, bool, PROPERTY_UPDATE_RENDER);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(SidebarDivider, TabsItemDivider, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(SidebarDividerColorSetByUser, bool, PROPERTY_UPDATE_RENDER);
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(KeepTabBarInSideBar, bool, PROPERTY_UPDATE_MEASURE);
 };
 
 } // namespace OHOS::Ace::NG

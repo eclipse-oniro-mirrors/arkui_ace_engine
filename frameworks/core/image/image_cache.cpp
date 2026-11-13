@@ -264,6 +264,11 @@ void ImageCache::DumpImgObjCacheInfo()
     int32_t pixmapCount = 0;
     int32_t animatedCount = 0;
     int32_t staticCount = 0;
+    int32_t base64Count = 0;
+    size_t pixmapDataSize = 0;
+    size_t animatedDataSize = 0;
+    size_t staticDataSize = 0;
+    size_t base64DataSize = 0;
     size_t nonSvgTotalDataSize = 0;
     for (const auto& item : cacheImgObjListNG_) {
         const auto& cacheObj = item.cacheObj;
@@ -274,23 +279,35 @@ void ImageCache::DumpImgObjCacheInfo()
             continue;
         }
         const auto& srcInfo = cacheObj->GetSourceInfo();
-        if (srcInfo.IsPixmap()) {
+        size_t dataSize = cacheObj->GetImageDataSize();
+        nonSvgTotalDataSize += dataSize;
+        if (srcInfo.GetSrcType() == SrcType::BASE64) {
+            base64Count++;
+            base64DataSize += dataSize;
+        } else if (srcInfo.IsPixmap()) {
             pixmapCount++;
+            pixmapDataSize += dataSize;
         } else if (cacheObj->GetFrameCount() > SINGLE_FRAME_COUNT) {
             animatedCount++;
+            animatedDataSize += dataSize;
         } else {
             staticCount++;
+            staticDataSize += dataSize;
         }
-        nonSvgTotalDataSize += cacheObj->GetImageDataSize();
     }
     DumpLog::GetInstance().Print("ImageObject cache total count: " + std::to_string(totalImgObjCount));
     DumpLog::GetInstance().Print("SvgDom cache count: " + std::to_string(svgDomCount));
     DumpLog::GetInstance().Print("SvgDom cache total node count: " + std::to_string(svgDomTotalNodeCount));
     DumpLog::GetInstance().Print("SvgDom cache estimated size: " +
         std::to_string(svgDomTotalNodeCount * SVG_NODE_ESTIMATE_SIZE) + "(B)");
-    DumpLog::GetInstance().Print("PixelMap cache count: " + std::to_string(pixmapCount));
-    DumpLog::GetInstance().Print("Animated image cache count: " + std::to_string(animatedCount));
-    DumpLog::GetInstance().Print("Static image cache count: " + std::to_string(staticCount));
+    DumpLog::GetInstance().Print("PixelMap cache count: " + std::to_string(pixmapCount) +
+        ", data size: " + std::to_string(pixmapDataSize) + "(B)");
+    DumpLog::GetInstance().Print("Animated image cache count: " + std::to_string(animatedCount) +
+        ", data size: " + std::to_string(animatedDataSize) + "(B)");
+    DumpLog::GetInstance().Print("Static image cache count: " + std::to_string(staticCount) +
+        ", data size: " + std::to_string(staticDataSize) + "(B)");
+    DumpLog::GetInstance().Print("Base64 image cache count: " + std::to_string(base64Count) +
+        ", data size: " + std::to_string(base64DataSize) + "(B)");
     DumpLog::GetInstance().Print("Non-SVG cache total data size: " + std::to_string(nonSvgTotalDataSize) + "(B)");
 }
 

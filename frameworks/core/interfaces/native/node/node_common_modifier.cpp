@@ -13,6 +13,10 @@
  * limitations under the License.
  */
 #include "core/interfaces/native/node/node_common_modifier.h"
+#include "core/components_ng/event/event_constants.h"
+
+#include "base/log/log_wrapper.h"
+#include "core/common/application_shortcut.h"
 #include "core/common/container.h"
 
 #include "interfaces/native/node/native_type_visual_impl.h"
@@ -2115,6 +2119,24 @@ void ResetBackShadow(ArkUINodeHandle node)
     ViewAbstract::SetBackShadow(frameNode, shadow);
 }
 
+void SetShadowClipMode(ArkUINodeHandle node, ArkUI_Int32 clipMode)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    if (clipMode < 0 || clipMode > static_cast<ArkUI_Int32>(ShadowClipMode::BOUNDS_SHAPE)) {
+        ViewAbstract::ResetShadowClipMode(frameNode);
+        return;
+    }
+    ViewAbstract::SetShadowClipMode(frameNode, static_cast<ShadowClipMode>(clipMode));
+}
+
+void ResetShadowClipMode(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    ViewAbstract::ResetShadowClipMode(frameNode);
+}
+
 void SetHitTestBehavior(ArkUINodeHandle node, uint32_t value)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -2128,6 +2150,17 @@ void ResetHitTestBehavior(ArkUINodeHandle node)
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
     ViewAbstract::SetHitTestMode(frameNode, NG::HitTestMode::HTMDEFAULT);
+}
+
+void SetAgentControlMode(ArkUINodeHandle node, ArkUI_Int32 value)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    if (value < static_cast<int32_t>(AgentControlMode::ALLOW) || value > static_cast<int32_t>(AgentControlMode::DENY)) {
+        frameNode->SetAgentControlMode(std::nullopt);
+        return;
+    }
+    ViewAbstract::SetAgentControlMode(frameNode, static_cast<AgentControlMode>(value));
 }
 
 void SetZIndex(ArkUINodeHandle node, ArkUI_Int32 value)
@@ -11207,6 +11240,7 @@ ArkUI_Int32 SetOnTouchTestDoneCallback(ArkUINodeHandle node, void* userData,
         ArkUIGestureRecognizerHandleArray recognizerArray = nullptr;
         auto count = static_cast<int32_t>(recognizers.size());
         if (count <= 0) {
+            LOG_CALLBACK("OH_ArkUI_SetTouchTestDoneCallback", touchTestDone);
             touchTestDone(&arkUIGestureEvent, recognizerArray, count, userData);
             return;
         }
@@ -11219,7 +11253,10 @@ ArkUI_Int32 SetOnTouchTestDoneCallback(ArkUINodeHandle node, void* userData,
             recognizerArray[index] = NodeModifier::CreateGestureRecognizer(value.Upgrade());
             index++;
         }
-        touchTestDone(&arkUIGestureEvent, recognizerArray, count, userData);
+        {
+            LOG_CALLBACK("OH_ArkUI_SetTouchTestDoneCallback", touchTestDone);
+            touchTestDone(&arkUIGestureEvent, recognizerArray, count, userData);
+        }
         delete[] recognizerArray;
     };
     ViewAbstract::SetOnTouchTestDone(frameNode, callback);
@@ -11523,6 +11560,17 @@ ArkUINodeEvent CreateNodeEventFromTouchEvent(int32_t nodeId, void* extraParam, T
 
 namespace {
 OHOS::Ace::TouchEventInfo globalEventInfo("global");
+}
+
+ArkUI_Int32 RegisterApplicationShortcut(const std::string& value, uint8_t keys,
+    std::function<void(ArkUI_Int32)>&& callback)
+{
+    return ApplicationShortcutManager::GetInstance().RegisterApplicationShortcut(value, keys, std::move(callback));
+}
+
+void UnregisterApplicationShortcut(ArkUI_Int32 registrationId)
+{
+    ApplicationShortcutManager::GetInstance().UnregisterApplicationShortcut(registrationId);
 }
 
 const ArkUICommonModifier* GetCommonModifier()
@@ -12099,7 +12147,12 @@ const ArkUICommonModifier* GetCommonModifier()
         .resetDoubleSided = ResetDoubleSided,
         .getNextFocus = GetNextFocus,
         .getFocusBoxStyle = GetFocusBoxStyle,
-        .getLinearGradientBlur = GetLinearGradientBlur
+        .getLinearGradientBlur = GetLinearGradientBlur,
+        .setShadowClipMode = SetShadowClipMode,
+        .resetShadowClipMode = ResetShadowClipMode,
+        .setAgentControlMode = SetAgentControlMode,
+        .registerApplicationShortcut = RegisterApplicationShortcut,
+        .unregisterApplicationShortcut = UnregisterApplicationShortcut,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
 

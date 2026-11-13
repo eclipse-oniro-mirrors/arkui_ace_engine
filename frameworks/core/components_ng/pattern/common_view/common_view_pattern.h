@@ -33,6 +33,15 @@ public:
     {
         return false;
     }
+    // Restricted scroll-placeholder copy protocol: the static placeholder
+    // execution builds its template under an engine ComponentRoot (tag
+    // __Common__). It is a stateless layout-only container, so a fresh
+    // pattern is a faithful copy; this keeps the template root exactly the
+    // node the builder produced instead of unwrapping it.
+    RefPtr<Pattern> CloneForPlaceholder() override
+    {
+        return MakeRefPtr<CommonViewPattern>();
+    }
     RefPtr<LayoutAlgorithm> CreateLayoutAlgorithm() override
     {
         return AceType::MakeRefPtr<CommonViewLayoutAlgorithm>();

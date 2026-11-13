@@ -59,7 +59,9 @@ public:
     void Unlock() override {}
 };
 
-class SmartLayoutAlgorithmTestWrapper final : public LayoutWrapper {
+class SmartLayoutAlgorithmTestWrapper final : public LayoutWrapper, public AceType {
+    DECLARE_ACE_TYPE(SmartLayoutAlgorithmTestWrapper, LayoutWrapper, AceType);
+
 public:
     SmartLayoutAlgorithmTestWrapper(const WeakPtr<FrameNode>& hostNode, const std::string& hostTag)
         : LayoutWrapper(hostNode), hostTag_(hostTag)
@@ -164,6 +166,11 @@ public:
     bool layoutCalled_ = false;
 
 private:
+    AceType* GetLayoutOwner() const override
+    {
+        return const_cast<SmartLayoutAlgorithmTestWrapper*>(this);
+    }
+
     std::string hostTag_;
     bool active_ = true;
     TestRecursiveLock lock_;

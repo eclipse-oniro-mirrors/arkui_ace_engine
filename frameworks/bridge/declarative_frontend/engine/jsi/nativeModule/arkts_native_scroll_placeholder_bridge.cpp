@@ -33,7 +33,8 @@ namespace {
 // Northbound-facing message text of the registration rejection (SDK documents
 // error 100031 for exactly this condition).
 constexpr char REGISTER_REJECTED_MESSAGE[] =
-    "Registration rejected: the builder is not marked with @Builder({ isPlaceholder: true }).";
+    "Registration rejected: the builder is not marked with @Builder({ isPlaceholder: true })."
+    " The ID is not registered.";
 constexpr char UNSUPPORTED_COMPONENT_MESSAGE_PREFIX[] =
     "Registration rejected: the placeholder template contains an unsupported component";
 
@@ -57,25 +58,25 @@ bool ParseRegisterArguments(EcmaVM* vm, ArkUIRuntimeCallInfo* runtimeCallInfo,
     std::string& templateId, panda::Local<panda::FunctionRef>& execClosure)
 {
     if (runtimeCallInfo->GetArgsNumber() < 3) { // 3: id + wrapped builder + execution closure
-        ArkTSUtils::ThrowError(vm, "Parameter error.", ERROR_CODE_PARAM_INVALID);
+        ArkTSUtils::ThrowBusinessError(vm, "Parameter error.", ERROR_CODE_PARAM_INVALID);
         return false;
     }
     Local<JSValueRef> idArg = runtimeCallInfo->GetCallArgRef(0);
     Local<JSValueRef> builderArg = runtimeCallInfo->GetCallArgRef(1);
     Local<JSValueRef> closureArg = runtimeCallInfo->GetCallArgRef(2);
     if (!idArg->IsString(vm)) {
-        ArkTSUtils::ThrowError(vm, "Parameter error.", ERROR_CODE_PARAM_INVALID);
+        ArkTSUtils::ThrowBusinessError(vm, "Parameter error.", ERROR_CODE_PARAM_INVALID);
         return false;
     }
     templateId = idArg->ToString(vm)->ToString(vm);
     if (templateId.empty() || !builderArg->IsObject(vm) || !closureArg->IsFunction(vm)) {
-        ArkTSUtils::ThrowError(vm, "Parameter error.", ERROR_CODE_PARAM_INVALID);
+        ArkTSUtils::ThrowBusinessError(vm, "Parameter error.", ERROR_CODE_PARAM_INVALID);
         return false;
     }
     auto wrappedBuilder = builderArg->ToObject(vm);
     Local<JSValueRef> builderProp = wrappedBuilder->Get(vm, panda::StringRef::NewFromUtf8(vm, "builder"));
     if (!builderProp->IsFunction(vm)) {
-        ArkTSUtils::ThrowError(vm, "Parameter error.", ERROR_CODE_PARAM_INVALID);
+        ArkTSUtils::ThrowBusinessError(vm, "Parameter error.", ERROR_CODE_PARAM_INVALID);
         return false;
     }
     execClosure = closureArg;
@@ -234,12 +235,12 @@ ArkUINativeModuleValue ScrollPlaceholderRegisterBridge::Unregister(ArkUIRuntimeC
     EcmaVM* vm = runtimeCallInfo->GetVM();
     CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
     if (runtimeCallInfo->GetArgsNumber() < 1) {
-        ArkTSUtils::ThrowError(vm, "Parameter error.", ERROR_CODE_PARAM_INVALID);
+        ArkTSUtils::ThrowBusinessError(vm, "Parameter error.", ERROR_CODE_PARAM_INVALID);
         return panda::JSValueRef::Undefined(vm);
     }
     Local<JSValueRef> idArg = runtimeCallInfo->GetCallArgRef(0);
     if (!idArg->IsString(vm)) {
-        ArkTSUtils::ThrowError(vm, "Parameter error.", ERROR_CODE_PARAM_INVALID);
+        ArkTSUtils::ThrowBusinessError(vm, "Parameter error.", ERROR_CODE_PARAM_INVALID);
         return panda::JSValueRef::Undefined(vm);
     }
     auto context = PipelineContext::GetCurrentContext();
@@ -257,12 +258,12 @@ ArkUINativeModuleValue ScrollPlaceholderRegisterBridge::IsRegistered(ArkUIRuntim
     EcmaVM* vm = runtimeCallInfo->GetVM();
     CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
     if (runtimeCallInfo->GetArgsNumber() < 1) {
-        ArkTSUtils::ThrowError(vm, "Parameter error.", ERROR_CODE_PARAM_INVALID);
+        ArkTSUtils::ThrowBusinessError(vm, "Parameter error.", ERROR_CODE_PARAM_INVALID);
         return panda::BooleanRef::New(vm, false);
     }
     Local<JSValueRef> idArg = runtimeCallInfo->GetCallArgRef(0);
     if (!idArg->IsString(vm)) {
-        ArkTSUtils::ThrowError(vm, "Parameter error.", ERROR_CODE_PARAM_INVALID);
+        ArkTSUtils::ThrowBusinessError(vm, "Parameter error.", ERROR_CODE_PARAM_INVALID);
         return panda::BooleanRef::New(vm, false);
     }
     // Read-only query: a template stays registered regardless of whether prebuilt

@@ -237,10 +237,8 @@ void ToggleButtonPattern::HandleBorderAndShadow()
         }
     }
 
-    auto&& graphics = renderContext->GetOrCreateGraphics();
-    CHECK_NULL_VOID(graphics);
     CHECK_NULL_VOID(paintProperty->GetIsOn());
-    if (!graphics->HasBackShadow()) {
+    if (!renderContext->HasBackShadow()) {
         ShadowStyle shadowStyle = ShadowStyle::None;
         if (paintProperty->GetIsOnValue(false)) {
             shadowStyle = static_cast<ShadowStyle>(toggleTheme_->GetShadowNormal());
@@ -360,9 +358,7 @@ void ToggleButtonPattern::HandleFocusShadowStyle(bool isOffState, RefPtr<RenderC
     Shadow shadowValue, bool isbgColorFocus)
 {
     CHECK_NULL_VOID(renderContext);
-    auto&& graphics = renderContext->GetOrCreateGraphics();
-    CHECK_NULL_VOID(graphics);
-    auto isNeedShadow = !graphics->HasBackShadow() || graphics->GetBackShadowValue() == shadowValue;
+    auto isNeedShadow = !renderContext->HasBackShadow() || renderContext->GetBackShadowValue(Shadow()) == shadowValue;
     if (isNeedShadow) {
         isOffState ? isCheckedShadow_ = isNeedShadow : isShadow_ = isNeedShadow;
         ShadowStyle focusShadowStyle = static_cast<ShadowStyle>(toggleTheme_->GetShadowFocus());
@@ -910,6 +906,11 @@ bool ToggleButtonPattern::ParseCommand(const std::string& command, bool& isOn)
     }
     isOn = isOnJson->GetBool();
     return true;
+}
+
+CommandResult ToggleButtonPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "onToggleChange" }, CommandErrorType::EXECUTE_FAIL);
 }
 
 int32_t ToggleButtonPattern::OnInjectionEvent(const std::string& command)

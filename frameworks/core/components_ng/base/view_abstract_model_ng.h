@@ -969,6 +969,9 @@ public:
         ViewAbstract::SetClipShape(frameNode, basicShape);
     }
 
+    void SetShadowShape(const RefPtr<BasicShape>& basicShape) override;
+    void SetShadowClipMode(ShadowClipMode clipMode) override;
+
     void SetClipEdge(bool isClip) override
     {
         ViewAbstract::SetClipEdge(isClip);
@@ -1552,6 +1555,8 @@ public:
     {
         ViewAbstract::SetHitTestMode(hitTestMode);
     }
+
+    void SetAgentControlMode(const std::optional<NG::AgentControlMode>& mode) override;
 
     void SetOnTouchTestFunc(NG::OnChildTouchTestFunc&& onChildTouchTest) override
     {

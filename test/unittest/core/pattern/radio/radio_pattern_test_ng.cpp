@@ -82,6 +82,14 @@ void RadioPatternTestNg::SetUpTestSuite()
         radioTheme->defaultHeight_ = DEFAULT_HEIGHT_DIMENSION;
         return radioTheme;
     });
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly([](ThemeType, int32_t) -> RefPtr<Theme> {
+        auto radioTheme = AceType::MakeRefPtr<RadioTheme>();
+        radioTheme->hotZoneHorizontalPadding_ = HORIZONTAL_PADDING;
+        radioTheme->hotZoneVerticalPadding_ = VERTICAL_PADDING;
+        radioTheme->defaultWidth_ = DEFAULT_WIDTH_DIMENSION;
+        radioTheme->defaultHeight_ = DEFAULT_HEIGHT_DIMENSION;
+        return radioTheme;
+    });
     MockPipelineContext::GetCurrent()->SetThemeManager(themeManager);
     MockContainer::SetUp();
 }

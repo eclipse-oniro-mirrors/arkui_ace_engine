@@ -28,6 +28,7 @@
 
 #include "system_ability.h"
 #include "ui_service_mgr_new_stub.h"
+#include "ui_service_statistic_event.h"
 
 namespace OHOS {
 namespace Ace {
@@ -57,6 +58,8 @@ public:
     int32_t Dump(int32_t fd, const std::vector<std::u16string>& args) override;
     int32_t ReportStatisticEvents(const AppInfoParcel& appInfo,
         const std::vector<StatisticEventInfoParcel>& events) override;
+    int32_t ReportMaterialStatisticEvents(
+        const AppInfoParcel& appInfo, const std::vector<MaterialStatisticEventInfoParcel>& events) override;
 
     int32_t OnRemoteRequest(uint32_t code, MessageParcel& data, MessageParcel& reply, MessageOption& option) override;
 

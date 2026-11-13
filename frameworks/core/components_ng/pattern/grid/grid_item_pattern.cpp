@@ -396,22 +396,28 @@ void GridItemPattern::DumpAdvanceItemRangeInfo(std::unique_ptr<JsonValue>& json,
 {
     auto property = GetLayoutProperty<GridItemLayoutProperty>();
     CHECK_NULL_VOID(property);
-    if (!config.IsPublicTree() || property->GetRowStart().has_value()) {
+    if (!config.IsPublicTree()) {
         json->Put("RowStart",
             property->GetRowStart().has_value() ? std::to_string(property->GetRowStart().value()).c_str() : "null");
-    }
-    if (!config.IsPublicTree() || property->GetRowEnd().has_value()) {
         json->Put("RowEnd",
             property->GetRowEnd().has_value() ? std::to_string(property->GetRowEnd().value()).c_str() : "null");
-    }
-    if (!config.IsPublicTree() || property->GetColumnStart().has_value()) {
         json->Put("ColumnStart", property->GetColumnStart().has_value()
-                                     ? std::to_string(property->GetColumnStart().value()).c_str()
-                                     : "null");
-    }
-    if (!config.IsPublicTree() || property->GetColumnEnd().has_value()) {
+                                     ? std::to_string(property->GetColumnStart().value()).c_str() : "null");
         json->Put("ColumnEnd",
             property->GetColumnEnd().has_value() ? std::to_string(property->GetColumnEnd().value()).c_str() : "null");
+        return;
+    }
+    if (property->GetRowStart().has_value()) {
+        json->Put("RowStart", property->GetRowStart().value());
+    }
+    if (property->GetRowEnd().has_value()) {
+        json->Put("RowEnd", property->GetRowEnd().value());
+    }
+    if (property->GetColumnStart().has_value()) {
+        json->Put("ColumnStart", property->GetColumnStart().value());
+    }
+    if (property->GetColumnEnd().has_value()) {
+        json->Put("ColumnEnd", property->GetColumnEnd().value());
     }
 }
 

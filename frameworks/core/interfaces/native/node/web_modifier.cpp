@@ -27,6 +27,7 @@ namespace {
 constexpr bool DEFAULT_JS_ACCESS_ENABLED = true;
 constexpr bool DEFAULT_FILE_ACCESS_ENABLED = false;
 constexpr bool DEFAULT_DOM_STORAGE_ACCESS_ENABLED = false;
+constexpr bool DEFAULT_VISITED_LINK_PERSIST_ENABLED = false;
 constexpr MixedModeContent DEFAULT_MIXED_MODE = MixedModeContent::MIXED_CONTENT_NEVER_ALLOW;
 constexpr int32_t DEFAULT_ZOOM_ACCESS_ENABLED = true;
 constexpr bool DEFAULT_ZOOM_CONTROL_ACCESS = false;
@@ -2764,6 +2765,20 @@ void ResetFlingSpeedLimit(ArkUINodeHandle node)
     WebModelNG::SetFlingSpeedLimit(frameNode, DEFAULT_FLING_SPEED_LIMIT);
 }
 
+void SetVisitedLinkPersistEnabled(ArkUINodeHandle node, ArkUI_Bool value)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetVisitedLinkPersistEnabled(frameNode, value);
+}
+
+void ResetVisitedLinkPersistEnabled(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetVisitedLinkPersistEnabled(frameNode, DEFAULT_VISITED_LINK_PERSIST_ENABLED);
+}
+
 void SetBackToTop(ArkUINodeHandle node, ArkUI_Bool value)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -2957,8 +2972,6 @@ const ArkUIWebModifier* GetWebModifier()
         .resetAllowWindowOpenMethod = ResetAllowWindowOpenMethod,
         .setKeyboardAvoidMode = SetKeyboardAvoidMode,
         .resetKeyboardAvoidMode = ResetKeyboardAvoidMode,
-        .setKeyboardAppearance = SetKeyboardAppearance,
-        .resetKeyboardAppearance = ResetKeyboardAppearance,
         .setOnControllerAttached = SetOnControllerAttached,
         .resetOnControllerAttached = ResetOnControllerAttached,
         .setVerticalScrollBarAccessEnabled = SetVerticalScrollBarAccessEnabled,
@@ -3117,8 +3130,6 @@ const ArkUIWebModifier* GetWebModifier()
         .resetEnableBlankScreenMonitor = ResetEnableBlankScreenMonitor,
         .setOnFirstScreenPaint = SetOnFirstScreenPaint,
         .resetOnFirstScreenPaint = ResetOnFirstScreenPaint,
-        .setEnableImageAnalyzer = SetEnableImageAnalyzer,
-        .resetEnableImageAnalyzer = ResetEnableImageAnalyzer,
         .setOnContextMenuShow = SetOnContextMenuShow,
         .resetOnContextMenuShow = ResetOnContextMenuShow,
         .setOnSafeBrowsingCheckResultCallBack = SetOnSafeBrowsingCheckResultCallBack,
@@ -3165,6 +3176,8 @@ const ArkUIWebModifier* GetWebModifier()
         .resetOnBeforeUnload = ResetOnBeforeUnload,
         .setJavaScriptProxy = SetJavaScriptProxy,
         .resetJavaScriptProxy = ResetJavaScriptProxy,
+        .setEnableImageAnalyzer = SetEnableImageAnalyzer,
+        .resetEnableImageAnalyzer = ResetEnableImageAnalyzer,
         .setForceEnableZoom = SetForceEnableZoom,
         .resetForceEnableZoom = ResetForceEnableZoom,
         .setFlingSpeedLimit = SetFlingSpeedLimit,
@@ -3187,18 +3200,22 @@ const ArkUIWebModifier* GetWebModifier()
         .resetEnableNativeMediaPlayer = ResetEnableNativeMediaPlayer,
         .setEnableWebAVSession = SetEnableWebAVSession,
         .resetEnableWebAVSession = ResetEnableWebAVSession,
-        .setEnableMediaNetworkProxy = SetEnableMediaNetworkProxy,
-        .resetEnableMediaNetworkProxy = ResetEnableMediaNetworkProxy,
         .setEnableDrag = SetEnableDrag,
         .resetEnableDrag = ResetEnableDrag,
+        .setEnableMediaNetworkProxy = SetEnableMediaNetworkProxy,
+        .resetEnableMediaNetworkProxy = ResetEnableMediaNetworkProxy,
         .setScrollbarLayoutPolicy = SetScrollbarLayoutPolicy,
         .resetScrollbarLayoutPolicy = ResetScrollbarLayoutPolicy,
         .setOnInputMethodAttached = SetOnInputMethodAttached,
         .resetOnInputMethodAttached = ResetOnInputMethodAttached,
+        .setKeyboardAppearance = SetKeyboardAppearance,
+        .resetKeyboardAppearance = ResetKeyboardAppearance,
         .setEnableFullscreenVideoOverlay = SetEnableFullscreenVideoOverlay,
         .resetEnableFullscreenVideoOverlay = ResetEnableFullscreenVideoOverlay,
         .setOnZoomChangeCallBack = SetOnZoomChangeCallBack,
         .resetOnZoomChangeCallBack = ResetOnZoomChangeCallBack,
+        .setVisitedLinkPersistEnabled = SetVisitedLinkPersistEnabled,
+        .resetVisitedLinkPersistEnabled = ResetVisitedLinkPersistEnabled,
         .setCaretColor = SetWebCaretColor,
         .resetCaretColor = ResetWebCaretColor,
     };
@@ -3236,8 +3253,6 @@ const CJUIWebModifier* GetCJUIWebModifier()
         .resetAllowWindowOpenMethod = ResetAllowWindowOpenMethod,
         .setKeyboardAvoidMode = SetKeyboardAvoidMode,
         .resetKeyboardAvoidMode = ResetKeyboardAvoidMode,
-        .setKeyboardAppearance = SetKeyboardAppearance,
-        .resetKeyboardAppearance = ResetKeyboardAppearance,
         .setOnControllerAttached = SetOnControllerAttached,
         .resetOnControllerAttached = ResetOnControllerAttached,
         .setVerticalScrollBarAccessEnabled = SetVerticalScrollBarAccessEnabled,
@@ -3384,20 +3399,18 @@ const CJUIWebModifier* GetCJUIWebModifier()
         .resetOnPromptCallBack = ResetOnPromptCallBack,
         .setOnShowFileSelector = SetOnShowFileSelector,
         .resetOnShowFileSelector = ResetOnShowFileSelector,
-        .setOnTextSelectionChange = SetOnTextSelectionChange,
-        .resetOnTextSelectionChange = ResetOnTextSelectionChange,
         .setOnDetectedBlankScreen = SetOnDetectedBlankScreen,
         .resetOnDetectedBlankScreen = ResetOnDetectedBlankScreen,
         .setOnMonitoredBlankScreen = SetOnMonitoredBlankScreen,
         .resetOnMonitoredBlankScreen = ResetOnMonitoredBlankScreen,
+        .setOnTextSelectionChange = SetOnTextSelectionChange,
+        .resetOnTextSelectionChange = ResetOnTextSelectionChange,
         .setBlankScreenDetectionConfig = SetBlankScreenDetectionConfig,
         .resetBlankScreenDetectionConfig = ResetBlankScreenDetectionConfig,
         .setEnableBlankScreenMonitor = SetEnableBlankScreenMonitor,
         .resetEnableBlankScreenMonitor = ResetEnableBlankScreenMonitor,
         .setOnFirstScreenPaint = SetOnFirstScreenPaint,
         .resetOnFirstScreenPaint = ResetOnFirstScreenPaint,
-        .setEnableImageAnalyzer = SetEnableImageAnalyzer,
-        .resetEnableImageAnalyzer = ResetEnableImageAnalyzer,
         .setOnContextMenuShow = SetOnContextMenuShow,
         .resetOnContextMenuShow = ResetOnContextMenuShow,
         .setOnSafeBrowsingCheckResultCallBack = SetOnSafeBrowsingCheckResultCallBack,
@@ -3444,6 +3457,8 @@ const CJUIWebModifier* GetCJUIWebModifier()
         .resetOnBeforeUnload = ResetOnBeforeUnload,
         .setJavaScriptProxy = SetJavaScriptProxy,
         .resetJavaScriptProxy = ResetJavaScriptProxy,
+        .setEnableImageAnalyzer = SetEnableImageAnalyzer,
+        .resetEnableImageAnalyzer = ResetEnableImageAnalyzer,
         .setForceEnableZoom = SetForceEnableZoom,
         .resetForceEnableZoom = ResetForceEnableZoom,
         .setFlingSpeedLimit = SetFlingSpeedLimit,
@@ -3474,10 +3489,14 @@ const CJUIWebModifier* GetCJUIWebModifier()
         .resetScrollbarLayoutPolicy = ResetScrollbarLayoutPolicy,
         .setOnInputMethodAttached = SetOnInputMethodAttached,
         .resetOnInputMethodAttached = ResetOnInputMethodAttached,
+        .setKeyboardAppearance = SetKeyboardAppearance,
+        .resetKeyboardAppearance = ResetKeyboardAppearance,
         .setEnableFullscreenVideoOverlay = SetEnableFullscreenVideoOverlay,
         .resetEnableFullscreenVideoOverlay = ResetEnableFullscreenVideoOverlay,
         .setOnZoomChangeCallBack = SetOnZoomChangeCallBack,
         .resetOnZoomChangeCallBack = ResetOnZoomChangeCallBack,
+        .setVisitedLinkPersistEnabled = SetVisitedLinkPersistEnabled,
+        .resetVisitedLinkPersistEnabled = ResetVisitedLinkPersistEnabled,
         .setCaretColor = SetWebCaretColor,
         .resetCaretColor = ResetWebCaretColor,
     };

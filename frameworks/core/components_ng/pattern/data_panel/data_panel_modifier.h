@@ -109,6 +109,11 @@ public:
         }
     };
 
+    size_t GetDataPanelType() const
+    {
+        return dataPanelType_;
+    };
+
     void SetEffect(bool effect)
     {
         isEffect_->Set(effect);

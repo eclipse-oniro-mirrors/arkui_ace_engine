@@ -2640,6 +2640,17 @@ void TimePickerRowPattern::BeforeCreateLayoutWrapper()
     }
 }
 
+CommandResult TimePickerRowPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "setTimePickerTime", "setTimePickerDialogTime" },
+        CommandErrorType::INVALID_PARAM, [this](const std::unique_ptr<JsonValue>& json) {
+        if ((json->GetString("cmd") == "setTimePickerDialogTime") != GetIsShowInDialog()) {
+            return CommandResult::Error(CommandErrorType::INVALID_COMMAND);
+        }
+        return CommandResult::Success();
+    });
+}
+
 int32_t TimePickerRowPattern::OnInjectionEvent(const std::string& command)
 {
     auto host = GetHost();
@@ -2784,4 +2795,13 @@ bool TimePickerRowPattern::ReportCommandResult(int32_t nodeId, const std::string
 #endif
     return true;
 }
+void TimePickerRowPattern::DumpInspectorTreeInfo(
+    std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context)
+{
+    Pattern::DumpInspectorTreeInfo(attrs, context);
+    if (!GetIsShowInDialog()) {
+        attrs->Put("expanded", true);
+    }
+}
+
 } // namespace OHOS::Ace::NG

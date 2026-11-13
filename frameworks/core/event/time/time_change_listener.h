@@ -23,7 +23,7 @@ namespace OHOS::Ace {
 /**
  * @brief an interface for time change listeners. Listeners need to register to TimeEventProxy to receive time change
  */
-class TimeChangeListener : public AceType {
+class TimeChangeListener : public virtual AceType {
 public:
     TimeChangeListener() = default;
     ~TimeChangeListener() override = default;

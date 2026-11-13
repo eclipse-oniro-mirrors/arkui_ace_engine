@@ -723,6 +723,11 @@ void MenuManager::OnShowMenuAnimationFinished(const WeakPtr<FrameNode> menuWK, c
     CHECK_NULL_VOID(menuWrapperPattern);
     menuWrapperPattern->SetMenuStatus(MenuStatus::SHOW);
     overlayManager->ContentChangeReport(menu, true);
+
+    CHECK_NULL_VOID(menuNode);
+    if (auto ctx = menuNode->GetContext()) {
+        ctx->ReportOverlayNodeMaterialArea(menuNode, "MenuManager OnShowMenuAnimationFinished");
+    }
 }
 
 void MenuManager::SetPreviewFirstShow(const RefPtr<FrameNode>& menu, const RefPtr<OverlayManager>& overlayManager)
@@ -736,7 +741,7 @@ void MenuManager::SetPreviewFirstShow(const RefPtr<FrameNode>& menu, const RefPt
     CHECK_NULL_VOID(previewPattern);
     previewPattern->SetFirstShow();
     CHECK_NULL_VOID(overlayManager);
-    overlayManager->ContentChangeReport(menu, true);
+    overlayManager->ContentChangeReport(menu, true, false);
 }
 
 void MenuManager::ShowMenuAnimation(const RefPtr<FrameNode>& menu,

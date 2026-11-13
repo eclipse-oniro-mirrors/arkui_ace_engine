@@ -41,6 +41,8 @@ struct AccessibilityHoverState {
     bool idle = true;
     AccessibilityHoverEventType eventType = AccessibilityHoverEventType::MOVE;
     std::vector<WeakPtr<FrameNode>> nodeTransparent;
+    // A registered provider session must receive EXIT before this host path is reset.
+    bool sessionNeedsExit = false;
 };
 
 struct HandleHoverEventParam {
@@ -110,6 +112,9 @@ private:
         const RefPtr<FrameNode>& root,
         const HandleHoverEventParam& param,
         const TouchEvent& event);
+
+    void ResetHoverStateWithSessionExit(const RefPtr<FrameNode>& root,
+        const HandleHoverEventParam& param, AccessibilityHoverState& hoverState);
 
     bool IgnoreCurrentHoveringNode(const RefPtr<FrameNode> &node);
     static bool NotifyHoverEventToNodeSession(

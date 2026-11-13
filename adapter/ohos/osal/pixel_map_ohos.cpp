@@ -394,9 +394,9 @@ void* PixelMapOhos::GetWritablePixels() const
 bool PixelMapOhos::GetPixelsVec(std::vector<uint8_t>& data) const
 {
     CHECK_NULL_RETURN(pixmap_, false);
-    data.resize(pixmap_->GetByteCount());
+    data.resize(pixmap_->GetAllocationByteCount());
     uint8_t* dst = data.data();
-    uint32_t errCode = pixmap_->ReadPixels(pixmap_->GetByteCount(), dst);
+    uint32_t errCode = pixmap_->ReadPixels(pixmap_->GetAllocationByteCount(), dst);
     if (errCode) {
         TAG_LOGW(AceLogTag::ACE_IMAGE, "GetPixelsVec error, errCode=%{public}d", errCode);
         return false;
@@ -486,5 +486,12 @@ void PixelMapOhos::SetMemoryName(std::string pixelMapName) const
     CHECK_NULL_VOID(pixmap_);
     LOGD("PixelMapOhos::SetMemoryName, %{private}s", pixelMapName.c_str());
     pixmap_->SetMemoryName(pixelMapName);
+}
+
+bool PixelMapOhos::ReadPixel(int32_t x, int32_t y, uint32_t& pixel) const
+{
+    CHECK_NULL_RETURN(pixmap_, false);
+    uint32_t errCode = pixmap_->ReadPixel({x, y}, pixel);
+    return errCode == 0;
 }
 } // namespace OHOS::Ace

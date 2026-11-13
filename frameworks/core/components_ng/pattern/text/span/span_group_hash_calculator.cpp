@@ -234,6 +234,8 @@ uint64_t HashTextBackgroundStyle(uint64_t seed, const std::optional<TextBackgrou
         seed = HashOptionalColor(seed, value->backgroundColor);
         // Keep hash semantics aligned with TextBackgroundStyle::operator==.
         seed = HashOptionalBorderRadius(seed, value->backgroundRadius);
+        seed = HashOptionalDimension(seed, value->borderWidth);
+        seed = HashOptionalColor(seed, value->borderColor);
     }
     return seed;
 }

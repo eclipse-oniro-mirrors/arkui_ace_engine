@@ -17,6 +17,7 @@
 #include <securec.h>
 
 #include "animate_impl.h"
+#include "node/config_manager.h"
 #include "node/node_model.h"
 #include "ui/animation/animation_constants.h"
 
@@ -713,31 +714,37 @@ int32_t OH_ArkUI_AnimatorOption_RegisterOnRepeatCallback(
 
 int32_t OH_ArkUI_Animator_ResetAnimatorOption(ArkUI_AnimatorHandle animator, ArkUI_AnimatorOption* option)
 {
+    CHECK_UI_THREAD("OH_ArkUI_Animator_ResetAnimatorOption");
     return OHOS::Ace::AnimateModel::AnimatorReset(animator, option);
 }
 
 int32_t OH_ArkUI_Animator_Play(ArkUI_AnimatorHandle animator)
 {
+    CHECK_UI_THREAD("OH_ArkUI_Animator_Play");
     return OHOS::Ace::AnimateModel::AnimatorPlay(animator);
 }
 
 int32_t OH_ArkUI_Animator_Finish(ArkUI_AnimatorHandle animator)
 {
+    CHECK_UI_THREAD("OH_ArkUI_Animator_Finish");
     return OHOS::Ace::AnimateModel::AnimatorFinish(animator);
 }
 
 int32_t OH_ArkUI_Animator_Pause(ArkUI_AnimatorHandle animator)
 {
+    CHECK_UI_THREAD("OH_ArkUI_Animator_Pause");
     return OHOS::Ace::AnimateModel::AnimatorPause(animator);
 }
 
 int32_t OH_ArkUI_Animator_Cancel(ArkUI_AnimatorHandle animator)
 {
+    CHECK_UI_THREAD("OH_ArkUI_Animator_Cancel");
     return OHOS::Ace::AnimateModel::AnimatorCancel(animator);
 }
 
 int32_t OH_ArkUI_Animator_Reverse(ArkUI_AnimatorHandle animator)
 {
+    CHECK_UI_THREAD("OH_ArkUI_Animator_Reverse");
     return OHOS::Ace::AnimateModel::AnimatorReverse(animator);
 }
 
@@ -1997,6 +2004,7 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_AnimationGroup_AddPathAnimation(
 ArkUI_ErrorCode OH_ArkUI_NativeModule_AddAnimationGroup(
     ArkUI_ContextHandle context, OH_ArkUI_AnimationGroupHandle group, const char* key)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NativeModule_AddAnimationGroup");
     CHECK_NULL_RETURN_WITH_MESSAGE(context, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "context is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(group, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "group is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(key, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "key is null");
@@ -2031,6 +2039,7 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_AddAnimationGroup(
 
 ArkUI_ErrorCode OH_ArkUI_NativeModule_RemoveAnimationGroup(ArkUI_ContextHandle context, const char* key)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NativeModule_RemoveAnimationGroup");
     CHECK_NULL_RETURN_WITH_MESSAGE(context, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "context is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(key, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "key is null");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
@@ -2042,6 +2051,7 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_RemoveAnimationGroup(ArkUI_ContextHandle c
 ArkUI_ErrorCode OH_ArkUI_NativeModule_GetAnimationGroupState(
     ArkUI_ContextHandle context, const char* key, OH_ArkUI_AnimationGroupState* state)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NativeModule_GetAnimationGroupState");
     CHECK_NULL_RETURN_WITH_MESSAGE(context, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "context is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(key, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "key is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(state, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "state is null");
@@ -2053,6 +2063,7 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_GetAnimationGroupState(
 
 ArkUI_ErrorCode OH_ArkUI_NativeModule_HasAnimationGroup(ArkUI_ContextHandle context, const char* key, bool* exists)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NativeModule_HasAnimationGroup");
     CHECK_NULL_RETURN_WITH_MESSAGE(context, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "context is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(key, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "key is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(exists, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "exists is null");
@@ -2064,6 +2075,7 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_HasAnimationGroup(ArkUI_ContextHandle cont
 
 ArkUI_ErrorCode OH_ArkUI_NativeModule_PauseAnimationGroup(ArkUI_ContextHandle context, const char* key)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NativeModule_PauseAnimationGroup");
     CHECK_NULL_RETURN_WITH_MESSAGE(context, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "context is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(key, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "key is null");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
@@ -2074,6 +2086,7 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_PauseAnimationGroup(ArkUI_ContextHandle co
 
 ArkUI_ErrorCode OH_ArkUI_NativeModule_ResumeAnimationGroup(ArkUI_ContextHandle context, const char* key)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NativeModule_ResumeAnimationGroup");
     CHECK_NULL_RETURN_WITH_MESSAGE(context, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "context is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(key, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "key is null");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
@@ -2085,6 +2098,7 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_ResumeAnimationGroup(ArkUI_ContextHandle c
 ArkUI_ErrorCode OH_ArkUI_NativeModule_FinishAnimationGroup(
     ArkUI_ContextHandle context, const char* key, OH_ArkUI_AnimationFinishMode mode)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NativeModule_FinishAnimationGroup");
     CHECK_NULL_RETURN_WITH_MESSAGE(context, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "context is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(key, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "key is null");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();

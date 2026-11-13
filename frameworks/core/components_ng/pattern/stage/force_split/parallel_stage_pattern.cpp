@@ -188,9 +188,11 @@ bool ParallelStagePattern::CalculateMode()
         auto container = Container::GetContainer(pipelineContext->GetInstanceId());
         CHECK_NULL_RETURN(container, false);
         bool isMainWindow = container->IsMainWindow();
-        splitMode = isMainWindow ? PageMode::SPLIT : PageMode::STACK;
-        TAG_LOGI(AceLogTag::ACE_ROUTER, "calc splitMode, isMainWindow: %{public}d, resultMode: %{public}d",
-            isMainWindow, static_cast<int32_t>(splitMode));
+        // page-level split switch on means the current top page does not enter split mode
+        splitMode = isMainWindow && !forceSplitMgr->IsTopPageSplitDisabled() ? PageMode::SPLIT : PageMode::STACK;
+        TAG_LOGI(AceLogTag::ACE_ROUTER,
+            "calc splitMode, isMainWindow: %{public}d, isPageSplitDisabled: %{public}d, resultMode: %{public}d",
+            isMainWindow, forceSplitMgr->IsTopPageSplitDisabled(), static_cast<int32_t>(splitMode));
     }
     if (mode_ == splitMode) {
         return false;

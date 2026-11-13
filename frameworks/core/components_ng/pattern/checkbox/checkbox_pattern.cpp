@@ -1284,6 +1284,11 @@ int32_t CheckBoxPattern::ParseCommand(const std::string& command, bool& selectSt
     return RET_SUCCESS;
 }
 
+CommandResult CheckBoxPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "selectCheckBox" }, CommandErrorType::EXECUTE_FAIL);
+}
+
 int32_t CheckBoxPattern::OnInjectionEvent(const std::string& command)
 {
     auto host = GetHost();

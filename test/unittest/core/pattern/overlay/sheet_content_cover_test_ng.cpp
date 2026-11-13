@@ -94,7 +94,9 @@ void SheetContentCoverObjectTestNG::SetUpTestCase()
  */
 void SheetContentCoverObjectTestNG::TearDownTestCase()
 {
-    MockPipelineContext::GetCurrent()->themeManager_ = nullptr;
+    if (auto* mockPipeCtx = MockPipelineContext::GetCurrent().GetRawPtr()) {
+        mockPipeCtx->themeManager_ = nullptr;
+    }
     MockPipelineContext::TearDown();
     MockContainer::TearDown();
 }
@@ -1545,5 +1547,48 @@ HWTEST_F(SheetContentCoverObjectTestNG, ContentCoverSheetLayoutAlgorithm1, TestS
     algorithm->Measure(AceType::RawPtr(sheetNode));
     EXPECT_FLOAT_EQ(algorithm->sheetWidth_, 1000);
     EXPECT_FLOAT_EQ(algorithm->sheetHeight_, 1000);
+}
+
+/**
+ * @tc.name: ContentCoverMeasureChildren001
+ * @tc.desc: Test MeasureOperation/MeasureDragBar/MeasureCloseIcon and Layout guards.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SheetContentCoverObjectTestNG, ContentCoverMeasureChildren001, TestSize.Level1)
+{
+    auto callback = [](const std::string&) {};
+    auto sheetNode = FrameNode::CreateFrameNode(V2::SHEET_PAGE_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<SheetPresentationPattern>(0, "", std::move(callback)));
+    ASSERT_NE(sheetNode, nullptr);
+    auto sheetPattern = sheetNode->GetPattern<SheetPresentationPattern>();
+    ASSERT_NE(sheetPattern, nullptr);
+    auto algorithm = AceType::MakeRefPtr<SheetContentCoverLayoutAlgorithm>();
+    ASSERT_NE(algorithm, nullptr);
+
+    // child nodes not set yet: CHECK_NULL_VOID branches inside three measure helpers
+    LayoutConstraintF constraint;
+    algorithm->MeasureOperation(sheetPattern, constraint);
+    algorithm->MeasureDragBar(sheetPattern, constraint);
+    algorithm->MeasureCloseIcon(sheetPattern, constraint);
+
+    // set nodes then measure normally
+    auto contentNode = FrameNode::CreateFrameNode(V2::STACK_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(contentNode, nullptr);
+    sheetNode->AddChild(contentNode);
+    auto weakContent = AceType::WeakClaim(AceType::RawPtr(contentNode));
+    sheetPattern->SetTitleBuilderNode(weakContent);
+    sheetPattern->SetDragBarNode(weakContent);
+    sheetPattern->SetCloseButtonNode(weakContent);
+    algorithm->MeasureOperation(sheetPattern, constraint);
+    algorithm->MeasureDragBar(sheetPattern, constraint);
+    algorithm->MeasureCloseIcon(sheetPattern, constraint);
+    EXPECT_TRUE(true);
+
+    // scroll node null: Layout/LayoutScrollNode early return
+    OffsetF offset(0.0f, 0.0f);
+    algorithm->LayoutScrollNode(offset, AceType::RawPtr(sheetNode));
+    algorithm->Layout(AceType::RawPtr(sheetNode));
 }
 } // namespace OHOS::Ace::NG

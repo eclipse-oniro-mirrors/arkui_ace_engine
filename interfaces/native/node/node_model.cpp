@@ -14,8 +14,10 @@
  */
 
 #include "node_model.h"
+#include "core/interfaces/native/node/content_change_api.h"
 #include "core/interfaces/native/node/page_text_api.h"
 #include "core/interfaces/native/node/ui_tree_api.h"
+#include "core/interfaces/native/node/interaction_observer_api.h"
 #include "node/config_manager.h"
 
 #include <cstring>
@@ -216,6 +218,28 @@ const ArkUITreeAPI* GetTreeAPI()
     return entry ? entry(1) : nullptr;
 }
 
+const ArkUIInteractionObserverAPI* GetInteractionObserverAPI()
+{
+    using Entry = const ArkUIInteractionObserverAPI* (*)(int32_t);
+    auto* module = FindModule();
+    if (!module) {
+        return nullptr;
+    }
+    auto entry = reinterpret_cast<Entry>(FindFunction(module, "GetArkUIInteractionObserverAPI"));
+    return entry ? entry(1) : nullptr;
+}
+
+const ArkUIContentChangeAPI* GetContentChangeAPI()
+{
+    using Entry = const ArkUIContentChangeAPI* (*)(int32_t);
+    auto* module = FindModule();
+    if (!module) {
+        return nullptr;
+    }
+    auto entry = reinterpret_cast<Entry>(FindFunction(module, "GetArkUIContentChangeAPI"));
+    return entry ? entry(ARKUI_CONTENT_CHANGE_API_VERSION) : nullptr;
+}
+
 ArkUIFullNodeAPI* GetFullImpl()
 {
     return impl;
@@ -227,6 +251,21 @@ ArkUIFullNodeAPI* GetOrCreateFullImpl()
         return nullptr;
     }
     return impl;
+}
+
+ArkUIFullNodeAPI* GetFullImplForAnyThread()
+{
+    static auto* api = []() -> ArkUIFullNodeAPI* {
+        auto* module = FindModule();
+        if (!module) {
+            return nullptr;
+        }
+        using GetAPI = ArkUIAnyAPI* (*)(int);
+        auto entry = reinterpret_cast<GetAPI>(FindFunction(module, "GetArkUIAnyFullNodeAPI"));
+        auto* resolved = entry ? reinterpret_cast<ArkUIFullNodeAPI*>(entry(ARKUI_NODE_API_VERSION)) : nullptr;
+        return resolved && resolved->version == ARKUI_NODE_API_VERSION ? resolved : nullptr;
+    }();
+    return api;
 }
 
 ArkUIFullNodeAPI* GetFullImplForErrorMessage()
@@ -593,7 +632,6 @@ int32_t RegisterNodeEvent(ArkUI_NodeHandle nodePtr, ArkUI_NodeEventType eventTyp
 
 int32_t RegisterNodeEvent(ArkUI_NodeHandle nodePtr, ArkUI_NodeEventType eventType, int32_t targetId, void* userData)
 {
-    CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.registerNodeEvent");
     if (nodePtr == nullptr) {
         return ERROR_CODE_PARAM_INVALID;
     }
@@ -682,7 +720,6 @@ int32_t RegisterNodeEvent(ArkUI_NodeHandle nodePtr, ArkUI_NodeEventType eventTyp
 
 void UnregisterNodeEvent(ArkUI_NodeHandle nodePtr, ArkUI_NodeEventType eventType)
 {
-    CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.unregisterNodeEvent");
     if (nodePtr == nullptr) {
         return;
     }
@@ -729,13 +766,11 @@ void RegisterOnEvent(void (*eventReceiver)(ArkUI_CompatibleNodeEvent* event))
 void (*g_eventReceiver)(ArkUI_NodeEvent* event) = nullptr;
 void RegisterOnEvent(void (*eventReceiver)(ArkUI_NodeEvent* event))
 {
-    CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.registerNodeEventReceiver");
     g_eventReceiver = eventReceiver;
 }
 
 void UnregisterOnEvent()
 {
-    CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.unregisterNodeEventReceiver");
     g_eventReceiver = nullptr;
 }
 
@@ -958,6 +993,7 @@ void HandleNodeEvent(ArkUI_NodeEvent* event)
         TriggerNodeEvent(event, eventListenersSet);
     }
     if (g_eventReceiver) {
+        LOG_CALLBACK("ArkUI_NativeNodeAPI_1.registerNodeEventReceiver", g_eventReceiver);
         g_eventReceiver(event);
     }
 }
@@ -976,7 +1012,10 @@ void TriggerNodeEvent(ArkUI_NodeEvent* event, std::set<void (*)(ArkUI_NodeEvent*
 
     // Use the copy for iteration and callbacks
     for (const auto& eventListener : listenersCopy) {
-        eventListener(event);
+        {
+            LOG_CALLBACK("ArkUI_NativeNodeAPI_1.addNodeEventReceiver", eventListener);
+            eventListener(event);
+        }
         if (!IsValidArkUINode(event->node)) {
             break;
         }
@@ -1065,6 +1104,13 @@ void TriggerNodeCommonEvent(ArkUI_NodeEvent* event, int32_t eventType,
     auto it = commonEventListenersMap->find(eventType);
     if (it != commonEventListenersMap->end()) {
         const auto& eventListener = it->second;
+        const char* source = "OH_ArkUI_NativeModule_RegisterCommonEvent";
+        if (eventType == NODE_VISIBLE_AREA_APPROXIMATE_CHANGE_EVENT) {
+            source = "OH_ArkUI_NativeModule_RegisterCommonVisibleAreaApproximateChangeEvent";
+        } else if (eventType == NODE_EVENT_ON_AREA_CHANGE) {
+            source = "OH_ArkUI_NativeModule_RegisterCommonAreaApproximateChangeEvent";
+        }
+        LOG_CALLBACK(source, eventListener);
         (*eventListener)(event);
     }
 }

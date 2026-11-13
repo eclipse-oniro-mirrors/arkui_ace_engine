@@ -1799,8 +1799,9 @@ HWTEST_F(ListEventTestNg, ListScrollToIndexTopToTopWithExternalScrollBar001, Tes
 
 /**
  * @tc.name: DragScrollCoexistAutoScrollSuppression001
- * @tc.desc: only a second finger that really scrolls the container stops the drag edge
- *           auto-scroll, and it is actively stopped instead of merely skipped
+ * @tc.desc: a second pointer on the List together with a scroll stops the drag edge
+ *           auto-scroll, whatever drove that scroll, and it is actively stopped instead of
+ *           merely skipped
  * @tc.type: FUNC
  */
 HWTEST_F(ListEventTestNg, DragScrollCoexistAutoScrollSuppression001, TestSize.Level1)
@@ -1867,19 +1868,18 @@ HWTEST_F(ListEventTestNg, DragScrollCoexistAutoScrollSuppression001, TestSize.Le
     EXPECT_NE(pattern_->hotZoneScrollCallback_, nullptr);
 
     /**
-     * @tc.steps: step5. both fingers down again, but the container moves because of a
-     *              wheel/crown scroll rather than a finger.
-     * @tc.expected: that is not "another finger scrolling", the edge auto-scroll is
-     *              left alone.
+     * @tc.steps: step5. both fingers down again and the container moves, whatever drove
+     *              that movement.
+     * @tc.expected: the scroll source is not discriminated, so a second pointer on the List
+     *              together with a scroll takes the edge auto-scroll over and actively
+     *              stops it.
      */
     pattern_->activeTouchFingerIds_ = { DRAG_FINGER_ID, SCROLL_FINGER_ID };
     dragManager->HandleContainerScroll(SCROLL_FROM_AXIS);
-    EXPECT_FALSE(dragManager->suppressAutoScroll_);
+    EXPECT_TRUE(dragManager->suppressAutoScroll_);
     dragManager->HandleAutoScroll(0, center, frameRect);
-    EXPECT_TRUE(dragManager->scrolling_);
-    EXPECT_NE(pattern_->hotZoneScrollCallback_, nullptr);
-    dragManager->StopAutoScroll();
     EXPECT_FALSE(dragManager->scrolling_);
+    EXPECT_EQ(pattern_->hotZoneScrollCallback_, nullptr);
 }
 
 /**
@@ -1906,6 +1906,7 @@ HWTEST_F(ListEventTestNg, LockDragFingerAndEscapeScrollPan001, TestSize.Level1)
     ASSERT_NE(gestureHub, nullptr);
     auto dragEventActuator = gestureHub->GetDragEventActuator();
     ASSERT_NE(dragEventActuator, nullptr);
+    dragEventActuator->EnsurePanRecognizer();
     auto dragPan = dragEventActuator->GetDragEventPanRecognizer();
     ASSERT_NE(dragPan, nullptr);
 

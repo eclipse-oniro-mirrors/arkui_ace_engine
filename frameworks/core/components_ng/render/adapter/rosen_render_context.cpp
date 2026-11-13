@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "core/components_ng/property/gradient_property.h"
 #include "core/components_ng/render/adapter/rosen_render_context.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/modifier.h"
@@ -34,6 +35,7 @@
 #include "render_service_client/core/ui/rs_canvas_node.h"
 #include "render_service_client/core/ui/rs_effect_node.h"
 #include "render_service_client/core/ui_effect/effect/include/brightness_blender.h"
+#include "render_service_client/core/ui_effect/effect/include/colorful_brightness_blender.h"
 #include "render_service_client/core/ui_effect/filter/include/filter_radius_gradient_blur_para.h"
 #include "render_service_client/core/ui_effect/property/include/rs_ui_shape_base.h"
 #include "render_service_client/core/ui/rs_node.h"
@@ -429,6 +431,22 @@ OHOS::Rosen::RectF CalcMaterialSnapshotRect(
         }
         default:
             return bound;
+    }
+}
+
+std::string VibrancyModeToString(VibrancyMode mode)
+{
+    switch (mode) {
+        case VibrancyMode::DISABLED:
+            return "DISABLED";
+        case VibrancyMode::AUTO:
+            return "AUTO";
+        case VibrancyMode::BRIGHTEN:
+            return "BRIGHTEN";
+        case VibrancyMode::DARKEN:
+            return "DARKEN";
+        default:
+            return "UNKNOWN";
     }
 }
 } // namespace
@@ -1034,6 +1052,10 @@ void RosenRenderContext::SyncAdditionalGeometryProperties(const RectF& paintRect
 
     if (propClip_) {
         PaintClip(paintRect.GetSize());
+    }
+
+    if (HasShadowShape()) {
+        PaintShadowShape(GetShadowShapeValue(nullptr), paintRect.GetSize());
     }
 
     if (HasProgressMask() && GetProgressMaskValue()) {
@@ -1975,6 +1997,34 @@ void RosenRenderContext::ResetShadowPath()
 {
     CHECK_NULL_VOID(rsNode_);
     rsNode_->SetShadowPath(nullptr);
+}
+
+void RosenRenderContext::OnShadowShapeUpdate(const RefPtr<BasicShape>& basicShape)
+{
+    FREE_RS_CONTEXT_CHECK(OnShadowShapeUpdate, basicShape);
+    CHECK_NULL_VOID(rsNode_);
+    if (basicShape) {
+        if (!RectIsNull()) {
+            RectF rect = GetPaintRectWithoutTransform();
+            auto frameSize = rect.GetSize();
+            PaintShadowShape(basicShape, frameSize);
+        }
+    } else {
+        rsNode_->SetShadowPath(nullptr);
+    }
+    RequestNextFrame();
+}
+
+void RosenRenderContext::OnShadowClipModeUpdate(ShadowClipMode clipMode)
+{
+    FREE_RS_CONTEXT_CHECK(OnShadowClipModeUpdate, clipMode);
+    CHECK_NULL_VOID(rsNode_);
+    if (clipMode == ShadowClipMode::BOUNDS_SHAPE) {
+        rsNode_->SetShadowClipType(1);
+    } else {
+        rsNode_->SetShadowClipType(0);
+    }
+    RequestNextFrame();
 }
 
 void RosenRenderContext::SetOverlayNGShader(const std::shared_ptr<OHOS::Ace::RenderEdgeLightModifier>& edgeLightFilter)
@@ -2984,16 +3034,22 @@ void SkewPoint(float sx, float sy, PointF& point)
 
 RectF RosenRenderContext::GetPaintRectWithTransform()
 {
+    return GetPaintRectWithTransform(rsNode_, GetPaintRectWithoutTransform());
+}
+
+RectF RosenRenderContext::GetPaintRectWithTransform(
+    const std::shared_ptr<RSNode>& rsNode, const RectF& paintRect)
+{
     RectF rect;
 
-    CHECK_NULL_RETURN(rsNode_, rect);
-    rect = GetPaintRectWithoutTransform();
+    CHECK_NULL_RETURN(rsNode, rect);
+    rect = paintRect;
     // when the width and height of rect is -1, the func SkewRect will change to 1
-    if (ShouldSkipAffineTransformation(rsNode_) && rect.Width() != -1 && rect.Height() != -1) {
+    if (ShouldSkipAffineTransformation(rsNode) && rect.Width() != -1 && rect.Height() != -1) {
         gRect = rect;
         return rect;
     }
-    auto transform = rsNode_->GetStagingProperties().GetAllTransformPropertyValues();
+    auto transform = rsNode->GetStagingProperties().GetAllTransformPropertyValues();
     const auto& translate = transform.translate;
     const auto& skew = transform.skew;
     const auto& perspective = transform.persp;
@@ -3016,7 +3072,7 @@ RectF RosenRenderContext::GetPaintRectWithTransform()
     degree = static_cast<int32_t>(degree) % FULL_ROTATION;
     auto radian = Degree2Radian(degree);
     if (degree != 0) {
-        auto newRect = GetPaintRectWithoutTransform();
+        auto newRect = paintRect;
         double leftX = 0.0;
         double leftY = 0.0;
         degree = degree < 0 ? degree + FULL_ROTATION : degree;
@@ -3042,6 +3098,11 @@ RectF RosenRenderContext::GetPaintRectWithTransform()
     }
     gRect = rect;
     return rect;
+}
+
+bool RosenRenderContext::HasRenderNode() const
+{
+    return rsNode_ != nullptr;
 }
 
 std::pair<RectF, bool> RosenRenderContext::GetPaintRectWithTranslate()
@@ -3141,34 +3202,48 @@ Matrix4 RosenRenderContext::GetMatrixWithTransformRotate()
     if (ShouldSkipAffineTransformation(rsNode_)) {
         return Matrix4();
     }
-    return GetMatrixWithTransformRotateInner();
+    return GetMatrixWithTransformRotateInner(rsNode_, GetPaintRectWithoutTransform(), transformModifier_);
 }
 
-__attribute__((noinline)) Matrix4 RosenRenderContext::GetMatrixWithTransformRotateInner()
+Matrix4 RosenRenderContext::GetMatrixWithTransformRotate(
+    const std::shared_ptr<RSNode>& rsNode, const RectF& paintRect)
 {
-    auto center = rsNode_->GetStagingProperties().GetPivot();
+    CHECK_NULL_RETURN(rsNode, Matrix4());
+    if (ShouldSkipAffineTransformation(rsNode)) {
+        return Matrix4();
+    }
+    auto modifier = rsNode->GetModifierByType(Rosen::ModifierNG::RSModifierType::TRANSFORM);
+    auto transformModifier = std::static_pointer_cast<Rosen::ModifierNG::RSTransformModifier>(modifier);
+    return GetMatrixWithTransformRotateInner(rsNode, paintRect, transformModifier);
+}
+
+__attribute__((noinline)) Matrix4 RosenRenderContext::GetMatrixWithTransformRotateInner(
+    const std::shared_ptr<RSNode>& rsNode, const RectF& paintRect,
+    const std::shared_ptr<Rosen::ModifierNG::RSTransformModifier>& transformModifier)
+{
+    auto center = rsNode->GetStagingProperties().GetPivot();
     Matrix4 rotateMat;
 
-    if (transformModifier_ && !transformModifier_->GetQuaternion().IsIdentity()) {
-        auto quaternionValue = transformModifier_->GetQuaternion();
+    if (transformModifier && !transformModifier->GetQuaternion().IsIdentity()) {
+        auto quaternionValue = transformModifier->GetQuaternion();
         // 2: parameter index, 3: parameter index
         rotateMat =
             Matrix4::QuaternionToMatrix(quaternionValue[0], quaternionValue[1], quaternionValue[2], quaternionValue[3]);
     } else {
-        int32_t degree = rsNode_->GetStagingProperties().GetRotation();
-        if (rsNode_->GetType() == RSUINodeType::DISPLAY_NODE && degree != 0) {
+        int32_t degree = rsNode->GetStagingProperties().GetRotation();
+        if (rsNode->GetType() == RSUINodeType::DISPLAY_NODE && degree != 0) {
             degree = 0;
             return Matrix4();
         }
         rotateMat = Matrix4::CreateRotate(degree, 0, 0, 1);
     }
 
-    auto translate = rsNode_->GetStagingProperties().GetTranslate();
-    auto skew = rsNode_->GetStagingProperties().GetSkew();
-    auto scale = rsNode_->GetStagingProperties().GetScale();
-    auto perspective = rsNode_->GetStagingProperties().GetPersp();
+    auto translate = rsNode->GetStagingProperties().GetTranslate();
+    auto skew = rsNode->GetStagingProperties().GetSkew();
+    auto scale = rsNode->GetStagingProperties().GetScale();
+    auto perspective = rsNode->GetStagingProperties().GetPersp();
 
-    RectF rect = GetPaintRectWithoutTransform();
+    RectF rect = paintRect;
     auto centOffset = OffsetF(center[0] * rect.Width(), center[1] * rect.Height());
     auto centerPos = rect.GetOffset() + centOffset;
 
@@ -3223,6 +3298,7 @@ void RosenRenderContext::GetPointWithTransform(PointF& point)
     if (ShouldSkipAffineTransformation(rsNode_)) {
         return;
     }
+    gRect = GetPaintRectWithTransform();
     GetPointWithTransformInner(point);
 }
 
@@ -5889,6 +5965,7 @@ void RosenRenderContext::UpdateBlender(const OHOS::Rosen::Blender* blender)
     FREE_RS_CONTEXT_CHECK(UpdateBlender, blender);
     CHECK_NULL_VOID(rsNode_);
     CHECK_NULL_VOID(blender);
+    propVibrancyMode_.reset(); // invalidate vibrancyMode attribute: external blender overwrites rsNode blender
     rsNode_->SetBlender(blender);
     RequestNextFrame();
 }
@@ -5897,7 +5974,43 @@ void RosenRenderContext::ResetBlender()
 {
     FREE_RS_CONTEXT_CHECK(ResetBlender);
     CHECK_NULL_VOID(rsNode_);
+    propVibrancyMode_.reset(); // invalidate vibrancyMode attribute: external reset overwrites rsNode blender
     auto blender = OHOS::Rosen::BrightnessBlender();
+    rsNode_->SetBlender(&blender);
+    RequestNextFrame();
+}
+
+void RosenRenderContext::OnVibrancyModeUpdate(const VibrancyMode& mode)
+{
+    FREE_RS_CONTEXT_CHECK(OnVibrancyModeUpdate, mode);
+    CHECK_NULL_VOID(rsNode_);
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    VibrancyMode effectiveMode = mode;
+    if (mode == VibrancyMode::AUTO) {
+        // resolve AUTO based on effective color mode (WithTheme-aware)
+        auto localColorMode = host->GetLocalColorMode();
+        ColorMode effectiveColorMode = localColorMode;
+        if (effectiveColorMode == ColorMode::COLOR_MODE_UNDEFINED) {
+            auto pipeline = host->GetContext();
+            CHECK_NULL_VOID(pipeline);
+            effectiveColorMode = pipeline->GetColorMode();
+        }
+        effectiveMode = (effectiveColorMode == ColorMode::DARK) ? VibrancyMode::BRIGHTEN : VibrancyMode::DARKEN;
+    }
+    if (effectiveMode == VibrancyMode::DISABLED) {
+        auto blender = OHOS::Rosen::BrightnessBlender();
+        rsNode_->SetBlender(&blender);
+        RequestNextFrame();
+        return;
+    }
+    auto blender = OHOS::Rosen::ColorfulBrightnessBlender();
+    if (effectiveMode == VibrancyMode::BRIGHTEN) {
+        blender.SetDarkenWeight(0.0f);
+    } else {
+        blender.SetDarkenWeight(1.0f);
+    }
+    blender.SetFraction(0.0f);
     rsNode_->SetBlender(&blender);
     RequestNextFrame();
 }
@@ -6344,7 +6457,7 @@ void RosenRenderContext::PaintClipMask(const std::unique_ptr<ClipProperty>& clip
     CHECK_NULL_VOID(rsNode_);
     auto basicShape = clip->GetClipMaskValue();
     auto rsPath = DrawingDecorationPainter::DrawingCreatePath(basicShape, frameSize);
-
+    CHECK_NULL_VOID(basicShape);
     RSColor rsStrokeColor;
     rsStrokeColor.SetColorQuad(basicShape->GetStrokeColor());
     RSPen pen;
@@ -6368,6 +6481,14 @@ void RosenRenderContext::PaintClip(const SizeF& frameSize)
     if (clip->HasClipMask()) {
         PaintClipMask(clip, frameSize);
     }
+}
+
+void RosenRenderContext::PaintShadowShape(const RefPtr<BasicShape>& basicShape, const SizeF& frameSize)
+{
+    CHECK_NULL_VOID(rsNode_);
+    CHECK_NULL_VOID(basicShape);
+    auto rsPath = DrawingDecorationPainter::DrawingCreatePath(basicShape, frameSize);
+    rsNode_->SetShadowPath(Rosen::RSPath::CreateRSPath(rsPath));
 }
 
 void RosenRenderContext::PaintProgressMask()
@@ -7143,6 +7264,11 @@ void RosenRenderContext::DumpInfo()
             auto bgDynamicBrightness = graphicProps->propBgDynamicBrightnessOption->GetJsonObject();
             DumpLog::GetInstance().AddDesc(
                 std::string("backgroundBrightnessInternal:").append(bgDynamicBrightness->ToString().c_str()));
+        }
+        if (HasVibrancyMode()) {
+            auto mode = GetVibrancyModeValue();
+            std::string modeStr = VibrancyModeToString(mode);
+            DumpLog::GetInstance().AddDesc(std::string("vibrancyMode:").append(modeStr));
         }
         if (!NearZero(rsNode_->GetStagingProperties().GetCameraDistance())) {
             DumpLog::GetInstance().AddDesc(
@@ -8737,21 +8863,29 @@ void RosenRenderContext::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const
     const bool visual = !config.IsPublicTree() || config.visualProperties;
     DumpAdvanceBackgroundInfo(json, config);
     if (visual) {
-        DumpAdvanceVisualInfo(json);
+        DumpAdvanceVisualInfo(json, config);
     }
     SetAdvanceInfo(json, config);
 }
 
-void RosenRenderContext::DumpAdvanceVisualInfo(std::unique_ptr<JsonValue>& json)
+void RosenRenderContext::DumpAdvanceVisualInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
     if (GetSphericalEffect().has_value()) {
-        json->Put("SphericalEffect", std::to_string(GetSphericalEffect().value()).c_str());
+        if (config.IsPublicTree()) {
+            json->Put("SphericalEffect", GetSphericalEffect().value());
+        } else {
+            json->Put("SphericalEffect", std::to_string(GetSphericalEffect().value()).c_str());
+        }
     }
     if (GetPixelStretchEffect().has_value()) {
         json->Put("PixelStretchEffect", GetPixelStretchEffect().value().ToString().c_str());
     }
     if (GetLightUpEffect().has_value()) {
-        json->Put("LightUpEffect", std::to_string(GetLightUpEffect().value()).c_str());
+        if (config.IsPublicTree()) {
+            json->Put("LightUpEffect", GetLightUpEffect().value());
+        } else {
+            json->Put("LightUpEffect", std::to_string(GetLightUpEffect().value()).c_str());
+        }
     }
     if (GetBorderColor().has_value()) {
         json->Put("BorderColor", GetBorderColor().value().ToString().c_str());
@@ -8768,20 +8902,48 @@ void RosenRenderContext::DumpAdvanceVisualInfo(std::unique_ptr<JsonValue>& json)
     if (GetOuterBorderWidth().has_value()) {
         json->Put("OuterBorderWidth", GetOuterBorderWidth().value().ToString().c_str());
     }
+    DumpAdvanceBlendAndGradientInfo(json, config);
+}
+
+void RosenRenderContext::DumpAdvanceBlendAndGradientInfo(
+    std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
     if (GetDynamicLightUpRate().has_value()) {
-        json->Put("DynamicLightUpRate", std::to_string(GetDynamicLightUpRate().value()).c_str());
+        if (config.IsPublicTree()) {
+            json->Put("DynamicLightUpRate", GetDynamicLightUpRate().value());
+        } else {
+            json->Put("DynamicLightUpRate", std::to_string(GetDynamicLightUpRate().value()).c_str());
+        }
     }
     if (GetDynamicLightUpDegree().has_value()) {
-        json->Put("DynamicLightUpDegree", std::to_string(GetDynamicLightUpDegree().value()).c_str());
+        if (config.IsPublicTree()) {
+            json->Put("DynamicLightUpDegree", GetDynamicLightUpDegree().value());
+        } else {
+            json->Put("DynamicLightUpDegree", std::to_string(GetDynamicLightUpDegree().value()).c_str());
+        }
     }
     if (GetBackBlendMode().has_value()) {
         json->Put("BlendMode", static_cast<int>(GetBackBlendMode().value()));
     }
     if (GetLinearGradient().has_value()) {
-        json->Put("LinearGradient", GetLinearGradient().value().ToString().c_str());
+        if (config.IsPublicTree()) {
+            auto gradient = GradientJsonUtils::ToTreeJson(GetLinearGradient().value());
+            if (gradient) {
+                json->PutRef("LinearGradient", std::move(gradient));
+            }
+        } else {
+            json->Put("LinearGradient", GetLinearGradient().value().ToString().c_str());
+        }
     }
     if (GetSweepGradient().has_value()) {
-        json->Put("SweepGradient", GetSweepGradient().value().ToString().c_str());
+        if (config.IsPublicTree()) {
+            auto gradient = GradientJsonUtils::ToTreeJson(GetSweepGradient().value());
+            if (gradient) {
+                json->PutRef("SweepGradient", std::move(gradient));
+            }
+        } else {
+            json->Put("SweepGradient", GetSweepGradient().value().ToString().c_str());
+        }
     }
 }
 
@@ -8804,28 +8966,41 @@ void RosenRenderContext::SetAdvanceInfo(std::unique_ptr<JsonValue>& json, const 
 {
     const bool visual = !config.IsPublicTree() || config.visualProperties;
     if (visual && GetRadialGradient().has_value()) {
-        json->Put("RadialGradient", GetRadialGradient().value().ToString().c_str());
+        if (config.IsPublicTree()) {
+            auto gradient = GradientJsonUtils::ToTreeJson(GetRadialGradient().value());
+            if (gradient) {
+                json->PutRef("RadialGradient", std::move(gradient));
+            }
+        } else {
+            json->Put("RadialGradient", GetRadialGradient().value().ToString().c_str());
+        }
     }
-    if (visual && GetFrontBrightness().has_value()) {
-        json->Put("FrontBrightness", GetFrontBrightness().value().ToString().c_str());
-    }
-    if (visual && GetFrontGrayScale().has_value()) {
-        json->Put("FrontGrayScale", GetFrontGrayScale().value().ToString().c_str());
-    }
-    if (visual && GetFrontContrast().has_value()) {
-        json->Put("FrontContrast", GetFrontContrast().value().ToString().c_str());
-    }
-    if (visual && GetFrontSaturate().has_value()) {
-        json->Put("FrontSaturate", GetFrontSaturate().value().ToString().c_str());
-    }
-    if (visual && GetFrontSepia().has_value()) {
-        json->Put("FrontSepia", GetFrontSepia().value().ToString().c_str());
-    }
-    if (visual && GetFrontHueRotate().has_value()) {
-        json->Put("FrontHueRotate", std::to_string(GetFrontHueRotate().value()).c_str());
-    }
-    if (visual && GetFrontColorBlend().has_value()) {
-        json->Put("FrontColorBlend", GetFrontColorBlend().value().ColorToString().c_str());
+    if (visual) {
+        if (GetFrontBrightness().has_value()) {
+            json->Put("FrontBrightness", GetFrontBrightness().value().ToString().c_str());
+        }
+        if (GetFrontGrayScale().has_value()) {
+            json->Put("FrontGrayScale", GetFrontGrayScale().value().ToString().c_str());
+        }
+        if (GetFrontContrast().has_value()) {
+            json->Put("FrontContrast", GetFrontContrast().value().ToString().c_str());
+        }
+        if (GetFrontSaturate().has_value()) {
+            json->Put("FrontSaturate", GetFrontSaturate().value().ToString().c_str());
+        }
+        if (GetFrontSepia().has_value()) {
+            json->Put("FrontSepia", GetFrontSepia().value().ToString().c_str());
+        }
+        if (GetFrontHueRotate().has_value()) {
+            if (config.IsPublicTree()) {
+                json->Put("FrontHueRotate", GetFrontHueRotate().value());
+            } else {
+                json->Put("FrontHueRotate", std::to_string(GetFrontHueRotate().value()).c_str());
+            }
+        }
+        if (GetFrontColorBlend().has_value()) {
+            json->Put("FrontColorBlend", GetFrontColorBlend().value().ColorToString().c_str());
+        }
     }
     DumpAdvanceImageAndLightInfo(json, config);
 }
@@ -8837,29 +9012,48 @@ void RosenRenderContext::DumpAdvanceImageAndLightInfo(std::unique_ptr<JsonValue>
         DumpAdvanceSourceInfo(json, "BorderImageSource", GetBorderImageSource().value(), config);
     }
     if (visual && GetBorderImageGradient().has_value()) {
-        json->Put("BorderImageGradient", GetBorderImageGradient().value().ToString().c_str());
+        if (config.IsPublicTree()) {
+            auto gradient = GradientJsonUtils::ToTreeJson(GetBorderImageGradient().value());
+            if (gradient) {
+                json->PutRef("BorderImageGradient", std::move(gradient));
+            }
+        } else {
+            json->Put("BorderImageGradient", GetBorderImageGradient().value().ToString().c_str());
+        }
     }
     if (visual && GetForegroundColor().has_value()) {
         json->Put("ForegroundColor", GetForegroundColor().value().ColorToString().c_str());
     }
     if (visual) {
-        DumpAdvanceLightInfo(json);
+        DumpAdvanceLightInfo(json, config);
     }
 }
 
-void RosenRenderContext::DumpAdvanceLightInfo(std::unique_ptr<JsonValue>& json)
+void RosenRenderContext::DumpAdvanceLightInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
     if (GetLightIntensity().has_value()) {
-        json->Put("LightIntensity", std::to_string(GetLightIntensity().value()).c_str());
+        if (config.IsPublicTree()) {
+            json->Put("LightIntensity", GetLightIntensity().value());
+        } else {
+            json->Put("LightIntensity", std::to_string(GetLightIntensity().value()).c_str());
+        }
     }
     if (GetLightIlluminated().has_value()) {
-        json->Put("LightIlluminated", std::to_string(GetLightIlluminated().value()).c_str());
+        if (config.IsPublicTree()) {
+            json->Put("LightIlluminated", static_cast<int64_t>(GetLightIlluminated().value()));
+        } else {
+            json->Put("LightIlluminated", std::to_string(GetLightIlluminated().value()).c_str());
+        }
     }
     if (GetIlluminatedBorderWidth().has_value()) {
         json->Put("IlluminatedBorderWidth", GetIlluminatedBorderWidth().value().ToString().c_str());
     }
     if (GetBloom().has_value()) {
-        json->Put("Bloom", std::to_string(GetBloom().value()).c_str());
+        if (config.IsPublicTree()) {
+            json->Put("Bloom", GetBloom().value());
+        } else {
+            json->Put("Bloom", std::to_string(GetBloom().value()).c_str());
+        }
     }
 }
 
@@ -8888,8 +9082,12 @@ void RosenRenderContext::DumpAdvanceSourceInfo(std::unique_ptr<JsonValue>& json,
             json->PutRef(key, std::move(resource));
             break;
         }
-        default:
+        default: {
+            auto descriptor = JsonUtil::Create();
+            descriptor->Put("sourceType", source.GetSrcTypeName());
+            json->PutRef(key, std::move(descriptor));
             break;
+        }
     }
 }
 
@@ -9265,7 +9463,7 @@ void RosenRenderContext::MarkNeedDrawNode(bool condition)
     }
 }
 
-bool RosenRenderContext::ShouldSkipAffineTransformation(std::shared_ptr<RSNode>& rsNode)
+bool RosenRenderContext::ShouldSkipAffineTransformation(const std::shared_ptr<RSNode>& rsNode)
 {
     if (SystemProperties::GetContainerDeleteFlag() &&
         rsNode->GetDrawNodeType() != Rosen::DrawNodeType::GeometryPropertyType) {

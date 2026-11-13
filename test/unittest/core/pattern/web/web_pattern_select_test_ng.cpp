@@ -71,6 +71,21 @@ public:
     void Cancel() override {}
 };
 
+class NWebColorChooserCallbackMock : public NWebColorChooserCallback {
+public:
+    void Continue(const std::string& color) override
+    {
+        last_continue_color_ = color;
+        continue_count_++;
+    }
+
+    void Cancel() override { cancel_count_++; }
+
+    std::string last_continue_color_;
+    int continue_count_ = 0;
+    int cancel_count_ = 0;
+};
+
 class NWebCursorInfoMock : public NWebCursorInfo {
 public:
     int32_t GetX() override
@@ -1677,6 +1692,227 @@ HWTEST_F(WebPatternSelectTestNg, GetShadowFromTheme_003, TestSize.Level1)
 
     MockContainer::TearDown();
     MockPipelineContext::TearDown();
+#endif
+}
+
+// ============================================================================
+// OnColorChooserPopup / OnColorChooserClose tests
+//
+// The callback is strongly owned by the HDS color picker SESSION (id-keyed
+// registry, see web_pattern.cpp) — WebPattern keeps no member copy. Every
+// discard path "erases" the session, and erase == cancel.
+//
+// In the unit-test environment OpenHdsColorPicker always fails (no ArkTS
+// runtime), so OnColorChooserPopup's observable behavior here is: the
+// callback is Cancelled immediately (open-failure fallback).
+//
+// Branch coverage:
+//   1. Null callback → no crash
+//   2. Valid callback, open fails → callback cancelled exactly once
+//   3. Suggestions path → same cancel-on-failure semantics
+//   4. Second OnColorChooserPopup cancels any previous session (single-popup)
+//   5. OnColorChooserClose with live session → cancels and clears ids
+//   6. OnColorChooserClose with no session → no crash
+//   7. OnColorChooserClose is idempotent (no double cancel)
+// ============================================================================
+
+/**
+ * @tc.name: OnColorChooserPopup_001
+ * @tc.desc: OnColorChooserPopup with null callback
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternSelectTestNg, OnColorChooserPopup_001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    std::shared_ptr<OHOS::NWeb::NWebColorChooserCallback> callback = nullptr;
+    std::vector<OHOS::NWeb::NWebColorSuggestion> suggestions;
+    // Should not crash with null callback; no session should be registered
+    webPattern->OnColorChooserPopup("#ff0000", suggestions, callback);
+    EXPECT_TRUE(webPattern->hdsColorPickerSessionIds_.empty());
+#endif
+}
+
+/**
+ * @tc.name: OnColorChooserPopup_002
+ * @tc.desc: OnColorChooserPopup with valid callback and suggestions
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternSelectTestNg, OnColorChooserPopup_002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    auto callback = std::make_shared<OHOS::NWeb::NWebColorChooserCallbackMock>();
+    ASSERT_NE(callback, nullptr);
+    std::vector<OHOS::NWeb::NWebColorSuggestion> suggestions;
+    suggestions.push_back({"#ff0000", "red"});
+    suggestions.push_back({"#00ff00", "green"});
+    webPattern->OnColorChooserPopup("#0000ff", suggestions, callback);
+    // No ArkTS runtime in tests → open fails → callback cancelled once,
+    // no session left registered (no leak, chooser does not hang)
+    EXPECT_EQ(callback->cancel_count_, 1);
+    EXPECT_TRUE(webPattern->hdsColorPickerSessionIds_.empty());
+#endif
+}
+
+/**
+ * @tc.name: OnColorChooserPopup_003
+ * @tc.desc: OnColorChooserPopup with valid callback and empty suggestions
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternSelectTestNg, OnColorChooserPopup_003, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    auto callback = std::make_shared<OHOS::NWeb::NWebColorChooserCallbackMock>();
+    ASSERT_NE(callback, nullptr);
+    std::vector<OHOS::NWeb::NWebColorSuggestion> suggestions;
+    suggestions.clear();
+    webPattern->OnColorChooserPopup("#ffffff", suggestions, callback);
+    EXPECT_EQ(callback->cancel_count_, 1);
+    EXPECT_TRUE(webPattern->hdsColorPickerSessionIds_.empty());
+#endif
+}
+
+/**
+ * @tc.name: OnColorChooserPopup_004
+ * @tc.desc: OnColorChooserPopup cancels previous session callback (single-popup enforcement)
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternSelectTestNg, OnColorChooserPopup_004, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    // First popup — open fails in tests, callback cancelled once
+    auto callback1 = std::make_shared<OHOS::NWeb::NWebColorChooserCallbackMock>();
+    std::vector<OHOS::NWeb::NWebColorSuggestion> suggestions;
+    webPattern->OnColorChooserPopup("#ff0000", suggestions, callback1);
+    EXPECT_EQ(callback1->cancel_count_, 1);
+    // Second popup — previous sessions were already purged by the first
+    // open-failure; still no crash, callback2 cancelled exactly once
+    auto callback2 = std::make_shared<OHOS::NWeb::NWebColorChooserCallbackMock>();
+    webPattern->OnColorChooserPopup("#00ff00", suggestions, callback2);
+    EXPECT_EQ(callback1->cancel_count_, 1);
+    EXPECT_EQ(callback2->cancel_count_, 1);
+    EXPECT_TRUE(webPattern->hdsColorPickerSessionIds_.empty());
+#endif
+}
+
+/**
+ * @tc.name: OnColorChooserClose_001
+ * @tc.desc: OnColorChooserClose with no live session (open failed in tests)
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternSelectTestNg, OnColorChooserClose_001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    auto callback = std::make_shared<OHOS::NWeb::NWebColorChooserCallbackMock>();
+    std::vector<OHOS::NWeb::NWebColorSuggestion> suggestions;
+    webPattern->OnColorChooserPopup("#ff0000", suggestions, callback);
+    // Close after failed open — no double cancel, no crash
+    webPattern->OnColorChooserClose();
+    EXPECT_EQ(callback->cancel_count_, 1);
+    EXPECT_TRUE(webPattern->hdsColorPickerSessionIds_.empty());
+#endif
+}
+
+/**
+ * @tc.name: OnColorChooserClose_002
+ * @tc.desc: OnColorChooserClose with no session at all (no crash)
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternSelectTestNg, OnColorChooserClose_002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    // No session — should not crash
+    EXPECT_TRUE(webPattern->hdsColorPickerSessionIds_.empty());
+    webPattern->OnColorChooserClose();
+    EXPECT_TRUE(webPattern->hdsColorPickerSessionIds_.empty());
+#endif
+}
+
+/**
+ * @tc.name: OnColorChooserClose_003
+ * @tc.desc: OnColorChooserClose after close is idempotent
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternSelectTestNg, OnColorChooserClose_003, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    auto callback = std::make_shared<OHOS::NWeb::NWebColorChooserCallbackMock>();
+    std::vector<OHOS::NWeb::NWebColorSuggestion> suggestions;
+    webPattern->OnColorChooserPopup("#ff0000", suggestions, callback);
+    webPattern->OnColorChooserClose();
+    // Second close — no session, no crash, no double cancel
+    webPattern->OnColorChooserClose();
+    EXPECT_EQ(callback->cancel_count_, 1);
+    EXPECT_TRUE(webPattern->hdsColorPickerSessionIds_.empty());
 #endif
 }
 } // namespace OHOS::Ace::NG

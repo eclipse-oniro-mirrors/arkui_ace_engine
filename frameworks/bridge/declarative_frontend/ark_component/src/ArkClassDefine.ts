@@ -1613,13 +1613,19 @@ class ArkBindMenu{
 class ArkTextBackGroundStyle {
   color: ResourceColor;
   radius: ArkBorderRadius;
+  borderColor: ResourceColor;
+  borderWidth: Dimension;
   constructor() {
     this.color = undefined;
     this.radius = new ArkBorderRadius();
+    this.borderColor = undefined;
+    this.borderWidth = undefined;
   }
   isEqual(another: ArkTextBackGroundStyle): boolean {
     return (this.color === another.color &&
-      this.radius.isEqual(another.radius));
+      this.radius.isEqual(another.radius) &&
+      this.borderColor === another.borderColor &&
+      this.borderWidth === another.borderWidth);
   }
   checkObjectDiff(another: ArkTextBackGroundStyle): boolean {
     return !this.isEqual(another);
@@ -1646,6 +1652,16 @@ class ArkTextBackGroundStyle {
         this.radius.topRight = (value.radius as BorderRadiuses)?.topRight;
         this.radius.bottomLeft = (value.radius as BorderRadiuses)?.bottomLeft;
         this.radius.bottomRight = (value.radius as BorderRadiuses)?.bottomRight;
+      }
+    }
+    if (!isUndefined(value?.borderColor) && value?.borderColor !== null) {
+      if (isNumber(value.borderColor) || isString(value.borderColor) || isResource(value.borderColor)) {
+        this.borderColor = value.borderColor;
+      }
+    }
+    if (!isUndefined(value?.borderWidth) && value?.borderWidth !== null) {
+      if (isNumber(value.borderWidth) || isString(value.borderWidth) || isResource(value.borderWidth)) {
+        this.borderWidth = value.borderWidth;
       }
     }
     return true;

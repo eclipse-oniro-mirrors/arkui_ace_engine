@@ -42,12 +42,16 @@
 #include "core/components_ng/base/view_abstract.h"
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/layout/layout_wrapper_node.h"
+#include "core/components_ng/layout/overlay_safe_area_helper.h"
+#include "core/components_ng/manager/avoid_info/avoid_info_manager.h"
 #include "core/components_ng/pattern/bubble/bubble_event_hub.h"
 #include "core/components_ng/pattern/bubble/bubble_layout_property.h"
 #include "core/components_ng/pattern/bubble/bubble_pattern.h"
 #include "core/components_ng/pattern/bubble/bubble_render_property.h"
 #include "core/components_ng/pattern/bubble/bubble_view.h"
 #include "core/components_ng/event/focus_hub.h"
+#include "core/components_ng/pattern/overlay/dialog_manager.h"
+#include "core/common/ace_engine.h"
 #include "core/components_ng/pattern/overlay/level_mode.h"
 #include "core/components_ng/pattern/button/button_pattern.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
@@ -114,7 +118,68 @@ const std::vector<Placement> BUBBLE_LAYOUT_PROPERTY_PLACEMENTS = { Placement::LE
     Placement::LEFT_BOTTOM, Placement::LEFT_TOP, Placement::RIGHT_BOTTOM, Placement::RIGHT_TOP, Placement::NONE };
 const Offset POPUP_PARAM_POSITION_OFFSET = Offset(100.0f, 100.0f);
 const OffsetF BUBBLE_POSITION_OFFSET = OffsetF(100.0f, 100.0f);
+
+// Safe area avoidance values injected through the mocked SafeAreaManager/AvoidInfoManager
+// (Func-04-02-01-Feat-07, VM-1 ~ VM-5).
+constexpr uint32_t SAFE_AREA_SYSTEM_TOP_END = 50;
+constexpr uint32_t SAFE_AREA_CUTOUT_TOP_END = 100;
+constexpr int32_t FREE_NAV_TITLE_HEIGHT = 36;
+constexpr float FREE_NAV_BUTTONS_WIDTH = 96.0f;
+constexpr float FREE_NAV_BUTTONS_HEIGHT = 36.0f;
+constexpr float SUBWINDOW_FLOAT_BUTTONS_HEIGHT = 60.0f;
+constexpr uint32_t ABNORMAL_HUGE_INSET_END = 100000;
+constexpr float EXPECTED_UNION_TOP = 100.0f;
+
+void ResetBubbleSafeAreaState()
+{
+    auto pipeline = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto safeAreaManager = pipeline->GetSafeAreaManager();
+    ASSERT_NE(safeAreaManager, nullptr);
+    safeAreaManager->UpdateSystemSafeArea(SafeAreaInsets());
+    safeAreaManager->UpdateCutoutSafeArea(SafeAreaInsets());
+    safeAreaManager->UpdateNavSafeArea(SafeAreaInsets());
+    safeAreaManager->SetUseCutout(false);
+    auto avoidInfoMgr = pipeline->GetAvoidInfoManager();
+    if (avoidInfoMgr) {
+        avoidInfoMgr->SetAvoidInfo(ContainerModalAvoidInfo());
+    }
+}
+
+// Registers a main-window container so DialogManager::GetMainPipelineContext (used by
+// OverlaySafeAreaHelper and the main-window branch of BubbleLayoutAlgorithm) resolves in the
+// mock environment; pattern follows GetWindowButtonRect001 in bubble_test_five_ng.cpp.
+void RegisterMainContainer(const RefPtr<FrameNode>& frameNode)
+{
+    if (!frameNode) {
+        return;
+    }
+    auto pipeline = frameNode->GetContextRefPtr();
+    if (!pipeline) {
+        return;
+    }
+    auto containerId = pipeline->GetInstanceId();
+    if (!AceEngine::Get().GetContainer(containerId)) {
+        AceEngine::Get().AddContainer(containerId, AceType::MakeRefPtr<MockContainer>(pipeline));
+    }
+}
+
+void UnregisterMainContainer(const RefPtr<FrameNode>& frameNode)
+{
+    if (!frameNode) {
+        return;
+    }
+    auto pipeline = frameNode->GetContextRefPtr();
+    if (!pipeline) {
+        return;
+    }
+    auto containerId = pipeline->GetInstanceId();
+    if (AceEngine::Get().GetContainer(containerId)) {
+        AceEngine::Get().RemoveContainer(containerId);
+    }
+}
 } // namespace
+
 struct TestProperty {
     // layout property
     std::optional<bool> enableArrow = std::nullopt;
@@ -1698,5 +1763,359 @@ HWTEST_F(BubbleTestNg, CreateButton001, TestSize.Level1)
     auto focusHub = buttonNode->GetOrCreateFocusHub();
     ASSERT_NE(focusHub, nullptr);
     EXPECT_EQ(focusHub->GetFocusStyleType(), FocusStyleType::INNER_BORDER);
+}
+
+/**
+ * @tc.name: BubbleLayoutAlgorithmSafeAreaHelper001
+ * @tc.desc: Main-window bubble sources the displayable safe area from OverlaySafeAreaHelper:
+ *           injected system and cutout insets deduct the popup max height by their per-edge
+ *           union and match the Helper's own return value (VM-1/VM-5,
+ *           Func-04-02-01-Feat-07 AC-1/AC-2).
+ * @tc.type: FUNC
+ */
+HWTEST_F(BubbleTestNg, BubbleLayoutAlgorithmSafeAreaHelper001, TestSize.Level0)
+{
+    auto targetNode = CreateTargetNode();
+    auto popupId = ElementRegister::GetInstance()->MakeUniqueId();
+    auto frameNode = FrameNode::CreateFrameNode(V2::POPUP_ETS_TAG, popupId,
+        AceType::MakeRefPtr<BubblePattern>(targetNode->GetId(), targetNode->GetTag()));
+    ASSERT_NE(frameNode, nullptr);
+    auto bubblePattern = frameNode->GetPattern<BubblePattern>();
+    ASSERT_NE(bubblePattern, nullptr);
+    auto layoutAlgorithm =
+        AceType::DynamicCast<BubbleLayoutAlgorithm>(bubblePattern->CreateLayoutAlgorithm());
+    ASSERT_NE(layoutAlgorithm, nullptr);
+    ResetBubbleSafeAreaState();
+    RegisterMainContainer(frameNode);
+
+    /**
+     * @tc.steps: step1. no safe area data (switch off): nothing is deducted.
+     */
+    auto baseline = layoutAlgorithm->GetPopupMaxWidthAndHeight(false, frameNode).Height();
+
+    /**
+     * @tc.steps: step2. inject system top 50 and cutout top 100 (switch on).
+     */
+    auto pipeline = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto safeAreaManager = pipeline->GetSafeAreaManager();
+    ASSERT_NE(safeAreaManager, nullptr);
+    SafeAreaInsets systemSafeArea;
+    systemSafeArea.top_ = SafeAreaInsets::Inset { 0, SAFE_AREA_SYSTEM_TOP_END };
+    SafeAreaInsets cutoutSafeArea;
+    cutoutSafeArea.top_ = SafeAreaInsets::Inset { 0, SAFE_AREA_CUTOUT_TOP_END };
+    safeAreaManager->UpdateSystemSafeArea(systemSafeArea);
+    safeAreaManager->UpdateCutoutSafeArea(cutoutSafeArea);
+    safeAreaManager->SetUseCutout(true);
+
+    /**
+     * @tc.steps: step3. the deduction equals the per-edge interval union (max = 100) and the
+     *            Helper's own displayable-rect shrink, edge by edge (VM-5).
+     * @tc.expected: popupMaxHeight is reduced by exactly the union top.
+     */
+    auto deducted = layoutAlgorithm->GetPopupMaxWidthAndHeight(false, frameNode).Height();
+    EXPECT_FLOAT_EQ(baseline - deducted, EXPECTED_UNION_TOP);
+    AvoidConfig config;
+    config.avoidSafeArea = true;
+    config.avoidPopupFreeNav = true;
+    RectF displayable = OverlaySafeAreaHelper::ComputeDisplayableRect(frameNode, config,
+        static_cast<int32_t>(SubwindowType::TYPE_POPUP));
+    auto context = DialogManager::GetMainPipelineContext(frameNode);
+    RectF base = context ? context->GetRootRect() : RectF();
+    EXPECT_FLOAT_EQ(displayable.Top() - base.Top(), EXPECTED_UNION_TOP);
+    EXPECT_FLOAT_EQ(baseline - deducted, displayable.Top() - base.Top());
+
+    UnregisterMainContainer(frameNode);
+    ResetBubbleSafeAreaState();
+}
+
+/**
+ * @tc.name: BubbleLayoutAlgorithmSafeAreaHelper002
+ * @tc.desc: bindPopup free-navigation avoidance runs through the Helper's avoidPopupFreeNav
+ *           dimension and is independent of the safe area switch state (VM-2,
+ *           Func-04-02-01-Feat-07 AC-4/R-3).
+ * @tc.type: FUNC
+ */
+HWTEST_F(BubbleTestNg, BubbleLayoutAlgorithmSafeAreaHelper002, TestSize.Level0)
+{
+    auto targetNode = CreateTargetNode();
+    auto popupId = ElementRegister::GetInstance()->MakeUniqueId();
+    auto frameNode = FrameNode::CreateFrameNode(V2::POPUP_ETS_TAG, popupId,
+        AceType::MakeRefPtr<BubblePattern>(targetNode->GetId(), targetNode->GetTag()));
+    ASSERT_NE(frameNode, nullptr);
+    auto bubblePattern = frameNode->GetPattern<BubblePattern>();
+    ASSERT_NE(bubblePattern, nullptr);
+    auto layoutAlgorithm =
+        AceType::DynamicCast<BubbleLayoutAlgorithm>(bubblePattern->CreateLayoutAlgorithm());
+    ASSERT_NE(layoutAlgorithm, nullptr);
+    ResetBubbleSafeAreaState();
+    RegisterMainContainer(frameNode);
+    auto pipeline = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto safeAreaManager = pipeline->GetSafeAreaManager();
+    ASSERT_NE(safeAreaManager, nullptr);
+    auto avoidInfoMgr = pipeline->GetAvoidInfoManager();
+    ASSERT_NE(avoidInfoMgr, nullptr);
+
+    /**
+     * @tc.steps: step1. inject container-modal free-navigation info (needAvoid + title 36).
+     */
+    ContainerModalAvoidInfo avoidInfo;
+    avoidInfo.needAvoid = true;
+    avoidInfo.titleHeight = FREE_NAV_TITLE_HEIGHT;
+    avoidInfo.controlBottonsRect = RectF(600.0f, 0.0f, FREE_NAV_BUTTONS_WIDTH, FREE_NAV_BUTTONS_HEIGHT);
+    avoidInfoMgr->SetAvoidInfo(avoidInfo);
+
+    /**
+     * @tc.steps: step2. switch off (no safe area data): free-navigation avoidance still applies.
+     * @tc.expected: popupMaxHeight is reduced by the title height.
+     */
+    auto switchOffBase = layoutAlgorithm->GetPopupMaxWidthAndHeight(false, frameNode).Height();
+    avoidInfoMgr->SetAvoidInfo(ContainerModalAvoidInfo());
+    auto noFreeNav = layoutAlgorithm->GetPopupMaxWidthAndHeight(false, frameNode).Height();
+    EXPECT_FLOAT_EQ(noFreeNav - switchOffBase, static_cast<float>(FREE_NAV_TITLE_HEIGHT));
+
+    /**
+     * @tc.steps: step3. switch on (system top 50): the union keeps the larger edge interval.
+     * @tc.expected: the deduction equals max(50, 36) = 50, still not below the title height.
+     */
+    avoidInfoMgr->SetAvoidInfo(avoidInfo);
+    SafeAreaInsets systemSafeArea;
+    systemSafeArea.top_ = SafeAreaInsets::Inset { 0, SAFE_AREA_SYSTEM_TOP_END };
+    safeAreaManager->UpdateSystemSafeArea(systemSafeArea);
+    auto switchOnDeducted = layoutAlgorithm->GetPopupMaxWidthAndHeight(false, frameNode).Height();
+    EXPECT_FLOAT_EQ(noFreeNav - switchOnDeducted, static_cast<float>(SAFE_AREA_SYSTEM_TOP_END));
+    EXPECT_GE(noFreeNav - switchOnDeducted, static_cast<float>(FREE_NAV_TITLE_HEIGHT));
+
+    UnregisterMainContainer(frameNode);
+    ResetBubbleSafeAreaState();
+}
+
+/**
+ * @tc.name: BubbleLayoutAlgorithmSafeAreaHelper003
+ * @tc.desc: Switch-off regression: zero insets deduct nothing on the main-window branch, and
+ *           the subwindow branch keeps the legacy max(safeArea.top_, floatButtonsHeight_)
+ *           behavior (VM-3, Func-04-02-01-Feat-07 AC-5/R-4).
+ * @tc.type: FUNC
+ */
+HWTEST_F(BubbleTestNg, BubbleLayoutAlgorithmSafeAreaHelper003, TestSize.Level0)
+{
+    auto targetNode = CreateTargetNode();
+    auto popupId = ElementRegister::GetInstance()->MakeUniqueId();
+    auto frameNode = FrameNode::CreateFrameNode(V2::POPUP_ETS_TAG, popupId,
+        AceType::MakeRefPtr<BubblePattern>(targetNode->GetId(), targetNode->GetTag()));
+    ASSERT_NE(frameNode, nullptr);
+    auto bubblePattern = frameNode->GetPattern<BubblePattern>();
+    ASSERT_NE(bubblePattern, nullptr);
+    auto layoutAlgorithm =
+        AceType::DynamicCast<BubbleLayoutAlgorithm>(bubblePattern->CreateLayoutAlgorithm());
+    ASSERT_NE(layoutAlgorithm, nullptr);
+    ResetBubbleSafeAreaState();
+    RegisterMainContainer(frameNode);
+
+    /**
+     * @tc.steps: step1. zero insets (switch off): the Helper shrinks nothing.
+     */
+    AvoidConfig config;
+    config.avoidSafeArea = true;
+    config.avoidPopupFreeNav = true;
+    RectF displayable = OverlaySafeAreaHelper::ComputeDisplayableRect(frameNode, config,
+        static_cast<int32_t>(SubwindowType::TYPE_POPUP));
+    auto context = DialogManager::GetMainPipelineContext(frameNode);
+    RectF base = context ? context->GetRootRect() : RectF();
+    EXPECT_FLOAT_EQ(displayable.Top() - base.Top(), 0.0f);
+
+    /**
+     * @tc.steps: step2. subwindow branch keeps the legacy free-navigation merge: with system
+     *            top 50 injected, the deduction follows max(50, floatButtonsHeight_).
+     * @tc.expected: floatButtonsHeight_ 60 -> top 60; 40 -> top 50 (legacy max retained).
+     */
+    auto pipeline = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto safeAreaManager = pipeline->GetSafeAreaManager();
+    ASSERT_NE(safeAreaManager, nullptr);
+    // The mocked pipeline returns zero insets by default (NiceMock default), so the legacy
+    // subwindow source (OverlayManager::GetSafeAreaInsets -> pipeline->GetSafeAreaWithoutProcess)
+    // would not observe the injected system inset. Delegate the mocked method to the real
+    // SafeAreaManager for the duration of this test, matching the real
+    // PipelineContext::GetSafeAreaWithoutProcess implementation.
+    auto mockPipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(mockPipeline, nullptr);
+    ON_CALL(*mockPipeline, GetSafeAreaWithoutProcess())
+        .WillByDefault(Invoke([]() {
+            return MockPipelineContext::GetCurrentContext()->GetSafeAreaManager()->GetSafeAreaWithoutProcess();
+        }));
+    SafeAreaInsets systemSafeArea;
+    systemSafeArea.top_ = SafeAreaInsets::Inset { 0, SAFE_AREA_SYSTEM_TOP_END };
+    safeAreaManager->UpdateSystemSafeArea(systemSafeArea);
+    layoutAlgorithm->floatButtonsHeight_ = SUBWINDOW_FLOAT_BUTTONS_HEIGHT;
+    auto subwindowHigher =
+        layoutAlgorithm->GetPopupMaxWidthAndHeight(true, frameNode).Height();
+    layoutAlgorithm->floatButtonsHeight_ = SAFE_AREA_SYSTEM_TOP_END - 10.0f;
+    auto subwindowLower = layoutAlgorithm->GetPopupMaxWidthAndHeight(true, frameNode).Height();
+    EXPECT_FLOAT_EQ(subwindowLower - subwindowHigher, 10.0f);
+    // Restore the zero default so later tests are not affected by this delegation.
+    ON_CALL(*mockPipeline, GetSafeAreaWithoutProcess()).WillByDefault(Return(SafeAreaInsets()));
+
+    UnregisterMainContainer(frameNode);
+    ResetBubbleSafeAreaState();
+}
+
+/**
+ * @tc.name: BubbleLayoutAlgorithmSafeAreaHelper004
+ * @tc.desc: Abnormal safe area data (huge insets) is clamped by the Helper (never negative,
+ *           no crash) and the bubble max-size path stays guarded (VM-4,
+ *           Func-04-02-01-Feat-07 AC-6/R-5).
+ * @tc.type: FUNC
+ */
+HWTEST_F(BubbleTestNg, BubbleLayoutAlgorithmSafeAreaHelper004, TestSize.Level0)
+{
+    auto targetNode = CreateTargetNode();
+    auto popupId = ElementRegister::GetInstance()->MakeUniqueId();
+    auto frameNode = FrameNode::CreateFrameNode(V2::POPUP_ETS_TAG, popupId,
+        AceType::MakeRefPtr<BubblePattern>(targetNode->GetId(), targetNode->GetTag()));
+    ASSERT_NE(frameNode, nullptr);
+    auto bubblePattern = frameNode->GetPattern<BubblePattern>();
+    ASSERT_NE(bubblePattern, nullptr);
+    auto layoutAlgorithm =
+        AceType::DynamicCast<BubbleLayoutAlgorithm>(bubblePattern->CreateLayoutAlgorithm());
+    ASSERT_NE(layoutAlgorithm, nullptr);
+    ResetBubbleSafeAreaState();
+    RegisterMainContainer(frameNode);
+
+    /**
+     * @tc.steps: step1. inject a huge cutout top inset.
+     */
+    auto pipeline = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto safeAreaManager = pipeline->GetSafeAreaManager();
+    ASSERT_NE(safeAreaManager, nullptr);
+    SafeAreaInsets abnormal;
+    abnormal.top_ = SafeAreaInsets::Inset { 0, ABNORMAL_HUGE_INSET_END };
+    safeAreaManager->UpdateCutoutSafeArea(abnormal);
+    safeAreaManager->SetUseCutout(true);
+
+    /**
+     * @tc.steps: step2. the Helper result is clamped inside the screen (never negative).
+     */
+    AvoidConfig config;
+    config.avoidSafeArea = true;
+    config.avoidPopupFreeNav = true;
+    RectF displayable = OverlaySafeAreaHelper::ComputeDisplayableRect(frameNode, config,
+        static_cast<int32_t>(SubwindowType::TYPE_POPUP));
+    EXPECT_GE(displayable.Height(), 0.0f);
+    EXPECT_GE(displayable.Width(), 0.0f);
+
+    /**
+     * @tc.steps: step3. the bubble max-size path runs without crashing and stays guarded
+     *            (non-positive max height is rejected by UpdateBubbleMaxSize).
+     * @tc.expected: no crash; popupMaxHeight is not positive.
+     */
+    auto maxSize = layoutAlgorithm->GetPopupMaxWidthAndHeight(false, frameNode);
+    EXPECT_LE(maxSize.Height(), 0.0f);
+
+    UnregisterMainContainer(frameNode);
+    ResetBubbleSafeAreaState();
+}
+
+/**
+ * @tc.name: BubbleLayoutAlgorithmSafeAreaHelper005
+ * @tc.desc: The legacy GetWindowButtonRect fetch is retired for main-window bubbles
+ *           (floatButtonsHeight_ stays 0) and preserved for the subwindow branch
+ *           (VM-1/VM-3, Func-04-02-01-Feat-07 ADR-3/ADR-4). UpdateBubbleMaxSize only runs for
+ *           non-Tips bubbles (CHECK_EQUAL_VOID(isTips_, true) early return), so a regular
+ *           popup is used; Tips reach the Helper path via the second
+ *           GetPopupMaxWidthAndHeight call site and InitProps.
+ * @tc.type: FUNC
+ */
+HWTEST_F(BubbleTestNg, BubbleLayoutAlgorithmSafeAreaHelper005, TestSize.Level0)
+{
+    auto targetNode = CreateTargetNode();
+    auto popupId = ElementRegister::GetInstance()->MakeUniqueId();
+    auto frameNode = FrameNode::CreateFrameNode(V2::POPUP_ETS_TAG, popupId,
+        AceType::MakeRefPtr<BubblePattern>(targetNode->GetId(), targetNode->GetTag()));
+    ASSERT_NE(frameNode, nullptr);
+    auto childNode = FrameNode::CreateFrameNode(V2::BLANK_ETS_TAG, 1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(childNode, nullptr);
+    frameNode->AddChild(childNode);
+    auto bubblePattern = frameNode->GetPattern<BubblePattern>();
+    ASSERT_NE(bubblePattern, nullptr);
+    auto bubbleLayoutProperty = bubblePattern->GetLayoutProperty<BubbleLayoutProperty>();
+    ASSERT_NE(bubbleLayoutProperty, nullptr);
+    auto layoutAlgorithm =
+        AceType::DynamicCast<BubbleLayoutAlgorithm>(bubblePattern->CreateLayoutAlgorithm());
+    ASSERT_NE(layoutAlgorithm, nullptr);
+    // CreateLayoutWrapper builds the child wrappers (a raw LayoutWrapperNode has no children,
+    // which would make UpdateBubbleMaxSize return early at the children.empty() guard).
+    auto layoutWrapper = frameNode->CreateLayoutWrapper(true, true);
+    ASSERT_NE(layoutWrapper, nullptr);
+    ResetBubbleSafeAreaState();
+    RegisterMainContainer(frameNode);
+    auto pipeline = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto avoidInfoMgr = pipeline->GetAvoidInfoManager();
+    ASSERT_NE(avoidInfoMgr, nullptr);
+
+    /**
+     * @tc.steps: step1. main-window popup (isTips_ false so UpdateBubbleMaxSize does not
+     *            early-return) with free-navigation info injected: the legacy fetch no
+     *            longer populates floatButtonsHeight_ (no user position offset is set, so
+     *            the legacy subwindow path would store the fetch into the member —
+     *            NonOffset() is true for an unset/zero offset).
+     * @tc.expected: floatButtonsHeight_ stays 0 (avoidance flows through the Helper).
+     */
+    ContainerModalAvoidInfo avoidInfo;
+    avoidInfo.needAvoid = true;
+    avoidInfo.titleHeight = FREE_NAV_TITLE_HEIGHT;
+    avoidInfo.controlBottonsRect = RectF(600.0f, 0.0f, FREE_NAV_BUTTONS_WIDTH, FREE_NAV_BUTTONS_HEIGHT);
+    avoidInfoMgr->SetAvoidInfo(avoidInfo);
+    layoutAlgorithm->isTips_ = false;
+    layoutAlgorithm->UpdateBubbleMaxSize(bubbleLayoutProperty, AceType::RawPtr(layoutWrapper), false);
+    EXPECT_FLOAT_EQ(layoutAlgorithm->floatButtonsHeight_, 0.0f);
+
+    /**
+     * @tc.steps: step2. the same popup still avoids free navigation through the Helper.
+     * @tc.expected: popupMaxHeight is reduced by the title height.
+     */
+    auto deducted = layoutAlgorithm->GetPopupMaxWidthAndHeight(false, frameNode).Height();
+    avoidInfoMgr->SetAvoidInfo(ContainerModalAvoidInfo());
+    auto baseline = layoutAlgorithm->GetPopupMaxWidthAndHeight(false, frameNode).Height();
+    EXPECT_FLOAT_EQ(baseline - deducted, static_cast<float>(FREE_NAV_TITLE_HEIGHT));
+
+    /**
+     * @tc.steps: step3. subwindow popup with the same setup: the legacy fetch is preserved
+     *            and, with no user position offset, stores into the member variable.
+     * @tc.expected: floatButtonsHeight_ equals the control buttons rect height.
+     */
+    avoidInfoMgr->SetAvoidInfo(avoidInfo); // re-inject: step2 cleared it for the baseline
+    layoutAlgorithm->floatButtonsHeight_ = 0.0f;
+    layoutAlgorithm->UpdateBubbleMaxSize(bubbleLayoutProperty, AceType::RawPtr(layoutWrapper), true);
+    EXPECT_FLOAT_EQ(layoutAlgorithm->floatButtonsHeight_, FREE_NAV_BUTTONS_HEIGHT);
+
+    UnregisterMainContainer(frameNode);
+    ResetBubbleSafeAreaState();
+}
+
+/**
+ * @tc.name: BubblePatternAvoidSafeAreaSemantics001
+ * @tc.desc: Bubble avoidance flags are explicit data-driven declarations: all Avoid* overrides
+ *           return false so ContentRootPattern::CreateSafeAreaInsets records no separate insets
+ *           that could double-stack with the Helper-derived ones; avoidance amounts come from
+ *           OverlaySafeAreaHelper in BubbleLayoutAlgorithm (Func-04-02-01-Feat-07 ADR-2).
+ * @tc.type: FUNC
+ */
+HWTEST_F(BubbleTestNg, BubblePatternAvoidSafeAreaSemantics001, TestSize.Level0)
+{
+    auto targetNode = CreateTargetNode();
+    auto popupId = ElementRegister::GetInstance()->MakeUniqueId();
+    auto frameNode = FrameNode::CreateFrameNode(V2::POPUP_ETS_TAG, popupId,
+        AceType::MakeRefPtr<BubblePattern>(targetNode->GetId(), targetNode->GetTag()));
+    ASSERT_NE(frameNode, nullptr);
+    auto bubblePattern = frameNode->GetPattern<BubblePattern>();
+    ASSERT_NE(bubblePattern, nullptr);
+    EXPECT_FALSE(bubblePattern->AvoidTop());
+    EXPECT_FALSE(bubblePattern->AvoidCutout());
+    EXPECT_FALSE(bubblePattern->AvoidBottom());
+    EXPECT_FALSE(bubblePattern->AvoidKeyboard());
 }
 } // namespace OHOS::Ace::NG

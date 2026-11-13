@@ -57,7 +57,6 @@ void NodeAddExtraData(ArkUI_NodeHandle node, ArkUI_NodeCustomEventType eventType
 
 int32_t RegisterNodeCustomEvent(ArkUI_NodeHandle node, ArkUI_NodeCustomEventType eventType, int32_t targetId, void* userData)
 {
-    CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.registerNodeCustomEvent");
     if (!node) {
         SET_ERROR_MESSAGE(ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node is invalid");
         return ERROR_CODE_PARAM_INVALID;
@@ -141,7 +140,6 @@ void NodeRemoveExtraData(ArkUI_NodeHandle node, ArkUI_NodeCustomEventType eventT
 
 void UnregisterNodeCustomEvent(ArkUI_NodeHandle node, ArkUI_NodeCustomEventType eventType)
 {
-    CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.unregisterNodeCustomEvent");
     if (node == nullptr) {
         return;
     }
@@ -189,13 +187,11 @@ void UnregisterNodeCustomEvent(ArkUI_NodeHandle node, ArkUI_NodeCustomEventType 
 void (*g_customEventReceiver)(ArkUI_NodeCustomEvent* event) = nullptr;
 void RegisterNodeCustomReceiver(void (*eventReceiver)(ArkUI_NodeCustomEvent* event))
 {
-    CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.registerNodeCustomEventReceiver");
     g_customEventReceiver = eventReceiver;
 }
 
 void UnregisterNodeCustomEventReceiver()
 {
-    CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.unregisterNodeCustomEventReceiver");
     g_customEventReceiver = nullptr;
 }
 
@@ -234,11 +230,13 @@ void HandleCustomEvent(ArkUI_NodeCustomEvent* event)
             event->node->customEventListeners);
         if (eventListenersSet) {
             for (const auto& eventlistener : *eventListenersSet) {
+                LOG_CALLBACK("ArkUI_NativeNodeAPI_1.addNodeCustomEventReceiver", eventlistener);
                 (*eventlistener)(event);
             }
         }
     }
     if (g_customEventReceiver) {
+        LOG_CALLBACK("ArkUI_NativeNodeAPI_1.registerNodeCustomEventReceiver", g_customEventReceiver);
         g_customEventReceiver(event);
     }
 }

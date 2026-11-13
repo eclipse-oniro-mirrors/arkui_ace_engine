@@ -15,6 +15,7 @@
 
 #include "core/components_ng/pattern/text/text_base.h"
 
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include "core/components_ng/manager/select_overlay/select_overlay_manager.h"
 #include "core/components_ng/property/measure_utils.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -192,7 +193,7 @@ void TextBase::RevertLocalPointWithTransform(const RefPtr<FrameNode>& targetNode
     std::stack<RefPtr<FrameNode>> nodeStack;
     while (parent) {
         nodeStack.push(parent);
-        parent = parent->GetAncestorNodeOfFrame(true);
+        parent = parent->GetCoordinateAncestorNodeOfFrame(true);
     }
     CHECK_NULL_VOID(!nodeStack.empty());
     PointF localPoint(point.GetX(), point.GetY());
@@ -205,6 +206,10 @@ void TextBase::RevertLocalPointWithTransform(const RefPtr<FrameNode>& targetNode
         renderContext->GetPointWithRevert(localPoint);
         auto rectOffset = renderContext->GetPaintRectWithoutTransform().GetOffset();
         localPoint = localPoint - rectOffset;
+        if (!nodeStack.empty()) {
+            FrameNodeAdoptedCompensation::RevertAdoptedCompensationFromPoint(
+                nodeStack.top().GetRawPtr(), localPoint);
+        }
     }
     point.SetX(localPoint.GetX());
     point.SetY(localPoint.GetY());
@@ -227,10 +232,15 @@ bool TextBase::HasRenderTransform(const RefPtr<FrameNode>& targetNode)
             auto noTransformRect = renderContext->GetPaintRectWithoutTransform();
             auto transformRect = renderContext->GetPaintRectWithTransform();
             hasTransform = noTransformRect != transformRect;
+            if (!hasTransform && host->IsAdopted() &&
+                FrameNodeAdoptedCompensation::UseAdoptedCompensation(host.GetRawPtr())) {
+                hasTransform = FrameNodeAdoptedCompensation::HasAdoptedCompensationPaintRectTransform(
+                    host.GetRawPtr());
+            }
         } else {
             break;
         }
-        host = host->GetAncestorNodeOfFrame(true);
+        host = host->GetCoordinateAncestorNodeOfFrame(true);
     }
     return hasTransform;
 }
@@ -310,7 +320,13 @@ VectorF TextBase::GetHostScale(const RefPtr<FrameNode>& host) const
             scaleX *= std::abs(transform.scale[0]);
             scaleY *= std::abs(transform.scale[1]);
         }
-        parent = parent->GetAncestorNodeOfFrame(true);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            auto compensationScale = FrameNodeAdoptedCompensation::GetAdoptedCompensationScale(parent.GetRawPtr());
+            scaleX *= std::abs(compensationScale.x);
+            scaleY *= std::abs(compensationScale.y);
+        }
+        parent = ancestor;
     }
     return VectorF(scaleX, scaleY);
 }

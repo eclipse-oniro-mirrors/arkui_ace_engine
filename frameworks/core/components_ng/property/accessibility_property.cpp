@@ -77,6 +77,11 @@ namespace {
 constexpr uint64_t ACTIONS = std::numeric_limits<uint64_t>::max();
 constexpr double PRECISION_RESPONSEREGION_COMP = -1.0001f;
 
+bool ShouldSkipHoverTestForNode(const RefPtr<FrameNode>& node)
+{
+    return !node->IsAccessibilityVirtualNode() && (!node->IsActive() || node->IsInternal());
+}
+
 bool IsResponseRegionOverRectWithPrecision(const RectF& responseRect, const RectF& origRect)
 {
     auto responseLeft = responseRect.Left();
@@ -548,10 +553,16 @@ float AccessibilityProperty::GetScrollOffSet() const
     return DEFAULT_ACCESSIBILITY_SCROLL_OFFSET;
 }
 
+AccessibilityHoverTestPath AccessibilityProperty::HoverTest(const PointF& point,
+    const RefPtr<FrameNode>& root, std::unique_ptr<HoverTestDebugTraceInfo>& debugInfo)
+{
+    return HoverTest(point, root, debugInfo, {});
+}
+
 AccessibilityHoverTestPath AccessibilityProperty::HoverTest(
     const PointF& point,
     const RefPtr<FrameNode>& root,
-    std::unique_ptr<HoverTestDebugTraceInfo>& debugInfo)
+    std::unique_ptr<HoverTestDebugTraceInfo>& debugInfo, const HoverTestStopPredicate& stopAtHost)
 {
     AccessibilityHoverTestPath path;
     CHECK_NULL_RETURN(root, path);
@@ -561,7 +572,7 @@ AccessibilityHoverTestPath AccessibilityProperty::HoverTest(
     if (accessibilityProperty != nullptr) {
         ancestorGroupFlag = accessibilityProperty->IsAccessibilityGroup();
     }
-    AccessibilityProperty::HoverTestRecursive(point, root, path, debugInfo, ancestorGroupFlag);
+    AccessibilityProperty::HoverTestRecursive(point, root, path, debugInfo, ancestorGroupFlag, stopAtHost);
     return path;
 }
 
@@ -635,7 +646,7 @@ std::unique_ptr<JsonValue> AccessibilityProperty::CreateNodeSearchInfo(const Ref
 
 bool AccessibilityProperty::ProcessHoverTestRecursive(const PointF& noOffsetPoint, const RefPtr<FrameNode>& node,
     AccessibilityHoverTestPath& path, std::unique_ptr<HoverTestDebugTraceInfo>& debugInfo,
-    RecursiveParam recursiveParam)
+    RecursiveParam recursiveParam, const HoverTestStopPredicate& stopAtHost)
 {
     auto property = node->GetAccessibilityProperty<NG::AccessibilityProperty>();
     auto virtualNode = property->GetAccessibilityVirtualNode();
@@ -644,7 +655,7 @@ bool AccessibilityProperty::ProcessHoverTestRecursive(const PointF& noOffsetPoin
         CHECK_NULL_RETURN(frameNode, false);
 
         if (AccessibilityProperty::HoverTestRecursive(noOffsetPoint, frameNode, path, debugInfo,
-            recursiveParam.ancestorGroupFlag)) {
+            recursiveParam.ancestorGroupFlag, stopAtHost)) {
             return true;
         }
     } else {
@@ -655,7 +666,7 @@ bool AccessibilityProperty::ProcessHoverTestRecursive(const PointF& noOffsetPoin
                 continue;
             }
             if (AccessibilityProperty::HoverTestRecursive(noOffsetPoint, child, path, debugInfo,
-                recursiveParam.ancestorGroupFlag)) {
+                recursiveParam.ancestorGroupFlag, stopAtHost)) {
                 return true;
             }
         }
@@ -774,12 +785,10 @@ bool AccessibilityProperty::HoverTestRecursive(
     const RefPtr<FrameNode>& node,
     AccessibilityHoverTestPath& path,
     std::unique_ptr<HoverTestDebugTraceInfo>& debugInfo,
-    bool& ancestorGroupFlag)
+    bool& ancestorGroupFlag, const HoverTestStopPredicate& stopAtHost)
 {
-    if (!node->IsAccessibilityVirtualNode()) {
-        if (!node->IsActive() || node->IsInternal()) {
-            return false;
-        }
+    if (ShouldSkipHoverTestForNode(node)) {
+        return false;
     }
     if (debugInfo != nullptr) {
         auto nodeInfo = CreateNodeSearchInfo(node, parentPoint, ancestorGroupFlag);
@@ -799,6 +808,12 @@ bool AccessibilityProperty::HoverTestRecursive(
     PointF selfPoint = parentPoint;
     renderContext->GetPointWithRevert(selfPoint);
     bool hitSelf = rect.IsInnerRegion(selfPoint);
+    // A registered host owns hit testing of its contents, including hosts without their own readable text.
+    if (stopAtHost && hitSelf && (shouldSearchSelf || shouldSearchChildren) && stopAtHost(node) &&
+        CheckHoverConsumeByComponent(node, selfPoint - rect.GetOffset())) {
+        path.push_back(node);
+        return true;
+    }
     // hitTarget true means self hit hover, and will not search brothers
     if (hitSelf && shouldSearchSelf
         && CheckHoverConsumeByAccessibility(node)
@@ -821,7 +836,7 @@ bool AccessibilityProperty::HoverTestRecursive(
         RecursiveParam recursiveParam;
         recursiveParam.hitTarget = hitTarget;
         recursiveParam.ancestorGroupFlag = currentGroupFlag;
-        return ProcessHoverTestRecursive(noOffsetPoint, node, path, debugInfo, recursiveParam);
+        return ProcessHoverTestRecursive(noOffsetPoint, node, path, debugInfo, recursiveParam, stopAtHost);
     }
     return hitTarget;
 }

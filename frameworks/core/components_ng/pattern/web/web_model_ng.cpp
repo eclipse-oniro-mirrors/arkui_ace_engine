@@ -751,6 +751,13 @@ void WebModelNG::SetZoomChangeId(std::function<void(const BaseEventInfo* info)>&
     webEventHub->SetOnZoomChangeEvent(std::move(uiCallback));
 }
 
+void WebModelNG::SetVisitedLinkPersistEnabled(bool enabled)
+{
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->UpdateVisitedLinkPersistEnabled(enabled);
+}
+
 void WebModelNG::SetScrollId(std::function<void(const BaseEventInfo* info)>&& jsCallback)
 {
     auto func = jsCallback;
@@ -1792,6 +1799,14 @@ void WebModelNG::SetOnZoomChange(FrameNode* frameNode, std::function<void(const 
         func(info.get());
     };
     webEventHub->SetOnZoomChangeEvent(std::move(uiCallback));
+}
+
+void WebModelNG::SetVisitedLinkPersistEnabled(FrameNode* frameNode, bool enabled)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->UpdateVisitedLinkPersistEnabled(enabled);
 }
 
 void WebModelNG::SetOnRequestFocus(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& jsCallback)

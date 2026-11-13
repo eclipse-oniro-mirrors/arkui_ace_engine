@@ -75,6 +75,12 @@ std::vector<RefPtr<MockImplicitAnimation>> MockAnimationManager::CloseAnimation(
             }
             // update existing animation instead
             anim->Update(params_.callbacks, ticks_);
+            // A caller-held handle can outlive the finished animation's queue entry.
+            if (runningVersion_ >= Version::V2 &&
+                std::find(animations_.begin(), animations_.end(), anim) == animations_.end()) {
+                animations_.emplace_back(anim);
+                res.emplace_back(anim);
+            }
             continue;
         }
         res.emplace_back(AceType::MakeRefPtr<MockImplicitAnimation>(prop, params_.callbacks, ticks_));

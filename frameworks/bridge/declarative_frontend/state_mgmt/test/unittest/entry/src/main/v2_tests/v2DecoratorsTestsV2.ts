@@ -30,7 +30,7 @@ declare function Provider(aliasName?: string): (proto: object, varName: string) 
 
 declare function Consumer(aliasName?: string): (proto: object, varName: string) => void;
 
-declare function Monitor(key: string, ...keys: Array<string>): (target: object, propertyKey: string,
+declare function Monitor(optionsOrFirstPath: MonitorDecoratorOptions | string, path?: string, ...pathN: string[]): (target: object, propertyKey: string,
   descriptor: MonitorDescriptorImpl) => void;
 
 declare function SyncMonitor(key: string, ...keys: Array<string>): (target: object, propertyKey: string,
@@ -39,6 +39,10 @@ declare function SyncMonitor(key: string, ...keys: Array<string>): (target: obje
 declare function Computed(target: object, propertyKey: string, descriptor: ComputedDescriptorImpl): void;
 
 declare function Env(envKey: string): (proto: object, varName: string) => void;
+
+interface MonitorDecoratorOptions {
+  enableWildcard?: boolean;
+}
 
 interface IMonitorValue<T> {
   before: T;

@@ -1,0 +1,44 @@
+{
+  "color": [
+    {
+      "name": "start_window_background",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "aicard_gradient_0",
+      "value": "#0084FF"
+    },
+    {
+      "name": "aicard_gradient_1",
+      "value": "#9266F8"
+    },
+    {
+      "name": "aicard_gradient_2",
+      "value": "#BE56E8"
+    },
+    {
+      "name": "aicard_gradient_3",
+      "value": "#FF678C"
+    },
+    {
+      "name": "aicard_gradient_4",
+      "value": "#FFC458"
+    },
+    {
+      "name": "titlebar_gradient_start",
+      "value": "#0084FF"
+    },
+    {
+      "name": "titlebar_gradient_mid",
+      "value": "#9266F8"
+    },
+    {
+      "name": "titlebar_gradient_end",
+      "value": "#BE56E8"
+    },
+    {
+      "name": "titlebar_gradient_extra",
+      "value": "#FF678C"
+    }
+  ]
+}

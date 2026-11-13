@@ -7086,10 +7086,52 @@ HWTEST_F(ListCommonTestNg, GetDummyItemRect010, TestSize.Level1)
 }
 
 /**
+ * @tc.name: ItemDragFloatKeptWithoutSecondPointer001
+ * @tc.desc: A floating item (long press, the finger never moved) survives a container scroll
+ *           as long as the dragging finger is the only pointer on the List.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListCommonTestNg, ItemDragFloatKeptWithoutSecondPointer001, TestSize.Level1)
+{
+    constexpr int32_t itemCount = 6;
+    constexpr float itemMainSize = 100.0f;
+    constexpr float scrollStep = 51.0f;
+    ListModelNG model = CreateList();
+    auto lazyForEachModelNG = CreateItemsInForLazyEachForItemDragEvent(itemCount, itemMainSize);
+    // the item drag manager only exists once OnMove is set, see LazyForEachNode
+    lazyForEachModelNG.OnMove([](int32_t from, int32_t to) {});
+    lazyForEachModelNG.SetItemDragHandler([](int32_t index) {}, [](int32_t index) {},
+        [](int32_t from, int32_t to) {}, [](int32_t index) {});
+    CreateDone();
+    auto dragManager = GetLazyForEachItemDragManager(0);
+    ASSERT_NE(dragManager, nullptr);
+
+    /**
+     * @tc.steps: step1. Long press item 0, the finger then never moves.
+     * @tc.expected: the item floats and the host List notifies it on container scrolls.
+     */
+    GestureEvent info;
+    dragManager->HandleOnItemLongPress(info);
+    FlushUITasks();
+    ASSERT_EQ(dragManager->dragState_, ListItemDragState::LONG_PRESS);
+    ASSERT_NE(pattern_->dragScrollCallback_, nullptr);
+
+    /**
+     * @tc.steps: step2. The container scrolls with only the dragging finger on it.
+     * @tc.expected: the float survives, nobody took the container over.
+     */
+    pattern_->activeTouchFingerIds_ = { 0 };
+    ASSERT_TRUE(pattern_->HandleScrollImpl(-scrollStep, SCROLL_FROM_UPDATE));
+    FlushUITasks();
+    EXPECT_EQ(dragManager->dragState_, ListItemDragState::LONG_PRESS);
+    EXPECT_NE(pattern_->dragScrollCallback_, nullptr);
+}
+
+/**
  * @tc.name: ItemDragFloatInterruptedByContainerScroll001
- * @tc.desc: A floating item (long press, the finger never moved) is dropped as soon as
- *           another finger really scrolls the List; a single finger scroll, or a scroll
- *           that no finger drove, keeps it.
+ * @tc.desc: A floating item is dropped as soon as another pointer takes the List over, which
+ *           is a second finger on the List together with a scroll; the scroll source is not
+ *           discriminated. Nothing is reported to the application, the drag never started.
  * @tc.type: FUNC
  */
 HWTEST_F(ListCommonTestNg, ItemDragFloatInterruptedByContainerScroll001, TestSize.Level1)
@@ -7115,44 +7157,23 @@ HWTEST_F(ListCommonTestNg, ItemDragFloatInterruptedByContainerScroll001, TestSiz
     lazyForEachModelNG.SetItemDragHandler([](int32_t index) {}, [](int32_t index) {},
         std::move(onMoveThroughEvent), std::move(onDropEvent));
     CreateDone();
+    auto dragManager = GetLazyForEachItemDragManager(0);
+    ASSERT_NE(dragManager, nullptr);
 
     /**
      * @tc.steps: step1. Long press item 0, the finger then never moves.
-     * @tc.expected: the item floats and the host List notifies it on container scrolls.
+     * @tc.expected: the item floats.
      */
-    auto dragManager = GetLazyForEachItemDragManager(0);
-    ASSERT_NE(dragManager, nullptr);
     GestureEvent info;
     dragManager->HandleOnItemLongPress(info);
     FlushUITasks();
     ASSERT_EQ(dragManager->dragState_, ListItemDragState::LONG_PRESS);
-    ASSERT_NE(pattern_->dragScrollCallback_, nullptr);
 
     /**
-     * @tc.steps: step2. The container scrolls with only the dragging finger on it.
-     * @tc.expected: the float survives, nobody took the container over.
-     */
-    pattern_->activeTouchFingerIds_ = { 0 };
-    ASSERT_TRUE(pattern_->HandleScrollImpl(-scrollStep, SCROLL_FROM_UPDATE));
-    FlushUITasks();
-    EXPECT_EQ(dragManager->dragState_, ListItemDragState::LONG_PRESS);
-    EXPECT_NE(pattern_->dragScrollCallback_, nullptr);
-
-    /**
-     * @tc.steps: step3. A second finger is down, but the container moves because of a
-     *              wheel/crown scroll rather than that finger.
-     * @tc.expected: the float survives, only a finger really scrolling drops it.
+     * @tc.steps: step2. A second finger is on the List and really scrolls it.
+     * @tc.expected: the pending float is interrupted and nothing is reported.
      */
     pattern_->activeTouchFingerIds_ = { 0, 1 };
-    dragManager->HandleContainerScroll(SCROLL_FROM_AXIS);
-    EXPECT_EQ(dragManager->dragState_, ListItemDragState::LONG_PRESS);
-    EXPECT_NE(pattern_->dragScrollCallback_, nullptr);
-
-    /**
-     * @tc.steps: step4. That second finger really scrolls the container.
-     * @tc.expected: the pending float is interrupted and nothing is reported to the
-     *              application, because the drag never started.
-     */
     ASSERT_TRUE(pattern_->HandleScrollImpl(-scrollStep, SCROLL_FROM_UPDATE));
     FlushUITasks();
     EXPECT_EQ(dragManager->dragState_, ListItemDragState::IDLE);
@@ -7163,10 +7184,57 @@ HWTEST_F(ListCommonTestNg, ItemDragFloatInterruptedByContainerScroll001, TestSiz
 }
 
 /**
+ * @tc.name: ItemDragRealOffsetSeededOnDragStart001
+ * @tc.desc: realOffset_ is seeded with the slot the item was picked up from, so a container
+ *           scroll frame arriving before the first drag update cannot compute a delta that
+ *           has nothing to do with the visual position and swap with the wrong item.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListCommonTestNg, ItemDragRealOffsetSeededOnDragStart001, TestSize.Level1)
+{
+    constexpr int32_t itemCount = 6;
+    constexpr float itemMainSize = 100.0f;
+    int32_t actualOnMoveThroughTo = -1;
+    ListModelNG model = CreateList();
+    auto lazyForEachModelNG = CreateItemsInForLazyEachForItemDragEvent(itemCount, itemMainSize);
+    lazyForEachModelNG.OnMove([](int32_t from, int32_t to) {});
+    lazyForEachModelNG.SetItemDragHandler([](int32_t index) {}, [](int32_t index) {},
+        [&actualOnMoveThroughTo](int32_t from, int32_t to) { actualOnMoveThroughTo = to; },
+        [](int32_t index) {});
+    CreateDone();
+    // item 1, whose slot is not at the container origin: a zero realOffset_ would yield a
+    // delta of one full item height there, while item 0 would hide the problem
+    auto dragManager = GetLazyForEachItemDragManager(1);
+    ASSERT_NE(dragManager, nullptr);
+
+    /**
+     * @tc.steps: step1. The drag starts, no drag update has been delivered yet.
+     * @tc.expected: the drag position is seeded with the slot of the item.
+     */
+    GestureEvent info;
+    dragManager->HandleOnItemLongPress(info);
+    dragManager->HandleOnItemDragStart(info);
+    ASSERT_EQ(dragManager->dragState_, ListItemDragState::DRAGGING);
+    ASSERT_EQ(dragManager->realOffset_.GetX(), dragManager->dragOffset_.GetX());
+    ASSERT_EQ(dragManager->realOffset_.GetY(), dragManager->dragOffset_.GetY());
+
+    /**
+     * @tc.steps: step2. A mouse drag, one finger scrolls the List before any drag update.
+     * @tc.expected: the delta is zero, so nothing is swapped and nothing is reported.
+     */
+    dragManager->isMouseDrag_ = true;
+    pattern_->activeTouchFingerIds_ = { 0 };
+    dragManager->HandleContainerScroll(SCROLL_FROM_UPDATE);
+    EXPECT_EQ(dragManager->dragState_, ListItemDragState::DRAGGING);
+    EXPECT_EQ(actualOnMoveThroughTo, -1);
+}
+
+/**
  * @tc.name: ItemDragNotInterruptedWhileDragging001
  * @tc.desc: Once the item is really being dragged, a second finger scrolling the List does
  *           not interrupt it, one finger drags while another scrolls; only the drag edge
- *           auto-scroll is handed over, and only for a finger driven scroll.
+ *           auto-scroll is handed over, for any scroll source, since the source is not
+ *           discriminated once a second pointer is on the List.
  * @tc.type: FUNC
  */
 HWTEST_F(ListCommonTestNg, ItemDragNotInterruptedWhileDragging001, TestSize.Level1)
@@ -7198,14 +7266,15 @@ HWTEST_F(ListCommonTestNg, ItemDragNotInterruptedWhileDragging001, TestSize.Leve
     ASSERT_EQ(dragManager->dragState_, ListItemDragState::DRAGGING);
 
     /**
-     * @tc.steps: step2. A second finger is down, but the container moves because of a
-     *              wheel/crown scroll rather than that finger.
-     * @tc.expected: the drag edge auto-scroll is not handed over.
+     * @tc.steps: step2. A second finger is down and the container moves, whatever drove
+     *              that movement.
+     * @tc.expected: the scroll source is not discriminated, so the drag edge auto-scroll is
+     *              handed over while the running drag itself is left alone.
      */
     pattern_->activeTouchFingerIds_ = { 0, 1 };
     dragManager->HandleContainerScroll(SCROLL_FROM_AXIS);
     EXPECT_EQ(dragManager->dragState_, ListItemDragState::DRAGGING);
-    EXPECT_FALSE(dragManager->suppressAutoScroll_);
+    EXPECT_TRUE(dragManager->suppressAutoScroll_);
 
     /**
      * @tc.steps: step3. That second finger really scrolls the container.

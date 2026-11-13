@@ -2935,4 +2935,59 @@ HWTEST_F(TabBarPatternTestNg, SetOnTabBarItemsChangeEvent, TestSize.Level1)
     tabBarPattern_->NotifyTabBarItemsChange();
     EXPECT_NE(tabBarPattern_->onTabBarItemsChangeEvent_, nullptr);
 }
+
+/**
+ * @tc.name: OnThemeScopeUpdateClearsLabelAndIconColors001
+ * @tc.desc: Test OnThemeScopeUpdate clears cached label/icon selected and unselected colors
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabBarPatternTestNg, OnThemeScopeUpdateClearsLabelAndIconColors001, TestSize.Level1)
+{
+    TabsModelNG model = CreateTabs();
+    CreateTabContents(TABCONTENT_NUMBER);
+    CreateTabsDone(model);
+    ASSERT_NE(tabBarPattern_, nullptr);
+
+    LabelStyle labelStyle;
+    labelStyle.selectedColor = Color::WHITE;
+    labelStyle.unselectedColor = Color::BLACK;
+    tabBarPattern_->SetLabelStyle(0, labelStyle);
+
+    IconStyle iconStyle;
+    iconStyle.selectedColor = Color::WHITE;
+    iconStyle.unselectedColor = Color::BLACK;
+    tabBarPattern_->SetIconStyle(iconStyle, 0);
+
+    ASSERT_TRUE(tabBarPattern_->labelStyles_[0].selectedColor.has_value());
+    ASSERT_TRUE(tabBarPattern_->labelStyles_[0].unselectedColor.has_value());
+
+    auto result = tabBarPattern_->OnThemeScopeUpdate(0);
+    EXPECT_FALSE(result);
+
+    EXPECT_FALSE(tabBarPattern_->labelStyles_[0].selectedColor.has_value());
+    EXPECT_FALSE(tabBarPattern_->labelStyles_[0].unselectedColor.has_value());
+    EXPECT_FALSE(tabBarPattern_->iconStyles_[0].selectedColor.has_value());
+    EXPECT_FALSE(tabBarPattern_->iconStyles_[0].unselectedColor.has_value());
+}
+
+/**
+ * @tc.name: OnThemeScopeUpdateEmptyStyles001
+ * @tc.desc: Test OnThemeScopeUpdate when labelStyles and iconStyles are empty (loop body skipped)
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabBarPatternTestNg, OnThemeScopeUpdateEmptyStyles001, TestSize.Level1)
+{
+    TabsModelNG model = CreateTabs();
+    CreateTabContents(TABCONTENT_NUMBER);
+    CreateTabsDone(model);
+    ASSERT_NE(tabBarPattern_, nullptr);
+
+    tabBarPattern_->labelStyles_.clear();
+    tabBarPattern_->iconStyles_.clear();
+
+    auto result = tabBarPattern_->OnThemeScopeUpdate(0);
+    EXPECT_FALSE(result);
+    EXPECT_TRUE(tabBarPattern_->labelStyles_.empty());
+    EXPECT_TRUE(tabBarPattern_->iconStyles_.empty());
+}
 } // namespace OHOS::Ace::NG

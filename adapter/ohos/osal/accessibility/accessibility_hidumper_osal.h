@@ -25,6 +25,11 @@
 
 namespace OHOS::Accessibility {
     class AccessibilityElementInfo;
+    struct FocusMoveResult;
+}
+
+namespace OHOS::Ace {
+struct DumpInfoArgument;
 }
 
 namespace OHOS::Ace::NG {
@@ -34,6 +39,7 @@ class UINode;
 
 namespace OHOS::Ace::Framework {
 struct CommonProperty;
+class JsAccessibilityManager;
 
 bool IsExtensionComponent(const RefPtr<NG::UINode>& node);
 bool IsUIExtensionShowPlaceholder(const RefPtr<NG::UINode>& node);
@@ -64,6 +70,11 @@ class AccessibilityManagerHidumper {
 public:
     AccessibilityManagerHidumper() = default;
     ~AccessibilityManagerHidumper() = default;
+
+    static void DumpFocusSearch(
+        JsAccessibilityManager& manager, const DumpInfoArgument& argument, int32_t windowId);
+    static void DumpFocusSearchResult(const std::list<Accessibility::AccessibilityElementInfo>& infos,
+        const Accessibility::FocusMoveResult& result);
 
     static void DumpCustomActionTest(
         const std::vector<std::string>& params,

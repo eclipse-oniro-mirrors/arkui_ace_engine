@@ -14,11 +14,13 @@
  */
 #include <cstdint>
 
+#include "base/log/log_wrapper.h"
 #include "base/utils/macros.h"
 #include "core/common/ace_translate_manager.h"
 #include "core/components_ng/pattern/page_translate/page_translate_node.h"
 #include "core/components_ng/pattern/pattern.h"
 #include "core/components_v2/inspector/inspector_constants.h"
+#include "interfaces/inner_api/ui_session/ui_session_manager.h"
 
 namespace OHOS::Ace {
 void UiTranslateManagerImpl::AddPixelMap(int32_t nodeId, RefPtr<PixelMap> pixelMap) {}
@@ -68,4 +70,34 @@ void UiTranslateManagerImpl::ResetTranslate(int32_t) {}
 void UiTranslateManagerImpl::SendTranslateResult(int32_t, std::string) {}
 void UiTranslateManagerImpl::ClearMap() {}
 void UiTranslateManagerImpl::PostToUI(const std::function<void()>&) {}
+
+void UiTranslateManagerImpl::GetWebInfoByRequest(uint32_t windowId, int32_t webId, const std::string& request)
+{
+    auto iter = listenerMap_.find(webId);
+    if (iter != listenerMap_.end()) {
+        auto translateNode = iter->second.translateNode.Upgrade();
+        CHECK_NULL_VOID(translateNode);
+        const auto& finishCallback = []
+            (uint32_t windowId, int32_t webId, const std::string& request, const std::string& result,
+                WebRequestErrorCode errorCode) {
+                UiSessionManager::GetInstance()->SendWebInfoByRequest(windowId, webId, request, result, errorCode);
+            };
+        finishCallback(windowId, webId, request, "", WebRequestErrorCode::INVALID_REQUEST);
+        return;
+    }
+    std::string availableWebIds;
+    for (const auto& listener : listenerMap_) {
+        if (!listener.second.translateNode.Upgrade()) {
+            continue;
+        }
+        if (!availableWebIds.empty()) {
+            availableWebIds += ",";
+        }
+        availableWebIds += std::to_string(listener.first);
+    }
+    LOGI("GetWebInfoByRequest webId:%{public}d not found, available webIds: [%{public}s]",
+        webId, availableWebIds.c_str());
+    UiSessionManager::GetInstance()->SendWebInfoByRequest(
+        windowId, webId, request, "", WebRequestErrorCode::INVALID_WEB_ID);
+}
 } // namespace OHOS::Ace

@@ -1099,6 +1099,20 @@ void SetOnZoomChangeImpl(Ark_NativePointer node,
     WebModelStatic::SetZoomChangeId(frameNode, onZoomChange);
 #endif // WEB_SUPPORTED
 }
+void SetVisitedLinkPersistEnabledImpl(Ark_NativePointer node,
+                                      const Opt_Boolean* value)
+{
+#ifdef WEB_SUPPORTED
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto convValue = Converter::OptConvert<bool>(*value);
+    if (!convValue) {
+        // Implement Reset value
+        return;
+    }
+    WebModelStatic::SetVisitedLinkPersistEnabled(frameNode, *convValue);
+#endif // WEB_SUPPORTED
+}
 void SetOnHttpAuthRequestImpl(Ark_NativePointer node,
                               const Opt_Callback_OnHttpAuthRequestEvent_Boolean* value)
 {
@@ -3462,6 +3476,7 @@ const GENERATED_ArkUIWebModifier* GetWebModifier()
         WebAttributeModifier::SetCaretColorImpl,
         WebAttributeModifier::SetOnZoomChangeImpl,
         WebAttributeModifier::SetFlingSpeedLimitImpl,
+        WebAttributeModifier::SetVisitedLinkPersistEnabledImpl,
         WebAttributeModifier::SetRegisterNativeEmbedRuleImpl,
         WebAttributeModifier::SetBindSelectionMenuImpl,
         WebAttributeModifier::SetEnableScrollDirectionalLockImpl,

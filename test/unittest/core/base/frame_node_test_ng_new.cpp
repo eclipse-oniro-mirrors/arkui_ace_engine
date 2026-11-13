@@ -2472,6 +2472,100 @@ HWTEST_F(FrameNodeTestNg, FrameNodeMarkRemoving004, TestSize.Level1)
 }
 
 /**
+ * @tc.name: FrameNodeMarkRemoving005
+ * @tc.desc: Test MarkRemoving when geometryNode_ is nullptr.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeTestNg, FrameNodeMarkRemoving005, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. create frameNode with geometry transition.
+     */
+    auto frameNode = FrameNode::CreateFrameNode("main", 1, AceType::MakeRefPtr<Pattern>(), true);
+    ASSERT_NE(frameNode, nullptr);
+    frameNode->layoutProperty_->UpdateGeometryTransition("test_geo_id");
+
+    /**
+     * @tc.steps: step2. set geometryNode_ to nullptr.
+     */
+    frameNode->geometryNode_ = nullptr;
+
+    /**
+     * @tc.steps: step3. test MarkRemoving.
+     * @tc.expected: expect returns false due to early return (!geometryNode_).
+     */
+    auto pendingRemove = frameNode->MarkRemoving();
+    EXPECT_FALSE(pendingRemove);
+}
+
+/**
+ * @tc.name: FrameNodeMarkRemoving006
+ * @tc.desc: Test MarkRemoving when isOnShow is false (app in background).
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeTestNg, FrameNodeMarkRemoving006, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. create frameNode with geometry transition.
+     */
+    auto frameNode = FrameNode::CreateFrameNode("main", 1, AceType::MakeRefPtr<Pattern>(), true);
+    ASSERT_NE(frameNode, nullptr);
+    frameNode->layoutProperty_->UpdateGeometryTransition("test_geo_id");
+
+    /**
+     * @tc.steps: step2. set onShow_ to false (app in background).
+     */
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    bool savedOnShow = context->onShow_;
+    context->onShow_ = false;
+
+    /**
+     * @tc.steps: step3. test MarkRemoving.
+     * @tc.expected: expect returns false because isOnShow is false, Build is skipped.
+     */
+    auto pendingRemove = frameNode->MarkRemoving();
+    EXPECT_FALSE(pendingRemove);
+
+    /**
+     * @tc.steps: step4. restore onShow_.
+     */
+    context->onShow_ = savedOnShow;
+}
+
+/**
+ * @tc.name: FrameNodeMarkRemoving007
+ * @tc.desc: Test MarkRemoving when child has geometry transition (recursion propagation).
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeTestNg, FrameNodeMarkRemoving007, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. create parent and child frameNodes.
+     */
+    auto parent = FrameNode::CreateFrameNode("parent", 1, AceType::MakeRefPtr<Pattern>(), true);
+    ASSERT_NE(parent, nullptr);
+    auto child = FrameNode::CreateFrameNode("child", 2, AceType::MakeRefPtr<Pattern>(), true);
+    ASSERT_NE(child, nullptr);
+    parent->AddChild(child);
+
+    /**
+     * @tc.steps: step2. set geometry transition on child only (parent has none).
+     */
+    child->layoutProperty_->UpdateGeometryTransition("test_geo_id");
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    context->onShow_ = true;
+
+    /**
+     * @tc.steps: step3. test parent MarkRemoving.
+     * @tc.expected: expect returns true because child's MarkRemoving returns true.
+     */
+    auto pendingRemove = parent->MarkRemoving();
+    EXPECT_TRUE(pendingRemove);
+}
+
+/**
  * @tc.name: FrameNodeOnConfigurationUpdate
  * @tc.desc: Test of OnConfigurationUpdate
  * @tc.type: FUNC

@@ -58,6 +58,7 @@ public:
             SetToolbarActiveIconColor(colors->IconEmphasize());
             SetToolBarItemActiveFontColor(colors->FontEmphasize());
             SetNavigationDividerColor(colors->CompDivider());
+            SetBackgroundFocusOutlineColor(colors->InteractiveFocus());
         }
     }
 

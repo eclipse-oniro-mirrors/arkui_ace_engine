@@ -13,12 +13,15 @@
  * limitations under the License.
  */
 
+#include <type_traits>
+
 #include "gtest/gtest.h"
 #include "gtest/hwext/gtest-ext.h"
 
 #include "base/memory/ace_type.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/view_stack_processor.h"
+#include "core/components_ng/pattern/custom/custom_measure_layout_node.h"
 #include "core/components_ng/pattern/custom/custom_node.h"
 #include "core/components_ng/pattern/recycle_view/recycle_dummy_node.h"
 #include "core/components_v2/inspector/inspector_constants.h"
@@ -110,4 +113,123 @@ HWTEST_F(RecycleNodeTestNG, RecycleNodeTestNG002, TestSize.Level1)
     
     recycleNode.Reset();
 }
+/**
+ * @tc.name: CustomOwnerLifetime
+ * @tc.desc: A custom capability keeps its node alive and preserves copy, move and weak reference semantics.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RecycleNodeTestNG, CustomOwnerLifetime, TestSize.Level1)
+{
+    static_assert(!std::is_base_of_v<AceType, CustomNodeBase>);
+    static_assert(sizeof(RefPtr<CustomNodeBase>) == sizeof(void*));
+    static_assert(sizeof(WeakPtr<CustomNodeBase>) == 2 * sizeof(void*));
+    int32_t destroyed = 0;
+    auto node = AceType::MakeRefPtr<CustomNode>(ElementRegister::GetInstance()->MakeUniqueId(), "owner");
+    node->SetDestroyFunction([&destroyed]() { ++destroyed; });
+    RefPtr<CustomNodeBase> capability = node;
+    WeakPtr<CustomNodeBase> weak = capability;
+    EXPECT_TRUE(AceType::InstanceOf<CustomNodeBase>(node));
+    EXPECT_EQ(AceType::RawPtr(capability), static_cast<CustomNodeBase*>(AceType::RawPtr(node)));
+    EXPECT_EQ(node->RefCount(), 2);
+    {
+        auto claimed = AceType::Claim(AceType::RawPtr(capability));
+        auto copy = claimed;
+        RefPtr<CustomNodeBase> moved = std::move(copy);
+        EXPECT_EQ(copy, nullptr);
+        EXPECT_EQ(moved, node);
+        RefPtr<UINode> owner = std::move(moved);
+        EXPECT_EQ(moved, nullptr);
+        EXPECT_EQ(owner, node);
+        EXPECT_EQ(node->RefCount(), 4);
+    }
+    EXPECT_EQ(node->RefCount(), 2);
+    node.Reset();
+    EXPECT_EQ(destroyed, 0);
+    EXPECT_NE(weak.Upgrade(), nullptr);
+    capability.Reset();
+    EXPECT_EQ(destroyed, 1);
+    EXPECT_EQ(weak.Upgrade(), nullptr);
+    EXPECT_EQ(AceType::DynamicCast<UINode>(weak).Upgrade(), nullptr);
+}
+
+/**
+ * @tc.name: CustomAndLayoutShareOwner
+ * @tc.desc: Layout and custom capabilities share one owner, including cross-casts and final release.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RecycleNodeTestNG, CustomAndLayoutShareOwner, TestSize.Level1)
+{
+    int32_t destroyed = 0;
+    auto node = AceType::MakeRefPtr<CustomMeasureLayoutNode>(
+        ElementRegister::GetInstance()->MakeUniqueId(), "dual-capability");
+    node->SetDestroyFunction([&destroyed]() { ++destroyed; });
+    RefPtr<CustomNodeBase> custom = node;
+    RefPtr<LayoutWrapper> layout = node;
+    WeakPtr<CustomNodeBase> weakCustom = custom;
+    WeakPtr<LayoutWrapper> weakLayout = layout;
+    EXPECT_EQ(custom, layout);
+    EXPECT_EQ(weakCustom, weakLayout);
+    EXPECT_EQ(WeakPtr<CustomNodeBase>::Hash()(weakCustom), WeakPtr<LayoutWrapper>::Hash()(weakLayout));
+    EXPECT_EQ(AceType::RawPtr(custom), static_cast<CustomNodeBase*>(AceType::RawPtr(node)));
+    EXPECT_EQ(AceType::RawPtr(layout), static_cast<LayoutWrapper*>(AceType::RawPtr(node)));
+    EXPECT_EQ(AceType::DynamicCast<LayoutWrapper>(custom), layout);
+    EXPECT_EQ(AceType::DynamicCast<CustomNodeBase>(layout), custom);
+    {
+        RefPtr<const CustomNodeBase> constCustom = custom;
+        EXPECT_EQ(RefPtrTraits<const CustomNodeBase>::GetOwner(constCustom.GetRawPtr()), AceType::RawPtr(node));
+        auto constLayout = AceType::DynamicCast<const LayoutWrapper>(std::move(constCustom));
+        EXPECT_EQ(constCustom, nullptr);
+        EXPECT_EQ(RefPtrTraits<const LayoutWrapper>::GetOwner(constLayout.GetRawPtr()), AceType::RawPtr(node));
+        auto failed = AceType::DynamicCast<CustomNode>(std::move(custom));
+        EXPECT_EQ(failed, nullptr);
+        EXPECT_NE(custom, nullptr);
+        EXPECT_EQ(node->RefCount(), 4);
+    }
+    auto transferred = AceType::DynamicCast<LayoutWrapper>(std::move(custom));
+    EXPECT_EQ(custom, nullptr);
+    EXPECT_EQ(node->RefCount(), 3);
+    node.Reset();
+    layout.Reset();
+    EXPECT_EQ(destroyed, 0);
+    EXPECT_NE(weakCustom.Upgrade(), nullptr);
+    transferred.Reset();
+    EXPECT_EQ(destroyed, 1);
+    EXPECT_EQ(weakCustom.Upgrade(), nullptr);
+    EXPECT_EQ(weakLayout.Upgrade(), nullptr);
+}
+
+/**
+ * @tc.name: CustomRecycleCallbackRetainsOwner
+ * @tc.desc: The original recycle callback can retain a capability and release the node after reuse.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RecycleNodeTestNG, CustomRecycleCallbackRetainsOwner, TestSize.Level1)
+{
+    int32_t destroyed = 0;
+    int32_t recycled = 0;
+    int32_t rendered = 0;
+    RefPtr<CustomNodeBase> cached;
+    auto node = AceType::MakeRefPtr<CustomNode>(ElementRegister::GetInstance()->MakeUniqueId(), "recycle");
+    node->SetDestroyFunction([&destroyed]() { ++destroyed; });
+    WeakPtr<CustomNodeBase> weak = node;
+    node->SetRecycleFunction([&cached, &recycled](RefPtr<CustomNodeBase> capability) {
+        ++recycled;
+        cached = std::move(capability);
+    });
+    node->FireRecycleSelf();
+    EXPECT_EQ(recycled, 1);
+    EXPECT_EQ(cached, node);
+    node.Reset();
+    ASSERT_NE(cached, nullptr);
+    EXPECT_EQ(destroyed, 0);
+    cached->SetRecycleRenderFunc([&rendered]() { ++rendered; });
+    cached->FireRecycleRenderFunc();
+    cached->FireRecycleRenderFunc();
+    EXPECT_EQ(rendered, 1);
+    EXPECT_NE(weak.Upgrade(), nullptr);
+    cached.Reset();
+    EXPECT_EQ(destroyed, 1);
+    EXPECT_EQ(weak.Upgrade(), nullptr);
+}
+
 } // namespace OHOS::Ace::NG

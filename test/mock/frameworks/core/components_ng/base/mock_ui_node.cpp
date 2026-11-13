@@ -138,6 +138,11 @@ void UINode::DumpSimplifyInfoWithParamConfig(std::shared_ptr<JsonValue>& json, P
     }
 }
 
+void UINode::DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& json, ParamConfig config)
+{
+    UINode::DumpSimplifyInfoWithParamConfig(json, config);
+}
+
 void UINode::DumpSimplifyTree(int32_t depth, std::shared_ptr<JsonValue>& current)
 {
     DumpSimplifyTreeWithParamConfig(depth, current, true, {}, nullptr);

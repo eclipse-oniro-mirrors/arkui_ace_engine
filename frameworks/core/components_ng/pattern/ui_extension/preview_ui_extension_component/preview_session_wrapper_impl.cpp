@@ -333,6 +333,8 @@ void PreviewSessionWrapperImpl::InitAllCallback()
 /*********************** Begin: About session ************************************/
 void PreviewSessionWrapperImpl::CreateSession(const AAFwk::Want& want, const SessionConfig& config)
 {
+    auto pattern = hostPattern_.Upgrade();
+    CHECK_NULL_VOID(pattern);
     PLATFORM_LOGI("PreviewUIExtension The session is created with bundle = %{public}s, ability = %{public}s",
         want.GetElement().GetBundleName().c_str(), want.GetElement().GetAbilityName().c_str());
     auto container = Platform::AceContainer::GetContainer(instanceId_);
@@ -347,8 +349,9 @@ void PreviewSessionWrapperImpl::CreateSession(const AAFwk::Want& want, const Ses
     } else {
         parentWindowType = container->GetWindowType();
     }
-    PLATFORM_LOGI("PreviewUIExtension isNotifyOccupiedAreaChange is %{public}d, parentWindowType: %{public}u",
-        isNotifyOccupiedAreaChange_, parentWindowType);
+    auto brandColorStr = pattern->GetBrandColorStr();
+    PLATFORM_LOGI("PreviewUIExtension isNotifyOccupiedAreaChange is %{public}d, parentWindowType: %{public}u, "
+        "brandColorStr: %{public}s", isNotifyOccupiedAreaChange_, parentWindowType, brandColorStr.c_str());
     auto callerToken = container->GetToken();
     auto parentToken = container->GetParentToken();
     Rosen::SessionInfo extensionSessionInfo;
@@ -360,9 +363,11 @@ void PreviewSessionWrapperImpl::CreateSession(const AAFwk::Want& want, const Ses
     extensionSessionInfo.parentWindowType_ = parentWindowType;
     extensionSessionInfo.uiExtensionUsage_ = static_cast<uint32_t>(config.uiExtensionUsage);
     extensionSessionInfo.isAsyncModalBinding_ = config.isAsyncModalBinding;
+    extensionSessionInfo.brandColorStr_ = brandColorStr;
     SetConnectToRenderInner(container, extensionSessionInfo);
     session_ = Rosen::ExtensionSessionManager::GetInstance().RequestExtensionSession(extensionSessionInfo);
     CHECK_NULL_VOID(session_);
+    pattern->SetLastSentBrandColorStr(brandColorStr);
     lifecycleListener_ = std::make_shared<PreviewUIExtensionLifecycleListener>(
         AceType::WeakClaim(this));
     session_->RegisterLifecycleListener(lifecycleListener_);

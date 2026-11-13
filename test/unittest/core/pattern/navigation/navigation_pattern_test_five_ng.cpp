@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 #include <iostream>
+#include <iterator>
 #include <optional>
 
 #include "gtest/gtest.h"
@@ -35,6 +36,7 @@
 #include "core/components_ng/pattern/dialog/dialog_pattern.h"
 #include "core/components_ng/pattern/dialog/dialog_view.h"
 #include "core/components_ng/pattern/divider/divider_pattern.h"
+#include "core/components_ng/pattern/navigation/nav_bar_node.h"
 #include "core/components_ng/pattern/navigation/nav_bar_pattern.h"
 #include "core/components_ng/pattern/navigation/navigation_drag_bar_pattern.h"
 #include "core/components_ng/pattern/navigation/navigation_model_ng.h"
@@ -69,6 +71,7 @@ RefPtr<NavigationBarTheme> CreateAndBindNavigationBarTheme()
     EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(navigationTheme));
     return navigationTheme;
 }
+
 } // namespace
 
 using SwitchHandleFunc = std::function<void(const AbilityContextInfo&, NavDestinationSwitchInfo&)>;
@@ -82,7 +85,6 @@ public:
     static RefPtr<FrameNode> CreateDialogNode();
     static void RunMeasureAndLayout(RefPtr<LayoutWrapperNode>& layoutWrapper, float width = DEFAULT_ROOT_WIDTH);
     void MockPipelineContextGetTheme();
-
     static void TestNavSwitchHandleFunc(const AbilityContextInfo& ctxInfo, NavDestinationSwitchInfo& switchInfo)
     {
         if (innerHandleFunc_) {
@@ -2028,4 +2030,5 @@ HWTEST_F(NavigationPatternTestFiveNg, IsHomeDestinationOrNavBarVisible, TestSize
     ret = pattern->IsHomeDestinationOrNavBarVisible();
     EXPECT_TRUE(ret);
 }
+
 } // namespace OHOS::Ace::NG

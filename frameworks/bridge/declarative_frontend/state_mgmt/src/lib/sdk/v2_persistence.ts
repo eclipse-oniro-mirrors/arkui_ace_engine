@@ -78,6 +78,7 @@ class StorageHelper {
   protected static readonly INVALID_LENGTH_KEY: string = 'Cannot use the key! The length of key should be 2 to 255';
   protected static readonly INVALID_CHARACTER_KEY: string = 'Cannot use the key! The value of key can only consist of letters, digits and underscores';
   protected static readonly NULL_OR_UNDEFINED_KEY: string = `The parameter cannot be null or undefined`;
+  protected static readonly VALID_KEY_PATTERN: RegExp = /^[0-9a-zA-Z_]+$/;
 
   // sotre old type name to check the type matches or not
   protected oldTypeValues_: Map<string, string>;
@@ -158,7 +159,7 @@ class StorageHelper {
       stateMgmtConsole.applicationWarn(StorageHelper.INVALID_LENGTH_KEY);
     }
 
-    if (!/^[0-9a-zA-Z_]+$/.test(key)) {
+    if (!StorageHelper.VALID_KEY_PATTERN.test(key)) {
       stateMgmtConsole.applicationWarn(StorageHelper.INVALID_CHARACTER_KEY);
     }
 

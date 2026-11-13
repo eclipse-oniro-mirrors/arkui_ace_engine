@@ -23,9 +23,10 @@ namespace OHOS::Ace::Framework {
 
 ThirdRulesCheckNode::ThirdRulesCheckNode(std::shared_ptr<ArkUI_AccessibilityElementInfo> nodeInfo,
     int64_t accessibilityId,
-    const WeakPtr<AccessibilityProvider>& accessibilityProvider)
+    const WeakPtr<AccessibilityProvider>& accessibilityProvider,
+    const std::shared_ptr<ParentMap>& parentMap, const std::shared_ptr<NodeMap>& nodeMap)
     : FocusRulesCheckNode(accessibilityId), nodeInfo_(std::move(nodeInfo)),
-    accessibilityProvider_(accessibilityProvider)
+    accessibilityProvider_(accessibilityProvider), parentMap_(parentMap), nodeMap_(nodeMap)
 {
 }
 
@@ -171,18 +172,37 @@ std::vector<std::shared_ptr<T>> ThirdRulesCheckNode::GetChildrenTemplate()
 {
     std::vector<std::shared_ptr<T>> checkNodeChildren;
     CHECK_NULL_RETURN(nodeInfo_, checkNodeChildren);
-    auto childrenIds = nodeInfo_->GetChildNodeIds();
+    const auto& childrenIds = nodeInfo_->GetChildNodeIds();
+    std::unordered_set<int64_t> visited;
     for (auto& childId : childrenIds) {
+        if (!visited.insert(childId).second) {
+            continue;
+        }
+        if (parentMap_) {
+            auto parent = parentMap_->find(childId);
+            if (parent == parentMap_->end() || parent->second != GetAccessibilityId()) {
+                continue;
+            }
+        }
         if (childId == -1) {
             continue;
         }
         if (childId == Accessibility::AccessibilityElementInfo::ROOT_PARENT_ID) {
             continue;
         }
+        if (nodeMap_) {
+            auto child = nodeMap_->find(childId);
+            if (child != nodeMap_->end()) {
+                checkNodeChildren.push_back(std::make_shared<ThirdRulesCheckNode>(
+                    child->second, childId, accessibilityProvider_, parentMap_, nodeMap_));
+            }
+            continue;
+        }
         auto child = std::make_shared<ArkUI_AccessibilityElementInfo>();
-        if (JsThirdProviderInteractionOperation::FindNativeInfoById(accessibilityProvider_, childId, child)) {
+        if (JsThirdProviderInteractionOperation::FindNativeInfoById(accessibilityProvider_, childId, child) &&
+            child->GetElementId() == childId) {
             auto childCheckNode = std::make_shared<ThirdRulesCheckNode>(
-                child, child->GetElementId(), accessibilityProvider_);
+                child, child->GetElementId(), accessibilityProvider_, parentMap_);
             checkNodeChildren.push_back(childCheckNode);
         }
     }
@@ -203,13 +223,27 @@ std::shared_ptr<FocusRulesCheckNode> ThirdRulesCheckNode::GetAceParent()
 {
     CHECK_NULL_RETURN(nodeInfo_, nullptr);
     auto parentId = nodeInfo_->GetParentId();
+    if (parentMap_) {
+        auto parent = parentMap_->find(GetAccessibilityId());
+        CHECK_EQUAL_RETURN(parent == parentMap_->end(), true, nullptr);
+        parentId = parent->second;
+    }
     if ((parentId == -1) || (parentId == Accessibility::AccessibilityElementInfo::ROOT_PARENT_ID)) {
         return nullptr;
     }
+    if (nodeMap_) {
+        auto parent = nodeMap_->find(parentId);
+        if (parent == nodeMap_->end()) {
+            return nullptr;
+        }
+        return std::make_shared<ThirdRulesCheckNode>(
+            parent->second, parentId, accessibilityProvider_, parentMap_, nodeMap_);
+    }
     auto parent = std::make_shared<ArkUI_AccessibilityElementInfo>();
-    if (JsThirdProviderInteractionOperation::FindNativeInfoById(accessibilityProvider_, parentId, parent)) {
+    if (JsThirdProviderInteractionOperation::FindNativeInfoById(accessibilityProvider_, parentId, parent) &&
+        parent->GetElementId() == parentId) {
         auto parentCheckNode = std::make_shared<ThirdRulesCheckNode>(
-            parent, parent->GetElementId(), accessibilityProvider_);
+            parent, parent->GetElementId(), accessibilityProvider_, parentMap_);
         return parentCheckNode;
     }
     return nullptr;

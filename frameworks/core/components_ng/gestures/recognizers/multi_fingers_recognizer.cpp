@@ -35,6 +35,15 @@ MultiFingersRecognizer::MultiFingersRecognizer(int32_t fingers, bool isLimitFing
     isLimitFingerCount_ = isLimitFingerCount;
 }
 
+void MultiFingersRecognizer::ReleaseTouchEventPayload(TouchEvent& event)
+{
+    std::vector<TouchEvent>().swap(event.history);
+    std::vector<KeyCode>().swap(event.pressedKeyCodes_);
+    std::list<std::string>().swap(event.childTouchTestList);
+    std::vector<TouchPoint>().swap(event.pointers);
+    event.pointerEvent.reset();
+}
+
 namespace {
 bool CheckRefereeState(RefereeState refereeState)
 {

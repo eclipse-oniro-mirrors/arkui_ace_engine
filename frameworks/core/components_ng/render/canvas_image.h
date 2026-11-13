@@ -94,6 +94,11 @@ public:
         return nullptr;
     }
 
+    virtual std::string PixelSamplingDump() const
+    {
+        return "";
+    }
+
     virtual int32_t GetWidth() const = 0;
     virtual int32_t GetHeight() const = 0;
 

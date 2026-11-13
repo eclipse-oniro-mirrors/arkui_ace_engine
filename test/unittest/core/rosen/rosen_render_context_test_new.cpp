@@ -36,6 +36,8 @@
 #include "core/components_ng/pattern/button/button_pattern.h"
 #include "core/common/event_manager.h"
 #include "modifier_ng/background/rs_background_shader_modifier.h"
+#include "base/geometry/shape.h"
+#include "core/components/common/properties/shadow.h"
 
 #undef private
 #undef protected
@@ -1794,5 +1796,72 @@ HWTEST_F(RosenRenderContextTest, RosenRenderContextTestNew051, TestSize.Level1)
     ASSERT_NE(rosenRenderContext->drawRegionRects_[DRAW_REGION_OVERLAY_TEXT_INDEX], nullptr);
     EXPECT_TRUE(*rosenRenderContext->drawRegionRects_[DRAW_REGION_OVERLAY_TEXT_INDEX] == *expectedTextRect);
     EXPECT_FALSE(*rosenRenderContext->drawRegionRects_[DRAW_REGION_OVERLAY_TEXT_INDEX] == *expectedClearRect);
+}
+
+/**
+ * @tc.name: RosenRenderContextTestNewShadowClipMode001
+ * @tc.desc: UpdateShadowClipMode.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RosenRenderContextTest, RosenRenderContextTestNewShadowClipMode001, TestSize.Level1)
+{
+    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
+    auto rosenRenderContext = InitRosenRenderContext(frameNode);
+    ASSERT_NE(rosenRenderContext, nullptr);
+
+    /**
+     * @tc.steps: step1. UpdateShadowClipMode with BOUNDS_SHAPE.
+     * @tc.expected: SHADOW modifier is set.
+     */
+    rosenRenderContext->UpdateShadowClipMode(ShadowClipMode::BOUNDS_SHAPE);
+    auto modifier = rosenRenderContext->GetRSNode()->GetModifierByType(
+        Rosen::ModifierNG::RSModifierType::SHADOW);
+    EXPECT_NE(modifier, nullptr);
+
+    /**
+     * @tc.steps: step2. UpdateShadowClipMode with DEFAULT_SHAPE.
+     * @tc.expected: SHADOW modifier is set.
+     */
+    rosenRenderContext->UpdateShadowClipMode(ShadowClipMode::DEFAULT_SHAPE);
+    modifier = rosenRenderContext->GetRSNode()->GetModifierByType(
+        Rosen::ModifierNG::RSModifierType::SHADOW);
+    EXPECT_NE(modifier, nullptr);
+}
+
+/**
+ * @tc.name: RosenRenderContextTestNewShadowShape001
+ * @tc.desc: UpdateShadowShape.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RosenRenderContextTest, RosenRenderContextTestNewShadowShape001, TestSize.Level1)
+{
+    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
+    auto rosenRenderContext = InitRosenRenderContext(frameNode);
+    ASSERT_NE(rosenRenderContext, nullptr);
+
+    /**
+     * @tc.steps: step1. UpdateShadowShape with nullptr basicShape.
+     * @tc.expected: shadowPath is null.
+     */
+    rosenRenderContext->UpdateShadowShape(nullptr);
+    EXPECT_EQ(rosenRenderContext->GetRSNode()->GetStagingProperties().GetShadowPath(), nullptr);
+
+    /**
+     * @tc.steps: step2. UpdateShadowShape with valid Circle but rect is null.
+     * @tc.expected: shadowPath is null (not painted).
+     */
+    auto circle = AceType::MakeRefPtr<Circle>();
+    circle->SetRadius(Dimension(5.0, DimensionUnit::PX));
+    rosenRenderContext->UpdateShadowShape(circle);
+
+    /**
+     * @tc.steps: step3. UpdateShadowShape with valid Circle and valid rect.
+     * @tc.expected: shadowPath is not null.
+     */
+    RectF paintRect(0.0f, 0.0f, 10.0f, 10.0f);
+    rosenRenderContext->paintRect_ = paintRect;
+    rosenRenderContext->SyncGeometryProperties(paintRect);
+    rosenRenderContext->OnShadowShapeUpdate(circle);
+    EXPECT_NE(rosenRenderContext->GetRSNode()->GetStagingProperties().GetShadowPath(), nullptr);
 }
 } // namespace OHOS::Ace::NG

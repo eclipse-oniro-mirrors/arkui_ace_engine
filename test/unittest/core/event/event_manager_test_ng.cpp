@@ -16,6 +16,9 @@
 #include "test/unittest/core/event/event_manager_test_ng.h"
 #include "core/common/event_manager.h"
 #include "core/common/ace_engine.h"
+#include "core/common/container_consts.h"
+#include "core/common/container_scope.h"
+#include "core/components_ng/pattern/pattern.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -1892,5 +1895,87 @@ HWTEST_F(EventManagerTestNg, GetCurrentReferee006, TestSize.Level1)
     auto result = eventManager->GetCurrentReferee(false, eventHandleId);
     EXPECT_EQ(result, nullptr);
     EXPECT_EQ(eventManager->postEventRefereeWithStrategyNG_[5], nullptr);
+}
+
+class EventManagerCommandScopeTest : public EventManagerTestNg {
+protected:
+    static constexpr int32_t COMMAND_INSTANCE_ID = 1001;
+    static constexpr int32_t OTHER_INSTANCE_ID = 1002;
+
+    void CheckFailureScope(int32_t callerId)
+    {
+        ContainerScope callerScope(callerId);
+        auto eventManager = AceType::MakeRefPtr<EventManager>();
+        eventManager->SetInstanceId(COMMAND_INSTANCE_ID);
+        int32_t callbackCount = 0;
+        eventManager->ProcessCommandWithResult(R"({"cmd":{"type":"backpress"}})",
+            [] { ADD_FAILURE() << "A rejected command must not request a frame"; },
+            [&callbackCount](const CommandResult& result) {
+                ++callbackCount;
+                EXPECT_EQ(ContainerScope::CurrentId(), COMMAND_INSTANCE_ID);
+                EXPECT_FALSE(result.success);
+#ifdef RELAXED_INTERACTION_SUPPORT
+                // The fixture has a container without a pipeline.
+                EXPECT_EQ(result.errorType, CommandErrorType::EXECUTE_FAIL);
+#else
+                EXPECT_EQ(result.errorType, CommandErrorType::INVALID_COMMAND);
+#endif
+            });
+        EXPECT_EQ(callbackCount, 1);
+        EXPECT_EQ(ContainerScope::CurrentId(), callerId);
+    }
+};
+
+/**
+ * @tc.name: ProcessCommandWithResultWithoutCurrentInstance
+ * @tc.desc: Establish the command instance and restore an undefined caller scope after early completion.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerCommandScopeTest, ProcessCommandWithResultWithoutCurrentInstance, TestSize.Level1)
+{
+    CheckFailureScope(INSTANCE_ID_UNDEFINED);
+}
+
+/**
+ * @tc.name: ProcessCommandWithResultFromAnotherInstance
+ * @tc.desc: Use the command owner instead of an unrelated caller instance, then restore the caller.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerCommandScopeTest, ProcessCommandWithResultFromAnotherInstance, TestSize.Level1)
+{
+    CheckFailureScope(OTHER_INSTANCE_ID);
+}
+
+/**
+ * @tc.name: ProcessCommandWithResultReentrantScope
+ * @tc.desc: Nested command callbacks restore the outer command scope and finally the original caller scope.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerCommandScopeTest, ProcessCommandWithResultReentrantScope, TestSize.Level1)
+{
+    ContainerScope callerScope(INSTANCE_ID_UNDEFINED);
+    auto outerManager = AceType::MakeRefPtr<EventManager>();
+    auto innerManager = AceType::MakeRefPtr<EventManager>();
+    outerManager->SetInstanceId(COMMAND_INSTANCE_ID);
+    innerManager->SetInstanceId(OTHER_INSTANCE_ID);
+    int32_t outerCount = 0;
+    int32_t innerCount = 0;
+    auto requestFrame = [] { ADD_FAILURE() << "A rejected command must not request a frame"; };
+    outerManager->ProcessCommandWithResult(R"({"cmd":{"type":"backpress"}})", requestFrame,
+        [&](const CommandResult& result) {
+            ++outerCount;
+            EXPECT_FALSE(result.success);
+            EXPECT_EQ(ContainerScope::CurrentId(), COMMAND_INSTANCE_ID);
+            innerManager->ProcessCommandWithResult(R"({"cmd":{"type":"backpress"}})", requestFrame,
+                [&innerCount](const CommandResult& innerResult) {
+                    ++innerCount;
+                    EXPECT_FALSE(innerResult.success);
+                    EXPECT_EQ(ContainerScope::CurrentId(), OTHER_INSTANCE_ID);
+                });
+            EXPECT_EQ(ContainerScope::CurrentId(), COMMAND_INSTANCE_ID);
+        });
+    EXPECT_EQ(outerCount, 1);
+    EXPECT_EQ(innerCount, 1);
+    EXPECT_EQ(ContainerScope::CurrentId(), INSTANCE_ID_UNDEFINED);
 }
 } // namespace OHOS::Ace::NG

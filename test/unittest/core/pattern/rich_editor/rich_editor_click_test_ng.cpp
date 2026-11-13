@@ -319,9 +319,6 @@ HWTEST_F(RichEditorClickTestNg, HandleSingleClickEvent001, TestSize.Level0)
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
 
-    // RichEditorPattern::OperationRecord record;
-    // richEditorPattern->DeleteSelectOperation(&record);
-
     RectF rect(0, 0, 5, 5);
     richEditorPattern->CreateHandles();
     richEditorPattern->textSelector_.Update(0, 5);

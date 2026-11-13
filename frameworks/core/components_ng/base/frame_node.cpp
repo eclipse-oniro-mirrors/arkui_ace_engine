@@ -14,6 +14,12 @@
  */
 
 #include "core/components_ng/base/frame_node.h"
+
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <tuple>
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include "core/components_ng/base/modifier.h"
 #include "core/pipeline/container_window_manager.h"
 #include "core/accessibility/accessibility_manager.h"
@@ -25,6 +31,7 @@
 #include "core/components_ng/base/ui_tree_collector.h"
 
 #include <cinttypes>
+#include <cmath>
 #include <unordered_set>
 #include "core/components_ng/event/gesture_event_hub.h"
 #include "core/components_ng/event/input_event_hub.h"
@@ -33,6 +40,7 @@
 #endif
 
 #include "core/components_ng/base/node_render_status_monitor.h"
+#include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/components_ng/base/ui_node.h"
 #include "core/components_ng/event/event_constants.h"
 #include "core/components_ng/layout/layout_algorithm.h"
@@ -97,6 +105,7 @@
 #include "core/components_ng/manager/privacy_sensitive/privacy_sensitive_manager.h"
 #include "core/components_ng/pattern/corner_mark/corner_mark.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
+#include "core/components_ng/pattern/overlay/overlay_container_pattern.h"
 #include "core/components_ng/pattern/page_translate/page_translate_node.h"
 #include "core/components_ng/pattern/stage/page_pattern.h"
 #include "core/components_ng/property/accessibility_property.h"
@@ -209,6 +218,7 @@ constexpr int32_t MIN_OPINC_AREA = 10000;
 } // namespace
 namespace OHOS::Ace::NG {
 namespace {
+
 void ClearAccessibilityFocus(
     const RefPtr<AccessibilityProperty>& accessibilityProperty, const RefPtr<RenderContext>& renderContext)
 {
@@ -774,6 +784,7 @@ void FrameNode::DetachRsNodeInAdoptedChildren()
 {
     for (auto& adoptedChild : adoptedChildren_) {
         CHECK_NULL_CONTINUE(adoptedChild);
+        FrameNodeAdoptedCompensation::SetUseAdoptedCompensation(adoptedChild.GetRawPtr(), false);
         adoptedChild->SetIsAdopted(false);
         adoptedChild->SetAdoptParent(nullptr);
         auto rsContext = adoptedChild->GetRenderContext();
@@ -1202,6 +1213,11 @@ void FrameNode::DumpCommonInfo()
     DumpLog::GetInstance().AddDesc(std::string("FrameRect: ").append(geometryNode_->GetFrameRect().ToString()));
     DumpLog::GetInstance().AddDesc(
         std::string("PaintRect without transform: ").append(renderContext_->GetPaintRectWithoutTransform().ToString()));
+    // DebugLine memory trace: emit when a source line is bound via .debugLine().
+    auto debugLine = GetDebugLine();
+    if (!debugLine.empty()) {
+        DumpLog::GetInstance().AddDesc(std::string("DebugLine: ").append(debugLine));
+    }
     if (renderContext_->GetBackgroundColor()->ColorToString().compare("#00000000") != 0) {
         DumpLog::GetInstance().AddDesc(
             std::string("BackgroundColor: ").append(renderContext_->GetBackgroundColor()->ColorToString()));
@@ -1485,9 +1501,26 @@ void DumpAdvancedVisualProperties(
     }
 }
 
+void DumpAdvancedKeyboardShortcuts(FrameNode& node, JsonValue& functional)
+{
+    auto hub = node.GetEventHub<EventHub>();
+    if (!hub || !hub->HasKeyboardShortcut()) {
+        return;
+    }
+    auto shortcuts = JsonUtil::CreateArray();
+    for (const auto& shortcut : hub->GetKeyboardShortcut()) {
+        auto entry = JsonUtil::Create();
+        entry->Put("value", shortcut.value.c_str());
+        entry->Put("keys", static_cast<int32_t>(shortcut.keys));
+        shortcuts->PutRef(std::move(entry));
+    }
+    functional.PutRef("keyboardShortcuts", std::move(shortcuts));
+}
+
 void DumpAdvancedFunctionalProperties(
     FrameNode& node, std::unique_ptr<JsonValue>& functional, const ParamConfig& config)
 {
+    DumpAdvancedKeyboardShortcuts(node, *functional);
     if (auto render = node.GetRenderContext()) {
         render->DumpAdvanceInfo(functional, config);
     }
@@ -1708,6 +1741,213 @@ void FrameNode::DumpSimplifyInfoOnlyForParamConfig(std::shared_ptr<JsonValue>& j
         MergeAttributesIntoJson(json, child);
     }
     DumpAdvancedNodeProperties(*this, json, config);
+}
+
+void FrameNode::DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& json, ParamConfig config)
+{
+    CHECK_NULL_VOID(json);
+    CHECK_NULL_VOID(config.inspectorContext);
+    auto& context = *config.inspectorContext;
+    if (context.ShouldStop()) {
+        return;
+    }
+    DumpSimplifyCommonInfo(json);
+    if (pattern_) {
+        auto attrs = JsonUtil::CreateSharedPtrJson();
+        pattern_->DumpInspectorTreeInfo(attrs, context);
+        json->Put("$attrs", std::move(attrs));
+    }
+    // Reuse the existing/ UIAgent property readers and Web/UIExtension routing.
+    DumpSimplifyInfoOnlyForParamConfig(json, config);
+    if (context.ShouldStop()) {
+        return;
+    }
+    auto gesture = eventHub_ ? eventHub_->GetGestureEventHub() : nullptr;
+    if (config.interactionInfo) {
+        json->Put("touchable", !gesture || gesture->GetTouchable());
+        const auto customProperty = accessibilityProperty_ ?
+            accessibilityProperty_->GetCustomAccessibilityProperty() : nullptr;
+        const bool checkable = customProperty ? customProperty->GetCheckable() :
+            (accessibilityProperty_ && (accessibilityProperty_->HasUserCheckable() ?
+                accessibilityProperty_->IsUserCheckable() : accessibilityProperty_->IsCheckable()));
+        json->Put("checkable", checkable);
+        if (checkable) {
+            const bool checked = customProperty ? customProperty->GetChecked() :
+                (accessibilityProperty_->HasUserCheckedType() ?
+                    static_cast<bool>(accessibilityProperty_->GetUserCheckedType()) :
+                    accessibilityProperty_->IsChecked());
+            json->Put("checked", checked);
+        }
+        if (accessibilityProperty_) {
+            const auto actions = accessibilityProperty_->GetSupportAction();
+            const bool hasSelection = (pattern_ && pattern_->HasInspectorSelection()) ||
+                accessibilityProperty_->IsEditable() || accessibilityProperty_->HasUserSelected() ||
+                actions.count(AceAction::ACTION_SELECT) || actions.count(AceAction::ACTION_CLEAR_SELECTION);
+            if (hasSelection) {
+                json->Put("selected", accessibilityProperty_->HasUserSelected() ?
+                    accessibilityProperty_->IsUserSelected() : accessibilityProperty_->IsSelected());
+            }
+        }
+    }
+    if (config.accessibilityInfo) {
+        const auto id = GetAccessibilityId();
+        if (id >= 0) {
+            json->Put("accessibilityId", std::to_string(id).c_str());
+        }
+        const auto putText = [&json](const char* key, const std::string& value) {
+            if (!value.empty()) {
+                json->Put(key, value.c_str());
+            }
+        };
+        if (accessibilityProperty_) {
+            putText("description", accessibilityProperty_->GetAccessibilityDescription());
+            putText("hint", accessibilityProperty_->GetHintText());
+            putText("accessibilityLevel", accessibilityProperty_->GetAccessibilityLevel());
+        }
+        json->Put("accessibilityGroup", accessibilityProperty_ && accessibilityProperty_->IsAccessibilityGroup());
+    }
+    if (config.withResponseRegion) {
+        DumpInspectorResponseRegions(json, context);
+    }
+    if (inspectorMenuShowInSubWindow_.has_value()) {
+        auto expanded = context.GetMenuExpanded(*this, inspectorMenuShowInSubWindow_.value());
+        if (expanded.has_value()) {
+            auto attrs = json->GetObject("$attrs");
+            attrs->Put("expanded", expanded.value());
+        }
+    }
+    if (pattern_) {
+        pattern_->AddInspectorTreeInfo(json, context);
+    }
+    // Accessibility overrides take precedence over component-derived selection state.
+    if (config.interactionInfo && accessibilityProperty_ && json->Contains("selected")) {
+        auto customProperty = accessibilityProperty_->GetCustomAccessibilityProperty();
+        if (customProperty || accessibilityProperty_->HasUserSelected()) {
+            const bool selected = customProperty ? customProperty->GetSelected() :
+                accessibilityProperty_->IsUserSelected();
+            json->Replace("selected", selected);
+        }
+    }
+}
+
+void FrameNode::DumpInspectorResponseRegions(
+    std::shared_ptr<JsonValue>& json, const InspectorTreeRequestContext& context)
+{
+    if (!context.config.withResponseRegion || !renderContext_) {
+        return;
+    }
+    auto gesture = eventHub_ ? eventHub_->GetGestureEventHub() : nullptr;
+    CHECK_NULL_VOID(gesture);
+    const auto raw = renderContext_->GetPaintRectWithoutTransform();
+    const auto toWindow = [](const FrameNode& node, const std::vector<RectF>& regions) {
+        std::vector<RectF> result;
+        for (const auto& rect : regions) {
+            // Transform every corner; two opposite corners lose rotated extents.
+            const OffsetF corners[] = {
+                { rect.Left(), rect.Top() }, { rect.Right(), rect.Top() },
+                { rect.Right(), rect.Bottom() }, { rect.Left(), rect.Bottom() }
+            };
+            float left = std::numeric_limits<float>::max();
+            float top = left;
+            float right = std::numeric_limits<float>::lowest();
+            float bottom = right;
+            bool finite = true;
+            for (const auto& corner : corners) {
+                auto point = node.GetPositionToWindowWithTransform(corner);
+                finite = finite && std::isfinite(point.GetX()) && std::isfinite(point.GetY());
+                left = std::min(left, point.GetX());
+                top = std::min(top, point.GetY());
+                right = std::max(right, point.GetX());
+                bottom = std::max(bottom, point.GetY());
+            }
+            if (!finite) {
+                continue;
+            }
+            result.emplace_back(left, top, right - left, bottom - top);
+        }
+        return result;
+    };
+    const auto encode = [this, &toWindow](const std::vector<RectF>& regions, SourceType type, SourceTool tool) {
+        auto effective = toWindow(*this, regions);
+        TouchEvent event;
+        event.sourceType = type;
+        event.sourceTool = tool;
+        // Self clipping does not limit explicit regions. Ancestors gate hit testing by their response regions.
+        for (auto node = GetAncestorNodeOfFrame(true); node && !effective.empty();
+             node = node->GetAncestorNodeOfFrame(true)) {
+            auto render = node->GetRenderContext();
+            if (!render || !render->GetClipEdgeValue(false)) {
+                continue;
+            }
+            if (!node->GetTouchable()) {
+                effective.clear();
+                break;
+            }
+            auto paintRect = render->GetPaintRectWithoutTransform();
+            auto responseRect = node->CheckResponseRegionForStylus(paintRect, event);
+            auto clips = toWindow(*node,
+                node->GetResponseRegionList(responseRect, static_cast<int32_t>(type), static_cast<int32_t>(tool)));
+            std::vector<RectF> clipped;
+            for (const auto& rect : effective) {
+                for (const auto& clip : clips) {
+                    auto intersection = rect.IntersectRectT(clip);
+                    if (intersection.IsValid()) {
+                        clipped.emplace_back(intersection);
+                    }
+                }
+            }
+            // RectF equality is approximate; preserve distinct regions with close coordinates.
+            const auto coordinates = [](const RectF& rect) {
+                return std::make_tuple(rect.Left(), rect.Top(), rect.Width(), rect.Height());
+            };
+            std::sort(clipped.begin(), clipped.end(), [&coordinates](const RectF& left, const RectF& right) {
+                return coordinates(left) < coordinates(right);
+            });
+            clipped.erase(std::unique(clipped.begin(), clipped.end(),
+                [&coordinates](const RectF& left, const RectF& right) {
+                    return coordinates(left) == coordinates(right);
+                }),
+                clipped.end());
+            effective = std::move(clipped);
+        }
+        auto array = JsonUtil::CreateArray();
+        size_t index = 0;
+        for (const auto& rect : effective) {
+            array->Put(std::to_string(index++).c_str(), rect.ToBounds().c_str());
+        }
+        return array;
+    };
+    const auto& map = gesture->GetResponseRegionMap();
+    if (!map.empty()) {
+        auto output = JsonUtil::Create();
+        const std::tuple<ResponseRegionSupportedTool, SourceTool, const char*> tools[] = {
+            { ResponseRegionSupportedTool::ALL, SourceTool::UNKNOWN, "all" },
+            { ResponseRegionSupportedTool::FINGER, SourceTool::FINGER, "finger" },
+            { ResponseRegionSupportedTool::PEN, SourceTool::PEN, "pen" },
+            { ResponseRegionSupportedTool::MOUSE, SourceTool::MOUSE, "mouse" }
+        };
+        for (const auto& [tool, source, name] : tools) {
+            auto found = map.find(tool);
+            if (found == map.end() || found->second.empty()) {
+                continue;
+            }
+            const auto type = source == SourceTool::MOUSE ? SourceType::MOUSE : SourceType::TOUCH;
+            auto regions = GetResponseRegionList(raw, static_cast<int32_t>(type), static_cast<int32_t>(source));
+            output->Put(name, encode(regions, type, source));
+        }
+        if (output->GetChild()->IsValid()) {
+            json->Put("responseRegionMap", output);
+        }
+        return;
+    }
+    if (!gesture->GetResponseRegion().empty() && (!pattern_ || pattern_->HasInspectorResponseRegion())) {
+        json->Put("responseRegion", encode(GetResponseRegionListRaw(raw, static_cast<int32_t>(SourceType::TOUCH)),
+            SourceType::TOUCH, SourceTool::FINGER));
+    }
+    if (!gesture->GetMouseResponseRegion().empty()) {
+        json->Put("mouseResponseRegion", encode(GetResponseRegionListRaw(raw, static_cast<int32_t>(SourceType::MOUSE)),
+            SourceType::MOUSE, SourceTool::MOUSE));
+    }
 }
 
 void FrameNode::DumpInfo()
@@ -1988,6 +2228,13 @@ void FrameNode::UpdateGeometryTransition()
     }
 }
 
+const DragPreviewOption* FrameNode::GetDragPreviewOptionIfExist() const
+{
+    return dragDropRelatedConfigurations_
+        ? dragDropRelatedConfigurations_->GetDragPreviewOptionIfExist()
+        : nullptr;
+}
+
 void FrameNode::TriggerRsProfilerNodeMountCallbackIfExist()
 {
 #if !defined(PREVIEW) && !defined(ACE_UNITTEST) && defined(OHOS_PLATFORM)
@@ -2031,6 +2278,7 @@ void FrameNode::OnAttachToMainTree(bool recursive)
         layoutProperty_->UpdatePropertyChangeFlag(PROPERTY_UPDATE_MEASURE_SELF);
     }
     UINode::OnAttachToMainTree(recursive);
+    NotifyPageSceneSplitChanged(true);
     if (safeAreaInsetNode_ && !safeAreaInsetNode_->IsOnMainTree()) {
         safeAreaInsetNode_->AttachToMainTree(recursive, GetContext());
     }
@@ -2306,8 +2554,27 @@ void FrameNode::NotifyVisibleChange(
     }
 }
 
+void FrameNode::NotifyPageSceneSplitChanged(bool attached)
+{
+#ifndef CROSS_PLATFORM
+    if (!ContentChangeManager::HasPageSceneSplitTracking()) {
+        return;
+    }
+    auto context = GetContext();
+    if (!context || !context->CheckThreadSafe() ||
+        !ContentChangeManager::IsPageSceneSplitWindowSupported(context)) {
+        return;
+    }
+    auto manager = context->GetContentChangeManager();
+    if (manager) {
+        manager->NotifyPageSceneSplitChanged(AceType::Claim(this), attached);
+    }
+#endif
+}
+
 void FrameNode::NotifyPageSceneVisibilityChanged()
 {
+    NotifyPageSceneSplitChanged();
 #if !defined(PREVIEW) && !defined(ACE_UNITTEST) && defined(OHOS_PLATFORM) && defined(WEB_SUPPORTED)
     if (!IsOnMainTree()) {
         return;
@@ -2319,6 +2586,7 @@ void FrameNode::NotifyPageSceneVisibilityChanged()
 
 void FrameNode::NotifyPageSceneActiveChanged()
 {
+    NotifyPageSceneSplitChanged();
 #if !defined(PREVIEW) && !defined(ACE_UNITTEST) && defined(OHOS_PLATFORM) && defined(WEB_SUPPORTED)
     if (!IsOnMainTree()) {
         return;
@@ -2341,6 +2609,7 @@ void FrameNode::NotifyPageSceneFocusabilityChanged()
 
 void FrameNode::NotifyPageSceneOpacityChanged()
 {
+    NotifyPageSceneSplitChanged();
 #if !defined(PREVIEW) && !defined(ACE_UNITTEST) && defined(OHOS_PLATFORM) && defined(WEB_SUPPORTED)
     if (!IsOnMainTree()) {
         return;
@@ -2361,14 +2630,13 @@ void FrameNode::TryVisibleChangeOnDescendant(VisibleType preVisibility, VisibleT
 
 void FrameNode::OnDetachFromMainTree(bool recursive, PipelineContext* context)
 {
-#ifndef CROSS_PLATFORM
     if (context) {
         auto contentChangeMgr = context->GetContentChangeManager();
         if (contentChangeMgr) {
-            contentChangeMgr->OnContentChangeNodeDestroyed(GetId());
+            // This path also runs from ~FrameNode: never claim the node into a RefPtr here.
+            contentChangeMgr->OnContentChangeNodeDestroyed(GetId(), GetTag(), context);
         }
     }
-#endif
     if (safeAreaInsetNode_ && safeAreaInsetNode_->IsOnMainTree()) {
         safeAreaInsetNode_->DetachFromMainTree(recursive);
     }
@@ -3786,6 +4054,16 @@ RefPtr<FrameNode> FrameNode::GetAncestorNodeOfFrame(bool checkBoundary) const
     return nullptr;
 }
 
+RefPtr<FrameNode> FrameNode::GetCoordinateAncestorNodeOfFrame(bool checkBoundary) const
+{
+    auto parent = GetAncestorNodeOfFrame(checkBoundary);
+    if (parent || (checkBoundary && IsWindowBoundary()) || !IsAdopted() ||
+        !FrameNodeAdoptedCompensation::UseAdoptedCompensation(this)) {
+        return parent;
+    }
+    return AceType::DynamicCast<FrameNode>(GetAdoptParent());
+}
+
 RefPtr<FrameNode> FrameNode::GetPageNode()
 {
     if (tag_ == "page") {
@@ -3840,6 +4118,7 @@ void FrameNode::MarkNeedRender(bool isRenderBoundary)
 {
     // This function has a mirror function (XxxMultiThread) and needs to be modified synchronously.
     FREE_NODE_CHECK(this, MarkNeedRender, isRenderBoundary);
+    NotifyPageSceneSplitChanged();
     auto context = GetContext();
     CHECK_NULL_VOID(context);
     // If it has dirtyLayoutBox, need to mark dirty after layout done.
@@ -4013,6 +4292,21 @@ bool FrameNode::IsAtomicNode() const
         return kitNode_->GetPattern()->IsAtomicNode();
     }
     return pattern_->IsAtomicNode();
+}
+
+void FrameNode::SetAgentControlMode(const std::optional<AgentControlMode>& mode)
+{
+    agentControlMode_ = mode;
+}
+
+bool FrameNode::HasAgentControlMode() const
+{
+    return agentControlMode_.has_value();
+}
+
+AgentControlMode FrameNode::GetAgentControlMode() const
+{
+    return agentControlMode_.value_or(AgentControlMode::ALLOW);
 }
 
 HitTestMode FrameNode::GetHitTestMode() const
@@ -4431,6 +4725,9 @@ HitTestResult FrameNode::TouchTest(const PointF& globalPoint, const PointF& pare
         (isDispatch || (InResponseRegionList(revertPoint, responseRegionList)))) {
         pattern_->OnTouchTestHit(touchRestrict.hitTestType);
         consumed = true;
+        if (!touchRestrict.sensitiveInputHitNode.Upgrade()) {
+            touchRestrict.sensitiveInputHitNode = WeakClaim(this);
+        }
         if (touchRestrict.hitTestType == SourceType::TOUCH) {
             auto gestureHub = GetOrCreateGestureEventHub();
             if (gestureHub) {
@@ -5064,7 +5361,7 @@ void FrameNode::OnWindowSizeChanged(int32_t width, int32_t height, WindowSizeCha
 OffsetF FrameNode::GetOffsetRelativeToWindow() const
 {
     auto offset = geometryNode_->GetFrameOffset();
-    auto parent = GetAncestorNodeOfFrame(true);
+    auto parent = GetCoordinateAncestorNodeOfFrame(true);
     if (renderContext_ && renderContext_->GetPositionProperty()) {
         if (renderContext_->GetPositionProperty()->HasPosition()) {
             auto renderPosition =
@@ -5072,6 +5369,9 @@ OffsetF FrameNode::GetOffsetRelativeToWindow() const
             offset.SetX(static_cast<float>(renderPosition.first));
             offset.SetY(static_cast<float>(renderPosition.second));
         }
+    }
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        offset += FrameNodeAdoptedCompensation::GetAdoptedCompensationOffset(this);
     }
     while (parent) {
         auto parentRenderContext = parent->GetRenderContext();
@@ -5083,14 +5383,22 @@ OffsetF FrameNode::GetOffsetRelativeToWindow() const
                     parentRenderContext, parentLayoutProperty->GetLayoutConstraint()->percentReference);
                 offset.AddX(static_cast<float>(parentRenderContextPosition.first));
                 offset.AddY(static_cast<float>(parentRenderContextPosition.second));
-                parent = parent->GetAncestorNodeOfFrame(true);
+                auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+                if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+                    offset += FrameNodeAdoptedCompensation::GetAdoptedCompensationOffset(parent.GetRawPtr());
+                }
+                parent = ancestor;
                 continue;
             }
         }
         if (parentRenderContext) {
             offset += parentRenderContext->GetPaintRectWithoutTransform().GetOffset();
         }
-        parent = parent->GetAncestorNodeOfFrame(true);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            offset += FrameNodeAdoptedCompensation::GetAdoptedCompensationOffset(parent.GetRawPtr());
+        }
+        parent = ancestor;
     }
 
     return offset;
@@ -5184,7 +5492,10 @@ OffsetF FrameNode::GetPositionToWindowWithTransform(bool fromBottom) const
 
     PointF pointNode(offset.GetX(), offset.GetY());
     context->GetPointTransformRotate(pointNode);
-    auto parent = GetAncestorNodeOfFrame(true);
+    auto parent = GetCoordinateAncestorNodeOfFrame(true);
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(this, pointNode);
+    }
     while (parent) {
         auto parentRenderContext = parent->GetRenderContext();
         offset = parentRenderContext->GetPaintRectWithoutTransform().GetOffset();
@@ -5192,7 +5503,11 @@ OffsetF FrameNode::GetPositionToWindowWithTransform(bool fromBottom) const
         parentRenderContext->GetPointTransformRotate(pointTmp);
         pointNode.SetX(pointTmp.GetX());
         pointNode.SetY(pointTmp.GetY());
-        parent = parent->GetAncestorNodeOfFrame(true);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(parent.GetRawPtr(), pointNode);
+        }
+        parent = ancestor;
     }
     offset.SetX(pointNode.GetX());
     offset.SetY(pointNode.GetY());
@@ -5250,7 +5565,10 @@ OffsetF FrameNode::GetPositionToWindowWithTransform(OffsetF offset) const
 
     PointF pointNode(offset.GetX(), offset.GetY());
     context->GetPointTransformRotate(pointNode);
-    auto parent = GetAncestorNodeOfFrame(true);
+    auto parent = GetCoordinateAncestorNodeOfFrame(true);
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(this, pointNode);
+    }
     while (parent) {
         auto parentRenderContext = parent->GetRenderContext();
         offset = parentRenderContext->GetPaintRectWithoutTransform().GetOffset();
@@ -5258,7 +5576,11 @@ OffsetF FrameNode::GetPositionToWindowWithTransform(OffsetF offset) const
         parentRenderContext->GetPointTransformRotate(pointTmp);
         pointNode.SetX(pointTmp.GetX());
         pointNode.SetY(pointTmp.GetY());
-        parent = parent->GetAncestorNodeOfFrame(true);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(parent.GetRawPtr(), pointNode);
+        }
+        parent = ancestor;
     }
     offset.SetX(pointNode.GetX());
     offset.SetY(pointNode.GetY());
@@ -5275,7 +5597,12 @@ VectorF FrameNode::GetTransformScaleRelativeToWindow() const
         finalScale.y = scale.y;
     }
 
-    auto parent = GetAncestorNodeOfFrame(true);
+    auto parent = GetCoordinateAncestorNodeOfFrame(true);
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        auto scale = FrameNodeAdoptedCompensation::GetAdoptedCompensationScale(this);
+        finalScale.x *= scale.x;
+        finalScale.y *= scale.y;
+    }
     while (parent) {
         auto contextParent = parent->GetRenderContext();
         if (contextParent) {
@@ -5283,7 +5610,13 @@ VectorF FrameNode::GetTransformScaleRelativeToWindow() const
             finalScale.x *= scale.x;
             finalScale.y *= scale.y;
         }
-        parent = parent->GetAncestorNodeOfFrame(true);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            auto scale = FrameNodeAdoptedCompensation::GetAdoptedCompensationScale(parent.GetRawPtr());
+            finalScale.x *= scale.x;
+            finalScale.y *= scale.y;
+        }
+        parent = ancestor;
     }
     return finalScale;
 }
@@ -5297,13 +5630,20 @@ RectF FrameNode::GetTransformRectRelativeToWindow(bool checkBoundary) const
     auto context = GetRenderContext();
     CHECK_NULL_RETURN(context, RectF());
     RectF rect = context->GetPaintRectWithTransform();
-    auto parent = GetAncestorNodeOfFrame(true);
+    auto parent = GetCoordinateAncestorNodeOfFrame(true);
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(this, rect);
+    }
     while (parent) {
         if (checkBoundary && parent->IsWindowBoundary()) {
             break;
         }
         rect = ApplyFrameNodeTranformToRect(rect, parent);
-        parent = parent->GetAncestorNodeOfFrame(true);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(parent.GetRawPtr(), rect);
+        }
+        parent = ancestor;
     }
     return rect;
 }
@@ -5319,7 +5659,10 @@ RectF FrameNode::GetTransformRectRelativeToWindowOnlyVisible(bool checkBoundary)
     auto context = GetRenderContext();
     CHECK_NULL_RETURN(context, invalidRect);
     RectF rect = context->GetPaintRectWithTransform();
-    auto parent = GetAncestorNodeOfFrame(true);
+    auto parent = GetCoordinateAncestorNodeOfFrame(true);
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(this, rect);
+    }
     while (parent) {
         if (!parent->IsVisibleAndActive()) {
             return invalidRect;
@@ -5328,7 +5671,11 @@ RectF FrameNode::GetTransformRectRelativeToWindowOnlyVisible(bool checkBoundary)
             break;
         }
         rect = ApplyFrameNodeTranformToRect(rect, parent);
-        parent = parent->GetAncestorNodeOfFrame(true);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(parent.GetRawPtr(), rect);
+        }
+        parent = ancestor;
     }
     return rect;
 }
@@ -5342,12 +5689,19 @@ OffsetF FrameNode::GetTransformRelativeOffset() const
     auto context = GetRenderContext();
     CHECK_NULL_RETURN(context, OffsetF());
     auto offset = context->GetPaintRectWithTransform().GetOffset();
-    auto parent = GetAncestorNodeOfFrame(true);
+    auto parent = GetCoordinateAncestorNodeOfFrame(true);
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        offset += FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(this);
+    }
 
     while (parent) {
         auto parentRenderContext = parent->GetRenderContext();
         offset += parentRenderContext->GetPaintRectWithTransform().GetOffset();
-        parent = parent->GetAncestorNodeOfFrame(true);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            offset += FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(parent.GetRawPtr());
+        }
+        parent = ancestor;
     }
 
     return offset;
@@ -5358,7 +5712,10 @@ OffsetF FrameNode::GetPaintRectOffset(bool excludeSelf, bool checkBoundary, bool
     auto context = GetRenderContext();
     CHECK_NULL_RETURN(context, OffsetF());
     OffsetF offset = excludeSelf ? OffsetF() : context->GetPaintRectWithTransform().GetOffset();
-    auto parent = GetAncestorNodeOfFrame(checkBoundary);
+    auto parent = GetCoordinateAncestorNodeOfFrame(checkBoundary);
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        offset += FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(this);
+    }
     while (parent) {
         if ((!checkBoundary && parent->CheckTopWindowBoundary()) || (checkScreen && parent->CheckTopScreen())) {
             break;
@@ -5366,7 +5723,11 @@ OffsetF FrameNode::GetPaintRectOffset(bool excludeSelf, bool checkBoundary, bool
         auto renderContext = parent->GetRenderContext();
         CHECK_NULL_RETURN(renderContext, OffsetF());
         offset += renderContext->GetPaintRectWithTransform().GetOffset();
-        parent = parent->GetAncestorNodeOfFrame(checkBoundary);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(checkBoundary);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            offset += FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(parent.GetRawPtr());
+        }
+        parent = ancestor;
     }
     return offset;
 }
@@ -5377,7 +5738,10 @@ OffsetF FrameNode::GetPaintRectOffsetNG(bool excludeSelf, bool checkBoundary) co
     CHECK_NULL_RETURN(context, OffsetF());
     OffsetF offset = excludeSelf ? OffsetF() : context->GetPaintRectWithoutTransform().GetOffset();
     Point point = Matrix4::Invert(context->GetRevertMatrix()) * Point(offset.GetX(), offset.GetY());
-    auto parent = GetAncestorNodeOfFrame(checkBoundary);
+    auto parent = GetCoordinateAncestorNodeOfFrame(checkBoundary);
+    if (parent) {
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(this, point);
+    }
     while (parent) {
         if (!checkBoundary && parent->CheckTopWindowBoundary()) {
             break;
@@ -5388,7 +5752,11 @@ OffsetF FrameNode::GetPaintRectOffsetNG(bool excludeSelf, bool checkBoundary) co
         point = point + Offset(parentOffset.GetX(), parentOffset.GetY());
         auto parentMatrix = Matrix4::Invert(renderContext->GetRevertMatrix());
         point = parentMatrix * point;
-        parent = parent->GetAncestorNodeOfFrame(checkBoundary);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(checkBoundary);
+        if (ancestor) {
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(parent.GetRawPtr(), point);
+        }
+        parent = ancestor;
     }
     return OffsetF(point.GetX(), point.GetY());
 }
@@ -5409,7 +5777,7 @@ OffsetF FrameNode::ConvertPoint(OffsetF position, const RefPtr<FrameNode>& targe
         if (targetNodeParent == sameParentNode) {
             break;
         }
-        targetNodeParent = targetNodeParent->GetAncestorNodeOfFrame(false);
+        targetNodeParent = targetNodeParent->GetCoordinateAncestorNodeOfFrame(false);
     }
     auto context = GetRenderContext();
     CHECK_NULL_RETURN(context, OffsetF());
@@ -5428,7 +5796,11 @@ OffsetF FrameNode::ConvertPoint(OffsetF position, const RefPtr<FrameNode>& targe
         if (parent == sameParentNode) {
             break;
         }
-        parent = parent->GetAncestorNodeOfFrame(false);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(false);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(parent.GetRawPtr(), point);
+        }
+        parent = ancestor;
     }
     Point targetNodePoint = point;
     while (!historyNodes.empty()) {
@@ -5440,6 +5812,12 @@ OffsetF FrameNode::ConvertPoint(OffsetF position, const RefPtr<FrameNode>& targe
         targetNodePoint = revertMatrix * targetNodePoint;
         targetNodePoint = targetNodePoint - Offset(parentOffset.GetX(), parentOffset.GetY());
         historyNodes.pop_back();
+        if (!historyNodes.empty() &&
+            FrameNodeAdoptedCompensation::HasAdoptedCompensation(historyNodes.back().GetRawPtr())) {
+            auto child = historyNodes.back();
+            FrameNodeAdoptedCompensation::RevertAdoptedCompensationFromPoint(
+                child.GetRawPtr(), targetNodePoint);
+        }
     }
     return OffsetF(targetNodePoint.GetX(), targetNodePoint.GetY());
 }
@@ -5467,7 +5845,16 @@ OffsetF FrameNode::ConvertPositionToWindow(OffsetF position, bool fromWindow)
         if (parent->tag_ == V2::ROOT_ETS_TAG) {
             break;
         }
-        parent = parent->GetAncestorNodeOfFrame(false);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(false);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            if (fromWindow) {
+                FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPointFromWindow(
+                    parent.GetRawPtr(), point);
+            } else {
+                FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(parent.GetRawPtr(), point);
+            }
+        }
+        parent = ancestor;
     }
     return OffsetF(point.GetX(), point.GetY());
 }
@@ -5529,10 +5916,17 @@ RectF FrameNode::GetPaintRectToWindowWithTransform()
     auto frameSize = geometryNode->GetFrameSize();
     auto pointList = GetRectPoints(frameSize);
     GetRectPointToParentWithTransform(pointList, Claim(this));
-    auto parent = GetAncestorNodeOfFrame(true);
+    auto parent = GetCoordinateAncestorNodeOfFrame(true);
+    if (parent) {
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoints(this, pointList);
+    }
     while (parent) {
         if (GetRectPointToParentWithTransform(pointList, parent)) {
-            parent = parent->GetAncestorNodeOfFrame(true);
+            auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+            if (ancestor) {
+                FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoints(parent.GetRawPtr(), pointList);
+            }
+            parent = ancestor;
         } else {
             return RectF();
         }
@@ -5546,10 +5940,14 @@ RectF FrameNode::GetPaintRectToWindowWithTransform()
 OffsetF FrameNode::GetParentGlobalOffsetDuringLayout() const
 {
     OffsetF offset {};
-    auto parent = GetAncestorNodeOfFrame(true);
+    auto parent = GetCoordinateAncestorNodeOfFrame(true);
     while (parent) {
         offset += parent->geometryNode_->GetFrameOffset();
-        parent = parent->GetAncestorNodeOfFrame(true);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            offset += FrameNodeAdoptedCompensation::GetAdoptedCompensationOffset(parent.GetRawPtr());
+        }
+        parent = ancestor;
     }
     return offset;
 }
@@ -5563,7 +5961,13 @@ std::pair<OffsetF, bool> FrameNode::GetPaintRectGlobalOffsetWithTranslate(bool e
     auto context = GetRenderContext();
     CHECK_NULL_RETURN(context, std::make_pair(OffsetF(), error));
     OffsetF offset = excludeSelf ? OffsetF() : context->GetPaintRectWithTranslate().first.GetOffset();
-    auto parent = GetAncestorNodeOfFrame(checkBoundary);
+    auto parent = GetCoordinateAncestorNodeOfFrame(checkBoundary);
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        auto [compensationOffset, compensationError] =
+            FrameNodeAdoptedCompensation::GetAdoptedCompensationOffsetWithTranslate(this);
+        offset += compensationOffset;
+        error = error || compensationError;
+    }
     while (parent) {
         auto renderContext = parent->GetRenderContext();
         CHECK_NULL_RETURN(renderContext, std::make_pair(OffsetF(), error));
@@ -5571,7 +5975,14 @@ std::pair<OffsetF, bool> FrameNode::GetPaintRectGlobalOffsetWithTranslate(bool e
         error = error || err;
         CHECK_NULL_RETURN(rect.IsValid(), std::make_pair(offset + parent->GetPaintRectOffset(), error));
         offset += rect.GetOffset();
-        parent = parent->GetAncestorNodeOfFrame(checkBoundary);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(checkBoundary);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            auto [compensationOffset, compensationError] =
+                FrameNodeAdoptedCompensation::GetAdoptedCompensationOffsetWithTranslate(parent.GetRawPtr());
+            offset += compensationOffset;
+            error = error || compensationError;
+        }
+        parent = ancestor;
     }
     return std::make_pair(offset, error);
 }
@@ -5584,13 +5995,20 @@ OffsetF FrameNode::GetPaintRectOffsetToPage() const
     auto context = GetRenderContext();
     CHECK_NULL_RETURN(context, OffsetF());
     OffsetF offset = context->GetPaintRectWithTransform().GetOffset();
-    auto parent = GetAncestorNodeOfFrame(true);
+    auto parent = GetCoordinateAncestorNodeOfFrame(true);
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        offset += FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(this);
+    }
     while (parent && parent->GetTag() != V2::PAGE_ETS_TAG) {
         auto renderContext = parent->GetRenderContext();
         CHECK_NULL_RETURN(renderContext, OffsetF());
         // Eliminate the impact of default page transition
         offset += renderContext->GetPaintRectWithTransform().GetOffset();
-        parent = parent->GetAncestorNodeOfFrame(true);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            offset += FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(parent.GetRawPtr());
+        }
+        parent = ancestor;
     }
     return (parent && parent->GetTag() == V2::PAGE_ETS_TAG) ? offset : OffsetF();
 }
@@ -5600,13 +6018,13 @@ std::optional<RectF> FrameNode::GetViewPort(bool checkBoundary) const
     if (viewPort_.has_value()) {
         return viewPort_;
     }
-    auto parent = GetAncestorNodeOfFrame(checkBoundary);
+    auto parent = GetCoordinateAncestorNodeOfFrame(checkBoundary);
     while (parent && parent->GetTag() != V2::PAGE_ETS_TAG) {
         auto parentViewPort = parent->GetSelfViewPort();
         if (parentViewPort.has_value()) {
             return parentViewPort;
         }
-        parent = parent->GetAncestorNodeOfFrame(checkBoundary);
+        parent = parent->GetCoordinateAncestorNodeOfFrame(checkBoundary);
     }
     return std::nullopt;
 }
@@ -5778,7 +6196,8 @@ bool FrameNode::MarkRemoving()
 
     const auto& geometryTransition = layoutProperty_->GetGeometryTransition();
     if (geometryTransition != nullptr) {
-        const bool isOnShow = GetContext() ? GetContext()->GetOnShow() : true;
+        auto context = GetContext();
+        const bool isOnShow = context ? context->GetOnShow() : true;
         TAG_LOGD(AceLogTag::ACE_GEOMETRY_TRANSITION, "FrameNode::MarkRemoving, outNode: %{public}d, %{public}s,"
             " isOnForeground: %{public}d", GetId(), GetTag().c_str(), isOnShow);
         if (isOnShow) {
@@ -6643,6 +7062,10 @@ void FrameNode::Layout()
     bool needSyncRsNode = false;
     DirtySwapConfig config;
     bool willSyncGeoProperties = OnLayoutFinish(needSyncRsNode, config);
+    if (tag_ == V2::NAVIGATION_VIEW_ETS_TAG || config.frameSizeChange || config.frameOffsetChange ||
+        config.contentSizeChange || config.contentOffsetChange) {
+        NotifyPageSceneSplitChanged();
+    }
     needSyncRsNode |= AvoidKeyboard(isFocusOnPage);
     if (GetIsGeometryTransitionIn()) {
         renderContext_->SetFrameWithoutAnimation(renderContext_->GetPaintRectWithoutTransform());
@@ -7510,7 +7933,10 @@ OffsetF FrameNode::CalculateCachedTransformRelativeOffset(uint64_t nanoTimestamp
     CHECK_NULL_RETURN(context, OffsetF());
     auto offset = context->GetPaintRectWithTransform().GetOffset();
 
-    auto parent = GetAncestorNodeOfFrame(true);
+    auto parent = GetCoordinateAncestorNodeOfFrame(true);
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        offset += FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(this);
+    }
     if (parent) {
         auto parentTimestampOffset = parent->GetCachedTransformRelativeOffset();
         if (parentTimestampOffset.first == nanoTimestamp) {
@@ -7540,7 +7966,10 @@ OffsetF FrameNode::CalculateOffsetRelativeToWindow(uint64_t nanoTimestamp, bool 
 
     // if this node have not calculate once, then it will calculate to root
     areaChangeMinDepth = cachedGlobalOffset_.first > 0 ? areaChangeMinDepth : -1;
-    auto parent = GetAncestorNodeOfFrame(true);
+    auto parent = GetCoordinateAncestorNodeOfFrame(true);
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        currOffset += FrameNodeAdoptedCompensation::GetAdoptedCompensationOffset(this);
+    }
     if (parent) {
         auto parentTimestampOffset = parent->GetCachedGlobalOffset();
         // MinDepth < 0, it do not work
@@ -7890,11 +8319,15 @@ void FrameNode::GetVisibleRect(RectF& visibleRect, RectF& frameRect) const
 {
     visibleRect = GetPaintRectWithTransform();
     frameRect = visibleRect;
-    RefPtr<FrameNode> parentUi = GetAncestorNodeOfFrame(true);
+    RefPtr<FrameNode> parentUi = GetCoordinateAncestorNodeOfFrame(true);
     if (!parentUi) {
         visibleRect.SetWidth(0.0f);
         visibleRect.SetHeight(0.0f);
         return;
+    }
+    if (FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(this, visibleRect);
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(this, frameRect);
     }
     while (parentUi) {
         visibleRect = ApplyFrameNodeTranformToRect(visibleRect, parentUi);
@@ -7904,7 +8337,12 @@ void FrameNode::GetVisibleRect(RectF& visibleRect, RectF& frameRect) const
             return;
         }
         frameRect = ApplyFrameNodeTranformToRect(frameRect, parentUi);
-        parentUi = parentUi->GetAncestorNodeOfFrame(true);
+        auto ancestor = parentUi->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parentUi.GetRawPtr())) {
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(parentUi.GetRawPtr(), visibleRect);
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(parentUi.GetRawPtr(), frameRect);
+        }
+        parentUi = ancestor;
     }
 }
 
@@ -7919,13 +8357,18 @@ void FrameNode::GetVisibleRectWithClip(
     visibleRect = GetPaintRectWithTransform();
     frameRect = visibleRect;
     visibleInnerRect = visibleRect;
-    RefPtr<FrameNode> parentUi = GetAncestorNodeOfFrame(true);
+    RefPtr<FrameNode> parentUi = GetCoordinateAncestorNodeOfFrame(true);
     if (!AllowVisibleAreaCheck() || !parentUi || IsFrameDisappear()) {
         visibleRect.SetWidth(0.0f);
         visibleRect.SetHeight(0.0f);
         visibleInnerRect.SetWidth(0.0f);
         visibleInnerRect.SetHeight(0.0f);
         return;
+    }
+    if (FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(this, visibleRect);
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(this, visibleInnerRect);
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(this, frameRect);
     }
 
     while (parentUi) {
@@ -7950,7 +8393,13 @@ void FrameNode::GetVisibleRectWithClip(
             return;
         }
         frameRect = ApplyFrameNodeTranformToRect(frameRect, parentUi);
-        parentUi = parentUi->GetAncestorNodeOfFrame(true);
+        auto ancestor = parentUi->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parentUi.GetRawPtr())) {
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(parentUi.GetRawPtr(), visibleRect);
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(parentUi.GetRawPtr(), visibleInnerRect);
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(parentUi.GetRawPtr(), frameRect);
+        }
+        parentUi = ancestor;
     }
 
     if (!(isCalculateInnerVisibleRectClip_ || withClip)) {
@@ -7978,14 +8427,24 @@ void FrameNode::LogCacheVisibleRect(const CacheVisibleRectResult& result, bool l
 
 const CacheVisibleRectResult& FrameNode::GetCacheVisibleRect(uint64_t timestamp, bool logFlag)
 {
-    RefPtr<FrameNode> parentUi = GetAncestorNodeOfFrame(true);
+    RefPtr<FrameNode> parentUi = GetCoordinateAncestorNodeOfFrame(true);
     auto rectToParent = GetPaintRectWithTransform();
+    auto overlayContainerPattern = AceType::DynamicCast<OverlayContainerPattern>(pattern_);
+    if (overlayContainerPattern && !renderContext_->HasRenderNode()) {
+        rectToParent = renderContext_->GetPaintRectWithoutTransform();
+    }
     auto scale = GetTransformScale();
     auto innerScale = scale;
     if (renderContext_->HasTransformMatrix()) {
         auto& matrix4 = renderContext_->GetTransformMatrixValue();
         innerScale = { innerScale.x * static_cast<float>(matrix4.GetScaleX()),
             innerScale.y * static_cast<float>(matrix4.GetScaleY()) };
+    }
+    if (parentUi && FrameNodeAdoptedCompensation::HasAdoptedCompensation(this)) {
+        FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToRect(this, rectToParent);
+        auto compensationScale = FrameNodeAdoptedCompensation::GetAdoptedCompensationScale(this);
+        scale = { scale.x * compensationScale.x, scale.y * compensationScale.y };
+        innerScale = { innerScale.x * compensationScale.x, innerScale.y * compensationScale.y };
     }
 
     if (!parentUi || IsWindowBoundary()) {
@@ -8391,7 +8850,7 @@ void FrameNode::ProcessFrameNodeChangeFlag()
     auto parent = Claim(this);
     while (parent) {
         changeFlag = changeFlag | parent->GetChangeInfoFlag();
-        parent = parent->GetAncestorNodeOfFrame(true);
+        parent = parent->GetCoordinateAncestorNodeOfFrame(true);
         if (changeFlag == FRAME_NODE_CHANGE_ALL) {
             break;
         }
@@ -8417,6 +8876,7 @@ void FrameNode::OnNodeTransformInfoUpdate(bool changed)
     if (!changed) {
         return;
     }
+    NotifyPageSceneSplitChanged();
     AddFrameNodeChangeInfoFlag(FRAME_NODE_CHANGE_TRANSFORM_CHANGE);
     if (AnimationUtils::IsImplicitAnimationOpen()) {
         AddFrameNodeChangeInfoFlag(FRAME_NODE_CHANGE_START_ANIMATION);
@@ -8658,6 +9118,11 @@ void FrameNode::DumpCommonInfo(std::unique_ptr<JsonValue>& json)
 {
     json->Put("FrameRect", geometryNode_->GetFrameRect().ToString().c_str());
     json->Put("PaintRect without transform", renderContext_->GetPaintRectWithoutTransform().ToString().c_str());
+    // DebugLine memory trace: emit when a source line is bound via .debugLine().
+    auto debugLine = GetDebugLine();
+    if (!debugLine.empty()) {
+        json->Put("DebugLine", debugLine.c_str());
+    }
     if (renderContext_->GetBackgroundColor()->ColorToString().compare("#00000000") != 0) {
         json->Put("BackgroundColor", renderContext_->GetBackgroundColor()->ColorToString().c_str());
     }
@@ -8983,6 +9448,14 @@ int32_t FrameNode::OnRecvCommand(const std::string& command)
     return pattern->OnRecvCommand(command);
 }
 
+CommandResult FrameNode::OnRecvCommandWithResult(const std::string& command)
+{
+    ContainerScope scope(GetInstanceId());
+    auto pattern = GetPattern();
+    CHECK_NULL_RETURN(pattern, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+    return pattern->OnRecvCommandWithResult(command);
+}
+
 void FrameNode::HandleAreaChangeDestruct()
 {
     if (eventHub_) {
@@ -9306,6 +9779,16 @@ MountPolicy FrameNode::GetMountPolicy()
 void FrameNode::SetMountPolicy(MountPolicy mountPolicy)
 {
     mountPolicy_ = mountPolicy;
+}
+
+std::unique_ptr<FrameNode::AdoptedCompensationInfo>& FrameNode::GetAdoptedCompensationInfo()
+{
+    return adoptedCompensationInfo_;
+}
+
+const std::unique_ptr<FrameNode::AdoptedCompensationInfo>& FrameNode::GetAdoptedCompensationInfo() const
+{
+    return adoptedCompensationInfo_;
 }
 
 void FrameNode::OnMixedMountChildAdded(const RefPtr<UINode>& child)

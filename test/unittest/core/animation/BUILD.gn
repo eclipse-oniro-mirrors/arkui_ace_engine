@@ -15,6 +15,12 @@ import("//foundation/arkui/ace_engine/test/unittest/ace_unittest.gni")
 
 test_sources = [ "geometry_transition_test_ng.cpp" ]
 
+animation_group_sources = [
+  "$ace_root/frameworks/core/components_ng/animation/animation_group_adapter.cpp",
+  "animation_group_adapter_test.cpp",
+  "animation_group_animation_utils_mock.cpp",
+]
+
 core_min_sources = [
   "animation_test_min.cpp",
   "animation_test_core.cpp",
@@ -70,9 +76,28 @@ if (is_host_product) {
   }
 }
 
+if (is_host_product) {
+  ace_unittest("animation_group_adapter_test") {
+    type = "host_components"
+    module_name = "Animation-Animatable"
+    sources = animation_group_sources
+    cflags = [ "-fno-access-control" ]
+    external_deps = [ "hilog:libhilog" ]
+  }
+} else {
+  ace_unittest("animation_group_adapter_test") {
+    module_name = "Animation-Animatable"
+    type = "new"
+    sources = animation_group_sources
+    cflags = [ "-fno-access-control" ]
+    external_deps = [ "hilog:libhilog" ]
+  }
+}
+
 group("core_animation_unittest") {
   testonly = true
   deps = [
+    ":animation_group_adapter_test",
     ":callback_thread_wrapper_test",
     ":geometry_transition_test_ng",
   ]

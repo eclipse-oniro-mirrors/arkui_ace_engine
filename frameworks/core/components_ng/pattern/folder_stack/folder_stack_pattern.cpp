@@ -40,7 +40,10 @@ void FolderStackPattern::OnAttachToFrameNode()
     CHECK_NULL_VOID(pipeline);
     auto container = Container::Current();
     CHECK_NULL_VOID(container);
-    CHECK_NULL_VOID(container->IsFoldable());
+    if (!(OHOS::Ace::SystemProperties::IsPortraitFoldProduct() ||
+            container->IsFoldable())) {
+        return;
+    }
     auto callbackId = pipeline->RegisterFoldStatusChangedCallback([weak = WeakClaim(this)](FoldStatus folderStatus) {
         auto pattern = weak.Upgrade();
         if (pattern) {

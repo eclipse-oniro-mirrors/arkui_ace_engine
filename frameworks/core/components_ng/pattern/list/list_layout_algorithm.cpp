@@ -2556,6 +2556,67 @@ void ListLayoutAlgorithm::ProcessCacheCount(LayoutWrapper* layoutWrapper, int32_
     }
 }
 
+void ListLayoutAlgorithm::UpdateItemDecodeState(LayoutWrapper* layoutWrapper, int32_t idx, bool active)
+{
+    auto wrapper = GetListItem(layoutWrapper, idx, false, true);
+    CHECK_NULL_VOID(wrapper);
+    auto itemFrameNode = AceType::DynamicCast<FrameNode>(wrapper);
+    CHECK_NULL_VOID(itemFrameNode);
+    if (itemPosition_.count(idx) > 0 && itemPosition_[idx].isGroup) {
+        auto groupAlgo = wrapper->GetLayoutAlgorithm(true);
+        if (groupAlgo) {
+            auto group = AceType::DynamicCast<ListItemGroupLayoutAlgorithm>(
+                groupAlgo->GetLayoutAlgorithm());
+            if (group) {
+                group->UpdateGroupDecodeCacheWindow(RawPtr(wrapper), active);
+                return;
+            }
+        }
+    }
+    ScrollableUtils::UpdateCachedItemDecodeState(itemFrameNode, active);
+}
+
+void ListLayoutAlgorithm::UpdateListDecodeCacheWindow(LayoutWrapper* layoutWrapper, int32_t cacheCount)
+{
+    CHECK_NULL_VOID(layoutWrapper);
+    if (!ScrollableUtils::IsLowMemoryDeviceRuntime()) {
+        return;
+    }
+    auto listProps = layoutWrapper->GetHostNode()->GetLayoutProperty<ListLayoutProperty>();
+    if (listProps && listProps->GetShowCachedItemsValue(false)) {
+        return;
+    }
+    if (cacheCount <= 0 || itemPosition_.empty()) {
+        return;
+    }
+    const int32_t decodeWindow = ScrollableUtils::CalcDecodeWindowCount(cacheCount);
+    if (decodeWindow <= 0) {
+        return;
+    }
+    auto host = layoutWrapper->GetHostNode();
+    CHECK_NULL_VOID(host);
+
+    const int32_t startIndex = GetStartIndex();
+    const int32_t endIndex = GetEndIndex();
+    const int32_t lanes = GetLanes();
+    const int32_t firstCacheIdx = std::max(0, startIndex - cacheCount * lanes);
+    const int32_t lastCacheIdx = std::min(totalItemCount_ - 1, endIndex + cacheCount * lanes);
+    const int32_t decodeStart = std::max(0, startIndex - decodeWindow * lanes);
+    const int32_t decodeEnd = std::min(totalItemCount_ - 1, endIndex + decodeWindow * lanes);
+
+    TAG_LOGD(AceLogTag::ACE_LIST,
+        "decode window: cacheCount=%{public}d, window=%{public}d, visible=[%{public}d,%{public}d], "
+        "decode=[%{public}d,%{public}d], cache=[%{public}d,%{public}d], lanes=%{public}d",
+        cacheCount, decodeWindow, startIndex, endIndex, decodeStart, decodeEnd,
+        firstCacheIdx, lastCacheIdx, lanes);
+
+    for (int32_t idx = firstCacheIdx; idx <= lastCacheIdx; ++idx) {
+        bool active = (idx >= startIndex && idx <= endIndex) ||
+                      (idx >= decodeStart && idx <= decodeEnd);
+        UpdateItemDecodeState(layoutWrapper, idx, active);
+    }
+}
+
 std::optional<ListItemGroupLayoutInfo> ListLayoutAlgorithm::GetListItemGroupLayoutInfo(
     const RefPtr<LayoutWrapper>& wrapper) const
 {
@@ -2688,6 +2749,7 @@ void ListLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
         listProps->SetDefaultCachedCount(newCacheCount);
     }
     ProcessCacheCount(layoutWrapper, cacheCount, listProps->GetShowCachedItemsValue(false));
+    UpdateListDecodeCacheWindow(layoutWrapper, cacheCount);
     FixItemLayoutOffset(layoutWrapper);
     LayoutHeader(layoutWrapper, paddingOffset_, crossSize);
     UpdateOverlay(layoutWrapper);

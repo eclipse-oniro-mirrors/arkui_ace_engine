@@ -197,6 +197,11 @@ void FrameNode::DumpInfo()
 void FrameNode::DumpInfo(std::unique_ptr<JsonValue>& json)
 {}
 
+void FrameNode::DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& json, ParamConfig config)
+{
+    UINode::DumpInspectorTreeInfo(json, config);
+}
+
 void FrameNode::DumpSimplifyInfo(std::shared_ptr<JsonValue>& json)
 {}
 

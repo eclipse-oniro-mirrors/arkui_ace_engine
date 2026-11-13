@@ -1470,4 +1470,207 @@ HWTEST_F(NativeStyledStringTest, CreateParagraphStyle018, TestSize.Level1)
     delete paragraphStyle;
     paragraphStyle = nullptr;
 }
+
+/**
+ * @tc.name: BackgroundColorStyleCreateDefaults001
+ * @tc.desc: Test OH_ArkUI_BackgroundColorStyle_Create initializes hasBorderColor to false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeStyledStringTest, BackgroundColorStyleCreateDefaults001, TestSize.Level0)
+{
+    auto* style = OH_ArkUI_BackgroundColorStyle_Create();
+    ASSERT_NE(style, nullptr);
+    EXPECT_FALSE(style->hasBorderColor);
+    EXPECT_EQ(style->borderColor, 0x00000000u);
+    EXPECT_FLOAT_EQ(style->borderWidth, 0.0f);
+    OH_ArkUI_BackgroundColorStyle_Destroy(style);
+}
+
+/**
+ * @tc.name: BackgroundColorStyleSetBorderColor001
+ * @tc.desc: Test SetBorderColor sets borderColor value and hasBorderColor flag to true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeStyledStringTest, BackgroundColorStyleSetBorderColor001, TestSize.Level0)
+{
+    auto* style = OH_ArkUI_BackgroundColorStyle_Create();
+    ASSERT_NE(style, nullptr);
+    const uint32_t testColor = 0xFFFF0000;
+    auto errorCode = OH_ArkUI_BackgroundColorStyle_SetBorderColor(style, testColor);
+    EXPECT_EQ(errorCode, ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_TRUE(style->hasBorderColor);
+    EXPECT_EQ(style->borderColor, testColor);
+    OH_ArkUI_BackgroundColorStyle_Destroy(style);
+}
+
+/**
+ * @tc.name: BackgroundColorStyleSetBorderColorNull001
+ * @tc.desc: Test SetBorderColor with null pointer returns error.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeStyledStringTest, BackgroundColorStyleSetBorderColorNull001, TestSize.Level1)
+{
+    auto errorCode = OH_ArkUI_BackgroundColorStyle_SetBorderColor(nullptr, 0xFF00FF00);
+    EXPECT_EQ(errorCode, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+}
+
+/**
+ * @tc.name: BackgroundColorStyleGetBorderColor001
+ * @tc.desc: Test GetBorderColor returns the value set by SetBorderColor.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeStyledStringTest, BackgroundColorStyleGetBorderColor001, TestSize.Level0)
+{
+    auto* style = OH_ArkUI_BackgroundColorStyle_Create();
+    ASSERT_NE(style, nullptr);
+    const uint32_t testColor = 0xFF123456;
+    OH_ArkUI_BackgroundColorStyle_SetBorderColor(style, testColor);
+    uint32_t result = 0;
+    auto errorCode = OH_ArkUI_BackgroundColorStyle_GetBorderColor(style, &result);
+    EXPECT_EQ(errorCode, ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(result, testColor);
+    OH_ArkUI_BackgroundColorStyle_Destroy(style);
+}
+
+/**
+ * @tc.name: BackgroundColorStyleGetBorderColorNotSet001
+ * @tc.desc: Test GetBorderColor returns default 0x00000000 when SetBorderColor was not called.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeStyledStringTest, BackgroundColorStyleGetBorderColorNotSet001, TestSize.Level0)
+{
+    auto* style = OH_ArkUI_BackgroundColorStyle_Create();
+    ASSERT_NE(style, nullptr);
+    uint32_t result = 0xDEADBEEF;
+    auto errorCode = OH_ArkUI_BackgroundColorStyle_GetBorderColor(style, &result);
+    EXPECT_EQ(errorCode, ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(result, 0x00000000u);
+    EXPECT_FALSE(style->hasBorderColor);
+    OH_ArkUI_BackgroundColorStyle_Destroy(style);
+}
+
+/**
+ * @tc.name: BackgroundColorStyleGetBorderColorNull001
+ * @tc.desc: Test GetBorderColor with null params returns error.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeStyledStringTest, BackgroundColorStyleGetBorderColorNull001, TestSize.Level1)
+{
+    auto* style = OH_ArkUI_BackgroundColorStyle_Create();
+    ASSERT_NE(style, nullptr);
+    uint32_t result = 0;
+    EXPECT_EQ(OH_ArkUI_BackgroundColorStyle_GetBorderColor(nullptr, &result),
+        ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(OH_ArkUI_BackgroundColorStyle_GetBorderColor(style, nullptr),
+        ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    OH_ArkUI_BackgroundColorStyle_Destroy(style);
+}
+
+/**
+ * @tc.name: SpanStyleSetGetBackgroundColorStyleHasBorderColor001
+ * @tc.desc: Test SetBackgroundColorStyle and GetBackgroundColorStyle preserve hasBorderColor=true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeStyledStringTest, SpanStyleSetGetBackgroundColorStyleHasBorderColor001, TestSize.Level0)
+{
+    auto* bgStyle = OH_ArkUI_BackgroundColorStyle_Create();
+    ASSERT_NE(bgStyle, nullptr);
+    OH_ArkUI_BackgroundColorStyle_SetBorderColor(bgStyle, 0xFFAABBCC);
+    EXPECT_TRUE(bgStyle->hasBorderColor);
+
+    auto* spanStyle = OH_ArkUI_SpanStyle_Create();
+    ASSERT_NE(spanStyle, nullptr);
+    auto errorCode = OH_ArkUI_SpanStyle_SetBackgroundColorStyle(spanStyle, bgStyle);
+    EXPECT_EQ(errorCode, ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_TRUE(spanStyle->backgroundColorStyle.hasBorderColor);
+    EXPECT_EQ(spanStyle->backgroundColorStyle.borderColor, 0xFFAABBCCu);
+
+    auto* retrieved = OH_ArkUI_BackgroundColorStyle_Create();
+    ASSERT_NE(retrieved, nullptr);
+    errorCode = OH_ArkUI_SpanStyle_GetBackgroundColorStyle(spanStyle, retrieved);
+    EXPECT_EQ(errorCode, ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_TRUE(retrieved->hasBorderColor);
+    EXPECT_EQ(retrieved->borderColor, 0xFFAABBCCu);
+
+    OH_ArkUI_BackgroundColorStyle_Destroy(bgStyle);
+    OH_ArkUI_BackgroundColorStyle_Destroy(retrieved);
+    OH_ArkUI_SpanStyle_Destroy(spanStyle);
+}
+
+/**
+ * @tc.name: SpanStyleSetGetBackgroundColorStyleHasBorderColor002
+ * @tc.desc: Test SetBackgroundColorStyle and GetBackgroundColorStyle preserve hasBorderColor=false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeStyledStringTest, SpanStyleSetGetBackgroundColorStyleHasBorderColor002, TestSize.Level0)
+{
+    auto* bgStyle = OH_ArkUI_BackgroundColorStyle_Create();
+    ASSERT_NE(bgStyle, nullptr);
+    EXPECT_FALSE(bgStyle->hasBorderColor);
+
+    auto* spanStyle = OH_ArkUI_SpanStyle_Create();
+    ASSERT_NE(spanStyle, nullptr);
+    auto errorCode = OH_ArkUI_SpanStyle_SetBackgroundColorStyle(spanStyle, bgStyle);
+    EXPECT_EQ(errorCode, ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_FALSE(spanStyle->backgroundColorStyle.hasBorderColor);
+
+    auto* retrieved = OH_ArkUI_BackgroundColorStyle_Create();
+    ASSERT_NE(retrieved, nullptr);
+    errorCode = OH_ArkUI_SpanStyle_GetBackgroundColorStyle(spanStyle, retrieved);
+    EXPECT_EQ(errorCode, ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_FALSE(retrieved->hasBorderColor);
+
+    OH_ArkUI_BackgroundColorStyle_Destroy(bgStyle);
+    OH_ArkUI_BackgroundColorStyle_Destroy(retrieved);
+    OH_ArkUI_SpanStyle_Destroy(spanStyle);
+}
+
+/**
+ * @tc.name: BackgroundColorStyleSetBorderWidth001
+ * @tc.desc: Test SetBorderWidth and GetBorderWidth.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeStyledStringTest, BackgroundColorStyleSetBorderWidth001, TestSize.Level0)
+{
+    auto* style = OH_ArkUI_BackgroundColorStyle_Create();
+    ASSERT_NE(style, nullptr);
+    const float testWidth = 2.5f;
+    auto errorCode = OH_ArkUI_BackgroundColorStyle_SetBorderWidth(style, testWidth);
+    EXPECT_EQ(errorCode, ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_FLOAT_EQ(style->borderWidth, testWidth);
+
+    float result = 0.0f;
+    errorCode = OH_ArkUI_BackgroundColorStyle_GetBorderWidth(style, &result);
+    EXPECT_EQ(errorCode, ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_FLOAT_EQ(result, testWidth);
+    OH_ArkUI_BackgroundColorStyle_Destroy(style);
+}
+
+/**
+ * @tc.name: BackgroundColorStyleSetBorderWidthNull001
+ * @tc.desc: Test SetBorderWidth with null pointer returns error.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeStyledStringTest, BackgroundColorStyleSetBorderWidthNull001, TestSize.Level1)
+{
+    auto errorCode = OH_ArkUI_BackgroundColorStyle_SetBorderWidth(nullptr, 1.0f);
+    EXPECT_EQ(errorCode, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+}
+
+/**
+ * @tc.name: BackgroundColorStyleGetBorderWidthNull001
+ * @tc.desc: Test GetBorderWidth with null params returns error.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeStyledStringTest, BackgroundColorStyleGetBorderWidthNull001, TestSize.Level1)
+{
+    auto* style = OH_ArkUI_BackgroundColorStyle_Create();
+    ASSERT_NE(style, nullptr);
+    float result = 0.0f;
+    EXPECT_EQ(OH_ArkUI_BackgroundColorStyle_GetBorderWidth(nullptr, &result),
+        ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(OH_ArkUI_BackgroundColorStyle_GetBorderWidth(style, nullptr),
+        ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    OH_ArkUI_BackgroundColorStyle_Destroy(style);
+}
 } // namespace OHOS::Ace

@@ -2469,6 +2469,63 @@ HWTEST_F(MenuViewTestNg, HandleLowEndImmersiveMaterialForMenu007, TestSize.Level
     TokenThemeStorage::GetInstance()->CacheClear();
 }
 
+/**
+ * @tc.name: HandleLowEndImmersiveMaterialForMenu008
+ * @tc.desc: Test if-branch (materialColor empty) marks node scope-exempt via SetSystemMaterialForOverlay
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuViewTestNg, HandleLowEndImmersiveMaterialForMenu008, TestSize.Level1)
+{
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    MockPipelineContext::GetCurrent()->SetThemeManager(themeManager);
+    auto themeConstants = AceType::MakeRefPtr<ThemeConstants>(nullptr);
+    EXPECT_CALL(*themeManager, GetThemeConstants()).WillRepeatedly(Return(themeConstants));
+
+    auto menuNode = FrameNode::CreateFrameNode(
+        V2::MENU_ETS_TAG, GetNodeId(), AceType::MakeRefPtr<MenuPattern>(TARGET_ID, TEXT_TAG, MenuType::MENU));
+    ASSERT_NE(menuNode, nullptr);
+    auto renderContext = menuNode->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+    auto material = AceType::MakeRefPtr<UiMaterial>();
+    material->SetType(static_cast<int32_t>(MaterialType::IMMERSIVE));
+    ImmersiveOptions options;
+    options.applyShadow = false;
+    // materialColor and colorResObj are not set -> enters the if-branch (copiedMaterial path).
+    material->SetImmersiveOptions(options);
+
+    EXPECT_FALSE(renderContext->IsMaterialScopeExempt());
+    auto result = MenuView::HandleLowEndImmersiveMaterialForMenu(menuNode, material, renderContext);
+    EXPECT_TRUE(result);
+    // The low-end path must go through SetSystemMaterialForOverlay so the overlay node is
+    // exempt from the material scope gate, keeping material effective for non-system apps.
+    EXPECT_TRUE(renderContext->IsMaterialScopeExempt());
+}
+
+/**
+ * @tc.name: HandleLowEndImmersiveMaterialForMenu009
+ * @tc.desc: Test else-branch (materialColor preset) marks node scope-exempt via SetSystemMaterialForOverlay
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuViewTestNg, HandleLowEndImmersiveMaterialForMenu009, TestSize.Level1)
+{
+    auto menuNode = FrameNode::CreateFrameNode(
+        V2::MENU_ETS_TAG, GetNodeId(), AceType::MakeRefPtr<MenuPattern>(TARGET_ID, TEXT_TAG, MenuType::MENU));
+    ASSERT_NE(menuNode, nullptr);
+    auto renderContext = menuNode->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+    auto material = AceType::MakeRefPtr<UiMaterial>();
+    material->SetType(static_cast<int32_t>(MaterialType::IMMERSIVE));
+    ImmersiveOptions options;
+    options.applyShadow = false;
+    options.materialColor = Color(0xFF000000); // preset -> skips if-branch, goes to else path.
+    material->SetImmersiveOptions(options);
+
+    EXPECT_FALSE(renderContext->IsMaterialScopeExempt());
+    auto result = MenuView::HandleLowEndImmersiveMaterialForMenu(menuNode, material, renderContext);
+    EXPECT_TRUE(result);
+    EXPECT_TRUE(renderContext->IsMaterialScopeExempt());
+}
+
 // --- ApplySystemMaterialForMenu ---
 
 /**
@@ -3036,5 +3093,348 @@ HWTEST_F(MenuViewTestNg, MenuManagerClearResidualLayoutDirtyMarkTest004, TestSiz
     menuManager->ClearResidualLayoutDirtyMark(frameRoot, pipeline);
     EXPECT_FALSE(frameRoot->IsLayoutDirtyMarked());
     EXPECT_EQ(pipeline->GetDirtyLayoutNodes().size(), 1u);
+}
+
+// ===================== BuildGridListColumn Divider Margin Tests =====================
+
+namespace {
+// SelectTheme with non-zero divider metrics so the icon-based and default divider start
+// margins are distinguishable: icon-based = horInterval(5) + iconSideLength(20) + iconContentPadding(4) = 29,
+// default = defaultDividerStartMargin(10).
+RefPtr<SelectTheme> SetupDividerTestTheme()
+{
+    auto selectTheme = AceType::MakeRefPtr<SelectTheme>();
+    selectTheme->defaultDividerStartMargin_ = Dimension(10.0f, DimensionUnit::VP);
+    selectTheme->defaultDividerEndMargin_ = Dimension(8.0f, DimensionUnit::VP);
+    selectTheme->defaultDividerWidth_ = Dimension(1.0f, DimensionUnit::VP);
+    selectTheme->menuItemHorIntervalPadding_ = Dimension(5.0f, DimensionUnit::VP);
+    selectTheme->iconSideLength_ = Dimension(20.0f, DimensionUnit::VP);
+    selectTheme->iconContentPadding_ = Dimension(4.0f, DimensionUnit::VP);
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    MockPipelineContext::GetCurrent()->SetThemeManager(themeManager);
+    auto getTheme = [selectTheme](ThemeType type) -> RefPtr<Theme> {
+        if (type == SelectTheme::TypeId()) {
+            return selectTheme;
+        }
+        if (type == TextTheme::TypeId()) {
+            return AceType::MakeRefPtr<TextTheme>();
+        }
+        if (type == IconTheme::TypeId()) {
+            return AceType::MakeRefPtr<IconTheme>();
+        }
+        return AceType::MakeRefPtr<MenuTheme>();
+    };
+    EXPECT_CALL(*themeManager, GetTheme(_))
+        .WillRepeatedly([getTheme](ThemeType type) -> RefPtr<Theme> { return getTheme(type); });
+    EXPECT_CALL(*themeManager, GetTheme(_, _))
+        .WillRepeatedly([getTheme](ThemeType type, int32_t) -> RefPtr<Theme> { return getTheme(type); });
+    return selectTheme;
+}
+
+// Return the n-th (0-based) direct child of parent whose tag is MENU_ITEM_ETS_TAG.
+RefPtr<FrameNode> FindNthMenuItemChild(const RefPtr<FrameNode>& parent, int32_t n)
+{
+    int32_t count = 0;
+    for (const auto& child : parent->GetChildren()) {
+        auto childFrame = AceType::DynamicCast<FrameNode>(child);
+        if (childFrame && childFrame->GetTag() == V2::MENU_ITEM_ETS_TAG) {
+            if (count == n) {
+                return childFrame;
+            }
+            count++;
+        }
+    }
+    return nullptr;
+}
+} // namespace
+
+/**
+ * @tc.name: BuildGridListColumn_DividerStartMargin001
+ * @tc.desc: Divider startMargin uses the icon-based value when the previous list item has a start icon.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuViewTestNg, BuildGridListColumn_DividerStartMargin001, TestSize.Level1)
+{
+    SetupDividerTestTheme();
+    constexpr double expectedIconMargin = 29.0; // 5 + 20 + 4
+
+    auto customMenuNode = FrameNode::CreateFrameNode(
+        V2::MENU_ETS_TAG, GetNodeId(), AceType::MakeRefPtr<MenuPattern>(TARGET_ID, TEXT_TAG, MenuType::MENU));
+    ASSERT_NE(customMenuNode, nullptr);
+
+    auto makeItem = [this](const std::string& content, bool withStartIcon, bool withStartSymbol) {
+        auto node = FrameNode::CreateFrameNode(
+            V2::MENU_ITEM_ETS_TAG, GetNodeId(), AceType::MakeRefPtr<MenuItemPattern>());
+        if (auto layoutProp = node->GetLayoutProperty<MenuItemLayoutProperty>()) {
+            layoutProp->UpdateContent(content);
+            if (withStartIcon) {
+                layoutProp->UpdateStartIcon(ImageSourceInfo("resource:///ohos_test.svg"));
+            }
+            if (withStartSymbol) {
+                layoutProp->SetStartSymbol([](WeakPtr<FrameNode>) {});
+            }
+        }
+        if (auto p = node->GetPattern<MenuItemPattern>()) {
+            p->SetIsTextMenuGridMenuItem(false);
+        }
+        return node;
+    };
+    // 3 items; count=1 -> first becomes a grid param (removed), the remaining two are list items
+    // whose divider is governed by the *previous* list item.
+    auto gridItem = makeItem("Grid", false, false);
+    auto prevItem = makeItem("Copy", true, false); // previous list item has a start icon
+    auto dividerItem = makeItem("Paste", false, false);
+    ASSERT_TRUE(gridItem && prevItem && dividerItem);
+    gridItem->MountToParent(customMenuNode);
+    prevItem->MountToParent(customMenuNode);
+    dividerItem->MountToParent(customMenuNode);
+
+    MenuGridStyleOptions gridStyle;
+    gridStyle.count = 1;
+    gridStyle.horizontalSize = 1;
+    gridStyle.position = MenuGridPosition::TOP;
+    MenuParam menuParam;
+    menuParam.gridStyle = gridStyle;
+
+    auto result = MenuView::BuildGridListColumn(customMenuNode, customMenuNode, menuParam, 0);
+    ASSERT_EQ(result, customMenuNode);
+
+    auto dividerListItem = FindNthMenuItemChild(customMenuNode, 1); // listIndex 1
+    ASSERT_NE(dividerListItem, nullptr);
+    auto paintProp = dividerListItem->GetPaintProperty<MenuItemPaintProperty>();
+    ASSERT_NE(paintProp, nullptr);
+    ASSERT_TRUE(paintProp->HasStartMargin());
+    ASSERT_TRUE(paintProp->GetStartMargin().has_value());
+    EXPECT_NEAR(paintProp->GetStartMargin().value().Value(), expectedIconMargin, 1e-6);
+}
+
+/**
+ * @tc.name: BuildGridListColumn_DividerStartMargin002
+ * @tc.desc: Divider startMargin uses the icon-based value when the previous list item has a start symbol.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuViewTestNg, BuildGridListColumn_DividerStartMargin002, TestSize.Level1)
+{
+    SetupDividerTestTheme();
+    constexpr double expectedIconMargin = 29.0; // 5 + 20 + 4
+
+    auto customMenuNode = FrameNode::CreateFrameNode(
+        V2::MENU_ETS_TAG, GetNodeId(), AceType::MakeRefPtr<MenuPattern>(TARGET_ID, TEXT_TAG, MenuType::MENU));
+    ASSERT_NE(customMenuNode, nullptr);
+
+    auto makeItem = [this](const std::string& content, bool withStartSymbol) {
+        auto node = FrameNode::CreateFrameNode(
+            V2::MENU_ITEM_ETS_TAG, GetNodeId(), AceType::MakeRefPtr<MenuItemPattern>());
+        if (auto layoutProp = node->GetLayoutProperty<MenuItemLayoutProperty>()) {
+            layoutProp->UpdateContent(content);
+            if (withStartSymbol) {
+                layoutProp->SetStartSymbol([](WeakPtr<FrameNode>) {});
+            }
+        }
+        if (auto p = node->GetPattern<MenuItemPattern>()) {
+            p->SetIsTextMenuGridMenuItem(false);
+        }
+        return node;
+    };
+    auto gridItem = makeItem("Grid", false);
+    auto prevItem = makeItem("Copy", true); // previous list item has a start symbol (no start icon)
+    auto dividerItem = makeItem("Paste", false);
+    ASSERT_TRUE(gridItem && prevItem && dividerItem);
+    gridItem->MountToParent(customMenuNode);
+    prevItem->MountToParent(customMenuNode);
+    dividerItem->MountToParent(customMenuNode);
+
+    MenuGridStyleOptions gridStyle;
+    gridStyle.count = 1;
+    gridStyle.horizontalSize = 1;
+    gridStyle.position = MenuGridPosition::TOP;
+    MenuParam menuParam;
+    menuParam.gridStyle = gridStyle;
+
+    auto result = MenuView::BuildGridListColumn(customMenuNode, customMenuNode, menuParam, 0);
+    ASSERT_EQ(result, customMenuNode);
+
+    auto dividerListItem = FindNthMenuItemChild(customMenuNode, 1); // listIndex 1
+    ASSERT_NE(dividerListItem, nullptr);
+    auto paintProp = dividerListItem->GetPaintProperty<MenuItemPaintProperty>();
+    ASSERT_NE(paintProp, nullptr);
+    ASSERT_TRUE(paintProp->HasStartMargin());
+    ASSERT_TRUE(paintProp->GetStartMargin().has_value());
+    EXPECT_NEAR(paintProp->GetStartMargin().value().Value(), expectedIconMargin, 1e-6);
+}
+
+/**
+ * @tc.name: BuildGridListColumn_DividerStartMargin003
+ * @tc.desc: Divider startMargin uses the default value when the previous list item has neither icon nor symbol.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuViewTestNg, BuildGridListColumn_DividerStartMargin003, TestSize.Level1)
+{
+    SetupDividerTestTheme();
+    constexpr double expectedDefaultMargin = 10.0; // defaultDividerStartMargin
+
+    auto customMenuNode = FrameNode::CreateFrameNode(
+        V2::MENU_ETS_TAG, GetNodeId(), AceType::MakeRefPtr<MenuPattern>(TARGET_ID, TEXT_TAG, MenuType::MENU));
+    ASSERT_NE(customMenuNode, nullptr);
+
+    auto makeItem = [this](const std::string& content) {
+        auto node = FrameNode::CreateFrameNode(
+            V2::MENU_ITEM_ETS_TAG, GetNodeId(), AceType::MakeRefPtr<MenuItemPattern>());
+        if (auto layoutProp = node->GetLayoutProperty<MenuItemLayoutProperty>()) {
+            layoutProp->UpdateContent(content);
+            // neither start icon nor start symbol
+        }
+        if (auto p = node->GetPattern<MenuItemPattern>()) {
+            p->SetIsTextMenuGridMenuItem(false);
+        }
+        return node;
+    };
+    auto gridItem = makeItem("Grid");
+    auto prevItem = makeItem("Copy"); // no icon, no symbol
+    auto dividerItem = makeItem("Paste");
+    ASSERT_TRUE(gridItem && prevItem && dividerItem);
+    gridItem->MountToParent(customMenuNode);
+    prevItem->MountToParent(customMenuNode);
+    dividerItem->MountToParent(customMenuNode);
+
+    MenuGridStyleOptions gridStyle;
+    gridStyle.count = 1;
+    gridStyle.horizontalSize = 1;
+    gridStyle.position = MenuGridPosition::TOP;
+    MenuParam menuParam;
+    menuParam.gridStyle = gridStyle;
+
+    auto result = MenuView::BuildGridListColumn(customMenuNode, customMenuNode, menuParam, 0);
+    ASSERT_EQ(result, customMenuNode);
+
+    auto dividerListItem = FindNthMenuItemChild(customMenuNode, 1); // listIndex 1
+    ASSERT_NE(dividerListItem, nullptr);
+    auto paintProp = dividerListItem->GetPaintProperty<MenuItemPaintProperty>();
+    ASSERT_NE(paintProp, nullptr);
+    ASSERT_TRUE(paintProp->HasStartMargin());
+    ASSERT_TRUE(paintProp->GetStartMargin().has_value());
+    EXPECT_NEAR(paintProp->GetStartMargin().value().Value(), expectedDefaultMargin, 1e-6);
+}
+
+/**
+ * @tc.name: BuildGridListColumn_NoDivider001
+ * @tc.desc: expandDisplay suppresses all dividers via the SetRemainingItemDividers early-return guard.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuViewTestNg, BuildGridListColumn_NoDivider001, TestSize.Level1)
+{
+    // Reuse the custom theme (proper routing + metrics) and flip expandDisplay on the shared
+    // theme object the mock holds; the early-return guard then skips the whole divider loop.
+    auto selectTheme = SetupDividerTestTheme();
+    selectTheme->expandDisplay_ = true;
+
+    auto customMenuNode = FrameNode::CreateFrameNode(
+        V2::MENU_ETS_TAG, GetNodeId(), AceType::MakeRefPtr<MenuPattern>(TARGET_ID, TEXT_TAG, MenuType::MENU));
+    ASSERT_NE(customMenuNode, nullptr);
+
+    auto makeItem = [this](const std::string& content, bool withStartIcon) {
+        auto node = FrameNode::CreateFrameNode(
+            V2::MENU_ITEM_ETS_TAG, GetNodeId(), AceType::MakeRefPtr<MenuItemPattern>());
+        if (auto layoutProp = node->GetLayoutProperty<MenuItemLayoutProperty>()) {
+            layoutProp->UpdateContent(content);
+            if (withStartIcon) {
+                layoutProp->UpdateStartIcon(ImageSourceInfo("resource:///ohos_test.svg"));
+            }
+        }
+        if (auto p = node->GetPattern<MenuItemPattern>()) {
+            p->SetIsTextMenuGridMenuItem(false);
+        }
+        return node;
+    };
+    // prevItem carries a start icon; without the guard this would yield the icon-based margin.
+    auto gridItem = makeItem("Grid", false);
+    auto prevItem = makeItem("Copy", true);
+    auto dividerItem = makeItem("Paste", false);
+    ASSERT_TRUE(gridItem && prevItem && dividerItem);
+    gridItem->MountToParent(customMenuNode);
+    prevItem->MountToParent(customMenuNode);
+    dividerItem->MountToParent(customMenuNode);
+
+    MenuGridStyleOptions gridStyle;
+    gridStyle.count = 1;
+    gridStyle.horizontalSize = 1;
+    gridStyle.position = MenuGridPosition::TOP;
+    MenuParam menuParam;
+    menuParam.gridStyle = gridStyle;
+
+    auto result = MenuView::BuildGridListColumn(customMenuNode, customMenuNode, menuParam, 0);
+    ASSERT_EQ(result, customMenuNode);
+
+    // Guard returned early -> no list item gets a divider.
+    auto first = FindNthMenuItemChild(customMenuNode, 0);
+    auto second = FindNthMenuItemChild(customMenuNode, 1);
+    ASSERT_NE(first, nullptr);
+    ASSERT_NE(second, nullptr);
+    auto firstPaint = first->GetPaintProperty<MenuItemPaintProperty>();
+    auto secondPaint = second->GetPaintProperty<MenuItemPaintProperty>();
+    ASSERT_NE(firstPaint, nullptr);
+    ASSERT_NE(secondPaint, nullptr);
+    EXPECT_FALSE(firstPaint->HasStartMargin());
+    EXPECT_FALSE(secondPaint->HasStartMargin());
+}
+
+/**
+ * @tc.name: BuildGridListColumn_NoDivider002
+ * @tc.desc: IsPCMode() suppresses all dividers (the other operand of the early-return guard).
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuViewTestNg, BuildGridListColumn_NoDivider002, TestSize.Level1)
+{
+    MockPipelineContextGetTheme();
+    SystemProperties::isPCMode_ = true;
+
+    auto customMenuNode = FrameNode::CreateFrameNode(
+        V2::MENU_ETS_TAG, GetNodeId(), AceType::MakeRefPtr<MenuPattern>(TARGET_ID, TEXT_TAG, MenuType::MENU));
+    ASSERT_NE(customMenuNode, nullptr);
+
+    auto makeItem = [this](const std::string& content, bool withStartIcon) {
+        auto node = FrameNode::CreateFrameNode(
+            V2::MENU_ITEM_ETS_TAG, GetNodeId(), AceType::MakeRefPtr<MenuItemPattern>());
+        if (auto layoutProp = node->GetLayoutProperty<MenuItemLayoutProperty>()) {
+            layoutProp->UpdateContent(content);
+            if (withStartIcon) {
+                layoutProp->UpdateStartIcon(ImageSourceInfo("resource:///ohos_test.svg"));
+            }
+        }
+        if (auto p = node->GetPattern<MenuItemPattern>()) {
+            p->SetIsTextMenuGridMenuItem(false);
+        }
+        return node;
+    };
+    auto gridItem = makeItem("Grid", false);
+    auto prevItem = makeItem("Copy", true);
+    auto dividerItem = makeItem("Paste", false);
+    ASSERT_TRUE(gridItem && prevItem && dividerItem);
+    gridItem->MountToParent(customMenuNode);
+    prevItem->MountToParent(customMenuNode);
+    dividerItem->MountToParent(customMenuNode);
+
+    MenuGridStyleOptions gridStyle;
+    gridStyle.count = 1;
+    gridStyle.horizontalSize = 1;
+    gridStyle.position = MenuGridPosition::TOP;
+    MenuParam menuParam;
+    menuParam.gridStyle = gridStyle;
+
+    // Build with PC mode on, then reset immediately so an assertion failure cannot leak the flag.
+    auto result = MenuView::BuildGridListColumn(customMenuNode, customMenuNode, menuParam, 0);
+    SystemProperties::isPCMode_ = false;
+    ASSERT_EQ(result, customMenuNode);
+
+    auto first = FindNthMenuItemChild(customMenuNode, 0);
+    auto second = FindNthMenuItemChild(customMenuNode, 1);
+    ASSERT_NE(first, nullptr);
+    ASSERT_NE(second, nullptr);
+    auto firstPaint = first->GetPaintProperty<MenuItemPaintProperty>();
+    auto secondPaint = second->GetPaintProperty<MenuItemPaintProperty>();
+    ASSERT_NE(firstPaint, nullptr);
+    ASSERT_NE(secondPaint, nullptr);
+    EXPECT_FALSE(firstPaint->HasStartMargin());
+    EXPECT_FALSE(secondPaint->HasStartMargin());
 }
 } // namespace OHOS::Ace::NG

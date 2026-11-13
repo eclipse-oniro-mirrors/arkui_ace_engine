@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_RELAXED_INTERACTION_PARSERS_CONTENT_SWITCH_COMMAND_PARSER_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_RELAXED_INTERACTION_PARSERS_CONTENT_SWITCH_COMMAND_PARSER_H
 
+#include "base/geometry/ng/point_t.h"
 #include "base/json/json_util.h"
 #include "base/memory/referenced.h"
 #include "core/components_ng/relaxed_interaction/base_command_parser.h"
@@ -32,6 +33,7 @@ public:
     ~ContentSwitchCommandParser() override = default;
 
     std::vector<std::unique_ptr<BaseExecutor>> Parse(const std::unique_ptr<JsonValue>& json) override;
+    static bool Validate(const std::unique_ptr<JsonValue>& json);
 
 private:
     struct ActionInfo {
@@ -39,9 +41,10 @@ private:
         int32_t count;
     };
 
-    bool ValidateBasicJson(const std::unique_ptr<JsonValue>& json);
-    bool ValidateType(const std::unique_ptr<JsonValue>& json);
-    ActionInfo ParseActionInfo(const std::unique_ptr<JsonValue>& actionJson);
+    static bool ParseParameters(const std::unique_ptr<JsonValue>& json, ActionInfo& actionInfo, PointF& point);
+    static bool ValidateBasicJson(const std::unique_ptr<JsonValue>& json);
+    static bool ValidateType(const std::unique_ptr<JsonValue>& json);
+    static ActionInfo ParseActionInfo(const std::unique_ptr<JsonValue>& actionJson);
 };
 
 } // namespace OHOS::Ace::NG

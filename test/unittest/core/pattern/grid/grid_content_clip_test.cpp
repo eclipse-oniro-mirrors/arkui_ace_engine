@@ -216,6 +216,108 @@ protected:
     }
 };
 
+// ===================== Unified immersive strategy: promoted default =====================
+// AC-1.1/AC-1.2 (VM-1/VM-4): with GRID_EXPAND_SAFE_AREA applied and clipContent
+// never set explicitly, the Grid resolves its effective default to SAFE_AREA and
+// reuses the whole explicit-SAFE_AREA extension chain - the assertions mirror
+// GridClipScrollSafeAreaPaddingExtension001 field by field (INV-4).
+
+HWTEST_F(GridContentClipTest, GridClipImmersiveStrategyDefaultSafeArea001, TestSize.Level1)
+{
+    ImmersiveStrategyScope scope({ ImmersiveStrategy::GRID_EXPAND_SAFE_AREA });
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetRowsGap(Dimension(0));
+    model.SetColumnsGap(Dimension(0));
+    CreateGridItems(ITEM_COUNT, GRID_ITEM_WIDTH, ITEM_HEIGHT);
+    CreateDone();
+
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::SAFE_AREA);
+
+    layoutProperty_->UpdateSafeAreaPadding(CreatePadding(0.0f, 100.0f, 0.0f, 100.0f));
+    FlushUITasks();
+    const auto& info = pattern_->GetGridLayoutInfo();
+    EXPECT_EQ(info.startFixOffset_, 100.0f) << "promoted default reuses the SAFE_AREA start extension";
+    EXPECT_EQ(info.endFixOffset_, 100.0f) << "promoted default reuses the SAFE_AREA end extension";
+    EXPECT_GT(info.endIndex_, info.ReportEndIndex()) << "extension items laid out beyond content area";
+}
+
+// AC-2.1 (VM-2): an explicit value is never overridden by the enabled strategy.
+// Mirrors GridClipScrollContentOnlyNoExtension001 exactly (INV-1).
+HWTEST_F(GridContentClipTest, GridClipImmersiveStrategyExplicitContentOnlyWins001, TestSize.Level1)
+{
+    ImmersiveStrategyScope scope({ ImmersiveStrategy::GRID_EXPAND_SAFE_AREA });
+    BuildGrid(LayoutKind::SCROLL, ContentClipMode::CONTENT_ONLY, { .bottomPadding = 300.0f });
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::CONTENT_ONLY);
+    VerifyNoExtension();
+    EXPECT_EQ(pattern_->GetGridLayoutInfo().endIndex_, 1);
+}
+
+// AC-2.1/R-3: an explicit "restore default" resolves to the promoted default.
+HWTEST_F(GridContentClipTest, GridClipImmersiveStrategyExplicitDefaultPromotes001, TestSize.Level1)
+{
+    ImmersiveStrategyScope scope({ ImmersiveStrategy::GRID_EXPAND_SAFE_AREA });
+    BuildGrid(LayoutKind::SCROLL, ContentClipMode::DEFAULT, {});
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::SAFE_AREA);
+    layoutProperty_->UpdateSafeAreaPadding(CreatePadding(0.0f, 100.0f, 0.0f, 100.0f));
+    FlushUITasks();
+    EXPECT_EQ(pattern_->GetGridLayoutInfo().startFixOffset_, 100.0f);
+    EXPECT_EQ(pattern_->GetGridLayoutInfo().endFixOffset_, 100.0f);
+}
+
+// AC-3.1 (VM-3): with no strategy applied the unset Grid keeps its built-in
+// BOUNDARY default and the ADR-1 gate keeps the extension inactive.
+HWTEST_F(GridContentClipTest, GridClipImmersiveStrategyDisabledKeepsBuiltInDefault001, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetRowsGap(Dimension(0));
+    model.SetColumnsGap(Dimension(0));
+    layoutProperty_->UpdatePadding(CreatePadding(0.0f, 0.0f, 0.0f, 300.0f));
+    CreateGridItems(ITEM_COUNT, GRID_ITEM_WIDTH, ITEM_HEIGHT);
+    CreateDone();
+
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::BOUNDARY);
+    VerifyNoExtension();
+}
+
+// AC-1.3: a strategy for another component type never touches the Grid.
+HWTEST_F(GridContentClipTest, GridClipImmersiveStrategyOtherComponentIsolated001, TestSize.Level1)
+{
+    ImmersiveStrategyScope scope({ ImmersiveStrategy::LIST_EXPAND_SAFE_AREA });
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetRowsGap(Dimension(0));
+    model.SetColumnsGap(Dimension(0));
+    layoutProperty_->UpdatePadding(CreatePadding(0.0f, 0.0f, 0.0f, 300.0f));
+    CreateGridItems(ITEM_COUNT, GRID_ITEM_WIDTH, ITEM_HEIGHT);
+    CreateDone();
+
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::BOUNDARY);
+    VerifyNoExtension();
+}
+
+// AC-1.1 dump surface: the promoted default is observable through the property
+// dump, while the un-enabled dump text stays byte-identical (INV-2).
+HWTEST_F(GridContentClipTest, GridClipImmersiveStrategyDumpSurface001, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    CreateGridItems(ITEM_COUNT, GRID_ITEM_WIDTH, ITEM_HEIGHT);
+    CreateDone();
+
+    auto paintProperty = frameNode_->GetPaintProperty<ScrollablePaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    auto disabledJson = JsonUtil::Create(true);
+    paintProperty->DumpInfo(disabledJson);
+    EXPECT_EQ(disabledJson->GetString("clipContent"), "None") << "un-enabled dump output unchanged";
+
+    ImmersiveStrategyScope scope({ ImmersiveStrategy::GRID_EXPAND_SAFE_AREA });
+    auto enabledJson = JsonUtil::Create(true);
+    paintProperty->DumpInfo(enabledJson);
+    EXPECT_EQ(enabledJson->GetString("clipContent"), "SAFE_AREA");
+}
+
 // ===================== AC-1.1: BOUNDARY extension item layout =====================
 
 HWTEST_F(GridContentClipTest, GridClipScrollBoundaryBottomExtension001, TestSize.Level1)
@@ -473,6 +575,60 @@ HWTEST_F(GridContentClipTest, GridClipRepeatReportNonNegative001, TestSize.Level
     const auto& info = pattern_->GetGridLayoutInfo();
     EXPECT_GE(info.ReportStartIndex(), 0) << "report start never negative";
     EXPECT_GE(info.ReportEndIndex(), -1) << "report end never below -1";
+}
+
+// ===================== multi-column irregular item start-row report =====================
+// FindStartIdx must keep the same-row rule for horizontal continuation cells:
+// a multi-column item's start row holds its origin (+idx) AND continuation
+// cells (-idx) to its right. Those cells start in the current row; walking up
+// (FindItemStartRow) returns the row above and the spanned item would outrank
+// same-row items with smaller indexes, breaking parity with the
+// unset-contentClip anchor (CheckMultiRow reports the leftmost same-row item).
+//
+// Layout (4 columns): row0 = 0..3; row1 = { 4 | 5 5 | 6 } with item 5 spanning
+// 2 rows x 2 cols; row2 = { 7 | (5) | 8 }. Scrolling row1 to the content top
+// must report 4 (not 5); once row1 leaves the content area the straddling
+// item 5 is the first visible child and must be reported.
+
+HWTEST_F(GridContentClipTest, GridClipIrregularMultiColumnStartRowReport001, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr 1fr");
+    model.SetRowsGap(Dimension(0));
+    model.SetColumnsGap(Dimension(0));
+    GridLayoutOptions opt;
+    opt.regularSize = GridItemSize { 1, 1 };
+    opt.irregularIndexes = { 5 };
+    opt.getSizeByIndex = [](int32_t index) {
+        return index == 5 ? GridItemSize { 2, 2 } : GridItemSize { 1, 1 };
+    };
+    model.SetLayoutOptions(opt);
+    model.SetOnScrollIndex([this](int32_t s, int32_t e) {
+        cbStart_ = s;
+        cbEnd_ = e;
+    });
+    // Bottom padding activates the end extension so ReportStartIndex resolves
+    // through SyncReportRange/FindStartIdx instead of the layout startIndex_.
+    layoutProperty_->UpdatePadding(CreatePadding(0.0f, 0.0f, 0.0f, 300.0f));
+    SetClip(ContentClipMode::BOUNDARY);
+    CreateFixedHeightItems(5, ITEM_HEIGHT);
+    CreateFixedHeightItems(1, ITEM_HEIGHT * 2); // item 5 spans two rows
+    CreateFixedHeightItems(ITEM_COUNT - 6, ITEM_HEIGHT);
+    CreateDone();
+
+    const auto& info = pattern_->GetGridLayoutInfo();
+    EXPECT_EQ(info.ReportStartIndex(), 0) << "initial report start is item 0";
+
+    // Row1 (4 | 5 5 | 6) becomes the first content-area row: report the
+    // leftmost same-row item 4, not the spanned item 5.
+    UpdateCurrentOffset(-ITEM_HEIGHT);
+    EXPECT_EQ(cbStart_, 4) << "start row of a multi-column item reports its leftmost item";
+    EXPECT_EQ(info.ReportStartIndex(), 4);
+
+    // Row1 fully scrolled out: the straddling item 5 is the first visible child.
+    UpdateCurrentOffset(-ITEM_HEIGHT);
+    EXPECT_EQ(cbStart_, 5) << "straddling multi-row item is reported once its start row left";
+    EXPECT_EQ(info.ReportStartIndex(), 5);
 }
 
 // ===================== F-8: report range must stay inside the content area =====================

@@ -24,10 +24,13 @@
 #include "core/components_ng/pattern/ui_extension/accessibility_session_adapter_ui_extension.h"
 #include "core/components_ng/pattern/ui_extension/platform_event_proxy.h"
 #include "core/components_ng/pattern/ui_extension/session_wrapper.h"
+#include "core/components_ng/token_theme/brand_color_info.h"
+#include "core/components_ng/token_theme/token_theme_storage.h"
 #ifdef SUPPORT_DIGITAL_CROWN
 #include "core/event/crown_event.h"
 #endif
 #include "core/event/mouse_event.h"
+#include "interfaces/inner_api/ace/macros.h"
 #include "interfaces/inner_api/ace/ui_content_config.h"
 
 #define UIEXT_LOGD(fmt, ...)                                                                                      \
@@ -158,9 +161,11 @@ public:
         const std::function<void(const UIExtensionOperationPhase&, int32_t)>&& callback);
     void FireOnAbilityErrorCodeCallback(
         const UIExtensionOperationPhase& operationPhase, int32_t abilityErrorCode);
-    void SetSyncCallbacks(const std::list<std::function<void(const RefPtr<UIExtensionProxy>&)>>&& callbackList);
+    ACE_FORCE_EXPORT void SetSyncCallbacks(
+        const std::list<std::function<void(const RefPtr<UIExtensionProxy>&)>>&& callbackList);
     void FireSyncCallbacks();
-    void SetAsyncCallbacks(const std::list<std::function<void(const RefPtr<UIExtensionProxy>&)>>&& callbackList);
+    ACE_FORCE_EXPORT void SetAsyncCallbacks(
+        const std::list<std::function<void(const RefPtr<UIExtensionProxy>&)>>&& callbackList);
     void FireAsyncCallbacks();
     void SetBindModalCallback(const std::function<void()>&& callback);
     void FireBindModalCallback();
@@ -270,7 +275,8 @@ public:
     void AddExtraInfoWithParamConfig(
         std::shared_ptr<JsonValue>& json, ParamConfig config = ParamConfig()) override;
     void ExecuteDumpTask(
-        std::shared_ptr<JsonValue>& json, const std::vector<std::string>& params, const RefPtr<FrameNode>& host);
+        std::shared_ptr<JsonValue>& json, const std::vector<std::string>& params, const RefPtr<FrameNode>& host,
+        InspectorTreeRequestContext* request = nullptr);
     int32_t GetInstanceIdFromHost() const;
     void DispatchDisplayArea(bool isForce = false);
     void DispatchDisplayAreaWithDelay(uint32_t delayMs);
@@ -331,6 +337,21 @@ public:
         isUpdateDisplayArea_ = isUpdate;
     }
     void AddWindowStateChangedCallback();
+
+    void NotifyBrandColorChangeToUEA(
+        int32_t instanceId, const std::string& brandColorStr);
+    void NotifyBrandColorChange(int32_t instanceId);
+    std::string GetBrandColorStr() const;
+    bool OnThemeScopeUpdate(int32_t themeScopeId) override;
+    std::string ResolveBrandColor(int32_t themeScopeId) const;
+    // Called after brand color is successfully sent to UEA (via Want or BusinessData).
+    // Updates both brandColorStr_ (current cache) and lastSentBrandColorStr_ (dedup record).
+    void SetLastSentBrandColorStr(const std::string& brandColorStr)
+    {
+        brandColorStr_ = brandColorStr;
+        lastSentBrandColorStr_ = brandColorStr;
+    }
+
 protected:
     virtual void DispatchPointerEvent(const std::shared_ptr<MMI::PointerEvent>& pointerEvent);
     virtual void DispatchKeyEvent(const KeyEvent& event);
@@ -528,7 +549,9 @@ private:
     ContainerModalAvoidInfo avoidInfo_;
     RefPtr<UIExtensionAvoidListener> avoidListener_;
     bool isUpdateDisplayArea_ = true;
-
+    std::string brandColorStr_ = DEFAULT_BRAND_COLOR_STR;
+    std::string lastSentBrandColorStr_;
+    bool isUeaConnecting_ = false;
     ACE_DISALLOW_COPY_AND_MOVE(UIExtensionPattern);
 };
 } // namespace OHOS::Ace::NG

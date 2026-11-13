@@ -15,14 +15,19 @@
 
 #include "adapter/ohos/entrance/ui_content_impl.h"
 #include "adapter/ohos/entrance/ui_session/ui_session_manager_ohos.h"
+#include "adapter/ohos/entrance/ui_session/page_scene_split_adapter.h"
+#include "interfaces/inner_api/ui_session/ui_session_split_rule.h"
 #include "core/accessibility/accessibility_manager.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 #include "base/resource/shared_image_manager.h"
 
 #include <map>
 
+#include <algorithm>
 #include <atomic>
 #include <cinttypes>
+#include <cmath>
+#include <limits>
 #include <optional>
 #include <tuple>
 
@@ -70,6 +75,7 @@
 #include "core/components_ng/manager/force_split/force_split_manager.h"
 #include "core/components_ng/manager/form_visible/form_visible_manager.h"
 #include "core/components_ng/manager/page_scene/page_scene_rule_manager.h"
+#include "core/components_ng/manager/page_scene/developer_response_observer.h"
 #include "core/components_ng/manager/page_scene/search_scene_context_collector.h"
 #include "core/components_ng/manager/uisession_query/component_tree_query.h"
 #include "core/components_ng/base/frame_node.h"
@@ -121,6 +127,7 @@
 #include "adapter/ohos/entrance/hap_asset_provider_impl.h"
 #include "adapter/ohos/entrance/plugin_utils_impl.h"
 #include "adapter/ohos/entrance/ui_session/ui_session_batch_command.h"
+#include "adapter/ohos/entrance/ui_session/ui_session_command_result.h"
 #include "adapter/ohos/entrance/ui_event_impl.h"
 #include "adapter/ohos/entrance/utils.h"
 #include "adapter/ohos/osal/navigation_route_ohos.h"
@@ -154,6 +161,7 @@
 #include "core/components/theme/shadow_theme.h"
 #include "core/components/popup/popup_theme.h"
 #include "core/components_ng/base/inspector.h"
+#include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/components_ng/base/view_abstract.h"
 #include "core/components_ng/manager/content_change_manager/content_change_manager.h"
 #include "core/components_ng/pattern/app_bar/app_bar_view.h"
@@ -166,6 +174,8 @@
 #include "core/components_ng/pattern/ui_extension/ui_extension_component/ui_extension_pattern.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_config.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_container_handler.h"
+#include "core/components_ng/token_theme/brand_color_info.h"
+#include "core/components_ng/token_theme/token_theme_storage.h"
 #include "core/components_ng/render/adapter/rosen_render_context.h"
 #include "core/image/image_file_cache.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -632,6 +642,7 @@ bool HandlePageSceneRuleRemoval(int32_t processId, const std::unique_ptr<JsonVal
     return true;
 }
 
+
 } // namespace
 
 const std::string SUBWINDOW_PREFIX = "ARK_APP_SUBWINDOW_";
@@ -717,6 +728,14 @@ extern "C" ACE_FORCE_EXPORT char* OHOS_ACE_GetCurrentUIStackInfo()
 extern "C" ACE_FORCE_EXPORT int32_t OHOS_ACE_GetUIContentWindowID(int32_t instanceId)
 {
     return UIContentImpl::GetUIContentWindowID(instanceId);
+}
+
+extern "C" ACE_FORCE_EXPORT bool OHOS_ACE_IsBrandColorValid(const char* brandColorStr)
+{
+    if (brandColorStr == nullptr) {
+        return false;
+    }
+    return UIContentImpl::IsBrandColorValid(brandColorStr);
 }
 
 extern "C" ACE_FORCE_EXPORT void OHOS_ACE_ScopeErrorHivewReport()
@@ -1753,6 +1772,7 @@ UIContentErrorCode UIContentImpl::CommonInitializeForm(OHOS::Rosen::Window* wind
     }
 
     auto context = context_.lock();
+    CHECK_NULL_RETURN(context, UIContentErrorCode::NULL_POINTER);
     static std::once_flag onceFlag;
     auto configuration = context->GetConfiguration();
     std::unordered_map<std::string, DeviceType> typeMap = { { "phone", DeviceType::PHONE }, { "tv", DeviceType::TV },
@@ -3104,6 +3124,7 @@ UIContentErrorCode UIContentImpl::CommonInitialize(
             fontManager->UpdateStyleOptimizeFlagInCurrentLanguage();
         }
     }
+    InitBrandColor();
     return errorCode;
 }
 
@@ -3266,8 +3287,7 @@ void UIContentImpl::Background()
     }
     Platform::AceContainer::OnHide(instanceId_);
 
-    // Search presence: app background reports one false for every PRESENT page
-    //.
+    // Search presence: app background reports one false for every PRESENT page.
     if (pageSceneMatcher_) {
         auto exitEvents = pageSceneMatcher_->ExitAllSearchPresence();
         for (const auto& [pid, event] : exitEvents) {
@@ -3814,12 +3834,17 @@ void UIContentImpl::UpdateConfiguration(const std::shared_ptr<OHOS::AppExecFwk::
     bool formFontUseDefault = isFormRender_ && !fontScaleFollowSystem_;
     taskExecutor->PostTask(
         [weakContainer = WeakPtr<Platform::AceContainer>(container), config, instanceId = instanceId_,
-            bundleName = bundleName_, moduleName = moduleName_, formFontUseDefault]() {
+            bundleName = bundleName_, moduleName = moduleName_, formFontUseDefault, weakContext = context_]() {
             auto container = weakContainer.Upgrade();
             CHECK_NULL_VOID(container);
             Platform::ParsedConfig parsedConfig;
             BuildParsedConfig(parsedConfig, config, formFontUseDefault);
             container->UpdateConfiguration(parsedConfig, config->GetName());
+            auto brandColorChanged =
+                !config->GetItem(OHOS::AAFwk::GlobalConfigurationKey::BRAND_COLOR_CHANGED).empty();
+            if (brandColorChanged) {
+                HandleBrandColorChanged(weakContext, instanceId);
+            }
             LOGI("[%{public}d][%{public}s][%{public}s] UpdateConfiguration, name:%{public}s",
                 instanceId, bundleName.c_str(), moduleName.c_str(), config->GetName().c_str());
         },
@@ -3849,12 +3874,17 @@ void UIContentImpl::UpdateConfiguration(const std::shared_ptr<OHOS::AppExecFwk::
     bool formFontUseDefault = isFormRender_ && !fontScaleFollowSystem_;
     taskExecutor->PostTask(
         [weakContainer = WeakPtr<Platform::AceContainer>(container), config, instanceId = instanceId_,
-            bundleName = bundleName_, moduleName = moduleName_, formFontUseDefault]() {
+            bundleName = bundleName_, moduleName = moduleName_, formFontUseDefault, weakContext = context_]() {
             auto container = weakContainer.Upgrade();
             CHECK_NULL_VOID(container);
             Platform::ParsedConfig parsedConfig;
             BuildParsedConfig(parsedConfig, config, formFontUseDefault);
             container->UpdateConfiguration(parsedConfig, config->GetName(), true);
+            auto brandColorChanged =
+                !config->GetItem(OHOS::AAFwk::GlobalConfigurationKey::BRAND_COLOR_CHANGED).empty();
+            if (brandColorChanged) {
+                HandleBrandColorChanged(weakContext, instanceId);
+            }
             LOGI("[%{public}d][%{public}s][%{public}s] UpdateConfiguration, name:%{public}s", instanceId,
                 bundleName.c_str(), moduleName.c_str(), config->GetName().c_str());
         },
@@ -4245,7 +4275,8 @@ void KeyboardAvoid(OHOS::Rosen::WindowSizeChangeReason reason, int32_t instanceI
     auto rect = info->rect_;
     Rect keyboardRect = Rect(rect.posX_, rect.posY_, rect.width_, rect.height_);
     SetKeyboardInfo(pipelineContext, keyboardRect.Height());
-    if (DynamicKeyboardAvoid(reason, instanceId, pipelineContext, info, rsTransaction, avoidAreas)) {
+    if (DynamicKeyboardAvoid(reason, instanceId, pipelineContext, info,
+        rsTransaction, avoidAreas)) {
         return;
     }
     if (UIExtensionKeyboardAvoid(pipelineContext, instanceId, keyboardRect, info)) {
@@ -4547,7 +4578,6 @@ void UIContentImpl::UpdateViewportConfigWithAnimation(const ViewportConfig& conf
                 if (originalReason != OHOS::Rosen::WindowSizeChangeReason::PAGE_ROTATION) {
                     // Page rotation has most of the same logic as regular rotation,
                     // but page rotation does not trigger rotation animations.
-                    LOGI("StartWindowAnimation with reason: %{public}d", reason);
                     pipelineContext->StartWindowAnimation();
                 }
                 // SCENE_WITH_ANIMATION does not require refreshing all nodes
@@ -4945,7 +4975,6 @@ void UIContentImpl::NotifyRotationAnimationEnd()
         [container]() {
             auto pipelineContext = container->GetPipelineContext();
             if (pipelineContext) {
-                LOGI("StopWindowAnimation: %{public}d", pipelineContext->GetInstanceId());
                 pipelineContext->StopWindowAnimation();
             }
         },
@@ -6331,7 +6360,21 @@ void UIContentImpl::SetForceSplitConfig(const std::optional<ForceSplitConfig>& s
     forceSplitMgr->SetForceSplitSupported(true);
     NG::ForceSplitUtils::LogForceSplitParam(splitConfig->isRouter, config);
     context->SetIsArkUIHookEnabled(config.isArkUIHookEnabled);
-    forceSplitMgr->SetIsRouter(splitConfig->isRouter);
+    ApplyForceSplitParams(forceSplitMgr, config, splitConfig->isRouter);
+    if (!(splitConfig->isRouter)) {
+        navManager->SetForceSplitNavigationId(config.navigationId);
+        navManager->SetForceSplitNavigationDepth(config.navigationDepth);
+        // page-level split: no placeholder, keep the right column empty
+        navManager->SetPlaceholderDisabled(config.navigationDisablePlaceholder ||
+            config.enablePageLevelSplit);
+        navManager->SetDividerDisabled(config.navigationDisableDivider);
+    }
+}
+
+void UIContentImpl::ApplyForceSplitParams(
+    const RefPtr<NG::ForceSplitManager>& forceSplitMgr, NG::ForceSplitParam& config, bool isRouter)
+{
+    forceSplitMgr->SetIsRouter(isRouter);
     forceSplitMgr->SetDialogSupportSplit(config.dialogSupportSplit);
     forceSplitMgr->SetHomePageName(config.homePage);
     forceSplitMgr->SetRelatedPageName(config.relatedPage);
@@ -6345,12 +6388,9 @@ void UIContentImpl::SetForceSplitConfig(const std::optional<ForceSplitConfig>& s
     forceSplitMgr->SetBehaviorMode(config.behaviorMode);
     forceSplitMgr->SetPagePairs(std::move(config.pagePairs));
     forceSplitMgr->SetTransPages(std::move(config.transPages));
-    if (!(splitConfig->isRouter)) {
-        navManager->SetForceSplitNavigationId(config.navigationId);
-        navManager->SetForceSplitNavigationDepth(config.navigationDepth);
-        navManager->SetPlaceholderDisabled(config.navigationDisablePlaceholder);
-        navManager->SetDividerDisabled(config.navigationDisableDivider);
-    }
+    forceSplitMgr->SetEnablePageLevelSplit(config.enablePageLevelSplit);
+    forceSplitMgr->SetPageSplitOptions(std::move(config.pageSplitOptions));
+    forceSplitMgr->SetEnableInheritSplitStrategy(config.enableInheritSplitStrategy);
 }
 
 void UIContentImpl::ProcessDestructCallbacks()
@@ -6555,7 +6595,7 @@ void UIContentImpl::SetTopWindowBoundaryByID(const std::string& stringId)
         TaskExecutor::TaskType::UI, "ArkUISetTopWindowBoundaryByID");
 }
 
-void sendCommandCallbackInner(const WeakPtr<TaskExecutor>& taskExecutor)
+void SendCommandCallbackInner(const WeakPtr<TaskExecutor>& taskExecutor)
 {
     auto sendCommandCallback = [weakTaskExecutor = taskExecutor](int32_t value) {
         KeyEvent keyEvent;
@@ -6568,6 +6608,7 @@ void sendCommandCallbackInner(const WeakPtr<TaskExecutor>& taskExecutor)
         taskExecutor->PostTask(
             [keyEvent]() {
                 auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
+                AceAsyncTraceEnd(0, "SendCommand.Request.Legacy.Global");
                 CHECK_NULL_VOID(pipeline);
                 pipeline->OnNonPointerEvent(keyEvent);
             },
@@ -6619,12 +6660,153 @@ BatchResolvedTarget ResolveBatchTextTarget(int32_t nodeId)
             } };
 }
 
+namespace {
+BatchResolvedTarget ResolveBatchTextTargetWithResult(int32_t nodeId)
+{
+    auto target = ResolveBatchTextTarget(nodeId);
+    if (target.status == BatchTargetStatus::READY) {
+        auto node = AceType::DynamicCast<NG::FrameNode>(ElementRegister::GetInstance()->GetUINodeById(nodeId));
+        if (!node) {
+            return {
+                .status = BatchTargetStatus::NOT_FOUND
+            };
+        }
+        target.execute = [node](const std::string& command) {
+            return node->OnRecvCommandWithResult(command).success;
+        };
+    }
+    return target;
+}
+
+bool IsKeyCodeNumber(const std::unique_ptr<JsonValue>& json)
+{
+    auto value = json->GetValue("cmd");
+    if (!value || !value->IsNumber() || !std::isfinite(value->GetDouble())) {
+        return false;
+    }
+    auto number = value->GetDouble();
+    return number == std::trunc(number) && number >= std::numeric_limits<int32_t>::min() &&
+        number <= std::numeric_limits<int32_t>::max();
+}
+
+NG::CommandResult ExecuteKeyCodeWithResult(
+    const std::unique_ptr<JsonValue>& json, const RefPtr<NG::PipelineContext>& pipeline)
+{
+    if (!IsKeyCodeNumber(json)) {
+        AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Global");
+        return NG::CommandResult::Error(NG::CommandErrorType::INVALID_PARAM);
+    }
+    KeyEvent keyEvent;
+    keyEvent.isInjected = true;
+    keyEvent.action = KeyAction::DOWN;
+    keyEvent.code = static_cast<KeyCode>(json->GetInt("cmd"));
+    keyEvent.pressedCodes = { keyEvent.code };
+    AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Global");
+    return pipeline->OnNonPointerEvent(keyEvent)
+        ? NG::CommandResult::Success() : NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL);
+}
+
+void ExecuteGlobalCommandWithResult(
+    const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback)
+{
+    auto json = JsonUtil::ParseJsonString(command);
+    if (!json || !json->IsValid() || !json->IsObject()) {
+        AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Global");
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::INVALID_PARAM)));
+        return;
+    }
+    auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
+    if (!pipeline) {
+        AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Global");
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
+        return;
+    }
+    finishCallback(SerializeCommandResult(ExecuteKeyCodeWithResult(json, pipeline)));
+}
+
+void ExecuteRelaxedCommandWithResult(
+    const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback)
+{
+    auto batch = UiSessionBatchCommand::Parse(command);
+    if (batch.status != BatchParseStatus::NOT_BATCH) {
+        AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Global");
+        finishCallback(UiSessionBatchCommand::ExecuteWithResult(batch, ResolveBatchTextTargetWithResult));
+        return;
+    }
+    auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
+    if (!pipeline) {
+        AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Global");
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
+        return;
+    }
+    AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Global");
+    pipeline->ProcessCommandWithResult(command, [finishCallback](const NG::CommandResult& result) {
+        finishCallback(SerializeCommandResult(result));
+    });
+}
+
+void ExecuteNodeCommandWithResult(
+    int32_t id, const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback)
+{
+    AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Node");
+    auto node = AceType::DynamicCast<NG::FrameNode>(ElementRegister::GetInstance()->GetUINodeById(id));
+    if (!node) {
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::NODE_NOT_FOUND)));
+        return;
+    }
+    finishCallback(SerializeCommandResult(node->OnRecvCommandWithResult(command)));
+}
+
+void PostNodeCommandWithResult(const WeakPtr<TaskExecutor>& weakTaskExecutor, int32_t id,
+    const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback)
+{
+    auto taskExecutor = weakTaskExecutor.Upgrade();
+    if (!taskExecutor) {
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
+        return;
+    }
+    bool posted = taskExecutor->PostTask(
+        [id, command, finishCallback]() { ExecuteNodeCommandWithResult(id, command, finishCallback); },
+        TaskExecutor::TaskType::UI, "UiSessionSendCommandPatternWithResult");
+    if (!posted) {
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
+    }
+}
+
+void PostGlobalCommandWithResult(const WeakPtr<TaskExecutor>& weakTaskExecutor,
+    const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback, bool isRelaxed)
+{
+    auto taskExecutor = weakTaskExecutor.Upgrade();
+    if (!taskExecutor) {
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
+        return;
+    }
+    bool posted = taskExecutor->PostTask(
+        [command, finishCallback, isRelaxed]() {
+            if (isRelaxed) {
+                ExecuteRelaxedCommandWithResult(command, finishCallback);
+            } else {
+                ExecuteGlobalCommandWithResult(command, finishCallback);
+            }
+        },
+        TaskExecutor::TaskType::UI, "UiSessionSendCommandWithResult");
+    if (!posted) {
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
+    }
+}
+} // namespace
+
 BatchDispatchCallbacks CreateBatchDispatchCallbacks(const RefPtr<TaskExecutor>& taskExecutor)
 {
     BatchDispatchCallbacks callbacks;
     if (taskExecutor) {
         callbacks.postTask = [taskExecutor](std::function<void()>&& task) {
-            return taskExecutor->PostTask(std::move(task), TaskExecutor::TaskType::UI, "UiSessionBatchSendCommand");
+            return taskExecutor->PostTask(
+                [task = std::move(task)]() {
+                    AceAsyncTraceEnd(0, "SendCommand.Request.Legacy.Global");
+                    task();
+                },
+                TaskExecutor::TaskType::UI, "UiSessionBatchSendCommand");
         };
     }
     callbacks.resolveTarget = ResolveBatchTextTarget;
@@ -6645,6 +6827,7 @@ void UIContentImpl::RelaxedCommandCallbackInner(const WeakPtr<TaskExecutor>& tas
         taskExecutor->PostTask(
             [command]() {
                 auto pipelineContext = NG::PipelineContext::GetCurrentContextSafely();
+                AceAsyncTraceEnd(0, "SendCommand.Request.Legacy.Global");
                 if (pipelineContext == nullptr) {
                     TAG_LOGE(
                         AceLogTag::ACE_UIEVENT, "Failed to process relaxed command because pipelineContext is nullptr");
@@ -6658,10 +6841,46 @@ void UIContentImpl::RelaxedCommandCallbackInner(const WeakPtr<TaskExecutor>& tas
 #endif
     };
     UiSessionManager::GetInstance()->SaveRelaxedCommandFunction(relaxedCommandCallback);
+    auto relaxedCommandWithResult = [weakTaskExecutor = taskExecutor](const std::string& command,
+        const UiSessionManager::CommandResultCallback& finishCallback) {
+        PostGlobalCommandWithResult(weakTaskExecutor, command, finishCallback, true);
+    };
+    UiSessionManager::GetInstance()->SaveRelaxedCommandWithResultFunction(std::move(relaxedCommandWithResult));
+}
+
+void UIContentImpl::InitInspectorWindowSnapshotCallback()
+{
+    auto container = Platform::AceContainer::GetContainer(instanceId_);
+    auto pipeline = container ? AceType::DynamicCast<NG::PipelineContext>(container->GetPipelineContext()) : nullptr;
+    WeakPtr<NG::PipelineContext> weakPipeline = pipeline;
+    wptr<OHOS::Rosen::Window> weakWindow = Platform::AceContainer::GetUIWindow(instanceId_);
+    auto snapshot = [weakPipeline, weakWindow]() -> std::optional<InspectorWindowSnapshot> {
+        auto window = weakWindow.promote();
+        auto pipeline = weakPipeline.Upgrade();
+        CHECK_NULL_RETURN(window, std::nullopt);
+        CHECK_NULL_RETURN(pipeline, std::nullopt);
+        if (pipeline->IsDestroyed()) {
+            return std::nullopt;
+        }
+        std::string title = pipeline->GetInspectorAppTitle();
+        if (title.empty()) {
+            auto themes = pipeline->GetThemeManager();
+            auto constants = themes ? themes->GetThemeConstants() : nullptr;
+            auto manager = pipeline->GetWindowManager();
+            if (constants && manager) {
+                title = constants->GetString(manager->GetAppLabelId());
+            }
+        }
+        return InspectorWindowSnapshot { window->IsPrivacyMode(), std::move(title), getpid() };
+    };
+    if (pipeline) {
+        pipeline->SetInspectorWindowSnapshotCallback(std::move(snapshot));
+    }
 }
 
 void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& taskExecutor)
 {
+    InitInspectorWindowSnapshotCallback();
     const int32_t GET_INSPECTOR_TREE_TIMEOUT_TIME = 1500;
     // set get inspector tree function for ui session manager
     auto callback = [weakTaskExecutor = taskExecutor](bool onlyNeedVisible, ParamConfig config) {
@@ -6697,7 +6916,7 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
     SetupGetImagesByIdCallback(taskExecutor);
     RegisterGetCurrentPageName(taskExecutor);
     InitSendCommandFunctionsCallbacks(taskExecutor);
-    sendCommandCallbackInner(taskExecutor);
+    SendCommandCallbackInner(taskExecutor);
     RelaxedCommandCallbackInner(taskExecutor);
     SaveGetCurrentInstanceId();
     RegisterExeAppAIFunction(taskExecutor);
@@ -6766,7 +6985,7 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
             auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
             if (!pipeline) {
                 if (isGetResult) {
-                    UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
+                    PageSceneSplitAdapter::CompletePageSceneQuery(processId, ruleJson);
                 }
                 return;
             }
@@ -6774,7 +6993,7 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
         }
         if (!taskExecutor) {
             if (isGetResult) {
-                UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
+                PageSceneSplitAdapter::CompletePageSceneQuery(processId, ruleJson);
             }
             return;
         }
@@ -6783,16 +7002,28 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
                 auto pageSceneMatcher = weakPageSceneMatcher.lock();
                 if (!pageSceneMatcher) {
                     if (isGetResult) {
-                        UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
+                        PageSceneSplitAdapter::CompletePageSceneQuery(processId, ruleJson);
                     }
                     return;
                 }
                 if (ruleJson.empty()) {
                     // Search removals carry their registration generation separately.
                     pageSceneMatcher->ClearProcess(processId, false);
+                    auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
+                    if (pipeline) {
+                        auto session = static_cast<UiSessionManagerOhos*>(UiSessionManager::GetInstance());
+                        auto content = pipeline->GetContentChangeManager();
+                        if (content && !session->HasPendingSplitPageSceneQuery(processId)) {
+                            content->CancelPageSceneQuery(processId);
+                        }
+                    }
                     return;
                 }
                 auto searchRoot = JsonUtil::ParseJsonString(ruleJson);
+                if (!isGetResult &&
+                    PageSceneSplitAdapter::HandleConfigurationChanged(processId, searchRoot, pageSceneMatcher)) {
+                    return;
+                }
                 bool isSearchRule = searchRoot && searchRoot->IsObject() &&
                     (!searchRoot->GetValue("version") || searchRoot->GetValue("version")->IsNull());
                 if (!isGetResult &&
@@ -6803,7 +7034,7 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
                 if (!pipeline) {
                     LOGW("PageSceneDetect pipeline is null, processId=%{public}d", processId);
                     if (isGetResult) {
-                        UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
+                        PageSceneSplitAdapter::CompletePageSceneQuery(processId, ruleJson);
                     }
                     return;
                 }
@@ -6879,6 +7110,11 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
                     }
                     return;
                 }
+                if (isGetResult && searchRoot && PageSceneSplit::ContainsSplitRule(searchRoot->GetJsonObject())) {
+                    PageSceneSplitAdapter::QuerySplitPageScenes(processId, ruleJson,
+                        searchRoot->GetString("_splitQueryGeneration"), pageSceneMatcher, pipeline);
+                    return;
+                }
                 auto startNodes = pipeline->GetDumpStartNodes();
                 auto result = pageSceneMatcher->MatchPageScene(
                     processId, ruleJson, startNodes, pipeline->GetCurrentPageName(), isGetResult);
@@ -6913,10 +7149,33 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
             },
             TaskExecutor::TaskType::UI, "UiSessionPageSceneDetect");
         if (!posted && isGetResult) {
-            UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
+            PageSceneSplitAdapter::CompletePageSceneQuery(processId, ruleJson);
         }
     };
     UiSessionManager::GetInstance()->SavePageSceneDetectFunction(pageSceneDetectCallback);
+    UiSessionManager::PageSceneResponseObserverFunction responseObserverFunc;
+    responseObserverFunc.registerRuleSet = [](int32_t processId, const std::string& ruleJson) {
+        return NG::PageSceneResponseObserver::GetInstance()->RegisterRuleSet(processId, ruleJson);
+    };
+    responseObserverFunc.unregisterRuleSet = [](int32_t processId, const std::string& ruleSetId) {
+        return NG::PageSceneResponseObserver::GetInstance()->UnregisterRuleSet(processId, ruleSetId);
+    };
+    responseObserverFunc.clearProcess = [](int32_t processId) {
+        NG::PageSceneResponseObserver::GetInstance()->ClearProcess(processId);
+    };
+    responseObserverFunc.setActive = [](bool active) {
+        NG::PageSceneResponseObserver::GetInstance()->SetActive(active);
+    };
+    responseObserverFunc.hasRegisteredRules = []() {
+        return NG::PageSceneResponseObserver::GetInstance()->HasRegisteredRules();
+    };
+    responseObserverFunc.getActiveRuleJsons = []() {
+        return NG::PageSceneResponseObserver::GetInstance()->GetActiveRuleJsons();
+    };
+    responseObserverFunc.onContentStable = []() {
+        NG::PageSceneResponseObserver::GetInstance()->OnContentStable();
+    };
+    UiSessionManager::GetInstance()->SavePageSceneResponseObserverFunction(std::move(responseObserverFunc));
 }
 
 void UIContentImpl::SaveArkUIPageTranslateFunctions(const WeakPtr<TaskExecutor>& taskExecutor)
@@ -7128,6 +7387,8 @@ void UIContentImpl::SaveComponentTreeQueryFunction(const WeakPtr<TaskExecutor>& 
                 NG::ComponentTreeQuery::Execute(request, resultJson);
                 if (request.type == ComponentTreeQueryType::LAZY_FOREACH_DATA_BY_POINT) {
                     UiSessionManager::GetInstance()->ReportLazyForEachQueryResult(resultJson);
+                } else if (request.type == ComponentTreeQueryType::NODES_IN_RECT) {
+                    UiSessionManager::GetInstance()->ReportNodesInRectQueryResult(resultJson);
                 } else {
                     UiSessionManager::GetInstance()->ReportNavigationQueryResult(resultJson);
                 }
@@ -7232,6 +7493,7 @@ void UIContentImpl::InitSendCommandFunctionsCallbacks(const WeakPtr<TaskExecutor
         CHECK_NULL_VOID(taskExecutor);
         taskExecutor->PostTask(
             [id, command]() {
+                AceAsyncTraceEnd(0, "SendCommand.Request.Legacy.Node");
                 auto node = AceType::DynamicCast<NG::FrameNode>(ElementRegister::GetInstance()->GetUINodeById(id));
                 if (!node) {
                     LOGI("UiSessionSendCommandPattern: Node is null for id: %{public}d", id);
@@ -7242,6 +7504,16 @@ void UIContentImpl::InitSendCommandFunctionsCallbacks(const WeakPtr<TaskExecutor
             TaskExecutor::TaskType::UI, "UiSessionSendCommandPattern");
     };
     UiSessionManager::GetInstance()->SaveForSendCommandFunction(sendCommand);
+    auto nodeCommandWithResult = [weakTaskExecutor = taskExecutor](int32_t id, const std::string& command,
+        const UiSessionManager::CommandResultCallback& finishCallback) {
+        PostNodeCommandWithResult(weakTaskExecutor, id, command, finishCallback);
+    };
+    UiSessionManager::GetInstance()->SaveForSendCommandWithResultFunction(std::move(nodeCommandWithResult));
+    auto globalCommandWithResult = [weakTaskExecutor = taskExecutor](const std::string& command,
+        const UiSessionManager::CommandResultCallback& finishCallback) {
+        PostGlobalCommandWithResult(weakTaskExecutor, command, finishCallback, false);
+    };
+    UiSessionManager::GetInstance()->SaveSendCommandWithResultFunction(std::move(globalCommandWithResult));
 }
 
 bool UIContentImpl::SendUIExtProprty(uint32_t code, const AAFwk::Want& data,
@@ -7622,16 +7894,75 @@ void UIContentImpl::SetContentChangeDetectCallback(const WeakPtr<TaskExecutor>& 
     });
 }
 
-void UIContentImpl::PostTraverseWebTask(const WeakPtr<TaskExecutor>& weakTaskExecutor,
+bool UIContentImpl::PostTraverseWebTask(const WeakPtr<TaskExecutor>& weakTaskExecutor,
     std::function<void()>&& task)
 {
     auto taskExecutor = weakTaskExecutor.Upgrade();
     if (!taskExecutor) {
         auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
-        CHECK_NULL_VOID(pipeline);
+        if (!pipeline) {
+            return false;
+        }
         taskExecutor = pipeline->GetTaskExecutor();
     }
-    taskExecutor->PostTask(std::move(task), TaskExecutor::TaskType::UI, "TraverseWebForPageScene");
+    if (!taskExecutor) {
+        return false;
+    }
+    return taskExecutor->PostTask(std::move(task), TaskExecutor::TaskType::UI, "TraverseWebForPageScene");
+}
+
+namespace {
+// Posted task body for the Web page-scene traversal: reports an empty get result when
+// the pipeline or the translate manager is unavailable so the session-side pending
+// query cannot deadlock.
+void TraverseWebForPageScene(int32_t processId, const std::string& ruleJson, bool isGetResult)
+{
+    auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
+    if (!pipeline) {
+        if (isGetResult) {
+            WebPageSceneManager::GetInstance().ReportEmptyWebRound(processId);
+        }
+        return;
+    }
+    auto uiTranslateManager = pipeline->GetUiTranslateManagerImpl();
+    if (!uiTranslateManager) {
+        if (isGetResult) {
+            WebPageSceneManager::GetInstance().ReportEmptyWebRound(processId);
+        }
+        return;
+    }
+    uiTranslateManager->TraverseAndMatchAllWeb(processId, ruleJson, isGetResult);
+}
+} // namespace
+
+int32_t UIContentImpl::HandleWebPageSceneRegister(const WeakPtr<TaskExecutor>& weakTaskExecutor,
+    int32_t processId, const std::string& ruleJson)
+{
+    int32_t ret = WebPageSceneManager::GetInstance().RegisterPageSceneRules(processId, ruleJson);
+    if (ret != PAGE_SCENE_ERR_OK) {
+        return ret;
+    }
+    PostTraverseWebTask(weakTaskExecutor, [processId]() {
+        TraverseWebForPageScene(processId, "", false);
+    });
+    return PAGE_SCENE_ERR_OK;
+}
+
+int32_t UIContentImpl::HandleWebPageSceneGet(const WeakPtr<TaskExecutor>& weakTaskExecutor,
+    int32_t processId, const std::string& ruleJson, bool isGetResult)
+{
+    bool posted = PostTraverseWebTask(weakTaskExecutor, [processId, ruleJson, isGetResult]() {
+        TraverseWebForPageScene(processId, ruleJson, isGetResult);
+    });
+    if (!posted && isGetResult) {
+        // Task dropped (no usable task executor): the session side has already marked
+        // the query pending before invoking this callback, so close out
+        // any previous round and report an empty result synchronously to clear it —
+        // otherwise subsequent Gets for the same pid would be rejected with
+        // LAST_UNFINISH forever ("get unavailable afterwards").
+        WebPageSceneManager::GetInstance().ReportEmptyWebRound(processId);
+    }
+    return PAGE_SCENE_ERR_OK;
 }
 
 void UIContentImpl::SaveTraverseWebForPageSceneCallback(const WeakPtr<TaskExecutor>& taskExecutor)
@@ -7641,32 +7972,12 @@ void UIContentImpl::SaveTraverseWebForPageSceneCallback(const WeakPtr<TaskExecut
         UiSessionManager::WebPageSceneOp op, int32_t processId, const std::string& ruleJson,
         bool isGetResult) -> int32_t {
         switch (op) {
-            case UiSessionManager::WebPageSceneOp::RegisterRules: {
-                int32_t ret = WebPageSceneManager::GetInstance().RegisterPageSceneRules(processId, ruleJson);
-                if (ret != PAGE_SCENE_ERR_OK) {
-                    return ret;
-                }
-                PostTraverseWebTask(weakTaskExecutor, [processId]() {
-                    auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
-                    CHECK_NULL_VOID(pipeline);
-                    auto uiTranslateManager = pipeline->GetUiTranslateManagerImpl();
-                    CHECK_NULL_VOID(uiTranslateManager);
-                    uiTranslateManager->TraverseAndMatchAllWeb(processId, "", false);
-                });
-                return PAGE_SCENE_ERR_OK;
-            }
+            case UiSessionManager::WebPageSceneOp::RegisterRules:
+                return HandleWebPageSceneRegister(weakTaskExecutor, processId, ruleJson);
             case UiSessionManager::WebPageSceneOp::UnregisterRules:
                 return WebPageSceneManager::GetInstance().UnregisterPageSceneRules(processId);
-            case UiSessionManager::WebPageSceneOp::GetPageScene: {
-                PostTraverseWebTask(weakTaskExecutor, [processId, ruleJson, isGetResult]() {
-                    auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
-                    CHECK_NULL_VOID(pipeline);
-                    auto uiTranslateManager = pipeline->GetUiTranslateManagerImpl();
-                    CHECK_NULL_VOID(uiTranslateManager);
-                    uiTranslateManager->TraverseAndMatchAllWeb(processId, ruleJson, isGetResult);
-                });
-                return PAGE_SCENE_ERR_OK;
-            }
+            case UiSessionManager::WebPageSceneOp::GetPageScene:
+                return HandleWebPageSceneGet(weakTaskExecutor, processId, ruleJson, isGetResult);
         }
         return PAGE_SCENE_ERR_FAILED;
     };
@@ -7770,5 +8081,104 @@ const std::shared_ptr<const OHOS::MMI::PointerEvent> UIContentImpl::GetPointerEv
         return touchEventInfo->GetPointerEvent();
     }
     return nullptr;
+}
+
+void UIContentImpl::InitBrandColor()
+{
+    auto context = context_.lock();
+    CHECK_NULL_VOID(context);
+    auto brandColorStr = context->GetBrandColorValue();
+    auto abilityStrategy = context->GetBrandColorStrategy();
+    if (brandColorStr.empty() ||
+        static_cast<NG::BrandColorStrategy>(abilityStrategy) == NG::BrandColorStrategy::BRAND_COLOR_FOLLOW_SYSTEM) {
+        return;
+    }
+    NG::BrandColorInfo info;
+    info.brandColor = Color::FromString(brandColorStr);
+    info.colorStrategy = static_cast<NG::BrandColorStrategy>(abilityStrategy);
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    CHECK_NULL_VOID(storage);
+    storage->StoreInstanceBrandColor(instanceId_, info);
+    NotifyBrandColorChangeToUEC(instanceId_, info.brandColor, info.colorStrategy);
+}
+
+void UIContentImpl::HandleBrandColorChanged(
+    const std::weak_ptr<OHOS::AbilityRuntime::Context>& weakContext, int32_t instanceId)
+{
+    TAG_LOGI(AceLogTag::ACE_THEME, "HandleBrandColorChanged instanceId: %{public}d", instanceId);
+    UpdateBrandColor(weakContext, instanceId);
+}
+
+void UIContentImpl::UpdateBrandColor(
+    const std::weak_ptr<OHOS::AbilityRuntime::Context>& weakContext, int32_t instanceId)
+{
+    auto context = weakContext.lock();
+    CHECK_NULL_VOID(context);
+    auto brandColorStr = context->GetBrandColorValue();
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    CHECK_NULL_VOID(storage);
+    if (brandColorStr.empty()) {
+        storage->RemoveInstanceBrandColor(instanceId);
+        NotifyBrandColorChangeToUEC(instanceId, std::nullopt, std::nullopt);
+        return;
+    }
+    NG::BrandColorInfo info;
+    info.brandColor = Color::FromString(brandColorStr);
+    info.colorStrategy = static_cast<NG::BrandColorStrategy>(context->GetBrandColorStrategy());
+    storage->StoreInstanceBrandColor(instanceId, info);
+    auto pipelineContext = NG::PipelineContext::GetContextByContainerId(instanceId);
+    CHECK_NULL_VOID(pipelineContext);
+    auto rootNode = pipelineContext->GetRootElement();
+    CHECK_NULL_VOID(rootNode);
+    ContainerScope scope(instanceId);
+    rootNode->UpdateThemeScopeUpdate(0); // 0 means default theme scope id
+}
+
+void UIContentImpl::NotifyBrandColorChangeToUEC(
+    int32_t instanceId, const std::optional<Color>& brandColor,
+    const std::optional<NG::BrandColorStrategy>& colorStrategy)
+{
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    CHECK_NULL_VOID(storage);
+    storage->NotifyBrandColorChange(instanceId, brandColor, colorStrategy);
+}
+
+void UIContentImpl::RegisterBrandColorChangeListener(const BrandColorChangeCallback& callback)
+{
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    CHECK_NULL_VOID(storage);
+    NG::BrandColorChangeCallback internalCallback =
+        [callback](int32_t instanceId, const std::optional<Color>& brandColor,
+            const std::optional<NG::BrandColorStrategy>& colorStrategy) {
+            if (!callback) {
+                return;
+            }
+            std::optional<uint32_t> rawColor;
+            if (brandColor.has_value()) {
+                rawColor = brandColor.value().GetValue();
+            }
+            std::optional<int32_t> rawStrategy;
+            if (colorStrategy.has_value()) {
+                rawStrategy = static_cast<int32_t>(colorStrategy.value());
+            }
+            callback(instanceId, rawColor, rawStrategy);
+        };
+    storage->RegisterBrandColorChangeListener(instanceId_, internalCallback);
+}
+
+void UIContentImpl::UnregisterBrandColorChangeListener()
+{
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    CHECK_NULL_VOID(storage);
+    storage->UnregisterBrandColorChangeListener(instanceId_);
+}
+
+bool UIContentImpl::IsBrandColorValid(const std::string& brandColorStr)
+{
+    if (brandColorStr.empty()) {
+        return false;
+    }
+    auto color = Color::FromString(brandColorStr);
+    return color.GetAlpha() != 0;
 }
 } // namespace OHOS::Ace

@@ -435,6 +435,7 @@ public:
     virtual void SetLayerMark(bool isLayer) {}
 
     virtual RectF GetPaintRectWithTransform();
+    virtual bool HasRenderNode() const { return false; }
     virtual int32_t GetRotateDegree() { return 0; }
     virtual void SavePaintRect(bool isRound = true, uint16_t flag = 0) {}
     virtual void SyncPartialRsProperties() {}
@@ -637,6 +638,7 @@ public:
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(BdImage, BorderSourceFromImage, bool);
 
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP_GET(BackgroundColor, Color);
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP_GET(VibrancyMode, VibrancyMode);
 public:
     void UpdateBackgroundColor(const Color& value)
     {
@@ -649,6 +651,7 @@ public:
         propBackgroundColor_ = value;
         OnBackgroundColorUpdate(value);
     }
+    void UpdateVibrancyMode(const VibrancyMode& mode);
     ACE_DEFINE_PROPERTY_ITEM_FUNC_WITHOUT_GROUP(Opacity, double);
     ACE_DEFINE_PROPERTY_ITEM_FUNC_WITHOUT_GROUP(RenderGroup, bool);
     ACE_DEFINE_PROPERTY_ITEM_FUNC_WITHOUT_GROUP(ExcludeFromRenderGroup, bool);
@@ -685,19 +688,24 @@ public:
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, DynamicLightUpDegree, float);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, BgDynamicBrightnessOption, BrightnessOption);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, FgDynamicBrightnessOption, BrightnessOption);
-    ACE_DEFINE_PROPERTY_ITEM_WITH_GROUP_GET(Graphics, BackShadow, Shadow);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, BackBlendMode, BlendMode);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, BackBlendApplyType, BlendApplyType);
+
+    // Visual
+    ACE_DEFINE_PROPERTY_GROUP(Visual, VisualProperty);
+    ACE_DEFINE_PROPERTY_ITEM_WITH_GROUP_GET(Visual, BackShadow, Shadow);
     void UpdateBackShadow(const Shadow& value)
     {
         UpdatePreBackShadow(value);
-        auto& groupProperty = GetOrCreateGraphics();
+        auto& groupProperty = GetOrCreateVisual();
         if (groupProperty->CheckBackShadow(value)) {
             return;
         }
         groupProperty->UpdateBackShadow(value);
         OnBackShadowUpdate(value);
     }
-    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, BackBlendMode, BlendMode);
-    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, BackBlendApplyType, BlendApplyType);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Visual, ShadowShape, RefPtr<BasicShape>);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Visual, ShadowClipMode, ShadowClipMode);
 
     // BorderRadius.
     ACE_DEFINE_PROPERTY_GROUP(Border, BorderProperty);
@@ -751,7 +759,7 @@ public:
     }
     void UpdateMaterialBackShadow(const Shadow& value)
     {
-        auto& groupProperty = GetOrCreateGraphics();
+        auto& groupProperty = GetOrCreateVisual();
         if (groupProperty->CheckBackShadow(value)) {
             return;
         }
@@ -1122,8 +1130,11 @@ protected:
     virtual void OnFgDynamicBrightnessOptionUpdate(const std::optional<BrightnessOption>& brightnessOption) {}
     virtual void OnBackShadowUpdate(const Shadow& shadow) {}
     virtual void OnPreBackShadowUpdate(const Shadow& shadow) {}
+    virtual void OnShadowShapeUpdate(const RefPtr<BasicShape>& basicShape) {}
+    virtual void OnShadowClipModeUpdate(ShadowClipMode clipMode) {}
     virtual void OnBackBlendModeUpdate(BlendMode blendMode) {}
     virtual void OnBackBlendApplyTypeUpdate(BlendApplyType blendApplyType) {}
+    virtual void OnVibrancyModeUpdate(const VibrancyMode& mode) {}
 
     virtual void OnOverlayTextUpdate(const OverlayOptions& overlay) {}
     virtual void OnMotionPathUpdate(const MotionPathOption& motionPath) {}

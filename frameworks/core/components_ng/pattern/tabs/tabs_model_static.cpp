@@ -365,8 +365,10 @@ void TabsModelStatic::SetTabBarWidth(FrameNode* frameNode, const std::optional<D
 {
     if (tabBarWidthOpt) {
         ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, BarWidth, tabBarWidthOpt.value(), frameNode);
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, BarWidthForSideBar, tabBarWidthOpt.value(), frameNode);
     } else {
         ACE_RESET_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, BarWidth, frameNode);
+        ACE_RESET_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, BarWidthForSideBar, frameNode);
     }
     auto tabsNode = AceType::DynamicCast<TabsNode>(frameNode);
     CHECK_NULL_VOID(tabsNode);
@@ -704,6 +706,12 @@ void TabsModelStatic::SetBarOverlap(FrameNode* frameNode, bool barOverlap)
         option.blurStyle = BlurStyle::COMPONENT_THICK;
     }
     SetBarBackgroundBlurStyle(frameNode, option);
+}
+
+void TabsModelStatic::SetKeepTabBarInSideBar(FrameNode* frameNode, bool keepTabBarInSideBar)
+{
+    CHECK_NULL_VOID(frameNode);
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, KeepTabBarInSideBar, keepTabBarInSideBar, frameNode);
 }
 
 void TabsModelStatic::SetBarBackgroundBlurStyle(FrameNode* frameNode, const BlurStyleOption& styleOption)

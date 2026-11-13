@@ -218,6 +218,46 @@ int32_t OH_ArkUI_RenderNodeUtils_InsertChildAfter(
     return result;
 }
 
+ArkUI_ErrorCode OH_ArkUI_RenderNodeUtils_AddChildWithPolicy(
+    ArkUI_RenderNodeHandle node, ArkUI_RenderNodeHandle child, OH_ArkUI_RenderNodeAttachPolicy policy)
+{
+    CHECK_UI_THREAD("OH_ArkUI_RenderNodeUtils_AddChildWithPolicy");
+    if (!(node && child)) {
+        SET_ERROR_MESSAGE(
+            ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Render node or child is null");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
+    CHECK_NULL_RETURN_WITH_MESSAGE(
+        impl, ARKUI_ERROR_CODE_CAPI_INIT_ERROR, __FUNCTION__, "Native module not initialized");
+    auto result = impl->getNodeModifiers()->getNDKRenderNodeModifier()->addChildWithPolicy(
+        node->renderNodeHandle, child->renderNodeHandle, static_cast<ArkUI_Int32>(policy));
+    if (result != OHOS::Ace::ERROR_CODE_NO_ERROR) {
+        SET_ERROR_FUNCTION_NAME(__FUNCTION__);
+    }
+    return static_cast<ArkUI_ErrorCode>(result);
+}
+
+ArkUI_ErrorCode OH_ArkUI_RenderNodeUtils_InsertChildAfterWithPolicy(
+    ArkUI_RenderNodeHandle node, ArkUI_RenderNodeHandle child,
+    ArkUI_RenderNodeHandle sibling, OH_ArkUI_RenderNodeAttachPolicy policy)
+{
+    CHECK_UI_THREAD("OH_ArkUI_RenderNodeUtils_InsertChildAfterWithPolicy");
+    if (!(node && child && sibling)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Render node, child, or sibling is null");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
+    CHECK_NULL_RETURN_WITH_MESSAGE(
+        impl, ARKUI_ERROR_CODE_CAPI_INIT_ERROR, __FUNCTION__, "Native module not initialized");
+    auto result = impl->getNodeModifiers()->getNDKRenderNodeModifier()->insertChildAfterWithPolicy(
+        node->renderNodeHandle, child->renderNodeHandle, sibling->renderNodeHandle, static_cast<ArkUI_Int32>(policy));
+    if (result != OHOS::Ace::ERROR_CODE_NO_ERROR) {
+        SET_ERROR_FUNCTION_NAME(__FUNCTION__);
+    }
+    return static_cast<ArkUI_ErrorCode>(result);
+}
+
 int32_t OH_ArkUI_RenderNodeUtils_RemoveChild(ArkUI_RenderNodeHandle node, ArkUI_RenderNodeHandle child)
 {
     CHECK_UI_THREAD("OH_ArkUI_RenderNodeUtils_RemoveChild");

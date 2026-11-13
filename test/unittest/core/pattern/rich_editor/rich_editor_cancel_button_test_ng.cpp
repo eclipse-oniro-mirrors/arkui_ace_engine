@@ -1263,4 +1263,823 @@ HWTEST_F(RichEditorCancelButtonTestNg, OnModifyDone_ClearsDirtyFlag, TestSize.Le
     pattern->OnModifyDone();
     EXPECT_FALSE(pattern->cancelButtonDirty_);
 }
+
+// ============ Focus navigation map and index getters ============
+
+/**
+ * @tc.name: GetFocusForwardMap_ReturnsCorrectMap
+ * @tc.desc: Verify GetFocusForwardMap returns TEXT→CANCEL, CANCEL→UNIT.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, GetFocusForwardMap_ReturnsCorrectMap, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    const auto& fwdMap = pattern->GetFocusForwardMap();
+    ASSERT_EQ(fwdMap.size(), 2u);
+    EXPECT_EQ(fwdMap.at(FocuseIndex::TEXT), FocuseIndex::CANCEL);
+    EXPECT_EQ(fwdMap.at(FocuseIndex::CANCEL), FocuseIndex::UNIT);
+}
+
+/**
+ * @tc.name: GetFocusBackwardMap_ReturnsCorrectMap
+ * @tc.desc: Verify GetFocusBackwardMap returns UNIT→CANCEL, CANCEL→TEXT.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, GetFocusBackwardMap_ReturnsCorrectMap, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    const auto& bwdMap = pattern->GetFocusBackwardMap();
+    ASSERT_EQ(bwdMap.size(), 2u);
+    EXPECT_EQ(bwdMap.at(FocuseIndex::UNIT), FocuseIndex::CANCEL);
+    EXPECT_EQ(bwdMap.at(FocuseIndex::CANCEL), FocuseIndex::TEXT);
+}
+
+/**
+ * @tc.name: GetFocusIndex_DefaultIsText
+ * @tc.desc: Verify focusIndex_ defaults to FocuseIndex::TEXT.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, GetFocusIndex_DefaultIsText, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_EQ(pattern->GetFocusIndex(), FocuseIndex::TEXT);
+}
+
+// ============ CancelNodeIsShow branch coverage ============
+
+/**
+ * @tc.name: CancelNodeIsShow_NullArea_ReturnsFalse
+ * @tc.desc: When cleanNodeResponseArea_ is null, CancelNodeIsShow returns false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, CancelNodeIsShow_NullArea_ReturnsFalse, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ASSERT_EQ(pattern->cleanNodeResponseArea_, nullptr);
+    EXPECT_FALSE(pattern->CancelNodeIsShow());
+}
+
+/**
+ * @tc.name: CancelNodeIsShow_WhenShown_ReturnsTrue
+ * @tc.desc: When cleanNodeResponseArea_ exists and IsShow() returns true, CancelNodeIsShow returns true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, CancelNodeIsShow_WhenShown_ReturnsTrue, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto* frameNode = AceType::RawPtr(richEditorNode_);
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, SingleLine, true, frameNode);
+    RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
+        CalcDimension(16.0_vp), Color::WHITE, "");
+    pattern->OnModifyDone();
+    ASSERT_NE(pattern->cleanNodeResponseArea_, nullptr);
+    // CONSTANT style should show the cancel button
+    EXPECT_TRUE(pattern->CancelNodeIsShow());
+}
+
+/**
+ * @tc.name: CancelNodeIsShow_WhenHidden_ReturnsFalse
+ * @tc.desc: When cleanNodeResponseArea_ exists but IsShow() returns false, CancelNodeIsShow returns false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, CancelNodeIsShow_WhenHidden_ReturnsFalse, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto* frameNode = AceType::RawPtr(richEditorNode_);
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, SingleLine, true, frameNode);
+    RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::INVISIBLE),
+        CalcDimension(16.0_vp), Color::WHITE, "");
+    pattern->OnModifyDone();
+    ASSERT_NE(pattern->cleanNodeResponseArea_, nullptr);
+    // INVISIBLE style should hide the cancel button
+    EXPECT_FALSE(pattern->CancelNodeIsShow());
+}
+
+// ============ HandleSwithFocus branch coverage ============
+
+/**
+ * @tc.name: HandleSwithFocus_TextIndex_Succeeds
+ * @tc.desc: HandleSwithFocus(TEXT) sets focusIndex_ to TEXT and returns true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleSwithFocus_TextIndex_Succeeds, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->focusIndex_ = FocuseIndex::CANCEL;
+    EXPECT_TRUE(pattern->HandleSwithFocus(FocuseIndex::TEXT));
+    EXPECT_EQ(pattern->focusIndex_, FocuseIndex::TEXT);
+}
+
+/**
+ * @tc.name: HandleSwithFocus_CancelIndex_NotShown_ReturnsFalse
+ * @tc.desc: HandleSwithFocus(CANCEL) when cancel node is not shown returns false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleSwithFocus_CancelIndex_NotShown_ReturnsFalse, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    // No cancel button set up, so cleanNodeResponseArea_ is null → CancelNodeIsShow returns false
+    ASSERT_EQ(pattern->cleanNodeResponseArea_, nullptr);
+    EXPECT_FALSE(pattern->HandleSwithFocus(FocuseIndex::CANCEL));
+}
+
+/**
+ * @tc.name: HandleSwithFocus_CancelIndex_Shown_Succeeds
+ * @tc.desc: HandleSwithFocus(CANCEL) when cancel node is shown sets focusIndex_ to CANCEL and returns true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleSwithFocus_CancelIndex_Shown_Succeeds, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto* frameNode = AceType::RawPtr(richEditorNode_);
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, SingleLine, true, frameNode);
+    RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
+        CalcDimension(16.0_vp), Color::WHITE, "");
+    pattern->OnModifyDone();
+    ASSERT_TRUE(pattern->CancelNodeIsShow());
+    EXPECT_TRUE(pattern->HandleSwithFocus(FocuseIndex::CANCEL));
+    EXPECT_EQ(pattern->focusIndex_, FocuseIndex::CANCEL);
+}
+
+/**
+ * @tc.name: HandleSwithFocus_UnitIndex_ReturnsFalse
+ * @tc.desc: HandleSwithFocus(UNIT) returns false (reserved for future password icon).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleSwithFocus_UnitIndex_ReturnsFalse, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_FALSE(pattern->HandleSwithFocus(FocuseIndex::UNIT));
+}
+
+/**
+ * @tc.name: HandleSwithFocus_VoiceIndex_ReturnsFalse
+ * @tc.desc: HandleSwithFocus(VOICE) returns false (not supported in RichEditor).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleSwithFocus_VoiceIndex_ReturnsFalse, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_FALSE(pattern->HandleSwithFocus(FocuseIndex::VOICE));
+}
+
+// ============ HandleOnTab branch coverage ============
+
+/**
+ * @tc.name: HandleOnTab_Forward_FromText_CancelShown_MovesToCancel
+ * @tc.desc: Tab forward from TEXT when cancel is visible moves focus to CANCEL.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleOnTab_Forward_FromText_CancelShown_MovesToCancel, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto* frameNode = AceType::RawPtr(richEditorNode_);
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, SingleLine, true, frameNode);
+    RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
+        CalcDimension(16.0_vp), Color::WHITE, "");
+    pattern->OnModifyDone();
+    pattern->focusIndex_ = FocuseIndex::TEXT;
+    // Need focus for HandleFocusForwardImpl to proceed
+    auto focusHub = richEditorNode_->GetOrCreateFocusHub();
+    ASSERT_NE(focusHub, nullptr);
+    focusHub->RequestFocusImmediately();
+    ASSERT_TRUE(pattern->HasFocus());
+    EXPECT_TRUE(pattern->HandleOnTab(false));
+    EXPECT_EQ(pattern->focusIndex_, FocuseIndex::CANCEL);
+}
+
+/**
+ * @tc.name: HandleOnTab_Forward_FromText_CancelHidden_ReturnsFalse
+ * @tc.desc: Tab forward from TEXT when cancel is hidden skips to UNIT (returns false).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleOnTab_Forward_FromText_CancelHidden_ReturnsFalse, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto* frameNode = AceType::RawPtr(richEditorNode_);
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, SingleLine, true, frameNode);
+    RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::INVISIBLE),
+        CalcDimension(16.0_vp), Color::WHITE, "");
+    pattern->OnModifyDone();
+    pattern->focusIndex_ = FocuseIndex::TEXT;
+    auto focusHub = richEditorNode_->GetOrCreateFocusHub();
+    ASSERT_NE(focusHub, nullptr);
+    focusHub->RequestFocusImmediately();
+    ASSERT_TRUE(pattern->HasFocus());
+    // TEXT→CANCEL (hidden, HandleSwithFocus returns false)→UNIT (HandleSwithFocus returns false)→not in map→false
+    EXPECT_FALSE(pattern->HandleOnTab(false));
+}
+
+/**
+ * @tc.name: HandleOnTab_Forward_FromCancel_ReturnsFalse
+ * @tc.desc: Tab forward from CANCEL goes to UNIT which returns false in RichEditor.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleOnTab_Forward_FromCancel_ReturnsFalse, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto* frameNode = AceType::RawPtr(richEditorNode_);
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, SingleLine, true, frameNode);
+    RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
+        CalcDimension(16.0_vp), Color::WHITE, "");
+    pattern->OnModifyDone();
+    auto focusHub = richEditorNode_->GetOrCreateFocusHub();
+    ASSERT_NE(focusHub, nullptr);
+    focusHub->RequestFocusImmediately();
+    ASSERT_TRUE(pattern->HasFocus());
+    // Set focusIndex_ AFTER RequestFocusImmediately (which resets to TEXT via HandleFocusEvent)
+    pattern->focusIndex_ = FocuseIndex::CANCEL;
+    // CANCEL→UNIT, HandleSwithFocus(UNIT) returns false, UNIT not in forward map→false
+    EXPECT_FALSE(pattern->HandleOnTab(false));
+}
+
+/**
+ * @tc.name: HandleOnTab_Backward_FromCancel_MovesToText
+ * @tc.desc: Tab backward from CANCEL moves focus to TEXT.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleOnTab_Backward_FromCancel_MovesToText, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto* frameNode = AceType::RawPtr(richEditorNode_);
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, SingleLine, true, frameNode);
+    RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
+        CalcDimension(16.0_vp), Color::WHITE, "");
+    pattern->OnModifyDone();
+    auto focusHub = richEditorNode_->GetOrCreateFocusHub();
+    ASSERT_NE(focusHub, nullptr);
+    focusHub->RequestFocusImmediately();
+    ASSERT_TRUE(pattern->HasFocus());
+    pattern->focusIndex_ = FocuseIndex::CANCEL;
+    EXPECT_TRUE(pattern->HandleOnTab(true));
+    EXPECT_EQ(pattern->focusIndex_, FocuseIndex::TEXT);
+}
+
+/**
+ * @tc.name: HandleOnTab_Backward_FromText_ReturnsFalse
+ * @tc.desc: Tab backward from TEXT returns false (TEXT not in backward map).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleOnTab_Backward_FromText_ReturnsFalse, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->focusIndex_ = FocuseIndex::TEXT;
+    auto focusHub = richEditorNode_->GetOrCreateFocusHub();
+    ASSERT_NE(focusHub, nullptr);
+    focusHub->RequestFocusImmediately();
+    ASSERT_TRUE(pattern->HasFocus());
+    // TEXT not in backward map→false
+    EXPECT_FALSE(pattern->HandleOnTab(true));
+}
+
+/**
+ * @tc.name: HandleOnTab_NoFocus_ReturnsFalse
+ * @tc.desc: HandleOnTab returns false when component does not have focus.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleOnTab_NoFocus_ReturnsFalse, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->focusIndex_ = FocuseIndex::TEXT;
+    EXPECT_FALSE(pattern->HasFocus());
+    EXPECT_FALSE(pattern->HandleOnTab(false));
+    EXPECT_FALSE(pattern->HandleOnTab(true));
+}
+
+// ============ ProcessFocusIndexAction branch coverage ============
+
+/**
+ * @tc.name: ProcessFocusIndexAction_TextIndex_ReturnsTrue
+ * @tc.desc: When focusIndex_ is TEXT, ProcessFocusIndexAction returns true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, ProcessFocusIndexAction_TextIndex_ReturnsTrue, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->focusIndex_ = FocuseIndex::TEXT;
+    EXPECT_TRUE(pattern->ProcessFocusIndexAction());
+}
+
+/**
+ * @tc.name: ProcessFocusIndexAction_CancelIndex_ReturnsFalse
+ * @tc.desc: When focusIndex_ is CANCEL, ProcessFocusIndexAction calls CleanNodeResponseKeyEvent and returns false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, ProcessFocusIndexAction_CancelIndex_ReturnsFalse, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->focusIndex_ = FocuseIndex::CANCEL;
+    EXPECT_FALSE(pattern->ProcessFocusIndexAction());
+    // CleanNodeResponseKeyEvent calls HandleCleanNodeClicked but does not reset focusIndex_
+    EXPECT_EQ(pattern->focusIndex_, FocuseIndex::CANCEL);
+}
+
+/**
+ * @tc.name: ProcessFocusIndexAction_UnitIndex_ReturnsTrue
+ * @tc.desc: When focusIndex_ is UNIT, ProcessFocusIndexAction returns true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, ProcessFocusIndexAction_UnitIndex_ReturnsTrue, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->focusIndex_ = FocuseIndex::UNIT;
+    EXPECT_TRUE(pattern->ProcessFocusIndexAction());
+}
+
+// ============ HandleSpaceKeyClickEvent branch coverage ============
+
+/**
+ * @tc.name: HandleSpaceKeyClickEvent_TextIndex_ReturnsFalse
+ * @tc.desc: When focusIndex_ is TEXT, HandleSpaceKeyClickEvent returns false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleSpaceKeyClickEvent_TextIndex_ReturnsFalse, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->focusIndex_ = FocuseIndex::TEXT;
+    EXPECT_FALSE(pattern->HandleSpaceKeyClickEvent());
+}
+
+/**
+ * @tc.name: HandleSpaceKeyClickEvent_CancelIndex_NoArea_ReturnsFalse
+ * @tc.desc: When focusIndex_ is CANCEL but cleanNodeResponseArea_ is null, returns false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleSpaceKeyClickEvent_CancelIndex_NoArea_ReturnsFalse, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->focusIndex_ = FocuseIndex::CANCEL;
+    ASSERT_EQ(pattern->cleanNodeResponseArea_, nullptr);
+    EXPECT_FALSE(pattern->HandleSpaceKeyClickEvent());
+}
+
+/**
+ * @tc.name: HandleSpaceKeyClickEvent_CancelIndex_WithArea_ActsClick
+ * @tc.desc: When focusIndex_ is CANCEL and area exists, HandleSpaceKeyClickEvent triggers ActClick and returns true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleSpaceKeyClickEvent_CancelIndex_WithArea_ActsClick, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto* frameNode = AceType::RawPtr(richEditorNode_);
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, SingleLine, true, frameNode);
+    RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
+        CalcDimension(16.0_vp), Color::WHITE, "");
+    pattern->OnModifyDone();
+    ASSERT_NE(pattern->cleanNodeResponseArea_, nullptr);
+    pattern->focusIndex_ = FocuseIndex::CANCEL;
+    // ActClick may crash in mock environment; verify no crash
+    EXPECT_TRUE(pattern->HandleSpaceKeyClickEvent());
+}
+
+/**
+ * @tc.name: HandleSpaceKeyClickEvent_UnitIndex_ReturnsFalse
+ * @tc.desc: When focusIndex_ is UNIT, HandleSpaceKeyClickEvent returns false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleSpaceKeyClickEvent_UnitIndex_ReturnsFalse, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->focusIndex_ = FocuseIndex::UNIT;
+    EXPECT_FALSE(pattern->HandleSpaceKeyClickEvent());
+}
+
+// ============ CleanNodeResponseKeyEvent branch coverage ============
+
+/**
+ * @tc.name: CleanNodeResponseKeyEvent_IsDragging_Returns
+ * @tc.desc: When IsDragging is true, CleanNodeResponseKeyEvent returns early without state change.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, CleanNodeResponseKeyEvent_IsDragging_Returns, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->focusIndex_ = FocuseIndex::CANCEL;
+    pattern->status_ = Status::DRAGGING;
+    pattern->CleanNodeResponseKeyEvent();
+    // focusIndex_ should remain CANCEL (early return)
+    EXPECT_EQ(pattern->focusIndex_, FocuseIndex::CANCEL);
+}
+
+/**
+ * @tc.name: CleanNodeResponseKeyEvent_NotDragging_CallsCleanNodeClicked
+ * @tc.desc: When not dragging, CleanNodeResponseKeyEvent calls HandleCleanNodeClicked (no crash).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, CleanNodeResponseKeyEvent_NotDragging_CallsCleanNodeClicked, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->focusIndex_ = FocuseIndex::CANCEL;
+    pattern->status_ = Status::NONE;
+    pattern->CleanNodeResponseKeyEvent();
+    // CleanNodeResponseKeyEvent does not reset focusIndex_, only calls HandleCleanNodeClicked
+    EXPECT_EQ(pattern->focusIndex_, FocuseIndex::CANCEL);
+}
+
+// ============ Focus state reset in existing functions ============
+
+/**
+ * @tc.name: HandleBlurEventReset_ResetsFocusIndex
+ * @tc.desc: HandleBlurEventReset resets focusIndex_ to TEXT.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleBlurEventReset_ResetsFocusIndex, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->focusIndex_ = FocuseIndex::CANCEL;
+    pattern->HandleBlurEventReset();
+    EXPECT_EQ(pattern->focusIndex_, FocuseIndex::TEXT);
+}
+
+/**
+ * @tc.name: HandleFocusEvent_SetsFocusIndexToText
+ * @tc.desc: HandleFocusEvent sets focusIndex_ to TEXT on focus.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleFocusEvent_SetsFocusIndexToText, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->focusIndex_ = FocuseIndex::CANCEL;
+    pattern->HandleFocusEvent(FocusReason::DEFAULT);
+    EXPECT_EQ(pattern->focusIndex_, FocuseIndex::TEXT);
+}
+
+/**
+ * @tc.name: StartTwinkling_ResetsFocusFromCancelToText
+ * @tc.desc: When focusIndex_ is CANCEL, StartTwinkling resets it to TEXT.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, StartTwinkling_ResetsFocusFromCancelToText, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->focusIndex_ = FocuseIndex::CANCEL;
+    pattern->StartTwinkling();
+    EXPECT_EQ(pattern->focusIndex_, FocuseIndex::TEXT);
+}
+
+// ============ OnKeyEvent space key handling ============
+
+/**
+ * @tc.name: OnKeyEvent_SpaceKeyCancelFocused_TriggersClick
+ * @tc.desc: When KEY_SPACE is pressed and focusIndex_ is CANCEL, OnKeyEvent calls HandleSpaceKeyClickEvent.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, OnKeyEvent_SpaceKeyCancelFocused_TriggersClick, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto* frameNode = AceType::RawPtr(richEditorNode_);
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, SingleLine, true, frameNode);
+    RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
+        CalcDimension(16.0_vp), Color::WHITE, "");
+    pattern->OnModifyDone();
+    pattern->focusIndex_ = FocuseIndex::CANCEL;
+    KeyEvent keyEvent;
+    keyEvent.code = KeyCode::KEY_SPACE;
+    keyEvent.action = KeyAction::DOWN;
+    auto result = pattern->OnKeyEvent(keyEvent);
+    // HandleSpaceKeyClickEvent should return true when cancel area exists
+    EXPECT_TRUE(result);
+}
+
+/**
+ * @tc.name: OnKeyEvent_SpaceKeyTextFocused_FallsThrough
+ * @tc.desc: When KEY_SPACE is pressed and focusIndex_ is TEXT, OnKeyEvent falls through to default handler.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, OnKeyEvent_SpaceKeyTextFocused_FallsThrough, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->focusIndex_ = FocuseIndex::TEXT;
+    KeyEvent keyEvent;
+    keyEvent.code = KeyCode::KEY_SPACE;
+    keyEvent.action = KeyAction::DOWN;
+    // Should fall through to TextInputClient::HandleKeyEvent (returns false in mock)
+    pattern->OnKeyEvent(keyEvent);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: OnKeyEvent_NonSpaceKey_FallsThrough
+ * @tc.desc: When a non-space key is pressed, OnKeyEvent falls through to default handler regardless of focusIndex_.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, OnKeyEvent_NonSpaceKey_FallsThrough, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->focusIndex_ = FocuseIndex::CANCEL;
+    KeyEvent keyEvent;
+    keyEvent.code = KeyCode::KEY_ENTER;
+    keyEvent.action = KeyAction::DOWN;
+    pattern->OnKeyEvent(keyEvent);
+    SUCCEED();
+}
+
+// ============ PerformAction focus check ============
+
+/**
+ * @tc.name: PerformAction_FocusOnCancel_SkipsAction
+ * @tc.desc: When focusIndex_ is CANCEL, PerformAction skips the action via ProcessFocusIndexAction.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, PerformAction_FocusOnCancel_SkipsAction, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->focusIndex_ = FocuseIndex::CANCEL;
+    // PerformAction should return early without processing the action
+    pattern->PerformAction(TextInputAction::NEW_LINE, false);
+    // ProcessFocusIndexAction calls CleanNodeResponseKeyEvent which does not reset focusIndex_
+    EXPECT_EQ(pattern->focusIndex_, FocuseIndex::CANCEL);
+}
+
+/**
+ * @tc.name: PerformAction_FocusOnText_Proceeds
+ * @tc.desc: When focusIndex_ is TEXT, PerformAction proceeds normally.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, PerformAction_FocusOnText_Proceeds, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->focusIndex_ = FocuseIndex::TEXT;
+    pattern->PerformAction(TextInputAction::NEW_LINE, false);
+    SUCCEED();
+}
+
+// ============ ProcessInsertValue space key interception ============
+
+/**
+ * @tc.name: ProcessInsertValue_SpaceKeyCancelFocused_TriggersClick
+ * @tc.desc: When focusIndex_ is CANCEL and insertValue is space, ProcessInsertValue triggers HandleSpaceKeyClickEvent.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, ProcessInsertValue_SpaceKeyCancelFocused_TriggersClick, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto* frameNode = AceType::RawPtr(richEditorNode_);
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, SingleLine, true, frameNode);
+    RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
+        CalcDimension(16.0_vp), Color::WHITE, "");
+    pattern->OnModifyDone();
+    pattern->focusIndex_ = FocuseIndex::CANCEL;
+    pattern->ProcessInsertValue(u" ", OperationType::DEFAULT, true);
+    // After ProcessInsertValue with space when CANCEL focused, should trigger click
+    SUCCEED();
+}
+
+// ============ HandleMouseEvent cancel hover area check ============
+
+/**
+ * @tc.name: HandleMouseEvent_NotOnCancelArea_ChangesToTextCursor
+ * @tc.desc: When mouse style is DEFAULT and not on cancel hover area, style changes to TEXT_CURSOR.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleMouseEvent_NotOnCancelArea_ChangesToTextCursor, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    // No cancel button area, so IsOnCancelButtonHoverArea returns false
+    ASSERT_EQ(pattern->cleanNodeResponseArea_, nullptr);
+    MouseInfo info;
+    info.SetAction(MouseAction::MOVE);
+    info.SetButton(MouseButton::NONE_BUTTON);
+    info.SetLocalLocation(Offset(10, 10));
+    pattern->HandleMouseEvent(info);
+    // Should not crash; mouse style may or may not change depending on mock
+    SUCCEED();
+}
+
+/**
+ * @tc.name: HandleMouseEvent_OnCancelHoverArea_StaysDefault
+ * @tc.desc: When on cancel hover area, mouse style stays DEFAULT (does not change to TEXT_CURSOR).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleMouseEvent_OnCancelHoverArea_StaysDefault, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto* frameNode = AceType::RawPtr(richEditorNode_);
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, SingleLine, true, frameNode);
+    RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
+        CalcDimension(16.0_vp), Color::WHITE, "");
+    pattern->OnModifyDone();
+    ASSERT_NE(pattern->cleanNodeResponseArea_, nullptr);
+    MouseInfo info;
+    info.SetAction(MouseAction::MOVE);
+    info.SetButton(MouseButton::NONE_BUTTON);
+    info.SetLocalLocation(Offset(10, 10));
+    pattern->HandleMouseEvent(info);
+    SUCCEED();
+}
+
+// ============ GetInnerFocusPaintRect branch coverage ============
+
+/**
+ * @tc.name: GetInnerFocusPaintRect_NotCancelIndex_Returns
+ * @tc.desc: When focusIndex_ is not CANCEL, GetInnerFocusPaintRect returns immediately.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, GetInnerFocusPaintRect_NotCancelIndex_Returns, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->focusIndex_ = FocuseIndex::TEXT;
+    RoundRect paintRect;
+    pattern->GetInnerFocusPaintRect(paintRect);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: GetInnerFocusPaintRect_CancelIndex_NullArea_NoCrash
+ * @tc.desc: When focusIndex_ is CANCEL but cleanNodeResponseArea_ is null, no crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, GetInnerFocusPaintRect_CancelIndex_NullArea_NoCrash, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->focusIndex_ = FocuseIndex::CANCEL;
+    ASSERT_EQ(pattern->cleanNodeResponseArea_, nullptr);
+    RoundRect paintRect;
+    pattern->GetInnerFocusPaintRect(paintRect);
+    SUCCEED();
+}
+
+// ============ Paint function no-crash verification ============
+
+/**
+ * @tc.name: PaintTextRect_NoCrash
+ * @tc.desc: PaintTextRect with valid host does not crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, PaintTextRect_NoCrash, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->PaintTextRect();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: PaintCancelRect_NoCrash
+ * @tc.desc: PaintCancelRect with valid host does not crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, PaintCancelRect_NoCrash, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->focusIndex_ = FocuseIndex::CANCEL;
+    pattern->PaintCancelRect();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: FocusForwardStopTwinkling_NoCrash
+ * @tc.desc: FocusForwardStopTwinkling with valid host does not crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, FocusForwardStopTwinkling_NoCrash, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->FocusForwardStopTwinkling();
+    SUCCEED();
+}
+
+// ============ HandleOnTab forward from UNIT (not in map) ============
+
+/**
+ * @tc.name: HandleOnTab_Forward_FromUnit_ReturnsFalse
+ * @tc.desc: Tab forward from UNIT returns false (UNIT not in forward map).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleOnTab_Forward_FromUnit_ReturnsFalse, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto focusHub = richEditorNode_->GetOrCreateFocusHub();
+    ASSERT_NE(focusHub, nullptr);
+    focusHub->RequestFocusImmediately();
+    ASSERT_TRUE(pattern->HasFocus());
+    pattern->focusIndex_ = FocuseIndex::UNIT;
+    EXPECT_FALSE(pattern->HandleOnTab(false));
+}
+
+// ============ HandleOnTab backward from UNIT (UNIT→CANCEL→TEXT) ============
+
+/**
+ * @tc.name: HandleOnTab_Backward_FromUnit_MovesToCancel
+ * @tc.desc: Tab backward from UNIT moves focus to CANCEL if cancel is visible.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleOnTab_Backward_FromUnit_MovesToCancel, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto* frameNode = AceType::RawPtr(richEditorNode_);
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, SingleLine, true, frameNode);
+    RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
+        CalcDimension(16.0_vp), Color::WHITE, "");
+    pattern->OnModifyDone();
+    auto focusHub = richEditorNode_->GetOrCreateFocusHub();
+    ASSERT_NE(focusHub, nullptr);
+    focusHub->RequestFocusImmediately();
+    ASSERT_TRUE(pattern->HasFocus());
+    pattern->focusIndex_ = FocuseIndex::UNIT;
+    // UNIT→CANCEL (visible, HandleSwithFocus returns true)
+    EXPECT_TRUE(pattern->HandleOnTab(true));
+    EXPECT_EQ(pattern->focusIndex_, FocuseIndex::CANCEL);
+}
+
+// ============ HandleOnTab backward from UNIT when cancel hidden ============
+
+/**
+ * @tc.name: HandleOnTab_Backward_FromUnit_CancelHidden_MovesToText
+ * @tc.desc: Tab backward from UNIT when cancel is hidden skips to TEXT.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleOnTab_Backward_FromUnit_CancelHidden_MovesToText, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto* frameNode = AceType::RawPtr(richEditorNode_);
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, SingleLine, true, frameNode);
+    RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::INVISIBLE),
+        CalcDimension(16.0_vp), Color::WHITE, "");
+    pattern->OnModifyDone();
+    auto focusHub = richEditorNode_->GetOrCreateFocusHub();
+    ASSERT_NE(focusHub, nullptr);
+    focusHub->RequestFocusImmediately();
+    ASSERT_TRUE(pattern->HasFocus());
+    pattern->focusIndex_ = FocuseIndex::UNIT;
+    // UNIT→CANCEL (hidden, returns false)→TEXT (returns true)
+    EXPECT_TRUE(pattern->HandleOnTab(true));
+    EXPECT_EQ(pattern->focusIndex_, FocuseIndex::TEXT);
+}
+
+// ============ CleanNodeHostBase CRTP template method coverage ============
+
+/**
+ * @tc.name: HandleFocusForwardImpl_NoFocus_ReturnsFalse
+ * @tc.desc: HandleFocusForwardImpl returns false when HasFocus() is false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleFocusForwardImpl_NoFocus_ReturnsFalse, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->focusIndex_ = FocuseIndex::TEXT;
+    EXPECT_FALSE(pattern->HasFocus());
+    // HandleOnTab delegates to HandleFocusForwardImpl which checks HasFocus
+    EXPECT_FALSE(pattern->HandleOnTab(false));
+}
+
+/**
+ * @tc.name: HandleFocusBackwardImpl_NoFocus_ReturnsFalse
+ * @tc.desc: HandleFocusBackwardImpl returns false when HasFocus() is false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCancelButtonTestNg, HandleFocusBackwardImpl_NoFocus_ReturnsFalse, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->focusIndex_ = FocuseIndex::CANCEL;
+    EXPECT_FALSE(pattern->HasFocus());
+    EXPECT_FALSE(pattern->HandleOnTab(true));
+}
+
 } // namespace OHOS::Ace::NG

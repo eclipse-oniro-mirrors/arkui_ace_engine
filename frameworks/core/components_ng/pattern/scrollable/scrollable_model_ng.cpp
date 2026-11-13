@@ -21,6 +21,7 @@
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/pattern/scroll/inner/scroll_bar.h"
+#include "core/components_ng/pattern/scrollable/scrollable_utils.h"
 #include "core/components_ng/pattern/scrollable/scrollable_event_hub.h"
 #include "core/components_ng/pattern/scrollable/scrollable_layout_property.h"
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
@@ -432,6 +433,14 @@ EffectEdge ScrollableModelNG::GetEffectEdge(FrameNode* frameNode)
     return pattern->GetEffectEdge();
 }
 
+int32_t ScrollableModelNG::GetScrollState(FrameNode* frameNode)
+{
+    CHECK_NULL_RETURN(frameNode, -1);
+    const auto& pattern = frameNode->GetPattern<ScrollablePattern>();
+    CHECK_NULL_RETURN(pattern, -1);
+    return static_cast<int32_t>(pattern->GetScrollStateForQuery());
+}
+
 void ScrollableModelNG::SetOnReachEnd(FrameNode* frameNode, OnReachEvent&& onReachEnd)
 {
     CHECK_NULL_VOID(frameNode);
@@ -478,8 +487,11 @@ ContentClipMode ScrollableModelNG::GetContentClip(FrameNode* frameNode)
     CHECK_NULL_RETURN(paintProperty, ContentClipMode::CONTENT_ONLY);
     const auto& clip = paintProperty->GetContentClip();
     const auto mode = clip ? clip->first : ContentClipMode::DEFAULT;
-    if (mode >= ContentClipMode::CUSTOM) {
+    if (mode == ContentClipMode::CUSTOM) {
         return paintProperty->GetDefaultContentClip();
+    }
+    if (mode == ContentClipMode::DEFAULT) {
+        return ScrollableUtils::ResolveEffectiveDefaultContentClip(frameNode, AceType::RawPtr(paintProperty));
     }
     return mode;
 }
@@ -502,7 +514,10 @@ void ScrollableModelNG::ResetContentClip(FrameNode* frameNode)
     CHECK_NULL_VOID(frameNode);
     auto paintProperty = frameNode->GetPaintProperty<ScrollablePaintProperty>();
     CHECK_NULL_VOID(paintProperty);
-    paintProperty->UpdateContentClip(ContentClip(paintProperty->GetDefaultContentClip(), nullptr));
+    // Store DEFAULT instead of the resolved value, so that the effective default stays a dynamic
+    // query and a later change of the immersive strategy set is observed by Grid / List / Scroll /
+    // WaterFlow alike instead of being frozen into the paint property.
+    paintProperty->UpdateContentClip(ContentClip(ContentClipMode::DEFAULT, nullptr));
     auto layoutProperty = frameNode->GetLayoutProperty<ScrollableLayoutProperty>();
     CHECK_NULL_VOID(layoutProperty);
     layoutProperty->UpdateContentClip(std::nullopt);
@@ -667,7 +682,7 @@ void ScrollableModelNG::ResetEnableScrollWithKeyboard(FrameNode* frameNode)
     CHECK_NULL_VOID(frameNode);
     auto pattern = frameNode->GetPattern<ScrollablePattern>();
     CHECK_NULL_VOID(pattern);
-    pattern->SetIsAllowKeyboard(true);
+    pattern->SetIsAllowKeyboard(false);
 }
 
 bool ScrollableModelNG::GetEnableScrollWithKeyboard(FrameNode* frameNode)

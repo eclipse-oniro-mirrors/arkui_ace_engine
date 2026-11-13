@@ -28,6 +28,7 @@ import { DismissDialogAction, DismissDialogAction_serializer } from './actionShe
 import { LevelMode, ImmersiveMode, LevelOrder } from '@ohos.promptAction'
 import { extractors } from '#handwritten'
 import { default as uiMaterial } from '@ohos.arkui.uiMaterial'
+import { HandednessFollowMode } from '@ohos.arkui.dialog'
 import { CallbackTransformer } from './../CallbackTransformer'
 import { global_resource_Resource_serializer } from './../framework/resource'
 import { LevelOrder_serializer } from './../framework/ohos.promptAction'
@@ -103,6 +104,7 @@ export interface AlertDialogParam {
     systemMaterial?: SystemUiMaterial;
     distortionMode?: DistortionMode;
     edgeLightMode?: EdgeLightMode;
+    adaptToHandedness?: HandednessFollowMode;
 }
 export interface AlertDialogParamWithConfirm extends AlertDialogParam {
     confirm?: AlertDialogButtonBaseOptions;
@@ -958,6 +960,14 @@ export class AlertDialogParamWithButtons_serializer {
         } else {
             valueSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
+        const valueHolderForAdaptToHandedness = value.adaptToHandedness
+        if (valueHolderForAdaptToHandedness !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForAdaptToHandednessTmpValue = (valueHolderForAdaptToHandedness as HandednessFollowMode)
+            valueSerializer.writeInt32(valueHolderForAdaptToHandednessTmpValue.valueOf())
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
         const valueHolderForPrimaryButton = value.primaryButton
         AlertDialogButtonBaseOptions_serializer.write(valueSerializer, valueHolderForPrimaryButton)
         const valueHolderForSecondaryButton = value.secondaryButton
@@ -1415,9 +1425,15 @@ export class AlertDialogParamWithButtons_serializer {
             edgeLightModeTmpBuf = EdgeLightMode.fromValue(valueDeserializer.readInt32())
         }
         const edgeLightModeTmpResult: EdgeLightMode | undefined = edgeLightModeTmpBuf
+        const adaptToHandednessTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let adaptToHandednessTmpBuf: HandednessFollowMode | undefined = undefined
+        if ((adaptToHandednessTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            adaptToHandednessTmpBuf = HandednessFollowMode.fromValue(valueDeserializer.readInt32())
+        }
+        const adaptToHandednessTmpResult: HandednessFollowMode | undefined = adaptToHandednessTmpBuf
         const primaryButtonTmpResult: AlertDialogButtonBaseOptions = AlertDialogButtonBaseOptions_serializer.read(valueDeserializer)
         const secondaryButtonTmpResult: AlertDialogButtonBaseOptions = AlertDialogButtonBaseOptions_serializer.read(valueDeserializer)
-        let value: AlertDialogParamWithButtons = ({title: titleTmpResult, subtitle: subtitleTmpResult, message: messageTmpResult, autoCancel: autoCancelTmpResult, cancel: cancelTmpResult, alignment: alignmentTmpResult, offset: offsetTmpResult, gridCount: gridCountTmpResult, maskRect: maskRectTmpResult, showInSubWindow: showInSubWindowTmpResult, isModal: isModalTmpResult, backgroundColor: backgroundColorTmpResult, backgroundBlurStyle: backgroundBlurStyleTmpResult, backgroundBlurStyleOptions: backgroundBlurStyleOptionsTmpResult, backgroundEffect: backgroundEffectTmpResult, onWillDismiss: onWillDismissTmpResult, transition: transitionTmpResult, cornerRadius: cornerRadiusTmpResult, width: widthTmpResult, height: heightTmpResult, borderWidth: borderWidthTmpResult, borderColor: borderColorTmpResult, borderStyle: borderStyleTmpResult, shadow: shadowTmpResult, textStyle: textStyleTmpResult, enableHoverMode: enableHoverModeTmpResult, hoverModeArea: hoverModeAreaTmpResult, onDidAppear: onDidAppearTmpResult, onDidDisappear: onDidDisappearTmpResult, onWillAppear: onWillAppearTmpResult, onWillDisappear: onWillDisappearTmpResult, levelMode: levelModeTmpResult, levelUniqueId: levelUniqueIdTmpResult, immersiveMode: immersiveModeTmpResult, levelOrder: levelOrderTmpResult, systemMaterial: systemMaterialTmpResult, distortionMode: distortionModeTmpResult, edgeLightMode: edgeLightModeTmpResult, primaryButton: primaryButtonTmpResult, secondaryButton: secondaryButtonTmpResult} as AlertDialogParamWithButtons)
+        let value: AlertDialogParamWithButtons = ({title: titleTmpResult, subtitle: subtitleTmpResult, message: messageTmpResult, autoCancel: autoCancelTmpResult, cancel: cancelTmpResult, alignment: alignmentTmpResult, offset: offsetTmpResult, gridCount: gridCountTmpResult, maskRect: maskRectTmpResult, showInSubWindow: showInSubWindowTmpResult, isModal: isModalTmpResult, backgroundColor: backgroundColorTmpResult, backgroundBlurStyle: backgroundBlurStyleTmpResult, backgroundBlurStyleOptions: backgroundBlurStyleOptionsTmpResult, backgroundEffect: backgroundEffectTmpResult, onWillDismiss: onWillDismissTmpResult, transition: transitionTmpResult, cornerRadius: cornerRadiusTmpResult, width: widthTmpResult, height: heightTmpResult, borderWidth: borderWidthTmpResult, borderColor: borderColorTmpResult, borderStyle: borderStyleTmpResult, shadow: shadowTmpResult, textStyle: textStyleTmpResult, enableHoverMode: enableHoverModeTmpResult, hoverModeArea: hoverModeAreaTmpResult, onDidAppear: onDidAppearTmpResult, onDidDisappear: onDidDisappearTmpResult, onWillAppear: onWillAppearTmpResult, onWillDisappear: onWillDisappearTmpResult, levelMode: levelModeTmpResult, levelUniqueId: levelUniqueIdTmpResult, immersiveMode: immersiveModeTmpResult, levelOrder: levelOrderTmpResult, systemMaterial: systemMaterialTmpResult, distortionMode: distortionModeTmpResult, edgeLightMode: edgeLightModeTmpResult, adaptToHandedness: adaptToHandednessTmpResult, primaryButton: primaryButtonTmpResult, secondaryButton: secondaryButtonTmpResult} as AlertDialogParamWithButtons)
         return value
     }
 }
@@ -1875,6 +1891,14 @@ export class AlertDialogParamWithConfirm_serializer {
             valueSerializer.writeInt8(RuntimeType.OBJECT)
             const valueHolderForEdgeLightModeTmpValue = (valueHolderForEdgeLightMode as EdgeLightMode)
             valueSerializer.writeInt32(valueHolderForEdgeLightModeTmpValue.valueOf())
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        const valueHolderForAdaptToHandedness = value.adaptToHandedness
+        if (valueHolderForAdaptToHandedness !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForAdaptToHandednessTmpValue = (valueHolderForAdaptToHandedness as HandednessFollowMode)
+            valueSerializer.writeInt32(valueHolderForAdaptToHandednessTmpValue.valueOf())
         } else {
             valueSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
@@ -2339,13 +2363,19 @@ export class AlertDialogParamWithConfirm_serializer {
             edgeLightModeTmpBuf = EdgeLightMode.fromValue(valueDeserializer.readInt32())
         }
         const edgeLightModeTmpResult: EdgeLightMode | undefined = edgeLightModeTmpBuf
+        const adaptToHandednessTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let adaptToHandednessTmpBuf: HandednessFollowMode | undefined = undefined
+        if ((adaptToHandednessTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            adaptToHandednessTmpBuf = HandednessFollowMode.fromValue(valueDeserializer.readInt32())
+        }
+        const adaptToHandednessTmpResult: HandednessFollowMode | undefined = adaptToHandednessTmpBuf
         const confirmTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
         let confirmTmpBuf: AlertDialogButtonBaseOptions | undefined = undefined
         if ((confirmTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
             confirmTmpBuf = AlertDialogButtonBaseOptions_serializer.read(valueDeserializer)
         }
         const confirmTmpResult: AlertDialogButtonBaseOptions | undefined = confirmTmpBuf
-        let value: AlertDialogParamWithConfirm = ({title: titleTmpResult, subtitle: subtitleTmpResult, message: messageTmpResult, autoCancel: autoCancelTmpResult, cancel: cancelTmpResult, alignment: alignmentTmpResult, offset: offsetTmpResult, gridCount: gridCountTmpResult, maskRect: maskRectTmpResult, showInSubWindow: showInSubWindowTmpResult, isModal: isModalTmpResult, backgroundColor: backgroundColorTmpResult, backgroundBlurStyle: backgroundBlurStyleTmpResult, backgroundBlurStyleOptions: backgroundBlurStyleOptionsTmpResult, backgroundEffect: backgroundEffectTmpResult, onWillDismiss: onWillDismissTmpResult, transition: transitionTmpResult, cornerRadius: cornerRadiusTmpResult, width: widthTmpResult, height: heightTmpResult, borderWidth: borderWidthTmpResult, borderColor: borderColorTmpResult, borderStyle: borderStyleTmpResult, shadow: shadowTmpResult, textStyle: textStyleTmpResult, enableHoverMode: enableHoverModeTmpResult, hoverModeArea: hoverModeAreaTmpResult, onDidAppear: onDidAppearTmpResult, onDidDisappear: onDidDisappearTmpResult, onWillAppear: onWillAppearTmpResult, onWillDisappear: onWillDisappearTmpResult, levelMode: levelModeTmpResult, levelUniqueId: levelUniqueIdTmpResult, immersiveMode: immersiveModeTmpResult, levelOrder: levelOrderTmpResult, systemMaterial: systemMaterialTmpResult, distortionMode: distortionModeTmpResult, edgeLightMode: edgeLightModeTmpResult, confirm: confirmTmpResult} as AlertDialogParamWithConfirm)
+        let value: AlertDialogParamWithConfirm = ({title: titleTmpResult, subtitle: subtitleTmpResult, message: messageTmpResult, autoCancel: autoCancelTmpResult, cancel: cancelTmpResult, alignment: alignmentTmpResult, offset: offsetTmpResult, gridCount: gridCountTmpResult, maskRect: maskRectTmpResult, showInSubWindow: showInSubWindowTmpResult, isModal: isModalTmpResult, backgroundColor: backgroundColorTmpResult, backgroundBlurStyle: backgroundBlurStyleTmpResult, backgroundBlurStyleOptions: backgroundBlurStyleOptionsTmpResult, backgroundEffect: backgroundEffectTmpResult, onWillDismiss: onWillDismissTmpResult, transition: transitionTmpResult, cornerRadius: cornerRadiusTmpResult, width: widthTmpResult, height: heightTmpResult, borderWidth: borderWidthTmpResult, borderColor: borderColorTmpResult, borderStyle: borderStyleTmpResult, shadow: shadowTmpResult, textStyle: textStyleTmpResult, enableHoverMode: enableHoverModeTmpResult, hoverModeArea: hoverModeAreaTmpResult, onDidAppear: onDidAppearTmpResult, onDidDisappear: onDidDisappearTmpResult, onWillAppear: onWillAppearTmpResult, onWillDisappear: onWillDisappearTmpResult, levelMode: levelModeTmpResult, levelUniqueId: levelUniqueIdTmpResult, immersiveMode: immersiveModeTmpResult, levelOrder: levelOrderTmpResult, systemMaterial: systemMaterialTmpResult, distortionMode: distortionModeTmpResult, edgeLightMode: edgeLightModeTmpResult, adaptToHandedness: adaptToHandednessTmpResult, confirm: confirmTmpResult} as AlertDialogParamWithConfirm)
         return value
     }
 }
@@ -2803,6 +2833,14 @@ export class AlertDialogParamWithOptions_serializer {
             valueSerializer.writeInt8(RuntimeType.OBJECT)
             const valueHolderForEdgeLightModeTmpValue = (valueHolderForEdgeLightMode as EdgeLightMode)
             valueSerializer.writeInt32(valueHolderForEdgeLightModeTmpValue.valueOf())
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        const valueHolderForAdaptToHandedness = value.adaptToHandedness
+        if (valueHolderForAdaptToHandedness !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForAdaptToHandednessTmpValue = (valueHolderForAdaptToHandedness as HandednessFollowMode)
+            valueSerializer.writeInt32(valueHolderForAdaptToHandednessTmpValue.valueOf())
         } else {
             valueSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
@@ -3273,6 +3311,12 @@ export class AlertDialogParamWithOptions_serializer {
             edgeLightModeTmpBuf = EdgeLightMode.fromValue(valueDeserializer.readInt32())
         }
         const edgeLightModeTmpResult: EdgeLightMode | undefined = edgeLightModeTmpBuf
+        const adaptToHandednessTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let adaptToHandednessTmpBuf: HandednessFollowMode | undefined = undefined
+        if ((adaptToHandednessTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            adaptToHandednessTmpBuf = HandednessFollowMode.fromValue(valueDeserializer.readInt32())
+        }
+        const adaptToHandednessTmpResult: HandednessFollowMode | undefined = adaptToHandednessTmpBuf
         const buttonsTmpBufLength: int32 = valueDeserializer.readInt32()
         const buttonsTmpBuf: Array<AlertDialogButtonOptions> = new Array<AlertDialogButtonOptions>(buttonsTmpBufLength, (arg0: int32):AlertDialogButtonOptions => {
             return AlertDialogButtonOptions_serializer.read(valueDeserializer);
@@ -3284,7 +3328,7 @@ export class AlertDialogParamWithOptions_serializer {
             buttonDirectionTmpBuf = DialogButtonDirection.fromValue(valueDeserializer.readInt32())
         }
         const buttonDirectionTmpResult: DialogButtonDirection | undefined = buttonDirectionTmpBuf
-        let value: AlertDialogParamWithOptions = ({title: titleTmpResult, subtitle: subtitleTmpResult, message: messageTmpResult, autoCancel: autoCancelTmpResult, cancel: cancelTmpResult, alignment: alignmentTmpResult, offset: offsetTmpResult, gridCount: gridCountTmpResult, maskRect: maskRectTmpResult, showInSubWindow: showInSubWindowTmpResult, isModal: isModalTmpResult, backgroundColor: backgroundColorTmpResult, backgroundBlurStyle: backgroundBlurStyleTmpResult, backgroundBlurStyleOptions: backgroundBlurStyleOptionsTmpResult, backgroundEffect: backgroundEffectTmpResult, onWillDismiss: onWillDismissTmpResult, transition: transitionTmpResult, cornerRadius: cornerRadiusTmpResult, width: widthTmpResult, height: heightTmpResult, borderWidth: borderWidthTmpResult, borderColor: borderColorTmpResult, borderStyle: borderStyleTmpResult, shadow: shadowTmpResult, textStyle: textStyleTmpResult, enableHoverMode: enableHoverModeTmpResult, hoverModeArea: hoverModeAreaTmpResult, onDidAppear: onDidAppearTmpResult, onDidDisappear: onDidDisappearTmpResult, onWillAppear: onWillAppearTmpResult, onWillDisappear: onWillDisappearTmpResult, levelMode: levelModeTmpResult, levelUniqueId: levelUniqueIdTmpResult, immersiveMode: immersiveModeTmpResult, levelOrder: levelOrderTmpResult, systemMaterial: systemMaterialTmpResult, distortionMode: distortionModeTmpResult, edgeLightMode: edgeLightModeTmpResult, buttons: buttonsTmpResult, buttonDirection: buttonDirectionTmpResult} as AlertDialogParamWithOptions)
+        let value: AlertDialogParamWithOptions = ({title: titleTmpResult, subtitle: subtitleTmpResult, message: messageTmpResult, autoCancel: autoCancelTmpResult, cancel: cancelTmpResult, alignment: alignmentTmpResult, offset: offsetTmpResult, gridCount: gridCountTmpResult, maskRect: maskRectTmpResult, showInSubWindow: showInSubWindowTmpResult, isModal: isModalTmpResult, backgroundColor: backgroundColorTmpResult, backgroundBlurStyle: backgroundBlurStyleTmpResult, backgroundBlurStyleOptions: backgroundBlurStyleOptionsTmpResult, backgroundEffect: backgroundEffectTmpResult, onWillDismiss: onWillDismissTmpResult, transition: transitionTmpResult, cornerRadius: cornerRadiusTmpResult, width: widthTmpResult, height: heightTmpResult, borderWidth: borderWidthTmpResult, borderColor: borderColorTmpResult, borderStyle: borderStyleTmpResult, shadow: shadowTmpResult, textStyle: textStyleTmpResult, enableHoverMode: enableHoverModeTmpResult, hoverModeArea: hoverModeAreaTmpResult, onDidAppear: onDidAppearTmpResult, onDidDisappear: onDidDisappearTmpResult, onWillAppear: onWillAppearTmpResult, onWillDisappear: onWillDisappearTmpResult, levelMode: levelModeTmpResult, levelUniqueId: levelUniqueIdTmpResult, immersiveMode: immersiveModeTmpResult, levelOrder: levelOrderTmpResult, systemMaterial: systemMaterialTmpResult, distortionMode: distortionModeTmpResult, edgeLightMode: edgeLightModeTmpResult, adaptToHandedness: adaptToHandednessTmpResult, buttons: buttonsTmpResult, buttonDirection: buttonDirectionTmpResult} as AlertDialogParamWithOptions)
         return value
     }
 }

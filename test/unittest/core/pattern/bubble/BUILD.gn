@@ -22,6 +22,7 @@ test_sources = [
   "bubble_test_three_ng.cpp",
   "bubble_test_two_ng.cpp",
   "bubble_tips_test_ng.cpp",
+  "popup_theme_wrapper_test_ng.cpp",
   "bubble_test_core.cpp",
 ]
 

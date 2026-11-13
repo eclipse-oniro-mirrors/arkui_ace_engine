@@ -16,6 +16,7 @@
 #include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
 
 #include <cmath>
+#include <set>
 
 #include "base/log/dump_log.h"
 #include "base/utils/utils.h"
@@ -23,11 +24,13 @@
 #include "core/animation/curves.h"
 #include "core/components/scroll/scroll_controller_base.h"
 #include "core/components_ng/manager/content_change_manager/content_change_manager.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_shell_mount.h"
 #include "core/components_ng/event/focus_hub.h"
 #include "core/components_ng/pattern/scroll/inner/scroll_bar.h"
 #include "core/components_ng/pattern/scroll/inner/scroll_bar_overlay_modifier.h"
 #include "core/components_ng/pattern/scroll/scroll_edge_effect.h"
 #include "core/components_ng/pattern/scrollable/scrollable_paint_property.h"
+#include "core/components_ng/pattern/scrollable/scrollable_utils.h"
 #include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "core/components_ng/pattern/scrollable/scroll_snap_utils.h"
 #include "core/components_ng/pattern/waterflow/layout/sliding_window/water_flow_layout_sw.h"
@@ -50,7 +53,434 @@
 
 namespace OHOS::Ace::NG {
 
-WaterFlowPattern::~WaterFlowPattern() = default;
+WaterFlowPattern::~WaterFlowPattern()
+{
+    ResetScrollPlaceholder();
+}
+
+void WaterFlowPattern::SetScrollPlaceholder(ScrollPlaceholderProvider&& provider)
+{
+    // Provider replacement bumps the host fact implicitly: pending real-build tasks
+    // carry the host node id and are cancelled below, already-created real nodes
+    // stay under the normal component management, and unfilled placeholder slots
+    // rebuild through the existing path. WaterFlow prediction only ever defers
+    // builds the lazy path would have deferred as well.
+    scrollPlaceholderProvider_ = std::move(provider);
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    if (!scrollPlaceholderProvider_) {
+        ResetScrollPlaceholder();
+        return;
+    }
+    auto* context = host->GetContext();
+    if (context) {
+        const auto& manager = context->GetOrCreateScrollPlaceholderManager();
+        if (manager) {
+            // Selector replacement invalidates in-flight placeholder work of this
+            // host; the new provider's decisions start from a clean queue.
+            manager->CancelHostRealBuilds(host->GetId(), ScrollPlaceholderCancelReason::RE_REGISTER);
+        }
+    }
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+}
+
+void WaterFlowPattern::ResetScrollPlaceholder()
+{
+    scrollPlaceholderProvider_ = nullptr;
+    // Host reset/destroy: retire every mounted placeholder shell (unmount +
+    // content back to the pool); unfilled slots rebuild through the existing path.
+    for (auto& [index, info] : scrollPlaceholderItems_) {
+        RetireScrollPlaceholderShell(info.shell, info.templateId);
+    }
+    scrollPlaceholderItems_.clear();
+    for (auto& [shell, templateId] : retiringPlaceholderShells_) {
+        // Shells of committed items awaiting the layout-round reconcile are mounted
+        // too; the reset must retire them, not just forget them.
+        RetireScrollPlaceholderShell(shell, templateId);
+    }
+    retiringPlaceholderShells_.clear();
+    SweepOrphanPlaceholderShells();
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* context = host->GetContext();
+    CHECK_NULL_VOID(context);
+    const auto& manager = context->GetOrCreateScrollPlaceholderManager();
+    CHECK_NULL_VOID(manager);
+    // Pending placeholder real-builds of this host turn stale immediately; the
+    // manager never calls back into a detached pattern.
+    manager->CancelHostRealBuilds(host->GetId(), ScrollPlaceholderCancelReason::HOST_RESET);
+}
+
+bool WaterFlowPattern::OnScrollCallback(float offset, int32_t source)
+{
+    lastScrollCallbackNs_ = GetSysTimestamp();
+    return ScrollablePattern::OnScrollCallback(offset, source);
+}
+
+// Two-stage budget decision for one not-yet-built index: the provider callback
+// crosses into ArkTS (VM entry + object marshalling), so it must only run under
+// real budget pressure. Stage 1 predicts with the empty-templateId
+// component-aggregate estimate — no JS. Light load / no vsync anchor keeps the
+// synchronous build path without the provider ever being consulted. Stage 2,
+// under pressure only, asks the item provider (nullopt keeps the synchronous
+// path) and the template-specific estimate may flip the decision back to
+// BUILD_REAL_NOW. Returns the provider options when the index should defer.
+std::optional<ScrollPlaceholderOptions> WaterFlowPattern::PredictScrollPlaceholderDefer(
+    const RefPtr<ScrollPlaceholderManager>& manager, const RefPtr<FrameNode>& host, int32_t index)
+{
+    // Placeholder deferral is a scroll-time feature. The initial viewport (no
+    // scroll event yet) and a settled water flow must always build real items:
+    // deferring there mounts invisible shells the real-build queue can never
+    // deliver on (the startup frame is the one frame that is guaranteed to be
+    // over budget).
+    constexpr int64_t SCROLL_ACTIVE_WINDOW_NS = 200000000; // 200ms, covers fling frame gaps
+    int64_t nowNs = GetSysTimestamp();
+    if (lastScrollCallbackNs_ <= 0 || nowNs - lastScrollCallbackNs_ > SCROLL_ACTIVE_WINDOW_NS) {
+        return std::nullopt;
+    }
+    ScrollPlaceholderPredictParams params;
+    params.componentType = ScrollPlaceholderComponentType::WATER_FLOW;
+    params.hostNodeId = host->GetId();
+    params.index = index;
+    params.cacheBuild = false;
+    auto deadline = manager->GetVsyncDerivedFrameDeadlineNs();
+    if (manager->Predict(params, deadline).decision != ScrollPlaceholderDecision::USE_PLACEHOLDER) {
+        return std::nullopt;
+    }
+    auto options = scrollPlaceholderProvider_(index);
+    if (!options.has_value()) {
+        return std::nullopt;
+    }
+    params.templateId = options->id;
+    if (manager->Predict(params, deadline).decision != ScrollPlaceholderDecision::USE_PLACEHOLDER) {
+        return std::nullopt;
+    }
+    return options;
+}
+
+RefPtr<FrameNode> WaterFlowPattern::CreateScrollPlaceholderShell(int32_t index)
+{
+    // Component call-site decision: called from the WaterFlow layout child
+    // acquisition for a not-yet-built visible index. Predicts with the remaining
+    // frame budget before the real builder would run; on USE_PLACEHOLDER mounts a
+    // placeholder shell on the WaterFlow host and defers the real build into the
+    // pipeline framed queue. Returns null to keep the existing acquisition.
+    CHECK_NULL_RETURN(scrollPlaceholderProvider_, nullptr);
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, nullptr);
+    // Section/footer exclusion (interface contract): the footer children occupy
+    // the child indices [0, footerIndex_] and never enter the placeholder
+    // selection — no provider call, no shell, the existing path as-is.
+    if (layoutInfo_ && index <= layoutInfo_->footerIndex_) {
+        return nullptr;
+    }
+    if (scrollPlaceholderItems_.find(index) != scrollPlaceholderItems_.end()) {
+        // Safety: never stack a second placeholder on the same index.
+        return scrollPlaceholderItems_[index].shell;
+    }
+    if (index < 0 || index >= host->GetTotalChildCount()) {
+        return nullptr;
+    }
+    // Deferral-blind built-probe (UINode window walk, no FrameProxy): once a
+    // deferral for this index is recorded, the index acquisition itself resolves
+    // to the shell, so the plain GetChildByIndex here would mistake our own shell
+    // for a real child.
+    if (host->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(index))) {
+        // The real child at this index is already built (a committed real-build or
+        // a normal-path rebuild): never place a placeholder over it.
+        return nullptr;
+    }
+    auto* context = host->GetContext();
+    CHECK_NULL_RETURN(context, nullptr);
+    const auto& manager = context->GetOrCreateScrollPlaceholderManager();
+    CHECK_NULL_RETURN(manager, nullptr);
+    auto options = PredictScrollPlaceholderDefer(manager, host, index);
+    CHECK_NULL_RETURN(options.has_value(), nullptr);
+
+    // The shell carries a plain WaterFlowItemPattern so it measures like a real
+    // flow item of this host: the suggested size (or the content estimate)
+    // resolves against the column cross-size constraint at measure.
+    auto shell = scroll_placeholder_mount::CreatePlaceholderShellNode(
+        *options, manager, AceType::MakeRefPtr<WaterFlowItemPattern>());
+    CHECK_NULL_RETURN(shell, nullptr);
+    scroll_placeholder_mount::MountPlaceholderShellOnHost(host, shell);
+    ACE_SCOPED_TRACE("ScrollPlaceholder::Defer hostId:%d index:%d", host->GetId(), index);
+
+    ScrollPlaceholderItemInfo info;
+    info.shell = shell;
+    info.templateId = options->id;
+    if (!info.templateId.empty()) {
+        auto snapshot = manager->LookupTemplateForCreate(info.templateId);
+        info.templateGen = snapshot.has_value() ? snapshot->generation : 0;
+    }
+    scrollPlaceholderItems_[index] = info;
+    mountedPlaceholderShells_[shell] = info.templateId;
+    // Acquisition substitution table: FrameProxy::GetFrameNodeByIndex resolves
+    // this index to the shell until the real build commits and clears it.
+    manager->RecordDeferral(host->GetId(), index, shell);
+    ScrollPlaceholderPredictParams params;
+    params.componentType = ScrollPlaceholderComponentType::WATER_FLOW;
+    params.templateId = options->id;
+    params.hostNodeId = host->GetId();
+    params.index = index;
+    params.cacheBuild = false;
+    EnqueueScrollPlaceholderRealBuild(manager, params, info.templateGen);
+    return shell;
+}
+
+void WaterFlowPattern::EnqueueScrollPlaceholderRealBuild(
+    const RefPtr<ScrollPlaceholderManager>& manager,
+    const ScrollPlaceholderPredictParams& params, uint64_t templateGen)
+{
+    auto weak = WeakClaim(this);
+    manager->EnqueueRealBuild(params, templateGen,
+        [weak, index = params.index]() -> bool {
+            auto pattern = weak.Upgrade();
+            CHECK_NULL_RETURN(pattern, false);
+            return pattern->CommitScrollPlaceholderRealBuild(index);
+        },
+        ScrollPlaceholderRealBuildPriority::VISIBLE);
+}
+
+void WaterFlowPattern::PrepareScrollPlaceholderForAcquisition(int32_t index)
+{
+    // Decision-side pre-check for the FrameProxy acquisition substitution: predicts
+    // with the remaining frame budget and, on defer, mounts the shell and records
+    // the deferral. The wrapper substitution is deliberately NOT done here — the
+    // normal acquisition right after this call flows through GetOrCreateChildByIndex
+    // -> FrameProxy::GetFrameNodeByIndex, which resolves the deferral so the shell
+    // picks up the same skip-flag inheritance and activation as a real item.
+    CreateScrollPlaceholderShell(index);
+}
+
+bool WaterFlowPattern::HasScrollPlaceholderItem(int32_t index) const
+{
+    return scrollPlaceholderItems_.find(index) != scrollPlaceholderItems_.end();
+}
+
+namespace {
+// Placeholder commit/sweep visibility margin: covers typical cachedCount prefetch
+// bands without consulting each component's cached-count plumbing. A deferred build
+// whose index fell outside the window is dropped — the index falls back to the normal
+// acquisition and re-defers on demand if the user scrolls back.
+constexpr int32_t SCROLL_PH_RANGE_MARGIN = 10;
+
+bool InScrollPhVisibleRange(int32_t start, int32_t end, int32_t index)
+{
+    if (start < 0 || end < 0 || index < 0) {
+        return true; // range unknown (pre-first-layout): fail open
+    }
+    return index >= start - SCROLL_PH_RANGE_MARGIN && index <= end + SCROLL_PH_RANGE_MARGIN;
+}
+} // namespace
+
+bool WaterFlowPattern::CommitScrollPlaceholderRealBuild(int32_t index)
+{
+    // Framed real-build closure (UI thread, pipeline OnIdle flush). The real item
+    // is produced by the existing build-style acquisition — the syntax layer path
+    // is untouched — and enters the tree there; the replacement completes with
+    // the next local remeasure (WaterFlow's existing item-size anchor rules),
+    // after which the shell is retired (ReconcileScrollPlaceholderItems).
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, false);
+    auto iter = scrollPlaceholderItems_.find(index);
+    if (iter == scrollPlaceholderItems_.end()) {
+        return false;
+    }
+    auto* context = host->GetContext();
+    const auto& manager = context ? context->GetOrCreateScrollPlaceholderManager() : nullptr;
+    // Drop the acquisition deferral FIRST: the real acquisition below must resolve
+    // through FrameProxy's normal path, not back into this shell.
+    if (manager) {
+        manager->ClearDeferral(host->GetId(), index);
+    }
+    if (index < 0 || index >= host->GetTotalChildCount()) {
+        // Data shrank below this index: drop the placeholder, never mount.
+        RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
+        scrollPlaceholderItems_.erase(iter);
+        return false;
+    }
+
+    // Visibility guard: a storm can leave a task queued for an index the viewport has
+    // long left behind (the queue itself has no scroll-position cleanup). Committing
+    // it would mount a full off-screen item and force a host re-measure for content
+    // the user may never revisit; retire the shell — the index re-defers through the
+    // normal path if the user scrolls back.
+    const int32_t visStart = layoutInfo_ ? layoutInfo_->startIndex_ : -1;
+    const int32_t visEnd = layoutInfo_ ? layoutInfo_->endIndex_ : -1;
+    if (!InScrollPhVisibleRange(visStart, visEnd, index)) {
+        RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
+        scrollPlaceholderItems_.erase(iter);
+        return false;
+    }
+    // A real child already present at the index (built through the normal path
+    // after a data change): keep it, retire the placeholder. Deferral-blind probe —
+    // plain GetChildByIndex would still see this index's own shell without the
+    // clear above, and any other deferred index must not resolve here either.
+    if (host->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(index))) {
+        RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
+        scrollPlaceholderItems_.erase(iter);
+        return false;
+    }
+    ACE_SCOPED_TRACE("ScrollPlaceholder::BuildReal hostId:%d index:%d", host->GetId(), index);
+    // Take the entry out FIRST: the acquisition below re-enters
+    // CreateScrollPlaceholderShell, whose dedup check must not resolve to our own shell.
+    ScrollPlaceholderItemInfo info = iter->second;
+    scrollPlaceholderItems_.erase(iter);
+    auto realWrapper = host->GetOrCreateChildByIndex(static_cast<uint32_t>(index), true);
+    if (!realWrapper) {
+        // The queue task is consumed either way: retire the orphan shell so future
+        // acquisitions take the normal path instead of hitting the shell forever.
+        RetireScrollPlaceholderShell(info.shell, info.templateId);
+        return false;
+    }
+    // Transaction: the real node is in the tree; the remeasure re-lays the item
+    // range (anchors follow the existing item-size change rules). The shell stays
+    // mounted until that layout completes, then the reconcile retires it (content
+    // back to the pool, shell unmounted outside the transaction).
+    retiringPlaceholderShells_.emplace_back(info.shell, info.templateId);
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+    return true;
+}
+
+void WaterFlowPattern::RetireScrollPlaceholderShell(const RefPtr<FrameNode>& shell, const std::string& templateId)
+{
+    CHECK_NULL_VOID(shell);
+    mountedPlaceholderShells_.erase(shell);
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* context = host->GetContext();
+    const auto& manager = context ? context->GetOrCreateScrollPlaceholderManager() : nullptr;
+    // Retirement funnel for every path (commit drops, reconcile drops, the retiring
+    // list and the orphan sweep): drop any deferral still pointing at this shell so
+    // the index resolves through the normal acquisition again.
+    if (manager) {
+        manager->RemoveDeferralsByShell(host->GetId(), shell);
+    }
+    // Return the template content subtree to the per-template instance pool —
+    // the expensive part (builder/clone) — and drop the cheap shell.
+    bool contentPooled = false;
+    if (!templateId.empty() && shell->GetChildren().size() == 1) {
+        if (manager) {
+            auto content = shell->GetChildren().front();
+            shell->RemoveChild(content);
+            manager->CacheTemplateInstance(templateId, content);
+            contentPooled = true;
+        }
+    }
+    if (!templateId.empty() && !contentPooled && !shell->GetChildren().empty()) {
+        // Content existed but missed the pool (unexpected child count or no manager):
+        // it degrades to the re-clone cost path; log to make pool anomalies visible.
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder content dropped without pooling: children=%{public}d, templateId=%{public}s",
+            static_cast<int32_t>(shell->GetChildren().size()), templateId.c_str());
+    }
+    host->RemoveChild(shell);
+    shell->DetachFromMainTree();
+}
+
+void WaterFlowPattern::SweepScrollPlaceholderOutOfRange(int32_t start, int32_t end)
+{
+    // Scroll-driven hygiene for the framed real-build queue: a fast fling can defer
+    // more items than the viewport will ever revisit. Queued tasks whose index left
+    // the window (plus margin) can no longer render near the user — drop the task and
+    // retire the shell so the index falls back to the normal acquisition. Without
+    // this the backlog drains for minutes, building items the user has long passed.
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* context = host->GetContext();
+    const auto& manager = context ? context->GetOrCreateScrollPlaceholderManager() : nullptr;
+    CHECK_NULL_VOID(manager);
+    manager->SetHostVisibleRange(host->GetId(), start, end);
+    for (auto iter = scrollPlaceholderItems_.begin(); iter != scrollPlaceholderItems_.end();) {
+        const int32_t index = iter->first;
+        if (InScrollPhVisibleRange(start, end, index)) {
+            ++iter;
+            continue;
+        }
+        manager->CancelRealBuildTask(host->GetId(), index, ScrollPlaceholderCancelReason::OUT_OF_RANGE);
+        RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
+        iter = scrollPlaceholderItems_.erase(iter);
+    }
+}
+void WaterFlowPattern::ReconcileScrollPlaceholderItems()
+{
+    // Layout-round reconcile: placeholders whose index already holds a real
+    // child (normal-path rebuild after data change) or fell out of range are
+    // dropped; shells of committed items are retired after the replacement
+    // layout finished (removed outside the transaction, per the commit ordering).
+    // The orphan sweep at the end also runs with both tables empty: an empty
+    // table with a mounted shell is exactly the residual it exists to catch.
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    int32_t totalCount = host->GetTotalChildCount();
+    for (auto iter = scrollPlaceholderItems_.begin(); iter != scrollPlaceholderItems_.end();) {
+        if (iter->second.shell) {
+            scroll_placeholder_mount::LogScrollPlaceholderShellState(host, iter->first, iter->second.shell);
+        }
+        bool drop = iter->first >= totalCount ||
+            (host->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(iter->first)) != nullptr);
+        if (drop) {
+            RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
+            iter = scrollPlaceholderItems_.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
+    for (auto& [shell, templateId] : retiringPlaceholderShells_) {
+        RetireScrollPlaceholderShell(shell, templateId);
+    }
+    retiringPlaceholderShells_.clear();
+    SweepOrphanPlaceholderShells();
+}
+
+void WaterFlowPattern::SweepOrphanPlaceholderShells()
+{
+    // Shells carry a zero frame count, so index-based cleanup (data shrink child
+    // removal, syntax rebuilds) never touches them: every retirement goes through
+    // the two tables. This sweep closes the residual path — a shell still mounted
+    // on the host (per the mounted-shell registry) that neither table tracks (a
+    // missed erase/retire somewhere) is retired here, with the template id from the
+    // registry so the content still finds its way back to the instance pool.
+    if (mountedPlaceholderShells_.empty()) {
+        return;
+    }
+    std::set<const FrameNode*> tracked;
+    for (const auto& [index, info] : scrollPlaceholderItems_) {
+        if (info.shell) {
+            tracked.insert(AceType::RawPtr(info.shell));
+        }
+    }
+    for (const auto& [shell, templateId] : retiringPlaceholderShells_) {
+        if (shell) {
+            tracked.insert(AceType::RawPtr(shell));
+        }
+    }
+    std::vector<std::pair<RefPtr<FrameNode>, std::string>> orphans;
+    for (const auto& [shell, templateId] : mountedPlaceholderShells_) {
+        if (shell && tracked.find(AceType::RawPtr(shell)) == tracked.end()) {
+            orphans.emplace_back(shell, templateId);
+        }
+    }
+    for (auto& [shell, templateId] : orphans) {
+        TAG_LOGD(AceLogTag::ACE_SCROLL, "ScrollPlaceholder orphan shell swept: shellId=%{public}d",
+            shell->GetId());
+        RetireScrollPlaceholderShell(shell, templateId);
+    }
+}
+
+void WaterFlowPattern::OnDetachFromMainTree()
+{
+    // The last animation callback can clear the shared request before its final
+    // layout consumes our state. Cancel that state at UI-tree detach as well.
+    // Do not move animation cleanup into the potentially off-thread destructor, and leave
+    // thread-safe nodes to the multi-thread detach path of the base class.
+    auto host = GetHost();
+    if ((fastScrollState_ || targetIndex_ || legacyScrollTarget_) && !(host && host->IsThreadSafeNode())) {
+        StopAnimate();
+    }
+    ScrollablePattern::OnDetachFromMainTree();
+}
 
 ScrollSnapStrategy WaterFlowPattern::GetScrollSnapStrategy() const
 {
@@ -102,8 +532,9 @@ void WaterFlowPattern::UpdateSnapItemGeometryCache()
     const int32_t start = std::max(0, layoutInfo_->startIndex_ - cacheCount);
     const int32_t end = std::min(itemCount - 1, layoutInfo_->endIndex_ + cacheCount);
     for (int32_t index = start; index <= end; ++index) {
-        // Sliding-window prediction caches hold sizes of unlaid items; only lane members are real geometry.
-        if (layoutInfo_->Mode() == LayoutMode::SLIDING_WINDOW && layoutInfo_->GetCrossIndex(index) < 0) {
+        // Children left in the tree after a direction change still carry the previous axis rect
+        // until this layout records them. Prediction caches and unlaid cache nodes are not anchors.
+        if (layoutInfo_->GetCrossIndex(index) < 0) {
             continue;
         }
         // Cached items are read without building or adding them to the render tree.
@@ -130,6 +561,16 @@ void WaterFlowPattern::AppendSnapItemGeometry(
         startPos = GetMainContentSize() - startPos - size;
     }
     snapItemGeometryCache_.push_back({ startPos + totalOffset, size, index });
+}
+
+void WaterFlowPattern::ResetSnapGeometry()
+{
+    snapItemGeometryCache_.clear();
+    snapTotalHeight_.reset();
+    ClearPredictedItemSnapTarget();
+    const float offset = static_cast<float>(GetTotalOffset());
+    snapGeometryEstimatedOffset_ = offset;
+    snapGeometryStableOffset_ = offset;
 }
 
 void WaterFlowPattern::UpdateSnapGeometryAfterLayout(bool isLayoutValid)
@@ -284,21 +725,8 @@ SizeF WaterFlowPattern::GetContentSize() const
     return geometryNode->GetPaddingSize();
 }
 
-bool WaterFlowPattern::UpdateCurrentOffset(float delta, int32_t source)
+bool WaterFlowPattern::AdjustOffsetForEdgeEffect(float& delta, int32_t source)
 {
-    auto host = GetHost();
-    CHECK_NULL_RETURN(host, false);
-
-    // check edgeEffect is not springEffect
-    if (!HandleEdgeEffect(delta, source, GetContentSize())) {
-        if (IsOutOfBoundary()) {
-            host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
-        }
-        return false;
-    }
-    SetScrollSource(source);
-    MarkUserScrollSource(source);
-    FireAndCleanScrollingListener();
     if (GetScrollEdgeEffect()) {
         // over scroll in drag update from normal to over scroll.
         float overScroll = layoutInfo_->CalcOverScroll(GetMainContentSize(), delta);
@@ -318,8 +746,46 @@ bool WaterFlowPattern::UpdateCurrentOffset(float delta, int32_t source)
             delta = std::min(delta, -layoutInfo_->Offset() + layoutInfo_->contentStartOffset_);
         }
     }
+    return true;
+}
+
+bool WaterFlowPattern::UpdateCurrentOffset(float delta, int32_t source)
+{
+    if ((fastScrollState_ || targetIndex_) && source != SCROLL_FROM_ANIMATION_CONTROLLER) {
+        StopAnimate();
+    } else if (legacyScrollTarget_ && source != SCROLL_FROM_ANIMATION_CONTROLLER) {
+        // Stop pursuing the retained index. Keep the pre-existing direct-offset
+        // animation semantics; touch and API interruption stop it at their entry points.
+        CancelFastScroll();
+    }
+    const auto serial = fastScrollSerial_;
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, false);
+
+    // check edgeEffect is not springEffect
+    if (!HandleEdgeEffect(delta, source, GetContentSize())) {
+        if (IsOutOfBoundary()) {
+            host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+        }
+        return false;
+    }
+    SetScrollSource(source);
+    MarkUserScrollSource(source);
+    FireAndCleanScrollingListener();
+    if (serial != fastScrollSerial_) {
+        return false;
+    }
+    if (!AdjustOffsetForEdgeEffect(delta, source)) {
+        return false;
+    }
     delta = -FireOnWillScroll(-delta);
+    if (serial != fastScrollSerial_) {
+        return false;
+    }
     delta = -FireObserverOnWillScroll(-delta);
+    if (serial != fastScrollSerial_) {
+        return false;
+    }
     if (source == SCROLL_FROM_BAR && InstanceOf<WaterFlowLayoutInfo>(layoutInfo_) &&
         GreatOrEqual(layoutInfo_->CurrentPos() + delta, layoutInfo_->TopFinalPos())) {
         delta = -layoutInfo_->CurrentPos() + layoutInfo_->TopFinalPos();
@@ -419,6 +885,16 @@ void WaterFlowPattern::BeforeCreateLayoutWrapper()
 
 RefPtr<LayoutAlgorithm> WaterFlowPattern::CreateLayoutAlgorithm()
 {
+    if (targetIndex_ || legacyScrollTarget_) {
+        const auto footer = footer_.Upgrade();
+        const int32_t count = GetChildrenCount() - (footer ? footer->FrameCount() : 0);
+        const int32_t index = targetIndex_.value_or(legacyScrollTarget_ ? legacyScrollTarget_->index : LAST_ITEM);
+        // Reloads can remove a destination without passing NotifyDataChange.
+        // Do not keep scheduling a request that can no longer be measured.
+        if (count <= 0 || (index != LAST_ITEM && (index < 0 || index >= count))) {
+            StopAnimate();
+        }
+    }
     if (targetIndex_.has_value()) {
         layoutInfo_->targetIndex_ = targetIndex_;
     }
@@ -426,6 +902,10 @@ RefPtr<LayoutAlgorithm> WaterFlowPattern::CreateLayoutAlgorithm()
     if (layoutInfo_->Mode() == LayoutMode::SLIDING_WINDOW) {
         auto sw = MakeRefPtr<WaterFlowLayoutSW>(DynamicCast<WaterFlowLayoutInfoSW>(layoutInfo_));
         sw->EnableSkip((AnimateStoped() && !IsOutOfBoundary(true)) || IsBackToTopRunning());
+        sw->SetFastScrollState(fastScrollState_, std::exchange(fastScrollSkip_, false), fastScrollSerial_);
+        if (fastScrollState_) {
+            sw->EnableSkip(false);
+        }
         algorithm = sw;
     } else if (sections_ || SystemProperties::WaterFlowUseSegmentedLayout()) {
         algorithm = MakeRefPtr<WaterFlowSegmentedLayout>(DynamicCast<WaterFlowLayoutInfo>(layoutInfo_));
@@ -461,17 +941,26 @@ RefPtr<NodePaintMethod> WaterFlowPattern::CreateNodePaintMethod()
 void WaterFlowPattern::SetLayoutAlgorithmContentClip(const RefPtr<WaterFlowLayoutBase>& algorithm)
 {
     CHECK_NULL_VOID(algorithm);
+    // Activation gate: List reads the clip value from the paint property, while Grid gates through
+    // the layout property (ADR-1). A stored DEFAULT (written by ResetContentClip) is resolved
+    // dynamically here, so both follow a change of the immersive strategy set.
     auto paintProperty = GetPaintProperty<ScrollablePaintProperty>();
-    if (!paintProperty || !paintProperty->HasContentClip()) {
+    const bool hasClip = paintProperty && paintProperty->HasContentClip();
+    auto mode = ContentClipMode::DEFAULT;
+    RefPtr<ShapeRect> clipShape;
+    if (hasClip) {
+        const auto& clip = paintProperty->GetContentClipValue();
+        mode = clip.first;
+        clipShape = clip.second;
+    }
+    if (mode == ContentClipMode::DEFAULT) {
+        mode = ScrollableUtils::ResolveEffectiveDefaultContentClip(GetHost(), AceType::RawPtr(paintProperty));
+    }
+    if (!hasClip && mode != ContentClipMode::SAFE_AREA) {
         safeAreaPad_.reset();
         return;
     }
 
-    auto clip = paintProperty->GetContentClipValue();
-    auto mode = clip.first;
-    if (mode == ContentClipMode::DEFAULT) {
-        mode = paintProperty->GetDefaultContentClip();
-    }
     algorithm->SetContentClipMode(mode);
     if (mode != ContentClipMode::SAFE_AREA) {
         safeAreaPad_.reset();
@@ -479,7 +968,7 @@ void WaterFlowPattern::SetLayoutAlgorithmContentClip(const RefPtr<WaterFlowLayou
     if (mode == ContentClipMode::SAFE_AREA && safeAreaPad_.has_value()) {
         algorithm->SetContentClipSafeAreaPad(safeAreaPad_);
     } else if (mode == ContentClipMode::CUSTOM) {
-        algorithm->SetContentClipShape(clip.second);
+        algorithm->SetContentClipShape(clipShape);
     }
 }
 
@@ -512,6 +1001,11 @@ void WaterFlowPattern::OnModifyDone()
     Pattern::OnModifyDone();
     auto layoutProperty = GetLayoutProperty<WaterFlowLayoutProperty>();
     CHECK_NULL_VOID(layoutProperty);
+    const auto direction = layoutProperty->GetWaterflowDirection().value_or(FlexDirection::COLUMN);
+    if (snapLayoutDirection_.has_value() && snapLayoutDirection_.value() != direction) {
+        ResetSnapGeometry();
+    }
+    snapLayoutDirection_ = direction;
     // SetAxis for scroll event
     SetAxis(layoutProperty->GetAxis());
     if (!GetScrollableEvent()) {
@@ -587,6 +1081,7 @@ void WaterFlowPattern::TriggerPostLayoutEvents()
     auto onJsFrameNodeScrollIndex = eventHub->GetJSFrameNodeOnWaterFlowScrollIndex();
     FireOnScrollIndex(indexChanged, onScrollIndex);
     FireOnScrollIndex(indexChanged, onJsFrameNodeScrollIndex);
+    SweepScrollPlaceholderOutOfRange(layoutInfo_->reportStartIndex_, layoutInfo_->reportEndIndex_);
     if (indexChanged) {
         host->OnAccessibilityEvent(
             AccessibilityEventType::SCROLLING_EVENT, layoutInfo_->reportStartIndex_, layoutInfo_->reportEndIndex_);
@@ -597,7 +1092,9 @@ void WaterFlowPattern::TriggerPostLayoutEvents()
     auto onReachEnd = eventHub->GetOnReachEnd();
     auto onJSFrameNodeReachEnd = eventHub->GetJSFrameNodeOnReachEnd();
     FireOnReachEnd(onReachEnd, onJSFrameNodeReachEnd);
-    OnScrollStop(eventHub->GetOnScrollStop(), eventHub->GetJSFrameNodeOnScrollStop());
+    if (!legacyScrollTarget_ || !legacyScrollFinishing_) {
+        OnScrollStop(eventHub->GetOnScrollStop(), eventHub->GetJSFrameNodeOnScrollStop());
+    }
 }
 
 void WaterFlowPattern::FireOnReachStart(const OnReachEvent& onReachStart, const OnReachEvent& onJSFrameNodeReachStart)
@@ -664,11 +1161,48 @@ void WaterFlowPattern::CheckSpringAfterContentShrink()
     swInfo->contentSizeDiminished_ = false;
 }
 
+void WaterFlowPattern::UpdateScrollTargetsAfterLayout(const RefPtr<LayoutWrapper>& dirty)
+{
+    auto algorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto sw = algorithmWrapper ? DynamicCast<WaterFlowLayoutSW>(algorithmWrapper->GetLayoutAlgorithm()) : nullptr;
+    const auto serial = sw ? sw->GetFastScrollSerial() : fastScrollSerial_;
+    const float calibration = layoutInfo_->CalibrateOffset();
+    prevOffset_ += calibration; // public content coordinates change by -calibration
+    if (serial == fastScrollSerial_) {
+        UpdateLegacyScrollTarget(-calibration);
+    }
+    if (!layoutInfo_->measureInNextFrame_) {
+        TriggerPostLayoutEvents();
+    }
+
+    if (serial == fastScrollSerial_) {
+        UpdateFastScroll(-calibration);
+    }
+    if (serial == fastScrollSerial_ && targetIndex_ && !layoutInfo_->measureInNextFrame_) {
+        const bool started = ScrollToTargetIndex(*targetIndex_);
+        if (started && serial == fastScrollSerial_) {
+            targetIndex_.reset();
+        }
+    }
+    layoutInfo_->UpdateStartIndex();
+    prevOffset_ = layoutInfo_->Offset();
+    if (serial == fastScrollSerial_ && !(targetIndex_ && layoutInfo_->measureInNextFrame_)) {
+        layoutInfo_->jumpIndex_ = WaterFlowLayoutInfoBase::EMPTY_JUMP_INDEX;
+        layoutInfo_->duringPositionCalc_ = false;
+        layoutInfo_->targetIndex_.reset();
+        layoutInfo_->EndTargetPreparation();
+        layoutInfo_->extraOffset_.reset();
+    }
+}
+
 bool WaterFlowPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config)
 {
     if (config.skipMeasure && config.skipLayout) {
         return false;
     }
+    // Scroll placeholder layout-round reconcile: retire shells whose replacement
+    // layout finished and drop placeholders overtaken by real children.
+    ReconcileScrollPlaceholderItems();
 
     const bool snapLayoutValid = layoutInfo_->isDataValid_ && !layoutInfo_->measureInNextFrame_;
     auto scrollable = GetScrollable();
@@ -683,21 +1217,7 @@ bool WaterFlowPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dir
     }
     layoutInfo_->isDataValid_ = true;
 
-    prevOffset_ += layoutInfo_->CalibrateOffset(); // adjust prevOffset_ to keep in sync with calibrated TotalOffset
-    if (!layoutInfo_->measureInNextFrame_) {
-        TriggerPostLayoutEvents();
-    }
-
-    if (targetIndex_.has_value()) {
-        ScrollToTargetIndex(targetIndex_.value());
-        targetIndex_.reset();
-    }
-    layoutInfo_->UpdateStartIndex();
-    prevOffset_ = layoutInfo_->Offset();
-    layoutInfo_->jumpIndex_ = WaterFlowLayoutInfoBase::EMPTY_JUMP_INDEX;
-    layoutInfo_->duringPositionCalc_ = false;
-    layoutInfo_->targetIndex_.reset();
-    layoutInfo_->extraOffset_.reset();
+    UpdateScrollTargetsAfterLayout(dirty);
     UpdateScrollBarOffset();
     CheckScrollable();
 
@@ -712,9 +1232,18 @@ bool WaterFlowPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dir
 
     UpdateSnapGeometryAfterLayout(snapLayoutValid);
 
-	// Check if we need to mark node dirty when at section boundary with misalignment
-    if (IsAtSectionBoundary() && CheckMisalignment(layoutInfo_)) {
-        MarkDirtyNodeSelf();
+    // Animation stop callbacks can run synchronously while a new segment is
+    // starting. Rebuild misaligned lanes only after target bookkeeping is done,
+    // otherwise that bookkeeping discards Reset's pending jump.
+    // Prepared route geometry still includes released offscreen nodes. Defer
+    // viewport misalignment checks until the next measure trims that route;
+    // Reset here would discard its heights and rebuild it synchronously.
+    if (!layoutInfo_->measureInNextFrame_ && !layoutInfo_->targetPreparationCleanup_ &&
+        (IsAtSectionBoundary() || pendingMisalignmentCheck_)) {
+        pendingMisalignmentCheck_ = false;
+        if (CheckMisalignment(layoutInfo_)) {
+            MarkDirtyNodeSelf();
+        }
     }
 
     ChangeAnimateOverScroll();
@@ -736,12 +1265,33 @@ bool WaterFlowPattern::ScrollToTargetIndex(int32_t index)
         return false;
     }
     float targetPosition = layoutInfo_->CalcTargetPosition(index, crossIndex);
+    if (!std::isfinite(targetPosition) || targetPosition == LayoutInfinity<float>()) {
+        return false;
+    }
     auto extraOffset = GetExtraOffset();
     if (extraOffset.has_value()) {
         targetPosition += extraOffset.value();
         ResetExtraOffset();
     }
-    ScrollablePattern::AnimateTo(targetPosition, -1, nullptr, true);
+    const bool slidingWindow = GetLayoutMode() == LayoutMode::SLIDING_WINDOW;
+    if (slidingWindow && legacyScrollTarget_ && NearEqual(targetPosition, GetTotalOffset(), 0.1f)) {
+        // Remeasuring an intentionally offscreen target can produce the current
+        // offset. No new animation will deliver the retained request's stop.
+        FinishLegacyScroll();
+        return true;
+    }
+    if (slidingWindow && !NearEqual(targetPosition, GetTotalOffset(), 0.1f)) {
+        if (legacyScrollFinishing_) {
+            SetScrollAbort(true);
+        }
+        legacyScrollFinishing_ = false;
+        legacyScrollTarget_ = ScrollToIndexTarget { index, extraOffset.value_or(0.0f),
+            layoutInfo_->align_, targetPosition };
+        // Use the shared segment-start guard: preserve the index request during
+        // a synchronous stop, then clear the guard before user callbacks run.
+        startingFastScroll_ = true;
+    }
+    ScrollablePattern::AnimateTo(targetPosition, -1, nullptr, true, false, !slidingWindow);
     return true;
 }
 
@@ -820,6 +1370,7 @@ void WaterFlowPattern::ScrollPage(bool reverse, bool smooth, AccessibilityScroll
             ScrollablePattern::AnimateTo(-position, -1, nullptr, true, false, false);
         }
     } else {
+        ScheduleCapiScrollCommand(false);
         UpdateCurrentOffset(distance, SCROLL_FROM_JUMP);
     }
     // AccessibilityEventType::SCROLL_END
@@ -908,6 +1459,9 @@ RefPtr<WaterFlowSections> WaterFlowPattern::GetOrCreateWaterFlowSections()
 
 void WaterFlowPattern::OnSectionChanged(int32_t start)
 {
+    if (fastScrollState_ || targetIndex_ || legacyScrollTarget_) {
+        StopAnimate();
+    }
     snapItemGeometryCache_.clear();
     snapTotalHeight_.reset();
     if (!sections_) {
@@ -928,6 +1482,9 @@ int32_t WaterFlowPattern::GetFirstIndex() const
 
 void WaterFlowPattern::ResetSections()
 {
+    if (fastScrollState_ || targetIndex_ || legacyScrollTarget_) {
+        StopAnimate();
+    }
     snapItemGeometryCache_.clear();
     snapTotalHeight_.reset();
     if (!sections_) {
@@ -941,6 +1498,9 @@ void WaterFlowPattern::ResetSections()
 
 void WaterFlowPattern::ScrollToIndex(int32_t index, bool smooth, ScrollAlign align, std::optional<float> extraOffset)
 {
+    if (!smooth) {
+        ScheduleCapiScrollCommand(true);
+    }
     SetScrollSource(SCROLL_FROM_JUMP);
     SetScrollAlign(align);
     StopAnimate();
@@ -962,10 +1522,221 @@ void WaterFlowPattern::ScrollToIndex(int32_t index, bool smooth, ScrollAlign ali
             if (extraOffset.has_value()) {
                 layoutInfo_->extraOffset_ = -extraOffset.value();
             }
-            ContentChangeReport(GetHost(), ContentChangeManager::SCROLL_TO_INDEX);
+            ContentChangeReport(GetHost(), ContentChangeManager::SCROLL_TO_INDEX, false);
         }
     }
     FireAndCleanScrollingListener();
+}
+
+void WaterFlowPattern::ScrollToIndexFastScroll(int32_t index, bool smooth, ScrollAlign align,
+    std::optional<float> extraOffset, FastScrollMode mode)
+{
+    if (GetLayoutMode() != LayoutMode::SLIDING_WINDOW || !smooth || !IsFastScrollEnabled(mode)) {
+        ScrollToIndex(index, smooth, align, extraOffset);
+        return;
+    }
+    const auto footer = footer_.Upgrade();
+    const int32_t count = GetChildrenCount() - (footer ? footer->FrameCount() : 0);
+    if (index == LAST_ITEM) {
+        index = count - 1;
+    }
+    if (index < 0 || index >= count || !std::isfinite(extraOffset.value_or(0.0f))) {
+        // Preserve the legacy interruption behavior without preparing an invalid request.
+        SetScrollSource(SCROLL_FROM_JUMP);
+        SetScrollAlign(align);
+        StopAnimate();
+        FireAndCleanScrollingListener();
+        return;
+    }
+    StopScrollableAndAnimate();
+    targetIndex_.reset();
+    layoutInfo_->targetIndex_.reset();
+    layoutInfo_->jumpIndex_ = WaterFlowLayoutInfoBase::EMPTY_JUMP_INDEX;
+    layoutInfo_->duringPositionCalc_ = false;
+    layoutInfo_->extraOffset_.reset();
+    ResetExtraOffset();
+    ResetLastSnapTargetIndex();
+    auto info = DynamicCast<WaterFlowLayoutInfoSW>(layoutInfo_);
+    info->delta_ = 0.0f;
+    scrollTarget_ = ScrollToIndexTarget { index, extraOffset.value_or(0.0f), align, 0.0f };
+    scrollTarget_->fastScrollMode = mode;
+    fastScrollState_ = std::make_shared<WaterFlowFastScrollState>();
+    ++fastScrollSerial_;
+    fastScrollState_->index = index;
+    fastScrollState_->align = align;
+    fastScrollState_->extraOffset = extraOffset.value_or(0.0f);
+    fastScrollState_->mode = mode;
+    MarkDirtyNodeSelf();
+}
+
+void WaterFlowPattern::CancelFastScroll()
+{
+    if (legacyScrollTarget_) {
+        ++fastScrollSerial_;
+        legacyScrollTarget_.reset();
+        legacyScrollFinishing_ = false;
+        legacyScrollRetried_ = false;
+    }
+    if (targetIndex_ || layoutInfo_->targetPreparation_) {
+        ++fastScrollSerial_;
+        targetIndex_.reset();
+        layoutInfo_->targetIndex_.reset();
+        layoutInfo_->EndTargetPreparation();
+        layoutInfo_->duringPositionCalc_ = false;
+        layoutInfo_->measureInNextFrame_ = false;
+        ResetExtraOffset();
+    }
+    if (fastScrollState_ || GetFastScrollRequest()) {
+        ++fastScrollSerial_;
+    }
+    if (fastScrollState_) {
+        fastScrollState_->cancelled = true;
+        fastScrollState_.reset();
+        targetIndex_.reset();
+        layoutInfo_->targetIndex_.reset();
+        layoutInfo_->duringPositionCalc_ = false;
+        layoutInfo_->extraOffset_.reset();
+        ResetExtraOffset();
+        if (auto info = DynamicCast<WaterFlowLayoutInfoSW>(layoutInfo_)) {
+            info->delta_ = 0.0f;
+        }
+    }
+    ScrollablePattern::CancelFastScroll();
+}
+
+void WaterFlowPattern::ResumeFastScrollAnimation(float position, float coordinateCorrection)
+{
+    auto state = fastScrollState_;
+    CHECK_NULL_VOID(state);
+    // A finish callback can run before its last layout. Keep the numeric target until
+    // that layout settles, then restart only when measured geometry needs correction.
+    if (!GetFastScrollRequest() && state->finishing) {
+        scrollTarget_ = ScrollToIndexTarget { state->index, state->extraOffset, state->align, 0.0f };
+        scrollTarget_->fastScrollMode = state->mode;
+        state->finishing = false;
+    }
+    auto request = GetFastScrollRequest();
+    CHECK_NULL_VOID(request);
+    if (!AnimateRunning() || !NearEqual(request->targetOffset, position, 0.1f) ||
+        !NearEqual(request->viewportSize, GetMainContentSize()) || !NearZero(coordinateCorrection)) {
+        StartFastScrollAnimation(position);
+    }
+}
+
+void WaterFlowPattern::UpdateFastScroll(float coordinateCorrection)
+{
+    auto state = fastScrollState_;
+    CHECK_NULL_VOID(state);
+    if (state->cancelled) {
+        StopAnimate();
+        return;
+    }
+    if (!state->targetOffset || layoutInfo_->measureInNextFrame_) {
+        return;
+    }
+    auto info = DynamicCast<WaterFlowLayoutInfoSW>(layoutInfo_);
+    CHECK_NULL_VOID(info);
+    *state->targetOffset += coordinateCorrection;
+    if (state->preparedWindow) {
+        state->preparedWindow->totalOffset_ -= coordinateCorrection;
+    }
+    if (info->ItemInView(state->index) && state->align != ScrollAlign::NONE) {
+        info->align_ = state->align;
+        const float position = info->CalcTargetPosition(state->index, 0);
+        if (std::isfinite(position) && position != LayoutInfinity<float>()) {
+            state->targetOffset = position + state->extraOffset;
+        }
+    }
+    float position = *state->targetOffset;
+    if ((info->itemStart_ && position < GetTotalOffset()) ||
+        (info->offsetEnd_ && position > GetTotalOffset())) {
+        position = GetTotalOffset();
+    }
+    if (!std::isfinite(position) || NearEqual(position, GetTotalOffset(), 0.1f)) {
+        StopAnimate();
+        return;
+    }
+    ResumeFastScrollAnimation(position, coordinateCorrection);
+}
+
+void WaterFlowPattern::UpdateLegacyScrollTarget(float coordinateCorrection)
+{
+    if (!legacyScrollTarget_ || targetIndex_ || layoutInfo_->measureInNextFrame_) {
+        return;
+    }
+    const auto info = DynamicCast<WaterFlowLayoutInfoSW>(layoutInfo_);
+    CHECK_NULL_VOID(info);
+    auto& target = *legacyScrollTarget_;
+    target.targetOffset += coordinateCorrection;
+    if (info->jumpIndex_ != WaterFlowLayoutInfoBase::EMPTY_JUMP_INDEX) {
+        return;
+    }
+    if (!info->ItemInView(target.index)) {
+        RemeasureLegacyScrollTarget();
+        return;
+    }
+    info->align_ = target.align;
+    float position = info->CalcTargetPosition(target.index, 0) + target.extraOffset;
+    if (!std::isfinite(position) || position == LayoutInfinity<float>()) {
+        return;
+    }
+    if ((info->itemStart_ && position < GetTotalOffset()) ||
+        (info->offsetEnd_ && position > GetTotalOffset())) {
+        position = GetTotalOffset();
+    }
+    if (NearEqual(position, GetTotalOffset(), 0.1f)) {
+        FinishLegacyScroll();
+        return;
+    }
+    if (!AnimateRunning() || !NearEqual(position, target.targetOffset, 0.5f) ||
+        !NearZero(coordinateCorrection)) {
+        target.targetOffset = position;
+        // Keep this as one logical scroll even if its numeric endpoint changes.
+        if (legacyScrollFinishing_) {
+            SetScrollAbort(true);
+        }
+        legacyScrollFinishing_ = false;
+        startingFastScroll_ = true;
+        ScrollablePattern::AnimateTo(position, -1, nullptr, true, false, false);
+    }
+}
+
+void WaterFlowPattern::RemeasureLegacyScrollTarget()
+{
+    if (!legacyScrollFinishing_) {
+        return;
+    }
+    // A large extra offset can keep the requested item outside the final
+    // viewport. Allow one geometry correction, never an endless measurement loop.
+    if (legacyScrollRetried_) {
+        FinishLegacyScroll();
+        return;
+    }
+    legacyScrollRetried_ = true;
+    const auto& target = *legacyScrollTarget_;
+    targetIndex_ = target.index;
+    layoutInfo_->targetIndex_ = target.index;
+    layoutInfo_->duringPositionCalc_ = true;
+    layoutInfo_->align_ = target.align;
+    SetExtraOffset(target.extraOffset);
+    scrollStop_ = false;
+    MarkDirtyNodeSelf();
+}
+
+void WaterFlowPattern::FinishLegacyScroll()
+{
+    SetScrollAbort(false);
+    StopAnimate();
+    scrollStop_ = true;
+    MarkDirtyNodeSelf();
+}
+
+void WaterFlowPattern::OnTouchDown(const TouchEventInfo& info)
+{
+    if (fastScrollState_ || targetIndex_ || legacyScrollTarget_) {
+        StopAnimate();
+    }
+    ScrollablePattern::OnTouchDown(info);
 }
 
 bool WaterFlowPattern::IsOutOfBoundary(bool useCurrentDelta)
@@ -1025,7 +1796,7 @@ void WaterFlowPattern::OnScrollEndCallback()
     if (AnimateStoped()) {
         scrollStop_ = true;
     }
-    CheckMisalignment(layoutInfo_);
+    pendingMisalignmentCheck_ = true;
     MarkDirtyNodeSelf();
 }
 
@@ -1044,18 +1815,25 @@ void WaterFlowPattern::CheckBackToTopFallback()
 
 void WaterFlowPattern::OnAnimateStop()
 {
+    if (!startingFastScroll_ && legacyScrollTarget_) {
+        legacyScrollFinishing_ = true;
+    }
+    if (!startingFastScroll_ && fastScrollState_) {
+        fastScrollState_->finishing = true;
+    }
+    ScrollablePattern::OnAnimateStop();
     if (!GetIsDragging() || GetScrollAbort()) {
         scrollStop_ = true;
     }
     CheckBackToTopFallback();
-    CheckMisalignment(layoutInfo_);
+    pendingMisalignmentCheck_ = true;
     MarkDirtyNodeSelf();
 }
 
 void WaterFlowPattern::AnimateTo(
     float position, float duration, const RefPtr<Curve>& curve, bool smooth, bool canOverScroll, bool useTotalOffset)
 {
-    ScrollablePattern::AnimateTo(position, duration, curve, smooth, canOverScroll);
+    ScrollablePattern::AnimateTo(position, duration, curve, smooth, canOverScroll, useTotalOffset);
 }
 
 void WaterFlowPattern::ScrollTo(float position)
@@ -1086,6 +1864,9 @@ bool WaterFlowPattern::NeedRender()
 
 void WaterFlowPattern::ResetLayoutInfo()
 {
+    if (fastScrollState_ || targetIndex_ || legacyScrollTarget_) {
+        StopAnimate();
+    }
     snapItemGeometryCache_.clear();
     snapTotalHeight_.reset();
     layoutInfo_->Reset();
@@ -1122,6 +1903,9 @@ void WaterFlowPattern::SetLayoutMode(LayoutMode mode)
     // Same-mode property replay must keep sampled snap geometry. Data, section and layout resets,
     // as well as actual mode switches, remain responsible for invalidation.
     if (!layoutInfo_ || mode != layoutInfo_->Mode()) {
+        if (fastScrollState_ || targetIndex_ || legacyScrollTarget_) {
+            StopAnimate();
+        }
         snapItemGeometryCache_.clear();
         snapTotalHeight_.reset();
         layoutInfo_ = WaterFlowLayoutInfoBase::Create(mode);
@@ -1141,6 +1925,9 @@ int32_t WaterFlowPattern::GetChildrenCount() const
 
 void WaterFlowPattern::NotifyDataChange(int32_t index, int32_t count)
 {
+    if (fastScrollState_ || targetIndex_ || legacyScrollTarget_) {
+        StopAnimate();
+    }
     snapItemGeometryCache_.clear();
     snapTotalHeight_.reset();
     if (layoutInfo_->Mode() == LayoutMode::SLIDING_WINDOW && keepContentPosition_) {
@@ -1335,15 +2122,62 @@ void WaterFlowPattern::DumpAdvanceVisualProperties(
     DumpAdvanceLayoutProperties(*json);
 }
 
+namespace {
+void PutTreeSectionMargin(JsonValue& json, const MarginProperty& margin)
+{
+    auto value = JsonUtil::Create();
+    const std::pair<const char*, std::optional<CalcLength>> edges[] = {
+        { "left", margin.left }, { "right", margin.right }, { "top", margin.top },
+        { "bottom", margin.bottom }, { "start", margin.start }, { "end", margin.end }
+    };
+    for (const auto& [key, edge] : edges) {
+        if (edge) {
+            value->Put(key, edge->ToString().c_str());
+        }
+    }
+    json.PutRef("margin", std::move(value));
+}
+
+void PutTreeSections(JsonValue& json, const RefPtr<WaterFlowSections>& sections)
+{
+    CHECK_NULL_VOID(sections);
+    auto values = JsonUtil::CreateArray();
+    for (const auto& section : sections->GetSectionInfo()) {
+        auto value = JsonUtil::Create();
+        value->Put("itemsCount", section.itemsCount);
+        if (section.crossCount) {
+            value->Put("crossCount", *section.crossCount);
+        }
+        if (section.columnsGap) {
+            value->Put("columnsGap", section.columnsGap->ToString().c_str());
+        }
+        if (section.rowsGap) {
+            value->Put("rowsGap", section.rowsGap->ToString().c_str());
+        }
+        if (section.margin) {
+            PutTreeSectionMargin(*value, *section.margin);
+        }
+        values->PutRef(std::move(value));
+    }
+    json.PutRef("sections", std::move(values));
+}
+} // namespace
+
 void WaterFlowPattern::DumpAdvanceFunctionalProperties(
     std::unique_ptr<JsonValue>& json, const ParamConfig& /* config */)
 {
+    PutTreeSections(*json, sections_);
     auto property = GetLayoutProperty<WaterFlowLayoutProperty>();
     if (property) {
         if (layoutInfo_) {
             json->Put("CachedCount", property->GetCachedCount().value_or(layoutInfo_->defCachedCount_));
         }
-        json->Put("isReverse", property->IsReverse());
+        // Layout is authoritative; the inherited scrollbar cache may not be synchronized yet.
+        if (json->Contains("isReverse")) {
+            json->Replace("isReverse", property->IsReverse());
+        } else {
+            json->Put("isReverse", property->IsReverse());
+        }
     }
     json->Put("footer", static_cast<bool>(footer_.Upgrade()));
     auto host = GetHost();
@@ -1577,6 +2411,11 @@ void WaterFlowPattern::ReportOnItemWaterFlowScrollEvent(const std::string& event
 #endif
 }
 
+CommandResult WaterFlowPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return OnInjectionEventByRatioWithResult(command);
+}
+
 int32_t WaterFlowPattern::OnInjectionEvent(const std::string& command)
 {
     return OnInjectionEventByRatio(command);
@@ -1588,10 +2427,16 @@ void WaterFlowPattern::PostAsyncLoadTask()
     CHECK_NULL_VOID(host);
     auto context = host->GetContext();
     CHECK_NULL_VOID(context);
-    context->AddAsyncLoadTask([weak = AceType::WeakClaim(this)]() {
+    const auto serial = fastScrollSerial_;
+    context->AddAsyncLoadTask([weak = AceType::WeakClaim(this), serial]() {
         auto pattern = weak.Upgrade();
         CHECK_NULL_VOID(pattern);
-        if (pattern->layoutInfo_->measureInNextFrame_) {
+        // Wrapper creation may clear the frame flag even when Measure is skipped.
+        const auto state = pattern->fastScrollState_;
+        const bool pendingFastScroll = pattern->fastScrollSerial_ == serial && state &&
+            !state->cancelled && !state->targetOffset;
+        const bool pendingTarget = pattern->fastScrollSerial_ == serial && pattern->targetIndex_;
+        if (pattern->layoutInfo_->measureInNextFrame_ || pendingFastScroll || pendingTarget) {
             pattern->MarkDirtyNodeSelf();
         }
     });

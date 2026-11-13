@@ -15,7 +15,61 @@
 
 #include "core/event/key_event.h"
 
+#include <algorithm>
+#include <sstream>
+
 namespace OHOS::Ace {
+
+bool KeyEvent::HasKey(KeyCode expectCode) const
+{
+    auto curPressedCode = pressedCodes.rbegin();
+    while (curPressedCode != pressedCodes.rend()) {
+        if (expectCode == *curPressedCode) {
+            return true;
+        }
+        ++curPressedCode;
+    }
+    return false;
+}
+
+bool KeyEvent::IsExactlyKey(const std::vector<KeyCode>& expectCodes) const
+{
+    auto pressedKeysCnt = pressedCodes.size();
+    if (std::find(pressedCodes.begin(), pressedCodes.end(), KeyCode::KEY_FN) != pressedCodes.end()) {
+        --pressedKeysCnt;
+    }
+    return (expectCodes.size() != pressedKeysCnt) ? false : IsKey(expectCodes);
+}
+
+bool KeyEvent::IsKey(const std::vector<KeyCode>& expectCodes) const
+{
+    if (expectCodes.size() > pressedCodes.size() || pressedCodes.empty()) {
+        return false;
+    }
+    auto curExpectCode = expectCodes.crbegin();
+    auto curPressedCode = pressedCodes.crbegin();
+    while (curExpectCode != expectCodes.crend()) {
+        if (*curExpectCode != *curPressedCode) {
+            return false;
+        }
+        ++curExpectCode;
+        ++curPressedCode;
+    }
+    return true;
+}
+
+std::string KeyEvent::ToString() const
+{
+    std::stringstream ss;
+    ss << "code=" << static_cast<int32_t>(code) << ", ";
+    ss << "action=" << static_cast<int32_t>(action) << ", ";
+    ss << "pressedCodes=[";
+    std::for_each(pressedCodes.begin(), pressedCodes.end(),
+        [&ss](const KeyCode& code) { ss << static_cast<int32_t>(code) << ", "; });
+    ss << "]" << ", ";
+    ss << "isPreIme = " << isPreIme;
+    return ss.str();
+}
 
 uint64_t CalculateModifierKeyState(const std::vector<OHOS::Ace::KeyCode>& status)
 {

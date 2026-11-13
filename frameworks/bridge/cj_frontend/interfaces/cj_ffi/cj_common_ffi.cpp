@@ -92,6 +92,25 @@ void TransformNativeCJFingerInfo(CJFingerInfo* sources, const std::list<OHOS::Ac
     }
 }
 
+void TransformNativeCJFingerInfoExtra(
+    CJFingerInfoExtra* sources, const std::list<OHOS::Ace::FingerInfo>& fingerInfoList)
+{
+    int id = 0;
+    for (const OHOS::Ace::FingerInfo& fingerInfo : fingerInfoList) {
+        auto& ffiFingers = sources[id];
+        auto& screenLoc = fingerInfo.screenLocation_;
+        ffiFingers.displayX = PipelineBase::Px2VpWithCurrentDensity(screenLoc.GetX());
+        ffiFingers.displayY = PipelineBase::Px2VpWithCurrentDensity(screenLoc.GetY());
+        auto& globalDisplayLoc = fingerInfo.globalDisplayLocation_;
+        ffiFingers.globalDisplayX = PipelineBase::Px2VpWithCurrentDensity(globalDisplayLoc.GetX());
+        ffiFingers.globalDisplayY = PipelineBase::Px2VpWithCurrentDensity(globalDisplayLoc.GetY());
+        ffiFingers.operatingHand = fingerInfo.operatingHand_;
+        ffiFingers.sourceType = static_cast<int32_t>(fingerInfo.sourceType_);
+        ffiFingers.sourceTool = static_cast<int32_t>(fingerInfo.sourceTool_);
+        id++;
+    }
+}
+
 void AssambleCJEventTarget(
     const OHOS::Ace::EventTarget& eventTarget, CJArea& area, CJPosition& position, CJPosition& globalPosition)
 {

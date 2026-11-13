@@ -61,6 +61,8 @@ public:
     static ArkUINativeModuleValue ResetOnScaleChange(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue SetOnZoomChange(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue ResetOnZoomChange(ArkUIRuntimeCallInfo* runtimeCallInfo);
+    static ArkUINativeModuleValue SetVisitedLinkPersistEnabled(ArkUIRuntimeCallInfo* runtimeCallInfo);
+    static ArkUINativeModuleValue ResetVisitedLinkPersistEnabled(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue SetOnRequestSelected(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue RetsetOnRequestSelected(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue SetOnContextMenuHide(ArkUIRuntimeCallInfo* runtimeCallInfo);

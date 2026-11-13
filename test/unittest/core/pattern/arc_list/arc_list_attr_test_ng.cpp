@@ -1647,7 +1647,7 @@ HWTEST_F(ArcListAttrTestNg, ListItemDisableEvent006, TestSize.Level1)
 
 /**
  * @tc.name: ScrollBarWidthLowerCaseUnit001
- * @tc.desc: Test SetListScrollBarWidth with lowercase unit string "16vp" (the format JS fix produces)
+ * @tc.desc: Test SetListScrollBarWidth with lowercase unit string "16vp" (the format ArcList JS emits)
  * @tc.type: FUNC
  */
 HWTEST_F(ArcListAttrTestNg, ScrollBarWidthLowerCaseUnit001, TestSize.Level1)
@@ -1836,7 +1836,7 @@ HWTEST_F(ArcListAttrTestNg, StringToDimensionWithUnitNGUpperCase001, TestSize.Le
  * @tc.name: ScrollBarWidthResetOnInvalidUnit001
  * @tc.desc: Test that when an invalid (uppercase) unit string causes StringToDimensionWithUnitNG
  *           to return false, the bridge would reset scrollBarWidth. Validates the root cause
- *           of the "touch width always 0vp" bug fixed by adding .toLowerCase() in JS.
+ *           of the "touch width always 0vp" bug fixed by emitting lowercase vp in ArcList JS.
  * @tc.type: FUNC
  */
 HWTEST_F(ArcListAttrTestNg, ScrollBarWidthResetOnInvalidUnit001, TestSize.Level1)
@@ -1858,6 +1858,36 @@ HWTEST_F(ArcListAttrTestNg, ScrollBarWidthResetOnInvalidUnit001, TestSize.Level1
     EXPECT_FALSE(parseOK);
     // When parse fails, bridge resets width -> width becomes theme default (no custom value)
     // This is the root cause: uppercase unit → parse failure → reset → width = 0/theme default
+}
+
+/**
+ * @tc.name: ScrollBarWidthArcListAlwaysVp001
+ * @tc.desc: ArcList always passes "<value>vp" for every LengthUnit to preserve the historical VP behavior;
+ *           verify the native model stores those values as VP.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ArcListAttrTestNg, ScrollBarWidthArcListAlwaysVp001, TestSize.Level1)
+{
+    ListModelNG model = CreateList();
+    model.SetListScrollBar(AceType::RawPtr(frameNode_), static_cast<int32_t>(DisplayMode::ON));
+    CreateDone();
+
+    struct WidthCase {
+        const char* width;
+        float expected;
+    };
+    const WidthCase cases[] = {
+        { "0vp", 0.0f },
+        { "16vp", 16.0f },
+        { "24.5vp", 24.5f },
+    };
+    for (const auto& item : cases) {
+        ListModelNG::SetListScrollBarWidth(AceType::RawPtr(frameNode_), item.width);
+        auto barWidth = paintProperty_->GetScrollBarWidth();
+        ASSERT_TRUE(barWidth.has_value());
+        EXPECT_FLOAT_EQ(barWidth.value().Value(), item.expected);
+        EXPECT_EQ(barWidth.value().Unit(), DimensionUnit::VP);
+    }
 }
 
 } // namespace OHOS::Ace::NG

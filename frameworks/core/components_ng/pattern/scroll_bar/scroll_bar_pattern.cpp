@@ -379,8 +379,24 @@ void ScrollBarPattern::RegisterScrollBarEventTask()
         return scrollBarProxy->NotifySnapScrollWithoutChild(snapAnimationOptions);
     };
     scrollBar_->SetStartSnapAnimationCallback(std::move(startSnapAnimationCallback));
+    InitTouchStateCallback();
     InitScrollBarGestureEvent();
     RegisterScrollBarOverDragEventTask();
+}
+
+void ScrollBarPattern::InitTouchStateCallback()
+{
+    CHECK_NULL_VOID(scrollBar_);
+    auto touchStateCallback = [weak = WeakClaim(this)](bool isPressed) {
+        auto pattern = weak.Upgrade();
+        CHECK_NULL_VOID(pattern);
+        if (isPressed) {
+            pattern->StopDisappearAnimator();
+        } else if (pattern->GetDisplayMode() == DisplayMode::AUTO && !pattern->isScrolling_) {
+            pattern->StartDisappearAnimator();
+        }
+    };
+    scrollBar_->SetTouchStateCallback(std::move(touchStateCallback));
 }
 
 void ScrollBarPattern::InitScrollBarGestureEvent()
@@ -703,18 +719,15 @@ void ScrollBarPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const P
 void ScrollBarPattern::DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
     if (!hasChild_ && scrollBar_) {
-        auto bar = JsonUtil::Create();
-        scrollBar_->DumpAdvanceInfo(bar, config);
-        json->PutRef("scrollBar", std::move(bar));
+        scrollBar_->DumpAdvanceInfo(json, config);
     }
 }
 
 void ScrollBarPattern::DumpAdvanceFunctionalProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
-    if (!hasChild_ && scrollBar_) {
-        auto bar = JsonUtil::Create();
-        scrollBar_->DumpAdvanceInfo(bar, config);
-        json->PutRef("scrollBar", std::move(bar));
+    // The visual branch already writes both sets when both options are enabled.
+    if (!config.visualProperties && !hasChild_ && scrollBar_) {
+        scrollBar_->DumpAdvanceInfo(json, config);
     }
 }
 

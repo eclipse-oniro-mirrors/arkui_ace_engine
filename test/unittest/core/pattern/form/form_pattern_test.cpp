@@ -245,13 +245,13 @@ HWTEST_F(FormPatternTest, FormPatternTest_004, TestSize.Level0)
     auto pattern = frameNode->GetPattern<FormPattern>();
     EXPECT_NE(pattern, nullptr);
 
-    EXPECT_FALSE(pattern->shouldResponseClick_);
+    EXPECT_EQ(pattern->shouldResponseClick_, ClickResponseState::DEFAULT);
     auto host = pattern->GetHost();
     EXPECT_NE(host, nullptr);
     pattern->OnAttachToFrameNode();
     pattern->InitClickEvent();
 
-    pattern->shouldResponseClick_ = true;
+    pattern->shouldResponseClick_ = ClickResponseState::RESPONSIBLE;
     TouchEventInfo event("onTouchUp");
     TimeStamp timeStamp = event.timeStamp_;
     std::chrono::duration<long, std::ratio<1, 1000>> millisecondDuration(MAX_CLICK_DURATION / 1000000 + 10);
@@ -260,28 +260,28 @@ HWTEST_F(FormPatternTest, FormPatternTest_004, TestSize.Level0)
     touchLocationInfo.SetTouchType(TouchType::UP);
     event.AddTouchLocationInfo(std::move(touchLocationInfo));
     pattern->HandleTouchUpEvent(event);
-    EXPECT_EQ(pattern->shouldResponseClick_, false);
+    EXPECT_EQ(pattern->shouldResponseClick_, ClickResponseState::REJECT_TIMEOUT);
     event.timeStamp_ = timeStamp;
-    pattern->shouldResponseClick_ = true;
+    pattern->shouldResponseClick_ = ClickResponseState::RESPONSIBLE;
 
     std::list<TouchLocationInfo> newTouches;
     std::list<TouchLocationInfo> touches = event.GetTouches();
     EXPECT_EQ(touches.empty(), false);
     event.touches_ = std::move(newTouches);
     pattern->HandleTouchUpEvent(event);
-    EXPECT_EQ(pattern->shouldResponseClick_, true);
+    EXPECT_EQ(pattern->shouldResponseClick_, ClickResponseState::RESPONSIBLE);
     event.touches_ = touches;
-    pattern->shouldResponseClick_ = true;
+    pattern->shouldResponseClick_ = ClickResponseState::RESPONSIBLE;
 
     event.touches_.begin()->screenLocation_ += Offset(30, 30);
     pattern->HandleTouchUpEvent(event);
-    EXPECT_EQ(pattern->shouldResponseClick_, false);
-    pattern->shouldResponseClick_ = true;
+    EXPECT_EQ(pattern->shouldResponseClick_, ClickResponseState::REJECT_SLIDE);
+    pattern->shouldResponseClick_ = ClickResponseState::RESPONSIBLE;
 
     event.touches_.begin()->screenLocation_ -= Offset(30, 30);
     pattern->HandleTouchUpEvent(event);
-    EXPECT_EQ(pattern->shouldResponseClick_, true);
-    pattern->shouldResponseClick_ = false;
+    EXPECT_EQ(pattern->shouldResponseClick_, ClickResponseState::RESPONSIBLE);
+    pattern->shouldResponseClick_ = ClickResponseState::DEFAULT;
 }
 
 /**
@@ -370,20 +370,20 @@ HWTEST_F(FormPatternTest, FormPatternTest_008, TestSize.Level0)
     pattern->HandleStaticFormEvent(touchPoint);
     EXPECT_EQ(pattern->formLinkInfos_.empty(), true);
     EXPECT_TRUE(pattern->isDynamic_);
-    EXPECT_FALSE(pattern->shouldResponseClick_);
+    EXPECT_EQ(pattern->shouldResponseClick_, ClickResponseState::DEFAULT);
 
     pattern->isDynamic_ = false;
     pattern->SetFormLinkInfos(infos);
     EXPECT_TRUE(pattern->formLinkInfos_.empty());
 
-    pattern->shouldResponseClick_ = false;
+    pattern->shouldResponseClick_ = ClickResponseState::REJECT_TIMEOUT;
     pattern->HandleStaticFormEvent(touchPoint);
     EXPECT_EQ(pattern->formLinkInfos_.empty(), true);
 
     std::string tmpStr = "action";
     infos.emplace_back(tmpStr);
     pattern->SetFormLinkInfos(infos);
-    pattern->shouldResponseClick_ = true;
+    pattern->shouldResponseClick_ = ClickResponseState::RESPONSIBLE;
     pattern->HandleStaticFormEvent(touchPoint);
     EXPECT_EQ(pattern->formLinkInfos_.empty(), false);
 }

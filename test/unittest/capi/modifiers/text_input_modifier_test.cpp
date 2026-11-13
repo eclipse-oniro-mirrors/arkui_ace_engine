@@ -156,7 +156,7 @@ HWTEST_F(TextInputModifierTest, DISABLED_setShowUnitTest, TestSize.Level1)
     int32_t nodeId = 555;
     auto node = BlankModelNG::CreateFrameNode(nodeId);
     EXPECT_NE(node, nullptr);
-    static std::optional<RefPtr<UINode>> uiNode = node;
+    const int32_t token = CallbackNodeBinder::Bind(node);
 
     auto checkCallback = [](
         const Ark_Int32 resourceId,
@@ -167,22 +167,22 @@ HWTEST_F(TextInputModifierTest, DISABLED_setShowUnitTest, TestSize.Level1)
             .parentNode = parentNode
         };
 
-        if (uiNode) {
-            CallbackHelper(continuation).InvokeSync(AceType::RawPtr(uiNode.value()));
+        auto target = CallbackNodeBinder::Upgrade(resourceId);
+        if (target) {
+            CallbackHelper(continuation).InvokeSync(AceType::RawPtr(target));
         }
     };
 
-    static constexpr int32_t contextId = 123;
-    CustomNodeBuilder customBuilder =
-        Converter::ArkValue<CustomNodeBuilder>(checkCallback, contextId);
+    CustomNodeBuilder customBuilder = Converter::ArkValue<CustomNodeBuilder>(checkCallback, token);
 
     EXPECT_EQ(checkEvent.has_value(), false);
     EXPECT_EQ(pattern->GetUnitNode(), nullptr);
     modifier_->setShowUnit(node_, &customBuilder);
     ASSERT_EQ(checkEvent.has_value(), true);
-    EXPECT_EQ(checkEvent->resourceId, contextId);
+    EXPECT_EQ(checkEvent->resourceId, token);
     EXPECT_EQ(reinterpret_cast<FrameNode*>(checkEvent->parentNode), frameNode);
     EXPECT_EQ(pattern->GetUnitNode(), node);
+    CallbackNodeBinder::Unbind(token);
 #endif
 }
 

@@ -318,6 +318,7 @@ HWTEST_F(ScrollableKeyboardScrollTestNg, HandleArrowKeyScrollTriggered001, TestS
     pattern->axis_ = Axis::VERTICAL;
     MountPattern(pattern, V2::LIST_ETS_TAG, false);
     auto scrollable = AttachBareScrollable(pattern, Axis::VERTICAL);
+    pattern->SetIsAllowKeyboard(true); // keyboard scrolling is opt-in (default false)
     auto event = CreateKeyEvent(KeyCode::KEY_DPAD_UP, KeyAction::DOWN);
     EXPECT_TRUE(pattern->HandleArrowKeyScroll(event));
     // UP key maps to positive delta (scroll toward start), same sign as mouse wheel up.
@@ -336,6 +337,7 @@ HWTEST_F(ScrollableKeyboardScrollTestNg, HandleArrowKeyScrollTriggered002, TestS
     pattern->axis_ = Axis::VERTICAL;
     MountPattern(pattern, V2::LIST_ETS_TAG, false);
     auto scrollable = AttachBareScrollable(pattern, Axis::VERTICAL);
+    pattern->SetIsAllowKeyboard(true); // opt-in
     auto event = CreateKeyEvent(KeyCode::KEY_DPAD_DOWN, KeyAction::DOWN);
     EXPECT_TRUE(pattern->HandleArrowKeyScroll(event));
     EXPECT_NEAR(scrollable->lastMainDelta_, -pattern->CalculateScrollDelta(3), DELTA_EPSILON);
@@ -353,6 +355,7 @@ HWTEST_F(ScrollableKeyboardScrollTestNg, HandleArrowKeyScrollTriggered003, TestS
     pattern->axis_ = Axis::HORIZONTAL;
     MountPattern(pattern, V2::LIST_ETS_TAG, false);
     auto scrollable = AttachBareScrollable(pattern, Axis::HORIZONTAL);
+    pattern->SetIsAllowKeyboard(true); // opt-in
     auto event = CreateKeyEvent(KeyCode::KEY_DPAD_LEFT, KeyAction::DOWN);
     EXPECT_TRUE(pattern->HandleArrowKeyScroll(event));
     EXPECT_NEAR(scrollable->lastMainDelta_, pattern->CalculateScrollDelta(3), DELTA_EPSILON);
@@ -370,6 +373,7 @@ HWTEST_F(ScrollableKeyboardScrollTestNg, HandleArrowKeyScrollTriggered004, TestS
     pattern->axis_ = Axis::HORIZONTAL;
     MountPattern(pattern, V2::LIST_ETS_TAG, false);
     auto scrollable = AttachBareScrollable(pattern, Axis::HORIZONTAL);
+    pattern->SetIsAllowKeyboard(true); // opt-in
     auto event = CreateKeyEvent(KeyCode::KEY_DPAD_RIGHT, KeyAction::DOWN);
     EXPECT_TRUE(pattern->HandleArrowKeyScroll(event));
     EXPECT_NEAR(scrollable->lastMainDelta_, -pattern->CalculateScrollDelta(3), DELTA_EPSILON);
@@ -433,10 +437,10 @@ HWTEST_F(ScrollableKeyboardScrollTestNg, HandleArrowKeyScrollFreeModeNone001, Te
 
 /**
  * @tc.name: HandleArrowKeyScrollEnableOptOut001
- * @tc.desc: Test enableScrollWithKeyboard opt-out flag gating
+ * @tc.desc: Test enableScrollWithKeyboard opt-in flag gating
  * @tc.type: FUNC
- * AC-15.1/15.2/15.4: default enabled; false disables scroll and lets the key bubble;
- * true re-enables scrolling
+ * AC-15.1/15.2/15.4: default disabled (key bubbles, pre-change behavior); true enables
+ * scrolling; false disables again
  */
 HWTEST_F(ScrollableKeyboardScrollTestNg, HandleArrowKeyScrollEnableOptOut001, TestSize.Level1)
 {
@@ -446,21 +450,22 @@ HWTEST_F(ScrollableKeyboardScrollTestNg, HandleArrowKeyScrollEnableOptOut001, Te
     auto scrollable = AttachBareScrollable(pattern, Axis::VERTICAL);
     auto event = CreateKeyEvent(KeyCode::KEY_DPAD_UP, KeyAction::DOWN);
 
-    // Default: enabled
-    EXPECT_TRUE(pattern->GetIsAllowKeyboard());
+    // Default: disabled (the default flipped to false) — not consumed, no scroll,
+    // the key bubbles (pre-change behavior preserved)
+    EXPECT_FALSE(pattern->GetIsAllowKeyboard());
+    EXPECT_FALSE(pattern->HandleArrowKeyScroll(event));
+    EXPECT_NEAR(scrollable->lastMainDelta_, 0.0, DELTA_EPSILON);
+
+    // Enabled: scroll restored
+    pattern->SetIsAllowKeyboard(true);
     EXPECT_TRUE(pattern->HandleArrowKeyScroll(event));
     EXPECT_NEAR(scrollable->lastMainDelta_, pattern->CalculateScrollDelta(3), DELTA_EPSILON);
 
-    // Disabled: not consumed, no scroll (event bubbles, restoring pre-change behavior)
+    // Disabled again: not consumed, no scroll
     pattern->SetIsAllowKeyboard(false);
     scrollable->lastMainDelta_ = 0.0;
     EXPECT_FALSE(pattern->HandleArrowKeyScroll(event));
     EXPECT_NEAR(scrollable->lastMainDelta_, 0.0, DELTA_EPSILON);
-
-    // Re-enabled: scroll restored
-    pattern->SetIsAllowKeyboard(true);
-    EXPECT_TRUE(pattern->HandleArrowKeyScroll(event));
-    EXPECT_NEAR(scrollable->lastMainDelta_, pattern->CalculateScrollDelta(3), DELTA_EPSILON);
 }
 
 } // namespace OHOS::Ace::NG

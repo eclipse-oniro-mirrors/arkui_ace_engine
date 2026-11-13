@@ -34,6 +34,8 @@ public:
 
     virtual ExecutorResult ExecuteStep() = 0;
 
+    virtual void Cancel() {}
+
     virtual std::string GetType() const = 0;
 
     virtual bool IsSingleStep() const = 0;
@@ -43,9 +45,21 @@ public:
         return "{executorType='" + GetType() + "', isSingleStep=" + (IsSingleStep() ? "true" : "false") + "}";
     }
 
+    ExecutionState GetFailureState() const
+    {
+        return failureState_;
+    }
+
 protected:
+    ExecutorResult SetFailureState(ExecutionState state = ExecutionState::FAILED)
+    {
+        failureState_ = state;
+        return ExecutorResult::FAILED;
+    }
+
     FrameNodeMatch FindFrameNode(double x, double y, GestureRecognizerPred pred);
     WeakPtr<PipelineContext> context_;
+    ExecutionState failureState_ = ExecutionState::FAILED;
 };
 
 } // namespace OHOS::Ace::NG

@@ -36,7 +36,7 @@ import { Frame } from 'arkui/Graphics';
 import { KeyEvent, KeyframeAnimateParam, KeyframeState, PopupCommonOptions, MenuOptions, ExpectedFrameRateRange } from 'arkui/framework';
 import { TextMenuOptions, TextMenuItemId } from 'arkui/framework';
 import { Nullable, WidthBreakpoint, HeightBreakpoint } from 'arkui/framework';
-import { KeyProcessingMode } from 'arkui/framework';
+import { KeyProcessingMode, ModifierKey } from 'arkui/framework';
 import { default as uiObserver } from '@ohos/arkui/observer';
 import { PlaceholderRegister, createPlaceholderRegister } from '@ohos.arkui.placeholderRegister';
 import { default as mediaquery } from '@ohos/mediaquery';
@@ -49,6 +49,11 @@ import { SheetOptions } from 'arkui/framework';
 import inspector from '@ohos/arkui/inspector';
 import router from '@ohos/router';
 import { ComponentContent, ComponentContentBase } from 'arkui/ComponentContent';
+import Want from '@ohos.app.ability.Want'
+import { DpiFollowStrategy, ReceiveCallback, UIExtensionProxy,
+    WindowModeFollowStrategy } from 'arkui/component/uiExtensionComponent';
+import { TerminationInfo, TransitionEffect } from 'arkui/component/common';
+import { VoidCallback } from 'arkui/component/units';
 import overlayManager from '@ohos/overlayManager';
 import promptAction, { LevelOrder, LevelMode } from '@ohos/promptAction';
 import { LocalStorage } from 'arkui/stateManagement/storage/localStorage';
@@ -59,17 +64,19 @@ import { PeerNode } from 'arkui/PeerNode';
 import { ArkUIAniModule } from 'arkui.ani';
 import { UIContextUtil } from 'arkui/base/UIContextUtil';
 import { int32, int64 } from "@koalaui/common";
-import { KPointer, KSerializerBuffer, KBuffer, DeserializerBase, nullptr, wrapSystemCallback } from '@koalaui/interop';
+import { KPointer, KSerializerBuffer, KBuffer, DeserializerBase,
+    nullptr, wrapSystemCallback, KLong, KInt } from '@koalaui/interop';
 import { TabsController } from 'arkui/component/tabs';
 import { Scroller } from 'arkui/component/scroll';
 import { InputEventListener, InputEventMonitor } from 'arkui/component/common';
 import { TextLayoutOptions, Paragraph, StyledString, ContextMenu, FrameNodeExtender, AnimationExtender, AlertDialog, ActionSheet, DialogExtender } from 'arkui/framework';
 import { InnerGestureObserverConfigs, InnerGestureTriggerInfo, IUIContext, UIContextGetInfo, SystemOps } from 'arkui/component/idlize';
-import { BusinessError } from "@ohos.base"
+import { BusinessError, ErrorCallback, RecordData } from '@ohos.base'
 import { ArkUIGeneratedNativeModule } from '#components';
 import { GlobalScopeUicontextFontScale, GlobalScopeUicontextTextMenu } from "#generated"
 import { deserializeAndCallCallback } from 'arkui/framework/peers/CallbackDeserializeCall';
 import { RawInputEventType, SmartGestureAction, OperateIntention } from 'arkui/component/enums';
+import { TouchEvent, MouseEvent, TouchEventHandwritten, RawInputEventWrapper } from 'arkui/component/common';
 
 export enum GestureActionPhase {
     WILL_START = 0,
@@ -721,6 +728,10 @@ export enum KeyboardAvoidMode {
 export enum ImmersiveStrategy {
     AVOID_CUTOUT = 0,
     AVOID_FLOAT_NAV = 1,
+    GRID_EXPAND_SAFE_AREA = 2,
+    LIST_EXPAND_SAFE_AREA = 3,
+    SCROLL_EXPAND_SAFE_AREA = 4,
+    WATER_FLOW_EXPAND_SAFE_AREA = 5,
     AVOID_WINDOW_CONTROLS = 6,
     NAVIGATION_EXPAND_SAFE_AREA = 8,
 }
@@ -747,6 +758,82 @@ class InputEventMonitorHandle implements InputEventMonitor {
     constructor(handle: KPointer) {
         this.handle = handle;
     }
+}
+
+export interface ModalUIExtensionOptions {
+    dpiFollowStrategy?: DpiFollowStrategy;
+    windowModeFollowStrategy?: WindowModeFollowStrategy;
+    transition?: TransitionEffect;
+}
+
+interface ModalUIExtensionInnerOptions {
+    dpiFollowStrategy?: KInt;
+    isWindowModeFollowHost?: boolean;
+    transition?: TransitionEffect;
+    instanceId?: KInt;
+}
+
+interface ModalUIExtensionInnerCallback {
+    onRemoteReady?: (ptr: KLong) => void;
+    onReceive?: ReceiveCallback;
+    onError?: ErrorCallback<BusinessError>;
+    onTerminated?: (code: int32) => void;
+    onDrawReady?: VoidCallback;
+}
+
+export interface ModalUIExtensionCallback {
+    onRemoteReady?: Callback<UIExtensionProxy>;
+    onReceive?: ReceiveCallback;
+    onError?: ErrorCallback<BusinessError>;
+    onTerminated?: Callback<TerminationInfo>;
+    onDrawReady?: VoidCallback;
+}
+
+export class ModalUIExtensionProxy implements UIExtensionProxy {
+    private proxyPtr_: KLong = 0;
+    constructor(ptr: KLong) {
+        this.proxyPtr_ = ptr;
+    }
+    public send(data: Record<string, RecordData>): void {
+        if (this.proxyPtr_ === 0) {
+            return;
+        }
+        ArkUIAniModule._ModalUIExtensionProxySend(this.proxyPtr_, data);
+    }
+    public sendSync(data: Record<string, RecordData>): Record<string, RecordData> {
+        if (this.proxyPtr_ === 0) {
+            return new Record<string, RecordData>();
+        }
+        return ArkUIAniModule._ModalUIExtensionProxySendSync(this.proxyPtr_, data);
+    }
+    public onAsyncReceiverRegister(callback_: Callback<UIExtensionProxy>): void {
+        if (this.proxyPtr_ === 0) {
+            return;
+        }
+        ArkUIAniModule._ModalUIExtensionProxyOnAsyncReceiverRegister(this.proxyPtr_, callback_);
+    }
+    public onSyncReceiverRegister(callback_: Callback<UIExtensionProxy>): void {
+        if (this.proxyPtr_ === 0) {
+            return;
+        }
+        ArkUIAniModule._ModalUIExtensionProxyOnSyncReceiverRegister(this.proxyPtr_, callback_);
+    }
+    public offAsyncReceiverRegister(callback_?: Callback<UIExtensionProxy>): void {
+        if (this.proxyPtr_ === 0) {
+            return;
+        }
+        ArkUIAniModule._ModalUIExtensionProxyOffAsyncReceiverRegister(this.proxyPtr_, callback_);
+    }
+    public offSyncReceiverRegister(callback_?: Callback<UIExtensionProxy>): void {
+        if (this.proxyPtr_ === 0) {
+            return;
+        }
+        ArkUIAniModule._ModalUIExtensionProxyOffSyncReceiverRegister(this.proxyPtr_, callback_);
+    }
+}
+
+export interface ApplicationShortcutCallbackInfo {
+    uiContext: UIContext;
 }
 
 export class UIContext {
@@ -826,6 +913,42 @@ export class UIContext {
     }
 
     callCallbacks(): void {}
+
+    static registerApplicationShortcut(value: string, keys: Array<ModifierKey>,
+        callback: Callback<ApplicationShortcutCallbackInfo>): int32 {
+        let modifiers: int32 = 0;
+        for (const key of keys) {
+            let bit: int32;
+            switch (key) {
+                case ModifierKey.CTRL: bit = 1 << 0; break;
+                case ModifierKey.SHIFT: bit = 1 << 1; break;
+                case ModifierKey.ALT: bit = 1 << 2; break;
+                default:
+                    console.error('Application shortcut registration failed: unsupported modifier key.');
+                    return 0;
+            }
+            if ((modifiers & bit) !== 0) {
+                console.error('Application shortcut registration failed: duplicate modifier key.');
+                return 0;
+            }
+            modifiers |= bit;
+        }
+        const registrationId = ArkUIAniModule._RegisterApplicationShortcut(value, modifiers,
+            (instanceId: int32): void => {
+                const info: ApplicationShortcutCallbackInfo = {
+                    uiContext: UIContextUtil.getOrCreateUIContextById(instanceId)
+                };
+                callback(info);
+            });
+        if (registrationId === 0) {
+            console.error('Application shortcut registration failed.');
+        }
+        return registrationId;
+    }
+
+    static unregisterApplicationShortcut(registrationId: int32): void {
+        ArkUIAniModule._UnregisterApplicationShortcut(registrationId);
+    }
 
     static getCallingScopeUIContext(): UIContext | undefined {
         const instanceId = ArkUIAniModule._GetCallingScopeUIContext();
@@ -1502,6 +1625,12 @@ export class UIContext {
         ArkUIAniModule._Common_Restore_InstanceId();
     }
 
+    public setTransPageEnabled(enabled: boolean): void {
+        ArkUIAniModule._Common_Sync_InstanceId(this.instanceId_);
+        IUIContext.setTransPageEnabled(enabled);
+        ArkUIAniModule._Common_Restore_InstanceId();
+    }
+
     public setRouter(router: RouterExt) {
         if (this.router_ === undefined) {
             this.router_ = new RouterImpl(this.instanceId_)
@@ -1533,6 +1662,73 @@ export class UIContext {
     public isEasySplit(): boolean {
         return ArkUIAniModule._Common_IsEasySplit(this.instanceId_);
     }
+
+    public isTransPageEnabled(): boolean {
+        return ArkUIAniModule._Common_IsTransPageEnabled(this.instanceId_);
+    }
+
+    public createModalUIExtension(want: Want, options?: ModalUIExtensionOptions, callback?: ModalUIExtensionCallback): int {
+        let innerOptions: ModalUIExtensionInnerOptions = UIContext.parseModalUIExtensionOptions(options);
+        innerOptions.instanceId = this.instanceId_;
+        let innerCallback: Object | undefined = UIContext.parseModalUIExtensionCallback(callback);
+        return ArkUIAniModule._CreateModalUIExtension(want, innerOptions, innerCallback);
+    }
+
+    private static parseModalUIExtensionOptions(options?: ModalUIExtensionOptions): ModalUIExtensionInnerOptions {
+        let dpiFollow: KInt | undefined = undefined;
+        let isWindowModeFollowHost: boolean | undefined = undefined;
+        let transition: TransitionEffect | undefined = undefined;
+        if (options !== undefined) {
+            if (options.dpiFollowStrategy !== undefined) {
+                dpiFollow = (options.dpiFollowStrategy as DpiFollowStrategy).valueOf();
+            }
+            if (options.windowModeFollowStrategy !== undefined) {
+                isWindowModeFollowHost =
+                    options.windowModeFollowStrategy === WindowModeFollowStrategy.FOLLOW_HOST_WINDOW_MODE;
+            }
+            if (options.transition !== undefined) {
+                transition = options.transition;
+            }
+        }
+        return {
+            dpiFollowStrategy: dpiFollow,
+            isWindowModeFollowHost: isWindowModeFollowHost,
+            transition: transition
+        };
+    }
+
+    private static parseModalUIExtensionCallback(callback?: ModalUIExtensionCallback): Object | undefined {
+        if (callback === undefined) {
+            return undefined;
+        }
+        let innerCb: ModalUIExtensionInnerCallback = {};
+        if (callback.onRemoteReady !== undefined) {
+        let userCallback = callback.onRemoteReady;
+        innerCb.onRemoteReady = (ptr: KLong): void => {
+            let proxy = new ModalUIExtensionProxy(ptr);
+                if (userCallback !== undefined) {
+                    userCallback(proxy as UIExtensionProxy);
+                }
+            };
+        }
+        innerCb.onReceive = callback.onReceive;
+        innerCb.onError = callback.onError;
+        if (callback.onTerminated !== undefined) {
+            let userTerminatedCallback = callback.onTerminated;
+            innerCb.onTerminated = (code: int32): void => {
+                let info: TerminationInfo = { code: code };
+                if (userTerminatedCallback !== undefined) {
+                    userTerminatedCallback(info);
+                }
+            };
+        }
+        innerCb.onDrawReady = callback.onDrawReady;
+        return innerCb;
+    }
+
+    public closeModalUIExtension(sessionId: int): void {
+        ArkUIAniModule._CloseModalUIExtension(sessionId, this.instanceId_);
+    }
 }
 export abstract class FrameCallback {
     onFrame(frameTimeInNano: long): void {}
@@ -1547,6 +1743,63 @@ export declare type NodeRenderStateChangeCallback = (state: NodeRenderState, nod
 // Global gesture listener callback type
 export declare type GestureListenerCallback = (triggerInfo: GestureTriggerInfo) => void;
 
+export enum NodeSensitiveInputEventType {
+    TOUCH = 0,
+    MOUSE = 1,
+    KEY = 2
+}
+
+export interface NodeSensitiveInputInfo {
+    isAgent: boolean;
+    type: NodeSensitiveInputEventType;
+    touchEvent?: TouchEvent;
+    mouseEvent?: MouseEvent;
+    keyEvent?: KeyEvent;
+}
+
+export type NodeSensitiveInputCallback = (info: NodeSensitiveInputInfo, node?: FrameNode) => void;
+
+class NodeSensitiveInputDispatcher {
+    private instanceId: int32;
+    private callback: NodeSensitiveInputCallback;
+
+    constructor(instanceId: int32, callback: NodeSensitiveInputCallback) {
+        this.instanceId = instanceId;
+        this.callback = callback;
+    }
+
+    public dispatchInput(isAgent: boolean, type: int32, owner: RawInputEventWrapper, rawNode: int64): void {
+        const info: NodeSensitiveInputInfo = {
+            isAgent: isAgent, type: NodeSensitiveInputEventType.fromValue(type)
+        };
+        if (type === NodeSensitiveInputEventType.TOUCH) {
+            const touch = owner.asTouchEvent();
+            if (touch instanceof TouchEventHandwritten) {
+                touch.retainInputOwner(owner);
+            }
+            if (touch) {
+                info.touchEvent = touch;
+            }
+        } else if (type === NodeSensitiveInputEventType.MOUSE) {
+            const mouse = owner.asMouseEvent();
+            if (mouse) {
+                info.mouseEvent = mouse;
+            }
+        } else {
+            const key = owner.asKeyEvent();
+            if (key) {
+                info.keyEvent = key;
+            }
+        }
+        const peer = FrameNodeExtender.createByRawPtr(rawNode);
+        let node = FrameNodeUtils.searchNodeInRegisterProxy(peer);
+        if (!node) {
+            node = FrameNodeUtils.createFrameNode(UIContextUtil.getOrCreateUIContextById(this.instanceId), peer);
+        }
+        this.callback(info, node ?? undefined);
+    }
+}
+
 export class UIObserver {
     private instanceId_: number = 100000;
     private observerImpl: uiObserver.UIObserver | null = null;
@@ -1559,6 +1812,17 @@ export class UIObserver {
     private createUIObserver(id: number): uiObserver.UIObserver | null {
         this.observerImpl = uiObserver.createUIObserver(id);
         return this.observerImpl;
+    }
+
+    public onNodeSensitiveInput(nodeIdentity: NodeIdentity, callback: NodeSensitiveInputCallback): void {
+        const dispatcher = new NodeSensitiveInputDispatcher(this.instanceId_.toInt(), callback);
+        this.observerImpl?.onNodeSensitiveInput(nodeIdentity instanceof String ? -1 : nodeIdentity as int,
+            nodeIdentity instanceof String ? nodeIdentity as string : '', callback, dispatcher);
+    }
+
+    public offNodeSensitiveInput(nodeIdentity: NodeIdentity, callback?: NodeSensitiveInputCallback): void {
+        this.observerImpl?.offNodeSensitiveInput(nodeIdentity instanceof String ? -1 : nodeIdentity as int,
+            nodeIdentity instanceof String ? nodeIdentity as string : '', callback);
     }
 
     public on(type: string, callback: ((param: object) => void)): void {

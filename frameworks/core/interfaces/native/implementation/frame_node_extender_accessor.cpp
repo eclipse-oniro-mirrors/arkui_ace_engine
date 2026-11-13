@@ -257,8 +257,7 @@ Ark_Boolean DispatchInputEventImpl(Ark_FrameNode peer,
             TouchEvent touchEvent;
             BuilderNodeOpsAccessor::GetTouchEventFromProxy(event->value0, touchEvent, false);
             touchEvent.isNewReferee = useCompetition ? false : true;
-            result = useCompetition ? postEventManager->PostTouchEventWithStrategy(node, std::move(touchEvent))
-                                    : postEventManager->PostTouchEvent(node, std::move(touchEvent));
+            result = postEventManager->PostTouchEventWithStrategy(node, std::move(touchEvent));
             break;
         }
         case SELECTOR_ID_1: {
@@ -269,8 +268,7 @@ Ark_Boolean DispatchInputEventImpl(Ark_FrameNode peer,
             auto mouseEvent = mouseEventInfo->ConvertToMouseEventForStatic(density);
             mouseEvent.time = mouseEventInfo->GetTimeStamp();
             mouseEvent.isNewReferee = useCompetition ? false : true;
-            result = useCompetition ? postEventManager->PostMouseEventWithStrategy(node, std::move(mouseEvent))
-                                    : postEventManager->PostMouseEvent(node, std::move(mouseEvent));
+            result = postEventManager->PostMouseEventWithStrategy(node, std::move(mouseEvent));
             break;
         }
         case SELECTOR_ID_2: {
@@ -281,8 +279,7 @@ Ark_Boolean DispatchInputEventImpl(Ark_FrameNode peer,
             auto axisEvent = axisEventInfo->ConvertToAxisEvent(true, density);
             axisEvent.pressedCodes = axisEventInfo->GetPressedKeyCodes();
             axisEvent.isNewReferee = useCompetition ? false : true;
-            result = useCompetition ? postEventManager->PostAxisEventWithStrategy(node, std::move(axisEvent))
-                                    : postEventManager->PostAxisEvent(node, std::move(axisEvent));
+            result = postEventManager->PostAxisEventWithStrategy(node, std::move(axisEvent));
             break;
         }
         default:

@@ -29,7 +29,7 @@ import { SubscriberManagerTestsV1 } from '../../v1_tests/subscriber_manager_test
 import { SubscribableAbstractTestsV1 } from '../../v1_tests/subscribable_abstract_tests_v1'
 import { PuSyncedPropertyObjectNestedTestsV1 } from '../../v1_tests/pu_synced_property_object_nested_tests_v1'
 import { PuTrackedObjectTestsV1 } from '../../v1_tests/pu_tracked_object_tests_v1'
-import router from '@system.router'
+import { router } from '@kit.ArkUI'
 
 const storage = new LocalStorage();
 interface MockObject1 {

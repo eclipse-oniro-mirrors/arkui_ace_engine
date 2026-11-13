@@ -23,14 +23,19 @@
 #include "base/utils/macros.h"
 #include "interfaces/inner_api/ui_session/param_config.h"
 
+#include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <set>
 #include <unordered_map>
+#include <vector>
 
 namespace OHOS::Ace::NG {
 class FrameNode;
+class PipelineContext;
 class PageTranslateNode;
+struct DeferredPageSceneQuery;
 #ifndef IS_RELEASE_VERSION
 class ContentChangeDumpManager;
 #endif
@@ -46,7 +51,7 @@ public:
     };
 
     explicit ContentChangeManager(const RefPtr<TaskExecutor>& taskExecutor = nullptr);
-    virtual ~ContentChangeManager() = default;
+    ~ContentChangeManager() override;
     void StartContentChangeReport(const ContentChangeConfig& config);
     void StopContentChangeReport();
     void AddOnContentChangeNode(WeakPtr<FrameNode> node);
@@ -69,21 +74,34 @@ public:
     }
 
     void OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode);
-    void OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode, int32_t transitionId);
+    void OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode, int32_t transitionId, bool reportCapi = true);
+    void ReportCapiPageEndEvent(const RefPtr<FrameNode>& keyNode, int32_t transitionId);
+    void ReportCapiPageEndEventFromCache(int32_t transitionId);
+    std::function<void()> BuildCapiOverlayContentHideCallback(const RefPtr<FrameNode>& target);
     void OnContentChangeStart(const RefPtr<FrameNode>& keyNode, ChangeType type);
-    void OnContentChangeInterrupted(const RefPtr<FrameNode>& keyNode, ChangeType type);
-    void OnContentChangeNodeDestroyed(int32_t nodeId);
-    void OnScrollChangeStart(const RefPtr<FrameNode>& keyNode);
+    void OnContentChangeStart(const RefPtr<FrameNode>& keyNode, ChangeType type, bool reportCapi);
+    void ReportCapiPageStartEvent(const RefPtr<FrameNode>& node);
+    void OnContentChangeInterrupted(const RefPtr<FrameNode>& keyNode, ChangeType type, bool reportCapiEnd = true);
+    // Identity-only signature: the detach path also runs from ~FrameNode, where the node
+    // must not be re-claimed into a RefPtr. Context is the caller's non-owning pipeline.
+    void OnContentChangeNodeDestroyed(int32_t nodeId, const std::string& tag, PipelineContext* context);
+    void OnScrollChangeStart(const RefPtr<FrameNode>& keyNode, bool reportCapi = true);
     void OnScrollChangeEnd(const RefPtr<FrameNode>& keyNode, uint32_t type = NONE);
+    void OnScrollChangeEnd(const RefPtr<FrameNode>& keyNode, uint32_t type, bool reportCapi);
     void OnSwiperChangeStart(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor);
+    void ReportCapiSwiperStartEvent(const RefPtr<FrameNode>& node, bool hasTabsAncestor);
     void OnSwiperChangeCancel(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor);
+    void CompleteCapiSwiperChangeWithoutMove(const RefPtr<FrameNode>& node, bool hasTabsAncestor);
+    void CompleteCapiSwiperChangeAfterAutoPlay(const RefPtr<FrameNode>& node, bool hasTabsAncestor, bool canceled);
     void OnSwiperChangeEnd(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor);
     ACE_FORCE_EXPORT void OnDialogChangeEnd(const RefPtr<FrameNode>& keyNode, bool isShow);
+    void OnDialogChangeEnd(const RefPtr<FrameNode>& keyNode, bool isShow, bool reportCapi);
     void OnScrollRemoved(int32_t nodeId);
     void OnTransitionAdded(int32_t nodeId);
     void OnTransitionRemoved(int32_t nodeId);
     bool IsScrolling() const;
     bool IsTransitioning() const;
+    bool IsContentChanging() const;
     void OnTextChangeEnd(const RectF& rect, const RectF& rootRect);
     void OnVsyncStart();
     void OnVsyncEnd(const RectF& rootRect);
@@ -98,6 +116,23 @@ public:
     void OnSwiperScrollStart(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor = false);
     void OnSwiperScrollEnd(const RefPtr<FrameNode>& keyNode);
 
+    using CapiSink = void (*)(uint32_t, uint64_t, const char*, uint32_t, void*);
+    uint64_t RegisterCapiContentChangeEvent(bool withStart, uint32_t eventMask, uint32_t ignoreMask, void* cookie,
+        CapiSink sink, void (*release)(void*));
+    bool UnregisterCapiContentChangeEvent(uint64_t subscriptionId);
+    bool HasCapiContentChangeSubscriptions() const;
+    void InvalidateCapiContentChangeSubscriptions();
+    void OnScrollInterrupted(const RefPtr<FrameNode>& node, bool reportEnd);
+    void OnSwiperChangeInterrupted(const RefPtr<FrameNode>& node, bool hasTabsAncestor);
+    void ReportCapiOverlayEvent(const RefPtr<FrameNode>& target, bool isShow, const char* overlayType,
+        const RefPtr<FrameNode>& trigger = nullptr);
+    void ReportCapiScrollStartEvent(const RefPtr<FrameNode>& node);
+    void ReportCapiScrollEndEvent(const RefPtr<FrameNode>& node);
+    void ReportCapiScrollCommand(const RefPtr<FrameNode>& node, uint32_t source);
+    void MarkCapiScrollByEventSource(int32_t nodeId);
+    void MarkCapiScrollToEventSource(int32_t nodeId);
+    void ClearCapiScrollEventSource(int32_t nodeId);
+
 #ifndef IS_RELEASE_VERSION
     std::string DumpInfo() const;
 #endif
@@ -109,8 +144,57 @@ public:
     // ruleSet is registered (NeedPageSceneDetect fast-returns).
     void NotifyPageSceneContentChanged(bool flushNow);
     void FlushPageSceneNodeChanged();
+    void DeferPageSceneQuery(int32_t processId, std::function<bool()>&& run, std::function<void()>&& cancel);
+    void FlushPageSceneQueries();
+    void CancelPageSceneQuery(int32_t processId);
+    size_t GetPendingPageSceneQueryCount() const;
+
+    // UI-thread-only, weak candidate index. Disabled path does no tree/geometry work.
+    void ConfigurePageSceneSplitTracking(const std::set<std::string>& tags, bool trackNavigation);
+    void SetPageSceneSplitDetector(std::function<void()>&& detector);
+    void SeedPageSceneSplitNodes(const std::vector<RefPtr<FrameNode>>& roots);
+    void NotifyPageSceneSplitNodeChanged(const RefPtr<FrameNode>& node, bool attached = false);
+    void RemovePageSceneSplitNode(int32_t nodeId);
+    std::vector<RefPtr<FrameNode>> GetPageSceneSplitNodes();
+    std::vector<RefPtr<FrameNode>> GetPageSceneSplitNodes(const std::set<std::string>& tags);
+    bool IsPageSceneSplitNodeRelevant(const FrameNode* node) const;
+    bool NeedsPageSceneSplitNodeUpdate(bool attached) const;
+    void MarkPageSceneSplitDirty();
+    void FlushPageSceneSplitDetection();
+    bool IsPageSceneSplitTracking() const;
+    static bool HasPageSceneSplitTracking();
+    static bool IsPageSceneSplitWindowSupported(const PipelineContext* pipeline);
+    uint64_t GetPageSceneSplitSeedVisits() const;
+
+    // Node-side split notifications moved from FrameNode; callers pass the node as a RefPtr.
+    // Only the manager bound to the node's context consumes the notification.
+    void NotifyPageSceneSplitChanged(const RefPtr<FrameNode>& node, bool attached = false);
 
 private:
+    static bool IsPageSceneSplitInSubwindow();
+    struct SplitTrackingState;
+    class CapiImpl;
+    std::unique_ptr<CapiImpl> capiImpl_;
+#ifndef CROSS_PLATFORM
+    std::unique_ptr<SplitTrackingState> splitTracking_;
+    std::map<int32_t, std::shared_ptr<DeferredPageSceneQuery>> pageSceneQueries_;
+#endif
+
+    static RefPtr<FrameNode> GetSwiperContentChangeNode(const RefPtr<FrameNode>& node, bool hasTabsAncestor);
+    void OnScrollChangeStartInner(const RefPtr<FrameNode>& node);
+    void OnSwiperScrollStartInner(const RefPtr<FrameNode>& node);
+    void OnContentChangeNodeDestroyedInner(int32_t nodeId);
+    void OnContentChangeStartInner(const RefPtr<FrameNode>& keyNode, ChangeType type);
+    void OnContentChangeInterruptedInner(const RefPtr<FrameNode>& keyNode, ChangeType type);
+    void OnPageTransitionEndInner(const RefPtr<FrameNode>& keyNode, int32_t transitionId);
+    void OnScrollChangeEndInner(const RefPtr<FrameNode>& keyNode, uint32_t type);
+    void OnSwiperChangeStartInner(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor);
+    void OnSwiperChangeEndInner(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor);
+    void OnSwiperChangeCancelInner(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor);
+    void OnDialogChangeEndInner(const RefPtr<FrameNode>& keyNode, bool isShow);
+    void OnVsyncEndInner(const RectF& rootRect);
+    void OnScrollRemovedInner(int32_t nodeId);
+
     struct ActiveContentChange {
         ChangeType endType = ChangeType::PAGE;
         std::string tag;
@@ -123,6 +207,7 @@ private:
     struct PendingSwiperChange {
         int32_t logicalNodeId = -1;
         bool canceled = false;
+        WeakPtr<FrameNode> reportNode;
     };
 
     std::optional<ChangeType> GetStartChangeType(ChangeType type) const;
@@ -141,7 +226,6 @@ private:
     void ReportSwiperEvent(const RefPtr<FrameNode>& node, bool hasTabsAncestor);
     void StartTextAABBCollecting();
     void StopTextAABBCollecting(const RectF& rootRect);
-    bool IsContentChanging() const;
     bool NeedPageSceneDetect() const;
     bool NeedContentChangeReportOrPageSceneDetect() const;
     void ReportImageEvent();

@@ -391,6 +391,13 @@ float GetFlingSpeedLimit(ArkUINodeHandle node)
     return ScrollableModelNG::GetMaxFlingSpeed(frameNode);
 }
 
+ArkUI_Int32 GetScrollState(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_RETURN(frameNode, ERROR_INT_CODE);
+    return static_cast<ArkUI_Int32>(ScrollableModelNG::GetScrollState(frameNode));
+}
+
 void SetOnWillStopDragging(ArkUINodeHandle node, void* extraParam)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -618,6 +625,7 @@ const ArkUIScrollableModifier* GetScrollableModifier()
         .getContentEndOffset = GetContentEndOffset,
         .createWithResourceObjContentStartOffset = CreateWithResourceObjContentStartOffset,
         .createWithResourceObjContentEndOffset = CreateWithResourceObjContentEndOffset,
+        .getScrollState = GetScrollState,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;

@@ -48,6 +48,7 @@
 #include "core/components_ng/pattern/text_field/password_icon_host.h"
 #include "core/components/text_field/textfield_theme.h"
 #include "core/components_ng/pattern/rich_editor/span_string_mode_switcher.h"
+#include "core/common/text_field_manager_ng.h"
 
 #include "core/components_ng/pattern/text_field/clean_node_host.h"
 
@@ -218,6 +219,12 @@ enum class OperationType {
     UNDO
 };
 
+enum class RichEditorAutoFillReason {
+    UNKNOWN = 0,
+    SINGLE_CLICK,
+    EDITOR_FOCUS,
+};
+
 const std::unordered_map<OperationType, TextChangeReason> OPERATION_REASON_MAP = {
     { OperationType::DEFAULT, TextChangeReason::INPUT },
     { OperationType::DRAG, TextChangeReason::DRAG },
@@ -276,6 +283,8 @@ class RichEditorPattern
         ICounterHost, IPasswordIconHost);
 
 public:
+    void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context) override;
+
     RefPtr<NG::FrameNode> GetHost() const override { return TextPattern::GetHost(); }
     RichEditorPattern(bool isStyledStringMode = false);
     ~RichEditorPattern() override;
@@ -352,7 +361,6 @@ public:
     bool IsPreviewTextInputting();
     std::vector<RectF> GetPreviewTextRects();
     float GetPreviewTextUnderlineWidth() const;
-    PreviewTextStyle GetPreviewTextStyle() const;
     void SetSupportPreviewText(bool isTextPreviewSupported);
     bool IsSupportPreviewText();
 
@@ -479,6 +487,7 @@ public:
     void DeleteBackward(int32_t length = 1) override;
     void DeleteBackward(int32_t length, TextChangeReason reason, bool isByIME = false);
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
     void DeleteBackwardFunction();
     void ReportSelectionChangeEvent(int32_t nodeId, const std::string& str, int32_t start, int32_t end);
     void ReportCommandExecution(int32_t nodeId, const std::string& command);
@@ -703,8 +712,12 @@ public:
     RefPtr<SpanString> ToStyledString(int32_t start, int32_t end);
     SelectionInfo FromStyledString(const RefPtr<SpanString>& spanString);
     bool BeforeAddSymbol(RichEditorChangeValue& changeValue, const SymbolSpanOptions& options);
-    void AfterContentChange(RichEditorChangeValue& changeValue);
-    void ReportAfterContentChangeEvent();
+    void AfterContentChange(RichEditorChangeValue& changeValue,
+        const std::optional<std::u16string>& addText = std::nullopt,
+        const std::optional<std::u16string>& deleteText = std::nullopt);
+    void ReportAfterContentChangeEvent(
+        const std::optional<std::u16string>& addText = std::nullopt,
+        const std::optional<std::u16string>& deleteText = std::nullopt);
     void ReportTextChange();
     void ReportEditorEvent(const std::string& eventType);
     void DeleteToMaxLength(std::optional<int32_t> length);
@@ -811,6 +824,10 @@ public:
     void OnScrollEndCallback() override;
     bool IsScrollable() const override;
     void SetScrollable(bool scrollable);
+    bool IsReverse() const override
+    {
+        return false;
+    }
     bool IsAtomicNode() const override;
     RefPtr<FrameNode> GetClientHost() const override;
     bool IsSelectAreaVisible();
@@ -819,6 +836,7 @@ public:
     TextSpanType GetEditorType() const;
     std::string GetPlaceHolder() const;
     void HandleOnCameraInput() override;
+    void HandleOnTranslateInput();
     void HandleOnAIWrite();
     void GetAIWriteInfo(AIWriteInfo& info);
     void HandleAIWriteResult(int32_t start, int32_t end, std::vector<uint8_t>& buffer);
@@ -1062,10 +1080,41 @@ public:
         RefPtr<PageNodeInfoWrap> nodeWrap, AceAutoFillType autoFillType,
         AceAutoFillTriggerType triggerType = AceAutoFillTriggerType::AUTO_REQUEST) override;
     void DumpViewDataPageNode(RefPtr<ViewDataWrap> viewDataWrap, bool needsRecordData = false) override;
-    bool ProcessAutoFill(AceAutoFillTriggerType triggerType = AceAutoFillTriggerType::AUTO_REQUEST);
+    bool CheckAutoSave() override;
+    void FillAutoFillPageNodeInfo(const RefPtr<PageNodeInfoWrap>& info);
+    std::pair<bool, bool> ProcessAutoFill(bool isNewPassWord = false,
+        AceAutoFillTriggerType triggerType = AceAutoFillTriggerType::AUTO_REQUEST);
+    bool CheckAutoFill(AceAutoFillTriggerType triggerType);
+    void SetAutoFillTriggeredStateByType(const AceAutoFillType& autoFillType);
+    bool GetAutoFillTriggeredStateByType(const AceAutoFillType& autoFillType);
     void ProcessAutoFillOnPaste();
     void HandleOnPasswordVault();
     bool IsShowAutoFill();
+    bool IsAutoFillEnabled() const;
+    AceAutoFillType GetAutoFillType();
+    void SetFillRequestFinish(bool success) { isFillRequestFinish_ = success; }
+    bool IsFillRequestFinish() { return isFillRequestFinish_; }
+    bool IsAutoFillPasswordType(const AceAutoFillType& autoFillType);
+    bool IsAutoFillUserName(const AceAutoFillType& autoFillType);
+    bool HasAutoFillPasswordNode();
+    bool IsTriggerAutoFillPassword();
+    bool ProcessAutoFillOnFocus();
+    bool DoProcessAutoFill(RichEditorAutoFillReason autoFillReason, SourceType sourceType = SourceType::NONE);
+    bool ProcessAutoFillAndKeyboard(RichEditorAutoFillReason autoFillReason, SourceType sourceType = SourceType::NONE);
+    void SetAutoFillRequestSuccessOnFocus(bool success) { autoFillRequestSuccessOnFocus_ = success; }
+    bool IsAutoFillRequestSuccessOnFocus() const { return autoFillRequestSuccessOnFocus_; }
+    bool IsModalCovered();
+    void AutoFillValueChanged();
+    void NotifyFillRequestFailed(int32_t errCode, const std::string& fillContent = "", bool isPopup = false) override;
+    TextFieldInfo GenerateTextFieldInfo();
+    void AddAutoFillNodeInfo();
+    void RemoveAutoFillNodeInfo();
+    void UpdateAutoFillNodeInfo();
+    void SyncAutoFillNodeInfo();
+
+    void HandleAutoRequestFill(const std::u16string& fillData, const RefPtr<PageNodeInfoWrap>& nodeWrap,
+        bool fromOtherAccount);
+    void HandleOnAutoFillSecurePaste(const std::u16string& fillData);
     bool IsInterceptInput(const bool shouldCommitInput, const OperationType operationType);
 
     // local/global coordinate conversion with render transform.
@@ -1168,6 +1217,24 @@ public:
     bool RequestKeyboard(bool isFocusViewChanged, bool needStartTwinkling, bool needShowSoftKeyboard,
         SourceType sourceType = SourceType::NONE);
 
+    // Tab focus navigation (shared logic via CleanNodeHostBase CRTP)
+    bool HandleOnTab(bool backward) override;
+    bool HandleSwithFocus(FocuseIndex index);
+    void FocusForwardStopTwinkling();
+    void PaintCancelRect();
+    void PaintTextRect();
+    void GetInnerFocusPaintRect(RoundRect& paintRect);
+    bool CancelNodeIsShow() const;
+    bool ProcessFocusIndexAction();
+    bool HandleSpaceKeyClickEvent();
+    void CleanNodeResponseKeyEvent();
+    FocuseIndex GetFocusIndex() const
+    {
+        return focusIndex_;
+    }
+    const std::unordered_map<FocuseIndex, FocuseIndex>& GetFocusForwardMap() const;
+    const std::unordered_map<FocuseIndex, FocuseIndex>& GetFocusBackwardMap() const;
+
     Color GetUnderlineColor() const;
     Dimension GetUnderlineWidth() const;
     void UpdateUnderlineStyle();
@@ -1176,6 +1243,7 @@ public:
     {
         return frameRect_;
     }
+
 protected:
     RefPtr<TextSelectOverlay> GetOrCreateSelectOverlay() override;
     RefPtr<TextSelectOverlay> GetSelectOverlay() const override;
@@ -1608,6 +1676,15 @@ private:
     bool isCursorAlwaysDisplayed_ = false;
     bool isClickOnAISpan_ = false;
     bool isOnlyRequestFocus_ = false;
+
+    // Autofill request lifecycle
+    std::string lastAutoFillTextValue_;
+    bool isFillRequestFinish_ = true;
+    uint32_t autoFillSessionId_ = 0;
+    bool autoFillRequestSuccessOnFocus_ = false;
+    bool shouldSkipAutoFillOnFocus_ = false;
+    WeakPtr<FrameNode> firstAutoFillContainerNode_;
+
     int32_t moveLength_ = 0;
     int32_t insertValueLength_ = 0;
     int32_t lastCaretPosition_ = 0;
@@ -1768,6 +1845,7 @@ private:
     bool lastContentEmptyForCancel_ = true;
     bool cancelButtonDirty_ = true;
     bool cancelButtonTouched_ = false;
+    FocuseIndex focusIndex_ = FocuseIndex::TEXT;
     std::string lastReportSelectionText_ = "";
 
     // ===== counter members =====

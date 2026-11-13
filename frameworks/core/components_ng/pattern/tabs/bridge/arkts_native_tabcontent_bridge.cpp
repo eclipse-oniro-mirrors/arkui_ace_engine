@@ -16,6 +16,9 @@
 #include "core/components_ng/pattern/tabs/bridge/arkts_native_tabcontent_bridge.h"
 #include "ui/base/utils/utils.h"
 
+#include <cmath>
+#include <climits>
+
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/base/view_stack_model.h"
@@ -907,6 +910,7 @@ void TabContentBridge::RegisterTabContentAttributes(panda::Local<panda::ObjectRe
         "setTabContentOnWillShow", "resetTabContentOnWillShow",
         "setTabContentOnWillHide", "resetTabContentOnWillHide",
         "setTabBarVisibility", "resetTabBarVisibility",
+        "setSidebarSection", "resetSidebarSection",
     };
     Local<panda::JSValueRef> funcValues[] = {
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabContentBridge::Create),
@@ -925,6 +929,8 @@ void TabContentBridge::RegisterTabContentAttributes(panda::Local<panda::ObjectRe
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabContentBridge::ResetTabContentOnWillHide),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabContentBridge::SetTabBarVisibility),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabContentBridge::ResetTabBarVisibility),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabContentBridge::SetSidebarSection),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabContentBridge::ResetSidebarSection),
     };
     auto tabContent = panda::ObjectRef::NewWithNamedProperties(
         vm, ArraySize(functionNames), functionNames, funcValues);
@@ -1264,6 +1270,63 @@ ArkUINativeModuleValue TabContentBridge::ResetTabBarVisibility(ArkUIRuntimeCallI
     CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
     auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
     GetArkUINodeModifiers()->getTabContentModifier()->resetTabBarVisibility(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue TabContentBridge::SetSidebarSection(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(TABCONTENT_ARG_INDEX_0);
+    Local<JSValueRef> sectionArg = runtimeCallInfo->GetCallArgRef(TABCONTENT_ARG_INDEX_1);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+
+    std::string title;
+    if (!sectionArg.IsNull() && !sectionArg->IsUndefined() && sectionArg->IsObject(vm)) {
+        auto sectionObj = sectionArg->ToObject(vm);
+        // Parse "title" - can be string or Resource
+        Local<JSValueRef> titleVal = ArkTSUtils::GetProperty(vm, sectionObj, "title");
+        RefPtr<ResourceObject> resTitleObj;
+        if (SystemProperties::ConfigChangePerform()) {
+            if (!titleVal.IsNull() && !titleVal->IsUndefined()) {
+                ArkTSUtils::ParseJsString(vm, titleVal, title, resTitleObj);
+            }
+        } else if (!titleVal.IsNull() && !titleVal->IsUndefined()) {
+            ArkTSUtils::ParseJsString(vm, titleVal, title);
+        }
+        // Parse "order" - optional number, range [0, INT32_MAX), out-of-range treated as unset
+        Local<JSValueRef> orderVal = ArkTSUtils::GetProperty(vm, sectionObj, "order");
+        ArkUI_Bool hasOrder = false;
+        ArkUI_Int32 order = 0;
+        if (!orderVal.IsNull() && !orderVal->IsUndefined() && orderVal->IsNumber()) {
+            double orderNum = orderVal->ToNumber(vm)->Value();
+            int64_t orderInt = static_cast<int64_t>(std::floor(orderNum));
+            if (orderInt >= 0 && orderInt < static_cast<int64_t>(INT32_MAX)) {
+                order = static_cast<ArkUI_Int32>(orderInt);
+                hasOrder = true;
+            }
+        }
+        // Parse "titleStyle" - optional enum, 0=STANDARD (medium), 1=EMPHASIZED (bold)
+        Local<JSValueRef> titleStyleVal = ArkTSUtils::GetProperty(vm, sectionObj, "titleStyle");
+        ArkUI_Int32 titleStyle = 0; // default STANDARD
+        if (!titleStyleVal.IsNull() && !titleStyleVal->IsUndefined() && titleStyleVal->IsNumber()) {
+            titleStyle = static_cast<ArkUI_Int32>(titleStyleVal->ToNumber(vm)->Value());
+        }
+        GetArkUINodeModifiers()->getTabContentModifier()->setSidebarSection(
+            nativeNode, title.c_str(), hasOrder, order, titleStyle, resTitleObj.GetRawPtr());
+    }
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue TabContentBridge::ResetSidebarSection(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(0);
+    CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
+    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    GetArkUINodeModifiers()->getTabContentModifier()->resetSidebarSection(nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }
 } // namespace OHOS::Ace::NG

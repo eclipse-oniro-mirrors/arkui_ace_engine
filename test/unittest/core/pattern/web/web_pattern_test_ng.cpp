@@ -16,7 +16,6 @@
 #include <gmock/gmock.h>
 
 #include "gtest/gtest.h"
-#include "test/unittest/core/pattern/web/mock_web_delegate.h"
 
 #define private public
 #define protected public
@@ -27,6 +26,7 @@
 #include "core/components_ng/pattern/stage/page_pattern.h"
 #include "core/components_ng/pattern/stage/page_info.h"
 #include "test/mock/frameworks/core/common/mock_container.h"
+#include "test/unittest/core/pattern/web/mock_web_delegate.h"
 #undef protected
 #undef private
 

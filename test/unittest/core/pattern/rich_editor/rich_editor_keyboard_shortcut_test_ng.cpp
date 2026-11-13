@@ -501,50 +501,6 @@ HWTEST_F(RichEditorKeyboardShortcutTestNg, BeforeChangeText101, TestSize.Level0)
 }
 
 /**
- * @tc.name: GetTextThemeFontSize101
- * @tc.desc: test GetTextThemeFontSize
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorKeyboardShortcutTestNg, GetTextThemeFontSize101, TestSize.Level0)
-{
-    /**
-     * @tc.steps: step1. declare and init variables and call function.
-     */
-    ASSERT_NE(richEditorNode_, nullptr);
-    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-    auto context = PipelineContext::GetCurrentContext();
-    ASSERT_NE(context, nullptr);
-    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
-    context->SetThemeManager(themeManager);
-    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(AceType::MakeRefPtr<TextTheme>()));
-    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(AceType::MakeRefPtr<TextTheme>()));
-    auto theme = context->GetTheme<TextTheme>();
-    ASSERT_NE(theme, nullptr);
-    auto ret = richEditorPattern->GetTextThemeFontSize();
-    EXPECT_NE(ret, 0.0f);
-}
-
-/**
- * @tc.name: HandleSelectWrapper101
- * @tc.desc: test HandleSelectWrapper
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorKeyboardShortcutTestNg, HandleSelectWrapper101, TestSize.Level0)
-{
-    /**
-     * @tc.steps: step1. declare and init variables and call function.
-     */
-    ASSERT_NE(richEditorNode_, nullptr);
-    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-    OHOS::Ace::CaretMoveIntent direction = OHOS::Ace::CaretMoveIntent::Home;
-    int32_t fixedPos = 0;
-    auto ret = richEditorPattern->HandleSelectWrapper(direction, fixedPos);
-    EXPECT_EQ(ret, -1);
-}
-
-/**
  * @tc.name: HandleTripleClickEvent
  * @tc.desc: test HandleTripleClickEvent001
  * @tc.type: FUNC
@@ -631,7 +587,6 @@ HWTEST_F(RichEditorKeyboardShortcutTestNg, GetTextColorInJson001, TestSize.Level
     auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
     ASSERT_NE(themeManager, nullptr);
     EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(AceType::MakeRefPtr<RichEditorTheme>()));
-    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(AceType::MakeRefPtr<RichEditorTheme>()));
     PipelineBase::GetCurrentContext()->themeManager_ = themeManager;
     std::optional<Color> value;
     auto ret = richEditorPattern->GetTextColorInJson(value);
@@ -1390,54 +1345,6 @@ HWTEST_F(RichEditorKeyboardShortcutTestNg, ShiftMultipleSelection001, TestSize.L
     keyEvent.pressedCodes.pop_back();
     richEditorPattern->UpdateShiftFlag(keyEvent);
     EXPECT_FALSE(richEditorPattern->shiftFlag_);
-}
-
-/**
- * @tc.name: OnFocusCustomKeyboardChange
- * @tc.desc: test OnFocusCustomKeyboardChange
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorKeyboardShortcutTestNg, OnFocusCustomKeyboardChange, TestSize.Level0)
-{
-    /**
-     * @tc.steps: step1. get richEditor pattern
-     */
-    ASSERT_NE(richEditorNode_, nullptr);
-    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-    auto pipeline = richEditorPattern->GetContext();
-    auto textFieldManager = AceType::MakeRefPtr<TextFieldManagerNG>();
-    auto refPattern = AceType::MakeRefPtr<RichEditorPattern>();
-    refPattern->customKeyboardBuilder_ = []() {};
-    refPattern->isCustomKeyboardAttached_ = true;
-    auto frameNode = FrameNode::CreateFrameNode("tag", 2, refPattern, false);
-    WeakPtr<FrameNode> weakNode(frameNode);
-    textFieldManager->SetPreNode(weakNode);
-    pipeline->SetTextFieldManager(textFieldManager);
-    /**
-     * @tc.steps: step2. get richEditor controller
-     */
-    richEditorPattern->OnFocusCustomKeyboardChange();
-    richEditorPattern->customKeyboardBuilder_ = []() {};
-    richEditorPattern->isCustomKeyboardAttached_ = true;
-    RefPtr<UINode> customNode = AceType::MakeRefPtr<FrameNode>("node", 2002, AceType::MakeRefPtr<Pattern>());
-    richEditorPattern->customKeyboardNode_ = customNode;
-    richEditorPattern->keyboardOverlay_ = pipeline->GetOverlayManager();
-    richEditorPattern->OnFocusCustomKeyboardChange();
-    EXPECT_FALSE(richEditorPattern->isCustomKeyboardAttached_);
-
-    textFieldManager->SetPreNode(weakNode);
-    textFieldManager->SetCustomKeyboardContinueFeature(true);
-    pipeline->SetTextFieldManager(textFieldManager);
-    richEditorPattern->OnFocusCustomKeyboardChange();
-    EXPECT_FALSE(richEditorPattern->isCustomKeyboardAttached_);
-
-    richEditorPattern->customKeyboardNode_ =
-        AceType::MakeRefPtr<FrameNode>("node", 2003, AceType::MakeRefPtr<Pattern>());
-    EXPECT_TRUE(richEditorPattern->customKeyboardBuilder_);
-    pipeline->SetTextFieldManager(textFieldManager);
-    richEditorPattern->OnFocusCustomKeyboardChange();
-    EXPECT_FALSE(textFieldManager->NeedCloseKeyboard());
 }
 
 /**

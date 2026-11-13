@@ -346,6 +346,7 @@ HWTEST_F(XComponentV2TestNg, XComponentSurfaceLifeCycleCallback001, TestSize.Lev
     EXPECT_FALSE(surfaceHolder->node_);
     delete surfaceCallback;
     delete surfaceHolder;
+    pattern->surfaceHolder_ = nullptr;
 }
 
 /**
@@ -482,6 +483,7 @@ HWTEST_F(XComponentV2TestNg, XComponentWindowTest004, TestSize.Level1)
     pattern->OnWindowShow(); // test when hasReleasedSurface_ is not satisfied
     EXPECT_FALSE(pattern->hasReleasedSurface_);
     delete surfaceHolder;
+    pattern->surfaceHolder_ = nullptr;
 }
 
 /**
@@ -853,6 +855,36 @@ HWTEST_F(XComponentV2TestNg, CreateAndDisposeAccessibilityProviderTest, TestSize
     XComponentModelNG::DisposeAccessibilityProvider(provider);
     ASSERT_FALSE(pattern->arkuiAccessibilityProvider_);
     delete provider_invalid;
+}
+
+/**
+ * @tc.name: AccessibilityProviderLifecycleTest
+ * @tc.desc: Sequential creation, host lookup and repeated disposal preserve the provider lifecycle.
+ * @tc.type: FUNC
+ */
+HWTEST_F(XComponentV2TestNg, AccessibilityProviderLifecycleTest, TestSize.Level1)
+{
+    auto frameNode = CreateXComponentNode();
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<XComponentPatternV2>();
+    ASSERT_TRUE(pattern);
+    auto provider = static_cast<ArkUI_AccessibilityProvider*>(
+        XComponentModelNG::CreateAccessibilityProvider(AceType::RawPtr(frameNode)));
+    ASSERT_TRUE(provider);
+    EXPECT_EQ(XComponentModelNG::CreateAccessibilityProvider(AceType::RawPtr(frameNode)), provider);
+    bool valid = false;
+    auto host = XComponentPatternV2::QueryAccessibilityProviderHost(provider, valid);
+    EXPECT_TRUE(valid);
+    EXPECT_EQ(host, AceType::RawPtr(frameNode));
+
+    XComponentModelNG::DisposeAccessibilityProvider(provider);
+    EXPECT_EQ(pattern->arkuiAccessibilityProvider_, nullptr);
+    EXPECT_FALSE(XComponentPatternV2::QueryAccessibilityProviderHost(provider, valid));
+    EXPECT_FALSE(valid);
+
+    XComponentModelNG::DisposeAccessibilityProvider(provider);
+    provider = nullptr;
+    EXPECT_EQ(pattern->arkuiAccessibilityProvider_, nullptr);
 }
 
 /**

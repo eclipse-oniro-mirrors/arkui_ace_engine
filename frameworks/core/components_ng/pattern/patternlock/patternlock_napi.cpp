@@ -37,8 +37,6 @@ namespace OHOS::Ace {
 namespace {
 static constexpr const size_t MAX_ARG_NUM = 10;
 } // namespace
-std::unique_ptr<PatternLockModel> PatternLockModel::instance_ = nullptr;
-std::mutex PatternLockModel::mutex_;
 
 template<typename T>
 RefPtr<T> GetTheme()
@@ -54,13 +52,8 @@ RefPtr<T> GetTheme()
 
 PatternLockModel* PatternLockModel::GetInstance()
 {
-    if (!instance_) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (!instance_) {
-            instance_.reset(new NG::PatternLockModelNG());
-        }
-    }
-    return instance_.get();
+    static NG::PatternLockModelNG instance;
+    return &instance;
 }
 
 bool AutoResetResult(napi_env env, napi_value value)

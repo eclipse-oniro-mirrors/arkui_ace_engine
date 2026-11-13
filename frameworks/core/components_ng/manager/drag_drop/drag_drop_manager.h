@@ -919,10 +919,8 @@ private:
     int32_t BundlecurrentPullId_ = -1;
     DragBundleInfo dragBundleInfo_;
     DragAnimationType dragAnimationType_ = DragAnimationType::DEFAULT;
-#ifdef ENABLE_ROSEN_BACKEND
     OHOS::Rosen::RSSyncTransactionController* transactionController_ = nullptr;
     std::shared_ptr<Rosen::RSSyncTransactionHandler> transactionHandler_ = nullptr;
-#endif
 };
 } // namespace OHOS::Ace::NG
 

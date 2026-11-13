@@ -321,7 +321,20 @@ type TabsSidebarSearchableOptions = object;
 type TabBarDisplayMode = 'bottomTabbar' | 'sidebar' | 'topTabbar';
 type TabsBreakpointType<T> = object;
 type TabVisibility = 'visible' | 'hidden';
-
+enum SidebarSectionTitleStyle {
+    STANDARD = 0,
+    EMPHASIZED = 1
+}
+interface SidebarSection {
+    title: ResourceStr;
+    order?: number;
+    titleStyle?: SidebarSectionTitleStyle;
+}
+interface TabViewCustomization {
+    visibilityMap?: Map<number, TabVisibility>;
+    sectionMap?: Map<number, SidebarSection>;
+    orderMap?: Map<number, number>
+};
 declare class Indicator {
     left(value: LengthMetrics | undefined): this;
     top(value: LengthMetrics | undefined): this;

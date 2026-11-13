@@ -1122,6 +1122,15 @@ RefPtr<TaskExecutor> DynamicComponentRendererImpl::GetHostTaskExecutor()
     return container->GetTaskExecutor();
 }
 
+SizeF DynamicComponentRendererImpl::GetHostContentSize() const
+{
+    auto host = host_.Upgrade();
+    CHECK_NULL_RETURN(host, SizeF(0, 0));
+    auto geoNode = host->GetGeometryNode();
+    CHECK_NULL_RETURN(geoNode, SizeF(0, 0));
+    return geoNode->GetContentSize();
+}
+
 void DynamicComponentRendererImpl::Dump(RendererDumpInfo &rendererDumpInfo)
 {
     rendererDumpInfo = rendererDumpInfo_;
@@ -1173,11 +1182,24 @@ void DynamicComponentRendererImpl::NotifyForeground()
     auto taskExecutor = GetTaskExecutor();
     CHECK_NULL_VOID(taskExecutor);
     isForeground_ = true;
+    auto hostSize = GetHostContentSize();
     taskExecutor->PostTask(
-        [uiContent = uiContent_, aceLogTag = aceLogTag_]() {
+        [weak = WeakClaim(this), uiContent = uiContent_, aceLogTag = aceLogTag_, hostSize]() {
             CHECK_NULL_VOID(uiContent);
             ContainerScope scope(uiContent->GetInstanceId());
-            TAG_LOGI(aceLogTag, "NotifyForeground");
+            int32_t viewportWidth = 0;
+            int32_t viewportHeight = 0;
+            auto renderer = weak.Upgrade();
+            if (renderer) {
+                viewportWidth = renderer->viewport_.Width();
+                viewportHeight = renderer->viewport_.Height();
+            }
+            OHOS::Rosen::Rect paintRect;
+            uiContent->GetAppPaintSize(paintRect);
+            TAG_LOGW(aceLogTag, "NotifyForeground hostSize:[%{public}f x %{public}f], "
+                "viewportSize:[%{public}d x %{public}d], appPaintSize:[%{public}d x %{public}d]",
+                hostSize.Width(), hostSize.Height(), viewportWidth, viewportHeight,
+                paintRect.width_, paintRect.height_);
             uiContent->Foreground();
         },
         TaskExecutor::TaskType::UI, "ArkUIDynamicComponentNotifyForeground");
@@ -1193,11 +1215,24 @@ void DynamicComponentRendererImpl::NotifyBackground()
     auto taskExecutor = GetTaskExecutor();
     CHECK_NULL_VOID(taskExecutor);
     isForeground_ = false;
+    auto hostSize = GetHostContentSize();
     taskExecutor->PostTask(
-        [uiContent = uiContent_, aceLogTag = aceLogTag_]() {
+        [weak = WeakClaim(this), uiContent = uiContent_, aceLogTag = aceLogTag_, hostSize]() {
             CHECK_NULL_VOID(uiContent);
             ContainerScope scope(uiContent->GetInstanceId());
-            TAG_LOGI(aceLogTag, "NotifyBackground");
+            int32_t viewportWidth = 0;
+            int32_t viewportHeight = 0;
+            auto renderer = weak.Upgrade();
+            if (renderer) {
+                viewportWidth = renderer->viewport_.Width();
+                viewportHeight = renderer->viewport_.Height();
+            }
+            OHOS::Rosen::Rect paintRect;
+            uiContent->GetAppPaintSize(paintRect);
+            TAG_LOGW(aceLogTag, "NotifyBackground hostSize:[%{public}f x %{public}f], "
+                "viewportSize:[%{public}d x %{public}d], appPaintSize:[%{public}d x %{public}d]",
+                hostSize.Width(), hostSize.Height(), viewportWidth, viewportHeight,
+                paintRect.width_, paintRect.height_);
             uiContent->Background();
         },
         TaskExecutor::TaskType::UI, "ArkUIDynamicComponentNotifyBackground");

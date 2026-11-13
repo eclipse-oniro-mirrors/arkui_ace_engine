@@ -154,10 +154,10 @@ void ListItemGroupPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, con
     if (!config.IsPublicTree()) {
         json->Put("itemStartIndex", itemStartIndex_);
         json->Put("itemTotalCount", itemTotalCount_);
-    }
-    if (!config.IsPublicTree() || config.visualProperties) {
         json->Put("itemDisplayEndIndex", itemDisplayEndIndex_);
         json->Put("itemDisplayStartIndex", itemDisplayStartIndex_);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
         json->Put("headerMainSize", headerMainSize_);
         json->Put("footerMainSize", footerMainSize_);
         json->Put("spaceWidth", spaceWidth_);

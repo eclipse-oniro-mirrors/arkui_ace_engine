@@ -48,7 +48,7 @@ public:
 
 void CallBack(uint64_t nanoTimestamp, uint32_t frameCount, void* userData)
 {
-    printf("nanoTimestamp = %llu\n", nanoTimestamp);
+    printf("nanoTimestamp = %" PRIu64 "\n", nanoTimestamp);
     printf("frameCount = %d\n", frameCount);
     if (userData) {
         int* myData = (int*)userData;

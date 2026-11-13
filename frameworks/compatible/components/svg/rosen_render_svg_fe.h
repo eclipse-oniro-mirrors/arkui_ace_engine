@@ -22,7 +22,7 @@
 
 namespace OHOS::Ace {
 
-class RosenRenderSvgFe : public AceType {
+class RosenRenderSvgFe : public virtual AceType {
     DECLARE_ACE_TYPE(RosenRenderSvgFe, AceType);
 
 public:

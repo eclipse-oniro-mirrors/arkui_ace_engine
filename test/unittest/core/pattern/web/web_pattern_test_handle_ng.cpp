@@ -91,6 +91,7 @@ public:
     MOCK_METHOD(uint32_t, WritePixels, (const WritePixelsOptions& opts), (override));
     MOCK_METHOD(uint32_t, GetInnerColorGamut, (), (const override));
     MOCK_METHOD(void, SetMemoryName, (std::string pixelMapName), (const override));
+    MOCK_METHOD(bool, ReadPixel, (int32_t x, int32_t y, uint32_t& pixel), (const override));
 };
 
 class WebDelegateDummy : public WebDelegate {
@@ -113,7 +114,9 @@ public:
     void Unlock() override {}
 }; // namespace OHOS::Ace::NG
 
-class MockLayoutWrapper : public LayoutWrapper {
+class MockLayoutWrapper : public LayoutWrapper, public AceType {
+    DECLARE_ACE_TYPE(MockLayoutWrapper, LayoutWrapper, AceType);
+
 public:
     MockLayoutWrapper(WeakPtr<FrameNode> hostNode) : LayoutWrapper(std::move(hostNode)), lock_() {}
 
@@ -226,6 +229,11 @@ public:
     void SetLongPredictTask() override {}
 
 private:
+    AceType* GetLayoutOwner() const override
+    {
+        return const_cast<MockLayoutWrapper*>(this);
+    }
+
     MockRecursiveLock lock_;
 };
 } // namespace OHOS::Ace::NG

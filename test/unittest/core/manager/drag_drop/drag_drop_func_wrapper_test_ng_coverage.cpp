@@ -22,6 +22,7 @@
 #define private public
 
 #include "test/mock/adapter/ohos/osal/mock_system_properties.h"
+#include "test/mock/frameworks/base/image/mock_pixel_map.h"
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
 #include "test/mock/frameworks/core/components_ng/render/mock_render_context.h"
 #include "test/mock/frameworks/base/window/mock_drag_window.h"
@@ -46,6 +47,7 @@
 #include "core/components_ng/base/geometry_node.h"
 #include "core/components_ng/base/ui_node.h"
 #include "core/components_ng/base/view_abstract.h"
+#include "core/components_ng/event/drag_event.h"
 #include "core/components_ng/event/event_hub.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_func_wrapper.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_global_controller.h"
@@ -854,6 +856,27 @@ HWTEST_F(DragDropFuncWrapperTestNgCoverage, TestIsSelectedItemNode, TestSize.Lev
             testCase.expectResult));
         caseNum++;
     }
+}
+
+/**
+ * @tc.name: TestIsSelectedItemNodeWithoutCreatingConfiguration
+ * @tc.desc: Test IsSelectedItemNode does not create drag-related configurations for an unconfigured node.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropFuncWrapperTestNgCoverage, TestIsSelectedItemNodeWithoutCreatingConfiguration, TestSize.Level1)
+{
+    auto frameNode = FrameNode::CreateFrameNode(
+        V2::GRID_ITEM_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<GridItemPattern>(nullptr, GridItemStyle::NONE));
+    ASSERT_NE(frameNode, nullptr);
+    ASSERT_EQ(frameNode->dragDropRelatedConfigurations_, nullptr);
+
+    EXPECT_FALSE(DragDropFuncWrapper::IsSelectedItemNode(frameNode));
+    EXPECT_EQ(frameNode->dragDropRelatedConfigurations_, nullptr);
+    EXPECT_FALSE(DragEventActuator::IsSelectedItemNode(frameNode));
+    EXPECT_EQ(frameNode->dragDropRelatedConfigurations_, nullptr);
+    EXPECT_FALSE(DragDropFuncWrapper::CheckIsNeedGather(frameNode));
+    EXPECT_EQ(frameNode->dragDropRelatedConfigurations_, nullptr);
 }
 
 /**
@@ -2242,6 +2265,51 @@ HWTEST_F(DragDropFuncWrapperTestNgCoverage, ParseDragPreviewMaterialInfo004, Tes
         EXPECT_EQ(materialInfo.materialId, -1);
         EXPECT_EQ(materialInfo.materialFilter, nullptr);
     }
+}
+/**
+ * @tc.name: GetShadowInfoArrayEmpty001
+ * @tc.desc: Empty and all-null pixel map lists produce no shadow information.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropFuncWrapperTestNgCoverage, GetShadowInfoArrayEmpty001, TestSize.Level1)
+{
+    auto dragAction = std::make_shared<ArkUIInteralDragAction>();
+    dragAction->pixelMapList = { nullptr, nullptr };
+    dragAction->instanceId = 0;
+    MockContainer::Current()->pipelineContext_ = MockPipelineContext::GetCurrentContext();
+    AceEngine::Get().AddContainer(0, MockContainer::container_);
+    dragAction->callback = [](const DragNotifyMsg&, int32_t) {};
+    EXPECT_EQ(DragDropFuncWrapper::StartDragAction(dragAction), -1);
+}
+
+/**
+ * @tc.name: GetShadowInfoArrayMixed001
+ * @tc.desc: Skip null entries without losing or reordering valid shadows and their touch offsets.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropFuncWrapperTestNgCoverage, GetShadowInfoArrayMixed001, TestSize.Level1)
+{
+    auto dragAction = std::make_shared<ArkUIInteralDragAction>();
+    auto first = AceType::MakeRefPtr<MockPixelMap>();
+    auto second = AceType::MakeRefPtr<MockPixelMap>();
+    dragAction->pixelMapList = { nullptr, first, nullptr, second, nullptr };
+    dragAction->previewOption.isScaleEnabled = false;
+    dragAction->windowScale = 0.5;
+    dragAction->hasTouchPoint = true;
+    dragAction->touchPointX = 10;
+    dragAction->touchPointY = 20;
+    dragAction->instanceId = 0;
+    MockContainer::Current()->pipelineContext_ = MockPipelineContext::GetCurrentContext();
+    AceEngine::Get().AddContainer(0, MockContainer::container_);
+    dragAction->callback = [](const DragNotifyMsg&, int32_t) {};
+    EXPECT_CALL(*first, GetWidth()).Times(2).WillRepeatedly(Return(100));
+    EXPECT_CALL(*first, GetHeight()).Times(2).WillRepeatedly(Return(200));
+    EXPECT_CALL(*second, GetWidth()).Times(2).WillRepeatedly(Return(80));
+    EXPECT_CALL(*second, GetHeight()).Times(2).WillRepeatedly(Return(120));
+    EXPECT_CALL(*first, Scale(0.5f, 0.5f, AceAntiAliasingOption::HIGH)).Times(1);
+    EXPECT_CALL(*second, Scale(0.5f, 0.5f, AceAntiAliasingOption::HIGH)).Times(1);
+
+    EXPECT_EQ(DragDropFuncWrapper::StartDragAction(dragAction), 0);
 }
 
 /**
