@@ -250,6 +250,11 @@ private:
     ToastInfo toastInfo_;
     ACE_DISALLOW_COPY_AND_MOVE(ToastPattern);
     Rect wrapperRect_;
+    // Full (unshrunk) window dimensions, preserved alongside the safe-area-
+    // shrunk wrapperRect_ so that center-alignment can re-center against the
+    // full window and then clamp into the safe region.
+    float wrapperFullWidth_ = 0.0f;
+    float wrapperFullHeight_ = 0.0f;
     bool isHoverMode_ = false;
     Dimension defaultBottom_;
     bool expandDisplay_ = false;

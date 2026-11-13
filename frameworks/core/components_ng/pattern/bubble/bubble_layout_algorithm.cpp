@@ -970,8 +970,25 @@ void BubbleLayoutAlgorithm::InitProps(const RefPtr<BubbleLayoutProperty>& layout
     }
     bottom_ = safeAreaInsets.bottom_.Length();
     UpdateDumpInfo();
-    marginStart_ = (isTips_ ? TIPS_MARGIN_SPACE : MARGIN_SPACE + DRAW_EDGES_SPACE).ConvertToPx();
-    marginEnd_ = (isTips_ ? TIPS_MARGIN_SPACE : MARGIN_SPACE + DRAW_EDGES_SPACE).ConvertToPx();
+    // In landscape mode the cutout / gesture insets appear on the left/right
+    // sides. Previously marginStart_/marginEnd_ only carried the base margin, so
+    // a bubble could overlap the side cutouts. Adding the left/right safe-area
+    // insets to the horizontal margins keeps the bubble inside the safe region.
+    float safeAreaLeft = static_cast<float>(safeAreaInsets.left_.Length());
+    float safeAreaRight = static_cast<float>(safeAreaInsets.right_.Length());
+    // If the layout span is narrower than the safe-area right boundary, part of
+    // the right inset already falls outside the layout and must not be added
+    // again (avoids double-shrinking the bubble in sub-window / UEU scenarios).
+    float baseWidth = static_cast<float>(safeAreaInsets.right_.end);
+    float layoutSpan = wrapperSize_.Width();
+    float rightInsetOutsideLayout = GreatNotEqual(layoutSpan, 0.0f) ? std::max(0.0f, baseWidth - layoutSpan) : 0.0f;
+    float safeAreaRightInLayout = std::max(0.0f, safeAreaRight - rightInsetOutsideLayout);
+    marginStart_ = (isTips_ ? TIPS_MARGIN_SPACE : MARGIN_SPACE + DRAW_EDGES_SPACE).ConvertToPx() + safeAreaLeft;
+    marginEnd_ = (isTips_ ? TIPS_MARGIN_SPACE : MARGIN_SPACE + DRAW_EDGES_SPACE).ConvertToPx() + safeAreaRightInLayout;
+    TAG_LOGD(AceLogTag::ACE_OVERLAY,
+        "popup safeArea left: %{public}f, right: %{public}f, "
+        "marginStart: %{public}f, marginEnd: %{public}f",
+        safeAreaLeft, safeAreaRight, marginStart_, marginEnd_);
     marginTop_ = top_ + (isTips_ ? TIPS_MARGIN_SPACE : DRAW_EDGES_SPACE).ConvertToPx();
     marginBottom_ = bottom_ + (isTips_ ? TIPS_MARGIN_SPACE : DRAW_EDGES_SPACE).ConvertToPx();
     HandleKeyboard(layoutWrapper, showInSubWindow);

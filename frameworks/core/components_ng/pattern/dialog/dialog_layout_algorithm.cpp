@@ -1270,43 +1270,72 @@ bool DialogLayoutAlgorithm::SetAlignmentSwitch(SizeF& maxSize, const SizeF& chil
 {
     auto halfScreenHeight = maxSize.Height() / HALF;
     CaculateMaxSize(maxSize);
+    // In landscape mode the cutout / gesture insets appear on the left/right
+    // sides. Previously the horizontal alignment used maxSize.Width() directly,
+    // so a TOP/CENTER/BOTTOM dialog could overlap the side cutouts. Shrinking
+    // the layout span by the left/right safe-area insets and then shifting the
+    // result by safeAreaLeft keeps the dialog inside the safe region.
+    float safeAreaLeft = static_cast<float>(safeAreaInsets_.left_.Length());
+    float safeAreaRight = static_cast<float>(safeAreaInsets_.right_.Length());
+    float rootWidth = 0.0f;
+    auto pipelineContext = GetPipelineContext();
+    if (pipelineContext) {
+        rootWidth = pipelineContext->GetRootWidth();
+    }
+    // When maxSize.Width() equals the root width the right inset has not yet
+    // been excluded upstream, so it must be subtracted here. If the layout is
+    // already narrower than the root (e.g. sub-window), the right inset was
+    // already consumed and must not be subtracted twice.
+    bool rightInsetNotPreExcluded = GreatNotEqual(rootWidth, 0.0f) && NearEqual(maxSize.Width(), rootWidth, 0.5f);
+    float shrunkWidth = std::max(0.0f, maxSize.Width() - safeAreaLeft);
+    if (rightInsetNotPreExcluded) {
+        shrunkWidth = std::max(0.0f, shrunkWidth - safeAreaRight);
+    }
+    TAG_LOGD(AceLogTag::ACE_DIALOG,
+        "SetAlignmentSwitch safeArea left: %{public}f, right: %{public}f, "
+        "shrunkWidth: %{public}f, rightInsetNotPreExcluded: %{public}d",
+        safeAreaLeft, safeAreaRight, shrunkWidth, rightInsetNotPreExcluded);
     if (alignment_ != DialogAlignment::DEFAULT || Container::GreatOrEqualAPIVersion(PlatformVersion::VERSION_TWELVE)) {
         switch (alignment_) {
             case DialogAlignment::TOP:
-                topLeftPoint = OffsetF((maxSize.Width() - childSize.Width()) / HALF, 0.0);
+                topLeftPoint = OffsetF((shrunkWidth - childSize.Width()) / HALF, 0.0);
                 break;
             case DialogAlignment::CENTER:
                 topLeftPoint =
-                    OffsetF(maxSize.Width() - childSize.Width(), maxSize.Height() - childSize.Height()) / HALF;
+                    OffsetF(shrunkWidth - childSize.Width(), maxSize.Height() - childSize.Height()) / HALF;
                 break;
             case DialogAlignment::BOTTOM:
                 topLeftPoint =
-                    OffsetF((maxSize.Width() - childSize.Width()) / HALF, maxSize.Height() - childSize.Height());
+                    OffsetF((shrunkWidth - childSize.Width()) / HALF, maxSize.Height() - childSize.Height());
                 break;
             case DialogAlignment::TOP_START:
                 topLeftPoint = OffsetF(0.0, 0.0);
                 break;
             case DialogAlignment::TOP_END:
-                topLeftPoint = OffsetF(maxSize.Width() - childSize.Width(), 0.0);
+                topLeftPoint = OffsetF(shrunkWidth - childSize.Width(), 0.0);
                 break;
             case DialogAlignment::CENTER_START:
                 topLeftPoint = OffsetF(0.0, maxSize.Height() - childSize.Height()) / HALF;
                 break;
             case DialogAlignment::CENTER_END:
                 topLeftPoint =
-                    OffsetF(maxSize.Width() - childSize.Width(), (maxSize.Height() - childSize.Height()) / HALF);
+                    OffsetF(shrunkWidth - childSize.Width(), (maxSize.Height() - childSize.Height()) / HALF);
                 break;
             case DialogAlignment::BOTTOM_START:
                 topLeftPoint = OffsetF(0.0, maxSize.Height() - childSize.Height());
                 break;
             case DialogAlignment::BOTTOM_END:
-                topLeftPoint = OffsetF(maxSize.Width() - childSize.Width(), maxSize.Height() - childSize.Height());
+                topLeftPoint = OffsetF(shrunkWidth - childSize.Width(), maxSize.Height() - childSize.Height());
                 break;
             default:
                 topLeftPoint =
-                    OffsetF(maxSize.Width() - childSize.Width(), maxSize.Height() - childSize.Height()) / HALF;
+                    OffsetF(shrunkWidth - childSize.Width(), maxSize.Height() - childSize.Height()) / HALF;
                 break;
         }
+        // Shift the horizontally-computed X into the safe region (the
+        // shrunkWidth calculation above only shrinks the span; the origin still
+        // starts at 0, so safeAreaLeft must be added back to avoid the cutout).
+        topLeftPoint.SetX(topLeftPoint.GetX() + safeAreaLeft);
         if (alignBottomScreen_) {
             topLeftPoint.SetY(topLeftPoint.GetY() + halfScreenHeight);
         }
