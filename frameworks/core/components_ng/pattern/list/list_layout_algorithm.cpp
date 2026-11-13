@@ -2560,7 +2560,7 @@ void ListLayoutAlgorithm::UpdateItemDecodeState(LayoutWrapper* layoutWrapper, in
 {
     auto wrapper = GetListItem(layoutWrapper, idx, false, true);
     CHECK_NULL_VOID(wrapper);
-    auto itemFrameNode = AceType::DynamicCast<FrameNode>(wrapper);
+    auto itemFrameNode = wrapper->GetHostNode();
     CHECK_NULL_VOID(itemFrameNode);
     if (itemPosition_.count(idx) > 0 && itemPosition_[idx].isGroup) {
         auto groupAlgo = wrapper->GetLayoutAlgorithm(true);
