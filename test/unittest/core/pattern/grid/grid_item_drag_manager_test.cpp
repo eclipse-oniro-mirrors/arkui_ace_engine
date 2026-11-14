@@ -2015,7 +2015,7 @@ HWTEST_F(GridItemDragManagerTestNg, ScaleMainAxisNeighborNeighborNotFound001, Te
     auto manager = CreateDragManagerWithForEach();
     ASSERT_NE(manager, nullptr);
     manager->axis_ = Axis::VERTICAL;
-    auto forEach = AceType::DynamicCast<ForEachBaseNode>(manager->forEachNode_.Upgrade());
+    auto forEach = manager->forEachNode_.Upgrade();
     ASSERT_NE(forEach, nullptr);
     auto& info = GetLayoutInfo();
     RectF rect(0.0f, 0.0f, 100.0f, 100.0f);
@@ -2035,7 +2035,7 @@ HWTEST_F(GridItemDragManagerTestNg, ScaleMainAxisNeighborSelfIndex001, TestSize.
     auto manager = CreateDragManagerWithForEach();
     ASSERT_NE(manager, nullptr);
     manager->axis_ = Axis::VERTICAL;
-    auto forEach = AceType::DynamicCast<ForEachBaseNode>(manager->forEachNode_.Upgrade());
+    auto forEach = manager->forEachNode_.Upgrade();
     ASSERT_NE(forEach, nullptr);
     auto& info = GetLayoutInfo();
     RectF rect(0.0f, 0.0f, 100.0f, 100.0f);
@@ -2055,7 +2055,7 @@ HWTEST_F(GridItemDragManagerTestNg, ScaleMainAxisNeighborScalesSuccessfully001, 
     auto manager = CreateDragManagerWithForEachAndChildren();
     ASSERT_NE(manager, nullptr);
     manager->axis_ = Axis::VERTICAL;
-    auto forEach = AceType::DynamicCast<ForEachBaseNode>(manager->forEachNode_.Upgrade());
+    auto forEach = manager->forEachNode_.Upgrade();
     ASSERT_NE(forEach, nullptr);
     auto& info = GetLayoutInfo();
     auto host = manager->GetHost();
@@ -2084,7 +2084,7 @@ HWTEST_F(GridItemDragManagerTestNg, ScaleCrossAxisNeighborNeighborNotFound001, T
     auto manager = CreateDragManagerWithForEach();
     ASSERT_NE(manager, nullptr);
     manager->axis_ = Axis::VERTICAL;
-    auto forEach = AceType::DynamicCast<ForEachBaseNode>(manager->forEachNode_.Upgrade());
+    auto forEach = manager->forEachNode_.Upgrade();
     ASSERT_NE(forEach, nullptr);
     auto& info = GetLayoutInfo();
     RectF rect(0.0f, 0.0f, 100.0f, 100.0f);
@@ -2104,7 +2104,7 @@ HWTEST_F(GridItemDragManagerTestNg, ScaleCrossAxisNeighborOutOfRange001, TestSiz
     auto manager = CreateDragManagerWithForEach();
     ASSERT_NE(manager, nullptr);
     manager->axis_ = Axis::VERTICAL;
-    auto forEach = AceType::DynamicCast<ForEachBaseNode>(manager->forEachNode_.Upgrade());
+    auto forEach = manager->forEachNode_.Upgrade();
     ASSERT_NE(forEach, nullptr);
     auto& info = GetLayoutInfo();
     RectF rect(0.0f, 0.0f, 100.0f, 100.0f);
@@ -2124,7 +2124,7 @@ HWTEST_F(GridItemDragManagerTestNg, ScaleCrossAxisNeighborScalesSuccessfully001,
     auto manager = CreateDragManagerWithForEachAndChildren();
     ASSERT_NE(manager, nullptr);
     manager->axis_ = Axis::VERTICAL;
-    auto forEach = AceType::DynamicCast<ForEachBaseNode>(manager->forEachNode_.Upgrade());
+    auto forEach = manager->forEachNode_.Upgrade();
     ASSERT_NE(forEach, nullptr);
     auto& info = GetLayoutInfo();
     auto host = manager->GetHost();
@@ -2153,7 +2153,7 @@ HWTEST_F(GridItemDragManagerTestNg, ScaleDiagonalNeighborNeighborNotFound001, Te
     auto manager = CreateDragManagerWithForEach();
     ASSERT_NE(manager, nullptr);
     manager->axis_ = Axis::VERTICAL;
-    auto forEach = AceType::DynamicCast<ForEachBaseNode>(manager->forEachNode_.Upgrade());
+    auto forEach = manager->forEachNode_.Upgrade();
     ASSERT_NE(forEach, nullptr);
     auto& info = GetLayoutInfo();
     RectF rect(0.0f, 0.0f, 100.0f, 100.0f);
@@ -2172,7 +2172,7 @@ HWTEST_F(GridItemDragManagerTestNg, ScaleDiagonalNeighborScalesSuccessfully001, 
     auto manager = CreateDragManagerWithForEachAndChildren();
     ASSERT_NE(manager, nullptr);
     manager->axis_ = Axis::VERTICAL;
-    auto forEach = AceType::DynamicCast<ForEachBaseNode>(manager->forEachNode_.Upgrade());
+    auto forEach = manager->forEachNode_.Upgrade();
     ASSERT_NE(forEach, nullptr);
     auto& info = GetLayoutInfo();
     auto host = manager->GetHost();
