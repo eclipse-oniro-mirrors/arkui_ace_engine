@@ -67,10 +67,10 @@ void ApplyLowEndHeaderFooterMaterial(const RefPtr<FrameNode>& node, const RefPtr
                 .level = UiMaterialLevel::SMOOTH,
                 .colorMode = options->colorMode == ColorMode::COLOR_MODE_UNDEFINED ? colorMode : options->colorMode,
             },
-        .materialColor = options->materialColor,
         .applyShadow = options->applyShadow,
-        .dipScale = static_cast<float>(pipeline->GetDipScale()),
         .interactive = options->interactive.value_or(false),
+        .materialColor = options->materialColor,
+        .dipScale = static_cast<float>(pipeline->GetDipScale()),
     };
     renderContext->SetImmersiveMaterialConfig(config);
     renderContext->SetSystemMaterial(material->Copy());

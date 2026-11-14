@@ -84,6 +84,10 @@ struct ArkUIMaterialKeyParams {
     float dipScale = 1.0f;
 };
 
+struct ExtraGlassParam {
+    float alpha = 0.0f;
+};
+
 struct UiMaterialMapKey {
     UiMaterialLevel level;
     UiMaterialStyle style;

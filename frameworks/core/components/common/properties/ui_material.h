@@ -90,16 +90,22 @@ struct UiMaterialParam {
 
 struct ImmersiveMaterialConfig {
     UiMaterialMapKey key {};
-    std::optional<Color> materialColor = std::nullopt;
+
+    /** ------------------ enum params ------------------ */
+    MaterialColorBlendMode colorBlendMode = MaterialColorBlendMode::LINEAR_MIX;
+
+    /** ------------------ bool params ------------------ */
     bool colorInvert = false;
     bool applyShadow = true;
-    float dipScale = 1.0f;
     // the result of interactive after the calculation of component.
     bool interactive = false;
-    // Store the lightEffectOptions (color and colorResObj). nullptr means no lightEffect.
-    std::shared_ptr<LightEffectOptions> lightEffectOptions;
     // when needSplitOverlayShader is true, split material shader into base and overlay layers
     bool needSplitOverlayShader = false;
+
+    std::optional<Color> materialColor = std::nullopt;
+    float dipScale = 1.0f;
+    // Store the lightEffectOptions (color and colorResObj). nullptr means no lightEffect.
+    std::shared_ptr<LightEffectOptions> lightEffectOptions;
 
     // return true if same, return false if different.
     bool CompareLightEffectOptions(const ImmersiveMaterialConfig& other) const
@@ -108,12 +114,17 @@ struct ImmersiveMaterialConfig {
                (lightEffectOptions && other.lightEffectOptions && *lightEffectOptions == *other.lightEffectOptions);
     }
 
+    /**
+     * @notice When adding a new field to ImmersiveMaterialConfig:
+     *         1. [MUST] Add it to operator== below
+     *         2. [Optional] Add a TDD test case verifying != when only that field differs
+     */
     bool operator==(const ImmersiveMaterialConfig& other) const
     {
         return key == other.key && materialColor == other.materialColor && colorInvert == other.colorInvert &&
                applyShadow == other.applyShadow && interactive == other.interactive &&
                NearEqual(dipScale, other.dipScale) && CompareLightEffectOptions(other) &&
-               needSplitOverlayShader == other.needSplitOverlayShader;
+               needSplitOverlayShader == other.needSplitOverlayShader && colorBlendMode == other.colorBlendMode;
     }
 
     bool HasLightEffect() const
@@ -149,14 +160,14 @@ public:
     // Get material config with component scale adjustment (for drag scenario)
     static std::optional<ImmersiveMaterialConfig> GetImmersiveMaterialConfigWithScale(
         const std::shared_ptr<ImmersiveOptions>& options, const RefPtr<NG::FrameNode>& node, float componentScale);
-    static bool GetUiMaterialFilter(
-        const ImmersiveMaterialConfig& params, std::shared_ptr<Rosen::RSNGFilterBase>& filter);
+    static bool GetUiMaterialFilter(const ImmersiveMaterialConfig& params,
+        std::shared_ptr<Rosen::RSNGFilterBase>& filter, const ExtraGlassParam* extraParam);
     static bool GetUiMaterialFilterEC(
         const ImmersiveMaterialConfig& params, std::shared_ptr<Rosen::RSNGFilterBase>& filter);
-    static bool GetUiMaterialShaderECSub(
-        const ImmersiveMaterialConfig& params, std::shared_ptr<Rosen::RSNGShaderBase>& shader);
-    static bool GetUiMaterialECSubShaderOverlay(
-        const ImmersiveMaterialConfig& params, std::shared_ptr<Rosen::RSNGShaderBase>& shader);
+    static bool GetUiMaterialShaderECSub(const ImmersiveMaterialConfig& params,
+        std::shared_ptr<Rosen::RSNGShaderBase>& shader, const ExtraGlassParam* extraParam);
+    static bool GetUiMaterialECSubShaderOverlay(const ImmersiveMaterialConfig& params,
+        std::shared_ptr<Rosen::RSNGShaderBase>& shader, const ExtraGlassParam* extraParam);
     static Shadow GetImmersiveShadow(float dipScale);
     static Shadow GetImmersiveEmptyShadow();
     static MaterialState GetConfiguredMaterialState();

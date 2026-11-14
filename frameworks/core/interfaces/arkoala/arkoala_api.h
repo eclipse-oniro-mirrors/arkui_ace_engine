@@ -33,6 +33,7 @@ struct SymbolGradient;
 struct SelectParam;
 struct SelectResObjParam;
 struct ArkUIMaterialKeyParams;
+struct ExtraGlassParam;
 }
 
 namespace OHOS::Ace::NG {
@@ -171,14 +172,17 @@ struct ArkUIMaterialFuncRegistry {
 };
 typedef const ArkUIMaterialFuncRegistry* ArkUIMaterialFuncHandle;
 
-typedef void* (*ArkUICreateMaterialFilterFunc)(const OHOS::Ace::ArkUIMaterialKeyParams*);
+typedef void* (*ArkUICreateMaterialFilterFunc)(
+    const OHOS::Ace::ArkUIMaterialKeyParams*, const OHOS::Ace::ExtraGlassParam*);
 typedef void (*ArkUIReleaseMaterialFilterFunc)(void*);
-typedef void* (*ArkUICreateMaterialFilterWithSplitFunc)(const OHOS::Ace::ArkUIMaterialKeyParams*, bool);
+typedef void* (*ArkUICreateMaterialFilterWithSplitFunc)(
+    const OHOS::Ace::ArkUIMaterialKeyParams*, bool, const OHOS::Ace::ExtraGlassParam*);
+typedef void* (*ArkUICreateMaterialFilterECFunc)(const OHOS::Ace::ArkUIMaterialKeyParams*);
 typedef int32_t (*ArkUIGetEnableColorInvertFunc)(int32_t, int32_t);
 struct ArkUIMaterialFilterFuncRegistry {
     ArkUICreateMaterialFilterFunc createUiMaterialFilter;
     ArkUIReleaseMaterialFilterFunc releaseUiMaterialFilter;
-    ArkUICreateMaterialFilterFunc createUiMaterialFilterEC;
+    ArkUICreateMaterialFilterECFunc createUiMaterialFilterEC;
     ArkUIReleaseMaterialFilterFunc releaseUiMaterialFilterEC;
     ArkUICreateMaterialFilterWithSplitFunc createUiMaterialShaderECSub;
     ArkUIReleaseMaterialFilterFunc releaseUiMaterialShaderECSub;

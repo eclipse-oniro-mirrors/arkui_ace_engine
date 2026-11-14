@@ -22380,6 +22380,7 @@ typedef struct Ark_ImmersiveOptionsInner {
     Opt_Boolean applyShadow;
     Opt_Boolean interactive;
     Opt_LightEffectOptionsInner lightEffect;
+    Opt_Int32 colorBlendMode;
 } Ark_ImmersiveOptionsInner;
 typedef struct Opt_ImmersiveOptionsInner {
     Ark_Tag tag;

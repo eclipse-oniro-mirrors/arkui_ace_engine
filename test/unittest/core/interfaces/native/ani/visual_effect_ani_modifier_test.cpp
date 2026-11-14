@@ -14,9 +14,10 @@
  */
 
 #include "gtest/gtest.h"
+#include "interfaces/inner_api/ace_kit/include/ui/properties/ui_material.h"
+#include "interfaces/inner_api/ace_kit/include/ui/properties/ui_material_enums.h"
 #include "test/mock/adapter/ohos/osal/mock_system_properties.h"
 
-#include "interfaces/inner_api/ace_kit/include/ui/properties/ui_material_enums.h"
 #include "core/interfaces/ani/ani_api.h"
 #include "core/interfaces/native/ani/visual_effect_ani_modifier.h"
 
@@ -89,5 +90,35 @@ HWTEST_F(VisualEffectAniModifierTest, IsImmersiveMaterialSupportedToggle, TestSi
 
     g_isDeviceSystemMaterialSupported = true;
     EXPECT_TRUE(modifier->isImmersiveMaterialSupported());
+}
+
+/**
+ * @tc.name: ConvertToECMaterial_PreservesColorBlendMode
+ * @tc.desc: convertToECMaterial should not clear colorBlendMode (intentionally preserved per design)
+ * @tc.type: FUNC
+ */
+HWTEST_F(VisualEffectAniModifierTest, ConvertToECMaterial_PreservesColorBlendMode, TestSize.Level1)
+{
+    auto* modifier = GetVisualEffectAniModifier();
+    ASSERT_NE(modifier, nullptr);
+
+    auto* src = modifier->constructMaterial(static_cast<int32_t>(MaterialType::IMMERSIVE));
+    ASSERT_NE(src, nullptr);
+    ImmersiveOptions options;
+    options.style = UiMaterialStyle::ULTRA_THIN;
+    options.colorBlendMode = MaterialColorBlendMode::TINTED_GLASS;
+    src->SetImmersiveOptions(options);
+
+    auto* dst = modifier->constructMaterial(static_cast<int32_t>(MaterialType::IMMERSIVE));
+    ASSERT_NE(dst, nullptr);
+
+    modifier->convertToECMaterial(src, dst);
+
+    auto dstOptions = dst->GetImmersiveOptions();
+    ASSERT_NE(dstOptions, nullptr);
+    EXPECT_EQ(dstOptions->colorBlendMode, MaterialColorBlendMode::TINTED_GLASS);
+
+    modifier->destroyMaterial(src);
+    modifier->destroyMaterial(dst);
 }
 } // namespace OHOS::Ace::NG

@@ -39,6 +39,8 @@ interface ImmersiveOptionsInner {
   attribute boolean interactive;
   [Optional]
   attribute (LightEffectOptionsInner or idlize.stdlib.Null) lightEffect;
+  [Optional]
+  attribute i32 colorBlendMode;
 };
 
 [Entity=Class]

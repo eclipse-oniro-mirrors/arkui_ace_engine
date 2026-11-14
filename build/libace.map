@@ -2173,7 +2173,7 @@
       "OHOS::Ace::NG::RecoverableView::UnregisterRecoverable()";
       "OHOS::Ace::NG::RenderContext::GetHost() const";
       "OHOS::Ace::NG::RichEditorDragPattern::CreateDragNode(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, std::__h::list<OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode>, std::__h::allocator<OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode>>>&, OHOS::Ace::NG::TextDragInfo const&)";
-      "OHOS::Ace::NG::RosenEffectConverter::ConvertToFrostedGlassFilter(OHOS::Ace::FrostedGlassParam const&, float)";
+      "OHOS::Ace::NG::RosenEffectConverter::ConvertToFrostedGlassFilter(OHOS::Ace::FrostedGlassParam const&, float, OHOS::Ace::ExtraGlassParam const*)";
       "OHOS::Ace::NG::RosenRenderContext::GetBitmap(OHOS::Rosen::Drawing::Bitmap&, std::__h::shared_ptr<OHOS::Rosen::Drawing::DrawCmdList>)";
       "OHOS::Ace::NG::RosenRenderContext::GetPixelMap(std::__h::shared_ptr<OHOS::Media::PixelMap> const&, std::__h::shared_ptr<OHOS::Rosen::Drawing::DrawCmdList>, OHOS::Rosen::Drawing::RectF*)";
       "OHOS::Ace::NG::RosenRenderContext::SetHDRColorHeadRoom(float)";

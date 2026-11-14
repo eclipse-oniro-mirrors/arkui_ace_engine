@@ -23,6 +23,7 @@
 #include "core/components/theme/resource_adapter.h"
 #include "core/components/theme/theme_constants.h"
 #include "core/components_ng/render/ui_material_filter_creator.h"
+#include "core/components_v2/inspector/inspector_constants.h"
 #include "core/interfaces/arkoala/arkoala_api.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
@@ -102,6 +103,15 @@ ArkUIMaterialKeyParams ConvertToArkUIMaterialKeyParams(const ImmersiveMaterialCo
 bool IsTransparencyThin(UiMaterialTransparency transparency)
 {
     return transparency == UiMaterialTransparency::THIN || transparency == UiMaterialTransparency::GENTLE_THIN;
+}
+
+bool IsTintedGlassSupported(const RefPtr<NG::FrameNode>& node)
+{
+    if (!node) {
+        return false;
+    }
+    const auto& tag = node->GetTag();
+    return tag == V2::BUTTON_ETS_TAG || tag == V2::TOGGLE_ETS_TAG;
 }
 } // namespace
 
@@ -292,8 +302,10 @@ std::optional<ImmersiveMaterialConfig> MaterialUtils::GetImmersiveMaterialConfig
     auto materialLevel = SystemProperties::GetUiMaterialLevel();
     LowerGearLevel(materialLevel, node);
     ImmersiveMaterialConfig result {
-        .applyShadow = options->applyShadow, .dipScale = dipScale, .interactive = options->interactive.value_or(false),
-        .needSplitOverlayShader = options->needSplitOverlayShader
+        .applyShadow = options->applyShadow,
+        .interactive = options->interactive.value_or(false),
+        .needSplitOverlayShader = options->needSplitOverlayShader,
+        .dipScale = dipScale,
     };
     if (materialLevel == UiMaterialLevel::SMOOTH) {
         result.key = UiMaterialMapKey {
@@ -330,6 +342,10 @@ std::optional<ImmersiveMaterialConfig> MaterialUtils::GetImmersiveMaterialConfig
     if (ResourceParseUtilsBase::ParseResColorWithColorMode(options->colorResObj, materialColor, result.key.colorMode)) {
         result.materialColor = materialColor;
     }
+    result.colorBlendMode =
+        (options->colorBlendMode == MaterialColorBlendMode::TINTED_GLASS && IsTintedGlassSupported(node))
+            ? MaterialColorBlendMode::TINTED_GLASS
+            : MaterialColorBlendMode::LINEAR_MIX;
     return result;
 }
 
@@ -366,7 +382,7 @@ std::optional<ImmersiveMaterialConfig> MaterialUtils::GetImmersiveMaterialConfig
     // Example: scale=0.5 means 2x larger dipScale to compensate for 0.5x compression.
     float adjustedDipScale = baseDipScale / componentScale;
 
-    return GetImmersiveMaterialConfig(options, adjustedDipScale, colorMode);
+    return GetImmersiveMaterialConfig(options, adjustedDipScale, colorMode, node);
 }
 
 bool MaterialUtils::ValidColorInvert(const std::shared_ptr<ImmersiveOptions>& options, UiMaterialLevel systemLevel,
@@ -399,8 +415,8 @@ bool MaterialUtils::ValidColorInvert(const std::shared_ptr<ImmersiveOptions>& op
     return false;
 }
 
-bool MaterialUtils::GetUiMaterialFilter(
-    const ImmersiveMaterialConfig& params, std::shared_ptr<Rosen::RSNGFilterBase>& filter)
+bool MaterialUtils::GetUiMaterialFilter(const ImmersiveMaterialConfig& params,
+    std::shared_ptr<Rosen::RSNGFilterBase>& filter, const ExtraGlassParam* extraParam)
 {
 #ifndef ACE_ENGINE_IMMERSIVE_MATERIAL_CUSTOMIZED
     // do not need judge level when customized
@@ -422,7 +438,7 @@ bool MaterialUtils::GetUiMaterialFilter(
     });
     if (createFunc && releaseFunc) {
         auto arkParam = ConvertToArkUIMaterialKeyParams(params);
-        auto filterStructVoid = createFunc(&arkParam);
+        auto filterStructVoid = createFunc(&arkParam, extraParam);
         auto filterStruct = reinterpret_cast<MaterialFilterStruct*>(filterStructVoid);
         if (!filterStruct) {
             TAG_LOGW(AceLogTag::ACE_VISUAL_EFFECT, "not find param, (%{public}d, %{public}d, %{public}d)",
@@ -445,7 +461,7 @@ bool MaterialUtils::GetUiMaterialFilterEC(
         return false;
     }
 #endif
-    static ArkUICreateMaterialFilterFunc createFunc = nullptr;
+    static ArkUICreateMaterialFilterECFunc createFunc = nullptr;
     static ArkUIReleaseMaterialFilterFunc releaseFunc = nullptr;
     static std::once_flag onceFlag;
     std::call_once(onceFlag, []() {
@@ -471,8 +487,8 @@ bool MaterialUtils::GetUiMaterialFilterEC(
     return false;
 }
 
-bool MaterialUtils::GetUiMaterialShaderECSub(
-    const ImmersiveMaterialConfig& params, std::shared_ptr<Rosen::RSNGShaderBase>& shader)
+bool MaterialUtils::GetUiMaterialShaderECSub(const ImmersiveMaterialConfig& params,
+    std::shared_ptr<Rosen::RSNGShaderBase>& shader, const ExtraGlassParam* extraParam)
 {
 #ifndef ACE_ENGINE_IMMERSIVE_MATERIAL_CUSTOMIZED
     // do not need judge level when customized
@@ -492,7 +508,7 @@ bool MaterialUtils::GetUiMaterialShaderECSub(
     });
     if (createFunc && releaseFunc) {
         auto arkParam = ConvertToArkUIMaterialKeyParams(params);
-        auto shaderStructVoid = createFunc(&arkParam, params.needSplitOverlayShader);
+        auto shaderStructVoid = createFunc(&arkParam, params.needSplitOverlayShader, extraParam);
         auto shaderStruct = reinterpret_cast<MaterialShaderECSubStruct*>(shaderStructVoid);
         if (!shaderStruct) {
             TAG_LOGW(AceLogTag::ACE_VISUAL_EFFECT, "not find param, (%{public}d, %{public}d, %{public}d)",
@@ -506,8 +522,8 @@ bool MaterialUtils::GetUiMaterialShaderECSub(
     return false;
 }
 
-bool MaterialUtils::GetUiMaterialECSubShaderOverlay(
-    const ImmersiveMaterialConfig& params, std::shared_ptr<Rosen::RSNGShaderBase>& shader)
+bool MaterialUtils::GetUiMaterialECSubShaderOverlay(const ImmersiveMaterialConfig& params,
+    std::shared_ptr<Rosen::RSNGShaderBase>& shader, const ExtraGlassParam* extraParam)
 {
 #ifndef ACE_ENGINE_IMMERSIVE_MATERIAL_CUSTOMIZED
     // do not need judge level when customized
@@ -527,7 +543,7 @@ bool MaterialUtils::GetUiMaterialECSubShaderOverlay(
     });
     if (createFunc && releaseFunc) {
         auto arkParam = ConvertToArkUIMaterialKeyParams(params);
-        auto overlayShaderStructVoid = createFunc(&arkParam);
+        auto overlayShaderStructVoid = createFunc(&arkParam, extraParam);
         auto overlayShaderStruct = reinterpret_cast<MaterialShaderECSubStruct*>(overlayShaderStructVoid);
         if (!overlayShaderStruct) {
             TAG_LOGW(AceLogTag::ACE_VISUAL_EFFECT, "not find param, (%{public}d, %{public}d, %{public}d)",

@@ -9624,9 +9624,9 @@ void RosenRenderContext::UpdateForegroundFilterDistortionParam(const DistortionP
 }
 
 std::shared_ptr<Rosen::RSNGFilterBase> RosenRenderContext::CreateFrostedGlassFilter(
-    const FrostedGlassParam& param, float dipScale)
+    const FrostedGlassParam& param, float dipScale, const ExtraGlassParam* extraParam)
 {
-    return RosenEffectConverter::ConvertToFrostedGlassFilter(param, dipScale);
+    return RosenEffectConverter::ConvertToFrostedGlassFilter(param, dipScale, extraParam);
 }
 
 void RosenRenderContext::SetBackgroundNGFilterEC(const std::shared_ptr<Rosen::RSNGFilterBase>& materialFilter)
