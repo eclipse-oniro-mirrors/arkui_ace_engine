@@ -2502,9 +2502,8 @@ void FormPattern::DoSkeletonAnimation()
     CHECK_NULL_VOID(externalRenderContext);
     auto rsNode = externalRenderContext->GetRSNode();
     CHECK_NULL_VOID(rsNode);
-    auto lastFrameChild = AceType::DynamicCast<FrameNode>(skeletonNode);
-    CHECK_NULL_VOID(lastFrameChild);
-    RefPtr<OHOS::Ace::NG::RenderContext> childRenderContext = lastFrameChild->GetRenderContext();
+    CHECK_NULL_VOID(skeletonNode);
+    RefPtr<OHOS::Ace::NG::RenderContext> childRenderContext = skeletonNode->GetRenderContext();
     CHECK_NULL_VOID(childRenderContext);
 
     std::unique_ptr<FormScopedRSTransaction> formScopedRSTransaction = nullptr;
