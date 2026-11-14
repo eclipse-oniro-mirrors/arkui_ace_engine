@@ -247,7 +247,7 @@ void ScrollablePattern::CreateAnalyzerOverlay(const RefPtr<FrameNode> node)
     overlayNode->SetParent(AceType::WeakClaim(AceType::RawPtr(node)));
     overlayNode->SetActive(true);
     overlayNode->SetHitTestMode(HitTestMode::HTMTRANSPARENT);
-    auto overlayProperty = AceType::DynamicCast<LayoutProperty>(overlayNode->GetLayoutProperty());
+    auto overlayProperty = overlayNode->GetLayoutProperty();
     CHECK_NULL_VOID(overlayProperty);
     overlayProperty->SetIsOverlayNode(true);
     overlayProperty->UpdateMeasureType(MeasureType::MATCH_PARENT);
