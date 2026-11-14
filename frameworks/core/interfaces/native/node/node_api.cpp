@@ -2245,6 +2245,14 @@ ArkUI_Bool IsDebugForParallelSet()
     return AceApplicationInfo::GetInstance().IsDebugForParallelSet() ? 1 : 0;
 }
 
+ArkUI_Int32 EnableTouchPadEvent(ArkUI_Bool enabled)
+{
+    auto pipeline = PipelineContext::GetCurrentContext();
+    CHECK_NULL_RETURN(pipeline, ARKUI_ERROR_CODE_CAPI_INIT_ERROR);
+    pipeline->SetTouchPadEventEnabled(enabled);
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
 const ArkUIBasicAPI* GetBasicAPI()
 {
     CHECK_INITIALIZED_FIELDS_BEGIN(); // don't move this line
@@ -2287,6 +2295,7 @@ const ArkUIBasicAPI* GetBasicAPI()
         .isCurrentThreadSafe = IsCurrentThreadSafe,
         .isDebugForParallel = IsDebugForParallel,
         .isDebugForParallelSet = IsDebugForParallelSet,
+        .enableTouchPadEvent = EnableTouchPadEvent,
     };
     CHECK_INITIALIZED_FIELDS_END(basicImpl, 0, 0, 0); // don't move this line
     return &basicImpl;

@@ -1125,6 +1125,17 @@ int32_t OH_ArkUI_AxisEvent_HasAxis(const ArkUI_UIInputEvent* event, int32_t axis
 int32_t OH_ArkUI_PointerEvent_SetInterceptHitTestMode(const ArkUI_UIInputEvent* event, HitTestMode mode);
 
 /**
+ * @brief Enables or disables touch pad raw event reporting.
+ *
+ * @param enabled Indicates whether to enable touch pad raw event reporting. The value <b>true</b> means to enable
+ * the reporting, and <b>false</b> means to disable the reporting.
+ * @return Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful;
+ *         returns {@link ARKUI_ERROR_CODE_CAPI_INIT_ERROR} if the C API is not initialized.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_EnableTouchPadEvent(bool enabled);
+
+/**
  * @brief 获取鼠标事件的按键类型的值。
  *
  * @param event 表示指向当前UI输入事件的指针。

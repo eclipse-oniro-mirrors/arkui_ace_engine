@@ -846,6 +846,8 @@ public:
     bool IsDragging() const override;
     void SetIsDragging(bool isDragging) override;
 
+    void SetTouchPadEventEnabled(bool enabled);
+
     void ResetDragging() override;
     const RefPtr<PostEventManager>& GetPostEventManager();
 

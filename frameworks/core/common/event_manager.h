@@ -109,6 +109,8 @@ class EventManager : public NG::KeyEventManager {
     DECLARE_ACE_TYPE(EventManager, KeyEventManager);
 
 public:
+    void ClearTouchPadEvents() {}
+
     EventManager();
     ~EventManager() override;
     // After the touch down event is triggered, the touch test is performed to collect the corresponding

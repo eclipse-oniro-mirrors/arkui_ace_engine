@@ -10759,6 +10759,7 @@ struct ArkUIBasicAPI {
     ArkUI_Bool (*isCurrentThreadSafe)();
     ArkUI_Bool (*isDebugForParallel)();
     ArkUI_Bool (*isDebugForParallelSet)();
+    ArkUI_Int32 (*enableTouchPadEvent)(ArkUI_Bool enabled);
 };
 
 struct ArkUIMultiThreadManagerAPI {

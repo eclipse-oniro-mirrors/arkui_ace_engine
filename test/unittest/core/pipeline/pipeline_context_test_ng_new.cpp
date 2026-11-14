@@ -4983,5 +4983,89 @@ HWTEST_F(PipelineContextTestNg, GetDumpStartNodesKeepsLastPage, TestSize.Level1)
     EXPECT_EQ(context_->GetDumpStartNodes().pageStartNodes, (std::vector<RefPtr<FrameNode>> { lastPage }));
     context_->stageManager_ = savedStage;
 }
+
+/**
+ * @tc.name: SetTouchPadEventEnabled001
+ * @tc.desc: Test SetTouchPadEventEnabled invokes the raw-event-enable callback with true when enabling.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, SetTouchPadEventEnabled001, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    bool capturedValue = false;
+    bool callbackCalled = false;
+    context_->SetTouchPadRawEventEnableCallback(
+        [&capturedValue, &callbackCalled](bool enabled) {
+            capturedValue = enabled;
+            callbackCalled = true;
+        });
+    context_->SetTouchPadEventEnabled(true);
+    EXPECT_TRUE(callbackCalled);
+    EXPECT_TRUE(capturedValue);
+    context_->SetTouchPadRawEventEnableCallback(nullptr);
+}
+
+/**
+ * @tc.name: SetTouchPadEventEnabled002
+ * @tc.desc: Test SetTouchPadEventEnabled invokes the raw-event-enable callback with false when disabling.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, SetTouchPadEventEnabled002, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    bool capturedValue = true;
+    bool callbackCalled = false;
+    context_->SetTouchPadRawEventEnableCallback(
+        [&capturedValue, &callbackCalled](bool enabled) {
+            capturedValue = enabled;
+            callbackCalled = true;
+        });
+    context_->SetTouchPadEventEnabled(false);
+    EXPECT_TRUE(callbackCalled);
+    EXPECT_FALSE(capturedValue);
+    context_->SetTouchPadRawEventEnableCallback(nullptr);
+}
+
+/**
+ * @tc.name: SetTouchPadEventEnabled003
+ * @tc.desc: Test SetTouchPadEventEnabled does not crash when no callback is registered.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, SetTouchPadEventEnabled003, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    context_->SetTouchPadRawEventEnableCallback(nullptr);
+    context_->SetTouchPadEventEnabled(true);
+    context_->SetTouchPadEventEnabled(false);
+}
+
+/**
+ * @tc.name: SetTouchPadEventEnabled004
+ * @tc.desc: Test SetTouchPadEventEnabled does not crash when eventManager_ is null while disabling.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, SetTouchPadEventEnabled004, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    auto savedEventManager = context_->eventManager_;
+    context_->eventManager_ = nullptr;
+    context_->SetTouchPadEventEnabled(false);
+    context_->eventManager_ = savedEventManager;
+}
+
+/**
+ * @tc.name: SetTouchPadEventEnabled005
+ * @tc.desc: Test SetTouchPadEventEnabled clears touch pad events on a valid eventManager_ when disabling.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, SetTouchPadEventEnabled005, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    auto savedEventManager = context_->eventManager_;
+    context_->SetEventManager(AceType::MakeRefPtr<EventManager>());
+    ASSERT_NE(context_->eventManager_, nullptr);
+    context_->SetTouchPadEventEnabled(false);
+    context_->eventManager_ = savedEventManager;
+}
 } // namespace NG
 } // namespace OHOS::Ace

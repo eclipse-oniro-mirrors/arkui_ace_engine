@@ -9496,6 +9496,16 @@ ArkUINativeModuleValue CommonBridge::ResetOnTouch(ArkUIRuntimeCallInfo* runtimeC
     return panda::JSValueRef::Undefined(vm);
 }
 
+ArkUINativeModuleValue CommonBridge::EnableTouchPadEvent(ArkUIRuntimeCallInfo* info)
+{
+    auto* vm = info->GetVM();
+    auto pipeline = PipelineContext::GetCurrentContextSafelyWithCheck();
+    if (pipeline && info->GetCallArgRef(0)->IsBoolean()) {
+        pipeline->SetTouchPadEventEnabled(info->GetCallArgRef(0)->ToBoolean(vm)->Value());
+    }
+    return panda::JSValueRef::Undefined(vm);
+}
+
 ArkUINativeModuleValue CommonBridge::SetChainMode(ArkUIRuntimeCallInfo* runtimeCallInfo)
 {
     EcmaVM* vm = runtimeCallInfo->GetVM();

@@ -28,6 +28,7 @@ class FocusAxisEventInfo;
 using TouchRecognizerMap = std::map<WeakPtr<TouchEventTarget>, std::unordered_set<int32_t>>;
 class ACE_FORCE_EXPORT CommonBridge {
 public:
+    static ArkUINativeModuleValue EnableTouchPadEvent(ArkUIRuntimeCallInfo* info);
     static ArkUINativeModuleValue SetBackground(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue ResetBackground(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue SetBackgroundColor(ArkUIRuntimeCallInfo* runtimeCallInfo);

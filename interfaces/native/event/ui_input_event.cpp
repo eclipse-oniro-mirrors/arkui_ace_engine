@@ -3193,6 +3193,14 @@ int32_t OH_ArkUI_PointerEvent_SetInterceptHitTestMode(const ArkUI_UIInputEvent* 
     RETURN_RET_WITH_STATUS_CHECK(OHOS::Ace::ERROR_CODE_NO_ERROR, ARKUI_ERROR_CODE_NO_ERROR);
 }
 
+ArkUI_ErrorCode OH_ArkUI_EnableTouchPadEvent(bool enabled)
+{
+    CHECK_UI_THREAD("OH_ArkUI_EnableTouchPadEvent");
+    const auto* basicApi = OHOS::Ace::NodeModel::GetBasicAPI();
+    CHECK_NULL_RETURN(basicApi && basicApi->enableTouchPadEvent, ARKUI_ERROR_CODE_CAPI_INIT_ERROR);
+    return static_cast<ArkUI_ErrorCode>(basicApi->enableTouchPadEvent(enabled));
+}
+
 int32_t OH_ArkUI_PointerEvent_SetStopPropagation(const ArkUI_UIInputEvent* event, bool stopPropagation)
 {
     CHECK_UI_THREAD("OH_ArkUI_PointerEvent_SetStopPropagation");

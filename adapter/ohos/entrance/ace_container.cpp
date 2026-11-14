@@ -1395,6 +1395,12 @@ void AceContainer::InitializeCallback()
     };
     aceView_->RegisterTouchEventCallback(touchEventCallback);
 
+    pipelineContext_->SetTouchPadRawEventEnableCallback(
+        [view = aceView_](bool enabled) {
+            CHECK_NULL_VOID(view);
+            view->EnableTouchpadRawEvent(enabled);
+        });
+
     auto&& mouseEventCallback = [context = pipelineContext_, id = instanceId_](const MouseEvent& event,
                                     const std::function<void()>& markProcess,
                                     const RefPtr<OHOS::Ace::NG::FrameNode>& node) {
