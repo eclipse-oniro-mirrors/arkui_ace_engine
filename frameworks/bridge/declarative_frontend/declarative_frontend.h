@@ -276,7 +276,7 @@ public:
 
     RefPtr<Framework::FrontendDelegate> GetDelegate() const
     {
-        return AceType::DynamicCast<Framework::FrontendDelegate>(delegate_);
+        return delegate_;
     }
 
     std::string GetPagePathByUrl(const std::string& url) const override;

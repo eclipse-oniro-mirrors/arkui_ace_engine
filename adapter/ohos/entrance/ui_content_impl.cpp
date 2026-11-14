@@ -5989,7 +5989,7 @@ int32_t UIContentImpl::CreateCustomPopupUIExtension(
                 UICONTENT_IMPL_HELPER_GUARD(content, return);
                 UICONTENT_IMPL_PTR(content)->OnPopupStateChange(event, config, nodeId);
             });
-            NG::ViewAbstract::BindPopup(popupParam, targetNode, AceType::DynamicCast<NG::UINode>(uiExtNode));
+            NG::ViewAbstract::BindPopup(popupParam, targetNode, uiExtNode);
             SetCustomPopupConfig(nodeId, config, uiExtNode->GetId());
         },
         TaskExecutor::TaskType::UI, "ArkUIUIExtensionCreateCustomPopup");
@@ -6510,7 +6510,7 @@ void UIContentImpl::UpdateSingleHandTransform(const OHOS::Rosen::SingleHandTrans
 {
     auto container = Platform::AceContainer::GetContainer(instanceId_);
     CHECK_NULL_VOID(container);
-    auto aceContainer = AceType::DynamicCast<Platform::AceContainer>(container);
+    auto aceContainer = container;
     CHECK_NULL_VOID(aceContainer);
     ContainerScope scope(instanceId_);
     auto taskExecutor = Container::CurrentTaskExecutor();
@@ -7718,7 +7718,7 @@ bool UIContentImpl::SendUIExtProprty(uint32_t code, const AAFwk::Want& data,
 {
     auto container = Platform::AceContainer::GetContainer(instanceId_);
     CHECK_NULL_RETURN(container, false);
-    auto aceContainer = AceType::DynamicCast<Platform::AceContainer>(container);
+    auto aceContainer = container;
     CHECK_NULL_RETURN(aceContainer, false);
     ContainerScope scope(instanceId_);
     auto taskExecutor = Container::CurrentTaskExecutor();
@@ -7740,7 +7740,7 @@ bool UIContentImpl::SendUIExtProprtyByPersistentId(uint32_t code, const AAFwk::W
 {
     auto container = Platform::AceContainer::GetContainer(instanceId_);
     CHECK_NULL_RETURN(container, false);
-    auto aceContainer = AceType::DynamicCast<Platform::AceContainer>(container);
+    auto aceContainer = container;
     CHECK_NULL_RETURN(aceContainer, false);
     auto taskExecutor = container->GetTaskExecutor();
     CHECK_NULL_RETURN(taskExecutor, false);

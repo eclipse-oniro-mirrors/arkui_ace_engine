@@ -189,7 +189,7 @@ bool GetWebLangIfActive(const RefPtr<UINode>& node, std::string& lang)
     auto pattern = frameNode->GetPattern<WebPattern>();
     CHECK_NULL_RETURN(pattern, false);
     if (pattern->GetActiveStatus()) {
-        auto translateNode = AceType::DynamicCast<PageTranslateNode>(pattern);
+        RefPtr<PageTranslateNode> translateNode = pattern;
         CHECK_NULL_RETURN(translateNode, false);
         lang = translateNode->GetCurrentLanguage();
         return true;

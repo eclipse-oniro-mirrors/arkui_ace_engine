@@ -645,7 +645,7 @@ HWTEST_F(ContainerModelToolBarTestNg, OnToolBarLayoutChange, TestSize.Level1)
 
         // 触发工具栏布局变更
         titleMgr_->OnToolBarLayoutChange();
-        auto pipeline = AceType::DynamicCast<PipelineContext>(MockPipelineContext::GetCurrent());
+        RefPtr<PipelineContext> pipeline = MockPipelineContext::GetCurrent();
         ASSERT_NE(pipeline, nullptr);
         pipeline->taskScheduler_->FlushAfterRenderTask();
     }

@@ -73,7 +73,7 @@ ArkUI_Bool IsModifiable(ArkUINodeHandle node)
 {
     auto* currentNode = reinterpret_cast<UINode*>(node);
     CHECK_NULL_RETURN(currentNode, false);
-    auto* frameNode = AceType::DynamicCast<UINode>(currentNode);
+    auto* frameNode = currentNode;
     CHECK_NULL_RETURN(frameNode, false);
     return frameNode->GetTag() == "CustomFrameNode";
 }
@@ -289,7 +289,7 @@ ArkUI_Uint32 GetChildrenCount(ArkUINodeHandle node, ArkUI_Uint32 childrenCountMo
 {
     auto* currentNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_RETURN(currentNode, 0);
-    auto* frameNode = AceType::DynamicCast<FrameNode>(currentNode);
+    auto* frameNode = currentNode;
     CHECK_NULL_RETURN(frameNode, 0);
     auto childrenCountModeResult = static_cast<ChildrenCountMode>(childrenCountMode);
     if (childrenCountModeResult == ChildrenCountMode::ALL_EXPAND) {
@@ -306,7 +306,7 @@ ArkUINodeHandle GetChild(ArkUINodeHandle node, ArkUI_Int32 index, ArkUI_Uint32 e
 {
     auto* currentNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_RETURN(currentNode, nullptr);
-    auto* frameNode = AceType::DynamicCast<FrameNode>(currentNode);
+    auto* frameNode = currentNode;
     CHECK_NULL_RETURN(frameNode, nullptr);
     CHECK_NULL_RETURN(index >= 0, nullptr);
     auto expandModeResult = static_cast<ExpandMode>(expandMode);
@@ -337,7 +337,7 @@ ArkUI_Int32 GetFirstChildIndexWithoutExpand(ArkUINodeHandle node, ArkUI_Uint32* 
         SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(ERROR_CODE_PARAM_INVALID, "Frame node is null");
         return ERROR_CODE_PARAM_INVALID;
     }
-    auto* frameNode = AceType::DynamicCast<FrameNode>(currentNode);
+    auto* frameNode = currentNode;
     if (!frameNode) {
         SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(ERROR_CODE_PARAM_INVALID, "Frame node is null");
         return ERROR_CODE_PARAM_INVALID;
@@ -360,7 +360,7 @@ ArkUI_Int32 GetLastChildIndexWithoutExpand(ArkUINodeHandle node, ArkUI_Uint32* i
         SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(ERROR_CODE_PARAM_INVALID, "Frame node is null");
         return ERROR_CODE_PARAM_INVALID;
     }
-    auto* frameNode = AceType::DynamicCast<FrameNode>(currentNode);
+    auto* frameNode = currentNode;
     if (!frameNode) {
         SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(ERROR_CODE_PARAM_INVALID, "Frame node is null");
         return ERROR_CODE_PARAM_INVALID;
@@ -384,7 +384,7 @@ ArkUI_Int32 GetLastChildIndexWithoutExpand(ArkUINodeHandle node, ArkUI_Uint32* i
 ArkUINodeHandle GetFirst(ArkUINodeHandle node, ArkUI_Bool isExpanded)
 {
     auto* currentNode = reinterpret_cast<FrameNode*>(node);
-    auto* frameNode = AceType::DynamicCast<FrameNode>(currentNode);
+    auto* frameNode = currentNode;
     CHECK_NULL_RETURN(frameNode, nullptr);
     if (isExpanded) {
         frameNode->GetAllChildrenWithBuild(false);
@@ -681,7 +681,7 @@ ArkUINodeHandle GetLast(ArkUINodeHandle node, ArkUI_Bool isExpanded)
 {
     auto* currentNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_RETURN(currentNode, nullptr);
-    auto* frameNode = AceType::DynamicCast<FrameNode>(currentNode);
+    auto* frameNode = currentNode;
     CHECK_NULL_RETURN(frameNode, nullptr);
     size_t size = isExpanded ? frameNode->GetAllChildrenWithBuild(false).size()
                              : static_cast<size_t>(frameNode->GetTotalChildCountWithoutExpanded());

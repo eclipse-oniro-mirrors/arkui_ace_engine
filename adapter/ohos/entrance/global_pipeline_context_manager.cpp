@@ -74,10 +74,10 @@ RefPtr<NG::PipelineContext> GlobalPipelineContextManager::CreateGlobalPipelineCo
     // frontend
 #ifdef NG_BUILD
     auto frontend = AceType::MakeRefPtr<DeclarativeFrontendNG>();
-    auto declarativeFrontend = AceType::DynamicCast<DeclarativeFrontendNG>(frontend);
+    auto declarativeFrontend = frontend;
 #else
     auto frontend = AceType::MakeRefPtr<DeclarativeFrontend>();
-    auto declarativeFrontend = AceType::DynamicCast<DeclarativeFrontend>(frontend);
+    auto declarativeFrontend = frontend;
 #endif
 
     auto window = std::make_shared<NG::RosenWindow>(rsWindow, taskExecutor, instanceId, true);

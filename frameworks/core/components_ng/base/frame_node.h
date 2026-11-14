@@ -21,6 +21,7 @@
 #include <list>
 #include <mutex>
 #include <string>
+#include <type_traits>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -554,22 +555,35 @@ public:
     template<typename T>
     T* GetPatternPtr() const
     {
-        if (ACE_UNLIKELY(pattern_ && ShouldDetectAceObjTypeConvertion() && !DynamicCast<T>(pattern_))) {
-            LOGF_ABORT("bad type conversion: from [%{public}s] to [%{public}s]", GetPatternTypeName(), T::TypeName());
+        if constexpr (std::is_convertible_v<Pattern*, T*>) {
+            return static_cast<T*>(RawPtr(pattern_));
+        } else {
+            if (ACE_UNLIKELY(pattern_ && ShouldDetectAceObjTypeConvertion() && !DynamicCast<T>(pattern_))) {
+                LOGF_ABORT(
+                    "bad type conversion: from [%{public}s] to [%{public}s]", GetPatternTypeName(), T::TypeName());
+            }
+            return CastComponentPtr<T>(RawPtr(pattern_), 0);
         }
-        return CastComponentPtr<T>(RawPtr(pattern_), 0);
     }
 
     template<typename T>
     T* GetRawPattern() const
     {
-        return DynamicCast<T>(pattern_.GetRawPtr());
+        if constexpr (std::is_convertible_v<Pattern*, T*>) {
+            return static_cast<T*>(RawPtr(pattern_));
+        } else {
+            return DynamicCast<T>(pattern_.GetRawPtr());
+        }
     }
 
     template<typename T>
     RefPtr<T> GetPattern() const
     {
-        return DynamicCast<T>(pattern_);
+        if constexpr (std::is_convertible_v<Pattern*, T*>) {
+            return pattern_;
+        } else {
+            return DynamicCast<T>(pattern_);
+        }
     }
 
     template<typename T>
@@ -583,35 +597,50 @@ public:
     template<typename T>
     T* GetLayoutPropertyPtr() const
     {
-        if (ACE_UNLIKELY(layoutProperty_ && ShouldDetectAceObjTypeConvertion() &&
-                         !DynamicCast<T>(layoutProperty_))) {
-            LOGF_ABORT(
-                "bad type conversion: from [%{public}s] to [%{public}s]", GetLayoutPropertyTypeName(), T::TypeName());
+        if constexpr (std::is_convertible_v<LayoutProperty*, T*>) {
+            return static_cast<T*>(RawPtr(layoutProperty_));
+        } else {
+            if (ACE_UNLIKELY(layoutProperty_ && ShouldDetectAceObjTypeConvertion() &&
+                             !DynamicCast<T>(layoutProperty_))) {
+                LOGF_ABORT("bad type conversion: from [%{public}s] to [%{public}s]",
+                    GetLayoutPropertyTypeName(), T::TypeName());
+            }
+            return CastComponentPtr<T>(RawPtr(layoutProperty_), 0);
         }
-        return CastComponentPtr<T>(RawPtr(layoutProperty_), 0);
     }
 
     template<typename T>
     RefPtr<T> GetLayoutProperty() const
     {
-        return DynamicCast<T>(layoutProperty_);
+        if constexpr (std::is_convertible_v<LayoutProperty*, T*>) {
+            return layoutProperty_;
+        } else {
+            return DynamicCast<T>(layoutProperty_);
+        }
     }
 
     template<typename T>
     T* GetPaintPropertyPtr() const
     {
-        if (ACE_UNLIKELY(
-                paintProperty_ && ShouldDetectAceObjTypeConvertion() && !DynamicCast<T>(paintProperty_))) {
-            LOGF_ABORT(
-                "bad type conversion: from [%{public}s] to [%{public}s]", GetPaintPropertyTypeName(), T::TypeName());
+        if constexpr (std::is_convertible_v<PaintProperty*, T*>) {
+            return static_cast<T*>(RawPtr(paintProperty_));
+        } else {
+            if (ACE_UNLIKELY(paintProperty_ && ShouldDetectAceObjTypeConvertion() && !DynamicCast<T>(paintProperty_))) {
+                LOGF_ABORT("bad type conversion: from [%{public}s] to [%{public}s]", GetPaintPropertyTypeName(),
+                    T::TypeName());
+            }
+            return CastComponentPtr<T>(RawPtr(paintProperty_), 0);
         }
-        return CastComponentPtr<T>(RawPtr(paintProperty_), 0);
     }
 
     template<typename T>
     RefPtr<T> GetPaintProperty() const
     {
-        return DynamicCast<T>(paintProperty_);
+        if constexpr (std::is_convertible_v<PaintProperty*, T*>) {
+            return paintProperty_;
+        } else {
+            return DynamicCast<T>(paintProperty_);
+        }
     }
 
     template<typename T>
@@ -619,13 +648,21 @@ public:
     {
         CreateEventHubInner();
         CHECK_NULL_RETURN(eventHub_, nullptr);
-        return DynamicCast<T>(eventHub_);
+        if constexpr (std::is_convertible_v<EventHub*, T*>) {
+            return eventHub_;
+        } else {
+            return DynamicCast<T>(eventHub_);
+        }
     }
 
     template<typename T>
     RefPtr<T> GetEventHubOnly()
     {
-        return DynamicCast<T>(eventHub_);
+        if constexpr (std::is_convertible_v<EventHub*, T*>) {
+            return eventHub_;
+        } else {
+            return DynamicCast<T>(eventHub_);
+        }
     }
 
     MountPolicy GetMountPolicy();

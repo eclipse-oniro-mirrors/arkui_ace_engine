@@ -144,7 +144,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractTest002, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
     ASSERT_NE(frameNode, nullptr);
-    auto Node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto Node = frameNode;
     ASSERT_NE(Node, nullptr);
     auto layoutProperty = Node->GetLayoutProperty();
     ASSERT_NE(layoutProperty, nullptr);
@@ -336,7 +336,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractTest004, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
     ASSERT_NE(frameNode, nullptr);
-    auto Node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto Node = frameNode;
     ASSERT_NE(Node, nullptr);
     auto layoutProperty = Node->GetLayoutProperty<LayoutProperty>();
     ASSERT_NE(layoutProperty, nullptr);
@@ -416,7 +416,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractTest006, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
     ASSERT_NE(frameNode, nullptr);
-    auto Node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto Node = frameNode;
     ASSERT_NE(Node, nullptr);
     auto layoutProperty = Node->GetLayoutProperty<LayoutProperty>();
     ASSERT_NE(layoutProperty, nullptr);
@@ -500,7 +500,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractTest008, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
     ASSERT_NE(frameNode, nullptr);
-    auto Node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto Node = frameNode;
     ASSERT_NE(Node, nullptr);
     auto layoutProperty = Node->GetLayoutProperty<LayoutProperty>();
     ASSERT_NE(layoutProperty, nullptr);
@@ -600,7 +600,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractTest010, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
     ASSERT_NE(frameNode, nullptr);
-    auto Node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto Node = frameNode;
     ASSERT_NE(Node, nullptr);
     auto layoutProperty = Node->GetLayoutProperty<LayoutProperty>();
     ASSERT_NE(layoutProperty, nullptr);
@@ -717,7 +717,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractTest012, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
     ASSERT_NE(frameNode, nullptr);
-    auto Node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto Node = frameNode;
     ASSERT_NE(Node, nullptr);
     auto layoutProperty = Node->GetLayoutProperty<LayoutProperty>();
     ASSERT_NE(layoutProperty, nullptr);
@@ -867,7 +867,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractTest014, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
     ASSERT_NE(frameNode, nullptr);
-    auto Node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto Node = frameNode;
     ASSERT_NE(Node, nullptr);
     auto layoutProperty = Node->GetLayoutProperty<LayoutProperty>();
     ASSERT_NE(layoutProperty, nullptr);
@@ -975,7 +975,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractTest016, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
     ASSERT_NE(frameNode, nullptr);
-    auto Node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto Node = frameNode;
     ASSERT_NE(Node, nullptr);
     auto layoutProperty = Node->GetLayoutProperty<LayoutProperty>();
     ASSERT_NE(layoutProperty, nullptr);
@@ -1084,7 +1084,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractTest018, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
     ASSERT_NE(frameNode, nullptr);
-    auto Node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto Node = frameNode;
     ASSERT_NE(Node, nullptr);
     auto layoutProperty = Node->GetLayoutProperty<LayoutProperty>();
     ASSERT_NE(layoutProperty, nullptr);
@@ -1187,7 +1187,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractTest020, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
     ASSERT_NE(frameNode, nullptr);
-    auto Node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto Node = frameNode;
     ASSERT_NE(Node, nullptr);
     auto layoutProperty = Node->GetLayoutProperty<LayoutProperty>();
     ASSERT_NE(layoutProperty, nullptr);
@@ -1269,7 +1269,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractTest022, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
     ASSERT_NE(frameNode, nullptr);
-    auto Node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto Node = frameNode;
     ASSERT_NE(Node, nullptr);
     auto layoutProperty = Node->GetLayoutProperty<LayoutProperty>();
     ASSERT_NE(layoutProperty, nullptr);
@@ -1347,7 +1347,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractTest024, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
     ASSERT_NE(frameNode, nullptr);
-    auto Node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto Node = frameNode;
     ASSERT_NE(Node, nullptr);
     auto layoutProperty = Node->GetLayoutProperty<LayoutProperty>();
     ASSERT_NE(layoutProperty, nullptr);

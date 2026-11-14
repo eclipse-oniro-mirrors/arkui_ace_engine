@@ -390,7 +390,7 @@ public:
     {
         auto host = GetHost();
         CHECK_NULL_RETURN(host, nullptr);
-        return DynamicCast<T>(host->GetLayoutProperty<T>());
+        return host->GetLayoutProperty<T>();
     }
 
     template<typename T>
@@ -398,7 +398,7 @@ public:
     {
         auto host = GetHost();
         CHECK_NULL_RETURN(host, nullptr);
-        return DynamicCast<T>(host->GetPaintProperty<T>());
+        return host->GetPaintProperty<T>();
     }
 
     template<typename T>
@@ -406,7 +406,7 @@ public:
     {
         auto host = GetHost();
         CHECK_NULL_RETURN(host, nullptr);
-        return DynamicCast<T>(host->GetEventHub<T>());
+        return host->GetEventHub<T>();
     }
 
     void MarkDirty(PropertyChangeFlag flag = PROPERTY_UPDATE_MEASURE_SELF);

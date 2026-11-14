@@ -377,7 +377,7 @@ HWTEST_F(ContainerModelToolBarTestNg, SetToolbarBuilder001, TestSize.Level1)
     auto& items = titleMgr_->itemsWillOnTree_[parentNode];
     EXPECT_EQ(items.size(), 1);
     EXPECT_EQ(parentNode->removeToolbarItemCallbacks_.size(), 1);
-    auto pipeline = AceType::DynamicCast<PipelineContext>(MockPipelineContext::GetCurrent());
+    RefPtr<PipelineContext> pipeline = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipeline, nullptr);
     pipeline->taskScheduler_->FlushAfterRenderTask();
 }
@@ -422,7 +422,7 @@ HWTEST_F(ContainerModelToolBarTestNg, SetToolbarBuilder002, TestSize.Level1)
     ret = titleMgr_->itemsWillOnTree_[parentNode].size();
     EXPECT_EQ(ret, 0);
 
-    auto pipeline = AceType::DynamicCast<PipelineContext>(MockPipelineContext::GetCurrent());
+    RefPtr<PipelineContext> pipeline = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipeline, nullptr);
     pipeline->taskScheduler_->FlushAfterRenderTask();
 }
@@ -1326,7 +1326,7 @@ HWTEST_F(ContainerModelToolBarTestNg, OnToolBarLayoutChange, TestSize.Level1)
         titleMgr_->toolbarManager_->SetNavDestInfo(navDestInfo_);
 
         titleMgr_->OnToolBarLayoutChange();
-        auto pipeline = AceType::DynamicCast<PipelineContext>(MockPipelineContext::GetCurrent());
+        RefPtr<PipelineContext> pipeline = MockPipelineContext::GetCurrent();
         ASSERT_NE(pipeline, nullptr);
         pipeline->taskScheduler_->FlushAfterRenderTask();
     }
@@ -2889,7 +2889,7 @@ HWTEST_F(ContainerModelToolBarTestNg, ToolbarManager_SetNavigationModeChangeCall
 HWTEST_F(ContainerModelToolBarTestNg, FocusEventTest_003, TestSize.Level1)
 {
     CreateContainerModal();
-    auto pipeline = AceType::DynamicCast<PipelineContext>(MockPipelineContext::GetCurrent());
+    RefPtr<PipelineContext> pipeline = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipeline, nullptr);
     auto rootNode = pipeline->rootNode_;
     ASSERT_NE(rootNode, nullptr);
@@ -2939,7 +2939,7 @@ HWTEST_F(ContainerModelToolBarTestNg, FocusEventTest_003, TestSize.Level1)
 HWTEST_F(ContainerModelToolBarTestNg, ToolBarRowPatternGetNextFocusNodeTest_001, TestSize.Level1)
 {
     CreateContainerModal();
-    auto pipeline = AceType::DynamicCast<PipelineContext>(MockPipelineContext::GetCurrent());
+    RefPtr<PipelineContext> pipeline = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipeline, nullptr);
     auto rootNode = pipeline->rootNode_;
     ASSERT_NE(rootNode, nullptr);
@@ -2978,7 +2978,7 @@ HWTEST_F(ContainerModelToolBarTestNg, ToolBarRowPatternGetNextFocusNodeTest_001,
 HWTEST_F(ContainerModelToolBarTestNg, ToolBarRowPatternGetNextFocusNodeTest_002, TestSize.Level1)
 {
     CreateContainerModal();
-    auto pipeline = AceType::DynamicCast<PipelineContext>(MockPipelineContext::GetCurrent());
+    RefPtr<PipelineContext> pipeline = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipeline, nullptr);
     auto rootNode = pipeline->rootNode_;
     ASSERT_NE(rootNode, nullptr);
@@ -3020,7 +3020,7 @@ HWTEST_F(ContainerModelToolBarTestNg, ToolBarRowPatternGetNextFocusNodeTest_002,
 HWTEST_F(ContainerModelToolBarTestNg, ToolBarRowPatternGetNextFocusNodeTest_003, TestSize.Level1)
 {
     CreateContainerModal();
-    auto pipeline = AceType::DynamicCast<PipelineContext>(MockPipelineContext::GetCurrent());
+    RefPtr<PipelineContext> pipeline = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipeline, nullptr);
     auto rootNode = pipeline->rootNode_;
     ASSERT_NE(rootNode, nullptr);
@@ -3063,7 +3063,7 @@ HWTEST_F(ContainerModelToolBarTestNg, ToolBarRowPatternGetNextFocusNodeTest_003,
 HWTEST_F(ContainerModelToolBarTestNg, ToolBarRowPatternGetNextFocusNodeTest_004, TestSize.Level1)
 {
     CreateContainerModal();
-    auto pipeline = AceType::DynamicCast<PipelineContext>(MockPipelineContext::GetCurrent());
+    RefPtr<PipelineContext> pipeline = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipeline, nullptr);
     auto rootNode = pipeline->rootNode_;
     ASSERT_NE(rootNode, nullptr);
@@ -3115,7 +3115,7 @@ HWTEST_F(ContainerModelToolBarTestNg, ToolBarRowPatternGetNextFocusNodeTest_004,
 HWTEST_F(ContainerModelToolBarTestNg, ToolBarRowPatternGetNextFocusNodeTest_005, TestSize.Level1)
 {
     CreateContainerModal();
-    auto pipeline = AceType::DynamicCast<PipelineContext>(MockPipelineContext::GetCurrent());
+    RefPtr<PipelineContext> pipeline = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipeline, nullptr);
     auto rootNode = pipeline->rootNode_;
     ASSERT_NE(rootNode, nullptr);

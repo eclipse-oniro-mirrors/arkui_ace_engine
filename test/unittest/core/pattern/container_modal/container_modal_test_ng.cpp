@@ -943,7 +943,7 @@ HWTEST_F(ContainerModelTestNg, AddButtonOnEvent, TestSize.Level1)
  */
 HWTEST_F(ContainerModelTestNg, ConfigCustomWindowMask, TestSize.Level1)
 {
-    auto pipeline = AceType::DynamicCast<PipelineContext>(MockPipelineContext::GetCurrent());
+    RefPtr<PipelineContext> pipeline = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipeline, nullptr);
     ASSERT_NE(pipeline->rootNode_, nullptr);
     EXPECT_FALSE(ContainerModalView::ConfigCustomWindowMask(pipeline, true));

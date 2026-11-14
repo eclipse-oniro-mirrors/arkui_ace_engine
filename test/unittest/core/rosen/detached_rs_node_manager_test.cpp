@@ -65,7 +65,7 @@ public:
         if (withWindow) {
             pipeline->window_ = std::make_shared<NiceMock<MockWindow>>();
         }
-        auto pipelineBase = AceType::DynamicCast<PipelineBase>(pipeline);
+        RefPtr<PipelineBase> pipelineBase = pipeline;
         MockContainer::SetUp(pipelineBase);
         auto taskExecutor = AceType::MakeRefPtr<MockTaskExecutor>();
         MockContainer::Current()->SetTaskExecutor(taskExecutor);
@@ -152,7 +152,7 @@ HWTEST_F(DetachedRsNodeManagerTest, PreFreezeFlushForAllContexts_NullCheckPaths,
 
     // Branch C3: taskExecutor==null
     MockPipelineContext::SetUp();
-    auto pipelineBase = AceType::DynamicCast<PipelineBase>(MockPipelineContext::GetCurrent());
+    RefPtr<PipelineBase> pipelineBase = MockPipelineContext::GetCurrent();
     MockContainer::SetUp(pipelineBase);
     MockContainer::Current()->SetTaskExecutor(nullptr);
 
