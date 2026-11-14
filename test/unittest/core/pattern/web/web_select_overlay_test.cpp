@@ -7625,6 +7625,27 @@ protected:
 };
 
 /**
+ * @tc.name: MenuOptionsShowsSupportedTranslationInput
+ * @tc.desc: A single caret with the native capability and menu eligibility exposes translation input.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebTranslateInputActionTest, MenuOptionsShowsSupportedTranslationInput, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto params = std::make_shared<NWebQuickMenuParamsSelectImpl>();
+    SelectOverlayInfo info;
+    info.isSingleHandle = true;
+    auto oldFlags = g_editStateFlags;
+    g_editStateFlags = NWebQuickMenuParams::QM_EF_CAN_TRANSLATE_INPUT;
+    overlay_->SetMenuOptions(info, params, callback_);
+    g_editStateFlags = oldFlags;
+    EXPECT_TRUE(info.menuInfo.showTranslateInput);
+    EXPECT_EQ(overlay_->eligibilityQueries_, 1);
+    EXPECT_EQ(callback_->calls_, 0);
+#endif
+}
+
+/**
  * @tc.name: ContinueUsesTranslationCommandAndConsumesEntry
  * @tc.desc: A supported click dispatches once with the native command and mouse flag.
  * @tc.type: FUNC
