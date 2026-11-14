@@ -2043,4 +2043,272 @@ HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest01
 #endif
 }
 
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest012
+ * @tc.desc: Test RegisterBrandColorChangeListener registers per-node callback in storage
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest012, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    auto host = pattern->GetHost();
+    ASSERT_NE(host, nullptr);
+
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    ASSERT_NE(storage, nullptr);
+    storage->UnregisterBrandColorChangeListener(pattern->instanceId_, host->GetId());
+
+    pattern->RegisterBrandColorChangeListener();
+    EXPECT_FALSE(storage->brandColorChangeListeners_[pattern->instanceId_].empty());
+
+    pattern->UnRegisterBrandColorChangeListener();
+    EXPECT_TRUE(storage->brandColorChangeListeners_.find(pattern->instanceId_) ==
+                storage->brandColorChangeListeners_.end());
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest013
+ * @tc.desc: Test RegisterBrandColorChangeListener is idempotent when called multiple times
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest013, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    auto host = pattern->GetHost();
+    ASSERT_NE(host, nullptr);
+
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    ASSERT_NE(storage, nullptr);
+    storage->UnregisterBrandColorChangeListener(pattern->instanceId_, host->GetId());
+
+    pattern->RegisterBrandColorChangeListener();
+    pattern->RegisterBrandColorChangeListener();
+    EXPECT_EQ(storage->brandColorChangeListeners_[pattern->instanceId_].size(), 1u);
+
+    pattern->UnRegisterBrandColorChangeListener();
+    EXPECT_TRUE(storage->brandColorChangeListeners_.find(pattern->instanceId_) ==
+                storage->brandColorChangeListeners_.end());
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest014
+ * @tc.desc: Test UnRegisterBrandColorChangeListener no-op when not registered
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest014, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    ASSERT_NE(storage, nullptr);
+
+    pattern->UnRegisterBrandColorChangeListener();
+    EXPECT_TRUE(storage->brandColorChangeListeners_.find(pattern->instanceId_) ==
+                storage->brandColorChangeListeners_.end());
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest015
+ * @tc.desc: Test NotifyBrandColorChange triggers the registered SUEC listener
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest015, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    auto host = pattern->GetHost();
+    ASSERT_NE(host, nullptr);
+    ValidSessionWrapper(pattern);
+    pattern->state_ = SecurityUIExtensionPattern::AbilityState::FOREGROUND;
+    pattern->isUeaConnecting_ = true;
+
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    ASSERT_NE(storage, nullptr);
+    storage->UnregisterBrandColorChangeListener(pattern->instanceId_, host->GetId());
+    pattern->RegisterBrandColorChangeListener();
+
+    pattern->lastSentBrandColorStr_ = "#FFAABBCC";
+    storage->NotifyBrandColorChange(pattern->instanceId_, std::make_optional<Color>(0xFF00FF00),
+        std::nullopt);
+    EXPECT_NE(pattern->lastSentBrandColorStr_, "#FFAABBCC");
+
+    pattern->UnRegisterBrandColorChangeListener();
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest016
+ * @tc.desc: Test NotifyBrandColorChange does not fire after Unregister
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest016, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    auto host = pattern->GetHost();
+    ASSERT_NE(host, nullptr);
+    ValidSessionWrapper(pattern);
+    pattern->state_ = SecurityUIExtensionPattern::AbilityState::FOREGROUND;
+    pattern->isUeaConnecting_ = true;
+
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    ASSERT_NE(storage, nullptr);
+    storage->UnregisterBrandColorChangeListener(pattern->instanceId_, host->GetId());
+    pattern->RegisterBrandColorChangeListener();
+    pattern->UnRegisterBrandColorChangeListener();
+
+    pattern->lastSentBrandColorStr_ = "#FFAABBCC";
+    storage->NotifyBrandColorChange(pattern->instanceId_, std::make_optional<Color>(0xFF00FF00),
+        std::nullopt);
+    EXPECT_EQ(pattern->lastSentBrandColorStr_, "#FFAABBCC");
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest017
+ * @tc.desc: Test ResolveBrandColor returns DEFAULT_BRAND_COLOR_STR when storage returns nullopt
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest017, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    auto result = pattern->ResolveBrandColor(7777);
+    EXPECT_EQ(result, DEFAULT_BRAND_COLOR_STR);
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest018
+ * @tc.desc: Test OnThemeScopeUpdate invokes ResolveBrandColor and updates brandColorStr_
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest018, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    auto result = pattern->OnThemeScopeUpdate(7777);
+    EXPECT_TRUE(result);
+    EXPECT_EQ(pattern->brandColorStr_, DEFAULT_BRAND_COLOR_STR);
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest019
+ * @tc.desc: Test OnDetachContext unregisters brand color listener
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest019, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    auto host = pattern->GetHost();
+    ASSERT_NE(host, nullptr);
+
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    ASSERT_NE(storage, nullptr);
+    storage->UnregisterBrandColorChangeListener(pattern->instanceId_, host->GetId());
+    pattern->RegisterBrandColorChangeListener();
+    ASSERT_FALSE(storage->brandColorChangeListeners_.empty());
+
+    auto pipeline = NG::PipelineContext::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+    pattern->hasAttachContext_ = true;
+    pattern->OnDetachContext(pipeline);
+    EXPECT_FALSE(pattern->hasAttachContext_);
+    EXPECT_TRUE(storage->brandColorChangeListeners_.find(pattern->instanceId_) ==
+                storage->brandColorChangeListeners_.end());
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest020
+ * @tc.desc: Test OnDetachContext with null context still unregisters listener
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest020, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    auto host = pattern->GetHost();
+    ASSERT_NE(host, nullptr);
+
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    ASSERT_NE(storage, nullptr);
+    storage->UnregisterBrandColorChangeListener(pattern->instanceId_, host->GetId());
+    pattern->RegisterBrandColorChangeListener();
+    ASSERT_FALSE(storage->brandColorChangeListeners_.empty());
+
+    pattern->hasAttachContext_ = true;
+    pattern->OnDetachContext(nullptr);
+    EXPECT_FALSE(pattern->hasAttachContext_);
+    EXPECT_FALSE(storage->brandColorChangeListeners_.empty());
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest021
+ * @tc.desc: Test two SUEC patterns on same instance register distinct nodeId callbacks
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest021, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern1 = CreateSecurityUEC();
+    ASSERT_NE(pattern1, nullptr);
+    auto host1 = pattern1->GetHost();
+    ASSERT_NE(host1, nullptr);
+
+    auto pattern2 = CreateSecurityUEC();
+    ASSERT_NE(pattern2, nullptr);
+    auto host2 = pattern2->GetHost();
+    ASSERT_NE(host2, nullptr);
+    pattern2->instanceId_ = pattern1->instanceId_;
+
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    ASSERT_NE(storage, nullptr);
+    storage->UnregisterBrandColorChangeListener(pattern1->instanceId_, host1->GetId());
+    storage->UnregisterBrandColorChangeListener(pattern1->instanceId_, host2->GetId());
+
+    pattern1->RegisterBrandColorChangeListener();
+    pattern2->RegisterBrandColorChangeListener();
+    EXPECT_EQ(storage->brandColorChangeListeners_[pattern1->instanceId_].size(), 2u);
+
+    pattern1->UnRegisterBrandColorChangeListener();
+    EXPECT_EQ(storage->brandColorChangeListeners_[pattern1->instanceId_].size(), 1u);
+
+    pattern2->UnRegisterBrandColorChangeListener();
+    EXPECT_TRUE(storage->brandColorChangeListeners_.find(pattern1->instanceId_) ==
+                storage->brandColorChangeListeners_.end());
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest022
+ * @tc.desc: Test GetBrandColorStr uses themeScopeId 0 when host is null
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest022, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    auto brandColorStr = pattern->GetBrandColorStr();
+    EXPECT_FALSE(brandColorStr.empty());
+#endif
+}
 } //namespace OHOS::Ace::NG
