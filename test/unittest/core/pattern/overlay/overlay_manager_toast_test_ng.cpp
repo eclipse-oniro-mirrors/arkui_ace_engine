@@ -2252,7 +2252,7 @@ HWTEST_F(OverlayManagerToastTestNg, CalculateTitleBarHeightForTopAlignment001, T
      * @tc.steps: step3. Set container modal title height in mock pipeline.
      * @tc.expected: Title bar height is configured successfully.
      */
-    auto mockPipeline = AceType::DynamicCast<MockPipelineContext>(pipelineContext);
+    auto mockPipeline = pipelineContext;
     ASSERT_NE(mockPipeline, nullptr);
     const int32_t titleBarHeight = 50;
     mockPipeline->SetContainerModalTitleHeight(titleBarHeight);
@@ -2299,7 +2299,7 @@ HWTEST_F(OverlayManagerToastTestNg, CalculateTitleBarHeightForTopAlignment002, T
      * @tc.steps: step3. Set container modal title height in mock pipeline.
      * @tc.expected: Title bar height is configured successfully.
      */
-    auto mockPipeline = AceType::DynamicCast<MockPipelineContext>(pipelineContext);
+    auto mockPipeline = pipelineContext;
     ASSERT_NE(mockPipeline, nullptr);
     const int32_t titleBarHeight = 50;
     mockPipeline->SetContainerModalTitleHeight(titleBarHeight);
@@ -2338,7 +2338,7 @@ HWTEST_F(OverlayManagerToastTestNg, CalculateTitleBarHeightForTopAlignment003, T
     auto pipelineContext = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipelineContext, nullptr);
 
-    auto mockPipeline = AceType::DynamicCast<MockPipelineContext>(pipelineContext);
+    auto mockPipeline = pipelineContext;
     ASSERT_NE(mockPipeline, nullptr);
     mockPipeline->SetContainerModalTitleHeight(50);
 
@@ -2420,7 +2420,7 @@ HWTEST_F(OverlayManagerToastTestNg, CalculateTitleBarHeightForTopAlignment004, T
      * @tc.steps: step3. Set title bar height and configure SYSTEM_TOP_MOST mode.
      * @tc.expected: Mock pipeline and toast property are configured successfully.
      */
-    auto mockPipeline = AceType::DynamicCast<MockPipelineContext>(pipelineContext);
+    auto mockPipeline = pipelineContext;
     ASSERT_NE(mockPipeline, nullptr);
     mockPipeline->SetContainerModalTitleHeight(50);
 
@@ -2498,7 +2498,7 @@ HWTEST_F(OverlayManagerToastTestNg, CalculateTitleBarHeightForTopAlignment005, T
      * @tc.steps: step3. Set title bar height and configure SYSTEM_TOP_MOST mode with nullptr subwindow.
      * @tc.expected: Current container id is valid and GetSystemToastWindow returns nullptr.
      */
-    auto mockPipeline = AceType::DynamicCast<MockPipelineContext>(pipelineContext);
+    auto mockPipeline = pipelineContext;
     ASSERT_NE(mockPipeline, nullptr);
     mockPipeline->SetContainerModalTitleHeight(50);
 
@@ -2682,7 +2682,7 @@ HWTEST_F(OverlayManagerToastTestNg, CalculateTitleBarHeightForTopAlignment009, T
      * @tc.steps: step3. Set SYSTEM_TOP_MOST and configure title bar height.
      * @tc.expected: Mock pipeline and toast property are configured successfully.
      */
-    auto mockPipeline = AceType::DynamicCast<MockPipelineContext>(pipelineContext);
+    auto mockPipeline = pipelineContext;
     ASSERT_NE(mockPipeline, nullptr);
     const int32_t titleBarHeight = 50;
     mockPipeline->SetContainerModalTitleHeight(titleBarHeight);
@@ -2759,7 +2759,7 @@ HWTEST_F(OverlayManagerToastTestNg, CalculateTitleBarHeightForTopAlignment010, T
      * Configure container modal title height as invalid.
      * @tc.expected: Fallback branch uses custom title height.
      */
-    auto mockPipeline = AceType::DynamicCast<MockPipelineContext>(pipelineContext);
+    auto mockPipeline = pipelineContext;
     ASSERT_NE(mockPipeline, nullptr);
     toastProp->UpdateShowMode(ToastShowMode::DEFAULT);
     mockPipeline->SetContainerModalTitleHeight(0);
@@ -2795,7 +2795,7 @@ HWTEST_F(OverlayManagerToastTestNg, CalculateTitleBarHeightForTopAlignment011, T
     auto toastProp = AceType::DynamicCast<ToastLayoutProperty>(layoutWrapper->GetLayoutProperty());
     ASSERT_NE(toastProp, nullptr);
 
-    auto mockPipeline = AceType::DynamicCast<MockPipelineContext>(pipelineContext);
+    auto mockPipeline = pipelineContext;
     ASSERT_NE(mockPipeline, nullptr);
     const int32_t titleBarHeight = 50;
     mockPipeline->SetContainerModalTitleHeight(titleBarHeight);

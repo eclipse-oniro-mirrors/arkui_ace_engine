@@ -36,7 +36,7 @@ public:
     RefPtr<PaintProperty> Clone() const override
     {
         auto value = MakeRefPtr<SelectPaintProperty>();
-        value->PaintProperty::UpdatePaintProperty(DynamicCast<PaintProperty>(this));
+        value->PaintProperty::UpdatePaintProperty(this);
         value->propBackgroundColor_ = CloneBackgroundColor();
         return value;
     }

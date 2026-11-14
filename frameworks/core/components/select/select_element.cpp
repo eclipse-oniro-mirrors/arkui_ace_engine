@@ -102,12 +102,7 @@ void SelectElement::PerformBuild()
 
     dataComponent_ = component;
 
-    auto focusNode = AceType::DynamicCast<FocusNode>(this);
-    if (!focusNode) {
-        LOGE("select: can not dynamicCast to focusNode.");
-        return;
-    }
-    focusNode->SetFocusable(!component->GetDisabled());
+    SetFocusable(!component->GetDisabled());
 
     SoleChildElement::PerformBuild();
 }
@@ -132,7 +127,7 @@ void SelectElement::HandleClickedEvent()
         return;
     }
 
-    RefPtr<SelectPopupComponent> selectPopup = AceType::DynamicCast<SelectPopupComponent>(select->GetPopup());
+    RefPtr<SelectPopupComponent> selectPopup = select->GetPopup();
     if (!selectPopup) {
         LOGE("select: the type of popup component is not SelectPopupComponent.");
         return;

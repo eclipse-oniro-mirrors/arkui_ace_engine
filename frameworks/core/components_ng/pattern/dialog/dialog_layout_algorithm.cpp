@@ -92,7 +92,7 @@ void DialogLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     CHECK_NULL_VOID(dialogTheme_);
     auto navigationManager = pipeline->GetNavigationManager();
     CHECK_NULL_VOID(navigationManager);
-    auto forceSplitMgr = AceType::DynamicCast<ForceSplitManager>(pipeline->GetForceSplitManager());
+    auto forceSplitMgr = pipeline->GetForceSplitManager();
     CHECK_NULL_VOID(forceSplitMgr);
     NG::RectF floatButtons;
     dialogPattern->GetWindowButtonRect(floatButtons);
@@ -570,7 +570,7 @@ void DialogLayoutAlgorithm::AnalysisLayoutOfTitle(const RefPtr<LayoutWrapper>& t
     }
     auto textNode = AceType::DynamicCast<FrameNode>(title->GetChildByIndex(ROW_CHILD_INDEX));
     CHECK_NULL_VOID(textNode);
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(textNode->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = textNode->GetLayoutAlgorithm();
     CHECK_NULL_VOID(layoutAlgorithmWrapper);
     auto textLayoutAlgorithm = DynamicCast<TextLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_VOID(textLayoutAlgorithm);
@@ -595,7 +595,7 @@ void DialogLayoutAlgorithm::AnalysisLayoutOfContent(LayoutWrapper* layoutWrapper
     if (!Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY_SIX)) {
         textLayoutProperty->UpdateWordBreak(dialogPattern->GetDialogProperties().wordBreak);
     }
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(text->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = text->GetLayoutAlgorithm();
     CHECK_NULL_VOID(layoutAlgorithmWrapper);
     auto textLayoutAlgorithm = DynamicCast<TextLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_VOID(textLayoutAlgorithm);

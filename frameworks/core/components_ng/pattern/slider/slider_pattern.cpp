@@ -685,7 +685,7 @@ bool SliderPattern::InitAccessibilityVirtualNode()
     UpdateStepAccessibilityVirtualNode();
     UpdateParentNodeSize();
     parentAccessibilityNode_->SetAccessibilityNodeVirtual();
-    parentAccessibilityNode_->SetAccessibilityVirtualNodeParent(AceType::DynamicCast<NG::UINode>(host));
+    parentAccessibilityNode_->SetAccessibilityVirtualNodeParent(host);
     parentAccessibilityNode_->SetFirstAccessibilityVirtualNode();
 
     FrameNode::ProcessOffscreenNode(parentAccessibilityNode_);

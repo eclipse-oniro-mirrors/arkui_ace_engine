@@ -1607,7 +1607,7 @@ RefPtr<FrameNode> DialogPattern::BuildMenu(const std::vector<ButtonInfo>& button
             button = CreateButton(buttons[i], i, true, true, size);
         }
         CHECK_NULL_RETURN(button, nullptr);
-        auto buttonFrameNode = DynamicCast<FrameNode>(button);
+        auto buttonFrameNode = button;
         CHECK_NULL_RETURN(buttonFrameNode, nullptr);
         auto props = buttonFrameNode->GetLayoutProperty();
         CHECK_NULL_RETURN(props, nullptr);
@@ -3079,7 +3079,7 @@ void DialogPattern::AddForceSplitRatioListener()
     CHECK_NULL_VOID(host);
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
-    auto forceSplitMgr = AceType::DynamicCast<ForceSplitManager>(pipeline->GetForceSplitManager());
+    auto forceSplitMgr = pipeline->GetForceSplitManager();
     CHECK_NULL_VOID(forceSplitMgr);
     forceSplitMgr->AddForceSplitRatioListener(
         host->GetId(), [weakHost = AceType::WeakClaim(AceType::RawPtr(host))](float splitRatio) {
@@ -3095,7 +3095,7 @@ void DialogPattern::RemoveForceSplitRatioListener()
     CHECK_NULL_VOID(host);
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
-    auto forceSplitMgr = AceType::DynamicCast<ForceSplitManager>(pipeline->GetForceSplitManager());
+    auto forceSplitMgr = pipeline->GetForceSplitManager();
     CHECK_NULL_VOID(forceSplitMgr);
     forceSplitMgr->RemoveForceSplitRatioListener(host->GetId());
 }
@@ -3253,7 +3253,7 @@ bool DialogPattern::HandleAlertDialogButtonClickCmd(const std::unique_ptr<JsonVa
             "The index value exceeds the actual total number of buttons!", btnIndex);
         return false;
     }
-    auto buttonFrameNode = DynamicCast<FrameNode>(btnNodes.at(btnIndex));
+    auto buttonFrameNode = btnNodes.at(btnIndex);
     CHECK_NULL_RETURN(buttonFrameNode, false);
     RefPtr<GestureEventHub> gestureHub = buttonFrameNode->GetOrCreateGestureEventHub();
     CHECK_NULL_RETURN(gestureHub, false);
@@ -3499,7 +3499,7 @@ int32_t DialogPattern::HandleActionButtonClick(int32_t index)
         ReportActionSheetOnInjectionEvent(false, "button index out of range", -1, index);
         return RET_FAILED;
     }
-    auto buttonFrameNode = DynamicCast<FrameNode>(btnNodes.at(index));
+    auto buttonFrameNode = btnNodes.at(index);
     CHECK_NULL_RETURN(buttonFrameNode, RET_FAILED);
     RefPtr<GestureEventHub> gestureHub = buttonFrameNode->GetOrCreateGestureEventHub();
     CHECK_NULL_RETURN(gestureHub, RET_FAILED);

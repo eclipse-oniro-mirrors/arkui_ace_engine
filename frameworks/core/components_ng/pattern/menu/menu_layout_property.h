@@ -54,7 +54,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<MenuLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propIsRectInTarget_ = CloneIsRectInTarget();
         value->propMenuOffset_ = CloneMenuOffset();
         value->propTargetSize_ = CloneTargetSize();

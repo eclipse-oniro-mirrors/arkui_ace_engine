@@ -370,7 +370,7 @@ HWTEST_F(SliderModifierTestNg, SliderContentModifierTest003, TestSize.Level1)
     // set BasicShapeType CIRCLE
     auto basicShape = AceType::MakeRefPtr<Circle>();
     basicShape->SetBasicShapeType(BasicShapeType::CIRCLE);
-    auto circle = AceType::DynamicCast<Circle>(basicShape);
+    auto circle = basicShape;
     circle->SetRadius(RADIUS);
     sliderContentModifier.SetBlockShape(basicShape);
     // set SliderMode OUTSET

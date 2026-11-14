@@ -33,7 +33,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<BubbleLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propEnableArrow_ = CloneEnableArrow();
         value->propUseCustom_ = CloneUseCustom();
         value->propIsTips_ = CloneIsTips();
