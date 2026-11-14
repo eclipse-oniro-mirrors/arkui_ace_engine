@@ -218,7 +218,8 @@ export class ArkUIExtensionComponentPeer extends ArkUIExtensionComponentPeerBase
 }
 export enum DpiFollowStrategy {
     FOLLOW_HOST_DPI = 0,
-    FOLLOW_UI_EXTENSION_ABILITY_DPI = 1
+    FOLLOW_UI_EXTENSION_ABILITY_DPI = 1,
+    FOLLOW_HOST_DPI_ALL = 2
 }
 export enum WindowModeFollowStrategy {
     FOLLOW_HOST_WINDOW_MODE = 0,

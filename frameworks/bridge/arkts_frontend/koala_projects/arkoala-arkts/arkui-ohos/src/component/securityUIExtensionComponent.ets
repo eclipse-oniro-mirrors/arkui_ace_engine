@@ -35,7 +35,8 @@ export interface SecurityUIExtensionProxy {
 
 export enum SecurityDpiFollowStrategy {
     FOLLOW_HOST_DPI = 0,
-    FOLLOW_UI_EXTENSION_ABILITY_DPI = 1
+    FOLLOW_UI_EXTENSION_ABILITY_DPI = 1,
+    FOLLOW_HOST_DPI_ALL = 2
 }
 
 export interface SecurityUIExtensionOptions {

@@ -4980,6 +4980,7 @@ typedef struct Opt_DividerMode {
 typedef enum Ark_DpiFollowStrategy {
     ARK_DPI_FOLLOW_STRATEGY_FOLLOW_HOST_DPI = 0,
     ARK_DPI_FOLLOW_STRATEGY_FOLLOW_UI_EXTENSION_ABILITY_DPI = 1,
+    ARK_DPI_FOLLOW_STRATEGY_FOLLOW_HOST_DPI_ALL = 2,
 } Ark_DpiFollowStrategy;
 typedef struct Opt_DpiFollowStrategy {
     Ark_Tag tag;
@@ -5158,6 +5159,7 @@ typedef struct Opt_EllipsisMode {
 typedef enum Ark_EmbeddedDpiFollowStrategy {
     ARK_EMBEDDED_DPI_FOLLOW_STRATEGY_FOLLOW_HOST_DPI = 0,
     ARK_EMBEDDED_DPI_FOLLOW_STRATEGY_FOLLOW_UI_EXTENSION_ABILITY_DPI = 1,
+    ARK_EMBEDDED_DPI_FOLLOW_STRATEGY_FOLLOW_HOST_DPI_ALL = 2,
 } Ark_EmbeddedDpiFollowStrategy;
 typedef struct Opt_EmbeddedDpiFollowStrategy {
     Ark_Tag tag;
