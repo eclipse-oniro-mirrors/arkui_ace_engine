@@ -48,7 +48,7 @@ void LazyDynamicLayoutModelNG::SetAdjustedOffset(FrameNode* frameNode, float adj
     CHECK_NULL_VOID(lazyDynamicLayoutPattern);
     auto customParams = lazyDynamicLayoutPattern->GetCustomLayoutAlgorithmParam();
     CHECK_NULL_VOID(customParams);
-    auto lazyParams = AceType::DynamicCast<LazyCustomLayoutAlgorithmParam>(customParams);
+    auto lazyParams = customParams;
     CHECK_NULL_VOID(lazyParams);
     lazyParams->SetAdjustedOffset(adjustedOffset);
 }
