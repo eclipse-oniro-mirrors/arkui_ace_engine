@@ -1152,7 +1152,7 @@ bool ListPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, c
     if (config.skipMeasure && config.skipLayout) {
         return false;
     }
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto listLayoutAlgorithm = DynamicCast<ListLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(listLayoutAlgorithm, false);
@@ -5230,7 +5230,7 @@ RefPtr<FrameNode> ListPattern::GetSelectableItemAtIndex(int32_t index) const
     }
     auto itemWrapper = host->GetChildByIndex(index + itemStartIndex_);
     CHECK_NULL_RETURN(itemWrapper, nullptr);
-    auto itemNode = AceType::DynamicCast<FrameNode>(itemWrapper->GetHostNode());
+    auto itemNode = itemWrapper->GetHostNode();
     CHECK_NULL_RETURN(itemNode, nullptr);
     auto itemPattern = itemNode->GetPattern<ListItemPattern>();
     if (itemPattern) {
@@ -5248,7 +5248,7 @@ RefPtr<FrameNode> ListPattern::GetSelectableItemAtIndex(int32_t index) const
     auto groupItemWrapper = itemNode->GetChildByIndex(
         resolvedItemInfo->indexInGroup + groupPattern->GetItemStartIndex(), isCache);
     CHECK_NULL_RETURN(groupItemWrapper, nullptr);
-    auto groupItemNode = AceType::DynamicCast<FrameNode>(groupItemWrapper->GetHostNode());
+    auto groupItemNode = groupItemWrapper->GetHostNode();
     if (!groupItemNode) {
         groupItemNode = AceType::DynamicCast<FrameNode>(groupItemWrapper);
     }
@@ -5417,7 +5417,7 @@ SelectableContainerPattern::SwipeSelectStateKey ListPattern::GetSwipeSelectState
     for (int32_t index = startIndex_; index <= endIndex_; ++index) {
         auto itemWrapper = host->GetChildByIndex(index + itemStartIndex_);
         CHECK_NULL_CONTINUE(itemWrapper);
-        auto itemNode = AceType::DynamicCast<FrameNode>(itemWrapper->GetHostNode());
+        auto itemNode = itemWrapper->GetHostNode();
         CHECK_NULL_CONTINUE(itemNode);
         auto itemPattern = itemNode->GetPattern<ListItemPattern>();
         if (itemPattern) {
@@ -5480,7 +5480,7 @@ void ListPattern::BuildSwipeSelectStateKeysInRange(const SwipeSelectStateKey& st
     for (int32_t index = startIndex_; index <= endIndex_; ++index) {
         auto itemWrapper = host->GetChildByIndex(index + itemStartIndex_);
         CHECK_NULL_CONTINUE(itemWrapper);
-        auto itemNode = AceType::DynamicCast<FrameNode>(itemWrapper->GetHostNode());
+        auto itemNode = itemWrapper->GetHostNode();
         CHECK_NULL_CONTINUE(itemNode);
         auto itemPattern = itemNode->GetPattern<ListItemPattern>();
         if (itemPattern) {
