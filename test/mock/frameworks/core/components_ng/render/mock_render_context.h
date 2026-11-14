@@ -53,6 +53,7 @@ public:
     MOCK_METHOD1(RemoveOverlayModifier, void(const RefPtr<OverlayModifier>&));
     MOCK_METHOD0(UpdateCustomBackground, void());
     MOCK_METHOD1(SetSurfaceBufferOpaque, void(bool));
+    MOCK_METHOD1(RemoveChild, void(const RefPtr<RenderContext>&));
 
     const RefPtr<NG::ChainedTransitionEffect> GetChainedTransitionEffect()
     {

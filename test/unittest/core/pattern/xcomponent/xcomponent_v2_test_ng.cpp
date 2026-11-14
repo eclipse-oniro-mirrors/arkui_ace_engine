@@ -1077,11 +1077,11 @@ HWTEST_F(XComponentV2TestNg, GetRSUIContextTest004, TestSize.Level1)
 }
 
 /**
- * @tc.name: FlushImplicitTransaction001
- * @tc.desc: Test FlushImplicitTransaction method
+ * @tc.name: FlushRemoveChild001
+ * @tc.desc: Test FlushRemoveChild method when multiInstanceEnabled is false
  * @tc.type: FUNC
  */
-HWTEST_F(XComponentV2TestNg, FlushImplicitTransaction001, TestSize.Level1)
+HWTEST_F(XComponentV2TestNg, FlushRemoveChild001, TestSize.Level1)
 {
     /**
      * @tc.steps: step1. set multiInstanceEnabled property to false
@@ -1098,25 +1098,24 @@ HWTEST_F(XComponentV2TestNg, FlushImplicitTransaction001, TestSize.Level1)
     ASSERT_TRUE(frameNode);
     auto xcomponentPattern = frameNode->GetPattern<XComponentPatternV2>();
     ASSERT_NE(xcomponentPattern, nullptr);
-    auto hostNode = xcomponentPattern->GetHost();
     /**
-     * @tc.steps: step2. call FlushImplicitTransaction
-     * @tc.expected: FlushImplicitTransaction return nullptr
+     * @tc.steps: step2. call FlushRemoveChild
+     * @tc.expected: frameNode is not affected
      */
-    xcomponentPattern->FlushImplicitTransaction(hostNode);
+    xcomponentPattern->FlushRemoveChild();
     EXPECT_EQ(frameNode->GetId(), nodeId);
 }
 
 /**
- * @tc.name: FlushImplicitTransaction002
- * @tc.desc: Test FlushImplicitTransaction method
+ * @tc.name: FlushRemoveChild002
+ * @tc.desc: Test FlushRemoveChild method when multiInstanceEnabled is true
  * @tc.type: FUNC
  */
-HWTEST_F(XComponentV2TestNg, FlushImplicitTransaction002, TestSize.Level1)
+HWTEST_F(XComponentV2TestNg, FlushRemoveChild002, TestSize.Level1)
 {
     /**
-     * @tc.steps: step1. set multiInstanceEnabled property to false
-     * @tc.expected: multiInstanceEnabled is false
+     * @tc.steps: step1. set multiInstanceEnabled property to true
+     * @tc.expected: multiInstanceEnabled is true
      */
     SystemProperties::multiInstanceEnabled_ = true;
     ASSERT_TRUE(SystemProperties::multiInstanceEnabled_);
@@ -1129,12 +1128,11 @@ HWTEST_F(XComponentV2TestNg, FlushImplicitTransaction002, TestSize.Level1)
     ASSERT_TRUE(frameNode);
     auto xcomponentPattern = frameNode->GetPattern<XComponentPatternV2>();
     ASSERT_NE(xcomponentPattern, nullptr);
-    auto hostNode = xcomponentPattern->GetHost();
     /**
-     * @tc.steps: step2. call FlushImplicitTransaction
-     * @tc.expected: FlushImplicitTransaction return nullptr
+     * @tc.steps: step2. call FlushRemoveChild
+     * @tc.expected: frameNode is not affected
      */
-    xcomponentPattern->FlushImplicitTransaction(hostNode);
+    xcomponentPattern->FlushRemoveChild();
     EXPECT_EQ(frameNode->GetId(), nodeId);
 }
 
@@ -1256,7 +1254,7 @@ HWTEST_F(XComponentV2TestNg, InitializeRenderContextTest, TestSize.Level1)
 
 /**
  * @tc.name: XComponentV2InitAndDisposeSurfaceTest
- * @tc.desc: Test FlushImplicitTransaction method
+ * @tc.desc: Test DisposeSurface and FlushRemoveChild method
  * @tc.type: FUNC
  */
 HWTEST_F(XComponentV2TestNg, XComponentV2InitAndDisposeSurfaceTest, TestSize.Level1)
@@ -1334,5 +1332,142 @@ HWTEST_F(XComponentV2TestNg, XComponentV2ControllerSetSurfaceRectTest, TestSize.
 
     EXPECT_EQ(pattern->surfaceSize_, SizeF(100.0f, 80.0f));
     EXPECT_EQ(pattern->surfaceOffset_, OffsetF(12.0f, 16.0f));
+}
+
+/**
+ * @tc.name: XComponentV2FlushRemoveChildTest
+ * @tc.desc: Test FlushRemoveChild removes surface renderContext as child of host renderContext,
+ *           and does not reset renderContextForSurface_
+ * @tc.type: FUNC
+ */
+HWTEST_F(XComponentV2TestNg, XComponentV2FlushRemoveChildTest, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. call CreateXComponentNode.
+     * @tc.expected: xcomponent frameNode create successfully.
+     */
+    auto frameNode = CreateXComponentNode();
+    ASSERT_TRUE(frameNode);
+    ASSERT_EQ(frameNode->GetTag(), V2::XCOMPONENT_ETS_TAG);
+    auto pattern = frameNode->GetPattern<XComponentPatternV2>();
+    ASSERT_TRUE(pattern);
+
+    /**
+     * @tc.steps: step2. mock host renderContext and initialize renderContextForSurface_.
+     * @tc.expected: renderContextForSurface_ initialized.
+     */
+    pattern->renderContextForSurface_ = AceType::MakeRefPtr<RenderContext>();
+    pattern->handlingSurfaceRenderContext_ = pattern->renderContextForSurface_;
+    ASSERT_TRUE(pattern->renderContextForSurface_);
+    auto hostRenderContext = AceType::MakeRefPtr<MockRenderContext>();
+    frameNode->renderContext_ = hostRenderContext;
+
+    /**
+     * @tc.steps: step3. call FlushRemoveChild.
+     * @tc.expected: renderContextForSurface_ removed as child of host renderContext,
+     *               and renderContextForSurface_ itself is not reset.
+     */
+    EXPECT_CALL(*hostRenderContext, RemoveChild(pattern->renderContextForSurface_)).Times(1);
+    pattern->FlushRemoveChild();
+    EXPECT_EQ(pattern->renderContextForSurface_, pattern->handlingSurfaceRenderContext_);
+    EXPECT_TRUE(pattern->renderContextForSurface_);
+}
+
+/**
+ * @tc.name: XComponentV2FlushRemoveChildNullSurfaceContextTest
+ * @tc.desc: Test FlushRemoveChild when renderContextForSurface_ is null
+ * @tc.type: FUNC
+ */
+HWTEST_F(XComponentV2TestNg, XComponentV2FlushRemoveChildNullSurfaceContextTest, TestSize.Level1)
+{
+    auto frameNode = CreateXComponentNode();
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<XComponentPatternV2>();
+    ASSERT_TRUE(pattern);
+
+    auto hostRenderContext = AceType::MakeRefPtr<MockRenderContext>();
+    frameNode->renderContext_ = hostRenderContext;
+    pattern->renderContextForSurface_ = nullptr;
+
+    /**
+     * @tc.steps: step1. call FlushRemoveChild with null renderContextForSurface_.
+     * @tc.expected: return early without removing any child.
+     */
+    EXPECT_CALL(*hostRenderContext, RemoveChild(_)).Times(0);
+    pattern->FlushRemoveChild();
+    EXPECT_FALSE(pattern->renderContextForSurface_);
+}
+
+/**
+ * @tc.name: XComponentV2FlushRemoveChildNoHostTest
+ * @tc.desc: Test FlushRemoveChild when pattern is not attached to a frameNode
+ * @tc.type: FUNC
+ */
+HWTEST_F(XComponentV2TestNg, XComponentV2FlushRemoveChildNoHostTest, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<XComponentPatternV2>(
+        XComponentType::SURFACE, XComponentNodeType::DECLARATIVE_NODE);
+    pattern->renderContextForSurface_ = AceType::MakeRefPtr<RenderContext>();
+
+    /**
+     * @tc.steps: step1. call FlushRemoveChild without host.
+     * @tc.expected: return early without crash, renderContextForSurface_ unchanged.
+     */
+    pattern->FlushRemoveChild();
+    EXPECT_TRUE(pattern->renderContextForSurface_);
+}
+
+/**
+ * @tc.name: XComponentV2DisposeSurfaceRemoveChildOnceTest
+ * @tc.desc: Test DisposeSurface triggers FlushRemoveChild and resets renderContextForSurface_
+ * @tc.type: FUNC
+ */
+HWTEST_F(XComponentV2TestNg, XComponentV2DisposeSurfaceRemoveChildOnceTest, TestSize.Level1)
+{
+    auto frameNode = CreateXComponentNode();
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<XComponentPatternV2>();
+    ASSERT_TRUE(pattern);
+
+    pattern->renderContextForSurface_ = AceType::MakeRefPtr<RenderContext>();
+    pattern->handlingSurfaceRenderContext_ = pattern->renderContextForSurface_;
+    auto hostRenderContext = AceType::MakeRefPtr<MockRenderContext>();
+    frameNode->renderContext_ = hostRenderContext;
+
+    /**
+     * @tc.steps: step1. call DisposeSurface.
+     * @tc.expected: RemoveChild called once, renderContextForSurface_ and
+     *               handlingSurfaceRenderContext_ are reset.
+     */
+    EXPECT_CALL(*hostRenderContext, RemoveChild(pattern->renderContextForSurface_)).Times(1);
+    pattern->DisposeSurface();
+    EXPECT_FALSE(pattern->renderContextForSurface_);
+    EXPECT_FALSE(pattern->handlingSurfaceRenderContext_);
+}
+
+/**
+ * @tc.name: XComponentV2DisposeSurfaceTwiceTest
+ * @tc.desc: Test DisposeSurface can be called repeatedly without crash
+ * @tc.type: FUNC
+ */
+HWTEST_F(XComponentV2TestNg, XComponentV2DisposeSurfaceTwiceTest, TestSize.Level1)
+{
+    auto frameNode = CreateXComponentNode();
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<XComponentPatternV2>();
+    ASSERT_TRUE(pattern);
+
+    pattern->renderContextForSurface_ = AceType::MakeRefPtr<RenderContext>();
+    pattern->handlingSurfaceRenderContext_ = pattern->renderContextForSurface_;
+    pattern->DisposeSurface();
+    EXPECT_FALSE(pattern->renderContextForSurface_);
+
+    /**
+     * @tc.steps: step1. call DisposeSurface again with null renderContextForSurface_.
+     * @tc.expected: no crash, state stays cleared.
+     */
+    pattern->DisposeSurface();
+    EXPECT_FALSE(pattern->renderContextForSurface_);
+    EXPECT_FALSE(pattern->handlingSurfaceRenderContext_);
 }
 } // namespace OHOS::Ace::NG
