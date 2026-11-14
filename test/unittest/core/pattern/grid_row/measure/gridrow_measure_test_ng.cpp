@@ -451,7 +451,7 @@ HWTEST_F(GridRowMeasureTestNG, MeasureChildTest, TestSize.Level0)
     parentConstraint.maxSize = SizeF(100, 40.0f);
     layoutProperty->UpdateLayoutConstraint(parentConstraint);
     layoutProperty->UpdateContentConstraint();
-    auto childLayoutWrapper = AceType::DynamicCast<LayoutWrapper>(gridCol1);
+    RefPtr<LayoutWrapper> childLayoutWrapper = gridCol1;
     algorithm.MeasureChild(Referenced::RawPtr(gridRow), childLayoutWrapper,
         V2::GridSizeType::XS, 30.0f);
     /**

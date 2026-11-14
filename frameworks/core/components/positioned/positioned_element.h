@@ -38,13 +38,7 @@ public:
     void PerformBuild() override
     {
         SoleChildElement::PerformBuild();
-        auto focusScope = AceType::DynamicCast<PositionedElement>(this);
-        if (!focusScope) {
-            LOGE("PositionedElement can not DynamicCast to FocusGroup");
-            return;
-        }
-
-        if (focusScope->GetIsAutoFocus()) {
+        if (GetIsAutoFocus()) {
             RequestFocusImmediately();
         }
     }

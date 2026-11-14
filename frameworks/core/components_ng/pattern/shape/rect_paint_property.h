@@ -41,7 +41,7 @@ public:
     RefPtr<PaintProperty> Clone() const override
     {
         auto value = MakeRefPtr<RectPaintProperty>();
-        value->PaintProperty::UpdatePaintProperty(DynamicCast<PaintProperty>(this));
+        value->PaintProperty::UpdatePaintProperty(this);
         value->propTopLeftRadius_ = CloneTopLeftRadius();
         value->propTopRightRadius_ = CloneTopRightRadius();
         value->propBottomLeftRadius_ = CloneBottomLeftRadius();

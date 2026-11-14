@@ -47,22 +47,19 @@ CustomMeasureLayoutNode* CustomNodeStatic::ConstructCustomNode(int32_t id,
     auto customNode = NG::CustomMeasureLayoutNode::CreateCustomMeasureLayoutNode(id, "");
     customNode->IncRefCount();
     if (onMeasureSize) {
-        auto customMeasureLayoutNode = AceType::DynamicCast<NG::CustomMeasureLayoutNode>(customNode);
-        customMeasureLayoutNode->SetMeasureFunction(std::move(onMeasureSize));
+        customNode->SetMeasureFunction(std::move(onMeasureSize));
     } else {
         TAG_LOGI(AceLogTag::ACE_NATIVE_NODE, "onMeasureSize is nullptr");
     }
 
     if (onPlaceChildren) {
-        auto customMeasureLayoutNode = AceType::DynamicCast<NG::CustomMeasureLayoutNode>(customNode);
-        customMeasureLayoutNode->SetLayoutFunction(std::move(onPlaceChildren));
+        customNode->SetLayoutFunction(std::move(onPlaceChildren));
     } else {
         TAG_LOGI(AceLogTag::ACE_NATIVE_NODE, "onPlaceChildren is nullptr");
     }
 
     if (updateParamFunc) {
-        auto customMeasureLayoutNode = AceType::DynamicCast<NG::CustomMeasureLayoutNode>(customNode);
-        customMeasureLayoutNode->SetUpdateParamFunc(std::move(updateParamFunc));
+        customNode->SetUpdateParamFunc(std::move(updateParamFunc));
     } else {
         TAG_LOGI(AceLogTag::ACE_NATIVE_NODE, "updateParamFunc is nullptr");
     }
@@ -72,7 +69,7 @@ CustomMeasureLayoutNode* CustomNodeStatic::ConstructCustomNode(int32_t id,
 SizeF CustomNodeStatic::DidDefaultMeasure(const RefPtr<OHOS::Ace::NG::CustomMeasureLayoutNode>& frameNode)
 {
     CHECK_NULL_RETURN(frameNode, NG::SizeF());
-    auto layoutWrapper = AceType::DynamicCast<OHOS::Ace::NG::LayoutWrapper>(frameNode);
+    RefPtr<OHOS::Ace::NG::LayoutWrapper> layoutWrapper = frameNode;
     CHECK_NULL_RETURN(layoutWrapper, NG::SizeF());
     // use normal measure step.
     auto layoutProperty = layoutWrapper->GetLayoutProperty();
@@ -97,7 +94,7 @@ SizeF CustomNodeStatic::DidDefaultMeasure(const RefPtr<OHOS::Ace::NG::CustomMeas
 void CustomNodeStatic::DidDefaultLayout(const RefPtr<OHOS::Ace::NG::CustomMeasureLayoutNode>& frameNode)
 {
     CHECK_NULL_VOID(frameNode);
-    auto layoutWrapper = AceType::DynamicCast<OHOS::Ace::NG::LayoutWrapper>(frameNode);
+    RefPtr<OHOS::Ace::NG::LayoutWrapper> layoutWrapper = frameNode;
     CHECK_NULL_VOID(layoutWrapper);
     NG::BoxLayoutAlgorithm::PerformLayout(AceType::RawPtr(layoutWrapper));
     for (auto&& child : layoutWrapper->GetAllChildrenWithBuild()) {

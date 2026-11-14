@@ -60,7 +60,7 @@ HWTEST_F(OverflowCollectorTestNg, OverflowCollectorAccumulateFromWrapperTest, Te
 
     // Test with out-of-layout child
     auto frameNode = FrameNode::CreateFrameNode("test", 1, AceType::MakeRefPtr<Pattern>());
-    auto child = AceType::DynamicCast<LayoutWrapper>(frameNode);
+    RefPtr<LayoutWrapper> child = frameNode;
 
     // Test with inactive child
     child->SetActive(false);
@@ -87,7 +87,7 @@ HWTEST_F(OverflowCollectorTestNg, OverflowCollectorAccumulateFromWrapperTest, Te
 HWTEST_F(OverflowCollectorTestNg, OverflowCollectorAccumulateFromWrapperWithSafeAreaTest, TestSize.Level0)
 {
     auto frameNode = FrameNode::CreateFrameNode("test", 2, AceType::MakeRefPtr<Pattern>());
-    auto child = AceType::DynamicCast<LayoutWrapper>(frameNode);
+    RefPtr<LayoutWrapper> child = frameNode;
     child->SetActive(true);
     
     // Set up safe area property
@@ -112,7 +112,7 @@ HWTEST_F(OverflowCollectorTestNg, OverflowCollectorAccumulateFromWrapperWithSafe
 HWTEST_F(OverflowCollectorTestNg, OverflowCollectorEarlyBreakTest, TestSize.Level0)
 {
     auto frameNode = FrameNode::CreateFrameNode("test", 3, AceType::MakeRefPtr<Pattern>());
-    auto child = AceType::DynamicCast<LayoutWrapper>(frameNode);
+    RefPtr<LayoutWrapper> child = frameNode;
     child->SetActive(true);
     
     // Set up layout property that might trigger safe area conditions
@@ -140,7 +140,7 @@ HWTEST_F(OverflowCollectorTestNg, OverflowCollectorMultipleChildrenTest, TestSiz
     
     // First child
     auto frameNode1 = FrameNode::CreateFrameNode("test1", 4, AceType::MakeRefPtr<Pattern>());
-    auto child1 = AceType::DynamicCast<LayoutWrapper>(frameNode1);
+    RefPtr<LayoutWrapper> child1 = frameNode1;
     child1->SetActive(true);
     auto geom1 = child1->GetGeometryNode();
     geom1->SetFrameSize(SizeF(50, 50));
@@ -152,7 +152,7 @@ HWTEST_F(OverflowCollectorTestNg, OverflowCollectorMultipleChildrenTest, TestSiz
     
     // Second child that should be combined
     auto frameNode2 = FrameNode::CreateFrameNode("test2", 5, AceType::MakeRefPtr<Pattern>());
-    auto child2 = AceType::DynamicCast<LayoutWrapper>(frameNode2);
+    RefPtr<LayoutWrapper> child2 = frameNode2;
     child2->SetActive(true);
     auto geom2 = child2->GetGeometryNode();
     geom2->SetFrameSize(SizeF(30, 30));
@@ -178,7 +178,7 @@ HWTEST_F(OverflowCollectorTestNg, OverflowCollectorMultipleChildrenTest, TestSiz
 HWTEST_F(OverflowCollectorTestNg, OverflowCollectorUseFrameRectTest, TestSize.Level0)
 {
     auto frameNode = FrameNode::CreateFrameNode("test", 6, AceType::MakeRefPtr<Pattern>());
-    auto child = AceType::DynamicCast<LayoutWrapper>(frameNode);
+    RefPtr<LayoutWrapper> child = frameNode;
     child->SetActive(true);
     auto geometryNode = child->GetGeometryNode();
     MarginPropertyF margin { .left = 10.0f, .right = 10.0f, .top = 10.0f, .bottom = 10.0f };

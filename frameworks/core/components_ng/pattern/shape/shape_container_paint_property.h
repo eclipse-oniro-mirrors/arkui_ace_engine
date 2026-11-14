@@ -37,7 +37,7 @@ public:
     RefPtr<PaintProperty> Clone() const override
     {
         auto value = MakeRefPtr<ShapeContainerPaintProperty>();
-        value->PaintProperty::UpdatePaintProperty(DynamicCast<PaintProperty>(this));
+        value->PaintProperty::UpdatePaintProperty(this);
         value->propImageMesh_ = CloneImageMesh();
         value->propShapeViewBox_ = CloneShapeViewBox();
         value->propFill_ = CloneFill();

@@ -102,7 +102,7 @@ void HandednessManagerTestNg::SetUpTestSuite()
     MockPipelineContext::SetUp();
     auto pipeline = MockPipelineContext::GetCurrent();
     pipeline->window_ = std::make_shared<NiceMock<MockWindow>>();
-    auto pipelineBase = AceType::DynamicCast<PipelineBase>(pipeline);
+    RefPtr<PipelineBase> pipelineBase = pipeline;
     MockContainer::SetUp(pipelineBase);
     auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
     pipeline->SetThemeManager(themeManager);

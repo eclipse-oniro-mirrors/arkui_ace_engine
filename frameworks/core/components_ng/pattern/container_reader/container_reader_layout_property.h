@@ -89,7 +89,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<ContainerReaderLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->size_ = size_;
         value->widthBreakpoint_ = widthBreakpoint_;
         value->heightBreakpoint_ = heightBreakpoint_;

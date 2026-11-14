@@ -59,7 +59,7 @@ RefPtr<ShapePaintProperty> ShapePattern::GetAncestorPaintProperty()
     CHECK_NULL_RETURN(curFrameNode, nullptr);
     auto childNode = curFrameNode;
     ShapePaintProperty propertiesFromAncestor;
-    auto parentFrameNode = AceType::DynamicCast<FrameNode>(curFrameNode->GetAncestorNodeOfFrame(false));
+    auto parentFrameNode = curFrameNode->GetAncestorNodeOfFrame(false);
     while (parentFrameNode) {
         auto parentPaintProperty = parentFrameNode->GetPaintProperty<ShapePaintProperty>();
         if (parentPaintProperty) {
@@ -71,7 +71,7 @@ RefPtr<ShapePaintProperty> ShapePattern::GetAncestorPaintProperty()
             }
         }
         curFrameNode = parentFrameNode;
-        parentFrameNode = AceType::DynamicCast<FrameNode>(curFrameNode->GetAncestorNodeOfFrame(false));
+        parentFrameNode = curFrameNode->GetAncestorNodeOfFrame(false);
     }
     return DynamicCast<ShapePaintProperty>(propertiesFromAncestor.Clone());
 }
