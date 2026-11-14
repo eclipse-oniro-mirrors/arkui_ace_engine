@@ -8208,6 +8208,7 @@ void UIContentImpl::HandleBrandColorChanged(
 void UIContentImpl::UpdateBrandColor(
     const std::weak_ptr<OHOS::AbilityRuntime::Context>& weakContext, int32_t instanceId)
 {
+    ContainerScope scope(instanceId);
     auto context = weakContext.lock();
     CHECK_NULL_VOID(context);
     auto brandColorStr = context->GetBrandColorValue();
@@ -8215,6 +8216,7 @@ void UIContentImpl::UpdateBrandColor(
     CHECK_NULL_VOID(storage);
     if (brandColorStr.empty()) {
         storage->RemoveInstanceBrandColor(instanceId);
+        storage->UpdateInstanceDefaultTheme(instanceId);
         NotifyBrandColorChangeToUEC(instanceId, std::nullopt, std::nullopt);
         return;
     }
@@ -8222,11 +8224,12 @@ void UIContentImpl::UpdateBrandColor(
     info.brandColor = Color::FromString(brandColorStr);
     info.colorStrategy = static_cast<NG::BrandColorStrategy>(context->GetBrandColorStrategy());
     storage->StoreInstanceBrandColor(instanceId, info);
+    storage->UpdateInstanceDefaultTheme(instanceId);
+    NotifyBrandColorChangeToUEC(instanceId, info.brandColor, info.colorStrategy);
     auto pipelineContext = NG::PipelineContext::GetContextByContainerId(instanceId);
     CHECK_NULL_VOID(pipelineContext);
     auto rootNode = pipelineContext->GetRootElement();
     CHECK_NULL_VOID(rootNode);
-    ContainerScope scope(instanceId);
     rootNode->UpdateThemeScopeUpdate(0); // 0 means default theme scope id
 }
 
@@ -8237,36 +8240,6 @@ void UIContentImpl::NotifyBrandColorChangeToUEC(
     auto* storage = NG::TokenThemeStorage::GetInstance();
     CHECK_NULL_VOID(storage);
     storage->NotifyBrandColorChange(instanceId, brandColor, colorStrategy);
-}
-
-void UIContentImpl::RegisterBrandColorChangeListener(const BrandColorChangeCallback& callback)
-{
-    auto* storage = NG::TokenThemeStorage::GetInstance();
-    CHECK_NULL_VOID(storage);
-    NG::BrandColorChangeCallback internalCallback =
-        [callback](int32_t instanceId, const std::optional<Color>& brandColor,
-            const std::optional<NG::BrandColorStrategy>& colorStrategy) {
-            if (!callback) {
-                return;
-            }
-            std::optional<uint32_t> rawColor;
-            if (brandColor.has_value()) {
-                rawColor = brandColor.value().GetValue();
-            }
-            std::optional<int32_t> rawStrategy;
-            if (colorStrategy.has_value()) {
-                rawStrategy = static_cast<int32_t>(colorStrategy.value());
-            }
-            callback(instanceId, rawColor, rawStrategy);
-        };
-    storage->RegisterBrandColorChangeListener(instanceId_, internalCallback);
-}
-
-void UIContentImpl::UnregisterBrandColorChangeListener()
-{
-    auto* storage = NG::TokenThemeStorage::GetInstance();
-    CHECK_NULL_VOID(storage);
-    storage->UnregisterBrandColorChangeListener(instanceId_);
 }
 
 bool UIContentImpl::IsBrandColorValid(const std::string& brandColorStr)
