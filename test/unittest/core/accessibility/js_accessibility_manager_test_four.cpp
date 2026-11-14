@@ -1046,6 +1046,55 @@ HWTEST_F(JsAccessibilityManagerTestFour, IsSelectReaderEnabled001, TestSize.Leve
 }
 
 /**
+ * @tc.name: SelectReaderStateObserver001
+ * @tc.desc: Test select reader state observer updates cached state and cache stays initialized
+ * @tc.type: FUNC
+ */
+HWTEST_F(JsAccessibilityManagerTestFour, SelectReaderStateObserver001, TestSize.Level1)
+{
+    GTEST_LOG_(INFO) << "JsAccessibilityManagerTestFour-begin SelectReaderStateObserver001";
+
+    /**
+     * @tc.steps: step1. construct JsAccessibilityManager and subscribe select reader state observer
+     */
+    auto jsAccessibilityManager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    ASSERT_NE(jsAccessibilityManager, nullptr);
+    auto context = MockPipelineContext::GetCurrentContext();
+    jsAccessibilityManager->SetPipelineContext(context);
+
+    uint32_t eventType = AccessibilityStateEventType::EVENT_SELECT_READER_STATE_CHANGED;
+    jsAccessibilityManager->SubscribeStateObserver(eventType);
+    auto observer = jsAccessibilityManager->stateObserver_[eventType];
+    ASSERT_NE(observer, nullptr);
+
+    /**
+     * @tc.steps: step2. select reader turned on
+     * @tc.expected: IsSelectReaderEnabled returns true and cache is initialized
+     */
+    observer->OnStateChanged(true);
+    EXPECT_TRUE(jsAccessibilityManager->isSelectReaderEnabledInitialized_);
+    EXPECT_TRUE(jsAccessibilityManager->IsSelectReaderEnabled());
+
+    /**
+     * @tc.steps: step3. select reader turned off after turned on
+     * @tc.expected: IsSelectReaderEnabled returns false, cache is refreshed by observer
+     */
+    observer->OnStateChanged(false);
+    EXPECT_TRUE(jsAccessibilityManager->isSelectReaderEnabledInitialized_);
+    EXPECT_FALSE(jsAccessibilityManager->IsSelectReaderEnabled());
+
+    /**
+     * @tc.steps: step4. IsSelectReaderEnabled called frequently
+     * @tc.expected: cache stays initialized so client query interface is not called again
+     */
+    EXPECT_FALSE(jsAccessibilityManager->IsSelectReaderEnabled());
+    EXPECT_FALSE(jsAccessibilityManager->IsSelectReaderEnabled());
+    EXPECT_TRUE(jsAccessibilityManager->isSelectReaderEnabledInitialized_);
+
+    GTEST_LOG_(INFO) << "JsAccessibilityManagerTestFour-end SelectReaderStateObserver001";
+}
+
+/**
  * @tc.name: IsEventIgnoredByWorkModeSelectReader001
  * @tc.desc: Test IsEventIgnoredByWorkMode when select reader is enabled
  * @tc.type: FUNC
