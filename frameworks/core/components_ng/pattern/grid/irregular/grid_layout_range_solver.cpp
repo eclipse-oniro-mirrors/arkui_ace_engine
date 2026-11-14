@@ -32,6 +32,43 @@ Result GridLayoutRangeSolver::FindStartingRow(float mainGap)
     if (info_->gridMatrix_.empty() || info_->lineHeightMap_.empty()) {
         return { 0, 0, 0.0f };
     }
+    // The scroll family can land at the exact content top in one step (fling
+    // clamped at the start edge, spring settle). The stored
+    // { startMainLineIndex_, startIndex_ } pair is only re-solved while the
+    // offset moves, so it can still hold the result solved at the previous
+    // negative offset — e.g. a multi-row item backtracked from a lower row by
+    // CheckMultiRow — and the reported startIndex then misses the top-left
+    // item of the first row.
+    // Conditions, each with its own role:
+    // 1. NearZero(currentOffset_): the anchor line's top sits at the viewport
+    //    top, i.e. the anchor is the first visible line. This is the exact
+    //    state whose stale startIndex_ the NearZero branch below would return.
+    // 2. lineHeightMap_ records from line 0: guard for GetStartLineOffset()'s
+    //    precondition ("only meaningful when all lines are recorded"). The
+    //    custom layout and long jumps leave the lines above the anchor
+    //    unrecorded, where condition 3 would be a false zero.
+    // 3. NearZero(GetStartLineOffset()) — heights of the lines above the
+    //    anchor minus currentOffset_ — i.e. the viewport top coincides with
+    //    the CONTENT top. This is not implied by 1: after a scrollToIndex
+    //    jump (anchor on the jump line, currentOffset_ == 0) the matrix top
+    //    is far above the viewport and must stay untouched. When the anchor
+    //    is line 0, 3 degenerates to -currentOffset_ and 1 and 3 coincide
+    //    (kept explicit per review, so the condition does not rely on that
+    //    algebraic identity if GetStartLineOffset ever changes).
+    // With contentStartOffset_ > 0 the top position has currentOffset_ ==
+    //    contentStartOffset_ != 0; conditions 1 and 3 both fail and the
+    //    Positive branch below (SolveBackward from the anchor) already
+    //    recomputes the start correctly — covered by
+    //    OnScrollIndexStartIndexAtTopWithPadding001.
+    // Skip while the start extension is active; it applies its own
+    // corrections.
+    if (NearZero(info_->startFixOffset_) && NearZero(info_->currentOffset_) &&
+        info_->lineHeightMap_.begin()->first == 0 && NearZero(info_->GetStartLineOffset(mainGap))) {
+        auto [topRow, topIdx] = CheckMultiRow(info_->gridMatrix_.begin()->first);
+        if (topRow >= 0 && topIdx >= 0) {
+            return { topRow, topIdx, info_->currentOffset_ };
+        }
+    }
     if (NearZero(info_->currentOffset_)) {
         // With the start extension active, rows visible in the start extension
         // must join the starting row too (fix #1/#3: the original code returned

@@ -19,6 +19,7 @@
 #include "core/components_ng/pattern/grid/irregular/grid_irregular_layout_algorithm.h"
 #include "core/components_ng/pattern/grid/irregular/grid_layout_range_solver.h"
 #include "core/components_ng/pattern/scroll/scroll_edge_effect.h"
+#include "core/components_ng/pattern/scrollable/scrollable_model_ng.h"
 
 namespace OHOS::Ace::NG {
 class GridIrregularLayoutTestTwo : public GridTestNg {};
@@ -1467,6 +1468,357 @@ HWTEST_F(GridIrregularLayoutTestTwo, PreloadItemsItemNotInMatrix001, TestSize.Le
     PipelineContext::GetCurrentContext()->OnIdle(INT64_MAX);
 
     EXPECT_TRUE(pattern_->preloadItemList_.empty());
+}
+
+/**
+ * @tc.name: OnScrollIndexStartIndexAtTop001
+ * @tc.desc: Layout with a multi-row item in the middle column (3 columns,
+ *           item 1 spans rows 0-2):
+ *           0 [1] 2
+ *           3 [1] 4
+ *           5 [1] 6
+ *           7  8  9 ...
+ *           When the grid scrolls back to the first row in one step (fling
+ *           clamped at the start edge / spring settle), the reported start
+ *           index must be the top-left item of the first row (0), not the
+ *           multi-row item backtracked from a lower row (1).
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridIrregularLayoutTestTwo, OnScrollIndexStartIndexAtTop001, TestSize.Level1)
+{
+    GridLayoutOptions option;
+    option.irregularIndexes = { 1 };
+    auto onGetIrregularSizeByIndex = [](int32_t index) -> GridItemSize {
+        return { .rows = 3, .columns = 1 };
+    };
+    option.getSizeByIndex = std::move(onGetIrregularSizeByIndex);
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr");
+    model.SetLayoutOptions(option);
+    CreateFixedItems(16);
+    CreateDone();
+    FlushUITasks();
+
+    EXPECT_EQ(pattern_->info_.startIndex_, 0);
+    // item 1 occupies the middle column and spans the first three rows:
+    // continuation markers -1 sit below its start cell in rows 1 and 2
+    EXPECT_EQ(pattern_->info_.gridMatrix_.at(0).at(1), 1);
+    EXPECT_EQ(pattern_->info_.gridMatrix_.at(1).at(1), -1);
+    EXPECT_EQ(pattern_->info_.gridMatrix_.at(2).at(1), -1);
+    EXPECT_FLOAT_EQ(pattern_->GetItemRect(1).Top(), 0.0f);
+
+    // scroll down: row 0 leaves the viewport, the multi-row item 1 (still
+    // visible from row 0) becomes the start of the visible range
+    UpdateCurrentOffset(-150.0f);
+    EXPECT_EQ(pattern_->info_.startMainLineIndex_, 0);
+    EXPECT_EQ(pattern_->info_.startIndex_, 1);
+
+    // scroll straight back to the first row in a single step
+    UpdateCurrentOffset(150.0f);
+    EXPECT_FLOAT_EQ(pattern_->info_.currentOffset_, 0.0f);
+    EXPECT_EQ(pattern_->info_.startMainLineIndex_, 0);
+    EXPECT_EQ(pattern_->info_.startIndex_, 0);
+    EXPECT_EQ(pattern_->info_.ReportStartIndex(), 0);
+}
+
+/**
+ * @tc.name: OnScrollIndexStartIndexAtTopWithPadding001
+ * @tc.desc: Same layout as OnScrollIndexStartIndexAtTop001, but the grid has
+ *           a content start offset, so the top position is currentOffset_ ==
+ *           contentStartOffset_ instead of 0. A one-step scroll back to the
+ *           top must still report the top-left item of the first row.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridIrregularLayoutTestTwo, OnScrollIndexStartIndexAtTopWithPadding001, TestSize.Level1)
+{
+    GridLayoutOptions option;
+    option.irregularIndexes = { 1 };
+    auto onGetIrregularSizeByIndex = [](int32_t index) -> GridItemSize {
+        return { .rows = 3, .columns = 1 };
+    };
+    option.getSizeByIndex = std::move(onGetIrregularSizeByIndex);
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr");
+    model.SetLayoutOptions(option);
+    ScrollableModelNG::SetContentStartOffset(CONTENT_START_OFFSET);
+    CreateFixedItems(16);
+    CreateDone();
+    FlushUITasks();
+
+    EXPECT_FLOAT_EQ(pattern_->info_.contentStartOffset_, CONTENT_START_OFFSET);
+    EXPECT_EQ(pattern_->info_.startIndex_, 0);
+
+    // scroll down past the first row (the first step is friction-damped while
+    // the grid is still at its start position)
+    UpdateCurrentOffset(-150.0f);
+    UpdateCurrentOffset(-150.0f);
+    EXPECT_EQ(pattern_->info_.startIndex_, 1);
+
+    // scroll past the very top in a single step: the layout must clamp to the
+    // top position and report the top-left item of the first row
+    UpdateCurrentOffset(300.0f);
+    EXPECT_FLOAT_EQ(pattern_->info_.currentOffset_, CONTENT_START_OFFSET);
+    EXPECT_EQ(pattern_->info_.startMainLineIndex_, 0);
+    EXPECT_EQ(pattern_->info_.startIndex_, 0);
+    EXPECT_EQ(pattern_->info_.ReportStartIndex(), 0);
+}
+
+/**
+ * @tc.name: OnScrollIndexStartIndexAtTopHorizontal001
+ * @tc.desc: Horizontal grid (3 rows) with a default full-height irregular
+ *           item: col0 holds 0/1/2, col1 holds the single item 3 spanning all
+ *           rows, col2 holds 4/5/6. Scrolling back to the start in one step
+ *           must report the top-left item (0).
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridIrregularLayoutTestTwo, OnScrollIndexStartIndexAtTopHorizontal001, TestSize.Level1)
+{
+    GridLayoutOptions option;
+    option.irregularIndexes = { 3 };
+    GridModelNG model = CreateGrid();
+    model.SetRowsTemplate("1fr 1fr 1fr");
+    model.SetLayoutOptions(option);
+    CreateFixedItems(12);
+    CreateDone();
+    FlushUITasks();
+
+    EXPECT_EQ(pattern_->info_.startIndex_, 0);
+    // item 3 starts at the second column and spans the whole grid height
+    auto rect3 = pattern_->GetItemRect(3);
+    EXPECT_FLOAT_EQ(rect3.Left(), ITEM_MAIN_SIZE);
+
+    // scroll right: column 0 leaves the viewport, the full-height item 3
+    // becomes the start of the visible range
+    UpdateCurrentOffset(-150.0f);
+    EXPECT_EQ(pattern_->info_.startIndex_, 3);
+
+    // scroll straight back to the start in a single step
+    UpdateCurrentOffset(150.0f);
+    EXPECT_FLOAT_EQ(pattern_->info_.currentOffset_, 0.0f);
+    EXPECT_EQ(pattern_->info_.startIndex_, 0);
+    EXPECT_EQ(pattern_->info_.ReportStartIndex(), 0);
+
+    // scroll straight to the end edge in a single step (content 500, viewport
+    // 240): the range must cover through the last item. The anchor line is
+    // column 2 (its top edge sits 60px above the viewport), hence the offset.
+    UpdateCurrentOffset(-400.0f);
+    EXPECT_FLOAT_EQ(pattern_->info_.currentOffset_, -60.0f);
+    EXPECT_EQ(pattern_->info_.startMainLineIndex_, 2);
+    EXPECT_EQ(pattern_->info_.startIndex_, 4);
+    EXPECT_EQ(pattern_->info_.endIndex_, 11);
+    EXPECT_EQ(pattern_->info_.ReportEndIndex(), 11);
+    EXPECT_TRUE(pattern_->info_.reachEnd_);
+}
+
+/**
+ * @tc.name: OnScrollIndexRangeAtBottom001
+ * @tc.desc: Same layout as OnScrollIndexStartIndexAtTop001 (3 columns, item 1
+ *           spans rows 0-2, 6 rows of 100). Scrolling straight to the bottom
+ *           edge in a single step (fling clamped at the end edge) must report
+ *           the full visible range: startIndex = 1 (the multi-row item is
+ *           still partially visible at the top of the viewport) and
+ *           endIndex = last item.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridIrregularLayoutTestTwo, OnScrollIndexRangeAtBottom001, TestSize.Level1)
+{
+    GridLayoutOptions option;
+    option.irregularIndexes = { 1 };
+    auto onGetIrregularSizeByIndex = [](int32_t index) -> GridItemSize {
+        return { .rows = 3, .columns = 1 };
+    };
+    option.getSizeByIndex = std::move(onGetIrregularSizeByIndex);
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr");
+    model.SetLayoutOptions(option);
+    CreateFixedItems(16);
+    CreateDone();
+    FlushUITasks();
+
+    // one-step scroll far past the bottom edge (content 600, viewport 400,
+    // max scroll 200): the offset must clamp and the range must cover the
+    // last item
+    UpdateCurrentOffset(-500.0f);
+    EXPECT_FLOAT_EQ(pattern_->info_.currentOffset_, -200.0f);
+    EXPECT_EQ(pattern_->info_.endIndex_, 15);
+    EXPECT_EQ(pattern_->info_.ReportEndIndex(), 15);
+    EXPECT_TRUE(pattern_->info_.reachEnd_);
+    // the viewport shows rows 2-5; the multi-row item 1 (rows 0-2) is still
+    // partially visible and keeps starting the range
+    EXPECT_EQ(pattern_->info_.startMainLineIndex_, 0);
+    EXPECT_EQ(pattern_->info_.startIndex_, 1);
+    EXPECT_EQ(pattern_->info_.ReportStartIndex(), 1);
+}
+
+/**
+ * @tc.name: OnScrollIndexRangeAtBottom002
+ * @tc.desc: Same as OnScrollIndexRangeAtBottom001 but the multi-row item sits
+ *           at the bottom of the content (item 13 spans rows 4-5). At the
+ *           bottom edge the last visible row contains its continuation cell;
+ *           endIndex must still resolve to the true last item (15).
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridIrregularLayoutTestTwo, OnScrollIndexRangeAtBottom002, TestSize.Level1)
+{
+    GridLayoutOptions option;
+    option.irregularIndexes = { 13 };
+    auto onGetIrregularSizeByIndex = [](int32_t index) -> GridItemSize {
+        return { .rows = 2, .columns = 1 };
+    };
+    option.getSizeByIndex = std::move(onGetIrregularSizeByIndex);
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr");
+    model.SetLayoutOptions(option);
+    CreateFixedItems(16);
+    CreateDone();
+    FlushUITasks();
+
+    // layout: r4: 12 [13] 14; r5: 15 [13-cont]
+    EXPECT_EQ(pattern_->info_.gridMatrix_.at(4).at(1), 13);
+    EXPECT_EQ(pattern_->info_.gridMatrix_.at(5).at(1), -13);
+
+    // one-step scroll far past the bottom edge (content 600, viewport 400):
+    // the offset clamps with the anchor on row 2 (no multi-row backtrack in
+    // this layout), so the anchor-relative offset is 0 while the viewport
+    // shows rows 2-5; endIndex resolves through the continuation cell to 15
+    UpdateCurrentOffset(-500.0f);
+    EXPECT_FLOAT_EQ(pattern_->info_.currentOffset_, 0.0f);
+    EXPECT_EQ(pattern_->info_.startMainLineIndex_, 2);
+    EXPECT_EQ(pattern_->info_.endIndex_, 15);
+    EXPECT_EQ(pattern_->info_.ReportEndIndex(), 15);
+    EXPECT_TRUE(pattern_->info_.reachEnd_);
+    EXPECT_EQ(pattern_->info_.startIndex_, 6);
+}
+
+/**
+ * @tc.name: OnScrollIndexRangeAtMiddlePosition001
+ * @tc.desc: One-step scroll to a middle position must report the range of the
+ *           actual viewport: first visible row 1 backtracks to the multi-row
+ *           item (startIndex = 1) while startIndex/top and endIndex recompute
+ *           from scratch on every measure.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridIrregularLayoutTestTwo, OnScrollIndexRangeAtMiddlePosition001, TestSize.Level1)
+{
+    GridLayoutOptions option;
+    option.irregularIndexes = { 1 };
+    auto onGetIrregularSizeByIndex = [](int32_t index) -> GridItemSize {
+        return { .rows = 3, .columns = 1 };
+    };
+    option.getSizeByIndex = std::move(onGetIrregularSizeByIndex);
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr");
+    model.SetLayoutOptions(option);
+    CreateFixedItems(16);
+    CreateDone();
+    FlushUITasks();
+
+    // single-step scroll: viewport covers content [110, 510] = rows 1-5
+    UpdateCurrentOffset(-110.0f);
+    EXPECT_FLOAT_EQ(pattern_->info_.currentOffset_, -110.0f);
+    EXPECT_EQ(pattern_->info_.startMainLineIndex_, 0);
+    EXPECT_EQ(pattern_->info_.startIndex_, 1);
+    EXPECT_EQ(pattern_->info_.ReportStartIndex(), 1);
+    EXPECT_EQ(pattern_->info_.endIndex_, 15);
+
+    // single-step scroll back up from the bottom: re-solves both ends
+    UpdateCurrentOffset(-90.0f);
+    EXPECT_FLOAT_EQ(pattern_->info_.currentOffset_, -200.0f);
+    UpdateCurrentOffset(90.0f);
+    EXPECT_FLOAT_EQ(pattern_->info_.currentOffset_, -110.0f);
+    EXPECT_EQ(pattern_->info_.startIndex_, 1);
+    EXPECT_EQ(pattern_->info_.endIndex_, 15);
+}
+
+/**
+ * @tc.name: OnScrollIndexStartIndexAtTopWithResidual001
+ * @tc.desc: A real one-step scroll back to the top is produced by the fling
+ *           clamp / spring settle, whose final currentOffset_ can carry a
+ *           tiny floating-point residual instead of an exact 0. Both residual
+ *           signs must still report the top-left item of the first row
+ *           (NearZero boundary of the re-anchor in FindStartingRow).
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridIrregularLayoutTestTwo, OnScrollIndexStartIndexAtTopWithResidual001, TestSize.Level1)
+{
+    GridLayoutOptions option;
+    option.irregularIndexes = { 1 };
+    auto onGetIrregularSizeByIndex = [](int32_t index) -> GridItemSize {
+        return { .rows = 3, .columns = 1 };
+    };
+    option.getSizeByIndex = std::move(onGetIrregularSizeByIndex);
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr");
+    model.SetLayoutOptions(option);
+    CreateFixedItems(16);
+    CreateDone();
+    FlushUITasks();
+
+    // positive residual: scroll back past the top by 0.001 (clamped frame)
+    UpdateCurrentOffset(-150.0f);
+    UpdateCurrentOffset(150.001f);
+    EXPECT_NEAR(pattern_->info_.currentOffset_, 0.0f, 0.01f);
+    EXPECT_EQ(pattern_->info_.startMainLineIndex_, 0);
+    EXPECT_EQ(pattern_->info_.startIndex_, 0);
+    EXPECT_EQ(pattern_->info_.ReportStartIndex(), 0);
+
+    // negative residual: stop 0.001 short of the top
+    UpdateCurrentOffset(-150.0f);
+    UpdateCurrentOffset(149.999f);
+    EXPECT_NEAR(pattern_->info_.currentOffset_, 0.0f, 0.01f);
+    EXPECT_EQ(pattern_->info_.startMainLineIndex_, 0);
+    EXPECT_EQ(pattern_->info_.startIndex_, 0);
+    EXPECT_EQ(pattern_->info_.ReportStartIndex(), 0);
+}
+
+/**
+ * @tc.name: OnScrollIndexStartIndexOnOverscroll001
+ * @tc.desc: Head blank overscroll transient (spring edge effect drag at the
+ *           start edge, currentOffset_ > contentStartOffset_): the re-anchor
+ *           branch must stay out of this state and the reported startIndex
+ *           must keep being the top-left item via the regular Positive
+ *           (SolveBackward) path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridIrregularLayoutTestTwo, OnScrollIndexStartIndexOnOverscroll001, TestSize.Level1)
+{
+    GridLayoutOptions option;
+    option.irregularIndexes = { 1 };
+    auto onGetIrregularSizeByIndex = [](int32_t index) -> GridItemSize {
+        return { .rows = 3, .columns = 1 };
+    };
+    option.getSizeByIndex = std::move(onGetIrregularSizeByIndex);
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr");
+    model.SetLayoutOptions(option);
+    model.SetEdgeEffect(EdgeEffect::SPRING, true);
+    CreateFixedItems(16);
+    CreateDone();
+    FlushUITasks();
+
+    EXPECT_EQ(pattern_->info_.startIndex_, 0);
+
+    // drag down at the start edge: content is pulled below the content-area
+    // top, leaving a transient blank above the first row. Whether the layout
+    // keeps the overscroll offset (canOverScrollStart_) or clamps it back to
+    // the top, the reported start must be the top-left item of the first row
+    // via the regular Positive (SolveBackward) path — the re-anchor branch
+    // must stay out of this transient state (currentOffset_ > contentStart).
+    pattern_->scrollableEvent_->scrollable_->isTouching_ = true;
+    UpdateCurrentOffset(50.0f);
+    EXPECT_GE(pattern_->info_.currentOffset_, 0.0f);
+    EXPECT_LE(pattern_->info_.currentOffset_, 50.0f);
+    EXPECT_EQ(pattern_->info_.startMainLineIndex_, 0);
+    EXPECT_EQ(pattern_->info_.startIndex_, 0);
+    EXPECT_EQ(pattern_->info_.ReportStartIndex(), 0);
+
+    // release: the spring settles straight back to the exact top in one step
+    pattern_->scrollableEvent_->scrollable_->isTouching_ = false;
+    UpdateCurrentOffset(-50.0f);
+    EXPECT_FLOAT_EQ(pattern_->info_.currentOffset_, 0.0f);
+    EXPECT_EQ(pattern_->info_.startMainLineIndex_, 0);
+    EXPECT_EQ(pattern_->info_.startIndex_, 0);
+    EXPECT_EQ(pattern_->info_.ReportStartIndex(), 0);
 }
 
 } // namespace OHOS::Ace::NG
