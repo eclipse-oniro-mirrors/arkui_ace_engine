@@ -1396,7 +1396,8 @@ void AceContainer::InitializeCallback()
     aceView_->RegisterTouchEventCallback(touchEventCallback);
 
     pipelineContext_->SetTouchPadRawEventEnableCallback(
-        [view = aceView_](bool enabled) {
+        [weakView = WeakPtr<AceView>(aceView_)](bool enabled) {
+            auto view = weakView.Upgrade();
             CHECK_NULL_VOID(view);
             view->EnableTouchpadRawEvent(enabled);
         });
