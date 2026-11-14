@@ -249,6 +249,9 @@ protected:
     std::string transform_;
     Matrix4 cachedTransformMatrix_;
     bool transformMatrixCached_ = false;
+    // transformVec/transformOrigin are only set during parsing, so cache never expires
+    std::optional<Matrix4> transformVecMatrixCache_;
+    std::optional<SvgLengthScaleRule> transformVecCacheKey_;
     std::map<std::string, std::vector<float>> animateTransform_;
 
     SvgBaseAttribute attributes_;

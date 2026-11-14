@@ -51,7 +51,7 @@ public:
         return viewPort_;
     }
 
-    bool operator==(const SvgLengthScaleRule& lengthRule)
+    bool operator==(const SvgLengthScaleRule& lengthRule) const
     {
         return containerRect_ == lengthRule.GetContainerRect() && viewPort_ == lengthRule.GetViewPort()
             && lengthScaleUnit_ == lengthRule.GetLengthScaleUnit();
