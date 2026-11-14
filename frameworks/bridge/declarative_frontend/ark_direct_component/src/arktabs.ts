@@ -294,6 +294,10 @@ function loadComponent(): ComponentObj | undefined {
         modifierWithKey(this._modifiersWithKeys, ShowSidebarControlButtonModifier.identity, ShowSidebarControlButtonModifier, value);
         return this;
       }
+      sidebarTitleBar(value: Optional<TabsSidebarTitleBarOptions>): TabsAttribute {
+        modifierWithKey(this._modifiersWithKeys, TabsSidebarTitleBarModifier.identity, TabsSidebarTitleBarModifier, value);
+        return this;
+      }
       barDisplayModeBreakpoint(value: TabsBreakpointType<TabBarDisplayMode>): TabsAttribute {
         modifierWithKey(this._modifiersWithKeys, TabsBarDisplayModeBreakpointModifier.identity, TabsBarDisplayModeBreakpointModifier, value);
         return this;
@@ -1309,6 +1313,25 @@ function loadComponent(): ComponentObj | undefined {
       }
     }
 
+    class TabsSidebarTitleBarModifier extends ModifierWithKey<TabsSidebarTitleBarOptions> {
+      constructor(value: TabsSidebarTitleBarOptions) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('sidebarTitleBar');
+
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().tabs.resetSidebarTitleBar(node);
+        } else {
+          getUINativeModule().tabs.setSidebarTitleBar(node, this.value);
+        }
+      }
+
+      checkObjectDiff(): boolean {
+        return !isBaseOrResourceEqual(this.stageValue, this.value);
+      }
+    }
+
     class TabsBarDisplayModeBreakpointModifier extends ModifierWithKey<TabsBreakpointType<TabBarDisplayMode>> {
       constructor(value: TabsBreakpointType<TabBarDisplayMode>) {
         super(value);
@@ -1693,6 +1716,9 @@ class JSTabs extends JSContainerBase {
 
   static sidebarSearchable(value: any): void {
     getUINativeModule().tabs.setSidebarSearchable(true, value);
+  }
+  static sidebarTitleBar(value: any): void {
+    getUINativeModule().tabs.setSidebarTitleBar(true, value);
   }
 
   static showSidebarControlButton(value: any): void {

@@ -17,6 +17,7 @@
 
 #include "core/components/common/properties/color.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/pattern/linear_layout/linear_layout_property.h"
 #include "core/components_ng/pattern/tabs/tabs_side_bar_pattern.h"
 #include "core/components_v2/inspector/inspector_constants.h"
 
@@ -73,16 +74,25 @@ float TabsSideBarLayoutAlgorithm::MeasureHeaderContainer(LayoutWrapper* layoutWr
     if (property->GetVisibilityValue(VisibleType::GONE) != VisibleType::VISIBLE) {
         return 0.0f;
     }
+    float padding = SIDEBAR_PADDING.ConvertToPx();
+    float contentWidth = std::max(0.0f, size.Width() - padding - padding);
+    float contentHeight = size.Height();
+
     auto index = hostNode->GetChildIndexById(headerContainerNode->GetId());
     if (index < 0) {
         return 0.0f;
     }
     auto headerContainerWrapper = layoutWrapper->GetOrCreateChildByIndex(index);
     CHECK_NULL_RETURN(headerContainerWrapper, 0.0f);
-
-    float padding = SIDEBAR_PADDING.ConvertToPx();
-    float contentWidth = std::max(0.0f, size.Width() - padding - padding);
-    float contentHeight = size.Height();
+    auto titleBarRowNode = sideBarPattern->GetTitleBarRowNode();
+    if (titleBarRowNode) {
+        auto rowProp = titleBarRowNode->GetLayoutProperty<LinearLayoutProperty>();
+        if (rowProp) {
+            Dimension rowHeight = sideBarPattern->ComputeTitleBarRowHeight();
+            rowProp->UpdateUserDefinedIdealSize(
+                CalcSize(CalcLength(contentWidth), CalcLength(rowHeight)));
+        }
+    }
     LayoutConstraintF childConstraint;
     childConstraint.maxSize.SetWidth(contentWidth);
     childConstraint.maxSize.SetHeight(contentHeight);

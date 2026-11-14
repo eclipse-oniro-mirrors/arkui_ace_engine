@@ -688,20 +688,58 @@ void TabsLayoutAlgorithm::LayoutInSideBarMode(LayoutWrapper* layoutWrapper)
                 auto buttonGeo = buttonWrapper->GetGeometryNode();
                 if (buttonGeo) {
                     float buttonSize = COLLAPSE_BUTTON_SIZE.ConvertToPx();
-                    float padding = COLLAPSE_BUTTON_PADDING.ConvertToPx();
                     float verticalPadding = COLLAPSE_BUTTON_VERTICAL_PADDING.ConvertToPx();
                     auto paddingOffset = layoutProperty->CreatePaddingAndBorder().Offset();
-                    auto sideBarPosition = layoutProperty->GetSidebarPositionValue(BarPosition::START);
                     bool isRTL = layoutProperty->GetNonAutoLayoutDirection() == TextDirection::RTL;
-                    bool isEnd = (isRTL && sideBarPosition == BarPosition::START) ||
-                                (!isRTL && sideBarPosition == BarPosition::END);
+                    auto sideBarPattern = sideBar->GetPattern<TabsSideBarPattern>();
+                    bool isCollapsed = sideBarPattern ? sideBarPattern->IsCollapsed() : false;
+                    float buttonY = verticalPadding + paddingOffset.GetY();
+                    if (sideBarPattern && sideBarPattern->ShouldAlignWithControlButtons()) {
+                        auto pipeline = tabsNode->GetContext();
+                        int32_t titleHeight = pipeline ? pipeline->GetContainerModalTitleHeight() : 0;
+                        if (titleHeight > 0) {
+                            buttonY = (static_cast<float>(titleHeight) - buttonSize) / 2.0f + paddingOffset.GetY();
+                        }
+                    }
+                    bool hasTitleBarRow = tabsPattern->HasSidebarTitleBar();
+                    auto sideBarPosition = layoutProperty->GetSidebarPositionValue(BarPosition::START);
+                    bool isLeadingEdge =
+                        (!isRTL && sideBarPosition == BarPosition::START) ||
+                        (isRTL && sideBarPosition == BarPosition::END);
                     OffsetF buttonOffset;
-                    if (isEnd) {
+                    if (isCollapsed) {
+                        float tabsWidth = frameSize.Width();
+                        float breakpoint600 = BREAKPOINT_600.ConvertToPx();
+                        float breakpoint840 = BREAKPOINT_840.ConvertToPx();
+                        float padding = FLOATING_BAR_MARGIN_16.ConvertToPx();
+                        if (GreatOrEqual(tabsWidth, breakpoint840)) {
+                            padding = FLOATING_BAR_MARGIN_32.ConvertToPx();
+                        } else if (GreatOrEqual(tabsWidth, breakpoint600)) {
+                            padding = FLOATING_BAR_MARGIN_24.ConvertToPx();
+                        }
+                        if (isLeadingEdge) {
+                            buttonOffset = OffsetF(padding + paddingOffset.GetX(), buttonY);
+                        } else {
                         buttonOffset = OffsetF(frameSize.Width() - buttonSize - padding + paddingOffset.GetX(),
-                            verticalPadding + paddingOffset.GetY());
+                                buttonY);
+                        }
+                    } else if (hasTitleBarRow && sideBarGeo) {
+                        float padding = COLLAPSE_BUTTON_PADDING.ConvertToPx();
+                        float sideBarX = sideBarGeo->GetMarginFrameOffset().GetX();
+                        float sideBarWidth = sideBarGeo->GetMarginFrameSize().Width();
+                        if (isRTL) {
+                            buttonOffset = OffsetF(sideBarX + padding, buttonY);
+                        } else {
+                            buttonOffset = OffsetF(sideBarX + sideBarWidth - buttonSize - padding, buttonY);
+                        }
                     } else {
-                        buttonOffset = OffsetF(padding + paddingOffset.GetX(),
-                            verticalPadding + paddingOffset.GetY());
+                        float padding = FLOATING_BAR_MARGIN_16.ConvertToPx();
+                        if (isLeadingEdge) {
+                            buttonOffset = OffsetF(padding + paddingOffset.GetX(), buttonY);
+                    } else {
+                            buttonOffset = OffsetF(frameSize.Width() - buttonSize - padding + paddingOffset.GetX(),
+                                buttonY);
+                        }
                     }
                     buttonGeo->SetMarginFrameOffset(buttonOffset);
                     buttonWrapper->Layout();
