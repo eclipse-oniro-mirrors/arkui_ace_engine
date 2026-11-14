@@ -15,6 +15,7 @@
 
 #include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
 
+#include <algorithm>
 #include <cmath>
 #include <set>
 
@@ -571,19 +572,157 @@ void WaterFlowPattern::ResetSnapGeometry()
 {
     snapItemGeometryCache_.clear();
     snapTotalHeight_.reset();
+    ClearSnapFollow();
     ClearPredictedItemSnapTarget();
     const float offset = static_cast<float>(GetTotalOffset());
     snapGeometryEstimatedOffset_ = offset;
     snapGeometryStableOffset_ = offset;
 }
 
+void WaterFlowPattern::ClearSnapFollow()
+{
+    snapFollowIndex_.reset();
+    snapFollowAnchor_ = 0.0f;
+}
+
+float WaterFlowPattern::SnapAnchorOffset(
+    ScrollSnapAlign align, const SnapItemGeometry& geometry, float viewport) const
+{
+    float offset = geometry.contentStart;
+    if (align == ScrollSnapAlign::CENTER) {
+        offset += (geometry.mainSize - viewport) / 2.0f;
+    } else if (align == ScrollSnapAlign::END) {
+        offset += geometry.mainSize - viewport;
+    }
+    return offset;
+}
+
+std::optional<float> WaterFlowPattern::ResolveSnapAnchorOffset(
+    int32_t index, const std::vector<SnapItemGeometry>& previous) const
+{
+    const auto align = GetScrollSnapStrategy().align;
+    const float viewport = GetMainContentSize();
+    for (const auto& geometry : snapItemGeometryCache_) {
+        if (geometry.index == index) {
+            return SnapAnchorOffset(align, geometry, viewport);
+        }
+    }
+    // The target dropped out of the window after a preceding item changed height. Its content
+    // start moves by the same amount as that item's end.
+    int32_t bestIndex = -1;
+    float shift = 0.0f;
+    for (const auto& oldGeometry : previous) {
+        if (oldGeometry.index >= index || oldGeometry.index < bestIndex) {
+            continue;
+        }
+        const SnapItemGeometry* updated = nullptr;
+        for (const auto& geometry : snapItemGeometryCache_) {
+            if (geometry.index == oldGeometry.index) {
+                updated = &geometry;
+                break;
+            }
+        }
+        if (!updated) {
+            continue;
+        }
+        bestIndex = oldGeometry.index;
+        shift = (updated->contentStart + updated->mainSize) - (oldGeometry.contentStart + oldGeometry.mainSize);
+    }
+    if (bestIndex < 0 || !std::isfinite(shift)) {
+        return std::nullopt;
+    }
+    return snapFollowAnchor_ + shift;
+}
+
+void WaterFlowPattern::OnItemSnapAlignTarget(int32_t index, float /* anchorOffset */)
+{
+    if (index < 0) {
+        ClearSnapFollow();
+        return;
+    }
+    const auto anchor = ResolveSnapAnchorOffset(index, {});
+    if (!anchor || !std::isfinite(*anchor)) {
+        ClearSnapFollow();
+        return;
+    }
+    snapFollowIndex_ = index;
+    snapFollowAnchor_ = *anchor;
+}
+
+void WaterFlowPattern::FollowSnapAnchorAfterLayout(const std::vector<SnapItemGeometry>& previous)
+{
+    if (!snapFollowIndex_ || snapFollowApplying_) {
+        return;
+    }
+    auto scrollable = GetScrollable();
+    if (!scrollable) {
+        ClearSnapFollow();
+        return;
+    }
+    // Friction and takeover still rebuild the target from live geometry. Following here would
+    // drag that fling. Touch-down also drops the lock so the next gesture starts clean.
+    if (!scrollable->IsSnapAnimationRunning() && !scrollable->IsStopped()) {
+        ClearSnapFollow();
+        return;
+    }
+    const auto updated = ResolveSnapAnchorOffset(*snapFollowIndex_, previous);
+    if (!updated || !std::isfinite(*updated)) {
+        return;
+    }
+    constexpr float SNAP_ANCHOR_FOLLOW_MIN = 1.0f;
+    const float delta = *updated - snapFollowAnchor_;
+    if (std::abs(delta) < SNAP_ANCHOR_FOLLOW_MIN) {
+        // Keep the lock after the spring stops. A later layout can still follow a preceding
+        // item that grows once its height settles. Sub-pixel movement does not mark dirty.
+        return;
+    }
+    snapFollowApplying_ = true;
+    if (scrollable->IsSnapAnimationRunning()) {
+        // Move the content with the anchor in this frame and slide the spring by the applied
+        // distance. Restarting the spring here is what stalls the first frames of the fling.
+        const float before = static_cast<float>(GetItemSnapCurrentOffset());
+        if (!UpdateCurrentOffset(-delta, SCROLL_FROM_ANIMATION)) {
+            ClearSnapFollow();
+        } else {
+            const float applied = static_cast<float>(GetItemSnapCurrentOffset()) - before;
+            if (NearZero(applied)) {
+                ClearSnapFollow();
+            } else {
+                scrollable->RetargetItemSnapContent(applied);
+                snapFollowAnchor_ += applied;
+                TAG_LOGD(AceLogTag::ACE_WATERFLOW,
+                    "snap anchor %{public}d moved by %{public}f during spring", *snapFollowIndex_, applied);
+            }
+        }
+    } else {
+        const float before = static_cast<float>(GetItemSnapCurrentOffset());
+        if (!UpdateCurrentOffset(-delta, SCROLL_FROM_ANIMATION)) {
+            ClearSnapFollow();
+        } else {
+            const float applied = static_cast<float>(GetItemSnapCurrentOffset()) - before;
+            if (NearZero(applied)) {
+                // The edge effect consumed the correction. Drop the lock so layout does not retry forever.
+                ClearSnapFollow();
+            } else {
+                scrollable->SetCurrentPos(static_cast<float>(scrollable->GetCurrentPos()) - applied);
+                snapFollowAnchor_ += applied;
+                TAG_LOGD(AceLogTag::ACE_WATERFLOW,
+                    "snap anchor %{public}d moved by %{public}f after settle", *snapFollowIndex_, applied);
+            }
+        }
+    }
+    snapFollowApplying_ = false;
+}
+
 void WaterFlowPattern::UpdateSnapGeometryAfterLayout(bool isLayoutValid)
 {
+    const auto previousGeometry = snapItemGeometryCache_;
     if (!isLayoutValid) {
         snapItemGeometryCache_.clear();
         return;
     }
     UpdateSnapItemGeometryCache();
+    FollowSnapAnchorAfterLayout(previousGeometry);
     const float height = layoutInfo_->EstimateTotalHeight();
     if (layoutInfo_->Mode() == LayoutMode::SLIDING_WINDOW && std::isfinite(height)) {
         snapTotalHeight_ = height;
@@ -611,13 +750,18 @@ std::vector<SnapCandidate> WaterFlowPattern::BuildTrackedItemSnapCandidates(Scro
 
 float WaterFlowPattern::GetItemSnapCalibrationMargin() const
 {
+    const float viewport = GetMainContentSize();
+    const bool capAtViewport = std::isfinite(viewport) && GreatNotEqual(viewport, 0.0f);
     double total = 0.0;
     int32_t count = 0;
     for (const auto& geometry : snapItemGeometryCache_) {
-        if (std::isfinite(geometry.mainSize) && GreatNotEqual(geometry.mainSize, 0.0f)) {
-            total += geometry.mainSize;
-            ++count;
+        if (!std::isfinite(geometry.mainSize) || !GreatNotEqual(geometry.mainSize, 0.0f)) {
+            continue;
         }
+        // A multi-screen lazy child must not pull takeover a whole section away from a real anchor.
+        const float size = capAtViewport ? std::min(geometry.mainSize, viewport) : geometry.mainSize;
+        total += size;
+        ++count;
     }
     return count > 0 ? static_cast<float>(total / count) : 0.0f;
 }
@@ -1639,6 +1783,7 @@ void WaterFlowPattern::UpdateFastScroll(float coordinateCorrection)
 
 void WaterFlowPattern::OnTouchDown(const TouchEventInfo& info)
 {
+    ClearSnapFollow();
     if (fastScrollState_ || targetIndex_) {
         StopAnimate();
     }

@@ -1383,6 +1383,22 @@ SnapSelectResult ScrollablePattern::SelectItemSnapForAlign(const ScrollSnapStrat
     return selection;
 }
 
+namespace {
+int32_t ClosestSnapCandidateIndex(const std::vector<SnapCandidate>& candidates, float target, int32_t fallback)
+{
+    int32_t index = fallback;
+    float bestDistance = std::numeric_limits<float>::infinity();
+    for (const auto& candidate : candidates) {
+        const float distance = std::abs(candidate.offset - target);
+        if (distance < bestDistance || (NearEqual(distance, bestDistance) && candidate.index == fallback)) {
+            bestDistance = distance;
+            index = candidate.index;
+        }
+    }
+    return index;
+}
+} // namespace
+
 bool ScrollablePattern::StartItemSnapWithAlign(const ScrollSnapStrategy& strategy,
     const SnapAnimationOptions& snapAnimationOptions, float currentOffset, float maxOffset, float motionVelocity,
     float motionDelta)
@@ -1425,6 +1441,7 @@ bool ScrollablePattern::StartItemSnapWithAlign(const ScrollSnapStrategy& strateg
         ((forward && LessNotEqual(delta, 0.0f)) || (!forward && GreatNotEqual(delta, 0.0f)))) {
         return false;
     }
+    OnItemSnapAlignTarget(ClosestSnapCandidateIndex(candidates, target, selection.targetIndex), target);
     if (NearZero(delta)) {
         // Already on the target: report "not handled" so the caller finishes the stop chain
         // (CheckStopFlingInTouchUp / onDidStopFling / onScrollStop). Returning true without an

@@ -866,6 +866,9 @@ public:
         return false;
     }
     virtual void BeginTrackedItemSnap(float) {}
+    // The align spring committed to this item. Subclasses follow the same index when a later layout
+    // moves that anchor (a lazy child's estimated height settling, for example).
+    virtual void OnItemSnapAlignTarget(int32_t /* index */, float /* anchorOffset */) {}
     virtual std::vector<SnapCandidate> BuildTrackedItemSnapCandidates(ScrollSnapAlign align);
     // Shared item snap execution for align strategies and custom providers; false = capability off.
     bool StartItemSnapAnimation(const SnapAnimationOptions& snapAnimationOptions);

@@ -45,6 +45,13 @@ constexpr size_t POST_TASK_NAME_ARGUMENT = 3;
 constexpr double PROVIDER_TARGET = 320.0;
 constexpr float PROVIDER_NATURAL_OFFSET = 500.0f;
 constexpr float PROVIDER_INITIAL_VELOCITY = 1300.0f;
+constexpr float FOLLOW_VIEWPORT = 300.0f;
+constexpr float FOLLOW_ITEM0 = 100.0f;
+constexpr float FOLLOW_ITEM1_START = 100.0f;
+constexpr float FOLLOW_GROWTH = 80.0f;
+constexpr float FOLLOW_START_OFFSET = 60.0f;
+constexpr float FOLLOW_TALL_ITEM = 900.0f;
+constexpr float FOLLOW_SPRING_STEP = 10.0f;
 constexpr std::array<float, 6> SNAP_ITEM_SIZES = { 100.0f, 170.0f, 80.0f, 120.0f, 150.0f, 90.0f };
 constexpr std::array<SnapCandidate, 3> EXPECTED_START_ANCHORS = { {
     { 0.0f, 0 }, { 100.0f, 2 }, { 170.0f, 3 }
@@ -191,6 +198,33 @@ protected:
         pattern_.Reset();
         ClearOldNodes();
         ASSERT_EQ(weakNode.Upgrade(), nullptr);
+    }
+
+    // One column. Item 0 is 100px, so a START snap from 60px locks item 1.
+    void CreateFollowColumn()
+    {
+        auto model = CreateWaterFlow();
+        model.SetColumnsTemplate("1fr");
+        ViewAbstract::SetHeight(CalcLength(FOLLOW_VIEWPORT));
+        model.SetScrollSnapStrategy(MakeAlign(ScrollSnapAlign::START));
+        constexpr std::array<float, 8> heights = { FOLLOW_ITEM0, 120.0f, 80.0f, 150.0f, 100.0f, 100.0f, 100.0f,
+            100.0f };
+        for (float height : heights) {
+            CreateItemWithHeight(height);
+        }
+        CreateDone();
+    }
+
+    void ResizeFlowItem(int32_t index, float height)
+    {
+        auto item = GetItem(index);
+        ASSERT_NE(item, nullptr);
+        item->GetLayoutProperty()->UpdateUserDefinedIdealSize(
+            CalcSize(CalcLength(FILL_LENGTH), CalcLength(Dimension(height))));
+        item->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+        // Sliding-window keeps the follow delta until the next layout.
+        FlushUITasks();
+        FlushUITasks();
     }
 
     void FinishDetachedSnapAnimation(const RefPtr<Scrollable>& scrollable)
@@ -1795,5 +1829,115 @@ HWTEST_F(WaterFlowScrollSnapTestNg, ScrollSnapStrategyDump001, TestSize.Level1)
         allDesc += line;
     }
     EXPECT_NE(allDesc.find("ScrollSnapStrategy: ScrollSnapAlign.NONE\n"), std::string::npos);
+}
+
+/**
+ * @tc.name: SnapAnchorFollowsPrecedingGrowthDuringSpring
+ * @tc.desc: A START snap locked on an item keeps that item's viewport position when a preceding
+ *           item grows, and the running spring slides instead of restarting.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, SnapAnchorFollowsPrecedingGrowthDuringSpring, TestSize.Level1)
+{
+    CreateFollowColumn();
+    ScrollTo(FOLLOW_START_OFFSET);
+    const float itemYBefore = GetChildRect(frameNode_, 1).GetY();
+    ASSERT_NEAR(itemYBefore, FOLLOW_ITEM1_START - FOLLOW_START_OFFSET, 0.5f);
+    ASSERT_TRUE(pattern_->StartSnapAnimation({ .snapDelta = FOLLOW_SPRING_STEP }));
+    auto scroll = pattern_->GetScrollable();
+    ASSERT_NE(scroll, nullptr);
+    ASSERT_TRUE(scroll->IsSnapAnimationRunning());
+    ASSERT_TRUE(pattern_->snapFollowIndex_.has_value());
+    EXPECT_EQ(pattern_->snapFollowIndex_.value(), 1);
+    const float finalBefore = scroll->GetFinalPosition();
+    const float currentBefore = static_cast<float>(scroll->GetCurrentPos());
+    ASSERT_NEAR(finalBefore, -FOLLOW_ITEM1_START, 0.5f);
+
+    ASSERT_NO_FATAL_FAILURE(ResizeFlowItem(0, FOLLOW_ITEM0 + FOLLOW_GROWTH));
+
+    EXPECT_NEAR(pattern_->GetItemSnapCurrentOffset(), FOLLOW_START_OFFSET + FOLLOW_GROWTH, 0.5f);
+    EXPECT_NEAR(scroll->GetFinalPosition(), finalBefore - FOLLOW_GROWTH, 0.5f);
+    EXPECT_NEAR(static_cast<float>(scroll->GetCurrentPos()), currentBefore - FOLLOW_GROWTH, 0.5f);
+    // Remaining travel is unchanged: the curve slid, it was not rebuilt from the sample.
+    EXPECT_NEAR(scroll->GetFinalPosition() - static_cast<float>(scroll->GetCurrentPos()),
+        finalBefore - currentBefore, 0.5f);
+    EXPECT_TRUE(scroll->IsSnapAnimationRunning());
+    EXPECT_NEAR(GetChildRect(frameNode_, 1).GetY(), itemYBefore, 0.5f);
+    // The next sample still advances. A restarted spring would consume it and stay put.
+    ASSERT_TRUE(TickPosition(-FOLLOW_SPRING_STEP, -(FOLLOW_START_OFFSET + FOLLOW_GROWTH + FOLLOW_SPRING_STEP)));
+
+    FinishSnapAnimation();
+    EXPECT_NEAR(pattern_->GetTotalOffset(), FOLLOW_ITEM1_START + FOLLOW_GROWTH, 0.5f);
+    EXPECT_NEAR(GetChildRect(frameNode_, 1).GetY(), 0.0f, 0.5f);
+}
+
+/**
+ * @tc.name: SnapAnchorFollowsPrecedingGrowthAfterSettle
+ * @tc.desc: After a START snap has stopped, a preceding item that is still measured grows and the locked
+ *           item keeps its viewport position. Finishing onto item 1 scrolls item 0 out of the layout
+ *           window, so its later ideal-size change is not measured and cannot move the anchor.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, SnapAnchorFollowsPrecedingGrowthAfterSettle, TestSize.Level1)
+{
+    CreateFollowColumn();
+    ScrollTo(FOLLOW_START_OFFSET);
+    ASSERT_TRUE(pattern_->StartSnapAnimation({ .snapDelta = FOLLOW_SPRING_STEP }));
+    // Offset 70 still leaves item 0 (height 100) as the measured start item.
+    ASSERT_TRUE(TickPosition(-FOLLOW_SPRING_STEP, -(FOLLOW_START_OFFSET + FOLLOW_SPRING_STEP)));
+    auto scroll = pattern_->GetScrollable();
+    ASSERT_NE(scroll, nullptr);
+    scroll->StopSnapAnimation();
+    FlushUITasks();
+    EXPECT_TRUE(scroll->IsStopped());
+    ASSERT_TRUE(pattern_->snapFollowIndex_.has_value());
+    EXPECT_EQ(pattern_->snapFollowIndex_.value(), 1);
+    const float offsetBefore = pattern_->GetTotalOffset();
+    const float itemYBefore = GetChildRect(frameNode_, 1).GetY();
+    ASSERT_NEAR(offsetBefore, FOLLOW_START_OFFSET + FOLLOW_SPRING_STEP, 0.5f);
+
+    ASSERT_NO_FATAL_FAILURE(ResizeFlowItem(0, FOLLOW_ITEM0 + FOLLOW_GROWTH));
+
+    EXPECT_NEAR(pattern_->GetTotalOffset(), offsetBefore + FOLLOW_GROWTH, 0.5f);
+    EXPECT_NEAR(GetChildRect(frameNode_, 1).GetY(), itemYBefore, 0.5f);
+    EXPECT_FALSE(scroll->IsSnapAnimationRunning());
+}
+
+/**
+ * @tc.name: ItemSnapCalibrationMarginCappedAtViewport
+ * @tc.desc: A child taller than the viewport contributes at most one viewport to the snap takeover margin.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, ItemSnapCalibrationMarginCappedAtViewport, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    model.SetColumnsTemplate("1fr");
+    ViewAbstract::SetHeight(CalcLength(FOLLOW_VIEWPORT));
+    model.SetScrollSnapStrategy(MakeAlign(ScrollSnapAlign::START));
+    CreateItemWithHeight(FOLLOW_ITEM0);
+    CreateItemWithHeight(FOLLOW_TALL_ITEM);
+    CreateItemWithHeight(FOLLOW_ITEM0);
+    CreateItemWithHeight(FOLLOW_ITEM0);
+    CreateDone();
+
+    const float viewport = pattern_->GetMainContentSize();
+    ASSERT_GT(viewport, 0.0f);
+    double raw = 0.0;
+    double capped = 0.0;
+    int32_t count = 0;
+    bool sawTall = false;
+    for (const auto& geometry : pattern_->snapItemGeometryCache_) {
+        if (!std::isfinite(geometry.mainSize) || geometry.mainSize <= 0.0f) {
+            continue;
+        }
+        raw += geometry.mainSize;
+        capped += std::min(geometry.mainSize, viewport);
+        sawTall = sawTall || geometry.mainSize > viewport;
+        ++count;
+    }
+    ASSERT_GT(count, 0);
+    ASSERT_TRUE(sawTall);
+    EXPECT_NEAR(pattern_->GetItemSnapCalibrationMargin(), static_cast<float>(capped / count), 0.5f);
+    EXPECT_LT(pattern_->GetItemSnapCalibrationMargin(), static_cast<float>(raw / count));
 }
 } // namespace OHOS::Ace::NG
