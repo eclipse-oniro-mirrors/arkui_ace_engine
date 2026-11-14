@@ -30,7 +30,7 @@ void SlidingPanelModelImpl::Create(bool isShow)
     ViewStackProcessor::GetInstance()->Push(slidingPanel);
     slidingPanel->SetVisible(isShow);
     auto component = ViewStackProcessor::GetInstance()->GetDisplayComponent();
-    auto display = AceType::DynamicCast<DisplayComponent>(component);
+    auto display = component;
     if (!display) {
         LOGE("display is null");
         return;
@@ -95,7 +95,7 @@ void SlidingPanelModelImpl::SetFullHeight(const Dimension& fullHeight)
 void SlidingPanelModelImpl::SetIsShow(bool isShow)
 {
     auto component = ViewStackProcessor::GetInstance()->GetDisplayComponent();
-    auto display = AceType::DynamicCast<DisplayComponent>(component);
+    auto display = component;
     if (!display) {
         LOGE("display is null");
         return;
@@ -120,7 +120,7 @@ void SlidingPanelModelImpl::SetBackgroundMask(const Color& backgroundMask)
     }
 
     auto displayComponent = ViewStackProcessor::GetInstance()->GetDisplayComponent();
-    auto display = AceType::DynamicCast<DisplayComponent>(displayComponent);
+    auto display = displayComponent;
     if (!display) {
         LOGE("display is null");
         return;

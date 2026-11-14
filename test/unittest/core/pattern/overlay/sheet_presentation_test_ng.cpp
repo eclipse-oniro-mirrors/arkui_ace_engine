@@ -280,7 +280,7 @@ HWTEST_F(SheetPresentationTestNg, OnDirtyLayoutWrapperSwap001, TestSize.Level1)
     auto dirty = sheetNode->CreateLayoutWrapper();
     DirtySwapConfig config;
     config.skipMeasure = false;
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     ASSERT_NE(layoutAlgorithmWrapper, nullptr);
     auto sheetLayoutAlgorithm =
         AceType::DynamicCast<SheetPresentationLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
@@ -808,7 +808,7 @@ HWTEST_F(SheetPresentationTestNg, IsTypeNeedAvoidAiBar001, TestSize.Level1)
     ret = sheetPattern->IsTypeNeedAvoidAiBar();
     EXPECT_TRUE(ret);
 
-    auto rootLayoutProperty = AceType::DynamicCast<FrameNode>(pipelineContext->rootNode_)->GetLayoutProperty();
+    auto rootLayoutProperty = pipelineContext->rootNode_->GetLayoutProperty();
     rootLayoutProperty->safeAreaExpandOpts_ = std::make_unique<SafeAreaExpandOpts>();
     rootLayoutProperty->safeAreaExpandOpts_->type = SAFE_AREA_TYPE_SYSTEM;
     rootLayoutProperty->safeAreaExpandOpts_->edges = SAFE_AREA_EDGE_TOP;

@@ -428,7 +428,7 @@ void SheetMinimizeObject::HandleDragStartAnimation()
     auto context = host->GetContextRefPtr();
     CHECK_NULL_VOID(context);
     AnimationUtils::Animate(option, [weak = WeakClaim(this)]() {
-            auto sheetObject = AceType::DynamicCast<SheetMinimizeObject>(weak.Upgrade());
+            auto sheetObject = weak.Upgrade();
             CHECK_NULL_VOID(sheetObject);
             auto sheetPattern = sheetObject->GetPattern();
             CHECK_NULL_VOID(sheetPattern);
@@ -456,7 +456,7 @@ void SheetMinimizeObject::HandleTransformScale()
     auto context = host->GetContextRefPtr();
     CHECK_NULL_VOID(context);
     AnimationUtils::Animate(option, [weak = WeakClaim(this)]() {
-            auto sheetObject = AceType::DynamicCast<SheetMinimizeObject>(weak.Upgrade());
+            auto sheetObject = weak.Upgrade();
             CHECK_NULL_VOID(sheetObject);
             auto sheetPattern = sheetObject->GetPattern();
             CHECK_NULL_VOID(sheetPattern);
@@ -607,7 +607,7 @@ void SheetMinimizeObject::HandleEndPosition()
     optionY.SetDuration(DEFAULT_DURATION);
 
     AnimationUtils::Animate(optionX, [finalShowPosition, weak = WeakClaim(this)]() {
-            auto sheetObject = AceType::DynamicCast<SheetMinimizeObject>(weak.Upgrade());
+            auto sheetObject = weak.Upgrade();
             CHECK_NULL_VOID(sheetObject);
             auto sheetPattern = sheetObject->GetPattern();
             CHECK_NULL_VOID(sheetPattern);
@@ -620,7 +620,7 @@ void SheetMinimizeObject::HandleEndPosition()
         optionX.GetOnFinishEvent(), nullptr, context
     );
     AnimationUtils::Animate(optionY, [finalShowPosition, weak = WeakClaim(this)]() {
-            auto sheetObject = AceType::DynamicCast<SheetMinimizeObject>(weak.Upgrade());
+            auto sheetObject = weak.Upgrade();
             CHECK_NULL_VOID(sheetObject);
             auto sheetPattern = sheetObject->GetPattern();
             CHECK_NULL_VOID(sheetPattern);
@@ -685,25 +685,25 @@ void SheetMinimizeObject::InitDragDropEvent()
     }
 
     auto actionStartTask = [weak = WeakClaim(this)](const GestureEvent& info) {
-        auto sheetObject = AceType::DynamicCast<SheetMinimizeObject>(weak.Upgrade());
+        auto sheetObject = weak.Upgrade();
         CHECK_NULL_VOID(sheetObject);
         sheetObject->HandleDragStart();
     };
 
     auto actionUpdateTask = [weak = WeakClaim(this)](const GestureEvent& info) {
-        auto sheetObject = AceType::DynamicCast<SheetMinimizeObject>(weak.Upgrade());
+        auto sheetObject = weak.Upgrade();
         CHECK_NULL_VOID(sheetObject);
         sheetObject->HandleDragUpdate(info);
     };
 
     auto actionCancelTask = [weak = WeakClaim(this)]() {
-        auto sheetObject = AceType::DynamicCast<SheetMinimizeObject>(weak.Upgrade());
+        auto sheetObject = weak.Upgrade();
         CHECK_NULL_VOID(sheetObject);
         sheetObject->HandleOnDragCancel();
     };
 
     auto actionEndTask = [weak = WeakClaim(this)](const GestureEvent& info) {
-        auto sheetObject = AceType::DynamicCast<SheetMinimizeObject>(weak.Upgrade());
+        auto sheetObject = weak.Upgrade();
         CHECK_NULL_VOID(sheetObject);
         sheetObject->HandleOnDragEnd(info);
     };

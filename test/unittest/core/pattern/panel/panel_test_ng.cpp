@@ -246,7 +246,7 @@ HWTEST_F(PanelTestNg, PanelTestNg001, TestSize.Level1)
     RefPtr<LayoutWrapperNode> layoutWrapper =
         AceType::MakeRefPtr<LayoutWrapperNode>(frameNode, geometryNode, frameNode->GetLayoutProperty());
     layoutWrapper->SetLayoutAlgorithm(AccessibilityManager::MakeRefPtr<LayoutAlgorithmWrapper>(layoutAlgorithm));
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(layoutWrapper->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = layoutWrapper->GetLayoutAlgorithm();
     EXPECT_FALSE(layoutAlgorithmWrapper == nullptr);
     auto slidingPanelLayoutAlgorithm =
         AceType::DynamicCast<SlidingPanelLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
@@ -442,7 +442,7 @@ HWTEST_F(PanelTestNg, PanelTestNg005, TestSize.Level1)
     DirtySwapConfig config;
     config.skipLayout = false;
     config.skipMeasure = false;
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(layoutWrapper->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = layoutWrapper->GetLayoutAlgorithm();
     EXPECT_FALSE(layoutAlgorithmWrapper == nullptr);
     auto slidingPanelLayoutAlgorithm =
         AceType::DynamicCast<SlidingPanelLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
@@ -2472,7 +2472,7 @@ HWTEST_F(PanelTestNg, PanelTestNg0044, TestSize.Level1)
     DirtySwapConfig config;
     config.skipLayout = false;
     config.skipMeasure = true;
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(layoutWrapper->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = layoutWrapper->GetLayoutAlgorithm();
     EXPECT_FALSE(layoutAlgorithmWrapper == nullptr);
     auto slidingPanelLayoutAlgorithm =
         AceType::DynamicCast<SlidingPanelLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
