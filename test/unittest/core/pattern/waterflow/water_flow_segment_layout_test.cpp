@@ -863,7 +863,7 @@ HWTEST_F(WaterFlowSegmentTest, Segmented001, TestSize.Level1)
     auto algo =
         AceType::MakeRefPtr<WaterFlowSegmentedLayout>(AceType::DynamicCast<WaterFlowLayoutInfo>(pattern_->layoutInfo_));
 
-    auto info = AceType::DynamicCast<WaterFlowLayoutInfo>(algo->info_);
+    auto info = algo->info_;
     pattern_->BeforeCreateLayoutWrapper();
     algo->Measure(AceType::RawPtr(frameNode_));
 
