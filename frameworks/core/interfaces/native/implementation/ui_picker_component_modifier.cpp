@@ -139,6 +139,37 @@ void SetDisplayedItemCountImpl(Ark_NativePointer node, const Opt_Int32* value)
     auto convertedValue = Converter::OptConvertPtr<int32_t>(value);
     ContainerPickerModelStatic::SetDisplayedItemCount(frameNode, convertedValue);
 }
+void ParsePickerComponentFont(const Ark_arkui_component_units_Font& font, NG::PickerTextStyle& style)
+{
+    if (font.size.tag != INTEROP_TAG_UNDEFINED) {
+        auto sizeOpt = Converter::OptConvertFromArkLength(font.size.value, DimensionUnit::FP);
+        if (sizeOpt.has_value() && sizeOpt->IsValid() && !sizeOpt->IsNegative()) {
+            style.fontSize = sizeOpt.value();
+        }
+    }
+    Converter::VisitUnion(font.weight,
+        [&style](const Ark_FontWeight& v) {
+            auto weightOpt = Converter::OptConvert<FontWeight>(v);
+            if (weightOpt.has_value()) {
+                style.fontWeight = weightOpt.value();
+            }
+        },
+        [&style](const Ark_Int32& v) {
+            auto weightOpt = Converter::OptConvert<FontWeight>(v);
+            if (weightOpt.has_value()) {
+                style.fontWeight = weightOpt.value();
+            }
+        },
+        [&style](const Ark_String& v) {
+            auto str = Converter::Convert<std::string>(v);
+            auto [parseOk, val] = StringUtils::ParseFontWeight(str);
+            if (parseOk) {
+                style.fontWeight = val;
+            }
+        },
+        []() {});
+}
+
 void SetSelectedTextStyleImpl(Ark_NativePointer node,
     const Opt_PickerComponentTextStyle* value)
 {
@@ -156,27 +187,25 @@ void SetSelectedTextStyleImpl(Ark_NativePointer node,
         style.textColorSetByUser = true;
     }
     if (ts.font.tag != INTEROP_TAG_UNDEFINED) {
-        const auto& font = ts.font.value;
-        auto sizeOpt = Converter::OptConvert<Dimension>(font.size);
-        if (sizeOpt.has_value()) {
-            style.fontSize = sizeOpt.value();
-        }
-        auto weightOpt = Converter::OptConvert<FontWeight>(font.weight);
-        if (weightOpt.has_value()) {
-            style.fontWeight = weightOpt.value();
-        }
+        ParsePickerComponentFont(ts.font.value, style);
     }
-    auto minFontSizeOpt = Converter::OptConvert<Dimension>(ts.minFontSize);
-    if (minFontSizeOpt.has_value()) {
+    auto minFontSizeOpt = Converter::OptConvertFromF64ResourceStr(ts.minFontSize, DimensionUnit::FP);
+    if (minFontSizeOpt.has_value() && minFontSizeOpt->IsValid() && !minFontSizeOpt->IsNegative()) {
         style.minFontSize = minFontSizeOpt.value();
     }
-    auto maxFontSizeOpt = Converter::OptConvert<Dimension>(ts.maxFontSize);
-    if (maxFontSizeOpt.has_value()) {
+    auto maxFontSizeOpt = Converter::OptConvertFromF64ResourceStr(ts.maxFontSize, DimensionUnit::FP);
+    if (maxFontSizeOpt.has_value() && maxFontSizeOpt->IsValid() && !maxFontSizeOpt->IsNegative()) {
         style.maxFontSize = maxFontSizeOpt.value();
     }
     auto overflowOpt = Converter::OptConvert<Ace::TextOverflow>(ts.overflow);
     if (overflowOpt.has_value()) {
         style.textOverflow = overflowOpt.value();
+    }
+    if (!style.fontSize.has_value() && !style.textColor.has_value() &&
+        !style.fontWeight.has_value() && !style.minFontSize.has_value() &&
+        !style.maxFontSize.has_value() && !style.textOverflow.has_value()) {
+        ContainerPickerModel::ResetSelectedTextStyle(frameNode);
+        return;
     }
     ContainerPickerModel::SetSelectedTextStyle(frameNode, style);
 }
