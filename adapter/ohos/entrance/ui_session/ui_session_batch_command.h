@@ -45,6 +45,7 @@ enum class BatchDiagnosticReason {
     COMMAND_EXECUTION_FAILED,
     TASK_EXECUTOR_UNAVAILABLE,
     POST_TASK_FAILED,
+    SECURITY_DENIED,
 };
 
 enum class BatchCommandSummary {
@@ -88,6 +89,7 @@ enum class BatchTargetStatus {
     READY,
     NOT_FOUND,
     UNSUPPORTED_TYPE,
+    SECURITY_DENIED,
 };
 
 struct BatchResolvedTarget {

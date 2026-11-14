@@ -320,6 +320,10 @@ void EmitItemDiagnostic(const BatchDispatchContext& context, const BatchCommandI
 void ProcessItem(const BatchDispatchContext& context, const BatchCommandItem& item)
 {
     const auto target = context.resolveTarget ? context.resolveTarget(item.nodeId) : BatchResolvedTarget {};
+    if (target.status == BatchTargetStatus::SECURITY_DENIED) {
+        EmitItemDiagnostic(context, item, BatchDiagnosticReason::SECURITY_DENIED);
+        return;
+    }
     if (target.status == BatchTargetStatus::NOT_FOUND) {
         EmitItemDiagnostic(context, item, BatchDiagnosticReason::NODE_NOT_FOUND);
         return;
@@ -447,6 +451,8 @@ const char* UiSessionBatchCommand::GetReasonName(BatchDiagnosticReason reason)
             return "task_executor_unavailable";
         case BatchDiagnosticReason::POST_TASK_FAILED:
             return "post_task_failed";
+        case BatchDiagnosticReason::SECURITY_DENIED:
+            return "security_denied";
         default:
             return "unknown";
     }

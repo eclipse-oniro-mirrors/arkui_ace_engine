@@ -16,11 +16,25 @@
 #ifndef FOUNDATION_ACE_INTERFACE_UI_CONTENT_ERRORS_H
 #define FOUNDATION_ACE_INTERFACE_UI_CONTENT_ERRORS_H
 
+#include <cstdint>
+
 #ifdef NO_ERROR
 #undef NO_ERROR
 #endif
 
 namespace OHOS::Ace {
 enum ErrorCode { NO_ERROR = 0, NOT_CONNECTED, FAILED, REPLY_ERROR, PARAM_INVALID, LAST_UNFINISH };
+
+// Security auth request carried by one AI SendCommand.
+// needSecurityAuth: caller-declared auth flag; when true and the target node declares
+//   AgentControlMode::DENY, the command is authenticated before execution and a
+//   successful auth refuses the injection. Default false keeps the legacy behavior.
+// tokenId: access token id identifying the originating controller relayed by the
+//   UISession caller; used to route the security-fence notification for refused
+//   commands. UINT64_MAX means unset.
+struct SecurityAuthInfo {
+    bool needSecurityAuth = false;
+    uint64_t tokenId = UINT64_MAX;
+};
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_INTERFACE_UI_CONTENT_ERRORS_H

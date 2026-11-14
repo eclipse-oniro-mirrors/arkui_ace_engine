@@ -16,13 +16,20 @@
 #include "gtest/gtest.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
+#include "core/common/event_manager.h"
+
 #include "base/geometry/ng/point_t.h"
 #include "base/memory/ace_type.h"
 #include "base/memory/referenced.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/event/event_constants.h"
+#include "core/components_ng/gestures/recognizers/click_recognizer.h"
+#include "core/components_ng/pattern/command/ui_command_security_gate.h"
+#include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/relaxed_interaction/executors/scroll_simulating_executor.h"
 #include "core/components_ng/relaxed_interaction/relaxed_interaction_types.h"
 #include "core/pipeline_ng/pipeline_context.h"
+#include "test/mock/adapter/ohos/osal/mock_input_manager.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -499,5 +506,142 @@ HWTEST_F(ScrollSimulatingExecutorStepTest, ExecuteStep_ReturnPENDING1, TestSize.
     ScrollSimulatingExecutor executor(context, tmpCmd);
     auto result = executor.ExecuteStep();
     EXPECT_EQ(result, ExecutorResult::PENDING);
+}
+
+namespace {
+class MockFrameNodeForScroll : public FrameNode {
+    DECLARE_ACE_TYPE(MockFrameNodeForScroll, FrameNode);
+
+public:
+    MockFrameNodeForScroll(const std::string& tag, int32_t nodeId, const RefPtr<Pattern>& pattern)
+        : FrameNode(tag, nodeId, pattern) {}
+
+    HitTestResult TouchTest(const PointF& globalPoint, const PointF& parentLocalPoint, // NOLINT
+        const PointF& parentRevertPoint, TouchRestrict& touchRestrict, TouchTestResult& result,
+        int32_t touchId, ResponseLinkResult& responseLinkResult, bool isDispatch = false) override
+    {
+        if (onTouchTest_) {
+            onTouchTest_(result);
+        }
+        return HitTestResult::STOP_BUBBLING;
+    }
+
+    void SetTouchTestCallback(std::function<void(TouchTestResult&)> callback)
+    {
+        onTouchTest_ = std::move(callback);
+    }
+
+private:
+    std::function<void(TouchTestResult&)> onTouchTest_;
+};
+} // namespace
+
+/**
+ * @tc.name: ExecuteStep_SecurityDeniedRefusesBeforeScrollDispatch
+ * @tc.desc: AC-4/R-8: with the security auth request on and the hit target at the scroll
+ *           start point declaring DENY plus the permission granted, the scroll is refused
+ *           before any touch event is dispatched.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollSimulatingExecutorStepTest, ExecuteStep_SecurityDeniedRefusesBeforeScrollDispatch, TestSize.Level1)
+{
+    auto buttonNode = AceType::MakeRefPtr<FrameNode>("Button", 411, AceType::MakeRefPtr<Pattern>());
+    buttonNode->SetAgentControlMode(AgentControlMode::DENY);
+    auto clickRecognizer = AceType::MakeRefPtr<ClickRecognizer>();
+    clickRecognizer->AttachFrameNode(buttonNode);
+
+    auto context = WeakPtr<PipelineContext>(mockPipelineContext_);
+    auto rootNode = AceType::MakeRefPtr<MockFrameNodeForScroll>("Root", 412, AceType::MakeRefPtr<Pattern>());
+    rootNode->SetTouchTestCallback([&clickRecognizer](TouchTestResult& result) {
+        result.push_back(clickRecognizer);
+    });
+    auto rootBackup = mockPipelineContext_->rootNode_;
+    mockPipelineContext_->SetEventManager(AceType::MakeRefPtr<EventManager>());
+    mockPipelineContext_->rootNode_ = rootNode;
+
+    int reportCount = 0;
+    auto savedReporter = MockInputManager::agentInputReporter;
+    const bool savedGranted = MockInputManager::controlComponentPermissionGranted;
+    auto savedCache = MockInputManager::controlComponentPermissionCache;
+    MockInputManager::controlComponentPermissionGranted = true;
+    MockInputManager::controlComponentPermissionCache.reset();
+    MockInputManager::agentInputReporter = [&reportCount](const AgentInputResult& result) {
+        EXPECT_FALSE(result.allowed);
+        ++reportCount;
+    };
+
+    Command tmpCmd;
+    tmpCmd.type = "scroll";
+    tmpCmd.mode = ExecuteMode::SIMULATING;
+    tmpCmd.actionInfo.distance = 1200.0;
+    tmpCmd.actionInfo.coordinates.x1 = 60.0;
+    tmpCmd.actionInfo.coordinates.y1 = 60.0;
+    tmpCmd.actionInfo.coordinates.x2 = 60.0;
+    tmpCmd.actionInfo.coordinates.y2 = 700.0;
+    tmpCmd.isY2Set = true;
+    ScrollSimulatingExecutor executor(context, tmpCmd);
+    CommandSecurityContext security;
+    security.needSecurityAuth = true;
+    NG::UiCommandSecurityGate::SetContext(security);
+
+    EXPECT_EQ(reportCount, 0);
+
+    MockInputManager::agentInputReporter = savedReporter;
+    MockInputManager::controlComponentPermissionGranted = savedGranted;
+    MockInputManager::controlComponentPermissionCache = savedCache;
+    NG::UiCommandSecurityGate::ClearContext();
+        mockPipelineContext_->eventManager_.Reset();
+    mockPipelineContext_->rootNode_ = rootBackup;
+}
+
+/**
+ * @tc.name: ExecuteStep_SecurityAuthFailureProceedsWithScroll
+ * @tc.desc: AC-6/R-3: the auth flag is on and the scroll start target is DENY, but the
+ *           permission check fails; the scroll proceeds through the original path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollSimulatingExecutorStepTest, ExecuteStep_SecurityAuthFailureProceedsWithScroll, TestSize.Level1)
+{
+    auto buttonNode = AceType::MakeRefPtr<FrameNode>("Button", 413, AceType::MakeRefPtr<Pattern>());
+    buttonNode->SetAgentControlMode(AgentControlMode::DENY);
+    auto clickRecognizer = AceType::MakeRefPtr<ClickRecognizer>();
+    clickRecognizer->AttachFrameNode(buttonNode);
+
+    auto context = WeakPtr<PipelineContext>(mockPipelineContext_);
+    auto rootNode = AceType::MakeRefPtr<MockFrameNodeForScroll>("Root", 414, AceType::MakeRefPtr<Pattern>());
+    rootNode->SetTouchTestCallback([&clickRecognizer](TouchTestResult& result) {
+        result.push_back(clickRecognizer);
+    });
+    auto rootBackup = mockPipelineContext_->rootNode_;
+    mockPipelineContext_->SetEventManager(AceType::MakeRefPtr<EventManager>());
+    mockPipelineContext_->rootNode_ = rootNode;
+
+    const bool savedGranted = MockInputManager::controlComponentPermissionGranted;
+    auto savedCache = MockInputManager::controlComponentPermissionCache;
+    MockInputManager::controlComponentPermissionGranted = false;
+    MockInputManager::controlComponentPermissionCache.reset();
+
+    Command tmpCmd;
+    tmpCmd.type = "scroll";
+    tmpCmd.mode = ExecuteMode::SIMULATING;
+    tmpCmd.actionInfo.distance = 1200.0;
+    tmpCmd.actionInfo.coordinates.x1 = 60.0;
+    tmpCmd.actionInfo.coordinates.y1 = 60.0;
+    tmpCmd.actionInfo.coordinates.x2 = 60.0;
+    tmpCmd.actionInfo.coordinates.y2 = 700.0;
+    tmpCmd.isY2Set = true;
+    ScrollSimulatingExecutor executor(context, tmpCmd);
+    CommandSecurityContext security;
+    security.needSecurityAuth = true;
+    NG::UiCommandSecurityGate::SetContext(security);
+
+    auto result = executor.ExecuteStep();
+    EXPECT_NE(result, ExecutorResult::FAILED);
+
+    MockInputManager::controlComponentPermissionGranted = savedGranted;
+    MockInputManager::controlComponentPermissionCache = savedCache;
+    NG::UiCommandSecurityGate::ClearContext();
+        mockPipelineContext_->eventManager_.Reset();
+    mockPipelineContext_->rootNode_ = rootBackup;
 }
 } // namespace OHOS::Ace::NG

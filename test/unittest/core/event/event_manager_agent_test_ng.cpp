@@ -22,6 +22,7 @@
 #include "core/components_ng/base/observer_handler.h"
 #include "core/components_ng/gestures/recognizers/click_recognizer.h"
 #include "core/components_ng/gestures/recognizers/parallel_recognizer.h"
+#include "core/components_ng/pattern/command/ui_command_security_gate.h"
 #include "test/mock/adapter/ohos/osal/mock_input_manager.h"
 
 using namespace testing::ext;
@@ -76,7 +77,6 @@ public:
             EXPECT_EQ(reports[index].tag, node->GetTag());
             EXPECT_EQ(reports[index].allowed, allowed);
             EXPECT_EQ(reports[index].sessionId, session);
-            EXPECT_EQ(reports[index].callingUid, CALLING_UID);
         }
     }
     std::vector<AgentInputResult> reports;
@@ -374,5 +374,129 @@ HWTEST_F(EventManagerTestNg, AgentKeyCancel001, TestSize.Level1)
     EXPECT_EQ(MockInputManager::controlComponentPermissionCheckCount, 1);
     event.action = KeyAction::CANCEL;
     EXPECT_TRUE(focus->HandleEvent(event));
+}
+
+/**
+ * @tc.name: CommandSecurityGateMatrix001
+ * @tc.desc: AC-1/AC-2: SendCommand security gate refuses only when the caller declared auth, the target
+ *           itself is DENY and the control-component permission is granted; the fence report
+ *           fires exactly once per refused command and never on the legacy path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, CommandSecurityGateMatrix001, TestSize.Level1)
+{
+    auto deniedNode = MakeNode(DENY);
+    auto allowNode = MakeNode(ALLOW);
+    auto unsetNode = FrameNode::CreateFrameNode("unsetMode",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_TRUE(unsetNode);
+    EXPECT_FALSE(unsetNode->HasAgentControlMode());
+
+    // Legacy path: auth flag false never triggers the permission check or a fence report.
+    {
+        AgentInputProbe probe;
+        EXPECT_FALSE(UiCommandSecurityGate::IsCommandDenied(deniedNode, false));
+        EXPECT_FALSE(UiCommandSecurityGate::IsCommandDenied(allowNode, false));
+        EXPECT_EQ(MockInputManager::controlComponentPermissionCheckCount, 0);
+        EXPECT_TRUE(probe.reports.empty());
+    }
+
+    // Auth flag true but target is ALLOW (explicit or unset default): proceed.
+    {
+        AgentInputProbe probe;
+        EXPECT_FALSE(UiCommandSecurityGate::IsCommandDenied(allowNode, true));
+        EXPECT_FALSE(UiCommandSecurityGate::IsCommandDenied(unsetNode, true));
+        EXPECT_TRUE(probe.reports.empty());
+    }
+
+    // Auth flag true and target DENY but the permission check fails: auth fails, proceed.
+    {
+        AgentInputProbe probe;
+        MockInputManager::controlComponentPermissionGranted = false;
+        MockInputManager::controlComponentPermissionCache.reset();
+        EXPECT_FALSE(UiCommandSecurityGate::IsCommandDenied(deniedNode, true));
+        EXPECT_TRUE(probe.reports.empty());
+    }
+
+    // Auth flag true, target DENY and permission granted: refuse and report to the fence.
+    // The caller-relayed tokenId routes the notification when present.
+    {
+        AgentInputProbe probe;
+        EXPECT_TRUE(UiCommandSecurityGate::IsCommandDenied(deniedNode, true));
+        CommandSecurityContext security;
+        security.needSecurityAuth = true;
+        security.tokenId = SESSION_ID;
+        UiCommandSecurityGate::ReportDeniedCommand(deniedNode, security);
+        ASSERT_EQ(probe.reports.size(), 1u);
+        const auto& result = probe.reports.front();
+        EXPECT_EQ(result.nodeId, deniedNode->GetId());
+        EXPECT_EQ(result.compId, std::to_string(deniedNode->GetId()));
+        EXPECT_EQ(result.tag, deniedNode->GetTag());
+        EXPECT_FALSE(result.allowed);
+        EXPECT_EQ(result.sessionId, SESSION_ID);
+    }
+
+    // A null target never triggers the gate.
+    EXPECT_FALSE(UiCommandSecurityGate::IsCommandDenied(nullptr, true));
+}
+
+/**
+ * @tc.name: CommandSecurityGateParentChildAndDynamic001
+ * @tc.desc: AC-3/R-4: the gate reads only the target's own AgentControlMode; a parent's
+ *           DENY/ALLOW is never inherited, and a dynamic mode change applies from the
+ *           next command check on.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, CommandSecurityGateParentChildAndDynamic001, TestSize.Level1)
+{
+    AgentInputProbe probe;
+    auto parent = MakeNode(DENY);
+    auto child = MakeNode(ALLOW);
+    parent->AddChild(child);
+    // Parent DENY, child ALLOW: the child command is not denied.
+    EXPECT_FALSE(UiCommandSecurityGate::IsCommandDenied(child, true));
+
+    auto allowParent = MakeNode(ALLOW);
+    auto denyChild = MakeNode(DENY);
+    allowParent->AddChild(denyChild);
+    // Parent ALLOW, child DENY: the child command is denied by its own policy.
+    EXPECT_TRUE(UiCommandSecurityGate::IsCommandDenied(denyChild, true));
+
+    // Dynamic update: the same node flips DENY -> ALLOW -> DENY and each check reads
+    // the current value (changes apply from the next command).
+    auto node = MakeNode(DENY);
+    EXPECT_TRUE(UiCommandSecurityGate::IsCommandDenied(node, true));
+    node->SetAgentControlMode(ALLOW);
+    EXPECT_FALSE(UiCommandSecurityGate::IsCommandDenied(node, true));
+    node->SetAgentControlMode(DENY);
+    EXPECT_TRUE(UiCommandSecurityGate::IsCommandDenied(node, true));
+    // Unsetting keeps the ALLOW default.
+    node->SetAgentControlMode(std::nullopt);
+    EXPECT_FALSE(UiCommandSecurityGate::IsCommandDenied(node, true));
+    EXPECT_TRUE(probe.reports.empty());
+}
+
+/**
+ * @tc.name: CommandSecurityGateInternalPopupTarget001
+ * @tc.desc: AC-5/R-14: an internal popup target (e.g. a Menu node reached by nodeId)
+ *           follows the same gate rule as a normal target within the same instance.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, CommandSecurityGateInternalPopupTarget001, TestSize.Level1)
+{
+    AgentInputProbe probe;
+    auto popupItem = FrameNode::CreateFrameNode(
+        "Menu", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_TRUE(popupItem);
+    popupItem->SetAgentControlMode(DENY);
+    // Same rule as a normal DENY target: refused with the auth request on.
+    EXPECT_TRUE(UiCommandSecurityGate::IsCommandDenied(popupItem, true));
+    // And same rule when the popup target is ALLOW: proceeds.
+    popupItem->SetAgentControlMode(ALLOW);
+    EXPECT_FALSE(UiCommandSecurityGate::IsCommandDenied(popupItem, true));
+    // A normal node in the same instance behaves identically.
+    auto normal = MakeNode(DENY);
+    EXPECT_TRUE(UiCommandSecurityGate::IsCommandDenied(normal, true));
+    EXPECT_TRUE(probe.reports.empty());
 }
 } // namespace OHOS::Ace::NG

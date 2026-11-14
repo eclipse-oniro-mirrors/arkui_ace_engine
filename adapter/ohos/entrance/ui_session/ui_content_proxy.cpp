@@ -673,7 +673,7 @@ int32_t UIContentServiceProxy::HighlightSpecifiedContent(int32_t id, const std::
     return NO_ERROR;
 }
 
-int32_t UIContentServiceProxy::SendCommand(int32_t id, const std::string& command)
+int32_t UIContentServiceProxy::SendCommand(int32_t id, const std::string& command, SecurityAuthInfo securityAuth)
 {
     UiSessionCommandRequestTraceBegin("Legacy.Node");
     MessageParcel data;
@@ -683,7 +683,8 @@ int32_t UIContentServiceProxy::SendCommand(int32_t id, const std::string& comman
         LOGW("SendCommand write interface token failed");
         return FAILED;
     }
-    if (!data.WriteInt32(id) || !data.WriteString(command)) {
+    if (!data.WriteInt32(id) || !data.WriteString(command) || !data.WriteBool(securityAuth.needSecurityAuth) ||
+        !data.WriteUint64(securityAuth.tokenId)) {
         LOGW("SendCommand write data failed");
         return FAILED;
     }
@@ -695,7 +696,7 @@ int32_t UIContentServiceProxy::SendCommand(int32_t id, const std::string& comman
     return NO_ERROR;
 }
 
-int32_t UIContentServiceProxy::SendCommandSync(int32_t id, const std::string& command)
+int32_t UIContentServiceProxy::SendCommandSync(int32_t id, const std::string& command, SecurityAuthInfo securityAuth)
 {
     MessageParcel data;
     MessageParcel reply;
@@ -704,7 +705,8 @@ int32_t UIContentServiceProxy::SendCommandSync(int32_t id, const std::string& co
         LOGW("SendCommandSync write interface token failed");
         return FAILED;
     }
-    if (!data.WriteInt32(id) || !data.WriteString(command)) {
+    if (!data.WriteInt32(id) || !data.WriteString(command) || !data.WriteBool(securityAuth.needSecurityAuth) ||
+        !data.WriteUint64(securityAuth.tokenId)) {
         LOGW("SendCommandSync write data failed");
         return FAILED;
     }
@@ -721,7 +723,7 @@ int32_t UIContentServiceProxy::SendCommandSync(int32_t id, const std::string& co
     return result;
 }
 
-int32_t UIContentServiceProxy::SendCommand(const std::string command)
+int32_t UIContentServiceProxy::SendCommand(const std::string command, SecurityAuthInfo securityAuth)
 {
     UiSessionCommandRequestTraceBegin("Legacy.Global");
     MessageParcel data;
@@ -737,7 +739,8 @@ int32_t UIContentServiceProxy::SendCommand(const std::string command)
         return FAILED;
     }
 
-    if (!data.WriteString(command)) {
+    if (!data.WriteString(command) || !data.WriteBool(securityAuth.needSecurityAuth) ||
+        !data.WriteUint64(securityAuth.tokenId)) {
         LOGW("SendCommand WriteStringVector  failed");
         return FAILED;
     }
@@ -750,23 +753,25 @@ int32_t UIContentServiceProxy::SendCommand(const std::string command)
 }
 
 int32_t UIContentServiceProxy::SendCommand(
-    int32_t id, const std::string& command, const SendCommandFinishCallback& finishCallback)
+    int32_t id, const std::string& command, const SendCommandFinishCallback& finishCallback,
+    SecurityAuthInfo securityAuth)
 {
     UiSessionCommandRequestTraceBegin("Callback.Node");
     return SendCommandWithFinishCallback(
-        SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK, &id, command, finishCallback);
+        SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK, &id, command, finishCallback, securityAuth);
 }
 
 int32_t UIContentServiceProxy::SendCommand(
-    const std::string command, const SendCommandFinishCallback& finishCallback)
+    const std::string command, const SendCommandFinishCallback& finishCallback, SecurityAuthInfo securityAuth)
 {
     UiSessionCommandRequestTraceBegin("Callback.Global");
     return SendCommandWithFinishCallback(
-        SEND_COMMAND_WITH_FINISH_CALLBACK, nullptr, command, finishCallback);
+        SEND_COMMAND_WITH_FINISH_CALLBACK, nullptr, command, finishCallback, securityAuth);
 }
 
 int32_t UIContentServiceProxy::SendCommandWithFinishCallback(
-    uint32_t code, const int32_t* id, const std::string& command, const SendCommandFinishCallback& finishCallback)
+    uint32_t code, const int32_t* id, const std::string& command, const SendCommandFinishCallback& finishCallback,
+    const SecurityAuthInfo& securityAuth)
 {
     if (finishCallback == nullptr) {
         LOGW("SendCommandWithFinishCallback callback is nullptr");
@@ -793,7 +798,8 @@ int32_t UIContentServiceProxy::SendCommandWithFinishCallback(
     if (writeSuccess && id != nullptr) {
         writeSuccess = data.WriteInt32(*id);
     }
-    writeSuccess = writeSuccess && data.WriteString(command);
+    writeSuccess = writeSuccess && data.WriteString(command) && data.WriteBool(securityAuth.needSecurityAuth) &&
+        data.WriteUint64(securityAuth.tokenId);
     if (!writeSuccess) {
         LOGW("SendCommandWithFinishCallback write parcel failed");
         report_->UnregisterSendCommandFinishCallback(requestId);

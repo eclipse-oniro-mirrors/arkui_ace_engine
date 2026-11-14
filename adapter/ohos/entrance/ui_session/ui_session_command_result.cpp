@@ -35,6 +35,7 @@ std::string SerializeCommandResult(const NG::CommandResult& result)
         case NG::CommandErrorType::INVALID_COMMAND: type = "INVALID_COMMAND"; break;
         case NG::CommandErrorType::INVALID_PARAM: type = "INVALID_PARAM"; break;
         case NG::CommandErrorType::NOT_SUPPORTED: type = "NOT_SUPPORTED"; break;
+        case NG::CommandErrorType::SECURITY_DENIED: type = "SECURITY_DENIED"; break;
         default: break;
     }
     auto message = result.errorMessage;
@@ -61,7 +62,9 @@ std::string UiSessionBatchCommand::ExecuteWithResult(const BatchParseResult& par
             result = CommandResult::Error(CommandErrorType::INVALID_PARAM);
         } else {
             auto target = resolveTarget ? resolveTarget(item.nodeId) : BatchResolvedTarget {};
-            if (target.status == BatchTargetStatus::NOT_FOUND) {
+            if (target.status == BatchTargetStatus::SECURITY_DENIED) {
+                result = CommandResult::Error(CommandErrorType::SECURITY_DENIED);
+            } else if (target.status == BatchTargetStatus::NOT_FOUND) {
                 result = CommandResult::Error(CommandErrorType::NODE_NOT_FOUND);
             } else if (target.status == BatchTargetStatus::UNSUPPORTED_TYPE) {
                 result = CommandResult::Error(CommandErrorType::INVALID_COMMAND);

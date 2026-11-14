@@ -29,6 +29,7 @@ ace_unittest("relaxed_interaction_manager_test_ng") {
 
   sources += [
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/base_executor.cpp",
+    "$ace_root/frameworks/core/components_ng/pattern/command/ui_command_security_gate.cpp",
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/executors/fallback_executor.cpp",
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/executors/key_executor.cpp",
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/executors/scroll_simulating_executor.cpp",

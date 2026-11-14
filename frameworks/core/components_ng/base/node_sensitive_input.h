@@ -57,7 +57,11 @@ struct AgentInputResult {
     int32_t nodeId = -1;
     std::string compId;
     std::string tag;
-    bool allowed = true;
+    // Only reported when allowed is false; allowed is a reserved field.
+    bool allowed = false;
+    // Bundle name of the app hosting the target (target app), empty when unavailable.
+    std::string bundleName;
+    int32_t index = 0;
 };
 
 // Frozen per-node decision, captured when the node is first engaged by the gesture.

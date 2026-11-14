@@ -81,6 +81,8 @@
 #include "core/components_ng/manager/page_scene/search_scene_context_collector.h"
 #include "core/components_ng/manager/uisession_query/component_tree_query.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/pattern/command/ui_command_security_gate.h"
+#include "core/components_ng/relaxed_interaction/utils/focused_target_security_gate.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_manager.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_utils.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_resolution_config.h"
@@ -108,6 +110,7 @@
 #include "core/components/web/resource/web_page_scene_manager.h"
 #endif
 #include "interfaces/inner_api/ui_session/component_tree_query_type.h"
+#include "interfaces/inner_api/ui_session/ui_content_service_interface.h"
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
 #include "interfaces/napi/kits/observer/ui_observer.h"
 
@@ -229,6 +232,10 @@ constexpr char SCENE_START_CHAR = '1';
 constexpr uint32_t VSYNC_FIRST_WITHOUT_DEFAULT_BARRIER = 2;
 // Delay search click flushing to batch rapid clicks.
 constexpr uint32_t SEARCH_CLICK_FLUSH_DELAY_MS = 250;
+// SendCommandSync legacy error codes (see IUiContentService::SendCommandSync contract).
+constexpr int32_t SEND_COMMAND_SYNC_NO_EXECUTOR = 11;
+constexpr int32_t SEND_COMMAND_SYNC_HANDLE_ERROR = 12;
+constexpr int32_t SEND_COMMAND_SYNC_NO_NODE = 13;
 static const uint64_t VSYNC_FIRST_FORCE_ENABLE_TIME_NS =
     system::GetIntParameter("const.sys.param_vsync_first_force_enable_time_ms", 5000) * 1000000ULL;
 
@@ -6599,7 +6606,8 @@ void UIContentImpl::SetTopWindowBoundaryByID(const std::string& stringId)
 
 void SendCommandCallbackInner(const WeakPtr<TaskExecutor>& taskExecutor)
 {
-    auto sendCommandCallback = [weakTaskExecutor = taskExecutor](int32_t value) {
+    auto sendCommandCallback = [weakTaskExecutor = taskExecutor](int32_t value,
+                                 const SecurityAuthInfo& securityAuth) {
         KeyEvent keyEvent;
         keyEvent.action = KeyAction::DOWN;
         keyEvent.code = static_cast<KeyCode>(value);
@@ -6608,10 +6616,15 @@ void SendCommandCallbackInner(const WeakPtr<TaskExecutor>& taskExecutor)
         auto taskExecutor = weakTaskExecutor.Upgrade();
         CHECK_NULL_VOID(taskExecutor);
         taskExecutor->PostTask(
-            [keyEvent]() {
+            [keyEvent, securityAuth]() {
                 auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
                 AceAsyncTraceEnd(0, "SendCommand.Request.Legacy.Global");
                 CHECK_NULL_VOID(pipeline);
+                NG::UiCommandSecurityGate::SetContext(
+                    NG::CommandSecurityContext { securityAuth.needSecurityAuth, securityAuth.tokenId });
+                if (IsFocusedTargetDenied(pipeline, "UiSessionSendCommandKeyCode")) {
+                    return;
+                }
                 pipeline->OnNonPointerEvent(keyEvent);
             },
             TaskExecutor::TaskType::UI, "UiSessionSendCommandKeyCode");
@@ -6647,7 +6660,17 @@ bool IsSupportedBatchTextTarget(const RefPtr<NG::FrameNode>& node)
            tag == V2::RICH_EDITOR_ETS_TAG;
 }
 
-BatchResolvedTarget ResolveBatchTextTarget(int32_t nodeId)
+// Build the core-side security context from the IPC-layer request plus the
+// trusted calling uid captured on the stub binder thread.
+NG::CommandSecurityContext MakeSecurityContext(const SecurityAuthInfo& securityAuth)
+{
+    NG::CommandSecurityContext security;
+    security.needSecurityAuth = securityAuth.needSecurityAuth;
+    security.tokenId = securityAuth.tokenId;
+    return security;
+}
+
+BatchResolvedTarget ResolveBatchTextTarget(int32_t nodeId, const SecurityAuthInfo& securityAuth)
 {
     auto uiNode = ElementRegister::GetInstance()->GetUINodeById(nodeId);
     if (!uiNode) {
@@ -6657,27 +6680,33 @@ BatchResolvedTarget ResolveBatchTextTarget(int32_t nodeId)
     if (!frameNode || !IsSupportedBatchTextTarget(frameNode)) {
         return { .status = BatchTargetStatus::UNSUPPORTED_TYPE };
     }
+    if (NG::UiCommandSecurityGate::IsCommandDenied(frameNode, securityAuth.needSecurityAuth)) {
+        NG::UiCommandSecurityGate::ReportDeniedCommand(frameNode, MakeSecurityContext(securityAuth));
+        return { .status = BatchTargetStatus::SECURITY_DENIED };
+    }
     return { .status = BatchTargetStatus::READY, .execute = [frameNode](const std::string& command) {
                 return frameNode->OnRecvCommand(command) == NG::RET_SUCCESS;
             } };
 }
 
 namespace {
-BatchResolvedTarget ResolveBatchTextTargetWithResult(int32_t nodeId)
+BatchResolvedTarget ResolveBatchTextTargetWithResult(int32_t nodeId, const SecurityAuthInfo& securityAuth)
 {
-    auto target = ResolveBatchTextTarget(nodeId);
-    if (target.status == BatchTargetStatus::READY) {
-        auto node = AceType::DynamicCast<NG::FrameNode>(ElementRegister::GetInstance()->GetUINodeById(nodeId));
-        if (!node) {
-            return {
-                .status = BatchTargetStatus::NOT_FOUND
-            };
-        }
-        target.execute = [node](const std::string& command) {
-            return node->OnRecvCommandWithResult(command).success;
-        };
+    auto uiNode = ElementRegister::GetInstance()->GetUINodeById(nodeId);
+    if (!uiNode) {
+        return { .status = BatchTargetStatus::NOT_FOUND };
     }
-    return target;
+    auto node = AceType::DynamicCast<NG::FrameNode>(uiNode);
+    if (!node || !IsSupportedBatchTextTarget(node)) {
+        return { .status = BatchTargetStatus::UNSUPPORTED_TYPE };
+    }
+    if (NG::UiCommandSecurityGate::IsCommandDenied(node, securityAuth.needSecurityAuth)) {
+        NG::UiCommandSecurityGate::ReportDeniedCommand(node, MakeSecurityContext(securityAuth));
+        return { .status = BatchTargetStatus::SECURITY_DENIED };
+    }
+    return { .status = BatchTargetStatus::READY, .execute = [node](const std::string& command) {
+                return node->OnRecvCommandWithResult(command).success;
+            } };
 }
 
 bool IsKeyCodeNumber(const std::unique_ptr<JsonValue>& json)
@@ -6745,8 +6774,8 @@ bool TryExecuteGlobalAccessibilityCommand(const std::string& command, NG::Comman
     return true;
 }
 
-void ExecuteGlobalCommandWithResult(
-    const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback)
+void ExecuteGlobalCommandWithResult(const std::string& command,
+    const UiSessionManager::CommandResultCallback& finishCallback, const SecurityAuthInfo& securityAuth)
 {
     NG::CommandResult accessibilityResult;
     if (TryExecuteGlobalAccessibilityCommand(command, accessibilityResult)) {
@@ -6765,11 +6794,19 @@ void ExecuteGlobalCommandWithResult(
         finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
         return;
     }
+    if (IsKeyCodeNumber(json)) {
+        NG::UiCommandSecurityGate::SetContext(
+            NG::CommandSecurityContext { securityAuth.needSecurityAuth, securityAuth.tokenId });
+        if (IsFocusedTargetDenied(pipeline, "UiSessionSendCommandWithResultKeyCode")) {
+            finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::SECURITY_DENIED)));
+            return;
+        }
+    }
     finishCallback(SerializeCommandResult(ExecuteKeyCodeWithResult(json, pipeline)));
 }
 
-void ExecuteRelaxedCommandWithResult(
-    const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback)
+void ExecuteRelaxedCommandWithResult(const std::string& command,
+    const UiSessionManager::CommandResultCallback& finishCallback, const SecurityAuthInfo& securityAuth)
 {
     NG::CommandResult accessibilityResult;
     if (TryExecuteGlobalAccessibilityCommand(command, accessibilityResult)) {
@@ -6779,7 +6816,10 @@ void ExecuteRelaxedCommandWithResult(
     auto batch = UiSessionBatchCommand::Parse(command);
     if (batch.status != BatchParseStatus::NOT_BATCH) {
         AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Global");
-        finishCallback(UiSessionBatchCommand::ExecuteWithResult(batch, ResolveBatchTextTargetWithResult));
+        finishCallback(UiSessionBatchCommand::ExecuteWithResult(batch,
+            [securityAuth](int32_t nodeId) {
+                return ResolveBatchTextTargetWithResult(nodeId, securityAuth);
+            }));
         return;
     }
     auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
@@ -6789,6 +6829,9 @@ void ExecuteRelaxedCommandWithResult(
         return;
     }
     AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Global");
+    // The context must outlive this call: executors run on later frames, the next
+    // command's SetContext overwrites it (single in-flight SendCommand on UI thread).
+    NG::UiCommandSecurityGate::SetContext(MakeSecurityContext(securityAuth));
     pipeline->ProcessCommandWithResult(command, [finishCallback](const NG::CommandResult& result) {
         finishCallback(SerializeCommandResult(result));
     });
@@ -6835,8 +6878,8 @@ NG::CommandResult ExecuteAccessibilityNodeCommand(int32_t id, const JsonValue& j
     }
 }
 
-void ExecuteNodeCommandWithResult(
-    int32_t id, const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback)
+void ExecuteNodeCommandWithResult(int32_t id, const std::string& command,
+    const UiSessionManager::CommandResultCallback& finishCallback, const SecurityAuthInfo& securityAuth)
 {
     AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Node");
     auto json = JsonUtil::ParseJsonString(command);
@@ -6850,11 +6893,17 @@ void ExecuteNodeCommandWithResult(
         finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::NODE_NOT_FOUND)));
         return;
     }
+    if (NG::UiCommandSecurityGate::IsCommandDenied(node, securityAuth.needSecurityAuth)) {
+        NG::UiCommandSecurityGate::ReportDeniedCommand(node, MakeSecurityContext(securityAuth));
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::SECURITY_DENIED)));
+        return;
+    }
     finishCallback(SerializeCommandResult(node->OnRecvCommandWithResult(command)));
 }
 
 void PostNodeCommandWithResult(const WeakPtr<TaskExecutor>& weakTaskExecutor, int32_t id,
-    const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback)
+    const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback,
+    const SecurityAuthInfo& securityAuth)
 {
     auto taskExecutor = weakTaskExecutor.Upgrade();
     if (!taskExecutor) {
@@ -6862,7 +6911,9 @@ void PostNodeCommandWithResult(const WeakPtr<TaskExecutor>& weakTaskExecutor, in
         return;
     }
     bool posted = taskExecutor->PostTask(
-        [id, command, finishCallback]() { ExecuteNodeCommandWithResult(id, command, finishCallback); },
+        [id, command, finishCallback, securityAuth]() {
+            ExecuteNodeCommandWithResult(id, command, finishCallback, securityAuth);
+        },
         TaskExecutor::TaskType::UI, "UiSessionSendCommandPatternWithResult");
     if (!posted) {
         finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
@@ -6870,7 +6921,8 @@ void PostNodeCommandWithResult(const WeakPtr<TaskExecutor>& weakTaskExecutor, in
 }
 
 void PostGlobalCommandWithResult(const WeakPtr<TaskExecutor>& weakTaskExecutor,
-    const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback, bool isRelaxed)
+    const std::string& command, const UiSessionManager::CommandResultCallback& finishCallback, bool isRelaxed,
+    const SecurityAuthInfo& securityAuth)
 {
     auto taskExecutor = weakTaskExecutor.Upgrade();
     if (!taskExecutor) {
@@ -6878,11 +6930,11 @@ void PostGlobalCommandWithResult(const WeakPtr<TaskExecutor>& weakTaskExecutor,
         return;
     }
     bool posted = taskExecutor->PostTask(
-        [command, finishCallback, isRelaxed]() {
+        [command, finishCallback, isRelaxed, securityAuth]() {
             if (isRelaxed) {
-                ExecuteRelaxedCommandWithResult(command, finishCallback);
+                ExecuteRelaxedCommandWithResult(command, finishCallback, securityAuth);
             } else {
-                ExecuteGlobalCommandWithResult(command, finishCallback);
+                ExecuteGlobalCommandWithResult(command, finishCallback, securityAuth);
             }
         },
         TaskExecutor::TaskType::UI, "UiSessionSendCommandWithResult");
@@ -6892,7 +6944,8 @@ void PostGlobalCommandWithResult(const WeakPtr<TaskExecutor>& weakTaskExecutor,
 }
 } // namespace
 
-BatchDispatchCallbacks CreateBatchDispatchCallbacks(const RefPtr<TaskExecutor>& taskExecutor)
+BatchDispatchCallbacks CreateBatchDispatchCallbacks(
+    const RefPtr<TaskExecutor>& taskExecutor, const SecurityAuthInfo& securityAuth)
 {
     BatchDispatchCallbacks callbacks;
     if (taskExecutor) {
@@ -6905,7 +6958,9 @@ BatchDispatchCallbacks CreateBatchDispatchCallbacks(const RefPtr<TaskExecutor>& 
                 TaskExecutor::TaskType::UI, "UiSessionBatchSendCommand");
         };
     }
-    callbacks.resolveTarget = ResolveBatchTextTarget;
+    callbacks.resolveTarget = [securityAuth](int32_t nodeId) {
+        return ResolveBatchTextTarget(nodeId, securityAuth);
+    };
     callbacks.itemDiagnosticSink = LogBatchItemDiagnostic;
     callbacks.batchDiagnosticSink = LogBatchLevelDiagnostic;
     return callbacks;
@@ -6913,15 +6968,17 @@ BatchDispatchCallbacks CreateBatchDispatchCallbacks(const RefPtr<TaskExecutor>& 
 
 void UIContentImpl::RelaxedCommandCallbackInner(const WeakPtr<TaskExecutor>& taskExecutor)
 {
-    auto relaxedCommandCallback = [weakTaskExecutor = taskExecutor](const std::string& command) {
+    auto relaxedCommandCallback = [weakTaskExecutor = taskExecutor](const std::string& command,
+        const SecurityAuthInfo& securityAuth) {
         auto taskExecutor = weakTaskExecutor.Upgrade();
-        if (UiSessionBatchCommand::Dispatch(command, CreateBatchDispatchCallbacks(taskExecutor))) {
+        if (UiSessionBatchCommand::Dispatch(command,
+            CreateBatchDispatchCallbacks(taskExecutor, securityAuth))) {
             return;
         }
 #ifdef RELAXED_INTERACTION_SUPPORT
         CHECK_NULL_VOID(taskExecutor);
         taskExecutor->PostTask(
-            [command]() {
+            [command, securityAuth]() {
                 auto pipelineContext = NG::PipelineContext::GetCurrentContextSafely();
                 AceAsyncTraceEnd(0, "SendCommand.Request.Legacy.Global");
                 if (pipelineContext == nullptr) {
@@ -6929,6 +6986,9 @@ void UIContentImpl::RelaxedCommandCallbackInner(const WeakPtr<TaskExecutor>& tas
                         AceLogTag::ACE_UIEVENT, "Failed to process relaxed command because pipelineContext is nullptr");
                     return;
                 }
+                // Context survives until the next SetContext overwrites it: executors
+                // run on later frames (single in-flight SendCommand on UI thread).
+                NG::UiCommandSecurityGate::SetContext(MakeSecurityContext(securityAuth));
                 pipelineContext->ProcessCommand(command);
             },
             TaskExecutor::TaskType::UI, "UiSessionRelaxedSendCommand");
@@ -6938,8 +6998,9 @@ void UIContentImpl::RelaxedCommandCallbackInner(const WeakPtr<TaskExecutor>& tas
     };
     UiSessionManager::GetInstance()->SaveRelaxedCommandFunction(relaxedCommandCallback);
     auto relaxedCommandWithResult = [weakTaskExecutor = taskExecutor](const std::string& command,
-        const UiSessionManager::CommandResultCallback& finishCallback) {
-        PostGlobalCommandWithResult(weakTaskExecutor, command, finishCallback, true);
+        const UiSessionManager::CommandResultCallback& finishCallback,
+        const SecurityAuthInfo& securityAuth) {
+        PostGlobalCommandWithResult(weakTaskExecutor, command, finishCallback, true, securityAuth);
     };
     UiSessionManager::GetInstance()->SaveRelaxedCommandWithResultFunction(std::move(relaxedCommandWithResult));
 }
@@ -7561,21 +7622,40 @@ void UIContentImpl::RegisterGetCurrentPageName(const WeakPtr<TaskExecutor>& task
     UiSessionManager::GetInstance()->RegisterPipeLineGetCurrentPageName(getPageNameCallback);
 }
 
-void UIContentImpl::InitSendCommandFunctionsCallbacks(const WeakPtr<TaskExecutor>& taskExecutor)
+namespace {
+// Returns true and reports to the fence when the security gate refuses the node.
+bool IsNodeDeniedBySecurityGate(const RefPtr<NG::FrameNode>& node, const SecurityAuthInfo& securityAuth)
 {
-    auto sendCommandSync = [weakTaskExecutor = taskExecutor](int32_t id, const std::string& command) {
+    if (!NG::UiCommandSecurityGate::IsCommandDenied(node, securityAuth.needSecurityAuth)) {
+        return false;
+    }
+    NG::UiCommandSecurityGate::ReportDeniedCommand(node, MakeSecurityContext(securityAuth));
+    return true;
+}
+} // namespace
+
+namespace {
+UiSessionManager::NotifySendCommandSyncFunction MakeSendCommandSyncCallback(
+    const WeakPtr<TaskExecutor>& weakTaskExecutor)
+{
+    return [weakTaskExecutor](int32_t id, const std::string& command,
+        const SecurityAuthInfo& securityAuth) {
         auto taskExecutor = weakTaskExecutor.Upgrade();
         if (!taskExecutor) {
             LOGI("Task executor is null");
-            return 11;
+            return SEND_COMMAND_SYNC_NO_EXECUTOR;
         }
-        int32_t result = 12;
+        int32_t result = SEND_COMMAND_SYNC_HANDLE_ERROR;
         taskExecutor->PostSyncTask(
-            [id, command, &result]() {
+            [id, command, securityAuth, &result]() {
                 auto node = AceType::DynamicCast<NG::FrameNode>(ElementRegister::GetInstance()->GetUINodeById(id));
                 if (!node) {
                     LOGI("UiSessionSendCommandSyncPattern: Node is null for id: %{public}d", id);
-                    result = 13;
+                    result = SEND_COMMAND_SYNC_NO_NODE;
+                    return;
+                }
+                if (IsNodeDeniedBySecurityGate(node, securityAuth)) {
+                    result = SEND_COMMAND_SYNC_HANDLE_ERROR;
                     return;
                 }
                 result = node->OnRecvCommand(command);
@@ -7583,31 +7663,50 @@ void UIContentImpl::InitSendCommandFunctionsCallbacks(const WeakPtr<TaskExecutor
             TaskExecutor::TaskType::UI, "UiSessionSendCommandSyncPattern");
         return result;
     };
-    UiSessionManager::GetInstance()->SaveForSendCommandSyncFunction(sendCommandSync);
-    auto sendCommand = [weakTaskExecutor = taskExecutor](int32_t id, const std::string& command) {
+}
+
+UiSessionManager::NotifySendCommandFunction MakeSendCommandCallback(
+    const WeakPtr<TaskExecutor>& weakTaskExecutor)
+{
+    return [weakTaskExecutor](int32_t id, const std::string& command,
+        const SecurityAuthInfo& securityAuth) {
         auto taskExecutor = weakTaskExecutor.Upgrade();
         CHECK_NULL_VOID(taskExecutor);
         taskExecutor->PostTask(
-            [id, command]() {
+            [id, command, securityAuth]() {
                 AceAsyncTraceEnd(0, "SendCommand.Request.Legacy.Node");
                 auto node = AceType::DynamicCast<NG::FrameNode>(ElementRegister::GetInstance()->GetUINodeById(id));
                 if (!node) {
                     LOGI("UiSessionSendCommandPattern: Node is null for id: %{public}d", id);
                     return;
                 }
+                if (IsNodeDeniedBySecurityGate(node, securityAuth)) {
+                    LOGW("UiSessionSendCommandPattern: command refused by security gate, id: %{public}d", id);
+                    return;
+                }
                 node->OnRecvCommand(command);
             },
             TaskExecutor::TaskType::UI, "UiSessionSendCommandPattern");
     };
-    UiSessionManager::GetInstance()->SaveForSendCommandFunction(sendCommand);
+}
+} // namespace
+
+void UIContentImpl::InitSendCommandFunctionsCallbacks(const WeakPtr<TaskExecutor>& taskExecutor)
+{
+    auto sendCommandSync = MakeSendCommandSyncCallback(taskExecutor);
+    UiSessionManager::GetInstance()->SaveForSendCommandSyncFunction(std::move(sendCommandSync));
+    auto sendCommand = MakeSendCommandCallback(taskExecutor);
+    UiSessionManager::GetInstance()->SaveForSendCommandFunction(std::move(sendCommand));
     auto nodeCommandWithResult = [weakTaskExecutor = taskExecutor](int32_t id, const std::string& command,
-        const UiSessionManager::CommandResultCallback& finishCallback) {
-        PostNodeCommandWithResult(weakTaskExecutor, id, command, finishCallback);
+        const UiSessionManager::CommandResultCallback& finishCallback,
+        const SecurityAuthInfo& securityAuth) {
+        PostNodeCommandWithResult(weakTaskExecutor, id, command, finishCallback, securityAuth);
     };
     UiSessionManager::GetInstance()->SaveForSendCommandWithResultFunction(std::move(nodeCommandWithResult));
     auto globalCommandWithResult = [weakTaskExecutor = taskExecutor](const std::string& command,
-        const UiSessionManager::CommandResultCallback& finishCallback) {
-        PostGlobalCommandWithResult(weakTaskExecutor, command, finishCallback, false);
+        const UiSessionManager::CommandResultCallback& finishCallback,
+        const SecurityAuthInfo& securityAuth) {
+        PostGlobalCommandWithResult(weakTaskExecutor, command, finishCallback, false, securityAuth);
     };
     UiSessionManager::GetInstance()->SaveSendCommandWithResultFunction(std::move(globalCommandWithResult));
 }

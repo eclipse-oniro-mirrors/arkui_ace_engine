@@ -210,27 +210,34 @@ public:
 
     /**
      * @description: define register a callback on SendCommand event occur to execute interface
+     * @param securityAuth: security auth request, see SecurityAuthInfo. Default keeps
+     *        the legacy behavior for existing callers.
      * @return: result number
      *          0: Node execution is successful.
      */
-    virtual int32_t SendCommand(int32_t id, const std::string& command) = 0;
+    virtual int32_t SendCommand(
+        int32_t id, const std::string& command, SecurityAuthInfo securityAuth = {}) = 0;
 
     /**
      * @description: define register a callback on SendCommand Sync event occur to execute interface
+     * @param securityAuth: security auth request, see SendCommand(id, command).
      * @return: result number
      *          0: Node execution is successful.
      *          10: SendCommand Pipeline context is null.
      *          11: SendCommand Task executor is null.
-     *          12: Error occurred during self handling of SendCommand.
+     *          12: Error occurred during self handling of SendCommand (also returned
+     *              when the security gate refuses the injection).
      *          13: Failure due to no nodes.
      */
-    virtual int32_t SendCommandSync(int32_t id, const std::string& command) = 0;
+    virtual int32_t SendCommandSync(
+        int32_t id, const std::string& command, SecurityAuthInfo securityAuth = {}) = 0;
 
     /**
      * @description: define register a callback on Send keycode command occur to execute interface
+     * @param securityAuth: security auth request, see SendCommand(id, command).
      * @return: result number
      */
-    virtual int32_t SendCommand(const std::string command) = 0;
+    virtual int32_t SendCommand(const std::string command, SecurityAuthInfo securityAuth = {}) = 0;
 
     /**
      * @description: define unregister the click event occur callback last register interface
@@ -481,19 +488,32 @@ public:
         int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS) = 0;
     /**
      * @description: send a command with one asynchronous completion on this connection.
+     * @param securityAuth: security auth request, see SecurityAuthInfo; when its
+     *        needSecurityAuth is true and the target node declares AgentControlMode::DENY
+     *        and the control-component permission check succeeds, the injection is refused
+     *        and the finish callback reports errorType "SECURITY_DENIED".
+     *        Default keeps the legacy behavior.
      * @return: NO_ERROR for accepted, PARAM_INVALID for an empty callback,
      * LAST_UNFINISH when a callback command is pending, FAILED or REPLY_ERROR for send failure.
      * Waiting expires after 5000ms without calling back or cancelling UI execution.
      * Death/disconnect and duplicate/late results do not call back.
+     * @note: callers must pass the finishCallback as a SendCommandFinishCallback value,
+     * nullptr, or use the 4-argument form. A braced {} or a bare captureless lambda in the
+     * callback position resolves to the securityAuth overload instead and must be
+     * wrapped explicitly, e.g. SendCommandFinishCallback([](const std::string&) {}).
      */
     virtual int32_t SendCommand(
-        int32_t id, const std::string& command, const SendCommandFinishCallback& finishCallback)
+        int32_t id, const std::string& command, const SendCommandFinishCallback& finishCallback,
+        SecurityAuthInfo securityAuth = {})
     {
         return FAILED;
     }
     virtual int32_t SendCommand(
-        const std::string command, const SendCommandFinishCallback& finishCallback)
+        const std::string command, const SendCommandFinishCallback& finishCallback,
+        SecurityAuthInfo securityAuth = {})
     {
+        // See the note on the node-id callback overload above before passing a braced {}
+        // or a bare captureless lambda as the callback.
         return FAILED;
     }
 };
