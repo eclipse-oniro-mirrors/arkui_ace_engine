@@ -1210,6 +1210,18 @@ void AssignCast(std::optional<std::string>& dst, const Ark_FunctionKey& src)
         case ARK_FUNCTION_KEY_DPAD_DOWN: dst = "DPAD_DOWN"; break;
         case ARK_FUNCTION_KEY_DPAD_LEFT: dst = "DPAD_LEFT"; break;
         case ARK_FUNCTION_KEY_DPAD_RIGHT: dst = "DPAD_RIGHT"; break;
+        case ARK_FUNCTION_KEY_CAPS_LOCK: dst = "CAPS_LOCK"; break;
+        case ARK_FUNCTION_KEY_SCROLL_LOCK: dst = "SCROLL_LOCK"; break;
+        case ARK_FUNCTION_KEY_PAUSE_BREAK: dst = "PAUSE_BREAK"; break;
+        case ARK_FUNCTION_KEY_NUM_LOCK: dst = "NUM_LOCK"; break;
+        case ARK_FUNCTION_KEY_INSERT: dst = "INSERT"; break;
+        case ARK_FUNCTION_KEY_DELETE: dst = "DELETE"; break;
+        case ARK_FUNCTION_KEY_HOME: dst = "HOME"; break;
+        case ARK_FUNCTION_KEY_END: dst = "END"; break;
+        case ARK_FUNCTION_KEY_PAGE_UP: dst = "PAGE_UP"; break;
+        case ARK_FUNCTION_KEY_PAGE_DOWN: dst = "PAGE_DOWN"; break;
+        case ARK_FUNCTION_KEY_ENTER: dst = "ENTER"; break;
+        case ARK_FUNCTION_KEY_BACKSPACE: dst = "BACKSPACE"; break;
         default: LOGE("Unexpected enum value in Ark_FunctionKey: %{public}d", src);
     }
 }

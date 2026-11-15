@@ -3967,6 +3967,9 @@ struct ArkUICommonModifier {
     ArkUI_Int32 (*registerApplicationShortcut)(const std::string& value, uint8_t keys,
         std::function<void(ArkUI_Int32)>&& callback);
     void (*unregisterApplicationShortcut)(ArkUI_Int32 registrationId);
+    void (*registerNodeKeyboardShortcut)(ArkUINodeHandle node, const std::string& value, uint8_t keys,
+        std::function<void()>&& callback);
+    void (*unregisterNodeKeyboardShortcut)(ArkUINodeHandle node, const std::string& value, uint8_t keys);
 };
 
 struct ArkUICommonShapeModifier {

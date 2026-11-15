@@ -15,12 +15,14 @@
 
 #include "bridge/declarative_frontend/jsview/js_view_abstract.h"
 #include "core/components_ng/event/event_constants.h"
+#include "core/event/function_key.h"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <regex>
@@ -12417,6 +12419,44 @@ void JSViewAbstract::JsForegroundColor(const JSCallbackInfo& info)
             ViewAbstractModel::GetInstance()->SetForegroundColor(foregroundColor);
         }
     }
+}
+
+std::string JSViewAbstract::GetFunctionKeyName(FunctionKey functionkey)
+{
+    static const std::map<FunctionKey, std::string> keyNameMap {
+        {FunctionKey::FK_ESC, "ESC"},
+        {FunctionKey::FK_F1, "F1"},
+        {FunctionKey::FK_F2, "F2"},
+        {FunctionKey::FK_F3, "F3"},
+        {FunctionKey::FK_F4, "F4"},
+        {FunctionKey::FK_F5, "F5"},
+        {FunctionKey::FK_F6, "F6"},
+        {FunctionKey::FK_F7, "F7"},
+        {FunctionKey::FK_F8, "F8"},
+        {FunctionKey::FK_F9, "F9"},
+        {FunctionKey::FK_F10, "F10"},
+        {FunctionKey::FK_F11, "F11"},
+        {FunctionKey::FK_F12, "F12"},
+        {FunctionKey::FK_TAB, "TAB"},
+        {FunctionKey::FK_DPAD_UP, "DPAD_UP"},
+        {FunctionKey::FK_DPAD_DOWN, "DPAD_DOWN"},
+        {FunctionKey::FK_DPAD_LEFT, "DPAD_LEFT"},
+        {FunctionKey::FK_DPAD_RIGHT, "DPAD_RIGHT"},
+        {FunctionKey::FK_CAPS_LOCK, "CAPS_LOCK"},
+        {FunctionKey::FK_SCROLL_LOCK, "SCROLL_LOCK"},
+        {FunctionKey::FK_PAUSE_BREAK, "PAUSE_BREAK"},
+        {FunctionKey::FK_NUM_LOCK, "NUM_LOCK"},
+        {FunctionKey::FK_INSERT, "INSERT"},
+        {FunctionKey::FK_DELETE, "DELETE"},
+        {FunctionKey::FK_HOME, "HOME"},
+        {FunctionKey::FK_END, "END"},
+        {FunctionKey::FK_PAGE_UP, "PAGE_UP"},
+        {FunctionKey::FK_PAGE_DOWN, "PAGE_DOWN"},
+        {FunctionKey::FK_ENTER, "ENTER"},
+        {FunctionKey::FK_BACKSPACE, "BACKSPACE"}
+    };
+    auto result = keyNameMap.find(functionkey);
+    return (result != keyNameMap.end()) ? result->second : std::string();
 }
 
 void JSViewAbstract::JsKeyboardShortcut(const JSCallbackInfo& info)

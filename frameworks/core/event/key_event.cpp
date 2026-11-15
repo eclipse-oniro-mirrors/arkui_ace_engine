@@ -16,6 +16,7 @@
 #include "core/event/key_event.h"
 
 #include <algorithm>
+#include <set>
 #include <sstream>
 
 namespace OHOS::Ace {
@@ -56,6 +57,20 @@ bool KeyEvent::IsKey(const std::vector<KeyCode>& expectCodes) const
         ++curPressedCode;
     }
     return true;
+}
+
+bool KeyEvent::IsFunctionKey() const
+{
+    static const std::set<KeyCode> functionKeys = {
+        KeyCode::KEY_F1, KeyCode::KEY_F2, KeyCode::KEY_F3, KeyCode::KEY_F4, KeyCode::KEY_F5,
+        KeyCode::KEY_F6, KeyCode::KEY_F7, KeyCode::KEY_F8, KeyCode::KEY_F9, KeyCode::KEY_F10,
+        KeyCode::KEY_F11, KeyCode::KEY_F12, KeyCode::KEY_TAB, KeyCode::KEY_DPAD_UP,
+        KeyCode::KEY_DPAD_DOWN, KeyCode::KEY_DPAD_LEFT, KeyCode::KEY_DPAD_RIGHT,
+        KeyCode::KEY_CAPS_LOCK, KeyCode::KEY_SCROLL_LOCK, KeyCode::KEY_BREAK, KeyCode::KEY_NUM_LOCK,
+        KeyCode::KEY_INSERT, KeyCode::KEY_FORWARD_DEL, KeyCode::KEY_MOVE_HOME, KeyCode::KEY_MOVE_END,
+        KeyCode::KEY_PAGE_UP, KeyCode::KEY_PAGE_DOWN, KeyCode::KEY_ENTER, KeyCode::KEY_DEL,
+    };
+    return functionKeys.find(code) != functionKeys.end();
 }
 
 std::string KeyEvent::ToString() const
@@ -200,7 +215,14 @@ std::string KeyEvent::ConvertInputCodeToString() const
         { KeyCode::KEY_F6, "F6" }, { KeyCode::KEY_F7, "F7" }, { KeyCode::KEY_F8, "F8" }, { KeyCode::KEY_F9, "F9" },
         { KeyCode::KEY_F10, "F10" }, { KeyCode::KEY_F11, "F11" }, { KeyCode::KEY_F12, "F12" },
         { KeyCode::KEY_DPAD_UP, "DPAD_UP" }, { KeyCode::KEY_DPAD_DOWN, "DPAD_DOWN" },
-        { KeyCode::KEY_DPAD_LEFT, "DPAD_LEFT" }, { KeyCode::KEY_DPAD_RIGHT, "DPAD_RIGHT" } };
+        { KeyCode::KEY_DPAD_LEFT, "DPAD_LEFT" }, { KeyCode::KEY_DPAD_RIGHT, "DPAD_RIGHT" },
+        { KeyCode::KEY_CAPS_LOCK, "CAPS_LOCK" }, { KeyCode::KEY_PRINT, "PRINT_SCREEN" },
+        { KeyCode::KEY_SCROLL_LOCK, "SCROLL_LOCK" }, { KeyCode::KEY_BREAK, "PAUSE_BREAK" },
+        { KeyCode::KEY_NUM_LOCK, "NUM_LOCK" }, { KeyCode::KEY_INSERT, "INSERT" },
+        { KeyCode::KEY_FORWARD_DEL, "DELETE" }, { KeyCode::KEY_MOVE_HOME, "HOME" },
+        { KeyCode::KEY_MOVE_END, "END" }, { KeyCode::KEY_PAGE_UP, "PAGE_UP" },
+        { KeyCode::KEY_PAGE_DOWN, "PAGE_DOWN" }, { KeyCode::KEY_ENTER, "ENTER" },
+        { KeyCode::KEY_DEL, "BACKSPACE" } };
     if (KeyCode::KEY_NUMPAD_0 <= code && code <= KeyCode::KEY_NUMPAD_9) {
         return std::to_string(static_cast<int32_t>(code) - static_cast<int32_t>(KeyCode::KEY_NUMPAD_0));
     }

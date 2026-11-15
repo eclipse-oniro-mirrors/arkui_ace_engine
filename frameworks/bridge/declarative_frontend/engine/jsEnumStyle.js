@@ -2217,6 +2217,18 @@ let FunctionKey;
   FunctionKey[FunctionKey.DPAD_DOWN = 15] = 'DPAD_DOWN';
   FunctionKey[FunctionKey.DPAD_LEFT = 16] = 'DPAD_LEFT';
   FunctionKey[FunctionKey.DPAD_RIGHT = 17] = 'DPAD_RIGHT';
+  FunctionKey[FunctionKey.CAPS_LOCK = 18] = 'CAPS_LOCK';
+  FunctionKey[FunctionKey.SCROLL_LOCK = 20] = 'SCROLL_LOCK';
+  FunctionKey[FunctionKey.PAUSE_BREAK = 21] = 'PAUSE_BREAK';
+  FunctionKey[FunctionKey.NUM_LOCK = 22] = 'NUM_LOCK';
+  FunctionKey[FunctionKey.INSERT = 23] = 'INSERT';
+  FunctionKey[FunctionKey.DELETE = 24] = 'DELETE';
+  FunctionKey[FunctionKey.HOME = 25] = 'HOME';
+  FunctionKey[FunctionKey.END = 26] = 'END';
+  FunctionKey[FunctionKey.PAGE_UP = 27] = 'PAGE_UP';
+  FunctionKey[FunctionKey.PAGE_DOWN = 28] = 'PAGE_DOWN';
+  FunctionKey[FunctionKey.ENTER = 29] = 'ENTER';
+  FunctionKey[FunctionKey.BACKSPACE = 30] = 'BACKSPACE';
 })(FunctionKey || (FunctionKey = {}));
 
 let ContentType;
