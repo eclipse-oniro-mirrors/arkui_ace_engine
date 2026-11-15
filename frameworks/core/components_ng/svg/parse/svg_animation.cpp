@@ -223,6 +223,10 @@ void SvgAnimation::CreatePropertyAnimation(const T& originalValue, std::function
     }
 
     if (!CreatePropertyAnimate(std::move(callback), originalValue, animator_)) {
+        auto context = svgContext_.Upgrade();
+        if (context) {
+            context->RemoveAnimator(animator_->GetId());
+        }
         animator_ = nullptr;
         LOGW("CreatePropertyAnimate failed");
     }

@@ -34,6 +34,7 @@ public:
     RSRecordingPath GetPath(const SvgLengthScaleRule& lengthRule);
 private:
     std::string d_;
+    mutable std::optional<RSRecordingPath> sizePathCache_;
 };
 
 } // namespace OHOS::Ace::NG

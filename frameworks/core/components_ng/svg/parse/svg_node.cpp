@@ -730,10 +730,18 @@ void SvgNode::OnTransform(RSCanvas& canvas, const Size& viewPort)
 
 void SvgNode::OnTransform(RSCanvas& canvas, const SvgLengthScaleRule& lengthRule)
 {
-    Offset globalPivot = CalcGlobalPivot(attributes_.transformOrigin, lengthRule);
-    auto matrix = (animateTransform_.empty()) ?
-        NGSvgTransform::CreateMatrix4(attributes_.transformVec, globalPivot, lengthRule)
-        : SvgTransform::CreateMatrixFromMap(animateTransform_);
+    Matrix4 matrix;
+    if (!animateTransform_.empty()) {
+        matrix = SvgTransform::CreateMatrixFromMap(animateTransform_);
+    } else {
+        if (!transformVecCacheKey_.has_value() || !(transformVecCacheKey_.value() == lengthRule)) {
+            Offset globalPivot = CalcGlobalPivot(attributes_.transformOrigin, lengthRule);
+            transformVecMatrixCache_ =
+                NGSvgTransform::CreateMatrix4(attributes_.transformVec, globalPivot, lengthRule);
+            transformVecCacheKey_ = lengthRule;
+        }
+        matrix = transformVecMatrixCache_.value();
+    }
     canvas.ConcatMatrix(RosenSvgPainter::ToDrawingMatrix(matrix));
 }
 
