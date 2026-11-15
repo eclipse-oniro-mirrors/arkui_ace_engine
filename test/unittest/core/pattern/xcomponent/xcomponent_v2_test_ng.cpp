@@ -90,7 +90,7 @@ RefPtr<FrameNode> XComponentV2TestNg::CreateXComponentNode()
     g_params.type = XCOMPONENT_SURFACE_TYPE_VALUE;
     auto* stack = ViewStackProcessor::GetInstance();
     auto nodeId = stack->ClaimNodeId();
-    auto frameNode = AceType::DynamicCast<FrameNode>(XComponentModelNG().CreateTypeNode(nodeId, &g_params));
+    auto frameNode = XComponentModelNG().CreateTypeNode(nodeId, &g_params);
     return frameNode;
 }
 
@@ -1093,7 +1093,7 @@ HWTEST_F(XComponentV2TestNg, FlushRemoveChild001, TestSize.Level1)
     g_params.type = XCOMPONENT_SURFACE_TYPE_VALUE;
     auto* stack = ViewStackProcessor::GetInstance();
     auto nodeId = stack->ClaimNodeId();
-    auto frameNode = AceType::DynamicCast<FrameNode>(XComponentModelNG().CreateTypeNode(nodeId, &g_params));
+    auto frameNode = XComponentModelNG().CreateTypeNode(nodeId, &g_params);
 
     ASSERT_TRUE(frameNode);
     auto xcomponentPattern = frameNode->GetPattern<XComponentPatternV2>();
@@ -1123,7 +1123,7 @@ HWTEST_F(XComponentV2TestNg, FlushRemoveChild002, TestSize.Level1)
     g_params.type = XCOMPONENT_SURFACE_TYPE_VALUE;
     auto* stack = ViewStackProcessor::GetInstance();
     auto nodeId = stack->ClaimNodeId();
-    auto frameNode = AceType::DynamicCast<FrameNode>(XComponentModelNG().CreateTypeNode(nodeId, &g_params));
+    auto frameNode = XComponentModelNG().CreateTypeNode(nodeId, &g_params);
 
     ASSERT_TRUE(frameNode);
     auto xcomponentPattern = frameNode->GetPattern<XComponentPatternV2>();

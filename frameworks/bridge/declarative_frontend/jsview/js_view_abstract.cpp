@@ -9982,7 +9982,7 @@ void JSViewAbstract::JSCreateAnimatableProperty(const JSCallbackInfo& info)
         RefPtr<JSAnimatableArithmetic> animatableArithmeticImpl =
             AceType::MakeRefPtr<JSAnimatableArithmetic>(obj, info.GetExecutionContext());
         RefPtr<CustomAnimatableArithmetic> animatableArithmetic =
-            AceType::DynamicCast<CustomAnimatableArithmetic>(animatableArithmeticImpl);
+            animatableArithmeticImpl;
         std::function<void(const RefPtr<NG::CustomAnimatableArithmetic>&)> onCallbackEvent;
         RefPtr<JsFunction> jsFunc = AceType::MakeRefPtr<JsFunction>(JSRef<JSObject>(), JSRef<JSFunc>::Cast(callback));
         onCallbackEvent = [execCtx = info.GetExecutionContext(), func = std::move(jsFunc), id = Container::CurrentId(),
@@ -10018,7 +10018,7 @@ void JSViewAbstract::JSUpdateAnimatableProperty(const JSCallbackInfo& info)
         RefPtr<JSAnimatableArithmetic> animatableArithmeticImpl =
             AceType::MakeRefPtr<JSAnimatableArithmetic>(obj, info.GetExecutionContext());
         RefPtr<CustomAnimatableArithmetic> animatableArithmetic =
-            AceType::DynamicCast<CustomAnimatableArithmetic>(animatableArithmeticImpl);
+            animatableArithmeticImpl;
         ViewAbstractModel::GetInstance()->UpdateAnimatableArithmeticProperty(propertyName, animatableArithmetic);
     }
 }

@@ -570,7 +570,7 @@ std::string EventManager::GetTouchTestResultInfo(
         if (!node) {
             continue;
         }
-        auto frameNode = AceType::DynamicCast<NG::FrameNode>(node);
+        auto frameNode = node;
         if (!frameNode) {
             continue;
         }
@@ -722,7 +722,7 @@ std::string EventManager::GetTouchTestResultRecognizers(const TouchTestResult& r
                 hittedRecognizerInfo.emplace(AceType::TypeName(item), std::list<NG::TouchTestResultInfo>());
                 continue;
             }
-            auto frameNode = AceType::DynamicCast<NG::FrameNode>(node);
+            auto frameNode = node;
             if (!frameNode) {
                 hittedRecognizerInfo.emplace(AceType::TypeName(item), std::list<NG::TouchTestResultInfo>());
                 continue;

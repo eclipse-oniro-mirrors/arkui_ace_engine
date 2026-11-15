@@ -48,7 +48,7 @@ UdmfClient* UdmfClient::GetInstance()
 
 RefPtr<UnifiedData> UdmfClientImpl::CreateUnifiedData()
 {
-    return AceType::DynamicCast<UnifiedData>(AceType::MakeRefPtr<UnifiedDataImpl>());
+    return AceType::MakeRefPtr<UnifiedDataImpl>();
 }
 
 RefPtr<UnifiedData> UdmfClientImpl::TransformUnifiedData(napi_value napiValue)

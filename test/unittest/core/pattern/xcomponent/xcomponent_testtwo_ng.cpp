@@ -970,7 +970,7 @@ HWTEST_F(XComponentTestTwoNg, SetScreenIdShouldCallPatternSetFuncTest, TestSize.
     g_params.screenId = XCOMPONENT_SCREEN_ID;
     auto* stack = ViewStackProcessor::GetInstance();
     auto nodeId = stack->ClaimNodeId();
-    auto frameNode = AceType::DynamicCast<FrameNode>(XComponentModelNG().CreateTypeNode(nodeId, &g_params));
+    auto frameNode = XComponentModelNG().CreateTypeNode(nodeId, &g_params);
     ASSERT_TRUE(frameNode);
     auto pattern = frameNode->GetPattern<XComponentPattern>();
     ASSERT_TRUE(pattern);
@@ -991,7 +991,7 @@ HWTEST_F(XComponentTestTwoNg, SetScreenIdShouldNotCallPatternSetFuncTest, TestSi
     g_params.screenId = XCOMPONENT_SCREEN_ID;
     auto* stack = ViewStackProcessor::GetInstance();
     auto nodeId = stack->ClaimNodeId();
-    auto frameNode = AceType::DynamicCast<FrameNode>(XComponentModelNG().CreateTypeNode(nodeId, &g_params));
+    auto frameNode = XComponentModelNG().CreateTypeNode(nodeId, &g_params);
     ASSERT_TRUE(frameNode);
     auto pattern = frameNode->GetPattern<XComponentPattern>();
     ASSERT_TRUE(pattern);

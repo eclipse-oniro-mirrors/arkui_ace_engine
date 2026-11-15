@@ -86,7 +86,7 @@ HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage001, TestSi
     childNodeNull->SetGeometryNode(geometryNode);
     auto pipelineTmp = NG::PipelineContext::GetCurrentContext();
     auto parentNodeTmp = pipelineTmp->GetRootElement();
-    auto parentFrameNodeTmp = AceType::DynamicCast<FrameNode>(parentNodeTmp);
+    auto parentFrameNodeTmp = parentNodeTmp;
     parentFrameNodeTmp->SetGeometryNode(geometryNode);
     parentFrameNodeTmp->frameChildren_.insert(WeakPtr<NG::FrameNode>(frameNodeNull));
     parentFrameNodeTmp->frameChildren_.insert(WeakPtr<NG::FrameNode>(childNodeNull));
@@ -103,7 +103,7 @@ HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage001, TestSi
     auto pipeline = NG::PipelineContext::GetCurrentContext();
     auto manager = pipeline->GetOverlayManager();
     auto parentNode = pipeline->GetRootElement();
-    auto parentFrameNode = AceType::DynamicCast<FrameNode>(parentNode);
+    auto parentFrameNode = parentNode;
     auto children = parentFrameNode->GetFrameChildren();
     auto result = dragDropManager->FindTargetInChildNodes(parentNode, hitFrameNodes, true);
     EXPECT_TRUE(result);
@@ -236,7 +236,7 @@ HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage006, TestSi
     childNodeNull->SetGeometryNode(geometryNode);
     auto pipelineTmp = NG::PipelineContext::GetCurrentContext();
     auto parentNodeTmp = pipelineTmp->GetRootElement();
-    auto parentFrameNodeTmp = AceType::DynamicCast<FrameNode>(parentNodeTmp);
+    auto parentFrameNodeTmp = parentNodeTmp;
     parentFrameNodeTmp->SetGeometryNode(geometryNode);
     parentFrameNodeTmp->frameChildren_.insert(WeakPtr<NG::FrameNode>(frameNodeNull));
     parentFrameNodeTmp->frameChildren_.insert(WeakPtr<NG::FrameNode>(childNodeNull));
@@ -253,7 +253,7 @@ HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage006, TestSi
     auto pipeline = NG::PipelineContext::GetCurrentContext();
     auto manager = pipeline->GetOverlayManager();
     auto parentNode = pipeline->GetRootElement();
-    auto parentFrameNode = AceType::DynamicCast<FrameNode>(parentNode);
+    auto parentFrameNode = parentNode;
     auto children = parentFrameNode->GetFrameChildren();
     auto result = dragDropManager->FindTargetInChildNodes(parentNode, hitFrameNodes, true);
     EXPECT_TRUE(result);
@@ -331,7 +331,7 @@ HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage010, TestSi
     childNodeNull->GetRenderContext()->UpdatePaintRect({ 0.0, 0.0, 200.0, 200.0 });
     auto pipelineTmp = NG::PipelineContext::GetCurrentContext();
     auto parentNodeTmp = pipelineTmp->GetRootElement();
-    auto parentFrameNodeTmp = AceType::DynamicCast<FrameNode>(parentNodeTmp);
+    auto parentFrameNodeTmp = parentNodeTmp;
     parentFrameNodeTmp->SetGeometryNode(geometryNode);
     parentFrameNodeTmp->GetRenderContext()->UpdatePaintRect({ 0.0, 0.0, 200.0, 200.0 });
     parentFrameNodeTmp->frameChildren_.insert(WeakPtr<NG::FrameNode>(frameNodeNull));
@@ -345,7 +345,7 @@ HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage010, TestSi
     auto pipeline = NG::PipelineContext::GetCurrentContext();
     auto manager = pipeline->GetOverlayManager();
     auto parentNode = pipeline->GetRootElement();
-    auto parentFrameNode = AceType::DynamicCast<FrameNode>(parentNode);
+    auto parentFrameNode = parentNode;
     auto children = parentFrameNode->GetFrameChildren();
     auto result = dragDropManager->FindTargetDropNode(parentNode, point);
     EXPECT_TRUE(result);
@@ -455,7 +455,7 @@ HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage012, TestSi
     childNodeNull->GetRenderContext()->UpdatePaintRect({ 0.0, 0.0, 200.0, 200.0 });
     auto pipelineTmp = NG::PipelineContext::GetCurrentContext();
     auto parentNodeTmp = pipelineTmp->GetRootElement();
-    auto parentFrameNodeTmp = AceType::DynamicCast<FrameNode>(parentNodeTmp);
+    auto parentFrameNodeTmp = parentNodeTmp;
     parentFrameNodeTmp->SetGeometryNode(geometryNode);
     parentFrameNodeTmp->GetRenderContext()->UpdatePaintRect({ 0.0, 0.0, 200.0, 200.0 });
     parentFrameNodeTmp->frameChildren_.insert(WeakPtr<NG::FrameNode>(frameNodeNull));
@@ -469,7 +469,7 @@ HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage012, TestSi
     auto pipeline = NG::PipelineContext::GetCurrentContext();
     auto manager = pipeline->GetOverlayManager();
     auto parentNode = pipeline->GetRootElement();
-    auto parentFrameNode = AceType::DynamicCast<FrameNode>(parentNode);
+    auto parentFrameNode = parentNode;
     auto children = parentFrameNode->GetFrameChildren();
     auto resultNode = dragDropManager->FindDragFrameNodeByPosition(point.GetX(), point.GetY());
     EXPECT_TRUE(resultNode);
@@ -752,7 +752,7 @@ HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage026, TestSi
     childNodeNull->GetRenderContext()->UpdatePaintRect({ 0.0, 0.0, 200.0, 200.0 });
     auto pipelineTmp = NG::PipelineContext::GetCurrentContext();
     auto parentNodeTmp = pipelineTmp->GetRootElement();
-    auto parentFrameNodeTmp = AceType::DynamicCast<FrameNode>(parentNodeTmp);
+    auto parentFrameNodeTmp = parentNodeTmp;
     parentFrameNodeTmp->SetGeometryNode(geometryNode);
     parentFrameNodeTmp->GetRenderContext()->UpdatePaintRect({ 0.0, 0.0, 200.0, 200.0 });
     parentFrameNodeTmp->frameChildren_.insert(WeakPtr<NG::FrameNode>(frameNodeNull));
@@ -766,7 +766,7 @@ HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage026, TestSi
     auto pipeline = NG::PipelineContext::GetCurrentContext();
     auto manager = pipeline->GetOverlayManager();
     auto parentNode = pipeline->GetRootElement();
-    auto parentFrameNode = AceType::DynamicCast<FrameNode>(parentNode);
+    auto parentFrameNode = parentNode;
     auto children = parentFrameNode->GetFrameChildren();
     DragPointerEvent pointEvent(100, 100, 100, 100);
     auto draggedNode = dragDropManager->draggedFrameNode_;
@@ -810,7 +810,7 @@ HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage027, TestSi
     childNodeNull->GetRenderContext()->UpdatePaintRect({ 0.0, 0.0, 200.0, 200.0 });
     auto pipelineTmp = NG::PipelineContext::GetCurrentContext();
     auto parentNodeTmp = pipelineTmp->GetRootElement();
-    auto parentFrameNodeTmp = AceType::DynamicCast<FrameNode>(parentNodeTmp);
+    auto parentFrameNodeTmp = parentNodeTmp;
     parentFrameNodeTmp->SetGeometryNode(geometryNode);
     parentFrameNodeTmp->GetRenderContext()->UpdatePaintRect({ 0.0, 0.0, 200.0, 200.0 });
     parentFrameNodeTmp->frameChildren_.insert(WeakPtr<NG::FrameNode>(frameNodeNull));
@@ -824,7 +824,7 @@ HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage027, TestSi
     auto pipeline = NG::PipelineContext::GetCurrentContext();
     auto manager = pipeline->GetOverlayManager();
     auto parentNode = pipeline->GetRootElement();
-    auto parentFrameNode = AceType::DynamicCast<FrameNode>(parentNode);
+    auto parentFrameNode = parentNode;
     auto children = parentFrameNode->GetFrameChildren();
     DragPointerEvent pointEvent(100, 100, 100, 100);
     auto draggedNode = dragDropManager->draggedFrameNode_;
@@ -1463,7 +1463,7 @@ HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage054, TestSi
     ASSERT_NE(pipelineTmp, nullptr);
     auto parentNodeTmp = pipelineTmp->GetRootElement();
     ASSERT_NE(parentNodeTmp, nullptr);
-    auto parentFrameNodeTmp = AceType::DynamicCast<FrameNode>(parentNodeTmp);
+    auto parentFrameNodeTmp = parentNodeTmp;
     parentFrameNodeTmp->SetGeometryNode(geometryNode);
     parentFrameNodeTmp->GetRenderContext()->UpdatePaintRect({ 0.0, 0.0, 200.0, 200.0 });
     parentFrameNodeTmp->frameChildren_.insert(WeakPtr<NG::FrameNode>(frameNodeNull));
@@ -1477,7 +1477,7 @@ HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage054, TestSi
     auto pipeline = NG::PipelineContext::GetCurrentContext();
     auto manager = pipeline->GetOverlayManager();
     auto parentNode = pipeline->GetRootElement();
-    auto parentFrameNode = AceType::DynamicCast<FrameNode>(parentNode);
+    auto parentFrameNode = parentNode;
     auto children = parentFrameNode->GetFrameChildren();
     auto result = true;
     dragDropManager->OnItemDragMove(100.0, 100.0, 1, DragType::GRID);
@@ -1521,7 +1521,7 @@ HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage055, TestSi
     auto pipelineTmp = NG::PipelineContext::GetCurrentContext();
     ASSERT_NE(pipelineTmp, nullptr);
     auto parentNodeTmp = pipelineTmp->GetRootElement();
-    auto parentFrameNodeTmp = AceType::DynamicCast<FrameNode>(parentNodeTmp);
+    auto parentFrameNodeTmp = parentNodeTmp;
     parentFrameNodeTmp->SetGeometryNode(geometryNode);
     parentFrameNodeTmp->GetRenderContext()->UpdatePaintRect({ 0.0, 0.0, 200.0, 200.0 });
     parentFrameNodeTmp->frameChildren_.insert(WeakPtr<NG::FrameNode>(frameNodeNull));
@@ -1535,7 +1535,7 @@ HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage055, TestSi
     auto pipeline = NG::PipelineContext::GetCurrentContext();
     auto manager = pipeline->GetOverlayManager();
     auto parentNode = pipeline->GetRootElement();
-    auto parentFrameNode = AceType::DynamicCast<FrameNode>(parentNode);
+    auto parentFrameNode = parentNode;
     auto children = parentFrameNode->GetFrameChildren();
     auto result = true;
     dragDropManager->OnItemDragEnd(100.0, 100.0, 1, DragType::GRID);
@@ -2645,26 +2645,26 @@ HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage078, TestSi
         if (imageNode->GetTag() == V2::WEB_ETS_TAG) {
             frameNode1->children_.push_back(imageNode);
             frameNode2->children_.push_back(frameNode1);
-            overlayManager = AceType::MakeRefPtr<OverlayManager>(AceType::DynamicCast<FrameNode>(frameNode2));
+            overlayManager = AceType::MakeRefPtr<OverlayManager>(frameNode2);
         } else if (imageNode->GetTag() == V2::TEXT_ETS_TAG) {
             auto previewOption = frameNode1->GetDragPreviewOption();
             previewOption.isScaleEnabled = false;
             imageNode->SetDragPreviewOptions(previewOption, false);
             frameNode1->children_.push_back(imageNode);
             frameNode2->children_.push_back(frameNode1);
-            overlayManager = AceType::MakeRefPtr<OverlayManager>(AceType::DynamicCast<FrameNode>(frameNode2));
+            overlayManager = AceType::MakeRefPtr<OverlayManager>(frameNode2);
         } else {
             frameNode1->children_.push_back(imageNode);
             frameNode1->children_.push_back(imageNode);
-            overlayManager = AceType::MakeRefPtr<OverlayManager>(AceType::DynamicCast<FrameNode>(frameNode1));
+            overlayManager = AceType::MakeRefPtr<OverlayManager>(frameNode1);
         }
         
         overlayManager->hasDragPixelMap_ = true;
         frameNode1->isActive_ = true;
         if (imageNode->GetTag() == V2::WEB_ETS_TAG || imageNode->GetTag() == V2::TEXT_ETS_TAG) {
-            overlayManager->dragPixmapColumnNodeWeak_ = WeakPtr<FrameNode>(AceType::DynamicCast<FrameNode>(frameNode2));
+            overlayManager->dragPixmapColumnNodeWeak_ = WeakPtr<FrameNode>(frameNode2);
         } else {
-            overlayManager->dragPixmapColumnNodeWeak_ = WeakPtr<FrameNode>(AceType::DynamicCast<FrameNode>(frameNode1));
+            overlayManager->dragPixmapColumnNodeWeak_ = WeakPtr<FrameNode>(frameNode1);
         }
         NG::DragControllerFuncWrapper::GetDragPreviewInfo(overlayManager, containerId);
         EXPECT_EQ(dragDropManager->GetDragPreviewInfo().width, testCase.width);

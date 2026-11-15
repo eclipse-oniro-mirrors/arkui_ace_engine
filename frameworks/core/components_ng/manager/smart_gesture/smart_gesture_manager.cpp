@@ -259,7 +259,7 @@ void CollectPanGestureNodes(std::vector<RefPtr<FrameNode>>& centerHitPath, std::
     }
 
     for (const auto& childRecognizer : recognizerGroup->GetGroupRecognizer()) {
-        auto childGestureRecognizer = AceType::DynamicCast<NGGestureRecognizer>(childRecognizer);
+        auto childGestureRecognizer = childRecognizer;
         CollectPanGestureNodes(centerHitPath, visitedNodeIds, childGestureRecognizer);
     }
 }
