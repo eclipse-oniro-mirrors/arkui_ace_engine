@@ -3282,6 +3282,9 @@ HWTEST_F(WebPatternTestNgSupplement, MergeAndInject_BothEmpty_EarlyReturn_011, T
     EXPECT_TRUE(webPattern->systemDocumentStartScripts_.empty());
     EXPECT_TRUE(webPattern->publicOnDocumentStartScriptItems_.empty());
     EXPECT_TRUE(webPattern->publicOnDocumentStartScriptItemsByOrder_.empty());
+    // An empty batch must be prepared for submission (no early return).
+    ASSERT_TRUE(webPattern->delegate_->onDocumentStartScriptItems_.has_value());
+    EXPECT_TRUE(webPattern->delegate_->onDocumentStartScriptItems_->empty());
 #endif
 }
 
@@ -3537,11 +3540,11 @@ HWTEST_F(WebPatternTestNgSupplement, MergeNonByOrderPath_SystemMergedIntoPublic_
 }
 
 /**
- * @tc.name: RemoveSystemDocumentStartJS_OnlySystem_BothEmptyEarlyReturn_017
- * @tc.desc: RemoveSystemDocumentStartJS with only system scripts triggers MergeAndInject early return (both empty).
+  * @tc.name: RemoveSystemDocumentStartJS_OnlySystem_ForcesEmptyBatch_017
+  * @tc.desc: RemoveSystemDocumentStartJS with only system scripts forces an empty batch to clear NWeb.
  * @tc.type: FUNC
  */
-HWTEST_F(WebPatternTestNgSupplement, RemoveSystemDocumentStartJS_OnlySystem_BothEmptyEarlyReturn_017, TestSize.Level1)
+HWTEST_F(WebPatternTestNgSupplement, RemoveSystemDocumentStartJS_OnlySystem_ForcesEmptyBatch_017, TestSize.Level1)
 {
 #ifdef OHOS_STANDARD_SYSTEM
     auto* stack = ViewStackProcessor::GetInstance();
@@ -3567,7 +3570,11 @@ HWTEST_F(WebPatternTestNgSupplement, RemoveSystemDocumentStartJS_OnlySystem_Both
     EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
     EXPECT_TRUE(webPattern->publicOnDocumentStartScriptItems_.empty());
 
-    // Step 2: Remove system JS — both stores become empty, MergeAndInject early-returns.
+    // Keep nweb_ null so the delegate retains the prepared batch for inspection.
+    webPattern->delegate_->nweb_ = nullptr;
+
+    // Step 2: Remove system JS — both stores become empty, but an empty batch is
+    // still submitted so NWeb's replace semantics clear the previous registration.
     webPattern->RemoveSystemDocumentStartJS();
 
     // AC: system store cleared; flag reset; public store remains empty; no crash.

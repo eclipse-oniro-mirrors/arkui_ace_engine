@@ -9215,7 +9215,11 @@ void WebPattern::UpdateJavaScriptOnDocumentStart()
         publicOnDocumentStartScriptItems_ = onDocumentStartScriptItems_.value();
         publicOnDocumentStartScriptRegexItems_.clear();
         publicOnDocumentStartScriptItemsByOrder_.clear();
-        delegate_->SetJavaScriptItems(onDocumentStartScriptItems_.value(), ScriptItemType::DOCUMENT_START);
+        // When inner scripts exist, MergeAndInject writes the merged batch, so
+        // skip the redundant public-only write here.
+        if (!hasInnerOnDocumentStartScripts_) {
+            delegate_->SetJavaScriptItems(onDocumentStartScriptItems_.value(), ScriptItemType::DOCUMENT_START);
+        }
         onDocumentStartScriptItems_ = std::nullopt;
         // If inner scripts exist, re-inject the merged batch.
         if (hasInnerOnDocumentStartScripts_) {
@@ -9233,9 +9237,13 @@ void WebPattern::UpdateJavaScriptOnDocumentStartByOrder()
         publicOnDocumentStartScriptItems_ = onDocumentStartScriptItems_.value();
         publicOnDocumentStartScriptRegexItems_ = onDocumentStartScriptRegexItems_.value();
         publicOnDocumentStartScriptItemsByOrder_ = onDocumentStartScriptItemsByOrder_.value();
-        delegate_->SetJavaScriptItemsByOrder(onDocumentStartScriptItems_.value(),
-            onDocumentStartScriptRegexItems_.value(), ScriptItemType::DOCUMENT_START,
-            onDocumentStartScriptItemsByOrder_.value());
+        // When inner scripts exist, MergeAndInject writes the merged batch, so
+        // skip the redundant public-only write here.
+        if (!hasInnerOnDocumentStartScripts_) {
+            delegate_->SetJavaScriptItemsByOrder(onDocumentStartScriptItems_.value(),
+                onDocumentStartScriptRegexItems_.value(), ScriptItemType::DOCUMENT_START,
+                onDocumentStartScriptItemsByOrder_.value());
+        }
         onDocumentStartScriptItems_ = std::nullopt;
         onDocumentStartScriptRegexItems_ = std::nullopt;
         onDocumentStartScriptItemsByOrder_ = std::nullopt;
@@ -9266,22 +9274,27 @@ void WebPattern::RegisterSystemDocumentStartJS(const ScriptItems& scriptItems,
 
 void WebPattern::RemoveSystemDocumentStartJS()
 {
+    // NWeb keeps the last submitted DocumentStart registration until a new batch
+    // replaces it. Remember whether system scripts had been submitted so that an
+    // empty batch can be forced to clear them even when no public scripts exist.
+    bool hadSystemScripts = !systemDocumentStartScripts_.empty();
     systemDocumentStartScripts_.clear();
     systemDocumentStartScriptRegexItems_.clear();
     systemDocumentStartScriptItemsByOrder_.clear();
     hasInnerOnDocumentStartScripts_ = false;
     if (delegate_) {
-        MergeAndInjectJavaScriptOnDocumentStart();
+        MergeAndInjectJavaScriptOnDocumentStart(hadSystemScripts);
     }
 }
 
-void WebPattern::MergeAndInjectJavaScriptOnDocumentStart()
+void WebPattern::MergeAndInjectJavaScriptOnDocumentStart(bool forceInject)
 {
     if (!delegate_) {
         return;
     }
-    // Early return when both system and public scripts are empty — nothing to inject.
-    if (systemDocumentStartScripts_.empty() && publicOnDocumentStartScriptItems_.empty()) {
+    // Early return only when there is nothing to inject and no previously
+    // submitted system scripts need to be cleared from NWeb.
+    if (!forceInject && systemDocumentStartScripts_.empty() && publicOnDocumentStartScriptItems_.empty()) {
         return;
     }
     // Use ByOrder path when app registered via ByOrder API OR when only system
@@ -11288,6 +11301,8 @@ void WebPattern::RunJsInit()
          sysByOrder.emplace_back(g_translateTextData.translateScript);
          sysByOrder.emplace_back(g_translateTextData.initScript);
          RegisterSystemDocumentStartJS(sysScriptItems, sysRegexItems, sysByOrder);
+         // Registers the JS Bridge with isNeedRefresh=true, which internally calls
+         // nweb->Reload() so the reloaded page picks up the system DocumentStart JS.
          RegisterTranslateTextJavaScript();
     }
 }
