@@ -90,6 +90,14 @@ RefPtr<ResourceObject> GetResourceObjectFromResourceStr(const Ark_ResourceStr& r
     return GetResourceObject(resStr.value1);
 }
 
+RefPtr<ResourceObject> GetResourceObjectFromOptResourceStr(const Opt_ResourceStr& opt)
+{
+    if (opt.tag == InteropTag::INTEROP_TAG_UNDEFINED) {
+        return nullptr;
+    }
+    return GetResourceObjectFromResourceStr(opt.value);
+}
+
 std::optional<int32_t> ProcessBindableIndex(FrameNode* frameNode, const Opt_Union_I32_Bindable_I32& value)
 {
     std::optional<int32_t> result;
@@ -1355,6 +1363,27 @@ void SetTabViewCustomizationImpl(Ark_NativePointer node,
     ParseOrderMap(arkCust, customization);
     TabsModelNG::SetTabViewCustomization(frameNode, customization);
 }
+void SetSidebarTitleBarImpl(Ark_NativePointer node,
+                            const Opt_TabsSidebarTitleBarOptions* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabsSidebarTitleBarOptions options;
+    if (!value || value->tag == InteropTag::INTEROP_TAG_UNDEFINED) {
+        TabsModelNG::SetSidebarTitleBar(frameNode, options);
+        TabsModelNG::CreateWithSidebarResourceObj(frameNode, TabJsResType::SIDEBAR_TITLE_BAR_ICON, nullptr);
+        TabsModelNG::CreateWithSidebarResourceObj(frameNode, TabJsResType::SIDEBAR_TITLE_BAR_TEXT, nullptr);
+        return;
+    }
+    options.isNull = false;
+    options.text = Converter::OptConvertPtr<std::string>(&value->value.text);
+    options.icon = Converter::OptConvertPtr<std::string>(&value->value.icon);
+    TabsModelNG::SetSidebarTitleBar(frameNode, options);
+    auto iconResObj = GetResourceObjectFromOptResourceStr(value->value.icon);
+    TabsModelNG::CreateWithSidebarResourceObj(frameNode, TabJsResType::SIDEBAR_TITLE_BAR_ICON, iconResObj);
+    auto textResObj = GetResourceObjectFromOptResourceStr(value->value.text);
+    TabsModelNG::CreateWithSidebarResourceObj(frameNode, TabJsResType::SIDEBAR_TITLE_BAR_TEXT, textResObj);
+}
 } // TabsAttributeModifier
 const GENERATED_ArkUITabsModifier* GetTabsModifier()
 {
@@ -1414,6 +1443,7 @@ const GENERATED_ArkUITabsModifier* GetTabsModifier()
         TabsAttributeModifier::SetSidebarBottomBarImpl,
         TabsAttributeModifier::SetShowSideBarControlButtonImpl,
         TabsAttributeModifier::SetTabViewCustomizationImpl,
+        TabsAttributeModifier::SetSidebarTitleBarImpl,
         TabsAttributeModifier::SetBarModeImpl,
         TabsAttributeModifier::SetBarHeight1Impl,
         TabsAttributeModifier::SetBarBackgroundBlurStyle1Impl,

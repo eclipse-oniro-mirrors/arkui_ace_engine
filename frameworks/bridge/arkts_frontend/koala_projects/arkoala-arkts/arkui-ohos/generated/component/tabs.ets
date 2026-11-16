@@ -1056,6 +1056,18 @@ export class ArkTabsPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._TabsAttribute_setTabViewCustomization(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setSidebarTitleBarAttribute(value: TabsSidebarTitleBarOptions | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            TabsSidebarTitleBarOptions_serializer.write(thisSerializer, valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._TabsAttribute_setSidebarTitleBar(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setBarModeAttribute(value: BarMode | undefined, options?: ScrollableBarModeOptions): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (value !== undefined) {
@@ -1258,6 +1270,10 @@ export interface TabViewCustomization {
     sectionMap?: Map<int32, SidebarSection>;
     orderMap?: Map<int32, int32>;
 }
+export interface TabsSidebarTitleBarOptions {
+    icon?: ResourceStr;
+    text?: ResourceStr;
+}
 export interface TabsAttribute extends CommonMethod {
     setTabsOptions(options?: TabsOptions): this {
         throw new Error('Unimplemented method setTabsOptions')
@@ -1420,6 +1436,9 @@ export interface TabsAttribute extends CommonMethod {
     }
     tabViewCustomization(value: TabViewCustomization | undefined): this {
         throw new Error('Unimplemented method tabViewCustomization')
+    }
+    sidebarTitleBar(value: TabsSidebarTitleBarOptions | undefined): this {
+        throw new Error('Unimplemented method sidebarTitleBar')
     }
     barMode(value: BarMode | undefined, options?: ScrollableBarModeOptions): this {
         throw new Error('Unimplemented method barMode')
@@ -1715,6 +1734,11 @@ export class ArkTabsComponent extends ArkCommonMethodComponent implements TabsAt
     public tabViewCustomization(value: TabViewCustomization | undefined): this {
         const value_casted = value as (TabViewCustomization | undefined)
         this.getPeer()?.setTabViewCustomizationAttribute(value_casted)
+        return this
+    }
+    public sidebarTitleBar(value: TabsSidebarTitleBarOptions | undefined): this {
+        const value_casted = value as (TabsSidebarTitleBarOptions | undefined)
+        this.getPeer()?.setSidebarTitleBarAttribute(value_casted)
         return this
     }
     public barMode(value: BarMode | undefined, options?: ScrollableBarModeOptions): this {
@@ -2232,6 +2256,78 @@ export class TabsSidebarSearchableOptions_serializer {
         }
         const searchFilterTmpResult: TabsSidebarSearchFilterCallback | undefined = searchFilterTmpBuf
         let value: TabsSidebarSearchableOptions = ({searchText: searchTextTmpResult, placeholder: placeholderTmpResult, searchCallback: searchCallbackTmpResult, searchFilter: searchFilterTmpResult} as TabsSidebarSearchableOptions)
+        return value
+    }
+}
+export class TabsSidebarTitleBarOptions_serializer {
+    public static write(buffer: SerializerBase, value: TabsSidebarTitleBarOptions): void {
+        let valueSerializer: SerializerBase = buffer
+        const valueHolderForIcon = value.icon
+        if (valueHolderForIcon !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForIconTmpValue = valueHolderForIcon!
+            if (valueHolderForIconTmpValue instanceof string) {
+                valueSerializer.writeInt8((0).toByte())
+                const valueHolderForIconTmpValueForIdx0 = valueHolderForIconTmpValue as string
+                valueSerializer.writeString(valueHolderForIconTmpValueForIdx0)
+            } else if (valueHolderForIconTmpValue instanceof arkui_component_units_Resource) {
+                valueSerializer.writeInt8((1).toByte())
+                const valueHolderForIconTmpValueForIdx1 = valueHolderForIconTmpValue as arkui_component_units_Resource
+                global_resource_Resource_serializer.write(valueSerializer, valueHolderForIconTmpValueForIdx1)
+            }
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        const valueHolderForText = value.text
+        if (valueHolderForText !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForTextTmpValue = valueHolderForText!
+            if (valueHolderForTextTmpValue instanceof string) {
+                valueSerializer.writeInt8((0).toByte())
+                const valueHolderForTextTmpValueForIdx0 = valueHolderForTextTmpValue as string
+                valueSerializer.writeString(valueHolderForTextTmpValueForIdx0)
+            } else if (valueHolderForTextTmpValue instanceof arkui_component_units_Resource) {
+                valueSerializer.writeInt8((1).toByte())
+                const valueHolderForTextTmpValueForIdx1 = valueHolderForTextTmpValue as arkui_component_units_Resource
+                global_resource_Resource_serializer.write(valueSerializer, valueHolderForTextTmpValueForIdx1)
+            }
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+    }
+    public static read(buffer: DeserializerBase): TabsSidebarTitleBarOptions {
+        let valueDeserializer: DeserializerBase = buffer
+        const iconTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let iconTmpBuf: ResourceStr | undefined = undefined
+        if ((iconTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            const iconTmpBufOptUnionSelector: int32 = valueDeserializer.readInt8()
+            let iconTmpBufOpt: string | arkui_component_units_Resource | undefined
+            if (iconTmpBufOptUnionSelector == (0).toByte()) {
+                iconTmpBufOpt = (valueDeserializer.readString() as string)
+            } else if (iconTmpBufOptUnionSelector == (1).toByte()) {
+                iconTmpBufOpt = global_resource_Resource_serializer.read(valueDeserializer)
+            } else {
+                throw new Error('One of the branches for iconTmpBufOpt has to be chosen through deserialisation.')
+            }
+            iconTmpBuf = (iconTmpBufOpt as string | arkui_component_units_Resource)
+        }
+        const iconTmpResult: ResourceStr | undefined = iconTmpBuf
+        const textTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let textTmpBuf: ResourceStr | undefined = undefined
+        if ((textTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            const textTmpBufOptUnionSelector: int32 = valueDeserializer.readInt8()
+            let textTmpBufOpt: string | arkui_component_units_Resource | undefined
+            if (textTmpBufOptUnionSelector == (0).toByte()) {
+                textTmpBufOpt = (valueDeserializer.readString() as string)
+            } else if (textTmpBufOptUnionSelector == (1).toByte()) {
+                textTmpBufOpt = global_resource_Resource_serializer.read(valueDeserializer)
+            } else {
+                throw new Error('One of the branches for textTmpBufOpt has to be chosen through deserialisation.')
+            }
+            textTmpBuf = (textTmpBufOpt as string | arkui_component_units_Resource)
+        }
+        const textTmpResult: ResourceStr | undefined = textTmpBuf
+        let value: TabsSidebarTitleBarOptions = ({icon: iconTmpResult, text: textTmpResult} as TabsSidebarTitleBarOptions)
         return value
     }
 }
