@@ -631,7 +631,7 @@ HWTEST_F(WebPatternAddTestNg, OnDragFileNameStart, TestSize.Level1)
     ASSERT_NE(aceUnifiedData, nullptr);
     auto mockUdmfClient = AceType::DynamicCast<MockUdmfClient>(UdmfClient::GetInstance());
     ASSERT_NE(mockUdmfClient, nullptr);
-    EXPECT_CALL(*mockUdmfClient, AddFileUriRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData),
+    EXPECT_CALL(*mockUdmfClient, AddFileUriRecord(RefPtr<UnifiedData>(aceUnifiedData),
                                      ElementsAreArray({ "file:///abc/dragdrop/test.txt" })))
         .WillOnce(Return(false));
     webPattern->OnDragFileNameStart(aceUnifiedData, "test.txt");
@@ -1032,17 +1032,17 @@ HWTEST_F(WebPatternAddTestNg, HandleOnDragStart_002, TestSize.Level1)
     ASSERT_NE(mockUdmfClient, nullptr);
     EXPECT_CALL(*mockUdmfClient, CreateUnifiedData()).WillOnce(Return(aceUnifiedData));
     EXPECT_CALL(*mockUdmfClient,
-        AddFileUriRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData),
+        AddFileUriRecord(RefPtr<UnifiedData>(aceUnifiedData),
             ElementsAreArray({ "file:///data/storage/el2/base/haps/entry/temp/dragdrop/example_image.jpg" })))
         .Times(1);
     EXPECT_CALL(*mockUdmfClient,
-        AddPlainTextRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData), "This is some fragment text"))
+        AddPlainTextRecord(RefPtr<UnifiedData>(aceUnifiedData), "This is some fragment text"))
         .Times(1);
     EXPECT_CALL(*mockUdmfClient,
-        AddHtmlRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData), "<p>This is some fragment html</p>", ""))
+        AddHtmlRecord(RefPtr<UnifiedData>(aceUnifiedData), "<p>This is some fragment html</p>", ""))
         .Times(1);
     EXPECT_CALL(*mockUdmfClient,
-        AddLinkRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData), "https://example.com", "Example Link Title"))
+        AddLinkRecord(RefPtr<UnifiedData>(aceUnifiedData), "https://example.com", "Example Link Title"))
         .Times(1);
     RefPtr<OHOS::Ace::DragEvent> info = AceType::MakeRefPtr<OHOS::Ace::DragEvent>();
     webPattern->HandleOnDragStart(info);
@@ -1249,7 +1249,7 @@ HWTEST_F(WebPatternAddTestNg, HandleOnDragDropFile001, TestSize.Level1)
     auto mockUdmfClient = AceType::DynamicCast<MockUdmfClient>(UdmfClient::GetInstance());
     EXPECT_NE(mockUdmfClient, nullptr);
     std::vector<std::string> urlVec = { "abc/dragdrop/test.txt" };
-    EXPECT_CALL(*mockUdmfClient, GetFileUriEntry(AceType::DynamicCast<UnifiedData>(aceUnifiedData), _))
+    EXPECT_CALL(*mockUdmfClient, GetFileUriEntry(RefPtr<UnifiedData>(aceUnifiedData), _))
         .WillOnce(testing::Invoke([&](const RefPtr<UnifiedData>& data, std::vector<std::string>& outUrlVec) {
             outUrlVec = urlVec;
             EXPECT_FALSE(outUrlVec.empty());
@@ -1566,20 +1566,20 @@ HWTEST_F(WebPatternAddTestNg, HandleOnDragStart_003, TestSize.Level1)
     ASSERT_NE(mockUdmfClient, nullptr);
     EXPECT_CALL(*mockUdmfClient, CreateUnifiedData()).WillOnce(Return(aceUnifiedData));
     EXPECT_CALL(*mockUdmfClient,
-        AddFileUriRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData),
+        AddFileUriRecord(RefPtr<UnifiedData>(aceUnifiedData),
             ElementsAreArray({ "file:///data/storage/el2/base/haps/entry/temp/dragdrop/example_image.jpg" })))
         .WillOnce(Return(true));
     EXPECT_CALL(*mockUdmfClient,
-        AddPlainTextRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData), "This is some fragment text"))
+        AddPlainTextRecord(RefPtr<UnifiedData>(aceUnifiedData), "This is some fragment text"))
         .Times(1);
     // After RewriteHtmlImgSrc, the html should contain the rewritten fileUri instead of the original src.
     std::string expectedHtml =
         R"(<img src="file:///data/storage/el2/base/haps/entry/temp/dragdrop/example_image.jpg" alt="test">)";
     EXPECT_CALL(*mockUdmfClient,
-        AddHtmlRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData), expectedHtml, ""))
+        AddHtmlRecord(RefPtr<UnifiedData>(aceUnifiedData), expectedHtml, ""))
         .Times(1);
     EXPECT_CALL(*mockUdmfClient,
-        AddLinkRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData), "https://example.com", "Example Link Title"))
+        AddLinkRecord(RefPtr<UnifiedData>(aceUnifiedData), "https://example.com", "Example Link Title"))
         .Times(1);
     RefPtr<OHOS::Ace::DragEvent> info = AceType::MakeRefPtr<OHOS::Ace::DragEvent>();
     webPattern->HandleOnDragStart(info);
@@ -1649,7 +1649,7 @@ HWTEST_F(WebPatternAddTestNg, OnDragFileNameStart_002, TestSize.Level1)
     auto mockUdmfClient = AceType::DynamicCast<MockUdmfClient>(UdmfClient::GetInstance());
     ASSERT_NE(mockUdmfClient, nullptr);
     std::string expectedUri = "file:///data/storage/el2/base/haps/entry/temp/dragdrop/test.jpg";
-    EXPECT_CALL(*mockUdmfClient, AddFileUriRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData),
+    EXPECT_CALL(*mockUdmfClient, AddFileUriRecord(RefPtr<UnifiedData>(aceUnifiedData),
                                      ElementsAreArray({ expectedUri })))
         .WillOnce(Return(false));
     std::string result = webPattern->OnDragFileNameStart(aceUnifiedData, "test.jpg");

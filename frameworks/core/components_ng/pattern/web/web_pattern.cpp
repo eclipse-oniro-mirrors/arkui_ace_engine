@@ -7995,7 +7995,7 @@ bool WebPattern::ShowDateTimeDialog(std::shared_ptr<OHOS::NWeb::NWebDateTimeChoo
     CHECK_NULL_RETURN(pipelineContext, false);
     auto executor = pipelineContext->GetTaskExecutor();
     CHECK_NULL_RETURN(executor, false);
-    auto context = AccessibilityManager::DynamicCast<NG::PipelineContext>(pipelineContext);
+    auto context = pipelineContext;
     auto overlayManager = context ? context->GetOverlayManager() : nullptr;
     CHECK_NULL_RETURN(overlayManager, false);
     auto theme = pipelineContext->GetTheme<DialogTheme>();
@@ -8048,7 +8048,7 @@ bool WebPattern::ShowTimeDialog(std::shared_ptr<OHOS::NWeb::NWebDateTimeChooser>
     CHECK_NULL_RETURN(executor, false);
     auto theme = pipelineContext->GetTheme<DialogTheme>();
     CHECK_NULL_RETURN(theme, false);
-    auto context = AccessibilityManager::DynamicCast<NG::PipelineContext>(pipelineContext);
+    auto context = pipelineContext;
     auto overlayManager = context ? context->GetOverlayManager() : nullptr;
     CHECK_NULL_RETURN(overlayManager, false);
     NG::TimePickerSettingData settingData;
@@ -8101,7 +8101,7 @@ bool WebPattern::ShowDateTimeSuggestionDialog(std::shared_ptr<OHOS::NWeb::NWebDa
     CHECK_NULL_RETURN(executor, false);
     auto theme = pipelineContext->GetTheme<DialogTheme>();
     CHECK_NULL_RETURN(theme, false);
-    auto context = AccessibilityManager::DynamicCast<NG::PipelineContext>(pipelineContext);
+    auto context = pipelineContext;
     auto overlayManager = context ? context->GetOverlayManager() : nullptr;
     CHECK_NULL_RETURN(overlayManager, false);
     NG::TextPickerSettingData settingData;
@@ -9899,7 +9899,7 @@ void WebPattern::OnShowAutofillPopup(
             CHECK_NULL_VOID(webPattern);
             webPattern->SuggestionSelected(index);
         };
-        auto optionNode = AceType::DynamicCast<FrameNode>(option);
+        auto optionNode = option;
         if (optionNode) {
             CHECK_NULL_CONTINUE(menuItemModifier);
             if (!menuItemModifier->hasMenuItemEventHub(optionNode) ||
@@ -9956,7 +9956,7 @@ void WebPattern::OnShowAutofillPopupV2(
             CHECK_NULL_VOID(webPattern);
             webPattern->SuggestionSelected(index);
         };
-        auto optionNode = AceType::DynamicCast<FrameNode>(option);
+        auto optionNode = option;
         if (optionNode) {
             CHECK_NULL_CONTINUE(menuItemModifier);
             if (!menuItemModifier->hasMenuItemEventHub(optionNode) ||
