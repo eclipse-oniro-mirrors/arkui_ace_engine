@@ -245,14 +245,7 @@ void WindowPattern::OnAttachToFrameNode()
 
     CHECK_EQUAL_VOID(CheckAndAddStartingWindowForPrelaunch(), true);
     if (state == Rosen::SessionState::STATE_DISCONNECT) {
-        CHECK_EQUAL_VOID(HasStartingPage(), false);
-        if (session_->GetShowRecent() && session_->HasPersistentSnapshot()) {
-            CreateSnapshotWindow();
-            AddChild(host, snapshotWindow_, snapshotWindowName_);
-            return;
-        }
-        CreateStartingWindow();
-        AddChild(host, startingWindow_, startingWindowName_);
+        HandleStateDisconnect(host);
         return;
     }
 
@@ -270,29 +263,7 @@ void WindowPattern::OnAttachToFrameNode()
     }
 
     if (state == Rosen::SessionState::STATE_CONNECT && session_->GetSessionInfo().isPrelaunch_) {
-        if (!session_->GetShowRecent()) {
-            TAG_LOGI(AceLogTag::ACE_WINDOW_SCENE, "OnAttachToFrameNode prelaunch add appWindow");
-            AddChild(host, appWindow_, appWindowName_, 0);
-            attachToFrameNodeFlag_ = true;
-            auto surfaceNode = session_->GetSurfaceNode();
-            CHECK_NULL_VOID(surfaceNode);
-            if (session_->GetSessionInfo().frameNum_ == 0 && !surfaceNode->IsBufferAvailable()) {
-                TAG_LOGI(AceLogTag::ACE_WINDOW_SCENE, "OnAttachToFrameNode prelaunch add starting window");
-                CreateStartingWindow();
-                AddChild(host, startingWindow_, startingWindowName_);
-            } else if (session_->GetSessionInfo().frameNum_ < 0) {
-                TAG_LOGI(AceLogTag::ACE_WINDOW_SCENE, "OnAttachToFrameNode prelaunch pending add starting window");
-                needReplaceBlankWithStarting_ = true;
-            }
-            surfaceNode->SetBufferAvailableCallback(callback_);
-        } else if (session_->GetShowRecent() && session_->HasPersistentSnapshot()) {
-            TAG_LOGI(AceLogTag::ACE_WINDOW_SCENE, "OnAttachToFrameNode prelaunch add snapshot");
-            CreateSnapshotWindow();
-            AddChild(host, snapshotWindow_, snapshotWindowName_);
-            attachToFrameNodeFlag_ = true;
-        } else {
-            TAG_LOGW(AceLogTag::ACE_WINDOW_SCENE, "OnAttachToFrameNode prelaunch, has no persistent snapshot");
-        }
+        HandlePrelaunchConnect(host);
         return;
     }
 
@@ -310,6 +281,26 @@ void WindowPattern::OnAttachToFrameNode()
         attachToFrameNodeFlag_ = true;
         return;
     }
+    HandleDefaultAttach(host);
+}
+
+void WindowPattern::HandleStateDisconnect(const RefPtr<FrameNode>& host)
+{
+    CHECK_EQUAL_VOID(HasStartingPage(), false);
+    if ((session_->GetShowRecent() || session_->GetTryUseSnapshot()) && session_->HasPersistentSnapshot()) {
+        TAG_LOGI(AceLogTag::ACE_WINDOW_SCENE,
+            "OnAttachToFrameNode id: %{public}d, keep snapshot window",
+            session_->GetPersistentId());
+        CreateSnapshotWindow();
+        AddChild(host, snapshotWindow_, snapshotWindowName_);
+        return;
+    }
+    CreateStartingWindow();
+    AddChild(host, startingWindow_, startingWindowName_);
+}
+
+void WindowPattern::HandleDefaultAttach(const RefPtr<FrameNode>& host)
+{
     AddChild(host, appWindow_, appWindowName_, 0);
     auto surfaceNode = session_->GetSurfaceNode();
     CHECK_NULL_VOID(surfaceNode);
@@ -321,6 +312,33 @@ void WindowPattern::OnAttachToFrameNode()
         return;
     }
     attachToFrameNodeFlag_ = true;
+}
+
+void WindowPattern::HandlePrelaunchConnect(const RefPtr<FrameNode>& host)
+{
+    if (!session_->GetShowRecent()) {
+        TAG_LOGI(AceLogTag::ACE_WINDOW_SCENE, "OnAttachToFrameNode prelaunch add appWindow");
+        AddChild(host, appWindow_, appWindowName_, 0);
+        attachToFrameNodeFlag_ = true;
+        auto surfaceNode = session_->GetSurfaceNode();
+        CHECK_NULL_VOID(surfaceNode);
+        if (session_->GetSessionInfo().frameNum_ == 0 && !surfaceNode->IsBufferAvailable()) {
+            TAG_LOGI(AceLogTag::ACE_WINDOW_SCENE, "OnAttachToFrameNode prelaunch add starting window");
+            CreateStartingWindow();
+            AddChild(host, startingWindow_, startingWindowName_);
+        } else if (session_->GetSessionInfo().frameNum_ < 0) {
+            TAG_LOGI(AceLogTag::ACE_WINDOW_SCENE, "OnAttachToFrameNode prelaunch pending add starting window");
+            needReplaceBlankWithStarting_ = true;
+        }
+        surfaceNode->SetBufferAvailableCallback(callback_);
+    } else if (session_->GetShowRecent() && session_->HasPersistentSnapshot()) {
+        TAG_LOGI(AceLogTag::ACE_WINDOW_SCENE, "OnAttachToFrameNode prelaunch add snapshot");
+        CreateSnapshotWindow();
+        AddChild(host, snapshotWindow_, snapshotWindowName_);
+        attachToFrameNodeFlag_ = true;
+    } else {
+        TAG_LOGW(AceLogTag::ACE_WINDOW_SCENE, "OnAttachToFrameNode prelaunch, has no persistent snapshot");
+    }
 }
 
 bool WindowPattern::CheckAndAddStartingWindowForPrelaunch()
