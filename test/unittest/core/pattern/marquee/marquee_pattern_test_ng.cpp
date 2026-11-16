@@ -645,6 +645,12 @@ HWTEST_F(MarqueePatternTestNg, MarqueePattern_ChangeSecondChildVisibility003, Te
     marqueeModel->ChangeSecondChildVisibility(false);
     
     EXPECT_TRUE(textLayoutProperty->GetVisibilityValue(VisibleType::VISIBLE) == VisibleType::INVISIBLE);
+
+    geo1->SetFrameSize(SizeF(0, 50));
+    EXPECT_FALSE(marqueeModel->IsRunMarquee());
+
+    geo1->SetFrameSize(SizeF(25, 50));
+    EXPECT_TRUE(marqueeModel->IsRunMarquee());
 }
 
 /**
