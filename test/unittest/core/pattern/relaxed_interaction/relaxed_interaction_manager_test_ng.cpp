@@ -16,6 +16,7 @@
 #include "relaxed_interaction_manager_test_ng.h"
 
 #include "base/utils/system_properties.h"
+#include "core/components_ng/pattern/command/ui_command_security_gate.h"
 #include "core/components_ng/relaxed_interaction/executor_choreographer.h"
 #include "core/components_ng/relaxed_interaction/executor_generator.h"
 #include "core/components_ng/relaxed_interaction/base_command_parser.h"
@@ -381,6 +382,72 @@ HWTEST_F(RelaxedInteractionManagerExecuteNextStepTest, ExecuteNextStep_PendingTh
     // Next call returns SUCCESS
     state = manager_->ExecuteNextStep();
     EXPECT_EQ(state, ExecutionState::SUCCESS);
+}
+
+/**
+ * @tc.name: ExecuteNextStep_RestoresWorkflowSecurityContext
+ * @tc.desc: Test each queued workflow restores the security context captured at enqueue time
+ * @tc.type: FUNC
+ */
+HWTEST_F(RelaxedInteractionManagerExecuteNextStepTest, ExecuteNextStep_RestoresWorkflowSecurityContext, TestSize.Level1)
+{
+    UiCommandSecurityGate::ClearContext();
+    UiCommandSecurityGate::SetContext(CommandSecurityContext { true, 100 });
+    ASSERT_EQ(manager_->ProcessCommand(VALID_BACKPRESS_JSON, [](ExecutionState) {}), ProcessResult::SUCCESS);
+
+    manager_->choreographer_->Clear();
+    CommandSecurityContext observed;
+    std::vector<std::unique_ptr<BaseExecutor>> executors;
+    executors.emplace_back(std::make_unique<MockExecutor>(ExecutorResult::SUCCESS, true, [&observed]() {
+        observed = UiCommandSecurityGate::GetContext();
+    }));
+    manager_->choreographer_->Enqueue(std::move(executors));
+
+    // The next command's seed overwrites the thread-local context before the workflow runs.
+    UiCommandSecurityGate::SetContext(CommandSecurityContext { false, 200 });
+
+    auto state = manager_->ExecuteNextStep();
+    EXPECT_EQ(state, ExecutionState::SUCCESS);
+    EXPECT_TRUE(observed.needSecurityAuth);
+    EXPECT_EQ(observed.tokenId, 100u);
+    // Context must not leak once the queue drains.
+    EXPECT_FALSE(UiCommandSecurityGate::GetContext().needSecurityAuth);
+    EXPECT_EQ(UiCommandSecurityGate::GetContext().tokenId, UINT64_MAX);
+    UiCommandSecurityGate::ClearContext();
+}
+
+/**
+ * @tc.name: ExecuteNextStep_QueuedWorkflowsKeepDistinctSecurityContexts
+ * @tc.desc: Test two queued workflows each execute with their own security context
+ * @tc.type: FUNC
+ */
+HWTEST_F(RelaxedInteractionManagerExecuteNextStepTest, ExecuteNextStep_QueuedWorkflowsKeepDistinctSecurityContexts,
+    TestSize.Level1)
+{
+    UiCommandSecurityGate::ClearContext();
+    UiCommandSecurityGate::SetContext(CommandSecurityContext { true, 100 });
+    ASSERT_EQ(manager_->ProcessCommand(VALID_BACKPRESS_JSON, [](ExecutionState) {}), ProcessResult::SUCCESS);
+    UiCommandSecurityGate::SetContext(CommandSecurityContext { false, 200 });
+    ASSERT_EQ(manager_->ProcessCommand(VALID_BACKPRESS_JSON, [](ExecutionState) {}), ProcessResult::SUCCESS);
+
+    manager_->choreographer_->Clear();
+    CommandSecurityContext observed[2];
+    std::vector<std::unique_ptr<BaseExecutor>> executors;
+    executors.emplace_back(std::make_unique<MockExecutor>(ExecutorResult::SUCCESS, true, [&observed]() {
+        observed[0] = UiCommandSecurityGate::GetContext();
+    }));
+    executors.emplace_back(std::make_unique<MockExecutor>(ExecutorResult::SUCCESS, true, [&observed]() {
+        observed[1] = UiCommandSecurityGate::GetContext();
+    }));
+    manager_->choreographer_->Enqueue(std::move(executors));
+
+    EXPECT_EQ(manager_->ExecuteNextStep(), ExecutionState::SUCCESS);
+    EXPECT_EQ(manager_->ExecuteNextStep(), ExecutionState::SUCCESS);
+    EXPECT_TRUE(observed[0].needSecurityAuth);
+    EXPECT_EQ(observed[0].tokenId, 100u);
+    EXPECT_FALSE(observed[1].needSecurityAuth);
+    EXPECT_EQ(observed[1].tokenId, 200u);
+    UiCommandSecurityGate::ClearContext();
 }
 
 /**

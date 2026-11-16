@@ -6829,8 +6829,9 @@ void ExecuteRelaxedCommandWithResult(const std::string& command,
         return;
     }
     AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Global");
-    // The context must outlive this call: executors run on later frames, the next
-    // command's SetContext overwrites it (single in-flight SendCommand on UI thread).
+    // Seed the gate context for this command. RelaxedInteractionManager snapshots it per
+    // workflow and restores it before each execution step, so queued commands cannot
+    // inherit the context of a later SendCommand.
     NG::UiCommandSecurityGate::SetContext(MakeSecurityContext(securityAuth));
     pipeline->ProcessCommandWithResult(command, [finishCallback](const NG::CommandResult& result) {
         finishCallback(SerializeCommandResult(result));
@@ -6986,8 +6987,9 @@ void UIContentImpl::RelaxedCommandCallbackInner(const WeakPtr<TaskExecutor>& tas
                         AceLogTag::ACE_UIEVENT, "Failed to process relaxed command because pipelineContext is nullptr");
                     return;
                 }
-                // Context survives until the next SetContext overwrites it: executors
-                // run on later frames (single in-flight SendCommand on UI thread).
+                // Seed the gate context for this command. RelaxedInteractionManager snapshots it
+                // per workflow and restores it before each execution step, so queued commands
+                // cannot inherit the context of a later SendCommand.
                 NG::UiCommandSecurityGate::SetContext(MakeSecurityContext(securityAuth));
                 pipelineContext->ProcessCommand(command);
             },

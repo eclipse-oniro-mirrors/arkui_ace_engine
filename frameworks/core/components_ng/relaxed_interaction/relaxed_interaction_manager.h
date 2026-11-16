@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_RELAXED_INTERACTION_RELAXED_INTERACTION_MANAGER_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_RELAXED_INTERACTION_RELAXED_INTERACTION_MANAGER_H
 
+#include <cstdint>
 #include <deque>
 #include <functional>
 #include <memory>
@@ -76,6 +77,11 @@ private:
         std::function<void(ExecutionState)> finishCallback;
         bool preserveLegacySemantics = false;
         InterruptionPolicy interruptionPolicy = InterruptionPolicy::IGNORE_USER_INPUT;
+        // Snapshot of the security context at enqueue time. The gate context is thread-local and a later
+        // command may overwrite it before this workflow finishes, so each workflow restores its own
+        // snapshot before every execution step.
+        bool needSecurityAuth = false;
+        uint64_t tokenId = UINT64_MAX;
     };
     enum class ExecutionPhase {
         IDLE,
