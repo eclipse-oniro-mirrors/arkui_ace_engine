@@ -245,7 +245,7 @@ public:
         }
         auto delegate = webDelegate_.Upgrade();
         if (delegate) {
-            TAG_LOGD(AceLogTag::ACE_WEB, "SecurityHitTestCallback OnReceiveValue called");
+            TAG_LOGI(AceLogTag::ACE_WEB, "SecurityHitTestCallback OnReceiveValue called");
             delegate->OnTouchForSecurityHitTest(state_);
         }
     }
@@ -5567,7 +5567,7 @@ void WebDelegate::GetElementInfoForSecurityHitTest(SecurityHitTestInfo& secInfo)
             auto callback = std::make_shared<SecurityHitTestCallback>(weak, state);
             if (delegate->nweb_) {
                 delegate->nweb_->GetElementInfoForSecurityHitTest(x, y, callback);
-                TAG_LOGD(AceLogTag::ACE_WEB, "WebDelegate::GetElementInfoForSecurityHitTest called");
+                TAG_LOGI(AceLogTag::ACE_WEB, "WebDelegate::GetElementInfoForSecurityHitTest called");
             }
         },
         TaskExecutor::TaskType::PLATFORM, "ArkUIWebGetElementInfoForSecurityHitTest");
@@ -5584,11 +5584,11 @@ void WebDelegate::OnTouchForSecurityHitTest(std::shared_ptr<SecurityHitTestInfo>
             auto webPattern = delegate->webPattern_.Upgrade();
             CHECK_NULL_VOID(webPattern);
             CHECK_NULL_VOID(state);
-            TAG_LOGD(AceLogTag::ACE_WEB, "WebDelegate::OnTouchForSecurityHitTest report");
+            TAG_LOGI(AceLogTag::ACE_WEB, "WebDelegate::OnTouchForSecurityHitTest report");
             bool allowed = webPattern->ReportDecsionForSecurityHitTest(
                 state->callingUid, state->sessionId, state->response);
             if (allowed && delegate->nweb_) {
-                TAG_LOGD(AceLogTag::ACE_WEB, "WebDelegate::OnTouchForSecurityHitTest TouchPress");
+                TAG_LOGI(AceLogTag::ACE_WEB, "WebDelegate::OnTouchForSecurityHitTest TouchPress");
                 delegate->nweb_->OnTouchPress(state->id, state->x, state->y, state->from_overlay);
             }
         },

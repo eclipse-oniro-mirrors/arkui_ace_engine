@@ -2903,8 +2903,8 @@ bool WebPattern::ReportDecsionForSecurityHitTest(
     result.nodeId      = resultInfo.domNodeId;
     result.compId      = resultInfo.elementId;
     result.tag         = host ? host->GetTag() : "Web";
-    result.allowed     = !(resultInfo.securityLabel == NWEB_SECURITY_LABEL_DENY);
-    TAG_LOGD(AceLogTag::ACE_WEB,
+    result.allowed     = (resultInfo.securityLabel != NWEB_SECURITY_LABEL_DENY);
+    TAG_LOGI(AceLogTag::ACE_WEB,
         "WebPattern::WebSecurityReportDecision report agent compId=%{public}s, decision=%{public}d",
         result.compId.c_str(), result.allowed);
     InputManager::ReportAgentInputDecision(result);
