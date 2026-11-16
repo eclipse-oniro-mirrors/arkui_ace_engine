@@ -563,6 +563,18 @@ HWTEST_F(PatternLockTestNg, PatternLockModifierTest015, TestSize.Level1)
     patternlockModifier->SetCorrectColor(Color(0xFF445566));
     EXPECT_EQ(patternlockModifier->correctColor_->Get(), Color(0xFF445566));
     EXPECT_EQ(patternlockModifier->pointAnimateColor_->Get().ToColor(), pointAnimateBefore);
+    /**
+     * @tc.steps: step5. Enter the WRONG challenge state and update correctColor_ again.
+     * @tc.expected: correctColor_ is updated but pointAnimateColor_ is not synced, because
+     * SetCorrectColor only syncs pointAnimateColor_ in the CORRECT steady state; the WRONG
+     * state (challengeResult_ has a value but is not CORRECT) must be excluded too.
+     */
+    patternlockModifier->challengeResult_ = PatternLockChallengeResult::WRONG;
+    pointAnimateBefore = patternlockModifier->pointAnimateColor_->Get().ToColor();
+    patternlockModifier->SetCorrectColor(Color(0xFF778899));
+    EXPECT_EQ(patternlockModifier->correctColor_->Get(), Color(0xFF778899));
+    EXPECT_EQ(patternlockModifier->pointAnimateColor_->Get().ToColor(), pointAnimateBefore);
+    EXPECT_TRUE(patternlockModifier->challengeResult_.has_value());
 }
 
 }
