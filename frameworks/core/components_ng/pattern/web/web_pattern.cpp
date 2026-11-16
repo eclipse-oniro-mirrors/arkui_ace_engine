@@ -9447,8 +9447,16 @@ void WebPattern::JavaScriptOnDocumentEnd(const ScriptItems& scriptItems)
 void WebPattern::UpdateJavaScriptOnDocumentStart()
 {
     if (delegate_ && onDocumentStartScriptItems_.has_value() && !onDocumentStartScriptItemsByOrder_.has_value()) {
+        // Save a persistent copy of public scripts for later re-merge.
+        publicOnDocumentStartScriptItems_ = onDocumentStartScriptItems_.value();
+        publicOnDocumentStartScriptRegexItems_.clear();
+        publicOnDocumentStartScriptItemsByOrder_.clear();
         delegate_->SetJavaScriptItems(onDocumentStartScriptItems_.value(), ScriptItemType::DOCUMENT_START);
         onDocumentStartScriptItems_ = std::nullopt;
+        // If inner scripts exist, re-inject the merged batch.
+        if (hasInnerOnDocumentStartScripts_) {
+            MergeAndInjectJavaScriptOnDocumentStart();
+        }
     }
 }
 
@@ -9456,12 +9464,143 @@ void WebPattern::UpdateJavaScriptOnDocumentStartByOrder()
 {
     if (delegate_ && onDocumentStartScriptItems_.has_value() && onDocumentStartScriptRegexItems_.has_value() &&
         onDocumentStartScriptItemsByOrder_.has_value()) {
+        // Save a persistent copy of public scripts before injection so that
+        // inner-only changes can re-merge later without losing public scripts.
+        publicOnDocumentStartScriptItems_ = onDocumentStartScriptItems_.value();
+        publicOnDocumentStartScriptRegexItems_ = onDocumentStartScriptRegexItems_.value();
+        publicOnDocumentStartScriptItemsByOrder_ = onDocumentStartScriptItemsByOrder_.value();
         delegate_->SetJavaScriptItemsByOrder(onDocumentStartScriptItems_.value(),
             onDocumentStartScriptRegexItems_.value(), ScriptItemType::DOCUMENT_START,
             onDocumentStartScriptItemsByOrder_.value());
         onDocumentStartScriptItems_ = std::nullopt;
         onDocumentStartScriptRegexItems_ = std::nullopt;
         onDocumentStartScriptItemsByOrder_ = std::nullopt;
+        // If inner scripts exist, re-inject the merged batch to ensure both
+        // sets survive NWeb's replace semantics.
+        if (hasInnerOnDocumentStartScripts_) {
+            MergeAndInjectJavaScriptOnDocumentStart();
+        }
+    }
+}
+
+void WebPattern::RegisterSystemDocumentStartJS(const ScriptItems& scriptItems,
+    const ScriptRegexItems& scriptRegexItems, const ScriptItemsByOrder& scriptItemsByOrder)
+{
+    // EX-3: empty scriptItems is rejected, no registration occurs.
+    if (scriptItems.empty()) {
+        return;
+    }
+    // EX-4: full replace — system stores are cleared before writing.
+    systemDocumentStartScripts_ = scriptItems;
+    systemDocumentStartScriptRegexItems_ = scriptRegexItems;
+    systemDocumentStartScriptItemsByOrder_ = scriptItemsByOrder;
+    hasInnerOnDocumentStartScripts_ = true;
+    if (delegate_) {
+        MergeAndInjectJavaScriptOnDocumentStart();
+    }
+}
+
+void WebPattern::RemoveSystemDocumentStartJS()
+{
+    systemDocumentStartScripts_.clear();
+    systemDocumentStartScriptRegexItems_.clear();
+    systemDocumentStartScriptItemsByOrder_.clear();
+    hasInnerOnDocumentStartScripts_ = false;
+    if (delegate_) {
+        MergeAndInjectJavaScriptOnDocumentStart();
+    }
+}
+
+void WebPattern::MergeAndInjectJavaScriptOnDocumentStart()
+{
+    if (!delegate_) {
+        return;
+    }
+    // Early return when both system and public scripts are empty — nothing to inject.
+    if (systemDocumentStartScripts_.empty() && publicOnDocumentStartScriptItems_.empty()) {
+        return;
+    }
+    // Use ByOrder path when app registered via ByOrder API OR when only system
+    // JS exists with ByOrder information (no public scripts at all).
+    bool appUsesByOrder = !publicOnDocumentStartScriptItemsByOrder_.empty();
+    bool onlySystemWithByOrder = publicOnDocumentStartScriptItems_.empty() &&
+        publicOnDocumentStartScriptItemsByOrder_.empty() &&
+        !systemDocumentStartScriptItemsByOrder_.empty();
+    bool useByOrderPath = appUsesByOrder || onlySystemWithByOrder;
+
+    if (useByOrderPath) {
+        ScriptItems mergedItems;
+        ScriptRegexItems mergedRegexItems;
+        ScriptItemsByOrder mergedByOrder;
+        MergeByOrderPath(mergedItems, mergedRegexItems, mergedByOrder);
+        delegate_->SetJavaScriptItemsByOrder(mergedItems, mergedRegexItems,
+            ScriptItemType::DOCUMENT_START, mergedByOrder);
+        delegate_->JavaScriptOnDocumentStartByOrder();
+    } else {
+        ScriptItems mergedItems = publicOnDocumentStartScriptItems_;
+        MergeNonByOrderPath(mergedItems);
+        delegate_->SetJavaScriptItems(mergedItems, ScriptItemType::DOCUMENT_START);
+        delegate_->JavaScriptOnDocumentStart();
+    }
+}
+
+void WebPattern::MergeByOrderPath(ScriptItems& mergedItems, ScriptRegexItems& mergedRegexItems,
+    ScriptItemsByOrder& mergedByOrder)
+{
+    // App JS inserted at the front, preserving original order. Insert-or-append
+    // to avoid overwriting when script keys collide.
+    for (const auto& [script, urlRules] : publicOnDocumentStartScriptItems_) {
+        auto it = mergedItems.find(script);
+        if (it == mergedItems.end()) {
+            mergedItems[script] = urlRules;
+        } else {
+            it->second.insert(it->second.end(), urlRules.begin(), urlRules.end());
+        }
+    }
+    for (const auto& [script, regexList] : publicOnDocumentStartScriptRegexItems_) {
+        auto it = mergedRegexItems.find(script);
+        if (it == mergedRegexItems.end()) {
+            mergedRegexItems[script] = regexList;
+        } else {
+            it->second.insert(it->second.end(), regexList.begin(), regexList.end());
+        }
+    }
+    for (const auto& script : publicOnDocumentStartScriptItemsByOrder_) {
+        mergedByOrder.emplace_back(script);
+    }
+    // System JS appended after app JS.
+    for (const auto& [script, urlRules] : systemDocumentStartScripts_) {
+        auto it = mergedItems.find(script);
+        if (it == mergedItems.end()) {
+            mergedItems[script] = urlRules;
+        } else {
+            it->second.insert(it->second.end(), urlRules.begin(), urlRules.end());
+        }
+    }
+    for (const auto& [script, regexList] : systemDocumentStartScriptRegexItems_) {
+        auto it = mergedRegexItems.find(script);
+        if (it == mergedRegexItems.end()) {
+            mergedRegexItems[script] = regexList;
+        } else {
+            it->second.insert(it->second.end(), regexList.begin(), regexList.end());
+        }
+    }
+    for (const auto& script : systemDocumentStartScriptItemsByOrder_) {
+        mergedByOrder.emplace_back(script);
+    }
+}
+
+void WebPattern::MergeNonByOrderPath(ScriptItems& mergedItems)
+{
+    // Non-ByOrder fallback (DD-3): merge system JS into ScriptItems.
+    // Regex rules and execution order are not preserved in this path (BR-4).
+    for (const auto& [script, urlRules] : systemDocumentStartScripts_) {
+        auto it = mergedItems.find(script);
+        if (it == mergedItems.end()) {
+            mergedItems[script] = urlRules;
+        } else {
+            it->second.insert(it->second.end(), urlRules.begin(), urlRules.end());
+        }
     }
 }
 
@@ -11429,14 +11568,22 @@ void WebPattern::RunJsInit()
         return;
     }
     if (!isRegisterJsObject_) {
-        isRegisterJsObject_ = true;
-        RegisterTranslateTextJavaScript();
-        return;
+         isRegisterJsObject_ = true;
+         TAG_LOGI(AceLogTag::ACE_WEB, "run java TranslateScript and InitScript. WebId: %{public}d", GetWebId());
+         // Register translate script as system DocumentStart JS so it executes
+         // at DocumentStart stage (before page load). The rule "*" matches all pages.
+         // ScriptItems: key = script content, value = URL match rules.
+         // ScriptItemsByOrder: script contents in execution order.
+         ScriptItems sysScriptItems;
+         sysScriptItems.insert(std::make_pair(g_translateTextData.translateScript, std::vector<std::string>{ "*" }));
+         sysScriptItems.insert(std::make_pair(g_translateTextData.initScript, std::vector<std::string>{ "*" }));
+         ScriptRegexItems sysRegexItems;
+         ScriptItemsByOrder sysByOrder;
+         sysByOrder.emplace_back(g_translateTextData.translateScript);
+         sysByOrder.emplace_back(g_translateTextData.initScript);
+         RegisterSystemDocumentStartJS(sysScriptItems, sysRegexItems, sysByOrder);
+         RegisterTranslateTextJavaScript();
     }
-    TAG_LOGI(AceLogTag::ACE_WEB, "run java TranslateScript and InitScript. WebId:%{public}d", GetWebId());
-    CHECK_NULL_VOID(delegate_);
-    delegate_->ExecuteTypeScript(g_translateTextData.translateScript, [](std::string result) {});
-    delegate_->ExecuteTypeScript(g_translateTextData.initScript, [](std::string result) {});
 }
 
 void WebPattern::GetTranslateText(std::string extraData, std::function<void(std::string)> callback, bool isContinued)
@@ -11583,6 +11730,9 @@ void WebPattern::EndTranslate()
         CHECK_NULL_VOID(webPattern);
         if (webPattern->isRegisterJsObject_) {
             CHECK_NULL_VOID(webPattern->delegate_);
+            // Remove system DocumentStart JS before reload so the reloaded
+            // page does not re-inject the translate script at DocumentStart.
+            webPattern->RemoveSystemDocumentStartJS();
             std::string p = g_translateTextData.registerObjectName;
             TAG_LOGI(AceLogTag::ACE_WEB, "UnRegister TranslateText JsObject %{public}s", p.c_str());
             webPattern->delegate_->UnRegisterNativeArkJSFunction(std::move(p));

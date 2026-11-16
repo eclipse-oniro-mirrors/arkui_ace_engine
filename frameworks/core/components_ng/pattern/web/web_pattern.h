@@ -858,6 +858,44 @@ public:
     void UpdateJavaScriptOnHeadReadyByOrder();
     void JavaScriptOnHeadReadyByOrder(const ScriptItems& scriptItems,
         const ScriptRegexItems& scriptRegexItems, const ScriptItemsByOrder& scriptItemsByOrder);
+
+    // ---------------------------------------------------------------------------
+    // Inner APIs for JavaScriptOnDocumentStart
+    // ---------------------------------------------------------------------------
+    // NWeb JSPROXY uses REPLACE semantics: each nweb_->JavaScriptOnDocumentStart*
+    // call triggers scripts_.clear() + batch insert in the renderer. Therefore
+    // inner and public scripts MUST be merged into a single batch before
+    // calling NWeb, otherwise the second call wipes out the first.
+    // Strategy: inner scripts are stored persistently in WebPattern. When
+    // either public or inner scripts change, the two sets are merged and
+    // re-injected as a single batch via the existing delegate path
+    // (SetJavaScriptItemsByOrder + JavaScriptOnDocumentStartByOrder).
+    // Public script persistent copies are also maintained so that inner-only
+    // changes can re-merge without losing the public set.
+    // ---------------------------------------------------------------------------
+
+    // Register system DocumentStart JS (inner API for system-internal use).
+    // Stores the triple (scriptItems, scriptRegexItems, scriptItemsByOrder) as
+    // system script data (full replace per EX-4), then re-injects the combined
+    // public+system batch to NWeb.
+    // Empty scriptItems is rejected per EX-3.
+    void RegisterSystemDocumentStartJS(const ScriptItems& scriptItems,
+        const ScriptRegexItems& scriptRegexItems, const ScriptItemsByOrder& scriptItemsByOrder);
+
+    // Remove all system DocumentStart JS. Clears system store, then
+    // re-injects the public-only batch to NWeb.
+    void RemoveSystemDocumentStartJS();
+
+    // Merge public + system scripts and inject the combined batch to NWeb.
+    // App JS is inserted before system JS in the ByOrder vector.
+    // Falls back to non-ByOrder path when app uses non-ByOrder API (DD-3).
+    void MergeAndInjectJavaScriptOnDocumentStart();
+    // ByOrder V2 merge path: app JS first, then system JS in ByOrder vector.
+    void MergeByOrderPath(ScriptItems& mergedItems, ScriptRegexItems& mergedRegexItems,
+        ScriptItemsByOrder& mergedByOrder);
+    // Non-ByOrder fallback path: merge system JS into ScriptItems only.
+    void MergeNonByOrderPath(ScriptItems& mergedItems);
+
     void SetTouchEventInfo(const TouchEvent& touchEvent,
         TouchEventInfo& touchEventInfo, const std::string& embdedId);
     DragRet GetDragAcceptableStatus();
@@ -1806,6 +1844,27 @@ private:
     std::optional<ScriptItemsByOrder> onDocumentStartScriptItemsByOrder_;
     std::optional<ScriptItemsByOrder> onDocumentEndScriptItemsByOrder_;
     std::optional<ScriptItemsByOrder> onHeadReadyScriptItemsByOrder_;
+
+    // Persistent storage for inner JavaScriptOnDocumentStart scripts.
+    // Inner scripts persist across register/delete operations (unlike the
+    // public API's optional-based members which are consumed after injection).
+    // Public script persistent copies are maintained so that inner-only
+    // changes can re-merge the full set without losing public scripts.
+    // NWeb JSPROXY uses replace semantics, so public + inner must be merged
+    // into a single batch before each NWeb injection.
+    ScriptItems publicOnDocumentStartScriptItems_;
+    ScriptRegexItems publicOnDocumentStartScriptRegexItems_;
+    ScriptItemsByOrder publicOnDocumentStartScriptItemsByOrder_;
+    // System DocumentStart JS store, fully replaced on each register call (BR-2/EX-4).
+    // Stored as the same triple (ScriptItems, ScriptRegexItems, ScriptItemsByOrder)
+    // used by the ByOrder V2 API. Completely independent from
+    // onDocumentStartScriptItems_ etc. (BR-1/DD-1).
+    ScriptItems systemDocumentStartScripts_;
+    ScriptRegexItems systemDocumentStartScriptRegexItems_;
+    ScriptItemsByOrder systemDocumentStartScriptItemsByOrder_;
+    // True when inner scripts have been registered (controls whether
+    // OnModifyDone should attempt a merge-and-inject).
+    bool hasInnerOnDocumentStartScripts_ = false;
 
     bool isAttachedToMainTree_ = false;
     bool offlineWebInited_ = false;
