@@ -96,6 +96,8 @@ public:
         MockPipelineContext::TearDown();
         MockContainer::TearDown();
     }
+    void ValidSessionWrapper(RefPtr<UIExtensionPattern> pattern);
+    RefPtr<FrameNode> CreateUecNode();
 };
 
 void UIExtensionComponentTestTwoNg::SetUp()
@@ -110,6 +112,43 @@ void UIExtensionComponentTestTwoNg::SetUp()
 }
 
 void UIExtensionComponentTestTwoNg::TearDown() {}
+
+void UIExtensionComponentTestTwoNg::ValidSessionWrapper(RefPtr<UIExtensionPattern> pattern)
+{
+    CHECK_NULL_VOID(pattern);
+    pattern->sessionWrapper_ =
+        AceType::MakeRefPtr<SessionWrapperImpl>(pattern, pattern->instanceId_, 1, SessionType::UI_EXTENSION_ABILITY);
+}
+
+RefPtr<FrameNode> UIExtensionComponentTestTwoNg::CreateUecNode()
+{
+    auto onRelease = [](int32_t code) {};
+    auto onResult = [](int32_t code, const AAFwk::Want& wantRes) {};
+    auto onReceive = [](const AAFwk::WantParams& wantParams) {};
+    auto onError = [](int32_t code, const std::string& name, const std::string& message) {};
+    auto onModalRemoteReady = [](const std::shared_ptr<Ace::ModalUIExtensionProxy>& proxy) {};
+    auto onDestroy = []() {};
+    auto onRemoteReady = [](const RefPtr<NG::UIExtensionProxy>&) {};
+    auto onModalDestroy = []() {};
+    auto onTerminated = [](int32_t code, const RefPtr<WantWrap>&) {};
+    auto onDrawReady = []() {};
+
+    ModalUIExtensionCallbacks callbacks = {
+        .onRelease = onRelease,
+        .onResult = onResult,
+        .onReceive = onReceive,
+        .onError = onError,
+        .onRemoteReady = onModalRemoteReady,
+        .onDestroy = onDestroy,
+        .onDrawReady = onDrawReady,
+    };
+
+    OHOS::AAFwk::Want want;
+    want.SetElementName("123", "123", "123");
+    InnerModalUIExtensionConfig config;
+    auto uiExtNode = UIExtensionModelNG::Create(want, callbacks, config);
+    return uiExtNode;
+}
 
 /**
  * @tc.name: UIExtensionComponentTestTwoNg
@@ -1857,7 +1896,7 @@ HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionComponentIsModalFixFocusTest0
  * @tc.desc: Test RegisterBrandColorChangeListener registers a per-node callback in storage
  * @tc.type: FUNC
  */
-HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest016, TestSize.Level1)
+HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionBrandColorTest016, TestSize.Level1)
 {
 #ifdef OHOS_STANDARD_SYSTEM
     auto uiExtNode = CreateUecNode();
@@ -1884,7 +1923,7 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest016, TestSize.Leve
  * @tc.desc: Test RegisterBrandColorChangeListener skipped when GetHost returns null
  * @tc.type: FUNC
  */
-HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest017, TestSize.Level1)
+HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionBrandColorTest017, TestSize.Level1)
 {
 #ifdef OHOS_STANDARD_SYSTEM
     auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
@@ -1904,7 +1943,7 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest017, TestSize.Leve
  * @tc.desc: Test UnRegisterBrandColorChangeListener no-op when not registered
  * @tc.type: FUNC
  */
-HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest018, TestSize.Level1)
+HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionBrandColorTest018, TestSize.Level1)
 {
 #ifdef OHOS_STANDARD_SYSTEM
     auto uiExtNode = CreateUecNode();
@@ -1926,7 +1965,7 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest018, TestSize.Leve
  * @tc.desc: Test NotifyBrandColorChange triggers the registered listener and calls NotifyBrandColorChange
  * @tc.type: FUNC
  */
-HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest019, TestSize.Level1)
+HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionBrandColorTest019, TestSize.Level1)
 {
 #ifdef OHOS_STANDARD_SYSTEM
     auto uiExtNode = CreateUecNode();
@@ -1957,7 +1996,7 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest019, TestSize.Leve
  * @tc.desc: Test NotifyBrandColorChange does not fire after Unregister
  * @tc.type: FUNC
  */
-HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest020, TestSize.Level1)
+HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionBrandColorTest020, TestSize.Level1)
 {
 #ifdef OHOS_STANDARD_SYSTEM
     auto uiExtNode = CreateUecNode();
@@ -1987,7 +2026,7 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest020, TestSize.Leve
  * @tc.desc: Test ResolveBrandColor returns DEFAULT_BRAND_COLOR_STR when storage returns nullopt
  * @tc.type: FUNC
  */
-HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest021, TestSize.Level1)
+HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionBrandColorTest021, TestSize.Level1)
 {
 #ifdef OHOS_STANDARD_SYSTEM
     auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
@@ -2002,7 +2041,7 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest021, TestSize.Leve
  * @tc.desc: Test OnThemeScopeUpdate invokes ResolveBrandColor and updates brandColorStr_
  * @tc.type: FUNC
  */
-HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest022, TestSize.Level1)
+HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionBrandColorTest022, TestSize.Level1)
 {
 #ifdef OHOS_STANDARD_SYSTEM
     auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
@@ -2018,7 +2057,7 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest022, TestSize.Leve
  * @tc.desc: Test UnRegisterEvent removes brand color listener
  * @tc.type: FUNC
  */
-HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest023, TestSize.Level1)
+HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionBrandColorTest023, TestSize.Level1)
 {
 #ifdef OHOS_STANDARD_SYSTEM
     auto uiExtNode = CreateUecNode();
@@ -2045,7 +2084,7 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest023, TestSize.Leve
  * @tc.desc: Test GetBrandColorStr uses themeScopeId 0 when host is null
  * @tc.type: FUNC
  */
-HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest024, TestSize.Level1)
+HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionBrandColorTest024, TestSize.Level1)
 {
 #ifdef OHOS_STANDARD_SYSTEM
     auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
@@ -2060,7 +2099,7 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest024, TestSize.Leve
  * @tc.desc: Test OnAttachContext registers brand color listener on context attach
  * @tc.type: FUNC
  */
-HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest025, TestSize.Level1)
+HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionBrandColorTest025, TestSize.Level1)
 {
 #ifdef OHOS_STANDARD_SYSTEM
     auto uiExtNode = CreateUecNode();
@@ -2088,7 +2127,7 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest025, TestSize.Leve
  * @tc.desc: Test two patterns on same instance register distinct nodeId callbacks
  * @tc.type: FUNC
  */
-HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest026, TestSize.Level1)
+HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionBrandColorTest026, TestSize.Level1)
 {
 #ifdef OHOS_STANDARD_SYSTEM
     auto node1 = CreateUecNode();
