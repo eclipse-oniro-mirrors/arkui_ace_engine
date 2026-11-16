@@ -1593,7 +1593,7 @@ void BaseTextSelectOverlay::FillMenuShowTranslateInput(SelectMenuInfo& menuInfo,
     bool isContentRestricted, bool hasCustomKeyboard)
 {
     menuInfo.showTranslateInput = !isSelected && !isContentRestricted && !hasCustomKeyboard &&
-        TextSystemMenu::IsShowTranslateInput() && IsCurrentInputMethodDefaultIme();
+        TextSystemMenu::IsShowTranslateInput() && IsTranslateInputSupportedByCurrentIme();
 }
 
 void BaseTextSelectOverlay::FillMenuVisibility(SelectMenuInfo& menuInfo, bool hasText, bool showCameraInput,

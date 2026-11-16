@@ -890,9 +890,9 @@ HWTEST_F(TextInputMenuTestNg, TranslateInputEmptyInput, TestSize.Level1)
     overlay->isShowPaste_ = false;
     SelectMenuInfo info;
     overlay->OnUpdateMenuInfo(info, DIRTY_ALL_MENU_ITEM);
-    auto isDefaultIme = IsCurrentInputMethodDefaultIme();
-    EXPECT_EQ(info.showTranslateInput, isDefaultIme);
-    if (isDefaultIme) {
+    auto isTranslateSupported = IsTranslateInputSupportedByCurrentIme();
+    EXPECT_EQ(info.showTranslateInput, isTranslateSupported);
+    if (info.showTranslateInput) {
         EXPECT_TRUE(info.menuIsShow);
     }
 
@@ -919,7 +919,7 @@ HWTEST_F(TextInputMenuTestNg, TranslateInputSelectionAndPassword, TestSize.Level
 
     pattern_->selectController_->UpdateHandleIndex(0, 0);
     overlay->OnUpdateMenuInfo(info, DIRTY_ALL_MENU_ITEM);
-    EXPECT_EQ(info.showTranslateInput, IsCurrentInputMethodDefaultIme());
+    EXPECT_EQ(info.showTranslateInput, IsTranslateInputSupportedByCurrentIme());
 
     layoutProperty_->UpdateTextInputType(TextInputType::VISIBLE_PASSWORD);
     overlay->OnUpdateMenuInfo(info, DIRTY_ALL_MENU_ITEM);
@@ -938,10 +938,10 @@ HWTEST_F(TextInputMenuTestNg, TranslateInputVisibilityMatrix, TestSize.Level1)
     auto overlay = pattern_->selectOverlay_;
     ASSERT_NE(overlay, nullptr);
     SelectMenuInfo info;
-    auto isDefaultIme = IsCurrentInputMethodDefaultIme();
+    auto isTranslateSupported = IsTranslateInputSupportedByCurrentIme();
     for (int32_t flags = 0; flags < 8; ++flags) {
         overlay->FillMenuShowTranslateInput(info, (flags & 1) != 0, (flags & 2) != 0, (flags & 4) != 0);
-        EXPECT_EQ(info.showTranslateInput, flags == 0 && isDefaultIme) << "flags=" << flags;
+        EXPECT_EQ(info.showTranslateInput, flags == 0 && isTranslateSupported) << "flags=" << flags;
     }
 }
 } // namespace OHOS::Ace::NG
