@@ -26,6 +26,7 @@
 
 #include "base/log/ace_trace.h"
 #include "base/utils/time_util.h"
+#include "core/common/inspector_tree_ui_state.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/overlay/overlay_content_change_report.h"
 #include "core/components_ng/pattern/swiper/swiper_paint_property.h"
@@ -583,8 +584,9 @@ void ContentChangeManager::CapiImpl::ReportCapiOverlayEvent(const RefPtr<FrameNo
         overlayType, triggerNode);
 }
 
-void ContentChangeManager::OnTransitionAdded(int32_t nodeId)
+void ContentChangeManager::OnTransitionAdded(int32_t nodeId, InspectorTreeActivity activity)
 {
+    inspectorTreeUiState_->Start(activity, nodeId);
 #ifndef CROSS_PLATFORM
     if (!NeedContentChangeReportOrPageSceneDetect()) {
         return;
@@ -593,8 +595,9 @@ void ContentChangeManager::OnTransitionAdded(int32_t nodeId)
 #endif
 }
 
-void ContentChangeManager::OnTransitionRemoved(int32_t nodeId)
+void ContentChangeManager::OnTransitionRemoved(int32_t nodeId, InspectorTreeActivity activity)
 {
+    inspectorTreeUiState_->Stop(activity, nodeId);
     if (transitioningNodes_.count(nodeId)) {
         transitioningNodes_.erase(nodeId);
     }
@@ -603,6 +606,7 @@ void ContentChangeManager::OnTransitionRemoved(int32_t nodeId)
 void ContentChangeManager::OnSwiperScrollEnd(const RefPtr<FrameNode>& keyNode)
 {
     CHECK_NULL_VOID(keyNode);
+    inspectorTreeUiState_->Stop(InspectorTreeActivity::SWIPER_SCROLL, keyNode->GetId());
     ACE_SCOPED_TRACE("[ContentChangeManager] OnSwiperScrollEnd");
     scrollingSwiperNodes_.erase(keyNode->GetId());
 }
@@ -651,6 +655,7 @@ void ContentChangeManager::OnContentChangeInterrupted(
 void ContentChangeManager::OnContentChangeNodeDestroyed(
     int32_t nodeId, const std::string& tag, PipelineContext* context)
 {
+    inspectorTreeUiState_->RemoveNode(nodeId);
 #ifndef CROSS_PLATFORM
     OnContentChangeNodeDestroyedInner(nodeId);
     // Merged from the FrameNode detach path: keep the split index and dirty
@@ -769,7 +774,8 @@ void ContentChangeManager::OnScrollRemoved(int32_t nodeId)
 
 #ifdef CROSS_PLATFORM
 ContentChangeManager::ContentChangeManager(const RefPtr<TaskExecutor>& taskExecutor)
-    : capiImpl_(std::make_unique<CapiImpl>()), taskExecutor_(taskExecutor)
+    : capiImpl_(std::make_unique<CapiImpl>()), inspectorTreeUiState_(std::make_unique<InspectorTreeUiState>()),
+      taskExecutor_(taskExecutor)
 {}
 #endif
 
@@ -794,9 +800,7 @@ void ContentChangeManager::OnSwiperScrollStart(const RefPtr<FrameNode>& node, bo
 void ContentChangeManager::OnScrollInterrupted(const RefPtr<FrameNode>& node, bool reportEnd)
 {
 #ifndef CROSS_PLATFORM
-    if (reportEnd) {
-        OnContentChangeInterruptedInner(node, ChangeType::SCROLL);
-    }
+    OnContentChangeInterruptedInner(node, ChangeType::SCROLL, reportEnd);
 #endif
     capiImpl_->ReportCapiScrollEndEvent(node, NO_SCROLL_EVENT_SOURCE, true);
 }

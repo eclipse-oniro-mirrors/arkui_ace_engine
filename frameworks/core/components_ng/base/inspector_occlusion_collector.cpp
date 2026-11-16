@@ -22,6 +22,7 @@
 
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/inspector_occlusion_region.h"
+#include "core/common/inspector_tree_input_guard.h"
 #include "core/components_ng/pattern/blank/blank_paint_property.h"
 #include "core/components_ng/render/render_context.h"
 #include "core/components_v2/inspector/inspector_constants.h"
@@ -91,6 +92,9 @@ bool CollectSnapshots(const RefPtr<FrameNode>& node, int32_t domainId, double pa
     const std::optional<RectF>& parentClip, bool ancestorTrusted, size_t depth,
     std::vector<OcclusionPaintSnapshot>& snapshots)
 {
+    if (InspectorTreeInputGuard::Checkpoint()) {
+        return false;
+    }
     if (!node || depth >= MAX_DEPTH || snapshots.size() >= MAX_SNAPSHOTS || node->IsRenderTreeSyncPending() ||
         (depth > 0 && node->IsWindowBoundary())) {
         return false;
@@ -163,6 +167,9 @@ bool CollectAncestorState(const RefPtr<FrameNode>& startNode, double& opacity, s
     auto ancestor = startNode->GetParentFrameNode();
     size_t depth = 0;
     while (ancestor) {
+        if (InspectorTreeInputGuard::Checkpoint()) {
+            return false;
+        }
         if (++depth >= MAX_DEPTH || ancestor->IsRenderTreeSyncPending() || ancestor->GetIsGeometryTransitionIn() ||
             ancestor->GetIsUseTransitionAnimator() || IsExternalOrScrollable(ancestor->GetTag())) {
             return false;
@@ -200,6 +207,9 @@ InspectorOcclusionCollector::Decisions InspectorOcclusionCollector::Evaluate(
     std::unordered_set<int32_t> unknownDomains;
     std::unordered_map<int32_t, int32_t> firstDomainByNode;
     for (const auto& snapshot : paintOrder) {
+        if (InspectorTreeInputGuard::Checkpoint()) {
+            return decisions;
+        }
         if (!snapshot.paintOrderTrusted) {
             unknownDomains.insert(snapshot.domainId);
         }
@@ -211,6 +221,9 @@ InspectorOcclusionCollector::Decisions InspectorOcclusionCollector::Evaluate(
     }
     std::unordered_map<int32_t, OcclusionRegionSet> coveredByDomain;
     for (auto it = paintOrder.rbegin(); it != paintOrder.rend(); ++it) {
+        if (InspectorTreeInputGuard::Checkpoint()) {
+            return decisions;
+        }
         const auto& snapshot = *it;
         if (unknownDomains.find(snapshot.domainId) != unknownDomains.end()) {
             decisions[snapshot.nodeId] = OcclusionDecision::UNKNOWN;

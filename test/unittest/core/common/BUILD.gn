@@ -113,6 +113,7 @@ if (is_host_product) {
 
     external_deps = [ "eventhandler:libeventhandler" ]
   }
+
 }
 
 group("core_common_unittest") {

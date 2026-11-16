@@ -60,6 +60,10 @@ int32_t UIContentServiceProxy::GetInspectorTree(
         LOGW("GetInspectorTree eventCallback is nullptr");
         return PARAM_INVALID;
     }
+    if (config.inputCheckInterval == 0) {
+        LOGW("GetInspectorTree inputCheckInterval is invalid");
+        return PARAM_INVALID;
+    }
     MessageParcel data;
     MessageParcel reply;
     MessageOption option;
@@ -100,6 +104,10 @@ int32_t UIContentServiceProxy::GetVisibleInspectorTree(
 {
     if (eventCallback == nullptr) {
         LOGW("GetVisibleInspectorTree eventCallback is nullptr");
+        return PARAM_INVALID;
+    }
+    if (config.inputCheckInterval == 0) {
+        LOGW("GetVisibleInspectorTree inputCheckInterval is invalid");
         return PARAM_INVALID;
     }
     MessageParcel data;

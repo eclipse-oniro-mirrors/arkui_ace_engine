@@ -26,7 +26,8 @@ public:
     GetInspectorTreeConfigImpl() = default;
     GetInspectorTreeConfigImpl(bool interactionInfo, bool accessibilityInfo, bool cacheNodes, bool withWeb,
         bool withUIExtension, bool rectCulling, float minOpacity,
-        bool withResponseRegion = false, bool withCustomContent = false);
+        bool withResponseRegion = false, bool withCustomContent = false,
+        uint32_t inputCheckInterval = UINT32_MAX);
     GetInspectorTreeConfigImpl(const ParamConfig& config);
     bool Marshalling(Parcel& parcel) const override;
     static GetInspectorTreeConfigImpl* Unmarshalling(Parcel& parcel);

@@ -52,6 +52,12 @@ struct ParamConfig {
     // Occluder threshold; must not reuse minOpacity, which filters a node by its own final opacity.
     bool filterOccludedNodes = false;
     float occlusionOpacityThreshold = 1.0f;
+    // UINT_MAX disables pending-input interruption by default, including begin/end checks.
+    // Explicitly set a value in [1, UINT_MAX - 1] to enable checks; 30..100 is recommended.
+    // Smaller intervals add query overhead; large intervals may provide no effective
+    // responsiveness benefit. The recommendation does not restrict valid values. Zero is invalid.
+    // This option does not disable the window UI-activity precheck.
+    uint32_t inputCheckInterval = UINT32_MAX;
 
     bool IsPublicTree() const
     {

@@ -14,6 +14,7 @@
  */
 
 #include "core/components_ng/pattern/stage/page_pattern.h"
+#include "core/common/inspector_tree_activity.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 
 #include "base/log/jank_frame_report.h"
@@ -635,7 +636,7 @@ void PagePattern::FirePageTransitionStart(PageTransitionType type)
     pipeline->SetTHPNotifyState(ThpNotifyState::ROUTER_TRANSITION);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
-    mgr->OnTransitionAdded(host->GetId());
+    mgr->OnTransitionAdded(host->GetId(), InspectorTreeActivity::PAGE_TRANSITION);
     if (type == PageTransitionType::ENTER_PUSH || type == PageTransitionType::ENTER_POP) {
         mgr->OnContentChangeStart(host, ChangeType::PAGE);
     }
@@ -658,7 +659,7 @@ void PagePattern::FirePageTransitionFinish()
     pipeline->PostTaskResponseRegion(DEFAULT_DELAY_THP);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
-    mgr->OnTransitionRemoved(host->GetId());
+    mgr->OnTransitionRemoved(host->GetId(), InspectorTreeActivity::PAGE_TRANSITION);
 }
 
 void PagePattern::StopPageTransition()
@@ -1298,7 +1299,7 @@ void PagePattern::ContentChangeByDetaching(PipelineContext* pipeline)
     CHECK_NULL_VOID(mgr);
     auto host = GetHost();
     CHECK_NULL_VOID(host);
-    mgr->OnTransitionRemoved(host->GetId());
+    mgr->OnTransitionRemoved(host->GetId(), InspectorTreeActivity::PAGE_TRANSITION);
 }
 
 bool PagePattern::GetComponentInfo(const std::string& id, std::string& info)

@@ -30,12 +30,14 @@
 #include <unistd.h>
 #include <unordered_set>
 #include "base/log/log_wrapper_without_instance.h"
+#include "base/input_manager/input_manager.h"
 #include "base/resource/data_provider_manager.h"
 #include "core/components_ng/base/inspector_tree_request_context.h"
 #include "base/json/json_util_internal.h"
 #include "base/subwindow/subwindow_manager.h"
 #include "core/common/draw_delegate.h"
 #include "core/common/event_manager.h"
+#include "core/common/inspector_tree_input_guard.h"
 #include "core/common/reporter/reporter.h"
 #include "core/components_ng/event/event_constants.h"
 #include "core/components_ng/manager/avoid_info/avoid_info_manager.h"
@@ -7708,7 +7710,8 @@ void PipelineContext::GetOverlayInfo(bool hasOverlay, std::shared_ptr<JsonValue>
         overlayContent->PutRef("$children", std::move(overlayChildrenArray));
         RecordTreeNodeBytes(*overlayContent, config, true);
         RecordTreeChildInsertion(*root, config);
-        if (config.collectionState && config.collectionState->GetError()) {
+        if (InspectorTreeInputGuard::IsInterrupted() ||
+            (config.collectionState && config.collectionState->GetError())) {
             return;
         }
         overlayArray->Put(overlayContent);
@@ -7730,7 +7733,8 @@ bool PipelineContext::ProcessOverlayChildrenDumpInfo(const RefPtr<FrameNode>& ro
     auto childNodes = rootNode->GetChildren();
     bool hasOverlay = false;
     for (const auto& child : childNodes) {
-        if (config.collectionState && config.collectionState->GetError()) {
+        if (InspectorTreeInputGuard::IsInterrupted() ||
+            (config.collectionState && config.collectionState->GetError())) {
             break;
         }
         auto tag = child->GetTag();
@@ -7761,7 +7765,8 @@ bool PipelineContext::ProcessOverlayChildrenDumpInfo(const RefPtr<FrameNode>& ro
 void PipelineContext::GetComponentOverlayInspector(std::shared_ptr<JsonValue>& root,
     RefPtr<NG::FrameNode> startNode, ParamConfig config, bool isInSubWindow, double parentFinalOpacity) const
 {
-    if (config.collectionState && config.collectionState->GetError()) {
+    if (InspectorTreeInputGuard::IsInterrupted() ||
+        (config.collectionState && config.collectionState->GetError())) {
         return;
     }
     CHECK_NULL_VOID(startNode);
@@ -7852,7 +7857,8 @@ void PipelineContext::DumpSimplifyTreeJsonFromTopNavNode(std::shared_ptr<JsonVal
     }
     if (!root->Contains("$children")) {
         RecordTreeChildInsertion(*root, config);
-        if (config.collectionState && config.collectionState->GetError()) {
+        if (InspectorTreeInputGuard::IsInterrupted() ||
+            (config.collectionState && config.collectionState->GetError())) {
             return;
         }
         auto array = JsonUtil::CreateArray();
@@ -7860,7 +7866,8 @@ void PipelineContext::DumpSimplifyTreeJsonFromTopNavNode(std::shared_ptr<JsonVal
     }
     auto childrenJson = root->GetValue("$children");
     for (const auto& navNode : navNodeList) {
-        if (config.collectionState && config.collectionState->GetError()) {
+        if (InspectorTreeInputGuard::IsInterrupted() ||
+            (config.collectionState && config.collectionState->GetError())) {
             return;
         }
         if (navNode == nullptr) {
@@ -7890,6 +7897,9 @@ void PipelineContext::DumpSimplifyTreeJsonEntrance(std::shared_ptr<JsonValue> ro
     RefPtr<NG::FrameNode> startNode, const std::vector<RefPtr<NG::FrameNode>>& navNodes, ParamConfig config) const
 {
     CHECK_NULL_VOID(startNode);
+    if (InspectorTreeInputGuard::IsInterrupted()) {
+        return;
+    }
     auto startNodeRect = startNode->GetTransformRectRelativeToWindow();
     if (NearEqual(startNodeRect.Width(), 0) && NearEqual(startNodeRect.Height(), 0)) {
         return;
@@ -7901,6 +7911,9 @@ void PipelineContext::DumpSimplifyTreeJsonEntrance(std::shared_ptr<JsonValue> ro
 
 void PipelineContext::DumpVisibleInspectorTree(std::shared_ptr<JsonValue>& rootJson, ParamConfig config) const
 {
+    if (InspectorTreeInputGuard::IsInterrupted()) {
+        return;
+    }
     config.minOpacity = NormalizeMinOpacity(config.minOpacity);
     CHECK_NULL_VOID(rootNode_);
     if (ShouldPruneNode(rootNode_, true, config)) {
@@ -7998,6 +8011,9 @@ void PipelineContext::SetInspectorWindowSnapshotCallback(
 void PipelineContext::GetInspectorTree(bool onlyNeedVisible, ParamConfig config)
 {
     CHECK_NULL_VOID(taskExecutor_);
+    std::function<bool()> inputChecker = []() { return InputManager::HasPendingInputEvent(); };
+    InspectorTreeInputGuard inputGuard(config.inputCheckInterval, std::move(inputChecker));
+    bool interrupted = inputGuard.IsInterrupted();
     auto snapshot = inspectorWindowSnapshot_ ? inspectorWindowSnapshot_() :
         std::make_optional(InspectorWindowSnapshot {});
     InspectorTreeRequestContext context(config, snapshot.value_or(InspectorWindowSnapshot {}));
@@ -8008,7 +8024,7 @@ void PipelineContext::GetInspectorTree(bool onlyNeedVisible, ParamConfig config)
         root = JsonUtil::CreateSharedPtrJson(true);
         if (!root || !root->IsObject() || !rootNode_ || !snapshot) {
             context.ReportError(InspectorTreeError::COLLECTION_FAILED);
-        } else {
+        } else if (!interrupted) {
             GetAppInfo(root);
             auto appInfo = root->GetObject("appInfo");
             appInfo->Put("WindowTitle", context.window.windowTitle.c_str());
@@ -8019,7 +8035,7 @@ void PipelineContext::GetInspectorTree(bool onlyNeedVisible, ParamConfig config)
                 onlyNeedVisible, config.interactionInfo, config.accessibilityInfo, config.cacheNodes, config.withWeb,
                 config.rectCulling, config.minOpacity);
             CollectInspectorTreeInto(root, onlyNeedVisible, config);
-            if (!context.ShouldStop()) {
+            if (!context.ShouldStop() && !InspectorTreeInputGuard::IsInterrupted()) {
                 context.FinalizeNativeTree(root);
             }
         }
@@ -8027,19 +8043,36 @@ void PipelineContext::GetInspectorTree(bool onlyNeedVisible, ParamConfig config)
             context.ReportError(InspectorTreeError::COLLECTION_FAILED);
         }
     }
+    interrupted = interrupted || InspectorTreeInputGuard::IsInterrupted();
     {
         JsonWriteErrorScope errors;
-        root = context.FinalizeResult(std::move(root));
-        if (!root || errors.HasError()) {
+        if (!interrupted) {
+            root = context.FinalizeResult(std::move(root));
+        }
+        if ((!root && !interrupted) || errors.HasError()) {
+            TAG_LOGE(AceLogTag::ACE_UIEVENT, "GetInspectorTree finalize failed, no result callback");
             return;
         }
     }
-    auto cb = [root = std::move(root)]() {
+    interrupted = inputGuard.CheckNow();
+    const auto visitedNodes = inputGuard.GetVisitedNodes();
+    auto cb = [root = std::move(root), interrupted, visitedNodes]() {
+        if (interrupted) {
+            auto res = JsonUtil::Create(true);
+            res->Put("result", 1);
+            res->Put("error", "INPUT_INTERRUPTED");
+            res->Put("visitedNodes", static_cast<double>(visitedNodes));
+#ifndef CROSS_PLATFORM
+            UiSessionManager::GetInstance()->ReportInspectorTreeValue(res->ToString());
+#endif
+            return;
+        }
         constexpr size_t MAX_REPORT_BYTES = 100 * 1024 * 1024;
         JsonWriteErrorScope errors;
         char* data = nullptr;
         size_t size = 0;
         if (WriteJsonBounded(*root, false, MAX_REPORT_BYTES, &data, &size) != JsonWriteResult::SUCCESS) {
+            TAG_LOGE(AceLogTag::ACE_UIEVENT, "GetInspectorTree serialize failed, no result callback");
             return;
         }
         auto res = JsonUtil::Create(true);
@@ -8047,6 +8080,7 @@ void PipelineContext::GetInspectorTree(bool onlyNeedVisible, ParamConfig config)
         std::free(data);
         if (errors.HasError() ||
             WriteJsonBounded(*res, false, MAX_REPORT_BYTES, &data, &size) != JsonWriteResult::SUCCESS) {
+            TAG_LOGE(AceLogTag::ACE_UIEVENT, "GetInspectorTree wrap result failed, no result callback");
             return;
         }
         std::string result(data, size);
@@ -8055,8 +8089,14 @@ void PipelineContext::GetInspectorTree(bool onlyNeedVisible, ParamConfig config)
         UiSessionManager::GetInstance()->ReportInspectorTreeValue(result);
 #endif
     };
-    taskExecutor_->PostTask(cb, TaskExecutor::TaskType::BACKGROUND,
-        onlyNeedVisible ? "ArkUIGetVisibleInspectorTree" : "ArkUIGetInspectorTree");
+    if (!taskExecutor_->PostTask(cb, TaskExecutor::TaskType::BACKGROUND,
+        onlyNeedVisible ? "ArkUIGetVisibleInspectorTree" : "ArkUIGetInspectorTree")) {
+#ifndef CROSS_PLATFORM
+        UiSessionManager::GetInstance()->ReportInspectorTreeValue(
+            R"({"result":1,"error":"COLLECTION_FAILED","reason":"BACKGROUND_POST_FAILED",)"
+            R"("phase":"AFTER_UI_COLLECTION","visitedNodes":0})");
+#endif
+    }
 }
 
 UITreeRequestState& PipelineContext::GetUITreeRequestState()
@@ -8070,7 +8110,7 @@ namespace {
 bool MarkOcclusionKeepIds(const RefPtr<FrameNode>& node, const InspectorOcclusionCollector::Decisions& decisions,
     std::unordered_set<int32_t>& keepIds)
 {
-    if (!node) {
+    if (InspectorTreeInputGuard::Checkpoint() || !node) {
         return false;
     }
     auto found = decisions.find(node->GetId());
@@ -8101,8 +8141,14 @@ void PipelineContext::CollectInspectorTreeInto(
             auto& state = *config.collectionState;
             state.occlusionDecisions = InspectorOcclusionCollector::Collect(
                 rootNode_, static_cast<double>(config.occlusionOpacityThreshold), GetInstanceId());
+            if (InspectorTreeInputGuard::IsInterrupted()) {
+                return;
+            }
             if (!state.occlusionDecisions.empty()) {
                 MarkOcclusionKeepIds(rootNode_, state.occlusionDecisions, state.occlusionKeepIds);
+            }
+            if (InspectorTreeInputGuard::IsInterrupted()) {
+                return;
             }
             state.occlusionEnabled = true;
         }

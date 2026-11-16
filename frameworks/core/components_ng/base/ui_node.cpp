@@ -27,6 +27,7 @@
 #include "base/utils/utils.h"
 #include "bridge/common/utils/engine_helper.h"
 #include "core/common/builder_util.h"
+#include "core/common/inspector_tree_input_guard.h"
 #include "core/common/multi_thread_build_manager.h"
 #include "core/common/premake_scope.h"
 #include "core/common/resource/resource_parse_utils.h"
@@ -1706,7 +1707,8 @@ void UINode::DumpSimplifyTreeWithParamConfigInner(int32_t depth, std::shared_ptr
     bool onlyNeedVisible, ParamConfig config, std::function<std::pair<bool, bool>(const RefPtr<UINode>&)> dumpChecker,
     double parentFinalOpacity, const RectCullingState& rectCullingState)
 {
-    if ((config.collectionState && config.collectionState->GetError()) ||
+    if (InspectorTreeInputGuard::Checkpoint() ||
+        (config.collectionState && config.collectionState->GetError()) ||
         (config.inspectorContext && config.inspectorContext->ShouldStop())) {
         return;
     }
@@ -1748,6 +1750,9 @@ void UINode::DumpSimplifyTreeWithParamConfigInner(int32_t depth, std::shared_ptr
         array = JsonUtil::CreateArray();
         if (config.cacheNodes && !cacheChildren.empty()) {
             for (const auto& item : cacheChildren) {
+                if (InspectorTreeInputGuard::Checkpoint()) {
+                    return;
+                }
                 CHECK_NULL_CONTINUE(item);
                 auto [dumpChild, _] = dumpChecker(item);
                 CHECK_NULL_CONTINUE(dumpChild);
@@ -1762,19 +1767,24 @@ void UINode::DumpSimplifyTreeWithParamConfigInner(int32_t depth, std::shared_ptr
                 auto child = JsonUtil::CreateSharedPtrJson();
                 item->DumpSimplifyTreeWithParamConfigInner(
                     childDepth, child, false, config, dumpChecker, currentFinalOpacity, childRectCullingState);
-                if (config.collectionState && config.collectionState->GetError()) {
+                if (InspectorTreeInputGuard::IsInterrupted() ||
+                    (config.collectionState && config.collectionState->GetError())) {
                     return;
                 }
                 if (!child->Contains("$type")) {
                     continue;
                 }
                 hasDumpedChildren = AppendTreeChild(*array, std::move(child), item, config) || hasDumpedChildren;
-                if (config.collectionState && config.collectionState->GetError()) {
+                if (InspectorTreeInputGuard::IsInterrupted() ||
+                    (config.collectionState && config.collectionState->GetError())) {
                     return;
                 }
             }
         } else {
             for (const auto& item : nodeChildren) {
+                if (InspectorTreeInputGuard::Checkpoint()) {
+                    return;
+                }
                 auto [dumpChild, _] = dumpChecker(item);
                 CHECK_NULL_CONTINUE(dumpChild);
                 if (!NearZero(config.minOpacity) &&
@@ -1788,19 +1798,24 @@ void UINode::DumpSimplifyTreeWithParamConfigInner(int32_t depth, std::shared_ptr
                 auto child = JsonUtil::CreateSharedPtrJson();
                 item->DumpSimplifyTreeWithParamConfigInner(childDepth, child, onlyNeedVisible, config, dumpChecker,
                     currentFinalOpacity, childRectCullingState);
-                if (config.collectionState && config.collectionState->GetError()) {
+                if (InspectorTreeInputGuard::IsInterrupted() ||
+                    (config.collectionState && config.collectionState->GetError())) {
                     return;
                 }
                 if (!child->Contains("$type")) {
                     continue;
                 }
                 hasDumpedChildren = AppendTreeChild(*array, std::move(child), item, config) || hasDumpedChildren;
-                if (config.collectionState && config.collectionState->GetError()) {
+                if (InspectorTreeInputGuard::IsInterrupted() ||
+                    (config.collectionState && config.collectionState->GetError())) {
                     return;
                 }
             }
         }
         for (const auto& [item, index, branch] : disappearingChildren_) {
+            if (InspectorTreeInputGuard::Checkpoint()) {
+                return;
+            }
             auto [dumpChild, _] = dumpChecker(item);
             CHECK_NULL_CONTINUE(dumpChild);
             if (!NearZero(config.minOpacity) &&
@@ -1814,14 +1829,16 @@ void UINode::DumpSimplifyTreeWithParamConfigInner(int32_t depth, std::shared_ptr
             auto child = JsonUtil::CreateSharedPtrJson();
             item->DumpSimplifyTreeWithParamConfigInner(childDepth, child, onlyNeedVisible, config, dumpChecker,
                 currentFinalOpacity, childRectCullingState);
-            if (config.collectionState && config.collectionState->GetError()) {
+            if (InspectorTreeInputGuard::IsInterrupted() ||
+                (config.collectionState && config.collectionState->GetError())) {
                 return;
             }
             if (!child->Contains("$type")) {
                 continue;
             }
             hasDumpedChildren = AppendTreeChild(*array, std::move(child), item, config) || hasDumpedChildren;
-            if (config.collectionState && config.collectionState->GetError()) {
+            if (InspectorTreeInputGuard::IsInterrupted() ||
+                (config.collectionState && config.collectionState->GetError())) {
                 return;
             }
         }
@@ -1831,7 +1848,8 @@ void UINode::DumpSimplifyTreeWithParamConfigInner(int32_t depth, std::shared_ptr
     }
 
     RecordTreeNode(Claim(this), config);
-    if (config.collectionState && config.collectionState->GetError()) {
+    if (InspectorTreeInputGuard::Checkpoint() ||
+        (config.collectionState && config.collectionState->GetError())) {
         return;
     }
     DumpSimplifyTreeBase(current);
@@ -1849,7 +1867,8 @@ void UINode::DumpSimplifyTreeWithParamConfig(int32_t depth, std::shared_ptr<Json
     ParamConfig config, std::function<std::pair<bool, bool>(const RefPtr<UINode>&)> dumpChecker,
     double parentFinalOpacity)
 {
-    if (config.collectionState && config.collectionState->GetError()) {
+    if (InspectorTreeInputGuard::Checkpoint() ||
+        (config.collectionState && config.collectionState->GetError())) {
         return;
     }
     if (config.collectionState) {
@@ -3139,6 +3158,9 @@ void UINode::SetAncestor(const WeakPtr<UINode>& parent)
 
 void UINode::FindTopNavDestination(std::list<RefPtr<FrameNode>>& result)
 {
+    if (InspectorTreeInputGuard::Checkpoint()) {
+        return;
+    }
     auto currentNode = AceType::DynamicCast<FrameNode>(this);
     if (currentNode) {
         if (!currentNode->IsVisibleAndActive()) {
@@ -3166,6 +3188,9 @@ void UINode::FindTopNavDestination(std::list<RefPtr<FrameNode>>& result)
     }
 
     for (const auto& item : GetChildren()) {
+        if (InspectorTreeInputGuard::IsInterrupted()) {
+            return;
+        }
         item->FindTopNavDestination(result);
         if (!result.empty()) {
             return;

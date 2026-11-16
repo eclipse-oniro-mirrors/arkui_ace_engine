@@ -14,6 +14,7 @@
  */
 
 #include "core/components_ng/pattern/navigation/navigation_pattern.h"
+#include "core/common/inspector_tree_activity.h"
 
 #include "base/log/ace_performance_check.h"
 #include "core/pipeline/container_window_manager.h"
@@ -4534,7 +4535,7 @@ bool NavigationPattern::TriggerCustomAnimation(RefPtr<NavDestinationGroupNode> p
                 auto pipeline = pattern->GetContext();
                 auto mgr = pipeline ? pipeline->GetContentChangeManager() : nullptr;
                 if (mgr && contentChangeTransitionId >= 0) {
-                    mgr->OnTransitionRemoved(contentChangeTransitionId);
+                    mgr->OnTransitionRemoved(contentChangeTransitionId, InspectorTreeActivity::PAGE_TRANSITION);
                 }
                 pattern->pendingCapiPageEnds_.erase(contentChangeTransitionId);
                 pattern->RecoveryToLastStack(preDestination, topDestination);
@@ -9325,7 +9326,7 @@ void NavigationPattern::ContentChangeOnTransitionStart(const RefPtr<FrameNode>& 
         return;
     }
     if (keyNode || mgr->IsStartEventReportEnabled()) {
-        mgr->OnTransitionAdded(reportNode->GetId());
+        mgr->OnTransitionAdded(reportNode->GetId(), InspectorTreeActivity::PAGE_TRANSITION);
     }
     mgr->OnContentChangeStart(reportNode, ChangeType::PAGE);
 }

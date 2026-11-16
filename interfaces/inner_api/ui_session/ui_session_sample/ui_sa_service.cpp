@@ -68,6 +68,7 @@ constexpr size_t GET_VISIBLE_WITH_WEB_INDEX = 4;
 constexpr size_t GET_VISIBLE_WITH_UI_EXTENSION_INDEX = 5;
 constexpr size_t GET_VISIBLE_RECT_CULLING_INDEX = 6;
 constexpr size_t GET_VISIBLE_MIN_OPACITY_INDEX = 7;
+constexpr size_t GET_VISIBLE_INPUT_CHECK_INTERVAL_INDEX = 8;
 constexpr size_t SIMPLIFYTREE_WITH_PARAMCONFIG = GET_VISIBLE_WITH_UI_EXTENSION_INDEX + 1;
 constexpr size_t SIMPLIFYTREE_WITH_EXTENDED_PARAMCONFIG = GET_VISIBLE_MIN_OPACITY_INDEX + 1;
 constexpr int32_t SEND_COMMAND_WITH_NODEID = 3;
@@ -782,6 +783,18 @@ void UiSaService::HandleInspectorTree(
             config.rectCulling = params[GET_VISIBLE_RECT_CULLING_INDEX] == "true";
             config.minOpacity = ParseMinOpacityParam(params[GET_VISIBLE_MIN_OPACITY_INDEX]);
         }
+        if (params.size() > GET_VISIBLE_INPUT_CHECK_INTERVAL_INDEX &&
+            params[GET_VISIBLE_INPUT_CHECK_INTERVAL_INDEX].rfind("--", 0) != 0) {
+            char* end = nullptr;
+            errno = 0;
+            const auto parsed = std::strtol(params[GET_VISIBLE_INPUT_CHECK_INTERVAL_INDEX].c_str(), &end, 10);
+            if (errno || end == params[GET_VISIBLE_INPUT_CHECK_INTERVAL_INDEX].c_str() || *end || parsed <= 0 ||
+                parsed > static_cast<long>(UINT32_MAX)) {
+                LOGW("[InspectorTree] invalid input check interval");
+                return;
+            }
+            config.inputCheckInterval = static_cast<uint32_t>(parsed);
+        }
     }
     const std::map<std::string, bool*> flags {
         { "--interactionInfo", &config.interactionInfo }, { "--accessibilityInfo", &config.accessibilityInfo },
@@ -817,6 +830,15 @@ void UiSaService::HandleInspectorTree(
             *flag->second = value == "true" || value == "1";
         } else if (key == "--minOpacity") {
             config.minOpacity = ParseMinOpacityParam(value);
+        } else if (key == "--inputCheckInterval") {
+            char* end = nullptr;
+            errno = 0;
+            const auto parsed = std::strtol(value.c_str(), &end, 10);
+            if (errno || end == value.c_str() || *end || parsed <= 0 || parsed > static_cast<long>(UINT32_MAX)) {
+                LOGW("[InspectorTree] invalid input check interval");
+                return;
+            }
+            config.inputCheckInterval = static_cast<uint32_t>(parsed);
         } else if (key == "--timeout") {
             char* end = nullptr;
             errno = 0;
@@ -861,10 +883,10 @@ void UiSaService::HandleInspectorTree(
         }
     };
     LOGI("[InspectorTree] caseId=%{public}s api=%{public}s config=%{public}d,%{public}d,%{public}d,"
-        "%{public}d,%{public}d,%{public}d,%{public}f,%{public}d,%{public}d timeout=%{public}d",
+        "%{public}d,%{public}d,%{public}d,%{public}f,%{public}d,%{public}d,%{public}d timeout=%{public}d",
         caseId.c_str(), api.c_str(), config.interactionInfo, config.accessibilityInfo, config.cacheNodes,
         config.withWeb, config.withUIExtension, config.rectCulling, config.minOpacity,
-        config.withResponseRegion, config.withCustomContent, timeout);
+        config.withResponseRegion, config.withCustomContent, config.inputCheckInterval, timeout);
     const auto result = visible ? service->GetVisibleInspectorTree(callback, config, timeout) :
         service->GetInspectorTree(callback, config, timeout);
     LOGI("[InspectorTree] caseId=%{public}s api=%{public}s returnCode=%{public}d startMs=%{public}" PRId64,

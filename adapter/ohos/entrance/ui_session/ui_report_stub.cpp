@@ -986,6 +986,11 @@ void UiReportStub::PostGetInspectorTreeCallbackRemoveTask(int32_t timeout)
         return;
     }
     wptr<UiReportStub> weakThis = this;
+    std::lock_guard<std::mutex> lock(inspectorTreeCallbackMutex_);
+    if (inspectorTreeCallback_ == nullptr) {
+        LOGD("PostGetInspectorTreeCallbackRemoveTask skipped, no pending callback");
+        return;
+    }
     bool postTaskSuccess = eventHandler->PostTask([weakThis]() {
         auto uiReportStub = weakThis.promote();
         if (uiReportStub == nullptr) {
@@ -996,7 +1001,6 @@ void UiReportStub::PostGetInspectorTreeCallbackRemoveTask(int32_t timeout)
     }, GET_INSPECTOR_TREE_CALLBACK_TIMEOUT, NormalizeTimeout(timeout, DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS));
     if (!postTaskSuccess) {
         LOGW("Post GetInspectorTree timeout task failed");
-        std::lock_guard<std::mutex> lock(inspectorTreeCallbackMutex_);
         inspectorTreeCallback_ = nullptr;
     }
 }
@@ -1111,6 +1115,10 @@ void UiReportStub::FinishPageTranslateTextRequest()
 void UiReportStub::HandleInspectorTreeCallbackTimeout()
 {
     std::lock_guard<std::mutex> lock(inspectorTreeCallbackMutex_);
+    if (inspectorTreeCallback_ == nullptr) {
+        LOGD("GetInspectorTree callback timeout ignored, no pending callback");
+        return;
+    }
     LOGW("GetInspectorTree callback timeout, clear pending callback");
     inspectorTreeCallback_ = nullptr;
 }

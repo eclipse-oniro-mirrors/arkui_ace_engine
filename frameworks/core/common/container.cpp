@@ -20,6 +20,7 @@
 #include <dirent.h>
 #include "iremote_object.h"
 
+#include "base/utils/macros.h"
 #include "base/utils/utils.h"
 #include "base/subwindow/subwindow_manager.h"
 #include "base/view_data/ace_auto_fill_error.h"

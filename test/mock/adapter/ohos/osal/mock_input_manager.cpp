@@ -50,6 +50,11 @@ bool InputManager::HasControlComponentPermission()
     return MockInputManager::controlComponentPermissionCache.value();
 }
 
+bool InputManager::HasPendingInputEvent()
+{
+    return false;
+}
+
 bool InputManager::IsKeyboardConnected()
 {
     return true;
