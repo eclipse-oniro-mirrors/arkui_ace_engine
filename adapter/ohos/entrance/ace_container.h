@@ -96,12 +96,14 @@ struct ParsedConfig {
     std::string mnc;
     std::string preferredLanguage;
     std::string fontId;
+    std::string themeSkin;
+    std::string themeIcon;
     bool IsValid() const
     {
         return !(colorMode.empty() && deviceAccess.empty() && languageTag.empty() && direction.empty() &&
                  densitydpi.empty() && themeTag.empty() && fontScale.empty() && fontWeightScale.empty() &&
                  colorModeIsSetByApp.empty() && mcc.empty() && mnc.empty() && fontFamily.empty() &&
-                 preferredLanguage.empty() && fontId.empty());
+                 preferredLanguage.empty() && fontId.empty() && themeSkin.empty() && themeIcon.empty());
     }
 };
 
@@ -1110,7 +1112,9 @@ private:
 
     SingleHandTransform singleHandTransform_;
 
-    bool lastThemeHasSkin_ = false;
+    uint32_t lastThemeFonts_ = 0;
+    uint32_t lastThemeIcons_ = 0;
+    uint32_t lastThemeSkin_ = 0;
 
     // for multiple frontEnd
     // valid only when type_ is STATIC_HYBRID_DYNAMIC or DYNAMIC_HYBRID_STATIC
