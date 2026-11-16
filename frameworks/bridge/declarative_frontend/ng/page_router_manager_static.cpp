@@ -430,7 +430,7 @@ void PageRouterManager::ReplaceDynamicExtender(
     auto iter = pageRouterStack_.begin();
     std::advance(iter, popIndex);
     auto lastIter = pageRouterStack_.erase(iter);
-    pageRouterStack_.emplace_back(WeakPtr<FrameNode>(AceType::DynamicCast<FrameNode>(popNode)));
+    pageRouterStack_.emplace_back(WeakPtr<FrameNode>(popNode));
     popNode->MovePosition(GetLastPageIndex());
     for (auto iter = lastIter; iter != pageRouterStack_.end(); ++iter, ++popIndex) {
         auto page = iter->Upgrade();
@@ -565,7 +565,7 @@ void PageRouterManager::ReplaceExtender(const RouterPageInfo& target,
     auto iter = pageRouterStack_.begin();
     std::advance(iter, popIndex);
     auto lastIter = pageRouterStack_.erase(iter);
-    pageRouterStack_.emplace_back(WeakPtr<FrameNode>(AceType::DynamicCast<FrameNode>(popNode)));
+    pageRouterStack_.emplace_back(WeakPtr<FrameNode>(popNode));
     popNode->MovePosition(GetLastPageIndex());
     for (auto iter = lastIter; iter != pageRouterStack_.end(); ++iter, ++popIndex) {
         auto page = iter->Upgrade();
@@ -686,7 +686,7 @@ void PageRouterManager::ReplaceNamedRouteExtender(
     auto iter = pageRouterStack_.begin();
     std::advance(iter, popIndex);
     auto lastIter = pageRouterStack_.erase(iter);
-    pageRouterStack_.emplace_back(WeakPtr<FrameNode>(AceType::DynamicCast<FrameNode>(popNode)));
+    pageRouterStack_.emplace_back(WeakPtr<FrameNode>(popNode));
     popNode->MovePosition(GetLastPageIndex());
     for (auto iter = lastIter; iter != pageRouterStack_.end(); ++iter, ++popIndex) {
         auto page = iter->Upgrade();

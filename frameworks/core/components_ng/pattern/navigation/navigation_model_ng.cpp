@@ -3475,7 +3475,7 @@ void NavigationModelNG::UpdateDividerColor(FrameNode* frameNode, const Color& co
     }
     auto UpdateDividerColorFunc = [key, weakNode = AceType::WeakClaim(navigationNode)](
         const RefPtr<ResourceObject>& res) {
-        auto navigationNode = AceType::DynamicCast<NavigationGroupNode>(weakNode.Upgrade());
+        auto navigationNode = weakNode.Upgrade();
         CHECK_NULL_VOID(navigationNode);
         auto pattern = navigationNode->GetPattern<NavigationPattern>();
         CHECK_NULL_VOID(pattern);

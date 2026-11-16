@@ -33,7 +33,7 @@ public:
         RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto themeWrapper = AceType::MakeRefPtr<IndexerThemeWrapper>();
-            auto theme = AceType::DynamicCast<IndexerTheme>(themeWrapper);
+            RefPtr<IndexerTheme> theme = themeWrapper;
             if (!themeConstants) {
                 return themeWrapper;
             }

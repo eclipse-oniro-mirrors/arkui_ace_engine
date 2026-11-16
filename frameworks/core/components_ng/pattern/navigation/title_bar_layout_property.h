@@ -37,7 +37,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto copy = MakeRefPtr<TitleBarLayoutProperty>();
-        copy->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        copy->LayoutProperty::UpdateLayoutProperty(this);
         copy->propTitleMode_ = CloneTitleMode();
         copy->propHideBackButton_ = CloneHideBackButton();
         copy->propTitleBarParentType_ = CloneTitleBarParentType();

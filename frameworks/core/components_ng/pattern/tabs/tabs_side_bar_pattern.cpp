@@ -110,7 +110,7 @@ void TabsSideBarPattern::CreateHeaderContainerIfNeeded()
     if (headerContainerNode_) {
         return;
     }
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto columnNode = FrameNode::GetOrCreateFrameNode(
         V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
@@ -135,7 +135,7 @@ void TabsSideBarPattern::CreateBottomBarContainerIfNeeded()
     if (bottomBarContainerNode_) {
         return;
     }
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto columnNode = FrameNode::GetOrCreateFrameNode(
         V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
@@ -157,7 +157,7 @@ void TabsSideBarPattern::CreateBottomBarContainerIfNeeded()
 
 void TabsSideBarPattern::CreateMaskNodeIfNeeded()
 {
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     do {
         if (headerContainerMaskBlurNode_) {
@@ -197,7 +197,7 @@ void TabsSideBarPattern::CreateMaskNodeIfNeeded()
 
 void TabsSideBarPattern::CreateBottomBarMaskNodeIfNeeded()
 {
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     do {
         if (bottomBarMaskBlurNode_) {
@@ -269,7 +269,7 @@ void TabsSideBarPattern::CreateTabListIfNeeded(const RefPtr<FrameNode>& tabsNode
     if (tabListNode_) {
         return;
     }
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
 
     // Create SideBarTabListNode with TabsSideBarTabListPattern (NOT TabBarPattern)
@@ -452,7 +452,7 @@ void TabsSideBarPattern::UpdateSearchNodeIfNeeded()
     if (!incommingOptions_.has_value()) {
         return;
     }
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto newOptions = incommingOptions_.value();
     incommingOptions_ = std::nullopt;
@@ -846,7 +846,7 @@ RefPtr<FrameNode> TabsSideBarPattern::CreateCollapseButtonIcon()
     CHECK_NULL_RETURN(symbolLayoutProperty, nullptr);
 
     // Resolve symbol icon based on sidebar position and collapsed state
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_RETURN(host, iconNode);
     auto context = host->GetContextRefPtr();
     CHECK_NULL_RETURN(context, iconNode);
@@ -908,7 +908,7 @@ void TabsSideBarPattern::CollapseSideBarContent()
 {
     isCollapsed_ = true;
     isCollapseAnimating_ = true;
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto tabsNode = tabsNode_.Upgrade();
     CHECK_NULL_VOID(tabsNode);
@@ -1042,7 +1042,7 @@ void TabsSideBarPattern::ExpandSideBarContent()
 {
     isCollapsed_ = false;
     isCollapseAnimating_ = true;
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto tabsNode = tabsNode_.Upgrade();
     CHECK_NULL_VOID(tabsNode);
@@ -1171,7 +1171,7 @@ void TabsSideBarPattern::UpdateCollapseButtonIcon()
     CHECK_NULL_VOID(symbolLayoutProperty);
 
     // Resolve symbol icon based on sidebar position and collapsed state
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto context = host->GetContextRefPtr();
     CHECK_NULL_VOID(context);

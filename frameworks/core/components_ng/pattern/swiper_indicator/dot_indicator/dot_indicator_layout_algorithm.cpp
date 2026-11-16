@@ -251,7 +251,7 @@ void DotIndicatorLayoutAlgorithm::LayoutCustomIconChildren(
         childGeometry->SetMarginFrameOffset(childOffset);
         bool baseMoved = !NearEqual(prevFrameOffset.GetX(), childOffset.GetX()) ||
                         !NearEqual(prevFrameOffset.GetY(), childOffset.GetY());
-        auto wrapperNode = AceType::DynamicCast<FrameNode>(child->GetHostNode());
+        auto wrapperNode = child->GetHostNode();
         auto renderContext = wrapperNode ? wrapperNode->GetRenderContext() : nullptr;
         if (baseMoved && renderContext) {
             renderContext->UpdateOffset(OffsetT<Dimension>(Dimension(0.0f, DimensionUnit::PX),

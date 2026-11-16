@@ -119,7 +119,7 @@ void ParallelPagePattern::RemoveOnTouchEvent()
 
 void ParallelPagePattern::PrepareSplitTransition(int32_t animationId, PageTransitionType type)
 {
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     CaptureSplitTransitionVisualState();
     UpdateSplitTransitionState(type, SplitTransitionPhase::START);
@@ -150,7 +150,7 @@ void ParallelPagePattern::OnSplitTransitionEnd(PageTransitionType type)
 
 bool ParallelPagePattern::IsPageInStack()
 {
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_RETURN(host, false);
     auto context = host->GetContext();
     CHECK_NULL_RETURN(context, false);
@@ -161,7 +161,7 @@ bool ParallelPagePattern::IsPageInStack()
 
 bool ParallelPagePattern::OnSplitTransitionFinish(int32_t animationId, PageTransitionType type)
 {
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_RETURN(host, false);
     if (!GetPageInTransition() || GetAnimationId() != animationId) {
         return false;
@@ -205,7 +205,7 @@ bool ParallelPagePattern::OnSplitTransitionFinish(int32_t animationId, PageTrans
 
 void ParallelPagePattern::AbortSplitTransition()
 {
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto renderContext = host->GetRenderContext();
     if (renderContext) {
@@ -255,7 +255,7 @@ ForceSplitPageColumnType ParallelPagePattern::GetSplitTransitionColumnType() con
 
 void ParallelPagePattern::CaptureSplitTransitionVisualState()
 {
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto geometry = host->GetGeometryNode();
     CHECK_NULL_VOID(geometry);
@@ -270,7 +270,7 @@ void ParallelPagePattern::CaptureSplitTransitionVisualState()
 
 void ParallelPagePattern::HandleSplitTransitionStage(PageTransitionType type, bool isStart)
 {
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto renderContext = host->GetRenderContext();
     CHECK_NULL_VOID(renderContext);

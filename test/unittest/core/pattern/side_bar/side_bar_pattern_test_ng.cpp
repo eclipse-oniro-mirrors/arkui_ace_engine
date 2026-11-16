@@ -639,7 +639,7 @@ HWTEST_F(SideBarPatternTestNg, SideBarPatternTestNg022, TestSize.Level1)
     ASSERT_NE(layoutAlgorithmWrapper, nullptr);
     layoutWrapper->SetLayoutAlgorithm(layoutAlgorithmWrapper);
 
-    auto algorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(layoutWrapper->GetLayoutAlgorithm());
+    auto algorithmWrapper = layoutWrapper->GetLayoutAlgorithm();
     ASSERT_NE(algorithmWrapper, nullptr);
     auto algorithm = AceType::DynamicCast<SideBarContainerLayoutAlgorithm>(algorithmWrapper->GetLayoutAlgorithm());
     ASSERT_NE(algorithm, nullptr);
@@ -1173,7 +1173,7 @@ HWTEST_F(SideBarPatternTestNg, SideBarPatternTestNg038, TestSize.Level1)
         AceType::MakeRefPtr<LayoutAlgorithmWrapper>(AceType::MakeRefPtr<SideBarContainerLayoutAlgorithm>());
     ASSERT_NE(layoutAlgorithmWrapper, nullptr);
     layoutWrapper->SetLayoutAlgorithm(layoutAlgorithmWrapper);
-    auto algorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(layoutWrapper->GetLayoutAlgorithm());
+    auto algorithmWrapper = layoutWrapper->GetLayoutAlgorithm();
     ASSERT_NE(algorithmWrapper, nullptr);
     auto algorithm = AceType::DynamicCast<SideBarContainerLayoutAlgorithm>(algorithmWrapper->GetLayoutAlgorithm());
     ASSERT_NE(algorithm, nullptr);
@@ -1342,7 +1342,7 @@ HWTEST_F(SideBarPatternTestNg, SideBarPatternTestNg044, TestSize.Level1)
         AceType::MakeRefPtr<LayoutAlgorithmWrapper>(AceType::MakeRefPtr<SideBarContainerLayoutAlgorithm>());
     ASSERT_NE(layoutAlgorithmWrapper, nullptr);
     layoutWrapper->SetLayoutAlgorithm(layoutAlgorithmWrapper);
-    auto algorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(layoutWrapper->GetLayoutAlgorithm());
+    auto algorithmWrapper = layoutWrapper->GetLayoutAlgorithm();
     ASSERT_NE(algorithmWrapper, nullptr);
     auto algorithm = AceType::DynamicCast<SideBarContainerLayoutAlgorithm>(algorithmWrapper->GetLayoutAlgorithm());
     ASSERT_NE(algorithm, nullptr);
@@ -1526,7 +1526,7 @@ HWTEST_F(SideBarPatternTestNg, SideBarPatternTestNg051, TestSize.Level1)
         AceType::MakeRefPtr<LayoutAlgorithmWrapper>(AceType::MakeRefPtr<SideBarContainerLayoutAlgorithm>());
     ASSERT_NE(layoutAlgorithmWrapper, nullptr);
     layoutWrapper->SetLayoutAlgorithm(layoutAlgorithmWrapper);
-    auto algorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(layoutWrapper->GetLayoutAlgorithm());
+    auto algorithmWrapper = layoutWrapper->GetLayoutAlgorithm();
     ASSERT_NE(algorithmWrapper, nullptr);
     auto algorithm = AceType::DynamicCast<SideBarContainerLayoutAlgorithm>(algorithmWrapper->GetLayoutAlgorithm());
     ASSERT_NE(algorithm, nullptr);
@@ -1630,7 +1630,7 @@ HWTEST_F(SideBarPatternTestNg, SideBarPatternTestNg056, TestSize.Level1)
     auto nodeId = stack->ClaimNodeId();
     auto frameNode = FrameNode::CreateFrameNode("Test", nodeId, pattern);
     EXPECT_FALSE(frameNode == nullptr);
-    auto uINode = AceType::DynamicCast<UINode>(frameNode);
+    RefPtr<UINode> uINode = frameNode;
     frameNode->children_.push_back(uINode);
     auto sideBarNode = pattern->GetControlButtonNode();
     EXPECT_EQ(sideBarNode, nullptr);
@@ -1727,7 +1727,7 @@ HWTEST_F(SideBarPatternTestNg, SideBarPatternTestNg060, TestSize.Level1)
     pattern->CreateAndMountNodes();
     auto host = pattern->GetHost();
     ASSERT_NE(host, nullptr);
-    auto uINode = AceType::DynamicCast<UINode>(host);
+    RefPtr<UINode> uINode = host;
     ASSERT_NE(uINode, nullptr);
     auto firstChildNode = pattern->GetFirstFrameNode(uINode);
     EXPECT_NE(firstChildNode, nullptr);

@@ -424,7 +424,7 @@ void TabsModelNG::SetIndex(int32_t index)
     tabBarPattern->UpdateIndicator(index);
     tabBarPattern->UpdateTextColorAndFontWeight(index);
     swiperLayoutProperty->UpdateIndex(index);
-    auto tabsFrameNode = AceType::DynamicCast<FrameNode>(tabsNode);
+    FrameNode* tabsFrameNode = tabsNode;
     CHECK_NULL_VOID(tabsFrameNode);
     auto tabsLayoutProperty = tabsFrameNode->GetLayoutProperty<TabsLayoutProperty>();
     tabsLayoutProperty->UpdateIndex(index);
@@ -450,7 +450,7 @@ void TabsModelNG::SetIndex(FrameNode* frameNode, int32_t index)
     tabBarPattern->UpdateIndicator(index);
     tabBarPattern->UpdateTextColorAndFontWeight(index);
     swiperLayoutProperty->UpdateIndex(index);
-    auto tabsFrameNode = AceType::DynamicCast<FrameNode>(tabsNode);
+    FrameNode* tabsFrameNode = tabsNode;
     CHECK_NULL_VOID(tabsFrameNode);
     auto tabsLayoutProperty = tabsFrameNode->GetLayoutProperty<TabsLayoutProperty>();
     tabsLayoutProperty->UpdateIndex(index);

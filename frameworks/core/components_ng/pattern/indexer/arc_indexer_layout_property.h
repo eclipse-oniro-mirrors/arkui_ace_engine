@@ -29,7 +29,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<ArcIndexerLayoutProperty>();
-        value->IndexerLayoutProperty::UpdateLayoutProperty(DynamicCast<IndexerLayoutProperty>(this));
+        value->IndexerLayoutProperty::UpdateLayoutProperty(this);
         return value;
     }
 

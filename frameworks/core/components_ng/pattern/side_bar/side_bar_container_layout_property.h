@@ -54,7 +54,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<SideBarContainerLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(AceType::DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propSideBarContainerType_ = CloneSideBarContainerType();
         value->propShowSideBar_ = CloneShowSideBar();
         value->propShowControlButton_ = CloneShowControlButton();

@@ -34,7 +34,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto copy = MakeRefPtr<NavContentLayoutPropertyBase>(IsVertical());
-        copy->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        copy->LayoutProperty::UpdateLayoutProperty(this);
         return copy;
     }
 

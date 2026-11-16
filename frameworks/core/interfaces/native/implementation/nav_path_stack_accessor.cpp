@@ -627,13 +627,13 @@ void SetInterceptionImpl(Ark_NavPathStack peer,
                                bool isAnimated) {
             Ark_Union_NavDestinationContext_String tempfrom;
             Ark_Union_NavDestinationContext_String tempto;
-            auto preDestination = AceType::DynamicCast<NG::NavDestinationContext>(from);
+            auto preDestination = from;
             if (!preDestination) {
                 tempfrom = Converter::ArkUnion<Ark_Union_NavDestinationContext_String, Ark_String>("navbar");
             } else {
                 tempfrom = Converter::ArkUnion<Ark_Union_NavDestinationContext_String, Ark_NavDestinationContext>(from);
             }
-            auto topDestination = AceType::DynamicCast<NG::NavDestinationContext>(to);
+            auto topDestination = to;
             if (!topDestination) {
                 tempto = Converter::ArkUnion<Ark_Union_NavDestinationContext_String, Ark_String>("navbar");
             } else {
@@ -650,13 +650,13 @@ void SetInterceptionImpl(Ark_NavPathStack peer,
                               bool isAnimated) {
             Ark_Union_NavDestinationContext_String tempfrom;
             Ark_Union_NavDestinationContext_String tempto;
-            auto preDestination = AceType::DynamicCast<NG::NavDestinationContext>(from);
+            auto preDestination = from;
             if (!preDestination) {
                 tempfrom = Converter::ArkUnion<Ark_Union_NavDestinationContext_String, Ark_String>("navbar");
             } else {
                 tempfrom = Converter::ArkUnion<Ark_Union_NavDestinationContext_String, Ark_NavDestinationContext>(from);
             }
-            auto topDestination = AceType::DynamicCast<NG::NavDestinationContext>(to);
+            auto topDestination = to;
             if (!topDestination) {
                 tempto = Converter::ArkUnion<Ark_Union_NavDestinationContext_String, Ark_String>("navbar");
             } else {
@@ -673,7 +673,7 @@ void SetInterceptionImpl(Ark_NavPathStack peer,
                                    const RefPtr<NG::NavDestinationContext> &from, const int32_t index,
                                    bool isAnimated) {
             Ark_Union_NavPathInfo_String tempfrom;
-            auto preDestination = AceType::DynamicCast<NG::NavDestinationContext>(from);
+            auto preDestination = from;
             if (!preDestination) {
                 tempfrom = Converter::ArkUnion<Ark_Union_NavPathInfo_String, Ark_String>("navbar");
             } else {

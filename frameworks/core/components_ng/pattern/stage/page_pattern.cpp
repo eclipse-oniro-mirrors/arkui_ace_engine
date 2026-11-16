@@ -338,7 +338,7 @@ void PagePattern::OnWindowSizeChanged(int32_t /*width*/, int32_t /*height*/, Win
     if (isCustomTransition_) {
         return;
     }
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_VOID(hostNode);
     auto pipelineContext = hostNode->GetContext();
     CHECK_NULL_VOID(pipelineContext);
@@ -746,7 +746,7 @@ void PagePattern::MarkDirtyOverlay()
 void PagePattern::InitTransitionIn(const RefPtr<PageTransitionEffect>& effect, PageTransitionType type)
 {
     CHECK_NULL_VOID(effect);
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_VOID(hostNode);
     auto renderContext = hostNode->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
@@ -762,7 +762,7 @@ void PagePattern::InitTransitionIn(const RefPtr<PageTransitionEffect>& effect, P
 void PagePattern::InitTransitionOut(const RefPtr<PageTransitionEffect> & effect, PageTransitionType type)
 {
     CHECK_NULL_VOID(effect);
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_VOID(hostNode);
     auto renderContext = hostNode->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
@@ -811,7 +811,7 @@ RefPtr<PageTransitionEffect> PagePattern::GetDefaultPageTransition(PageTransitio
 void PagePattern::UpdateDefaultEnterPopEffect(RefPtr<PageTransitionEffect>& effect, float statusHeight)
 {
     CHECK_NULL_VOID(effect);
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_VOID(hostNode);
     auto renderContext = hostNode->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
@@ -836,7 +836,7 @@ void PagePattern::UpdateDefaultEnterPopEffect(RefPtr<PageTransitionEffect>& effe
 void PagePattern::UpdateEnterPushEffect(RefPtr<PageTransitionEffect>& effect, float statusHeight)
 {
     CHECK_NULL_VOID(effect);
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_VOID(hostNode);
     auto renderContext = hostNode->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
@@ -864,7 +864,7 @@ void PagePattern::UpdateEnterPushEffect(RefPtr<PageTransitionEffect>& effect, fl
 void PagePattern::UpdateExitPushEffect(RefPtr<PageTransitionEffect>& effect, float statusHeight)
 {
     CHECK_NULL_VOID(effect);
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_VOID(hostNode);
     auto renderContext = hostNode->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
@@ -889,7 +889,7 @@ void PagePattern::UpdateExitPushEffect(RefPtr<PageTransitionEffect>& effect, flo
 void PagePattern::TransitionInFinish(const RefPtr<PageTransitionEffect>& effect, PageTransitionType type)
 {
     CHECK_NULL_VOID(effect);
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_VOID(hostNode);
     auto renderContext = hostNode->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
@@ -902,7 +902,7 @@ void PagePattern::TransitionInFinish(const RefPtr<PageTransitionEffect>& effect,
 void PagePattern::TransitionOutFinish(const RefPtr<PageTransitionEffect>& effect, PageTransitionType type)
 {
     CHECK_NULL_VOID(effect);
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_VOID(hostNode);
     auto renderContext = hostNode->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
@@ -916,7 +916,7 @@ void PagePattern::TransitionOutFinish(const RefPtr<PageTransitionEffect>& effect
 
 void PagePattern::MaskAnimation(const Color& initialBackgroundColor, const Color& backgroundColor)
 {
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_VOID(hostNode);
     auto renderContext = hostNode->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
@@ -931,7 +931,7 @@ void PagePattern::MaskAnimation(const Color& initialBackgroundColor, const Color
 
 RefPtr<PageTransitionEffect> PagePattern::GetPageTransitionEffect(const RefPtr<PageTransitionEffect>& transition)
 {
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_RETURN(hostNode, nullptr);
     auto renderContext = hostNode->GetRenderContext();
     CHECK_NULL_RETURN(renderContext, nullptr);
@@ -1000,7 +1000,7 @@ void PagePattern::SlideTransitionEffect(const SlideEffect& effect, const RectF& 
 
 void PagePattern::ResetPageTransitionEffect()
 {
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_VOID(hostNode);
     auto renderContext = hostNode->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
@@ -1048,7 +1048,7 @@ void PagePattern::RemoveJsChildImmediately(const RefPtr<FrameNode>& page, PageTr
 
 void PagePattern::FinishOutPage(const int32_t animationId, PageTransitionType type)
 {
-    auto outPage = AceType::DynamicCast<FrameNode>(GetHost());
+    auto outPage = GetHost();
     CHECK_NULL_VOID(outPage);
     outPage->SetNodeFreeze(false);
     if (animationId_ != animationId) {
@@ -1090,7 +1090,7 @@ void PagePattern::FinishOutPage(const int32_t animationId, PageTransitionType ty
 
 void PagePattern::FinishInPage(const int32_t animationId, PageTransitionType type)
 {
-    auto inPage = AceType::DynamicCast<FrameNode>(GetHost());
+    auto inPage = GetHost();
     CHECK_NULL_VOID(inPage);
     inPage->SetNodeFreeze(false);
     if (animationId_ != animationId) {
@@ -1132,7 +1132,7 @@ void PagePattern::TriggerDefaultTransition(const std::function<void()>& onFinish
     UpdateAnimationOption(transition, effect, option, type);
     option.SetOnFinishEvent(onFinish);
     option.SetAnimationInterface(AnimationInterface::PAGE_TRANSITION);
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_VOID(hostNode);
     auto pipelineContext = hostNode->GetContext();
     CHECK_NULL_VOID(pipelineContext);
@@ -1224,7 +1224,7 @@ void PagePattern::UpdateAnimationOption(const RefPtr<PageTransitionEffect>& tran
 
 void PagePattern::NotifyNavigationLifecycle(bool isShow, bool isFromWindow)
 {
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_VOID(hostNode);
     auto context = hostNode->GetContextRefPtr();
     CHECK_NULL_VOID(context);

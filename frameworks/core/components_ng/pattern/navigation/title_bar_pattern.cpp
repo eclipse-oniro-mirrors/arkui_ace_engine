@@ -588,7 +588,7 @@ void MountBackButton(const RefPtr<TitleBarNode>& hostNode)
         auto navBarLayoutProperty = navBarNode->GetLayoutProperty<NavBarLayoutProperty>();
         CHECK_NULL_VOID(navBarLayoutProperty);
         auto hideBackButton = navBarLayoutProperty->GetHideBackButtonValue(false);
-        auto backButtonLayoutProperty = AceType::DynamicCast<FrameNode>(backButtonNode)->GetLayoutProperty();
+        auto backButtonLayoutProperty = backButtonNode->GetLayoutProperty();
         CHECK_NULL_VOID(backButtonLayoutProperty);
         backButtonLayoutProperty->UpdateVisibility(hideBackButton ? VisibleType::GONE : VisibleType::VISIBLE);
         backButtonNode->SetJSViewActive(hideBackButton ? false : true);
@@ -1765,7 +1765,7 @@ bool TitleBarPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirt
     if (config.skipMeasure && config.skipLayout) {
         return false;
     }
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto titleBarLayoutAlgorithm = DynamicCast<TitleBarLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(titleBarLayoutAlgorithm, false);
@@ -2552,7 +2552,7 @@ void TitleBarPattern::UnregisterColorPicker(TitleBarAreaType type, const RefPtr<
         return;
     }
     colorPickerCtx->hasRegisterColorPicker = false;
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto context = host->GetContext();
     CHECK_NULL_VOID(context);

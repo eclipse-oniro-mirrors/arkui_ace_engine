@@ -110,7 +110,7 @@ float UpdateToolBarItemsContainer(LayoutWrapper* layoutWrapper, size_t toolbarIt
     float toolbarItemWidth = CalcToolbarItemWidth(toolbarWidth, toolbarItemNum);
 
     for (const auto& toolbarItemWrapper : containerWrapper->GetAllChildrenWithBuild()) {
-        auto layoutProperty = AceType::DynamicCast<LayoutProperty>(toolbarItemWrapper->GetLayoutProperty());
+        auto layoutProperty = toolbarItemWrapper->GetLayoutProperty();
         layoutProperty->UpdateUserDefinedIdealSize(CalcSize(CalcLength(toolbarItemWidth), std::nullopt));
     }
 

@@ -455,7 +455,7 @@ HWTEST_F(NavigationPatternTestNg, NavigationPatternTest_012, TestSize.Level1)
     LayoutConstraintVaildSize.selfIdealSize.SetSize(SizeF(1000000, 1000000));
     layoutWrapper->GetLayoutProperty()->UpdateLayoutConstraint(LayoutConstraintVaildSize);
     layoutWrapper->GetLayoutProperty()->UpdateContentConstraint();
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(layoutWrapper->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = layoutWrapper->GetLayoutAlgorithm();
     ASSERT_NE(layoutAlgorithmWrapper, nullptr);
     auto navigationLayoutAlgorithm =
         AceType::DynamicCast<NavigationLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());

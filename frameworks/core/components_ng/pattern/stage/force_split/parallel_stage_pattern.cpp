@@ -111,7 +111,7 @@ void ParallelStagePattern::FireModeChangeCallback()
 
 void ParallelStagePattern::OnForceSplitIsDraggableChange(bool isDraggable)
 {
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_VOID(hostNode);
     auto context = hostNode->GetContext();
     CHECK_NULL_VOID(context);
@@ -620,7 +620,7 @@ void ParallelStagePattern::HandleTouchUp()
 
 void ParallelStagePattern::HandleForceSplitDragStart()
 {
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_VOID(hostNode);
     auto context = hostNode->GetContext();
     CHECK_NULL_VOID(context);
@@ -640,7 +640,7 @@ void ParallelStagePattern::HandleForceSplitDragStart()
 void ParallelStagePattern::OnForceSplitDragStart()
 {
     ShowForceSplitMask();
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_VOID(hostNode);
     auto context = hostNode->GetContext();
     CHECK_NULL_VOID(context);
@@ -663,7 +663,7 @@ void ParallelStagePattern::OnForceSplitDragEnd()
 
 void ParallelStagePattern::HandleForceSplitDragUpdate(float xOffset)
 {
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_VOID(hostNode);
     auto context = hostNode->GetContext();
     CHECK_NULL_VOID(context);
@@ -693,7 +693,7 @@ void ParallelStagePattern::HandleForceSplitDragUpdate(float xOffset)
 
 void ParallelStagePattern::UpdateForceSplitScaleAndTranslateByRatio(float ratio)
 {
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_VOID(hostNode);
     auto geometryNode = hostNode->GetGeometryNode();
     CHECK_NULL_VOID(geometryNode);
@@ -724,7 +724,7 @@ void ParallelStagePattern::UpdateForceSplitScaleAndTranslateByRatio(float ratio)
 void ParallelStagePattern::UpdateForceSplitScaleAndTranslate(
     float primaryScale, float primaryTranslateX, float secondaryScale, float secondaryTranslateX)
 {
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_VOID(hostNode);
     auto context = hostNode->GetContext();
     CHECK_NULL_VOID(context);
@@ -761,7 +761,7 @@ void ParallelStagePattern::UpdateForceSplitScaleAndTranslate(
 
 void ParallelStagePattern::HandleForceSplitDragEnd(bool isDragCanceled)
 {
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_VOID(hostNode);
     auto context = hostNode->GetContext();
     CHECK_NULL_VOID(context);
@@ -796,7 +796,7 @@ void ParallelStagePattern::HandleForceSplitDragEnd(bool isDragCanceled)
 
 void ParallelStagePattern::ShowForceSplitMask()
 {
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_VOID(hostNode);
     auto context = hostNode->GetContext();
     CHECK_NULL_VOID(context);
@@ -820,7 +820,7 @@ void ParallelStagePattern::ShowForceSplitMask()
 
 void ParallelStagePattern::RemoveForceSplitMask()
 {
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_VOID(hostNode);
     if (hasLeftMaskNode_) {
         auto leftMask = GetOrCreateMaskNode(true);
@@ -841,7 +841,7 @@ void ParallelStagePattern::RemoveForceSplitMask()
 
 void ParallelStagePattern::PlayForceSplitSnapAnimation(ForceSplitMode mode, float fromRatio, float toRatio)
 {
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_VOID(hostNode);
     AnimationOption option;
     option.SetCurve(DIVIDER_DRAG_ANIMATION_CURVE);
@@ -862,7 +862,7 @@ void ParallelStagePattern::PlayForceSplitSnapAnimation(ForceSplitMode mode, floa
 
 void ParallelStagePattern::OnForceSplitSnapAnimationEnd(float toRatio)
 {
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto context = host->GetContext();
     CHECK_NULL_VOID(context);

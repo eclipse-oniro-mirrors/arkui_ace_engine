@@ -46,7 +46,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto copy = MakeRefPtr<NavigationLayoutProperty>();
-        copy->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        copy->LayoutProperty::UpdateLayoutProperty(this);
         copy->propNavigationMode_ = CloneNavigationMode();
         copy->propUsrNavigationMode_ = CloneUsrNavigationMode();
         copy->propNavBarWidth_ = CloneNavBarWidth();

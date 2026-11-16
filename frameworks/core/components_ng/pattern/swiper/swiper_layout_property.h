@@ -40,7 +40,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<SwiperLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propDirection_ = CloneDirection();
         value->propIndex_ = CloneIndex();
         value->propItemSpace_ = CloneItemSpace();

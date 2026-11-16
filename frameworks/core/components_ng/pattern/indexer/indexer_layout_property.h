@@ -62,7 +62,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<IndexerLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propArrayValue_ = CloneArrayValue();
         value->propActualArrayValue_ = CloneActualArrayValue();
         value->propSelected_ = CloneSelected();

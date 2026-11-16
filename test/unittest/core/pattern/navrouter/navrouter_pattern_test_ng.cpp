@@ -84,7 +84,7 @@ HWTEST_F(NavrouterPatternTestNg, OnAttachToMainTree001, TestSize.Level1)
     auto navDestinationPattern = AceType::MakeRefPtr<NavDestinationPattern>();
     ASSERT_NE(navDestinationPattern, nullptr);
 
-    ASSERT_EQ(AceType::DynamicCast<UINode>(navDestinationPattern->GetHost()), nullptr);
+    ASSERT_EQ(navDestinationPattern->GetHost(), nullptr);
     navDestinationPattern->OnAttachToMainTree();
 }
 
@@ -102,7 +102,7 @@ HWTEST_F(NavrouterPatternTestNg, OnAttachToMainTree002, TestSize.Level1)
     auto navDestinationPattern = AceType::MakeRefPtr<NavDestinationPattern>();
     navDestinationPattern->frameNode_ = AceType::WeakClaim(AceType::RawPtr(navDestinationNode));
 
-    RefPtr<UINode> node = AceType::DynamicCast<UINode>(navDestinationPattern->GetHost());
+    RefPtr<UINode> node = navDestinationPattern->GetHost();
     ASSERT_NE(node, nullptr);
     EXPECT_NE(node->GetTag(), V2::NAVIGATION_VIEW_ETS_TAG);
     navDestinationPattern->OnAttachToMainTree();
@@ -123,7 +123,7 @@ HWTEST_F(NavrouterPatternTestNg, OnAttachToMainTree003, TestSize.Level1)
     auto navDestinationPattern = AceType::MakeRefPtr<NavDestinationPattern>();
     navDestinationPattern->frameNode_ = AceType::WeakClaim(AceType::RawPtr(navDestinationNode));
 
-    RefPtr<UINode> node = AceType::DynamicCast<UINode>(navDestinationPattern->GetHost());
+    RefPtr<UINode> node = navDestinationPattern->GetHost();
     ASSERT_NE(node, nullptr);
     EXPECT_EQ(node->GetTag(), V2::NAVIGATION_VIEW_ETS_TAG);
     navDestinationPattern->OnAttachToMainTree();
@@ -310,8 +310,8 @@ HWTEST_F(NavrouterPatternTestNg, Create001, TestSize.Level1)
     navDestinationNode->nodeId_ = originNodeId + 1;
 
     // Make sure navDestinationNodeTest is false
-    auto parent = AceType::DynamicCast<UINode>(
-        FrameNode::GetFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, navDestinationNode->nodeId_));
+    RefPtr<UINode> parent =
+        FrameNode::GetFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, navDestinationNode->nodeId_);
     auto navDestinationNodeTest = AceType::DynamicCast<NavDestinationGroupNode>(parent);
     EXPECT_EQ(AceType::DynamicCast<NavDestinationGroupNode>(parent), nullptr);
     // Prepare for calling the deepRender defined in NavDestinationModelNG::Create()
@@ -345,8 +345,8 @@ HWTEST_F(NavrouterPatternTestNg, Create002, TestSize.Level1)
     navDestinationNode->contentNode_ = nullptr;
 
     // Make sure navDestinationNodeTest is true
-    auto parent = AceType::DynamicCast<UINode>(
-        FrameNode::GetFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, navDestinationNode->nodeId_));
+    RefPtr<UINode> parent =
+        FrameNode::GetFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, navDestinationNode->nodeId_);
     auto navDestinationNodeTest = AceType::DynamicCast<NavDestinationGroupNode>(parent);
     ASSERT_NE(navDestinationNodeTest, nullptr);
     EXPECT_EQ(navDestinationNodeTest->GetContentNode(), nullptr);
@@ -379,8 +379,8 @@ HWTEST_F(NavrouterPatternTestNg, Create003, TestSize.Level1)
     ASSERT_NE(navDestinationNode, nullptr);
 
     // Make sure navDestinationNodeTest is true
-    auto parent = AceType::DynamicCast<UINode>(
-        FrameNode::GetFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, navDestinationNode->nodeId_));
+    RefPtr<UINode> parent =
+        FrameNode::GetFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, navDestinationNode->nodeId_);
     auto navDestinationNodeTest = AceType::DynamicCast<NavDestinationGroupNode>(parent);
     ASSERT_NE(navDestinationNodeTest, nullptr);
     EXPECT_NE(navDestinationNodeTest->GetContentNode(), nullptr);

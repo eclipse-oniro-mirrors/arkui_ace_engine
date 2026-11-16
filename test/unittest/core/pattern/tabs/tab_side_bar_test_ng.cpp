@@ -396,7 +396,7 @@ HWTEST_F(TabsSidebarTestNg, SidebarFooterTest001, TestSize.Level1)
      * @tc.steps: step1. SetSidebarFooter with null frameNode (no crash)
      */
     auto footer = CreateTestNode();
-    TabsModelNG::SetSidebarFooter(nullptr, AceType::DynamicCast<AceType>(footer));
+    TabsModelNG::SetSidebarFooter(nullptr, footer);
     EXPECT_TRUE(true);
 
     /**
@@ -406,14 +406,14 @@ HWTEST_F(TabsSidebarTestNg, SidebarFooterTest001, TestSize.Level1)
     CreateTabContents(TABCONTENT_NUMBER);
     CreateTabsDone(model);
 
-    TabsModelNG::SetSidebarFooter(AceType::RawPtr(frameNode_), AceType::DynamicCast<AceType>(footer));
+    TabsModelNG::SetSidebarFooter(AceType::RawPtr(frameNode_), footer);
     EXPECT_EQ(pattern_->GetSidebarFooterNode(), footer);
 
     /**
      * @tc.steps: step3. Replace footer with a new one
      */
     auto footer2 = CreateTestNode();
-    TabsModelNG::SetSidebarFooter(AceType::RawPtr(frameNode_), AceType::DynamicCast<AceType>(footer2));
+    TabsModelNG::SetSidebarFooter(AceType::RawPtr(frameNode_), footer2);
     EXPECT_EQ(pattern_->GetSidebarFooterNode(), footer2);
     EXPECT_NE(pattern_->GetSidebarFooterNode(), footer);
 
@@ -451,7 +451,7 @@ HWTEST_F(TabsSidebarTestNg, SidebarFooterTest002, TestSize.Level1)
      * @tc.steps: step2. Footer is synced to TabsSideBarPattern
      */
     auto footer = CreateTestNode();
-    TabsModelNG::SetSidebarFooter(AceType::RawPtr(frameNode_), AceType::DynamicCast<AceType>(footer));
+    TabsModelNG::SetSidebarFooter(AceType::RawPtr(frameNode_), footer);
     pattern_->SyncPropertiesToSideBar();
     sideBarPattern->OnModifyDone();
     EXPECT_EQ(sideBarPattern->curFooterNode_, footer);
@@ -532,7 +532,7 @@ HWTEST_F(TabsSidebarTestNg, SidebarBottomBarTest001, TestSize.Level1)
      * @tc.steps: step1. SetSidebarBottomBar with null frameNode (no crash)
      */
     auto bottomBar = CreateTestNode();
-    TabsModelNG::SetSidebarBottomBar(nullptr, AceType::DynamicCast<AceType>(bottomBar));
+    TabsModelNG::SetSidebarBottomBar(nullptr, bottomBar);
     EXPECT_TRUE(true);
 
     /**
@@ -542,14 +542,14 @@ HWTEST_F(TabsSidebarTestNg, SidebarBottomBarTest001, TestSize.Level1)
     CreateTabContents(TABCONTENT_NUMBER);
     CreateTabsDone(model);
 
-    TabsModelNG::SetSidebarBottomBar(AceType::RawPtr(frameNode_), AceType::DynamicCast<AceType>(bottomBar));
+    TabsModelNG::SetSidebarBottomBar(AceType::RawPtr(frameNode_), bottomBar);
     EXPECT_EQ(pattern_->GetSidebarBottomBarNode(), bottomBar);
 
     /**
      * @tc.steps: step3. Replace bottomBar with a new one
      */
     auto bottomBar2 = CreateTestNode();
-    TabsModelNG::SetSidebarBottomBar(AceType::RawPtr(frameNode_), AceType::DynamicCast<AceType>(bottomBar2));
+    TabsModelNG::SetSidebarBottomBar(AceType::RawPtr(frameNode_), bottomBar2);
     EXPECT_EQ(pattern_->GetSidebarBottomBarNode(), bottomBar2);
     EXPECT_NE(pattern_->GetSidebarBottomBarNode(), bottomBar);
 
@@ -589,7 +589,7 @@ HWTEST_F(TabsSidebarTestNg, SidebarBottomBarTest002, TestSize.Level1)
      * @tc.steps: step2. BottomBar is synced to TabsSideBarPattern
      */
     auto bottomBar = CreateTestNode();
-    TabsModelNG::SetSidebarBottomBar(AceType::RawPtr(frameNode_), AceType::DynamicCast<AceType>(bottomBar));
+    TabsModelNG::SetSidebarBottomBar(AceType::RawPtr(frameNode_), bottomBar);
     pattern_->SyncPropertiesToSideBar();
     sideBarPattern->OnModifyDone();
     EXPECT_EQ(sideBarPattern->curBottomBarNode_, bottomBar);
@@ -857,7 +857,7 @@ HWTEST_F(TabsSidebarTestNg, SidebarBottomBarTest006, TestSize.Level1)
     auto bottomBar = CreateTestNode();
     ViewAbstract::SetWidth(CalcLength(100.0f));
     ViewAbstract::SetHeight(CalcLength(50.0f));
-    TabsModelNG::SetSidebarBottomBar(AceType::RawPtr(frameNode_), AceType::DynamicCast<AceType>(bottomBar));
+    TabsModelNG::SetSidebarBottomBar(AceType::RawPtr(frameNode_), bottomBar);
     FlushUITasks();
 
     auto containerRect = bottomBarContainer->GetGeometryNode()->GetFrameRect();

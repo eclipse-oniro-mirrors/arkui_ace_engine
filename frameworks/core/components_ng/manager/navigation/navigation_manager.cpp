@@ -700,7 +700,7 @@ void NavigationManager::FireLowerLayerLifecycle(const RefPtr<UINode>& node, int3
 
 void NavigationManager::FireSubWindowLifecycle(const RefPtr<UINode>& node, int32_t lifecycle, int32_t reason)
 {
-    auto context = AceType::DynamicCast<NG::PipelineContext>(PipelineContext::GetMainPipelineContext());
+    auto context = PipelineContext::GetMainPipelineContext();
     CHECK_NULL_VOID(context);
     auto navigationManager = context->GetNavigationManager();
     CHECK_NULL_VOID(navigationManager);

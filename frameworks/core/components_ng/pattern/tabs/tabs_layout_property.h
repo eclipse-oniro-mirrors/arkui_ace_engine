@@ -38,7 +38,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<TabsLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(AceType::DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propTabBarPosition_ = CloneTabBarPosition();
         value->propAxis_ = CloneAxis();
         value->propTabBarMode_ = CloneTabBarMode();

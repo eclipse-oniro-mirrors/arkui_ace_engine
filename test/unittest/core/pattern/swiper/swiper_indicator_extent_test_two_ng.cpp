@@ -73,14 +73,14 @@ HWTEST_F(SwiperIndicatorExtentTestTwoNg, SwiperDigitIndicatorLayoutAlgorithmMeas
     auto geometryNode = AceType::MakeRefPtr<GeometryNode>();
     LayoutWrapperNode layoutWrapper =
         LayoutWrapperNode(indicatorNode_, geometryNode, indicatorNode_->GetLayoutProperty());
-    auto firstChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto firstChild = indicatorNode_;
     RefPtr<GeometryNode> firstGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     firstGeometryNode->Reset();
     firstGeometryNode->SetFrameSize(SizeF(20.0, 20.0));
     RefPtr<LayoutWrapperNode> firstLayoutWrapper =
         AceType::MakeRefPtr<LayoutWrapperNode>(firstChild, firstGeometryNode, firstChild->GetLayoutProperty());
     layoutWrapper.AppendChild(firstLayoutWrapper);
-    auto lastChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto lastChild = indicatorNode_;
     RefPtr<GeometryNode> lastGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     lastGeometryNode->Reset();
     lastGeometryNode->SetFrameSize(SizeF(30.0, 30.0));
@@ -114,14 +114,14 @@ HWTEST_F(SwiperIndicatorExtentTestTwoNg, SwiperDigitIndicatorLayoutAlgorithmMeas
     auto geometryNode = AceType::MakeRefPtr<GeometryNode>();
     LayoutWrapperNode layoutWrapper =
         LayoutWrapperNode(indicatorNode_, geometryNode, indicatorNode_->GetLayoutProperty());
-    auto firstChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto firstChild = indicatorNode_;
     RefPtr<GeometryNode> firstGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     firstGeometryNode->Reset();
     firstGeometryNode->SetFrameSize(SizeF(20.0, 20.0));
     RefPtr<LayoutWrapperNode> firstLayoutWrapper =
         AceType::MakeRefPtr<LayoutWrapperNode>(firstChild, firstGeometryNode, firstChild->GetLayoutProperty());
     layoutWrapper.AppendChild(firstLayoutWrapper);
-    auto lastChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto lastChild = indicatorNode_;
     RefPtr<GeometryNode> lastGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     lastGeometryNode->Reset();
     lastGeometryNode->SetFrameSize(SizeF(30.0, 30.0));
@@ -155,14 +155,14 @@ HWTEST_F(SwiperIndicatorExtentTestTwoNg, SwiperDigitIndicatorLayoutAlgorithmMeas
     auto geometryNode = AceType::MakeRefPtr<GeometryNode>();
     LayoutWrapperNode layoutWrapper =
         LayoutWrapperNode(indicatorNode_, geometryNode, indicatorNode_->GetLayoutProperty());
-    auto firstChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto firstChild = indicatorNode_;
     RefPtr<GeometryNode> firstGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     firstGeometryNode->Reset();
     firstGeometryNode->SetFrameSize(SizeF(20.0, 20.0));
     RefPtr<LayoutWrapperNode> firstLayoutWrapper =
         AceType::MakeRefPtr<LayoutWrapperNode>(firstChild, firstGeometryNode, firstChild->GetLayoutProperty());
     layoutWrapper.AppendChild(firstLayoutWrapper);
-    auto lastChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto lastChild = indicatorNode_;
     RefPtr<GeometryNode> lastGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     lastGeometryNode->Reset();
     lastGeometryNode->SetFrameSize(SizeF(30.0, 30.0));
@@ -195,14 +195,14 @@ HWTEST_F(SwiperIndicatorExtentTestTwoNg, SwiperDigitIndicatorLayoutAlgorithmMeas
     auto geometryNode = AceType::MakeRefPtr<GeometryNode>();
     LayoutWrapperNode layoutWrapper =
         LayoutWrapperNode(indicatorNode_, geometryNode, indicatorNode_->GetLayoutProperty());
-    auto firstChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto firstChild = indicatorNode_;
     RefPtr<GeometryNode> firstGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     firstGeometryNode->Reset();
     firstGeometryNode->SetFrameSize(SizeF(20.0, 20.0));
     RefPtr<LayoutWrapperNode> firstLayoutWrapper =
         AceType::MakeRefPtr<LayoutWrapperNode>(firstChild, firstGeometryNode, firstChild->GetLayoutProperty());
     layoutWrapper.AppendChild(firstLayoutWrapper);
-    auto lastChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto lastChild = indicatorNode_;
     RefPtr<GeometryNode> lastGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     lastGeometryNode->Reset();
     lastGeometryNode->SetFrameSize(SizeF(30.0, 30.0));
@@ -236,14 +236,14 @@ HWTEST_F(SwiperIndicatorExtentTestTwoNg, SwiperDigitIndicatorLayoutAlgorithmMeas
     auto geometryNode = AceType::MakeRefPtr<GeometryNode>();
     LayoutWrapperNode layoutWrapper =
         LayoutWrapperNode(indicatorNode_, geometryNode, indicatorNode_->GetLayoutProperty());
-    auto firstChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto firstChild = indicatorNode_;
     RefPtr<GeometryNode> firstGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     firstGeometryNode->Reset();
     firstGeometryNode->SetFrameSize(SizeF(20.0, 20.0));
     RefPtr<LayoutWrapperNode> firstLayoutWrapper =
         AceType::MakeRefPtr<LayoutWrapperNode>(firstChild, firstGeometryNode, firstChild->GetLayoutProperty());
     layoutWrapper.AppendChild(firstLayoutWrapper);
-    auto lastChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto lastChild = indicatorNode_;
     RefPtr<GeometryNode> lastGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     lastGeometryNode->Reset();
     lastGeometryNode->SetFrameSize(SizeF(30.0, 30.0));
@@ -277,14 +277,14 @@ HWTEST_F(SwiperIndicatorExtentTestTwoNg, SwiperDigitIndicatorLayoutAlgorithmMeas
     auto geometryNode = AceType::MakeRefPtr<GeometryNode>();
     LayoutWrapperNode layoutWrapper =
         LayoutWrapperNode(indicatorNode_, geometryNode, indicatorNode_->GetLayoutProperty());
-    auto firstChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto firstChild = indicatorNode_;
     RefPtr<GeometryNode> firstGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     firstGeometryNode->Reset();
     firstGeometryNode->SetFrameSize(SizeF(20.0, 20.0));
     RefPtr<LayoutWrapperNode> firstLayoutWrapper =
         AceType::MakeRefPtr<LayoutWrapperNode>(firstChild, firstGeometryNode, firstChild->GetLayoutProperty());
     layoutWrapper.AppendChild(firstLayoutWrapper);
-    auto lastChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto lastChild = indicatorNode_;
     RefPtr<GeometryNode> lastGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     lastGeometryNode->Reset();
     lastGeometryNode->SetFrameSize(SizeF(30.0, 30.0));
@@ -318,14 +318,14 @@ HWTEST_F(SwiperIndicatorExtentTestTwoNg, SwiperDigitIndicatorLayoutAlgorithmLayo
     geometryNode->SetFrameSize(SizeF(720.f, 1136.f));
     LayoutWrapperNode layoutWrapper =
         LayoutWrapperNode(indicatorNode_, geometryNode, indicatorNode_->GetLayoutProperty());
-    auto firstChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto firstChild = indicatorNode_;
     RefPtr<GeometryNode> firstGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     firstGeometryNode->Reset();
     firstGeometryNode->SetFrameSize(SizeF(20.0, 20.0));
     RefPtr<LayoutWrapperNode> firstLayoutWrapper =
         AceType::MakeRefPtr<LayoutWrapperNode>(firstChild, firstGeometryNode, firstChild->GetLayoutProperty());
     layoutWrapper.AppendChild(firstLayoutWrapper);
-    auto lastChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto lastChild = indicatorNode_;
     RefPtr<GeometryNode> lastGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     lastGeometryNode->Reset();
     lastGeometryNode->SetFrameSize(SizeF(30.0, 30.0));
@@ -362,14 +362,14 @@ HWTEST_F(SwiperIndicatorExtentTestTwoNg, SwiperDigitIndicatorLayoutAlgorithmLayo
     geometryNode->SetFrameSize(SizeF(720.f, 1136.f));
     LayoutWrapperNode layoutWrapper =
         LayoutWrapperNode(indicatorNode_, geometryNode, indicatorNode_->GetLayoutProperty());
-    auto firstChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto firstChild = indicatorNode_;
     RefPtr<GeometryNode> firstGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     firstGeometryNode->Reset();
     firstGeometryNode->SetFrameSize(SizeF(20.0, 20.0));
     RefPtr<LayoutWrapperNode> firstLayoutWrapper =
         AceType::MakeRefPtr<LayoutWrapperNode>(firstChild, firstGeometryNode, firstChild->GetLayoutProperty());
     layoutWrapper.AppendChild(firstLayoutWrapper);
-    auto lastChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto lastChild = indicatorNode_;
     RefPtr<GeometryNode> lastGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     lastGeometryNode->Reset();
     lastGeometryNode->SetFrameSize(SizeF(30.0, 30.0));
@@ -406,14 +406,14 @@ HWTEST_F(SwiperIndicatorExtentTestTwoNg, SwiperDigitIndicatorLayoutAlgorithmLayo
     geometryNode->SetFrameSize(SizeF(720.f, 1136.f));
     LayoutWrapperNode layoutWrapper =
         LayoutWrapperNode(indicatorNode_, geometryNode, indicatorNode_->GetLayoutProperty());
-    auto firstChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto firstChild = indicatorNode_;
     RefPtr<GeometryNode> firstGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     firstGeometryNode->Reset();
     firstGeometryNode->SetFrameSize(SizeF(20.0, 20.0));
     RefPtr<LayoutWrapperNode> firstLayoutWrapper =
         AceType::MakeRefPtr<LayoutWrapperNode>(firstChild, firstGeometryNode, firstChild->GetLayoutProperty());
     layoutWrapper.AppendChild(firstLayoutWrapper);
-    auto lastChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto lastChild = indicatorNode_;
     RefPtr<GeometryNode> lastGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     lastGeometryNode->Reset();
     lastGeometryNode->SetFrameSize(SizeF(30.0, 30.0));
@@ -449,14 +449,14 @@ HWTEST_F(SwiperIndicatorExtentTestTwoNg, SwiperDigitIndicatorLayoutAlgorithmLayo
     geometryNode->SetFrameSize(SizeF(720.f, 1136.f));
     LayoutWrapperNode layoutWrapper =
         LayoutWrapperNode(indicatorNode_, geometryNode, indicatorNode_->GetLayoutProperty());
-    auto firstChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto firstChild = indicatorNode_;
     RefPtr<GeometryNode> firstGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     firstGeometryNode->Reset();
     firstGeometryNode->SetFrameSize(SizeF(20.0, 20.0));
     RefPtr<LayoutWrapperNode> firstLayoutWrapper =
         AceType::MakeRefPtr<LayoutWrapperNode>(firstChild, firstGeometryNode, firstChild->GetLayoutProperty());
     layoutWrapper.AppendChild(firstLayoutWrapper);
-    auto lastChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto lastChild = indicatorNode_;
     RefPtr<GeometryNode> lastGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     lastGeometryNode->Reset();
     lastGeometryNode->SetFrameSize(SizeF(30.0, 30.0));
@@ -493,14 +493,14 @@ HWTEST_F(SwiperIndicatorExtentTestTwoNg, SwiperDigitIndicatorLayoutAlgorithmLayo
     geometryNode->SetFrameSize(SizeF(720.f, 1136.f));
     LayoutWrapperNode layoutWrapper =
         LayoutWrapperNode(indicatorNode_, geometryNode, indicatorNode_->GetLayoutProperty());
-    auto firstChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto firstChild = indicatorNode_;
     RefPtr<GeometryNode> firstGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     firstGeometryNode->Reset();
     firstGeometryNode->SetFrameSize(SizeF(20.0, 20.0));
     RefPtr<LayoutWrapperNode> firstLayoutWrapper =
         AceType::MakeRefPtr<LayoutWrapperNode>(firstChild, firstGeometryNode, firstChild->GetLayoutProperty());
     layoutWrapper.AppendChild(firstLayoutWrapper);
-    auto lastChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto lastChild = indicatorNode_;
     RefPtr<GeometryNode> lastGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     lastGeometryNode->Reset();
     lastGeometryNode->SetFrameSize(SizeF(30.0, 30.0));
@@ -537,14 +537,14 @@ HWTEST_F(SwiperIndicatorExtentTestTwoNg, SwiperDigitIndicatorLayoutAlgorithmLayo
     geometryNode->SetFrameSize(SizeF(720.f, 1136.f));
     LayoutWrapperNode layoutWrapper =
         LayoutWrapperNode(indicatorNode_, geometryNode, indicatorNode_->GetLayoutProperty());
-    auto firstChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto firstChild = indicatorNode_;
     RefPtr<GeometryNode> firstGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     firstGeometryNode->Reset();
     firstGeometryNode->SetFrameSize(SizeF(20.0, 20.0));
     RefPtr<LayoutWrapperNode> firstLayoutWrapper =
         AceType::MakeRefPtr<LayoutWrapperNode>(firstChild, firstGeometryNode, firstChild->GetLayoutProperty());
     layoutWrapper.AppendChild(firstLayoutWrapper);
-    auto lastChild = AccessibilityManager::DynamicCast<FrameNode>(indicatorNode_);
+    auto lastChild = indicatorNode_;
     RefPtr<GeometryNode> lastGeometryNode = AceType::MakeRefPtr<GeometryNode>();
     lastGeometryNode->Reset();
     lastGeometryNode->SetFrameSize(SizeF(30.0, 30.0));

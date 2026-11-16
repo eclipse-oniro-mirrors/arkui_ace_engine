@@ -38,7 +38,7 @@ public:
     RefPtr<PaintProperty> Clone() const override
     {
         auto value = MakeRefPtr<IndexerPaintProperty>();
-        value->PaintProperty::UpdatePaintProperty(DynamicCast<PaintProperty>(this));
+        value->PaintProperty::UpdatePaintProperty(this);
         value->propSelectedBackgroundColor_ = CloneSelectedBackgroundColor();
         value->propPopupBackground_ = ClonePopupBackground();
         value->propPopupSelectedColor_ = ClonePopupSelectedColor();
