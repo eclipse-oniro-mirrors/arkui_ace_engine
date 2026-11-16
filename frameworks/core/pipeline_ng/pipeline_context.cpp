@@ -161,6 +161,7 @@ constexpr int32_t MIN_IDLE_TIME = 1000;
 constexpr uint8_t SINGLECOLOR_UPDATE_ALPHA = 75;
 constexpr int8_t RENDERING_SINGLE_COLOR = 1;
 constexpr int32_t DELAY_TIME = 500;
+constexpr int32_t RELOAD_TRANSITION_DURATION = 400;
 constexpr int32_t PARAM_NUM = 2;
 constexpr int64_t MAX_MISS_COUNT = 3;
 constexpr int32_t MAX_FLUSH_COUNT = 2;
@@ -6221,10 +6222,13 @@ void PipelineContext::FlushReload(const ConfigurationChange& configurationChange
     };
     if (!onShow_) {
         changeTask();
+    } else if (!configurationChange.fontAnimationEnabled && configurationChange.OnlyFontChange()) {
+        // Safe to skip OnFlushReloadFinish: only fontScale, excluded by OnlyFontChange, registers after-reload tasks.
+        RecycleManager::Notify(configurationChange);
+        changeTask();
     } else {
         AnimationOption option;
-        const int32_t duration = 400;
-        option.SetDuration(duration);
+        option.SetDuration(RELOAD_TRANSITION_DURATION);
         option.SetCurve(Curves::FRICTION);
         RecycleManager::Notify(configurationChange);
         AnimationUtils::Animate(

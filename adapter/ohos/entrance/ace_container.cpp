@@ -3750,6 +3750,7 @@ void AceContainer::ProcessThemeUpdate(const ParsedConfig& parsedConfig, Configur
 void AceContainer::BuildResConfig(
     ResourceConfiguration& resConfig, ConfigurationChange& configurationChange, const ParsedConfig& parsedConfig)
 {
+    configurationChange.fontAnimationEnabled = parsedConfig.fontAnimationEnabled;
     if (!parsedConfig.colorMode.empty()) {
         ProcessColorModeUpdate(resConfig, configurationChange, parsedConfig);
     }
