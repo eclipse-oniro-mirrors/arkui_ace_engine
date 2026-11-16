@@ -287,6 +287,14 @@ void SetBarOverlapImpl(ArkUINodeHandle node, ArkUI_Bool barOverlap)
     tabsModelImpl->SetBarOverlap(barOverlap);
 }
 
+void SetBarOverlapModeImpl(ArkUINodeHandle node, ArkUI_Int32 barOverlapMode)
+{
+    (void)node;
+    auto tabsModelImpl = GetTabsModelImpl();
+    CHECK_NULL_VOID(tabsModelImpl);
+    tabsModelImpl->SetBarOverlapMode(static_cast<BarOverlapMode>(barOverlapMode));
+}
+
 void SetIsVerticalImpl(ArkUINodeHandle node, ArkUI_Bool isVertical)
 {
     (void)node;
@@ -480,6 +488,11 @@ void ResetBarBackgroundBlurStyleImpl(ArkUINodeHandle node)
 void ResetBarOverlapImpl(ArkUINodeHandle node)
 {
     SetBarOverlapImpl(node, false);
+}
+
+void ResetBarOverlapModeImpl(ArkUINodeHandle node)
+{
+    SetBarOverlapModeImpl(node, static_cast<ArkUI_Int32>(BarOverlapMode::STANDARD));
 }
 
 void ResetIsVerticalImpl(ArkUINodeHandle node)
@@ -1362,6 +1375,13 @@ void SetBarOverlap(ArkUINodeHandle node, ArkUI_Bool barOverlap)
     CHECK_NULL_VOID(frameNode);
     TabsModelNG::SetBarOverlap(frameNode, barOverlap);
 }
+void SetBarOverlapMode(ArkUINodeHandle node, ArkUI_Int32 barOverlapMode)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto mode = static_cast<BarOverlapMode>(barOverlapMode);
+    TabsModelNG::SetBarOverlapMode(frameNode, mode);
+}
 void SetIsVertical(ArkUINodeHandle node, ArkUI_Bool isVertical)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -1569,6 +1589,12 @@ void ResetBarOverlap(ArkUINodeHandle node)
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
     TabsModelNG::SetBarOverlap(frameNode, false);
+}
+void ResetBarOverlapMode(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabsModelNG::ResetBarOverlapMode(frameNode);
 }
 void ResetIsVertical(ArkUINodeHandle node)
 {
@@ -2554,6 +2580,7 @@ const ArkUITabsModifier* GetTabsModifier()
             .setBarBackgroundBlurStyle = SetBarBackgroundBlurStyle,
             .setBarBackgroundBlurStyleWithStyleOption = SetBarBackgroundBlurStyleWithStyleOption,
             .setBarOverlap = SetBarOverlap,
+            .setBarOverlapMode = SetBarOverlapMode,
             .setIsVertical = SetIsVertical,
             .setTabBarPosition = SetTabBarPosition,
             .setTabsOptionsIndex = SetTabsOptionsIndex,
@@ -2576,6 +2603,7 @@ const ArkUITabsModifier* GetTabsModifier()
             .resetBarBackgroundColor = ResetBarBackgroundColor,
             .resetBarBackgroundBlurStyle = ResetBarBackgroundBlurStyle,
             .resetBarOverlap = ResetBarOverlap,
+            .resetBarOverlapMode = ResetBarOverlapMode,
             .resetIsVertical = ResetIsVertical,
             .resetTabBarPosition = ResetTabBarPosition,
             .resetTabsOptionsIndex = ResetTabsOptionsIndex,
@@ -2711,6 +2739,7 @@ const ArkUITabsModifier* GetTabsModifier()
         .setBarBackgroundBlurStyle = SetBarBackgroundBlurStyleImpl,
         .setBarBackgroundBlurStyleWithStyleOption = SetBarBackgroundBlurStyleWithStyleOptionImpl,
         .setBarOverlap = SetBarOverlapImpl,
+        .setBarOverlapMode = SetBarOverlapModeImpl,
         .setIsVertical = SetIsVerticalImpl,
         .setTabBarPosition = SetTabBarPositionImpl,
         .setTabsOptionsIndex = SetTabsOptionsIndexImpl,
@@ -2733,6 +2762,7 @@ const ArkUITabsModifier* GetTabsModifier()
         .resetBarBackgroundColor = ResetBarBackgroundColorImpl,
         .resetBarBackgroundBlurStyle = ResetBarBackgroundBlurStyleImpl,
         .resetBarOverlap = ResetBarOverlapImpl,
+        .resetBarOverlapMode = ResetBarOverlapModeImpl,
         .resetIsVertical = ResetIsVerticalImpl,
         .resetTabBarPosition = ResetTabBarPositionImpl,
         .resetTabsOptionsIndex = ResetTabsOptionsIndexImpl,

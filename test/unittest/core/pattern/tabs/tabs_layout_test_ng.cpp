@@ -18,6 +18,8 @@
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "core/components_ng/manager/content_change_manager/content_change_manager.h"
 #include "core/components_ng/pattern/tabs/tab_content_pattern.h"
+#include "core/components_ng/pattern/tabs/tabs_layout_property.h"
+#include "core/components_ng/pattern/tabs/tabs_model.h"
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -820,6 +822,26 @@ HWTEST_F(TabsLayoutTestNg, TabsSameIndexReplacementReportsOnce, TestSize.Level1)
     EXPECT_EQ(b, (std::vector<uint32_t> { TABS_END_EVENT }));
     manager->UnregisterCapiContentChangeEvent(aid);
     manager->UnregisterCapiContentChangeEvent(bid);
+}
+
+/**
+ * @tc.name: GetEffectiveBarOverlapMode001
+ * @tc.desc: BarOverlapMode takes priority over BarOverlap boolean; boolean fallback works after reset
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsTestNg, GetEffectiveBarOverlapMode001, TestSize.Level1)
+{
+    auto prop = AceType::MakeRefPtr<TabsLayoutProperty>();
+    ASSERT_NE(prop, nullptr);
+    prop->UpdateBarOverlapMode(BarOverlapMode::STACK);
+    prop->UpdateBarOverlap(false);
+    EXPECT_EQ(prop->GetEffectiveBarOverlapMode(), BarOverlapMode::STACK);
+    prop->ResetBarOverlapMode();
+    EXPECT_EQ(prop->GetEffectiveBarOverlapMode(), BarOverlapMode::STANDARD);
+    prop->UpdateBarOverlap(true);
+    EXPECT_EQ(prop->GetEffectiveBarOverlapMode(), BarOverlapMode::STACK);
+    prop->UpdateBarOverlapMode(BarOverlapMode::SAFE_AREA_PADDING);
+    EXPECT_EQ(prop->GetEffectiveBarOverlapMode(), BarOverlapMode::SAFE_AREA_PADDING);
 }
 
 } // namespace OHOS::Ace::NG

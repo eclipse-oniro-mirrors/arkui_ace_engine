@@ -4299,6 +4299,15 @@ typedef struct Opt_BarMode {
     Ark_Tag tag;
     Ark_BarMode value;
 } Opt_BarMode;
+typedef enum Ark_BarOverlapMode {
+    ARK_BAR_OVERLAP_MODE_STANDARD = 0,
+    ARK_BAR_OVERLAP_MODE_STACK = 1,
+    ARK_BAR_OVERLAP_MODE_SAFE_AREA_PADDING = 2,
+} Ark_BarOverlapMode;
+typedef struct Opt_BarOverlapMode {
+    Ark_Tag tag;
+    Ark_BarOverlapMode value;
+} Opt_BarOverlapMode;
 typedef enum Ark_BarPosition {
     ARK_BAR_POSITION_START = 0,
     ARK_BAR_POSITION_END = 1,
@@ -5773,6 +5782,7 @@ typedef enum Ark_ImmersiveStrategy {
     ARK_IMMERSIVE_STRATEGY_AVOID_CUTOUT = 0,
     ARK_IMMERSIVE_STRATEGY_AVOID_FLOAT_NAV = 1,
     ARK_IMMERSIVE_STRATEGY_BIND_SHEET_EXPAND_SAFE_AREA = 7,
+    ARK_IMMERSIVE_STRATEGY_TABS_EXPAND_SAFE_AREA = 9,
 } Ark_ImmersiveStrategy;
 typedef struct Opt_ImmersiveStrategy {
     Ark_Tag tag;
@@ -28177,8 +28187,10 @@ typedef struct GENERATED_ArkUITabsModifier {
                        const Opt_DividerStyle* value);
     void (*setNestedScroll)(Ark_NativePointer node,
                             const Opt_TabsNestedScrollMode* value);
-    void (*setBarOverlap)(Ark_NativePointer node,
-                          const Opt_Boolean* value);
+    void (*setBarOverlap0)(Ark_NativePointer node,
+                           const Opt_Boolean* value);
+    void (*setBarOverlap1)(Ark_NativePointer node,
+                           const Opt_BarOverlapMode* value);
     void (*setBarBackgroundColor)(Ark_NativePointer node,
                                   const Opt_ResourceColor* value);
     void (*setBarGridAlign)(Ark_NativePointer node,

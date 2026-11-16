@@ -28,6 +28,7 @@
 #include "core/components_ng/pattern/tabs/tab_content_event_hub.h"
 #include "core/components_ng/pattern/tabs/tab_content_layout_property.h"
 #include "core/components_ng/pattern/tabs/tabs_declaration.h"
+#include "ui/properties/ng/measure_property.h"
 #include "core/components_ng/syntax/shallow_builder.h"
 #include "core/components_ng/pattern/tabs/tab_content_node.h"
 #include "core/components_ng/pattern/tabs/tabs_node.h"
@@ -634,6 +635,24 @@ public:
 
     void OnModifyDone() override;
 
+    void SaveOriginalSafeAreaPadding(const PaddingProperty& padding)
+    {
+        if (!safeAreaPaddingAppliedByTabs_) {
+            savedSafeAreaPadding_ = padding;
+        }
+    }
+    void SaveOriginalSafeAreaExpandOpts(const SafeAreaExpandOpts& opts)
+    {
+        if (!safeAreaPaddingAppliedByTabs_) {
+            savedSafeAreaExpandOpts_ = opts;
+        }
+    }
+    void MarkSafeAreaPaddingAppliedByTabs() { safeAreaPaddingAppliedByTabs_ = true; }
+    void ResetSafeAreaPaddingAppliedByTabs() { safeAreaPaddingAppliedByTabs_ = false; }
+    bool IsSafeAreaPaddingAppliedByTabs() const { return safeAreaPaddingAppliedByTabs_; }
+    const std::optional<PaddingProperty>& GetSavedSafeAreaPadding() const { return savedSafeAreaPadding_; }
+    const std::optional<SafeAreaExpandOpts>& GetSavedSafeAreaExpandOpts() const { return savedSafeAreaExpandOpts_; }
+
 private:
     // Updates a FrameNode's layout visibility and marks it dirty for re-measure.
     void UpdateNodeVisibility(const RefPtr<FrameNode>& node, bool shouldHide);
@@ -676,6 +695,10 @@ private:
     bool firstTimeLayout_ = true;
     bool secondTimeLayout_ = false;
     bool useLocalizedPadding_ = false;
+
+    std::optional<PaddingProperty> savedSafeAreaPadding_;
+    std::optional<SafeAreaExpandOpts> savedSafeAreaExpandOpts_;
+    bool safeAreaPaddingAppliedByTabs_ = false;
 
     ACE_DISALLOW_COPY_AND_MOVE(TabContentPattern);
 };

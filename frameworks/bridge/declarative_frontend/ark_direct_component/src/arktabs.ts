@@ -150,7 +150,7 @@ function loadComponent(): ComponentObj | undefined {
         modifierWithKey(this._modifiersWithKeys, TabsDividerModifier.identity, TabsDividerModifier, value);
         return this;
       }
-      barOverlap(value: boolean): TabsAttribute {
+      barOverlap(value: BarOverlapMode | boolean): TabsAttribute {
         modifierWithKey(this._modifiersWithKeys, BarOverlapModifier.identity, BarOverlapModifier, value);
         return this;
       }
@@ -485,8 +485,8 @@ function loadComponent(): ComponentObj | undefined {
       }
     }
     
-    class BarOverlapModifier extends ModifierWithKey<boolean> {
-      constructor(value: boolean) {
+    class BarOverlapModifier extends ModifierWithKey<BarOverlapMode | boolean> {
+      constructor(value: BarOverlapMode | boolean) {
         super(value);
       }
       static identity: Symbol = Symbol('barOverlap');

@@ -68,6 +68,7 @@ class SpanBase;
 class ResponseRegion;
 class UiMaterial;
 enum class AutoCapitalizationMode;
+enum class BarOverlapMode;
 enum class CanvasUnit;
 enum class CancelButtonStyle;
 enum class ChainEdgeEffect;
@@ -1076,6 +1077,7 @@ namespace Converter {
     ACE_FORCE_EXPORT void AssignCast(std::optional<SubMenuExpandingMode>& dst, const Ark_SubMenuExpandingMode& src);
     template<> void AssignCast(std::optional<SwipeActionState>& dst, const Ark_SwipeActionState& src);
     template<> void AssignCast(std::optional<SwipeDirection>& dst, const Ark_SwipeDirection& src);
+    template<> ACE_FORCE_EXPORT void AssignCast(std::optional<BarOverlapMode>& dst, const Ark_BarOverlapMode& src);
     template<> ACE_FORCE_EXPORT void AssignCast(std::optional<SymbolData>& dst, const Ark_Resource& src);
     template<> ACE_FORCE_EXPORT void AssignCast(std::optional<TabAnimateMode>& dst, const Ark_AnimationMode& src);
     template<> ACE_FORCE_EXPORT void AssignCast(std::optional<TabBarMode>& dst, const Ark_BarMode& src);

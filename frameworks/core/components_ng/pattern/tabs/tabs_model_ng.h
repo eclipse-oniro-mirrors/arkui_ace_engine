@@ -63,6 +63,7 @@ public:
     void SetDividerColorByUser(bool isByUser) override;
     void SetFadingEdge(bool fadingEdge) override;
     void SetBarOverlap(bool barOverlap) override;
+    void SetBarOverlapMode(BarOverlapMode barOverlapMode) override;
     void SetOnChangeEvent(std::function<void(const BaseEventInfo*)>&& onChangeEvent) override;
     void SetBarBackgroundColor(const Color& backgroundColor) override;
     void SetBarBackgroundColorByUser(bool isByUser) override;
@@ -133,6 +134,8 @@ public:
     static void SetBarBackgroundBlurStyle(FrameNode* frameNode, const BlurStyleOption& styleOption,
         bool updateForSideBar = true);
     static void SetBarOverlap(FrameNode* frameNode, bool barOverlap);
+    static void SetBarOverlapMode(FrameNode* frameNode, BarOverlapMode barOverlapMode);
+    static void ResetBarOverlapMode(FrameNode* frameNode);
     static void SetKeepTabBarInSideBar(FrameNode* frameNode, bool keepTabBarInSideBar);
     static void SetIsVertical(FrameNode* frameNode, bool isVertical);
     static void SetTabBarPosition(FrameNode* frameNode, BarPosition tabBarPosition);
