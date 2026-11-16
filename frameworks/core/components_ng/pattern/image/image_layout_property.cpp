@@ -33,7 +33,7 @@ void ImageSizeStyle::ToJsonValue(std::unique_ptr<JsonValue>& json, const Inspect
 RefPtr<LayoutProperty> ImageLayoutProperty::Clone() const
 {
     auto value = MakeRefPtr<ImageLayoutProperty>();
-    value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+    value->LayoutProperty::UpdateLayoutProperty(this);
     value->propImageSourceInfo_ = CloneImageSourceInfo();
     value->propAlt_ = CloneAlt();
     value->propImageFit_ = CloneImageFit();

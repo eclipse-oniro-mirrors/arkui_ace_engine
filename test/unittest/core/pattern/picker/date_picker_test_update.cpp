@@ -2028,7 +2028,7 @@ HWTEST_F(DatePickerTestUpdate, UpdateNextButtonMargin001, TestSize.Level1)
         ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<ButtonPattern>(); });
     CHECK_NULL_VOID(buttonNode);
     auto layoutProperty = buttonNode->GetLayoutProperty<ButtonLayoutProperty>();
-    RefPtr<ButtonLayoutProperty> buttonLayoutProperty = AceType::DynamicCast<ButtonLayoutProperty>(layoutProperty);
+    RefPtr<ButtonLayoutProperty> buttonLayoutProperty = layoutProperty;
     ASSERT_NE(buttonLayoutProperty, nullptr);
     DatePickerDialogView::UpdateNextButtonMargin(buttonLayoutProperty);
     ASSERT_NE(buttonLayoutProperty->GetMarginProperty(), nullptr);
@@ -2044,7 +2044,7 @@ HWTEST_F(DatePickerTestUpdate, HandleMouseEvent001, TestSize.Level1)
     bool isHover = true;
     auto titleButtonRow = DatePickerDialogView::CreateTitleButtonRowNode();
     DatePickerDialogView::HandleMouseEvent(titleButtonRow, isHover);
-    EXPECT_EQ(AceType::DynamicCast<FrameNode>(titleButtonRow)->GetRenderContext()->GetBackgroundColor(),
+    EXPECT_EQ(titleButtonRow->GetRenderContext()->GetBackgroundColor(),
         PipelineBase::GetCurrentContext()->GetTheme<PickerTheme>()->GetHoverColor());
 }
 
@@ -2059,7 +2059,7 @@ HWTEST_F(DatePickerTestUpdate, HandleMouseEvent002, TestSize.Level1)
     auto titleButtonRow = DatePickerDialogView::CreateTitleButtonRowNode();
     DatePickerDialogView::HandleMouseEvent(titleButtonRow, isHover);
     EXPECT_EQ(
-        AceType::DynamicCast<FrameNode>(titleButtonRow)->GetRenderContext()->GetBackgroundColor(), Color::TRANSPARENT);
+        titleButtonRow->GetRenderContext()->GetBackgroundColor(), Color::TRANSPARENT);
 }
 
 /**

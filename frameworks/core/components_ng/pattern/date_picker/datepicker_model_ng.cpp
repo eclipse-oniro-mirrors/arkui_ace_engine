@@ -890,7 +890,7 @@ void DatePickerDialogModelNG::SetDatePickerDialogShow(PickerDialogInfo& pickerDi
         settingData.datePickerProperty["selected"] = pickerDialog.parseSelectedDate;
         settingData.timePickerProperty["selected"] = pickerDialog.pickerTime;
     }
-    auto context = AccessibilityManager::DynamicCast<NG::PipelineContext>(pipelineContext);
+    auto context = pipelineContext;
     auto overlayManager = context ? context->GetOverlayManager() : nullptr;
     executor->PostTask(
         [properties, settingData, dialogEvent, dialogCancelEvent, dialogLifeCycleEvent, buttonInfos,

@@ -2018,7 +2018,7 @@ void DatePickerPattern::HandleLunarYearChange(bool isAdd, uint32_t index)
     auto allChildNode = GetAllChildNode();
     auto yearNode = allChildNode["year"];
     CHECK_NULL_VOID(yearNode);
-    auto yearColumn = DynamicCast<FrameNode>(yearNode);
+    auto yearColumn = yearNode;
     uint32_t lastYearIndex = index;
     auto optionCount = GetOptionCount(yearColumn);
     if (isAdd) { // need reduce one index

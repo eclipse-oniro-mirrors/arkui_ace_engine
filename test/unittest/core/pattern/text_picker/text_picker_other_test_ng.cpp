@@ -427,7 +427,7 @@ HWTEST_F(TextPickerOtherTestNg, FlushAnimationTextProperties001, TestSize.Level1
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
 
     /**

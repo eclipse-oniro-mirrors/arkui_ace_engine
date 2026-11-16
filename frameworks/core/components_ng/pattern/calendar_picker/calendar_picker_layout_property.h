@@ -102,7 +102,7 @@ protected:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<CalendarPickerLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(AceType::DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propDialogAlignType_ = CloneDialogAlignType();
         value->propDialogOffset_ = CloneDialogOffset();
         value->propTextStyle_ = CloneTextStyle();

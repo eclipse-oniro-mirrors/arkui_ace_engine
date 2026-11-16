@@ -71,7 +71,7 @@ void ImageTestNg::GetImageLayoutAlgorithm()
     imageLayoutWrapper_->SetLayoutAlgorithm(AceType::MakeRefPtr<LayoutAlgorithmWrapper>(layoutAlgorithm));
 
     auto layoutAlgorithmWrapper =
-        AceType::DynamicCast<LayoutAlgorithmWrapper>(imageLayoutWrapper_->GetLayoutAlgorithm());
+        imageLayoutWrapper_->GetLayoutAlgorithm();
     ASSERT_NE(layoutAlgorithmWrapper, nullptr);
     imageLayoutAlgorithm_ = AceType::DynamicCast<ImageLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     ASSERT_NE(imageLayoutAlgorithm_, nullptr);

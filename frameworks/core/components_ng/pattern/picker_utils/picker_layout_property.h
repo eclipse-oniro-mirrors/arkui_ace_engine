@@ -41,7 +41,7 @@ public:
     {
         auto value = MakeRefPtr<PickerLayoutProperty>();
         Clone(value);
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propDisappearTextStyle_ = CloneDisappearTextStyle();
         value->propTextStyle_ = CloneTextStyle();
         value->propSelectedTextStyle_ = CloneSelectedTextStyle();
