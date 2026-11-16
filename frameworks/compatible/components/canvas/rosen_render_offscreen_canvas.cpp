@@ -824,7 +824,7 @@ void RosenRenderOffscreenCanvas::Arc(const ArcParam& param)
         double half = GreatNotEqual(sweepAngle, 0.0) ? HALF_CIRCLE_ANGLE : -HALF_CIRCLE_ANGLE;
         path_.ArcTo(point1, point2, static_cast<RSScalar>(startAngle), static_cast<RSScalar>(half));
         path_.ArcTo(point1, point2, static_cast<RSScalar>(half + startAngle), static_cast<RSScalar>(half));
-    } else if (!NearEqual(std::fmod(sweepAngle, FULL_CIRCLE_ANGLE), 0.0) && abs(sweepAngle) > FULL_CIRCLE_ANGLE) {
+    } else if (!NearEqual(std::fmod(sweepAngle, FULL_CIRCLE_ANGLE), 0.0) && std::abs(sweepAngle) > FULL_CIRCLE_ANGLE) {
         double half = GreatNotEqual(sweepAngle, 0.0) ? HALF_CIRCLE_ANGLE : -HALF_CIRCLE_ANGLE;
         path_.ArcTo(point1, point2, static_cast<RSScalar>(startAngle), static_cast<RSScalar>(half));
         path_.ArcTo(point1, point2, static_cast<RSScalar>(half + startAngle), static_cast<RSScalar>(half));
@@ -1017,7 +1017,7 @@ void RosenRenderOffscreenCanvas::Path2DArc(const PathArgs& args)
     if (NearEqual(std::fmod(sweepAngle, FULL_CIRCLE_ANGLE), 0.0) && !NearEqual(startAngle, endAngle)) {
         path2d_.ArcTo(point1, point2, startAngle, HALF_CIRCLE_ANGLE);
         path2d_.ArcTo(point1, point2, startAngle + HALF_CIRCLE_ANGLE, HALF_CIRCLE_ANGLE);
-    } else if (!NearEqual(std::fmod(sweepAngle, FULL_CIRCLE_ANGLE), 0.0) && abs(sweepAngle) > FULL_CIRCLE_ANGLE) {
+    } else if (!NearEqual(std::fmod(sweepAngle, FULL_CIRCLE_ANGLE), 0.0) && std::abs(sweepAngle) > FULL_CIRCLE_ANGLE) {
         path2d_.ArcTo(point1, point2, startAngle, HALF_CIRCLE_ANGLE);
         path2d_.ArcTo(point1, point2, startAngle + HALF_CIRCLE_ANGLE, HALF_CIRCLE_ANGLE);
         path2d_.ArcTo(point1, point2, startAngle + HALF_CIRCLE_ANGLE + HALF_CIRCLE_ANGLE, sweepAngle);

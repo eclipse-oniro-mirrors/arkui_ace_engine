@@ -45,7 +45,7 @@ bool IsTimeout(const CompatibleManager& manager)
 
 bool IsReachEnd(float remain, float threshold)
 {
-    return abs(remain) <= threshold;
+    return std::abs(remain) <= threshold;
 }
 
 CompatibleManager::CompatibleManager()
@@ -361,7 +361,7 @@ float GetNextStep(float remainingDistance, float endThreshold, const std::chrono
     const float dampingFactor{ -0.040f };
     auto durationTimeMs = durationTime.count();
     float alpha = 1.0f - std::exp(dampingFactor * durationTimeMs);
-    float step = (abs(remainingDistance) <= endThreshold) ? remainingDistance : (alpha * remainingDistance);
+    float step = (std::abs(remainingDistance) <= endThreshold) ? remainingDistance : (alpha * remainingDistance);
 
     TAG_LOGD(AceLogTag::ACE_INPUTKEYFLOW, "GetNextStep, remainingDistance: %{public}f, step: %{public}f, "
         "durationTime: %{public}" PRIu64, remainingDistance, step, static_cast<uint64_t>(durationTimeMs));
