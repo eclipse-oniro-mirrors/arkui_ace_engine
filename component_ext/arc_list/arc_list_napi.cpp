@@ -122,6 +122,21 @@ napi_value JsSpace(napi_env env, napi_callback_info info)
     return UnwrapOptionalValue(env, info, handleValue, handleUndefined);
 }
 
+napi_value JsFormatScrollBarWidth(napi_env env, napi_callback_info info)
+{
+    size_t argc = 1;
+    napi_value argv[1] = { nullptr };
+    NAPI_CALL(env, napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr));
+    CalcDimension scrollBarWidth;
+    if (argc < 1 || !ExtNapiUtils::ParseLengthMetrics(env, argv[0], scrollBarWidth)) {
+        return ExtNapiUtils::CreateUndefined(env);
+    }
+    auto width = scrollBarWidth.ToString();
+    napi_value result = nullptr;
+    NAPI_CALL(env, napi_create_string_utf8(env, width.c_str(), width.size(), &result));
+    return result;
+}
+
 napi_value JsDigitalCrownSensitivity(napi_env env, napi_callback_info info)
 {
 #ifdef SUPPORT_DIGITAL_CROWN
@@ -371,6 +386,7 @@ napi_value InitArcList(napi_env env, napi_value exports)
     napi_property_descriptor desc[] = {
         DECLARE_NAPI_FUNCTION("create", ArcList::JsCreate),
         DECLARE_NAPI_FUNCTION("space", ArcList::JsSpace),
+        DECLARE_NAPI_FUNCTION("formatScrollBarWidth", ArcList::JsFormatScrollBarWidth),
         DECLARE_NAPI_FUNCTION("digitalCrownSensitivity", ArcList::JsDigitalCrownSensitivity),
     };
     NAPI_CALL(env, napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc));

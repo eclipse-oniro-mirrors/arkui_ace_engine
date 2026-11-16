@@ -18,7 +18,6 @@
 #include "core/components_ng/pattern/scroll/scroll_edge_effect.h"
 #include "core/components_ng/pattern/scrollable/scrollable_model_static.h"
 #include "core/components_ng/pattern/scrollable/scrollable_model_ng.h"
-#include "base/utils/string_utils.h"
 
 namespace OHOS::Ace::NG {
 
@@ -1646,227 +1645,29 @@ HWTEST_F(ArcListAttrTestNg, ListItemDisableEvent006, TestSize.Level1)
 }
 
 /**
- * @tc.name: ScrollBarWidthLowerCaseUnit001
- * @tc.desc: Test SetListScrollBarWidth with lowercase unit string "16vp" (the format ArcList JS emits)
+ * @tc.name: SetScrollBarWidth_001
+ * @tc.desc: ArcList static scrollBarWidth preserves the LengthMetrics unit instead of forcing VP.
  * @tc.type: FUNC
  */
-HWTEST_F(ArcListAttrTestNg, ScrollBarWidthLowerCaseUnit001, TestSize.Level1)
+HWTEST_F(ArcListAttrTestNg, SetScrollBarWidth_001, TestSize.Level1)
 {
     ListModelNG model = CreateList();
     model.SetListScrollBar(AceType::RawPtr(frameNode_), static_cast<int32_t>(DisplayMode::ON));
+    model.SetScrollBarWidth("20px");
     CreateDone();
-
-    // Lowercase unit string is the correct format produced after the JS .toLowerCase() fix
-    ListModelNG::SetListScrollBarWidth(AceType::RawPtr(frameNode_), "16vp");
 
     auto barWidth = paintProperty_->GetScrollBarWidth();
     ASSERT_TRUE(barWidth.has_value());
-    EXPECT_EQ(barWidth.value().Value(), 16.0f);
-    EXPECT_EQ(barWidth.value().Unit(), DimensionUnit::VP);
-}
-
-/**
- * @tc.name: ScrollBarWidthLowerCaseUnit002
- * @tc.desc: Test SetListScrollBarWidth with lowercase unit string "16px"
- * @tc.type: FUNC
- */
-HWTEST_F(ArcListAttrTestNg, ScrollBarWidthLowerCaseUnit002, TestSize.Level1)
-{
-    ListModelNG model = CreateList();
-    model.SetListScrollBar(AceType::RawPtr(frameNode_), static_cast<int32_t>(DisplayMode::ON));
-    CreateDone();
-
-    ListModelNG::SetListScrollBarWidth(AceType::RawPtr(frameNode_), "16px");
-
-    auto barWidth = paintProperty_->GetScrollBarWidth();
-    ASSERT_TRUE(barWidth.has_value());
-    EXPECT_EQ(barWidth.value().Value(), 16.0f);
+    EXPECT_FLOAT_EQ(barWidth.value().Value(), 20.0f);
     EXPECT_EQ(barWidth.value().Unit(), DimensionUnit::PX);
 }
 
 /**
- * @tc.name: ScrollBarWidthLowerCaseUnit003
- * @tc.desc: Test SetListScrollBarWidth with lowercase unit string "16fp"
+ * @tc.name: SetScrollBarWidth_002
+ * @tc.desc: ArcList attribute modifier preserves all supported LengthMetrics units.
  * @tc.type: FUNC
  */
-HWTEST_F(ArcListAttrTestNg, ScrollBarWidthLowerCaseUnit003, TestSize.Level1)
-{
-    ListModelNG model = CreateList();
-    model.SetListScrollBar(AceType::RawPtr(frameNode_), static_cast<int32_t>(DisplayMode::ON));
-    CreateDone();
-
-    ListModelNG::SetListScrollBarWidth(AceType::RawPtr(frameNode_), "16fp");
-
-    auto barWidth = paintProperty_->GetScrollBarWidth();
-    ASSERT_TRUE(barWidth.has_value());
-    EXPECT_EQ(barWidth.value().Value(), 16.0f);
-    EXPECT_EQ(barWidth.value().Unit(), DimensionUnit::FP);
-}
-
-/**
- * @tc.name: ScrollBarWidthUpperCaseUnit001
- * @tc.desc: Test SetListScrollBarWidth with uppercase unit string "16VP" (the old buggy JS format)
- *           StringToDimensionWithUnit does not match "VP" (case-sensitive), falls back to defaultUnit=PX
- * @tc.type: FUNC
- */
-HWTEST_F(ArcListAttrTestNg, ScrollBarWidthUpperCaseUnit001, TestSize.Level1)
-{
-    ListModelNG model = CreateList();
-    model.SetListScrollBar(AceType::RawPtr(frameNode_), static_cast<int32_t>(DisplayMode::ON));
-    CreateDone();
-
-    // Uppercase "VP" is not recognized by StringToDimensionWithUnit (case-sensitive strcmp)
-    // Falls back to defaultUnit=PX instead of VP
-    ListModelNG::SetListScrollBarWidth(AceType::RawPtr(frameNode_), "16VP");
-
-    auto barWidth = paintProperty_->GetScrollBarWidth();
-    ASSERT_TRUE(barWidth.has_value());
-    // Value is parsed but unit falls back to PX (default) instead of VP
-    EXPECT_EQ(barWidth.value().Value(), 16.0f);
-    EXPECT_EQ(barWidth.value().Unit(), DimensionUnit::PX);
-}
-
-/**
- * @tc.name: ScrollBarWidthUpperCaseUnit002
- * @tc.desc: Test SetListScrollBarWidth with uppercase unit string "16PX" (the old buggy JS format)
- *           StringToDimensionWithUnit does not match "PX" (case-sensitive), falls back to defaultUnit=PX
- * @tc.type: FUNC
- */
-HWTEST_F(ArcListAttrTestNg, ScrollBarWidthUpperCaseUnit002, TestSize.Level1)
-{
-    ListModelNG model = CreateList();
-    model.SetListScrollBar(AceType::RawPtr(frameNode_), static_cast<int32_t>(DisplayMode::ON));
-    CreateDone();
-
-    ListModelNG::SetListScrollBarWidth(AceType::RawPtr(frameNode_), "16PX");
-
-    auto barWidth = paintProperty_->GetScrollBarWidth();
-    ASSERT_TRUE(barWidth.has_value());
-    EXPECT_EQ(barWidth.value().Value(), 16.0f);
-    // Unit falls back to PX because "PX" is not matched (case-sensitive)
-    EXPECT_EQ(barWidth.value().Unit(), DimensionUnit::PX);
-}
-
-/**
- * @tc.name: ScrollBarWidthUpperCaseUnit003
- * @tc.desc: Test SetListScrollBarWidth with uppercase unit string "16FP" (the old buggy JS format)
- *           StringToDimensionWithUnit does not match "FP" (case-sensitive), falls back to defaultUnit=PX
- * @tc.type: FUNC
- */
-HWTEST_F(ArcListAttrTestNg, ScrollBarWidthUpperCaseUnit003, TestSize.Level1)
-{
-    ListModelNG model = CreateList();
-    model.SetListScrollBar(AceType::RawPtr(frameNode_), static_cast<int32_t>(DisplayMode::ON));
-    CreateDone();
-
-    ListModelNG::SetListScrollBarWidth(AceType::RawPtr(frameNode_), "16FP");
-
-    auto barWidth = paintProperty_->GetScrollBarWidth();
-    ASSERT_TRUE(barWidth.has_value());
-    EXPECT_EQ(barWidth.value().Value(), 16.0f);
-    // Unit falls back to PX because "FP" is not matched (case-sensitive)
-    EXPECT_EQ(barWidth.value().Unit(), DimensionUnit::PX);
-}
-
-/**
- * @tc.name: StringToDimensionWithUnitNGLowerCase001
- * @tc.desc: Test StringToDimensionWithUnitNG correctly parses lowercase unit strings.
- *           This is the NG variant used by the ArkTS bridge (ParseJsDimensionVpNG path).
- *           Lowercase units must return true and correct DimensionUnit.
- * @tc.type: FUNC
- */
-HWTEST_F(ArcListAttrTestNg, StringToDimensionWithUnitNGLowerCase001, TestSize.Level1)
-{
-    Dimension result;
-
-    // lowercase "px" must be recognized
-    bool ret = StringUtils::StringToDimensionWithUnitNG("16px", result, DimensionUnit::VP);
-    EXPECT_TRUE(ret);
-    EXPECT_EQ(result.Value(), 16.0);
-    EXPECT_EQ(result.Unit(), DimensionUnit::PX);
-
-    // lowercase "vp" must be recognized
-    ret = StringUtils::StringToDimensionWithUnitNG("16vp", result, DimensionUnit::VP);
-    EXPECT_TRUE(ret);
-    EXPECT_EQ(result.Value(), 16.0);
-    EXPECT_EQ(result.Unit(), DimensionUnit::VP);
-
-    // lowercase "fp" must be recognized
-    ret = StringUtils::StringToDimensionWithUnitNG("16fp", result, DimensionUnit::VP);
-    EXPECT_TRUE(ret);
-    EXPECT_EQ(result.Value(), 16.0);
-    EXPECT_EQ(result.Unit(), DimensionUnit::FP);
-
-    // lowercase "lpx" must be recognized
-    ret = StringUtils::StringToDimensionWithUnitNG("16lpx", result, DimensionUnit::VP);
-    EXPECT_TRUE(ret);
-    EXPECT_EQ(result.Value(), 16.0);
-    EXPECT_EQ(result.Unit(), DimensionUnit::LPX);
-}
-
-/**
- * @tc.name: StringToDimensionWithUnitNGUpperCase001
- * @tc.desc: Test StringToDimensionWithUnitNG rejects uppercase unit strings (returns false).
- *           This is the NG variant used by the ArkTS bridge. When JS sends uppercase units
- *           (e.g., "16PX"), the parse fails and the bridge resets scrollBarWidth to 0.
- *           This test documents why the JS .toLowerCase() fix is required.
- * @tc.type: FUNC
- */
-HWTEST_F(ArcListAttrTestNg, StringToDimensionWithUnitNGUpperCase001, TestSize.Level1)
-{
-    Dimension result;
-
-    // uppercase "PX" must NOT be recognized -> returns false
-    bool ret = StringUtils::StringToDimensionWithUnitNG("16PX", result, DimensionUnit::VP);
-    EXPECT_FALSE(ret);
-    EXPECT_EQ(result.Unit(), DimensionUnit::NONE);
-
-    // uppercase "VP" must NOT be recognized -> returns false
-    ret = StringUtils::StringToDimensionWithUnitNG("16VP", result, DimensionUnit::VP);
-    EXPECT_FALSE(ret);
-    EXPECT_EQ(result.Unit(), DimensionUnit::NONE);
-
-    // uppercase "FP" must NOT be recognized -> returns false
-    ret = StringUtils::StringToDimensionWithUnitNG("16FP", result, DimensionUnit::VP);
-    EXPECT_FALSE(ret);
-    EXPECT_EQ(result.Unit(), DimensionUnit::NONE);
-}
-
-/**
- * @tc.name: ScrollBarWidthResetOnInvalidUnit001
- * @tc.desc: Test that when an invalid (uppercase) unit string causes StringToDimensionWithUnitNG
- *           to return false, the bridge would reset scrollBarWidth. Validates the root cause
- *           of the "touch width always 0vp" bug fixed by emitting lowercase vp in ArcList JS.
- * @tc.type: FUNC
- */
-HWTEST_F(ArcListAttrTestNg, ScrollBarWidthResetOnInvalidUnit001, TestSize.Level1)
-{
-    ListModelNG model = CreateList();
-    model.SetListScrollBar(AceType::RawPtr(frameNode_), static_cast<int32_t>(DisplayMode::ON));
-    CreateDone();
-
-    // First set a valid lowercase width
-    ListModelNG::SetListScrollBarWidth(AceType::RawPtr(frameNode_), "16vp");
-    auto barWidth = paintProperty_->GetScrollBarWidth();
-    ASSERT_TRUE(barWidth.has_value());
-    EXPECT_EQ(barWidth.value().Unit(), DimensionUnit::VP);
-
-    // Simulate what the bridge does with uppercase unit: ParseJsDimensionVpNG fails,
-    // bridge calls resetListScrollBarWidth. We directly test the parse failure.
-    Dimension parseResult;
-    bool parseOK = StringUtils::StringToDimensionWithUnitNG("16VP", parseResult, DimensionUnit::VP);
-    EXPECT_FALSE(parseOK);
-    // When parse fails, bridge resets width -> width becomes theme default (no custom value)
-    // This is the root cause: uppercase unit → parse failure → reset → width = 0/theme default
-}
-
-/**
- * @tc.name: ScrollBarWidthArcListAlwaysVp001
- * @tc.desc: ArcList always passes "<value>vp" for every LengthUnit to preserve the historical VP behavior;
- *           verify the native model stores those values as VP.
- * @tc.type: FUNC
- */
-HWTEST_F(ArcListAttrTestNg, ScrollBarWidthArcListAlwaysVp001, TestSize.Level1)
+HWTEST_F(ArcListAttrTestNg, SetScrollBarWidth_002, TestSize.Level1)
 {
     ListModelNG model = CreateList();
     model.SetListScrollBar(AceType::RawPtr(frameNode_), static_cast<int32_t>(DisplayMode::ON));
@@ -1874,20 +1675,45 @@ HWTEST_F(ArcListAttrTestNg, ScrollBarWidthArcListAlwaysVp001, TestSize.Level1)
 
     struct WidthCase {
         const char* width;
-        float expected;
+        double value;
+        DimensionUnit unit;
     };
     const WidthCase cases[] = {
-        { "0vp", 0.0f },
-        { "16vp", 16.0f },
-        { "24.5vp", 24.5f },
+        { "16vp", 16.0, DimensionUnit::VP },
+        { "20px", 20.0, DimensionUnit::PX },
+        { "24fp", 24.0, DimensionUnit::FP },
+        { "32lpx", 32.0, DimensionUnit::LPX },
     };
     for (const auto& item : cases) {
         ListModelNG::SetListScrollBarWidth(AceType::RawPtr(frameNode_), item.width);
         auto barWidth = paintProperty_->GetScrollBarWidth();
         ASSERT_TRUE(barWidth.has_value());
-        EXPECT_FLOAT_EQ(barWidth.value().Value(), item.expected);
-        EXPECT_EQ(barWidth.value().Unit(), DimensionUnit::VP);
+        EXPECT_FLOAT_EQ(barWidth.value().Value(), item.value);
+        EXPECT_EQ(barWidth.value().Unit(), item.unit);
     }
+}
+
+/**
+ * @tc.name: ResetScrollBarWidth_001
+ * @tc.desc: ArcList attribute modifier resets an invalid LengthMetrics value to the theme default.
+ * @tc.type: RELI
+ */
+HWTEST_F(ArcListAttrTestNg, ResetScrollBarWidth_001, TestSize.Level2)
+{
+    ListModelNG model = CreateList();
+    model.SetListScrollBar(AceType::RawPtr(frameNode_), static_cast<int32_t>(DisplayMode::ON));
+    CreateDone();
+
+    ListModelNG::SetListScrollBarWidth(AceType::RawPtr(frameNode_), "20px");
+    ASSERT_TRUE(paintProperty_->GetScrollBarWidth().has_value());
+
+    ListModelNG::SetListScrollBarWidth(AceType::RawPtr(frameNode_), "0vp");
+    ListModelNG::CreateWithResourceObjScrollBarWidth(AceType::RawPtr(frameNode_), nullptr);
+
+    auto barWidth = paintProperty_->GetScrollBarWidth();
+    ASSERT_TRUE(barWidth.has_value());
+    EXPECT_EQ(barWidth.value().Value(), 0.0f);
+    EXPECT_EQ(barWidth.value().Unit(), DimensionUnit::VP);
 }
 
 } // namespace OHOS::Ace::NG
