@@ -1497,29 +1497,37 @@ void DragDropManager::TryGetDataBackGround(const RefPtr<FrameNode>& dragFrameNod
     CHECK_NULL_VOID(pipeline);
     auto taskScheduler = pipeline->GetTaskExecutor();
     CHECK_NULL_VOID(taskScheduler);
+    auto weakPipeline = AceType::WeakClaim(AceType::RawPtr(pipeline));
+    auto weakDragFrameNode = AceType::WeakClaim(AceType::RawPtr(dragFrameNode));
     taskScheduler->PostTask(
-        [id = Container::CurrentId(), pipeline, dragFrameNode, pointerEvent, udKey, count,
+        [id = Container::CurrentId(), weakPipeline, weakDragFrameNode, pointerEvent, udKey, count,
         weakManager = WeakClaim(this)]() {
             ContainerScope scope(id);
             auto dragDropManager = weakManager.Upgrade();
             CHECK_NULL_VOID(dragDropManager);
+            auto pipeline = weakPipeline.Upgrade();
+            CHECK_NULL_VOID(pipeline);
             auto taskScheduler = pipeline->GetTaskExecutor();
             CHECK_NULL_VOID(taskScheduler);
             auto result = dragDropManager->RequestUDMFDataWithUDKey(udKey);
             if (result != nullptr || count >= MAX_RETRY_TIMES) {
                 taskScheduler->PostTask(
-                    [dragFrameNode, pointerEvent, weakManager, result, udKey]() {
+                    [weakDragFrameNode, pointerEvent, weakManager, result, udKey]() {
                         auto dragDropManager = weakManager.Upgrade();
                         CHECK_NULL_VOID(dragDropManager);
+                        auto dragFrameNode = weakDragFrameNode.Upgrade();
+                        CHECK_NULL_VOID(dragFrameNode);
                         dragDropManager->DoDropAction(dragFrameNode, pointerEvent, result, udKey);
                     },
                     TaskExecutor::TaskType::UI, "ArkUIDragDropAction");
             } else {
                 // first temp get udmfData failed, prepare to retryGetData.
                 taskScheduler->PostDelayedTask(
-                    [dragFrameNode, pointerEvent, weakManager, count, udKey]() {
+                    [weakDragFrameNode, pointerEvent, weakManager, count, udKey]() {
                         auto dragDropManager = weakManager.Upgrade();
                         CHECK_NULL_VOID(dragDropManager);
+                        auto dragFrameNode = weakDragFrameNode.Upgrade();
+                        CHECK_NULL_VOID(dragFrameNode);
                         dragDropManager->TryGetDataBackGround(dragFrameNode, pointerEvent, udKey, count + 1);
                     },
                     TaskExecutor::TaskType::UI, MAX_RETRY_DURATION, "ArkUIDragDropRetryGetData");

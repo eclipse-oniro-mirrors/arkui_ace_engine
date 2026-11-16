@@ -1066,6 +1066,7 @@ int32_t RemoveGestureFromNode(ArkUI_NodeHandle node, ArkUI_GestureRecognizer* re
     OHOS::Ace::NodeModel::GetFullImpl()->getNodeModifiers()->getGestureModifier()->removeGestureFromNode(
         node->uiNodeHandle, recognizer->gesture);
     recognizer->attachNodeId = -1;
+    recognizer->attachNode = nullptr;
     recognizer->targetInfo.uiNode = nullptr;
     return 0;
 }
