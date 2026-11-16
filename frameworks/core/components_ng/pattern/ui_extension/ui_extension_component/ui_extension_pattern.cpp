@@ -2674,7 +2674,7 @@ std::string UIExtensionPattern::ResolveBrandColor(int32_t themeScopeId) const
     if (!brandColor.has_value()) {
         UIEXT_LOGW("ResolveBrandColor: themeColors is null, "
                 "themeScopeId=%{public}d, instanceId=%{public}d",
-                themeScopeId, instanceId_);
+            themeScopeId, instanceId_);
         return DEFAULT_BRAND_COLOR_STR;
     }
     if (brandColor.value().GetAlpha() == 0) {

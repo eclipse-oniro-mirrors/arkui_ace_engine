@@ -2227,7 +2227,7 @@ HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest01
     auto pipeline = NG::PipelineContext::GetCurrentContext();
     ASSERT_NE(pipeline, nullptr);
     pattern->hasAttachContext_ = true;
-    pattern->OnDetachContext(pipeline);
+    pattern->OnDetachContext(AceType::RawPtr(pipeline));
     EXPECT_FALSE(pattern->hasAttachContext_);
     EXPECT_TRUE(storage->brandColorChangeListeners_.find(pattern->instanceId_) ==
                 storage->brandColorChangeListeners_.end());
