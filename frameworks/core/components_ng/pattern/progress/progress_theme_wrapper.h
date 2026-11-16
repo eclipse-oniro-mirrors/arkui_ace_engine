@@ -41,7 +41,7 @@ public:
         RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<ProgressThemeWrapper>();
-            ParsePattern(themeConstants, RefPtr<ProgressTheme>(wrapper));
+            ParsePattern(themeConstants, AceType::DynamicCast<ProgressTheme>(wrapper));
             return wrapper;
         }
     };

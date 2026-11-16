@@ -41,7 +41,7 @@ std::optional<SizeF> DataPanelLayoutAlgorithm::MeasureContent(
         }
         return std::nullopt;
     }
-    auto layoutProperty = layoutWrapper->GetLayoutProperty();
+    auto layoutProperty = AceType::DynamicCast<LayoutProperty>(layoutWrapper->GetLayoutProperty());
     CHECK_NULL_RETURN(layoutProperty, std::nullopt);
     auto layoutPolicy = layoutProperty->GetLayoutPolicyProperty();
     if (layoutPolicy.has_value() && (layoutPolicy->IsWrap() || layoutPolicy->IsFix())) {
