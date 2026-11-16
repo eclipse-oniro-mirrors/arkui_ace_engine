@@ -18,6 +18,7 @@
 #include "core/components_ng/pattern/sheet/sheet_presentation_pattern.h"
 #include "core/components_ng/pattern/sheet/sheet_wrapper_pattern.h"
 #include "core/components_ng/pattern/sheet/side/sheet_side_object.h"
+#include "core/components_ng/pattern/scrollable/scrollable_paint_property.h"
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -144,13 +145,15 @@ void SheetPresentationSideLayoutAlgorithm::MeasureScrollNode(LayoutWrapper* layo
     auto operatorGeometryNode = operatoration->GetGeometryNode();
     CHECK_NULL_VOID(operatorGeometryNode);
     auto padding = sheetPattern->GetSheetObject()->GetSheetSafeAreaPadding();
-    float childHeight = sheetHeight_ - operatorGeometryNode->GetFrameSize().Height() - padding.top.value_or(0.0f);
+    // side style does not have a floating dragBar, so titleHeight needs to be increased by 16vp.
+    float childHeight = sheetHeight_ - operatorGeometryNode->GetFrameSize().Height() -
+                        SHEET_DRAG_BAR_HEIGHT.ConvertToPx() - padding.top.value_or(0.0f);
     float childWidth = sheetWidth_ - padding.left.value_or(0.0f) - padding.right.value_or(0.0f);
 
     auto sheetStyle = layoutProperty->GetSheetStyleValue(SheetStyle());
     auto titleBarHoverMode = sheetStyle.titleBarHoverMode.value_or(SheetTitleBarHoverMode::STANDARD);
     if (titleBarHoverMode == SheetTitleBarHoverMode::STACK) {
-        childHeight += operatorGeometryNode->GetFrameSize().Height();
+        childHeight += operatorGeometryNode->GetFrameSize().Height() + SHEET_DRAG_BAR_HEIGHT.ConvertToPx();
     }
 
     auto childConstraint = layoutProperty->CreateChildConstraint();
@@ -353,6 +356,8 @@ void SheetPresentationSideLayoutAlgorithm::LayoutScrollNode(LayoutWrapper* layou
     auto geometryNode = scrollWrapper->GetGeometryNode();
     CHECK_NULL_VOID(geometryNode);
     geometryNode->SetMarginFrameOffset(offset);
+    sheetPattern->UpdateSafeAreaPaddingClip(
+        scrollNode->GetPaintProperty<ScrollablePaintProperty>(), titleBarHoverMode, offset.GetY());
     scrollWrapper->Layout();
 }
 
