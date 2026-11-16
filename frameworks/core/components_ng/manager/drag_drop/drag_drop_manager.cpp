@@ -428,7 +428,7 @@ RefPtr<FrameNode> DragDropManager::FindTargetInChildNodes(
         if (child == nullptr) {
             continue;
         }
-        auto childNode = AceType::DynamicCast<UINode>(child);
+        auto childNode = child;
         auto childFindResult = FindTargetInChildNodes(childNode, hitFrameNodes, findDrop);
         if (childFindResult) {
             return childFindResult;
@@ -502,7 +502,7 @@ RefPtr<FrameNode> DragDropManager::FindTargetDropNode(const RefPtr<UINode> paren
         if (child == nullptr) {
             continue;
         }
-        auto childNode = AceType::DynamicCast<UINode>(child);
+        auto childNode = child;
         auto childFindResult = FindTargetDropNode(childNode, subLocalPoint);
         if (childFindResult) {
             return childFindResult;

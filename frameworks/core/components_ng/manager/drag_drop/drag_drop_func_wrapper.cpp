@@ -658,7 +658,7 @@ DragDropFuncWrapper::DragPreviewMaterialInfo DragDropFuncWrapper::ParseDragPrevi
     if (Ace::AceType::TypeId(AceType::RawPtr(material)) != Ace::UiMaterial::TypeId()) {
         return ParseDragPreviewMaterialInfo(option);
     }
-    auto uiMaterial = AceType::DynamicCast<UiMaterial>(AceType::RawPtr(material));
+    auto uiMaterial = AceType::RawPtr(material);
     CHECK_NULL_RETURN(uiMaterial, materialInfo);
     auto immersiveOptions = uiMaterial->CopyImmersiveOptions();
     CHECK_NULL_RETURN(immersiveOptions, materialInfo);

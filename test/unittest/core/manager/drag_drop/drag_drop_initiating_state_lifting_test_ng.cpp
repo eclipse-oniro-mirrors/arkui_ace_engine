@@ -864,7 +864,7 @@ HWTEST_F(DragDropInitiatingStateLiftingTestNG, CheckStatusForPanActionBeginTestN
     machine->InitializeState();
     auto state = machine->dragDropInitiatingState_[static_cast<int32_t>(DragDropInitiatingStatus::LIFTING)];
     ASSERT_NE(state, nullptr);
-    auto liftingState = AceType::DynamicCast<DragDropInitiatingStateBase>(state);
+    auto liftingState = state;
     ASSERT_NE(liftingState, nullptr);
     auto pipeline = PipelineContext::GetCurrentContextSafelyWithCheck();
     ASSERT_NE(pipeline, nullptr);

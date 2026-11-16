@@ -95,7 +95,7 @@ RefPtr<FrameNode> XComponentTestSetRateRange::CreateXComponentNode()
     g_params.type = XCOMPONENT_SURFACE_TYPE_VALUE;
     auto* stack = ViewStackProcessor::GetInstance();
     auto nodeId = stack->ClaimNodeId();
-    auto frameNode = AceType::DynamicCast<FrameNode>(XComponentModelNG().CreateTypeNode(nodeId, &g_params));
+    auto frameNode = XComponentModelNG().CreateTypeNode(nodeId, &g_params);
     return frameNode;
 }
 

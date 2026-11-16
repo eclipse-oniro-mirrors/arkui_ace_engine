@@ -72,7 +72,7 @@ RefPtr<FrameNode> XComponentTestHdrBrightness::CreateStaticXComponentNode(bool i
 {
     auto* stack = ViewStackProcessor::GetInstance();
     auto nodeId = stack->ClaimNodeId();
-    return AceType::DynamicCast<FrameNode>(XComponentModelStatic::CreateFrameNode(nodeId, isTypedNode));
+    return XComponentModelStatic::CreateFrameNode(nodeId, isTypedNode);
 }
 
 void XComponentTestHdrBrightness::SetUpTestSuite()

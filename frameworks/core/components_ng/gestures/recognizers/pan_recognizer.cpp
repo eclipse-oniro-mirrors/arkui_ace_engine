@@ -1263,9 +1263,7 @@ RefPtr<GestureSnapshot> PanRecognizer::Dump() const
 
 RefPtr<DragEventActuator> PanRecognizer::GetDragEventActuator()
 {
-    auto uiNode = GetAttachedNode().Upgrade();
-    CHECK_NULL_RETURN(uiNode, nullptr);
-    auto frameNode = AceType::DynamicCast<FrameNode>(uiNode);
+    auto frameNode = GetAttachedNode().Upgrade();
     CHECK_NULL_RETURN(frameNode, nullptr);
     auto gestureEventHub = frameNode->GetOrCreateGestureEventHub();
     CHECK_NULL_RETURN(gestureEventHub, nullptr);

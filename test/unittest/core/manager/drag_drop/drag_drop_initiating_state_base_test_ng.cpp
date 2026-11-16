@@ -109,7 +109,7 @@ HWTEST_F(DragDropInitiatingStateBaseTestNG, DragDropInitiatingStateBaseTestNG001
      */
     auto state = GetDragDropState(actuator, DragDropInitiatingStatus::IDLE);
     ASSERT_NE(state, nullptr);
-    auto stateIdle = AceType::DynamicCast<DragDropInitiatingStateBase>(state);
+    auto stateIdle = state;
     ASSERT_NE(stateIdle, nullptr);
     auto machine = stateIdle->GetStateMachine();
     ASSERT_NE(machine, nullptr);
@@ -157,7 +157,7 @@ HWTEST_F(DragDropInitiatingStateBaseTestNG, DragDropInitiatingStateBaseTestNG002
      */
     auto state = GetDragDropState(dragDropEventActuator, DragDropInitiatingStatus::IDLE);
     ASSERT_NE(state, nullptr);
-    auto stateIdle = AceType::DynamicCast<DragDropInitiatingStateBase>(state);
+    auto stateIdle = state;
     ASSERT_NE(stateIdle, nullptr);
 
     /**
@@ -215,7 +215,7 @@ HWTEST_F(DragDropInitiatingStateBaseTestNG, DragDropInitiatingStateBaseTestNG003
      */
     auto state = GetDragDropState(dragDropEventActuator, DragDropInitiatingStatus::IDLE);
     ASSERT_NE(state, nullptr);
-    auto stateIdle = AceType::DynamicCast<DragDropInitiatingStateBase>(state);
+    auto stateIdle = state;
     ASSERT_NE(stateIdle, nullptr);
 
     /**
@@ -266,7 +266,7 @@ HWTEST_F(DragDropInitiatingStateBaseTestNG, DragDropInitiatingStateBaseTestNG004
      */
     auto state = GetDragDropState(dragDropEventActuator, DragDropInitiatingStatus::IDLE);
     ASSERT_NE(state, nullptr);
-    auto stateIdle = AceType::DynamicCast<DragDropInitiatingStateBase>(state);
+    auto stateIdle = state;
     ASSERT_NE(stateIdle, nullptr);
 
     /**
@@ -322,7 +322,7 @@ HWTEST_F(DragDropInitiatingStateBaseTestNG, DragDropInitiatingStateBaseTestNG005
      */
     auto state = GetDragDropState(dragDropEventActuator, DragDropInitiatingStatus::IDLE);
     ASSERT_NE(state, nullptr);
-    auto stateIdle = AceType::DynamicCast<DragDropInitiatingStateBase>(state);
+    auto stateIdle = state;
     ASSERT_NE(stateIdle, nullptr);
     auto& params = machine->GetDragDropInitiatingParams();
 
@@ -374,7 +374,7 @@ HWTEST_F(DragDropInitiatingStateBaseTestNG, DragDropInitiatingStateBaseTestNG006
      */
     auto state = GetDragDropState(dragDropEventActuator, DragDropInitiatingStatus::IDLE);
     ASSERT_NE(state, nullptr);
-    auto stateIdle = AceType::DynamicCast<DragDropInitiatingStateBase>(state);
+    auto stateIdle = state;
     ASSERT_NE(stateIdle, nullptr);
     auto context = frameNode->GetRenderContext();
     ASSERT_NE(context, nullptr);
@@ -439,7 +439,7 @@ HWTEST_F(DragDropInitiatingStateBaseTestNG, DragDropInitiatingStateBaseTestNG007
      */
     auto state = GetDragDropState(dragDropEventActuator, DragDropInitiatingStatus::IDLE);
     ASSERT_NE(state, nullptr);
-    auto stateIdle = AceType::DynamicCast<DragDropInitiatingStateBase>(state);
+    auto stateIdle = state;
     ASSERT_NE(stateIdle, nullptr);
     auto gestureHub = frameNode->GetOrCreateGestureEventHub();
     ASSERT_NE(gestureHub, nullptr);
@@ -487,7 +487,7 @@ HWTEST_F(DragDropInitiatingStateBaseTestNG, DragDropInitiatingStateBaseTestNG008
          */
         auto state = GetDragDropState(dragDropEventActuator, DragDropInitiatingStatus::IDLE);
         ASSERT_NE(state, nullptr);
-        auto stateIdle = AceType::DynamicCast<DragDropInitiatingStateBase>(state);
+        auto stateIdle = state;
         ASSERT_NE(stateIdle, nullptr);
         auto gestureHub = frameNode->GetOrCreateGestureEventHub();
         ASSERT_NE(gestureHub, nullptr);
@@ -542,7 +542,7 @@ HWTEST_F(DragDropInitiatingStateBaseTestNG, DragDropInitiatingStateBaseTestNG010
      */
     auto state = GetDragDropState(dragDropEventActuator, DragDropInitiatingStatus::IDLE);
     ASSERT_NE(state, nullptr);
-    auto stateIdle = AceType::DynamicCast<DragDropInitiatingStateBase>(state);
+    auto stateIdle = state;
     ASSERT_NE(stateIdle, nullptr);
 
     /**

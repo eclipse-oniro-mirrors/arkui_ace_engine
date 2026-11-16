@@ -7494,7 +7494,7 @@ void ViewAbstract::SetOverlayBuilder(FrameNode* frameNode, const RefPtr<NG::UINo
     overlayNode->SetParent(AceType::WeakClaim(frameNode));
     overlayNode->SetActive(true);
     overlayNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
-    auto layoutProperty = AceType::DynamicCast<LayoutProperty>(overlayNode->GetLayoutProperty());
+    auto layoutProperty = overlayNode->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
     layoutProperty->SetIsOverlayNode(true);
     layoutProperty->UpdateMeasureType(MeasureType::MATCH_PARENT);
@@ -7532,7 +7532,7 @@ void ViewAbstract::AddOverlayToFrameNode(const RefPtr<NG::FrameNode>& overlayNod
     overlayNode->SetParent(AceType::WeakClaim(frameNode));
     overlayNode->SetActive(true);
     overlayNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
-    auto layoutProperty = AceType::DynamicCast<LayoutProperty>(overlayNode->GetLayoutProperty());
+    auto layoutProperty = overlayNode->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
     layoutProperty->SetIsOverlayNode(true);
     layoutProperty->UpdateMeasureType(MeasureType::MATCH_PARENT);
@@ -8690,7 +8690,7 @@ void ViewAbstract::SetOverlayNode(FrameNode* frameNode, FrameNode* node, const N
     overlayNode->SetParent(AceType::WeakClaim(frameNode));
     overlayNode->SetActive(true);
     overlayNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
-    auto layoutProperty = AceType::DynamicCast<LayoutProperty>(overlayNode->GetLayoutProperty());
+    auto layoutProperty = overlayNode->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
     layoutProperty->SetIsOverlayNode(true);
     layoutProperty->UpdateMeasureType(MeasureType::MATCH_PARENT);

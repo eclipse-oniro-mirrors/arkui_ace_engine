@@ -73,7 +73,7 @@ HWTEST_F(RecognizerGroupTestNg, RecognizerGroupTest001, TestSize.Level1)
 {
     std::vector<RefPtr<NGGestureRecognizer>> longPressRecognizers;
     auto longPressRecognizer = AceType::MakeRefPtr<LongPressRecognizer>(false, true);
-    longPressRecognizers.push_back(AceType::DynamicCast<NGGestureRecognizer>(longPressRecognizer));
+    longPressRecognizers.push_back(longPressRecognizer);
     ExclusiveRecognizer excluRecognizer(longPressRecognizers);
     auto recognizer = excluRecognizer.CreateGestureFromRecognizer();
     EXPECT_NE(recognizer, nullptr);
@@ -88,7 +88,7 @@ HWTEST_F(RecognizerGroupTestNg, RecognizerGroupTest003, TestSize.Level1)
 {
     std::vector<RefPtr<NGGestureRecognizer>> longPressRecognizers;
     auto longPressRecognizer = AceType::MakeRefPtr<LongPressRecognizer>(false, true);
-    longPressRecognizers.push_back(AceType::DynamicCast<NGGestureRecognizer>(longPressRecognizer));
+    longPressRecognizers.push_back(longPressRecognizer);
     ExclusiveRecognizer excluRecognizer(longPressRecognizers);
     Offset coordinateOffset;
     std::string test = "test";
@@ -100,7 +100,7 @@ HWTEST_F(RecognizerGroupTestNg, RecognizerGroupTest003, TestSize.Level1)
     std::vector<RefPtr<NGGestureRecognizer>> recognizers { panRecognizer };
     auto testRecognizer = AceType::MakeRefPtr<SequencedRecognizer>(recognizers);
     auto gesture = AceType::MakeRefPtr<NG::GestureReferee>();
-    auto Ngg = AceType::DynamicCast<NG::NGGestureRecognizer>(testRecognizer);
+    RefPtr<NG::NGGestureRecognizer> Ngg = testRecognizer;
     excluRecognizer.recognizers_.push_back(Ngg);
     GetEventTargetImpl getEventTargetImpl = []() -> std::optional<EventTarget> {
         EventTarget target;
@@ -119,7 +119,7 @@ HWTEST_F(RecognizerGroupTestNg, RecognizerGroupTest004, TestSize.Level1)
 {
     std::vector<RefPtr<NGGestureRecognizer>> longPressRecognizers;
     auto longPressRecognizer = AceType::MakeRefPtr<LongPressRecognizer>(false, true);
-    longPressRecognizers.push_back(AceType::DynamicCast<NGGestureRecognizer>(longPressRecognizer));
+    longPressRecognizers.push_back(longPressRecognizer);
     ExclusiveRecognizer excluRecognizer(longPressRecognizers);
     TouchTestResultInfo tesultInfo;
     tesultInfo.depth = 1;
@@ -140,21 +140,21 @@ HWTEST_F(RecognizerGroupTestNg, RecognizerGroupTest005, TestSize.Level1)
 {
     std::vector<RefPtr<NGGestureRecognizer>> longPressRecognizers;
     auto longPressRecognizer = AceType::MakeRefPtr<LongPressRecognizer>(false, true);
-    longPressRecognizers.push_back(AceType::DynamicCast<NGGestureRecognizer>(longPressRecognizer));
+    longPressRecognizers.push_back(longPressRecognizer);
     ExclusiveRecognizer excluRecognizer(longPressRecognizers);
     excluRecognizer.refereeState_ = RefereeState::SUCCEED;
     excluRecognizer.currentFingers_ = 0;
     excluRecognizer.RecognizerGroup::CleanRecognizerState();
     std::vector<RefPtr<NGGestureRecognizer>> longPressRecognizers1;
     auto longPressRecognizer1 = AceType::MakeRefPtr<LongPressRecognizer>(false, true);
-    longPressRecognizers1.push_back(AceType::DynamicCast<NGGestureRecognizer>(longPressRecognizer1));
+    longPressRecognizers1.push_back(longPressRecognizer1);
     ExclusiveRecognizer excluRecognizer1(longPressRecognizers1);
     excluRecognizer1.refereeState_ = RefereeState::FAIL;
     excluRecognizer1.currentFingers_ = 0;
     excluRecognizer1.RecognizerGroup::CleanRecognizerState();
     std::vector<RefPtr<NGGestureRecognizer>> longPressRecognizers2;
     auto longPressRecognizer2 = AceType::MakeRefPtr<LongPressRecognizer>(false, true);
-    longPressRecognizers2.push_back(AceType::DynamicCast<NGGestureRecognizer>(longPressRecognizer2));
+    longPressRecognizers2.push_back(longPressRecognizer2);
     ExclusiveRecognizer excluRecognizer2(longPressRecognizers2);
     excluRecognizer2.refereeState_ = RefereeState::DETECTING;
     excluRecognizer2.currentFingers_ = 0;
@@ -171,21 +171,21 @@ HWTEST_F(RecognizerGroupTestNg, RecognizerGroupTest0052, TestSize.Level1)
 {
     std::vector<RefPtr<NGGestureRecognizer>> longPressRecognizers3;
     auto longPressRecognizer3 = AceType::MakeRefPtr<LongPressRecognizer>(false, true);
-    longPressRecognizers3.push_back(AceType::DynamicCast<NGGestureRecognizer>(longPressRecognizer3));
+    longPressRecognizers3.push_back(longPressRecognizer3);
     ExclusiveRecognizer excluRecognizer3(longPressRecognizers3);
     excluRecognizer3.refereeState_ = RefereeState::DETECTING;
     excluRecognizer3.currentFingers_ = 0;
     excluRecognizer3.RecognizerGroup::CleanRecognizerState();
     std::vector<RefPtr<NGGestureRecognizer>> longPressRecognizers4;
     auto longPressRecognizer4 = AceType::MakeRefPtr<LongPressRecognizer>(false, true);
-    longPressRecognizers4.push_back(AceType::DynamicCast<NGGestureRecognizer>(longPressRecognizer4));
+    longPressRecognizers4.push_back(longPressRecognizer4);
     ExclusiveRecognizer excluRecognizer4(longPressRecognizers4);
     excluRecognizer4.refereeState_ = RefereeState::DETECTING;
     excluRecognizer4.currentFingers_ = 1;
     excluRecognizer4.RecognizerGroup::CleanRecognizerState();
     std::vector<RefPtr<NGGestureRecognizer>> longPressRecognizers5;
     auto longPressRecognizer5 = AceType::MakeRefPtr<LongPressRecognizer>(false, true);
-    longPressRecognizers5.push_back(AceType::DynamicCast<NGGestureRecognizer>(longPressRecognizer5));
+    longPressRecognizers5.push_back(longPressRecognizer5);
     ExclusiveRecognizer excluRecognizer5(longPressRecognizers5);
     excluRecognizer5.refereeState_ = RefereeState::DETECTING;
     excluRecognizer5.currentFingers_ = 1;
@@ -203,9 +203,9 @@ HWTEST_F(RecognizerGroupTestNg, RecognizerGroupTest006, TestSize.Level1)
 {
     std::vector<RefPtr<NGGestureRecognizer>> longPressRecognizers;
     auto longPressRecognizer = AceType::MakeRefPtr<LongPressRecognizer>(false, true);
-    longPressRecognizers.push_back(AceType::DynamicCast<NGGestureRecognizer>(longPressRecognizer));
+    longPressRecognizers.push_back(longPressRecognizer);
     ExclusiveRecognizer excluRecognizer(longPressRecognizers);
-    auto recognizerTest = AceType::DynamicCast<RecognizerGroup>(&excluRecognizer);
+    RecognizerGroup* recognizerTest = &excluRecognizer;
     recognizerTest->refereeState_ = RefereeState::READY;
     auto result = recognizerTest->IsReady();
     EXPECT_EQ(result, true);
@@ -220,9 +220,9 @@ HWTEST_F(RecognizerGroupTestNg, RecognizerGroupTest007, TestSize.Level1)
 {
     std::vector<RefPtr<NGGestureRecognizer>> longPressRecognizers;
     auto longPressRecognizer = AceType::MakeRefPtr<LongPressRecognizer>(false, true);
-    longPressRecognizers.push_back(AceType::DynamicCast<NGGestureRecognizer>(longPressRecognizer));
+    longPressRecognizers.push_back(longPressRecognizer);
     ExclusiveRecognizer excluRecognizer(longPressRecognizers);
-    auto recognizerTest = AceType::DynamicCast<RecognizerGroup>(&excluRecognizer);
+    RecognizerGroup* recognizerTest = &excluRecognizer;
     recognizerTest->refereeState_ = RefereeState::DETECTING;
     auto result = recognizerTest->IsReady();
     EXPECT_EQ(result, false);
@@ -237,7 +237,7 @@ HWTEST_F(RecognizerGroupTestNg, RecognizerGroupTest008, TestSize.Level1)
 {
     std::vector<RefPtr<NGGestureRecognizer>> longPressRecognizers;
     auto longPressRecognizer = AceType::MakeRefPtr<LongPressRecognizer>(false, true);
-    longPressRecognizers.push_back(AceType::DynamicCast<NGGestureRecognizer>(longPressRecognizer));
+    longPressRecognizers.push_back(longPressRecognizer);
     ExclusiveRecognizer excluRecognizer(longPressRecognizers);
     Offset coordinateOffset;
     std::string test = "test";
@@ -263,7 +263,7 @@ HWTEST_F(RecognizerGroupTestNg, RecognizerGroupTest009, TestSize.Level1)
 {
     std::vector<RefPtr<NGGestureRecognizer>> longPressRecognizers;
     auto longPressRecognizer = AceType::MakeRefPtr<LongPressRecognizer>(false, true);
-    longPressRecognizers.push_back(AceType::DynamicCast<NGGestureRecognizer>(longPressRecognizer));
+    longPressRecognizers.push_back(longPressRecognizer);
     ExclusiveRecognizer excluRecognizer(longPressRecognizers);
     RefPtr<ClickRecognizer> clickRecognizerPtrNotSame = AceType::MakeRefPtr<ClickRecognizer>(FINGER_NUMBER, COUNT);
     excluRecognizer.recognizers_.push_back(clickRecognizerPtrNotSame);
@@ -281,7 +281,7 @@ HWTEST_F(RecognizerGroupTestNg, RecognizerGroupTest010, TestSize.Level1)
 {
     std::vector<RefPtr<NGGestureRecognizer>> longPressRecognizers;
     auto longPressRecognizer = AceType::MakeRefPtr<LongPressRecognizer>(false, true);
-    longPressRecognizers.push_back(AceType::DynamicCast<NGGestureRecognizer>(longPressRecognizer));
+    longPressRecognizers.push_back(longPressRecognizer);
     ExclusiveRecognizer excluRecognizer(longPressRecognizers);
     TouchTestResultInfo tesultInfo;
     tesultInfo.depth = 1;
@@ -295,7 +295,7 @@ HWTEST_F(RecognizerGroupTestNg, RecognizerGroupTest010, TestSize.Level1)
     std::vector<RefPtr<NGGestureRecognizer>> recognizers { panRecognizer };
     auto testRecognizer = AceType::MakeRefPtr<SequencedRecognizer>(recognizers);
     auto gesture = AceType::MakeRefPtr<NG::GestureReferee>();
-    auto Ngg = AceType::DynamicCast<NG::NGGestureRecognizer>(testRecognizer);
+    RefPtr<NG::NGGestureRecognizer> Ngg = testRecognizer;
     RefPtr<FrameNode> FRAME_NODE_0 = FrameNode::CreateFrameNode("0", 0, AceType::MakeRefPtr<Pattern>());
     Ngg->AttachFrameNode(FRAME_NODE_0);
     excluRecognizer.recognizers_.push_back(Ngg);
@@ -312,9 +312,9 @@ HWTEST_F(RecognizerGroupTestNg, RecognizerGroupTest011, TestSize.Level1)
 {
     std::vector<RefPtr<NGGestureRecognizer>> longPressRecognizers;
     auto longPressRecognizer = AceType::MakeRefPtr<LongPressRecognizer>(false, true);
-    longPressRecognizers.push_back(AceType::DynamicCast<NGGestureRecognizer>(longPressRecognizer));
+    longPressRecognizers.push_back(longPressRecognizer);
     ExclusiveRecognizer excluRecognizer(longPressRecognizers);
-    auto recognizerTest = AceType::DynamicCast<RecognizerGroup>(&excluRecognizer);
+    RecognizerGroup* recognizerTest = &excluRecognizer;
     recognizerTest->refereeState_ = RefereeState::READY;
     PanDirection panDirection;
     panDirection.type = PanDirection::VERTICAL;
@@ -322,7 +322,7 @@ HWTEST_F(RecognizerGroupTestNg, RecognizerGroupTest011, TestSize.Level1)
     std::vector<RefPtr<NGGestureRecognizer>> recognizers { panRecognizer };
     auto testRecognizer = AceType::MakeRefPtr<SequencedRecognizer>(recognizers);
     auto gesture = AceType::MakeRefPtr<NG::GestureReferee>();
-    auto Ngg = AceType::DynamicCast<NG::NGGestureRecognizer>(testRecognizer);
+    RefPtr<NG::NGGestureRecognizer> Ngg = testRecognizer;
     recognizerTest->recognizers_.push_back(Ngg);
     auto result = recognizerTest->IsReady();
     EXPECT_EQ(result, true);
@@ -337,9 +337,9 @@ HWTEST_F(RecognizerGroupTestNg, RecognizerGroupTest012, TestSize.Level1)
 {
     std::vector<RefPtr<NGGestureRecognizer>> longPressRecognizers;
     auto longPressRecognizer = AceType::MakeRefPtr<LongPressRecognizer>(false, true);
-    longPressRecognizers.push_back(AceType::DynamicCast<NGGestureRecognizer>(longPressRecognizer));
+    longPressRecognizers.push_back(longPressRecognizer);
     ExclusiveRecognizer excluRecognizer(longPressRecognizers);
-    auto recognizerTest = AceType::DynamicCast<RecognizerGroup>(&excluRecognizer);
+    RecognizerGroup* recognizerTest = &excluRecognizer;
     recognizerTest->refereeState_ = RefereeState::DETECTING;
     PanDirection panDirection;
     panDirection.type = PanDirection::VERTICAL;
@@ -347,7 +347,7 @@ HWTEST_F(RecognizerGroupTestNg, RecognizerGroupTest012, TestSize.Level1)
     std::vector<RefPtr<NGGestureRecognizer>> recognizers { panRecognizer };
     auto testRecognizer = AceType::MakeRefPtr<SequencedRecognizer>(recognizers);
     auto gesture = AceType::MakeRefPtr<NG::GestureReferee>();
-    auto Ngg = AceType::DynamicCast<NG::NGGestureRecognizer>(testRecognizer);
+    RefPtr<NG::NGGestureRecognizer> Ngg = testRecognizer;
     recognizerTest->recognizers_.push_back(Ngg);
     auto result = recognizerTest->IsReady();
     EXPECT_EQ(result, false);
@@ -366,16 +366,16 @@ HWTEST_F(RecognizerGroupTestNg, RecognizerGroupTest013, TestSize.Level1)
      */
     std::vector<RefPtr<NGGestureRecognizer>> longPressRecognizers;
     auto longPressRecognizer = AceType::MakeRefPtr<LongPressRecognizer>(false, true);
-    longPressRecognizers.push_back(AceType::DynamicCast<NGGestureRecognizer>(longPressRecognizer));
+    longPressRecognizers.push_back(longPressRecognizer);
     ExclusiveRecognizer excluRecognizer(longPressRecognizers);
-    auto recognizerTest = AceType::DynamicCast<RecognizerGroup>(&excluRecognizer);
+    RecognizerGroup* recognizerTest = &excluRecognizer;
     recognizerTest->refereeState_ = RefereeState::DETECTING;
     PanDirection panDirection;
     panDirection.type = PanDirection::VERTICAL;
     auto panRecognizer = AceType::MakeRefPtr<PanRecognizer>(1, panDirection, 0);
     std::vector<RefPtr<NGGestureRecognizer>> recognizers { panRecognizer };
     auto testRecognizer = AceType::MakeRefPtr<SequencedRecognizer>(recognizers);
-    auto gestureRecognizer = AceType::DynamicCast<NG::NGGestureRecognizer>(testRecognizer);
+    RefPtr<NG::NGGestureRecognizer> gestureRecognizer = testRecognizer;
     recognizerTest->recognizers_.push_back(gestureRecognizer);
     recognizerTest->recognizers_.push_back(nullptr);
     recognizerTest->RemainChildOnResetStatus();
@@ -408,9 +408,9 @@ HWTEST_F(RecognizerGroupTestNg, GetGestureInfoString001, TestSize.Level1)
      */
     std::vector<RefPtr<NGGestureRecognizer>> longPressRecognizers;
     auto longPressRecognizer = AceType::MakeRefPtr<LongPressRecognizer>(false, true);
-    longPressRecognizers.push_back(AceType::DynamicCast<NGGestureRecognizer>(longPressRecognizer));
+    longPressRecognizers.push_back(longPressRecognizer);
     ExclusiveRecognizer excluRecognizer(longPressRecognizers);
-    auto recognizerTest = AceType::DynamicCast<RecognizerGroup>(&excluRecognizer);
+    RecognizerGroup* recognizerTest = &excluRecognizer;
 
     recognizerTest->remainChildOnResetStatus_ = true;
 

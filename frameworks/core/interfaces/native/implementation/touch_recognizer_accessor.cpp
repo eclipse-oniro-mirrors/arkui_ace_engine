@@ -122,7 +122,7 @@ Ark_Boolean IsHostBelongsToImpl(Ark_TouchRecognizer peer,
     CHECK_NULL_RETURN(peer, false);
     auto target = peer->target_.Upgrade();
     CHECK_NULL_RETURN(target, false);
-    auto node = AceType::DynamicCast<FrameNode>(target->GetAttachedNode().Upgrade());
+    auto node = target->GetAttachedNode().Upgrade();
     return Converter::ArkValue<Ark_Boolean>(IsNodeBelongsTo(node, uniqueId));
 }
 } // TouchRecognizerAccessor

@@ -491,7 +491,7 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionUpdateWantTest1, TestSize.Level1
     pattern->UpdateWant(nullptr);
     RefPtr<WantWrap> wantOhos = AceType::MakeRefPtr<WantWrapOhos>("123", "123");
     pattern->UpdateWant(wantOhos);
-    auto wantOhos2 = AceType::DynamicCast<WantWrap>(wantOhos);
+    auto wantOhos2 = wantOhos;
     pattern->UpdateWant(wantOhos2);
 #endif
 }
@@ -2440,7 +2440,7 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionComponentEmbeddedInitOptionsTest
     config.dpiFollowStrategy = DpiFollowStrategy::FOLLOW_HOST_DPI;
     config.isWindowModeFollowHost = true;
     model.Create(config);
-    auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
     ASSERT_NE(frameNode, nullptr);
     auto pattern = frameNode->GetPattern<UIExtensionPattern>();
     ASSERT_NE(pattern, nullptr);
