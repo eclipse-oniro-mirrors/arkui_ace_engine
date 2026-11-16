@@ -729,12 +729,19 @@ uint32_t OH_ArkUI_PointerEvent_GetPointerCount(const ArkUI_UIInputEvent* event)
     CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetPointerCount");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                                   S_NODE_ON_HOVER_MOVE | S_NODE_ON_AXIS | S_NODE_ON_CLICK_EVENT |
-                                                  S_GESTURE_TOUCH_EVENT,
+                                                  S_GESTURE_TOUCH_EVENT | S_NXC_DISPATCH_AXIS_EVENT,
         event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(0, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
     switch (event->eventTypeId) {
+        case AXIS_EVENT_ID: {
+            const auto* axisEvent = reinterpret_cast<const OHOS::Ace::AxisEvent*>(event->inputEvent);
+            if (!axisEvent) {
+                RETURN_RET_WITH_STATUS_CHECK(0, ARKUI_ERROR_CODE_PARAM_INVALID);
+            }
+            RETURN_RET_WITH_STATUS_CHECK(1, ARKUI_ERROR_CODE_NO_ERROR);
+        }
         case C_TOUCH_EVENT_ID: {
             const auto* touchEvent = reinterpret_cast<ArkUITouchEvent*>(event->inputEvent);
             if (!touchEvent) {
