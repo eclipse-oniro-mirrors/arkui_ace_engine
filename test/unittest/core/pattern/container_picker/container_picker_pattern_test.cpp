@@ -3453,4 +3453,146 @@ HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_UpdateScrollText
     pattern->UpdateScrollTextAnimation(10.0);
     EXPECT_FLOAT_EQ(pattern->distancePercent_, 0.5);
 }
+/**
+ * @tc.name: ContainerPickerPatternTest_SetSelectedTextStyleRestoreApply001
+ * @tc.desc: Switch from full style to partial style (only color), verify size and weight reset to default
+ *           through restore-then-apply sequence.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_SetSelectedTextStyleRestoreApply001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    Dimension defaultSize(16.0, DimensionUnit::FP);
+    Color defaultColor = Color::BLACK;
+    pattern->CacheOriginalItemStyle(0, textLayoutProperty, defaultSize, defaultColor);
+
+    PickerTextStyle fullStyle;
+    fullStyle.textColor = Color::BLUE;
+    fullStyle.fontSize = Dimension(22.0, DimensionUnit::FP);
+    fullStyle.fontWeight = FontWeight::BOLD;
+    pattern->SetSelectedTextStyleVal(fullStyle);
+
+    Color applyColor = defaultColor;
+    pattern->RestoreItemOriginalStyle(0, textLayoutProperty, applyColor);
+    pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+
+    EXPECT_TRUE(textLayoutProperty->HasTextColor());
+    EXPECT_EQ(textLayoutProperty->GetTextColor().value(), Color::BLUE);
+    EXPECT_TRUE(textLayoutProperty->HasFontSize());
+    EXPECT_FLOAT_EQ(textLayoutProperty->GetFontSize().value().Value(), 22.0);
+    EXPECT_TRUE(textLayoutProperty->HasFontWeight());
+    EXPECT_EQ(textLayoutProperty->GetFontWeight().value(), FontWeight::BOLD);
+
+    PickerTextStyle partialStyle;
+    partialStyle.textColor = Color::RED;
+    pattern->SetSelectedTextStyleVal(partialStyle);
+
+    pattern->RestoreItemOriginalStyle(0, textLayoutProperty, applyColor);
+    pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+
+    EXPECT_TRUE(textLayoutProperty->HasTextColor());
+    EXPECT_EQ(textLayoutProperty->GetTextColor().value(), Color::RED);
+    EXPECT_TRUE(textLayoutProperty->HasFontSize());
+    EXPECT_FLOAT_EQ(textLayoutProperty->GetFontSize().value().Value(), 16.0);
+    EXPECT_TRUE(textLayoutProperty->HasFontWeight());
+    EXPECT_NE(textLayoutProperty->GetFontWeight().value(), FontWeight::BOLD);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_SetSelectedTextStyleRestoreApply002
+ * @tc.desc: Switch from full style to empty style, verify all fields reset to default
+ *           through restore-then-apply sequence.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_SetSelectedTextStyleRestoreApply002, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    Dimension defaultSize(16.0, DimensionUnit::FP);
+    Color defaultColor = Color::BLACK;
+    pattern->CacheOriginalItemStyle(0, textLayoutProperty, defaultSize, defaultColor);
+
+    PickerTextStyle fullStyle;
+    fullStyle.textColor = Color::BLUE;
+    fullStyle.fontSize = Dimension(22.0, DimensionUnit::FP);
+    fullStyle.fontWeight = FontWeight::BOLD;
+    pattern->SetSelectedTextStyleVal(fullStyle);
+
+    Color applyColor = defaultColor;
+    pattern->RestoreItemOriginalStyle(0, textLayoutProperty, applyColor);
+    pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+
+    EXPECT_TRUE(textLayoutProperty->HasTextColor());
+    EXPECT_TRUE(textLayoutProperty->HasFontSize());
+    EXPECT_TRUE(textLayoutProperty->HasFontWeight());
+
+    pattern->SetSelectedTextStyleVal(PickerTextStyle());
+    pattern->RestoreItemOriginalStyle(0, textLayoutProperty, applyColor);
+
+    EXPECT_TRUE(textLayoutProperty->HasTextColor());
+    EXPECT_EQ(textLayoutProperty->GetTextColor().value(), Color::BLACK);
+    EXPECT_TRUE(textLayoutProperty->HasFontSize());
+    EXPECT_FLOAT_EQ(textLayoutProperty->GetFontSize().value().Value(), 16.0);
+    EXPECT_TRUE(textLayoutProperty->HasFontWeight());
+    EXPECT_NE(textLayoutProperty->GetFontWeight().value(), FontWeight::BOLD);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_SetSelectedTextStyleRestoreApply003
+ * @tc.desc: First time setting full style with restore-then-apply, verify all fields applied correctly.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_SetSelectedTextStyleRestoreApply003, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    Dimension defaultSize(16.0, DimensionUnit::FP);
+    Color defaultColor = Color::BLACK;
+    pattern->CacheOriginalItemStyle(0, textLayoutProperty, defaultSize, defaultColor);
+
+    PickerTextStyle style;
+    style.textColor = Color::GREEN;
+    style.fontSize = Dimension(25.0, DimensionUnit::FP);
+    style.fontWeight = FontWeight::MEDIUM;
+    pattern->SetSelectedTextStyleVal(style);
+
+    Color applyColor = defaultColor;
+    pattern->RestoreItemOriginalStyle(0, textLayoutProperty, applyColor);
+    pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+
+    EXPECT_TRUE(textLayoutProperty->HasTextColor());
+    EXPECT_EQ(textLayoutProperty->GetTextColor().value(), Color::GREEN);
+    EXPECT_TRUE(textLayoutProperty->HasFontSize());
+    EXPECT_FLOAT_EQ(textLayoutProperty->GetFontSize().value().Value(), 25.0);
+    EXPECT_TRUE(textLayoutProperty->HasFontWeight());
+    EXPECT_EQ(textLayoutProperty->GetFontWeight().value(), FontWeight::MEDIUM);
+}
 } // namespace OHOS::Ace::NG
