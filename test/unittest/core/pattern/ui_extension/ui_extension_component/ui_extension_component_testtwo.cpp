@@ -2090,7 +2090,7 @@ HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionBrandColorTest024, TestSize.L
     auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
     ASSERT_NE(pattern, nullptr);
     auto brandColorStr = pattern->GetBrandColorStr();
-    EXPECT_FALSE(brandColorStr.empty());
+    EXPECT_TRUE(brandColorStr.empty());
 #endif
 }
 

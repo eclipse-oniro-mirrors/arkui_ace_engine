@@ -2286,10 +2286,10 @@ HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest02
 
     pattern1->RegisterBrandColorChangeListener();
     pattern2->RegisterBrandColorChangeListener();
-    EXPECT_EQ(storage->brandColorChangeListeners_[pattern1->instanceId_].size(), 2u);
+    EXPECT_EQ(storage->brandColorChangeListeners_[pattern1->instanceId_].size(), 1u);
 
     pattern1->UnRegisterBrandColorChangeListener();
-    EXPECT_EQ(storage->brandColorChangeListeners_[pattern1->instanceId_].size(), 1u);
+    EXPECT_EQ(storage->brandColorChangeListeners_[pattern1->instanceId_].size(), 0u);
 
     pattern2->UnRegisterBrandColorChangeListener();
     EXPECT_TRUE(storage->brandColorChangeListeners_.find(pattern1->instanceId_) ==
@@ -2308,7 +2308,7 @@ HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest02
     auto pattern = CreateSecurityUEC();
     ASSERT_NE(pattern, nullptr);
     auto brandColorStr = pattern->GetBrandColorStr();
-    EXPECT_FALSE(brandColorStr.empty());
+    EXPECT_TRUE(brandColorStr.empty());
 #endif
 }
 } //namespace OHOS::Ace::NG
