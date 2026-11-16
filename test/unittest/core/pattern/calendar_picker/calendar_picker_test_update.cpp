@@ -50,6 +50,7 @@
 #include "core/components_ng/pattern/calendar_picker/calendar_picker_layout_algorithm.h"
 #include "core/components_ng/pattern/calendar_picker/calendar_picker_layout_property.h"
 #include "core/components_ng/pattern/calendar_picker/calendar_picker_model_ng.h"
+#include "core/components_ng/pattern/calendar_picker/calendar_picker_i18n.h"
 #include "core/components_ng/pattern/calendar_picker/calendar_picker_pattern.h"
 #include "core/components_ng/pattern/dialog/dialog_view.h"
 #include "core/components_ng/pattern/divider/divider_pattern.h"
@@ -1603,5 +1604,227 @@ HWTEST_F(CalendarPickerTestUpdate, CalendarPickerCreateAndSetMarkTodayTest, Test
 
     CalendarPickerModelNG::SetMarkToday(frameNode, false);
     EXPECT_EQ(CalendarPickerModelNG::GetMarkToday(frameNode), false);
+}
+
+/**
+ * @tc.name: CalendarPickerI18nGetDateSeparators001
+ * @tc.desc: Test GetDateSeparators returns exactly two separators.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerTestUpdate, CalendarPickerI18nGetDateSeparators001, TestSize.Level1)
+{
+    CalendarPickerI18n::ClearCache();
+    auto separators = CalendarPickerI18n::GetDateSeparators("en");
+    EXPECT_EQ(separators.size(), 2);
+}
+
+/**
+ * @tc.name: CalendarPickerI18nGetDateSeparators002
+ * @tc.desc: Test GetDateSeparators cache hit returns same result for same locale.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerTestUpdate, CalendarPickerI18nGetDateSeparators002, TestSize.Level1)
+{
+    CalendarPickerI18n::ClearCache();
+    auto sep1 = CalendarPickerI18n::GetDateSeparators("en");
+    auto sep2 = CalendarPickerI18n::GetDateSeparators("en");
+    EXPECT_EQ(sep1, sep2);
+}
+
+/**
+ * @tc.name: CalendarPickerI18nGetDateSeparators003
+ * @tc.desc: Test GetDateSeparators returns fallback for empty locale.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerTestUpdate, CalendarPickerI18nGetDateSeparators003, TestSize.Level1)
+{
+    CalendarPickerI18n::ClearCache();
+    auto separators = CalendarPickerI18n::GetDateSeparators("");
+    EXPECT_EQ(separators.size(), 2);
+    EXPECT_EQ(separators[0], "/");
+    EXPECT_EQ(separators[1], "/");
+}
+
+/**
+ * @tc.name: CalendarPickerI18nGetDateSeparators004
+ * @tc.desc: Test GetDateSeparators with different locales does not crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerTestUpdate, CalendarPickerI18nGetDateSeparators004, TestSize.Level1)
+{
+    CalendarPickerI18n::ClearCache();
+    auto sepEn = CalendarPickerI18n::GetDateSeparators("en");
+    EXPECT_EQ(sepEn.size(), 2);
+    auto sepZh = CalendarPickerI18n::GetDateSeparators("zh");
+    EXPECT_EQ(sepZh.size(), 2);
+}
+
+/**
+ * @tc.name: CalendarPickerI18nLocalizeDateNumber001
+ * @tc.desc: Test LocalizeDateNumber pads year to four digits.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerTestUpdate, CalendarPickerI18nLocalizeDateNumber001, TestSize.Level1)
+{
+    CalendarPickerI18n::ClearCache();
+    auto result = CalendarPickerI18n::LocalizeDateNumber(2024, 4, "en");
+    EXPECT_GE(result.length(), 4);
+    EXPECT_NE(result.find("2024"), std::string::npos);
+}
+
+/**
+ * @tc.name: CalendarPickerI18nLocalizeDateNumber002
+ * @tc.desc: Test LocalizeDateNumber pads month to two digits.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerTestUpdate, CalendarPickerI18nLocalizeDateNumber002, TestSize.Level1)
+{
+    CalendarPickerI18n::ClearCache();
+    auto result = CalendarPickerI18n::LocalizeDateNumber(3, 2, "en");
+    EXPECT_GE(result.length(), 2);
+}
+
+/**
+ * @tc.name: CalendarPickerI18nLocalizeDateNumber003
+ * @tc.desc: Test LocalizeDateNumber pads day to two digits.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerTestUpdate, CalendarPickerI18nLocalizeDateNumber003, TestSize.Level1)
+{
+    CalendarPickerI18n::ClearCache();
+    auto result = CalendarPickerI18n::LocalizeDateNumber(7, 2, "en");
+    EXPECT_GE(result.length(), 2);
+}
+
+/**
+ * @tc.name: CalendarPickerI18nLocalizeDateNumber004
+ * @tc.desc: Test LocalizeDateNumber cache hit returns same result for same input.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerTestUpdate, CalendarPickerI18nLocalizeDateNumber004, TestSize.Level1)
+{
+    CalendarPickerI18n::ClearCache();
+    auto r1 = CalendarPickerI18n::LocalizeDateNumber(15, 2, "en");
+    auto r2 = CalendarPickerI18n::LocalizeDateNumber(15, 2, "en");
+    EXPECT_EQ(r1, r2);
+}
+
+/**
+ * @tc.name: CalendarPickerI18nLocalizeDateNumber005
+ * @tc.desc: Test LocalizeDateNumber uses separate caches for different minDigits.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerTestUpdate, CalendarPickerI18nLocalizeDateNumber005, TestSize.Level1)
+{
+    CalendarPickerI18n::ClearCache();
+    auto r2 = CalendarPickerI18n::LocalizeDateNumber(12, 2, "en");
+    auto r4 = CalendarPickerI18n::LocalizeDateNumber(12, 4, "en");
+    EXPECT_GE(r2.length(), 2);
+    EXPECT_GE(r4.length(), 4);
+}
+
+/**
+ * @tc.name: CalendarPickerI18nLocalizeDateNumber006
+ * @tc.desc: Test LocalizeDateNumber cache invalidation on locale change.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerTestUpdate, CalendarPickerI18nLocalizeDateNumber006, TestSize.Level1)
+{
+    CalendarPickerI18n::ClearCache();
+    auto rEn = CalendarPickerI18n::LocalizeDateNumber(10, 2, "en");
+    auto rZh = CalendarPickerI18n::LocalizeDateNumber(10, 2, "zh");
+    EXPECT_FALSE(rEn.empty());
+    EXPECT_FALSE(rZh.empty());
+}
+
+/**
+ * @tc.name: CalendarPickerI18nGetFirstDayOfWeek001
+ * @tc.desc: Test GetFirstDayOfWeek returns a valid value in [0, 6].
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerTestUpdate, CalendarPickerI18nGetFirstDayOfWeek001, TestSize.Level1)
+{
+    CalendarPickerI18n::ClearCache();
+    auto firstDay = CalendarPickerI18n::GetFirstDayOfWeek("en");
+    EXPECT_GE(firstDay, 0);
+    EXPECT_LE(firstDay, 6);
+}
+
+/**
+ * @tc.name: CalendarPickerI18nGetFirstDayOfWeek002
+ * @tc.desc: Test GetFirstDayOfWeek cache hit returns same result.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerTestUpdate, CalendarPickerI18nGetFirstDayOfWeek002, TestSize.Level1)
+{
+    CalendarPickerI18n::ClearCache();
+    auto d1 = CalendarPickerI18n::GetFirstDayOfWeek("en");
+    auto d2 = CalendarPickerI18n::GetFirstDayOfWeek("en");
+    EXPECT_EQ(d1, d2);
+}
+
+/**
+ * @tc.name: CalendarPickerI18nClearCache001
+ * @tc.desc: Test ClearCache forces recompute and result remains correct.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerTestUpdate, CalendarPickerI18nClearCache001, TestSize.Level1)
+{
+    CalendarPickerI18n::ClearCache();
+    auto sepBefore = CalendarPickerI18n::GetDateSeparators("en");
+    CalendarPickerI18n::ClearCache();
+    auto sepAfter = CalendarPickerI18n::GetDateSeparators("en");
+    EXPECT_EQ(sepBefore, sepAfter);
+
+    CalendarPickerI18n::ClearCache();
+    auto numBefore = CalendarPickerI18n::LocalizeDateNumber(2024, 4, "en");
+    CalendarPickerI18n::ClearCache();
+    auto numAfter = CalendarPickerI18n::LocalizeDateNumber(2024, 4, "en");
+    EXPECT_EQ(numBefore, numAfter);
+}
+
+/**
+ * @tc.name: CalendarPickerI18nBatchCall001
+ * @tc.desc: Test 100 batch calls with same locale return consistent results.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerTestUpdate, CalendarPickerI18nBatchCall001, TestSize.Level1)
+{
+    CalendarPickerI18n::ClearCache();
+    const std::string locale = "en";
+    auto sepFirst = CalendarPickerI18n::GetDateSeparators(locale);
+    auto yearFirst = CalendarPickerI18n::LocalizeDateNumber(2024, 4, locale);
+    auto monthFirst = CalendarPickerI18n::LocalizeDateNumber(1, 2, locale);
+    auto dayFirst = CalendarPickerI18n::LocalizeDateNumber(1, 2, locale);
+    auto fdowFirst = CalendarPickerI18n::GetFirstDayOfWeek(locale);
+
+    for (int32_t i = 0; i < 100; ++i) {
+        EXPECT_EQ(CalendarPickerI18n::GetDateSeparators(locale), sepFirst);
+        EXPECT_EQ(CalendarPickerI18n::LocalizeDateNumber(2024, 4, locale), yearFirst);
+        EXPECT_EQ(CalendarPickerI18n::LocalizeDateNumber(1, 2, locale), monthFirst);
+        EXPECT_EQ(CalendarPickerI18n::LocalizeDateNumber(1, 2, locale), dayFirst);
+        EXPECT_EQ(CalendarPickerI18n::GetFirstDayOfWeek(locale), fdowFirst);
+    }
+}
+
+/**
+ * @tc.name: CalendarPickerI18nClearCache002
+ * @tc.desc: Test ClearCache followed by locale switch works correctly.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerTestUpdate, CalendarPickerI18nClearCache002, TestSize.Level1)
+{
+    CalendarPickerI18n::ClearCache();
+    auto sepEn = CalendarPickerI18n::GetDateSeparators("en");
+    EXPECT_EQ(sepEn.size(), 2);
+
+    CalendarPickerI18n::ClearCache();
+    auto sepZh = CalendarPickerI18n::GetDateSeparators("zh");
+    EXPECT_EQ(sepZh.size(), 2);
+
+    CalendarPickerI18n::ClearCache();
+    auto fdowEn = CalendarPickerI18n::GetFirstDayOfWeek("en");
+    EXPECT_GE(fdowEn, 0);
+    EXPECT_LE(fdowEn, 6);
 }
 } // namespace OHOS::Ace::NG
