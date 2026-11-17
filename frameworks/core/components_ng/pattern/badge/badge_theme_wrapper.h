@@ -43,7 +43,7 @@ public:
         RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<BadgeThemeWrapper>();
-            auto theme = AceType::DynamicCast<BadgeTheme>(wrapper);
+            RefPtr<BadgeTheme> theme = wrapper;
             if (!themeConstants) {
                 return wrapper;
             }

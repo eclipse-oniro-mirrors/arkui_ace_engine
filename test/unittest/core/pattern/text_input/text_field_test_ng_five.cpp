@@ -205,7 +205,7 @@ void TextFieldTestNgFive::CreateSearchTextField(RefPtr<FrameNode>& searchNode,
     SearchModelNG searchModelInstance;
     searchModelInstance.Create(
         StringUtils::Str8ToStr16(DEFAULT_TEXT), u"placeholder", "resource:///ohos_search.svg");
-    searchNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    searchNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
     ASSERT_NE(searchNode, nullptr);
     searchFieldNode = AceType::DynamicCast<FrameNode>(searchNode->GetChildAtIndex(SEARCH_FIELD_CHILD_INDEX));
     ASSERT_NE(searchFieldNode, nullptr);

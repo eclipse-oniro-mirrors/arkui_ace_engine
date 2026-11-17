@@ -124,7 +124,7 @@ protected:
         env.layoutWrapperRef = frameNode_->CreateLayoutWrapper(true, true);
         env.layoutWrapper = AceType::RawPtr(env.layoutWrapperRef);
         auto layoutAlgorithmWrapper =
-            AceType::DynamicCast<LayoutAlgorithmWrapper>(env.layoutWrapper->GetLayoutAlgorithm());
+            env.layoutWrapper->GetLayoutAlgorithm();
         if (layoutAlgorithmWrapper) {
             env.algorithmRef =
                 AceType::DynamicCast<TextFieldLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());

@@ -43,7 +43,7 @@ public:
         {
             auto wrapper = AceType::MakeRefPtr<TextFieldThemeWrapper>();
             wrapper->SetThemeConstants(themeConstants);
-            auto theme = AceType::DynamicCast<TextFieldTheme>(wrapper);
+            RefPtr<TextFieldTheme> theme = wrapper;
             if (!themeConstants) {
                 return wrapper;
             }

@@ -39,7 +39,7 @@ public:
     {
         auto value = MakeRefPtr<HyperlinkLayoutProperty>();
         TextLayoutProperty::Clone(value);
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propColor_ = CloneColor();
         value->propContent_ = CloneContent();
         return value;

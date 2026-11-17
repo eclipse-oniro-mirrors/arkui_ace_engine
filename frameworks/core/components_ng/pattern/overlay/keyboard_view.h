@@ -39,7 +39,7 @@ public:
         NG::ScopedViewStackProcessor builderViewStackProcessor;
         builder();
         auto customNode = NG::ViewStackProcessor::GetInstance()->Finish();
-        auto keyboardNode = AceType::DynamicCast<UINode>(customNode);
+        auto keyboardNode = customNode;
 
         return CreateKeyboardWithNode(targetId, keyboardNode);
     };

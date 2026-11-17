@@ -28,7 +28,7 @@ std::optional<SizeF> QRCodeLayoutAlgorithm::MeasureContent(
     const LayoutConstraintF& contentConstraint, LayoutWrapper* layoutWrapper)
 {
     CHECK_NULL_RETURN(layoutWrapper, std::nullopt);
-    auto layoutProperty = AceType::DynamicCast<LayoutProperty>(layoutWrapper->GetLayoutProperty());
+    auto layoutProperty = layoutWrapper->GetLayoutProperty();
     CHECK_NULL_RETURN(layoutProperty, std::nullopt);
 
     auto pipeline = PipelineContext::GetCurrentContext();

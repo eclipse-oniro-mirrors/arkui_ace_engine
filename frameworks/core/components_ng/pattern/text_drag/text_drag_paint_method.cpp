@@ -35,7 +35,7 @@ void TextDragPaintMethod::UpdateHandleInfo(const TextDragInfo& info)
     CHECK_NULL_VOID(pipleline);
     auto textOverlayTheme = pipleline->GetTheme<TextOverlayTheme>();
     CHECK_NULL_VOID(textOverlayTheme);
-    auto modifier = DynamicCast<TextDragOverlayModifier>(overlayModifier_);
+    auto modifier = overlayModifier_;
     CHECK_NULL_VOID(modifier);
     auto handleDiameter = textOverlayTheme->GetHandleDiameter().ConvertToPx();
     modifier->SetHandleRadius(handleDiameter / CONSTANT_DOUBLE);

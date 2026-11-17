@@ -41,7 +41,7 @@ public:
     {
         auto value = MakeRefPtr<TextClockLayoutProperty>();
         TextLayoutProperty::Clone(value);
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propFormat_ = CloneFormat();
         value->propHoursWest_ = CloneHoursWest();
         value->propFontSize_ = CloneFontSize();

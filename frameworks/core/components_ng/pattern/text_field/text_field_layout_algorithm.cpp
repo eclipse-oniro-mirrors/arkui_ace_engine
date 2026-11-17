@@ -1090,7 +1090,7 @@ void TextFieldLayoutAlgorithm::FontRegisterCallback(
         frameNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
         auto pattern = frameNode->GetPattern<TextFieldPattern>();
         CHECK_NULL_VOID(pattern);
-        auto modifier = DynamicCast<TextFieldContentModifier>(pattern->GetContentModifier());
+        auto modifier = pattern->GetContentModifier();
         CHECK_NULL_VOID(modifier);
         modifier->SetFontReady(true);
     };
@@ -1109,7 +1109,7 @@ void TextFieldLayoutAlgorithm::FontRegisterCallback(
         auto pattern = frameNode->GetPattern<TextFieldPattern>();
         CHECK_NULL_VOID(pattern);
         pattern->SetIsCustomFont(true);
-        auto modifier = DynamicCast<TextFieldContentModifier>(pattern->GetContentModifier());
+        auto modifier = pattern->GetContentModifier();
         CHECK_NULL_VOID(modifier);
         modifier->SetIsCustomFont(true);
     }

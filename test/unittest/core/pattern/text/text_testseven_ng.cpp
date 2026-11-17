@@ -511,7 +511,7 @@ HWTEST_F(TextTestSevenNg, CopyTextWithSpanString010, TestSize.Level1)
     auto it = spansDe.begin();
     EXPECT_EQ(StringUtils::Str16ToStr8((*it)->content), " ");
     if ((*it)->spanItemType == SpanItemType::NORMAL) {
-        auto spanDe = AceType::DynamicCast<SpanItem>(*it);
+        auto spanDe = *it;
         EXPECT_EQ(spanDe->interval.first, 0);
         EXPECT_EQ(spanDe->interval.second, 1);
         EXPECT_EQ(StringUtils::Str16ToStr8(spanDe->content), " ");

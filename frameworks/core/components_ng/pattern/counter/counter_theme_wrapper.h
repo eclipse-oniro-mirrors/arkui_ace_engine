@@ -42,7 +42,7 @@ public:
         RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<CounterThemeWrapper>();
-            ParsePattern(themeConstants, AceType::DynamicCast<CounterTheme>(wrapper));
+            ParsePattern(themeConstants, RefPtr<CounterTheme>(wrapper));
             return wrapper;
         }
     };

@@ -57,7 +57,7 @@ std::optional<SizeF> ProgressLayoutAlgorithm::MeasureContent(
     auto progressTheme = host->GetTheme<ProgressTheme>(true);
     auto progressLayoutProperty = DynamicCast<ProgressLayoutProperty>(layoutWrapper->GetLayoutProperty());
     CHECK_NULL_RETURN(progressLayoutProperty, std::nullopt);
-    auto layoutProperty = AceType::DynamicCast<LayoutProperty>(layoutWrapper->GetLayoutProperty());
+    auto layoutProperty = layoutWrapper->GetLayoutProperty();
     CHECK_NULL_RETURN(layoutProperty, std::nullopt);
     auto layoutPolicy = layoutProperty->GetLayoutPolicyProperty();
     if (layoutPolicy.has_value() && (layoutPolicy->IsWrap() || layoutPolicy->IsFix())) {
@@ -191,7 +191,7 @@ float ProgressLayoutAlgorithm::GetChildHeight(LayoutWrapper* layoutWrapper, floa
     CHECK_NULL_RETURN(host, DEFALT_CAPSULE_WIDTH.ConvertToPx());
     auto paintProperty = host->GetPaintProperty<ProgressPaintProperty>();
     CHECK_NULL_RETURN(paintProperty, DEFALT_CAPSULE_WIDTH.ConvertToPx());
-    auto pipeline = AceType::DynamicCast<NG::PipelineContext>(host->GetContextWithCheck());
+    auto pipeline = host->GetContextWithCheck();
     CHECK_NULL_RETURN(pipeline, DEFALT_CAPSULE_WIDTH.ConvertToPx());
     auto progressTheme = host->GetTheme<ProgressTheme>(true);
     Dimension margin = progressTheme->GetTextMargin();

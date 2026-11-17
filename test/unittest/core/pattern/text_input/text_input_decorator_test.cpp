@@ -217,7 +217,7 @@ HWTEST_F(TextInputDecoratorTest, CounterDecoratorUpdateTextFieldMargin005, TestS
     counterDecorator->UpdateTextFieldMargin();
 
     // Verify text node has barrierfree property set
-    auto textNode = AceType::DynamicCast<FrameNode>(counterDecorator->textNode_.Upgrade());
+    auto textNode = counterDecorator->textNode_.Upgrade();
     ASSERT_NE(textNode, nullptr);
 
     auto accessibilityProperty = textNode->GetAccessibilityProperty<AccessibilityProperty>();
@@ -316,7 +316,7 @@ HWTEST_F(TextInputDecoratorTest, CounterDecoratorUpdateCounterContentAndStyle001
      */
     counterDecorator->UpdateCounterContentAndStyle(5, 10, true);
 
-    auto textNode = AceType::DynamicCast<FrameNode>(counterDecorator->textNode_.Upgrade());
+    auto textNode = counterDecorator->textNode_.Upgrade();
     ASSERT_NE(textNode, nullptr);
     // Note: BarrierFree text requires theme constants that may not be available in test environment
 }
@@ -350,7 +350,7 @@ HWTEST_F(TextInputDecoratorTest, CounterDecoratorUpdateCounterContentAndStyle002
      */
     counterDecorator->UpdateCounterContentAndStyle(5, 10, false);
 
-    auto textNode = AceType::DynamicCast<FrameNode>(counterDecorator->textNode_.Upgrade());
+    auto textNode = counterDecorator->textNode_.Upgrade();
     ASSERT_NE(textNode, nullptr);
     auto accessibilityProperty = textNode->GetAccessibilityProperty<AccessibilityProperty>();
     ASSERT_NE(accessibilityProperty, nullptr);
@@ -387,7 +387,7 @@ HWTEST_F(TextInputDecoratorTest, CounterDecoratorUpdateCounterContentAndStyle003
      */
     counterDecorator->UpdateCounterContentAndStyle(5, 10, true);
 
-    auto textNode = AceType::DynamicCast<FrameNode>(counterDecorator->textNode_.Upgrade());
+    auto textNode = counterDecorator->textNode_.Upgrade();
     ASSERT_NE(textNode, nullptr);
     auto textLayoutProperty = AceType::DynamicCast<TextLayoutProperty>(textNode->GetLayoutProperty());
     ASSERT_NE(textLayoutProperty, nullptr);
@@ -424,7 +424,7 @@ HWTEST_F(TextInputDecoratorTest, CounterDecoratorUpdateCounterContentAndStyle004
      */
     counterDecorator->UpdateCounterContentAndStyle(5, 10, true);
 
-    auto textNode = AceType::DynamicCast<FrameNode>(counterDecorator->textNode_.Upgrade());
+    auto textNode = counterDecorator->textNode_.Upgrade();
     ASSERT_NE(textNode, nullptr);
     auto textLayoutProperty = AceType::DynamicCast<TextLayoutProperty>(textNode->GetLayoutProperty());
     ASSERT_NE(textLayoutProperty, nullptr);
@@ -463,7 +463,7 @@ HWTEST_F(TextInputDecoratorTest, CounterDecoratorProcessCounterColor001, TestSiz
     // Trigger UpdateCounterContentAndStyle which calls ProcessCounterColor
     counterDecorator->UpdateCounterContentAndStyle(10, 10, true);
 
-    auto textNode = AceType::DynamicCast<FrameNode>(counterDecorator->textNode_.Upgrade());
+    auto textNode = counterDecorator->textNode_.Upgrade();
     ASSERT_NE(textNode, nullptr);
     auto textLayoutProperty = AceType::DynamicCast<TextLayoutProperty>(textNode->GetLayoutProperty());
     ASSERT_NE(textLayoutProperty, nullptr);
@@ -502,7 +502,7 @@ HWTEST_F(TextInputDecoratorTest, CounterDecoratorProcessCounterColor002, TestSiz
 
     counterDecorator->UpdateCounterContentAndStyle(10, 10, true);
 
-    auto textNode = AceType::DynamicCast<FrameNode>(counterDecorator->textNode_.Upgrade());
+    auto textNode = counterDecorator->textNode_.Upgrade();
     ASSERT_NE(textNode, nullptr);
     auto textLayoutProperty = AceType::DynamicCast<TextLayoutProperty>(textNode->GetLayoutProperty());
     ASSERT_NE(textLayoutProperty, nullptr);
@@ -617,7 +617,7 @@ HWTEST_F(TextInputDecoratorTest, CounterDecoratorUpdateTextNodeAndMeasure001, Te
 
     counterDecorator->UpdateTextNodeAndMeasure(5, 10, contentConstraint);
 
-    auto textNode = AceType::DynamicCast<FrameNode>(counterDecorator->textNode_.Upgrade());
+    auto textNode = counterDecorator->textNode_.Upgrade();
     ASSERT_NE(textNode, nullptr);
     EXPECT_NE(textNode->GetGeometryNode(), nullptr);
 }
@@ -654,7 +654,7 @@ HWTEST_F(TextInputDecoratorTest, CounterDecoratorUpdateTextNodeAndMeasure002, Te
 
     counterDecorator->UpdateTextNodeAndMeasure(2, 10, contentConstraint);
 
-    auto textNode = AceType::DynamicCast<FrameNode>(counterDecorator->textNode_.Upgrade());
+    auto textNode = counterDecorator->textNode_.Upgrade();
     ASSERT_NE(textNode, nullptr);
     auto textLayoutProperty = AceType::DynamicCast<TextLayoutProperty>(textNode->GetLayoutProperty());
     ASSERT_NE(textLayoutProperty, nullptr);
@@ -690,7 +690,7 @@ HWTEST_F(TextInputDecoratorTest, CounterDecoratorLayoutDecorator001, TestSize.Le
      */
     counterDecorator->LayoutDecorator();
 
-    auto textNode = AceType::DynamicCast<FrameNode>(counterDecorator->textNode_.Upgrade());
+    auto textNode = counterDecorator->textNode_.Upgrade();
     ASSERT_NE(textNode, nullptr);
     EXPECT_NE(textNode->GetGeometryNode(), nullptr);
 }
@@ -738,7 +738,7 @@ HWTEST_F(TextInputDecoratorTest, CounterDecoratorLayoutDecorator002, TestSize.Le
      */
     counterDecorator->LayoutDecorator();
 
-    auto textNode = AceType::DynamicCast<FrameNode>(counterDecorator->textNode_.Upgrade());
+    auto textNode = counterDecorator->textNode_.Upgrade();
     ASSERT_NE(textNode, nullptr);
 }
 
@@ -897,7 +897,7 @@ HWTEST_F(TextInputDecoratorTest, ErrorDecoratorUpdateLayoutProperty001, TestSize
      */
     errorDecorator->UpdateLayoutProperty();
 
-    auto textNode = AceType::DynamicCast<FrameNode>(errorDecorator->textNode_.Upgrade());
+    auto textNode = errorDecorator->textNode_.Upgrade();
     ASSERT_NE(textNode, nullptr);
     auto textLayoutProperty = AceType::DynamicCast<TextLayoutProperty>(textNode->GetLayoutProperty());
     ASSERT_NE(textLayoutProperty, nullptr);
@@ -944,7 +944,7 @@ HWTEST_F(TextInputDecoratorTest, ErrorDecoratorUpdateLayoutProperty002, TestSize
      */
     errorDecorator->UpdateLayoutProperty();
 
-    auto textNode = AceType::DynamicCast<FrameNode>(errorDecorator->textNode_.Upgrade());
+    auto textNode = errorDecorator->textNode_.Upgrade();
     ASSERT_NE(textNode, nullptr);
     auto textLayoutProperty = AceType::DynamicCast<TextLayoutProperty>(textNode->GetLayoutProperty());
     ASSERT_NE(textLayoutProperty, nullptr);
@@ -991,7 +991,7 @@ HWTEST_F(TextInputDecoratorTest, ErrorDecoratorUpdateErrorStyle001, TestSize.Lev
      */
     errorDecorator->UpdateErrorStyle();
 
-    auto textNode = AceType::DynamicCast<FrameNode>(errorDecorator->textNode_.Upgrade());
+    auto textNode = errorDecorator->textNode_.Upgrade();
     ASSERT_NE(textNode, nullptr);
     auto accessibilityProperty = textNode->GetAccessibilityProperty<AccessibilityProperty>();
     ASSERT_NE(accessibilityProperty, nullptr);
@@ -1212,7 +1212,7 @@ HWTEST_F(TextInputDecoratorTest, ErrorDecoratorBeforeLayout001, TestSize.Level1)
      */
     errorDecorator->BeforeLayout();
 
-    auto textNode = AceType::DynamicCast<FrameNode>(errorDecorator->textNode_.Upgrade());
+    auto textNode = errorDecorator->textNode_.Upgrade();
     ASSERT_NE(textNode, nullptr);
     EXPECT_NE(textNode->GetGeometryNode(), nullptr);
 }
@@ -1257,7 +1257,7 @@ HWTEST_F(TextInputDecoratorTest, ErrorDecoratorLayoutDecorator001, TestSize.Leve
      */
     errorDecorator->LayoutDecorator();
 
-    auto textNode = AceType::DynamicCast<FrameNode>(errorDecorator->textNode_.Upgrade());
+    auto textNode = errorDecorator->textNode_.Upgrade();
     ASSERT_NE(textNode, nullptr);
     EXPECT_NE(textNode->GetGeometryNode(), nullptr);
 }
@@ -1303,7 +1303,7 @@ HWTEST_F(TextInputDecoratorTest, ErrorDecoratorLayoutDecorator002, TestSize.Leve
      */
     errorDecorator->LayoutDecorator();
 
-    auto textNode = AceType::DynamicCast<FrameNode>(errorDecorator->textNode_.Upgrade());
+    auto textNode = errorDecorator->textNode_.Upgrade();
     ASSERT_NE(textNode, nullptr);
     auto geometryNode = textNode->GetGeometryNode();
     ASSERT_NE(geometryNode, nullptr);
@@ -1351,7 +1351,7 @@ HWTEST_F(TextInputDecoratorTest, ErrorDecoratorLayoutDecorator003, TestSize.Leve
      */
     errorDecorator->LayoutDecorator();
 
-    auto textNode = AceType::DynamicCast<FrameNode>(errorDecorator->textNode_.Upgrade());
+    auto textNode = errorDecorator->textNode_.Upgrade();
     ASSERT_NE(textNode, nullptr);
     EXPECT_NE(textNode->GetGeometryNode(), nullptr);
 }
@@ -1402,7 +1402,7 @@ HWTEST_F(TextInputDecoratorTest, ErrorDecoratorLayoutDecorator004, TestSize.Leve
      */
     errorDecorator->LayoutDecorator();
 
-    auto textNode = AceType::DynamicCast<FrameNode>(errorDecorator->textNode_.Upgrade());
+    auto textNode = errorDecorator->textNode_.Upgrade();
     ASSERT_NE(textNode, nullptr);
 }
 
@@ -1479,7 +1479,7 @@ HWTEST_F(TextInputDecoratorTest, TextComponentDecoratorCleanDecorator001, TestSi
     /**
      * @tc.steps: step3. Verify text node is attached
      */
-    auto textNode = AceType::DynamicCast<FrameNode>(counterDecorator->textNode_.Upgrade());
+    auto textNode = counterDecorator->textNode_.Upgrade();
     ASSERT_NE(textNode, nullptr);
 
     /**
@@ -1526,7 +1526,7 @@ HWTEST_F(TextInputDecoratorTest, TextComponentDecoratorCleanDecorator002, TestSi
     /**
      * @tc.steps: step4. Verify text node is attached
      */
-    auto textNode = AceType::DynamicCast<FrameNode>(errorDecorator->textNode_.Upgrade());
+    auto textNode = errorDecorator->textNode_.Upgrade();
     ASSERT_NE(textNode, nullptr);
 
     /**
