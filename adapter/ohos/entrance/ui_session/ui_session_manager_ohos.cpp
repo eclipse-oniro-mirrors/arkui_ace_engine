@@ -728,18 +728,18 @@ void UiSessionManagerOhos::SaveReportProxy(sptr<IRemoteObject> reportProxy, int3
                     pageTranslateScope_ = 0;
                     pageTranslateOwnerPid_ = -1;
                 }
+                if (shouldResetWebTranslate) {
+                    ResetTranslate(-1);
+                }
+                if (shouldResetPageTranslate) {
+                    ResetPageTranslate(-1);
+                }
             }
             // reportMap remove this processId
             this->reportObjectMap_.erase(processId);
             // processMap remove this processId
             for (auto& [_, processSet] : processMap_) {
                 processSet.erase(processId);
-            }
-            if (shouldResetWebTranslate) {
-                ResetTranslate(-1);
-            }
-            if (shouldResetPageTranslate) {
-                ResetPageTranslate(-1);
             }
         }
         std::vector<std::string> pageSceneRemovals;
