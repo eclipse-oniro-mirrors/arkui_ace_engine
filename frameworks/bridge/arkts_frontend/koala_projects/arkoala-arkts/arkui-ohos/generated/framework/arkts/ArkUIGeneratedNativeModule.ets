@@ -2484,6 +2484,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _TabContentAttribute_setSidebarSection(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
+    native static _TabContentAttribute_setKeepAlive(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
     native static _TabContentAttribute_setTabBarVisibility(ptr: KPointer, visibility: KInt, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _Tabs_construct(id: KInt, flags: KInt): KPointer

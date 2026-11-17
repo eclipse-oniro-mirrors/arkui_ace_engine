@@ -28151,6 +28151,8 @@ typedef struct GENERATED_ArkUITabContentModifier {
                           const Opt_VoidCallback* value);
     void (*setSidebarSection)(Ark_NativePointer node,
                               const Opt_SidebarSection* value);
+    void (*setKeepAlive)(Ark_NativePointer node,
+                         const Opt_Boolean* value);
     void (*setTabBarVisibility)(Ark_NativePointer node,
                                 Ark_TabVisibility visibility,
                                 const Opt_TabBarDisplayMode* displayMode);
