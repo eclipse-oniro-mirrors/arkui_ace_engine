@@ -20,6 +20,7 @@
 
 #define private public
 #define protected public
+#include "base/utils/system_properties.h"
 #include "core/components/common/properties/border_image.h"
 #include "core/components_ng/animation/geometry_transition.h"
 #ifdef GESTURE_DEBUG_BOUNDARY_SUPPORTED
@@ -2545,9 +2546,35 @@ HWTEST_F(RosenRenderContextTest, ShouldSkipAffineTransformation001, TestSize.Lev
     ASSERT_NE(rosenRenderContext->rsNode_, nullptr);
     rosenRenderContext->rsNode_->SetDrawNodeType(Rosen::DrawNodeType::DrawPropertyType);
     bool res = rosenRenderContext->ShouldSkipAffineTransformation(rosenRenderContext->rsNode_);
+    EXPECT_EQ(res, true);
     rosenRenderContext->rsNode_->SetDrawNodeType(Rosen::DrawNodeType::GeometryPropertyType);
     res = rosenRenderContext->ShouldSkipAffineTransformation(rosenRenderContext->rsNode_);
     ASSERT_EQ(res, false);
+    rosenRenderContext->rsNode_ = nullptr;
+    ASSERT_EQ(rosenRenderContext->rsNode_, nullptr);
+}
+
+/**
+ * @tc.name: ShouldSkipAffineTransformation003
+ * @tc.desc: Test ShouldSkipAffineTransformation no longer depends on GetContainerDeleteFlag:
+ *           DrawPropertyType node should always skip regardless of the flag.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RosenRenderContextTest, ShouldSkipAffineTransformation003, TestSize.Level1)
+{
+    auto frameNode = FrameNode::GetOrCreateFrameNode("frame", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    RefPtr rosenRenderContext = InitRosenRenderContext(frameNode);
+    ASSERT_NE(rosenRenderContext, nullptr);
+    ASSERT_NE(rosenRenderContext->rsNode_, nullptr);
+    SystemProperties::containerDeleteFlag_ = false;
+    rosenRenderContext->rsNode_->SetDrawNodeType(Rosen::DrawNodeType::DrawPropertyType);
+    bool res = rosenRenderContext->ShouldSkipAffineTransformation(rosenRenderContext->rsNode_);
+    EXPECT_EQ(res, true);
+    SystemProperties::containerDeleteFlag_ = true;
+    res = rosenRenderContext->ShouldSkipAffineTransformation(rosenRenderContext->rsNode_);
+    EXPECT_EQ(res, true);
+    SystemProperties::containerDeleteFlag_ = false;
     rosenRenderContext->rsNode_ = nullptr;
     ASSERT_EQ(rosenRenderContext->rsNode_, nullptr);
 }
@@ -2564,6 +2591,7 @@ HWTEST_F(RosenRenderContextTest, ShouldSkipAffineTransformation002, TestSize.Lev
     RefPtr rosenRenderContext = InitRosenRenderContext(frameNode);
     ASSERT_NE(rosenRenderContext, nullptr);
     ASSERT_NE(rosenRenderContext->rsNode_, nullptr);
+    rosenRenderContext->rsNode_->SetDrawNodeType(Rosen::DrawNodeType::GeometryPropertyType);
     rosenRenderContext->paintRect_ = RectT<float>(1.0f, 1.0f, -1.0f, 1.0f);
     rosenRenderContext->GetPaintRectWithTransform();
     rosenRenderContext->GetPaintRectWithTransformWithoutDegree();
@@ -3021,8 +3049,7 @@ HWTEST_F(RosenRenderContextTest, GetPointWithTransformGRectRefresh001, TestSize.
     auto rosenRenderContext = InitRosenRenderContext(frameNode);
     ASSERT_NE(rosenRenderContext, nullptr);
     ASSERT_NE(rosenRenderContext->rsNode_, nullptr);
-    bool backupContainerDeleteFlag = SystemProperties::containerDeleteFlag_;
-    SystemProperties::containerDeleteFlag_ = false;
+    rosenRenderContext->rsNode_->SetDrawNodeType(Rosen::DrawNodeType::GeometryPropertyType);
     // Non-square paint rect so that GetPaintRectWithTransform (with-degree) and
     // GetPaintRectWithTransformWithoutDegree produce different gRect values when rotation != 0.
     rosenRenderContext->paintRect_ = RectF(0.0f, 0.0f, 200.0f, 100.0f);
@@ -3050,7 +3077,6 @@ HWTEST_F(RosenRenderContextTest, GetPointWithTransformGRectRefresh001, TestSize.
     rosenRenderContext->GetPointWithTransform(point2);
     EXPECT_TRUE(NearEqual(point1.GetX(), point2.GetX(), 0.001));
     EXPECT_TRUE(NearEqual(point1.GetY(), point2.GetY(), 0.001));
-    SystemProperties::containerDeleteFlag_ = backupContainerDeleteFlag;
 }
 
 /**
@@ -3065,8 +3091,7 @@ HWTEST_F(RosenRenderContextTest, GetPointWithTransformWithRotation002, TestSize.
     auto rosenRenderContext = InitRosenRenderContext(frameNode);
     ASSERT_NE(rosenRenderContext, nullptr);
     ASSERT_NE(rosenRenderContext->rsNode_, nullptr);
-    bool backupContainerDeleteFlag = SystemProperties::containerDeleteFlag_;
-    SystemProperties::containerDeleteFlag_ = false;
+    rosenRenderContext->rsNode_->SetDrawNodeType(Rosen::DrawNodeType::GeometryPropertyType);
     rosenRenderContext->paintRect_ = RectF(0.0f, 0.0f, 200.0f, 100.0f);
     rosenRenderContext->GetRSNode()->SetRotation(90.0f);
 
@@ -3079,7 +3104,6 @@ HWTEST_F(RosenRenderContextTest, GetPointWithTransformWithRotation002, TestSize.
     // The point must be transformed by the 90-degree rotation; it cannot stay identical.
     EXPECT_FALSE(NearEqual(point.GetX(), original.GetX(), 0.001) &&
                  NearEqual(point.GetY(), original.GetY(), 0.001));
-    SystemProperties::containerDeleteFlag_ = backupContainerDeleteFlag;
 }
 
 /**
@@ -3094,8 +3118,7 @@ HWTEST_F(RosenRenderContextTest, GetPointWithTransformGRectRefresh003, TestSize.
     auto rosenRenderContext = InitRosenRenderContext(frameNode);
     ASSERT_NE(rosenRenderContext, nullptr);
     ASSERT_NE(rosenRenderContext->rsNode_, nullptr);
-    bool backupContainerDeleteFlag = SystemProperties::containerDeleteFlag_;
-    SystemProperties::containerDeleteFlag_ = false;
+    rosenRenderContext->rsNode_->SetDrawNodeType(Rosen::DrawNodeType::GeometryPropertyType);
     rosenRenderContext->paintRect_ = RectF(0.0f, 0.0f, 200.0f, 100.0f);
     rosenRenderContext->GetRSNode()->SetRotation(45.0f);
 
@@ -3116,6 +3139,5 @@ HWTEST_F(RosenRenderContextTest, GetPointWithTransformGRectRefresh003, TestSize.
 
     EXPECT_TRUE(NearEqual(point1.GetX(), point2.GetX(), 0.001));
     EXPECT_TRUE(NearEqual(point1.GetY(), point2.GetY(), 0.001));
-    SystemProperties::containerDeleteFlag_ = backupContainerDeleteFlag;
 }
 } // namespace OHOS::Ace::NG
