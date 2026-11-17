@@ -23,6 +23,7 @@
 #include "core/common/statistic_event_reporter.h"
 
 #include "base/geometry/rect.h"
+#include "base/hiviewdfx/histogram_wrapper.h"
 #include "base/log/dump_log.h"
 #include "base/log/event_report.h"
 #include "base/log/log_wrapper.h"
@@ -3360,6 +3361,9 @@ void ListPattern::ScrollToIndex(int32_t index, bool smooth, ScrollAlign align, s
             jumpIndexInGroup_.reset();
             auto host = GetHost();
             CHECK_NULL_VOID(host);
+            ACE_ENGINE_HISTOGRAM_BOOLEAN("Scrollable.Scroller.ScrollToIndex",
+                (index >= 0 && std::isfinite(currentDelta_) && !NearZero(currentDelta_) &&
+                    index >= host->GetTotalChildCount() - itemStartIndex_) ? 0 : 1);
             ContentChangeReport(host, ContentChangeManager::SCROLL_TO_INDEX, false);
         }
         MarkDirtyNodeSelf();
