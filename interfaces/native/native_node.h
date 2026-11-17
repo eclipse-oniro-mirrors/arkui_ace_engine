@@ -14522,6 +14522,7 @@ int32_t OH_ArkUI_NativeModule_AdoptChild(ArkUI_NodeHandle node, ArkUI_NodeHandle
  *     Valid values correspond to {@link OH_ArkUI_AdoptPolicy}.
  * @return Result code.
  *     <ul><li>Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
+ *     <li>If the parameter is abnormal, {@link ARKUI_ERROR_CODE_PARAM_INVALID} is returned. </li>
  *     <li>Returns {@link ARKUI_ERROR_CODE_CAPI_INIT_ERROR} if C API initialization failed.</li>
  *     <li>Returns {@link ARKUI_ERROR_CODE_NODE_HAS_PARENT} if the adopted node already has a parent node.</li>
  *     <li>Returns {@link ARKUI_ERROR_CODE_NODE_CAN_NOT_BE_ADOPTED} if the node cannot be
