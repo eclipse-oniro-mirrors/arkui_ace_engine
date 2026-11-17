@@ -305,7 +305,7 @@ void CalendarDialogPattern::UpdateImage(
     CHECK_NULL_VOID(imageLayoutProperty);
 
     ImageSourceInfo imageSourceInfo;
-    imageSourceInfo.SetResourceId(resourceId);
+    imageSourceInfo.SetResourceId(resourceId, theme->GetEntryArrowColor());
     imageLayoutProperty->UpdateImageSourceInfo(imageSourceInfo);
     imageNode->MarkModifyDone();
 }
