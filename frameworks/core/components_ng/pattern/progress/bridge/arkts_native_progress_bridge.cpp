@@ -455,11 +455,11 @@ ArkUINativeModuleValue ProgressBridge::ResetProgressStyle(ArkUIRuntimeCallInfo* 
 }
 
 void ParseStrokeWidth(const EcmaVM* vm,
-    ArkUIRuntimeCallInfo* runtimeCallInfo, ArkUIProgressStyle& progressStyle, int32_t index, bool isJsView)
+    ArkUIRuntimeCallInfo* runtimeCallInfo, ArkUIProgressStyle& progressStyle, int32_t index, bool isJsView,
+    const RefPtr<ProgressTheme>& theme)
 {
     Local<JSValueRef> strokeWidthArg = runtimeCallInfo->GetCallArgRef(index);
     CalcDimension strokeWidth = CalcDimension(DEFAULT_STROKE_WIDTH, DimensionUnit::VP);
-    auto theme = ArkTSUtils::GetTheme<ProgressTheme>();
     CHECK_NULL_VOID(theme);
     if ((strokeWidthArg->IsNull() || strokeWidthArg->IsUndefined()) && isJsView) {
         strokeWidth = theme->GetTrackThickness();
@@ -529,11 +529,11 @@ void ParseBorderWidth(const EcmaVM* vm,
 }
 
 void ParseScaleCount(
-    const EcmaVM* vm, ArkUIRuntimeCallInfo* runtimeCallInfo, ArkUIProgressStyle& progressStyle, int32_t index)
+    const EcmaVM* vm, ArkUIRuntimeCallInfo* runtimeCallInfo, ArkUIProgressStyle& progressStyle, int32_t index,
+    const RefPtr<ProgressTheme>& theme)
 {
     Local<JSValueRef> scaleCountArg = runtimeCallInfo->GetCallArgRef(index);
     int32_t scaleCount = DEFAULT_SCALE_COUNT;
-    auto theme = ArkTSUtils::GetTheme<ProgressTheme>();
     if (theme) {
         scaleCount = theme->GetScaleNumber();
     }
@@ -568,11 +568,11 @@ void ParseProgressStatus(
 }
 
 void ParseScaleWidth(const EcmaVM* vm,
-    ArkUIRuntimeCallInfo* runtimeCallInfo, ArkUIProgressStyle& progressStyle, int32_t index, bool isJsView)
+    ArkUIRuntimeCallInfo* runtimeCallInfo, ArkUIProgressStyle& progressStyle, int32_t index, bool isJsView,
+    const RefPtr<ProgressTheme>& theme)
 {
     Local<JSValueRef> scaleWidthArg = runtimeCallInfo->GetCallArgRef(index);
     CalcDimension scaleWidth = CalcDimension(DEFAULT_SCALE_WIDTH, DimensionUnit::VP);
-    auto theme = ArkTSUtils::GetTheme<ProgressTheme>();
     CHECK_NULL_VOID(theme);
 
     if (scaleWidthArg->IsString(vm)) {
@@ -857,18 +857,19 @@ void ParseBorderRadius(
 }
 
 void ParseLinearStyle(const EcmaVM* vm, ArkUIRuntimeCallInfo* runtimeCallInfo, ArkUIProgressStyle& progressStyle,
-    bool isJsView, ArkUINodeHandle& nativeNode)
+    bool isJsView, ArkUINodeHandle& nativeNode, const RefPtr<ProgressTheme>& theme)
 {
-    ParseStrokeWidth(vm, runtimeCallInfo, progressStyle, ARG_NUM_STYLE_STROKE_WIDTH, isJsView);
+    ParseStrokeWidth(vm, runtimeCallInfo, progressStyle, ARG_NUM_STYLE_STROKE_WIDTH, isJsView, theme);
     ParseStrokeRadius(vm, runtimeCallInfo, progressStyle, ARG_NUM_STYLE_STROKE_RADIUS, isJsView);
     ParseEnableScanEffect(vm, runtimeCallInfo, progressStyle, ARG_NUM_STYLE_ENABLE_SCAN_EFFECT);
     ParseEnableSmoothEffect(vm, runtimeCallInfo, progressStyle, ARG_NUM_STYLE_ENABLE_SMOOTH_EFFECT);
 }
 
 void ParseRingStyle(
-    const EcmaVM* vm, ArkUIRuntimeCallInfo* runtimeCallInfo, ArkUIProgressStyle& progressStyle, bool isJsView)
+    const EcmaVM* vm, ArkUIRuntimeCallInfo* runtimeCallInfo, ArkUIProgressStyle& progressStyle, bool isJsView,
+    const RefPtr<ProgressTheme>& theme)
 {
-    ParseStrokeWidth(vm, runtimeCallInfo, progressStyle, ARG_NUM_STYLE_STROKE_WIDTH, isJsView);
+    ParseStrokeWidth(vm, runtimeCallInfo, progressStyle, ARG_NUM_STYLE_STROKE_WIDTH, isJsView, theme);
     ParseShadow(vm, runtimeCallInfo, progressStyle, ARG_NUM_STYLE_SHADOW);
     ParseProgressStatus(vm, runtimeCallInfo, progressStyle, ARG_NUM_STYLE_PROGRESS_STATUS);
     ParseEnableScanEffect(vm, runtimeCallInfo, progressStyle, ARG_NUM_STYLE_ENABLE_SCAN_EFFECT);
@@ -893,13 +894,12 @@ void ParseCapsuleStyle(const EcmaVM* vm, ArkUIRuntimeCallInfo* runtimeCallInfo, 
 }
 
 void ParseProgressStyle(
-    const EcmaVM* vm, ArkUIRuntimeCallInfo* runtimeCallInfo, ArkUIProgressStyle& progressStyle, bool isJsView)
+    const EcmaVM* vm, ArkUIRuntimeCallInfo* runtimeCallInfo, ArkUIProgressStyle& progressStyle, bool isJsView,
+    const RefPtr<ProgressTheme>& progressTheme)
 {
-    auto progressTheme = ArkTSUtils::GetTheme<ProgressTheme>();
-    CHECK_NULL_VOID(progressTheme);
-    ParseStrokeWidth(vm, runtimeCallInfo, progressStyle, ARG_NUM_STYLE_STROKE_WIDTH, isJsView);
-    ParseScaleCount(vm, runtimeCallInfo, progressStyle, ARG_NUM_STYLE_SCALE_COUNT);
-    ParseScaleWidth(vm, runtimeCallInfo, progressStyle, ARG_NUM_STYLE_SCALE_WIDTH, isJsView);
+    ParseStrokeWidth(vm, runtimeCallInfo, progressStyle, ARG_NUM_STYLE_STROKE_WIDTH, isJsView, progressTheme);
+    ParseScaleCount(vm, runtimeCallInfo, progressStyle, ARG_NUM_STYLE_SCALE_COUNT, progressTheme);
+    ParseScaleWidth(vm, runtimeCallInfo, progressStyle, ARG_NUM_STYLE_SCALE_WIDTH, isJsView, progressTheme);
     if ((progressStyle.scaleWidthValue <= 0.0) ||
         (progressStyle.scaleWidthValue > progressStyle.strokeWidthValue) ||
         progressStyle.scaleWidthUnit == static_cast<int8_t>(DimensionUnit::PERCENT)) {
@@ -956,15 +956,15 @@ ArkUINativeModuleValue ProgressBridge::SetProgressStyle(ArkUIRuntimeCallInfo* ru
         progressStyle.styleResource.contentRawPtr = AceType::RawPtr(contentResObj);
     }
     if (progresstype == ProgressType::LINEAR) {
-        ParseLinearStyle(vm, runtimeCallInfo, progressStyle, isJsView, nativeNode);
+        ParseLinearStyle(vm, runtimeCallInfo, progressStyle, isJsView, nativeNode, progressTheme);
     } else if (progresstype == ProgressType::RING) {
-        ParseRingStyle(vm, runtimeCallInfo, progressStyle, isJsView);
+        ParseRingStyle(vm, runtimeCallInfo, progressStyle, isJsView, progressTheme);
     } else if (progresstype == ProgressType::CAPSULE) {
         auto nodeInfo = MakeProgressNodeInfo(nativeNode);
         ParseCapsuleStyle(vm, runtimeCallInfo, progressStyle, fontFamilies, families, nodeInfo, isJsView, nativeNode);
         progressStyle.content = (contentArg->IsString(vm) || contentArg->IsObject(vm)) ? content.c_str() : nullptr;
     } else {
-        ParseProgressStyle(vm, runtimeCallInfo, progressStyle, isJsView);
+        ParseProgressStyle(vm, runtimeCallInfo, progressStyle, isJsView, progressTheme);
     }
     auto nodeModifiers = GetArkUINodeModifiers();
     CHECK_NULL_RETURN(nodeModifiers, panda::JSValueRef::Undefined(vm));
