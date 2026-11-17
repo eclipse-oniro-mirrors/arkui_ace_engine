@@ -2317,6 +2317,15 @@ void TextPickerPattern::BeforeCreateLayoutWrapper()
 
 void TextPickerPattern::OnWindowSizeChanged(int32_t width, int32_t height, WindowSizeChangeReason type)
 {
+    // MOVE and DRAG_MOVE indicate window position-only changes with no size change.
+    // Picker display (text content, padding, font) depends on window size, not position.
+    // Skipping FlushCurrentOptions and MarkDirtyNode avoids unnecessary dirty propagation
+    // to parent dialog, which would trigger AvoidScreen repositioning during free-window
+    // dragging on PC.
+    if (type == WindowSizeChangeReason::MOVE || type == WindowSizeChangeReason::DRAG_MOVE) {
+        return;
+    }
+
     auto frameNodes = GetColumnNodes();
     for (auto& it : frameNodes) {
         auto columnNode = it.second;

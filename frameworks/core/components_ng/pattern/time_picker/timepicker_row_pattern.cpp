@@ -2421,6 +2421,14 @@ bool TimePickerRowPattern::OnThemeScopeUpdate(int32_t themeScopeId)
 
 void TimePickerRowPattern::OnWindowSizeChanged(int32_t width, int32_t height, WindowSizeChangeReason type)
 {
+    // MOVE and DRAG_MOVE indicate window position-only changes with no size change.
+    // Picker display (text content, padding, font) depends on window size, not position.
+    // Skipping FlushCurrentOptions avoids unnecessary dirty propagation to parent dialog,
+    // which would trigger AvoidScreen repositioning during free-window dragging on PC.
+    if (type == WindowSizeChangeReason::MOVE || type == WindowSizeChangeReason::DRAG_MOVE) {
+        return;
+    }
+
     bool oldFullscreen = isWindowFullscreen_;
     switch (type) {
         case WindowSizeChangeReason::SPLIT_TO_FULL:
