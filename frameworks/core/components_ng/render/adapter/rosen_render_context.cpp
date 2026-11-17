@@ -9465,8 +9465,7 @@ void RosenRenderContext::MarkNeedDrawNode(bool condition)
 
 bool RosenRenderContext::ShouldSkipAffineTransformation(const std::shared_ptr<RSNode>& rsNode)
 {
-    if (SystemProperties::GetContainerDeleteFlag() &&
-        rsNode->GetDrawNodeType() != Rosen::DrawNodeType::GeometryPropertyType) {
+    if (rsNode->GetDrawNodeType() != Rosen::DrawNodeType::GeometryPropertyType) {
         if (SystemProperties::GetDebugEnabled()) {
             TAG_LOGD(AceLogTag::ACE_DEFAULT_DOMAIN, "Should skip affine transformation, node(%{public}d, %{public}s)",
                 rsNode->GetFrameNodeId(), rsNode->GetFrameNodeTag().c_str());
