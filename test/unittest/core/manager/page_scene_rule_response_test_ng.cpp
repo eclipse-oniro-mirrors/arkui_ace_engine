@@ -844,4 +844,113 @@ HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_MatchPageSceneResponse
     EXPECT_EQ(hitsJson->GetArrayItem(1)->GetString("ruleId"), "rule_b");
     EXPECT_TRUE(manager.ShouldReport(TEST_PROCESS_ID, result.value()));
 }
+
+/**
+ * @tc.name: PageSceneRuleManager_CollectResponseExits001
+ * @tc.desc: A reported RESPONSE hit that is no longer present yields exactly one exit event and
+ *           the state is cleared, so repeated stable points do not repeat it (AC-9.1, INV-3).
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_CollectResponseExits001, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    const std::string region = BuildResponseRegionJson(20, 20, 40, 100);
+    auto root = CreateResponseRoot();
+    auto responseNode = CreateResponseNode(RESPONSE_NODE_ID, RESPONSE_NODE_X, RESPONSE_NODE_Y, RESPONSE_INSPECTOR_ID);
+    AddChild(root, responseNode);
+    auto ruleJson = BuildResponseRuleSetJson(RESPONSE_RULE_SET_ID, {
+        BuildResponseRuleJson(RESPONSE_RULE_ID, { "Router", TEST_PAGE_NAME, {}, { RESPONSE_INSPECTOR_ID },
+            { region } }) });
+    ASSERT_EQ(manager.RegisterResponseRuleSet(TEST_PROCESS_ID, ruleJson), PAGE_SCENE_NO_ERROR);
+
+    // Nothing has been reported yet: the sweep produces no exit.
+    EXPECT_TRUE(manager.CollectResponseExits().empty());
+
+    auto result = manager.MatchPageSceneResponse(
+        TEST_PROCESS_ID, ruleJson, responseNode, BuildStartNodes(root), TEST_PAGE_NAME, "");
+    ASSERT_TRUE(result.has_value());
+
+    // The response node is not on a live pipeline in this unit test, which is the "scene left"
+    // state: one exit, then nothing until a new hit arms the state again.
+    auto exits = manager.CollectResponseExits();
+    ASSERT_EQ(exits.size(), 1U);
+    EXPECT_EQ(exits[0].processId, TEST_PROCESS_ID);
+    EXPECT_EQ(exits[0].ruleSetId, RESPONSE_RULE_SET_ID);
+    EXPECT_EQ(exits[0].ruleId, RESPONSE_RULE_ID);
+    EXPECT_EQ(exits[0].pageName, TEST_PAGE_NAME);
+    EXPECT_TRUE(manager.CollectResponseExits().empty());
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_CollectResponseExits002
+ * @tc.desc: A hit, its exit and a second hit produce one exit per leave (AC-9.5, INV-3).
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_CollectResponseExits002, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    const std::string region = BuildResponseRegionJson(20, 20, 40, 100);
+    auto root = CreateResponseRoot();
+    auto responseNode = CreateResponseNode(RESPONSE_NODE_ID, RESPONSE_NODE_X, RESPONSE_NODE_Y, RESPONSE_INSPECTOR_ID);
+    AddChild(root, responseNode);
+    auto ruleJson = BuildResponseRuleSetJson(RESPONSE_RULE_SET_ID, {
+        BuildResponseRuleJson(RESPONSE_RULE_ID, { "Router", TEST_PAGE_NAME, {}, { RESPONSE_INSPECTOR_ID },
+            { region } }) });
+    ASSERT_EQ(manager.RegisterResponseRuleSet(TEST_PROCESS_ID, ruleJson), PAGE_SCENE_NO_ERROR);
+
+    ASSERT_TRUE(manager.MatchPageSceneResponse(
+        TEST_PROCESS_ID, ruleJson, responseNode, BuildStartNodes(root), TEST_PAGE_NAME, "").has_value());
+    EXPECT_EQ(manager.CollectResponseExits().size(), 1U);
+
+    ASSERT_TRUE(manager.MatchPageSceneResponse(
+        TEST_PROCESS_ID, ruleJson, responseNode, BuildStartNodes(root), TEST_PAGE_NAME, "").has_value());
+    EXPECT_EQ(manager.CollectResponseExits().size(), 1U);
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_CollectResponseExits003
+ * @tc.desc: Unregistering a ruleSet drops its pending exit state instead of reporting an exit.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_CollectResponseExits003, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    const std::string region = BuildResponseRegionJson(20, 20, 40, 100);
+    auto root = CreateResponseRoot();
+    auto responseNode = CreateResponseNode(RESPONSE_NODE_ID, RESPONSE_NODE_X, RESPONSE_NODE_Y, RESPONSE_INSPECTOR_ID);
+    AddChild(root, responseNode);
+    auto ruleJson = BuildResponseRuleSetJson(RESPONSE_RULE_SET_ID, {
+        BuildResponseRuleJson(RESPONSE_RULE_ID, { "Router", TEST_PAGE_NAME, {}, { RESPONSE_INSPECTOR_ID },
+            { region } }) });
+    ASSERT_EQ(manager.RegisterResponseRuleSet(TEST_PROCESS_ID, ruleJson), PAGE_SCENE_NO_ERROR);
+    ASSERT_TRUE(manager.MatchPageSceneResponse(
+        TEST_PROCESS_ID, ruleJson, responseNode, BuildStartNodes(root), TEST_PAGE_NAME, "").has_value());
+
+    ASSERT_EQ(manager.UnregisterResponseRuleSet(TEST_PROCESS_ID, RESPONSE_RULE_SET_ID), PAGE_SCENE_NO_ERROR);
+    EXPECT_TRUE(manager.CollectResponseExits().empty());
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_CollectResponseExits004
+ * @tc.desc: An unmatched operation never arms an exit: only reported hits can leave a scene
+ *           (AC-2.4 negative path, AC-9.1).
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_CollectResponseExits004, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    const std::string region = BuildResponseRegionJson(20, 20, 40, 100);
+    auto root = CreateResponseRoot();
+    auto responseNode = CreateResponseNode(RESPONSE_NODE_ID, RESPONSE_NODE_X, RESPONSE_NODE_Y, RESPONSE_INSPECTOR_ID);
+    AddChild(root, responseNode);
+    auto ruleJson = BuildResponseRuleSetJson(RESPONSE_RULE_SET_ID, {
+        BuildResponseRuleJson(RESPONSE_RULE_ID, { "Router", TEST_PAGE_NAME, {}, { RESPONSE_INSPECTOR_ID },
+            { region } }) });
+    ASSERT_EQ(manager.RegisterResponseRuleSet(TEST_PROCESS_ID, ruleJson), PAGE_SCENE_NO_ERROR);
+
+    auto noMatch = manager.MatchPageSceneResponse(
+        TEST_PROCESS_ID, ruleJson, responseNode, BuildStartNodes(root), "pages/Other", "");
+    EXPECT_FALSE(noMatch.has_value());
+    EXPECT_TRUE(manager.CollectResponseExits().empty());
+}
 } // namespace OHOS::Ace::NG

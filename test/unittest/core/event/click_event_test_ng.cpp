@@ -25,6 +25,7 @@
 #include "base/ressched/ressched_touch_optimizer.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/event/click_event.h"
+#include "core/components_ng/event/developer_response_publisher.h"
 #include "core/components_ng/event/event_hub.h"
 #include "core/components_ng/gestures/recognizers/click_recognizer.h"
 #include "core/components_ng/pattern/pattern.h"
@@ -578,5 +579,58 @@ HWTEST_F(ClickEventTestNg, ClickEventActuatorTest013, TestSize.Level1)
     auto clickEvent = AceType::MakeRefPtr<ClickEvent>(std::move(callback));
     clickEventActuator.AddClickEvent(clickEvent);
     EXPECT_FALSE(clickEventActuator.IsClickEventsEmpty());
+}
+
+namespace {
+class CountingClickResponseObserver : public DeveloperResponseObserver {
+public:
+    DECLARE_ACE_TYPE(CountingClickResponseObserver, DeveloperResponseObserver);
+    void OnDeveloperResponse(const DeveloperResponseCandidate& candidate) override
+    {
+        ++count_;
+    }
+    int32_t count_ = 0;
+};
+} // namespace
+
+/**
+ * @tc.name: ClickPublishRequiresDeveloperCallback
+ * @tc.desc: A component-internal click listener (toggle, menu item, search and so on) must not
+ *           publish a RESPONSE candidate; only a developer-visible onClick may (AC-3.2).
+ * @tc.type: FUNC
+ */
+HWTEST_F(ClickEventTestNg, ClickPublishRequiresDeveloperCallback, TestSize.Level1)
+{
+    auto eventHub = AceType::MakeRefPtr<EventHub>();
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(V2::TEXT_ETS_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    eventHub->AttachHost(frameNode);
+    auto gestureEventHub = AceType::MakeRefPtr<GestureEventHub>(AceType::WeakClaim(AceType::RawPtr(eventHub)));
+    auto clickEventActuator = AceType::MakeRefPtr<ClickEventActuator>(AceType::WeakClaim(AceType::RawPtr(
+        gestureEventHub)));
+
+    auto observer = AceType::MakeRefPtr<CountingClickResponseObserver>();
+    auto publisher = DeveloperResponsePublisher::GetInstance();
+    publisher->SetObserver(AceType::RawPtr(observer));
+
+    GestureEvent info;
+    /**
+     * @tc.steps: step1. Add a component-internal click listener only.
+     * @tc.expected: no candidate is published.
+     */
+    clickEventActuator->AddClickEvent(AceType::MakeRefPtr<ClickEvent>([](GestureEvent&) {}));
+    EXPECT_FALSE(clickEventActuator->HasDeveloperClickCallback());
+    clickEventActuator->PublishClick(info);
+    EXPECT_EQ(observer->count_, 0);
+
+    /**
+     * @tc.steps: step2. Bind a developer onClick callback.
+     * @tc.expected: exactly one candidate is published.
+     */
+    clickEventActuator->SetUserCallback([](GestureEvent&) {});
+    EXPECT_TRUE(clickEventActuator->HasDeveloperClickCallback());
+    clickEventActuator->PublishClick(info);
+    EXPECT_EQ(observer->count_, 1);
+
+    publisher->SetObserver(nullptr);
 }
 } // namespace OHOS::Ace::NG

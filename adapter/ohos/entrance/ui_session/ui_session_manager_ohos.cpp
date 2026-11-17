@@ -851,9 +851,21 @@ int32_t UiSessionManagerOhos::RegisterPageSceneRules(int32_t processId, const st
         LOGW("RegisterPageSceneRules invalid rule json, process id:%{public}d", processId);
         return PARAM_INVALID;
     }
+    if (ruleSetInfo.invalidResponseRule) {
+        // AC-1.12: one schema-invalid RESPONSE rule rejects the whole ruleSet; never register
+        // a partial set and never fall through to the legacy TEXT_EDITOR branch.
+        LOGW("RegisterPageSceneRules invalid response rule, process id:%{public}d", processId);
+        return PARAM_INVALID;
+    }
     if (HasPageSceneRule(ruleSetInfo, PAGE_SCENE_RESPONSE_SCENE, false, "")) {
         return RegisterResponsePageSceneRules(processId, ruleJson);
     }
+    return RegisterLegacyPageSceneRules(processId, ruleSetInfo, ruleJson);
+}
+
+int32_t UiSessionManagerOhos::RegisterLegacyPageSceneRules(
+    int32_t processId, const PageSceneRuleSetInfo& ruleSetInfo, const std::string& ruleJson)
+{
     {
         std::lock_guard<std::mutex> lock(pageSceneMutex_);
         if (pageSceneRuleSets_.find(processId) != pageSceneRuleSets_.end()) {
@@ -1706,6 +1718,17 @@ UiSessionManagerOhos::PageSceneRuleSetInfo UiSessionManagerOhos::ExtractPageScen
         PageSceneRuleInfo ruleInfo;
         ruleInfo.ruleId = GetJsonString(ruleJsonValue, PAGE_SCENE_RULE_ID);
         ruleInfo.sceneType = GetJsonString(ruleJsonValue, PAGE_SCENE_SCENE_TYPE);
+        const bool isResponseRule = ruleInfo.sceneType == PAGE_SCENE_RESPONSE_SCENE;
+        // A RESPONSE rule that fails the schema is a ruleSet-level error: AC-1.12 requires the
+        // whole registration to fail with PARAM_INVALID instead of dropping the rule silently
+        // and falling through to the legacy TEXT_EDITOR path.
+        const bool invalidResponseRule =
+            isResponseRule && ruleSetInfo.arkuiEnabled &&
+            (!IsValidPageSceneId(ruleInfo.ruleId) || !HasResponsePageSceneCondition(ruleJsonValue));
+        if (invalidResponseRule) {
+            ruleSetInfo.invalidResponseRule = true;
+            continue;
+        }
         if (ruleInfo.ruleId.empty() || ruleInfo.sceneType.empty()) {
             continue;
         }
