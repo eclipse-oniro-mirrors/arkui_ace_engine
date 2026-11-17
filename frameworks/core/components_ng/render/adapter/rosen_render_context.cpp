@@ -510,10 +510,15 @@ void RosenRenderContext::ClearModifiers()
     RSModifierPtr modifiers[] = { translateXYUserModifier_, translateZUserModifier_, scaleXYUserModifier_,
         rotationXUserModifier_, rotationYUserModifier_, rotationZUserModifier_, cameraDistanceUserModifier_,
         baseTranslateInXYModifier_, baseRotateInZModifier_, alphaUserModifier_ };
+    std::vector<RSModifierPtr> modifiersToRemove;
+    modifiersToRemove.reserve(sizeof(modifiers) / sizeof(modifiers[0]));
     for (auto& modifier : modifiers) {
         if (modifier) {
-            rsNode_->RemoveModifier(modifier);
+            modifiersToRemove.emplace_back(modifier);
         }
+    }
+    if (!modifiersToRemove.empty()) {
+        rsNode_->RemoveModifiers(modifiersToRemove);
     }
 }
 
@@ -1444,11 +1449,13 @@ void RosenRenderContext::PaintBackground()
         slice.top.ConvertToPxWithSize(srcSize.Height()),
         srcSize.Width() - (slice.left + slice.right).ConvertToPxWithSize(srcSize.Width()),
         srcSize.Height() - (slice.top + slice.bottom).ConvertToPxWithSize(srcSize.Height()));
-    rsNode_->SetBgImageWidth(renderSize.Width());
-    rsNode_->SetBgImageHeight(renderSize.Height());
-    rsNode_->SetBgImagePositionX(positionOffset.GetX());
-    rsNode_->SetBgImagePositionY(positionOffset.GetY());
-    rsNode_->SetBgImageInnerRect(rect);
+    Rosen::BgImageConfig config;
+    config.width = renderSize.Width();
+    config.height = renderSize.Height();
+    config.positionX = positionOffset.GetX();
+    config.positionY = positionOffset.GetY();
+    config.innerRect = rect;
+    rsNode_->SetBgImageConfig(config);
 }
 
 void RosenRenderContext::OnBackgroundImageUpdate(const ImageSourceInfo& src)
@@ -1798,14 +1805,18 @@ void RosenRenderContext::OnPixelStretchEffectUpdate(const PixStretchEffectOption
     if (option.IsPercentOption()) {
         pixStretchVector.SetValues(static_cast<float>(option.left.Value()), static_cast<float>(option.top.Value()),
             static_cast<float>(option.right.Value()), static_cast<float>(option.bottom.Value()));
-        rsNode_->SetPixelStretchPercent(pixStretchVector);
-        rsNode_->SetPixelStretch({ 0, 0, 0, 0 });
+        Rosen::PixelStretchConfig config;
+        config.vector = pixStretchVector;
+        config.usePercent = true;
+        rsNode_->SetPixelStretch(config);
     } else {
         pixStretchVector.SetValues(static_cast<float>(option.left.ConvertToPx()),
             static_cast<float>(option.top.ConvertToPx()), static_cast<float>(option.right.ConvertToPx()),
             static_cast<float>(option.bottom.ConvertToPx()));
-        rsNode_->SetPixelStretch(pixStretchVector);
-        rsNode_->SetPixelStretchPercent({ 0, 0, 0, 0 });
+        Rosen::PixelStretchConfig config;
+        config.vector = pixStretchVector;
+        config.usePercent = false;
+        rsNode_->SetPixelStretch(config);
     }
     RequestNextFrame();
 }
@@ -3110,14 +3121,15 @@ std::pair<RectF, bool> RosenRenderContext::GetPaintRectWithTranslate()
     RectF rect;
     bool error = hasScales_;
     CHECK_NULL_RETURN(rsNode_, std::make_pair(rect, error));
-    if (rsNode_->GetStagingProperties().GetRotation()) {
+    auto transform = rsNode_->GetStagingProperties().GetAllTransformPropertyValues();
+    if (transform.rotation) {
         return std::make_pair(RectF(0, 0, -1, -1), error);
     }
     rect = GetPaintRectWithoutTransform();
     if (ShouldSkipAffineTransformation(rsNode_)) {
         return std::make_pair(rect, error);
     }
-    auto translate = rsNode_->GetStagingProperties().GetTranslate();
+    const auto& translate = transform.translate;
     rect.SetOffset(rect.GetOffset() + OffsetF(translate[0], translate[1]));
     return std::make_pair(rect, error);
 }
@@ -3125,7 +3137,8 @@ std::pair<RectF, bool> RosenRenderContext::GetPaintRectWithTranslate()
 Matrix4 RosenRenderContext::GetRevertMatrix()
 {
     CHECK_NULL_RETURN(rsNode_, {});
-    auto center = rsNode_->GetStagingProperties().GetPivot();
+    auto transform = rsNode_->GetStagingProperties().GetAllTransformPropertyValues();
+    const auto& center = transform.pivot;
     Matrix4 rotateMat;
     if (transformModifier_ && !transformModifier_->GetQuaternion().IsIdentity()) {
         auto quaternionValue = transformModifier_->GetQuaternion();
@@ -3133,7 +3146,7 @@ Matrix4 RosenRenderContext::GetRevertMatrix()
         rotateMat =
             Matrix4::QuaternionToMatrix(quaternionValue[0], quaternionValue[1], quaternionValue[2], quaternionValue[3]);
     } else {
-        int32_t degree = rsNode_->GetStagingProperties().GetRotation();
+        int32_t degree = static_cast<int32_t>(transform.rotation);
         if (rsNode_->GetType() == RSUINodeType::DISPLAY_NODE && degree != 0) {
             degree = 0;
             return Matrix4();
@@ -3141,10 +3154,10 @@ Matrix4 RosenRenderContext::GetRevertMatrix()
         rotateMat = Matrix4::CreateRotate(degree, 0, 0, 1);
     }
 
-    auto translate = rsNode_->GetStagingProperties().GetTranslate();
-    auto skew = rsNode_->GetStagingProperties().GetSkew();
-    auto scale = rsNode_->GetStagingProperties().GetScale();
-    auto perspective = rsNode_->GetStagingProperties().GetPersp();
+    const auto& translate = transform.translate;
+    const auto& skew = transform.skew;
+    const auto& scale = transform.scale;
+    const auto& perspective = transform.persp;
 
     RectF rect = GetPaintRectWithoutTransform();
     auto centOffset = OffsetF(center[0] * rect.Width(), center[1] * rect.Height());
@@ -3171,16 +3184,17 @@ Matrix4 RosenRenderContext::GetMatrix()
 
 __attribute__((noinline)) Matrix4 RosenRenderContext::GetMatrixInner()
 {
-    auto center = rsNode_->GetStagingProperties().GetPivot();
-    int32_t degree = rsNode_->GetStagingProperties().GetRotation();
+    auto transform = rsNode_->GetStagingProperties().GetAllTransformPropertyValues();
+    const auto& center = transform.pivot;
+    int32_t degree = static_cast<int32_t>(transform.rotation);
     if (rsNode_->GetType() == RSUINodeType::DISPLAY_NODE && degree != 0) {
         degree = 0;
         return Matrix4();
     }
 
-    auto translate = rsNode_->GetStagingProperties().GetTranslate();
-    auto skew = rsNode_->GetStagingProperties().GetSkew();
-    auto scale = rsNode_->GetStagingProperties().GetScale();
+    const auto& translate = transform.translate;
+    const auto& skew = transform.skew;
+    const auto& scale = transform.scale;
 
     RectF rect = GetPaintRectWithoutTransform();
     auto centOffset = OffsetF(center[0] * rect.Width(), center[1] * rect.Height());
@@ -3221,7 +3235,8 @@ __attribute__((noinline)) Matrix4 RosenRenderContext::GetMatrixWithTransformRota
     const std::shared_ptr<RSNode>& rsNode, const RectF& paintRect,
     const std::shared_ptr<Rosen::ModifierNG::RSTransformModifier>& transformModifier)
 {
-    auto center = rsNode->GetStagingProperties().GetPivot();
+    auto transform = rsNode->GetStagingProperties().GetAllTransformPropertyValues();
+    const auto& center = transform.pivot;
     Matrix4 rotateMat;
 
     if (transformModifier && !transformModifier->GetQuaternion().IsIdentity()) {
@@ -3230,7 +3245,7 @@ __attribute__((noinline)) Matrix4 RosenRenderContext::GetMatrixWithTransformRota
         rotateMat =
             Matrix4::QuaternionToMatrix(quaternionValue[0], quaternionValue[1], quaternionValue[2], quaternionValue[3]);
     } else {
-        int32_t degree = rsNode->GetStagingProperties().GetRotation();
+        int32_t degree = static_cast<int32_t>(transform.rotation);
         if (rsNode->GetType() == RSUINodeType::DISPLAY_NODE && degree != 0) {
             degree = 0;
             return Matrix4();
@@ -3238,10 +3253,10 @@ __attribute__((noinline)) Matrix4 RosenRenderContext::GetMatrixWithTransformRota
         rotateMat = Matrix4::CreateRotate(degree, 0, 0, 1);
     }
 
-    auto translate = rsNode->GetStagingProperties().GetTranslate();
-    auto skew = rsNode->GetStagingProperties().GetSkew();
-    auto scale = rsNode->GetStagingProperties().GetScale();
-    auto perspective = rsNode->GetStagingProperties().GetPersp();
+    const auto& translate = transform.translate;
+    const auto& skew = transform.skew;
+    const auto& scale = transform.scale;
+    const auto& perspective = transform.persp;
 
     RectF rect = paintRect;
     auto centOffset = OffsetF(center[0] * rect.Width(), center[1] * rect.Height());
@@ -3304,20 +3319,21 @@ void RosenRenderContext::GetPointWithTransform(PointF& point)
 
 __attribute__((noinline)) void RosenRenderContext::GetPointWithTransformInner(PointF& point)
 {
-    auto skew = rsNode_->GetStagingProperties().GetSkew();
-    auto scale = rsNode_->GetStagingProperties().GetScale();
+    auto transform = rsNode_->GetStagingProperties().GetAllTransformPropertyValues();
+    const auto& skew = transform.skew;
+    const auto& scale = transform.scale;
     point = PointF(point.GetX() / scale[0], point.GetY() / scale[1]);
     SkewPoint(skew[0], skew[1], point);
-    int32_t degree = rsNode_->GetStagingProperties().GetRotation();
+    int32_t degree = static_cast<int32_t>(transform.rotation);
     if (degree != 0 && rsNode_->GetType() == RSUINodeType::DISPLAY_NODE) {
         degree = 0;
     }
     degree = degree % FULL_ROTATION;
     if (degree != 0) {
-        auto translate = rsNode_->GetStagingProperties().GetTranslate();
-        auto perspective = rsNode_->GetStagingProperties().GetPersp();
+        const auto& translate = transform.translate;
+        const auto& perspective = transform.persp;
         RectF rect = GetPaintRectWithoutTransform();
-        auto center = rsNode_->GetStagingProperties().GetPivot();
+        const auto& center = transform.pivot;
         auto radian = Degree2Radian(degree);
         point = point + gRect.GetOffset();
         point = point - OffsetF(translate[0], translate[1]);
@@ -9514,12 +9530,10 @@ void RosenRenderContext::ModifyCustomBackground()
     auto backgroundModifier = GetOrCreateBackgroundModifier();
     CHECK_NULL_VOID(backgroundModifier);
     if (GetIsTransitionBackgroundValue(false)) {
-        rsNode_->RemoveModifier(backgroundModifier);
-        rsNode_->AddModifier(transitionModifier);
+        rsNode_->SwapModifier(backgroundModifier, transitionModifier);
         transitionModifier->Modify();
     } else {
-        rsNode_->RemoveModifier(transitionModifier);
-        rsNode_->AddModifier(backgroundModifier);
+        rsNode_->SwapModifier(transitionModifier, backgroundModifier);
         backgroundModifier->Modify();
     }
 }

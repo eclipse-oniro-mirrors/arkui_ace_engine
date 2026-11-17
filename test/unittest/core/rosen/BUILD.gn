@@ -191,6 +191,7 @@ ohos_unittest("arkui_rosen_render_context_test") {
     "overlay_modifier_test_ng.cpp",
     "rosen_render_context_test.cpp",
     "rosen_render_context_test_new.cpp",
+    "rs_lock_count_test.cpp",
     "sheet_edge_light_test_ng.cpp",
     "ui_material_filter_creator_test_ng.cpp",
   ]
@@ -387,4 +388,9 @@ ohos_unittest("gradient_style_modifier_test") {
   if (defined(use_rosen_drawing) && use_rosen_drawing) {
     defines += [ "USE_ROSEN_DRAWING" ]
   }
+}
+
+group("rs_lock_count_test") {
+  testonly = true
+  deps = [ ":arkui_rosen_render_context_test" ]
 }
