@@ -344,6 +344,8 @@ public:
     float GetTotalHeight() const override;
 
     void OnAnimateStop() override;
+    void HandleOnDragStatusCallback(
+        const DragEventType& dragEventType, const RefPtr<NotifyDragEvent>& notifyDragEvent) override;
 
     void AnimateTo(float position, float duration, const RefPtr<Curve>& curve, bool smooth, bool canOverScroll = false,
         bool useTotalOffset = true) override;
@@ -599,6 +601,7 @@ private:
     std::unique_ptr<GridLayoutInfo> infoCopy_; // legacy impl to save independent data for animation.
     GridLayoutInfo info_;
     std::list<GridPreloadItem> preloadItemList_; // list of GridItems to build preemptively in IdleTask
+    std::optional<double> dragAutoScrollStartOffset_;
 
     ACE_DISALLOW_COPY_AND_MOVE(GridPattern);
 };
