@@ -21,13 +21,14 @@
 #include "core/components/common/properties/color.h"
 #include "core/components_ng/base/modifier.h"
 #include "core/components_ng/pattern/pattern.h"
+#include "core/components_ng/pattern/text_field/auto_fill_host.h"
 
 namespace OHOS::Ace::NG {
 namespace {
 constexpr float DEFAULT_LINE_THICKNESS_SCALE = 1.0f;
 } // namespace
 
-class TextFieldContentModifier : public ContentModifier {
+class TextFieldContentModifier : public ContentModifier, public IAutoFillContentModifier {
     DECLARE_ACE_TYPE(TextFieldContentModifier, ContentModifier);
 
 public:
@@ -69,11 +70,12 @@ public:
         float lineThicknessScale = DEFAULT_LINE_THICKNESS_SCALE);
     void ContentChange();
     void SetTextFadeoutEnabled(bool enabled);
-    void SetAutoFillTextScrollOffset(const float value);
-    void SetAutoFillTranslationOffset(const float value);
-    void SetAutoFillOriginTextColor(const Color& value);
-    void SetAutoFillEmphasizeCharIndex(const float value);
-    void SetAutoFillDefaultCharIndex(const float value);
+    void SetAutoFillTextScrollOffset(const float value) override;
+    void SetAutoFillTranslationOffset(const float value) override;
+    void SetAutoFillOriginTextColor(const Color& value) override;
+    void SetAutoFillEmphasizeCharIndex(const float value) override;
+    void SetAutoFillDefaultCharIndex(const float value) override;
+    void ResetAutoFillProperties() override;
 
 private:
     void SetDefaultFontSize(const TextStyle& textStyle);

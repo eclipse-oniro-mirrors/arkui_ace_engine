@@ -29,7 +29,7 @@ class ACE_EXPORT ViewDataWrap : public AceType {
     DECLARE_ACE_TYPE(ViewDataWrap, AceType);
 
 public:
-    static RefPtr<ViewDataWrap> CreateViewDataWrap();
+    ACE_FORCE_EXPORT static RefPtr<ViewDataWrap> CreateViewDataWrap();
     static RefPtr<ViewDataWrap> CreateViewDataWrap(const AbilityBase::ViewData& viewData);
     static AbilityBase::AutoFillType ViewDataToType(const AbilityBase::ViewData& viewData);
     static bool GetPlaceHolderValue(AbilityBase::ViewData& viewData);

@@ -1970,6 +1970,7 @@ void RichEditorModelNG::SetContentType(FrameNode* frameNode, const TextContentTy
     CHECK_NULL_VOID(frameNode);
     auto layoutProperty = frameNode->GetLayoutProperty<RichEditorLayoutProperty>();
     CHECK_NULL_VOID(layoutProperty);
+    TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "SetContentType=%{public}d", value);
     // companion: notify contentType changed for downstream re-parse
     if (layoutProperty->HasTextContentType() && layoutProperty->GetTextContentTypeValue() != value) {
         layoutProperty->UpdateTextContentTypeChanged(true);

@@ -27,7 +27,12 @@
 #include "core/components/text_field/textfield_theme.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_foreground_modifier.h"
 #include "core/common/autofill/auto_fill_trigger_state_holder.h"
-
+#ifdef ENABLE_AUTO_FILL_CONTROLLER
+#include "core/components_ng/render/paragraph.h"
+#include "core/components_ng/render/font_collection.h"
+#include "core/components_ng/pattern/text_field/text_field_pattern.h"
+#include "core/components_ng/pattern/rich_editor/rich_editor_content_modifier.h"
+#endif
 #include <chrono>
 #include <cstddef>
 #include <string_view>
@@ -36,6 +41,7 @@
 #include <functional>
 #include <future>
 #include <iterator>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -74,6 +80,7 @@
 #include "core/components/common/layout/layout_constants_string_utils.h"
 #include "core/components/common/properties/text_layout_info.h"
 #include "core/components/common/properties/text_style_parser.h"
+#include "core/components_ng/pattern/text/text_styles.h"
 #include "core/components_ng/base/inspector_filter.h"
 #include "core/components_ng/base/observer_handler.h"
 #include "core/components_ng/event/event_hub.h"
@@ -99,6 +106,7 @@
 #include "core/components_ng/pattern/text/layout_info_interface.h"
 #include "core/components_ng/pattern/text/span_node.h"
 #include "core/components_ng/pattern/text/text_base.h"
+#include "core/components_ng/pattern/text_field/text_field_type_utils.h"
 #include "core/common/text_field_manager_ng.h"
 #include "core/interfaces/native/node/node_text_input_modifier.h"
 #include "core/text/html_utils.h"
@@ -737,7 +745,7 @@ void RichEditorPattern::ReportEditorEvent(const std::string& eventType)
     data->Put("event", eventType.data());
     data->Put("id", host->GetId());
     data->Put("$type", "RichEditor");
-    data->Put("inputType", static_cast<int16_t>(keyboard_));
+    data->Put("inputType", static_cast<int16_t>(GetKeyboard()));
     data->Put("text", currentContent.data());
     auto rectObj = JsonUtil::Create();
     auto hostGeometryNode = host->GetGeometryNode();
@@ -6858,7 +6866,7 @@ bool RichEditorPattern::EnableStandardInput(bool needShowSoftKeyboard, SourceTyp
         std::unordered_map<std::string, MiscServices::PrivateDataValue> privateCommand;
         privateCommand.insert(std::make_pair("isEditorConsumeAlphaKey", true));
         inputMethod->SendPrivateCommand(privateCommand);
-        if (keyboard_ == TextInputType::NUMBER_DECIMAL) {
+        if (GetKeyboard() == TextInputType::NUMBER_DECIMAL) {
             std::unordered_map<std::string, MiscServices::PrivateDataValue> actualTypeCommand;
             actualTypeCommand.insert(
                 std::make_pair("actualTypeOfTheTextBox", static_cast<int32_t>(TextInputType::NUMBER_DECIMAL)));
@@ -6866,6 +6874,7 @@ bool RichEditorPattern::EnableStandardInput(bool needShowSoftKeyboard, SourceTyp
         }
         textFieldManager->SetIsImeAttached(true);
         textFieldManager->SetAttachInputId(host->GetId());
+        SendAccountRecommendCommand(textFieldManager);
     }
     UpdateCaretInfoToController();
     if (context) {
@@ -6917,7 +6926,7 @@ std::optional<MiscServices::TextConfig> RichEditorPattern::GetMiscTextConfig()
         .top = caretLeftTopPoint.GetY() + windowRect.Top(),
         .width = std::abs(caretLeftTopPoint.GetX() - caretRightBottomPoint.GetX()),
         .height = std::abs(caretLeftTopPoint.GetY() - caretRightBottomPoint.GetY()) };
-    MiscServices::InputAttribute inputAttribute = { .inputPattern = (int32_t)keyboard_,
+    MiscServices::InputAttribute inputAttribute = { .inputPattern = (int32_t)GetAutoFillKeyboardType(),
         .enterKeyType = (int32_t)GetTextInputActionValue(GetDefaultTextInputAction()),
         .isTextPreviewSupported = isTextPreviewSupported_ && (!isSpanStringMode_ || isAPI18Plus),
         .immersiveMode = static_cast<int32_t>(keyboardAppearance_),
@@ -6974,13 +6983,14 @@ bool RichEditorPattern::UnableStandardInput(bool isFocusViewChanged)
         return true;
     }
     TextInputConfiguration config;
-    config.type = keyboard_;
+    config.type = GetKeyboard();
     if (IsInPlainTextInputMode()) {
         // Input type configured via NODE_TEXT_EDITOR_TYPE: align with TextField spec.
         config.action = GetTextInputActionValue(GetDefaultTextInputAction());
         config.inputFilter = GetInputFilter();
         config.maxLength = maxLength_.value_or(INT_MAX);
-        if (keyboard_ == TextInputType::VISIBLE_PASSWORD || keyboard_ == TextInputType::NEW_PASSWORD) {
+        if (GetKeyboard() == TextInputType::VISIBLE_PASSWORD ||
+            GetKeyboard() == TextInputType::NEW_PASSWORD) {
             config.obscureText = IsPasswordObscured();
         }
     } else {
@@ -7019,13 +7029,14 @@ bool RichEditorPattern::UnableStandardInputCrossPlatform(bool isFocusViewChanged
     auto context = host->GetContext();
     CHECK_NULL_RETURN(context, false);
     TextInputConfiguration config;
-    config.type = keyboard_;
+    config.type = GetKeyboard();
     config.action = GetTextInputActionValue(GetDefaultTextInputAction());
     config.maxLength = maxLength_.value_or(INT_MAX);
     if (IsInPlainTextInputMode()) {
         // Input type configured via NODE_TEXT_EDITOR_TYPE: align with TextField spec.
         config.inputFilter = GetInputFilter();
-        if (keyboard_ == TextInputType::VISIBLE_PASSWORD || keyboard_ == TextInputType::NEW_PASSWORD) {
+        if (GetKeyboard() == TextInputType::VISIBLE_PASSWORD ||
+            GetKeyboard() == TextInputType::NEW_PASSWORD) {
             config.obscureText = IsPasswordObscured();
         }
     } else {
@@ -10834,6 +10845,135 @@ void RichEditorPattern::InsertValueByPaste(const std::u16string& pasteStr)
     }
     InsertValueByOperationType(pasteStr, OperationType::PASTE);
 }
+#ifdef ENABLE_AUTO_FILL_CONTROLLER
+// GetOrCreateAutoFillController() is now provided by AutoFillHostBase<RichEditorPattern, RichEditorLayoutProperty>
+ 
+RefPtr<Paragraph> RichEditorPattern::GetAutoFillParagraph()
+{
+    auto controller = GetOrCreateAutoFillController();
+    CHECK_NULL_RETURN(controller, nullptr);
+    auto content = controller->GetAutoFillTextUtf16Value();
+    CHECK_NULL_RETURN(!content.empty(), nullptr);
+    auto layoutProperty = GetLayoutProperty<RichEditorLayoutProperty>();
+    CHECK_NULL_RETURN(layoutProperty, nullptr);
+    // Build textStyle the same way the layout algorithm does: start from
+    // TextTheme's textStyle and overlay the layout property's fontStyle.
+    // CreateTextStyleByTypingStyle() falls back to RichEditorTheme when no
+    // typing style is set, which may have a different fontSize than what the
+    // layout actually uses (especially when showing placeholder).
+    auto pipeline = GetContext();
+    CHECK_NULL_RETURN(pipeline, nullptr);
+    auto textTheme = pipeline->GetTheme<TextTheme>();
+    TextStyle textStyle = textTheme ? textTheme->GetTextStyle() : TextStyle();
+    if (textTheme) {
+        CreateTextStyleUsingTheme(layoutProperty, textTheme, textStyle, false, AceType::Claim(static_cast<Pattern*>(this)));
+    }
+    // If user has explicitly set a typing style, overlay it on top.
+    if (styleManager_->HasTypingFontStyle() && styleManager_->HasTypingTextStyle()) {
+        textStyle = CreateTextStyleByTypingStyle();
+    }
+    auto theme = pipeline->GetTheme<TextFieldTheme>();
+    CHECK_NULL_RETURN(theme, nullptr);
+    // Set origin text color on controller — align with TextField which sets it during layout.
+    controller->SetAutoFillOriginTextColor(textStyle.GetTextColor());
+    bool needObscureText = true;
+    int32_t nakedCharPosition = -1;
+    // Apply text case transformation — align with TextField's CreateAutoFillParagraph.
+    StringUtils::TransformStrCase(content, static_cast<int32_t>(textStyle.GetTextCase()));
+    auto displayText = TextFieldPattern::CreateDisplayText(
+        content, nakedCharPosition, needObscureText, theme->IsShowPasswordDirectly());
+    // Build paragraph style from textStyle — align with TextField's GetParagraphStyle + alignment.
+    ParagraphStyle paraStyle;
+    paraStyle.maxLines = 1;
+    paraStyle.align = textStyle.GetTextAlign();
+    paraStyle.wordBreak = textStyle.GetWordBreak();
+    auto paragraph = Paragraph::Create(paraStyle, FontCollection::Current());
+    CHECK_NULL_RETURN(paragraph, nullptr);
+    UtfUtils::HandleInvalidUTF16(reinterpret_cast<uint16_t*>(displayText.data()), displayText.length(), 0);
+    for (size_t i = 0; i < displayText.length(); i++) {
+        paragraph->PushStyle(textStyle);
+        std::u16string tempStr(1, displayText[i]);
+        paragraph->AddText(tempStr);
+        paragraph->PopStyle();
+    }
+    paragraph->Build();
+    // Layout with infinity width so GetLongestLine() returns the full text width
+    // (not clamped to the component width). This matches TextField's horizontal
+    // scrolling path which layouts at infinity. AutoFillController relies on
+    // GetLongestLine() exceeding the content rect width to detect EXTRA_LONG
+    // mode and trigger PlayAutoFillTextScrollAnimation — the content scroll
+    // effect when text overflows the component.
+    paragraph->Layout(std::numeric_limits<double>::infinity());
+    return paragraph;
+}
+ 
+TextDirection RichEditorPattern::GetAutoFillParagraphDirection(TextDirection fallback)
+{
+    const auto& paragraphs = paragraphs_.GetParagraphs();
+    if (!paragraphs.empty() && paragraphs.front().paragraph) {
+        return paragraphs.front().paragraph->GetParagraphStyle().direction;
+    }
+    return fallback;
+}
+ 
+RefPtr<FrameNode> RichEditorPattern::GetAutoFillHostNode()
+{
+    return GetContentHost();
+}
+ 
+RectF RichEditorPattern::GetAutoFillTextContentRect()
+{
+    auto rect = GetTextContentRect();
+    auto contentHost = GetContentHost();
+    CHECK_NULL_RETURN(contentHost, rect);
+    auto geometryNode = contentHost->GetGeometryNode();
+    CHECK_NULL_RETURN(geometryNode, rect);
+    auto frameOffset = geometryNode->GetFrameOffset();
+    rect.SetLeft(rect.GetX() - frameOffset.GetX());
+    rect.SetTop(rect.GetY() - frameOffset.GetY());
+    return rect;
+}
+ 
+RectF RichEditorPattern::GetAutoFillTextRect()
+{
+    auto rect = GetTextRect();
+    auto contentHost = GetContentHost();
+    CHECK_NULL_RETURN(contentHost, rect);
+    auto geometryNode = contentHost->GetGeometryNode();
+    CHECK_NULL_RETURN(geometryNode, rect);
+    auto frameOffset = geometryNode->GetFrameOffset();
+    rect.SetLeft(rect.GetX() - frameOffset.GetX());
+    rect.SetTop(rect.GetY() - frameOffset.GetY());
+    return rect;
+}
+ 
+IAutoFillContentModifier* RichEditorPattern::GetAutoFillContentModifier()
+{
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, nullptr);
+    auto children = host->GetChildren();
+    for (const auto& child : children) {
+        auto frameNode = AceType::DynamicCast<FrameNode>(child);
+        CHECK_NULL_CONTINUE(frameNode);
+        auto contentPattern = frameNode->GetPattern<RichEditorContentPattern>();
+        CHECK_NULL_CONTINUE(contentPattern);
+        auto contentModifier = contentPattern->GetContentModifierInstance();
+        CHECK_NULL_RETURN(contentModifier, nullptr);
+        auto richEditorModifier = DynamicCast<RichEditorContentModifier>(contentModifier);
+        CHECK_NULL_RETURN(richEditorModifier, nullptr);
+        return static_cast<IAutoFillContentModifier*>(RawPtr(richEditorModifier));
+    }
+    return nullptr;
+}
+ 
+// BeforeAutoFillAnimation is now provided by AutoFillHostBase (delegates to ExecuteBeforeAutoFillAnimation).
+// PrepareAutoFillText and IsAutoFillAnimationEnabled use default implementations (no filtering, always enabled).
+// Only the text insertion hook is component-specific:
+void RichEditorPattern::ExecuteAutoFillInsert(const std::u16string& content)
+{
+    InsertValueByOperationType(content, OperationType::AUTO_FILL);
+}
+#endif
 
 void RichEditorPattern::NotifyFillRequestSuccess(RefPtr<ViewDataWrap> viewDataWrap,
     RefPtr<PageNodeInfoWrap> nodeWrap, AceAutoFillType autoFillType, AceAutoFillTriggerType triggerType)
@@ -10971,25 +11111,42 @@ void RichEditorPattern::DumpViewDataPageNode(RefPtr<ViewDataWrap> viewDataWrap, 
     pageNodeRect.SetOffset(offsetToWindow);
     info->SetPageNodeRect(pageNodeRect);
     info->SetIsFocus(HasFocus());
-    FillAutoFillPageNodeInfo(info);
+    FillAutoFillPageNodeInfo(viewDataWrap, info);
     if (needsRecordData) {
         lastAutoFillTextValue_ = info->GetValue();
     }
     viewDataWrap->AddPageNodeInfoWrap(info);
 }
 
-void RichEditorPattern::FillAutoFillPageNodeInfo(const RefPtr<PageNodeInfoWrap>& info)
+void RichEditorPattern::FillAutoFillPageNodeInfo(const RefPtr<ViewDataWrap>& viewDataWrap,
+    const RefPtr<PageNodeInfoWrap>& info)
 {
     CHECK_NULL_VOID(info);
     CHECK_NULL_VOID(IsAutoFillEnabled());
     auto layoutProperty = GetLayoutProperty<RichEditorLayoutProperty>();
     CHECK_NULL_VOID(layoutProperty);
     auto contentType = layoutProperty->GetTextContentTypeValue(TextContentType::UNSPECIFIED);
-    auto autoFillType = TextContentTypeToAceAutoFillType(contentType);
+    auto aceContentType = TextContentTypeToAceAutoFillType(contentType);
+    auto textInputType = layoutProperty->GetTextInputTypeValue(TextInputType::UNSPECIFIED);
+    auto aceInputType = ConvertToAceAutoFillType(textInputType);
     auto passwordRules = layoutProperty->GetPasswordRulesValue("");
     auto textValue = GetTextValue();
-    info->SetAutoFillType(autoFillType);
-    info->SetEnableAutoFill(true);
+    // Handle autoFillOtherAccount_ — mirror TextFieldPattern: set OtherAccount
+    // flag on viewDataWrap so the AutoFillManager knows this is an otherAccount
+    // request, then include the current value.
+    if (autoFillOtherAccount_) {
+        viewDataWrap->SetOtherAccount(true);
+        autoFillOtherAccount_ = false;
+    }
+    if (aceContentType != AceAutoFillType::ACE_UNSPECIFIED){
+        info->SetAutoFillType(aceContentType);
+    } else if (aceInputType != AceAutoFillType::ACE_UNSPECIFIED){
+        info->SetAutoFillType(aceInputType);
+    } else {
+        auto jsonValue = JsonUtil::Create(true);
+        jsonValue->Put("type", TextFieldTypeUtils::ToInputTypeString(textInputType, false, false).c_str());
+        info->SetMetadata(jsonValue->ToString());
+    }
     info->SetPasswordRules(passwordRules);
     info->SetValue(textValue);
 }
@@ -11033,11 +11190,11 @@ void RichEditorPattern::HandleOnPaste()
 #endif
 }
 
-std::pair<bool, bool> RichEditorPattern::ProcessAutoFill(bool isNewPassWord,
+std::pair<bool, bool> RichEditorPattern::ProcessAutoFill(bool isNewPassWord, bool ignoreFillType,
     AceAutoFillTriggerType triggerType)
 {
 #ifdef ENABLE_AUTO_FILL_CONTROLLER
-    CHECK_NULL_RETURN(CheckAutoFill(triggerType), std::make_pair(false, false));
+    CHECK_NULL_RETURN(CheckAutoFill(triggerType, ignoreFillType), std::make_pair(false, false));
     if (auto focusHub = GetFocusHub(); focusHub && !HasFocus()) {
         focusHub->RequestFocusImmediately();
         isOnlyRequestFocus_ = true;
@@ -11084,16 +11241,42 @@ std::pair<bool, bool> RichEditorPattern::ProcessAutoFill(bool isNewPassWord,
 #endif
 }
 
+void RichEditorPattern::ProcessAutoFillTrigger(AceAutoFillTriggerType triggerType)
+{
+    TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "ProcessAutoFillTrigger, triggerType=%{public}d", (int32_t)triggerType);
+    ProcessAutoFill(false, true, triggerType);
+}
+
 void RichEditorPattern::ProcessAutoFillOnPaste()
 {
     TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "ProcessAutoFillOnPaste");
-    ProcessAutoFill(false, AceAutoFillTriggerType::PASTE_REQUEST);
+    ProcessAutoFill(false, false, AceAutoFillTriggerType::PASTE_REQUEST);
+}
+
+void RichEditorPattern::SendAccountRecommendCommand(const RefPtr<TextFieldManagerNG>& textFieldManager)
+{
+#if defined(ENABLE_STANDARD_INPUT)
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto fillContentMap = textFieldManager->GetFillContentMap(host->GetId());
+    if (fillContentMap.empty() || !IsTriggerAutoFillPassword()) {
+        TAG_LOGD(AceLogTag::ACE_AUTO_FILL, "SendAccountRecommendCommand: fillContentMap empty or not needed");
+        return;
+    }
+    // RichEditor has no firstAutoFillContainerNode_ / sibling userName node, so
+    // TryRecommendTypedUserName is skipped; fillContentMap is forwarded as-is.
+    auto inputMethod = MiscServices::InputMethodController::GetInstance();
+    CHECK_NULL_VOID(inputMethod);
+    inputMethod->SendPrivateCommand(fillContentMap);
+#else
+    (void)textFieldManager;
+#endif
 }
 
 void RichEditorPattern::HandleOnPasswordVault()
 {
     TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "HandleOnPasswordVault");
-    ProcessAutoFill(false, AceAutoFillTriggerType::MANUAL_REQUEST);
+    ProcessAutoFill(false, false, AceAutoFillTriggerType::MANUAL_REQUEST);
 }
 
 bool RichEditorPattern::IsModalCovered()
@@ -11111,7 +11294,7 @@ bool RichEditorPattern::IsModalCovered()
 bool RichEditorPattern::ProcessAutoFillAndKeyboard(RichEditorAutoFillReason autoFillReason, SourceType sourceType)
 {
 #ifdef ENABLE_AUTO_FILL_CONTROLLER
-    auto [isSuccess, isPopup] = ProcessAutoFill(false, AceAutoFillTriggerType::AUTO_REQUEST);
+    auto [isSuccess, isPopup] = ProcessAutoFill(false, false, AceAutoFillTriggerType::AUTO_REQUEST);
     if (!isPopup && isSuccess) {
         if (autoFillReason == RichEditorAutoFillReason::EDITOR_FOCUS) {
             SetAutoFillRequestSuccessOnFocus(true);
@@ -11224,7 +11407,7 @@ bool RichEditorPattern::IsTriggerAutoFillPassword()
            autoFillType == AceAutoFillType::ACE_NEW_PASSWORD;
 }
 
-bool RichEditorPattern::CheckAutoFill(AceAutoFillTriggerType triggerType)
+bool RichEditorPattern::CheckAutoFill(AceAutoFillTriggerType triggerType, bool ignoreFillType)
 {
     if (triggerType == AceAutoFillTriggerType::MANUAL_REQUEST ||
         triggerType == AceAutoFillTriggerType::PASTE_REQUEST) {
@@ -11232,6 +11415,9 @@ bool RichEditorPattern::CheckAutoFill(AceAutoFillTriggerType triggerType)
     }
     if (!IsAutoFillEnabled()) {
         return false;
+    }
+    if (ignoreFillType) {
+        return true;
     }
     auto autoFillType = GetAutoFillType();
     auto isTriggerPassword = IsTriggerAutoFillPassword();
@@ -17674,12 +17860,32 @@ bool RichEditorPattern::IsInPlainTextInputMode() const
     return isSingleLineMode_ && SpanStringModeSwitcher::IsPlainTextInputType(GetTextInputType());
 }
 
+TextInputType RichEditorPattern::GetKeyboard() const
+{
+    return isSingleLineMode_ ? keyboard_ : TextInputType::UNSPECIFIED;
+}
+
+TextInputType RichEditorPattern::GetAutoFillKeyboardType()
+{
+    auto current = GetKeyboard();
+    if (current != TextInputType::UNSPECIFIED) {
+        return current;
+    }
+    auto autoFillType = GetAutoFillType();
+    const auto& keyBoardMap = TextInputClient::GetAutoFillKeyboardMap();
+    auto it = keyBoardMap.find(autoFillType);
+    if (it != keyBoardMap.end()) {
+        return it->second;
+    }
+    return TextInputType::UNSPECIFIED;
+}
+
 RefPtr<SpanString> RichEditorPattern::FilterSpanStringByInputType(const RefPtr<SpanString>& src, bool checkPreview)
 {
     CHECK_NULL_RETURN(src, src);
     CHECK_NULL_RETURN(IsInPlainTextInputMode(), src);
     CHECK_NULL_RETURN(!(checkPreview && IsPreviewTextInputting()), src);
-    return SpanStringModeSwitcher::FilterSpanString(src, keyboard_);
+    return SpanStringModeSwitcher::FilterSpanString(src, GetKeyboard());
 }
 
 void RichEditorPattern::FilterTextByInputType(std::u16string& text)
@@ -17693,9 +17899,9 @@ void RichEditorPattern::FilterTextByInputType(std::u16string& text)
         if (selStart >= 0 && selEnd > selStart && selEnd <= static_cast<int32_t>(existing.length())) {
             selected = existing.substr(selStart, selEnd - selStart);
         }
-        text = TextInputFilter::PreprocessValue(keyboard_, existing, text, selected);
+        text = TextInputFilter::PreprocessValue(GetKeyboard(), existing, text, selected);
     }
-    TextInputFilter::FilterByInputType(keyboard_, text);
+    TextInputFilter::FilterByInputType(GetKeyboard(), text);
 }
 
 void RichEditorPattern::FilterInitializeTextByInputType()
@@ -17704,9 +17910,9 @@ void RichEditorPattern::FilterInitializeTextByInputType()
     CHECK_NULL_VOID(isSingleLineMode_ && IsStyledStringModeEnabled());
     auto original = styledString_->GetU16string();
     std::u16string filtered = original;
-    TextInputFilter::FilterByInputType(keyboard_, filtered);
+    TextInputFilter::FilterByInputType(GetKeyboard(), filtered);
     TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "FilterInitializeTextByInputType completed, keyboard_=%{public}d",
-        static_cast<int32_t>(keyboard_));
+        static_cast<int32_t>(GetKeyboard()));
     CHECK_NULL_VOID(filtered != original);
     auto length = styledString_->GetLength();
     styledString_->ReplaceString(0, length, filtered);
@@ -17823,7 +18029,7 @@ void RichEditorPattern::DoKeyboardResetPlatform(
                 }
                 return;
             }
-            NotifyInputMethodConfigChange(action_, keyboard_);
+            NotifyInputMethodConfigChange(action_, GetKeyboard());
         }
 #else
         if (needToResetKeyboard && HasConnection()) {

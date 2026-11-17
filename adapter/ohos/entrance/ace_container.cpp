@@ -2235,7 +2235,7 @@ void AceContainer::FillAutoFillViewData(const RefPtr<NG::FrameNode>& node, RefPt
     CHECK_NULL_VOID(node);
     CHECK_NULL_VOID(viewDataWrap);
     auto nodeInfoWraps = viewDataWrap->GetPageNodeInfoWraps();
-    auto pattern = node->GetPattern<NG::TextFieldPattern>();
+    auto pattern = node->GetPattern<TextInputClient>();
     CHECK_NULL_VOID(pattern);
     auto autoFillUserName = pattern->GetAutoFillUserName();
     auto autoFillNewPassword = pattern->GetAutoFillNewPassword();

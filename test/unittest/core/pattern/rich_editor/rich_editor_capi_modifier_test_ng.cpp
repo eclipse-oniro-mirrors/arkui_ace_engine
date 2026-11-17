@@ -305,10 +305,12 @@ HWTEST_F(RichEditorCapiModifierTestNg, RichEditorEnableAutoFillAnimationTest, Te
     // default: enableAutoFillAnimation is true when not set
     EXPECT_TRUE(RichEditorModelNG::GetEnableAutoFillAnimation(rawNode));
 
+    // enableAutoFillAnimation is false
     RichEditorModelNG::SetEnableAutoFillAnimation(rawNode, false);
     EXPECT_FALSE(RichEditorModelNG::GetEnableAutoFillAnimation(rawNode));
     EXPECT_FALSE(layoutProperty->GetEnableAutoFillAnimation().value_or(true));
 
+    // resetEnableAutoFillAnimation
     RichEditorModelNG::ResetEnableAutoFillAnimation(rawNode);
     EXPECT_TRUE(RichEditorModelNG::GetEnableAutoFillAnimation(rawNode));
     EXPECT_TRUE(layoutProperty->GetEnableAutoFillAnimation().value_or(false));

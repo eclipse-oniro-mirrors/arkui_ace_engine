@@ -149,7 +149,7 @@ void RichEditorBaseController::SetSelection(
     richEditorPattern->ForceTriggerAvoidOnCaretChange();
 }
 
-const PreviewTextInfo RichEditorBaseController::GetPreviewTextInfo() const
+const OHOS::Ace::PreviewTextInfo RichEditorBaseController::GetPreviewTextInfo() const
 {
     auto richEditorPattern = pattern_.Upgrade();
     CHECK_NULL_RETURN(richEditorPattern, PreviewTextInfo());

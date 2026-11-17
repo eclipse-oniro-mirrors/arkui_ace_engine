@@ -46,6 +46,10 @@
 #include "core/text/text_emoji_processor.h"
 #include "base/view_data/ace_auto_fill_type.h"
 #include "core/components_ng/pattern/text_field/password_icon_host.h"
+#include "core/components_ng/pattern/text_field/auto_fill_host.h"
+#ifdef ENABLE_AUTO_FILL_CONTROLLER
+#include "core/components_ng/pattern/text_field/auto_fill_controller.h"
+#endif
 #include "core/components/text_field/textfield_theme.h"
 #include "core/components_ng/pattern/rich_editor/span_string_mode_switcher.h"
 #include "core/common/text_field_manager_ng.h"
@@ -278,9 +282,10 @@ using RichEditorCapability = TextCapability;
 class RichEditorPattern
     : public TextPattern, public ScrollablePattern, public TextInputClient, public SpanWatcher,
       public CleanNodeHostBase<RichEditorPattern, RichEditorLayoutProperty>, public ICounterHost,
-      public PasswordIconHostBase<RichEditorPattern, RichEditorLayoutProperty> {
+      public PasswordIconHostBase<RichEditorPattern, RichEditorLayoutProperty>,
+      public AutoFillHostBase<RichEditorPattern, RichEditorLayoutProperty> {
     DECLARE_ACE_TYPE(RichEditorPattern, TextPattern, ScrollablePattern, TextInputClient, SpanWatcher, ICleanNodeHost,
-        ICounterHost, IPasswordIconHost);
+        ICounterHost, IPasswordIconHost, IAutoFillHost);
 
 public:
     void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context) override;
@@ -1020,6 +1025,8 @@ public:
     }
 
     bool IsInPlainTextInputMode() const;
+    TextInputType GetKeyboard() const;
+    TextInputType GetAutoFillKeyboardType();
     void SwitchStyledStringByInputMode();
     void InitPasswordMode();
     RefPtr<SpanString> FilterSpanStringByInputType(const RefPtr<SpanString>& src, bool checkPreview);
@@ -1081,10 +1088,10 @@ public:
         AceAutoFillTriggerType triggerType = AceAutoFillTriggerType::AUTO_REQUEST) override;
     void DumpViewDataPageNode(RefPtr<ViewDataWrap> viewDataWrap, bool needsRecordData = false) override;
     bool CheckAutoSave() override;
-    void FillAutoFillPageNodeInfo(const RefPtr<PageNodeInfoWrap>& info);
-    std::pair<bool, bool> ProcessAutoFill(bool isNewPassWord = false,
+    void FillAutoFillPageNodeInfo(const RefPtr<ViewDataWrap>& viewDataWrap, const RefPtr<PageNodeInfoWrap>& info);
+    std::pair<bool, bool> ProcessAutoFill(bool isNewPassWord = false, bool ignoreFillType = false,
         AceAutoFillTriggerType triggerType = AceAutoFillTriggerType::AUTO_REQUEST);
-    bool CheckAutoFill(AceAutoFillTriggerType triggerType);
+    bool CheckAutoFill(AceAutoFillTriggerType triggerType, bool ignoreFillType = false);
     void SetAutoFillTriggeredStateByType(const AceAutoFillType& autoFillType);
     bool GetAutoFillTriggeredStateByType(const AceAutoFillType& autoFillType);
     void ProcessAutoFillOnPaste();
@@ -1115,7 +1122,46 @@ public:
     void HandleAutoRequestFill(const std::u16string& fillData, const RefPtr<PageNodeInfoWrap>& nodeWrap,
         bool fromOtherAccount);
     void HandleOnAutoFillSecurePaste(const std::u16string& fillData);
+    // AutoFill password-vault IME bridge — mirrors TextFieldPattern's
+    // SendAccountRecommendCommand path so IMF can surface the password-vault
+    // button on the soft keyboard for password-mode RichEditor.
+    void SetAutoFillUserName(const std::string& userName) override
+    {
+        autoFillUserName_ = userName;
+    }
+    void SetAutoFillNewPassword(const std::string& newPassword) override
+    {
+        autoFillNewPassword_ = newPassword;
+    }
+    std::string GetAutoFillUserName() override
+    {
+        return autoFillUserName_;
+    }
+
+    std::string GetAutoFillNewPassword() override
+    {
+        return autoFillNewPassword_;
+    }
+    void SetAutoFillOtherAccount(bool otherAccount)
+    {
+        autoFillOtherAccount_ = otherAccount;
+    }
+    void SendAccountRecommendCommand(const RefPtr<TextFieldManagerNG>& textFieldManager);
+    // TextInputClient virtual dispatch entry — routes to ProcessAutoFill(triggerType).
+    // Implemented in rich_editor_pattern.cpp so the symbol stays local to this SO.
+    void ProcessAutoFillTrigger(AceAutoFillTriggerType triggerType) override;
     bool IsInterceptInput(const bool shouldCommitInput, const OperationType operationType);
+
+#ifdef ENABLE_AUTO_FILL_CONTROLLER
+    RefPtr<FrameNode> GetAutoFillHostNode() override;
+    RectF GetAutoFillTextContentRect() override;
+    RectF GetAutoFillTextRect() override;
+    RefPtr<Paragraph> GetAutoFillParagraph() override;
+    IAutoFillContentModifier* GetAutoFillContentModifier() override;
+    RefPtr<TextFieldTheme> GetAutoFillTheme() override { return GetTheme<TextFieldTheme>(); }
+    TextDirection GetAutoFillParagraphDirection(TextDirection fallback) override;
+    void ExecuteAutoFillInsert(const std::u16string& content) override;
+#endif
 
     // local/global coordinate conversion with render transform.
     Offset ConvertToLocalOffsetWithTransform(const Offset& globalOffset);
@@ -1255,6 +1301,7 @@ protected:
 
 private:
     friend class RichEditorSelectOverlay;
+    friend class AutoFillHostBase<RichEditorPattern, RichEditorLayoutProperty>;
     friend class OneStepDragController;
     friend class RichEditorUndoManager;
     friend class StyledStringUndoManager;
@@ -1685,6 +1732,10 @@ private:
     bool shouldSkipAutoFillOnFocus_ = false;
     WeakPtr<FrameNode> firstAutoFillContainerNode_;
 
+    // AutoFill IME bridge state — set by IMF PrivateCommand, consumed by ProcessAutoFill.
+    std::string autoFillUserName_;
+    std::string autoFillNewPassword_;
+    bool autoFillOtherAccount_ = false;
     int32_t moveLength_ = 0;
     int32_t insertValueLength_ = 0;
     int32_t lastCaretPosition_ = 0;
