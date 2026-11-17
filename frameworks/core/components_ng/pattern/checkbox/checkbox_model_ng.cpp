@@ -596,12 +596,15 @@ void CheckBoxModelNG::UpdatePaintPropertyBySettingData(
     checkboxPaintProps->UpdateCheckBoxSelect(isLunar);
     if (data.selectedColor.has_value()) {
         checkboxPaintProps->UpdateCheckBoxSelectedColor(data.selectedColor.value());
+        checkboxPaintProps->UpdateCheckBoxSelectedColorFlagByUser(true);
     }
     if (data.unselectedColor.has_value()) {
         checkboxPaintProps->UpdateCheckBoxUnSelectedColor(data.unselectedColor.value());
+        checkboxPaintProps->UpdateCheckBoxUnSelectedColorFlagByUser(true);
     }
     if (data.strokeColor.has_value()) {
         checkboxPaintProps->UpdateCheckBoxCheckMarkColor(data.strokeColor.value());
+        checkboxPaintProps->UpdateCheckBoxCheckMarkColorFlagByUser(true);
     }
     auto checkboxPattern = frameNode->GetPattern<CheckBoxPattern>();
     CHECK_NULL_VOID(checkboxPattern);
