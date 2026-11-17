@@ -2470,6 +2470,7 @@ frameworks/core/components_ng/pattern/common_text/ @huawei_g_five
 frameworks/core/components_ng/pattern/common_view/ @ArkUI_Event
 frameworks/core/components_ng/pattern/container_modal/ @ArkUI_ability_group
 frameworks/core/components_ng/pattern/container_picker/ @arkui001
+frameworks/core/components_ng/pattern/container_reader/container_reader_layout_property.h @arkuilayout1
 frameworks/core/components_ng/pattern/corner_mark/ @arkui_framework_xnode
 frameworks/core/components_ng/pattern/counter/ @huawei_g_five
 frameworks/core/components_ng/pattern/custom/ @arkuilayout1

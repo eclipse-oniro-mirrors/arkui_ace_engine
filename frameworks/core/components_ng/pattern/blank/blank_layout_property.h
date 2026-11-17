@@ -36,7 +36,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto copy = MakeRefPtr<BlankLayoutProperty>();
-        copy->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        copy->LayoutProperty::UpdateLayoutProperty(this);
         copy->propMinSize_ = CloneMinSize();
         copy->propHeight_ = CloneHeight();
         return copy;

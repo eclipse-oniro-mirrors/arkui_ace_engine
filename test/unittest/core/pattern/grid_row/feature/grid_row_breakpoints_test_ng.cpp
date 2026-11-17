@@ -240,7 +240,7 @@ HWTEST_F(GridRowBreakPointsTestNG, ProcessGridSizeType_WindowSize01, TestSize.Le
     CHECK_NULL_VOID(pipeline);
     Rect displayWindowRectInfo = Rect(0, 0, 319, 1000);
     pipeline->SetDisplayWindowRectInfo(displayWindowRectInfo);
-    auto container = AceType::DynamicCast<Container>(Container::Current());
+    auto container = Container::Current();
     ASSERT_NE(container, nullptr);
     container->SetApiTargetVersion((int32_t)PlatformVersion::VERSION_TWENTY);
     EXPECT_TRUE(Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY));
@@ -267,7 +267,7 @@ HWTEST_F(GridRowBreakPointsTestNG, ProcessGridSizeType_WindowSize02, TestSize.Le
     CHECK_NULL_VOID(pipeline);
     Rect displayWindowRectInfo = Rect(0, 0, 320, 1000);
     pipeline->SetDisplayWindowRectInfo(displayWindowRectInfo);
-    auto container = AceType::DynamicCast<Container>(Container::Current());
+    auto container = Container::Current();
     ASSERT_NE(container, nullptr);
     container->SetApiTargetVersion((int32_t)PlatformVersion::VERSION_TWENTY);
     EXPECT_TRUE(Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY));
@@ -290,7 +290,7 @@ HWTEST_F(GridRowBreakPointsTestNG, ProcessGridSizeType_WindowSize03, TestSize.Le
     CHECK_NULL_VOID(pipeline);
     Rect displayWindowRectInfo = Rect(0, 0, 321, 1000);
     pipeline->SetDisplayWindowRectInfo(displayWindowRectInfo);
-    auto container = AceType::DynamicCast<Container>(Container::Current());
+    auto container = Container::Current();
     ASSERT_NE(container, nullptr);
     container->SetApiTargetVersion((int32_t)PlatformVersion::VERSION_TWENTY);
     EXPECT_TRUE(Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY));
@@ -313,7 +313,7 @@ HWTEST_F(GridRowBreakPointsTestNG, ProcessGridSizeType_WindowSize04, TestSize.Le
     CHECK_NULL_VOID(pipeline);
     Rect displayWindowRectInfo = Rect(0, 0, 599, 1000);
     pipeline->SetDisplayWindowRectInfo(displayWindowRectInfo);
-    auto container = AceType::DynamicCast<Container>(Container::Current());
+    auto container = Container::Current();
     ASSERT_NE(container, nullptr);
     container->SetApiTargetVersion((int32_t)PlatformVersion::VERSION_TWENTY);
     EXPECT_TRUE(Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY));
@@ -336,7 +336,7 @@ HWTEST_F(GridRowBreakPointsTestNG, ProcessGridSizeType_WindowSize05, TestSize.Le
     CHECK_NULL_VOID(pipeline);
     Rect displayWindowRectInfo = Rect(0, 0, 600, 1000);
     pipeline->SetDisplayWindowRectInfo(displayWindowRectInfo);
-    auto container = AceType::DynamicCast<Container>(Container::Current());
+    auto container = Container::Current();
     ASSERT_NE(container, nullptr);
     container->SetApiTargetVersion((int32_t)PlatformVersion::VERSION_TWENTY);
     EXPECT_TRUE(Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY));
@@ -360,7 +360,7 @@ HWTEST_F(GridRowBreakPointsTestNG, ProcessGridSizeType_WindowSize06, TestSize.Le
     CHECK_NULL_VOID(pipeline);
     Rect displayWindowRectInfo = Rect(0, 0, 601, 1000);
     pipeline->SetDisplayWindowRectInfo(displayWindowRectInfo);
-    auto container = AceType::DynamicCast<Container>(Container::Current());
+    auto container = Container::Current();
     ASSERT_NE(container, nullptr);
     container->SetApiTargetVersion((int32_t)PlatformVersion::VERSION_TWENTY);
     EXPECT_TRUE(Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY));
@@ -386,7 +386,7 @@ HWTEST_F(GridRowBreakPointsTestNG, ProcessGridSizeType_WindowSize07, TestSize.Le
     CHECK_NULL_VOID(pipeline);
     Rect displayWindowRectInfo = Rect(0, 0, 839, 1000);
     pipeline->SetDisplayWindowRectInfo(displayWindowRectInfo);
-    auto container = AceType::DynamicCast<Container>(Container::Current());
+    auto container = Container::Current();
     ASSERT_NE(container, nullptr);
     container->SetApiTargetVersion((int32_t)PlatformVersion::VERSION_TWENTY);
     EXPECT_TRUE(Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY));
@@ -412,7 +412,7 @@ HWTEST_F(GridRowBreakPointsTestNG, ProcessGridSizeType_WindowSize08, TestSize.Le
     CHECK_NULL_VOID(pipeline);
     Rect displayWindowRectInfo = Rect(0, 0, 840, 1000);
     pipeline->SetDisplayWindowRectInfo(displayWindowRectInfo);
-    auto container = AceType::DynamicCast<Container>(Container::Current());
+    auto container = Container::Current();
     ASSERT_NE(container, nullptr);
     container->SetApiTargetVersion((int32_t)PlatformVersion::VERSION_TWENTY);
     EXPECT_TRUE(Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY));
@@ -435,7 +435,7 @@ HWTEST_F(GridRowBreakPointsTestNG, ProcessGridSizeType_WindowSize09, TestSize.Le
     CHECK_NULL_VOID(pipeline);
     Rect displayWindowRectInfo = Rect(0, 0, 841, 1000);
     pipeline->SetDisplayWindowRectInfo(displayWindowRectInfo);
-    auto container = AceType::DynamicCast<Container>(Container::Current());
+    auto container = Container::Current();
     ASSERT_NE(container, nullptr);
     container->SetApiTargetVersion((int32_t)PlatformVersion::VERSION_TWENTY);
     EXPECT_TRUE(Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY));
@@ -464,7 +464,7 @@ HWTEST_F(GridRowBreakPointsTestNG, ProcessGridSizeType_WindowSize_SelfDefine_01,
     CHECK_NULL_VOID(pipeline);
     Rect displayWindowRectInfo = Rect(0, 0, 500, 1000);
     pipeline->SetDisplayWindowRectInfo(displayWindowRectInfo);
-    auto container = AceType::DynamicCast<Container>(Container::Current());
+    auto container = Container::Current();
     ASSERT_NE(container, nullptr);
     container->SetApiTargetVersion((int32_t)PlatformVersion::VERSION_TWENTY);
     EXPECT_TRUE(Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY));

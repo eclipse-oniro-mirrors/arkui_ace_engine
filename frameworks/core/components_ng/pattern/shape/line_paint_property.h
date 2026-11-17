@@ -36,7 +36,7 @@ public:
     RefPtr<PaintProperty> Clone() const override
     {
         auto value = MakeRefPtr<LinePaintProperty>();
-        value->PaintProperty::UpdatePaintProperty(DynamicCast<PaintProperty>(this));
+        value->PaintProperty::UpdatePaintProperty(this);
         value->propStartPoint_ = CloneStartPoint();
         value->propEndPoint_ = CloneEndPoint();
         value->propFill_ = CloneFill();

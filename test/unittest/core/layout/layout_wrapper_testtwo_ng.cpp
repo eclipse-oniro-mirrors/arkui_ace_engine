@@ -114,7 +114,7 @@ std::pair<RefPtr<FrameNode>, RefPtr<LayoutWrapper>> CreateNodeAndWrapper(
     RectF rf = RectF())
 {
     auto node = FrameNode::CreateFrameNode(tag, nodeId, AceType::MakeRefPtr<Pattern>());
-    auto layoutWrapper = AceType::DynamicCast<LayoutWrapper>(node);
+    RefPtr<LayoutWrapper> layoutWrapper = node;
     auto geometryNode = node->GetGeometryNode();
     geometryNode->frame_.rect_ = rf;
 
@@ -127,7 +127,7 @@ std::pair<RefPtr<FrameNode>, RefPtr<LayoutWrapper>> CreateNodeAndWrapperTestPatt
     RectF rf = RectF())
 {
     auto node = FrameNode::CreateFrameNode(tag, nodeId, AceType::MakeRefPtr<TestPattern>());
-    auto layoutWrapper = AceType::DynamicCast<LayoutWrapper>(node);
+    RefPtr<LayoutWrapper> layoutWrapper = node;
     auto geometryNode = node->GetGeometryNode();
     geometryNode->frame_.rect_ = rf;
 
@@ -138,7 +138,7 @@ std::pair<RefPtr<FrameNode>, RefPtr<LayoutWrapper>> CreateScrollableWrapper(int3
 {
     auto frameNode = FrameNode::GetOrCreateFrameNode(
         V2::SCROLL_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<ScrollPattern>(); });
-    auto layoutWrapper = AceType::DynamicCast<LayoutWrapper>(frameNode);
+    RefPtr<LayoutWrapper> layoutWrapper = frameNode;
     auto geometryNode = frameNode->GetGeometryNode();
     geometryNode->frame_.rect_ = rf;
 
@@ -298,7 +298,7 @@ HWTEST_F(LayoutWrapperTestTwoNg, LayoutWrapperTest001, TestSize.Level0)
 HWTEST_F(LayoutWrapperTestTwoNg, LayoutWrapperTest002, TestSize.Level0)
 {
     auto node = FrameNode::CreateFrameNode(ROW_FRAME_NODE, NODE_ID_0, AceType::MakeRefPtr<Pattern>());
-    auto layoutWrapper = AceType::DynamicCast<LayoutWrapper>(node);
+    RefPtr<LayoutWrapper> layoutWrapper = node;
     EXPECT_EQ(layoutWrapper->GetFrameRectWithoutSafeArea(), RectF());
     auto gn = node->GetGeometryNode();
     gn->frame_.rect_ = RectF{10.0f, 20.0f, 30.0f, 40.0f};
@@ -626,7 +626,7 @@ HWTEST_F(LayoutWrapperTestTwoNg, LayoutWrapperTest011, TestSize.Level0)
 {
     RectF frame;
     auto node = FrameNode::CreateFrameNode(ROW_FRAME_NODE, NODE_ID_0, AceType::MakeRefPtr<Pattern>());
-    auto layoutWrapper = AceType::DynamicCast<LayoutWrapper>(node);
+    RefPtr<LayoutWrapper> layoutWrapper = node;
     layoutWrapper->AdjustFixedSizeNode(frame);
     EXPECT_EQ(frame, RectF());
 
@@ -652,7 +652,7 @@ HWTEST_F(LayoutWrapperTestTwoNg, LayoutWrapperTest011, TestSize.Level0)
 HWTEST_F(LayoutWrapperTestTwoNg, LayoutWrapperTest015, TestSize.Level0)
 {
     auto node = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, NODE_ID_0, AceType::MakeRefPtr<Pattern>());
-    auto layoutWrapper = AceType::DynamicCast<LayoutWrapper>(node);
+    RefPtr<LayoutWrapper> layoutWrapper = node;
     RefPtr<EventHub> eventHub = AceType::MakeRefPtr<EventHub>();
     RefPtr<FocusHub> focusHub = AceType::MakeRefPtr<FocusHub>(AceType::WeakClaim(AceType::RawPtr(eventHub)));
     focusHub->currentFocus_ = false;
@@ -738,7 +738,7 @@ HWTEST_F(LayoutWrapperTestTwoNg, LayoutWrapperTest018, TestSize.Level0)
     RectF tmpFrame = RectF{20.0f, 30.0f, 670.0f, 1220.0f};
     auto pipeline = PipelineContext::GetCurrentContext();
     auto node = FrameNode::CreateFrameNode(ROW_FRAME_NODE, NODE_ID_0, AceType::MakeRefPtr<Pattern>());
-    auto layoutWrapper = AceType::DynamicCast<LayoutWrapper>(node);
+    RefPtr<LayoutWrapper> layoutWrapper = node;
     auto gn = node->GetGeometryNode();
     gn->frame_.rect_ = RectF{10.0f, 20.0f, 30.0f, 40.0f};
     RectF frame = tmpFrame;
@@ -858,7 +858,7 @@ HWTEST_F(LayoutWrapperTestTwoNg, LayoutWrapperTest020, TestSize.Level0)
 HWTEST_F(LayoutWrapperTestTwoNg, LayoutWrapperTest021, TestSize.Level0)
 {
     auto node = FrameNode::CreateFrameNode(V2::OVERLAY_ETS_TAG, NODE_ID_0, AceType::MakeRefPtr<Pattern>());
-    auto layoutWrapper = AceType::DynamicCast<LayoutWrapper>(node);
+    RefPtr<LayoutWrapper> layoutWrapper = node;
     RefPtr<EventHub> eventHub = AceType::MakeRefPtr<EventHub>();
     RefPtr<FocusHub> focusHub = AceType::MakeRefPtr<FocusHub>(AceType::WeakClaim(AceType::RawPtr(eventHub)));
     focusHub->currentFocus_ = false;
@@ -887,7 +887,7 @@ HWTEST_F(LayoutWrapperTestTwoNg, LayoutWrapperTest021, TestSize.Level0)
 HWTEST_F(LayoutWrapperTestTwoNg, IgnoreLayoutProcessTagFuncs, TestSize.Level0)
 {
     auto node = FrameNode::CreateFrameNode(V2::OVERLAY_ETS_TAG, NODE_ID_0, AceType::MakeRefPtr<Pattern>());
-    auto layoutWrapper = AceType::DynamicCast<LayoutWrapper>(node);
+    RefPtr<LayoutWrapper> layoutWrapper = node;
     EXPECT_EQ(layoutWrapper->GetIgnoreLayoutProcess(), false);
     layoutWrapper->SetIgnoreLayoutProcess(true);
     EXPECT_EQ(layoutWrapper->GetIgnoreLayoutProcess(), true);
