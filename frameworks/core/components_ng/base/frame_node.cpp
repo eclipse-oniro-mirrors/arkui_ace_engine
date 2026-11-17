@@ -9909,7 +9909,7 @@ void FrameNode::FireLpxUpdateCallbacks()
 template<typename T>
 ACE_FORCE_EXPORT RefPtr<T> FrameNode::GetAccessibilityProperty() const
 {
-    auto accessibilityProperty = const_cast<FrameNode*>(this)->GetOrCreateAccessibilityProperty();
+    const auto& accessibilityProperty = const_cast<FrameNode*>(this)->GetOrCreateAccessibilityProperty();
     if constexpr (std::is_convertible_v<AccessibilityProperty*, T*>) {
         return accessibilityProperty;
     } else {
