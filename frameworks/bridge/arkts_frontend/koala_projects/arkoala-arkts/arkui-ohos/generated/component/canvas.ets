@@ -18,7 +18,7 @@
 
 import { SerializerBase, DeserializerBase, Finalizable, RuntimeType, toPeerPtr, KPointer, MaterializedBase, MaterializedBaseTag, NativeBuffer, nullptr, KInt, KBoolean, KStringPtr, CallbackResource, InteropNativeModule, Tags, KSerializerBuffer, KUint8ArrayPtr } from '@koalaui/interop'
 import { ColorMetricsExt, ColorMetricsExt_serializer, LengthMetricsProxy, LengthMetricsProxy_serializer } from './idlize'
-import { extractors, AttributeModifier, hookSetCanvasOptions, hookCanvasAttributeModifier, AttributeUpdater, hookCreateImageData, hookGetImageData, hookPutImageData, LengthMetrics as arkui_component_units_LengthMetrics, LengthMetrics as arkui_Graphics_LengthMetrics, ImageData, ImageDataInternal, hookCanvasStartImageAnalyzer, registerAttach, unregisterAttach, registerDetach, unregisterDetach, hookGetCanvas } from '#handwritten'
+import { extractors, AttributeModifier, hookSetCanvasOptions, hookCanvasAttributeModifier, AttributeUpdater, hookCreateImageData, hookGetImageData, hookGetPixelMap, hookPutImageData, LengthMetrics as arkui_component_units_LengthMetrics, LengthMetrics as arkui_Graphics_LengthMetrics, ImageData, ImageDataInternal, hookCanvasStartImageAnalyzer, registerAttach, unregisterAttach, registerDetach, unregisterDetach, hookGetCanvas } from '#handwritten'
 import { ColorMetrics as arkui_component_units_ColorMetrics, DrawingCanvas, LengthMetricsUnit as arkui_component_units_LengthMetricsUnit, VoidCallback } from './units'
 import { ColorMetrics as arkui_Graphics_ColorMetrics, Size, LengthMetricsUnit as arkui_Graphics_LengthMetricsUnit } from 'arkui.Graphics'
 import { unsafeCast, int32, int64, float32 } from '@koalaui/common'
@@ -1337,11 +1337,7 @@ export class CanvasRenderer extends CanvasPath implements MaterializedBase {
         return hookGetImageData(this, sx, sy, sw, sh)
     }
     public getPixelMap(sx: double, sy: double, sw: double, sh: double): PixelMap | undefined {
-        const sx_casted = sx as (double)
-        const sy_casted = sy as (double)
-        const sw_casted = sw as (double)
-        const sh_casted = sh as (double)
-        return this.getPixelMap_serialize(sx_casted, sy_casted, sw_casted, sh_casted)
+        return hookGetPixelMap(this, sx, sy, sw, sh)
     }
     public putImageData(imageData: ImageData, dx: double | string, dy: double | string): void {
         hookPutImageData(this, imageData, dx, dy)
@@ -1796,18 +1792,6 @@ export class CanvasRenderer extends CanvasPath implements MaterializedBase {
         const retval = ArkUIGeneratedNativeModule._CanvasRenderer_createConicGradient(this.peer!.ptr, startAngle, x, y)
         const obj: CanvasGradient = CanvasGradientInternal.fromPtr(retval)
         return obj
-    }
-    private getPixelMap_serialize(sx: double, sy: double, sw: double, sh: double): PixelMap | undefined {
-        const retval = ArkUIGeneratedNativeModule._CanvasRenderer_getPixelMap(this.peer!.ptr, sx, sy, sw, sh)
-        let retvalDeserializer: DeserializerBase = new DeserializerBase(retval, retval.length)
-        const buffer_runtimeType = retvalDeserializer.readInt8()!.toInt()
-        let buffer: PixelMap | undefined = undefined
-        if ((buffer_runtimeType) != (RuntimeType.UNDEFINED)) {
-            buffer = (image_PixelMap_serializer.read(retvalDeserializer) as image.PixelMap)
-        }
-        const returnResult: PixelMap | undefined = buffer
-        retvalDeserializer.dispose()
-        return (returnResult as PixelMap | undefined)
     }
     private getLineDash_serialize(): Array<double> {
         const retval = ArkUIGeneratedNativeModule._CanvasRenderer_getLineDash(this.peer!.ptr)

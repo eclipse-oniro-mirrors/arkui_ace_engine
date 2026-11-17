@@ -4183,8 +4183,6 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _CanvasRenderer_createConicGradient(ptr: KPointer, startAngle: KDouble, x: KDouble, y: KDouble): KPointer
     @ani.unsafe.Quick
-    native static _CanvasRenderer_getPixelMap(ptr: KPointer, sx: KDouble, sy: KDouble, sw: KDouble, sh: KDouble): KInteropReturnBuffer
-    @ani.unsafe.Quick
     native static _CanvasRenderer_getLineDash(ptr: KPointer): KInteropReturnBuffer
     @ani.unsafe.Direct
     native static _CanvasRenderer_setLineDash(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
