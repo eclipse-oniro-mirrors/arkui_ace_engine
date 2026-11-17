@@ -14533,7 +14533,7 @@ int32_t OH_ArkUI_NativeModule_AdoptChild(ArkUI_NodeHandle node, ArkUI_NodeHandle
  */
 int32_t OH_ArkUI_NativeModule_AdoptChildWithPolicy(
     ArkUI_NodeHandle node, ArkUI_NodeHandle child, OH_ArkUI_AdoptPolicy policy);
- 
+
 /**
  * @brief Sets the position compensation from the accepted child node to the accepted parent node. This compensation
  * represents the overall impact of the tree of pure render nodes between them.
