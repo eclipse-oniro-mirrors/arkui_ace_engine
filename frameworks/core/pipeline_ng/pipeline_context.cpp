@@ -6337,6 +6337,41 @@ void PipelineContext::AddWindowStateChangedCallback(int32_t nodeId)
     onWindowStateChangedCallbacks_.emplace(nodeId);
 }
 
+void PipelineContext::AddWindowVisibilityChangedCallback(int32_t nodeId, const std::function<void(bool)>& callback)
+{
+    if (!CheckThreadSafe()) {
+        LOGE("AddWindowVisibilityChangedCallback doesn't run on UI thread!");
+        return;
+    }
+    onWindowVisibilityChangedCallbacks_.emplace(nodeId, callback);
+}
+
+void PipelineContext::RemoveWindowVisibilityChangedCallback(int32_t nodeId)
+{
+    if (!CheckThreadSafe()) {
+        LOGE("RemoveWindowVisibilityChangedCallback doesn't run on UI thread!");
+        return;
+    }
+    onWindowVisibilityChangedCallbacks_.erase(nodeId);
+}
+
+void PipelineContext::OnWindowVisibilityChanged(bool isVisible)
+{
+    if (!CheckThreadSafe()) {
+        LOGE("OnWindowVisibilityChanged doesn't run on UI thread!");
+        return;
+    }
+    // iterate over a copy: a callback may re-enter and add/remove callbacks
+    // (e.g. XComponent detached during visibility change), which would
+    // otherwise invalidate iterators of onWindowVisibilityChangedCallbacks_
+    auto onWindowVisibilityChangedCallbacks = onWindowVisibilityChangedCallbacks_;
+    for (const auto& entry : onWindowVisibilityChangedCallbacks) {
+        if (entry.second) {
+            entry.second(isVisible);
+        }
+    }
+}
+
 void PipelineContext::RemoveWindowStateChangedCallback(int32_t nodeId)
 {
     if (!CheckThreadSafe()) {

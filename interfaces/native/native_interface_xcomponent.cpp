@@ -998,6 +998,18 @@ int32_t OH_ArkUI_SurfaceHolder_SetSurfaceConfig(
         surfaceHolder->SetSurfaceConfig(config), OHOS::Ace::ERROR_CODE_NO_ERROR, __FUNCTION__);
 }
 
+int32_t OH_ArkUI_XComponent_EnableSurfaceVisibilityLifecycle(
+    OH_NativeXComponent* component, bool isVisibilityLifecycle)
+{
+    CHECK_UI_THREAD("OH_ArkUI_XComponent_EnableSurfaceVisibilityLifecycle");
+    if (component == nullptr) {
+        return ReturnArkUIParamError(__FUNCTION__, "component is null");
+    }
+    return ReturnResultWithFunctionName(
+        component->EnableSurfaceVisibilityLifecycle(isVisibilityLifecycle),
+        OHOS::Ace::ERROR_CODE_NO_ERROR, __FUNCTION__);
+}
+
 #ifdef __cplusplus
 };
 #endif

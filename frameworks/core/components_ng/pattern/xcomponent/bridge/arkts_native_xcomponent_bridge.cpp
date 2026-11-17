@@ -549,6 +549,11 @@ void XComponentBridge::RegisterXComponentAttributes(Local<panda::ObjectRef> obje
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), XComponentBridge::SetEnableTransparentLayer));
     xComponent->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetEnableTransparentLayer"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), XComponentBridge::ResetEnableTransparentLayer));
+    xComponent->Set(vm, panda::StringRef::NewFromUtf8(vm, "setEnableSurfaceVisibilityLifecycle"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), XComponentBridge::SetEnableSurfaceVisibilityLifecycle));
+    xComponent->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetEnableSurfaceVisibilityLifecycle"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm),
+            XComponentBridge::ResetEnableSurfaceVisibilityLifecycle));
     xComponent->Set(vm, panda::StringRef::NewFromUtf8(vm, "setBufferQueueCount"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), XComponentBridge::SetBufferQueueCount));
     xComponent->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetBufferQueueCount"),
@@ -1318,6 +1323,42 @@ ArkUINativeModuleValue XComponentBridge::ResetEnableTransparentLayer(ArkUIRuntim
     auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
     ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
     GetArkUINodeModifiers()->getXComponentModifier()->resetXComponentEnableTransparentLayer(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue XComponentBridge::SetEnableSurfaceVisibilityLifecycle(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(ARG_FIRST);
+    Local<JSValueRef> secondArg = runtimeCallInfo->GetCallArgRef(ARG_ID);
+    if (secondArg.IsNull() || secondArg->IsUndefined()) {
+        return panda::JSValueRef::Undefined(vm);
+    }
+    ArkUINodeHandle nativeNode = nullptr;
+    bool isJsView = false;
+    CHECK_NE_RETURN(
+        GetNativeNodeAndIsJsView(nativeNode, isJsView, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
+    if (secondArg->IsBoolean()) {
+        bool isVisibilityLifecycle = secondArg->ToBoolean(vm)->Value();
+        GetArkUINodeModifiers()->getXComponentModifier()->setXComponentSurfaceVisibilityLifecycle(
+            nativeNode, isVisibilityLifecycle);
+    } else {
+        GetArkUINodeModifiers()->getXComponentModifier()->resetXComponentSurfaceVisibilityLifecycle(nativeNode);
+    }
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue XComponentBridge::ResetEnableSurfaceVisibilityLifecycle(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(ARG_FIRST);
+    CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
+    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
+    GetArkUINodeModifiers()->getXComponentModifier()->resetXComponentSurfaceVisibilityLifecycle(nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }
 

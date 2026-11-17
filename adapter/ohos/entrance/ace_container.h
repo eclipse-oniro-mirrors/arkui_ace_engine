@@ -1052,6 +1052,7 @@ private:
     int32_t pageId_ = 0;
     bool useCurrentEventRunner_ = false;
     sptr<OHOS::Rosen::Window> uiWindow_ = nullptr;
+    sptr<OHOS::Rosen::IWindowVisibilityChangedListener> windowVisibilityListener_ = nullptr;
     std::string windowName_;
     uint32_t windowId_ = OHOS::Rosen::INVALID_WINDOW_ID;
     float windowScale_ = 1.0f;

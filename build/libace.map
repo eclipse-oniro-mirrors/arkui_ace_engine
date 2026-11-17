@@ -2139,6 +2139,7 @@
       "OHOS::Ace::NG::PipelineContext::AddWindowFocusChangedCallback(int)";
       "OHOS::Ace::NG::PipelineContext::AddWindowSizeChangeCallback(int)";
       "OHOS::Ace::NG::PipelineContext::AddWindowStateChangedCallback(int)";
+      "OHOS::Ace::NG::PipelineContext::AddWindowVisibilityChangedCallback(int, std::__h::function<void (bool)> const&)";
       "OHOS::Ace::NG::PipelineContext::ChangeMouseStyle(int, OHOS::Ace::MouseFormat, int, bool, OHOS::Ace::MouseStyleChangeReason)";
       "OHOS::Ace::NG::PipelineContext::FlushUITaskWithSingleDirtyNode(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&)";
       "OHOS::Ace::NG::PipelineContext::GetColorMode() const";
@@ -2161,6 +2162,8 @@
       "OHOS::Ace::NG::PipelineContext::RemoveWindowFocusChangedCallback(int)";
       "OHOS::Ace::NG::PipelineContext::RemoveWindowSizeChangeCallback(int)";
       "OHOS::Ace::NG::PipelineContext::RemoveWindowStateChangedCallback(int)";
+      "OHOS::Ace::NG::PipelineContext::RemoveWindowVisibilityChangedCallback(int)";
+      "OHOS::Ace::NG::PipelineContext::OnWindowVisibilityChanged(bool)";
       "OHOS::Ace::NG::PipelineContext::SendEventToAccessibilityWithNode(OHOS::Ace::AccessibilityEvent const&, OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&)";
       "OHOS::Ace::NG::PipelineContext::SetCallBackNode(OHOS::Ace::WeakPtr<OHOS::Ace::NG::FrameNode> const&)";
       "OHOS::Ace::NG::PipelineContext::UsingCaretAvoidMode()";

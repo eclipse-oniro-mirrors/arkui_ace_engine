@@ -151,6 +151,9 @@ void XComponentPattern::OnAttachToMainTreeMultiThread(const RefPtr<FrameNode>& h
     if (isTypedNode_ && surfaceCallbackMode_ == SurfaceCallbackMode::DEFAULT) {
         HandleSurfaceCreated();
     }
+    if (IsSurfaceVisibilityLifecycle()) {
+        RegisterVisibilityLifecycleCallback();
+    }
     CHECK_NULL_VOID(host);
     if (host->GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_EIGHTEEN)) {
         if (needRecoverDisplaySync_ && displaySync_ && !displaySync_->IsOnPipeline()) {
@@ -168,6 +171,7 @@ void XComponentPattern::OnDetachFromMainTreeMultiThread(const RefPtr<FrameNode>&
     if (isTypedNode_ && surfaceCallbackMode_ == SurfaceCallbackMode::DEFAULT) {
         HandleSurfaceDestroyed();
     }
+    UnregisterVisibilityLifecycleCallback();
     CHECK_NULL_VOID(host);
     if (host->GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_EIGHTEEN)) {
         if (displaySync_ && displaySync_->IsOnPipeline()) {
@@ -236,6 +240,9 @@ void XComponentPatternV2::OnAttachToMainTreeMultiThread(const RefPtr<FrameNode>&
     if (autoInitialize_) {
         HandleSurfaceCreated();
     }
+    if (IsSurfaceVisibilityLifecycle()) {
+        RegisterVisibilityLifecycleCallback();
+    }
     CHECK_NULL_VOID(displaySync_);
     if (needRecoverDisplaySync_  && !displaySync_->IsOnPipeline()) {
         TAG_LOGD(AceLogTag::ACE_XCOMPONENT, "OnAttachToMainTree:recover displaySync: "
@@ -262,6 +269,7 @@ void XComponentPatternV2::OnDetachFromMainTreeMultiThread(const RefPtr<FrameNode
     if (autoInitialize_) {
         HandleSurfaceDestroyed();
     }
+    UnregisterVisibilityLifecycleCallback();
     CHECK_NULL_VOID(host);
     auto id = host->GetId();
     auto pipeline = host->GetContextRefPtr();
