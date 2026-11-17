@@ -1159,7 +1159,7 @@ RefPtr<AceType> JSViewPartialUpdate::InitialRender(int64_t deadline, bool& isTim
     } else {
         RenderJSExecution();
     }
-    return ViewStackModel::GetInstance()->Finish();
+    return NG::ViewStackProcessor::GetInstance()->Finish();
 }
 
 // parentCustomView in not used by PartialUpdate
