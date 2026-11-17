@@ -33,7 +33,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<FormLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<FormLayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propRequestFormInfo_ = CloneRequestFormInfo();
         value->propVisibleType_ = CloneVisibleType();
         return value;

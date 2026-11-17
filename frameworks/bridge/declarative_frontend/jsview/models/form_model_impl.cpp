@@ -57,8 +57,7 @@ void FormModelImpl::SetVisible(VisibleType visible) {}
 void FormModelImpl::SetVisibility(VisibleType visible)
 {
     auto component = ViewStackProcessor::GetInstance()->GetDisplayComponent();
-    auto display = AceType::DynamicCast<DisplayComponent>(component);
-    display->SetVisible(visible);
+    component->SetVisible(visible);
 }
 
 void FormModelImpl::SetModuleName(const std::string& value)
