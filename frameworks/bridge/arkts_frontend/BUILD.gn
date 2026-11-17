@@ -54,6 +54,9 @@ template("arkts_frontend") {
   ohos_shared_library("arkts_frontend") {
     defines += invoker.defines
     configs = [ "$ace_root:ace_config" ]
+    if (is_ohos) {
+      version_script = "$ace_root/build/libarkts_frontend.map"
+    }
     deps = [
       "$ace_root/build:libace_compatible",
       "koala_projects/arkoala-arkts/arkui-ohos/src/ani/native:ani_utils_common",
@@ -179,6 +182,10 @@ ohos_shared_library("ArkoalaNative_ark") {
     "koala_projects/interop/src/cpp/interop-logging.cc",
     "koala_projects/interop/src/cpp/types/signatures.cc",
   ]
+
+  if (is_ohos) {
+    version_script = "$ace_root/build/libArkoalaNative_ark.map"
+  }
 
   configs = [ ":arkoala_native_config" ]
 

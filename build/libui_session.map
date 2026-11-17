@@ -1,0 +1,78 @@
+/*
+ * Copyright (c) 2026 Huawei Device Co., Ltd.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+{
+  global:
+    _init;
+    _fini;
+    __cfi_check*;
+    extern "C++" {
+      OHOS::Ace::*;
+      "vtable for OHOS::Ace::UIContentServiceProxy";
+      "VTT for OHOS::Ace::UIContentServiceProxy";
+      "typeinfo for OHOS::Ace::UIContentServiceProxy";
+      "typeinfo name for OHOS::Ace::UIContentServiceProxy";
+      "vtable for OHOS::Ace::UiContentProxyRecipient";
+      "VTT for OHOS::Ace::UiContentProxyRecipient";
+      "typeinfo for OHOS::Ace::UiContentProxyRecipient";
+      "typeinfo name for OHOS::Ace::UiContentProxyRecipient";
+      "vtable for OHOS::Ace::UiContentStub";
+      "VTT for OHOS::Ace::UiContentStub";
+      "typeinfo for OHOS::Ace::UiContentStub";
+      "typeinfo name for OHOS::Ace::UiContentStub";
+      "vtable for OHOS::Ace::UIContentServiceStubImpl";
+      "VTT for OHOS::Ace::UIContentServiceStubImpl";
+      "typeinfo for OHOS::Ace::UIContentServiceStubImpl";
+      "typeinfo name for OHOS::Ace::UIContentServiceStubImpl";
+      "vtable for OHOS::Ace::UiReportProxy";
+      "VTT for OHOS::Ace::UiReportProxy";
+      "typeinfo for OHOS::Ace::UiReportProxy";
+      "typeinfo name for OHOS::Ace::UiReportProxy";
+      "vtable for OHOS::Ace::UiReportProxyRecipient";
+      "VTT for OHOS::Ace::UiReportProxyRecipient";
+      "typeinfo for OHOS::Ace::UiReportProxyRecipient";
+      "typeinfo name for OHOS::Ace::UiReportProxyRecipient";
+      "vtable for OHOS::Ace::UiReportStub";
+      "VTT for OHOS::Ace::UiReportStub";
+      "typeinfo for OHOS::Ace::UiReportStub";
+      "typeinfo name for OHOS::Ace::UiReportStub";
+      "vtable for OHOS::Ace::IUiContentService";
+      "VTT for OHOS::Ace::IUiContentService";
+      "typeinfo for OHOS::Ace::IUiContentService";
+      "typeinfo name for OHOS::Ace::IUiContentService";
+      "vtable for OHOS::Ace::ReportService";
+      "VTT for OHOS::Ace::ReportService";
+      "typeinfo for OHOS::Ace::ReportService";
+      "typeinfo name for OHOS::Ace::ReportService";
+      "vtable for OHOS::Ace::UiSessionManager";
+      "VTT for OHOS::Ace::UiSessionManager";
+      "typeinfo for OHOS::Ace::UiSessionManager";
+      "typeinfo name for OHOS::Ace::UiSessionManager";
+      "vtable for OHOS::Ace::UiTranslateManager";
+      "VTT for OHOS::Ace::UiTranslateManager";
+      "typeinfo for OHOS::Ace::UiTranslateManager";
+      "typeinfo name for OHOS::Ace::UiTranslateManager";
+      "vtable for OHOS::Ace::InspectorJsonValue";
+      "VTT for OHOS::Ace::InspectorJsonValue";
+      "typeinfo for OHOS::Ace::InspectorJsonValue";
+      "typeinfo name for OHOS::Ace::InspectorJsonValue";
+      "vtable for OHOS::Ace::InspectorJsonUtil";
+      "VTT for OHOS::Ace::InspectorJsonUtil";
+      "typeinfo for OHOS::Ace::InspectorJsonUtil";
+      "typeinfo name for OHOS::Ace::InspectorJsonUtil";
+    };
+  local:
+    *;
+};

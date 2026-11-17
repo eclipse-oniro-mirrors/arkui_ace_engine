@@ -56,6 +56,9 @@ ohos_shared_library("ui_session") {
   ]
 
   configs = [ "$ace_root:ace_config" ]
+  if (is_ohos) {
+    version_script = "$ace_root/build/libui_session.map"
+  }
 
   public_configs = [ ":uisession_manager_public_config" ]
 

@@ -22,6 +22,9 @@ group("arkuicustomnode_group") {
 
 ohos_shared_library("arkuicustomnode_ani") {
   deps = [ "$ace_root/build:libace_compatible" ]
+  if (is_ohos) {
+    version_script = "$ace_root/build/libarkuicustomnode_ani.map"
+  }
   if (!build_ohos_sdk && !(defined(is_arkui_x) && is_arkui_x)) {
     deps += [ "$ace_root/frameworks/bridge/arkts_frontend:ArkoalaNative_ark" ]
   }
