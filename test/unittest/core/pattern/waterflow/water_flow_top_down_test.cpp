@@ -2324,4 +2324,55 @@ HWTEST_F(WaterFlowTestNg, ZeroHeightAtEnd002, TestSize.Level1)
         EXPECT_TRUE(pattern_->layoutInfo_->itemEnd_);
     }
 }
+
+/**
+ * @tc.name: WaterFlowReportStartZeroHeightItem001
+ * @tc.desc: A zero-height first item sits at the content top (currentOffset_ == 0, bottom edge 0).
+ *           SyncReportRange must keep reporting it as the start: reportStartIndex_ stays 0 and
+ *           onScrollIndex never reports 1, matching Grid and List semantics
+ *           (IsReportStartIndexCandidate keeps a zero-size item on the leading report boundary).
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowTestNg, WaterFlowReportStartZeroHeightItem001, TestSize.Level1)
+{
+    WaterFlowModelNG model = CreateWaterFlow();
+    std::vector<std::pair<int32_t, int32_t>> reported;
+    model.SetOnScrollIndex([&reported](int32_t first, int32_t last) { reported.emplace_back(first, last); });
+    CreateWaterFlowItem(0.0f); // first item: zero height
+    ViewStackProcessor::GetInstance()->Pop();
+    ViewStackProcessor::GetInstance()->StopGetAccessRecording();
+    CreateWaterFlowItems(TOTAL_LINE_NUMBER);
+    CreateDone();
+
+    EXPECT_EQ(pattern_->layoutInfo_->reportStartIndex_, 0)
+        << "zero-height first item at content top must stay the report start";
+    for (const auto& [first, last] : reported) {
+        EXPECT_EQ(first, 0) << "onScrollIndex must not report startIndex 1 for a zero-height first item";
+    }
+}
+
+/**
+ * @tc.name: WaterFlowReportStartZeroHeightItem002
+ * @tc.desc: Scrolled-past semantics: once the zero-height item 0 moves above the content top it is
+ *           skipped (reportStartIndex_ 1); scrolling back to the top restores 0 (cached items_
+ *           entries still participate in the report-range walk).
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowTestNg, WaterFlowReportStartZeroHeightItem002, TestSize.Level1)
+{
+    WaterFlowModelNG model = CreateWaterFlow();
+    CreateWaterFlowItem(0.0f); // first item: zero height
+    ViewStackProcessor::GetInstance()->Pop();
+    ViewStackProcessor::GetInstance()->StopGetAccessRecording();
+    CreateWaterFlowItems(TOTAL_LINE_NUMBER);
+    CreateDone();
+    ASSERT_EQ(pattern_->layoutInfo_->reportStartIndex_, 0);
+
+    UpdateCurrentOffset(-MAIN_DELTA); // item 0 (height 0) now above the content top
+    EXPECT_EQ(pattern_->layoutInfo_->reportStartIndex_, 1);
+
+    UpdateCurrentOffset(MAIN_DELTA); // back to the top
+    EXPECT_EQ(pattern_->layoutInfo_->reportStartIndex_, 0)
+        << "cached zero-height item at the content top must be reported again after scrolling back";
+}
 } // namespace OHOS::Ace::NG
