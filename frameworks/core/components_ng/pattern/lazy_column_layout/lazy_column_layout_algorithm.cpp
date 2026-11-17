@@ -783,20 +783,22 @@ void LazyColumnLayoutAlgorithm::UpdateSiblingHandoffGap(
     CHECK_NULL_VOID(layoutWrapper);
     CHECK_NULL_VOID(wrapper);
     auto currentPattern = LazyLayoutUtils::GetStickyHeaderPattern(wrapper->GetHostNode());
-    // Cache-only lookup: a never-built previous item cannot hold stale state, so don't build one on this hot path.
-    auto previousWrapper = itemIndex > 0
-        ? layoutWrapper->GetChildByIndex(GetRawIndexForItem(itemIndex - 1), true) : nullptr;
-    auto previousPattern = previousWrapper
-        ? LazyLayoutUtils::GetStickyHeaderPattern(previousWrapper->GetHostNode()) : nullptr;
-    if (layoutOnly && !(currentPattern && currentPattern->RequiresStickyHandoffInLayout()) &&
-        !(previousPattern && previousPattern->RequiresStickyHandoffInLayout())) {
-        return;
-    }
-    // The last section has no next sibling: clear its own outbound gap.
+    // Clear the last section's outbound gap before any early return, including layout-only refreshes.
     if (currentPattern && itemIndex >= totalItemCount_ - 1) {
         currentPattern->PublishNextStickyHeaderGap(std::nullopt);
     }
+    if (itemIndex <= 0) {
+        return;
+    }
+    // Cache-only lookup: a never-built previous item cannot hold stale state, so don't build one on this hot path.
+    auto previousWrapper = layoutWrapper->GetChildByIndex(GetRawIndexForItem(itemIndex - 1), true);
+    CHECK_NULL_VOID(previousWrapper);
+    auto previousPattern = LazyLayoutUtils::GetStickyHeaderPattern(previousWrapper->GetHostNode());
     CHECK_NULL_VOID(previousPattern);
+    if (layoutOnly && !(currentPattern && currentPattern->RequiresStickyHandoffInLayout()) &&
+        !previousPattern->RequiresStickyHandoffInLayout()) {
+        return;
+    }
     const bool currentHasStickyHeader = currentPattern && currentPattern->HasStickyHeader();
     const bool previousHasStickyHeader = previousPattern->HasStickyHeader();
     std::optional<float> handoffGap;

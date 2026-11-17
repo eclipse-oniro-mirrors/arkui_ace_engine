@@ -285,6 +285,60 @@ HWTEST_F(LazyColumnLayoutHeaderFooterTest, LazyPatternLookupStopsAtOrdinaryFrame
 }
 
 /**
+ * @tc.name: StickyHandoffClearsSingleSectionGap001
+ * @tc.desc: A sole legacy section clears its stale outbound gap before the layout-only early return.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyColumnLayoutHeaderFooterTest, StickyHandoffClearsSingleSectionGap001, TestSize.Level1)
+{
+    auto parent = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    auto childPattern = AceType::MakeRefPtr<StickyStateTestPattern>();
+    auto child = FrameNode::CreateFrameNode(V2::LAZY_COLUMN_LAYOUT_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), childPattern);
+    parent->AddChild(child);
+    auto wrapper = parent->GetOrCreateChildByIndex(0);
+    ASSERT_NE(wrapper, nullptr);
+    LazyColumnLayoutAlgorithm algorithm(AceType::MakeRefPtr<LazyColumnLayoutInfo>());
+    algorithm.totalItemCount_ = 1;
+    EXPECT_FALSE(childPattern->RequiresStickyHandoffInLayout());
+    for (const bool layoutOnly : { false, true }) {
+        childPattern->PublishNextStickyHeaderGap(HANDOFF_SPACE);
+        ASSERT_TRUE(childPattern->GetNextStickyHeaderGap().has_value());
+        algorithm.UpdateSiblingHandoffGap(AceType::RawPtr(parent), wrapper, 0, layoutOnly);
+        EXPECT_FALSE(childPattern->GetNextStickyHeaderGap().has_value());
+    }
+}
+
+/**
+ * @tc.name: StickyHandoffClearsTailWithoutUpdatingLegacySibling001
+ * @tc.desc: Layout-only tail cleanup preserves the measured gap of its ordinary Lazy predecessor.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyColumnLayoutHeaderFooterTest, StickyHandoffClearsTailWithoutUpdatingLegacySibling001, TestSize.Level1)
+{
+    auto parent = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    auto firstPattern = AceType::MakeRefPtr<StickyStateTestPattern>();
+    auto lastPattern = AceType::MakeRefPtr<StickyStateTestPattern>();
+    for (const auto& pattern : { firstPattern, lastPattern }) {
+        pattern->SetHasStickyHeader(true);
+        parent->AddChild(FrameNode::CreateFrameNode(V2::LAZY_COLUMN_LAYOUT_ETS_TAG,
+            ElementRegister::GetInstance()->MakeUniqueId(), pattern));
+        pattern->PublishNextStickyHeaderGap(HANDOFF_SPACE);
+    }
+    ASSERT_NE(parent->GetOrCreateChildByIndex(0), nullptr);
+    auto last = parent->GetOrCreateChildByIndex(1);
+    ASSERT_NE(last, nullptr);
+    LazyColumnLayoutAlgorithm algorithm(AceType::MakeRefPtr<LazyColumnLayoutInfo>());
+    algorithm.totalItemCount_ = 2;
+    algorithm.space_ = HANDOFF_SPACE + GRID_MARGIN;
+    algorithm.UpdateSiblingHandoffGap(AceType::RawPtr(parent), last, 1, true);
+    EXPECT_EQ(firstPattern->GetNextStickyHeaderGap(), std::optional<float>(HANDOFF_SPACE));
+    EXPECT_FALSE(lastPattern->GetNextStickyHeaderGap().has_value());
+}
+
+/**
  * @tc.name: StickyHeaderParentNotificationIsBounded001
  * @tc.desc: Effective sticky-header changes notify the nearest lazy parent through lazy proxy FrameNodes only;
  *           first observation and the first observation after detach do not schedule a redundant parent pass.
