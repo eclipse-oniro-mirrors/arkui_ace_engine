@@ -304,7 +304,7 @@ bool SheetPresentationPattern::OnDirtyLayoutWrapperSwap(
     if (config.skipMeasure && config.skipLayout) {
         return false;
     }
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     InitPageHeight();
     sheetObject_->DirtyLayoutProcess(layoutAlgorithmWrapper);
@@ -2049,7 +2049,7 @@ float SheetPresentationPattern::GetWrapperHeight()
     CHECK_NULL_RETURN(host, 0.0f);
     auto sheetWrapper = SheetPresentationPattern::GetParentSkipEffectComponent(host);
     CHECK_NULL_RETURN(sheetWrapper, 0.0f);
-    auto sheetWrapperNode = AceType::DynamicCast<FrameNode>(sheetWrapper);
+    auto sheetWrapperNode = sheetWrapper;
     CHECK_NULL_RETURN(sheetWrapperNode, 0.0f);
     auto sheetWrapperGeometryNode = sheetWrapperNode->GetGeometryNode();
     CHECK_NULL_RETURN(sheetWrapperGeometryNode, 0.0f);
@@ -2062,7 +2062,7 @@ float SheetPresentationPattern::GetWrapperWidth()
     CHECK_NULL_RETURN(host, 0.0f);
     auto sheetWrapper = SheetPresentationPattern::GetParentSkipEffectComponent(host);
     CHECK_NULL_RETURN(sheetWrapper, 0.0f);
-    auto sheetWrapperNode = AceType::DynamicCast<FrameNode>(sheetWrapper);
+    auto sheetWrapperNode = sheetWrapper;
     CHECK_NULL_RETURN(sheetWrapperNode, 0.0f);
     auto sheetWrapperGeometryNode = sheetWrapperNode->GetGeometryNode();
     CHECK_NULL_RETURN(sheetWrapperGeometryNode, 0.0f);
@@ -2344,7 +2344,7 @@ int32_t SheetPresentationPattern::GetSubWindowId() const
     CHECK_NULL_RETURN(host, INVALID_SUBWINDOW_ID);
     auto sheetWrapper = SheetPresentationPattern::GetParentSkipEffectComponent(host);
     CHECK_NULL_RETURN(sheetWrapper, INVALID_SUBWINDOW_ID);
-    auto wrapperNode = AceType::DynamicCast<FrameNode>(sheetWrapper);
+    auto wrapperNode = sheetWrapper;
     auto sheetWrapperPattern = wrapperNode->GetPattern<SheetWrapperPattern>();
     CHECK_NULL_RETURN(sheetWrapperPattern, INVALID_SUBWINDOW_ID);
     return sheetWrapperPattern->GetSubWindowId();

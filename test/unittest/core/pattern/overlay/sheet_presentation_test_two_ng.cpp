@@ -1792,7 +1792,7 @@ HWTEST_F(SheetPresentationTestTwoNg, SheetOffset003, TestSize.Level1)
      */
     auto dirty = sheetNode->CreateLayoutWrapper();
     ASSERT_NE(dirty, nullptr);
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     ASSERT_NE(layoutAlgorithmWrapper, nullptr);
     auto sheetLayoutAlgorithm =
         AceType::DynamicCast<SheetPresentationLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
@@ -2091,7 +2091,7 @@ HWTEST_F(SheetPresentationTestTwoNg, SheetHoverStatus002, TestSize.Level1)
     pipeline->isHalfFoldHoverStatus_ = true;
     auto dirty = sheetNode->CreateLayoutWrapper();
     ASSERT_NE(dirty, nullptr);
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     ASSERT_NE(layoutAlgorithmWrapper, nullptr);
     auto sheetLayoutAlgorithm =
         AceType::DynamicCast<SheetPresentationLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
@@ -2153,7 +2153,7 @@ HWTEST_F(SheetPresentationTestTwoNg, SheetHoverStatus003, TestSize.Level1)
     ASSERT_NE(layoutProperty, nullptr);
     auto dirty = sheetNode->CreateLayoutWrapper();
     ASSERT_NE(dirty, nullptr);
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     ASSERT_NE(layoutAlgorithmWrapper, nullptr);
     auto sheetLayoutAlgorithm =
         AceType::DynamicCast<SheetPresentationLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
@@ -2705,7 +2705,7 @@ HWTEST_F(SheetPresentationTestTwoNg, SheetHoverStatus004, TestSize.Level1)
      */
     auto dirty = sheetNode->CreateLayoutWrapper();
     ASSERT_NE(dirty, nullptr);
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     ASSERT_NE(layoutAlgorithmWrapper, nullptr);
     auto sheetLayoutAlgorithm =
         AceType::DynamicCast<SheetPresentationLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
@@ -2765,7 +2765,7 @@ HWTEST_F(SheetPresentationTestTwoNg, SheetHoverStatus005, TestSize.Level1)
         "Sheet", 101, AceType::MakeRefPtr<SheetPresentationPattern>(201, "SheetPresentation", std::move(callback)));
     auto dirty = sheetNode->CreateLayoutWrapper();
     ASSERT_NE(dirty, nullptr);
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     ASSERT_NE(layoutAlgorithmWrapper, nullptr);
 
     /**

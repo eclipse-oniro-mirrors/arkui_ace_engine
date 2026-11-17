@@ -31,7 +31,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<CloseIconLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propCloseIconWidth_ = CloneCloseIconWidth();
         value->propCloseIconHeight_ = CloneCloseIconHeight();
         value->propCloseIconMarginTop_ = CloneCloseIconMarginTop();

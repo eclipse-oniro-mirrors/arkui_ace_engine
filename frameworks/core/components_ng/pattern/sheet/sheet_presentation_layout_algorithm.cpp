@@ -173,7 +173,7 @@ float SheetPresentationLayoutAlgorithm::CalculateSheetHeightInOtherScenes(
     if (isWaterfallWindowMode_) {
         auto sheetWrapper = SheetPresentationPattern::GetParentSkipEffectComponent(host);
         CHECK_NULL_RETURN(sheetWrapper, height);
-        auto sheetWrapperNode = AceType::DynamicCast<FrameNode>(sheetWrapper);
+        auto sheetWrapperNode = sheetWrapper;
         CHECK_NULL_RETURN(sheetWrapperNode, height);
         maxUpSheetHeight = foldCreaseRect.Top() - sheetWrapperNode->GetPositionToScreen().GetY() -
                            DOUBLE_SIZE * (SHEET_BLANK_MINI_HEIGHT.ConvertToPx());
@@ -209,7 +209,7 @@ void SheetPresentationLayoutAlgorithm::CalculateSheetOffsetInOtherScenes(LayoutW
     if (isWaterfallWindowMode_) {
         auto sheetWrapper = SheetPresentationPattern::GetParentSkipEffectComponent(host);
         CHECK_NULL_VOID(sheetWrapper);
-        auto sheetWrapperNode = AceType::DynamicCast<FrameNode>(sheetWrapper);
+        auto sheetWrapperNode = sheetWrapper;
         CHECK_NULL_VOID(sheetWrapperNode);
         upScreenHeight = foldCreaseRect.Top() - sheetWrapperNode->GetPositionToScreen().GetY();
         topStartOffsetY = 0.0f;
@@ -343,7 +343,7 @@ void SheetPresentationLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
         if ((sheetType_ == SheetType::SHEET_CENTER || sheetType_ == SheetType::SHEET_POPUP ||
             (sheetType_ == SheetType::SHEET_BOTTOM_OFFSET))
             && (sheetStyle_.sheetHeight.sheetMode.value_or(SheetMode::LARGE) == SheetMode::AUTO)) {
-            auto secondChild = AceType::DynamicCast<LayoutWrapper>(scrollNode);
+            RefPtr<LayoutWrapper> secondChild = scrollNode;
             CHECK_NULL_VOID(secondChild);
             auto&& scrollChild = secondChild->GetAllChildrenWithBuild();
             auto builder = scrollChild.front();
