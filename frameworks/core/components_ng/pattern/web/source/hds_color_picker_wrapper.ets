@@ -49,7 +49,7 @@ class HdsColorPickerWrapper {
       }
       const controller = new ColorPickerController();
       controller.openColorPicker(uiContext, {
-        options:undefined,
+        options: { useOpacityArea:false },
         initialColor:initialColor,
         onColorSelected:onSelected,
         onClose:onClose});
