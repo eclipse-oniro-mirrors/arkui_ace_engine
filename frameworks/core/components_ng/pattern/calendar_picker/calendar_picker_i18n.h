@@ -26,6 +26,15 @@ public:
     static int32_t GetFirstDayOfWeek(const std::string& locale);
     static std::string LocalizeDateNumber(int32_t value, int32_t minDigits, const std::string& locale);
     static std::vector<std::string> GetDateSeparators(const std::string& locale);
+
+    /**
+     * @brief Clear all cached i18n results (separators, localized numbers, first day of week).
+     *        Intended for unit tests to ensure a clean cache state between test cases.
+     *        Thread-safe: protected by internal mutex.
+     *        Note: Calling this in production forces the next i18n query to recompute from ICU,
+     *        causing a one-time performance cost. Do not call from non-UI threads.
+     */
+    static void ClearCache();
 };
 
 } // namespace OHOS::Ace::NG
