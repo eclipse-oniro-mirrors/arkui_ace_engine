@@ -56,6 +56,8 @@ enum class SheetMiniDefaultShowPosition {
     LeftBottom,
     RightBottom,
 };
+class ScrollablePaintProperty;
+
 class ACE_EXPORT SheetPresentationPattern : public LinearLayoutPattern,
                                             public PopupBasePattern,
                                             public FocusView,
@@ -1046,6 +1048,9 @@ public:
         auto scrollNode = scrolNode_.Upgrade();
         return scrollNode;
     }
+
+    void UpdateSafeAreaPaddingClip(const RefPtr<ScrollablePaintProperty>& scrollPaintProps,
+        SheetTitleBarHoverMode hoverMode, float top);
 
     const SheetEffectEdge& GetSheetEffectEdge() const
     {
