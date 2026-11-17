@@ -38,8 +38,20 @@ public:
         boundingBoxRect_ = boundingBoxRect;
     }
 private:
+    struct PictureCacheKey {
+        Rect containerRect;
+        Size viewPort;
+        uint32_t renderCacheVersion;
+        bool operator==(const PictureCacheKey& other) const
+        {
+            return containerRect == other.containerRect && viewPort == other.viewPort &&
+                renderCacheVersion == other.renderCacheVersion;
+        }
+    };
     SvgPatternAttribute patternAttr_;
     Rect boundingBoxRect_;
+    std::optional<PictureCacheKey> pictureCacheKey_;
+    std::shared_ptr<RSPicture> pictureCache_;
 };
 
 } // namespace OHOS::Ace::NG

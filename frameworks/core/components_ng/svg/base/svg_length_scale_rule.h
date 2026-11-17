@@ -57,6 +57,12 @@ public:
             && lengthScaleUnit_ == lengthRule.GetLengthScaleUnit();
     }
 
+    bool IsSameForCache(const SvgLengthScaleRule& other) const
+    {
+        return *this == other && pathTransform_ == other.pathTransform_ &&
+            useFillColor_ == other.useFillColor_;
+    }
+
     void SetPathTransform(bool transform)
     {
         pathTransform_ = transform;

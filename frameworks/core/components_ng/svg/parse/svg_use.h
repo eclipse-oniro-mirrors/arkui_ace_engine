@@ -39,6 +39,24 @@ public:
     void ApplyOpacity(RSCanvas& canvas);
 
 private:
+    struct SizePathCacheKey {
+        Size viewPort;
+        uint32_t renderCacheVersion;
+        bool evenodd;
+        bool operator==(const SizePathCacheKey& other) const
+        {
+            return viewPort == other.viewPort && renderCacheVersion == other.renderCacheVersion &&
+                evenodd == other.evenodd;
+        }
+    };
+    struct RulePathCacheKey {
+        SvgLengthScaleRule lengthRule;
+        uint32_t renderCacheVersion;
+        bool operator==(const RulePathCacheKey& other) const
+        {
+            return lengthRule.IsSameForCache(other.lengthRule) && renderCacheVersion == other.renderCacheVersion;
+        }
+    };
     // saves the current attributes of the svg node, and restores them when the scope exits.
     class AttributeScope {
     public:
@@ -50,6 +68,10 @@ private:
         WeakPtr<SvgNode> node_;
     };
     SvgAttributes useAttr_;
+    mutable std::optional<SizePathCacheKey> sizePathCacheKey_;
+    mutable std::optional<RSRecordingPath> sizePathCache_;
+    std::optional<RulePathCacheKey> rulePathCacheKey_;
+    std::optional<RSRecordingPath> rulePathCache_;
 };
 
 } // namespace OHOS::Ace::NG
