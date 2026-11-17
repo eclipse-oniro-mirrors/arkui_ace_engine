@@ -378,7 +378,7 @@ HWTEST_F(ToggleButtonTestNg, ToggleButtonPatternTest007, TestSize.Level1)
      * @tc.expected: step4. Parent frame node's font size synchronized with child.
      */
     frameNode->children_.clear();
-    auto childrenTextNode = AceType::DynamicCast<FrameNode>(childrenNode);
+    auto childrenTextNode = childrenNode;
     ASSERT_NE(childrenTextNode, nullptr);
     auto childrenTextLayoutProperty = childrenTextNode->GetLayoutProperty<TextLayoutProperty>();
     ASSERT_NE(childrenTextLayoutProperty, nullptr);

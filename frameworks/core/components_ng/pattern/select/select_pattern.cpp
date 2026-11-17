@@ -2026,7 +2026,7 @@ void SelectPattern::ToJsonOptionMaxlines(std::unique_ptr<JsonValue>& json, const
         auto menuItemModifier = NG::NodeModifier::GetMenuItemInnerModifier();
         CHECK_NULL_VOID(menuItemModifier);
         for (size_t i = 0; i < options_.size(); ++i) {
-            auto textNode = AceType::DynamicCast<FrameNode>(menuItemModifier->getTextNode(options_[i]));
+            auto textNode = menuItemModifier->getTextNode(options_[i]);
             CHECK_NULL_VOID(textNode);
             auto props = textNode->GetLayoutProperty<TextLayoutProperty>();
             CHECK_NULL_VOID(props);

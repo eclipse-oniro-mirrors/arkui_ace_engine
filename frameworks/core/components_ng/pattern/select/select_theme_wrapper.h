@@ -35,7 +35,7 @@ public:
         RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<SelectThemeWrapper>();
-            auto theme = AceType::DynamicCast<SelectTheme>(wrapper);
+            RefPtr<SelectTheme> theme = wrapper;
             if (!themeConstants) {
                 return wrapper;
             }

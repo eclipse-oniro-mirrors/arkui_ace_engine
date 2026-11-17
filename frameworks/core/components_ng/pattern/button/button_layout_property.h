@@ -39,7 +39,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<ButtonLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propType_ = CloneType();
         value->propFontSize_ = CloneFontSize();
         value->propFontWeight_ = CloneFontWeight();

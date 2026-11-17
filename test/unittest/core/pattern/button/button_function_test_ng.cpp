@@ -706,7 +706,7 @@ HWTEST_F(ButtonFunctionTestNg, ButtonFunctionTest007, TestSize.Level1)
         layoutWrapper->AppendChild(childWrapper);
     }
     auto childButtonLayoutProperty =
-        AccessibilityManager::DynamicCast<LayoutProperty>(childWrapper->GetLayoutProperty());
+        childWrapper->GetLayoutProperty();
     ASSERT_NE(childButtonLayoutProperty, nullptr);
     /**
      * @tc.steps: step5. create a CalcSize and update to child button layout property.
@@ -1024,7 +1024,7 @@ HWTEST_F(ButtonFunctionTestNg, ButtonFunctionTest012, TestSize.Level1)
         layoutWrapper->AppendChild(childWrapper);
     }
     auto childButtonLayoutProperty =
-        AccessibilityManager::DynamicCast<LayoutProperty>(childWrapper->GetLayoutProperty());
+        childWrapper->GetLayoutProperty();
     ASSERT_NE(childButtonLayoutProperty, nullptr);
     /**
      * @tc.steps: step4. create new calcSize and call UpdateUserDefinedIdealSize.

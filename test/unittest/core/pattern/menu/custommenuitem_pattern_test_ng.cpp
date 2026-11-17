@@ -1058,7 +1058,7 @@ HWTEST_F(CustomMenuItemPatternTestNg, StackModeNoHeader001, TestSize.Level1)
      * @tc.steps: step4. Verify submenu has no header child (AddStackSubMenuHeader was skipped)
      * @tc.expected: submenu first child is not a header MenuItem
      */
-    auto subMenuFrame = AceType::DynamicCast<FrameNode>(subMenu);
+    auto subMenuFrame = subMenu;
     ASSERT_NE(subMenuFrame, nullptr);
     // CustomMenuItem should not have stack header added
     EXPECT_NE(subMenuFrame->GetChildren().size(), 2);

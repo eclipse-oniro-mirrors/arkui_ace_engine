@@ -1370,7 +1370,7 @@ void BubbleLayoutAlgorithm::UpdateTextNodeMaxLines(
     constraint.maxSize.SetWidth(maxSize.Width() - tipsMarginSpace * DOUBLE);
     constraint.maxSize.SetHeight(maxSize.Height() - tipsMarginSpace * DOUBLE);
     text->Measure(constraint);
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(text->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = text->GetLayoutAlgorithm();
     CHECK_NULL_VOID(layoutAlgorithmWrapper);
     auto textLayoutAlgorithm = DynamicCast<TextLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_VOID(textLayoutAlgorithm);

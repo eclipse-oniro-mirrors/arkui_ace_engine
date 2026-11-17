@@ -307,7 +307,7 @@ void RadioPattern::ImageNodeCreate()
         auto node = FrameNode::GetOrCreateFrameNode(V2::IMAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
             []() { return AceType::MakeRefPtr<ImagePattern>(); });
         CHECK_NULL_VOID(node);
-        builderChildNode_ = AceType::DynamicCast<FrameNode>(node);
+        builderChildNode_ = node;
         CHECK_NULL_VOID(builderChildNode_);
         auto gesturehub = builderChildNode_->GetOrCreateGestureEventHub();
         CHECK_NULL_VOID(gesturehub);
