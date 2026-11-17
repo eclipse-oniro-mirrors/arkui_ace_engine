@@ -795,13 +795,11 @@ static const char* ParseApplicationShortcutKey(
         static const char* const existingFunctionKeys[] = {
             "ESC", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
             "TAB", "DPAD_UP", "DPAD_DOWN", "DPAD_LEFT", "DPAD_RIGHT",
-            "CAPS_LOCK", nullptr,  // Index 19 is reserved for the removed PRINT_SCREEN key.
-            "SCROLL_LOCK", "PAUSE_BREAK", "NUM_LOCK", "INSERT", "DELETE",
+            "CAPS_LOCK", "SCROLL_LOCK", "PAUSE_BREAK", "NUM_LOCK", "INSERT", "DELETE",
             "HOME", "END", "PAGE_UP", "PAGE_DOWN", "ENTER", "BACKSPACE"
         };
         if (key->functionKey >= 0 &&
-            key->functionKey <= OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_BACKSPACE &&
-            existingFunctionKeys[key->functionKey] != nullptr) {
+            key->functionKey <= OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_BACKSPACE) {
             value = existingFunctionKeys[key->functionKey];
         } else {
             return "Unsupported function key";
