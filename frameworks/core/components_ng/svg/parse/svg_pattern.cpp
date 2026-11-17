@@ -70,23 +70,32 @@ void SvgPattern::OnPatternEffect(RSCanvas& canvas, RSBrush& brush,
     auto measuredWidth = GetRegionLength(patternAttr_.width, patternRule, SvgLengthType::HORIZONTAL);
     auto measuredHeight = GetRegionLength(patternAttr_.height, patternRule, SvgLengthType::VERTICAL);
     RSRect tileRect(0, 0, measuredWidth, measuredHeight);
-    auto pictureRecorder = std::make_unique<RSPictureRecorder>();
-    auto patternCanvas = pictureRecorder->BeginRecording(measuredWidth, measuredHeight);
-    auto patternContentRule = BuildContentScaleRule(svgCoordinateSystemContext, patternAttr_.patternContentUnits);
-    auto containerSize = svgCoordinateSystemContext.GetContainerRect().GetSize();
-    TransformForCurrentOBB(*patternCanvas, patternContentRule, containerSize, Offset(0.0, 0.0));
-    for (auto& child : children_) {
-        auto node = child;
-        if (node) {
-            node->Draw(*patternCanvas, patternContentRule);
+
+    auto svgContext = svgContext_.Upgrade();
+    uint32_t currentVersion = svgContext ? svgContext->GetRenderCacheVersion() : 0;
+    PictureCacheKey key{svgCoordinateSystemContext.GetContainerRect(),
+        svgCoordinateSystemContext.GetViewPort(), currentVersion};
+    if (!pictureCacheKey_.has_value() || !(pictureCacheKey_.value() == key)) {
+        auto pictureRecorder = std::make_unique<RSPictureRecorder>();
+        auto patternCanvas = pictureRecorder->BeginRecording(measuredWidth, measuredHeight);
+        auto patternContentRule = BuildContentScaleRule(svgCoordinateSystemContext, patternAttr_.patternContentUnits);
+        auto containerSize = svgCoordinateSystemContext.GetContainerRect().GetSize();
+        TransformForCurrentOBB(*patternCanvas, patternContentRule, containerSize, Offset(0.0, 0.0));
+        for (auto& child : children_) {
+            auto node = child;
+            if (node) {
+                node->Draw(*patternCanvas, patternContentRule);
+            }
         }
+        pictureCache_ = pictureRecorder->FinishRecordingAsPicture();
+        pictureCacheKey_ = key;
     }
+
     RSMatrix patternMatrix;
     RSMatrix localMatrix;
     localMatrix.Translate(measureX, measureY);
     patternMatrix.PreConcat(localMatrix);
-    auto picture = pictureRecorder->FinishRecordingAsPicture();
-    auto shader = RSShaderEffect::CreatePictureShader(*picture, RSTileMode::REPEAT, RSTileMode::REPEAT,
+    auto shader = RSShaderEffect::CreatePictureShader(*pictureCache_, RSTileMode::REPEAT, RSTileMode::REPEAT,
         RSFilterMode::LINEAR, patternMatrix, tileRect);
     brush.SetShaderEffect(shader);
     canvas.Restore();

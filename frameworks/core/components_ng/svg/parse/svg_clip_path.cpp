@@ -37,9 +37,36 @@ void SvgClipPath::OnClipEffect(RSCanvas& canvas, const SvgCoordinateSystemContex
     canvas.ClipPath(clipPath, RSClipOp::INTERSECT, true);
 }
 
+RSRecordingPath SvgClipPath::AsPath(const Size& viewPort) const
+{
+    auto svgContext = svgContext_.Upgrade();
+    uint32_t currentVersion = svgContext ? svgContext->GetRenderCacheVersion() : 0;
+    SizePathCacheKey key{viewPort, currentVersion};
+    if (sizePathCacheKey_.has_value() && sizePathCacheKey_.value() == key) {
+        return sizePathCache_.value();
+    }
+    if (svgContext && !svgContext->IncrementAsPathDepth()) {
+        return RSRecordingPath();
+    }
+    AsPathDepthGuard depthGuard(svgContext);
+    RSRecordingPath path;
+    for (const auto& child : children_) {
+        auto childPath = child->AsPath(viewPort);
+        path.Op(path, childPath, RSPathOp::UNION);
+    }
+    sizePathCache_ = path;
+    sizePathCacheKey_ = key;
+    return path;
+}
+
 RSRecordingPath SvgClipPath::AsPath(const SvgLengthScaleRule& lengthRule)
 {
     auto svgContext = svgContext_.Upgrade();
+    uint32_t currentVersion = svgContext ? svgContext->GetRenderCacheVersion() : 0;
+    RulePathCacheKey key{lengthRule, currentVersion};
+    if (rulePathCacheKey_.has_value() && rulePathCacheKey_.value() == key) {
+        return rulePathCache_.value();
+    }
     if (svgContext && !svgContext->IncrementAsPathDepth()) {
         return RSRecordingPath();
     }
@@ -55,6 +82,8 @@ RSRecordingPath SvgClipPath::AsPath(const SvgLengthScaleRule& lengthRule)
         }
         path.Op(path, childPath, RSPathOp::UNION);
     }
+    rulePathCache_ = path;
+    rulePathCacheKey_ = key;
     return path;
 }
 } // namespace OHOS::Ace::NG

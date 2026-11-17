@@ -236,6 +236,16 @@ public:
         return ++nodeCount_ <= MAX_NODE_COUNT;
     }
 
+    void IncrementRenderCacheVersion()
+    {
+        ++renderCacheVersion_;
+    }
+
+    uint32_t GetRenderCacheVersion() const
+    {
+        return renderCacheVersion_;
+    }
+
 private:
     static constexpr int32_t MAX_HREF_RESOLVE_COUNT = 10000;
     static constexpr int32_t MAX_DRAW_DEPTH = 5000;
@@ -262,6 +272,7 @@ private:
     int32_t drawDepth_ = 0;
     int32_t asPathDepth_ = 0;
     int32_t nodeCount_ = 0;
+    uint32_t renderCacheVersion_ = 0;
     ACE_DISALLOW_COPY_AND_MOVE(SvgContext);
 };
 
