@@ -426,11 +426,11 @@ void CoastingAxisEventGenerator::FrictionAnimationHandler::CalculateFinalPositio
         double rawVelocityX = velocity.GetVelocityX();
         double rawVelocityY = velocity.GetVelocityY();
         velocityRatioX_ = GreatOrEqual(generator->axisDirection_.GetX(), 0)
-                              ? abs(rawVelocityX / generator->originVelocity_)
-                              : -abs(rawVelocityX / generator->originVelocity_);
+                              ? std::abs(rawVelocityX / generator->originVelocity_)
+                              : -std::abs(rawVelocityX / generator->originVelocity_);
         velocityRatioY_ = GreatOrEqual(generator->axisDirection_.GetY(), 0)
-                              ? abs(rawVelocityY / generator->originVelocity_)
-                              : -abs(rawVelocityY / generator->originVelocity_);
+                              ? std::abs(rawVelocityY / generator->originVelocity_)
+                              : -std::abs(rawVelocityY / generator->originVelocity_);
     }
 }
 
