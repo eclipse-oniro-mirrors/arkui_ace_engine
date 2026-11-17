@@ -47,6 +47,14 @@ static bool g_securityHitTestFromOverlay = false;
 static int32_t g_securityHitTestCallingUid = -1;
 static uint64_t g_securityHitTestSessionId = 0;
 static std::string g_securityHitTestResponse = "";
+// Records WebDelegate::SetJavaScriptItems(DOCUMENT_START) calls so tests can
+// verify that a batch (possibly empty) was submitted.
+static bool g_documentStartScriptItemsSet = false;
+static size_t g_documentStartScriptItemsSize = 0;
+// Records WebDelegate::SetJavaScriptItemsByOrder(DOCUMENT_START) calls so tests
+// can verify that the ByOrder path was taken and how many scripts were submitted.
+static bool g_documentStartScriptItemsByOrderSet = false;
+static size_t g_documentStartScriptItemsByOrderSize = 0;
 std::shared_ptr<NWeb::NWebAccessibilityNodeInfo> g_customAccessibilityNode = nullptr;
 std::shared_ptr<NWeb::NWebAgentManager> g_nwebAgentManager = nullptr;
 // Mock state for WebDelegate::RequestNativeDomTree.
@@ -1292,7 +1300,13 @@ bool WebDelegate::ShouldVirtualKeyboardOverlay()
 {
     return true;
 }
-void WebDelegate::SetJavaScriptItems(const ScriptItems& scriptItems, const ScriptItemType& type) {}
+void WebDelegate::SetJavaScriptItems(const ScriptItems& scriptItems, const ScriptItemType& type)
+{
+    if (type == ScriptItemType::DOCUMENT_START) {
+        g_documentStartScriptItemsSet = true;
+        g_documentStartScriptItemsSize = scriptItems.size();
+    }
+}
 void WebDelegate::JavaScriptOnDocumentStart() {}
 void WebDelegate::JavaScriptOnDocumentEnd() {}
 
@@ -1300,7 +1314,13 @@ void WebDelegate::SetJavaScriptItemsByOrder(
     const ScriptItems& scriptItems,
     const ScriptRegexItems& scriptRegexItems,
     const ScriptItemType& type,
-    const ScriptItemsByOrder& scriptItemsByOrder) {}
+    const ScriptItemsByOrder& scriptItemsByOrder)
+{
+    if (type == ScriptItemType::DOCUMENT_START) {
+        g_documentStartScriptItemsByOrderSet = true;
+        g_documentStartScriptItemsByOrderSize = scriptItemsByOrder.size();
+    }
+}
 void WebDelegate::JavaScriptOnDocumentStartByOrder() {}
 void WebDelegate::JavaScriptOnDocumentEndByOrder() {}
 void WebDelegate::JavaScriptOnHeadReadyByOrder() {}
@@ -1555,6 +1575,32 @@ void ResetMockRequestNativeDomTree()
 void SetMockRequestNativeDomTreeResult(const std::string& result)
 {
     g_mockRequestNativeDomTreeResult = result;
+}
+void ResetMockDocumentStartScriptItems()
+{
+    g_documentStartScriptItemsSet = false;
+    g_documentStartScriptItemsSize = 0;
+}
+bool HasMockDocumentStartScriptItems()
+{
+    return g_documentStartScriptItemsSet;
+}
+size_t GetMockDocumentStartScriptItemsSize()
+{
+    return g_documentStartScriptItemsSize;
+}
+void ResetMockDocumentStartScriptItemsByOrder()
+{
+    g_documentStartScriptItemsByOrderSet = false;
+    g_documentStartScriptItemsByOrderSize = 0;
+}
+bool HasMockDocumentStartScriptItemsByOrder()
+{
+    return g_documentStartScriptItemsByOrderSet;
+}
+size_t GetMockDocumentStartScriptItemsByOrderSize()
+{
+    return g_documentStartScriptItemsByOrderSize;
 }
 int WebDelegate::SendCommandActionToNWeb(const std::shared_ptr<OHOS::NWeb::NWebCommandAction>& simulatedAction)
 {

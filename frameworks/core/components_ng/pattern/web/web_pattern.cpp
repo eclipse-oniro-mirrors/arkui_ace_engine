@@ -9560,6 +9560,13 @@ void WebPattern::MergeAndInjectJavaScriptOnDocumentStart(bool forceInject)
 void WebPattern::MergeByOrderPath(ScriptItems& mergedItems, ScriptRegexItems& mergedRegexItems,
     ScriptItemsByOrder& mergedByOrder)
 {
+    // Append each script at most once: NWeb derives the batch's final flag from
+    // count == scriptItems.size(), so duplicate entries would break it.
+    auto appendByOrder = [&mergedByOrder](const std::string& script) {
+        if (std::find(mergedByOrder.begin(), mergedByOrder.end(), script) == mergedByOrder.end()) {
+            mergedByOrder.emplace_back(script);
+        }
+    };
     // App JS inserted at the front, preserving original order. Insert-or-append
     // to avoid overwriting when script keys collide.
     for (const auto& [script, urlRules] : publicOnDocumentStartScriptItems_) {
@@ -9579,7 +9586,7 @@ void WebPattern::MergeByOrderPath(ScriptItems& mergedItems, ScriptRegexItems& me
         }
     }
     for (const auto& script : publicOnDocumentStartScriptItemsByOrder_) {
-        mergedByOrder.emplace_back(script);
+        appendByOrder(script);
     }
     // System JS appended after app JS.
     for (const auto& [script, urlRules] : systemDocumentStartScripts_) {
@@ -9599,7 +9606,7 @@ void WebPattern::MergeByOrderPath(ScriptItems& mergedItems, ScriptRegexItems& me
         }
     }
     for (const auto& script : systemDocumentStartScriptItemsByOrder_) {
-        mergedByOrder.emplace_back(script);
+        appendByOrder(script);
     }
 }
 
@@ -11581,23 +11588,34 @@ void WebPattern::RunJsInit()
         return;
     }
     if (!isRegisterJsObject_) {
-         isRegisterJsObject_ = true;
-         TAG_LOGI(AceLogTag::ACE_WEB, "run java TranslateScript and InitScript. WebId: %{public}d", GetWebId());
-         // Register translate script as system DocumentStart JS so it executes
-         // at DocumentStart stage (before page load). The rule "*" matches all pages.
-         // ScriptItems: key = script content, value = URL match rules.
-         // ScriptItemsByOrder: script contents in execution order.
-         ScriptItems sysScriptItems;
-         sysScriptItems.insert(std::make_pair(g_translateTextData.translateScript, std::vector<std::string>{ "*" }));
-         sysScriptItems.insert(std::make_pair(g_translateTextData.initScript, std::vector<std::string>{ "*" }));
-         ScriptRegexItems sysRegexItems;
-         ScriptItemsByOrder sysByOrder;
-         sysByOrder.emplace_back(g_translateTextData.translateScript);
-         sysByOrder.emplace_back(g_translateTextData.initScript);
-         RegisterSystemDocumentStartJS(sysScriptItems, sysRegexItems, sysByOrder);
-         // Registers the JS Bridge with isNeedRefresh=true, which internally calls
-         // nweb->Reload() so the reloaded page picks up the system DocumentStart JS.
-         RegisterTranslateTextJavaScript();
+        // The delegate is required to submit system scripts and register the JS
+        // bridge. If it is not ready yet, leave the flag unset so a later
+        // RunJsInit (e.g. from OnPageStarted) retries instead of silently skipping.
+        CHECK_NULL_VOID(delegate_);
+        isRegisterJsObject_ = true;
+        TAG_LOGI(AceLogTag::ACE_WEB, "run java TranslateScript and InitScript. WebId: %{public}d", GetWebId());
+        // Register translate script as system DocumentStart JS so it executes
+        // at DocumentStart stage (before page load). The rule "*" matches all pages.
+        // ScriptItems: key = script content, value = URL match rules.
+        // ScriptItemsByOrder: script contents in execution order.
+        // Empty scripts are skipped so they cannot bypass the EX-3 empty check.
+        ScriptItems sysScriptItems;
+        ScriptRegexItems sysRegexItems;
+        ScriptItemsByOrder sysByOrder;
+        if (!g_translateTextData.translateScript.empty()) {
+            sysScriptItems.insert(
+                std::make_pair(g_translateTextData.translateScript, std::vector<std::string>{ "*" }));
+            sysByOrder.emplace_back(g_translateTextData.translateScript);
+        }
+        if (!g_translateTextData.initScript.empty()) {
+            sysScriptItems.insert(
+                std::make_pair(g_translateTextData.initScript, std::vector<std::string>{ "*" }));
+            sysByOrder.emplace_back(g_translateTextData.initScript);
+        }
+        RegisterSystemDocumentStartJS(sysScriptItems, sysRegexItems, sysByOrder);
+        // Registers the JS Bridge with isNeedRefresh=true, which internally calls
+        // nweb->Reload() so the reloaded page picks up the system DocumentStart JS.
+        RegisterTranslateTextJavaScript();
     }
 }
 

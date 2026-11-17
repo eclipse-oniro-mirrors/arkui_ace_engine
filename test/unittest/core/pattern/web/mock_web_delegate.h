@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_WEB_MOCK_WEB_DELEGATE_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_WEB_MOCK_WEB_DELEGATE_H
 
+#include <cstddef>
 #include <string>
 #include <memory>
 #include <vector>
@@ -57,6 +58,15 @@ void SetMockRequestNativeDomTreeCallback(std::function<void(const NG::OffsetF&, 
 const MockRequestNativeDomTreeCall& GetMockRequestNativeDomTreeLastCall();
 void ResetMockRequestNativeDomTree();
 void SetMockRequestNativeDomTreeResult(const std::string& result);
+// Test-only knobs to observe WebDelegate::SetJavaScriptItems calls. The test target
+// links a stub WebDelegate, so the real optional state is not retained.
+void ResetMockDocumentStartScriptItems();
+bool HasMockDocumentStartScriptItems();
+size_t GetMockDocumentStartScriptItemsSize();
+// Test-only knobs to observe WebDelegate::SetJavaScriptItemsByOrder calls.
+void ResetMockDocumentStartScriptItemsByOrder();
+bool HasMockDocumentStartScriptItemsByOrder();
+size_t GetMockDocumentStartScriptItemsByOrderSize();
 } // namespace OHOS::Ace
 
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_WEB_MOCK_WEB_DELEGATE_H
