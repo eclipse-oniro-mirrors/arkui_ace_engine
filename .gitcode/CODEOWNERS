@@ -5124,14 +5124,17 @@ frameworks/core/interfaces/native/node/node_scroll_bar_modifier.cpp @arkuiscroll
 frameworks/core/interfaces/native/node/node_scroll_bar_modifier.h @arkuiscroll
 frameworks/core/interfaces/native/runtime/runtime_init.cpp @huawei_g_five
 frameworks/core/interfaces/native/runtime/runtime_init.h @huawei_g_five
+interfaces/ets/ani/animator/ets/@ohos.animator.ets @arkuicodepulse
 interfaces/ets/ani/animator/src/animator.cpp @arkuicodepulse
 interfaces/ets/ani/componentUtils/src/componentUtils.cpp @ArkUI_Event
+interfaces/ets/ani/curves/ets/@ohos.curves.ets @arkuicodepulse
 interfaces/ets/ani/curves/src/curves.cpp @arkuicodepulse
 interfaces/ets/ani/focuscontroller/src/focusController.cpp @ArkUI_Event
 interfaces/ets/ani/imagecache/src/imagecache.cpp @arkui001
 interfaces/ets/ani/inspector/src/inspector.cpp @ArkUI_ability_group
 interfaces/ets/ani/inspector/src/inspector_util.cpp @ArkUI_ability_group
 interfaces/ets/ani/inspector/src/inspector_util.h @ArkUI_ability_group
+interfaces/ets/ani/matrix4/ets/@ohos.matrix4.ets @arkuicodepulse
 interfaces/ets/ani/matrix4/src/matrix4.cpp @arkuicodepulse
 interfaces/ets/ani/mediaquery/src/mediaquery.cpp @arkuilayout1
 interfaces/ets/ani/ohosprompt/src/prompt.cpp @arkuipopupwindow_all
@@ -5140,6 +5143,7 @@ interfaces/ets/ani/overlayManager/src/overlayManager.cpp @arkuipopupwindow_all
 interfaces/ets/ani/performanceMonitor/src/performanceMonitor.cpp @arkui_framework_xnode
 interfaces/ets/ani/pluginComponent/ @ArkUI_ability_group
 interfaces/ets/ani/promptaction/ @arkuipopupwindow_all
+interfaces/ets/ani/shape/ets/@ohos.arkui.shape.ets @arkuicodepulse
 interfaces/ets/ani/shape/src/circleShape.cpp @arkuicodepulse
 interfaces/ets/ani/shape/src/ellipseShape.cpp @arkuicodepulse
 interfaces/ets/ani/shape/src/pathShape.cpp @arkuicodepulse
