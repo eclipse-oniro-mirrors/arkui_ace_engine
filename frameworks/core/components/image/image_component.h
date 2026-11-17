@@ -220,11 +220,7 @@ private:
     bool fitMaxSize_ = true;
     bool hasObjectPosition_ = false;
     bool matchTextDirection_ = false;
-#ifndef USE_ROSEN_DRAWING
-    bool useSkiaSvg_ = true;
-#else
     bool useSkiaSvg_ = false;
-#endif
     bool autoResize_ = true;
     bool focusable_ = true;
 
