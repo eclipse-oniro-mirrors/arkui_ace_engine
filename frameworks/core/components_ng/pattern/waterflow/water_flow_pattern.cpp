@@ -1163,7 +1163,7 @@ void WaterFlowPattern::CheckSpringAfterContentShrink()
 
 void WaterFlowPattern::UpdateScrollTargetsAfterLayout(const RefPtr<LayoutWrapper>& dirty)
 {
-    auto algorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto algorithmWrapper = dirty->GetLayoutAlgorithm();
     auto sw = algorithmWrapper ? DynamicCast<WaterFlowLayoutSW>(algorithmWrapper->GetLayoutAlgorithm()) : nullptr;
     const auto serial = sw ? sw->GetFastScrollSerial() : fastScrollSerial_;
     const float calibration = layoutInfo_->CalibrateOffset();

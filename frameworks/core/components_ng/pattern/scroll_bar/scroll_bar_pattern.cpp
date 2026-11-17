@@ -474,7 +474,7 @@ bool ScrollBarPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dir
     if (UseInnerScrollBar()) {
         updateFlag = true;
     } else {
-        auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+        auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
         CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
         auto layoutAlgorithm = DynamicCast<ScrollBarLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
         CHECK_NULL_RETURN(layoutAlgorithm, false);

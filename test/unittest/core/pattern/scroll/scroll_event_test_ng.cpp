@@ -2099,7 +2099,7 @@ HWTEST_F(ScrollEventTestNg, HandleCrownActionEnd001, TestSize.Level1)
  */
 HWTEST_F(ScrollEventTestNg, ScrollBarOverDrag001, TestSize.Level1)
 {
-    auto container = AceType::DynamicCast<Container>(MockContainer::Current());
+    RefPtr<Container> container = MockContainer::Current();
     ASSERT_NE(container, nullptr);
     container->SetApiTargetVersion((int32_t)PlatformVersion::VERSION_TWENTY_THREE);
     StackModelNG stackModel;
@@ -2138,7 +2138,7 @@ HWTEST_F(ScrollEventTestNg, ScrollBarOverDrag001, TestSize.Level1)
  */
 HWTEST_F(ScrollEventTestNg, ScrollBarOverDrag002, TestSize.Level1)
 {
-    auto container = AceType::DynamicCast<Container>(MockContainer::Current());
+    RefPtr<Container> container = MockContainer::Current();
     ASSERT_NE(container, nullptr);
     container->SetApiTargetVersion((int32_t)PlatformVersion::VERSION_TWENTY_THREE);
     StackModelNG stackModel;

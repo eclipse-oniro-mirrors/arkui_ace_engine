@@ -175,7 +175,7 @@ protected:
     {
         auto value = DynamicCast<WaterFlowLayoutProperty>(property);
         ScrollableLayoutProperty::Clone(value);
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propRowsTemplate_ = CloneRowsTemplate();
         value->propColumnsTemplate_ = CloneColumnsTemplate();
         value->propRowsGap_ = CloneRowsGap();

@@ -38,7 +38,7 @@ public:
         RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<ScrollBarThemeWrapper>();
-            auto theme = AceType::DynamicCast<ScrollBarTheme>(wrapper);
+            RefPtr<ScrollBarTheme> theme = wrapper;
             if (!themeConstants) {
                 return wrapper;
             }

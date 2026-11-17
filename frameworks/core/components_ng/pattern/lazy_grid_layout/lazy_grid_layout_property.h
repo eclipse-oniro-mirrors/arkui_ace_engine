@@ -36,7 +36,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<LazyGridLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propRowGap_ = CloneRowGap();
         value->propColumnGap_ = CloneColumnGap();
         value->propColumnsTemplate_ = CloneColumnsTemplate();

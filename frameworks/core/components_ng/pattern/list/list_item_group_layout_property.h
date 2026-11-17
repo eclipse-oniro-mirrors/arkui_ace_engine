@@ -37,7 +37,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<ListItemGroupLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propSpace_ = CloneSpace();
         value->propSpaceWidth_ = CloneSpaceWidth();
         value->propDivider_ = CloneDivider();

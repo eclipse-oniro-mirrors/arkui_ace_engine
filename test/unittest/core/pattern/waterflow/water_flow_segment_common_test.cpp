@@ -27,7 +27,7 @@ protected:
     void GetWaterFlow() override
     {
         WaterFlowTestNg::GetWaterFlow();
-        info_ = AceType::DynamicCast<WaterFlowLayoutInfoBase>(pattern_->layoutInfo_);
+        info_ = pattern_->layoutInfo_;
         EXPECT_TRUE(info_);
     }
 

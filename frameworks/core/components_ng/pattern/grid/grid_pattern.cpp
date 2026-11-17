@@ -1009,7 +1009,7 @@ void GridPattern::ClearMultiSelect()
             continue;
         }
 
-        auto itemFrameNode = AceType::DynamicCast<FrameNode>(item);
+        auto itemFrameNode = item;
         auto itemPattern = itemFrameNode->GetPattern<GridItemPattern>();
         CHECK_NULL_VOID(itemPattern);
         auto selectedStatus = itemToBeSelected_.find(itemFrameNode->GetId());
@@ -1456,7 +1456,7 @@ bool GridPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, c
     if (config.skipMeasure && config.skipLayout) {
         return false;
     }
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto gridLayoutAlgorithm = DynamicCast<GridLayoutBaseAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(gridLayoutAlgorithm, false);

@@ -2198,7 +2198,7 @@ HWTEST_F(WaterFlowTestNg, ScrollBarOverDrag001, TestSize.Level1)
  */
 HWTEST_F(WaterFlowTestNg, ScrollBarOverDrag002, TestSize.Level1)
 {
-    auto container = AceType::DynamicCast<Container>(MockContainer::Current());
+    RefPtr<Container> container = MockContainer::Current();
     ASSERT_NE(container, nullptr);
     container->SetApiTargetVersion((int32_t)PlatformVersion::VERSION_TWENTY_THREE);
     StackModelNG stackModel;

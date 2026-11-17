@@ -40,7 +40,7 @@ public:
         RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<GridItemThemeWrapper>();
-            auto theme = AceType::DynamicCast<GridItemTheme>(wrapper);
+            RefPtr<GridItemTheme> theme = wrapper;
             if (!themeConstants) {
                 return wrapper;
             }

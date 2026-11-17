@@ -31,7 +31,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<WaterFlowItemLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         if (originalConstraint_) {
             value->originalConstraint_ = std::make_unique<MeasureProperty>(*originalConstraint_);
         }

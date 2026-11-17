@@ -560,7 +560,7 @@ void GridItemPattern::HandleFocusEvent()
 {
     auto host = GetHost();
     CHECK_NULL_VOID(host);
-    auto uiNode = DynamicCast<UINode>(host);
+    RefPtr<UINode> uiNode = host;
     while (uiNode->GetTag() != GRID_ETS_TAG) {
         uiNode = uiNode->GetParent();
         CHECK_NULL_VOID(uiNode);
