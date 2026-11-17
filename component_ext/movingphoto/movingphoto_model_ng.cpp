@@ -27,6 +27,20 @@ namespace OHOS::Ace::NG {
 namespace {
 }
 
+std::unique_ptr<NG::MovingPhotoModelNG> NG::MovingPhotoModelNG::instance_ = nullptr;
+std::mutex NG::MovingPhotoModelNG::mutex_;
+ 
+NG::MovingPhotoModelNG* NG::MovingPhotoModelNG::GetInstance()
+{
+    if (!instance_) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (!instance_) {
+            instance_.reset(new NG::MovingPhotoModelNG());
+        }
+    }
+    return instance_.get();
+}
+
 void MovingPhotoModelNG::Create(const RefPtr<MovingPhotoController>& controller)
 {
     auto* stack = ViewStackProcessor::GetInstance();

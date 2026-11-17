@@ -261,6 +261,7 @@ void MovingPhotoPattern::SetNotifyTransitionImpl(const SingleTaskExecutor& uiTas
 void MovingPhotoPattern::SetPrepareImpl(const SingleTaskExecutor& uiTaskExecutor)
 {
     controller_->SetPrepareImpl([weak = WeakClaim(this), uiTaskExecutor](std::function<void()> callback) {
+        TAG_LOGI(AceLogTag::ACE_MOVING_PHOTO, "SetPrepareImpl");
         auto pattern = weak.Upgrade();
         CHECK_NULL_RETURN(pattern, false);
         if (pattern->pendingSeekCallback_) {
@@ -1742,7 +1743,7 @@ void MovingPhotoPattern::DoPrepare()
         Pause();
     }
     int64_t startUs = (autoPlayPeriodStartTime_ >= 0) ? autoPlayPeriodStartTime_ : 0;
-    Seek(static_cast<int32_t>(startUs / US_CONVERT), SeekMode::SEEK_CLOSEST);
+    Seek(static_cast<int32_t>(startUs / US_CONVERT));
 }
  
 void MovingPhotoPattern::StartPlay(bool prepareMode)
@@ -2284,7 +2285,6 @@ void MovingPhotoPattern::StopAnimation(bool isZoomIn)
     auto videoRsContext = video->GetRenderContext();
     CHECK_NULL_VOID(videoRsContext);
 
-    videoRsContext->UpdateOpacity(1.0);
     RsContextUpdateTransformScale(imageRsContext, videoRsContext, autoAndRepeatLevel_, isZoomIn);
     image->MarkModifyDone();
     video->MarkModifyDone();
@@ -2307,7 +2307,7 @@ void MovingPhotoPattern::StopAnimation(bool isZoomIn)
 void MovingPhotoPattern::StopAnimationCallback()
 {
     if (autoPlayPeriodStartTime_ >= 0) {
-        Seek(static_cast<int32_t>(autoPlayPeriodStartTime_ / US_CONVERT), SeekMode::SEEK_CLOSEST);
+        Seek(static_cast<int32_t>(autoPlayPeriodStartTime_ / US_CONVERT));
     } else {
         Seek(0);
     }
@@ -2405,7 +2405,7 @@ void MovingPhotoPattern::JumpToCover()
     isPrepareMode_ = false;
     HideVideoFrame();
     int64_t startUs = (autoPlayPeriodStartTime_ >= 0) ? autoPlayPeriodStartTime_ : 0;
-    Seek(static_cast<int32_t>(startUs / US_CONVERT), SeekMode::SEEK_CLOSEST);
+    Seek(static_cast<int32_t>(startUs / US_CONVERT));
     PauseVideo();
 }
 
