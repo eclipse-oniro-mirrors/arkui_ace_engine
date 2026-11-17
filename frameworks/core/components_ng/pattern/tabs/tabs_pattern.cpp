@@ -2797,10 +2797,12 @@ void TabsPattern::SyncSideBarTabListIndicator(int32_t currentIndex)
     CHECK_NULL_VOID(sideBarPattern);
     auto tabListNode = AceType::DynamicCast<FrameNode>(sideBarPattern->GetTabListNode());
     CHECK_NULL_VOID(tabListNode);
-    // Use TabsSideBarTabListPattern::SetCurrentIndex instead of TabBarPattern::OnTabBarIndexChange
+    // Sync the sidebar tab item visual state only. Do not call SetCurrentIndex here:
+    // it issues SwipeTo, which would re-enter the swiper change-event chain that
+    // invoked this function and corrupt an in-flight custom transition.
     auto tabListPattern = tabListNode->GetPattern<TabsSideBarTabListPattern>();
     CHECK_NULL_VOID(tabListPattern);
-    tabListPattern->SetCurrentIndex(currentIndex);
+    tabListPattern->SyncTabItemStyle(currentIndex);
 }
 
 TabBarDisplayMode TabsPattern::GetActiveBarDisplayMode() const
