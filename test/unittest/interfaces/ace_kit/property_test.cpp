@@ -104,7 +104,7 @@ HWTEST_F(PropertyTest, PropertyTest002, TestSize.Level1)
     auto aceNode = frameNodeImpl->GetAceNodePtr();
     ASSERT_TRUE(aceNode);
 
-    auto paintProp = aceNode->GetPaintProperty<NG::Property>();
+    auto paintProp = aceNode->GetPaintProperty<NG::PaintProperty>();
     ASSERT_TRUE(paintProp);
 
     EXPECT_EQ(paintProp->GetPropertyChangeFlag(), NG::PROPERTY_UPDATE_RENDER);
@@ -159,7 +159,7 @@ HWTEST_F(PropertyTest, PropertyTest004, TestSize.Level1)
 
     auto aceNode = frameNodeImpl->GetAceNodePtr();
     ASSERT_TRUE(aceNode);
-    auto paintProp = aceNode->GetPaintProperty<NG::Property>();
+    auto paintProp = aceNode->GetPaintProperty<NG::PaintProperty>();
     ASSERT_TRUE(paintProp);
     EXPECT_EQ(paintProp->GetPropertyChangeFlag(), NG::PROPERTY_UPDATE_NORMAL);
     auto property = frameNode->GetProperty();
