@@ -15,8 +15,6 @@
 
 #include "core/components_ng/pattern/grid/grid_layout_base_algorithm.h"
 
-#include <set>
-
 #include "base/log/log_wrapper.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_observer.h"
@@ -366,7 +364,8 @@ RefPtr<LayoutWrapper> GridLayoutBaseAlgorithm::GetGridItem(
     return wrapper;
 }
 
-void GridLayoutBaseAlgorithm::UpdateGridDecodeCacheWindow(LayoutWrapper* layoutWrapper, int32_t cacheCount)
+void GridLayoutBaseAlgorithm::UpdateGridDecodeCacheWindow(
+    LayoutWrapper* layoutWrapper, int32_t cacheCount, bool expandToFullMatrix)
 {
     CHECK_NULL_VOID(layoutWrapper);
     if (!ScrollableUtils::IsLowMemoryDeviceRuntime()) {
@@ -395,7 +394,13 @@ void GridLayoutBaseAlgorithm::UpdateGridDecodeCacheWindow(LayoutWrapper* layoutW
         startLine - decodeWindow, endLine + decodeWindow,
         startLine - cacheCount, endLine + cacheCount);
     auto decodeItems = CollectDecodeItems(startLine - decodeWindow, endLine + decodeWindow);
-    ApplyItemDecodeState(layoutWrapper, startLine - cacheCount, endLine + cacheCount, decodeItems);
+    int32_t cacheStartLine = startLine - cacheCount;
+    int32_t cacheEndLine = endLine + cacheCount;
+    if (expandToFullMatrix) {
+        cacheStartLine = std::min(cacheStartLine, info_.gridMatrix_.begin()->first);
+        cacheEndLine = std::max(cacheEndLine, info_.gridMatrix_.rbegin()->first);
+    }
+    ApplyItemDecodeState(host, cacheStartLine, cacheEndLine, decodeItems);
 }
 
 std::set<int32_t> GridLayoutBaseAlgorithm::CollectDecodeItems(int32_t decodeStartLine, int32_t decodeEndLine) const
@@ -412,8 +417,9 @@ std::set<int32_t> GridLayoutBaseAlgorithm::CollectDecodeItems(int32_t decodeStar
 }
 
 void GridLayoutBaseAlgorithm::ApplyItemDecodeState(
-    LayoutWrapper* layoutWrapper, int32_t cacheStartLine, int32_t cacheEndLine, const std::set<int32_t>& decodeItems)
+    const RefPtr<FrameNode>& host, int32_t cacheStartLine, int32_t cacheEndLine, const std::set<int32_t>& decodeItems)
 {
+    CHECK_NULL_VOID(host);
     std::set<int32_t> processed;
     std::set<int32_t> processedNodeIds;
     for (auto lineIt = info_.gridMatrix_.lower_bound(cacheStartLine);
@@ -426,9 +432,7 @@ void GridLayoutBaseAlgorithm::ApplyItemDecodeState(
             }
             processed.insert(itemIdx);
             bool active = decodeItems.count(itemIdx) > 0;
-            auto wrapper = GetGridItem(layoutWrapper, itemIdx, false, true);
-            CHECK_NULL_CONTINUE(wrapper);
-            auto itemFrameNode = wrapper->GetHostNode();
+            auto itemFrameNode = AceType::Claim(host->GetFrameNodeChildByIndexWithoutBuild(itemIdx));
             CHECK_NULL_CONTINUE(itemFrameNode);
             if (!processedNodeIds.insert(itemFrameNode->GetId()).second) {
                 continue;
