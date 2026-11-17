@@ -50,6 +50,10 @@ ohos_shared_library("smartlayout") {
 
   public_configs = [ ":smartlayout_config" ]
 
+  if (is_ohos) {
+    version_script = "libsmartlayout.map"
+  }
+
   external_deps = [
     "bounds_checking_function:libsec_shared",
     "hilog:libhilog",
