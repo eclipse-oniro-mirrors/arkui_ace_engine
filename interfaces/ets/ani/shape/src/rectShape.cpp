@@ -41,13 +41,17 @@ void ParseWidthAndHeight(ani_env* env, ani_object object, OHOS::Ace::RefPtr<OHOS
 }
 }
 
-void ANICreateRectShapeWithParam(
-    ani_env* env, [[maybe_unused]] ani_object object, [[maybe_unused]] ani_object aniOption)
+ani_long ANICreateRectShape(
+    ani_env* env, [[maybe_unused]] ani_object aniClass, [[maybe_unused]] ani_object aniOption)
 {
     if (GetIsUndefinedObject(env, aniOption)) {
-        return;
+        return 0;
     }
-
+    ani_class cls;
+    if (ANI_OK != env->FindClass(ANI_SHAPE_NAME, &cls)) {
+        LOGE("RectShape find class fail");
+        return 0;
+    }
     RectPeer* shapePeer = new RectPeer();
     auto rect = AceType::MakeRefPtr<ShapeRect>();
     ani_status status;
@@ -57,7 +61,7 @@ void ANICreateRectShapeWithParam(
         if ((status = env->Object_GetPropertyByName_Ref(aniOption, "radius", &params_ref)) != ANI_OK) {
             LOGE("Get radius failed, status:%{public}d", status);
             delete shapePeer;
-            return;
+            return 0;
         }
         if (!GetIsUndefinedObject(env, params_ref) && GetIsArrayObject(env, params_ref)) {
             OHOS::Ace::CalcDimension radius;
@@ -86,12 +90,7 @@ void ANICreateRectShapeWithParam(
     }
     ParseWidthAndHeight(env, aniOption, rect);
     shapePeer->rectShape = rect;
-    if ((status = env->Object_SetPropertyByName_Long(
-             object, "basicShapeResult", reinterpret_cast<ani_long>(shapePeer))) != ANI_OK) {
-        LOGE("RectShape set addr failed, status:%{public}d", status);
-        delete shapePeer;
-        return;
-    }
+    return reinterpret_cast<ani_long>(shapePeer);
 }
 
 RectPeer* GetRectShape(ani_env* env, ani_object obj)
@@ -306,9 +305,6 @@ ani_status RectShape::BindRectShape(ani_env* env)
     }
 
     std::array methods = {
-        ani_native_function { "<ctor>",
-            "X{C{@ohos.arkui.shape.RectShapeOptions}C{@ohos.arkui.shape.RoundRectShapeOptions}}:",
-            reinterpret_cast<void*>(ANICreateRectShapeWithParam) },
         ani_native_function { "width", nullptr, reinterpret_cast<void*>(ANIRectShapeWidth) },
         ani_native_function { "radiusWidth", nullptr, reinterpret_cast<void*>(ANIRectShapeRadiusWidth) },
         ani_native_function { "radiusHeight", nullptr, reinterpret_cast<void*>(ANIRectShapeRadiusHeight) },
@@ -322,6 +318,15 @@ ani_status RectShape::BindRectShape(ani_env* env)
     ani_status tmp = env->Class_BindNativeMethods(cls, methods.data(), methods.size());
     if (ANI_OK != tmp) {
         LOGW("bind Rect methods error, status:%{public}d", tmp);
+        return ANI_ERROR;
+    }
+    std::array staticMethods = {
+        ani_native_function { "create", nullptr, reinterpret_cast<void*>(ANICreateRectShape) },
+        ani_native_function { "nativeDestroy", nullptr, reinterpret_cast<void*>(ANIDestroyShape<RectPeer>) },
+    };
+    tmp = env->Class_BindStaticNativeMethods(cls, staticMethods.data(), staticMethods.size());
+    if (ANI_OK != tmp) {
+        LOGW("bind Rect static methods error, status:%{public}d", tmp);
         return ANI_ERROR;
     }
     return ANI_OK;

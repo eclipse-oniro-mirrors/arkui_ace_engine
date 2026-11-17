@@ -58,10 +58,83 @@ export class BaseShape extends CommonShapeMethod {
    public native size(size: SizeOptions): this;
 }
 
-export class RectShape extends BaseShape {
-    basicShapeResult:long;
+export class RectShapeCleaner {
+    private ptr: long = 0;
+    constructor(ptr: long) { this.ptr = ptr; }
+    clean(): void {
+        if (this.ptr != 0) {
+            RectShape.nativeDestroy(this.ptr);
+            this.ptr = 0;
+        }
+    }
+}
 
-    public native constructor(options?: RectShapeOptions | RoundRectShapeOptions);
+export class EllipseShapeCleaner {
+    private ptr: long = 0;
+    constructor(ptr: long) { this.ptr = ptr; }
+    clean(): void {
+        if (this.ptr != 0) {
+            EllipseShape.nativeDestroy(this.ptr);
+            this.ptr = 0;
+        }
+    }
+}
+
+export class CircleShapeCleaner {
+    private ptr: long = 0;
+    constructor(ptr: long) { this.ptr = ptr; }
+    clean(): void {
+        if (this.ptr != 0) {
+            CircleShape.nativeDestroy(this.ptr);
+            this.ptr = 0;
+        }
+    }
+}
+
+export class PathShapeCleaner {
+    private ptr: long = 0;
+    constructor(ptr: long) { this.ptr = ptr; }
+    clean(): void {
+        if (this.ptr != 0) {
+            PathShape.nativeDestroy(this.ptr);
+            this.ptr = 0;
+        }
+    }
+}
+
+export class RectShape extends BaseShape {
+    basicShapeResult: long = 0;
+    protected cleaner_: RectShapeCleaner | undefined = undefined;
+    private static destroyRegister: FinalizationRegistry<RectShapeCleaner> =
+        new FinalizationRegistry<RectShapeCleaner>(RectShape.cleanCallback);
+    private static unregisterToken: object = new object();
+
+    static native create(options?: RectShapeOptions | RoundRectShapeOptions): long;
+    static native nativeDestroy(ptr: long): void;
+
+    static cleanCallback(cleaner: RectShapeCleaner): void {
+        cleaner.clean();
+    }
+
+    constructor(options?: RectShapeOptions | RoundRectShapeOptions) {
+        super();
+        if (this.basicShapeResult == 0) {
+            let ptr = RectShape.create(options);
+            this.basicShapeResult = ptr;
+            this.registerCleaner(ptr);
+        }
+    }
+
+    registerCleaner(ptr: long): void {
+        if (this.cleaner_ !== undefined) {
+            this.cleaner_!.clean();
+        }
+        this.cleaner_ = new RectShapeCleaner(ptr);
+        RectShape.destroyRegister.register(this, this.cleaner_!, RectShape.unregisterToken);
+    }
+    unregisterCleaner(): void {
+        RectShape.destroyRegister.unregister(RectShape.unregisterToken);
+    }
 
     public native radiusWidth(rWidth: double | string): this;
 
@@ -83,10 +156,38 @@ export class RectShape extends BaseShape {
 }
 
 export class EllipseShape  extends BaseShape {
+    basicShapeResult: long = 0;
+    protected cleaner_: EllipseShapeCleaner | undefined = undefined;
+    private static destroyRegister: FinalizationRegistry<EllipseShapeCleaner> =
+        new FinalizationRegistry<EllipseShapeCleaner>(EllipseShape.cleanCallback);
+    private static unregisterToken: object = new object();
 
-    basicShapeResult:long;
+    static native create(options?: ShapeSize): long;
+    static native nativeDestroy(ptr: long): void;
 
-    public native constructor(options?: ShapeSize);
+    static cleanCallback(cleaner: EllipseShapeCleaner): void {
+        cleaner.clean();
+    }
+
+    constructor(options?: ShapeSize) {
+        super();
+        if (this.basicShapeResult == 0) {
+            let ptr = EllipseShape.create(options);
+            this.basicShapeResult = ptr;
+            this.registerCleaner(ptr);
+        }
+    }
+
+    registerCleaner(ptr: long): void {
+        if (this.cleaner_ !== undefined) {
+            this.cleaner_!.clean();
+        }
+        this.cleaner_ = new EllipseShapeCleaner(ptr);
+        EllipseShape.destroyRegister.register(this, this.cleaner_!, EllipseShape.unregisterToken);
+    }
+    unregisterCleaner(): void {
+        EllipseShape.destroyRegister.unregister(EllipseShape.unregisterToken);
+    }
 
     public native width(width: Length): this;
 
@@ -102,10 +203,38 @@ export class EllipseShape  extends BaseShape {
 }
 
 export class CircleShape extends BaseShape {
+    basicShapeResult: long = 0;
+    protected cleaner_: CircleShapeCleaner | undefined = undefined;
+    private static destroyRegister: FinalizationRegistry<CircleShapeCleaner> =
+        new FinalizationRegistry<CircleShapeCleaner>(CircleShape.cleanCallback);
+    private static unregisterToken: object = new object();
 
-    basicShapeResult:long;
+    static native create(options?: ShapeSize): long;
+    static native nativeDestroy(ptr: long): void;
 
-    public native constructor(options?: ShapeSize);
+    static cleanCallback(cleaner: CircleShapeCleaner): void {
+        cleaner.clean();
+    }
+
+    constructor(options?: ShapeSize) {
+        super();
+        if (this.basicShapeResult == 0) {
+            let ptr = CircleShape.create(options);
+            this.basicShapeResult = ptr;
+            this.registerCleaner(ptr);
+        }
+    }
+
+    registerCleaner(ptr: long): void {
+        if (this.cleaner_ !== undefined) {
+            this.cleaner_!.clean();
+        }
+        this.cleaner_ = new CircleShapeCleaner(ptr);
+        CircleShape.destroyRegister.register(this, this.cleaner_!, CircleShape.unregisterToken);
+    }
+    unregisterCleaner(): void {
+        CircleShape.destroyRegister.unregister(CircleShape.unregisterToken);
+    }
 
     public native width(width: Length): this;
 
@@ -121,10 +250,38 @@ export class CircleShape extends BaseShape {
 }
 
 export class PathShape extends CommonShapeMethod {
+    basicShapeResult: long = 0;
+    protected cleaner_: PathShapeCleaner | undefined = undefined;
+    private static destroyRegister: FinalizationRegistry<PathShapeCleaner> =
+        new FinalizationRegistry<PathShapeCleaner>(PathShape.cleanCallback);
+    private static unregisterToken: object = new object();
 
-    basicShapeResult:long;
+    static native create(options?: PathShapeOptions): long;
+    static native nativeDestroy(ptr: long): void;
 
-    public native constructor(options?: PathShapeOptions);
+    static cleanCallback(cleaner: PathShapeCleaner): void {
+        cleaner.clean();
+    }
+
+    constructor(options?: PathShapeOptions) {
+        super();
+        if (this.basicShapeResult == 0) {
+            let ptr = PathShape.create(options);
+            this.basicShapeResult = ptr;
+            this.registerCleaner(ptr);
+        }
+    }
+
+    registerCleaner(ptr: long): void {
+        if (this.cleaner_ !== undefined) {
+            this.cleaner_!.clean();
+        }
+        this.cleaner_ = new PathShapeCleaner(ptr);
+        PathShape.destroyRegister.register(this, this.cleaner_!, PathShape.unregisterToken);
+    }
+    unregisterCleaner(): void {
+        PathShape.destroyRegister.unregister(PathShape.unregisterToken);
+    }
 
     public native commands(commands: string): this;
 
