@@ -2727,7 +2727,7 @@ HWTEST_F(WebModelTestNg, SetNativeEmbedMouseEventId001, TestSize.Level1)
     WebModelNG webModelNG;
     auto NativeEmbedMouseEventId = [&callCount](const BaseEventInfo* info) { callCount++; };
     webModelNG.SetNativeEmbedMouseEventId(NativeEmbedMouseEventId);
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnNativeEmbedMouseEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -2745,7 +2745,7 @@ HWTEST_F(WebModelTestNg, SetNativeEmbedObjectParamChangeId001, TestSize.Level1)
     WebModelNG webModelNG;
     auto nativeEmbedObjectParamChangeId = [&callCount](const BaseEventInfo* info) { callCount++; };
     webModelNG.SetNativeEmbedObjectParamChangeId(std::move(nativeEmbedObjectParamChangeId));
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnNativeEmbedObjectParamChangeEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -2819,7 +2819,7 @@ HWTEST_F(WebModelTestNg, SetOnControllerAttached010, TestSize.Level1)
     };
     WebModelNG webModelNG;
     webModelNG.SetOnControllerAttached(AccessibilityManager::RawPtr(frameNode), callback);
-    AceType::DynamicCast<WebPattern>(ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>()
         ->onControllerAttachedCallback_();
     EXPECT_NE(callCount, 0);
 #endif
@@ -3549,7 +3549,7 @@ HWTEST_F(WebModelTestNg, SetNativeEmbedLifecycleChangeId018, TestSize.Level1)
     auto NativeEmbedLifecycleChangeId = [&callCount](const BaseEventInfo* info) { callCount++; };
     webModelNG.SetNativeEmbedLifecycleChangeId(
         AccessibilityManager::RawPtr(frameNode), std::move(NativeEmbedLifecycleChangeId));
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnNativeEmbedLifecycleChangeEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -3575,7 +3575,7 @@ HWTEST_F(WebModelTestNg, SetNativeEmbedObjectParamChangeId002, TestSize.Level1)
     auto NativeEmbedObjectParamChangeId = [&callCount](const BaseEventInfo* info) { callCount++; };
     webModelNG.SetNativeEmbedObjectParamChangeId(
         AccessibilityManager::RawPtr(frameNode), std::move(NativeEmbedObjectParamChangeId));
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnNativeEmbedObjectParamChangeEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -3823,7 +3823,7 @@ HWTEST_F(WebModelTestNg, SetRenderProcessNotRespondingId003, TestSize.Level1)
     int callCount = 0;
     auto renderProcessNotRespondingId = [&callCount](const BaseEventInfo* info) { callCount++; };
     webModelNG.SetRenderProcessNotRespondingId(AccessibilityManager::RawPtr(frameNode), renderProcessNotRespondingId);
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnRenderProcessNotRespondingEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -4202,7 +4202,7 @@ HWTEST_F(WebModelTestNg, SetNativeEmbedGestureEventId019, TestSize.Level1)
     WebModelNG webModelNG;
     auto NativeEmbedGestureEventId = [&callCount](const BaseEventInfo* info) { callCount++; };
     webModelNG.SetNativeEmbedGestureEventId(AccessibilityManager::RawPtr(frameNode), NativeEmbedGestureEventId);
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnNativeEmbedGestureEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -4228,7 +4228,7 @@ HWTEST_F(WebModelTestNg, SetNativeEmbedMouseEventId, TestSize.Level1)
     WebModelNG webModelNG;
     auto NativeEmbedMouseEventId = [&callCount](const BaseEventInfo* info) { callCount++; };
     webModelNG.SetNativeEmbedMouseEventId(AccessibilityManager::RawPtr(frameNode), NativeEmbedMouseEventId);
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnNativeEmbedMouseEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -4282,7 +4282,7 @@ HWTEST_F(WebModelTestNg, SetPermissionRequestEventId028, TestSize.Level1)
     WebModelNG webModelNG;
     auto screenCaptureRequestEventId = [&callCount](const BaseEventInfo* info) { callCount++; };
     webModelNG.SetScreenCaptureRequestEventId(AccessibilityManager::RawPtr(frameNode), screenCaptureRequestEventId);
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnScreenCaptureRequestEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif

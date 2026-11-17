@@ -6325,7 +6325,7 @@ HWTEST_F(WebSelectOverlayTest, UpdateTouchHandleForOverlayTestSelectAll, TestSiz
     auto manager = SelectContentOverlayManager::GetOverlayManager();
     EXPECT_NE(manager, nullptr);
     auto holder = AceType::MakeRefPtr<SelectOverlayHolder>();
-    auto contentManager = AceType::DynamicCast<SelectContentOverlayManager>(manager);
+    auto contentManager = manager;
     auto g_webPattern = frameNode->GetPattern<WebPattern>();
     EXPECT_NE(g_webPattern, nullptr);
     WebSelectOverlay overlay(g_webPattern);
