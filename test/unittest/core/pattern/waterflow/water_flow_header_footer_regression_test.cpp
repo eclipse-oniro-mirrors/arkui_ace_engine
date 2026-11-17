@@ -72,6 +72,7 @@ public:
     void PublishNextStickyHeaderGap(const std::optional<float>& gap) override
     {
         ++publications_;
+        LazyLayoutPattern::PublishNextStickyHeaderGap(gap);
     }
 
     int32_t publications_ = 0;
@@ -1405,7 +1406,7 @@ HWTEST_F(WaterFlowHeaderFooterRegressionTest, WFHF_LazyColumnPublishesHandoff, T
 }
 /**
  * @tc.name: WFHF_LazyOnlyLayoutKeepsExistingHandoff
- * @tc.desc: WaterFlow layout refreshes must not publish new state to a Lazy-only section sequence.
+ * @tc.desc: Lazy-only layout refreshes clear stale tail state without republishing the predecessor's measured gap.
  * @tc.type: FUNC
  */
 HWTEST_F(WaterFlowHeaderFooterRegressionTest, WFHF_LazyOnlyLayoutKeepsExistingHandoff, TestSize.Level1)
@@ -1427,21 +1428,32 @@ HWTEST_F(WaterFlowHeaderFooterRegressionTest, WFHF_LazyOnlyLayoutKeepsExistingHa
     algorithm.space_ = 12.0f;
     info->startIndex_ = 0;
     info->endIndex_ = 1;
+    firstPattern->PublishNextStickyHeaderGap(12.0f);
+    secondPattern->PublishNextStickyHeaderGap(24.0f);
+    firstPattern->publications_ = secondPattern->publications_ = 0;
     algorithm.LayoutItems(AceType::RawPtr(parent), WATER_FLOW_WIDTH, OffsetF());
     EXPECT_EQ(firstPattern->publications_, 0);
-    EXPECT_EQ(secondPattern->publications_, 0);
+    EXPECT_EQ(secondPattern->publications_, 1);
+    EXPECT_EQ(firstPattern->GetNextStickyHeaderGap(), std::optional<float>(12.0f));
+    EXPECT_FALSE(secondPattern->GetNextStickyHeaderGap().has_value());
+    secondPattern->PublishNextStickyHeaderGap(24.0f);
     firstPattern->publications_ = secondPattern->publications_ = 0;
     info->endIndex_ = 0;
     algorithm.cacheEndPos_ = 1200.0f;
     algorithm.LayoutCachedItemsForward(AceType::RawPtr(parent), WATER_FLOW_WIDTH, OffsetF());
     EXPECT_EQ(firstPattern->publications_, 0);
-    EXPECT_EQ(secondPattern->publications_, 0);
+    EXPECT_EQ(secondPattern->publications_, 1);
+    EXPECT_EQ(firstPattern->GetNextStickyHeaderGap(), std::optional<float>(12.0f));
+    EXPECT_FALSE(secondPattern->GetNextStickyHeaderGap().has_value());
+    secondPattern->PublishNextStickyHeaderGap(24.0f);
     firstPattern->publications_ = secondPattern->publications_ = 0;
     info->startIndex_ = 2;
     algorithm.cacheStartPos_ = 500.0f;
     algorithm.LayoutCachedItemsBackward(AceType::RawPtr(parent), WATER_FLOW_WIDTH, OffsetF());
     EXPECT_EQ(firstPattern->publications_, 0);
-    EXPECT_EQ(secondPattern->publications_, 0);
+    EXPECT_EQ(secondPattern->publications_, 1);
+    EXPECT_EQ(firstPattern->GetNextStickyHeaderGap(), std::optional<float>(12.0f));
+    EXPECT_FALSE(secondPattern->GetNextStickyHeaderGap().has_value());
     // The existing measurement publication remains available to Lazy-only sections.
     firstPattern->publications_ = secondPattern->publications_ = 0;
     algorithm.UpdateSiblingHandoffGap(AceType::RawPtr(parent), second, 1);
