@@ -883,13 +883,16 @@ public:
         const ScriptRegexItems& scriptRegexItems, const ScriptItemsByOrder& scriptItemsByOrder);
 
     // Remove all system DocumentStart JS. Clears system store, then
-    // re-injects the public-only batch to NWeb.
+    // re-injects the public-only batch to NWeb. When system scripts had been
+    // submitted, an empty batch is forced even if no public scripts exist, so
+    // NWeb's replace semantics clear the previous registration.
     void RemoveSystemDocumentStartJS();
 
     // Merge public + system scripts and inject the combined batch to NWeb.
     // App JS is inserted before system JS in the ByOrder vector.
     // Falls back to non-ByOrder path when app uses non-ByOrder API (DD-3).
-    void MergeAndInjectJavaScriptOnDocumentStart();
+    // forceInject submits an empty batch to clear NWeb when both stores are empty.
+    void MergeAndInjectJavaScriptOnDocumentStart(bool forceInject = false);
     // ByOrder V2 merge path: app JS first, then system JS in ByOrder vector.
     void MergeByOrderPath(ScriptItems& mergedItems, ScriptRegexItems& mergedRegexItems,
         ScriptItemsByOrder& mergedByOrder);

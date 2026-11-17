@@ -31,7 +31,7 @@
 #undef private
 
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
-#include "test/mock/base/mock_task_executor.h"
+#include "test/mock/frameworks/base/thread/mock_task_executor.h"
 
 #include "base/log/dump_log.h"
 #include "base/base64/base64_util.h"
