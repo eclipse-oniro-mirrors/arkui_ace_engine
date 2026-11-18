@@ -19,6 +19,7 @@ import("//foundation/arkui/ace_engine/ace_config.gni")
 additional_include_dirs = [ "${ace_root}" ]
 
 ohos_shared_library("libtransform_interaction_ext") {
+  branch_protector_ret = "pac_ret"
   sources = [ "input_compatible_policy.cpp" ]
   include_dirs = [
     "$ace_root/frameworks/",

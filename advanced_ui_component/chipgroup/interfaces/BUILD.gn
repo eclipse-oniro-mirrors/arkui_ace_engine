@@ -40,6 +40,7 @@ gen_obj("chipgroup_abc_preview") {
 }
 
 ohos_shared_library("chipgroup") {
+  branch_protector_ret = "pac_ret"
   sources = [ "chipgroup.cpp" ]
 
   if (use_mingw_win || use_mac || use_linux) {

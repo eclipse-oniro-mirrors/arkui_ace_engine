@@ -62,6 +62,7 @@ gen_obj("mock_multinavigation_abc_preview") {
 }
 
 ohos_shared_library("multinavigation") {
+  branch_protector_ret = "pac_ret"
   sources = [ "multinavigation.cpp" ]
 
   if (use_mingw_win || use_mac || use_linux) {

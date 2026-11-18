@@ -36,6 +36,7 @@ foreach(src, common_sources) {
 
 template("ace_core_interfaces_native") {
   ohos_source_set(target_name) {
+    branch_protector_ret = "pac_ret"
     subsystem_name = ace_engine_subsystem
     part_name = ace_engine_part
     defines = invoker.defines

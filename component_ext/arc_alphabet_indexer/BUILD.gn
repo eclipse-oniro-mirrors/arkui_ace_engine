@@ -39,6 +39,7 @@ gen_obj("arkui_arcalphabetindexer_abc") {
 }
 
 ohos_shared_library("arcalphabetindexer") {
+  branch_protector_ret = "pac_ret"
   defines = [ "USE_ARK_ENGINE" ]
   sources = [
     "${component_ext_path}/arc_alphabet_indexer/arc_alphabet_indexer_napi.cpp",

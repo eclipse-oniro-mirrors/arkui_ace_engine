@@ -40,6 +40,7 @@ gen_obj("editabletitlebarv2_abc_preview") {
 }
 
 ohos_shared_library("editabletitlebarv2") {
+  branch_protector_ret = "pac_ret"
   sources = [ "editabletitlebarv2.cpp" ]
 
   if (use_mingw_win || use_mac || use_linux) {
