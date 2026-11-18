@@ -738,15 +738,24 @@ void SvgNode::OnTransform(RSCanvas& canvas, const SvgLengthScaleRule& lengthRule
     if (!animateTransform_.empty()) {
         matrix = SvgTransform::CreateMatrixFromMap(animateTransform_);
     } else {
-        if (!transformVecCacheKey_.has_value() || !transformVecCacheKey_.value().IsSameForCache(lengthRule)) {
-            Offset globalPivot = CalcGlobalPivot(attributes_.transformOrigin, lengthRule);
-            transformVecMatrixCache_ =
-                NGSvgTransform::CreateMatrix4(attributes_.transformVec, globalPivot, lengthRule);
-            transformVecCacheKey_ = lengthRule;
-        }
-        matrix = transformVecMatrixCache_.value();
+        matrix = GetTransformVecMatrix(lengthRule);
     }
     canvas.ConcatMatrix(RosenSvgPainter::ToDrawingMatrix(matrix));
+}
+
+const Matrix4& SvgNode::GetTransformVecMatrix(const SvgLengthScaleRule& lengthRule)
+{
+    auto svgContext = svgContext_.Upgrade();
+    uint32_t currentVersion = svgContext ? svgContext->GetRenderCacheVersion() : 0;
+    if (!transformVecCacheKey_.has_value() || !transformVecCacheKey_.value().IsSameForCache(lengthRule)
+        || transformVecCacheVersion_ != currentVersion) {
+        Offset globalPivot = CalcGlobalPivot(attributes_.transformOrigin, lengthRule);
+        transformVecMatrixCache_ =
+            NGSvgTransform::CreateMatrix4(attributes_.transformVec, globalPivot, lengthRule);
+        transformVecCacheKey_ = lengthRule;
+        transformVecCacheVersion_ = currentVersion;
+    }
+    return transformVecMatrixCache_.value();
 }
 
 float SvgNode::GetRegionLength(Dimension origin, const SvgLengthScaleRule& rule, SvgLengthType lengthType)
@@ -1130,9 +1139,7 @@ void SvgNode::ApplyTransform(RSRecordingPath& path, const SvgLengthScaleRule& le
     if (!attributes_.transformVec.size()) {
         return;
     }
-    Offset globalPivot = CalcGlobalPivot(attributes_.transformOrigin, lengthRule);
-    auto matrix = NGSvgTransform::CreateMatrix4(attributes_.transformVec, globalPivot, lengthRule);
-    path.Transform(RosenSvgPainter::ToDrawingMatrix(matrix));
+    path.Transform(RosenSvgPainter::ToDrawingMatrix(GetTransformVecMatrix(lengthRule)));
 }
 
 uint32_t SvgNode::GetUsrConfigVersion()
