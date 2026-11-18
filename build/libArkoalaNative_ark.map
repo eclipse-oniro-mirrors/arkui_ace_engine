@@ -20,8 +20,12 @@
     __cfi_check*;
     ANI_Constructor;
     AniThrowError;
-    _Z10GetAnyImpliiPNSt3__h12basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEEE;
-    _ZN4OHOS3Ace21GetResourceColorArrayExi;
+    # int64_t mangles differently by ABI (arm32: long long 'x',
+    # lp64: long 'l'), so use demangled globs instead of exact mangled names.
+    extern "C++" {
+      GetAnyImpl*;
+      OHOS::Ace::GetResourceColorArray*;
+    };
   local:
     *;
 };
