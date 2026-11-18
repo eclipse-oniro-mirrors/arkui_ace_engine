@@ -9796,7 +9796,7 @@ void WebDelegate::OnAttachContext(const RefPtr<NG::PipelineContext> &context)
         auto windowId = context->GetFocusWindowId();
         nweb_->SetWindowId(windowId);
     }
-    auto pipelineContext = DynamicCast<NG::PipelineContext>(context);
+    auto pipelineContext = context;
     CHECK_NULL_VOID(pipelineContext);
     pipelineContext->AddAfterRenderTask(
         [weak = WeakClaim(this), instanceId = instanceId_]() {
