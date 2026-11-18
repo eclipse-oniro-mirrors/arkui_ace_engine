@@ -724,6 +724,28 @@ HWTEST_F(UIInputEventTest, OH_ArkUI_PointerEvent_GetPointerCount, TestSize.Level
 }
 
 /**
+ * @tc.name: OH_ArkUI_PointerEvent_GetPointerCountForAxisEvent
+ * @tc.desc: Test OH_ArkUI_PointerEvent_GetPointerCount with AXIS_EVENT_ID
+ *           (axis event dispatched by nativeXComponent)
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIInputEventTest, OH_ArkUI_PointerEvent_GetPointerCountForAxisEvent, TestSize.Level1)
+{
+    ArkUI_UIInputEvent event;
+    event.eventTypeId = AXIS_EVENT_ID;
+    event.inputEvent = nullptr;
+    auto ret = OH_ArkUI_PointerEvent_GetPointerCount(&event);
+    EXPECT_EQ(ret, 0);
+    EXPECT_EQ(g_latestEventStatus, ARKUI_ERROR_CODE_PARAM_INVALID);
+
+    OHOS::Ace::AxisEvent aceAxisEvent;
+    event.inputEvent = &aceAxisEvent;
+    ret = OH_ArkUI_PointerEvent_GetPointerCount(&event);
+    EXPECT_EQ(ret, 1);
+    EXPECT_EQ(g_latestEventStatus, ARKUI_ERROR_CODE_NO_ERROR);
+}
+
+/**
  * @tc.name: OH_ArkUI_PointerEvent_GetPointerId
  * @tc.desc: Test OH_ArkUI_PointerEvent_GetPointerId
  * @tc.type: FUNC
