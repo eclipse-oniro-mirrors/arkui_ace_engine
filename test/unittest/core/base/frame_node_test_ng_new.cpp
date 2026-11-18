@@ -717,6 +717,30 @@ HWTEST_F(FrameNodeTestNg, GetPreviewScaleVal002, TestSize.Level1)
 }
 
 /**
+ * @tc.name: FrameNodeTestNg_GetPreviewScaleVal003
+ * @tc.desc: Test frame node method GetPreviewScaleVal
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeTestNg, GetPreviewScaleVal003, TestSize.Level1)
+{
+    auto frameNode = FRAME_NODE_WEB_ETS_TAG;
+    /**
+     * @tc.steps: step1. initialize parameters.
+     */
+    frameNode->isActive_ = true;
+    frameNode->GetEventHub<EventHub>()->SetEnabled(true);
+    SystemProperties::debugEnabled_ = true;
+
+    /**
+     * @tc.steps: step2. call GetPreviewScaleVal
+     * @tc.expected: expect GetPreviewScaleVal return scale value.
+     */
+    auto geometryNode = frameNode->GetGeometryNode();
+    geometryNode->SetFrameSize(CONTAINER_SIZE_HUGE);
+
+    EXPECT_FLOAT_EQ(frameNode->GetPreviewScaleVal(), 1.0f);
+}
+/**
  * @tc.name: FrameNodeTestNg_GetPreviewApplyVal001
  * @tc.desc: Test frame node method GetPreviewApplyVal001
  * @tc.type: FUNC
@@ -741,31 +765,6 @@ HWTEST_F(FrameNodeTestNg, GetPreviewApplyVal001, TestSize.Level1)
     previewOption.onApply = [](WeakPtr<NG::FrameNode> frameNode) {};
     frameNode->SetDragPreviewOptions(previewOption);
     EXPECT_NE(frameNode->GetDragPreviewOption().onApply, nullptr);
-}
-
-/**
- * @tc.name: FrameNodeTestNg_GetPreviewScaleVal003
- * @tc.desc: Test frame node method GetPreviewScaleVal
- * @tc.type: FUNC
- */
-HWTEST_F(FrameNodeTestNg, GetPreviewScaleVal003, TestSize.Level1)
-{
-    auto frameNode = FRAME_NODE_WEB_ETS_TAG;
-    /**
-     * @tc.steps: step1. initialize parameters.
-     */
-    frameNode->isActive_ = true;
-    frameNode->GetEventHub<EventHub>()->SetEnabled(true);
-    SystemProperties::debugEnabled_ = true;
-
-    /**
-     * @tc.steps: step2. call GetPreviewScaleVal
-     * @tc.expected: expect GetPreviewScaleVal return scale value.
-     */
-    auto geometryNode = frameNode->GetGeometryNode();
-    geometryNode->SetFrameSize(CONTAINER_SIZE_HUGE);
-
-    EXPECT_FLOAT_EQ(frameNode->GetPreviewScaleVal(), 1.0f);
 }
 
 /**
