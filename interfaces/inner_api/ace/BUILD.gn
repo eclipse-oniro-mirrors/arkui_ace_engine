@@ -71,6 +71,10 @@ ohos_shared_library("ace_uicontent") {
   public_configs = [ ":uicontent_public_config" ]
   branch_protector_ret = "pac_ret"
 
+  if (is_ohos) {
+    version_script = "$ace_root/build/libace_uicontent.map"
+  }
+
   configs = [
     ":uicontent_config",
     ":preview_config",
@@ -134,6 +138,10 @@ ohos_shared_library("ace_forward_compatibility") {
 
   public_configs = [ ":uicontent_public_config" ]
   branch_protector_ret = "pac_ret"
+
+  if (is_ohos) {
+    version_script = "$ace_root/build/libace_forward_compatibility.map"
+  }
 
   sources =
       [ "${ace_root}/interfaces/inner_api/ace/ace_forward_compatibility.cpp" ]
