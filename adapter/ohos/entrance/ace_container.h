@@ -98,6 +98,9 @@ struct ParsedConfig {
     std::string fontId;
     std::string themeSkin;
     std::string themeIcon;
+    // One-shot policy for this configuration update only; not part of IsValid so it never
+    // triggers an otherwise-empty configuration update.
+    bool fontAnimationEnabled = true;
     bool IsValid() const
     {
         return !(colorMode.empty() && deviceAccess.empty() && languageTag.empty() && direction.empty() &&
