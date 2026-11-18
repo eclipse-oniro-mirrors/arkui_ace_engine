@@ -384,7 +384,7 @@ HWTEST_F(XComponentTestSurfaceVisibilityLifecycle, SurfaceVisibilityLifecycleTes
     params.type = XCOMPONENT_SURFACE_TYPE_VALUE;
     auto* stack = ViewStackProcessor::GetInstance();
     auto nodeId = stack->ClaimNodeId();
-    auto frameNode = AceType::DynamicCast<FrameNode>(XComponentModelNG().CreateTypeNode(nodeId, &params));
+    auto frameNode = XComponentModelNG().CreateTypeNode(nodeId, &params);
     ASSERT_NE(frameNode, nullptr);
     auto pattern = frameNode->GetPattern<XComponentPatternV2>();
     ASSERT_NE(pattern, nullptr);
@@ -444,7 +444,7 @@ HWTEST_F(XComponentTestSurfaceVisibilityLifecycle, SurfaceVisibilityLifecycleTes
     params.type = XCOMPONENT_SURFACE_TYPE_VALUE;
     auto* stack = ViewStackProcessor::GetInstance();
     auto nodeId = stack->ClaimNodeId();
-    auto frameNode = AceType::DynamicCast<FrameNode>(XComponentModelNG().CreateTypeNode(nodeId, &params));
+    auto frameNode = XComponentModelNG().CreateTypeNode(nodeId, &params);
     ASSERT_NE(frameNode, nullptr);
     auto pattern = frameNode->GetPattern<XComponentPatternV2>();
     ASSERT_NE(pattern, nullptr);
@@ -483,7 +483,7 @@ HWTEST_F(XComponentTestSurfaceVisibilityLifecycle, SurfaceVisibilityLifecycleTes
     params.type = XCOMPONENT_SURFACE_TYPE_VALUE;
     auto* stack = ViewStackProcessor::GetInstance();
     auto nodeId = stack->ClaimNodeId();
-    auto frameNode = AceType::DynamicCast<FrameNode>(XComponentModelNG().CreateTypeNode(nodeId, &params));
+    auto frameNode = XComponentModelNG().CreateTypeNode(nodeId, &params);
     ASSERT_NE(frameNode, nullptr);
     auto pattern = frameNode->GetPattern<XComponentPatternV2>();
     ASSERT_NE(pattern, nullptr);
