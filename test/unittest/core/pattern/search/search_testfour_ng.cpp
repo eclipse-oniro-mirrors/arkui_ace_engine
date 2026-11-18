@@ -1068,7 +1068,7 @@ HWTEST_F(SearchTestFourNg, SearchButton_FontColor_MarkDirtyNode, TestSize.Level1
  
     auto buttonFrameNode = AceType::DynamicCast<FrameNode>(frameNode->GetChildAtIndex(BUTTON_INDEX));
     ASSERT_NE(buttonFrameNode, nullptr);
-    auto paintProp = buttonFrameNode->GetPaintProperty<NG::PaintProperty>();
+    auto paintProp = buttonFrameNode->GetPaintProperty<NG::Property>();
     ASSERT_TRUE(paintProp);
     auto changeFlag = paintProp->GetPropertyChangeFlag() | NG::PROPERTY_UPDATE_MEASURE;
     EXPECT_EQ(paintProp->GetPropertyChangeFlag(), changeFlag);

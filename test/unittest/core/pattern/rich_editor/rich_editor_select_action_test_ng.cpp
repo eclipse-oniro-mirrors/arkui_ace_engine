@@ -1022,7 +1022,7 @@ HWTEST_F(RichEditorSelectActionTestNg, MarkContentNodeForRender001, TestSize.Lev
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
     richEditorPattern->MarkContentNodeForRender();
-    auto paintProp = richEditorNode_->GetPaintProperty<NG::PaintProperty>();
+    auto paintProp = richEditorNode_->GetPaintProperty<NG::Property>();
     ASSERT_TRUE(paintProp);
     auto changeFlag = paintProp->GetPropertyChangeFlag() | NG::PROPERTY_UPDATE_RENDER;
     EXPECT_EQ(paintProp->GetPropertyChangeFlag(), changeFlag);
