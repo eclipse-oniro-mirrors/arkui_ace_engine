@@ -3734,7 +3734,6 @@
       "OHOS::Ace::TextFieldManager::ResetSlidingPanelParentHeight()";
       "OHOS::Ace::TextInputClient::HandleKeyEvent(OHOS::Ace::KeyEvent const&)";
       "OHOS::Ace::TextInputClient::NotifyKeyboardHeight(unsigned int)";
-      "OHOS::Ace::TextInputClient::GetAutoFillKeyboardMap()";
       "OHOS::Ace::TextOverlayComponent::GetHandleDiameter() const";
       "OHOS::Ace::TextOverlayComponent::GetHandleDiameterInner() const";
       "OHOS::Ace::TextOverlayComponent::SetClipRect(OHOS::Ace::Rect const&)";

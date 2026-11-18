@@ -683,22 +683,10 @@ void TextFieldContentModifier::UpdateTextFadeout(
 }
 
 #ifdef ENABLE_AUTO_FILL_CONTROLLER
-void TextFieldContentModifier::SetAutoFillTranslationOffset(const float value)
-{
-    CHECK_NULL_VOID(autoFillTranslationOffset_);
-    autoFillTranslationOffset_->Set(value);
-}
-
 void TextFieldContentModifier::SetDefaultAutoFillTranslationOffset()
 {
     autoFillTranslationOffset_ = AceType::MakeRefPtr<AnimatablePropertyFloat>(0.0f);
     AttachProperty(autoFillTranslationOffset_);
-}
-
-void TextFieldContentModifier::SetAutoFillTextScrollOffset(const float value)
-{
-    CHECK_NULL_VOID(autoFillTextScrollOffset_);
-    autoFillTextScrollOffset_->Set(value);
 }
 
 void TextFieldContentModifier::SetDefaultAutoFillTextScrollOffset()
@@ -707,37 +695,12 @@ void TextFieldContentModifier::SetDefaultAutoFillTextScrollOffset()
     AttachProperty(autoFillTextScrollOffset_);
 }
 
-void TextFieldContentModifier::SetAutoFillEmphasizeCharIndex(const float value)
-{
-    CHECK_NULL_VOID(autoFillEmphasizeCharIndex_);
-    autoFillEmphasizeCharIndex_->Set(value);
-}
-
-void TextFieldContentModifier::SetAutoFillDefaultCharIndex(const float value)
-{
-    CHECK_NULL_VOID(autoFillDefaultCharIndex_);
-    autoFillDefaultCharIndex_->Set(value);
-}
-
 void TextFieldContentModifier::SetDefaultAutoFillCharIndex()
 {
     autoFillEmphasizeCharIndex_ = AceType::MakeRefPtr<AnimatablePropertyFloat>(0.0f);
     AttachProperty(autoFillEmphasizeCharIndex_);
     autoFillDefaultCharIndex_ = AceType::MakeRefPtr<AnimatablePropertyFloat>(0.0f);
     AttachProperty(autoFillDefaultCharIndex_);
-}
-
-void TextFieldContentModifier::SetAutoFillOriginTextColor(const Color& value)
-{
-    autoFillOriginTextColor_ = value;
-}
-
-void TextFieldContentModifier::ResetAutoFillProperties()
-{
-    SetAutoFillTranslationOffset(0.0f);
-    SetAutoFillTextScrollOffset(0.0f);
-    SetAutoFillEmphasizeCharIndex(0.0f);
-    SetAutoFillDefaultCharIndex(0.0f);
 }
 
 void TextFieldContentModifier::DoAutoFillDraw(DrawingContext& context)
@@ -754,4 +717,46 @@ void TextFieldContentModifier::DoAutoFillDraw(DrawingContext& context)
         autoFillDefaultCharInitTextColor_, autoFillOriginTextColor_);
 }
 #endif
+
+// IAutoFillContentModifier overrides must be compiled on every platform:
+// the interface is inherited unconditionally (see text_field_content_modifier.h),
+// so the vtable references these entries even when ENABLE_AUTO_FILL_CONTROLLER
+// is undefined (e.g. cross-platform builds). They are cheap null-safe property
+// setters, safe to build without the auto fill controller.
+void TextFieldContentModifier::SetAutoFillTranslationOffset(const float value)
+{
+    CHECK_NULL_VOID(autoFillTranslationOffset_);
+    autoFillTranslationOffset_->Set(value);
+}
+
+void TextFieldContentModifier::SetAutoFillTextScrollOffset(const float value)
+{
+    CHECK_NULL_VOID(autoFillTextScrollOffset_);
+    autoFillTextScrollOffset_->Set(value);
+}
+
+void TextFieldContentModifier::SetAutoFillEmphasizeCharIndex(const float value)
+{
+    CHECK_NULL_VOID(autoFillEmphasizeCharIndex_);
+    autoFillEmphasizeCharIndex_->Set(value);
+}
+
+void TextFieldContentModifier::SetAutoFillDefaultCharIndex(const float value)
+{
+    CHECK_NULL_VOID(autoFillDefaultCharIndex_);
+    autoFillDefaultCharIndex_->Set(value);
+}
+
+void TextFieldContentModifier::SetAutoFillOriginTextColor(const Color& value)
+{
+    autoFillOriginTextColor_ = value;
+}
+
+void TextFieldContentModifier::ResetAutoFillProperties()
+{
+    SetAutoFillTranslationOffset(0.0f);
+    SetAutoFillTextScrollOffset(0.0f);
+    SetAutoFillEmphasizeCharIndex(0.0f);
+    SetAutoFillDefaultCharIndex(0.0f);
+}
 } // namespace OHOS::Ace::NG

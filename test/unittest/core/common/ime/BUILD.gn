@@ -29,7 +29,10 @@ if (is_host_product) {
   ace_unittest("ime_test") {
     module_name = "TextSet-Text"
     type = "new"
-    sources = [ "ime_test.cpp" ]
+    sources = [
+      "ime_test.cpp",
+      "text_input_client_test.cpp",
+    ]
 
     if (!ace_enable_full_test_suite) {
       sources = []
