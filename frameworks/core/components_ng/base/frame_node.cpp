@@ -2441,6 +2441,10 @@ void FrameNode::HandleLanguageConfigurationUpdate(const ConfigurationChange& con
 {
     CHECK_NULL_VOID(pattern_);
     pattern_->OnLanguageConfigurationUpdate();
+    auto rsContext = GetRenderContext();
+    if (rsContext) {
+        rsContext->ReloadBackgroundImage();
+    }
     MarkModifyDone();
     MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
     if (cornerMarkNode_) {
