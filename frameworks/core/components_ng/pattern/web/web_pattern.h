@@ -1524,7 +1524,6 @@ private:
     void UninitTouchEventListener();
     std::string OnDragFileNameStart(const RefPtr<UnifiedData>& aceUnifiedData, const std::string& fileName);
     void RewriteHtmlImgSrc(std::string& htmlContent, const std::string& fileUri);
-    std::string BuildImageDataUri(const std::string& fullName, const std::string& fileName);
     void AdjustRotationRenderFit(WindowSizeChangeReason type);
     void RecoverToTopLeft();
     bool needRestoreMenuForDrag_ = false;
