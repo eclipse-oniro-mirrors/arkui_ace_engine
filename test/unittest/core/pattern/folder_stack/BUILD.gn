@@ -25,7 +25,6 @@ if (is_host_product) {
   ace_unittest("folder_stack_test_ng") {
     type = "host_components"
     module_name = "Layout-FolderStack"
-    include_dirs = [ "$ace_root/test/mock/ohos_mock/c_utils" ]
     sources = test_sources
     sources += [
       "$ace_root/adapter/ohos/osal/display_info_utils.cpp",
