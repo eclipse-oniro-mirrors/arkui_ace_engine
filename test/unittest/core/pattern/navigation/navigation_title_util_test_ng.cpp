@@ -19,6 +19,7 @@
 #define private public
 
 #include "core/components_ng/pattern/navigation/navigation_title_util.h"
+#include "core/components_ng/pattern/navigation/title_bar_pattern.h"
 #include "core/components_ng/pattern/text/text_layout_property.h"
 #include "core/components_ng/pattern/text/text_pattern.h"
 #include "core/common/ace_application_info.h"
@@ -125,6 +126,56 @@ HWTEST_F(NavigationTitleUtilTestNg, InitTextPropertyEnablePunctuationOverflowOpt
 
     EXPECT_TRUE(textLayoutProperty->HasEnablePunctuationOverflowOptimize());
     EXPECT_TRUE(textLayoutProperty->GetEnablePunctuationOverflowOptimizeValue(false));
+}
+
+/**
+ * @tc.name: CreateOrUpdateSubtitleNotResetOpacity001
+ * @tc.desc: Updating subtitle content should keep the pattern-managed subtitle opacity
+ *           (e.g. FREE mode collapse state) instead of forcing it back to 1.0
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationTitleUtilTestNg, CreateOrUpdateSubtitleNotResetOpacity001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. create TitleBarNode with TitleBarPattern.
+     * @tc.expected: titleBarNode created successfully.
+     */
+    auto titleBarNode = TitleBarNode::GetOrCreateTitleBarNode(V2::TITLE_BAR_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<TitleBarPattern>(); });
+    ASSERT_NE(titleBarNode, nullptr);
+
+    /**
+     * @tc.steps: step2. create subtitle via CreateOrUpdateSubtitle.
+     * @tc.expected: subtitle node created with content and opacity not set.
+     */
+    NavigationTitleInfo titleInfo;
+    titleInfo.hasSubTitle = true;
+    titleInfo.hasMainTitle = true;
+    titleInfo.subtitle = "subtitle";
+    NavigationTitleUtil::CreateOrUpdateSubtitle(titleBarNode, titleInfo);
+    auto subTitle = AceType::DynamicCast<FrameNode>(titleBarNode->GetSubtitle());
+    ASSERT_NE(subTitle, nullptr);
+    auto renderContext = subTitle->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+    EXPECT_FALSE(renderContext->HasOpacity());
+
+    /**
+     * @tc.steps: step3. simulate pattern-managed opacity during title mode change.
+     */
+    renderContext->UpdateOpacity(0.5);
+
+    /**
+     * @tc.steps: step4. update subtitle content via CreateOrUpdateSubtitle.
+     * @tc.expected: content updated and opacity stays 0.5 instead of being forced to 1.0.
+     */
+    titleInfo.subtitle = "new subtitle";
+    NavigationTitleUtil::CreateOrUpdateSubtitle(titleBarNode, titleInfo);
+    subTitle = AceType::DynamicCast<FrameNode>(titleBarNode->GetSubtitle());
+    ASSERT_NE(subTitle, nullptr);
+    auto textLayoutProperty = subTitle->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+    EXPECT_EQ(textLayoutProperty->GetContentValue(u""), u"new subtitle");
+    EXPECT_NEAR(renderContext->GetOpacityValue(1.0), 0.5, 0.001);
 }
 
 } // namespace OHOS::Ace::NG
