@@ -898,7 +898,7 @@ HWTEST_F(ScrollControllerTestNg, GetScrollState013, TestSize.Level1)
 
 /**
  * @tc.name: GetScrollState014
- * @tc.desc: Test zero-delta nested frame resets previous session-level query state
+ * @tc.desc: Test zero-delta frame preserves previous session-level query state
  * @tc.type: FUNC
  */
 HWTEST_F(ScrollControllerTestNg, GetScrollState014, TestSize.Level1)
@@ -910,10 +910,10 @@ HWTEST_F(ScrollControllerTestNg, GetScrollState014, TestSize.Level1)
     EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
     /**
      * @tc.steps: step1. A zero-delta delegation frame arrives during an active drag session.
-     * @tc.expected: Query state becomes IDLE because the parent does not actually move.
+     * @tc.expected: Query state keeps SCROLL, neither polluted nor reset.
      */
     pattern_->HandleScroll(0.0f, SCROLL_FROM_UPDATE, NestedState::CHILD_SCROLL, 0.0f);
-    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
 }
 
 /**
@@ -1014,7 +1014,7 @@ HWTEST_F(ScrollControllerTestNg, GetScrollState019, TestSize.Level1)
         NestedState::CHILD_CHECK_OVER_SCROLL };
     for (auto state : nestedStates) {
         for (auto source : sources) {
-            pattern_->SetScrollSource(source);
+            pattern_->SetScrollSource(SCROLL_FROM_NONE);
             pattern_->HandleScroll(10.0f, source, state, 1000.0f);
             EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE) << "source: " << source
                                                                               << ", nested state: "

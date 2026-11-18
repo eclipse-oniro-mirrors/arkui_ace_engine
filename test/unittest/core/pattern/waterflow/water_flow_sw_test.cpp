@@ -52,6 +52,32 @@ protected:
 };
 
 /**
+ * @tc.name: NestedScrollStateWithPendingDelta001
+ * @tc.desc: Nested scrolling keeps query state when sliding-window delta is pending layout
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowSWTest, NestedScrollStateWithPendingDelta001, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateWaterFlowItems(100);
+    CreateDone();
+    info_->delta_ = 0.0f;
+    const double committedOffset = pattern_->GetTotalOffset();
+    pattern_->HandleScroll(-10.0f, SCROLL_FROM_UPDATE, NestedState::CHILD_SCROLL, 0.0f);
+    EXPECT_DOUBLE_EQ(pattern_->GetTotalOffset(), committedOffset);
+    EXPECT_FLOAT_EQ(info_->delta_, -10.0f);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
+
+    // Keep an over-scroll delta pending and let the check frame consume a boundary offset.
+    info_->itemStart_ = false;
+    info_->delta_ = 10.0f;
+    pattern_->HandleScroll(-5.0f, SCROLL_FROM_UPDATE, NestedState::CHILD_CHECK_OVER_SCROLL, 0.0f);
+    EXPECT_DOUBLE_EQ(pattern_->GetTotalOffset(), committedOffset);
+    EXPECT_FLOAT_EQ(info_->delta_, 15.0f);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
+}
+
+/**
  * @tc.name: LazyforeachReloaded01
  * @tc.desc: test lazyforeach reloaded func
  * @tc.type: FUNC
