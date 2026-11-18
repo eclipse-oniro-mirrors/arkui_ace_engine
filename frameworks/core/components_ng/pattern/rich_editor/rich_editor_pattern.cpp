@@ -1360,7 +1360,7 @@ bool RichEditorPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& di
     CHECK_NULL_RETURN(!config.skipMeasure && !dirty->SkipMeasureContent(), false);
     auto originalFrameRect = frameRect_;
     frameRect_ = dirty->GetGeometryNode()->GetFrameRect();
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto layoutAlgorithm = DynamicCast<RichEditorLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(layoutAlgorithm, false);
@@ -3730,7 +3730,7 @@ void RichEditorPattern::UpdateImageAttribute(RefPtr<FrameNode>& imageNode, const
     CHECK_NULL_VOID(imageNode);
     auto node = DynamicCast<ImageSpanNode>(imageNode);
     CHECK_NULL_VOID(node);
-    auto imageSpanItem = DynamicCast<ImageSpanItem>(node->GetSpanItem());
+    auto imageSpanItem = node->GetSpanItem();
     CHECK_NULL_VOID(imageSpanItem);
     auto& imageAttribute = imageSpanItem->options.imageAttribute;
     IF_TRUE(!imageAttribute.has_value(), imageAttribute = imageStyle);
@@ -17711,7 +17711,7 @@ void RichEditorPattern::ApplyInnerBorderColor()
 
 void RichEditorPattern::UltralimitShake()
 {
-    auto counterDec = DynamicCast<CounterDecorator>(counterDecorator_);
+    auto counterDec = counterDecorator_;
     CHECK_NULL_VOID(counterDec);
     counterDec->UltralimitShake();
 }
