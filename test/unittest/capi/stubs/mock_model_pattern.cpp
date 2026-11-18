@@ -143,7 +143,7 @@ void ModelPattern::ToJsonValue(std::unique_ptr<JsonValue>& json, const Inspector
     
     CHECK_NULL_VOID(host);
     
-    auto mainProperty = DynamicCast<ModelPaintProperty>(host->GetPaintProperty<ModelPaintProperty>());
+    auto mainProperty = host->GetPaintProperty<ModelPaintProperty>();
     
     CHECK_NULL_VOID(mainProperty);
     
