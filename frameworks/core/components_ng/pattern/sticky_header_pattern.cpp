@@ -231,7 +231,8 @@ void StickyHeaderPattern::SetSticky(StickyStyle style)
     host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
 }
 
-void StickyHeaderPattern::SetEdgeGeometry(const OffsetF& origin, float totalSize, std::optional<float> measuredTotalSize)
+void StickyHeaderPattern::SetEdgeGeometry(
+    const OffsetF& origin, float totalSize, std::optional<float> measuredTotalSize)
 {
     if (!edgeState_.enabled) {
         return;
