@@ -57,6 +57,7 @@ public:
     }
 
     void SetCurrentIndex(int32_t index);
+    void SyncTabItemStyle(int32_t index);
     void InitCurrentIndex(int32_t index);
     int32_t GetCurrentIndex() const
     {
