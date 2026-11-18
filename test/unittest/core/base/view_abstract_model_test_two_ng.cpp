@@ -556,7 +556,7 @@ HWTEST_F(ViewAbstractModelTestTwoNg, SetAccessibilityStateDescription002, TestSi
  */
 HWTEST_F(ViewAbstractModelTestTwoNg, SetToolbarBuilder001, TestSize.Level1)
 {
-    auto pipeline = AceType::DynamicCast<PipelineContext>(MockPipelineContext::GetCurrent());
+    RefPtr<PipelineContext> pipeline = MockPipelineContext::GetCurrent();
     auto rootNode = pipeline->rootNode_;
     ASSERT_NE(rootNode, nullptr);
 
@@ -586,7 +586,7 @@ HWTEST_F(ViewAbstractModelTestTwoNg, SetToolbarBuilder001, TestSize.Level1)
  */
 HWTEST_F(ViewAbstractModelTestTwoNg, SetToolbarBuilder002, TestSize.Level1)
 {
-    auto pipeline = AceType::DynamicCast<PipelineContext>(MockPipelineContext::GetCurrent());
+    RefPtr<PipelineContext> pipeline = MockPipelineContext::GetCurrent();
     auto rootNode = pipeline->rootNode_;
     ASSERT_NE(rootNode, nullptr);
 

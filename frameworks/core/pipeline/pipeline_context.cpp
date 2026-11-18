@@ -1127,7 +1127,7 @@ void PipelineContext::PushPage(const RefPtr<PageComponent>& pageComponent, const
     }
     buildingFirstPage_ = isFirstPage_;
     isFirstPage_ = false;
-    if (PageTransitionComponent::HasTransitionComponent(AceType::DynamicCast<Component>(pageComponent))) {
+    if (PageTransitionComponent::HasTransitionComponent(pageComponent)) {
         stageElement->PushPage(pageComponent);
     } else {
         RefPtr<DisplayComponent> display = AceType::MakeRefPtr<DisplayComponent>(pageComponent);
@@ -1316,7 +1316,7 @@ void PipelineContext::ReplacePage(const RefPtr<PageComponent>& pageComponent, co
             return;
         }
     }
-    if (PageTransitionComponent::HasTransitionComponent(AceType::DynamicCast<Component>(pageComponent))) {
+    if (PageTransitionComponent::HasTransitionComponent(pageComponent)) {
         stageElement->Replace(pageComponent, listener);
     } else {
         RefPtr<DisplayComponent> display = AceType::MakeRefPtr<DisplayComponent>(pageComponent);

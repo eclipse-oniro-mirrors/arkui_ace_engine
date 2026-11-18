@@ -2380,7 +2380,7 @@ void FrameNode::NotifyColorModeChange(uint32_t colorMode, bool recursive)
         pattern_->OnColorModeChange(colorMode);
     }
 
-    auto frameNode = AceType::DynamicCast<FrameNode>(this);
+    auto frameNode = this;
     if (frameNode && frameNode->GetOverlayNode()) {
         frameNode->GetOverlayNode()->NotifyColorModeChange(colorMode);
     }
@@ -2740,7 +2740,7 @@ void FrameNode::SwapDirtyLayoutWrapperOnMainThread(const RefPtr<LayoutWrapper>& 
     layoutProperty_->CleanDirty();
     DirtySwapConfig config { frameSizeChange, frameOffsetChange, contentSizeChange, contentOffsetChange };
     // check if need to paint content.
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_VOID(layoutAlgorithmWrapper);
     config.skipMeasure = layoutAlgorithmWrapper->SkipMeasure() || dirty->SkipMeasureContent();
     config.skipLayout = layoutAlgorithmWrapper->SkipLayout();
@@ -7263,7 +7263,7 @@ bool FrameNode::OnLayoutFinish(bool& needSyncRsNode, DirtySwapConfig& config)
         .contentSizeChange = contentSizeChange,
         .contentOffsetChange = contentOffsetChange };
     // check if need to paint content.
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(layoutAlgorithm_);
+    auto layoutAlgorithmWrapper = layoutAlgorithm_;
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     config.skipMeasure = layoutAlgorithmWrapper->SkipMeasure();
     config.skipLayout = layoutAlgorithmWrapper->SkipLayout();
@@ -9909,7 +9909,12 @@ void FrameNode::FireLpxUpdateCallbacks()
 template<typename T>
 ACE_FORCE_EXPORT RefPtr<T> FrameNode::GetAccessibilityProperty() const
 {
-    return DynamicCast<T>(const_cast<FrameNode*>(this)->GetOrCreateAccessibilityProperty());
+    const auto& accessibilityProperty = const_cast<FrameNode*>(this)->GetOrCreateAccessibilityProperty();
+    if constexpr (std::is_same_v<AccessibilityProperty*, T*>) {
+        return accessibilityProperty;
+    } else {
+        return DynamicCast<T>(accessibilityProperty);
+    }
 }
 
 // Explicit template instantiation for common use cases

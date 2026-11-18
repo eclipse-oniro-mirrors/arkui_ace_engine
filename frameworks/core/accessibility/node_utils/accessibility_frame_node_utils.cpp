@@ -506,7 +506,7 @@ void AccessibilityFrameNodeUtils::GetLastestPageNodes(
 {
     CHECK_NULL_VOID(node);
     auto context = node->GetContextRefPtr();
-    auto ngPipeline = AceType::DynamicCast<PipelineContext>(context);
+    auto ngPipeline = context;
     CHECK_NULL_VOID(ngPipeline);
     auto stageManager = ngPipeline->GetStageManager();
     CHECK_NULL_VOID(stageManager);

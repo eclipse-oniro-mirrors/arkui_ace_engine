@@ -5067,7 +5067,7 @@ void JsAccessibilityManager::DumpSpecificPropertySearchTest(const std::vector<st
     }
     auto pipeline = GetPipelineByWindowId(windowId);
     CHECK_NULL_VOID(pipeline);
-    auto ngPipeline = AceType::DynamicCast<NG::PipelineContext>(pipeline);
+    auto ngPipeline = pipeline;
     CHECK_NULL_VOID(ngPipeline);
 
     std::list<AccessibilityElementInfo> infos;
@@ -5781,7 +5781,7 @@ bool JsAccessibilityManager::DumpElementInfosIfNeed(const DumpInfoArgument& argu
     AccessibilityElementInfo nodeInfo;
     auto pipeline = GetPipelineByWindowId(windowId);
     CHECK_NULL_RETURN(pipeline, false);
-    auto ngPipeline = AceType::DynamicCast<NG::PipelineContext>(pipeline);
+    auto ngPipeline = pipeline;
     CHECK_NULL_RETURN(ngPipeline, false);
 
     if (mode != -1) {
@@ -7871,7 +7871,7 @@ void JsAccessibilityManager::ActAccessibilityActionPreHandle(Accessibility::Acti
     // text update event not send while in SET_TEXT action
     CHECK_NE_VOID(action, ActionType::ACCESSIBILITY_ACTION_SET_TEXT);
     CHECK_NULL_VOID(frameNode);
-    auto ngPipeline = AceType::DynamicCast<NG::PipelineContext>(frameNode->GetContextRefPtr());
+    auto ngPipeline = frameNode->GetContextRefPtr();
     CHECK_NULL_VOID(ngPipeline);
 
     std::vector<AccessibilityEventType> events = {
@@ -10484,7 +10484,7 @@ void JsAccessibilityManager::SetFocusMoveResultWithNode(
     auto host = hostNode.Upgrade();
     if (host) {
         auto context = host->GetContextRefPtr();
-        auto ngPipeline = AceType::DynamicCast<NG::PipelineContext>(context);
+        auto ngPipeline = context;
         CommonProperty commonProperty;
         GenerateCommonProperty(ngPipeline, commonProperty, ngPipeline, host);
         UpdateAccessibilityElementInfo(host, commonProperty, nodeInfo, ngPipeline);
@@ -14475,8 +14475,7 @@ bool JsAccessibilityManager::BindExportTree(NG::FrameNode* owner, int64_t bindId
         state.state = CmpBindingState::State::WAIT_TREE_ID;
     }
     // Node registry entry (single exportedRoot key).
-    CmpAccessibility::CmpAccessibilityRegistry::RegisterSubAM(exportedRoot,
-        OHOS::Ace::AceType::DynamicCast<OHOS::Ace::AceType>(subAM));
+    CmpAccessibility::CmpAccessibilityRegistry::RegisterSubAM(exportedRoot, subAM);
     TAG_LOGI(AceLogTag::ACE_ACCESSIBILITY,
         "BindExportTree: bindId=%{public}" PRId64 ", owner=%{public}d, exportedRoot=%{public}d",
         bindId, owner->GetId(), exportedRoot->GetId());

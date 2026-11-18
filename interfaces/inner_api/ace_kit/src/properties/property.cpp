@@ -38,7 +38,7 @@ void Property::CleanDirty()
 {
     auto* node = GetNodePtr(host_);
     CHECK_NULL_VOID(node);
-    auto paintProp = node->GetPaintProperty<NG::Property>();
+    auto paintProp = node->GetPaintProperty<NG::PaintProperty>();
     paintProp->CleanDirty();
     auto layoutProp = node->GetLayoutProperty();
     layoutProp->CleanDirty();
@@ -61,7 +61,7 @@ void Property::UpdatePaintFlag(NG::PropertyChangeFlag propertyChangeFlag)
 {
     auto* node = GetNodePtr(host_);
     CHECK_NULL_VOID(node);
-    auto paintProp = node->GetPaintProperty<NG::Property>();
+    auto paintProp = node->GetPaintProperty<NG::PaintProperty>();
     paintProp->UpdatePropertyChangeFlag(propertyChangeFlag);
 }
 

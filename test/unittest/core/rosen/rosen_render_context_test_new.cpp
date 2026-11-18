@@ -1794,7 +1794,7 @@ HWTEST_F(RosenRenderContextTest, RosenRenderContextTestNew051, TestSize.Level1)
     overlay.align = Alignment::TOP_LEFT;
     overlay.x = Dimension(10.0_px);
     overlay.y = Dimension(5.0_px);
-    RefPtr<RenderContext> renderContext = AceType::DynamicCast<RenderContext>(rosenRenderContext);
+    RefPtr<RenderContext> renderContext = rosenRenderContext;
     ASSERT_NE(renderContext, nullptr);
     renderContext->UpdateOverlayText(overlay);
     ASSERT_NE(rosenRenderContext->overlayTextModifier_, nullptr);

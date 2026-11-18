@@ -43,7 +43,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableAxisByFrameNodeTest, TestSize.Le
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     OnAxisEventFunc onAxisEventFunc = [](AxisInfo& info) {};
     ViewAbstract::SetOnAxisEvent(AceType::RawPtr(node), std::move(onAxisEventFunc));
@@ -76,7 +76,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableHoverByFrameNodeTest, TestSize.L
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     OnHoverFunc onHoverEventFunc = [](bool isHover, HoverInfo& info) {};
     ViewAbstract::SetOnHover(AceType::RawPtr(node), std::move(onHoverEventFunc));
@@ -109,7 +109,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableKeyByFrameNodeTest, TestSize.Lev
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     OnKeyConsumeFunc onKeyCallback = [](KeyEventInfo& info) -> bool { return false; };
     ViewAbstract::SetOnKeyEvent(AceType::RawPtr(node), std::move(onKeyCallback));
@@ -143,7 +143,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableFocusByFrameNodeTest, TestSize.L
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     OnFocusFunc onFocusCallback = []() {};
     ViewAbstract::SetOnFocus(AceType::RawPtr(node), std::move(onFocusCallback));
@@ -177,7 +177,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableBlurByFrameNodeTest, TestSize.Le
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     OnBlurFunc onBlurCallback = []() {};
     ViewAbstract::SetOnBlur(AceType::RawPtr(node), std::move(onBlurCallback));
@@ -211,7 +211,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableOnAppearByFrameNodeTest, TestSiz
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     std::function<void()> onAppearCallback = []() {};
     ViewAbstract::SetOnAppear(AceType::RawPtr(node), std::move(onAppearCallback));
@@ -245,7 +245,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableOnDisAppearByFrameNodeTest, Test
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     std::function<void()> onDiaAppearCallback = []() {};
     ViewAbstract::SetOnDisappear(AceType::RawPtr(node), std::move(onDiaAppearCallback));
@@ -279,7 +279,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableOnAreaChangeByFrameNodeTest, Tes
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     std::function<void(const RectF& oldRect, const OffsetF& oldOrigin, const RectF& rect, const OffsetF& origin)>
         onAreaChangeCallback =
@@ -346,7 +346,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractSetOnGestureJudgeBeiginByFrameNodeTest,
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     GestureJudgeFunc onGestureJudgeCallback = [](const RefPtr<GestureInfo>& gestureInfo,
                                                   const std::shared_ptr<BaseGestureEvent>& info) {
@@ -376,7 +376,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractSetOnSizeChangeByFrameNodeTest, TestSiz
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     std::function<void(const RectF& oldRect, const RectF& rect)> onSizeChangeCallback = [](const RectF& oldRect,
                                                                                             const RectF& rect) {};
@@ -531,7 +531,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableOnKeyEventDispatchTest, TestSize
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     auto focusHub = node->GetOrCreateFocusHub();
     auto& callback = focusHub->focusCallbackEvents_->onKeyEventDispatchCallback_;
@@ -594,7 +594,7 @@ HWTEST_F(ViewAbstractTestNg, DisableOnCrownEvent001, TestSize.Level1)
     auto topFrameNodeOne = ViewStackProcessor::GetInstance()->GetMainElementNode();
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
 
     /**
